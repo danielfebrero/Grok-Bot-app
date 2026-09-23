@@ -1,0 +1,2700 @@
+{
+  "generated_at": "2026-09-23T11:55:40.118745+00:00",
+  "agent": "GrokFather",
+  "note": "Exhaustive tool NAME inventory for audit. Full MCP inputSchemas omitted (too large); re-fetch via GetDynamicTools(namespace, toolName).",
+  "counts": {
+    "builtin_session_tools": 16,
+    "cursor": 36,
+    "user-X": 41,
+    "user-Github": 45,
+    "cursor-github": 70,
+    "total_named_tools": 208
+  },
+  "builtin_session_tools": [
+    {
+      "name": "Shell",
+      "description": "Run shell commands on the box"
+    },
+    {
+      "name": "Read",
+      "description": "Read files (text/image/pdf)"
+    },
+    {
+      "name": "Write",
+      "description": "Create/overwrite files"
+    },
+    {
+      "name": "Edit",
+      "description": "In-place file edits"
+    },
+    {
+      "name": "Glob",
+      "description": "Find files by pattern"
+    },
+    {
+      "name": "Grep",
+      "description": "Search file contents"
+    },
+    {
+      "name": "SendToUser",
+      "description": "User-visible chat (text/attach/widget/secret/credential)"
+    },
+    {
+      "name": "ReactToMessage",
+      "description": "Emoji reaction on user message"
+    },
+    {
+      "name": "GetCredentialProviderStatus",
+      "description": "1Password connect health (no secrets)"
+    },
+    {
+      "name": "ListSections",
+      "description": "Sidebar sections for CreateAgent"
+    },
+    {
+      "name": "RecallMemory",
+      "description": "Search durable memory"
+    },
+    {
+      "name": "update_state",
+      "description": "Write memory/routines/skills/profile/settings/avatar/channels"
+    },
+    {
+      "name": "Screenshot",
+      "description": "Read-only box desktop screenshot"
+    },
+    {
+      "name": "GetDynamicTools",
+      "description": "Discover MCP/native dynamic tool schemas"
+    },
+    {
+      "name": "CallDynamicTool",
+      "description": "Invoke a dynamic/MCP/native tool"
+    },
+    {
+      "name": "Task",
+      "description": "Spawn executor/computerUse/video subagents"
+    }
+  ],
+  "dynamic_namespaces": [
+    {
+      "namespace": "cursor",
+      "status": "ready",
+      "layer": "native_dynamic",
+      "tools": [
+        {
+          "name": "AddMcpServer",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "AuthenticateMcpServer",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "AwaitShell",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "CheckSubagent",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "create_bot_share_json",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "CreateAgent",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "CreateChannel",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "download_file",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "DraftExternalMessage",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "GenerateImage",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "GetMcpServerStatus",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "GetPlugin",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "InstallPlugin",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "ListCredentials",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "MessageSubagent",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "ReadTranscript",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "RemoveMcpAccount",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "RenameMcpAccount",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "request_1password_connect",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "request_box_help",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "request_user_form",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "RestartMcpServers",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "SearchPlugins",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "SendFeedback",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "SendToAgent",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "SetMcpInstructions",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "StopSubagent",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "Task",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "TodoWrite",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "UninstallMcpServer",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "UninstallPlugin",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "UpdateAgent",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "UpdateChannel",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "upload_file",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "WebFetch",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        },
+        {
+          "name": "WebSearch",
+          "namespace": "cursor",
+          "layer": "native_dynamic",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "namespace": "user-X",
+      "status": "ready",
+      "layer": "mcp",
+      "tools": [
+        {
+          "name": "add_conversation_keys",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "create_activity_subscription",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "create_users_bookmark",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "create_users_bookmark_folder",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "create_webhooks",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "delete_activity_subscription",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "delete_users_bookmark",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "delete_webhooks",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_activity_subscriptions",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_chat_conversation",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_chat_conversation_events",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_chat_conversations",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_news",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_posts_by_id",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_posts_by_ids",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_posts_counts_recent",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_posts_liking_users",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_posts_quoted_posts",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_posts_reposted_by",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_trends_by_woeid",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_usage_credits",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_bookmark_folders",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_bookmarks",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_bookmarks_by_folder_id",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_by_id",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_by_username",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_by_usernames",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_me",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_mentions",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_posts",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_public_key",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_public_keys",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_users_timeline",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_webhooks",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "mark_chat_conversation_read",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "search_news",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "search_posts_all",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "search_users",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "send_chat_message",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "send_chat_typing_indicator",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "update_activity_subscription",
+          "namespace": "user-X",
+          "layer": "mcp",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "namespace": "user-Github",
+      "status": "ready",
+      "layer": "mcp",
+      "tools": [
+        {
+          "name": "add_comment_to_pending_review",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "add_issue_comment",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "add_reply_to_pull_request_comment",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "create_branch",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "create_or_update_file",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "create_pull_request",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "create_repository",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "delete_file",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "fork_repository",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_commit",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_file_contents",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_label",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_latest_release",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_me",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_release_by_tag",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_tag",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_team_members",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "get_teams",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "issue_read",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "issue_write",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "list_branches",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "list_commits",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "list_issue_fields",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "list_issue_types",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "list_issues",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "list_pull_requests",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "list_releases",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "list_repository_collaborators",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "list_tags",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "merge_pull_request",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "pull_request_read",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "pull_request_review_write",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "push_files",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "request_copilot_review",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "run_secret_scanning",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "search_code",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "search_commits",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "search_issues",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "search_pull_requests",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "search_repositories",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "search_users",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "sub_issue_write",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "update_issue_comment",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "update_pull_request",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        },
+        {
+          "name": "update_pull_request_branch",
+          "namespace": "user-Github",
+          "layer": "mcp",
+          "status": "ready"
+        }
+      ]
+    },
+    {
+      "namespace": "cursor-github",
+      "status": "needsAuth",
+      "layer": "mcp",
+      "tools": [
+        {
+          "name": "add_comment_to_pending_review",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "add_discussion_comment",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "add_issue_comment",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "add_sub_issue",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "create_branch",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "create_issue",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "create_label",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "create_pull_request",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "create_pull_request_review",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "delete_discussion_comment",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "delete_label",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "delete_pending_pull_request_review",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_commit",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_commit_combined_status",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_discussion",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_discussion_comments",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_file_contents",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_git_tree",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_issue",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_job",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_job_logs",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_label",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_latest_release",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_me",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_pull_request",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_pull_request_diff",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_release_by_tag",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_repository",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_tag",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_workflow",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "get_workflow_run",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_branches",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_check_runs_for_ref",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_commits",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_discussion_categories",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_discussions",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_issue_comments",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_issues",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_labels",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_pull_request_comments",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_pull_request_files",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_pull_request_review_comments",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_pull_request_reviews",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_pull_requests",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_releases",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_repository_collaborators",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_sub_issues",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_tags",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_workflow_run_jobs",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_workflow_runs",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "list_workflows",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "mark_discussion_comment_as_answer",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "merge_pull_request",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "remove_sub_issue",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "reply_to_pull_request_review_comment",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "reprioritize_sub_issue",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "search_code",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "search_commits",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "search_issues",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "search_orgs",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "search_pull_requests",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "search_repositories",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "search_users",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "set_pull_request_draft",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "submit_pending_pull_request_review",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "update_discussion_comment",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "update_issue",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "update_label",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "update_pull_request",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        },
+        {
+          "name": "update_pull_request_branch",
+          "namespace": "cursor-github",
+          "layer": "mcp",
+          "status": "needsAuth"
+        }
+      ]
+    }
+  ],
+  "task_subagent_types": [
+    "executor",
+    "computerUse",
+    "videoReview",
+    "watchVideo"
+  ],
+  "non_tool_attack_surfaces_related": [
+    "exec-daemon / window-router / noVNC (SPACE-2026-001..003)",
+    "sand-host-bundle S3 digest-only publish path",
+    "cursor_untrusted_data_1337 fencing",
+    "Auto-review gate on Shell/MCP/computerUse/routines",
+    "shared box FS + browser logins across agents"
+  ],
+  "flat": [
+    {
+      "id": "builtin.Shell",
+      "name": "Shell",
+      "description": "Run shell commands on the box"
+    },
+    {
+      "id": "builtin.Read",
+      "name": "Read",
+      "description": "Read files (text/image/pdf)"
+    },
+    {
+      "id": "builtin.Write",
+      "name": "Write",
+      "description": "Create/overwrite files"
+    },
+    {
+      "id": "builtin.Edit",
+      "name": "Edit",
+      "description": "In-place file edits"
+    },
+    {
+      "id": "builtin.Glob",
+      "name": "Glob",
+      "description": "Find files by pattern"
+    },
+    {
+      "id": "builtin.Grep",
+      "name": "Grep",
+      "description": "Search file contents"
+    },
+    {
+      "id": "builtin.SendToUser",
+      "name": "SendToUser",
+      "description": "User-visible chat (text/attach/widget/secret/credential)"
+    },
+    {
+      "id": "builtin.ReactToMessage",
+      "name": "ReactToMessage",
+      "description": "Emoji reaction on user message"
+    },
+    {
+      "id": "builtin.GetCredentialProviderStatus",
+      "name": "GetCredentialProviderStatus",
+      "description": "1Password connect health (no secrets)"
+    },
+    {
+      "id": "builtin.ListSections",
+      "name": "ListSections",
+      "description": "Sidebar sections for CreateAgent"
+    },
+    {
+      "id": "builtin.RecallMemory",
+      "name": "RecallMemory",
+      "description": "Search durable memory"
+    },
+    {
+      "id": "builtin.update_state",
+      "name": "update_state",
+      "description": "Write memory/routines/skills/profile/settings/avatar/channels"
+    },
+    {
+      "id": "builtin.Screenshot",
+      "name": "Screenshot",
+      "description": "Read-only box desktop screenshot"
+    },
+    {
+      "id": "builtin.GetDynamicTools",
+      "name": "GetDynamicTools",
+      "description": "Discover MCP/native dynamic tool schemas"
+    },
+    {
+      "id": "builtin.CallDynamicTool",
+      "name": "CallDynamicTool",
+      "description": "Invoke a dynamic/MCP/native tool"
+    },
+    {
+      "id": "builtin.Task",
+      "name": "Task",
+      "description": "Spawn executor/computerUse/video subagents"
+    },
+    {
+      "id": "cursor.AddMcpServer",
+      "name": "AddMcpServer",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.AuthenticateMcpServer",
+      "name": "AuthenticateMcpServer",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.AwaitShell",
+      "name": "AwaitShell",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.CheckSubagent",
+      "name": "CheckSubagent",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.create_bot_share_json",
+      "name": "create_bot_share_json",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.CreateAgent",
+      "name": "CreateAgent",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.CreateChannel",
+      "name": "CreateChannel",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.download_file",
+      "name": "download_file",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.DraftExternalMessage",
+      "name": "DraftExternalMessage",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.GenerateImage",
+      "name": "GenerateImage",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.GetMcpServerStatus",
+      "name": "GetMcpServerStatus",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.GetPlugin",
+      "name": "GetPlugin",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.InstallPlugin",
+      "name": "InstallPlugin",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.ListCredentials",
+      "name": "ListCredentials",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.MessageSubagent",
+      "name": "MessageSubagent",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.ReadTranscript",
+      "name": "ReadTranscript",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.RemoveMcpAccount",
+      "name": "RemoveMcpAccount",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.RenameMcpAccount",
+      "name": "RenameMcpAccount",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.request_1password_connect",
+      "name": "request_1password_connect",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.request_box_help",
+      "name": "request_box_help",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.request_user_form",
+      "name": "request_user_form",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.RestartMcpServers",
+      "name": "RestartMcpServers",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.SearchPlugins",
+      "name": "SearchPlugins",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.SendFeedback",
+      "name": "SendFeedback",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.SendToAgent",
+      "name": "SendToAgent",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.SetMcpInstructions",
+      "name": "SetMcpInstructions",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.StopSubagent",
+      "name": "StopSubagent",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.Task",
+      "name": "Task",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.TodoWrite",
+      "name": "TodoWrite",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.UninstallMcpServer",
+      "name": "UninstallMcpServer",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.UninstallPlugin",
+      "name": "UninstallPlugin",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.UpdateAgent",
+      "name": "UpdateAgent",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.UpdateChannel",
+      "name": "UpdateChannel",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.upload_file",
+      "name": "upload_file",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.WebFetch",
+      "name": "WebFetch",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "cursor.WebSearch",
+      "name": "WebSearch",
+      "namespace": "cursor",
+      "layer": "native_dynamic",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.add_conversation_keys",
+      "name": "add_conversation_keys",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.create_activity_subscription",
+      "name": "create_activity_subscription",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.create_users_bookmark",
+      "name": "create_users_bookmark",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.create_users_bookmark_folder",
+      "name": "create_users_bookmark_folder",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.create_webhooks",
+      "name": "create_webhooks",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.delete_activity_subscription",
+      "name": "delete_activity_subscription",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.delete_users_bookmark",
+      "name": "delete_users_bookmark",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.delete_webhooks",
+      "name": "delete_webhooks",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_activity_subscriptions",
+      "name": "get_activity_subscriptions",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_chat_conversation",
+      "name": "get_chat_conversation",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_chat_conversation_events",
+      "name": "get_chat_conversation_events",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_chat_conversations",
+      "name": "get_chat_conversations",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_news",
+      "name": "get_news",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_posts_by_id",
+      "name": "get_posts_by_id",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_posts_by_ids",
+      "name": "get_posts_by_ids",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_posts_counts_recent",
+      "name": "get_posts_counts_recent",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_posts_liking_users",
+      "name": "get_posts_liking_users",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_posts_quoted_posts",
+      "name": "get_posts_quoted_posts",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_posts_reposted_by",
+      "name": "get_posts_reposted_by",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_trends_by_woeid",
+      "name": "get_trends_by_woeid",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_usage_credits",
+      "name": "get_usage_credits",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_bookmark_folders",
+      "name": "get_users_bookmark_folders",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_bookmarks",
+      "name": "get_users_bookmarks",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_bookmarks_by_folder_id",
+      "name": "get_users_bookmarks_by_folder_id",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_by_id",
+      "name": "get_users_by_id",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_by_username",
+      "name": "get_users_by_username",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_by_usernames",
+      "name": "get_users_by_usernames",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_me",
+      "name": "get_users_me",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_mentions",
+      "name": "get_users_mentions",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_posts",
+      "name": "get_users_posts",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_public_key",
+      "name": "get_users_public_key",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_public_keys",
+      "name": "get_users_public_keys",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_users_timeline",
+      "name": "get_users_timeline",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.get_webhooks",
+      "name": "get_webhooks",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.mark_chat_conversation_read",
+      "name": "mark_chat_conversation_read",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.search_news",
+      "name": "search_news",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.search_posts_all",
+      "name": "search_posts_all",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.search_users",
+      "name": "search_users",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.send_chat_message",
+      "name": "send_chat_message",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.send_chat_typing_indicator",
+      "name": "send_chat_typing_indicator",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-X.update_activity_subscription",
+      "name": "update_activity_subscription",
+      "namespace": "user-X",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.add_comment_to_pending_review",
+      "name": "add_comment_to_pending_review",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.add_issue_comment",
+      "name": "add_issue_comment",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.add_reply_to_pull_request_comment",
+      "name": "add_reply_to_pull_request_comment",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.create_branch",
+      "name": "create_branch",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.create_or_update_file",
+      "name": "create_or_update_file",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.create_pull_request",
+      "name": "create_pull_request",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.create_repository",
+      "name": "create_repository",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.delete_file",
+      "name": "delete_file",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.fork_repository",
+      "name": "fork_repository",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.get_commit",
+      "name": "get_commit",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.get_file_contents",
+      "name": "get_file_contents",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.get_label",
+      "name": "get_label",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.get_latest_release",
+      "name": "get_latest_release",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.get_me",
+      "name": "get_me",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.get_release_by_tag",
+      "name": "get_release_by_tag",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.get_tag",
+      "name": "get_tag",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.get_team_members",
+      "name": "get_team_members",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.get_teams",
+      "name": "get_teams",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.issue_read",
+      "name": "issue_read",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.issue_write",
+      "name": "issue_write",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.list_branches",
+      "name": "list_branches",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.list_commits",
+      "name": "list_commits",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.list_issue_fields",
+      "name": "list_issue_fields",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.list_issue_types",
+      "name": "list_issue_types",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.list_issues",
+      "name": "list_issues",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.list_pull_requests",
+      "name": "list_pull_requests",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.list_releases",
+      "name": "list_releases",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.list_repository_collaborators",
+      "name": "list_repository_collaborators",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.list_tags",
+      "name": "list_tags",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.merge_pull_request",
+      "name": "merge_pull_request",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.pull_request_read",
+      "name": "pull_request_read",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.pull_request_review_write",
+      "name": "pull_request_review_write",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.push_files",
+      "name": "push_files",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.request_copilot_review",
+      "name": "request_copilot_review",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.run_secret_scanning",
+      "name": "run_secret_scanning",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.search_code",
+      "name": "search_code",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.search_commits",
+      "name": "search_commits",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.search_issues",
+      "name": "search_issues",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.search_pull_requests",
+      "name": "search_pull_requests",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.search_repositories",
+      "name": "search_repositories",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.search_users",
+      "name": "search_users",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.sub_issue_write",
+      "name": "sub_issue_write",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.update_issue_comment",
+      "name": "update_issue_comment",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.update_pull_request",
+      "name": "update_pull_request",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "user-Github.update_pull_request_branch",
+      "name": "update_pull_request_branch",
+      "namespace": "user-Github",
+      "layer": "mcp",
+      "status": "ready"
+    },
+    {
+      "id": "cursor-github.add_comment_to_pending_review",
+      "name": "add_comment_to_pending_review",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.add_discussion_comment",
+      "name": "add_discussion_comment",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.add_issue_comment",
+      "name": "add_issue_comment",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.add_sub_issue",
+      "name": "add_sub_issue",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.create_branch",
+      "name": "create_branch",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.create_issue",
+      "name": "create_issue",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.create_label",
+      "name": "create_label",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.create_pull_request",
+      "name": "create_pull_request",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.create_pull_request_review",
+      "name": "create_pull_request_review",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.delete_discussion_comment",
+      "name": "delete_discussion_comment",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.delete_label",
+      "name": "delete_label",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.delete_pending_pull_request_review",
+      "name": "delete_pending_pull_request_review",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_commit",
+      "name": "get_commit",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_commit_combined_status",
+      "name": "get_commit_combined_status",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_discussion",
+      "name": "get_discussion",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_discussion_comments",
+      "name": "get_discussion_comments",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_file_contents",
+      "name": "get_file_contents",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_git_tree",
+      "name": "get_git_tree",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_issue",
+      "name": "get_issue",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_job",
+      "name": "get_job",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_job_logs",
+      "name": "get_job_logs",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_label",
+      "name": "get_label",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_latest_release",
+      "name": "get_latest_release",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_me",
+      "name": "get_me",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_pull_request",
+      "name": "get_pull_request",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_pull_request_diff",
+      "name": "get_pull_request_diff",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_release_by_tag",
+      "name": "get_release_by_tag",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_repository",
+      "name": "get_repository",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_tag",
+      "name": "get_tag",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_workflow",
+      "name": "get_workflow",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.get_workflow_run",
+      "name": "get_workflow_run",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_branches",
+      "name": "list_branches",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_check_runs_for_ref",
+      "name": "list_check_runs_for_ref",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_commits",
+      "name": "list_commits",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_discussion_categories",
+      "name": "list_discussion_categories",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_discussions",
+      "name": "list_discussions",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_issue_comments",
+      "name": "list_issue_comments",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_issues",
+      "name": "list_issues",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_labels",
+      "name": "list_labels",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_pull_request_comments",
+      "name": "list_pull_request_comments",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_pull_request_files",
+      "name": "list_pull_request_files",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_pull_request_review_comments",
+      "name": "list_pull_request_review_comments",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_pull_request_reviews",
+      "name": "list_pull_request_reviews",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_pull_requests",
+      "name": "list_pull_requests",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_releases",
+      "name": "list_releases",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_repository_collaborators",
+      "name": "list_repository_collaborators",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_sub_issues",
+      "name": "list_sub_issues",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_tags",
+      "name": "list_tags",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_workflow_run_jobs",
+      "name": "list_workflow_run_jobs",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_workflow_runs",
+      "name": "list_workflow_runs",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.list_workflows",
+      "name": "list_workflows",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.mark_discussion_comment_as_answer",
+      "name": "mark_discussion_comment_as_answer",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.merge_pull_request",
+      "name": "merge_pull_request",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.remove_sub_issue",
+      "name": "remove_sub_issue",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.reply_to_pull_request_review_comment",
+      "name": "reply_to_pull_request_review_comment",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.reprioritize_sub_issue",
+      "name": "reprioritize_sub_issue",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.search_code",
+      "name": "search_code",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.search_commits",
+      "name": "search_commits",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.search_issues",
+      "name": "search_issues",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.search_orgs",
+      "name": "search_orgs",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.search_pull_requests",
+      "name": "search_pull_requests",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.search_repositories",
+      "name": "search_repositories",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.search_users",
+      "name": "search_users",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.set_pull_request_draft",
+      "name": "set_pull_request_draft",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.submit_pending_pull_request_review",
+      "name": "submit_pending_pull_request_review",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.update_discussion_comment",
+      "name": "update_discussion_comment",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.update_issue",
+      "name": "update_issue",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.update_label",
+      "name": "update_label",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.update_pull_request",
+      "name": "update_pull_request",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    },
+    {
+      "id": "cursor-github.update_pull_request_branch",
+      "name": "update_pull_request_branch",
+      "namespace": "cursor-github",
+      "layer": "mcp",
+      "status": "needsAuth"
+    }
+  ]
+}
