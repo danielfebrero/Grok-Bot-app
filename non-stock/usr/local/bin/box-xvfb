@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Removing X lock/socket paths does not close a live server's abstract socket. https://man7.org/linux/man-pages/man7/unix.7.html
+set -uo pipefail
+
+display="${1:-}"
+num="${display#:}"
+num="${num%%.*}"
+
+socket_path="/tmp/.X11-unix/X${num}"
+
+display_owner_pids() {
+	local n="$1"
+	if command -v ss >/dev/null 2>&1; then
+		ss -lpxH "src = @/tmp/.X11-unix/X${n}" 2>/dev/null \
+			| grep -oE 'pid=[0-9]+' | cut -d= -f2 || true
+	fi
+	if command -v fuser >/dev/null 2>&1; then
+		fuser "/tmp/.X11-unix/X${n}" 2>/dev/null \
+			| tr ' ' '\n' | grep -E '^[0-9]+$' || true
+	fi
+}
+
+xvfb_for_display() {
+	local pid="$1" n="$2" cmd
+	[ "${pid}" = "$$" ] && return 1
+	cmd="$( (tr '\0' '\n' <"/proc/${pid}/cmdline") 2>/dev/null || true)"
+	[ -n "${cmd}" ] || return 1
+	printf '%s\n' "${cmd}" | grep -q 'Xvfb' || return 1
+	printf '%s\n' "${cmd}" | grep -Eq "^:${n}([.][0-9]+)?$"
+}
+
+reap_targets() {
+	local n="$1" path pid candidates=""
+	candidates="$(
+		{
+			display_owner_pids "${n}"
+			for path in /proc/[0-9]*/cmdline; do
+				[ -r "${path}" ] || continue
+				pid="${path%/cmdline}"
+				printf '%s\n' "${pid##*/}"
+			done
+		} | sort -un
+	)"
+	for pid in ${candidates}; do
+		xvfb_for_display "${pid}" "${n}" && printf '%s\n' "${pid}"
+	done
+}
+
+display_bound() {
+	local n="$1"
+	if command -v ss >/dev/null 2>&1 \
+		&& [ -n "$(ss -lxH "src = @/tmp/.X11-unix/X${n}" 2>/dev/null)" ]; then
+		return 0
+	fi
+	if command -v fuser >/dev/null 2>&1 \
+		&& [ -n "$(fuser "/tmp/.X11-unix/X${n}" 2>/dev/null)" ]; then
+		return 0
+	fi
+	[ -n "$(reap_targets "${n}")" ]
+}
+
+case "${num}" in
+	"" | *[!0-9]*)
+		;;
+	1)
+		rm -f "/tmp/.X${num}-lock" "${socket_path}" 2>/dev/null || true
+		;;
+	*)
+		targets="$(reap_targets "${num}")"
+		for pid in ${targets}; do
+			kill "${pid}" 2>/dev/null || true
+		done
+		for _ in $(seq 1 50); do
+			display_bound "${num}" || break
+			for pid in ${targets}; do
+				xvfb_for_display "${pid}" "${num}" \
+					&& kill -9 "${pid}" 2>/dev/null || true
+			done
+			sleep 0.1
+		done
+		rm -f "/tmp/.X${num}-lock" "${socket_path}" 2>/dev/null || true
+		;;
+esac
+
+paint_root_when_ready() {
+	local n="$1"
+	for _ in $(seq 1 100); do
+		DISPLAY=":${n}" xdpyinfo >/dev/null 2>&1 && break
+		sleep 0.1
+	done
+	if [ -x /usr/local/bin/sand-wallpaper ]; then
+		DISPLAY=":${n}" /usr/local/bin/sand-wallpaper paint >/dev/null 2>&1 \
+			&& return 0
+	fi
+	DISPLAY=":${n}" hsetroot -cover /usr/share/backgrounds/cursor-box-wallpaper.jpg >/dev/null 2>&1 \
+		&& return 0
+	DISPLAY=":${n}" hsetroot -solid "#1e2330" >/dev/null 2>&1 \
+		|| DISPLAY=":${n}" xsetroot -solid "#1e2330" >/dev/null 2>&1 \
+		|| true
+}
+
+case "${num}" in
+"" | *[!0-9]*) ;;
+*) paint_root_when_ready "${num}" & ;;
+esac
+
+exec Xvfb "$@"

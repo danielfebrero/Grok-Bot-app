@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+if [ "$#" -lt 2 ]; then
+	echo "usage: supervise-exec-daemon.sh <port> <launcher> [args...]" >&2
+	exit 64
+fi
+
+port="$1"
+launcher="$2"
+shift 2
+
+SAND_BOX_CGROUPS_LIB="${SAND_BOX_CGROUPS_LIB:-/usr/local/bin/box-cgroups.sh}"
+if [ -r "${SAND_BOX_CGROUPS_LIB}" ]; then
+	# shellcheck source=/dev/null
+	. "${SAND_BOX_CGROUPS_LIB}"
+fi
+if ! command -v sand_cgroup_join >/dev/null 2>&1; then
+	sand_cgroup_join() { :; }
+fi
+sand_cgroup_join "${SAND_CGROUP_AGENT_NAME:-agent}"
+
+child_pid=""
+delay_pid=""
+stopping=0
+restart_delay_s=1
+restart_count=0
+restart_cause="daemon_exited"
+boot_daemon_listening_emitted=0
+telemetry_log="${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}"
+
+emit_daemon_boot_stage() {
+	if [ "${boot_daemon_listening_emitted}" = "1" ] ||
+		[ -z "${SAND_BOX_BOOT_STARTED_AT_MS:-}" ]; then
+		return
+	fi
+	local now_ms duration_ms
+	now_ms="$(date +%s%3N)"
+	duration_ms=$((now_ms - SAND_BOX_BOOT_STARTED_AT_MS))
+	if [ "${duration_ms}" -lt 0 ]; then
+		duration_ms=0
+	fi
+	printf '{"kind":"boot_stage","stage":"daemon_listening","durationMs":%s}\n' \
+		"${duration_ms}" >>"${telemetry_log}"
+	boot_daemon_listening_emitted=1
+}
+
+emit_restart_event() {
+	local runtime_s="$1"
+	local child_status="$2"
+	printf '{"kind":"exec_daemon_restart","restartAttempt":%s,"runtimeS":%s,"cause":"%s","exitStatus":%s}\n' \
+		"${restart_count}" "${runtime_s}" "${restart_cause}" "${child_status}" >>"${telemetry_log}"
+}
+
+stop_supervisor() {
+	stopping=1
+	if [ -n "${delay_pid}" ]; then
+		kill -TERM "${delay_pid}" 2>/dev/null || true
+	fi
+	if [ -n "${child_pid}" ]; then
+		kill -TERM -- "-${child_pid}" 2>/dev/null ||
+			kill -TERM "${child_pid}" 2>/dev/null ||
+			true
+	fi
+}
+trap stop_supervisor TERM INT
+
+port_is_listening() {
+	ss -H -ltn "sport = :${port}" 2>/dev/null | grep -q .
+}
+
+has_exec_daemon_bundle_args() {
+	local pid="$1"
+	local -a argv=()
+	mapfile -d '' -t argv 2>/dev/null <"/proc/${pid}/cmdline" || return 1
+	[ "${argv[1]:-}" = "/exec-daemon/index.js" ] &&
+		[ "${argv[2]:-}" = "serve" ]
+}
+
+stale_exec_daemon_listeners() {
+	local pid cmd
+	for pid in $(ss -lptnH "sport = :${port}" 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -un); do
+		[ -n "${pid}" ] || continue
+		if has_exec_daemon_bundle_args "${pid}"; then
+			printf '%s\n' "${pid}"
+			continue
+		fi
+		cmd="$( (tr '\0' ' ' <"/proc/${pid}/cmdline") 2>/dev/null || true)"
+		case "${cmd}" in
+		/exec-daemon/node\ /exec-daemon/index.js\ serve*) printf '%s\n' "${pid}" ;;
+		esac
+	done
+}
+
+reap_stale_port_owner() {
+	if ! port_is_listening; then
+		return 0
+	fi
+	echo "[exec-daemon-supervisor] stale listener found; reaping port=${port}" >&2
+	for pid in $(stale_exec_daemon_listeners); do
+		kill -TERM "${pid}" 2>/dev/null || true
+	done
+	for _ in $(seq 1 10); do
+		if ! port_is_listening; then
+			return 0
+		fi
+		sleep 0.2
+	done
+	for pid in $(stale_exec_daemon_listeners); do
+		kill -KILL "${pid}" 2>/dev/null || true
+	done
+	for _ in $(seq 1 10); do
+		if ! port_is_listening; then
+			return 0
+		fi
+		sleep 0.2
+	done
+	echo "[exec-daemon-supervisor] unhealthy: port=${port} remains owned after stale-listener reap" >&2
+	return 1
+}
+
+stop_unhealthy_child() {
+	local reason="$1"
+	case "${reason}" in
+	startup-listener-timeout) restart_cause="startup_listener_timeout" ;;
+	listener-lost) restart_cause="listener_lost" ;;
+	esac
+	echo "[exec-daemon-supervisor] liveness failed (${reason}); restarting pid=${child_pid} port=${port}" >&2
+	kill -TERM -- "-${child_pid}" 2>/dev/null ||
+		kill -TERM "${child_pid}" 2>/dev/null ||
+		true
+	for _ in $(seq 1 10); do
+		if ! kill -0 -- "-${child_pid}" 2>/dev/null; then
+			return
+		fi
+		sleep 0.5
+	done
+	kill -KILL -- "-${child_pid}" 2>/dev/null ||
+		kill -KILL "${child_pid}" 2>/dev/null ||
+		true
+}
+
+while [ "${stopping}" = "0" ]; do
+	if ! reap_stale_port_owner; then
+		sleep "${restart_delay_s}" &
+		delay_pid=$!
+		wait "${delay_pid}" 2>/dev/null || true
+		delay_pid=""
+		if [ "${restart_delay_s}" -lt 30 ]; then
+			restart_delay_s=$((restart_delay_s * 2))
+			if [ "${restart_delay_s}" -gt 30 ]; then
+				restart_delay_s=30
+			fi
+		fi
+		continue
+	fi
+	started_at_s="$(date +%s)"
+	restart_count=$((restart_count + 1))
+	restart_cause="daemon_exited"
+	echo "[exec-daemon-supervisor] launching attempt=${restart_count} port=${port}"
+	setsid "${launcher}" "$@" &
+	child_pid=$!
+	if [ "${stopping}" = "1" ]; then
+		stop_supervisor
+	fi
+
+	became_ready=0
+	missed_live_checks=0
+	while kill -0 "${child_pid}" 2>/dev/null; do
+		if port_is_listening; then
+			if [ "${became_ready}" = "0" ]; then
+				echo "[exec-daemon-supervisor] ready pid=${child_pid} port=${port} attempt=${restart_count}"
+				emit_daemon_boot_stage
+			fi
+			became_ready=1
+			missed_live_checks=0
+		else
+			now_s="$(date +%s)"
+			if [ "${became_ready}" = "0" ]; then
+				if [ $((now_s - started_at_s)) -ge 30 ]; then
+					stop_unhealthy_child "startup-listener-timeout"
+				fi
+			else
+				missed_live_checks=$((missed_live_checks + 1))
+				if [ "${missed_live_checks}" -ge 3 ]; then
+					stop_unhealthy_child "listener-lost"
+				fi
+			fi
+		fi
+
+		sleep 2 &
+		delay_pid=$!
+		wait "${delay_pid}" 2>/dev/null || true
+		delay_pid=""
+		if [ "${stopping}" = "1" ]; then
+			break
+		fi
+	done
+
+	wait "${child_pid}" 2>/dev/null
+	child_status=$?
+	kill -KILL -- "-${child_pid}" 2>/dev/null || true
+	child_pid=""
+	if [ "${stopping}" = "1" ]; then
+		echo "[exec-daemon-supervisor] stopped"
+		exit 0
+	fi
+
+	runtime_s=$(( $(date +%s) - started_at_s ))
+	if [ "${runtime_s}" -lt 0 ]; then
+		runtime_s=0
+	fi
+	emit_restart_event "${runtime_s}" "${child_status}"
+	echo "[exec-daemon-supervisor] daemon exited status=${child_status} runtime_s=${runtime_s} restart_in_s=${restart_delay_s}" >&2
+	if [ "${runtime_s}" -ge 60 ]; then
+		restart_delay_s=1
+	fi
+
+	sleep "${restart_delay_s}" &
+	delay_pid=$!
+	wait "${delay_pid}" 2>/dev/null || true
+	delay_pid=""
+	if [ "${restart_delay_s}" -lt 30 ]; then
+		restart_delay_s=$((restart_delay_s * 2))
+		if [ "${restart_delay_s}" -gt 30 ]; then
+			restart_delay_s=30
+		fi
+	fi
+done

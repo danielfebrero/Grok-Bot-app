@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+if [ "$#" -lt 2 ]; then
+	echo "usage: supervise-egress-tunnel.sh <ws_port> <launcher> [args...]" >&2
+	exit 64
+fi
+
+port="$1"
+launcher="$2"
+shift 2
+
+child_pid=""
+stopping=0
+restart_delay_s=1
+restart_attempt=0
+telemetry_log="${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}"
+
+emit_tunnel_event() {
+	local outcome="$1"
+	local attempt="$2"
+	local exit_status="${3:-}"
+	local runtime_s="${4:-}"
+	if [ -n "${exit_status}" ] && [ -n "${runtime_s}" ]; then
+		printf '{"kind":"egress_tunnel","outcome":"%s","attempt":%s,"exitStatus":%s,"runtimeS":%s}\n' \
+			"${outcome}" "${attempt}" "${exit_status}" "${runtime_s}" >>"${telemetry_log}"
+	else
+		printf '{"kind":"egress_tunnel","outcome":"%s","attempt":%s}\n' \
+			"${outcome}" "${attempt}" >>"${telemetry_log}"
+	fi
+}
+
+stop_supervisor() {
+	stopping=1
+	if [ -n "${child_pid}" ]; then
+		kill -TERM -- "-${child_pid}" 2>/dev/null || kill -TERM "${child_pid}" 2>/dev/null || true
+	fi
+}
+trap stop_supervisor TERM INT
+
+port_is_listening() {
+	ss -H -ltn "sport = :${port}" 2>/dev/null | grep -q .
+}
+
+listener_pids() {
+	ss -lptnH "sport = :${port}" 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -un
+}
+
+reap_stale_port_owner() {
+	port_is_listening || return 0
+	emit_tunnel_event "stale_port" "$((restart_attempt + 1))"
+	echo "[egress-tunnel-supervisor] reaping stale listener on port=${port}" >&2
+	local pid
+	for pid in $(listener_pids); do
+		kill -TERM "${pid}" 2>/dev/null || true
+	done
+	for _ in $(seq 1 15); do
+		port_is_listening || return 0
+		sleep 0.2
+	done
+	for pid in $(listener_pids); do
+		kill -KILL "${pid}" 2>/dev/null || true
+	done
+	for _ in $(seq 1 15); do
+		port_is_listening || return 0
+		sleep 0.2
+	done
+	echo "[egress-tunnel-supervisor] port=${port} still owned after reap" >&2
+	return 1
+}
+
+backoff() {
+	sleep "${restart_delay_s}" &
+	wait "$!" 2>/dev/null || true
+	if [ "${restart_delay_s}" -lt 30 ]; then
+		restart_delay_s=$((restart_delay_s * 2))
+		[ "${restart_delay_s}" -gt 30 ] && restart_delay_s=30
+	fi
+}
+
+while [ "${stopping}" = "0" ]; do
+	if ! reap_stale_port_owner; then
+		backoff
+		continue
+	fi
+	restart_attempt=$((restart_attempt + 1))
+	started_at_s="$(date +%s)"
+	echo "[egress-tunnel-supervisor] launching port=${port}" >&2
+	setsid "${launcher}" "$@" &
+	child_pid=$!
+	if [ "${stopping}" = "1" ]; then
+		stop_supervisor
+	fi
+
+	became_ready=0
+	missed_checks=0
+	while kill -0 "${child_pid}" 2>/dev/null; do
+		if port_is_listening; then
+			if [ "${became_ready}" = "0" ]; then
+				emit_tunnel_event "ready" "${restart_attempt}"
+			fi
+			became_ready=1
+			missed_checks=0
+		elif [ "${became_ready}" = "0" ]; then
+			if [ $(( $(date +%s) - started_at_s )) -ge 30 ]; then
+				emit_tunnel_event "startup_timeout" "${restart_attempt}"
+				echo "[egress-tunnel-supervisor] startup listener timeout; restarting port=${port}" >&2
+				kill -TERM -- "-${child_pid}" 2>/dev/null || kill -TERM "${child_pid}" 2>/dev/null || true
+				break
+			fi
+		else
+			missed_checks=$((missed_checks + 1))
+			if [ "${missed_checks}" -ge 3 ]; then
+				emit_tunnel_event "listener_lost" "${restart_attempt}"
+				echo "[egress-tunnel-supervisor] listener lost; restarting port=${port}" >&2
+				kill -TERM -- "-${child_pid}" 2>/dev/null || kill -TERM "${child_pid}" 2>/dev/null || true
+				break
+			fi
+		fi
+		sleep 2 &
+		wait "$!" 2>/dev/null || true
+		if [ "${stopping}" = "1" ]; then
+			break
+		fi
+	done
+
+	wait "${child_pid}" 2>/dev/null
+	child_status=$?
+	kill -KILL -- "-${child_pid}" 2>/dev/null || true
+	child_pid=""
+	if [ "${stopping}" = "1" ]; then
+		echo "[egress-tunnel-supervisor] stopped" >&2
+		exit 0
+	fi
+
+	runtime_s=$(( $(date +%s) - started_at_s ))
+	emit_tunnel_event "restart" "${restart_attempt}" "${child_status}" "${runtime_s}"
+	echo "[egress-tunnel-supervisor] tunnel exited status=${child_status} runtime_s=${runtime_s} restart_in_s=${restart_delay_s}" >&2
+	if [ "${runtime_s}" -ge 60 ]; then
+		restart_delay_s=1
+	fi
+	backoff
+done

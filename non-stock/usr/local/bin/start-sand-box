@@ -1,0 +1,526 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+export DISPLAY="${DISPLAY:-:1}"
+export SAND_BOX_BOOT_STARTED_AT_MS="${SAND_BOX_BOOT_STARTED_AT_MS:-$(date +%s%3N)}"
+if [ -z "${SAND_BOX_BOOT_ID:-}" ]; then
+	if [ -r /proc/sys/kernel/random/uuid ]; then
+		SAND_BOX_BOOT_ID="$(cat /proc/sys/kernel/random/uuid)"
+	else
+		SAND_BOX_BOOT_ID="${SAND_BOX_BOOT_STARTED_AT_MS}-$$"
+	fi
+	export SAND_BOX_BOOT_ID
+fi
+export SAND_BOX_TELEMETRY_LOG="${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}"
+
+# >>> box port table (from sand/src/shared/box/box-contract.ts; regenerate: pnpm --filter sand run gen:box-ports) >>>
+SAND_BOX_PORT_PRIMARY_EXEC_DAEMON=1337
+SAND_BOX_PORT_WINDOW_ROUTER=1339
+SAND_BOX_PORT_FORK_NOVNC=6081
+SAND_BOX_PORT_EGRESS_TUNNEL_WS=8790
+SAND_BOX_PORT_EGRESS_CONNECT_PROXY=8791
+SAND_BOX_FORK_EXEC_BASE=14000
+WINDOW_TOKEN_DIR="/tmp/sand-window-tokens.d"
+NOVNC_TOKEN_DIR="/tmp/sand-novnc-tokens.d"
+# <<< box port table <<<
+
+emit_boot_stage() {
+	local stage="$1"
+	local now_ms duration_ms
+	now_ms="$(date +%s%3N)"
+	duration_ms=$((now_ms - SAND_BOX_BOOT_STARTED_AT_MS))
+	if [ "${duration_ms}" -lt 0 ]; then
+		duration_ms=0
+	fi
+	printf '{"kind":"boot_stage","stage":"%s","durationMs":%s}\n' \
+		"${stage}" "${duration_ms}" >>"${SAND_BOX_TELEMETRY_LOG}"
+}
+
+emit_boot_failure() {
+	local stage="$1"
+	local reason="$2"
+	local now_ms duration_ms
+	now_ms="$(date +%s%3N)"
+	duration_ms=$((now_ms - SAND_BOX_BOOT_STARTED_AT_MS))
+	if [ "${duration_ms}" -lt 0 ]; then
+		duration_ms=0
+	fi
+	printf '{"kind":"boot_failure","stage":"%s","reason":"%s","durationMs":%s}\n' \
+		"${stage}" "${reason}" "${duration_ms}" >>"${SAND_BOX_TELEMETRY_LOG}"
+}
+
+emit_boot_stage "entrypoint_started"
+
+SAND_BOX_CGROUPS_LIB="${SAND_BOX_CGROUPS_LIB:-/usr/local/bin/box-cgroups.sh}"
+if [ -r "${SAND_BOX_CGROUPS_LIB}" ]; then
+	# shellcheck source=/dev/null
+	. "${SAND_BOX_CGROUPS_LIB}"
+fi
+if ! command -v sand_cgroup_setup >/dev/null 2>&1; then
+	sand_cgroup_setup() { :; }
+	sand_cgroup_place() { :; }
+	sand_cgroup_join() { :; }
+fi
+sand_cgroup_setup
+
+sand_user_non_root() {
+	case "$(printf '%s' "${SAND_USER_NON_ROOT:-}" | tr '[:upper:]' '[:lower:]')" in
+	1 | true | yes) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+if sand_user_non_root; then
+	export SAND_BOX_SCRIPT_SYNC_DISABLED="${SAND_BOX_SCRIPT_SYNC_DISABLED:-1}"
+fi
+
+# Team-admin opt-out (enterprise): the backend stamps SAND_BOX_SUDO_DISABLED=1
+# on a NEW pod when the owner's team turned off the agent's root access on its
+# own machine. Absent (the default) keeps the box user's blanket passwordless
+# sudo; set, the box user gets the narrow timezone grant only.
+sand_box_sudo_disabled() {
+	case "$(printf '%s' "${SAND_BOX_SUDO_DISABLED:-}" | tr '[:upper:]' '[:lower:]')" in
+	1 | true | yes) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+reassert_cli_config_owner() {
+	[ "$(id -u)" -eq 0 ] || return 0
+	if sand_user_non_root; then
+		chown -R box:box /home/box/cli-config 2>/dev/null || true
+	else
+		chown -R root:root /home/box/cli-config 2>/dev/null || true
+		chmod 700 /home/box/cli-config 2>/dev/null || true
+	fi
+}
+
+if [ "$(id -u)" -eq 0 ]; then
+	if sand_user_non_root; then
+		if sand_box_sudo_disabled; then
+			SAND_BOX_SUDOERS_RULE='box ALL=(root:root) NOPASSWD: /usr/local/bin/sand-box-timezone apply *'
+		else
+			SAND_BOX_SUDOERS_RULE='box ALL=(ALL:ALL) NOPASSWD:ALL'
+		fi
+		if printf '%s\n' "$SAND_BOX_SUDOERS_RULE" >/etc/sudoers.d/box.tmp 2>/dev/null; then
+			chmod 440 /etc/sudoers.d/box.tmp 2>/dev/null || true
+			if visudo -cf /etc/sudoers.d/box.tmp >/dev/null 2>&1; then
+				mv -f /etc/sudoers.d/box.tmp /etc/sudoers.d/box 2>/dev/null || rm -f /etc/sudoers.d/box.tmp
+			else
+				rm -f /etc/sudoers.d/box.tmp 2>/dev/null || true
+			fi
+		fi
+	else
+		rm -f /etc/sudoers.d/box 2>/dev/null || true
+	fi
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+	SAND_BOX_LAUNCHER_HELPERS=(
+		/usr/local/bin/box-chrome
+	)
+	if sand_user_non_root; then
+		chown box:box "${SAND_BOX_LAUNCHER_HELPERS[@]}" 2>/dev/null || true
+	else
+		chown root:root "${SAND_BOX_LAUNCHER_HELPERS[@]}" 2>/dev/null || true
+	fi
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+	if sand_user_non_root; then
+		chown -R box:box /home/box/sand-host /home/box/deps 2>/dev/null || true
+	else
+		chown -R root:root /home/box/sand-host /home/box/deps 2>/dev/null || true
+	fi
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+	rm -f /tmp/sand-managed-converge.log
+	if sand_user_non_root; then
+		install -d -m 755 -o box -g box /run/sand 2>/dev/null || true
+		install -d -m 700 -o box -g box /opt/sand-managed 2>/dev/null || true
+		chown -R box:box /run/sand /opt/sand-managed 2>/dev/null || true
+	else
+		install -d -m 755 -o root -g root /run/sand 2>/dev/null || true
+		install -d -m 700 -o root -g root /opt/sand-managed 2>/dev/null || true
+		chown -R root:root /run/sand /opt/sand-managed 2>/dev/null || true
+	fi
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+	install -d -m 755 -o root -g root \
+		/var/lib/sand \
+		/var/lib/sand/telemetry \
+		2>/dev/null || true
+
+	if sand_user_non_root; then
+		install -d -m 700 -o box -g box \
+			/var/lib/sand/telemetry/codebase \
+			2>/dev/null || true
+	else
+		install -d -m 700 -o root -g root \
+			/var/lib/sand/telemetry/codebase \
+			2>/dev/null || true
+	fi
+fi
+
+export_npm_prefix_without_seeded_npmrc() {
+	AS_BOX+=(NPM_CONFIG_PREFIX=/home/box/.local)
+}
+
+AS_BOX=()
+if sand_user_non_root && [ "$(id -u)" -eq 0 ]; then
+	AS_BOX=(setpriv --reuid=box --regid=box --init-groups env HOME=/home/box USER=box LOGNAME=box)
+	export_npm_prefix_without_seeded_npmrc
+	AS_BOX+=("PATH=/home/box/.local/bin:${PATH}")
+fi
+
+{
+	printf '%s\n' '/tmp/core.%e.%p.%t' >/proc/sys/kernel/core_pattern
+	ulimit -c 0
+} >/dev/null 2>&1 || true
+
+# vm.swappiness weighs swap against file-page reclaim on a 0-200 scale, and at 0
+# the kernel does not swap until free plus file-backed pages fall below the
+# zone high watermark (https://docs.kernel.org/admin-guide/sysctl/vm.html#swappiness).
+printf '%s\n' 10 >/proc/sys/vm/swappiness 2>/dev/null || true
+
+if [ -r /usr/local/bin/sand-desktop-supervise.sh ]; then
+	# shellcheck source=/dev/null
+	. /usr/local/bin/sand-desktop-supervise.sh
+fi
+if ! command -v sand_desktop_register >/dev/null 2>&1; then
+	sand_desktop_register() { :; }
+	sand_desktop_supervision_enabled() { return 1; }
+fi
+
+display_number="${DISPLAY#:}"
+display_number="${display_number%%.*}"
+rm -f "/tmp/.X${display_number}-lock" "/tmp/.X11-unix/X${display_number}"
+mkdir -p /tmp/.X11-unix 2>/dev/null || true
+chmod 1777 /tmp/.X11-unix 2>/dev/null || true
+
+if [ "$(id -u)" -eq 0 ]; then
+	chown -hR box:box \
+		/home/box/sand-data \
+		/home/box/box-store \
+		/home/box/chrome-profile \
+		2>/dev/null || true
+fi
+reassert_cli_config_owner
+ln -sfn /home/box/sand-data /home/box/agent-data 2>/dev/null || true
+
+# With fs.protected_regular enabled, an O_CREAT open of an existing regular file
+# in a sticky world-writable directory fails unless the opener or the directory
+# owner owns it (https://docs.kernel.org/admin-guide/sysctl/fs.html#protected-regular).
+NOVNC_FORKS_LOG=/tmp/novnc-forks.log
+BOX_BOOT_LOGS=(
+	"${NOVNC_FORKS_LOG}"
+	/tmp/sand-window-router.log
+	/tmp/sand-session-sync.log
+	/tmp/sand-cookie-persist.log
+	/tmp/exec-daemon.log
+	/tmp/sand-supervisor.log
+	/tmp/persist-cli-auth.log
+	/tmp/start-desktop.log
+	"${SAND_BOX_TELEMETRY_LOG}"
+)
+touch "${BOX_BOOT_LOGS[@]}" 2>/dev/null || true
+chmod a+rw "${BOX_BOOT_LOGS[@]}" 2>/dev/null || true
+
+clear_chrome_singletons() {
+	local profile_root="${1:-/home/box/chrome-profile}"
+	rm -f \
+		"${profile_root}/SingletonLock" \
+		"${profile_root}/SingletonSocket" \
+		"${profile_root}/SingletonCookie" \
+		"${profile_root}"/Fork-*/SingletonLock \
+		"${profile_root}"/Fork-*/SingletonSocket \
+		"${profile_root}"/Fork-*/SingletonCookie
+}
+
+# Restored singleton files describe processes from the previous box, so clear
+# every persisted Chrome profile before this boot launches any browser.
+clear_chrome_singletons
+
+mkdir -p "${NOVNC_TOKEN_DIR}"
+mkdir -p "${WINDOW_TOKEN_DIR}"
+if [ "$(id -u)" -eq 0 ]; then
+	chown box:box "${NOVNC_TOKEN_DIR}" "${WINDOW_TOKEN_DIR}" 2>/dev/null || true
+fi
+SAND_DESKTOP_SUPERVISE_DIR="${SAND_DESKTOP_DIR:-/tmp/sand-desktop}"
+mkdir -p "${SAND_DESKTOP_SUPERVISE_DIR}/shared" 2>/dev/null || true
+if [ "$(id -u)" -eq 0 ]; then
+	if sand_user_non_root; then
+		chown -R box:box "${SAND_DESKTOP_SUPERVISE_DIR}" 2>/dev/null || true
+	else
+		chown -R root:root "${SAND_DESKTOP_SUPERVISE_DIR}" 2>/dev/null || true
+	fi
+fi
+NOVNC_HEARTBEAT_S="${SAND_NOVNC_HEARTBEAT_S:-30}"
+FORK_WEBSOCKIFY_ARGS=(
+	--web=/usr/share/novnc
+	--heartbeat="${NOVNC_HEARTBEAT_S}"
+	--token-plugin TokenFile
+	--token-source "${NOVNC_TOKEN_DIR}"
+	"0.0.0.0:${SAND_BOX_PORT_FORK_NOVNC}"
+)
+"${AS_BOX[@]}" /usr/local/bin/box-bounded-log --run "${NOVNC_FORKS_LOG}" -- \
+	websockify "${FORK_WEBSOCKIFY_ARGS[@]}" &
+FORK_WEBSOCKIFY_PID=$!
+sand_cgroup_place "${SAND_CGROUP_INTERACTIVE_NAME:-interactive}" "${FORK_WEBSOCKIFY_PID}"
+HOME=/home/box sand_desktop_register shared fork-websockify 4 "${NOVNC_FORKS_LOG}" "${FORK_WEBSOCKIFY_PID}" -- \
+	/usr/local/bin/box-bounded-log --run "${NOVNC_FORKS_LOG}" -- \
+	websockify "${FORK_WEBSOCKIFY_ARGS[@]}"
+FORK_ROUTER_ARGS=("${SAND_BOX_PORT_WINDOW_ROUTER}" "${SAND_BOX_PORT_PRIMARY_EXEC_DAEMON}" "${SAND_BOX_FORK_EXEC_BASE}")
+"${AS_BOX[@]}" setsid nohup /exec-daemon/node /usr/local/bin/sand-window-router.mjs "${FORK_ROUTER_ARGS[@]}" \
+	>/tmp/sand-window-router.log 2>&1 &
+FORK_ROUTER_PID=$!
+sand_cgroup_place "${SAND_CGROUP_INTERACTIVE_NAME:-interactive}" "${FORK_ROUTER_PID}"
+HOME=/home/box sand_desktop_register shared fork-router 4 /tmp/sand-window-router.log "${FORK_ROUTER_PID}" --listen-port "${SAND_BOX_PORT_WINDOW_ROUTER}" -- \
+	/exec-daemon/node /usr/local/bin/sand-window-router.mjs "${FORK_ROUTER_ARGS[@]}"
+
+"${AS_BOX[@]}" setsid nohup /exec-daemon/node /usr/local/bin/sand-session-sync.mjs \
+	>/tmp/sand-session-sync.log 2>&1 &
+
+"${AS_BOX[@]}" /usr/local/bin/box-bounded-log --run /tmp/sand-web-bot-auth.log -- \
+	/exec-daemon/node /usr/local/bin/sand-web-bot-auth.mjs &
+SAND_WEB_BOT_AUTH_PID=$!
+HOME=/home/box sand_desktop_register shared web-bot-auth 4 /tmp/sand-web-bot-auth.log "${SAND_WEB_BOT_AUTH_PID}" -- \
+	/usr/local/bin/box-bounded-log --run /tmp/sand-web-bot-auth.log -- \
+	/exec-daemon/node /usr/local/bin/sand-web-bot-auth.mjs
+
+# Chrome takes --user-agent from its own process command line
+# (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/components/embedder_support/user_agent_utils.cc)
+# and a second launch only hands its flags to the running singleton
+# (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/chrome/browser/process_singleton_posix.cc),
+# so this daemon sets a live browser's UA over CDP Emulation.setUserAgentOverride
+# (https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setUserAgentOverride).
+"${AS_BOX[@]}" /usr/local/bin/box-bounded-log --run /tmp/sand-ua-governor.log -- \
+	/exec-daemon/node /usr/local/bin/sand-ua-governor.mjs &
+SAND_UA_GOVERNOR_PID=$!
+sand_cgroup_place "${SAND_CGROUP_INTERACTIVE_NAME:-interactive}" "${SAND_UA_GOVERNOR_PID}"
+HOME=/home/box sand_desktop_register shared ua-governor 4 /tmp/sand-ua-governor.log "${SAND_UA_GOVERNOR_PID}" -- \
+	/usr/local/bin/box-bounded-log --run /tmp/sand-ua-governor.log -- \
+	/exec-daemon/node /usr/local/bin/sand-ua-governor.mjs
+
+"${AS_BOX[@]}" setsid nohup /exec-daemon/node /usr/local/bin/sand-cookie-persist.mjs \
+	>/tmp/sand-cookie-persist.log 2>&1 &
+
+if [ -n "${SAND_DEV_LOCAL_BACKEND_PROXY_PORTS:-}" ] && [ -r /tmp/sand-local-backend-proxy.mjs ]; then
+	for local_backend_proxy_port in ${SAND_DEV_LOCAL_BACKEND_PROXY_PORTS//,/ }; do
+		"${AS_BOX[@]}" setsid nohup /exec-daemon/node /tmp/sand-local-backend-proxy.mjs \
+			"${local_backend_proxy_port}" host.docker.internal "${local_backend_proxy_port}" \
+			>>/tmp/sand-local-backend-relay.log 2>&1 &
+	done
+fi
+
+(
+	printf '%s\n' '-1000' >/proc/self/oom_score_adj 2>/dev/null || true
+	exec "${AS_BOX[@]}" /usr/local/bin/supervise-exec-daemon "${SAND_BOX_PORT_PRIMARY_EXEC_DAEMON}" /usr/local/bin/start-exec-daemon "$@"
+) >/tmp/exec-daemon.log 2>&1 &
+EXEC_DAEMON_SUPERVISOR_PID=$!
+
+if [ "${SAND_EGRESS_TUNNEL_ENABLED:-}" = "1" ]; then
+	(
+		exec "${AS_BOX[@]}" /usr/local/bin/supervise-egress-tunnel \
+			"${SAND_EGRESS_TUNNEL_WS_PORT:-${SAND_BOX_PORT_EGRESS_TUNNEL_WS}}" \
+			/usr/local/bin/start-egress-tunnel
+	) >/tmp/egress-tunnel.log 2>&1 &
+	EGRESS_TUNNEL_SUPERVISOR_PID=$!
+	HOME=/home/box sand_desktop_register shared egress-proxy 4 /tmp/egress-tunnel.log "${EGRESS_TUNNEL_SUPERVISOR_PID}" -- \
+		/usr/local/bin/supervise-egress-tunnel "${SAND_EGRESS_TUNNEL_WS_PORT:-${SAND_BOX_PORT_EGRESS_TUNNEL_WS}}" /usr/local/bin/start-egress-tunnel
+	printf '%s\n' "${SAND_EGRESS_TUNNEL_PROXY_ADDR:-127.0.0.1:${SAND_BOX_PORT_EGRESS_CONNECT_PROXY}}" \
+		>/tmp/sand-egress-proxy 2>/dev/null || true
+	chmod 644 /tmp/sand-egress-proxy 2>/dev/null || true
+fi
+
+clear_stale_root_box_store_lock() {
+	local lock=/home/box/sand-data/box-store-sync.lock
+	[ -f "${lock}" ] || return 0
+	[ "$(stat -c %u "${lock}" 2>/dev/null)" = "0" ] || return 0
+	local first_mtime age attempt
+	first_mtime="$(stat -c %Y "${lock}" 2>/dev/null || echo 0)"
+	for attempt in 1 2 3 4 5 6 7 8; do
+		[ -f "${lock}" ] || return 0
+		[ "$(stat -c %Y "${lock}" 2>/dev/null || echo 0)" = "${first_mtime}" ] || return 0
+		age=$(( $(date +%s) - first_mtime ))
+		if [ "${age}" -gt 5 ] && [ "${attempt}" -gt 2 ]; then
+			echo "[start-sand-box] removing a root-owned box-store lock that stopped beating ${age}s ago (a copy-in that did not exit)"
+			rm -f /home/box/sand-data/box-store-sync.lock
+			return 0
+		fi
+		sleep 1
+	done
+}
+
+copy_in_flag="$(printf '%s' "${SAND_BOX_STORE_COPY_IN:-}" | tr '[:upper:]' '[:lower:]')"
+if { [ "${copy_in_flag}" = "1" ] || [ "${copy_in_flag}" = "true" ] || [ "${copy_in_flag}" = "yes" ]; } \
+	&& [ -f /home/box/sand-host/host-main.cjs ]; then
+	echo "[start-sand-box] box-store copy-in: starting (flag on, host bundle present)"
+	SAND_PACKAGED=1 SAND_HOST_IN_BOX=1 SAND_DATA_ROOT=/home/box/sand-data \
+		/exec-daemon/node --disable-warning=ExperimentalWarning /home/box/sand-host/host-main.cjs --box-copy-in \
+		>/tmp/sand-copy-in.log 2>&1
+	copy_in_rc=$?
+	if [ "${copy_in_rc}" != "10" ] && [ "${copy_in_rc}" != "0" ]; then
+		if ! /exec-daemon/node -e '
+			const fs = require("node:fs");
+			try {
+				const status = JSON.parse(fs.readFileSync("/tmp/sand-copy-in-status.json", "utf8"));
+				if (
+					status.phase !== "failed" ||
+					(status.outcome !== "partial" && status.outcome !== "failed")
+				) process.exit(1);
+			} catch {
+				process.exit(1);
+			}
+		' >/dev/null 2>&1; then
+			printf '{"phase":"failed","restored":0,"total":0,"bytes":0,"outcome":"failed","errorClass":"entrypoint-no-terminal-status","exitCode":%s}\n' \
+				"${copy_in_rc}" \
+				>/tmp/sand-copy-in-status.json.tmp
+			mv -f /tmp/sand-copy-in-status.json.tmp /tmp/sand-copy-in-status.json
+			copy_in_rc=1
+		fi
+	fi
+	cat /tmp/sand-copy-in.log 2>/dev/null || true
+	clear_stale_root_box_store_lock
+	if [ "${copy_in_rc}" = "10" ]; then
+		echo "[start-sand-box] box-store copy-in: hydrated; applying box ownership + clearing Chrome locks"
+		chown -hR box:box /home/box/chrome-profile 2>/dev/null || true
+		chown -hR box:box /home/box/sand-data 2>/dev/null || true
+		chown -hR box:box /workspace 2>/dev/null || true
+		reassert_cli_config_owner
+		clear_chrome_singletons
+	elif [ "${copy_in_rc}" = "0" ]; then
+		echo "[start-sand-box] box-store copy-in: no-op (store empty / disabled); continuing without store hydration"
+		chown -hR box:box /home/box/sand-data 2>/dev/null || true
+	else
+		echo "[start-sand-box] box-store copy-in FAILED (rc=${copy_in_rc}); booting WITHOUT restore, with snapshot-out DISABLED to protect the durable store, and with the host held down so an un-restored box never serves as an empty identity (the host stays down and the gateway does not listen; only the exec-daemon and the desktop answer; the backend keeps the old box on a preserve recreate; a later recreate retries the hydrate). See /tmp/sand-copy-in.log." >&2
+		SAND_SUPERVISOR_ENABLED=0
+		unset SAND_BOX_STORE_SYNC
+		chown -hR box:box /home/box/chrome-profile 2>/dev/null || true
+		chown -hR box:box /home/box/sand-data 2>/dev/null || true
+		chown -hR box:box /workspace 2>/dev/null || true
+		reassert_cli_config_owner
+		clear_chrome_singletons
+	fi
+fi
+
+ensure_real_dir() {
+	local dir="${1}"
+	if [ -L "${dir}" ]; then
+		rm -f "${dir}"
+	fi
+	mkdir -p "${dir}"
+	[ -d "${dir}" ] && [ ! -L "${dir}" ]
+}
+
+if ensure_real_dir /home/box/chrome-profile/Default; then
+	chmod 700 /home/box/chrome-profile/Default
+	chown -h box:box /home/box/chrome-profile/Default
+fi
+
+start_in_box_supervisor() {
+	if [ "${SAND_SUPERVISOR_ENABLED:-}" = "1" ] || sand_desktop_supervision_enabled; then
+		(
+			printf '%s\n' '-1000' >/proc/self/oom_score_adj 2>/dev/null || true
+			exec "${AS_BOX[@]}" setsid nohup /usr/local/bin/supervise-sand-supervisor \
+				/tmp/sand-supervisor/status.json \
+				/tmp/sand-supervisor.log \
+				/exec-daemon/node /usr/local/bin/sand-supervisor.mjs
+		) >/tmp/sand-supervisor-supervise.log 2>&1 &
+		SAND_SUPERVISOR_SUPERVISE_PID=$!
+	fi
+}
+
+run_box_doctor() {
+	if [ -x /usr/local/bin/box-doctor ]; then
+		("${AS_BOX[@]}" /usr/local/bin/box-doctor 2>&1 | tee /tmp/box-doctor.log) || true &
+	fi
+}
+
+sand_memory_watch_enabled() {
+	case "$(printf '%s' "${SAND_MEMORY_WATCH_DISABLED:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+	1 | true | yes) return 1 ;;
+	*) return 0 ;;
+	esac
+}
+
+start_memory_watch() {
+	if sand_memory_watch_enabled &&
+		[ -x /usr/local/bin/sand-memory-watch ] &&
+		[ -x /usr/bin/python3 ]; then
+		setsid nohup /usr/local/bin/sand-memory-watch \
+			--telemetry-log "${SAND_BOX_TELEMETRY_LOG}" \
+			>>/tmp/sand-memory-watch.log 2>&1 &
+	fi
+}
+
+cli_auth_boot() {
+	[ -x /usr/local/bin/persist-cli-auth ] || return 0
+	"${AS_BOX[@]}" /usr/local/bin/persist-cli-auth retire-mirror \
+		>>/tmp/persist-cli-auth.log 2>&1 || true
+}
+
+apply_box_timezone() {
+	[ -x /usr/local/bin/sand-box-timezone ] || return 0
+	/usr/local/bin/sand-box-timezone apply >>/tmp/sand-box-timezone.log 2>&1 || true
+}
+
+start_desktop() {
+	/usr/local/bin/ensure-machine-id || true
+	"${AS_BOX[@]}" /usr/local/bin/box-bounded-log --run /tmp/start-desktop.log -- \
+		/usr/local/bin/start-desktop.sh &
+	sand_cgroup_place "${SAND_CGROUP_INTERACTIVE_NAME:-interactive}" "$!"
+	desktop_up=0
+	for _ in $(seq 1 150); do
+		if xdpyinfo -display "${DISPLAY}" >/dev/null 2>&1; then
+			desktop_up=1
+			break
+		fi
+		sleep 0.2
+	done
+	if [ "${desktop_up}" = "1" ]; then
+		emit_boot_stage "desktop_up"
+	else
+		emit_boot_failure "desktop" "x_display_timeout"
+	fi
+}
+
+cli_auth_boot
+apply_box_timezone
+start_in_box_supervisor
+start_desktop
+run_box_doctor
+start_memory_watch
+
+sand_exit_watch_enabled() {
+	case "$(printf '%s' "${SAND_EXIT_WATCH_DISABLED:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+	1 | true | yes) return 1 ;;
+	*) return 0 ;;
+	esac
+}
+if sand_exit_watch_enabled &&
+	[ -x /usr/local/bin/sand-exit-watch ] &&
+	[ -x /usr/bin/python3 ]; then
+	shopt -s execfail
+	if [ -n "${SAND_SUPERVISOR_SUPERVISE_PID:-}" ]; then
+		exec /usr/local/bin/sand-exit-watch \
+			--telemetry-log "${SAND_BOX_TELEMETRY_LOG}" \
+			--exec-owner "${EXEC_DAEMON_SUPERVISOR_PID}" \
+			--supervise-owner "${SAND_SUPERVISOR_SUPERVISE_PID}"
+	else
+		exec /usr/local/bin/sand-exit-watch \
+			--telemetry-log "${SAND_BOX_TELEMETRY_LOG}" \
+			--exec-owner "${EXEC_DAEMON_SUPERVISOR_PID}"
+	fi
+	echo "[start-sand-box] sand-exit-watch exec failed; falling back to the plain wait" >&2
+fi
+if [ -n "${SAND_SUPERVISOR_SUPERVISE_PID:-}" ]; then
+	wait -n "${EXEC_DAEMON_SUPERVISOR_PID}" "${SAND_SUPERVISOR_SUPERVISE_PID}"
+	owner_status=$?
+	echo "[start-sand-box] a box lifecycle owner exited (status ${owner_status}); ending the box" >&2
+	exit 1
+else
+	wait "${EXEC_DAEMON_SUPERVISOR_PID}"
+fi

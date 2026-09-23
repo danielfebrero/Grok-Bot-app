@@ -1,0 +1,32 @@
+# Secrets / credentials (do not ship)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credentials*
+*secret*
+*.secret
+id_rsa*
+id_ed25519*
+*.p12
+*.pfx
+
+# Caches only (venv trees under non-stock/ are intentional dump content)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Personal media (belt-and-suspenders)
+*marion*
+*.mp4
+*.mkv
+*.mov
+*.avi

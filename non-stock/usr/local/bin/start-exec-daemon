@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+unset SAND_GATEWAY_TOKEN SAND_INFERENCE_RENEWAL_CREDENTIAL SAND_EGRESS_TUNNEL_BEARER
+export CURSOR_AGENT_SOCKET=/tmp/sand-identity.sock
+{ echo -1000 > /proc/$$/oom_score_adj || sudo -n sh -c "echo -1000 > /proc/$$/oom_score_adj"; } >/dev/null 2>&1 || true
+cd /workspace && /exec-daemon/exec-daemon serve --port 1337 --pty-websocket-port 1338 --auth-token local --rg-path /exec-daemon/rg --pty-auth-token local-pty --computer-use-enabled --computer-use-lazy-init --mcp-meta-tool-enabled --origin-cli-enabled "$@"

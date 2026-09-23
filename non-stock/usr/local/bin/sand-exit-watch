@@ -1,0 +1,281 @@
+#!/usr/bin/python3
+
+import ctypes
+import json
+import os
+import signal
+import sys
+import time
+
+WINDOW_MS_ENV = "SAND_EXIT_WATCH_WINDOW_MS"
+DEFAULT_WINDOW_MS = 60_000
+MAX_COUNT_PER_SIGNATURE = 10_000
+MAX_TELEMETRY_LOG_BYTES = 8 * 1024 * 1024
+IDLE_WAIT_S = 1.0
+
+KNOWN_BINARIES = frozenset(
+    [
+        "cursor",
+        "cursor-nightly",
+        "cursor-lab",
+        "chrome",
+        "node",
+        "exec-daemon",
+        "xvfb",
+        "xfwm4",
+        "picom",
+        "x11vnc",
+        "websockify",
+        "plank",
+        "thunar",
+        "xfce4-terminal",
+    ]
+)
+
+FAULT_SIGNALS = frozenset(
+    [
+        signal.SIGILL,
+        signal.SIGSEGV,
+        signal.SIGABRT,
+        signal.SIGBUS,
+        signal.SIGFPE,
+        signal.SIGTRAP,
+        signal.SIGSYS,
+        signal.SIGQUIT,
+        signal.SIGXCPU,
+        signal.SIGXFSZ,
+    ]
+)
+
+SIGNAL_ENUM = {
+    signal.SIGILL: "sigill",
+    signal.SIGSEGV: "sigsegv",
+    signal.SIGABRT: "sigabrt",
+    signal.SIGBUS: "sigbus",
+}
+
+
+def log(line):
+    print("[sand-exit-watch] %s" % line, file=sys.stderr, flush=True)
+
+
+def best_effort_prctl():
+    # prctl(2) option 15 is PR_SET_NAME and 36 is PR_SET_CHILD_SUBREAPER:
+    # https://github.com/torvalds/linux/blob/v6.15/include/uapi/linux/prctl.h
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        libc.prctl(15, b"sand-exit-watch", 0, 0, 0)
+        libc.prctl(36, 1, 0, 0, 0)
+    except Exception:
+        pass
+
+
+def read_comm(pid):
+    # /proc/<pid>/stat still exists for an unreaped zombie and writes comm (field
+    # 2) in parentheses unescaped, so it is read before waitpid and up to the
+    # last ")": https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html and
+    # https://github.com/torvalds/linux/blob/v6.15/fs/proc/array.c
+    try:
+        with open("/proc/%d/stat" % pid, "rb") as handle:
+            stat = handle.read(4096)
+        start = stat.index(b"(")
+        end = stat.rindex(b")")
+        return stat[start + 1 : end].decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
+def classify_binary(comm):
+    normalized = comm.strip().lower()
+    return normalized if normalized in KNOWN_BINARIES else "other"
+
+
+def classify_signal(signo):
+    return SIGNAL_ENUM.get(signo, "other")
+
+
+def wait_status_exit_code(code, status):
+    if code == os.CLD_EXITED:
+        return status & 0xFF
+    return 128 + (status & 0x7F)
+
+
+def monotonic_ms():
+    return int(time.monotonic() * 1000)
+
+
+class CrashWindow:
+    def __init__(self, telemetry_log, window_ms):
+        self.telemetry_log = telemetry_log
+        self.window_ms = window_ms
+        self.opened_at_ms = None
+        self.counts = {}
+        self.log_full_reported = False
+
+    def record(self, binary, signal_name):
+        if self.opened_at_ms is None:
+            self.opened_at_ms = monotonic_ms()
+        key = (binary, signal_name)
+        self.counts[key] = min(MAX_COUNT_PER_SIGNATURE, self.counts.get(key, 0) + 1)
+
+    def remaining_ms(self):
+        if self.opened_at_ms is None:
+            return None
+        return max(0, self.opened_at_ms + self.window_ms - monotonic_ms())
+
+    def flush_if_due(self):
+        if self.opened_at_ms is not None and self.remaining_ms() == 0:
+            self.flush()
+
+    def flush(self):
+        counts, self.counts, self.opened_at_ms = self.counts, {}, None
+        for (binary, signal_name), count in sorted(counts.items()):
+            record = {
+                "kind": "process_crash",
+                "binary": binary,
+                "signal": signal_name,
+                "count": count,
+            }
+            try:
+                if os.path.exists(self.telemetry_log):
+                    if os.stat(self.telemetry_log).st_size > MAX_TELEMETRY_LOG_BYTES:
+                        if not self.log_full_reported:
+                            self.log_full_reported = True
+                            log("telemetry log over size cap; dropping crash records")
+                        continue
+                with open(self.telemetry_log, "a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(record, sort_keys=True) + "\n")
+            except Exception as error:
+                log("crash record append failed: %r" % (error,))
+
+
+class ExitWatch:
+    def __init__(self, telemetry_log, exec_owner, supervise_owner, window_ms):
+        self.exec_owner = exec_owner
+        self.supervise_owner = supervise_owner
+        self.owners = {pid for pid in (exec_owner, supervise_owner) if pid is not None}
+        self.window = CrashWindow(telemetry_log, window_ms)
+
+    def end_box_for_owner(self, owner_exit_code):
+        self.window.flush()
+        if self.supervise_owner is not None:
+            print(
+                "[start-sand-box] a box lifecycle owner exited (status %d); ending the box"
+                % owner_exit_code,
+                file=sys.stderr,
+                flush=True,
+            )
+            sys.exit(1)
+        sys.exit(owner_exit_code)
+
+    def end_box_owner_untraceable(self):
+        self.end_box_for_owner(127)
+
+    def handle_exit(self, info):
+        if info.si_code in (os.CLD_KILLED, os.CLD_DUMPED):
+            signo = info.si_status
+            if signo in FAULT_SIGNALS:
+                self.window.record(
+                    classify_binary(read_comm(info.si_pid)), classify_signal(signo)
+                )
+        if info.si_pid in self.owners:
+            self.end_box_for_owner(wait_status_exit_code(info.si_code, info.si_status))
+
+    def reap_all(self):
+        while True:
+            try:
+                info = os.waitid(os.P_ALL, 0, os.WEXITED | os.WNOWAIT | os.WNOHANG)
+            except ChildProcessError:
+                self.end_box_owner_untraceable()
+            except InterruptedError:
+                continue
+            if info is None:
+                return
+            self.handle_exit(info)
+            try:
+                os.waitpid(info.si_pid, 0)
+            except (ChildProcessError, InterruptedError):
+                pass
+
+    def check_owner_liveness(self):
+        # kill(2) with signal 0 sends nothing but still runs the existence and
+        # permission checks, so EPERM means the pid exists:
+        # https://man7.org/linux/man-pages/man2/kill.2.html
+        for pid in self.owners:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                self.end_box_owner_untraceable()
+            except PermissionError:
+                pass
+
+    def run(self):
+        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGCHLD})
+        self.check_owner_liveness()
+        while True:
+            try:
+                self.reap_all()
+                self.window.flush_if_due()
+                remaining_ms = self.window.remaining_ms()
+                timeout_s = (
+                    IDLE_WAIT_S
+                    if remaining_ms is None
+                    else min(IDLE_WAIT_S, remaining_ms / 1000)
+                )
+                signal.sigtimedwait([signal.SIGCHLD], max(0.05, timeout_s))
+                self.check_owner_liveness()
+            except SystemExit:
+                raise
+            except Exception as error:
+                log("watch iteration failed: %r" % (error,))
+                time.sleep(1)
+
+
+def parse_args(argv):
+    telemetry_log = None
+    exec_owner = None
+    supervise_owner = None
+    index = 1
+    while index < len(argv):
+        flag = argv[index]
+        value = argv[index + 1] if index + 1 < len(argv) else None
+        if flag == "--telemetry-log" and value is not None:
+            telemetry_log = value
+        elif flag == "--exec-owner" and value is not None and value.isdigit():
+            exec_owner = int(value)
+        elif flag == "--supervise-owner" and value is not None and value.isdigit():
+            supervise_owner = int(value)
+        else:
+            raise SystemExit(
+                "usage: sand-exit-watch --telemetry-log PATH --exec-owner PID [--supervise-owner PID]"
+            )
+        index += 2
+    if telemetry_log is None or exec_owner is None:
+        raise SystemExit(
+            "usage: sand-exit-watch --telemetry-log PATH --exec-owner PID [--supervise-owner PID]"
+        )
+    return telemetry_log, exec_owner, supervise_owner
+
+
+def parse_window_ms(env):
+    raw = env.get(WINDOW_MS_ENV, "")
+    if raw.isdigit() and int(raw) > 0:
+        return int(raw)
+    return DEFAULT_WINDOW_MS
+
+
+def main():
+    telemetry_log, exec_owner, supervise_owner = parse_args(sys.argv)
+    best_effort_prctl()
+    # Python turns SIGINT into KeyboardInterrupt unless the parent changed it
+    # (https://docs.python.org/3/library/signal.html), and pid 1 receives only
+    # signals it has handlers for (https://man7.org/linux/man-pages/man2/kill.2.html),
+    # so SIG_DFL keeps SIGINT undeliverable to the box's pid 1.
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    ExitWatch(
+        telemetry_log, exec_owner, supervise_owner, parse_window_ms(os.environ)
+    ).run()
+
+
+if __name__ == "__main__":
+    main()
