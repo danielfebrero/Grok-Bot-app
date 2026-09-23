@@ -3058,3 +3058,12 @@ usr/local/share/sand-webauthn-proxy.crx	4031
 usr/local/share/sand-webauthn-proxy.id	32
 usr/local/share/sand-webauthn-proxy/background.js	9132
 usr/local/share/sand-webauthn-proxy/manifest.json	327
+/exec-daemon/gh
+/exec-daemon/index.js
+/exec-daemon/node
+/exec-daemon/tools/origin
+/home/box/sand-host/host-main.cjs
+/home/box/sand-host/sand-eval-runner.cjs
+/usr/local/bin/cursor-agent-store-fuse
+/usr/local/bin/uv
+/usr/local/libexec/printing-press/table-reservation-goat-pp-cli

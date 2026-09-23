@@ -2,19 +2,10 @@
 # Format: absolute path<TAB>reason
 /exec-daemon/97f64a4d8eca9a2e35bb.mp4	media file
 /exec-daemon/agent-sdk/cursor/canvas/canvas-tokens.d.ts	secret-like name
-/exec-daemon/gh	over 8 MiB (41517218 bytes)
-/exec-daemon/index.js	over 8 MiB (14388142 bytes)
 /exec-daemon/lib/node_modules/	cache/profile/build metadata
-/exec-daemon/node	over 8 MiB (120177224 bytes)
 /exec-daemon/node_modules/	cache/profile/build metadata
-/exec-daemon/tools/origin	over 8 MiB (104917335 bytes)
-/home/box/sand-host/host-main.cjs	over 8 MiB (27116514 bytes)
 /home/box/sand-host/node_modules/	cache/profile/build metadata
-/home/box/sand-host/sand-eval-runner.cjs	over 8 MiB (18867093 bytes)
-/usr/local/bin/cursor-agent-store-fuse	over 8 MiB (9378448 bytes)
-/usr/local/bin/uv	over 8 MiB (50275840 bytes)
 /usr/local/lib/node_modules/	cache/profile/build metadata
-/usr/local/libexec/printing-press/table-reservation-goat-pp-cli	over 8 MiB (79781634 bytes)
 /usr/local/share/sand-webauthn-proxy.pem	secret-like name
 
 

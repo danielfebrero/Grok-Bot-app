@@ -1,0 +1,10 @@
+non-stock/exec-daemon/node filter=lfs diff=lfs merge=lfs -text
+non-stock/exec-daemon/tools/origin filter=lfs diff=lfs merge=lfs -text
+non-stock/exec-daemon/gh filter=lfs diff=lfs merge=lfs -text
+non-stock/usr/local/bin/uv filter=lfs diff=lfs merge=lfs -text
+non-stock/usr/local/libexec/printing-press/table-reservation-goat-pp-cli filter=lfs diff=lfs merge=lfs -text
+non-stock/home/box/sand-host/host-main.cjs filter=lfs diff=lfs merge=lfs -text
+non-stock/home/box/sand-host/sand-eval-runner.cjs filter=lfs diff=lfs merge=lfs -text
+non-stock/home/box/sand-host/extensions/codebase-telemetry/csnaps filter=lfs diff=lfs merge=lfs -text
+non-stock/exec-daemon/index.js filter=lfs diff=lfs merge=lfs -text
+non-stock/usr/local/bin/cursor-agent-store-fuse filter=lfs diff=lfs merge=lfs -text
