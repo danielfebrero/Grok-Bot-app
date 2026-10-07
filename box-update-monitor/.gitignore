@@ -23,3 +23,5 @@ id_ed25519*
 **/home/box/.cursor/projects/**
 **/home/box/.ssh/**
 **/workspace/**
+reports/PUBLISH-BLOCKED.flag
+.publish.conf

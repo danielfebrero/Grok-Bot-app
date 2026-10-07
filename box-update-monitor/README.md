@@ -16,7 +16,8 @@ perimeter.conf          périmètre surveillé (full = hash + copie texte, hash 
 snapshot.sh             crée snapshots/<YYYY-MM-DD_HH-MM>/
 diff.sh                 compare 2 snapshots -> reports/<snapshot>.md (+ reports/<snapshot>-diffs/*.diff)
 check-update.sh         détection auto (routine) -> snapshot + diff + reports/NOUVEAU-DIFF.flag
-scan-personal-data.sh   scan données perso / secrets à lancer AVANT toute publication (exit 0 = propre)
+scan-personal-data.sh   scan données perso / secrets (exit 0 = propre ; --redact = chemins seulement)
+publish.sh              publication auto sur GitHub, bloquée si le scan n'est pas propre
 VERSION-actuelle        versions/build courantes (réécrit à chaque snapshot)
 lib/bum.py              moteur (python3 stdlib)
 objects/                store dédupliqué par sha256 des fichiers texte (local seulement, gitignoré)
@@ -44,11 +45,13 @@ bash /workspace/box-update-monitor/diff.sh --list
 # Cas "j'ai fait une update, compare" en une commande :
 bash /workspace/box-update-monitor/check-update.sh --deep
 
-# Routine auto
+# Routine auto (flux complet : détection -> publication)
 bash /workspace/box-update-monitor/check-update.sh
 #   exit 0  + "NO_CHANGE last=<snap>"                         -> rien à faire
-#   exit 10 + "CHANGED old=.. new=.. report=<chemin .md> ..." -> lire le rapport, notifier,
-#             puis consommer le flag : rm /workspace/box-update-monitor/reports/NOUVEAU-DIFF.flag
+#   exit 10 + "CHANGED old=.. new=.. report=<chemin .md> ..." -> alors :
+bash /workspace/box-update-monitor/publish.sh
+#             puis lire le rapport, notifier, et consommer le flag :
+#             rm /workspace/box-update-monitor/reports/NOUVEAU-DIFF.flag
 #   exit 0  + "BASELINE snapshot=<snap>"                      -> premier snapshot créé
 #   exit 3 verrou occupé ; exit 1 erreur
 ```
@@ -81,3 +84,29 @@ Le repo est **public**. Règles :
   utilisateur (`sand-data` sauf managed-skills, chrome-profile, .cursor/projects, .ssh, workspace, *secret*, *.key…).
 - Les adresses e-mail/IP présentes dans les copies sont celles des **paquets open source** (auteurs npm,
   exemples de doc, liste des suffixes publics) ou des **templates officekit** (noms fictifs) — pas des données perso.
+
+## Publication automatique : `publish.sh`
+Flux auto de la routine : `check-update.sh` → (si exit 10) `publish.sh` → notification.
+
+`publish.sh [--dry-run]` :
+1. prend le verrou partagé `.lock` (attend 10 min max, sinon exit 3) ;
+2. lit `.publish.conf` (**local, gitignoré** : repo cible, branche, identité git), met à jour un clone persistant (`/workspace/.box-update-monitor-publish-repo`, surchargeable par
+   `PUBLISH_REPO_DIR`) sur `origin/main`, y recopie l'état publiable du dossier (mêmes exclusions que le
+   `.gitignore`) et fait `git add -A box-update-monitor` ;
+3. s'il n'y a aucun changement → `NOTHING_TO_PUBLISH`, exit 0 ;
+4. lance `scan-personal-data.sh --redact` sur **exactement** les fichiers ajoutés/modifiés qui seraient poussés ;
+5. scan **non propre** → rien n'est commité ni poussé, le clone est remis à `origin/main`, et
+   `reports/PUBLISH-BLOCKED.flag` (local, gitignoré) est écrit : date, chemins, n° de règle de
+   `.pii-denylist`, nombre d'occurrences — **jamais la valeur perso brute**. Exit **2** ;
+6. scan propre → commit avec l'identité git de `.publish.conf`, message
+   `box-update-monitor: snapshot <nom> (<label>); diff <nom> +A/-S/~M`, push sur `main`
+   (compte propriétaire du repo : `GH_TOKEN`/`GITHUB_TOKEN` désactivés dans le script ; 1 retry après
+   `pull --rebase`). Affiche `PUBLISHED commit=<sha>`, exit **0**. Un ancien `PUBLISH-BLOCKED.flag`
+   est alors archivé dans `logs/`.
+
+Codes : 0 publié / rien à publier / dry-run propre · 2 bloqué par le scan · 3 verrou occupé · 1 erreur.
+`--dry-run` fait tout (copie + scan + message de commit) sauf le commit/push, puis remet le clone à zéro.
+Journal : `logs/publish.log`.
+
+Si `PUBLISH-BLOCKED.flag` apparaît : corriger/masquer la donnée dans le dossier local (ou exclure le chemin
+du périmètre / `.gitignore`), relancer `publish.sh`. Le scan n'est jamais contourné.
