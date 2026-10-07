@@ -1,0 +1,352 @@
+/**
+ * "Home Decor Inspiration" — 15-slide deck rebuilt with pptxgenjs.
+ *
+ * Run:  node 18caed5c-dcbe-40be-a26e-ed3d80d792b0_grok_final.js
+ * Out:  18caed5c-dcbe-40be-a26e-ed3d80d792b0_grok_final.pptx  (next to this file)
+ *
+ * The original deck uses empty PowerPoint picture placeholders for its photos.
+ * Those hold no raster data, so nothing is drawn for them here; the only real
+ * bitmaps (two phone mock-ups on slide 13) are redrawn as native shapes.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+
+const COLOR = {
+  darkBrown: '4B3D30', // headings, dark cards, buttons
+  midBrown:  '71635A', // secondary panels / circles
+  tan:       'B79F92', // accent panels / circles
+  sand:      'CBBAB1', // title + closing slide background
+  white:     'FFFFFF',
+  bodyText:  '404040', // tx1 @ 75% luminance in the original
+  gridLine:  'D9D9D9', // chart gridlines / category axis
+};
+
+const HEAD_FONT = 'Libre Baskerville';
+const BODY_FONT = 'Ovo';
+const BODY_SIZE = 12;
+
+/* Filler copy. The deck reuses one paragraph, truncated at six lengths. */
+const LOREM = {
+  xs: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent imperdiet quis eros sed pellentesque. Quisque sed pretium purus, nec luctus lorem. ',
+  s: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent imperdiet quis eros sed pellentesque. Quisque sed pretium purus, nec luctus lorem. Morbi molestie tincidunt hendrerit. Maecenas nisi massa, tempor in convallis eu, accumsan sit amet purus',
+  m: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent imperdiet quis eros sed pellentesque. Quisque sed pretium purus, nec luctus lorem. Morbi molestie tincidunt hendrerit. Maecenas nisi massa, tempor in convallis eu, accumsan sit amet purus. Aliquam erat volutpat. Donec venenatis fermentum lacus id congue. ',
+  mPlus: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent imperdiet quis eros sed pellentesque. Quisque sed pretium purus, nec luctus lorem. Morbi molestie tincidunt hendrerit. Maecenas nisi massa, tempor in convallis eu, accumsan sit amet purus. Aliquam erat volutpat. Donec venenatis fermentum lacus id congue. Etiam porttitor massa nec turpis malesuada, molestie venenatis turpis.',
+  l: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent imperdiet quis eros sed pellentesque. Quisque sed pretium purus, nec luctus lorem. Morbi molestie tincidunt hendrerit. Maecenas nisi massa, tempor in convallis eu, accumsan sit amet purus. Aliquam erat volutpat. Donec venenatis fermentum lacus id congue. Etiam porttitor massa nec turpis malesuada, molestie venenatis turpis blandit. Donec accumsan sollicitudin ante, non sagittis sapien dignissim et. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Duis at neque in felis semper tincidunt. ',
+  full: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent imperdiet quis eros sed pellentesque. Quisque sed pretium purus, nec luctus lorem. Morbi molestie tincidunt hendrerit. Maecenas nisi massa, tempor in convallis eu, accumsan sit amet purus. Aliquam erat volutpat. Donec venenatis fermentum lacus id congue. Etiam porttitor massa nec turpis malesuada, molestie venenatis turpis blandit. Donec accumsan sollicitudin ante, non sagittis sapien dignissim et. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Duis at neque in felis semper tincidunt. Suspendisse bibendum tempor gravida.',
+};
+
+/* ------------------------------------------------------------------ *
+ * Drawing helpers
+ * ------------------------------------------------------------------ */
+
+/** Filled circle; (x, y) is the top-left of its bounding box. */
+function circle(slide, x, y, size, color) {
+  slide.addShape('ellipse', { x, y, w: size, h: size, fill: { color } });
+}
+
+/** Filled rectangle. */
+function panel(slide, x, y, w, h, color) {
+  slide.addShape('rect', { x, y, w, h, fill: { color } });
+}
+
+/** Rounded rectangle using PowerPoint's default 16.667% corner radius. */
+function card(slide, x, y, w, h, color) {
+  slide.addShape('roundRect', {
+    x, y, w, h, fill: { color }, rectRadius: Math.min(w, h) * 0.16667,
+  });
+}
+
+/** Fully rounded "pill" button (corner radius = half the height). */
+function pill(slide, x, y, w, h, color) {
+  slide.addShape('roundRect', { x, y, w, h, fill: { color }, rectRadius: h / 2 });
+}
+
+/** Libre Baskerville bold headline. Boxes never wrap in the original. */
+function heading(slide, txt, x, y, w, h, size, color, align) {
+  slide.addText(txt, {
+    x, y, w, h,
+    fontFace: HEAD_FONT, fontSize: size, bold: true, color,
+    align: align || 'left', valign: 'top', wrap: false, fit: 'resize',
+  });
+}
+
+/** Ovo 12pt running copy. */
+function paragraph(slide, txt, x, y, w, h, color, align) {
+  slide.addText(txt, {
+    x, y, w, h,
+    fontFace: BODY_FONT, fontSize: BODY_SIZE, color,
+    align: align || 'left', valign: 'top', fit: 'resize',
+  });
+}
+
+/**
+ * Placeholder for the phone-mockup photograph on slide 13: dark rounded body,
+ * white screen, camera dot and speaker bars. Fractions were measured off the
+ * original bitmap so the drawing lands where the photo used to be.
+ */
+function phoneMockup(slide, x, y, w, h) {
+  const at = (fx, fy, fw, fh) => ({ x: x + fx * w, y: y + fy * h, w: fw * w, h: fh * h });
+  const shadowBox = at(0.103, 0.031, 0.837, 0.945);
+  const bodyBox = at(0.130, 0.034, 0.795, 0.918);
+  slide.addShape('roundRect', {
+    ...shadowBox, fill: { color: 'CBCBCB' }, rectRadius: shadowBox.w * 0.118,
+  });
+  slide.addShape('roundRect', {
+    ...bodyBox, fill: { color: '303030' }, rectRadius: bodyBox.w * 0.118,
+  });
+  slide.addShape('rect', { ...at(0.158, 0.130, 0.742, 0.740), fill: { color: COLOR.white } });
+  slide.addShape('ellipse', { ...at(0.277, 0.068, 0.026, 0.015), fill: { color: '151515' } });
+  slide.addShape('roundRect', {
+    ...at(0.387, 0.069, 0.285, 0.013), fill: { color: '151515' }, rectRadius: 0.03,
+  });
+  slide.addShape('roundRect', {
+    ...at(0.387, 0.913, 0.285, 0.012), fill: { color: '151515' }, rectRadius: 0.03,
+  });
+  // Volume rocker + power button on the right-hand edge
+  [[0.337, 0.058], [0.428, 0.117]].forEach(([top, tall]) => {
+    slide.addShape('rect', { ...at(0.925, top, 0.015, tall), fill: { color: 'CBCBCB' } });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+// 1 — Title
+function slideTitle(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: COLOR.sand };
+  circle(s, 3.774, 5.024, 4.952, COLOR.midBrown);
+  circle(s, 10.149, -1.288, 4.952, COLOR.darkBrown);
+  heading(s, 'Home Decor', 0.995, 2.476, 4.772, 0.909, 48, COLOR.darkBrown);
+  heading(s, 'Inspiration', 0.995, 3.135, 4.162, 0.909, 48, COLOR.darkBrown);
+  paragraph(s, LOREM.xs, 0.995, 3.999, 4.299, 0.707, COLOR.bodyText);
+  pill(s, 1.097, 4.86, 1.812, 0.5, COLOR.darkBrown);
+  paragraph(s, 'Start Presentation', 1.222, 4.959, 1.562, 0.303, COLOR.white, 'center');
+  circle(s, -1.321, -2.955, 4.952, COLOR.tan);
+}
+
+// 2 — Introduction
+function slideIntroduction(pptx) {
+  const s = pptx.addSlide();
+  panel(s, 7.979, 0, 5.354, 7.5, COLOR.midBrown);
+  heading(s, 'Introduction', 1.165, 2.639, 4.011, 0.774, 40, COLOR.darkBrown);
+  paragraph(s, LOREM.full, 1.165, 3.44, 4.792, 2.322, COLOR.bodyText);
+  pill(s, 1.248, 5.899, 2.148, 0.5, COLOR.darkBrown);
+  paragraph(s, 'www.yourwebsite.com', 1.352, 5.997, 1.94, 0.303, COLOR.white, 'center');
+  panel(s, 0, 0.709, 5.354, 1.418, COLOR.tan);
+}
+
+// 3 — Importance of Home Decor
+function slideImportance(pptx) {
+  const s = pptx.addSlide();
+  panel(s, 0, 4.455, 7.222, 2.466, COLOR.tan);
+  heading(s, 'Importance of', 7.698, 1.877, 4.458, 0.774, 40, COLOR.darkBrown);
+  heading(s, 'Home Decor', 7.698, 2.536, 4.006, 0.774, 40, COLOR.darkBrown);
+  paragraph(s, LOREM.full, 0.635, 4.878, 6.419, 1.717, COLOR.bodyText);
+  circle(s, -1.299, -2.301, 4.952, COLOR.midBrown);
+  panel(s, 7.979, -0.014, 5.354, 1.418, COLOR.tan);
+}
+
+// 4 — Elements of Home Decor (three numbered cards)
+function slideElements(pptx) {
+  const s = pptx.addSlide();
+  heading(s, 'Elements of', 0.726, 1.611, 3.757, 0.774, 40, COLOR.darkBrown);
+  heading(s, 'Home Decor', 0.726, 2.269, 4.006, 0.774, 40, COLOR.darkBrown);
+
+  const rows = [
+    { top: 0.552, card: COLOR.darkBrown, bullet: COLOR.tan,       num: COLOR.darkBrown, text: COLOR.white },
+    { top: 2.744, card: COLOR.tan,       bullet: COLOR.darkBrown, num: COLOR.white,     text: COLOR.bodyText },
+    { top: 4.936, card: COLOR.darkBrown, bullet: COLOR.tan,       num: COLOR.darkBrown, text: COLOR.white },
+  ];
+  rows.forEach((row, i) => {
+    card(s, 7.413, row.top, 5.194, 2.077, row.card);
+    circle(s, 6.794, row.top + 0.419, 1.238, row.bullet);
+    heading(s, String(i + 1), 7.021, row.top + 0.651, 0.783, 0.774, 40, row.num, 'center');
+    heading(s, 'Your Text', 8.195, row.top + 0.299, 1.701, 0.438, 20, row.text);
+    paragraph(s, LOREM.s, 8.195, row.top + 0.651, 4.135, 1.111, row.text);
+  });
+
+  circle(s, 1.058, -3.561, 4.952, COLOR.tan);
+}
+
+// 5 — Interior Design Style
+function slideDesignStyle(pptx) {
+  const s = pptx.addSlide();
+  circle(s, 9.919, 4.257, 4.952, COLOR.tan);
+  circle(s, 4.159, -2.449, 4.952, COLOR.midBrown);
+  heading(s, 'Interior', 1.313, 1.928, 2.523, 0.774, 40, COLOR.darkBrown);
+  heading(s, 'Design Style', 1.313, 2.587, 3.885, 0.774, 40, COLOR.darkBrown);
+  paragraph(s, LOREM.m, 1.313, 3.361, 4.792, 1.313, COLOR.bodyText);
+  panel(s, 0, 4.994, 5.718, 1.892, COLOR.tan);
+  paragraph(s, LOREM.mPlus, 0.321, 5.184, 5.171, 1.313, COLOR.bodyText);
+}
+
+// 6 — Living Room Inspiration
+function slideLivingRoom(pptx) {
+  const s = pptx.addSlide();
+  panel(s, 0, 5.111, 13.333, 2.389, COLOR.tan);
+  heading(s, 'Living Room', 1.476, 1.452, 4.101, 0.774, 40, COLOR.darkBrown);
+  heading(s, 'Inspiration', 1.476, 2.111, 3.503, 0.774, 40, COLOR.darkBrown);
+  paragraph(s, LOREM.l, 5.857, 1.367, 6.873, 1.515, COLOR.bodyText);
+  circle(s, -0.725, -1.561, 3.121, COLOR.midBrown);
+}
+
+// 7 — Bedroom Inspiration
+function slideBedroom(pptx) {
+  const s = pptx.addSlide();
+  heading(s, 'Bedroom', 7.758, 1.992, 3.005, 0.774, 40, COLOR.darkBrown);
+  heading(s, 'Inspiration', 7.758, 2.65, 3.503, 0.774, 40, COLOR.darkBrown);
+  paragraph(s, LOREM.m, 7.758, 3.493, 4.792, 1.313, COLOR.bodyText);
+  panel(s, 6.111, 5.05, 7.222, 2.466, COLOR.tan);
+  paragraph(s, LOREM.full, 6.746, 5.474, 6.419, 1.717, COLOR.bodyText);
+  circle(s, -1.64, -1.456, 4.529, COLOR.midBrown);
+  circle(s, 11.928, 0.561, 2.81, COLOR.sand);
+}
+
+// 8 — Kitchen Inspiration
+function slideKitchen(pptx) {
+  const s = pptx.addSlide();
+  heading(s, 'Kitchen', 1.173, 1.245, 2.532, 0.774, 40, COLOR.darkBrown);
+  heading(s, 'Inspiration', 1.173, 1.904, 3.503, 0.774, 40, COLOR.darkBrown);
+  paragraph(s, LOREM.full, 7.188, 4.29, 5.175, 2.121, COLOR.bodyText);
+  panel(s, 7.188, -0.014, 6.146, 2.931, COLOR.tan);
+  paragraph(s, LOREM.l, 7.616, 0.492, 5.288, 1.919, COLOR.bodyText);
+  circle(s, -0.545, 4.684, 3.804, COLOR.midBrown);
+}
+
+// 9 — Bathroom Inspiration
+function slideBathroom(pptx) {
+  const s = pptx.addSlide();
+  panel(s, 10.729, 0, 2.604, 7.5, COLOR.midBrown);
+  heading(s, 'Bathroom', 5.394, 1.876, 3.224, 0.774, 40, COLOR.darkBrown);
+  heading(s, 'Inspiration', 5.394, 2.535, 3.503, 0.774, 40, COLOR.darkBrown);
+  paragraph(s, LOREM.m, 5.394, 3.353, 3.84, 1.515, COLOR.bodyText);
+  circle(s, -1.64, -1.456, 4.529, COLOR.tan);
+}
+
+// 10 — DIY Home Decor Project (three project cards)
+function slideProjects(pptx) {
+  const s = pptx.addSlide();
+  heading(s, 'DIY Home', 0.965, 1.749, 3.38, 0.774, 40, COLOR.darkBrown);
+  heading(s, 'Decor Project', 0.965, 2.407, 4.252, 0.774, 40, COLOR.darkBrown, 'center');
+  panel(s, 0, 4.649, 13.333, 2.851, COLOR.midBrown);
+
+  const projects = [
+    { x: 0.965, card: COLOR.darkBrown, text: COLOR.white,    label: 'Project 01', labelX: 2.021, labelW: 1.662 },
+    { x: 4.878, card: COLOR.tan,       text: COLOR.bodyText, label: 'Project 02', labelX: 5.903, labelW: 1.722 },
+    { x: 8.79,  card: COLOR.darkBrown, text: COLOR.white,    label: 'Project 03', labelX: 9.818, labelW: 1.718 },
+  ];
+  projects.forEach((p) => {
+    card(s, p.x, 3.75, 3.75, 3.0, p.card);
+    heading(s, p.label, p.labelX, 4.228, p.labelW, 0.438, 20, p.text, 'center');
+    paragraph(s, LOREM.s, p.x + 0.393, 4.649, 2.987, 1.717, p.text, 'center');
+  });
+
+  circle(s, 3.671, -2.103, 3.927, COLOR.tan);
+}
+
+// 11 — Break slide
+function slideBreak(pptx) {
+  const s = pptx.addSlide();
+  panel(s, 7.59, 0, 5.743, 7.5, COLOR.midBrown);
+  panel(s, 10.208, 0, 3.125, 7.5, COLOR.tan);
+  heading(s, 'Break Slide', 1.153, 5.181, 5.288, 1.111, 60, COLOR.darkBrown);
+  paragraph(s, LOREM.xs, 1.153, 6.264, 5.743, 0.505, COLOR.bodyText);
+}
+
+// 12 — Our Chart (clustered column chart)
+function slideChart(pptx) {
+  const s = pptx.addSlide();
+  heading(s, 'Our Chart', 1.037, 1.409, 3.233, 0.774, 40, COLOR.darkBrown);
+  paragraph(s, LOREM.m, 1.037, 2.288, 3.84, 1.515, COLOR.bodyText);
+
+  const categories = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+  const series = [
+    { name: 'Series 1', labels: categories, values: [4.3, 2.5, 3.5, 4.5] },
+    { name: 'Series 2', labels: categories, values: [2.4, 4.4, 1.8, 2.8] },
+    { name: 'Series 3', labels: categories, values: [2.0, 2.0, 3.0, 5.0] },
+  ];
+  s.addChart(pptx.ChartType.bar, series, {
+    x: 5.571, y: 0.787, w: 7.165, h: 5.926,
+    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 219, barOverlapPct: -27,
+    chartColors: [COLOR.darkBrown, COLOR.midBrown, COLOR.tan],
+    showLegend: true, legendPos: 'b',
+    legendFontFace: BODY_FONT, legendFontSize: BODY_SIZE, legendColor: COLOR.bodyText,
+    catAxisLabelFontFace: BODY_FONT, catAxisLabelFontSize: BODY_SIZE, catAxisLabelColor: COLOR.bodyText,
+    valAxisLabelFontFace: BODY_FONT, valAxisLabelFontSize: BODY_SIZE, valAxisLabelColor: COLOR.bodyText,
+    catAxisLineColor: COLOR.gridLine, valAxisLineShow: false,
+    catAxisMajorTickMark: 'none', valAxisMajorTickMark: 'none', catAxisLabelPos: 'nextTo',
+    catGridLine: { style: 'none' }, valGridLine: { color: COLOR.gridLine, size: 1 },
+    chartArea: { roundedCorners: false },
+  });
+
+  card(s, 1.037, 4.007, 3.75, 2.194, COLOR.darkBrown);
+  heading(s, '1000++', 1.784, 4.577, 2.348, 0.774, 40, COLOR.white, 'center');
+  heading(s, 'Your Text', 2.107, 5.239, 1.701, 0.438, 20, COLOR.white, 'center');
+}
+
+// 13 — Shopping & Resources (two phone mock-ups)
+function slideShopping(pptx) {
+  const s = pptx.addSlide();
+  panel(s, -0.051, 0, 6.16, 7.5, COLOR.midBrown);
+  heading(s, 'Shopping', 0.809, 1.991, 3.079, 0.774, 40, COLOR.white);
+  heading(s, '& Resources', 0.809, 2.649, 3.848, 0.774, 40, COLOR.white);
+  paragraph(s, LOREM.full, 0.809, 3.547, 4.64, 2.322, COLOR.white);
+  phoneMockup(s, 9.429, 0.702, 3.32, 5.965);
+  phoneMockup(s, 6.442, 0.702, 3.32, 5.965);
+}
+
+// 14 — Conclusion
+function slideConclusion(pptx) {
+  const s = pptx.addSlide();
+  heading(s, 'Conclusion', 1.558, 1.84, 3.598, 0.774, 40, COLOR.darkBrown);
+  paragraph(s, LOREM.m, 1.558, 2.719, 4.379, 1.313, COLOR.bodyText);
+  panel(s, 0.007, 4.427, 9.66, 1.97, COLOR.darkBrown);
+  paragraph(s, LOREM.full, 0.642, 4.787, 8.585, 1.313, COLOR.white);
+  circle(s, 5.266, -1.644, 3.927, COLOR.tan);
+}
+
+// 15 — Thanks
+function slideThanks(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: COLOR.sand };
+  circle(s, 4.024, 5.674, 4.952, COLOR.midBrown);
+  circle(s, -1.374, -1.997, 4.952, COLOR.tan);
+  heading(s, 'Thanks for', 7.271, 2.58, 4.131, 0.909, 48, COLOR.darkBrown);
+  heading(s, 'Your Attention', 7.271, 3.24, 5.526, 0.909, 48, COLOR.darkBrown);
+  paragraph(s, LOREM.xs, 7.271, 4.103, 4.299, 0.707, COLOR.bodyText);
+  pill(s, 7.373, 4.965, 2.21, 0.5, COLOR.darkBrown);
+  paragraph(s, 'www.yourwebsite.com', 7.498, 5.063, 2.012, 0.303, COLOR.white, 'center');
+  circle(s, 9.545, -2.375, 4.952, COLOR.darkBrown);
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE'; // 13.333in x 7.5in
+  pptx.title = 'Home Decor Inspiration';
+
+  [
+    slideTitle, slideIntroduction, slideImportance, slideElements, slideDesignStyle,
+    slideLivingRoom, slideBedroom, slideKitchen, slideBathroom, slideProjects,
+    slideBreak, slideChart, slideShopping, slideConclusion, slideThanks,
+  ].forEach((buildSlide) => buildSlide(pptx));
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '18caed5c-dcbe-40be-a26e-ed3d80d792b0_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

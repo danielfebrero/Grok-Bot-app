@@ -1,0 +1,9 @@
+snapshot	2026-10-07_16-53
+created	2026-10-07 16:53:50 CEST
+label	BASELINE initial (périmètre sans plugins utilisateur)
+files	14678
+text_copies	4281
+big_text_gz	4
+unreadable	0
+bytes_hashed	1827796988
+duration_s	5.0

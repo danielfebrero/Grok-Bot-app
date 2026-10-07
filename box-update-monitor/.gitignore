@@ -1,0 +1,25 @@
+# --- box-update-monitor : ne jamais publier ---
+# motifs perso du scanner (contient justement ce qu'il ne faut pas publier)
+.pii-denylist
+# store dédupliqué (doublon binaire de snapshots/*/files, noms = hash)
+objects/
+# état local / runtime
+logs/
+.lock
+reports/NOUVEAU-DIFF.flag
+snapshots/*.partial/
+# belt-and-suspenders : jamais de secrets ni de données utilisateur de la box
+*.env
+.env*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*secret*
+*credential*
+**/home/box/sand-data/*
+!**/home/box/sand-data/managed-skills/
+**/home/box/chrome-profile/**
+**/home/box/.cursor/projects/**
+**/home/box/.ssh/**
+**/workspace/**

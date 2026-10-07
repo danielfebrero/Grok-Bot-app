@@ -1,0 +1,771 @@
+/**
+ * Cardiology Presentation - recreated with pptxgenjs.
+ *
+ *   node 0ea54e6a-6625-4a37-b9a2-7e29e6093c45_grok_final.js   ->   0ea54e6a-6625-4a37-b9a2-7e29e6093c45_grok_final.pptx
+ *
+ * Slide size 13.333 x 7.5 in (16:9). Brand palette, type scale and the
+ * recurring decorative motifs (badges, corner blobs, notched tabs, social
+ * chips) are defined once below and reused by the per-slide builders.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette
+const C = {
+  red:   'D43440',  // accent1
+  coral: 'F45059',  // accent2
+  sand:  'ECEBE9',  // accent3
+  teal:  '65BABF',  // accent4
+  sea:   '018EA0',  // accent5
+  navy:  '085879',  // accent6
+  white: 'FFFFFF',
+  ink:   '000000',
+  ink2:  '0D0D0D',
+  body:  '808080',  // bg2 lumMod 50%
+  nav:   '595959',  // tx1 lumMod 65%
+  gold:  'FFC000',
+};
+
+const HEAD = 'Archivo SemiBold';   // theme major font
+const BODY = 'Krub';               // theme minor font
+const PAD  = [7.2, 7.2, 3.6, 3.6]; // lIns, rIns, bIns, tIns (pt)
+
+const NUMBER = { type: 'number', style: 'arabicPeriod', indent: 27 };
+const DOT    = { characterCode: '2022', indent: 22.5 };
+
+// Three outer-shadow recipes used throughout the deck (all black @ 10%).
+const SOFT = { type: 'outer', blur: 25, offset: 0,  angle: 90, color: C.ink, opacity: 0.1 };
+const DROP = { type: 'outer', blur: 8,  offset: 4,  angle: 90, color: C.ink, opacity: 0.1 };
+const DEEP = { type: 'outer', blur: 63, offset: 43, angle: 45, color: C.ink, opacity: 0.1 };
+
+// pptxgenjs rewrites the shadow object it is handed (pt -> EMU), so every shape
+// must get its own copy or the presets accumulate conversions.
+const fx = preset => (preset ? Object.assign({}, preset) : undefined);
+
+// -------------------------------------------------------- vector artwork
+// Normalised (0..1) outlines lifted from the deck's icon set. Each entry is a
+// list of path steps: [x,y] = line/move, [x1,y1,x2,y2,x,y] = cubic bezier,
+// [] = close. `drawPath` maps them onto a pptxgenjs custGeom shape.
+const ART = {
+  heart:   [[0.5,1.0],[0.485,1.0,0.471,0.997,0.457,0.991],[0.443,0.985,0.431,0.976,0.42,0.964],[0.085,0.59],[0.056,0.558,0.034,0.521,0.021,0.479],[0.007,0.437,0.0,0.394,0.0,0.349],[0.0,0.253,0.028,0.171,0.084,0.103],[0.14,0.034,0.209,0.0,0.292,0.0],[0.332,0.0,0.37,0.009,0.406,0.026],[0.441,0.044,0.472,0.069,0.5,0.1],[0.527,0.069,0.558,0.044,0.593,0.026],[0.629,0.009,0.666,0.0,0.706,0.0],[0.79,0.0,0.859,0.034,0.916,0.103],[0.972,0.171,1.0,0.253,1.0,0.347],[1.0,0.393,0.993,0.436,0.979,0.478],[0.965,0.519,0.943,0.556,0.915,0.589],[0.579,0.964],[0.568,0.976,0.556,0.985,0.542,0.991],[0.529,0.997,0.515,1.0,0.5,1.0],[],[0.55,0.278],[0.558,0.278,0.566,0.28,0.574,0.285],[0.581,0.289,0.587,0.295,0.591,0.303],[0.676,0.444],[0.884,0.444],[0.89,0.429,0.894,0.413,0.897,0.397],[0.9,0.38,0.901,0.364,0.901,0.347],[0.9,0.283,0.88,0.228,0.844,0.183],[0.807,0.137,0.761,0.114,0.706,0.114],[0.68,0.114,0.656,0.119,0.632,0.131],[0.608,0.142,0.588,0.158,0.57,0.179],[0.536,0.219],[0.532,0.225,0.527,0.229,0.52,0.233],[0.513,0.236,0.507,0.237,0.5,0.237],[0.493,0.237,0.487,0.236,0.48,0.233],[0.473,0.229,0.468,0.225,0.462,0.219],[0.429,0.179],[0.411,0.158,0.391,0.141,0.368,0.129],[0.344,0.117,0.319,0.111,0.292,0.111],[0.238,0.111,0.192,0.134,0.155,0.181],[0.118,0.228,0.1,0.283,0.1,0.347],[0.1,0.364,0.101,0.38,0.104,0.397],[0.106,0.413,0.11,0.429,0.116,0.444],[0.35,0.444],[0.358,0.444,0.366,0.447,0.374,0.451],[0.381,0.456,0.387,0.462,0.391,0.469],[0.435,0.542],[0.502,0.317],[0.506,0.306,0.512,0.296,0.521,0.289],[0.529,0.281,0.539,0.278,0.55,0.278],[],[0.565,0.458],[0.498,0.683],[0.494,0.694,0.488,0.704,0.479,0.711],[0.47,0.719,0.46,0.722,0.449,0.722],[0.44,0.722,0.432,0.72,0.425,0.715],[0.418,0.711,0.412,0.705,0.408,0.697],[0.322,0.556],[0.195,0.556],[0.491,0.885],[0.493,0.887,0.494,0.888,0.496,0.888],[0.497,0.889,0.498,0.889,0.5,0.889],[0.502,0.889,0.503,0.889,0.504,0.888],[0.506,0.888,0.507,0.887,0.509,0.885],[0.804,0.556],[0.65,0.556],[0.642,0.556,0.634,0.553,0.626,0.549],[0.619,0.544,0.612,0.538,0.608,0.531],[0.565,0.458],[]],
+  plus:    [[0.913,0.36],[0.641,0.36],[0.641,0.087],[0.641,0.039,0.602,0.0,0.554,0.0],[0.448,0.0],[0.399,0.0,0.361,0.039,0.361,0.087],[0.361,0.36],[0.087,0.36],[0.039,0.36,0.0,0.399,0.0,0.447],[0.0,0.553],[0.0,0.601,0.039,0.64,0.087,0.64],[0.36,0.64],[0.36,0.913],[0.36,0.961,0.399,1.0,0.447,1.0],[0.553,1.0],[0.601,1.0,0.64,0.961,0.64,0.913],[0.64,0.64],[0.913,0.64],[0.961,0.64,1.0,0.601,1.0,0.553],[1.0,0.447],[1.001,0.399,0.962,0.36,0.913,0.36],[]],
+  quarter: [[0.0,0.0],[1.0,0.0],[0.995,0.089],[0.947,0.567,0.567,0.947,0.089,0.995],[0.0,1.0],[]],
+  xLogo:   [[0.003,0.997],[0.004,0.995,0.092,0.895,0.197,0.776],[0.303,0.656,0.389,0.557,0.389,0.556],[0.389,0.555,0.303,0.432,0.198,0.282],[0.093,0.133,0.006,0.008,0.004,0.005],[0.0,0.0],[0.149,0.0],[0.297,0.0],[0.426,0.184],[0.497,0.284,0.556,0.367,0.556,0.367],[0.557,0.366,0.627,0.287,0.713,0.19],[0.798,0.092,0.871,0.01,0.874,0.006],[0.881,0.0],[0.924,0.001],[0.967,0.001],[0.781,0.212],[0.679,0.328,0.596,0.424,0.597,0.425],[0.597,0.426,0.686,0.553,0.795,0.708],[0.904,0.863,0.994,0.992,0.996,0.995],[1.0,1.0],[0.851,1.0],[0.703,1.0],[0.567,0.807],[0.492,0.7,0.43,0.614,0.429,0.614],[0.428,0.614,0.351,0.701,0.258,0.807],[0.089,0.999],[0.044,1.0],[0.002,1.0,-0.0,1.0,0.003,0.997],[],[0.663,0.635],[0.544,0.469,0.404,0.273,0.351,0.199],[0.255,0.065],[0.188,0.065],[0.151,0.065,0.12,0.065,0.12,0.065],[0.12,0.066,0.73,0.919,0.739,0.931],[0.744,0.938],[0.812,0.938],[0.879,0.938],[]],
+  igFrame: [[0.5,0.09],[0.634,0.09,0.649,0.091,0.702,0.093],[0.757,0.095,0.813,0.108,0.852,0.148],[0.892,0.188,0.905,0.243,0.907,0.298],[0.909,0.351,0.91,0.366,0.91,0.5],[0.91,0.634,0.909,0.649,0.907,0.702],[0.905,0.756,0.892,0.813,0.852,0.852],[0.812,0.892,0.757,0.905,0.702,0.907],[0.649,0.909,0.634,0.91,0.5,0.91],[0.366,0.91,0.351,0.909,0.298,0.907],[0.244,0.905,0.187,0.892,0.148,0.852],[0.108,0.812,0.095,0.756,0.093,0.702],[0.091,0.649,0.09,0.634,0.09,0.5],[0.09,0.366,0.091,0.351,0.093,0.298],[0.095,0.244,0.108,0.187,0.148,0.148],[0.188,0.108,0.243,0.095,0.298,0.093],[0.351,0.091,0.366,0.09,0.5,0.09],[0.5,0.0],[0.364,0.0,0.347,0.001,0.294,0.003],[0.217,0.007,0.14,0.028,0.084,0.084],[0.028,0.14,0.007,0.217,0.003,0.294],[0.001,0.347,0.0,0.364,0.0,0.5],[0.0,0.636,0.001,0.653,0.003,0.706],[0.007,0.783,0.028,0.86,0.084,0.916],[0.14,0.972,0.217,0.993,0.294,0.997],[0.347,0.999,0.364,1.0,0.5,1.0],[0.636,1.0,0.653,0.999,0.706,0.997],[0.783,0.993,0.86,0.972,0.916,0.916],[0.972,0.86,0.993,0.783,0.997,0.706],[0.999,0.653,1.0,0.636,1.0,0.5],[1.0,0.364,0.999,0.347,0.997,0.294],[0.993,0.217,0.972,0.14,0.916,0.084],[0.86,0.028,0.783,0.006,0.706,0.003],[0.653,0.001,0.636,0.0,0.5,0.0],[]],
+  igLens:  [[0.5,0.0],[0.224,0.0,0.0,0.224,0.0,0.5],[0.0,0.776,0.224,1.0,0.5,1.0],[0.776,1.0,1.0,0.776,1.0,0.5],[1.0,0.224,0.776,0.0,0.5,0.0],[],[0.5,0.825],[0.321,0.825,0.175,0.679,0.175,0.5],[0.175,0.321,0.321,0.175,0.5,0.175],[0.679,0.175,0.825,0.321,0.825,0.5],[0.825,0.679,0.679,0.825,0.5,0.825],[]],
+  igDot:   [[1.0,0.5],[1.0,0.776,0.776,1.0,0.5,1.0],[0.224,1.0,0.0,0.776,0.0,0.5],[0.0,0.224,0.224,0.0,0.5,0.0],[0.776,0.0,1.0,0.224,1.0,0.5],[]],
+  inDot:   [[0.415,-0.0],[0.141,0.03,-0.057,0.277,-0.027,0.552],[0.003,0.827,0.25,1.025,0.524,0.995],[0.778,0.967,0.97,0.753,0.97,0.498],[0.959,0.211,0.719,-0.012,0.433,-0.001],[0.427,-0.001,0.421,-0.001,0.415,-0.0],[]],
+  inBar:   [[0.0,0.0],[1.0,0.0],[1.0,1.0],[0.0,1.0],[]],
+  inArm:   [[0.622,-0.0],[0.495,-0.005,0.374,0.051,0.297,0.148],[0.293,0.148],[0.278,0.02],[-0.009,0.02],[-0.009,0.109,-0.001,0.209,-0.001,0.327],[-0.001,0.997],[0.332,0.997],[0.332,0.424],[0.332,0.398,0.336,0.371,0.345,0.346],[0.368,0.282,0.431,0.239,0.501,0.24],[0.616,0.24,0.658,0.324,0.658,0.437],[0.658,0.999],[0.991,0.999],[0.991,0.404],[0.991,0.138,0.844,-0.0,0.622,-0.0],[]],
+};
+
+// The four jigsaw pieces of the "Infographic Summary" head illustration.
+const PUZZLE = [
+  [[0.63,0.0],[0.63,0.014],[0.63,0.051,0.63,0.101,0.63,0.167],[0.63,0.263,0.661,0.286,0.697,0.273],[0.768,0.248,0.777,0.205,0.874,0.218],[1.042,0.237,1.042,0.441,0.874,0.461],[0.777,0.473,0.768,0.429,0.697,0.405],[0.661,0.393,0.63,0.415,0.63,0.51],[0.63,0.51,0.63,0.51,0.63,0.775],[0.63,0.775,0.63,0.775,0.282,0.775],[0.156,0.775,0.125,0.799,0.143,0.827],[0.175,0.88,0.23,0.887,0.215,0.961],[0.213,0.969,0.211,0.976,0.208,0.983],[0.197,1.0],[0.18,0.995],[0.173,0.992,0.167,0.99,0.161,0.986],[0.136,0.972,0.122,0.949,0.113,0.928],[0.107,0.915,0.106,0.901,0.113,0.889],[0.118,0.879,0.127,0.869,0.131,0.856],[0.131,0.854,0.131,0.852,0.131,0.848],[0.131,0.839,0.125,0.822,0.118,0.818],[0.109,0.812,0.094,0.809,0.091,0.798],[0.088,0.79,0.09,0.784,0.097,0.778],[0.098,0.775,0.093,0.774,0.092,0.773],[0.085,0.769,0.076,0.764,0.074,0.755],[0.071,0.743,0.075,0.731,0.082,0.723],[0.088,0.716,0.103,0.705,0.1,0.695],[0.098,0.688,0.087,0.686,0.078,0.681],[0.062,0.672,0.048,0.664,0.031,0.656],[0.016,0.649,-0.003,0.642,0.0,0.624],[0.004,0.607,0.022,0.596,0.035,0.584],[0.042,0.579,0.048,0.572,0.053,0.565],[0.058,0.558,0.061,0.551,0.066,0.543],[0.073,0.531,0.085,0.515,0.097,0.501],[0.102,0.496,0.11,0.49,0.115,0.482],[0.119,0.476,0.128,0.466,0.128,0.46],[0.128,0.455,0.12,0.447,0.118,0.444],[0.108,0.429,0.096,0.413,0.094,0.392],[0.093,0.377,0.1,0.365,0.107,0.354],[0.122,0.334,0.136,0.314,0.149,0.292],[0.156,0.282,0.16,0.27,0.166,0.258],[0.188,0.212,0.217,0.172,0.251,0.136],[0.268,0.118,0.289,0.102,0.314,0.089],[0.338,0.076,0.363,0.063,0.39,0.053],[0.417,0.044,0.446,0.035,0.478,0.027],[0.493,0.023,0.508,0.018,0.524,0.015],[0.556,0.009,0.593,0.002,0.629,0.0],[]],
+  [[0.07,0.001],[0.098,-0.0,0.127,-0.0,0.154,0.001],[0.208,0.003,0.265,0.004,0.317,0.009],[0.342,0.012,0.365,0.015,0.389,0.02],[0.483,0.037,0.573,0.053,0.65,0.081],[0.726,0.109,0.787,0.146,0.84,0.192],[0.865,0.214,0.886,0.24,0.907,0.266],[0.928,0.291,0.945,0.32,0.959,0.35],[0.974,0.381,0.986,0.412,0.992,0.449],[0.997,0.485,1.001,0.522,1.0,0.562],[0.999,0.586,0.996,0.609,0.991,0.63],[0.976,0.679],[0.96,0.67],[0.837,0.609,0.615,0.639,0.587,0.762],[0.565,0.857,0.646,0.866,0.692,0.935],[0.714,0.97,0.673,1.0,0.495,1.0],[0.0,1.0,0.0,1.0,0.0,1.0],[0.0,0.66,0.0,0.66,0.0,0.66],[0.0,0.537,0.043,0.508,0.095,0.524],[0.195,0.556,0.205,0.612,0.346,0.595],[0.584,0.571,0.584,0.309,0.346,0.283],[0.205,0.268,0.195,0.324,0.095,0.355],[0.043,0.37,0.0,0.342,0.0,0.219],[0.0,0.134,0.0,0.071,0.0,0.023],[0.0,0.004],[]],
+  [[0.166,0.0],[0.166,0.0,0.166,0.0,0.571,0.0],[0.571,0.0,0.571,0.0,0.571,0.34],[0.571,0.463,0.606,0.492,0.648,0.476],[0.73,0.444,0.741,0.388,0.854,0.405],[1.049,0.429,1.049,0.691,0.854,0.717],[0.741,0.732,0.73,0.676,0.648,0.645],[0.606,0.63,0.571,0.658,0.571,0.781],[0.571,0.781,0.571,0.781,0.571,0.963],[0.571,1.0],[0.093,1.0],[0.099,0.974],[0.103,0.961,0.111,0.947,0.121,0.932],[0.164,0.873,0.308,0.755,0.353,0.702],[0.399,0.648,0.39,0.639,0.396,0.61],[0.399,0.596,0.394,0.584,0.39,0.571],[0.389,0.567],[0.368,0.509],[0.36,0.485,0.351,0.46,0.341,0.437],[0.321,0.392,0.299,0.35,0.273,0.31],[0.228,0.308,0.18,0.303,0.136,0.299],[0.115,0.298,0.094,0.295,0.075,0.29],[0.068,0.288],[0.081,0.267],[0.084,0.258,0.087,0.248,0.089,0.238],[0.107,0.143,0.043,0.134,0.005,0.065],[-0.015,0.03,0.021,0.0,0.166,0.0],[]],
+  [[0.606,0.0],[0.645,0.0,0.684,0.008,0.715,0.023],[0.726,0.029],[0.723,0.038],[0.711,0.067,0.695,0.093,0.676,0.118],[0.669,0.128,0.662,0.138,0.654,0.147],[0.639,0.166,0.62,0.183,0.599,0.198],[0.577,0.213,0.557,0.228,0.536,0.244],[0.515,0.26,0.496,0.276,0.484,0.297],[0.471,0.317,0.454,0.337,0.449,0.362],[0.444,0.386,0.446,0.419,0.452,0.444],[0.459,0.471,0.462,0.496,0.473,0.518],[0.484,0.541,0.496,0.561,0.51,0.581],[0.524,0.601,0.541,0.619,0.559,0.637],[0.567,0.645,0.575,0.654,0.583,0.663],[0.594,0.675],[0.634,0.696],[0.714,0.734,0.858,0.755,0.918,0.819],[0.956,0.858,0.987,0.932,0.999,0.993],[1.0,1.0],[0.0,1.0],[0.0,0.973],[0.0,0.839,0.0,0.839,0.0,0.839],[0.0,0.749,0.032,0.727,0.07,0.739],[0.145,0.763,0.153,0.804,0.258,0.791],[0.435,0.774,0.435,0.581,0.258,0.562],[0.153,0.551,0.145,0.592,0.07,0.615],[0.032,0.626,0.0,0.606,0.0,0.515],[0.0,0.265,0.0,0.265,0.0,0.265],[0.368,0.265],[0.501,0.265,0.531,0.243,0.515,0.216],[0.481,0.167,0.42,0.16,0.437,0.09],[0.451,0.03,0.529,0.0,0.606,0.0],[]],
+];
+
+function drawPath(s, x, y, w, h, fill, steps, extra) {
+  // custGeom point coordinates are shape-local (inches from the shape origin).
+  const pts = steps.map(p => {
+    if (p.length === 0) return { close: true };
+    if (p.length === 6) {
+      return { x: p[4] * w, y: p[5] * h,
+               curve: { type: 'cubic', x1: p[0] * w, y1: p[1] * h,
+                                       x2: p[2] * w, y2: p[3] * h } };
+    }
+    return { x: p[0] * w, y: p[1] * h };
+  });
+  s.addShape('custGeom', Object.assign({ x, y, w, h, fill: { color: fill }, points: pts }, extra));
+}
+
+// ------------------------------------------------------- shape primitives
+function rect(s, x, y, w, h, fill, shadow) {
+  s.addShape('rect', { x, y, w, h, fill: { color: fill }, shadow: fx(shadow) });
+}
+
+function oval(s, x, y, w, h, fill, shadow) {
+  s.addShape('ellipse', { x, y, w, h, fill: { color: fill }, shadow: fx(shadow) });
+}
+
+function star(s, x, y, d, fill) {
+  s.addShape('star5', { x, y, w: d, h: d, fill: { color: fill } });
+}
+
+/** Rounded rectangle / card. `r` is the corner radius in inches. */
+function card(s, x, y, w, h, r, fill, shadow) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: r, fill: { color: fill }, shadow: fx(shadow) });
+}
+
+/** Pill outline used by the "Get in touch" / "Read More" buttons. */
+function pillOutline(s, x, y, w, h, color) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: Math.min(w, h) / 2,
+                            fill: { type: 'none' }, line: { color, width: 2 } });
+}
+
+/** Rectangle with two rounded corners on one `side` ('top'|'right'|'bottom'|'left'). */
+function tab(s, x, y, w, h, r, fill, side, shadow) {
+  const rot = { top: 0, right: 90, bottom: 180, left: 270 }[side];
+  const sw = (rot % 180) ? h : w, sh = (rot % 180) ? w : h;
+  s.addShape('round2SameRect', {
+    x: x + (w - sw) / 2, y: y + (h - sh) / 2, w: sw, h: sh,
+    rotate: rot, rectRadius: r, fill: { color: fill }, shadow: fx(shadow),
+  });
+}
+
+/** Quarter-disc corner decoration; `corner` says which corner stays square. */
+function blob(s, x, y, d, fill, corner, shadow) {
+  const flip = { tl: [false, false], tr: [true, false], bl: [false, true], br: [true, true] }[corner];
+  drawPath(s, x, y, d, d, fill, ART.quarter, { flipH: flip[0], flipV: flip[1], shadow: fx(shadow) });
+}
+
+// ------------------------------------------------------------ icon motifs
+/** Concentric-ring badge with a heart or plus glyph, centred on (cx, cy). */
+function badge(s, cx, cy, d, outer, inner, glyph) {
+  oval(s, cx - d / 2, cy - d / 2, d, d, outer);
+  oval(s, cx - d * 0.421, cy - d * 0.421, d * 0.842, d * 0.842, inner);
+  if (glyph === 'heart') drawPath(s, cx - d * 0.232, cy - d * 0.189, d * 0.464, d * 0.418, C.white, ART.heart);
+  else drawPath(s, cx - d * 0.2625, cy - d * 0.2625, d * 0.525, d * 0.525, C.white, ART.plus);
+}
+
+/** Two overlapping half-pill tabs plus a glyph - the corner "app tile".
+ *  The back tile sits at (x, y); the front one is nudged by (dx, dy). */
+function tabBadge(s, x, y, dx, dy, d, back, front, side, glyph) {
+  tab(s, x, y, d, d, d / 2, back, side);
+  tab(s, x + dx, y + dy, d, d, d / 2, front, side);
+  const cx = x + dx + d / 2, cy = y + dy + d / 2;
+  if (glyph === 'heart') drawPath(s, cx - d * 0.2425, cy - d * 0.2183, d * 0.485, d * 0.4367, C.white, ART.heart);
+  else drawPath(s, cx - d * 0.2183, cy - d * 0.2183, d * 0.4367, d * 0.4367, C.white, ART.plus);
+}
+
+/** Rounded square social button (x / instagram / linkedin) in the footer. */
+function socialChip(s, x, y, d, fill, kind) {
+  card(s, x, y, d, d, d / 2, fill);
+  if (kind === 'x') {
+    drawPath(s, x + d * 0.27, y + d * 0.262, d * 0.465, d * 0.475, C.white, ART.xLogo);
+  } else if (kind === 'instagram') {
+    drawPath(s, x + d * 0.225, y + d * 0.225, d * 0.549, d * 0.549, C.white, ART.igFrame);
+    drawPath(s, x + d * 0.359, y + d * 0.359, d * 0.282, d * 0.282, C.white, ART.igLens);
+    drawPath(s, x + d * 0.613, y + d * 0.319, d * 0.066, d * 0.066, C.white, ART.igDot);
+  } else {
+    drawPath(s, x + d * 0.247, y + d * 0.207, d * 0.113, d * 0.113, C.white, ART.inDot);
+    drawPath(s, x + d * 0.24,  y + d * 0.364, d * 0.12,  d * 0.365, C.white, ART.inBar);
+    drawPath(s, x + d * 0.447, y + d * 0.357, d * 0.36,  d * 0.375, C.white, ART.inArm);
+  }
+}
+
+/** One jigsaw piece: [x, y, w, h, colour] come from the slide, path from PUZZLE. */
+function puzzlePiece(s, x, y, w, h, fill, steps) {
+  drawPath(s, x, y, w, h, fill, steps, { line: { color: C.white, width: 3 }, shadow: fx(SOFT) });
+}
+
+// ------------------------------------------------------------ text styles
+function hero(s, x, y, w, h, text) {
+  // wrap:false boxes are auto-sized in the source deck, so they carry no inset
+  s.addText(text, { x, y, w, h, fontFace: HEAD, fontSize: 66, color: C.ink,
+                    valign: 'top', wrap: false, margin: 0 });
+}
+
+function heading(s, x, y, w, h, text, o) {
+  s.addText(text, Object.assign({ x, y, w, h, fontFace: HEAD, fontSize: 40, color: C.ink,
+                                  valign: 'top', margin: PAD }, o));
+}
+
+function kicker(s, x, y, w, text, o) {
+  s.addText(text, Object.assign({ x, y, w, h: 0.337, fontFace: HEAD, fontSize: 14,
+                                  color: C.red, valign: 'top', margin: PAD }, o));
+}
+
+function body(s, x, y, w, h, text, o) {
+  s.addText(text, Object.assign({ x, y, w, h, fontFace: BODY, fontSize: 11, color: C.body,
+                                  valign: 'top', lineSpacingMultiple: 1.5, margin: PAD }, o));
+}
+
+function navLink(s, x, y, w, text) {
+  s.addText(text, { x, y, w, h: 0.252, fontFace: BODY, fontSize: 9, color: C.nav,
+                    valign: 'middle', margin: PAD });
+}
+
+// ---------------------------------------------------------- slide builders
+
+function slide01(s) {  // Cover
+  card(s, 0.718, 0.146, 4.705, 0.55, 0.275, C.white, DROP);
+  rect(s, 0.519, 0.024, 5.1, 0.668, C.white);
+  rect(s, 0, 6.288, 13.333, 1.212, C.red);
+  navLink(s, 11.491, 0.57, 0.659, 'Contact');
+  navLink(s, 9.857, 0.57, 0.532, 'Team');
+  navLink(s, 6.356, 0.57, 0.549, 'Home');
+  navLink(s, 8.007, 0.57, 0.749, 'About Us');
+  s.addText([
+    { text: 'Innovative Heart Health Insights', options: { fontSize: 16, color: C.red, fontFace: BODY, bold: true } },
+  ], { x: 6.435, y: 3.837, w: 4.303, h: 0.37, valign: 'top', align: 'left', lineSpacingMultiple: 1, margin: PAD });
+  body(s, 6.422, 4.228, 5.247, 0.624, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua');
+  pillOutline(s, 6.5, 5.24, 2.012, 0.523, C.navy);
+  s.addText([
+    { text: 'Get in touch', options: { fontSize: 12, color: C.sea, fontFace: HEAD } },
+  ], { x: 6.798, y: 5.35, w: 1.416, h: 0.303, valign: 'top', align: 'center', lineSpacingMultiple: 1, margin: PAD });
+  hero(s, 6.422, 1.348, 4.879, 1.212, 'Cardiology');
+  hero(s, 6.422, 2.358, 5.661, 1.212, 'Presentation');
+  blob(s, 0, 0, 1, C.navy, 'tl');
+  blob(s, 0, 0, 0.91, C.teal, 'tl');
+  badge(s, 0.692, 0.69, 0.804, C.navy, C.teal, 'heart');
+  socialChip(s, 1.228, 6.757, 0.275, C.navy, 'linkedin');
+  socialChip(s, 0.805, 6.757, 0.275, C.teal, 'instagram');
+  socialChip(s, 0.381, 6.757, 0.275, C.coral, 'x');
+  tabBadge(s, 12.011, 6.288, 0.139, 0, 1.212, C.navy, C.teal, 'left', 'plus');
+  s.addText([
+    { text: 'Review :', options: { fontSize: 12, color: C.white, fontFace: HEAD } },
+  ], { x: 9.478, y: 6.743, w: 0.97, h: 0.303, valign: 'top', align: 'left', margin: PAD });
+  star(s, 10.524, 6.826, 0.17, C.gold);
+  star(s, 10.741, 6.826, 0.17, C.gold);
+  star(s, 10.958, 6.826, 0.17, C.gold);
+  star(s, 11.175, 6.826, 0.17, C.gold);
+  star(s, 11.392, 6.826, 0.17, C.gold);
+  s.addText([
+    { text: 'Doctor Specialist : 100+', options: { fontSize: 12, color: C.white, fontFace: HEAD } },
+  ], { x: 6.422, y: 6.743, w: 2.336, h: 0.303, valign: 'top', align: 'left', margin: PAD });
+  s.addText([
+    { text: '©2026', options: { fontSize: 12, color: C.white, fontFace: HEAD } },
+  ], { x: 4.875, y: 6.743, w: 0.821, h: 0.303, valign: 'top', align: 'center', margin: PAD });
+  tab(s, 12.744, 0.146, 0.589, 0.55, 0.275, C.white, 'left', DROP);
+  rect(s, 12.594, 0.024, 0.739, 0.668, C.white);
+}
+
+function slide02(s) {  // Introduction
+  tab(s, 9.486, 0, 3.847, 7.5, 0.641, C.white, 'left', SOFT);
+  heading(s, 1.156, 1.733, 3.717, 0.774, 'Introduction');
+  body(s, 1.156, 3.232, 4.486, 0.904, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud');
+  kicker(s, 1.156, 2.895, 4.364, 'Why Cardiology Matters');
+  body(s, 1.156, 4.861, 4.486, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud');
+  kicker(s, 1.156, 4.524, 4.364, 'Overview of cardiovascular care', { color: C.sea });
+  tab(s, 10.141, 0, 3.847, 7.5, 0.641, C.white, 'left', SOFT);
+  card(s, 6.659, 1.022, 5.654, 5.456, 0.43, C.teal);
+  badge(s, 0.691, 0.69, 0.804, C.coral, C.red, 'heart');
+  blob(s, 0, 6.406, 1.094, C.red, 'bl');
+  blob(s, 0, 6.564, 0.936, C.coral, 'bl');
+  badge(s, 6.728, 3.75, 0.804, C.navy, C.teal, 'plus');
+}
+
+function slide03(s) {  // About Cardiology
+  card(s, 7.749, 5.836, 5.36, 0.55, 0.275, C.white, DROP);
+  rect(s, 7.522, 5.714, 5.811, 0.668, C.white);
+  heading(s, 7.522, 1.022, 4.722, 0.774, 'About Cardiology');
+  body(s, 7.522, 2.521, 4.722, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  kicker(s, 7.522, 2.184, 4.364, 'Definition');
+  body(s, 7.522, 4.137, 4.722, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  kicker(s, 7.522, 3.8, 4.364, 'Scope');
+  body(s, 0.628, 6.241, 6.706, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  kicker(s, 0.628, 5.904, 6.197, 'Core disciplines', { color: C.sea });
+  badge(s, 9.389, 6.386, 0.804, C.navy, C.teal, 'heart');
+  badge(s, 11.848, 6.386, 0.804, C.navy, C.teal, 'plus');
+  tabBadge(s, 6.525, 0, -0.092, 0, 0.806, C.red, C.coral, 'right', 'plus');
+  tab(s, 12.744, 0.255, 0.589, 0.55, 0.275, C.white, 'left', DROP);
+  rect(s, 12.594, 0.133, 0.739, 0.668, C.white);
+}
+
+function slide04(s) {  // Heart Anatomy
+  tab(s, -0.001, 3.779, 7.684, 3.429, 1.714, C.red, 'right');
+  heading(s, 0.966, 0.943, 4.486, 0.774, 'Heart Anatomy');
+  body(s, 0.966, 2.032, 6.718, 0.629, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  body(s, 10.14, 3.466, 2.228, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor');
+  kicker(s, 10.14, 3.129, 2.228, 'Valves');
+  body(s, 10.14, 5.651, 2.228, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor');
+  kicker(s, 10.14, 5.314, 2.228, 'Major vessels', { color: C.sea });
+  body(s, 10.14, 1.28, 2.228, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor');
+  kicker(s, 10.14, 0.943, 2.228, 'Chambers', { color: C.sea });
+  card(s, 8.362, 0.289, 0.55, 6.918, 0.275, C.white, DROP);
+  rect(s, 8.24, 0, 0.668, 7.5, C.white);
+  badge(s, 8.908, 3.75, 0.804, C.coral, C.red, 'heart');
+  badge(s, 8.908, 1.564, 0.804, C.navy, C.teal, 'plus');
+  badge(s, 8.908, 5.936, 0.804, C.navy, C.teal, 'plus');
+  tab(s, -0.001, 3.443, 7.684, 3.429, 1.714, C.coral, 'right');
+}
+
+function slide05(s) {  // Blood Circulation
+  tab(s, 0.001, -0.001, 1.947, 7.5, 0, C.white, 'left', SOFT);
+  heading(s, 7.757, 1.664, 3.01, 1.447, 'Blood Circulation');
+  body(s, 7.757, 3.34, 4.486, 0.629, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  body(s, 7.757, 4.652, 4.486, 1.184, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo conse');
+  kicker(s, 7.757, 4.316, 4.364, 'Systemic & pulmonary circulation explained');
+  badge(s, 11.505, 2.387, 0.804, C.coral, C.red, 'heart');
+  card(s, 0.869, 0.698, 2.156, 6.104, 0.359, C.sea);
+  blob(s, 12.635, 6.802, 0.698, C.red, 'br');
+  blob(s, 12.736, 6.903, 0.597, C.coral, 'br');
+  blob(s, 12.635, 0, 0.698, C.red, 'tr');
+  blob(s, 12.736, 0, 0.597, C.coral, 'tr');
+  badge(s, 3.896, 3.75, 0.804, C.navy, C.teal, 'plus');
+}
+
+function slide06(s) {  // Cardiovascular Diseases
+  rect(s, 0, 6.31, 13.333, 1, C.coral);
+  rect(s, 0, 6.5, 13.333, 1, C.red);
+  badge(s, 0.691, 0.69, 0.804, C.coral, C.red, 'heart');
+  card(s, 6.823, 0.709, 5.822, 3.62, 0.457, C.white, SOFT);
+  heading(s, 1.406, 1.001, 4.486, 1.447, 'Cardiovascular Diseases');
+  body(s, 1.406, 3.133, 4.486, 0.904, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud');
+  kicker(s, 1.406, 2.783, 4.364, 'Common types: CAD, Arrhythmia, HF');
+  s.addText([
+    { text: 'CAD : ', options: { fontSize: 14, color: C.sea, fontFace: HEAD, bullet: NUMBER } },
+    { text: 'Lorem ipsum dolor sit amet, consectetur adipi elit, sed do eiusmod tempor incididunt ut labore', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER, breakLine: true } },
+    { text: '', options: { fontSize: 14, breakLine: true } },
+    { text: 'A', options: { fontSize: 14, color: C.sea, fontFace: HEAD, bullet: NUMBER } },
+    { text: 'rrhythmia : ', options: { fontSize: 14, color: C.sea, fontFace: HEAD, bullet: NUMBER } },
+    { text: 'Lorem ipsum dolor sit amet consectet ', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER } },
+    { text: 'adipiscing', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER } },
+    { text: ' elit, sed do eiusmod tempor incididunt', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER, breakLine: true } },
+    { text: '', options: { fontSize: 14, breakLine: true } },
+    { text: 'HF : ', options: { fontSize: 14, color: C.sea, fontFace: HEAD, bullet: NUMBER } },
+    { text: 'Lorem ipsum dolor sit amet, consectetur ', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER } },
+    { text: 'adipisci', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER } },
+    { text: ' elit, sed do eiusmod tempor incididunt ut labore', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER } },
+  ], { x: 7.491, y: 1.183, w: 4.486, h: 2.672, valign: 'top', align: 'left', lineSpacingMultiple: 1.5, margin: PAD });
+  badge(s, 12.642, 0.69, 0.804, C.navy, C.teal, 'plus');
+}
+
+function slide07(s) {  // Heart Statistics
+  rect(s, 0, 0, 3.642, 7.5, C.coral);
+  rect(s, 0, 0, 2.267, 7.5, C.red);
+  card(s, 1.562, 0.304, 4.159, 6.892, 0.299, C.white, SOFT);
+  heading(s, 7.757, 1.612, 4.486, 0.774, 'Heart Statistics');
+  body(s, 7.757, 3.087, 4.486, 0.629, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna');
+  kicker(s, 7.757, 2.738, 4.364, 'Global heart health data and trends', { color: C.sea });
+  body(s, 7.757, 3.937, 4.486, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud');
+  pillOutline(s, 7.807, 5.365, 1.65, 0.523, C.navy);
+  s.addText([
+    { text: 'Read More', options: { fontSize: 12, color: C.sea, fontFace: HEAD } },
+  ], { x: 8.052, y: 5.475, w: 1.161, h: 0.303, valign: 'top', align: 'center', lineSpacingMultiple: 1, margin: PAD });
+  badge(s, 9.909, 5.627, 0.523, C.navy, C.teal, 'plus');
+  badge(s, 12.642, 0.69, 0.804, C.coral, C.red, 'heart');
+  blob(s, 12.635, 6.802, 0.698, C.red, 'br');
+  blob(s, 12.736, 6.903, 0.597, C.coral, 'br');
+}
+
+function slide08(s) {  // Risk Factors
+  rect(s, 6.514, 0, 4.875, 7.5, C.red);
+  badge(s, 0.691, 0.69, 0.804, C.coral, C.red, 'heart');
+  heading(s, 1.285, 1.28, 3.097, 1.447, 'Risk Factors');
+  body(s, 1.285, 2.895, 3.097, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna');
+  card(s, 0.549, 4.43, 12.236, 2.595, 0.387, C.white, SOFT);
+  body(s, 1.285, 5.443, 3.097, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 1.285, 5.106, 3.097, 'Lifestyle', { color: C.sea });
+  body(s, 5.118, 5.443, 3.097, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 5.118, 5.106, 3.097, 'Genetic');
+  body(s, 8.952, 5.443, 3.097, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 8.952, 5.106, 3.097, 'Environmental risks', { color: C.sea });
+  badge(s, 12.383, 6.623, 0.804, C.navy, C.teal, 'plus');
+}
+
+function slide09(s) {  // Symptoms Overview
+  rect(s, 0, 0, 3.973, 7.5, C.white, SOFT);
+  oval(s, 1.204, 0.981, 5.538, 5.538, C.teal);
+  heading(s, 7.946, 1.664, 3.01, 1.447, 'Symptoms Overview');
+  body(s, 7.946, 3.34, 4.199, 0.629, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  body(s, 7.946, 4.652, 4.199, 1.184, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea');
+  kicker(s, 7.946, 4.316, 4.199, 'Early and advanced warning signs');
+  blob(s, 0, 0, 1.949, C.red, 'tl');
+  blob(s, 0, 0, 1.668, C.coral, 'tl');
+  blob(s, 12.333, 6.5, 1, C.navy, 'br');
+  blob(s, 12.477, 6.644, 0.856, C.teal, 'br');
+  badge(s, 6.308, 2.504, 1.114, C.coral, C.red, 'heart');
+}
+
+function slide10(s) {  // Diagnosis Methods
+  rect(s, 0, 0, 0.497, 7.5, C.white, SOFT);
+  rect(s, 0, 4.583, 2.917, 2.917, C.red);
+  blob(s, 7.633, 1.8, 5.7, C.sand, 'br');
+  heading(s, 1.153, 1.076, 2.792, 1.447, 'Diagnosis Methods');
+  body(s, 1.153, 2.705, 5.357, 0.629, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim');
+  card(s, 6.923, 4.811, 5.499, 1.778, 0.296, C.white, SOFT);
+  card(s, 6.923, 0.911, 5.499, 1.778, 0.296, C.white, SOFT);
+  card(s, 6.923, 2.861, 5.499, 1.778, 0.296, C.white, SOFT);
+  body(s, 9.011, 3.604, 3.101, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor');
+  kicker(s, 9.011, 3.267, 3.101, 'Echocardiogram');
+  body(s, 9.011, 5.554, 3.101, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor');
+  kicker(s, 9.011, 5.217, 3.101, 'Stress test', { color: C.sea });
+  body(s, 9.011, 1.654, 3.101, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor');
+  kicker(s, 9.011, 1.317, 3.101, 'ECG', { color: C.sea });
+  badge(s, 5.434, 1.8, 1.114, C.coral, C.red, 'heart');
+}
+
+function slide11(s) {  // Advanced Diagnostics
+  tab(s, 0.795, 0.116, 5.986, 3.887, 0.648, C.white, 'bottom', SOFT);
+  tab(s, 0.795, -0.27, 5.986, 2.579, 0.681, C.white, 'bottom', SOFT);
+  card(s, 1.039, 2.884, 5.628, 1.732, 0.213, C.coral);
+  card(s, 1.039, 1.039, 5.628, 1.732, 0.213, C.sea);
+  card(s, 1.039, 4.729, 5.628, 1.732, 0.213, C.red);
+  heading(s, 9.036, 3.851, 3.259, 1.447, 'Advanced Diagnostics');
+  body(s, 7.577, 5.555, 4.718, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  body(s, 1.494, 3.604, 4.718, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', { color: C.white });
+  kicker(s, 1.494, 3.267, 4.718, 'MRI', { color: C.white });
+  body(s, 1.494, 5.45, 4.718, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', { color: C.white });
+  kicker(s, 1.494, 5.113, 4.718, 'Angiography', { color: C.white });
+  body(s, 1.494, 1.759, 4.718, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', { color: C.white });
+  kicker(s, 1.494, 1.422, 4.718, 'CT scan', { color: C.white });
+  tabBadge(s, 0.107, 0, -0.107, 0, 0.932, C.navy, C.teal, 'right', 'plus');
+  badge(s, 8.134, 4.574, 1.114, C.coral, C.red, 'heart');
+}
+
+function slide12(s) {  // Treatment Overview
+  card(s, 10.015, 0.522, 2.949, 6.456, 0.352, C.coral);
+  card(s, 9.647, 0.522, 2.949, 6.456, 0.352, C.red);
+  heading(s, 1.644, 2.014, 2.877, 1.447, 'Treatment Overview');
+  body(s, 1.644, 3.77, 3.89, 0.629, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labor');
+  body(s, 1.644, 4.581, 3.89, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam');
+  badge(s, 5.179, 2.737, 0.709, C.navy, C.teal, 'plus');
+  badge(s, 0.691, 0.69, 0.804, C.coral, C.red, 'heart');
+  blob(s, 0, 6.406, 1.094, C.red, 'bl');
+  blob(s, 0, 6.564, 0.936, C.coral, 'bl');
+  card(s, 6.461, 3.917, 2.311, 1.569, 0.21, C.white, SOFT);
+  s.addText([
+    { text: 'Medication', options: { fontSize: 14, color: C.sea, fontFace: HEAD, bullet: DOT, breakLine: true } },
+    { text: 'Surgery ', options: { fontSize: 14, color: C.sea, fontFace: HEAD, bullet: DOT, breakLine: true } },
+    { text: 'Interventions', options: { fontSize: 14, color: C.sea, fontFace: HEAD, bullet: DOT } },
+  ], { x: 6.755, y: 4.142, w: 1.722, h: 1.118, valign: 'top', align: 'left', lineSpacingMultiple: 1.5, margin: PAD });
+}
+
+function slide13(s) {  // Drug Therapy
+  heading(s, 7.757, 1.612, 4.486, 0.774, 'Drug Therapy');
+  body(s, 7.757, 3.087, 4.486, 0.629, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna');
+  kicker(s, 7.757, 2.738, 4.364, 'Common cardiology medications', { color: C.sea });
+  body(s, 7.757, 3.937, 4.486, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud');
+  pillOutline(s, 7.807, 5.365, 2.037, 0.523, C.navy);
+  s.addText([
+    { text: 'Read More', options: { fontSize: 12, color: C.sea, fontFace: HEAD } },
+  ], { x: 8.491, y: 5.475, w: 1.192, h: 0.303, valign: 'top', align: 'center', lineSpacingMultiple: 1, margin: PAD });
+  badge(s, 8.069, 5.627, 0.523, C.navy, C.teal, 'plus');
+  rect(s, 0, 0, 6.667, 7.5, C.coral);
+  rect(s, 0, 0, 3.333, 7.5, C.red);
+  tabBadge(s, 12.295, 0, 0.107, 0, 0.932, C.navy, C.teal, 'left', 'heart');
+  tab(s, 12.295, 6.568, 0.932, 0.932, 0.466, C.white, 'left', SOFT);
+  tab(s, 12.402, 6.568, 0.932, 0.932, 0.466, C.white, 'left', SOFT);
+}
+
+function slide14(s) {  // Surgical Procedures
+  blob(s, 0, 0, 1.333, C.white, 'tl', SOFT);
+  blob(s, 0, 0, 1.141, C.white, 'tl', SOFT);
+  badge(s, 0.691, 0.69, 0.804, C.coral, C.red, 'heart');
+  heading(s, 1.285, 1.426, 3.193, 1.447, 'Surgical Procedures');
+  body(s, 1.285, 3.041, 3.193, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna');
+  body(s, 1.285, 5.168, 3.097, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 1.285, 4.831, 3.097, 'Bypass surgery', { color: C.sea });
+  body(s, 5.118, 5.168, 3.097, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 5.118, 4.831, 3.097, 'Valve repair');
+  card(s, 5.349, 1.322, 5.793, 2.728, 0.441, C.white);
+  tabBadge(s, 11.744, 6.074, 0.164, 0, 1.426, C.navy, C.teal, 'left', 'plus');
+}
+
+function slide15(s) {  // Minimally Invasive Procedures
+  rect(s, 3.178, 0, 1.104, 7.5, C.teal);
+  rect(s, 2.242, 0, 1.104, 7.5, C.red);
+  card(s, 1.846, 1.305, 2.832, 4.89, 1.416, C.white, SOFT);
+  heading(s, 7.308, 1.305, 4.913, 1.447, 'Minimally Invasive Procedures');
+  body(s, 7.308, 3.573, 4.913, 0.907, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed does eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  kicker(s, 7.308, 3.224, 3.096, 'Stents');
+  body(s, 7.308, 5.288, 4.913, 0.907, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed does eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  kicker(s, 7.308, 4.939, 3.096, 'Catheterization', { color: C.sea });
+  badge(s, 2.248, 1.891, 0.804, C.coral, C.red, 'heart');
+  badge(s, 4.276, 5.608, 0.804, C.navy, C.teal, 'plus');
+  card(s, 7.5, 0.122, 4.532, 0.55, 0.275, C.white, DROP);
+  rect(s, 7.308, 0, 4.913, 0.668, C.white);
+  card(s, 7.5, 6.828, 4.532, 0.55, 0.275, C.white, DROP);
+  rect(s, 7.308, 6.832, 4.913, 0.668, C.white);
+}
+
+function slide16(s) {  // Preventive Care
+  blob(s, 7.631, 0, 5.703, C.white, 'tr', SOFT);
+  blob(s, 0, 1.797, 5.703, C.sand, 'bl');
+  card(s, 0.906, 2.153, 6.094, 4.449, 0.507, C.white, SOFT);
+  heading(s, 1.406, 0.977, 4.486, 0.774, 'Preventive Care');
+  s.addText([
+    { text: 'Diet : ', options: { fontSize: 14, color: C.red, fontFace: HEAD, bullet: NUMBER } },
+    { text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER, breakLine: true } },
+    { text: '', options: { fontSize: 14, breakLine: true } },
+    { text: 'Exercise', options: { fontSize: 14, color: C.sea, fontFace: HEAD, bullet: NUMBER } },
+    { text: ' : ', options: { fontSize: 14, color: C.sea, fontFace: HEAD, bullet: NUMBER } },
+    { text: 'Lorem ipsum dolor sit amet, consectetur adipiscin elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER, breakLine: true } },
+    { text: '', options: { fontSize: 14, breakLine: true } },
+    { text: 'lifestyle modification : ', options: { fontSize: 14, color: C.red, fontFace: HEAD, bullet: NUMBER } },
+    { text: 'Lorem ipsum dolor sit amet consec adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis', options: { fontSize: 11, color: C.body, fontFace: BODY, bullet: NUMBER } },
+  ], { x: 1.406, y: 2.624, w: 5.094, h: 3.506, valign: 'top', align: 'left', lineSpacingMultiple: 1.5, margin: PAD });
+  tabBadge(s, 0.107, 0, -0.107, 0, 0.932, C.navy, C.teal, 'right', 'plus');
+  tabBadge(s, 12.295, 6.568, 0.107, 0, 0.932, C.red, C.coral, 'left', 'heart');
+}
+
+function slide17(s) {  // Cardiac Rehabilitation
+  tab(s, 1.246, -0.858, 3.847, 9.214, 0.641, C.white, 'right', SOFT);
+  tab(s, 0.44, -0.858, 3.847, 9.214, 0.641, C.white, 'right', SOFT);
+  heading(s, 7.594, 1.332, 4.486, 1.447, 'Cardiac Rehabilitation');
+  body(s, 7.594, 3.506, 4.486, 0.629, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna');
+  kicker(s, 7.594, 3.156, 4.364, 'Phases and program structure', { color: C.sea });
+  body(s, 7.594, 4.217, 4.486, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud');
+  pillOutline(s, 7.644, 5.646, 1.65, 0.523, C.navy);
+  s.addText([
+    { text: 'Read More', options: { fontSize: 12, color: C.sea, fontFace: HEAD } },
+  ], { x: 7.889, y: 5.756, w: 1.161, h: 0.303, valign: 'top', align: 'center', lineSpacingMultiple: 1, margin: PAD });
+  badge(s, 10.357, 1.725, 0.523, C.navy, C.teal, 'plus');
+  blob(s, 12.509, 6.676, 0.824, C.red, 'br');
+  blob(s, 12.628, 6.795, 0.705, C.coral, 'br');
+  tabBadge(s, 12.295, 0, 0.107, 0, 0.932, C.red, C.coral, 'left', 'heart');
+}
+
+function slide18(s) {  // Emergency Response
+  tab(s, 9.679, 6.427, 3.654, 0.804, 0.402, C.teal, 'left');
+  tab(s, 0, 0.269, 0.804, 0.804, 0.402, C.red, 'right');
+  rect(s, 0, 1.342, 10.57, 4.816, C.white, SOFT);
+  heading(s, 1.166, 2.113, 3.221, 1.448, 'Emergency Response');
+  body(s, 1.166, 4.482, 3.096, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 1.166, 4.145, 3.096, 'CPR');
+  body(s, 5.088, 4.482, 3.096, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 5.088, 4.145, 3.096, 'Rapid intervention');
+  body(s, 5.088, 2.552, 3.096, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 5.088, 2.215, 3.096, 'AED', { color: C.sea });
+  badge(s, 0.654, 0.671, 0.804, C.coral, C.red, 'heart');
+  badge(s, 9.753, 6.829, 0.804, C.navy, C.teal, 'plus');
+  blob(s, 0, 6.858, 0.642, C.red, 'bl');
+  blob(s, 0, 6.951, 0.549, C.coral, 'bl');
+  blob(s, 12.691, 0, 0.642, C.navy, 'tr');
+  blob(s, 12.784, 0, 0.549, C.teal, 'tr');
+}
+
+function slide19(s) {  // Diagnosis Methods (tech)
+  rect(s, 0, 2.866, 7.747, 3.179, C.red);
+  tab(s, 9.443, 0.367, 3.89, 6.766, 0.453, C.white, 'left', SOFT);
+  tab(s, 7.522, 0.81, 5.811, 5.878, 0.358, C.white, 'left', SOFT);
+  heading(s, 1.193, 1.076, 5.136, 0.774, 'Diagnosis Methods');
+  body(s, 8.467, 3.466, 3.922, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam');
+  kicker(s, 8.467, 3.129, 3.922, 'Robotics');
+  body(s, 8.467, 5.104, 3.922, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam');
+  kicker(s, 8.467, 4.767, 3.922, 'Tele-cardiology', { color: C.sea });
+  body(s, 8.467, 1.827, 3.922, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam');
+  kicker(s, 8.467, 1.49, 3.922, 'AI (Artificial Intelligent)', { color: C.sea });
+  badge(s, 6.219, 6.197, 0.804, C.coral, C.red, 'heart');
+}
+
+function slide20(s) {  // Case Study
+  blob(s, 0, 1.494, 6.006, C.sand, 'bl');
+  tab(s, -0.001, 5.069, 7.823, 1.894, 0.379, C.white, 'right', SOFT);
+  heading(s, 8.981, 2.555, 3.193, 0.774, 'Case Study', { align: 'center' });
+  body(s, 9.025, 3.484, 3.104, 1.462, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation', { align: 'center' });
+  body(s, 0.555, 5.869, 6.712, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  kicker(s, 0.555, 5.532, 6.712, 'Sample patient scenario');
+  tabBadge(s, 11.983, 6.288, 0.139, 0, 1.212, C.navy, C.teal, 'left', 'plus');
+  blob(s, 12.099, 0, 1.235, C.coral, 'tr');
+  blob(s, 12.21, 0, 1.124, C.red, 'tr');
+  badge(s, 12.479, 0.851, 0.993, C.coral, C.red, 'heart');
+}
+
+function slide21(s) {  // Monitoring Tools
+  rect(s, 9.462, 0, 2.093, 7.5, C.white, SOFT);
+  rect(s, 6.161, 0, 2.093, 7.5, C.white, SOFT);
+  heading(s, 1.285, 1.236, 3.193, 1.447, 'Monitoring Tools');
+  body(s, 1.285, 5.359, 3.173, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 1.285, 5.022, 3.097, 'Continuous tracking', { color: C.sea });
+  body(s, 1.285, 3.59, 3.173, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore');
+  kicker(s, 1.285, 3.253, 3.097, 'Wearables');
+  badge(s, 0.691, 0.69, 0.804, C.coral, C.red, 'heart');
+  badge(s, 12.642, 6.808, 0.804, C.navy, C.teal, 'plus');
+  blob(s, 0, 6.406, 1.094, C.red, 'bl');
+  blob(s, 0, 6.564, 0.936, C.coral, 'bl');
+  blob(s, 12.24, 0, 1.094, C.navy, 'tr');
+  blob(s, 12.398, 0, 0.936, C.teal, 'tr');
+}
+
+function slide22(s) {  // Pediatric Cardiology
+  rect(s, 2.145, 0, 3.178, 2.229, C.red);
+  heading(s, 7.468, 1.716, 4.715, 1.447, 'Pediatric Cardiology');
+  body(s, 7.468, 3.985, 4.715, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  kicker(s, 7.468, 3.635, 2.971, 'Congenital conditions and care');
+  body(s, 7.468, 5.155, 4.715, 0.629, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua');
+  tab(s, 11.279, 2.038, 2.054, 0.804, 0.402, C.teal, 'left');
+  badge(s, 11.353, 2.44, 0.804, C.navy, C.teal, 'plus');
+  blob(s, 0.011, 0, 1.333, C.white, 'tl', SOFT);
+  blob(s, 0.011, 0, 1.141, C.white, 'tl', SOFT);
+  badge(s, 0.691, 0.69, 0.804, C.coral, C.red, 'heart');
+}
+
+function slide23(s) {  // Geriatric Cardiology
+  card(s, 0.916, 4.583, 11.74, 2.388, 0.398, C.white, SOFT);
+  heading(s, 1.387, 5.053, 3.01, 1.447, 'Geriatric Cardiology');
+  body(s, 4.845, 5.498, 7.409, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse');
+  kicker(s, 4.845, 5.149, 4.67, 'Heart challenges in older adults');
+  blob(s, 12.099, 0, 1.235, C.navy, 'tr');
+  blob(s, 12.21, 0, 1.123, C.teal, 'tr');
+  oval(s, 11.983, 0.355, 0.993, 0.993, C.navy);
+  oval(s, 12.061, 0.434, 0.837, 0.837, C.teal);
+  blob(s, 0, 0, 1.235, C.coral, 'tl');
+  blob(s, 0, 0, 1.124, C.red, 'tl');
+  badge(s, 0.853, 0.851, 0.993, C.coral, C.red, 'heart');
+  // TODO custom sig=1688
+}
+
+function slide24(s) {  // Clinical Guidelines
+  rect(s, 0.177, 0, 1, 7.5, C.coral);
+  card(s, 7.706, 5.681, 4.356, 0.55, 0.275, C.white, DROP);
+  rect(s, 7.522, 5.559, 4.722, 0.668, C.white);
+  heading(s, 7.522, 0.867, 4.722, 1.447, 'Clinical Guidelines');
+  body(s, 7.522, 3.072, 4.722, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua');
+  kicker(s, 7.522, 2.735, 4.364, 'Standard protocols ');
+  body(s, 7.522, 4.458, 4.722, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation');
+  kicker(s, 7.522, 4.121, 4.364, 'Frameworks', { color: C.sea });
+  badge(s, 8.962, 6.231, 0.804, C.coral, C.red, 'heart');
+  badge(s, 10.804, 6.231, 0.804, C.navy, C.teal, 'plus');
+  rect(s, 0, 0, 0.823, 7.5, C.red);
+}
+
+function slide25(s) {  // Research Trends
+  card(s, 8.323, 0.494, 4.582, 6.513, 0.498, C.navy);
+  card(s, 1.499, 2.304, 4.356, 0.55, 0.275, C.white, DROP);
+  rect(s, 1.315, 2.182, 4.722, 0.668, C.white);
+  badge(s, 2.755, 2.854, 0.804, C.coral, C.red, 'heart');
+  badge(s, 4.597, 2.854, 0.804, C.navy, C.teal, 'plus');
+  heading(s, 1.285, 1.407, 4.782, 0.774, 'Research Trends', { align: 'center' });
+  body(s, 1.3, 5.161, 4.753, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation', { align: 'center' });
+  body(s, 1.3, 3.456, 4.753, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation', { align: 'center' });
+  kicker(s, 1.357, 4.825, 4.638, 'Latest scientific findings', { align: 'center' });
+  card(s, 7.894, 0.494, 4.582, 6.513, 0.498, C.teal);
+}
+
+function slide26(s) {  // Heart-Healthy Diet
+  tab(s, 0.001, 0.893, 4.582, 5.715, 0.435, C.white, 'right', SOFT);
+  heading(s, 6.667, 1.467, 5.026, 0.774, 'Heart-Healthy Diet');
+  body(s, 6.667, 3.065, 5.406, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip');
+  kicker(s, 6.667, 2.715, 2.971, 'Nutrition recommendations');
+  body(s, 8.921, 4.548, 3.152, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magn');
+  tabBadge(s, 0.139, 6.288, -0.139, 0, 1.212, C.navy, C.teal, 'right', 'plus');
+  tabBadge(s, 11.983, 0, 0.139, 0, 1.212, C.red, C.coral, 'left', 'heart');
+  blob(s, 0, 0, 1.094, C.red, 'tl');
+  blob(s, 0, 0, 0.936, C.coral, 'tl');
+  blob(s, 12.24, 6.406, 1.094, C.navy, 'br');
+  blob(s, 12.398, 6.564, 0.936, C.teal, 'br');
+}
+
+function slide27(s) {  // Fitness for Heart Health
+  heading(s, 1.635, 0.986, 3.459, 1.447, 'Fitness for Heart Health');
+  body(s, 6.333, 5.498, 5.921, 0.907, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo');
+  kicker(s, 6.333, 5.149, 3.732, 'Safe exercise routines');
+  blob(s, 0, 0, 0.986, C.coral, 'tl');
+  blob(s, 0, 0, 0.897, C.red, 'tl');
+  badge(s, 0.681, 0.68, 0.793, C.coral, C.red, 'heart');
+  blob(s, 12.348, 6.514, 0.986, C.navy, 'br');
+  blob(s, 12.437, 6.603, 0.897, C.teal, 'br');
+  badge(s, 12.652, 6.819, 0.793, C.navy, C.teal, 'plus');
+}
+
+function slide28(s) {  // Infographic Summary
+  heading(s, 3.473, 0.522, 6.388, 0.774, 'Infographic Summary', { align: 'center' });
+  body(s, 3.207, 1.794, 6.92, 0.628, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation', { align: 'center' });
+  kicker(s, 4.348, 1.457, 4.638, 'Key cardiology insights', { align: 'center' });
+  s.addText([
+    { text: '15', options: { fontSize: 44, color: C.coral, fontFace: BODY } },
+  ], { x: 8.779, y: 3.145, w: 1.416, h: 0.842, valign: 'top', align: 'left', margin: PAD });
+  body(s, 8.779, 4.215, 3.289, 0.532, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', { lineSpacingMultiple: 1.2 });
+  s.addText([
+    { text: 'Your text here', options: { fontSize: 16, color: C.ink2, fontFace: HEAD } },
+  ], { x: 8.779, y: 3.844, w: 2.481, h: 0.37, valign: 'top', align: 'left', margin: PAD });
+  s.addText([
+    { text: '22', options: { fontSize: 44, color: C.teal, fontFace: BODY } },
+  ], { x: 8.779, y: 5.153, w: 1.416, h: 0.842, valign: 'top', align: 'left', margin: PAD });
+  body(s, 8.779, 6.222, 3.289, 0.532, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', { lineSpacingMultiple: 1.2 });
+  s.addText([
+    { text: 'Your text here', options: { fontSize: 16, color: C.ink2, fontFace: HEAD } },
+  ], { x: 8.779, y: 5.852, w: 2.481, h: 0.37, valign: 'top', align: 'left', margin: PAD });
+  s.addText([
+    { text: '10', options: { fontSize: 44, color: C.red, fontFace: BODY } },
+  ], { x: 3.137, y: 3.151, w: 1.416, h: 0.842, valign: 'top', align: 'right', margin: PAD });
+  body(s, 1.264, 4.221, 3.289, 0.532, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', { align: 'right', lineSpacingMultiple: 1.2 });
+  s.addText([
+    { text: 'Your text here', options: { fontSize: 16, color: C.ink2, fontFace: HEAD } },
+  ], { x: 2.072, y: 3.851, w: 2.481, h: 0.37, valign: 'top', align: 'right', margin: PAD });
+  s.addText([
+    { text: '30', options: { fontSize: 44, color: C.navy, fontFace: BODY } },
+  ], { x: 3.137, y: 5.159, w: 1.416, h: 0.842, valign: 'top', align: 'right', margin: PAD });
+  body(s, 1.264, 6.228, 3.289, 0.532, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', { align: 'right', lineSpacingMultiple: 1.2 });
+  s.addText([
+    { text: 'Your text here', options: { fontSize: 16, color: C.ink2, fontFace: HEAD } },
+  ], { x: 2.072, y: 5.858, w: 2.481, h: 0.37, valign: 'top', align: 'right', margin: PAD });
+  puzzlePiece(s, 4.907, 2.953, 2.222, 2.923, C.red, PUZZLE[0]);
+  puzzlePiece(s, 6.323, 2.944, 1.566, 2.278, C.coral, PUZZLE[1]);
+  puzzlePiece(s, 5.214, 5.222, 1.915, 2.278, C.navy, PUZZLE[2]);
+  puzzlePiece(s, 6.323, 4.403, 2.104, 3.097, C.teal, PUZZLE[3]);
+  tabBadge(s, 0.139, 0.866, -0.139, 0, 1.212, C.navy, C.teal, 'right', 'plus');
+  tabBadge(s, 11.983, 0.866, 0.139, 0, 1.212, C.red, C.coral, 'left', 'heart');
+}
+
+function slide29(s) {  // Conclusion
+  rect(s, 0, 0, 3.152, 7.5, C.white, SOFT);
+  heading(s, 6.316, 1.982, 4.714, 0.774, 'Conclusion');
+  body(s, 6.316, 3.466, 5.937, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo');
+  kicker(s, 6.316, 3.116, 2.971, 'Essential takeaways');
+  body(s, 6.316, 4.611, 5.937, 0.906, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo');
+  blob(s, 0, 0, 6.025, C.red, 'tl');
+  blob(s, 12.099, 0, 1.235, C.navy, 'tr');
+  blob(s, 12.21, 0, 1.124, C.teal, 'tr');
+  badge(s, 12.479, 0.852, 0.993, C.navy, C.teal, 'plus');
+  tab(s, 12.258, 6.309, 1.076, 0.55, 0.275, C.white, 'left', DROP);
+  rect(s, 11.983, 6.187, 1.351, 0.668, C.white);
+}
+
+function slide30(s) {  // Thank You
+  card(s, 7.939, 0.146, 4.705, 0.55, 0.275, C.white, DROP);
+  rect(s, 7.742, 0.024, 5.1, 0.668, C.white);
+  rect(s, 0.028, 6.288, 13.333, 1.212, C.red);
+  card(s, 7.999, 0.5, 4.306, 6.5, 2.153, C.white);
+  navLink(s, 6.347, 0.57, 0.659, 'Contact');
+  navLink(s, 4.713, 0.57, 0.532, 'Team');
+  navLink(s, 1.212, 0.57, 0.549, 'Home');
+  navLink(s, 2.863, 0.57, 0.749, 'About Us');
+  card(s, 1.503, 3.28, 5.212, 1.636, 0.273, C.white, SOFT);
+  s.addText([
+    { text: 'Contact & follow-up details', options: { fontSize: 16, color: C.red, fontFace: BODY, bold: true } },
+  ], { x: 1.474, y: 2.701, w: 4.302, h: 0.37, valign: 'top', align: 'left', lineSpacingMultiple: 1, margin: PAD });
+  s.addText([
+    { text: 'Address \t:', options: { fontSize: 11, color: C.sea, fontFace: HEAD } },
+    { text: ' 200 Arcadway Av Nevv Canberra WA 5024 West', options: { fontSize: 11, color: C.body, fontFace: BODY, breakLine: true } },
+    { text: 'Email\t: ', options: { fontSize: 11, color: C.sea, fontFace: HEAD } },
+    { text: 'info@psychocare.com', options: { fontSize: 11, color: C.body, fontFace: BODY, breakLine: true } },
+    { text: 'Phone\t: ', options: { fontSize: 11, color: C.sea, fontFace: HEAD } },
+    { text: '+123 456 789', options: { fontSize: 11, color: C.body, fontFace: BODY, breakLine: true } },
+    { text: 'Website\t: ', options: { fontSize: 11, color: C.sea, fontFace: HEAD } },
+    { text: 'www.psychocare.com', options: { fontSize: 11, color: C.body, fontFace: BODY } },
+  ], { x: 1.753, y: 3.506, w: 4.709, h: 1.184, valign: 'top', align: 'left', lineSpacingMultiple: 1.5, margin: PAD });
+  pillOutline(s, 1.539, 5.24, 2.012, 0.523, C.navy);
+  s.addText([
+    { text: 'Get in touch', options: { fontSize: 12, color: C.sea, fontFace: HEAD } },
+  ], { x: 1.837, y: 5.35, w: 1.416, h: 0.303, valign: 'top', align: 'center', lineSpacingMultiple: 1, margin: PAD });
+  hero(s, 1.461, 1.348, 4.779, 1.212, 'Thank You');
+  blob(s, 12.362, 0, 1, C.navy, 'tr');
+  blob(s, 12.452, 0, 0.91, C.teal, 'tr');
+  badge(s, 12.67, 0.69, 0.804, C.navy, C.teal, 'heart');
+  socialChip(s, 12.706, 6.757, 0.275, C.navy, 'linkedin');
+  socialChip(s, 12.283, 6.757, 0.275, C.teal, 'instagram');
+  socialChip(s, 11.859, 6.757, 0.275, C.coral, 'x');
+  tabBadge(s, 0.139, 6.288, -0.139, 0, 1.212, C.navy, C.teal, 'right', 'plus');
+  s.addText([
+    { text: 'Copyright ©2026', options: { fontSize: 12, color: C.white, fontFace: HEAD } },
+  ], { x: 1.631, y: 6.743, w: 1.536, h: 0.303, valign: 'top', align: 'center', margin: PAD });
+  tab(s, 0.028, 0.146, 0.589, 0.55, 0.275, C.white, 'right', DROP);
+  rect(s, 0.028, 0.024, 0.739, 0.668, C.white);
+}
+
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06,
+  slide07, slide08, slide09, slide10, slide11, slide12,
+  slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24,
+  slide25, slide26, slide27, slide28, slide29, slide30,
+];
+
+// --------------------------------------------------------------- assemble
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE';
+pptx.title = 'Cardiology Presentation';
+
+SLIDES.forEach(build => build(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '0ea54e6a-6625-4a37-b9a2-7e29e6093c45_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));

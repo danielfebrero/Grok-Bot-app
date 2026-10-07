@@ -1,0 +1,573 @@
+/**
+ * "UMROH" travel deck — 20 slides, 10 x 5.625 in (16:9).
+ *
+ * Standalone pptxgenjs re-creation of the reference presentation.
+ * Photographs in the original are stock placeholders (a flat #F2F2F2 plate with a
+ * small photo glyph); they are reproduced here as native shapes via `photo()`.
+ * The small line-art icons are redrawn from primitive pptxgenjs shapes.
+ *
+ * Run:  node 02214d08-4d57-4e6f-8887-26efa658c2d2_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const GREEN = '445247'; // accent1 - deep sage
+const TAN = 'BCA37F'; // accent2 - warm sand
+const SAND = 'EAD7BB'; // accent3 - pale sand
+const WHITE = 'FFFFFF';
+const INK = '3F3F3F'; // body copy
+const PALE = 'F2F2F2'; // near-white copy on dark panels
+const GRAY = '595959';
+const PLATE = 'F2F2F2'; // image placeholder plate
+const GLYPH = '1A1A1A'; // photo glyph inside the plate
+
+const BASE = 'Plus Jakarta Sans';
+const SEMI = 'Plus Jakarta Sans SemiBold';
+
+// Google-Slides text inset: 0.075in horizontal / 0.0375in vertical, in points.
+// pptxgenjs orders text-box margins [left, right, bottom, top] but slide-number
+// margins [top, right, bottom, left], so the two arrays below are the same inset.
+const INSET = [5.4, 5.4, 2.7, 2.7];
+const PAGE_INSET = [2.7, 5.4, 2.7, 5.4];
+
+const TITLE = { face: SEMI, size: 27 };
+const HEAD = { face: SEMI, size: 14 };
+const BODY = { face: BASE, size: 9, ls: 1.5 };
+const BODY11 = { face: BASE, size: 11, ls: 1.5 };
+
+/* ------------------------------------------------------------- copy decks */
+
+const LOREM_LONG =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+  'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. ';
+const LOREM_MED =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+  'ut labore et dolore magna aliqua. ';
+const LOREM_TEMPOR = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor';
+const LOREM_LABORE = LOREM_TEMPOR + ' incididunt ut labore';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ';
+const NISI = 'Nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in';
+const HERE = 'Your Title Here';
+
+/* ------------------------------------------------------------- primitives */
+
+/** Text box. `box` is [x, y, w, h] in inches. */
+function txt(slide, content, box, o) {
+  const runs = Array.isArray(content)
+    ? content.map((line, i) => ({ text: line, options: { breakLine: i < content.length - 1 } }))
+    : content;
+  slide.addText(runs, {
+    x: box[0], y: box[1], w: box[2], h: box[3],
+    fontFace: o.face || BASE,
+    fontSize: o.size || 9,
+    color: o.color || INK,
+    align: o.align || 'left',
+    valign: 'top',
+    lineSpacingMultiple: o.ls,
+    margin: INSET,
+    wrap: true,
+  });
+}
+
+function rect(slide, box, color, opts) {
+  slide.addShape('rect', Object.assign(
+    { x: box[0], y: box[1], w: box[2], h: box[3], fill: { color } }, opts));
+}
+
+function circle(slide, x, y, size, color, opts) {
+  slide.addShape('ellipse', Object.assign(
+    { x, y, w: size, h: size, fill: { color } }, opts));
+}
+
+/** Vertical rule. */
+function vrule(slide, x, y, h, color, width) {
+  slide.addShape('line', { x, y, w: 0, h, line: { color, width } });
+}
+
+/**
+ * Stand-in for a photograph: the flat plate plus the small "picture" glyph that
+ * the reference stock image carries in its centre. Glyph size follows the
+ * original, which scales it as a fixed fraction of the plate.
+ * `shape` may be 'rect' (default) or 'ellipse'.
+ */
+function photo(slide, box, shape) {
+  const [x, y, w, h] = box;
+  slide.addShape(shape || 'rect', { x, y, w, h, fill: { color: PLATE } });
+  // The stock 16:9 source is scaled to cover the box, and its glyph occupies
+  // 6.25% of the source width — so the glyph grows as the frame crops in.
+  const gw = 0.0625 * Math.max(w, (h * 16) / 9);
+  const gh = gw * 0.925;
+  const gx = x + (w - gw) / 2;
+  const gy = y + (h - gh) / 2;
+  // A tilted card behind, a framed card in front, and inside it a sun over two peaks.
+  slide.addShape('roundRect', {
+    x: gx, y: gy + 0.30 * gh, w: 0.80 * gw, h: 0.62 * gh,
+    fill: { color: GLYPH }, rectRadius: 0.06 * gw, rotate: -10,
+  });
+  slide.addShape('roundRect', {
+    x: gx + 0.163 * gw, y: gy, w: 0.825 * gw, h: 0.743 * gh,
+    fill: { color: GLYPH }, rectRadius: 0.09 * gw,
+  });
+  const mx = gx + 0.25 * gw;
+  const my = gy + 0.108 * gh;
+  const mw = 0.65 * gw;
+  const mh = 0.527 * gh;
+  slide.addShape('rect', { x: mx, y: my, w: mw, h: mh, fill: { color: PLATE } });
+  slide.addShape('ellipse', { x: mx + 0.09 * mw, y: my + 0.10 * mh, w: 0.22 * mw, h: 0.26 * mh, fill: { color: GLYPH } });
+  slide.addShape('triangle', { x: mx + 0.25 * mw, y: my + 0.20 * mh, w: 0.75 * mw, h: 0.80 * mh, fill: { color: GLYPH } });
+  slide.addShape('triangle', { x: mx, y: my + 0.44 * mh, w: 0.56 * mw, h: 0.56 * mh, fill: { color: GLYPH } });
+  slide.addShape('rect', { x: mx, y: my + 0.82 * mh, w: mw, h: 0.18 * mh, fill: { color: GLYPH } });
+}
+
+/* ------------------------------------------------------------------ icons
+ * Each icon paints inside a square box (x, y, size) using a single colour,
+ * mirroring the flat line-art PNGs used by the reference deck.            */
+
+/** Stroke weight (pt) that keeps the outline icons looking right at any size. */
+function stroke(z) { return 6.2 * z; }
+
+/** Stroked circle — these icons are outlines, not solid discs. */
+function ring(s, x, y, d, c, z) {
+  s.addShape('ellipse', { x, y, w: d, h: d, line: { color: c, width: stroke(z) } });
+}
+
+/** Upper half of an ellipse, stroked. */
+function arch(s, x, y, w, h, c, z) {
+  s.addShape('arc', { x, y, w, h, line: { color: c, width: stroke(z) }, angleRange: [180, 360] });
+}
+
+/** Solid head-and-shoulders bust used inside the "group" mark. */
+function bust(s, x, y, w, c) {
+  s.addShape('ellipse', { x: x + w * 0.22, y, w: w * 0.56, h: w * 0.56, fill: { color: c } });
+  s.addShape('chord', { x, y: y + w * 0.66, w, h: w * 0.62, fill: { color: c }, angleRange: [180, 360] });
+}
+
+function iconPersonPlus(s, x, y, z, c) {
+  ring(s, x + 0.16 * z, y + 0.13 * z, 0.34 * z, c, z);
+  arch(s, x, y + 0.46 * z, 0.66 * z, 0.48 * z, c, z);
+  s.addShape('rect', { x, y: y + 0.74 * z, w: 0.66 * z, h: 0.12 * z, fill: { color: c } });
+  s.addShape('rect', { x: x + 0.75 * z, y: y + 0.38 * z, w: 0.25 * z, h: 0.09 * z, fill: { color: c } });
+  s.addShape('rect', { x: x + 0.83 * z, y: y + 0.30 * z, w: 0.09 * z, h: 0.25 * z, fill: { color: c } });
+}
+
+function iconGroup(s, x, y, z, c) {
+  // an inverted heart outline forms the shell; three busts stand in front of it
+  s.addShape('heart', { x, y: y - 0.02 * z, w: z, h: 1.04 * z, line: { color: c, width: stroke(z) }, rotate: 180 });
+  s.addShape('rect', { x, y: y + 0.88 * z, w: z, h: 0.12 * z, fill: { color: c } });
+  bust(s, x + 0.03 * z, y + 0.52 * z, 0.32 * z, c);
+  bust(s, x + 0.65 * z, y + 0.52 * z, 0.32 * z, c);
+  bust(s, x + 0.29 * z, y + 0.44 * z, 0.42 * z, c);
+}
+
+function iconGlobeSearch(s, x, y, z, c) {
+  ring(s, x + 0.02 * z, y + 0.04 * z, 0.68 * z, c, z);   // globe with a filled landmass
+  s.addShape('pie', { x: x + 0.10 * z, y: y + 0.12 * z, w: 0.52 * z, h: 0.52 * z, fill: { color: c }, angleRange: [110, 250] });
+  ring(s, x + 0.40 * z, y + 0.40 * z, 0.42 * z, c, z);   // magnifier over its lower right
+  s.addShape('roundRect', {
+    x: x + 0.72 * z, y: y + 0.80 * z, w: 0.26 * z, h: 0.10 * z,
+    fill: { color: c }, rectRadius: 0.05 * z, rotate: 45,
+  });
+}
+
+function iconSmiley(s, x, y, z, c) {
+  ring(s, x + 0.05 * z, y + 0.05 * z, 0.90 * z, c, z);
+  s.addShape('chord', { x: x + 0.26 * z, y: y + 0.32 * z, w: 0.16 * z, h: 0.13 * z, fill: { color: c }, angleRange: [180, 360] });
+  s.addShape('chord', { x: x + 0.58 * z, y: y + 0.32 * z, w: 0.16 * z, h: 0.13 * z, fill: { color: c }, angleRange: [180, 360] });
+  s.addShape('chord', { x: x + 0.22 * z, y: y + 0.48 * z, w: 0.56 * z, h: 0.34 * z, fill: { color: c }, angleRange: [0, 180] });
+}
+
+function iconDocument(s, x, y, z, c) {
+  // page with a folded lower-left corner, ruled line, and a quill laid over it
+  s.addShape('rect', { x: x + 0.22 * z, y: y + 0.14 * z, w: 0.68 * z, h: 0.72 * z, line: { color: c, width: stroke(z) } });
+  s.addShape('rect', { x: x + 0.32 * z, y: y + 0.62 * z, w: 0.46 * z, h: 0.10 * z, fill: { color: c } });
+  s.addShape('roundRect', {
+    x: x + 0.20 * z, y: y + 0.32 * z, w: 0.44 * z, h: 0.10 * z,
+    fill: { color: c }, rectRadius: 0.05 * z, rotate: 40,
+  });
+  s.addShape('teardrop', { x: x + 0.00 * z, y: y + 0.12 * z, w: 0.26 * z, h: 0.20 * z, fill: { color: c }, rotate: 45 });
+}
+
+function iconPhone(s, x, y, z, c) {
+  // handset: two ear/mouth pieces joined by a diagonal bar
+  s.addShape('round2SameRect', { x: x + 0.06 * z, y: y + 0.08 * z, w: 0.24 * z, h: 0.30 * z, line: { color: c, width: stroke(z) }, rectRadius: 0.08 * z });
+  s.addShape('round2SameRect', { x: x + 0.58 * z, y: y + 0.62 * z, w: 0.30 * z, h: 0.26 * z, line: { color: c, width: stroke(z) }, rectRadius: 0.08 * z, rotate: 180 });
+  s.addShape('roundRect', {
+    x: x + 0.14 * z, y: y + 0.46 * z, w: 0.50 * z, h: 0.10 * z,
+    fill: { color: c }, rectRadius: 0.05 * z, rotate: 45,
+  });
+  // signal waves off the top-right corner
+  s.addShape('arc', { x: x + 0.48 * z, y: y + 0.00 * z, w: 0.56 * z, h: 0.56 * z, line: { color: c, width: stroke(z) }, angleRange: [305, 55] });
+  s.addShape('arc', { x: x + 0.56 * z, y: y + 0.12 * z, w: 0.34 * z, h: 0.34 * z, line: { color: c, width: stroke(z) }, angleRange: [305, 55] });
+}
+
+function iconPin(s, x, y, z, c) {
+  s.addShape('teardrop', {
+    x: x + 0.08 * z, y: y + 0.02 * z, w: 0.84 * z, h: 0.84 * z,
+    line: { color: c, width: stroke(z) }, rotate: 135,
+  });
+  s.addShape('ellipse', { x: x + 0.40 * z, y: y + 0.30 * z, w: 0.20 * z, h: 0.20 * z, fill: { color: c } });
+}
+
+function iconCheck(s, x, y, z, c) {
+  s.addShape('roundRect', { x: x + 0.02 * z, y: y + 0.52 * z, w: 0.40 * z, h: 0.15 * z, fill: { color: c }, rotate: 45 });
+  s.addShape('roundRect', { x: x + 0.32 * z, y: y + 0.43 * z, w: 0.72 * z, h: 0.15 * z, fill: { color: c }, rotate: -45 });
+}
+
+/** Sand/green disc with a line-art icon centred inside it. */
+function iconDisc(s, x, y, size, discColor, icon, iconSize, iconColor, opts) {
+  circle(s, x, y, size, discColor, opts);
+  icon(s, x + (size - iconSize) / 2, y + (size - iconSize) / 2, iconSize, iconColor);
+}
+
+/* ------------------------------------------------------------ slide bodies */
+
+function slide01(s) {
+  photo(s, [5.0, 0.0, 5.0, 5.625]);
+  txt(s, 'UMROH', [0.682, 0.583, 4.062, 1.186], { face: SEMI, size: 66, color: INK });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+    'ut labore et dolore magna aliqua. Ut enim ad minim veniam. ',
+    [0.682, 1.77, 3.15, 0.954], Object.assign({ color: INK }, BODY));
+  rect(s, [0.682, 3.069, 1.172, 0.413], TAN);
+  txt(s, 'Learn More', [0.682, 3.088, 1.172, 0.306], { size: 11, color: WHITE, align: 'center', ls: 1.5 });
+  rect(s, [0.0, 4.057, 5.0, 1.568], GREEN);
+}
+
+function slide02(s) {
+  photo(s, [0.0, 0.583, 2.503, 2.518]);
+  photo(s, [2.503, 3.102, 2.503, 2.518]);
+  rect(s, [2.503, 0.579, 2.503, 2.524], SAND);
+  txt(s, HERE, [3.004, 1.582, 1.762, 0.305], Object.assign({ color: GREEN }, HEAD));
+  rect(s, [0.003, 3.101, 2.503, 2.524], SAND);
+  txt(s, 'Understanding the Spiritual Journey of Umrah', [5.512, 0.583, 3.582, 1.439],
+    Object.assign({ color: INK }, TITLE));
+  txt(s, [LOREM_LONG, '', NISI], [5.512, 2.881, 3.463, 1.636], Object.assign({ color: INK }, BODY));
+  txt(s, HERE, [5.512, 2.446, 2.061, 0.305], Object.assign({ color: INK }, HEAD));
+  iconPersonPlus(s, 10.718, 2.185, 0.522, GREEN); // stray icon parked off-canvas in the original
+  iconPersonPlus(s, 3.004, 0.898, 0.519, GREEN);
+  iconGlobeSearch(s, 0.505, 3.414, 0.521, GREEN);
+  txt(s, HERE, [0.505, 4.095, 1.762, 0.305], Object.assign({ color: GREEN }, HEAD));
+  const blurb = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do.';
+  txt(s, blurb, [3.004, 1.896, 1.652, 0.727], Object.assign({ color: INK }, BODY));
+  txt(s, blurb, [0.525, 4.399, 1.652, 0.727], Object.assign({ color: INK }, BODY));
+}
+
+function slide03(s) {
+  iconDisc(s, 0.5, 3.575, 0.615, SAND, iconGroup, 0.291, GREEN);
+  txt(s, 'A Guide to Performing Umrah', [0.5, 0.583, 3.542, 0.985], Object.assign({ color: INK }, TITLE));
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+    'ut labore et dolore magna aliqua. Ut enim ad minim veniam',
+    [0.5, 1.62, 3.732, 0.727], Object.assign({ color: INK }, BODY));
+  [2.686, 3.591, 4.479].forEach((y) => {
+    txt(s, LOREM_TEMPOR, [1.387, y, 3.238, 0.5], Object.assign({ color: INK }, BODY));
+  });
+  vrule(s, 0.807, 3.269, 0.306, SAND, 3);
+  vrule(s, 0.807, 4.158, 0.306, SAND, 3);
+  vrule(s, 0.807, 5.062, 0.562, SAND, 3);
+  iconDisc(s, 0.5, 2.686, 0.615, SAND, iconPersonPlus, 0.312, GREEN);
+  iconDisc(s, 0.5, 4.464, 0.615, SAND, iconGlobeSearch, 0.308, GREEN);
+  photo(s, [5.0, 0.0, 1.987, 2.812]);
+  photo(s, [6.987, 0.0, 3.013, 4.302]);
+  photo(s, [5.755, 3.284, 2.534, 1.777]);
+}
+
+function slide04(s) {
+  txt(s, 'The Significance of Umrah in Islam', [0.5, 0.583, 3.582, 0.985], Object.assign({ color: INK }, TITLE));
+  txt(s, LOREM_LONG, [0.5, 1.682, 4.44, 0.727], Object.assign({ color: INK }, BODY));
+  txt(s, LOREM_LONG, [6.104, 3.266, 3.062, 1.182], Object.assign({ color: INK }, BODY));
+  rect(s, [5.76, 0.0, 3.74, 2.812], GREEN);
+  iconDisc(s, 6.135, 0.562, 0.615, SAND, iconPersonPlus, 0.312, GREEN);
+  txt(s, LOREM_MED, [6.094, 1.622, 3.073, 0.727], Object.assign({ color: WHITE }, BODY));
+  txt(s, HERE, [6.094, 1.317, 2.061, 0.305], Object.assign({ color: WHITE }, HEAD));
+  photo(s, [0.0, 2.812, 5.75, 2.812]);
+}
+
+function slide05(s) {
+  photo(s, [0.0, 0.0, 10.0, 5.625]);
+  rect(s, [0.0, 0.0, 10.0, 5.625], GREEN, { fill: { color: GREEN, transparency: 20 } });
+  rect(s, [0.0, 1.861, 10.0, 2.912], SAND);
+  txt(s, 'Preparing for the Sacred Pilgrimage of Umrah', [2.166, 0.583, 5.669, 0.985],
+    Object.assign({ color: WHITE, align: 'center' }, TITLE));
+  vrule(s, 3.5, 2.212, 2.398, GREEN, 3);
+  vrule(s, 6.5, 2.212, 2.398, GREEN, 3);
+  iconDisc(s, 1.693, 2.298, 0.615, GREEN, iconPersonPlus, 0.312, SAND);
+  iconDisc(s, 4.693, 2.298, 0.615, GREEN, iconGroup, 0.291, SAND);
+  iconDisc(s, 7.693, 2.298, 0.615, GREEN, iconGlobeSearch, 0.308, SAND);
+  [0.5, 3.5, 6.5].forEach((x) => {
+    txt(s, LOREM_LABORE, [x + 0.312, 3.6, 2.375, 0.727], Object.assign({ color: INK, align: 'center' }, BODY));
+    txt(s, HERE, [x, 3.165, 3.0, 0.303], Object.assign({ color: INK, align: 'center' }, HEAD));
+  });
+}
+
+function slide06(s) {
+  txt(s, 'The Spiritual Benefits of Performing Umrah', [0.5, 0.745, 4.5, 0.985],
+    Object.assign({ color: INK }, TITLE));
+  rect(s, [5.74, 2.812, 3.76, 2.24], GREEN);
+  iconDisc(s, 6.135, 3.032, 0.615, SAND, iconGroup, 0.291, GREEN);
+  txt(s, LOREM_MED, [6.094, 4.103, 3.073, 0.727], Object.assign({ color: WHITE }, BODY));
+  txt(s, HERE, [6.094, 3.799, 2.061, 0.305], Object.assign({ color: WHITE }, HEAD));
+  iconDisc(s, 6.135, 0.784, 0.615, SAND, iconPersonPlus, 0.312, GREEN);
+  txt(s, LOREM_MED, [6.094, 1.843, 3.073, 0.727], Object.assign({ color: GRAY }, BODY));
+  txt(s, HERE, [6.094, 1.538, 2.061, 0.305], Object.assign({ color: GRAY }, HEAD));
+  txt(s, LOREM_LONG, [0.5, 1.848, 4.134, 0.727], Object.assign({ color: INK }, BODY));
+  photo(s, [0.0, 2.812, 5.74, 2.24]);
+}
+
+function slide07(s) {
+  photo(s, [5.0, 0.562, 4.5, 4.5], 'ellipse');
+  rect(s, [2.932, 3.724, 4.297, 1.083], SAND);
+  txt(s, 'Exploring the History and Origins of Umrah', [0.5, 0.573, 4.5, 0.985],
+    Object.assign({ color: PALE }, TITLE));
+  txt(s, LOREM_MED, [0.5, 3.853, 2.229, 0.954], Object.assign({ color: WHITE }, BODY));
+  txt(s, HERE, [0.5, 3.3, 2.061, 0.305], Object.assign({ color: WHITE }, HEAD));
+  txt(s, [LOREM_LONG, '', NISI], [0.5, 1.713, 3.99, 1.182], Object.assign({ color: PALE }, BODY));
+  txt(s, LOREM_MED, [3.991, 3.902, 3.083, 0.727], Object.assign({ color: GREEN }, BODY));
+  iconDocument(s, 3.193, 3.96, 0.595, GREEN);
+}
+
+function slide08(s) {
+  txt(s, 'The Difference Hajj and Umrah', [1.833, 0.663, 6.335, 0.53],
+    Object.assign({ color: INK, align: 'center' }, TITLE));
+  rect(s, [0.0, 1.721, 4.892, 3.341], GREEN);
+  rect(s, [5.108, 1.721, 4.892, 3.341], SAND);
+  txt(s, HERE, [0.5, 3.324, 2.061, 0.305], Object.assign({ color: WHITE }, HEAD));
+  txt(s, HERE, [7.439, 3.324, 2.061, 0.305], Object.assign({ color: INK, align: 'right' }, HEAD));
+  txt(s, [LOREM_LONG, '', NISI], [0.5, 3.644, 3.99, 1.182], Object.assign({ color: PALE }, BODY));
+  txt(s, [LOREM_LONG, '', NISI], [5.51, 3.644, 3.99, 1.182],
+    Object.assign({ color: INK, align: 'right' }, BODY));
+  photo(s, [0.5, 1.721, 4.392, 1.397]);
+  photo(s, [5.108, 1.721, 4.392, 1.397]);
+}
+
+function slide09(s) {
+  photo(s, [0.0, 0.0, 5.0, 5.625]);
+  rect(s, [0.0, 0.0, 5.0, 5.625], TAN, { fill: { color: TAN, transparency: 10 } });
+  txt(s, 'Essential Tips for a Fulfilling Umrah Experience', [0.5, 0.946, 3.241, 1.439],
+    Object.assign({ color: WHITE }, TITLE));
+  // three numbered green bars down the right-hand side
+  [['01', 0.562, 0.997, 0.692, 0.943],
+   ['02', 2.167, 2.601, 2.296, 2.547],
+   ['03', 3.772, 4.206, 3.901, 4.152]].forEach(([n, yBar, yBody, yHead, yNum]) => {
+    rect(s, [4.578, yBar, 4.922, 1.291], GREEN);
+    txt(s, LOREM_MED, [5.714, yBody, 3.623, 0.727], Object.assign({ color: WHITE }, BODY));
+    txt(s, HERE, [5.714, yHead, 2.061, 0.305], Object.assign({ color: WHITE }, HEAD));
+    txt(s, n, [4.882, yNum, 0.747, 0.53], Object.assign({ color: WHITE }, TITLE));
+  });
+  txt(s, [LOREM_LONG, '', NISI], [0.5, 2.551, 3.241, 1.636], Object.assign({ color: PALE }, BODY));
+}
+
+function slide10(s) {
+  // Alternating semicircles on a common axis at y = 3.212: sand arcs bulge up,
+  // green arcs bulge down. Each is half of a 2.247in circle.
+  [[0.5, TAN, [180, 360]],
+   [2.753, GREEN, [0, 180]],
+   [5.006, TAN, [180, 360]],
+   [7.259, GREEN, [0, 180]]].forEach(([x, color, arc]) => {
+    s.addShape('chord', { x, y: 2.088, w: 2.247, h: 2.248, fill: { color }, angleRange: arc });
+  });
+  // caption below (0/2) or above (1/3) each semicircle
+  [[0.503, 4.265, 0.506, 3.96],
+   [2.744, 1.736, 2.747, 1.431],
+   [5.023, 4.265, 5.026, 3.96],
+   [7.265, 1.736, 7.267, 1.431]].forEach(([bx, by, hx, hy]) => {
+    txt(s, LOREM_TEMPOR + ' incididunt', [bx, by, 2.253, 0.727],
+      Object.assign({ color: GRAY, align: 'center' }, BODY));
+    txt(s, HERE, [hx, hy, 2.247, 0.305], Object.assign({ color: GRAY, align: 'center' }, HEAD));
+  });
+  txt(s, 'A Step-by-Step Guide to the Umrah Rituals', [0.485, 0.562, 9.029, 0.53],
+    Object.assign({ color: INK, align: 'center' }, TITLE));
+  iconDisc(s, 1.017, 2.606, 1.212, '9B7C51', iconPersonPlus, 0.477, 'E8EAED');
+  iconDisc(s, 3.27, 2.606, 1.212, '879D8C', iconGroup, 0.437, WHITE);
+  iconDisc(s, 5.523, 2.606, 1.212, '9B7C51', iconGlobeSearch, 0.512, WHITE);
+  iconDisc(s, 7.776, 2.606, 1.212, '879D8C', iconSmiley, 0.524, WHITE);
+}
+
+function slide11(s) {
+  txt(s, 'Exploring the History and Origins of Umrah', [0.5, 0.562, 5.125, 0.985],
+    Object.assign({ color: WHITE }, TITLE));
+  txt(s, LOREM_LONG, [6.177, 0.562, 3.323, 0.954], Object.assign({ color: PALE }, BODY));
+  [['01', 0.5, 1.131], ['02', 3.693, 4.324], ['03', 6.885, 7.517]].forEach(([n, nx, tx]) => {
+    txt(s, LOREM_SHORT, [tx, 4.186, 1.983, 0.5], Object.assign({ color: WHITE }, BODY));
+    txt(s, HERE, [tx, 3.881, 1.983, 0.303], Object.assign({ color: WHITE }, HEAD));
+    txt(s, n, [nx, 3.768, 0.655, 0.53], Object.assign({ color: WHITE }, TITLE));
+  });
+  photo(s, [0.0, 1.823, 10.0, 1.74]);
+}
+
+function slide12(s) {
+  photo(s, [5.0, 0.0, 5.0, 3.973]);
+  txt(s, 'The Role of Umrah in a Muslim\u2019s Spiritual Life', [0.485, 1.152, 4.515, 0.985],
+    Object.assign({ color: INK }, TITLE));
+  rect(s, [0.5, 2.812, 2.241, 2.25], GREEN);
+  rect(s, [2.741, 2.629, 2.259, 2.616], SAND);
+  rect(s, [5.0, 2.812, 4.5, 2.25], GREEN);
+  vrule(s, 7.26, 3.036, 1.802, PALE, 1.5);
+  const blurb = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.';
+  // four cards: text colour flips on the pale sand card
+  [[0.778, PALE], [3.028, INK], [5.292, PALE], [7.542, PALE]].forEach(([x, color]) => {
+    txt(s, HERE, [x, 3.163, 1.071, 0.53], Object.assign({ color }, HEAD));
+    txt(s, blurb, [x, 3.8, 1.685, 0.954], Object.assign({ color }, BODY));
+  });
+  iconDisc(s, 1.849, 3.12, 0.615, SAND, iconPersonPlus, 0.312, GREEN);
+  iconDisc(s, 4.099, 3.12, 0.615, GREEN, iconPersonPlus, 0.312, SAND);
+  iconDisc(s, 6.352, 3.12, 0.615, SAND, iconGroup, 0.291, GREEN);
+  iconDisc(s, 8.613, 3.118, 0.615, SAND, iconGlobeSearch, 0.308, GREEN);
+}
+
+function slide13(s) {
+  photo(s, [5.0, 0.0, 5.0, 2.448]);
+  txt(s, 'Our Great Service', [0.5, 0.562, 4.5, 0.53], Object.assign({ color: INK }, TITLE));
+  txt(s, LOREM_LONG, [0.5, 1.301, 4.5, 0.727], Object.assign({ color: INK }, BODY));
+  [[0.5, 'Basic', '$131K', SAND],
+   [3.5, 'Premium', '$331K', TAN],
+   [6.5, 'Platinum', '$531K', '675336']].forEach(([x, tier, price, priceColor]) => {
+    txt(s, LOREM_LABORE, [x, 3.847, 2.013, 0.954], Object.assign({ color: INK }, BODY));
+    txt(s, tier, [x, 2.709, 2.042, 0.303], Object.assign({ color: INK }, HEAD));
+    txt(s, price, [x, 3.014, 2.042, 0.53], Object.assign({ color: priceColor }, TITLE));
+  });
+}
+
+function slide14(s) {
+  photo(s, [0.0, 0.0, 3.49, 5.625]);
+  rect(s, [2.833, 0.938, 6.667, 4.688], SAND);
+  txt(s, 'A Family Guide to Performing Umrah Together', [3.188, 1.219, 5.323, 0.985],
+    Object.assign({ color: INK }, TITLE));
+  txt(s, LOREM_LONG, [3.188, 2.335, 5.323, 0.727], Object.assign({ color: INK }, BODY));
+  [[3.188, 3.28], [3.188, 4.335], [6.559, 3.28], [6.559, 4.335]].forEach(([x, y]) => {
+    txt(s, LOREM_TEMPOR + ' .', [x + 0.406, y, 2.091, 0.727], Object.assign({ color: INK }, BODY));
+    iconCheck(s, x, y, 0.335, INK);
+  });
+}
+
+function slide15(s) {
+  rect(s, [8.33, 0.0, 1.67, 5.625], GREEN);
+  txt(s, 'The Rewards of Performing Umrah in the Holy Cities', [0.5, 0.885, 4.229, 1.439],
+    Object.assign({ color: INK }, TITLE));
+  txt(s, [LOREM_LONG, '', NISI], [0.5, 3.108, 3.463, 1.636], Object.assign({ color: INK }, BODY));
+  txt(s, HERE, [0.5, 2.673, 2.061, 0.305], Object.assign({ color: INK }, HEAD));
+  photo(s, [4.854, 0.0, 2.198, 3.573]);
+  photo(s, [7.052, 1.312, 2.448, 4.312]);
+}
+
+function slide16(s) {
+  txt(s, 'A Family Guide to Performing Umrah Together', [4.384, 0.562, 4.75, 1.439],
+    Object.assign({ color: INK }, TITLE));
+  txt(s, '2024', [6.729, 2.594, 1.211, 0.53], Object.assign({ color: INK }, TITLE));
+  txt(s, '2500+ Goes To Makkah', [6.729, 3.307, 2.146, 0.633],
+    Object.assign({ color: INK, ls: 1.3 }, HEAD, { ls: 1.3 }));
+  txt(s, LOREM_TEMPOR + ' incididunt ut labore.', [6.74, 4.036, 2.604, 0.727],
+    Object.assign({ color: INK }, BODY));
+  photo(s, [0.0, 0.0, 3.875, 3.902]);
+  photo(s, [3.178, 2.33, 3.295, 3.295]);
+}
+
+function slide17(s) {
+  [0.562, 2.147, 3.732].forEach((y) => photo(s, [7.397, y, 2.103, 1.331]));
+  txt(s, 'Key Rituals & Prayers to Perform During Umrah', [2.953, 1.078, 3.661, 1.439],
+    Object.assign({ color: GREEN }, TITLE));
+  txt(s, LOREM_LONG, [2.953, 3.108, 3.463, 0.954], Object.assign({ color: INK }, BODY));
+  txt(s, HERE, [2.953, 2.674, 2.061, 0.305], Object.assign({ color: INK }, HEAD));
+  [['01', 0.92], ['02', 2.516], ['03', 4.09]].forEach(([n, y]) => {
+    circle(s, 7.094, y, 0.615, GREEN);
+    txt(s, n, [7.094, y + 0.155, 0.615, 0.303], Object.assign({ color: SAND, align: 'center' }, HEAD));
+  });
+  photo(s, [0.0, 0.0, 2.473, 5.625]);
+}
+
+function slide18(s) {
+  rect(s, [0.0, 3.878, 10.0, 1.747], GREEN);
+  txt(s, 'Meet Our Team', [0.5, 0.562, 9.0, 0.53], Object.assign({ color: INK, align: 'center' }, TITLE));
+  [[0.5, 0.635], [2.792, 2.927], [5.083, 5.216], [7.375, 7.504]].forEach(([cardX, colX]) => {
+    rect(s, [cardX, 1.321, 2.125, 3.741], SAND);
+    txt(s, LOREM_TEMPOR + ' incididunt ut labore et dolore', [colX, 3.878, 1.854, 0.954],
+      Object.assign({ color: INK, align: 'center' }, BODY));
+    txt(s, 'Your Name Here', [colX, 3.553, 1.854, 0.303],
+      Object.assign({ color: INK, align: 'center' }, HEAD));
+  });
+  [0.635, 2.927, 5.216, 7.504].forEach((x) => photo(s, [x, 1.47, 1.854, 1.854], 'ellipse'));
+}
+
+function slide19(s) {
+  photo(s, [0.0, 0.0, 5.0, 5.625]);
+  rect(s, [5.0, 3.893, 5.0, 1.732], SAND);
+  rect(s, [3.518, 3.598, 5.982, 1.464], GREEN);
+  iconPin(s, 3.812, 3.893, 0.375, WHITE);
+  txt(s, 'Address', [4.219, 3.893, 1.438, 0.303], Object.assign({ color: WHITE }, HEAD));
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur', [4.219, 4.15, 1.781, 0.575],
+    Object.assign({ color: WHITE }, BODY11));
+  iconPhone(s, 7.023, 3.893, 0.344, 'E8EAED');
+  txt(s, 'Phone', [7.354, 3.893, 1.438, 0.303], Object.assign({ color: WHITE }, HEAD));
+  txt(s, ['4658 \u2013 4654 \u2013 6574', '012 \u2013 4857- 1847'], [7.354, 4.15, 1.781, 0.575],
+    Object.assign({ color: WHITE }, BODY11));
+  txt(s, ['Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, ', '',
+    'Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. '],
+    [5.296, 1.518, 3.839, 1.631], Object.assign({ color: GRAY }, BODY11));
+  txt(s, 'Get in Touch', [5.296, 0.804, 2.438, 0.53], Object.assign({ color: '323D35' }, TITLE));
+}
+
+function slide20(s) {
+  rect(s, [0.0, 4.464, 7.259, 1.18], GREEN);
+  txt(s, 'THANK YOU', [0.5, 1.013, 4.5, 2.297], { face: SEMI, size: 66, color: INK });
+  txt(s, LOREM_MED, [0.5, 3.629, 3.036, 0.727], Object.assign({ color: INK }, BODY));
+  txt(s, 'For Your Attention', [0.5, 3.305, 2.061, 0.305], Object.assign({ color: INK }, HEAD));
+  photo(s, [5.0, 0.0, 5.0, 3.098]);
+  photo(s, [4.223, 2.241, 2.831, 2.831]);
+  photo(s, [7.259, 3.285, 2.741, 2.34]);
+}
+
+/* ------------------------------------------------------------------- deck */
+
+const DECK = [
+  { build: slide01, pageNumber: null },
+  { build: slide02 },
+  { build: slide03 },
+  { build: slide04 },
+  { build: slide05, pageNumber: WHITE },
+  { build: slide06 },
+  { build: slide07, background: GREEN, pageNumber: WHITE },
+  { build: slide08 },
+  { build: slide09 },
+  { build: slide10 },
+  { build: slide11, background: GREEN, pageNumber: WHITE },
+  { build: slide12 },
+  { build: slide13 },
+  { build: slide14 },
+  { build: slide15, pageNumber: WHITE },
+  { build: slide16, background: SAND },
+  { build: slide17 },
+  { build: slide18, pageNumber: WHITE },
+  { build: slide19 },
+  { build: slide20, pageNumber: WHITE },
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'UMROH_16x9', width: 10, height: 5.625 });
+  pptx.layout = 'UMROH_16x9';
+  pptx.author = 'UMROH';
+  pptx.title = 'UMROH';
+
+  DECK.forEach((spec) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: spec.background || WHITE };
+    const pageNumber = spec.pageNumber === undefined ? GREEN : spec.pageNumber;
+    if (pageNumber) {
+      slide.slideNumber = {
+        x: 9.477, y: 5.253, w: 0.586, h: 0.252,
+        fontFace: BASE, fontSize: 11, color: pageNumber, align: 'left', margin: PAGE_INSET,
+      };
+    }
+    spec.build(slide);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '02214d08-4d57-4e6f-8887-26efa658c2d2_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f));

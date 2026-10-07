@@ -1,0 +1,710 @@
+/*
+ * "Solek" skin-care brand proposal — 25 slides, 13.333in x 7.5in.
+ *
+ * Rebuilt with pptxgenjs only.  Raster photos in the source deck are replaced
+ * by flat "[image]" placeholder rectangles (see `photo()`).
+ *
+ *   node 04920559-6837-48f1-8856-b12229b19ff7_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const CREAM = 'F5F1DF'; // page background / light text
+const GREEN = '013025'; // deep bottle green
+const SAND = 'D8D0A9'; // pale gold accent
+const BROWN = '604415'; // ink-brown line art
+const PHOTO = '6B8E8A'; // average colour of the replaced photographs
+
+const SERIF = 'Yeseva One'; // display face
+const SANS_XL = 'Nunito ExtraLight'; // sub-headings
+const SANS_L = 'Nunito Light'; // body copy
+
+/* -------------------------------------------------------- boilerplate copy */
+
+const LOREM = 'The copy warned the Little Blind Text, that where it came from it would have ' +
+  'PLACEHOLDER' +
+  'word "and" and the Little Blind Text';
+const LOREM_MED = LOREM + ' should turn around and return to its own, safe country. ';
+const LOREM_SHORT = LOREM + '.';
+const LOREM_TINY = 'The copy warned the Little Blind Text, that where it came from it would ' +
+  'have been rewritten a thousand times and everything.';
+const LOREM_ABOUT = LOREM_MED + 'But nothing the copy said could convince her and so it ' +
+  'didn\u2019t take long until a few insidious Copy Writers ambushed her, made her drunk with ' +
+  'Longe and Parole and dragged her into their agency, where they abused her for their';
+const LOREM_TRIAL = LOREM_MED + 'But nothing the copy said could convince her and so it didn\u2019t .';
+const RIVER = 'PLACEHOLDER' +
+  'necessary regelialia. It is a paradisematic country, in which roasted parts of sentences ' +
+  'fly into your mouth.';
+const TAGLINE = 'The true health comes from nature ';
+const CRUELTY_A = 'Our commitment to ethical practices means that ';
+const CRUELTY_B = ' is completely cruelty-free \u2013 no animals are involved in testing our products';
+
+/* --------------------------------------------------------- shape factories */
+
+// Five hand-drawn petals looping out of a common centre.  Each entry is
+// [ direction in degrees, petal length, petal half-width ] as a fraction of
+// the bounding box width.
+const PETALS = [
+  [18, 0.55, 0.23],
+  [78, 0.49, 0.22],
+  [157, 0.48, 0.22],
+  [207, 0.58, 0.22],
+  [272, 0.54, 0.23],
+];
+const PETAL_ORIGIN = [0.496, 0.529]; // centre of the flower inside its box
+
+function flowerPoints(w, h) {
+  const cx = PETAL_ORIGIN[0] * w;
+  const cy = PETAL_ORIGIN[1] * h;
+  const pts = [];
+  PETALS.forEach(function (petal) {
+    const a = (petal[0] * Math.PI) / 180;
+    const len = petal[1] * w;
+    const wid = petal[2] * w;
+    const ux = Math.cos(a), uy = Math.sin(a); // along the petal
+    const px = -Math.sin(a), py = Math.cos(a); // across the petal
+    const at = function (along, across) {
+      return { x: cx + ux * along + px * across, y: cy + uy * along + py * across };
+    };
+    // Out along one flank to the rounded tip, then back along the other flank.
+    pts.push({ x: cx, y: cy, moveTo: true });
+    pts.push({
+      x: cx + ux * len, y: cy + uy * len,
+      curve: cub(at(len * 0.40, wid * 0.85), at(len * 1.03, wid * 0.80)),
+    });
+    pts.push({ x: cx, y: cy, curve: cub(at(len * 1.03, -wid * 0.80), at(len * 0.40, -wid * 0.85)) });
+  });
+  return pts;
+}
+
+function cub(c1, c2) {
+  return { type: 'cubic', x1: c1.x, y1: c1.y, x2: c2.x, y2: c2.y };
+}
+
+function flower(slide, x, y, rot, color) {
+  const w = 1.401, h = 1.432;
+  slide.addShape('custGeom', {
+    x: x, y: y, w: w, h: h, rotate: rot,
+    fill: { type: 'none' }, line: { color: color, width: 1.5 },
+    points: flowerPoints(w, h),
+  });
+}
+
+// Loose honeycomb lattice: nine outlined hexagons on a staggered grid.
+// Centres are stored as fractions of the 2.536 x 2.449 in bounding box.
+const HEX_CELLS = [
+  [0.142, 0.281],
+  [0.377, 0.135], [0.377, 0.426], [0.377, 0.717],
+  [0.613, 0.281], [0.613, 0.572], [0.613, 0.862],
+  [0.848, 0.426], [0.848, 0.717],
+];
+const HEX_W = 0.289; // hexagon width  / box width
+const HEX_H = 0.264; // hexagon height / box height
+
+function honeycomb(slide, x, y, rot, color, scale) {
+  const w = 2.536 * (scale || 1), h = 2.449 * (scale || 1);
+  const pts = [];
+  HEX_CELLS.forEach(function (cell) {
+    const cx = cell[0] * w, cy = cell[1] * h;
+    const rw = (HEX_W * w) / 2, rh = (HEX_H * h) / 2;
+    [[-rw, 0], [-rw / 2, -rh], [rw / 2, -rh], [rw, 0], [rw / 2, rh], [-rw / 2, rh]]
+      .forEach(function (v, i) {
+        pts.push(i === 0 ? { x: cx + v[0], y: cy + v[1], moveTo: true } : { x: cx + v[0], y: cy + v[1] });
+      });
+    pts.push({ close: true });
+  });
+  slide.addShape('custGeom', {
+    x: x, y: y, w: w, h: h, rotate: rot,
+    fill: { type: 'none' }, line: { color: color, width: 1.25 }, points: pts,
+  });
+}
+
+// The "Solek" bee mark: three capsule strokes leaning down-right, plus a wing
+// triangle at the top right.  Offsets are inches relative to the mark origin.
+const LOGO_BARS = [ // centre x, centre y, length
+  [0.058, 0.196, 0.215],
+  [0.100, 0.150, 0.258],
+  [0.196, 0.145, 0.258],
+];
+function logo(slide, x, y, markColor, textColor) {
+  LOGO_BARS.forEach(function (bar) {
+    slide.addShape('roundRect', {
+      x: x + bar[0] - bar[2] / 2, y: y + bar[1] - 0.027, w: bar[2], h: 0.054,
+      rotate: 66, rectRadius: 0.027,
+      fill: { type: 'none' }, line: { color: markColor, width: 0.75 },
+    });
+  });
+  slide.addShape('custGeom', {
+    x: x + 0.19, y: y, w: 0.12, h: 0.115,
+    fill: { type: 'none' }, line: { color: markColor, width: 0.75 },
+    points: [
+      { x: 0.006, y: 0.024, moveTo: true }, { x: 0.118, y: 0.001 },
+      { x: 0.070, y: 0.111 }, { close: true },
+    ],
+  });
+  slide.addText('Solek', {
+    x: x + 0.299, y: y - 0.039, w: 0.81, h: 0.37,
+    fontFace: SERIF, fontSize: 16, color: textColor, valign: 'top', wrap: false,
+  });
+}
+
+// Sketched ellipse used as a callout ring around the tagline.
+function ring(slide, x, y, w, h, color) {
+  slide.addShape('ellipse', { x: x, y: y, w: w, h: h, fill: { type: 'none' }, line: { color: color, width: 1 } });
+}
+
+// Replacement for a photograph in the source deck.
+function photo(slide, x, y, w, h) {
+  slide.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: PHOTO } });
+  slide.addText('[image]', {
+    x: x, y: y + h / 2 - 0.25, w: w, h: 0.5,
+    fontFace: SANS_L, fontSize: 14, color: CREAM, align: 'center', valign: 'middle',
+  });
+}
+
+/* ------------------------------------------------------------ text helpers */
+
+// Big Yeseva One headline (72 pt unless overridden).
+function title(slide, text, x, y, w, color, size) {
+  slide.addText(text, {
+    x: x, y: y, w: w, h: size && size >= 100 ? 1.784 : 1.313,
+    fontFace: SERIF, fontSize: size || 72, color: color, valign: 'top',
+  });
+}
+
+// Light sans kicker sitting above / beside a headline.
+function kicker(slide, text, x, y, w, h, color, size) {
+  slide.addText(text, {
+    x: x, y: y, w: w, h: h, fontFace: SANS_XL, fontSize: size, color: color, valign: 'top',
+  });
+}
+
+// Justified body paragraph.
+function body(slide, text, x, y, w, h, color, align, size) {
+  slide.addText(text, {
+    x: x, y: y, w: w, h: h, fontFace: SANS_L, fontSize: size || 12, color: color,
+    align: align || 'justify', valign: 'top',
+  });
+}
+
+// Bold italic label above a body paragraph.
+function label(slide, text, x, y, w, color, size, align) {
+  slide.addText(text, {
+    x: x, y: y, w: w, h: size === 12 ? 0.303 : 0.337,
+    fontFace: SANS_L, fontSize: size, bold: true, italic: true, color: color,
+    align: align || 'justify', valign: 'top',
+  });
+}
+
+// Oversized Yeseva One statistic ("01", "100%", "95%" ...).
+function stat(slide, text, x, y, w, color, align) {
+  slide.addText(text, {
+    x: x, y: y, w: w, h: 0.774, fontFace: SERIF, fontSize: 40, color: color,
+    align: align || 'left', valign: 'top',
+  });
+}
+
+// Tagline set inside a hand-drawn ring or aligned to a slide edge.
+function tagline(slide, x, y, color, align) {
+  slide.addText(TAGLINE, {
+    x: x, y: y, w: 2.691, h: 0.707, fontFace: SANS_XL, fontSize: 18, color: color,
+    align: align, valign: 'top',
+  });
+}
+
+// Dark pill behind a name / caption.
+function pill(slide, x, y, w, h, text, tx, ty, tw, fillColor, textColor) {
+  slide.addShape('ellipse', { x: x, y: y, w: w, h: h, fill: { color: fillColor } });
+  slide.addText(text, {
+    x: tx, y: ty, w: tw, h: 0.438, fontFace: SANS_XL, fontSize: 20, color: textColor,
+    align: 'center', valign: 'top',
+  });
+}
+
+/* --------------------------------------------------------------- the deck */
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'SOLEK', width: 13.333, height: 7.5 });
+pptx.layout = 'SOLEK';
+pptx.author = 'Solek';
+pptx.title = 'Skin Care Brand Proposal';
+
+function newSlide(bg) {
+  const s = pptx.addSlide();
+  if (bg) s.background = { color: bg };
+  return s;
+}
+
+/* 1 — cover */
+function slide01() {
+  const s = newSlide();
+  photo(s, 0, 0, 13.333, 7.5);
+  s.addShape('rect', { x: 4.677, y: 0.417, w: 8.198, h: 6.667, fill: { color: SAND, transparency: 50 } });
+  flower(s, 3.977, 1.096, 85.4, SAND);
+  logo(s, 0.458, 0.417, CREAM, CREAM);
+  title(s, 'Solek', 8.448, 1.44, 3.996, CREAM, 100);
+  s.addShape('rect', { x: 4.677, y: 5.889, w: 4.906, h: 1.209, fill: { color: GREEN } });
+  s.addText([
+    { text: 'Skin Care Brand Proposal', options: { breakLine: true } },
+    { text: 'Help your skin better, make your day better' },
+  ], { x: 5.163, y: 6.291, w: 4.386, h: 0.572, fontFace: SANS_XL, fontSize: 14, color: CREAM, valign: 'top' });
+  tagline(s, 9.767, 3.137, CREAM, 'right');
+  honeycomb(s, 11.607, 5.859, 0, CREAM);
+}
+
+/* 2 — brand intro */
+function slide02() {
+  const s = newSlide(CREAM);
+  flower(s, 10.591, 0.527, 153.7, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  title(s, 'Solek', 8.297, 1.202, 4.214, GREEN);
+  kicker(s, 'Here for your best solution', 8.297, 2.353, 3.751, 0.438, GREEN, 20);
+  [[0.483, 3.119], [0.483, 3.875], [5.598, 3.119], [5.598, 3.875]].forEach(function (p) {
+    body(s, RIVER, p[0], p[1], 4.386, 0.656, GREEN, 'justify', 11);
+  });
+  honeycomb(s, 11.473, 5.664, 68.3, BROWN);
+}
+
+/* 3 — table of contents */
+const TOC = [
+  ['01', 'About Company', 0.920, 3.911],
+  ['02', 'Product Philosophy', 3.263, 3.911],
+  ['03', 'Portfolio', 5.607, 3.911],
+  ['04', 'Marketing Strategy', 2.263, 5.804],
+  ['05', 'Regulation', 4.838, 5.804],
+];
+function slide03() {
+  const s = newSlide(GREEN);
+  flower(s, 6.906, 1.196, 96.1, SAND);
+  logo(s, 0.458, 0.417, SAND, CREAM);
+  kicker(s, 'Table Of', 8.509, 1.694, 1.911, 0.64, SAND, 32);
+  title(s, 'Content', 7.563, 2.076, 5.028, CREAM);
+  honeycomb(s, 11.357, -0.705, 0, SAND);
+  honeycomb(s, -0.969, 6.035, 0, SAND);
+  TOC.forEach(function (item) {
+    stat(s, item[0], item[2], item[3], 1.154, SAND);
+    label(s, item[1], item[2], item[3] + 0.798, 2.224, CREAM, 12);
+  });
+}
+
+/* 4 — about us */
+function slide04() {
+  const s = newSlide(CREAM);
+  flower(s, 2.145, 1.726, 180, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  kicker(s, 'About', 0.376, 1.74, 1.911, 0.64, GREEN, 32);
+  title(s, 'Us', 0.935, 1.996, 2.148, GREEN);
+  body(s, LOREM_ABOUT, 1.054, 4.419, 6.155, 1.515, GREEN);
+  photo(s, 9.113, -0.033, 4.22, 7.557);
+  honeycomb(s, 7.357, 5.859, 0, BROWN);
+}
+
+/* 5 — history */
+function slide05() {
+  const s = newSlide(GREEN);
+  flower(s, 8.064, 0.617, 84.2, SAND);
+  logo(s, 0.458, 0.417, SAND, CREAM);
+  title(s, 'History', 8.765, 1.368, 5.028, CREAM);
+  body(s, LOREM_ABOUT, 6.72, 4.714, 6.155, 1.515, CREAM);
+  ring(s, 1.037, 2.647, 3.436, 1.172, CREAM);
+  tagline(s, 1.409, 2.912, CREAM, 'center');
+  photo(s, 0.458, 4.236, 4.665, 3.264);
+}
+
+/* 6 — our vision */
+function slide06() {
+  const s = newSlide(CREAM);
+  flower(s, 3.681, 1.489, 165.5, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  kicker(s, 'Our', 1.006, 1.565, 1.911, 0.64, GREEN, 32);
+  title(s, 'Vision', 1.006, 1.888, 3.962, GREEN);
+  body(s, LOREM_MED, 2.328, 4.24, 5.821, 0.909, GREEN);
+  body(s, LOREM_MED, 1.162, 5.865, 5.821, 0.909, GREEN);
+  honeycomb(s, 11.77, -0.613, 0, BROWN);
+  photo(s, 8.727, 2.644, 4.606, 2.792);
+}
+
+/* 7 — our mission */
+function slide07() {
+  const s = newSlide(CREAM);
+  flower(s, 4.834, 1.274, 165.5, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  kicker(s, 'Our', 1.006, 1.432, 1.911, 0.64, GREEN, 32);
+  title(s, 'Mission', 1.006, 1.755, 5.258, GREEN);
+  [3.201, 4.437, 5.673].forEach(function (y) {
+    body(s, LOREM_MED, 6.392, y, 5.821, 0.909, GREEN);
+  });
+  honeycomb(s, 11.357, -0.705, 0, BROWN);
+  photo(s, 0, 4.708, 4.606, 2.792);
+}
+
+/* 8 — product philosophy divider */
+function slide08() {
+  const s = newSlide(GREEN);
+  flower(s, 0.696, 1.353, 83, SAND);
+  logo(s, 0.458, 0.417, SAND, CREAM);
+  kicker(s, 'Product', 2.194, 1.75, 1.911, 0.64, CREAM, 32);
+  title(s, 'Philosophy', 1.398, 2.07, 6.788, CREAM);
+  honeycomb(s, -0.949, 5.859, 7.5, SAND);
+  ring(s, 9.439, 4.921, 3.436, 1.172, CREAM);
+  tagline(s, 9.812, 5.186, CREAM, 'center');
+  photo(s, 2.752, 3.862, 5.448, 3.638);
+  photo(s, 8.2, 0, 5.134, 3.898);
+}
+
+/* 9 — three philosophy points */
+const PHILOSOPHY = [
+  ['01', 'Nature make everything \u201cless is more\u201d', 2.189, 1.974],
+  ['02', 'Nature thing makes our skin more better', 3.465, 3.248],
+  ['03', 'Nature have a lot treasure', 4.769, 4.550],
+];
+function slide09() {
+  const s = newSlide(CREAM);
+  photo(s, 0, 0, 4.653, 7.5);
+  honeycomb(s, 11.288, -0.808, 322.9, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  PHILOSOPHY.forEach(function (row) {
+    stat(s, row[0], 5.238, row[2], 1.154, BROWN);
+    label(s, row[1], 6.392, row[3], 5.821, GREEN, 12);
+    body(s, LOREM_MED, 6.392, row[3] + 0.296, 5.821, 0.909, GREEN);
+  });
+  flower(s, 5.475, 5.536, 335, BROWN);
+}
+
+/* 10 — product benefit */
+const BENEFITS = [
+  ['100%', 'Natural Ingredient', 1.848, 1.944],
+  ['100%', 'Using Natural Honey', 5.189, 2.794],
+  ['80%', 'Anti Inflamation', 8.530, 2.794],
+];
+function slide10() {
+  const s = newSlide();
+  photo(s, 0, 0, 13.333, 7.5);
+  s.addShape('rect', { x: 0.589, y: 0.527, w: 12.006, h: 6.581, fill: { color: BROWN, transparency: 75 } });
+  flower(s, 10.608, 0.856, 153.7, SAND);
+  kicker(s, 'Product', 9.124, 1.353, 3.751, 0.438, CREAM, 20);
+  title(s, 'Benefit', 7.418, 1.505, 4.214, CREAM);
+  BENEFITS.forEach(function (col) {
+    stat(s, col[0], col[2], 3.144, 1.855, CREAM);
+    label(s, col[1], col[2], 3.899, col[3], CREAM, 14);
+    body(s, LOREM_MED, col[2], 4.264, 2.955, 1.717, CREAM);
+  });
+}
+
+/* 11 — customer testimonials */
+const TESTIMONIALS = [
+  ['Amanda Roe', 0.000, 3.500, 3.486],
+  ['Jean Benneth', 6.694, 3.477, 10.100],
+];
+function slide11() {
+  const s = newSlide(CREAM);
+  flower(s, 11.263, 0.562, 158.8, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  kicker(s, 'Customer', 8.886, 0.914, 3.479, 0.64, GREEN, 32);
+  title(s, 'Testimonials', 5.213, 1.17, 7.045, GREEN);
+  TESTIMONIALS.forEach(function (t) {
+    photo(s, t[1], t[2], 3.236, 4.023);
+    label(s, t[0], t[3], 4.653, 1.401, GREEN, 14);
+    body(s, LOREM_MED, t[3], 5.097, 2.775, 1.717, GREEN);
+  });
+}
+
+/* 12 — product highlight */
+function slide12() {
+  const s = newSlide(CREAM);
+  photo(s, 0, 3, 5.139, 4.5);
+  flower(s, 5.736, 0.892, 160, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  kicker(s, 'Our Product', 2.786, 1.23, 3.036, 0.64, GREEN, 32);
+  title(s, 'Highlight', 1.415, 1.553, 5.255, GREEN);
+  honeycomb(s, 11.34, -0.613, 331.1, BROWN);
+  pill(s, 3.696, 5.705, 2.576, 1.09, 'Our Best Product', 3.466, 6.031, 3.036, GREEN, SAND);
+  [3.374, 4.821].forEach(function (y, i) {
+    stat(s, '100%', 6.67, y + 0.168, 1.855, BROWN);
+    body(s, LOREM_MED, 8.524, y, 4.214, 1.111, GREEN);
+  });
+}
+
+/* 13 — portfolio divider */
+function slide13() {
+  const s = newSlide(GREEN);
+  flower(s, 0.463, 1.353, 83, SAND);
+  logo(s, 0.458, 0.417, SAND, CREAM);
+  kicker(s, 'Our Special', 2.2, 1.75, 3.042, 0.64, CREAM, 32);
+  title(s, 'Portfolio', 1.164, 2.07, 6.788, CREAM);
+  honeycomb(s, 11.329, -0.215, 7.5, SAND);
+  photo(s, -0.014, 3.863, 13.347, 3.637);
+}
+
+/* 14 — portfolio gallery */
+const GALLERY = [
+  [0.436, 0.852, 4.326, 3.264],
+  [5.159, 0.852, 3.788, 3.264],
+  [0.487, 4.486, 4.306, 2.575],
+  [5.157, 4.486, 1.065, 2.575],
+  [6.586, 4.486, 6.232, 2.575],
+];
+function slide14() {
+  const s = newSlide(CREAM);
+  logo(s, 0.458, 0.417, GREEN, GREEN);
+  honeycomb(s, 11.607, -0.691, 7.5, BROWN);
+  honeycomb(s, -1.016, 6.12, 338, BROWN);
+  GALLERY.forEach(function (g) { photo(s, g[0], g[1], g[2], g[3]); });
+  ring(s, 9.282, 2.08, 3.436, 1.172, GREEN);
+  tagline(s, 9.655, 2.345, GREEN, 'center');
+}
+
+/* 15 — cruelty-free statement */
+function slide15() {
+  const s = newSlide(CREAM);
+  flower(s, 0.462, 1.618, 90, BROWN);
+  logo(s, 0.458, 0.45, BROWN, GREEN);
+  s.addText([
+    { text: CRUELTY_A, options: { fontFace: SANS_XL } },
+    { text: 'Solek', options: { fontFace: SERIF } },
+    { text: CRUELTY_B, options: { fontFace: SANS_XL } },
+  ], {
+    x: 1.215, y: 2.704, w: 6.713, h: 1.986,
+    fontSize: 28, bold: true, italic: true, color: GREEN, valign: 'top',
+  });
+  photo(s, 9.113, -0.033, 4.22, 7.557);
+  honeycomb(s, 7.357, 5.893, 0, BROWN);
+}
+
+/* 16 — marketing strategy */
+const STRATEGY = [
+  ['01', 'Digital marketing', 1.532, 1.317],
+  ['02', 'Use Influencer ', 2.917, 2.701],
+  ['03', 'Healthy Campagin', 4.251, 4.036],
+];
+function slide16() {
+  const s = newSlide(GREEN);
+  flower(s, 7.753, 4.65, 90, SAND);
+  logo(s, 0.458, 0.417, SAND, CREAM);
+  kicker(s, 'Marketing', 9.313, 5.288, 2.536, 0.64, CREAM, 32);
+  title(s, 'Strategy', 8.353, 5.608, 5.477, CREAM);
+  honeycomb(s, -0.949, 5.859, 7.5, SAND);
+  honeycomb(s, 11.607, -0.846, 350.6, SAND);
+  STRATEGY.forEach(function (row) {
+    stat(s, row[0], 0.481, row[2], 1.154, SAND);
+    label(s, row[1], 1.635, row[3], 5.821, CREAM, 12);
+    body(s, LOREM_MED, 1.635, row[3] + 0.296, 5.821, 0.909, CREAM);
+  });
+}
+
+/* 17 — partnership and collaboration */
+const BRANDS = [
+  ['Brand A', 0.699, 1.545, 1.565],
+  ['Brand B', 4.949, 6.053, 5.815],
+  ['Brand C', 9.462, 10.272, 10.327],
+];
+function slide17() {
+  const s = newSlide(CREAM);
+  flower(s, 4.486, 0.61, 75.8, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  kicker(s, 'Partnership And', 6.029, 1.009, 2.673, 0.438, GREEN, 20);
+  title(s, 'Collaboration', 5.187, 1.278, 7.388, GREEN);
+  honeycomb(s, 11.478, -0.846, 0, BROWN);
+  honeycomb(s, -0.96, 6.112, 346, BROWN);
+  BRANDS.forEach(function (b) {
+    s.addShape('ellipse', { x: b[2], y: 2.934, w: 1.667, h: 1.667, fill: { color: SAND } });
+    label(s, b[0], b[3], 4.748, 1.628, GREEN, 14, 'center');
+    body(s, LOREM_SHORT, b[1], 5.26, 3.359, 1.111, GREEN, 'center');
+  });
+  // Abstract brand glyphs drawn inside the sand discs.
+  s.addShape('custGeom', {
+    x: 1.893, y: 3.27, w: 0.972, h: 0.96, fill: { type: 'none' }, line: { color: CREAM, width: 1 },
+    points: [
+      { x: 0.14, y: 0.12, moveTo: true }, { x: 0.14, y: 0.84 },
+      { x: 0.00, y: 0.44, moveTo: true }, { x: 0.50, y: 0.96 }, { x: 0.97, y: 0.44 },
+      { x: 0.44, y: 0.00, moveTo: true }, { x: 0.14, y: 0.30 }, { x: 0.62, y: 0.78 }, { x: 0.62, y: 0.12 },
+      { x: 0.44, y: 0.44, moveTo: true }, { x: 0.97, y: 0.44 },
+    ],
+  });
+  s.addShape('roundRect', {
+    x: 6.37, y: 3.239, w: 1.033, h: 1.021, rectRadius: 0.09,
+    fill: { type: 'none' }, line: { color: CREAM, width: 1 },
+  });
+  s.addShape('custGeom', {
+    x: 6.37, y: 3.239, w: 1.033, h: 1.021, fill: { type: 'none' }, line: { color: CREAM, width: 1 },
+    points: [
+      { x: 0.00, y: 0.28, moveTo: true }, { x: 0.62, y: 0.28 },
+      { x: 0.00, y: 0.40, moveTo: true }, { x: 0.50, y: 0.40 },
+      { x: 0.00, y: 0.52, moveTo: true }, { x: 0.38, y: 0.52 },
+      { x: 0.12, y: 0.52, moveTo: true }, { x: 0.65, y: 0.22 }, { x: 1.03, y: 0.52 },
+      { x: 0.65, y: 0.86 }, { x: 0.12, y: 0.52 },
+    ],
+  });
+  s.addShape('custGeom', {
+    x: 11.027, y: 3.239, w: 0.42, h: 1.155, fill: { type: 'none' }, line: { color: CREAM, width: 1 },
+    points: [
+      { x: 0.09, y: 0.00, moveTo: true }, { x: 0.09, y: 1.155 },
+      { x: 0.09, y: 0.05, moveTo: true },
+      { x: 0.42, y: 0.33, curve: { type: 'cubic', x1: 0.35, y1: 0.02, x2: 0.42, y2: 0.18 } },
+      { x: 0.09, y: 0.60, curve: { type: 'cubic', x1: 0.42, y1: 0.46, x2: 0.30, y2: 0.58 } },
+      { x: 0.09, y: 0.05, curve: { type: 'cubic', x1: 0.02, y1: 0.48, x2: 0.02, y2: 0.16 } },
+    ],
+  });
+}
+
+/* 18 — target market */
+const AGES = [
+  ['Teenagers', '18', 1.797, 2.118, 1.931],
+  ['Youth', '22', 3.242, 3.562, 3.381],
+  ['Adult', '33', 4.763, 5.083, 4.889],
+];
+function slide18() {
+  const s = newSlide(CREAM);
+  flower(s, 8.082, 2.574, 75.8, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  kicker(s, 'Target', 9.719, 3.008, 2.673, 0.438, GREEN, 20);
+  title(s, 'Market', 8.782, 3.242, 3.922, GREEN);
+  honeycomb(s, 11.478, -0.846, 0, BROWN);
+  honeycomb(s, -0.96, 6.112, 346, BROWN);
+  AGES.forEach(function (a) {
+    label(s, a[0], 0.798, a[2], 1.628, GREEN, 14, 'left');
+    body(s, LOREM_TINY, 0.779, a[3], 3.359, 0.707, GREEN, 'left');
+    s.addShape('ellipse', { x: 5.77, y: a[2], w: 1.043, h: 1.043, fill: { color: SAND } });
+    stat(s, a[1], 5.772, a[4], 1.041, GREEN, 'center');
+  });
+}
+
+/* 19 — promotional programs and discount */
+const DISCOUNTS = [['< 50% Price', 2.551, 2.931], ['> 50% Qty', 4.951, 5.260]];
+function slide19() {
+  const s = newSlide(CREAM);
+  photo(s, 0, 4.708, 4.606, 2.792);
+  flower(s, 4.626, 2.002, 159.8, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  kicker(s, 'Promotional Programs &', 0.439, 2.45, 4.622, 0.438, GREEN, 20);
+  title(s, 'Discount', 0.691, 2.621, 4.813, GREEN);
+  honeycomb(s, 11.478, -0.846, 0, BROWN);
+  honeycomb(s, -0.96, 6.112, 346, BROWN);
+  DISCOUNTS.forEach(function (d) {
+    label(s, d[0], 7.807, d[1], 1.628, GREEN, 14, 'left');
+    body(s, LOREM_SHORT, 7.807, d[2], 3.359, 1.111, GREEN);
+  });
+}
+
+/* 20 — celebrity endorsements */
+const CELEBS = [
+  ['Niana Doe', 2.316, 1.324, 1.095],
+  ['Jhean Roan', 5.429, 4.458, 4.228],
+  ['Dabby Hope', 8.466, 7.592, 7.362],
+];
+function slide20() {
+  const s = newSlide(CREAM);
+  CELEBS.forEach(function (c) { photo(s, c[1], 3.042, 2.476, 3.616); });
+  flower(s, 5.689, 0.489, 90, BROWN);
+  logo(s, 0.458, 0.417, BROWN, GREEN);
+  kicker(s, 'Celebrity Who Endorse', 8.94, 1.198, 3.485, 0.438, GREEN, 20);
+  title(s, 'Our Product', 6.172, 1.265, 6.81, GREEN);
+  honeycomb(s, 11.478, -0.846, 0, BROWN);
+  honeycomb(s, -0.953, 5.817, 340.8, BROWN);
+  CELEBS.forEach(function (c) {
+    pill(s, c[2], 6.04, 2.345, 0.992, c[0], c[3], 6.307, 2.764, GREEN, SAND);
+  });
+}
+
+/* 21 — full-bleed cruelty-free statement */
+function slide21() {
+  const s = newSlide();
+  photo(s, 0, 0, 13.333, 7.5);
+  s.addShape('rect', { x: 0.589, y: 0.527, w: 12.006, h: 6.581, fill: { color: SAND, transparency: 50 } });
+  flower(s, 7.458, 4.268, 153.7, CREAM);
+  s.addText([
+    { text: CRUELTY_A, options: { fontFace: SANS_XL } },
+    { text: 'Solek ', options: { fontFace: SERIF } },
+    { text: CRUELTY_B.slice(1), options: { fontFace: SANS_XL } },
+  ], { x: 0.896, y: 5.28, w: 7.582, h: 1.313, fontSize: 24, color: CREAM, valign: 'top' });
+}
+
+/* 22 — standards and regulation */
+const REGULATION = [
+  ['95%', 'Dermatology Test Safe For Dry Skin Type', 0.912],
+  ['98%', 'Dermatology Test Safe For Oil Skin Type', 5.202],
+];
+function slide22() {
+  const s = newSlide(GREEN);
+  flower(s, 5.937, 0.692, 75.8, SAND);
+  logo(s, 0.458, 0.417, SAND, SAND);
+  kicker(s, 'Strandards &', 7.488, 1.256, 2.673, 0.438, CREAM, 20);
+  title(s, 'Regulation', 6.638, 1.359, 7.388, CREAM);
+  honeycomb(s, 11.478, -0.846, 0, SAND);
+  honeycomb(s, -0.96, 6.112, 346, SAND);
+  REGULATION.forEach(function (r) {
+    stat(s, r[0], r[2], 3.943, 1.855, SAND);
+    label(s, r[1], r[2], 4.73, 4.29, CREAM, 14, 'left');
+    body(s, LOREM_SHORT, r[2], 5.109, 3.359, 1.111, CREAM);
+  });
+  pill(s, 10.111, 4.738, 2.231, 0.867, 'Age 12+', 9.708, 4.953, 3.036, SAND, GREEN);
+}
+
+/* 23 — clinical trials */
+function slide23() {
+  const s = newSlide(CREAM);
+  flower(s, 7.567, 1.48, 90, BROWN);
+  logo(s, 0.458, 0.417, GREEN, GREEN);
+  kicker(s, 'Clinical', 9.787, 1.915, 1.911, 0.64, GREEN, 32);
+  title(s, 'Trials', 8.253, 2.266, 3.638, GREEN);
+  body(s, LOREM_TRIAL, 0.956, 2.763, 5.252, 1.111, GREEN);
+  body(s, LOREM_TRIAL, 0.956, 4.221, 5.252, 1.111, GREEN);
+  honeycomb(s, 11.607, -0.691, 7.5, BROWN);
+  honeycomb(s, -1.016, 6.12, 338, BROWN);
+  photo(s, 8.092, 4.236, 4.665, 3.264);
+}
+
+/* 24 — contact us */
+const CONTACT = [
+  ['110 Lorem St, West City 011', 5.404, 4.604, 3.359],
+  ['solek@mail.com', 5.404, 4.957, 3.359],
+  ['@Solek_Beauty', 11.386, 4.604, 2.218],
+  ['+11 04071125', 11.386, 4.957, 2.218],
+];
+function slide24() {
+  const s = newSlide(GREEN);
+  photo(s, 0, 0, 4.653, 7.5);
+  flower(s, 6.83, 1.471, 171.5, SAND);
+  logo(s, 0.458, 0.417, GREEN, GREEN);
+  kicker(s, 'Contact', 5.458, 1.883, 2.673, 0.438, CREAM, 20);
+  title(s, 'Us', 5.93, 2.014, 1.924, CREAM);
+  honeycomb(s, 10.797, -0.216, 0, SAND);
+  honeycomb(s, 3.797, 5.965, 346, SAND, 1.3);
+  CONTACT.forEach(function (c) { body(s, c[0], c[1], c[2], c[3], 0.303, CREAM); });
+  s.addText([
+    { text: 'Great Idea To Choose ', options: { fontFace: SANS_XL } },
+    { text: 'Solek', options: { fontFace: SERIF } },
+  ], {
+    x: 9.191, y: 6.436, w: 3.955, h: 0.438,
+    fontSize: 20, bold: true, italic: true, color: CREAM, valign: 'top',
+  });
+}
+
+/* 25 — thank you */
+function slide25() {
+  const s = newSlide();
+  photo(s, 0, 0, 13.333, 7.5);
+  s.addShape('rect', { x: 4.677, y: 0.417, w: 8.198, h: 6.667, fill: { color: SAND, transparency: 50 } });
+  flower(s, 3.977, 1.096, 85.4, SAND);
+  logo(s, 0.458, 0.417, CREAM, CREAM);
+  title(s, 'Thank you', 5.112, 1.39, 7.593, CREAM, 100);
+  s.addShape('rect', { x: 4.677, y: 5.889, w: 4.906, h: 1.209, fill: { color: GREEN } });
+  s.addText([
+    { text: 'Skin Care Brand Proposal', options: { breakLine: true } },
+    { text: 'Help your skin better, make your day better' },
+  ], { x: 5.163, y: 6.291, w: 4.386, h: 0.572, fontFace: SANS_XL, fontSize: 14, color: CREAM, valign: 'top' });
+  tagline(s, 10.014, 3.529, CREAM, 'right');
+  honeycomb(s, 11.607, 5.859, 0, CREAM);
+}
+
+[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25].forEach(function (build) { build(); });
+
+pptx.writeFile({
+  fileName: path.join(__dirname, '04920559-6837-48f1-8856-b12229b19ff7_grok_final.pptx'),
+});

@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Chrome derives its enrollment client ID from /etc/machine-id and rejects any
+# content that is not 32 characters
+# (https://chromium.googlesource.com/chromium/src/+/151.0.7922.169/chrome/browser/policy/browser_dm_token_storage_linux.cc),
+# and machine-id(5) defines the file as one 32-character lowercase hex line
+# that /var/lib/dbus/machine-id may be a symlink to
+# (https://www.freedesktop.org/software/systemd/man/latest/machine-id.html).
+set -u
+
+if [ "$(id -u)" -ne 0 ] && [ -z "${SAND_MACHINE_ID_ROOT:-}" ] \
+	&& command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+	exec sudo -n "$0" "$@"
+fi
+
+ROOT="${SAND_MACHINE_ID_ROOT:-}"
+etc_path="${ROOT}/etc/machine-id"
+dbus_path="${ROOT}/var/lib/dbus/machine-id"
+persisted_path="${ROOT}/home/box/chrome-profile/machine-id"
+
+read_machine_id() {
+	local path="${1:-}" id
+	[ -s "${path}" ] || return 0
+	id="$(tr -d '\n' <"${path}" 2>/dev/null)"
+	case "${id}" in
+	"" | *[!0-9a-f]*) return 0 ;;
+	esac
+	[ "${#id}" -eq 32 ] && printf '%s' "${id}"
+}
+
+etc_id="$(read_machine_id "${etc_path}")"
+persisted_id="$(read_machine_id "${persisted_path}")"
+
+if [ -n "${persisted_id}" ]; then
+	machine_id="${persisted_id}"
+elif [ -n "${etc_id}" ]; then
+	machine_id="${etc_id}"
+else
+	machine_id="$(tr -dc 'a-f0-9' </proc/sys/kernel/random/uuid 2>/dev/null | head -c 32)"
+fi
+
+if [ "${#machine_id}" -ne 32 ]; then
+	exit 0
+fi
+
+replace_regular_file() {
+	local path="$1" content="$2"
+	local dir="${path%/*}" tmp
+	mkdir -p "${dir}" 2>/dev/null || true
+	if tmp="$(mktemp "${dir}/.machine-id.XXXXXX" 2>/dev/null)"; then
+		if printf '%s\n' "${content}" >"${tmp}" 2>/dev/null; then
+			chmod 644 "${tmp}" 2>/dev/null || true
+			chown box:box "${tmp}" 2>/dev/null || true
+			mv -T "${tmp}" "${path}" 2>/dev/null \
+				|| rm -f "${tmp}" 2>/dev/null || true
+		else
+			rm -f "${tmp}" 2>/dev/null || true
+		fi
+	fi
+}
+
+if [ "${persisted_id}" != "${machine_id}" ]; then
+	replace_regular_file "${persisted_path}" "${machine_id}"
+fi
+
+if [ "${etc_id}" != "${machine_id}" ]; then
+	mkdir -p "${etc_path%/*}" 2>/dev/null || true
+	printf '%s\n' "${machine_id}" >"${etc_path}" || true
+fi
+
+if [ "$(read_machine_id "${dbus_path}")" != "${machine_id}" ]; then
+	mkdir -p "${dbus_path%/*}" 2>/dev/null || true
+	ln -sf "${etc_path}" "${dbus_path}" || true
+fi
+
+exit 0

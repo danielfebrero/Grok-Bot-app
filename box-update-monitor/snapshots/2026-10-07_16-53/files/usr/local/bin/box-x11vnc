@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+port=""
+prev=""
+for arg in "$@"; do
+	if [ "${prev}" = "-rfbport" ]; then
+		port="${arg}"
+		break
+	fi
+	prev="${arg}"
+done
+
+reap_targets() {
+	local p="$1" pids="" pid cmd
+	if command -v ss >/dev/null 2>&1; then
+		pids="$(ss -lptnH "sport = :${p}" 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2)"
+	elif command -v fuser >/dev/null 2>&1; then
+		pids="$(fuser "${p}/tcp" 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+$')"
+	fi
+	for pid in $(printf '%s\n' ${pids} | sort -un); do
+		[ -n "${pid}" ] || continue
+		[ "${pid}" = "$$" ] && continue
+		cmd="$( (tr '\0' ' ' <"/proc/${pid}/cmdline") 2>/dev/null || true)"
+		case "${cmd}" in
+		*x11vnc*) printf '%s\n' "${pid}" ;;
+		esac
+	done
+}
+
+port_bound() {
+	local p="$1"
+	if command -v ss >/dev/null 2>&1; then
+		[ -n "$(ss -ltnH "sport = :${p}" 2>/dev/null)" ]
+	else
+		[ -n "$(reap_targets "${p}")" ]
+	fi
+}
+
+if [ -n "${port}" ] && [ "${port}" -eq "${port}" ] 2>/dev/null; then
+	for pid in $(reap_targets "${port}"); do
+		kill "${pid}" 2>/dev/null || true
+	done
+	for _ in $(seq 1 50); do
+		port_bound "${port}" || break
+		for pid in $(reap_targets "${port}"); do
+			kill -9 "${pid}" 2>/dev/null || true
+		done
+		sleep 0.1
+	done
+fi
+
+exec x11vnc -skip_lockkeys "$@"
