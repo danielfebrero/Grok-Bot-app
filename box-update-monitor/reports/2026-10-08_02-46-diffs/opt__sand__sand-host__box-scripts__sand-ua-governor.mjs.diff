@@ -1,0 +1,56 @@
+--- 2026-10-07_17-05:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
++++ 2026-10-08_02-46:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
+@@ -127,14 +127,12 @@
+ }
+ 
+ export async function installDocumentScript(browser, sessionId, script) {
+-  await removeDocumentScript(browser, sessionId);
+-  await browser.send("Runtime.evaluate", { expression: script }, sessionId);
+-  await browser.send("Page.enable", {}, sessionId);
+-  const added = await browser.send(
+-    "Page.addScriptToEvaluateOnNewDocument",
+-    { source: script },
+-    sessionId,
+-  );
++  if (documentScriptMap(browser).has(sessionId)) await removeDocumentScript(browser, sessionId);
++  const [, , added] = await Promise.all([
++    browser.send("Runtime.evaluate", { expression: script }, sessionId),
++    browser.send("Page.enable", {}, sessionId),
++    browser.send("Page.addScriptToEvaluateOnNewDocument", { source: script }, sessionId),
++  ]);
+   if (typeof added?.identifier === "string") {
+     documentScriptMap(browser).set(sessionId, added.identifier);
+   }
+@@ -149,8 +147,10 @@
+     await browser.send("Runtime.evaluate", { expression: documentScript(browser) }, sessionId);
+     return;
+   }
+-  await applyDesktopUaToTarget(browser, sessionId);
+-  await installDocumentScript(browser, sessionId, documentScript(browser));
++  await Promise.all([
++    applyDesktopUaToTarget(browser, sessionId),
++    installDocumentScript(browser, sessionId, documentScript(browser)),
++  ]);
+ }
+ 
+ export async function configureUaGovernorBrowser(browser) {
+@@ -174,13 +174,12 @@
+       if (isCdpTargetGone(error)) return;
+       console.error(`${step} failed port=${browser.port}: ${errorClass(error)}`);
+     };
+-    void applyUaTreatmentToTarget(browser, sessionId, { type: targetType })
+-      .catch(reportUnlessGone("ua apply"))
+-      .finally(() => {
+-        void browser
+-          .send("Runtime.runIfWaitingForDebugger", {}, sessionId)
+-          .catch(reportUnlessGone("resume"));
+-      });
++    void applyUaTreatmentToTarget(browser, sessionId, { type: targetType }).catch(
++      reportUnlessGone("ua apply"),
++    );
++    void browser
++      .send("Runtime.runIfWaitingForDebugger", {}, sessionId)
++      .catch(reportUnlessGone("resume"));
+   });
+   const hardwareProfile = hardwareProfileEnabledForBrowser(browser);
+   await browser.send("Target.setAutoAttach", {

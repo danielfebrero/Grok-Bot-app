@@ -1,0 +1,344 @@
+/*
+ * "Portfolio / Design" deck — 10 slides, 20 x 11.25 in (16:9 @ 2x)
+ * Rebuilt with pptxgenjs only.
+ *
+ * The source deck ships no photographs: every picture frame in it is an empty
+ * PowerPoint picture placeholder that renders as bare background. Those frames
+ * are left blank here too, with their coordinates noted above each slide
+ * builder. The only bitmaps in the original are the check-mark and star icons,
+ * which are redrawn below as native shapes.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ── palette (theme "Custom 286") ───────────────────────────────────────── */
+const GREEN = '444F3F'; // accent1
+const GREEN_DK = '333B2F'; // accent1, lumMod 75%
+const GREEN_MID = '525B4E'; // accent1 -> accent2 gradient, flattened
+const WHITE = 'FDFDFD'; // accent5
+const TEXT = '1B1B1B'; // tx1 — default body colour
+const INK = '242424'; // tx2
+const INK_SOFT = '343434'; // accent6
+const PAPER = 'F3F3F3'; // bg1
+const GOLD = 'FFC000';
+
+/* ── typography ─────────────────────────────────────────────────────────── */
+const SERIF = 'Playfair Display'; // major font
+const SANS = 'Poppins'; // minor font
+
+/* ── copy reused across slides ──────────────────────────────────────────── */
+const QUOTE = 'PLACEHOLDER';
+const LOREM_FULL =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit amet ' +
+  'pellentesque rutrum. Curabitur ullamcorper maximus mi, vel blandit orci viverra in. ' +
+  'Praesent suscipit felis sem, sed tempus sapien cursus dapibus. Nullam mi odio, aliquet ' +
+  'eget tortor a, commodo. ';
+const LOREM_TAIL =
+  'Curabitur ullamcorper maximus mi, vel blandit orci viverra in. Praesent suscipit felis ' +
+  'sem, sed tempus sapien';
+const LOREM_MED =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit amet ' +
+  'pellentesque rutrum. Curabitur ullamcorper maximus mi, vel blandit orci viverra in';
+const LOREM_SHORT =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce cons equat quam sit amet pellentesque';
+const LOREM_ROW =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit sce cons equat quam sit amet pellentesque rutru';
+const LOREM_CARD =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit amet pellentesque urabitur';
+
+const VALUES_CAPS = ['TOLERANCE', 'TRUSTWORTHINESS', 'EQUANIMITY', 'ALTRUISM', 'APPRECIATION', 'EMPATHY', 'SELF-RELIANCE', 'ATTENTIVENESS'];
+const VALUES_A = ['Humility.', 'Compassion.', 'Honesty.', 'Kindness.', 'Integrity.', 'Selflessness.', 'Determination.', 'Generosity.'];
+const VALUES_B = ['Tolerance', 'Trustworthiness', 'Equanimity', 'Altruism', 'Appreciation', 'Empathy', 'Self-reliance', 'Attentiveness'];
+const VALUES_SHORT = ['Tolerance', 'Trustworthiness', 'Equanimity', 'Altruism'];
+
+/* ── helpers ────────────────────────────────────────────────────────────── */
+
+// Text boxes in the source are top-anchored, un-bulleted, with PowerPoint's
+// default 0.1" / 0.05" insets. margin is [left, right, bottom, top] in points.
+function text(slide, content, opts) {
+  slide.addText(content, Object.assign({ valign: 'top', fontFace: SANS, color: TEXT, margin: [7.2, 7.2, 3.6, 3.6] }, opts));
+}
+
+// A bulleted list -> one paragraph per entry.
+function bullets(items, indentPt) {
+  return items.map((t, i) => ({
+    text: t,
+    options: { breakLine: i < items.length - 1, bullet: { characterCode: '2022', indent: indentPt } },
+  }));
+}
+
+// Plain (bullet-free) multi-line block.
+function lines(items) {
+  return items.map((t, i) => ({ text: t, options: { breakLine: i < items.length - 1 } }));
+}
+
+function rect(slide, x, y, w, h, color) {
+  slide.addShape('rect', { x, y, w, h, fill: { color } });
+}
+
+/*
+ * "P O R T F O L I O" pill on the left, then date / role / page number.
+ * `pill` tints the outline + its label and the date; `strip` the two
+ * right-hand labels, which sit on the green panel on slides 1-2 and on the
+ * paper background elsewhere.
+ */
+function header(slide, pageNo, pill, strip) {
+  slide.addShape('roundRect', {
+    x: 1.0, y: 0.607, w: 3.0, h: 0.417, rectRadius: 0.2085,
+    fill: { type: 'none' }, line: { color: pill, width: 1 },
+  });
+  slide.addText('P O R T F O L I O', {
+    x: 1.0, y: 0.607, w: 3.0, h: 0.417, align: 'center', valign: 'middle',
+    fontFace: SANS, fontSize: 12, color: pill,
+  });
+  const labels = [
+    { t: '24 JANUARY 2040', x: 7.912, align: 'left', color: pill === WHITE ? WHITE : TEXT },
+    { t: 'CREATIVE WORKER', x: 12.917, align: 'left', color: strip },
+    { t: pageNo, x: 16.996, align: 'right', color: strip },
+  ];
+  labels.forEach((l) => {
+    text(slide, l.t, { x: l.x, y: 0.647, w: 2.088, h: 0.337, align: l.align, fontSize: 12, color: l.color, lineSpacing: 18 });
+  });
+}
+
+/*
+ * Twitter / Facebook / Google+ buttons: a white mark on a filled green disc.
+ * The bird is stood in for by a pie wedge; Facebook keeps the original's white
+ * tile with a knocked-out "f".
+ */
+function socials(slide, x, y) {
+  const D = 0.421;
+  [0, 1, 2].forEach((i) => {
+    const cx = x + i * 0.599;
+    slide.addShape('ellipse', { x: cx, y, w: D, h: D, fill: { color: GREEN } });
+    if (i === 0) {
+      slide.addShape('pie', { x: cx + 0.07, y: y + 0.10, w: 0.28, h: 0.24, angleRange: [195, 45], fill: { color: WHITE } });
+    } else if (i === 1) {
+      slide.addShape('rect', { x: cx + 0.115, y: y + 0.105, w: 0.19, h: 0.21, fill: { color: WHITE } });
+      slide.addText('f', {
+        x: cx + 0.115, y: y + 0.105, w: 0.19, h: 0.21, align: 'center', valign: 'middle',
+        fontFace: SANS, fontSize: 11, bold: true, color: GREEN, margin: 0,
+      });
+    } else {
+      slide.addText('G+', {
+        x: cx, y, w: D, h: D, align: 'center', valign: 'middle',
+        fontFace: SANS, fontSize: 12, bold: true, color: WHITE, margin: 0,
+      });
+    }
+  });
+}
+
+/*
+ * Round check-mark bullet used on the "Our Fact" slide: a filled disc with the
+ * tick drawn as two rotated bars, so it does not depend on font glyph coverage.
+ */
+function checkIcon(slide, x, y, d) {
+  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: GREEN_MID } });
+  const bar = { fill: { color: WHITE }, rotate: 0 };
+  slide.addShape('rect', Object.assign({}, bar, { x: x + 0.20 * d, y: y + 0.50 * d, w: 0.26 * d, h: 0.10 * d, rotate: 45 }));
+  slide.addShape('rect', Object.assign({}, bar, { x: x + 0.36 * d, y: y + 0.44 * d, w: 0.44 * d, h: 0.10 * d, rotate: -45 }));
+}
+
+/*
+ * Four solid stars + one faded star. The originals are 0.352" icon frames whose
+ * artwork only fills the middle ~80%, so the star shape is inset to match.
+ */
+function starRow(slide, x, y) {
+  for (let i = 0; i < 5; i++) {
+    slide.addShape('star5', {
+      x: x + i * 0.3495 + 0.037, y: y + 0.062, w: 0.278, h: 0.262,
+      fill: i < 4 ? { color: GOLD } : { color: GOLD, transparency: 65 },
+    });
+  }
+}
+
+/* ── slide builders ─────────────────────────────────────────────────────── */
+
+// 1 — Title: "Design / Portfolio" on a full-bleed green field.
+// Empty photo frame: 7.0, 3.625, 7.083 x 5.0
+function slide1(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: GREEN };
+  rect(s, 12.0, 0.0, 5.996, 6.625, GREEN_DK);
+  header(s, '001', WHITE, WHITE);
+  text(s, 'Design', { x: 0.667, y: 1.708, w: 10.0, h: 3.45, fontFace: SERIF, fontSize: 199, color: WHITE });
+  text(s, 'Portfolio', { x: 8.833, y: 6.9, w: 10.375, h: 2.895, align: 'right', fontFace: SERIF, fontSize: 166, color: WHITE });
+  text(s, '[ 2040 ]', { x: 1.917, y: 6.625, w: 3.791, h: 0.438, fontSize: 20, color: WHITE });
+  text(s, QUOTE, { x: 1.917, y: 8.875, w: 3.791, h: 1.784, fontSize: 20, color: WHITE });
+  text(s, bullets(VALUES_SHORT, 13.5), { x: 14.917, y: 4.764, w: 2.75, h: 0.945, fontSize: 14, color: WHITE, lineSpacing: 15 });
+  s.addShape('line', { x: 7.0, y: 10.625, w: 13.0, h: 0, line: { color: WHITE, width: 1 } });
+}
+
+// 2 — About: green panel on the right, author credit on the left.
+// Empty photo frame: 1.0, 4.625, 6.0 x 5.865
+function slide2(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  rect(s, 12.0, 0.0, 8.0, 11.25, GREEN);
+  header(s, '002', GREEN, WHITE);
+  text(s, 'Thomas Dune', { x: 7.873, y: 6.996, w: 2.71, h: 0.438, fontSize: 20, bold: true });
+  text(s, 'CEO, BRAND Company', { x: 7.873, y: 7.413, w: 2.71, h: 0.379, fontSize: 16 });
+  socials(s, 8.0, 9.621);
+  text(s, 'About', { x: 12.833, y: 2.005, w: 5.417, h: 2.036, fontFace: SERIF, fontSize: 115, color: WHITE });
+  text(s, lines([LOREM_FULL, '', LOREM_TAIL]), {
+    x: 12.917, y: 4.94, w: 6.167, h: 3.685, fontSize: 16.5, color: WHITE, lineSpacingMultiple: 1.3,
+  });
+}
+
+// 3 — Missions: wide green band holding two numbered columns.
+// Empty photo frames: 1.0, 2.625, 4.0 x 3.083 | 11.0, 7.54, 3.84 x 3.083 | 15.156, 7.54, 3.84 x 3.083
+function slide3(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  rect(s, 6.0, 1.625, 14.0, 5.0, GREEN);
+  header(s, '003', GREEN, TEXT);
+  text(s, QUOTE, { x: 6.875, y: 4.042, w: 3.791, h: 1.784, fontSize: 20, color: WHITE });
+  [
+    { n: '01', x: 11.804 },
+    { n: '02', x: 15.701 },
+  ].forEach((col) => {
+    text(s, col.n, { x: col.x, y: 2.05, w: 1.78, h: 0.909, fontFace: SERIF, fontSize: 40, color: WHITE, lineSpacingMultiple: 1.3 });
+    text(s, 'Your Topic Here', { x: col.x, y: 3.244, w: 3.201, h: 0.586, fontFace: SERIF, fontSize: 24, color: WHITE, lineSpacingMultiple: 1.3 });
+    text(s, LOREM_SHORT, { x: col.x, y: 4.078, w: 3.0, h: 1.88, fontSize: 16.5, color: WHITE, lineSpacingMultiple: 1.3 });
+  });
+  text(s, 'Missions', { x: 0.75, y: 7.005, w: 7.167, h: 2.036, fontFace: SERIF, fontSize: 115 });
+  socials(s, 1.0, 10.208);
+}
+
+// 4 — Capabilities: green card on the right, keyword list on the left.
+// Empty photo frame: 4.956, 2.625, 4.0 x 6.0
+function slide4(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  header(s, '003', GREEN, TEXT);
+  text(s, lines(VALUES_CAPS), { x: 0.917, y: 3.537, w: 2.71, h: 2.255, fontSize: 16 });
+  socials(s, 1.0, 6.287);
+  text(s, QUOTE, { x: 0.912, y: 9.532, w: 5.017, h: 1.111, fontSize: 20 });
+  rect(s, 10.0, 1.625, 9.0, 9.018, GREEN);
+  text(s, 'Capabilities', { x: 10.833, y: 2.511, w: 6.162, h: 1.447, fontFace: SERIF, fontSize: 80, color: WHITE });
+  text(s, 'Type Your Subtitle Here', { x: 10.833, y: 4.898, w: 7.525, h: 0.571, fontFace: SERIF, fontSize: 24, color: WHITE, lineSpacingMultiple: 1.3 });
+  text(s, LOREM_MED, { x: 10.833, y: 5.674, w: 6.5, h: 1.519, fontSize: 16.5, color: WHITE, lineSpacingMultiple: 1.3 });
+  text(s, bullets(['Consectetur adipiscing elit', 'Fusce consequat quam', 'Sit amet pellentesque rutrum'], 20.25), {
+    x: 10.833, y: 7.479, w: 4.548, h: 1.146, fontFace: SERIF, fontSize: 16.5, color: WHITE, lineSpacingMultiple: 1.3,
+  });
+}
+
+// 5 — Our Team: three member cards plus a green sidebar.
+// Empty photo frames: 1.021 / 5.51 / 10.0 at y 4.603, each 4.0 x 3.105
+function slide5(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  header(s, '005', GREEN, TEXT);
+  text(s, 'Our Team', { x: 0.833, y: 1.958, w: 7.75, h: 2.036, fontFace: SERIF, fontSize: 115 });
+  [
+    { tag: '[ 001 ]', px: 1.021, tx: 0.833 },
+    { tag: '[ 002 ]', px: 5.51, tx: 5.304 },
+    { tag: '[ 003 ]', px: 10.0, tx: 9.859 },
+  ].forEach((m) => {
+    text(s, m.tag, { x: m.px, y: 8.115, w: 2.71, h: 0.404, fontSize: 16.5, lineSpacing: 22.5 });
+    text(s, 'Insert Your Name', { x: m.tx, y: 8.996, w: 3.955, h: 0.555, fontFace: SERIF, fontSize: 27, color: INK });
+    text(s, 'Your Position Here', { x: m.tx, y: 9.496, w: 3.28, h: 0.379, fontSize: 16.5, italic: true, color: INK });
+  });
+  rect(s, 15.004, 1.625, 4.996, 9.018, GREEN);
+  text(s, QUOTE, { x: 15.931, y: 2.527, w: 3.048, h: 1.447, fontSize: 16, color: WHITE });
+  text(s, bullets(VALUES_SHORT, 13.5), { x: 15.917, y: 5.764, w: 2.75, h: 0.945, fontSize: 14, color: WHITE, lineSpacing: 15 });
+  text(s, '2024', { x: 15.917, y: 8.542, w: 3.048, h: 1.313, fontFace: SERIF, fontSize: 72, color: WHITE });
+}
+
+// 6 — Our Values: two bullet columns, two photo frames, a note on the right.
+// Empty photo frames: 6.167 / 9.728 at y 4.603, each 3.272 x 4.939
+function slide6(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  header(s, '006', GREEN, TEXT);
+  text(s, 'Our Values', { x: 0.833, y: 1.958, w: 8.5, h: 2.036, fontFace: SERIF, fontSize: 115 });
+  text(s, bullets(VALUES_A, 22.5), { x: 0.917, y: 6.537, w: 2.166, h: 2.255, fontSize: 16 });
+  text(s, bullets(VALUES_B, 22.5), { x: 3.414, y: 6.537, w: 2.336, h: 2.255, fontSize: 16 });
+  text(s, 'Type Your Subtitle Here', { x: 13.667, y: 5.497, w: 5.323, h: 0.582, fontFace: SERIF, fontSize: 24, color: INK, lineSpacingMultiple: 1.3 });
+  text(s, LOREM_FULL, { x: 13.667, y: 6.273, w: 5.417, h: 2.602, fontSize: 16.5, color: INK_SOFT, lineSpacingMultiple: 1.3 });
+  socials(s, 1.0, 10.208);
+}
+
+// 7 — Our Fact: three check-marked facts, tall photo frame on the right.
+// Empty photo frame: 13.0, 0.625, 6.022 x 10.0  (this slide has no role/page labels)
+function slide7(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  s.addShape('roundRect', { x: 1.0, y: 0.607, w: 3.0, h: 0.417, rectRadius: 0.2085, fill: { type: 'none' }, line: { color: GREEN, width: 1 } });
+  s.addText('P O R T F O L I O', { x: 1.0, y: 0.607, w: 3.0, h: 0.417, align: 'center', valign: 'middle', fontFace: SANS, fontSize: 12, color: GREEN });
+  text(s, '24 JANUARY 2040', { x: 7.912, y: 0.647, w: 2.088, h: 0.337, fontSize: 12, lineSpacing: 18 });
+  text(s, 'Our Fact', { x: 0.833, y: 1.839, w: 8.5, h: 2.036, fontFace: SERIF, fontSize: 115 });
+  [4.388, 6.042, 7.696].forEach((y) => {
+    checkIcon(s, 0.994, y + 0.175, 0.441);
+    text(s, 'Insert Your Topic Here', { x: 1.525, y, w: 4.262, h: 0.512, fontFace: SERIF, fontSize: 21, color: INK, lineSpacingMultiple: 1.3 });
+    text(s, LOREM_ROW, { x: 1.525, y: y + 0.503, w: 7.159, h: 0.734, fontSize: 15, color: INK_SOFT, lineSpacingMultiple: 1.3 });
+  });
+  rect(s, 7.0, 9.625, 4.996, 1.625, GREEN);
+}
+
+// 8 — Resume: green panel with two paragraphs and two stat blocks.
+// Empty photo frame: 5.906, 5.625, 3.05 x 4.083
+function slide8(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  rect(s, 10.0, 1.625, 9.083, 9.625, GREEN);
+  header(s, '008', GREEN, TEXT);
+  text(s, 'Resume', { x: 0.833, y: 2.208, w: 6.5, h: 2.036, fontFace: SERIF, fontSize: 115 });
+  text(s, lines(VALUES_CAPS), { x: 0.917, y: 6.458, w: 2.71, h: 2.255, fontSize: 16 });
+  socials(s, 1.0, 9.209);
+  text(s, LOREM_FULL, { x: 10.833, y: 2.763, w: 7.417, h: 1.88, fontSize: 16.5, color: WHITE, lineSpacingMultiple: 1.3 });
+  text(s,
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce consequat quam sit am etell entesque rutrum. Curabitur ullamcorper maximus mi.',
+    { x: 10.833, y: 5.284, w: 7.417, h: 1.158, fontSize: 16.5, color: WHITE, lineSpacingMultiple: 1.3 });
+  [
+    { n: '907+', x: 10.84 },
+    { n: '78%', x: 13.591 },
+  ].forEach((stat) => {
+    text(s, stat.n, { x: stat.x, y: 8.208, w: 2.105, h: 0.707, fontFace: SERIF, fontSize: 36, color: WHITE });
+    text(s, 'Type Your Achievements', { x: stat.x, y: 8.956, w: 2.009, h: 0.656, fontFace: SERIF, fontSize: 16.5, color: WHITE });
+  });
+}
+
+// 9 — Testimonial: two stacked review cards.
+// Empty photo frames: 4.0, 4.708, 4.956 x 5.895 | 1.0, 5.625, 4.083 x 4.061
+function slide9(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  header(s, '009', GREEN, TEXT);
+  text(s, 'Testimonial', { x: 0.833, y: 2.708, w: 8.04, h: 1.717, fontFace: SERIF, fontSize: 96 });
+  [2.625, 6.278].forEach((cardY) => {
+    rect(s, 10.0, cardY, 8.04, 3.325, GREEN);
+    starRow(s, 10.796, cardY + 0.679);
+    text(s, '4.0 Stars Rating', { x: 12.533, y: cardY + 0.677, w: 1.72, h: 0.345, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.3 });
+    text(s, 'Type Your Subtitle Here', { x: 10.686, y: cardY + 1.055, w: 6.667, h: 0.571, fontFace: SERIF, fontSize: 24, color: WHITE, lineSpacingMultiple: 1.3 });
+    text(s, LOREM_CARD, { x: 10.686, y: cardY + 1.85, w: 6.667, h: 0.798, fontSize: 16.5, color: WHITE, lineSpacingMultiple: 1.3 });
+  });
+}
+
+/*
+ * 10 — Closing: a green "Portfolio" panel; the left two-thirds is a six-frame
+ * photo mosaic, all frames empty in the source:
+ *   0.958 / 4.769 / 8.579 at y 2.625, 3.55 x 3.0
+ *   7.329, 7.603, 3.55 x 3.0 | 10.021, 3.625, 3.94 x 5.0 | 2.994, 4.625, 4.052 x 5.0
+ */
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: PAPER };
+  rect(s, 12.917, 1.625, 7.083, 8.0, GREEN);
+  header(s, '010', GREEN, TEXT);
+  socials(s, 1.0, 7.204);
+  text(s, 'Portfolio', { x: 14.417, y: 3.511, w: 4.917, h: 1.447, fontFace: SERIF, fontSize: 80, color: WHITE });
+  text(s, QUOTE, { x: 14.496, y: 6.989, w: 3.088, h: 1.616, fontSize: 18, color: WHITE });
+}
+
+/* ── build ──────────────────────────────────────────────────────────────── */
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE20', width: 20, height: 11.25 });
+pptx.layout = 'WIDE20';
+pptx.theme = { headFontFace: SERIF, bodyFontFace: SANS };
+pptx.title = 'Portfolio';
+
+[slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10].forEach((build) => build(pptx));
+
+pptx.writeFile({ fileName: path.join(__dirname, '18ac3d81-f537-4c18-9976-2ea5b6100b8b_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));

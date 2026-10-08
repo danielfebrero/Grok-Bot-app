@@ -1,0 +1,709 @@
+/**
+ * "The Make Up" — 30-slide deck rebuilt with pptxgenjs.
+ * Raster photos in the source deck are replaced by grey `[image]` placeholders;
+ * the vector portrait illustrations are redrawn from native shapes (see `figure`).
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  bg: '100911',      // deck background (slide master)
+  panel: '311C34',   // darkest purple panel
+  panel2: '492C4E',  // mid purple panel / card
+  a1: '92599D',      // accent 1 .. 6
+  a2: 'A26BAF',
+  a3: 'B482BF',
+  a4: 'C797D1',
+  a5: 'F25E5E',
+  a6: 'FA7F81',
+  white: 'FFFFFF',
+  ink: '262626',     // tx1 lum 85%
+  grey: '808080',    // tx1 lum 50%
+  greyLight: 'D9D9D9',
+  img: 'A6A6A6',     // colour the source deck's photo placeholders render as
+  imgTag: 'BFBFBF',
+};
+
+const FH = 'Lora';       // major / heading font
+const FB = 'Open Sans';  // minor / body font
+
+const NONE = { type: 'none' };
+const SHADOW = (blur, offset, angle, opacity) => ({
+  type: 'outer', color: '000000', blur, offset, angle, opacity, rotateWithShape: false,
+});
+
+/* ---------------------------------------------------------------- helpers */
+
+function shape(s, kind, o) { s.addShape(kind, o); }
+
+/** Solid-filled, border-less shape. */
+function solid(s, kind, x, y, w, h, color, extra) {
+  shape(s, kind, Object.assign({ x, y, w, h, fill: { color }, line: NONE }, extra));
+}
+
+/** Heading in Lora — the deck's standard 32pt white title unless overridden. */
+function title(s, text, x, y, w, h, o = {}) {
+  s.addText(text, Object.assign({
+    x, y, w, h, fontFace: FH, fontSize: 32, bold: true,
+    color: C.white, valign: 'top',
+  }, o));
+}
+
+/** Body copy in Open Sans — 12pt with the deck's 130% leading. */
+function body(s, text, x, y, w, h, o = {}) {
+  s.addText(text, Object.assign({
+    x, y, w, h, fontFace: FB, fontSize: 12,
+    color: C.white, valign: 'top', lineSpacingMultiple: 1.3,
+  }, o));
+}
+
+/** Small numbered kicker used all over the deck: "01." over a bold caption. */
+function kicker(s, num, caption, x, y, o = {}) {
+  const color = o.color || C.a1;
+  const w = o.w || 2.84;
+  const align = o.align || 'left';
+  body(s, num, x, y, 0.44, 0.32, { fontSize: 10.5, bold: true, color, align, w: align === 'right' ? w : 0.44 });
+  body(s, caption, x, y + 0.35, w, 0.39, { fontSize: 14, bold: true, color, align });
+}
+
+/** Bold label with a paragraph underneath — the deck's generic list item. */
+function labelBlock(s, label, text, x, y, w, o = {}) {
+  body(s, label, x, y, o.labelW || w, 0.34, {
+    fontSize: 12, bold: true, color: o.labelColor || C.white, align: o.align,
+  });
+  body(s, text, x, y + 0.35, w, o.textH || 0.61, {
+    fontSize: 12, color: o.textColor || C.white, align: o.align,
+  });
+}
+
+/** Replacement for a bitmap: flat grey block tagged `[image]`. */
+function imageBox(s, x, y, w, h, o = {}) {
+  const kind = o.round ? 'roundRect' : 'rect';
+  solid(s, kind, x, y, w, h, C.img, o.round ? { rectRadius: o.round } : undefined);
+  s.addText('[image]', {
+    x, y: y + h / 2 - 0.16, w, h: 0.32, align: 'center', valign: 'middle',
+    fontFace: FB, fontSize: 9, color: C.imgTag,
+  });
+}
+
+/** Deck furniture inherited from the slide master (drawn first, sits behind). */
+function deco(s, num, o = {}) {
+  s.addText('The Make Up', {
+    x: 0.54, y: 0.26, w: 1.95, h: 0.4, fontFace: FH, fontSize: 18, bold: true,
+    charSpacing: -1.3, color: o.light ? C.white : C.a1, valign: 'top',
+  });
+  if (o.copyright !== false) {
+    body(s, 'Copyright © The Make Up', 0.54, 6.85, 2.24, 0.3, { lineSpacingMultiple: 1 });
+  }
+  body(s, String(num), 12.16, 6.85, 0.6, 0.3, { align: 'right', lineSpacingMultiple: 1 });
+}
+
+/* --------------------------------------------------- the portrait figures */
+
+const F = {
+  skin: 'FFE7DD', shade: 'F4DBCF', hair: 'A2A09D', brow: 'C9BDB6',
+  lip: 'C89A8A', eye: '2B2B2B', towel: 'FFFFFF', mask: '8AB0D0',
+};
+
+/**
+ * Flat-vector portrait drawn from native shapes, scaled into the box (x,y,w,h).
+ * All coordinates below are fractions of that box: the head occupies the top
+ * ~55%, the shoulders fill the bottom and are cut flat by the box edge.
+ * opts: hands | wrap (towel turban) | mask (sheet mask) | jar (cream pot)
+ */
+function figure(s, x, y, w, h, opts = {}) {
+  const put = (kind, fx, fy, fw, fh, color, extra) =>
+    solid(s, kind, x + fx * w, y + fy * h, fw * w, fh * h, color, extra);
+
+  const radius = (fw, fh) => Math.min(fw * w, fh * h) / 2;
+  /** Rounded bar from (x1,y1) to (x2,y2) — used for the forearms. */
+  const limb = (x1, y1, x2, y2, thick) => {
+    const dx = (x2 - x1) * w, dy = (y2 - y1) * h;
+    const len = Math.hypot(dx, dy), t = thick * w;
+    solid(s, 'roundRect',
+      x + ((x1 + x2) / 2) * w - len / 2, y + ((y1 + y2) / 2) * h - t / 2, len, t, F.skin,
+      { rotate: Math.atan2(dy, dx) * 180 / Math.PI, rectRadius: t / 2 });
+  };
+  const hand = (fx, fy, tilt) => put('ellipse', fx, fy, 0.105, 0.21, F.skin, { rotate: tilt });
+
+  put('ellipse', 0.27, 0.54, 0.46, 0.32, F.shade);              // upper chest
+  put('ellipse', -0.02, 0.72, 1.04, 0.28, F.skin);              // shoulders
+  put('rect', 0.30, 0.93, 0.40, 0.07, F.towel);                 // strapless towel
+  put('rect', 0.455, 0.42, 0.09, 0.22, F.shade);                // neck
+  put('ellipse', 0.28, 0.02, 0.44, 0.42, F.hair);               // hair mass
+  put('ellipse', 0.315, 0.25, 0.04, 0.065, F.skin);             // ears
+  put('ellipse', 0.645, 0.25, 0.04, 0.065, F.skin);
+  put('ellipse', 0.33, 0.07, 0.34, 0.44, F.skin);               // face
+  put('ellipse', 0.30, 0.02, 0.40, 0.15, F.hair);               // fringe / hairline
+
+  if (opts.mask) put('ellipse', 0.355, 0.17, 0.29, 0.28, F.mask);
+
+  put('roundRect', 0.385, 0.245, 0.060, 0.010, F.brow);         // brows
+  put('roundRect', 0.555, 0.245, 0.060, 0.010, F.brow);
+  put('ellipse', 0.40, 0.265, 0.038, 0.024, F.eye);             // eyes
+  put('ellipse', 0.562, 0.265, 0.038, 0.024, F.eye);
+  put('ellipse', 0.4835, 0.318, 0.018, 0.030, F.shade);         // nose
+  put('ellipse', 0.462, 0.382, 0.076, 0.032, F.lip);            // lips
+
+  if (opts.wrap) {                                              // towel turban
+    put('ellipse', 0.29, -0.02, 0.42, 0.15, F.towel);
+    put('ellipse', 0.59, 0.00, 0.17, 0.11, F.towel, { rotate: 25 });
+  }
+  if (opts.hands || opts.jar) {                                 // hand raised to left cheek
+    limb(0.35, 1.02, 0.295, 0.52, 0.085);
+    hand(0.235, 0.30, 15);
+  }
+  if (opts.hands) {                                             // mirrored right hand
+    limb(0.65, 1.02, 0.705, 0.52, 0.085);
+    hand(0.66, 0.30, -15);
+  }
+  if (opts.jar) {                                               // right hand holds a pot
+    limb(0.74, 1.02, 0.71, 0.66, 0.085);
+    hand(0.655, 0.52, -10);
+    put('roundRect', 0.665, 0.48, 0.12, 0.10, F.shade, { rectRadius: radius(0.12, 0.10) * 0.35 });
+    put('roundRect', 0.660, 0.455, 0.13, 0.035, F.towel, { rectRadius: radius(0.13, 0.035) * 0.4 });
+  }
+}
+
+/**
+ * The deck's peanut-shaped "feature bubble": a fat round lobe plus a flat
+ * ellipse sweeping out to the side, filling a 4.5 x 1.8 in area from (x,y).
+ */
+function blob(s, x, y, color, mirrored) {
+  const round = [mirrored ? x + 2.7 : x, y, 1.8, 1.8];
+  const sweep = [mirrored ? x : x + 1.2, y + 0.45, 3.3, 1.05];
+  [round, sweep].forEach(([lx, ly, lw, lh]) => solid(s, 'ellipse', lx, ly, lw, lh, color));
+}
+
+/* ------------------------------------------------------------ slide bodies */
+
+const LOREM = 'Leverage agile frameworks to provide a robust synopsis for high level overviews. ';
+const LOREM2 = LOREM + 'Iterative approaches to corporate strategy foster collaborative thinking to further the overall value proposition. ';
+const LOREM3 = LOREM2 + 'Organically grow the holistic world view of disruptive innovation via workplace diversity and empowerment.';
+const SURVIVAL = 'survival strategies to ensure proactive domination. ';
+const EMAIL_LINE = 'Email, live chat, phone — no matter which medium you prefer, we’re always';
+
+const slides = [];
+
+/* 1 — cover */
+slides.push((s) => {
+  s.background = { color: C.a1 };
+  title(s, 'The Make Up', 4.33, 2.76, 8.07, 1.58, { fontSize: 88, charSpacing: -2, align: 'center' });
+  title(s, 'Make Up Application Tips', 4.33, 4.17, 6.94, 0.57, { fontSize: 28, bold: false, charSpacing: -2, align: 'right' });
+  figure(s, -0.51, 0.64, 5.93, 6.86, { jar: true });
+});
+
+/* 2 — two-step intro */
+slides.push((s) => {
+  deco(s, 2);
+  title(s, 'Mastering the Art of Flawless Makeup Application', 1.02, 1.30, 6.58, 1.18);
+  body(s, LOREM3, 1.02, 2.71, 10.04, 0.87);
+  kicker(s, '01.', 'Use Toner', 3.45, 4.37);
+  body(s, LOREM, 3.45, 5.33, 2.84, 0.87);
+  kicker(s, '02.', 'Spray for prepare the skin', 9.27, 4.31);
+  body(s, LOREM, 9.27, 5.26, 2.84, 0.87);
+  figure(s, 1.06, 4.03, 2.13, 2.27, { jar: true });
+  figure(s, 6.62, 4.03, 2.20, 2.27, { mask: true });
+});
+
+/* 3 — photo + card */
+slides.push((s) => {
+  deco(s, 3);
+  imageBox(s, 1.20, 1.44, 4.62, 4.62, { round: 0.27 });
+  solid(s, 'round1Rect', 3.56, 4.78, 9.77, 2.72, C.panel, { flipH: true });
+  title(s, 'Crafting a Striking Makeup Routine', 6.46, 1.44, 4.30, 1.18);
+  body(s, LOREM + 'Iterative approaches to corporate strategy', 6.46, 3.01, 5.29, 0.60);
+  solid(s, 'roundRect', 6.46, 4.01, 5.29, 2.05, C.panel2, { rectRadius: 0.25, shadow: SHADOW(22, 9, 90, 0.1) });
+  imageBox(s, 9.70, 4.01, 2.05, 2.05, { round: 0.12 });
+  labelBlock(s, 'Personal Make Up', SURVIVAL, 6.78, 4.56, 2.60, { labelW: 2.01 });
+});
+
+/* 4 — full-bleed photo, justified copy */
+slides.push((s) => {
+  deco(s, 4);
+  solid(s, 'rect', 9.15, 0, 4.19, 7.50, C.panel2, { fill: { color: C.panel2, transparency: 98 } });
+  imageBox(s, 0, 0, 9.15, 7.50);
+  title(s, 'A Quick and Easy Guide to Daily Makeup Application', 1.21, 1.51, 5.95, 1.18);
+  body(s, [
+    { text: LOREM3, options: { breakLine: true } },
+    { text: '', options: { breakLine: true } },
+    { text: 'Bring to the table win-win survival strategies to ensure proactive domination. At the end of the day, going forward, a new normal that has evolved from generation X is on the runway heading towards a streamlined cloud solution. User generated content in real-time will have multiple touchpoints for offshoring.' },
+  ], 1.21, 3.02, 5.52, 2.97, { align: 'justify' });
+  figure(s, 6.41, 0.97, 6.60, 7.03, { hands: true });
+});
+
+/* 5 — approach */
+slides.push((s) => {
+  deco(s, 5, { copyright: false });
+  solid(s, 'ellipse', 1.42, 1.20, 5.64, 4.92, C.panel2);
+  solid(s, 'roundRect', 2.30, 1.20, 3.74, 5.50, C.a1, { rectRadius: 0.37 });
+  title(s, [
+    { text: 'Approach to', options: { breakLine: true } },
+    { text: 'Makeup Application' },
+  ], 7.23, 2.60, 4.67, 1.18);
+  body(s, LOREM + 'Iterative approaches to corporate strategy foster', 7.23, 4.03, 4.28, 0.87);
+  figure(s, 1.70, 1.87, 4.94, 5.26, { jar: true });
+});
+
+/* 6 — pricing */
+slides.push((s) => {
+  deco(s, 6);
+  solid(s, 'ellipse', 5.66, 0.56, 6.87, 5.72, C.panel2);
+  solid(s, 'roundRect', 8.24, 1.69, 3.06, 3.75, C.panel, { rectRadius: 0.10 });
+  title(s, 'Crafting a Striking Makeup Routine', 0.97, 2.74, 4.21, 1.18);
+  body(s, LOREM, 0.97, 4.16, 3.67, 0.60);
+  figure(s, 8.08, 1.56, 3.39, 3.62, { hands: true });
+
+  shape(s, 'roundRect', {
+    x: 5.68, y: 2.70, w: 2.75, h: 2.79, rectRadius: 0.20,
+    fill: { color: C.panel }, line: { color: C.a1, width: 1 },
+  });
+  [['Make Up Routine', '$346', 3.01], ['Make Up Wedding', '$566', 3.77], ['Make Up', '$356', 4.53]]
+    .forEach(([name, price, y]) => {
+      body(s, name, 6.03, y, 2.08, 0.34, { fontSize: 14, lineSpacingMultiple: 1 });
+      body(s, price, 6.03, y + 0.35, 2.08, 0.31, { fontSize: 11, lineSpacingMultiple: 1 });
+      solid(s, 'ellipse', 5.90, y + 0.10, 0.10, 0.10, C.white);
+    });
+  shape(s, 'line', { x: 5.95, y: 3.18, w: 0, h: 1.52, line: { color: C.greyLight, width: 1, dashType: 'dash' } });
+
+  solid(s, 'roundRect', 7.34, 4.97, 4.08, 1.32, C.a2, { rectRadius: 0.66, shadow: SHADOW(40, 17, 90, 0.2) });
+  s.addText([
+    { text: '$ 132,44 ', options: { fontSize: 32, bold: true } },
+    { text: 'USD', options: { fontSize: 12 } },
+  ], { x: 8.07, y: 5.19, w: 2.64, h: 0.64, fontFace: FB, color: C.white, align: 'center', valign: 'top' });
+  body(s, 'Make Up Routine', 7.96, 5.70, 2.84, 0.37, { fontSize: 16, align: 'center', lineSpacingMultiple: 1 });
+});
+
+/* 7 — essential steps */
+slides.push((s) => {
+  deco(s, 7);
+  solid(s, 'roundRect', 7.48, 1.72, 3.94, 4.68, C.a1, { rectRadius: 0.28 });
+  title(s, 'Essential Steps for Makeup Mastery', 0.93, 2.60, 5.28, 1.18);
+  body(s, LOREM2, 0.93, 4.03, 5.28, 0.87);
+  figure(s, 6.89, 1.28, 5.13, 5.71, { hands: true });
+});
+
+/* 8 — three numbered features */
+slides.push((s) => {
+  solid(s, 'rect', 6.34, 0, 6.67, 7.50, C.panel);
+  shape(s, 'line', { x: 9.67, y: 1.48, w: 0, h: 3.29, line: { color: C.greyLight, width: 1, dashType: 'dash' } });
+  [['1', 1.23, C.a1], ['2', 2.75, C.a2], ['3', 4.77, C.a3]].forEach(([n, y, color]) => {
+    solid(s, 'roundRect', 9.55, y, 0.25, 0.25, color, { rectRadius: 0.125 });
+    s.addText(n, { x: 9.55, y, w: 0.25, h: 0.25, align: 'center', valign: 'middle', fontFace: FB, fontSize: 10, bold: true, color: C.white });
+  });
+  kicker(s, '01.', 'Card Modules', 10.06, 0.80, { color: C.white });
+  body(s, LOREM, 10.06, 1.76, 2.84, 0.87);
+  kicker(s, '02.', 'Automatically ', 6.45, 2.33, { color: C.white, align: 'right' });
+  body(s, LOREM, 6.45, 3.29, 2.84, 0.87, { align: 'right' });
+  kicker(s, '03.', 'Fast Transaction ', 10.06, 4.37, { color: C.ink });
+  body(s, LOREM, 10.06, 5.33, 2.84, 0.87);
+  title(s, 'Features with Expert Makeup Techniques', 0.97, 2.45, 4.76, 1.18);
+  body(s, LOREM2, 0.97, 3.88, 4.40, 1.13);
+  [11.44, 11.88].forEach((qx) => solid(s, 'rect', qx, 5.15, 0.28, 0.47, '574660', { rotate: 12 }));
+  figure(s, 6.74, 4.74, 2.74, 2.92, { jar: true });
+});
+
+/* 9 — founder timeline */
+slides.push((s) => {
+  deco(s, 9);
+  solid(s, 'round1Rect', 0, 0.96, 13.33, 3.55, C.panel, { flipV: true });
+  imageBox(s, 7.42, 1.49, 4.14, 4.52, { round: 0.24 });
+  title(s, 'Meet Our Founder', 1.39, 2.18, 4.65, 0.64);
+  body(s, LOREM + 'Iterative approaches to corporate strategy. ', 1.39, 2.94, 5.34, 0.60);
+  shape(s, 'line', { x: 1.63, y: 4.51, w: 3.81, h: 0, line: { color: C.a1, width: 1, dashType: 'dash' } });
+  [['2022', 'Marketing', 1.39], ['2023', 'Manager', 3.32], ['2024', 'COO', 5.23]]
+    .forEach(([year, role, x], i) => {
+      solid(s, 'roundRect', x + 0.12, 4.39, 0.25, 0.25, '404040', { rectRadius: 0.125 });
+      s.addText(String(i + 1), { x: x + 0.12, y: 4.39, w: 0.25, h: 0.25, align: 'center', valign: 'middle', fontFace: FB, fontSize: 10, bold: true, color: C.white });
+      body(s, year, x, 3.95, 0.77, 0.31, { fontSize: 10.5, bold: true, color: C.a1 });
+      body(s, role, x, 4.71, 1.49, 0.38, { fontSize: 14, bold: true });
+    });
+});
+
+/* 10 — three photos + stat */
+slides.push((s) => {
+  deco(s, 10);
+  imageBox(s, 0.94, 2.37, 3.08, 2.13, { round: 0.12 });
+  imageBox(s, 4.43, 2.37, 3.08, 2.19, { round: 0.12 });
+  solid(s, 'round2SameRect', 7.73, 2.10, 3.51, 5.26, C.panel, { rectRadius: 0.34 });
+  imageBox(s, 7.95, 2.37, 3.08, 2.19, { round: 0.12 });
+  title(s, 'Crafting a Striking Makeup Routine', 0.94, 1.11, 7.95, 0.64);
+  body(s, '89%', 8.25, 4.79, 1.27, 0.67, { fontSize: 28, bold: true, color: C.a3 });
+  body(s, LOREM, 8.25, 5.39, 2.48, 0.87);
+  body(s, LOREM2, 0.94, 5.39, 6.57, 0.87);
+});
+
+/* 11 — photo grid with headline card */
+slides.push((s) => {
+  deco(s, 11);
+  [[0, 3.75, 3.53, 3.75], [3.53, 3.75, 3.53, 3.75], [7.06, 3.75, 6.27, 3.75],
+   [9.80, 0, 3.53, 3.75], [6.27, 0, 3.53, 3.75], [0, 0, 6.27, 3.75]]
+    .forEach(([x, y, w, h]) => imageBox(s, x, y, w, h));
+  solid(s, 'roundRect', 2.21, 1.94, 8.92, 3.62, C.a1, { rectRadius: 0.24, shadow: SHADOW(28, 18, 45, 0.32) });
+  title(s, 'Mastering the Art of Flawless Makeup Application', 5.90, 2.89, 4.50, 1.72);
+  figure(s, 1.50, 0.64, 5.93, 6.86, { jar: true });
+});
+
+/* 12 — photo collage */
+slides.push((s) => {
+  s.background = { color: C.a1 };
+  imageBox(s, 6.79, 0.84, 2.79, 5.82, { round: 0.22 });
+  imageBox(s, 0.67, 0.84, 5.83, 5.82, { round: 0.34 });
+  imageBox(s, 9.88, 3.88, 2.79, 2.78, { round: 0.22 });
+  solid(s, 'roundRect', 9.84, 0.84, 2.78, 2.78, C.panel, { rectRadius: 0.22 });
+  figure(s, 10.00, 1.14, 2.46, 2.47, { hands: true });
+});
+
+/* 13 — agenda */
+slides.push((s) => {
+  deco(s, 13);
+  solid(s, 'rect', 8.48, 0, 4.86, 7.50, C.panel);
+  [['19', 'Make Up Wedding', 0.95], ['22', 'Make Up Event', 2.96], ['25', 'Make Up Graduation', 4.97]]
+    .forEach(([day, name, y]) => {
+      solid(s, 'roundRect', 6.36, y, 5.91, 1.58, C.panel2, { rectRadius: 0.126, shadow: SHADOW(15, 15, 45, 0.05) });
+      s.addText([
+        { text: day, options: { fontSize: 40 } },
+        { text: '/3', options: { fontSize: 18, bold: true } },
+      ], { x: 10.27, y: y + 0.40, w: 1.57, h: 0.77, fontFace: FH, color: C.a1, align: 'center', valign: 'top' });
+      body(s, name, 6.86, y + 0.22, 2.88, 0.46, { fontSize: 18, bold: true });
+      body(s, SURVIVAL, 6.86, y + 0.75, 3.41, 0.61);
+    });
+  title(s, 'Agenda Detail on this week.', 1.35, 2.53, 2.99, 1.72);
+  body(s, LOREM, 1.35, 4.37, 3.50, 0.60);
+});
+
+/* 14 — laptop mock-up */
+slides.push((s) => {
+  deco(s, 14);
+  solid(s, 'ellipse', 7.46, 0.32, 5.55, 5.55, C.panel);
+  shape(s, 'roundRect', {                                 // laptop lid
+    x: 6.98, y: 2.15, w: 4.88, h: 3.30, rectRadius: 0.10,
+    fill: { color: '111111' }, line: { color: 'C8C8C8', width: 1.5 },
+  });
+  solid(s, 'roundRect', 6.41, 5.42, 5.64, 0.20, 'C8C8C8', { rectRadius: 0.08 });
+  imageBox(s, 7.16, 2.33, 4.53, 2.83);
+  title(s, 'Bold and Beautiful', 1.18, 1.98, 4.40, 0.64);
+  body(s, LOREM + 'Iterative approaches to corporate strategy foster collaborative', 1.18, 2.75, 4.53, 0.87);
+  [['01.', 'Use Toner', 1.18], ['02.', 'Use Serum', 3.47]].forEach(([n, cap, x]) => {
+    kicker(s, n, cap, x, 3.96, { w: 1.47 });
+    body(s, 'Leverage agile frameworks to provide', x, 4.92, 2.02, 0.60);
+  });
+});
+
+/* 15 — break */
+slides.push((s) => {
+  s.background = { color: C.a1 };
+  imageBox(s, 0, 0, 6.67, 7.48);
+  solid(s, 'roundRect', 2.30, 2.19, 8.73, 3.11, C.panel, { rectRadius: 0.21, shadow: SHADOW(28, 18, 45, 0.12) });
+  title(s, 'Break Time', 3.25, 2.76, 6.84, 1.58, { fontSize: 88, charSpacing: -2, color: C.a1, align: 'right' });
+  title(s, '10 Minutes', 7.22, 4.17, 2.87, 0.57, { fontSize: 28, bold: false, charSpacing: -2, color: C.a1, align: 'right' });
+  solid(s, 'rect', 2.30, 4.40, 5.73, 0.12, C.a1);
+});
+
+/* 16 — timeline */
+slides.push((s) => {
+  deco(s, 16);
+  shape(s, 'line', { x: 0, y: 3.62, w: 13.33, h: 0, line: { color: C.panel2, width: 6 } });
+  body(s, LOREM2, 1.46, 2.43, 8.08, 0.60);
+  title(s, 'Make Up Timeline', 1.46, 1.56, 6.29, 0.64);
+  const steps = [
+    { x: 1.62, month: 'Feb', name: 'Make Up One', dot: C.a1, fig: [1.81, 3.97, 1.42, 1.66], opts: { hands: true }, sub: C.grey },
+    { x: 4.41, month: 'Mar', name: 'Make Up Two', dot: C.a2, fig: [4.49, 3.96, 1.63, 1.67], opts: { jar: true } },
+    { x: 7.21, month: 'Apr', name: 'Make Up Three', dot: C.a3, fig: [7.46, 3.96, 1.49, 1.67], opts: {} },
+    { x: 10.00, month: 'May', name: 'Make Up Four', dot: C.a4, fig: [10.25, 3.93, 1.47, 1.70], opts: { jar: true } },
+  ];
+  steps.forEach((st) => {
+    shape(s, 'ellipse', {
+      x: st.x, y: 3.50, w: 0.25, h: 0.25, fill: { color: st.dot },
+      line: { color: C.panel2, width: 4.5 }, shadow: SHADOW(16, 3, 90, 0.16),
+    });
+    body(s, st.month, st.x - 0.10, 4.17, 1.73, 0.31, { fontSize: 10.5, color: C.a1, charSpacing: 1 });
+    figure(s, st.fig[0], st.fig[1], st.fig[2], st.fig[3], st.opts);
+    body(s, st.name, st.x - 0.17, 5.74, 2.01, 0.34, { fontSize: 12, bold: true, align: 'center' });
+    body(s, 'survival strategies to', st.x - 0.17, 6.09, 2.01, 0.34, { fontSize: 12, align: 'center', color: st.sub || C.white });
+  });
+});
+
+/* 17 — flows */
+slides.push((s) => {
+  deco(s, 17);
+  [[4.30, C.a1], [7.94, C.greyLight]].forEach(([x, color]) => {
+    shape(s, 'line', { x, y: 4.35, w: 0.79, h: 0, line: { color, width: 1, dashType: 'dash' } });
+    body(s, 'Next', x, 3.91, 0.79, 0.31, { fontSize: 10.5, color, charSpacing: 1, align: 'center' });
+  });
+  const cards = [
+    { x: 1.74, fig: [1.89, 3.54, 1.91, 1.93], opts: { jar: true }, name: 'Make Up Flow One', tx: 1.86 },
+    { x: 5.44, fig: [5.72, 3.54, 1.65, 1.93], opts: { hands: true }, name: 'Make Up Flow Two', tx: 5.53 },
+    { x: 9.01, fig: [9.29, 3.54, 1.66, 1.92], opts: {}, name: 'Make Up Flow Three', tx: 9.16 },
+  ];
+  cards.forEach((c) => {
+    solid(s, 'roundRect', c.x, 3.25, 2.21, 2.21, C.white, { rectRadius: 0.37, shadow: SHADOW(48, 18, 45, 0.07) });
+    figure(s, c.fig[0], c.fig[1], c.fig[2], c.fig[3], c.opts);
+    body(s, c.name, c.tx, 5.74, 2.01, 0.34, { fontSize: 12, bold: true, align: 'center' });
+    body(s, 'survival strategies to', c.tx, 6.09, 2.01, 0.34, { fontSize: 12, align: 'center' });
+  });
+  title(s, 'Make Up Flows', 1.74, 1.50, 3.70, 0.64);
+  body(s, LOREM2, 1.74, 2.30, 8.06, 0.60);
+});
+
+/* 18 — desk research bar chart */
+slides.push((s) => {
+  deco(s, 18);
+  solid(s, 'ellipse', 1.76, 1.37, 5.08, 5.08, C.panel);
+  const bars = [
+    { x: 1.59, top: 2.23, value: '8', color: C.a1, lx: 1.70, ly: 1.82 },
+    { x: 2.38, top: 3.18, value: '6', color: C.a2, lx: 2.55, ly: 2.75 },
+    { x: 3.17, top: 3.67, value: '5', color: C.a3, lx: 3.33, ly: 3.25 },
+    { x: 3.99, top: 4.14, value: '4', color: C.a4, lx: 4.14, ly: 3.78 },
+    { x: 4.80, top: 4.63, value: '3', color: C.a5, lx: 4.94, ly: 4.22 },
+    { x: 5.59, top: 5.59, value: '1', color: C.a6, lx: 5.70, ly: 5.22 },
+    { x: 6.39, top: 5.59, value: '1', color: '5A415F', lx: 6.52, ly: 5.22 },
+  ];
+  bars.forEach((b) => {
+    solid(s, 'rect', b.x, b.top, 0.62, 6.08 - b.top, b.color);
+    body(s, b.value, b.lx, b.ly, 0.43, 0.37, { fontSize: 16, lineSpacingMultiple: 1 });
+  });
+  body(s, LOREM2, 8.10, 3.59, 3.64, 1.39);
+  title(s, 'Desk Research ', 8.10, 2.16, 3.02, 1.18);
+});
+
+/* 19 — enhancing your features */
+slides.push((s) => {
+  deco(s, 19);
+  solid(s, 'ellipse', 1.19, 0.94, 5.62, 5.62, C.panel);
+  figure(s, 1.38, 0.83, 5.23, 5.57, { hands: true });
+  solid(s, 'star4', 1.86, 2.28, 0.24, 0.31, C.white);
+  solid(s, 'star4', 5.74, 2.90, 0.22, 0.29, C.white);
+  solid(s, 'star4', 5.83, 3.42, 0.40, 0.52, C.white);
+  title(s, 'Enhancing Your Features with Expert Makeup Techniques', 7.44, 2.46, 4.88, 1.72, { color: C.a1 });
+  body(s, LOREM, 7.44, 4.38, 3.73, 0.60);
+});
+
+/* 20 — guide card */
+slides.push((s) => {
+  deco(s, 20);
+  solid(s, 'rect', 0, 4.71, 13.33, 2.79, C.panel);
+  solid(s, 'roundRect', 3.14, 3.49, 7.05, 2.89, C.panel2, { rectRadius: 0.28, shadow: SHADOW(27, 5, 315, 0.12) });
+  title(s, 'Guide to Chic Makeup Application', 3.54, 3.80, 2.38, 0.77, { fontSize: 16, color: C.a1 });
+  body(s, LOREM + 'Iterative approaches to corporate', 3.54, 4.69, 3.36, 0.87);
+  body(s, LOREM2, 2.58, 2.14, 8.17, 0.60, { align: 'center' });
+  title(s, 'Crafting a Striking Makeup Routine', 2.63, 1.38, 8.08, 0.64, { align: 'center' });
+  figure(s, 6.66, 2.94, 3.35, 3.44, { jar: true });
+});
+
+/* 21 — sheet mask, purple ground */
+slides.push((s) => {
+  s.background = { color: C.a1 };
+  deco(s, 21, { light: true });
+  solid(s, 'ellipse', 2.29, 1.73, 4.04, 4.04, C.white, { fill: { color: C.white, transparency: 90 } });
+  figure(s, 2.11, 1.26, 4.41, 4.98, { mask: true, wrap: true });
+  title(s, 'Flawless Makeup Application', 7.32, 2.18, 3.91, 1.18);
+  body(s, EMAIL_LINE, 7.32, 3.61, 3.73, 0.60);
+  kicker(s, '01.', 'Use Toner', 7.32, 4.59, { color: C.white, w: 1.47 });
+  kicker(s, '02.', 'Use Serum', 9.12, 4.59, { color: C.white, w: 1.47 });
+});
+
+/* 22 — four numbered steps */
+slides.push((s) => {
+  deco(s, 22);
+  solid(s, 'rect', 0, 2.43, 13.33, 4.15, C.panel2);
+  shape(s, 'line', { x: -0.09, y: 3.43, w: 13.42, h: 0, line: { color: C.panel, width: 2.25, dashType: 'sysDot' } });
+  const steps = [
+    { x: 0.98, color: C.a1, label: 'Skincare', fig: [1.06, 4.08, 0.97, 1.13], opts: { hands: true } },
+    { x: 3.99, color: C.a2, label: 'Skin Prepared', fig: [4.09, 4.08, 1.11, 1.14], opts: { jar: true } },
+    { x: 6.99, color: C.a3, label: 'Make Up', fig: [7.06, 4.08, 1.02, 1.13], opts: {} },
+    { x: 9.99, color: C.a4, label: 'Final Touch', fig: [10.01, 4.06, 1.00, 1.16], opts: { jar: true } },
+  ];
+  steps.forEach((st, i) => {
+    solid(s, 'roundRect', st.x, 3.20, 0.46, 0.46, st.color, { rectRadius: 0.23 });
+    s.addText(String(i + 1), { x: st.x, y: 3.20, w: 0.46, h: 0.46, align: 'center', valign: 'middle', fontFace: FB, fontSize: 10, bold: true, color: C.white });
+    figure(s, st.fig[0], st.fig[1], st.fig[2], st.fig[3], st.opts);
+    labelBlock(s, st.label, 'Leverage agile frameworks to provide a robust', st.x - 0.06, 5.37, 2.42, { labelW: 2.23, textH: 0.60 });
+  });
+  title(s, 'Crafting a Striking Makeup Routine', 0.98, 0.83, 5.83, 1.18);
+});
+
+/* 23 — sheet mask with white footer card */
+slides.push((s) => {
+  s.background = { color: C.a1 };
+  deco(s, 23, { light: true });
+  solid(s, 'rect', 0, 0, 13.33, 5.68, C.white, { fill: { color: C.white, transparency: 90 } });
+  solid(s, 'ellipse', 2.41, 0.95, 3.65, 3.65, C.white, { fill: { color: C.white, transparency: 90 } });
+  figure(s, 2.25, 0.53, 3.98, 4.49, { mask: true, wrap: true });
+  solid(s, 'roundRect', 1.46, 4.91, 10.42, 1.58, C.white, { rectRadius: 0.126, shadow: SHADOW(15, 15, 45, 0.05) });
+  [['Spa', 2.07], ['Skincare', 5.40], ['Make Up', 8.73]].forEach(([label, x]) => {
+    labelBlock(s, label, SURVIVAL, x, 5.23, 2.60, { labelW: 2.01, labelColor: C.ink, textColor: C.grey });
+  });
+  title(s, 'Flawless Makeup Application', 7.32, 1.81, 3.91, 1.18);
+  body(s, EMAIL_LINE, 7.32, 3.23, 3.73, 0.60);
+});
+
+/* 24 — quick guide */
+slides.push((s) => {
+  deco(s, 24);
+  solid(s, 'ellipse', 6.29, 1.81, 5.81, 3.56, C.panel2);
+  title(s, 'A Quick and Easy Guide to Daily Makeup Application', 1.33, 2.47, 4.77, 1.72);
+  body(s, LOREM, 1.33, 4.42, 3.97, 0.61);
+  figure(s, 6.59, 1.29, 4.78, 4.91, { jar: true });
+});
+
+/* 25 — feature bubbles */
+slides.push((s) => {
+  deco(s, 25);
+  body(s, LOREM + 'PLACEHOLDER', 3.86, 2.32, 5.62, 0.87, { align: 'center' });
+  title(s, 'Feature Bubble', 4.54, 1.54, 4.25, 0.64, { align: 'center' });
+  blob(s, 2.48, 3.68, C.a1, false);
+  blob(s, 6.51, 3.68, C.a1, true);
+  figure(s, 4.51, 3.75, 1.71, 1.75, { jar: true });
+  figure(s, 7.71, 3.80, 1.47, 1.70, { hands: true });
+  labelBlock(s, 'Skin Prepared', 'Leverage agile frame', 2.72, 4.25, 1.91, { labelW: 1.47, textH: 0.34 });
+  labelBlock(s, 'Skin Prepared', 'Leverage agile frame', 8.79, 4.25, 1.91, { labelW: 1.91, align: 'right', textH: 0.34 });
+  shape(s, 'line', { x: 6.23, y: 4.62, w: 1.23, h: 0, line: { color: C.a1, width: 1, dashType: 'dash' } });
+  body(s, 'Next', 6.44, 4.19, 0.79, 0.31, { fontSize: 10.5, color: C.a1, charSpacing: 1, align: 'center' });
+});
+
+/* 26 — mind map */
+slides.push((s) => {
+  deco(s, 26);
+  solid(s, 'rect', 0, 1.67, 13.33, 4.15, C.panel);
+  const hub = { x: 9.265, y: 3.765 };
+  const nodes = [
+    { label: 'Makeup Look', cx: 8.215, cy: 1.955, ring: C.greyLight },
+    { label: 'Flawless Makeup', cx: 10.305, cy: 1.955, ring: C.greyLight },
+    { label: 'Makeup', cx: 11.355, cy: 3.765, ring: C.a1 },
+    { label: 'Chic Makeup', cx: 10.305, cy: 5.575, ring: C.greyLight },
+    { label: 'Daily Makeup', cx: 8.215, cy: 5.575, ring: C.greyLight },
+    { label: 'Makeup Techniques', cx: 7.165, cy: 3.765, ring: C.a1 },
+  ];
+  nodes.slice(0, 3).forEach((n, i) => {
+    const o = nodes[(i + 3) % 6];
+    shape(s, 'line', {
+      x: Math.min(n.cx, o.cx), y: Math.min(n.cy, o.cy),
+      w: Math.abs(o.cx - n.cx), h: Math.abs(o.cy - n.cy),
+      flipV: (o.cx - n.cx) * (o.cy - n.cy) < 0,
+      line: { color: C.greyLight, width: 0.75, dashType: 'dash' },
+    });
+  });
+  nodes.forEach((n) => {
+    shape(s, 'ellipse', {
+      x: n.cx - 0.685, y: n.cy - 0.685, w: 1.37, h: 1.37,
+      fill: { color: C.panel2 }, line: { color: n.ring, width: 0.5 },
+    });
+    s.addText(n.label, {
+      x: n.cx - 0.585, y: n.cy - 0.30, w: 1.17, h: 0.6, align: 'center', valign: 'middle',
+      fontFace: FB, fontSize: 10.5, color: C.white,
+    });
+  });
+  solid(s, 'ellipse', hub.x - 1.11, hub.y - 1.11, 2.22, 2.22, C.a2, { shadow: SHADOW(19, 0, 0, 0.1) });
+  body(s, 'Mindmap', 8.00, 3.51, 2.53, 0.50, { fontSize: 24, bold: true, align: 'center', lineSpacingMultiple: 1 });
+  title(s, 'Mind Map Diagram ', 1.50, 2.59, 2.55, 1.18);
+  body(s, LOREM + 'Iterative approaches', 1.50, 4.04, 3.33, 0.87);
+});
+
+/* 27 — three step cards */
+slides.push((s) => {
+  deco(s, 27);
+  const cards = [
+    { x: 4.29, label: 'Step One', fig: [4.81, 2.24, 1.42, 1.66], opts: { hands: true } },
+    { x: 7.09, label: 'Step Two', fig: [7.50, 2.24, 1.63, 1.67], opts: { jar: true } },
+    { x: 9.89, label: 'Step Three', fig: [10.36, 2.24, 1.49, 1.67], opts: {} },
+  ];
+  cards.forEach((c) => {
+    solid(s, 'roundRect', c.x, 1.75, 2.45, 4.00, C.panel2, { rectRadius: 0.142, shadow: SHADOW(51, 24, 45, 0.04) });
+    figure(s, c.fig[0], c.fig[1], c.fig[2], c.fig[3], c.opts);
+    body(s, c.label, c.x + 0.22, 4.20, 2.01, 0.34, { fontSize: 12, bold: true, align: 'center' });
+    body(s, SURVIVAL, c.x + 0.22, 4.55, 1.91, 0.87, { fontSize: 12, align: 'center' });
+  });
+  body(s, LOREM, 1.24, 4.10, 2.73, 0.87);
+  title(s, 'Makeup Routine', 1.24, 2.73, 2.63, 1.18);
+});
+
+/* --- contact pill used on slides 28 and 29 --- */
+const CONTACTS = [
+  { icon: 'pin', text: 'Address ' },
+  { icon: 'phone', text: '0123456789' },
+  { icon: 'mail', text: 'Company@gmail.com' },
+];
+
+function contactPill(s, x, y, kind, text) {
+  shape(s, 'roundRect', {
+    x: x + 0.06, y, w: 3.28, h: 0.54, rectRadius: 0.27,
+    fill: NONE, line: { color: C.a1, width: 1 },
+  });
+  shape(s, 'roundRect', {
+    x, y, w: 0.83, h: 0.54, rectRadius: 0.27,
+    fill: { color: C.panel2 }, line: { color: C.a1, width: 1 },
+  });
+  const cx = x + 0.415, cy = y + 0.27;
+  if (kind === 'pin') {
+    solid(s, 'teardrop', cx - 0.13, cy - 0.16, 0.26, 0.26, C.a1, { rotate: 135 });
+    solid(s, 'ellipse', cx - 0.05, cy - 0.08, 0.10, 0.10, C.panel2);
+  } else if (kind === 'phone') {
+    solid(s, 'ellipse', cx - 0.15, cy - 0.15, 0.30, 0.30, C.a1);
+    solid(s, 'ellipse', cx - 0.06, cy - 0.06, 0.12, 0.12, C.panel2);
+  } else {
+    solid(s, 'roundRect', cx - 0.16, cy - 0.11, 0.32, 0.22, C.a1, { rectRadius: 0.03 });
+    solid(s, 'triangle', cx - 0.10, cy - 0.10, 0.20, 0.12, C.panel2, { flipV: true });
+  }
+  s.addText(text, {
+    x: x + 0.93, y: y + 0.08, w: 2.3, h: 0.36, fontFace: FB, fontSize: 14,
+    color: C.a1, valign: 'top', lineSpacingMultiple: 1.2,
+  });
+}
+
+/* 28 — get in touch */
+slides.push((s) => {
+  deco(s, 28);
+  solid(s, 'rect', 8.20, 0, 5.13, 7.50, C.panel2);
+  title(s, 'Get in Touch. ', 1.67, 1.62, 4.96, 0.64);
+  CONTACTS.forEach((c, i) => contactPill(s, 1.67, 2.73 + i * 0.755, c.icon, c.text));
+  body(s, LOREM, 1.67, 5.25, 4.15, 0.60);
+  figure(s, 6.59, 1.29, 4.78, 4.91, { jar: true });
+});
+
+/* 29 — contact band */
+slides.push((s) => {
+  deco(s, 29);
+  imageBox(s, 0, 2.34, 13.33, 2.41);
+  shape(s, 'roundRect', {
+    x: 7.88, y: 2.94, w: 2.57, h: 0.65, rectRadius: 0.038,
+    fill: { color: C.panel2 }, line: { color: C.a1, width: 1 },
+  });
+  body(s, 'Address ', 8.42, 3.07, 1.84, 0.39, { fontSize: 14, bold: true });
+  solid(s, 'teardrop', 7.75, 3.17, 0.58, 0.58, C.a1, { rotate: 135, shadow: SHADOW(6, 0, 210, 0.16) });
+  solid(s, 'ellipse', 7.93, 3.36, 0.21, 0.21, C.white);
+  title(s, 'Get In Touch With Us.', 3.32, 1.22, 6.69, 0.74, { align: 'center' });
+  body(s, LOREM, 3.05, 5.35, 7.24, 0.34, { align: 'center' });
+  CONTACTS.forEach((c, i) => contactPill(s, 1.18 + i * 3.81, 5.89, c.icon, c.text));
+});
+
+/* 30 — thank you */
+slides.push((s) => {
+  imageBox(s, 0, 0, 13.33, 7.50);
+  title(s, 'Thank You!', 1.30, 2.91, 6.61, 1.45, { fontSize: 80 });
+  body(s, 'For your attention ', 1.41, 4.13, 3.19, 0.46, { fontSize: 18, charSpacing: 3 });
+});
+
+/* -------------------------------------------------------------------- run */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: 13.3333, height: 7.5 });
+  pptx.layout = 'DECK';
+  pptx.theme = { headFontFace: FH, bodyFontFace: FB };
+  pptx.title = 'The Make Up';
+
+  slides.forEach((buildSlide) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: C.bg };
+    buildSlide(slide);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '0689738b-43cd-4f96-9771-680b7a98fa45_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f));

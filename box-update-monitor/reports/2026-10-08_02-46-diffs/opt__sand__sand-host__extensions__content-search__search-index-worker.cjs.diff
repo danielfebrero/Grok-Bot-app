@@ -1,0 +1,330 @@
+--- 2026-10-07_17-05:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-08_02-46:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -796,7 +796,8 @@
+   realtime_conversation_id: readVoiceCallUuid,
+   fault_send_task_owed: readFlag,
+   fault_agent_running: readFlag,
+-  fault_news_owed: readFlag
++  fault_news_owed: readFlag,
++  fault_recovered: readFlag
+ };
+ var SOCKET_FAULT_DETAIL_KEYS = Object.keys(SOCKET_FAULT_DETAIL_READERS);
+ 
+@@ -1206,10 +1207,12 @@
+   role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+   timestamp_ms INTEGER NOT NULL,
+   body TEXT NOT NULL,
++  seq INTEGER,
+   UNIQUE(agent_id, entry_id)
+ ) STRICT;
+ CREATE INDEX IF NOT EXISTS messages_agent_recency
+   ON messages(agent_id, timestamp_ms DESC);
++CREATE INDEX IF NOT EXISTS messages_agent_seq ON messages(agent_id, seq);
+ CREATE TABLE IF NOT EXISTS media (
+   id INTEGER PRIMARY KEY,
+   agent_id TEXT NOT NULL,
+@@ -1221,9 +1224,17 @@
+   timestamp_ms INTEGER NOT NULL,
+   width INTEGER,
+   height INTEGER,
++  seq INTEGER,
+   UNIQUE(agent_id, entry_id)
+ ) STRICT;
+ CREATE INDEX IF NOT EXISTS media_recency ON media(timestamp_ms DESC);
++CREATE INDEX IF NOT EXISTS media_agent_seq ON media(agent_id, seq);
++CREATE TABLE IF NOT EXISTS server_cursors (
++  agent_id TEXT PRIMARY KEY,
++  generation INTEGER NOT NULL,
++  topped_through_seq INTEGER NOT NULL,
++  backfilled_from_seq INTEGER NOT NULL
++) STRICT;
+ `;
+ var FTS_SCHEMA = `
+ CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+@@ -1305,6 +1316,41 @@
+     "INSERT INTO meta (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = '1'"
+   ).run(META_RECONCILE_DONE);
+ }
++function readServerCursor(db, agentId) {
++  const row = db.prepare(
++    `SELECT generation, topped_through_seq AS toppedThroughSeq,
++				backfilled_from_seq AS backfilledFromSeq
++			 FROM server_cursors WHERE agent_id = ?`
++  ).get(agentId);
++  if (typeof row?.generation !== "number" || typeof row.toppedThroughSeq !== "number" || typeof row.backfilledFromSeq !== "number") {
++    return null;
++  }
++  return {
++    generation: row.generation,
++    toppedThroughSeq: row.toppedThroughSeq,
++    backfilledFromSeq: row.backfilledFromSeq
++  };
++}
++function nextServerCursor(current, range) {
++  const isTop = range.beforeSeq == null;
++  const restarted = {
++    generation: range.generation,
++    toppedThroughSeq: range.beforeSeq == null ? range.rows.reduce((max, row) => Math.max(max, row.seq), range.fromSeq - 1) : range.beforeSeq - 1,
++    backfilledFromSeq: range.fromSeq
++  };
++  if (current == null || range.generation > current.generation) {
++    return isTop ? { kind: "reset", next: restarted } : { kind: "superseded" };
++  }
++  if (range.generation < current.generation) return { kind: "superseded" };
++  const isAdjacent = range.fromSeq <= current.toppedThroughSeq + 1 && (range.beforeSeq == null || range.beforeSeq >= current.backfilledFromSeq);
++  if (!isAdjacent) return isTop ? { kind: "advance", next: restarted } : { kind: "superseded" };
++  const next = {
++    generation: current.generation,
++    toppedThroughSeq: Math.max(current.toppedThroughSeq, restarted.toppedThroughSeq),
++    backfilledFromSeq: Math.min(current.backfilledFromSeq, range.fromSeq)
++  };
++  return next.toppedThroughSeq === current.toppedThroughSeq && next.backfilledFromSeq === current.backfilledFromSeq ? { kind: "verify" } : { kind: "advance", next };
++}
+ function deriveMessageRow(entry) {
+   if (isHiddenOutboundAgentPeerMessageEntry(entry)) return null;
+   const body = entrySearchText(entry).trim();
+@@ -1551,26 +1597,40 @@
+ var import_node_fs = require("node:fs");
+ var import_node_path2 = require("node:path");
+ var import_node_sqlite3 = require("node:sqlite");
++
++// src/shared/ids.ts
++function isAgentId(raw) {
++  return typeof raw === "string" && raw.length > 0 && raw === raw.trim() && !raw.includes("/") && !raw.includes("\\") && !raw.includes("\0") && raw !== "." && raw !== "..";
++}
++function parseAgentId(raw) {
++  return isAgentId(raw) ? raw : null;
++}
++
++// src/host/extensions/content-search/search-index-writer.ts
+ var STORE_FILENAME = "store.db";
+ var INCREMENTAL_VACUUM_PAGES = 512;
+ function prepareStatements(db) {
+   return {
+     upsertMessage: db.prepare(
+-      `INSERT INTO messages (agent_id, entry_id, role, timestamp_ms, body)
+-			 VALUES (?, ?, ?, ?, ?)
++      `INSERT INTO messages (agent_id, entry_id, role, timestamp_ms, body, seq)
++			 VALUES (?, ?, ?, ?, ?, ?)
+ 			 ON CONFLICT(agent_id, entry_id) DO UPDATE SET
+ 				role = excluded.role,
+ 				timestamp_ms = excluded.timestamp_ms,
+-				body = excluded.body`
++				body = excluded.body,
++				seq = excluded.seq`
+     ),
+     deleteMessage: db.prepare("DELETE FROM messages WHERE agent_id = ? AND entry_id = ?"),
+     deleteAgentMessages: db.prepare("DELETE FROM messages WHERE agent_id = ?"),
++    deleteMessageSpan: db.prepare(
++      "DELETE FROM messages WHERE agent_id = ? AND seq >= ? AND seq < ?"
++    ),
+     upsertMedia: db.prepare(
+       `INSERT INTO media (
+ 				agent_id, entry_id, file_name, ext, mime, kind,
+-				timestamp_ms, width, height
++				timestamp_ms, width, height, seq
+ 			 )
+-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
++			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ 			 ON CONFLICT(agent_id, entry_id) DO UPDATE SET
+ 				file_name = excluded.file_name,
+ 				ext = excluded.ext,
+@@ -1578,10 +1638,22 @@
+ 				kind = excluded.kind,
+ 				timestamp_ms = excluded.timestamp_ms,
+ 				width = excluded.width,
+-				height = excluded.height`
++				height = excluded.height,
++				seq = excluded.seq`
+     ),
+     deleteMedia: db.prepare("DELETE FROM media WHERE agent_id = ? AND entry_id = ?"),
+     deleteAgentMedia: db.prepare("DELETE FROM media WHERE agent_id = ?"),
++    deleteMediaSpan: db.prepare("DELETE FROM media WHERE agent_id = ? AND seq >= ? AND seq < ?"),
++    readIsServerOwned: db.prepare("SELECT 1 AS owned FROM server_cursors WHERE agent_id = ?"),
++    upsertCursor: db.prepare(
++      `INSERT INTO server_cursors (agent_id, generation, topped_through_seq, backfilled_from_seq)
++			 VALUES (?, ?, ?, ?)
++			 ON CONFLICT(agent_id) DO UPDATE SET
++				generation = excluded.generation,
++				topped_through_seq = excluded.topped_through_seq,
++				backfilled_from_seq = excluded.backfilled_from_seq`
++    ),
++    deleteCursor: db.prepare("DELETE FROM server_cursors WHERE agent_id = ?"),
+     upsertFingerprint: db.prepare(
+       `INSERT INTO agents (agent_id, fingerprint) VALUES (?, ?)
+ 			 ON CONFLICT(agent_id) DO UPDATE SET fingerprint = excluded.fingerprint`
+@@ -1591,7 +1663,8 @@
+     listIndexedAgentIds: db.prepare(
+       `SELECT agent_id AS agentId FROM agents
+ 			 UNION SELECT DISTINCT agent_id FROM messages
+-			 UNION SELECT DISTINCT agent_id FROM media`
++			 UNION SELECT DISTINCT agent_id FROM media
++			 UNION SELECT agent_id FROM server_cursors`
+     )
+   };
+ }
+@@ -1617,22 +1690,71 @@
+   runJob(job) {
+     switch (job.kind) {
+       case "upsert-entries":
+-        this.upsertEntries(job.agentId, job.entries);
+-        return;
++        if (!this.isServerOwned(job.agentId)) this.upsertEntries(job.agentId, job.entries);
++        return void 0;
+       case "delete-entry":
+-        this.deleteEntry(job.agentId, job.entryId);
+-        return;
++        if (!this.isServerOwned(job.agentId)) this.deleteEntry(job.agentId, job.entryId);
++        return void 0;
+       case "clear-agent":
++        if (!this.isServerOwned(job.agentId)) this.clearAgent(job.agentId);
++        return void 0;
++      case "remove-agent":
+         this.clearAgent(job.agentId);
+-        return;
++        return void 0;
+       case "reindex-agents":
+         for (const agentId of job.agentIds) this.reindexAgent(agentId);
+-        return;
++        return void 0;
+       case "reconcile":
+         this.reconcile();
+-        return;
++        return void 0;
++      case "apply-server-range":
++        return this.applyServerRange(job.range);
++      default: {
++        const _exhaustive = job;
++        return _exhaustive;
++      }
+     }
+   }
++  isServerOwned(agentId) {
++    return this.statements.readIsServerOwned.get(agentId) != null;
++  }
++  applyServerRange(range) {
++    if (parseAgentId(range.agentId) == null || !(0, import_node_fs.existsSync)((0, import_node_path2.join)(this.agentsRootDir, range.agentId))) {
++      return "unknown-agent";
++    }
++    return this.inTransaction(() => {
++      const step = nextServerCursor(readServerCursor(this.db, range.agentId), range);
++      switch (step.kind) {
++        case "superseded":
++          return "superseded";
++        case "reset":
++          this.statements.deleteAgentMessages.run(range.agentId);
++          this.statements.deleteAgentMedia.run(range.agentId);
++          this.statements.deleteFingerprint.run(range.agentId);
++          break;
++        case "advance":
++        case "verify":
++          break;
++        default: {
++          const _exhaustive = step;
++          return _exhaustive;
++        }
++      }
++      const beforeSeq = range.beforeSeq ?? Number.MAX_SAFE_INTEGER;
++      this.statements.deleteMessageSpan.run(range.agentId, range.fromSeq, beforeSeq);
++      this.statements.deleteMediaSpan.run(range.agentId, range.fromSeq, beforeSeq);
++      for (const row of range.rows) this.applyEntry(range.agentId, row, row.seq);
++      if (step.kind !== "verify") {
++        this.statements.upsertCursor.run(
++          range.agentId,
++          step.next.generation,
++          step.next.toppedThroughSeq,
++          step.next.backfilledFromSeq
++        );
++      }
++      return "applied";
++    });
++  }
+   storeDbPath(agentId) {
+     return (0, import_node_path2.join)(this.agentsRootDir, agentId, STORE_FILENAME);
+   }
+@@ -1679,8 +1801,9 @@
+   inTransaction(operation) {
+     this.db.exec("BEGIN IMMEDIATE");
+     try {
+-      operation();
++      const result = operation();
+       this.db.exec("COMMIT");
++      return result;
+     } catch (error) {
+       try {
+         this.db.exec("ROLLBACK");
+@@ -1689,7 +1812,7 @@
+       throw error;
+     }
+   }
+-  applyEntry(agentId, entry) {
++  applyEntry(agentId, entry, seq) {
+     let message = null;
+     let media = null;
+     try {
+@@ -1703,7 +1826,8 @@
+         message.entryId,
+         message.role,
+         message.timestampMs,
+-        message.body
++        message.body,
++        seq
+       );
+     } else {
+       this.statements.deleteMessage.run(agentId, entry.id);
+@@ -1718,7 +1842,8 @@
+         media.kind,
+         media.timestampMs,
+         media.width,
+-        media.height
++        media.height,
++        seq
+       );
+     } else {
+       this.statements.deleteMedia.run(agentId, entry.id);
+@@ -1735,7 +1860,7 @@
+   upsertEntries(agentId, entries) {
+     if (entries.length === 0) return;
+     this.inTransaction(() => {
+-      for (const entry of entries) this.applyEntry(agentId, entry);
++      for (const entry of entries) this.applyEntry(agentId, entry, null);
+       this.refreshFingerprint(agentId);
+     });
+   }
+@@ -1752,10 +1877,12 @@
+       this.statements.deleteAgentMessages.run(agentId);
+       this.statements.deleteAgentMedia.run(agentId);
+       this.statements.deleteFingerprint.run(agentId);
++      this.statements.deleteCursor.run(agentId);
+     });
+     this.db.exec(`PRAGMA incremental_vacuum(${INCREMENTAL_VACUUM_PAGES})`);
+   }
+   reindexAgent(agentId) {
++    if (this.isServerOwned(agentId)) return;
+     this.evictStoreConnection(agentId);
+     if (!(0, import_node_fs.existsSync)(this.storeDbPath(agentId))) {
+       this.clearAgent(agentId);
+@@ -1787,7 +1914,7 @@
+     this.inTransaction(() => {
+       this.statements.deleteAgentMessages.run(agentId);
+       this.statements.deleteAgentMedia.run(agentId);
+-      for (const entry of entries) this.applyEntry(agentId, entry);
++      for (const entry of entries) this.applyEntry(agentId, entry, null);
+       this.statements.upsertFingerprint.run(agentId, fingerprint);
+     });
+     this.db.exec(`PRAGMA incremental_vacuum(${INCREMENTAL_VACUUM_PAGES})`);
+@@ -1830,8 +1957,12 @@
+   port2.on("message", (request) => {
+     let response;
+     try {
+-      writer.runJob(request.job);
+-      response = { requestId: request.requestId, ok: true };
++      const outcome = writer.runJob(request.job);
++      response = {
++        requestId: request.requestId,
++        ok: true,
++        ...outcome === void 0 ? {} : { outcome }
++      };
+     } catch (error) {
+       response = {
+         requestId: request.requestId,

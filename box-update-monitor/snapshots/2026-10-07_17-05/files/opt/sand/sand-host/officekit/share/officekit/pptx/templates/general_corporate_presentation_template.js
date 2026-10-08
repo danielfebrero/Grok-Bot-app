@@ -1,0 +1,652 @@
+/**
+ * "Netho." presentation template — 30 slides, 13.333 x 7.5 in (16:9).
+ * Rebuilt from scratch with pptxgenjs.
+ *
+ * Notes on fidelity:
+ *  - Theme fonts are Roboto (major/headings) and Open Sans (minor/body).
+ *  - The source deck's picture placeholders are all empty, so nothing is drawn
+ *    for them. The four real bitmaps (device mock-ups on slides 22-25) are
+ *    replaced by flat "[image]" rectangles of the same position and size.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette ---
+const BLUE = '2A79A0'; // theme accent1
+const BLUE_D = '205B78'; // accent1 lumMod 75%
+const BLUE_M = '6DB5D9'; // accent1 lumMod 60% + lumOff 40%
+const BLUE_L = '9DCEE5'; // accent1 lumMod 40% + lumOff 60%
+const WHITE = 'FFFFFF';
+const OFFWHITE = 'E6E6E6'; // bg1 lumMod 90% — kicker text on blue
+const GREY_XL = 'D9D9D9'; // oversized "01." numerals
+const GREY_L = 'CACACA'; // progress-bar track
+const GREY = '959595'; // body copy
+const GREY_D = '606060'; // section headings
+const INK = '404040'; // progress-bar fill on light slides
+const IMG_BG = 'EFEFEF'; // stand-in for a photograph
+const TX = '2B2B2B'; // theme tx1 — default text colour
+
+const HEAD = 'Roboto';
+const BODY = 'Open Sans';
+
+// ------------------------------------------------------------- primitives ---
+// Text boxes in the source are top-anchored; pptxgenjs centres by default.
+function T(slide, text, o) {
+    slide.addText(text, Object.assign({ valign: 'top', fontFace: BODY }, o));
+}
+
+function R(slide, o) {
+    slide.addShape('rect', Object.assign({ line: { type: 'none' } }, o));
+}
+
+function hline(slide, x, y, w, color, transparency, rotate) {
+    slide.addShape('line', { x, y, w, h: 0, rotate: rotate || 0, line: { color, width: 6, transparency: transparency || 0 } });
+}
+
+// Flat stand-in for a bitmap image.
+function photo(slide, x, y, w, h) {
+    R(slide, { x, y, w, h, fill: { color: IMG_BG } });
+    T(slide, '[image]', { x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle', fontSize: 11, color: GREY });
+}
+
+// ------------------------------------------------------------ text styles ---
+const HEADLINE = 'YOU AFFECT THE WORLD BY WHAT YOU BROWSE';
+const DATE = '14 – 08 - 19';
+
+const h1 = (size, color) => ({ fontFace: HEAD, fontSize: size, bold: true, color: color || TX });
+const kicker = (color) => ({ fontFace: BODY, fontSize: 11, color: color || GREY, lineSpacingMultiple: 1.5 });
+const body = (color, size) => ({ fontFace: BODY, fontSize: size || 11, color: color || GREY, align: 'justify', lineSpacingMultiple: 1.5 });
+const stamp = { fontFace: HEAD, fontSize: 10, color: GREY, charSpacing: 3 };
+const stamp12 = { fontFace: HEAD, fontSize: 12, color: GREY, charSpacing: 3 };
+
+// ------------------------------------------------------------- lorem text ---
+const L = {
+    sub: 'aebesma hanab nana banes hanal banis',
+    subSide: 'aebesma hanab nana bane hanal banis',
+    long: 'PLACEHOLDER',
+    card: 'PLACEHOLDER',
+    cardShort: 'PLACEHOLDER',
+    cardTail: 'bala nasil dani',
+    portfolio: 'PLACEHOLDER',
+    portfolioTail: 'bala nasilasan dani',
+    mirror: 'PLACEHOLDER',
+    onBlue: 'PLACEHOLDER',
+    team: 'PLACEHOLDER',
+    person: 'PLACEHOLDER',
+    caption: 'PLACEHOLDER',
+    intro: 'PLACEHOLDER',
+    teamKicker: 'sanisina alane daenil atasanit at bandalisil hani aebesma',
+    info: 'PLACEHOLDER',
+    infoAlt: 'PLACEHOLDER',
+    infoFoot: 'PLACEHOLDER',
+};
+
+// --------------------------------------------------------- shared modules ---
+
+/**
+ * "Add Title Here .......... 87%" with a two-tone rule underneath.
+ * `x`,`y` = top-left of the caption; `w` = width of the (grey) track.
+ * The filled part of the rule is always 85% of the track.
+ */
+function progress(slide, x, y, w, o) {
+    o = o || {};
+    const dark = !!o.onBlue;
+    const fs = o.fontSize || 11;
+    const pctW = o.pctW || 0.732;
+    const gap = o.gap === undefined ? 0.408 : o.gap;
+    const color = dark ? WHITE : GREY_D;
+    T(slide, 'Add Title Here', { x, y, w: o.capW || w * 0.7, h: 0.286, fontFace: HEAD, fontSize: fs, color });
+    T(slide, '87%', { x: x + w + 0.285 - pctW, y, w: pctW, h: 0.286, align: o.pctAlign || 'right', fontFace: HEAD, fontSize: fs, color });
+    hline(slide, x + 0.14, y + gap, w, dark ? BLUE_D : (o.track || GREY_L), 38);
+    hline(slide, x + 0.136, y + gap - 0.003, w * 0.852, dark ? WHITE : INK, 0);
+}
+
+/**
+ * Numbered feature card: oversized grey numeral, bold heading, body copy.
+ * `x`,`y` = top-left of the numeral box.
+ */
+function card(slide, x, y, o) {
+    const right = o.align === 'right';
+    const bx = o.bx !== undefined ? o.bx : (right ? x - 0.529 : x + 0.185);
+    const bw = o.bw || (right ? 1.779 : 1.585);
+    const align = right ? 'right' : 'justify';
+    T(slide, o.num, Object.assign({ x, y, w: 1.273, h: 1.111, align: right ? 'right' : 'left', charSpacing: -3 }, h1(o.numSize || 60, GREY_XL)));
+    T(slide, o.head, Object.assign({ x: right ? x - 0.334 : x + 0.185, y: y + 0.387, w: 1.585, h: 0.337, align: right ? 'right' : 'left' }, h1(14)));
+    const text = o.tail ? [{ text: o.body, options: { breakLine: true } }, { text: o.tail }] : o.body;
+    T(slide, text, Object.assign({ x: bx, y: y + (o.by === undefined ? 0.884 : o.by), w: bw, h: o.bh || 1.46 }, body(), { align }));
+}
+
+/** Rotated label hugging the left edge, with optional smaller sub-label. */
+function sideLabel(slide, o) {
+    T(slide, o.text, Object.assign({ x: o.x, y: o.y, w: o.w || 1.755, h: 0.505, rotate: 270 }, h1(o.size || 24, GREY_D)));
+    if (o.sub) T(slide, o.sub, Object.assign({ x: o.subX, y: o.subY, w: o.subW || 3.081, h: 0.326, rotate: 270 }, kicker()));
+}
+
+/** Bottom-left heading and its grey sub-line, both horizontal. */
+function footLabel(slide, o) {
+    T(slide, o.text, Object.assign({ x: o.x, y: o.y, w: o.w, h: 0.505 }, h1(24, GREY_D)));
+    T(slide, o.sub, Object.assign({ x: o.subX, y: o.subY, w: o.subW, h: 0.326 }, kicker(), { fontSize: 10 }));
+}
+
+/** Blue panel plus the small white tab that overlaps its left edge. */
+function bluePanel(slide, o) {
+    R(slide, { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: BLUE } });
+    R(slide, { x: o.x, y: o.tabY, w: o.tabW || 0.454, h: o.tabH || 0.24, fill: { color: WHITE } });
+}
+
+/**
+ * Narrow vertical blue banner carrying the rotated headline. The white tab
+ * straddles the banner's top-right corner (0.781" in from its left edge).
+ */
+function blueBanner(slide, x, y, w, h) {
+    R(slide, { x, y, w, h, fill: { color: BLUE } });
+    T(slide, HEADLINE, Object.assign({ x: x - 1.423, y: y + h / 2 - 0.412, w: 4.486, h: 0.841, rotate: 270 }, h1(22, WHITE)));
+    R(slide, { x: x + 0.781, y: y + 0.106, w: 0.454, h: 0.24, rotate: 90, fill: { color: WHITE } });
+}
+
+/** Kicker line above a bold headline. */
+function headline(slide, o) {
+    T(slide, o.kicker === undefined ? L.sub : o.kicker, Object.assign(
+        { x: o.kx === undefined ? o.x + 0.023 : o.kx, y: o.ky, w: o.kw || 3.081, h: 0.379, align: o.align },
+        kicker(o.onBlue ? OFFWHITE : GREY)));
+    T(slide, HEADLINE, Object.assign({ x: o.x, y: o.y, w: o.w, h: o.h || 1.212, align: o.align }, h1(o.size || 22, o.onBlue ? WHITE : undefined)));
+}
+
+// ------------------------------------------------------------------ charts ---
+
+/** Slides 4 & 6 — three single-value horizontal bars. */
+function barChart(slide, x, y, w, h, o) {
+    const data = [
+        { name: 'Series 1', labels: ['1'], values: [4.3] },
+        { name: 'Series 2', labels: ['1'], values: [2.4] },
+        { name: 'Series 3', labels: ['1'], values: [3.5] },
+    ];
+    slide.addChart('bar', data, {
+        x, y, w, h,
+        barDir: 'bar', barGrouping: 'clustered', barGapWidthPct: 200, barOverlapPct: -60,
+        chartColors: [BLUE, GREY_L, BLUE_M],
+        showValue: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: 'General',
+        dataLabelFontSize: o.labelSize, dataLabelFontFace: BODY, dataLabelColor: '5F5F5F',
+        showLegend: false, showTitle: false,
+        catAxisHidden: o.axes === false, valAxisHidden: o.axes === false,
+        catAxisLabelFontSize: 7, valAxisLabelFontSize: 7,
+        catAxisLabelFontFace: BODY, valAxisLabelFontFace: BODY,
+        catAxisLabelColor: '757575', valAxisLabelColor: '757575',
+        catAxisLineShow: true, valAxisLineShow: false,
+        valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
+        chartArea: { fill: { color: WHITE, transparency: 100 } },
+    });
+}
+
+/** Slide 26 — 100% stacked columns across four categories. */
+function stackedChart(slide, x, y, w, h) {
+    const cats = ['1', '2', '3', '4'];
+    slide.addChart('bar', [
+        { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
+        { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
+        { name: 'Series 3', labels: cats, values: [2, 2, 3, 5] },
+    ], {
+        x, y, w, h,
+        barDir: 'col', barGrouping: 'percentStacked', barGapWidthPct: 150, barOverlapPct: 100,
+        chartColors: [BLUE_D, BLUE_M, BLUE],
+        showValue: true, dataLabelPosition: 'ctr', dataLabelFormatCode: 'General',
+        dataLabelFontSize: 8, dataLabelFontFace: BODY, dataLabelColor: WHITE,
+        showLegend: false, showTitle: false,
+        valAxisLabelFormatCode: '0%',
+        catAxisLabelFontSize: 10, valAxisLabelFontSize: 8,
+        catAxisLabelFontFace: BODY, valAxisLabelFontFace: BODY,
+        catAxisLabelColor: '757575', valAxisLabelColor: '757575',
+        valGridLine: { color: 'DFDFDF', size: 0.75 }, catGridLine: { style: 'none' },
+        chartArea: { fill: { color: WHITE, transparency: 100 } },
+    });
+}
+
+/** Slide 27 — pie with the third slice exploded. */
+function pieChart(slide, x, y, w, h) {
+    slide.addChart('pie', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'], values: [8, 3, 2, 1] }], {
+        x, y, w, h,
+        chartColors: [BLUE_D, BLUE_M, BLUE, BLUE_L],
+        dataBorder: { pt: 1.5, color: WHITE },
+        showLegend: false, showTitle: false, showValue: false,
+        firstSliceAng: 0,
+        chartArea: { fill: { color: WHITE, transparency: 100 } },
+    });
+}
+
+// ------------------------------------------------------------ 1 & 30: hero ---
+function heroSlide(word) {
+    return (slide) => {
+        R(slide, { x: 2.838, y: 2.729, w: 7.657, h: 2.042, fill: { color: BLUE } });
+        T(slide, word, Object.assign({ x: word === 'Netho.' ? 4.365 : 4.25, y: 3.04, w: 4.614, h: 1.212, align: 'center' }, h1(66, WHITE)));
+        T(slide, 'Presentation Template', { x: 5.187, y: 4.133, w: 3.573, h: 0.338, fontSize: 10, color: OFFWHITE, charSpacing: 3, lineSpacingMultiple: 1.5 });
+        R(slide, { x: 3.475, y: 2.836, w: 0.454, h: 0.24, rotate: 90, fill: { color: WHITE } });
+    };
+}
+
+// ---------------------------------------------------------------- slide 2 ---
+function slide02(slide) {
+    R(slide, { x: 1.843, y: 1.0, w: 4.824, h: 5.5, fill: { color: WHITE, transparency: 15 } });
+    bluePanel(slide, { x: 6.667, y: 1.0, w: 4.824, h: 5.5, tabY: 1.518 });
+    T(slide, HEADLINE, Object.assign({ x: 7.623, y: 1.953, w: 3.127, h: 1.313 }, h1(24, WHITE)));
+    T(slide, L.sub, Object.assign({ x: 7.646, y: 3.367, w: 3.081, h: 0.349 }, kicker(OFFWHITE)));
+    progress(slide, 7.646, 4.384, 2.758, { onBlue: true });
+    progress(slide, 7.648, 5.206, 2.758, { onBlue: true });
+    T(slide, DATE, Object.assign({ x: 11.218, y: 2.435, w: 2.345, h: 0.303, rotate: 90 }, stamp12));
+    sideLabel(slide, { text: 'About Us', x: 0.183, y: 4.992, sub: L.subSide, subX: -0.447, subY: 2.499 });
+    T(slide, [
+        { text: 'PLACEHOLDER', options: { breakLine: true } },
+        { text: '', options: { breakLine: true } },
+        { text: 'PLACEHOLDER' },
+    ], Object.assign({ x: 2.688, y: 2.647, w: 3.104, h: 3.126 }, body()));
+    R(slide, { x: 6.667, y: 1.518, w: 0.454, h: 0.24, fill: { color: WHITE } });
+}
+
+// ---------------------------------------------------------------- slide 3 ---
+function slide03(slide) {
+    blueBanner(slide, 0.815, 0.918, 1.606, 5.665);
+    T(slide, 'PLACEHOLDER',
+        Object.assign({ x: 3.403, y: 1.775, w: 3.426, h: 2.571 }, body()));
+    progress(slide, 3.424, 4.836, 3.09, { capW: 2.159, pctW: 0.82 });
+    progress(slide, 3.426, 5.658, 3.09, { capW: 2.159, pctW: 0.82 });
+    T(slide, DATE, Object.assign({ x: 11.388, y: 2.069, w: 2.572, h: 0.269, rotate: 90 }, stamp));
+}
+
+// ---------------------------------------------------------------- slide 4 ---
+function slide04(slide) {
+    R(slide, { x: 0.68, y: 2.333, w: 4.581, h: 2.897, fill: { color: WHITE, transparency: 15 } });
+    T(slide, HEADLINE, Object.assign({ x: 1.406, y: 2.921, w: 3.246, h: 1.313 }, h1(24)));
+    T(slide, 'aebesma hanab nana banes hanal baris', Object.assign({ x: 1.43, y: 4.293, w: 3.081, h: 0.349 }, kicker()));
+    T(slide, 'PLACEHOLDER',
+        Object.assign({ x: 6.347, y: 2.881, w: 3.426, h: 1.691 }, body(GREY, 10.5)));
+    T(slide, 'PLACEHOLDER',
+        Object.assign({ x: 10.103, y: 2.881, w: 2.277, h: 1.737 }, body(GREY, 10.5)));
+    barChart(slide, 6.198, 5.378, 6.183, 1.4, { labelSize: 9, axes: true });
+    T(slide, 'About Us', Object.assign({ x: 6.347, y: 1.427, w: 1.755, h: 0.505 }, h1(24, GREY_D)));
+    T(slide, 'aebesma hanab nana bane hanal banis hanasa', Object.assign({ x: 8.297, y: 1.549, w: 3.265, h: 0.326 }, kicker(), { fontSize: 10 }));
+    R(slide, { x: 12.66, y: 0.518, w: 0.674, h: 0.24, fill: { color: BLUE } });
+}
+
+// ---------------------------------------------------------------- slide 5 ---
+function slide05(slide) {
+    R(slide, { x: 0, y: 1.287, w: 0.674, h: 0.24, fill: { color: BLUE } });
+    headline(slide, { x: 1.395, y: 1.649, w: 3.127, h: 1.313, size: 24, kx: 1.418, ky: 1.21 });
+    T(slide, L.long, Object.assign({ x: 1.418, y: 3.489, w: 3.426, h: 2.571 }, body()));
+    T(slide, [{ text: 'About ', options: { breakLine: true } }, { text: 'Us' }],
+        Object.assign({ x: 10.912, y: 5.653, w: 1.238, h: 0.64, align: 'center' }, h1(16, GREY_D)));
+    // Vertical progress column.
+    R(slide, { x: 10.891, y: 0.958, w: 1.238, h: 4.288, fill: { color: BLUE } });
+    T(slide, 'Title Here', { x: 11.033, y: 1.196, w: 0.963, h: 0.286, align: 'center', fontFace: HEAD, fontSize: 11, color: WHITE });
+    T(slide, '87%', { x: 11.15, y: 4.717, w: 0.732, h: 0.286, align: 'center', fontFace: HEAD, fontSize: 11, color: WHITE });
+    hline(slide, 10.131, 3.101, 2.758, BLUE_D, 38, 90);
+    hline(slide, 10.339, 2.892, 2.349, WHITE, 0, 90);
+    T(slide, DATE, Object.assign({ x: 3.344, y: 6.334, w: 1.5, h: 0.269, align: 'right' }, stamp));
+}
+
+// ---------------------------------------------------------------- slide 6 ---
+function slide06(slide) {
+    R(slide, { x: 6.667, y: 0.771, w: 5.714, h: 3.324, fill: { color: WHITE, transparency: 15 } });
+    T(slide, HEADLINE, Object.assign({ x: 7.822, y: 1.469, w: 3.403, h: 1.414 }, h1(26)));
+    T(slide, 'aebesma hanab nana banes hanal banisasil', Object.assign({ x: 7.845, y: 3.019, w: 3.38, h: 0.379 }, kicker()));
+    T(slide, 'PLACEHOLDER',
+        Object.assign({ x: 7.845, y: 4.644, w: 3.38, h: 2.045 }, body()));
+    barChart(slide, 1.265, 4.593, 5.402, 1.4, { labelSize: 10, axes: false });
+    T(slide, 'About Us', Object.assign({ x: 1.265, y: 6.184, w: 1.755, h: 0.505 }, h1(24, GREY_D)));
+    T(slide, L.subSide, Object.assign({ x: 3.183, y: 6.306, w: 3.081, h: 0.326 }, kicker(), { fontSize: 10 }));
+    T(slide, DATE, Object.assign({ x: 11.022, y: 6.907, w: 1.923, h: 0.269, align: 'right' }, stamp));
+}
+
+// ---------------------------------------------------------------- slide 7 ---
+function slide07(slide) {
+    R(slide, { x: 0.833, y: 0.771, w: 7.875, h: 4.833, fill: { color: WHITE, transparency: 15 } });
+    footLabel(slide, { text: 'Our Service', x: 1.061, y: 6.224, w: 2.106, sub: 'aebesma hanab nana bane hanal banis bala nasil dani atasanisa', subX: 3.544, subY: 6.346, subW: 4.55 });
+    bluePanel(slide, { x: 8.708, y: 0.771, w: 4.625, h: 6.729, tabY: 1.483, tabW: 0.615 });
+    headline(slide, { x: 9.643, y: 2.568, w: 3.142, onBlue: true, kicker: 'aebesma hanab nana baneshit banin', kx: 9.667, ky: 2.075 });
+    T(slide, L.onBlue, Object.assign({ x: 9.642, y: 4.35, w: 2.858, h: 2.322 }, body(WHITE)));
+    [['01.', 1.55, 1.767, 0.884], ['02.', 3.843, 1.737, 0.822], ['03.', 6.126, 1.737, 0.822]].forEach(([num, x, bh, by]) => {
+        card(slide, x, 1.943, { num, head: 'Service', body: L.card, tail: L.cardTail, bh, by });
+    });
+}
+
+// ---------------------------------------------------------------- slide 8 ---
+function slide08(slide) {
+    blueBanner(slide, 5.099, 0.918, 1.606, 5.665);
+    [['01.', 7.937, 1.258, 0.887], ['03.', 7.937, 3.96, 0.822], ['02.', 10.339, 1.258, 0.887], ['04.', 10.339, 3.96, 0.822]]
+        .forEach(([num, x, y, by]) => card(slide, x, y, { num, head: 'Service', body: L.cardShort, by }));
+    T(slide, DATE, Object.assign({ x: 10.516, y: 6.871, w: 2.345, h: 0.269, align: 'right' }, stamp));
+}
+
+// ---------------------------------------------------------------- slide 9 ---
+function slide09(slide) {
+    card(slide, 5.312, 0.981, { num: '01.', head: 'Service', body: L.card, tail: L.cardTail, bh: 1.767 });
+    card(slide, 5.312, 3.793, { num: '02.', head: 'Service', body: L.card, tail: L.cardTail, bh: 1.737, by: 0.822 });
+    R(slide, { x: 12.66, y: 0.802, w: 0.674, h: 0.24, fill: { color: BLUE } });
+    headline(slide, { x: 8.347, y: 1.838, w: 3.127, h: 1.313, size: 24, kx: 8.37, ky: 1.336 });
+    T(slide, L.long, Object.assign({ x: 8.37, y: 3.782, w: 3.426, h: 2.571 }, body()));
+    T(slide, DATE, Object.assign({ x: 10.516, y: 6.871, w: 2.345, h: 0.269, align: 'right' }, stamp));
+}
+
+// --------------------------------------------------------------- slide 10 ---
+function slide10(slide) {
+    headline(slide, { x: 1.044, y: 5.751, w: 4.798, h: 0.976, size: 26, kx: 1.067, ky: 5.312 });
+    [['01.', 1.154, 1.767, 0.884], ['02.', 3.447, 1.737, 0.822], ['03.', 5.73, 1.737, 0.822]].forEach(([num, x, bh, by]) => {
+        card(slide, x, 1.491, { num, head: 'Service', body: L.card, tail: L.cardTail, bh, by });
+    });
+    R(slide, { x: 10.282, y: 3.782, w: 1.414, h: 4.688, rotate: 90, fill: { color: BLUE } });
+    T(slide, DATE, Object.assign({ x: 0.505, y: 0.407, w: 2.572, h: 0.269 }, stamp));
+    progress(slide, 9.208, 5.842, 3.269, { onBlue: true, capW: 2.266, pctW: 0.819 });
+}
+
+// --------------------------------------------------------------- slide 11 ---
+function slide11(slide) {
+    R(slide, { x: 8.604, y: 0, w: 3.854, h: 7.5, fill: { color: WHITE, transparency: 15 } });
+    card(slide, 9.646, 1.064, { num: '01.', head: 'Service', body: L.card, tail: L.cardTail, bh: 1.767 });
+    card(slide, 9.646, 3.876, { num: '02.', head: 'Service', body: L.card, tail: L.cardTail, bh: 1.737, by: 0.822 });
+    T(slide, L.long, Object.assign({ x: 3.871, y: 1.949, w: 3.426, h: 2.571 }, body()));
+    progress(slide, 3.892, 5.026, 3.09, { capW: 2.159, pctW: 0.82 });
+    progress(slide, 3.895, 5.847, 3.09, { capW: 2.159, pctW: 0.82 });
+    blueBanner(slide, 0.958, 0.918, 1.606, 5.665);
+}
+
+// --------------------------------------------------------------- slide 12 ---
+function slide12(slide) {
+    bluePanel(slide, { x: 8.144, y: 0.901, w: 4.335, h: 3.183, tabY: 1.188, tabH: 0.218 });
+    headline(slide, { x: 8.808, y: 1.648, w: 3.127, h: 1.313, size: 24, onBlue: true, kx: 8.831, ky: 3.11 });
+    T(slide, 'PLACEHOLDER',
+        Object.assign({ x: 8.808, y: 4.787, w: 3.104, h: 2.045 }, body()));
+    [2.112, 5.127].forEach((x, i) => card(slide, x, 4.443, {
+        num: ['01.', '02.'][i], head: 'Portfolio', body: L.portfolio, tail: L.portfolioTail, bw: 2.16, bh: 1.489,
+    }));
+    T(slide, 'Our Portfolio', Object.assign({ x: -0.216, y: 5.591, w: 2.294, h: 0.505, rotate: 270 }, h1(24, GREY_D)));
+    T(slide, DATE, Object.assign({ x: 10.46, y: 0.314, w: 2.572, h: 0.269, align: 'right' }, stamp));
+}
+
+// --------------------------------------------------------------- slide 13 ---
+function slide13(slide) {
+    T(slide, HEADLINE, Object.assign({ x: 0.986, y: 1.617, w: 2.398, h: 1.582 }, h1(22)));
+    T(slide, 'aebesma hanab banes hanal', Object.assign({ x: 1.009, y: 1.178, w: 2.263, h: 0.379 }, kicker()));
+    [4.47, 5.17, 5.867].forEach((y) => progress(slide, 0.987, y, 2.048, { fontSize: 8, capW: 1.431, pctW: 0.544, gap: 0.338 }));
+    R(slide, { x: 0, y: 0.521, w: 0.674, h: 0.24, fill: { color: BLUE } });
+    T(slide, DATE, Object.assign({ x: 10.516, y: 6.954, w: 2.345, h: 0.269, align: 'right' }, stamp));
+    card(slide, 10.528, 1.209, { num: '01.', head: 'Portfolio', body: L.cardShort, by: 0.885 });
+    card(slide, 10.528, 4.021, { num: '02.', head: 'Portfolio', body: L.cardShort, by: 0.822 });
+}
+
+// --------------------------------------------------------------- slide 14 ---
+function slide14(slide) {
+    bluePanel(slide, { x: 7.5, y: 1.0, w: 4.824, h: 5.5, tabY: 1.539, tabH: 0.199 });
+    progress(slide, 8.479, 4.611, 2.758, { onBlue: true });
+    progress(slide, 8.481, 5.433, 2.758, { onBlue: true });
+    T(slide, HEADLINE, Object.assign({ x: 8.456, y: 1.854, w: 3.127, h: 1.313 }, h1(24, WHITE)));
+    T(slide, 'aebesma hanab nana banes hanal bain', Object.assign({ x: 8.479, y: 3.325, w: 3.081, h: 0.379 }, kicker(OFFWHITE)));
+    card(slide, 1.549, 1.146, { num: '01.', head: 'Portfolio', body: L.mirror, align: 'right', bh: 1.489 });
+    card(slide, 1.549, 4.012, { num: '02.', head: 'Portfolio', body: L.mirror, align: 'right', bh: 1.489, bw: 1.786, by: 0.822 });
+}
+
+// --------------------------------------------------------------- slide 15 ---
+function slide15(slide) {
+    headline(slide, { x: 9.562, y: 1.877, w: 3.127, kicker: 'aebesma hanab nana banes ha banis', kx: 9.585, ky: 1.377 });
+    T(slide, 'PLACEHOLDER',
+        Object.assign({ x: 9.585, y: 3.655, w: 2.879, h: 2.6 }, body()));
+    T(slide, DATE, Object.assign({ x: 10.516, y: 6.954, w: 2.345, h: 0.269, align: 'right' }, stamp));
+    card(slide, 3.657, 4.068, { num: '02.', head: 'Service', body: L.cardShort });
+    card(slide, 0.949, 0.96, { num: '01.', head: 'Service', body: L.cardShort });
+}
+
+// --------------------------------------------------------------- slide 16 ---
+function slide16(slide) {
+    bluePanel(slide, { x: 9.308, y: 1.0, w: 3.039, h: 5.5, tabY: 1.539, tabH: 0.199 });
+    T(slide, HEADLINE, Object.assign({ x: 10.08, y: 2.237, w: 1.718, h: 2.693 }, h1(22, WHITE)));
+    T(slide, 'aebesma hane nona', Object.assign({ x: 10.08, y: 5.315, w: 1.718, h: 0.379 }, kicker(OFFWHITE)));
+    card(slide, 3.931, 1.165, { num: '01.', head: 'Portfolio', body: L.cardShort });
+    card(slide, 3.931, 4.021, { num: '02.', head: 'Portfolio', body: L.cardShort, by: 0.822 });
+}
+
+// --------------------------------------------------------------- slide 17 ---
+function slide17(slide) {
+    bluePanel(slide, { x: 7.014, y: 0.927, w: 4.635, h: 5.646, tabY: 1.518, tabH: 0.193 });
+    progress(slide, 7.945, 4.608, 2.575, { onBlue: true, capW: 1.798, pctW: 0.683 });
+    progress(slide, 7.947, 5.408, 2.575, { onBlue: true, capW: 1.798, pctW: 0.683 });
+    headline(slide, { x: 7.922, y: 1.969, w: 3.127, onBlue: true, kicker: 'aebesma hanab nana banesas banis', kx: 7.945, ky: 3.341 });
+    T(slide, DATE, Object.assign({ x: 11.218, y: 2.435, w: 2.345, h: 0.303, rotate: 90 }, stamp12));
+    T(slide, [
+        { text: 'PLACEHOLDER', options: { breakLine: true } },
+        { text: '', options: { breakLine: true } },
+        { text: 'PLACEHOLDER' },
+    ], Object.assign({ x: 0.827, y: 2.586, w: 1.698, h: 3.433 }, body()));
+    T(slide, 'Your Name', Object.assign({ x: 0.827, y: 1.93, w: 1.698, h: 0.438 }, h1(20, GREY_D)));
+}
+
+// --------------------------------------------------------------- slide 18 ---
+function slide18(slide) {
+    [['01.', 1.987, 4.291], ['03.', 8.969, 4.295], ['02.', 5.574, 5.175]].forEach(([num, x, y]) => {
+        T(slide, num, Object.assign({ x, y, w: 1.273, h: 1.111, charSpacing: -3 }, h1(60, GREY_XL)));
+        T(slide, 'Your Name', Object.assign({ x: x + 0.187, y: y + 0.387, w: 1.585, h: 0.337 }, h1(14)));
+        T(slide, 'sanisinaia salannila atasanit atile hanas bandalisil aeben',
+            Object.assign({ x: x + 0.187, y: y + 1.023, w: 2.208, h: 0.627 }, kicker()));
+    });
+    sideLabel(slide, { text: 'Our Team', x: -0.123, y: 5.592, sub: L.subSide, subX: -0.642, subY: 3.102, subW: 2.859 });
+    T(slide, DATE, Object.assign({ x: 10.516, y: 6.922, w: 2.345, h: 0.269, align: 'right' }, stamp));
+    T(slide, HEADLINE, Object.assign({ x: 4.209, y: 0.959, w: 4.916, h: 0.841, align: 'center' }, h1(22)));
+    T(slide, L.teamKicker, Object.assign({ x: 4.387, y: 0.486, w: 4.582, h: 0.349, align: 'center' }, kicker()));
+    R(slide, { x: 12.66, y: 0.776, w: 0.674, h: 0.24, fill: { color: BLUE } });
+}
+
+// --------------------------------------------------------------- slide 19 ---
+function slide19(slide) {
+    R(slide, { x: 10.891, y: 0.763, w: 1.606, h: 5.974, fill: { color: BLUE } });
+    T(slide, HEADLINE, Object.assign({ x: 9.467, y: 3.649, w: 4.486, h: 0.841, rotate: 90, align: 'right' }, h1(22, WHITE)));
+    R(slide, { x: 11.671, y: 0.87, w: 0.454, h: 0.24, rotate: 90, fill: { color: WHITE } });
+    T(slide, L.team, Object.assign({ x: 6.747, y: 2.523, w: 3.045, h: 2.015 }, kicker()));
+    progress(slide, 6.765, 5.117, 2.747, { capW: 1.919, pctW: 0.729, pctAlign: 'left' });
+    progress(slide, 6.767, 5.939, 2.747, { capW: 1.919, pctW: 0.729, pctAlign: 'left' });
+    T(slide, 'About Our Team', Object.assign({ x: 6.77, y: 1.547, w: 2.865, h: 0.505 }, h1(24, GREY_D)));
+}
+
+// --------------------------------------------------------------- slide 20 ---
+function slide20(slide) {
+    R(slide, { x: 1.104, y: 0.771, w: 4.26, h: 5.979, fill: { color: WHITE, transparency: 15 } });
+    T(slide, L.person, Object.assign({ x: 2.05, y: 2.375, w: 2.37, h: 1.886 }, body(GREY, 12)));
+    progress(slide, 2.02, 4.81, 2.16, { fontSize: 10, capW: 1.509, pctW: 0.574, track: GREY, gap: 0.4 });
+    progress(slide, 2.022, 5.573, 2.16, { fontSize: 10, capW: 1.509, pctW: 0.574, track: GREY, gap: 0.4 });
+    T(slide, 'Your Name', Object.assign({ x: 2.05, y: 1.548, w: 2.397, h: 0.505 }, h1(24, GREY_D)));
+    card(slide, 10.481, 1.165, { num: '01.', head: 'Service', body: L.cardShort });
+    card(slide, 10.481, 4.021, { num: '02.', head: 'Service', body: L.cardShort, by: 0.822 });
+    R(slide, { x: 0.002, y: 1.695, w: 0.674, h: 0.24, fill: { color: BLUE } });
+    T(slide, DATE, Object.assign({ x: 10.616, y: 6.972, w: 2.345, h: 0.269, align: 'right' }, stamp));
+}
+
+// --------------------------------------------------------------- slide 21 ---
+function slide21(slide) {
+    bluePanel(slide, { x: 3.552, y: 0.771, w: 4.625, h: 5.979, tabY: 1.16, tabW: 0.615, tabH: 0.196 });
+    headline(slide, { x: 4.476, y: 2.022, w: 3.142, onBlue: true, kicker: 'aebesma hanab nana baneshit banin', kx: 4.499, ky: 1.528 });
+    T(slide, L.onBlue, Object.assign({ x: 4.475, y: 3.804, w: 2.858, h: 2.322 }, body(WHITE)));
+    T(slide, '01.', Object.assign({ x: 8.9, y: 4.696, w: 1.273, h: 1.111, charSpacing: -3 }, h1(60, GREY_XL)));
+    T(slide, 'Your Name', Object.assign({ x: 9.087, y: 5.083, w: 1.585, h: 0.337 }, h1(14)));
+    T(slide, 'PLACEHOLDER',
+        Object.assign({ x: 9.087, y: 5.581, w: 2.776, h: 0.904 }, kicker()));
+    T(slide, DATE, Object.assign({ x: 10.516, y: 6.922, w: 2.345, h: 0.269, align: 'right' }, stamp));
+}
+
+// --------------------------------------------------------------- slide 22 ---
+function slide22(slide) {
+    photo(slide, 1.453, 2.825, 4.907, 2.863);
+    photo(slide, 6.974, 2.825, 4.907, 2.863);
+    T(slide, L.caption, Object.assign({ x: 1.917, y: 6.148, w: 3.966, h: 0.627, align: 'center' }, kicker()));
+    T(slide, L.caption, Object.assign({ x: 7.528, y: 6.148, w: 3.799, h: 0.627, align: 'center' }, kicker()));
+    T(slide, HEADLINE, Object.assign({ x: 1.854, y: 1.049, w: 5.604, h: 0.909 }, h1(24)));
+    sideLabel(slide, { text: 'Our Mockup', x: -0.181, y: 3.843, w: 2.033, size: 22, sub: 'aebesm satis nana bane hanale', subX: -0.313, subY: 1.615, subW: 2.345 });
+    T(slide, L.intro, Object.assign({ x: 7.458, y: 1.049, w: 3.958, h: 0.904 }, kicker()));
+    T(slide, DATE, Object.assign({ x: 11.176, y: 2.1, w: 2.345, h: 0.303, rotate: 90 }, stamp12));
+}
+
+// --------------------------------------------------------------- slide 23 ---
+function slide23(slide) {
+    photo(slide, 0.996, 0.819, 2.906, 5.861);
+    R(slide, { x: 11.021, y: 0.763, w: 1.477, h: 5.974, fill: { color: BLUE } });
+    T(slide, HEADLINE, Object.assign({ x: 9.517, y: 3.666, w: 4.485, h: 0.774, rotate: 90, align: 'right' }, h1(20, WHITE)));
+    R(slide, { x: 11.7, y: 0.87, w: 0.454, h: 0.24, rotate: 90, fill: { color: WHITE } });
+    T(slide, L.team, Object.assign({ x: 4.842, y: 2.326, w: 3.045, h: 2.015 }, kicker()));
+    progress(slide, 4.861, 4.92, 2.747, { capW: 1.919, pctW: 0.729, pctAlign: 'left' });
+    progress(slide, 4.863, 5.742, 2.747, { capW: 1.919, pctW: 0.729, pctAlign: 'left' });
+    T(slide, 'About Mockup', Object.assign({ x: 4.865, y: 1.371, w: 2.865, h: 0.505 }, h1(24, GREY_D)));
+    card(slide, 8.523, 1.165, { num: '01.', head: 'Mockup', body: L.cardShort });
+    card(slide, 8.523, 4.021, { num: '02.', head: 'Mockup', body: L.cardShort, by: 0.822 });
+}
+
+// --------------------------------------------------------------- slide 24 ---
+function slide24(slide) {
+    R(slide, { x: 6.667, y: 0, w: 5.349, h: 7.5, fill: { color: WHITE, transparency: 15 } });
+    card(slide, 1.644, 1.118, { num: '01.', head: 'Mockup', body: L.mirror, align: 'right', bh: 1.489 });
+    card(slide, 1.644, 3.984, { num: '02.', head: 'Mockup', body: L.mirror, align: 'right', bh: 1.489, bw: 1.786, by: 0.822 });
+    T(slide, L.person, Object.assign({ x: 8.637, y: 2.354, w: 2.37, h: 1.886 }, body(GREY, 12)));
+    progress(slide, 8.608, 4.789, 2.16, { fontSize: 10, capW: 1.509, pctW: 0.574, track: GREY, gap: 0.4 });
+    progress(slide, 8.61, 5.552, 2.16, { fontSize: 10, capW: 1.509, pctW: 0.574, track: GREY, gap: 0.4 });
+    T(slide, 'Our Mockup', Object.assign({ x: 8.637, y: 1.527, w: 2.397, h: 0.505 }, h1(24, GREY_D)));
+    T(slide, DATE, Object.assign({ x: 11.51, y: 1.548, w: 2.345, h: 0.303, rotate: 90 }, stamp12));
+    photo(slide, 4.114, 1.161, 3.511, 5.179);
+}
+
+// --------------------------------------------------------------- slide 25 ---
+function slide25(slide) {
+    photo(slide, 1.796, 0.773, 4.956, 4.956);
+    bluePanel(slide, { x: 7.679, y: 1.0, w: 4.824, h: 5.5, tabY: 1.518 });
+    progress(slide, 8.658, 4.384, 2.758, { onBlue: true });
+    progress(slide, 8.66, 5.206, 2.758, { onBlue: true });
+    T(slide, HEADLINE, Object.assign({ x: 8.635, y: 1.953, w: 3.127, h: 1.313 }, h1(24, WHITE)));
+    T(slide, L.sub, Object.assign({ x: 8.658, y: 3.367, w: 3.081, h: 0.349 }, kicker(OFFWHITE)));
+    T(slide, 'PLACEHOLDER',
+        Object.assign({ x: 1.796, y: 5.873, w: 4.956, h: 0.627, align: 'center' }, kicker()));
+    sideLabel(slide, { text: 'Our Mockup', x: -0.181, y: 4.333, w: 2.033, size: 22, sub: 'aebesm satis nana baneham', subX: -0.313, subY: 2.105, subW: 2.345 });
+}
+
+// --------------------------------------------------------------- slide 26 ---
+function slide26(slide) {
+    stackedChart(slide, 8.065, 0.958, 4.401, 5.833);
+    headline(slide, { x: 1.187, y: 1.808, w: 3.127, h: 1.313, size: 24, kx: 1.21, ky: 1.369 });
+    T(slide, L.long, Object.assign({ x: 1.21, y: 3.648, w: 3.426, h: 2.571 }, body()));
+    card(slide, 5.552, 1.165, { num: '01.', head: 'Our Chart', body: L.cardShort });
+    card(slide, 5.552, 4.021, { num: '02.', head: 'Our Chart', body: L.cardShort, by: 0.822 });
+    T(slide, DATE, Object.assign({ x: 0.53, y: 6.838, w: 2.345, h: 0.303 }, stamp12));
+    R(slide, { x: 0.002, y: 0.512, w: 0.674, h: 0.24, fill: { color: BLUE } });
+}
+
+// --------------------------------------------------------------- slide 27 ---
+function slide27(slide) {
+    pieChart(slide, 0.05, 1.26, 7.667, 4.69);
+    [['01.', 7.801, 1.142], ['03.', 7.801, 3.844], ['02.', 10.203, 1.142], ['04.', 10.203, 3.844]].forEach(([num, x, y]) => {
+        card(slide, x, y, { num, head: 'Our Chart', body: L.cardShort, by: y < 2 ? 0.885 : 0.822 });
+    });
+    T(slide, DATE, Object.assign({ x: 10.516, y: 0.483, w: 2.345, h: 0.269, align: 'right' }, stamp));
+    footLabel(slide, { text: 'Our Chart', x: 0.847, y: 6.464, w: 1.919, sub: 'aebesma hanab nana bane hanal banis contansa', subX: 2.922, subY: 6.586, subW: 3.373 });
+    // Percentage callouts sitting on the slices.
+    T(slide, '80%', Object.assign({ x: 4.554, y: 3.572, w: 1.186, h: 0.505, align: 'center' }, h1(24, WHITE)));
+    T(slide, '20%', Object.assign({ x: 2.223, y: 2.33, w: 0.792, h: 0.37, align: 'center' }, h1(16, WHITE)));
+    T(slide, '10%', Object.assign({ x: 3.237, y: 1.55, w: 0.607, h: 0.337 }, h1(14, WHITE)));
+    T(slide, '30%', Object.assign({ x: 1.966, y: 4.2, w: 0.886, h: 0.438, align: 'center' }, h1(20, WHITE)));
+}
+
+// --------------------------------------------------------------- slide 28 ---
+function slide28(slide) {
+    // Four rings: a full grey circle overlaid by a coloured half-arc.
+    [[2.168, BLUE_D, 0], [4.48, BLUE_M, 180], [6.791, BLUE, 0], [9.103, BLUE_L, 180]].forEach(([x, color, rotate]) => {
+        slide.addShape('ellipse', { x, y: 2.776, w: 2.312, h: 2.312, fill: { type: 'none' }, line: { color: GREY_XL, width: 7 } });
+        slide.addShape('arc', { x: x + 0.001, y: 2.777, w: 2.31, h: 2.31, rotate, angleRange: [180, 0], fill: { type: 'none' }, line: { color, width: 7 } });
+    });
+    T(slide, HEADLINE, Object.assign({ x: 1.979, y: 1.049, w: 5.604, h: 0.909 }, h1(24)));
+    T(slide, L.intro, Object.assign({ x: 7.583, y: 1.049, w: 3.958, h: 0.904 }, kicker()));
+    ['01.', '02.', '03.', '04.'].forEach((num, i) => {
+        const x = [2.532, 4.841, 7.151, 9.461][i];
+        T(slide, num, Object.assign({ x: x + 0.154, y: 3.023, w: 1.273, h: 0.909, align: 'center', charSpacing: -3 }, h1(48, GREY_XL)));
+        T(slide, 'Our Infographic', Object.assign({ x, y: 4.055, w: 1.585, h: 0.572, align: 'center' }, h1(14)));
+        T(slide, L.infoFoot, Object.assign({ x: x - 0.225, y: 5.755, w: 2.031, h: 0.904, align: 'center' }, kicker()));
+    });
+    sideLabel(slide, { text: 'Infographic', x: -0.181, y: 5.407, w: 2.033, size: 22, sub: 'aebesm satis nana baneh', subX: -0.313, subY: 3.179, subW: 2.345 });
+    T(slide, DATE, Object.assign({ x: 11.312, y: 2.07, w: 2.345, h: 0.303, rotate: 90 }, stamp12));
+}
+
+// --------------------------------------------------------------- slide 29 ---
+function slide29(slide) {
+    quatrefoil(slide, 4.769, 2.622);
+    card(slide, 9.542, 1.954, { num: '02.', head: 'Infographic', body: L.info, bw: 2.591, bh: 1.182, by: 1.01 });
+    card(slide, 9.542, 4.623, { num: '03.', head: 'Infographic', body: L.info, bw: 2.591, bh: 1.182, by: 1.009 });
+    card(slide, 2.349, 1.943, { num: '01.', head: 'Infographic', body: L.infoAlt, align: 'right', bx: 1.013, bw: 2.586, bh: 1.182, by: 1.009 });
+    card(slide, 2.349, 4.652, { num: '04.', head: 'Infographic', body: L.infoAlt, align: 'right', bx: 1.013, bw: 2.593, bh: 1.182, by: 0.947 });
+    T(slide, HEADLINE, Object.assign({ x: 4.209, y: 1.023, w: 4.916, h: 0.841, align: 'center' }, h1(22)));
+    T(slide, L.teamKicker, Object.assign({ x: 4.387, y: 0.551, w: 4.582, h: 0.349, align: 'center' }, kicker()));
+    [['80%', 5.099, 3.185, BLUE_D], ['72%', 7.287, 3.185, BLUE_M], ['67%', 5.099, 5.375, BLUE_M], ['79%', 7.287, 5.375, BLUE]]
+        .forEach(([t, x, y, color]) => T(slide, t, Object.assign({ x, y, w: 0.9, h: 0.438, align: 'center' }, h1(20, color))));
+}
+
+/**
+ * Four lobes joined by pinched "bone" bands, with white discs punched out.
+ * BONE is the source freeform normalised to a unit box: two round ends joined
+ * by a waist that curves inward. `bone()` scales it and optionally transposes
+ * it to run vertically.
+ */
+const BONE = [
+    [0.792, 0.000],
+    [0.732, 0.000, 0.679, 0.059, 0.641, 0.154],
+    [0.605, 0.240, 0.555, 0.295, 0.500, 0.295],
+    [0.445, 0.295, 0.394, 0.240, 0.357, 0.154],
+    [0.320, 0.059, 0.267, 0.000, 0.208, 0.000],
+    [0.093, 0.000, 0.000, 0.224, 0.000, 0.501],
+    [0.000, 0.776, 0.093, 1.000, 0.208, 1.000],
+    [0.267, 1.000, 0.321, 0.941, 0.358, 0.846],
+    [0.394, 0.760, 0.445, 0.708, 0.500, 0.708],
+    [0.555, 0.708, 0.605, 0.760, 0.641, 0.846],
+    [0.679, 0.941, 0.732, 1.000, 0.792, 1.000],
+    [0.907, 1.000, 1.000, 0.776, 1.000, 0.501],
+    [1.000, 0.224, 0.907, 0.000, 0.792, 0.000],
+];
+
+function bone(slide, x, y, w, h, color, vertical) {
+    const u = vertical ? ((a, b) => [b * w, a * h]) : ((a, b) => [a * w, b * h]);
+    const points = BONE.map((seg, i) => {
+        if (i === 0) { const [px, py] = u(seg[0], seg[1]); return { x: px, y: py, moveTo: true }; }
+        const [x1, y1] = u(seg[0], seg[1]);
+        const [x2, y2] = u(seg[2], seg[3]);
+        const [px, py] = u(seg[4], seg[5]);
+        return { x: px, y: py, curve: { type: 'cubic', x1, y1, x2, y2 } };
+    }).concat([{ close: true }]);
+    slide.addShape('custGeom', { x, y, w, h, points, fill: { color }, line: { type: 'none' } });
+}
+
+function quatrefoil(slide, x, y) {
+    const S = 3.749; // overall square
+    const D = 1.562; // lobe diameter
+    const W = 1.343; // white disc diameter
+    const inset = (D - W) / 2;
+    // Stacking order decides each lobe's ring colour: the last band drawn over
+    // a lobe wins, so bottom -> left -> top -> right, then the bottom-right
+    // lobe is restored to plain blue.
+    bone(slide, x, y + S - D, S, D, BLUE, false);
+    bone(slide, x, y, D, S, BLUE_M, true);
+    bone(slide, x, y, S, D, BLUE_D, false);
+    bone(slide, x + S - D, y, D, S, BLUE_M, true);
+    slide.addShape('ellipse', { x: x + S - D, y: y + S - D, w: D, h: D, fill: { color: BLUE }, line: { type: 'none' } });
+    [[x, y], [x + S - D, y], [x, y + S - D], [x + S - D, y + S - D], [x + (S - D) / 2, y + (S - D) / 2]]
+        .forEach(([lx, ly]) => slide.addShape('ellipse', { x: lx + inset, y: ly + inset, w: W, h: W, fill: { color: WHITE }, line: { type: 'none' } }));
+}
+
+// -------------------------------------------------------------------- main ---
+const SLIDES = [
+    heroSlide('Netho.'), slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+    slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, heroSlide('Thank.'),
+];
+
+function build() {
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
+    pptx.layout = 'WIDE_16x9';
+    pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+    pptx.title = 'Netho. Presentation Template';
+
+    SLIDES.forEach((fn) => fn(pptx.addSlide()));
+
+    return pptx.writeFile({ fileName: path.join(__dirname, '088b4b5d-178a-4cb6-b447-4a3b1b7594a4_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

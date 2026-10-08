@@ -1,0 +1,19 @@
+--- 2026-10-07_17-05:/home/box/sand-data/managed-skills/skills/site-playbooks-luma/SKILL.md
++++ 2026-10-08_02-46:/home/box/sand-data/managed-skills/skills/site-playbooks-luma/SKILL.md
+@@ -93,6 +93,8 @@
+ 
+ The user pastes a `lu.ma/<slug>` or `luma.com/<slug>` link and wants that event's details or whether registration is open, free, paid, waitlisted, or approval gated. The parent needs the slug (the last path segment of the link, without query). The subagent reads and reports, and nothing is registered. Registering is the next section.
+ 
++This playbook covers public reads, not host tools. Host only data such as join links (Zoom or other meeting URLs) and guest lists is not in the public JSON: an online event returns `virtual_info.has_access` false. Get it from Luma's API in the shell if a Luma API key is already set, otherwise use the host dashboard on luma.com in the browser.
++
+ ### Fastest path
+ 
+ `https://lu.ma/<slug>` answers 301 to `https://luma.com/<slug>`. The event JSON is public with no key, cookie, or special header:
+@@ -130,6 +132,7 @@
+ ### Read the result
+ 
+ - `slug_not_found` is the API's 404. Check the pasted link for a trailing path or query before reporting.
++- `virtual_info.has_access` false means the join link is hidden from a public reader, not missing. Do not retry the public API or the public page for it.
+ 
+ ### When blocked
+ 

@@ -1,0 +1,728 @@
+/**
+ * "Fitness Training and Coaching" - 20 slide PowerPoint template, rebuilt with pptxgenjs.
+ *
+ * Slide size 13.333 x 7.5 in (16:9). Raster photos in the original deck are replaced
+ * by flat colour placeholder shapes that keep the original silhouette and footprint.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+
+const C = {
+  green: '03C03C', // primary brand green
+  mint: '55EF90', // theme accent 2
+  blue: '0140FD', // theme accent 1
+  ink: '0D0D0D', // headline text (tx1 lumMod 95%)
+  ink75: '404040', // tx1 lumMod 75%
+  body: '595959', // body copy (tx1 lumMod 65%)
+  dark: '262626', // theme accent 3
+  grey: 'A6A6A6',
+  silver: 'D9D9D9',
+  white: 'FFFFFF',
+  photo: 'F2F2F2', // stand-in fill for the deck's photographs (bg1 lumMod 95%)
+  photoTxt: 'D6D6D6',
+};
+
+const F = {
+  head: 'Poppins', // display / headline face used throughout the deck
+  major: 'Outfit', // theme major font (+mj-lt)
+  body: 'Roboto Light', // theme minor font (+mn-lt)
+};
+
+/**
+ * Soft drop shadow used by every card in the deck (blur 100pt, 33pt offset @ 45deg, 10% black).
+ * Returned fresh each call because pptxgenjs rewrites the object it is handed.
+ */
+const shadow = () => ({ type: 'outer', color: '000000', opacity: 0.1, blur: 100, offset: 33, angle: 45 });
+
+/* ------------------------------------------------------------------ helpers */
+
+const rr = (w, h, pct) => (Math.min(w, h) * pct) / 100000; // OOXML roundRect adj -> inches
+
+/** Rounded rectangle / card. */
+function card(slide, o) {
+  slide.addShape('roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    rectRadius: o.r !== undefined ? o.r : rr(o.w, o.h, 50000),
+    fill: o.fill ? { color: o.fill } : { color: C.white, transparency: 100 },
+    line: o.line || { type: 'none' },
+    shadow: o.shadow ? shadow() : undefined,
+    rotate: o.rotate,
+  });
+}
+
+/** Text box: top anchored, left aligned, 0.1"/0.05" insets - the deck's default. */
+function text(slide, o) {
+  slide.addText(o.text, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    align: o.align || 'left',
+    valign: o.valign || 'top',
+    fontFace: o.face || F.body,
+    fontSize: o.size || 13,
+    color: o.color || C.body,
+    bold: o.bold,
+    italic: o.italic,
+    lineSpacingMultiple: o.lsm === undefined ? 1.2 : o.lsm,
+    paraSpaceAfter: o.after === undefined ? 6 : o.after,
+    margin: [7.2, 7.2, 3.6, 3.6], // [left, right, bottom, top] pt - PowerPoint's "Normal"
+    isTextBox: true,
+    wrap: o.wrap !== false,
+  });
+}
+
+/**
+ * Two-tone headline. `parts` is a list of [string, accent?] pairs; accent runs are
+ * bold + green, plain runs use the ink colour. `null` inserts a line break.
+ */
+function headline(slide, o) {
+  const runs = [];
+  o.parts.forEach((p) => {
+    if (p === null) { runs.push({ text: '', options: { breakLine: true } }); return; }
+    runs.push({
+      text: p[0],
+      options: { bold: !!p[1], color: p[1] ? (o.accent || C.green) : (o.plain || C.ink) },
+    });
+  });
+  text(slide, {
+    x: o.x, y: o.y, w: o.w, h: o.h, text: runs,
+    face: F.head, size: o.size, align: o.align, lsm: 0.9, after: 0,
+  });
+}
+
+/** Pill shaped label (fully rounded rectangle with centred text). */
+function badge(slide, o) {
+  slide.addShape('roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: rr(o.w, o.h, 50000),
+    fill: { color: o.fill }, line: o.line || { type: 'none' },
+  });
+  slide.addText(o.text, {
+    x: o.x, y: o.y, w: o.w, h: o.h, align: 'center', valign: 'middle',
+    fontFace: o.face || F.body, fontSize: o.size || 14,
+    color: o.color || C.white, italic: o.italic, margin: 0, wrap: false,
+  });
+}
+
+/** Thin divider line (white 65% luminance at 50% alpha over a light background). */
+function rule(slide, x, y, w) {
+  slide.addShape('line', { x, y, w, h: 0, line: { color: C.grey, width: 1, transparency: 50 } });
+}
+
+/**
+ * Circular icon chip: filled disc plus a simple line-art glyph standing in for the
+ * original PNG pictograms (bottle / watch / clipboard / trainer / scale / arrow).
+ */
+function iconChip(slide, o) {
+  const d = o.d || 1.032;
+  const cx = o.x + d / 2;
+  const cy = o.y + d / 2;
+  slide.addShape('ellipse', { x: o.x, y: o.y, w: d, h: d, fill: { color: o.fill || C.green } });
+  glyph(slide, cx, cy, d * 0.5, o.color || C.white, o.kind);
+}
+
+/** Small disc with an arrow knocked out of it (the deck's "next" button). */
+function arrowButton(slide, x, y, d, disc, arrow) {
+  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: disc } });
+  slide.addShape('line', {
+    x: x + d * 0.24, y: y + d / 2, w: d * 0.52, h: 0,
+    line: { color: arrow, width: d * 5, endArrowType: 'triangle' },
+  });
+}
+
+/** Minimal line-art glyph drawn from native shapes, centred on (cx, cy). */
+function glyph(slide, cx, cy, s, color, kind) {
+  const stroke = { color, width: 1.25 };
+  const box = (x, y, w, h, r) => slide.addShape('roundRect', {
+    x, y, w, h, rectRadius: r, fill: { color, transparency: 100 }, line: stroke,
+  });
+  const dot = (x, y, w, h) => slide.addShape('ellipse', { x, y, w, h, fill: { color } });
+  const bar = (x, y, w) => slide.addShape('line', { x, y, w, h: 0, line: stroke });
+
+  if (kind === 'arrow') {
+    slide.addShape('line', {
+      x: cx - s * 0.6, y: cy, w: s * 1.2, h: 0,
+      line: { color, width: 1.5, endArrowType: 'triangle' },
+    });
+    return;
+  }
+  if (kind === 'watch') { // smart watch
+    box(cx - s * 0.42, cy - s * 0.5, s * 0.84, s, s * 0.22);
+    slide.addShape('ellipse', {
+      x: cx - s * 0.28, y: cy - s * 0.28, w: s * 0.56, h: s * 0.56,
+      fill: { color, transparency: 100 }, line: stroke,
+    });
+    return;
+  }
+  if (kind === 'clipboard') { // checklist + apple
+    box(cx - s * 0.55, cy - s * 0.6, s * 0.8, s * 1.2, s * 0.12);
+    bar(cx - s * 0.4, cy - s * 0.2, s * 0.5);
+    bar(cx - s * 0.4, cy + s * 0.1, s * 0.5);
+    dot(cx + s * 0.1, cy + s * 0.05, s * 0.6, s * 0.6);
+    return;
+  }
+  if (kind === 'trainer') { // coach: head and shoulders
+    slide.addShape('ellipse', {
+      x: cx - s * 0.34, y: cy - s * 0.62, w: s * 0.68, h: s * 0.7,
+      fill: { color, transparency: 100 }, line: stroke,
+    });
+    box(cx - s * 0.62, cy + s * 0.18, s * 1.24, s * 0.7, s * 0.3);
+    return;
+  }
+  if (kind === 'scale') { // bathroom scale
+    box(cx - s * 0.6, cy - s * 0.6, s * 1.2, s * 1.2, s * 0.2);
+    box(cx - s * 0.2, cy - s * 0.6, s * 0.4, s * 0.34, s * 0.08);
+    return;
+  }
+  // default: supplement bottle
+  box(cx - s * 0.5, cy - s * 0.35, s * 1, s * 0.95, s * 0.16);
+  box(cx - s * 0.28, cy - s * 0.62, s * 0.56, s * 0.3, s * 0.08);
+  bar(cx - s * 0.3, cy + s * 0.1, s * 0.6);
+}
+
+/** Linear interpolation between two hex colours. */
+function mix(a, b, t) {
+  let out = '';
+  for (let i = 0; i < 6; i += 2) {
+    const va = parseInt(a.substr(i, 2), 16);
+    const vb = parseInt(b.substr(i, 2), 16);
+    out += Math.round(va + (vb - va) * t).toString(16).padStart(2, '0');
+  }
+  return out.toUpperCase();
+}
+
+/**
+ * Stadium ("pill") with a top-to-bottom gradient.
+ *
+ * pptxgenjs only emits solid fills, so the gradient is painted as a stack of solid
+ * bands clipped to the silhouette: the straight middle section is plain rectangles,
+ * and the two round caps are `chord` segments (a circular arc closed by its chord),
+ * drawn largest first so each new band covers the previous one. Gradient stops that
+ * are partly transparent are pre-composited over the white slide background.
+ *
+ * `from`/`to` are the gradient stop colours, `fromA`/`toA` their opacities (0-1),
+ * `rot` rotates the whole pill about its centre.
+ */
+function gradientPill(slide, o) {
+  const bands = 18; // bands across the straight middle section
+  const capBands = 12; // bands across each round cap
+  const r = o.w / 2;
+  const rot = o.rot || 0;
+  const cs = Math.cos((rot * Math.PI) / 180);
+  const sn = Math.sin((rot * Math.PI) / 180);
+  const CX = o.x + o.w / 2;
+  const CY = o.y + o.h / 2;
+  const fromA = o.fromA === undefined ? 1 : o.fromA;
+  const toA = o.toA === undefined ? 1 : o.toA;
+  const deg = (v) => (Math.asin(Math.max(-1, Math.min(1, v))) * 180) / Math.PI;
+
+  // pptxgenjs rotates each shape about its own centre, so re-place sub-shapes by hand
+  const place = (bx, by, bw, bh) => {
+    const dx = bx + bw / 2 - CX;
+    const dy = by + bh / 2 - CY;
+    return {
+      x: CX + dx * cs - dy * sn - bw / 2,
+      y: CY + dx * sn + dy * cs - bh / 2,
+      w: bw, h: bh, rotate: rot, line: { type: 'none' },
+    };
+  };
+  const at = (yy) => {
+    const t = Math.max(0, Math.min(1, (yy - o.y) / o.h));
+    return { color: mix(C.white, mix(o.from, o.to, t), fromA + (toA - fromA) * t) };
+  };
+
+  slide.addShape('roundRect', Object.assign(place(o.x, o.y, o.w, o.h), {
+    rectRadius: r, fill: at(o.y), shadow: o.shadow ? shadow() : undefined,
+  }));
+  // top cap: segments reaching from the crown down to depth d, deepest first so that
+  // each one leaves only the strip between the previous depth and its own visible
+  for (let k = capBands; k >= 1; k -= 1) {
+    const d = (r * k) / capBands;
+    const a = deg((r - d) / r);
+    slide.addShape('chord', Object.assign(place(o.x, o.y, o.w, o.w), {
+      angleRange: [180 + a, 360 - a], fill: at(o.y + (d + (r * (k - 1)) / capBands) / 2),
+    }));
+  }
+  const bh = (o.h - 2 * r) / bands;
+  for (let i = 0; i < bands; i += 1) {
+    const by = o.y + r + i * bh;
+    slide.addShape('rect', Object.assign(place(o.x, by, o.w, bh + 0.01), { fill: at(by + bh / 2) }));
+  }
+  // bottom cap: mirror of the top, measured upwards from the base
+  for (let k = capBands; k >= 1; k -= 1) {
+    const d = (r * k) / capBands;
+    const a = deg((r - d) / r);
+    slide.addShape('chord', Object.assign(place(o.x, o.y + o.h - o.w, o.w, o.w), {
+      angleRange: [a, 180 - a], fill: at(o.y + o.h - (d + (r * (k - 1)) / capBands) / 2),
+    }));
+  }
+}
+
+/* ------------------------------------------------- photo placeholder shapes */
+
+/**
+ * The reference deck ships empty picture frames rather than embedded photographs, and
+ * an unfilled frame is invisible when the deck is presented or printed. These helpers
+ * keep every frame in place as a real shape (so the layout stays visible in the code
+ * and in PowerPoint's editing view) using a barely-there tint that matches the way the
+ * reference renders.
+ */
+const PHOTO = { color: C.photo, transparency: 92 };
+
+/** Arch: rectangle whose top corners are fully rounded (layouts 8 / 11 / 12). */
+function photoArch(slide, x, y, w, h) {
+  slide.addShape('round2SameRect', {
+    x, y, w, h, rectRadius: w / 2, fill: PHOTO, line: { type: 'none' },
+  });
+}
+
+/** Vertical stadium: both ends fully rounded (layouts 7 / 9 / 11). */
+function photoPill(slide, x, y, w, h) {
+  slide.addShape('roundRect', { x, y, w, h, rectRadius: w / 2, fill: PHOTO, line: { type: 'none' } });
+}
+
+/** Horizontal stadium (layout 13). */
+function photoHPill(slide, x, y, w, h) {
+  slide.addShape('roundRect', { x, y, w, h, rectRadius: h / 2, fill: PHOTO, line: { type: 'none' } });
+}
+
+function photoCircle(slide, x, y, d) {
+  slide.addShape('ellipse', { x, y, w: d, h: d, fill: PHOTO, line: { type: 'none' } });
+}
+
+/** Soft rounded rectangle (layout 6). */
+function photoRounded(slide, x, y, w, h, r) {
+  slide.addShape('roundRect', { x, y, w, h, rectRadius: r, fill: PHOTO, line: { type: 'none' } });
+}
+
+/* ------------------------------------------------------------- shared copy */
+
+const LOREM = 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart.';
+const LOREM_LONG = `${LOREM} I am alone, and feel the charm of existence in this spot, which was created for the bliss of souls like mine. I am so happy, my dear friend, so absorbed in the exquisite sense of mere tranquil existence, that I neglect my talents.`;
+const LOREM_SHORT = 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings';
+const LOREM_TINY = 'A wonderful serenity has taken possession of my entire';
+
+/* =============================================================== the slides */
+
+/** 1 - Title slide (solid green background). */
+function slide01(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.green };
+  photoArch(s, 7.516, 0.782, 5.294, 6.718);
+  badge(s, { x: 0.663, y: 2.287, w: 2.369, h: 0.466, fill: C.white, text: 'PowerPoint Template', size: 11, color: C.ink, face: F.head });
+  headline(s, { x: 0.663, y: 3.269, w: 6.715, h: 1.744, size: 54, plain: C.white, parts: [['Fitness Training and Coaching', 1]], accent: C.white });
+}
+
+/** 2 - Alternate title: outlined pill + card on the left. */
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  card(s, { x: -4.045, y: 0.667, w: 9.073, h: 6.167, line: { color: C.mint, width: 0.75 } });
+  card(s, { x: -3.259, y: 1.327, w: 7.5, h: 4.847, fill: C.white, shadow: true });
+  photoHPill(s, -2.464, 1.952, 5.91, 3.566);
+  headline(s, { x: 6.521, y: 2.62, w: 6.358, h: 1.744, size: 54, parts: [['Fitness', 1], [' Training and Coaching', 0]] });
+  badge(s, { x: 6.521, y: 5.707, w: 2.369, h: 0.466, fill: C.green, text: 'PowerPoint Template', size: 14, italic: true });
+  iconChip(s, { x: 4.52, y: 3.234, kind: 'bottle' });
+}
+
+/** 3 - Section divider with an oversized "01". */
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  gradientPill(s, { x: 8.478, y: 1.133, w: 3.057, h: 5.575, from: C.mint, fromA: 0, to: C.green, shadow: true });
+  gradientPill(s, { x: 9.758, y: 0.792, w: 3.057, h: 5.575, from: C.mint, fromA: 0, to: C.green, rot: 180, shadow: true });
+  text(s, { x: 7.215, y: 1.284, w: 5.587, h: 4.931, text: '01', face: F.major, size: 287, color: C.ink, bold: true, lsm: 1, after: 0 });
+  badge(s, { x: 0.629, y: 2.41, w: 1.535, h: 0.466, fill: C.green, text: 'Section Slide', size: 12, face: F.head });
+  headline(s, { x: 0.629, y: 3.255, w: 6.368, h: 1.562, size: 48, parts: [['By the ', 0], ['People', 1], [', for the People', 0]] });
+  text(s, { x: 0.629, y: 5.111, w: 6.368, h: 0.605, text: LOREM });
+}
+
+/** 4 - "Feel Complete" with two photo shapes. */
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  photoPill(s, 8.959, 0, 4.113, 7.5);
+  photoArch(s, 4.61, 3.745, 4.113, 3.755);
+  headline(s, { x: 0.667, y: 1.56, w: 7.51, h: 1.11, size: 66, parts: [['Feel', 1], [' Complete', 0]] });
+  text(s, { x: 0.667, y: 2.867, w: 7.51, h: 0.482, text: 'INSIDE AND OUTSIDE', face: F.head, size: 20, color: C.ink75 });
+  text(s, { x: 0.667, y: 3.745, w: 3.389, h: 1.13, text: LOREM });
+}
+
+/** 5 - "Life Coaching in Numbers": full height green panel on the right. */
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  card(s, { x: 6.667, y: 0, w: 6.667, h: 7.5, r: rr(6.667, 7.5, 30646), fill: C.green });
+  photoPill(s, 9.221, 0, 4.113, 7.5);
+  headline(s, { x: 0.849, y: 2.542, w: 4.922, h: 1.555, size: 48, parts: [['Life', 1], [' Coaching in Numbers', 0]] });
+  text(s, { x: 0.849, y: 4.632, w: 4.922, h: 0.868, text: LOREM });
+}
+
+/** 6 - Green callout pill plus a two column white card. */
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  headline(s, { x: 0.805, y: 1.639, w: 5.628, h: 1.318, size: 40, parts: [['Dedicated', 1], [' to Improving Your Life', 0]] });
+  card(s, { x: 0.805, y: 3.75, w: 8.766, h: 2.958, fill: C.white, shadow: true });
+  photoCircle(s, 9.57, 3.75, 2.958);
+  card(s, { x: 6.667, y: 0.792, w: 5.862, h: 2.958, fill: C.green });
+  text(s, { x: 7.358, y: 1.248, w: 4.479, h: 0.478, text: 'Work Smarter, Not Harder', face: F.major, size: 20, color: C.white });
+  text(s, { x: 7.358, y: 1.864, w: 4.479, h: 0.868, text: LOREM, color: C.white });
+  arrowButton(s, 11.478, 3.002, 0.292, C.white, C.green);
+  [['01.', 1.496], ['02.', 5.308]].forEach(([label, x]) => {
+    text(s, { x, y: 4.193, w: 3.571, h: 0.478, text: label, face: F.major, size: 20, color: C.green });
+    text(s, { x, y: 4.873, w: 3.571, h: 1.393, text: `${LOREM} I am alone, and feel the charm of existence in this spot` });
+  });
+}
+
+/** 7 - Two feature columns beside rotated gradient pills. */
+function slide07(pptx) {
+  const s = pptx.addSlide();
+  gradientPill(s, { x: 7.905, y: 1.025, w: 3.183, h: 5.805, rot: 330, from: C.green, to: C.mint, shadow: true });
+  gradientPill(s, { x: 9.238, y: 0.67, w: 3.183, h: 5.805, rot: 150, from: C.green, to: C.mint, shadow: true });
+  photoPill(s, 8.541, 0.792, 3.244, 5.917);
+  headline(s, { x: 0.903, y: 1.13, w: 6.814, h: 1.44, size: 44, parts: [['Life ', 0], ['coaching', 1], [' for your family', 0]] });
+  [['Subtitle 01', 0.903, 1.023, 'bottle'], ['Subtitle 02', 4.467, 4.586, 'watch']].forEach(([title, x, cx, kind]) => {
+    iconChip(s, { x: cx, y: 3.373, kind });
+    text(s, { x, y: 4.56, w: 3.251, h: 0.478, text: title, face: F.major, size: 20, color: C.green });
+    text(s, { x, y: 5.24, w: 3.251, h: 1.13, text: `${LOREM} ` });
+  });
+}
+
+/** 8 - "Over 20 Years of Experience" with three statistic cards. */
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  photoArch(s, 6.783, 0.765, 5.294, 6.718);
+  headline(s, { x: 0.667, y: 1.13, w: 4.914, h: 1.562, size: 48, parts: [['Over ', 0], ['20', 1], [' Years of Experience ', 0]] });
+  text(s, {
+    x: 0.667, y: 4.685, w: 2.842, h: 1.685, face: F.major, size: 20, color: C.green,
+    text: [
+      { text: 'A wonderful ', options: { breakLine: true } },
+      { text: 'serenity has taken possession of my entire soul' },
+    ],
+  });
+  ['500+', '75%', '12.5k'].forEach((value, i) => {
+    const x = 3.811 + i * 3.007;
+    card(s, { x, y: 3.914, w: 2.704, h: 2.456, r: rr(2.704, 2.456, 13909), fill: C.white, shadow: true });
+    text(s, { x: x + 0.171, y: 4.124, w: 2.362, h: 0.864, text: value, face: F.head, size: 40, color: C.ink, align: 'center' });
+    text(s, { x: x + 0.171, y: 5.089, w: 2.362, h: 0.482, text: 'Subtitle Here', face: F.head, size: 20, color: C.green, align: 'center' });
+    text(s, { x: x + 0.171, y: 5.555, w: 2.362, h: 0.605, text: 'A wonderful serenity has taken possession', align: 'center' });
+  });
+}
+
+/** 9 - "Online Coaching" green panel with three subtitles on the right. */
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  card(s, { x: 0.667, y: 0.433, w: 5.876, h: 6.708, r: rr(5.876, 6.708, 24339), fill: C.green });
+  headline(s, { x: 1.294, y: 2.187, w: 3.568, h: 1.44, size: 44, plain: C.white, accent: C.white, parts: [['Online ', 0], ['Coaching', 1]] });
+  text(s, { x: 1.294, y: 4.009, w: 3.244, h: 0.877, text: 'By the people, for the people', face: F.major, size: 20, color: C.white });
+  ['Subtitle 01', 'Subtitle 02', 'Subtitle 03'].forEach((title, i) => {
+    const y = 1.13 + i * 1.9775;
+    text(s, { x: 8.984, y, w: 3.683, h: 0.482, text: title, face: F.head, size: 20, color: C.green });
+    text(s, { x: 8.984, y: y + 0.68, w: 3.683, h: 0.605, text: 'A wonderful serenity has taken possession of my entire soul, like these sweet' });
+  });
+  rule(s, 9.123, 2.761, 3.405);
+  rule(s, 9.123, 4.739, 3.405);
+}
+
+/** 10 - "Smart Training Everyday": two icon rows on white pills. */
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  photoRounded(s, 0.283, 0.208, 6.667, 7.083, 2.0);
+  headline(s, { x: 7.671, y: 1.13, w: 5.032, h: 1.44, size: 44, parts: [['Smart', 1], [' Training Everyday', 0]] });
+  [['Subtitle 01', 3.314, 'bottle'], ['Subtitle 02', 4.941, 'watch']].forEach(([title, y, kind]) => {
+    card(s, { x: 8.304, y, w: 4.398, h: 1.429, fill: C.white, shadow: true });
+    iconChip(s, { x: 7.809, y: y + 0.198, kind });
+    text(s, { x: 8.981, y: y + 0.326, w: 3.343, h: 0.478, text: title, face: F.head, size: 20, color: C.green });
+    text(s, { x: 8.981, y: y + 0.759, w: 3.343, h: 0.343, text: 'A wonderful serenity has taken' });
+  });
+}
+
+/** 11 - Profile slide "Calista Muller". */
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  gradientPill(s, { x: 0.615, y: 0.148, w: 5.621, h: 9.558, from: C.mint, fromA: 0, to: C.green, shadow: true });
+  photoCircle(s, 1.129, 0.569, 4.593);
+  headline(s, { x: 6.896, y: 1.212, w: 5.444, h: 0.828, size: 48, parts: [['Calista ', 1], ['Muller', 0]] });
+  text(s, { x: 6.896, y: 2.149, w: 5.444, h: 0.605, text: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy' });
+  [['Subtitle 01', 3.566, 3.587, 'bottle'], ['Subtitle 02', 5.214, 5.235, 'watch']].forEach(([title, y, cy, kind]) => {
+    iconChip(s, { x: 7.016, y: cy, kind });
+    text(s, { x: 8.155, y, w: 4.125, h: 0.478, text: title, face: F.major, size: 20, color: C.green });
+    text(s, { x: 8.155, y: y + 0.469, w: 4.125, h: 0.605, text: LOREM_SHORT });
+  });
+  rule(s, 7.016, 4.927, 5.204);
+  card(s, { x: 1.275, y: 5.488, w: 4.593, h: 1.112, fill: C.green });
+  text(s, { x: 1.654, y: 5.605, w: 3.244, h: 0.877, text: 'Dedicated to your life improvement ', face: F.major, size: 20, color: C.white, valign: 'middle' });
+  glyph(s, 5.246, 6.044, 0.189, C.white, 'arrow');
+}
+
+/** 12 - "Our Services": 2 x 3 grid of numbered cards. */
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  headline(s, { x: 0.769, y: 2.759, w: 3.127, h: 1.555, size: 48, parts: [['Our', 1], [' Services', 0]] });
+  arrowButton(s, 2.478, 4.575, 0.292, C.green, C.white);
+  [0, 1].forEach((col) => {
+    [0, 1, 2].forEach((row) => {
+      const x = 5.542 + col * 3.6;
+      const y = 1.127 + row * 1.818;
+      const num = `0${col * 3 + row + 1}`;
+      card(s, { x, y, w: 3.387, h: 1.61, r: rr(3.387, 1.61, 13909), fill: C.white, shadow: true });
+      badge(s, { x: x + 2.46, y, w: 0.608, h: 0.253, fill: C.green, text: num, size: 10, face: F.major });
+      text(s, { x: x + 0.206, y: y + 0.365, w: 2.975, h: 0.478, text: 'Service Here', face: F.major, size: 20, color: C.green });
+      text(s, { x: x + 0.206, y: y + 0.834, w: 2.975, h: 0.605, text: LOREM_TINY });
+    });
+  });
+}
+
+/** 13 - "Our Valuable Service": three icon cards. */
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  headline(s, { x: 0.667, y: 1.13, w: 4.627, h: 1.562, size: 48, parts: [['Our', 1], [' Valuable Service', 0]] });
+  text(s, { x: 8.665, y: 1.27, w: 3.864, h: 1.281, text: 'A wonderful serenity has taken possession of my entire soul', face: F.head, size: 20, color: C.green, align: 'right' });
+  ['bottle', 'watch', 'clipboard'].forEach((kind, i) => {
+    const x = 0.805 + i * 3.999;
+    card(s, { x, y: 2.946, w: 3.726, h: 3.424, r: rr(3.726, 3.424, 7000), fill: C.white, shadow: true });
+    iconChip(s, { x: x + 0.363, y: 3.289, kind });
+    text(s, { x: x + 0.263, y: 4.754, w: 3.2, h: 0.478, text: 'Service Here', face: F.major, size: 20, color: C.green });
+    text(s, { x: x + 0.263, y: 5.223, w: 3.2, h: 0.868, text: LOREM_SHORT });
+  });
+}
+
+/** 14 - Long copy on the left, statement headline on the right. */
+function slide14(pptx) {
+  const s = pptx.addSlide();
+  card(s, { x: 0.375, y: 0.667, w: 5.862, h: 6.167, r: rr(5.862, 6.167, 14792), line: { color: C.mint, width: 0.75 } });
+  card(s, { x: 6.651, y: 0.667, w: 5.862, h: 6.167, r: rr(5.862, 6.167, 14792), fill: C.white, shadow: true });
+  headline(s, {
+    x: 7.096, y: 1.13, w: 4.82, h: 3.439, size: 44,
+    parts: [['We ', 0], ['have', 1], [' ', 0], null, ['the Best Caretaker to Provide the Best Services', 0]],
+  });
+  text(s, { x: 0.82, y: 1.13, w: 4.971, h: 0.482, text: 'Dedicated to Improving Your Life', face: F.head, size: 20, color: C.green });
+  text(s, {
+    x: 0.82, y: 2.005, w: 4.971, h: 4.365,
+    text: [
+      { text: LOREM_LONG, options: { breakLine: true } },
+      { text: 'I should be incapable of drawing a single stroke at the present moment; and yet I feel that I never was a greater artist than now. When, while the lovely valley teems with vapour around me, and the meridian sun strikes the upper surface of the impenetrable foliage of my trees, and but a few stray gleams steal into the inner sanctuary, I throw myself down among the tall grass by the trickling stream; and, as I lie close to the earth, a thousand unknown plants are noticed by me' },
+    ],
+  });
+  slideDots(s, 7.229, 5.338);
+}
+
+/** Three overlapping circles used as a decorative avatar cluster on slide 14. */
+function slideDots(s, x, y) {
+  const d = 1.032;
+  s.addShape('ellipse', { x: x + 1.225, y, w: d, h: d, fill: { color: C.mint, transparency: 45 }, shadow: shadow() });
+  s.addShape('ellipse', { x: x + 0.612, y, w: d, h: d, fill: { color: C.white }, line: { color: C.mint, width: 0.75 } });
+  iconChip(s, { x, y, kind: 'trainer' });
+}
+
+/** 15 - "Two Paragraph Slide". */
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  card(s, { x: 8.75, y: 0.665, w: 3.748, h: 6.835, fill: C.white, shadow: true });
+  iconChip(s, { x: 10.108, y: 3.566, kind: 'watch' });
+  headline(s, { x: 0.667, y: 1.13, w: 7.5, h: 0.828, size: 48, parts: [['Two', 1], [' Paragraph Slide', 0]] });
+  [['Dedicated to Improving Your Life', 2.531], ['Life coaching for your family', 4.663]].forEach(([title, y]) => {
+    text(s, { x: 0.667, y, w: 7.5, h: 0.478, text: title, face: F.major, size: 20, color: C.green });
+    text(s, { x: 0.667, y: y + 0.577, w: 7.5, h: 1.13, text: LOREM_LONG });
+  });
+  rule(s, 0.792, 4.45, 7.25);
+}
+
+/** 16 - "Manage Your Body Weight": concentric ring chart. */
+function slide16(pptx) {
+  const s = pptx.addSlide();
+  headline(s, { x: 0.667, y: 1.13, w: 5.083, h: 1.44, size: 44, parts: [['Manage', 1], [' Your Body Weight', 0]] });
+  text(s, { x: 0.667, y: 3.076, w: 5.083, h: 0.605, text: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy' });
+
+  card(s, { x: 0.804, y: 3.914, w: 4.807, h: 2.456, r: rr(4.807, 2.456, 7781), fill: C.white, shadow: true });
+  text(s, { x: 1.004, y: 4.124, w: 4.408, h: 0.864, text: '50.5%', face: F.head, size: 40, color: C.ink });
+  text(s, { x: 1.004, y: 5.089, w: 4.408, h: 0.482, text: 'Nutrition Strategies', face: F.head, size: 20, color: C.green });
+  text(s, { x: 1.004, y: 5.555, w: 4.408, h: 0.605, text: LOREM_SHORT });
+  iconChip(s, { x: 4.444, y: 4.124, d: 0.846, kind: 'bottle' });
+
+  // three nested "partial circle" wedges, drawn largest first
+  [
+    { x: 7.392, y: 1.182, d: 5.137, color: C.dark, from: 233.2 },
+    { x: 7.863, y: 1.638, d: 4.204, color: C.green, from: 209.1 },
+    { x: 8.366, y: 2.12, d: 3.2, color: C.blue, from: 175.0 },
+  ].forEach((ring) => {
+    s.addShape('pie', {
+      x: ring.x, y: ring.y, w: ring.d, h: ring.d,
+      angleRange: [ring.from, 89.8], fill: { color: ring.color }, line: { type: 'none' },
+    });
+  });
+  card(s, { x: 8.913, y: 2.662, w: 2.121, h: 2.125, fill: C.white, shadow: true });
+  text(s, { x: 8.913, y: 2.662, w: 2.121, h: 2.125, text: '2024', face: F.head, size: 36, color: C.ink, align: 'center', valign: 'middle' });
+
+  [['67kg', C.dark, 1.234, 1.638], ['72kg', C.green, 2.319, 2.723], ['88kg', C.blue, 3.403, 3.808]].forEach(([label, color, y, ly], i) => {
+    text(s, { x: 6.223, y, w: 1.482, h: 0.475, text: label, face: F.major, size: 20, color, align: 'right' });
+    text(s, { x: 6.223, y: y + 0.466, w: 1.482, h: 0.343, text: 'Earning Cost', align: 'right' });
+    s.addShape('line', {
+      x: 7.752, y: ly, w: 0.755, h: 0,
+      line: { color: [C.dark, C.mint, C.blue][i], width: 1, dashType: 'dash' },
+    });
+  });
+  ['April', 'May', 'June'].forEach((m, i) => {
+    text(s, { x: 8.187, y: 4.834 + i * 0.538, w: 1.482, h: 0.343, text: m, align: 'right' });
+  });
+}
+
+/** 17 - "Table Slide": 8 x 4 banded table. */
+function slide17(pptx) {
+  const s = pptx.addSlide();
+  card(s, { x: 5.484, y: 1.796, w: 7.045, h: 4.575, r: rr(7.045, 4.575, 3512), fill: C.white, shadow: true });
+  headline(s, { x: 0.667, y: 1.235, w: 4.219, h: 0.828, size: 48, parts: [['Table', 1], [' Slide', 0]] });
+  badge(s, { x: 5.656, y: 1.13, w: 1.183, h: 0.466, fill: C.green, text: 'August', size: 14 });
+  s.addShape('round2SameRect', {
+    x: 5.656, y: 1.961, w: 6.701, h: 0.53, rectRadius: 0.13,
+    fill: { color: C.blue }, line: { type: 'none' },
+  });
+
+  const head = ['Value title here', 'Value #1', 'Value #2', 'Value #3'];
+  const rows = [head.map((t) => ({
+    text: t, options: { color: C.white, bold: true, fill: { color: C.mint } },
+  }))];
+  for (let i = 1; i <= 7; i += 1) {
+    const band = i % 2 === 1 ? 'D0F8DB' : 'E9FBEE'; // banded rows: accent2 tint 40% / 20%
+    rows.push([`Content Value 0${i}`, 'Your text', '100%', 'A wonderful serenity'].map((t) => ({
+      text: t, options: { color: C.body, fill: { color: band } },
+    })));
+  }
+  s.addTable(rows, {
+    x: 5.656, y: 1.961, w: 6.701, colW: [1.675, 1.675, 1.2, 2.15], rowH: 0.53,
+    fontFace: F.body, fontSize: 13, valign: 'middle', autoPage: false,
+    margin: [1, 8, 1, 8], border: { type: 'solid', color: C.white, pt: 1 },
+  });
+
+  text(s, { x: 0.667, y: 2.367, w: 4.219, h: 0.868, text: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy' });
+  [['75%', 3.772, 3.9, 'bottle'], ['25%', 5.338, 5.466, 'clipboard']].forEach(([label, cy, ty, kind]) => {
+    iconChip(s, { x: 0.805, y: cy, kind });
+    text(s, { x: 1.977, y: ty, w: 3.343, h: 0.478, text: label, face: F.major, size: 20, color: C.green });
+    text(s, { x: 1.977, y: ty + 0.433, w: 3.343, h: 0.343, text: 'A wonderful serenity has taken' });
+  });
+  rule(s, 0.768, 5.071, 4.016);
+}
+
+/** 18 - "Illustration Diet Process": before / after figures on a green band. */
+function slide18(pptx) {
+  const s = pptx.addSlide();
+  headline(s, { x: 0.669, y: 0.983, w: 12, h: 0.828, size: 48, align: 'center', parts: [['Illustration', 0], [' Diet ', 1], ['Process', 0]] });
+  s.addShape('roundRect', {
+    x: 4.607, y: -1.69, w: 4.12, h: 12, rotate: 90, rectRadius: 2.06,
+    fill: { color: C.green }, line: { type: 'none' },
+  });
+  s.addShape('ellipse', { x: 0.893, y: 2.476, w: 3.667, h: 3.667, fill: { color: C.white }, shadow: shadow() });
+  s.addShape('ellipse', { x: 8.773, y: 2.476, w: 3.667, h: 3.667, fill: { color: C.white }, shadow: shadow() });
+  figure(s, { x: 1.6, y: 2.55, w: 2.25, h: 3.3, bulk: 1 });
+  figure(s, { x: 9.6, y: 2.6, w: 2.0, h: 3.25, bulk: 0 });
+
+  iconChip(s, { x: 6.151, y: 2.476, fill: C.mint, color: C.white, kind: 'scale' });
+  text(s, { x: 5.012, y: 3.575, w: 3.309, h: 0.846, text: '15kg', face: F.major, size: 40, color: C.white, align: 'center' });
+  text(s, { x: 5.012, y: 4.54, w: 3.309, h: 0.473, text: 'Wight Lose', face: F.major, size: 20, color: C.white, align: 'center' });
+  text(s, { x: 5.012, y: 5.006, w: 3.309, h: 0.605, text: LOREM_TINY, color: C.white, align: 'center' });
+  badge(s, { x: 3.411, y: 5.678, w: 1.149, h: 0.466, fill: C.mint, text: 'BEFORE', size: 14, color: C.ink, italic: true });
+  badge(s, { x: 8.773, y: 5.678, w: 1.149, h: 0.466, fill: C.mint, text: 'AFTER', size: 14, color: C.ink, italic: true });
+  s.addShape('line', {
+    x: 5.06, y: 5.911, w: 3.214, h: 0,
+    line: { color: C.white, width: 2, beginArrowType: 'triangle', endArrowType: 'triangle' },
+  });
+}
+
+/**
+ * Stand-in for the deck's vector illustration of a person: a flat figure built from
+ * native shapes. `bulk` (0-1) widens the torso for the "before" pose.
+ */
+function figure(s, o) {
+  const skin = 'FBD8BE';
+  const shade = 'E3B092';
+  const top = 'FEC200';
+  const shorts = '262626';
+  const cx = o.x + o.w / 2;
+  const W = (f) => o.w * f;
+  const H = (f) => o.h * f;
+  const put = (shape, x, y, w, h, color, r) => s.addShape(shape, {
+    x, y, w, h, fill: { color }, line: { type: 'none' }, rectRadius: r,
+  });
+  const torso = W(0.46 + 0.16 * o.bulk);
+
+  put('ellipse', cx - W(0.135), o.y, W(0.27), H(0.19), skin); // head
+  put('roundRect', cx - W(0.145), o.y + H(0.13), W(0.29), H(0.09), shade, W(0.06)); // neck
+  put('roundRect', cx - torso / 2, o.y + H(0.18), torso, H(0.42), skin, W(0.2)); // torso
+  put('roundRect', cx - torso / 2 - W(0.02), o.y + H(0.2), torso + W(0.04), H(0.16), top, W(0.08)); // sports top
+  put('roundRect', cx - torso / 2 + W(0.02), o.y + H(0.34), torso - W(0.04), H(0.05), 'E05D14'); // top trim
+  put('roundRect', cx - W(0.31), o.y + H(0.21), W(0.13), H(0.34), shade, W(0.06)); // left arm
+  put('roundRect', cx + W(0.18), o.y + H(0.21), W(0.13), H(0.34), shade, W(0.06)); // right arm
+  put('roundRect', cx - torso / 2, o.y + H(0.56), torso, H(0.16), shorts, W(0.08)); // shorts
+  put('roundRect', cx - W(0.24), o.y + H(0.68), W(0.19), H(0.32), skin, W(0.07)); // left leg
+  put('roundRect', cx + W(0.05), o.y + H(0.68), W(0.19), H(0.32), skin, W(0.07)); // right leg
+}
+
+/** 19 - "Target Body Weight": five segment gauge. */
+function slide19(pptx) {
+  const s = pptx.addSlide();
+  card(s, { x: 5.081, y: 0.665, w: 7.253, h: 6.835, r: rr(7.253, 6.835, 22208), fill: C.white, shadow: true });
+  headline(s, { x: 1.0, y: 1.13, w: 3.063, h: 2.282, size: 48, parts: [['Target', 1], [' Body Weight', 0]] });
+  iconChip(s, { x: 1.138, y: 3.969, kind: 'clipboard' });
+  text(s, { x: 1.0, y: 5.24, w: 3.062, h: 1.13, text: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy' });
+
+  gauge(s, 8.708, 3.645, 2.253);
+  [
+    ['EXTREME OBESITY', 7.859, 1.193], ['EXTREME OBESITY', 5.915, 1.913], ['EXTREME OBESITY', 9.802, 1.913],
+    ['UNDER WEIGHT', 5.506, 2.955], ['UNDER WEIGHT', 10.211, 2.955],
+  ].forEach(([label, x, y]) => {
+    badge(s, {
+      x, y, w: 1.697, h: 0.335, fill: C.green, text: label, size: 10, face: F.major,
+      line: { color: C.white, width: 2 },
+    });
+  });
+
+  rule(s, 5.506, 4.222, 6.403);
+  text(s, { x: 5.506, y: 4.333, w: 2.647, h: 2.294, text: '15%', face: F.head, size: 115, color: C.green, wrap: false });
+  text(s, { x: 8.342, y: 4.787, w: 3.566, h: 0.482, text: 'Subtitle Here', face: F.head, size: 20, color: C.green });
+  text(s, { x: 8.342, y: 5.253, w: 3.566, h: 0.868, text: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy' });
+}
+
+/**
+ * Semi circular five-segment speedometer, centred on (cx, cy): green wedges separated
+ * by white gaps, a two-tone grey hub and a needle pointing just right of vertical.
+ */
+function gauge(s, cx, cy, r) {
+  const gap = 4; // degrees of white space between segments
+  const wedge = (rad, a0, a1, color) => s.addShape('pie', {
+    x: cx - rad, y: cy - rad, w: rad * 2, h: rad * 2,
+    angleRange: [a0, a1], fill: { color }, line: { type: 'none' },
+  });
+  for (let i = 0; i < 5; i += 1) {
+    wedge(r, 180 + i * 36 + gap / 2, 180 + (i + 1) * 36 - gap / 2, C.green);
+  }
+  wedge(r * 0.482, 180, 360, C.silver); // outer hub
+  wedge(r * 0.239, 180, 360, C.grey); // inner hub
+  s.addShape('line', {
+    x: cx - 0.088, y: cy - 1.378, w: 0.088, h: 1.318,
+    line: { color: C.dark, width: 5 },
+  });
+}
+
+/** 20 - Closing slide (solid green background). */
+function slide20(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.green };
+  photoArch(s, 0.404, 0.782, 5.294, 6.718);
+  headline(s, { x: 6.667, y: 2.787, w: 6.347, h: 1.927, size: 60, plain: C.white, accent: C.white, parts: [['Thank You See You Soon', 1]] });
+}
+
+/* ------------------------------------------------------------------- build */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE';
+  pptx.title = 'Fitness Training and Coaching';
+  pptx.theme = { headFontFace: F.major, bodyFontFace: F.body };
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
+    .forEach((fn) => fn(pptx));
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '07ed8ce8-70c7-47e7-b591-57a33675c87b_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

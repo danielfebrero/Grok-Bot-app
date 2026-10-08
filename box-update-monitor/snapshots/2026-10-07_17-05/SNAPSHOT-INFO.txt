@@ -1,0 +1,9 @@
+snapshot	2026-10-07_17-05
+created	2026-10-07 17:05:10 CEST
+label	avant update (Dani)
+files	14678
+text_copies	4281
+big_text_gz	4
+unreadable	0
+bytes_hashed	1827796988
+duration_s	2.7

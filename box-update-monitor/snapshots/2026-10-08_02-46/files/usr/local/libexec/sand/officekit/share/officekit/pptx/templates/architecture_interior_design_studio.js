@@ -1,0 +1,834 @@
+/**
+ * "Interiorch Studio" — Architecture & Interior Design presentation (45 slides, 16:9).
+ *
+ * Standalone pptxgenjs rebuild of the reference deck. Photographs in the original are
+ * reproduced here as grey `photo()` swatches labelled "Image", exactly where the
+ * picture placeholders sit in the source deck.
+ *
+ *   node 0a19c73e-920d-4f39-be4a-812870dcc21b_grok_final.js
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ── Palette — theme "Interiorch Colors" ─────────────────────────────────────
+const INK = '1A1F1F'; // tx1 / accent1 — near-black, headings and dark panels
+const GOLD = 'CEA575'; // accent2 — brass accent bars, prices, job titles
+const MIST = 'EFEEEE'; // accent3 — pale grey background panels
+const SILVER = 'E2E2E3'; // accent4 — hairlines and column dividers
+const WHITE = 'FFFFFF';
+const SLATE = '545757'; // tx2 — body copy grey
+const PHOTO = 'CBCBCD'; // stand-in swatch for the deck's photography
+
+// ── Typography ──────────────────────────────────────────────────────────────
+const HEAD = 'Inter Medium'; // +mj-lt — headings, numerals, captions
+const BODY = 'Inter'; // +mn-lt — body copy (default)
+const LOGO = 'Oswald regular'; // wordmark only
+
+const NO_LINE = { type: 'none' };
+
+// ── Drawing helpers ─────────────────────────────────────────────────────────
+
+/** Solid colour block: full-bleed backgrounds, side bands, cards, thin bars. */
+function panel(s, x, y, w, h, fill, line) {
+  s.addShape('rect', {
+    x, y, w, h,
+    fill: fill ? { color: fill } : NO_LINE,
+    line: line || NO_LINE,
+  });
+}
+
+/** The short accent rule that sits under most headings (0.47" x 0.03"). */
+function rule(s, x, y, color) {
+  panel(s, x, y, 0.4724, 0.0315, color || GOLD);
+}
+
+/** Text box. Top-anchored and auto-sized, matching the source deck's boxes. */
+function text(s, x, y, w, h, lines, opts) {
+  const o = Object.assign({ fontFace: BODY, fontSize: 12, color: INK }, opts);
+  const arr = Array.isArray(lines) ? lines : [lines];
+  s.addText(
+    arr.map(t => ({ text: t, options: { breakLine: true } })),
+    Object.assign({ x, y, w, h, valign: 'top', fit: 'resize' }, o)
+  );
+}
+
+/** Placeholder standing in for a photograph in the reference deck. */
+function photo(s, x, y, w, h, edge) {
+  panel(s, x, y, w, h, PHOTO, edge ? { color: edge, width: 2 } : null);
+  s.addText('Image', {
+    x, y, w, h: 0.3,
+    align: 'center', valign: 'top',
+    fontFace: BODY, fontSize: 14, color: INK,
+  });
+}
+
+/** "INTERIORCH / STUDIO" lock-up: two Oswald lines over a hairline rule. */
+function wordmark(s, x, y) {
+  text(s, x, y, 1.5522, 0.3366, 'INTERIORCH', { fontSize: 14, fontFace: LOGO, charSpacing: 3 });
+  text(s, x + 0.8203, y + 0.2788, 0.6977, 0.2524, 'STUDIO', { fontSize: 9, fontFace: LOGO, charSpacing: 1.5 });
+  panel(s, x + 0.1014, y + 0.3972, 0.7087, 0.0157, INK);
+}
+
+/** Price list on slide 39: gold header band, hairline-separated rows. */
+function priceTable(s, x, y, head, rows) {
+  const pad = [0.05, 0.2362, 0.05, 0.2362];
+  const hair = { type: 'solid', color: SILVER, pt: 1 };
+  const gap = { type: 'solid', color: WHITE, pt: 1 };
+  const body = rows.map((row, r) => row.map(cell => ({
+    text: cell,
+    options: {
+      fontSize: 10, color: SLATE, valign: 'middle', margin: pad,
+      border: [r === 0 ? NO_LINE : hair, NO_LINE, r === rows.length - 1 ? NO_LINE : hair, NO_LINE],
+    },
+  })));
+  const header = head.map(cell => ({
+    text: cell,
+    options: {
+      fontSize: 12, color: WHITE, fill: { color: GOLD }, valign: 'middle',
+      margin: [0.1181, 0.2362, 0.1181, 0.2362],
+      border: [gap, gap, { type: 'solid', color: WHITE, pt: 3 }, gap],
+    },
+  }));
+  s.addTable([header].concat(body), {
+    x, y,
+    colW: [4.6777, 2.3798, 2.3566, 2.3444],
+    rowH: [0.5612].concat(rows.map(() => 0.4677)),
+    fontFace: BODY,
+    autoPage: false,
+  });
+}
+
+// ---- Slide 1 — Front 1 ----
+function slide01(s) {
+  panel(s, 7.4278, 0, 5.9055, 7.5, MIST);
+  photo(s, 1.666, 1.1793, 9.3051, 4.5276);
+  wordmark(s, 0.6937, 6.2604);
+  text(s, 7.6709, 2.6857, 4.875, 1.5146, ['Architecture', 'and Interior Design', 'Presentation'], { fontSize: 28, fontFace: HEAD, align: 'right' });
+  text(s, -1.3081, 3.2747, 4.5276, 0.3366, 'www.yourdomain.com', { fontSize: 14, fontFace: HEAD, align: 'center', rotate: 270 });
+  text(s, 7.6709, 6.2195, 4.875, 0.6395, '2022', { fontSize: 32, color: GOLD, fontFace: HEAD, align: 'right' });
+}
+
+// ---- Slide 2 — Front 2 ----
+function slide02(s) {
+  photo(s, 0.3937, 0.3937, 12.5459, 5.1316);
+  panel(s, 7.4541, 2.9916, 4.6982, 3.721, GOLD);
+  wordmark(s, 0.6937, 6.2604);
+  text(s, 7.9265, 3.4641, 3.7533, 1.0434, ['Interior Design', 'Presentation'], { fontSize: 28, color: WHITE, fontFace: HEAD });
+  text(s, 7.9265, 4.5908, 3.7533, 0.5763,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien.',
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  panel(s, 8.0389, 5.3967, 0.5512, 0.0394, WHITE);
+  text(s, 7.9265, 5.5992, 3.7533, 0.6395, '2022', { fontSize: 32, color: WHITE, fontFace: HEAD });
+}
+
+// ---- Slide 3 — Front 3 ----
+function slide03(s) {
+  panel(s, 0, 2.7618, 13.3333, 4.7382, MIST);
+  text(s, 7.9265, 3.5897, 4.6194, 1.5146, ['Architecture', 'and Interior Design', 'Presentation'], { fontSize: 28, fontFace: HEAD });
+  text(s, 7.9265, 5.1877, 4.6194, 0.6714,
+    'Sed pretium auctor tellus et lacinia dignissim lorem ipsum dolar sit amet donce dui tempor odio.',
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 7.9265, 6.2356, 4.6194, 0.6395, '2022', { fontSize: 32, color: GOLD, fontFace: HEAD });
+  wordmark(s, 0.6937, 0.7261);
+  text(s, 7.9265, 0.7867, 4.6117, 0.3366, 'www.yourdomain.com', { fontSize: 14, fontFace: HEAD });
+  panel(s, 12.5459, 0.8769, 0.7874, 0.1465, GOLD);
+  panel(s, 0.7951, 7.3031, 5.8716, 0.1969, GOLD);
+  photo(s, 0.7951, 1.966, 5.8716, 4.7382);
+}
+
+// ---- Slide 4 — Front 4 ----
+function slide04(s) {
+  text(s, 0.6739, 2.9827, 3.3465, 1.0434, ['Inspirational', 'interiors'], { fontSize: 28, fontFace: HEAD });
+  text(s, 0.6739, 4.0956, 3.3465, 0.6714,
+    'Sed pretium auctor tellus et lacinia dignissim donce nulla sit amet.',
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 0.6739, 6.2262, 3.3465, 0.6395, '2022', { fontSize: 32, color: GOLD, fontFace: HEAD });
+  wordmark(s, 0.6937, 0.7261);
+  panel(s, 4.8078, 0, 8.5256, 7.5, MIST);
+  photo(s, 5.5952, 0.7952, 7.7382, 5.9172);
+}
+
+// ---- Slide 5 — Introduction ----
+function slide05(s) {
+  text(s, 7.3426, 1.6673, 4.416, 0.5722, 'Introduction', { fontSize: 28, fontFace: HEAD });
+  text(s, 7.3426, 2.7378, 4.416, 3.0949,
+    [
+      'Sed dapibus imperdiet nisl quis blandit aliquet pulvinar pretium mauris metus ligula, laoreet nec efficitur sed tempor non mauris phasellus.',
+      '',
+      'Maecenas tincidunt tortor velit, quis viverra tortor ornare sed cras vitae massa mattis, tincidunt urna sed fringilla tortor curabitur eu ipsum.',
+      '',
+      'Egestas vitae scelerisque vel, sagittis a aliquet tellus at mi scelerisque, non bibendum mi fringilla.',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  rule(s, 7.4688, 2.3313);
+  panel(s, 7.3426, 7.3031, 4.416, 0.1969, GOLD);
+  panel(s, 7.3426, 0, 4.416, 0.1969, GOLD);
+  photo(s, 0, 0, 5.8793, 7.5);
+}
+
+// ---- Slide 6 — About 1 ----
+function slide06(s) {
+  panel(s, 10.585, 0, 2.7484, 7.5, GOLD);
+  text(s, 0.7874, 0.7874, 4.7244, 1.0434, ['About our', 'Interiorch Studio'], { fontSize: 28, fontFace: HEAD });
+  text(s, 0.7874, 2.3207, 2.5591, 2.091,
+    [
+      'Mentis mossimo temperum que sintion nis maio comnisciis as aliquam te nest fugitas sinctemolor nulparum sectiae ducitio.',
+      '',
+      'Da ipsumquodi doluptatent quiam fuga mentis mossimo temperum que rehenis enimporatur.',
+    ],
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  rule(s, 0.9137, 1.9142);
+  text(s, 4.156, 2.3207, 4.8355, 4.3066,
+    [
+      'Curabitur dictum magna enim, sit amet feugiat augue rhoncus dictum in hac habitasse platea dictumst eget libero sagittis, pharetra purus nec fermentum nulla.',
+      '',
+      'Suspendisse libero leo, mollis sed orci vel, iaculis accumsan est nullam venenatis cursus augue id lacinia vestibulum in magna ut risus convallis sollicitudin.',
+      '',
+      'Duis velit massa, euismod et ultrices vel, auctor ut orci curabitur vel maximus mi nulla fringilla, tellus non pretium venenatis, odio nisi malesuada velit.',
+      '',
+      'Mauris ac vestibulum magna. Class aptent taciti sociosqu ad litora torquent per conubia nostra.',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.791, 5.1991, 2.5554, 1.5135);
+  photo(s, 9.79, 0.7874, 3.5433, 5.9252);
+}
+
+// ---- Slide 7 — About 2 ----
+function slide07(s) {
+  panel(s, 0, 0, 13.3333, 7.5, GOLD);
+  photo(s, 0, 0.7874, 11.7585, 5.9252);
+  panel(s, 9.2066, 2.5961, 3.3394, 3.7228, WHITE);
+  text(s, 9.6003, 2.9898, 2.552, 0.4039, 'Curiosity', { fontSize: 18, fontFace: HEAD });
+  text(s, 9.6003, 3.5818, 2.552, 2.3434,
+    [
+      'Etiam posuere dolor dui neque hendrerit sit amet sem tellus, mollis ultrices molestie nec semper.',
+      '',
+      'Fusce urna odio, consectetur vel est sit amet, lacinia fringilla neque. ',
+      '',
+      'Aliquam tincidunt ligula leo, sit amet dictum dui ornare donce.',
+    ],
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+}
+
+// ---- Slide 8 — About 3 ----
+function slide08(s) {
+  panel(s, 0.3937, 0.3937, 12.9396, 6.7189, INK);
+  text(s, 5.4593, 2.1324, 3.3465, 0.4376, 'Our mission', { fontSize: 20, color: WHITE, fontFace: HEAD });
+  text(s, 5.4593, 2.7244, 3.3465, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales mi justo, sit amet venenatis.',
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  text(s, 9.1995, 2.1324, 3.3465, 0.4376, 'Our vision', { fontSize: 20, color: WHITE, fontFace: HEAD });
+  text(s, 9.1995, 2.7244, 3.3465, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales mi justo, sit amet venenatis.',
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  text(s, 5.4593, 3.9469, 3.3465, 0.4376, 'Creative goals', { fontSize: 20, color: WHITE, fontFace: HEAD });
+  text(s, 5.4593, 4.5388, 3.3465, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales mi justo, sit amet venenatis.',
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  text(s, 9.1995, 3.9469, 3.3465, 0.4376, 'Experience', { fontSize: 20, color: WHITE, fontFace: HEAD });
+  text(s, 9.1995, 4.5388, 3.3465, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales mi justo, sit amet venenatis.',
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  photo(s, 0, 1.1874, 4.6719, 5.1252);
+}
+
+// ---- Slide 9 — About 4 ----
+function slide09(s) {
+  panel(s, 0, 0.3937, 4.6719, 6.7189, INK);
+  photo(s, 0.7874, 1.1874, 7.4541, 5.1252);
+  photo(s, 8.6352, 1.1874, 3.9108, 5.1252);
+}
+
+// ---- Slide 10 — Process 1 ----
+function slide10(s) {
+  text(s, 5.4593, 1.7815, 4.416, 1.0434, ['The creative', 'process of our artists'], { fontSize: 28, fontFace: HEAD });
+  text(s, 5.4593, 3.3148, 3.3465, 3.3978,
+    [
+      'Integer dignissim vitae massa at laoreet cras erat tristique, vestibulum mauris vitae, dictum nibh varius donce.',
+      '',
+      'Malesuada magna venenatis suspendisse convallis placerat ex in vulputate quisque sollicitudin.',
+      '',
+      'Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus vestibulum ligula.',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  rule(s, 5.5856, 2.9083);
+  text(s, 9.1995, 3.3148, 3.3465, 3.3978,
+    [
+      'Duis suscipit ultrices lobortis vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae volutpat iaculis. ',
+      '',
+      'Suspendisse potenti venenatis felis orci, et laoreet justo.',
+      '',
+      'Cras sollicitudin posuere felis, porttitor interdum ante venenatis done nulla sit amet non diam quis mi mollis.',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  panel(s, 0, 0, 1.5748, 6.7126, GOLD);
+  photo(s, 0, 0.7874, 4.2795, 5.9252);
+}
+
+// ---- Slide 11 — Process 2 ----
+function slide11(s) {
+  text(s, 0.7874, 5.2889, 3.3946, 0.4376, 'Project plan', { fontSize: 20, fontFace: HEAD });
+  text(s, 0.7874, 5.8809, 3.3946, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales mi justo, sit amet venenatis.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 0.7874, 4.2423, 3.3946, 0.9424, '01.', { fontSize: 50, color: GOLD });
+  text(s, 4.9694, 5.2889, 3.3946, 0.4376, 'Completion', { fontSize: 20, fontFace: HEAD });
+  text(s, 4.9694, 5.8809, 3.3946, 0.8288,
+    'Fusce eu porta lectus, nec tempor dolor ut ante vel massa varius congue efficitur felis dictum scelerisque tristique donce nulla sit.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 4.9694, 4.2423, 3.3946, 0.9424, '02.', { fontSize: 50, color: GOLD });
+  text(s, 9.1514, 5.2889, 3.3946, 0.4376, 'Realization', { fontSize: 20, fontFace: HEAD });
+  text(s, 9.1513, 5.8809, 3.3946, 0.8288,
+    'Sed tincidunt dui ut dui iaculis, in scelerisque dui blandit tempor pulvinar dolor sit amet finibus nisi dignissim egestas nibh lorem amet.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 9.1513, 4.2423, 3.3946, 0.9424, '03.', { fontSize: 50, color: GOLD });
+  photo(s, 0.7874, 0.7903, 3.3946, 3.0548);
+  photo(s, 4.9694, 1.1837, 3.3946, 2.6614);
+  photo(s, 9.1513, 1.5774, 3.3946, 2.2677);
+}
+
+// ---- Slide 12 — Bathroom 1 ----
+function slide12(s) {
+  text(s, 0.7874, 0.7874, 4.7244, 1.0434, ['Delicate and', 'dazzling bathrooms'], { fontSize: 28, fontFace: HEAD });
+  rule(s, 0.9137, 1.9142);
+  text(s, 4.156, 2.3207, 8.3899, 1.5802,
+    [
+      'Interdum et malesuada fames ac ante ipsum primis in faucibus proin placerat, lorem ut ultricies consequat, nisi dui finibus tellus, venenatis viverra turpis enim eget urna donec porta.',
+      '',
+      'Duis mi mi, hendrerit consequat justo in, interdum aliquet risus nunc vitae augue ligula sed vestibulum in quam at aliquet maecenas ante enim, tempor id sollicitudin scelerisque.',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 0.7874, 3.2693, 2.5591, 0.3239, 'Photographer', { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 0.7874, 3.5319, 2.5591, 0.3685, 'Robert Williams', { fontSize: 12, lineSpacingMultiple: 1.5 });
+  text(s, 0.7874, 2.3207, 2.5591, 0.3239, 'Customer', { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 0.7874, 2.5833, 2.5591, 0.3685, 'Elements Envato Corp', { fontSize: 12, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 4.6942, 2.5591, 2.8058);
+  photo(s, 4.156, 4.6942, 8.3899, 2.8058);
+}
+
+// ---- Slide 13 — Bathroom 2 ----
+function slide13(s) {
+  panel(s, 1.5653, 0, 11.768, 6.7126, INK);
+  text(s, 2.3527, 5.2538, 10.1593, 0.6714,
+    'Duis mi mi, hendrerit consequat justo in, interdum aliquet risus nunc vitae augue ligula sed vestibulum in quam at aliquet maecenas ante enim, tempor id sollicitudin scelerisque, aliquet nec ante pellentesque velit metus, ut sodales lorem.',
+    { fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 0.7874, 5.6739, 3.679);
+  photo(s, 6.8889, 0.7874, 5.6739, 3.679);
+}
+
+// ---- Slide 14 — Kitchen 1 ----
+function slide14(s) {
+  panel(s, 0.3937, 0.3874, 12.5459, 6.7189, INK);
+  text(s, 5.4593, 1.8261, 3.7402, 1.0434, ['Innovative', 'kitchen interiors'], { fontSize: 28, color: WHITE, fontFace: HEAD });
+  text(s, 5.4593, 3.3594, 6.6929, 0.6714,
+    'Aenean accumsan id quam eu tempor sed tellus ante donce nulla sit amet lorem ipsum amet dolar eleifend non efficitur amet donce vel commodo a mauris.',
+    { fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 });
+  rule(s, 5.5856, 2.9529);
+  text(s, 9.0026, 4.3225, 3.1496, 0.8288,
+    'Metus, ut sodales massa ultrices ut nam eget efficitur justo pellentesque quis erat dignissim metus sagittis donce.',
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  text(s, 5.4593, 4.3225, 3.1496, 0.8288,
+    'Orci varius natoque penatibus et magnis dis parturient montes nascetur ridiculus mus commodo aliquet lorem ipsum.',
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 0.7874, 3.8845, 3.2434);
+  photo(s, 0.7874, 4.4308, 3.8845, 2.2755);
+}
+
+// ---- Slide 15 — Kitchen 2 ----
+function slide15(s) {
+  panel(s, 0.3937, 0.3874, 6.0761, 6.7189, INK);
+  text(s, 1.9685, 2.507, 2.9265, 0.7742, ['High-quality', 'materials'], { fontSize: 20, color: WHITE, fontFace: HEAD });
+  text(s, 1.9685, 3.4027, 2.9265, 1.5861,
+    [
+      'Fusce ultricies mauris nec sodales condimentum accumsan, ligula id cursus tempus, quam ante molestie tortor.',
+      '',
+      'Nullam mattis mi id libero porttitor condimentum posuere odio.',
+    ],
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  panel(s, 1.1811, 1.7196, 4.5013, 3.9662, null, { color: GOLD, width: 3 });
+  photo(s, 6.8635, 0.3874, 6.0761, 6.7189);
+}
+
+// ---- Slide 16 — Children 1 ----
+function slide16(s) {
+  panel(s, 5.8793, 1.1811, 7.0604, 5.1378, INK);
+  text(s, 7.0604, 2.0874, 4.6982, 1.0434, ['Cozy children’s', 'rooms'], { fontSize: 28, color: WHITE, fontFace: HEAD });
+  text(s, 7.0604, 3.6207, 4.6982, 0.6714,
+    'Aenean accumsan id quam eu tempor sed tellus ante donce nulla sit amet lorem ipsum amet dolar.',
+    { fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 });
+  rule(s, 7.1867, 3.2142);
+  text(s, 7.0604, 4.5838, 4.6982, 0.8288,
+    'Orci varius natoque penatibus et magnis dis parturient montes nascetur ridiculus mus commodo aliquet sollicitudin lorem ipsum dolor sit amet, donce consectetur adipiscing.',
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.3937, 1.1811, 5.0919, 5.1378);
+}
+
+// ---- Slide 17 — Children 2 ----
+function slide17(s) {
+  photo(s, 0, 1.1811, 5.4856, 5.1378);
+  photo(s, 5.8793, 1.1811, 7.0604, 5.1378);
+}
+
+// ---- Slide 18 — Bedrooms 1 ----
+function slide18(s) {
+  text(s, 0.7874, 0.7874, 4.7244, 1.0434, ['Elegant adult', 'bedrooms'], { fontSize: 28, fontFace: HEAD });
+  rule(s, 0.9137, 1.9142);
+  text(s, 1.9685, 2.3207, 9.3963, 0.9744,
+    'Interdum et malesuada fames ac ante ipsum primis in faucibus proin placerat, lorem ut ultricies consequat, nisi dui finibus tellus, venenatis viverra turpis enim eget urna donec porta sapien sit amet enim molestie efficitur morbi nibh neque, elementum quis neque nec, ornare venenatis donec fringilla nisi id venenatis.',
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 4.0824, 5.6824, 2.5689);
+  photo(s, 6.8635, 4.1131, 5.6824, 2.5689);
+}
+
+// ---- Slide 19 — Bedrooms 2 ----
+function slide19(s) {
+  photo(s, 0.7874, 1.585, 12.5459, 5.0663);
+  panel(s, 8.6089, 0.7874, 3.937, 2.2081, INK, { color: GOLD, width: 3 });
+  text(s, 9.0026, 1.1811, 3.1496, 0.4039, 'Convenience', { fontSize: 18, color: WHITE, fontFace: HEAD });
+  text(s, 9.0026, 1.7731, 3.1496, 0.8288,
+    'Etiam posuere dolor dui neque hendrerit sit amet sem tellus, mollis ultrices molestie nec semper sit amet, lacinia fringilla neque',
+    { fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
+}
+
+// ---- Slide 20 — Sleep 1 ----
+function slide20(s) {
+  panel(s, 10.585, 0.3937, 2.7484, 6.7126, GOLD);
+  photo(s, 0.7874, 0.7874, 12.5459, 5.9252);
+}
+
+// ---- Slide 21 — Sleep 2 ----
+function slide21(s) {
+  panel(s, 0, 0.3937, 12.9396, 6.7126, GOLD);
+  text(s, 5.0656, 3.8803, 7.0866, 0.5722, 'Sleep in luxury', { fontSize: 28, color: WHITE, fontFace: HEAD });
+  rule(s, 5.1919, 4.5443, WHITE);
+  text(s, 5.0656, 4.9508, 7.0866, 0.9744,
+    'Interdum et malesuada fames ac ante ipsum primis in faucibus etiam iaculis tempus suscipit integer non augue sit amet enim ullamcorper blandit id ut tellus sed auctor neque neque, ac ultricies magna tincidunt vitae. Nunc urna eros.',
+    { fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 });
+  photo(s, 0, 0.7874, 4.2782, 5.9252);
+  photo(s, 4.6735, 0.7874, 3.739, 2.3055);
+  photo(s, 8.7983, 0.7874, 3.739, 1.9118);
+}
+
+// ---- Slide 22 — Kitchens 1 ----
+function slide22(s) {
+  panel(s, 0.3937, 0.3937, 12.9396, 6.7126, INK);
+  photo(s, 0, 1.1811, 8.6614, 5.1378);
+  photo(s, 9.0551, 1.1811, 4.2782, 5.1378);
+}
+
+// ---- Slide 23 — Kitchens 2 ----
+function slide23(s) {
+  panel(s, 0, 0.3937, 2.3622, 6.7126, INK);
+  text(s, 4.3307, 1.8116, 4.7244, 1.0434, 'Kitchen islands as additional worktops', { fontSize: 28, fontFace: HEAD });
+  rule(s, 4.457, 2.9384);
+  text(s, 7.6994, 3.3449, 4.0694, 2.7919,
+    [
+      'Interdum et malesuada fames ac ante ipsum primis in faucibus proin placerat, lorem ut ultricies consequat, nisi dui finibus tellus.',
+      '',
+      'Duis mi mi, hendrerit consequat justo in, interdum aliquet risus nunc vitae augue.',
+      '',
+      'Integer pellentesque velit metus, ut sodales massa ultrices ut nam donce nulla.',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 4.3307, 4.2884, 2.5591, 0.3239, 'Photographer', { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 4.3307, 4.551, 2.5591, 0.3685, 'Robert Williams', { fontSize: 12, lineSpacingMultiple: 1.5 });
+  text(s, 4.3307, 3.3449, 2.5591, 0.3239, 'Customer', { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 4.3307, 3.6075, 2.5591, 0.3685, 'Elements Envato Corp', { fontSize: 12, lineSpacingMultiple: 1.5 });
+  photo(s, 0, 1.1811, 2.7559, 5.1378);
+}
+
+// ---- Slide 24 — Tables 1 ----
+function slide24(s) {
+  text(s, 0.7874, 4.205, 4.7244, 1.0434, ['Slim and elegant', 'coffee tables'], { fontSize: 28, fontFace: HEAD });
+  rule(s, 0.9137, 5.3317);
+  text(s, 2.3622, 5.7382, 7.0341, 0.9744,
+    'Interdum et malesuada fames ac ante ipsum primis in faucibus proin placerat, lorem ut ultricies consequat, nisi dui finibus tellus, venenatis viverra turpis enim eget urna donec porta sapien sit amet enim molestie efficitur morbi nibh neque.',
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 7.4541, 0.7874, 5.8793, 4.3088);
+}
+
+// ---- Slide 25 — Tables 2 ----
+function slide25(s) {
+  panel(s, 0.7874, 0.7874, 4.8847, 0.0315, GOLD);
+  text(s, 0.6611, 2.2193, 5.011, 0.9744,
+    'Interdum et malesuada fames ac ante ipsum primis in faucibus proin placerat, lorem ut ultricies consequat, nisi dui finibus tellus, venenatis viverra turpis enim.',
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 3.3153, 1.1939, 2.3568, 0.3239, 'Photographer', { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 3.3153, 1.4565, 2.3568, 0.3685, 'Robert Williams', { fontSize: 12, lineSpacingMultiple: 1.5 });
+  text(s, 0.6611, 1.1939, 2.3718, 0.3239, 'Customer', { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 0.6611, 1.4565, 2.3718, 0.3685, 'Elements Envato Corp', { fontSize: 12, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 3.9803, 5.6824, 2.7323);
+  photo(s, 6.8635, 2.2193, 5.6824, 2.7323);
+}
+
+// ---- Slide 26 — Accessories 1 ----
+function slide26(s) {
+  text(s, 0.7874, 4.205, 5.8793, 1.0434, ['Interesting and', 'elegant accessories'], { fontSize: 28, fontFace: HEAD });
+  rule(s, 0.9137, 5.3317);
+  text(s, 0.7874, 5.7382, 5.8793, 0.9744,
+    'Interdum et malesuada fames ac ante ipsum primis in faucibus proin placerat, lorem ut ultricies consequat, nisi dui finibus tellus, venenatis viverra turpis enim eget urna donec porta sapien lorem.',
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 0.7874, 3.657, 2.6302);
+  photo(s, 4.8381, 0.7874, 3.657, 2.6302);
+  photo(s, 8.8889, 0.7874, 3.657, 5.9252);
+}
+
+// ---- Slide 27 — Accessories 2 ----
+function slide27(s) {
+  text(s, 9.2826, 4.7841, 3.2633, 1.0812,
+    'Interdum et malesuada fames ac ante ipsum primis in faucibus proin placerat, lorem ut ultricies consequat, nisi dui finibus tellus, venenatis viverra turpis enim.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 0.7874, 3.657, 2.7757);
+  photo(s, 4.8381, 0.7874, 7.7078, 2.7757);
+  photo(s, 0.7874, 3.9369, 7.7078, 2.7757);
+}
+
+// ---- Slide 28 — Home 1 ----
+function slide28(s) {
+  panel(s, 0, 0, 2.3622, 7.5, GOLD);
+  text(s, 6.273, 2.0418, 6.273, 1.0434, ['Make your', 'home stand out'], { fontSize: 28, fontFace: HEAD });
+  rule(s, 6.3993, 3.1685);
+  text(s, 6.273, 3.5751, 6.273, 1.8831,
+    [
+      'Suspendisse pretium mattis aliquet praesent lacus ac magna convallis porta non congue nisi pellentesque ipsum sed dui fringilla, non ultricies ante posuere ultrices nibh in tellus bibendum faucibus placerat.',
+      '',
+      'Ligula fusce et tellus malesuada, fringilla libero eget fermentum dolor aliquam vehicula et est sit amet tempor cras tempus massa.',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 0.7874, 3.9108, 5.9252);
+}
+
+// ---- Slide 29 — Home 2 ----
+function slide29(s) {
+  text(s, 0.7874, 5.2889, 3.657, 0.4376, 'Kitchen', { fontSize: 20, fontFace: HEAD });
+  text(s, 0.7874, 5.8809, 3.657, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales mi justo, sit amet venenatis.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 4.8381, 5.2889, 3.657, 0.4376, 'Bedroom', { fontSize: 20, fontFace: HEAD });
+  text(s, 4.8381, 5.8809, 3.657, 0.8288,
+    'Cras ut lorem eget nisl blandit sodales vitae dapibus eget massa sed sodales dolor enim, suscipit sed nunc eget donce nulla dolar sit amet.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 8.8889, 5.2889, 3.657, 0.4376, 'Bathroom', { fontSize: 20, fontFace: HEAD });
+  text(s, 8.8889, 5.8809, 3.657, 0.8288,
+    'Praesent gravida velit quis viverra pharetra sed in ligula nulla morbi neque orci donce nulla tincidunt ac congue eget nulla lobortis ac sapien.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 0.7874, 3.657, 4.1028);
+  photo(s, 4.8381, 0.7874, 3.657, 4.1028);
+  photo(s, 8.8889, 0.7874, 3.657, 4.1028);
+}
+
+// ---- Slide 30 — Architecture 1 ----
+function slide30(s) {
+  panel(s, 0.7874, 0.7874, 5.6824, 5.9223, MIST);
+  text(s, 1.5748, 1.7374, 4.1076, 1.0434, ['Modern', 'architecture'], { fontSize: 28, fontFace: HEAD });
+  rule(s, 1.7011, 2.8642);
+  text(s, 1.5748, 3.2707, 4.1076, 2.489,
+    [
+      'Aliquam dictum sem sed tristique rhoncus augue purus, rutrum vehicula leo ultrices bibendum justo in nec magna fermentum euismod diam non, rhoncus felis aenean quis.',
+      '',
+      'Nam tincidunt ultricies tincidunt finibus quam vitae condimentum tincidunt tellus augue fringilla enim, sit amet euismod velit risus donce.',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 6.8635, 0.7874, 5.6824, 2.7628);
+  photo(s, 6.8635, 3.9439, 5.6824, 2.7628);
+}
+
+// ---- Slide 31 — Architecture 2 ----
+function slide31(s) {
+  photo(s, 0.7874, 0.7874, 3.657, 3.1565);
+  photo(s, 4.8381, 0.7874, 7.7078, 2.3758);
+  photo(s, 4.8381, 3.5502, 7.7078, 3.1565);
+  photo(s, 0.7874, 4.3435, 3.657, 2.3633);
+}
+
+// ---- Slide 32 — Fancy 1 ----
+function slide32(s) {
+  panel(s, 0.3937, 0.3937, 12.5459, 6.7126, MIST);
+  text(s, 1.9705, 1.1811, 9.3882, 1.0434, ['Modern fencing', 'for home and industry'], { fontSize: 28, fontFace: HEAD, align: 'center' });
+  rule(s, 6.4304, 2.3079);
+  text(s, 1.9705, 2.7144, 9.3882, 0.6714,
+    'Aliquam dictum sem sed tristique rhoncus augue purus, rutrum vehicula leo ultrices bibendum justo in nec magna fermentum euismod diam non, rhoncus felis aenean quis mattis sapien.',
+    { fontSize: 12, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 4.1674, 5.6804, 2.5394);
+  photo(s, 6.8635, 4.1674, 5.6804, 2.5394);
+}
+
+// ---- Slide 33 — Fancy 2 ----
+function slide33(s) {
+  panel(s, 0.3937, 0.3937, 12.5459, 6.7126, MIST);
+  text(s, 0.7874, 5.3544, 3.657, 0.3702, 'Steel profiles', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 0.7874, 5.8809, 3.657, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales mi justo, sit amet venenatis.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 4.8381, 0.7874, 3.657, 0.3702, 'Fence spans', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 4.8381, 1.3139, 3.657, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales mi justo, sit amet venenatis.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 8.8889, 5.3544, 3.657, 0.3702, 'Architectural concrete', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 8.8889, 5.8809, 3.657, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales mi justo, sit amet venenatis.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 0.7882, 3.657, 4.157);
+  photo(s, 4.8381, 2.5519, 3.657, 4.157);
+  photo(s, 8.8889, 0.7882, 3.657, 4.157);
+}
+
+// ---- Slide 34 — Sale 1 ----
+function slide34(s) {
+  panel(s, 0.7874, 4.8818, 11.7585, 1.8308, GOLD);
+  text(s, 1.9705, 5.2755, 9.3882, 1.0434, ['Our best products', 'on sale'], { fontSize: 28, color: WHITE, fontFace: HEAD, align: 'center' });
+  photo(s, 0.7874, 0.7882, 5.6824, 3.6999);
+  photo(s, 6.8635, 0.7882, 5.6824, 3.6999);
+}
+
+// ---- Slide 35 — Sale 2 ----
+function slide35(s) {
+  text(s, 1.1811, 4.9838, 2.6072, 0.3702, 'Fancy armchair', { fontSize: 16, fontFace: HEAD });
+  text(s, 1.1811, 5.8809, 2.6072, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 1.1811, 5.3957, 2.6072, 0.3366, '$1 859.00', { fontSize: 14, color: GOLD, fontFace: HEAD });
+  text(s, 5.3631, 4.9838, 2.6072, 0.3702, 'Steel stool', { fontSize: 16, fontFace: HEAD });
+  text(s, 5.3631, 5.8809, 2.6072, 0.8288,
+    'Curabitur ac ante porta, volutpat sem  scelerisque nisl tortor lacinia at ligula nulla dolar sit aliquet.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 5.3631, 5.3957, 2.6072, 0.3366, '$99.00', { fontSize: 14, color: GOLD, fontFace: HEAD });
+  text(s, 9.5451, 4.9838, 2.6072, 0.3702, 'Tripod lamp', { fontSize: 16, fontFace: HEAD });
+  text(s, 9.5451, 5.8809, 2.6072, 0.8288,
+    'Nullam sapien ex rhoncus et elementum nec consectetur cursus ligula sem nulla congue.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  text(s, 9.5451, 5.3957, 2.6072, 0.3366, '$429.00', { fontSize: 14, color: GOLD, fontFace: HEAD });
+  panel(s, 4.5619, 1.9661, 0.0276, 4.7436, SILVER);
+  panel(s, 8.7381, 1.9661, 0.0276, 4.7436, SILVER);
+  panel(s, 1.1811, 0, 10.9711, 0.1969, GOLD);
+  photo(s, 1.1811, 1.9661, 2.6072, 2.6063, SILVER);
+  photo(s, 5.3631, 1.9661, 2.6072, 2.6063, SILVER);
+  photo(s, 9.5451, 1.9661, 2.6072, 2.6063, SILVER);
+}
+
+// ---- Slide 36 — Sale 3 ----
+function slide36(s) {
+  text(s, 1.1811, 4.9838, 2.6072, 0.3702, 'Coffee table', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 1.1811, 5.8809, 2.6072, 0.8288,
+    'Vestibulum rutrum urna id commodo tincidunt enim orci efficitur consequat ipsum metus non nibh.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 1.1811, 5.3957, 2.6072, 0.3366, '$629.00', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'center' });
+  text(s, 5.3631, 4.9838, 2.6072, 0.3702, 'Relaxing armchair', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 5.3631, 5.8809, 2.6072, 0.8288,
+    'Etiam lectus ex hendrerit et velit porta, sollicitudin consectetur lacus nec efficitur tortor ut eros lorem.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 5.3631, 5.3957, 2.6072, 0.3366, '$989.00', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'center' });
+  text(s, 9.5451, 4.9838, 2.6072, 0.3702, 'Bedside cabinet', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 9.5451, 5.8809, 2.6072, 0.8288,
+    'Morbi eu pharetra metus cras vitae rhoncus urna aliquam dui magna enim faucibus vitae mattis massa.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 9.5451, 5.3957, 2.6072, 0.3366, '$679.00', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'center' });
+  panel(s, 4.5619, 1.9661, 0.0276, 4.7436, SILVER);
+  panel(s, 8.7381, 1.9661, 0.0276, 4.7436, SILVER);
+  panel(s, 1.1811, 0, 10.9711, 0.1969, GOLD);
+  photo(s, 1.1811, 1.9661, 2.6072, 2.6063, SILVER);
+  photo(s, 5.3631, 1.9661, 2.6072, 2.6063, SILVER);
+  photo(s, 9.5451, 1.9661, 2.6072, 2.6063, SILVER);
+}
+
+// ---- Slide 37 — Sale 4 ----
+function slide37(s) {
+  text(s, 1.1811, 4.9838, 2.6072, 0.3702, 'Kitchen chair', { fontSize: 16, fontFace: HEAD, align: 'right' });
+  text(s, 1.1811, 5.8809, 2.6072, 0.8288,
+    'Aenean non nunc diam et malesuada fames ac ante ipsum primis in faucibus vulputate.',
+    { fontSize: 10, color: SLATE, align: 'right', lineSpacingMultiple: 1.5 });
+  text(s, 1.1811, 5.3957, 2.6072, 0.3366, '$499.00', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'right' });
+  text(s, 5.3631, 4.9838, 2.6072, 0.3702, 'Elegant pouffe', { fontSize: 16, fontFace: HEAD, align: 'right' });
+  text(s, 5.3631, 5.8809, 2.6072, 0.8288,
+    'Duis semper nunc lectus tellus posuere ut donec at volutpat dolor cras et leo sed metus.',
+    { fontSize: 10, color: SLATE, align: 'right', lineSpacingMultiple: 1.5 });
+  text(s, 5.3631, 5.3957, 2.6072, 0.3366, '$259.00', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'right' });
+  text(s, 9.5451, 4.9838, 2.6072, 0.3702, 'Pleated vase', { fontSize: 16, fontFace: HEAD, align: 'right' });
+  text(s, 9.5451, 5.8809, 2.6072, 0.8288,
+    'Sed vitae convallis leo lorem ipsum dolor sit amet consectetur adipiscing elit etiam facilisis.',
+    { fontSize: 10, color: SLATE, align: 'right', lineSpacingMultiple: 1.5 });
+  text(s, 9.5451, 5.3957, 2.6072, 0.3366, '$129.00', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'right' });
+  panel(s, 4.5619, 1.9661, 0.0276, 4.7436, SILVER);
+  panel(s, 8.7381, 1.9661, 0.0276, 4.7436, SILVER);
+  panel(s, 1.1811, 0, 10.9711, 0.1969, GOLD);
+  photo(s, 1.1811, 1.9661, 2.6072, 2.6063, SILVER);
+  photo(s, 5.3631, 1.9661, 2.6072, 2.6063, SILVER);
+  photo(s, 9.5451, 1.9661, 2.6072, 2.6063, SILVER);
+}
+
+// ---- Slide 38 — List ----
+function slide38(s) {
+  panel(s, 0, 0, 13.3333, 7.5, INK);
+  text(s, 1.5748, 1.7389, 3.9108, 1.0434, ['Our product', 'list and prices'], { fontSize: 28, color: WHITE, fontFace: HEAD });
+  rule(s, 1.7011, 2.8656);
+  text(s, 1.5748, 3.2721, 3.9108, 2.489,
+    [
+      'Aliquam dictum sem sed tristique rhoncus augue purus, rutrum vehicula leo ultrices bibendum justo in nec magna fermentum euismod diam non, rhoncus felis.',
+      '',
+      'Nam tincidunt ultricies tincidunt finibus quam vitae condimentum tincidunt tellus augue fringilla enim, sit amet euismod.',
+    ],
+    { fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 });
+  photo(s, 7.0604, 0.7882, 5.4856, 5.9226);
+}
+
+// ---- Slide 39 — Front 1 ----
+function slide39(s) {
+  const head = ['Item name', 'Item No.', 'List price', 'Salon price'];
+  const rows = [
+    ['Lorem ipsum dolar', '15658', '$9 899.00', '$11 589.00'],
+    ['Sit amet donce', '12151', '$10 256.00', '$12 548.00'],
+    ['Donec viverra', '12158', '$5 656.00', '$7 895.00'],
+    ['Phasellus pellentesque', '00568', '$3 568.00', '$4 599.00'],
+    ['Sed scelerisque ipsum', '84852', '$2 889.00', '$3 200.00'],
+    ['Nam malesuada', '56656', '$7 458.00', '$8 955.00'],
+    ['Aliquam semper', '18990', '$458.00', '$569.00'],
+    ['Ut dictum tortor', '54578', '$1 548.00', '$1 786.00'],
+    ['Sed et molestie', '11124', '$259.00', '$299.00'],
+  ];
+  priceTable(s, 0.7874, 1.9423, head, rows);
+  text(s, 0.7874, 0.7874, 1.9685, 0.3702, 'Catalog prices', { fontSize: 16, fontFace: HEAD });
+  text(s, 5.4593, 0.8156, 7.0866, 0.5763,
+    'Donec malesuada felis ante, vel posuere neque egestas potenti mauris ipsum nulla, ultricies id imperdiet at varius non vel purus pretium, eleifend nunc ac, vestibulum tortor ex nulla, vestibulum.',
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+}
+
+// ---- Slide 40 — Team 1 ----
+function slide40(s) {
+  text(s, 9.5451, 4.9838, 2.6072, 0.3702, 'Daniel Stone', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 9.5451, 5.8809, 2.6072, 0.8288,
+    'Sed pretium auctor tellus et lacinia dignissim dui tempor odio maximus varius ultricies sapien sodales.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 9.5451, 5.3957, 2.6072, 0.3366, 'Founder', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'center' });
+  text(s, 1.1811, 2.0816, 7.1829, 1.0434, ['Meet our team of', 'creative designers'], { fontSize: 28, fontFace: HEAD });
+  rule(s, 1.3074, 3.2083);
+  text(s, 1.1811, 3.6148, 7.1829, 3.0949,
+    [
+      'Etiam at felis fermentum, ultrices erat nec, volutpat nisl tortor metus, egestas sit amet arcu a, iaculis sagittis dolor vestibulum tellus metus, eu pulvinar sapien hendrerit porta felis id nunc accumsan in faucibus purus eleifend ante ipsum primis.',
+      '',
+      'Duis erat eros, pulvinar eget sem donce placerat porttitor nisi nullam vulputate orci non egestas malesuada quisque ornare turpis tortor, at finibus nibh lobortis vel aliquam nisi dui, cursus tincidunt venenatis ultrices, finibus quis lacus.',
+      '',
+      'Aenean sed ex consequat, feugiat purus vitae, laoreet sapien etiam aliquam urna et iaculis dictum fusce at nisi nec nulla rhoncus feugiat vitae id enim. ',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  panel(s, 1.1811, 0, 5.4856, 0.1969, GOLD);
+  photo(s, 9.5451, 0.7874, 2.6072, 3.785);
+}
+
+// ---- Slide 41 — Team 2 ----
+function slide41(s) {
+  text(s, 1.1811, 4.9838, 2.6072, 0.3702, 'Robert Williams', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 1.1811, 5.8809, 2.6072, 0.8288,
+    'Praesent id velit congue, cursus quam eget volutpat purus fusce ut justo elit mattis sem et digniss.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 1.1811, 5.3957, 2.6072, 0.3366, 'Architect', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'center' });
+  text(s, 5.3631, 4.9838, 2.6072, 0.3702, 'Kate McFly', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 5.3631, 5.8809, 2.6072, 0.8288,
+    'Donec at sagittis elit sed finibus sapien fusce massa arcu interdum et ante tristique hendrerit.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 5.3631, 5.3957, 2.6072, 0.3366, 'Designer', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'center' });
+  text(s, 9.5451, 4.9838, 2.6072, 0.3702, 'Sandra Rain', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 9.5451, 5.8809, 2.6072, 0.8288,
+    'Proin nec interdum lacus venenatis accumsan lacus id ipsum feugiat suscipit orci nec fermentum.',
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 9.5451, 5.3957, 2.6072, 0.3366, 'Marketing', { fontSize: 14, color: GOLD, fontFace: HEAD, align: 'center' });
+  panel(s, 1.1811, 0, 10.9711, 0.1969, GOLD);
+  photo(s, 1.1811, 1.9661, 2.6072, 2.6063);
+  photo(s, 5.3631, 1.9661, 2.6072, 2.6063);
+  photo(s, 9.5451, 1.9661, 2.6072, 2.6063);
+}
+
+// ---- Slide 42 — Contact 1 ----
+function slide42(s) {
+  panel(s, 0, 0, 4.7244, 7.5, MIST);
+  text(s, 8.2677, 2.0347, 4.2782, 0.5722, 'Contact us', { fontSize: 28, fontFace: HEAD });
+  text(s, 8.2677, 2.9763, 4.2782, 2.489,
+    [
+      'Minerva Rd, Farnworth,',
+      'Bolton BL 0JR, United Kingdom',
+      '',
+      'contact@yourdomain.com',
+      'www.yourdomain.com',
+      '',
+      '+44 1204 390390',
+      '+44 1204 380380',
+    ],
+    { fontSize: 12, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 0.7874, 0.7874, 5.8793, 5.9252);
+}
+
+// ---- Slide 43 — Contact 2 ----
+function slide43(s) {
+  text(s, 0.7874, 6.376, 11.7585, 0.3366, 'www.yourdomain.com', { fontSize: 14, fontFace: HEAD, align: 'center' });
+  photo(s, 0.3937, 0.3937, 12.5459, 5.1316);
+}
+
+// ---- Slide 44 — Contact 3 ----
+function slide44(s) {
+  panel(s, 0, 2.7618, 13.3333, 4.7382, MIST);
+  panel(s, 6.6667, 7.3031, 5.8716, 0.1969, GOLD);
+  text(s, 1.5671, 3.75, 3.5248, 0.3702, 'Contact us', { fontSize: 16, fontFace: HEAD });
+  text(s, 1.5671, 4.2765, 3.5248, 2.091,
+    [
+      'Minerva Rd, Farnworth,',
+      'Bolton BL 0JR, United Kingdom',
+      '',
+      'contact@yourdomain.com',
+      'www.yourdomain.com',
+      '',
+      '+44 1204 390390',
+      '+44 1204 380380',
+    ],
+    { fontSize: 10, color: SLATE, lineSpacingMultiple: 1.5 });
+  photo(s, 6.6744, 1.966, 5.8639, 4.7382);
+}
+
+// ---- Slide 45 — Front 1 ----
+function slide45(s) {
+  panel(s, 0, 0, 13.3333, 4.767, MIST);
+  wordmark(s, 5.8905, 2.1179);
+  text(s, 0.7874, 5.6098, 3.3946, 0.3702, 'Address', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 0.7874, 6.1363, 3.3946, 0.5763,
+    [
+      'Minerva Rd, Farnworth,',
+      'Bolton BL 0JR, United Kingdom',
+    ],
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 4.9694, 5.6098, 3.3946, 0.3702, 'E-mail and Web', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 4.9694, 6.1363, 3.3946, 0.5763,
+    [
+      'contact@yourdomain.com',
+      'www.yourdomain.com',
+    ],
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+  text(s, 9.1514, 5.6098, 3.3946, 0.3702, 'Phone', { fontSize: 16, fontFace: HEAD, align: 'center' });
+  text(s, 9.1514, 6.1363, 3.3946, 0.5763,
+    [
+      '+44 1204 390390',
+      '+44 1204 380380',
+    ],
+    { fontSize: 10, color: SLATE, align: 'center', lineSpacingMultiple: 1.5 });
+}
+
+
+// ── Build ───────────────────────────────────────────────────────────────────
+
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27,
+  slide28, slide29, slide30, slide31, slide32, slide33, slide34, slide35, slide36,
+  slide37, slide38, slide39, slide40, slide41, slide42, slide43, slide44, slide45,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'INTERIORCH', width: 13.3333, height: 7.5 });
+pptx.layout = 'INTERIORCH';
+pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+pptx.author = 'Interiorch Studio';
+pptx.title = 'Architecture and Interior Design Presentation';
+
+SLIDES.forEach(build => build(pptx.addSlide()));
+
+const outFile = path.join(__dirname, '0a19c73e-920d-4f39-be4a-812870dcc21b_grok_final.pptx');
+pptx.writeFile({ fileName: outFile }).then(() => console.log('wrote ' + outFile));

@@ -1,0 +1,609 @@
+/**
+ * Scent Bliss — perfume brand deck (20 slides, 13.333in x 7.5in)
+ * Rebuilt with pptxgenjs. Photographs in the source deck are replaced by
+ * light-grey "[image]" placeholder shapes of matching size and outline.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const TEAL = '006577'; // theme accent1
+const TEAL_D = '004C59'; // accent1 lumMod 75%
+const TEAL_XD = '00323C'; // accent1 lumMod 50%
+const SKY = '9EC7D5'; // accent2
+const PALE = 'C4E0EB'; // accent3
+const ICE = 'B1F3FF';
+const MIST = 'ECF4F7';
+const WHITE = 'FFFFFF';
+const INK = '262626'; // tx1 lumMod 85%
+const IMG_FILL = 'CCCCCC'; // photo placeholder
+const IMG_TEXT = 'AFAFAF';
+
+const SERIF = 'Playfair Display';
+const SANS = 'Work Sans';
+const SANS_SB = 'Work Sans SemiBold';
+const SANS_O = 'Open Sans';
+
+const BODY = { fontFace: SANS, fontSize: 10.5, color: INK };
+const LEAD = { fontFace: SANS, fontSize: 18, bold: true, color: TEAL_XD };
+
+/* -------------------------------------------------------- generic helpers */
+
+const INSET = [7.2, 7.2, 3.6, 3.6]; // pt: left, right, bottom, top — PowerPoint default
+
+// Text block. The source deck uses auto-fit text boxes anchored at the top.
+function text(slide, runs, x, y, w, h, opt) {
+  slide.addText(runs, Object.assign({ x, y, w, h, valign: 'top', wrap: true, margin: INSET }, opt || {}));
+}
+
+// Paragraph of 10.5pt body copy (justified, 1.5 line spacing) as in the deck.
+function para(slide, str, x, y, w, h, opt) {
+  text(slide, str, x, y, w, h,
+    Object.assign({}, BODY, { align: 'justify', lineSpacingMultiple: 1.5 }, opt || {}));
+}
+
+// Two-tone 40pt Playfair section heading, e.g. "OUR" + "TEAM".
+function heading(slide, first, second, x, y, w, h, c1, c2, opt) {
+  const runs = [{ text: first, options: { color: c1 || TEAL_D } }];
+  if (second) runs.push({ text: second, options: { color: c2 || TEAL_XD } });
+  text(slide, runs, x, y, w, h,
+    Object.assign({ fontFace: SERIF, fontSize: 40, bold: true }, opt || {}));
+}
+
+// "INFOGRAPHIC SECTION" title shared by slides 9-18.
+function infoTitle(slide) {
+  heading(slide, 'INFOGRAPHIC SECTION ', null, 2.247, 1.515, 8.84, 0.774, TEAL_D, null,
+    { align: 'center' });
+}
+
+// Scale a normalised path ([x,y] line / [x,y,x1,y1,x2,y2] cubic / [] close /
+// [x,y,1] moveTo) into a pptxgenjs points array placed at x,y with size w,h.
+function poly(pts, x, y, w, h) {
+  return pts.map(function (p) {
+    if (p.length === 0) return { close: true };
+    const px = x + p[0] * w, py = y + p[1] * h;
+    if (p.length === 6) {
+      return { x: px, y: py, curve: { type: 'cubic', x1: x + p[2] * w, y1: y + p[3] * h, x2: x + p[4] * w, y2: y + p[5] * h } };
+    }
+    if (p.length === 3) return { x: px, y: py, moveTo: true };
+    return { x: px, y: py };
+  });
+}
+
+function shape(slide, kind, x, y, w, h, opt) {
+  slide.addShape(kind, Object.assign({ x, y, w, h }, opt || {}));
+}
+
+// Freeform shape from a normalised path.
+function form(slide, pts, x, y, w, h, opt) {
+  slide.addShape('custGeom', Object.assign({ x, y, w, h, points: poly(pts, 0, 0, w, h) }, opt || {}));
+}
+
+/* ------------------------------------------------------- photo placeholders */
+
+function imgLabel(slide, x, y, w, h) {
+  if (w < 0.75 || h < 0.3) return;
+  slide.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: SANS, fontSize: Math.min(12, Math.max(8, h * 4)), color: IMG_TEXT
+  });
+}
+
+// Rectangular photo placeholder (r = corner radius in inches, 0 = square).
+function imgBox(slide, x, y, w, h, r) {
+  shape(slide, r ? 'roundRect' : 'rect', x, y, w, h, { fill: { color: IMG_FILL }, rectRadius: r });
+  imgLabel(slide, x, y, w, h);
+}
+
+// Free-form photo placeholder (arch shapes etc).
+function imgForm(slide, pts, x, y, w, h, opt) {
+  form(slide, pts, x, y, w, h, Object.assign({ fill: { color: IMG_FILL } }, opt || {}));
+  imgLabel(slide, x, y, w, h);
+}
+
+/* ------------------------------------------------------------ shared motifs */
+
+// magnifier glass used in the nav bar
+const SEARCH_ICON = [[0.991, 0.852, 1], [0.817, 0.678], [0.887, 0.435, 0.861, 0.609, 0.887, 0.522], [0.443, 0, 0.887, 0.191, 0.687, 0], [0, 0.435, 0.2, 0, 0, 0.191], [0.443, 0.878, 0, 0.678, 0.2, 0.878], [0.678, 0.809, 0.53, 0.878, 0.617, 0.852], [0.852, 0.983], [0.904, 0.983, 0.87, 1, 0.887, 1], [0.991, 0.896], [0.991, 0.852, 1, 0.878, 1, 0.861], [], [0.443, 0.757, 1], [0.13, 0.435, 0.27, 0.757, 0.13, 0.609], [0.443, 0.122, 0.13, 0.261, 0.27, 0.122], [0.757, 0.435, 0.617, 0.122, 0.757, 0.261], [0.443, 0.757, 0.757, 0.609, 0.617, 0.757], []];
+
+const NAV_LINKS = [
+  ['Home', 4.292, 0.227, 0.654, 0.278],
+  ['Shop', 5.078, 0.227, 0.654, 0.278],
+  ['About Us', 5.865, 0.227, 0.938, 0.278],
+  ['Portfolio', 6.935, 0.223, 0.938, 0.285],
+  ['Project ', 8.005, 0.227, 0.764, 0.278],
+  ['Contact Us', 8.901, 0.225, 1.202, 0.278]
+];
+
+// Top navigation bar; on the dark slides some labels turn white.
+function navbar(slide, brand, linkColors) {
+  shape(slide, 'roundRect', 10.991, 0.213, 1.202, 0.311,
+    { fill: { color: WHITE }, line: { color: TEAL, width: 1 }, rectRadius: 0.052 });
+  text(slide, 'SCENT BLISS', 1.063, 0.201, 2.337, 0.404,
+    { fontFace: SANS, fontSize: 18, bold: true, color: brand || TEAL });
+  NAV_LINKS.forEach(function (l, i) {
+    text(slide, l[0], l[1], l[2], l[3], l[4],
+      { fontFace: SANS, fontSize: 10.5, color: linkColors ? linkColors[i] : TEAL });
+  });
+  text(slide, 'Search ', 11.29, 0.225, 0.816, 0.278,
+    { fontFace: SANS_SB, fontSize: 10.5, color: TEAL, align: 'center' });
+  form(slide, SEARCH_ICON, 11.163, 0.281, 0.165, 0.165, { fill: { color: TEAL } });
+  slide.addShape('line', { x: 0.378, y: 0.8, w: 12.598, h: 0, line: { color: TEAL, width: 0.5 } });
+}
+
+// Six-oval flower motif. s = overall width; the shape is 0.927 * s tall.
+const PETALS = [[0, 0.287], [0.228, 0], [0.496, 0.053], [0.539, 0.313], [0.23, 0.466]];
+function flower(slide, x, y, s, petal, center) {
+  const p = 0.459 * s;
+  PETALS.slice(0, 3).forEach(function (d) { shape(slide, 'ellipse', x + d[0] * s, y + d[1] * s, p, p, { fill: { color: petal } }); });
+  shape(slide, 'ellipse', x + 0.347 * s, y + 0.242 * s, 0.276 * s, 0.276 * s, { fill: { color: center } });
+  PETALS.slice(3).forEach(function (d) { shape(slide, 'ellipse', x + d[0] * s, y + d[1] * s, p, p, { fill: { color: petal } }); });
+}
+
+// Scattered petal cluster (teardrops) used in several corners of the deck.
+const DROPS = [
+  [0.963, 0.327, 0.576, 0.458, 0, SKY],
+  [0, 0, 0.473, 0.438, 270, SKY],
+  [0.381, 0.683, 0.253, 0.312, 75, PALE],
+  [-0.481, 0.431, 0.253, 0.312, 35, PALE],
+  [0.894, -0.124, 0.253, 0.312, 198, PALE]
+];
+function drops(slide, ax, ay, which) {
+  (which || [0, 1, 2, 3, 4]).forEach(function (i) {
+    const d = DROPS[i];
+    shape(slide, 'teardrop', ax + d[0], ay + d[1], d[2], d[3], { fill: { color: d[5] }, rotate: d[4] });
+  });
+}
+
+/* -------------------------------------------------------------- slide 1..8 */
+
+function slide1(s) {
+  navbar(s);
+  shape(s, 'teardrop', 6.773, 1.622, 1.614, 1.281, { fill: { color: TEAL } });
+  imgForm(s, [[0.5, 0, 1], [0.986, 0.507, 0.991, 0.169, 0.986, 0.338], [0.493, 1, 0.986, 0.779, 0.766, 1], [0, 0.507, 0.221, 1, 0, 0.779], [0.493, 0.014, 0, 0.234, 0.221, 0.014], [1, 0, 0.662, 0.014, 0.831, 0.009], []], 6.722, 1.734, 1.532, 1.216);
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore e', 1.092, 1.508, 4.808, 0.601);
+  text(s, 'BLISS', 8.608, 1.622, 3.953, 1.616, { fontFace: SERIF, fontSize: 90, bold: true, color: TEAL });
+  text(s, 'SCENT', 6.539, 3.095, 4.592, 1.616, { fontFace: SERIF, fontSize: 90, bold: true, color: TEAL_D });
+  text(s, 'Fragrance Perfume ', 10.837, 3.55, 1.447, 0.707, { fontFace: SANS, fontSize: 18, bold: true, color: TEAL });
+  text(s, 'What kind of smell is this?', 1.063, 2.578, 3.514, 0.404, { fontFace: SERIF, fontSize: 18, bold: true, color: TEAL_D });
+  text(s, 'Mmhh, Smell like a joy isn\u2019t?', 1.063, 5.769, 3.514, 0.404, { fontFace: SERIF, fontSize: 18, bold: true, color: TEAL_D });
+  imgBox(s, 1.12, 3.111, 1.641, 2.43, 0.362);
+  imgBox(s, 3.136, 3.111, 1.944, 2.43, 0.429);
+  [5.9, 8.038, 10.177].forEach(function (x) { imgBox(s, x, 5.386, 2.023, 0.759, 0.168); });
+}
+
+function slide2(s) {
+  navbar(s);
+  heading(s, 'ABOUT ', 'US', 1.135, 1.29, 3.157, 0.774);
+  text(s, 'Welcome to Our perfumery', 1.063, 2.197, 4.016, 0.404, LEAD);
+  flower(s, 4.338, 1.488, 0.508, SKY, TEAL);
+  flower(s, 5.114, 1.825, 0.378, SKY, TEAL);
+  imgBox(s, 1.106, 2.917, 2.17, 3.986, 0.479);
+  imgBox(s, 3.478, 3.461, 2.387, 3.442, 0.527);
+  imgBox(s, 6.2, 1.392, 2.387, 2.357, 0.315);
+  imgBox(s, 8.358, 1.393, 2.931, 2.357, 0);
+  imgBox(s, 10.946, 1.393, 2.387, 2.357, 0.315);
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', 6.625, 4.414, 5.646, 0.601);
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut nisi ut aliquip ex deserunt mollit anim consectetur adipiscing elit,', 6.611, 5.226, 5.66, 0.867);
+  drops(s, 10.857, 6.14);
+}
+
+function slide3(s) {
+  shape(s, 'roundRect', 10.664, 1.371, 2.673, 2.736, { fill: { color: TEAL }, rectRadius: 0.073 });
+  shape(s, 'roundRect', -0.002, 1.416, 2.673, 2.736, { fill: { color: TEAL }, rectRadius: 0.073 });
+  shape(s, 'roundRect', 7.208, 4.346, 6.125, 2.579, { fill: { color: TEAL }, rectRadius: 0.344 });
+  shape(s, 'roundRect', 0, 1.417, 5.131, 2.736, { fill: { color: TEAL }, rectRadius: 0.365 });
+  shape(s, 'roundRect', 8.203, 1.362, 5.131, 2.736, { fill: { color: TEAL }, rectRadius: 0.365 });
+  navbar(s);
+  imgBox(s, 5.237, 1.381, 2.858, 2.736, 0.365);
+  imgBox(s, 0, 4.351, 7.03, 2.466, 0.33);
+  heading(s, 'VISI', 'ON AND ', 8.144, 4.778, 4.91, 1.447, WHITE, PALE);
+  text(s, [{ text: 'MISSI', options: { color: WHITE } }, { text: 'ON', options: { color: PALE } }],
+    8.144, 5.478, 4.91, 0.747, { fontFace: SERIF, fontSize: 40, bold: true });
+  [['Vision', 1.063, 1.014], ['Mission', 9.281, 9.232]].forEach(function (c) {
+    text(s, c[0], c[1], 2.104, 1.285, 0.404, { fontFace: SANS, fontSize: 18, bold: true, color: WHITE });
+    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt', c[2], 2.556, 3.012, 0.867, { color: WHITE });
+  });
+  drops(s, 11.551, 5.779);
+  flower(s, 4.172, 1.798, 0.508, SKY, TEAL);
+  flower(s, 3.718, 1.675, 0.252, SKY, TEAL);
+  flower(s, 4.587, 2.481, 0.294, SKY, TEAL);
+  flower(s, 12.365, 1.892, 0.508, SKY, TEAL);
+  flower(s, 11.911, 1.768, 0.252, SKY, TEAL);
+  flower(s, 12.781, 2.575, 0.294, SKY, TEAL);
+}
+
+function slide4(s) {
+  shape(s, 'rect', 2.236, 6.834, 11.097, 0.675, { fill: { color: TEAL } });
+  shape(s, 'rect', 0, 3.765, 2.957, 3.749, { fill: { color: TEAL } });
+  navbar(s);
+  heading(s, 'OUR ', 'FACILITIES', 1.052, 1.623, 3.511, 1.447);
+  shape(s, 'roundRect', 5.581, 1.392, 7.752, 2.357, { fill: { color: TEAL }, rectRadius: 0.315 });
+  imgBox(s, 0.37, 3.734, 3.019, 3.116, 0.667);
+  imgBox(s, 4.681, 1.39, 2.661, 2.385, 0.319);
+  imgBox(s, 7.677, 1.393, 2.661, 2.357, 0.315);
+  imgBox(s, 10.672, 1.393, 2.661, 2.357, 0.315);
+  flower(s, 0.443, 3.477, 0.508, SKY, TEAL);
+  flower(s, 0.198, 3.99, 0.378, SKY, TEAL);
+  const FACILITIES = [['01.', 'First ', 'Facility', 4.049], ['02.', 'Second ', 'Facility', 7.048], ['03.', 'Third ', 'Facility', 10.047]];
+  FACILITIES.forEach(function (f) {
+    text(s, f[0], f[3] + 0.009, 4.114, 0.721, 0.523,
+      { fontFace: SANS, fontSize: 18, bold: true, color: INK, lineSpacingMultiple: 1.5 });
+    text(s, [{ text: f[1], options: { breakLine: true } }, { text: f[2] }], f[3] + 0.514, 4.094, 1.72, 0.959,
+      { fontFace: SANS, fontSize: 18, bold: true, color: INK, lineSpacingMultiple: 1.5 });
+    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod', f[3], 5.201, 2.243, 0.867);
+  });
+  drops(s, 3.044, 6.379, [1, 2, 3]);
+}
+
+function slide5(s) {
+  navbar(s);
+  heading(s, 'OUR ', 'PRODUCT', 1.062, 1.387, 4.712, 0.774);
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut nisi ut aliquip ex', 5.865, 1.421, 6.234, 0.601);
+  s.addShape('line', { x: 0, y: 2.967, w: 0.787, h: 0, line: { color: TEAL, width: 0.5 } });
+  s.addShape('line', { x: 3.844, y: 2.973, w: 9.449, h: 0, line: { color: TEAL, width: 0.5 } });
+  text(s, 'Simple Text Here', 1.16, 2.756, 2.561, 0.404, { fontFace: SANS, fontSize: 18, bold: true, color: INK });
+  shape(s, 'roundRect', 0, 3.765, 0.45, 3.182, { fill: { color: TEAL }, rectRadius: 0.225 });
+  imgBox(s, 0.604, 3.755, 3.019, 3.116, 0.667);
+  imgBox(s, 3.123, 3.763, 4.039, 3.116, 0);
+  imgBox(s, 6.549, 3.776, 3.019, 3.116, 0.667);
+  imgBox(s, 9.819, 3.798, 3.31, 3.116, 0.661);
+  flower(s, 0.503, 3.662, 0.508, SKY, TEAL);
+  flower(s, 0.198, 4.028, 0.378, SKY, TEAL);
+}
+
+// arch: rounded top, square bottom
+const ARCH = [[0.5, 0, 1], [1, 0.291, 0.776, 0, 1, 0.13], [1, 1], [0, 1], [0, 0.291], [0.5, 0, 0, 0.13, 0.224, 0], []];
+// arch turned on its side: rounded left edge
+const ARCH_L = [[0.291, 0, 1], [1, 0], [1, 1], [0.291, 1], [0, 0.5, 0.13, 1, 0, 0.776], [0.291, 0, 0, 0.224, 0.13, 0], []];
+
+function slide6(s) {
+  navbar(s);
+  heading(s, 'OUR ', 'TEAM', 1.035, 2.817, 3.604, 0.774);
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ', 1.076, 3.761, 2.59, 0.601);
+  [4.452, 7.185, 9.918].forEach(function (x, i) { imgForm(s, ARCH, x, 1.517, i === 2 ? 2.413 : 2.399, 3.839); });
+  s.addShape('line', { x: 1.517, y: 5.322, w: 11.811, h: 0, line: { color: TEAL, width: 0.5 } });
+  [['Esther', 4.626, 5.637], ['Lusi ', 7.394, 5.639], ['Lulu', 10.092, 5.631]].forEach(function (m) {
+    shape(s, 'roundRect', m[1], m[2], 2.051, 0.612, { fill: { color: WHITE }, rectRadius: 0.188, shadow: { type: 'outer', color: '000000', opacity: 0.2, blur: 50, offset: 20, angle: 45 } });
+    text(s, m[0], m[1], m[2], 2.051, 0.612, { fontFace: SANS, fontSize: 18, bold: true, color: TEAL, align: 'center', valign: 'middle' });
+  });
+  flower(s, 3.665, 1.685, 0.508, SKY, TEAL);
+  flower(s, 4.302, 2.281, 0.378, SKY, TEAL);
+  flower(s, 3.561, 2.419, 0.237, SKY, TEAL);
+}
+
+const BAND = [[0.881, 1, 1], [0, 0.999], [0, 0], [0.881, 0.001], [1, 0.5, 0.947, 0.001, 1, 0.225], [0.881, 1, 1, 0.776, 0.947, 1], []];
+const SVC_TOGGLE = [[0.305, 0, 1], [0.683, 0], [1, 0.49, 0.854, 0, 1, 0.216], [0.683, 1, 1, 0.765, 0.854, 1], [0.305, 1], [0, 0.49, 0.134, 1, 0, 0.765], [0.305, 0, 0, 0.216, 0.134, 0], [], [0.939, 0.49, 1], [0.683, 0.098, 0.939, 0.275, 0.829, 0.098], [0.439, 0.49, 0.549, 0.098, 0.439, 0.275], [0.683, 0.902, 0.439, 0.725, 0.549, 0.902], [0.939, 0.49, 0.829, 0.902, 0.939, 0.725], []];
+const SVC_STAR = [[0.5, 0, 1], [0, 0.5, 0.224, 0, 0, 0.224], [0.5, 1, 0, 0.776, 0.224, 1], [1, 0.5, 0.776, 1, 1, 0.776], [0.5, 0, 1, 0.224, 0.776, 0], [], [0.733, 0.828, 1], [0.5, 0.655], [0.267, 0.828], [0.353, 0.552], [0.121, 0.388], [0.414, 0.388], [0.5, 0.112], [0.586, 0.388], [0.871, 0.388], [0.647, 0.552], [0.733, 0.828], []];
+const SVC_THUMB = [[0.25, 0.871, 1], [0.219, 0.919, 0.25, 0.903, 0.234, 0.919], [0.031, 0.919], [0, 0.871, 0.016, 0.919, 0, 0.903], [0, 0.468], [0.031, 0.419, 0, 0.435, 0.016, 0.419], [0.219, 0.419], [0.25, 0.468, 0.234, 0.419, 0.25, 0.435], [0.25, 0.871], [], [0.969, 0.565, 1], [0.953, 0.694, 0.969, 0.645, 0.969, 0.677], [0.953, 0.774], [0.922, 0.839, 0.938, 0.79, 0.938, 0.823], [0.891, 0.952, 0.922, 0.887, 0.906, 0.919], [0.766, 1, 0.859, 0.984, 0.812, 1], [0.672, 1], [0.438, 0.952, 0.594, 1, 0.5, 0.968], [0.344, 0.919, 0.391, 0.935, 0.359, 0.919], [0.297, 0.871, 0.312, 0.919, 0.297, 0.903], [0.297, 0.468], [0.328, 0.419, 0.297, 0.435, 0.312, 0.419], [0.453, 0.306, 0.359, 0.419, 0.422, 0.339], [0.516, 0.226, 0.469, 0.274, 0.484, 0.242], [0.547, 0.129, 0.531, 0.21, 0.547, 0.161], [0.594, 0.016, 0.562, 0.081, 0.562, 0.048], [0.625, 0, 0.594, 0.016, 0.609, 0], [0.766, 0.177, 0.766, 0, 0.766, 0.129], [0.703, 0.339, 0.766, 0.226, 0.719, 0.306], [0.875, 0.339], [1, 0.468, 0.938, 0.339, 1, 0.403], [0.969, 0.565, 1, 0.5, 0.984, 0.532], []];
+const SVC_CAL = [[1, 0.931, 1], [0.91, 1, 1, 0.972, 0.955, 1], [0.075, 1], [0, 0.931, 0.03, 1, 0, 0.972], [0, 0.222], [0.075, 0.153, 0, 0.181, 0.03, 0.153], [0.149, 0.153], [0.149, 0.097], [0.239, 0, 0.149, 0.042, 0.194, 0], [0.284, 0], [0.373, 0.097, 0.343, 0, 0.373, 0.042], [0.373, 0.153], [0.612, 0.153], [0.612, 0.097], [0.701, 0, 0.612, 0.042, 0.657, 0], [0.746, 0], [0.836, 0.097, 0.791, 0, 0.836, 0.042], [0.836, 0.153], [0.91, 0.153], [1, 0.222, 0.955, 0.153, 1, 0.181], [1, 0.931], [], [0.91, 0.931, 1], [0.91, 0.361], [0.075, 0.361], [0.075, 0.931], [0.91, 0.931], []];
+
+function slide7(s) {
+  shape(s, 'round2SameRect', 4.435, -1.399, 7.508, 10.289, { fill: { color: TEAL }, rotate: 270 });
+  imgForm(s, ARCH, 0, 2.191, 4.292, 5.309);
+  navbar(s, TEAL, [WHITE, WHITE, WHITE, WHITE, WHITE, WHITE]);
+  drops(s, 2.175, 1.655, [1, 2, 3]);
+  [5.169, 7.703, 9.966].forEach(function (x, i) { imgForm(s, ARCH_L, x, i === 2 ? 1.413 : (i === 1 ? 1.402 : 1.411), 3.351, i === 0 ? 2.072 : 2.081); });
+  form(s, BAND, 5.166, 1.397, 8.165, 2.107, { fill: { color: TEAL, transparency: 25 }, rotate: 180 });
+  heading(s, 'OUR', ' TEAM', 5.786, 2.008, 3.604, 0.774, PALE, WHITE);
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod', 8.927, 2.112, 3.351, 0.601, { color: WHITE });
+  const SERVICES = [
+    [SVC_TOGGLE, 5.884, 4.594, 0.406, 0.252, 'Service 1', 6.538, 4.544],
+    [SVC_CAL, 5.92, 5.734, 0.333, 0.358, 'Service 2', 6.547, 5.772],
+    [SVC_THUMB, 8.989, 4.483, 0.319, 0.308, 'Service 3', 9.636, 4.516],
+    [SVC_STAR, 9.017, 5.72, 0.36, 0.36, 'Service 4', 9.644, 5.744]
+  ];
+  SERVICES.forEach(function (v) {
+    form(s, v[0], v[1], v[2], v[3], v[4], { fill: { color: SKY } });
+    text(s, v[5], v[6], v[7], 1.88, 0.404, { fontFace: SANS_SB, fontSize: 18, color: WHITE });
+  });
+}
+
+function slide8(s) {
+  navbar(s);
+  text(s, [{ text: 'OUR                     ', options: { color: TEAL_D } }, { text: 'PORTFOLIO', options: { color: TEAL_XD } }],
+    5.41, 1.262, 3.604, 1.447, { fontFace: SERIF, fontSize: 40, bold: true, align: 'right' });
+  s.addShape('line', { x: 1.138, y: 1.656, w: 0.787, h: 0, line: { color: TEAL, width: 0.5 } });
+  s.addShape('line', { x: 4.996, y: 1.649, w: 2.362, h: 0, line: { color: TEAL, width: 0.5 } });
+  text(s, 'Simple Text Here', 2.298, 1.446, 2.561, 0.404, { fontFace: SANS, fontSize: 18, bold: true, color: INK });
+  flower(s, 3.572, 2.281, 0.508, SKY, TEAL);
+  imgBox(s, 0.72, 2.972, 3.019, 3.899, 0.667);
+  imgBox(s, 3.917, 2.949, 5.196, 3.917, 0.865);
+  imgBox(s, 9.295, 1.351, 3.318, 1.635, 0.361);
+  imgBox(s, 9.295, 3.081, 3.318, 2.072, 0.458);
+  imgBox(s, 9.295, 5.267, 3.318, 1.635, 0.361);
+}
+
+/* ------------------------------------------------ slides 9..18 infographics */
+
+function slide9(s) {
+  navbar(s);
+  infoTitle(s);
+  // pill + an "X" cross built from four rotated ellipse petals
+  const X_PETALS = [[0, 0, 314.98, false], [0.399, 0, 44.98, false],
+    [0, 0.399, 44.98, true], [0.399, 0.399, 314.98, true]];
+  const ROWS = [
+    // pill x/y, colour, cross x/y, label x/y, caption x/y
+    [1.158, 5.418, TEAL, 4.807, 5.323, 4.724, 4.749, 1.082, 3.730],
+    [3.648, 4.528, SKY, 2.764, 4.436, 2.234, 5.654, 3.369, 2.799],
+    [6.160, 3.659, TEAL, 9.785, 3.577, 7.217, 3.873, 6.168, 5.526],
+    [8.629, 2.779, SKY, 7.767, 2.705, 9.707, 2.969, 8.419, 4.659]
+  ];
+  ROWS.forEach(function (r) {
+    const c = r[2];
+    shape(s, 'roundRect', r[0], r[1], 3.547, 0.806, { fill: { color: c }, rectRadius: 0.403 });
+    X_PETALS.forEach(function (d) {
+      shape(s, 'ellipse', r[3] + d[0], r[4] + d[1], 0.377, 0.569,
+        { fill: { color: c }, rotate: d[2], flipV: d[3] });
+    });
+    text(s, 'Title Here', r[5], r[6], 1.395, 0.37, { fontFace: SANS, fontSize: 16, bold: true, color: WHITE });
+    para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing ceask elit maecenas dolor porttitor', r[7], r[8], 3.819, 0.603, { fontFace: SANS_O });
+  });
+}
+
+function slide10(s) {
+  navbar(s);
+  infoTitle(s);
+  const COLS = [
+    [1.167, 2.952, TEAL, 1.663, 1.19, 1.343, 'Lorem ipsum dolor sit amet, est consectetuer ceask dolor consectetuer adipiscing ceask elit maecenas ceask dolor porttitor ceask'],
+    [4.034, 2.96, SKY, 4.515, 4.063, 4.199, 'Lorem ipsum dolor sit amet, est consectetuer ceask dolor consectetuer adipiscing ceask elit maecenas ceask dolor porttitor ceask.'],
+    [6.902, 2.967, TEAL, 7.376, 6.937, 7.06, 'Lorem ipsum dolor sit amet, est consectetuer ceask dolor consectetuer adipiscing ceask elit maecenas ceask dolor porttitor ceask'],
+    [9.77, 2.975, SKY, 10.237, 9.81, 9.921, 'Lorem ipsum dolor sit amet, est consectetuer ceask dolor consectetuer adipiscing ceask elit maecenas ceask dolor porttitor ceask']
+  ];
+  COLS.forEach(function (c) {
+    shape(s, 'wedgeRoundRectCallout', c[0], c[1], 2.357, 0.771, { fill: { color: c[2] } });
+    text(s, 'Title Here', c[3], 3.149, 1.395, 0.37, { fontFace: SANS, fontSize: 16, bold: true, color: WHITE });
+    shape(s, 'roundRect', c[4], 4.167, 2.357, 2.369, { fill: { type: 'none' }, line: { color: c[2], width: 1.5 }, rectRadius: 0.393 });
+    para(s, c[6], c[5], 4.413, 2.139, 1.84, { fontFace: SANS_O, shape: 'roundRect' });
+  });
+}
+
+const PUZZLE = [[1, 0.267, 1], [1, 0.429], [0.983, 0.435], [0.95, 0.438, 0.972, 0.437, 0.961, 0.438], [0.86, 0.41, 0.917, 0.438, 0.886, 0.428], [0.853, 0.404], [0.845, 0.407], [0.774, 0.514, 0.802, 0.43, 0.774, 0.469], [0.845, 0.621, 0.774, 0.558, 0.802, 0.597], [0.846, 0.621], [0.86, 0.609], [0.95, 0.581, 0.886, 0.591, 0.917, 0.581], [0.998, 0.588, 0.967, 0.581, 0.983, 0.583], [1, 0.589], [1, 0.742], [0.843, 0.861, 1, 0.808, 0.93, 0.861], [0.591, 0.861], [0.59, 0.866], [0.628, 0.935, 0.59, 0.892, 0.604, 0.915], [0.643, 0.945], [0.643, 0.946], [0.502, 1, 0.612, 0.979, 0.561, 1], [0.361, 0.946, 0.443, 1, 0.392, 0.979], [0.357, 0.94], [0.364, 0.935], [0.402, 0.866, 0.388, 0.915, 0.402, 0.892], [0.401, 0.861], [0.157, 0.861], [0, 0.742, 0.07, 0.861, 0, 0.808], [0, 0.587], [0.002, 0.586], [0.05, 0.579, 0.017, 0.581, 0.033, 0.579], [0.14, 0.607, 0.083, 0.579, 0.114, 0.589], [0.154, 0.619], [0.155, 0.619], [0.226, 0.512, 0.198, 0.596, 0.226, 0.556], [0.155, 0.405, 0.226, 0.467, 0.198, 0.428], [0.147, 0.402], [0.14, 0.408], [0.05, 0.436, 0.114, 0.426, 0.083, 0.436], [0.017, 0.433, 0.039, 0.436, 0.028, 0.435], [0, 0.427], [0, 0.267], [0.157, 0.149, 0, 0.202, 0.07, 0.149], [0.4, 0.149], [0.402, 0.134], [0.364, 0.065, 0.402, 0.108, 0.388, 0.085], [0.357, 0.06], [0.361, 0.054], [0.502, 0, 0.392, 0.021, 0.443, 0], [0.643, 0.054, 0.561, 0, 0.612, 0.021], [0.643, 0.055], [0.628, 0.065], [0.59, 0.134, 0.604, 0.085, 0.59, 0.108], [0.592, 0.149], [0.843, 0.149], [1, 0.267, 0.93, 0.149, 1, 0.202], []];
+
+function slide11(s) {
+  navbar(s);
+  infoTitle(s);
+  const PIECES = [
+    [1.43, 2.238, 2.208, 3.052, 90, TEAL, 1.822, 1.242],
+    [4.088, 2.307, 2.48, 2.913, 0, SKY, 4.653, 4.073],
+    [7.018, 2.238, 2.208, 3.052, 90, TEAL, 7.55, 6.97],
+    [9.677, 2.307, 2.48, 2.913, 0, SKY, 10.315, 9.735]
+  ];
+  PIECES.forEach(function (p) {
+    form(s, PUZZLE, p[0], p[1], p[2], p[3], { fill: { color: p[5] }, rotate: p[4], flipH: true, flipV: true });
+    text(s, 'Title Here', p[6], 3.583, 1.321, 0.344, { fontFace: SANS, fontSize: 16, bold: true, color: WHITE });
+    para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing ceask elit maecenas dolor porttitor', p[7], 5.25, 2.48, 0.806, { fontFace: SANS_O });
+  });
+}
+
+function slide12(s) {
+  navbar(s);
+  infoTitle(s);
+  shape(s, 'roundRect', 1.125, 2.972, 11.083, 0.778, { fill: { color: TEAL }, rectRadius: 0.13 });
+  shape(s, 'roundRect', 3.875, 2.972, 2.792, 0.778, { fill: { color: SKY }, rectRadius: 0.13 });
+  shape(s, 'roundRect', 9.417, 2.972, 2.792, 0.778, { fill: { color: SKY }, rectRadius: 0.13 });
+  const CARDS = [[1.125, TEAL, 1.723, 1.315], [3.975, SKY, 4.543, 4.135], [6.768, TEAL, 7.363, 6.955], [9.588, SKY, 10.115, 9.776]];
+  CARDS.forEach(function (c) {
+    shape(s, 'wedgeRoundRectCallout', c[0], 4.361, 2.591, 1.818, { fill: { color: c[1] }, flipH: true, flipV: true });
+    text(s, 'Title Here', c[2], 3.151, 1.395, 0.37, { fontFace: SANS, fontSize: 16, bold: true, color: WHITE });
+    para(s, 'Lorem ipsum dolor sit amet, est consectetuer ceask id dolor consectetuer', c[3], 4.807, 2.211, 0.868, { fontFace: SANS_O, color: WHITE });
+  });
+}
+
+function slide13(s) {
+  navbar(s);
+  infoTitle(s);
+  const CARDS = [[1.189, 2.976, SKY], [3.877, 2.631, TEAL], [6.653, 2.976, SKY], [9.341, 2.631, TEAL]];
+  CARDS.forEach(function (c) {
+    const x = c[0], y = c[1], col = c[2];
+    shape(s, 'roundRect', x, y, 2.357, 4.107, { fill: { color: col }, rectRadius: 0.393 });
+    shape(s, 'roundRect', x + 0.05, y + 2.167, 2.256, 1.869, { fill: { color: WHITE }, rectRadius: 0.311 });
+    text(s, 'Title Here', x + 0.481, y + 0.289, 1.395, 0.37, { fontFace: SANS, fontSize: 16, bold: true, color: WHITE, align: 'center' });
+    text(s, 'Lorem ipsum dolor sit amet, est consectetuer ceask id consectetuer adipiscing dolore',
+      x + 0.253, y + 0.712, 1.852, 1.133,
+      { fontFace: SANS_O, fontSize: 10.5, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
+    shape(s, 'sun', x + 0.58, y + 2.488, 1.197, 1.197, { fill: { type: 'none' }, line: { color: col, width: 1.5 } });
+  });
+}
+
+function slide14(s) {
+  navbar(s);
+  infoTitle(s);
+  const PILLS = [
+    [0.912, 3.336, TEAL, 0.924, 3.526, 1.137, 2.646, TEAL, 1.205],
+    [3.708, 3.347, SKY, 3.72, 3.538, 3.864, 2.792, SKY, 3.973],
+    [6.504, 3.359, TEAL, 6.516, 3.55, 6.761, 2.646, TEAL, 6.829],
+    [9.453, 3.359, SKY, 9.464, 3.55, 9.571, 2.792, SKY, 9.723]
+  ];
+  PILLS.forEach(function (p) {
+    shape(s, 'roundRect', p[0], p[1], 3.135, 1.107, { fill: { color: p[2] }, rectRadius: 0.554 });
+    shape(s, 'roundRect', p[3], p[4], 3.135, 1.107, { fill: { color: WHITE }, rectRadius: 0.554 });
+  });
+  PILLS.forEach(function (p) {
+    shape(s, 'roundRect', p[5], 3.722, p[6], 0.778, { fill: { color: p[7] }, rectRadius: 0.389 });
+    text(s, 'Title Here', p[5], 3.722, p[6], 0.778, { fontFace: SANS, fontSize: 18, bold: true, color: WHITE, align: 'center', valign: 'middle' });
+    para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing ceask elit maecenas dolor porttitor Lorem ipsum dolor sit amet, ', p[8], 5.035, 2.503, 1.133, { fontFace: SANS_O });
+  });
+}
+
+const PETAL_A = [[0.33, 0, 1], [0.331, 0.01], [0.677, 0.427, 0.354, 0.19, 0.488, 0.344], [0.694, 0.434], [0.691, 0.476], [0.986, 0.921, 0.691, 0.661, 0.808, 0.825], [1, 0.928], [0.986, 0.935], [0.668, 1, 0.892, 0.977, 0.783, 1], [0, 0.463, 0.299, 1, 0, 0.76], [0.294, 0.018, 0, 0.277, 0.117, 0.114], [0.33, 0], []];
+const PETAL_B = [[0.643, 0, 1], [0.66, 0.006], [1, 0.471, 0.862, 0.096, 1, 0.271], [0.35, 1, 1, 0.763, 0.709, 1], [0.04, 0.936, 0.237, 1, 0.132, 0.977], [0, 0.917], [0.04, 0.897], [0.327, 0.458, 0.213, 0.802, 0.327, 0.641], [0.324, 0.414], [0.359, 0.397], [0.643, 0.012, 0.515, 0.311, 0.623, 0.172], [0.643, 0], []];
+const LEAF_TOP = [[0.5, 0, 1], [1, 0.906, 0.776, 0, 1, 0.406], [0.998, 0.978], [0.967, 0.951], [0.772, 0.879, 0.907, 0.905, 0.841, 0.879], [0.534, 0.989, 0.686, 0.879, 0.605, 0.919], [0.524, 1], [0.493, 0.966], [0.255, 0.857, 0.422, 0.897, 0.341, 0.857], [0.017, 0.966, 0.169, 0.857, 0.087, 0.897], [0.002, 0.982], [0, 0.906], [0.5, 0, 0, 0.406, 0.224, 0], []];
+const LEAF_C = [[0.996, 0, 1], [1, 0.088], [0.543, 0.96, 1, 0.451, 0.819, 0.771], [0.479, 1], [0.457, 0.986], [0, 0.114, 0.181, 0.797, 0, 0.477], [0.004, 0.031], [0.069, 0.063], [0.472, 0.145, 0.193, 0.116, 0.329, 0.145], [0.966, 0.018, 0.651, 0.145, 0.819, 0.099], [0.996, 0], []];
+const LEAF_D = [[0.524, 0, 1], [0.934, 0.088, 0.67, 0, 0.808, 0.031], [1, 0.122], [0.999, 0.148], [0.54, 0.963, 0.966, 0.487, 0.792, 0.782], [0.483, 1], [0.482, 0.98], [0.023, 0.164, 0.45, 0.64, 0.275, 0.346], [0, 0.149], [0.022, 0.135], [0.524, 0, 0.171, 0.049, 0.342, 0], []];
+const LEAF_E = [[0.485, 0, 1], [0.942, 0.128, 0.65, 0, 0.806, 0.046], [1, 0.167], [0.941, 0.207], [0.523, 0.975, 0.711, 0.378, 0.552, 0.655], [0.522, 1], [0.498, 0.987], [0.001, 0.165, 0.226, 0.824, 0.034, 0.521], [0, 0.146], [0.028, 0.128], [0.485, 0, 0.163, 0.046, 0.319, 0], []];
+
+function slide15(s) {
+  navbar(s);
+  infoTitle(s);
+  form(s, LEAF_E, 5.295, 4.161, 1.422, 1.289, { fill: { color: SKY } });
+  form(s, LEAF_D, 6.716, 4.195, 1.293, 1.215, { fill: { color: SKY } });
+  form(s, LEAF_C, 6.031, 5.41, 1.316, 1.296, { fill: { color: TEAL } });
+  form(s, LEAF_TOP, 5.255, 2.693, 2.726, 1.504, { fill: { color: SKY } });
+  form(s, PETAL_B, 6.795, 4.421, 2.096, 2.578, { fill: { color: TEAL } });
+  form(s, PETAL_A, 4.442, 4.416, 2.041, 2.538, { fill: { color: TEAL } });
+  [[4.548, 5.52], [7.52, 5.47], [6.012, 3.453]].forEach(function (t) {
+    text(s, 'Title Here', t[0], t[1], 1.305, 0.346, { fontFace: SANS, fontSize: 16, bold: true, color: WHITE });
+  });
+  [['1', 5.652, 4.32], ['2', 7.227, 4.308], ['3', 6.44, 5.704]].forEach(function (n) {
+    text(s, n[0], n[1], n[2], 0.502, 0.724, { fontFace: SANS, fontSize: 40, bold: true, color: WHITE });
+  });
+  const LONG = 'Lorem ipsum dolor sit amet, consectetuer adipiscing ceask elit maecenas dolor porttitor Lorem ipsum dolor sit amet, consectetuer aipiscing ceask elit .';
+  para(s, LONG, 1.092, 3.129, 3.996, 0.868, { fontFace: SANS_O });
+  para(s, LONG, 8.245, 3.129, 3.996, 0.868, { fontFace: SANS_O });
+  para(s, 'Lorem ipsum dolor sit amet, consectetuer aipiscing ceask elit maecenas dolor porttitor Lorem ipsum dolor sit amet, consectetuer aipiscing ceask elit maecenas dolor ', 1.123, 4.74, 2.807, 1.398, { fontFace: SANS_O });
+  para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing ceask elit maecenas dolor porttitor Lorem ipsum dolor sit amet, consectetuer aipiscing ceask elit maecenas dolor ', 9.349, 4.749, 2.893, 1.398, { fontFace: SANS_O });
+}
+
+function slide16(s) {
+  navbar(s);
+  infoTitle(s);
+  // pale back petals then the four coloured petals of the pinwheel
+  [[5.809, 2.621, 120.76, ICE, false, false], [7.456, 4.212, 320.75, MIST, true, false],
+   [4.381, 4.11, 320.75, ICE, false, true], [6.029, 5.701, 125.2, MIST, true, true]].forEach(function (d) {
+    shape(s, 'teardrop', d[0], d[1], 1.377, 1.419, { fill: { color: d[3] }, rotate: d[2], flipH: d[4], flipV: d[5] });
+  });
+  [[7.195, 5.255, 256.76, TEAL, false, false], [4.451, 5.255, 96.75, SKY, true, false],
+   [7.186, 2.783, 96.75, TEAL, false, true], [4.441, 2.783, 261.2, SKY, true, true]].forEach(function (d) {
+    shape(s, 'teardrop', d[0], d[1], 1.65, 1.7, { fill: { color: d[3] }, rotate: d[2], flipH: d[4], flipV: d[5] });
+  });
+  shape(s, 'flowChartConnector', 5.898, 4.092, 1.497, 1.497, { fill: { color: SKY }, rotate: 43.84 });
+  shape(s, 'sun', 6.195, 4.357, 0.882, 0.882, { fill: { type: 'none' }, line: { color: WHITE, width: 1.5 }, rotate: 29.69 });
+  [[4.569, 3.448, 315], [7.313, 3.448, 45], [4.578, 5.92, 45], [7.323, 5.92, 315]].forEach(function (t) {
+    text(s, 'Title Here', t[0], t[1], 1.395, 0.37,
+      { fontFace: SANS, fontSize: 16, bold: true, color: WHITE, rotate: t[2] });
+  });
+  shape(s, 'ellipse', 1.139, 4.522, 2.488, 0.05, { fill: { color: TEAL } });
+  shape(s, 'ellipse', 9.714, 4.53, 2.488, 0.05, { fill: { color: SKY } });
+  const SIDE = 'Lorem ipsum dolor sit amet, est consectetuer ceask id dolor consectetuer adipiscing';
+  [[1.202, 3.076], [1.256, 5.149], [9.779, 3.074], [9.833, 5.147]].forEach(function (t) {
+    para(s, SIDE, t[0], t[1], 2.369, 0.868, { fontFace: SANS_O });
+  });
+}
+
+function slide17(s) {
+  navbar(s);
+  infoTitle(s);
+  [[4.457, 3.942, 1.27, 1.598, 2.46], [6.055, 2.501, 1.27, 1.582, 90],
+   [6.012, 5.351, 1.27, 1.582, 270], [7.442, 3.811, 1.27, 1.598, 177.23]].forEach(function (d) {
+    shape(s, 'flowChartOnlineStorage', d[0], d[1], d[2], d[3], { fill: { color: TEAL }, rotate: d[4] });
+  });
+  [[4.9, 3.062, 46.95], [6.983, 3.161, 139.64], [4.897, 5.001, 312.69], [6.962, 4.922, 221.72]].forEach(function (d) {
+    shape(s, 'flowChartOnlineStorage', d[0], d[1], 1.379, 1.399, { fill: { color: SKY }, rotate: d[2] });
+  });
+  shape(s, 'flowChartConnector', 5.835, 3.938, 1.519, 1.519, { fill: { color: TEAL }, rotate: 46.02 });
+  shape(s, 'lightningBolt', 6.149, 4.219, 0.882, 0.882, { fill: { type: 'none' }, line: { color: WHITE, width: 1.5 }, rotate: 29.69 });
+  [[5.23, 3.414, 315], [7.342, 3.541, 47.69], [5.2, 5.382, 220.74], [7.295, 5.329, 129.77]].forEach(function (t) {
+    text(s, [{ text: 'Title ', options: { breakLine: true } }, { text: 'Here' }], t[0], t[1], 0.718, 0.64,
+      { fontFace: SANS, fontSize: 16, bold: true, color: WHITE, rotate: t[2] });
+  });
+  shape(s, 'flowChartDelay', 2.656, 2.991, 0.127, 3.153, { fill: { color: TEAL }, rotate: 270 });
+  shape(s, 'flowChartDelay', 10.55, 2.972, 0.127, 3.153, { fill: { color: SKY }, rotate: 270 });
+  const SIDE = 'Lorem ipsum dolor sit amet, est consectetuer ceask id dolor consectetuer adipiscing';
+  [[1.191, 3.148, 2.589], [1.245, 5.22, 2.589], [9.373, 3.146, 2.763], [9.427, 5.219, 2.763]].forEach(function (t) {
+    para(s, SIDE, t[0], t[1], t[2], 0.868, { fontFace: SANS_O });
+  });
+}
+
+const RIBBON = [[0.103, 0.01, 1], [0.103, 0.076], [0.083, 0.389], [0.015, 0.389], [0.07, 0.583], [0.049, 0.898], [0.103, 0.704], [0.103, 0.735], [0.166, 0.959], [0.142, 0.591], [0.206, 0.364], [0.127, 0.364], [0.103, 0.01], [], [0.103, 0, 1], [0.104, 0.006], [0.456, 0.006], [0.456, 0], [0.905, 0], [1, 0.5], [0.905, 1], [0.683, 1], [0.469, 1], [0.456, 1], [0.375, 1], [0.103, 1], [0.103, 0.738], [0.039, 0.963], [0.064, 0.595], [0, 0.368], [0.079, 0.368], []];
+
+function slide18(s) {
+  navbar(s);
+  infoTitle(s);
+  const ROWS = [
+    [0.342, 3.276, TEAL, false, 4.69, 3.268, false, 1.864, 3.415, 1.889, 3.682],
+    [0.361, 4.853, TEAL, false, 4.709, 4.857, false, 1.854, 4.961, 1.87, 5.196],
+    [7.347, 3.254, SKY, true, 7.043, 3.255, true, 10.145, 3.403, 7.7, 3.681],
+    [7.366, 4.831, SKY, true, 7.063, 4.832, true, 10.134, 4.949, 7.68, 5.207]
+  ];
+  ROWS.forEach(function (r) {
+    form(s, RIBBON, r[0], r[1], r[3] ? 5.645 : 5.426, 1.218,
+      { fill: { color: r[2] }, rotate: r[3] ? 180 : 0, flipV: r[3] });
+    shape(s, 'flowChartDelay', r[4], r[5], 1.59, 1.218, { fill: { color: r[2] }, flipH: r[6] });
+    text(s, 'Title Here', r[7], r[8], 1.395, 0.37, { fontFace: SANS, fontSize: 16, bold: true, color: WHITE });
+    para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing ceask elit maecenas dolor porttitor', r[9], r[10], 3.819, 0.603, { fontFace: SANS_O, color: WHITE });
+  });
+}
+
+/* --------------------------------------------------------- slides 19 and 20 */
+
+const MAIL1 = [[1, 0, 1], [0.988, 0], [0, 0], [0.494, 1], [1, 0], []];
+const MAIL2 = [[1, 0, 1], [0, 0.5], [0.973, 1], [1, 0.938, 1, 0.984, 1, 0.953], [1, 0.031], [1, 0, 1, 0.016, 1, 0], []];
+const MAIL3 = [[0, 0, 1], [0, 0.047, 0, 0.016, 0, 0.031], [0, 0.953], [0.027, 1, 0, 0.969, 0, 0.984], [1, 0.516], [0, 0], []];
+const MAIL4 = [[0.503, 0.458, 1], [0.356, 0], [0, 1], [1, 1], [0.65, 0], [0.503, 0.458], []];
+const MONITOR = [[1, 0.795, 1], [1, 0], [0, 0], [0, 0.795], [0.376, 0.795], [0.376, 0.926], [0.129, 0.926], [0.129, 1], [0.882, 1], [0.882, 0.926], [0.629, 0.926], [0.629, 0.795], [1, 0.795], [], [0.059, 0.733, 1], [0.059, 0.062], [0.941, 0.062], [0.941, 0.733], [0.059, 0.733], []];
+const PIN = [[0.5, 0, 1], [0, 0.316, 0.3, 0, 0, 0.068], [0.5, 1, 0, 0.436, 0.4, 0.872], [1, 0.316, 0.6, 0.872, 1, 0.436], [0.5, 0, 1, 0.068, 0.7, 0], [], [0.5, 0.419, 1], [0.338, 0.316, 0.412, 0.419, 0.338, 0.376], [0.5, 0.205, 0.338, 0.256, 0.412, 0.205], [0.662, 0.316, 0.588, 0.205, 0.662, 0.256], [0.5, 0.419, 0.662, 0.376, 0.588, 0.419], []];
+const PHONE = [[0.982, 0.895, 1], [0.895, 0.965, 0.965, 0.93, 0.93, 0.947], [0.754, 1, 0.86, 0.982, 0.807, 1], [0.579, 0.947, 0.702, 1, 0.632, 0.965], [0.456, 0.895, 0.526, 0.93, 0.491, 0.912], [0.123, 0.561, 0.333, 0.825, 0.193, 0.667], [0.053, 0.439, 0.088, 0.509, 0.07, 0.474], [0, 0.246, 0.035, 0.368, 0, 0.316], [0.053, 0.123, 0, 0.193, 0.018, 0.158], [0.123, 0.035, 0.07, 0.088, 0.088, 0.053], [0.211, 0, 0.14, 0.018, 0.193, 0], [0.263, 0.07, 0.246, 0.018, 0.263, 0.053], [0.333, 0.175, 0.298, 0.105, 0.316, 0.14], [0.368, 0.246, 0.351, 0.211, 0.368, 0.228], [0.246, 0.386, 0.368, 0.298, 0.246, 0.351], [0.263, 0.456, 0.246, 0.404, 0.263, 0.439], [0.561, 0.737, 0.333, 0.579, 0.421, 0.667], [0.614, 0.772, 0.579, 0.754, 0.596, 0.772], [0.754, 0.632, 0.649, 0.772, 0.719, 0.632], [0.825, 0.667, 0.789, 0.632, 0.807, 0.667], [0.947, 0.737, 0.86, 0.702, 0.912, 0.719], [1, 0.772, 0.965, 0.754, 1, 0.754], [0.982, 0.895, 1, 0.825, 0.982, 0.86], []];
+
+function slide19(s) {
+  imgBox(s, 0.396, 0, 3.019, 7.453, 0.4);
+  shape(s, 'rect', 0, -0.002, 0.721, 7.502, { fill: { color: TEAL } });
+  const BANDS = 16; // teal wash, near-clear at the top and ~50% at the bottom
+  for (let i = 0; i < BANDS; i++) {
+    shape(s, 'rect', 0.393, -0.024 + i * 7.502 / BANDS, 3.019, 7.502 / BANDS,
+      { fill: { color: TEAL, transparency: 97 - 48 * i / (BANDS - 1) } });
+  }
+  shape(s, 'roundRect', 3.558, -0.089, 3.34, 7.502, { fill: { color: TEAL }, rectRadius: 0.443 });
+  navbar(s, WHITE, [WHITE, WHITE, WHITE, TEAL, TEAL, TEAL]);
+  heading(s, 'OUR ', null, 3.739, 2.915, 2.978, 0.747, PALE);
+  heading(s, 'CONTACT', null, 3.739, 3.615, 2.978, 0.747, WHITE);
+  flower(s, 5.764, 2.61, 0.508, WHITE, SKY);
+  flower(s, 5.459, 2.975, 0.378, WHITE, SKY);
+  s.addShape('line', { x: 6.915, y: 1.369, w: 3.15, h: 0, line: { color: TEAL, width: 0.5 } });
+  s.addShape('line', { x: 3.885, y: 4.522, w: 9.449, h: 0, line: { color: TEAL, width: 0.5 } });
+  text(s, 'Get Our Contact And Get Updates About Us Everyday', 7.397, 1.799, 1.665, 1.919,
+    { fontFace: SANS, fontSize: 18, bold: true, color: INK });
+  const CONTACT = [
+    ['Yourmail@mail.com', 10.167, 1.854, 1.875],
+    ['www.yourwebsite.com', 10.167, 2.324, 1.875],
+    ['123 Anywhere St. Any CIty', 10.125, 2.794, 2.199],
+    ['+1230 456 78910', 10.142, 3.264, 1.585]
+  ];
+  CONTACT.forEach(function (c) {
+    text(s, c[0], c[1], c[2], c[3], 0.336, { fontFace: SANS, fontSize: 10.5, color: INK, lineSpacingMultiple: 1.5 });
+  });
+  form(s, MAIL1, 9.811, 1.939, 0.24, 0.107, { fill: { color: TEAL }, flipH: true });
+  form(s, MAIL2, 9.979, 1.95, 0.085, 0.149, { fill: { color: TEAL }, flipH: true });
+  form(s, MAIL3, 9.795, 1.947, 0.085, 0.15, { fill: { color: TEAL }, flipH: true });
+  form(s, MAIL4, 9.811, 2.037, 0.236, 0.069, { fill: { color: TEAL }, flipH: true });
+  form(s, MONITOR, 9.795, 2.382, 0.269, 0.255, { fill: { color: TEAL }, flipH: true });
+  form(s, PIN, 9.795, 2.853, 0.187, 0.273, { fill: { color: TEAL }, flipH: true });
+  form(s, PHONE, 9.795, 3.373, 0.216, 0.216, { fill: { color: TEAL } });
+  text(s, 'Want to smell sweet, dont you?', 7.404, 5.327, 2.337, 0.707, { fontFace: SANS, fontSize: 18, bold: true, color: TEAL });
+  shape(s, 'roundRect', 9.811, 5.368, 2.337, 0.739, { fill: { color: TEAL }, rectRadius: 0.163 });
+  text(s, 'Contact Now', 9.811, 5.368, 2.337, 0.739, { fontFace: SANS, fontSize: 18, bold: true, color: WHITE, align: 'center', valign: 'middle' });
+}
+
+function slide20(s) {
+  navbar(s);
+  imgBox(s, 6.653, 1.379, 6.667, 3.058, 0);
+  shape(s, 'roundRect', 3.845, 1.379, 5.905, 3.058, { fill: { color: TEAL }, rectRadius: 0.535 });
+  text(s, [{ text: 'FOR ', options: { color: INK } }, { text: 'THE', options: { color: PALE } }],
+    1.083, 2.859, 6.111, 1.616, { fontFace: SERIF, fontSize: 90, bold: true });
+  text(s, 'THANKS', 3.859, 1.271, 5.45, 1.616, { fontFace: SERIF, fontSize: 90, bold: true, color: WHITE, align: 'center' });
+  text(s, 'ATTENTIONS ', 2.247, 4.326, 8.84, 1.616, { fontFace: SERIF, fontSize: 90, bold: true, color: TEAL_D, align: 'center' });
+  [0.186, 2.366, 4.545].forEach(function (x) { imgBox(s, x, 6.7, 2.063, 0.759, 0.168); });
+  [6.725, 8.905, 11.085].forEach(function (x) { imgBox(s, x, 6.687, 2.063, 0.759, 0.168); });
+}
+
+/* ---------------------------------------------------------------- assemble */
+
+const BUILDERS = [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'SCENT', width: 13.3333333, height: 7.5 });
+pptx.layout = 'SCENT';
+pptx.author = 'Scent Bliss';
+pptx.title = 'Scent Bliss';
+
+BUILDERS.forEach(function (build) {
+  const s = pptx.addSlide();
+  s.background = { color: WHITE };
+  build(s);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '04a2d053-1877-4c10-a788-9b6f729ea337_grok_final.pptx') })
+  .then(function (f) { console.log('wrote ' + f); });

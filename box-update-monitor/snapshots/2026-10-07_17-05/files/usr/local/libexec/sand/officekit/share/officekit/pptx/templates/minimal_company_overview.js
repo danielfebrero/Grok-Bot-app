@@ -1,0 +1,665 @@
+/**
+ * "Anthony" — minimal & stylish presentation template (28 slides, 13.333in x 7.5in).
+ *
+ * Rebuilt from scratch with pptxgenjs. Every slide is a small builder function; all
+ * geometry is in inches and matches the original deck. Photo frames in the original
+ * are empty picture placeholders, so nothing is drawn for them.
+ *
+ * Run: node 0d0b75dc-e6a3-4002-b4de-fcb583d206cc_grok_final.js
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+
+const C = {
+  cream: 'F1F0EC', // page background
+  sage:  'BDBAA2', // accent 1
+  olive: '595139', // accent 2
+  rust:  'A44D28', // accent 3 - the signature colour
+  moss:  '98936E',
+  white: 'FFFFFF',
+  paper: 'F2F2F2',
+  ink:   '262626',
+  rule:  '3F3F3F',
+  black: '000000',
+};
+
+/* ------------------------------------------------------- text style presets */
+
+const PLAYFAIR = 'Playfair Display';
+const ARIMO = 'Arimo';
+
+// Body inset used by every text frame in the deck: 0.1" sides, 0.05" top/bottom.
+const INSET = [7.2, 7.2, 3.6, 3.6];
+
+const S = {
+  display: { fontFace: PLAYFAIR, fontSize: 70, bold: true, lineSpacingMultiple: 1.07142 },
+  heading: { fontFace: PLAYFAIR, fontSize: 20, lineSpacingMultiple: 1.1 },
+  lead:    { fontFace: PLAYFAIR, fontSize: 16, lineSpacingMultiple: 1.25 },
+  numeral: { fontFace: PLAYFAIR, fontSize: 150, lineSpacingMultiple: 1.0 },
+  body:    { fontFace: ARIMO, fontSize: 11, lineSpacingMultiple: 1.63636 },
+  meta:    { fontFace: ARIMO, fontSize: 12, lineSpacingMultiple: 1.25 },
+  small:   { fontFace: ARIMO, fontSize: 14, lineSpacingMultiple: 1.57142 },
+  bullet:  { fontFace: ARIMO, fontSize: 16, lineSpacingMultiple: 1.25 },
+  stat:    { fontFace: ARIMO, fontSize: 45, lineSpacingMultiple: 1.11111 },
+  plain:   {},
+};
+
+/* ------------------------------------------------------------ draw helpers */
+
+/** Flat colour block. */
+function panel(s, x, y, w, h, color) {
+  s.addShape('rect', { x, y, w, h, fill: { color } });
+}
+
+/**
+ * Text frame. `body` is a string or an array of strings (one per paragraph).
+ * `style` is one of the S.* presets; `over` carries per-shape overrides.
+ */
+function txt(s, body, x, y, w, h, style, color, over) {
+  const opts = Object.assign(
+    { x, y, w, h, color, align: 'left', valign: 'top', margin: INSET },
+    style,
+    over || {}
+  );
+  if (opts.bullet === true) opts.bullet = { indent: 22.5 };
+  if (!Array.isArray(body)) { s.addText(body, opts); return; }
+  // pptxgenjs does not inherit `bullet` down to each paragraph, so set it per run.
+  const runs = body.map((t, i) => ({
+    text: t,
+    options: { breakLine: i < body.length - 1, bullet: opts.bullet },
+  }));
+  s.addText(runs, opts);
+}
+
+function hline(s, x, y, w, color, width) {
+  s.addShape('line', { x, y, w, h: 0, line: { color, width: width || 1 } });
+}
+
+function vline(s, x, y, h, color, width) {
+  s.addShape('line', { x, y, w: 0, h, line: { color, width: width || 1 } });
+}
+
+/**
+ * The recurring pair of short vertical rules used as a divider motif.
+ * The original stores them as horizontal connectors rotated -90 degrees, which
+ * pivots about the box centre; (x, y) below is that pre-rotation anchor.
+ */
+function tickPair(s, x, y, len, color, gap) {
+  const cx = x + len / 2;
+  const top = y - len / 2;
+  vline(s, cx, top, len, color);
+  vline(s, cx + (gap === undefined ? 0.264 : gap), top, len, color);
+}
+
+/**
+ * Outline artwork (normalised 0..1 coordinates, one array per sub-path). These
+ * are the small vector marks from the original deck: the two quote glyphs and
+ * the four social badges. Sub-paths alternate to punch out the counters.
+ */
+const ICONS = {
+  facebook: [
+    [0.629,1,0.326,1,0.264,0.979,0.258,0.581,0.021,0.572,0,0.544,0,0.388,0.043,0.353,0.258,0.35,0.258,0.256,0.291,0.153,0.382,0.072,0.524,0.019,0.708,0,0.957,0.006,1,0.044,0.994,0.204,0.957,0.223,0.708,0.236,0.697,0.35,0.936,0.35,0.979,0.367,0.985,0.56,0.921,0.581,0.697,0.581,0.697,0.963,0.676,0.991,0.629,1],
+    [0.067,0.388,0.067,0.544,0.326,0.544,0.326,0.963,0.629,0.963,0.629,0.544,0.921,0.544,0.921,0.388,0.629,0.388,0.633,0.243,0.7,0.195,0.933,0.188,0.933,0.044,0.549,0.053,0.428,0.098,0.352,0.167,0.326,0.256,0.326,0.388,0.067,0.388],
+  ],  // 47 pts
+  twitterT: [
+    [0.789,1,0.545,1,0.316,0.971,0.144,0.887,0.037,0.752,0,0.569,0,0.181,0.019,0.09,0.068,0.034,0.203,0,0.322,0.04,0.36,0.082,0.374,0.131,0.374,0.244,0.851,0.247,0.959,0.294,0.99,0.358,0.984,0.431,0.951,0.484,0.902,0.514,0.772,0.531,0.374,0.531,0.384,0.653,0.443,0.717,0.789,0.719,0.932,0.755,0.97,0.8,0.984,0.863,0.97,0.921,0.932,0.964,0.871,0.991,0.789,1],
+    [0.203,0.044,0.106,0.066,0.071,0.107,0.057,0.181,0.057,0.569,0.074,0.694,0.142,0.822,0.29,0.922,0.545,0.963,0.789,0.963,0.882,0.943,0.914,0.912,0.927,0.863,0.918,0.817,0.848,0.763,0.509,0.768,0.411,0.747,0.363,0.712,0.334,0.656,0.325,0.487,0.88,0.474,0.91,0.453,0.935,0.391,0.911,0.319,0.839,0.29,0.317,0.275,0.308,0.096,0.248,0.05,0.203,0.044],
+  ],  // 61 pts
+  bird: [
+    [0.317,1,0.163,0.974,0.005,0.885,0.027,0.826,0.145,0.812,0.224,0.779,0.113,0.67,0.091,0.607,0.099,0.574,0.03,0.427,0.027,0.357,0.05,0.331,0.027,0.172,0.061,0.064,0.095,0.056,0.258,0.219,0.447,0.294,0.474,0.15,0.55,0.052,0.602,0.022,0.718,0.018,0.82,0.081,0.956,0.035,0.969,0.081,0.95,0.125,0.987,0.13,0.998,0.161,0.901,0.294,0.863,0.551,0.752,0.772,0.663,0.867,0.565,0.934,0.446,0.983,0.317,1],
+    [0.056,0.875,0.182,0.931,0.377,0.946,0.493,0.918,0.641,0.83,0.72,0.743,0.803,0.592,0.848,0.423,0.863,0.273,0.938,0.184,0.826,0.213,0.919,0.088,0.828,0.128,0.71,0.068,0.615,0.074,0.572,0.097,0.509,0.173,0.49,0.311,0.468,0.338,0.352,0.315,0.252,0.268,0.081,0.11,0.062,0.206,0.078,0.291,0.174,0.426,0.062,0.39,0.073,0.447,0.131,0.541,0.255,0.618,0.137,0.618,0.234,0.732,0.329,0.757,0.179,0.854,0.056,0.875],
+  ],  // 68 pts
+  instagram: [
+    [0.694,0,0.187,0.024,0.09,0.09,0.024,0.187,0,0.306,0.024,0.813,0.09,0.91,0.187,0.976,0.306,1,0.813,0.976,0.91,0.91,0.976,0.813,1,0.694,0.976,0.187,0.91,0.09,0.813,0.024,0.694,0],
+    [0.956,0.694,0.935,0.795,0.795,0.935,0.694,0.956,0.205,0.935,0.065,0.795,0.044,0.694,0.065,0.205,0.205,0.065,0.306,0.044,0.795,0.065,0.935,0.205,0.956,0.694],
+    [0.5,0.237,0.399,0.258,0.318,0.315,0.244,0.5,0.318,0.682,0.5,0.756,0.685,0.682,0.742,0.601,0.762,0.5,0.685,0.315,0.5,0.237],
+    [0.5,0.731,0.335,0.665,0.269,0.5,0.335,0.332,0.5,0.263,0.668,0.332,0.738,0.5,0.668,0.665,0.5,0.731],
+    [0.5,0.338,0.386,0.384,0.338,0.5,0.386,0.614,0.5,0.662,0.616,0.614,0.662,0.5,0.616,0.384,0.5,0.338],
+    [0.5,0.637,0.403,0.597,0.362,0.5,0.403,0.398,0.5,0.356,0.602,0.398,0.644,0.5,0.602,0.597,0.5,0.637],
+    [0.769,0.15,0.715,0.17,0.694,0.219,0.715,0.267,0.769,0.287,0.838,0.219,0.769,0.15],
+    [0.769,0.269,0.719,0.219,0.769,0.169,0.812,0.219,0.769,0.269],
+  ],  // 80 pts
+  quote: [
+    [0.301,0.048,0.238,0.003,0.12,0.016,0.061,0.06,0.021,0.126,0.006,0.211,0.021,0.298,0.061,0.369,0.12,0.418,0.19,0.435,0.276,0.401,0.219,0.616,0.148,0.74,0.019,0.891,0.012,0.945,0.055,0.999,0.096,0.989,0.247,0.82,0.334,0.665,0.378,0.522,0.392,0.275,0.35,0.108,0.301,0.048],
+    [0.902,0.061,0.828,0.003,0.713,0.016,0.654,0.06,0.615,0.126,0.601,0.211,0.615,0.298,0.654,0.369,0.713,0.418,0.785,0.435,0.871,0.401,0.812,0.616,0.737,0.74,0.606,0.891,0.607,0.973,0.649,0.999,0.699,0.98,0.837,0.82,0.924,0.665,0.971,0.522,0.986,0.275,0.965,0.178,0.902,0.061],
+  ],  // 46 pts
+};
+
+/** Draw one of the ICONS entries into the given box. */
+function icon(s, shape, x, y, w, h, color, rotate) {
+  const points = [];
+  shape.forEach((flat) => {
+    for (let i = 0; i < flat.length; i += 2) {
+      points.push({ x: flat[i] * w, y: flat[i + 1] * h, moveTo: i === 0 });
+    }
+    points.push({ close: true });
+  });
+  s.addShape('custGeom', { x, y, w, h, fill: { color }, points, rotate: rotate || 0 });
+}
+
+/** Typographic quotation mark: `open` picks the opening or closing form. */
+function quote(s, x, y, w, color, open) {
+  icon(s, ICONS.quote, x, y, w, w * 147 / 163, color, open ? 0 : 180);
+}
+
+/**
+ * Row of social badges (facebook, twitter wordmark, twitter bird, instagram)
+ * laid out on the original 0.37in grid, scaled by `k`.
+ */
+function socialRow(s, x, y, k, color, count) {
+  const marks = [
+    [ICONS.facebook,  0.000, 0.000, 0.206, 0.370],
+    [ICONS.twitterT,  0.607, 0.000, 0.284, 0.370],
+    [ICONS.bird,      1.292, 0.028, 0.372, 0.314],
+    [ICONS.instagram, 2.066, 0.047, 0.370, 0.370],
+  ];
+  marks.slice(0, count).forEach(([shape, dx, dy, w, h]) => {
+    icon(s, shape, x + dx * k, y + dy * k, w * k, h * k, color);
+  });
+}
+
+/**
+ * Header furniture shared by every interior slide: the "Anthony" byline, two
+ * rules, the centred template label and the page-number pill on the right.
+ */
+function chrome(s, base, bylineColor, leftRuleColor) {
+  const byline = bylineColor || base;
+  const leftRule = leftRuleColor || base;
+  txt(s, 'Anthony', 0.488, 0.335, 0.862, 0.297, S.meta, byline);
+  txt(s, 'Presentation Template', 5.611, 0.335, 2.112, 0.297, S.meta, base, { align: 'center' });
+  hline(s, 1.548, 0.489, 3.702, leftRule);
+  hline(s, 7.958, 0.489, 4.375, base);
+  s.addShape('roundRect', {
+    x: 12.75, y: 0.288, w: 0.264, h: 0.992,
+    fill: { type: 'none' }, line: { color: base, width: 1 }, rectRadius: 0.132,
+  });
+  vline(s, 12.882, 0.784, 1.015, base);
+  txt(s, '#', 12.751, 0.335, 0.263, 0.297, S.meta, base, { align: 'center' });
+}
+
+/* ------------------------------------------------------------------ slides */
+
+function slide1(p) {
+  const s = p.addSlide();
+  s.background = { color: C.white };
+  panel(s, 7.472, 0, 5.861, 2.278, C.olive);
+  panel(s, 0, 2.278, 7.472, 5.222, C.rust);
+  txt(s, 'ANTHONY', 2.243, 2.89, 9.604, 1.994, S.plain, C.white, { fontFace: 'Playfair Display', fontSize: 130, bold: true, lineSpacingMultiple: 1.038 });
+  txt(s, 'LOREM IPSUM DOLOR STEAMED', 2.227, 4.698, 4.481, 0.41, S.heading, C.white);
+  txt(s, 'Present By: Catherin Earnshaw', 0.474, 6.619, 1.625, 0.505, S.meta, C.white);
+  txt(s, 'Minimal & Stylish Design', 3.203, 6.619, 1.465, 0.505, S.meta, C.white);
+  txt(s, 'Presentation Template', 5.544, 6.619, 1.312, 0.505, S.meta, C.white);
+  txt(s, 'Lorem Ipsum', 8.103, 0.313, 0.861, 0.505, S.meta, C.white);
+  txt(s, 'Dolor Steamed', 11.784, 0.313, 1.014, 0.505, S.meta, C.white);
+  hline(s, 9.048, 0.433, 2.542, C.paper);
+  hline(s, 9.048, 0.697, 2.542, C.paper);
+  tickPair(s, 4.689, 6.856, 0.404, C.paper);
+  tickPair(s, 2.363, 6.856, 0.404, C.paper);
+}
+
+function slide2(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 1.944, 2.111, 11.389, 5.389, C.sage);
+  panel(s, 2.548, 3.542, 3.375, 3.958, C.rust);
+  txt(s, 'Content', 0.488, 1.236, 4.132, 1.153, S.display, C.rust);
+  txt(s, 'LOREM IPSUM DOLOR STEAMED', 2.554, 2.776, 4.626, 0.41, S.heading, C.ink);
+  txt(s, ['Our Vision', 'Strategy', 'Passion ', 'Campaign', 'Service ', 'Our Project ', 'Our Team', 'Pricing', 'Demography', 'Portfolio', 'Testimonial'], 3.239, 3.937, 1.895, 3.167, S.bullet, C.white, { bullet: true });
+  chrome(s, C.ink);
+}
+
+function slide3(p) {
+  const s = p.addSlide();
+  s.background = { color: C.white };
+  panel(s, 0, 0, 5.611, 7.5, C.rust);
+  panel(s, 5.611, 0, 7.722, 7.5, C.sage);
+  txt(s, 'Hello!', 6.955, 2.307, 3.345, 1.153, S.display, C.rust);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using \'Content here, content here\', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 6.955, 3.589, 4.583, 2.093, S.body, C.black);
+  chrome(s, C.ink, C.paper, C.paper);
+  txt(s, 'LOREM IPSUM DOLOR STEAMED.', -1.169, 4.435, 4.585, 0.41, S.heading, C.paper, { rotate: -90 });
+  vline(s, 1.328, 2.556, 4.268, C.paper);
+}
+
+function slide4(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 0, 0, 5.611, 7.5, C.olive);
+  txt(s, 'Our', 4.248, 1.922, 2.726, 1.153, S.display, C.rust);
+  txt(s, 'Vision', 5.149, 3.03, 3.267, 1.153, S.display, C.rust);
+  chrome(s, C.ink, C.paper, C.paper);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 6.026, 5.616, 2.726, 0.83, S.body, C.black);
+  txt(s, 'Our Goals', 6.026, 5.206, 1.54, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 0.673, 5.616, 2.726, 0.83, S.body, C.white);
+  txt(s, 'Our Vision', 0.673, 5.206, 1.896, 0.41, S.heading, C.white);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 0.673, 2.637, 2.726, 0.83, S.body, C.white);
+  txt(s, 'Our Mission', 0.673, 2.228, 1.896, 0.41, S.heading, C.white);
+}
+
+function slide5(p) {
+  const s = p.addSlide();
+  s.background = { color: C.sage };
+  panel(s, 6.667, 0, 6.667, 7.5, C.rust);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using \'Content here, content here\', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 0.875, 3.145, 4.583, 2.093, S.body, C.black);
+  txt(s, 'Example', 0.875, 2.593, 1.896, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 10.095, 4.036, 2.3, 2.045, S.lead, C.white);
+  chrome(s, C.ink);
+}
+
+function slide6(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 6.667, 0, 6.667, 7.5, C.sage);
+  panel(s, 0, 0, 6.667, 3.75, C.rust);
+  txt(s, 'Our Mission Is Create Powerful and creative Visual brand', 1.286, 1.06, 4.254, 1.515, S.plain, C.white, { fontFace: 'Playfair Display', fontSize: 28 });
+  quote(s, 1.003, 1.06, 0.283, C.white, false);
+  quote(s, 3.765, 2.344, 0.283, C.white, true);
+  txt(s, 'Our', 7.669, 0.915, 2.265, 1.153, S.display, C.rust);
+  txt(s, 'Mission', 8.65, 3.305, 3.819, 1.153, S.display, C.rust);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 0.673, 5.616, 2.726, 0.83, S.body, C.ink);
+  txt(s, 'Our Vision', 0.673, 5.206, 1.896, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 5.419, 5.616, 2.726, 0.83, S.body, C.ink);
+  txt(s, 'Our Mission', 5.419, 5.206, 1.896, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 9.935, 5.616, 2.726, 0.83, S.body, C.ink);
+  txt(s, 'Our Goals', 9.935, 5.206, 1.896, 0.41, S.heading, C.ink);
+  tickPair(s, 4.075, 5.929, 0.404, C.rust);
+  tickPair(s, 8.639, 5.929, 0.404, C.rust);
+}
+
+function slide7(p) {
+  const s = p.addSlide();
+  s.background = { color: C.olive };
+  panel(s, 12.333, 0, 1, 7.5, C.rust);
+  chrome(s, C.white);
+  txt(s, 'Strategy', 0.569, 1.703, 4.216, 1.153, S.display, C.white);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point Ipsum as their default model text, and a search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 0.569, 3.034, 4.583, 1.083, S.body, C.white);
+  txt(s, 'lorem ipsum\' will uncover many web sites still in their infancy.', 8.309, 1.719, 2.726, 0.578, S.body, C.white);
+  txt(s, 'Focus', 8.309, 1.309, 1.427, 0.41, S.heading, C.white);
+  txt(s, 'lorem ipsum\' will uncover many web sites still in their infancy.', 8.309, 3.021, 2.726, 0.578, S.body, C.white);
+  txt(s, 'Passion', 8.309, 2.612, 1.427, 0.41, S.heading, C.white);
+  txt(s, 'lorem ipsum\' will uncover many web sites still in their infancy.', 8.309, 4.324, 2.726, 0.578, S.body, C.white);
+  txt(s, 'Carious', 8.309, 3.914, 1.427, 0.41, S.heading, C.white);
+  txt(s, '01', 6.516, 1.426, 1.19, 0.732, S.plain, C.white, { fontFace: 'Arimo', fontSize: 40, bold: true, lineSpacingMultiple: 1.125, align: 'center' });
+  txt(s, '02', 6.516, 2.771, 1.19, 0.732, S.plain, C.white, { fontFace: 'Arimo', fontSize: 40, bold: true, lineSpacingMultiple: 1.125, align: 'center' });
+  txt(s, '03', 6.516, 4.058, 1.19, 0.732, S.plain, C.white, { fontFace: 'Arimo', fontSize: 40, bold: true, lineSpacingMultiple: 1.125, align: 'center' });
+  tickPair(s, 7.536, 1.769, 0.404, C.white);
+  tickPair(s, 7.536, 3.119, 0.404, C.white);
+  tickPair(s, 7.536, 4.408, 0.404, C.white);
+}
+
+function slide8(p) {
+  const s = p.addSlide();
+  s.background = { color: C.sage };
+  panel(s, 0, 0, 2.653, 7.5, C.rust);
+  txt(s, 'Passion', -1.043, 3.49, 4.216, 1.153, S.display, C.white, { align: 'center', rotate: -90 });
+  txt(s, 'Creative Strategy', 0.332, 3.861, 3.028, 0.41, S.heading, C.white, { align: 'center', rotate: -90 });
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 9.609, 5.393, 2.726, 0.83, S.body, C.ink);
+  txt(s, 'Carious', 9.609, 4.984, 1.427, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 9.609, 2.208, 2.726, 0.83, S.body, C.ink);
+  txt(s, 'Passion', 9.609, 1.799, 1.427, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 4.262, 2.208, 2.726, 0.83, S.body, C.ink);
+  txt(s, 'Focus', 4.262, 1.799, 1.427, 0.41, S.heading, C.ink);
+  chrome(s, C.ink);
+  txt(s, '1', 2.915, 1.33, 1.683, 2.205, S.numeral, C.rust, { align: 'center' });
+  txt(s, '2', 8.236, 1.33, 1.683, 2.205, S.numeral, C.rust, { align: 'center' });
+  txt(s, '3', 8.236, 4.511, 1.683, 2.205, S.numeral, C.rust, { align: 'center' });
+}
+
+function slide9(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  txt(s, 'Creative Campaign', 3.595, 1.577, 5.266, 2.205, S.display, C.rust);
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 0.764, 5.353, 4.117, 1.204, S.lead, C.ink);
+  chrome(s, C.ink);
+  txt(s, 'LOREM IPSUM DOLOR STEAMED.', 9.445, 5.838, 2.59, 0.718, S.heading, C.rust, { align: 'right' });
+  tickPair(s, 11.872, 6.196, 0.556, C.rust, 0.282);
+}
+
+function slide10(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 0, 0, 5.25, 7.5, C.olive);
+  txt(s, 'Creative Service', 0.562, 1.545, 4.127, 2.205, S.display, C.white);
+  chrome(s, C.ink, C.white, C.white);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of here\', making it look like readable English. Many sites still in their infancy.', 0.625, 4.806, 3.542, 1.588, S.body, C.white);
+  hline(s, 0.703, 4.663, 0.578, C.white);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 6.581, 6.086, 2.726, 0.83, S.body, C.ink);
+  txt(s, 'Lookbook Project', 6.581, 5.463, 1.506, 0.718, S.heading, C.ink);
+  tickPair(s, 5.816, 6.181, 0.556, C.rust, 0.283);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 6.581, 4.021, 2.726, 0.83, S.body, C.ink);
+  txt(s, 'Content Creator', 6.581, 3.397, 1.472, 0.718, S.heading, C.ink);
+  tickPair(s, 5.816, 4.181, 0.556, C.rust, 0.283);
+  txt(s, 'It is a long established fact that a for \'lorem ipsum\' will uncover many web sites still in their infancy.', 6.581, 1.955, 2.726, 0.83, S.body, C.ink);
+  txt(s, 'Wedding Photography', 6.581, 1.331, 1.921, 0.718, S.heading, C.ink);
+  tickPair(s, 5.816, 2.051, 0.556, C.rust, 0.283);
+}
+
+function slide11(p) {
+  const s = p.addSlide();
+  s.background = { color: C.sage };
+  chrome(s, C.ink);
+  panel(s, 7.958, 4.175, 4.613, 3.325, C.rust);
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 8.77, 5.024, 3.213, 1.484, S.lead, C.white);
+  quote(s, 8.471, 4.943, 0.283, C.white, false);
+  quote(s, 10.614, 6.37, 0.283, C.white, true);
+}
+
+function slide12(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 0, 0, 5.25, 7.5, C.rust);
+  txt(s, 'Kayla Salva', 5.825, 2.288, 5.98, 1.153, S.display, C.rust);
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 0.894, 5.197, 3.213, 1.484, S.lead, C.white);
+  chrome(s, C.ink, C.white, C.white);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look like readable English. ', 5.825, 3.758, 2.498, 1.84, S.body, C.ink);
+  tickPair(s, 8.514, 4.752, 0.556, C.rust, 0.282);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look like readable English. ', 9.471, 3.758, 2.498, 1.84, S.body, C.ink);
+}
+
+function slide13(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 9.5, 3.069, 3.833, 4.431, C.olive);
+  txt(s, 'Ashley Smith', 0.919, 1.842, 3.522, 2.205, S.display, C.rust);
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 0.894, 4.739, 3.213, 1.484, S.lead, C.ink);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look like readable English. ', 10.067, 4.675, 2.498, 1.84, S.body, C.white);
+  chrome(s, C.ink);
+  txt(s, 'Lorem Ipsum', 10.067, 4.104, 2.016, 0.41, S.heading, C.white);
+}
+
+function slide14(p) {
+  const s = p.addSlide();
+  s.background = { color: C.white };
+  panel(s, 0, 0, 4.444, 7.5, C.olive);
+  panel(s, 8.889, 0, 4.444, 7.5, C.rust);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look like readable English. ', 0.873, 4.688, 2.498, 1.84, S.body, C.white);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look like readable English. ', 0.873, 2.077, 2.498, 1.84, S.body, C.white);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look like readable English. ', 9.762, 3.911, 2.498, 1.84, S.body, C.white);
+  txt(s, '01', 9.6, 2.704, 1.678, 1.207, S.plain, C.white, { fontFace: 'Playfair Display', fontSize: 100, lineSpacingMultiple: 0.75 });
+  chrome(s, C.white);
+}
+
+function slide15(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 0, 0, 7.954, 7.5, C.sage);
+  txt(s, 'Our Project', 8.482, 1.242, 3.734, 2.205, S.display, C.rust);
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' still in their infancy.', 8.505, 5.894, 4.079, 0.923, S.lead, C.ink);
+  chrome(s, C.ink);
+  txt(s, 'It is a long established fact that a reader will be distracted by the more-or-less normal distribution look like readable English. ', 0.845, 1.941, 2.498, 1.083, S.body, C.ink);
+  txt(s, 'Lorem Ipsum', 0.845, 1.496, 2.016, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long established fact that a reader will be distracted by the more-or-less normal distribution look like readable English. ', 4.317, 5.773, 2.498, 1.083, S.body, C.ink);
+  txt(s, 'Lorem Ipsum', 4.317, 5.327, 2.016, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look like readable English. ', 8.482, 3.547, 4.268, 1.083, S.body, C.ink);
+  quote(s, 8.604, 5.496, 0.283, C.ink, false);
+}
+
+function slide16(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 0, 0, 3.347, 7.5, C.rust);
+  txt(s, 'Our Team Member', -0.759, 2.622, 4.889, 2.205, S.display, C.white, { rotate: -90 });
+  chrome(s, C.ink);
+  txt(s, 'It is a long established fact that a look like readable English. ', 4.025, 6.203, 2.35, 0.578, S.body, C.ink);
+  txt(s, 'Title Here', 4.025, 5.855, 1.142, 0.377, S.small, C.ink);
+  txt(s, 'Your Name', 4.025, 5.486, 1.836, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long established fact that a look like readable English. ', 7.072, 2.465, 2.35, 0.578, S.body, C.ink);
+  txt(s, 'Title Here', 7.072, 2.117, 1.142, 0.377, S.small, C.ink);
+  txt(s, 'Your Name', 7.072, 1.747, 1.836, 0.41, S.heading, C.ink);
+  txt(s, 'It is a long established fact that a look like readable English. ', 10.118, 6.203, 2.35, 0.578, S.body, C.ink);
+  txt(s, 'Title Here', 10.118, 5.855, 1.142, 0.377, S.small, C.ink);
+  txt(s, 'Your Name', 10.118, 5.486, 1.836, 0.41, S.heading, C.ink);
+  tickPair(s, 1.239, 6.584, 0.556, C.white, 0.282);
+}
+
+function slide17(p) {
+  const s = p.addSlide();
+  s.background = { color: C.white };
+  panel(s, 4.444, 0, 4.444, 7.5, C.sage);
+  panel(s, 8.889, 0, 4.444, 7.5, C.olive);
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 9.63, 4.068, 2.856, 2.064, S.plain, C.white, { fontFace: 'Playfair Display', fontSize: 20, lineSpacingMultiple: 1 });
+  quote(s, 9.724, 3.477, 0.377, C.white, false);
+  txt(s, 'Pricing', 4.8, 0.953, 3.734, 1.153, S.display, C.rust);
+  txt(s, 'Lorem Ipsum', 4.841, 2.452, 1.441, 0.377, S.small, C.ink);
+  hline(s, 4.909, 2.873, 3.188, C.rule, 0.75);
+  txt(s, '$25', 7.529, 2.452, 0.712, 0.377, S.small, C.ink, { align: 'right' });
+  txt(s, 'Example', 4.841, 2.947, 1.441, 0.377, S.small, C.ink);
+  hline(s, 4.909, 3.369, 3.188, C.rule, 0.75);
+  txt(s, '$45', 7.529, 2.947, 0.712, 0.377, S.small, C.ink, { align: 'right' });
+  txt(s, 'Lorem Ipsum', 4.841, 3.443, 1.441, 0.377, S.small, C.ink);
+  txt(s, '$60', 7.529, 3.443, 0.712, 0.377, S.small, C.ink, { align: 'right' });
+  txt(s, 'Lorem Ipsum', 4.841, 4.293, 1.441, 0.377, S.small, C.ink);
+  hline(s, 4.909, 4.714, 3.188, C.rule, 0.75);
+  txt(s, '$25', 7.529, 4.293, 0.712, 0.377, S.small, C.ink, { align: 'right' });
+  txt(s, 'Example', 4.841, 4.788, 1.441, 0.377, S.small, C.ink);
+  hline(s, 4.909, 5.21, 3.188, C.rule, 0.75);
+  txt(s, '$45', 7.529, 4.788, 0.712, 0.377, S.small, C.ink, { align: 'right' });
+  txt(s, 'Lorem Ipsum', 4.841, 5.284, 1.441, 0.377, S.small, C.ink);
+  txt(s, '$60', 7.529, 5.284, 0.712, 0.377, S.small, C.ink, { align: 'right' });
+  txt(s, 'It is a long established fact that a reader will distribution look like readable English. ', 4.8, 6.227, 3.188, 0.578, S.body, C.ink);
+  chrome(s, C.white);
+  txt(s, '420K', 9.602, 2.069, 2.19, 1.065, S.plain, C.rust, { fontFace: 'Arimo', fontSize: 55, lineSpacingMultiple: 1.364 });
+}
+
+function slide18(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  txt(s, 'Simple', 0.488, 1.411, 3.734, 1.153, S.display, C.rust);
+  chrome(s, C.ink);
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 1.707, 3.68, 2.856, 2.064, S.plain, C.ink, { fontFace: 'Playfair Display', fontSize: 20, lineSpacingMultiple: 1 });
+  txt(s, '420K', 1.707, 6.019, 1.904, 0.802, S.stat, C.rust);
+  tickPair(s, 0.623, 5.191, 0.556, C.rust, 0.283);
+}
+
+function slide19(p) {
+  const s = p.addSlide();
+  s.background = { color: C.sage };
+  txt(s, 'Portfolio', -0.964, 4.076, 4.32, 1.153, S.display, C.rust, { rotate: -90 });
+  chrome(s, C.ink);
+  panel(s, 2.167, 1.375, 0.806, 0.861, C.moss);
+  panel(s, 3.306, 1.375, 0.806, 0.861, C.olive);
+  panel(s, 4.444, 1.375, 0.806, 0.861, C.rust);
+  txt(s, 'It is a long established fact that a reader will be is that it has a more-or-less normal distribution look like readable English. ', 8.806, 5.878, 3.528, 0.83, S.body, C.ink);
+}
+
+function slide20(p) {
+  const s = p.addSlide();
+  s.background = { color: C.olive };
+  panel(s, 0, 0, 4.381, 7.5, C.rust);
+  txt(s, 'Demography', 2.285, 3.271, 6.179, 1.153, S.display, C.white, { rotate: -90 });
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 0.799, 3.68, 2.861, 2.064, S.plain, C.white, { fontFace: 'Playfair Display', fontSize: 20, lineSpacingMultiple: 1 });
+  txt(s, '30%', 6.667, 4.85, 1.704, 0.802, S.stat, C.white);
+  txt(s, '80%', 9.824, 4.85, 1.704, 0.802, S.stat, C.white);
+  txt(s, 'It is a long established fact that a reader will be is that it has a more-or-less normal distribution look like readable English. ', 6.667, 5.764, 2.384, 1.083, S.body, C.white);
+  txt(s, 'It is a long established fact that a reader will be is that it has a more-or-less normal distribution look like readable English. ', 9.824, 5.764, 2.384, 1.083, S.body, C.white);
+  chrome(s, C.white);
+  txt(s, '420K', 0.799, 2.575, 2.024, 0.802, S.stat, C.white);
+}
+
+function slide21(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 0, 0, 4.381, 7.5, C.sage);
+  txt(s, 'Project List', 0.488, 1.411, 3.595, 2.205, S.display, C.rust);
+  chrome(s, C.ink);
+  hline(s, 0.608, 4.375, 0.597, C.rust, 3);
+  txt(s, 'Client Name', 6.163, 1.534, 1.441, 0.377, S.small, C.ink);
+  txt(s, 'Project Title', 6.163, 2.03, 1.441, 0.377, S.small, C.ink);
+  hline(s, 6.231, 1.956, 1.441, C.rule, 0.75);
+  hline(s, 6.231, 2.452, 1.441, C.rule, 0.75);
+  txt(s, 'Year', 6.163, 2.526, 1.117, 0.377, S.small, C.ink);
+  txt(s, '01', 5.147, 1.726, 1.117, 0.802, S.stat, C.rust);
+  txt(s, 'Client Name', 6.163, 3.408, 1.441, 0.377, S.small, C.ink);
+  txt(s, 'Project Title', 6.163, 3.904, 1.441, 0.377, S.small, C.ink);
+  hline(s, 6.231, 3.83, 1.441, C.rule, 0.75);
+  hline(s, 6.231, 4.325, 1.441, C.rule, 0.75);
+  txt(s, 'Year', 6.163, 4.399, 1.117, 0.377, S.small, C.ink);
+  txt(s, '02', 5.147, 3.6, 1.117, 0.802, S.stat, C.rust);
+  txt(s, 'Client Name', 6.163, 5.281, 1.441, 0.377, S.small, C.ink);
+  txt(s, 'Project Title', 6.163, 5.777, 1.441, 0.377, S.small, C.ink);
+  hline(s, 6.231, 5.703, 1.441, C.rule, 0.75);
+  hline(s, 6.231, 6.199, 1.441, C.rule, 0.75);
+  txt(s, 'Year', 6.163, 6.273, 1.117, 0.377, S.small, C.ink);
+  txt(s, '03', 5.147, 5.473, 1.117, 0.802, S.stat, C.rust);
+  txt(s, 'Client Name', 10.689, 1.534, 1.441, 0.377, S.small, C.ink);
+  txt(s, 'Project Title', 10.689, 2.03, 1.441, 0.377, S.small, C.ink);
+  hline(s, 10.756, 1.956, 1.441, C.rule, 0.75);
+  hline(s, 10.756, 2.452, 1.441, C.rule, 0.75);
+  txt(s, 'Year', 10.689, 2.526, 1.117, 0.377, S.small, C.ink);
+  txt(s, '04', 9.672, 1.726, 1.117, 0.802, S.stat, C.rust);
+  txt(s, 'Client Name', 10.689, 3.408, 1.441, 0.377, S.small, C.ink);
+  txt(s, 'Project Title', 10.689, 3.904, 1.441, 0.377, S.small, C.ink);
+  hline(s, 10.756, 3.83, 1.441, C.rule, 0.75);
+  hline(s, 10.756, 4.325, 1.441, C.rule, 0.75);
+  txt(s, 'Year', 10.689, 4.399, 1.117, 0.377, S.small, C.ink);
+  txt(s, '05', 9.672, 3.6, 1.117, 0.802, S.stat, C.rust);
+  txt(s, 'Client Name', 10.689, 5.281, 1.441, 0.377, S.small, C.ink);
+  txt(s, 'Project Title', 10.689, 5.777, 1.441, 0.377, S.small, C.ink);
+  hline(s, 10.756, 5.703, 1.441, C.rule, 0.75);
+  hline(s, 10.756, 6.199, 1.441, C.rule, 0.75);
+  txt(s, 'Year', 10.689, 6.273, 1.117, 0.377, S.small, C.ink);
+  txt(s, '06', 9.672, 5.473, 1.117, 0.802, S.stat, C.rust);
+  tickPair(s, 8.332, 4.15, 0.556, C.rust, 0.282);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of here\', making it look like readable English. Many sites still in their infancy.', 0.508, 4.806, 3.542, 1.588, S.body, C.ink);
+}
+
+function slide22(p) {
+  const s = p.addSlide();
+  s.background = { color: C.rust };
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look like readable English. It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look readable English. ', 0.638, 3.329, 3.096, 2.85, S.body, C.white);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution look like readable English. ', 9.73, 3.329, 2.498, 1.84, S.body, C.white);
+  txt(s, 'Testimonial', 0.543, 1.659, 5.655, 1.153, S.display, C.white);
+  txt(s, 'Your Title Here', 9.73, 5.802, 1.794, 0.377, S.small, C.white);
+  txt(s, 'Your Name Here', 9.73, 5.433, 2.498, 0.41, S.heading, C.white);
+  txt(s, '420K', 9.73, 2.41, 2.024, 0.802, S.stat, C.white);
+  socialRow(s, 5.449, 6.322, 1, C.white, 4);
+  chrome(s, C.white);
+}
+
+function slide23(p) {
+  const s = p.addSlide();
+  s.background = { color: C.sage };
+  panel(s, 9.27, 0, 4.063, 7.5, C.olive);
+  txt(s, '02', 0.952, 1.272, 2.7, 2.205, S.numeral, C.rust, { align: 'center' });
+  txt(s, 'It is a long fact that distracted by the readable content of search for \'lorem ipsum\' will uncover many web sites still in their infancy.', 2.429, 3.182, 3.571, 3.046, S.plain, C.ink, { fontFace: 'Playfair Display', fontSize: 25, lineSpacingMultiple: 1.2 });
+  chrome(s, C.white);
+}
+
+function slide24(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  txt(s, 'Statistic', 0.635, 1.509, 4.163, 1.153, S.display, C.rust);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of here\', making it look like readable English. Many sites still in their infancy.', 0.635, 3.794, 4.285, 1.335, S.body, C.ink);
+  panel(s, 0, 6.052, 5.825, 1.448, C.olive);
+  chrome(s, C.ink);
+  txt(s, 'It is a long established fact that a readable content of a page when looking at its layout. ', 5.825, 2.292, 2.513, 0.83, S.body, C.ink);
+  txt(s, '30%', 5.747, 1.527, 1.704, 0.802, S.stat, C.ink);
+  txt(s, 'It is a long established fact that a readable content of a page when looking at its layout. ', 9.658, 2.292, 2.513, 0.83, S.body, C.ink);
+  txt(s, '80%', 9.579, 1.527, 1.704, 0.802, S.stat, C.ink);
+  txt(s, 'It is a long established fact that a readable content of a page when looking at its layout. ', 5.825, 4.462, 2.513, 0.83, S.body, C.ink);
+  txt(s, '40%', 5.747, 3.697, 1.704, 0.802, S.stat, C.ink);
+  txt(s, 'It is a long established fact that a readable content of a page when looking at its layout. ', 9.658, 4.462, 2.513, 0.83, S.body, C.ink);
+  txt(s, '65%', 9.579, 3.697, 1.704, 0.802, S.stat, C.ink);
+  tickPair(s, 8.457, 3.532, 0.556, C.rust, 0.282);
+  txt(s, 'Lorem Ipsum', 0.635, 3.397, 2.016, 0.41, S.heading, C.ink);
+  socialRow(s, 1.548, 6.568, 1, C.white, 4);
+  tickPair(s, 4.315, 6.799, 0.556, C.paper, 0.282);
+  tickPair(s, 0.5, 6.799, 0.556, C.paper, 0.282);
+}
+
+function slide25(p) {
+  const s = p.addSlide();
+  s.background = { color: C.sage };
+  txt(s, 'Statistic', 4.347, 1.273, 4.639, 1.153, S.plain, C.rust, { fontFace: 'Playfair Display', fontSize: 80, bold: true, lineSpacingMultiple: 0.938, align: 'center' });
+  chrome(s, C.ink);
+  txt(s, 'Website Viewer', 0.741, 2.49, 1.624, 0.377, S.small, C.ink);
+  hline(s, 0.808, 3.133, 2.525, C.rule, 0.75);
+  txt(s, '246.027', 0.663, 1.799, 2.938, 0.802, S.stat, C.ink);
+  txt(s, 'Website Viewer', 0.741, 4.2, 1.624, 0.377, S.small, C.ink);
+  hline(s, 0.808, 4.843, 2.525, C.rule, 0.75);
+  txt(s, '654.471', 0.663, 3.509, 2.938, 0.802, S.stat, C.ink);
+  txt(s, 'Website Viewer', 0.741, 5.911, 1.624, 0.377, S.small, C.ink);
+  hline(s, 0.808, 6.554, 2.525, C.rule, 0.75);
+  txt(s, '974.549', 0.663, 5.22, 2.938, 0.802, S.stat, C.ink);
+  txt(s, 'Website Viewer', 9.739, 2.49, 1.624, 0.377, S.small, C.ink);
+  hline(s, 9.806, 3.133, 2.525, C.rule, 0.75);
+  txt(s, '710.45', 9.661, 1.799, 2.938, 0.802, S.stat, C.ink);
+  txt(s, 'Website Viewer', 9.739, 4.2, 1.624, 0.377, S.small, C.ink);
+  hline(s, 9.806, 4.843, 2.525, C.rule, 0.75);
+  txt(s, '246.073', 9.661, 3.509, 2.938, 0.802, S.stat, C.ink);
+  txt(s, 'Website Viewer', 9.739, 5.911, 1.624, 0.377, S.small, C.ink);
+  hline(s, 9.806, 6.554, 2.525, C.rule, 0.75);
+  txt(s, '416.751', 9.661, 5.22, 2.938, 0.802, S.stat, C.ink);
+}
+
+function slide26(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  txt(s, 'Profiles', 0.635, 1.273, 4.163, 1.153, S.display, C.rust);
+  txt(s, 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has readable English. Many sites still in their infancy.', 6.909, 1.434, 5.424, 0.83, S.body, C.ink);
+  chrome(s, C.ink);
+  panel(s, 0, 2.944, 13.333, 4.556, C.olive);
+  txt(s, 'Your Name Here', 9.817, 5.981, 2.603, 0.41, S.heading, C.white, { align: 'center' });
+  socialRow(s, 10.549, 6.559, 0.68, C.white, 3);
+  txt(s, 'Your Name Here', 5.365, 5.981, 2.603, 0.41, S.heading, C.white, { align: 'center' });
+  socialRow(s, 6.098, 6.559, 0.68, C.white, 3);
+  txt(s, 'Your Name Here', 0.914, 5.981, 2.603, 0.41, S.heading, C.white, { align: 'center' });
+  socialRow(s, 1.647, 6.559, 0.68, C.white, 3);
+  tickPair(s, 8.467, 5.14, 0.556, C.paper, 0.282);
+  tickPair(s, 4.004, 5.14, 0.556, C.paper, 0.282);
+}
+
+function slide27(p) {
+  const s = p.addSlide();
+  s.background = { color: C.cream };
+  txt(s, 'Social Media Statistic', 0.746, 0.706, 5.92, 2.205, S.display, C.rust);
+  panel(s, 7.079, 4.397, 1.444, 2.333, C.sage);
+  panel(s, 9.024, 2.911, 1.444, 3.819, C.olive);
+  panel(s, 10.968, 3.75, 1.444, 2.98, C.rust);
+  txt(s, '50K', 11.182, 3.054, 1.016, 0.41, S.plain, C.ink, { fontFace: 'Arimo', fontSize: 24, lineSpacingMultiple: 0.917, align: 'center' });
+  txt(s, '80K', 9.238, 2.213, 1.016, 0.41, S.plain, C.ink, { fontFace: 'Arimo', fontSize: 24, lineSpacingMultiple: 0.917, align: 'center' });
+  txt(s, '30K', 7.294, 3.772, 1.016, 0.41, S.plain, C.ink, { fontFace: 'Arimo', fontSize: 24, lineSpacingMultiple: 0.917, align: 'center' });
+}
+
+function slide28(p) {
+  const s = p.addSlide();
+  s.background = { color: C.white };
+  panel(s, 0, 0, 5.479, 7.5, C.rust);
+  txt(s, 'Contact Us', 0.689, 1.107, 4.561, 1.08, S.plain, C.white, { fontFace: 'Playfair Display', fontSize: 60, bold: true, lineSpacingMultiple: 1.25 });
+  txt(s, 'Emails:', 9.119, 3.612, 1.561, 0.37, S.plain, C.ink, { fontFace: 'Playfair Display', fontSize: 16 });
+  txt(s, 'myemail@example.com', 9.119, 3.973, 2.355, 0.297, S.meta, C.black);
+  txt(s, 'Social Media :', 9.119, 4.717, 1.714, 0.37, S.plain, C.ink, { fontFace: 'Playfair Display', fontSize: 16 });
+  txt(s, 'Twiterildogamant01,Instagram %id', 9.119, 5.078, 2.922, 0.297, S.meta, C.black);
+  txt(s, 'Address :', 9.119, 5.821, 1.561, 0.37, S.plain, C.ink, { fontFace: 'Playfair Display', fontSize: 16 });
+  txt(s, ['560 Colins Street,', 'Ny 854501'], 9.119, 6.182, 1.714, 0.507, S.meta, C.black);
+  txt(s, 'Phone & Face:', 9.119, 2.508, 1.894, 0.37, S.plain, C.ink, { fontFace: 'Playfair Display', fontSize: 16 });
+  txt(s, '+1234 254 876/+4567 547 231', 9.119, 2.869, 2.575, 0.297, S.meta, C.black);
+  chrome(s, C.ink, C.white, C.paper);
+}
+
+/* ------------------------------------------------------------------- build */
+
+const SLIDES = [
+  slide1, slide2, slide3, slide4, slide5, slide6, slide7,
+  slide8, slide9, slide10, slide11, slide12, slide13, slide14,
+  slide15, slide16, slide17, slide18, slide19, slide20, slide21,
+  slide22, slide23, slide24, slide25, slide26, slide27, slide28,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'ANTHONY', width: 13.3333333, height: 7.5 }); // 12192000 x 6858000 EMU
+  pptx.layout = 'ANTHONY';
+  pptx.author = 'Anthony';
+  pptx.title = 'Anthony — Presentation Template';
+  SLIDES.forEach((fn) => fn(pptx));
+  return pptx;
+}
+
+const OUT = path.join(__dirname, '0d0b75dc-e6a3-4002-b4de-fcb583d206cc_grok_final.pptx');
+build()
+  .writeFile({ fileName: OUT })
+  .then(() => console.log('wrote ' + OUT))
+  .catch((err) => { console.error(err); process.exit(1); });

@@ -1,0 +1,47 @@
+<xsd:schema elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/office/powerpoint/2022/06/main/command" xmlns="http://schemas.microsoft.com/office/powerpoint/2022/06/main/command" xmlns:pc226="http://schemas.microsoft.com/office/powerpoint/2022/06/main/command" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:pc2="http://schemas.microsoft.com/office/powerpoint/2019/9/main/command" xmlns:ac="http://schemas.microsoft.com/office/drawing/2013/main/command" xmlns:s="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <xsd:import namespace="http://schemas.microsoft.com/office/drawing/2013/main/command" schemaLocation="dml-cmd.xsd"/>
+  <xsd:import namespace="http://schemas.microsoft.com/office/powerpoint/2019/9/main/command" schemaLocation="ms-pptxMonikerList2.xsd"/>
+  <xsd:import namespace="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" schemaLocation="shared-commonSimpleTypes.xsd"/>
+  <xsd:import namespace="http://schemas.openxmlformats.org/presentationml/2006/main" schemaLocation="pml.xsd"/>
+  <xsd:simpleType name="ST_CommentReplyV2ChangeBit">
+    <xsd:restriction base="xsd:token">
+      <xsd:enumeration value="add"/>
+      <xsd:enumeration value="del"/>
+      <xsd:enumeration value="mod"/>
+      <xsd:enumeration value="modRxn"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="ST_CommentReplyV2ChangeBits">
+    <xsd:list itemType="ST_CommentReplyV2ChangeBit"/>
+  </xsd:simpleType>
+  <xsd:complexType name="CT_CommentReplyV2Changes">
+    <xsd:sequence>
+      <xsd:element name="chgData" type="ac:CT_ChangesData" minOccurs="0" maxOccurs="1"/>
+      <xsd:element ref="pc2:cmRplyMkLst" minOccurs="1" maxOccurs="1"/>
+      <xsd:element name="extLst" type="p:CT_ExtensionList" minOccurs="0" maxOccurs="1"/>
+    </xsd:sequence>
+    <xsd:attribute name="chg" type="ST_CommentReplyV2ChangeBits" use="required"/>
+  </xsd:complexType>
+  <xsd:simpleType name="ST_CommentV2ChangeBit">
+    <xsd:restriction base="xsd:token">
+      <xsd:enumeration value="add"/>
+      <xsd:enumeration value="del"/>
+      <xsd:enumeration value="mod"/>
+      <xsd:enumeration value="modTsk"/>
+      <xsd:enumeration value="modRxn"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="ST_CommentV2ChangeBits">
+    <xsd:list itemType="ST_CommentV2ChangeBit"/>
+  </xsd:simpleType>
+  <xsd:complexType name="CT_CommentV2Changes">
+    <xsd:sequence>
+      <xsd:element name="chgData" type="ac:CT_ChangesData" minOccurs="0" maxOccurs="1"/>
+      <xsd:element ref="pc2:cmMkLst" minOccurs="1" maxOccurs="1"/>
+      <xsd:element name="cmRplyChg" type="CT_CommentReplyV2Changes" minOccurs="0" maxOccurs="unbounded"/>
+      <xsd:element name="extLst" type="p:CT_ExtensionList" minOccurs="0" maxOccurs="1"/>
+    </xsd:sequence>
+    <xsd:attribute name="chg" type="ST_CommentV2ChangeBits" use="required"/>
+  </xsd:complexType>
+  <xsd:element name="cmChg" type="CT_CommentV2Changes"/>
+</xsd:schema>

@@ -1,0 +1,52 @@
+--- 2026-10-07_17-05:/home/box/sand-data/managed-skills/skills/slides/SKILL.md
++++ 2026-10-08_02-46:/home/box/sand-data/managed-skills/skills/slides/SKILL.md
+@@ -55,11 +55,13 @@
+ 
+ The user approves the `family` result and the `storyboard` result before the next phase starts. In `edit`, the `storyboard` result needs no approval.
+ 
++After `finish`, when the user is satisfied with the delivered deck, the `clean` phase removes the working files.
++
+ ## Phases
+ 
+ Each brief is one phase. The child does only the work of that phase, then it returns.
+ 
+-The parent resumes the child that did a phase for every later brief of that same phase. A revision of what that child just returned, such as more color on a template, is a resume, and that brief still names the working folder. A `build` brief names the group, its slides, and the sources. A `fix` brief resumes the child that built that group. A new child starts for `storyboard`, for `build`, and for `finish`.
++The parent resumes the child that did a phase for every later brief of that same phase. A revision of what that child just returned, such as more color on a template, is a resume, and that brief still names the working folder. A `build` brief names the group, its slides, and the sources. A `fix` brief resumes the child that built that group. A `clean` brief resumes the `finish` child. A new child starts for `storyboard`, for `build`, and for `finish`.
+ 
+ | Phase | What the child makes | Step budget |
+ |---|---|---|
+@@ -68,6 +70,7 @@
+ | `build` | The text and pictures of one group of two or three slides | 10 |
+ | `fix` | The changes that the parent names, on the slides of one group | 5 |
+ | `finish` | No new slides. It merges the notes, checks the whole deck, fixes it, cleans it, and packs it. | 10 |
++| `clean` | No slides. It deletes the working files of the delivered deck. The finished `.pptx` stays. | 2 |
+ 
+ A step is one turn of tool calls. Parallel calls in one step count as one step. If the child runs setup in a phase, it can use 5 more steps. If the child reaches the budget of a phase, the child renders the slides that it has and returns. It says what is left.
+ 
+@@ -91,7 +94,7 @@
+ built: slides 4-6
+ images: <box paths of the images that this phase returns>
+ pptx: <box path of the deck>
+-status: more | deck done | blocked
++status: more | deck done | cleaned | blocked
+ ```
+ 
+ The defect list names each defect by slide number, with its status: fixed, or left with the reason. If the phase found no defect, the list says so.
+@@ -148,12 +151,15 @@
+ 
+ ### 10. The next message
+ 
+-Their next message after the deck is done is an edit. Start the `edit` workflow on the finished `.pptx`, in a new working folder.
++If they are satisfied with the deck, reply to them. In the same step, resume the `finish` child with a `clean` brief that names the working folder, the finished `.pptx`, and the `slides-executor` skill. If that resume is refused, start a new Task with the same brief. Then end your turn. The child deletes the working files. You do not delete files yourself.
++
++If they want a change, start the `edit` workflow on the finished `.pptx`, in a new working folder.
+ 
+ ## What to do with a return
+ 
+-Steps 6, 7, and 8 start Tasks. This table says what to do when a Task returns. Find the first row that matches the return, and do what it says.
++Steps 6, 7, 8, and 10 start Tasks. This table says what to do when a Task returns. Find the first row that matches the return, and do what it says.
+ 
++- `clean`: End your turn. Do not tell them about the cleanup, even when it returns `status: blocked`.
+ - `status: blocked`: Tell them that the box does not respond, and quote the error. End your turn. When they say to try again, resume the child that returned `status: blocked`, with the same brief. If that resume is refused, start a new Task with the same brief. Do this one time for each brief. If the brief returns `status: blocked` again, stop and tell them.
+ - `family`: Send the four images, and ask which family to use. Wait. If they ask for a change to those templates, such as more color, resume the family child with that change, and end your turn. If they pick a family, that deck is the start file of the `storyboard` Task. Then do step 7.
+ - `storyboard`, in `new-plain` or `new-template`: In the `SendToUser` of its `images` line, include the storyboard lines. Say that the slides still have the template's own text. Ask whether the plan of layouts works. Wait. If they change the plan, resume the storyboard child with their changes, and end your turn. If they approve the plan, do step 8.

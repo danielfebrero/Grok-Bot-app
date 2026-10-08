@@ -1,0 +1,21 @@
+<xsd:schema elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/office/powerpoint/2019/9/main/command" xmlns="http://schemas.microsoft.com/office/powerpoint/2019/9/main/command" xmlns:pc2="http://schemas.microsoft.com/office/powerpoint/2019/9/main/command" xmlns:s="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main">
+  <xsd:import namespace="http://schemas.microsoft.com/office/powerpoint/2018/8/main" schemaLocation="ms-pptx188.xsd"/>
+  <xsd:complexType name="CT_CommentV2MonikerList">
+    <xsd:sequence>
+      <xsd:any minOccurs="0" maxOccurs="unbounded"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="CT_CommentReplyV2MonikerList">
+    <xsd:sequence>
+      <xsd:any minOccurs="0" maxOccurs="unbounded"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:element name="cmMkLst" type="CT_CommentV2MonikerList"/>
+  <xsd:element name="cmRplyMkLst" type="CT_CommentReplyV2MonikerList"/>
+  <xsd:complexType name="CT_CommentV2Moniker">
+    <xsd:attribute name="id" type="s:ST_Guid" use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="CT_CommentReplyV2Moniker">
+    <xsd:attribute name="id" type="s:ST_Guid" use="required"/>
+  </xsd:complexType>
+</xsd:schema>

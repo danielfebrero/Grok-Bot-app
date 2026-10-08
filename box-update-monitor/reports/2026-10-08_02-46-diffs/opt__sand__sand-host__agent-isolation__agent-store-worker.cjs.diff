@@ -1,0 +1,19 @@
+--- 2026-10-07_17-05:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-08_02-46:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -5580,6 +5580,7 @@
+     this.disabledEnvironments = [];
+     this.scopedTo = [];
+     this.frontmatter = "";
++    this.warnings = [];
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -5595,7 +5596,7 @@
+     return proto3.util.equals(_CursorRule, a, b);
+   }
+   static $() {
+-    return ["CursorRule|1 full_path 9|2 content 9|3 type #0|4 source #1|5 git_remote_origin 9?|6 parse_error 9?|7 environments 9*|8 disabled_environments 9*|9 plugin 9?|10 marketplace 9?|11 plugin_id 9?|12 marketplace_id 9?|13 scoped_to 9*|14 frontmatter 9|15 is_required 8?", CursorRuleType, CursorRuleSource];
++    return ["CursorRule|1 full_path 9|2 content 9|3 type #0|4 source #1|5 git_remote_origin 9?|6 parse_error 9?|7 environments 9*|8 disabled_environments 9*|9 plugin 9?|10 marketplace 9?|11 plugin_id 9?|12 marketplace_id 9?|13 scoped_to 9*|14 frontmatter 9|15 is_required 8?|16 warnings 9*", CursorRuleType, CursorRuleSource];
+   }
+ };
+ 

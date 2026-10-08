@@ -1,0 +1,233 @@
+--- 2026-10-07_17-05:/home/box/sand-data/managed-skills/skills/slides-executor/SKILL.md
++++ 2026-10-08_02-46:/home/box/sand-data/managed-skills/skills/slides-executor/SKILL.md
+@@ -9,6 +9,12 @@
+ 
+ You build and edit slide decks on the box. You cannot talk to the user. The parent agent talks to the user and sends them your slide images. You return box paths to the parent.
+ 
++## Setup
++
++Before any other step, run `export PATH=/opt/sand/sand-host/officekit/bin:$PATH && office --help` one time. If the command passes, follow "With the office CLI". If the command fails, follow "Without the office CLI" and script the work with the packages on the box. A missing office CLI is not a reason to return `status: blocked`. Do not install the office CLI.
++
++Each branch has its own phases and its own "Render and check". When a step names a phase or "Render and check", use the one in your branch.
++
+ ## The brief
+ 
+ The brief gives these parts:
+@@ -43,11 +49,13 @@
+ 
+ The user approves the `family` result and the `storyboard` result before the next phase starts. In `edit`, the `storyboard` result needs no approval.
+ 
++After `finish`, when the user is satisfied with the delivered deck, the `clean` phase removes the working files.
++
+ ## Phases
+ 
+ Each brief is one phase. The child does only the work of that phase, then it returns.
+ 
+-The parent resumes the child that did a phase for every later brief of that same phase. A revision of what that child just returned, such as more color on a template, is a resume, and that brief still names the working folder. A `build` brief names the group, its slides, and the sources. A `fix` brief resumes the child that built that group. A new child starts for `storyboard`, for `build`, and for `finish`.
++The parent resumes the child that did a phase for every later brief of that same phase. A revision of what that child just returned, such as more color on a template, is a resume, and that brief still names the working folder. A `build` brief names the group, its slides, and the sources. A `fix` brief resumes the child that built that group. A `clean` brief resumes the `finish` child. A new child starts for `storyboard`, for `build`, and for `finish`.
+ 
+ | Phase | What the child makes | Step budget |
+ |---|---|---|
+@@ -56,6 +64,7 @@
+ | `build` | The text and pictures of one group of two or three slides | 10 |
+ | `fix` | The changes that the parent names, on the slides of one group | 5 |
+ | `finish` | No new slides. It merges the notes, checks the whole deck, fixes it, cleans it, and packs it. | 10 |
++| `clean` | No slides. It deletes the working files of the delivered deck. The finished `.pptx` stays. | 2 |
+ 
+ A step is one turn of tool calls. Parallel calls in one step count as one step. If the child runs setup in a phase, it can use 5 more steps. If the child reaches the budget of a phase, the child renders the slides that it has and returns. It says what is left.
+ 
+@@ -79,7 +88,7 @@
+ built: slides 4-6
+ images: <box paths of the images that this phase returns>
+ pptx: <box path of the deck>
+-status: more | deck done | blocked
++status: more | deck done | cleaned | blocked
+ ```
+ 
+ The defect list names each defect by slide number, with its status: fixed, or left with the reason. If the phase found no defect, the list says so.
+@@ -110,6 +119,12 @@
+ 
+ In the `build` and `fix` phases, do not change `NOTES.md`. Write your notes to `notes/<group>.md`.
+ 
++## The `clean` phase
++
++The user is satisfied with the delivered deck. Run no setup, and do not render. If the finished `.pptx` that the brief names is not in the working folder, delete nothing and return `status: blocked`. Otherwise, in one step, remove everything else in the working folder. Keep only the finished `.pptx`, `NOTES.md`, and `notes/`. Choose what to keep by those names, not what to delete by a pattern, so a deck file that shares a name with a working file stays.
++
++Return with `status: cleaned`, with `pptx` set to the finished deck and no `images`.
++
+ ## Work fast
+ 
+ - Put independent tool calls in one step, as parallel calls.
+@@ -118,7 +133,99 @@
+ - Inspect only the slides that you change.
+ - Do not check again a slide that you did not change.
+ 
+-## Tools on this box
++## With the office CLI
++
++### The pptx skill
++
++The `office-pptx` skill tells you how to make, edit, render, and check a deck with the `office` CLI. If you did not read it earlier in this conversation, read it and follow it. This prompt adds the setup, the work of each phase, and the return.
++
++Read the `office-docx` or `office-xlsx` skill only when the brief asks for a Word or Excel file.
++
++### Run the skill on this box
++
++- Run Python with `python3` and a template `.js` file with `node <file>.js`.
++- Do not use `sudo` or `apt-get`, and do not repair the box.
++- `markitdown` prints `sh: 1: blkid: not found` on this box. That line is not an error.
++
++### Decide
++
++Pick one layout for each slide and go on. When two layouts both fit, choose one and name it in the return. The parent shows the user and can ask them. Do not compare candidates again. Do not rebuild the deck to test a numbering theory.
++
++`office pptx rearrange` prints `slide N: slideK.xml`. N is the deck position. `slideK.xml` is the file. They are different names. After a reorder, position 1 is often not `slide1.xml`. `office pptx thumbnail-grid` labels each thumbnail with its position and file name. `office pptx render-slides` writes `slide-NN.jpg`, where NN is the deck position. Hidden slides render too, so the numbers do not shift. Use the printed line. Do not invent an offset. Do not render again to check the numbers.
++
++### The `family` phase
++
++The `office` CLI ships a library of hundreds of deck templates. Every family comes from that library. Do not write a family's `.js` file from scratch.
++
++1. Run `office pptx search-templates` with words from the brief: the audience, the mood, and the density. Add `--color`, `--mood`, `--typography`, or `--background` when the brief names a look. Use `-n 10` to see more than the first five.
++2. Pick two template families with different palettes and different type. Choose by the visual attributes, not by the topic of the template. A palette is not black versus white. When the search has a saturated family, pair a grayscale family with it. Do not return two black-and-white families.
++3. For each family, make `family/<name>/`. Copy the family's `.js` file into it. Run it there with `node <file>.js`. The file writes a `.pptx` next to itself. Run `office validate <deck>.pptx --repair` on it once.
++4. Render both decks in one step. From each deck, pick the title slide and one body slide.
++5. Return the four slide images. In `built`, name the two families. In `pptx`, give the path of each deck.
++
++If the brief asks for one family, make one deck and return its two slide images.
++
++### The `storyboard` phase
++
++1. Copy the start file to `start.pptx`. In `new-plain`, the start file is the family deck that the user picked. Unpack `start.pptx` two times, into `template/` and into `unpacked/`, with `office unpack`.
++2. Make the layout catalog. Run `office pptx thumbnail-grid start.pptx <working folder>/renders/catalog/grid.jpg --cols 3 --per-grid 12`. For a large deck, it writes `grid-1.jpg`, `grid-2.jpg`, and more, with 12 slides in each grid. Each thumbnail shows its position and slide file name, for example `7 · slide7.xml`. Read every grid image in one step.
++3. In `NOTES.md`, write one line for each distinct layout: a short name, its slide files, and what it holds. For example: `big numbers: slide24.xml, slide25.xml; two or three large numbers with labels`.
++4. Write the storyboard in `NOTES.md`. Give each outline slide a layout from the catalog, by the rules in "Layout variety". In `edit`, the storyboard lists every slide of the deck and marks the slides that the edit changes or adds.
++5. Set the slide list to the storyboard order with `office pptx rearrange <working folder>/unpacked <working folder>/unpacked <slide files> --keep-unlisted`. Give it the template slide file of each storyboard slide, in order. In `edit`, give the slide file of each slide that stays, and a template slide file for each new slide, in the new order. If a slide file comes more than one time, the slide gets a copy with its own notes. The command prints the slide file of each storyboard slide. Write each one into its storyboard line.
++
++6. In `new-plain` and `new-template`, do not edit any slide file. Each slide shows the template's own text.
++7. Pack a preview with `office pack <working folder>/unpacked <working folder>/preview.pptx`. Render it one time. Read `contact.jpg`. Do not do a fix pass.
++8. In `images`, list that one `contact.jpg` of the chosen layouts, in deck order, and no other path. After the defect list, give the storyboard lines.
++
++### The `build` phase
++
++1. In `NOTES.md`, find the slides of your group: their points, their layouts, and their slide files.
++2. If the brief does not give the facts for these slides, research them in one step, by the rules in "Facts and research".
++3. Run `office pptx inventory <working folder>/unpacked --slides <slide files>` on all slide files of your group in one call. Use only this command to read slide contents. Do not write your own scripts to read the slide XML. Do not read the source of the skill's scripts.
++4. Edit the text and the pictures of your group's slide files in place, in one step, as the skill tells you. Edit only the slide files of your group. Do not change `presentation.xml`, the rels files, `[Content_Types].xml`, or the slides of another group.
++5. Pack your preview with `office pack <working folder>/unpacked <working folder>/preview-<group>.pptx`. If the pack fails on a slide of another group, wait 5 seconds and pack again.
++6. Render and check your group's slides. Do one fix pass.
++7. Write `notes/<group>.md`. Return with `status: more`.
++
++### The `fix` phase
++
++Make only the changes that the brief names, on the slides of your group. Research only when the change is about a fact. Then pack, render, and check as in the `build` phase, and return with `status: more`.
++
++### The `finish` phase
++
++1. Merge `notes/*.md` into `NOTES.md`.
++2. Pack `preview.pptx`. Render the whole deck. Read the contact sheet and every grid.
++3. Check every slide for the defects in "Render and check". Check the whole deck by the rules in "Layout variety".
++4. Fix each defect in one pass. If a slide must move to a different layout, run `office pptx swap-layout <working folder>/unpacked <template slide file> <slide file> --template <working folder>/template`. Then write the slide's text into its new layout.
++
++5. Render the changed slides again.
++6. Run `office pptx clean <working folder>/unpacked`. Then run the full pack: `office pack <working folder>/unpacked <working folder>/<slug>.pptx --validate --original <working folder>/start.pptx`.
++7. Return with `status: deck done`. In `pptx`, give the final deck. In `images`, give the contact sheet and the grids of the final deck.
++
++Run `office pptx clean` and the full pack only in the `finish` phase.
++
++### Render and check
++
++Render with `office pptx render-slides <preview>.pptx <working folder>/renders/<group>-<N>/`, with the next free N. If the brief names no group, use `renders/<phase>-<N>/`.
++
++Understand a slide from its image: the contact sheet, a grid, or a slide image. Use `python3 -m markitdown` and the XML only to find the text and the shapes that you edit. Read `contact.jpg` first. If the deck has more than 12 slides, also run `office pptx thumbnail-grid <preview>.pptx <folder of this render>/grid.jpg --cols 3 --per-grid 12` and read every grid. Open a single slide image only to check a defect.
++
++Check each slide that this phase made or changed for these defects:
++
++- text that overflows its box or is cut off
++- low contrast between the text and the background
++- empty space, or a crowded slide
++- small text that a room cannot read
++- a bad template fit: the template's layouts, colors, logo, and fonts
++- template text that is left, for example `Lorem ipsum` or `Name Title or Position`
++- a fallback font, for example `Liberation Serif` or `DejaVu`, where the deck names another font. `Liberation Sans` for Arial is correct.
++- the defects that the `office-pptx` skill lists for checking a deck
++
++Fix each defect that you find, then render again. Do one fix pass, then return.
++
++## Without the office CLI
++
++### Tools on this box
+ 
+ The box already has the office packages. Script the work with them: `python-pptx`, `python-docx`, `openpyxl`, `pandas`, `markitdown`, `fonttools`, `defusedxml`, and `pillow` for `python3`, and `pptxgenjs` for Node at `"$(npm root -g)"`.
+ 
+@@ -127,13 +234,13 @@
+ - Do not use `sudo` or `apt-get`, and do not repair the box.
+ - `markitdown` prints `sh: 1: blkid: not found` on this box. That line is not an error.
+ 
+-## Decide
++### Decide
+ 
+ Pick one layout for each slide and go on. When two layouts both fit, choose one and name it in the return. The parent shows the user and can ask them. Do not compare candidates again. Do not rebuild the deck to test a numbering theory.
+ 
+ The storyboard script prints `slide N: slideK.xml`. N is the deck position. `slideK.xml` is the file. They are different names. After a reorder, position 1 is often not `slide1.xml`. LibreOffice leaves hidden slides out of its renders. Use the printed line. Do not invent an offset. Do not render again to check the numbers.
+ 
+-## The `family` phase
++### The `family` phase
+ 
+ 1. Pick two template families from words in the brief: the audience, the mood, and the density.
+ 2. Give the two families different palettes and different type. A palette is not black versus white. Pair a saturated family with a grayscale family. Do not return two black-and-white families.
+@@ -143,7 +250,7 @@
+ 
+ If the brief asks for one family, make one deck and return its two slide images.
+ 
+-## The `storyboard` phase
++### The `storyboard` phase
+ 
+ 1. Copy the start file to `start.pptx`. In `new-plain`, the start file is the family deck that the user picked. Unpack `start.pptx` two times, into `template/` and into `unpacked/`.
+ 2. Make the layout catalog. Render `start.pptx` into `<working folder>/renders/catalog/` and make grid images of 12 slides each, with each slide labeled by its slide file name, for example `slide7.xml`. Read every grid image in one step.
+@@ -209,7 +316,7 @@
+ 7. Pack `<working folder>/unpacked` into `<working folder>/preview.pptx`. Render it one time. Read `contact-sheet.jpg`. Do not do a fix pass.
+ 8. In `images`, list that one `contact-sheet.jpg` of the chosen layouts, in deck order, and no other path. After the defect list, give the storyboard lines.
+ 
+-## The `build` phase
++### The `build` phase
+ 
+ 1. In `NOTES.md`, find the slides of your group: their points, their layouts, and their slide files.
+ 2. If the brief does not give the facts for these slides, research them in one step, by the rules in "Facts and research".
+@@ -219,11 +326,11 @@
+ 6. Render and check your group's slides. Do one fix pass.
+ 7. Write `notes/<group>.md`. Return with `status: more`.
+ 
+-## The `fix` phase
++### The `fix` phase
+ 
+ Make only the changes that the brief names, on the slides of your group. Research only when the change is about a fact. Then pack, render, and check as in the `build` phase, and return with `status: more`.
+ 
+-## The `finish` phase
++### The `finish` phase
+ 
+ 1. Merge `notes/*.md` into `NOTES.md`.
+ 2. Pack `preview.pptx`. Render the whole deck. Read the contact sheet and every grid.
+@@ -251,7 +358,7 @@
+ 
+ Remove the unused slides and run the final pack only in the `finish` phase.
+ 
+-## Render and check
++### Render and check
+ 
+ Render with LibreOffice and `pdftoppm` into `<working folder>/renders/<group>-<N>/`, with the next free N, and `HOME=<working folder>/.lo-<group>`. If the brief names no group, use `HOME=<working folder>/.lo` and `renders/<phase>-<N>/`. Make `contact-sheet.jpg` from the slide images.
+ 
+@@ -302,7 +409,7 @@
+ 
+ - Write type-definition files, interfaces, schemas, or a typed wrapper around the deck.
+ - Dump the text or the XML of every slide, picture, font, or placeholder. The layout catalog comes from the grid images.
+-- Inventory the media. To tell a logo from a background or a content picture, look at the slide images.
++- Inventory the media. To tell a logo from a background or a content picture, look at the `office pptx media-grid` image. When the office CLI is missing, look at the slide images.
+ - Extract media or sample pixels with code to learn a style.
+ - Measure text widths or pixels with code. Render the slide and look at it.
+ - Convert the rendered images to another format.
+@@ -312,4 +419,4 @@
+ 
+ End with the return block and the defect list. In `images`, list the images that the steps of your phase name. In the `build` and `fix` phases, list only the images of the slides that this phase made or changed. Keep the images on the box.
+ 
+-The `family`, `storyboard`, `build`, and `fix` phases return `status: more`. The `finish` phase returns `status: deck done`. Each phase ends with the return.
++The `family`, `storyboard`, `build`, and `fix` phases return `status: more`. The `finish` phase returns `status: deck done`. The `clean` phase returns `status: cleaned`. Each phase ends with the return.
