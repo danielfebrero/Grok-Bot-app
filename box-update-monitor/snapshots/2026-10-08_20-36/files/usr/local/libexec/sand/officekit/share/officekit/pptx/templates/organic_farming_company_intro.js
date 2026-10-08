@@ -1,0 +1,1030 @@
+#!/usr/bin/env node
+/**
+ * "Organic Farm Agriculture" - 30 slide deck, rebuilt with pptxgenjs.
+ *
+ * The source deck is photo-driven: every photograph / SVG icon is replaced here
+ * by a native pptxgenjs shape (a light "photo slot" rectangle, a labelled
+ * "[image]" box or a simple vector glyph). Everything else - geometry, colours,
+ * fonts and copy - mirrors the original slide XML.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const DARK = '262626';   // body headings (tx1 lumMod 85%)
+const BODY = '808080';   // paragraph grey (tx1 lum 50%)
+const GREEN = '7FCB23';  // brand accent
+const WHITE = 'FFFFFF';
+const RULE = 'D9D9D9';   // hairline / side-marker grey
+const TEAL = '28BE88';
+const LIME = '98DF46';
+const LIME2 = '98DF48';
+const LEAF = '8CD35A';
+const MID = '60CE67';    // flat stand-in for the TEAL->LIME gradient
+const OLIVE = '5B8A3A';
+const MINT = '2FD397';
+const APPLE = '97D54C';
+const DEEP = '197554';
+const FOREST = '1A9A57';
+const OLIVE2 = '69A71D';
+const GRASS = '6BDD2B';
+const PINE = '1BAD48';
+const MOSS = '449418';
+const JADE = '20BE67';
+
+/* -------------------------------------------------------------------- fonts */
+const F_TITLE = 'Montserrat ExtraBold';
+const F_BODY = 'Lato';
+const F_HEAD = 'Lato Black';
+const F_LIGHT = 'Lato Light';
+
+/* ------------------------------------------------------------- lorem blocks */
+const L_SHORT = 'PLACEHOLDER';
+const L_NODOLOR = 'PLACEHOLDER';
+const L_LOREM = L_SHORT + ' dolore lorem ';
+const L_ENIMVAS = 'PLACEHOLDER';
+const L_ENIMVAS2 = L_ENIMVAS + ' ';
+const L_ALIQUA = L_ENIMVAS + 'PLACEHOLDER';
+const L_CULUISA = L_ALIQUA + ' commodo maines conseuatenai culuisa';
+const L_FULL = L_CULUISA + 'PLACEHOLDER';
+const L_INS = L_CULUISA + ' kerninsa vederico fernandesi uisas aute irure dolor ins';
+const L_MAGNA = 'PLACEHOLDER';
+const L_CILLUM = 'PLACEHOLDER';
+const L_DOLORSIT = 'PLACEHOLDER';
+const L_VOLUPTATE = 'Duis aute irure dolor in reprehenderit in voluptate ';
+const L_VELIT = 'Duis aute irure dolor in reprehenderit in voluptate velit';
+const L_IN = 'Duis aute irure dolor in reprehenderit in';
+const L_ONLY = 'Duis aute irure dolor in reprehenderit';
+const L_DOLOR = 'PLACEHOLDER';
+const L_CILLUM2 = 'PLACEHOLDER';
+const SIDE_LABEL = 'ORGANIC COMPANY';
+
+/* ==================================================================== helpers */
+
+/**
+ * Stand-ins for the two device photographs in the source deck: a desktop
+ * monitor and a phone, both drawn from native shapes rather than embedded art.
+ */
+function monitorMock(s, x, y, w, h) {
+    const bodyH = h * 0.67, chinH = h * 0.125, bezel = w * 0.028;
+    s.addShape('roundRect', { x, y, w, h: bodyH, rectRadius: 0.06, fill: { color: '242424' } });
+    s.addShape('rect', {
+        x: x + bezel, y: y + bezel, w: w - bezel * 2, h: bodyH - bezel * 2.2,
+        fill: { color: WHITE },
+    });
+    s.addShape('roundRect', {
+        x, y: y + bodyH, w, h: chinH, rectRadius: 0.06, fill: { color: 'BFBFBF' },
+    });
+    s.addShape('trapezoid', {
+        x: x + w * 0.41, y: y + bodyH + chinH, w: w * 0.18, h: h * 0.12,
+        fill: { color: 'CFCFCF' }, flipV: true,
+    });
+    s.addShape('roundRect', {
+        x: x + w * 0.29, y: y + h * 0.94, w: w * 0.42, h: h * 0.05,
+        rectRadius: 0.05, fill: { color: 'D8D8D8' },
+    });
+    caption(s, x, y, w, bodyH);
+}
+
+function phoneMock(s, x, y, w, h) {
+    const bezel = w * 0.038;
+    s.addShape('roundRect', { x, y, w, h, rectRadius: 0.42, fill: { color: '3A3A3A' } });
+    s.addShape('roundRect', {
+        x: x + bezel, y: y + bezel, w: w - bezel * 2, h: h - bezel * 2,
+        rectRadius: 0.36, fill: { color: WHITE },
+    });
+    s.addShape('roundRect', {
+        x: x + w * 0.32, y: y + bezel * 0.5, w: w * 0.36, h: h * 0.028,
+        rectRadius: 0.02, fill: { color: '3A3A3A' },
+    });
+    caption(s, x, y, w, h);
+}
+
+function caption(s, x, y, w, h) {
+    s.addText('[image]', {
+        x, y, w, h, align: 'center', valign: 'middle',
+        fontFace: F_BODY, fontSize: 12, color: 'B0B0B0',
+    });
+}
+
+/** Big section title: array of [text, {g:green, i:italic}] rows -> one paragraph each. */
+function title(s, o) {
+    const runs = [];
+    o.lines.forEach((line, li) => {
+        line.forEach((run, ri) => {
+            runs.push({
+                text: run[0],
+                options: {
+                    color: (run[1] && run[1].g) ? GREEN : (o.color || DARK),
+                    italic: !!(run[1] && run[1].i),
+                    breakLine: ri === line.length - 1 && li < o.lines.length - 1,
+                },
+            });
+        });
+    });
+    s.addText(runs, {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        fontFace: F_TITLE, fontSize: o.size || 28, color: o.color || DARK,
+        align: o.align || 'left', valign: 'top', wrap: false, isTextBox: true, fit: 'resize',
+    });
+}
+
+/** All-caps bold label above a paragraph. */
+function kicker(s, o) {
+    const lines = Array.isArray(o.text) ? o.text : [o.text];
+    const h = o.h || 0.303;
+    s.addText(lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })), {
+        x: o.x, y: o.y, w: o.w, h,
+        fontFace: F_HEAD, fontSize: o.size || 12, bold: true, charSpacing: 3,
+        color: o.color || DARK, align: o.align || 'left', valign: 'top',
+        wrap: false, isTextBox: true, fit: 'resize',
+    });
+}
+
+/** Grey 11pt body copy, 1.5 line spacing. */
+function para(s, o) {
+    s.addText(o.text, {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        fontFace: F_BODY, fontSize: 11, color: o.color || BODY,
+        align: o.align || 'justify', valign: 'top', lineSpacingMultiple: 1.5,
+        isTextBox: true, fit: 'resize',
+    });
+}
+
+/** Small open circle used as a list bullet. */
+function bullet(s, x, y, d) {
+    const size = d || 0.184;
+    s.addShape('ellipse', { x, y, w: size, h: size, fill: { color: WHITE }, line: { color: LEAF, width: 2.25 } });
+}
+
+/** Vertical "ORGANIC COMPANY" marker: open circle + hairline + rotated caption. */
+function sideMark(s, o) {
+    const c = o.color || RULE;
+    const tw = o.tw || 3.161;
+    s.addShape('ellipse', {
+        x: o.cx - 0.246, y: o.circleY, w: 0.492, h: 0.492,
+        line: { color: o.circleColor || c, width: 2.25 },
+    });
+    s.addShape('line', {
+        x: o.cx, y: o.lineY, w: 0, h: o.lineH || 0.84,
+        line: { color: o.lineColor || RULE, width: 1 },
+    });
+    s.addText(o.text || SIDE_LABEL, {
+        x: o.cx - tw / 2, y: o.textCY - 0.1515, w: tw, h: 0.303, rotate: 90,
+        fontFace: F_LIGHT, fontSize: 12, italic: true, charSpacing: 6,
+        color: o.textColor || c, align: 'justify', valign: 'top', wrap: false,
+        isTextBox: true, fit: 'resize',
+    });
+}
+
+/** Pointed-oval leaf replacing the deck's SVG "leaf" icon. */
+function leafGlyph(s, x, y, size, color, rotate) {
+    const w = size * 0.66;
+    s.addShape('custGeom', {
+        x: x + (size - w) / 2, y, w, h: size, rotate: rotate || 0,
+        fill: { color: color || WHITE },
+        points: [
+            { x: w / 2, y: 0 },
+            { curve: { type: 'quadratic', x1: w, y1: size * 0.30 }, x: w / 2, y: size },
+            { curve: { type: 'quadratic', x1: 0, y1: size * 0.30 }, x: w / 2, y: 0 },
+            { close: true },
+        ],
+    });
+}
+
+/**
+ * The four line-art pictograms the deck drops into its coloured discs and
+ * tiles, drawn from primitives instead of the original SVGs.
+ */
+function icon(s, kind, x, y, size, color) {
+    const c = color || WHITE, lw = Math.max(1, size * 18);
+    if (kind === 'leaf') {
+        leafGlyph(s, x, y, size, c, 330);
+    } else if (kind === 'plant') {
+        leafGlyph(s, x - size * 0.20, y, size * 0.72, c, 320);
+        leafGlyph(s, x + size * 0.20, y, size * 0.72, c, 40);
+        s.addShape('line', { x: x + size / 2, y: y + size * 0.35, w: 0, h: size * 0.6, line: { color: c, width: lw } });
+    } else if (kind === 'hand') {
+        leafGlyph(s, x + size * 0.22, y - size * 0.05, size * 0.55, c, 335);
+        s.addShape('arc', {
+            x, y: y + size * 0.10, w: size, h: size * 0.9,
+            angleRange: [20, 140], line: { color: c, width: lw },
+        });
+    } else if (kind === 'recycle') {
+        s.addShape('triangle', { x, y, w: size, h: size * 0.9, line: { color: c, width: lw } });
+    } else if (kind === 'bird') {
+        s.addShape('arc', { x, y, w: size, h: size, angleRange: [200, 330], line: { color: c, width: lw } });
+        s.addShape('arc', { x: x + size * 0.2, y: y + size * 0.25, w: size * 0.7, h: size * 0.7, angleRange: [200, 330], line: { color: c, width: lw } });
+    }
+}
+
+/** Brand mark: two leaves plus the swooping arc. Scale 1 == the 0.437" version. */
+function leafMark(s, x, y, scale) {
+    const k = scale === undefined ? 1 : scale;
+    leafGlyph(s, x + 0.213 * k, y, 0.224 * k, GREEN, 340);
+    leafGlyph(s, x + 0.261 * k, y + 0.171 * k, 0.158 * k, GREEN, 55);
+    s.addShape('arc', {
+        x, y: y + 0.209 * k, w: 0.383 * k, h: 0.383 * k, rotate: 24.72,
+        angleRange: [198.46, 36.11], line: { color: GREEN, width: 2.25 },
+    });
+}
+
+/** Oversized brand mark used on the cover slides (white, 1.436" wide). */
+function bigLeafMark(s, x, y) {
+    leafGlyph(s, x, y, 0.532, WHITE, 12);
+    leafGlyph(s, x + 0.115, y + 0.405, 0.375, WHITE, 87);
+    s.addShape('arc', {
+        x: x + 0.303, y: y + 0.254, w: 1.133, h: 1.133, flipH: true,
+        angleRange: [265.79, 36.11], line: { color: WHITE, width: 4.5 },
+    });
+}
+
+/** Three dots that sit under the cover titles. */
+function dotTrio(s, x, y) {
+    s.addShape('ellipse', { x, y: y + 0.056, w: 0.196, h: 0.196, fill: { color: WHITE } });
+    s.addShape('ellipse', { x: x + 0.275, y, w: 0.288, h: 0.288, fill: { color: '9CAE00' } });
+    s.addShape('ellipse', { x: x + 0.641, y: y + 0.056, w: 0.196, h: 0.196, fill: { color: WHITE } });
+}
+
+/** Pyramid tier: `trapezoid` with the template's adj=56480 side inset. */
+function tier(s, o) {
+    const inset = 0.5648 * Math.min(o.w, o.h);
+    s.addShape('custGeom', {
+        x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.fill },
+        points: [
+            { x: inset, y: 0 }, { x: o.w - inset, y: 0 },
+            { x: o.w, y: o.h }, { x: 0, y: o.h }, { close: true },
+        ],
+    });
+}
+
+/** Corner "swoosh" (custom geometry lifted from the original path). */
+function blob(s, o) {
+    const w = o.w, h = o.h;
+    const p = (a, b) => ({ x: a * w, y: b * h });
+    const c = (x1, y1, x2, y2, x3, y3) => ({
+        curve: { type: 'cubic', x1: x1 * w, y1: y1 * h, x2: x2 * w, y2: y2 * h },
+        x: x3 * w, y: y3 * h,
+    });
+    s.addShape('custGeom', {
+        x: o.x, y: o.y, w, h, flipH: !!o.flipH, flipV: !!o.flipV,
+        fill: { color: o.fill, transparency: o.transparency || 0 },
+        points: [
+            p(0, 0), p(1, 0),
+            c(0.8254, 0.1771, 0.4294, 0.0016, 0.3512, 0.4409),
+            c(0.2730, 0.8802, 0.1588, 0.8437, 0, 1),
+            p(0, 0), { close: true },
+        ],
+    });
+}
+
+/* pptxgenjs has no gradient fill, so the deck's TEAL -> LIME gradients are
+   emulated by stacking thin bands of interpolated colour. */
+function mixColor(a, b, t) {
+    let out = '';
+    for (let i = 0; i < 3; i++) {
+        const ca = parseInt(a.substr(i * 2, 2), 16);
+        const cb = parseInt(b.substr(i * 2, 2), 16);
+        out += Math.round(ca + (cb - ca) * t).toString(16).padStart(2, '0');
+    }
+    return out.toUpperCase();
+}
+
+function gradRect(s, o) {
+    const steps = o.steps || 28;
+    const c1 = o.from || TEAL, c2 = o.to || LIME;
+    const bh = o.h / steps;
+    for (let i = 0; i < steps; i++) {
+        s.addShape('rect', {
+            x: o.x, y: o.y + i * bh, w: o.w, h: bh + 0.02,
+            fill: { color: mixColor(c1, c2, i / (steps - 1)) },
+        });
+    }
+}
+
+/* A mid-tone disc plugs any hairline, then chord-shaped bands ramp the colour. */
+function gradEllipse(s, o) {
+    const steps = o.steps || 48;
+    const c1 = o.from || TEAL, c2 = o.to || LIME;
+    const rx = o.w / 2, ry = o.h / 2;
+    const lap = o.h / steps / 2;
+    s.addShape('ellipse', { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: mixColor(c1, c2, 0.5) } });
+    for (let i = 0; i < steps; i++) {
+        const y0 = (i / steps) * o.h, y1 = ((i + 1) / steps) * o.h;
+        const top = Math.max(0, y0 - lap);
+        const h0 = halfChord(top, ry, rx), h1 = halfChord(y1, ry, rx);
+        const wide = Math.max(h0, h1);
+        if (wide <= 0) continue;
+        s.addShape('custGeom', {
+            x: o.x + rx - wide, y: o.y + top, w: wide * 2, h: y1 - top,
+            fill: { color: mixColor(c1, c2, i / (steps - 1)) },
+            points: [
+                { x: wide - h0, y: 0 }, { x: wide + h0, y: 0 },
+                { x: wide + h1, y: y1 - top }, { x: wide - h1, y: y1 - top },
+                { close: true },
+            ],
+        });
+    }
+}
+
+function halfChord(y, ry, rx) {
+    const d = 1 - Math.pow((y - ry) / ry, 2);
+    return d <= 0 ? 0 : rx * Math.sqrt(d);
+}
+
+/**
+ * Drop shadows used by the deck's white cards. Values are the template's own
+ * outerShdw settings: [blur pt, offset pt, direction deg, opacity].
+ * pptxgenjs mutates the object it is handed, so hand it a fresh one each time.
+ */
+const SHADOWS = {
+    panel: [5, 4, 0, 0.38],       // full-height white panels
+    tile: [5, 5, 45, 0.30],       // slide 24 text tiles
+    pill: [4, 3, 45, 0.40],       // slide 23 pyramid callouts
+    priceL: [5, 6, 135, 0.33],
+    priceM: [5, 8, 90, 0.36],
+    priceR: [6, 6, 45, 0.40],
+    round: [5, 6, 135, 0.32],     // slide 10 rounded cards
+};
+
+function shadow(name) {
+    const v = SHADOWS[name || 'panel'];
+    return { type: 'outer', color: '000000', blur: v[0], offset: v[1], angle: v[2], opacity: v[3] };
+}
+
+function card(s, o) {
+    s.addShape(o.radius ? 'roundRect' : 'rect', {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        rectRadius: o.radius, fill: { color: o.fill || WHITE },
+        shadow: shadow(o.shadow),
+    });
+}
+
+/* ================================================================== slides */
+
+function slide01(s) {                                    // cover (full-bleed photo placeholder = plain background)
+    title(s, {
+        x: 3.379, y: 2.927, w: 6.574, h: 2.121, size: 60, color: WHITE, align: 'center',
+        lines: [[['Organic Farm ']], [['Agriculture']]],
+    });
+    s.addText('WELCOME TO', {
+        x: 5.366, y: 1.768, w: 2.63, h: 0.387, align: 'center', valign: 'top',
+        fontFace: F_LIGHT, fontSize: 17, charSpacing: 6, color: WHITE, wrap: false,
+        isTextBox: true, fit: 'resize',
+    });
+    bigLeafMark(s, 3.098, 2.814);
+    sideMark(s, { cx: 12.5075, circleY: 6.058, lineY: 0.76, lineH: 1.348, textCY: 3.9945, tw: 2.977 });
+    blob(s, { x: 0, y: 5.841, w: 2.365, h: 1.68, flipV: true, fill: WHITE });
+    dotTrio(s, 6.263, 6.12);
+}
+
+function slide02(s) {                                    // welcome / introduction
+    title(s, {
+        x: 1.279, y: 1.549, w: 3.089, h: 1.515,
+        lines: [[['Welcome to']], [['The World of']], [['Organic '], ['Farm', { g: 1, i: 1 }]]],
+    });
+    leafMark(s, 4.014, 2.337);
+    blob(s, { x: 11.527, y: -0.015, w: 1.806, h: 1.283, flipH: true, fill: WHITE, transparency: 10 });
+    kicker(s, { x: 1.279, y: 3.818, w: 2.015, text: 'INTRODUCTION' });
+    para(s, { x: 1.279, y: 4.127, w: 3.898, h: 2.008, text: L_FULL });
+    sideMark(s, { cx: 11.5265, circleY: 1.529, lineY: 2.306, textCY: 5.0325, color: WHITE, lineColor: WHITE, tw: 2.977 });
+}
+
+function slide03(s) {                                    // what is organic farming
+    gradEllipse(s, { x: 0.687, y: 1.26, w: 4.98, h: 4.98, steps: 56 });
+    blob(s, { x: 0, y: 5.841, w: 2.365, h: 1.68, flipV: true, fill: WHITE, transparency: 10 });
+    title(s, {
+        x: 7.263, y: 1.312, w: 4.024, h: 1.043,
+        lines: [[['What is ', { i: 1 }]], [['Organic ', { i: 1 }], ['Farming?', { g: 1, i: 1 }]]],
+    });
+    leafMark(s, 10.905, 1.577);
+    [['EMPHASIZES SOIL HEALTH', 3.273, 3.135, 3.444],
+     ['BIODIVERSITY', 1.878, 4.458, 4.766],
+     ['ANIMAL WELFARE', 2.288, 5.78, 6.089]].forEach(([t, w, ky, py]) => {
+        kicker(s, { x: 7.263, y: ky, w, text: t });
+        para(s, { x: 7.263, y: py, w: 4.042, h: 0.62, text: L_SHORT });
+    });
+    sideMark(s, { cx: 12.6465, circleY: 1.394, lineY: 2.171, textCY: 4.8965 });
+    [[3.095, PINE, 'hand', 0.581, 5.895, 3.177], [4.48, GRASS, 'leaf', 0.447, 5.962, 4.68],
+     [5.759, PINE, 'bird', 0.581, 5.895, 5.885]].forEach(([cy, fill, kind, d, ix, iy]) => {
+        s.addShape('ellipse', { x: 5.77, y: cy, w: 0.847, h: 0.847, fill: { color: fill }, line: { color: WHITE, width: 4.5 } });
+        icon(s, kind, ix, iy, d, WHITE);
+    });
+}
+
+function slide04(s) {                                    // principles content
+    sideMark(s, { cx: 11.7645, circleY: 1.222, lineY: 2.162, textCY: 4.8885, color: WHITE });
+    blob(s, { x: 0, y: 6.283, w: 1.744, h: 1.239, flipV: true, fill: MID });
+    title(s, {
+        x: 1.37, y: 0.895, w: 4.096, h: 1.043,
+        lines: [[['Organic'], [' Farming ', { g: 1, i: 1 }]], [['Principles Content']]],
+    });
+    leafMark(s, 4.74, 0.751);
+    [['HEALTH', 1.75, 2.442, 2.498, 2.685], ['ECOLOGY', 1.73, 3.592, 3.648, 3.835],
+     ['FAIRNESS', 1.75, 4.741, 4.818, 4.985], ['CARE', 1.75, 5.891, 5.967, 6.135]]
+        .forEach(([t, x, ky, by, py]) => {
+            bullet(s, 1.474, by);
+            kicker(s, { x, y: ky, w: 1.336, text: t });
+            para(s, { x, y: py, w: 3.816, h: 0.62, text: L_NODOLOR });
+        });
+}
+
+function slide05(s) {                                    // benefits content
+    gradRect(s, { x: -0.063, y: 0, w: 5.429, h: 7.5 });
+    card(s, { x: 0, y: 0, w: 2.651, h: 7.5 });
+    sideMark(s, { cx: 4.035, circleY: 1.222, lineY: 2.162, textCY: 4.8885, color: WHITE });
+    title(s, {
+        x: 7.206, y: 0.923, w: 4.404, h: 1.043,
+        lines: [[['Benefits of '], ['Organic ', { g: 1, i: 1 }]], [['Farming Content']]],
+    });
+    leafMark(s, 11.135, 0.779);
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+    [['REDUCED ENVIRONMENTAL IMPACT', 4.357, 7.216, 2.585, 6.872, 2.645, 2.807],
+     ['IMPROVED SOIL FERTILITY', 3.328, 7.216, 3.655, 6.872, 3.715, 3.883],
+     ['HEALTHIER FOOD', 2.237, 7.206, 4.737, 6.863, 4.796, 4.997],
+     ['SUPPORT FOR LOCAL COMMUNITIES', 4.392, 7.206, 5.859, 6.863, 5.918, 6.159]]
+        .forEach(([t, w, x, ky, bx, by, py]) => {
+            bullet(s, bx, by);
+            kicker(s, { x, y: ky, w, text: t });
+            para(s, { x, y: py, w: 4.365, h: 0.62, text: L_LOREM });
+        });
+}
+
+function slide06(s) {                                    // organic vs conventional
+    s.addShape('rect', { x: 11.778, y: 0, w: 1.556, h: 7.5, fill: { color: LEAF } });
+    card(s, { x: 4.58, y: 0.933, w: 3.915, h: 5.635 });
+    card(s, { x: 8.752, y: 0.933, w: 3.915, h: 5.635 });
+    title(s, {
+        x: 0.932, y: 1.471, w: 3.137, h: 1.515,
+        lines: [[['Organic ', { g: 1, i: 1 }], ['vs ']], [['Conventional ']], [['Farming']]],
+    });
+    leafMark(s, 0.866, 1.22, 1.306);
+    kicker(s, { x: 5.809, y: 3.836, w: 1.28, text: 'ORGANIC', align: 'center' });
+    para(s, { x: 5.201, y: 4.384, w: 2.497, h: 1.453, text: L_ENIMVAS, align: 'center' });
+    kicker(s, { x: 9.689, y: 3.836, w: 2.058, h: 0.505, text: ['CONVENTIONAL', 'FARMING'], align: 'center' });
+    para(s, { x: 9.469, y: 4.384, w: 2.497, h: 1.453, text: L_ENIMVAS, align: 'center' });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: WHITE });
+    bullet(s, 8.126, 6.208, 0.26);
+    bullet(s, 12.276, 6.208, 0.26);
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: MID });
+    para(s, { x: 1.056, y: 4.341, w: 2.497, h: 1.453, text: L_ENIMVAS, align: 'left' });
+}
+
+function slide07(s) {                                    // crop rotation
+    card(s, { x: 1.683, y: 0, w: 3.915, h: 7.5 });
+    s.addShape('ellipse', { x: 1.948, y: 2.221, w: 3.384, h: 3.384, line: { color: mixColor(TEAL, GREEN, 0.4), width: 8 } });
+    gradEllipse(s, { x: 2.719, y: 3.082, w: 1.842, h: 1.842, to: GREEN, steps: 26 });
+    title(s, {
+        x: 7.48, y: 1.183, w: 3.147, h: 1.043,
+        lines: [[['Organic ', { g: 1, i: 1 }]], [['Crop Rotation']]],
+    });
+    leafMark(s, 9.164, 1.035);
+    kicker(s, { x: 7.48, y: 2.922, w: 3.787, text: 'PREVENT PESTS AND DISEASES' });
+    para(s, { x: 7.48, y: 3.225, w: 3.898, h: 0.62, text: L_SHORT });
+    kicker(s, { x: 7.48, y: 4.194, w: 3.45, text: 'IMPROVES SOIL STRUCTURE' });
+    para(s, { x: 7.48, y: 4.497, w: 3.898, h: 0.62, text: L_SHORT });
+    kicker(s, { x: 7.48, y: 5.466, w: 2.768, h: 0.505, text: ['ENHANCES NUTRIENT ', 'AVAILABILITY'] });
+    para(s, { x: 7.48, y: 5.992, w: 3.898, h: 0.62, text: L_SHORT });
+    blob(s, { x: 0, y: 5.733, w: 2.339, h: 1.781, flipV: true, fill: MID });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+}
+
+function slide08(s) {                                    // natural pest control
+    card(s, { x: 0.286, y: 0.302, w: 5.603, h: 6.857 });
+    gradRect(s, { x: 2.143, y: 3.026, w: 3.429, h: 3.463 });
+    sideMark(s, { cx: 0.8845, circleY: 1.394, lineY: 2.171, textCY: 4.8965 });
+    blob(s, { x: 10.968, y: 0, w: 2.365, h: 1.68, flipH: true, fill: MID });
+    title(s, {
+        x: 8.137, y: 2.05, w: 2.805, h: 1.043,
+        lines: [[['Natural', { g: 1, i: 1 }]], [['Pest Control']]],
+    });
+    leafMark(s, 9.61, 1.871);
+    kicker(s, { x: 8.137, y: 4.062, w: 2.302, text: 'ORGANIC FARMER' });
+    para(s, { x: 8.137, y: 4.365, w: 3.898, h: 1.175, text: L_ALIQUA });
+    blob(s, { x: 11.815, y: 6.421, w: 1.518, h: 1.079, flipH: true, flipV: true, fill: LIME2, transparency: 10 });
+}
+
+function slide09(s) {                                    // weed management
+    gradRect(s, { x: 3.626, y: 1.254, w: 2.16, h: 2.182, steps: 18 });
+    gradRect(s, { x: 8.357, y: 1.254, w: 2.16, h: 2.182, steps: 18 });
+    title(s, {
+        x: 0.872, y: 3.258, w: 2.986, h: 1.515,
+        lines: [[['Organic ', { g: 1, i: 1 }]], [['Weed', { g: 1, i: 1 }], [' ']], [['Management']]],
+    });
+    leafMark(s, 2.456, 3.046);
+    kicker(s, { x: 4.502, y: 5.822, w: 1.746, h: 0.37, size: 16, text: 'MULCHING' });
+    para(s, { x: 4.502, y: 6.125, w: 2.571, h: 0.62, text: L_VELIT, align: 'left' });
+    kicker(s, { x: 9.233, y: 5.822, w: 2.483, h: 0.37, size: 16, text: 'HAND WEEDING' });
+    para(s, { x: 9.233, y: 6.125, w: 2.571, h: 0.62, text: L_VELIT, align: 'left' });
+    blob(s, { x: 0, y: 5.841, w: 2.365, h: 1.68, flipV: true, fill: LEAF });
+    sideMark(s, { cx: 12.7205, circleY: 0.667, lineY: 1.376, textCY: 4.1015 });
+}
+
+function slide10(s) {                                    // composting - three cards
+    [1.133, 4.591, 8.05].forEach(x => card(s, { x, y: 1.889, w: 3.072, h: 5.234, radius: 0.375, shadow: 'round' }));
+    s.addShape('rect', { x: 12.014, y: 0, w: 1.319, h: 7.5, fill: { color: LEAF } });
+    title(s, {
+        x: 1.425, y: 0.674, w: 3.198, h: 1.043,
+        lines: [[['Composting ']], [['for Soil '], ['Health', { g: 1, i: 1 }]]],
+    });
+    leafMark(s, 4.254, 0.949);
+    [[1.953, 1.427, 0.505, 5.31, ['ENRICHES ', 'THE SOIL'], 1.704],
+     [5.128, 1.999, 0.505, 5.31, ['IMPROVES', 'ITS STRUCTURE'], 5.166],
+     [8.756, 1.664, 0.707, 5.209, ['REDUCES ', 'SYNTHETIC ', 'FERTILIZERS'], 8.629]]
+        .forEach(([kx, kw, kh, ky, lines, px]) => {
+            kicker(s, { x: kx, y: ky, w: kw, h: kh, text: lines, align: 'center' });
+            para(s, { x: px, y: 5.815, w: 1.925, h: 0.62, text: L_IN, align: 'center' });
+        });
+    sideMark(s, { cx: 12.6605, circleY: 1.188, lineY: 2.128, textCY: 4.8545, color: WHITE });
+    blob(s, { x: 0, y: 5.841, w: 2.365, h: 1.68, flipV: true, fill: LEAF });
+}
+
+function slide11(s) {                                    // soil amendments
+    gradRect(s, { x: 0, y: 0, w: 2.16, h: 2.182, steps: 18 });
+    title(s, {
+        x: 8.326, y: 1.501, w: 3.047, h: 1.043,
+        lines: [[['Organic Soil ']], [['Amendments', { g: 1, i: 1 }]]],
+    });
+    leafMark(s, 11.0, 1.813);
+    [['MANURE', 1.194, 3.389, 3.448, 3.698], ['GREEN MANURE', 2.029, 5.039, 5.098, 5.347]]
+        .forEach(([t, w, ky, by, py]) => {
+            bullet(s, 8.142, by);
+            kicker(s, { x: 8.418, y: ky, w, text: t });
+            para(s, { x: 8.418, y: py, w: 3.548, h: 0.897, text: L_ENIMVAS2 });
+        });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+    sideMark(s, { cx: 1.4595, circleY: 1.222, lineY: 2.162, textCY: 4.8885, color: WHITE });
+}
+
+function slide12(s) {                                    // certification process
+    title(s, {
+        x: 3.986, y: 1.123, w: 2.928, h: 1.515,
+        lines: [[['Organic', { g: 1, i: 1 }], [' ']], [['Certification ']], [['Process']]],
+    });
+    leafMark(s, 5.65, 0.954);
+    kicker(s, { x: 3.982, y: 3.281, w: 1.76, h: 0.505, text: ['STANDARDS', 'INSPECTIONS'] });
+    para(s, { x: 3.982, y: 3.763, w: 2.141, h: 0.897, text: L_DOLOR, align: 'left' });
+    kicker(s, { x: 6.819, y: 3.382, w: 2.267, text: 'DOCUMENTATION' });
+    para(s, { x: 6.819, y: 3.763, w: 2.141, h: 0.897, text: L_DOLOR, align: 'left' });
+    sideMark(s, { cx: 12.5425, circleY: 1.222, lineY: 2.162, textCY: 4.8885, color: WHITE });
+    blob(s, { x: 11.561, y: 0.191, w: 1.518, h: 1.079, flipH: true, fill: WHITE });
+    para(s, { x: 0.695, y: 1.609, w: 2.33, h: 3.119, text: L_INS, align: 'center' });
+    blob(s, { x: 0, y: 5.841, w: 2.365, h: 1.68, flipV: true, fill: LEAF });
+}
+
+function slide13(s) {                                    // water - four items
+    blob(s, { x: 0, y: 5.841, w: 2.365, h: 1.68, flipV: true, fill: LEAF });
+    title(s, {
+        x: 1.329, y: 3.386, w: 2.072, h: 1.043,
+        lines: [[['Organic', { g: 1, i: 1 }], [' ']], [['Farming ']]],
+    });
+    leafMark(s, 2.942, 3.216);
+    [[4.955, 3.525, 5.231, 3.465, 2.046, ['WATER ', 'CONSERVATION'], 3.976],
+     [8.495, 3.519, 8.771, 3.46, 1.694, ['IRRIGATION ', 'METHODS'], 3.97],
+     [4.955, 5.415, 5.231, 5.304, 1.511, ['WATER ', 'RECYCLING'], 5.798],
+     [8.495, 5.409, 8.771, 5.298, 2.321, ['DROUGHT', 'RESISTANT CROPS'], 5.792]]
+        .forEach(([bx, by, tx, ky, kw, lines, py]) => {
+            bullet(s, bx, by);
+            kicker(s, { x: tx, y: ky, w: kw, h: 0.505, text: lines });
+            para(s, { x: tx, y: py, w: 1.983, h: 0.897, text: L_CILLUM, align: 'left' });
+        });
+    sideMark(s, { cx: 12.7205, circleY: 0.945, lineY: 2.632, textCY: 5.3575, circleColor: WHITE });
+}
+
+function slide14(s) {                                    // livestock management
+    blob(s, { x: 11.225, y: 0, w: 2.108, h: 1.606, flipH: true, fill: MID });
+    blob(s, { x: 0, y: 5.841, w: 2.365, h: 1.68, flipV: true, fill: WHITE });
+    title(s, {
+        x: 8.209, y: 1.753, w: 2.986, h: 1.515,
+        lines: [[['Organic', { g: 1, i: 1 }], [' ']], [['Livestock ']], [['Management']]],
+    });
+    leafMark(s, 9.75, 1.59);
+    kicker(s, { x: 8.209, y: 3.929, w: 2.288, text: 'ANIMAL WELFARE' });
+    para(s, { x: 8.209, y: 4.238, w: 3.898, h: 2.008, text: L_FULL });
+    sideMark(s, { cx: 4.6615, circleY: 1.222, lineY: 2.162, textCY: 4.8885, color: WHITE, lineColor: WHITE });
+}
+
+function slide15(s) {                                    // section cover - livestock feed
+    s.addText('Organic livestock ', {
+        x: 4.91, y: 2.211, w: 3.513, h: 0.387, align: 'center', valign: 'top',
+        fontFace: F_LIGHT, fontSize: 17, charSpacing: 6, color: WHITE, wrap: false,
+        isTextBox: true, fit: 'resize',
+    });
+    bigLeafMark(s, 3.342, 2.649);
+    sideMark(s, { cx: 12.5075, circleY: 6.058, lineY: 0.76, lineH: 1.348, textCY: 3.9945, tw: 2.977 });
+    blob(s, { x: 0, y: 5.841, w: 2.365, h: 1.68, flipV: true, fill: WHITE });
+    dotTrio(s, 6.263, 6.12);
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+    title(s, {
+        x: 3.056, y: 2.927, w: 7.221, h: 2.121, size: 60, color: WHITE, align: 'center',
+        lines: [[['Sustainable ']], [['Livestock Feed ']]],
+    });
+}
+
+function slide16(s) {                                    // food labels
+    gradRect(s, { x: 5.931, y: 0, w: 3.736, h: 7.5 });
+    card(s, { x: 7.403, y: 0.302, w: 5.351, h: 6.857 });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+    title(s, {
+        x: 1.365, y: 1.686, w: 2.716, h: 1.043,
+        lines: [[['Organic', { g: 1, i: 1 }], [' ']], [['Food Labels']]],
+    });
+    leafMark(s, 2.907, 1.522);
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: MID });
+    sideMark(s, { cx: 11.9685, circleY: 1.344, lineY: 2.053, textCY: 4.7785 });
+    bullet(s, 1.477, 3.724);
+    kicker(s, { x: 1.753, y: 3.664, w: 2.63, h: 0.505, text: ['DIFFERENT ORGANIC', 'FOOD LABEL'] });
+    para(s, { x: 1.365, y: 4.272, w: 3.293, h: 1.731, text: L_CULUISA });
+}
+
+function slide17(s) {                                    // climate change
+    gradRect(s, { x: 0, y: 0, w: 4.799, h: 7.5 });
+    card(s, { x: 0.788, y: 0.782, w: 5.351, h: 5.937 });
+    title(s, {
+        x: 8.873, y: 1.191, w: 3.549, h: 1.515,
+        lines: [[['Organic', { g: 1, i: 1 }], [' ']], [['Farming &']], [['Climate Change']]],
+    });
+    leafMark(s, 10.429, 1.053);
+    bullet(s, 8.92, 3.616);
+    kicker(s, { x: 9.196, y: 3.557, w: 2.721, h: 0.505, text: ['ORGANIC ', 'FARMING PRACTICES '] });
+    para(s, { x: 8.855, y: 4.069, w: 3.293, h: 0.897, text: L_MAGNA });
+    bullet(s, 8.938, 5.451);
+    kicker(s, { x: 9.215, y: 5.391, w: 2.504, text: 'SUSTAINABLE LAND' });
+    para(s, { x: 8.873, y: 5.694, w: 3.293, h: 0.897, text: L_MAGNA });
+    // the side marker is rotated flat across the top of the white card here
+    s.addShape('line', { x: 1.5835, y: 1.5635, w: 0.84, h: 0, line: { color: RULE, width: 1 } });
+    s.addText(SIDE_LABEL, {
+        x: 2.7285, y: 1.4125, w: 3.161, h: 0.303, fontFace: F_LIGHT, fontSize: 12, italic: true,
+        charSpacing: 6, color: RULE, align: 'justify', valign: 'top', wrap: false,
+        isTextBox: true, fit: 'resize',
+    });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+}
+
+function slide18(s) {                                    // market growth - four columns
+    [[10.346, 3.933, 2.416, 2.226], [7.782, 3.933, 2.416, 2.226],
+     [4.822, 3.75, 2.813, 2.592], [2.258, 3.933, 2.416, 2.226]]
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: MID });
+    sideMark(s, { cx: 0.7225, circleY: 1.344, lineY: 2.053, textCY: 4.7785, text: 'CREATIVE COMPANY' });
+    [2.258, 5.084, 7.909, 10.524].forEach(x => {
+        bullet(s, x + 0.062, 2.236);
+        kicker(s, { x, y: 2.579, w: 2.011, text: 'ORGANIC FOOD' });
+        para(s, { x, y: 2.888, w: 1.983, h: 0.62, text: L_VOLUPTATE, align: 'left' });
+    });
+    title(s, {
+        x: 2.191, y: 0.799, w: 3.37, h: 1.043,
+        lines: [[['Organic', { g: 1, i: 1 }], [' ']], [['Market Growth']]],
+    });
+    leafMark(s, 3.757, 0.645);
+}
+
+function slide19(s) {                                    // challenges
+    title(s, {
+        x: 3.631, y: 4.76, w: 2.665, h: 1.515,
+        lines: [[['Challenges', { g: 1, i: 1 }], [' ']], [['in Organic']], [['Farming ', { i: 1 }]]],
+    });
+    leafMark(s, 5.832, 4.601);
+    [[1.529, 'HIGHER LABOR COSTS', 2.761, 1.469, 0.303, 1.772],
+     [3.331, 'LOWER YIELDS', 1.916, 3.272, 0.303, 3.575],
+     [5.162, ['LIMITED ACCESS TO ', 'ORGANIC INPUTS'], 2.593, 5.075, 0.505, 5.582]]
+        .forEach(([by, t, kw, ky, kh, py]) => {
+            bullet(s, 8.439, by);
+            kicker(s, { x: 8.715, y: ky, w: kw, h: kh, text: t });
+            para(s, { x: 8.373, y: py, w: 3.293, h: 0.897, text: L_MAGNA });
+        });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: WHITE });
+    sideMark(s, { cx: 0.7225, circleY: 1.344, lineY: 2.053, textCY: 4.7785 });
+}
+
+function slide20(s) {                                    // success stories - colour grid
+    [[8.329, 0, APPLE], [5.826, 2.306, TEAL], [10.831, 2.306, OLIVE], [8.329, 4.611, MINT]]
+        .forEach(([x, y, c]) => s.addShape('rect', { x, y, w: 2.502, h: 2.306, fill: { color: c } }));
+    title(s, {
+        x: 1.042, y: 1.494, w: 2.099, h: 1.986,
+        lines: [[['Organic ', { g: 1, i: 1 }]], [['Farming ']], [['Success ']], [['Stories']]],
+    });
+    leafMark(s, 2.621, 1.296);
+    kicker(s, { x: 1.051, y: 4.106, w: 2.144, h: 0.505, text: ['SUCCESSFUL', 'ORGANIC FARMS'] });
+    para(s, { x: 1.051, y: 4.633, w: 3.876, h: 1.453, text: L_CULUISA + ' lorem ipsum do' });
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: MID });
+    [[6.18, 3.021], [8.744, 0.704], [11.247, 3.01], [8.744, 5.315]].forEach(([x, y]) => {
+        para(s, { x, y, w: 1.671, h: 0.897, text: L_VOLUPTATE, align: 'center', color: WHITE });
+    });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: WHITE, transparency: 10 });
+}
+
+function slide21(s) {                                    // food security - monitor mockup
+    [[0, APPLE], [2.5, OLIVE], [5, MINT]].forEach(([y, c]) =>
+        s.addShape('rect', { x: 0, y, w: 2.502, h: 2.5, fill: { color: c } }));
+    title(s, {
+        x: 8.019, y: 1.582, w: 2.272, h: 1.986,
+        lines: [[['Organic', { g: 1, i: 1 }], [' ']], [['Farming', { g: 1, i: 1 }], [' ']],
+                [['and Food ']], [['Security']]],
+    });
+    leafMark(s, 9.604, 1.422);
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: WHITE });
+    icon(s, 'leaf', 0.878, 0.92, 0.677, WHITE);
+    s.addShape('ellipse', { x: 0.785, y: 0.827, w: 0.864, h: 0.864, line: { color: WHITE, width: 2.25 } });
+    monitorMock(s, 1.486, 1.72, 5.472, 4.5);
+    kicker(s, { x: 8.058, y: 4.09, w: 2.595, h: 0.505, text: ['PRESERVING ', 'TRADITIONAL SEEDS'] });
+    para(s, { x: 8.058, y: 4.551, w: 4.077, h: 0.897, text: L_ENIMVAS + ' minim veniam' });
+    para(s, { x: 8.066, y: 5.663, w: 4.077, h: 0.62, text: L_SHORT });
+}
+
+function slide22(s) {                                    // pollinators - phone mockup
+    phoneMock(s, 2.05, 1.15, 3.14, 5.4);
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: MID });
+    title(s, {
+        x: 6.404, y: 1.381, w: 3.903, h: 1.043,
+        lines: [[['Organic Farming ', { g: 1, i: 1 }]], [['and Pollinators ']]],
+    });
+    leafMark(s, 9.818, 1.227);
+    kicker(s, { x: 6.404, y: 3.361, w: 3.485, text: 'HABITAT FOR POLLINATORS' });
+    para(s, { x: 6.404, y: 3.568, w: 5.37, h: 0.897, text: L_ALIQUA + ' commodo' });
+    para(s, {
+        x: 6.404, y: 4.84, w: 5.37, h: 1.175,
+        text: L_ALIQUA + ' commodo ' + L_VOLUPTATE + 'Duis aute irure dolor in rer',
+    });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+    sideMark(s, { cx: 0.8575, circleY: 1.344, lineY: 2.053, textCY: 4.7785 });
+}
+
+function slide23(s) {                                    // sustainable packaging pyramid
+    const TIERS = [
+        { n: '01', color: GREEN, cardX: 3.764, cardY: 1.853, cardW: 3.599, numX: 3.915, numY: 1.925, numW: 0.57, tx: 4.556, ty: 1.955 },
+        { n: '02', color: OLIVE2, cardX: 4.349, cardY: 3.074, cardW: 3.599, numX: 4.418, numY: 3.087, numW: 0.635, tx: 5.086, ty: 3.139 },
+        { n: '03', color: FOREST, cardX: 4.839, cardY: 4.205, cardW: 3.599, numX: 4.873, numY: 4.248, numW: 0.637, tx: 5.445, ty: 4.282 },
+        { n: '04', color: DEEP, cardX: 5.053, cardY: 5.31, cardW: 3.816, numX: 5.431, numY: 5.341, numW: 0.668, tx: 6.0, ty: 5.376 },
+    ];
+    TIERS.slice().reverse().forEach(t =>
+        card(s, { x: t.cardX, y: t.cardY, w: t.cardW, h: 0.768, radius: 0.128, shadow: 'pill' }));
+    s.addShape('triangle', { x: 2.446, y: 1.912, w: 1.469, h: 1.282, fill: { color: GREEN } });
+    [[1.894, 3.264, 2.568, OLIVE2], [1.348, 4.25, 3.685, FOREST], [0.776, 5.236, 4.826, DEEP]]
+        .forEach(([x, y, w, c]) => tier(s, { x, y, w, h: 0.915, fill: c }));
+    TIERS.forEach(t => {
+        s.addText(t.n, {
+            x: t.numX, y: t.numY, w: t.numW, h: 0.505, fontFace: F_TITLE, fontSize: 24,
+            color: t.color, valign: 'top', wrap: false, isTextBox: true, fit: 'resize',
+        });
+        kicker(s, { x: t.tx, y: t.ty, w: 1.31, text: 'PRODUCT', color: t.color });
+        para(s, { x: t.tx, y: t.ty + 0.195, w: 2.807, h: 0.342, text: L_ONLY, align: 'left' });
+    });
+    [['leaf', 2.959, 2.557, 0.447], ['hand', 2.951, 3.467, 0.42],
+     ['plant', 2.915, 4.515, 0.42], ['recycle', 2.951, 5.457, 0.42]]
+        .forEach(([kind, x, y, d]) => icon(s, kind, x, y, d, WHITE));
+    title(s, {
+        x: 9.418, y: 1.715, w: 2.823, h: 1.043, align: 'center',
+        lines: [[['Sustainable', { g: 1, i: 1 }], [' ']], [['Packaging ']]],
+    });
+    leafMark(s, 11.804, 1.556);
+    kicker(s, { x: 9.572, y: 3.842, w: 2.463, text: 'ORGANIC PRODUCT', align: 'center' });
+    para(s, { x: 9.449, y: 4.151, w: 2.709, h: 2.008, text: L_CULUISA.replace(' culuisa', ''), align: 'center' });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: LIME2, transparency: 10 });
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: MID });
+}
+
+function slide24(s) {                                    // circular economy - four cards
+    const CARDS = [
+        { tri: [1.362, 3.071, '277E18'], box: [0.901, 2.379, GREEN], card: [2.545, 2.379], icon: ['leaf', 1.389, 2.782, 0.447], label: 'CIRCULAR ECONOMY', lw: 2.7, tx: 2.895, ty: 2.689 },
+        { tri: [1.362, 5.768, '1C624B'], box: [0.901, 5.076, TEAL], card: [2.545, 5.12], icon: ['recycle', 1.293, 5.413, 0.581], label: 'WASTE REDUCTION', lw: 2.442, tx: 2.895, ty: 5.407 },
+        { tri: [7.582, 3.144, '106034'], box: [7.122, 2.451, JADE], card: [8.765, 2.451], icon: ['hand', 7.543, 2.721, 0.581], label: 'RECYCLING', lw: 1.511, tx: 9.097, ty: 2.672 },
+        { tri: [7.582, 5.841, '16801B'], box: [7.122, 5.149, GRASS], card: [8.765, 5.192], icon: ['plant', 7.543, 5.418, 0.581], label: 'RESOURCE EFFICIENCY', lw: 2.854, tx: 9.097, ty: 5.39 },
+    ];
+    CARDS.forEach(c => {
+        s.addShape('triangle', { x: c.tri[0], y: c.tri[1], w: 0.372, h: 1.28, rotate: 278.74, fill: { color: c.tri[2] } });
+        s.addShape('rect', { x: c.box[0], y: c.box[1], w: 1.423, h: 1.254, fill: { color: c.box[2] } });
+    });
+    CARDS.forEach(c => card(s, { x: c.card[0], y: c.card[1], w: 3.667, h: 1.613, shadow: 'tile' }));
+    CARDS.forEach(c => {
+        icon(s, c.icon[0], c.icon[1], c.icon[2], c.icon[3], WHITE);
+        kicker(s, { x: c.tx, y: c.ty, w: c.lw, text: c.label, color: c.box[2] });
+        para(s, { x: c.tx + 0.007, y: c.ty + 0.303, w: 2.998, h: 0.62, text: L_DOLORSIT, align: 'left' });
+    });
+    title(s, {
+        x: 2.867, y: 0.811, w: 4.979, h: 1.043,
+        lines: [[['Organic Farming ', { g: 1, i: 1 }]], [['and Circular Economy ']]],
+    });
+    leafMark(s, 6.31, 0.637);
+    blob(s, { x: 11.062, y: -0.015, w: 2.271, h: 1.613, flipH: true, fill: LIME2, transparency: 10 });
+}
+
+function slide25(s) {                                    // global collaboration - ring gauges
+    const GAUGES = [
+        { x: 1.826, sweep: 45.38, color: GREEN, pct: '40%', box: 3.534, dot: 3.1, tx: 3.755, kx: 2.241, px: 1.911, icon: ['leaf', 2.626, 3.902, 0.447] },
+        { x: 5.42, sweep: 137.28, color: PINE, pct: '60%', box: 7.239, dot: 6.805, tx: 7.46, kx: 5.83, px: 5.5, icon: ['recycle', 6.154, 3.836, 0.581] },
+        { x: 9.015, sweep: 188.67, color: MOSS, pct: '78%', box: 10.854, dot: 10.421, tx: 11.076, kx: 9.452, px: 9.122, icon: ['hand', 9.748, 3.785, 0.581] },
+    ];
+    GAUGES.forEach(g => {
+        s.addShape('ellipse', { x: g.x, y: 3.102, w: 2.047, h: 2.047, fill: { color: WHITE }, line: { color: RULE, width: 40 } });
+        s.addShape('arc', {
+            x: g.x, y: 3.102, w: 2.047, h: 2.047, angleRange: [270, g.sweep],
+            line: { color: g.color, width: 60 },
+            shadow: { type: 'outer', color: '000000', blur: 6, offset: 5, angle: 135, opacity: 0.29 },
+        });
+        s.addShape('ellipse', { x: g.x + 0.6, y: 3.702, w: 0.847, h: 0.847, fill: { color: WHITE }, line: { color: g.color, width: 10 } });
+        icon(s, g.icon[0], g.icon[1], g.icon[2], g.icon[3], g.color);
+        s.addShape('rect', { x: g.box, y: 2.239, w: 1.088, h: 0.458, line: { color: g.color, width: 1 } });
+        s.addShape('line', { x: g.dot + 0.066, y: 2.468, w: g.box - g.dot - 0.066, h: 0.504, line: { color: g.color, width: 1 } });
+        s.addShape('ellipse', { x: g.dot, y: 2.906, w: 0.132, h: 0.132, fill: { color: WHITE } });
+        s.addText(g.pct, {
+            x: g.tx, y: 2.283, w: 0.645, h: 0.37, fontFace: F_HEAD, fontSize: 16, bold: true,
+            color: g.color, valign: 'top', wrap: false, isTextBox: true, fit: 'resize',
+        });
+        kicker(s, { x: g.kx, y: 5.743, w: 1.28, text: 'ORGANIC', color: g.color, align: 'center' });
+        para(s, { x: g.px, y: 6.036, w: 1.94, h: 0.897, text: L_CILLUM2, align: 'center' });
+    });
+    blob(s, { x: 11.062, y: -0.015, w: 2.271, h: 1.613, flipH: true, fill: LIME2, transparency: 10 });
+    title(s, {
+        x: 4.03, y: 0.672, w: 4.837, h: 1.043, align: 'center',
+        lines: [[['Organic Farming and ', { g: 1, i: 1 }]], [['Global Collaboration ']]],
+    });
+    leafMark(s, 8.43, 0.422);
+    blob(s, { x: 0, y: 6.254, w: 1.655, h: 1.261, flipV: true, fill: MID });
+}
+
+function slide26(s, pptx) {                              // ecotourism - line + doughnut
+    card(s, { x: 0.781, y: 2.0, w: 5.416, h: 3.775, radius: 0.49 });
+    s.addChart(pptx.ChartType.line, [
+        { name: 'Series 1', labels: CATS4, values: [4.3, 2.5, 3.5, 4.5] },
+        { name: 'Series 2', labels: CATS4, values: [2.4, 4.4, 1.8, 2.8] },
+        { name: 'Series 3', labels: CATS4, values: [2, 2, 3, 5] },
+    ], Object.assign({}, CHART_BASE, {
+        x: 1.573, y: 2.534, w: 4.089, h: 2.726,
+        chartColors: [DARK, OLIVE, LIME2], lineSize: 2.25,
+        lineDataSymbol: 'circle', lineDataSymbolSize: 5,
+        legendPos: 'b', legendFontSize: 12,
+        catAxisLabelFontSize: 12, valAxisLabelFontSize: 12,
+    }));
+    card(s, { x: 6.454, y: 2.0, w: 3.968, h: 3.775, radius: 0.49 });
+    s.addChart(pptx.ChartType.doughnut, [
+        { name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'], values: [6, 5, 4.4, 3] },
+    ], {
+        x: 6.691, y: 2.731, w: 3.495, h: 2.33, holeSize: 75,
+        chartColors: [LIME, TEAL, DARK, OLIVE],
+        showLegend: true, legendPos: 'b', legendFontSize: 10,
+        legendFontFace: F_BODY, legendColor: BODY, dataBorder: { pt: 0, color: WHITE },
+    });
+    title(s, {
+        x: 1.573, y: 0.693, w: 3.85, h: 1.043,
+        lines: [[['Organic '], ['Farming', { g: 1, i: 1 }], [' ']], [['and Ecotourism ']]],
+    });
+    leafMark(s, 4.973, 0.541);
+    para(s, { x: 1.573, y: 6.25, w: 4.286, h: 0.62, text: L_SHORT + ' dolore' });
+    para(s, { x: 6.691, y: 6.25, w: 3.154, h: 0.62, text: 'PLACEHOLDER' });
+    blob(s, { x: 0, y: 6.25, w: 1.66, h: 1.264, flipV: true, fill: MID });
+    blob(s, { x: 11.815, y: -0.015, w: 1.518, h: 1.079, flipH: true, fill: WHITE, transparency: 10 });
+    sideMark(s, { cx: 12.4435, circleY: 1.774, lineY: 2.483, textCY: 5.2085 });
+}
+
+function slide27(s, pptx) {                              // case studies - bar chart
+    card(s, { x: 5.313, y: 2.944, w: 6.954, h: 3.775, radius: 0.49 });
+    s.addChart(pptx.ChartType.bar, [
+        { name: 'Series 1', labels: CATS5, values: [4.3, 2.5, 3.5, 4.5, 4.5] },
+        { name: 'Series 2', labels: CATS5, values: [2.4, 4.4, 1.8, 2.8, 2.8] },
+        { name: 'Series 3', labels: CATS5, values: [2, 2, 3, 5, 5] },
+    ], Object.assign({}, CHART_BASE, {
+        x: 5.931, y: 3.44, w: 6.063, h: 2.717, barDir: 'col',
+        chartColors: [TEAL, OLIVE, LIME2], barGapWidthPct: 219, barOverlapPct: -27,
+        legendPos: 'r', legendFontSize: 12,
+        catAxisLabelFontSize: 10, valAxisLabelFontSize: 9,
+    }));
+    title(s, {
+        x: 5.931, y: 1.363, w: 3.85, h: 1.043,
+        lines: [[['Organic '], ['Farming', { g: 1, i: 1 }], [' ']], [['Case Studies ']]],
+    });
+    leafMark(s, 9.344, 1.175);
+    [[1.59, 'ORGANIC ', 1.355, 1.531, 1.84], [3.225, 'ECOSYSTEM', 1.571, 3.166, 3.475],
+     [4.856, 'COMMUNITIES', 1.873, 4.797, 5.106]].forEach(([by, t, kw, ky, py]) => {
+        bullet(s, 1.466, by);
+        kicker(s, { x: 1.742, y: ky, w: kw, text: t });
+        para(s, { x: 1.742, y: py, w: 1.983, h: 0.897, text: L_CILLUM, align: 'left' });
+    });
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: MID });
+    blob(s, { x: 10.732, y: -0.015, w: 2.601, h: 1.848, flipH: true, fill: LIME2, transparency: 10 });
+}
+
+function slide28(s) {                                    // pricing
+    card(s, { x: 1.551, y: 1.985, w: 3.06, h: 4.695, radius: 0.397, shadow: 'priceL' });
+    card(s, { x: 7.98, y: 1.985, w: 3.06, h: 4.695, radius: 0.397, shadow: 'priceR' });
+    card(s, { x: 4.494, y: 1.569, w: 3.603, h: 5.529, radius: 0.468, fill: DEEP, shadow: 'priceM' });
+    blob(s, { x: 10.732, y: -0.015, w: 2.601, h: 1.848, flipH: true, fill: LIME2, transparency: 10 });
+    const PLANS = [
+        { price: '$50', color: DEEP, priceX: 2.576, priceW: 0.856, ringX: 2.426, ringY: 2.351, bestX: 2.221, bestY: 3.75, itemX: 2.026, itemY0: 4.489, items: 3, chooseX: 2.257, chooseY: 6.005, ruleY: 6.152, ruleL: 1.727, ruleR: 3.869, ruleW: 0.45 },
+        { price: '$100', color: WHITE, priceX: 5.745, priceW: 1.019, ringX: 5.686, ringY: 2.155, bestX: 5.5, bestY: 3.666, itemX: 5.304, itemY0: 4.405, items: 4, chooseX: 5.536, chooseY: 6.346, ruleY: 6.515, ruleL: 4.722, ruleR: 7.222, ruleW: 0.66 },
+        { price: '$30', color: DEEP, priceX: 9.115, priceW: 0.854, ringX: 8.965, ringY: 2.351, bestX: 8.76, bestY: 3.75, itemX: 8.564, itemY0: 4.489, items: 3, chooseX: 8.796, chooseY: 6.005, ruleY: 6.152, ruleL: 8.266, ruleR: 10.407, ruleW: 0.45 },
+    ];
+    PLANS.forEach(p => {
+        s.addText(p.price, {
+            x: p.priceX, y: p.ringY + 0.356, w: p.priceW, h: 0.505, fontFace: F_TITLE, fontSize: 24,
+            color: p.color, valign: 'top', wrap: false, isTextBox: true, fit: 'resize',
+        });
+        s.addShape('ellipse', { x: p.ringX, y: p.ringY, w: 1.156, h: 1.156, line: { color: p.color, width: 2.25 } });
+        s.addText([{ text: 'BEST ', options: { breakLine: true } }, { text: 'PRODUCTS ' }], {
+            x: p.bestX, y: p.bestY, w: 1.673, h: 0.572, fontFace: F_HEAD, fontSize: 14, bold: true,
+            charSpacing: 3, color: p.color, align: 'center', valign: 'top', wrap: false,
+            isTextBox: true, fit: 'resize',
+        });
+        for (let i = 0; i < p.items; i++) {
+            s.addText('PRODUCT 0' + (i + 1), {
+                x: p.itemX, y: p.itemY0 + i * 0.4555, w: 1.983, h: 0.342, fontFace: F_BODY, fontSize: 11,
+                charSpacing: 3, color: p.color, align: 'center', valign: 'top',
+                lineSpacingMultiple: 1.5, isTextBox: true, fit: 'resize',
+            });
+        }
+        s.addText('CHOOSE', {
+            x: p.chooseX, y: p.chooseY, w: 1.601, h: 0.337, fontFace: F_TITLE, fontSize: 14,
+            charSpacing: 6, color: p.color, valign: 'top', wrap: false, isTextBox: true, fit: 'resize',
+        });
+        s.addShape('line', { x: p.ruleL, y: p.ruleY, w: p.ruleW, h: 0, line: { color: p.color, width: 1 } });
+        s.addShape('line', { x: p.ruleR, y: p.ruleY, w: p.ruleW, h: 0, line: { color: p.color, width: 1 } });
+    });
+    sideMark(s, { cx: 12.2255, circleY: 1.768, lineY: 2.477, textCY: 5.2025 });
+    title(s, {
+        x: 5.406, y: 0.623, w: 1.697, h: 0.572, align: 'center',
+        lines: [[['Pricing', { g: 1, i: 1 }]]],
+    });
+    leafMark(s, 6.736, 0.459);
+    blob(s, { x: 0, y: 6.015, w: 1.968, h: 1.499, flipV: true, fill: MID });
+}
+
+function slide29(s) {                                    // your role
+    [[0.238, APPLE], [2.579, OLIVE], [4.921, MINT]].forEach(([y, c]) =>
+        s.addShape('rect', { x: 5.651, y, w: 0.709, h: 2.341, fill: { color: c } }));
+    blob(s, { x: 11.682, y: -0.015, w: 1.652, h: 1.173, flipH: true, fill: LIME2, transparency: 10 });
+    blob(s, { x: 0.254, y: 5.486, w: 2.3, h: 1.752, flipV: true, fill: MID });
+    sideMark(s, { cx: 2.0585, circleY: 1.633, lineY: 2.342, textCY: 5.0675, color: WHITE, lineColor: WHITE });
+    title(s, {
+        x: 7.743, y: 1.374, w: 3.85, h: 1.043,
+        lines: [[['Organic'], [' ', { g: 1 }], ['Farming', { g: 1, i: 1 }], [' ', { g: 1 }]],
+                [['and Your Role ']]],
+    });
+    leafMark(s, 11.156, 1.207);
+    [[3.419, 'CHOOSING ORGANIC PRODUCTS', 3.91, 3.346, 3.649],
+     [5.054, 'SUSTAINABLE AGRICULTURE', 3.496, 4.973, 5.276]].forEach(([by, t, kw, ky, py]) => {
+        bullet(s, 7.447, by);
+        kicker(s, { x: 7.743, y: ky, w: kw, text: t });
+        para(s, { x: 7.743, y: py, w: 4.15, h: 0.897, text: L_ENIMVAS + ' minim veniam nostrud ' });
+    });
+}
+
+function slide30(s) {                                    // thank you
+    title(s, {
+        x: 3.284, y: 3.127, w: 6.765, h: 1.582, size: 88, color: WHITE, align: 'center',
+        lines: [[['Thankyou']]],
+    });
+    s.addText('PRESENTATION', {
+        x: 7.086, y: 2.912, w: 2.963, h: 0.387, align: 'right', valign: 'top',
+        fontFace: F_LIGHT, fontSize: 17, charSpacing: 6, color: WHITE, wrap: false,
+        isTextBox: true, fit: 'resize',
+    });
+    bigLeafMark(s, 2.692, 2.899);
+    sideMark(s, { cx: 12.5075, circleY: 6.058, lineY: 0.76, lineH: 1.348, textCY: 3.9945, tw: 2.977 });
+    blob(s, { x: 0, y: 5.841, w: 2.365, h: 1.68, flipV: true, fill: WHITE });
+    dotTrio(s, 6.263, 6.12);
+}
+
+const CATS4 = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+const CATS5 = CATS4.concat(['Category 5']);
+
+/** Axis / legend styling shared by all three charts in the deck. */
+const CHART_BASE = {
+    showLegend: true, legendFontFace: F_BODY, legendColor: BODY,
+    catAxisLabelFontFace: F_BODY, catAxisLabelColor: BODY,
+    valAxisLabelFontFace: F_BODY, valAxisLabelColor: BODY,
+    catAxisLineColor: RULE, valAxisLineShow: false,
+    catAxisMajorTickMark: 'none', valAxisMajorTickMark: 'none',
+    valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
+    valAxisMaxVal: 6, valAxisMajorUnit: 1,
+};
+
+const SLIDES = [
+    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+    slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+];
+
+/* ==================================================================== output */
+
+function main() {
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'WIDE_13x75', width: 13.333, height: 7.5 });
+    pptx.layout = 'WIDE_13x75';
+    pptx.title = 'Organic Farm Agriculture';
+    pptx.company = 'Organic Company';
+
+    SLIDES.forEach(builder => {
+        const slide = pptx.addSlide();
+        slide.background = { color: WHITE };
+        builder(slide, pptx);
+    });
+
+    const out = path.join(__dirname, '13bd3049-0bb7-47b6-82d8-4e4d4c419fee_grok_final.pptx');
+    return pptx.writeFile({ fileName: out }).then(() => console.log('wrote ' + out));
+}
+
+main().catch(err => { console.error(err); process.exit(1); });

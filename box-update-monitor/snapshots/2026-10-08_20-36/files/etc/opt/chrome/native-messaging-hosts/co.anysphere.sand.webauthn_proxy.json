@@ -1,0 +1,7 @@
+{
+	"name": "co.anysphere.sand.webauthn_proxy",
+	"description": "Sand WebAuthn proxy bridge — forwards box browser ceremonies to the in-box host.",
+	"path": "/usr/local/bin/sand-webauthn-proxy-host",
+	"type": "stdio",
+	"allowed_origins": ["chrome-extension://agbllaojcpnneljifnhgkibkiaefijgf/"]
+}

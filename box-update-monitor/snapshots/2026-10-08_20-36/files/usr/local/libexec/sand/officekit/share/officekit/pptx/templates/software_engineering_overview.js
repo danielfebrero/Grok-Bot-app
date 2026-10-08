@@ -1,0 +1,677 @@
+#!/usr/bin/env node
+/**
+ * "Software Engineering" deck — rebuilt with pptxgenjs.
+ *
+ * Raster artwork from the source deck is replaced with light placeholder
+ * panels (see `photo()`); everything else is drawn with native shapes.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Palette & typography
+ * ------------------------------------------------------------------ */
+const INK = '090715'; // page background (theme dk2)
+const WHITE = 'FFFFFF';
+const VIOLET = '916EF0'; // accent 1
+const PLUM = '6649A5'; // accent 2
+const MAGENTA = '9A31E8'; // accent 3
+const CHARCOAL = '0C0C0C'; // text on white chips
+const GLOW = '290F75'; // corner-glow gradient stop
+const GRID_DASH = 'D9D9D9';
+const GRID_PALE = 'E0E5EB';
+const GRID_AXIS = 'ADB9CA';
+const GRID_DARK = '404040';
+
+const HEAD = 'Archivo'; // headings / labels
+const BODY = 'Inter'; // paragraphs
+const NUMERIC = 'Urbanist'; // stat readouts
+
+const SLIDE_W = 10;
+const SLIDE_H = 5.625;
+
+/** Text insets used throughout the source deck, in points (l, r, b, t). */
+const INSET = [5.4, 5.4, 2.7, 2.7];
+const NO_LINE = { type: 'none' };
+
+/* ------------------------------------------------------------------ *
+ * Small drawing helpers
+ * ------------------------------------------------------------------ */
+
+function mixHex(from, to, t) {
+  const c = (hex, i) => parseInt(hex.substr(i * 2, 2), 16);
+  const out = [0, 1, 2].map((i) => Math.round(c(from, i) + (c(to, i) - c(from, i)) * t));
+  return out.map((v) => v.toString(16).padStart(2, '0').toUpperCase()).join('');
+}
+
+/**
+ * Flat ink page plus the violet glow that bleeds out of the bottom-right
+ * corner. The master paints this with a 225-degree gradient; here it is
+ * approximated by nested right triangles whose hypotenuses lie exactly on
+ * the gradient's iso-colour lines.
+ */
+function backdrop(slide) {
+  slide.background = { color: INK };
+  const REACH = 2.49; // distance from the corner at which the glow hits ink
+  const BANDS = 30;
+  for (let i = BANDS; i >= 1; i--) {
+    const size = (REACH * i) / BANDS;
+    slide.addShape('rtTriangle', {
+      x: SLIDE_W - size, y: SLIDE_H - size, w: size, h: size,
+      flipH: true, fill: { color: mixHex(GLOW, INK, size / REACH) }, line: NO_LINE,
+    });
+  }
+}
+
+/** Bracket rules + dots that frame every page in the master. */
+function frame(slide) {
+  const rule = { color: VIOLET, width: 2 };
+  const bars = [
+    [0.2917, 0.2368, 9.4333, 0], [0.2917, 0.2333, 0, 0.725], [9.7222, 0.2333, 0, 0.725],
+    [0.2778, 5.4032, 9.4333, 0], [0.2778, 4.6917, 0, 0.725], [9.7222, 4.6917, 0, 0.725],
+  ];
+  bars.forEach(([x, y, w, h]) => slide.addShape('line', { x, y, w, h, line: rule }));
+  [[0.254, 0.883], [9.688, 0.883], [0.246, 4.667], [9.679, 4.667]].forEach(([x, y]) =>
+    slide.addShape('ellipse', { x, y, w: 0.075, h: 0.075, fill: { color: PLUM }, line: NO_LINE })
+  );
+}
+
+/** Base text writer: every call in this deck goes through here. */
+function text(slide, body, o) {
+  slide.addText(body, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: o.face || BODY,
+    fontSize: o.size,
+    color: o.color || WHITE,
+    bold: !!o.bold,
+    align: o.align || 'left',
+    valign: o.valign || 'top',
+    lineSpacingMultiple: o.lh || 1,
+    margin: o.margin || INSET,
+    fill: o.fill ? { color: o.fill } : undefined,
+    line: o.line,
+    shape: o.shape,
+    wrap: true,
+  });
+}
+
+/** Page heading — Archivo, white, flush left unless told otherwise. */
+const title = (slide, body, o) => text(slide, body, Object.assign({ face: HEAD }, o));
+
+/** Section label — Archivo 14 by default. */
+const label = (slide, body, o) =>
+  text(slide, body, Object.assign({ face: HEAD, size: 14 }, o));
+
+/** Body paragraph — Inter 9 at 130% leading. */
+const copy = (slide, body, o) =>
+  text(slide, body, Object.assign({ face: BODY, size: 9, lh: 1.3 }, o));
+
+function rect(slide, x, y, w, h, color) {
+  slide.addShape('rect', { x, y, w, h, fill: { color }, line: NO_LINE });
+}
+
+/** Placeholder standing in for a photograph in the source deck. */
+function photo(slide, x, y, w, h) {
+  text(slide, '[image]', {
+    x, y, w, h, shape: 'rect', fill: WHITE,
+    face: BODY, size: 9, color: 'B4B4C0', align: 'center', valign: 'middle',
+  });
+}
+
+/** Pill button: filled when `fill` is given, otherwise outlined. */
+function button(slide, body, o) {
+  text(slide, body, {
+    x: o.x, y: o.y, w: o.w || 1.317, h: o.h || 0.375,
+    shape: 'rect', fill: o.fill,
+    line: o.fill ? undefined : { color: o.stroke || MAGENTA, width: 2 },
+    face: HEAD, size: 11, color: WHITE, align: 'center', valign: 'middle',
+  });
+}
+
+/** White disc with a dark numeral, used as a step marker. */
+function stepDot(slide, x, y, body, d) {
+  const size = d || 0.408;
+  text(slide, body, {
+    x, y, w: size, h: size, shape: 'flowChartConnector', fill: WHITE,
+    face: HEAD, size: 12, color: CHARCOAL, align: 'center', valign: 'middle',
+  });
+}
+
+/** Straight segment between two points (pptxgenjs lines are box + flip). */
+function seg(slide, [x1, y1], [x2, y2], line) {
+  slide.addShape('line', {
+    x: Math.min(x1, x2), y: Math.min(y1, y2),
+    w: Math.abs(x2 - x1), h: Math.abs(y2 - y1),
+    flipH: (x2 - x1) * (y2 - y1) < 0,
+    line,
+  });
+}
+
+function polyline(slide, pts, line) {
+  for (let i = 1; i < pts.length; i++) seg(slide, pts[i - 1], pts[i], line);
+}
+
+/** Round markers centred on each point of a series. */
+function markers(slide, pts, d, fill, line) {
+  pts.forEach(([x, y]) =>
+    slide.addShape('ellipse', {
+      x: x - d / 2, y: y - d / 2, w: d, h: d,
+      fill: { color: fill }, line: line || NO_LINE,
+    })
+  );
+}
+
+/** Laptop-with-globe icon used on the badge circles. */
+function laptopGlyph(slide, x, y, d) {
+  const stroke = { color: WHITE, width: 1 };
+  const gx = x + d * 0.37, gy = y + d * 0.28, gw = d * 0.26, gh = d * 0.3;
+  slide.addShape('rect', { x: x + d * 0.16, y: y + d * 0.2, w: d * 0.68, h: d * 0.46, fill: { type: 'none' }, line: stroke });
+  slide.addShape('ellipse', { x: gx, y: gy, w: gw, h: gh, fill: { type: 'none' }, line: stroke });
+  seg(slide, [gx + gw / 2, gy], [gx + gw / 2, gy + gh], stroke); // meridian
+  seg(slide, [gx, gy + gh / 2], [gx + gw, gy + gh / 2], stroke); // equator
+  slide.addShape('rect', { x: x + d * 0.04, y: y + d * 0.72, w: d * 0.92, h: d * 0.09, fill: { color: WHITE }, line: NO_LINE });
+}
+
+/** Outlined circle enclosing a right-pointing arrow (card affordance). */
+function arrowCircle(slide, x, y, d) {
+  const stroke = { color: WHITE, width: 2 };
+  slide.addShape('ellipse', { x, y, w: d, h: d * 1.022, fill: { type: 'none' }, line: stroke });
+  const cy = y + d * 0.511;
+  const tip = x + d * 0.735;
+  seg(slide, [x + d * 0.256, cy], [tip, cy], stroke);
+  seg(slide, [tip - d * 0.26, cy - d * 0.26], [tip, cy], stroke);
+  seg(slide, [tip - d * 0.26, cy + d * 0.26], [tip, cy], stroke);
+}
+
+/** Tick glyph used inside the comparison table on slide 8. */
+function checkMark(slide, cx, cy) {
+  const stroke = { color: WHITE, width: 2.5 };
+  seg(slide, [cx - 0.128, cy], [cx - 0.04, cy + 0.079], stroke);
+  seg(slide, [cx - 0.04, cy + 0.079], [cx + 0.128, cy - 0.079], stroke);
+}
+
+/** Maps chart values onto the drawing area of a plot. */
+function scale(axis) {
+  const { x0, dx, yZero, yTop, vTop } = axis;
+  return (i, v) => [x0 + dx * i, yZero - ((yZero - yTop) * v) / vTop];
+}
+
+/* ------------------------------------------------------------------ *
+ * Recurring composite blocks
+ * ------------------------------------------------------------------ */
+
+/** Heading + paragraph stacked in a column (slides 2, 5, 6, 7, 18 …). */
+function textBlock(slide, o) {
+  label(slide, o.head, { x: o.x, y: o.y, w: o.headW || o.w, h: 0.303, size: o.headSize || 14 });
+  copy(slide, o.body, { x: o.x, y: o.y + (o.gap || 0.346), w: o.w, h: o.bodyH || 0.45 });
+}
+
+/** Numbered card: coloured panel, white step dot, title and blurb. */
+function numberedCard(slide, o) {
+  rect(slide, o.x, o.y, o.w, o.h, o.color);
+  stepDot(slide, o.x + 0.199, o.y + 0.2, o.n);
+  label(slide, o.head, { x: o.x + 0.199, y: o.y + 0.655, w: o.w - 0.36, h: 0.303 });
+  copy(slide, o.body, { x: o.x + 0.199, y: o.y + 0.948, w: o.bodyW || o.w - 0.31, h: 0.647 });
+}
+
+/** 40% / VALUE BALANCE / blurb trio with a small triangle accent. */
+function statBlock(slide, o) {
+  title(slide, o.value, { x: o.x, y: o.y, w: 1.636, h: 0.909, size: 50 });
+  label(slide, o.head, { x: o.x + 0.017, y: o.y + 0.942, w: 1.947, h: 0.278, size: 12 });
+  copy(slide, o.body, { x: o.x + 0.017, y: o.y + 1.2, w: 1.949, h: 0.647 });
+  slide.addShape('triangle', {
+    x: o.x + 1.636, y: o.y + 0.231, w: 0.2, h: 0.209,
+    rotate: o.flip ? 180 : 0, fill: { color: o.flip ? PLUM : MAGENTA }, line: NO_LINE,
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide builders
+ * ------------------------------------------------------------------ */
+
+function slide01(slide) {
+  title(slide, 'SOFTWARE ENGINEERING', { x: 0.57, y: 1.094, w: 4.594, h: 1.59, size: 45 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc ullamcorp sit amet orci et consequat. Morbi semper eros vitae tincidunt porta. Mauris euismod. Cum sociis natoque penatibus. ',
+    { x: 0.57, y: 2.82, w: 4.43, h: 0.647 });
+  button(slide, 'READ MORE', { x: 0.667, y: 4.148, fill: MAGENTA });
+  button(slide, 'NEXT SLIDE', { x: 2.608, y: 4.156 });
+  photo(slide, 5.592, 0.725, 3.838, 4.174);
+}
+
+function slide02(slide) {
+  title(slide, 'THE ROLE OF SOFTWARE IN MODERN LIFE', { x: 0.591, y: 0.457, w: 8.838, h: 1.287, size: 36 });
+  const blurb = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc ullamcorper sit amet orci et consequat. Morbi semper eros vitae tincidunt porta. Mauris euismod. Cum sociis';
+  [['AUTOMATION', 1.948], ['CONNECTIVITY', 3.177]].forEach(([head, y]) =>
+    textBlock(slide, { x: 0.591, y, w: 3.893, headW: 1.58, head, body: blurb, bodyH: 0.647 })
+  );
+  button(slide, 'READ MORE', { x: 0.658, y: 4.66, fill: MAGENTA });
+  photo(slide, 5.0, 1.59, 4.43, 3.585);
+}
+
+function slide03(slide) {
+  title(slide, 'SOFTWARE DEVELOPMENT LIFE CYCLE ', { x: 0.57, y: 0.457, w: 8.859, h: 1.287, size: 36 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse aliquam, turpis dictum rutrum imperdiet, justo arcu consequat urna, ut consequat nisi massa et',
+    { x: 0.576, y: 1.976, w: 3.831, h: 0.647 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse aliquam, turpis dictum rutrum imperdiet, ',
+    { x: 0.576, y: 2.705, w: 3.831, h: 0.45 });
+
+  // Two data chips under the copy.
+  [['DATA ONE', 0.576, PLUM], ['DATA TWO', 2.48, MAGENTA]].forEach(([head, x, color]) => {
+    rect(slide, x, 3.663, 1.796, 1.238, color);
+    label(slide, head, { x: x + 0.157, y: 3.894, w: 1.545, h: 0.303, align: 'center' });
+    copy(slide, 'Lorem ipsum dolor sit Qui sint neque a', { x: x + 0.157, y: 4.202, w: 1.545, h: 0.45, align: 'center' });
+  });
+
+  // Line chart: white rules, two violet series over a 0-60 scale.
+  const at = scale({ x0: 5.123, dx: 1.3851, yZero: 4.9205, yTop: 1.7343, vTop: 60 });
+  [[0, 4.9205], [15, 4.124], [30, 3.3258], [45, 2.5318], [60, 1.7343]].forEach(([v, y]) => {
+    seg(slide, [5.1274, y], [9.2868, y], { color: WHITE, width: 0.75 });
+    text(slide, String(v), { x: 4.621, y: y - 0.158, w: 0.424, h: 0.265, size: 9, align: 'right', margin: 4.05 });
+  });
+  [[10.09, 20.18, 50.04, 46.07], [5.14, 30.10, 40.10, 35.17]].forEach((vals) => {
+    const pts = vals.map((v, i) => at(i, v));
+    polyline(slide, pts, { color: VIOLET, width: 3 });
+    markers(slide, pts, 0.152, WHITE, { color: VIOLET, width: 2.25 });
+  });
+}
+
+function slide04(slide) {
+  title(slide, 'SOFTWARE REQUIREMENTS ENGINEERING', { x: 0.57, y: 0.461, w: 8.859, h: 1.287, size: 36, align: 'center' });
+  const cards = [
+    { x: 0.554, img: 0.57, head: 'USE CASES', color: MAGENTA, bubble: 2.196, headW: 1.395, headX: 0.919 },
+    { x: 3.704, img: 3.72, head: 'USER STORIES', color: PLUM, bubble: 5.346, headW: 1.395, headX: 4.069 },
+    { x: 6.837, img: 6.854, head: 'SYSTEM CONSTRAINTS', color: MAGENTA, bubble: 8.479, headW: 2.093, headX: 6.87 },
+  ];
+  const drawCard = (c) => {
+    text(slide, '50%', {
+      x: c.bubble, y: 2.244, w: 0.967, h: 0.924, shape: 'flowChartConnector', fill: c.color,
+      face: HEAD, size: 15, bold: true, align: 'center', valign: 'middle',
+    });
+    rect(slide, c.x, 4.316, 2.126, 0.801, c.color);
+    label(slide, c.head, { x: c.headX, y: 4.375, w: c.headW, h: 0.278, size: 12, align: 'center' });
+    copy(slide, 'Lorem ipsum dolor sit amet sint neque a', { x: c.headX + (c.headW - 1.395) / 2, y: 4.596, w: 1.395, h: 0.45, align: 'center' });
+  };
+  // The last panel is painted over the third bubble, so it is drawn last.
+  photo(slide, cards[0].img, 2.245, 2.109, 2.088);
+  photo(slide, cards[1].img, 2.245, 2.109, 2.088);
+  [cards[0], cards[2], cards[1]].forEach(drawCard);
+  photo(slide, cards[2].img, 2.245, 2.109, 2.088);
+}
+
+function slide05(slide) {
+  title(slide, 'SYSTEM DESIGN PRINCIPLES', { x: 5.057, y: 0.456, w: 4.385, h: 1.287, size: 36 });
+  copy(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numqua. Non exercitationem reiciendis qui consequatur.',
+    { x: 5.148, y: 1.751, w: 4.294, h: 0.45 });
+  photo(slide, 5.148, 2.593, 4.281, 2.581);
+
+  const rows = [
+    { y: 0.752, x: 0.577, head: 'SEPARATION OF CONCERNS', color: MAGENTA },
+    { y: 2.341, x: 0.577, head: 'SINGLE RESPONSIBILITY', color: PLUM },
+    { y: 3.931, x: 0.57, head: 'DON\u2019T REPEAT YOURSELF', color: PLUM },
+  ];
+  rows.forEach((r) => {
+    rect(slide, r.x, r.y, 4.016, 1.244, r.color);
+    textBlock(slide, {
+      x: r.x + 0.207, y: r.y + 0.252, w: 3.111, head: r.head,
+      body: 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.',
+      gap: 0.301,
+    });
+    arrowCircle(slide, r.x + 3.496, r.y + 0.463, 0.321);
+  });
+}
+
+function slide06(slide) {
+  title(slide, 'AGILE VS WATERFALL METHODOLOGY', { x: 0.57, y: 0.454, w: 8.859, h: 1.287, size: 36, align: 'center' });
+
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const RULES = [3.9742, 3.6105, 3.2448, 2.8788, 2.5129, 2.1472]; // values 0 … 5
+  const XS = [1.065, 1.5493, 1.9336, 2.223, 2.5086, 2.8209, 3.0943, 3.5349, 4.2508];
+  const VALUES = [4.454, 1.037, 4.759, 1.694, 4.647, 0.750, 2.266, 0.903, 3.432];
+  // Both plots carry the same series; only the x offset and caption differ.
+  const PLOTS = [
+    { ox: 0.0, head: 'AGILE METHODOLOGY', textX: 0.57 },
+    { ox: 4.9909, head: 'WATERFALL METHODOLOGY', textX: 5.609 },
+  ];
+  PLOTS.forEach((p) => {
+    RULES.forEach((y, v) => {
+      seg(slide, [0.7717 + p.ox, y], [4.4242 + p.ox, y], { color: GRID_DASH, width: 0.75, dashType: v === 0 ? 'solid' : 'lgDash' });
+      text(slide, String(v), { x: 0.5 + p.ox, y: y - 0.148, w: 0.251, h: 0.215, size: 8, align: 'right' });
+    });
+    MONTHS.forEach((m, i) =>
+      text(slide, m, { x: 0.85 + p.ox + i * 0.29025, y: 4.02, w: 0.423, h: 0.215, size: 8, align: 'center' })
+    );
+    const pts = VALUES.map((v, i) => [XS[i] + p.ox, RULES[0] - (v / 5) * (RULES[0] - RULES[5])]);
+    polyline(slide, pts, { color: VIOLET, width: 1.5 });
+    markers(slide, pts, 0.03, VIOLET);
+    textBlock(slide, {
+      x: p.textX, y: 4.345, w: 3.821, headW: 3.291, head: p.head,
+      body: 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem',
+      gap: 0.3,
+    });
+  });
+}
+
+function slide07(slide) {
+  title(slide, 'SOFTWARE ARCHITECTURE MODELS', { x: 0.587, y: 0.459, w: 8.842, h: 0.631, size: 33, align: 'center' });
+  const CARDS = [
+    { n: '01', x: 0.587, y: 1.565, color: PLUM },
+    { n: '02', x: 3.603, y: 1.565, color: MAGENTA },
+    { n: '03', x: 6.619, y: 1.565, color: PLUM },
+    { n: '06', x: 0.587, y: 3.375, color: MAGENTA },
+    { n: '05', x: 3.603, y: 3.375, color: PLUM },
+    { n: '04', x: 6.619, y: 3.375, color: MAGENTA },
+  ];
+  CARDS.forEach((c) => {
+    rect(slide, c.x, c.y, 2.783, 1.639, c.color);
+    title(slide, c.n, { x: c.x + 0.122, y: c.y + 0.067, w: 0.697, h: 0.48, size: 24, bold: true });
+    label(slide, 'LAYERED ARCHITECTURE', { x: c.x + 0.622, y: c.y + 0.083, w: 1.61, h: 0.48, size: 12 });
+    copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendi sse aliquam, ',
+      { x: c.x + 0.122, y: c.y + 0.561, w: 2.571, h: 0.45 });
+    text(slide, 'LEARN MORE', {
+      x: c.x + 0.199, y: c.y + 1.182, w: 1.048, h: 0.31, shape: 'rect', fill: WHITE,
+      face: HEAD, size: 9, color: CHARCOAL, align: 'center', valign: 'middle',
+    });
+  });
+}
+
+function slide08(slide) {
+  title(slide, 'PROGRAMMING PARADIGMS', { x: 0.587, y: 0.459, w: 4.679, h: 1.439, size: 41 });
+  textBlock(slide, {
+    x: 7.055, y: 0.613, w: 2.299, head: '11/12/2025 TYPE',
+    body: 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', gap: 0.277,
+  });
+
+  const COL_W = 1.367;
+  const COL_X = [2.475, 3.842, 5.208, 6.575, 7.942]; // OUR BUSINESS + Business 1-4
+  const ROW_Y = [2.757, 3.278, 3.749, 4.22, 4.69]; // label baselines
+  // Ticked cells per column, addressed by row index.
+  const TICKS = [[0, 1, 2, 3, 4], [0, 2, 4], [0, 4], [3, 4], [0, 1, 2]];
+
+  slide.addShape('rect', { x: 7.942, y: 2.127, w: COL_W, h: 2.974, fill: { color: VIOLET }, line: NO_LINE });
+  slide.addShape('rect', {
+    x: 0.694, y: 2.559, w: 8.614, h: 2.542,
+    fill: { color: WHITE, transparency: 85.5 }, line: NO_LINE,
+  });
+  rect(slide, 3.842, 2.127, 5.467, 0.526, MAGENTA);
+  [3.191, 3.665, 4.138, 4.612].forEach((y) =>
+    seg(slide, [0.694, y], [9.308, y], { color: MAGENTA, width: 0.75, transparency: 89.4 })
+  );
+  rect(slide, COL_X[0], 2.127, COL_W, 2.974, PLUM);
+
+  label(slide, 'OUR BUSINESS', { x: 2.533, y: 2.183, w: 1.251, h: 0.429, size: 11, align: 'center' });
+  ['Business 1', 'Business 2', 'Business 3', 'Business 4'].forEach((name, i) =>
+    label(slide, name, { x: COL_X[i + 1] + 0.057, y: 2.3, w: 1.251, h: 0.252, size: 11, align: 'center' })
+  );
+  ROW_Y.forEach((y) => label(slide, 'Your Text Here', { x: 0.936, y, w: 1.367, h: 0.278, size: 12 }));
+  TICKS.forEach((rows, col) =>
+    rows.forEach((r) => checkMark(slide, COL_X[col] + 0.692, ROW_Y[r] + 0.142))
+  );
+}
+
+function slide09(slide) {
+  title(slide, 'VERSION CONTROL SYSTEMS', { x: 0.57, y: 0.454, w: 8.859, h: 0.757, size: 41 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc ullamcorper sit amet orci et consequat. Morbi semper eros vitae tincidunt porta. Mauris euismod. Cum sociis natoque penatibus. veniam minim as tempor incididunt ut labore et',
+    { x: 0.581, y: 1.417, w: 7.376, h: 0.45 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc ullamcorper sit amet orci et consequat. Morbi semper eros vitae tincidunt porta. Mauris euismod. Cum sociis natoque penatibus. veniam minim as tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam. Cum sociis natoque penatibus. veniam minim as',
+    { x: 0.581, y: 2.072, w: 7.376, h: 0.647 });
+
+  const BLURB = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc ullamcorper sit amet orci et consequat';
+  numberedCard(slide, { n: '1', x: 0.58, y: 3.169, w: 2.762, h: 1.871, color: MAGENTA, head: 'CONTROL SYSTEM', body: BLURB, bodyW: 2.449 });
+  numberedCard(slide, { n: '2', x: 3.624, y: 3.191, w: 2.762, h: 1.871, color: PLUM, head: 'CONTROL SYSTEM', body: BLURB, bodyW: 2.449 });
+  photo(slide, 6.667, 3.169, 2.762, 1.871);
+  stepDot(slide, 6.916, 3.369, '3');
+}
+
+function slide10(slide) {
+  const COLS = [
+    { x: 0.47, y: 0.938, head: 'AGILE PRACTICES', n: '01', color: PLUM },
+    { x: 5.38, y: 0.948, head: 'SCRUM PRACTICES', n: '02', color: MAGENTA },
+  ];
+  COLS.forEach((c) => {
+    title(slide, c.head, { x: c.x, y: c.y, w: 4.272, h: 1.439, size: 41 });
+    title(slide, '+ 42.812.023', { x: c.x + 0.336, y: c.y + 2.055, w: 3.98, h: 0.833, size: 45 });
+    title(slide, '5.267.192+', { x: c.x + 0.736, y: c.y + 1.644, w: 2.144, h: 0.48, size: 24 });
+    text(slide, 'Increase', {
+      x: c.x + 2.766, y: c.y + 1.704, w: 0.939, h: 0.286, shape: 'rect', fill: c.color,
+      face: BODY, size: 14, lh: 0.9,
+    });
+    text(slide, c.n, {
+      x: c.x + 0.082, y: c.y + 1.706, w: 0.414, h: 0.219, shape: 'rect', fill: c.color,
+      face: BODY, size: 15, lh: 0.9, align: 'center', valign: 'middle',
+    });
+    copy(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur repudiandae.',
+      { x: c.x, y: c.y + 3.004, w: 4.114, h: 0.743, size: 11 });
+  });
+}
+
+function slide11(slide) {
+  title(slide, 'DEVOPS AND CONTINUOUS INTEGRATION', { x: 0.722, y: 0.634, w: 3.627, h: 1.893, size: 36 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendi sse aliquam, turpis dictum rutrum imperdiet, justo arcu consequat urna, ut consequat nisi massa et',
+    { x: 0.722, y: 2.711, w: 3.627, h: 0.647 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendis se aliquam, turpis dictum rutrum imperdiet, ',
+    { x: 0.722, y: 3.441, w: 3.627, h: 0.45 });
+  button(slide, 'NEXT SLIDE', { x: 0.856, y: 4.31, fill: MAGENTA });
+  photo(slide, 5.0, 0.758, 4.43, 1.893);
+  photo(slide, 5.0, 2.974, 4.43, 1.893);
+}
+
+function slide12(slide) {
+  title(slide, 'QUALITY ASSURANCE IN SOFTWARE', { x: 0.566, y: 0.455, w: 6.9, h: 1.456, size: 41 });
+  copy(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. ',
+    { x: 7.109, y: 0.571, w: 2.377, h: 0.45 });
+
+  // Donut gauge + readout.
+  ['9A31E8', WHITE].forEach((color, i) =>
+    slide.addShape('blockArc', {
+      x: 7.236, y: 1.196, w: 0.613, h: 0.613,
+      angleRange: i === 0 ? [71, 270] : [108, 270],
+      arcThicknessRatio: 0.256,
+      flipH: i === 1,
+      fill: { color }, line: NO_LINE,
+    })
+  );
+  text(slide, '200,000', { x: 8.042, y: 1.199, w: 1.269, h: 0.429, face: NUMERIC, size: 21 });
+  copy(slide, 'Quality content', { x: 8.042, y: 1.574, w: 1.269, h: 0.227, lh: 1 });
+
+  text(slide, 'NEW SOFTWARE', { x: 0.755, y: 2.151, w: 1.591, h: 0.297, shape: 'rect', fill: MAGENTA, face: HEAD, size: 12, valign: 'middle' });
+  text(slide, 'QUALITY ASSURANCE', { x: 0.755, y: 2.571, w: 2.306, h: 0.297, shape: 'rect', fill: PLUM, face: HEAD, size: 14, valign: 'middle' });
+
+  // Grid: five horizontal rules plus a value axis and thirteen verticals.
+  [3.147, 3.588, 4.027, 4.466, 4.906].forEach((y) =>
+    seg(slide, [1.207, y], [9.468, y], { color: GRID_PALE, width: 0.75 })
+  );
+  seg(slide, [1.207, 3.157], [1.207, 4.911], { color: GRID_AXIS, width: 0.75 });
+  for (let i = 0; i <= 12; i++) {
+    const x = 1.542 + i * 0.6552;
+    seg(slide, [x, 3.153], [x, 4.906], { color: GRID_PALE, width: 0.75 });
+  }
+  [0, 2, 4, 6, 8].forEach((v) =>
+    text(slide, String(v), { x: 0.822, y: 4.906 - (v / 8) * 1.759 - 0.096, w: 0.288, h: 0.227, size: 9, align: 'right' })
+  );
+  for (let i = 1; i <= 12; i++) {
+    text(slide, String(i), { x: 1.452 + (i - 1) * 0.6555, y: 4.967, w: 0.831, h: 0.227, size: 9, align: 'center' });
+  }
+  const VALUES = [2.95, 1.71, 5.45, 7.07, 4.21, 2.55, 5.01, 1.30, 3.66, 4.77, 1.69, 3.65];
+  const pts = VALUES.map((v, i) => [1.897 + i * 0.6528, 4.906 - (v / 8) * 1.759]);
+  polyline(slide, pts, { color: VIOLET, width: 0.75 });
+  markers(slide, pts, 0.075, WHITE, { color: VIOLET, width: 2.25 });
+}
+
+function slide13(slide) {
+  title(slide, 'SOFTWARE PROJECT MANAGEMENT', { x: 5.529, y: 0.686, w: 3.901, h: 1.893, size: 36 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendi sse aliquam, turpis dictum rutrum imperdiet, justo arcu consequat urna, ut consequat nisi massa et',
+    { x: 5.529, y: 2.8, w: 4.16, h: 0.647 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendis se aliquam, turpis dictum rutrum imperdiet, ',
+    { x: 5.529, y: 3.529, w: 3.901, h: 0.45 });
+  button(slide, 'NEXT SLIDE', { x: 5.65, y: 4.366 });
+
+  const BLURB = 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi';
+  [['1', 0.632, 'PLANNING', MAGENTA], ['2', 2.937, 'SCHEDULING', PLUM]].forEach(([n, x, head, color]) => {
+    rect(slide, x, 0.776, 2.019, 1.499, color);
+    stepDot(slide, x + 0.165, 0.889, n);
+    label(slide, head, { x: x + 0.115, y: 1.345, w: 1.463, h: 0.303 });
+    copy(slide, BLURB, { x: x + 0.115, y: 1.638, w: 1.826, h: 0.45 });
+  });
+  photo(slide, 0.647, 2.533, 4.325, 2.408);
+}
+
+function slide14(slide) {
+  title(slide, 'CODE REVIEW AND BEST PRACTICES', { x: 0.587, y: 0.459, w: 6.188, h: 1.439, size: 41 });
+  textBlock(slide, {
+    x: 7.055, y: 0.613, w: 2.299, head: '11/12/2025 TYPE',
+    body: 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', gap: 0.277,
+  });
+  photo(slide, 0.57, 2.225, 4.43, 2.941);
+
+  slide.addShape('ellipse', { x: 5.418, y: 2.987, w: 1.908, h: 1.908, fill: { color: PLUM }, line: NO_LINE });
+  title(slide, '49,21%', { x: 5.45, y: 3.491, w: 1.843, h: 0.631, size: 33, align: 'center' });
+  copy(slide, 'Lorem ipsum dolor ', { x: 5.628, y: 4.117, w: 1.488, h: 0.227, lh: 1, align: 'center' });
+  rect(slide, 7.544, 3.587, 1.606, 0.424, VIOLET);
+  text(slide, 'CODE REVIEW', { x: 7.544, y: 3.582, w: 1.7, h: 0.303, shape: 'rect', fill: PLUM, face: HEAD, size: 14 });
+  copy(slide, 'Lorem ipsum dolor sit amet. Qui sint neque.', { x: 7.465, y: 4.026, w: 1.908, h: 0.45 });
+}
+
+function slide15(slide) {
+  title(slide, 'SECURITY IN SOFTWARE ENGINEERING', { x: 0.57, y: 0.46, w: 3.901, h: 1.893, size: 36 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Susp sse aliquam, turpis dictum rutrum imperdiet, justo arcu consequat urna, ut consequat nisi massa et',
+    { x: 0.57, y: 2.474, w: 3.818, h: 0.647 });
+  photo(slide, 5.379, 0.451, 4.049, 4.724);
+
+  // Overlay card on the photo.
+  rect(slide, 5.634, 3.295, 1.625, 1.583, MAGENTA);
+  label(slide, 'Your Text Description', { x: 5.77, y: 3.44, w: 1.158, h: 0.53 });
+  copy(slide, 'Lorem ipsum dolor sit am. Qui sint neque a', { x: 5.77, y: 4.103, w: 1.401, h: 0.647 });
+
+  // Alert bar with an exclamation badge.
+  rect(slide, 0.57, 3.89, 4.43, 0.988, PLUM);
+  slide.addShape('ellipse', { x: 0.835, y: 4.209, w: 0.367, h: 0.369, fill: { type: 'none' }, line: { color: WHITE, width: 2.5 } });
+  seg(slide, [1.019, 4.28], [1.019, 4.42], { color: WHITE, width: 2.5 });
+  slide.addShape('ellipse', { x: 0.997, y: 4.462, w: 0.043, h: 0.043, fill: { color: WHITE }, line: NO_LINE });
+  text(slide, 'Sit possimus fuga iste nostrum sed deserunt fugiat et minus dolore ab soluta perferendis. ',
+    { x: 1.416, y: 4.135, w: 3.413, h: 0.512, face: HEAD, size: 11, lh: 1.3 });
+}
+
+function slide16(slide) {
+  title(slide, 'SOFTWARE MAINTENANCE AND UPDATES', { x: 0.572, y: 0.451, w: 3.901, h: 1.893, size: 36 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendi sse aliquam, turpis dictum rutrum imperdiet, justo arcu consequat urna, ut consequat nisi massa et',
+    { x: 0.572, y: 2.565, w: 4.16, h: 0.647 });
+  copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendis se aliquam, turpis dictum rutrum imperdiet, ',
+    { x: 0.572, y: 3.294, w: 3.901, h: 0.45 });
+  button(slide, 'NEXT SLIDE', { x: 0.659, y: 4.283, fill: MAGENTA });
+  photo(slide, 5.202, 0.526, 2.089, 2.113);
+  photo(slide, 5.202, 2.986, 2.089, 2.113);
+  const BLURB = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque tincidunt';
+  statBlock(slide, { x: 7.465, y: 0.411, value: '40%', head: 'VALUE BALANCE', body: BLURB });
+  statBlock(slide, { x: 7.482, y: 3.251, value: '40%', head: 'VALUE BALANCE', body: BLURB, flip: true });
+}
+
+function slide17(slide) {
+  title(slide, 'EMERGING TECHNOLOGY IN SOFTWARE', { x: 5.003, y: 0.691, w: 4.427, h: 2.121, size: 41 });
+  [['79%', 5.023, 5.0], ['599$', 7.305, 7.31]].forEach(([value, x, labelX]) => {
+    title(slide, value, { x, y: 3.57, w: 1.861, h: 0.581, size: 30, valign: 'bottom' });
+    label(slide, 'YOUR TEXT HERE', { x: labelX, y: 4.164, w: 1.726, h: 0.278, size: 12 });
+    copy(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', { x, y: 4.419, w: 2.038, h: 0.647 });
+  });
+
+  // Column chart: 0-35 scale, three bars.
+  const yZero = 5.065, yTop = 0.899, vTop = 35;
+  for (let v = 0; v <= 35; v += 5) {
+    const y = yZero - ((yZero - yTop) * v) / vTop;
+    if (v > 0) seg(slide, [1.132, y], [4.463, y], { color: GRID_DARK, width: 0.75 });
+    text(slide, String(v), { x: 0.506, y: y - 0.14, w: 0.558, h: 0.263, size: 9, align: 'right', lh: 1.3 });
+  }
+  [[1.377, 32.0], [2.488, 28.2], [3.6, 24.6]].forEach(([x, v]) => {
+    const h = ((yZero - yTop) * v) / vTop;
+    rect(slide, x, yZero - h, 0.621, h, PLUM);
+  });
+  seg(slide, [1.132, yZero], [4.463, yZero], { color: WHITE, width: 1 });
+  [1.132, 2.241, 3.354, 4.461].forEach((x) => seg(slide, [x, yZero], [x, yZero + 0.049], { color: WHITE, width: 1 }));
+}
+
+function slide18(slide) {
+  title(slide, 'ETHICS IN SOFTWARE DEVELOPMENT', { x: 5.003, y: 0.466, w: 4.427, h: 1.893, size: 36 });
+  photo(slide, 0.57, 0.451, 3.809, 4.724);
+  const ROWS = [
+    { y: 2.772, head: 'PRIVACY PROTECTION FIRST' },
+    { y: 3.606, head: 'SECURE CODING PRACTICES' },
+    { y: 4.44, head: 'TRANSPARENT DATA USAGE' },
+  ];
+  ROWS.forEach((r) => {
+    slide.addShape('flowChartConnector', { x: 5.001, y: r.y + 0.04, w: 0.621, h: 0.593, fill: { color: MAGENTA }, line: NO_LINE });
+    laptopGlyph(slide, 5.162, r.y + 0.196, 0.299);
+    label(slide, r.head, { x: 5.765, y: r.y, w: 3.361, h: 0.278, size: 12 });
+    copy(slide, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendi sse aliquam, turpis dictum rutrum imperdiet, ',
+      { x: 5.765, y: r.y + 0.268, w: 3.666, h: 0.45 });
+  });
+}
+
+function slide19(slide) {
+  slide.addShape('flowChartConnector', { x: 4.69, y: 0.499, w: 0.621, h: 0.593, fill: { color: MAGENTA }, line: NO_LINE });
+  laptopGlyph(slide, 4.851, 0.655, 0.299);
+  label(slide, 'SOFTWARE ENGINEERING PRESENTATION TEMPLATE',
+    { x: 2.027, y: 1.175, w: 5.938, h: 0.312, size: 12, align: 'center', lh: 1.3 });
+
+  slide.addText(
+    [
+      { text: '\u201C ', options: { color: WHITE } },
+      { text: 'SOFTWARE ENGINEERING ', options: { color: VIOLET } },
+      { text: 'IS THE SYSTEMATIC APPLICATION OF ENGINEERING APPROACHES TO THE ', options: { color: WHITE } },
+      { text: 'DEVELOPMENT OF SOFTWARE', options: { color: VIOLET } },
+      { text: '.\u201D', options: { color: WHITE } },
+    ],
+    {
+      x: 0.57, y: 1.817, w: 8.859, h: 1.598,
+      fontFace: HEAD, fontSize: 24, align: 'center', valign: 'top',
+      lineSpacingMultiple: 1.3, margin: INSET,
+    }
+  );
+
+  const STATS = [['SYSTEM DESIGN', '100%', 0.75], ['ERROR LOGS', '35%', 3.967], ['DEV TOOLS', '90%', 7.025]];
+  STATS.forEach(([head, value, x], i) => {
+    label(slide, head, { x: x + 0.009, y: 3.784, w: 2.059, h: 0.278, size: 12, align: 'center' });
+    title(slide, value, { x, y: 4.062, w: 2.08, h: 0.909, size: 50, align: 'center' });
+    if (i < 2) {
+      const divider = i === 0 ? 3.312 : 6.53;
+      seg(slide, [divider, 3.784], [divider, 4.829], { color: VIOLET, width: 1.5 });
+    }
+  });
+}
+
+function slide20(slide) {
+  title(slide, 'THANK YOU', { x: 5.009, y: 0.451, w: 4.634, h: 2.979, size: 86 });
+  photo(slide, 0.689, 0.725, 3.838, 4.174);
+  title(slide, 'Office Address:', { x: 5.08, y: 3.682, w: 3.057, h: 0.38, size: 15, lh: 1.3 });
+  copy(slide, '500 Fifth Avenue, Suite 2500 New York, NY 10110, USA', { x: 5.08, y: 4.029, w: 4.15, h: 0.287, size: 11 });
+  title(slide, 'Phone:', { x: 5.086, y: 4.338, w: 1.471, h: 0.347, size: 14, lh: 1.3 });
+  copy(slide, '+22 1234 5678 9999', { x: 5.086, y: 4.669, w: 2.506, h: 0.287, size: 11 });
+}
+
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+];
+
+/* ------------------------------------------------------------------ *
+ * Assemble & write
+ * ------------------------------------------------------------------ */
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'DECK';
+  pptx.title = 'Software Engineering';
+
+  BUILDERS.forEach((builder) => {
+    const slide = pptx.addSlide();
+    backdrop(slide);
+    frame(slide);
+    builder(slide);
+  });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '11efc14f-44ca-48ea-b88d-127458c08a02_grok_final.pptx'),
+  });
+}
+
+build().then((f) => console.log('wrote', f));

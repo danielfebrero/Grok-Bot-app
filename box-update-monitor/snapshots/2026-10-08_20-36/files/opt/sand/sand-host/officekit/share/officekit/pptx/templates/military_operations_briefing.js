@@ -1,0 +1,745 @@
+#!/usr/bin/env node
+/**
+ * "Operation V" — Military Presentation Template (20 slides, 13.333 x 7.5 in).
+ *
+ * Standalone recreation of the reference deck with pptxgenjs only.
+ * Design notes:
+ *  - The template is built from skewed "parallelogram" bars/panels with linear
+ *    gradients. pptxgenjs has no gradient-fill API, so `gradQuad()` paints a
+ *    gradient by tiling the quad with a strip of flat-coloured slices.
+ *  - The reference deck contains no embedded raster images: every picture frame
+ *    is an EMPTY picture placeholder, and what is visible in those frames is the
+ *    dark "photo panel" gradient the slides draw on top of them. `photoPanel()`
+ *    reproduces those frames.
+ *  - Vector artwork (rank insignia, three icons, the world map) is kept as plain
+ *    polygon point tables and drawn with custom-geometry shapes.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  cream:    'EAEBCD',  // accent1 lumMod 20% / lumOff 80% — slide background
+  ink:      '1A1A1A',  // accent3 — near-black used for shading
+  black:    '000000',
+  white:    'FFFFFF',
+  gold:     'D59F25',  // accent4 — headline / rule accent
+  goldDark: '6A5013',  // accent4 lumMod 50%
+  olive:    '71722E',  // accent1
+  oliveDk:  '373A25',  // accent2 — dark panels, dark headings
+  oliveMid: '4F5335',  // accent2 lumMod 90% / lumOff 10%
+  oliveLt:  '43472D',
+  body:     '262626',  // tx1 lumMod 85% — body copy on cream
+  land:     'D6D79B',  // world-map land fill
+};
+
+const FONT = { head: 'Staatliches', body: 'DM Sans' };
+
+/* Gradient stop tables: [position 0..1, colour, alpha 0..1] */
+const G = {
+  goldFade:  [[0, C.gold,     1], [1, C.gold,     0]],
+  darkFade:  [[0, C.goldDark, 1], [1, C.goldDark, 0]],
+  oliveFade: [[0, C.olive,    1], [1, C.olive,    0]],
+  panel:     [[0, C.oliveMid, 1], [0.5, C.oliveDk, 1], [1, C.oliveMid, 1]],
+  panel4:    [[0, C.oliveMid, 1], [0.34, C.oliveDk, 1], [0.78, C.oliveLt, 1], [1, C.oliveMid, 1]],
+  titleBg:   [[0, C.ink, 1], [0.5, C.black, 1], [1, C.ink, 1]],
+};
+/** Vertical "photo" shading: opaque ink at the bottom fading to `top` alpha. */
+const shade = (top = 0, from = 0) => [[from, C.ink, 1], [1, C.ink, top]];
+
+const SLIDE_W = 13.333333;
+const SLIDE_H = 7.5;
+const PARA_ADJ = 0.25;   // OOXML "parallelogram" default adjust value
+
+/* -------------------------------------------------------------- utilities */
+
+function mix(c1, c2, t) {
+  let out = '';
+  for (let i = 0; i < 6; i += 2) {
+    const a = parseInt(c1.substr(i, 2), 16);
+    const b = parseInt(c2.substr(i, 2), 16);
+    out += Math.round(a + (b - a) * t).toString(16).padStart(2, '0');
+  }
+  return out.toUpperCase();
+}
+
+/** Colour + alpha of a gradient stop table at position `t`. */
+function sample(stops, t) {
+  const first = stops[0];
+  const last = stops[stops.length - 1];
+  if (t <= first[0]) return [first[1], first[2]];
+  if (t >= last[0]) return [last[1], last[2]];
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0]) {
+      const [p0, c0, a0] = stops[i - 1];
+      const [p1, c1, a1] = stops[i];
+      const f = (t - p0) / (p1 - p0);
+      return [mix(c0, c1, f), a0 + (a1 - a0) * f];
+    }
+  }
+  return [last[1], last[2]];
+}
+
+/** Corner points (TL, TR, BR, BL) of a rectangle skewed like a parallelogram. */
+function quadOf(x, y, w, h, adj) {
+  const dx = adj ? Math.min(Math.min(w, h) * adj, w) : 0;
+  return [[x + dx, y], [x + w, y], [x + w - dx, y + h], [x, y + h]];
+}
+
+function lerpPt(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
+
+/** Draw one flat quad as a custom-geometry shape. */
+function quad(slide, pts, color, alpha) {
+  const xs = pts.map(p => p[0]);
+  const ys = pts.map(p => p[1]);
+  const x0 = Math.min(...xs);
+  const y0 = Math.min(...ys);
+  const w = Math.max(...xs) - x0;
+  const h = Math.max(...ys) - y0;
+  slide.addShape('custGeom', {
+    x: x0, y: y0, w: w, h: h,
+    points: pts.map(p => ({ x: +(p[0] - x0).toFixed(4), y: +(p[1] - y0).toFixed(4) })).concat([{ close: true }]),
+    fill: alpha >= 0.999 ? { color: color } : { color: color, transparency: Math.round((1 - alpha) * 100) },
+    line: { type: 'none' },
+  });
+}
+
+/**
+ * Paint a rectangle / parallelogram filled with a linear gradient.
+ * `ang` follows OOXML: 0 = left→right, 180 = right→left, 270 = bottom→top.
+ *
+ * pptxgenjs cannot emit a real <a:gradFill>, so the shape is tiled with a strip
+ * of flat-coloured slices laid perpendicular to the gradient axis.
+ */
+function gradQuad(slide, x, y, w, h, opts) {
+  const { stops, ang = 0, adj = 0, steps, over } = opts;
+  const c = Math.cos(ang * Math.PI / 180);
+  const s = Math.sin(ang * Math.PI / 180);
+  const lo = Math.min(0, c) + Math.min(0, s);
+  const span = Math.abs(c) + Math.abs(s);
+  const [TL, TR, BR, BL] = quadOf(x, y, w, h, adj);
+  const byColumn = Math.abs(c) >= Math.abs(s);
+  const n = steps || Math.max(8, Math.min(48, Math.round((byColumn ? w : h) * 14)));
+  /** Parametric position along the gradient axis at cross-position `u`. */
+  const axisAt = u => {
+    const [gu, gv] = byColumn ? [u, 0.5] : [0.5, u];
+    return (gu * c + gv * s - lo) / span;
+  };
+  /** Sub-quad of the shape between cross-positions t0 and t1. */
+  const cell = (t0, t1) => (byColumn
+    ? [lerpPt(TL, TR, t0), lerpPt(TL, TR, t1), lerpPt(BL, BR, t1), lerpPt(BL, BR, t0)]
+    : [lerpPt(TL, BL, t0), lerpPt(TR, BR, t0), lerpPt(TR, BR, t1), lerpPt(TL, BL, t1)]);
+
+  // Butt-joined edges let the renderer's anti-aliasing show hairlines of
+  // whatever lies behind, so slices grow slightly into their neighbour and the
+  // strip as a whole overshoots the shape outline by a sub-pixel sliver.
+  // Opaque slices may overlap generously; translucent ones only by the sliver,
+  // otherwise the overlap would visibly double up their alpha.
+  const edge = 0.004 / (byColumn ? w : h);
+  const bleed = over || stops.every(st => st[2] >= 1) ? 0.4 / n : edge;
+  for (let i = 0; i < n; i++) {
+    // Later slices paint over the overlap, so the visible band of slice `i` is
+    // shifted back by `bleed`; colour it from the middle of that band.
+    let [color, alpha] = sample(stops, axisAt((i + 0.5) / n - bleed));
+    if (over) { color = mix(over, color, alpha); alpha = 1; }  // pre-blended: no see-through seams
+    if (alpha < 0.02) continue;
+    quad(slide, cell(i ? i / n - bleed : -edge, i < n - 1 ? (i + 1) / n : 1 + edge), color, alpha);
+  }
+}
+
+/** Skewed accent bar (the deck's signature gold / olive streaks). */
+function bar(slide, x, y, w, h, stops, ang, adj = 0.51478) {
+  gradQuad(slide, x, y, w, h, { stops: stops, ang: ang, adj: adj });
+}
+
+/** Flat-topped dark panel used behind titles, numbers and icons. */
+function panel(slide, x, y, w, h, adj = PARA_ADJ, stops = G.panel4, ang = 20) {
+  gradQuad(slide, x, y, w, h, { stops: stops, ang: ang, adj: adj });
+}
+
+/**
+ * Frame that sits over one of the deck's (empty) picture placeholders:
+ * the dark bottom-up gradient the reference paints on top of the photo area.
+ * `over` is the flat colour behind the frame (pass null when it straddles
+ * other artwork and must stay genuinely translucent).
+ */
+function photoPanel(slide, x, y, w, h, opts = {}) {
+  gradQuad(slide, x, y, w, h, {
+    stops: shade(opts.top || 0, opts.from || 0), ang: 270, adj: opts.adj || 0,
+    over: 'over' in opts ? opts.over : C.cream,
+    steps: opts.steps || Math.max(24, Math.min(56, Math.round(h * 18))),
+  });
+}
+
+/* ------------------------------------------------------------------- text */
+
+/** An array of strings becomes one paragraph per entry. */
+function lines(text) {
+  return Array.isArray(text)
+    ? text.map((t, i) => ({ text: t, options: { breakLine: i < text.length - 1 } }))
+    : text;
+}
+
+function txt(slide, text, o) {
+  slide.addText(lines(text), Object.assign({
+    fontFace: FONT.body, fontSize: 14, color: C.body, valign: 'top', align: 'left', isTextBox: true,
+  }, o));
+}
+
+/** Big Staatliches headline (54 pt unless overridden), 80 % line spacing. */
+function heading(slide, text, x, y, w, h, o = {}) {
+  txt(slide, text, Object.assign({
+    x: x, y: y, w: w, h: h, fontFace: FONT.head, fontSize: 54, color: C.oliveDk, lineSpacingMultiple: 0.8,
+  }, o));
+}
+
+/** Small gold Staatliches kicker above a paragraph. */
+function kicker(slide, text, x, y, w, h, o = {}) {
+  txt(slide, text, Object.assign({
+    x: x, y: y, w: w, h: h, fontFace: FONT.head, fontSize: 16, color: C.gold, lineSpacingMultiple: 1.2,
+  }, o));
+}
+
+/** Body copy; `text` may be a string or an array of paragraphs. */
+function body(slide, text, x, y, w, h, o = {}) {
+  txt(slide, text, Object.assign({
+    x: x, y: y, w: w, h: h, fontSize: 14, lineSpacingMultiple: 1.2, paraSpaceAfter: 6,
+  }, o));
+}
+
+/* --------------------------------------------------------------- vectors  */
+
+/**
+ * Draw a table of normalised polygons ([0..1] coords) as ONE custom-geometry
+ * shape, so nested sub-paths punch holes (even-odd fill) — that is how the
+ * template's line-art insignia and icons are drawn.
+ */
+function polyArt(slide, x, y, w, h, polys, color) {
+  const pts = [];
+  polys.forEach(sub => {
+    sub.forEach((p, i) => pts.push({ x: +(p[0] * w).toFixed(4), y: +(p[1] * h).toFixed(4), moveTo: i === 0 }));
+    pts.push({ close: true });
+  });
+  slide.addShape('custGeom', { x: x, y: y, w: w, h: h, points: pts, fill: { color: color }, line: { type: 'none' } });
+}
+
+/** Rank insignia: shield outline + star + two chevrons (one even-odd path). */
+const BADGE = [
+  [[0.21, 0.577], [0.5, 0.695], [0.79, 0.577], [0.79, 0.703], [0.5, 0.825], [0.21, 0.703]],
+  [[0.21, 0.39], [0.5, 0.507], [0.79, 0.39], [0.79, 0.516], [0.5, 0.638], [0.21, 0.516]],
+  [[0.504, 0.113], [0.548, 0.219], [0.693, 0.219], [0.576, 0.284], [0.62, 0.389],
+   [0.504, 0.324], [0.387, 0.389], [0.431, 0.284], [0.315, 0.219], [0.459, 0.219]],
+  [[0.07, 0.054], [0.07, 0.761], [0.5, 0.942], [0.93, 0.761], [0.93, 0.054]],
+  [[0.036, 0], [0.967, 0], [1, 0.027], [1, 0.777], [0.983, 0.8], [0.518, 0.997],
+   [0.501, 1], [0.484, 0.997], [0.019, 0.8], [0, 0.777], [0, 0.027]],
+];
+
+function badge(slide, x, y, w = 0.477, h = 0.619) {
+  polyArt(slide, x, y, w, h, BADGE, C.gold);
+}
+
+/* Icons used by "Strategic Priorities" (normalised polygon tables). */
+const ICON_WIRE = [
+  [[0.964,0.214],[0.714,0.214],[0.78,0.038],[0.732,0],[0.625,0.036],[0.58,0.116],[0.3,0.11],[0.249,0.145],[0.223,0.214],[0.025,0.216],[0,0.357],[0.025,0.391],[0.161,0.393],[0.107,0.526],[0.152,0.571],[0.275,0.523],[0.312,0.446],[0.563,0.464],[0.652,0.393],[0.975,0.391],[1,0.25],[0.964,0.214]],
+  [[0.071,0.321],[0.071,0.286],[0.196,0.286],[0.179,0.321],[0.071,0.321]],
+  [[0.223,0.473],[0.304,0.187],[0.328,0.179],[0.223,0.473]],
+  [[0.366,0.384],[0.344,0.382],[0.436,0.179],[0.366,0.384]],
+  [[0.473,0.384],[0.452,0.382],[0.543,0.179],[0.473,0.384]],
+  [[0.563,0.393],[0.661,0.098],[0.688,0.089],[0.563,0.393]],
+  [[0.929,0.321],[0.679,0.321],[0.688,0.286],[0.929,0.286],[0.929,0.321]],
+  [[0.964,0.643],[0.857,0.643],[0.923,0.467],[0.875,0.429],[0.768,0.465],[0.723,0.545],[0.423,0.547],[0.366,0.643],[0.025,0.645],[0,0.786],[0.036,0.822],[0.304,0.822],[0.25,0.955],[0.295,1],[0.423,0.951],[0.455,0.875],[0.727,0.891],[0.795,0.822],[0.975,0.82],[1,0.679],[0.964,0.643]],
+  [[0.071,0.75],[0.071,0.714],[0.339,0.714],[0.321,0.75],[0.071,0.75]],
+  [[0.366,0.902],[0.446,0.616],[0.471,0.608],[0.366,0.902]],
+  [[0.509,0.813],[0.487,0.811],[0.578,0.608],[0.509,0.813]],
+  [[0.598,0.822],[0.686,0.608],[0.598,0.822]],
+  [[0.705,0.822],[0.804,0.527],[0.83,0.518],[0.705,0.822]],
+  [[0.929,0.75],[0.821,0.75],[0.83,0.714],[0.929,0.714],[0.929,0.75]],
+];
+const ICON_DRONE = [
+  [[0.964,0.25],[0.929,0.25],[0.929,0.103],[0.975,0.097],[1,0.05],[0.985,0.01],[0.937,0],[0.861,0.077],[0.857,0.25],[0.821,0.35],[0.759,0.35],[0.679,0.3],[0.399,0.3],[0.179,0.35],[0.127,0.046],[0.088,0.006],[0.015,0.01],[0.007,0.078],[0.071,0.112],[0.071,0.25],[0.002,0.285],[0.016,0.501],[0.059,0.544],[0.115,0.546],[0.179,0.45],[0.214,0.45],[0.234,0.541],[0.33,0.6],[0.357,0.675],[0.281,0.799],[0.259,0.9],[0.186,0.922],[0.194,0.99],[0.306,0.99],[0.348,0.825],[0.411,0.737],[0.589,0.737],[0.652,0.825],[0.694,0.99],[0.806,0.99],[0.814,0.922],[0.741,0.9],[0.719,0.799],[0.643,0.675],[0.67,0.6],[0.766,0.541],[0.786,0.45],[0.821,0.45],[0.885,0.546],[0.965,0.528],[0.996,0.467],[1,0.3],[0.964,0.25]],
+  [[0.107,0.425],[0.075,0.439],[0.071,0.35],[0.107,0.35],[0.107,0.425]],
+  [[0.679,0.5],[0.618,0.513],[0.567,0.639],[0.464,0.65],[0.409,0.608],[0.375,0.506],[0.301,0.49],[0.288,0.435],[0.321,0.4],[0.679,0.4],[0.714,0.45],[0.679,0.5]],
+  [[0.929,0.425],[0.897,0.439],[0.893,0.35],[0.929,0.35],[0.929,0.425]],
+];
+const ICON_CAMP = [
+  [[0.952,0.554],[0.538,0.268],[0.538,0.214],[0.761,0.199],[0.761,0.015],[0.489,0.002],[0.462,0.036],[0.462,0.268],[0.009,0.604],[0.002,0.975],[0.038,1],[0.973,0.998],[1,0.964],[1,0.643],[0.952,0.554]],
+  [[0.692,0.143],[0.538,0.143],[0.538,0.071],[0.692,0.071],[0.692,0.143]],
+  [[0.423,0.929],[0.428,0.688],[0.567,0.683],[0.577,0.929],[0.423,0.929]],
+  [[0.923,0.929],[0.654,0.929],[0.648,0.675],[0.548,0.607],[0.419,0.612],[0.367,0.648],[0.346,0.929],[0.077,0.929],[0.078,0.638],[0.5,0.33],[0.919,0.632],[0.923,0.929]],
+  [[0.269,0.643],[0.122,0.658],[0.13,0.815],[0.299,0.807],[0.307,0.679],[0.269,0.643]],
+  [[0.23,0.751],[0.191,0.751],[0.191,0.715],[0.23,0.715],[0.23,0.751]],
+  [[0.845,0.643],[0.7,0.658],[0.709,0.815],[0.876,0.807],[0.884,0.679],[0.845,0.643]],
+  [[0.807,0.751],[0.769,0.751],[0.769,0.715],[0.807,0.715],[0.807,0.751]],
+];
+
+/* World map behind "Area of Operation" — polygons in slide inches. */
+const WORLD_MAP = [
+  [[15.19,2.1],[15.1,2.12],[14.84,1.94],[14.69,1.93],[14.66,2],[14.39,1.96],[14.35,1.89],[14.15,1.89],[13.92,1.78],[13.83,1.78],[13.74,1.87],[13.58,1.84],[13.54,1.89],[13.45,1.81],[13.49,1.8],[13.46,1.74],[13.34,1.72],[13.3,1.77],[12.97,1.71],[12.82,1.76],[13.03,1.58],[12.83,1.55],[12.75,1.47],[12.67,1.55],[12.31,1.62],[12.27,1.71],[12.09,1.73],[12.13,1.84],[12.03,1.8],[11.96,1.83],[11.97,1.87],[11.89,1.83],[11.89,1.96],[11.97,1.98],[11.85,2.12],[11.74,2.1],[11.87,2.03],[11.85,1.78],[11.76,1.77],[11.7,1.88],[11.74,2.03],[11.59,1.96],[11.59,2.1],[11.44,2.28],[11.37,2.62],[11.44,2.88],[11.22,2.82],[11.1,2.93],[11.15,3.02],[11.28,3.05],[11.24,3.11],[11.32,3.18],[11.33,3.34],[11.22,3.31],[11.18,3.17],[10.97,3.16],[10.89,3.22],[10.72,3.18],[10.52,3.25],[10.62,3.38],[10.8,3.37],[10.76,3.65],[11.03,4.15],[11.36,3.99],[11.47,3.87],[11.37,3.76],[11.23,3.8],[11.13,3.62],[11.16,3.58],[11.32,3.7],[11.68,3.75],[11.79,3.89],[11.85,3.87],[11.99,4.3],[12.07,4.07],[12.28,3.88],[12.4,3.84],[12.49,4.05],[12.56,4.01],[12.58,4.06],[12.66,4.47],[12.58,4.4],[12.52,4.41],[12.71,4.7],[12.8,4.73],[12.81,4.64],[12.71,4.51],[12.75,4.5],[12.74,4.4],[12.61,4.26],[12.64,4.14],[12.78,4.28],[12.88,4.22],[12.9,4.1],[12.8,3.97],[12.82,3.91],[13.11,3.82],[13.25,3.66],[13.26,3.53],[13.19,3.43],[13.29,3.35],[13.2,3.35],[13.16,3.28],[13.27,3.21],[13.27,3.27],[13.38,3.27],[13.41,3.43],[13.48,3.41],[13.43,3.26],[13.74,3.01],[13.83,2.78],[13.79,2.7],[13.71,2.72],[13.66,2.65],[13.9,2.46],[14.23,2.47],[14.29,2.35],[14.38,2.35],[14.39,2.4],[14.52,2.31],[14.26,2.6],[14.28,2.82],[14.46,2.6],[14.43,2.52],[14.47,2.44],[14.67,2.43],[14.83,2.32],[14.93,2.31],[14.86,2.2],[14.97,2.13],[15.15,2.22],[15.24,2.14],[15.19,2.1]],
+  [[8.27,2.92],[8.2,2.88],[8.2,2.72],[8.06,2.61],[7.96,2.42],[7.84,2.48],[7.81,2.38],[7.71,2.31],[7.53,2.31],[7.52,2.5],[7.57,2.58],[7.49,2.68],[7.5,2.79],[7.43,2.64],[7.09,2.47],[7.22,2.19],[7.3,2.2],[7.28,2.27],[7.34,2.3],[7.48,2.27],[7.36,2.16],[7.46,2.12],[7.48,1.94],[7.69,2.06],[7.54,2.24],[7.68,2.24],[7.87,2.36],[7.94,2.31],[7.87,2.14],[7.97,2.21],[8.01,2.1],[7.86,2.03],[7.83,1.9],[7.56,1.73],[7.24,1.73],[7.2,1.84],[7.31,1.95],[7.29,2.03],[7.09,1.83],[7.19,1.71],[7.05,1.7],[7.01,1.9],[7.05,2.02],[6.97,1.94],[6.88,2.04],[6.79,2],[6.86,2],[6.86,1.92],[6.75,1.76],[6.6,1.79],[6.29,1.67],[6.21,1.68],[6.17,1.82],[6.29,1.87],[6.39,1.77],[6.4,1.9],[6.54,1.91],[6.42,1.93],[6.44,1.98],[6.11,1.89],[5.89,1.98],[5.29,1.84],[4.99,2],[5.06,2.1],[4.96,2.19],[5.13,2.25],[5.01,2.33],[5.03,2.43],[5.12,2.52],[5.23,2.53],[5.1,2.68],[5.41,2.57],[5.4,2.47],[5.46,2.49],[5.55,2.42],[5.92,2.54],[6.19,2.96],[6.22,3.31],[6.49,3.71],[6.64,3.84],[6.63,3.73],[6.8,4],[7.26,4.17],[7.46,4.35],[7.54,4.29],[7.42,4.23],[7.41,4.08],[7.25,4.04],[7.31,3.87],[7.2,3.87],[7.15,3.95],[7.06,3.95],[7,3.86],[7.02,3.69],[7.29,3.61],[7.38,3.64],[7.44,3.77],[7.5,3.78],[7.47,3.57],[7.62,3.43],[7.69,3.24],[7.83,3.11],[7.91,3.14],[8.05,3.07],[7.96,3],[7.93,2.88],[8.12,2.85],[8.1,2.98],[8.26,3],[8.27,2.92]],
+  [[11.22,4.21],[10.96,4.23],[10.98,4.15],[10.89,4.08],[10.82,3.9],[10.75,3.87],[10.78,3.81],[10.69,3.62],[10.76,3.65],[10.74,3.57],[10.58,3.58],[10.4,3.51],[10.32,3.6],[10.06,3.48],[10.05,3.35],[9.61,3.41],[9.28,3.89],[9.29,4.17],[9.51,4.4],[9.87,4.36],[10.04,4.44],[10.03,4.6],[10.13,4.72],[10.17,4.92],[10.11,5.12],[10.33,5.68],[10.55,5.64],[10.69,5.47],[10.79,5.31],[10.76,5.19],[10.94,5.02],[10.89,4.71],[11.14,4.42],[11.22,4.21]],
+  [[11.59,1.96],[11.51,1.95],[11.48,2.03],[11.31,2],[11.12,2.11],[11.05,2.02],[11.04,2.14],[10.93,2.16],[10.93,2.23],[10.84,2.19],[10.84,2.26],[10.72,2.1],[10.9,2.14],[10.95,2.09],[10.91,2.04],[10.62,1.95],[10.65,1.92],[10.57,1.88],[10.32,1.96],[9.93,2.36],[9.94,2.5],[10.09,2.47],[10.18,2.64],[10.31,2.46],[10.27,2.33],[10.45,2.15],[10.5,2.2],[10.39,2.3],[10.39,2.4],[10.61,2.44],[10.45,2.48],[10.47,2.57],[10.4,2.55],[10.33,2.7],[10.09,2.72],[10.03,2.58],[10.03,2.72],[9.65,2.95],[9.74,3.01],[9.74,3.12],[9.53,3.14],[9.53,3.35],[9.71,3.36],[9.86,3.13],[10.02,3.09],[10.24,3.25],[10.12,3.1],[10.15,3.03],[10.33,3.16],[10.41,3.35],[10.45,3.31],[10.41,3.23],[10.55,3.23],[10.66,2.99],[10.75,3.07],[10.77,3.01],[10.89,2.98],[10.86,3.06],[10.97,3.16],[11.15,3.18],[11.12,2.87],[11.22,2.82],[11.44,2.88],[11.37,2.62],[11.44,2.28],[11.59,2.1],[11.59,1.96]],
+  [[8.77,4.79],[8.63,4.66],[8.33,4.57],[8.28,4.41],[8.13,4.37],[7.99,4.25],[7.73,4.18],[7.54,4.29],[7.55,4.46],[7.44,4.73],[7.6,5.03],[7.76,5.2],[7.65,5.94],[7.66,5.99],[7.69,5.94],[7.68,6.04],[7.62,6.11],[7.66,6.14],[7.61,6.23],[7.68,6.41],[7.77,6.4],[7.73,6.44],[7.9,6.46],[7.8,6.29],[7.89,6.17],[7.84,6.1],[7.91,6.03],[7.91,5.9],[7.97,5.92],[7.99,5.83],[8.12,5.81],[8.15,5.74],[8.1,5.68],[8.22,5.68],[8.37,5.49],[8.39,5.37],[8.57,5.28],[8.77,4.79]],
+  [[9.16,1.93],[9.16,1.85],[9.06,1.75],[9.2,1.74],[9.16,1.69],[9.25,1.68],[9.17,1.55],[9.28,1.51],[9.18,1.45],[9.29,1.31],[9.21,1.31],[9.46,1.2],[9.33,1.17],[9.16,1.22],[9.16,1.16],[9.06,1.17],[9.16,1.11],[8.72,1.05],[8.67,1.09],[8.5,1.08],[8.51,1.18],[8.34,1.13],[8.34,1.18],[8.22,1.14],[8.05,1.18],[7.86,1.29],[7.92,1.32],[7.9,1.37],[7.69,1.44],[7.81,1.5],[7.74,1.51],[7.82,1.58],[8.02,1.57],[8.14,1.65],[8.21,1.77],[8.19,1.85],[8.27,1.84],[8.32,1.9],[8.23,1.9],[8.34,1.95],[8.26,2.15],[8.38,2.37],[8.5,2.43],[8.56,2.44],[8.64,2.19],[9.16,1.93]],
+  [[14.09,5.25],[13.98,5.14],[13.86,4.88],[13.8,5.1],[13.66,5.02],[13.7,4.93],[13.57,4.9],[13.49,5.01],[13.4,4.99],[13.25,5.16],[13.03,5.25],[13.07,5.63],[13.15,5.67],[13.56,5.56],[13.67,5.66],[13.73,5.6],[13.71,5.67],[13.74,5.64],[13.81,5.77],[13.98,5.8],[14.07,5.75],[14.17,5.51],[14.18,5.4],[14.09,5.25]],
+  [[7.08,1.37],[7.14,1.44],[7.28,1.42],[7.22,1.55],[7.49,1.58],[7.56,1.55],[7.53,1.51],[7.64,1.36],[8.04,1.14],[7.76,1.08],[7.45,1.11],[7.16,1.19],[7.3,1.26],[7.3,1.31],[7.08,1.21],[7.01,1.3],[7.08,1.37]],
+  [[13.17,4.43],[13.12,4.34],[12.91,4.51],[12.94,4.63],[13.11,4.67],[13.17,4.43]],
+  [[11.18,4.94],[11.03,5.1],[11.01,5.29],[11.06,5.37],[11.12,5.34],[11.22,5.04],[11.18,4.94]],
+  [[7.1,1.57],[7.2,1.67],[7.5,1.64],[7.01,1.52],[7.1,1.57]],
+  [[10.13,1.42],[10.25,1.54],[10.38,1.4],[10.24,1.31],[10.23,1.36],[10.09,1.34],[10.13,1.42]],
+  [[11.71,1.52],[11.44,1.61],[11.25,1.83],[11.41,1.89],[11.38,1.75],[11.51,1.63],[11.73,1.55],[11.71,1.52]],
+  [[6.41,1.62],[6.54,1.68],[6.75,1.65],[6.76,1.59],[6.65,1.53],[6.63,1.61],[6.49,1.54],[6.41,1.62]],
+  [[13.86,4.84],[13.94,4.79],[14.1,4.87],[14.01,4.74],[13.82,4.64],[13.82,4.83],[13.86,4.84]],
+  [[9.37,2.17],[9.31,2.12],[9.16,2.18],[9.12,2.12],[9.08,2.17],[9.14,2.17],[9.09,2.21],[9.13,2.26],[9.23,2.27],[9.37,2.17]],
+  [[9.64,2.66],[9.69,2.7],[9.62,2.8],[9.78,2.82],[9.81,2.76],[9.69,2.62],[9.67,2.51],[9.61,2.55],[9.64,2.66]],
+  [[13.77,4.62],[13.66,4.66],[13.56,4.59],[13.82,4.83],[13.82,4.64],[13.77,4.62]],
+  [[6.98,1.71],[6.89,1.71],[6.85,1.77],[6.94,1.87],[7.03,1.81],[6.98,1.71]],
+  [[13.83,3.2],[13.77,3.33],[13.54,3.46],[13.59,3.45],[13.59,3.5],[13.63,3.43],[13.67,3.47],[13.8,3.41],[13.83,3.2]],
+];
+
+function worldMap(slide) {
+  WORLD_MAP.forEach(poly => {
+    const xs = poly.map(p => p[0]);
+    const ys = poly.map(p => p[1]);
+    const x0 = Math.min(...xs);
+    const y0 = Math.min(...ys);
+    const w = Math.max(Math.max(...xs) - x0, 0.01);
+    const h = Math.max(Math.max(...ys) - y0, 0.01);
+    slide.addShape('custGeom', {
+      x: x0, y: y0, w: w, h: h,
+      points: poly.map(p => ({ x: +(p[0] - x0).toFixed(3), y: +(p[1] - y0).toFixed(3) })).concat([{ close: true }]),
+      fill: { color: C.land, transparency: 30 }, line: { type: 'none' },
+    });
+  });
+}
+
+/* ============================================================== slides === */
+
+/** 1 — title, 20 — closing: same layout, different wording. */
+function coverSlide(pptx, o) {
+  const s = pptx.addSlide();
+  if (o.gradientBg) gradQuad(s, 0, 0, SLIDE_W, SLIDE_H, { stops: G.titleBg, ang: 315, steps: 20 });
+  s.addShape('rect', { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: { color: C.ink, transparency: 10 }, line: { type: 'none' } });
+  gradQuad(s, o.panel[0], o.panel[1], o.panel[2], o.panel[3], { stops: G.panel, ang: 0, adj: 0.35661 });
+  heading(s, o.title, o.titleBox[0], o.titleBox[1], o.titleBox[2], 2.036,
+    { fontSize: 115, color: C.white, align: 'center', lineSpacingMultiple: 1 });
+  txt(s, 'Military Presentation Template', {
+    x: 4.571, y: o.subY, w: 4.192, h: 0.438, fontSize: 20, color: C.gold, align: 'center',
+  });
+  return s;
+}
+
+function slide01(pptx) {
+  const s = coverSlide(pptx, {
+    title: 'Operation V', gradientBg: true,
+    panel: [1.0, 2.640, 11.333, 2.459], titleBox: [3.709, 2.732, 7.235], subY: 4.408,
+  });
+  bar(s, 4.309, 5.569, 8.024, 0.269, G.oliveFade, 0);
+  bar(s, 1.590, 1.902, 8.024, 0.269, G.oliveFade, 180);
+  bar(s, 8.606, 6.097, 7.455, 0.936, G.darkFade, 0);
+  bar(s, -2.543, 0.712, 7.455, 0.936, G.darkFade, 180);
+  badge(s, 2.677, 3.129, 0.923, 1.198);
+}
+
+function slide20(pptx) {
+  const s = coverSlide(pptx, {
+    title: 'Thank You!', gradientBg: false,
+    panel: [1.896, 2.562, 9.708, 2.703], titleBox: [3.588, 2.732, 6.497], subY: 4.508,
+  });
+  bar(s, -0.716, 5.782, 8.024, 0.269, G.oliveFade, 0);
+  bar(s, 6.667, 1.983, 8.024, 0.269, G.oliveFade, 180);
+  bar(s, 9.188, 6.138, 5.665, 0.725, G.darkFade, 0);
+  bar(s, -2.392, 1.320, 6.293, 0.725, G.darkFade, 180);
+  badge(s, 6.452, 1.437, 0.595, 0.773);
+}
+
+/** 2 — agenda: four numbered rows. */
+function slide02(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  const rows = [
+    { n: '01', title: 'Intel & Recon',     rule: 7.048, numW: 0.440, numX: 1.261, titleX: 8.095, titleW: 4.276 },
+    { n: '04', title: 'Tactical Planning', rule: 5.500, numW: 0.739, numX: 1.131, titleX: 7.153, titleW: 5.219 },
+    { n: '12', title: 'Deployment ',       rule: 7.700, numW: 0.440, numX: 1.261, titleX: 8.095, titleW: 4.276 },
+    { n: '16', title: 'Evaluation',        rule: 7.900, numW: 0.440, numX: 1.261, titleX: 8.095, titleW: 4.276 },
+  ];
+  const badgeX = [7.785, 6.565, 8.216, 8.493];
+  rows.forEach((r, i) => {
+    const dy = i * 1.4286;
+    bar(s, 1.524, 1.667 + dy, r.rule, 0.119, G.goldFade, 0);
+    panel(s, 1.0, 1.173 + dy, 1.0, 0.613, 0.34778);
+    heading(s, r.title, r.titleX, 1.151 + dy, r.titleW, 0.864, { align: 'right' });
+    body(s, 'Lorem ipsum dolor sit amet.', 0.962, 1.847 + dy, 2.800, 0.384);
+    txt(s, r.n, { x: r.numX, y: 1.235 + dy, w: r.numW, h: 0.505, fontFace: FONT.head, fontSize: 24, color: C.gold, align: 'center' });
+    badge(s, badgeX[i], 1.217 + dy);
+  });
+}
+
+/** 3 — "Mission Overview": full-bleed photo panel with a dark skewed title slab. */
+function slide03(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.white };
+  photoPanel(s, 0, 1.281, SLIDE_W, 6.219, { from: 0.2, over: C.white });
+  gradQuad(s, -0.625, 4.587, 5.417, 1.985, { stops: G.panel, ang: 210, adj: PARA_ADJ });
+  kicker(s, 'Lorem Ipsum', 5.093, 4.758, 1.382, 0.408);
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut sodales id posuere aliquam. '
+    + 'Nunc consectetur lacus malesuada ultrices venenatis. Maecenas ac mauris ut augue interdum rutrum non nec nunc. '
+    + 'Fusce iaculis tincidunt neque vel imperdiet. Suspendisse id ullamcorper nisi, et facilisis urna. In efficitur.',
+    5.093, 5.166, 7.387, 1.232, { color: C.white, paraSpaceAfter: 0 });
+  heading(s, ['Mission', 'Overview'], 1.047, 4.917, 3.491, 1.591, { color: C.white });
+  bar(s, -0.406, 4.275, 4.944, 0.166, G.oliveFade, 180, 0.37713);
+  bar(s, -1.099, 6.751, 4.228, 0.357, G.darkFade, 0, 0.33212);
+  badge(s, 12.333, 0.457);
+}
+
+/** 4 — "Briefing Introduction". */
+function slide04(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 8.615, 0, 7.113, 7.5, 0.27498, G.panel, 20);
+  heading(s, 'Briefing Introduction', 1.083, 2.330, 4.188, 1.591);
+  body(s, [
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam sollicitudin commodo iaculis. Donec non tincidunt erat. Vivamus magna dui, maximus ac libero at vestibulum.',
+    'Donec non tincidunt erat. Vivamus magna dui, maximus acolipa libero at, vestibulum maximus dui eu tincidunt.',
+  ], 1.083, 4.641, 5.459, 1.599);
+  bar(s, 1.168, 4.126, 3.737, 0.104, G.goldFade, 0);
+  badge(s, 1.168, 1.351);
+  bar(s, 7.179, 1.207, 3.373, 0.505, G.oliveFade, 180, 0.37713);
+  photoPanel(s, 7.576, 4.231, 4.198, 2.009, { over: null });
+  bar(s, 9.407, 6.042, 2.764, 0.397, G.goldFade, 0, 0.33212);
+}
+
+/** 5 — "Our Vision / Our Mission": two mirrored skewed slabs. */
+function slide05(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  photoPanel(s, -1.246, 1.032, 6.850, 2.667, { adj: PARA_ADJ });
+  photoPanel(s, 7.727, 3.835, 6.850, 2.667, { adj: PARA_ADJ });
+  panel(s, 0.672, 3.835, 7.772, 2.667);
+  panel(s, 4.925, 1.032, 7.772, 2.667);
+  heading(s, ['OUR', 'VISION'], 1.949, 1.836 + 0.15, 2.852, 1.707, { color: C.white });
+  heading(s, ['OUR', 'MISSION'], 8.444, 4.625 + 0.15, 3.436, 1.707, { color: C.white });
+  const copy = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam sollicitudin commodo iaculis. '
+    + 'Donec non tincidunt erat. Vivamus magna dui, maximus ac libero at, vestibulum maximus magna dui, maximus ac libero dui.';
+  kicker(s, 'Lorem Ipsum', 6.129, 1.491, 1.382, 0.408);
+  body(s, copy, 6.130, 1.879, 5.583, 1.306, { color: C.white, lineSpacingMultiple: 1.3 });
+  kicker(s, 'Lorem Ipsum', 1.707, 4.342, 1.382, 0.408);
+  body(s, copy, 1.708, 4.730, 5.583, 1.306, { color: C.white, lineSpacingMultiple: 1.3 });
+  bar(s, 4.223, 0.818, 2.764, 0.397, G.goldFade, 0, 0.33212);
+  bar(s, 7.278, 6.241, 2.764, 0.397, G.goldFade, 0, 0.33212);
+}
+
+/** 6 — "Mission Objectives": mirror of slide 4. */
+function slide06(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  panel(s, -3.105, 0, 7.113, 7.5, 0.36115, G.panel, 20);
+  photoPanel(s, 0, 3.263, 6.667, 3.240, { over: null });
+  heading(s, 'Mission Objectives', 7.541, 2.208, 4.188, 1.591);
+  bar(s, 7.626, 4.005, 3.737, 0.104, G.goldFade, 0);
+  badge(s, 7.626, 1.229);
+  body(s, [
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam sollicitudin commodo iaculis. Donec non tincidunt erat. Vivamus magna dui, maximus ac libero at vestibulum.',
+    'Donec non tincidunt erat. Vivamus magna dui, maximus acolipa libero at, vestibulum',
+  ], 7.541, 4.493, 4.188, 1.882);
+  bar(s, 4.282, 0.879, 2.845, 0.486, G.oliveFade, 0);
+  bar(s, -1.793, 0.712, 6.605, 0.913, G.darkFade, 180);
+  bar(s, -1.096, 5.887, 6.575, 0.936, G.goldFade, 0);
+}
+
+/** 7 — SWOT: four staggered letter cards. */
+function slide07(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  heading(s, 'Tactical SWOT Analysis', 3.316, 1.241, 6.701, 0.864);
+  bar(s, 4.300, 2.105, 4.900, 0.104, G.goldFade, 0);
+  const cards = [
+    { letter: 'S', label: 'Strengths',    x: 1.104, y: 2.698, lx: 1.634, lw: 1.235, tx: 1.309 },
+    { letter: 'W', label: 'weakness',     x: 3.729, y: 2.960, lx: 4.265, lw: 1.235, tx: 3.941 },
+    { letter: 'O', label: 'Opportunties', x: 6.556, y: 2.698, lx: 6.960, lw: 1.453, tx: 6.757 },
+    { letter: 'T', label: 'Threats',      x: 9.160, y: 2.960, lx: 9.713, lw: 1.235, tx: 9.389 },
+  ];
+  cards.forEach(c => {
+    panel(s, c.x, c.y, 3.028, 1.919, 0.34778);
+    txt(s, c.letter, { x: c.x + 0.704, y: c.y + 0.377, w: 1.355, h: 1.393, fontFace: FONT.head, fontSize: 96,
+      italic: true, color: C.gold, align: 'center', lineSpacingMultiple: 0.8 });
+    kicker(s, c.label, c.lx, c.y + 2.032, c.lw, 0.408, { align: 'center' });
+    body(s, 'Lorem ipsum dolor sit amet, sit eli consectetur.', c.tx, c.y + 2.363, 1.884, 0.949, { align: 'center' });
+  });
+  bar(s, 4.905, 0, 9.356, 0.490, G.darkFade, 180);
+  bar(s, -1.397, 7.097, 8.357, 0.403, G.goldFade, 0);
+}
+
+/** 8 — "Surveillance Technology": 2 x 2 copy grid on a dark field. */
+function slide08(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  panel(s, -3.395, 0, 13.377, 7.5, 0.36115, G.panel, 20);
+  heading(s, 'Surveillance Technology', 0.895, 1.933, 4.333, 1.555, { color: C.white });
+  badge(s, 1.000, 1.000);
+  [[1.000, 3.841], [3.998, 3.841], [1.000, 5.343], [3.998, 5.343]].forEach(([x, y]) => {
+    kicker(s, 'Lorem Ipsum', x, y, 1.349, 0.408);
+    body(s, 'Lorem ipsum dolor sit amet, sit eli adipiscin.', x, y + 0.325, 2.460, 0.666, { color: C.white });
+  });
+  bar(s, 7.602, 0.868, 3.380, 0.396, G.darkFade, 180);
+  bar(s, 7.421, 1.131, 2.738, 0.248, G.oliveFade, 0);
+  photoPanel(s, 8.053, 3.123, 3.877, 3.377, { over: null });
+  bar(s, 9.444, 6.236, 3.409, 0.528, G.goldFade, 0);
+}
+
+/** 9 — "Core Tactics" with the +250 stat. */
+function slide09(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  photoPanel(s, 0, 3.750, SLIDE_W, 3.750, { top: 0.57 });
+  panel(s, 7.413, 0, 7.965, 3.750, 0.36115, G.panel, 20);
+  heading(s, 'Core Tactics', 0.863, 1.875, 3.790, 0.828);
+  badge(s, 1.000, 1.006);
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam sollicitudin commodo iaculis. Donec non tincidunt.',
+    0.884, 2.703, 5.449, 0.666);
+  txt(s, '+250', { x: 10.016, y: 1.026 + 0.15, w: 2.447, h: 1.383, fontFace: FONT.head, fontSize: 80,
+    color: C.gold, align: 'right', lineSpacingMultiple: 0.8 });
+  body(s, 'Lorem ipsum dolor sit consectetur adipiscing elit. Nullam sollicitudin commodo iaculis donec.',
+    9.083, 2.346, 3.380, 0.949, { color: C.white, align: 'right' });
+  bar(s, -0.423, 3.750, 8.485, 0.468, G.goldFade, 0);
+  bar(s, 6.667, 6.973, 7.089, 0.527, G.darkFade, 180);
+  bar(s, 7.184, 0, 4.379, 0.468, G.darkFade, 180);
+}
+
+/** 10 — "Commanding Officers": four portrait placeholders + name tags. */
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  photoPanel(s, 0, 4.665, SLIDE_W, 2.835, { top: 0.57, from: 0.13 });
+  heading(s, 'Commanding Officers', 3.316, 0.839, 6.701, 0.864, { align: 'center' });
+  bar(s, 4.300, 1.703, 4.900, 0.104, G.goldFade, 0);
+  const team = [
+    { name: 'Col. Marcus Steele',   role: 'Chief Commander',   x: 1.153, roleX: 1.380, roleW: 1.866 },
+    { name: 'Lt. Col. Ryan Voss',   role: 'Intelligence Director', x: 4.156, roleX: 4.383, roleW: 1.866 },
+    { name: 'Maj. Daniel Reyes',    role: 'Field Operations',  x: 7.164, roleX: 7.391, roleW: 1.866 },
+    { name: ' Capt. Aisha Monroe',  role: 'Communication Head', x: 10.167, roleX: 10.238, roleW: 2.093 },
+  ];
+  team.forEach((m, i) => {
+    panel(s, m.x, 5.366, 2.431, 0.528, 0.34778);
+    bar(s, 0.733 + i * 3.0035, 2.408, 1.429, 0.210, G.goldFade, 0);
+    kicker(s, m.name, m.x + 0.319, 5.418, 1.844, 0.424, { align: 'center' });
+    txt(s, m.role, { x: m.roleX, y: 5.908, w: m.roleW, h: 0.343, fontSize: 12, color: C.white,
+      align: 'center', lineSpacingMultiple: 1.2, paraSpaceAfter: 6 });
+  });
+  bar(s, 1.000, 7.179, 12.648, 0.321, G.darkFade, 180);
+  badge(s, 1.000, 0.905);
+  badge(s, 11.856, 0.905);
+}
+
+/** 11 — section break. */
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  gradQuad(s, 0, 0.750, SLIDE_W, 5.197, { stops: [[0, C.black, 1], [1, C.black, 0]], ang: 270, over: C.cream, steps: 26 });
+  gradQuad(s, -0.625, 4.629, 9.521, 1.690, { stops: G.panel, ang: 210, adj: PARA_ADJ });
+  bar(s, 5.417, 4.275, 4.538, 0.491, G.oliveFade, 180, 0.37713);
+  bar(s, -1.099, 6.455, 7.849, 0.437, G.darkFade, 0, 0.33212);
+  heading(s, 'Tactical Break', 0.646, 4.945, 7.125, 1.286, { fontSize: 88, color: C.white });
+  bar(s, -1.844, 4.275, 4.944, 0.166, G.goldFade, 180, 0.37713);
+  badge(s, 11.856, 1.479);
+}
+
+/** 12 — "Strategic Priorities": three icon cards over a dark wedge. */
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  heading(s, 'Strategic Priorities', 0.999, 2.338, 3.617, 1.591);
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam sollicitudin commodo iaculis. '
+    + 'Donec non tincidunt erat. Vivamus magna dui, maximus ac libero vestibulum maximus tincidunt magna dui.',
+    1.051, 4.569, 4.169, 1.515);
+  photoPanel(s, 6.403, 0, 9.841, 7.5, { top: 0.57, adj: 0.31944, steps: 30 });
+  const cards = [
+    { x: 7.202, y: 1.271, title: 'Border Defense',    tx: 9.554, tw: 1.785,
+      copy: 'Lorem ipsum dolor sit amet, sit eli consectetur adipiscing.',
+      icon: ICON_WIRE,  ix: 7.837, iy: 1.590, iw: 0.630, ih: 0.632 },
+    { x: 6.535, y: 3.091, title: 'Cybersecurity',     tx: 8.941, tw: 1.517,
+      copy: 'Lorem ipsum dolor sit amet, sit eli consectetur adipiscing',
+      icon: ICON_DRONE, ix: 7.202, iy: 3.513, iw: 0.669, ih: 0.474 },
+    { x: 5.885, y: 4.910, title: 'Tactical Readiness', tx: 8.217, tw: 1.873,
+      copy: 'Lorem ipsum dolor sit amet, sit eli consectetur adipiscing',
+      icon: ICON_CAMP,  ix: 6.555, iy: 5.222, iw: 0.627, ih: 0.675 },
+  ];
+  cards.forEach(c => {
+    panel(s, c.x, c.y, 1.968, 1.299, 0.34778);
+    polyArt(s, c.ix, c.iy, c.iw, c.ih, c.icon, C.gold);
+    kicker(s, c.title, c.tx, c.y + 0.127, c.tw, 0.424);
+    body(s, c.copy, c.tx, c.y + 0.458, 2.858, 0.714, { color: C.white, lineSpacingMultiple: 1.3 });
+  });
+  bar(s, 1.135, 4.220, 3.737, 0.104, G.goldFade, 0);
+  badge(s, 1.135, 1.448);
+  bar(s, 5.559, 0, 4.532, 0.269, G.darkFade, 180);
+  bar(s, 2.903, 7.254, 4.532, 0.269, G.goldFade, 180);
+}
+
+/** 13 — "Mission Critical Insight": two numbered notes. */
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  panel(s, -3.105, 0, 7.626, 7.5, 0.36115, G.panel, 20);
+  photoPanel(s, 1.250, 3.393, 3.917, 2.940, { over: null });
+  heading(s, 'Mission Critical Insight', 5.775, 2.565, 6.850, 0.828);
+  bar(s, 5.921, 3.646, 3.737, 0.104, G.goldFade, 0);
+  badge(s, 5.921, 1.573);
+  [{ n: '01', px: 5.941, tx: 6.750, bx: 6.758, nx: 6.040 },
+   { n: '02', px: 9.274, tx: 10.083, bx: 10.091, nx: 9.373 }].forEach(c => {
+    panel(s, c.px, 4.407, 0.778, 0.514, 0.34778);
+    txt(s, c.n, { x: c.nx, y: 4.479, w: 0.570, h: 0.404, fontFace: FONT.head, fontSize: 18, color: C.gold, align: 'center' });
+    kicker(s, 'Add Subtitle', c.tx, 4.497, 2.282, 0.404, { fontSize: 18 });
+    body(s, 'Lorem ipsum dolor sit amet, adipiscing elit, eiusmod tempor.', c.bx, 4.835, 2.305, 0.949);
+  });
+  bar(s, 2.953, 1.000, 2.116, 0.442, G.oliveFade, 0);
+  bar(s, -1.207, 0.795, 4.913, 0.830, G.darkFade, 180);
+  bar(s, -0.562, 5.908, 5.277, 0.592, G.goldFade, 0);
+  bar(s, 9.658, 7.204, 4.686, 0.296, G.goldFade, 0);
+}
+
+/** 14 — "Squad Deployment" with the +125 stat card. */
+function slide14(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  photoPanel(s, 0, 3.220, 9.475, 3.280);
+  bar(s, 6.924, 3.344, 3.380, 0.396, G.darkFade, 180);
+  heading(s, 'Squad Deployment', 1.661, 1.045, 3.627, 1.555);
+  badge(s, 1.000, 1.104);
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam sollicitudin commodo iaculis. '
+    + 'Donec non tincidunt erat. Vivamus magna dui, maximus ac libero vestibulum maximus tincidunt loi idos magna dui '
+    + 'consectetur adipiscing elit. Nullam sollicitudin. ', 6.576, 1.209, 6.034, 1.217);
+  panel(s, 7.648, 3.597, 4.792, 2.470, 0.34778);
+  txt(s, '+125', { x: 8.685, y: 3.930 + 0.15, w: 2.447, h: 1.383, fontFace: FONT.head, fontSize: 80,
+    color: C.gold, align: 'center', lineSpacingMultiple: 0.8 });
+  body(s, 'Lorem ipsum dolor sit elit ullam sollicitudin commodo iaculis', 8.377, 5.055, 3.064, 0.666,
+    { color: C.white, align: 'center' });
+  bar(s, 2.942, 3.082, 2.738, 0.248, G.oliveFade, 0);
+  bar(s, -1.070, 6.246, 7.306, 0.384, G.goldFade, 0);
+}
+
+/** 15 — "Navigate Operation Zones": three photo tiles. */
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 9.022, 0, 13.377, 7.5, 0.36115, G.panel, 20);
+  heading(s, 'Navigate Operation Zones', 0.881, 1.869, 7.388, 0.828);
+  bar(s, 1.000, 2.866, 4.900, 0.104, G.goldFade, 0);
+  badge(s, 1.000, 1.000);
+  [[1.000, 2.912, C.cream], [4.223, 2.912, C.cream], [7.445, 5.888, null]]
+    .forEach(([x, w, over]) => photoPanel(s, x, 4.526, w, 1.816, { over: over }));
+  bar(s, 4.823, 3.232, 2.274, 0.345, G.oliveFade, 0);
+  bar(s, 1.692, 6.138, 2.661, 0.371, G.goldFade, 0);
+  bar(s, 11.003, 6.129, 2.661, 0.371, G.goldFade, 0);
+}
+
+/** 16 — "Equipment Status": starred list + 150+ figure. */
+function slide16(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  panel(s, 3.162, 0, 6.514, 7.516, 0.36668, G.panel, 20);
+  photoPanel(s, 0, 1.539, SLIDE_W, 4.442, { top: 0.26, over: null });
+  heading(s, 'Equipment Status', 0.982, 2.267, 3.204, 1.591, { color: C.white });
+  [
+    { text: 'Lorem ipsum dolor sit amet consectetur',      w: 3.888 },
+    { text: 'Magana nullam sollicitudin commodo iaculis',  w: 4.340 },
+    { text: 'Donec non tincidunt erat. magna dui, maximus', w: 4.546 },
+  ].forEach((row, i) => {
+    const y = 4.001 + i * 0.4995;
+    s.addShape('star5', { x: 1.166, y: y + 0.064, w: 0.233, h: 0.215, fill: { color: C.gold }, line: { type: 'none' } });
+    txt(s, row.text, { x: 1.399, y: y, w: row.w, h: 0.652, color: C.white, lineSpacingMultiple: 1.2 });
+  });
+  bar(s, 8.680, 5.789, 7.306, 0.384, G.goldFade, 0, 0.26676);
+  bar(s, 2.281, 1.402, 4.771, 0.365, G.goldFade, 0, 0.26676);
+  txt(s, '150+', { x: 8.968, y: 2.714, w: 3.365, h: 1.959, fontFace: FONT.head, fontSize: 138,
+    color: C.gold, align: 'center', lineSpacingMultiple: 0.8 });
+  txt(s, 'Add Subtitle Here', { x: 8.753, y: 4.387, w: 3.204, h: 0.355, fontSize: 18, color: C.white,
+    align: 'center', lineSpacingMultiple: 0.8 });
+}
+
+/** 17 — "Operation Timeline": four quarter chips. */
+function slide17(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  photoPanel(s, 0, 0, SLIDE_W, 4.388, { top: 0.25, from: 0.11 });
+  heading(s, 'Operation Timeline', 1.798, 1.597, 4.699, 1.555, { color: C.white });
+  badge(s, 1.000, 1.627);
+  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam sollicitudin commodo iaculis. '
+    + 'Donec non tincidunt erat. magna dui, maximus ac libero at, vestibulum miaculis. Donec tincidunt erat. '
+    + 'magna dui, maximus ac libero at, vestibulum.', 6.222, 1.599, 6.028, 1.232, { color: C.white });
+  ['Q1–Q2', 'Q2-Q3', 'Q3-Q4', 'Q4'].forEach((q, i) => {
+    const x = 1.134 + i * 3.0135;
+    gradQuad(s, x, 3.905, 2.075, 0.967, { stops: G.panel, ang: 20, adj: PARA_ADJ });
+    txt(s, q, { x: x + 0.364, y: 3.999, w: 1.312, h: 0.715, fontFace: FONT.head, fontSize: 32,
+      color: C.white, align: 'center', lineSpacingMultiple: 1.2 });
+    kicker(s, 'Lorem Ipsum', x + 0.316, 4.971, 1.349, 0.404, { fontSize: 18, lineSpacingMultiple: 1 });
+    body(s, 'Lorem ipsum dolor sit amet, sit eli consectetur adipiscing elit. ', x - 0.206, 5.280, 2.392, 0.949,
+      { align: 'center' });
+  });
+  bar(s, 9.658, 7.204, 4.686, 0.296, G.goldFade, 0);
+}
+
+/** 18 — "Area of Operation": world map with four pinged locations. */
+function slide18(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  worldMap(s);
+  heading(s, 'Area of Operation', 0.916, 2.330, 4.188, 1.591);
+  body(s, [
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam sollicitudin commodo iaculis. Donec non tincidunt erat. Vivamus magna dui, maximus ac libero at vestibulum.',
+    'Donec non tincidunt erat. Vivamus magna dui, maximus acolipa libero at, vestibulum maximus dui eu tincidunt.',
+  ], 0.916, 4.641, 5.459, 1.599);
+  bar(s, 1.001, 4.126, 3.737, 0.104, G.goldFade, 0);
+  badge(s, 1.001, 1.351);
+  const pins = [
+    { x: 6.468, y: 2.377, label: 'Location 01',  px: 6.814,  py: 2.648 },
+    { x: 7.795, y: 4.505, label: 'Location 04',  px: 8.129,  py: 4.791 },
+    { x: 9.744, y: 3.490, label: 'Location  02', px: 10.077, py: 3.781 },
+    { x: 11.220, y: 2.060, label: 'Location  03', px: 11.572, py: 2.362 },
+  ];
+  pins.forEach(p => {
+    [0.875, 0.631, 0.389].forEach(d => {
+      s.addShape('ellipse', { x: p.x + (0.875 - d) / 2, y: p.y + (0.875 - d) / 2, w: d, h: d,
+        fill: { type: 'none' }, line: { color: C.gold, width: 1 } });
+    });
+    panel(s, p.px, p.py, 1.306, 0.299, 0.34778);
+    txt(s, p.label, { x: p.px + 0.139, y: p.py - 0.008, w: 1.349, h: 0.337, fontFace: FONT.head,
+      fontSize: 14, color: C.white });
+  });
+  bar(s, -0.363, 0, 4.686, 0.296, G.goldFade, 0);
+  bar(s, 9.658, 7.204, 4.686, 0.296, G.goldFade, 0);
+}
+
+/** 19 — "Field Operations Gallery": five photo tiles. */
+function slide19(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  [[-0.073, 1.125, 3.083], [3.365, 1.125, 4.573], [1.000, 3.958, 3.935],
+   [5.202, 3.958, 3.521], [9.004, 3.958, 4.330]].forEach(([x, y, w]) => photoPanel(s, x, y, w, 2.396));
+  heading(s, 'Field Operations Gallery', 8.292, 1.125, 3.596, 2.282);
+  bar(s, 8.443, 3.387, 3.300, 0.104, G.goldFade, 0);
+  bar(s, 1.775, 0.951, 2.386, 0.348, G.goldFade, 0, 0.26676);
+  bar(s, 10.090, 6.138, 5.099, 0.362, G.goldFade, 0, 0.26676);
+  bar(s, 3.702, 3.346, 3.380, 0.396, G.darkFade, 180);
+  bar(s, 0.685, 3.835, 2.738, 0.248, G.oliveFade, 0);
+}
+
+/* ------------------------------------------------------------------ build */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'WIDE';
+  pptx.author = 'Operation V';
+  pptx.title = 'Operation V — Military Presentation Template';
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
+    .forEach(fn => fn(pptx));
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '12c1088c-fc20-4eee-b829-f67c3b91e86f_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });
