@@ -1,0 +1,688 @@
+/**
+ * FOURSET — Fitness Presentation Template (25 slides, 10" x 5.625")
+ * Rebuilt with pptxgenjs only. Photographs from the original deck are drawn as
+ * flat "[image]" placeholder rectangles; every other element is a native shape.
+ */
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ palette */
+const BG = '0C0C0C'; // deck background
+const INK = '000000'; // theme dk1
+const WHITE = 'FFFFFF';
+const ORANGE = 'F24405'; // theme accent3 - the brand colour
+const AMBER = 'F27405'; // theme accent4
+const SAND = 'FBC664'; // theme accent6
+const MAROON = '590202'; // theme accent1
+const CRIMSON = 'A60303'; // theme accent2
+const CARD = '262626'; // dark card fill
+const HAIR = '595959'; // hairline stroke around dark panels
+const GREY = '7F7F7F';
+const GRID = '3F3F3F';
+const PHOTO = 'D9D9D9'; // colour of the deck's photo placeholders
+const PHOTO_TX = '8A8A8A';
+
+/* -------------------------------------------------------------------- type */
+const HEAD = 'Antonio'; // display face
+const BODY = 'Plus Jakarta Sans'; // text face
+const PAD = [5.4, 5.4, 2.7, 2.7]; // [left, right, bottom, top] insets used all over the deck (pt)
+
+const W = 10;
+const H = 5.625;
+
+/* ----------------------------------------------------------------- helpers */
+const text = (s, t, o) =>
+    s.addText(t, Object.assign({ fontFace: BODY, color: WHITE, valign: 'top', margin: PAD, isTextBox: true }, o));
+
+const head = (s, t, o) => text(s, t, Object.assign({ fontFace: HEAD }, o));
+
+const box = (s, o) => s.addShape(o.shape || 'rect', o);
+
+const hline = (s, x, y, w, o) => s.addShape('line', Object.assign({ x, y, w, h: 0 }, o));
+
+/** Flat placeholder standing in for a photo of the original deck. */
+function photo(s, x, y, w, h, o = {}) {
+    box(s, Object.assign({ x, y, w, h, fill: { color: PHOTO } }, o));
+    text(s, '[image]', { x, y, w, h, align: 'center', valign: 'middle', fontSize: 9, color: PHOTO_TX });
+}
+
+/** Running footer + page number. Drawn first so slide artwork can cover it, as in the original. */
+function chrome(s, page) {
+    text(s, [
+        { text: 'FOURSET', options: { bold: true, color: ORANGE } },
+        { text: '– FITNESS PRESENTATION TEMPLATE' },
+    ], { x: 0.794, y: 5.235, w: 2.524, h: 0.202, fontFace: HEAD, fontSize: 8 });
+    text(s, String(page), { x: 8.712, y: 5.222, w: 0.422, h: 0.215, fontFace: HEAD, fontSize: 8, color: ORANGE, align: 'right' });
+}
+
+/** Bulleted list: one paragraph per string. */
+function bullets(s, lines, o, bullet) {
+    text(s, lines.map((t) => ({ text: t, options: { bullet, breakLine: true } })), o);
+}
+
+/** Radial halftone disc — the recurring dotted texture of the template (35x35 dot grid). */
+function halftone(s, x, y, size, color, cells = 35) {
+    const step = size / cells;
+    const r = size / 2;
+    for (let row = 0; row < cells; row++) {
+        for (let col = 0; col < cells; col++) {
+            const cx = x + (col + 0.5) * step;
+            const cy = y + (row + 0.5) * step;
+            if (cx < -0.1 || cx > W + 0.1 || cy < -0.1 || cy > H + 0.1) continue; // off-slide
+            const t = Math.hypot(cx - (x + r), cy - (y + r)) / r; // 0 at centre, 1 at rim
+            if (t > 1) continue;
+            const d = step * Math.pow(1 - t, 0.8); // dots shrink towards the rim
+            if (d < step * 0.05) continue;
+            s.addShape('ellipse', { x: cx - d / 2, y: cy - d / 2, w: d, h: d, fill: { color } });
+        }
+    }
+}
+
+/** The lightning-bolt monogram (custom outline used on the cover, TOC, closing…). */
+const BOLT_PTS = [
+    [0.445, 0.0], [1.0, 0.0], [0.555, 0.5], [0.9203, 0.5],
+    [0.4752, 1.0], [0.4725, 1.0], [0.4725, 0.5], [0.0, 0.5],
+];
+const BOLT_RATIO = 4.43 / 3.857; // height / width of the artwork
+
+function bolt(s, x, y, w, o) {
+    const h = w * BOLT_RATIO;
+    s.addShape('custGeom', Object.assign({
+        x, y, w, h,
+        points: BOLT_PTS.map(([px, py]) => ({ x: px * w, y: py * h })).concat([{ close: true }]),
+    }, o));
+}
+
+/** Award trophy: two ring handles, a bowl with a rim, a stem and a foot. */
+function trophy(s, x, y, w, h, color) {
+    const fill = { color };
+    s.addShape('blockArc', { x: x - 0.02 * w, y: y + 0.06 * h, w: 0.42 * w, h: 0.44 * h, angleRange: [45, 270], arcThicknessRatio: 0.34, fill });
+    s.addShape('blockArc', { x: x + 0.6 * w, y: y + 0.06 * h, w: 0.42 * w, h: 0.44 * h, angleRange: [45, 270], arcThicknessRatio: 0.34, flipH: true, fill });
+    s.addShape('chord', { x: x + 0.16 * w, y: y + 0.02 * h, w: 0.68 * w, h: 0.66 * h, angleRange: [0, 180], fill });
+    s.addShape('donut', { x: x + 0.16 * w, y: y - 0.09 * h, w: 0.68 * w, h: 0.22 * h, fill });
+    s.addShape('rect', { x: x + 0.42 * w, y: y + 0.6 * h, w: 0.16 * w, h: 0.24 * h, fill });
+    s.addShape('ellipse', { x: x + 0.22 * w, y: y + 0.8 * h, w: 0.56 * w, h: 0.2 * h, fill });
+}
+
+/* =================================================================== slides */
+
+/* 1 — cover */
+function slide01(s) {
+    s.background = { color: ORANGE };
+    chrome(s, 1);
+    photo(s, 0.314, 0, 5.352, 5.625);
+    box(s, { x: 4.797, y: 0, w: 5.203, h: 5.625, fill: { color: INK }, line: { color: '400101', width: 1 } });
+    halftone(s, -2.378, 0.361, 7.685, 'B53304');
+    head(s, 'FOUR\nSET', {
+        x: 5.223, y: 0.711, w: 4.201, h: 4.519, fontSize: 165, align: 'right', lineSpacingMultiple: 0.8,
+    });
+    text(s, 'FITNESS PRESENTATION TEMPLATE', { x: 5.373, y: 4.232, w: 1.458, h: 0.682, fontSize: 12 });
+    bolt(s, 0.458, 0.598, 3.857, { line: { color: WHITE, width: 1 } });
+}
+
+/* 2 — introduction */
+function slide02(s) {
+    chrome(s, 2);
+    halftone(s, -3.105, 0.028, 5.57, ORANGE);
+    halftone(s, 7.65, 0.028, 5.57, ORANGE);
+    text(s, [
+        { text: 'FOURSET', options: { bold: true, color: AMBER } },
+        { text: ' ', options: { color: SAND } },
+        { text: 'is dedicated to transforming lives through fitness. Our ' },
+        { text: 'state-of-the-art ', options: { bold: true } },
+        { text: 'facilities, expert trainers, and supportive community are designed to help you achieve your health and wellness goals.' },
+    ], { x: 2.08, y: 4.006, w: 5.839, h: 0.739, fontSize: 11, align: 'center', lineSpacingMultiple: 1.3 });
+    head(s, 'FOURSET', {
+        x: 2.594, y: 1.915, w: 4.812, h: 1.643, fontSize: 104, align: 'center', valign: 'middle', lineSpacingMultiple: 0.9,
+    });
+    head(s, 'INTRODUCTION TO ', {
+        x: 3.107, y: 1.449, w: 3.786, h: 0.568, fontSize: 27, color: 'A5A5A5', align: 'center', lineSpacingMultiple: 1.3,
+    });
+    bolt(s, -1.132, -0.685, 3.857, { line: { color: WHITE, width: 1 } });
+    bolt(s, 7.39, 1.53, 3.857, { line: { color: WHITE, width: 1 } });
+}
+
+/* 3 — table of content */
+function slide03(s) {
+    chrome(s, 3);
+    photo(s, -0.035, 0, 5.556, 5.625);
+    halftone(s, -3.071, 0.149, 6.137, ORANGE);
+    box(s, { x: -0.034, y: 2.542, w: 4.06, h: 3.083, fill: { color: ORANGE } });
+    ['05', '08', '14', '19', '22'].forEach((n, i) => {
+        head(s, n, { x: 8.466 + i * 0.018, y: 0.497 + i * 0.928, w: 0.677, h: 0.833, fontSize: 45, color: ORANGE, align: 'center' });
+        hline(s, 6.781 + i * 0.0155, 1.33 + i * 0.9188, 2.399, { line: { color: GREY, width: 0.75 } });
+        text(s, 'Lorem ipsum dolor sit amet, consectetuer', {
+            x: 6.719, y: 0.819 + i * 0.9188, w: 1.747, h: 0.447, fontSize: 9, lineSpacingMultiple: 1.3,
+        });
+    });
+    head(s, [
+        { text: 'TABLE OF', options: { breakLine: true } },
+        { text: 'CONTENT', options: { paraSpaceBefore: 9 } },
+    ], { x: 0.551, y: 3.218, w: 3.267, h: 1.979, fontSize: 66, color: INK, valign: 'middle', lineSpacingMultiple: 0.8 });
+}
+
+/* 4 — welcome */
+function slide04(s) {
+    chrome(s, 4);
+    photo(s, 5.0, 0, 5.0, 5.625);
+    head(s, [
+        { text: 'WELCOME TO', options: { breakLine: true } },
+        { text: 'FOURSET', options: { color: ORANGE } },
+    ], { x: 0.804, y: 1.268, w: 3.154, h: 1.439, fontSize: 45, lineSpacingMultiple: 0.9 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+        { x: 0.804, y: 3.274, w: 3.384, h: 1.198, fontSize: 11, lineSpacingMultiple: 1.3 });
+    bolt(s, 3.759, 1.387, 2.483, { fill: { color: ORANGE } });
+    halftone(s, 6.859, 2.912, 5.57, ORANGE);
+    text(s, 'WRITE SOMETHING HERE', { x: 0.858, y: 1.05, w: 3.285, h: 0.227, fontSize: 9 });
+}
+
+/* 5 — one slide paragraph */
+function slide05(s) {
+    chrome(s, 5);
+    halftone(s, 0.99, 2.912, 5.57, ORANGE);
+    box(s, { x: 4.881, y: 0, w: 5.119, h: 5.625, fill: { color: BG }, line: { color: HAIR, width: 1 } });
+    text(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for the bliss of souls like mine. ',
+        { x: 5.415, y: 1.127, w: 3.719, h: 0.96, fontSize: 11, lineSpacingMultiple: 1.3 });
+    text(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. ',
+        { x: 5.415, y: 2.409, w: 3.719, h: 0.739, fontSize: 11, lineSpacingMultiple: 1.3 });
+    bullets(s, [
+        'Sed ut perspiciatis unde omnis iste natus',
+        'Error sit voluptatem accusan',
+        'Dolor emque laudantium, totam rem aperiam',
+        'Eaque ipsa quae ab illo',
+        'Inventore veritatis et quasi',
+    ], { x: 5.467, y: 3.743, w: 3.667, h: 1.198, fontSize: 11, lineSpacingMultiple: 1.3 }, { indent: 17 });
+    text(s, 'WRITE SOMETHING HERE', { x: 0.858, y: 1.05, w: 3.285, h: 0.227, fontSize: 9 });
+    head(s, 'ONE SLIDE PARAGRAPH', { x: 0.806, y: 1.341, w: 3.794, h: 1.448, fontSize: 45, lineSpacingMultiple: 0.9 });
+}
+
+/* 6 — our vision */
+function slide06(s) {
+    chrome(s, 6);
+    photo(s, 0, 0, 10, 3.474);
+    box(s, { x: 0, y: 3.474, w: 3.714, h: 2.151, fill: { color: BG }, line: { color: HAIR, width: 1 } });
+    head(s, 'OUR VISION', { x: 0.6, y: 4.205, w: 2.711, h: 0.689, fontSize: 41, lineSpacingMultiple: 0.9 });
+    halftone(s, 6.29, 1.303, 5.57, WHITE);
+    bolt(s, 1.158, 0, 2.582, { line: { color: WHITE, width: 1 } });
+    box(s, { x: 3.714, y: 3.474, w: 6.286, h: 2.151, fill: { color: BG } });
+    text(s, [
+        { text: 'TO BE A LEADING FITNESS CENTER THAT ' },
+        { text: 'EMPOWERS', options: { color: ORANGE } },
+        { text: ' INDIVIDUALS TO REACH THEIR HIGHEST POTENTIAL.' },
+    ], { x: 4.41, y: 3.981, w: 5.418, h: 1.136, fontSize: 21, lineSpacingMultiple: 1.0 });
+}
+
+/* 7 — endure mission */
+function slide07(s) {
+    chrome(s, 7);
+    photo(s, 0, 0, 10, 2.583);
+    head(s, 'ENDURE MISSION', { x: 0.506, y: 0.893, w: 4.113, h: 0.757, fontSize: 45, lineSpacingMultiple: 0.9 });
+    halftone(s, 4.548, 0.107, 5.57, ORANGE);
+    const COPY = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada';
+    ['01', '02', '03'].forEach((n, i) => {
+        const last = i === 2;
+        box(s, {
+            x: -0.011 + i * 3.337, y: 2.583, w: 3.337, h: 3.041,
+            fill: { color: last ? ORANGE : BG }, line: last ? null : { color: HAIR, width: 1 },
+        });
+        head(s, n, {
+            x: 2.128 + i * 3.3365, y: 2.812, w: 0.938, h: 0.909, fontSize: 50, align: 'right',
+            color: last ? WHITE : ORANGE,
+        });
+        text(s, COPY, { x: 0.436 + i * 3.3365, y: 3.877, w: 2.63, h: 1.198, fontSize: 11, lineSpacingMultiple: 1.3 });
+    });
+}
+
+/* 8 — our facilities */
+function slide08(s) {
+    chrome(s, 8);
+    head(s, 'OUR FACILITIES', {
+        x: 0.6, y: 0.598, w: 4.189, h: 1.795, fontSize: 45, align: 'center', valign: 'middle',
+        lineSpacingMultiple: 0.9, shape: 'rect', fill: { color: ORANGE },
+    });
+    photo(s, 0.601, 2.474, 4.189, 2.554);
+    photo(s, 4.875, 0.597, 1.946, 4.431);
+    photo(s, 6.908, 0.597, 2.491, 2.09);
+    photo(s, 6.908, 2.769, 2.491, 2.259);
+}
+
+/* 9 — our services */
+function slide09(s) {
+    chrome(s, 9);
+    photo(s, 0, 0, 3.118, 5.625);
+    halftone(s, 8.16, -0.728, 4.76, ORANGE);
+    head(s, 'OUR SERVICES', { x: 3.707, y: 0.574, w: 3.749, h: 0.985, fontSize: 45, lineSpacingMultiple: 0.9 });
+    text(s, [
+        { text: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.', options: { breakLine: true } },
+        { text: '', options: { breakLine: true } },
+        { text: 'Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.' },
+    ], { x: 3.767, y: 1.601, w: 4.614, h: 1.136, fontSize: 11 });
+    const CARDS = [
+        { x: 3.119, tx: 3.405, title: 'PERSONAL TRAINER' },
+        { x: 5.412, tx: 5.689, title: 'MARTIAL ARTS' },
+        { x: 7.706, tx: 7.981, title: 'NUTRITION COACHING' },
+    ];
+    CARDS.forEach((c) => {
+        box(s, { x: c.x, y: 3.22, w: 2.294, h: 2.405, fill: { color: BG }, line: { color: HAIR, width: 1 } });
+        head(s, c.title, { x: c.tx, y: 3.621, w: 1.743, h: 0.28, fontSize: 14, color: ORANGE, lineSpacingMultiple: 0.9 });
+        text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
+            { x: c.tx, y: 4.115, w: 1.734, h: 0.865, fontSize: 9, lineSpacingMultiple: 1.3 });
+    });
+    bolt(s, -1.144, 0.606, 3.787, { line: { color: WHITE, width: 1 } });
+}
+
+/* 10 — from zero to heroes */
+function slide10(s) {
+    chrome(s, 10);
+    halftone(s, -1.897, -0.93, 7.299, ORANGE);
+    head(s, 'MEET THE TEAM', { x: 3.703, y: 0.639, w: 1.201, h: 0.317, fontSize: 12, color: INK, lineSpacingMultiple: 1.3 });
+    head(s, [
+        { text: 'FROM ZERO TO ' },
+        { text: 'HEROES', options: { color: ORANGE } },
+    ], { x: 5.23, y: 0.749, w: 2.928, h: 1.59, fontSize: 45, valign: 'bottom' });
+    text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis',
+        { x: 5.23, y: 2.742, w: 3.819, h: 0.644, fontSize: 9, lineSpacingMultiple: 1.3 });
+    text(s, 'LOREM IPSUM DOLOR', { x: 5.23, y: 2.502, w: 2.187, h: 0.217, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
+    box(s, { x: 5.285, y: 3.601, w: 4.114, h: 1.219, shape: 'roundRect', rectRadius: 0.057, fill: { color: CARD } });
+    text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh',
+        { x: 7.035, y: 4.054, w: 2.014, h: 0.53, fontSize: 9, lineSpacingMultiple: 1.3 });
+    text(s, 'LOREM IPSUM DOLOR', { x: 7.035, y: 3.837, w: 1.747, h: 0.217, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
+    for (let i = 0; i < 5; i++) {
+        box(s, { shape: 'star5', x: 5.621 + i * 0.2213, y: 4.38, w: 0.201, h: 0.193, fill: { color: ORANGE } });
+    }
+    head(s, '342 K', { x: 5.529, y: 3.873, w: 1.285, h: 0.48, fontSize: 30, valign: 'bottom', lineSpacingMultiple: 0.8 });
+    photo(s, 0, 0, 3.118, 5.625);
+}
+
+/* 11 — meet the trainer */
+function slide11(s) {
+    halftone(s, 6.787, 2.382, 4.76, ORANGE);
+    const TEAM = [
+        { x: 0.6, w: 2.133, px: 0.608, name: 'FLEUR COFFEY' },
+        { x: 2.853, w: 2.141, px: 2.861, name: 'NEIL BRIGHT' },
+        { x: 5.073, w: 2.149, px: 5.082, name: 'ERIKA HICKMAN' },
+        { x: 7.301, w: 2.149, px: 7.309, name: 'BRADLEY CLARK' },
+    ];
+    TEAM.forEach((t) => head(s, t.name, {
+        x: t.x, y: 4.27, w: t.w, h: 0.757, fontSize: 24, align: 'center', valign: 'middle',
+        shape: 'rect', fill: { color: ORANGE },
+    }));
+    head(s, 'MEET THE TRAINER', { x: 0.6, y: 0.803, w: 4.614, h: 0.757, fontSize: 45, lineSpacingMultiple: 0.9 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet',
+        { x: 5.081, y: 0.858, w: 4.614, h: 0.606, fontSize: 11 });
+    TEAM.forEach((t) => photo(s, t.px, 1.76, 2.108, 2.51));
+}
+
+/* 12 — write your title here */
+function slide12(s) {
+    chrome(s, 12);
+    halftone(s, 2.215, -2.296, 5.57, CARD);
+    photo(s, 4.866, 0, 5.134, 2.727);
+    photo(s, 4.866, 2.898, 5.134, 2.727);
+    box(s, { x: 0.88, y: 3.813, w: 3.467, h: 0.948, fill: { color: ORANGE } });
+    head(s, 'WRITE YOUR TITLE HERE', { x: 0.75, y: 0.777, w: 2.823, h: 1.287, fontSize: 36 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a',
+        { x: 0.792, y: 2.23, w: 3.469, h: 1.044, fontSize: 9, lineSpacingMultiple: 1.3 });
+    head(s, '+60', { x: 1.083, y: 3.896, w: 1.316, h: 0.833, fontSize: 45 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue',
+        { x: 2.146, y: 3.994, w: 1.979, h: 0.578, fontSize: 8, lineSpacingMultiple: 1.3 });
+    [['MARTIAL ARTS', 1.865, 2.02], ['CARDIO COACHING', 4.773, 4.93]].forEach(([label, yBand, yText]) => {
+        // black-to-transparent band, faked with slices (pptxgenjs has no gradient fill)
+        const slices = 36;
+        for (let i = 0; i < slices; i++) {
+            box(s, {
+                x: 4.867 + (i * 2.836) / slices, y: yBand, w: 2.836 / slices, h: 0.863,
+                fill: { color: INK, transparency: Math.round((i / (slices - 1)) * 100) },
+            });
+        }
+        head(s, label, { x: 5.105, y: yText, w: 2.6, h: 0.631, fontSize: 25 });
+    });
+}
+
+/* 13 — nutrition coaching */
+function slide13(s) {
+    chrome(s, 13);
+    photo(s, 0, 0, 4.785, 5.625);
+    halftone(s, 6.15, 0.931, 4.76, ORANGE);
+    bolt(s, 3.805, -1.567, 6.4, { line: { color: WHITE, width: 1 } });
+    head(s, [
+        { text: 'NUTRITION ', options: { color: ORANGE } },
+        { text: 'COACHING' },
+    ], { x: 1.116, y: 0.931, w: 3.313, h: 1.287, fontSize: 45, valign: 'bottom', lineSpacingMultiple: 0.8 });
+    text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. ',
+        { x: 1.116, y: 2.655, w: 3.088, h: 0.53, fontSize: 9, align: 'justify' });
+    text(s, 'LOREM IPSUM DOLOR', { x: 1.116, y: 2.419, w: 2.187, h: 0.217, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
+    const TILES = [
+        { x: 0.948, y: 3.455, dot: 1.315, dy: 3.678, lx: 1.955, ly: 3.784, tx: 1.261, ty: 4.336, accent: false, icon: 'donut' },
+        { x: 3.514, y: 3.455, dot: 3.859, dy: 3.678, lx: 4.499, ly: 3.784, tx: 3.805, ty: 4.336, accent: false, icon: 'chevron' },
+        { x: 6.308, y: 3.185, dot: 6.563, dy: 3.442, lx: 7.202, ly: 3.548, tx: 6.509, ty: 4.1, accent: true, icon: 'teardrop' },
+    ];
+    TILES.forEach((t) => {
+        box(s, { x: t.x, y: t.y, w: 2.391, h: 1.544, shape: 'snip2DiagRect', fill: { color: t.accent ? ORANGE : CARD } });
+        box(s, { x: t.dot, y: t.dy, w: 0.573, h: 0.573, shape: 'ellipse', fill: { color: t.accent ? WHITE : ORANGE } });
+        box(s, {
+            x: t.dot + 0.16, y: t.dy + 0.16, w: 0.25, h: 0.25, shape: t.icon,
+            fill: { color: t.accent ? 'B55703' : WHITE },
+        });
+        head(s, [
+            { text: 'LOREM ', options: { breakLine: true } },
+            { text: 'IPSUM DOLOR' },
+        ], { x: t.lx, y: t.ly, w: 1.198, h: 0.358, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
+        text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation', { x: t.tx, y: t.ty, w: 2.04, h: 0.379, fontSize: 9 });
+    });
+}
+
+/* 14 — don't stop */
+function slide14(s) {
+    chrome(s, 14);
+    photo(s, 0, 0, 4.785, 5.625);
+    halftone(s, -1.528, 1.051, 6.579, ORANGE);
+    const LINES = [
+        { t: "DON'T STOP", x: 4.051, y: 0.78, w: 3.809, color: ORANGE },
+        { t: 'WHEN YOURE', x: 2.932, y: 1.712, w: 4.217 },
+        { t: 'TIRED', x: 7.684, y: 1.712, w: 1.878 },
+        { t: 'STOP WHEN', x: 4.675, y: 2.645, w: 3.809 },
+        { t: 'YOURE', x: 3.285, y: 3.575, w: 2.465 },
+        { t: 'DONE.', x: 6.457, y: 3.575, w: 1.878, h: 2.297 },
+    ];
+    LINES.forEach((l) => head(s, l.t, { x: l.x, y: l.y, w: l.w, h: l.h || 1.186, fontSize: 66, color: l.color || WHITE }));
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+        { x: 7.86, y: 1.051, w: 1.54, h: 0.644, fontSize: 9, lineSpacingMultiple: 1.3 });
+}
+
+/* 15 — membership plan */
+function slide15(s) {
+    chrome(s, 15);
+    halftone(s, 1.468, 0.432, 4.76, CARD);
+    box(s, { x: 3.786, y: 0, w: 6.162, h: 5.625, fill: { color: BG }, line: { color: HAIR, width: 1 } });
+    const PLANS = [
+        { x: 7.044, tx: 7.293, lx: 7.32, name: 'PREMIUM', price: '$89,00', fill: ORANGE, nameW: 1.7 },
+        { x: 4.273, tx: 4.523, lx: 4.549, name: 'BASIC', price: '$79,00', fill: CARD, nameW: 1.519 },
+    ];
+    PLANS.forEach((p) => {
+        box(s, { x: p.x, y: 1.25, w: 2.521, h: 3.125, fill: { color: p.fill } });
+        head(s, p.price, { x: p.tx, y: 1.856, w: 1.881, h: 0.547, fontSize: 30, lineSpacingMultiple: 1.1 });
+        hline(s, p.x, 2.578, 2.521, { line: { color: WHITE, width: 0.75, transparency: 76 } });
+        head(s, p.name, { x: p.tx, y: 1.599, w: p.nameW, h: 0.303, fontSize: 14 });
+        bullets(s, ['FIRST DISCUSSION', 'SECOND DISCUSSION ', 'THIRD DISCUSSION', 'SECOND DISCUSSION '],
+            { x: p.lx, y: 2.765, w: 2.071, h: 1.304, fontSize: 11, lineSpacingMultiple: 1.8 },
+            { characterCode: '2714', indent: 17 });
+    });
+    head(s, 'MEMBERSHIP PLAN', { x: 0.606, y: 1.344, w: 3.232, h: 1.59, fontSize: 45 });
+    text(s, 'Think not, when the wailing winds of autumn. Drive the shivering leaflets.',
+        { x: 0.606, y: 3.44, w: 2.382, h: 0.749, fontSize: 11, lineSpacingMultiple: 1.3 });
+}
+
+/* 16 — safety measures (concentric ring chart) */
+function slide16(s) {
+    const STATS = [
+        { label: '90% MARKETING', y: 1.647, ly: 1.982, copy: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue', lw: 3.099, w: 2.408 },
+        { label: '70% DESIGN', y: 2.641, ly: 2.976, copy: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue', lw: 3.099, w: 1.98 },
+        { label: '60% CONTENT', y: 3.687, ly: 4.022, copy: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commode.', lw: 3.129, w: 2.299 },
+    ];
+    chrome(s, 16);
+    STATS.forEach((st) => {
+        head(s, st.label, { x: 6.005, y: st.y, w: st.w, h: 0.328, fontSize: 15, color: ORANGE, lineSpacingMultiple: 1.0 });
+        text(s, st.copy, { x: 6.005, y: st.ly, w: st.lw, h: 0.456, fontSize: 9, lineSpacingMultiple: 1.3 });
+    });
+    const track = { color: GREY, width: 25, transparency: 80 };
+    // three concentric rings: grey track + coloured arc, largest first
+    const RINGS = [
+        { x: 1.71, y: 1.878, d: 2.783, end: 177.26, color: MAROON },
+        { x: 2.134, y: 2.301, d: 1.936, end: 168.22, color: CRIMSON },
+        { x: 2.545, y: 2.713, d: 1.112, end: 135.28, color: ORANGE },
+    ];
+    RINGS.forEach((r) => box(s, { shape: 'ellipse', x: r.x, y: r.y, w: r.d, h: r.d, line: track }));
+    RINGS.forEach((r) => box(s, {
+        shape: 'arc', x: r.x, y: r.y, w: r.d, h: r.d, angleRange: [270, r.end],
+        line: { color: r.color, width: 25 },
+    }));
+    hline(s, 3.978, 2.817, 1.54, { line: { color: GREY, width: 1 } });
+    hline(s, 3.301, 3.837, 2.217, { line: { color: GREY, width: 1 } });
+    hline(s, 3.384, 1.878, 2.217, { line: { color: GREY, width: 1 } });
+    const KNOBS = [
+        { x: 1.49, y: 3.048, d: 0.398, color: MAROON },
+        { x: 2.454, y: 3.368, d: 0.398, color: ORANGE },
+        { x: 2.773, y: 2.129, d: 0.372, color: CRIMSON },
+    ];
+    KNOBS.forEach((k) => {
+        box(s, { shape: 'roundRect', rectRadius: 0.4, x: k.x, y: k.y, w: k.d, h: k.d, fill: { color: k.color } });
+        box(s, {
+            shape: 'roundRect', rectRadius: 0.02, x: k.x + k.d * 0.27, y: k.y + k.d * 0.3,
+            w: k.d * 0.46, h: k.d * 0.32, line: { color: WHITE, width: 0.75 },
+        });
+        box(s, { x: k.x + k.d * 0.44, y: k.y + k.d * 0.62, w: k.d * 0.12, h: k.d * 0.1, fill: { color: WHITE } });
+    });
+    head(s, 'SAFETY MEASURES', { x: 1.671, y: 0.883, w: 6.658, h: 0.581, fontSize: 38, align: 'center', lineSpacingMultiple: 0.8 });
+}
+
+/* 17 — workout plan (gantt) */
+function slide17(s) {
+    chrome(s, 17);
+    box(s, { x: 0, y: 1.924, w: 10, h: 3.683, fill: { color: BG }, line: { color: HAIR, width: 1 } });
+    [4.242, 3.832, 3.422, 3.012, 2.598].forEach((y) =>
+        hline(s, 1.045, y, 7.833, { line: { color: GRID, width: 1, dashType: 'dash' } }));
+    hline(s, 1.164, 4.675, 7.681, { line: { color: WHITE, width: 1.5 } });
+    const MONTHS = [
+        { t: 'AUG', x: 0.737, w: 0.78 }, { t: 'SEPT', x: 1.685, w: 0.819 },
+        { t: 'OCT', x: 2.606, w: 0.913 }, { t: 'NOV', x: 3.631, w: 0.796 },
+        { t: 'DEC', x: 4.643, w: 0.702 }, { t: 'JAN', x: 5.532, w: 0.858 },
+        { t: 'FEB', x: 6.51, w: 0.828 }, { t: 'MAR', x: 7.454, w: 0.815 },
+        { t: 'APR', x: 8.394, w: 0.869 },
+    ];
+    MONTHS.forEach((m, i) => {
+        box(s, { shape: 'ellipse', x: 1.077 + i * 0.9667, y: 4.623, w: 0.1, h: 0.103, fill: { color: BG }, line: { color: INK, width: 1.5 } });
+        text(s, m.t, { x: m.x, y: 4.805, w: m.w, h: 0.227, fontSize: 9, align: 'center' });
+    });
+    const BARS = [
+        { x: 1.222, y: 3.746, w: 1.037, color: WHITE },
+        { x: 4.899, y: 4.157, w: 1.186, color: ORANGE },
+        { x: 2.165, y: 3.336, w: 1.918, color: ORANGE },
+        { x: 4.154, y: 2.93, w: 4.365, color: ORANGE },
+        { x: 3.353, y: 2.523, w: 2.039, color: WHITE },
+        { x: 5.966, y: 3.755, w: 1.602, color: WHITE },
+    ];
+    BARS.forEach((b) => box(s, { x: b.x, y: b.y, w: b.w, h: 0.153, fill: { color: b.color } }));
+    head(s, 'WORKOUT PLAN', { x: 0.812, y: 0.516, w: 4.188, h: 0.909, fontSize: 50 });
+    box(s, { x: 8.0, y: 3.692, w: 1.134, h: 0.697, fill: { color: ORANGE } });
+    head(s, 'MARCH', { x: 8.085, y: 3.791, w: 0.964, h: 0.379, fontSize: 18, align: 'center' });
+    text(s, 'TARGET FINISH', { x: 8.085, y: 4.097, w: 0.964, h: 0.189, fontSize: 7, align: 'center' });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada',
+        { x: 4.95, y: 0.61, w: 4.192, h: 0.749, fontSize: 11, lineSpacingMultiple: 1.3 });
+}
+
+/* 18 — table standings */
+function slide18(s) {
+    chrome(s, 18);
+    head(s, 'TABLE STANDINGS', { x: 1.844, y: 0.553, w: 6.312, h: 0.757, fontSize: 45, align: 'center', lineSpacingMultiple: 0.9 });
+    const COLS = [
+        { x: 1.028, w: 0.631, cw: 0.631, align: 'center' },
+        { x: 1.941, w: 2.253, cw: 1.694, align: 'left' },
+        { x: 4.179, w: 1.053, cx: 4.239, cw: 0.862, align: 'center' },
+        { x: 5.073, w: 1.053, cx: 5.16, cw: 0.862, align: 'center' },
+        { x: 6.031, w: 1.053, cx: 6.136, cw: 0.862, align: 'center' },
+        { x: 6.962, w: 1.053, cx: 7.058, cw: 0.862, align: 'center' },
+        { x: 7.856, w: 1.053, cx: 7.952, cw: 0.862, align: 'center' },
+    ];
+    const HEADER = ['#', 'PLAYER NAME', 'PLAY', 'WIN', 'LOSE', 'DRAW', 'PTS'];
+    const ROWS = [
+        ['1', 'Steven Johnson', '15', '10', '1', '4', '90'],
+        ['2', 'Patrick Wilson', '15', '10', '2', '3', '88'],
+        ['3', 'Eduardo Claim', '15', '9', '2', '4', '84'],
+        ['4', 'Joe Carlos', '15', '9', '3', '3', '82'],
+        ['5', 'Esteban Perez', '15', '7', '3', '5', '70'],
+        ['6', 'Addison Alves', '15', '6', '3', '6', '65'],
+    ];
+    box(s, { x: 0.958, y: 1.563, w: 8.083, h: 0.552, shape: 'roundRect', rectRadius: 0.032, fill: { color: ORANGE } });
+    HEADER.forEach((t, i) => text(s, t, {
+        x: COLS[i].x, y: i === 0 ? 1.675 : 1.725, w: COLS[i].w, h: i === 0 ? 0.328 : 0.227,
+        fontSize: i === 0 ? 15 : 9, align: COLS[i].align, valign: 'middle',
+    }));
+    ROWS.forEach((row, r) => {
+        const y = 2.128 + r * 0.4413;
+        box(s, { x: 0.958, y, w: 8.083, h: 0.428, shape: 'roundRect', rectRadius: 0.025, fill: { color: CARD } });
+        row.forEach((cell, i) => text(s, cell, {
+            x: COLS[i].cx || COLS[i].x, y: y + 0.088, w: COLS[i].cw, h: 0.252,
+            fontSize: 11, align: COLS[i].align, valign: 'middle',
+        }));
+    });
+}
+
+/* 19 — our value year by year (two gauges) */
+function slide19(s) {
+    chrome(s, 19);
+    halftone(s, 6.277, -1.301, 4.76, ORANGE);
+    const GAUGES = [
+        { x: 4.058, lx: 4.553, lw: 1.357, label: 'BUILD WITH EASE', value: '74B', end: 67.68 },
+        { x: 6.71, lx: 7.258, lw: 1.251, label: 'DAILY JOURNEY', value: '52B', end: 138.51 },
+    ];
+    GAUGES.forEach((g) => {
+        const dx = g.x - 4.058;
+        box(s, { x: g.x, y: 0.948, w: 2.346, h: 3.728, fill: { color: CARD } });
+        head(s, g.label, { x: g.lx, y: 1.219, w: g.lw, h: 0.328, fontSize: 15, align: 'center' });
+        box(s, { shape: 'ellipse', x: 4.483 + dx, y: 2.176, w: 1.497, h: 1.497, line: { color: INK, width: 16, transparency: 80 } });
+        box(s, { shape: 'arc', x: 4.483 + dx, y: 2.176, w: 1.497, h: 1.497, angleRange: [270, g.end], line: { color: ORANGE, width: 10.5 } });
+        head(s, g.value, { x: 4.832 + dx, y: 2.542, w: 0.798, h: 0.682, fontSize: 36, align: 'center' });
+        text(s, '/year', { x: 5.0 + dx, y: 3.114, w: 0.463, h: 0.258, fontSize: 9, align: 'center', lineSpacingMultiple: 1.3 });
+        text(s, 'What has fingers but cannot use them? ', { x: 4.276 + dx, y: 3.913, w: 1.911, h: 0.429, fontSize: 11, align: 'center' });
+        hline(s, g.x, 1.72, 2.346, { line: { color: WHITE, width: 2.5, transparency: 92 } });
+    });
+    head(s, [
+        { text: 'OUR ' }, { text: 'VALUE ', options: { color: ORANGE } }, { text: 'YEAR BY YEAR' },
+    ], { x: 0.834, y: 1.33, w: 2.677, h: 1.287, fontSize: 36 });
+    text(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, ',
+        { x: 0.834, y: 3.368, w: 2.708, h: 0.697, fontSize: 11, lineSpacingMultiple: 1.2 });
+}
+
+/* 20 — award collection */
+function slide20(s) {
+    chrome(s, 20);
+    [6.194, 3.609, 1.025].forEach((x) => halftone(s, x, 1.416, 2.794, '404040'));
+    head(s, 'AWARD COLLECTION', { x: 1.693, y: 0.765, w: 6.614, h: 0.682, fontSize: 45, align: 'center', valign: 'bottom', lineSpacingMultiple: 0.8 });
+    text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. ',
+        { x: 2.422, y: 1.523, w: 5.156, h: 0.379, fontSize: 9, align: 'center' });
+    [{ x: 1.41, year: '1887' }, { x: 3.966, year: '1995' }, { x: 6.522, year: '2001' }].forEach((a) => {
+        trophy(s, a.x + 0.499, 2.347, 1.07, 1.104, AMBER);
+        head(s, a.year, { x: a.x + 0.283, y: 3.657, w: 1.501, h: 0.318, fontSize: 18, bold: true, align: 'center', valign: 'bottom', lineSpacingMultiple: 0.8 });
+        text(s, [
+            { text: 'Ut wisi enim ad ', options: { bold: true } },
+            { text: 'minim veniam, quis nostrud exerci tation ullamcorper nibh euismod' },
+        ], { x: a.x, y: 3.974, w: 2.068, h: 0.53, fontSize: 9, align: 'center' });
+    });
+}
+
+/* 21 — testimonial */
+function slide21(s) {
+    chrome(s, 21);
+    halftone(s, 4.326, -0.542, 5.57, ORANGE);
+    box(s, { x: 1.044, y: 1.088, w: 8.956, h: 4.537, fill: { color: BG }, line: { color: HAIR, width: 1 } });
+    head(s, 'TESTIMONIAL', { x: 1.489, y: 1.74, w: 3.362, h: 0.909, fontSize: 50 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+        { x: 1.472, y: 2.744, w: 3.767, h: 0.841, fontSize: 9, lineSpacingMultiple: 1.3 });
+    const QUOTES = [
+        { name: 'ANA POST', y: 1.482, stars: 1.522 },
+        { name: 'MARCO HOFFMAN', y: 2.729, stars: 2.776 },
+        { name: 'JOHN DEW', y: 3.847, stars: 3.872 },
+    ];
+    QUOTES.forEach((q) => {
+        head(s, q.name, { x: 6.764, y: q.y, w: 1.72, h: 0.278, fontSize: 12, bold: true, color: ORANGE });
+        hline(s, 6.822, q.y + 0.351, 0.443, { line: { color: GRID, width: 1, transparency: 75 } });
+        text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, ',
+            { x: 6.764, y: q.y + 0.351, w: 2.347, h: 0.597, fontSize: 8, lineSpacingMultiple: 1.3 });
+        for (let i = 0; i < 5; i++) {
+            box(s, { shape: 'star5', x: 8.137 + i * 0.2083, y: q.stars, w: 0.183, h: 0.183, fill: { color: ORANGE } });
+        }
+    });
+}
+
+/* 22 — our gallery */
+function slide22(s) {
+    chrome(s, 22);
+    box(s, { x: 6.148, y: 2.879, w: 2.986, h: 1.883, fill: { color: ORANGE } });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna',
+        { x: 6.415, y: 3.631, w: 2.298, h: 0.849, fontSize: 9, lineSpacingMultiple: 1.3 });
+    head(s, 'OUR GALLERY', { x: 6.415, y: 3.152, w: 1.822, h: 0.429, fontSize: 21 });
+    photo(s, 0.866, 0.892, 2.556, 1.854);
+    photo(s, 0.866, 2.878, 5.118, 1.863);
+    photo(s, 3.592, 0.892, 2.049, 1.854);
+    photo(s, 5.811, 0.892, 3.323, 1.854);
+}
+
+/* 23 — mockup slide */
+function slide23(s) {
+    chrome(s, 23);
+    head(s, 'PACKAGES INCLUDE :', { x: 0.564, y: 3.853, w: 1.602, h: 0.294, fontSize: 12, lineSpacingMultiple: 1.3 });
+    halftone(s, 2.506, -0.457, 4.988, ORANGE);
+    bullets(s, ['Lorem Ipsum dolor sit amet', 'Lorem Ipsum dolor sit amet'],
+        { x: 0.377, y: 4.251, w: 2.609, h: 0.519, fontSize: 9, lineSpacingMultiple: 1.3 },
+        { characterCode: '2714', indent: 28 });
+    // tablet mock-up (the original is a photo of a tablet lying at -90°) plus its stylus
+    s.addShape('custGeom', {
+        x: 4.98, y: 1.248, w: 5.0, h: 0.2, fill: { color: 'F2F2F2' },
+        points: [{ x: 0, y: 0.1 }, { x: 0.55, y: 0 }, { x: 4.9, y: 0 }, { x: 5.0, y: 0.1 },
+            { x: 4.9, y: 0.2 }, { x: 0.55, y: 0.2 }, { close: true }],
+    });
+    box(s, { x: 3.64, y: 1.485, w: 7.25, h: 5.74, shape: 'roundRect', rectRadius: 0.28, fill: { color: '020202' }, line: { color: 'DFDFDF', width: 1 } });
+    photo(s, 3.891, 1.663, 6.781, 5.073, { shape: 'roundRect', rectRadius: 0.072 });
+    head(s, [{ text: 'MOCKUP', options: { breakLine: true } }, { text: 'SLIDE' }],
+        { x: 0.518, y: 0.843, w: 2.363, h: 1.59, fontSize: 45 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar',
+        { x: 0.494, y: 2.812, w: 2.492, h: 0.849, fontSize: 9, lineSpacingMultiple: 1.3 });
+}
+
+/* 24 — get in touch */
+function slide24(s) {
+    chrome(s, 24);
+    halftone(s, 3.78, -0.598, 5.57, ORANGE);
+    photo(s, 5.271, 0, 4.729, 5.625, { shape: 'snip1Rect', flipH: true, rectRadius: 2.8125 });
+    // map pin: teardrop rotated to point down, with a hollow ring
+    box(s, { shape: 'teardrop', x: 6.727, y: 2.078, w: 0.72, h: 0.72, rotate: 135, fill: { color: 'E51B1B' } });
+    box(s, { shape: 'donut', x: 6.876, y: 2.235, w: 0.24, h: 0.24, fill: { color: 'C81414' } });
+    head(s, 'GET IN TOUCH', { x: 0.788, y: 1.477, w: 4.73, h: 0.71, fontSize: 45, valign: 'bottom', lineSpacingMultiple: 0.8 });
+    box(s, { x: 0.788, y: 2.652, w: 5.147, h: 2.327, fill: { color: CARD } });
+    text(s, 'Overview', { x: 1.223, y: 2.965, w: 2.187, h: 0.221, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
+    text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. ',
+        { x: 1.223, y: 3.249, w: 4.44, h: 0.379, fontSize: 9 });
+    hline(s, 1.206, 3.856, 4.312, { line: { color: WHITE, width: 0.75 } });
+    text(s, 'Social Media', { x: 1.223, y: 4.044, w: 2.187, h: 0.221, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
+    [{ g: 'f', x: 1.283 }, { g: 't', x: 3.226 }].forEach((icon) => {
+        text(s, icon.g, {
+            x: icon.x, y: 4.407, w: 0.23, h: 0.225, shape: 'roundRect', rectRadius: 0.04,
+            fill: { color: WHITE }, color: BG, fontSize: 12, bold: true, align: 'center', valign: 'middle', margin: 0,
+        });
+    });
+    text(s, 'Ut wisi enim ad', { x: 1.58, y: 4.406, w: 1.174, h: 0.227, fontSize: 9 });
+    text(s, 'Ut wisi enim ad', { x: 3.655, y: 4.406, w: 1.174, h: 0.227, fontSize: 9 });
+}
+
+/* 25 — thank you */
+function slide25(s) {
+    head(s, [{ text: 'THANK', options: { breakLine: true } }, { text: 'YOU' }],
+        { x: 0.605, y: 0.586, w: 3.563, h: 3.559, fontSize: 104 });
+    bolt(s, 4.175, 0.598, 3.857, { fill: { color: ORANGE } });
+    bolt(s, 5.562, 0.598, 3.857, { line: { color: ORANGE, width: 1 } });
+    head(s, 'FOURSET', { x: 0.523, y: 4.424, w: 0.987, h: 0.379, fontSize: 18, color: ORANGE });
+    text(s, [{ text: 'Presentation', options: { breakLine: true } }, { text: 'Template' }],
+        { x: 2.993, y: 4.383, w: 1.222, h: 0.379, fontSize: 9 });
+    halftone(s, 4.012, 0.028, 5.57, ORANGE);
+}
+
+/* ==================================================================== build */
+// Slide 11 and 25 use layouts that suppress the master's footer/page number.
+const DECK = [
+    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+    slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+    slide19, slide20, slide21, slide22, slide23, slide24, slide25,
+];
+
+const pres = new PptxGenJS();
+pres.defineLayout({ name: 'FOURSET', width: W, height: H });
+pres.layout = 'FOURSET';
+pres.author = 'FOURSET';
+pres.title = 'FOURSET – Fitness Presentation Template';
+pres.defineSlideMaster({ title: 'FOURSET', background: { color: BG } });
+
+DECK.forEach((build) => build(pres.addSlide({ masterName: 'FOURSET' })));
+
+pres.writeFile({ fileName: path.join(__dirname, '0af35f14-227e-4159-b82f-6e593eaab388_grok_final.pptx') })
+    .then((f) => console.log('wrote', f));

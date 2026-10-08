@@ -1,0 +1,741 @@
+/**
+ * Carbonwise — Pitch Deck Presentation (25 slides, 13.333 x 7.5 in / 16:9)
+ * Rebuilt with pptxgenjs. Raster photos in the source deck are replaced by
+ * grey "[image]" placeholder rectangles of the same position and size.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  dark: '21201E',   // tx1 / tx2
+  light: 'E4E4E2',  // bg1 / bg2
+  yellow: 'F9CD62', // accent1
+  purple: '684BF1', // accent2
+  image: '9E9E9E',  // stand-in for photographic content
+};
+
+const HEAD = 'Bebas Neue'; // theme major font
+const BODY = 'Nunito';     // theme minor font
+
+const NOLINE = { type: 'none' };
+
+/* ---------------------------------------------------------------- helpers */
+
+/** Rounded rectangle card. */
+function card(s, x, y, w, h, fill, r) {
+  s.addShape('roundRect', { x, y, w, h, fill: { color: fill }, rectRadius: r, line: NOLINE });
+}
+
+/** Plain (right-angle) rectangle. */
+function rect(s, x, y, w, h, fill) {
+  s.addShape('rect', { x, y, w, h, fill: { color: fill }, line: NOLINE });
+}
+
+/** Filled circle. */
+function circle(s, x, y, d, fill) {
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: fill }, line: NOLINE });
+}
+
+/** Body text (Nunito). `o` overrides any default. */
+function tx(s, content, o) {
+  s.addText(content, Object.assign({ fontFace: BODY, fontSize: 10, color: C.dark, valign: 'top' }, o));
+}
+
+/** Display text (Bebas Neue). */
+function hx(s, content, o) {
+  s.addText(content, Object.assign({ fontFace: HEAD, fontSize: 26, color: C.dark, valign: 'top' }, o));
+}
+
+/** Pill: rounded capsule + centred caption. */
+function pill(s, x, y, w, h, fill, label, labelColor, tw, tx0) {
+  card(s, x, y, w, h, fill, h / 2);
+  tx(s, label, { x: tx0 === undefined ? x : tx0, y, w: tw === undefined ? w : tw, h, fontSize: 16, color: labelColor, align: 'center' });
+}
+
+/** Stand-in for a photo / logo from the original deck. */
+function image(s, x, y, w, h, r) {
+  s.addShape(r ? 'roundRect' : 'rect',
+    Object.assign({ x, y, w, h, fill: { color: C.image }, line: NOLINE }, r ? { rectRadius: r } : {}));
+  tx(s, '[image]', { x, y, w, h, fontSize: 14, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
+}
+
+/**
+ * "Carbonwise | Pitch Deck Presentation" strap plus optional "NN/25".
+ * `rule` overrides the divider colour; slide 7 draws it light-on-light so it disappears.
+ */
+function header(s, color, page, rule) {
+  tx(s, 'Carbonwise', { x: 0.787, y: 0.48, w: 0.999, h: 0.269, bold: true, color });
+  tx(s, 'Pitch Deck Presentation', { x: 1.786, y: 0.48, w: 2.438, h: 0.269, color });
+  s.addShape('line', { x: 1.786, y: 0.511, w: 0, h: 0.2, line: { color: rule || color, width: 1 } });
+  if (page) {
+    tx(s, page + '/25', { x: 10.108, y: 0.48, w: 2.438, h: 0.269, bold: true, color, align: 'right' });
+  }
+}
+
+/** Circular badge holding a south-west arrow drawn from three strokes. */
+function arrowBadge(s, x, y, ring, stroke) {
+  const d = 0.442, ln = { color: stroke, width: 1.5 };
+  circle(s, x, y, d, ring);
+  s.addShape('line', { x: x + 0.136, y: y + 0.128, w: 0.183, h: 0.183, flipH: true, line: ln }); // diagonal
+  s.addShape('line', { x: x + 0.133, y: y + 0.312, w: 0.172, h: 0.002, line: ln });              // bottom rule
+  s.addShape('line', { x: x + 0.133, y: y + 0.141, w: 0.002, h: 0.172, line: ln });              // left rule
+}
+
+/** Circular badge holding an eight-spoke asterisk. */
+function starBadge(s, x, y, ring, stroke) {
+  const d = 0.442, c = d / 2, ln = { color: stroke, width: 1.25 };
+  circle(s, x, y, d, ring);
+  s.addShape('line', { x: x + 0.138, y: y + 0.138, w: 0.166, h: 0.166, line: ln });
+  s.addShape('line', { x: x + 0.138, y: y + 0.138, w: 0.166, h: 0.166, flipH: true, line: ln });
+  s.addShape('line', { x: x + c, y: y + 0.104, w: 0, h: 0.234, line: ln });
+  s.addShape('line', { x: x + 0.104, y: y + c, w: 0.234, h: 0, line: ln });
+}
+
+/** Circular badge holding a segmented "recycle" ring. */
+function recycleBadge(s, x, y, ring, stroke) {
+  const d = 0.442, inset = 0.09;
+  circle(s, x, y, d, ring);
+  [0, 120, 240].forEach(start => s.addShape('arc', {
+    x: x + inset, y: y + inset, w: d - 2 * inset, h: d - 2 * inset,
+    angleRange: [start, start + 95], line: { color: stroke, width: 1.5, endArrowType: 'triangle' },
+  }));
+}
+
+/** Small filled envelope used by the contact rows. */
+function envelopeIcon(s, x, y, w, h, color) {
+  s.addShape('rect', { x, y: y + h * 0.25, w, h: h * 0.75, fill: { color }, line: NOLINE });
+  s.addShape('triangle', { x, y, w, h: h * 0.55, flipV: true, fill: { color }, line: NOLINE });
+  s.addShape('line', { x, y: y + h * 0.25, w: w / 2, h: h * 0.4, line: { color: 'FFFFFF', width: 1 } });
+  s.addShape('line', { x: x + w / 2, y: y + h * 0.25, w: w / 2, h: h * 0.4, flipH: true, line: { color: 'FFFFFF', width: 1 } });
+}
+
+/** Small globe used by the contact rows. */
+function globeIcon(s, x, y, d, color) {
+  const ln = { color, width: 1.25 };
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color }, line: NOLINE });
+  s.addShape('ellipse', { x: x + d * 0.3, y: y + 0.008, w: d * 0.4, h: d - 0.016, fill: NOLINE, line: { color: 'FFFFFF', width: 1 } });
+  s.addShape('line', { x: x + 0.01, y: y + d / 2, w: d - 0.02, h: 0, line: { color: 'FFFFFF', width: 1 } });
+}
+
+/* -------------------------------------------------------- slide builders */
+
+// 1 — Cover
+function slide01(s) {
+  s.background = { color: C.dark };
+  image(s, 10.071, 0, 3.262, 7.5);
+  card(s, -0.281, 0, 10.697, 7.5, C.yellow, 0.247);
+  tx(s, 'Carbonwise', { x: 0.786, y: 0.477, w: 1.071, h: 0.269, bold: true });
+  tx(s, [{ text: 'Pitch Deck Presentation', options: { breakLine: true } }, { text: 'January 1, 2030' }],
+    { x: 7.191, y: 0.477, w: 2.438, h: 0.438, align: 'right' });
+  hx(s, 'Carbon accounting that makes sense and makes progress',
+    { x: 0.786, y: 1.57, w: 8.843, h: 3.942, fontSize: 88, lineSpacing: 90 });
+
+  // Founders chip
+  card(s, 0.786, 5.449, 4.393, 0.481, C.dark, 0.24);
+  card(s, 0.842, 5.501, 0.924, 0.376, C.light, 0.188);
+  tx(s, 'Founders', { x: 0.87, y: 5.555, w: 0.868, h: 0.269, bold: true, align: 'center' });
+  tx(s, 'Juno Ferreira & Miftah Rahman', { x: 1.766, y: 5.504, w: 3.414, h: 0.37, fontSize: 16, color: C.light });
+
+  // Contact strip
+  envelopeIcon(s, 0.876, 6.716, 0.178, 0.152, C.dark);
+  tx(s, 'founders@carbonwise.eco', { x: 1.054, y: 6.658, w: 1.984, h: 0.269 });
+  s.addShape('line', { x: 2.921, y: 6.692, w: 0, h: 0.2, line: { color: C.dark, width: 1 } });
+  globeIcon(s, 3.046, 6.714, 0.157, C.dark);
+  tx(s, 'carbonwise.eco', { x: 3.179, y: 6.658, w: 2.124, h: 0.269 });
+}
+
+// 2 — Problem
+function slide02(s) {
+  s.background = { color: C.dark };
+  const rows = [
+    { y: 1.638, h: 2.373, fill: C.purple, badge: C.light, num: '01.', numColor: C.purple,
+      text: 'Complex reporting frameworks (GHG, CSRD, TCFD)', textColor: C.light, ty: 2.004, th: 0.909, tw: 2.905 },
+    { y: 3.278, h: 2.373, fill: C.yellow, badge: C.dark, num: '02.', numColor: C.light,
+      text: 'Manual spreadsheets, fragmented data', textColor: C.dark, ty: 3.771, th: 0.64, tw: 2.439 },
+    { y: 4.918, h: 1.64, fill: C.light, badge: C.dark, num: '03.', numColor: C.light,
+      text: 'Expensive consultants ≠ scalable', textColor: C.dark, ty: 5.419, th: 0.64, tw: 2.439 },
+  ];
+  rows.forEach(r => card(s, 0.787, r.y, 4.483, r.h, r.fill, r.h > 2 ? 0.452 : 0.312));
+  tx(s, [
+    { text: 'Carbon reporting is becoming mandatory but most businesses are\u00a0' },
+    { text: 'not ready', options: { bold: true } },
+  ], { x: 5.736, y: 2.031, w: 7.022, h: 4.174, fontFace: HEAD, fontSize: 68, color: C.light, lineSpacing: 72 });
+  rows.forEach(r => {
+    circle(s, 1.286, r.ty + 0.055, 0.418, r.badge);
+    tx(s, r.num, { x: 1.286, y: r.ty + 0.129, w: 0.418, h: 0.269, color: r.numColor, align: 'center' });
+    tx(s, r.text, { x: 1.809, y: r.ty, w: r.tw, h: r.th, fontSize: 16, color: r.textColor });
+  });
+  header(s, C.light, '02');
+}
+
+// 3 — Solution
+function slide03(s) {
+  s.background = { color: C.dark };
+  const cards = [
+    { x: 8.627, fill: C.light, text: 'Auto-generate audit-ready reports', color: C.dark, tx: 9.033, ty: 4.375, tw: 3.107, th: 2.221 },
+    { x: 4.707, fill: C.yellow, text: 'AI-suggested reductions', color: C.dark, tx: 5.222, ty: 4.729, tw: 2.888, th: 1.515 },
+    { x: 0.787, fill: C.purple, text: 'Track Scope 1–3 emissions', color: C.light, tx: 1.3, ty: 4.729, tw: 2.894, th: 1.515 },
+  ];
+  cards.forEach(c => card(s, c.x, 3.983, 3.92, 3.006, c.fill, 0.296));
+  hx(s, 'Carbonwise automates carbon accounting & compliance reporting',
+    { x: 0.787, y: 1.526, w: 11.48, h: 2.154, fontSize: 68, color: C.light, lineSpacing: 72 });
+  cards.forEach(c => hx(s, c.text, { x: c.tx, y: c.ty, w: c.tw, h: c.th, fontSize: 42, color: c.color }));
+  header(s, C.light, '03');
+  arrowBadge(s, 7.778, 4.287, C.dark, C.yellow);
+}
+
+// 4 — Market size
+function slide04(s) {
+  s.background = { color: C.light };
+  card(s, 4.443, 0, 5.665, 7.5, C.yellow, 0.342);
+  card(s, 8.887, 0, 4.81, 7.5, C.purple, 0.291);
+  const cols = [
+    { cx: 0.783, tag: 'TAM', ring: C.dark, tagColor: C.light, value: '$18.4B ', color: C.dark,
+      note: 'global ESG & carbon management software', vx: 0.783, vw: 2.408, nx: 0.783, nw: 2.385 },
+    { cx: 5.355, tag: 'SAm', ring: C.dark, tagColor: C.light, value: '$5.1B ', color: C.dark,
+      note: 'Mid-market sustainability tools', vx: 5.355, vw: 2.06, nx: 5.321, nw: 1.733 },
+    { cx: 9.773, tag: 'SOm', ring: C.light, tagColor: C.purple, value: '$380M ', color: C.light,
+      note: 'Asia-Pacific & Europe (manufacturing, logistics, services)', vx: 9.779, vw: 2.317, nx: 9.779, nw: 2.987 },
+  ];
+  cols.forEach(c => {
+    circle(s, c.cx, 3.351, 0.919, c.ring);
+    hx(s, c.tag, { x: c.cx, y: 3.551, w: 0.919, h: 0.539, fontSize: 26, bold: true, color: c.tagColor, align: 'center', valign: 'middle' });
+    hx(s, c.value, { x: c.vx, y: 4.401, w: c.vw, h: 1.245, fontSize: 68, color: c.color });
+    hx(s, c.note, { x: c.nx, y: 5.782, w: c.nw, h: 0.64, fontSize: 16, color: c.color });
+  });
+  header(s, C.dark, '04');
+}
+
+// 5 — Product modules
+function slide05(s) {
+  s.background = { color: C.light };
+  const mods = [
+    { cx: 8.627, cy: 3.983, fill: C.purple, tag: 'Reduce', tagFill: C.light, tagColor: C.purple,
+      tx0: 9.221, ty: 4.667, tw: 1.083, body: 'AI suggestions based on cost + impact', bx: 9.221, by: 5.323, bw: 2.732, bc: C.light },
+    { cx: 4.707, cy: 3.983, fill: C.yellow, tag: 'Calculate', tagFill: C.dark, tagColor: C.light,
+      tx0: 5.169, ty: 4.671, tw: 1.149, body: 'Scope 1–3 with certified methodology', bx: 5.169, by: 5.323, bw: 2.996, bc: C.dark },
+    { cx: 0.787, cy: 3.983, fill: C.dark, tag: 'Integrate', tagFill: C.light, tagColor: C.dark,
+      tx0: 1.43, ty: 4.671, tw: 1.156, body: 'ERP, fleet, utility data', bx: 1.43, by: 5.286, bw: 2.634, bc: C.light },
+    { cx: 8.627, cy: 0.976, fill: C.dark, tag: 'Report', tagFill: C.light, tagColor: C.dark,
+      tx0: 9.221, ty: 1.66, tw: 1.083, body: 'One-click ESG, GRI, CDP, CSRD formats', bx: 9.221, by: 2.312, bw: 2.642, bc: C.light },
+  ];
+  mods.forEach(m => card(s, m.cx, m.cy, 3.92, 3.006, m.fill, 0.296));
+  hx(s, [{ text: 'A modular platform for ', options: { breakLine: true } }, { text: 'full-cycle carbon intelligence' }],
+    { x: 0.787, y: 1.609, w: 6.91, h: 1.515, fontSize: 42 });
+  mods.forEach(m => {
+    pill(s, m.tx0, m.ty, m.tw, 0.37, m.tagFill, m.tag, m.tagColor);
+    hx(s, m.body, { x: m.bx, y: m.by, w: m.bw, h: 0.976, fontSize: 26, color: m.bc });
+  });
+  header(s, C.dark, '05');
+}
+
+// 6 — How it works
+function slide06(s) {
+  s.background = { color: C.dark };
+  hx(s, 'How It Work', { x: 0.787, y: 3.76, w: 3.802, h: 3.264, fontSize: 110, bold: true, color: C.light, lineSpacing: 110 });
+  header(s, C.light, '06');
+
+  card(s, 6.667, 0, 3.802, 3.283, C.yellow, 0.198);
+  card(s, 10.007, 0, 3.511, 3.283, C.light, 0.198);
+  hx(s, 'Emissions dashboard', { x: 7.163, y: 0.831, w: 2.34, h: 1.179, fontSize: 42 });
+  tx(s, '(CO2e/month)', { x: 7.163, y: 2.242, w: 1.938, h: 0.21 });
+  hx(s, 'Facility-level tracking', { x: 10.468, y: 0.531, w: 2.583, h: 2.221, fontSize: 42 });
+
+  card(s, 6.667, 3.283, 4.337, 4.217, C.light, 0.255);
+  pill(s, 7.118, 3.704, 2.096, 0.37, C.dark, 'Recommendations', C.light);
+  hx(s, [{ text: 'Switch supplier X → save ', options: { breakLine: true } }, { text: '19.2 tons' }],
+    { x: 7.118, y: 4.236, w: 2.816, h: 2.928, fontSize: 42 });
+  hx(s, '/year', { x: 9.001, y: 6.608, w: 0.693, h: 0.404, fontSize: 18 });
+
+  card(s, 10.007, 3.283, 3.511, 4.217, C.purple, 0.212);
+  pill(s, 10.382, 3.704, 2.096, 0.37, C.light, 'PDF & API reports', C.purple);
+  hx(s, 'CSRD, GRI-compliant', { x: 10.382, y: 4.422, w: 2.282, h: 1.515, fontSize: 42, color: C.light });
+}
+
+// 7 — Our users
+function slide07(s) {
+  s.background = { color: C.light };
+  image(s, 6.346, 0, 6.988, 7.5);
+  card(s, 0, 0, 6.667, 7.5, C.light, 0.34);
+  hx(s, 'Our Users', { x: 0.787, y: 1.275, w: 3.618, h: 3.264, fontSize: 110, bold: true, lineSpacing: 110 });
+  const users = [
+    { n: '01', y: 4.788, ty: 4.783, text: 'Manufacturing operations directors', w: 4.184 },
+    { n: '02', y: 5.255, ty: 5.25, text: 'ESG & compliance teams', w: 3.149 },
+    { n: '03', y: 5.72, ty: 5.715, text: 'Logistics companies', w: 2.443 },
+    { n: '04', y: 6.186, ty: 6.181, text: 'Retail chains with 10–500 outlets', w: 4.182 },
+  ];
+  users.forEach(u => {
+    circle(s, 0.787, u.y, 0.36, C.dark);
+    tx(s, u.n, { x: 0.748, y: u.y + 0.053, w: 0.437, h: 0.269, color: C.light, align: 'center' });
+    tx(s, u.text, { x: 1.26, y: u.ty, w: u.w, h: 0.37, fontSize: 16 });
+  });
+  header(s, C.dark, null, C.light);
+}
+
+// 8 — Pricing
+function slide08(s) {
+  s.background = { color: C.light };
+  hx(s, 'Annual SaaS + consumption pricing', { x: 0.787, y: 1.486, w: 4.711, h: 1.515, fontSize: 42, bold: true });
+  pill(s, 0.952, 4.441, 1.697, 0.404, C.dark, 'Base License', C.light);
+  hx(s, '$3,000', { x: 0.952, y: 4.795, w: 3.643, h: 1.952, fontSize: 110 });
+  hx(s, '/year', { x: 4.451, y: 5.62, w: 1.626, h: 0.808, fontSize: 42 });
+  tx(s, '(50 facilities)', { x: 0.952, y: 6.454, w: 1.553, h: 0.37, fontSize: 16 });
+
+  // Stacked add-on bands on the right
+  card(s, 6.667, 0.976, 5.818, 1.137, C.yellow, 0.256);
+  card(s, 6.667, 1.564, 5.818, 2.364, C.dark, 0.251);
+  card(s, 6.667, 3.543, 5.818, 2.364, C.purple, 0.251);
+  card(s, 6.667, 5.521, 5.818, 2.186, C.yellow, 0.233);
+  hx(s, 'Add-ons ', { x: 7.688, y: 1.025, w: 1.254, h: 0.539, fontSize: 26 });
+
+  tx(s, 'Supplier-level Scope 3', { x: 7.688, y: 1.839, w: 2.557, h: 0.37, fontSize: 16, color: C.light });
+  hx(s, '+$0.01', { x: 7.688, y: 2.211, w: 2.321, h: 1.245, fontSize: 68, color: C.light });
+  hx(s, '/transaction', { x: 9.807, y: 2.829, w: 1.306, h: 0.37, fontSize: 16, color: C.light });
+
+  tx(s, 'Consulting partner API', { x: 7.688, y: 3.801, w: 2.557, h: 0.382, fontSize: 16, color: C.light });
+  hx(s, '$99', { x: 7.688, y: 4.179, w: 1.513, h: 1.245, fontSize: 68, color: C.light });
+  hx(s, '/month', { x: 8.899, y: 4.797, w: 1.059, h: 0.37, fontSize: 16, color: C.light });
+
+  hx(s, 'Offset purchasing ', { x: 7.688, y: 6.03, w: 3.775, h: 0.808, fontSize: 42 });
+  tx(s, '(10% margin on credits)', { x: 7.688, y: 6.722, w: 1.748, h: 0.269 });
+
+  header(s, C.dark, '08');
+  arrowBadge(s, 11.763, 3.75, C.light, C.purple);
+}
+
+// 9 — Traction
+function slide09(s) {
+  s.background = { color: C.dark };
+  [
+    { x: 8.627, y: 3.983, fill: C.light }, { x: 4.707, y: 3.983, fill: C.yellow },
+    { x: 0.787, y: 3.983, fill: C.purple }, { x: 8.627, y: 0.976, fill: C.purple },
+    { x: 4.707, y: 0.976, fill: C.light },
+  ].forEach(c => card(s, c.x, c.y, 3.92, 3.006, c.fill, 0.296));
+
+  hx(s, 'Traction', { x: 0.787, y: 1.856, w: 3.237, h: 1.245, fontSize: 68, bold: true, color: C.light });
+
+  const stats = [
+    { big: '94', bx: 5.632, by: 1.781, bw: 1.374, unit: 'active clients', ux: 6.543, uy: 1.886, uw: 1.159, uh: 0.976,
+      note: 'in 9 countries', nx: 5.632, ny: 2.807, nw: 1.655, nsz: 16, color: C.dark },
+    { big: '1.4M', bx: 9.23, by: 1.788, bw: 1.703, unit: 'tons', ux: 10.828, uy: 2.096, uw: 1.115, uh: 0.808,
+      note: 'of CO2e tracked', nx: 9.314, ny: 2.8, nw: 1.859, nsz: 16, color: C.light },
+    { big: '$51K ', bx: 1.38, by: 4.79, bw: 1.739, unit: 'MRR', ux: 3.082, uy: 5.097, uw: 1.031, uh: 0.808,
+      note: '(growing 17% MoM)', nx: 1.38, ny: 5.845, nw: 2.07, nsz: 14, color: C.light },
+    { big: '$660K', bx: 5.165, by: 4.863, bw: 2.205, unit: 'ARR', ux: 7.258, uy: 5.163, uw: 0.91, uh: 0.808, color: C.dark },
+    { big: '98% ', bx: 9.084, by: 4.65, bw: 1.528, unit: 'of customers ', ux: 10.562, uy: 4.735, uw: 1.528, uh: 0.976,
+      note: 'complete first audit in <3 weeks', nx: 9.084, ny: 5.683, nw: 2.21, nsz: 16, color: C.dark },
+  ];
+  stats.forEach(t => {
+    hx(s, t.big, { x: t.bx, y: t.by, w: t.bw, h: 1.245, fontSize: 68, color: t.color });
+    hx(s, t.unit, { x: t.ux, y: t.uy, w: t.uw, h: t.uh, fontSize: t.uh > 0.9 ? 26 : 42, color: t.color });
+    if (t.note) tx(s, t.note, { x: t.nx, y: t.ny, w: t.nw, h: 0.64, fontSize: t.nsz, color: t.color });
+  });
+  header(s, C.light, '09');
+  recycleBadge(s, 7.777, 4.293, C.dark, C.yellow);
+}
+
+// 10 — Before / after case study
+function slide10(s) {
+  s.background = { color: C.light };
+  image(s, 0.787, 1.062, 5.818, 2.364, 0.25);
+
+  // Right column — "After Carbonwise"
+  card(s, 6.727, 5.387, 5.818, 1.137, C.dark, 0.256);
+  card(s, 6.727, 3.572, 5.818, 2.364, C.purple, 0.251);
+  card(s, 6.727, 1.593, 5.818, 2.364, C.yellow, 0.251);
+  card(s, 6.727, -0.213, 5.818, 2.192, C.dark, 0.233);
+  tx(s, [{ text: 'After ' }, { text: 'Carbonwise' }],
+    { x: 7.379, y: 6.038, w: 2.116, h: 0.378, fontSize: 16, bold: true, color: C.light });
+  hx(s, 'Scope 3 visibility across 58 vendors', { x: 7.379, y: 0.501, w: 3.071, h: 0.976, fontSize: 26, color: C.light });
+  hx(s, 'Secured 3 new contracts with net-zero clients', { x: 7.379, y: 2.474, w: 3.653, h: 0.976, fontSize: 26 });
+  hx(s, '26% reduction in fleet emissions in 6 months', { x: 7.379, y: 4.464, w: 3.563, h: 0.976, fontSize: 26, color: C.light });
+
+  // Left column — "Before Carbonwise"
+  card(s, 0.787, 2.939, 5.82, 1.137, C.purple, 0.256);
+  card(s, 0.787, 3.527, 5.82, 2.364, C.yellow, 0.251);
+  card(s, 0.787, 5.506, 5.82, 2.364, C.dark, 0.251);
+  tx(s, [{ text: 'Before ' }, { text: 'Carbonwise' }],
+    { x: 1.21, y: 3.078, w: 2.262, h: 0.37, fontSize: 16, bold: true, color: C.light });
+  hx(s, 'No Scope 3 tracking', { x: 1.286, y: 4.245, w: 2.714, h: 0.539, fontSize: 26 });
+  hx(s, 'Missed RFPs requiring GHG data', { x: 1.286, y: 6.241, w: 3.95, h: 0.539, fontSize: 26, color: C.light });
+
+  header(s, C.dark, null);
+  starBadge(s, 11.684, 2.142, C.dark, C.yellow);
+}
+
+// 11 — Market timing
+function slide11(s) {
+  s.background = { color: C.light };
+  image(s, 7.483, 2.968, 6.112, 2.492, 0.15);
+  card(s, 0.528, 4.657, 5.818, 2.119, C.yellow, 0.284);
+  card(s, 0.528, 2.739, 5.818, 2.292, C.purple, 0.307);
+  card(s, 0.528, -0.382, 5.818, 3.711, C.dark, 0.395);
+
+  hx(s, 'ESG mandates rising ', { x: 1.171, y: 1.051, w: 4.532, h: 2.154, fontSize: 68, color: C.light, lineSpacing: 72 });
+  hx(s, 'EU CSRD', { x: 1.171, y: 3.661, w: 1.512, h: 0.37, fontSize: 16, bold: true, color: C.light });
+  hx(s, '50,000+ ', { x: 1.171, y: 3.93, w: 1.78, h: 0.808, fontSize: 42, color: C.light });
+  hx(s, 'companies impacted', { x: 2.812, y: 4.08, w: 2.892, h: 0.539, fontSize: 26, color: C.light });
+  hx(s, [{ text: 'Indonesia GRK compliance', options: { bold: true } }, { text: '\u00a0' }],
+    { x: 1.171, y: 5.338, w: 3.19, h: 1.308, fontSize: 42, lineSpacing: 42 });
+  tx(s, 'begins 2025', { x: 3.71, y: 6.197, w: 1.5, h: 0.269 });
+  arrowBadge(s, 5.499, 5.338, C.dark, C.yellow);
+
+  hx(s, '300+ ', { x: 7.483, y: 0.848, w: 2.677, h: 1.952, fontSize: 110 });
+  hx(s, 'demo requests ', { x: 10.16, y: 1.094, w: 2.054, h: 1.308, fontSize: 42, lineSpacing: 42 });
+  tx(s, 'in Q1 2025', { x: 10.16, y: 2.285, w: 1.369, h: 0.37, fontSize: 16 });
+  tx(s, 'Featured by\u00a0', { x: 7.483, y: 5.627, w: 1.639, h: 0.37, fontSize: 16 });
+  hx(s, 'ClimateLedger Asia\u00a0and\u00a0GreenBiz', { x: 7.483, y: 5.997, w: 4.245, h: 0.539, fontSize: 26 });
+}
+
+// 12 — Go-to-market
+function slide12(s) {
+  s.background = { color: C.dark };
+  [
+    { x: 8.996, w: 4.337, fill: C.purple }, { x: 5.663, w: 4.337, fill: C.light },
+    { x: 2.329, w: 4.337, fill: C.purple }, { x: 0, w: 3.333, fill: C.yellow },
+  ].forEach(c => card(s, c.x, 3.929, c.w, 3.571, c.fill, c.w > 4 ? 0.216 : 0.201));
+
+  hx(s, 'Go-to-Market Strategy', { x: 0.789, y: 1.181, w: 5.508, h: 2.39, fontSize: 68, bold: true, color: C.light });
+
+  const lanes = [
+    { px: 0.443, pw: 0.909, tag: 'Direct', tagFill: C.dark, tagColor: C.light,
+      body: 'Sustainability leads at mid-market firms', bx: 0.443, by: 5.428, bw: 2.642, bh: 1.414, bc: C.dark },
+    { px: 3.765, pw: 1.08, tag: 'Channel', tagFill: C.light, tagColor: C.purple,
+      body: 'Accounting & audit firms', bx: 3.723, by: 5.432, bw: 1.793, bh: 0.976, bc: C.light },
+    { px: 7.04, pw: 1.324, tag: 'Embedded', tagFill: C.dark, tagColor: C.light,
+      body: 'ERP & procurement software partners', bx: 7.04, by: 5.423, bw: 2.56, bh: 0.976, bc: C.dark },
+    { px: 10.433, pw: 1.054, tag: 'Content ', tagFill: C.light, tagColor: C.purple,
+      body: 'Carbonwise Playbook for SMEs', bx: 10.433, by: 5.428, bw: 2.474, bh: 0.976, bc: C.light },
+  ];
+  lanes.forEach(l => {
+    pill(s, l.px, 4.587, l.pw, 0.37, l.tagFill, l.tag, l.tagColor);
+    hx(s, l.body, { x: l.bx, y: l.by, w: l.bw, h: l.bh, fontSize: 26, color: l.bc });
+  });
+  header(s, C.light, '12');
+}
+
+// 13 — Unit economics
+function slide13(s) {
+  s.background = { color: C.light };
+  image(s, 8.627, 0.976, 3.92, 6.013, 0.42);
+  [
+    { x: 4.707, y: 3.982, fill: C.dark }, { x: 4.707, y: 0.977, fill: C.purple },
+    { x: 0.787, y: 3.983, fill: C.yellow }, { x: 0.787, y: 0.976, fill: C.dark },
+  ].forEach(c => card(s, c.x, c.y, 3.92, 3.006, c.fill, 0.296));
+
+  // Dark-on-dark in the source deck, kept for content fidelity
+  hx(s, '28% ', { x: 1.073, y: 0.851, w: 1.579, h: 1.245, fontSize: 68 });
+  hx(s, 'demo ', { x: 2.524, y: 1.359, w: 0.891, h: 0.539, fontSize: 26 });
+  tx(s, 'to paid conversion', { x: 1.073, y: 1.837, w: 2.039, h: 0.37, fontSize: 16 });
+
+  hx(s, 'CAC ', { x: 1.558, y: 1.599, w: 1.028, h: 0.539, fontSize: 26, color: C.light });
+  hx(s, '$180', { x: 1.558, y: 2.114, w: 1.734, h: 1.245, fontSize: 68, color: C.light });
+  hx(s, 'LTV', { x: 1.575, y: 4.606, w: 0.803, h: 0.539, fontSize: 26 });
+  hx(s, '$3,800', { x: 1.575, y: 5.121, w: 2.343, h: 1.245, fontSize: 68 });
+  hx(s, 'Top channels ', { x: 5.395, y: 1.558, w: 1.295, h: 0.37, fontSize: 16, color: C.light });
+  hx(s, 'Webinars + LinkedIn', { x: 5.395, y: 1.887, w: 2.543, h: 1.515, fontSize: 42, color: C.light });
+  hx(s, '37% ', { x: 5.305, y: 4.807, w: 1.52, h: 1.245, fontSize: 68, color: C.light });
+  hx(s, 'of users refer ', { x: 6.78, y: 4.983, w: 1.248, h: 0.848, fontSize: 26, color: C.light, lineSpacing: 26 });
+  tx(s, 'at least 1 company', { x: 5.305, y: 5.793, w: 2.424, h: 0.37, fontSize: 16, color: C.light });
+
+  header(s, C.dark, '13');
+  starBadge(s, 7.938, 1.253, C.light, C.purple);
+}
+
+// 14 — Competitive landscape
+function slide14(s) {
+  s.background = { color: C.light };
+  card(s, 0, 3.505, 13.333, 4.45, C.dark, 0.439);
+  hx(s, 'Competitive Landscape', { x: 0.787, y: 1.553, w: 8.166, h: 1.245, fontSize: 68, bold: true });
+  header(s, C.dark, '14');
+
+  const colX = [1.187, 3.454, 5.746, 8.056, 10.349];
+  const heads = ['Product', 'Scope 3', 'Localized Reporting', 'SME-Friendly UX', 'Offset Support'];
+  const rows = [
+    ['Carbonwise', '✔', '✔', '✔', '✔'],
+    ['SustainHub', '✔', '✖', '✖', '✖'],
+    ['EcoTrack Pro', '✖', '✔', '✔', '✖'],
+  ];
+  card(s, 1.079, 4.523, 11.159, 0.506, C.light, 0.253);
+  heads.forEach((h, i) => hx(s, h, { x: i === 2 ? 5.721 : colX[i], y: 4.591, w: i < 2 ? 0.892 : 1.889, h: 0.37, fontSize: 16 }));
+  rows.forEach((row, r) => row.forEach((cell, i) => hx(s, cell, {
+    x: colX[i], y: 5.153 + r * 0.392, w: i === 4 ? 1.906 : 2.08, h: 0.37, fontSize: 16, color: C.light,
+  })));
+}
+
+// 15 — Why we win
+function slide15(s) {
+  s.background = { color: C.dark };
+  image(s, 0, 0, 7.513, 7.5);
+  [
+    { y: 5.165, h: 2.335, fill: C.dark, r: 0.248 }, { y: 3.292, h: 2.335, fill: C.purple, r: 0.248 },
+    { y: 1.416, h: 2.335, fill: C.yellow, r: 0.248 }, { y: -0.224, h: 2.099, fill: C.dark, r: 0.223 },
+  ].forEach(b => card(s, 6.965, b.y, 6.369, b.h, b.fill, b.r));
+
+  const bands = [
+    { tag: 'Fast onboarding ', tw: 2.473, ty: 0.49, body: 'average setup <48 hours', by: 0.806, bw: 3.709, bh: 0.539, color: C.light },
+    { body: 'Localized compliance templates (EU, SEA, Australia)', by: 2.36, bw: 3.961, bh: 0.976, color: C.dark },
+    { tag: 'Modular platform', tw: 2.613, ty: 4.365, body: 'track, reduce, report in one place', by: 4.681, bw: 4.363, bh: 0.539, color: C.light },
+    { body: 'Built for real operators, not just sustainability experts', by: 6.116, bw: 4.071, bh: 0.976, color: C.light },
+  ];
+  bands.forEach(b => {
+    if (b.tag) hx(s, b.tag, { x: 7.967, y: b.ty, w: b.tw, h: 0.37, fontSize: 16, color: b.color });
+    hx(s, b.body, { x: 7.967, y: b.by, w: b.bw, h: b.bh, fontSize: 26, color: b.color });
+  });
+  arrowBadge(s, 12.499, 2.133, C.dark, C.yellow);
+}
+
+// 16 — Under the hood
+function slide16(s) {
+  s.background = { color: C.light };
+  const bands = [
+    { y: 0.976, h: 2.04, fill: C.dark, r: 0.248, tag: 'AI Model', tagColor: C.dark, px: 5.473, pw: 1.156,
+      body: 'Recommender trained on 7,200+ company data sets', by: 1.374, bw: 4.352, bh: 0.976, bc: C.light, py: 1.179 },
+    { y: 2.612, h: 2.04, fill: C.purple, r: 0.248, tag: 'Tech Stack', tagColor: C.purple, px: 5.244, pw: 1.386,
+      body: 'Node.js, Django, ClickHouse', by: 3.277, bw: 3.493, bh: 0.539, bc: C.light, py: 2.787 },
+    { y: 4.251, h: 2.04, fill: C.yellow, r: 0.248, tag: 'Integrations', tagColor: C.dark, px: 5.123, pw: 1.507,
+      body: 'SAP, NetSuite, QuickBooks, GCP, AWS', by: 4.645, bw: 3.179, bh: 0.976, bc: C.dark, py: 4.461 },
+    { y: 5.89, h: 1.834, fill: C.dark, r: 0.223, tag: 'Data Security ', tagColor: C.dark, px: 4.992, pw: 1.637,
+      body: 'ISO27001-compliant, AES-256 encrypted', by: 6.284, bw: 3.179, bh: 0.976, bc: C.light, py: 6.074 },
+  ];
+  bands.forEach(b => card(s, 0.463, b.y, 6.369, b.h, b.fill, b.r));
+  hx(s, 'Under the Hood', { x: 8.69, y: 4.588, w: 3.362, h: 2.39, fontSize: 68, bold: true, align: 'right' });
+  bands.forEach(b => {
+    hx(s, b.body, { x: 1.046, y: b.by, w: b.bw, h: b.bh, fontSize: 26, color: b.bc });
+    pill(s, b.px, b.py, b.pw, 0.37, C.light, b.tag, b.tagColor);
+  });
+  header(s, C.dark, '16');
+}
+
+// 17 — Roadmap
+function slide17(s) {
+  s.background = { color: C.light };
+  image(s, 10.184, 0, 3.149, 7.5);
+  card(s, 0, 3.395, 10.412, 4.105, C.yellow, 0.209);
+  card(s, 0, -0.141, 10.412, 3.891, C.light, 0.198);
+
+  hx(s, '2025', { x: 0.787, y: 1.065, w: 1.308, h: 0.539, fontSize: 26, bold: true });
+  s.addShape('line', { x: 1.516, y: 1.787, w: 0, h: 1.433, line: { color: C.dark, width: 1 } });
+  [
+    { q: 'Q2', y: 1.838, text: 'API marketplace for consultants' },
+    { q: 'Q3', y: 2.323, text: 'Real-time IoT emissions tracking' },
+    { q: 'Q4', y: 2.807, text: 'In-platform certified carbon credit purchases' },
+  ].forEach(r => {
+    circle(s, 0.866, r.y, 0.36, C.dark);
+    tx(s, r.q, { x: 0.839, y: r.y + 0.042, w: 0.408, h: 0.269, bold: true, color: C.light, align: 'center' });
+    hx(s, r.text, { x: 1.786, y: r.y - 0.089, w: 6.52, h: 0.539, fontSize: 26 });
+  });
+
+  hx(s, '2026', { x: 0.787, y: 4.161, w: 1.308, h: 0.539, fontSize: 26, bold: true });
+  hx(s, 'Expansion to Latin America + global B2B marketplace',
+    { x: 0.787, y: 4.699, w: 9.128, h: 2.39, fontSize: 68 });
+  header(s, C.dark, null);
+}
+
+// 18 — Financial projections
+function slide18(s) {
+  s.background = { color: C.dark };
+  card(s, 0, -0.459, 13.333, 4.776, C.yellow, 0.471);
+  hx(s, 'Financial Projections', { x: 4.76, y: 5.256, w: 7.787, h: 1.245, fontSize: 68, bold: true, color: C.light, align: 'right' });
+
+  const cols = [2.305, 4.572, 6.864, 9.174];
+  const heads = ['Year', 'Revenue', 'Clients', 'Gross Margin'];
+  const rows = [
+    ['2024', '$780K', '120', '74%'],
+    ['2025', '$2.3M', '360', '78%'],
+    ['2026', '$6.4M', '950', '81%'],
+  ];
+  card(s, 2.079, 1.641, 9.174, 0.506, C.dark, 0.253);
+  heads.forEach((h, i) => hx(s, h, {
+    x: i === 2 ? 6.839 : i === 3 ? 9.158 : cols[i], y: 1.709, w: i < 2 ? 0.892 : 1.889, h: 0.37,
+    fontSize: 16, color: C.light,
+  }));
+  rows.forEach((row, r) => row.forEach((cell, i) => hx(s, cell, {
+    x: cols[i], y: 2.271 + r * 0.392, w: 2.08, h: 0.37, fontSize: 16,
+  })));
+  header(s, C.dark, '18');
+}
+
+// 19 — KPI grid
+function slide19(s) {
+  s.background = { color: C.light };
+  image(s, 9.607, 0.976, 2.94, 3.006, 0.29);
+  image(s, 0.787, 0.976, 5.88, 3.006, 0.29);
+  const tiles = [
+    { x: 3.727, y: 3.982, fill: C.dark, label: 'LTV', lx: 4.024, lw: 1.037, value: '$3,800', vx: 4.024, vw: 2.345, color: C.light },
+    { x: 6.667, y: 3.982, fill: C.purple, label: 'Gross Margin ', lx: 7.233, lw: 1.811, value: '74%', vx: 7.229, vw: 1.521, color: C.light },
+    { x: 0.787, y: 3.983, fill: C.yellow, label: 'CAC', lx: 1.374, lw: 1.037, value: '$180', vx: 1.375, vw: 1.764, color: C.dark },
+    { x: 6.667, y: 0.976, fill: C.yellow, label: 'Net Revenue Retention ', lx: 7.189, lw: 1.765, value: '132%', vx: 7.183, vw: 1.907, color: C.dark, tall: true },
+    { x: 9.607, y: 3.982, fill: C.dark, label: 'NPS', lx: 10.176, lw: 0.728, value: '71', vx: 10.176, vw: 1.037, color: C.light },
+  ];
+  tiles.forEach(t => card(s, t.x, t.y, 2.94, 3.006, t.fill, 0.29));
+  tiles.forEach(t => {
+    hx(s, t.label, { x: t.lx, y: t.tall ? 1.383 : t.y + 0.678, w: t.lw, h: t.tall ? 0.976 : 0.539, fontSize: 26, color: t.color });
+    hx(s, t.value, { x: t.vx, y: t.tall ? 2.329 : t.y + 1.214, w: t.vw, h: 1.245, fontSize: 68, color: t.color });
+  });
+  header(s, C.dark, '19');
+  starBadge(s, 11.803, 4.215, C.yellow, C.dark);
+}
+
+// 20 — The ask
+function slide20(s) {
+  s.background = { color: C.light };
+  card(s, -0.326, 0, 6.993, 7.5, C.yellow, 0.356);
+  header(s, C.dark, '20');
+
+  hx(s, 'We’re raising', { x: 0.787, y: 1.114, w: 1.854, h: 0.539, fontSize: 26 });
+  hx(s, '$2.5M', { x: 0.787, y: 1.485, w: 3.355, h: 1.952, fontSize: 110, bold: true });
+
+  const uses = [
+    { pct: '50%', label: 'Engineering & integrations', y: 3.383, ly: 3.566, lw: 3.335, lh: 0.37, bar: 5.528, bx: 7.488 },
+    { pct: '25%', label: 'GTM & market expansion', y: 4.252, ly: 4.435, lw: 2.807, lh: 0.37, bar: 2.804, bx: 8.784 },
+    { pct: '15%', label: 'ESG audit & legal partnerships', y: 5.121, ly: 5.304, lw: 3.619, lh: 0.37, bar: 2.307, bx: 10.087 },
+    { pct: '10%', label: 'Certifying offset marketplace (Gold Standard / Verra)', y: 5.99, ly: 6.038, lw: 3.124, lh: 0.64, bar: 1.703, bx: 11.391 },
+  ];
+  const baseline = 6.212;
+  uses.forEach(u => {
+    circle(s, 0.866, u.y, 0.736, C.dark);
+    hx(s, u.pct, { x: 0.866, y: u.y + 0.128, w: 0.736, h: 0.48, fontSize: 26, color: C.light, align: 'center' });
+    tx(s, u.label, { x: 1.735, y: u.ly, w: u.lw, h: u.lh, fontSize: 16 });
+  });
+  // Allocation bar chart, drawn as native shapes (as in the source deck)
+  const barLabels = ['Engineering & integrations', 'GTM & market expansion', 'ESG audit & legal partnerships', 'Certifying offset marketplace '];
+  uses.forEach((u, i) => {
+    s.addShape('flowChartAlternateProcess', {
+      x: u.bx, y: baseline - u.bar, w: 1.12, h: u.bar, fill: { color: C.dark }, line: NOLINE,
+    });
+    tx(s, barLabels[i], { x: i === 2 ? 10.002 : u.bx, y: 6.378, w: i === 2 ? 1.368 : i === 3 ? 1.207 : 1.12, h: 0.438 });
+  });
+}
+
+// 21 — Team
+function slide21(s) {
+  s.background = { color: C.dark };
+  const team = [
+    { x: 0.755, cx: 0.756, tx0: 1.21, name: 'Juno Ferreira', nw: 1.377,
+      bio: [{ text: 'Former head of ESG data @ Clearmetrics' }], bw: 1.894 },
+    { x: 4.76, cx: 4.76, tx0: 5.195, name: 'Miftah Rahman', nw: 1.472,
+      bio: [{ text: 'Built carbon APIs ', options: { breakLine: true } }, { text: '@ OpenEcom (exit)' }], bw: 1.472 },
+    { x: 8.756, cx: 8.765, tx0: 9.191, name: 'Lana Kusumo', nw: 1.472,
+      bio: [{ text: 'Lead PM, ex-Gojek Ops, UNFCCC climate fellow' }], bw: 1.894 },
+  ];
+  team.forEach(m => image(s, m.x, 2.405, 3.813, 4.122, 0.26));
+  hx(s, 'Meet the Team', { x: 0.787, y: 0.973, w: 5.173, h: 1.245, fontSize: 68, bold: true, color: C.light });
+  team.forEach(m => {
+    card(s, m.cx, 5.888, 3.813, 1.853, C.light, 0.26);
+    hx(s, [{ text: m.name, options: { bold: true } }, { text: '\u00a0' }],
+      { x: m.tx0, y: 6.295, w: m.nw, h: 0.37, fontSize: 16 });
+    tx(s, m.bio, { x: m.tx0, y: 6.643, w: m.bw, h: 0.438 });
+  });
+  header(s, C.light, '21');
+}
+
+// 22 — Advisors
+function slide22(s) {
+  s.background = { color: C.light };
+  const people = [
+    { x: 0.786, cx: 0.787, tx0: 1.241, name: 'Dr. Josephine Lange ', nw: 1.644, ny: 5.991,
+      lines: ['ESG Policy Lead', 'Asia Carbon Forum'], ly: 6.305 },
+    { x: 4.791, cx: 4.791, tx0: 5.226, name: 'Tom Willis ', nw: 1.472, ny: 5.996,
+      lines: ['Ex-Microsoft Sustainability VP'], ly: 6.299, block: true },
+    { x: 8.787, cx: 8.796, tx0: 9.221, name: 'Riko Sanjaya ', nw: 1.472, ny: 5.991,
+      lines: ['Carbon Markets', 'Verra Accredited Broker'], ly: 6.295 },
+  ];
+  people.forEach(p => image(s, p.x, 2.384, 3.813, 3.359, 0.24));
+  hx(s, 'Advisors & Partners', { x: 0.787, y: 0.996, w: 7.245, h: 1.245, fontSize: 68, bold: true });
+  people.forEach(p => {
+    card(s, p.cx, 5.744, 3.813, 1.245, C.dark, 0.175);
+    hx(s, p.name, { x: p.tx0, y: p.ny, w: p.nw, h: 0.37, fontSize: 16, color: C.light });
+    if (p.block) {
+      tx(s, p.lines[0], { x: p.tx0, y: p.ly, w: 1.472, h: 0.438, color: C.light });
+    } else {
+      p.lines.forEach((l, i) => tx(s, l, { x: p.tx0, y: p.ly + i * 0.167, w: 1.894, h: 0.269, color: C.light }));
+    }
+  });
+  header(s, C.dark, '22');
+}
+
+// 23 — Ideal investors
+function slide23(s) {
+  s.background = { color: C.light };
+  image(s, 10.138, 3.982, 2.408, 3.006, 0.29);
+  image(s, 4.92, 0.976, 3.472, 3.006, 0.29);
+  card(s, 4.258, 3.983, 5.88, 3.006, C.purple, 0.296);
+  card(s, 0.787, 3.983, 3.472, 3.006, C.yellow, 0.296);
+  card(s, 0.787, 0.976, 4.135, 3.006, C.dark, 0.296);
+
+  hx(s, 'Ideal investors', { x: 8.805, y: 1.284, w: 3.34, h: 2.39, fontSize: 68, align: 'right' });
+  hx(s, 'Track record in B2B compliance or infra', { x: 1.187, y: 1.368, w: 3.333, h: 2.221, fontSize: 42, color: C.light });
+  hx(s, 'Climate-aligned SaaS expertise', { x: 1.173, y: 4.375, w: 2.726, h: 2.221, fontSize: 42 });
+  hx(s, 'Connections to ESG standards bodies or procurement channels',
+    { x: 4.839, y: 4.375, w: 4.719, h: 2.221, fontSize: 42, color: C.light });
+  header(s, C.dark, '23');
+  arrowBadge(s, 9.337, 4.375, C.light, C.purple);
+}
+
+// 24 — Closing statement
+function slide24(s) {
+  s.background = { color: C.dark };
+  hx(s, 'We’re building the\u00a0toolkit for mid-sized companies to lead the climate transition',
+    { x: 0.787, y: 1.586, w: 10.079, h: 3.534, fontSize: 68, color: C.light });
+
+  const chips = [
+    { x: 0.787, w: 2.064, fill: C.yellow, text: 'Smart action', tx0: 0.923, tw: 1.792, color: C.dark },
+    { x: 3.341, w: 2.387, fill: C.light, text: 'lower emissions', tx0: 3.438, tw: 2.194, color: C.dark },
+    { x: 6.219, w: 2.387, fill: C.purple, text: 'better business', tx0: 6.293, tw: 2.238, color: C.light },
+  ];
+  chips.forEach(c => {
+    card(s, c.x, 5.3, c.w, 0.614, c.fill, 0.307);
+    hx(s, c.text, { x: c.tx0, y: 5.338, w: c.tw, h: 0.539, fontSize: 26, color: c.color, align: 'center', valign: 'middle' });
+  });
+  [{ x: 2.851, fill: C.purple, color: C.light }, { x: 5.728, fill: C.yellow, color: C.dark }].forEach(a => {
+    card(s, a.x, 5.3, 0.491, 0.614, a.fill, 0.245);
+    tx(s, '→', { x: a.x + 0.053, y: 5.302, w: 0.384, h: 0.539, fontSize: 26, bold: true, color: a.color, align: 'center', valign: 'middle' });
+  });
+  header(s, C.light, '24');
+}
+
+// 25 — Contact
+function slide25(s) {
+  s.background = { color: C.light };
+  image(s, 6.337, 0, 6.996, 7.5);
+  card(s, -0.427, 0, 7.129, 7.5, C.yellow, 0.431);
+  hx(s, 'Let’s Make It Count',
+    { x: 0.787, y: 1.223, w: 4.69, h: 4.806, fontSize: 110, bold: true, lineSpacing: 110, valign: 'middle' });
+
+  const contacts = [
+    { y: 5.814, w: 2.273, text: 'youremail@website.co', tx0: 1.269, tw: 1.668, icon: 'mail' },
+    { y: 6.312, w: 2.675, text: 'Jakarta | Amsterdam | Nairobi', tx0: 1.285, tw: 2.051, icon: 'globe' },
+  ];
+  contacts.forEach(c => {
+    card(s, 0.787, c.y, c.w, 0.43, C.dark, 0.215);
+    card(s, 0.787, c.y, 0.451, 0.43, C.light, 0.215);
+    if (c.icon === 'mail') envelopeIcon(s, 0.922, c.y + 0.128, 0.18, 0.152, C.dark);
+    else globeIcon(s, 0.922, c.y + 0.128, 0.174, C.dark);
+    tx(s, c.text, { x: c.tx0, y: c.y + 0.068, w: c.tw, h: 0.269, color: C.light, align: 'center' });
+  });
+  header(s, C.dark, null);
+}
+
+/* -------------------------------------------------------------- assembly */
+
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'CARBONWISE', width: 13.3333333, height: 7.5 }); // 12192000 x 6858000 EMU
+pptx.layout = 'CARBONWISE';
+pptx.author = 'Carbonwise';
+pptx.title = 'Carbonwise — Pitch Deck Presentation';
+
+BUILDERS.forEach(build => build(pptx.addSlide()));
+
+pptx.writeFile({ fileName: path.join(__dirname, '082e2ed6-bd2c-4fd9-bda2-9589c665b3b3_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));

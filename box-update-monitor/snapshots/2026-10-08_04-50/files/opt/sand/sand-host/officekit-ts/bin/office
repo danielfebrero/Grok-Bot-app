@@ -1,0 +1,3 @@
+#!/bin/sh
+here="$(dirname "$0")"
+OFFICEKIT_DATA="${OFFICEKIT_DATA:-$here/../../officekit/share/officekit}" exec node "$here/../lib/office.mjs" "$@"

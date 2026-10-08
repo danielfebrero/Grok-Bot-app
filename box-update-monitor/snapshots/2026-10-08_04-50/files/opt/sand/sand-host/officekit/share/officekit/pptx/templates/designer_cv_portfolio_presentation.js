@@ -1,0 +1,1136 @@
+/**
+ * Portfolio / Curriculum Vitae deck (36 slides, 13.333 x 7.5 in) rebuilt with pptxgenjs.
+ *
+ * Run:  node <thisFile>.js   ->  writes <thisFile>.pptx next to the script.
+ *
+ * Photographs from the original deck are stubbed as flat colour blocks (see photo()),
+ * and the freeform vector icons are stored in ART as per-mille polygon rings.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------- palette
+const WHITE = 'FFFFFF', BLACK = '000000', INK = '262626', CHAR = '343434';
+const DARK = '404040', MID = '595959', GREY = '808080', SILVER = 'A6A6A6';
+const MIST = 'BFBFBF', CLOUD = 'D9D9D9', SNOW = 'F2F2F2';
+const GOLD = 'FFC000', AMBER = 'FCA629', SUN = 'F8AA16';
+const TEAL = '126350', PINE = '2F7871', COCOA = '3B3838', NAVY = '323E4F';
+
+// Stand-in colours for the bitmap photography the original deck embedded.
+const PHOTO_PINK = 'FF86E7', PHOTO_VIOLET = '40009D', PHOTO_GREY = 'C2C2C2';
+
+// ---------------------------------------------------------------- fonts
+const LATO = 'Lato', LATO_BK = 'Lato Black', LATO_MD = 'Lato Medium';
+const POP = 'Poppins', POP_MD = 'Poppins Medium', POP_SB = 'Poppins SemiBold';
+const POP_BD = 'Poppins Bold';
+const MONT = 'Montserrat', MONT_SB = 'Montserrat SemiBold', MONT_BD = 'Montserrat BOLD';
+const PLAY = 'Playfair Display', PLAY_SB = 'Playfair Display SemiBold';
+const PLAY_BD = 'Playfair Display Bold';
+
+// ---------------------------------------------------------------- helpers
+const xywh = ([x, y, w, h]) => ({ x, y, w, h });
+
+/** Plain filled rectangle. */
+function box(s, at, fill) {
+  s.addShape('rect', Object.assign(xywh(at), { fill: { color: fill }, line: { type: 'none' } }));
+}
+
+/** Any preset shape; `o` carries rr (corner radius), arc range, rotation, outline. */
+function shp(s, kind, at, fill, o) {
+  o = o || {};
+  const opt = Object.assign(xywh(at), { line: o.line || { type: 'none' } });
+  if (fill) opt.fill = typeof fill === 'string' ? { color: fill } : fill;
+  else opt.fill = { type: 'none' };
+  if (o.rr !== undefined) opt.rectRadius = o.rr;
+  if (o.arc) opt.angleRange = o.arc;
+  if (o.rot) opt.rotate = o.rot;
+  if (o.flipH) opt.flipH = true;
+  if (o.flipV) opt.flipV = true;
+  if (o.shadow) opt.shadow = o.shadow;
+  s.addShape(kind, opt);
+}
+
+/** Straight rule / connector. `o`: w (pt), dash, arrow, flipH/flipV. */
+function rule(s, at, color, o) {
+  o = o || {};
+  const line = { color, width: o.w || 1 };
+  if (o.dash) line.dashType = o.dash;
+  if (o.arrow) line.endArrowType = 'triangle';
+  const opt = Object.assign(xywh(at), { line });
+  if (o.flipH) opt.flipH = true;
+  if (o.flipV) opt.flipV = true;
+  if (o.rot) opt.rotate = o.rot;
+  s.addShape('line', opt);
+}
+
+/** Single styled run inside a text array. */
+const run = (text, opts) => ({ text, options: opts || {} });
+
+/**
+ * Text block. `o` keys: sz font-size, f font, c colour, b bold, i italic,
+ * sp char spacing, al align, lh line-height multiple, va vertical anchor,
+ * m margins, wrap, vert (vertical writing), rot, shape/fill/line for boxed text.
+ */
+function txt(s, at, body, o) {
+  o = o || {};
+  const opt = Object.assign(xywh(at), {
+    fontSize: o.sz || 18,
+    fontFace: o.f || LATO,
+    color: o.c || BLACK,
+    align: o.al || 'left',
+    valign: o.va || 'top',
+    margin: o.m !== undefined ? o.m : [0.1, 0.1, 0.05, 0.05],
+    wrap: o.wrap !== false,
+    isTextBox: true,
+    line: o.line || { type: 'none' },
+    fill: o.fill ? (typeof o.fill === 'string' ? { color: o.fill } : o.fill) : undefined,
+  });
+  if (o.b) opt.bold = true;
+  if (o.i) opt.italic = true;
+  if (o.sp) opt.charSpacing = o.sp;
+  if (o.lh) opt.lineSpacingMultiple = o.lh;
+  if (o.vert) opt.vert = o.vert;
+  if (o.rot) opt.rotate = o.rot;
+  if (o.flipH) opt.flipH = true;
+  if (o.flipV) opt.flipV = true;
+  if (o.shape) opt.shape = o.shape;
+  if (o.rr !== undefined) opt.rectRadius = o.rr;
+  if (o.shadow) opt.shadow = o.shadow;
+  s.addText(typeof body === 'string' ? [run(body)] : body, opt);
+}
+
+/** Placeholder standing in for a bitmap photo in the source deck. */
+function photo(s, at, color, kind) {
+  s.addShape(kind || 'rect', Object.assign(xywh(at), {
+    fill: { color }, line: { type: 'none' },
+  }));
+}
+
+/** Laptop mock-up: silver bezel with a dark screen. */
+function laptop(s, [x, y, w, h]) {
+  s.addShape('roundRect', { x, y, w, h: h * 0.93, fill: { color: 'C9CBCE' },
+    line: { color: '9A9CA0', width: 1 }, rectRadius: 0.06 });
+  box(s, [x + w * 0.035, y + h * 0.05, w * 0.93, h * 0.8], '111111');
+  s.addShape('roundRect', { x: x - w * 0.03, y: y + h * 0.9, w: w * 1.06, h: h * 0.09,
+    fill: { color: 'D7D9DC' }, line: { type: 'none' }, rectRadius: 0.04 });
+}
+
+/**
+ * Freeform icon: each ring in `rings` is "x y,x y,..." in per-mille of the shape
+ * box. All rings go into one custGeom path so inner rings punch out as holes.
+ */
+function art(s, rings, [x, y, w, h], color, o) {
+  o = o || {};
+  const pts = [];
+  rings.forEach((ring) => {
+    ring.split(',').forEach((p, i) => {
+      const [px, py] = p.split(' ');
+      pts.push({ x: (px / 1000) * w, y: (py / 1000) * h, moveTo: i === 0 });
+    });
+    pts.push({ close: true });
+  });
+  const opt = { x, y, w, h, points: pts, fill: { color }, line: { type: 'none' } };
+  if (o.rot) opt.rotate = o.rot;
+  if (o.flipH) opt.flipH = true;
+  if (o.flipV) opt.flipV = true;
+  s.addShape('custGeom', opt);
+}
+
+
+// Vector icon outlines, stored as per-mille polygon rings ("x y,x y,...").
+const ART = {
+  shape: [
+   
+    '334 46,376 21,424 10,473 16,503 29,542 61,570 104,586 155,595 230,625 276,689 306,805 314,864 329,932 373,969 424,982 466,983 509,973 552,953 588,922 614,827 647,797 675,789 713,807 811,806 866,778 932,725 976,676 989,610 978,581 959,510 892,470 877,406 886,298 938,234 954,174 937,136 888,122 840,120 790,148 627,150 544,129 483,57 402,37 367,30 286,47 235,80 196,129 178,191 175,221 165,254 139,334 46'],
+  shape2: [
+   
+    '419 0,497 19,549 65,580 130,596 232,625 272,692 302,813 310,894 334,961 386,993 443,1000 487,995 532,967 590,935 616,836 650,805 679,796 718,817 836,809 891,772 955,713 993,660 1000,609 988,505 900,463 885,396 894,249 958,183 960,130 924,102 864,96 796,126 630,128 545,106 483,31 399,10 364,0 309,9 254,55 190,106 171,203 158,237 132,329 30,367 10,419 0'],
+  shape3: [
+    '928 152,698 28,440 2,179 70,30 198,52 487,448 984,588 956,929 504,1000 310,928 152',
+    '897 316,495 924,146 464,124 214,313 89,591 70,818 164,897 316'],
+  shape4: [
+   
+    '880 0,50 27,0 140,24 749,101 804,472 806,472 938,287 939,287 998,720 994,713 939,528 938,528 806,901 804,998 689,998 117,880 0',
+    '944 667,880 744,120 744,56 643,944 667', '951 581,56 581,63 106,120 62,911 71,951 581'],
+  shape5: [
+   
+    '843 597,742 564,617 664,450 536,336 381,436 200,262 14,149 14,18 156,17 340,116 550,512 920,754 1000,886 958,1000 790,843 597',
+    '925 828,754 940,404 777,123 439,85 163,236 72,380 228,272 372,343 515,608 730,787 626,936 775,925 828'],
+  shape6: [
+    '993 81,944 0,25 10,6 958,976 985,993 81', '888 81,496 535,105 81,888 81',
+    '664 616,895 919,98 919,341 585,301 546,49 872,49 116,496 628,944 116,944 872,690 543,664 616'],
+  shape7: ['136 0,1000 0,1000 888,844 1000,0 1000,0 97,136 0'],
+  shape8: [
+    '739 324,566 328,517 432,330 335,358 460,316 475,432 602,296 642,438 682,605 624,739 324',
+    '500 0,341 25,146 146,25 341,0 500,25 659,146 854,341 975,500 1000,659 975,854 854,975 659,1000 500,975 341,854 146,659 25,500 0',
+    '500 954,179 821,46 500,179 179,500 46,821 179,954 500,821 821,500 954'],
+  shape9: [
+   
+    '500 0,341 25,146 146,25 341,0 500,25 659,146 854,341 975,500 1000,659 975,854 854,975 659,1000 500,975 341,854 146,659 25,500 0',
+    '500 954,179 821,46 500,179 179,500 46,821 179,954 500,821 821,500 954',
+    '546 392,614 364,614 296,485 311,454 432,409 432,454 704,546 704,546 500,608 500,614 432,546 392'],
+  shape10: [
+   
+    '500 0,341 25,146 146,25 341,0 500,25 659,146 854,341 975,500 1000,659 975,854 854,975 659,1000 500,975 341,854 146,659 25,500 0',
+    '500 954,179 821,46 500,179 179,500 46,821 179,954 500,821 821,500 954',
+    '636 273,290 310,310 710,710 690,726 349,636 273', '500 409,591 500,500 591,409 500,500 409',
+    '682 636,643 681,350 679,318 477,500 636,682 477,682 636'],
+  shape11: [
+   
+    '500 0,341 25,146 146,25 341,0 500,25 657,146 852,341 974,500 1000,659 974,854 852,975 657,1000 500,975 341,854 146,659 25,500 0',
+    '500 960,176 824,40 500,176 171,500 35,824 171,960 500,824 824,500 960'],
+  shape12: [
+   
+    '757 72,558 3,375 19,190 116,59 274,3 451,19 634,101 799,252 937,426 995,634 985,799 908,937 757,995 583,985 372,908 207,757 72',
+    '504 72,784 180,559 333,405 90,504 72', '171 234,324 117,478 360,81 414,171 234',
+    '108 658,81 486,514 432,544 489,360 595,189 784,108 658', '504 928,243 838,342 707,577 568,667 892,504 928',
+    '865 730,739 856,658 550,928 568,865 730', '928 496,631 486,595 396,838 234,928 496'],
+  shape13: [
+   
+    '985 379,899 199,753 69,567 5,341 26,204 98,56 272,0 500,25 659,96 796,270 944,500 1000,659 975,796 904,944 730,985 379',
+    '500 965,176 829,40 500,176 176,500 40,680 76,827 177,960 500,824 829,500 965'],
+  shape14: [
+    '722 0,232 4,31 149,4 768,149 969,768 996,969 851,986 189,887 53,722 0',
+    '911 722,877 837,754 909,168 877,89 722,127 168,278 89,837 127,909 248,911 722'],
+  shape15: [],
+  shape16: [
+   
+    '981 23,849 80,732 4,599 29,512 137,491 310,254 234,66 46,42 226,132 391,38 356,54 462,198 609,113 609,161 715,302 782,159 876,0 885,311 1000,688 845,850 588,906 253,1000 126,887 161,981 23'],
+  shape17: [
+   
+    '500 0,341 25,146 146,25 341,0 500,25 659,146 854,341 975,500 1000,659 975,854 854,975 659,1000 500,975 341,854 146,659 25,500 0',
+    '500 960,176 824,40 500,176 176,500 40,824 176,960 500,824 824,500 960'],
+  shape18: [
+   
+    '231 236,231 336,0 336,0 500,231 500,231 1000,577 1000,577 500,923 500,981 336,577 336,585 215,663 169,1000 164,1000 0,397 25,231 236'],
+  shape19: ['0 0,58 127,104 378,171 492,314 489,545 363,708 381,806 528,909 838,1000 1000,0 1000,0 0'],
+  shape20: [
+   
+    '782 445,878 428,851 546,936 693,962 990,3 961,7 3,736 24,736 386,704 33,33 33,33 935,575 935,717 546,689 428,782 445',
+    '783 968,959 937,895 679,791 613,668 686,655 891,607 937,783 968',
+    '842 452,725 452,748 532,820 532,842 452'],
+  shape21: [
+    '526 334,526 933,867 933,867 1000,7 990,7 9,995 14,1000 465,947 465,947 334,526 334',
+    '946 68,53 68,53 265,946 265,946 68', '472 933,472 334,53 334,53 933,472 933'],
+  shape22: ['500 0,992 16,992 984,7 984,7 16,500 0', '53 887,946 887,946 113,53 113,53 887'],
+  shape23: ['1000 59,200 1000,0 941,795 0,1000 59'],
+  shape24: [
+   
+    '658 1000,362 1000,43 717,33 668,336 668,523 751,653 688,595 598,166 508,46 385,54 246,342 0,652 2,964 280,974 329,671 329,490 249,351 312,391 388,783 463,956 599,942 768,658 1000'],
+  shape25: ['986 1000,664 1000,664 756,336 756,336 995,7 995,15 311,262 52,625 19,918 176,986 1000'],
+  shape26: [
+    '264 500,7 0,306 0,479 332,674 0,1000 0,762 500,1000 1000,674 1000,507 684,333 1000,7 1000,264 500'],
+  shape27: ['1000 0,1000 247,676 247,676 1000,331 1000,331 253,0 253,0 0,1000 0'],
+  shape28: [
+    '951 1000,0 1000,3 6,704 5,709 436,742 480,883 438,996 519,999 950,951 1000',
+    '677 32,32 32,32 968,401 968,400 522,502 439,648 480,677 436,677 32',
+    '429 626,440 964,963 958,968 626,429 626',
+    '430 593,968 593,968 535,910 511,852 568,742 513,685 568,572 513,517 568,454 512,430 593'],
+  shape29: [
+   
+    '127 157,127 839,733 839,733 607,564 756,374 467,452 428,577 570,884 225,963 223,988 308,863 531,845 978,65 999,0 898,18 22,842 21,859 106,798 156,127 157'],
+  shape30: [
+   
+    '129 157,129 839,731 839,731 607,562 756,373 468,453 429,575 570,883 228,962 222,983 313,862 515,842 977,64 999,0 902,18 23,840 20,857 103,797 156,129 157'],
+  shape31: [
+   
+    '127 157,127 839,735 839,735 607,566 757,385 550,376 466,453 426,576 574,886 225,965 223,985 316,869 498,846 977,62 999,0 905,18 23,844 22,861 106,802 156,127 157'],
+  shape32: ['496 1000,66 994,1 405,68 5,916 0,997 410,932 994,496 1000'],
+  shape33: ['496 1000,64 994,1 411,64 26,656 1,947 43,997 431,934 994,496 1000'],
+  shape34: ['0 497,77 20,929 20,986 919,848 1000,77 982,0 497'],
+  shape35: ['0 497,76 17,923 18,998 134,986 921,868 998,77 986,0 497'],
+  shape36: ['0 491,78 17,923 17,998 128,986 923,872 998,76 986,0 491'],
+  shape37: ['497 1000,14 919,14 79,132 2,923 14,999 136,985 915,497 1000'],
+  shape38: ['0 497,77 15,929 15,986 919,872 993,79 980,0 497'],
+  shape39: ['497 1000,17 919,17 77,128 2,923 14,998 128,986 921,497 1000'],
+  shape40: [
+   
+    '0 691,730 237,741 2,999 48,992 1000,973 120,757 120,748 1000,730 357,513 357,505 1000,487 557,270 557,262 1000,178 780,27 780,0 1000,0 691'],
+  shape41: ['0 1000,36 0,958 0,959 918,1000 1000,0 1000'],
+  shape42: [
+   
+    '570 508,244 640,242 738,357 819,347 945,328 833,214 755,213 650,415 519,40 560,58 814,85 610,62 996,0 584,103 512,96 364,210 378,194 512,336 501,640 337,610 216,677 160,753 218,724 335,807 335,844 7,991 5,991 102,870 107,894 418,757 482,758 591,876 674,872 820,848 688,728 594,741 445,873 397,867 227,823 363,589 372,436 495,449 538,596 457,585 884,570 508',
+    '634 248,674 321,728 265,695 192,634 248', '194 429,136 375,103 447,155 501,194 429'],
+  shape43: ['188 186,188 947,89 1000,4 940,48 26,959 326,999 710,926 770,823 734,789 399,188 186'],
+  shape44: ['191 213,189 925,82 997,0 916,47 30,960 360,994 696,947 754,842 748,792 448,191 213'],
+  shape45: [
+   
+    '861 1000,798 933,850 866,850 641,524 692,577 871,523 939,430 889,480 692,388 692,378 844,203 840,344 809,344 692,290 680,287 521,77 567,9 520,72 434,287 481,287 399,113 387,111 137,59 71,95 10,206 53,155 136,155 359,480 309,428 121,482 62,575 112,526 309,617 309,626 156,803 163,662 192,718 480,930 434,999 491,930 567,719 520,719 602,893 618,894 864,946 938,861 1000',
+    '674 349,332 349,332 652,674 652,674 349'],
+  shape46: [],
+  shape47: [
+    '0 493,1 108,47 20,937 11,999 108,989 935,864 1000,65 987,1 891,0 493',
+    '221 218,221 776,782 776,782 218,221 218'],
+  shape48: [
+    '676 483,416 234,631 500,416 766,676 483', '909 0,26 26,26 974,974 974,1000 91,909 0',
+    '954 909,909 954,60 940,60 60,940 60,954 909'],
+  shape49: ['500 1000,1000 457,1000 0,500 580,0 0,0 420,500 1000'],
+  shape50: [
+    '994 960,750 722,864 432,737 126,432 0,126 126,0 432,126 737,432 864,722 750,962 996,994 960',
+    '432 818,158 706,46 432,158 158,432 46,706 158,818 432,706 706,432 818'],
+  shape51: ['951 10,867 28,28 867,32 981,977 977,1000 82,951 10', '846 846,268 846,846 268,846 846'],
+  shape52: [
+   
+    '991 470,931 518,928 209,804 203,897 94,821 2,586 203,130 203,118 43,6 122,0 785,77 885,560 890,484 1000,992 998,991 470',
+    '746 84,814 152,787 179,719 111,746 84', '796 34,867 86,834 131,767 63,796 34',
+    '521 971,669 801,589 860,111 860,39 818,46 733,130 683,113 561,101 669,29 707,30 146,78 81,113 532,130 233,556 233,486 339,698 132,766 199,462 504,394 437,434 356,260 600,676 598,377 570,471 537,774 233,902 233,902 547,688 770,971 520,971 649,929 664,971 679,929 738,971 753,929 812,971 827,929 885,971 971,521 971'],
+  shape53: [
+   
+    '882 208,829 221,779 1,196 15,171 221,66 226,3 356,100 518,108 979,229 990,245 856,755 856,771 990,884 990,900 518,997 356,882 208',
+    '207 77,780 50,755 499,600 460,617 309,563 456,446 456,382 313,408 460,245 499,207 77',
+    '245 547,724 536,755 722,245 722,245 547', '207 953,136 951,135 501,39 376,107 257,208 346,207 953',
+    '245 809,755 769,245 809', '887 473,864 950,793 953,792 346,865 256,960 342,887 473'],
+  shape54: [
+   
+    '448 338,992 362,998 69,578 62,568 214,355 10,128 60,62 205,62 975,10 997,162 988,90 975,90 206,148 78,286 25,420 74,481 195,390 243,369 327,448 338',
+    '597 338,694 258,780 339,597 338', '820 339,885 287,948 339,820 339',
+    '972 87,972 324,886 258,798 318,696 227,621 286,597 87,972 87', '398 305,497 219,594 311,398 305'],
+  shape55: [],
+  shape56: [
+   
+    '1000 164,656 210,648 365,982 365,944 538,648 538,648 1000,296 1000,296 538,0 538,0 365,296 365,318 148,530 21,1000 10,1000 164'],
+  shape57: [
+   
+    '889 250,843 580,604 907,313 1000,0 888,303 775,166 705,111 600,202 600,58 454,40 350,131 388,45 226,71 50,256 233,495 312,507 135,594 28,722 3,838 75,970 12,879 150,1000 112,889 250'],
+  shape58: [
+   
+    '1000 1000,792 1000,788 588,677 484,565 589,562 1000,354 1000,354 330,562 330,562 429,725 310,931 383,997 556,1000 1000'],
+  shape59: [
+    '591 250,551 233,318 497,565 773,588 736,369 500,591 250',
+    '500 0,341 25,146 146,25 341,0 500,25 659,146 854,341 975,500 1000,659 975,854 854,975 659,1000 500,975 341,854 146,659 25,500 0',
+    '500 954,179 821,46 500,179 179,500 46,821 179,954 500,821 821,500 954'],
+  shape60: [
+    '449 233,412 264,631 500,413 735,432 773,682 503,449 233',
+    '500 0,341 25,146 146,25 341,0 500,25 659,146 854,341 975,500 1000,659 975,854 854,975 659,1000 500,975 341,854 146,659 25,500 0',
+    '500 954,179 821,46 500,179 179,500 46,821 179,954 500,821 821,500 954'],
+  shape61: [
+    '296 136,184 184,136 296,184 409,296 454,407 409,454 296,407 184,296 136',
+    '296 409,182 296,296 182,409 296,296 409', '296 0,86 86,0 296,64 506,296 773,527 506,591 296,505 86,296 0',
+    '296 710,107 491,46 296,119 119,296 46,472 119,546 296,477 500,296 710'],
+  shape62: [
+    '909 0,258 2,182 152,273 59,929 66,954 656,864 735,924 763,999 666,1000 118,909 0',
+    '727 235,37 258,17 952,781 978,817 334,727 235', '91 294,756 309,409 735,91 294',
+    '46 368,239 618,46 868,46 368', '727 941,62 926,267 662,409 794,551 662,727 941',
+    '773 868,580 618,773 368,773 868'],
+  shape63: [
+    '546 46,835 165,993 470,977 311,866 134,689 23,542 0,546 46',
+    '546 273,675 325,766 470,706 294,582 230,528 237,546 273',
+    '1000 796,757 574,593 653,437 525,347 403,429 253,238 10,68 70,3 200,23 341,427 831,761 1000,930 932,1000 796',
+    '761 954,452 792,156 478,46 247,143 67,222 51,381 256,302 417,466 616,597 699,731 614,949 778,896 901,761 954'],
+};
+
+// ---------------------------------------------------------------- slide 1
+function slide1(s) {   // Portfolio.
+  photo(s, [0, 0, 13.333, 7.5], 'FF86E7');
+  art(s, ART.shape, [6.715, 0.771, 6.005, 5.5], 'D3D3D3');
+  art(s, ART.shape, [6.995, 1.028, 5.445, 4.986], 'ADB9CA');
+  txt(s, [0.702, 4.016, 5.217, 1.582], 'Portfolio.', { sz: 88, f: PLAY, c: WHITE, b: 1, sp: -3, wrap: false });
+  txt(s, [0.761, 0.477, 5.954, 0.37], 'Your Name Here', { sz: 16, f: POP, c: SNOW });
+  txt(s, [0.761, 6.655, 5.954, 0.337], '@FBnatashaqwu', { sz: 14, f: POP, c: SNOW });
+  txt(s, [6.821, 6.655, 5.954, 0.337], '2023', { sz: 14, f: POP, c: SNOW, al: 'right' });
+  txt(s, [0.761, 3.914, 5.954, 0.37], 'CURRICULUM VITAE', { sz: 16, f: POP_MD, c: CLOUD });
+  art(s, ART.shape2, [7.145, 1.079, 5.207, 4.884], '40009D');
+}
+
+// ---------------------------------------------------------------- slide 2
+function slide2(s) {   // Portfolio.
+  art(s, ART.shape, [6.715, 0.771, 6.005, 5.5], 'D3D3D3');
+  art(s, ART.shape, [6.995, 1.028, 5.445, 4.986], 'ADB9CA');
+  txt(s, [0.761, 0.477, 5.954, 0.37], 'Your Name Here', { sz: 16, f: POP, c: 'B2B2B2' });
+  txt(s, [0.761, 6.655, 5.954, 0.337], '@FBnatashaqwu', { sz: 14, f: POP, c: 'C0C0C0' });
+  txt(s, [6.821, 6.655, 5.954, 0.337], '2023', { sz: 14, f: POP, c: 'C0C0C0', al: 'right' });
+  txt(s, [0.702, 4.016, 5.217, 1.582], 'Portfolio.', { sz: 88, f: PLAY, b: 1, sp: -3, wrap: false });
+  txt(s, [0.761, 3.914, 5.954, 0.37], 'CURRICULUM VITAE', { sz: 16, f: POP_MD, c: SILVER });
+  art(s, ART.shape2, [7.145, 1.079, 5.207, 4.884], '40009D');
+}
+
+// ---------------------------------------------------------------- slide 3
+function slide3(s) {   // NATASHA WILONA
+  box(s, [0, -0.008, 3.771, 7.5], DARK);
+  txt(s, [0.238, 3.937, 3.296, 0.972], 'PLACEHOLDER', { sz: 11, f: LATO, c: CLOUD, al: 'center', lh: 1.2 });
+  txt(s, [0.452, 3.391, 2.867, 0.303], 'NATASHA WILONA', { sz: 12, f: POP_SB, c: WHITE, sp: 1, al: 'center' });
+  [
+    [1.292, 3.82], [4.559, 0.787], [4.559, 3.954], [9.554, 0.787], [9.554, 3.28], [9.554, 5.801]
+  ].forEach(([x, y]) => rule(s, [x, y, 1.187, 0], GOLD, { w: 2.25 }));
+  [
+    [1.154, 5.133, 1.494, 'natasha@gler.com'], [1.147, 5.467, 1.099, '+01 23456 789'],
+    [1.154, 5.786, 1.406, 'www.nathaa.com'], [1.116, 6.153, 2.1, 'Mountain floor Building USA']
+  ].forEach(([x, y, w, t]) => txt(s, [x, y, w, 0.185], t, { sz: 11, f: POP, c: CLOUD, m: 0, wrap: false, vert: 'horz' }));
+  art(s, ART.shape3, [0.758, 6.063, 0.168, 0.268], WHITE);
+  shp(s, 'ellipse', [0.811, 6.119, 0.061, 0.061], WHITE);
+  art(s, ART.shape3, [0.758, 6.063, 0.168, 0.268], WHITE);
+  shp(s, 'ellipse', [0.811, 6.119, 0.061, 0.061], WHITE);
+  art(s, ART.shape4, [0.736, 5.739, 0.245, 0.219], WHITE);
+  art(s, ART.shape5, [0.758, 5.434, 0.233, 0.227], WHITE);
+  art(s, ART.shape6, [0.76, 5.168, 0.248, 0.145], WHITE);
+  [
+    [4.491, 0.406, 'EDUCATION'], [4.491, 3.573, 'EXPERIENCES'], [9.486, 0.406, 'EXPERTISE'],
+    [9.486, 2.899, 'SOFWARE'], [9.486, 5.42, 'LANGUAGE']
+  ].forEach(([x, y, t]) => txt(s, [x, y, 2.867, 0.303], t, { sz: 12, f: POP_SB, sp: 1 }));
+  txt(s, [4.492, 0.995, 1.151, 2.121], '1990 - 1993\n\n\n1993 - 1996\n\n\n1996 – 2000\n\n\n1996 - 2023', { sz: 12, f: LATO });
+  [
+    [0.948, 'sileancer andizm eraierae oblivion zomaidy extiner lorem ipsum.'],
+    [1.564, 'sileancer andizm eraierae oblivion zomaidy extiner lorem ipsum.'],
+    [2.18, 'sileancer andizm eraierae oblivion zomaidy extiner lorem ipsum.'],
+    [2.77, 'sileancer andizm eraierae oblivio zomaidy extiner lorem ipsum.'],
+    [4.115, 'sileancer andizm eraierae oblivio zomaidy extiner lorem ipsum.'],
+    [4.731, 'sileancer andizm eraierae oblivio zomaidy extiner lorem ipsum.'],
+    [5.347, 'sileancer andizm eraierae oblivio zomaidy extiner lorem ipsum.'],
+    [5.938, 'sileancer andizm eraierae oblivio zomaidy extiner lorem ipsum.'],
+    [6.549, 'sileancer andizm eraierae oblivio zomaidy extiner lorem ipsum.']
+  ].forEach(([y, t]) => txt(s, [6.046, y, 2.486, 0.545], t, { sz: 11, f: LATO, c: GREY, lh: 1.2 }));
+  rule(s, [5.841, 1.165, 0.005, 1.862], CLOUD, { w: 2.25, flipH: true });
+  shp(s, 'ellipse', [5.76, 1.062, 0.171, 0.171], WHITE, { line: { color: MIST, width: 1.5 } });
+  shp(s, 'ellipse', [5.76, 1.691, 0.171, 0.171], WHITE, { line: { color: MIST, width: 1.5 } });
+  shp(s, 'ellipse', [5.76, 2.291, 0.171, 0.171], WHITE, { line: { color: MIST, width: 1.5 } });
+  shp(s, 'ellipse', [5.76, 2.879, 0.171, 0.171], WHITE, { line: { color: MIST, width: 1.5 } });
+  txt(s, [4.492, 4.163, 1.151, 2.726], '1990 - 1993\n\n\n1993 - 1996\n\n\n1996 – 2000\n\n\n1996 – 2023\n\n\n2023 - 2024', { sz: 12, f: LATO });
+  rule(s, [5.844, 4.304, 0.003, 2.458], CLOUD, { w: 2.25, flipH: true });
+  shp(s, 'ellipse', [5.76, 4.229, 0.171, 0.171], WHITE, { line: { color: MIST, width: 1.5 } });
+  shp(s, 'ellipse', [5.76, 4.858, 0.171, 0.171], WHITE, { line: { color: MIST, width: 1.5 } });
+  shp(s, 'ellipse', [5.76, 5.458, 0.171, 0.171], WHITE, { line: { color: MIST, width: 1.5 } });
+  shp(s, 'ellipse', [5.76, 6.046, 0.171, 0.171], WHITE, { line: { color: MIST, width: 1.5 } });
+  shp(s, 'ellipse', [5.76, 6.639, 0.171, 0.171], WHITE, { line: { color: MIST, width: 1.5 } });
+  [
+    [1.29], [1.888], [2.487], [3.783], [4.381], [4.98], [6.304], [6.903]
+  ].forEach(([y]) => shp(s, 'roundRect', [9.564, y, 2.796, 0.12], { color: BLACK, transparency: 93 }, { rr: 0.06 }));
+  shp(s, 'roundRect', [9.564, 1.283, 2.589, 0.126], CLOUD, { rr: 0.063 });
+  [
+    [0.992, 1.178, 'Editorial Design'], [1.591, 1.217, 'Branding Design'], [2.189, 1.536, 'Digital Media Design'],
+    [3.485, 1.264, 'Adobe Illustrator'], [4.084, 1.171, 'Adobe InDesign'], [4.682, 1.222, 'Adobe Photosop'],
+    [6.007, 0.531, 'English'], [6.605, 0.433, 'Japan']
+  ].forEach(([y, w, t]) => txt(s, [9.564, y, w, 0.202], t, { sz: 12, f: LATO, c: COCOA, m: 0, wrap: false }));
+  [
+    [0.992], [1.591], [2.189], [3.485], [4.084], [4.682], [6.007], [6.605]
+  ].forEach(([y]) => txt(s, [11.945, y, 0.544, 0.202], '90%', { sz: 12, f: LATO, c: COCOA, m: 0 }));
+  shp(s, 'roundRect', [9.564, 1.882, 2.589, 0.126], CLOUD, { rr: 0.063 });
+  shp(s, 'roundRect', [9.564, 2.48, 2.589, 0.126], CLOUD, { rr: 0.063 });
+  shp(s, 'roundRect', [9.564, 3.776, 2.589, 0.126], CLOUD, { rr: 0.063 });
+  shp(s, 'roundRect', [9.564, 4.375, 2.589, 0.126], CLOUD, { rr: 0.063 });
+  shp(s, 'roundRect', [9.564, 4.973, 2.589, 0.126], CLOUD, { rr: 0.063 });
+  shp(s, 'roundRect', [9.564, 6.298, 2.589, 0.126], CLOUD, { rr: 0.063 });
+  shp(s, 'roundRect', [9.564, 6.896, 2.589, 0.126], CLOUD, { rr: 0.063 });
+  photo(s, [0.653, 0.769, 2.465, 2.419], 'FF86E7', 'ellipse');
+}
+
+// ---------------------------------------------------------------- slide 4
+function slide4(s) {   // About Me
+  box(s, [10.173, 0, 2.438, 7.5], DARK);
+  txt(s, [1.82, 3.502, 4.532, 0.656], 'sileancer andizm eraierae oblivion zomaidy extiner tiny definit tincidunt lacus in pretiumi iaculis nesa Aliquam ornare faucibus.', { sz: 11, f: LATO, c: GREY, al: 'justify', lh: 1.5 });
+  txt(s, [1.789, 2.023, 4.354, 0.841], 'William Richard', { sz: 40, f: PLAY_SB, c: TEAL, lh: 1.1 });
+  rule(s, [1.916, 2.912, 1.187, 0], GOLD, { w: 3 });
+  txt(s, [1.809, 1.651, 3.467, 0.37], 'Project Manager Company', { sz: 16, f: POP_SB });
+  txt(s, [1.82, 3.187, 2.867, 0.303], 'Detail Me,', { sz: 12, f: POP_SB, sp: 1 });
+  txt(s, [1.941, 4.366, 3.701, 1.818], 'Name 	: William Richard\n\nBirth 	: 08 August 1986\n\nPhone 	: +01234 5678\n\nAddress 	: Mountain Floor Building USA 97\n\nEmail 	: Will@mail.com', { sz: 12, f: POP_MD, c: GREY, m: 0, wrap: false, vert: 'horz' });
+  txt(s, [-1.622, 4.144, 4.848, 1.447], [run('About Me', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  art(s, ART.shape7, [6.774, 0, 5.376, 7.5], '40009D');
+}
+
+// ---------------------------------------------------------------- slide 5
+function slide5(s) {   // ROBERTO CANIAO
+  photo(s, [5.127, 0, 4.083, 7.5], '40009D');
+  rule(s, [9.973, 4.479, 2.52, 0], MIST);
+  rule(s, [9.973, 6.16, 2.52, 0], MIST);
+  txt(s, [0.729, 3.201, 3.788, 1.313], 'sileancer loremi deiandizm eraierae oblivion its zomaidy eixtiner tiny definit tincidunt lacus sedin pretiumi iaculis nesa Aliquam lorem ornare  lore faucibus lobortis Sedia dolor magna erex.', { sz: 12, f: LATO, c: GREY, lh: 1.5 });
+  rule(s, [0.838, 3.056, 3.46, 0], SILVER);
+  txt(s, [0.766, 2.561, 2.796, 0.505], 'Store Manager', { sz: 16, f: POP_MD, lh: 1.5, flipH: true });
+  txt(s, [0.707, 2.11, 4.42, 0.572], 'ROBERTO CANIAO', { sz: 28, f: PLAY_SB, c: TEAL, sp: 1 });
+  rule(s, [0.838, 4.611, 3.46, 0], SILVER);
+  shp(s, 'roundRect', [0.838, 5.094, 3.808, 0.097], CLOUD, { rr: 0.0485 });
+  shp(s, 'roundRect', [0.838, 5.089, 3.476, 0.108], GOLD, { rr: 0.054 });
+  txt(s, [0.838, 4.798, 1.253, 0.202], 'Problem Solving', { sz: 12, f: LATO_BK, c: NAVY, m: 0, wrap: false });
+  txt(s, [3.973, 4.798, 0.544, 0.202], '90%', { sz: 12, f: LATO_BK, c: NAVY, m: 0 });
+  rule(s, [0.838, 5.361, 3.46, 0], CLOUD);
+  shp(s, 'roundRect', [0.838, 5.844, 3.808, 0.097], CLOUD, { rr: 0.0485 });
+  shp(s, 'roundRect', [0.838, 5.839, 3.476, 0.108], GOLD, { rr: 0.054 });
+  txt(s, [0.838, 5.548, 0.649, 0.202], 'Analysis', { sz: 12, f: LATO_BK, c: NAVY, m: 0, wrap: false });
+  txt(s, [3.973, 5.548, 0.544, 0.202], '90%', { sz: 12, f: LATO_BK, c: NAVY, m: 0 });
+  box(s, [8.818, 1.068, 0.786, 2.798], DARK);
+  art(s, ART.shape8, [8.992, 2.235, 0.464, 0.464], WHITE);
+  art(s, ART.shape9, [8.965, 1.454, 0.464, 0.464], WHITE);
+  art(s, ART.shape10, [8.992, 3.016, 0.464, 0.464], WHITE);
+  txt(s, [0.707, 0.425, 1.289, 0.37], 'About Me', { sz: 16, f: POP_SB, c: 'B2B2B2', wrap: false });
+  [
+    [10.391, 4.687, 1.616, 'natasha@gler.com'], [10.383, 5.021, 1.183, '+01 23456 789'],
+    [10.391, 5.34, 1.485, 'www.nathaa.com'], [10.353, 5.708, 2.3, 'Mountain floor Building USA']
+  ].forEach(([x, y, w, t]) => txt(s, [x, y, w, 0.202], t, { sz: 12, f: POP, c: GREY, m: 0, wrap: false, vert: 'horz' }));
+  art(s, ART.shape3, [9.995, 5.617, 0.168, 0.268], GREY);
+  shp(s, 'ellipse', [10.047, 5.673, 0.061, 0.061], GREY);
+  art(s, ART.shape3, [9.995, 5.617, 0.168, 0.268], GREY);
+  shp(s, 'ellipse', [10.047, 5.673, 0.061, 0.061], GREY);
+  art(s, ART.shape4, [9.973, 5.293, 0.245, 0.219], GREY);
+  art(s, ART.shape5, [9.994, 4.988, 0.233, 0.227], GREY);
+  art(s, ART.shape6, [9.997, 4.723, 0.248, 0.145], GREY);
+}
+
+// ---------------------------------------------------------------- slide 6
+function slide6(s) {   // Professional Journey
+  shp(s, 'ellipse', [8.907, 0.825, 2.505, 2.505], GOLD);
+  box(s, [0, 0, 7.048, 7.5], DARK);
+  txt(s, [1.023, 1.999, 3.503, 1.524], 'Professional Journey', { sz: 40, f: PLAY_SB, c: GOLD, lh: 1.1 });
+  rule(s, [1.213, 3.636, 1.187, 0], WHITE, { w: 3 });
+  txt(s, [1.06, 1.652, 3.467, 0.37], 'About Me', { sz: 16, f: POP_SB, c: WHITE });
+  txt(s, [1.107, 3.929, 4.917, 2.045], 'andizm eraierae oblivion zomaidy extiner tiny definit ione strave inside our city aamia priliya moren delicaimeu jobbard pondrumas ini conie the invoke sni Great wosr oec tincidunt lacus in pretiumi iaculis nesa Aliquam ornare faucibus lobortis Sedia magna erex, rho sit tiny definit ione strave eser mnesai rche innera voltatibus well sileancer slarkin andizmerai oblivion zomaidy in definition serda inside ione strave inside our city mnesarches voltatibus sileancer andizmerai oblivion end', { sz: 11, f: LATO, c: CLOUD, al: 'justify', lh: 1.5 });
+  txt(s, [8.755, 3.87, 2.796, 0.467], 'Store Manager', { sz: 16, f: POP_MD, al: 'center', lh: 1.5, flipH: true });
+  txt(s, [7.942, 3.418, 4.42, 0.572], 'Natasha Richard', { sz: 28, f: PLAY_SB, c: TEAL, sp: 1, al: 'center' });
+  art(s, ART.shape11, [10.561, 4.969, 0.338, 0.338], '231F20');
+  art(s, ART.shape12, [10.635, 5.044, 0.189, 0.19], '231F20');
+  art(s, ART.shape13, [10.563, 4.506, 0.338, 0.338], '231F20');
+  art(s, ART.shape14, [10.652, 4.598, 0.153, 0.155], '231F20');
+  shp(s, 'ellipse', [10.69, 4.636, 0.078, 0.08], '231F20');
+  art(s, ART.shape15, [10.759, 4.624, 0.021, 0.02], '231F20');
+  art(s, ART.shape11, [8.126, 4.969, 0.338, 0.338], '231F20');
+  art(s, ART.shape16, [8.205, 5.064, 0.181, 0.148], '231F20');
+  art(s, ART.shape17, [8.126, 4.506, 0.338, 0.338], '231F20');
+  art(s, ART.shape18, [8.25, 4.58, 0.089, 0.189], '231F20');
+  [
+    [8.572, 4.565, 1.494, 'natasha@gler.com'], [8.572, 5.048, 1.494, 'natasha@gler.com'],
+    [11.007, 4.571, 1.494, 'natasha@gler.com'], [11.007, 5.046, 1.494, 'natasha@gler.com'],
+    [8.535, 5.546, 1.494, 'natasha@gler.com'], [11.065, 5.521, 1.099, '+01 23456 789']
+  ].forEach(([x, y, w, t]) => txt(s, [x, y, w, 0.185], t, { sz: 11, f: POP, c: GREY, m: 0, wrap: false, vert: 'horz' }));
+  box(s, [8.572, 6.027, 0.898, 0.898], GOLD);
+  txt(s, [8.61, 6.471, 0.823, 0.37], 'Years\nExperience', { sz: 8, f: POP_SB, c: WHITE, al: 'center', wrap: false });
+  txt(s, [8.718, 6.161, 0.674, 0.438], '10+', { sz: 20, f: POP_SB, c: WHITE, al: 'center', wrap: false });
+  box(s, [9.927, 6.027, 0.898, 0.898], TEAL);
+  txt(s, [9.98, 6.471, 0.791, 0.37], 'Complete \nProject', { sz: 8, f: POP_SB, c: WHITE, al: 'center', wrap: false });
+  txt(s, [9.995, 6.161, 0.828, 0.438], '170+', { sz: 20, f: POP_SB, c: WHITE, al: 'center', wrap: false });
+  box(s, [11.281, 6.027, 0.898, 0.898], DARK);
+  txt(s, [11.381, 6.471, 0.696, 0.37], 'Satisfied\nClients', { sz: 8, f: POP_SB, c: WHITE, al: 'center', wrap: false });
+  txt(s, [11.37, 6.161, 0.786, 0.438], '99%', { sz: 20, f: POP_SB, c: WHITE, al: 'center', wrap: false });
+  art(s, ART.shape5, [10.635, 5.489, 0.233, 0.227], BLACK);
+  art(s, ART.shape6, [8.183, 5.539, 0.248, 0.145], BLACK);
+  art(s, ART.shape11, [8.138, 5.443, 0.338, 0.338], '231F20');
+  art(s, ART.shape11, [10.582, 5.443, 0.338, 0.338], '231F20');
+  photo(s, [9.096, 1.034, 2.126, 2.086], 'FF86E7', 'ellipse');
+}
+
+// ---------------------------------------------------------------- slide 7
+function slide7(s) {   // About Me
+  shp(s, 'rect', [7.417, 4.65, 4.818, 1.288], DARK, { shadow: { type: 'outer', blur: 4, offset: 3, angle: 90, color: BLACK, opacity: 0.4 } });
+  txt(s, [6.903, 2.263, 5.02, 0.64], 'Work Experiences', { sz: 32, f: PLAY, b: 1 });
+  rule(s, [7.011, 3.058, 1.733, 0], GOLD, { w: 3 });
+  rule(s, [7.243, 3.714, 0.021, 3.786], CLOUD, { w: 3 });
+  shp(s, 'ellipse', [7.171, 3.657, 0.114, 0.114], CLOUD);
+  shp(s, 'ellipse', [7.19, 4.949, 0.114, 0.114], GOLD);
+  shp(s, 'ellipse', [7.2, 6.209, 0.114, 0.114], CLOUD);
+  txt(s, [8.266, 3.857, 3.582, 0.582], 'PLACEHOLDER', { sz: 11, f: MONT, c: GREY, lh: 1.3 });
+  txt(s, [8.266, 3.624, 2.867, 0.286], 'TITLE HERE', { sz: 11, f: POP_SB, c: PINE, sp: 1 });
+  txt(s, [7.438, 3.624, 1.305, 0.286], '2010', { sz: 11, f: POP_SB, c: PINE, sp: 1 });
+  txt(s, [8.266, 5.106, 3.582, 0.582], 'PLACEHOLDER', { sz: 11, f: MONT, c: SNOW, lh: 1.3 });
+  txt(s, [8.266, 4.873, 2.867, 0.286], 'TITLE HERE', { sz: 11, f: POP_SB, c: WHITE, sp: 1 });
+  txt(s, [7.438, 4.873, 1.305, 0.286], '2010', { sz: 11, f: POP_SB, c: WHITE, sp: 1 });
+  txt(s, [8.266, 6.354, 3.582, 0.582], 'PLACEHOLDER', { sz: 11, f: MONT, c: GREY, lh: 1.3 });
+  txt(s, [8.266, 6.121, 2.867, 0.286], 'TITLE HERE', { sz: 11, f: POP_SB, c: GREY, sp: 1 });
+  txt(s, [7.438, 6.121, 1.305, 0.286], '2010', { sz: 11, f: POP_SB, c: GREY, sp: 1 });
+  txt(s, [6.948, 1.895, 3.467, 0.37], 'About Me', { sz: 16, f: POP_SB, c: TEAL });
+  txt(s, [-1.821, 4.225, 4.848, 1.447], [run('About Me', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  photo(s, [1.318, 0, 5.122, 7.5], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 8
+function slide8(s) {   // About Me
+  shp(s, 'rect', [7.417, 1.996, 4.818, 1.288], DARK, { shadow: { type: 'outer', blur: 4, offset: 3, angle: 90, color: BLACK, opacity: 0.4 } });
+  rule(s, [7.237, -0.014, 0.041, 7.514], CLOUD, { w: 3 });
+  [
+    [7.171, 1.029], [7.2, 3.581], [7.218, 4.838], [7.219, 6.087]
+  ].forEach(([x, y]) => shp(s, 'ellipse', [x, y, 0.114, 0.114], CLOUD));
+  shp(s, 'ellipse', [7.19, 2.32, 0.114, 0.114], GOLD);
+  [
+    [1.229], [3.736], [4.99], [6.244]
+  ].forEach(([y]) => txt(s, [8.266, y, 3.582, 0.582], 'PLACEHOLDER', { sz: 11, f: MONT, c: GREY, lh: 1.3 }));
+  txt(s, [8.266, 0.996, 2.867, 0.286], 'TITLE HERE', { sz: 11, f: POP_SB, c: PINE, sp: 1 });
+  txt(s, [7.438, 0.996, 1.305, 0.286], '2010', { sz: 11, f: POP_SB, c: PINE, sp: 1 });
+  txt(s, [8.266, 2.483, 3.582, 0.582], 'PLACEHOLDER', { sz: 11, f: MONT, c: SNOW, lh: 1.3 });
+  txt(s, [8.266, 2.249, 2.867, 0.286], 'TITLE HERE', { sz: 11, f: POP_SB, c: WHITE, sp: 1 });
+  txt(s, [7.438, 2.249, 1.305, 0.286], '2010', { sz: 11, f: POP_SB, c: WHITE, sp: 1 });
+  txt(s, [8.266, 3.503, 2.867, 0.286], 'TITLE HERE', { sz: 11, f: POP_SB, c: GREY, sp: 1 });
+  txt(s, [7.438, 3.503, 1.305, 0.286], '2010', { sz: 11, f: POP_SB, c: GREY, sp: 1 });
+  txt(s, [8.266, 4.757, 2.867, 0.286], 'TITLE HERE', { sz: 11, f: POP_SB, c: GREY, sp: 1 });
+  txt(s, [7.438, 4.757, 1.305, 0.286], '2010', { sz: 11, f: POP_SB, c: GREY, sp: 1 });
+  txt(s, [8.266, 6.011, 2.867, 0.286], 'TITLE HERE', { sz: 11, f: POP_SB, c: GREY, sp: 1 });
+  txt(s, [7.438, 6.011, 1.305, 0.286], '2010', { sz: 11, f: POP_SB, c: GREY, sp: 1 });
+  txt(s, [-1.821, 4.225, 4.848, 1.447], [run('About Me', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  photo(s, [1.318, 0, 5.122, 7.5], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 9
+function slide9(s) {   // About Me
+  txt(s, [6.195, 2.051, 2.9, 1.043], 'My Skills Experiences :', { sz: 28, f: POP_SB });
+  txt(s, [6.215, 3.09, 6.157, 0.656], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod lorem tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim.', { sz: 11, f: POP, c: GREY, lh: 1.5 });
+  txt(s, [0.862, 0.755, 4.547, 0.707], 'Natasha William', { sz: 36, f: MONT_BD, c: GOLD, flipH: true });
+  txt(s, [-1.792, 4.225, 4.848, 1.447], [run('About Me', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  [
+    [6.324, 4.038, 1.943], [8.552, 4.038, 1.943], [10.771, 4.038, 1.552], [6.324, 4.759, 1.943],
+    [10.429, 4.759, 1.943], [6.324, 5.505, 1.943], [8.552, 5.505, 1.943], [10.771, 5.505, 1.552]
+  ].forEach(([x, y, w]) => shp(s, 'roundRect', [x, y, w, 0.419], WHITE, { rr: 0.2095, shadow: { type: 'outer', blur: 26, offset: 3, angle: 90, color: BLACK, opacity: 0.3 } }));
+  txt(s, [6.324, 4.105, 1.943, 0.286], 'Communication', { sz: 11, f: POP_MD, c: MID, sp: 1, al: 'center' });
+  txt(s, [8.552, 4.105, 1.943, 0.286], 'Strategic Planning', { sz: 11, f: POP_MD, c: MID, sp: 1, al: 'center' });
+  txt(s, [10.771, 4.105, 1.552, 0.286], 'Team Work', { sz: 11, f: POP_MD, c: MID, sp: 1, al: 'center' });
+  txt(s, [6.324, 4.825, 1.943, 0.286], 'Management Team', { sz: 11, f: POP_MD, c: MID, sp: 1, al: 'center' });
+  txt(s, [10.429, 4.825, 1.943, 0.286], 'Media Social Plan ', { sz: 11, f: POP_MD, c: MID, sp: 1, al: 'center' });
+  shp(s, 'roundRect', [8.571, 4.813, 1.552, 0.419], TEAL, { rr: 0.2095, shadow: { type: 'outer', blur: 26, offset: 3, angle: 90, color: BLACK, opacity: 0.3 } });
+  txt(s, [8.571, 4.861, 1.552, 0.286], 'Budgeting', { sz: 11, f: POP_MD, c: WHITE, sp: 1, al: 'center' });
+  txt(s, [6.324, 5.571, 1.943, 0.286], 'Communication', { sz: 11, f: POP_MD, c: MID, sp: 1, al: 'center' });
+  txt(s, [8.552, 5.571, 1.943, 0.286], 'Strategic Planning', { sz: 11, f: POP_MD, c: MID, sp: 1, al: 'center' });
+  txt(s, [10.771, 5.571, 1.552, 0.286], 'Team Work', { sz: 11, f: POP_MD, c: MID, sp: 1, al: 'center' });
+  photo(s, [1.886, 1.909, 3.819, 3.849], 'C2C2C2', 'ellipse');
+}
+
+// ---------------------------------------------------------------- slide 10
+function slide10(s) {   // 90%
+  box(s, [0, -0.008, 6.931, 7.5], DARK);
+  [[2.418], [3.669], [4.92], [6.171]].forEach(([y]) => box(s, [0.622, y, 3.717, 1.01], WHITE));
+  [
+    [2.407, 1.025], [3.652, 1.029], [4.919, 1.013], [6.162, 1.015]
+  ].forEach(([y, h]) => box(s, [4.166, y, 1.009, h], TEAL));
+  photo(s, [5.797, 0, 7.537, 7.519], 'FF86E7');
+  box(s, [9.715, 5.785, 3.618, 1.747], DARK);
+  txt(s, [1.052, 0.582, 3.776, 0.841], 'MY EXPERIENCES SOFTWARE SKILL', { sz: 22, f: POP_SB, c: WHITE, sp: 2, al: 'center' });
+  rule(s, [2.49, 1.559, 0.899, 0], GOLD, { w: 3 });
+  txt(s, [0.835, 1.665, 4.209, 0.62], 'Vocibus mediocr ex vis. Novmi era perti jamet eros verses arisian  tincunt Ethereum vmouse persequsap anein quarn', { sz: 11, f: LATO, c: SILVER, al: 'center', lh: 1.5 });
+  txt(s, [10.118, 5.985, 2.813, 0.32], 'WILLIAM RICHARD', { sz: 13, f: POP_SB, c: GOLD, sp: 1, al: 'center' });
+  txt(s, [10.118, 6.283, 2.813, 0.897], 'Bocibus mediocm ex vis. ovum errem erticia et sit. Verear fabulas meliore cata se eros aliquid idea moscow', { sz: 11, f: LATO, c: WHITE, al: 'center', lh: 1.5 });
+  [
+    [3.085], [4.382], [5.593], [6.809]
+  ].forEach(([y]) => shp(s, 'roundRect', [1.895, y, 1.923, 0.097], CLOUD, { rr: 0.0485 }));
+  shp(s, 'roundRect', [1.895, 3.08, 1.74, 0.102], GOLD, { rr: 0.051 });
+  [
+    [2.645, 1.991, 'Microsoft PowerPoint'], [3.942, 1.438, 'Microsoft Word'], [5.153, 1.304, 'Microsoft Exel'],
+    [6.368, 1.416, 'Microsoft Team']
+  ].forEach(([y, w, t]) => txt(s, [1.874, y, w, 0.236], t, { sz: 14, f: LATO_BK, c: NAVY, m: 0, wrap: false }));
+  [
+    [2.721], [3.942], [5.153], [6.368]
+  ].forEach(([y]) => txt(s, [4.231, y, 0.897, 0.404], '90%', { sz: 24, f: LATO_BK, c: WHITE, al: 'center', m: 0 }));
+  shp(s, 'roundRect', [1.895, 4.377, 1.74, 0.102], GOLD, { rr: 0.051 });
+  shp(s, 'roundRect', [1.895, 5.588, 1.74, 0.102], GOLD, { rr: 0.051 });
+  shp(s, 'roundRect', [1.895, 6.803, 1.74, 0.102], GOLD, { rr: 0.051 });
+  [[2.407], [3.674], [4.894], [6.157]].forEach(([y]) => photo(s, [0.626, y, 1.005, 1.021], '40009D'));
+}
+
+// ---------------------------------------------------------------- slide 11
+function slide11(s) {   // Abut Me
+  box(s, [0, 0, 6.832, 7.5], DARK);
+  photo(s, [6.832, 0, 3.733, 7.5], 'FF86E7');
+  box(s, [12.229, 0, 0.067, 7.5], SNOW);
+  shp(s, 'roundRect', [9.067, 2.692, 4.448, 0.626], TEAL, { rr: 0.1726 });
+  [
+    [11.476, 1.207, 0.563, '2010'], [11.499, 1.654, 0.518, '2011'], [11.483, 2.101, 0.549, '2012'],
+    [11.475, 3.586, 0.565, '2014'], [11.483, 4.069, 0.549, '2015'], [11.48, 4.524, 0.556, '2016'],
+    [11.481, 4.968, 0.554, '2017'], [11.478, 5.412, 0.56, '2018'], [11.48, 5.867, 0.556, '2019']
+  ].forEach(([x, y, w, t]) => txt(s, [x, y, w, 0.286], t, { sz: 11, f: MONT_BD, c: SILVER, al: 'center', wrap: false }));
+  txt(s, [11.403, 2.837, 0.709, 0.37], '2013', { sz: 16, f: MONT_BD, c: WHITE, al: 'center', wrap: false });
+  rule(s, [1.921, 3.359, 0.532, 0], GOLD, { w: 3 });
+  txt(s, [1.921, 4.708, 1.069, 0.306], 'Read more', { sz: 10.5, f: LATO_BK, c: WHITE, al: 'center', va: 'middle', shadow: { type: 'outer', blur: 18, offset: 3, angle: 90, color: '00825C', opacity: 0.22 }, fill: TEAL });
+  txt(s, [1.808, 2.028, 3.442, 1.178], 'Education and Certification', { sz: 32, f: PLAY, c: WHITE, b: 1 });
+  txt(s, [-2.193, 3.337, 6.159, 2.036], [run('Abut Me', { outline: { size: 0.75, color: WHITE }, transparency: 100 })], { sz: 115, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  txt(s, [1.853, 3.548, 4.897, 0.303], 'BACHELOR OF BUSINESS AUTRALIA UNIVERSITY ', { sz: 12, f: POP_SB, c: WHITE, sp: 1 });
+  txt(s, [1.85, 3.883, 4.618, 0.656], 'Nulla sed lorem ipsum dolor facilisi. Pellentesque habitant morbi tristique senectus sedi etnetus et malesuada fames actrse turpis', { sz: 11, f: LATO, c: WHITE, lh: 1.5 });
+}
+
+// ---------------------------------------------------------------- slide 12
+function slide12(s) {   // About Me
+  box(s, [0, 0, 5.019, 7.5], DARK);
+  art(s, ART.shape19, [10.778, 0.007, 2.556, 1], DARK, { flipH: true, flipV: true });
+  art(s, ART.shape19, [4.934, 6.504, 2.556, 1], DARK, { rot: 180, flipH: true, flipV: true });
+  txt(s, [1.275, 2.834, 3.363, 0.909], 'HOW MY PROCESS \nTO WORKING', { sz: 24, f: POP_SB, c: GOLD });
+  txt(s, [1.322, 4.373, 3.431, 1.786], 'Loerem ipsum dolor sedimi sedsat items went lorems doloru adolescens deterruisset itersius legimus appareat sed lorem ipsum dolour.\n\nLoerem ipsum dolor sedimi sedsat items went lorems doloru adolescens deterruisset itersius legimus appareat sed lorem ipsum dolour.', { sz: 11, f: LATO, c: CLOUD, al: 'justify', lh: 1.3 });
+  txt(s, [1.326, 3.975, 2.806, 0.37], 'Title Place Here', { sz: 16, f: POP_SB, c: SNOW });
+  box(s, [5.621, 1.615, 2.119, 1], GOLD);
+  [
+    [10.567, 1.615], [8.102, 3.282], [5.614, 4.949]
+  ].forEach(([x, y]) => shp(s, 'rect', [x, y, 2.119, 1], 'F5F5F5', { line: { color: MIST } }));
+  box(s, [10.567, 4.949, 2.119, 1], GOLD);
+  [
+    [11.995, 1.324], [9.543, 2.99], [7.043, 4.669]
+  ].forEach(([x, y]) => shp(s, 'ellipse', [x, y, 0.583, 0.583], CLOUD));
+  txt(s, [12.058, 1.414, 0.458, 0.404], '01', { f: POP_SB, al: 'center', wrap: false });
+  txt(s, [9.582, 3.08, 0.505, 0.404], '02', { f: POP_SB, al: 'center', wrap: false });
+  txt(s, [7.078, 4.759, 0.512, 0.404], '03', { f: POP_SB, al: 'center', wrap: false });
+  rule(s, [8.055, 2.032, 2.143, 0], MIST, { w: 1.5, dash: 'sysDot', arrow: 1 });
+  rule(s, [10.567, 2.865, 1.19, 1.095], MIST, { w: 1.5, dash: 'sysDot', arrow: 1, rot: 180, flipV: true });
+  shp(s, 'arc', [6.636, 3.669, 2.179, 2], null, { flipH: true, arc: [270, 0], line: { color: MIST, width: 1.5, dashType: 'sysDot' } });
+  rule(s, [8.055, 5.365, 2.143, 0], MIST, { w: 1.5, dash: 'sysDot', arrow: 1 });
+  [
+    [10.716, 1.949], [8.252, 3.607], [5.764, 5.288]
+  ].forEach(([x, y]) => txt(s, [x, y, 1.819, 0.471], 'pocibus iecremiz iovmi era pertis loremist', { sz: 11, f: LATO, c: GREY, i: 1 }));
+  txt(s, [5.585, 1.769, 2.21, 0.707], 'BRIEFING JOBDESK', { f: POP_BD, c: WHITE, sp: 1.5, al: 'center' });
+  txt(s, [10.601, 5.196, 2.051, 0.505], 'FINISHING', { sz: 24, f: POP_SB, c: WHITE, sp: 1.5, al: 'center' });
+  txt(s, [-1.792, 4.225, 4.848, 1.447], [run('About Me', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  photo(s, [1.387, 0.856, 1.817, 1.782], 'FF86E7', 'ellipse');
+}
+
+// ---------------------------------------------------------------- slide 13
+function slide13(s) {   // About Me
+  box(s, [8.779, 0, 4.554, 3.714], DARK);
+  txt(s, [9.277, 0.726, 3.584, 0.841], 'COMPENTENCIES AND WORK AREA', { sz: 20, f: POP_SB, c: WHITE, sp: 1.5, lh: 1.1 });
+  rule(s, [9.417, 1.849, 1.187, 0], WHITE, { w: 3 });
+  [
+    [10.794, 0.219, 0.219], [11.045, 0.219, 0.219], [11.301, 0.219, 0.219], [11.551, 0.219, 0.219],
+    [11.8, 0.215, 0.222]
+  ].forEach(([x, w, h]) => shp(s, 'star5', [x, 1.723, w, h], GOLD));
+  txt(s, [9.302, 2.109, 3.381, 0.934], 'PLACEHOLDER', { sz: 11, f: LATO, c: WHITE, al: 'justify', lh: 1.5 });
+  txt(s, [-1.765, 4.225, 4.848, 1.447], [run('About Me', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  [
+    [1.588, 5.03, '03/ TAXATION'], [5.213, 5.03, '04/ AUDITING'], [5.213, 2.232, '02/ LEADERSHIP']
+  ].forEach(([x, y, t]) => txt(s, [x, y, 2.742, 0.286], t, { sz: 11, f: POP_SB, sp: 1, al: 'center' }));
+  [
+    [1.588, 5.334, 0.897], [1.588, 2.536, 0.934], [5.213, 5.334, 0.897], [5.213, 2.536, 0.897]
+  ].forEach(([x, y, h]) => txt(s, [x, y, 2.742, h], 'Maldives sail inside lorem ipsum vims sadda euponderum dolor sit amet \nvcerti jameto parisianisas aase ', { sz: 11, f: LATO, c: GREY, al: 'center', lh: 1.5 }));
+  txt(s, [1.588, 2.232, 2.742, 0.303], '01/ FINANCIAL', { sz: 12, f: POP_SB, sp: 1, al: 'center' });
+  art(s, ART.shape20, [2.675, 4.162, 0.748, 0.742], TEAL);
+  art(s, ART.shape21, [2.723, 4.449, 0.455, 0.359], TEAL);
+  art(s, ART.shape22, [2.723, 4.209, 0.455, 0.216], TEAL);
+  art(s, ART.shape23, [2.999, 4.588, 0.105, 0.177], TEAL);
+  shp(s, 'ellipse', [2.974, 4.593, 0.072, 0.071], TEAL);
+  shp(s, 'ellipse', [3.058, 4.688, 0.072, 0.072], TEAL);
+  art(s, ART.shape24, [3.223, 4.677, 0.076, 0.143], TEAL);
+  box(s, [2.77, 4.593, 0.144, 0.023], TEAL);
+  box(s, [2.77, 4.641, 0.144, 0.023], TEAL);
+  box(s, [2.77, 4.689, 0.144, 0.023], TEAL);
+  box(s, [2.77, 4.736, 0.144, 0.023], TEAL);
+  art(s, ART.shape25, [2.914, 4.268, 0.072, 0.097], TEAL);
+  art(s, ART.shape26, [2.997, 4.269, 0.072, 0.095], TEAL);
+  art(s, ART.shape27, [2.831, 4.269, 0.071, 0.095], TEAL);
+  art(s, ART.shape28, [6.242, 4.126, 0.783, 0.778], TEAL);
+  art(s, ART.shape29, [6.316, 4.201, 0.193, 0.155], TEAL);
+  art(s, ART.shape30, [6.316, 4.437, 0.194, 0.155], TEAL);
+  art(s, ART.shape31, [6.316, 4.675, 0.193, 0.155], TEAL);
+  art(s, ART.shape32, [6.552, 4.201, 0.184, 0.024], TEAL);
+  art(s, ART.shape33, [6.552, 4.265, 0.184, 0.024], TEAL);
+  art(s, ART.shape34, [6.629, 4.649, 0.087, 0.087], TEAL);
+  art(s, ART.shape35, [6.861, 4.649, 0.087, 0.087], TEAL);
+  art(s, ART.shape36, [6.743, 4.649, 0.087, 0.087], TEAL);
+  art(s, ART.shape37, [6.861, 4.755, 0.087, 0.087], TEAL);
+  art(s, ART.shape38, [6.629, 4.755, 0.087, 0.087], TEAL);
+  art(s, ART.shape39, [6.743, 4.755, 0.087, 0.087], TEAL);
+  art(s, ART.shape40, [6.275, 1.871, 0.875, 0.2], TEAL);
+  art(s, ART.shape41, [6.93, 1.895, 0.205, 0.175], TEAL);
+  box(s, [6.718, 1.942, 0.205, 0.128], TEAL);
+  box(s, [6.505, 1.982, 0.205, 0.089], TEAL);
+  box(s, [6.291, 2.026, 0.205, 0.045], TEAL);
+  art(s, ART.shape42, [6.302, 1.197, 0.854, 0.764], TEAL);
+  art(s, ART.shape43, [6.857, 1.673, 0.128, 0.198], TEAL);
+  art(s, ART.shape44, [6.418, 1.784, 0.127, 0.177], TEAL);
+  art(s, ART.shape45, [2.665, 1.241, 0.806, 0.905], TEAL);
+  shp(s, 'ellipse', [3.394, 1.33, 0.128, 0.137], TEAL);
+  shp(s, 'ellipse', [2.617, 1.922, 0.128, 0.135], TEAL);
+  art(s, ART.shape46, [3.342, 1.38, 0.035, 0.035], TEAL);
+  shp(s, 'ellipse', [2.762, 1.972, 0.035, 0.036], TEAL);
+  art(s, ART.shape47, [2.988, 1.613, 0.163, 0.163], TEAL);
+  photo(s, [8.779, 3.714, 4.554, 3.8], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 14
+function slide14(s) {   // 01
+  box(s, [0, -0.008, 6.931, 7.5], DARK);
+  txt(s, [0.819, 2.792, 4.571, 1.01], 'Photography', { sz: 54, f: PLAY, c: WHITE, al: 'right', wrap: false, vert: 'horz' });
+  txt(s, [2.67, 3.701, 1.355, 1.447], '01', { sz: 80, f: POP_BD, c: GOLD, al: 'center', wrap: false });
+  rule(s, [4.052, 4.265, 1.187, 0], WHITE, { w: 3 });
+  photo(s, [6.681, 0, 6.653, 7.5], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 15
+function slide15(s) {   // Photography
+  photo(s, [4.191, 1.194, 3.7, 5.458], 'FF86E7');
+  [
+    [2.743], [3.563], [4.317], [5.127]
+  ].forEach(([y]) => txt(s, [1.854, y, 2.009, 0.303], 'Lorem Ipsum Dolor', { sz: 12, f: MONT, c: GREY }));
+  txt(s, [1.854, 2.384, 1.739, 0.454], 'CLIENT :', { sz: 14, f: MONT_SB, c: BLACK, lh: 1.5 });
+  txt(s, [1.854, 3.204, 1.739, 0.415], 'THEME :', { sz: 14, f: MONT_SB, c: BLACK, lh: 1.5 });
+  txt(s, [1.854, 3.958, 1.739, 0.454], 'CONCEPT :', { sz: 14, f: MONT_SB, c: BLACK, lh: 1.5 });
+  txt(s, [1.854, 4.768, 1.922, 0.454], 'PRODUCT NAME', { sz: 14, f: MONT_SB, c: BLACK, lh: 1.5 });
+  txt(s, [8.263, 3.637, 2.626, 0.303], 'Imboost Your Immune Body', { sz: 12, f: MONT });
+  txt(s, [8.145, 2.183, 3.098, 1.548], 'HEALTHY\nDRINK', { sz: 40, f: PLAY_BD, c: TEAL, m: [0.2, 0.2, 0.1, 0.1], wrap: false });
+  art(s, ART.shape48, [6.956, 1.387, 0.31, 0.312], WHITE);
+  art(s, ART.shape48, [7.377, 1.387, 0.31, 0.312], WHITE, { flipH: true });
+  txt(s, [9.141, 3.395, 6.467, 1.447], [run('Photography', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  txt(s, [8.263, 4.257, 3.19, 0.303], 'Theme Product Photography', { sz: 12, f: MONT_BD, c: INK });
+  txt(s, [8.274, 4.583, 3.345, 1.064], 'andiz oblivion dfiionehas shine in service are not beauty alins  maldies isuperior foatures lorom its women snoruma note oneom ipsum dor not.', { sz: 11, f: MONT, c: GREY, lh: 1.3 });
+  txt(s, [0.512, 0.477, 5.954, 0.37], 'Portfolio Photography', { sz: 16, f: POP });
+}
+
+// ---------------------------------------------------------------- slide 16
+function slide16(s) {   // Photography
+  [
+    [7.169, 3.166, 2.537, '02. PHOTO TWO'], [10.482, 5.659, 2.514, '02. PHOTO THREE'],
+    [10.482, 0.664, 2.514, '01. PHOTO ONE']
+  ].forEach(([x, y, w, t]) => txt(s, [x, y, w, 0.286], t, { sz: 11, f: MONT_BD, b: 1, sp: 0.5, al: 'center' }));
+  [
+    [7.169, 3.449, 2.537], [10.482, 5.946, 2.514], [10.482, 0.951, 2.514]
+  ].forEach(([x, y, w]) => txt(s, [x, y, w, 0.858], 'ocibus mediocrem ex vis ovume errem pertinacia et sit. rearear fabulas meliore jaeto rianas', { sz: 10, f: MONT, c: GREY, al: 'center', lh: 1.5 }));
+  txt(s, [1.948, 1.809, 4.376, 1.507], 'PHOTOGRAPHY IS THE STORY I FAIL TO PUT INTO WORDS', { sz: 26, f: PLAY_SB, c: TEAL, lh: 1.1 });
+  txt(s, [1.948, 3.316, 4.2, 0.858], 'mediocrem ex vis. Novumi era perti jameto fine parisi its Ethereum vmouse persequsap eanesin quarters name in mnesarch voltatibus andiz oblivionizi lasti definitionem, ', { sz: 10, f: MONT, c: GREY, lh: 1.5 });
+  txt(s, [1.948, 4.503, 3.845, 0.303], 'CONCEPT THEME PHOTOGRAPY', { sz: 12, f: MONT_BD, sp: 0.5 });
+  txt(s, [1.948, 4.835, 4.2, 1.111], 'Vocibus mediocrem ex vis ovi era dot perti jametosca parisian Ethereum vmoue persequsap eani quar nam mnesarch voltatibus sileancer andiz my coffee near porumase incorporate  ecia eolorese epicini mana ', { sz: 10, f: MONT, c: GREY, lh: 1.5 });
+  txt(s, [-2.432, 3.395, 6.467, 1.447], [run('Photography', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  txt(s, [0.512, 0.313, 5.954, 0.37], 'Portfolio Photography', { sz: 16, f: POP });
+  photo(s, [6.828, 0, 3.247, 2.506], 'FF86E7');
+  photo(s, [6.828, 4.984, 3.247, 2.506], '40009D');
+  photo(s, [10.085, 2.479, 3.247, 2.506], 'C2C2C2');
+}
+
+// ---------------------------------------------------------------- slide 17
+function slide17(s) {   // Photography
+  photo(s, [0, 0, 8.369, 7.5], 'FF86E7');
+  box(s, [7.188, 1.81, 4.929, 4], 'FDFDFD');
+  txt(s, [7.59, 2.38, 3.195, 1.043], 'Product Photography ', { sz: 28, f: PLAY, b: 1 });
+  rule(s, [7.665, 2.287, 0.532, 0], GOLD, { w: 3 });
+  txt(s, [7.74, 5.061, 1.069, 0.306], 'Read more', { sz: 10.5, f: LATO_BK, c: WHITE, al: 'center', va: 'middle', shadow: { type: 'outer', blur: 18, offset: 3, angle: 90, color: '7030A0', opacity: 0.22 }, fill: TEAL });
+  txt(s, [9.168, 3.395, 6.467, 1.447], [run('Photography', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  txt(s, [7.665, 3.673, 2.537, 0.303], 'NAME PROJECT', { sz: 12, f: POP_SB });
+  txt(s, [7.665, 3.956, 2.537, 0.858], 'ocibus mediocrem ex vis ovume errem pertinacia et sit. rearear fabulas meliore jaeto rianas', { sz: 10, f: MONT, c: GREY, lh: 1.5 });
+}
+
+// ---------------------------------------------------------------- slide 18
+function slide18(s) {   // 02
+  box(s, [0, -0.008, 6.931, 7.5], DARK);
+  txt(s, [1.731, 2.792, 3.659, 1.01], 'Packaging', { sz: 54, f: PLAY, c: WHITE, al: 'right', wrap: false, vert: 'horz' });
+  txt(s, [2.476, 3.701, 1.573, 1.447], '02', { sz: 80, f: POP_BD, c: GOLD, al: 'center', wrap: false });
+  rule(s, [4.052, 4.265, 1.187, 0], WHITE, { w: 3 });
+  photo(s, [6.681, 0, 6.653, 7.5], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 19
+function slide19(s) {   // ABOUT HISTORY, PROJECT NAME AND CONCEPT
+  box(s, [0, 0, 6.151, 3.438], DARK);
+  shp(s, 'rect', [0.232, 0.16, 5.686, 3.118], null, { line: { color: WHITE, width: 2.25 } });
+  txt(s, [-0.024, 0, 0.725, 2.524], 'PRODUCT  PHOTOGRAPHY', { sz: 12, f: POP_BD, c: BLACK, b: 1, al: 'center', va: 'middle', vert: 'vert', fill: WHITE });
+  txt(s, [1.002, 0.463, 4.54, 0.878], 'ABOUT HISTORY, PROJECT NAME AND CONCEPT', { sz: 22, f: POP_SB, c: WHITE, lh: 1.05 });
+  rule(s, [1.115, 1.466, 0.625, 0], GOLD, { w: 3 });
+  txt(s, [1.002, 1.679, 4.657, 1.212], 'Vocibus mediocrem ex vis. Novmi era pertis jamet vero arisianesa tinciduni no ethereum vmuse moe perseq usap anesin quarn name mnesarches voltatibus sileancer andizmerai oblivion zomaidy in definitioni ve inside our ipsum dolor amet consecteur everdeen ', { sz: 11, f: LATO, c: MIST, lh: 1.5 });
+  photo(s, [6.451, 0, 6.882, 7.5], 'FF86E7');
+  photo(s, [0, 3.75, 6.151, 3.75], '40009D');
+}
+
+// ---------------------------------------------------------------- slide 20
+function slide20(s) {   // ABOUT HISTORY, PROJECT NAME AND CONCEPT
+  photo(s, [0, 4.035, 3.695, 3.465], 'FF86E7');
+  photo(s, [3.695, 4.035, 5.845, 3.465], '40009D');
+  photo(s, [9.506, 0, 3.832, 7.5], 'FF86E7');
+  box(s, [3.685, 0, 5.832, 4.035], INK);
+  txt(s, [0.502, 1.133, 2.943, 1.717], 'PACKAGING CAN BE THEATER, IT CAN CREATE A STORY', { sz: 20, f: POP_SB, c: INK, sp: 2, lh: 1.2 });
+  txt(s, [0.502, 2.924, 2.322, 0.337], '- Steve Job - ', { sz: 14, f: PLAY, c: INK, i: 1, sp: 0.5, al: 'center' });
+  [
+    [3.695, 5.815, 'Bridge of USA  '], [0, 3.693, 'Super Mall California'], [9.51, 3.823, 'Apartment of England']
+  ].forEach(([x, w, t]) => txt(s, [x, 6.704, w, 0.419], t, { f: POP_SB, c: SNOW, al: 'center', lh: 1.05 }));
+  txt(s, [4.368, 0.796, 4.54, 0.878], 'ABOUT HISTORY, PROJECT NAME AND CONCEPT', { sz: 22, f: POP_SB, c: WHITE, lh: 1.05 });
+  rule(s, [4.481, 1.799, 0.625, 0], GOLD, { w: 3 });
+  txt(s, [4.368, 2.013, 4.657, 1.212], 'Vocibus mediocrem ex vis. Novmi era pertis jamet vero arisianesa tinciduni no ethereum vmuse moe perseq usap anesin quarn name mnesarches voltatibus sileancer andizmerai oblivion zomaidy in definitioni ve inside our ipsum dolor amet consecteur everdeen ', { sz: 11, f: LATO, c: MIST, lh: 1.5 });
+}
+
+// ---------------------------------------------------------------- slide 21
+function slide21(s) {   // PACKAGING CAN BE THEATER, IT CAN CREATE A ST
+  photo(s, [0, 0, 6.158, 7.5], 'FF86E7');
+  box(s, [6.159, 5.333, 7.175, 2.198], INK);
+  txt(s, [5.424, 5.345, 0.734, 2.196], 'DESCRIPTION', { sz: 12, f: POP_SB, c: INK, sp: 1, al: 'center', va: 'middle', vert: 'vert270', fill: AMBER });
+  txt(s, [8.72, 6.076, 3.763, 0.897], 'PLACEHOLDER', { sz: 11, f: LATO, c: SILVER, al: 'justify', lh: 1.5 });
+  txt(s, [8.72, 5.779, 3.763, 0.286], 'DETAIL PROJECT', { sz: 11, f: POP_SB, c: WHITE, sp: 1 });
+  txt(s, [7.175, 2.587, 5.308, 2.045], 'andizm eraierae oblivion zomaidy extiner tiny definit ione strave inside our city aamia priliya moren delicaimeu jobbard pondrumas ini conie the invoke sni Great wosr oec tincidunt lacus in pretiumi iaculis nesa Aliquam ornare faucibus lobortis Sedia magna erex, rho sit tiny definit ione strave eser mnesai rche innera voltatibus well sileancer slarkin andizmerai oblivion zomaidy in definition serda inside ione strave inside our city mnesarches voltatibus sileancer andizmerai oblivion end', { sz: 11, f: LATO, c: GREY, al: 'justify', lh: 1.5 });
+  rule(s, [7.277, 2.319, 1.165, 0], GOLD, { w: 3 });
+  txt(s, [7.175, 1.15, 4.854, 0.878], 'PACKAGING CAN BE THEATER, IT CAN CREATE A STORY', { sz: 21, f: POP_MD, c: INK, sp: 1, lh: 1.1 });
+  txt(s, [-0.024, 0, 0.725, 2.089], 'PACKAGING', { sz: 16, f: POP_BD, c: BLACK, b: 1, al: 'center', va: 'middle', vert: 'vert', fill: WHITE });
+  photo(s, [7.122, 5.702, 1.349, 1.324], '40009D', 'ellipse');
+}
+
+// ---------------------------------------------------------------- slide 22
+function slide22(s) {   // 03
+  box(s, [0, -0.008, 6.931, 7.5], DARK);
+  txt(s, [1.379, 2.792, 4.011, 1.01], 'Illustration', { sz: 54, f: PLAY, c: WHITE, al: 'right', wrap: false, vert: 'horz' });
+  txt(s, [2.457, 3.701, 1.611, 1.447], '03', { sz: 80, f: POP_BD, c: GOLD, al: 'center', wrap: false });
+  rule(s, [4.052, 4.265, 1.187, 0], WHITE, { w: 3 });
+  photo(s, [6.681, 0, 6.653, 7.5], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 23
+function slide23(s) {   // PROJECT CONCEPT NAME 02
+  box(s, [4.955, 3.75, 8.378, 3.75], DARK);
+  photo(s, [0, 0.017, 4.955, 7.483], 'FF86E7');
+  photo(s, [9.42, 4.463, 2.799, 2.325], '40009D');
+  photo(s, [5.919, 0.689, 2.799, 2.325], 'FF86E7');
+  txt(s, [5.716, 5.641, 3.41, 1.175], 'Vocibus mediocr ex vis. novmi era perti jametos os verses arian tincunt ethereum this vimouse sequsap anein quarn nam mnesahes this day voltatibus sileancer andizmeri per sempras', { sz: 11, f: LATO, c: SILVER, al: 'right', lh: 1.5 });
+  txt(s, [5.919, 4.434, 3.207, 0.792], 'PROJECT CONCEPT NAME 02', { f: POP_SB, c: WHITE, al: 'right', lh: 1.14 });
+  rule(s, [8.369, 5.414, 0.625, 0], GOLD, { w: 3 });
+  txt(s, [9.23, 1.868, 3.41, 1.175], 'Vocibus mediocr ex vis. novmi era perti jametos os verses arian tincunt ethereum this vimouse sequsap anein quarn nam mnesahes this day voltatibus sileancer andizmeri per sempras', { sz: 11, f: LATO, c: GREY, lh: 1.5 });
+  txt(s, [9.23, 0.66, 2.99, 0.792], 'PROJECT CONCEPT NAME 01', { f: POP_SB, c: INK, lh: 1.14 });
+  rule(s, [9.345, 1.64, 0.625, 0], GOLD, { w: 3 });
+}
+
+// ---------------------------------------------------------------- slide 24
+function slide24(s) {   // PROJECT DIRECTOR
+  photo(s, [0.84, 0, 7.932, 7.5], 'FF86E7');
+  photo(s, [9.853, 0.681, 2.292, 2.249], '40009D', 'ellipse');
+  txt(s, [9.446, 3.66, 3.162, 1.731], 'Vocibus mediocrem ex vis. Novmi era pertis jamet vero arisianesa tinciduni no ethereum vmuse moe perseq usap anesin quarn name mnesarches voltatibus sileancer andizmerai oblivion zomaidy in definitioni ve inside our ipsum dolor amet consecteur everdeen ', { sz: 11, f: LATO, c: GREY, al: 'justify', lh: 1.5 });
+  txt(s, [9.438, 3.293, 3.169, 0.32], 'PROJECT DIRECTOR', { sz: 13, f: POP_SB, c: INK, sp: 1, al: 'center' });
+  txt(s, [9.542, 5.668, 1.622, 0.496], 'DETAIL PROJECT', { sz: 11, f: POP_SB, c: WHITE, sp: 1, al: 'center', va: 'middle', fill: INK });
+  txt(s, [8.05, 4.905, 0.725, 1.951], 'ILUUSTRATION', { sz: 12, f: POP_SB, c: BLACK, al: 'center', va: 'middle', vert: 'vert', fill: WHITE });
+  box(s, [8.05, 6.831, 0.725, 0.664], BLACK);
+  art(s, ART.shape49, [8.187, 6.997, 0.213, 0.253], AMBER);
+  art(s, ART.shape49, [8.401, 6.997, 0.213, 0.253], WHITE);
+}
+
+// ---------------------------------------------------------------- slide 25
+function slide25(s) {   // “
+  box(s, [0, 0, 13.333, 3.75], DARK);
+  box(s, [0, 7.184, 13.333, 0.316], DARK);
+  txt(s, [1.373, 4.024, 1.063, 1.447], '“', { sz: 80, f: MONT, c: DARK, al: 'center' });
+  txt(s, [0.301, 0.598, 3.267, 0.909], 'ILLUSTRATION PORTFOLIO', { sz: 24, f: POP_SB, c: WHITE, sp: 3, al: 'center', flipH: true });
+  rule(s, [1.394, 1.636, 1.081, 0], GOLD, { w: 3 });
+  [
+    [4.013], [6.988], [9.963]
+  ].forEach(([x]) => txt(s, [x, 6.229, 2.351, 0.606], 'Lorem ipsum dolor sit \namet anasanu consectetun', { sz: 10.5, f: POP_SB, c: GREY, al: 'center', lh: 1.5, flipH: true }));
+  [
+    [3.972, 2.434, 0.467, 'PROJECT ONE'], [6.947, 2.434, 0.467, 'PROJECT TWO'],
+    [9.853, 2.571, 0.505, 'PROJECT THREE']
+  ].forEach(([x, w, h, t]) => txt(s, [x, 1.77, w, h], t, { sz: 16, f: POP_SB, c: WHITE, b: 1, sp: 3, al: 'center', lh: 1.5, flipH: true }));
+  art(s, ART.shape50, [12.455, 0.598, 0.283, 0.283], AMBER);
+  txt(s, [0.109, 4.63, 3.591, 1.683], 'DESIGN IS NOT JUST WHAT IT LOOKS LIKE AND FEELS LIKE. DESIGN IS HOW IT WORKS', { f: POP_SB, c: INK, sp: 2, al: 'center', lh: 1.05 });
+  photo(s, [3.835, 2.489, 2.708, 3.392], 'FF86E7');
+  photo(s, [6.81, 2.489, 2.708, 3.392], '40009D');
+  photo(s, [9.784, 2.489, 2.708, 3.392], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 26
+function slide26(s) {   // 04
+  box(s, [0, -0.008, 6.931, 7.5], DARK);
+  txt(s, [1.042, 2.792, 4.348, 1.01], 'Book design', { sz: 54, f: PLAY, c: WHITE, al: 'right', wrap: false, vert: 'horz' });
+  txt(s, [2.416, 3.701, 1.692, 1.447], '04', { sz: 80, f: POP_BD, c: GOLD, al: 'center', wrap: false });
+  rule(s, [4.052, 4.265, 1.187, 0], WHITE, { w: 3 });
+  photo(s, [6.681, 0, 6.653, 7.5], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 27
+function slide27(s) {   // DESIGN IS NOT JUST WHAT IT LOOKS LIKE AND FE
+  box(s, [8.886, 0.001, 4.448, 3.757], DARK);
+  txt(s, [5.085, 5.157, 3.143, 0.32], 'PROJECT NAME', { sz: 13, f: POP_SB, c: INK, sp: 1, al: 'center' });
+  txt(s, [5.085, 5.455, 3.143, 0.897], 'Vocibus mediocrem ex vis. Novum errem pertinacia et sit. Verear fabulas meliore delicata se eros aliquid idea moscow', { sz: 11, f: LATO, c: GREY, al: 'center', lh: 1.5 });
+  txt(s, [9.538, 1.262, 3.143, 0.337], 'PROJECT NAME', { sz: 14, f: POP_SB, c: WHITE, b: 1, sp: 1, al: 'center' });
+  txt(s, [9.538, 1.559, 3.143, 0.897], 'Vocibus mediocrem ex vis. Novum errem pertinacia et sit. Verear fabulas meliore delicata se eros aliquid idea moscow', { sz: 11, f: LATO, c: SILVER, al: 'center', lh: 1.5 });
+  txt(s, [0.511, 1.296, 3.591, 1.868], 'DESIGN IS NOT JUST WHAT IT LOOKS LIKE AND FEELS LIKE. DESIGN IS HOW IT WORKS', { sz: 20, f: POP_SB, c: INK, sp: 2, lh: 1.05 });
+  txt(s, [0, 0, 2.089, 0.725], 'BOOK', { sz: 16, f: POP_BD, c: WHITE, b: 1, sp: 3, al: 'center', va: 'middle', vert: 'vert', fill: DARK });
+  box(s, [2.063, 0, 0.664, 0.725], GOLD);
+  photo(s, [4.428, -0.016, 4.458, 3.75], 'FF86E7');
+  photo(s, [-0.01, 3.734, 4.438, 3.75], '40009D');
+  photo(s, [8.886, 3.734, 4.448, 3.75], '40009D');
+}
+
+// ---------------------------------------------------------------- slide 28
+function slide28(s) {   // ABOUT CONCEPT
+  box(s, [0, 0, 13.333, 7.5], DARK);
+  txt(s, [0.853, 5.497, 2.972, 1.212], 'Vocibus mediocr ex vis. novmi era perti jametos eros verses arian tincunt ethereum this vimouse persequsap anein quarn nam mnesahes', { sz: 11, f: LATO, c: SILVER, al: 'justify', lh: 1.5 });
+  txt(s, [0.853, 4.283, 3.881, 0.878], 'ABOUT CONCEPT\nCOVER DESIGN', { sz: 22, f: POP_SB, c: WHITE, sp: 2, lh: 1.05 });
+  rule(s, [0.965, 5.344, 0.625, 0], GOLD, { w: 3 });
+  txt(s, [7.256, 1.198, 4.423, 1.767], 'Vocibus mediocrem ex vis. Novmi era perti jamet vero arisian  tincidunt Ethereum vmuse moe persequsap anesin quarn nam mnesarches voltatibus sileancer andizmerai oblivion zomaidy in definitione ve inside our city agamia priliya moren delicaimeu jobbard pondrumas persequsap anesin quarn nam mnesarches vo oblivion zomaidy in definitione ve inside our city agamia pri', { sz: 11, f: LATO, c: SILVER, al: 'justify', lh: 1.5 });
+  txt(s, [7.256, 0.864, 1.441, 0.303], 'DESCRIPTION', { sz: 12, f: POP_SB, c: GOLD, sp: 1, wrap: false });
+  photo(s, [0, -0.012, 6.381, 3.75], '40009D');
+  photo(s, [5.048, 3.738, 8.286, 3.75], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 29
+function slide29(s) {   // 05
+  box(s, [0, -0.008, 6.931, 7.5], DARK);
+  txt(s, [1.266, 2.792, 4.124, 1.01], 'Web design', { sz: 54, f: PLAY, c: WHITE, al: 'right', wrap: false, vert: 'horz' });
+  txt(s, [2.416, 3.701, 1.692, 1.447], '05', { sz: 80, f: POP_BD, c: GOLD, al: 'center', wrap: false });
+  rule(s, [4.052, 4.265, 1.187, 0], WHITE, { w: 3 });
+  photo(s, [6.681, 0, 6.653, 7.5], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 30
+function slide30(s) {   // WITHOUT HARD WORK, NOTHING GROWS
+  box(s, [0, 6.683, 6.253, 0.817], INK);
+  photo(s, [6.253, 0, 7.08, 6.683], 'FF86E7');
+  txt(s, [0.462, 6.948, 1.58, 0.286], 'DETAIL PROJECT', { sz: 11, f: POP_MD, c: SNOW, sp: 1, wrap: false });
+  rule(s, [2.67, 7.091, 1.688, 0], MID, { w: 1.5 });
+  box(s, [8.81, 4.889, 4.524, 2.611], WHITE);
+  txt(s, [9.407, 5.381, 3.393, 0.404], 'PROJECY NAME', { sz: 17, f: POP_MD, sp: 1.2, lh: 1.1 });
+  txt(s, [9.407, 5.817, 3.393, 1.175], 'PLACEHOLDER', { sz: 11, f: LATO, c: GREY, al: 'justify', lh: 1.5 });
+  txt(s, [0.879, 3.319, 4.549, 2.322], 'andizm eraierae oblivion zomaidy extiner tiny definit ione strave inside our city aamia priliya moren delicaimeu jobbard pondrumas ini conie the invoke sni Great wosr oec tincidunt lacus in pretiumi iaculis nesa Aliquam ornare faucibus lobortis Sedia magna erex, rho sit tiny definit ione strave eser mnesai rche innera voltatibus well sileancer slarkin andizmerai oblivion zomaidy in definitione inside ione strave inside our city mnesarches voltatibus sileancer andizmerai oblivion', { sz: 11, f: LATO, c: GREY, al: 'justify', lh: 1.5 });
+  txt(s, [0.879, 1.077, 4.549, 1.253], 'WITHOUT HARD WORK, NOTHING GROWS \nBUT WEEDS', { sz: 21, f: POP_MD, c: INK, sp: 1, lh: 1.1 });
+  txt(s, [0.906, 2.354, 4.523, 0.342], 'PROJECT NAME WEBSITE', { sz: 11, f: LATO_MD, c: GREY, sp: 1, lh: 1.5 });
+  [
+    [0.97, 0.245, 0.245], [1.249, 0.245, 0.245], [1.535, 0.245, 0.245], [1.814, 0.245, 0.245], [2.092, 0.24, 0.248]
+  ].forEach(([x, w, h]) => shp(s, 'star5', [x, 2.877, w, h], 'FFD966'));
+  art(s, ART.shape49, [5.209, 6.965, 0.213, 0.253], MID);
+  art(s, ART.shape49, [5.423, 6.965, 0.213, 0.253], WHITE);
+  txt(s, [6.253, 0, 0.725, 2.089], 'WEB DESIGN', { sz: 16, f: POP_BD, c: BLACK, b: 1, sp: 3, al: 'center', va: 'middle', vert: 'vert', fill: WHITE });
+  box(s, [6.253, 2.063, 0.725, 0.664], INK);
+  txt(s, [6.253, 6.683, 2.556, 0.817], 'NATASHA WILONA', { sz: 11, f: POP_SB, c: INK, sp: 1, al: 'center', va: 'middle', fill: AMBER });
+}
+
+// ---------------------------------------------------------------- slide 31
+function slide31(s) {   // POrtofolio
+  txt(s, [8.481, 5.585, 3.143, 0.303], 'INTERIOR WEB DESIGN', { sz: 12, f: POP_SB, c: CHAR, b: 1, sp: 1, al: 'center' });
+  txt(s, [4.035, 1.808, 3.143, 0.303], 'ARCHITECTURE WEB DESIGN', { sz: 12, f: POP_SB, c: CHAR, b: 1, sp: 1, al: 'center' });
+  txt(s, [4.035, 2.07, 3.143, 0.897], 'Vocibus mediocrem ex vis. Novum errem pertinacia et sit. Verear fabulas meli delicata se eros aliquid idea', { sz: 11, f: LATO, c: GREY, al: 'center', lh: 1.5 });
+  art(s, ART.shape51, [5.759, 1.307, 0.143, 0.143], CHAR);
+  art(s, ART.shape52, [5.232, 0.782, 0.75, 0.746], CHAR);
+  txt(s, [8.481, 5.847, 3.143, 0.897], 'Vocibus mediocrem ex vis. Novum errem pertinacia et sit. Verear fabulas meli delicata se eros aliquid idea', { sz: 11, f: LATO, c: GREY, al: 'center', lh: 1.5 });
+  art(s, ART.shape53, [9.904, 4.876, 0.557, 0.422], CHAR);
+  art(s, ART.shape54, [9.642, 4.506, 0.697, 0.792], CHAR);
+  art(s, ART.shape55, [9.934, 4.696, 0.043, 0.044], CHAR);
+  shp(s, 'ellipse', [10.158, 4.624, 0.072, 0.073], CHAR);
+  txt(s, [-1.853, 3.927, 5.31, 1.447], [run('POrtofolio', { outline: { size: 0.75, color: GREY }, transparency: 100 })], { sz: 80, f: PLAY, b: 1, sp: -3, wrap: false, rot: 270 });
+  txt(s, [0.512, 0.313, 5.954, 0.37], 'Website Design', { sz: 16, f: POP });
+  photo(s, [7.833, 0, 4.438, 3.75], '40009D');
+  photo(s, [3.395, 3.75, 4.438, 3.75], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 32
+function slide32(s) {   // CORPORATE WEBSITE DESIGN
+  box(s, [0, 0, 5.271, 7.515], DARK);
+  laptop(s, [5.757, 2.207, 7.034, 3.815]);
+  txt(s, [6.021, 1, 6.254, 0.909], [
+    run('Creativity '),
+    run('is a habit, and the best creativity is the result of good work'),
+    run(' habits')
+  ], { sz: 24, f: PLAY, c: INK, b: 1, i: 1, al: 'center' });
+  txt(s, [8.304, 6.104, 1.964, 0.286], 'www.yourwebsite.com', { sz: 11, f: POP_MD, c: GREY, al: 'center', wrap: false });
+  txt(s, [0.779, 4.941, 2.009, 0.303], 'Lorem Ipsum Dolor', { sz: 12, f: LATO, c: CLOUD });
+  txt(s, [0.779, 4.582, 1.739, 0.454], 'Client :', { sz: 14, f: POP_SB, c: WHITE, lh: 1.5 });
+  txt(s, [0.779, 5.634, 2.009, 0.303], 'Lorem Ipsum Dolor', { sz: 12, f: LATO, c: CLOUD });
+  txt(s, [0.779, 5.275, 1.739, 0.454], 'Concept :', { sz: 14, f: POP_SB, c: WHITE, lh: 1.5 });
+  txt(s, [0.664, 0.957, 4.471, 2.221], 'CORPORATE WEBSITE DESIGN', { sz: 40, f: PLAY_BD, c: GOLD, m: [0.2, 0.2, 0.1, 0.1] });
+  txt(s, [0.772, 3.315, 3.19, 0.303], 'Theme Design Website', { sz: 12, f: MONT_BD, c: WHITE });
+  txt(s, [0.782, 3.664, 3.769, 0.859], 'andiz oblivion dfiionehas shine in service are not  you beauty alins  maldies isuperior foatures lorom its me women snoruma note oneom ipsu.', { sz: 12, f: LATO, c: SNOW, lh: 1.3 });
+  photo(s, [6.573, 2.375, 5.401, 3.181], 'FF86E7');
+}
+
+// ---------------------------------------------------------------- slide 33
+function slide33(s) {   // WHAT CLIENT SAY ABOUT ME
+  [
+    [5.003], [8.936], [1.067]
+  ].forEach(([x]) => shp(s, 'rect', [x, 2.607, 3.327, 4.177], DARK, { shadow: { type: 'outer', blur: 4, offset: 3, angle: 90, color: BLACK, opacity: 0.2 } }));
+  [
+    [5.393, 'ROBERT RICHARD'], [9.305, 'NATASHA WILLIAM'], [1.457, 'DIANA PODOL']
+  ].forEach(([x, t]) => txt(s, [x, 3.894, 2.577, 0.303], t, { sz: 12, f: POP_SB, c: GOLD, sp: 1, al: 'center' }));
+  txt(s, [5.393, 4.225, 2.577, 0.286], 'Business Owner', { sz: 11, f: POP, c: WHITE, al: 'center' });
+  txt(s, [9.305, 4.225, 2.577, 0.286], 'Business Owner', { sz: 11, f: POP, c: SNOW, al: 'center' });
+  [
+    [9.239], [5.349], [1.39]
+  ].forEach(([x]) => txt(s, [x, 4.896, 2.71, 1.212], 'PLACEHOLDER', { sz: 11, f: LATO, c: CLOUD, al: 'center', lh: 1.5 }));
+  txt(s, [1.457, 4.225, 2.577, 0.286], 'Business Owner', { sz: 11, f: POP, c: SNOW, al: 'center' });
+  txt(s, [3.837, 1.066, 5.66, 0.471], 'WHAT CLIENT SAY ABOUT ME', { sz: 22, f: POP_SB, c: TEAL, al: 'center' });
+  art(s, ART.shape56, [3.054, 4.63, 0.096, 0.15], SNOW);
+  art(s, ART.shape57, [2.324, 4.649, 0.159, 0.125], SNOW);
+  art(s, ART.shape58, [2.695, 4.63, 0.147, 0.14], SNOW);
+  art(s, ART.shape56, [6.99, 4.63, 0.096, 0.15], CLOUD);
+  art(s, ART.shape57, [6.259, 4.649, 0.159, 0.125], CLOUD);
+  art(s, ART.shape58, [6.63, 4.63, 0.147, 0.14], CLOUD);
+  art(s, ART.shape56, [10.911, 4.63, 0.096, 0.15], SNOW);
+  art(s, ART.shape57, [10.181, 4.649, 0.159, 0.125], SNOW);
+  art(s, ART.shape58, [10.552, 4.63, 0.147, 0.14], SNOW);
+  [
+    [5.738, 0.334, 0.334], [6.119, 0.334, 0.334], [6.509, 0.334, 0.334], [6.89, 0.334, 0.334],
+    [7.268, 0.327, 0.338]
+  ].forEach(([x, w, h]) => shp(s, 'star5', [x, 0.523, w, h], SUN));
+  [[9.762], [1.898], [5.83]].forEach(([x]) => photo(s, [x, 1.944, 1.664, 1.664], 'FF86E7', 'ellipse'));
+}
+
+// ---------------------------------------------------------------- slide 34
+function slide34(s) {   // “
+  txt(s, [1.996, 4.512, 1.298, 1.212], '“', { sz: 66, f: MONT_BD, c: CLOUD, sp: 0.5, al: 'center' });
+  txt(s, [3.837, 0.645, 5.66, 0.505], 'PEOPLE SAY ABOUT ME', { sz: 24, f: POP_SB, sp: 2, al: 'center' });
+  rule(s, [5.902, 1.269, 1.528, 0], GOLD, { w: 2.25 });
+  [
+    [5.866, 0.288, 0.288], [6.195, 0.288, 0.288], [6.531, 0.288, 0.288], [6.859, 0.288, 0.288],
+    [7.185, 0.282, 0.292]
+  ].forEach(([x, w, h]) => shp(s, 'star5', [x, 4.419, w, h], SUN));
+  txt(s, [2.37, 5.089, 8.594, 1.01], 'mediocrem ex vis. Novumi era perti jameto fine parisi its Ethereum lorem mouse it persequsap eanesin quarters it name in mnesarch voltatibus andiz oblivionizi lasti definitionem, intern agamiaprily morena delicane inner lorem porumase are', { sz: 12, f: MONT, c: GREY, al: 'center', lh: 1.5 });
+  txt(s, [4.744, 4.007, 3.845, 0.337], 'SOME TEXT TITLE PLACE HERE', { sz: 14, f: MONT_BD, c: TEAL, sp: 0.5, al: 'center' });
+  art(s, ART.shape59, [6.065, 6.31, 0.414, 0.414], PINE);
+  art(s, ART.shape60, [6.855, 6.31, 0.413, 0.414], PINE);
+  txt(s, [8.847, 5.724, 1.298, 1.111], '”', { sz: 60, f: MONT_BD, c: CLOUD, sp: 0.5, al: 'center' });
+  [
+    [5.679, 1.879, 1.975, 1.938], [1.569, 3.139, 1.431, 1.404], [10.316, 3.139, 1.431, 1.404]
+  ].forEach(([x, y, w, h]) => photo(s, [x, y, w, h], 'FF86E7', 'ellipse'));
+}
+
+// ---------------------------------------------------------------- slide 35
+function slide35(s) {   // WHAT PEOPLE SAY ABOUT ME
+  box(s, [6.107, 0, 7.226, 7.5], DARK);
+  [[5.076], [2.992], [0.908]].forEach(([y]) => box(s, [5.558, y, 1.667, 1.701], AMBER));
+  txt(s, [7.541, 1.417, 4.948, 0.667], 'PLACEHOLDER', { sz: 12, f: LATO, c: SILVER, i: 1, lh: 1.5 });
+  txt(s, [7.541, 1.128, 3.361, 0.37], 'WIILIAM  | CEO OF YTRX', { sz: 16, f: POP, c: GOLD, b: 1 });
+  txt(s, [7.541, 3.515, 4.948, 0.667], 'PLACEHOLDER', { sz: 12, f: LATO, c: MIST, i: 1, lh: 1.5 });
+  txt(s, [7.541, 3.226, 3.747, 0.37], 'TIARA  | CEO OF EAGLE CORP', { sz: 16, f: POP, c: GOLD, b: 1 });
+  txt(s, [7.541, 5.612, 4.948, 0.667], 'PLACEHOLDER', { sz: 12, f: LATO, c: MIST, i: 1, lh: 1.5 });
+  txt(s, [7.541, 5.324, 3.361, 0.37], 'CLARA  | CEO OF CROWN ', { sz: 16, f: POP, c: GOLD, b: 1 });
+  rule(s, [7.541, 2.67, 5.21, 0], SILVER, { w: 1.25 });
+  rule(s, [7.541, 4.832, 5.21, 0], SILVER, { w: 1.25 });
+  [[4.322], [2.214], [6.413]].forEach(([y]) => art(s, ART.shape56, [8.402, y, 0.134, 0.21], GREY));
+  [[4.344], [2.236], [6.435]].forEach(([y]) => art(s, ART.shape57, [7.684, y, 0.222, 0.175], GREY));
+  [[4.322], [2.214], [6.413]].forEach(([y]) => art(s, ART.shape58, [8.06, y, 0.206, 0.196], GREY));
+  txt(s, [0.794, 2.246, 4.508, 1.447], 'WHAT PEOPLE SAY ABOUT ME', { sz: 40, f: POP_BD });
+  txt(s, [0.842, 4.195, 4.226, 1.01], 'Nulla facilisi shirohi Pellentesque habitant morbi lorem tristique senectus etane netusersa et malesuada fames ac turpis egestas. Etiam fames ac turpise ipsum lorem.', { sz: 12, f: LATO, c: GREY, lh: 1.5 });
+  txt(s, [0.389, 0.407, 2.069, 0.323], 'Natasha Willona', { sz: 12, f: POP_SB, c: '4F4F4F', lh: 1.1 });
+  txt(s, [0.821, 6.849, 4.236, 0.315], [run('Personal '), run('Portfolio', { color: 'D1D1D1', italic: true })], { sz: 12, f: POP_SB, c: '4F4F4F', lh: 1.1 });
+  [
+    [0.894, 0.288, 0.288], [1.223, 0.288, 0.288], [1.559, 0.288, 0.288], [1.887, 0.288, 0.288],
+    [2.214, 0.282, 0.292]
+  ].forEach(([x, w, h]) => shp(s, 'star5', [x, 3.726, w, h], SUN));
+  [[0.994], [3.078], [5.162]].forEach(([y]) => photo(s, [5.628, y, 1.527, 1.527], 'FF86E7'));
+}
+
+// ---------------------------------------------------------------- slide 36
+function slide36(s) {   // THANK YOU
+  box(s, [0, 0.016, 9.679, 7.5], DARK);
+  [
+    [7.395, 0.947, 0.118, 0.118], [7.107, 0.947, 0.118, 0.118], [6.819, 0.947, 0.118, 0.118],
+    [6.531, 0.947, 0.118, 0.118], [6.243, 0.947, 0.118, 0.118], [7.395, 0.645, 0.118, 0.118],
+    [7.107, 0.645, 0.118, 0.118], [6.819, 0.645, 0.118, 0.118], [6.531, 0.645, 0.118, 0.118],
+    [6.243, 0.645, 0.118, 0.118], [7.395, 0.343, 0.118, 0.118], [7.107, 0.343, 0.118, 0.118],
+    [6.819, 0.343, 0.118, 0.118], [6.531, 0.343, 0.118, 0.118], [6.243, 0.343, 0.118, 0.118],
+    [7.395, 1.249, 0.118, 0.118], [7.107, 1.249, 0.118, 0.118], [6.819, 1.249, 0.118, 0.118],
+    [6.531, 1.249, 0.118, 0.118], [6.243, 1.249, 0.118, 0.118], [1.76, 6.745, 0.165, 0.165],
+    [1.358, 6.745, 0.165, 0.165], [0.956, 6.745, 0.165, 0.165], [0.554, 6.745, 0.165, 0.165],
+    [0.152, 6.745, 0.165, 0.165], [1.76, 6.324, 0.165, 0.165], [1.358, 6.324, 0.165, 0.165],
+    [0.956, 6.324, 0.165, 0.165], [0.554, 6.324, 0.165, 0.165], [0.152, 6.324, 0.165, 0.165],
+    [1.76, 5.903, 0.165, 0.165], [1.358, 5.903, 0.165, 0.165], [0.956, 5.903, 0.165, 0.165],
+    [0.554, 5.903, 0.165, 0.165], [0.152, 5.903, 0.165, 0.165], [1.76, 7.166, 0.165, 0.165],
+    [1.358, 7.166, 0.165, 0.165], [0.956, 7.166, 0.165, 0.165], [0.554, 7.166, 0.165, 0.165],
+    [0.152, 7.166, 0.165, 0.165]
+  ].forEach(([x, y, w, h]) => shp(s, 'ellipse', [x, y, w, h], MID));
+  photo(s, [6.536, 0.631, 6, 6.869], '40009D');
+  txt(s, [0.987, 0.919, 3.829, 1.232], [
+    run('LET’S'),
+    run(' KEEP IN', { color: WHITE, breakLine: true }),
+    run('TOUCH WITH ', { color: WHITE }),
+    run('ME')
+  ], { sz: 28, f: POP_SB, c: GOLD, sp: 1, lh: 1.2 });
+  rule(s, [1.092, 2.483, 1.187, 0], WHITE, { w: 3 });
+  txt(s, [1.006, 2.767, 3.81, 0.656], 'Please feel free to call ua on (phone cell) or contact \nby (email),  if you require any further information.', { sz: 11, f: LATO, c: WHITE, lh: 1.5 });
+  box(s, [3.603, 2.271, 0.411, 0.389], '7093D2');
+  art(s, ART.shape56, [3.75, 2.368, 0.117, 0.195], WHITE);
+  box(s, [3.059, 2.271, 0.411, 0.389], '00B0F0');
+  art(s, ART.shape57, [3.169, 2.389, 0.19, 0.153], WHITE);
+  box(s, [2.511, 2.271, 0.411, 0.389], '19C5D7');
+  art(s, ART.shape58, [2.633, 2.386, 0.168, 0.16], WHITE);
+  [
+    [2.569, 3.735, 'LOCATION'], [2.535, 4.815, 'EMAIL'], [2.535, 5.813, 'PHONE']
+  ].forEach(([x, y, t]) => txt(s, [x, y, 1.844, 0.303], t, { sz: 12, f: POP_SB, c: WHITE, sp: 1.5 }));
+  [
+    [2.603, 4.038, 0.539], [2.569, 5.118, 0.514], [2.569, 6.116, 0.514]
+  ].forEach(([x, y, h]) => txt(s, [x, y, 2.935, h], 'Nulla facilis Pellentesque iniad stiqibitant morbi  ia Pellentesque habitant stiqu', { sz: 10, f: LATO, c: WHITE, lh: 1.3 }));
+  art(s, ART.shape61, [1.821, 3.779, 0.623, 0.625], WHITE);
+  art(s, ART.shape62, [1.848, 4.923, 0.586, 0.453], WHITE);
+  art(s, ART.shape63, [1.899, 5.919, 0.451, 0.478], WHITE);
+  txt(s, [7.07, 6.074, 5.053, 1.111], 'THANK YOU', { sz: 60, f: POP_SB, c: WHITE, b: 1, al: 'center', wrap: false });
+}
+
+const DECK = [
+  slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10, slide11,
+  slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20, slide21,
+  slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30, slide31,
+  slide32, slide33, slide34, slide35, slide36
+];
+
+const pptx = new PptxGenJS();
+pptx.layout = 'LAYOUT_WIDE';            // 13.333 x 7.5 in
+pptx.author = 'Natasha Wilona';
+pptx.title = 'Portfolio';
+
+DECK.forEach((build) => build(pptx.addSlide()));
+
+const out = path.join(__dirname, path.basename(__filename, '.js') + '.pptx');
+pptx.writeFile({ fileName: out }).then(() => console.log('wrote', out));
