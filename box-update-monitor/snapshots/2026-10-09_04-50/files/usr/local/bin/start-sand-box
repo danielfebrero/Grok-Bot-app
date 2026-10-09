@@ -1,0 +1,1344 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+export DISPLAY="${DISPLAY:-:1}"
+export SAND_BOX_BOOT_STARTED_AT_MS="${SAND_BOX_BOOT_STARTED_AT_MS:-$(date +%s%3N)}"
+if [ -z "${SAND_BOX_BOOT_ID:-}" ]; then
+	if [ -r /proc/sys/kernel/random/uuid ]; then
+		SAND_BOX_BOOT_ID="$(cat /proc/sys/kernel/random/uuid)"
+	else
+		SAND_BOX_BOOT_ID="${SAND_BOX_BOOT_STARTED_AT_MS}-$$"
+	fi
+	export SAND_BOX_BOOT_ID
+fi
+export SAND_BOX_TELEMETRY_LOG="${SAND_BOX_TELEMETRY_LOG:-/tmp/sand-box-telemetry.log}"
+
+# >>> box port table (from sand/src/shared/box/box-contract.ts; regenerate: pnpm --filter sand run gen:box-ports) >>>
+SAND_BOX_PORT_PRIMARY_EXEC_DAEMON=1337
+SAND_BOX_PORT_WINDOW_ROUTER=1339
+SAND_BOX_PORT_FORK_NOVNC=6081
+SAND_BOX_PORT_EGRESS_TUNNEL_WS=8790
+SAND_BOX_PORT_EGRESS_CONNECT_PROXY=8791
+SAND_BOX_FORK_EXEC_BASE=14000
+WINDOW_TOKEN_DIR="/tmp/sand-window-tokens.d"
+NOVNC_TOKEN_DIR="/tmp/sand-novnc-tokens.d"
+SAND_BOX_WEBAUTHN_PROXY_CREDENTIAL_DIR="/run/sand-webauthn-proxy"
+# <<< box port table <<<
+
+emit_boot_stage() {
+	local stage="$1"
+	local now_ms duration_ms
+	now_ms="$(date +%s%3N)"
+	duration_ms=$((now_ms - SAND_BOX_BOOT_STARTED_AT_MS))
+	if [ "${duration_ms}" -lt 0 ]; then
+		duration_ms=0
+	fi
+	printf '{"kind":"boot_stage","stage":"%s","durationMs":%s}\n' \
+		"${stage}" "${duration_ms}" >>"${SAND_BOX_TELEMETRY_LOG}"
+}
+
+emit_boot_failure() {
+	local stage="$1"
+	local reason="$2"
+	local now_ms duration_ms
+	now_ms="$(date +%s%3N)"
+	duration_ms=$((now_ms - SAND_BOX_BOOT_STARTED_AT_MS))
+	if [ "${duration_ms}" -lt 0 ]; then
+		duration_ms=0
+	fi
+	printf '{"kind":"boot_failure","stage":"%s","reason":"%s","durationMs":%s}\n' \
+		"${stage}" "${reason}" "${duration_ms}" >>"${SAND_BOX_TELEMETRY_LOG}"
+}
+
+emit_boot_stage "entrypoint_started"
+
+SAND_BOX_CGROUPS_LIB="${SAND_BOX_CGROUPS_LIB:-/usr/local/bin/box-cgroups.sh}"
+if [ -r "${SAND_BOX_CGROUPS_LIB}" ]; then
+	# shellcheck source=/dev/null
+	. "${SAND_BOX_CGROUPS_LIB}"
+fi
+if ! command -v sand_cgroup_setup >/dev/null 2>&1; then
+	sand_cgroup_setup() { :; }
+	sand_cgroup_place() { :; }
+	sand_cgroup_join() { :; }
+fi
+if ! command -v sand_cgroup_background_ready >/dev/null 2>&1; then
+	sand_cgroup_background_ready() { return 1; }
+fi
+sand_cgroup_setup
+
+sand_user_non_root() {
+	case "$(printf '%s' "${SAND_USER_NON_ROOT:-}" | tr '[:upper:]' '[:lower:]')" in
+	1 | true | yes) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+if sand_user_non_root; then
+	export SAND_BOX_SCRIPT_SYNC_DISABLED="${SAND_BOX_SCRIPT_SYNC_DISABLED:-1}"
+fi
+
+# Team-admin opt-out (enterprise): the backend stamps SAND_BOX_SUDO_DISABLED=1
+# on a NEW pod when the owner's team turned off the agent's root access on its
+# own machine. Absent (the default) keeps the box user's blanket passwordless
+# sudo; set, the box user gets the narrow timezone grant only. The team's
+# setup scripts still run as root in such a box, but through the host, whose
+# own uid holds that grant (see the uid split below), never through `box`.
+sand_box_sudo_disabled() {
+	case "$(printf '%s' "${SAND_BOX_SUDO_DISABLED:-}" | tr '[:upper:]' '[:lower:]')" in
+	1 | true | yes) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+# Host/agent uid split (SAND_HOST_UID_SPLIT=1, non-root boxes only): the in-box
+# host and its supervisor run as the image's `sand-host` account while the
+# agent's shell, exec-daemon, and the desktop stay `box`. The agent then cannot
+# read or rewrite the host's code (/opt/sand), its mailbox, or the state it
+# keeps, and the managed-setup sudo grant belongs to sand-host alone, so
+# nothing the agent runs can reach it. The host still has to work inside the
+# agent's box-owned trees (sand-data, chrome-profile, /workspace), so it keeps
+# the file capabilities below as ambient capabilities: they let it read, write,
+# chown and signal there without being root or box. The split is requested by
+# the backend and only takes effect when the probe shows this image and this
+# runtime can actually hand those capabilities to sand-host; otherwise the boot
+# reports the fallback and runs the host as box exactly as before.
+SAND_HOST_USER=sand-host
+SAND_HOST_AMBIENT_CAPS=+chown,+dac_override,+fowner,+kill
+SAND_HOST_UID_SPLIT_ACTIVE=0
+sand_host_uid_split_requested() {
+	case "$(printf '%s' "${SAND_HOST_UID_SPLIT:-}" | tr '[:upper:]' '[:lower:]')" in
+	1 | true | yes) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+sand_host_uid_split_probe() {
+	[ "$(id -u)" -eq 0 ] || return 1
+	sand_user_non_root || return 1
+	# Only the supervisor launches the host as sand-host; a box that does not
+	# run it would start the host as box and hand the sudo grant to a uid the
+	# host never has.
+	[ "${SAND_SUPERVISOR_ENABLED:-}" = "1" ] || return 1
+	id -u "${SAND_HOST_USER}" >/dev/null 2>&1 || return 1
+	[ -x /usr/bin/setpriv ] || return 1
+	local probe
+	probe="$(mktemp /tmp/.sand-host-probe.XXXXXX 2>/dev/null)" || return 1
+	chmod 600 "${probe}" 2>/dev/null || {
+		rm -f "${probe}"
+		return 1
+	}
+	# A root-only file only reads as sand-host when CAP_DAC_OVERRIDE actually
+	# survived the uid change, which is the whole point of the probe.
+	if /usr/bin/setpriv --reuid="${SAND_HOST_USER}" --regid="${SAND_HOST_USER}" --init-groups \
+		--inh-caps="${SAND_HOST_AMBIENT_CAPS}" --ambient-caps="${SAND_HOST_AMBIENT_CAPS}" \
+		/usr/bin/cat "${probe}" >/dev/null 2>&1; then
+		rm -f "${probe}"
+		return 0
+	fi
+	rm -f "${probe}"
+	return 1
+}
+if sand_host_uid_split_requested; then
+	if sand_host_uid_split_probe; then
+		SAND_HOST_UID_SPLIT_ACTIVE=1
+		echo "[start-sand-box] host/agent uid split active: host runs as ${SAND_HOST_USER}, agent as box"
+	else
+		emit_boot_failure "host_uid_split" "probe_failed"
+		echo "[start-sand-box] SAND_HOST_UID_SPLIT requested but this box cannot run the host as ${SAND_HOST_USER}; running it as the box user" >&2
+	fi
+fi
+sand_host_uid_split() {
+	[ "${SAND_HOST_UID_SPLIT_ACTIVE}" = "1" ]
+}
+
+SAND_DATA_HOST_OWNED_FILES=(gateway.json webhook-keys.json teach-queue-key.json box-secrets.json)
+remove_host_owned_write_leftovers() {
+	box_no_follow remove-leftovers sand-data /home/box/sand-data "${SAND_DATA_HOST_OWNED_FILES[@]}" || true
+}
+chown_tree_to_box() {
+	local host=()
+	if sand_host_uid_split; then
+		host=(--host "$(id -u "${SAND_HOST_USER}"):$(id -g "${SAND_HOST_USER}")")
+	fi
+	/usr/bin/python3 -I - "$(id -u box):$(id -g box)" "${host[@]}" "$@" 2>/dev/null <<-'PY' || true
+	import argparse
+	import errno
+	import os
+	import resource
+	import stat
+
+
+	def ids(value):
+	    uid, gid = value.split(":")
+	    return int(uid), int(gid)
+
+
+	parser = argparse.ArgumentParser()
+	parser.add_argument("box", type=ids)
+	parser.add_argument("--host", type=ids)
+	parser.add_argument("--host-file", action="append", default=[])
+	parser.add_argument("--mode", type=lambda value: int(value, 8))
+	parser.add_argument("--shallow", action="store_true")
+	parser.add_argument("roots", nargs="+")
+	args = parser.parse_args()
+	host_files = set(args.host_file)
+
+
+	def is_host_file(name):
+	    stem, dot, suffix = name.rpartition(".")
+	    return name in host_files or (
+	        dot == "." and stem in host_files and suffix.isascii() and suffix.isdigit() and len(suffix) <= 10
+	    )
+
+
+	def is_host_owned(info):
+	    return args.host is not None and info.st_uid == args.host[0]
+
+
+	def owner_for(info, name, top):
+	    if is_host_owned(info):
+	        return None
+	    if top and is_host_file(name):
+	        return args.host if name in host_files and stat.S_ISREG(info.st_mode) else None
+	    return args.box
+
+
+	def open_entry(name, dir_fd):
+	    flags = os.O_NOFOLLOW | os.O_CLOEXEC
+	    try:
+	        fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | flags, dir_fd=dir_fd)
+	        opened_dir = True
+	    except OSError as error:
+	        if error.errno not in (errno.ENOTDIR, errno.ELOOP):
+	            raise
+	        fd = os.open(name, os.O_PATH | flags, dir_fd=dir_fd)
+	        opened_dir = False
+	    try:
+	        return fd, opened_dir, os.fstat(fd)
+	    except OSError:
+	        os.close(fd)
+	        raise
+
+
+	def open_root(path):
+	    parts = [part for part in path.split("/") if part]
+	    if not parts:
+	        raise FileNotFoundError(path)
+	    parent = os.open("/", os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+	    try:
+	        for part in parts[:-1]:
+	            child = os.open(
+	                part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent
+	            )
+	            os.close(parent)
+	            parent = child
+	            if is_host_owned(os.fstat(parent)):
+	                raise PermissionError(path)
+	        return open_entry(parts[-1], parent)
+	    finally:
+	        os.close(parent)
+
+
+	def settle(fd, opened_dir, info, name, top):
+	    owner = owner_for(info, name, top)
+	    if owner is None:
+	        return False
+	    try:
+	        if (info.st_uid, info.st_gid) != owner:
+	            if opened_dir:
+	                os.fchown(fd, *owner)
+	            else:
+	                os.chown("/proc/self/fd/%d" % fd, *owner)
+	    except OSError:
+	        return False
+	    return opened_dir and owner == args.box
+
+
+	def already_settled(name, dir_fd, top):
+	    try:
+	        info = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+	    except OSError:
+	        return True
+	    if is_host_owned(info):
+	        return True
+	    if top and is_host_file(name):
+	        return False
+	    return not stat.S_ISDIR(info.st_mode) and (info.st_uid, info.st_gid) == args.box
+
+
+	def walk(path):
+	    try:
+	        fd, opened_dir, info = open_root(path)
+	    except OSError:
+	        return
+	    try:
+	        descend = settle(fd, opened_dir, info, os.path.basename(path), False)
+	        if descend and args.mode is not None:
+	            os.fchmod(fd, args.mode)
+	        names = os.listdir(fd) if descend and not args.shallow else None
+	    except OSError:
+	        names = None
+	    if names is None:
+	        os.close(fd)
+	        return
+	    stack = [(fd, iter(names), True)]
+	    while stack:
+	        dir_fd, entries, top = stack[-1]
+	        name = next(entries, None)
+	        if name is None:
+	            os.close(dir_fd)
+	            stack.pop()
+	            continue
+	        if already_settled(name, dir_fd, top):
+	            continue
+	        try:
+	            child, opened_dir, info = open_entry(name, dir_fd)
+	        except OSError:
+	            continue
+	        try:
+	            if settle(child, opened_dir, info, name, top):
+	                stack.append((child, iter(os.listdir(child)), False))
+	                continue
+	        except OSError:
+	            pass
+	        os.close(child)
+
+
+	soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+	if hard != resource.RLIM_INFINITY and soft < hard:
+	    try:
+	        resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+	    except (OSError, ValueError):
+	        pass
+	for root in args.roots:
+	    walk(root)
+	PY
+}
+box_no_follow() {
+	/usr/bin/python3 -I - "$@" <<-'PY'
+	import errno
+	import os
+	import re
+	import stat
+	import sys
+	import time
+
+	DIRECTORY = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+	SINGLETONS = ("SingletonLock", "SingletonSocket", "SingletonCookie")
+
+
+	class Refused(Exception):
+	    pass
+
+
+	def report(operation, role, error_class):
+	    print("[start-sand-box] refused %s at %s (%s)" % (operation, role, error_class), file=sys.stderr)
+
+
+	def is_link(name, dir_fd):
+	    try:
+	        return stat.S_ISLNK(os.stat(name, dir_fd=dir_fd, follow_symlinks=False).st_mode)
+	    except OSError:
+	        return False
+
+
+	def open_below(name, dir_fd, error_class="parent-link"):
+	    try:
+	        return os.open(name, DIRECTORY, dir_fd=dir_fd)
+	    except OSError as error:
+	        if error.errno == errno.ELOOP or (error.errno == errno.ENOTDIR and is_link(name, dir_fd)):
+	            raise Refused(error_class)
+	        raise
+
+
+	def open_path(path, create=False):
+	    fd = os.open("/", DIRECTORY)
+	    try:
+	        for name in [part for part in path.split("/") if part]:
+	            try:
+	                child = open_below(name, fd)
+	            except FileNotFoundError:
+	                if not create:
+	                    raise
+	                try:
+	                    os.mkdir(name, 0o777, dir_fd=fd)
+	                except FileExistsError:
+	                    pass
+	                child = open_below(name, fd)
+	            os.close(fd)
+	            fd = child
+	    except BaseException:
+	        os.close(fd)
+	        raise
+	    return fd
+
+
+	def unlink_singletons(fd):
+	    for name in SINGLETONS:
+	        try:
+	            os.unlink(name, dir_fd=fd)
+	        except OSError:
+	            pass
+
+
+	def open_parent(path, create=False):
+	    parent_path, name = os.path.split(path.rstrip("/"))
+	    return open_path(parent_path, create), name
+
+
+	def clear_singletons(role, path):
+	    try:
+	        profile = open_path(path)
+	    except FileNotFoundError:
+	        return 0
+	    except Refused as refused:
+	        report("remove", role, refused.args[0])
+	        return 0
+	    try:
+	        unlink_singletons(profile)
+	        refused_fork = None
+	        for name in os.listdir(profile):
+	            if not name.startswith("Fork-"):
+	                continue
+	            try:
+	                fork = open_below(name, profile)
+	            except Refused as refused:
+	                refused_fork = refused.args[0]
+	                continue
+	            except OSError:
+	                continue
+	            try:
+	                unlink_singletons(fork)
+	            finally:
+	                os.close(fork)
+	        if refused_fork is not None:
+	            report("remove", role + "-fork", refused_fork)
+	    finally:
+	        os.close(profile)
+	    return 0
+
+
+	def real_dir(role, path):
+	    parent_path, name = os.path.split(path.rstrip("/"))
+	    try:
+	        parent = open_path(parent_path, create=True)
+	    except Refused as refused:
+	        report("create", role, refused.args[0])
+	        return 1
+	    try:
+	        if is_link(name, parent):
+	            os.unlink(name, dir_fd=parent)
+	        try:
+	            os.mkdir(name, 0o777, dir_fd=parent)
+	        except FileExistsError:
+	            pass
+	        os.close(open_below(name, parent, "target-link"))
+	        return 0
+	    except Refused as refused:
+	        report("create", role, refused.args[0])
+	        return 1
+	    finally:
+	        os.close(parent)
+
+
+	def remove(role, path):
+	    try:
+	        parent, name = open_parent(path)
+	    except FileNotFoundError:
+	        return 0
+	    except Refused as refused:
+	        report("remove", role, refused.args[0])
+	        return 1
+	    try:
+	        os.unlink(name, dir_fd=parent)
+	    except FileNotFoundError:
+	        pass
+	    finally:
+	        os.close(parent)
+	    return 0
+
+
+	def remove_leftovers(role, path, *names):
+	    try:
+	        folder = open_path(path)
+	    except FileNotFoundError:
+	        return 0
+	    except Refused as refused:
+	        report("remove", role, refused.args[0])
+	        return 1
+	    try:
+	        for entry in os.listdir(folder):
+	            stem, _, suffix = entry.rpartition(".")
+	            if stem not in names or not re.fullmatch("[0-9]{1,10}", suffix):
+	                continue
+	            try:
+	                os.unlink(entry, dir_fd=folder)
+	            except FileNotFoundError:
+	                pass
+	            except OSError as error:
+	                report("remove", role, errno.errorcode.get(error.errno, "OSError"))
+	    finally:
+	        os.close(folder)
+	    return 0
+
+
+	def replace_link(name, target, dir_fd):
+	    try:
+	        os.symlink(target, name, dir_fd=dir_fd)
+	    except FileExistsError:
+	        os.unlink(name, dir_fd=dir_fd)
+	        os.symlink(target, name, dir_fd=dir_fd)
+
+
+	def link(role, path, target):
+	    try:
+	        parent, name = open_parent(path)
+	    except Refused as refused:
+	        report("create", role, refused.args[0])
+	        return 1
+	    try:
+	        try:
+	            folder = open_below(name, parent)
+	        except (FileNotFoundError, NotADirectoryError, Refused):
+	            replace_link(name, target, parent)
+	            return 0
+	        try:
+	            replace_link(os.path.basename(target), target, folder)
+	        finally:
+	            os.close(folder)
+	        return 0
+	    finally:
+	        os.close(parent)
+
+
+	def root_lock_mtime(name, dir_fd):
+	    try:
+	        info = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+	    except FileNotFoundError:
+	        return None
+	    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0:
+	        return None
+	    return int(info.st_mtime)
+
+
+	def clear_stale_lock(role, path):
+	    try:
+	        parent, name = open_parent(path)
+	    except FileNotFoundError:
+	        return 0
+	    except Refused as refused:
+	        report("remove", role, refused.args[0])
+	        return 1
+	    try:
+	        first = root_lock_mtime(name, parent)
+	        if first is None:
+	            return 0
+	        for attempt in range(1, 9):
+	            if root_lock_mtime(name, parent) != first:
+	                return 0
+	            age = int(time.time()) - first
+	            if age > 5 and attempt > 2:
+	                print(
+	                    "[start-sand-box] removing a root-owned box-store lock that stopped beating %ds ago (a copy-in that did not exit)" % age,
+	                    flush=True,
+	                )
+	                try:
+	                    os.unlink(name, dir_fd=parent)
+	                except FileNotFoundError:
+	                    pass
+	                return 0
+	            time.sleep(1)
+	        return 0
+	    finally:
+	        os.close(parent)
+
+
+	OPERATIONS = {
+	    "clear-singletons": (clear_singletons, "remove"),
+	    "real-dir": (real_dir, "create"),
+	    "remove": (remove, "remove"),
+	    "remove-leftovers": (remove_leftovers, "remove"),
+	    "link": (link, "create"),
+	    "clear-stale-lock": (clear_stale_lock, "remove"),
+	}
+	operation, role = sys.argv[1:3]
+	action, verb = OPERATIONS[operation]
+	try:
+	    sys.exit(action(role, *sys.argv[3:]))
+	except Refused as refused:
+	    report(verb, role, refused.args[0])
+	    sys.exit(1)
+	except OSError as error:
+	    report(verb, role, errno.errorcode.get(error.errno, "OSError"))
+	    sys.exit(1)
+	PY
+}
+chown_sand_data_to_box() {
+	remove_host_owned_write_leftovers
+	local name host_files=()
+	if sand_host_uid_split; then
+		for name in "${SAND_DATA_HOST_OWNED_FILES[@]}"; do
+			host_files+=(--host-file "${name}")
+		done
+	fi
+	chown_tree_to_box "${host_files[@]}" /home/box/sand-data
+}
+
+reassert_cli_config_owner() {
+	[ "$(id -u)" -eq 0 ] || return 0
+	if sand_user_non_root; then
+		chown_tree_to_box /home/box/cli-config
+	else
+		chown -hR root:root /home/box/cli-config 2>/dev/null || true
+		chmod 700 /home/box/cli-config 2>/dev/null || true
+	fi
+}
+
+# Writes one validated sudoers drop-in; returns non-zero and leaves nothing
+# behind when the rule does not pass visudo.
+install_sudoers_rule() {
+	local name="$1" rule="$2"
+	printf '%s\n' "${rule}" >"/etc/sudoers.d/${name}.tmp" 2>/dev/null || return 1
+	chmod 440 "/etc/sudoers.d/${name}.tmp" 2>/dev/null || true
+	if visudo -cf "/etc/sudoers.d/${name}.tmp" >/dev/null 2>&1 &&
+		mv -f "/etc/sudoers.d/${name}.tmp" "/etc/sudoers.d/${name}" 2>/dev/null; then
+		return 0
+	fi
+	rm -f "/etc/sudoers.d/${name}.tmp" 2>/dev/null || true
+	return 1
+}
+
+if [ "$(id -u)" -eq 0 ]; then
+	if sand_user_non_root; then
+		if sand_box_sudo_disabled; then
+			SAND_BOX_SUDOERS_RULE='box ALL=(root:root) NOPASSWD: /usr/local/bin/sand-box-timezone apply *'
+		else
+			SAND_BOX_SUDOERS_RULE='box ALL=(ALL:ALL) NOPASSWD:ALL'
+		fi
+		install_sudoers_rule box "${SAND_BOX_SUDOERS_RULE}" || true
+		if sand_host_uid_split; then
+			# The host cannot change uid itself, so every managed-setup converge
+			# of a split box goes through the fixed wrapper: as root when the
+			# team disabled the agent's sudo (its setup scripts still get root;
+			# nothing the agent runs does), dropped back to box (`--as-box`)
+			# when it did not, exactly as the converge always ran. The timezone
+			# helper is there for the case where it decides to sudo itself.
+			SAND_HOST_SUDOERS_RULE="${SAND_HOST_USER}"' ALL=(root:root) NOPASSWD: /usr/local/bin/sand-box-timezone apply *, /usr/local/bin/sand-team-converge-privileged "", /usr/local/bin/sand-team-converge-privileged --force, /usr/local/bin/sand-team-converge-privileged --as-box, /usr/local/bin/sand-team-converge-privileged --as-box --force'
+			if install_sudoers_rule sand-host "${SAND_HOST_SUDOERS_RULE}" &&
+				[ -x /usr/local/bin/sand-team-converge-privileged ]; then
+				if sand_box_sudo_disabled; then
+					export SAND_MANAGED_SETUP_RUN_AS=root
+				else
+					export SAND_MANAGED_SETUP_RUN_AS=box
+				fi
+			else
+				# Without its grant the host could only converge as sand-host
+				# itself, which must never run team scripts; give the split up
+				# before anything launches.
+				SAND_HOST_UID_SPLIT_ACTIVE=0
+				rm -f /etc/sudoers.d/sand-host 2>/dev/null || true
+				emit_boot_failure "host_uid_split" "sudoers_failed"
+				echo "[start-sand-box] could not install the ${SAND_HOST_USER} sudoers rule; running the host as the box user" >&2
+			fi
+		else
+			rm -f /etc/sudoers.d/sand-host 2>/dev/null || true
+		fi
+	else
+		rm -f /etc/sudoers.d/box /etc/sudoers.d/sand-host 2>/dev/null || true
+	fi
+fi
+
+SAND_DAEMON_LAUNCHERS_DIR="/usr/local/libexec/sand"
+SAND_DAEMON_RELEASE_STORE_DIR="/var/lib/sand-daemon-supervisor"
+SAND_DAEMON_LOGS_DIR="/tmp"
+declare -A SAND_DISABLED_DAEMONS=()
+SAND_BUNDLED_DAEMON_SERVICES=()
+SAND_DAEMON_LAUNCHER_ARGS=()
+
+daemon_has_bundled_release() {
+	local service="$1"
+	local bundled="$SAND_DAEMON_RELEASE_STORE_DIR/$service/bundled"
+
+	[[ -x "$bundled/$service" && -f "$bundled/manifest.json" ]]
+}
+
+discover_bundled_daemons() {
+	local service_store service
+
+	for service_store in "$SAND_DAEMON_RELEASE_STORE_DIR"/*; do
+		[[ -d "$service_store" ]] || continue
+		service="$(basename "$service_store")"
+		daemon_has_bundled_release "$service" || continue
+		SAND_BUNDLED_DAEMON_SERVICES+=("$service")
+	done
+}
+
+reconcile_daemon_group_access() {
+	local service box_has_access
+
+	[ "$(id -u)" -eq 0 ] || return 0
+	sand_user_non_root || return 0
+	for service in "${SAND_BUNDLED_DAEMON_SERVICES[@]}"; do
+		if ! getent group "$service" >/dev/null 2>&1 ||
+			! id -u "$service" >/dev/null 2>&1; then
+			SAND_DISABLED_DAEMONS["$service"]=1
+			echo "[start-sand-box] daemon identity is missing for $service; keeping it down" >&2
+			continue
+		fi
+
+		box_has_access=0
+		case " $(id -nG box) " in
+		*" $service "*)
+			box_has_access=1
+			;;
+		esac
+
+		if sand_host_uid_split; then
+			if ((box_has_access)) &&
+				! gpasswd --delete box "$service" >/dev/null; then
+				SAND_DISABLED_DAEMONS["$service"]=1
+				echo "[start-sand-box] could not remove box from the $service group" >&2
+			fi
+		elif ((!box_has_access)) &&
+			! usermod --append --groups "$service" box; then
+			SAND_DISABLED_DAEMONS["$service"]=1
+			echo "[start-sand-box] could not grant box access to $service" >&2
+		fi
+	done
+}
+
+prepare_daemon_logs() {
+	local service="$1"
+	local bounded_log="$SAND_DAEMON_LOGS_DIR/sand-${service}.log"
+	local bounded_log_lock="${bounded_log}.lock"
+	local supervisor_log="$SAND_DAEMON_LOGS_DIR/sand-${service}-supervisor.log"
+
+	rm -f -- "$bounded_log" "$bounded_log_lock" "$supervisor_log" 2>/dev/null || return 1
+	install -T -m 0600 -o root -g root /dev/null "$bounded_log" || return 1
+	install -T -m 0600 -o root -g root /dev/null "$bounded_log_lock" || return 1
+	install -T -m 0644 -o root -g root /dev/null "$supervisor_log" || return 1
+}
+
+prepare_bundled_daemon_logs() {
+	local service
+
+	[ "$(id -u)" -eq 0 ] || return 0
+	for service in "${SAND_BUNDLED_DAEMON_SERVICES[@]}"; do
+		if ! prepare_daemon_logs "$service"; then
+			SAND_DISABLED_DAEMONS["$service"]=1
+			echo "[start-sand-box] could not prepare trusted logs for $service; keeping it down" >&2
+		fi
+	done
+}
+
+collect_daemon_launcher_args() {
+	local service service_dir
+
+	[ "$(id -u)" -eq 0 ] || return 0
+	((${#SAND_BUNDLED_DAEMON_SERVICES[@]} > 0)) || return 0
+	if ((copy_in_failed)); then
+		echo "[start-sand-box] box-store copy-in failed; keeping managed daemons down" >&2
+		return 0
+	fi
+	if ! sand_cgroup_background_ready; then
+		echo "[start-sand-box] background cgroup unavailable; keeping managed daemons down" >&2
+		return 0
+	fi
+
+	for service in "${SAND_BUNDLED_DAEMON_SERVICES[@]}"; do
+		service_dir="$SAND_DAEMON_LAUNCHERS_DIR/$service"
+		[[ -z "${SAND_DISABLED_DAEMONS[$service]:-}" ]] || continue
+		if [[ ! -x "$service_dir/start" ]]; then
+			echo "[start-sand-box] daemon launcher is missing for $service; keeping it down" >&2
+			continue
+		fi
+		SAND_DAEMON_LAUNCHER_ARGS+=(
+			--daemon-launcher
+			"$service=$service_dir/start"
+		)
+	done
+}
+
+discover_bundled_daemons
+reconcile_daemon_group_access
+
+if [ "$(id -u)" -eq 0 ]; then
+	SAND_BOX_LAUNCHER_HELPERS=(
+		/usr/local/bin/box-chrome
+	)
+	if sand_user_non_root; then
+		chown box:box "${SAND_BOX_LAUNCHER_HELPERS[@]}" 2>/dev/null || true
+	else
+		chown root:root "${SAND_BOX_LAUNCHER_HELPERS[@]}" 2>/dev/null || true
+	fi
+fi
+
+# The host bundle root (/opt/sand: sand-host/ + deps/, plus the swap's .stage
+# and .prev siblings) belongs to whichever account runs the host. Every
+# recursive chown over a tree the agent can write is -h: a symlink it planted
+# there must never hand its target to box.
+if [ "$(id -u)" -eq 0 ]; then
+	if sand_host_uid_split; then
+		chown -hR "${SAND_HOST_USER}:${SAND_HOST_USER}" /opt/sand 2>/dev/null || true
+	elif sand_user_non_root; then
+		chown_tree_to_box /opt/sand
+	else
+		chown -hR root:root /opt/sand 2>/dev/null || true
+	fi
+fi
+
+# The host owns the orbitd proxy socket; box processes may connect but cannot
+# replace it. setgid makes host-created sockets inherit group box.
+if [ "$(id -u)" -eq 0 ]; then
+	if sand_host_uid_split; then
+		install -d -m 2750 -o "${SAND_HOST_USER}" -g box /run/orbitd-proxy 2>/dev/null || true
+	elif sand_user_non_root; then
+		install -d -m 2750 -o box -g box /run/orbitd-proxy 2>/dev/null || true
+	else
+		install -d -m 2700 -o root -g root /run/orbitd-proxy 2>/dev/null || true
+	fi
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+	rm -f /tmp/sand-managed-converge.log
+	if sand_host_uid_split; then
+		# The host publishes the assignment and manifests here, and a root
+		# converge reads them, so the tree must be one the agent cannot write:
+		# sand-host owns it (the wrapper hands only the receipts of an --as-box
+		# converge to box). The converge log is host-owned and agent-readable,
+		# so the agent can debug setup without being able to alter the output.
+		install -d -m 755 -o box -g box /run/sand 2>/dev/null || true
+		install -d -m 755 -o "${SAND_HOST_USER}" -g "${SAND_HOST_USER}" /opt/sand-managed 2>/dev/null || true
+		chown_tree_to_box /run/sand
+		chown -hR "${SAND_HOST_USER}:${SAND_HOST_USER}" /opt/sand-managed 2>/dev/null || true
+		install -m 640 -o "${SAND_HOST_USER}" -g box /dev/null /tmp/sand-managed-converge.log 2>/dev/null || true
+	elif sand_user_non_root; then
+		install -d -m 755 -o box -g box /run/sand 2>/dev/null || true
+		install -d -m 700 -o box -g box /opt/sand-managed 2>/dev/null || true
+		chown_tree_to_box /run/sand /opt/sand-managed
+	else
+		install -d -m 755 -o root -g root /run/sand 2>/dev/null || true
+		install -d -m 700 -o root -g root /opt/sand-managed 2>/dev/null || true
+		chown -R root:root /run/sand /opt/sand-managed 2>/dev/null || true
+	fi
+fi
+
+box_no_follow remove sand-data-gateway /home/box/sand-data/gateway.json || true
+rm -f \
+	/tmp/xdg-runtime-box/sand-gateway-credential \
+	/tmp/xdg-runtime-box-*/sand-gateway-credential \
+	2>/dev/null || true
+
+if [ "$(id -u)" -eq 0 ]; then
+	rm -rf "${SAND_BOX_WEBAUTHN_PROXY_CREDENTIAL_DIR}"
+	if sand_host_uid_split; then
+		install -d -m 755 -o "${SAND_HOST_USER}" -g "${SAND_HOST_USER}" "${SAND_BOX_WEBAUTHN_PROXY_CREDENTIAL_DIR}" 2>/dev/null || true
+	elif sand_user_non_root; then
+		install -d -m 755 -o box -g box "${SAND_BOX_WEBAUTHN_PROXY_CREDENTIAL_DIR}" 2>/dev/null || true
+	else
+		install -d -m 755 -o root -g root "${SAND_BOX_WEBAUTHN_PROXY_CREDENTIAL_DIR}" 2>/dev/null || true
+	fi
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+	install -d -m 755 -o root -g root \
+		/var/lib/sand \
+		/var/lib/sand/telemetry \
+		2>/dev/null || true
+
+	if sand_user_non_root; then
+		install -d -m 700 -o box -g box \
+			/var/lib/sand/telemetry/codebase \
+			2>/dev/null || true
+	else
+		install -d -m 700 -o root -g root \
+			/var/lib/sand/telemetry/codebase \
+			2>/dev/null || true
+	fi
+fi
+
+export_npm_prefix_without_seeded_npmrc() {
+	AS_BOX+=(NPM_CONFIG_PREFIX=/home/box/.local)
+}
+
+AS_BOX=()
+if sand_user_non_root && [ "$(id -u)" -eq 0 ]; then
+	AS_BOX=(/usr/bin/setpriv --reuid=box --regid=box --init-groups /usr/bin/env HOME=/home/box USER=box LOGNAME=box)
+	export_npm_prefix_without_seeded_npmrc
+	AS_BOX+=("PATH=/home/box/.local/bin:${PATH}")
+fi
+
+box_env_token_unsets() {
+	local entry env_name token_value
+	BOX_ENV_TOKEN_UNSETS=(-u SAND_GATEWAY_TOKEN -u SAND_EGRESS_TUNNEL_BEARER)
+	TOKEN_ALIAS_UNSETS=()
+	while IFS= read -r -d '' entry; do
+		env_name="${entry%%=*}"
+		[ "${env_name}" != "${entry}" ] || continue
+		case "${env_name}" in
+		'' | SAND_GATEWAY_TOKEN | SAND_EGRESS_TUNNEL_BEARER) continue ;;
+		esac
+		for token_value in "${SAND_GATEWAY_TOKEN:-}" "${SAND_EGRESS_TUNNEL_BEARER:-}"; do
+			if [ -n "${token_value}" ] && [[ "${entry#*=}" == *"${token_value}"* ]]; then
+				TOKEN_ALIAS_UNSETS+=(-u "${env_name}")
+				break
+			fi
+		done
+	done < <(/usr/bin/env -0)
+	BOX_ENV_TOKEN_UNSETS+=("${TOKEN_ALIAS_UNSETS[@]}")
+}
+box_env_token_unsets
+
+# Launches the host side (its supervisor, and through it the host) as
+# sand-host with the file capabilities the probe confirmed. HOME stays the
+# agent's home because that is where the host keeps and finds the agent's
+# data; PATH deliberately omits /home/box/.local/bin, which the agent writes.
+AS_HOST=(/usr/bin/env "${TOKEN_ALIAS_UNSETS[@]}" "${AS_BOX[@]}")
+if sand_host_uid_split; then
+	AS_HOST=(
+		/usr/bin/env "${TOKEN_ALIAS_UNSETS[@]}"
+		/usr/bin/setpriv --reuid="${SAND_HOST_USER}" --regid="${SAND_HOST_USER}" --init-groups
+		--inh-caps="${SAND_HOST_AMBIENT_CAPS}" --ambient-caps="${SAND_HOST_AMBIENT_CAPS}"
+		/usr/bin/env HOME=/home/box "USER=${SAND_HOST_USER}" "LOGNAME=${SAND_HOST_USER}" "PATH=${PATH}"
+	)
+fi
+AS_EGRESS_TUNNEL=(/usr/bin/env -u SAND_GATEWAY_TOKEN "${AS_HOST[@]}")
+if sand_host_uid_split; then
+	AS_EGRESS_TUNNEL=(
+		/usr/bin/env -u SAND_GATEWAY_TOKEN "${TOKEN_ALIAS_UNSETS[@]}"
+		/usr/bin/setpriv --reuid="${SAND_HOST_USER}" --regid="${SAND_HOST_USER}" --init-groups
+		/usr/bin/env HOME=/home/box "USER=${SAND_HOST_USER}" "LOGNAME=${SAND_HOST_USER}" "PATH=${PATH}"
+	)
+fi
+AS_BOX=(/usr/bin/env "${BOX_ENV_TOKEN_UNSETS[@]}" "${AS_BOX[@]}")
+
+{
+	printf '%s\n' '/tmp/core.%e.%p.%t' >/proc/sys/kernel/core_pattern
+	ulimit -c 0
+} >/dev/null 2>&1 || true
+
+# vm.swappiness weighs swap against file-page reclaim on a 0-200 scale, and at 0
+# the kernel does not swap until free plus file-backed pages fall below the
+# zone high watermark (https://docs.kernel.org/admin-guide/sysctl/vm.html#swappiness).
+printf '%s\n' 10 >/proc/sys/vm/swappiness 2>/dev/null || true
+
+if [ -r /usr/local/bin/sand-desktop-supervise.sh ]; then
+	# shellcheck source=/dev/null
+	. /usr/local/bin/sand-desktop-supervise.sh
+fi
+if ! command -v sand_desktop_register >/dev/null 2>&1; then
+	sand_desktop_register() { :; }
+	sand_desktop_supervision_enabled() { return 1; }
+fi
+
+display_number="${DISPLAY#:}"
+display_number="${display_number%%.*}"
+rm -f "/tmp/.X${display_number}-lock" "/tmp/.X11-unix/X${display_number}"
+mkdir -p /tmp/.X11-unix 2>/dev/null || true
+chmod 1777 /tmp/.X11-unix 2>/dev/null || true
+
+if [ "$(id -u)" -eq 0 ]; then
+	# The agent's data root exists box-owned before any supervisor role could
+	# create it as sand-host.
+	box_no_follow real-dir sand-data /home/box/sand-data || true
+	chown_sand_data_to_box
+	chown_tree_to_box /home/box/box-store /home/box/chrome-profile
+	# access(2) checks with the caller's real uid and drops its capabilities
+	# when that uid is not root, so the host's existence checks (existsSync)
+	# see plain DAC even though its reads and writes do not. useradd made
+	# /home/box 0700; the group x bit lets sand-host, a member of box, reach
+	# the agent's data root at all.
+	if sand_host_uid_split; then
+		chmod g+x /home/box 2>/dev/null || true
+	fi
+fi
+reassert_cli_config_owner
+box_no_follow link agent-data /home/box/agent-data /home/box/sand-data || true
+
+# With fs.protected_regular enabled, an O_CREAT open of an existing regular file
+# in a sticky world-writable directory fails unless the opener or the directory
+# owner owns it (https://docs.kernel.org/admin-guide/sysctl/fs.html#protected-regular).
+NOVNC_FORKS_LOG=/tmp/novnc-forks.log
+BOX_BOOT_LOGS=(
+	"${NOVNC_FORKS_LOG}"
+	/tmp/sand-window-router.log
+	/tmp/sand-session-sync.log
+	/tmp/sand-cookie-persist.log
+	/tmp/exec-daemon.log
+	/tmp/sand-supervisor.log
+	/tmp/sand-desktop-supervisor.log
+	/tmp/sand-host.log
+	/tmp/persist-cli-auth.log
+	/tmp/start-desktop.log
+	"${SAND_BOX_TELEMETRY_LOG}"
+)
+touch "${BOX_BOOT_LOGS[@]}" 2>/dev/null || true
+chmod a+rw "${BOX_BOOT_LOGS[@]}" 2>/dev/null || true
+prepare_bundled_daemon_logs
+
+clear_chrome_singletons() {
+	box_no_follow clear-singletons chrome-profile "${1:-/home/box/chrome-profile}" || true
+}
+
+# Restored singleton files describe processes from the previous box, so clear
+# every persisted Chrome profile before this boot launches any browser.
+clear_chrome_singletons
+
+mkdir -p "${NOVNC_TOKEN_DIR}"
+mkdir -p "${WINDOW_TOKEN_DIR}"
+if [ "$(id -u)" -eq 0 ]; then
+	chown box:box "${NOVNC_TOKEN_DIR}" "${WINDOW_TOKEN_DIR}" 2>/dev/null || true
+fi
+SAND_DESKTOP_SUPERVISE_DIR="${SAND_DESKTOP_DIR:-/tmp/sand-desktop}"
+mkdir -p "${SAND_DESKTOP_SUPERVISE_DIR}/shared" 2>/dev/null || true
+if [ "$(id -u)" -eq 0 ]; then
+	if sand_user_non_root; then
+		chown_tree_to_box "${SAND_DESKTOP_SUPERVISE_DIR}"
+	else
+		chown -R root:root "${SAND_DESKTOP_SUPERVISE_DIR}" 2>/dev/null || true
+	fi
+fi
+if sand_host_uid_split; then
+	# Both supervisor dirs exist, each owned by the instance that serves it,
+	# before anything the agent can reach is running, so neither can be
+	# squatted in sticky /tmp.
+	install -d -m 755 -o "${SAND_HOST_USER}" -g "${SAND_HOST_USER}" /tmp/sand-supervisor 2>/dev/null || true
+	install -d -m 755 -o box -g box /tmp/sand-desktop-supervisor 2>/dev/null || true
+fi
+NOVNC_HEARTBEAT_S="${SAND_NOVNC_HEARTBEAT_S:-30}"
+FORK_WEBSOCKIFY_ARGS=(
+	--web=/usr/share/novnc
+	--heartbeat="${NOVNC_HEARTBEAT_S}"
+	--token-plugin TokenFile
+	--token-source "${NOVNC_TOKEN_DIR}"
+	"0.0.0.0:${SAND_BOX_PORT_FORK_NOVNC}"
+)
+"${AS_BOX[@]}" /usr/local/bin/box-bounded-log --run "${NOVNC_FORKS_LOG}" -- \
+	/usr/bin/websockify "${FORK_WEBSOCKIFY_ARGS[@]}" &
+FORK_WEBSOCKIFY_PID=$!
+sand_cgroup_place "${SAND_CGROUP_INTERACTIVE_NAME:-interactive}" "${FORK_WEBSOCKIFY_PID}"
+HOME=/home/box sand_desktop_register shared fork-websockify 4 "${NOVNC_FORKS_LOG}" "${FORK_WEBSOCKIFY_PID}" -- \
+	/usr/local/bin/box-bounded-log --run "${NOVNC_FORKS_LOG}" -- \
+	/usr/bin/websockify "${FORK_WEBSOCKIFY_ARGS[@]}"
+FORK_ROUTER_ARGS=("${SAND_BOX_PORT_WINDOW_ROUTER}" "${SAND_BOX_PORT_PRIMARY_EXEC_DAEMON}" "${SAND_BOX_FORK_EXEC_BASE}")
+"${AS_BOX[@]}" /usr/bin/setsid /usr/bin/nohup /exec-daemon/node /usr/local/bin/sand-window-router.mjs "${FORK_ROUTER_ARGS[@]}" \
+	>/tmp/sand-window-router.log 2>&1 &
+FORK_ROUTER_PID=$!
+sand_cgroup_place "${SAND_CGROUP_INTERACTIVE_NAME:-interactive}" "${FORK_ROUTER_PID}"
+HOME=/home/box sand_desktop_register shared fork-router 4 /tmp/sand-window-router.log "${FORK_ROUTER_PID}" --listen-port "${SAND_BOX_PORT_WINDOW_ROUTER}" -- \
+	/exec-daemon/node /usr/local/bin/sand-window-router.mjs "${FORK_ROUTER_ARGS[@]}"
+
+"${AS_BOX[@]}" /usr/bin/setsid /usr/bin/nohup /exec-daemon/node /usr/local/bin/sand-session-sync.mjs \
+	>/tmp/sand-session-sync.log 2>&1 &
+
+"${AS_BOX[@]}" /usr/local/bin/box-bounded-log --run /tmp/sand-web-bot-auth.log -- \
+	/exec-daemon/node /usr/local/bin/sand-web-bot-auth.mjs &
+SAND_WEB_BOT_AUTH_PID=$!
+HOME=/home/box sand_desktop_register shared web-bot-auth 4 /tmp/sand-web-bot-auth.log "${SAND_WEB_BOT_AUTH_PID}" -- \
+	/usr/local/bin/box-bounded-log --run /tmp/sand-web-bot-auth.log -- \
+	/exec-daemon/node /usr/local/bin/sand-web-bot-auth.mjs
+
+# Chrome takes --user-agent from its own process command line
+# (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/components/embedder_support/user_agent_utils.cc)
+# and a second launch only hands its flags to the running singleton
+# (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/chrome/browser/process_singleton_posix.cc),
+# so this daemon sets a live browser's UA over CDP Emulation.setUserAgentOverride
+# (https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setUserAgentOverride).
+"${AS_BOX[@]}" /usr/local/bin/box-bounded-log --run /tmp/sand-ua-governor.log -- \
+	/exec-daemon/node /usr/local/bin/sand-ua-governor.mjs &
+SAND_UA_GOVERNOR_PID=$!
+sand_cgroup_place "${SAND_CGROUP_INTERACTIVE_NAME:-interactive}" "${SAND_UA_GOVERNOR_PID}"
+HOME=/home/box sand_desktop_register shared ua-governor 4 /tmp/sand-ua-governor.log "${SAND_UA_GOVERNOR_PID}" -- \
+	/usr/local/bin/box-bounded-log --run /tmp/sand-ua-governor.log -- \
+	/exec-daemon/node /usr/local/bin/sand-ua-governor.mjs
+
+"${AS_BOX[@]}" /usr/bin/setsid /usr/bin/nohup /exec-daemon/node /usr/local/bin/sand-cookie-persist.mjs \
+	>/tmp/sand-cookie-persist.log 2>&1 &
+
+if [ -n "${SAND_DEV_LOCAL_BACKEND_PROXY_PORTS:-}" ] && [ -r /tmp/sand-local-backend-proxy.mjs ]; then
+	for local_backend_proxy_port in ${SAND_DEV_LOCAL_BACKEND_PROXY_PORTS//,/ }; do
+		"${AS_BOX[@]}" /usr/bin/setsid /usr/bin/nohup /exec-daemon/node /tmp/sand-local-backend-proxy.mjs \
+			"${local_backend_proxy_port}" host.docker.internal "${local_backend_proxy_port}" \
+			>>/tmp/sand-local-backend-relay.log 2>&1 &
+	done
+fi
+
+(
+	printf '%s\n' '-1000' >/proc/self/oom_score_adj 2>/dev/null || true
+	exec "${AS_BOX[@]}" /usr/local/bin/supervise-exec-daemon "${SAND_BOX_PORT_PRIMARY_EXEC_DAEMON}" /usr/local/bin/start-exec-daemon "$@"
+) >/tmp/exec-daemon.log 2>&1 &
+EXEC_DAEMON_SUPERVISOR_PID=$!
+
+if [ "${SAND_EGRESS_TUNNEL_ENABLED:-}" = "1" ]; then
+	EGRESS_TUNNEL_WRAPPER=(
+		/usr/local/bin/supervise-egress-tunnel
+		"${SAND_EGRESS_TUNNEL_WS_PORT:-${SAND_BOX_PORT_EGRESS_TUNNEL_WS}}"
+		/usr/local/bin/start-egress-tunnel
+	)
+	if sand_host_uid_split; then
+		(
+			attempt=0
+			delay_s=1
+			while :; do
+				started_s=${SECONDS}
+				"${AS_EGRESS_TUNNEL[@]}" "${EGRESS_TUNNEL_WRAPPER[@]}"
+				exit_status=$?
+				runtime_s=$((SECONDS - started_s))
+				attempt=$((attempt + 1))
+				[ "${runtime_s}" -lt 60 ] || delay_s=1
+				printf '{"kind":"egress_tunnel","outcome":"restart","attempt":%s,"exitStatus":%s,"runtimeS":%s}\n' \
+					"${attempt}" "${exit_status}" "${runtime_s}" >>"${SAND_BOX_TELEMETRY_LOG}" 2>/dev/null || true
+				echo "[start-sand-box] egress-tunnel wrapper exited (status ${exit_status}); restarting in ${delay_s}s" >&2
+				sleep "${delay_s}"
+				[ "${delay_s}" -ge 30 ] || delay_s=$((delay_s * 2))
+			done
+		) >/tmp/egress-tunnel.log 2>&1 &
+	else
+		(
+			exec "${AS_EGRESS_TUNNEL[@]}" "${EGRESS_TUNNEL_WRAPPER[@]}"
+		) >/tmp/egress-tunnel.log 2>&1 &
+		HOME=/home/box sand_desktop_register shared egress-proxy 4 /tmp/egress-tunnel.log "$!" -- \
+			/usr/bin/env -u SAND_GATEWAY_TOKEN "${EGRESS_TUNNEL_WRAPPER[@]}"
+	fi
+	printf '%s\n' "${SAND_EGRESS_TUNNEL_PROXY_ADDR:-127.0.0.1:${SAND_BOX_PORT_EGRESS_CONNECT_PROXY}}" \
+		>/tmp/sand-egress-proxy 2>/dev/null || true
+	chmod 644 /tmp/sand-egress-proxy 2>/dev/null || true
+fi
+
+clear_stale_root_box_store_lock() {
+	box_no_follow clear-stale-lock box-store-lock /home/box/sand-data/box-store-sync.lock || true
+}
+
+write_copy_in_failure_status() {
+	local error_class="$1"
+	local exit_code="$2"
+
+	printf '{"phase":"failed","restored":0,"total":0,"bytes":0,"outcome":"failed","errorClass":"%s","exitCode":%s}\n' \
+		"$error_class" \
+		"$exit_code" \
+		>/tmp/sand-copy-in-status.json.tmp
+	mv -f /tmp/sand-copy-in-status.json.tmp /tmp/sand-copy-in-status.json
+}
+
+normalize_copy_in_status() {
+	local copy_in_rc="$1"
+
+	if [ "${copy_in_rc}" != "10" ] && [ "${copy_in_rc}" != "0" ] &&
+		! /exec-daemon/node -e '
+			const fs = require("node:fs");
+			try {
+				const status = JSON.parse(fs.readFileSync("/tmp/sand-copy-in-status.json", "utf8"));
+				if (
+					status.phase !== "failed" ||
+					(status.outcome !== "partial" && status.outcome !== "failed")
+				) process.exit(1);
+			} catch {
+				process.exit(1);
+			}
+		' >/dev/null 2>&1; then
+		write_copy_in_failure_status "entrypoint-no-terminal-status" "$copy_in_rc"
+		copy_in_rc=1
+	fi
+
+	printf '%s\n' "${copy_in_rc}"
+}
+
+copy_in_flag="$(printf '%s' "${SAND_BOX_STORE_COPY_IN:-}" | tr '[:upper:]' '[:lower:]')"
+copy_in_requested=0
+case "${copy_in_flag}" in
+1 | true | yes) copy_in_requested=1 ;;
+esac
+copy_in_failed=0
+if ((copy_in_requested)); then
+	copy_in_rc=1
+	if [ -f /opt/sand/sand-host/host-main.cjs ]; then
+		echo "[start-sand-box] box-store copy-in: starting (flag on, host bundle present)"
+		SAND_PACKAGED=1 SAND_HOST_IN_BOX=1 SAND_DATA_ROOT=/home/box/sand-data \
+			/exec-daemon/node --disable-warning=ExperimentalWarning /opt/sand/sand-host/host-main.cjs --box-copy-in \
+			>/tmp/sand-copy-in.log 2>&1
+		copy_in_rc=$?
+		copy_in_rc="$(normalize_copy_in_status "${copy_in_rc}")"
+	else
+		copy_in_rc=127
+		write_copy_in_failure_status "host-bundle-missing" "$copy_in_rc"
+		echo "[start-sand-box] box-store copy-in FAILED: host bundle is missing" \
+			>/tmp/sand-copy-in.log
+	fi
+	cat /tmp/sand-copy-in.log 2>/dev/null || true
+	clear_stale_root_box_store_lock
+	if [ "${copy_in_rc}" = "10" ]; then
+		echo "[start-sand-box] box-store copy-in: hydrated; applying box ownership + clearing Chrome locks"
+		chown_tree_to_box /home/box/chrome-profile
+		chown_sand_data_to_box
+		chown_tree_to_box /workspace
+		reassert_cli_config_owner
+		clear_chrome_singletons
+	elif [ "${copy_in_rc}" = "0" ]; then
+		echo "[start-sand-box] box-store copy-in: no-op (store empty / disabled); continuing without store hydration"
+		chown_sand_data_to_box
+	else
+		copy_in_failed=1
+		echo "[start-sand-box] box-store copy-in FAILED (rc=${copy_in_rc}); booting WITHOUT restore, with snapshot-out DISABLED to protect the durable store, and with the host held down so an un-restored box never serves as an empty identity (the host stays down and the gateway does not listen; only the exec-daemon and the desktop answer; the backend keeps the old box on a preserve recreate; a later recreate retries the hydrate). See /tmp/sand-copy-in.log." >&2
+		SAND_SUPERVISOR_ENABLED=0
+		unset SAND_BOX_STORE_SYNC
+		chown_tree_to_box /home/box/chrome-profile
+		chown_sand_data_to_box
+		chown_tree_to_box /workspace
+		reassert_cli_config_owner
+		clear_chrome_singletons
+	fi
+fi
+
+ensure_real_dir() {
+	box_no_follow real-dir chrome-default-profile "${1}"
+}
+
+if ensure_real_dir /home/box/chrome-profile/Default; then
+	chown_tree_to_box --shallow --mode 700 /home/box/chrome-profile/Default
+fi
+
+start_in_box_supervisor() {
+	if [ "${SAND_SUPERVISOR_ENABLED:-}" = "1" ] || sand_desktop_supervision_enabled; then
+		if sand_host_uid_split; then
+			# Desktop children must keep spawning as box, so the split box runs
+			# two instances: the host role as sand-host (host lifecycle, mailbox,
+			# cgroup samples, box-script sync; the box's lifecycle owner) and the
+			# desktop role as box, each with its own dir, status, and log. The
+			# host learns the desktop role's health file from its env.
+			(
+				printf '%s\n' '-1000' >/proc/self/oom_score_adj 2>/dev/null || true
+				exec "${AS_HOST[@]}" /usr/bin/setsid /usr/bin/nohup /usr/bin/env \
+					SAND_SUPERVISOR_ROLE=host \
+					SAND_SUPERVISOR_DESKTOP_HEALTH_PATH=/tmp/sand-desktop-supervisor/desktop-health.json \
+					/usr/local/bin/supervise-sand-supervisor \
+					/tmp/sand-supervisor/status.json \
+					/tmp/sand-supervisor.log \
+					/exec-daemon/node /usr/local/bin/sand-supervisor.mjs
+			) >/tmp/sand-supervisor-supervise.log 2>&1 &
+			SAND_SUPERVISOR_SUPERVISE_PID=$!
+			if sand_desktop_supervision_enabled; then
+				(
+					printf '%s\n' '-1000' >/proc/self/oom_score_adj 2>/dev/null || true
+					exec "${AS_BOX[@]}" /usr/bin/setsid /usr/bin/nohup /usr/bin/env \
+						SAND_SUPERVISOR_ROLE=desktop \
+						SAND_SUPERVISOR_DIR=/tmp/sand-desktop-supervisor \
+						/usr/local/bin/supervise-sand-supervisor \
+						/tmp/sand-desktop-supervisor/status.json \
+						/tmp/sand-desktop-supervisor.log \
+						/exec-daemon/node /usr/local/bin/sand-supervisor.mjs
+				) >/tmp/sand-desktop-supervisor-supervise.log 2>&1 &
+			fi
+			return 0
+		fi
+		(
+			printf '%s\n' '-1000' >/proc/self/oom_score_adj 2>/dev/null || true
+			exec "${AS_HOST[@]}" /usr/bin/setsid /usr/bin/nohup /usr/local/bin/supervise-sand-supervisor \
+				/tmp/sand-supervisor/status.json \
+				/tmp/sand-supervisor.log \
+				/exec-daemon/node /usr/local/bin/sand-supervisor.mjs
+		) >/tmp/sand-supervisor-supervise.log 2>&1 &
+		SAND_SUPERVISOR_SUPERVISE_PID=$!
+	fi
+}
+
+run_box_doctor() {
+	if [ -x /usr/local/bin/box-doctor ]; then
+		("${AS_BOX[@]}" /usr/local/bin/box-doctor 2>&1 | tee /tmp/box-doctor.log) || true &
+	fi
+}
+
+sand_memory_watch_enabled() {
+	case "$(printf '%s' "${SAND_MEMORY_WATCH_DISABLED:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+	1 | true | yes) return 1 ;;
+	*) return 0 ;;
+	esac
+}
+
+start_memory_watch() {
+	if sand_memory_watch_enabled &&
+		[ -x /usr/local/bin/sand-memory-watch ] &&
+		[ -x /usr/bin/python3 ]; then
+		/usr/bin/setsid /usr/bin/nohup /usr/local/bin/sand-memory-watch \
+			--telemetry-log "${SAND_BOX_TELEMETRY_LOG}" \
+			>>/tmp/sand-memory-watch.log 2>&1 &
+	fi
+}
+
+cli_auth_boot() {
+	[ -x /usr/local/bin/persist-cli-auth ] || return 0
+	"${AS_BOX[@]}" /usr/local/bin/persist-cli-auth retire-mirror \
+		>>/tmp/persist-cli-auth.log 2>&1 || true
+}
+
+apply_box_timezone() {
+	[ -x /usr/local/bin/sand-box-timezone ] || return 0
+	/usr/local/bin/sand-box-timezone apply >>/tmp/sand-box-timezone.log 2>&1 || true
+}
+
+start_desktop() {
+	/usr/local/bin/ensure-machine-id || true
+	"${AS_BOX[@]}" /usr/local/bin/box-bounded-log --run /tmp/start-desktop.log -- \
+		/usr/local/bin/start-desktop.sh &
+	sand_cgroup_place "${SAND_CGROUP_INTERACTIVE_NAME:-interactive}" "$!"
+	desktop_up=0
+	for _ in $(seq 1 150); do
+		if xdpyinfo -display "${DISPLAY}" >/dev/null 2>&1; then
+			desktop_up=1
+			break
+		fi
+		sleep 0.2
+	done
+	if [ "${desktop_up}" = "1" ]; then
+		emit_boot_stage "desktop_up"
+	else
+		emit_boot_failure "desktop" "x_display_timeout"
+	fi
+}
+
+cli_auth_boot
+apply_box_timezone
+start_in_box_supervisor
+start_desktop
+run_box_doctor
+start_memory_watch
+
+sand_exit_watch_enabled() {
+	case "$(printf '%s' "${SAND_EXIT_WATCH_DISABLED:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+	1 | true | yes) return 1 ;;
+	*) return 0 ;;
+	esac
+}
+
+build_sand_exit_watch_args() {
+	SAND_EXIT_WATCH_ARGS=(
+		--telemetry-log "${SAND_BOX_TELEMETRY_LOG}"
+		--exec-owner "${EXEC_DAEMON_SUPERVISOR_PID}"
+	)
+	if [[ -n "${SAND_SUPERVISOR_SUPERVISE_PID:-}" ]]; then
+		SAND_EXIT_WATCH_ARGS+=(
+			--supervise-owner "${SAND_SUPERVISOR_SUPERVISE_PID}"
+		)
+	fi
+	SAND_EXIT_WATCH_ARGS+=("${SAND_DAEMON_LAUNCHER_ARGS[@]}")
+}
+
+collect_daemon_launcher_args
+
+if sand_exit_watch_enabled &&
+	[ -x /usr/local/bin/sand-exit-watch ] &&
+	[ -x /usr/bin/python3 ]; then
+	shopt -s execfail
+	build_sand_exit_watch_args
+	exec /usr/local/bin/sand-exit-watch "${SAND_EXIT_WATCH_ARGS[@]}"
+	echo "[start-sand-box] sand-exit-watch exec failed; falling back to the plain wait" >&2
+elif ((${#SAND_DAEMON_LAUNCHER_ARGS[@]} > 0)); then
+	echo "[start-sand-box] sand-exit-watch is unavailable; keeping managed daemons down" >&2
+fi
+if [ -n "${SAND_SUPERVISOR_SUPERVISE_PID:-}" ]; then
+	wait -n "${EXEC_DAEMON_SUPERVISOR_PID}" "${SAND_SUPERVISOR_SUPERVISE_PID}"
+	owner_status=$?
+	echo "[start-sand-box] a box lifecycle owner exited (status ${owner_status}); ending the box" >&2
+	exit 1
+else
+	wait "${EXEC_DAEMON_SUPERVISOR_PID}"
+fi

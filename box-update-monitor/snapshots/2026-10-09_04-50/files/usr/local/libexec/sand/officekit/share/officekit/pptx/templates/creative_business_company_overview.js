@@ -1,0 +1,3005 @@
+// Recreation of a 84-slide 'Creative Business' template deck with pptxgenjs.
+// Slide size 21.99 x 12.37 in.  Raster images in the original are replaced by
+// labelled placeholder rectangles (see IMG below).
+const pptxgen = require('pptxgenjs');
+const path = require('path');
+
+// ---------------------------------------------------------------- palette
+const K = '000000';
+const WH = 'FFFFFF';
+const NAVY = '292E4F';
+const BLUE = '2DAEFD';
+const PALE = 'AADEFE';
+const GY1 = 'F2F2F2';
+const GY2 = 'D8D8D8';
+const GY3 = 'BFBFBF';
+const NOFILL = { type: 'none' };
+
+// ---------------------------------------------------------------- shape kinds
+const RECT = 'rect', OVAL = 'ellipse', LINE = 'line', RRECT = 'roundRect', DONUT = 'donut';
+
+// ---------------------------------------------------------------- fonts
+const RG = 'Roboto';
+const RL = 'Roboto Light';
+const RM = 'Roboto Medium';
+const GV = 'Great Vibes';
+
+// ---------------------------------------------------------------- gradients
+// The template paints radial ramps focused on a corner.  pptxgenjs has no
+// gradient API, so each one is drawn as a stack of translucent bands.
+const GRAD_BANDS = 7;
+const GNBBL = {from:NAVY,to:BLUE,focus:'bl',flat:0.2};
+const GNBTRT = {from:NAVY,to:BLUE,focus:'tr',alpha:40};
+const GNBBLT = {from:NAVY,to:BLUE,focus:'bl',flat:0.2,alpha:16};
+const GNBBR = {from:NAVY,to:BLUE,focus:'br'};
+const GBNBL = {from:BLUE,to:NAVY,focus:'bl',flat:0.2};
+const GBNTL = {from:BLUE,to:NAVY,focus:'tl'};
+const GBNBR = {from:BLUE,to:NAVY,focus:'br'};
+const GNBTR = {from:NAVY,to:BLUE,focus:'tr'};
+const GNBTL = {from:NAVY,to:BLUE,focus:'tl'};
+const GNBBL2 = {from:NAVY,to:BLUE,focus:'bl'};
+const GBNBR2 = {from:BLUE,to:NAVY,focus:'br',flat:0.2};
+const GNBBRT = {from:NAVY,to:BLUE,focus:'br',flat:0.3,alpha:3};
+const GBNTR = {from:BLUE,to:NAVY,focus:'tr',flat:0.2};
+const GBNTL2 = {from:BLUE,to:NAVY,focus:'tl',flat:0.2};
+const GBNC = {from:BLUE,to:NAVY,focus:'c',flat:0.2};
+const GBNBRT = {from:BLUE,to:NAVY,focus:'br',flat:0.2,alpha:31};
+const GNBC = {from:NAVY,to:BLUE,focus:'c'};
+const GNBTLT = {from:NAVY,to:BLUE,focus:'tl',alpha:25};
+const GBNTLT = {from:BLUE,to:NAVY,focus:'tl',flat:0.2,alpha:51};
+const GBNTLT2 = {from:BLUE,to:NAVY,focus:'tl',flat:0.2,alpha:45};
+const GBNTLT3 = {from:BLUE,to:NAVY,focus:'tl',flat:0.2,alpha:91};
+const GNBTLT2 = {from:NAVY,to:BLUE,focus:'tl',alpha:31};
+
+// ---------------------------------------------------------------- line styles
+const lnGY22 = {color:GY2,width:2};
+const lnWH2 = {color:WH,width:2};
+const lnNAVY75 = {color:NAVY,width:75,transparency:80};
+const lnWH15 = {color:WH,width:1.5};
+const lnGY23 = {color:GY2,width:3};
+const lnBLUE10 = {color:BLUE,width:10};
+const lnGY3225 = {color:GY3,width:2.25};
+const lnWH45 = {color:WH,width:4.5};
+const lnGY2225 = {color:GY2,width:2.25};
+const lnWH75 = {color:WH,width:75,transparency:51};
+const lnNAVY15 = {color:NAVY,width:1.5};
+const lnNAVY3 = {color:NAVY,width:3};
+const lnNAVY10 = {color:NAVY,width:10};
+const lnNAVY225 = {color:NAVY,width:2.25};
+const lnGY315 = {color:GY3,width:1.5};
+const lnNAVY2 = {color:NAVY,width:2};
+const lnGY35 = {color:GY3,width:5,endArrowType:'triangle',beginArrowType:'stealth'};
+const lnBLUE2 = {color:BLUE,width:2};
+const lnWH6 = {color:WH,width:6};
+const lnWH8 = {color:WH,width:8};
+const lnGY32 = {color:GY3,width:2};
+const lnGY322 = {color:GY3,width:2,beginArrowType:'triangle'};
+const lnWH1 = {color:WH,width:1};
+
+// ---------------------------------------------------------------- solid fills
+const fWH = {color:WH};
+const fBLUE = {color:BLUE};
+const fWHT = {color:WH,transparency:71};
+const fWHT2 = {color:WH,transparency:20};
+const fGY2 = {color:GY2};
+const fK = {color:K};
+const fGY1 = {color:GY1};
+const fNAVY = {color:NAVY};
+const fPALE = {color:PALE};
+const fGY1T = {color:GY1,transparency:5};
+const fWHT3 = {color:WH,transparency:31};
+const fGY1T2 = {color:GY1,transparency:11};
+
+// ---------------------------------------------------------------- text styles
+const t160wB = {fontFace:RG,fontSize:160,color:WH,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t110w = {fontFace:RG,fontSize:110,color:WH,margin:[7.2,7.2,3.6,3.6]};
+const t28wB = {fontFace:RG,fontSize:28,color:WH,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t32w = {fontFace:RG,fontSize:32,color:WH,margin:[7.2,7.2,3.6,3.6]};
+const t24wB = {fontFace:RG,fontSize:24,color:WH,bold:1,lineSpacingMultiple:1.2,margin:[7.2,7.2,3.6,3.6]};
+const t160wcB = {fontFace:RG,fontSize:160,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t110wc = {fontFace:RG,fontSize:110,color:WH,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t32wc = {fontFace:RG,fontSize:32,color:WH,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t28wcB = {fontFace:RG,fontSize:28,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t18wc = {fontFace:RG,fontSize:18,color:WH,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t160kB = {fontFace:RG,fontSize:160,color:K,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t110k = {fontFace:RG,fontSize:110,color:K,margin:[7.2,7.2,3.6,3.6]};
+const t28kB = {fontFace:RG,fontSize:28,color:K,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t32k = {fontFace:RG,fontSize:32,color:K,margin:[7.2,7.2,3.6,3.6]};
+const t24kB = {fontFace:RG,fontSize:24,color:K,bold:1,lineSpacingMultiple:1.2,margin:[7.2,7.2,3.6,3.6]};
+const t85kB = {fontFace:RG,fontSize:85,color:K,bold:1,lineSpacingMultiple:0.8,margin:[7.2,7.2,3.6,3.6]};
+const t24kB2 = {fontFace:RG,fontSize:24,color:K,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t16Lk = {fontFace:RL,fontSize:16,color:K,lineSpacingMultiple:1.4,margin:[7.2,7.2,3.6,3.6]};
+const t28kcB = {fontFace:RG,fontSize:28,color:K,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t28kB2 = {fontFace:RG,fontSize:28,color:K,bold:1,lineSpacingMultiple:0.9,margin:[7.2,7.2,3.6,3.6]};
+const t16Lk2 = {fontFace:RL,fontSize:16,color:K,lineSpacingMultiple:1.4,margin:[0,0,0,0.9]};
+const t24wB2 = {fontFace:RG,fontSize:24,color:WH,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t85kB2 = {fontFace:RG,fontSize:85,color:K,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t20k = {fontFace:RG,fontSize:20,color:K,margin:[7.2,7.2,3.6,3.6]};
+const t85wB = {fontFace:RG,fontSize:85,color:WH,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t16Lw = {fontFace:RL,fontSize:16,color:WH,lineSpacingMultiple:1.4,margin:[0,0,0,0.9]};
+const t18w = {fontFace:RG,fontSize:18,color:WH,margin:[7.2,7.2,3.6,3.6]};
+const t36Vw = {fontFace:GV,fontSize:36,color:WH,margin:[7.2,7.2,3.6,3.6]};
+const t24wB3 = {fontFace:RG,fontSize:24,color:WH,bold:1,lineSpacingMultiple:0.9,margin:[7.2,7.2,3.6,3.6]};
+const t24krB = {fontFace:RG,fontSize:24,color:K,bold:1,align:'right',margin:[7.2,7.2,3.6,3.6]};
+const t16Lkr = {fontFace:RL,fontSize:16,color:K,align:'right',lineSpacingMultiple:1.4,margin:[7.2,7.2,3.6,3.6]};
+const t24wcB = {fontFace:RG,fontSize:24,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t16Lwc = {fontFace:RL,fontSize:16,color:WH,align:'center',lineSpacingMultiple:1.4,margin:[7.2,7.2,3.6,3.6]};
+const t16Lw2 = {fontFace:RL,fontSize:16,color:WH,lineSpacingMultiple:1.4,margin:[7.2,7.2,3.6,3.6]};
+const t24kcB = {fontFace:RG,fontSize:24,color:K,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t16Lkc = {fontFace:RL,fontSize:16,color:K,align:'center',lineSpacingMultiple:1.4,margin:[7.2,7.2,3.6,3.6]};
+const t32wcB = {fontFace:RG,fontSize:32,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t72wcB = {fontFace:RG,fontSize:72,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t32kB = {fontFace:RG,fontSize:32,color:K,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t20wB = {fontFace:RG,fontSize:20,color:WH,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t40wB = {fontFace:RG,fontSize:40,color:WH,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t595ncB = {fontFace:RG,fontSize:595,color:NAVY,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t36kB = {fontFace:RG,fontSize:36,color:K,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t18wcB = {fontFace:RG,fontSize:18,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t18kcB = {fontFace:RG,fontSize:18,color:K,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t18kcB2 = {fontFace:RG,fontSize:18,color:K,bold:1,align:'center',lineSpacingMultiple:0.9,margin:[7.2,7.2,3.6,3.6]};
+const t18wcB2 = {fontFace:RG,fontSize:18,color:WH,bold:1,align:'center',lineSpacingMultiple:0.9,margin:[7.2,7.2,3.6,3.6]};
+const t66wcB = {fontFace:RG,fontSize:66,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t40wcB = {fontFace:RG,fontSize:40,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t18b = {fontFace:RG,fontSize:18,color:BLUE,margin:[7.2,7.2,3.6,3.6]};
+const t20kB = {fontFace:RG,fontSize:20,color:K,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t40kB = {fontFace:RG,fontSize:40,color:K,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t18k = {fontFace:RG,fontSize:18,color:K,margin:[7.2,7.2,3.6,3.6]};
+const t28kcB2 = {fontFace:RG,fontSize:28,color:K,bold:1,align:'center',lineSpacingMultiple:0.9,margin:[7.2,7.2,3.6,3.6]};
+const t18kr = {fontFace:RG,fontSize:18,color:K,align:'right',lineSpacingMultiple:0.9,margin:[7.2,7.2,3.6,3.6]};
+const t18kr2 = {fontFace:RG,fontSize:18,color:K,align:'right',margin:[7.2,7.2,3.6,3.6]};
+const t20wcB = {fontFace:RG,fontSize:20,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t28kB3 = {fontFace:RG,fontSize:28,color:K,bold:1,margin:[0,0,0,1.2]};
+const t48wcB = {fontFace:RG,fontSize:48,color:WH,bold:1,align:'center',margin:[0,0,0,1.2]};
+const t18wcB3 = {fontFace:RG,fontSize:18,color:WH,bold:1,align:'center',margin:[0,0,0,1.2]};
+const t28wB2 = {fontFace:RG,fontSize:28,color:WH,bold:1,margin:[0,0,0,1.2]};
+const t18kcB3 = {fontFace:RG,fontSize:18,color:K,bold:1,align:'center',margin:[0,0,0,1.2]};
+const t18bc = {fontFace:RG,fontSize:18,color:BLUE,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t28krB = {fontFace:RG,fontSize:28,color:K,bold:1,align:'right',margin:[0,0,0,1.2]};
+const t24wcB2 = {fontFace:RG,fontSize:24,color:WH,bold:1,align:'center',margin:[0,0,0,1.2]};
+const t18kc = {fontFace:RG,fontSize:18,color:K,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t16Lkr2 = {fontFace:RL,fontSize:16,color:K,align:'right',lineSpacingMultiple:1.4,margin:[0,0,0,0.9]};
+const t28krB2 = {fontFace:RG,fontSize:28,color:K,bold:1,align:'right',margin:[7.2,7.2,3.6,3.6]};
+const t16Lkc2 = {fontFace:RL,fontSize:16,color:K,align:'center',lineSpacingMultiple:1.4,margin:[0,0,0,0.9]};
+const t66kcB = {fontFace:RG,fontSize:66,color:K,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t32kcB = {fontFace:RG,fontSize:32,color:K,bold:1,align:'center',lineSpacingMultiple:1,margin:[0,0,0,0.9]};
+const t36wcB = {fontFace:RG,fontSize:36,color:WH,bold:1,align:'center',lineSpacingMultiple:0.9,margin:[7.2,7.2,3.6,3.6]};
+const t80wcB = {fontFace:RG,fontSize:80,color:WH,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t44kcB = {fontFace:RG,fontSize:44,color:K,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t40bB = {fontFace:RG,fontSize:40,color:BLUE,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t28wcB2 = {fontFace:RG,fontSize:28,color:WH,bold:1,align:'center',lineSpacingMultiple:0.9,margin:[7.2,7.2,3.6,3.6]};
+const t80kcB = {fontFace:RG,fontSize:80,color:K,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t36kcB = {fontFace:RG,fontSize:36,color:K,bold:1,align:'center',lineSpacingMultiple:0.9,margin:[7.2,7.2,3.6,3.6]};
+const t36kcB2 = {fontFace:RG,fontSize:36,color:K,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t16Lkr3 = {fontFace:RL,fontSize:16,color:K,align:'right',lineSpacingMultiple:1.25,margin:[7.2,7.2,3.6,3.6]};
+const t16Lk3 = {fontFace:RL,fontSize:16,color:K,lineSpacingMultiple:1.25,margin:[7.2,7.2,3.6,3.6]};
+const t60krB = {fontFace:RG,fontSize:60,color:K,bold:1,align:'right',margin:[7.2,7.2,3.6,3.6]};
+const t60kB = {fontFace:RG,fontSize:60,color:K,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t28kB4 = {fontFace:RG,fontSize:28,color:K,bold:1,margin:[0,0,0,1.1]};
+const t16Lk4 = {fontFace:RL,fontSize:16,color:K,margin:[7.2,7.2,3.6,3.6],bullet:{characterCode:'2022',indent:22}};
+const t85kB3 = {fontFace:RG,fontSize:85,color:K,bold:1,lineSpacingMultiple:1.12,margin:[0,0,0,0.9]};
+const t14Mwc = {fontFace:RM,fontSize:14,color:WH,align:'center',margin:[0,0,0,1.3]};
+const t16Mkc = {fontFace:RM,fontSize:16,color:K,align:'center',margin:[0,0,0,1.3]};
+const t32wcB2 = {fontFace:RG,fontSize:32,color:WH,bold:1,align:'center',margin:[0,0,0,0.9]};
+const t16Lkj = {fontFace:RL,fontSize:16,color:K,align:'justify',lineSpacingMultiple:1.4,margin:[7.2,7.2,3.6,3.6]};
+const t32kcB2 = {fontFace:RG,fontSize:32,color:K,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t28wcB3 = {fontFace:RG,fontSize:28,color:WH,bold:1,align:'center',margin:[0,0,0,1.2]};
+const t16Lk5 = {fontFace:RL,fontSize:16,color:K,margin:[7.2,7.2,3.6,3.6]};
+const t16Lk6 = {fontFace:RL,fontSize:16,color:K,lineSpacingMultiple:1.25,margin:[0,0,0,0.9]};
+const t14Lw = {fontFace:RL,fontSize:14,color:WH,lineSpacingMultiple:1.4,margin:[7.2,7.2,3.6,3.6],bullet:{characterCode:'2022',indent:22}};
+const t14Lk = {fontFace:RL,fontSize:14,color:K,lineSpacingMultiple:1.4,margin:[7.2,7.2,3.6,3.6],bullet:{characterCode:'2022',indent:22}};
+const t88nB = {fontFace:RG,fontSize:88,color:NAVY,bold:1,margin:[7.2,7.2,3.6,3.6]};
+const t96wB = {fontFace:RG,fontSize:96,color:WH,bold:1,lineSpacingMultiple:0.7,margin:[7.2,7.2,3.6,3.6]};
+const t24wB4 = {fontFace:RG,fontSize:24,color:WH,bold:1,margin:[0,0,0,6.5]};
+const t85kcB = {fontFace:RG,fontSize:85,color:K,bold:1,align:'center',margin:[7.2,7.2,3.6,3.6]};
+const t24kcB2 = {fontFace:RG,fontSize:24,color:K,bold:1,align:'center',margin:[0,0,0,6.5]};
+
+// ---------------------------------------------------------------- repeated copy
+const ABOUT_AT_YOUR = 'About At Your Company';
+const ABOUT_TITLE_HERE = 'About Title Here';
+const AVERAGE_NIGHTLY_FEE = 'Average Nightly Fee';
+const BUSINESS_LOCATION = 'Business Location';
+const BUSINESS_MODEL = 'Business Model';
+const COMPETITOR_ANALYSIS = 'Competitor Analysis';
+const COMPLATE_PROJECT = 'Complate Project';
+const DIGENTIISACCAB_DEVOLLITA = 'PLACEHOLDER';
+const EXCLUSIVE_SUMMERY = 'Exclusive Summery';
+const FERRORER_IATIURE_PERORER = 'Ferrorer iatiure perorerum quos quatquo cor at eris sit optas aut aceat ut millis entibus pro mossunt veniam reptaque et omnam, sequam, aut audaernati veliqui omnis acearib dis essit';
+const GOOD_IDEA_MAKE = 'Good Idea Make \nEverything To Better';
+const GOOD_IDEA_MAKE_2 = 'Good Idea\nMake Everything\nTo Better';
+const HELLO_I_AM = 'Hello, I am John Johnson';
+const INSERT_TITLE_01 = 'Insert Title 01';
+const INSERT_TITLE_02 = 'Insert Title 02';
+const INSERT_TITLE_03 = 'Insert Title 03';
+const INSERT_TITLE_04 = 'Insert Title 04';
+const INSERT_TITLE_HERE = 'Insert Title Here';
+const IPSAM_SIASPERI_SPED = 'Ipsam siasperi sped eos velis quuntia voloresedumit qeundem numer quas quunt voluptae aditat.';
+const ISSUE_DATE_9 = 'Issue Date:\n9 November 2025';
+const OTATUM_OMMODIT_RE = 'Otatum ommodit re nobis de cone vollitat fugitae es rem.equae liquia senis reptatem quam res officip icimint';
+const OTATUM_OMMODIT_RE_10 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot verest fugitae es rem.equae liquia senis reptatem';
+const OTATUM_OMMODIT_RE_11 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatumren omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodia mtatum ommodit re nobis de cone vollitat tatum ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae esrem.equae liquia senis reptatem quam res officip icimint et eost eatum \n\nmnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodia mtatumat umommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp fugitae es rem.equae liquia senis reptatem';
+const OTATUM_OMMODIT_RE_12 = 'Otatum ommodit re nobis de cone vollitat evend as digentiis accab psant que erfersp fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatumren';
+const OTATUM_OMMODIT_RE_13 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res oficip icimintatum ommodit re nobis de cone vollitat evend';
+const OTATUM_OMMODIT_RE_14 = 'Otatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienixpel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodiamtumommodit re nobis de cone vollitat evendi as digentiis accab psant tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem querfem';
+const OTATUM_OMMODIT_RE_15 = 'Otatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienixpel etus tesserum busam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem psant tesserum libusam commo digenim in et verest es rem.equae liquia senis';
+const OTATUM_OMMODIT_RE_16 = 'Otatum ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem';
+const OTATUM_OMMODIT_RE_17 = 'Otatum ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodia mtatum tatum ommodit';
+const OTATUM_OMMODIT_RE_18 = 'Otatum ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodia mtatum tatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim ';
+const OTATUM_OMMODIT_RE_19 = 'Otatum ommodit re nobis de cone vollitat evendi as fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodiam.';
+const OTATUM_OMMODIT_RE_2 = 'Otatum, ommodit re nobis de cone vollitat vendi as digentiis accab ipsant que erfersp commo digenim fugitae remeq';
+const OTATUM_OMMODIT_RE_20 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae cimint et eost eatum re ni omnis doloriatus inusquia';
+const OTATUM_OMMODIT_RE_21 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis';
+const OTATUM_OMMODIT_RE_22 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodiam. Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia';
+const OTATUM_OMMODIT_RE_23 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae remequae liquia';
+const OTATUM_OMMODIT_RE_24 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus, tesserum alibusam commo digenim';
+const OTATUM_OMMODIT_RE_25 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp nimost enis expel etus';
+const OTATUM_OMMODIT_RE_26 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatumren omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodia mtatum ommodit re nobis de cone vollitat';
+const OTATUM_OMMODIT_RE_27 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodia mtatum ommodit re nobis de cone vollitat';
+const OTATUM_OMMODIT_RE_3 = 'Otatum ommodit re nobis de cone vollitat evend\n asrt digentiis accab ipsant que erfersp ienimost enis tesserum alibusam commo digenim';
+const OTATUM_OMMODIT_RE_4 = 'Otatum ommodit re nobis de cone vollitat fugitae es rem.equae liquia senis reptatem quam';
+const OTATUM_OMMODIT_RE_5 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodiam.';
+const OTATUM_OMMODIT_RE_6 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res oficip icimint';
+const OTATUM_OMMODIT_RE_7 = 'Otatum ommodit re nobis de cone vollitat enimost enis expel etus tesserum alibusam fugitae es rem.equae liquia senis reptatem quam res officip icimint';
+const OTATUM_OMMODIT_RE_8 = 'Otatum, ommodit re nobis de cone vollitat evendis digentiis senireptatem quam res officip icimint et eost eatumr doloriatus mtatum ommodit nobis de cone vollitat';
+const OTATUM_OMMODIT_RE_9 = 'Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim';
+const OUR_BEST_PRODUCT = 'Our Best Product';
+const OUR_WORK_PROCESS = 'Our Work Process';
+const PORESI_NISTRUM_EVELITAS = 'Poresi nistrum evelitas eaquia\npsunt laccusda lmagn econae cuorepudant doluptuempores veliquam ella ipsum';
+const PORE_NISTRUM_EVELITAS = 'Pore nistrum evelitas eaquiapsunt laccusdal int aut magneconae ma esenim digentiis accab psant quen.';
+const PORE_NISTRUM_EVELITAS_10 = 'PLACEHOLDER';
+const PORE_NISTRUM_EVELITAS_11 = 'PLACEHOLDER';
+const PORE_NISTRUM_EVELITAS_2 = 'Pore nistrum evelitas eaquiapsunt laccusdal int aut magneconae ma digentiis psant quen.';
+const PORE_NISTRUM_EVELITAS_3 = 'Pore nistrum evelitas eaquiapsunt laccusdal int aut magneconae ma esenim expere moluptu equiaes veliquam ella digentiis quen.';
+const PORE_NISTRUM_EVELITAS_4 = 'Pore nistrum evelitas eaquiapsunt laccusdal int aut magneconae ma esenim expere moluptu equiaes veliquam ella digentiis accab psant quen.';
+const PORE_NISTRUM_EVELITAS_5 = 'Pore nistrum evelitas eaquia est \npsunt laccusdal int aut magneconae ma esenim expere moluptu equiaes veliquam ella ipsum';
+const PORE_NISTRUM_EVELITAS_6 = 'Pore nistrum evelitas eaquiapsunt laccusdal int aut magneconae ma veliquam ella digentiis quen.';
+const PORE_NISTRUM_EVELITAS_7 = 'PLACEHOLDER';
+const PORE_NISTRUM_EVELITAS_8 = 'PLACEHOLDER';
+const PORE_NISTRUM_EVELITAS_9 = 'Pore nistrum evelitas eauquia\npsunt laccusdal magneconae cuorep udant disulpa';
+const PREPARED_FOR_WILKINS = 'Prepared For :\nWilkins Micawber';
+const PRESENTATION_TEMPLATE_20 = 'PRESENTATION TEMPLATE 2035';
+const PRICE_350_000 = 'Price, $350.000';
+const PRICE_456_000 = 'Price, $456.000';
+const PROJECT_OVERVIEW = 'Project Overview';
+const S00_123_4567890 = '+00 123 4567890\n555-555-5555';
+const S01_SERVICE_NAME = '01\nService Name';
+const S02_SERVICE_NAME = '02\nService Name';
+const S123_STREET_NAME = '123 Street Name City Name\nState, Country 12345';
+const SEVOAT_EVEND_ASURU = 'Sevoat evend asuru\neost eatum';
+const SEVOAT_EVEND_ASURUEOST = 'Sevoat evend asurueost eatum';
+const SEVOITAT_EVEND_ASU = 'Sevoitat evend asu';
+const SEVOITAT_EVEND_ASUSERU = 'Sevoitat evend asuseru';
+const SEVOLLITAT_EVEND_AS = 'Sevollitat evend as digentiisaccab devollitat evend as digentiis accab psant que erfersp fugitrem.equae liquia senis reptatem';
+const SEVOLLITAT_EVEND_AS_2 = 'Sevollitat evend as digentiisaccab Otatum ommodit re nobis devollitat evend as digentiis accab psant que erfersp fugitrem.equae liquia senis reptatem';
+const SEVOLLITAT_EVEND_AS_3 = 'Sevollitat evend as digentiisaccab devollitat evend as digentiis accab fugitrem.equae liquia senis reptatem';
+const SIERSP_IENIMOST_ENIS = 'siersp ienimost enis expel etus tesserum fugitae es rem.equae liquia senis reptatem quam cimint et eost eatum';
+const SITUT_EUM_QUE = 'Situt eum que veliquam sam fugadisque vemus esequi apiendenis dendior sam nienimi, veroratent aligendel eicaborporem nos atuptasim sit volorum que officipsam esed eum ipiciam nullutempos dolor aute core idellup tatiatem aut odit pro corec aerrovita placcus daereiumqui toreperaest faccullent ma quis quas earibus suntota conet aliquam consed ea nate volorab aut';
+const SIT_UT_EUM = 'Sit ut eum que veliquam sam fugadisque vemus esequi eicaborporem nos atuptasim sit volorum que officipsam esed eum ipiciam nullutempos dolor aute core idellup tatiatem aut odit pro corec aerrovita placcus daerei umqum.';
+const SOLORIATUS_INUS_QUIA = 'Soloriatus inus quia estibus denis tem et sitis eaquam quommodiam Otatum ommodit \nrenobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum busam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis';
+const SOLORIATUS_INUS_QUIA_2 = 'Soloriatus inus quia estibus denis tem et sitis eaquam renobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expe etus tesserum busam liquia senis reptatem quam res officip icimint.';
+const SPARK_CREATIVE = 'Spark Creative';
+const SQUEMU_SESEQUEICAOR_PORE = 'Squemu sesequeicaor poremno atuptasim sit sevolorum que officipsam esed eum piciam nullutempos dolor aute dellup tatiatem aut.';
+const STPRATEM_ABOIRERO_QUIOAE = 'Stpratem aboirero quioae snobist quam accab orum  serexperf volorit ut volor sit aliperiatque eossit asum  reex edipsam';
+const STPRATEM_ABOIRERO_QUIOAE_2 = 'Stpratem aboirero quioae snobist quamsr accab orum  serexperf volorit ut volor sit aliae periatque eossit asum  reex edipsam';
+const STPRATEM_ABOIRERO_QUIOAE_3 = 'Stpratem aboirero quioae snobist quamsr accab orum  serexperuo volorit ut volor sit aliae periatque';
+const SWOT_ANALYSIS = 'SWOT \nAnalysis';
+const S_W_O = 'S.W.O.T Analysis';
+const TABLE_OF_CONTENTS = 'Table Of Contents';
+const TRIPS_WITH_AIRBNB = 'Trips With Airbnb';
+const USER_EXAMPLE_COM = 'user@example.com\nwww.example.com';
+const VICTORIA_WOTTON = 'Victoria Wotton';
+const VOLORALIA_PERIATQUE_EOSI = 'Voloralia periatque eosisit asumrex edipsam oreatem aboirero quioae \n\nsnobist quatpreatem aboirerquioae snobist uams preatem boirero quioae snobist quam';
+const VOLORALIA_PERIATQUE_EOSI_2 = 'Voloralia periatque eosisit asumrex edipsam oreatem\n\n aboirero quioae snobist quatpreatem aboirerquioae snobist \n\nQuams tpreatem aboirero quioae snobist quams';
+const VOLORIT_UT_VOLOR = 'volorit ut volor sit aliae periatque eossit asum  reex edipsam\n\nStpratem aboirero quioae snobist quamsr accab orum\n\nStpratem aboirero quioae snobist';
+const WELCOME_MESSAGE = 'Welcome Message';
+const WILKINS_MICAWBER = 'Wilkins Micawber';
+const WWW_EXAMPLE_COM = 'www.example.com';
+
+// ---------------------------------------------------------------- vector outlines
+// Decorative swooshes, icons and continents, as polygon outlines in a 0..1000
+// box.  Each entry is [len0, x, y, x, y, ..., len1, x, y, ...] -- the run lengths
+// separate the sub-paths of a single shape.
+const m1 = [
+  34,755,698,686,680,774,677,725,579,770,610,738,556,835,525,838,357,997,181,801,205,863,135,689,138,887,
+  101,677,55,809,28,566,28,530,126,478,62,396,113,413,60,325,68,151,219,14,241,87,302,18,364,180,415,225,
+  641,151,667,232,668,132,793,201,971,287,998,374,848,755,698,
+];
+const m2 = [
+  28,996,459,854,255,777,3,702,210,597,122,631,38,514,7,436,119,360,94,218,261,31,336,8,490,31,670,3,749,
+  70,784,420,678,477,709,504,802,566,741,531,818,566,798,596,938,657,982,700,952,728,998,829,943,955,701,
+  996,459,
+];
+const m3 = [12,209,364,566,561,230,788,758,973,699,726,1000,698,830,373,459,46,209,224,270,5,5,202,209,364];
+const m4 = [
+  28,666,645,714,751,763,464,890,377,827,231,918,151,946,312,999,58,508,0,442,210,409,120,279,256,183,186,
+  125,318,245,300,50,454,293,543,68,512,0,660,155,735,210,1000,399,694,294,570,356,675,446,609,379,552,
+  554,706,666,645,
+];
+const m5 = [
+  13,976,939,463,841,126,980,0,747,196,128,358,209,417,452,604,308,455,192,743,0,633,329,970,721,976,939,
+];
+const m6 = [11,981,988,400,916,483,653,7,266,61,159,430,4,667,56,650,151,407,264,701,444,981,988];
+const m7 = [
+  25,995,662,463,508,501,451,611,480,813,341,730,327,858,295,752,196,664,293,585,238,725,139,663,103,714,
+  47,624,130,252,0,147,20,1,203,167,141,270,198,319,462,628,594,713,981,791,992,764,885,995,662,
+];
+const m8 = [
+  23,291,437,305,627,199,604,185,776,131,720,128,813,2,857,236,1000,468,755,503,605,617,588,999,225,856,
+  46,633,2,524,101,476,40,456,131,302,119,289,282,561,396,387,470,323,375,291,437,
+];
+const m9 = [12,393,24,40,404,326,621,36,563,9,711,133,933,744,986,994,103,772,127,644,443,665,186,393,24];
+const m10 = [
+  14,940,862,692,330,360,112,226,275,160,36,1,74,143,203,102,360,358,493,363,775,602,872,704,710,980,1000,
+  940,862,
+];
+const m11 = [11,15,595,159,895,701,984,856,588,960,549,854,322,1000,155,750,12,219,485,65,467,15,595];
+const m12 = [11,889,6,657,185,158,370,191,556,17,757,57,916,209,990,506,941,728,651,999,248,889,6];
+const m13 = [12,95,637,31,884,290,977,592,996,373,826,337,651,434,438,981,117,914,14,257,245,91,380,95,637];
+const m14 = [11,167,995,147,751,364,704,309,830,424,673,562,768,979,585,813,7,693,411,6,812,167,995];
+const m15 = [
+  14,105,964,338,997,951,736,998,379,818,291,728,5,477,230,244,252,372,388,186,367,59,563,244,647,35,734,
+  105,964,
+];
+const m16 = [11,947,763,1000,743,940,651,843,682,679,405,208,39,11,10,494,719,780,993,927,1000,947,763];
+const m17 = [10,56,848,68,996,274,986,607,650,992,535,983,248,706,14,457,24,11,670,56,848];
+const m18 = [12,31,157,398,542,165,795,381,856,124,993,898,894,965,681,427,296,518,133,309,92,378,8,31,157];
+const m19 = [12,65,304,242,560,411,464,242,624,480,994,664,402,769,730,986,653,379,8,334,179,46,98,65,304];
+const m20 = [
+  14,946,697,409,560,291,429,420,381,375,233,116,8,9,45,34,241,178,321,63,679,149,815,840,991,954,907,946,
+  697,
+];
+const m21 = [
+  14,638,600,528,562,516,206,402,12,5,521,329,730,144,802,203,983,810,932,990,609,835,494,842,67,707,214,
+  638,600,
+];
+const m22 = [9,977,71,830,20,598,340,92,701,11,871,203,994,395,874,969,236,977,71];
+const m23 = [
+  13,518,986,976,566,900,86,400,120,309,329,236,43,96,81,7,264,181,345,28,473,182,671,123,837,518,986,
+];
+const m24 = [10,47,511,218,803,330,598,552,947,994,908,725,427,379,528,383,188,142,11,47,511];
+const m25 = [12,972,480,737,502,575,336,467,362,496,157,225,7,366,400,18,680,181,799,99,1000,921,604,972,480];
+const m26 = [7,690,850,992,885,759,588,802,379,57,2,0,275,690,850];
+const m27 = [8,977,885,450,88,159,64,0,385,234,186,571,495,693,936,977,885];
+const m28 = [
+  17,500,0,316,35,163,131,35,316,0,500,35,684,131,837,316,965,500,1000,684,965,837,869,965,684,1000,500,
+  965,316,869,163,684,35,500,0,
+];
+const p29 = [
+  32,202,0,473,0,399,42,315,111,250,189,206,276,188,406,202,487,235,564,285,635,352,700,434,757,530,804,
+  639,840,813,868,1000,863,1000,994,877,1000,725,990,573,961,436,916,314,857,210,785,125,702,60,611,18,
+  513,1,410,8,305,31,227,68,153,117,84,202,0,
+];
+const p30 = [
+  10,862,579,767,684,837,772,784,861,483,596,379,693,655,967,834,992,981,789,862,579,10,724,184,837,246,
+  578,526,681,632,977,273,851,35,621,79,569,140,664,237,724,184,
+];
+const p31 = [
+  27,594,0,1000,0,832,44,686,93,449,210,362,276,297,347,257,422,243,500,257,578,297,653,362,724,449,790,
+  686,907,832,956,1000,1000,594,1000,461,950,244,839,159,777,41,644,10,573,10,427,91,288,244,161,461,50,
+  594,0,
+];
+const p32 = [
+  27,0,0,406,0,539,50,756,161,841,223,959,356,990,427,990,573,909,712,756,839,539,950,406,1000,0,1000,168,
+  956,314,907,551,790,638,724,703,653,743,578,757,500,743,422,703,347,638,276,551,210,314,93,168,44,0,0,
+];
+const p33 = [
+  17,837,376,804,228,652,63,415,0,183,63,71,164,8,299,23,505,154,670,139,765,57,872,209,850,350,752,500,
+  754,652,695,804,525,837,376,11,415,688,325,679,211,771,211,633,65,376,167,163,415,73,667,163,772,376,
+  667,597,415,688,
+];
+const p34 = [6,110,1,8,308,44,993,999,800,913,11,110,1];
+const p35 = [
+  13,236,0,203,84,6,101,18,395,400,709,332,1000,666,1000,598,709,958,442,994,98,800,84,774,1,236,0,6,496,
+  155,666,317,598,536,405,534,340,321,496,155,
+];
+const p36 = [
+  18,768,0,523,228,483,428,221,694,125,681,26,750,3,874,68,974,244,973,310,873,298,775,559,510,743,480,
+  975,242,941,165,804,179,819,37,768,0,
+];
+const p37 = [
+  15,498,0,146,147,0,504,145,855,498,1000,852,855,1000,504,954,288,661,731,506,780,306,697,224,500,276,
+  341,717,47,498,0,
+];
+const p38 = [
+  29,504,0,307,40,147,147,39,307,0,501,40,695,147,853,307,961,501,1000,696,961,854,853,961,695,1000,501,
+  954,289,835,349,861,575,806,705,707,802,504,863,362,834,247,756,168,641,139,501,202,296,301,197,431,142,
+  656,165,716,48,504,0,
+];
+const p39 = [
+  25,457,0,393,124,212,101,116,180,158,314,11,420,1,557,123,610,99,788,183,888,311,844,420,989,557,999,
+  607,876,786,901,881,822,842,689,989,581,1000,457,876,390,899,209,815,109,689,156,580,11,457,0,5,504,281,
+  718,499,504,714,286,499,504,281,
+];
+const p40 = [
+  17,496,0,302,39,145,145,39,302,0,496,39,691,145,851,302,960,496,1000,691,961,851,854,960,694,1000,496,
+  959,446,551,445,550,40,496,0,
+];
+const p41 = [7,113,0,10,429,83,1000,910,1000,998,608,919,9,113,0];
+const p42 = [
+  29,110,0,38,31,9,105,52,196,179,234,75,493,82,627,147,793,264,920,418,990,591,991,745,920,862,795,928,
+  628,921,412,831,234,971,183,1000,109,983,50,921,3,847,19,785,182,606,85,606,47,407,47,407,85,227,182,
+  189,43,110,0,
+];
+const p43 = [
+  17,500,0,304,39,146,146,39,305,0,498,39,694,146,853,304,960,500,1000,694,960,853,853,961,694,1000,498,
+  961,305,853,146,694,39,500,0,3,500,148,504,855,500,148,
+];
+const p44 = [10,503,0,86,221,10,605,148,855,402,990,914,782,1000,505,960,307,779,85,503,0];
+const p45 = [7,0,0,54,668,498,974,750,1000,1000,263,414,268,0,0];
+const p46 = [7,0,0,0,500,123,751,450,951,1000,974,785,316,0,0];
+const p47 = [6,0,0,0,481,128,715,1000,1000,1000,312,0,0];
+const p48 = [10,0,167,10,49,34,0,973,3,999,133,999,867,966,1000,27,997,1,867,0,167];
+const p49 = [
+  19,0,0,152,454,94,634,197,824,398,798,425,1000,573,1000,706,717,801,824,904,634,893,260,1000,206,1000,0,
+  809,0,718,472,439,629,246,387,193,0,0,0,
+];
+const p50 = [5,1,0,1,1000,999,1000,999,0,1,0];
+const p51 = [4,500,1,1,1000,999,1000,500,1];
+const p52 = [4,500,0,1,1000,999,1000,500,0];
+const p53 = [5,1,0,1,1000,1000,1000,1000,0,1,0];
+const p54 = [6,0,0,406,983,990,298,853,0,428,733,0,0];
+const p55 = [5,9,0,403,983,989,378,1000,0,9,0];
+const p56 = [4,500,0,1,1000,1000,1000,500,0];
+const p57 = [5,1,1,1,999,1000,999,1000,1,1,1];
+const p58 = [5,1,1,102,1000,898,1000,1000,1,1,1];
+const p59 = [8,503,0,21,426,235,1000,302,341,693,341,581,988,984,669,503,0];
+const p60 = [5,888,1,0,585,112,1000,1000,400,888,1];
+const p61 = [5,111,0,0,415,889,999,1000,600,111,0];
+const p62 = [5,112,1,0,400,888,1000,1000,585,112,1];
+const p63 = [5,888,0,0,600,112,999,1000,415,888,0];
+const p64 = [8,75,0,0,414,426,1000,1000,1000,553,390,535,686,154,383,75,0];
+const p65 = [8,921,0,847,384,463,689,450,387,0,1000,572,1000,1000,412,921,0];
+const p66 = [4,243,1,1,859,1000,1000,243,1];
+const p67 = [4,1000,1,0,1,511,999,1000,1];
+const p68 = [4,780,1,0,1000,999,857,780,1];
+const p69 = [5,507,1,1,500,507,1000,1000,500,507,1];
+const p70 = [7,502,0,39,350,166,1000,440,158,814,1000,954,755,502,0];
+const p71 = [
+  9,409,0,82,209,0,591,211,918,591,1000,918,789,1000,409,791,82,409,0,9,503,186,722,278,814,499,722,720,
+  503,810,282,719,190,499,282,278,503,186,
+];
+const p72 = [8,0,0,0,519,138,389,748,1000,1000,740,389,130,527,0,0,0];
+const p73 = [8,748,0,138,611,0,473,0,1000,527,1000,389,863,1000,252,748,0];
+const p74 = [4,815,0,0,1000,999,911,815,0];
+const p75 = [8,258,0,0,252,606,863,477,1000,1000,1000,1000,473,864,611,258,0];
+const p76 = [8,481,0,611,130,0,740,260,1000,870,389,1000,519,1000,0,481,0];
+const p77 = [7,500,0,10,435,226,1000,418,187,774,1000,984,683,500,0];
+const p78 = [4,0,0,510,1000,999,0,0,0];
+const p79 = [5,507,0,1,506,507,999,1000,506,507,0];
+const p80 = [4,205,0,0,911,999,1000,205,0];
+const p81 = [
+  26,812,0,791,9,613,195,610,308,482,250,330,247,199,301,95,409,42,546,42,692,95,829,199,937,331,993,470,
+  993,602,937,701,837,733,779,764,653,753,523,700,403,811,398,991,200,974,169,840,168,839,24,812,0,32,400,
+  297,503,315,597,370,558,411,461,362,350,358,222,430,166,518,147,617,166,717,222,805,378,883,474,873,562,
+  823,648,678,642,537,599,454,638,414,692,517,706,632,681,745,618,845,515,915,398,938,282,915,181,845,114,
+  740,92,618,114,497,181,389,283,320,400,297,
+];
+const p82 = [
+  13,624,0,312,167,250,414,339,625,23,862,55,989,288,838,373,666,698,750,936,591,970,233,833,66,624,0,3,
+  231,749,79,934,231,749,4,491,86,435,235,336,235,491,86,
+];
+const p83 = [
+  12,204,0,71,89,110,257,0,441,58,930,142,1000,334,961,403,649,915,623,941,57,1000,27,204,0,7,879,62,873,
+  586,409,595,401,386,298,259,317,62,879,62,
+];
+const p84 = [5,500,0,0,500,500,1000,1000,500,500,0,3,423,185,621,827,423,185];
+const p85 = [4,137,0,108,988,997,600,137,0];
+const p86 = [
+  11,200,0,0,200,7,948,702,993,755,581,970,360,980,252,872,179,755,251,686,2,200,0,6,669,60,115,741,697,
+  926,72,938,59,235,669,60,3,739,346,499,759,739,346,
+];
+const p87 = [
+  17,500,0,303,39,145,145,39,303,0,500,39,693,145,852,303,960,500,1000,693,960,852,852,960,693,1000,500,
+  960,303,852,145,693,39,500,0,9,500,921,201,796,79,500,201,196,500,70,799,196,921,500,799,796,500,921,3,
+  500,193,500,807,500,193,
+];
+const p88 = [
+  26,621,922,638,853,593,667,676,876,721,818,657,611,736,781,789,768,736,556,514,244,338,363,291,262,357,
+  167,243,167,129,422,207,533,316,378,372,378,393,456,455,498,457,589,501,656,486,733,518,748,571,900,621,
+  922,3,514,211,864,400,514,211,
+];
+const p89 = [
+  11,1000,545,740,306,491,237,231,327,0,545,305,799,679,820,831,1000,955,851,838,714,1000,545,7,669,716,
+  394,762,84,545,325,351,296,495,359,645,669,716,
+];
+const p90 = [
+  19,666,779,989,664,984,233,553,204,436,15,101,2,225,329,454,406,110,437,33,992,958,999,987,798,862,810,
+  970,860,29,860,810,827,624,798,624,702,666,779,
+];
+const p91 = [5,499,0,0,499,499,999,999,499,499,0,3,499,918,499,80,499,918];
+const p92 = [7,865,430,550,5,27,276,459,995,991,621,271,316,865,430];
+const p93 = [
+  13,999,890,789,765,908,538,598,324,918,358,998,260,480,1,40,264,71,628,251,710,42,988,977,999,999,890,6,
+  177,639,625,629,81,489,522,30,881,610,177,639,
+];
+const p94 = [
+  18,758,359,981,1,11,7,450,526,196,792,213,905,450,762,323,998,679,996,550,722,793,717,804,607,550,596,
+  729,396,482,624,212,29,786,29,758,359,
+];
+const p95 = [7,900,406,521,2,25,276,467,996,993,634,204,303,900,406];
+const p96 = [
+  30,978,79,917,2,860,64,700,18,582,277,296,81,11,77,13,140,363,178,629,391,658,497,623,593,420,517,608,
+  661,662,620,688,498,739,479,896,76,937,83,962,165,813,603,519,931,219,666,14,666,0,708,213,731,527,993,
+  832,653,981,255,978,79,
+];
+const p97 = [
+  18,997,565,822,547,822,315,779,295,769,587,894,604,499,934,105,604,231,585,232,57,766,57,796,210,821,21,
+  204,0,177,547,0,575,499,999,997,565,
+];
+const p98 = [
+  17,903,406,967,248,594,137,527,3,21,275,129,483,799,630,565,776,7,666,466,996,939,760,989,620,774,483,
+  264,423,201,302,666,228,903,406,
+];
+const p99 = [6,1000,1000,139,1000,0,500,139,0,1000,0,1000,1000];
+const p100 = [
+  9,991,484,743,285,482,231,224,303,2,500,229,701,483,774,788,690,991,484,9,946,508,718,682,491,733,268,
+  674,47,500,282,318,509,270,779,349,946,508,12,696,484,632,372,490,326,421,370,646,456,608,596,431,620,
+  336,453,303,520,399,650,536,675,696,484,
+];
+const p101 = [
+  27,1000,496,741,483,546,726,338,669,275,430,517,259,496,0,476,225,146,479,211,279,421,133,296,150,102,
+  476,0,496,225,522,308,691,479,774,473,860,336,822,114,593,496,1000,521,773,850,521,783,720,571,860,708,
+  837,1000,496,3,919,211,489,523,919,211,
+];
+const p102 = [
+  32,570,19,486,0,280,37,167,106,57,351,93,430,1,605,60,651,41,706,127,911,318,879,383,1000,817,1000,758,
+  714,885,422,731,699,736,846,785,972,402,972,346,860,460,810,480,739,415,800,148,884,75,701,92,641,32,
+  588,125,432,87,356,185,137,302,68,570,19,8,1000,243,944,75,757,0,421,131,328,362,407,527,623,598,1000,
+  243,5,645,178,832,355,579,570,364,318,645,178,
+];
+const p103 = [
+  29,984,150,894,126,921,63,870,102,843,5,724,110,630,149,699,268,618,346,392,226,263,222,154,268,57,370,
+  9,527,34,698,104,819,211,921,336,980,486,989,618,933,710,833,756,669,730,521,642,370,740,283,867,325,
+  902,244,967,220,984,150,30,634,402,712,534,733,657,697,781,626,858,519,897,386,885,279,842,156,728,82,
+  585,71,485,98,373,192,275,283,246,412,254,602,362,553,402,425,323,298,310,236,334,172,403,151,531,175,
+  620,266,739,385,804,521,809,620,732,651,593,577,433,634,402,
+];
+const p104 = [
+  16,139,617,516,617,467,542,172,542,172,75,803,75,803,542,730,542,795,617,854,610,869,579,863,13,836,0,
+  117,8,107,579,139,617,9,984,907,620,455,584,441,516,514,519,563,921,994,980,987,996,944,984,907,6,959,
+  953,937,956,582,589,631,533,959,925,959,953,7,49,664,15,681,0,720,40,774,664,776,557,664,49,664,7,402,
+  243,380,410,439,484,507,488,552,366,419,315,402,243,
+];
+const p105 = [
+  11,991,307,841,40,505,7,354,40,328,181,204,248,208,422,346,780,593,1000,884,724,991,307,8,894,535,593,
+  911,362,680,265,307,432,95,760,95,929,307,894,535,
+];
+const p106 = [
+  18,831,339,726,379,768,616,678,783,378,872,140,678,140,422,317,244,621,266,653,153,444,105,197,181,9,
+  460,77,801,355,991,696,923,886,640,831,339,
+];
+const p107 = [
+  23,727,486,939,394,989,348,995,162,939,74,767,17,591,0,284,10,91,54,8,187,19,320,299,320,325,223,415,
+  166,608,166,679,214,660,321,380,456,318,622,392,647,617,644,644,547,727,486,6,591,757,324,760,324,997,
+  631,997,636,768,591,757,
+];
+const p108 = [
+  33,972,844,704,574,738,508,757,435,753,307,731,236,696,171,593,67,529,31,457,8,380,0,303,8,232,31,167,
+  67,65,171,30,236,8,307,0,383,8,461,30,533,65,598,167,701,232,736,303,758,380,766,485,751,585,709,851,
+  979,892,999,945,994,990,951,999,888,972,844,17,380,702,256,677,156,609,88,508,63,383,88,258,156,157,256,
+  89,380,64,504,89,605,157,672,258,697,383,672,508,605,609,504,677,380,702,10,930,929,911,940,887,929,634,
+  674,639,665,671,634,683,631,932,889,937,913,930,929,
+];
+const p109 = [
+  12,309,162,235,162,456,242,567,406,591,638,510,735,574,789,546,715,628,594,594,391,481,221,309,162,7,
+  241,131,33,406,104,537,184,496,70,414,309,162,241,131,
+];
+const p110 = [
+  18,0,112,124,33,175,260,420,353,599,279,428,37,860,35,977,264,654,624,903,511,972,630,636,987,199,960,
+  428,671,163,624,15,786,148,275,0,112,
+];
+const p111 = [
+  16,913,82,698,64,595,278,315,45,89,319,357,545,683,310,689,512,865,576,879,455,715,495,714,306,906,267,
+  714,278,714,94,913,82,4,107,745,12,968,786,876,107,745,
+];
+const p112 = [
+  20,611,423,558,429,551,340,487,318,417,447,377,336,290,332,230,506,270,745,393,745,413,601,437,745,553,
+  750,583,601,603,745,724,748,766,577,729,362,634,326,611,423,
+];
+const p113 = [
+  31,874,244,775,177,898,374,853,604,679,787,547,787,547,655,813,452,547,106,746,133,417,0,165,139,29,393,
+  201,151,390,130,412,31,509,78,511,889,379,969,341,870,126,846,166,644,39,596,135,502,26,428,110,874,384,
+  1000,671,986,712,762,923,530,874,244,20,547,625,547,545,642,520,679,479,693,427,651,342,547,310,547,230,
+  564,230,623,291,716,288,711,363,783,425,714,484,727,554,713,571,637,560,597,577,575,624,547,625,8,640,
+  375,660,423,646,472,605,507,547,515,547,340,600,346,640,375,
+];
+const p114 = [10,540,0,88,50,39,161,13,712,153,995,908,955,1000,501,958,155,851,8,540,0];
+const p115 = [11,858,0,775,18,643,139,51,746,0,854,39,955,136,1000,240,948,930,238,1000,113,858,0];
+const p116 = [7,122,0,0,195,61,358,813,976,979,929,971,689,122,0];
+const p117 = [
+  34,497,188,383,211,289,273,225,364,201,474,209,537,239,613,336,714,316,753,336,805,317,837,321,877,347,
+  905,396,916,403,956,424,979,503,1000,574,979,596,956,604,916,652,905,679,877,684,844,664,805,684,753,
+  664,714,719,664,766,595,786,537,792,474,769,364,707,273,614,211,497,188,24,611,695,550,695,604,532,604,
+  513,589,501,416,500,394,515,443,695,383,695,354,676,305,629,270,572,248,474,268,378,322,300,401,247,497,
+  227,596,247,677,300,732,378,752,474,730,572,670,654,611,695,
+];
+const p118 = [6,0,896,103,999,969,969,969,30,30,30,0,896];
+const p119 = [7,499,0,0,435,470,870,63,435,242,138,755,66,499,0];
+const p120 = [8,812,0,55,73,55,924,944,924,163,911,62,748,118,111,812,0];
+const p121 = [7,500,0,0,500,500,999,100,505,699,393,117,384,500,0];
+const p122 = [
+  18,825,625,753,635,371,250,293,29,113,21,246,152,205,248,31,104,59,316,258,365,639,750,713,971,897,979,
+  753,833,795,754,990,869,972,715,825,625,
+];
+const p123 = [
+  9,348,657,478,519,452,454,87,843,87,963,180,984,330,833,283,734,348,657,8,104,481,209,648,461,380,513,
+  470,578,411,492,270,304,269,104,481,3,922,176,600,463,922,176,
+];
+const p124 = [
+  15,985,737,843,609,792,449,418,346,706,137,608,4,157,519,102,495,4,598,129,715,343,421,446,798,604,850,
+  745,1000,985,737,4,493,744,470,429,756,502,493,744,
+];
+const p125 = [
+  7,435,669,923,176,960,92,921,40,821,80,336,569,435,669,6,603,231,46,231,0,277,46,331,504,331,603,231,6,
+  664,954,718,1000,762,962,763,408,664,508,664,954,
+];
+const p126 = [
+  20,0,1000,108,847,164,784,197,766,252,765,279,752,350,616,377,586,408,589,479,636,515,626,551,562,625,
+  368,660,311,692,320,750,419,768,428,788,419,859,312,1000,0,
+];
+const p127 = [
+  21,500,0,319,34,153,140,41,301,11,397,0,500,34,681,140,846,301,959,397,989,500,1000,681,966,846,860,959,
+  699,989,603,1000,500,966,319,860,153,699,41,603,11,500,0,
+];
+const p128 = [9,500,0,118,178,0,500,118,822,500,1000,882,822,1000,500,882,178,500,0];
+const p129 = [11,916,0,885,0,385,683,115,313,84,313,0,427,0,469,385,997,1000,156,1000,114,916,0];
+const p130 = [
+  17,596,500,979,128,979,32,892,21,500,404,115,21,41,21,21,115,404,500,21,892,21,966,128,979,500,596,883,
+  979,979,979,979,883,596,500,
+];
+const p131 = [
+  16,346,642,209,587,105,662,177,320,362,62,327,0,190,138,66,344,1,712,65,934,134,988,240,996,324,956,376,
+  872,386,746,346,642,12,956,642,819,587,716,662,786,320,972,62,936,0,696,300,612,712,674,934,850,996,993,
+  853,956,642,
+];
+const p132 = [7,1000,651,194,0,0,349,134,651,791,1000,970,907,1000,651];
+const p133 = [8,1000,818,543,136,283,0,87,61,0,227,500,970,739,1000,1000,818];
+const p134 = [7,1000,227,957,61,543,61,43,712,87,939,500,970,1000,227];
+const p135 = [
+  30,1000,322,913,130,696,27,696,212,533,401,696,414,408,640,522,452,364,445,533,202,696,212,696,27,342,
+  14,92,130,22,219,11,408,261,736,293,870,239,877,239,921,293,921,293,1000,739,986,647,935,500,935,739,
+  911,717,877,435,853,728,846,1000,322,
+];
+const p136 = [7,1000,349,821,0,60,442,0,791,224,1000,881,651,1000,349];
+const p137 = [7,1000,43,471,0,0,65,0,957,235,1000,1000,957,1000,43];
+const p138 = [5,1000,42,0,42,133,1000,1000,944,1000,42];
+const p139 = [7,1000,122,867,0,0,122,0,902,333,1000,1000,902,1000,122];
+const p140 = [6,1000,42,0,42,0,944,250,1000,1000,944,1000,42];
+const p141 = [7,1000,122,667,0,133,0,0,122,133,1000,1000,902,1000,122];
+const p142 = [6,1000,133,42,0,0,667,42,1000,958,1000,1000,133];
+const p143 = [6,1000,286,958,0,42,0,0,857,958,1000,1000,286];
+const p144 = [
+  13,1000,17,659,124,651,157,716,298,384,843,218,529,0,876,9,917,210,628,376,1000,786,471,869,612,1000,17,
+];
+const p145 = [
+  28,1000,870,926,848,921,17,845,0,823,113,864,113,864,814,139,814,139,113,234,113,313,0,109,0,74,39,74,
+  848,0,870,5,926,46,991,676,1000,681,913,703,913,714,1000,749,1000,749,935,782,913,787,1000,926,1000,995,
+  926,1000,870,
+];
+const p146 = [
+  26,650,0,514,28,361,156,308,281,302,384,323,476,384,578,325,641,277,631,230,651,32,849,10,928,46,984,
+  102,1000,153,973,353,770,363,678,422,619,556,690,718,695,843,642,938,547,997,351,971,214,845,60,650,0,
+  17,650,60,764,82,857,145,920,237,943,351,920,466,857,559,764,623,650,646,537,623,443,559,381,466,357,
+  351,381,237,443,145,537,82,650,60,3,285,692,75,934,285,692,
+];
+const p147 = [
+  16,496,0,309,50,187,178,166,339,237,467,39,642,7,955,84,1000,948,994,1000,928,979,689,756,467,827,341,
+  805,178,683,50,496,0,4,572,572,824,862,160,862,572,572,
+];
+const p148 = [
+  27,795,410,645,66,426,13,306,113,234,302,68,408,5,721,71,897,194,992,735,995,200,950,34,712,92,434,256,
+  339,376,89,543,50,692,194,735,457,863,472,956,606,940,845,781,970,836,993,965,869,995,645,909,460,795,
+  410,
+];
+const p149 = [
+  18,854,438,977,257,554,5,24,272,112,494,704,633,554,737,341,727,190,608,7,653,453,996,903,793,994,624,
+  842,484,371,416,298,318,634,266,854,438,
+];
+const p150 = [8,56,0,28,103,644,354,979,984,924,576,722,276,422,74,56,0];
+const p151 = [7,43,12,43,159,609,388,838,954,973,971,730,267,43,12];
+const p152 = [5,192,0,26,288,909,960,826,316,192,0];
+const p153 = [
+  22,991,906,876,770,946,533,912,305,750,85,590,10,409,10,249,85,129,220,52,499,124,770,10,902,28,977,89,
+  979,194,865,329,961,470,998,643,973,805,865,928,987,981,966,991,906,5,500,960,87,499,500,39,912,499,500,
+  960,3,74,943,144,803,74,943,
+];
+const p154 = [
+  20,779,84,743,116,926,354,941,590,818,817,591,940,248,872,85,674,49,499,85,324,248,126,679,37,399,10,85,
+  220,10,600,220,914,601,989,914,778,990,402,779,84,
+];
+const p155 = [
+  16,898,405,963,248,590,137,526,2,23,274,131,483,800,629,569,776,7,665,472,997,988,619,771,483,270,426,
+  198,302,665,227,898,405,
+];
+const p156 = [6,792,71,327,61,12,551,746,986,997,487,792,71];
+const p157 = [7,988,476,737,110,476,1,151,112,1,426,289,997,988,476];
+const p158 = [5,986,812,563,229,23,41,847,979,986,812];
+const p159 = [5,981,749,514,166,14,95,786,971,981,749];
+const p160 = [4,993,96,435,231,20,946,993,96];
+const p161 = [4,995,137,414,215,19,909,995,137];
+const p162 = [
+  30,984,970,822,970,732,780,773,700,883,700,998,859,832,548,716,747,514,324,514,154,864,216,873,72,493,1,
+  484,324,318,674,194,456,1,859,146,620,259,620,302,708,177,970,2,991,625,998,210,970,342,692,436,661,656,
+  692,789,970,682,998,984,970,
+];
+const p163 = [
+  14,861,432,974,263,550,5,22,277,131,497,724,628,569,739,177,612,8,650,456,995,991,623,268,322,634,261,
+  861,432,
+];
+const p164 = [
+  16,928,422,961,249,550,5,38,263,133,496,729,625,559,739,175,611,6,651,430,989,994,634,793,470,322,408,
+  287,305,642,260,928,422,
+];
+const p165 = [
+  17,543,435,282,379,406,258,689,275,798,424,996,368,550,5,1,330,176,515,724,626,555,739,175,613,6,657,
+  489,998,994,665,862,497,543,435,
+];
+const p166 = [
+  7,500,0,146,109,0,373,500,999,999,373,853,109,500,0,7,500,939,63,373,191,142,500,46,808,142,936,373,500,
+  939,
+];
+const p167 = [8,921,233,416,905,119,338,771,96,220,85,85,778,779,913,921,233];
+const p168 = [7,865,430,539,4,25,277,453,995,991,623,277,312,865,430];
+const p169 = [6,999,422,478,5,3,412,4,984,981,995,999,422];
+const p170 = [
+  16,0,0,0,872,93,885,180,911,332,1000,1000,383,800,235,727,313,626,361,548,370,435,349,343,292,280,207,
+  258,102,269,28,0,0,
+];
+const p171 = [
+  16,384,0,237,197,318,270,367,372,378,452,356,565,299,657,214,720,109,742,29,729,0,1000,873,1000,885,907,
+  912,820,1000,667,384,0,
+];
+const p172 = [
+  16,617,0,0,667,89,820,115,907,128,1000,1000,1000,972,731,898,742,793,720,708,657,651,565,630,452,639,
+  374,687,273,765,200,617,0,
+];
+const p173 = [
+  16,1000,0,749,25,761,102,738,207,676,292,584,349,471,370,390,360,287,310,214,227,0,383,668,1000,820,911,
+  907,885,1000,872,1000,0,
+];
+const p174 = [
+  18,500,0,595,19,684,74,765,162,837,278,898,420,947,583,981,765,1000,1000,0,1000,19,765,53,583,102,420,
+  163,278,235,162,316,74,405,19,500,0,
+];
+const p175 = [
+  17,1000,697,793,18,453,11,413,262,382,93,173,115,0,943,461,906,198,189,380,189,358,364,719,230,912,453,
+  922,801,533,901,864,883,1000,697,3,99,418,215,803,99,418,
+];
+const p176 = [
+  19,930,594,853,344,891,586,646,740,442,711,525,514,326,570,506,250,826,322,641,11,502,218,290,56,37,199,
+  62,446,302,547,9,738,101,1000,682,937,930,594,
+];
+const p177 = [
+  17,156,0,864,0,937,16,982,48,990,228,1000,231,990,928,968,966,896,996,140,1000,69,985,17,948,0,136,11,
+  66,30,37,82,10,156,0,21,251,27,144,28,115,33,82,47,69,69,75,937,115,961,160,968,883,965,917,951,936,921,
+  929,52,886,30,762,27,751,31,738,50,695,59,319,59,276,50,263,31,251,27,
+];
+const p178 = [5,69,0,1000,488,69,976,0,488,69,0];
+const p179 = [11,891,0,84,13,11,280,3,615,41,890,109,1000,916,987,989,720,997,385,959,110,891,0];
+const p180 = [5,0,1000,1000,1000,1000,0,0,0,0,1000];
+const p181 = [6,0,864,145,999,957,959,957,40,42,40,0,864];
+const p182 = [6,498,0,0,436,468,870,63,436,746,66,498,0];
+const p183 = [7,812,0,55,73,55,924,944,924,62,792,123,100,812,0];
+const p184 = [8,500,0,0,507,558,999,100,581,715,393,117,384,798,100,500,0];
+const p185 = [
+  22,688,0,819,9,1000,54,1000,946,819,991,688,1000,557,991,435,965,323,924,180,837,105,765,48,684,12,595,
+  0,500,12,405,48,316,105,235,180,163,323,76,435,35,557,9,688,0,
+];
+const p186 = [5,926,0,77,0,0,1000,1000,1000,926,0];
+const p187 = [
+  13,1000,39,992,11,972,0,28,0,12,7,0,39,0,791,5,813,28,830,972,830,988,823,1000,791,1000,39,7,703,987,
+  665,978,373,978,336,986,335,999,702,1000,703,987,
+];
+const p188 = [13,972,0,28,0,12,8,0,46,0,953,6,982,28,1000,984,995,997,974,1000,953,1000,46,992,14,972,0];
+const p189 = [7,898,0,102,0,2,375,0,953,998,995,998,375,898,0];
+const p190 = [
+  33,0,500,10,399,39,305,85,220,146,146,220,85,305,39,399,10,500,0,601,10,695,39,780,85,854,146,915,220,
+  961,305,990,399,1000,500,990,601,961,695,915,780,854,854,780,915,695,961,601,990,500,1000,399,990,305,
+  961,220,915,146,854,85,780,39,695,10,601,0,500,
+];
+const p191 = [
+  29,5,285,0,249,5,213,21,179,46,146,79,115,122,87,230,40,294,22,430,2,570,2,639,10,770,40,828,61,878,87,
+  921,115,954,146,979,179,995,213,1000,249,995,285,619,957,597,977,564,991,500,1000,436,991,403,977,381,
+  957,5,285,25,40,250,49,290,76,328,119,362,175,391,321,434,500,450,679,434,825,391,881,362,924,328,951,
+  290,960,250,951,210,924,172,881,138,825,109,679,66,500,50,321,66,175,109,119,138,76,172,49,210,40,250,
+];
+const p192 = [5,0,0,1000,0,1000,1000,0,1000,0,0];
+const p193 = [12,1000,650,532,650,532,750,563,750,500,1000,437,750,468,750,468,650,0,650,0,0,1000,0,1000,650];
+const p194 = [
+  16,0,100,24,29,82,0,918,0,964,17,994,61,1000,100,1000,900,986,956,950,992,918,1000,82,1000,36,983,6,939,
+  0,900,0,100,
+];
+const p195 = [
+  10,492,427,448,645,269,872,316,812,512,810,413,779,487,534,627,504,497,497,492,427,10,771,0,748,210,616,
+  276,799,237,782,172,996,161,780,142,781,51,992,24,771,0,
+];
+const p196 = [
+  11,386,194,256,337,629,705,702,637,589,627,308,346,1000,330,312,314,429,226,904,226,386,194,8,354,570,
+  271,570,564,747,503,830,720,786,599,786,572,703,354,570,
+];
+const p197 = [
+  12,602,0,3,442,3,756,330,1000,382,967,24,734,72,676,24,640,72,579,24,481,647,31,602,0,5,698,541,548,948,
+  972,969,569,930,698,541,3,647,31,935,281,647,31,
+];
+const p198 = [
+  7,991,0,655,2,728,103,480,351,816,137,719,40,991,0,11,233,568,141,661,191,755,54,863,54,962,332,962,93,
+  960,233,755,185,667,317,614,233,568,
+];
+const p199 = [
+  15,643,783,561,737,466,791,408,771,211,565,255,431,209,348,137,302,43,365,34,472,111,644,351,882,601,
+  962,689,854,643,783,11,704,0,535,40,424,143,409,292,522,426,461,539,820,451,977,326,1000,235,950,103,
+  704,0,3,148,400,96,522,148,400,
+];
+const p200 = [
+  9,493,1000,938,514,1000,345,852,101,493,0,147,101,0,345,62,514,493,1000,9,493,191,638,227,693,318,638,
+  414,493,455,360,414,307,318,360,227,493,191,
+];
+const p201 = [
+  26,476,918,442,813,411,918,290,800,250,673,387,657,242,618,242,373,411,391,427,455,452,391,606,368,452,
+  345,452,55,611,280,645,255,556,73,772,204,574,29,342,10,74,214,9,578,189,881,342,954,487,963,476,918,4,
+  992,555,435,573,855,1000,992,555,
+];
+
+// The two 'Business Location' slides share one world map; the second slide
+// shifts it right and recolours it grey.
+const MAP_DX = 7.84;
+const WORLD = [
+  [4.76,4.2,1.54,1.98,m1],
+  [10.67,9.2,1.48,1.3,m2],
+  [4.02,5.03,0.71,0.98,m3],
+  [5.94,4.55,6.27,5.56,m4],
+  [7.52,6.87,0.48,0.28,m5],
+  [8.17,6.86,0.3,0.48,m6],
+  [1.1,4.69,4.22,6.47,m7],
+  [4.25,4.1,1.01,0.77,m8],
+  [3.18,4.88,0.55,0.48,m9],
+  [11.39,8.79,0.72,0.4,m10],
+  [10.58,8.52,0.38,0.42,m11],
+  [8.12,9.22,0.28,0.52,m12],
+  [7.98,4.86,0.33,0.62,m13],
+  [11.21,6.93,0.38,0.56,m14],
+  [4.3,4.22,0.25,0.4,m15],
+  [10.08,8.56,0.43,0.44,m16],
+  [3.07,4.73,0.36,0.28,m17],
+  [6.35,6.32,0.28,0.44,m18],
+  [6.8,4.71,0.36,0.36,m19],
+  [4.1,4.67,0.37,0.34,m20],
+  [3.47,4.58,0.36,0.23,m21],
+  [12.33,10.69,0.37,0.36,m22],
+  [5.83,5.83,0.31,0.2,m23],
+  [8.62,4.23,0.3,0.26,m24],
+  [12.71,10.32,0.2,0.43,m25],
+  [10.46,9,0.36,0.11,m26],
+  [3.51,7.88,0.38,0.15,m27],
+  [14,3.17,1.1,1.1,m28],
+  [14,8.89,1.1,1.1,m28],
+  [14,6.02,1.1,1.1,m28],
+];
+
+// ---------------------------------------------------------------- runtime
+const pres = new pptxgen();
+pres.defineLayout({ name: 'DECK', width: 21.99, height: 12.37 });
+pres.layout = 'DECK';
+let slide = null;
+
+// A gradient is faked with three nested copies of the shape, scaled towards the
+// focus corner and stepping from the outer colour to the inner one.
+const RAMP = [[1, 0.78], [0.62, 0.42], [0.3, 0.12]];
+const SCALABLE = { rect: 1, ellipse: 1, roundRect: 1 };
+
+function mix(a, b, t) {
+  let o = '#';
+  for (let i = 0; i < 3; i++) {
+    const p = parseInt(a.substr(i * 2, 2), 16), q = parseInt(b.substr(i * 2, 2), 16);
+    o += ('0' + Math.round(p + (q - p) * t).toString(16)).slice(-2);
+  }
+  return o.slice(1).toUpperCase();
+}
+
+function rampColor(g, t) {
+  const f = g.flat || 0;
+  return mix(g.from, g.to, t <= f ? 0 : (t - f) / (1 - f));
+}
+
+// Turn a flat outline list into pptxgenjs custGeom points, scaled into w x h.
+function poly(pts, x, y, w, h) {
+  const out = [];
+  for (let i = 0; i < pts.length;) {
+    const n = pts[i++];
+    for (let k = 0; k < n; k++, i += 2) {
+      out.push({ x: x + (pts[i] / 1000) * w, y: y + (pts[i + 1] / 1000) * h, moveTo: k === 0 });
+    }
+    out.push({ close: true });
+  }
+  return out;
+}
+
+// S(shape, x, y, w, h, fill, line, extra) -- the deck's only shape primitive.
+function S(shape, x, y, w, h, fill, line, extra) {
+  const geom = Array.isArray(shape) ? 'custGeom' : shape;
+  const base = Object.assign({ x: x, y: y, w: w, h: h,
+    line: line || { type: 'none' } }, extra || {});
+  if (Array.isArray(shape)) base.points = poly(shape, 0, 0, w, h);
+  if (!fill || !fill.from) {
+    slide.addShape(geom, Object.assign(base, { fill: fill || { type: 'none' } }));
+    return;
+  }
+  const scalable = Array.isArray(shape) || SCALABLE[shape];
+  const steps = scalable ? RAMP : [[1, 0.5]];
+  steps.forEach(([k, t], i) => {
+    const nw = w * k, nh = h * k;
+    const nx = x + (fill.focus[1] === 'r' ? w - nw : 0);
+    const ny = y + (fill.focus[0] === 'b' ? h - nh : 0);
+    const o = Object.assign({}, base, { x: nx, y: ny, w: nw, h: nh,
+      fill: { color: rampColor(fill, t), transparency: fill.alpha || 0 } });
+    if (Array.isArray(shape)) o.points = poly(shape, 0, 0, nw, nh);
+    if (i > 0) o.line = { type: 'none' };
+    slide.addShape(geom, o);
+  });
+}
+
+// T(text, x, y, w, style) -- top-anchored text box; TB adds an explicit height.
+function T(txt, x, y, w, style) { TB(txt, x, y, w, 0.6, style); }
+function TB(txt, x, y, w, h, style) {
+  slide.addText(txt, Object.assign({ x: x, y: y, w: w, h: h }, style));
+}
+
+// Every raster image in the source is redrawn as a labelled placeholder box.
+function IMG(x, y, w, h, round) {
+  slide.addShape(round ? 'ellipse' : 'rect',
+    { x: x, y: y, w: w, h: h, fill: { color: GY1 }, line: { color: GY2, width: 1 } });
+  slide.addText('[image]', { x: x, y: y + h / 2 - 0.25, w: w, h: 0.5,
+    align: 'center', fontFace: RL, fontSize: 14, color: GY3 });
+}
+
+function newSlide() { slide = pres.addSlide(); return slide; }
+
+// ---------------------------------------------------------------- slides
+function slide01() {  // BUSINESS
+  S(RECT,0,0,21.99,12.37,GNBBL);
+  S(p29,16.06,0,5.93,8.54,GNBTRT);
+  S(DONUT,12.33,2.35,8.19,8.19,GNBTRT,0,{rectRadius:1.082});
+  T('BUSINESS ',1.11,5.07,11.38,t160wB);
+  T('Creative',1.11,3.68,11.05,t110w);
+  S(OVAL,1.25,1.23,1,1,fWH,0,{flipH:1});
+  T(SPARK_CREATIVE,2.49,1.46,5.63,t28wB);
+  S(p30,1.53,1.5,0.45,0.44,fBLUE);
+  T(PRESENTATION_TEMPLATE_20,1.25,7.36,10.33,t32w);
+  T(PREPARED_FOR_WILKINS,1.25,10.24,2.83,t24wB);
+  T(ISSUE_DATE_9,5.99,10.24,2.87,t24wB);
+}
+
+function slide02() {  // BUSINESS
+  S(RECT,0,0,21.99,12.37,GNBBLT);
+  T('BUSINESS ',5.3,5.78,11.38,t160wcB);
+  T('Creative',5.47,4.39,11.05,t110wc);
+  T(PRESENTATION_TEMPLATE_20,5.61,8.07,10.33,t32wc);
+  S(OVAL,10.49,1.29,1,1,fWH,0,{flipH:1});
+  T(SPARK_CREATIVE,8.18,2.49,5.63,t28wcB);
+  S(p30,10.77,1.57,0.45,0.44,fBLUE);
+  S(p31,2.66,0,4.62,12.37,fWHT);
+  S(p32,14.7,0,4.62,12.37,fWHT);
+  T(WWW_EXAMPLE_COM,8.77,10.81,4.45,t18wc);
+}
+
+function slide03() {  // BUSINESS
+  T('BUSINESS ',1.11,5.07,11.38,t160kB);
+  T('Creative',1.11,3.68,11.05,t110k);
+  S(OVAL,1.25,1.23,1,1,GNBBR,0,{flipH:1});
+  T(SPARK_CREATIVE,2.49,1.46,5.63,t28kB);
+  S(p30,1.53,1.5,0.45,0.44,fWH);
+  T(PRESENTATION_TEMPLATE_20,1.25,7.36,10.33,t32k);
+  T(PREPARED_FOR_WILKINS,1.25,10.24,2.83,t24kB);
+  T(ISSUE_DATE_9,5.99,10.24,2.87,t24kB);
+  S(OVAL,14.77,4.29,3.81,3.81,fWHT2);
+  S(p29,16.06,0,5.93,8.54,GNBTRT);
+  IMG(12.83,2.35,7.69,7.69);
+}
+
+function slide04() {  // Table Of Contents
+  T(TABLE_OF_CONTENTS,1.11,1.25,11.05,t85kB);
+  [
+  [0,0,'Introduction','01'],
+  [6.91,0,'Our Values','02'],
+  [13.83,0,'Our Goals','03'],
+  [0,5.8,'About Us','07'],
+  [6.91,5.8,'Our Vision','08'],
+  [13.83,5.8,S_W_O,'09'],
+  [0,2.87,EXCLUSIVE_SUMMERY,'04'],
+  [6.91,2.87,'Our Mision','05'],
+  [13.83,2.87,'Services','06'],
+].forEach(([dx,dy,v0,v1]) => {
+    S(OVAL,1.25+dx,3.68+dy,1.38,1.38,GBNBL);
+    S(OVAL,1.49+dx,3.92+dy,0.9,0.9,fWH);
+    S(LINE,2.63+dx,4.37+dy,0.71,0,NOFILL,lnGY22);
+    S(LINE,3.33+dx,3.4+dy,0.01,1.94,NOFILL,lnGY22);
+    T(v0,3.73+dx,3.3+dy,3.18,t24kB2);
+    T(PORESI_NISTRUM_EVELITAS,3.73+dx,3.84+dy,3.18,t16Lk);
+    T(v1,1.58+dx,4.1+dy,0.72,t28kcB);
+  });
+}
+
+function slide05() {  // Table Of Contents
+  S(RECT,9.66,3.35,12.33,9.02,GBNTL);
+  T(TABLE_OF_CONTENTS,1.11,1.25,11.05,t85kB);
+  T(GOOD_IDEA_MAKE_2,1.25,3.3,3.18,t28kB2);
+  T(OTATUM_OMMODIT_RE_5,1.3,4.95,7.28,t16Lk2);
+  [
+  [0,0,'01.','Introduction'],
+  [5.24,0,'08.','Our Goals'],
+  [0,1.07,'02.','Welcome'],
+  [5.24,1.07,'09.','Our Services'],
+  [0,2.14,'03.',EXCLUSIVE_SUMMERY],
+  [5.24,2.14,'10.','Our Team'],
+  [0,3.22,'04.','About Us'],
+].forEach(([dx,dy,v0,v1]) => {
+    T(v0,10.58+dx,4.27+dy,0.83,t28wB);
+    S(LINE,11.49+dx,4.68+dy,0.5,0,NOFILL,lnWH2);
+    T(v1,12.16+dx,4.41+dy,3.33,t24wB2);
+  });
+  T('11.',15.82,7.48,0.83,t28wB);
+  S(LINE,16.74,7.9,0.5,0,NOFILL,lnWH2);
+  T('Competition Analysis',17.4,7.63,3.51,t24wB2);
+  [
+  [0,0,'05.','Our Values'],
+  [5.24,0,'12.',S_W_O],
+  [0,1.07,'06.','Our Mision'],
+  [5.24,1.07,'13.',BUSINESS_MODEL],
+  [0,2.14,'07.','Our Vision'],
+  [5.24,2.14,'14.','Market Analysis'],
+].forEach(([dx,dy,v0,v1]) => {
+    T(v0,10.58+dx,8.56+dy,0.83,t28wB);
+    S(LINE,11.49+dx,8.97+dy,0.5,0,NOFILL,lnWH2);
+    T(v1,12.16+dx,8.7+dy,3.33,t24wB2);
+  });
+  IMG(1.25,7.63,7.33,3.49);
+}
+
+function slide06() {  // Welcome Message
+  S(RECT,-0.02,3.35,8.76,9.02,GBNBR);
+  T(WELCOME_MESSAGE,1.11,1.25,19.63,t85kB2);
+  T('Your Best \nMessage Here',11.24,3.35,9.49,t28kB2);
+  T(OTATUM_OMMODIT_RE_22,9.91,4.58,10.83,t16Lk2);
+  T('Details Skills',9.86,7.74,5.71,t28kB);
+  S(RRECT,9.94,9.35,4.58,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,9.94,9.35,2.22,0.25,GBNTL,0,{rectRadius:0.125});
+  T('Skill Name',9.86,8.78,4.66,t20k);
+  S(RRECT,15.99,9.35,4.58,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,15.99,9.35,3.58,0.25,GBNTL,0,{rectRadius:0.125});
+  T('Skill Name',15.92,8.78,4.66,t20k);
+  S(RRECT,9.94,10.87,4.58,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,9.94,10.87,3.31,0.25,GBNTL,0,{rectRadius:0.125});
+  T('Skill Name',9.86,10.3,4.66,t20k);
+  S(RRECT,15.99,10.87,4.58,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,15.99,10.87,2.58,0.25,GBNTL,0,{rectRadius:0.125});
+  T('Skill Name',15.92,10.3,4.66,t20k);
+  S(OVAL,2.52,5.13,3.67,3.67,NOFILL,lnNAVY75,{rotate:180,flipH:1});
+  T(HELLO_I_AM,1.49,10.1,5.71,t28wcB);
+  T('CEO & Founder',1.49,10.64,5.71,t18wc);
+  S(p33,9.94,3.35,0.89,0.79,GNBTR);
+  IMG(2.77,5.38,3.16,3.16);
+}
+
+function slide07() {  // Welcome Message
+  S(RECT,0,0,21.99,12.37,GNBTL);
+  S(p29,16.06,3.75,5.93,8.61,fWHT,0,{rotate:180,flipH:1});
+  S(OVAL,1.83,3.93,4.65,4.65,NOFILL,lnNAVY75,{rotate:180,flipH:1});
+  T(WELCOME_MESSAGE,1.11,1.25,19.63,t85wB);
+  T(HELLO_I_AM,7.95,4.57,5.71,t28wB);
+  T(OTATUM_OMMODIT_RE_22,7.99,5.73,7.28,t16Lw);
+  T('CEO & Founder',7.95,5.09,5.71,t18w);
+  S(LINE,1.25,11.08,14.02,0.04,NOFILL,lnWH15,{rotate:180,flipH:1});
+  T('John Johnson',1.19,10.1,9.72,t36Vw);
+  IMG(2.15,4.25,4.01,4.01);
+}
+
+function slide08() {  // About Our Company
+  S(RECT,16.19,0,5.8,12.37,GNBBL2);
+  T('About Our Company',1.25,1.25,19.49,t85kB2);
+  T('About At Your\nCompany',2.14,3.37,3.95,t28kB2);
+  T(OTATUM_OMMODIT_RE_27,2.14,4.8,8.68,t16Lk);
+  S(OVAL,2.15,7.71,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,2.15,9.02,3.95,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_5,2.15,9.62,3.95,t16Lk);
+  S(OVAL,6.74,7.71,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,6.74,9.02,3.95,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_5,6.74,9.62,3.95,t16Lk);
+  S(p34,7.06,8.32,0.26,0.06,fWH);
+  S(p35,6.97,7.93,0.44,0.36,fWH);
+  S(p36,2.55,7.94,0.26,0.25,fWH);
+  S(p37,2.47,8.04,0.25,0.24,fWH);
+  S(p38,2.39,7.95,0.41,0.41,fWH);
+  S(LINE,1.25,3.4,0.06,7.72,NOFILL,lnGY23);
+  S(LINE,1.25,3.4,0.02,3.21,NOFILL,lnBLUE10);
+  IMG(11.83,3.35,8.91,7.77);
+}
+
+function slide09() {  // About  Our Company
+  T('About \nOur Company',1.25,1.25,11.08,t85kB);
+  T(ABOUT_AT_YOUR,1.16,4.2,11.17,t28kB);
+  T(OTATUM_OMMODIT_RE_27,1.16,4.85,11.17,t16Lk);
+  S(LINE,13.5,1.25,0.07,9.87,NOFILL,lnGY23);
+  [0, -3.58, -7.12].forEach(d => {
+    S(OVAL,14.41,8.37+d,0.9,0.9,GBNBR2,0,{flipH:1});
+    T(ABOUT_TITLE_HERE,14.41,9.55+d,6.33,t24kB2);
+    T(PORE_NISTRUM_EVELITAS_4,14.41,10.04+d,6.33,t16Lk);
+    S(p36,14.81,8.61+d,0.26,0.25,fWH);
+    S(p37,14.73,8.7+d,0.25,0.24,fWH);
+    S(p38,14.65,8.62+d,0.41,0.41,fWH);
+    S(OVAL,13.4,9.65+d,0.28,0.28,GBNBR2,0,{flipH:1});
+  });
+  IMG(8.82,7.27,3.51,3.85);
+  IMG(1.25,7.27,3.51,3.85);
+  IMG(5.04,7.27,3.51,3.85);
+}
+
+function slide10() {  // Who We Are
+  IMG(1.25,3.18,10.49,9.18);
+  T('Who We Are',1.25,1.25,10.49,t85kB2);
+  [0, 2.95, 5.9].forEach(d => {
+    S(OVAL,11.04,3.68+d,1.38,1.38,GBNBL);
+    S(OVAL,11.28,3.92+d,0.9,0.9,fWH);
+    S(LINE,12.42,4.37+d,0.71,0,NOFILL,lnGY22);
+    S(LINE,13.12,3.4+d,0.01,1.94,NOFILL,lnGY22);
+    T(INSERT_TITLE_HERE,13.52,3.35+d,7.22,t24kB2);
+    T(OTATUM_OMMODIT_RE_6,13.52,3.84+d,7.22,t16Lk);
+  });
+  S(p39,11.48,7.07,0.5,0.5,fK);
+  S(p40,11.58,4.25,0.3,0.3,fK);
+  S(p41,11.64,4.11,0.17,0.03,fK);
+  S(p42,11.48,4.15,0.5,0.47,fK);
+  S(p43,11.64,10.17,0.33,0.33,fK);
+  S(p44,11.49,10.05,0.26,0.12,fK);
+  S(p45,11.49,10.17,0.18,0.1,fK);
+  S(p46,11.49,10.37,0.17,0.1,fK);
+  S(p47,11.48,10.27,0.12,0.1,fK);
+}
+
+function slide11() {  // What We Do?
+  S(RECT,1.29,3.93,9.08,2.73,NOFILL,lnGY3225);
+  S(RECT,1.29,8.38,9.08,2.73,NOFILL,lnGY3225);
+  S(RECT,11.62,3.93,9.08,2.73,NOFILL,lnGY3225);
+  S(RECT,11.62,8.38,9.08,2.73,NOFILL,lnGY3225);
+  T('What We Do?',1.25,1.25,19.49,t85kB2);
+  S(p48,1.77,3.29,3.23,1.25,GNBBRT);
+  S(p48,1.77,7.74,3.23,1.25,GNBBRT);
+  S(p48,12.1,3.29,3.23,1.25,GNBBRT);
+  S(p48,12.1,7.74,3.23,1.25,GNBBRT);
+  T('Insert Title',2.74,3.7,2.06,t24wB3);
+  T(OTATUM_OMMODIT_RE_10,1.66,4.95,8.17,t16Lk);
+  T('Insert Title',13.08,3.7,2.06,t24wB3);
+  T(OTATUM_OMMODIT_RE_10,11.99,4.95,8.17,t16Lk);
+  T('Insert Title',2.74,8.1,2.06,t24wB3);
+  T(OTATUM_OMMODIT_RE_10,1.66,9.35,8.17,t16Lk);
+  T('Insert Title',13.08,8.1,2.06,t24wB3);
+  T(OTATUM_OMMODIT_RE_10,11.99,9.35,8.17,t16Lk);
+  S(p49,12.41,8.31,0.5,0.27,fWH);
+  S(p50,12.5,8.19,0.05,0.09,fWH);
+  S(p51,12.64,8.08,0.05,0.03,fWH);
+  S(p52,12.5,8.13,0.05,0.03,fWH);
+  S(p53,12.77,8.19,0.05,0.09,fWH);
+  S(p50,12.64,8.15,0.05,0.14,fWH);
+  S(p54,12.53,8.31,0.25,0.14,fWH);
+  S(p55,12.6,8.31,0.12,0.08,fWH);
+  S(p56,12.77,8.13,0.05,0.03,fWH);
+  S(p57,2.22,8.3,0.07,0.04,fWH);
+  S(p58,2.22,8.36,0.05,0.04,fWH);
+  S(p59,2.17,8.12,0.16,0.15,fWH);
+  S(p60,2.37,8.12,0.09,0.06,fWH);
+  S(p61,2.37,8.2,0.09,0.06,fWH);
+  S(p62,2.04,8.12,0.09,0.06,fWH);
+  S(p63,2.04,8.2,0.09,0.06,fWH);
+  S(p64,2.03,8.3,0.21,0.27,fWH);
+  S(p65,2.27,8.3,0.21,0.26,fWH);
+  S(p66,12.59,3.97,0.03,0.07,fWH);
+  S(p67,12.62,3.95,0.04,0.06,fWH);
+  S(p68,12.66,3.97,0.03,0.07,fWH);
+  S(p69,12.6,3.86,0.07,0.07,fWH);
+  S(p70,12.52,3.8,0.24,0.21,fWH);
+  S(p71,12.4,3.68,0.47,0.47,fWH);
+  S(p72,2.09,3.65,0.13,0.13,fWH);
+  S(p73,2.09,3.99,0.13,0.13,fWH);
+  S(p74,2.35,3.92,0.04,0.11,fWH);
+  S(p75,2.43,3.99,0.13,0.13,fWH);
+  S(p76,2.43,3.65,0.13,0.13,fWH);
+  S(p77,2.18,3.73,0.3,0.27,fWH);
+  S(p78,2.3,3.9,0.05,0.09,fWH);
+  S(p79,2.29,3.81,0.07,0.07,fWH);
+  S(p80,2.27,3.93,0.04,0.11,fWH);
+}
+
+function slide12() {  // Our Goals
+  S(LINE,6.39,4.96,4.63,3.56,NOFILL,lnGY23,{rotate:180});
+  S(LINE,6.2,7.39,4.72,1.13,NOFILL,lnGY23,{rotate:180});
+  S(LINE,6.3,8.52,4.59,1.19,NOFILL,lnGY23,{flipH:1});
+  S(LINE,11.03,8.48,4.72,1.06,NOFILL,lnGY23,{rotate:180});
+  S(LINE,10.99,7.39,4.75,1.04,NOFILL,lnGY23,{flipH:1});
+  S(LINE,10.99,4.85,4.63,3.67,NOFILL,lnGY23,{flipH:1});
+  S(OVAL,8.64,6,4.73,4.73,fWH);
+  T('Our Goals',1.25,1.25,10.49,t85kB2);
+  S(p81,7.31,3.77,7.37,6.93,GNBBRT,0,{rotate:-43.4});
+  S(OVAL,15.35,4.32,0.9,0.9,GBNBR2,0,{flipH:1});
+  S(OVAL,15.35,6.9,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,16.7,6.7,4.04,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_11,16.7,7.18,4.04,t16Lk);
+  S(OVAL,15.35,9.09,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,16.7,8.88,4.04,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_8,16.7,9.37,4.04,t16Lk);
+  [0, -2.33, -4.79].forEach(d => {
+    S(OVAL,5.75,9.25+d,0.9,0.9,GBNBR2,0,{flipH:1});
+    T(ABOUT_TITLE_HERE,1.2,9.05+d,4.04,t24krB);
+    T(PORE_NISTRUM_EVELITAS_8,1.2,9.53+d,4.04,t16Lkr);
+  });
+  T(ABOUT_TITLE_HERE,16.7,4.14,4.04,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_11,16.7,4.62,4.04,t16Lk);
+  T('01',5.81,4.66,0.74,t28wcB);
+  T('02',5.81,7.12,0.74,t28wcB);
+  T('03',5.81,9.46,0.74,t28wcB);
+  T('04',15.43,4.53,0.74,t28wcB);
+  T('05',15.43,7.16,0.74,t28wcB);
+  T('06',15.43,9.33,0.74,t28wcB);
+}
+
+function slide13() {  // Our Goals
+  T('Our Goals',1.25,1.25,10.49,t85kB2);
+  [0, 6.91].forEach(d => {
+    S(LINE,1.38+d,4.8,0.05,6.32,NOFILL,lnGY23);
+    S(OVAL,2.26+d,8.37,0.9,0.9,GBNBR2,0,{flipH:1});
+    T(ABOUT_TITLE_HERE,2.26+d,9.55,5.24,t24kB2);
+    T(PORE_NISTRUM_EVELITAS_3,2.26+d,10.04,5.24,t16Lk);
+    S(OVAL,1.25+d,9.65,0.28,0.28,GBNBR2,0,{flipH:1});
+    S(OVAL,2.26+d,4.8,0.9,0.9,GBNBR2,0,{flipH:1});
+    T(ABOUT_TITLE_HERE,2.26+d,5.98,5.24,t24kB2);
+    T(PORE_NISTRUM_EVELITAS_3,2.26+d,6.46,5.24,t16Lk);
+    S(OVAL,1.25+d,6.07,0.28,0.28,GBNBR2,0,{flipH:1});
+  });
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodia mtatum',1.16,2.62,13.24,t16Lk);
+  S(p82,9.4,5.03,0.43,0.42,fWH);
+  S(p83,9.4,8.61,0.43,0.42,fWH);
+  S(p84,9.6,8.66,0.15,0.15,fWH);
+  S(p81,2.48,5.03,0.44,0.42,fWH);
+  S(p85,2.61,8.71,0.1,0.03,fWH);
+  S(p86,2.49,8.61,0.43,0.42,fWH);
+  IMG(15.24,1.25,5.5,10.02);
+}
+
+function slide14() {  // Our Mission
+  S(LINE,9.62,7.33,2.51,0,NOFILL,lnGY23,{rotate:180});
+  S(OVAL,7.64,3.55,2.1,2.1,GBNTR,lnWH45);
+  S(OVAL,7.64,6.28,2.1,2.1,GBNTR,lnWH45);
+  S(OVAL,7.64,9.01,2.1,2.1,GBNTR,lnWH45);
+  T('Our Mission',1.25,1.25,10.49,t85kB2);
+  T(ABOUT_TITLE_HERE,1.24,9.26,5.87,t24krB);
+  T(PORE_NISTRUM_EVELITAS_7,1.24,9.74,5.87,t16Lkr);
+  S(p39,8.14,6.78,1.1,1.1,fWH);
+  S(p36,8.58,4.1,0.62,0.61,fWH);
+  S(p37,8.38,4.32,0.59,0.59,fWH);
+  S(p38,8.18,4.12,0.98,0.98,fWH);
+  S(p43,8.52,9.86,0.66,0.66,fWH);
+  S(p44,8.21,9.62,0.51,0.24,fWH);
+  S(p45,8.21,9.87,0.35,0.19,fWH);
+  S(p46,8.21,10.26,0.34,0.19,fWH);
+  S(p47,8.21,10.06,0.25,0.19,fWH);
+  S(OVAL,12.14,3.55,2.06,2.1,GBNTR,lnWH45);
+  S(OVAL,12.14,6.28,2.06,2.1,GBNTR,lnWH45);
+  S(OVAL,12.14,9.01,2.06,2.1,GBNTR,lnWH45);
+  S(p40,12.89,4.37,0.61,0.63,fWH);
+  S(p41,13.02,4.07,0.35,0.07,fWH);
+  S(p42,12.67,4.16,1.03,0.98,fWH);
+  S(p87,12.68,9.55,1.01,1.02,fWH,0,{flipH:1});
+  S(p88,12.62,6.96,1.13,0.74,fWH,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,1.24,6.48,5.87,t24krB);
+  T(PORE_NISTRUM_EVELITAS_7,1.24,6.96,5.87,t16Lkr);
+  T(ABOUT_TITLE_HERE,1.24,3.74,5.87,t24krB);
+  T(PORE_NISTRUM_EVELITAS_7,1.24,4.22,5.87,t16Lkr);
+  T(ABOUT_TITLE_HERE,14.79,9.26,5.87,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_7,14.79,9.74,5.87,t16Lk);
+  T(ABOUT_TITLE_HERE,14.79,6.48,5.87,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_7,14.79,6.96,5.87,t16Lk);
+  T(ABOUT_TITLE_HERE,14.79,3.74,5.87,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_7,14.79,4.22,5.87,t16Lk);
+  S(LINE,10.94,4.51,0,5.68,NOFILL,lnGY23);
+  S(OVAL,10.8,9.91,0.28,0.28,GBNBR2,0,{flipH:1});
+  S(OVAL,10.8,4.51,0.28,0.28,GBNBR2,0,{flipH:1});
+  S(OVAL,10.8,7.2,0.28,0.28,GBNBR2,0,{flipH:1});
+}
+
+function slide15() {  // Our Mission
+  S(RECT,0,7.47,21.99,4.9,GNBBL2);
+  S(OVAL,17.51,7.47,1.02,1.02,GBNTR);
+  S(OVAL,12.81,7.47,1.02,1.02,GBNTR);
+  S(OVAL,8.12,7.47,1.02,1.02,GBNTR);
+  S(OVAL,3.42,7.47,1.02,1.02,GBNTR);
+  T('Our Mission',1.25,1.25,10.49,t85kB2);
+  S(p39,17.75,7.71,0.54,0.54,fWH);
+  S(p88,8.35,7.8,0.55,0.36,fWH,0,{flipH:1});
+  S(p36,3.88,7.74,0.3,0.3,fWH);
+  S(p37,3.78,7.84,0.29,0.28,fWH);
+  S(p38,3.68,7.75,0.48,0.48,fWH);
+  T(ABOUT_TITLE_HERE,1.96,8.65,3.94,t24wcB);
+  T(PORE_NISTRUM_EVELITAS_6,1.96,9.14,3.94,t16Lwc);
+  T(ABOUT_TITLE_HERE,6.66,8.65,3.94,t24wcB);
+  T(PORE_NISTRUM_EVELITAS_6,6.66,9.14,3.94,t16Lwc);
+  T(ABOUT_TITLE_HERE,11.36,8.65,3.94,t24wcB);
+  T(PORE_NISTRUM_EVELITAS_6,11.36,9.14,3.94,t16Lwc);
+  T(ABOUT_TITLE_HERE,16.05,8.65,3.94,t24wcB);
+  T(PORE_NISTRUM_EVELITAS_6,16.05,9.14,3.94,t16Lwc);
+  S(p89,13.07,7.75,0.5,0.47,fWH);
+  IMG(1.25,3.35,19.49,7.77);
+}
+
+function slide16() {  // Our Vision
+  T('Our Vision',1.25,1.25,10.49,t85kB2);
+  [0, 13.24].forEach(d => {
+    S(LINE,1.38+d,4.8,0.05,6.32,NOFILL,lnGY23);
+    S(OVAL,2.26+d,8.37,0.9,0.9,GBNBR2,0,{flipH:1});
+    T(ABOUT_TITLE_HERE,2.26+d,9.55,5.24,t24kB2);
+    T(PORE_NISTRUM_EVELITAS_3,2.26+d,10.04,5.24,t16Lk);
+    S(OVAL,1.25+d,9.65,0.28,0.28,GBNBR2,0,{flipH:1});
+    S(OVAL,2.26+d,4.8,0.9,0.9,GBNBR2,0,{flipH:1});
+    T(ABOUT_TITLE_HERE,2.26+d,5.98,5.24,t24kB2);
+    T(PORE_NISTRUM_EVELITAS_3,2.26+d,6.46,5.24,t16Lk);
+    S(OVAL,1.25+d,6.07,0.28,0.28,GBNBR2,0,{flipH:1});
+  });
+  T(OTATUM_OMMODIT_RE_18,1.16,2.62,19.58,t16Lk);
+  S('rect',15.91,5.14,0.01,0.01,fWH);
+  S('rect',15.87,5.14,0.01,0.01,fWH);
+  S('rect',15.89,5.34,0.01,0.01,fWH);
+  S(p90,15.76,5.06,0.37,0.37,fWH);
+  S(p91,15.97,5.16,0.14,0.14,fWH);
+  S(p92,16.01,5.18,0.04,0.09,fWH);
+  S(p93,15.81,8.58,0.28,0.49,fWH);
+  S('rect',15.96,8.65,0.02,0.02,fWH);
+  S(p94,2.49,5.01,0.42,0.46,fWH);
+  S(p95,2.67,5.06,0.07,0.16,fWH);
+  S(p96,2.46,8.82,0.49,0.22,fWH);
+  S(p97,2.57,8.6,0.26,0.25,fWH);
+  S(p98,2.67,8.63,0.08,0.17,fWH);
+  IMG(8.33,4.8,5.23,6.32);
+}
+
+function slide17() {  // Our Vision
+  T('Our Vision',1.25,1.25,10.49,t85kB2);
+  T(GOOD_IDEA_MAKE_2,12.66,3.3,3.93,t28kB2);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodiam fugitae es rem.equae liquia senis ',12.77,4.95,7.96,t16Lk2);
+  S(p99,2.51,3.55,7.73,2.1,NOFILL,lnGY2225);
+  S(OVAL,1.25,3.55,2.1,2.1,GBNTR,lnWH45);
+  S(p99,2.51,6.28,7.73,2.1,GBNTL);
+  S(OVAL,1.25,6.28,2.1,2.1,GBNTR,lnWH45);
+  S(p99,2.51,9.01,7.73,2.1,NOFILL,lnGY2225);
+  S(OVAL,1.25,9.01,2.1,2.1,GBNTR,lnWH45);
+  T(ABOUT_TITLE_HERE,3.87,3.93,5.87,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_10,3.87,4.41,5.87,t16Lk);
+  T(ABOUT_TITLE_HERE,3.87,6.73,5.87,t24wB2);
+  T(PORE_NISTRUM_EVELITAS_10,3.87,7.21,5.87,t16Lw2);
+  T(ABOUT_TITLE_HERE,3.87,9.47,5.87,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_10,3.87,9.95,5.87,t16Lk);
+  S(LINE,11.5,3.4,0.06,7.72,NOFILL,lnGY23);
+  S(LINE,11.5,3.4,0.03,3.34,NOFILL,lnBLUE10);
+  S(p100,1.89,4.14,0.82,0.92,fWH);
+  S(p101,1.81,6.83,0.99,1,fWH);
+  S(p102,1.85,9.61,0.91,0.91,fWH);
+  IMG(12.79,7.63,7.95,3.49);
+}
+
+function slide18() {  // Mission & Vision
+  S(p99,7.91,7.54,11.03,3.58,GBNBR,0,{flipH:1});
+  S(p99,9.69,3.18,11.05,3.56,GBNBR);
+  T('Mission & Vision',1.25,1.25,10.49,t85kB);
+  S(OVAL,7.91,3.18,3.56,3.56,NOFILL,lnWH45);
+  S(OVAL,17.18,7.54,3.56,3.58,NOFILL,lnWH45,{flipH:1});
+  T(GOOD_IDEA_MAKE_2,1.25,3.35,5.9,t28kB2);
+  T(OTATUM_OMMODIT_RE_19,1.3,5.04,5.86,t16Lk2);
+  T(ABOUT_TITLE_HERE,11.99,3.78,8.08,t24wB2);
+  T(OTATUM_OMMODIT_RE_17,11.99,4.27,8.08,t16Lw2);
+  T(ABOUT_TITLE_HERE,8.49,8.12,8.08,t24wB2);
+  T(OTATUM_OMMODIT_RE_17,8.49,8.61,8.08,t16Lw2);
+  IMG(1.3,7.54,5.85,3.58);
+  IMG(7.91,3.18,3.56,3.56);
+  IMG(17.16,7.55,3.56,3.56);
+}
+
+function slide19() {  // Our Values
+  T('Our Values',1.18,1.25,10.56,t85kB2);
+  T(GOOD_IDEA_MAKE,1.18,3.02,7.33,t28kB2);
+  T(OTATUM_OMMODIT_RE_5,1.23,4.16,9.1,t16Lk2);
+  S(RECT,1.25,6.52,19.49,4.6,fGY1);
+  S(OVAL,17.51,7.47,1.02,1.02,GBNTR);
+  S(OVAL,12.81,7.47,1.02,1.02,GBNTR);
+  S(OVAL,8.12,7.47,1.02,1.02,GBNTR);
+  S(OVAL,3.42,7.47,1.02,1.02,GBNTR);
+  S(p39,17.75,7.71,0.54,0.54,fWH);
+  S(p88,8.35,7.8,0.55,0.36,fWH,0,{flipH:1});
+  S(p36,3.88,7.74,0.3,0.3,fWH);
+  S(p37,3.78,7.84,0.29,0.28,fWH);
+  S(p38,3.68,7.75,0.48,0.48,fWH);
+  T(ABOUT_TITLE_HERE,1.96,8.65,3.94,t24kcB);
+  T(PORE_NISTRUM_EVELITAS_6,1.96,9.14,3.94,t16Lkc);
+  T(ABOUT_TITLE_HERE,6.66,8.65,3.94,t24kcB);
+  T(PORE_NISTRUM_EVELITAS_6,6.66,9.14,3.94,t16Lkc);
+  T(ABOUT_TITLE_HERE,11.36,8.65,3.94,t24kcB);
+  T(PORE_NISTRUM_EVELITAS_6,11.36,9.14,3.94,t16Lkc);
+  T(ABOUT_TITLE_HERE,16.05,8.65,3.94,t24kcB);
+  T(PORE_NISTRUM_EVELITAS_6,16.05,9.14,3.94,t16Lkc);
+  S(p89,13.07,7.75,0.5,0.47,fWH);
+  IMG(11.36,1.26,4.42,4.42);
+  IMG(16.32,1.26,4.42,4.42);
+}
+
+function slide20() {  // Our Core Values
+  S(LINE,10.94,4.18,0.1,6.43,NOFILL,lnGY23);
+  T('Our Core Values',1.25,1.25,10.49,t85kB2);
+  S(OVAL,8.79,5.19,4.42,4.42,GBNTR);
+  S(LINE,1.99,10.61,18.33,0,NOFILL,lnGY23,{rotate:180});
+  S(LINE,1.99,4.18,17.92,0,NOFILL,lnGY23,{rotate:180});
+  S(OVAL,1.25,10.1,1.01,1.01,GBNTR);
+  S(OVAL,19.72,10.1,1.01,1.01,GBNTR);
+  S(OVAL,1.25,3.65,1.01,1.01,GBNTR);
+  S(OVAL,19.72,3.65,1.01,1.01,GBNTR);
+  T(ABOUT_TITLE_HERE,1.25,7.85,5.99,t24kB2);
+  T(OTATUM_OMMODIT_RE_9,1.25,8.33,6.33,t16Lk);
+  T(ABOUT_TITLE_HERE,1.25,5.2,5.99,t24kB2);
+  T(OTATUM_OMMODIT_RE_9,1.25,5.68,6.33,t16Lk);
+  T(ABOUT_TITLE_HERE,14.74,7.85,5.99,t24krB);
+  T(OTATUM_OMMODIT_RE_9,14.41,8.33,6.33,t16Lkr);
+  T(ABOUT_TITLE_HERE,14.74,5.2,5.99,t24krB);
+  T(OTATUM_OMMODIT_RE_9,14.41,5.68,6.33,t16Lkr);
+  S(p102,10.14,6.08,1.62,1.62,fWH);
+  T('Core Values',9.33,8.18,3.33,t32wcB);
+  S(p39,19.97,10.35,0.52,0.52,fWH);
+  S(p88,1.49,4.01,0.53,0.35,fWH,0,{flipH:1});
+  S(p36,1.69,10.38,0.29,0.28,fWH);
+  S(p37,1.59,10.48,0.27,0.27,fWH);
+  S(p38,1.51,10.39,0.46,0.46,fWH);
+  S(p89,19.99,3.93,0.48,0.45,fWH);
+}
+
+function slide21() {  // Our Target
+  T('Our Target',1.25,1.25,10.49,t85kB2);
+  S(p103,1.62,3.38,5.77,5.7,GBNTL2,0,{rotate:-86.6});
+  T(OTATUM_OMMODIT_RE_23,1.23,9.96,7.35,t16Lk2);
+  [0, 2.95, 5.9].forEach(d => {
+    S(OVAL,9.6,3.51+d,1.38,1.38,GBNBL);
+    S(OVAL,9.83,3.75+d,0.9,0.9,fWH);
+    S(LINE,10.97,4.2+d,0.71,0,NOFILL,lnGY22);
+    S(LINE,11.67,3.23+d,0.01,1.94,NOFILL,lnGY22);
+    T(INSERT_TITLE_HERE,12.28,3.18+d,8.46,t24kB2);
+    T(OTATUM_OMMODIT_RE_13,12.28,3.67+d,8.46,t16Lk);
+  });
+  S(p104,10.04,3.99,0.49,0.43,fK);
+  S(p105,10.06,9.9,0.45,0.4,fK);
+  S(p106,10.06,6.93,0.46,0.46,fK);
+}
+
+function slide22() {  // About  Our Target
+  IMG(10.83,1.25,9.91,5.27);
+  T('About \nOur Target',1.25,1.25,10.49,t85kB);
+  T(ABOUT_AT_YOUR,1.22,4.35,8.55,t28kB);
+  T(OTATUM_OMMODIT_RE_26,1.22,5.08,8.68,t16Lk);
+  S(OVAL,1.24,7.71,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,1.24,9.02,3.95,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_5,1.24,9.62,3.95,t16Lk);
+  S(OVAL,5.83,7.71,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,5.83,9.02,3.95,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_5,5.83,9.62,3.95,t16Lk);
+  S(p34,6.14,8.32,0.26,0.06,fWH);
+  S(p35,6.05,7.93,0.44,0.36,fWH);
+  S(p36,1.64,7.94,0.26,0.25,fWH);
+  S(p37,1.55,8.04,0.25,0.24,fWH);
+  S(p38,1.47,7.95,0.41,0.41,fWH);
+  S(RECT,10.83,7.71,9.91,3.41,GNBTR);
+  T(COMPLATE_PROJECT,11.47,9.64,3.62,t24wcB);
+  T('4.2K',11.47,8.53,3.62,t72wcB);
+  T('Clients Work',16.47,9.64,3.58,t24wcB);
+  T('1.3K',16.47,8.53,3.58,t72wcB);
+  S(LINE,15.78,8.45,0,1.92,NOFILL,lnGY23,{flipH:1});
+}
+
+function slide23() {  // The Problems
+  S(RECT,9.83,3.1,10.91,8.02,fGY1);
+  T('The Problems',1.25,1.25,10.49,t85kB2);
+  S(p107,2.91,4.64,0.92,1.54,GBNBL);
+  S(p108,1.08,3.1,5.92,5.9,GBNBL);
+  T(OTATUM_OMMODIT_RE_23,1.23,9.96,7.35,t16Lk2);
+  S(OVAL,17.26,7.47,1.02,1.02,GBNTR);
+  S(OVAL,12.17,7.47,1.02,1.02,GBNTR);
+  T('Problem Name',10.71,8.72,3.94,t24kcB);
+  T(OTATUM_OMMODIT_RE_2,10.37,9.2,4.62,t16Lkc);
+  T('Problem Name',15.8,8.72,3.94,t24kcB);
+  S(OVAL,17.26,3.85,1.02,1.02,GBNTR);
+  S(OVAL,12.17,3.85,1.02,1.02,GBNTR);
+  T('Problem Name',10.71,5.1,3.94,t24kcB);
+  T('Problem Name',15.8,5.1,3.94,t24kcB);
+  S(p109,12.41,7.71,0.54,0.54,fWH);
+  S(p110,12.42,4.1,0.52,0.53,fWH);
+  S(p111,17.51,4.09,0.52,0.53,fWH);
+  S(p112,17.48,7.68,0.58,0.59,fWH);
+  T(OTATUM_OMMODIT_RE_2,15.46,9.2,4.62,t16Lkc);
+  T(OTATUM_OMMODIT_RE_2,10.37,5.52,4.62,t16Lkc);
+  T(OTATUM_OMMODIT_RE_2,15.46,5.52,4.62,t16Lkc);
+}
+
+function slide24() {  // The Problems
+  T('The Problems',1.25,1.25,10.49,t85kB2);
+  S(p113,8.07,3.79,6.17,7.16,GBNBL);
+  S(p114,14.25,6.58,0.74,0.21,GBNBL);
+  S(p115,14.03,4.03,0.76,0.75,GBNBL);
+  S(p116,14.03,8.59,0.75,0.55,GBNBL);
+  S(p114,7.03,6.58,0.74,0.21,GBNBL);
+  S(p115,7.09,4.03,0.76,0.75,GBNBL,0,{rotate:72.5});
+  S(p116,6.9,8.62,0.75,0.55,GBNBL,0,{rotate:-61.8});
+  T('Problem 04',15.41,3.68,5.33,t24kB2);
+  T(OTATUM_OMMODIT_RE_3,15.41,4.17,5.33,t16Lk);
+  T('Problem 05',15.41,6.31,5.33,t24kB2);
+  T(OTATUM_OMMODIT_RE_3,15.41,6.79,5.33,t16Lk);
+  T('Problem 06',15.41,8.77,5.33,t24kB2);
+  T(OTATUM_OMMODIT_RE_3,15.41,9.25,5.33,t16Lk);
+  T('Problem 01',1.16,3.68,5.33,t24krB);
+  T(OTATUM_OMMODIT_RE_3,1.16,4.17,5.33,t16Lkr);
+  T('Problem 02',1.16,6.31,5.33,t24krB);
+  T(OTATUM_OMMODIT_RE_3,1.16,6.79,5.33,t16Lkr);
+  T('Problem 03',1.16,8.77,5.33,t24krB);
+  T(OTATUM_OMMODIT_RE_3,1.16,9.25,5.33,t16Lkr);
+}
+
+function slide25() {  // The Solution
+  T('The Solution',1.25,1.25,10.49,t85kB2);
+  S(p117,8.04,5.03,5.92,6.08,GBNC);
+  T('Solution 05',14.33,7.64,6.41,t24kB2);
+  T(OTATUM_OMMODIT_RE_8,14.33,8.12,6.41,t16Lk);
+  T('Solution 04',13.66,5.41,6.41,t24kB2);
+  T(OTATUM_OMMODIT_RE_8,13.66,5.9,6.41,t16Lk);
+  T('Solution 03',1.24,7.64,6.41,t24krB);
+  T(OTATUM_OMMODIT_RE_8,1.24,8.12,6.41,t16Lkr);
+  T('Solution 02',1.89,5.35,6.41,t24krB);
+  T(OTATUM_OMMODIT_RE_8,1.89,5.83,6.41,t16Lkr);
+  T('Solution 01',7.83,2.97,6.41,t24kcB);
+  T(OTATUM_OMMODIT_RE_8,7.83,3.45,6.41,t16Lkc);
+}
+
+function slide26() {  // The Solution
+  T('The Solution',1.25,1.25,10.49,t85kB2);
+  S(LINE,13.5,1.25,0.07,9.87,NOFILL,lnGY23);
+  [0, 2.86, 5.72, 8.58].forEach(d => {
+    T(ABOUT_TITLE_HERE,14.41,1.15+d,6.33,t24kB2);
+    T(PORE_NISTRUM_EVELITAS_4,14.41,1.63+d,6.33,t16Lk);
+    S(OVAL,13.09,0.92+d,0.91,0.91,GBNBR2,0,{flipH:1});
+  });
+  T('01',13.2,1.15,0.67,t28wcB);
+  T('02',13.2,3.98,0.67,t28wcB);
+  T('03',13.2,6.85,0.67,t28wcB);
+  T('04',13.2,9.68,0.67,t28wcB);
+  T(OTATUM_OMMODIT_RE_26,1.22,2.63,10.77,t16Lk);
+  T(GOOD_IDEA_MAKE_2,1.25,4.68,5.9,t28kB2);
+  S(p117,1.41,6.48,1.92,1.97,GBNTR);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis acipsant que erfersp ienimost enis expel etus tesserum alibusam commodigenim in nectioriot et verest fugitae remequae liquia',1.23,8.97,3.51,t16Lk2);
+  IMG(5.83,4.69,5.91,6.42);
+}
+
+function slide27() {  // Company Timeline
+  S(LINE,1.7,7.18,0,3.5,NOFILL,lnGY23);
+  T('Company Timeline',1.25,1.25,10.49,t85kB);
+  S(RECT,0,7.16,21.99,0.33,fGY2);
+  S(OVAL,1.19,10.12,1,1,GNBBR);
+  S(RECT,0,7.16,1.49,0.33,GBNBL);
+  [[0,'2027'], [7.03,'2028']].forEach(([d,v0]) => {
+    S(OVAL,1.25+d,6.89,0.88,0.88,GBNBL);
+    S(OVAL,1.45+d,7.08,0.5,0.5,fWH);
+    T(v0,2.49+d,8.3,4.25,t24kB2);
+    T(PORE_NISTRUM_EVELITAS,2.49+d,8.79,4.25,t16Lk);
+    S(LINE,8.72+d,7.18,0,3.5,NOFILL,lnGY23);
+    S(OVAL,8.22+d,10.12,1,1,GNBBR);
+  });
+  S(OVAL,15.24,6.89,0.88,0.88,GBNBL);
+  S(OVAL,15.44,7.08,0.5,0.5,fWH);
+  T('2029',16.49,8.3,4.25,t24kB2);
+  T(PORE_NISTRUM_EVELITAS,16.49,8.79,4.25,t16Lk);
+  S(LINE,5.01,3.93,0,3.5,NOFILL,lnGY23);
+  S(OVAL,4.5,3.48,1,1,GNBBR);
+  S(OVAL,4.56,6.89,0.88,0.88,GBNBL);
+  S(OVAL,4.76,7.08,0.5,0.5,fWH);
+  T('2025',5.58,4.68,4.25,t24kB2);
+  T(PORE_NISTRUM_EVELITAS,5.58,5.17,4.25,t16Lk);
+  S(LINE,12.24,3.93,0,3.5,NOFILL,lnGY23);
+  S(OVAL,11.74,3.48,1,1,GNBBR);
+  S(OVAL,11.8,6.89,0.88,0.88,GBNBL);
+  S(OVAL,11.99,7.08,0.5,0.5,fWH);
+  T(PORE_NISTRUM_EVELITAS,12.81,5.17,4.25,t16Lk);
+  T('2026',12.84,4.68,4.25,t24kB2);
+  T('01',4.66,3.75,0.67,t28wcB);
+  T('02',11.9,3.75,0.67,t28wcB);
+  T('03',1.35,10.36,0.67,t28wcB);
+  T('04',8.38,10.36,0.67,t28wcB);
+  T('05',15.35,10.36,0.67,t28wcB);
+}
+
+function slide28() {  // untitled
+  S(RECT,0,7.16,21.99,0.33,fGY2);
+  S(LINE,4.99,7.18,0,3.5,NOFILL,lnGY23);
+  S(OVAL,4.49,10.12,1,1,GNBBR);
+  S(OVAL,4.55,6.89,0.88,0.88,GBNBL);
+  S(OVAL,4.74,7.08,0.5,0.5,fWH);
+  T('2033',5.79,8.3,4.25,t24kB2);
+  T(PORE_NISTRUM_EVELITAS,5.79,8.79,4.25,t16Lk);
+  S(LINE,1.76,3.93,0,3.5,NOFILL,lnGY23);
+  S(OVAL,1.25,3.48,1,1,GNBBR);
+  S(OVAL,1.31,6.89,0.88,0.88,GBNBL);
+  S(OVAL,1.51,7.08,0.5,0.5,fWH);
+  T('2030',2.33,4.68,4.25,t24kB2);
+  T(PORE_NISTRUM_EVELITAS,2.33,5.17,4.25,t16Lk);
+  S(LINE,12.24,7.18,0,3.5,NOFILL,lnGY23);
+  S(OVAL,11.73,10.12,1,1,GNBBR);
+  S(OVAL,11.79,6.89,0.88,0.88,GBNBL);
+  S(OVAL,11.99,7.08,0.5,0.5,fWH);
+  T('2034',13.04,8.3,4.25,t24kB2);
+  T(PORE_NISTRUM_EVELITAS,13.04,8.79,4.25,t16Lk);
+  [[0,'2031'], [7.45,'2032']].forEach(([d,v0]) => {
+    S(LINE,8.48+d,3.93,0,3.5,NOFILL,lnGY23);
+    S(OVAL,7.97+d,3.48,1,1,GNBBR);
+    S(OVAL,8.03+d,6.89,0.88,0.88,GBNBL);
+    S(OVAL,8.23+d,7.08,0.5,0.5,fWH);
+    T(v0,9.04+d,4.68,4.25,t24kB2);
+    T(PORE_NISTRUM_EVELITAS,9.04+d,5.17,4.25,t16Lk);
+  });
+  T('09',4.66,10.41,0.67,t28wcB);
+  T('10',11.9,10.41,0.67,t28wcB);
+  T('06',1.41,3.73,0.67,t28wcB);
+  T('07',8.14,3.71,0.67,t28wcB);
+  T('08',15.58,3.71,0.67,t28wcB);
+}
+
+function slide29() {  // untitled
+  S(RECT,0,7.16,17.06,0.33,fGY2);
+  S('rightArrow',17.06,6.99,1.18,0.69,GBNBL);
+  [[0,'2037'], [7.03,'2038']].forEach(([d,v0]) => {
+    S(LINE,1.7+d,7.18,0,3.5,NOFILL,lnGY23);
+    S(OVAL,1.19+d,10.12,1,1,GNBBR);
+    S(OVAL,1.25+d,6.89,0.88,0.88,GBNBL);
+    S(OVAL,1.45+d,7.08,0.5,0.5,fWH);
+    T(v0,2.49+d,8.3,4.25,t24kB2);
+    T(PORE_NISTRUM_EVELITAS,2.49+d,8.79,4.25,t16Lk);
+  });
+  S(LINE,5.01,3.93,0,3.5,NOFILL,lnGY23);
+  S(OVAL,4.5,3.48,1,1,GNBBR);
+  S(OVAL,4.56,6.89,0.88,0.88,GBNBL);
+  S(OVAL,4.76,7.08,0.5,0.5,fWH);
+  T('2035',5.58,4.68,4.25,t24kB2);
+  T(PORE_NISTRUM_EVELITAS,5.58,5.17,4.25,t16Lk);
+  S(LINE,12.24,3.93,0,3.5,NOFILL,lnGY23);
+  S(OVAL,11.74,3.48,1,1,GNBBR);
+  S(OVAL,11.8,6.89,0.88,0.88,GBNBL);
+  S(OVAL,11.99,7.08,0.5,0.5,fWH);
+  T(PORE_NISTRUM_EVELITAS,12.81,5.17,4.25,t16Lk);
+  T('2036',12.89,4.68,4.25,t24kB2);
+  T('The End',18.66,7.1,2.08,t32kB);
+  T('11',4.66,3.75,0.67,t28wcB);
+  T('12',11.9,3.75,0.67,t28wcB);
+  T('13',1.35,10.36,0.67,t28wcB);
+  T('14',8.38,10.36,0.67,t28wcB);
+}
+
+function slide30() {  // Business Model
+  T(BUSINESS_MODEL,1.17,1.25,10.49,t85kB2);
+  T('Good Idea Make \nEverything To Better Slogan',1.15,3.13,8.55,t28kB2);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatumren omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodia mtatum ommodit re nobis de cone vollitat Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodia mtatum',1.15,4.23,9.99,t16Lk);
+  S(RECT,1.22,7.71,9.91,3.41,GNBBR);
+  T(TRIPS_WITH_AIRBNB,1.87,8.16,3.62,t20wB);
+  T('$3596',1.87,8.67,3.62,t40wB);
+  T(AVERAGE_NIGHTLY_FEE,6.86,8.16,3.58,t20wB);
+  T('1.3B',6.86,8.67,3.58,t40wB);
+  S(LINE,6.17,8.22,0,2.38,NOFILL,lnGY23);
+  T(PORE_NISTRUM_EVELITAS_2,1.87,9.43,3.62,t16Lw2);
+  T(PORE_NISTRUM_EVELITAS_2,6.99,9.43,3.62,t16Lw2);
+  IMG(12.24,6.52,8.51,4.6);
+  IMG(12.24,1.3,8.51,4.6);
+}
+
+function slide31() {  // Business Model
+  S('rightArrow',12,7.05,1.84,0.69,GBNBL);
+  S('rightArrow',11.55,5.24,2.11,0.69,GBNBL,0,{rotate:-22.7});
+  S('rightArrow',11.74,8.82,1.84,0.69,GBNBL,0,{rotate:16.8});
+  T(BUSINESS_MODEL,1.25,1.25,10.49,t85kB2);
+  T(GOOD_IDEA_MAKE_2,1.25,3.35,5.9,t28kB2);
+  T(OTATUM_OMMODIT_RE_19,1.3,5.04,5.86,t16Lk2);
+  S(OVAL,8.16,5.19,4.42,4.42,GBNBR2);
+  T('01. Insert Title Here',14.41,4.3,6.33,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_4,14.41,4.79,6.33,t16Lk);
+  T('02. Insert Title Here',14.41,6.86,6.33,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_4,14.41,7.34,6.33,t16Lk);
+  T('03. Insert Title Here',14.41,9.12,6.33,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_4,14.41,9.61,6.33,t16Lk);
+  S(OVAL,1.24,7.71,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,1.24,9.02,5.92,t28kB);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam oficip mintatum',1.24,9.62,6.92,t16Lk);
+  S(p111,1.49,7.95,0.39,0.4,fWH);
+  S(p104,9.2,6.37,2.34,2.05,fWH);
+}
+
+function slide32() {  // S
+  T('S',12.47,3.16,6.65,t595ncB);
+  T(SWOT_ANALYSIS,1.25,1.25,8.45,t85kB);
+  T('Strengths',1.15,6.04,8.55,t36kB);
+  T(OTATUM_OMMODIT_RE_11,1.15,6.91,8.55,t16Lk);
+  S(RECT,1.25,4.43,1.94,0.67,GBNTL2);
+  S(RECT,3.42,4.43,1.94,0.67,fGY2);
+  S(RECT,5.59,4.43,1.94,0.67,fGY2);
+  S(RECT,7.76,4.43,1.94,0.67,fGY2);
+  T('Strengths',1.43,4.61,1.58,t18wcB);
+  T('Weaknesses',3.53,4.61,1.71,t18kcB);
+  T('Opportunities',5.62,4.61,1.87,t18kcB2);
+  T('Threats ',7.94,4.61,1.58,t18kcB);
+  IMG(10.84,1.25,9.91,9.87);
+}
+
+function slide33() {  // W
+  T('W',12.47,3.16,6.65,t595ncB);
+  T(SWOT_ANALYSIS,1.25,1.25,8.45,t85kB);
+  T('Weaknesses',1.15,6.04,8.55,t36kB);
+  T(OTATUM_OMMODIT_RE_11,1.15,6.91,8.55,t16Lk);
+  S(RECT,1.25,4.43,1.94,0.67,fGY2);
+  S(RECT,3.42,4.43,1.94,0.67,GBNTL2);
+  S(RECT,5.59,4.43,1.94,0.67,fGY2);
+  S(RECT,7.76,4.43,1.94,0.67,fGY2);
+  T('Strengths',1.43,4.61,1.58,t18kcB);
+  T('Weaknesses',3.53,4.61,1.71,t18wcB);
+  T('Opportunities',5.62,4.61,1.87,t18kcB2);
+  T('Threats ',7.94,4.61,1.58,t18kcB);
+  IMG(10.84,1.25,9.91,9.87);
+}
+
+function slide34() {  // O
+  T('O',12.47,3.16,6.65,t595ncB);
+  T(SWOT_ANALYSIS,1.25,1.25,8.45,t85kB);
+  T('Opportunities',1.15,6.04,8.55,t36kB);
+  T(OTATUM_OMMODIT_RE_11,1.15,6.91,8.55,t16Lk);
+  S(RECT,1.25,4.43,1.94,0.67,fGY2);
+  S(RECT,3.42,4.43,1.94,0.67,fGY2);
+  S(RECT,5.59,4.43,1.94,0.67,GBNBL);
+  S(RECT,7.76,4.43,1.94,0.67,fGY2);
+  T('Strengths',1.43,4.61,1.58,t18kcB);
+  T('Weaknesses',3.53,4.61,1.71,t18kcB);
+  T('Opportunities',5.62,4.61,1.87,t18wcB2);
+  T('Threats ',7.94,4.61,1.58,t18kcB);
+  IMG(10.84,1.25,9.91,9.87);
+}
+
+function slide35() {  // T
+  T('T',12.47,3.16,6.65,t595ncB);
+  T(SWOT_ANALYSIS,1.25,1.25,8.45,t85kB);
+  T('Threats',1.15,6.04,8.55,t36kB);
+  T(OTATUM_OMMODIT_RE_11,1.15,6.91,8.55,t16Lk);
+  S(RECT,1.25,4.43,1.94,0.67,fGY2);
+  S(RECT,3.42,4.43,1.94,0.67,fGY2);
+  S(RECT,5.59,4.43,1.94,0.67,fGY2);
+  S(RECT,7.76,4.43,1.94,0.67,GBNBL);
+  T('Strengths',1.43,4.61,1.58,t18kcB);
+  T('Weaknesses',3.53,4.61,1.71,t18kcB);
+  T('Opportunities',5.62,4.61,1.87,t18kcB2);
+  T('Threats ',7.94,4.61,1.58,t18wcB);
+  IMG(10.84,1.25,9.91,9.87);
+}
+
+function slide36() {  // COFFEE BREAK
+  S(RECT,0,0,21.99,12.37,GBNBRT);
+  T('COFFEE BREAK',6.77,5.61,8.45,t66wcB);
+  T('30 Minutes',6.77,4.84,8.45,t40wcB);
+  T('Otatum ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp fugitae es rem.equae liquia senis \nptatem quam res officip icimint',7.66,6.54,6.67,t16Lwc);
+  S(OVAL,5.99,1.18,10,10,NOFILL,lnWH75);
+}
+
+function slide37() {  // The Leader
+  T('The Leader',1.25,1.25,10.49,t85kB2);
+  S(RECT,1.25,7.71,9.91,3.41,GNBBR);
+  T(COMPLATE_PROJECT,1.89,9.64,3.62,t24wcB);
+  T('4.2K',1.89,8.53,3.62,t72wcB);
+  T('Team Members',6.89,9.64,3.58,t24wcB);
+  T('2000+',6.89,8.53,3.58,t72wcB);
+  S(LINE,6.2,8.45,0,1.92,NOFILL,lnGY23,{flipH:1});
+  T(GOOD_IDEA_MAKE_2,1.25,3.3,9.91,t28kB2);
+  T('Otatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienixpel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodiamtumommodit re nobis de cone vollitat evendi as digentiis accab psant querfersp fugitae es rem.equae liquia senis reptatem',1.3,4.95,9.86,t16Lk2);
+  S(RECT,12.24,1.25,8.51,9.87,fGY1);
+  S(DONUT,13.2,1.92,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+  S(RRECT,13.2,9.85,2.93,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,13.2,9.85,1.46,0.25,GNBBR,0,{rectRadius:0.125});
+  T('Skill Name',13.14,9.28,2.98,t20k);
+  T(WILKINS_MICAWBER,13.15,5.21,4.52,t28kB);
+  T('Position Name',13.15,5.73,4.52,t18b);
+  S(RRECT,16.93,9.85,2.93,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,16.93,9.85,1.9,0.25,GNBBR,0,{rectRadius:0.125});
+  T('Skill Name',16.86,9.28,2.98,t20k);
+  T('Otatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienixpel etus tesserum alibusam commo digenim quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodiamtumommodit re nobis de cone vollitat evendi as digentiis accab psant querfersp fugitae es rem.equae liquia senis reptatem',13.2,6.27,6.65,t16Lk2);
+  IMG(13.49,2.22,2.17,2.17);
+}
+
+function slide38() {  // Meet Our Team
+  S(RECT,1.25,3.18,19.51,9.18,fGY1);
+  T('Meet Our Team',1.25,1.25,10.49,t85kB2);
+  S(DONUT,2.47,4.27,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+  T('Basil Hailward',2.41,7.56,4.59,t28kB);
+  T('Position Name',2.41,8.07,4.59,t18b);
+  S(RRECT,2.53,9.53,4.47,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,2.53,9.53,3.48,0.25,GNBBR,0,{rectRadius:0.125});
+  T('Skill Name',2.46,8.96,4.54,t20k);
+  S(RRECT,2.53,10.8,4.47,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,2.53,10.8,2.22,0.25,GNBBR,0,{rectRadius:0.125});
+  T('Skill Name',2.46,10.23,4.54,t20k);
+  T('Linda Brown',8.69,7.56,4.54,t28kB);
+  T('Position Name',8.69,8.07,4.54,t18b);
+  S(RRECT,8.75,9.53,4.47,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,8.75,9.53,3.48,0.25,GNBBR,0,{rectRadius:0.125});
+  T('Skill Name',8.69,8.96,4.54,t20k);
+  S(RRECT,8.75,10.8,4.47,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,8.75,10.8,2.22,0.25,GNBBR,0,{rectRadius:0.125});
+  T('Skill Name',8.69,10.23,4.54,t20k);
+  S(DONUT,14.98,4.27,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+  S(RRECT,14.98,9.53,4.47,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,14.98,9.53,3.48,0.25,GNBBR,0,{rectRadius:0.125});
+  T('Skill Name',14.91,8.96,4.54,t20k);
+  S(RRECT,14.98,10.8,4.47,0.25,fGY2,0,{rectRadius:0.125});
+  S(RRECT,14.98,10.8,2.22,0.25,GNBBR,0,{rectRadius:0.125});
+  T('Skill Name',14.91,10.23,4.54,t20k);
+  T('James Vane',14.92,7.56,4.52,t28kB);
+  T('Position Name',14.92,8.07,4.52,t18b);
+  S(DONUT,8.72,4.27,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+  IMG(15.27,4.57,2.17,2.17);
+  IMG(8.99,4.57,2.17,2.17);
+  IMG(2.76,4.57,2.17,2.17);
+}
+
+function slide39() {  // Meet Our Team
+  S(RECT,1.25,3.18,19.51,9.18,fGY1);
+  T('Meet Our Team',1.25,1.25,10.49,t85kB2);
+  S(DONUT,2.47,4.27,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+  T('Nelly Dean',2.41,7.56,4.59,t28kB);
+  T('Position Name',2.41,8.07,4.59,t18b);
+  S(DONUT,8.72,4.27,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+  T('William Jones',8.69,7.56,4.54,t28kB);
+  T('Position Name',8.69,8.07,4.54,t18b);
+  S(DONUT,14.98,4.27,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+  T(VICTORIA_WOTTON,14.92,7.56,4.52,t28kB);
+  T('Position Name',14.92,8.07,4.52,t18b);
+  [0, 6.36, 12.58].forEach(d => {
+    S(p118,2.47+d,10.62,0.48,0.48,NOFILL,lnNAVY15);
+    S(p118,3.33+d,10.62,0.48,0.48,NOFILL,lnNAVY15);
+    S(p118,4.19+d,10.62,0.48,0.48,NOFILL,lnNAVY15);
+    S(p119,3.47+d,10.76,0.21,0.2,GBNC);
+    S(p120,2.6+d,10.78,0.21,0.16,GBNC);
+    S(p121,4.34+d,10.76,0.2,0.2,GBNC);
+    T(OTATUM_OMMODIT_RE_12,2.33+d,8.52,5,t16Lk);
+  });
+  IMG(2.76,4.57,2.17,2.17);
+  IMG(8.99,4.57,2.17,2.17);
+  IMG(15.27,4.57,2.17,2.17);
+}
+
+function slide40() {  // Our Project
+  S(OVAL,13.85,4.35,5.2,5.2,NOFILL,lnNAVY3);
+  S(LINE,16.45,6.42,0.07,0.83,NOFILL,lnNAVY3,{rotate:180});
+  S(LINE,16.48,5.93,0.75,0.53,NOFILL,lnNAVY3,{flipH:1});
+  S(LINE,15.7,5.88,0.76,0.58,NOFILL,lnNAVY3);
+  S(OVAL,12.16,2.92,3.93,3.93,NOFILL,lnNAVY10);
+  S(OVAL,16.83,2.92,3.93,3.93,NOFILL,lnNAVY10);
+  S(OVAL,14.7,7.17,3.93,3.93,NOFILL,lnNAVY10);
+  T('Our Project',1.25,1.25,10.49,t85kB2);
+  T(TRIPS_WITH_AIRBNB,1.25,8.59,3.62,t20kB);
+  T('$3596',1.25,9.1,3.62,t40kB);
+  T(AVERAGE_NIGHTLY_FEE,5.66,8.59,3.58,t20kB);
+  T('1.3B',5.66,9.1,3.58,t40kB);
+  T(PORE_NISTRUM_EVELITAS_2,1.25,9.87,3.62,t16Lk);
+  T(PORE_NISTRUM_EVELITAS_2,5.71,9.87,3.62,t16Lk);
+  T('Our Design',10.33,8.59,3.58,t20kB);
+  T('3.2M',10.33,9.1,3.58,t40kB);
+  T(PORE_NISTRUM_EVELITAS_2,10.34,9.87,3.62,t16Lk);
+  T(GOOD_IDEA_MAKE_2,1.25,3.3,9.91,t28kB2);
+  T('Otatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienixpel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui ommodiamtumommodit re nobis de cone vollitat evendi as digentiis accab psant tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem querfersp fugitae es rem.equae liquia senis reptatem',1.3,4.95,9.86,t16Lk2);
+  S(OVAL,16.17,6.17,0.58,0.58,GNBTL);
+  IMG(12.16,2.92,3.93,3.93);
+  IMG(16.83,2.92,3.93,3.93);
+  IMG(14.7,7.17,3.93,3.93);
+}
+
+function slide41() {  // Our Project
+  T('Our Project',1.25,1.25,10.49,t85kB2);
+  T(GOOD_IDEA_MAKE_2,1.25,3.1,9.91,t28kB2);
+  T(OTATUM_OMMODIT_RE_14,1.3,4.68,11.31,t16Lk2);
+  S(OVAL,1.25,7.52,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,2.54,7.81,3.95,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_5,2.54,8.41,3.95,t16Lk);
+  S(OVAL,7.37,7.52,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,8.66,7.81,3.95,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_5,8.66,8.41,3.95,t16Lk);
+  T(WWW_EXAMPLE_COM,1.24,10.81,3.95,t18k);
+  T('01',1.26,7.74,0.87,t28wcB);
+  T('02',7.39,7.74,0.87,t28wcB);
+  IMG(13.74,1.25,7.01,5.33);
+  IMG(13.74,7.52,7.01,4.85);
+}
+
+function slide42() {  // Our Services
+  T('Our Services',1.25,1.25,10.49,t85kB2);
+  S(RECT,1.25,3.18,19.51,9.18,fGY1);
+  [[0,S01_SERVICE_NAME], [6.15,S02_SERVICE_NAME], [12.28,'03\nService Name']].forEach(([d,v0]) => {
+    S(DONUT,3.83+d,4.97,1.97,1.98,GNBTL,0,{rectRadius:0.238});
+    T(v0,3.06+d,7.35,3.51,t28kcB2);
+    T(SEVOLLITAT_EVEND_AS_2,3.05+d,8.44,3.53,t16Lkc);
+    S(RECT,2.38+d,4.27,4.86,6.86,NOFILL,lnNAVY225);
+    S(OVAL,4.2+d,5.35,1.22,1.22,fNAVY);
+  });
+  S(p122,4.56,5.71,0.5,0.49,fWH);
+  S(p104,10.65,5.68,0.63,0.55,fWH);
+  S(p123,16.78,5.67,0.62,0.59,fWH);
+}
+
+function slide43() {  // Our Services
+  T('Our Services',1.25,1.25,10.49,t85kB2);
+  S(RECT,9.83,3.1,10.91,8.02,fGY1);
+  S(OVAL,17.26,7.47,1.02,1.02,GBNTR);
+  S(OVAL,12.17,7.47,1.02,1.02,GBNTR);
+  T('Service Name',10.71,8.72,3.94,t24kcB);
+  T(OTATUM_OMMODIT_RE_2,10.37,9.2,4.62,t16Lkc);
+  T('Service Name',15.8,8.72,3.94,t24kcB);
+  S(OVAL,17.26,3.85,1.02,1.02,GBNTR);
+  S(OVAL,12.17,3.85,1.02,1.02,GBNTR);
+  T('Service Name',10.71,5.1,3.94,t24kcB);
+  T('Service Name',15.8,5.1,3.94,t24kcB);
+  T(OTATUM_OMMODIT_RE_2,15.46,9.2,4.62,t16Lkc);
+  T(OTATUM_OMMODIT_RE_2,10.37,5.52,4.62,t16Lkc);
+  T(OTATUM_OMMODIT_RE_2,15.46,5.52,4.62,t16Lkc);
+  T('01',12.29,4.14,0.79,t28wcB);
+  T('02',17.37,4.14,0.79,t28wcB);
+  T('03',12.29,7.74,0.79,t28wcB);
+  T('04',17.37,7.74,0.79,t28wcB);
+  T(GOOD_IDEA_MAKE_2,1.25,3.13,3.18,t28kB2);
+  T(OTATUM_OMMODIT_RE_5,1.3,4.79,7.28,t16Lk2);
+  IMG(1.26,7.47,7.32,3.65);
+}
+
+function slide44() {  // Our Services
+  T('Our Services',1.25,1.25,10.89,t85kB2);
+  S(RECT,1.29,4.6,4.86,6.52,NOFILL,lnGY3225);
+  S(RECT,7.28,4.6,4.86,6.52,NOFILL,lnGY3225);
+  S(DONUT,2.73,5.32,1.97,1.98,GNBTL,0,{rectRadius:0.238});
+  T(S01_SERVICE_NAME,1.97,7.71,3.51,t28kcB2);
+  T(SEVOLLITAT_EVEND_AS,1.96,8.79,3.53,t16Lkc);
+  S(OVAL,3.11,5.71,1.22,1.22,fNAVY);
+  S(DONUT,8.72,5.32,1.97,1.98,GNBTL,0,{rectRadius:0.238});
+  T(S02_SERVICE_NAME,7.95,7.71,3.51,t28kcB2);
+  T(SEVOLLITAT_EVEND_AS,7.94,8.79,3.53,t16Lkc);
+  S(OVAL,9.1,5.71,1.22,1.22,fNAVY);
+  T(OTATUM_OMMODIT_RE_15,1.3,2.71,10.84,t16Lk2);
+  T(GOOD_IDEA_MAKE,13.21,8.15,7.55,t28kB2);
+  T(OTATUM_OMMODIT_RE_5,13.26,9.34,7.5,t16Lk2);
+  S(p124,9.4,6.02,0.61,0.59,fWH);
+  S(p125,3.4,6,0.64,0.62,fWH);
+  IMG(13.26,1.25,7.48,6.06);
+}
+
+function slide45() {  // Traction
+  T('Traction',1.25,1.25,8.08,t85kB2);
+  T(GOOD_IDEA_MAKE,1.2,3.07,7.55,t28kB2);
+  T('Otatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint \n\net eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam quommodiam Otatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam qui odiam etus tesserum ',1.25,4.29,9.33,t16Lk2);
+  [[0,'$20,000'], [5.08,'$40,000'], [10.16,'$60,000'], [15.24,'$80,000']].forEach(([d,v0]) => {
+    T(INSERT_TITLE_HERE,1.18+d,8.59,4.57,t20kB);
+    T(v0,1.18+d,9.1,4.57,t40kB);
+    T(SIERSP_IENIMOST_ENIS,1.18+d,9.87,4.57,t16Lk);
+  });
+  S(RECT,11.33,1.25,9.41,6.41,fGY1);
+  T('$100,000',12.21,2.23,1.29,t18kr);
+  [[0,'$80,000'], [0.72,'$60,000'], [1.45,'$40,000'], [2.17,'$20,000'], [2.9,'$']].forEach(([d,v0]) => {
+    S(LINE,13.66,2.4+d,6.09,0,NOFILL,lnGY315,{rotate:180});
+    T(v0,12.21,2.95+d,1.29,t18kr2);
+  });
+  S(LINE,13.66,6.03,6.09,0,NOFILL,lnGY315,{rotate:180});
+  T('OCT',13.54,6.39,0.71,t18k);
+  T('NOV',14.51,6.39,0.81,t18k);
+  T('DEC',15.54,6.39,0.71,t18k);
+  T('JAN',16.41,6.39,0.71,t18k);
+  T('FEB',17.22,6.39,0.71,t18k);
+  T('MAR',18.17,6.39,0.82,t18k);
+  T('APR',19.12,6.39,0.71,t18kr2);
+  S(p126,13.68,2.52,5.98,3.52,NOFILL,lnNAVY2);
+  S(OVAL,17.58,3.47,0.27,0.27,fPALE);
+  S('wedgeRectCallout',17.33,2.27,1.42,0.67,GNBBR);
+  S(OVAL,14.75,5.01,0.27,0.27,fPALE);
+  S('wedgeRectCallout',14.51,3.83,1.42,0.67,GNBBR);
+  T('$60,000',14.58,3.97,1.29,t20wcB);
+  T('$80,000',17.39,2.4,1.29,t20wcB);
+}
+
+function slide46() {  // Traction
+  T('Traction',9.4,1.25,10.89,t85kB2);
+  T(GOOD_IDEA_MAKE_2,9.4,3.1,9.91,t28kB2);
+  T(OTATUM_OMMODIT_RE_14,9.45,4.68,11.31,t16Lk2);
+  S(OVAL,9.4,7.52,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,10.69,7.81,3.95,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_5,10.69,8.41,3.95,t16Lk);
+  S(OVAL,15.52,7.52,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(ABOUT_TITLE_HERE,16.81,7.81,3.95,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_5,16.81,8.41,3.95,t16Lk);
+  T(WWW_EXAMPLE_COM,9.39,10.81,3.95,t18k);
+  S(p110,9.63,7.75,0.43,0.44,fWH);
+  S(p112,15.77,7.76,0.4,0.41,fWH);
+  IMG(0,0,8.26,12.37);
+}
+
+function slide47() {  // Pricing Plan
+  T('Pricing Plan',1.25,1.25,10.89,t85kB2);
+  S(LINE,10.72,2.31,10.03,0,NOFILL,lnGY315);
+  S(p127,11.18,1.1,2.52,2.52,GBNBL);
+  S(p127,14.5,1.1,2.52,2.52,GBNBL);
+  S(p127,17.82,1.1,2.52,2.52,GBNBL);
+  T('Basic',11.18,4.06,2.52,t28kB3);
+  T('Premium',14.46,4.06,2.82,t28kB3);
+  T('High',17.83,4.06,2.72,t28kB3);
+  T('$250',10.89,1.85,3.02,t48wcB);
+  T('$565',14.22,1.85,3.02,t48wcB);
+  T('$980',17.52,1.85,3.02,t48wcB);
+  S(LINE,10.72,2.31,0,8.84,NOFILL,lnGY315);
+  S(LINE,14.11,2.31,0,8.84,NOFILL,lnGY315);
+  S(LINE,17.41,2.31,0,8.84,NOFILL,lnGY315);
+  S(LINE,20.76,2.31,0,8.84,NOFILL,lnGY315);
+  S(LINE,10.72,11.12,10.03,0,NOFILL,lnGY315);
+  [0, 3.29, 6.67].forEach(d => {
+    T(SEVOLLITAT_EVEND_AS_3,11.07+d,4.61,2.65,t16Lk);
+    S(p128,11.18+d,6.93,0.33,0.33,GBNBL);
+    S(p129,11.25+d,7.03,0.18,0.13,fWH);
+    T(SEVOITAT_EVEND_ASU,11.67+d,6.85,2.05,t16Lk);
+    S(p128,11.18+d,7.72,0.33,0.33,GBNBL);
+    S(p129,11.25+d,7.82,0.18,0.13,fWH);
+    T(SEVOITAT_EVEND_ASU,11.67+d,7.64,2.05,t16Lk);
+    S(p128,11.18+d,8.52,0.33,0.33,GBNBL);
+    S(p129,11.25+d,8.61,0.18,0.13,fWH);
+    T(SEVOITAT_EVEND_ASU,11.67+d,8.43,2.05,t16Lk);
+    S(p128,11.18+d,9.31,0.33,0.33,GBNBL);
+    S(p129,11.25+d,9.4,0.18,0.13,fWH);
+    T(SEVOITAT_EVEND_ASU,11.67+d,9.22,2.05,t16Lk);
+    S(RRECT,11.18+d,10.1,2.52,0.5,GNBBL2,0,{rectRadius:0.083});
+    T('Add To Card',11.65+d,10.17,1.58,t18wcB3);
+  });
+  T(GOOD_IDEA_MAKE,1.2,3.07,8.54,t28kB2);
+  T('Otatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam\n\nQuomm odiam tatum ommodit re nobis de cone vollitat evendi as digentiis accab nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inus quia',1.25,4.29,8.52,t16Lk2);
+  IMG(7.11,7.72,2.63,3.39);
+  IMG(1.2,7.72,2.63,3.39);
+  IMG(4.16,7.72,2.63,3.39);
+}
+
+function slide48() {  // Pricing Plan
+  IMG(1.25,6.27,19.51,6.1);
+  S(RECT,13.41,3.43,3.76,5.92,fGY1);
+  T('High',13.98,3.87,2.72,t28kB3);
+  T(DIGENTIISACCAB_DEVOLLITA,13.88,4.43,2.65,t16Lk);
+  [0, 0.79, 1.58].forEach(d => {
+    S(p128,13.99,5.98+d,0.33,0.33,GBNBL);
+    S(p129,14.07,6.07+d,0.18,0.13,fWH);
+    T(SEVOITAT_EVEND_ASU,14.49,5.89+d,2.05,t16Lk);
+  });
+  S(RRECT,13.99,8.42,2.52,0.5,GNBBL2,0,{rectRadius:0.083});
+  T('Add To Card',14.46,8.49,1.58,t18wcB3);
+  S(RECT,9.08,3.43,3.76,5.92,GNBTL);
+  T('Premium',9.65,3.87,2.72,t28wB2);
+  T(DIGENTIISACCAB_DEVOLLITA,9.56,4.43,2.65,t16Lw2);
+  [0, 0.79, 1.58].forEach(d => {
+    S(p128,9.67,5.98+d,0.33,0.33,fWH);
+    S(p129,9.74,6.07+d,0.18,0.13,fK);
+    T(SEVOITAT_EVEND_ASU,10.16,5.89+d,2.05,t16Lw2);
+  });
+  S(RRECT,9.67,8.42,2.52,0.5,fWH,0,{rectRadius:0.083});
+  T('Add To Card',10.13,8.49,1.58,t18kcB3);
+  S(RECT,4.76,3.43,3.76,5.92,fGY1);
+  T('Basic',5.33,3.87,2.72,t28kB3);
+  T(DIGENTIISACCAB_DEVOLLITA,5.23,4.43,2.65,t16Lk);
+  [0, 0.79, 1.58].forEach(d => {
+    S(p128,5.34,5.98+d,0.33,0.33,GBNBL);
+    S(p129,5.41,6.07+d,0.18,0.13,fWH);
+    T(SEVOITAT_EVEND_ASU,5.83,5.89+d,2.05,t16Lk);
+  });
+  S(RRECT,5.34,8.42,2.52,0.5,GNBBL2,0,{rectRadius:0.083});
+  T('Add To Card',5.81,8.49,1.58,t18wcB3);
+  T('Pricing Plan',1.25,1.25,10.89,t85kB2);
+}
+
+function slide49() {  // Pricing  Plan
+  T('Pricing \nPlan',1.2,1.25,6.46,t85kB);
+  T(OTATUM_OMMODIT_RE_5,1.3,5.52,6.53,t16Lk2);
+  T(GOOD_IDEA_MAKE,1.2,4.23,6.63,t28kB2);
+  [[0,0], [3.42,0], [0,1.08]].forEach(([dx,dy]) => {
+    S(p128,1.3+dx,8.62+dy,0.33,0.33,GBNBL);
+    S(p129,1.37+dx,8.72+dy,0.18,0.13,fWH);
+    T(SEVOITAT_EVEND_ASUSERU,1.79+dx,8.54+dy,2.53,t16Lk);
+  });
+  S(p128,4.71,9.71,0.33,0.33,GBNBL);
+  T(SEVOITAT_EVEND_ASUSERU,5.21,9.62,2.53,t16Lk);
+  S(p128,1.3,10.79,0.33,0.33,GBNBL);
+  T(SEVOITAT_EVEND_ASUSERU,1.79,10.71,2.53,t16Lk);
+  S(p128,4.71,10.79,0.33,0.33,GBNBL);
+  S(p129,4.79,10.89,0.18,0.13,fWH);
+  T(SEVOITAT_EVEND_ASUSERU,5.21,10.71,2.53,t16Lk);
+  S(p130,4.8,9.79,0.16,0.16,fWH);
+  S(p130,1.38,10.87,0.16,0.16,fWH);
+}
+
+function slide50() {  // Testimonials
+  T('Testimonials',1.25,1.25,10.89,t85kB2);
+  [[0,'Artful Dodger'], [6.88,'Fanny Price'], [13.76,'Matthaw Smith']].forEach(([d,v0]) => {
+    S(RECT,1.25+d,4.83,5.74,5.86,fGY1);
+    S(DONUT,2.75+d,3.5,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+    T(v0,2.02+d,6.67,4.21,t28kcB);
+    T('Position Name',2.02+d,7.19,4.21,t18bc);
+    S(p118,2.95+d,9.17,0.48,0.48,NOFILL,lnNAVY15);
+    S(p118,3.81+d,9.17,0.48,0.48,NOFILL,lnNAVY15);
+    S(p118,4.67+d,9.17,0.48,0.48,NOFILL,lnNAVY15);
+    S(p119,3.95+d,9.31,0.21,0.2,GBNC);
+    S(p120,3.08+d,9.33,0.21,0.16,GBNC);
+    S(p121,4.82+d,9.31,0.2,0.2,GBNC);
+    T(OTATUM_OMMODIT_RE,1.83+d,7.65,4.59,t16Lkc);
+  });
+  S(p131,3.64,10.28,0.96,0.82,GNBC);
+  S(p131,10.45,10.28,0.96,0.82,GNBC);
+  S(p131,17.4,10.28,0.96,0.82,GNBC);
+  IMG(3.04,3.8,2.17,2.17);
+  IMG(9.89,3.8,2.17,2.17);
+  IMG(16.77,3.8,2.17,2.17);
+}
+
+function slide51() {  // Testimonials
+  S(RECT,8.26,3.1,5.4,7,GNBTLT);
+  T('Testimonials',1.25,1.25,10.89,t85kB2);
+  S(RECT,13.66,4.93,4.83,5.17,fGY1T);
+  S(RECT,3.43,4.93,4.83,5.17,fGY1T);
+  T('Linda Brown',4.08,6.22,3.59,t28kcB);
+  T('Position Name',4.08,6.74,3.59,t18bc);
+  T(OTATUM_OMMODIT_RE_4,3.92,7.2,3.91,t16Lkc);
+  T('Marry Smith',14.28,6.22,3.59,t28kcB);
+  T('Position Name',14.28,6.74,3.59,t18bc);
+  T(OTATUM_OMMODIT_RE_4,14.12,7.2,3.91,t16Lkc);
+  T('Henry Wotton',8.9,6.35,4.21,t28wcB);
+  T('Position Name',8.9,6.87,4.21,t18wc);
+  S(p118,9.83,8.85,0.48,0.48,NOFILL,lnWH15);
+  S(p118,10.69,8.85,0.48,0.48,NOFILL,lnWH15);
+  S(p118,11.55,8.85,0.48,0.48,NOFILL,lnWH15);
+  S(p119,10.83,8.99,0.21,0.2,fWH);
+  S(p120,9.97,9.01,0.21,0.16,fWH);
+  S(p121,11.7,8.99,0.2,0.2,fWH);
+  T(OTATUM_OMMODIT_RE,8.71,7.24,4.59,t16Lwc);
+  [0, 10.23].forEach(d => {
+    S(p118,4.74+d,8.85,0.48,0.48,NOFILL,lnNAVY15);
+    S(p118,5.61+d,8.85,0.48,0.48,NOFILL,lnNAVY15);
+    S(p118,6.47+d,8.85,0.48,0.48,NOFILL,lnNAVY15);
+    S(p119,5.74+d,8.99,0.21,0.2,GBNBR2);
+    S(p120,4.88+d,9.01,0.21,0.16,GBNBR2);
+    S(p121,6.61+d,8.99,0.2,0.2,GBNBR2);
+  });
+  IMG(9.82,3.68,2.3,2.3);
+  IMG(4.94,4.08,1.81,1.81);
+  IMG(15.15,4.08,1.81,1.81);
+  IMG(1.25,6.27,19.51,6.1);
+}
+
+function slide52() {  // Testimonials
+  S(RECT,1.25,4.83,9.13,6.29,fGY1);
+  T(WILKINS_MICAWBER,4.78,6.91,4.35,t28kB);
+  T('Position Name',4.78,7.43,4.35,t18b);
+  S(p118,4.94,9.62,0.48,0.48,NOFILL,lnNAVY15);
+  S(p118,5.8,9.62,0.48,0.48,NOFILL,lnNAVY15);
+  S(p118,6.66,9.62,0.48,0.48,NOFILL,lnNAVY15);
+  S(p119,5.94,9.76,0.21,0.2,GBNC);
+  S(p120,5.08,9.78,0.21,0.16,GBNC);
+  S(p121,6.81,9.76,0.2,0.2,GBNC);
+  T(OTATUM_OMMODIT_RE,4.78,7.87,4.35,t16Lk);
+  T('Testimonials',1.25,1.25,10.89,t85kB2);
+  S(DONUT,2.52,3.52,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+  S(p131,3.41,7.02,0.96,0.82,GNBC);
+  S(RECT,11.65,4.83,9.13,6.29,fGY1);
+  T(VICTORIA_WOTTON,15.18,6.91,4.35,t28kB);
+  T('Position Name',15.18,7.43,4.35,t18b);
+  S(p118,15.33,9.62,0.48,0.48,NOFILL,lnNAVY15);
+  S(p118,16.2,9.62,0.48,0.48,NOFILL,lnNAVY15);
+  S(p118,17.06,9.62,0.48,0.48,NOFILL,lnNAVY15);
+  S(p119,16.34,9.76,0.21,0.2,GBNC);
+  S(p120,15.47,9.78,0.21,0.16,GBNC);
+  S(p121,17.2,9.76,0.2,0.2,GBNC);
+  T(OTATUM_OMMODIT_RE,15.18,7.87,4.35,t16Lk);
+  S(DONUT,12.91,3.52,2.74,2.76,GNBTL,0,{rectRadius:0.332});
+  S(p131,13.81,7.02,0.96,0.82,GNBC);
+  IMG(13.2,3.82,2.17,2.17);
+  IMG(2.81,3.82,2.17,2.17);
+}
+
+function slide53() {  // Our Work Process
+  T(OUR_WORK_PROCESS,1.25,1.25,10.89,t85kB2);
+  S('arc',13.63,3.56,5.13,5.13,NOFILL,lnGY35,{rotate:119.8,angleRange:[19,276]});
+  S(OVAL,16.74,3.18,3.93,3.93,GNBBR,0,{rotate:119.8});
+  S(OVAL,14.42,7.23,3.93,3.93,GNBBR,0,{rotate:119.8});
+  S(OVAL,11.89,3.09,3.93,3.93,GNBBR,0,{rotate:119.8});
+  T('Processing Work Name 01',1.16,3.34,9.67,t28kB);
+  T(SOLORIATUS_INUS_QUIA,1.16,4,9.67,t16Lk);
+  T('Processing Work Name 02',1.16,6.18,9.67,t28kB);
+  T(SOLORIATUS_INUS_QUIA,1.16,6.83,9.67,t16Lk);
+  T('Processing Work Name 03',1.16,8.99,9.67,t28kB);
+  T(SOLORIATUS_INUS_QUIA,1.16,9.65,9.67,t16Lk);
+  S(p132,13.07,4.81,0.3,0.19,fWH);
+  S(p133,13.45,4.24,0.21,0.3,fWH);
+  S(p134,14.05,4.24,0.21,0.3,fWH);
+  S(p135,13.44,4.56,0.83,1.31,fWH);
+  S(p136,14.33,4.81,0.3,0.19,fWH);
+  S(p137,15.76,9.14,0.1,0.54,fWH);
+  S(p138,15.93,9.26,0.09,0.42,fWH);
+  S(p139,16.09,9.44,0.09,0.24,fWH);
+  S(p140,16.26,9.26,0.09,0.42,fWH);
+  S(p141,16.43,9.44,0.09,0.24,fWH);
+  S(p142,16.79,9.57,0.28,0.09,fWH);
+  S(p143,16.79,9.37,0.28,0.08,fWH);
+  S(p144,15.79,8.35,1.35,0.71,fWH);
+  S(p145,15.3,8.67,2.17,1.36,fWH);
+  S(p146,17.82,4.27,1.76,1.75,fWH);
+  S(p147,18.66,4.47,0.62,0.72,fWH);
+}
+
+function slide54() {  // Our Work Process
+  S(LINE,9.23,5.27,0.68,1.07,NOFILL,lnNAVY2);
+  S(LINE,12.08,5.27,0.88,1.07,NOFILL,lnNAVY2,{flipH:1});
+  S(LINE,7.09,8.43,1.46,0,NOFILL,lnNAVY2,{rotate:180});
+  S(LINE,13.53,8.33,1.46,0,NOFILL,lnNAVY2,{rotate:180});
+  S(OVAL,8.44,6.05,5.11,5.11,fWH,lnNAVY2);
+  S('arc',6.41,4.33,9.17,9.74,NOFILL,lnBLUE2,{angleRange:[192,347]});
+  T(OUR_WORK_PROCESS,1.25,1.25,10.89,t85kB2);
+  S(m28,6.07,7.88,1.1,1.1,GBNBL);
+  T('Insert Title',1.24,7.25,4.27,t28krB);
+  T('01',6.36,8.2,0.51,t24wcB2);
+  T(IPSAM_SIASPERI_SPED,1.19,7.78,4.42,t16Lkr);
+  S(m28,8.38,4.29,1.1,1.1,GBNBL);
+  T('Insert Title',3.16,3.66,4.27,t28krB);
+  T('02',8.67,4.6,0.51,t24wcB2);
+  T(IPSAM_SIASPERI_SPED,3.16,4.18,4.42,t16Lkr);
+  S(m28,14.87,7.78,1.1,1.1,GBNBL);
+  T('Insert Title',16.47,7.15,4.27,t28kB3);
+  T('04',15.16,8.09,0.51,t24wcB2);
+  T(IPSAM_SIASPERI_SPED,16.32,7.68,4.42,t16Lk);
+  S(m28,12.67,4.32,1.1,1.1,GBNBL);
+  T('03',12.96,4.63,0.51,t24wcB2);
+  T('Insert Title',14.55,3.75,4.27,t28kB3);
+  T(IPSAM_SIASPERI_SPED,14.41,4.27,4.42,t16Lk);
+  IMG(9.02,6.62,3.95,3.95);
+}
+
+function slide55() {  // Competitor Analysis
+  T(COMPETITOR_ANALYSIS,1.25,1.25,19.51,t85kB2);
+  S(RECT,10.17,3.52,10.58,7.61,fGY1);
+  [
+  [0,'Competitor 01','Competitor 02'],
+  [1.8,'Competitor 03','Competitor 04'],
+  [3.61,'Competitor 05','Competitor 06'],
+].forEach(([d,v0,v1]) => {
+    T(v0,10.98,4.89+d,1.85,t18kr);
+    S(LINE,13.08,5.07+d,6.67,0,NOFILL,lnGY315,{rotate:180});
+    T(v1,10.98,5.8+d,1.85,t18kr);
+    S(LINE,13.08,5.97+d,6.67,0,NOFILL,lnGY315,{rotate:180});
+  });
+  T(INSERT_TITLE_03,1.25,9.3,3.62,t24kB2);
+  T(INSERT_TITLE_04,5.66,9.3,3.58,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_2,1.25,9.87,3.62,t16Lk);
+  T(PORE_NISTRUM_EVELITAS_2,5.71,9.87,3.62,t16Lk);
+  T(INSERT_TITLE_01,1.25,6.8,3.62,t24kB2);
+  T(INSERT_TITLE_02,5.66,6.8,3.58,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_2,1.25,7.37,3.62,t16Lk);
+  T(PORE_NISTRUM_EVELITAS_2,5.71,7.37,3.62,t16Lk);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum re ni omnis doloriatus inusquia',1.3,4.5,7.88,t16Lk2);
+  T(GOOD_IDEA_MAKE,1.2,3.32,8,t28kB2);
+  T('00',13.41,9.89,0.6,t18kc);
+  S(RECT,13.43,7.6,0.56,1.98,GNBTR);
+  T('100',13.33,4.41,0.76,t18kc);
+  T('00',14.49,9.89,0.6,t18kc);
+  S(RECT,14.51,6.63,0.56,2.95,GNBTR);
+  T('100',14.41,4.41,0.76,t18kc);
+  T('00',15.57,9.89,0.6,t18kc);
+  S(RECT,15.59,5.67,0.56,3.91,GNBTR);
+  T('100',15.49,4.41,0.76,t18kc);
+  T('00',16.66,9.89,0.6,t18kc);
+  S(RECT,16.67,7.6,0.56,1.98,GNBTR);
+  T('100',16.57,4.41,0.76,t18kc);
+  T('00',17.74,9.89,0.6,t18kc);
+  S(RECT,17.76,5.1,0.56,4.48,GNBTR);
+  T('100',17.65,4.41,0.76,t18kc);
+  T('00',18.82,9.89,0.6,t18kc);
+  S(RECT,18.84,6.02,0.56,3.56,GNBTR);
+  T('100',18.74,4.41,0.76,t18kc);
+}
+
+function slide56() {  // Competitor Analysis
+  T(COMPETITOR_ANALYSIS,1.25,1.25,19.51,t85kB2);
+  S('leftRightUpArrow',6.09,4.53,9.82,4.48,fGY1,0,{rotate:180});
+  S(OVAL,9.46,3.52,3.08,3.08,GNBBR);
+  S(p146,10.31,4.37,1.38,1.37,fWH);
+  S(p147,10.97,4.53,0.49,0.56,fWH);
+  T(OTATUM_OMMODIT_RE_20,1.3,6.1,3.95,t16Lkr2);
+  T('Insert Title',1.32,5.42,4.01,t28krB2);
+  T(OTATUM_OMMODIT_RE_20,16.67,6.1,3.95,t16Lk2);
+  T('Insert Title',16.57,5.42,4.01,t28kB);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam es ',6.51,10.03,8.91,t16Lkc2);
+  T('Insert Title',6.38,9.41,9.04,t28kcB);
+}
+
+function slide57() {  // Our Best Product
+  S(p128,4.29,7.49,0.33,0.33,GBNBL);
+  S(p130,4.37,7.58,0.16,0.16,fWH);
+  S(p99,7.98,5.23,5.86,5.93,GNBBR,0,{rotate:90});
+  S(p99,14.86,5.23,5.86,5.93,GNBBR,0,{rotate:90});
+  T('Product Name 02',15.35,7.35,4.87,t28wcB);
+  S(OVAL,9.11,3.2,3.56,3.56,NOFILL,lnWH6);
+  S(OVAL,15.99,3.2,3.56,3.56,NOFILL,lnWH6);
+  T(OUR_BEST_PRODUCT,1.25,1.25,19.51,t85kB2);
+  T('Product Name 01',8.47,7.35,4.87,t28wcB);
+  T(OTATUM_OMMODIT_RE_7,8.47,7.95,4.87,t16Lwc);
+  T(PRICE_350_000,8.47,9.99,4.87,t18wcB);
+  T(OTATUM_OMMODIT_RE_7,15.35,7.95,4.87,t16Lwc);
+  T(PRICE_456_000,15.35,9.99,4.87,t18wcB);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint et eost eatum',1.3,4.58,5.7,t16Lk2);
+  T(GOOD_IDEA_MAKE,1.2,3.32,5.78,t28kB2);
+  S(p128,1.3,7.49,0.33,0.33,GBNBL);
+  S(p129,1.37,7.58,0.18,0.13,fWH);
+  T(SEVOAT_EVEND_ASURU,1.79,7.4,2.2,t16Lk);
+  T(WWW_EXAMPLE_COM,1.24,10.81,3.95,t18k);
+  T(SEVOAT_EVEND_ASURU,4.78,7.4,2.2,t16Lk);
+  S(p128,1.3,8.83,0.33,0.33,GBNBL);
+  T(SEVOAT_EVEND_ASURU,1.79,8.75,2.2,t16Lk);
+  S(p128,4.29,8.83,0.33,0.33,GBNBL);
+  S(p129,4.36,8.93,0.18,0.13,fWH);
+  T(SEVOAT_EVEND_ASURU,4.78,8.75,2.2,t16Lk);
+  S(p130,1.38,8.92,0.16,0.16,fWH);
+  IMG(9.11,3.2,3.56,3.56);
+  IMG(15.99,3.2,3.56,3.56);
+}
+
+function slide58() {  // Our Best Product
+  T(OUR_BEST_PRODUCT,1.25,1.25,19.51,t85kB2);
+  S(p99,8.07,5.23,5.86,5.93,GNBBR,0,{rotate:90});
+  S(p99,14.86,5.23,5.86,5.93,GNBBR,0,{rotate:90});
+  T('Product Name 05',15.35,7.35,4.87,t28wcB);
+  S(OVAL,9.2,3.2,3.56,3.56,NOFILL,lnWH6);
+  S(OVAL,15.99,3.2,3.56,3.56,NOFILL,lnWH6);
+  T('Product Name 04',8.56,7.35,4.87,t28wcB);
+  T(OTATUM_OMMODIT_RE_7,8.56,7.95,4.87,t16Lwc);
+  T(PRICE_350_000,8.56,9.99,4.87,t18wcB);
+  T(OTATUM_OMMODIT_RE_7,15.35,7.95,4.87,t16Lwc);
+  T(PRICE_456_000,15.35,9.99,4.87,t18wcB);
+  S(p99,1.29,5.23,5.86,5.93,GNBBR,0,{rotate:90});
+  S(OVAL,2.41,3.2,3.56,3.56,NOFILL,lnWH6);
+  T('Product Name 03',1.77,7.35,4.87,t28wcB);
+  T(OTATUM_OMMODIT_RE_7,1.77,7.95,4.87,t16Lwc);
+  T(PRICE_350_000,1.77,9.99,4.87,t18wcB);
+  IMG(15.99,3.2,3.56,3.56);
+  IMG(9.2,3.2,3.56,3.56);
+  IMG(2.41,3.2,3.56,3.56);
+}
+
+function slide59() {  // Our New Product
+  IMG(12.43,0,9.57,12.37);
+  T('Our New Product',1.25,1.25,19.51,t85kB2);
+  S(OVAL,1.25,3.68,1.38,1.38,GBNBL);
+  S(LINE,2.63,4.37,0.71,0,NOFILL,lnGY22);
+  S(LINE,3.33,3.4,0.01,1.94,NOFILL,lnGY22);
+  T(INSERT_TITLE_HERE,3.73,3.35,7.22,t24kB2);
+  T(OTATUM_OMMODIT_RE_6,3.73,3.84,7.22,t16Lk);
+  S(OVAL,1.25,6.63,1.38,1.38,GBNBL);
+  S(LINE,2.63,7.32,0.71,0,NOFILL,lnGY22);
+  S(LINE,3.33,6.35,0.01,1.94,NOFILL,lnGY22);
+  T(INSERT_TITLE_HERE,3.73,6.3,7.22,t24kB2);
+  T(OTATUM_OMMODIT_RE_16,3.73,6.79,6.37,t16Lk);
+  S(OVAL,1.25,9.58,1.38,1.38,GBNBL);
+  S(LINE,2.63,10.27,0.71,0,NOFILL,lnGY22);
+  S(LINE,3.33,9.3,0.01,1.94,NOFILL,lnGY22);
+  T(INSERT_TITLE_HERE,3.73,9.26,7.22,t24kB2);
+  T(OTATUM_OMMODIT_RE_6,3.73,9.74,7.22,t16Lk);
+  S(p39,1.62,7,0.64,0.64,fWH);
+  S(p40,1.76,4.23,0.35,0.35,fWH);
+  S(p41,1.84,4.06,0.2,0.04,fWH);
+  S(p42,1.64,4.12,0.59,0.55,fWH);
+  S(p43,1.83,10.14,0.41,0.41,fWH);
+  S(p44,1.64,9.99,0.32,0.15,fWH);
+  S(p45,1.64,10.15,0.22,0.12,fWH);
+  S(p46,1.64,10.39,0.21,0.12,fWH);
+  S(p47,1.64,10.27,0.16,0.12,fWH);
+  S(OVAL,10.95,5.85,3.08,3.08,GNBBR,lnWH8);
+  S(p146,11.8,6.71,1.38,1.37,fWH);
+  S(p147,12.46,6.87,0.49,0.56,fWH);
+}
+
+function slide60() {  // Benefits
+  S(RECT,8.26,3.1,5.4,7,GNBTLT);
+  S(RECT,13.66,4.93,4.83,5.17,fGY1T);
+  S(RECT,3.43,4.93,4.83,5.17,fGY1T);
+  S(OVAL,15.15,4.08,1.81,1.81,fNAVY);
+  S(OVAL,4.94,4.08,1.81,1.81,fNAVY);
+  S(OVAL,9.8,3.67,2.32,2.32,fWHT3);
+  T('Benefits',1.25,1.25,19.51,t85kB2);
+  T('Insert Title',4.08,6.22,3.59,t28kcB);
+  T(OTATUM_OMMODIT_RE_4,3.92,6.91,3.91,t16Lkc);
+  T('Insert Title',14.28,6.22,3.59,t28kcB);
+  T(OTATUM_OMMODIT_RE_4,14.12,6.91,3.91,t16Lkc);
+  T('Insert Title',8.9,6.35,4.21,t28wcB);
+  T(OTATUM_OMMODIT_RE,8.71,6.95,4.59,t16Lwc);
+  T('01',4.08,8.58,3.59,t66kcB);
+  T('03',14.36,8.58,3.59,t66kcB);
+  T('02',9.17,8.58,3.59,t66kcB);
+  S(p96,10.4,4.84,1.13,0.5,fK);
+  S(p97,10.66,4.32,0.6,0.58,fK);
+  S(p98,10.87,4.39,0.17,0.39,fK);
+  S(p148,15.64,4.76,0.83,0.58,fWH);
+  S(p149,15.94,4.84,0.22,0.45,fWH);
+  S(p150,16.25,4.63,0.22,0.22,fWH);
+  S(p151,16.25,4.71,0.14,0.14,fWH);
+  S(p152,16.25,4.79,0.06,0.06,fWH);
+  S(p153,5.47,4.76,0.75,0.67,fWH);
+  S(p154,5.58,4.83,0.53,0.53,fWH);
+  S(p155,5.78,4.94,0.14,0.31,fWH);
+  S(p156,5.99,4.64,0.19,0.18,fWH);
+  S(p157,5.52,4.64,0.19,0.18,fWH);
+  S(p158,6.14,4.54,0.13,0.11,fWH);
+  S(p159,6.13,4.6,0.09,0.08,fWH);
+  S(p160,5.43,4.54,0.13,0.11,fWH);
+  S(p161,5.48,4.6,0.09,0.08,fWH);
+  IMG(1.25,6.27,19.51,6.1);
+}
+
+function slide61() {  // Benefits
+  T('Benefits',1.25,1.25,19.51,t85kB2);
+  S(LINE,9.23,5.27,0.68,1.07,NOFILL,lnGY32);
+  S(LINE,12.08,5.27,0.88,1.07,NOFILL,lnGY32,{flipH:1});
+  S(LINE,7.09,8.43,1.46,0,NOFILL,lnGY32,{rotate:180});
+  S(LINE,13.53,8.33,1.46,0,NOFILL,lnGY32,{rotate:180});
+  S(OVAL,8.44,6.05,5.11,5.11,fWH,lnGY32);
+  S(m28,6.07,7.88,1.1,1.1,GBNBL);
+  T('Insert Title',1.24,7.25,4.27,t28krB);
+  T(IPSAM_SIASPERI_SPED,1.19,7.78,4.42,t16Lkr);
+  S(m28,8.38,4.29,1.1,1.1,GBNBL);
+  T('Insert Title',3.16,3.66,4.27,t28krB);
+  T(IPSAM_SIASPERI_SPED,3.16,4.18,4.42,t16Lkr);
+  S(m28,14.87,7.78,1.1,1.1,GBNBL);
+  T('Insert Title',16.47,7.15,4.27,t28kB3);
+  T(IPSAM_SIASPERI_SPED,16.32,7.68,4.42,t16Lk);
+  S(m28,12.67,4.32,1.1,1.1,GBNBL);
+  T('Insert Title',14.55,3.75,4.27,t28kB3);
+  T(IPSAM_SIASPERI_SPED,14.41,4.27,4.42,t16Lk);
+  S(p162,10.25,7,1.54,1.54,GNBTR);
+  S(p163,10.68,7.08,0.17,0.36,GNBTR);
+  S(p164,10.29,7.39,0.17,0.36,GNBTR);
+  S(p165,11.31,7.49,0.17,0.36,GNBTR);
+  T('COMPANY\nBENEFITS',9.8,9.1,2.4,t32kcB);
+  S(p96,8.64,4.84,0.58,0.26,fWH);
+  S(p97,8.77,4.57,0.3,0.29,fWH);
+  S(p98,8.88,4.61,0.09,0.2,fWH);
+  S(p148,15.12,8.11,0.6,0.42,fWH);
+  S(p149,15.34,8.17,0.16,0.32,fWH);
+  S(p150,15.56,8.02,0.16,0.16,fWH);
+  S(p151,15.56,8.07,0.1,0.1,fWH);
+  S(p152,15.56,8.13,0.05,0.05,fWH);
+  S(p153,6.4,8.24,0.44,0.4,fWH);
+  S(p154,6.46,8.28,0.32,0.32,fWH);
+  S(p155,6.58,8.35,0.08,0.18,fWH);
+  S(p156,6.7,8.17,0.11,0.11,fWH);
+  S(p157,6.42,8.17,0.11,0.11,fWH);
+  S(p158,6.79,8.11,0.08,0.06,fWH);
+  S(p159,6.78,8.14,0.06,0.05,fWH);
+  S(p160,6.37,8.11,0.08,0.06,fWH);
+  S(p161,6.4,8.14,0.06,0.05,fWH);
+  S(p166,13.23,4.62,0.23,0.31,fWH);
+  S(p167,13.26,4.65,0.17,0.17,fWH);
+  S(p168,13.32,4.68,0.05,0.11,fWH);
+  S(p169,12.97,4.86,0.2,0.25,fWH);
+  S('rect',13.3,4.91,0.02,0.02,fWH);
+  S('rect',13.24,4.94,0.02,0.02,fWH);
+  S('rect',13.41,5.02,0.02,0.02,fWH);
+  S('rect',13.24,4.97,0.02,0.02,fWH);
+  S('rect',13.22,5.1,0.02,0.02,fWH);
+  S('rect',13.26,5.1,0.02,0.02,fWH);
+  S('rect',13.33,5.1,0.02,0.02,fWH);
+  S('rect',13.34,5,0.02,0.01,fWH);
+  S('rect',13.37,5,0.02,0.02,fWH);
+  S('rect',13.4,5.08,0.02,0.02,fWH);
+  S('rect',13.42,5.05,0.02,0.02,fWH);
+  S('rect',13.37,5.1,0.02,0.02,fWH);
+  S('rect',13.26,5,0.02,0.02,fWH);
+  S('rect',13.27,4.91,0.02,0.02,fWH);
+  S('rect',13.3,5,0.02,0.01,fWH);
+  S('rect',13.29,5.1,0.02,0.02,fWH);
+  S('rect',13.19,5.1,0.02,0.02,fWH);
+}
+
+function slide62() {  // A.I.D.A Analysis
+  S(p170,11.09,5.15,4.07,4.41,fGY1);
+  S(p171,4.83,7.05,4.41,4.07,fGY1);
+  S(p172,12.65,7.05,4.41,4.07,fGY1);
+  S(p173,6.73,5.15,4.07,4.41,fGY1);
+  S(p174,8.67,8.97,4.57,2.15,GBNBL);
+  T('A.I.D.A Analysis',1.25,1.25,19.51,t85kB2);
+  S(OVAL,4.34,7.91,1.96,1.96,GBNTL2);
+  S(OVAL,7.66,4.6,1.96,1.96,GBNTL2);
+  S(OVAL,12.37,4.6,1.96,1.96,GBNTL2);
+  S(OVAL,15.69,7.91,1.96,1.96,GBNTL2);
+  T('AIDA\nANALYSIS',9.67,9.6,2.58,t36wcB);
+  T('A',4.72,8.24,1.18,t80wcB);
+  T('I',8.03,4.95,1.18,t80wcB);
+  T('D',12.77,4.95,1.18,t80wcB);
+  T('A',16.08,8.29,1.18,t80wcB);
+  T(OTATUM_OMMODIT_RE_24,1.19,3.62,5.95,t16Lkr);
+  T('Desire',14.92,3.26,1.89,t28kB3);
+  T(OTATUM_OMMODIT_RE_24,14.89,3.88,5.95,t16Lk);
+  T(OTATUM_OMMODIT_RE_25,1.25,6.02,4.51,t16Lkr);
+  T(OTATUM_OMMODIT_RE_25,16.32,6.02,4.51,t16Lk);
+  T('Action',16.45,5.4,1.89,t28kB3);
+  T('Interest',5.17,3.02,1.89,t28krB);
+  T('Attention',3.77,5.4,1.89,t28krB);
+}
+
+function slide63() {  // Market Investment
+  T('Market Investment',1.25,1.25,10.89,t85kB);
+  S(RECT,1.29,4.6,4.86,6.52,fGY1);
+  S(RECT,7.28,4.6,4.86,6.52,fGY1);
+  S(DONUT,2.73,5.32,1.97,1.98,GNBTL,0,{rectRadius:0.238});
+  S(OVAL,3.11,5.71,1.22,1.22,fNAVY);
+  S(DONUT,8.72,5.32,1.97,1.98,GNBTL,0,{rectRadius:0.238});
+  T(INSERT_TITLE_HERE,7.95,8.39,3.51,t24kcB);
+  T(SEVOLLITAT_EVEND_AS,7.94,8.99,3.53,t16Lkc);
+  S(OVAL,9.1,5.71,1.22,1.22,fNAVY);
+  T(OTATUM_OMMODIT_RE_15,1.3,2.71,10.84,t16Lk2);
+  T(GOOD_IDEA_MAKE,13.21,8.15,7.55,t28kB2);
+  T(OTATUM_OMMODIT_RE_5,13.26,9.34,7.5,t16Lk2);
+  T('8.6B',7.95,7.58,3.51,t44kcB);
+  T(INSERT_TITLE_HERE,1.97,8.39,3.51,t24kcB);
+  T(SEVOLLITAT_EVEND_AS,1.96,8.99,3.53,t16Lkc);
+  T('127K',1.97,7.58,3.51,t44kcB);
+  S(p175,3.42,6.01,0.6,0.61,fWH);
+  S(p176,9.4,6.01,0.61,0.6,fWH);
+  IMG(13.26,1.25,7.48,6.06);
+}
+
+function slide64() {  // Market  Investment
+  T('Market \nInvestment',1.25,1.25,9.33,t85kB);
+  T(GOOD_IDEA_MAKE,1.2,4.07,7.55,t28kB2);
+  T('Otatum ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint \n\net eost eatum re ni omnis doloriatus inus quia estibus denis tem et sitis eaquam quommodiam Otatum ommodit re nobis de cone vollitat evendi as digentiis',1.25,5.21,9.33,t16Lk2);
+  [[0,'$20,000'], [5.08,'$40,000'], [10.16,'$60,000'], [15.24,'$80,000']].forEach(([d,v0]) => {
+    T(INSERT_TITLE_HERE,1.18+d,8.59,4.57,t20kB);
+    T(v0,1.18+d,9.1,4.57,t40bB);
+    T(SIERSP_IENIMOST_ENIS,1.18+d,9.87,4.57,t16Lk);
+  });
+  IMG(11.33,1.25,9.41,6.18);
+}
+
+function slide65() {  // Market Size
+  T('Market Size',1.25,1.25,10.89,t85kB2);
+  S('upArrow',1.25,3.52,3.83,4.67,fGY1);
+  T(INSERT_TITLE_HERE,1.16,8.99,6,t28kB);
+  T(SOLORIATUS_INUS_QUIA_2,1.16,9.65,6,t16Lk);
+  S(RECT,2.23,6.75,1.88,1.43,GBNBR2);
+  T('$27 \nBillion',2.47,6.98,1.4,t28wcB2);
+  S('upArrow',8.05,3.52,3.83,4.67,fGY1);
+  T(INSERT_TITLE_HERE,7.96,8.99,6,t28kB);
+  T(SOLORIATUS_INUS_QUIA_2,7.96,9.65,6,t16Lk);
+  S(RECT,9.03,5.77,1.88,2.42,GBNBR2);
+  T('$42 \nBillion',9.26,6.5,1.4,t28wcB2);
+  S('upArrow',14.84,3.52,3.83,4.67,GBNBR2);
+  T(INSERT_TITLE_HERE,14.76,8.99,6,t28kB);
+  T(SOLORIATUS_INUS_QUIA_2,14.76,9.65,6,t16Lk);
+  T('$210 \nBillion',16.06,4.43,1.4,t28wcB2);
+}
+
+function slide66() {  // Market Size
+  T('Market Size',1.25,1.25,10.89,t85kB2);
+  S(RECT,8.26,3.1,5.4,8.02,GNBTL);
+  S(RECT,13.66,4.93,4.83,6.19,fGY1);
+  S(RECT,3.43,4.93,4.83,6.19,fGY1);
+  S(OVAL,15.15,4.08,1.81,1.81,fNAVY);
+  S(OVAL,4.94,4.08,1.81,1.81,fNAVY);
+  S(OVAL,9.8,3.67,2.32,2.32,fWHT3);
+  T('Insert Title',4.08,6.72,3.59,t28kcB);
+  T(OTATUM_OMMODIT_RE_4,3.92,7.41,3.91,t16Lkc);
+  T('Insert Title',14.28,6.72,3.59,t28kcB);
+  T(OTATUM_OMMODIT_RE_4,14.12,7.41,3.91,t16Lkc);
+  T('Insert Title',8.9,6.85,4.21,t28wcB);
+  T(OTATUM_OMMODIT_RE,8.71,7.45,4.59,t16Lwc);
+  T('01',4.08,9.12,3.59,t80kcB);
+  T('03',14.36,9.12,3.59,t80kcB);
+  T('02',9.17,9.12,3.59,t80kcB);
+  T('$27 \nBillion',5.15,4.51,1.4,t28wcB2);
+  T('$42 \nBillion',15.35,4.51,1.4,t28wcB2);
+  T('$210 \nBillion',10.1,4.27,1.73,t36kcB);
+}
+
+function slide67() {  // Market Target
+  S(LINE,6.08,3.8,4.82,2.4,NOFILL,lnGY322);
+  S(LINE,11.1,3.93,4.98,2.26,NOFILL,lnGY322,{flipH:1});
+  S(LINE,5.98,6.35,4.81,1.66,NOFILL,lnGY322,{rotate:180,flipH:1});
+  S(LINE,10.89,6.2,4.93,1.9,NOFILL,lnGY322,{rotate:180});
+  S(OVAL,9.26,4.98,3.4,2.96,fWH);
+  T('MARKET TARGET',6.67,8.68,8.37,t36kcB2);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus, tesserum alibusam commodigenim in nectioriot et verest imperiorro blandanda conseunt archil idelectur, officip icimint et eost eatum re ni omnis doloriatus inus quia estibus deni tem et, ',6.74,9.62,8.58,t16Lkc2);
+  T(INSERT_TITLE_HERE,1.19,4.46,4.31,t28krB2);
+  T(SQUEMU_SESEQUEICAOR_PORE,1.19,5.08,4.31,t16Lkr3);
+  T(INSERT_TITLE_HERE,1.19,9.02,4.31,t28krB2);
+  T(SQUEMU_SESEQUEICAOR_PORE,1.19,9.65,4.31,t16Lkr3);
+  T(INSERT_TITLE_HERE,16.41,4.46,4.31,t28kB);
+  T(SQUEMU_SESEQUEICAOR_PORE,16.41,5.08,4.31,t16Lk3);
+  T(INSERT_TITLE_HERE,16.41,9.02,4.31,t28kB);
+  T(SQUEMU_SESEQUEICAOR_PORE,16.41,9.65,4.31,t16Lk3);
+  T('01',1.99,3.29,3.59,t60krB);
+  T('02',1.9,7.92,3.59,t60krB);
+  T('03',16.41,3.29,3.59,t60kB);
+  T('04',16.41,7.92,3.59,t60kB);
+  S(p103,8.76,3.6,4.53,4.47,GBNTR,0,{rotate:-45.5});
+  T('Market Target',1.25,1.25,10.89,t85kB2);
+}
+
+function slide68() {  // Mobile  App
+  S(p174,5.36,7.55,10.25,4.82,fGY1);
+  IMG(8.3,2.79,3.84,8.35);
+  S(p177,7.99,2.55,4.43,8.88,GBNTL2);
+  T('Mobile \nApp',1.25,1.25,6.08,t85kB);
+  S(OVAL,10.49,2.76,0.1,0.1,fWH);
+  S(p178,9.83,2.79,0.55,0.04,NOFILL,lnWH45);
+  S(p128,18.02,7.35,0.33,0.33,GBNBL);
+  S(p130,18.11,7.44,0.16,0.16,fWH);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem commo digenim in nectioriot et verest fugitae es rem.equae liquia seniquam res officip icimint et eost eatum',13.58,4.58,7.15,t16Lk2);
+  T(GOOD_IDEA_MAKE,13.46,3.32,7.26,t28kB2);
+  S(p128,15.03,7.35,0.33,0.33,GBNBL);
+  S(p129,15.11,7.45,0.18,0.13,fWH);
+  T(SEVOAT_EVEND_ASURU,15.53,7.27,2.2,t16Lk);
+  T(SEVOAT_EVEND_ASURU,18.52,7.27,2.2,t16Lk);
+  S(p128,15.03,8.69,0.33,0.33,GBNBL);
+  T(SEVOAT_EVEND_ASURU,15.53,8.61,2.2,t16Lk);
+  S(p128,18.02,8.69,0.33,0.33,GBNBL);
+  S(p129,18.1,8.79,0.18,0.13,fWH);
+  T(SEVOAT_EVEND_ASURU,18.52,8.61,2.2,t16Lk);
+  S(p130,15.12,8.78,0.16,0.16,fWH);
+  T(INSERT_TITLE_HERE,1.3,4.56,5.92,t28kB4);
+  T(OTATUM_OMMODIT_RE_21,1.19,5.2,6.05,t16Lk);
+  T('Solorit ut olor sit aliae periatque eossit asum  reex edipsam tatumom modit \n\nSobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis \n\nApel etus tesserum alibusam commo digenim nectioriot et verest fugitae esen.',1.25,7.3,6.02,t16Lk4);
+}
+
+function slide69() {  // Website Project Mock-up
+  S(p174,13.16,8.74,8.83,3.63,fGY1);
+  S(RECT,9.22,4.84,11.63,6.54,GBNTLT);
+  S(m28,1.15,8.83,1.1,1.1,GBNBR2);
+  S(m28,1.15,5.55,1.1,1.1,GBNBR2);
+  S(p179,16.42,9.26,2.01,0.44,fWH);
+  S(p180,11.29,5.83,7.49,4.21,NOFILL,lnWH8);
+  S(p181,10.66,5.18,0.21,0.23,NOFILL,lnWH1);
+  S(p181,10.23,5.18,0.21,0.23,NOFILL,lnWH1);
+  S(p181,9.81,5.18,0.21,0.23,NOFILL,lnWH1);
+  S(p182,10.29,5.24,0.1,0.1,fWH);
+  S(p183,9.86,5.25,0.1,0.08,fWH);
+  S(p184,10.72,5.24,0.1,0.1,fWH);
+  T('Website\nProject Mock-up',1.13,1.02,13.2,t85kB3);
+  T('Home',11.86,5.15,0.58,t14Mwc);
+  T('About',13.55,5.15,0.58,t14Mwc);
+  T('Product',15.61,5.15,0.75,t14Mwc);
+  T('Get Started',16.79,9.33,1.29,t16Mkc);
+  T('Contact',17.54,5.15,0.75,t14Mwc);
+  T('Website Project',2.71,8.74,5.16,t28kB3);
+  T(PROJECT_OVERVIEW,2.71,5.45,5.16,t28kB3);
+  T('01',1.39,5.79,0.6,t32wcB2);
+  T('02',1.34,9.07,0.71,t32wcB2);
+  T(SIT_UT_EUM,2.58,6.19,5.34,t16Lk3);
+  T(SIT_UT_EUM,2.58,9.52,5.34,t16Lk3);
+  IMG(9.22,4.84,11.63,6.54);
+}
+
+function slide70() {  // Mac-book Project Mock-up
+  S(p185,17.27,1.57,4.72,6.5,fGY1);
+  S(p186,15.65,10.11,2.42,0.97,GBNTL2);
+  S(p187,12.56,4.67,8.28,6.55,GBNTL2);
+  S(p188,12.6,4.72,8.21,5.35,GBNTL2);
+  S(p186,15.65,10.11,2.42,0.97,GBNTL2);
+  S(p189,15.34,11.08,3.04,0.14,GBNTL2);
+  S(m28,1.15,8.71,1.1,1.1,GBNTL2);
+  S(m28,1.15,5.43,1.1,1.1,GBNTL2);
+  T('Mac-book\nProject Mock-up',1.12,1.09,9.93,t85kB3);
+  T('Mac-book Project',2.71,8.62,8.5,t28kB3);
+  T(PROJECT_OVERVIEW,2.71,5.33,8.5,t28kB3);
+  T('01',1.39,5.67,0.6,t32wcB2);
+  T('02',1.34,8.95,0.71,t32wcB2);
+  T(SITUT_EUM_QUE,2.58,5.93,8.56,t16Lkj);
+  T(SITUT_EUM_QUE,2.58,9.2,8.56,t16Lkj);
+  S(OVAL,16.73,4.76,0.12,0.12,fWH);
+  IMG(12.78,4.92,7.85,4.99);
+}
+
+function slide71() {  // Infographics
+  S(p190,13.43,3.16,2.75,2.75,GBNTL2);
+  S(p190,15.4,5.22,2.75,2.75,GBNTL2);
+  S(p191,12.21,1.93,8.55,6.84,GBNTLT2);
+  S(OVAL,12.53,2.27,7.88,2.74,GBNTLT3);
+  T('Infographics',1.25,1.25,10.89,t85kB2);
+  S(p190,16.24,2.49,2.75,2.75,GBNTL2);
+  S('downArrow',15.72,8.97,1.53,0.98,GBNTLT2,lnWH2);
+  T('Funnel Infographics',12.75,10.44,7.66,t32kcB2);
+  T(INSERT_TITLE_HERE,1.16,3.34,9.67,t28kB);
+  T(SOLORIATUS_INUS_QUIA,1.16,4,9.67,t16Lk);
+  T(INSERT_TITLE_HERE,1.16,6.18,9.67,t28kB);
+  T(SOLORIATUS_INUS_QUIA,1.16,6.83,9.67,t16Lk);
+  T(INSERT_TITLE_HERE,1.16,8.99,9.67,t28kB);
+  S(p148,14.22,4.22,1.16,0.81,fWH);
+  S(p149,14.65,4.33,0.31,0.62,fWH);
+  S(p150,15.08,4.03,0.31,0.31,fWH);
+  S(p151,15.08,4.14,0.2,0.2,fWH);
+  S(p152,15.08,4.25,0.09,0.09,fWH);
+  T(SOLORIATUS_INUS_QUIA,1.16,9.65,9.67,t16Lk);
+  S(p96,16.97,3.88,1.3,0.58,fWH);
+  S(p97,17.27,3.28,0.68,0.66,fWH);
+  S(p98,17.51,3.36,0.2,0.44,fWH);
+  S(p153,16.29,6.3,0.96,0.86,fWH);
+  S(p154,16.43,6.39,0.68,0.68,fWH);
+  S(p155,16.68,6.53,0.18,0.39,fWH);
+  S(p156,16.95,6.16,0.24,0.23,fWH);
+  S(p157,16.35,6.16,0.24,0.23,fWH);
+  S(p158,17.15,6.02,0.17,0.14,fWH);
+  S(p159,17.13,6.09,0.12,0.1,fWH);
+  S(p160,16.23,6.02,0.17,0.14,fWH);
+  S(p161,16.3,6.09,0.12,0.1,fWH);
+}
+
+function slide72() {  // Infographics
+  T('Infographics',1.25,1.25,10.89,t85kB2);
+  S(p192,8.84,9.11,11.92,1.96,GBNBR2);
+  S(p193,8.84,6.12,11.92,3.02,GBNTL2);
+  S(p192,8.84,7.2,5.91,0.9,fGY1T2);
+  S(p193,8.84,3.13,11.92,3.02,GBNBR2);
+  S(p192,14.85,7.2,5.91,0.9,fGY1T2);
+  S(p192,8.84,10.17,5.91,0.9,fGY1T2);
+  S(p192,14.85,10.17,5.91,0.9,fGY1T2);
+  S(p192,8.84,4.21,5.91,0.9,fGY1T2);
+  S(p192,14.85,4.19,5.91,0.9,fGY1T2);
+  T(INSERT_TITLE_HERE,10.54,3.4,8.5,t28wcB3);
+  [[0,0], [6.05,0], [0,-3], [6.05,-3], [0,3], [6.05,3]].forEach(([dx,dy]) => {
+    S(p128,9.33+dx,7.5+dy,0.33,0.33,GBNBL);
+    S(p129,9.41+dx,7.59+dy,0.18,0.13,fWH);
+    T(SEVOAT_EVEND_ASURUEOST,9.83+dx,7.41+dy,4.17,t16Lk5);
+  });
+  T(INSERT_TITLE_HERE,1.3,6.23,5.92,t28kB4);
+  T(OTATUM_OMMODIT_RE_21,1.19,6.86,6.05,t16Lk);
+  T('Solorit ut olor sit aliae periatque eossit asum  reex edipsam tatumom modit \n\nSobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis \n\nApel etus tesserum alibusam commo digenim \nnectioriot et verest fugitae esen.',1.25,8.82,6.02,t16Lk4);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo',1.3,4.29,5.7,t16Lk2);
+  T(GOOD_IDEA_MAKE,1.2,3.03,5.78,t28kB2);
+  T(INSERT_TITLE_HERE,10.54,6.38,8.5,t28wcB3);
+  T(INSERT_TITLE_HERE,10.54,9.36,8.5,t28wcB3);
+}
+
+function slide73() {  // Business Location
+  WORLD.forEach(([x,y,w,h,pts]) => S(pts,x,y,w,h,GBNC));
+  T(BUSINESS_LOCATION,1.25,1.25,10.89,t85kB);
+  S('wedgeEllipseCallout',9.91,3.62,1.83,1.52,fGY1T2);
+  T('Location',10.13,4.22,1.4,t18kcB3);
+  S('wedgeEllipseCallout',2.69,4.39,1.83,1.52,fGY1T2);
+  T('Location',2.9,4.99,1.4,t18kcB3);
+  S('wedgeEllipseCallout',7.04,6.24,1.83,1.52,fGY1T2);
+  T('Location',7.25,6.84,1.4,t18kcB3);
+  T(FERRORER_IATIURE_PERORER,15.6,4.12,5.23,t16Lk6);
+  T(INSERT_TITLE_HERE,15.6,3.41,4.82,t28kB3);
+  T('01',14.22,3.41,0.65,t32wcB2);
+  T('02',14.16,6.25,0.77,t32wcB2);
+  T('03',14.16,9.13,0.77,t32wcB2);
+  T(FERRORER_IATIURE_PERORER,15.6,6.72,5.23,t16Lk6);
+  T(INSERT_TITLE_HERE,15.6,6.01,4.82,t28kB3);
+  T(FERRORER_IATIURE_PERORER,15.6,9.74,5.23,t16Lk6);
+  T(INSERT_TITLE_HERE,15.6,9.03,4.82,t28kB3);
+}
+
+function slide74() {  // Business Location
+  WORLD.forEach(([x,y,w,h,pts]) => S(pts,x+MAP_DX,y,w,h,fGY2));
+  T(BUSINESS_LOCATION,1.25,1.25,10.89,t85kB);
+  T(INSERT_TITLE_03,1.25,9.3,3.62,t24kB2);
+  T(INSERT_TITLE_04,5.66,9.3,3.58,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_2,1.25,9.87,3.62,t16Lk);
+  T(PORE_NISTRUM_EVELITAS_2,5.71,9.87,3.62,t16Lk);
+  T(INSERT_TITLE_01,1.25,6.8,3.62,t24kB2);
+  T(INSERT_TITLE_02,5.66,6.8,3.58,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_2,1.25,7.37,3.62,t16Lk);
+  T(PORE_NISTRUM_EVELITAS_2,5.71,7.37,3.62,t16Lk);
+  T('Otatum, ommodit re nobis de cone vollitat evendi as digentiis accab ipsant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res officip icimint',1.3,4.45,7.04,t16Lk2);
+  T(GOOD_IDEA_MAKE,1.2,3.27,7.13,t28kB2);
+  S('wedgeEllipseCallout',16.96,4.93,1.83,1.52,fGY1);
+  T('Location',17.18,5.53,1.4,t18kcB3);
+  S('wedgeEllipseCallout',10.53,4.39,1.83,1.52,fGY1);
+  T('Location',10.74,4.99,1.4,t18kcB3);
+  S('wedgeEllipseCallout',19.15,7.83,1.83,1.52,fGY1);
+  T('Location',19.37,8.43,1.4,t18kcB3);
+  S('wedgeEllipseCallout',11.99,7.16,1.83,1.52,fGY1);
+  T('Location',12.21,7.76,1.4,t18kcB3);
+}
+
+function slide75() {  // Business Location
+  T(BUSINESS_LOCATION,1.25,1.25,10.89,t85kB);
+  S(m4,10.93,3.02,9.82,8.24,GNBBL2,0,{rotate:180,flipH:1});
+  S(OVAL,1.25,3.68,1.38,1.38,GBNBL);
+  S(LINE,2.63,4.37,0.71,0,NOFILL,lnGY22);
+  S(LINE,3.33,3.4,0.01,1.94,NOFILL,lnGY22);
+  T(INSERT_TITLE_HERE,3.73,3.35,7.22,t24kB2);
+  T('Otatum ommodit re nobis de cone vollitat evendi as digentiis accab psant que erfersp ienimost enis expel etus tesserum alibusam commo digenim in nectioriot et verest fugitae es rem.equae liquia senis reptatem quam res oficip icimint',3.73,3.84,7.22,t16Lk);
+  S(OVAL,1.25,6.63,1.38,1.38,GBNBL);
+  S(LINE,2.63,7.32,0.71,0,NOFILL,lnGY22);
+  S(LINE,3.33,6.35,0.01,1.94,NOFILL,lnGY22);
+  T(INSERT_TITLE_HERE,3.73,6.3,7.22,t24kB2);
+  T(OTATUM_OMMODIT_RE_16,3.73,6.79,6.37,t16Lk);
+  S(OVAL,1.25,9.58,1.38,1.38,GBNBL);
+  S(LINE,2.63,10.27,0.71,0,NOFILL,lnGY22);
+  S(LINE,3.33,9.3,0.01,1.94,NOFILL,lnGY22);
+  T(INSERT_TITLE_HERE,3.73,9.26,7.22,t24kB2);
+  T(OTATUM_OMMODIT_RE_6,3.73,9.74,7.22,t16Lk);
+  S('wedgeEllipseCallout',18.14,8.4,1.83,1.56,fGY1);
+  T('Location',18.35,9.02,1.4,t18kcB3);
+  S('wedgeEllipseCallout',16.31,4.3,1.83,1.52,fGY1);
+  T('Location',16.53,4.9,1.4,t18kcB3);
+  S('wedgeEllipseCallout',11.22,4.26,1.83,1.52,fGY1);
+  T('Location',11.44,4.86,1.4,t18kcB3);
+  T('01',1.61,4.09,0.65,t32wcB2);
+  T('02',1.61,7.04,0.65,t32wcB2);
+  T('03',1.61,9.96,0.65,t32wcB2);
+}
+
+function slide76() {  // Check List
+  T('Check List',1.25,1.25,10.89,t85kB2);
+  S(RECT,8.26,3.1,5.4,7,fGY1);
+  S(RECT,13.66,4.93,4.83,5.17,GNBTLT2);
+  S(RECT,3.43,4.93,4.83,5.17,GNBTLT2);
+  S(OVAL,15.15,4.08,1.81,1.81,fGY1);
+  S(OVAL,4.94,4.08,1.81,1.81,fGY1);
+  S(OVAL,9.8,3.67,2.32,2.32,GNBTL);
+  S(p130,15.73,4.66,0.65,0.65,GNBTL);
+  T(VOLORALIA_PERIATQUE_EOSI_2,3.89,6.92,3.86,t14Lw);
+  T('Insert Title',3.97,6.18,3.75,t28wB2);
+  S(p129,10.34,4.38,1.25,0.91,fWH);
+  S(p129,5.44,4.69,0.81,0.59,GNBTL);
+  T(VOLORALIA_PERIATQUE_EOSI_2,14.14,6.92,3.86,t14Lw);
+  T('Insert Title',14.22,6.18,3.75,t28wB2);
+  T('Voloralia periatque eosisit asumrex edipsam oreatem aboirero quioae \n\nHoloralia periatque eosisit asumrex edipsam oreatem aboirero quioae \n\nSoloralia periatque eosisit asumrex edipsam oreatem aboirero quioae ',8.74,6.92,4.5,t14Lk);
+  T('Insert Title',8.82,6.18,4.38,t28kB3);
+  IMG(1.25,6.27,19.51,6.1);
+}
+
+function slide77() {  // Case Studys
+  T('Case Studys',1.25,1.25,10.89,t85kB2);
+  T('Challenge',1.35,3.43,6.49,t28kB4);
+  T(STPRATEM_ABOIRERO_QUIOAE_3,1.35,4.07,6.64,t16Lk);
+  T(VOLORIT_UT_VOLOR,1.35,5.24,6.61,t16Lk4);
+  T('Action',14.16,7.85,6.49,t28kB4);
+  T(STPRATEM_ABOIRERO_QUIOAE_3,14.07,8.5,6.64,t16Lk);
+  T(VOLORIT_UT_VOLOR,14.13,9.67,6.61,t16Lk4);
+  T('Solution',1.35,7.85,6.49,t28kB4);
+  T(STPRATEM_ABOIRERO_QUIOAE_3,1.26,8.5,6.64,t16Lk);
+  T(VOLORIT_UT_VOLOR,1.32,9.67,6.61,t16Lk4);
+  IMG(8.69,3.41,4.54,3.27);
+  IMG(8.69,7.85,4.54,3.27);
+  IMG(14.14,3.41,6.52,3.27);
+}
+
+function slide78() {  // Case Studys
+  T('Case Studys',1.25,1.25,10.89,t85kB2);
+  S(RECT,1.19,3.25,5.73,7.87,NOFILL,lnNAVY2);
+  T(VOLORALIA_PERIATQUE_EOSI,1.58,8.96,4.88,t14Lk);
+  T('Challenge',1.66,8.22,3.75,t28kB3);
+  S(RECT,8.09,3.25,5.73,7.87,GNBTL);
+  T(VOLORALIA_PERIATQUE_EOSI,8.48,8.96,4.88,t14Lw);
+  T('Solution',8.56,8.22,3.75,t28wB2);
+  S(RECT,14.99,3.25,5.73,7.87,NOFILL,lnNAVY2);
+  T(VOLORALIA_PERIATQUE_EOSI,15.38,8.96,4.88,t14Lk);
+  T('Action',15.46,8.22,3.75,t28kB3);
+  IMG(8.56,3.68,4.79,4);
+  IMG(15.46,3.68,4.79,4);
+  IMG(1.66,3.68,4.79,4);
+}
+
+function slide79() {  // Our Portfolio
+  T('Our Portfolio',1.25,1.25,10.89,t85kB2);
+  T('Insert Title ',9.77,3.18,4.99,t28kB4);
+  T(STPRATEM_ABOIRERO_QUIOAE_2,9.67,3.83,5.1,t16Lk);
+  T('Insert Title ',9.77,6.27,4.67,t28kB4);
+  T(STPRATEM_ABOIRERO_QUIOAE_2,9.67,6.89,5.1,t16Lk);
+  T('Insert Title ',9.77,9.41,4.99,t28kB4);
+  T(STPRATEM_ABOIRERO_QUIOAE_2,9.67,10.04,5.1,t16Lk);
+  IMG(1.25,3.27,7.44,7.84);
+  IMG(15.72,1.25,5.03,4.71);
+  IMG(15.72,6.4,5.03,4.71);
+}
+
+function slide80() {  // 01
+  IMG(14.6,3.18,6.16,5.2);
+  IMG(7.92,3.18,6.16,5.2);
+  IMG(1.25,3.18,6.16,5.2);
+  T('Our Portfolio',1.25,1.25,10.89,t85kB2);
+  S(RECT,1.25,8.39,19.51,3.98,fGY1);
+  [[0,'01'], [6.51,'02'], [13.26,'03']].forEach(([d,v0]) => {
+    T('Insert Title ',1.99+d,9.24,4.67,t28kB);
+    T(STPRATEM_ABOIRERO_QUIOAE,1.99+d,9.89,4.67,t16Lk);
+    T(v0,1.99+d,7.68,3.59,t88nB);
+  });
+}
+
+function slide81() {  // Future Plan
+  T('Future Plan',1.25,1.25,10.49,t85kB2);
+  S(LINE,7.25,4.8,0.05,6.32,NOFILL,lnGY23);
+  S(OVAL,5.59,8.37,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(INSERT_TITLE_HERE,1.25,9.55,5.24,t24krB);
+  T(PORE_NISTRUM_EVELITAS_3,1.25,10.04,5.24,t16Lkr);
+  S(OVAL,7.12,9.65,0.28,0.28,GBNBR2,0,{flipH:1});
+  S(OVAL,5.59,4.8,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(INSERT_TITLE_HERE,1.25,5.98,5.24,t24krB);
+  T(PORE_NISTRUM_EVELITAS_3,1.25,6.46,5.24,t16Lkr);
+  S(OVAL,7.12,6.07,0.28,0.28,GBNBR2,0,{flipH:1});
+  S(LINE,14.62,4.8,0.05,6.32,NOFILL,lnGY23);
+  S(OVAL,15.5,8.37,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(INSERT_TITLE_HERE,15.5,9.55,5.24,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_3,15.5,10.04,5.24,t16Lk);
+  S(OVAL,14.49,9.65,0.28,0.28,GBNBR2,0,{flipH:1});
+  S(OVAL,15.5,4.8,0.9,0.9,GBNBR2,0,{flipH:1});
+  T(INSERT_TITLE_HERE,15.5,5.98,5.24,t24kB2);
+  T(PORE_NISTRUM_EVELITAS_3,15.5,6.46,5.24,t16Lk);
+  S(OVAL,14.49,6.07,0.28,0.28,GBNBR2,0,{flipH:1});
+  T(OTATUM_OMMODIT_RE_18,1.16,2.62,19.58,t16Lk);
+  T('01',5.75,5.03,0.59,t24wcB);
+  T('02',5.75,8.59,0.59,t24wcB);
+  T('03',15.69,5.03,0.59,t24wcB);
+  T('04',15.69,8.59,0.59,t24wcB);
+  IMG(8.33,4.8,5.23,6.32);
+}
+
+function slide82() {  // Future Plan
+  S(p194,1.2,7.71,4.14,3.33,NOFILL,lnBLUE2);
+  S(p194,6.32,7.71,4.14,3.33,NOFILL,lnBLUE2);
+  S(p194,11.44,7.71,4.14,3.33,NOFILL,lnBLUE2);
+  S(p194,16.56,7.71,4.14,3.33,NOFILL,lnBLUE2);
+  S(OVAL,2.59,6.92,1.36,1.36,GBNBR2);
+  S(OVAL,7.71,6.92,1.36,1.36,GBNBR2);
+  S(OVAL,12.83,6.92,1.36,1.36,GBNBR2);
+  S(OVAL,17.95,6.92,1.36,1.36,GBNBR2);
+  T('Insert Title',1.68,8.65,3.18,t28kcB);
+  T(PORE_NISTRUM_EVELITAS_9,1.68,9.26,3.18,t16Lkc);
+  T('Insert Title',6.76,8.65,3.18,t28kcB);
+  T(PORE_NISTRUM_EVELITAS_9,6.76,9.26,3.18,t16Lkc);
+  T('Insert Title',11.93,8.65,3.18,t28kcB);
+  T(PORE_NISTRUM_EVELITAS_9,11.93,9.26,3.18,t16Lkc);
+  T('Insert Title',17.09,8.65,3.18,t28kcB);
+  T(PORE_NISTRUM_EVELITAS_9,17.09,9.26,3.18,t16Lkc);
+  S(p195,2.98,7.28,0.58,0.63,fWH);
+  S(p196,13.19,7.29,0.63,0.61,fWH);
+  S(p197,8.07,7.36,0.64,0.49,fWH);
+  S(p198,18.36,7.34,0.54,0.52,fWH);
+  T('Future Plan',1.25,1.25,10.89,t85kB2);
+  IMG(1.2,3.22,4.14,3.35);
+  IMG(6.33,3.22,4.14,3.35);
+  IMG(11.49,3.22,4.14,3.35);
+  IMG(16.62,3.22,4.14,3.35);
+}
+
+function slide83() {  // Contact  us
+  S(RECT,0,0,21.99,12.37,GNBBL);
+  S(p29,16.06,0,5.93,8.54,GNBTRT);
+  T('Contact \nus',1.25,1.36,10.64,t96wB);
+  T('Address',0.99,9.69,2.01,t24wB4);
+  T('Phone',5.1,9.69,1.63,t24wB4);
+  T('Website',9.18,9.69,2.31,t24wB4);
+  T(S123_STREET_NAME,0.86,10.22,3.11,t16Lw2);
+  T(S00_123_4567890,4.97,10.22,3.11,t16Lw2);
+  T(USER_EXAMPLE_COM,9.05,10.22,3.11,t16Lw2);
+  S(p199,5.1,8.71,0.72,0.72,fWH);
+  S(p200,1,8.71,0.5,0.73,fWH);
+  S(p201,9.18,8.77,0.75,0.66,fWH);
+  S(DONUT,12.33,2.35,8.19,8.19,GNBTRT,0,{rectRadius:1.082});
+}
+
+function slide84() {  // THE END.
+  T('THE END.',1.22,3.82,19.55,t85kcB);
+  T('Address',5.89,6.99,2.01,t24kcB2);
+  T('Phone',10.19,6.99,1.63,t24kcB2);
+  T('Website',13.93,6.99,2.31,t24kcB2);
+  T(S123_STREET_NAME,5.34,7.7,3.11,t16Lkc);
+  T(S00_123_4567890,9.45,7.7,3.11,t16Lkc);
+  T(USER_EXAMPLE_COM,13.54,7.7,3.11,t16Lkc);
+  S(p199,10.62,5.9,0.78,0.78,GNBBL2);
+  S(p200,6.64,5.93,0.51,0.74,GNBBL2);
+  S(p201,14.68,5.94,0.84,0.74,GNBBL2);
+}
+
+const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30, slide31, slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40, slide41, slide42, slide43, slide44, slide45, slide46, slide47, slide48, slide49, slide50, slide51, slide52, slide53, slide54, slide55, slide56, slide57, slide58, slide59, slide60, slide61, slide62, slide63, slide64, slide65, slide66, slide67, slide68, slide69, slide70, slide71, slide72, slide73, slide74, slide75, slide76, slide77, slide78, slide79, slide80, slide81, slide82, slide83, slide84];
+
+SLIDES.forEach(fn => { newSlide(); fn(); });
+
+pres.writeFile({ fileName: path.join(__dirname, '02aa2ab0-1384-4a2c-bcc4-9194f6c242d9_grok_final.pptx') })
+  .then(f => console.log('wrote ' + f));

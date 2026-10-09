@@ -1,0 +1,580 @@
+/*
+ * "Medical Healthy" deck - rebuilt with pptxgenjs.
+ * Raster photos of the original are replaced by flat grey [image] placeholders.
+ *
+ *   node 025d4e3b-4f41-4af9-a947-2cfb110fbc21_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  a1: '0F6FC6',        // accent1 - blue
+  a2: '009DD9',        // accent2 - sky
+  a3: '0BD0D9',        // accent3 - cyan
+  a4: '10CF9B',        // accent4 - green
+  a1d: '0B5394',       // accent1 lumMod 75%
+  a2d: '0076A3',
+  a3d: '089CA3',
+  a4d: '0C9B74',
+  a2l: '4FCEFF',       // accent2 lumMod 60% / lumOff 40%
+  a3l: '5EF0F7',
+  a4l: '5FF3CA',
+  white: 'FFFFFF',
+  black: '000000',
+  grey25: '404040',    // tx1 lumMod 75 / lumOff 25
+  grey35: '595959',    // tx1 lumMod 65 / lumOff 35
+  grey50: '808080',    // bg1 lumMod 50
+  grey65: 'A6A6A6',    // bg1 lumMod 65  (eyebrow text)
+  grey85: 'D9D9D9',    // bg1 lumMod 85
+  grey95: 'F2F2F2',    // bg1 lumMod 95
+  photo: 'CCCCCC',     // stand-in for the deck's photographs
+  photoTx: 'B3B3B3'
+};
+
+const FH = 'Poppins Medium';   // theme major font
+const FB = 'Poppins Light';    // theme minor font
+
+const EYEBROW = 'Better Health Through Medical Knowledge';
+const LOREM_L =
+  'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
+  'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.';
+const LOREM_M =
+  'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
+  'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero';
+const LOREM_S = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ';
+const LOREM_XS = 'Lorem dolor sit amet consectetur adipiscing elit';
+
+/* ---------------------------------------------------------------- helpers */
+
+// Plain text box. Sizes/colours default to the deck's body style.
+function txt(s, text, o) {
+  s.addText(text, Object.assign({
+    fontFace: FB, fontSize: 18, color: C.black, valign: 'top',
+    margin: [7.2, 3.6, 7.2, 3.6], wrap: true
+  }, o));
+}
+
+// Solid shape with no outline.
+function shp(s, kind, o) {
+  s.addShape(kind, Object.assign({ line: { type: 'none' } }, o));
+}
+
+// Free-form polygon whose points are given as 0..1 fractions of w/h.
+function poly(s, x, y, w, h, pts, o) {
+  const points = pts.map(p =>
+    p.length === 6
+      ? { x: x + p[4] * w, y: y + p[5] * h, curve: { type: 'cubic', x1: x + p[0] * w, y1: y + p[1] * h, x2: x + p[2] * w, y2: y + p[3] * h } }
+      : { x: x + p[0] * w, y: y + p[1] * h });
+  points.push({ close: true });
+  shp(s, 'custGeom', Object.assign({ x, y, w, h, points }, o));
+}
+
+// The pale mint wash that the slide master paints over the right half.
+function wash(s) {
+  shp(s, 'ellipse', { x: 6.2, y: -1.4, w: 10.4, h: 10.4, fill: { color: C.a4, transparency: 94 } });
+  shp(s, 'ellipse', { x: 8.4, y: 0.6, w: 7.0, h: 7.0, fill: { color: C.a4, transparency: 94 } });
+}
+
+// "Healthy Life" badge that sits in the corner of nearly every slide.
+function badge(s, x, y, textColor) {
+  shp(s, 'ellipse', { x: x, y: y, w: 0.207, h: 0.207, fill: { color: C.a1 } });
+  shp(s, 'plus', { x: x + 0.032, y: y + 0.032, w: 0.143, h: 0.143, fill: { color: C.white } });
+  txt(s, 'Healthy Life', { x: x + 0.207, y: y - 0.048, w: 1.145, h: 0.303, fontSize: 12, color: textColor || C.black, wrap: false });
+}
+
+// Grey stand-in for one of the original photographs.
+function photo(s, x, y, w, h, o) {
+  shp(s, (o && o.shape) || 'rect', Object.assign({
+    x, y, w, h, fill: { color: C.photo },
+    line: { type: 'none' }
+  }, o && o.rectRadius !== undefined ? { rectRadius: o.rectRadius } : {},
+     o && o.flipH ? { flipH: true } : {}, o && o.flipV ? { flipV: true } : {}));
+  txt(s, '[image]', {
+    x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle',
+    fontSize: 14, color: C.photoTx
+  });
+}
+
+// Slide heading: small grey eyebrow line above a large title.
+function heading(s, x, y, w, title, o) {
+  const align = (o && o.align) || 'left';
+  txt(s, EYEBROW, { x: (o && o.eyebrowX) !== undefined ? o.eyebrowX : x, y, w: (o && o.eyebrowW) || 3.389, h: 0.286, fontSize: 11, color: C.grey65, align, wrap: false });
+  txt(s, title, { x, y: y + 0.351, w, h: (o && o.h) || 0.64, fontFace: FH, fontSize: 32, color: C.black, align });
+}
+
+// Body paragraph in the deck's grey, 1.5 line spacing.
+function body(s, x, y, w, h, text, o) {
+  txt(s, text, Object.assign({ x, y, w, h, fontSize: 12, color: C.grey35, lineSpacingMultiple: 1.5 }, o));
+}
+
+// Bold 14pt caption line, vertically centred like the original "Rectangle 1" shapes.
+function caption(s, x, y, w, text, o) {
+  txt(s, text, Object.assign({
+    x, y, w, h: (o && o.h) || 0.337, fontSize: 14, bold: true, valign: 'middle', wrap: false
+  }, o));
+}
+
+// Courier-"o" bullet used by the agenda / list slides.
+function bulletLine(s, x, y, w, runs, o) {
+  const opts = Object.assign({ x, y, w, h: 0.337, valign: 'middle', wrap: false, fontFace: FB, fontSize: 14, color: C.black, margin: [7.2, 3.6, 7.2, 3.6] }, o);
+  s.addText(runs.map((r, i) => ({
+    text: r.text,
+    options: Object.assign({ bullet: i === 0 ? { characterCode: '006F', indent: 22 } : false, bold: r.bold, color: opts.color, fontFace: FB, fontSize: opts.fontSize }, {})
+  })), opts);
+}
+
+// Doctor pictogram (white circle person + chest cross) used on slides 1, 3 and 7.
+function doctorIcon(s, x, y, d, color) {
+  shp(s, 'ellipse', { x: x + 0.25 * d, y: y + 0.02 * d, w: 0.5 * d, h: 0.5 * d, fill: { color } });
+  poly(s, x, y + 0.44 * d, d, 0.56 * d, [[0.1, 1], [0.1, 0.35], [0.22, 0.12], [0.5, 0.0], [0.78, 0.12], [0.9, 0.35], [0.9, 1]], { fill: { color } });
+  shp(s, 'plus', { x: x + 0.17 * d, y: y + 0.62 * d, w: 0.2 * d, h: 0.2 * d, fill: { color: color === C.white ? C.a1 : C.white } });
+}
+
+// Small person figure used by the slide-13 infographic.
+function person(s, x, y, w, h, main, dark) {
+  const P = [[0.16, 1], [0.16, 0.42], [0.3, 0.26], [0.5, 0.21], [0.7, 0.26], [0.84, 0.42], [0.84, 1], [0.56, 1], [0.56, 0.62], [0.44, 0.62], [0.44, 1]];
+  poly(s, x + 0.1 * w, y, w, h, P, { fill: { color: dark } });
+  shp(s, 'ellipse', { x: x + 0.1 * w + 0.29 * w, y: y + 0.01 * h, w: 0.42 * w, h: 0.22 * h, fill: { color: dark } });
+  poly(s, x, y, w, h, P, { fill: { color: main } });
+  shp(s, 'ellipse', { x: x + 0.29 * w, y: y + 0.01 * h, w: 0.42 * w, h: 0.22 * h, fill: { color: main } });
+}
+
+/* ------------------------------------------------------------- the slides */
+
+// 1 - cover
+function slide01(pres) {
+  const s = pres.addSlide();
+  s.background = { color: C.a3, transparency: 87 };
+  photo(s, 7.683, 0.675, 5.557, 6.825);
+  // soft "wave" glows in the top-right and bottom-left corners
+  const WAVE = [[0, 0], [0.267, 0], [0.267, 0.33, 0.445, 0.598, 0.665, 0.598], [0.802, 0.598, 0.924, 0.494, 0.995, 0.334],
+    [1, 0.322], [1, 0.864], [0.982, 0.879], [0.888, 0.956, 0.78, 1, 0.665, 1], [0.298, 1, 0, 0.552, 0, 0]];
+  poly(s, 9.875, 0, 3.551, 2.362, WAVE, { fill: { color: C.a1, transparency: 90 } });
+  poly(s, 11.11, 0, 2.253, 1.127, WAVE, { fill: { color: C.a1, transparency: 90 } });
+  poly(s, -0.004, 5.284, 3.331, 2.216, WAVE, { fill: { color: C.a3, transparency: 90 } });
+  poly(s, 0.055, 6.443, 2.114, 1.057, WAVE, { fill: { color: C.a3, transparency: 90 } });
+
+  badge(s, 0.724, 0.5);
+  txt(s, EYEBROW, { x: 0.925, y: 1.617, w: 3.389, h: 0.286, fontSize: 11, color: C.grey65, wrap: false });
+  s.addText([
+    { text: 'Medical ', options: { color: C.black } },
+    { text: 'Healthy', options: { color: C.a3 } }
+  ], { x: 0.842, y: 2.029, w: 5.7, h: 2.52, fontFace: FB, fontSize: 88, bold: true, lineSpacingMultiple: 0.8, valign: 'top', margin: [7.2, 3.6, 7.2, 3.6] });
+  body(s, 0.843, 4.65, 5.682, 0.678, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ');
+
+  shp(s, 'roundRect', { x: 6.106, y: 5.553, w: 2.788, h: 0.604, fill: { color: C.a1 }, rectRadius: 0.302 });
+  shp(s, 'ellipse', { x: 6.175, y: 5.628, w: 0.454, h: 0.454, fill: { color: C.white } });
+  doctorIcon(s, 6.264, 5.72, 0.28, C.a1);
+  txt(s, 'Early Detection Of Diseases Saves Lives', { x: 6.785, y: 5.603, w: 2.109, h: 0.505, fontSize: 12, color: C.white, valign: 'middle' });
+
+  txt(s, 'Take Care Of Your Body By Checking Your Health Regularly', { x: 0.842, y: 6.733, w: 5.037, h: 0.303, fontSize: 12, wrap: false });
+}
+
+// 2 - table of contents
+function slide02(pres) {
+  const s = pres.addSlide();
+  photo(s, 0, 0, 13.333, 7.5);
+  shp(s, 'round1Rect', { x: 4.396, y: 0, w: 8.938, h: 7.5, fill: { color: C.a3 }, rectRadius: 2.281, flipH: true });
+  badge(s, 0.501, 0.5, C.white);
+  txt(s, EYEBROW, { x: 5.686, y: 0.908, w: 3.389, h: 0.286, fontSize: 11, color: C.a1, wrap: false });
+  txt(s, 'Table Of Content', { x: 5.686, y: 1.259, w: 5.396, h: 0.774, fontFace: FH, fontSize: 40, color: C.white });
+
+  const items = ['Introduction', 'Importance of Medical Health', 'Key Components', 'Common Health Tips',
+    'Role of Medical Professionals', 'Technology in Medical Health', 'Challenges in Achieving Medical Health'];
+  items.forEach((label, i) => {
+    s.addText([{ text: label, options: { bullet: { characterCode: '006F', indent: 27 }, bold: true, color: C.white, fontFace: FB, fontSize: 20 } }],
+      { x: 5.733, y: 2.409 + i * 0.6215, w: 6.31, h: 0.438, valign: 'top', margin: [7.2, 3.6, 7.2, 3.6] });
+  });
+}
+
+// 3 - what is "medical healthy"?
+function slide03(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  photo(s, 0.617, 0.601, 3.668, 6.316, { shape: 'round2DiagRect', rectRadius: 1.3, flipV: true });
+  shp(s, 'round2DiagRect', { x: 0.634, y: 5.137, w: 12.065, h: 1.803, fill: { color: C.a3 }, rectRadius: 0.901, flipV: true });
+  badge(s, 5.25, 0.5);
+  heading(s, 5.25, 1.559, 6.378, 'What is "Medical Healthy"?');
+  caption(s, 5.25, 2.915, 5.735, 'Combination Of Medical Awareness And Healthy Lifestyle');
+  body(s, 5.25, 3.271, 7.187, 0.981, LOREM_L);
+
+  shp(s, 'ellipse', { x: 0.986, y: 5.538, w: 1.0, h: 1.0, fill: { color: C.a1 } });
+  doctorIcon(s, 1.185, 5.73, 0.61, C.white);
+  caption(s, 2.514, 5.521, 5.761, 'Focuses on disease prevention, diagnosis, and treatment');
+  body(s, 2.514, 5.877, 8.804, 0.678,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo',
+    { color: C.grey25 });
+}
+
+// 4 - why medical health matters?
+function slide04(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  photo(s, 9.28, 0, 4.053, 3.522, { shape: 'round2DiagRect', rectRadius: 1.435, flipH: true });
+  shp(s, 'round2DiagRect', { x: 0, y: 3.522, w: 9.28, h: 3.978, fill: { color: C.a3 }, rectRadius: 1.408 });
+  shp(s, 'round2DiagRect', { x: 9.28, y: 3.522, w: 4.085, h: 3.978, fill: { color: C.a1 }, rectRadius: 1.408, flipV: true });
+  badge(s, 0.501, 0.5);
+  heading(s, 0.709, 1.265, 7.125, 'Why Medical Health Matters?');
+  body(s, 0.709, 2.278, 7.187, 0.678,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies purus');
+
+  [['01', 4.324, 'Early Detection Of Diseases Saves Lives', 3.983],
+   ['02', 5.663, 'Improves Quality Of Life', 2.483]].forEach(([num, y, title, w]) => {
+    shp(s, 'ellipse', { x: 0.852, y: y + 0.038, w: 0.667, h: 0.667, fill: { color: C.white } });
+    txt(s, num, { x: 0.852, y: y + 0.038, w: 0.667, h: 0.667, fontSize: 16, align: 'center', valign: 'middle' });
+    caption(s, 1.758, y, w, title);
+    body(s, 1.758, y + 0.357, 6.638, 0.678, LOREM_M.slice(0, 126), { color: C.grey25 });
+  });
+
+  txt(s, '80%', { x: 10.285, y: 4.287, w: 2.075, h: 1.111, fontSize: 60, bold: true, color: C.white, align: 'center' });
+  caption(s, 9.904, 5.397, 2.837, 'More Effective To Detection', { color: C.white, align: 'center' });
+  body(s, 9.624, 5.734, 3.398, 0.981, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor',
+    { color: C.grey95, align: 'center' });
+}
+
+// 5 - key components
+function slide05(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  photo(s, 0.676, 3.75, 6.594, 3.167, { shape: 'round2DiagRect', rectRadius: 1.12 });
+  badge(s, 0.501, 0.5);
+  heading(s, 0.709, 1.357, 4.498, 'Key Components');
+  body(s, 0.709, 2.37, 5.958, 0.678,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar');
+
+  shp(s, 'round2DiagRect', { x: 7.271, y: 2.328, w: 5.386, h: 1.422, fill: { color: C.a3 }, rectRadius: 0.711 });
+
+  const rows = [
+    { y: 1.002, x: 7.722, w: 4.72, bold: 'Preventive Care', rest: ' – Vaccinations, screenings', bw: 4.333, light: false },
+    { y: 2.305, x: 7.091, w: 3.948, bold: 'Nutrition & Exercise', rest: ' – Balanced diet', bw: 4.53, light: true },
+    { y: 3.814, x: 7.091, w: 4.094, bold: 'Mental Health', rest: ' – Stress management', bw: 4.333, light: false },
+    { y: 5.146, x: 7.091, w: 4.969, bold: 'Access to Healthcare', rest: ' – Availability of medical', bw: 4.333, light: false }
+  ];
+  rows.forEach(r => {
+    const x = r.y === 1.002 ? 7.722 : 7.754;
+    bulletLine(s, x, r.y, r.w, [{ text: r.bold, bold: true }, { text: r.rest }]);
+    txt(s, LOREM_S, { x, y: r.y + 0.356, w: r.bw, h: 0.678, fontSize: 18, color: r.light ? C.white : C.black });
+  });
+}
+
+// 6 - common health tips (four-petal flower)
+function slide06(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  badge(s, 0.501, 0.5);
+  heading(s, 0.709, 1.935, 5.312, 'Common Health Tips');
+  body(s, 0.709, 3.071, 5.312, 0.981, LOREM_M);
+
+  // Petals: round2DiagRect rotated 90 degrees, so only the outer corner is square.
+  const petals = [
+    { x: 7.3125, y: 1.0315, color: C.a1, deg: 90, fh: true, fv: true },   // top-left
+    { x: 10.0085, y: 1.0315, color: C.a3, deg: 90, fh: true, fv: false },  // top-right
+    { x: 7.3125, y: 3.7845, color: C.a3, deg: 90, fh: false, fv: true },   // bottom-left
+    { x: 10.0085, y: 3.7845, color: C.a1, deg: 90, fh: false, fv: false }  // bottom-right
+  ];
+  petals.forEach(p => {
+    shp(s, 'round2DiagRect', {
+      x: p.x, y: p.y, w: 2.617, h: 2.684, rotate: p.deg, flipH: p.fh, flipV: p.fv,
+      rectRadius: 0.925, fill: { color: p.color, transparency: 45 }
+    });
+  });
+  shp(s, 'ellipse', { x: 9.177, y: 2.963, w: 1.506, h: 1.506, fill: { color: C.white, transparency: 53 } });
+
+  [['Drink plenty of water', 7.817, 2.002, 1.736, C.white],
+   ['Sleep 7–9 hours per night', 10.294, 2.027, 2.085, C.black],
+   ['Eat more fruits and vegetables', 7.589, 4.773, 2.193, C.black],
+   ['Exercise at least 30 minutes a day', 10.205, 4.773, 2.46, C.white]].forEach(([t, x, y, w, col]) => {
+    txt(s, t, { x, y, w, h: 0.707, fontSize: 18, bold: true, color: col });
+  });
+
+  shp(s, 'ellipse', { x: 0.892, y: 4.418, w: 0.469, h: 0.469, fill: { color: C.a3 } });
+  shp(s, 'noSmoking', { x: 0.991, y: 4.514, w: 0.267, h: 0.267, fill: { color: C.white }, line: { type: 'none' } });
+  caption(s, 1.494, 4.481, 3.506, 'Avoid Smoking And Limit Alcohol', { wrap: true });
+  body(s, 1.494, 4.886, 4.839, 0.678, LOREM_S);
+}
+
+// 7 - role of medical professionals
+function slide07(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  photo(s, 0, 4.658, 13.333, 2.842);
+  badge(s, 0.501, 0.5);
+  heading(s, 0.709, 1.364, 7.159, 'Role of Medical Professionals');
+  body(s, 0.709, 2.499, 5.312, 0.981, LOREM_M);
+
+  [['Doctors, nurses, and specialists', 1.136, 3.552], ['Pharmacists', 1.706, 1.727],
+   ['Nutritionists', 2.276, 1.646], ['Mental health counselors', 2.846, 2.97],
+   ['Public health workers', 3.372, 2.574]].forEach(([label, y, w]) => {
+    bulletLine(s, 8.651, y, w, [{ text: label, bold: true }]);
+  });
+
+  shp(s, 'round2DiagRect', { x: 0, y: 4.216, w: 6.021, h: 0.981, fill: { color: C.a3 }, rectRadius: 0.49, flipH: true });
+  shp(s, 'ellipse', { x: 0.733, y: 4.426, w: 0.548, h: 0.548, fill: { color: C.a1 } });
+  doctorIcon(s, 0.842, 4.532, 0.335, C.white);
+  caption(s, 1.494, 4.42, 4.195, 'Make Sure The Mentor Is A Specialist In The Health Field', { h: 0.572, wrap: true });
+}
+
+// 8 - meet our specialist
+function slide08(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  // cyan backing cards come from the slide layout
+  [0.986, 5.006, 9.026].forEach(x => {
+    shp(s, 'round2DiagRect', { x, y: 2.443, w: 3.271, h: 3.823, rotate: 90, flipH: true, flipV: true, rectRadius: 1.157, fill: { color: C.a3, transparency: 45 } });
+  });
+  badge(s, 0.501, 0.5);
+  txt(s, EYEBROW, { x: 4.972, y: 0.755, w: 3.389, h: 0.286, fontSize: 11, color: C.grey65, align: 'center', wrap: false });
+  txt(s, 'Meet Our Specialist', { x: 4.229, y: 1.106, w: 4.875, h: 0.64, fontFace: FH, fontSize: 32, align: 'center' });
+
+  [[1.005, 2.673, 3.875, 3.823, 'Isabella Adams', 0.869],
+   [5.035, 2.673, 3.271, 3.522, 'Ethan Robinson', 4.914],
+   [9.421, 2.673, 2.623, 3.593, 'Harper Roberts', 8.959]].forEach(([x, y, w, h, name, tx]) => {
+    photo(s, x, y, w, h);
+    txt(s, name, { x: tx, y: 6.496, w: 3.506, h: 0.505, fontSize: 24, bold: true, align: 'center', valign: 'middle' });
+  });
+}
+
+// 9 - mockup slide with tablet device
+function slide09(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  shp(s, 'round2DiagRect', { x: 8.531, y: 2.51, w: 5.583, h: 4.271, rotate: 90, flipH: true, flipV: true, rectRadius: 1.51, fill: { color: C.a3, transparency: 45 } });
+  // tablet body (a device mock-up in the original artwork)
+  shp(s, 'roundRect', { x: 8.736, y: 1.333, w: 3.556, h: 5.278, fill: { color: '2B2B2B' }, rectRadius: 0.09 });
+  shp(s, 'ellipse', { x: 10.44, y: 6.28, w: 0.15, h: 0.15, fill: { color: '4D4D4D' } });
+  photo(s, 8.958, 1.875, 3.083, 4.125);
+
+  badge(s, 0.501, 0.5);
+  heading(s, 0.709, 1.714, 6.375, 'Medical Healthy Mockup Watch Design', { h: 1.178 });
+  body(s, 0.709, 3.438, 5.958, 0.981, LOREM_M);
+
+  shp(s, 'round1Rect', { x: 0, y: 5.062, w: 6.667, h: 2.438, fill: { color: C.a1 }, rectRadius: 1.031 });
+  shp(s, 'ellipse', { x: 1.223, y: 5.44, w: 0.628, h: 0.628, fill: { color: C.white } });
+  shp(s, 'rect', { x: 1.365, y: 5.695, w: 0.344, h: 0.231, fill: { color: C.a1 } });
+  poly(s, 1.452, 5.586, 0.172, 0.15, [[0.5, 0], [1, 1], [0, 1]], { fill: { color: C.a1 } });
+  [[1.41, 5.78], [1.41, 5.841], [1.602, 5.78], [1.602, 5.841]].forEach(([x, y]) =>
+    shp(s, 'rect', { x, y, w: 0.063, h: 0.042, fill: { color: C.white } }));
+  shp(s, 'rect', { x: 1.495, y: 5.78, w: 0.085, h: 0.103, fill: { color: C.white } });
+  caption(s, 1.994, 5.496, 2.901, 'Telemedicine And Virtual Consultations', { h: 0.572, color: C.white, wrap: true });
+  body(s, 1.223, 6.142, 4.387, 0.981,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus',
+    { fontSize: 18, color: C.grey85 });
+}
+
+// 10 - infographic: three stacked arrows
+function slide10(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  badge(s, 0.501, 0.5);
+  txt(s, EYEBROW, { x: 4.972, y: 0.755, w: 3.389, h: 0.286, fontSize: 11, color: C.grey65, align: 'center', wrap: false });
+  txt(s, 'Infographic Section', { x: 4.229, y: 1.106, w: 4.875, h: 0.64, fontFace: FH, fontSize: 32, align: 'center' });
+
+  const ARROW = [[0.4968, 0], [1, 0.2957], [0.7608, 0.2887], [0.7642, 1], [0.2427, 0.9846], [0.2393, 0.2733], [0, 0.2662]];
+  const STRIP = [[0, 0.0198], [0.9701, 0], [1, 0.9802], [0.0299, 1]];
+  const SHINE = [[0, 0.0463], [0.1798, 0], [1, 0.9537], [0.8202, 1]];
+  const arrows = [
+    { c: C.a2, l: C.a2l, sx: 10.96, sy: 2.766, sh: 3.803, ax: 9.341, ay: 1.328, ah: 5.241, hx: 10.398, hy: 1.253 },
+    { c: C.a3, l: C.a3l, sx: 10.308, sy: 3.961, sh: 2.721, ax: 8.688, ay: 2.523, ah: 4.159, hx: 9.746, hy: 2.448 },
+    { c: C.a4, l: C.a4l, sx: 9.631, sy: 5.169, sh: 1.639, ax: 8.011, ay: 3.722, ah: 3.085, hx: 9.069, hy: 3.656 }
+  ];
+  arrows.forEach(a => {
+    poly(s, a.sx, a.sy, 0.242, a.sh, STRIP, { fill: { color: a.l } });
+    poly(s, a.ax, a.ay, 2.129, a.ah, ARROW, { fill: { color: a.c } });
+    poly(s, a.hx, a.hy, 1.306, 1.625, SHINE, { fill: { color: a.l } });
+  });
+
+  // numbered bubbles
+  [[7.931, 5.339, '01', C.a4], [8.799, 2.409, '02', C.a3], [10.712, 4.172, '03', C.a2]].forEach(([x, y, n, col]) => {
+    shp(s, 'ellipse', { x, y, w: 0.938, h: 0.938, fill: { color: C.white } });
+    shp(s, 'ellipse', { x: x + 0.119, y: y + 0.119, w: 0.7, h: 0.7, fill: { color: col } });
+    txt(s, n, { x: x + 0.15, y: y + 0.266, w: 0.638, h: 0.408, fontSize: 16, bold: true, color: C.white, align: 'center' });
+  });
+
+  // percentage call-outs
+  [['40%', 'Visual Growth', C.a4, 6.667, 5.395, 1.279, 6.731, 5.891, 1.205, 'right'],
+   ['52%', 'Clear Insights', C.a3, 6.909, 2.484, 1.77, 6.909, 2.98, 1.77, 'right'],
+   ['78%', 'Data Trends', C.a2, 11.775, 4.247, 1.28, 11.775, 4.743, 1.28, 'left']].forEach(
+    ([pct, label, col, px, py, pw, lx, ly, lw, al]) => {
+      txt(s, pct, { x: px, y: py, w: pw, h: 0.638, fontSize: 28, bold: true, color: col, align: al, lineSpacingMultiple: 1.2 });
+      txt(s, label, { x: lx, y: ly, w: lw, h: 0.293, fontSize: 10, color: C.grey25, align: al, lineSpacingMultiple: 1.2 });
+    });
+
+  // three white legend cards
+  [['Visual Growth', 'Visualize data over time', C.a4, 3.422, 'pie'],
+   ['Clear Insight', 'Make complex data simple', C.a3, 4.53, 'chartPlus'],
+   ['Data Trends', 'Turn numbers into stories', C.a2, 5.638, 'donut']].forEach(([title, sub, col, y, glyph]) => {
+    shp(s, 'roundRect', { x: 2.131, y, w: 3.187, h: 0.841, fill: { color: C.white }, rectRadius: 0.214,
+      shadow: { type: 'outer', color: '9BB7C9', blur: 8, offset: 2, angle: 90, opacity: 0.3 } });
+    shp(s, glyph, { x: 2.425, y: y + 0.161, w: 0.253, h: 0.253, fill: { color: col }, line: { type: 'none' } });
+    txt(s, title, { x: 2.809, y: y + 0.122, w: 1.412, h: 0.331, fontSize: 12, bold: true, color: col, lineSpacingMultiple: 1.2 });
+    txt(s, sub, { x: 2.795, y: y + 0.388, w: 2.245, h: 0.311, fontSize: 11, color: C.grey25, lineSpacingMultiple: 1.2 });
+  });
+}
+
+// 11 - infographic: three banners
+function slide11(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  badge(s, 0.501, 0.5);
+  txt(s, EYEBROW, { x: 4.972, y: 0.755, w: 3.389, h: 0.286, fontSize: 11, color: C.grey65, align: 'center', wrap: false });
+  txt(s, 'Infographic Section', { x: 4.229, y: 1.106, w: 4.875, h: 0.64, fontFace: FH, fontSize: 32, align: 'center' });
+
+  // banner outline: rectangle whose bottom edge dips into a shallow V
+  const BANNER = [[1, 0.6555], [1, 0.6861, 0.979, 0.7237, 0.9533, 0.739], [0.5467, 0.9885],
+    [0.521, 1.0038, 0.479, 1.0038, 0.4533, 0.9885], [0.0467, 0.739],
+    [0.021, 0.7237, 0, 0.6861, 0, 0.6555], [0, 0.0557],
+    [0, 0.025, 0.0243, 0, 0.0539, 0], [0.9461, 0], [0.9757, 0, 1, 0.025, 1, 0.0557]];
+  [[1.705, C.a1], [5.236, C.a2], [8.767, C.a3]].forEach(([x, col]) => {
+    poly(s, x, 2.604, 2.862, 1.551, BANNER, { fill: { color: col } });
+    poly(s, x, 3.318, 2.862, 1.551, BANNER, { fill: { color: col }, line: { color: C.white, width: 1 } });
+    txt(s, 'BUSINESS', { x: x + 0.05, y: 2.928, w: 2.759, h: 0.292, fontSize: 16, color: C.white, align: 'center', lineSpacingMultiple: 0.8 });
+    txt(s, 'Presentation infogarphic', { x: x + 0.05, y: 3.318, w: 2.759, h: 0.6, fontSize: 16, color: C.white, align: 'center', lineSpacingMultiple: 0.8 });
+  });
+
+  [[1.862, C.a1], [5.399, C.a2], [8.935, C.a3]].forEach(([x, col]) => {
+    txt(s, 'Business Plan 1 ', { x, y: 5.142, w: 2.536, h: 0.449, color: col, align: 'center', lineSpacingMultiple: 1.2 });
+    txt(s, 'PLACEHOLDER',
+      { x, y: 5.583, w: 2.536, h: 1.057, fontSize: 12, color: C.grey35, align: 'center', lineSpacingMultiple: 1.2 });
+  });
+}
+
+// 12 - infographic: four circular arrows
+function slide12(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  badge(s, 0.501, 0.5);
+  txt(s, EYEBROW, { x: 4.972, y: 0.755, w: 3.389, h: 0.286, fontSize: 11, color: C.grey65, align: 'center', wrap: false });
+  txt(s, 'Infographic Section', { x: 4.229, y: 1.106, w: 4.875, h: 0.64, fontFace: FH, fontSize: 32, align: 'center' });
+
+  // ring + arrow head + icon bubble + percentage, repeated four times
+  const rings = [
+    { x: 3.304, y: 3.231, col: C.a1, start: 200, ix: 3.135, iy: 3.117, pct: '52%', px: 3.614, py: 3.741, head: [3.42, 2.74, 0.19, 0.29] },
+    { x: 5.04, y: 3.705, col: C.a2, start: 155, ix: 5.888, iy: 4.385, pct: '64%', px: 5.353, py: 4.303, head: [6.09, 3.19, 0.29, 0.29] },
+    { x: 6.848, y: 3.231, col: C.a3, start: 200, ix: 6.715, iy: 3.03, pct: '75%', px: 7.155, py: 3.793, head: [7.0, 2.74, 0.19, 0.29] },
+    { x: 8.534, y: 4.193, col: C.a4, start: 155, ix: 9.409, iy: 4.912, pct: '80%', px: 8.839, py: 4.779, head: [9.6, 3.68, 0.29, 0.29] }
+  ];
+  rings.forEach(r => {
+    shp(s, 'blockArc', { x: r.x, y: r.y, w: 1.492, h: 1.492, fill: { color: r.col },
+      angleRange: [r.start, (r.start + 280) % 360], arcThicknessRatio: 0.24 });
+    shp(s, 'triangle', { x: r.head[0], y: r.head[1], w: r.head[2], h: r.head[3], fill: { color: r.col }, rotate: r.start < 180 ? 35 : -35 });
+    txt(s, r.pct, { x: r.px, y: r.py, w: 0.878, h: 0.369, fontSize: 14, bold: true, color: C.grey25, align: 'center', lineSpacingMultiple: 1.2 });
+    shp(s, 'ellipse', { x: r.ix, y: r.iy, w: 0.812, h: 0.812, fill: { color: C.white } });
+    shp(s, 'ellipse', { x: r.ix + 0.103, y: r.iy + 0.103, w: 0.606, h: 0.606, fill: { color: r.col } });
+    shp(s, 'chartPlus', { x: r.ix + 0.271, y: r.iy + 0.271, w: 0.27, h: 0.27, fill: { color: C.white }, line: { type: 'none' } });
+  });
+
+  [['Clarity', C.a1, 1.192, 3.121, 1.84, 'Lorem dolor sit amet consectetur adipiscin', 0.678, 3.416, 2.354, 0.573, 'right'],
+   ['Insight', C.a2, 5.991, 5.411, 1.77, LOREM_XS, 5.991, 5.706, 2.647, 0.572, 'left'],
+   ['Trends', C.a3, 8.333, 2.697, 1.601, 'Lorem dolor sit amet consectetur adipiscing elit sed do eiusmo', 8.333, 2.992, 2.69, 0.815, 'left'],
+   ['Visuals', C.a4, 10.473, 4.926, 1.77, 'Lorem dolor sit amet consectetur adipiscing ', 10.473, 5.221, 2.182, 0.573, 'left']]
+    .forEach(([label, col, lx, ly, lw, text, bx, by, bw, bh, al]) => {
+      txt(s, label, { x: lx, y: ly, w: lw, h: 0.331, fontSize: 12, bold: true, color: col, align: al, lineSpacingMultiple: 1.2 });
+      txt(s, text, { x: bx, y: by, w: bw, h: bh, fontSize: 12, color: C.grey25, align: al, lineSpacingMultiple: 1.2 });
+    });
+
+  shp(s, 'ellipse', { x: 0.798, y: 5.156, w: 0.624, h: 0.624, fill: { color: C.white },
+    shadow: { type: 'outer', color: '9BB7C9', blur: 8, offset: 2, angle: 90, opacity: 0.3 } });
+  shp(s, 'upArrow', { x: 0.98, y: 5.32, w: 0.26, h: 0.3, fill: { color: C.a4 }, rotate: 45, line: { type: 'none' } });
+  txt(s, '2,150', { x: 1.535, y: 5.149, w: 1.353, h: 0.638, fontSize: 28, bold: true, color: C.a2, lineSpacingMultiple: 1.2 });
+  txt(s, 'PLACEHOLDER',
+    { x: 1.531, y: 5.708, w: 3.071, h: 0.572, fontSize: 12, color: C.grey25, lineSpacingMultiple: 1.2 });
+}
+
+// 13 - infographic: four stats + people
+function slide13(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  badge(s, 0.501, 0.5);
+  txt(s, EYEBROW, { x: 4.972, y: 0.755, w: 3.389, h: 0.286, fontSize: 11, color: C.grey65, align: 'center', wrap: false });
+  txt(s, 'Infographic Section', { x: 4.229, y: 1.106, w: 4.875, h: 0.64, fontFace: FH, fontSize: 32, align: 'center' });
+
+  const stats = [
+    { ax: 1.654, ay: 2.625, arrow: C.a1, pct: C.a1, tx: 1.543, ty: 3.642, title: C.a3, sx: 2.436, sy: 2.512 },
+    { ax: 4.483, ay: 2.622, arrow: C.a4, pct: C.a2, tx: 4.502, ty: 3.642, title: C.a2, sx: 5.246, sy: 2.512 },
+    { ax: 1.654, ay: 4.849, arrow: C.a3, pct: C.a1, tx: 1.543, ty: 5.866, title: C.a3, sx: 2.436, sy: 4.736 },
+    { ax: 4.483, ay: 4.846, arrow: C.a2, pct: C.a2, tx: 4.502, ty: 5.866, title: C.a2, sx: 5.246, sy: 4.736 }
+  ];
+  stats.forEach(st => {
+    shp(s, 'downArrow', { x: st.ax, y: st.ay, w: 0.445, h: 0.654, fill: { color: st.arrow }, rotate: 180 });
+    txt(s, '98.2%', { x: st.sx, y: st.sy, w: 1.275, h: 0.572, fontSize: 28, bold: true, color: st.pct, wrap: false });
+    txt(s, 'Perspiciatis unde ', { x: st.sx, y: st.sy + 0.462, w: 1.666, h: 0.303, fontSize: 12, color: C.grey35, wrap: false });
+    txt(s, 'Insert title here', { x: st.tx, y: st.ty, w: 1.839, h: 0.37, fontSize: 16, bold: true, color: st.title, wrap: false });
+    txt(s, LOREM_XS, { x: st.tx, y: st.ty + 0.395, w: 2.705, h: 0.537, fontSize: 12, color: C.grey50, lineSpacingMultiple: 1.1 });
+  });
+
+  [[8.188, 2.168, C.a1, C.a1d], [10.3, 2.165, C.a4, C.a4d],
+   [9.189, 4.389, C.a3, C.a3d], [11.302, 4.389, C.a2, C.a2d]].forEach(([x, y, main, dark]) => {
+    person(s, x, y, 0.764, 2.224, main, dark);
+  });
+  [[9.512, 3.103], [10.477, 5.231]].forEach(([x, y]) =>
+    shp(s, 'downArrow', { x, y, w: 0.329, h: 0.654, fill: { color: C.grey95 }, rotate: 270 }));
+}
+
+// 14 - contact
+function slide14(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  photo(s, 10.458, 0.444, 2.875, 4.104, { shape: 'round2DiagRect', rectRadius: 1.03, flipV: true });
+  badge(s, 0.501, 0.5);
+  heading(s, 1.003, 1.754, 5.498, 'Contact Information\u2019s');
+  body(s, 1.003, 2.89, 6.516, 0.678,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies');
+
+  shp(s, 'round2DiagRect', { x: 0, y: 4.548, w: 10.458, h: 2.438, fill: { color: C.a3 }, rectRadius: 0.406 });
+
+  const items = [
+    { cx: 0.972, cy: 5.211, glyph: 'ellipse', label: 'Phone Number', lw: 1.817, value: '+123-4567890', vw: 1.825, vh: 0.37, vsize: 16, tx: 1.627 },
+    { cx: 3.93, cy: 5.198, glyph: 'homePlate', label: 'Address', lw: 0.95, value: '123 Company Name, Street Name', vw: 2.471, vh: 0.64, vsize: 18, tx: 4.581 },
+    { cx: 7.149, cy: 5.211, glyph: 'donut', label: 'Social Media', lw: 1.389, value: '@social_media', vw: 1.59, vh: 0.37, vsize: 16, tx: 7.896 }
+  ];
+  items.forEach(it => {
+    shp(s, 'ellipse', { x: it.cx, y: it.cy, w: 0.47, h: 0.47, fill: { color: C.a1 } });
+    shp(s, it.glyph, { x: it.cx + 0.123, y: it.cy + 0.123, w: 0.224, h: 0.224, fill: { color: C.white }, line: { type: 'none' } });
+    txt(s, it.label, { x: it.tx, y: 5.261, w: it.lw, h: 0.37, fontSize: 16, bold: true, wrap: false });
+    txt(s, it.value, { x: it.tx, y: 5.696, w: it.vw, h: it.vh, fontSize: it.vsize, wrap: it.vsize === 18 });
+  });
+}
+
+// 15 - thank you
+function slide15(pres) {
+  const s = pres.addSlide();
+  wash(s);
+  shp(s, 'round2DiagRect', { x: 0, y: 1.897, w: 4.586, h: 5.603, rectRadius: 1.622, flipH: true, flipV: true, fill: { color: C.a3, transparency: 45 } });
+  photo(s, 0.045, 0.215, 5.947, 7.285);
+  badge(s, 0.501, 0.5);
+  txt(s, EYEBROW, { x: 6.037, y: 1.515, w: 3.389, h: 0.286, fontSize: 11, color: C.grey65, wrap: false });
+  s.addText([
+    { text: 'Thank ', options: { color: C.black, breakLine: true } },
+    { text: 'You!', options: { color: C.a3 } }
+  ], { x: 6.037, y: 2.37, w: 6.421, h: 3.046, fontFace: FB, fontSize: 120, lineSpacingMultiple: 0.7, valign: 'top', margin: [7.2, 3.6, 7.2, 3.6] });
+  body(s, 6.037, 5.307, 6.858, 0.678,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies');
+
+  const WAVE = [[0, 0], [0.267, 0], [0.267, 0.33, 0.445, 0.598, 0.665, 0.598], [0.802, 0.598, 0.924, 0.494, 0.995, 0.334],
+    [1, 0.322], [1, 0.864], [0.982, 0.879], [0.888, 0.956, 0.78, 1, 0.665, 1], [0.298, 1, 0, 0.552, 0, 0]];
+  poly(s, 10.771, 5.943, 2.562, 1.704, WAVE, { fill: { color: C.a3, transparency: 90 }, flipV: true });
+  poly(s, 11.662, 6.834, 1.626, 0.813, WAVE, { fill: { color: C.a3, transparency: 90 }, flipV: true });
+}
+
+/* ------------------------------------------------------------------- main */
+
+function build() {
+  const pres = new PptxGenJS();
+  pres.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
+  pres.layout = 'WIDE_16x9';
+  pres.theme = { headFontFace: FH, bodyFontFace: FB };
+  pres.title = 'Medical Healthy';
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+   slide09, slide10, slide11, slide12, slide13, slide14, slide15].forEach(fn => fn(pres));
+
+  return pres.writeFile({
+    fileName: path.join(__dirname, '025d4e3b-4f41-4af9-a947-2cfb110fbc21_grok_final.pptx')
+  });
+}
+
+build().then(f => console.log('wrote ' + f)).catch(e => { console.error(e); process.exit(1); });

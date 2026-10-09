@@ -1,0 +1,653 @@
+/**
+ * "Summit Conference" — 16:9 deck rebuilt with pptxgenjs.
+ *
+ * Everything (geometry, colours, copy) lives in plain literals below so the
+ * design can be read straight out of the source. Raster artwork from the
+ * reference deck is replaced by simple programmatic placeholders.
+ *
+ *   node 0b126b51-5234-4a29-9f4f-c720c893d198_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ */
+/* Theme                                                               */
+/* ------------------------------------------------------------------ */
+
+const HEAD = 'Plus Jakarta Sans'; // major (heading) typeface
+const BODY = 'Poppins'; // minor (body) typeface
+
+const C = {
+  black: '000000',
+  white: 'FFFFFF',
+  ink: '0D0D0D', // tx1 lumMod 95%
+  ink85: '262626', // tx1 lumMod 85%
+  orange: 'FF6D3A', // accent1
+  yellow: 'FFC302', // accent2
+  orangeDeep: 'EB3D00', // accent1 lumMod 75%
+  orangePale: 'FFA789', // accent1 lumMod 60% / lumOff 40%
+  orangeDark: '9C2900', // accent1 lumMod 50%
+  yellowDark: '806200', // accent2 lumMod 50%
+  grey: 'A6A6A6', // bg1 lumMod 65%
+  phone: '0A0A0A', // stand-in for the photographic phone mock-ups
+  silver: 'D2D5DC', // phone bezel
+};
+
+// Soft drop shadows (pptxgenjs rewrites the object it is given, so hand it a fresh one each time).
+const cardShadow = () => ({ type: 'outer', angle: 90, blur: 25, offset: 3, color: C.black, opacity: 0.2 });
+const badgeShadow = () => ({ type: 'outer', angle: 90, blur: 36, offset: 6, color: C.black, opacity: 0.2 });
+const pieceShadow = () => ({ type: 'outer', angle: 270, blur: 26, offset: 17, color: C.black, opacity: 0.12 });
+const ringShadow = () => ({ type: 'outer', angle: 90, blur: 100, offset: 21, color: C.black, opacity: 0.2 });
+
+/* ------------------------------------------------------------------ */
+/* Body copy (the reference deck uses the same lorem blocks repeatedly) */
+/* ------------------------------------------------------------------ */
+
+const T = {
+  full: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus',
+  cum: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis',
+  natoque: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque',
+  med: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula',
+  medPlus: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula consectetuer adipiscing elit. ',
+  eget: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget',
+  card2: 'Lorem ipsum dolor sit amet, eget consectetuer adipiscing elit. Aenean commodo ligula eget',
+  row: 'Lorem ipsum dolor sit amet',
+  tiny: 'Lorem ipsum dolor sit amet, consectetuer',
+  tinyElit: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+  bar: 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
+  check: 'Lorem ipsum dolor sit Aenean amet ',
+  elitLong: 'Lorem elit ipsum dolor sit amet, consectetuer Cum adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque',
+  elitShort: 'Lorem elit ipsum dolor sit amet, consectetuer Cum adipiscing elit. Aenean commodo ligula eget dolor. ',
+  elitPara: 'Lorem elit ipsum dolor sit amet, consectetuer Cum adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque ipsum dolor sit amet, consectetuer Cum adipiscing elit. Aenean commodo',
+  stars: 'Lorem ipsum dolor sit amet, consectetuer elit adipiscing elit. Aenean elit commodo ligula consectetuer adipiscing elit. ',
+  thanks1: 'Lorem massa eget Cum ipsum dolor sit amet, consectetuer dolor adipiscing elit. Aenean commodo ligula eget dolor. massa eget dolor Cum ipsum dolor sit amet, ',
+  thanks2: 'Lorem massa eget Cum ipsum dolor sit amet, consectetuer dolor adipiscing elit. Aenean commodo ligula eget dolor. massa',
+};
+
+/* ------------------------------------------------------------------ */
+/* Small helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+// Text box: top-anchored like every text frame in the reference deck.
+function txt(slide, text, opts) {
+  slide.addText(text, Object.assign({ fontFace: BODY, fontSize: 12, color: C.black, valign: 'top' }, opts));
+}
+
+// Heading in the major typeface.
+function head(slide, text, opts) {
+  txt(slide, text, Object.assign({ fontFace: HEAD, fontSize: 48 }, opts));
+}
+
+function shape(slide, type, opts) {
+  slide.addShape(type, opts);
+}
+
+function box(slide, o) {
+  slide.addShape('rect', o);
+}
+
+// Custom polygon defined with fractional coordinates inside {x,y,w,h}.
+function poly(slide, frame, fractions, opts) {
+  const points = fractions.map(([fx, fy]) => ({ x: frame.w * fx, y: frame.h * fy }));
+  points.push({ close: true });
+  slide.addShape('custGeom', Object.assign({ x: frame.x, y: frame.y, w: frame.w, h: frame.h, points }, opts));
+}
+
+// Rounded hexagon (slide 14) — corner curves taken from the reference outline.
+const HEX_PATH = [
+  ['M', 0.394, 0.026],
+  ['C', 0.46, -0.009, 0.54, -0.009, 0.606, 0.026],
+  ['L', 0.894, 0.179],
+  ['C', 0.96, 0.214, 1.0, 0.278, 1.0, 0.347],
+  ['L', 1.0, 0.653],
+  ['C', 1.0, 0.722, 0.96, 0.786, 0.894, 0.821],
+  ['L', 0.606, 0.974],
+  ['C', 0.54, 1.009, 0.46, 1.009, 0.394, 0.974],
+  ['L', 0.106, 0.821],
+  ['C', 0.04, 0.786, 0.0, 0.722, 0.0, 0.653],
+  ['L', 0.0, 0.347],
+  ['C', 0.0, 0.278, 0.04, 0.214, 0.106, 0.179],
+  ['L', 0.394, 0.026],
+];
+
+function hexagon(slide, frame, fill) {
+  const points = HEX_PATH.map((seg) => {
+    if (seg[0] === 'C') {
+      return {
+        x: frame.w * seg[5],
+        y: frame.h * seg[6],
+        curve: { type: 'cubic', x1: frame.w * seg[1], y1: frame.h * seg[2], x2: frame.w * seg[3], y2: frame.h * seg[4] },
+      };
+    }
+    return { x: frame.w * seg[1], y: frame.h * seg[2] };
+  });
+  points.push({ close: true });
+  slide.addShape('custGeom', { x: frame.x, y: frame.y, w: frame.w, h: frame.h, points, fill: { color: fill } });
+}
+
+// Stand-in for a photo / logo bitmap from the reference deck.
+function imagePlaceholder(slide, o) {
+  slide.addShape(o.shapeType || 'rect', {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fill: { color: o.color || C.grey },
+    rotate: o.rotate || 0,
+    rectRadius: o.rectRadius,
+    shadow: o.shadow,
+  });
+  if (o.label) {
+    txt(slide, o.label, { x: o.x, y: o.y + o.h / 2 - 0.18, w: o.w, h: 0.36, align: 'center', valign: 'middle', fontSize: 11, color: o.labelColor || C.white });
+  }
+}
+
+// Header strip + baseline that the slide master paints on every page.
+function newSlide(pptx, num) {
+  const slide = pptx.addSlide();
+  txt(slide, 'Summit Conference Presentation', { x: 0.256, y: 0.297, w: 3.015, h: 0.303 });
+  txt(slide, `Slide ${num}`, { x: 11.696, y: 0.297, w: 1.379, h: 0.303, align: 'right' });
+  shape(slide, 'line', { x: 3.27, y: 0.448, w: 8.883, h: 0.01, line: { color: C.black, width: 0.5 } });
+  shape(slide, 'line', { x: 0.256, y: 7.035, w: 12.819, h: 0, line: { color: C.black, width: 0.5 } });
+  return slide;
+}
+
+// Flat colour panel overlaid with two 5%-black tiles (slides 3, 4 and 7).
+function panel(slide, base, tiles) {
+  box(slide, { x: base.x, y: base.y, w: base.w, h: base.h, fill: { color: base.color } });
+  tiles.forEach((t) => box(slide, { x: t.x, y: t.y, w: t.w, h: t.h, fill: { color: C.black, transparency: 95 } }));
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 1 — title                                                     */
+/* ------------------------------------------------------------------ */
+
+function slide01(pptx) {
+  const s = newSlide(pptx, 1);
+  head(s, 'Summit Conference', { x: 0.934, y: 1.171, w: 11.466, h: 1.447, fontSize: 80, align: 'center' });
+  txt(s, T.full, { x: 3.403, y: 2.738, w: 6.528, h: 0.608, align: 'center', lineSpacingMultiple: 1.3 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 2 — agenda list + orange note card                            */
+/* ------------------------------------------------------------------ */
+
+const AGENDA_ROWS = [
+  { num: '01', y: 3.197 },
+  { num: '02', y: 4.038 },
+  { num: '03', y: 4.88, accent: true },
+  { num: '04', y: 5.721 },
+];
+
+function slide02(pptx) {
+  const s = newSlide(pptx, 2);
+  head(s, [
+    { text: 'Welcome to ' },
+    { text: 'Summit Conference', options: { fontFace: BODY } },
+  ], { x: 0.73, y: 1.14, w: 7.237, h: 1.717 });
+
+  AGENDA_ROWS.forEach((r) => {
+    const ink = r.accent ? C.orange : C.black;
+    head(s, r.num, { x: 0.73, y: r.y, w: 0.922, h: 0.572, fontSize: 28, color: ink });
+    txt(s, T.row, { x: 1.766, y: r.y + 0.235, w: 2.51, h: 0.345, align: 'center', lineSpacingMultiple: 1.3, color: ink });
+    shape(s, 'triangle', { x: 5.026, y: r.y + 0.348, w: 0.139, h: 0.12, rotate: 180, fill: { color: ink } });
+    shape(s, 'line', { x: 0.73, y: r.y + 0.615, w: 4.582, h: 0, line: { color: ink, width: 0.5 } });
+  });
+
+  box(s, { x: 7.224, y: 2.64, w: 2.619, h: 2.172, fill: { color: C.orange } });
+  txt(s, 'Your Title Here', { x: 7.358, y: 2.967, w: 1.751, h: 0.386, fontFace: HEAD, fontSize: 14, color: C.white, align: 'justify', lineSpacingMultiple: 1.3 });
+  txt(s, T.card2, { x: 7.358, y: 3.353, w: 2.352, h: 1.133, color: C.white, align: 'justify', lineSpacingMultiple: 1.3 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 3 — two numbered colour blocks                                */
+/* ------------------------------------------------------------------ */
+
+const BLOCKS_S3 = [
+  { num: '01', x: 5.711, color: C.orange },
+  { num: '02', x: 9.522, color: C.yellow },
+];
+
+function slide03(pptx) {
+  const s = newSlide(pptx, 3);
+
+  BLOCKS_S3.forEach((b) => {
+    panel(s, { x: b.x, y: 3.469, w: 3.811, h: 3.573, color: b.color }, [
+      { x: b.x - 0.004, y: 3.509, w: 2.268, h: 1.851 },
+      { x: b.x + 2.264, y: 5.36, w: 1.543, h: 1.682 },
+    ]);
+    head(s, b.num, { x: b.x + 0.524, y: 3.869, w: 1.565, h: 1.212, fontSize: 66, color: C.white });
+    txt(s, 'Your Title Here', { x: b.x + 0.539, y: 5.386, w: 1.751, h: 0.386, fontFace: HEAD, fontSize: 14, color: C.white, align: 'justify', lineSpacingMultiple: 1.3 });
+    txt(s, T.eget, { x: b.x + 0.539, y: 5.771, w: 2.749, h: 0.87, color: C.white, align: 'justify', lineSpacingMultiple: 1.3 });
+  });
+
+  head(s, 'How Agile Ops Crush The Competition', { x: 0.586, y: 1.14, w: 7.237, h: 1.717 });
+  txt(s, T.full, { x: 7.823, y: 1.563, w: 4.663, h: 0.87, lineSpacingMultiple: 1.3 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 4 — checklist + orange copy panel                             */
+/* ------------------------------------------------------------------ */
+
+function slide04(pptx) {
+  const s = newSlide(pptx, 4);
+  panel(s, { x: 4.647, y: 3.289, w: 4.038, h: 3.753, color: C.orange }, [
+    { x: 4.647, y: 3.289, w: 2.404, h: 1.966 },
+    { x: 7.051, y: 5.255, w: 1.635, h: 1.787 },
+  ]);
+
+  head(s, 'What High-performing Ceos Do Differently', { x: 0.548, y: 1.14, w: 7.904, h: 1.717 });
+
+  [3.389, 3.792, 4.195].forEach((y) => {
+    txt(s, T.check, {
+      x: 0.548, y, w: 3.556, h: 0.345, align: 'justify', lineSpacingMultiple: 1.3,
+      bullet: { characterCode: '2713', indent: 13.5 },
+    });
+  });
+
+  txt(s, `${T.full} ipsum dolor sit amet, consectetuer adipiscing elit. Aenean`, { x: 4.746, y: 3.561, w: 3.842, h: 1.395, color: C.white, align: 'justify', lineSpacingMultiple: 1.3 });
+  txt(s, T.cum, { x: 4.746, y: 4.965, w: 3.842, h: 0.87, color: C.white, align: 'justify', lineSpacingMultiple: 1.3 });
+  txt(s, T.med, { x: 4.746, y: 5.948, w: 3.842, h: 0.608, color: C.white, bold: true, italic: true, align: 'justify', lineSpacingMultiple: 1.3 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 5 — statistics                                                */
+/* ------------------------------------------------------------------ */
+
+function slide05(pptx) {
+  const s = newSlide(pptx, 5);
+
+  [0.956, 2.791].forEach((y) => {
+    head(s, '829+', { x: 0.548, y, w: 1.848, h: 0.909 });
+    txt(s, 'Your Description Here', { x: 0.548, y: y + 0.787, w: 2.098, h: 0.345, align: 'justify', lineSpacingMultiple: 1.3 });
+    txt(s, T.tiny, { x: 2.858, y: y + 0.262, w: 2.215, h: 0.608, lineSpacingMultiple: 1.3 });
+  });
+
+  head(s, 'Unlocking Opportunities ', { x: 0.548, y: 4.621, w: 5.271, h: 1.717 });
+
+  box(s, { x: 5.323, y: 3.162, w: 5.005, h: 0.588, fill: { color: C.orange } });
+  txt(s, T.bar, { x: 5.462, y: 3.284, w: 4.726, h: 0.345, color: C.white, bold: true, italic: true, align: 'justify', lineSpacingMultiple: 1.3 });
+
+  txt(s, 'Your Description Here', { x: 6.003, y: 4.978, w: 2.343, h: 0.372, fontFace: HEAD, fontSize: 14, lineSpacingMultiple: 1.3 });
+  txt(s, T.full, { x: 6.003, y: 5.374, w: 6.552, h: 0.608, lineSpacingMultiple: 1.3 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 6 — market overview list                                      */
+/* ------------------------------------------------------------------ */
+
+const ROWS_S6 = [4.389, 5.053, 5.717, 6.38];
+
+function slide06(pptx) {
+  const s = newSlide(pptx, 6);
+  head(s, 'Market Overview and trends', { x: 5.189, y: 1.559, w: 5.921, h: 1.717 });
+  txt(s, T.med, { x: 5.189, y: 3.429, w: 3.685, h: 0.608, lineSpacingMultiple: 1.3 });
+
+  ROWS_S6.forEach((y, i) => {
+    const ink = i === 2 ? C.orange : C.black;
+    txt(s, T.row, { x: 5.189, y, w: 2.51, h: 0.345, align: 'center', lineSpacingMultiple: 1.3, color: ink });
+    shape(s, 'triangle', { x: 8.735, y: y + 0.113, w: 0.139, h: 0.12, rotate: 180, fill: { color: ink } });
+    shape(s, 'line', { x: 5.189, y: y + 0.38, w: 3.685, h: 0, line: { color: ink, width: 0.5 } });
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 7 — mission & vision                                          */
+/* ------------------------------------------------------------------ */
+
+function slide07(pptx) {
+  const s = newSlide(pptx, 7);
+  panel(s, { x: 8.771, y: 2.487, w: 3.884, h: 4.548, color: C.orange }, [
+    { x: 8.771, y: 2.487, w: 2.404, h: 1.966 },
+    { x: 11.174, y: 4.453, w: 1.48, h: 2.582 },
+  ]);
+
+  head(s, 'Mission And Vision', { x: 0.59, y: 1.118, w: 6.263, h: 0.909 });
+  txt(s, T.natoque, { x: 6.852, y: 1.268, w: 5.6, h: 0.608, lineSpacingMultiple: 1.3 });
+
+  [{ x: 0.59, n: '01' }, { x: 4.725, n: '02' }].forEach((m) => {
+    txt(s, `${m.n}. Your Mission Here`, { x: m.x, y: 4.957, w: 2.431, h: 0.386, fontFace: HEAD, fontSize: 14, lineSpacingMultiple: 1.3 });
+    txt(s, T.medPlus, { x: m.x, y: 5.343, w: 3.685, h: 0.87, align: 'justify', lineSpacingMultiple: 1.3 });
+  });
+
+  imagePlaceholder(s, { x: 9.086, y: 3.344, w: 0.595, h: 0.595, color: C.white, shapeType: 'ellipse' });
+  txt(s, 'Your Description Here', { x: 9.843, y: 3.455, w: 2.343, h: 0.372, fontFace: HEAD, fontSize: 14, color: C.white, lineSpacingMultiple: 1.3 });
+  txt(s, T.elitLong, { x: 9.086, y: 4.166, w: 3.254, h: 1.133, color: C.white, align: 'justify', lineSpacingMultiple: 1.3 });
+  txt(s, T.elitShort, { x: 9.086, y: 5.343, w: 3.254, h: 0.87, color: C.white, align: 'justify', lineSpacingMultiple: 1.3 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 8 — testimonial                                               */
+/* ------------------------------------------------------------------ */
+
+function slide08(pptx) {
+  const s = newSlide(pptx, 8);
+  txt(s, '\u201C', { x: 2.246, y: 1.662, w: 0.438, h: 0.752, fontSize: 32, align: 'justify', lineSpacingMultiple: 1.3 });
+  txt(s, T.medPlus, { x: 2.465, y: 2.176, w: 3.685, h: 0.87, align: 'justify', lineSpacingMultiple: 1.3 });
+  head(s, 'Comprehensive Insights from the Summit Conference', { x: 0.59, y: 3.75, w: 6.869, h: 2.524 });
+
+  box(s, { x: 6.531, y: 3.962, w: 2.319, h: 0.896, fill: { color: C.orange } });
+  txt(s, 'Mark Medison', { x: 6.795, y: 4.099, w: 1.792, h: 0.372, fontFace: HEAD, fontSize: 14, color: C.white, lineSpacingMultiple: 1.3 });
+  txt(s, 'Your Position Here', { x: 6.795, y: 4.377, w: 1.725, h: 0.345, color: C.white, italic: true, lineSpacingMultiple: 1.3 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 9 — device mock-up                                            */
+/* ------------------------------------------------------------------ */
+
+function slide09(pptx) {
+  const s = newSlide(pptx, 9);
+
+  // The two tilted phone photographs.
+  [{ x: 1.815, y: 0.72 }, { x: 3.659, y: 3.314 }].forEach((ph) => {
+    shape(s, 'roundRect', { x: ph.x, y: ph.y, w: 2.684, h: 5.31, rotate: 30, rectRadius: 0.32, fill: { color: C.silver } });
+    shape(s, 'roundRect', { x: ph.x + 0.08, y: ph.y + 0.08, w: 2.524, h: 5.15, rotate: 30, rectRadius: 0.28, fill: { color: C.phone } });
+  });
+
+  // The reference crops the lower phone at the master's baseline.
+  box(s, { x: 0, y: 7.0, w: 13.333, h: 0.5, fill: { color: C.white } });
+  shape(s, 'line', { x: 0.256, y: 7.035, w: 12.819, h: 0, line: { color: C.black, width: 0.5 } });
+
+  head(s, 'Mobile Phone Device Mockup', { x: 6.459, y: 1.417, w: 5.75, h: 1.717 });
+  txt(s, 'Your Subtitle Here', { x: 8.165, y: 3.622, w: 2.469, h: 0.37, fontFace: HEAD, fontSize: 16 });
+  txt(s, T.cum, { x: 8.165, y: 4.011, w: 3.834, h: 0.87, align: 'justify', lineSpacingMultiple: 1.3 });
+  txt(s, T.med, { x: 8.165, y: 5.011, w: 3.834, h: 0.608, align: 'justify', lineSpacingMultiple: 1.3 });
+
+  // Two floating stat badges.
+  box(s, { x: 1.167, y: 1.879, w: 1.656, h: 1.293, fill: { color: C.orange }, shadow: cardShadow() });
+  txt(s, '25', { x: 1.334, y: 2.067, w: 1.321, h: 0.707, fontFace: HEAD, fontSize: 36, color: C.white, align: 'center' });
+  txt(s, 'Audience', { x: 1.334, y: 2.681, w: 1.321, h: 0.303, color: C.white, align: 'center' });
+
+  box(s, { x: 5.74, y: 4.757, w: 1.656, h: 1.206, fill: { color: C.white }, shadow: cardShadow() });
+  txt(s, [
+    { text: '86', options: { fontSize: 36 } },
+    { text: '%', options: { fontSize: 16 } },
+  ], { x: 5.908, y: 4.902, w: 1.321, h: 0.707, fontFace: HEAD, align: 'center', valign: 'top', color: C.black });
+  txt(s, 'Facility', { x: 5.908, y: 5.515, w: 1.321, h: 0.303, align: 'center' });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 10 — 3-D pyramid                                              */
+/* ------------------------------------------------------------------ */
+
+// bottom → top. Each tier is a diamond "top" plus mirrored left / right faces.
+const PYRAMID = [
+  { top: { x: 7.455, y: 3.805, w: 5.609, h: 1.447 }, topMid: 0.501,
+    face: { y: 4.529, w: 2.805, h: 1.812 }, lx: 7.455, rx: 10.26, mid: 0.601, high: 0.399 },
+  { top: { x: 7.805, y: 3.059, w: 4.798, h: 1.01 }, topMid: 0.39,
+    face: { y: 3.452, w: 2.399, h: 1.549 }, lx: 7.807, rx: 10.204, mid: 0.601, high: 0.398 },
+  { top: { x: 8.376, y: 2.12, w: 3.683, h: 0.698 }, topMid: 0.388,
+    face: { y: 2.39, w: 1.841, h: 1.313 }, lx: 8.376, rx: 10.218, mid: 0.674, high: 0.326 },
+  { top: { x: 8.647, y: 1.159, w: 3.141, h: 0.625 }, topMid: 0.52,
+    face: { y: 1.484, w: 1.57, h: 1.09 }, lx: 8.647, rx: 10.218, mid: 0.65, high: 0.275 },
+];
+
+const PYRAMID_LABELS = [
+  { n: '01', title: 'Project One', x: 0.775, gx: 1.685, y: 3.316 },
+  { n: '02', title: 'Project Two', x: 4.202, gx: 5.112, y: 3.316 },
+  { n: '03', title: 'Project Three', x: 0.775, gx: 1.685, y: 5.06 },
+  { n: '04', title: 'Project Four', x: 4.202, gx: 5.112, y: 5.06 },
+];
+
+function slide10(pptx) {
+  const s = newSlide(pptx, 10);
+
+  PYRAMID.forEach((t) => {
+    poly(s, { x: t.lx, y: t.face.y, w: t.face.w, h: t.face.h },
+      [[0, t.mid], [1, 1], [1, t.high], [0, 0]], { fill: { color: C.orange } });
+    poly(s, { x: t.rx, y: t.face.y, w: t.face.w, h: t.face.h },
+      [[1, t.mid], [0, 1], [0, t.high], [1, 0]], { fill: { color: C.orangePale } });
+    poly(s, t.top, [[0, t.topMid], [0.5, 1], [1, t.topMid], [0.5, 0]], { fill: { color: C.orangeDeep } });
+  });
+
+  // Icon bullets riding the left edge of the pyramid.
+  [2.093, 3.213, 4.532, 5.809].forEach((y) => {
+    shape(s, 'ellipse', { x: 10.025, y, w: 0.469, h: 0.469, fill: { color: C.white } });
+    shape(s, 'ellipse', { x: 10.164, y: 0.139 + y, w: 0.19, h: 0.19, fill: { color: C.orange } });
+  });
+
+  head(s, 'Participant Demographics', { x: 0.775, y: 1.018, w: 5.359, h: 1.717 });
+
+  PYRAMID_LABELS.forEach((l) => {
+    head(s, l.n, { x: l.x, y: l.y + 0.126, w: 0.971, h: 0.707, fontSize: 36 });
+    txt(s, l.title, { x: l.gx, y: l.y, w: 2.343, h: 0.386, fontFace: HEAD, fontSize: 14, lineSpacingMultiple: 1.3 });
+    txt(s, T.tiny, { x: l.gx, y: l.y + 0.35, w: 2.43, h: 0.608, lineSpacingMultiple: 1.3 });
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 11 — split donut + rating badges                              */
+/* ------------------------------------------------------------------ */
+
+function ratingBadge(s, o) {
+  shape(s, 'ellipse', { x: o.x, y: o.y, w: 1.438, h: 1.438, fill: { color: C.white }, shadow: badgeShadow() });
+  shape(s, 'ellipse', { x: o.x + 0.267, y: o.y + 0.267, w: 0.905, h: 0.905, fill: { color: o.color } });
+  shape(s, 'arc', { x: o.x + 0.111, y: o.y + 0.111, w: 1.216, h: 1.216, angleRange: [128.6, 49], line: { color: C.grey, width: 4, transparency: 75 } });
+  shape(s, 'arc', { x: o.x + 0.111, y: o.y + 0.111, w: 1.216, h: 1.216, angleRange: [128.6, o.end], line: { color: o.color, width: 4 } });
+  txt(s, 'Rating', { x: o.x + 0.184, y: o.y + 0.423, w: 1.07, h: 0.286, fontFace: HEAD, fontSize: 11, bold: true, color: C.white, align: 'center' });
+  txt(s, o.value, { x: o.x + 0.184, y: o.y + 0.587, w: 1.07, h: 0.505, fontFace: HEAD, fontSize: 24, bold: true, color: C.white, align: 'center' });
+}
+
+function slide11(pptx) {
+  const s = newSlide(pptx, 11);
+
+  // Two interlocking halves of a ring.
+  const ring = { x: 4.599, y: 2.447, w: 4.139, h: 4.138, arcThicknessRatio: 0.527 };
+  shape(s, 'blockArc', Object.assign({ angleRange: [90, 270], fill: { color: C.orange }, shadow: ringShadow() }, ring));
+  shape(s, 'blockArc', Object.assign({ angleRange: [270, 450], fill: { color: C.yellow }, shadow: ringShadow() }, ring));
+
+  // Dashed pointer arcs.
+  shape(s, 'arc', { x: 7.553, y: 3.373, w: 2.133, h: 2.133, angleRange: [277.7, 14.1], line: { color: C.yellow, width: 1.5, dashType: 'dash', endArrowType: 'triangle' } });
+  shape(s, 'arc', { x: 3.383, y: 3.35, w: 2.133, h: 2.133, angleRange: [78, 186.1], line: { color: C.orange, width: 1.5, dashType: 'dash', endArrowType: 'triangle' } });
+
+  ratingBadge(s, { x: 7.559, y: 2.588, color: C.yellow, value: '50', end: 271.1 });
+  ratingBadge(s, { x: 4.336, y: 4.719, color: C.orange, value: '78', end: 4.5 });
+
+  head(s, 'Session Breakdown', { x: 1.68, y: 0.915, w: 9.973, h: 0.909, align: 'center' });
+
+  txt(s, '110+', { x: 2.236, y: 2.295, w: 2.1, h: 0.774, fontFace: HEAD, fontSize: 40, bold: true, color: C.orange, align: 'right' });
+  txt(s, 'Innovation', { x: 2.236, y: 3.047, w: 2.1, h: 0.337, fontFace: HEAD, fontSize: 14, bold: true, color: C.ink85, align: 'right' });
+  txt(s, T.tiny, { x: 2.5, y: 3.534, w: 1.836, h: 0.565, fontSize: 11, color: C.ink, align: 'right' });
+
+  txt(s, '200+', { x: 8.997, y: 4.774, w: 2.1, h: 0.774, fontFace: HEAD, fontSize: 40, bold: true, color: C.yellow });
+  txt(s, 'Self Reward', { x: 8.997, y: 5.526, w: 2.1, h: 0.337, fontFace: HEAD, fontSize: 14, bold: true, color: C.ink85 });
+  txt(s, T.tiny, { x: 9.001, y: 6.012, w: 2.097, h: 0.565, fontSize: 11, color: C.ink });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 12 — gauges                                                   */
+/* ------------------------------------------------------------------ */
+
+const GAUGES = [
+  { x: 0.696, tx: 0.942, label: '48%', sweep: 129.6, color: C.orange },
+  { x: 3.199, tx: 3.447, label: '63%', sweep: 171.9, color: C.yellow },
+  { x: 5.702, tx: 5.925, label: '28%', sweep: 41.2, color: C.orange },
+];
+
+const LEGEND_S12 = [
+  { y: 1.88, pct: '48%', color: C.orange, title: 'Mapping & Planning' },
+  { y: 3.541, pct: '63%', color: C.yellow, title: 'Implementation' },
+  { y: 5.203, pct: '28%', color: C.orange, title: 'Results' },
+];
+
+function slide12(pptx) {
+  const s = newSlide(pptx, 12);
+  head(s, 'Opportunity to Build Valuable Networks', { x: 0.696, y: 1.268, w: 7.549, h: 1.717 });
+
+  GAUGES.forEach((g) => {
+    shape(s, 'ellipse', { x: g.x, y: 3.626, w: 1.393, h: 1.393, fill: { color: C.white } });
+    shape(s, 'pie', { x: g.x, y: 3.626, w: 1.393, h: 1.393, angleRange: [304.1, g.sweep], fill: { color: g.color } });
+    shape(s, 'ellipse', { x: g.x + 0.139, y: 3.765, w: 1.115, h: 1.115, fill: { color: C.white }, shadow: cardShadow() });
+    txt(s, g.label, { x: g.tx, y: 4.062, w: 1.25, h: 0.505, fontFace: HEAD, fontSize: 24, bold: true, color: C.ink });
+  });
+
+  txt(s, `${T.elitPara} ligula eget dolor. Aenean massa. Cum sociis natoque`, { x: 0.696, y: 5.324, w: 7.3, h: 0.908, fontSize: 11, color: C.ink, lineSpacingMultiple: 1.5 });
+
+  LEGEND_S12.forEach((l) => {
+    txt(s, l.pct, { x: 8.653, y: l.y, w: 1.416, h: 0.707, fontFace: HEAD, fontSize: 36, bold: true, color: l.color });
+    txt(s, 'Rewards', { x: 8.653, y: l.y + 0.578, w: 1.416, h: 0.37, fontFace: HEAD, fontSize: 16, color: C.ink });
+    txt(s, l.title, { x: 10.007, y: l.y + 0.007, w: 2.541, h: 0.37, fontFace: HEAD, fontSize: 16, color: C.ink });
+    txt(s, T.tinyElit, { x: 10.007, y: l.y + 0.377, w: 2.541, h: 0.63, fontSize: 11, color: C.ink, align: 'justify', lineSpacingMultiple: 1.5 });
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 13 — sponsor puzzle                                           */
+/* ------------------------------------------------------------------ */
+
+const PUZZLE = [
+  { label: 'Inspiration', x: 8.187, y: 1.048, w: 2.664, h: 1.37, color: C.orange, tx: 8.386, ty: 1.394, rot: -2.6 },
+  { label: 'Bravery', x: 8.267, y: 2.418, w: 2.695, h: 1.21, color: C.yellow, tx: 8.421, ty: 3.081, rot: 3.9 },
+  { label: 'Innovation', x: 8.236, y: 3.628, w: 2.616, h: 1.42, color: C.orange, tx: 8.372, ty: 4.493, rot: 0 },
+  { label: 'Promotion', x: 8.235, y: 5.05, w: 2.616, h: 1.293, color: C.yellow, tx: 8.4, ty: 5.761, rot: 0 },
+];
+
+// A step ladder: two side rails, evenly spaced rungs, plus a darker back leg.
+function ladder(s, o) {
+  const rail = o.w * 0.07;
+  box(s, { x: o.x + o.w * 0.86, y: o.y - o.h * 0.04, w: rail, h: o.h * 1.04, fill: { color: o.back } });
+  box(s, { x: o.x, y: o.y, w: rail, h: o.h, fill: { color: o.color } });
+  box(s, { x: o.x + o.w * 0.62, y: o.y, w: rail, h: o.h, fill: { color: o.color } });
+  for (let i = 0; i < o.rungs; i++) {
+    box(s, { x: o.x, y: o.y + (o.h / o.rungs) * (i + 0.4), w: o.w * 0.62 + rail, h: rail * 0.75, fill: { color: o.color } });
+  }
+}
+
+function slide13(pptx) {
+  const s = newSlide(pptx, 13);
+
+  // Ground shadow under the whole illustration.
+  shape(s, 'ellipse', { x: 6.475, y: 6.217, w: 5.677, h: 0.271, fill: { color: C.grey, transparency: 70 } });
+
+  ladder(s, { x: 6.717, y: 3.486, w: 1.399, h: 2.856, rungs: 8, color: C.orange, back: C.orangeDark });
+  ladder(s, { x: 10.909, y: 5.432, w: 1.001, h: 0.911, rungs: 3, color: C.yellow, back: C.yellowDark });
+
+  PUZZLE.forEach((p) => {
+    shape(s, 'roundRect', { x: p.x, y: p.y, w: p.w, h: p.h, fill: { color: p.color }, line: { color: C.white, width: 2 }, rectRadius: 0.1, shadow: pieceShadow() });
+  });
+  // Interlocking knobs: each joint carries the colour of the band above it.
+  PUZZLE.slice(0, -1).forEach((p) => {
+    shape(s, 'ellipse', { x: p.x + p.w * 0.55, y: p.y + p.h - 0.24, w: 0.48, h: 0.48, fill: { color: p.color }, line: { color: C.white, width: 2 } });
+  });
+  PUZZLE.forEach((p) => {
+    txt(s, p.label, { x: p.tx, y: p.ty, w: 2.0, h: 0.35, fontFace: HEAD, fontSize: 14, bold: true, color: C.white, rotate: p.rot, lineSpacingMultiple: 1.1 });
+  });
+
+  // Two value callouts.
+  shape(s, 'wedgeEllipseCallout', { x: 6.444, y: 1.54, w: 1.608, h: 1.8, fill: { color: C.orange } });
+  txt(s, '18,99', { x: 6.482, y: 1.926, w: 1.518, h: 0.572, fontFace: HEAD, fontSize: 28, bold: true, charSpacing: -1.5, color: C.white, align: 'center' });
+  txt(s, 'Value', { x: 6.572, y: 2.369, w: 1.338, h: 0.383, fontSize: 14, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+
+  shape(s, 'wedgeEllipseCallout', { x: 11.078, y: 3.941, w: 1.291, h: 1.365, fill: { color: C.yellow } });
+  txt(s, '27,36', { x: 11.078, y: 4.23, w: 1.291, h: 0.438, fontFace: HEAD, fontSize: 20, bold: true, charSpacing: -1.5, color: C.white, align: 'center' });
+  txt(s, 'Value', { x: 11.155, y: 4.553, w: 1.138, h: 0.317, fontSize: 11, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+
+  head(s, 'Collaboration with Official Sponsors and Partners', { x: 0.964, y: 1.398, w: 5.15, h: 3.332 });
+  txt(s, T.elitPara, { x: 0.964, y: 4.917, w: 4.63, h: 1.185, fontSize: 11, color: C.ink, align: 'justify', lineSpacingMultiple: 1.5 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 14 — outcomes with hexagon cluster                            */
+/* ------------------------------------------------------------------ */
+
+const HEXES = [
+  { x: 7.785, y: 2.182, color: C.orange, ix: 8.78, iy: 3.292 },
+  { x: 9.91, y: 2.182, color: C.yellow, ix: 10.905, iy: 3.292 },
+  { x: 7.758, y: 4.036, color: C.yellow, ix: 8.754, iy: 5.146 },
+  { x: 9.91, y: 4.062, color: C.orange, ix: 10.905, iy: 5.173 },
+];
+
+const OUTCOMES = [
+  { n: '01', title: 'Market', x: 0.775, cx: 1.802, y: 3.75 },
+  { n: '02', title: 'Promotion', x: 4.202, cx: 4.961, y: 3.75 },
+  { n: '03', title: 'Comparison', x: 0.775, cx: 1.806, y: 5.306 },
+  { n: '04', title: 'Market Recovery', x: 4.202, cx: 4.991, y: 5.306 },
+];
+
+function slide14(pptx) {
+  const s = newSlide(pptx, 14);
+  head(s, 'Key Outcomes & Impact', { x: 0.838, y: 1.032, w: 9.567, h: 0.909 });
+  txt(s, T.elitPara, { x: 0.838, y: 2.337, w: 6.057, h: 0.904, fontSize: 11, color: C.ink, align: 'justify', lineSpacingMultiple: 1.5 });
+
+  HEXES.forEach((h) => {
+    hexagon(s, { x: h.x, y: h.y, w: 2.585, h: 2.816 }, h.color);
+    imagePlaceholder(s, { x: h.ix, y: h.iy, w: 0.595, h: 0.595, color: C.white, shapeType: 'ellipse' });
+  });
+
+  OUTCOMES.forEach((o) => {
+    head(s, o.n, { x: o.x, y: o.y + 0.121, w: 0.971, h: 0.707, fontSize: 36 });
+    txt(s, o.title, { x: o.cx, y: o.y, w: 2.428, h: 0.372, fontFace: HEAD, fontSize: 14, lineSpacingMultiple: 1.3 });
+    txt(s, 'Lorem elit ipsum dolor sit amet, consectetuer', { x: o.cx, y: o.y + 0.315, w: 2.069, h: 0.63, fontSize: 11, color: C.ink, lineSpacingMultiple: 1.5, paraSpaceBefore: 9 });
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 15 — review cards                                             */
+/* ------------------------------------------------------------------ */
+
+const REVIEWS = [
+  { x: 0.981, y: 1.11, tx: 1.191, sx: 4.258, card: C.white, ink: C.black, star: C.orange },
+  { x: 2.072, y: 2.99, tx: 2.282, sx: 5.35, card: C.orange, ink: C.white, star: C.white },
+  { x: 3.736, y: 4.87, tx: 3.946, sx: 7.013, card: C.white, ink: C.black, star: C.orange },
+];
+
+function slide15(pptx) {
+  const s = newSlide(pptx, 15);
+  head(s, 'Experience The Difference', { x: 6.603, y: 1.012, w: 5.75, h: 1.717 });
+
+  REVIEWS.forEach((r) => {
+    box(s, { x: r.x, y: r.y, w: 4.806, h: 1.52, fill: { color: r.card }, shadow: cardShadow() });
+    txt(s, T.med, { x: r.tx, y: r.y + 0.325, w: 2.885, h: 0.87, color: r.ink, align: 'justify', lineSpacingMultiple: 1.3 });
+    for (let i = 0; i < 5; i++) {
+      shape(s, 'star5', { x: r.sx + i * 0.2724, y: r.y + 0.437, w: 0.229, h: 0.229, fill: { color: r.star } });
+    }
+  });
+
+  txt(s, T.medPlus, { x: 7.323, y: 3.315, w: 3.685, h: 0.87, align: 'justify', lineSpacingMultiple: 1.3 });
+  txt(s, T.stars, { x: 9.088, y: 5.064, w: 3.158, h: 1.133, align: 'justify', lineSpacingMultiple: 1.3 });
+}
+
+/* ------------------------------------------------------------------ */
+/* Slide 16 — thank you                                                */
+/* ------------------------------------------------------------------ */
+
+const CONTACTS = [
+  { text: 'www.companyinfo.com', y: 4.576, w: 2.231 },
+  { text: 'thesisone@gmail.com', y: 5.062, w: 2.089 },
+  { text: '+214-704-76532', y: 5.548, w: 1.957 },
+];
+
+function slide16(pptx) {
+  const s = newSlide(pptx, 16);
+  head(s, 'Thank You!!', { x: 8.789, y: 0.868, w: 3.566, h: 2.794, fontSize: 80 });
+  txt(s, T.thanks1, { x: 0.779, y: 4.233, w: 3.833, h: 1.133, align: 'justify', lineSpacingMultiple: 1.3 });
+  txt(s, T.thanks2, { x: 0.779, y: 5.366, w: 3.833, h: 0.87, align: 'justify', lineSpacingMultiple: 1.3 });
+
+  box(s, { x: 9.65, y: 4.046, w: 2.905, h: 2.378, fill: { color: C.orange }, shadow: cardShadow() });
+  CONTACTS.forEach((c) => {
+    txt(s, c.text, { x: 9.987, y: c.y, w: c.w, h: 0.345, color: C.white, lineSpacingMultiple: 1.3 });
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Build                                                               */
+/* ------------------------------------------------------------------ */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE'; // 13.333in x 7.5in
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+  pptx.title = 'Summit Conference';
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+    slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16]
+    .forEach((fn) => fn(pptx));
+
+  const out = path.join(__dirname, '0b126b51-5234-4a29-9f4f-c720c893d198_grok_final.pptx');
+  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote', out));
+}
+
+build().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
