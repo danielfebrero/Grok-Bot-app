@@ -1,0 +1,874 @@
+/**
+ * "Admission School" — 20 slide deck rebuilt with pptxgenjs.
+ * Raster images of the original are replaced by flat colour placeholders.
+ *
+ *   node 0af6d0f7-a1dc-464a-bbff-e0d6c42f94f9_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Palette / typography
+ * ------------------------------------------------------------------ */
+const TEAL = '025865'; // primary dark teal
+const TEAL2 = '037183'; // lighter teal accent
+const LAV = 'C7B5F2'; // lavender accent
+const PALE = 'E6DFF9'; // pale lavender (light background)
+const WHITE = 'FFFFFF';
+const IMG = '729FCF'; // stand-in fill for every photo of the original deck
+
+const MONT = 'Montserrat';
+const JAK = 'Plus Jakarta Sans';
+
+const MARGIN = [7.2, 7.2, 3.6, 3.6]; // l, r, b, t  (matches the 91425/45700 EMU insets)
+
+/* ------------------------------------------------------------------ *
+ * Primitive helpers
+ * ------------------------------------------------------------------ */
+const T = (s, text, o) =>
+  s.addText(text, Object.assign({ fontFace: MONT, fontSize: 11, color: TEAL, align: 'left', valign: 'top', margin: MARGIN, isTextBox: true }, o));
+
+const rect = (s, x, y, w, h, o) => s.addShape('rect', Object.assign({ x, y, w, h }, o));
+
+// `adj` is the OOXML roundRect adjust value (fraction of the shorter side).
+const rrect = (s, x, y, w, h, adj, o) =>
+  s.addShape('roundRect', Object.assign({ x, y, w, h, rectRadius: adj * Math.min(w, h) }, o));
+
+const pill = (s, x, y, w, h, o) => rrect(s, x, y, w, h, 0.5, o);
+const ell = (s, x, y, w, h, o) => s.addShape('ellipse', Object.assign({ x, y, w, h }, o));
+
+const hline = (s, x, y, w, color, pt) => s.addShape('line', { x, y, w, h: 0, line: { color, width: pt } });
+const vline = (s, x, y, h, color, pt) => s.addShape('line', { x, y, w: 0, h, line: { color, width: pt } });
+
+const strokeBox = (color, pt) => ({ color, width: pt });
+
+/* Round "→" button: filled circle with a small arrow inside. */
+function arrowBtn(s, x, y, d, circle, arrow) {
+  ell(s, x, y, d, d, { fill: { color: circle } });
+  s.addShape('line', {
+    x: x + d * 0.32, y: y + d / 2, w: d * 0.36, h: 0,
+    line: { color: arrow, width: 0.75, endArrowType: 'triangle' },
+  });
+}
+
+/* Two-column "wing" brand mark used next to YOUR LOGO. */
+function brandMark(s, x, y, color) {
+  const cw = 0.219, ch = 0.137, gap = 0.013;
+  for (const dx of [0, cw + gap]) {
+    for (const dy of [0, ch + gap]) {
+      s.addShape('custGeom', {
+        x: x + dx, y: y + dy, w: cw, h: ch, fill: { color },
+        points: [
+          { x: 0, y: ch },
+          { x: cw, y: 0, curve: { type: 'cubic', x1: cw * 0.1, y1: ch * 0.55, x2: cw * 0.45, y2: ch * 0.03 } },
+          { x: cw, y: ch },
+          { close: true },
+        ],
+      });
+    }
+  }
+}
+
+/* Linear interpolation between two hex colours. */
+function mixHex(a, b, t) {
+  let out = '';
+  for (let i = 0; i < 6; i += 2) {
+    const va = parseInt(a.substr(i, 2), 16);
+    const vb = parseInt(b.substr(i, 2), 16);
+    out += Math.round(va + (vb - va) * t).toString(16).padStart(2, '0');
+  }
+  return out.toUpperCase();
+}
+
+/**
+ * Banded vertical gradient: colour ramps from `top` to `bottom` while the
+ * opacity ramps from `aTop`% to `aBot`%. Stand-in for OOXML gradFill.
+ */
+function fadeDown(s, x, y, w, h, top, bottom, aTop, aBot, steps) {
+  const n = steps || 14;
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    rect(s, x, y + (h * i) / n, w, h / n + 0.012,
+      { fill: { color: mixHex(top, bottom, t), transparency: Math.round(100 - (aTop + (aBot - aTop) * t)) } });
+  }
+}
+
+/* Repaints the two bottom corners of a banded gradient so it looks rounded. */
+function roundBottom(s, x, y, w, r, bg) {
+  const k = 0.5523; // circle -> bezier constant
+  [false, true].forEach((right) => {
+    const sx = right ? -1 : 1;
+    const ox = right ? x + w : x;
+    s.addShape('custGeom', {
+      x: right ? ox - r : ox, y: y - r, w: r, h: r, fill: { color: bg },
+      points: [
+        { x: right ? r : 0, y: 0 },
+        { x: right ? r : 0, y: r },
+        { x: right ? 0 : r, y: r },
+        { x: right ? r : 0, y: 0, curve: { type: 'cubic', x1: (right ? r : 0) + sx * r * (1 - k), y1: r, x2: right ? r : 0, y2: r * k } },
+        { close: true },
+      ],
+    });
+  });
+}
+
+/**
+ * Area below a polyline, filled with a top-down opacity fade. Each horizontal
+ * band is the polyline clamped to that band's vertical range.
+ */
+function areaFade(s, x, y, w, h, curve, color, opacity, steps) {
+  const n = steps || 12;
+  for (let i = 0; i < n; i++) {
+    const top = (h * i) / n, bot = (h * (i + 1)) / n;
+    const pts = curve.map(([cx, cy]) => ({ x: cx, y: Math.min(Math.max(cy, top), bot) - top }));
+    pts.push({ x: w, y: bot - top }, { x: 0, y: bot - top }, { close: true });
+    s.addShape('custGeom', {
+      x, y: y + top, w, h: bot - top, points: pts,
+      fill: { color, transparency: Math.round(100 - opacity * (1 - (i + 0.5) / n)) },
+    });
+  }
+}
+
+/* Photo stand-in. */
+const photo = (s, x, y, w, h, adj, o) => rrect(s, x, y, w, h, adj || 0, Object.assign({ fill: { color: IMG } }, o));
+
+/* ------------------------------------------------------------------ *
+ * Shared chrome: top navigation bar + bottom-left arrow button
+ * ------------------------------------------------------------------ */
+const NAV_LINKS = [
+  ['Home', 2.719, 0.352, 0.688],
+  ['About', 3.359, 0.349, 1.014],
+  ['Service', 4.054, 0.349, 0.757],
+];
+
+/** ink = colour of logo/links/rule, chip = "Sign in" pill fill, chipInk = its label */
+function navBar(s, ink, chip, chipInk) {
+  pill(s, 11.292, 0.324, 1.016, 0.321, { fill: { color: chip } });
+  brandMark(s, 0.451, 0.349, ink);
+  T(s, 'YOUR LOGO', { x: 0.891, y: 0.352, w: 1.248, h: 0.286, color: ink });
+  NAV_LINKS.forEach(([label, x, y, w]) => T(s, label, { x, y, w, h: 0.286, color: ink }));
+  T(s, 'Sign in', { x: 11.484, y: 0.324, w: 0.743, h: 0.286, color: chipInk });
+  for (const dy of [0, 0.09, 0.18]) hline(s, 12.548, 0.395 + dy, 0.328, ink, 2);
+  hline(s, 0.348, 0.781, 12.556, ink, 1.5);
+}
+
+const navLight = (s) => navBar(s, TEAL, TEAL, WHITE); // pale slides
+const navDark = (s) => navBar(s, LAV, LAV, TEAL); // teal slides
+
+/* corner navigation button (bottom left on most slides) */
+const cornerBtn = (s, x, y, circle, arrow) => arrowBtn(s, x === undefined ? 0.352 : x, y === undefined ? 6.733 : y, 0.418, circle, arrow);
+
+/* "2026 →" chip: rounded pill + label + small arrow button */
+function yearChip(s, x, y, w, h, fill, label, labelColor, dotFill, dotArrow) {
+  pill(s, x, y, w, h, { fill: { color: fill } });
+  T(s, label, { x: x + 0.183, y: y + 0.106, w: 0.628, h: 0.286, bold: true, color: labelColor });
+  arrowBtn(s, x + w - 0.352, y + 0.059, 0.363, dotFill, dotArrow);
+}
+
+/* outlined pill + centred-ish caption, the deck's recurring "tag" element */
+function tag(s, x, y, w, h, stroke, label, labelX, labelY, labelW, labelColor, font) {
+  pill(s, x, y, w, h, { line: strokeBox(stroke, 1) });
+  T(s, label, { x: labelX, y: labelY, w: labelW, h: 0.286, color: labelColor, fontFace: font || JAK });
+}
+
+/* ================================================================== *
+ * 1 — Title: "Admission School"
+ * ================================================================== */
+function slide01(s) {
+  s.background = { color: PALE };
+  navLight(s);
+  photo(s, 0.337, 1.03, 12.67, 4.227, 0.047, { line: strokeBox(TEAL, 2) });
+  T(s, 'Admission School', { x: 0.216, y: 5.401, w: 9.311, h: 1.279, fontSize: 70, bold: true });
+  T(s,
+    'Lorem ipsum dolor sit amet, consect ecing elit, sed diam nonum nibh ut euism erde tindunt. Consequence  ipsum dolor sit amet, consect ecing elit, sed diam nonum nibh um euismod.',
+    { x: 0.262, y: 6.634, w: 7.002, h: 0.471, fontFace: JAK });
+  vline(s, 7.058, 6.7, 0.393, TEAL, 1);
+  T(s, 'Lorem ipsum dolor sit amet, consect ecing elit, sed diam.', { x: 7.264, y: 6.634, w: 2.449, h: 0.471, fontFace: JAK });
+  pill(s, 10.176, 5.735, 2.831, 0.709, { fill: { color: TEAL } });
+  T(s, '2026', { x: 10.313, y: 5.835, w: 1.215, h: 0.522, fontSize: 25, bold: true, color: LAV, align: 'center' });
+  arrowBtn(s, 12.429, 5.886, 0.418, LAV, TEAL);
+}
+
+/* ================================================================== *
+ * 2 — Table of Content (five columns)
+ * ================================================================== */
+const TOC = [
+  { pill: 0.538, label: 'Our Vision', lx: 1.003, lw: 0.971, desc: 0.244, num: '(01)', nx: 0.891, nw: 1.146, photo: 0.37 },
+  { pill: 3.149, label: 'Our Mission', lx: 3.615, lw: 1.092, desc: 2.855, num: '(02)', nx: 3.575, nw: 1.332, photo: 3.008 },
+  { pill: 5.756, label: 'School Services', lx: 5.997, lw: 1.421, desc: 5.462, num: '(03)', nx: 6.142, nw: 1.313, photo: 5.611 },
+  { pill: 8.363, label: 'School Admission', lx: 8.542, lw: 1.642, desc: 8.069, num: '(04)', nx: 8.726, nw: 1.274, photo: 8.248 },
+  { pill: 10.953, label: 'Our Teachers', lx: 11.345, lw: 1.421, desc: 10.709, num: '(05)', nx: 11.381, nw: 1.397, photo: 10.823 },
+];
+
+function slide02(s) {
+  s.background = { color: PALE };
+  TOC.forEach((c) => photo(s, c.photo, 3.919, 2.138, 2.423, 0.099, { line: strokeBox(TEAL, 2) }));
+  navLight(s);
+  T(s, 'Table of Content', { x: 0.226, y: 1.166, w: 4.708, h: 0.707, fontSize: 36, bold: true });
+  arrowBtn(s, 4.855, 1.316, 0.417, TEAL, WHITE);
+  TOC.forEach((c, i) => {
+    pill(s, c.pill, 2.425, 1.901, 0.491, { line: strokeBox(TEAL, 1.5) });
+    T(s, c.label, { x: c.lx, y: 2.508, w: c.lw, h: 0.286, fontFace: JAK });
+    T(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh',
+      { x: c.desc, y: 3.053, w: 2.417, h: 0.656, fontFace: JAK, align: 'center' });
+    T(s, c.num, { x: c.nx, y: 4.784, w: c.nw, h: 0.707, fontSize: 36, bold: true, color: PALE });
+    if (i) vline(s, c.pill - 0.355, 2.425, 3.924, TEAL, 1.5);
+  });
+  cornerBtn(s, 0.352, 6.733, TEAL, WHITE);
+}
+
+/* ================================================================== *
+ * 3 — School Vision (2026)
+ * ================================================================== */
+function slide03(s) {
+  s.background = { color: TEAL };
+  photo(s, 0.326, 1.03, 12.67, 2.317, 0.072, { line: strokeBox(TEAL, 2) });
+  navDark(s);
+  T(s, 'School Vision (2026)', { x: 0.207, y: 3.442, w: 8.304, h: 1.061, fontSize: 55, bold: true, color: LAV, fontFace: JAK });
+  tag(s, 0.354, 4.681, 1.642, 0.493, LAV, 'Who We Are', 0.635, 4.764, 1.167, LAV);
+  T(s,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet.',
+    { x: 2.889, y: 4.623, w: 5.178, h: 1.027, color: LAV, fontFace: JAK });
+  vline(s, 8.413, 3.566, 3.585, LAV, 1.5);
+  T(s, 'Our  vision, values, and the people behind our success',
+    { x: 8.75, y: 3.674, w: 3.875, h: 0.606, fontSize: 15, bold: true, color: LAV, fontFace: JAK });
+  T(s,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.',
+    { x: 8.75, y: 4.729, w: 4.189, h: 0.84, color: LAV });
+  cornerBtn(s, 0.352, 6.733, LAV, TEAL);
+}
+
+/* ================================================================== *
+ * 4 — Our School's Mission
+ * ================================================================== */
+function slide04(s) {
+  s.background = { color: TEAL };
+  rect(s, 0, 3.434, 13.333, 4.066, { fill: { color: PALE } });
+  photo(s, 7.639, 1.166, 5.256, 5.939, 0.062, { line: strokeBox(PALE, 0.75) });
+  navDark(s);
+  T(s, 'Our School\u2019s Mission', { x: 0.241, y: 1.113, w: 6.286, h: 2.02, fontSize: 57, bold: true, color: LAV, fontFace: JAK });
+  pill(s, 0.354, 3.939, 1.642, 0.491, { fill: { color: TEAL } });
+  T(s, 'Our Mission', { x: 0.675, y: 4.036, w: 1.049, h: 0.286, color: WHITE, fontFace: JAK });
+  T(s,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet.',
+    { x: 2.524, y: 3.894, w: 4.587, h: 1.026, fontFace: JAK });
+  T(s,
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.',
+    { x: 2.505, y: 5.16, w: 4.606, h: 0.842 });
+  cornerBtn(s, 0.352, 6.733, TEAL, PALE);
+  arrowBtn(s, 12.27, 1.344, 0.418, LAV, TEAL);
+}
+
+/* ================================================================== *
+ * 5 — School Service & Offerings (three numbered columns)
+ * ================================================================== */
+const SERVICES = [
+  { dot: 1.239, num: '(01)', nx: 2.361, pill: 1.77, label: 1.947, body: 1.219, photo: 1.297, line: strokeBox(TEAL, 2),
+    text: 'Lorem ipsum dolor sit amet,lorem eida consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut em ubeh laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.Lorem ipsum dolor sitt.' },
+  { dot: 5.351, num: '(02)', nx: 6.345, pill: 5.719, label: 5.885, body: 5.271, photo: 5.377, line: strokeBox(TEAL, 2),
+    text: 'Lorem ipsum dolor sit amet,lorem eida consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut em ubeh laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam ipsum dolor sitt.' },
+  { dot: 9.464, num: '(03)', nx: 10.467, pill: 9.825, label: 9.982, body: 9.416, photo: 9.456, line: strokeBox(LAV, 0.75),
+    text: 'Lorem ipsum dolor sit amet,lorem eida consectetuer adipiscing elit, sed diam nonum euismod tincidunt ut em ubeh laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam ipsum dolor sitt.' },
+];
+
+function slide05(s) {
+  s.background = { color: TEAL };
+  rect(s, 0.007, -0.023, 13.333, 2.799, { fill: { color: PALE } });
+  navLight(s);
+  T(s, 'School Service & Offerings', { x: 0.318, y: 0.986, w: 9.905, h: 0.942, fontSize: 50, bold: true, fontFace: JAK });
+  tag(s, 0.451, 2.026, 1.642, 0.491, TEAL, 'Our Services', 0.732, 2.123, 1.165, TEAL);
+  SERVICES.forEach((c, i) => {
+    arrowBtn(s, c.dot, 3.174, 0.418, PALE, TEAL);
+    T(s, c.num, { x: c.nx, y: 3.038, w: 1.389, h: 0.69, fontSize: 35, bold: true, color: PALE });
+    pill(s, c.pill, 3.913, 2.215, 0.493, { line: strokeBox(LAV, 1) });
+    T(s, 'Product Service Tittle', { x: c.label, y: 4.017, w: 2.065, h: 0.286, bold: true, color: PALE });
+    T(s, c.text, { x: c.body, y: 4.591, w: 3.27, h: 1.212, color: PALE });
+    photo(s, c.photo, i === 1 ? 6.064 : 6.052, 3.048, 0.874, 0.5, { line: c.line });
+    if (i) vline(s, i === 1 ? 4.852 : 8.958, 3.03, 3.933, PALE, 1.5);
+  });
+}
+
+/* ================================================================== *
+ * 6 — School Admissions (four cards)
+ * ================================================================== */
+function slide06(s) {
+  s.background = { color: PALE };
+  const cards = [0.45, 3.614, 6.779, 9.948];
+  const titleX = [0.648, 3.862, 7.031, 10.242];
+  const photoX = [0.966, 4.092, 7.316, 10.492];
+  const btnX = [1.148, 4.345, 7.522, 10.732];
+  cards.forEach((x) => rrect(s, x, 2.769, 2.928, 4.119, 0.071, { fill: { color: TEAL } }));
+  navLight(s);
+  T(s, 'School Admissions', { x: 0.318, y: 0.986, w: 7.564, h: 0.942, fontSize: 50, bold: true });
+  pill(s, 0.451, 1.929, 1.924, 0.491, { line: strokeBox(TEAL, 1) });
+  T(s, [{ text: '2026 ', options: { fontFace: JAK } }, { text: 'Admissions', options: { fontFace: MONT } }],
+    { x: 0.732, y: 2.026, w: 1.642, h: 0.286 });
+  titleX.forEach((x, i) => {
+    T(s, 'Lorem Ipsum', { x, y: 2.977, w: i === 2 ? 2.24 : 2.17, h: 0.438, fontSize: 20, bold: true, color: PALE });
+    T(s, 'Dolor sit amet', { x: i === 2 ? 7.035 : x, y: 3.357, w: 2.125, h: 0.353, fontSize: 15, color: PALE });
+  });
+  btnX.forEach((x) => {
+    pill(s, x, 6.161, 1.397, 0.491, { line: strokeBox(PALE, 1) });
+    T(s, 'Explore', { x: x + 0.495, y: 6.258, w: 1.075, h: 0.286, color: PALE });
+    arrowBtn(s, x + 0.077, 6.194, 0.418, PALE, TEAL);
+  });
+  photoX.forEach((x) => photo(s, x, 3.955, 1.883, 1.911, 0.5, { line: strokeBox(LAV, 0.75) }));
+}
+
+/* ================================================================== *
+ * 7 — Meet Our Teacher (five staggered cards with a fading overlay)
+ * ================================================================== */
+const TEACHERS = [
+  { photo: [0.424, 2.503], card: [0.424, 3.458, 2.339, 2.569], name: 'Teacher 01', pill: [0.78, 4.972], label: [0.925, 4.975, 1.354], desc: [0.609, 5.432], btn: [2.234, 2.639] },
+  { photo: [2.992, 3.013], card: [2.991, 3.808, 2.344, 2.833], name: 'Teacher 02', pill: [3.32, 5.586], label: [3.428, 5.612, 1.425], desc: [3.189, 6.046], btn: [4.774, 3.253] },
+  { photo: [5.529, 2.503], card: [5.526, 3.358, 2.356, 2.712], name: 'Teacher 03', pill: [5.856, 4.972], label: [5.999, 4.998, 1.575], desc: [5.684, 5.432], btn: [7.309, 2.639] },
+  { photo: [8.082, 3.013], card: [8.078, 3.896, 2.334, 2.788], name: 'Teacher 04', pill: [8.408, 5.586], label: [8.562, 5.612, 1.637], desc: [8.237, 6.046], btn: [9.849, 3.253] },
+  { photo: [10.634, 2.503], card: [10.628, 3.443, 2.358, 2.583], name: 'Teacher 05', pill: [10.98, 4.972], label: [11.148, 4.998, 1.624], desc: [10.809, 5.432], btn: [12.354, 2.639] },
+];
+
+function slide07(s) {
+  s.background = { color: TEAL };
+  photo(s, 0, 3.975, 13.333, 3.525, 0);
+  rect(s, 0.007, 5.535, 13.333, 1.996, { fill: { color: PALE } });
+  TEACHERS.forEach((t) => photo(s, t.photo[0], t.photo[1], 2.334, 3.524, 0.114));
+  navDark(s);
+  T(s, 'Meet Our Teacher', { x: 0.352, y: 1.057, w: 7.53, h: 1.01, fontSize: 54, bold: true, color: LAV });
+  pill(s, 7.662, 1.396, 1.974, 0.491, { line: strokeBox(PALE, 1) });
+  T(s, 'Operational Team', { x: 7.849, y: 1.49, w: 1.786, h: 0.303, fontSize: 12, color: PALE });
+  TEACHERS.forEach((t) => {
+    // original fill: linear gradient white@0% opacity -> solid teal, top to bottom
+    fadeDown(s, t.card[0], t.card[1], t.card[2], t.card[3], WHITE, TEAL, 0, 100);
+    roundBottom(s, t.card[0], t.card[1] + t.card[3], t.card[2], 0.19, PALE);
+    arrowBtn(s, t.btn[0], t.btn[1], 0.418, TEAL, PALE);
+    pill(s, t.pill[0], t.pill[1], 1.666, 0.388, { fill: { color: WHITE } });
+    T(s, t.name, { x: t.label[0], y: t.label[1], w: t.label[2], h: 0.353, fontSize: 15, bold: true });
+    T(s, 'Lorem ipsum dolor sit amet, consectetuer', { x: t.desc[0], y: t.desc[1], w: 1.908, h: 0.471, color: WHITE, align: 'center' });
+  });
+}
+
+/* ================================================================== *
+ * 8 — Our Learning Programs (three cards)
+ * ================================================================== */
+const PROGRAMS = [
+  { card: 5.208, num: '(01)', nx: 5.831, nw: 1.312, label: 5.406, body: [5.384, 4.007], photo: 5.229 },
+  { card: 7.822, num: '(02)', nx: 8.431, nw: 1.331, label: 7.997, body: [7.997, 4.021], photo: 7.832 },
+  { card: 10.457, num: '(03)', nx: 11.023, nw: 1.315, label: 10.632, body: [10.665, 4.064], photo: 10.468 },
+];
+
+function slide08(s) {
+  s.background = { color: PALE };
+  PROGRAMS.forEach((p) => rrect(s, p.card, 2.659, 2.448, 4.363, 0.089, { fill: { color: TEAL }, line: strokeBox('1C3052', 1) }));
+  navLight(s);
+  T(s, 'Our Learning Programs', { x: 0.38, y: 1.059, w: 4.632, h: 1.582, fontSize: 44, bold: true });
+  pill(s, 0.479, 2.752, 1.674, 0.491, { fill: { color: TEAL }, line: strokeBox('1E3390', 1) });
+  T(s, 'Our  Strategies', { x: 0.694, y: 2.849, w: 1.458, h: 0.286, color: WHITE });
+  T(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt',
+    { x: 0.339, y: 3.451, w: 3.715, h: 0.707, fontSize: 12 });
+  T(s, [
+    { text: 'Lorem ipsum dolor sit amet', options: { bold: true } },
+    { text: ', ', options: { breakLine: true } },
+    { text: 'consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.Lorem ipsum dolor sit amet, consectetuer.' },
+  ], { x: 5.229, y: 1.314, w: 7.859, h: 0.909, fontSize: 12 });
+  vline(s, 4.893, 2.641, 4.363, TEAL, 1.5);
+  PROGRAMS.forEach((p) => {
+    T(s, p.num, { x: p.nx, y: 2.856, w: p.nw, h: 0.774, fontSize: 40, bold: true, color: PALE });
+    T(s, 'Learning Program', { x: p.label, y: 3.679, w: 2.162, h: 0.337, fontSize: 14, bold: true, color: PALE });
+    T(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut .',
+      { x: p.body[0], y: p.body[1], w: 2.095, h: 1.028, color: PALE });
+    photo(s, p.photo, 5.315, 2.426, 1.756, 0.093, { line: strokeBox(TEAL, 2) });
+  });
+  cornerBtn(s, 0.352, 6.733, TEAL, PALE);
+}
+
+/* ------------------------------------------------------------------ *
+ * Flat icon stand-ins used on slides 9 and 18
+ * ------------------------------------------------------------------ */
+function iconBooks(s, x, y, d, color) {
+  const f = { color };
+  rect(s, x + 0.03 * d, y + 0.84 * d, 0.94 * d, 0.1 * d, { fill: f });
+  rect(s, x + 0.07 * d, y + 0.14 * d, 0.13 * d, 0.66 * d, { fill: f });
+  rect(s, x + 0.26 * d, y + 0.1 * d, 0.19 * d, 0.7 * d, { fill: f });
+  rect(s, x + 0.51 * d, y + 0.22 * d, 0.17 * d, 0.58 * d, { fill: f });
+  rect(s, x + 0.73 * d, y + 0.14 * d, 0.22 * d, 0.2 * d, { fill: f });
+  rect(s, x + 0.73 * d, y + 0.42 * d, 0.22 * d, 0.38 * d, { fill: f });
+}
+
+function iconCase(s, x, y, d, color) {
+  rrect(s, x + 0.32 * d, y + 0.05 * d, 0.36 * d, 0.24 * d, 0.3, { line: strokeBox(color, 2) });
+  rrect(s, x + 0.03 * d, y + 0.24 * d, 0.94 * d, 0.62 * d, 0.1, { fill: { color } });
+  rect(s, x + 0.03 * d, y + 0.52 * d, 0.94 * d, 0.04 * d, { fill: { color: TEAL } });
+  rrect(s, x + 0.42 * d, y + 0.48 * d, 0.16 * d, 0.14 * d, 0.3, { fill: { color: TEAL } });
+}
+
+/* Laptop mock-up (replaces the photo of a laptop in the original). x/y = lid corner. */
+function laptop(s, x, y) {
+  const lidW = 3.708, lidH = 2.44, flare = 0.47;
+  rrect(s, x, y, lidW, lidH, 0.02, { fill: { color: '242424' }, line: strokeBox('9A9A9A', 1) });
+  rect(s, x + 0.125, y + 0.136, 3.472, 2.153, { fill: { color: IMG } });
+  s.addShape('custGeom', {
+    x: x - flare, y: y + lidH, w: lidW + 2 * flare, h: 0.42, fill: { color: 'C9C9CB' },
+    points: [{ x: flare, y: 0 }, { x: flare + lidW, y: 0 }, { x: lidW + 2 * flare, y: 0.42 }, { x: 0, y: 0.42 }, { close: true }],
+  });
+  rrect(s, x + 0.11, y + lidH + 0.03, lidW - 0.22, 0.19, 0.15, { fill: { color: '2E2E2E' } });
+  rrect(s, x - flare, y + lidH + 0.34, lidW + 2 * flare, 0.1, 0.5, { fill: { color: 'A6A7AC' } });
+}
+
+/* ================================================================== *
+ * 9 — School New Innovation Curriculum 2026
+ * ================================================================== */
+function slide09(s) {
+  s.background = { color: PALE };
+  navLight(s);
+  T(s, 'School New Innovation Curriculum 2026', { x: 0.29, y: 1.145, w: 7.989, h: 1.279, fontSize: 35, bold: true });
+  tag(s, 0.328, 2.549, 1.641, 0.491, TEAL, 'New Curriculum', 0.451, 2.646, 1.641, TEAL, MONT);
+  [[0.451, 0.56, iconBooks], [3.963, 4.086, iconCase]].forEach(([bx, ix, draw], i) => {
+    rrect(s, bx, 3.563, 0.82, 0.82, 0.167, { fill: { color: TEAL } });
+    draw(s, ix, i ? 3.678 : 3.657, 0.569, PALE);
+  });
+  [0.37, 3.866].forEach((x) => T(s, [
+    { text: 'Lorem ipsum dolor sit amet', options: { bold: true } },
+    { text: ', ', options: { breakLine: true } },
+    { text: 'consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim um veniam.Lorem ipsum dolor sit amet, consectetuer.' },
+  ], { x, y: 4.562, w: 3.211, h: 1.212, fontFace: JAK }));
+  vline(s, 3.581, 3.49, 2.367, TEAL, 1.5);
+  vline(s, 7.236, 1.381, 5.652, TEAL, 1.5);
+  laptop(s, 8.389, 2.361);
+  yearChip(s, 8.415, 1.609, 2.128, 0.481, TEAL, '2026', WHITE, LAV, TEAL);
+  T(s, 'Note 01', { x: 8.415, y: 5.571, w: 1.222, h: 0.303, fontSize: 12, bold: true });
+  T(s, 'Nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.Lorem ipsum dolor sit amet.',
+    { x: 8.415, y: 5.874, w: 4.056, h: 0.656 });
+  cornerBtn(s, 0.352, 6.733, TEAL, PALE);
+}
+
+/* ================================================================== *
+ * 10 — Holistic Development Programs (numbered list on the right)
+ * ================================================================== */
+const HOLISTIC = [
+  { y: 1.224, adj: 0.075, bar: LAV, dot: PALE, title: ['Excecutive Development'], num: '01', body: 'consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laore dolore magna aliquam erat volutpat. ' },
+  { y: 2.716, adj: 0.084, bar: PALE, dot: LAV, title: ['Institutions', 'Analysis'], num: '02', body: 'consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laore dolore.' },
+  { y: 4.244, adj: 0.075, bar: LAV, dot: PALE, title: ['Comunication', 'Technique'], num: '03', body: 'consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laore dolore magna. ' },
+  { y: 5.736, adj: 0.057, bar: PALE, dot: LAV, title: ['Teach Training', 'System'], num: '04', body: 'consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laore dolore magna aliquam. ' },
+];
+
+function slide10(s) {
+  s.background = { color: TEAL };
+  navDark(s);
+  T(s, [{ text: 'Holistic Development', options: { breakLine: true } }, { text: 'Programs' }],
+    { x: 0.314, y: 1.014, w: 6.648, h: 1.279, fontSize: 35, bold: true, color: LAV });
+  pill(s, 3.236, 1.801, 1.575, 0.491, { fill: { color: PALE }, line: strokeBox('1E3390', 1) });
+  T(s, 'Development', { x: 3.426, y: 1.913, w: 1.315, h: 0.286 });
+  T(s, 'Note 01', { x: 0.33, y: 3.31, w: 1.222, h: 0.353, fontSize: 15, bold: true, color: PALE });
+  T(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam', { x: 0.314, y: 3.611, w: 2.476, h: 0.656, color: PALE });
+  [0.38, 2.705].forEach((x) => photo(s, x, 4.447, 2.076, 1.717, 0.107, { line: strokeBox(PALE, 2) }));
+  HOLISTIC.forEach((r) => {
+    rrect(s, 7.128, r.y, 5.777, 1.279, r.adj, { fill: { color: r.bar } });
+    ell(s, 6.765, r.y + 0.277, 0.726, 0.726, { fill: { color: r.dot }, line: strokeBox(TEAL, 2) });
+    T(s, r.num, { x: 6.846, y: r.y + 0.429, w: 0.595, h: 0.438, fontSize: 20, bold: true });
+    T(s, r.title.map((t, i) => ({ text: t, options: { breakLine: i < r.title.length - 1 } })),
+      { x: 7.634, y: r.y + 0.353, w: 1.877, h: 0.572, fontSize: 14, bold: true });
+    vline(s, 9.504, r.y + 0.235, 0.808, TEAL, 1.5);
+    T(s, [{ text: 'Lorem ipsum dolor sit amet ', options: { bold: true } }, { text: r.body }],
+      { x: 9.692, y: r.y + 0.21, w: 3.14, h: 0.841, fontFace: JAK });
+  });
+  cornerBtn(s, 0.352, 6.597, PALE, TEAL);
+}
+
+/* ================================================================== *
+ * 11 — School Admission Entry Fees (three price cards)
+ * ================================================================== */
+const FEES = [
+  { card: 0.348, photo: 0.337, price: '$399/month', px: 0.564, dx: 0.564, btn: 3.685, desc: 'Dut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam. ' },
+  { card: 4.742, photo: 4.731, price: '$499/month', px: 5.02, dx: 5.035, btn: 8.068, desc: 'Dut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam. ' },
+  { card: 9.014, photo: 9.002, price: '$599/month', px: 9.311, dx: 9.282, btn: 12.38, desc: 'Dut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim. ' },
+];
+
+function slide11(s) {
+  s.background = { color: PALE };
+  FEES.forEach((f) => rrect(s, f.card, 3.291, 3.93, 3.719, 0.07, { fill: { color: TEAL }, line: strokeBox('1C3052', 1) }));
+  navLight(s);
+  T(s, 'School Admission Entry Fees ', { x: 0.214, y: 1.096, w: 6.555, h: 1.717, fontSize: 48, bold: true });
+  tag(s, 4.282, 2.13, 1.506, 0.493, TEAL, 'School Fees', 4.468, 2.217, 1.115, TEAL, MONT);
+  T(s, [
+    { text: 'Lorem ipsum dolor sit amet', options: { bold: true } },
+    { text: ', consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.Lorem ipsum dolor sit amet, consectetuer.' },
+  ], { x: 7.618, y: 1.892, w: 5.501, h: 0.842 });
+  yearChip(s, 7.612, 1.287, 2.128, 0.481, TEAL, '2026', WHITE, LAV, TEAL);
+  FEES.forEach((f) => {
+    photo(s, f.photo, 3.291, 3.941, 1.872, 0.164, { line: strokeBox(TEAL, 2) });
+    T(s, f.price, { x: f.px, y: 5.351, w: 1.749, h: 0.37, fontSize: 16, bold: true, color: PALE });
+    T(s, f.desc, { x: f.dx, y: 6.2, w: 3.556, h: 0.471, color: PALE });
+    ell(s, f.btn, 5.355, 0.363, 0.363, { fill: { color: LAV } });
+    s.addShape('line', { x: f.btn + 0.116, y: 5.536, w: 0.13, h: 0, rotate: 324, line: { color: TEAL, width: 0.75, endArrowType: 'triangle' } });
+  });
+}
+
+/* ================================================================== *
+ * 12 — Next Year Institution Growth Target (two wide rows)
+ * ================================================================== */
+const GROWTH = [
+  { y: 2.726, adj: 0.097, big: '89%', bigBox: [9.847, 3.572, 2.441], cap: [9.906, 4.265, 2.043], btn: 2.972, vl: 1.674,
+    left: ['This Year Growth', 3.175, 3.037, 2.674, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam, Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam', 3.175, 3.39, 2.905, 1.212],
+    right: ['Next Year Target', 6.627, 3.037, 2.58, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam. dolor sit amet, consectetuer adipiscing elit, sed', 6.627, 3.39, 3.038, 0.841] },
+  { y: 5.056, adj: 0.118, big: '25x', bigBox: [9.906, 5.888, 1.592], cap: [9.875, 6.577, 1.733], btn: 5.245, vl: 1.672,
+    left: ['This Year Growth', 3.212, 5.454, 2.637, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam, Lorem ipsum dolor sit amet, consectetuer adipiscing elit.', 3.212, 5.807, 2.932, 0.842],
+    right: ['Next Year Target', 6.627, 5.425, 2.903, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam. dolor sit amet, consectetuer adipiscing elit, sed diam nonum.', 6.627, 5.777, 2.809, 1.027] },
+];
+
+function slide12(s) {
+  s.background = { color: TEAL };
+  GROWTH.forEach((r) => rrect(s, 0.488, r.y, 12.406, 2.049, r.adj, { fill: { color: PALE } }));
+  navDark(s);
+  T(s, 'Next Year Institution Growth Target', { x: 0.28, y: 0.946, w: 6.347, h: 1.447, fontSize: 40, bold: true, color: LAV });
+  tag(s, 4.912, 1.774, 1.521, 0.491, PALE, 'Next Target', 5.124, 1.869, 1.252, PALE);
+  T(s, [
+    { text: 'Lorem ipsum dolor sit amet', options: { bold: true } },
+    { text: ', consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna.' },
+  ], { x: 7.618, y: 1.769, w: 5.276, h: 0.471, color: PALE });
+  yearChip(s, 7.612, 1.164, 2.128, 0.481, LAV, '2026', WHITE, PALE, TEAL);
+  GROWTH.forEach((r) => {
+    [r.left, r.right].forEach(([head, hx, hy, hw, body, bx, by, bw, bh]) => {
+      T(s, head, { x: hx, y: hy, w: hw, h: 0.337, fontSize: 14, bold: true });
+      T(s, body, { x: bx, y: by, w: bw, h: bh });
+    });
+    vline(s, 6.309, r.y + 0.206, r.vl, TEAL, 1.5);
+    vline(s, 9.665, r.y + 0.206, r.vl, TEAL, 1.5);
+    T(s, r.big, { x: r.bigBox[0], y: r.bigBox[1], w: r.bigBox[2], h: 0.773, fontSize: 40, bold: true });
+    T(s, 'Lorem Ipsum', { x: r.cap[0], y: r.cap[1], w: r.cap[2], h: 0.337, fontSize: 14, bold: true });
+    arrowBtn(s, 12.248, r.btn, 0.417, TEAL, PALE);
+  });
+  [2.733, 5.041].forEach((y) => photo(s, 0.488, y, 2.347, 2.05, 0.101, { line: strokeBox(TEAL, 2) }));
+}
+
+/* ================================================================== *
+ * 13 — School Institution Knowledge Investment
+ * ================================================================== */
+const INVEST = [
+  { y: 1.159, value: '30-35', vx: 7.513, vw: 2.233, tx: 1.333, ly: 1.298, alpha: 0 },
+  { y: 2.45, value: '15%', vx: 7.555, vw: 1.674, tx: 2.616, ly: 2.569, alpha: 14 },
+  { y: 3.761, value: '8%', vx: 7.555, vw: 1.674, tx: 4.017, ly: 3.876, alpha: 33 },
+];
+
+function slide13(s) {
+  s.background = { color: PALE };
+  navLight(s);
+  T(s, 'School Institution Knowledge Investment ', { x: 0.275, y: 1.076, w: 5.766, h: 1.178, fontSize: 32, bold: true });
+  yearChip(s, 0.407, 2.463, 2.128, 0.481, TEAL, '2026', WHITE, LAV, TEAL);
+  vline(s, 6.399, 1.241, 5.714, TEAL, 1.5);
+  T(s, [
+    { text: 'Lorem ipsum dolor sit amet', options: { bold: true } },
+    { text: ',', options: { breakLine: true } },
+    { text: ' consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.Lorem ipsum dolor sit amet, consectetuer.' },
+  ], { x: 0.275, y: 5.327, w: 4.839, h: 1.027 });
+  INVEST.forEach((r) => {
+    rrect(s, 7.292, r.y, 5.584, 1.17, 0.075, { fill: { color: TEAL, transparency: r.alpha } });
+    T(s, r.value, { x: r.vx, y: r.y + 0.031, w: r.vw, h: 0.942, fontSize: 50, color: PALE });
+    vline(s, 9.958, r.ly, 0.892, PALE, 1.5);
+    T(s, [
+      { text: 'Lorem ipsum dolor sit amet', options: { bold: true } },
+      { text: ',', options: { breakLine: true } },
+      { text: ' consectetuer adipiscing elit, sed diam nonum nibh' },
+    ], { x: 10.193, y: r.tx, w: 2.583, h: 0.656, color: PALE });
+  });
+  photo(s, 7.334, 5.327, 1.808, 1.683, 0.101, { line: strokeBox(TEAL, 2) });
+  pill(s, 9.59, 5.432, 1.016, 0.321, { line: strokeBox(TEAL, 1) });
+  T(s, 'Note 01', { x: 9.661, y: 5.432, w: 1.222, h: 0.303, fontSize: 12, bold: true });
+  T(s, 'Nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.Lorem ipsum dolor sit amet.',
+    { x: 9.498, y: 5.878, w: 3.184, h: 0.841 });
+  cornerBtn(s, 0.421, 6.733, TEAL, PALE);
+}
+
+/* ================================================================== *
+ * 14 — School Institutions Objectives and Key Performance
+ * ================================================================== */
+const KPI = [
+  { value: '275K+', vx: 4.576, cx: 4.634, cy: 6.12, line: 3.866 },
+  { value: '89%', vx: 7.698, cx: 7.542, cy: 6.12, line: 6.899 },
+  { value: '156K+', vx: 10.443, cx: 10.418, cy: 6.172, line: 9.783 },
+];
+
+function slide14(s) {
+  s.background = { color: TEAL };
+  photo(s, 6.988, 1.165, 5.917, 3.177, 0.055, { line: strokeBox(PALE, 2) });
+  navDark(s);
+  T(s, 'School Institutions Objectives and Key Performance', { x: 0.348, y: 1.118, w: 5.658, h: 1.919, fontSize: 36, bold: true, color: LAV });
+  tag(s, 0.451, 3.191, 1.442, 0.493, PALE, 'Objectives ', 0.696, 3.278, 1.106, PALE, MONT);
+  T(s, 'Sed diam nonum nibh euismod tincidunt ut laoreet dolore. Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+    { x: 2.104, y: 3.109, w: 3.663, h: 0.656, color: PALE });
+  pill(s, 7.181, 4.125, 2.128, 0.481, { fill: { color: LAV }, line: strokeBox(PALE, 2.75) });
+  T(s, '2025', { x: 7.364, y: 4.231, w: 0.628, h: 0.286, bold: true, fontFace: JAK });
+  arrowBtn(s, 8.88, 4.184, 0.363, TEAL, PALE);
+  rrect(s, 0.439, 4.913, 12.455, 2.132, 0.071, { fill: { color: PALE }, line: strokeBox(LAV, 2) });
+  T(s, [{ text: 'Institutions', options: { breakLine: true } }, { text: 'Objectives' }],
+    { x: 1.017, y: 5.439, w: 2.425, h: 1.043, fontSize: 28, bold: true, fontFace: JAK });
+  KPI.forEach((k) => {
+    vline(s, k.line, 5.269, 1.434, TEAL, 1.5);
+    T(s, k.value, { x: k.vx, y: k.value === '156K+' ? 5.53 : 5.477, w: 1.882, h: 0.707, fontSize: 36, bold: true });
+    T(s, 'Lorem Ipsum Dolor', { x: k.cx, y: k.cy, w: 1.767, h: 0.286, bold: true });
+  });
+  arrowBtn(s, 12.314, 5.111, 0.418, TEAL, PALE);
+}
+
+/* ================================================================== *
+ * 15 — Estimated Growth Student in 2026 (stepped bars)
+ * ================================================================== */
+const STEPS15 = [
+  { y: 3.429, w: 3.394, ty: 3.576, uy: 3.948, tick: '35', tx: 10.467, tyv: 3.772, alpha: 0 },
+  { y: 4.591, w: 4.417, ty: 4.715, uy: 5.087, tick: '48', tx: 11.461, tyv: 5.003, alpha: 14 },
+  { y: 5.754, w: 5.474, ty: 5.834, uy: 6.207, tick: '75', tx: 12.495, tyv: 6.256, alpha: 33 },
+];
+
+function slide15(s) {
+  s.background = { color: PALE };
+  navLight(s);
+  T(s, 'Estimated Growth Student in 2026', { x: 0.333, y: 1.023, w: 5.566, h: 1.346, fontSize: 37, bold: true });
+  yearChip(s, 0.48, 2.465, 2.128, 0.481, TEAL, '2026', PALE, LAV, TEAL);
+  vline(s, 6.175, 1.165, 5.851, TEAL, 1.5);
+  T(s, '$', { x: 6.747, y: 1.316, w: 0.811, h: 0.942, fontSize: 50, bold: true });
+  T(s, [{ text: '9,650', options: { color: TEAL } }, { text: '+', options: { color: TEAL2 } }],
+    { x: 7.361, y: 1.112, w: 5.806, h: 1.784, fontSize: 100, bold: true });
+  STEPS15.forEach((b) => {
+    rrect(s, 6.834, b.y, b.w, 1.17, 0.075, { fill: { color: TEAL, transparency: b.alpha } });
+    T(s, '2025', { x: 6.973, y: b.ty, w: 0.87, h: 0.438, fontSize: 20, color: PALE });
+    T(s, 'USD 1,567', { x: 6.948, y: b.uy, w: 1.921, h: 0.522, fontSize: 25, color: PALE });
+    T(s, b.tick, { x: b.tx, y: b.tyv, w: 0.636, h: 0.438, fontSize: 20, bold: true, color: TEAL2 });
+  });
+  T(s, 'Note 01', { x: 0.382, y: 5.284, w: 1.222, h: 0.303, fontSize: 12, bold: true });
+  T(s, 'Nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.Lorem ipsum dolor sit amet.',
+    { x: 0.382, y: 5.586, w: 3.797, h: 0.656 });
+  cornerBtn(s, 0.421, 6.733, TEAL, PALE);
+}
+
+/* ================================================================== *
+ * 16 — School Admission Steps (timeline)
+ * ================================================================== */
+const TIMELINE = [
+  { dot: 0.503, up: false, stem: 0.648, tip: 0.538, tipY: 5.201, text: 0.422, textY: 5.504, pill: 0.496, pillY: 6.524, pillW: 1.792, label: 'Lorem Ipsum 01', lx: 0.603, title: 'Steps 1' },
+  { dot: 2.901, up: true, stem: 3.054, tip: 2.944, tipY: 3.526, text: 2.87, textY: 2.068, pill: 2.944, pillY: 3.087, pillW: 1.792, label: 'Lorem Ipsum 02', lx: 3.051, title: 'Steps 2' },
+  { dot: 5.419, up: false, stem: 5.555, tip: 5.445, tipY: 5.201, text: 5.329, textY: 5.504, pill: 5.403, pillY: 6.524, pillW: 1.792, label: 'Lorem Ipsum 03', lx: 5.51, title: 'Steps 3' },
+  { dot: 7.866, up: true, stem: 8.003, tip: 7.893, tipY: 3.518, text: 7.819, textY: 2.06, pill: 7.893, pillY: 3.079, pillW: 1.792, label: 'Lorem Ipsum 04', lx: 8.0, title: 'Steps 4' },
+  { dot: 10.492, up: false, stem: 10.637, tip: 10.527, tipY: 5.201, text: 10.411, textY: 5.504, pill: 10.535, pillY: 6.524, pillW: 1.723, label: 'Lorem Ipsum 05', lx: 10.643, title: 'Steps 5' },
+];
+
+function slide16(s) {
+  s.background = { color: PALE };
+  navLight(s);
+  T(s, 'School Admission Steps', { x: 0.343, y: 1.033, w: 7.476, h: 0.774, fontSize: 40, bold: true, color: TEAL2 });
+  yearChip(s, 0.423, 1.867, 2.128, 0.481, TEAL, '2026', WHITE, LAV, TEAL);
+  hline(s, 0.503, 4.499, 12.831, TEAL, 3);
+  TIMELINE.forEach((n) => {
+    ell(s, n.dot, 4.335, 0.3, 0.3, { fill: { color: TEAL } });
+    vline(s, n.stem, n.up ? n.tipY + 0.144 : 4.335, 0.975, TEAL, 3);
+    ell(s, n.tip, n.tipY, 0.22, 0.22, { fill: { color: TEAL } });
+    T(s, n.title, { x: n.text, y: n.textY, w: 1.222, h: 0.303, fontSize: 12, bold: true });
+    T(s, 'Nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat wisi enim ad.',
+      { x: n.text, y: n.textY + 0.303, w: n.title === 'Steps 5' ? 2.584 : 3.19, h: 0.656 });
+    pill(s, n.pill, n.pillY, n.pillW, 0.319, { fill: { color: TEAL } });
+    T(s, n.label, { x: n.lx, y: n.pillY + 0.012, w: 1.685, h: 0.286, color: PALE });
+  });
+}
+
+/* ================================================================== *
+ * 17 — Admission Growth Report (bar chart drawn with shapes)
+ * ================================================================== */
+const BARS17 = [
+  { x: 1.515, y: 5.133, h: 0.807, capH: 0.329, year: '2024', yx: 1.515, top: '$80', tx: 1.551, ty: 5.186, low: '$200', lx: 1.515, ly: 5.554 },
+  { x: 2.265, y: 4.685, h: 1.256, capH: 0.451, year: '2025', yx: 2.264, top: '$120', tx: 2.263, ty: 4.765, low: '$320', lx: 2.263, ly: 5.352 },
+  { x: 2.988, y: 4.342, h: 1.599, capH: 0.558, year: '2026', yx: 2.97, top: '$200', tx: 2.988, ty: 4.49, low: '$370', lx: 2.987, ly: 5.209 },
+  { x: 3.705, y: 3.509, h: 2.432, capH: 0.558, year: '2027', yx: 3.722, top: '$306', tx: 3.705, ty: 3.68, low: '$550', lx: 3.678, ly: 4.744 },
+  { x: 4.428, y: 2.205, h: 3.736, capH: 0.874, year: '2028', yx: 4.467, top: '$420', tx: 4.426, ty: 2.517, low: '$870', lx: 4.441, ly: 4.134 },
+];
+const AXIS17 = [['100', 1.476], ['80', 2.348], ['60', 3.195], ['40', 4.014], ['20', 4.855]];
+const GRID17 = [1.627, 2.494, 3.321, 4.154, 4.994, 5.941];
+
+function slide17(s) {
+  s.background = { color: TEAL };
+  navDark(s);
+  T(s, 'Admission Growth Report', { x: 7.045, y: 0.972, w: 5.783, h: 1.447, fontSize: 40, bold: true, color: LAV });
+  T(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.',
+    { x: 7.045, y: 2.42, w: 5.484, h: 0.656, color: PALE });
+  vline(s, 6.434, 1.209, 5.714, LAV, 1.5);
+  yearChip(s, 9.356, 1.817, 2.128, 0.481, LAV, '2026', WHITE, PALE, TEAL);
+  GRID17.forEach((y) => hline(s, 1.218, y, 3.962, WHITE, 0.75));
+  AXIS17.forEach(([label, y]) => T(s, label, { x: 0.739, y, w: 0.728, h: 0.286, color: PALE }));
+  BARS17.forEach((b) => {
+    rrect(s, b.x, b.y, 0.567, b.h, 0.132, { fill: { color: LAV } });
+    rrect(s, b.x, b.y, 0.567, b.capH, 0.132, { fill: { color: PALE } });
+    T(s, b.top, { x: b.tx, y: b.ty, w: 0.624, h: 0.286 });
+    T(s, b.low, { x: b.lx, y: b.ly, w: 0.624, h: 0.286, color: WHITE });
+    T(s, b.year, { x: b.yx, y: 6.08, w: 0.728, h: 0.286, color: PALE });
+  });
+  ell(s, 7.179, 4.442, 0.847, 0.847, { fill: { color: PALE } });
+  s.addShape('custGeom', {
+    x: 7.3, y: 4.75, w: 0.45, h: 0.25, line: strokeBox(TEAL, 3.75),
+    points: [{ x: 0, y: 0.23 }, { x: 0.16, y: 0.08 }, { x: 0.26, y: 0.16 }, { x: 0.45, y: 0 }],
+  });
+  s.addShape('custGeom', {
+    x: 7.6, y: 4.74, w: 0.18, h: 0.19, fill: { color: TEAL },
+    points: [{ x: 0.18, y: 0 }, { x: 0.18, y: 0.19 }, { x: 0, y: 0 }, { close: true }],
+  });
+  T(s, '+65.7%', { x: 7.045, y: 5.356, w: 2.922, h: 0.942, fontSize: 50, bold: true, color: PALE });
+  T(s, 'Lorem ipsum dolor sit amet, sit contact consectetuer adipiscing elit, ', { x: 7.045, y: 6.299, w: 3.368, h: 0.471, color: PALE });
+  cornerBtn(s, 0.352, 6.597, PALE, TEAL);
+}
+
+/* ================================================================== *
+ * 18 — Main Integrity to Build Our Institution
+ * ================================================================== */
+const INTEGRITY = [
+  { box: [0.38, 3.212], icon: [0.489, 3.307], draw: iconBooks, text: [1.382, 3.127, 4.421, 1.026],
+    body: 'consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam ipsum dolor sit amet, consectetuer.' },
+  { box: [0.38, 4.386], icon: [0.503, 4.501], draw: iconCase, text: [1.382, 4.347, 4.421, 0.841],
+    body: 'consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.' },
+  { box: [0.428, 5.535], icon: [0.551, 5.651], draw: iconCase, text: [1.43, 5.497, 4.227, 0.841],
+    body: 'consectetuer adipiscing elit, sed diam nonum nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam.' },
+];
+
+/* Smartphone mock-up (replaces the phone photo of the original). */
+function phone(s, x, y, w, h) {
+  rrect(s, x, y, w, h, 0.15, { fill: { color: '101010' } });
+  rrect(s, x + 0.083, y + 0.083, w - 0.166, h - 0.166, 0.14, { fill: { color: PALE } });
+  rrect(s, x + 0.82, y + 0.083, 1.05, 0.21, 0.4, { fill: { color: '101010' } });
+  rect(s, x - 0.015, y + 1.05, 0.03, 0.3, { fill: { color: '101010' } });
+}
+
+function slide18(s) {
+  s.background = { color: PALE };
+  navLight(s);
+  T(s, 'Main Integrity to Build Our Institution', { x: 0.29, y: 1.043, w: 5.703, h: 1.245, fontSize: 34, bold: true });
+  tag(s, 0.368, 2.425, 2.051, 0.493, TEAL, 'Institution Integrity', 0.553, 2.512, 1.745, TEAL, MONT);
+  INTEGRITY.forEach((r) => {
+    rrect(s, r.box[0], r.box[1], 0.82, 0.82, 0.167, { fill: { color: TEAL } });
+    r.draw(s, r.icon[0], r.icon[1], 0.569, PALE);
+    T(s, [
+      { text: 'Lorem ipsum dolor sit amet', options: { bold: true } },
+      { text: ', ', options: { breakLine: true } },
+      { text: r.body },
+    ], { x: r.text[0], y: r.text[1], w: r.text[2], h: r.text[3] });
+  });
+  vline(s, 6.077, 1.165, 5.851, TEAL, 1.5);
+  phone(s, 6.694, 1.347, 2.681, 5.556);
+  rrect(s, 9.87, 2.355, 2.91, 2.266, 0.075, { fill: { color: TEAL } });
+  T(s, '(2025)', { x: 10.026, y: 2.518, w: 1.119, h: 0.353, fontSize: 15, color: PALE });
+  T(s, 'USD 1,567', { x: 10.002, y: 2.842, w: 1.921, h: 0.522, fontSize: 25, color: PALE });
+  hline(s, 10.077, 3.53, 2.477, PALE, 1.5);
+  T(s, '(2026)', { x: 10.05, y: 3.661, w: 0.881, h: 0.353, fontSize: 15, color: PALE });
+  T(s, 'USD 2,648', { x: 10.026, y: 3.993, w: 2.299, h: 0.522, fontSize: 25, color: PALE });
+  rrect(s, 9.87, 4.796, 2.91, 1.324, 0.075, { fill: { color: TEAL } });
+  T(s, '1500 K', { x: 10.134, y: 5.07, w: 1.921, h: 0.522, fontSize: 25, color: PALE });
+  T(s, 'Actived Student', { x: 10.134, y: 5.472, w: 2.299, h: 0.353, fontSize: 15, color: PALE });
+  [2.571, 4.979].forEach((y) => arrowBtn(s, 12.37, y, 0.271, PALE, TEAL));
+  cornerBtn(s, 0.421, 6.733, TEAL, PALE);
+}
+
+/* ================================================================== *
+ * 19 — Student Analytic Report (area chart)
+ * ================================================================== */
+const CURVE19 = [[0.0, 1.289], [0.472, 1.069], [1.53, 0.666], [2.6, 0.0], [3.674, 0.992], [4.723, 1.481], [5.168, 1.596]];
+const DOTS19 = [[1.031, 4.046], [2.058, 3.634], [3.086, 2.902], [4.186, 4.001], [5.173, 4.496]];
+const VALUES19 = [['125 K', 0.819, 3.642], ['150 K', 1.807, 3.201], ['190 K', 2.913, 2.534], ['131 K', 4.074, 3.634], ['100 K', 5.033, 4.121]];
+const XLAB19 = [['Que 01', 0.711], ['Que 01', 1.597], ['Que 01', 2.703], ['Que 02', 3.792], ['Que 03', 4.924]];
+const TICK19 = [1.042, 1.981, 3.086, 4.161, 5.262];
+const CARDS19 = [
+  { y: 2.68, pct: '75%', py: 2.84, year: 3.697, head: 3.025, body: 4, bodyW: 3.58, line: 2.868 },
+  { y: 4.456, pct: '25%', py: 4.623, year: 5.523, head: 4.819, body: 5.171, bodyW: 3.614, line: 4.701 },
+];
+
+function slide19(s) {
+  s.background = { color: TEAL };
+  navDark(s);
+  T(s, 'Student Analytic Report', { x: 0.354, y: 0.886, w: 5.775, h: 1.447, fontSize: 40, bold: true, color: LAV });
+  pill(s, 2.733, 1.704, 1.675, 0.491, { line: strokeBox(PALE, 1) });
+  T(s, [{ text: 'Student ', options: { fontFace: JAK } }, { text: 'Report', options: { fontFace: MONT } }],
+    { x: 2.945, y: 1.807, w: 1.38, h: 0.286, color: PALE });
+  areaFade(s, 0.58, 2.991, 5.168, 3.406, CURVE19, PALE, 34);
+  s.addShape('custGeom', {
+    x: 0.58, y: 2.991, w: 5.168, h: 1.596, line: strokeBox(LAV, 2.5),
+    points: CURVE19.map(([x, y]) => ({ x, y })),
+  });
+  DOTS19.forEach(([x, y]) => ell(s, x, y, 0.155, 0.155, { fill: { color: PALE } }));
+  VALUES19.forEach(([t, x, y]) => T(s, t, { x, y, w: 0.658, h: 0.285, color: PALE }));
+  hline(s, 0.543, 6.397, 5.205, WHITE, 0.75);
+  TICK19.forEach((x) => vline(s, x, 6.327, 0.14, WHITE, 0.75));
+  XLAB19.forEach(([t, x]) => T(s, t, { x, y: 6.516, w: 0.767, h: 0.286, color: PALE }));
+  vline(s, 6.294, 1.209, 5.714, LAV, 1.5);
+  photo(s, 6.667, 1.126, 6.313, 1.207, 0.5, { line: strokeBox(PALE, 2) });
+  CARDS19.forEach((c) => {
+    rrect(s, 6.666, c.y, 6.313, 1.525, 0.167, { fill: { color: PALE }, line: strokeBox(LAV, 1) });
+    T(s, c.pct, { x: 6.898, y: c.py, w: 1.675, h: 0.773, fontSize: 40, bold: true });
+    T(s, '(2026)', { x: 6.967, y: c.year, w: 0.818, h: 0.286 });
+    vline(s, 8.725, c.line, 1.109, TEAL, 1.5);
+    T(s, 'Student Report', { x: 8.934, y: c.head, w: 2.58, h: 0.337, fontSize: 14, bold: true });
+    T(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam. dolor sit amet.',
+      { x: 8.934, y: c.body, w: c.bodyW, h: 0.471 });
+  });
+  cornerBtn(s, 12.561, 6.597, PALE, TEAL);
+}
+
+/* ================================================================== *
+ * 20 — Yearly Statistic Report
+ * ================================================================== */
+const STATS20 = [
+  { num: '(01)', nx: 5.348, ny: 1.158, value: '$25M', vx: 5.727, vy: 1.419, vw: 3.808 },
+  { num: '(02)', nx: 5.276, ny: 2.811, value: '120K', vx: 5.818, vy: 2.973, vw: 3.085 },
+  { num: '(03)', nx: 5.287, ny: 4.286, value: '90K', vx: 5.818, vy: 4.512, vw: 3.085 },
+];
+
+/* Desktop monitor mock-up (replaces the monitor photo of the original). */
+function monitor(s, x, y, w, h) {
+  rrect(s, x, y, w, h, 0.015, { fill: { color: '202020' }, line: strokeBox('A5A6A7', 0.75) });
+  rect(s, x + 0.083, y + 0.083, w - 0.166, h - 0.166, { fill: { color: TEAL } });
+  ell(s, x + w / 2 - 0.02, y + 0.028, 0.04, 0.04, { fill: { color: '4A4A4A' } });
+  s.addShape('custGeom', {
+    x: x + 1.319, y: y + h, w: 1.362, h: 0.458, fill: { color: 'A0A0A0' },
+    points: [{ x: 0.25, y: 0 }, { x: 1.098, y: 0 }, { x: 1.362, y: 0.458 }, { x: 0, y: 0.458 }, { close: true }],
+  });
+  rrect(s, x + 1.361, y + h + 0.416, 1.292, 0.06, 0.5, { fill: { color: 'B7B7B7' } });
+}
+
+function slide20(s) {
+  s.background = { color: TEAL };
+  rrect(s, 9.838, 1.256, 3.067, 5.679, 0.076, { fill: { color: PALE }, line: strokeBox(LAV, 1) });
+  navDark(s);
+  T(s, [{ text: 'Yearly Statistic', options: { breakLine: true } }, { text: 'Report' }],
+    { x: 0.38, y: 1.189, w: 4.248, h: 1.279, fontSize: 35, bold: true, color: LAV });
+  pill(s, 2.503, 1.898, 1.675, 0.491, { fill: { color: PALE }, line: strokeBox('1E3390', 1) });
+  T(s, 'Our  Innovations', { x: 2.655, y: 1.997, w: 1.46, h: 0.285, fontFace: JAK });
+  monitor(s, 0.375, 2.917, 4.0, 2.375);
+  vline(s, 4.88, 1.3, 5.441, PALE, 1.5);
+  vline(s, 9.458, 1.264, 5.441, PALE, 1.5);
+  STATS20.forEach((r) => {
+    T(s, r.num, { x: r.nx, y: r.ny, w: 0.759, h: 0.438, fontSize: 20, color: PALE });
+    T(s, [{ text: r.value, options: { color: LAV } }, { text: '+', options: { color: PALE } }],
+      { x: r.vx, y: r.vy, w: r.vw, h: 1.313, fontSize: 72 });
+  });
+  T(s, 'Note 01', { x: 5.288, y: 6.031, w: 1.222, h: 0.405, fontSize: 18, bold: true, color: PALE });
+  T(s, 'Nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim.',
+    { x: 5.288, y: 6.464, w: 3.807, h: 0.471, color: PALE });
+  T(s, 'Student Report', { x: 10.166, y: 1.451, w: 1.884, h: 0.774, fontSize: 20, bold: true });
+  ell(s, 12.349, 1.471, 0.418, 0.418, { fill: { color: TEAL } });
+  s.addShape('line', { x: 12.483, y: 1.68, w: 0.15, h: 0, rotate: 322, line: { color: PALE, width: 0.75, endArrowType: 'triangle' } });
+  photo(s, 10.211, 2.581, 2.347, 2.338, 0.5, { line: strokeBox(TEAL, 2) });
+  T(s, '(2026)', { x: 10.091, y: 5.356, w: 1.222, h: 0.405, fontSize: 18, bold: true });
+  T(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam. dolor sit amet.',
+    { x: 10.08, y: 5.841, w: 2.478, h: 0.656 });
+  cornerBtn(s, 0.421, 6.733, LAV, TEAL);
+}
+
+/* ================================================================== *
+ * Build
+ * ================================================================== */
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: 13.333, height: 7.5 });
+  pptx.layout = 'DECK';
+  pptx.title = 'Admission School';
+  BUILDERS.forEach((fn) => fn(pptx.addSlide()));
+  return pptx.writeFile({ fileName: path.join(__dirname, '0af6d0f7-a1dc-464a-bbff-e0d6c42f94f9_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });
