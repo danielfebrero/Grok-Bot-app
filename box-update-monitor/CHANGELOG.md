@@ -1,7 +1,7 @@
 # Changelog de l'ordinateur cloud (box Grok Bot)
 
 Snapshot par snapshot, ce qui a changé dans le runtime de la box (sand-host, image, agent-store-fuse, skills gérées…),
-classé en **Bugfix / Change / Features / Perf / Autre-infra**. Entrées les plus récentes en haut. Format et règles : [README.md](README.md).
+classé en **Bugfix / Change / Features / Perf / Autre-infra**. Entrées les plus récentes en haut.
 Seuls les snapshots avec un vrai diff sont listés. Heures de Paris (CEST).
 
 Base de référence : snapshot `2026-10-07_17-05` (« avant update (Dani) ») — image `a6e2020`, sand-host `f95dbfb`,
@@ -10,8 +10,8 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 ---
 
 ## 2026-10-09 12:49 (Paris) — snapshot `2026-10-09_04-50` → `2026-10-09_12-49`
-- Commit GitHub : [75ed628](../../../../commit/75ed628da4680eae6a106662d1b4d8a156b9867d)
-- Rapport brut : [../reports/2026-10-09_12-49.md](../reports/2026-10-09_12-49.md)
+- Commit GitHub : [75ed628](../../../commit/75ed628da4680eae6a106662d1b4d8a156b9867d)
+- Rapport brut : [reports/2026-10-09_12-49.md](reports/2026-10-09_12-49.md)
 - Versions touchées : **agent-store-fuse** `2394551` → `3216860`. Le reste est inchangé (image `a6e2020`, sand-host `ddf72f7`, orbitd, Chrome, Node).
 - Diff : 0 ajouté, 0 supprimé, 2 modifiés.
 
@@ -30,8 +30,8 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 ---
 
 ## 2026-10-09 04:50 (Paris) — snapshot `2026-10-09_02-53` → `2026-10-09_04-50`
-- Commit GitHub : [c4c8a59](../../../../commit/c4c8a59d82adcaceba585c2616822325e0186887)
-- Rapport brut : [../reports/2026-10-09_04-50.md](../reports/2026-10-09_04-50.md)
+- Commit GitHub : [c4c8a59](../../../commit/c4c8a59d82adcaceba585c2616822325e0186887)
+- Rapport brut : [reports/2026-10-09_04-50.md](reports/2026-10-09_04-50.md)
 - Versions touchées : **agent-store-fuse** `3653d35` → `2394551`. Le reste est inchangé (sand-host `ddf72f7`).
 - Diff : 0 ajouté, 0 supprimé, 2 modifiés.
 
@@ -50,8 +50,8 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 ---
 
 ## 2026-10-09 02:53 (Paris) — snapshot `2026-10-08_20-36` → `2026-10-09_02-53`
-- Commit GitHub : [db01287](../../../../commit/db01287ee448f1f6d886a1b5da66c84e85aedca9)
-- Rapport brut : [../reports/2026-10-09_02-53.md](../reports/2026-10-09_02-53.md)
+- Commit GitHub : [db01287](../../../commit/db01287ee448f1f6d886a1b5da66c84e85aedca9)
+- Rapport brut : [reports/2026-10-09_02-53.md](reports/2026-10-09_02-53.md)
 - Versions touchées : **sand-host** `3f90dc1` → `ddf72f7` (hot-update du host, image inchangée `a6e2020`). Skills gérées `office-pptx`, `slides-executor` et `sign-in`. Dépendance **piscina** 4.9.3 → 4.9.4. agent-store-fuse inchangé (`3653d35`).
 - Diff : 0 ajouté, 0 supprimé, 15 modifiés.
 
@@ -83,8 +83,8 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 ---
 
 ## 2026-10-08 20:36 (Paris) — snapshot `2026-10-08_04-50` → `2026-10-08_20-36`
-- Commit GitHub : [85f87f0](../../../../commit/85f87f0b35f552659b61837bdaa60e4f0ed818ae)
-- Rapport brut : [../reports/2026-10-08_20-36.md](../reports/2026-10-08_20-36.md)
+- Commit GitHub : [85f87f0](../../../commit/85f87f0b35f552659b61837bdaa60e4f0ed818ae)
+- Rapport brut : [reports/2026-10-08_20-36.md](reports/2026-10-08_20-36.md)
 - Versions touchées : **agent-store-fuse** `82d6332` → `3653d35`. Le reste est inchangé (sand-host `3f90dc1`).
 - Diff : 0 ajouté, 0 supprimé, 1 modifié.
 
@@ -102,8 +102,8 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 ---
 
 ## 2026-10-08 04:50 (Paris) — snapshot `2026-10-08_02-46` → `2026-10-08_04-50`
-- Commit GitHub : [e7d2329](../../../../commit/e7d232949a1b44ce36fe83ddc81de3802455377e)
-- Rapport brut : [../reports/2026-10-08_04-50.md](../reports/2026-10-08_04-50.md)
+- Commit GitHub : [e7d2329](../../../commit/e7d232949a1b44ce36fe83ddc81de3802455377e)
+- Rapport brut : [reports/2026-10-08_04-50.md](reports/2026-10-08_04-50.md)
 - Versions touchées : **agent-store-fuse** `e44f687` → `82d6332`. Le reste est inchangé (sand-host `3f90dc1`).
 - Diff : 0 ajouté, 0 supprimé, 1 modifié.
 
@@ -121,8 +121,8 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 ---
 
 ## 2026-10-08 02:46 (Paris) — snapshot `2026-10-07_17-05` → `2026-10-08_02-46`
-- Commit GitHub : [1fae1ef](../../../../commit/1fae1efc17132fb9c0ca8cb207be3888384a3123) (publié avec le snapshot de base `2026-10-07_17-05`)
-- Rapport brut : [../reports/2026-10-08_02-46.md](../reports/2026-10-08_02-46.md)
+- Commit GitHub : [1fae1ef](../../../commit/1fae1efc17132fb9c0ca8cb207be3888384a3123) (publié avec le snapshot de base `2026-10-07_17-05`)
+- Rapport brut : [reports/2026-10-08_02-46.md](reports/2026-10-08_02-46.md)
 - Versions touchées : **sand-host** `f95dbfb` → `3f90dc1` (hot-update, image inchangée `a6e2020`). Skills gérées : `office-pptx` (nouvelle), `slides-executor`, `slides`, `routines`, `site-playbooks-luma`.
 - Diff : 1 ajouté, 0 supprimé, 11 modifiés.
 
