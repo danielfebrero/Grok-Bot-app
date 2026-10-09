@@ -1,0 +1,590 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/insurance_marketing_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/insurance_marketing_presentation.js
+@@ -0,0 +1,587 @@
++/**
++ * "Insurance Making Simple" — 20-slide deck rebuilt with pptxgenjs.
++ * Run: node 057c81bd-eaa7-4f40-86e6-daaebeb6af8e_grok_final.js
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- design tokens
++const HEAD = 'Red Hat Display Bold'; // theme major font
++const BODY = 'Archivo'; // theme minor font
++const TEAL = '3ECFB5'; // accent1
++const BG = 'F2F2F2'; // page background (bg1 lumMod 95%)
++const WHITE = 'FFFFFF';
++const INK = '000000';
++const INK_90 = '0D0D0D';
++const INK_85 = '262626';
++const GREY = '595959';
++const GREY_LT = 'BFBFBF';
++const FOOT_GREY = 'A6A6A6';
++const NUM_GREY = '7F7F7F';
++
++const SHADOW = { type: 'outer', blur: 4, offset: 3, angle: 45, color: INK, opacity: 0.1 };
++
++// Repeated filler copy, kept as named constants so the slide builders stay readable.
++const L = {
++  massa: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa.',
++  aenean: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean.',
++  eget: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget.',
++  ligula: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula.',
++  ligula0: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula',
++  commodo: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo.',
++  sociis: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis.',
++  nascetur: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur.',
++  parturient: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient.',
++  donec: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec.',
++  adip: 'Lorem ipsum dolor sit amet, consectetuer adipiscing.',
++  adip0: 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
++  consec: 'Lorem ipsum dolor sit amet, consectetuer.',
++};
++const BLURB_LONG = 'Because life is unpredictable, we\u2019re here to make sure your future';
++const BLURB = 'Because life is unpredictable, we\u2019re here to make sure';
++
++// ---------------------------------------------------------------- vector artwork
++// Each path is a list of segments in a 0..1 box: ['M'|'L', x, y] / ['C', x1,y1, x2,y2, x,y] / ['Z'].
++
++const SWOOSH = [
++  ['M', 0.402, 0.127], ['C', 0.673, -0.028, 0.933, 0.18, 0.957, 0.607], ['C', 0.96, 0.576, 0.968, 0.546, 0.979, 0.519],
++  ['C', 0.983, 0.51, 0.988, 0.501, 0.993, 0.494], ['C', 0.994, 0.493, 0.994, 0.493, 0.995, 0.492], ['C', 0.996, 0.492, 0.997, 0.493, 0.998, 0.494],
++  ['C', 0.998, 0.494, 0.999, 0.495, 0.999, 0.496], ['C', 0.999, 0.498, 0.999, 0.499, 0.999, 0.5], ['C', 0.979, 0.554, 0.979, 0.619, 0.979, 0.678],
++  ['C', 0.979, 0.727, 0.97, 0.716, 0.95, 0.687], ['C', 0.916, 0.637, 0.883, 0.605, 0.848, 0.571], ['C', 0.847, 0.57, 0.847, 0.569, 0.847, 0.569],
++  ['C', 0.847, 0.568, 0.847, 0.567, 0.847, 0.566], ['C', 0.847, 0.565, 0.848, 0.564, 0.848, 0.564], ['C', 0.849, 0.564, 0.849, 0.563, 0.85, 0.564],
++  ['C', 0.882, 0.571, 0.913, 0.589, 0.94, 0.615], ['C', 0.856, 0.284, 0.661, 0.101, 0.42, 0.204], ['C', 0.196, 0.321, 0.061, 0.666, 0.013, 0.991],
++  ['C', 0.013, 0.993, 0.012, 0.995, 0.011, 0.996], ['C', 0.009, 0.998, 0.008, 0.999, 0.006, 0.998], ['C', 0.005, 0.998, 0.005, 0.998, 0.004, 0.998],
++  ['C', 0.003, 0.997, 0.002, 0.996, 0.002, 0.995], ['C', 0.001, 0.994, 0.001, 0.993, 0.0, 0.992], ['C', 0.0, 0.991, 0.0, 0.989, 0.0, 0.988],
++  ['C', 0.031, 0.638, 0.167, 0.266, 0.402, 0.127], ['Z'],
++  ['M', 0.091, 0.372], ['C', 0.091, 0.372, 0.092, 0.372, 0.093, 0.373], ['C', 0.093, 0.374, 0.093, 0.374, 0.094, 0.375],
++  ['C', 0.094, 0.376, 0.094, 0.377, 0.094, 0.378], ['C', 0.09, 0.403, 0.082, 0.425, 0.069, 0.443], ['C', 0.069, 0.444, 0.068, 0.444, 0.068, 0.444],
++  ['C', 0.067, 0.445, 0.066, 0.445, 0.066, 0.444], ['C', 0.065, 0.444, 0.065, 0.443, 0.064, 0.443], ['C', 0.064, 0.442, 0.064, 0.441, 0.064, 0.44],
++  ['C', 0.063, 0.427, 0.066, 0.413, 0.07, 0.401], ['C', 0.074, 0.39, 0.081, 0.38, 0.089, 0.373], ['C', 0.089, 0.372, 0.09, 0.372, 0.091, 0.372], ['Z'],
++  ['M', 0.116, 0.308], ['C', 0.177, 0.132, 0.305, -0.011, 0.443, 0.001], ['C', 0.444, 0.001, 0.445, 0.001, 0.445, 0.002],
++  ['C', 0.446, 0.003, 0.446, 0.004, 0.446, 0.005], ['C', 0.446, 0.006, 0.446, 0.007, 0.445, 0.008], ['C', 0.445, 0.008, 0.444, 0.009, 0.444, 0.009],
++  ['C', 0.313, 0.043, 0.206, 0.167, 0.121, 0.313], ['C', 0.121, 0.313, 0.12, 0.314, 0.12, 0.314], ['C', 0.119, 0.314, 0.118, 0.314, 0.118, 0.313],
++  ['C', 0.117, 0.313, 0.116, 0.312, 0.116, 0.311], ['C', 0.116, 0.31, 0.116, 0.309, 0.116, 0.308], ['Z'],
++];
++
++const SHIELD = [
++  ['M', 0.5, 0.006], ['C', 0.684, 0.113, 0.851, 0.163, 0.994, 0.151], ['C', 1.019, 0.612, 0.832, 0.884, 0.502, 0.997],
++  ['C', 0.182, 0.891, -0.007, 0.631, 0.007, 0.144], ['C', 0.175, 0.152, 0.34, 0.119, 0.5, 0.006], ['Z'],
++];
++
++const ARROW_DIAG = [
++  ['M', 1.0, 0.482], ['L', 0.943, 0.538], ['L', 0.54, 0.149], ['C', 0.54, 0.433, 0.54, 0.716, 0.54, 1.0],
++  ['L', 0.456, 0.999], ['C', 0.458, 0.833, 0.457, 0.315, 0.46, 0.149], ['L', 0.057, 0.538], ['L', 0.0, 0.482],
++  ['L', 0.5, 0.0], ['L', 1.0, 0.482], ['Z'],
++];
++
++const PLUS = [
++  ['M', 1.0, 0.379], ['L', 1.0, 0.621], ['L', 0.621, 0.621], ['L', 0.621, 1.0], ['L', 0.379, 1.0], ['L', 0.379, 0.621],
++  ['L', 0.0, 0.621], ['L', 0.0, 0.379], ['L', 0.379, 0.379], ['L', 0.379, 0.0], ['L', 0.621, 0.0], ['L', 0.621, 0.379], ['Z'],
++];
++
++const QUOTE = [
++  ['M', 0.0, 0.0], ['L', 0.0, 0.504], ['L', 0.228, 0.504], ['C', 0.225, 0.66, 0.124, 0.784, 0.0, 0.784],
++  ['L', 0.0, 1.0], ['C', 0.218, 1.0, 0.397, 0.779, 0.4, 0.504], ['L', 0.4, 0.0], ['Z'],
++  ['M', 0.6, 0.0], ['L', 0.6, 0.504], ['L', 0.828, 0.504], ['C', 0.825, 0.66, 0.724, 0.784, 0.6, 0.784],
++  ['L', 0.6, 1.0], ['C', 0.818, 1.0, 0.997, 0.779, 1.0, 0.504], ['L', 1.0, 0.0], ['Z'],
++];
++
++// ---------------------------------------------------------------- drawing helpers
++
++/** Text box. Reference text boxes are top-anchored with PowerPoint's default insets. */
++function T(s, text, o) {
++  s.addText(text, Object.assign({ fontFace: BODY, fontSize: 18, color: INK, valign: 'top', align: 'left' }, o));
++}
++
++/** roundRect whose corner radius is given as the OOXML `adj` value (1/100000 of the short side). */
++function roundRect(s, o) {
++  s.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    rectRadius: (o.adj / 100000) * Math.min(o.w, o.h),
++    fill: { color: o.fill }, line: { type: 'none' },
++    shadow: o.shadow ? SHADOW : undefined,
++  });
++}
++
++/** "top corners rounded" rectangle; `adj1` is the OOXML adjust value. */
++function topRoundRect(s, o) {
++  s.addShape('round2SameRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h, rotate: o.rotate || 0,
++    angleRange: [o.adj1 / 60000, 0],
++    fill: { color: o.fill }, line: { type: 'none' },
++    shadow: o.shadow ? SHADOW : undefined,
++  });
++}
++
++/** Free-form path scaled into the box {x,y,w,h}. Points are relative to the shape origin. */
++function poly(s, segs, o) {
++  const pts = segs.map(g => {
++    if (g[0] === 'M') return { x: o.w * g[1], y: o.h * g[2], moveTo: true };
++    if (g[0] === 'L') return { x: o.w * g[1], y: o.h * g[2] };
++    if (g[0] === 'C') {
++      return {
++        x: o.w * g[5], y: o.h * g[6],
++        curve: { type: 'cubic', x1: o.w * g[1], y1: o.h * g[2], x2: o.w * g[3], y2: o.h * g[4] },
++      };
++    }
++    return { close: true };
++  });
++  s.addShape('custGeom', {
++    x: o.x, y: o.y, w: o.w, h: o.h, points: pts, rotate: o.rotate || 0, flipH: o.flipH || false,
++    fill: { color: o.color }, line: { type: 'none' },
++  });
++}
++
++/** The hand-drawn teal arc that decorates every slide. */
++function swoosh(s, x, y, rotate) {
++  poly(s, SWOOSH, { x: x, y: y, w: 1.188, h: 0.82, color: TEAL, rotate: rotate });
++}
++
++/** Teal disc + white shield glyph + small white arrow, used as a feature bullet. */
++function shieldBadge(s, x, y, o) {
++  const opt = o || {};
++  const disc = opt.disc || TEAL;
++  const glyph = opt.glyph || BG;
++  s.addShape('ellipse', { x: x, y: y, w: 1.118, h: 1.118, fill: { color: disc }, line: { type: 'none' }, shadow: SHADOW });
++  poly(s, SHIELD, { x: x + 0.322, y: y + 0.339, w: 0.472, h: 0.518, color: glyph });
++  s.addShape('rightArrow', {
++    x: x + 0.437, y: y + 0.473, w: 0.244, h: 0.252, rotate: opt.down ? 90 : 270,
++    fill: { color: disc }, line: { type: 'none' },
++  });
++}
++
++/** Small teal disc with a white "+" glyph. */
++function plusBadge(s, x, y) {
++  s.addShape('ellipse', { x: x, y: y, w: 0.486, h: 0.486, fill: { color: TEAL }, line: { type: 'none' } });
++  poly(s, PLUS, { x: x + 0.11, y: y + 0.11, w: 0.266, h: 0.266, color: WHITE, rotate: 270 });
++}
++
++/** Double closing-quote glyph (top-left corner of the quote cards). */
++function quoteMark(s, x, y, color) {
++  poly(s, QUOTE, { x: x, y: y, w: 0.266, h: 0.211, color: color });
++}
++
++/** Diagonal "down-right" arrow (bottom-right corner of the quote cards). */
++function diagArrow(s, x, y, w, h, color) {
++  poly(s, ARROW_DIAG, { x: x, y: y, w: w, h: h, color: color, rotate: 135 });
++}
++
++/** Outlined "database" glyph: a cylinder with two extra rims for the stacked-disc look. */
++function databaseGlyph(s, x, y, w, h, color) {
++  const rim = h * 0.24;
++  s.addShape('can', { x: x, y: y, w: w, h: h, fill: { type: 'none' }, line: { color: color, width: 1.25 } });
++  [0.42, 0.68].forEach(t => {
++    s.addShape('ellipse', { x: x, y: y + h * t - rim / 2, w: w, h: rim, fill: { type: 'none' }, line: { color: color, width: 1.25 } });
++  });
++}
++
++/** "Support" glyph: two little figures resting on an open hand. */
++function handGlyph(s, x, y, w, h, color) {
++  const fill = { color: color };
++  const none = { type: 'none' };
++  s.addShape('ellipse', { x: x + w * 0.31, y: y, w: w * 0.16, h: h * 0.19, fill: fill, line: none });
++  s.addShape('trapezoid', { x: x + w * 0.23, y: y + h * 0.21, w: w * 0.32, h: h * 0.26, fill: fill, line: none });
++  s.addShape('ellipse', { x: x + w * 0.60, y: y + h * 0.08, w: w * 0.13, h: h * 0.16, fill: fill, line: none });
++  s.addShape('trapezoid', { x: x + w * 0.54, y: y + h * 0.26, w: w * 0.26, h: h * 0.21, fill: fill, line: none });
++  s.addShape('rect', { x: x, y: y + h * 0.55, w: w * 0.17, h: h * 0.28, fill: fill, line: none });
++  s.addShape('chord', { x: x + w * 0.16, y: y + h * 0.55, w: w * 0.84, h: h * 0.52, angleRange: [0, 180], fill: fill, line: none });
++}
++
++/**
++ * Linear top-to-bottom gradient faked with horizontal colour bands, since pptxgenjs
++ * only emits solid fills. Optional rounded top corners are carved out afterwards by
++ * painting background-coloured masks over the band stack.
++ */
++function gradientPanel(s, o) {
++  const bands = o.bands || 40;
++  const from = [0, 2, 4].map(i => parseInt(o.from.substr(i, 2), 16));
++  const to = [0, 2, 4].map(i => parseInt(o.to.substr(i, 2), 16));
++  const mix = t => from.map((c, i) => Math.round(c + (to[i] - c) * t))
++    .map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('');
++  const bandH = o.h / bands;
++
++  for (let i = 0; i < bands; i++) {
++    s.addShape('rect', {
++      x: o.x, y: o.y + i * bandH, w: o.w, h: bandH + 0.012,
++      fill: { color: mix((i + 0.5) / bands) }, line: { type: 'none' },
++    });
++  }
++
++  const r = o.radius || 0;
++  if (r > 0) {
++    // Corner mask: a square with a quarter-disc bitten out, painted in the page colour.
++    // It overhangs the panel by `m` so its own antialiased edge falls on plain background.
++    const K = 0.5523; // cubic-bezier constant for a quarter circle
++    const m = 0.04;
++    const e = m / (r + m); // where the arc meets the panel edge, in mask-box coordinates
++    const c = 1 - K * (1 - e);
++    const mask = [['M', e, 1], ['C', e, c, c, e, 1, e], ['L', 1, 0], ['L', 0, 0], ['L', 0, 1], ['Z']];
++    poly(s, mask, { x: o.x - m, y: o.y - m, w: r + m, h: r + m, color: BG });
++    poly(s, mask, { x: o.x + o.w - r, y: o.y - m, w: r + m, h: r + m, color: BG, flipH: true });
++  }
++}
++
++// ---------------------------------------------------------------- slide builders
++
++// 1 — Title slide: gradient phone panel with floating info chips.
++function slide01(s) {
++  gradientPanel(s, { x: 7.104, y: 0.651, w: 4.636, h: 6.849, from: TEAL, to: BG, radius: 0.56 });
++  roundRect(s, { x: 6.176, y: 3.323, w: 2.009, h: 2.073, adj: 12152, fill: WHITE, shadow: true });
++  roundRect(s, { x: 9.623, y: 3.413, w: 2.556, h: 0.667, adj: 50000, fill: WHITE, shadow: true });
++  roundRect(s, { x: 9.93, y: 2.551, w: 2.249, h: 0.667, adj: 50000, fill: WHITE, shadow: true });
++
++  T(s, 'Insurance Making Simple', { x: 1.155, y: 1.427, w: 6.512, h: 1.747, fontSize: 60, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, BLURB_LONG, { x: 1.073, y: 5.501, w: 3.762, h: 0.572, fontSize: 14, color: GREY, fontFace: HEAD });
++  T(s, '+125,00K', { x: 2.756, y: 4.862, w: 2.009, h: 0.436, fontSize: 24, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++
++  s.addShape('ellipse', { x: 9.791, y: 3.503, w: 0.486, h: 0.486, fill: { color: TEAL }, line: { type: 'none' } });
++  plusBadge(s, 10.077, 2.642);
++  T(s, '85,5%', { x: 10.635, y: 2.639, w: 0.986, h: 0.297, fontSize: 14, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, 'What Matters Most', { x: 10.635, y: 2.862, w: 1.446, h: 0.269, fontSize: 10, color: GREY, fontFace: HEAD });
++  T(s, 'Future Secured', { x: 10.284, y: 3.503, w: 1.681, h: 0.269, fontSize: 12, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, 'Secured with Confidence', { x: 10.284, y: 3.727, w: 1.891, h: 0.269, fontSize: 10, color: GREY, fontFace: HEAD });
++  s.addShape('smileyFace', { x: 9.85, y: 3.562, w: 0.369, h: 0.369, fill: { color: TEAL }, line: { color: WHITE, width: 2 } });
++
++  T(s, 'Protect Your Dreams', { x: 6.271, y: 3.472, w: 1.112, h: 0.592, fontSize: 12, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  plusBadge(s, 7.583, 3.472);
++  T(s, BLURB, { x: 6.271, y: 4.228, w: 1.855, h: 0.707, fontSize: 12, color: GREY, fontFace: HEAD });
++  roundRect(s, { x: 6.345, y: 5.118, w: 1.671, h: 0.087, adj: 50000, fill: TEAL });
++  swoosh(s, 4.441, 1.12, 45);
++}
++
++// 2 — Table of content: three numbered rows on staggered rules.
++function slide02(s) {
++  T(s, 'Table of Content', { x: 1.155, y: 1.427, w: 8.033, h: 0.94, fontSize: 60, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  const rows = [
++    { n: '01', nx: 1.155, ny: 2.775, nw: 0.909, sx: 2.163, sy: 2.843, tx: 4.212, ty: 2.843, lx: 1.155, ly: 3.75 },
++    { n: '02', nx: 3.257, ny: 4.158, nw: 1.143, sx: 4.265, sy: 4.226, tx: 6.314, ty: 4.226, lx: 3.257, ly: 5.133 },
++    { n: '02', nx: 5.95, ny: 5.542, nw: 1.143, sx: 6.958, sy: 5.609, tx: 9.007, ty: 5.609, lx: 5.95, ly: 6.516 },
++  ];
++  rows.forEach(r => {
++    T(s, r.n, { x: r.nx, y: r.ny, w: r.nw, h: 0.774, fontSize: 40, bold: true, color: TEAL, fontFace: HEAD });
++    T(s, 'Your Subtitle Goes Here', { x: r.sx, y: r.sy, w: 1.604, h: 0.64, fontSize: 16, fontFace: HEAD });
++    T(s, BLURB_LONG, { x: r.tx, y: r.ty, w: 3.762, h: 0.572, fontSize: 14, color: GREY, fontFace: HEAD });
++    s.addShape('line', { x: r.lx, y: r.ly, w: 6.314, h: 0, line: { color: TEAL, width: 1 } });
++  });
++  swoosh(s, 7.38, 1.12, 45);
++}
++
++// 3 — Right-aligned headline with a pill card carrying a database icon.
++function slide03(s) {
++  T(s, 'Protecting What Matters Most', { x: 6.831, y: 1.427, w: 5.753, h: 2.555, fontSize: 60, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  roundRect(s, { x: 3.996, y: 4.215, w: 6.317, h: 1.51, adj: 50000, fill: WHITE });
++  s.addShape('ellipse', { x: 4.19, y: 4.411, w: 1.118, h: 1.118, fill: { color: TEAL }, line: { type: 'none' }, shadow: SHADOW });
++  databaseGlyph(s, 4.5, 4.721, 0.497, 0.5, WHITE);
++  T(s, 'A Future Secured with Confidence', { x: 5.426, y: 4.521, w: 3.71, h: 0.337, fontSize: 14, fontFace: HEAD });
++  T(s, L.massa, { x: 5.426, y: 4.821, w: 4.791, h: 0.67, fontSize: 12, lineSpacingMultiple: 1.5 });
++  T(s, L.ligula, { x: 10.507, y: 4.332, w: 2.077, h: 1.276, fontSize: 12, lineSpacingMultiple: 1.5 });
++  swoosh(s, 11.662, 1.823, 45);
++}
++
++// 4 — "Building Trust": two quote cards, one light and one teal.
++function slide04(s) {
++  T(s, 'Building Trust Through Protection', { x: 1.155, y: 1.266, w: 5.753, h: 2.31, fontSize: 54, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  swoosh(s, 4.55, 2.332, 45);
++  const cards = [
++    { x: 4.304, fill: WHITE, ink: INK, mark: INK_90, arrow: TEAL, text: 'it\u2019s about being there for you when life takes unexpected turns' },
++    { x: 8.379, fill: TEAL, ink: WHITE, mark: BG, arrow: WHITE, text: 'it\u2019s about confidence, knowing that no matter what happens' },
++  ];
++  cards.forEach(c => {
++    roundRect(s, { x: c.x, y: 3.893, w: 3.8, h: 2.044, adj: 10340, fill: c.fill, shadow: true });
++    quoteMark(s, c.x + 0.463, 4.185, c.mark);
++    T(s, c.text, { x: c.x + 0.341, y: 4.682, w: 3.353, h: 1.01, fontSize: 18, color: c.ink, fontFace: HEAD });
++    diagArrow(s, c.x + 3.041, 4.072, 0.523, 0.533, c.arrow);
++  });
++}
++
++// 5 — Centred statement over a 2x2 grid of alternating pills.
++function slide05(s) {
++  T(s, 'Insurance isn\u2019t just about safety \u2014 it\u2019s about confidence, knowing that no matter what happens, you\u2019re covered',
++    { x: 0.603, y: 1.319, w: 12.127, h: 1.901, fontSize: 44, bold: true, fontFace: HEAD, align: 'center', lineSpacingMultiple: 0.8 });
++  const pills = [
++    { x: 7.062, y: 4.607, fill: WHITE, shadow: true },
++    { x: 7.062, y: 3.628, fill: TEAL },
++    { x: 1.155, y: 4.607, fill: TEAL },
++    { x: 1.155, y: 3.628, fill: WHITE, shadow: true },
++  ];
++  pills.forEach(p => roundRect(s, { x: p.x, y: p.y, w: 5.107, h: 0.726, adj: 22777, fill: p.fill, shadow: p.shadow }));
++  const items = [
++    { n: '01.', nx: 1.321, nw: 0.516, ny: 3.789, tx: 1.99, ty: 3.738, tw: 5.107, label: 'Risks To Life\u2019s Biggest' },
++    { n: '02.', nx: 1.317, nw: 0.628, ny: 4.768, tx: 1.99, ty: 4.718, tw: 3.774, label: 'From the smallest risk' },
++    { n: '03.', nx: 7.286, nw: 0.617, ny: 3.789, tx: 7.903, ty: 3.738, tw: 4.456, label: 'Protecting Your Assets' },
++    { n: '04.', nx: 7.286, nw: 0.617, ny: 4.768, tx: 7.903, ty: 4.718, tw: 4.275, label: 'Believe True Protection' },
++  ];
++  items.forEach(i => {
++    T(s, i.label, { x: i.tx, y: i.ty, w: i.tw, h: 0.505, fontSize: 24, fontFace: HEAD });
++    T(s, i.n, { x: i.nx, y: i.ny, w: i.nw, h: 0.404, fontSize: 18, fontFace: HEAD });
++  });
++  swoosh(s, 11.969, 2.1, 45);
++  T(s, L.donec, { x: 1.149, y: 5.741, w: 11.036, h: 0.683, fontSize: 14, color: INK_85, align: 'center', lineSpacingMultiple: 1.3 });
++}
++
++// 6 — Headline left, white pill band right with a shield badge, two stats below.
++function slide06(s) {
++  T(s, 'A Future Secured with Confidence', { x: 1.155, y: 1.186, w: 5.099, h: 2.827, fontSize: 54, fontFace: HEAD });
++  T(s, '+125B', { x: 1.155, y: 5.71, w: 2.544, h: 0.604, fontSize: 36, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, L.ligula0, { x: 2.8, y: 5.631, w: 3.867, h: 0.683, fontSize: 14, color: INK_85, lineSpacingMultiple: 1.3 });
++  T(s, '+75M', { x: 6.841, y: 5.71, w: 2.544, h: 0.604, fontSize: 36, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, L.ligula0, { x: 8.486, y: 5.631, w: 3.867, h: 0.683, fontSize: 14, color: INK_85, lineSpacingMultiple: 1.3 });
++
++  topRoundRect(s, { x: 9.478, y: 1.387, w: 1.488, h: 6.222, rotate: 270, adj1: 50000, fill: WHITE });
++  shieldBadge(s, 7.25, 3.94);
++  T(s, 'Safeguarding Dreams, One Policy.', { x: 8.486, y: 4.049, w: 3.71, h: 0.337, fontSize: 14, bold: true, fontFace: HEAD });
++  T(s, L.massa, { x: 8.486, y: 4.349, w: 4.791, h: 0.67, fontSize: 12, lineSpacingMultiple: 1.5 });
++  swoosh(s, 5.052, 1.474, 45);
++}
++
++// 7 — Two progress pills with big percentages.
++function slide07(s) {
++  roundRect(s, { x: 6.946, y: 1.916, w: 5.233, h: 1.049, adj: 22777, fill: WHITE, shadow: true });
++  roundRect(s, { x: 4.296, y: 3.431, w: 5.233, h: 1.049, adj: 22777, fill: WHITE, shadow: true });
++  const rows = [
++    { label: 'Progress Insurance A', lx: 7.126, ly: 2.053, pct: '98%', px: 10.096, py: 2.019, pw: 1.902 },
++    { label: 'Progress Insurance B', lx: 4.563, ly: 3.568, pct: '84%', px: 7.705, py: 3.534, pw: 1.73 },
++  ];
++  rows.forEach(r => {
++    T(s, r.label, { x: r.lx, y: r.ly, w: 2.072, h: 0.774, fontSize: 20, color: INK_85, fontFace: HEAD });
++    T(s, r.pct, { x: r.px, y: r.py, w: r.pw, h: 0.841, fontSize: 44, color: INK_85, fontFace: HEAD, align: 'right' });
++  });
++  T(s, 'Power of Smart Coverage', { x: 1.043, y: 1.186, w: 5.972, h: 1.919, fontSize: 54, fontFace: HEAD });
++  T(s, L.ligula0, { x: 1.043, y: 3.431, w: 2.988, h: 0.989, fontSize: 14, color: INK_90, lineSpacingMultiple: 1.3 });
++  diagArrow(s, 7.147, 5.167, 1.083, 1.105, TEAL);
++  T(s, L.massa, { x: 8.398, y: 5.203, w: 3.781, h: 0.989, fontSize: 14, color: INK_85, lineSpacingMultiple: 1.3 });
++  swoosh(s, 4.858, 2.242, 180);
++}
++
++// 8 — Two white bands bleeding off opposite edges, each with a shield badge.
++function slide08(s) {
++  T(s, 'Your Shield in an Uncertain World', { x: 1.155, y: 1.186, w: 7.29, h: 1.919, fontSize: 54, fontFace: HEAD });
++  topRoundRect(s, { x: 2.648, y: 2.371, w: 1.488, h: 6.783, rotate: 90, adj1: 50000, fill: WHITE });
++  shieldBadge(s, 5.524, 5.204, { glyph: WHITE });
++  T(s, 'Redefining the Meaning of Security', { x: 1.081, y: 5.263, w: 4.12, h: 0.37, fontSize: 16, bold: true, fontFace: HEAD });
++  T(s, L.massa, { x: 1.081, y: 5.593, w: 4.791, h: 0.67, fontSize: 12, lineSpacingMultiple: 1.5 });
++
++  topRoundRect(s, { x: 9.478, y: 0.183, w: 1.488, h: 6.222, rotate: 270, adj1: 50000, fill: WHITE });
++  shieldBadge(s, 7.25, 2.736, { glyph: WHITE, down: true });
++  T(s, 'Safeguarding Dreams, One Policy.', { x: 8.486, y: 2.845, w: 3.71, h: 0.337, fontSize: 14, bold: true, fontFace: HEAD });
++  T(s, L.massa, { x: 8.486, y: 3.145, w: 4.791, h: 0.67, fontSize: 12, lineSpacingMultiple: 1.5 });
++
++  T(s, '+75M', { x: 8.044, y: 1.478, w: 2.544, h: 0.604, fontSize: 36, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, L.adip, { x: 9.622, y: 1.399, w: 2.968, h: 0.683, fontSize: 14, color: INK_85, lineSpacingMultiple: 1.3 });
++  swoosh(s, 6.429, 0.989, 45);
++}
++
++// 9 — Headline + teal stat on the left, quote card on the right.
++function slide09(s) {
++  T(s, 'Where Protection Meets Peace of Mind', { x: 1.155, y: 1.186, w: 6.479, h: 2.827, fontSize: 54, fontFace: HEAD });
++  T(s, '+865B', { x: 1.155, y: 4.432, w: 3.48, h: 0.716, fontSize: 44, bold: true, color: TEAL, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, L.nascetur, { x: 1.149, y: 5.148, w: 5.841, h: 0.989, fontSize: 14, color: INK_90, lineSpacingMultiple: 1.3 });
++  roundRect(s, { x: 8.379, y: 4.093, w: 3.8, h: 2.044, adj: 10340, fill: WHITE, shadow: true });
++  quoteMark(s, 8.842, 4.385, INK_90);
++  T(s, 'Transform Uncertainty Into Confidence Through Coverage.', { x: 8.72, y: 4.882, w: 3.353, h: 1.01, fontSize: 18, fontFace: HEAD });
++  diagArrow(s, 11.42, 4.272, 0.523, 0.533, TEAL);
++  swoosh(s, 3.259, 1.067, 45);
++}
++
++// 10 — Full-width teal divider band.
++function slide10(s) {
++  s.addShape('rect', { x: 0, y: 4.14, w: 13.333, h: 0.767, fill: { color: TEAL }, line: { type: 'none' } });
++  T(s, 'Where Protection Meets Peace of Mind', { x: 1.155, y: 1.186, w: 8.528, h: 1.919, fontSize: 54, fontFace: HEAD });
++  T(s, '+865B', { x: 9.688, y: 1.4, w: 3.48, h: 0.716, fontSize: 44, bold: true, color: TEAL, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, L.commodo, { x: 9.683, y: 2.116, w: 3.078, h: 0.989, fontSize: 14, color: INK_90, lineSpacingMultiple: 1.3 });
++  T(s, L.donec, { x: 1.149, y: 5.741, w: 11.036, h: 0.683, fontSize: 14, color: INK_85, align: 'center', lineSpacingMultiple: 1.3 });
++  swoosh(s, 7.103, 1.027, 45);
++}
++
++// 11 — Ascending bar chart drawn as alternating white / gradient columns.
++function slide11(s) {
++  s.addShape('rect', { x: 2.73, y: 5.413, w: 2.362, h: 1.054, fill: { color: WHITE }, line: { type: 'none' }, shadow: SHADOW });
++  gradientPanel(s, { x: 5.092, y: 4.437, w: 2.362, h: 2.03, from: TEAL, to: BG, bands: 24 });
++  s.addShape('rect', { x: 7.454, y: 3.397, w: 2.362, h: 3.07, fill: { color: WHITE }, line: { type: 'none' }, shadow: SHADOW });
++  gradientPanel(s, { x: 9.817, y: 2.778, w: 2.362, h: 3.689, from: TEAL, to: BG, bands: 34 });
++
++  T(s, '90,50%', { x: 9.817, y: 3.006, w: 2.362, h: 0.774, fontSize: 40, color: WHITE, fontFace: HEAD, align: 'center' });
++  T(s, '88,50%', { x: 7.454, y: 3.53, w: 2.362, h: 0.774, fontSize: 40, fontFace: HEAD, align: 'center' });
++  T(s, '75,50%', { x: 5.092, y: 4.622, w: 2.362, h: 0.774, fontSize: 40, color: WHITE, fontFace: HEAD, align: 'center' });
++
++  T(s, 'Protection for Every Stage.', { x: 1.082, y: 3.612, w: 3.918, h: 0.404, fontSize: 18, fontFace: HEAD });
++  T(s, L.ligula, { x: 1.082, y: 4.131, w: 3.521, h: 0.989, fontSize: 14, color: INK_85, lineSpacingMultiple: 1.3 });
++  T(s, L.consec, { x: 2.822, y: 5.518, w: 2.178, h: 0.599, fontSize: 12, color: INK_85, align: 'center', lineSpacingMultiple: 1.3 });
++  T(s, 'We believe true protection goes beyond numbers \u2014 it\u2019s about being there for you when life',
++    { x: 1.155, y: 1.186, w: 10.576, h: 2.121, fontSize: 40, fontFace: HEAD });
++  swoosh(s, 10.905, 1.704, 165);
++}
++
++// 12 — Long headline with two call-out pills.
++function slide12(s) {
++  T(s, 'From the smallest risks to life\u2019s biggest challenges, our mission is to ensure you\u2019re always one step ahead of uncertainty.',
++    { x: 1.155, y: 1.186, w: 11.615, h: 2.121, fontSize: 40, fontFace: HEAD });
++  const cards = [
++    { x: 1.155, fill: TEAL, ink: WHITE, arrow: WHITE, tw: 3.942, text: 'Coverage That Protects Not Just What You Have.' },
++    { x: 6.168, fill: WHITE, ink: INK, arrow: TEAL, tw: 4.068, text: 'Your Peace Of Mind Is Our Promise \u2014 We Stand Beside You' },
++  ];
++  cards.forEach(c => {
++    roundRect(s, { x: c.x, y: 5.161, w: 4.697, h: 1.153, adj: 16123, fill: c.fill, shadow: true });
++    T(s, c.text, { x: c.x + 0.14, y: 5.391, w: c.tw, h: 0.707, fontSize: 18, color: c.ink, fontFace: HEAD });
++    diagArrow(s, c.x + 4.062, 5.478, 0.523, 0.533, c.arrow);
++  });
++  T(s, L.parturient, { x: 1.149, y: 3.956, w: 5.512, h: 0.989, fontSize: 14, color: INK_90, lineSpacingMultiple: 1.3 });
++  swoosh(s, 11.217, 2.445, 165);
++}
++
++// 13 — Oversized statistic with a teal highlight bar behind it.
++function slide13(s) {
++  T(s, 'From the smallest risks to life\u2019s biggest challenges, our mission is to ensure.',
++    { x: 1.155, y: 1.186, w: 11.615, h: 1.447, fontSize: 40, fontFace: HEAD });
++  T(s, L.sociis, { x: 1.149, y: 5.762, w: 5.81, h: 0.683, fontSize: 14, color: INK_90, lineSpacingMultiple: 1.3 });
++  roundRect(s, { x: 7.379, y: 4.046, w: 4.613, h: 0.502, adj: 16667, fill: TEAL });
++  T(s, '90,95%', { x: 7.379, y: 3.098, w: 4.613, h: 1.582, fontSize: 88, fontFace: HEAD });
++  T(s, 'Problem-Solving Approach', { x: 7.474, y: 2.896, w: 3.521, h: 0.404, fontSize: 18, fontFace: HEAD });
++  swoosh(s, 10.598, 1.664, 165);
++}
++
++// 14 — Two feature cards on top, headline underneath.
++function slide14(s) {
++  T(s, 'Because tomorrow matters, we help you build a foundation of security today protecting your assets',
++    { x: 1.155, y: 4.043, w: 11.909, h: 2.121, fontSize: 40, fontFace: HEAD });
++  T(s, L.aenean, { x: 7.625, y: 5.762, w: 4.756, h: 0.683, fontSize: 14, color: INK_90, lineSpacingMultiple: 1.3 });
++  roundRect(s, { x: 8.379, y: 1.413, w: 3.8, h: 2.044, adj: 10340, fill: TEAL, shadow: true });
++  roundRect(s, { x: 4.144, y: 1.413, w: 3.8, h: 2.044, adj: 10340, fill: WHITE, shadow: true });
++  T(s, L.aenean, { x: 4.377, y: 2.202, w: 3.334, h: 0.989, fontSize: 14, color: INK_90, lineSpacingMultiple: 1.3 });
++  T(s, L.aenean, { x: 8.612, y: 2.202, w: 3.334, h: 0.989, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.3 });
++
++  // Small shield glyphs (no disc) sitting inside each card.
++  poly(s, SHIELD, { x: 8.609, y: 1.596, w: 0.472, h: 0.518, color: WHITE });
++  s.addShape('rightArrow', { x: 8.724, y: 1.73, w: 0.244, h: 0.252, rotate: 90, fill: { color: TEAL }, line: { type: 'none' } });
++  poly(s, SHIELD, { x: 4.452, y: 1.601, w: 0.472, h: 0.518, color: TEAL });
++  s.addShape('rightArrow', { x: 4.567, y: 1.735, w: 0.244, h: 0.252, rotate: 270, fill: { color: WHITE }, line: { type: 'none' } });
++
++  T(s, 'Smallest Risks', { x: 5.012, y: 1.677, w: 2.959, h: 0.37, fontSize: 16, fontFace: HEAD });
++  T(s, 'Foundation Of Security', { x: 9.244, y: 1.677, w: 2.935, h: 0.37, fontSize: 16, color: WHITE, fontFace: HEAD });
++  swoosh(s, 10.867, 4.522, 165);
++}
++
++// 15 — Right-hand headline over a white pill card and a teal percentage.
++function slide15(s) {
++  roundRect(s, { x: 5.268, y: 3.836, w: 4.457, h: 1.323, adj: 50000, fill: WHITE, shadow: true });
++  T(s, 'Protecting Your Assets, Your Future.', { x: 5.788, y: 4.019, w: 3.938, h: 0.337, fontSize: 14, color: INK_90, fontFace: HEAD });
++  T(s, L.eget, { x: 5.788, y: 4.307, w: 3.815, h: 0.67, fontSize: 12, color: INK_90, lineSpacingMultiple: 1.5 });
++  T(s, '50,75%', { x: 10.069, y: 3.836, w: 1.851, h: 0.64, fontSize: 32, color: TEAL, fontFace: HEAD });
++  T(s, L.adip, { x: 10.069, y: 4.417, w: 2.29, h: 0.67, fontSize: 12, lineSpacingMultiple: 1.5 });
++  T(s, 'More than a policy, it\u2019s a partnership \u2014 built on trust, guided by care.',
++    { x: 5.26, y: 1.277, w: 7.296, h: 2.121, fontSize: 40, fontFace: HEAD });
++  T(s, L.parturient, { x: 5.268, y: 5.495, w: 6.911, h: 0.599, fontSize: 12, color: INK_90, lineSpacingMultiple: 1.3 });
++  swoosh(s, 11.113, 1.008, 60);
++}
++
++// 16 — Three overlapping circles carrying a headline statistic.
++function slide16(s) {
++  s.addShape('ellipse', { x: 8.753, y: 2.931, w: 3.18, h: 3.18, fill: { color: WHITE }, line: { type: 'none' }, shadow: SHADOW });
++  T(s, 'PLACEHOLDER',
++    { x: 1.111, y: 1.304, w: 11.111, h: 1.447, fontSize: 40, fontFace: HEAD, align: 'center' });
++  s.addShape('ellipse', { x: 3.846, y: 3.076, w: 3.18, h: 3.18, fill: { color: WHITE }, line: { type: 'none' }, shadow: SHADOW });
++  T(s, L.adip0, { x: 4.236, y: 4.871, w: 2.4, h: 0.599, fontSize: 12, color: INK_85, align: 'center', lineSpacingMultiple: 1.3 });
++  T(s, '85,5%', { x: 4.252, y: 3.861, w: 2.367, h: 1.01, fontSize: 54, color: INK_85, fontFace: HEAD, align: 'center' });
++  shieldBadge(s, 1.192, 4.955, { glyph: WHITE });
++  s.addShape('ellipse', { x: 11.104, y: 2.956, w: 1.118, h: 1.118, fill: { color: TEAL }, line: { type: 'none' }, shadow: SHADOW });
++  handGlyph(s, 11.387, 3.278, 0.552, 0.472, WHITE);
++  swoosh(s, 11.465, 1.664, 135);
++}
++
++// 17 — Two stacked statistics separated by hairline rules.
++function slide17(s) {
++  T(s, 'In a world full of risks, we bring clarity, protection, and peace \u2014 empowering you.',
++    { x: 1.155, y: 1.304, w: 11.365, h: 1.447, fontSize: 40, fontFace: HEAD });
++  swoosh(s, 10.217, 0.908, 45);
++  [{ v: '750K', y: 3.093 }, { v: '560K', y: 4.955 }].forEach(st => {
++    T(s, st.v, { x: 1.155, y: st.y, w: 3.48, h: 0.716, fontSize: 44, bold: true, color: TEAL, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++    T(s, L.sociis, { x: 1.149, y: st.y + 0.716, w: 5.841, h: 0.683, fontSize: 14, color: INK_90, lineSpacingMultiple: 1.3 });
++    s.addShape('line', { x: 1.155, y: st.y + 1.597, w: 6.306, h: 0, line: { color: GREY_LT, width: 1 } });
++  });
++}
++
++// 18 — Tall left headline with a single quote card.
++function slide18(s) {
++  T(s, 'True protection begins with understanding \u2014 we listen, we care, and we design coverage.',
++    { x: 1.155, y: 1.304, w: 5.829, h: 3.467, fontSize: 40, fontFace: HEAD });
++  T(s, '750K', { x: 1.155, y: 5.108, w: 3.48, h: 0.716, fontSize: 44, bold: true, color: TEAL, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, L.sociis, { x: 1.149, y: 5.824, w: 5.841, h: 0.683, fontSize: 14, color: INK_90, lineSpacingMultiple: 1.3 });
++  roundRect(s, { x: 8.379, y: 4.086, w: 3.8, h: 2.044, adj: 10340, fill: WHITE, shadow: true });
++  quoteMark(s, 8.842, 4.379, INK_90);
++  T(s, 'Confidence Through Coverage That\u2019s Reliable, Responsive, And Ready.', { x: 8.72, y: 4.875, w: 3.353, h: 1.01, fontSize: 18, fontFace: HEAD });
++  diagArrow(s, 11.42, 4.266, 0.523, 0.533, TEAL);
++}
++
++// 19 — White band spanning the slide with three numbered stat cards.
++function slide19(s) {
++  topRoundRect(s, { x: 5.725, y: -1.665, w: 3.037, h: 12.179, rotate: 270, adj1: 13077, fill: WHITE, shadow: true });
++  const cols = [
++    { card: 1.419, x: 1.643, n: '01.', nw: 1.496, pct: '77,95%', pw: 3.712, teal: true },
++    { card: null, x: 5.217, n: '02.', nw: 1.45, pct: '85,55%', pw: 2.678, teal: false },
++    { card: 8.566, x: 8.814, n: '03.', nw: 1.801, pct: '90,95%', pw: 2.678, teal: true },
++  ];
++  cols.filter(c => c.teal).forEach(c => roundRect(s, { x: c.card, y: 3.076, w: 3.175, h: 2.697, adj: 9252, fill: TEAL }));
++  cols.forEach(c => {
++    T(s, c.pct, { x: c.x, y: 4.032, w: c.pw, h: 0.841, fontSize: 44, fontFace: HEAD });
++    T(s, L.adip0, { x: c.x, y: 4.948, w: 2.631, h: 0.683, fontSize: 14, color: INK_85, lineSpacingMultiple: 1.3 });
++    T(s, c.n, { x: c.x, y: 3.191, w: c.nw, h: 0.64, fontSize: 32, italic: true });
++  });
++  T(s, 'Because peace of mind isn\u2019t a luxury, it\u2019s a necessity \u2014 and our mission is to make it.',
++    { x: 1.155, y: 1.304, w: 11.37, h: 1.447, fontSize: 40, fontFace: HEAD });
++}
++
++// 20 — Closing slide: mirror of the title slide with a mini bar chart card.
++function slide20(s) {
++  gradientPanel(s, { x: 1.888, y: 0.794, w: 4.033, h: 6.706, from: TEAL, to: BG, radius: 0.49 });
++  roundRect(s, { x: 0.98, y: 3.083, w: 2.556, h: 0.667, adj: 50000, fill: WHITE, shadow: true });
++  roundRect(s, { x: 1.287, y: 2.222, w: 2.249, h: 0.667, adj: 50000, fill: WHITE, shadow: true });
++  s.addShape('ellipse', { x: 1.148, y: 3.174, w: 0.486, h: 0.486, fill: { color: TEAL }, line: { type: 'none' } });
++  T(s, '95,5%', { x: 1.383, y: 2.393, w: 1.169, h: 0.381, fontSize: 20, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, 'What Matters Most', { x: 2.322, y: 2.336, w: 1.104, h: 0.438, fontSize: 10, color: GREY, fontFace: HEAD });
++  T(s, 'Future Secured', { x: 1.641, y: 3.174, w: 1.681, h: 0.269, fontSize: 12, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, 'Secured with Confidence', { x: 1.641, y: 3.397, w: 1.891, h: 0.269, fontSize: 10, color: GREY, fontFace: HEAD });
++  s.addShape('smileyFace', { x: 1.207, y: 3.232, w: 0.369, h: 0.369, fill: { color: TEAL }, line: { color: WHITE, width: 2 } });
++
++  T(s, 'Thank You For Your Attention', { x: 6.58, y: 1.397, w: 6.512, h: 3.373, fontSize: 80, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  roundRect(s, { x: 4.229, y: 4.434, w: 2.009, h: 2.073, adj: 12152, fill: WHITE, shadow: true });
++  T(s, 'Protect Your Dreams', { x: 4.324, y: 4.583, w: 1.112, h: 0.592, fontSize: 12, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  plusBadge(s, 5.636, 4.583);
++  [[4.422, 5.716, 0.592], [4.763, 5.317, 0.99], [5.104, 5.561, 0.747], [5.445, 5.868, 0.439], [5.807, 5.561, 0.747]]
++    .forEach(b => topRoundRect(s, { x: b[0], y: b[1], w: 0.237, h: b[2], adj1: 16448, fill: TEAL }));
++
++  T(s, '+895,00K', { x: 6.649, y: 5.347, w: 2.448, h: 0.492, fontSize: 28, bold: true, fontFace: HEAD, lineSpacingMultiple: 0.8 });
++  T(s, BLURB + '.', { x: 6.649, y: 5.986, w: 3.254, h: 0.572, fontSize: 14, color: GREY, fontFace: HEAD });
++  T(s, '\u201CFrom life\u2019s first steps to its greatest milestones', { x: 9.836, y: 5.986, w: 2.638, h: 0.572, fontSize: 14, color: GREY, fontFace: HEAD });
++}
++
++// ---------------------------------------------------------------- assembly
++const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
++
++const pres = new PptxGenJS();
++pres.defineLayout({ name: 'W16x9', width: 13.333, height: 7.5 });
++pres.layout = 'W16x9';
++pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++
++pres.defineSlideMaster({
++  title: 'BASE',
++  background: { color: BG },
++  slideNumber: { x: 12.484, y: 6.803, w: 0.565, h: 0.269, fontSize: 10, color: NUM_GREY, fontFace: HEAD, align: 'center', valign: 'top' },
++});
++
++/** Website credit repeated in the bottom-left corner of every slide (comes from the master in the source deck). */
++function footer(s) {
++  s.addText([
++    { text: 'Your Website | ', options: { bold: true, italic: true, color: TEAL, fontFace: HEAD } },
++    { text: 'www.websitehere.com', options: { color: FOOT_GREY, fontFace: BODY } },
++  ], { x: 0.435, y: 6.811, w: 2.928, h: 0.252, fontSize: 9, valign: 'top', align: 'left' });
++}
++
++SLIDES.forEach(build => {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  build(s);
++  footer(s);
++});
++
++pres.writeFile({ fileName: path.join(__dirname, '057c81bd-eaa7-4f40-86e6-daaebeb6af8e_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

@@ -1,0 +1,668 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/hospitality_restaurant_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/hospitality_restaurant_pitch_deck.js
+@@ -0,0 +1,665 @@
++/**
++ * Tambul Restaurant — 30-slide business deck, rebuilt with pptxgenjs.
++ *
++ * Run:  node 0b9a61e7-447d-423a-8125-ee10fdee05da_grok_final.js
++ * Writes the .pptx next to this file. Raster photos in the original deck are
++ * replaced with flat grey `photo()` placeholders at the same box geometry.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette
++const BG      = 'E3F9EE'; // mint page background (from the slide master)
++const DARK    = '023231'; // deep green, primary text
++const PINK    = 'FF4F78'; // accent used for pills / bars / table stripes
++const WHITE   = 'FFFFFF';
++const NAVY    = '28278C'; // alternate header colour on slides 10 & 17
++const INK     = '0C0C0C';
++const BLACK   = '000000';
++const RULE    = '262626'; // hairline rules (black lumMod 85%)
++const GRID    = 'BFBFBF'; // chart gridlines (white lumMod 75%)
++const BAR_MID = 'BFBFBF'; // middle stack segment
++const BAR_HI  = 'D9D9D9'; // top stack segment
++const PHOTO   = 'ECECEC'; // image placeholder fill
++
++// ---------------------------------------------------------------- fonts
++const DISPLAY = 'Manrope Medium';   // oversized headlines
++const SANS    = 'Montserrat';       // body copy
++const SANS_M  = 'Montserrat Medium';// labels inside pills
++
++// Repeated body copy, verbatim from the source deck.
++const LOREM   = 'Suspendisse interdum consectetur libero id faucibus nisl tincidu Arcu risus quvarius qua quisque id diam vel. Volutpat interdum consectetur libero id .';
++const LOREM_A = 'Suspendisse interdum consectetur libero id faucibus nisl tincidu Arcu risus quvarius qua.';
++const LOREM_B = 'Suspendisse interdum consectetur libero id faucibus nisl tincidu Arcu risus quvarius qua quisque id diam vel. Volutpat interdum.';
++const LOREM_C = 'Suspendisse interdum consectetur liber faucibus nisl tincidu Arcu risus quvarius  quisque id diam vel. Volutpat.';
++const LOREM_D = 'Suspendisse interdum consectetur libero id faucus nisl tincidu Arcu risus.';
++const LOREM_E = 'Suspendisse interdum consecte libero id faucibus nisl tincidu  risus quvarius qua quisque.';
++
++// ---------------------------------------------------------------- helpers
++
++/** Text box. All source boxes have zero insets, top alignment and shrink-to-fit. */
++function txt(s, body, o) {
++  s.addText(body, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontSize: o.size, fontFace: o.font, color: o.color,
++    bold: o.bold || false,
++    align: o.align || 'left',
++    valign: 'top',
++    margin: 0,
++    autoFit: true,
++    wrap: !o.nowrap,
++    lineSpacingMultiple: o.lh || undefined,
++    bullet: o.bullet ? { characterCode: '2022', indent: 13.5 } : false,
++  });
++}
++
++/** Plain filled rectangle. */
++function box(s, x, y, w, h, color) {
++  s.addShape('rect', { x, y, w, h, fill: { color }, line: { type: 'none' } });
++}
++
++/**
++ * Rounded rectangle. `adj` is the OOXML corner-radius ratio (0 .. 0.5).
++ * pptxgenjs drops a zero radius and falls back to its own default, so square
++ * corners have to be drawn as a plain rect.
++ */
++function pill(s, x, y, w, h, color, adj) {
++  if (!adj) return box(s, x, y, w, h, color);
++  s.addShape('roundRect', {
++    x, y, w, h,
++    fill: { color }, line: { type: 'none' },
++    rectRadius: adj * Math.min(w, h),
++  });
++}
++
++/** Rectangle with two rounded corners on the same side (the slide-1 arrow tab). */
++function tab(s, x, y, w, h, color, rotate) {
++  s.addShape('round2SameRect', {
++    x, y, w, h, rotate: rotate || 0,
++    fill: { color }, line: { type: 'none' },
++    rectRadius: 0.227 * Math.min(w, h),
++  });
++}
++
++/** Horizontal hairline. */
++function rule(s, x, y, w, color, width) {
++  s.addShape('line', { x, y, w, h: 0, line: { color, width: width || 0.5 } });
++}
++
++/** Horizontal line with an arrowhead at the right end. */
++function arrow(s, x, y, w, color, width) {
++  s.addShape('line', { x, y, w, h: 0, line: { color, width, endArrowType: 'triangle' } });
++}
++
++/** Open bezier polyline used by the line chart on slide 17. */
++function curve(s, x, y, w, h, color, width, pts) {
++  const points = pts.map((p, i) => {
++    if (p.length === 6) return { x: p[4], y: p[5], curve: { type: 'cubic', x1: p[0], y1: p[1], x2: p[2], y2: p[3] } };
++    return { x: p[0], y: p[1], moveTo: i === 0 };
++  });
++  s.addShape('custGeom', { x, y, w, h, points, fill: { type: 'none' }, line: { color, width } });
++}
++
++/** Grey stand-in for a photograph from the original deck. */
++function photo(s, x, y, w, h) {
++  box(s, x, y, w, h, PHOTO);
++  txt(s, '[image]', { x, y: y + h / 2 - 0.12, w, h: 0.24, size: 11, font: SANS, color: '9A9A9A', align: 'center' });
++}
++
++/** The three running-head captions repeated on nearly every slide. */
++function header(s, color) {
++  const c = color || DARK;
++  txt(s, 'The High Quality\nRestaurant',      { x: 0.564, y: 0.481, w: 1.338, h: 0.37, size: 11, font: SANS, color: c });
++  txt(s, 'Restaurant Bsiness Presentation',   { x: 5.871, y: 0.481, w: 1.591, h: 0.37, size: 11, font: SANS, color: c });
++  txt(s, 'Best Restaurant \n2027',            { x: 7.947, y: 0.481, w: 4.836, h: 0.37, size: 11, font: SANS, color: c, align: 'right' });
++}
++
++/** Small three-line stamp that floats near the headline on most slides. */
++function tagline(s, x, y, color) {
++  txt(s, 'Fruitful Day\nFor Restaurant Business\n2027',
++      { x, y, w: 1.828, h: 0.74, size: 11, font: SANS, color: color || DARK });
++}
++
++// ================================================================ slides
++
++// ---------------------------------------------------------------- slide 01
++function slide01(s) {
++  pill(s, 0.564, 6.378, 3.128, 0.635, PINK, 0.258);
++  txt(s, 'TAMBUL', { x:0.583, y:1.338, w:4.858, h:1.481, size:85, font:DISPLAY, color:DARK, bold:true, nowrap:true });
++  txt(s, 'RESTAURANT', { x:0.583, y:2.555, w:7.877, h:1.481, size:85, font:DISPLAY, color:DARK, bold:true, nowrap:true });
++  header(s);
++  txt(s, 'Suspendisse interdum consectetur libero id faucibus nisl tincidu Arcu risus quvarius qua quisque id diam vel. Volutpat interdum consectetur libero id nisl tincu Arcu risus quvarius qua quisque id diam .', { x:4.006, y:4.44, w:4.609, h:1.178, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Explore Here', { x:0.941, y:6.595, w:1.316, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  tab(s, 2.846, 6.167, 0.635, 1.058, DARK, 90);
++  arrow(s, 2.935, 6.696, 0.507, WHITE, 3.25);
++  photo(s, 9.327, 1.493, 3.442, 5.52);
++  photo(s, 0.583, 4.214, 2.589, 1.654);
++}
++
++// ---------------------------------------------------------------- slide 02
++function slide02(s) {
++  pill(s, 0.564, 5.054, 3.006, 0.677, PINK, 0.5);
++  pill(s, 4.821, 5.054, 3.006, 0.677, PINK, 0.5);
++  txt(s, 'Content', { x:4.925, y:1.621, w:5.755, h:1.75, size:104, font:DISPLAY, color:DARK, nowrap:true });
++  header(s);
++  txt(s, LOREM_A, { x:0.584, y:6.049, w:3.006, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'About Us', { x:1.067, y:5.157, w:2.001, h:0.471, size:28, font:SANS_M, color:WHITE, align:'center' });
++  txt(s, 'Suspendisse interdum consectetur libero id faucibus nisl tincidu.', { x:4.925, y:6.049, w:3.006, h:0.581, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Who We Are', { x:5.064, y:5.157, w:2.52, h:0.471, size:28, font:SANS_M, color:WHITE, align:'center' });
++  txt(s, LOREM_A, { x:9.758, y:6.049, w:3.006, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  tagline(s, 9.433, 3.554);
++  pill(s, 9.758, 5.054, 3.006, 0.677, PINK, 0.5);
++  txt(s, 'Our Story', { x:10.001, y:5.157, w:2.52, h:0.471, size:28, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 0.584, 1.564, 2.867, 2.585);
++}
++
++// ---------------------------------------------------------------- slide 03
++function slide03(s) {
++  photo(s, 0.583, 3.148, 3.584, 4.352);
++  pill(s, 8.297, 4.65, 2.818, 0.677, PINK, 0.5);
++  header(s);
++  txt(s, 'About Us', { x:0.583, y:1.953, w:6.271, h:1.75, size:104, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 4.959, 4.298);
++  txt(s, LOREM, { x:8.297, y:5.649, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Best Tambul.Co', { x:8.534, y:4.82, w:2.344, h:0.337, size:20, font:SANS_M, color:WHITE, align:'center' });
++  rule(s, 8.297, 6.944, 2.61, RULE, 0.25);
++  photo(s, 8.297, 1.444, 4.453, 2.612);
++}
++
++// ---------------------------------------------------------------- slide 04
++function slide04(s) {
++  header(s);
++  txt(s, 'Who We', { x:6.667, y:1.804, w:6.117, h:1.75, size:104, font:DISPLAY, color:DARK });
++  tagline(s, 9.325, 4.365);
++  txt(s, 'Are', { x:6.667, y:3.186, w:3.365, h:1.75, size:104, font:DISPLAY, color:DARK });
++  txt(s, LOREM, { x:0.583, y:6.081, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Description Here', { x:0.583, y:5.419, w:3.006, h:0.337, size:20, font:SANS_M, color:DARK });
++  rule(s, 6.667, 5.889, 4.63, BLACK, 0.25);
++  pill(s, 9.844, 6.359, 1.452, 0.42, PINK, 0.5);
++  txt(s, 'Explore Here', { x:9.912, y:6.468, w:1.316, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 0.564, 1.646, 4.732, 3.28);
++}
++
++// ---------------------------------------------------------------- slide 05
++function slide05(s) {
++  pill(s, 0.584, 5.028, 1.72, 0.478, PINK, 0.5);
++  header(s);
++  txt(s, 'Our Story', { x:0.583, y:1.458, w:7.2, h:1.935, size:115, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 5.088, 3.625);
++  txt(s, LOREM, { x:2.429, y:6.11, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Best Story', { x:0.633, y:5.116, w:1.621, h:0.303, size:18, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 8.604, 1.565, 4.146, 5.454);
++}
++
++// ---------------------------------------------------------------- slide 06
++function slide06(s) {
++  header(s);
++  txt(s, 'Greeting From', { x:0.583, y:1.732, w:5.622, h:1.01, size:60, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 2.905, 4.018);
++  txt(s, 'Our CEO', { x:0.583, y:2.711, w:3.313, h:1.01, size:60, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, LOREM, { x:0.583, y:6.042, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Suspendisse interdum consectetur libero id faucibus nisl.', { x:10.83, y:6.178, w:1.939, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  pill(s, 7.267, 6.042, 2.344, 0.677, PINK, 0.5);
++  txt(s, 'Aaron Loeb', { x:7.414, y:6.213, w:2.05, h:0.337, size:20, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 7.267, 1.733, 5.484, 3.563);
++}
++
++// ---------------------------------------------------------------- slide 07
++function slide07(s) {
++  pill(s, 0.55, 5.936, 1.224, 0.425, PINK, 0.5);
++  header(s);
++  txt(s, 'Our ', { x:4.703, y:1.47, w:3.567, h:1.935, size:115, font:DISPLAY, color:DARK });
++  tagline(s, 7.582, 5.012);
++  txt(s, 'Team', { x:4.703, y:3.063, w:5.065, h:1.935, size:115, font:DISPLAY, color:DARK });
++  txt(s, 'Frank Brandon', { x:0.567, y:5.297, w:3.229, h:0.471, size:28, font:SANS_M, color:DARK });
++  txt(s, 'Team Mavi', { x:0.558, y:6.047, w:1.206, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  txt(s, 'Ptricia Cassidy ', { x:9.768, y:2.352, w:3.001, h:0.471, size:28, font:SANS_M, color:DARK, align:'right' });
++  rule(s, 0.564, 7.019, 4.139, RULE, 0.25);
++  rule(s, 8.63, 1.463, 4.139, RULE, 0.25);
++  pill(s, 11.554, 3.037, 1.224, 0.425, PINK, 0.5);
++  txt(s, 'Team Mavi', { x:11.563, y:3.148, w:1.206, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 0.564, 1.444, 3.232, 3.259);
++  photo(s, 9.552, 3.759, 3.232, 3.259);
++}
++
++// ---------------------------------------------------------------- slide 08
++function slide08(s) {
++  header(s);
++  txt(s, 'Lead To', { x:0.583, y:1.421, w:4.12, h:1.346, size:80, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 4.06, 5.476);
++  txt(s, 'Increased-', { x:1.809, y:2.519, w:6.826, h:1.346, size:80, font:DISPLAY, color:DARK });
++  txt(s, LOREM, { x:8.283, y:6.154, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  rule(s, 0.55, 7.167, 5.322, BLACK, 0.25);
++  txt(s, 'Vision', { x:1.809, y:3.827, w:5.556, h:1.346, size:80, font:DISPLAY, color:DARK });
++  pill(s, 8.283, 5.126, 2.344, 0.677, PINK, 0.5);
++  txt(s, 'Best Vision', { x:8.43, y:5.296, w:2.05, h:0.337, size:20, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 8.283, 1.361, 4.501, 3.259);
++}
++
++// ---------------------------------------------------------------- slide 09
++function slide09(s) {
++  header(s);
++  txt(s, 'The', { x:1.375, y:1.265, w:2.216, h:1.481, size:88, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 6.289, 5.321);
++  txt(s, 'Restaurant', { x:1.375, y:2.455, w:6.534, h:1.481, size:88, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, 'Mission', { x:3.956, y:3.691, w:4.453, h:1.481, size:88, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, LOREM_B, { x:9.048, y:6.057, w:3.736, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Best Mission', { x:9.048, y:5.395, w:3.006, h:0.337, size:20, font:SANS_M, color:DARK });
++  pill(s, 3.956, 6.512, 1.452, 0.42, PINK, 0.5);
++  txt(s, 'Explore Here', { x:4.024, y:6.621, w:1.316, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 0.564, 3.936, 3.102, 3.082);
++  photo(s, 9.048, 1.63, 3.721, 2.926);
++}
++
++// ---------------------------------------------------------------- slide 10
++function slide10(s) {
++  photo(s, 0, 3.75, 4.241, 3.75);
++  pill(s, 9.648, 4.772, 1.72, 0.478, PINK, 0.5);
++  header(s, NAVY);
++  txt(s, 'Cuisine Crafted, ', { x:0.583, y:1.411, w:10.274, h:1.616, size:96, font:DISPLAY, color:DARK });
++  tagline(s, 6.627, 6.463, BLACK);
++  txt(s, 'Memories', { x:2.968, y:2.963, w:8.351, h:1.616, size:96, font:DISPLAY, color:DARK });
++  txt(s, 'Created', { x:2.968, y:4.528, w:6.35, h:1.616, size:96, font:DISPLAY, color:DARK });
++  txt(s, 'Suspendisse interdum consectebero id faucibus nisl tincidu Arcu risusqua quisque id diam vel. Volutpat.', { x:9.648, y:5.53, w:3.151, h:0.884, size:12, font:SANS, color:BLACK, lh:1.5 });
++  txt(s, 'Bst Food', { x:9.698, y:4.859, w:1.621, h:0.303, size:18, font:SANS_M, color:WHITE, align:'center' });
++}
++
++// ---------------------------------------------------------------- slide 11
++function slide11(s) {
++  header(s);
++  txt(s, 'Concept', { x:0.583, y:1.302, w:6.597, h:1.935, size:115, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 4.939, 3.563);
++  txt(s, LOREM, { x:8.283, y:5.24, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, '"Gourmet Grace: Elevating Every Palate."', { x:8.283, y:3.237, w:3.384, h:1.414, size:28, font:SANS_M, color:DARK });
++  pill(s, 8.283, 6.527, 1.452, 0.42, PINK, 0.5);
++  txt(s, 'Explore Here', { x:8.351, y:6.636, w:1.316, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 0.564, 4.63, 5.758, 2.556);
++}
++
++// ---------------------------------------------------------------- slide 12
++function slide12(s) {
++  header(s);
++  txt(s, 'The Strategic', { x:6.157, y:1.502, w:5.91, h:1.111, size:66, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 10.643, 3.945);
++  txt(s, 'Spice of Food', { x:6.157, y:2.632, w:5.836, h:1.111, size:66, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, LOREM, { x:6.157, y:5.221, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  pill(s, 6.15, 6.599, 1.452, 0.42, PINK, 0.5);
++  txt(s, 'Explore Here', { x:6.218, y:6.708, w:1.316, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 0.564, 1.612, 2.954, 5.406);
++  photo(s, 3.745, 1.981, 1.477, 4.148);
++}
++
++// ---------------------------------------------------------------- slide 13
++function slide13(s) {
++  pill(s, 7.438, 2.893, 1.947, 0.478, PINK, 0.5);
++  header(s);
++  txt(s, 'Material', { x:0.583, y:1.372, w:5.175, h:1.616, size:96, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 4.068, 4.578);
++  txt(s, 'Selection', { x:0.583, y:2.7, w:6.041, h:1.616, size:96, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, LOREM_B, { x:0.564, y:5.877, w:4.536, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, '"Gourmet Grace: Elevating Every Palate."', { x:9.385, y:1.87, w:3.384, h:1.414, size:28, font:SANS_M, color:DARK, align:'right' });
++  txt(s, 'Best Tambul ', { x:7.601, y:2.981, w:1.621, h:0.303, size:18, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 7.438, 3.75, 5.313, 3.269);
++}
++
++// ---------------------------------------------------------------- slide 14
++function slide14(s) {
++  header(s);
++  txt(s, 'Award & Archievment', { x:0.583, y:1.497, w:9.703, h:1.111, size:66, font:DISPLAY, color:DARK });
++  tagline(s, 8.646, 2.975);
++  txt(s, LOREM_B, { x:0.564, y:3.253, w:4.124, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  pill(s, 11.317, 3.745, 1.452, 0.42, PINK, 0.5);
++  txt(s, 'Explore Here', { x:11.385, y:3.854, w:1.316, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 0, 4.704, 13.333, 2.796);
++}
++
++// ---------------------------------------------------------------- slide 15
++function slide15(s) {
++  pill(s, 4.368, 5.076, 2.572, 0.677, PINK, 0.5);
++  txt(s, 'Our ', { x:4.475, y:0.928, w:2.572, h:1.616, size:96, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 7.96, 3.875);
++  txt(s, 'Supplier', { x:4.475, y:2.256, w:5.247, h:1.616, size:96, font:DISPLAY, color:DARK, nowrap:true });
++  header(s);
++  txt(s, LOREM_A, { x:9.11, y:6.085, w:3.006, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, LOREM_A, { x:4.475, y:6.085, w:3.006, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Supplier One', { x:4.648, y:5.246, w:2.013, h:0.337, size:20, font:SANS_M, color:WHITE, align:'center' });
++  pill(s, 9.11, 5.076, 2.572, 0.677, PINK, 0.5);
++  txt(s, 'Supplier Two', { x:9.389, y:5.246, w:2.013, h:0.337, size:20, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 0.564, 1.37, 3.006, 5.648);
++}
++
++// ---------------------------------------------------------------- slide 16
++function slide16(s) {
++  header(s);
++  txt(s, 'Income Target', { x:0.583, y:1.097, w:9.169, h:1.616, size:96, font:DISPLAY, color:DARK, nowrap:true });
++
++  // Zebra table. Odd rows sit on a full-width pink band; a handful of individual
++  // cells get a grey (or pink) chip painted behind the number instead.
++  const COLS = [ { x:1.487, w:1.865, align:'left'   },  // row label
++                 { x:3.675, w:2.139, align:'center' },
++                 { x:6.652, w:1.859, align:'center' },
++                 { x:9.64,  w:1.906, align:'center' } ];
++  const ROWS = [
++    { bandY:3.298, textY:3.480, cells:['Target One',   '$1200.00',  '$8000.00',  '$9000.00' ], ink:[WHITE, WHITE, WHITE, WHITE] },
++    { bandY:null,  textY:4.120, cells:['Target Two',   '$2400.00',  '$4000.00',  '$5000.00' ], ink:[DARK,  WHITE, DARK,  DARK ] },
++    { bandY:4.587, textY:4.769, cells:['Target Three', '$8000.00',  '$1900.00',  '$25000.00'], ink:[WHITE, WHITE, WHITE, WHITE] },
++    { bandY:null,  textY:5.423, cells:['Target Four',  '$1900.00',  '$2400.00',  '$45000.00'], ink:[DARK,  DARK,  WHITE, DARK ] },
++    { bandY:5.876, textY:6.057, cells:['Target Five',  '$4000.00',  '$54000.00', '$79000.00'], ink:[WHITE, WHITE, WHITE, WHITE] },
++    { bandY:null,  textY:6.692, cells:['',             '$34000.00', '$68000.00', '$87000.00'], ink:[DARK,  WHITE, WHITE, WHITE] },
++  ];
++  const CHIPS = [ [9.809, 3.298, 1.568, 0.635, BAR_MID],
++                  [9.097, 6.511, 3.259, 0.635, PINK],
++                  [3.96,  3.926, 1.568, 0.677, BAR_MID],
++                  [6.798, 5.215, 1.568, 0.663, BAR_MID],
++                  [3.352, 6.511, 5.926, 0.635, BAR_MID] ];
++
++  ROWS.forEach(r => { if (r.bandY) box(s, 0.861, r.bandY, 11.495, 0.635, PINK); });
++  CHIPS.forEach(([x, y, w, h, color]) => box(s, x, y, w, h, color));
++  ROWS.forEach(r => r.cells.forEach((text, c) => {
++    if (!text) return;
++    txt(s, text, { x:COLS[c].x, y:r.textY, w:COLS[c].w, h:0.278,
++                   size:12, font:SANS, color:r.ink[c], align:COLS[c].align, lh:1.5 });
++  }));
++}
++
++// ---------------------------------------------------------------- slide 17
++function slide17(s) {
++  header(s, NAVY);
++  rule(s, 7.676, 6.388, 5.004, GRID, 0.5);
++  rule(s, 7.676, 5.985, 5.004, GRID, 0.5);
++  rule(s, 7.676, 5.581, 5.004, GRID, 0.5);
++  rule(s, 7.676, 5.178, 5.004, GRID, 0.5);
++  rule(s, 7.676, 4.774, 5.004, GRID, 0.5);
++  rule(s, 7.676, 4.37, 5.004, GRID, 0.5);
++  rule(s, 7.676, 3.967, 5.004, GRID, 0.5);
++  rule(s, 7.676, 3.563, 5.004, GRID, 0.5);
++  rule(s, 7.676, 3.16, 5.004, GRID, 0.5);
++  rule(s, 7.676, 2.756, 5.004, GRID, 0.5);
++  rule(s, 7.676, 2.352, 5.004, GRID, 0.5);
++  txt(s, '0', { x:7.132, y:6.249, w:0.093, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '10', { x:7.092, y:5.845, w:0.144, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '20', { x:7.092, y:5.442, w:0.172, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '30', { x:7.092, y:5.038, w:0.172, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '40', { x:7.092, y:4.653, w:0.186, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '50', { x:7.092, y:4.254, w:0.172, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '60', { x:7.092, y:3.853, w:0.179, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '70', { x:7.092, y:3.449, w:0.175, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '80', { x:7.092, y:3.046, w:0.182, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '90', { x:7.092, y:2.66, w:0.179, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  txt(s, '100', { x:7.052, y:2.235, w:0.237, h:0.168, size:10, font:SANS, color:INK, nowrap:true });
++  curve(s, 7.688, 3.51, 4.717, 1.654, DARK, 1.5, [
++    [0,0.981],
++    [0.212,1.107, 0.259,1.216, 0.616,1.321],
++    [0.973,1.426, 1.744,1.777, 2.143,1.609],
++    [2.542,1.441, 2.661,0.469, 3.012,0.312],
++    [3.363,0.156, 3.965,0.722, 4.249,0.67],
++    [4.534,0.618, 4.63,0.024, 4.717,0],
++    [4.717,0],
++    [4.717,0],
++  ]);
++  curve(s, 7.681, 4.229, 4.717, 1.381, PINK, 1.5, [
++    [0,1],
++    [0.212,1.126, 0.256,1.506, 0.616,1.34],
++    [0.976,1.173, 1.571,0.047, 2.16,0.001],
++    [2.749,-0.044, 2.807,1.065, 3.361,1.048],
++    [3.916,1.031, 4.265,0.362, 4.717,0.019],
++    [4.717,0.019],
++    [4.717,0.019],
++  ]);
++  txt(s, 'Target', { x:0.583, y:1.205, w:4.4, h:1.683, size:100, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 4.068, 4.598);
++  txt(s, 'Market', { x:0.583, y:2.829, w:4.618, h:1.683, size:100, font:DISPLAY, color:DARK, nowrap:true });
++  pill(s, 0.617, 5.425, 1.868, 1.654, PINK, 0.127);
++  txt(s, 'DATA AVERAGE', { x:0.876, y:5.737, w:1.35, h:0.202, size:12, font:SANS, color:WHITE, align:'center', nowrap:true });
++  txt(s, '87%', { x:0.917, y:6.09, w:1.269, h:0.74, size:44, font:SANS, color:WHITE, align:'center', nowrap:true });
++  txt(s, 'Suspendisse interdum consectetur.\nFaucibus nisl tincidunt arcu .\nVarius quam quisque id dia.', { x:2.795, y:6.252, w:3.068, h:0.81, size:11, font:SANS, color:DARK, lh:1.5, bullet:true });
++}
++
++// ---------------------------------------------------------------- slide 18
++function slide18(s) {
++  photo(s, 4.83, 3.75, 3.674, 3.75);
++  header(s);
++  txt(s, 'Our Special', { x:0.583, y:1.475, w:6.606, h:1.481, size:88, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 2.437, 4.965);
++  txt(s, 'Menu', { x:0.583, y:2.855, w:3.266, h:1.481, size:88, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, LOREM_C, { x:9.321, y:6.13, w:3.463, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  pill(s, 8.04, 3.167, 2.727, 1.972, PINK, 0.224);
++  txt(s, 'lasgna Special Menu from Our Restaurant', { x:8.318, y:3.648, w:2.171, h:1.01, size:20, font:SANS, color:WHITE });
++  txt(s, LOREM_C, { x:0.583, y:6.13, w:3.463, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++}
++
++// ---------------------------------------------------------------- slide 19
++function slide19(s) {
++  pill(s, 0.583, 6.607, 1.72, 0.478, PINK, 0.5);
++  header(s);
++  txt(s, 'Other Menu', { x:0.583, y:1.234, w:8.962, h:1.935, size:115, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 7.756, 3.17);
++  txt(s, 'Suspendisse interdum consectetur liber faucibus nisl tincidu Arcu risus.', { x:10.446, y:4.634, w:2.325, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Menu 001', { x:0.632, y:6.677, w:1.621, h:0.337, size:20, font:SANS_M, color:WHITE, align:'center' });
++  pill(s, 3.844, 6.607, 1.72, 0.478, PINK, 0.5);
++  txt(s, 'Menu 002', { x:3.894, y:6.677, w:1.621, h:0.337, size:20, font:SANS_M, color:WHITE, align:'center' });
++  pill(s, 7.106, 6.607, 1.72, 0.478, PINK, 0.5);
++  txt(s, 'Menu 003', { x:7.155, y:6.677, w:1.621, h:0.337, size:20, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 0.564, 4.292, 3.061, 2.06);
++  photo(s, 3.821, 4.292, 3.061, 2.06);
++  photo(s, 7.078, 4.292, 3.061, 2.06);
++}
++
++// ---------------------------------------------------------------- slide 20
++function slide20(s) {
++  header(s);
++  txt(s, 'Kitchen', { x:0.585, y:1.401, w:4.891, h:1.616, size:96, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 4.819, 4.616);
++  txt(s, 'Workflow', { x:0.585, y:2.913, w:5.955, h:1.616, size:96, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, LOREM_B, { x:0.585, y:6.186, w:4.124, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, LOREM_D, { x:10.302, y:3.219, w:2.482, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, LOREM_D, { x:10.302, y:6.186, w:2.482, h:0.884, size:12, font:SANS, color:DARK, lh:1.5 });
++  photo(s, 7.462, 1.864, 2.434, 2.229);
++  photo(s, 7.462, 4.831, 2.434, 2.229);
++}
++
++// ---------------------------------------------------------------- slide 21
++function slide21(s) {
++  photo(s, 0, 3.097, 3.667, 4.403);
++  header(s);
++  txt(s, 'Open for', { x:0.585, y:1.206, w:4.558, h:1.346, size:80, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 6.22, 4.009);
++  txt(s, 'Collaboration', { x:0.585, y:2.522, w:7.161, h:1.346, size:80, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, LOREM, { x:8.283, y:5.806, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  pill(s, 4.768, 6.512, 1.452, 0.42, PINK, 0.5);
++  txt(s, 'Explore Here', { x:4.836, y:6.621, w:1.316, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  rule(s, 8.539, 4.379, 4.23, BLACK, 0.5);
++  txt(s, 'Tambul.Corph', { x:9.846, y:3.381, w:2.909, h:0.471, size:28, font:SANS, color:DARK, align:'right' });
++}
++
++// ---------------------------------------------------------------- slide 22
++function slide22(s) {
++  pill(s, 0.583, 5.149, 2.124, 0.478, PINK, 0.5);
++  header(s);
++  txt(s, 'Marketing', { x:6.648, y:1.637, w:5.324, h:1.346, size:80, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 10.278, 4.523);
++  txt(s, 'Concept', { x:6.648, y:2.925, w:4.59, h:1.346, size:80, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, LOREM, { x:0.583, y:6.099, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Best Concept', { x:0.751, y:5.237, w:1.788, h:0.303, size:18, font:SANS_M, color:WHITE, align:'center' });
++  txt(s, LOREM, { x:6.627, y:6.099, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  photo(s, 0.564, 1.401, 4.949, 2.389);
++}
++
++// ---------------------------------------------------------------- slide 23
++function slide23(s) {
++  header(s);
++  txt(s, 'Our', { x:0.584, y:1.421, w:2.302, h:1.616, size:96, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 2.959, 4.402);
++  txt(s, 'Branch', { x:0.584, y:2.786, w:4.476, h:1.616, size:96, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, 'Suspendisse interdum consectetur libero id faucibus  tincidu Arcu risus quvarius qua quisque id diam vel. Volutpat interdum consectetur libero id .', { x:0.564, y:6.099, w:4.495, h:0.875, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Branch One', { x:5.922, y:5.625, w:2.196, h:0.404, size:24, font:SANS_M, color:BLACK });
++  txt(s, 'Branch Two', { x:9.472, y:5.625, w:2.353, h:0.404, size:24, font:SANS_M, color:BLACK });
++  pill(s, 5.922, 6.223, 1.136, 0.359, PINK, 0.5);
++  txt(s, '10/2030', { x:5.679, y:6.285, w:1.621, h:0.236, size:14, font:SANS_M, color:WHITE, align:'center' });
++  pill(s, 9.431, 6.221, 1.136, 0.359, PINK, 0.5);
++  txt(s, '10/2040', { x:9.188, y:6.283, w:1.621, h:0.236, size:14, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 5.922, 2.255, 3.266, 2.925);
++  photo(s, 9.472, 2.268, 3.266, 2.925);
++}
++
++// ---------------------------------------------------------------- slide 24
++function slide24(s) {
++  pill(s, 3.521, 4.759, 1.954, 0.478, PINK, 0.5);
++  pill(s, 10.147, 4.759, 1.954, 0.478, PINK, 0.5);
++  header(s);
++  txt(s, 'Our Offer', { x:0.581, y:1.301, w:6.986, h:1.935, size:115, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 4.839, 3.326);
++  txt(s, LOREM, { x:8.283, y:2.807, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, '72000%', { x:3.688, y:4.864, w:1.621, h:0.303, size:18, font:SANS_M, color:WHITE, align:'center' });
++  txt(s, LOREM_E, { x:3.521, y:5.757, w:2.712, h:0.875, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, '62000%', { x:10.313, y:4.864, w:1.621, h:0.303, size:18, font:SANS_M, color:WHITE, align:'center' });
++  txt(s, LOREM_E, { x:10.147, y:5.757, w:2.712, h:0.875, size:12, font:SANS, color:DARK, lh:1.5 });
++  photo(s, 0.576, 4.365, 2.712, 2.688);
++  photo(s, 7.202, 4.365, 2.712, 2.688);
++}
++
++// ---------------------------------------------------------------- slide 25
++function slide25(s) {
++  header(s);
++  txt(s, 'Customer', { x:0.564, y:1.421, w:4.744, h:1.212, size:72, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, 'Testimony', { x:0.564, y:2.591, w:5.038, h:1.212, size:72, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 4.287, 4.096);
++  txt(s, LOREM, { x:0.573, y:5.2, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, '"Soulful Dining: Where Passion Infuses Every Dish."', { x:10.065, y:4.255, w:2.761, h:1.616, size:24, font:SANS_M, color:DARK });
++  pill(s, 0.573, 6.569, 1.452, 0.42, PINK, 0.5);
++  txt(s, 'Explore Here', { x:0.641, y:6.678, w:1.316, h:0.202, size:12, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 6.627, 1.442, 3.119, 5.219);
++}
++
++// ---------------------------------------------------------------- slide 26
++function slide26(s) {
++  pill(s, 0.614, 5.059, 2.136, 0.478, PINK, 0.5);
++  header(s);
++  txt(s, 'Bringing Smiles', { x:0.564, y:1.421, w:7.282, h:1.212, size:72, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, 'After Eat', { x:0.585, y:2.672, w:4.172, h:1.212, size:72, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 3.506, 4.175);
++  txt(s, LOREM, { x:0.614, y:5.988, w:4.487, h:0.909, size:12, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'Best Tambul', { x:0.871, y:5.147, w:1.621, h:0.303, size:18, font:SANS_M, color:WHITE, align:'center' });
++  photo(s, 9.093, 1.421, 3.676, 5.598);
++}
++
++// ---------------------------------------------------------------- slide 27
++function slide27(s) {
++  header(s);
++  txt(s, 'After Sales Chart', { x:0.587, y:1.299, w:7.424, h:1.111, size:66, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 6.743, 2.474);
++  txt(s, 'Data Average', { x:9.482, y:4.233, w:2.855, h:0.471, size:28, font:SANS, color:DARK, align:'center' });
++  txt(s, '$332B',        { x:9.651, y:5.156, w:2.517, h:0.909, size:54, font:SANS, color:DARK, align:'center' });
++
++  // Value axis: one hairline plus its label every 20 units.
++  const AXIS = [['100', 3.625, 3.694], ['80', 4.167, 4.236], ['60', 4.709, 4.778],
++                ['40', 5.251, 5.32],   ['20', 5.793, 5.862], ['0',  6.335, 6.401]];
++  AXIS.forEach(([label, lineY, textY]) => {
++    rule(s, 0.545, lineY, 7.964, GRID, 0.25);
++    txt(s, label, { x:0.545, y:textY, w:0.546, h:0.202, size:12, font:SANS, color:DARK });
++  });
++
++  // Three-segment stacked columns. The segments overlap, so `seg` lists them in
++  // painting order exactly as the source deck stacks them: [colour, y, h, radius].
++  const BARS = [
++    { x:1.357, labelX:1.091, pct:'27',  who:'Comp.',
++      seg:[[PINK, 5.724, 0.605, 0], [BAR_MID, 5.182, 0.605, 0], [BAR_HI, 4.762, 0.453, 0.078]] },
++    { x:2.923, labelX:2.662, pct:'55',  who:'Comp.',
++      seg:[[PINK, 5.649, 0.679, 0], [BAR_MID, 4.909, 0.848, 0], [BAR_HI, 4.456, 0.453, 0.052]] },
++    { x:4.489, labelX:4.228, pct:'85',  who:'Us',
++      seg:[[BAR_HI, 4.236, 1.112, 0.062], [PINK, 5.503, 0.826, 0], [BAR_MID, 4.999, 0.738, 0]] },
++    { x:6.055, labelX:5.799, pct:'70',  who:'Comp.',
++      seg:[[PINK, 4.999, 1.330, 0], [BAR_MID, 4.853, 0.744, 0], [BAR_HI, 3.968, 0.934, 0.093]] },
++    { x:7.443, labelX:7.206, pct:'100', who:'Comp.',
++      seg:[[BAR_HI, 3.619, 1.283, 0.093], [PINK, 4.999, 1.330, 0], [BAR_MID, 4.612, 0.984, 0]] },
++  ];
++  BARS.forEach(b => {
++    b.seg.forEach(([color, y, h, adj]) => pill(s, b.x, y, 0.644, h, color, adj));
++    txt(s, [{ text:b.pct }, { text:'%', options:{ superscript:true } }],
++        { x:b.labelX, y:6.625, w:1.172, h:0.236, size:14, font:SANS, color:DARK, align:'center' });
++    txt(s, b.who, { x:b.labelX, y:6.896, w:1.172, h:0.202, size:12, font:SANS, color:DARK, align:'center' });
++  });
++}
++
++// ---------------------------------------------------------------- slide 28
++function slide28(s) {
++  txt(s, 'Increase Sales', { x:0.58, y:0.194, w:7.657, h:1.346, size:80, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 7.032, 1.52);
++
++  // Value axis: a hairline plus its label every 1,000.
++  const AXIS = [['7,000', 2.697, 2.766], ['6,000', 3.286, 3.355], ['5,000', 3.875, 3.943],
++                ['4,000', 4.463, 4.532], ['3,000', 5.052, 5.121], ['2,000', 5.641, 5.71],
++                ['1,000', 6.23,  6.299], ['0',     6.819, 6.885]];
++  AXIS.forEach(([label, lineY, textY]) => {
++    rule(s, 0.545, lineY, 12.264, GRID, 0.25);
++    txt(s, label, { x:0.547, y:textY, w:0.546, h:0.202, size:12, font:SANS, color:DARK });
++  });
++
++  // One stacked column per fiscal year: pale cap, grey middle, pink base.
++  const BARS = [
++    { x:1.357,  labelX:1.091,  year:'2025/2026', total:'7,061',   totalY:3.503, cap:[3.897, 2.928, 0.101], mid:[4.903, 0.980], pink:[5.875, 0.980] },
++    { x:2.859,  labelX:2.592,  year:'2026/2027', total:'9,345.0', totalY:2.613, cap:[2.965, 3.838, 0.135], mid:[4.379, 1.504], pink:[5.601, 1.253] },
++    { x:4.36,   labelX:4.093,  year:'202/2028',  total:'8,000',   totalY:2.971, cap:[3.355, 3.448, 0.135], mid:[4.168, 1.715], pink:[5.875, 0.980] },
++    { x:5.86,   labelX:5.593,  year:'2028/2029', total:'7,50',    totalY:3.217, cap:[3.557, 3.224, 0.101], mid:[4.674, 1.209], pink:[5.875, 0.980] },
++    { x:7.342,  labelX:7.094,  year:'2029/2030', total:'6,450',   totalY:3.592, cap:[3.943, 2.928, 0.135], mid:[5.201, 0.682], pink:[5.875, 0.980] },
++    { x:8.864,  labelX:8.595,  year:'2030/2031', total:'6,320',   totalY:3.665, cap:[3.994, 2.856, 0.135], mid:[4.903, 0.980], pink:[5.875, 0.980] },
++    { x:10.361, labelX:10.095, year:'2031/2032', total:'6,000',   totalY:3.795, cap:[4.145, 2.704, 0.101], mid:[4.897, 0.980], pink:[5.868, 0.980] },
++    { x:11.862, labelX:11.596, year:'2032/2033', total:'5,200',   totalY:3.909, cap:[4.267, 2.561, 0.101], mid:[5.201, 0.667], pink:[5.860, 0.980] },
++  ];
++  BARS.forEach(b => {
++    pill(s, b.x, b.cap[0], 0.644, b.cap[1], BAR_HI, b.cap[2]);
++    txt(s, b.total, { x:b.labelX, y:b.totalY, w:1.172, h:0.236, size:14, font:SANS, color:DARK, align:'center' });
++    txt(s, b.year,  { x:b.labelX, y:7.11,     w:1.172, h:0.236, size:14, font:SANS, color:DARK, align:'center' });
++  });
++  BARS.forEach(b => {
++    box(s, b.x, b.pink[0], 0.644, b.pink[1], PINK);
++    box(s, b.x, b.mid[0],  0.644, b.mid[1],  BAR_MID);
++  });
++}
++
++// ---------------------------------------------------------------- slide 29
++function slide29(s) {
++  header(s);
++  pill(s, 7.805, 5.973, 2.033, 0.541, PINK, 0.249);
++  txt(s, '325 West 38th Street, Batukaras, NY, 60325', { x:7.805, y:4.512, w:4.58, h:0.968, size:20, font:SANS, color:DARK, lh:1.5 });
++  txt(s, 'www. tambul.co', { x:7.805, y:6.849, w:2.669, h:0.269, size:16, font:SANS, color:DARK });
++  txt(s, '+2111-8831-228', { x:7.914, y:6.109, w:1.815, h:0.269, size:16, font:SANS, color:WHITE, align:'center' });
++  txt(s, 'Contact', { x:2.518, y:1.078, w:6.25, h:1.935, size:115, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 7.617, 2.913);
++  photo(s, 0.564, 4.293, 6.402, 2.885);
++}
++
++// ---------------------------------------------------------------- slide 30
++function slide30(s) {
++  photo(s, 5.66, 1.434, 4.566, 3.626);
++  header(s);
++  txt(s, 'Thank', { x:0.58, y:1.925, w:4.647, h:1.935, size:115, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, 'You', { x:0.58, y:3.537, w:2.87, h:1.935, size:115, font:DISPLAY, color:DARK, nowrap:true });
++  tagline(s, 2.255, 6.284);
++  txt(s, 'Food', { x:8.66, y:4.07, w:3.725, h:1.935, size:115, font:DISPLAY, color:DARK, nowrap:true });
++  txt(s, 'Suspendisse interdum consectetur libero id faucibus nisl tincidu Arcu risus quvarius qua quisque.', { x:4.867, y:6.109, w:3.136, h:0.875, size:12, font:SANS, color:DARK, lh:1.5 });
++  pill(s, 8.825, 6.109, 3.006, 0.677, PINK, 0.5);
++  txt(s, 'Tambul.Corph', { x:8.825, y:6.245, w:3.006, h:0.404, size:24, font:SANS_M, color:WHITE, align:'center' });
++}
++// ---------------------------------------------------------------- assembly
++const SLIDES = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'W16x9', width: 13.333333, height: 7.5 }); // 12192000 x 6858000 EMU
++pptx.layout = 'W16x9';
++pptx.title = 'Tambul Restaurant';
++pptx.author = 'Tambul Restaurant';
++
++SLIDES.forEach(build => {
++  const s = pptx.addSlide();
++  s.background = { color: BG };
++  build(s);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, '0b9a61e7-447d-423a-8125-ee10fdee05da_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

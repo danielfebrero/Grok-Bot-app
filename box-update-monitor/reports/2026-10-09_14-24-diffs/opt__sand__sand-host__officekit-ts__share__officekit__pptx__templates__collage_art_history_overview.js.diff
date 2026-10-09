@@ -1,0 +1,641 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/collage_art_history_overview.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/collage_art_history_overview.js
+@@ -0,0 +1,638 @@
++/**
++ * Collage Presentation Template — rebuilt with pptxgenjs.
++ *
++ * Slide size 13.333 x 7.5 in (16:9). Every slide is described below with plain
++ * pptxgenjs calls; repeated ornaments (chevron badges, rounded "pill" tags,
++ * photo placeholders, the header rule) live in the helper section.
++ *
++ * Photography from the source deck is replaced by outlined "[image]" frames at
++ * the original positions and sizes.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const C = {
++  accent: '993020',   // theme accent1 — brick red
++  accentSoft: 'E99F93', // accent1 lum +60%
++  accentPale: 'F4CFC9', // accent1 lum +80%
++  white: 'FFFFFF',
++  black: '000000',
++  ink: '262626',      // tx1 lum 85% — running body copy and dark cards
++  grey50: '808080',   // tx1 lum 50%
++  grey15: 'D9D9D9',   // bg1 lum 85%
++  grey25: 'BFBFBF',   // bg1 lum 75%
++  grey35: 'A6A6A6',   // bg1 lum 65%
++  axis: '595959',
++  pageNum: '202020',
++};
++
++const F = {
++  head: 'Montserrat SemiBold',
++  body: 'Montserrat',
++  black: 'Montserrat Black',
++};
++
++const SZ = { title: 54, big: 60, section: 32, sub: 28, item: 24, num: 48, body: 14, tag: 20, small: 12 };
++
++const LOREM_LONG =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.';
++const LOREM_ULLAMCO = LOREM_LONG.replace('exercitation.', 'exercitation ullamco.');
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.';
++const LOREM_STEP = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do.';
++const LOREM_TINY = 'Lorem ipsum dolor sit amet, ';
++
++/* ---------------------------------------------------------------- helpers */
++
++// Plain heading / display text. The source deck anchors every text box to the top.
++function heading(s, text, o) {
++  s.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontSize: o.size || SZ.title, fontFace: o.face || F.head,
++    color: o.color || C.black, align: o.align || 'left', valign: 'top',
++  });
++}
++
++// Running copy: 14 pt Montserrat at 1.5 line spacing.
++function body(s, text, o) {
++  s.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontSize: o.size || SZ.body, fontFace: F.body,
++    color: o.color || C.ink, align: o.align || 'left', valign: 'top',
++    lineSpacingMultiple: 1.5,
++  });
++}
++
++// Stand-in for the photographs of the original deck; `frame` overrides the
++// outline colour where the placeholder sits on a coloured panel.
++function photo(s, x, y, w, h, frame) {
++  const c = frame || C.grey25;
++  s.addShape('rect', { x, y, w, h, line: { color: c, width: 0.75 } });
++  s.addText('[image]', {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontSize: SZ.small, fontFace: F.body, color: c,
++  });
++}
++
++// Fully rounded tag. `y` is the top of the *text*; the capsule sits slightly lower,
++// exactly as in the source deck.
++const PILL = {
++  14: { rect: 0.419, text: 0.454, dy: 0.052 },
++  18: { rect: 0.503, text: 0.555, dy: 0.053 },
++  20: { rect: 0.503, text: 0.606, dy: 0.104 },
++};
++function pill(s, o) {
++  const m = PILL[o.size || 14];
++  s.addShape('roundRect', {
++    x: o.x, y: o.y + m.dy, w: o.w, h: m.rect, rectRadius: m.rect / 2,
++    fill: { color: o.fill || C.accent },
++  });
++  s.addText(o.text, {
++    x: o.x, y: o.y, w: o.w, h: m.text,
++    fontSize: o.size || 14, fontFace: F.body, color: o.color || C.white,
++    align: 'center', valign: 'top', lineSpacingMultiple: 1.5,
++  });
++}
++
++// Outlined circle holding a chevron; `dir` is 'down' or 'right'.
++function chevronBadge(s, x, y, d, color, dir) {
++  s.addShape('ellipse', { x, y, w: d, h: d, line: { color, width: 1.5 } });
++  const w = d * 0.54, h = d * 0.333;      // chevron bounding box inside the circle
++  const cx = x + (d - w) / 2, cy = y + d * 0.333;
++  const t = h * 0.19;                      // stroke thickness of the chevron
++  const pts = [
++    { x: w / 2, y: h, moveTo: true }, { x: 0, y: t }, { x: t, y: 0 },
++    { x: w / 2, y: h - t }, { x: w - t, y: 0 }, { x: w, y: t },
++    { x: w / 2, y: h }, { close: true },
++  ];
++  s.addShape('custGeom', {
++    x: dir === 'right' ? cx + (w - h) / 2 : cx,
++    y: dir === 'right' ? cy - (w - h) / 2 : cy,
++    w, h, fill: { color }, points: pts,
++    rotate: dir === 'right' ? 270 : 0,
++  });
++}
++
++// Filled circle with a tick — used for the bullet list on slide 17.
++function checkBullet(s, x, y, d, discColor, tickColor) {
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: discColor } });
++  const w = d * 0.78, h = d * 0.573;
++  s.addShape('custGeom', {
++    x: x + (d - w) / 2, y: y + d * 0.212, w, h, fill: { color: tickColor },
++    points: [
++      { x: w * 0.35, y: h, moveTo: true }, { x: 0, y: h * 0.526 }, { x: w * 0.087, y: h * 0.407 },
++      { x: w * 0.35, y: h * 0.763 }, { x: w * 0.913, y: 0 }, { x: w, y: h * 0.118 },
++      { x: w * 0.35, y: h }, { close: true },
++    ],
++  });
++}
++
++// Header rule + running title (+ optional page number) inherited from the master.
++function chrome(s, page, onDark) {
++  const c = onDark ? C.white : C.black;
++  s.addShape('line', { x: 0.366, y: 0.601, w: 12.601, h: 0, line: { color: c, width: 1.5 } });
++  s.addText('Collage Presentation Template', {
++    x: 0.366, y: 0.251, w: 2.953, h: 0.303,
++    fontSize: SZ.small, fontFace: F.body, color: c, valign: 'top',
++  });
++  if (page) {
++    s.addText([
++      { text: ' Page ', options: { fontFace: F.body } },
++      { text: String(page), options: { fontFace: F.head } },
++    ], {
++      x: 12.0, y: 0.251, w: 0.967, h: 0.303, fontSize: SZ.small,
++      color: onDark ? C.white : C.pageNum, align: 'right', valign: 'top',
++    });
++  }
++}
++
++// pptxgenjs writes `angleRange` entries as adj = value * 60000; the source deck
++// uses adj1 = 10021 for the "top corners rounded" cards on slide 14.
++const ADJ = (raw) => raw / 60000;
++
++/* ----------------------------------------------------------------- slides */
++
++// 1 — cover: the word COLLAGE scattered as individual rotated letters.
++function slideCover(p) {
++  const s = p.addSlide();
++  s.background = { color: C.accent };
++  const letters = [
++    { t: 'C', x: 0.470, y: 0.318, w: 2.278, rot: 342.30 },
++    { t: 'A', x: 3.769, y: 2.479, w: 2.451, rot: 14.32 },
++    { t: 'O', x: 2.552, y: 0.204, w: 2.569, rot: 13.87 },
++    { t: 'G', x: 0.550, y: 4.127, w: 2.348, rot: 13.29 },
++    { t: 'L', x: 0.419, y: 2.146, w: 1.923, rot: 345.17 },
++    { t: 'E', x: 2.755, y: 4.188, w: 2.079, rot: 349.89 },
++    { t: 'L', x: 2.177, y: 2.025, w: 1.923, rot: 0 },
++  ];
++  letters.forEach((l) => s.addText(l.t, {
++    x: l.x, y: l.y, w: l.w, h: 3.45, rotate: l.rot, wrap: false,
++    fontSize: 199, fontFace: F.black, color: C.white, valign: 'top',
++  }));
++  heading(s, 'Presentation Template', {
++    x: 6.667, y: 5.919, w: 3.286, h: 1.178, size: SZ.section, face: F.body, color: C.white,
++  });
++  chrome(s, null, true);
++}
++
++// 2 — "What is Collage?"
++function slideWhatIs(p) {
++  const s = p.addSlide();
++  photo(s, 0.366, 0.797, 4.759, 6.3);
++  photo(s, 6.206, 5.110, 1.515, 1.515);
++  s.addShape('roundRect', {
++    x: 5.732, y: 2.912, w: 7.235, h: 4.186, rectRadius: 0.502,
++    line: { color: C.accent, width: 1.5 },
++  });
++  heading(s, 'What is Collage?', { x: 5.735, y: 0.797, w: 3.972, h: 1.919 });
++  body(s, LOREM_ULLAMCO, { x: 6.162, y: 3.385, w: 6.374, h: 1.161 });
++  chevronBadge(s, 12.339, 0.923, 0.628, C.accent, 'down');
++  [
++    { text: 'Spans art', x: 7.902, y: 5.625, w: 1.515 },
++    { text: 'Design', x: 7.902, y: 6.152, w: 1.121 },
++    { text: 'Scrapbooking', x: 9.559, y: 5.625, w: 1.853 },
++    { text: 'Editorial use', x: 9.142, y: 6.152, w: 1.853 },
++    { text: 'Digital', x: 11.115, y: 6.152, w: 1.121 },
++  ].forEach((t) => pill(s, t));
++  chrome(s, 2, false);
++}
++
++// 3 — timeline riding a wavy accent ribbon.
++const RIBBON = [
++  { x: 10.514, y: 0.377, moveTo: true },
++  { x: 8.874, y: 1.531, curve: { type: 'cubic', x1: 9.760, y1: 0.717, x2: 9.227, y2: 1.206 } },
++  { x: 8.806, y: 1.593 },
++  { x: 3.789, y: 2.056, curve: { type: 'cubic', x1: 8.169, y1: 2.175, x2: 6.302, y2: 3.019 } },
++  { x: 0.000, y: 1.972, curve: { type: 'cubic', x1: 1.793, y1: 1.291, x2: 0.564, y2: 1.671 } },
++  { x: 0.000, y: 2.600 },
++  { x: 0.002, y: 2.602 },
++  { x: 0.000, y: 2.604 },
++  { x: 0.853, y: 2.218, curve: { type: 'cubic', x1: 0.003, y1: 2.601, x2: 0.280, y2: 2.351 } },
++  { x: 3.599, y: 2.549, curve: { type: 'cubic', x1: 1.389, y1: 2.095, x2: 2.301, y2: 2.051 } },
++  { x: 5.539, y: 3.003, curve: { type: 'cubic', x1: 4.249, y1: 2.798, x2: 4.902, y2: 2.950 } },
++  { x: 6.033, y: 3.023, curve: { type: 'cubic', x1: 5.705, y1: 3.017, x2: 5.869, y2: 3.023 } },
++  { x: 7.153, y: 2.913, curve: { type: 'cubic', x1: 6.409, y1: 3.024, x2: 6.784, y2: 2.987 } },
++  { x: 9.162, y: 1.984, curve: { type: 'cubic', x1: 8.333, y1: 2.676, x2: 8.989, y2: 2.142 } },
++  { x: 9.231, y: 1.920 },
++  { x: 13.334, y: 0.665, curve: { type: 'cubic', x1: 9.915, y1: 1.292, x2: 11.187, y2: 0.125 } },
++  { x: 13.334, y: 0.122 },
++  { x: 10.514, y: 0.377, curve: { type: 'cubic', x1: 12.337, y1: -0.103, x2: 11.389, y2: -0.018 } },
++  { close: true },
++];
++function slideHistory(p) {
++  const s = p.addSlide();
++  heading(s, 'Brief History of Collage', { x: 0.366, y: 0.797, w: 5.182, h: 1.919 });
++  body(s, LOREM_LONG, { x: 6.667, y: 1.433, w: 6.300, h: 1.161 });
++  s.addShape('custGeom', {
++    x: 0, y: 2.990, w: 13.333, h: 3.024, fill: { color: C.accent }, points: RIBBON,
++  });
++  // Labels alternate above / below the ribbon as it rises across the slide.
++  const stops = [
++    { label: 'Ancient China (200 BC)', x: 0.366, dotY: 4.824, textX: 0.366, textY: 3.217 },
++    { label: '10th Century Japan ', x: 2.477, dotY: 4.774, textX: 2.477, textY: 5.474 },
++    { label: '13th Century Europe', x: 4.589, dotY: 5.396, textX: 4.589, textY: 4.065 },
++    { label: '19th Century\nWorld', x: 6.700, dotY: 5.474, textX: 6.700, textY: 5.986 },
++    { label: 'Early 20th Century', x: 8.811, dotY: 4.549, textX: 8.811, textY: 5.176 },
++    { label: 'Dada Movement', x: 10.922, dotY: 3.217, textX: 10.924, textY: 3.836 },
++  ];
++  stops.forEach((t) => s.addShape('ellipse', {
++    x: t.x, y: t.dotY, w: 0.403, h: 0.403, fill: { color: C.white },
++  }));
++  stops.forEach((t) => heading(s, t.label, {
++    x: t.textX, y: t.textY, w: 1.463, h: 1.111, size: SZ.tag,
++  }));
++  chevronBadge(s, 5.794, 1.099, 0.628, C.accent, 'down');
++  chrome(s, 3, false);
++}
++
++// 4 — Traditional vs. Digital, two accent cards split by a black "VS" disc.
++function slideVersus(p) {
++  const s = p.addSlide();
++  [0.366, 7.375].forEach((x) => s.addShape('roundRect', {
++    x, y: 1.972, w: 5.592, h: 5.125, rectRadius: 0.666, fill: { color: C.accent },
++  }));
++  heading(s, 'Traditional', { x: 0.366, y: 2.178, w: 5.592, h: 0.64, size: SZ.section, color: C.white, align: 'center' });
++  heading(s, 'Digital Collage', { x: 7.375, y: 2.178, w: 5.592, h: 0.64, size: SZ.section, color: C.white, align: 'center' });
++  photo(s, 0.754, 2.983, 4.816, 2.030, C.accentSoft);
++  photo(s, 7.763, 2.983, 4.816, 2.030, C.accentSoft);
++  heading(s, 'Traditional vs. Digital Collage', { x: 0.366, y: 0.797, w: 12.601, h: 1.01 });
++  [
++    { text: 'Paper cutouts', x: 0.978, w: 1.826 }, { text: 'Glue', x: 2.924, w: 0.991 },
++    { text: 'Scissors', x: 4.035, w: 1.311 }, { text: 'Photoshop', x: 7.977, w: 1.673 },
++    { text: 'Procreate', x: 9.758, w: 1.451 }, { text: 'Adobe', x: 11.317, w: 1.049 },
++  ].forEach((t) => pill(s, { ...t, y: 5.275, fill: C.white, color: C.black }));
++  [0.805, 7.813].forEach((x) => body(s, LOREM_SHORT, {
++    x, y: 5.870, w: 4.715, h: 0.808, color: C.white, align: 'center',
++  }));
++  chevronBadge(s, 12.339, 0.923, 0.628, C.accent, 'down');
++  s.addShape('ellipse', { x: 5.5, y: 3.368, w: 2.333, h: 2.333, fill: { color: C.black } });
++  heading(s, 'VS', { x: 5.5, y: 3.929, w: 2.333, h: 1.212, size: 66, color: C.white, align: 'center' });
++  chrome(s, 4, false);
++}
++
++// 5 — a bank of tags. (The header rule is white on white here, as in the source.)
++function slideTypes(p) {
++  const s = p.addSlide();
++  photo(s, 0, 0, 13.333, 3.389);
++  heading(s, 'Types of Collage', { x: 0.366, y: 3.599, w: 12.601, h: 1.01 });
++  chevronBadge(s, 7.242, 3.790, 0.628, C.accent, 'down');
++  [
++    { text: 'Montage', x: 0.366, y: 4.912, w: 2.013 },
++    { text: '3D collage', x: 2.606, y: 4.912, w: 2.299 },
++    { text: 'Baby collages', x: 5.131, y: 4.917, w: 2.716 },
++    { text: 'Mixed media', x: 8.074, y: 4.917, w: 2.368 },
++    { text: 'Decoupage', x: 10.668, y: 4.911, w: 2.299 },
++    { text: 'Paper collage', x: 0.366, y: 5.704, w: 2.716 },
++    { text: 'Collage with wood', x: 3.537, y: 5.704, w: 3.343 },
++    { text: 'Papier collé', x: 7.335, y: 5.704, w: 2.368 },
++    { text: 'Digital collage', x: 10.159, y: 5.707, w: 2.808 },
++    { text: 'Collage Kit', x: 0.366, y: 6.491, w: 2.061 },
++    { text: 'Mosaic', x: 2.638, y: 6.491, w: 1.815 },
++    { text: 'Assemblage', x: 4.663, y: 6.491, w: 2.368 },
++    { text: 'Décollage', x: 7.242, y: 6.491, w: 2.097 },
++  ].forEach((t) => pill(s, { ...t, size: SZ.tag }));
++  chrome(s, 5, true);
++}
++
++// 6 — three artist cards.
++function slideArtists(p) {
++  const s = p.addSlide();
++  heading(s, 'Famous Collage Artists', { x: 0.366, y: 1.756, w: 3.421, h: 2.827 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.',
++    { x: 0.366, y: 5.024, w: 3.421, h: 1.161 });
++  chevronBadge(s, 0.366, 0.923, 0.628, C.accent, 'down');
++  pill(s, { text: 'Learn More', x: 0.366, y: 6.625, w: 1.853 });
++  const cards = [
++    { x: 4.159, fill: C.accent, name: 'Hannah Höch' },
++    { x: 7.184, fill: C.grey50, name: 'Romare Bearden' },
++    { x: 10.209, fill: C.grey50, name: 'Kurt Schwitters' },
++  ];
++  cards.forEach((c) => s.addShape('roundRect', {
++    x: c.x, y: 1.551, w: 2.758, h: 5.529, rectRadius: 0.372, fill: { color: c.fill },
++  }));
++  cards.forEach((c) => {
++    heading(s, c.name, { x: c.x + 0.15, y: 5.189, w: 2.607, h: 1.043, size: SZ.sub, color: C.white });
++    body(s, 'Lorem ipsum dolor sit.', { x: c.x + 0.15, y: 6.223, w: 2.607, h: 0.454, color: C.white });
++  });
++  cards.forEach((c) => photo(s, c.x + 0.15, 1.701, 2.457, 3.337, C.grey15));
++  chrome(s, 6, false);
++}
++
++// 7 — accent panel on the left, chevron list on the right.
++function slideTools(p) {
++  const s = p.addSlide();
++  photo(s, 3.811, 0.807, 4.304, 6.3);
++  s.addShape('roundRect', {
++    x: 0.366, y: 0.797, w: 4.304, h: 6.3, rectRadius: 0.528, fill: { color: C.accent },
++  });
++  heading(s, 'Tools for Collage Making', { x: 0.708, y: 3.907, w: 3.621, h: 2.827, color: C.white });
++  chevronBadge(s, 0.774, 1.203, 0.628, C.white, 'down');
++  ['Scissors', 'Glue', 'X-Acto knife', 'Scanner', 'GD software'].forEach((label, i) => {
++    const y = 1.229 + i * 1.2555;
++    chevronBadge(s, 8.507, y, 0.348, C.accent, 'right');
++    heading(s, label, { x: 8.981, y: y - 0.045, w: 3.906, h: 0.505, size: SZ.item });
++    body(s, LOREM_TINY, { x: 8.981, y: y + 0.393, w: 3.986, h: 0.454 });
++  });
++  chrome(s, 7, false);
++}
++
++// 8 — photo mosaic with white caption tags.
++function slideMaterials(p) {
++  const s = p.addSlide();
++  [
++    [0.366, 0.807, 3.195, 2.943], [8.175, 0.807, 4.792, 2.943],
++    [0.366, 4.144, 4.756, 2.943], [5.632, 4.144, 3.626, 2.943], [9.768, 4.144, 3.199, 2.943],
++  ].forEach((r) => photo(s, r[0], r[1], r[2], r[3]));
++  heading(s, 'Materials Used in Collage', { x: 3.988, y: 0.797, w: 3.760, h: 2.827 });
++  [
++    { text: 'Paper & Glue', x: 0.614, y: 2.876, w: 2.699 },
++    { text: 'Magazine cutouts', x: 8.455, y: 2.876, w: 4.233 },
++    { text: 'Digital assets', x: 0.612, y: 6.230, w: 4.264 },
++    { text: 'Cloth', x: 5.924, y: 6.230, w: 3.043 },
++    { text: 'cardboard', x: 10.042, y: 6.230, w: 2.651 },
++  ].forEach((t) => pill(s, { ...t, size: SZ.tag, fill: C.white, color: C.accent }));
++  chrome(s, 8, false);
++}
++
++// 9 — four numbered steps on a full accent background.
++function slideSteps(p) {
++  const s = p.addSlide();
++  s.background = { color: C.accent };
++  photo(s, 7.003, 0.807, 5.964, 2.953, C.accentSoft);
++  heading(s, 'Basic Steps in Creating a Collage', { x: 0.401, y: 0.797, w: 5.307, h: 2.827, color: C.white });
++  [
++    { n: '(01)', x: 0.366, title: 'Select \ntheme' },
++    { n: '(02)', x: 3.624, title: 'Gather materials' },
++    { n: '(03)', x: 6.881, title: 'Arrange layout' },
++    { n: '(04)', x: 10.138, title: 'Assemble & refine' },
++  ].forEach((c) => {
++    heading(s, c.n, { x: c.x, y: 4.065, w: 2.829, h: 0.909, size: SZ.num, color: C.accentSoft });
++    heading(s, c.title, { x: c.x + 0.122, y: 5.047, w: 2.707, h: 0.909, size: SZ.item, color: C.white });
++    body(s, LOREM_STEP, { x: c.x + 0.122, y: 5.936, w: 2.707, h: 1.161, color: C.accentPale });
++  });
++  chevronBadge(s, 5.899, 1.045, 0.628, C.white, 'down');
++  chrome(s, 9, true);
++}
++
++// 10 — full-bleed photo darkened left-to-right by a black gradient scrim.
++// pptxgenjs has no gradient fill, so the scrim is a run of narrow bands that
++// step from solid black to the white of the (empty) picture frame behind it.
++function slideModernArt(p) {
++  const s = p.addSlide();
++  photo(s, 0, 0, 13.333, 7.5);
++  const bands = 64, scrimW = 10.972;
++  for (let i = 0; i < bands; i++) {
++    const v = Math.round((255 * i) / (bands - 1)).toString(16).toUpperCase().padStart(2, '0');
++    s.addShape('rect', {
++      x: (i * scrimW) / bands, y: 0, w: scrimW / bands + 0.03, h: 7.5,
++      fill: { color: v + v + v },
++    });
++  }
++  heading(s, 'Collage in Modern Art', { x: 0.366, y: 0.797, w: 5.356, h: 2.121, size: SZ.big, color: C.white });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore.',
++    { x: 1.172, y: 2.917, w: 4.550, h: 1.161, color: C.white });
++  photo(s, 1.172, 4.583, 3.847, 2.222);
++  photo(s, 5.352, 4.583, 3.847, 2.222);
++  [
++    { text: 'Contemporary galleries', x: 1.363 },
++    { text: 'Art installations', x: 5.544 },
++  ].forEach((t) => pill(s, { ...t, y: 6.060, w: 3.465, size: 18, fill: C.white, color: C.accent }));
++  chevronBadge(s, 9.885, 5.380, 0.628, C.white, 'right');
++  chrome(s, 10, true);
++}
++
++// 11 — three graphic-design use cases.
++function slideGraphicDesign(p) {
++  const s = p.addSlide();
++  heading(s, 'Collage \nin Graphic Design', { x: 0.366, y: 3.750, w: 4.373, h: 2.827 });
++  [
++    { x: 5.194, title: 'Branding' },
++    { x: 7.924, title: 'Album art' },
++    { x: 10.653, title: 'Posters' },
++  ].forEach((c) => {
++    heading(s, c.title, { x: c.x, y: 1.892, w: 2.319, h: 0.505, size: SZ.item });
++    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do.',
++      { x: c.x, y: 2.397, w: 2.319, h: 1.161 });
++    photo(s, c.x, 3.798, 2.319, 2.319);
++    body(s, 'Lorem ipsum dolor sit amet consectetur.', { x: c.x, y: 6.289, w: 2.319, h: 0.808 });
++  });
++  chevronBadge(s, 0.366, 2.813, 0.628, C.accent, 'down');
++  chrome(s, 11, false);
++}
++
++// 12 — outlined card with a chevron list.
++function slideFashion(p) {
++  const s = p.addSlide();
++  heading(s, 'Collage \nin Fashion', { x: 6.359, y: 1.041, w: 4.890, h: 1.919 });
++  s.addShape('roundRect', {
++    x: 5.988, y: 0.797, w: 6.979, h: 6.300, rectRadius: 0.500,
++    line: { color: C.accent, width: 1.5 },
++  });
++  chevronBadge(s, 11.961, 1.128, 0.628, C.accent, 'down');
++  body(s, LOREM_LONG, { x: 6.359, y: 3.229, w: 6.177, h: 1.161 });
++  ['Mood boards', 'Lookbooks', 'Trend forecasting'].forEach((label, i) => {
++    const y = 4.706 + i * 0.7255;
++    chevronBadge(s, 7.021, y, 0.348, C.accent, 'right');
++    heading(s, label, { x: 7.495, y: y - 0.045, w: 3.906, h: 0.505, size: SZ.item });
++  });
++  photo(s, 0.366, 0.797, 2.581, 2.581);
++  photo(s, 2.084, 1.756, 3.500, 5.341);
++  chrome(s, 12, false);
++}
++
++// 13 — banner photo plus three numbered benefits.
++function slideEducation(p) {
++  const s = p.addSlide();
++  photo(s, 0.366, 1.933, 12.601, 2.444);
++  heading(s, 'Collage in Education', { x: 0.366, y: 0.797, w: 12.601, h: 1.01 });
++  chevronBadge(s, 12.339, 0.923, 0.628, C.accent, 'down');
++  [
++    { n: '(01)', x: 3.577, title: 'Creativity' },
++    { n: '(02)', x: 6.858, title: 'Storytelling' },
++    { n: '(03)', x: 10.138, title: 'Learning' },
++  ].forEach((c) => {
++    heading(s, c.n, { x: c.x, y: 4.431, w: 2.829, h: 0.909, size: SZ.num, color: C.grey15 });
++    heading(s, c.title, { x: c.x + 0.122, y: 5.340, w: 2.707, h: 0.572, size: SZ.sub });
++    body(s, LOREM_STEP, { x: c.x + 0.122, y: 5.936, w: 2.707, h: 1.161 });
++  });
++  chrome(s, 13, false);
++}
++
++// 14 — stacked "cards" fanning out of the accent background.
++function slideStorytelling(p) {
++  const s = p.addSlide();
++  s.background = { color: C.accent };
++  [
++    { x: 3.382, y: 0.797, w: 6.569, h: 4.198, fill: C.grey35 },
++    { x: 2.656, y: 1.486, w: 8.021, h: 4.198, fill: C.grey25 },
++    { x: 2.000, y: 2.175, w: 9.333, h: 4.198, fill: C.grey15 },
++    { x: 1.389, y: 2.903, w: 10.556, h: 4.597, fill: C.white },
++  ].forEach((c) => s.addShape('round2SameRect', {
++    x: c.x, y: c.y, w: c.w, h: c.h, fill: { color: c.fill }, angleRange: [ADJ(10021), 0],
++  }));
++  heading(s, 'Collage for Storytelling', { x: 1.389, y: 3.358, w: 10.556, h: 1.01, align: 'center' });
++  body(s, LOREM_LONG, { x: 2.0, y: 4.476, w: 9.333, h: 0.808, align: 'center' });
++  [
++    { text: 'Narrate emotions', x: 2.496, w: 3.175 },
++    { text: 'Themes', x: 5.807, w: 1.719 },
++    { text: 'Personal history', x: 7.662, w: 3.175 },
++  ].forEach((t) => pill(s, { ...t, y: 5.631, size: SZ.tag }));
++  body(s, LOREM_SHORT, { x: 2.0, y: 6.646, w: 9.333, h: 0.454, align: 'center' });
++  chrome(s, 14, true);
++}
++
++// 15 — numbered list separated by hairlines.
++function slidePsychology(p) {
++  const s = p.addSlide();
++  heading(s, 'Psychology Behind Collage', { x: 0.379, y: 0.797, w: 6.288, h: 1.919 });
++  [
++    'Creative Expression and Self-Discovery',
++    'Emotional Processing and Release',
++    'Enhanced Agency and Control',
++    'Connecting with the Unconscious',
++    'Building Connections & Relationships',
++  ].forEach((label, i) => {
++    const y = 2.931 + i * 0.8815;
++    heading(s, `(0${i + 1}).`, {
++      x: 2.585, y, w: 1.256, h: 0.64, size: SZ.section, color: C.grey25, align: 'right',
++    });
++    heading(s, label, { x: 3.841, y, w: 9.126, h: 0.64, size: SZ.section });
++    s.addShape('line', { x: 2.817, y: y + 0.64, w: 10.15, h: 0, line: { color: C.black, width: 0.5 } });
++  });
++  chevronBadge(s, 7.264, 0.923, 0.628, C.accent, 'down');
++  chrome(s, 15, false);
++}
++
++// 16 — clustered bar chart plus three stat cards.
++function slideEnvironment(p) {
++  const s = p.addSlide();
++  heading(s, 'Environmental Impact & Recycling', { x: 0.379, y: 0.797, w: 6.288, h: 2.827 });
++  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++  s.addChart(p.ChartType.bar, [
++    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: cats, values: [2.4, 3.4, 1.8, 2.8] },
++    { name: 'Series 3', labels: cats, values: [2, 2, 3, 5] },
++  ], {
++    x: 6.931, y: 0.797, w: 6.024, h: 6.3,
++    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 165, barOverlapPct: 56,
++    chartColors: [C.accent, C.accentPale, C.ink],
++    showLegend: false, showTitle: false,
++    valGridLine: { color: C.grey15, size: 1 }, catGridLine: { style: 'none' },
++    valAxisLineShow: false, catAxisLineColor: C.grey15,
++    valAxisMajorTickMark: 'none', catAxisMajorTickMark: 'none',
++    catAxisLabelColor: C.axis, catAxisLabelFontFace: F.body, catAxisLabelFontSize: 12,
++    valAxisLabelColor: C.axis, valAxisLabelFontFace: F.body, valAxisLabelFontSize: 12,
++  });
++  body(s, LOREM_LONG, { x: 0.379, y: 3.801, w: 6.024, h: 1.161 });
++  [
++    { x: 0.366, fill: C.accent, ink: C.white, label: 'ACTIVITY 01', value: '3249++' },
++    { x: 2.507, fill: C.accentPale, ink: C.ink, label: 'ACTIVITY 02', value: '5627++' },
++    { x: 4.647, fill: C.ink, ink: C.white, label: 'ACTIVITY 03', value: '7890++' },
++  ].forEach((c) => {
++    s.addShape('roundRect', {
++      x: c.x, y: 5.342, w: 1.756, h: 1.756, rectRadius: 0.293, fill: { color: c.fill },
++    });
++    heading(s, c.label, { x: c.x + 0.106, y: 6.185, w: 1.65, h: 0.303, size: SZ.small, face: F.body, color: c.ink });
++    heading(s, c.value, { x: c.x + 0.106, y: 6.486, w: 1.65, h: 0.505, size: SZ.item, color: c.ink });
++    chevronBadge(s, c.x + 1.313, 5.536, 0.262, c.ink, 'down');
++  });
++  chrome(s, 16, false);
++}
++
++// 17 — accent background, checklist, photo cluster on the right.
++function slideChallenges(p) {
++  const s = p.addSlide();
++  s.background = { color: C.accent };
++  heading(s, 'Challenges in Collage Making', { x: 2.129, y: 0.797, w: 4.544, h: 2.827, color: C.white });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore.',
++    { x: 2.117, y: 3.876, w: 4.544, h: 1.161, color: C.white });
++  [5.579, 6.151, 6.723].forEach((y) => {
++    checkBullet(s, 2.193, y, 0.288, C.white, C.accent);
++    body(s, 'Lorem ipsum dolor sit amet.', { x: 2.603, y: y - 0.083, w: 4.058, h: 0.454, color: C.white });
++  });
++  photo(s, 7.147, 0.797, 3.583, 6.300, C.accentSoft);
++  photo(s, 10.028, 3.542, 2.939, 2.903, C.accentSoft);
++  photo(s, 11.216, 1.308, 1.751, 1.723, C.accentSoft);
++  chrome(s, 17, true);
++}
++
++// 18 — tips, photo in the middle, chevron list on the right.
++function slideTips(p) {
++  const s = p.addSlide();
++  photo(s, 4.656, 0.797, 4.550, 6.300);
++  heading(s, 'Tips for Better Collages', { x: 0.379, y: 2.178, w: 3.749, h: 2.827 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.',
++    { x: 0.379, y: 5.183, w: 3.946, h: 1.161 });
++  chevronBadge(s, 0.366, 1.311, 0.628, C.accent, 'down');
++  pill(s, { text: 'Learn More', x: 0.366, y: 6.625, w: 1.853 });
++  ['Use contrast and balance', 'Play with texture & layers'].forEach((label, i) => {
++    const y = 2.639 + i * 2.447;
++    chevronBadge(s, 9.560, y, 0.348, C.accent, 'right');
++    heading(s, label, { x: 10.013, y: y - 0.076, w: 2.954, h: 0.909, size: SZ.item });
++    body(s, 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor incididunt.',
++      { x: 10.012, y: y + 0.833, w: 2.943, h: 1.161 });
++  });
++  chrome(s, 18, false);
++}
++
++// 19 — contact details.
++function slideContact(p) {
++  const s = p.addSlide();
++  heading(s, 'Connect\nWith us!', { x: 8.642, y: 1.831, w: 4.325, h: 1.919 });
++  heading(s, 'Address', { x: 9.028, y: 4.040, w: 3.939, h: 0.505, size: SZ.item });
++  body(s, 'Lorem Ipsum Road, Manhattan CB31 9AF, United Kingdom',
++    { x: 9.028, y: 4.541, w: 3.939, h: 0.808 });
++  heading(s, 'Phone', { x: 9.028, y: 5.789, w: 3.939, h: 0.505, size: SZ.item });
++  body(s, '(+13) 3142 7464 876\n(+13) 6455 8183 173', { x: 9.028, y: 6.289, w: 3.939, h: 0.714 });
++  photo(s, 0.366, 0.797, 7.828, 6.300);
++  chrome(s, 19, false);
++}
++
++// 20 — closing slide, THANK YOU scattered like the cover.
++function slideThanks(p) {
++  const s = p.addSlide();
++  s.background = { color: C.accent };
++  [
++    { t: 'T', x: 7.081, y: 0.468, w: 2.027, rot: 342.30 },
++    { t: 'K', x: 10.564, y: 2.420, w: 2.337, rot: 351.29 },
++    { t: 'H', x: 8.638, y: 0.493, w: 2.446, rot: 0 },
++    { t: 'Y', x: 6.476, y: 4.024, w: 2.183, rot: 13.29 },
++    { t: 'A', x: 10.516, y: 0.122, w: 2.451, rot: 0 },
++    { t: 'O', x: 8.355, y: 4.277, w: 2.569, rot: 349.89 },
++    { t: 'N', x: 8.243, y: 2.256, w: 2.446, rot: 15.50 },
++    { t: 'U', x: 10.675, y: 4.277, w: 2.390, rot: 349.89 },
++  ].forEach((l) => s.addText(l.t, {
++    x: l.x, y: l.y, w: l.w, h: 3.45, rotate: l.rot, wrap: false,
++    fontSize: 199, fontFace: F.black, color: C.white, valign: 'top',
++  }));
++  heading(s, 'For Your\nAttention', {
++    x: 3.930, y: 5.749, w: 2.736, h: 1.178, size: SZ.section, face: F.body, color: C.white,
++  });
++  chrome(s, null, true);
++}
++
++/* ------------------------------------------------------------------ build */
++
++function build() {
++  const pres = new PptxGenJS();
++  pres.defineLayout({ name: 'WIDE_16x9', width: 40 / 3, height: 7.5 }); // 12192000 x 6858000 EMU
++  pres.layout = 'WIDE_16x9';
++  pres.theme = { headFontFace: F.head, bodyFontFace: F.body };
++  pres.title = 'Collage Presentation Template';
++
++  [
++    slideCover, slideWhatIs, slideHistory, slideVersus, slideTypes,
++    slideArtists, slideTools, slideMaterials, slideSteps, slideModernArt,
++    slideGraphicDesign, slideFashion, slideEducation, slideStorytelling, slidePsychology,
++    slideEnvironment, slideChallenges, slideTips, slideContact, slideThanks,
++  ].forEach((make) => make(pres));
++
++  return pres.writeFile({
++    fileName: path.join(__dirname, '140f6d3b-2344-4424-97fb-3fa9361983b6_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

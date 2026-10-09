@@ -1,0 +1,792 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/multipurpose_business_presentation_2.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/multipurpose_business_presentation_2.js
+@@ -0,0 +1,789 @@
++/**
++ * MIORA - Multipurpose Business Presentation Template (30 slides, 13.333" x 7.5")
++ * Standalone pptxgenjs re-creation of the reference deck.
++ * Raster artwork in the original is replaced by flat colour placeholders.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Theme
++ * ------------------------------------------------------------------ */
++const C = {
++  green: '344E41',      // accent1 - primary dark green
++  greenDeep: '273B31',  // accent1 shaded
++  green2: '3A5A40',     // accent2
++  green3: '588157',     // accent3
++  sage: 'A3B18A',       // accent4
++  mint: '76A48D',
++  mint2: '7BAA84',
++  white: 'FFFFFF',
++  black: '000000',
++  ink: '404040',        // tx1 75%
++  inkSoft: '808080',    // tx1 50%
++  inkFaint: 'A6A6A6',   // white 65%
++  silver: 'BFBFBF',     // tx1 25%
++  smoke: 'D9D9D9',      // white 85%
++  nearBlack: '0D0D0D',
++  charcoal: '1A1A1A',
++  plum: '92278F',
++};
++
++const F = {
++  head: 'Montserrat',
++  body: 'Noto Sans',
++  pop: 'Poppins',
++  popSemi: 'Poppins SemiBold',
++  lato: 'Lato',
++  raleway: 'Raleway',
++  osExtra: 'Open Sans Extrabold',
++};
++
++/* Boiler-plate copy reused all over the deck */
++const L = {
++  full: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for the bliss of souls like mine',
++  short: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart.',
++  tiny: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings',
++  spring: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring',
++  seed: 'A wonderful serenity has taken possession of my entire soul,',
++  happy: 'I am so happy, my dear friend, so absorbed in the exquisite sense of mere tranquil existence, ',
++  neglect: 'I am so happy, my dear friend, so absorbed in the exquisite sense of mere tranquil existence, that I neglect my talents',
++  charm: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm ',
++  spotBold: 'of existence in this spot, which was created for the bliss of souls like mine',
++  tagline: 'Multipurpose Business Presentation Template',
++  bizTemplate: 'Business Presentation Template',
++  title: 'Write Your Title Here',
++};
++L.dot = L.full + '.';
++
++/* ------------------------------------------------------------------ *
++ * Low level helpers
++ * ------------------------------------------------------------------ */
++function txt(slide, content, o) {
++  slide.addText(content, Object.assign({ fontFace: F.body, color: C.black, valign: 'top' }, o));
++}
++
++function rect(slide, x, y, w, h, color, extra) {
++  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, extra));
++}
++
++function oval(slide, x, y, w, h, color, extra) {
++  slide.addShape('ellipse', Object.assign({ x, y, w, h, fill: { color } }, extra));
++}
++
++function hline(slide, x, y, w, color, pt) {
++  slide.addShape('line', { x, y, w, h: 0, line: { color, width: pt } });
++}
++
++/* Vertical brand strip that runs down the left edge of most slides */
++function sidebar(slide) {
++  rect(slide, 0, 0, 0.76, 7.5, C.green);
++  txt(slide, 'MIORA TEMPLATE', {
++    x: -0.889, y: 1.714, w: 2.539, h: 0.37, rotate: 270, wrap: false,
++    fontFace: F.head, fontSize: 16, bold: true, charSpacing: 1, color: C.white,
++  });
++}
++
++/* facebook / instagram / twitter pills - dark, mid and sage green */
++function socialRow(slide, x, y, d, gap) {
++  [[C.green, 'f'], [C.green3, 'ig'], [C.sage, 't']].forEach(function (pair, i) {
++    const cx = x + i * (d + gap);
++    oval(slide, cx, y, d, d, pair[0]);
++    txt(slide, pair[1], {
++      x: cx, y: y, w: d, h: d, align: 'center', valign: 'middle',
++      fontSize: Math.round(d * 22), bold: true, color: C.white,
++    });
++  });
++}
++
++/* Small green "NOTE :" card used on several content slides */
++function noteCard(slide, x, y, w, h, o) {
++  const opt = o || {};
++  rect(slide, x, y, w, h, opt.fill || C.green3);
++  txt(slide, 'NOTE :', {
++    x: x + 0.234, y: y + (opt.padTop || 0.385), w: 1.151, h: 0.286,
++    fontFace: opt.noteFont || F.osExtra, fontSize: opt.noteSize || 11, color: C.white,
++  });
++  txt(slide, L.short, {
++    x: x + 0.234, y: y + (opt.padTop || 0.385) + 0.325, w: opt.textW || 1.703, h: opt.textH || 1.178,
++    fontSize: opt.textSize || 9, color: C.white, lineSpacingMultiple: 1.2,
++  });
++}
++
++/* Pill shaped call-to-action button */
++function button(slide, x, y, w, label) {
++  slide.addText(label, {
++    shape: 'roundRect', rectRadius: 0.3323 * 0.407,
++    x, y, w, h: 0.407, fill: { color: C.green },
++    align: 'center', valign: 'middle',
++    fontFace: F.body, fontSize: 10, bold: true, color: C.white,
++  });
++}
++
++/* "03  |  1st Art Company in LA  |  Modern Style" header band (white on white) */
++function pageTag(slide, num) {
++  txt(slide, num, { x: 0, y: 0.034, w: 1.521, h: 0.707, align: 'center', fontFace: F.popSemi, fontSize: 36, color: C.white });
++  txt(slide, [
++    { text: '1' },
++    { text: 'st', options: { superscript: true } },
++    { text: ' Art Company in LA' },
++  ], { x: 2.022, y: 0.216, w: 1.673, h: 0.269, align: 'right', wrap: false, fontFace: F.popSemi, fontSize: 10, color: C.white });
++  txt(slide, 'Modern Style', { x: 4.019, y: 0.216, w: 1.129, h: 0.269, align: 'center', wrap: false, fontFace: F.popSemi, fontSize: 10, color: C.white });
++}
++
++/* Big Montserrat section heading */
++function heading(slide, text, x, y, w, h, o) {
++  txt(slide, text, Object.assign({ x, y, w, h, fontFace: F.head, fontSize: 44, bold: true, color: C.black }, o));
++}
++
++/* 9pt grey body paragraph at 150% leading */
++function body9(slide, content, x, y, w, h, o) {
++  txt(slide, content, Object.assign({ x, y, w, h, fontSize: 9, color: C.inkSoft, lineSpacingMultiple: 1.5 }, o));
++}
++
++/* The three-part grey/green lorem paragraph that closes many slides */
++function loremTriple(color) {
++  return [{ text: L.dot }, { text: ' ' }, { text: L.happy }].map(function (r) {
++    return { text: r.text, options: { color } };
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide builders
++ * ------------------------------------------------------------------ */
++
++/* 1 + 30 - full bleed photo cover (photo placeholder is empty in the source) */
++function coverSlide(slide, word, wordX, wordW) {
++  txt(slide, word, {
++    x: wordX, y: 2.711, w: wordW, h: 1.582, align: 'center', wrap: false,
++    fontFace: F.head, fontSize: 88, bold: true, charSpacing: 6, color: C.white,
++  });
++  txt(slide, L.tagline, {
++    x: 3.594, y: 4.435, w: 6.146, h: 0.404, align: 'center',
++    fontSize: 18, bold: true, italic: true, color: C.white,
++  });
++  txt(slide, L.full, {
++    x: 1.498, y: 5.833, w: 10.338, h: 0.531, align: 'center',
++    fontSize: 9, color: C.white, lineSpacingMultiple: 1.5,
++  });
++  hline(slide, 5.647, 2.542, 2.04, C.white, 4.5);
++}
++
++function slide01(s) { coverSlide(s, 'MIORA', 4.117, 5.098); }
++function slide30(s) { coverSlide(s, 'THANK YOU', 2.28, 8.773); }
++
++/* 2 - title slide with photo panel on the right */
++function slide02(s) {
++  txt(s, 'MIORA', { x: 1.128, y: 3.169, w: 3.864, h: 1.313, fontFace: F.head, fontSize: 72, bold: true });
++  sidebar(s);
++  txt(s, L.bizTemplate, { x: 1.185, y: 0.757, w: 3.363, h: 0.269, fontSize: 10, bold: true, italic: true, color: C.green });
++  body9(s, L.dot + ' ', 9.151, 0.757, 3.422, 1.213, { color: C.white });
++  txt(s, 'CorpockOffice Here , 118, High Building Mall  3F 4HQ', {
++    x: 1.185, y: 5.854, w: 3.187, h: 0.673, fontSize: 12, lineSpacingMultiple: 1.5,
++  });
++  txt(s, 'Modern Style Presentation', {
++    x: 1.204, y: 5.232, w: 2.033, h: 0.327, align: 'justify', fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* 3 - agenda / table of contents */
++function slide03(s) {
++  txt(s, 'MIORA', {
++    x: 0.96, y: 3.296, w: 3.065, h: 0.909, align: 'center', wrap: false,
++    fontFace: F.head, fontSize: 48, bold: true, charSpacing: 6, color: C.white,
++  });
++  rect(s, 6.667, 1.258, 6.667, 4.984, C.green);
++  txt(s, 'Our Content', {
++    x: 3.559, y: 3.329, w: 4.532, h: 0.842, rotate: 270, wrap: false,
++    fontFace: F.head, fontSize: 44, bold: true, charSpacing: 2, color: C.black,
++  });
++  const agenda = [
++    ['01', 'introduction', 7.396, 3.470], ['02', 'About us', 7.396, 4.058], ['03', 'portfolio', 7.396, 4.631],
++    ['04', 'Infographic', 10.193, 3.470], ['05', 'closing', 10.193, 4.043],
++  ];
++  agenda.forEach(function (row) {
++    const num = row[0], label = row[1], x = row[2], y = row[3];
++    txt(s, num, {
++      x, y, w: 0.839, h: 0.778, fontSize: 30, bold: true, charSpacing: 3,
++      color: C.white, lineSpacingMultiple: 1.5,
++    });
++    txt(s, label, {
++      x: x + 0.896, y: y + 0.30, w: 1.35, h: 0.394, wrap: false,
++      fontSize: 13, bold: true, color: C.white, lineSpacingMultiple: 1.5,
++    });
++  });
++  body9(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot',
++    7.396, 2.268, 5.333, 0.783, { color: C.white });
++}
++
++/* 4 - welcome / author */
++function slide04(s) {
++  rect(s, 8.529, 4.569, 4.805, 2.932, C.green);
++  heading(s, 'Welcome To Miora Template', 1.44, 1.839, 5.267, 1.582);
++  txt(s, [
++    { text: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot,', options: { color: C.inkSoft } },
++    { text: ' ', options: { color: C.green } },
++    { text: 'which was created for the bliss of souls like mine.', options: { color: C.green, bold: true } },
++  ], { x: 1.44, y: 3.81, w: 5.663, h: 0.758, fontSize: 9, fontFace: F.body, lineSpacingMultiple: 1.5, valign: 'top' });
++  txt(s, 'CEO & MANAGER', { x: 1.44, y: 5.069, w: 2.238, h: 0.303, fontSize: 12, color: C.charcoal });
++  txt(s, 'YOUR NAME HERE', { x: 1.44, y: 5.439, w: 3.676, h: 0.438, fontSize: 20, bold: true, color: C.green });
++  txt(s, 'Lorem ipsum\nDolor\nSit amet.', { x: 12.01, y: 0.896, w: 0.738, h: 0.942, fontSize: 10, color: C.green });
++  socialRow(s, 5.595, 5.491, 0.327, 0.193);
++  sidebar(s);
++}
++
++/* 5 - "Little Bit Our Story" */
++function slide05(s) {
++  heading(s, 'Little Bit Our Story', 6.564, 1.422, 4.103, 1.582);
++  body9(s, L.full, 0.674, 5.412, 3.993, 1.01, { color: C.white });
++  txt(s, L.title, { x: 6.569, y: 4.014, w: 3.125, h: 0.37, fontSize: 16, bold: true, color: C.green });
++  body9(s, loremTriple(C.inkSoft), 6.569, 4.452, 4.575, 1.213);
++  button(s, 10.983, 6.336, 1.59, 'Click To View');
++}
++
++/* 6 - diagonal green panel */
++function slide06(s) {
++  s.addShape('custGeom', {
++    x: 0, y: 0, w: 7.673, h: 7.5, fill: { color: C.green },
++    points: [
++      { x: 0, y: 0 }, { x: 5.334, y: 0 }, { x: 7.673, y: 7.5 }, { x: 0, y: 7.5 }, { close: true },
++    ],
++  });
++  heading(s, 'Miora Business Adventure', 1.001, 1.68, 4.103, 2.322, { color: C.white });
++  txt(s, L.title, { x: 1.006, y: 4.76, w: 3.125, h: 0.37, fontSize: 16, bold: true, color: C.white });
++  body9(s, loremTriple(C.white), 1.006, 5.197, 4.575, 1.213);
++}
++
++/* 7 - interlocking ring timeline */
++function slide07(s) {
++  txt(s, 'MIORA', {
++    x: 5.345, y: 1.042, w: 2.644, h: 0.909, align: 'center', wrap: false,
++    fontFace: F.head, fontSize: 48, bold: true, color: C.white,
++  });
++  heading(s, 'Story Timeline', 3.396, 3.403, 6.542, 0.842, { align: 'center' });
++
++  const RING = 1.844, HOLE = 1.196;
++  const THICK = (RING - HOLE) / 2 / RING;      // arc thickness as a share of the radius
++  // x, y of the grey ring | arc colour | arc on top half? | year label
++  const stops = [
++    [2.708, 4.469, C.green3, true, '2014'],
++    [4.227, 4.461, C.mint2, false, '2017'],
++    [5.738, 4.469, C.mint, true, '2018'],
++    [7.258, 4.461, C.sage, false, '2020'],
++    [8.782, 4.469, C.black, true, '2021'],
++  ];
++  stops.forEach(function (st) {
++    oval(s, st[0], st[1], RING, RING, C.smoke);
++  });
++  stops.forEach(function (st) {
++    s.addShape('blockArc', {
++      x: st[0], y: st[1], w: RING, h: RING, fill: { color: st[2] },
++      angleRange: st[3] ? [180, 360] : [0, 180], arcThicknessRatio: THICK,
++    });
++  });
++  stops.forEach(function (st) {
++    const c = st[0] + RING / 2;
++    oval(s, c - HOLE / 2, st[1] + 0.324, HOLE, HOLE, C.white, { shadow: { type: 'outer', blur: 8, offset: 0, angle: 90, color: C.black, opacity: 0.25 } });
++    txt(s, st[4], {
++      x: c - 0.5, y: st[1] + 0.731, w: 1.0, h: 0.406, align: 'center',
++      fontFace: F.pop, fontSize: 20, bold: true, charSpacing: 3, superscript: true, lineSpacingMultiple: 1.5,
++    });
++  });
++  txt(s, L.full, {
++    x: 1.498, y: 6.582, w: 10.338, h: 0.531, align: 'center',
++    fontSize: 9, color: C.ink, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* 8 - "Let's Go" with a green icon card */
++function slide08(s) {
++  rect(s, 9.583, 0, 3.75, 3.75, C.green);
++  oval(s, 11.047, 0.667, 0.922, 0.88, C.sage);
++  txt(s, '\u25A3', { x: 11.047, y: 0.667, w: 0.922, h: 0.88, align: 'center', valign: 'middle', fontSize: 22, color: C.white });
++  txt(s, 'Content Here', { x: 10.425, y: 1.772, w: 2.066, h: 0.303, align: 'center', fontFace: F.lato, fontSize: 12, bold: true, color: C.white });
++  body9(s, L.spring + '.', 10.085, 2.301, 2.747, 0.783, { align: 'center', color: C.white });
++  body9(s, [{ text: L.dot }, { text: ' . ' }, { text: L.neglect }], 9.781, 4.782, 3.454, 1.686, { color: C.ink });
++  txt(s, 'MIORA', {
++    x: 6.03, y: 3.296, w: 3.065, h: 0.909, align: 'center', wrap: false,
++    fontFace: F.head, fontSize: 48, bold: true, charSpacing: 6, color: C.white,
++  });
++  heading(s, 'Let\u2019s Go', 0.71, 4.294, 3.368, 0.842);
++  body9(s, L.dot + ' ', 0.715, 5.53, 3.363, 1.213);
++  txt(s, L.bizTemplate, { x: 0.71, y: 0.757, w: 3.363, h: 0.269, fontSize: 10, bold: true, italic: true, color: C.green });
++}
++
++/* 9 - "Enjoy Yourself Into A Nature" */
++function slide09(s) {
++  noteCard(s, 5.302, 4.425, 2.208, 2.161);
++  heading(s, 'Enjoy Yourself Into A Nature', 8.118, 0.904, 4.575, 2.322);
++  txt(s, L.title, { x: 8.123, y: 4.618, w: 3.125, h: 0.37, fontSize: 16, bold: true, color: C.green });
++  body9(s, loremTriple(C.inkSoft), 8.123, 5.056, 4.575, 1.213);
++}
++
++/* 10 - services, green panel bottom left */
++function slide10(s) {
++  rect(s, 0, 3.757, 5.715, 3.743, C.green);
++  [[4.388, '\u25A4'], [5.607, '\u25A3']].forEach(function (row) {
++    const y = row[0];
++    oval(s, 0.76, y + 0.154, 0.521, 0.521, C.sage);
++    txt(s, row[1], { x: 0.76, y: y + 0.154, w: 0.521, h: 0.521, align: 'center', valign: 'middle', fontSize: 14, color: C.white });
++    txt(s, 'Service Here', { x: 1.449, y: y, w: 2.066, h: 0.37, fontSize: 16, bold: true, color: C.white });
++    txt(s, L.short, { x: 1.449, y: y + 0.319, w: 3.678, h: 0.633, fontSize: 9, color: C.white, lineSpacingMultiple: 1.2 });
++  });
++  heading(s, 'Services', 0.661, 0.792, 4.005, 0.842);
++  body9(s, loremTriple(C.inkSoft), 0.661, 1.846, 4.339, 1.213);
++  [[4.598, 'Service One', 4.388], [5.86, 'Service Two', 5.653]].forEach(function (row) {
++    txt(s, '\u2756', { x: 7.013, y: row[0], w: 0.446, h: 0.45, align: 'center', valign: 'middle', fontSize: 18, color: C.white });
++    txt(s, row[1], { x: 7.782, y: row[2], w: 2.05, h: 0.349, fontSize: 11, bold: true, charSpacing: 3, color: C.white, lineSpacingMultiple: 1.5 });
++    txt(s, L.spring + '.', { x: 7.782, y: row[2] + 0.373, w: 4.49, h: 0.532, fontSize: 9, color: C.white, lineSpacingMultiple: 1.5 });
++  });
++}
++
++/* 11 - services, full height green panel on the left */
++function slide11(s) {
++  rect(s, 0, 0, 5.0, 7.5, C.green);
++  heading(s, 'Services', 0.661, 0.736, 4.005, 0.842, { color: C.white });
++  body9(s, L.dot + ' ', 7.068, 0.993, 2.215, 1.913, { color: C.ink });
++  txt(s, 'MIORA', {
++    x: 2.634, y: 4.327, w: 3.065, h: 0.909, align: 'center', wrap: false,
++    fontFace: F.head, fontSize: 48, bold: true, charSpacing: 6, color: C.white,
++  });
++  oval(s, 7.411, 5.746, 0.762, 0.762, C.green3);
++  txt(s, '\u2706', { x: 7.578, y: 5.913, w: 0.428, h: 0.428, align: 'center', valign: 'middle', fontSize: 16, color: C.white });
++  txt(s, '\u2b21', { x: 7.599, y: 4.072, w: 0.428, h: 0.428, align: 'center', valign: 'middle', fontSize: 20, color: C.black });
++  [['Service One', 3.755], ['Service Two', 5.629]].forEach(function (row) {
++    txt(s, row[0], { x: 8.333, y: row[1], w: 1.654, h: 0.337, fontSize: 14, bold: true, color: C.green });
++    body9(s, L.short, 8.333, row[1] + 0.356, 3.717, 0.758);
++  });
++}
++
++/* 12 - team list */
++function slide12(s) {
++  rect(s, 0, 0, 4.257, 7.5, C.green);
++  [1.971, 3.062, 4.148, 5.236].forEach(function (y, i) {
++    txt(s, 'Your Name', { x: 6.06, y: y, w: 1.581, h: 0.286, fontSize: 11, bold: true, color: C.green });
++    txt(s, 'California, 03/14/1990', {
++      x: 6.065, y: y + 0.21, w: 1.983, h: 0.283,
++      fontSize: 8, bold: true, italic: true, color: i === 0 ? C.black : C.nearBlack, lineSpacingMultiple: 1.5,
++    });
++    hline(s, 6.183, y + 0.592, 1.725, C.inkSoft, 0.75);
++  });
++  heading(s, 'Miora Team', 8.507, 1.817, 3.538, 1.582);
++  txt(s, [
++    { text: L.charm, options: { color: C.inkSoft } },
++    { text: L.spotBold, options: { color: C.green, bold: true } },
++    { text: '. ', options: { color: C.plum, bold: true } },
++  ], { x: 8.507, y: 3.912, w: 3.994, h: 0.986, fontFace: F.body, fontSize: 9, lineSpacingMultiple: 1.5, valign: 'top' });
++  button(s, 8.598, 5.422, 1.59, 'Click To Details');
++  socialRow(s, 11.064, 5.496, 0.327, 0.193);
++}
++
++/* 13 - full green board with four name blocks */
++function slide13(s) {
++  rect(s, 0, 0, 13.333, 7.5, C.green);
++  [[9.12, 4.716], [10.274, 1.609], [3.288, 4.716], [4.473, 1.626]].forEach(function (p) {
++    txt(s, 'Your Name', { x: p[0], y: p[1], w: 2.421, h: 0.404, fontSize: 18, bold: true, color: C.white });
++    txt(s, L.tiny + ' ', {
++      x: p[0] + 0.025, y: p[1] + 0.42, w: 2.375, h: 0.783,
++      fontSize: 9, color: C.white, lineSpacingMultiple: 1.5,
++    });
++  });
++}
++
++/* 14 - team profile with skill bars */
++function slide14(s) {
++  txt(s, 'Team Profile', {
++    x: -0.796, y: 4.264, w: 4.636, h: 0.842, rotate: 270, wrap: false,
++    fontFace: F.head, fontSize: 44, bold: true, charSpacing: 2, color: C.black,
++  });
++  txt(s, 'Your Name Here', { x: 7.01, y: 1.116, w: 3.913, h: 0.572, fontSize: 28, bold: true, color: C.green });
++  socialRow(s, 7.161, 1.976, 0.327, 0.193);
++  body9(s, [{ text: L.dot }, { text: ' . ' }, { text: L.neglect }], 7.05, 2.662, 5.382, 1.256);
++  [['Apperance', 4.300], ['Ability', 5.098], ['Skills', 5.906]].forEach(function (row) {
++    txt(s, row[0], { x: 9.655, y: row[1], w: 1.393, h: 0.286, fontSize: 11, bold: true, color: C.ink });
++    txt(s, '87%', { x: 11.869, y: row[1] + 0.008, w: 0.532, h: 0.286, align: 'right', fontSize: 11, bold: true, color: C.ink });
++    hline(s, 9.807, row[1] + 0.408, 2.417, C.silver, 10);
++    hline(s, 9.803, row[1] + 0.405, 2.059, C.green, 10);
++  });
++  noteCard(s, 7.156, 4.3, 2.208, 2.161);
++  sidebar(s);
++}
++
++/* 15 - break slide */
++function slide15(s) {
++  rect(s, 0, 3.43, 5.715, 4.07, C.green);
++  txt(s, 'BREAK SLIDE', { x: 0, y: 0.702, w: 5.715, h: 2.12, align: 'center', fontFace: F.head, fontSize: 60, bold: true });
++  pageTag(s, '03');
++  txt(s, L.tagline, { x: 0.283, y: 4.489, w: 5.148, h: 0.303, align: 'center', fontSize: 12, bold: true, italic: true, color: C.white });
++  body9(s, loremTriple(C.white), 0.567, 5.247, 4.581, 1.213, { align: 'center' });
++}
++
++/* 16 - portfolio intro */
++function slide16(s) {
++  rect(s, 6.667, 3.75, 6.667, 2.993, C.green);
++  heading(s, 'Miora Portfolio', 0.674, 1.422, 4.103, 1.582);
++  txt(s, L.title, { x: 0.679, y: 4.014, w: 3.125, h: 0.37, fontSize: 16, bold: true, color: C.green });
++  body9(s, loremTriple(C.inkSoft), 0.679, 4.452, 4.575, 1.213);
++}
++
++/* 17 - portfolio statistics */
++function slide17(s) {
++  rect(s, 8.934, 3.844, 4.4, 3.656, C.green);       // panel inherited from the layout
++  heading(s, 'Portfolio', 0, 0.711, 5.892, 0.842, { align: 'center' });
++  txt(s, L.dot + ' ', {
++    x: 0.163, y: 1.791, w: 5.567, h: 0.761, align: 'center',
++    fontFace: F.pop, fontSize: 9, color: C.inkSoft, lineSpacingMultiple: 1.5,
++  });
++  button(s, 2.151, 2.855, 1.59, 'Click To Details');
++  txt(s, 'Aliquet nibh biba praesent tristique magna sitaminas sit amet. Risus pretium quam vulputate dignissim. Enim silka milal necis ba', {
++    x: 9.313, y: 0.569, w: 3.737, h: 0.758, align: 'justify', fontSize: 9, lineSpacingMultiple: 1.5,
++  });
++  [['+10', 'Clients Service', 1.712, 'Lorem ipsum incididunt dolor sit amet, consectetur adipisc'],
++   ['+120', 'Product Develops', 2.644, 'Lorem ipsum incididunt dolor sit amet, consectetur']].forEach(function (row) {
++    txt(s, row[0], { x: 9.373, y: row[2], w: 0.89, h: 0.269, margin: 0, fontSize: 16, bold: true });
++    txt(s, row[1], { x: 9.373, y: row[2] + 0.332, w: 1.463, h: 0.185, margin: 0, fontSize: 11, color: C.inkSoft });
++    txt(s, row[3], { x: 10.836, y: row[2] + 0.016, w: 2.215, h: 0.531, fontSize: 9, color: C.green3, lineSpacingMultiple: 1.5 });
++  });
++  txt(s, '68%', { x: 9.386, y: 5.218, w: 1.666, h: 0.909, wrap: false, fontFace: F.head, fontSize: 48, bold: true, color: C.white });
++  txt(s, 'Of shopping carts are abandoned right before the transaction its completed. ', {
++    x: 11.293, y: 5.178, w: 1.655, h: 0.988, fontFace: F.pop, fontSize: 9, color: C.white, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* 18 - phone mockups on a diagonal green field */
++function slide18(s) {
++  s.addShape('custGeom', {
++    x: 0.76, y: 0, w: 12.573, h: 7.5, fill: { color: C.green },
++    points: [
++      { x: 3.833, y: 0 }, { x: 12.573, y: 0 }, { x: 12.573, y: 7.5 }, { x: 0, y: 7.5 }, { close: true },
++    ],
++  });
++  phoneMock(s, 0.850, 1.090);
++  phoneMock(s, 4.060, 1.090);
++  heading(s, 'Agener Mockup', 7.574, 1.741, 3.868, 1.582, { color: C.white });
++  txt(s, L.title, { x: 7.574, y: 3.917, w: 3.125, h: 0.37, fontSize: 16, bold: true, color: C.white });
++  body9(s, loremTriple(C.white), 7.574, 4.442, 4.581, 1.213);
++}
++
++/* Phone body used twice on slide 18 */
++function phoneMock(slide, x, y) {
++  slide.addShape('roundRect', {
++    x, y, w: 2.540, h: 5.320, rectRadius: 0.28,
++    fill: { color: '0B0B0B' }, line: { color: '9A9A9A', width: 3 },
++  });
++  txt(slide, '[image]', { x, y: y + 2.51, w: 2.540, h: 0.3, align: 'center', fontSize: 10, color: C.smoke });
++}
++
++/* 19 - laptop mockup on white */
++function slide19(s) {
++  laptopOpen(s);
++  heading(s, 'Miora Mockup', 8.188, 1.352, 3.538, 1.582);
++  txt(s, [
++    { text: L.charm, options: { color: C.inkSoft } },
++    { text: L.spotBold, options: { color: C.green, bold: true } },
++    { text: '. ', options: { color: C.plum, bold: true } },
++  ], { x: 8.188, y: 3.446, w: 3.994, h: 0.986, fontFace: F.body, fontSize: 9, lineSpacingMultiple: 1.5, valign: 'top' });
++  body9(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart.',
++    8.188, 4.833, 4.199, 0.531);
++  txt(s, 'Your Text Here', { x: 8.186, y: 5.994, w: 2.072, h: 0.37, wrap: false, fontSize: 16, bold: true, charSpacing: 1 });
++  pageTag(s, '18');
++  sidebar(s);
++  button(s, 10.666, 5.976, 1.59, 'Click To View');
++  socialRow(s, 2.642, 1.585, 0.439, 0.257);
++}
++
++/* Open laptop seen slightly from the side: bezel, screen and keyboard deck */
++function laptopOpen(slide) {
++  slide.addShape('custGeom', {                      // dark bezel, leaning back a little
++    x: 1.69, y: 2.97, w: 4.20, h: 3.15, fill: { color: '1F1F1F' },
++    points: [{ x: 0.00, y: 0.00 }, { x: 3.93, y: 0.00 }, { x: 4.20, y: 3.15 }, { x: 0.19, y: 3.15 }, { close: true }],
++  });
++  slide.addShape('custGeom', {                      // blank screen
++    x: 1.88, y: 3.13, w: 3.83, h: 2.82, fill: { color: 'DEDEDC' },
++    points: [{ x: 0.00, y: 0.00 }, { x: 3.59, y: 0.00 }, { x: 3.83, y: 2.82 }, { x: 0.17, y: 2.82 }, { close: true }],
++  });
++  slide.addShape('custGeom', {                      // keyboard deck in perspective
++    x: 1.72, y: 6.05, w: 6.14, h: 0.80, fill: { color: 'D5D5D5' },
++    points: [{ x: 0.00, y: 0.06 }, { x: 2.53, y: 0.00 }, { x: 6.14, y: 0.25 }, { x: 4.98, y: 0.62 },
++             { x: 2.60, y: 0.80 }, { x: 1.32, y: 0.72 }, { x: 0.48, y: 0.50 }, { close: true }],
++  });
++  txt(slide, '[image]', { x: 1.88, y: 4.38, w: 3.83, h: 0.3, align: 'center', fontSize: 10, color: C.inkSoft });
++}
++
++/* 20 - laptop mockup over a green field */
++function slide20(s) {
++  rect(s, 0, 0, 8.167, 7.5, C.green);                 // panel inherited from the layout
++  // laptop: black bezel, transparent screen (green panel on the left, white on the right), silver base
++  rect(s, 6.220, 1.880, 5.210, 3.490, '070707');
++  rect(s, 6.410, 2.070, 1.757, 3.060, C.green);
++  rect(s, 8.167, 2.070, 3.063, 3.060, C.white);
++  rect(s, 5.620, 5.370, 6.410, 0.230, 'A9A9A9');
++  txt(s, '[image]', { x: 8.167, y: 3.450, w: 3.063, h: 0.3, align: 'center', fontSize: 10, color: C.inkSoft });
++  noteCard(s, 10.076, 0.757, 2.497, 2.443, { padTop: 0.511, noteFont: F.body, noteSize: 12, textW: 2.12, textH: 1.096, textSize: 10 });
++  txt(s, 'Miora Mockup Slide', {
++    x: 1.077, y: 1.278, w: 4.141, h: 2.322, fontFace: F.head, fontSize: 44, bold: true, charSpacing: 2, color: C.white,
++  });
++  body9(s, L.full, 1.077, 4.543, 3.927, 1.01, { color: C.white });
++  txt(s, 'Miora Presentation Design Template', {
++    x: 1.079, y: 6.369, w: 4.777, h: 0.303, wrap: false,
++    fontFace: F.head, fontSize: 12, italic: true, charSpacing: 3, color: C.white,
++  });
++  button(s, 10.75, 6.265, 1.823, 'Download Apps');
++}
++
++/* 21 - SWOT analysis */
++function slide21(s) {
++  txt(s, [
++    { text: 'SWOT ', options: { color: C.ink } },
++    { text: 'ANALYSIS', options: { color: C.green } },
++  ], {
++    x: 4.534, y: 0.855, w: 5.026, h: 0.842, align: 'center', wrap: false,
++    fontFace: F.raleway, fontSize: 44, bold: true, italic: true, valign: 'top',
++  });
++  txt(s, L.full, { x: 1.878, y: 1.925, w: 10.338, h: 0.531, align: 'center', fontSize: 9, color: C.ink, lineSpacingMultiple: 1.5 });
++
++  // gear wheel: a quartered disc with eight rounded teeth, one pair per quadrant
++  const CX = 7.046, CY = 4.857, R = 1.545, TOOTH = 0.40, TOOTH_R = 1.52;
++  const QUADS = [[180, 270, C.green], [270, 360, C.green2], [0, 90, C.sage], [90, 180, C.green3]];
++  QUADS.forEach(function (q, i) {
++    [22.5, 67.5].forEach(function (off) {                  // two teeth per quadrant
++      const ang = (i * 90 + off) * Math.PI / 180;
++      oval(s, CX + Math.cos(ang) * TOOTH_R - TOOTH, CY + Math.sin(ang) * TOOTH_R - TOOTH, TOOTH * 2, TOOTH * 2, q[2]);
++    });
++  });
++  QUADS.forEach(function (q) {
++    s.addShape('pie', { x: CX - R, y: CY - R, w: R * 2, h: R * 2, fill: { color: q[2] }, angleRange: [q[0], q[1]] });
++  });
++  const SPAN = TOOTH_R + TOOTH;                                          // reaches past the outermost tooth
++  rect(s, CX - 0.03, CY - SPAN, 0.06, SPAN * 2, C.white);                // white separators between quadrants
++  rect(s, CX - SPAN, CY - 0.03, SPAN * 2, 0.06, C.white);
++  oval(s, 6.684, 4.504, 0.727, 0.719, C.silver);
++  [['S', 6.026, 3.81, 0.581], ['W', 7.319, 3.81, 0.852], ['O', 5.967, 5.149, 0.668], ['T', 7.517, 5.149, 0.584]].forEach(function (g) {
++    txt(s, g[0], { x: g[1], y: g[2], w: g[3], h: 0.842, wrap: false, fontFace: F.raleway, fontSize: 44, bold: true, color: C.white });
++  });
++  const quads = [
++    ['STRENGH', 2.217, 3.368, 0.986, 2.217, 3.849, 2.755, 'left'],
++    ['WEAKNESS', 10.557, 3.366, 1.105, 9.148, 3.847, 2.668, 'right'],
++    ['OPPORTUNITIES', 2.217, 5.259, 1.568, 2.217, 5.585, 2.755, 'left'],
++    ['THREATS', 10.722, 5.250, 0.940, 9.148, 5.594, 2.668, 'right'],
++  ];
++  quads.forEach(function (q) {
++    txt(s, q[0], { x: q[1], y: q[2], w: q[3], h: 0.303, align: q[7], wrap: false, fontSize: 12, bold: true });
++    txt(s, L.seed, { x: q[4], y: q[5], w: q[6], h: 0.549, align: q[7], fontSize: 10, color: C.inkSoft, lineSpacingMultiple: 1.4 });
++  });
++  sidebar(s);
++}
++
++/* 22 - segmented ring infographic */
++function slide22(s) {
++  heading(s, 'Miora Infographic Slide', 3.19, 0.855, 7.714, 0.842, { align: 'center', wrap: false, color: C.ink });
++
++  // four pie wedges separated by 6-degree gaps, hollowed out by a white hub
++  const RCX = 3.318, RCY = 4.313, RR = 1.845;
++  [[14, 98, C.green], [104, 188, C.sage], [194, 278, C.green], [284, 368, C.greenDeep]].forEach(function (q) {
++    s.addShape('pie', { x: RCX - RR, y: RCY - RR, w: RR * 2, h: RR * 2, fill: { color: q[2] }, angleRange: [q[0], q[1]] });
++  });
++  oval(s, RCX - 0.806, RCY - 0.806, 1.612, 1.612, C.white);
++  [['\u2708', 2.20, 2.95], ['\u2605', 4.05, 3.10], ['\u2749', 2.25, 4.95], ['\u2756', 4.00, 4.85]].forEach(function (g) {
++    txt(s, g[0], { x: g[1], y: g[2], w: 0.5, h: 0.5, align: 'center', valign: 'middle', fontSize: 18, color: C.white });
++  });
++
++  // two columns of check-marked bullet cards
++  const cards = [
++    [6.717, 2.505, 6.200, 2.896, C.green], [6.719, 3.797, 6.202, 4.170, C.green2], [6.717, 5.071, 6.200, 5.444, C.green3],
++    [10.120, 2.505, 9.603, 2.878, C.sage], [10.122, 3.797, 9.604, 4.170, C.green], [10.122, 5.059, 9.604, 5.434, C.green2],
++  ];
++  cards.forEach(function (c) {
++    txt(s, 'Your Title Here', { x: c[0], y: c[1], w: 2.328, h: 0.326, fontSize: 11, color: C.inkSoft, lineSpacingMultiple: 1.2 });
++    txt(s, L.tiny, { x: c[0], y: c[1] + 0.305, w: 2.285, h: 0.783, fontSize: 9, color: C.inkSoft, lineSpacingMultiple: 1.5 });
++    oval(s, c[2], c[3], 0.381, 0.382, c[4]);
++    txt(s, '\u2713', { x: c[2], y: c[3], w: 0.381, h: 0.382, align: 'center', valign: 'middle', fontSize: 15, bold: true, color: C.white });
++  });
++  sidebar(s);
++}
++
++/* 23 - jigsaw infographic */
++function slide23(s) {
++  heading(s, 'Miora Infographic Slide', 3.19, 0.855, 7.714, 0.842, { align: 'center', wrap: false, color: C.ink });
++  // four jigsaw pieces; each carries one knob that reaches into its neighbour
++  // x, y, w, h, colour, glyph, knob centre, knob direction (dx, dy)
++  const pieces = [
++    [1.720, 2.480, 2.100, 2.030, C.green2, '\u25A3', 4.003, 3.494, 1, 0],
++    [3.865, 2.480, 2.065, 2.060, C.green, '\u2637', 4.898, 4.707, 0, 1],
++    [1.720, 4.550, 2.100, 2.057, C.sage, '\u2699', 2.759, 4.380, 0, -1],
++    [3.858, 4.600, 2.072, 2.007, C.green3, '\u2707', 3.652, 5.590, -1, 0],
++  ];
++  pieces.forEach(function (p) {                       // bodies first...
++    s.addShape('roundRect', {
++      x: p[0], y: p[1], w: p[2], h: p[3], rectRadius: 0.18,
++      fill: { color: p[4] }, line: { color: C.white, width: 4.25 },
++    });
++    txt(s, p[5], { x: p[0], y: p[1], w: p[2], h: p[3], align: 'center', valign: 'middle', fontSize: 40, color: C.white });
++  });
++  pieces.forEach(function (p) {                       // ...then the knobs, which sit on the neighbour
++    const KNOB = 0.83, dx = p[8], dy = p[9];
++    oval(s, p[6] - KNOB / 2, p[7] - KNOB / 2, KNOB, KNOB, p[4], { line: { color: C.white, width: 4.25 } });
++    // hide the outline where the knob joins its own piece
++    const bw = dx ? 0.26 : KNOB - 0.30, bh = dy ? 0.26 : KNOB - 0.30;
++    rect(s, p[6] - dx * KNOB / 2 - bw / 2, p[7] - dy * KNOB / 2 - bh / 2, bw, bh, p[4]);
++  });
++  const steps = [
++    ['01', 2.537, C.green], ['02', 3.399, C.green2], ['03', 4.261, C.green3], ['04', 5.123, C.sage], ['05', 6.028, C.black],
++  ];
++  steps.forEach(function (st) {
++    oval(s, 6.888, st[1], 0.69, 0.69, st[2]);
++    txt(s, st[0], { x: 6.976, y: st[1] + 0.173, w: 0.514, h: 0.337, align: 'center', fontSize: 14, bold: true, color: C.white });
++    txt(s, 'Your Text  Here', { x: 7.819, y: st[1] - 0.043, w: 5.501, h: 0.286, fontSize: 11, bold: true, color: C.ink });
++    txt(s, L.short, { x: 7.819, y: st[1] + 0.229, w: 4.675, h: 0.555, fontSize: 9, color: C.inkFaint, lineSpacingMultiple: 1.5 });
++  });
++  sidebar(s);
++}
++
++/* 24 - clustered column chart */
++function slide24(s, pptx) {
++  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++  s.addChart(pptx.ChartType.bar, [
++    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Series 3', labels: cats, values: [2.0, 2.0, 3.0, 5.0] },
++  ], {
++    x: 2.741, y: 2.213, w: 8.611, h: 3.35,
++    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 444, barOverlapPct: -90,
++    chartColors: [C.green, C.green2, C.green3],
++    showLegend: false, showValue: true, dataLabelFormatCode: 'General',
++    dataLabelFontFace: F.body, dataLabelFontSize: 10.6, dataLabelColor: C.inkSoft, dataLabelPosition: 'outEnd',
++    valAxisHidden: true, valGridLine: { style: 'none' },
++    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 12, catAxisLabelColor: C.inkSoft,
++    catAxisLineColor: C.smoke, catGridLine: { color: C.smoke, size: 1, style: 'solid' },
++  });
++  txt(s, L.full, { x: 1.878, y: 6.164, w: 10.338, h: 0.555, align: 'center', fontSize: 9, color: C.inkSoft, lineSpacingMultiple: 1.5 });
++  sidebar(s);
++  chartTitle(s, 'Miora Chart ', 4.169, 5.756);
++}
++
++/* 25 - 100% stacked bar chart */
++function slide25(s, pptx) {
++  const cats = ['1', '2', '3', '4'];
++  s.addChart(pptx.ChartType.bar, [
++    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Series 3', labels: cats, values: [2.0, 2.0, 3.0, 5.0] },
++  ], {
++    x: 6.746, y: 2.029, w: 5.786, h: 4.632,
++    barDir: 'bar', barGrouping: 'percentStacked', barGapWidthPct: 150,
++    chartColors: [C.green, C.green2, C.green3],
++    showLegend: false, showValue: false,
++    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 12, catAxisLabelColor: C.inkSoft,
++    catAxisLineColor: C.smoke, catGridLine: { style: 'none' },
++    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 12, valAxisLabelColor: C.inkSoft,
++    valAxisLabelFormatCode: '0%', valAxisLineShow: false,
++    valGridLine: { color: C.smoke, size: 1, style: 'solid' },
++  });
++  sidebar(s);
++  body9(s, [{ text: L.dot }, { text: ' ' }, { text: L.neglect + '. ' }], 1.128, 2.619, 5.009, 1.237);
++  noteCard(s, 1.214, 4.078, 2.497, 2.443, { fill: C.green, padTop: 0.511, noteSize: 12, textW: 2.12, textH: 1.096, textSize: 10 });
++  body9(s, L.dot + ' ', 3.945, 4.659, 2.563, 1.691);
++  chartTitle(s, 'Miora Chart ', 4.169, 5.756);
++}
++
++/* 26 - filled radar chart plus pricing cards */
++function slide26(s, pptx) {
++  const cats = ['5/1/2002', '6/1/2002', '7/1/2002', '8/1/2002', '9/1/2002'];
++  s.addChart(pptx.ChartType.radar, [
++    { name: 'Series 1', labels: cats, values: [32, 32, 28, 12, 15] },
++    { name: 'Series 2', labels: cats, values: [12, 12, 12, 21, 28] },
++  ], {
++    x: 1.047, y: 2.964, w: 5.311, h: 3.997,
++    radarStyle: 'filled', chartColors: [C.green, C.sage],
++    showLegend: false,
++    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 12, catAxisLabelColor: C.inkSoft,
++    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 12, valAxisLabelColor: C.inkSoft,
++    valGridLine: { color: C.green3, size: 1, style: 'solid' },
++  });
++  [['27', 2.085, 3.721], ['27', 4.281, 3.721], ['27', 2.405, 5.711], ['19 ', 4.281, 5.522]].forEach(function (p) {
++    txt(s, p[0] + '%', { x: p[1], y: p[2], w: 0.695, h: 0.37, wrap: false, fontSize: 16, color: C.white });
++  });
++  [['PERSONAL', '$19', 6.477], ['BUSINESS', '$69', 9.466]].forEach(function (card) {
++    s.addShape('roundRect', { x: card[2], y: 2.886, w: 2.441, h: 3.817, rectRadius: 0.407, fill: { color: C.green } });
++    txt(s, card[0], { x: card[2] + 0.392, y: 3.5, w: 1.658, h: 0.347, align: 'center', fontSize: 11, bold: true, color: C.white, lineSpacingMultiple: 1.5 });
++    txt(s, card[1], { x: card[2] + 0.392, y: 3.932, w: 1.658, h: 0.818, align: 'center', fontSize: 32, color: C.white, lineSpacingMultiple: 1.5 });
++    txt(s, L.short, { x: card[2] + 0.191, y: 4.962, w: 2.058, h: 1.237, align: 'center', fontSize: 9, color: C.white, lineSpacingMultiple: 1.5 });
++  });
++  sidebar(s);
++  chartTitle(s, 'Miora Pricing ', 3.91, 6.275);
++  txt(s, L.full, { x: 1.878, y: 1.925, w: 10.338, h: 0.555, align: 'center', fontSize: 9, color: C.inkSoft, lineSpacingMultiple: 1.5 });
++}
++
++function chartTitle(slide, lead, x, w) {
++  txt(slide, [
++    { text: lead, options: { color: C.ink } },
++    { text: 'Slide', options: { color: C.green } },
++  ], { x, y: 0.855, w, h: 0.842, align: 'center', wrap: false, fontFace: F.head, fontSize: 44, bold: true });
++}
++
++/* 27 - full bleed quote over a dimmed photo */
++function slide27(s) {
++  rect(s, 0, 0, 13.333, 7.5, C.black, { fill: { color: C.black, transparency: 60 } });
++  txt(s, '\u201C', { x: 2.53, y: 2.44, w: 1.2, h: 1.2, fontFace: F.head, fontSize: 88, bold: true, color: C.green });
++  txt(s, 'Sing like no one\u2019s listening, love like you\u2019ve never been hurt, dance like nobody\u2019s watching, and live like it\u2019s heaven on earth.', {
++    x: 2.776, y: 3.078, w: 7.782, h: 1.715, fontFace: F.pop, fontSize: 22, italic: true, color: C.white, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* 28 - attributed quote */
++function slide28(s) {
++  txt(s, '\u201C', { x: 7.75, y: 4.35, w: 1.2, h: 1.2, fontFace: F.head, fontSize: 88, bold: true, color: C.sage });
++  heading(s, 'Miora Quote', 7.98, 1.229, 4.211, 0.842, { wrap: false, color: C.ink });
++  txt(s, 'Ralph Waldo Emerson', { x: 7.98, y: 2.844, w: 2.906, h: 0.37, fontSize: 16, bold: true, color: C.green });
++  txt(s, 'California, 03/14/1990', { x: 7.98, y: 3.14, w: 1.983, h: 0.338, fontSize: 10.5, italic: true, lineSpacingMultiple: 1.5 });
++  txt(s, 'Illustrator', { x: 8.027, y: 3.37, w: 1.746, h: 0.307, fontSize: 9, lineSpacingMultiple: 1.5 });
++  txt(s, 'You can never go wrong by investing in communities and the human beings within them.\u00A0', {
++    x: 7.98, y: 5.072, w: 4.828, h: 1.421, fontFace: F.pop, fontSize: 18, bold: true, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* 29 - contact details */
++function slide29(s) {
++  rect(s, 0, 0.729, 12.625, 6.062, C.green);
++  heading(s, 'Contact Us', 6.188, 1.725, 4.122, 0.842, { color: C.white });
++  txt(s, 'Make Something Big With Us', { x: 6.188, y: 2.905, w: 2.495, h: 0.303, wrap: false, fontSize: 12, color: C.white });
++  const blocks = [
++    ['Our Address', 6.188, 3.478, 'Corpick Corporates Building 4 – 5 Kayutangan Heritage, 22 W 23', 6.188, 3.953, 2.643, 0.625],
++    ['Office Hours', 9.281, 3.478, 'Monday – Saturday\n08.00 AM – 04.00 PM', 9.283, 3.938, 2.245, 0.655],
++    ['Get In Touch', 6.188, 4.830, '(+21) 120 2221 0000\n(0005) 222 111 2', 6.188, 5.293, 2.245, 0.655],
++    ['Follow Us', 9.281, 4.830, 'www.corpickcorporate.com\ncorpick@corporate.com', 9.283, 5.293, 2.245, 0.653],
++  ];
++  blocks.forEach(function (b) {
++    txt(s, b[0], { x: b[1], y: b[2], w: 1.667, h: 0.46, align: 'justify', fontSize: 16, bold: true, color: C.white, lineSpacingMultiple: 1.5 });
++    txt(s, b[3], { x: b[4], y: b[5], w: b[6], h: b[7], align: 'justify', fontSize: 11, color: C.white, lineSpacingMultiple: 1.5, paraSpaceAfter: 1.5 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'MIORA_16x9', width: 13.3333, height: 7.5 });
++  pptx.layout = 'MIORA_16x9';
++  pptx.author = 'MIORA';
++  pptx.title = 'Miora - Multipurpose Business Presentation Template';
++
++  BUILDERS.forEach(function (buildSlide) {
++    const slide = pptx.addSlide();
++    slide.background = { color: C.white };
++    buildSlide(slide, pptx);
++  });
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '0e9ef57a-9e46-487e-b52d-32b3dfcb841b_grok_final.pptx') });
++}
++
++build().then(function (f) { console.log('wrote ' + f); }).catch(function (e) { console.error(e); process.exit(1); });

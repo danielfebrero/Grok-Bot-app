@@ -1,0 +1,700 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/food_culinary_brand_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/food_culinary_brand_presentation.js
+@@ -0,0 +1,697 @@
++/**
++ * Barokah — Food & Culinary Presentation Template
++ * Standalone pptxgenjs re-creation of the 32-slide reference deck (13.333in x 7.5in).
++ *
++ * Photographs from the original are replaced by labelled placeholder rectangles and
++ * the SVG food icons are redrawn with native pptxgenjs shapes; everything else
++ * (positions, colours, fonts, sizes, text) mirrors the source deck.
++ *
++ *   node 046896b0-f53e-4840-b7bf-c07ced816c7e_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette
++const YELLOW = 'F1CA55';   // brand accent
++const DARK = '404040';     // headings / body copy (theme tx1 @ 75% lum)
++const INK = '262626';      // darker heading grey  (theme tx1 @ 85% lum)
++const WHITE = 'FFFFFF';
++const PHOTO_BG = 'F7F7F7'; // stand-in for the deck's photo placeholders
++const PHOTO_TX = 'BFBFBF';
++
++const HEAD = 'Roboto';     // headings, labels, numbers
++const BODY = 'Open Sans';  // running copy
++
++// Body copy reused across the deck.
++const T = {
++  LEAD:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. ',
++  LEAD2:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.',
++  LEAD3:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat. Duis aute irure dolor reprehenderit voluptate velit esse cillum dolore eu fugiat nulla.',
++  LEAD4:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna minim venia nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id esilaborum lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.',
++  LEAD5:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt labore et dolore magna minim venia nostrud exercitation ullamco laboris nisi ut aliquip ex commodo consequat. Duis aute irure dolor reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa.',
++  LEAD6:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliquaquis nostrud exercitation',
++  LEAD7:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi.',
++  LEAD8:
++    'Lorem ipsum dolor sit amet, consectetu adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco.',
++  LEAD9:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat. ',
++  LEAD10:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi aliquip ex velit esse cillum dolore eu fugiat nulla.',
++  LEAD11:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco.',
++  LEAD12:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eius tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nost exercitation ullamco laboris nisi aliquip ex ea commodo consequat. ',
++  LEAD13:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit sedius tempor incididunt ut labore et dolore magna aliqua enim minim veniam quis nost exercitation ullamco laboris nisi consequat. ',
++  LEAD14:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eius tempor incididunt ut labore et dolore magna aliqua enim minim veniamnostrud exercitation ullamco laboris.',
++  LEAD15:
++    'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed eius tempor incididu ut labore et dolore magna.',
++  LEAD16:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor inci labore et dolore magna minim venia nostrud exercitation ullamco laboris nisi ut aliquip ex commodo consequat. Duis aute irure dolor reprehenderit in voluptat velit esse cillum dolore upidatat non proident, sunt in culpa.',
++  LEAD17:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor inci labore et dolore magna minim venia nostrud exercitation ullamco laboris.',
++  CARD:
++    'Lorem ipsum dolor amet consectet adipis',
++  CARD2:
++    'Lorem ipsum dolor siamet consectet adipis',
++  CARD3:
++    'Lorem ipsum dolor amet consectet adipiscing elit do eiusmod ',
++  CARD4:
++    'PLACEHOLDER',
++  CARD5:
++    'Lorem ipsum dolor sitina amet consec adip',
++};
++
++// ---------------------------------------------------------------- primitives
++const shape = (s, kind, x, y, w, h, o) =>
++  s.addShape(kind, Object.assign({ x, y, w, h }, o));
++
++const solid = (color) => ({ fill: { color }, line: { color, width: 0 } });
++
++/**
++ * Soft light-grey drop shadow used by the deck's three raised panels.
++ * Returned fresh each time because pptxgenjs rewrites the object in place.
++ */
++const panelShadow = () => ({ type: 'outer', color: 'D9D9D9', blur: 15, offset: 0.5, angle: 90, opacity: 0.4 });
++
++/** Flat filled rectangle — the deck's yellow/dark blocks, bands and rules. */
++function box(s, x, y, w, h, color, opts) {
++  shape(s, 'rect', x, y, w, h, Object.assign(solid(color), opts));
++}
++
++/** Fully rounded bar — used by the progress meters. */
++function pill(s, x, y, w, h, color) {
++  shape(s, 'roundRect', x, y, w, h, Object.assign(solid(color), { rectRadius: h / 2 }));
++}
++
++/** Text block. Deck defaults: Roboto, grey 404040, top-left. `lh` = line-height multiple. */
++function text(s, str, o) {
++  s.addText(str, Object.assign(
++    { fontFace: HEAD, fontSize: 18, color: DARK, align: 'left', valign: 'top' },
++    o,
++    { lineSpacingMultiple: o.lh },
++    o.fill ? { fill: { color: o.fill } } : {}
++  ));
++}
++
++/**
++ * Placeholder standing in for a photograph. The reference uses empty picture
++ * placeholders filled with a 5% dot pattern, so these stay very light.
++ */
++function photo(s, x, y, w, h) {
++  box(s, x, y, w, h, PHOTO_BG);
++  s.addText('[image]', {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontFace: BODY, fontSize: 11, color: PHOTO_TX,
++  });
++}
++
++/**
++ * Slides 1 & 32: full-bleed wash. The source ramps solid F1CA55 to the same hue
++ * at 65% alpha over white (= F6DC90). pptxgenjs has no gradient fill, so the ramp
++ * is stepped with opaque strips of interpolated colour.
++ */
++const WASH_FROM = [0xf1, 0xca, 0x55];
++const WASH_TO = [0xf6, 0xdc, 0x90];
++
++function gradientWash(s) {
++  const strips = 48, w = 13.333 / strips;
++  for (let i = 0; i < strips; i++) {
++    const t = i / (strips - 1);
++    const color = WASH_FROM
++      .map((from, c) => Math.round(from + (WASH_TO[c] - from) * t).toString(16).padStart(2, '0'))
++      .join('');
++    box(s, i * w, 0, w + 0.03, 7.5, color);
++  }
++}
++
++// ---------------------------------------------------------------- icon art
++/** Unfilled stroked shape in the deck's dark grey. */
++const outline = (s, kind, x, y, w, h, width, o) =>
++  s.addShape(kind, Object.assign({ x, y, w, h, line: { color: DARK, width: width || 1.6 } }, o));
++
++/** Line-art food glyphs, each drawn to fill a square of side d anchored at (x, y). */
++const GLYPHS = {
++  // crossed fork and spoon
++  cutlery(s, x, y, d) {
++    outline(s, 'line', x + 0.1 * d, y + 0.1 * d, 0.8 * d, 0.8 * d, 2.2);
++    outline(s, 'line', x + 0.1 * d, y + 0.1 * d, 0.8 * d, 0.8 * d, 2.2, { flipH: true });
++    outline(s, 'teardrop', x + 0.02 * d, y + 0.02 * d, 0.3 * d, 0.3 * d, 2, { rotate: 270 });
++    for (let i = 0; i < 3; i++) outline(s, 'rect', x + (0.7 + 0.1 * i) * d, y + 0.02 * d, 0.055 * d, 0.26 * d, 1.5);
++  },
++  // cut of steak
++  steak(s, x, y, d) {
++    outline(s, 'ellipse', x + 0.02 * d, y + 0.16 * d, 0.96 * d, 0.68 * d, 2.2);
++    outline(s, 'ellipse', x + 0.15 * d, y + 0.3 * d, 0.3 * d, 0.26 * d, 2);
++  },
++  // domed serving cloche resting on a hand
++  cloche(s, x, y, d) {
++    outline(s, 'chord', x + 0.05 * d, y + 0.14 * d, 0.9 * d, 0.9 * d, 2.2, { angleRange: [180, 360] });
++    box(s, x, y + 0.56 * d, d, 0.06 * d, DARK);
++    shape(s, 'ellipse', x + 0.44 * d, y + 0.06 * d, 0.12 * d, 0.12 * d, solid(DARK));
++    box(s, x + 0.1 * d, y + 0.78 * d, 0.52 * d, 0.055 * d, DARK);
++    box(s, x + 0.1 * d, y + 0.62 * d, 0.055 * d, 0.2 * d, DARK);
++  },
++  // beer stein with foam
++  beer(s, x, y, d) {
++    outline(s, 'rect', x + 0.1 * d, y + 0.3 * d, 0.56 * d, 0.64 * d, 2.2);
++    outline(s, 'round2SameRect', x + 0.66 * d, y + 0.42 * d, 0.26 * d, 0.34 * d, 2);
++    outline(s, 'cloud', x + 0.04 * d, y + 0.02 * d, 0.68 * d, 0.34 * d, 2);
++    box(s, x + 0.26 * d, y + 0.38 * d, 0.035 * d, 0.48 * d, DARK);
++    box(s, x + 0.44 * d, y + 0.38 * d, 0.035 * d, 0.48 * d, DARK);
++  },
++  // brand mark: a plate framed by cutlery
++  logo(s, x, y, d, color) {
++    box(s, x + 0.02 * d, y + 0.02 * d, 0.1 * d, 0.96 * d, color);
++    box(s, x + 0.88 * d, y + 0.02 * d, 0.1 * d, 0.96 * d, color);
++    shape(s, 'donut', x + 0.17 * d, y + 0.17 * d, 0.66 * d, 0.66 * d, solid(color));
++  },
++};
++
++const icon = (s, x, y, d, kind) => GLYPHS[kind](s, x, y, d);
++
++/** Icon centred on a yellow square (the deck's 1.02in feature tiles). */
++function iconTile(s, x, y, d, kind) {
++  box(s, x, y, d, d, YELLOW);
++  icon(s, x + 0.25 * d, y + 0.25 * d, 0.5 * d, kind);
++}
++
++/** Corner logo badge: solid square with the plate mark inside, in contrasting ink. */
++function logoMark(s, x, y, d, color) {
++  box(s, x, y, d, d, color);
++  GLYPHS.logo(s, x + 0.21 * d, y + 0.21 * d, 0.58 * d, color === DARK ? YELLOW : DARK);
++}
++
++/** Rounded social tile lettered t / f (slide 22). */
++function socialTile(s, x, y, d, letter) {
++  outline(s, 'roundRect', x, y, d, d, 1.5, { rectRadius: 0.1 * d });
++  s.addText(letter, {
++    x, y, w: d, h: d, align: 'center', valign: 'middle',
++    fontFace: HEAD, fontSize: 15, bold: true, color: DARK, margin: 0,
++  });
++}
++
++// ---------------------------------------------------------------- composites
++/** Feature block: bold 14pt Roboto heading above a 12pt Open Sans paragraph. */
++function card(s, c) {
++  text(s, c.title, { x: c.tx, y: c.ty, w: c.tw, h: 0.337, fontSize: 14, bold: true, align: c.align });
++  text(s, c.body, { x: c.x, y: c.y, w: c.w, h: c.h, fontSize: 12, fontFace: BODY, align: c.align, lh: 1.5 });
++}
++
++/** Dark track + yellow fill + right-aligned percentage + inline label. */
++function progressBar(s, x, y, trackW, fillW, pct, label) {
++  const h = 0.341;
++  pill(s, x, y, trackW, h, DARK);
++  pill(s, x, y, fillW, h, YELLOW);
++  text(s, pct, { x, y, w: fillW - 0.08, h, fontSize: 12, bold: true, align: 'right', valign: 'middle' });
++  text(s, label, { x: x + 0.083, y: y + 0.027, w: 1.8, h: 0.252, fontSize: 12, bold: true, valign: 'middle' });
++}
++
++/** Icon + big number + caption, both texts sitting on a yellow highlight. */
++function statBadge(s, x, y, d, kind, value, caption) {
++  if (kind === 'twitter' || kind === 'facebook') socialTile(s, x, y, d, kind === 'twitter' ? 't' : 'f');
++  else icon(s, x, y, d, kind);
++  text(s, value, { x: x + 0.639, y: y - 0.102, w: 0.857, h: 0.37, fontSize: 16, bold: true, fill: YELLOW });
++  text(s, caption, { x: x + 0.639, y: y + 0.283, w: 1.539, h: 0.303, fontSize: 12, fill: YELLOW });
++}
++
++/** Slide 11: yellow quote panel whose right edge is scooped out by an arc. */
++function bubble(s, x, y, w, h) {
++  s.addShape('custGeom', Object.assign({ x, y, w, h }, solid(YELLOW), {
++    points: [
++      { x: 0, y: 0 }, { x: w, y: 0 }, { x: 0.982 * w, y: 0.046 * h },
++      { curve: { type: 'cubic', x1: 0.938 * w, y1: 0.17 * h, x2: 0.912 * w, y2: 0.328 * h }, x: 0.912 * w, y: 0.5 * h },
++      { curve: { type: 'cubic', x1: 0.912 * w, y1: 0.672 * h, x2: 0.938 * w, y2: 0.83 * h }, x: 0.982 * w, y: 0.954 * h },
++      { x: w, y: h }, { x: 0, y: h }, { close: true },
++    ],
++  }));
++}
++
++/** Slide 11: a pair of translucent quotation marks (rotated 180 for the opening pair). */
++function quoteGlyph(s, x, y, w, h, rotate) {
++  const tick = (dx) => s.addShape('custGeom', {
++    x: x + dx, y, w: 0.44 * w, h,
++    fill: { color: DARK, transparency: 56 }, line: { width: 0 }, rotate,
++    points: [
++      { x: 0.21 * w, y: h }, { x: 0, y: 0.85 * h },
++      { curve: { type: 'cubic', x1: 0.09 * w, y1: 0.67 * h, x2: 0.13 * w, y2: 0.5 * h }, x: 0.135 * w, y: 0.32 * h },
++      { x: 0.135 * w, y: 0 }, { x: 0.44 * w, y: 0 }, { x: 0.44 * w, y: 0.29 * h },
++      { curve: { type: 'cubic', x1: 0.44 * w, y1: 0.41 * h, x2: 0.4 * w, y2: 0.54 * h }, x: 0.21 * w, y: h },
++      { close: true },
++    ],
++  });
++  tick(0);
++  tick(0.52 * w);
++}
++
++const DEVICE = '1C1C1C';
++const DEVICE_BASE = 'CFCFCF';
++
++/** Slide 30: smartphone mockup — dark bezel, blank screen, notch. */
++function phoneMockup(s, x, y, w, h) {
++  const bez = 0.13;
++  shape(s, 'roundRect', x, y, w, h, Object.assign(solid(DEVICE), { rectRadius: 0.3 }));
++  shape(s, 'roundRect', x + bez, y + bez, w - 2 * bez, h - 2 * bez,
++    Object.assign(solid(WHITE), { rectRadius: 0.22 }));
++  shape(s, 'roundRect', x + w / 2 - 0.38, y + bez - 0.02, 0.76, 0.15,
++    Object.assign(solid(DEVICE), { rectRadius: 0.075 }));
++}
++
++/** Slide 31: laptop mockup — dark screen bezel above a wider silver base. */
++function laptopMockup(s, x, y, w, h) {
++  const sx = x + 0.098 * w, sw = 0.807 * w, sh = 0.893 * h, bez = 0.155;
++  shape(s, 'roundRect', sx, y, sw, sh, Object.assign(solid(DEVICE), { rectRadius: 0.05 }));
++  shape(s, 'rect', sx + bez, y + bez, sw - 2 * bez, sh - 2 * bez, solid(WHITE));
++  shape(s, 'roundRect', x - 0.04 * w, y + sh, 1.078 * w, 0.052 * h,
++    Object.assign(solid(DEVICE_BASE), { rectRadius: 0.026 }));
++  shape(s, 'roundRect', x + 0.42 * w, y + sh + 0.008 * h, 0.16 * w, 0.02 * h,
++    Object.assign(solid('B4B4B4'), { rectRadius: 0.012 }));
++}
++
++// ---------------------------------------------------------------- slides
++function slide01(s) {
++  photo(s, 0, 0, 13.333, 7.5);
++  gradientWash(s);
++  text(s, 'BAROKAH', { x: 1.25, y: 2.067, w: 6.25, h: 1.582, fontSize: 88, bold: true });
++  text(s, 'Food & Culinary Presentation Template', { x: 1.292, y: 3.565, w: 5.111, h: 0.37, fontSize: 16, bold: true });
++  logoMark(s, 0, 0, 0.875, DARK);
++  text(s, T.LEAD, { x: 1.292, y: 5.226, w: 4.167, h: 0.978, fontSize: 12, fontFace: BODY, align: 'justify', lh: 1.5 });
++  box(s, 1.417, 4.978, 3.656, 0.05, DARK);
++  text(s, 'Barokah.io', { x: 1.292, y: 4.496, w: 2.844, h: 0.37, fontSize: 16 });
++  text(s, 'BAROKAH', { x: 11.76, y: 6.651, w: 1.344, h: 0.37, fontSize: 16, bold: true, color: YELLOW, align: 'center', fill: DARK });
++}
++
++function slide02(s) {
++  box(s, 1.088, 0, 2.533, 2.291, YELLOW);
++  box(s, 3.457, 4.214, 2.533, 2.291, YELLOW);
++  logoMark(s, 12.743, 0, 0.59, YELLOW);
++  text(s, 'About Barokah', { x: 6.82, y: 1.763, w: 5.028, h: 0.909, fontSize: 48, bold: true });
++  text(s, T.LEAD3, { x: 6.82, y: 2.913, w: 5.528, h: 1.583, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  text(s, T.LEAD2, { x: 6.82, y: 4.568, w: 5.528, h: 0.978, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  photo(s, 0, 1.25, 5.761, 5);
++}
++
++function slide03(s) {
++  box(s, 8.545, 1.248, 4.761, 1.583, YELLOW);
++  text(s, 'There Is No Love Sincerer Than The Love Of Food', { x: 1.271, y: 2.044, w: 5.456, h: 1.178, fontSize: 32, bold: true });
++  text(s, T.LEAD3, { x: 1.342, y: 3.829, w: 5.528, h: 1.583, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 7.9, 1.909, 4.348, 4.232);
++}
++
++function slide04(s) {
++  text(s, 'If more of us valued food and cheer and song above hoarded gold, it would be a merrier world.', { x: 6.528, y: 1.407, w: 5.904, h: 1.313, fontSize: 24, bold: true, align: 'right' });
++  text(s, T.LEAD4, { x: 1.22, y: 4.902, w: 10.966, h: 1.28, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  box(s, 5.986, 3.54, 7.348, 0.21, YELLOW);
++  logoMark(s, 12.761, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 0, 0.891, 5.986, 2.859);
++}
++
++function slide05(s) {
++  photo(s, 4.413, 0.913, 8.92, 2.837);
++  text(s, T.LEAD5, { x: 4.413, y: 4.902, w: 7.773, h: 1.28, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  box(s, 0, 5.437, 2.924, 0.21, YELLOW);
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  box(s, 3.011, 0, 2.979, 3.389, YELLOW);
++  text(s, 'All you need is love. But a little chocolate now and then doesn\'t hurt.', { x: 0.823, y: 1.448, w: 4.967, h: 1.515, fontSize: 28, bold: true, align: 'right' });
++}
++
++function slide06(s) {
++  box(s, 10.72, 1.758, 2.614, 2.061, YELLOW);
++  text(s, T.LEAD6, { x: 4.809, y: 4.526, w: 3.506, h: 1.28, fontSize: 12, fontFace: BODY, align: 'justify', lh: 1.5 });
++  text(s, T.LEAD6, { x: 8.882, y: 4.526, w: 3.506, h: 1.28, fontSize: 12, fontFace: BODY, align: 'justify', lh: 1.5 });
++  box(s, 3.301, 0, 2.614, 2.061, YELLOW);
++  logoMark(s, 12.743, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  text(s, 'One cannot think well, love well, sleep well, if one has not dined well.', { x: 4.809, y: 1.472, w: 7.715, h: 1.919, fontSize: 36, bold: true });
++  text(s, 'Section One', { x: 4.809, y: 4.106, w: 3.434, h: 0.404, fontSize: 18, bold: true });
++  text(s, 'Section Two', { x: 8.882, y: 4.106, w: 3.434, h: 0.404, fontSize: 18, bold: true });
++  photo(s, 0, 0.957, 3.891, 5.592);
++}
++
++function slide07(s) {
++  photo(s, 0, 2.435, 13.333, 3.761);
++  box(s, 0.59, 5.087, 6.077, 2.41, YELLOW);
++  text(s, 'I love you like a fat kid loves cake!', { x: 2.887, y: 0.568, w: 7.559, h: 1.447, fontSize: 40, bold: true, align: 'center' });
++  text(s, T.LEAD7, { x: 1.395, y: 5.652, w: 4.466, h: 1.28, fontSize: 12, fontFace: BODY, align: 'center', lh: 1.5 });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  logoMark(s, 12.743, 0, 0.59, YELLOW);
++}
++
++function slide08(s) {
++  photo(s, 5.057, 1.118, 7.021, 5.264);
++  box(s, 11.126, 0, 2.207, 3.349, YELLOW);
++  text(s, T.LEAD8, { x: 0.847, y: 4.799, w: 3.342, h: 1.583, fontSize: 12, fontFace: BODY, align: 'justify', lh: 1.5 });
++  box(s, 0, 3.75, 2.415, 0.21, YELLOW);
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  box(s, 2.415, 0.472, 4.508, 3.017, YELLOW);
++  text(s, 'Ask not what you can do for your country. Ask what’s for lunch.', { x: 0.805, y: 1.289, w: 5.797, h: 1.717, fontSize: 32, bold: true, align: 'right' });
++}
++
++function slide09(s) {
++  box(s, 5.981, 0, 1.597, 2.462, YELLOW);
++  text(s, 'After a good dinner one can forgive anybody, even one\'s own relations.', { x: 5.913, y: 1.173, w: 6.075, h: 1.717, fontSize: 32, bold: true, align: 'right' });
++  box(s, 13.104, 0.59, 0.229, 2.462, YELLOW);
++  text(s, T.LEAD9, { x: 0.996, y: 1.998, w: 5.14, h: 1.28, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 0.324, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  text(s, 'Section One', { x: 0.996, y: 1.595, w: 3.434, h: 0.404, fontSize: 18, bold: true });
++  text(s, T.LEAD9, { x: 0.996, y: 4.453, w: 5.14, h: 1.28, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  text(s, 'Section Two', { x: 0.996, y: 4.049, w: 3.434, h: 0.404, fontSize: 18, bold: true });
++  photo(s, 7.525, 3.75, 5.809, 2.955);
++}
++
++function slide10(s) {
++  box(s, 0, 1.577, 2.538, 1.433, YELLOW);
++  text(s, 'There Is No Love Sincerer Than The Love Of Food', { x: 1.331, y: 1.206, w: 5.028, h: 1.717, fontSize: 32, bold: true, align: 'right' });
++  text(s, T.LEAD10, { x: 0.831, y: 5.138, w: 5.528, h: 1.28, fontSize: 12, fontFace: BODY, align: 'justify', lh: 1.5 });
++  text(s, T.LEAD11, { x: 6.974, y: 5.138, w: 5.528, h: 0.978, fontSize: 12, fontFace: BODY, align: 'justify', lh: 1.5 });
++  box(s, 5.067, 3.645, 2.415, 0.21, YELLOW);
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 7.481, 0, 4.705, 4.186);
++}
++
++function slide11(s) {
++  bubble(s, 0, 2.12, 7.61, 3.261);
++  quoteGlyph(s, 0.295, 2.358, 0.676, 0.533, 180);
++  text(s, 'Pull up a chair. Take a taste. Come join us. Life is so endlessly delicious.', { x: 0.971, y: 2.892, w: 5.663, h: 1.717, fontSize: 32, bold: true });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  quoteGlyph(s, 5.653, 4.608, 0.676, 0.533, 0);
++  photo(s, 6.942, 1.424, 4.652, 4.652);
++}
++
++function slide12(s) {
++  box(s, 3.686, 3.815, 2.604, 3.217, YELLOW, { rotate: 180 });
++  box(s, 7.119, 3.815, 2.604, 3.217, YELLOW, { rotate: 180 });
++  box(s, 10.458, 3.815, 2.604, 3.217, YELLOW, { rotate: 180 });
++  box(s, 0.356, 3.815, 2.604, 3.217, YELLOW, { rotate: 180 });
++  icon(s, 8.004, 4.35, 0.834, 'cutlery');
++  card(s, { tx: 7.511, ty: 5.593, tw: 1.821, x: 7.268, y: 5.982, w: 2.306, h: 0.675, align: 'center', title: 'Great Service', body: T.CARD2 });
++  icon(s, 4.577, 4.353, 0.83, 'steak');
++  card(s, { tx: 4.081, ty: 5.593, tw: 1.821, x: 3.838, y: 5.982, w: 2.306, h: 0.675, align: 'center', title: 'Great Service', body: T.CARD2 });
++  icon(s, 1.243, 4.353, 0.83, 'cloche');
++  card(s, { tx: 0.748, ty: 5.593, tw: 1.821, x: 0.505, y: 5.982, w: 2.306, h: 0.675, align: 'center', title: 'Great Service', body: T.CARD2 });
++  icon(s, 11.348, 4.353, 0.83, 'beer');
++  card(s, { tx: 10.85, ty: 5.593, tw: 1.821, x: 10.607, y: 5.982, w: 2.306, h: 0.675, align: 'center', title: 'Great Service', body: T.CARD2 });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 0.191, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 0, 1.001, 3.333, 2.402);
++  photo(s, 3.333, 1.001, 3.333, 2.402);
++  photo(s, 6.667, 1.001, 3.333, 2.402);
++  photo(s, 10, 1.001, 3.333, 2.402);
++}
++
++function slide13(s) {
++  box(s, 3.891, 0.957, 9.442, 5.592, YELLOW, { shadow: panelShadow() });
++  text(s, 'There Is No Love Sincerer Than The Love Of Food', { x: 4.841, y: 1.725, w: 7.549, h: 1.178, fontSize: 32, bold: true });
++  icon(s, 4.983, 4.78, 0.83, 'cloche');
++  card(s, { tx: 6.139, ty: 4.715, tw: 1.821, x: 6.139, y: 5.103, w: 2.306, h: 0.675, align: 'left', title: 'Great Service', body: T.CARD2 });
++  icon(s, 8.933, 4.78, 0.83, 'steak');
++  card(s, { tx: 10.084, ty: 4.712, tw: 1.821, x: 10.084, y: 5.1, w: 2.306, h: 0.675, align: 'left', title: 'Great Service', body: T.CARD2 });
++  box(s, 3.891, 3.631, 9.442, 0.142, DARK);
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 0, 0.957, 3.891, 5.592);
++}
++
++function slide14(s) {
++  text(s, 'I cook with wine, sometimes I even add it to the food.', { x: 1.125, y: 0.692, w: 8.27, h: 1.313, fontSize: 36, bold: true });
++  icon(s, 1.169, 5.693, 0.83, 'cloche');
++  card(s, { tx: 2.325, ty: 5.628, tw: 1.821, x: 2.325, y: 6.016, w: 2.131, h: 0.675, align: 'left', title: 'Great Service', body: T.CARD });
++  icon(s, 5.118, 5.693, 0.83, 'steak');
++  card(s, { tx: 6.269, ty: 5.625, tw: 1.821, x: 6.269, y: 6.013, w: 2.131, h: 0.675, align: 'left', title: 'Great Service', body: T.CARD });
++  box(s, 0, 3.681, 2.415, 0.21, YELLOW);
++  icon(s, 9.067, 5.693, 0.834, 'cutlery');
++  card(s, { tx: 10.223, ty: 5.625, tw: 1.821, x: 10.223, y: 6.013, w: 2.131, h: 0.675, align: 'left', title: 'Great Service', body: T.CARD });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 0.169, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 2.727, 2.564, 2.962, 2.435);
++  photo(s, 6.549, 2.564, 2.962, 2.435);
++  photo(s, 10.371, 2.564, 2.962, 2.435);
++}
++
++function slide15(s) {
++  box(s, 0.778, 5.995, 2, 1.021, YELLOW, { rotate: 90 });
++  icon(s, 7.56, 1.271, 0.83, 'cloche');
++  card(s, { tx: 8.716, ty: 1.206, tw: 1.821, x: 8.716, y: 1.594, w: 3.011, h: 0.675, align: 'left', title: 'Great Service', body: T.CARD3 });
++  icon(s, 7.582, 3.05, 0.83, 'steak');
++  card(s, { tx: 8.733, ty: 2.983, tw: 1.821, x: 8.733, y: 3.371, w: 3.011, h: 0.675, align: 'left', title: 'Great Service', body: T.CARD3 });
++  icon(s, 7.543, 5.162, 0.834, 'cutlery');
++  card(s, { tx: 8.699, ty: 5.095, tw: 1.821, x: 8.699, y: 5.483, w: 3.011, h: 0.675, align: 'left', title: 'Great Service', body: T.CARD3 });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  text(s, 'BAROKAH', { x: 4.493, y: 2.75, w: 1.722, h: 2.014, fontSize: 18, bold: true, align: 'center', valign: 'middle', fill: YELLOW });
++  box(s, 11.703, 1.203, 2.833, 0.427, YELLOW, { rotate: 90 });
++  photo(s, 1.946, 4.964, 4.269, 2);
++  photo(s, 0, 2.75, 4.269, 2);
++  photo(s, 1.946, 0.536, 4.269, 2);
++}
++
++function slide16(s) {
++  photo(s, 4.883, 0, 4.33, 7.5);
++  iconTile(s, 8.715, 3.239, 1.022, 'steak');
++  iconTile(s, 8.715, 1.029, 1.022, 'cloche');
++  iconTile(s, 8.715, 5.449, 1.022, 'cutlery');
++  card(s, { tx: 10.274, ty: 1.009, tw: 1.821, x: 10.274, y: 1.397, w: 2.284, h: 0.675, align: 'left', title: 'Tiitle Section', body: T.CARD });
++  text(s, T.LEAD8, { x: 0.806, y: 4.281, w: 3.342, h: 1.583, fontSize: 12, fontFace: BODY, align: 'justify', lh: 1.5 });
++  box(s, 0, 3.607, 2.415, 0.21, YELLOW);
++  card(s, { tx: 10.274, ty: 3.219, tw: 1.821, x: 10.274, y: 3.607, w: 2.284, h: 0.675, align: 'left', title: 'Tiitle Section', body: T.CARD });
++  card(s, { tx: 10.274, ty: 5.429, tw: 1.821, x: 10.274, y: 5.817, w: 2.284, h: 0.675, align: 'left', title: 'Tiitle Section', body: T.CARD });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 0.295, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  text(s, 'I cook with wine, sometimes I even add it to the food.', { x: 0.873, y: 1.689, w: 3.593, h: 1.515, fontSize: 28, bold: true });
++}
++
++function slide17(s) {
++  photo(s, 8.689, 0, 3.792, 3.953);
++  box(s, 1.174, 3.953, 6.37, 2.577, YELLOW);
++  card(s, { tx: 1.931, ty: 4.548, tw: 1.821, x: 1.931, y: 4.958, w: 2.191, h: 0.978, align: 'left', title: 'Great Service', body: T.CARD4 });
++  card(s, { tx: 4.596, ty: 4.548, tw: 1.821, x: 4.596, y: 4.958, w: 2.191, h: 0.978, align: 'left', title: 'Great Service', body: T.CARD4 });
++  text(s, 'There Is No Love Sincerer Than The Love Of Food', { x: 1.389, y: 1.118, w: 5.028, h: 1.717, fontSize: 32, bold: true, color: INK });
++  box(s, 10.919, 3.262, 2.415, 0.21, YELLOW);
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  iconTile(s, 8.389, 4.865, 1.022, 'cloche');
++  card(s, { tx: 9.948, ty: 4.845, tw: 1.821, x: 9.948, y: 5.233, w: 2.284, h: 0.675, align: 'left', title: 'Tiitle Section', body: T.CARD });
++}
++
++function slide18(s) {
++  box(s, 0, 3.941, 13.333, 2.217, YELLOW);
++  text(s, 'There Is No Love Sincerer Than The Love Of Food', { x: 2.887, y: 4.46, w: 7.559, h: 1.178, fontSize: 32, bold: true, align: 'center' });
++  card(s, { tx: 10.23, ty: 1.219, tw: 1.821, x: 10.23, y: 1.63, w: 2.191, h: 0.978, align: 'left', title: 'Product Two', body: T.CARD4 });
++  card(s, { tx: 1.283, ty: 1.219, tw: 1.821, x: 0.912, y: 1.63, w: 2.191, h: 0.978, align: 'right', title: 'Product One', body: T.CARD4 });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 3.759, 0.961, 2.815, 2.511);
++  photo(s, 6.759, 0.961, 2.815, 2.511);
++}
++
++function slide19(s) {
++  box(s, 2.524, 0, 0.931, 7.5, YELLOW);
++  box(s, -0, 4.947, 2.989, 1.296, YELLOW);
++  card(s, { tx: 5.543, ty: 1.257, tw: 1.821, x: 5.543, y: 1.659, w: 6.651, h: 0.978, align: 'left', title: 'Food Barokah One', body: T.LEAD12 });
++  card(s, { tx: 5.543, ty: 4.864, tw: 2.311, x: 5.543, y: 5.266, w: 6.651, h: 0.978, align: 'left', title: 'Food Barokah Two', body: T.LEAD12 });
++  box(s, 6.667, 3.645, 6.667, 0.21, YELLOW);
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 1.522, 0.479, 2.935, 2.935);
++  photo(s, 1.522, 4.086, 2.935, 2.935);
++}
++
++function slide20(s) {
++  box(s, 10.971, 1.044, 2.362, 1.273, YELLOW);
++  text(s, T.LEAD13, { x: 1.38, y: 3.287, w: 5.612, h: 0.978, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  progressBar(s, 1.38, 4.798, 5.356, 4.146, '80%', 'Progress One');
++  progressBar(s, 1.38, 5.607, 5.356, 4.889, '94%', 'Progress Two');
++  text(s, 'Let food be thy medicine and medicine be thy food.', { x: 1.38, y: 1.735, w: 5.434, h: 1.178, fontSize: 32, bold: true, color: INK });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 7.9, 1.909, 4.348, 4.232);
++}
++
++function slide21(s) {
++  box(s, 7.593, 1.684, 2.362, 1.273, YELLOW);
++  text(s, 'A fit, healthy body—that is the best fashion statement', { x: 7.593, y: 1.305, w: 4.967, h: 1.717, fontSize: 32, bold: true, align: 'right' });
++  text(s, T.LEAD3, { x: 7.032, y: 3.75, w: 5.528, h: 1.583, fontSize: 12, fontFace: BODY, align: 'right', lh: 1.5 });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  progressBar(s, 0.472, 5.281, 5.356, 4.146, '80%', 'Progress One');
++  progressBar(s, 0.472, 6.09, 5.356, 4.889, '94%', 'Progress Two');
++  text(s, 'Proogress Food', { x: 0.472, y: 4.435, w: 2.83, h: 0.404, fontSize: 18, bold: true });
++  photo(s, 0, 0.891, 5.986, 2.859);
++}
++
++function slide22(s) {
++  box(s, 0, 5.627, 2.789, 1.873, YELLOW);
++  statBadge(s, 7.373, 5.49, 0.484, 'twitter', '250K', 'Simple Text Here');
++  statBadge(s, 10.327, 5.492, 0.484, 'facebook', '570K', 'Simple Text Here');
++  text(s, 'There Is No Love Sincerer Than The Love Of Food', { x: 7.269, y: 1.462, w: 4.967, h: 1.717, fontSize: 32, bold: true });
++  text(s, T.LEAD14, { x: 7.269, y: 3.688, w: 5.236, h: 0.978, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 0.472, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 0, 1.25, 5.761, 5);
++}
++
++function slide23(s) {
++  box(s, 0.862, 0.695, 11.61, 3.61, YELLOW, { shadow: panelShadow() });
++  card(s, { tx: 2.14, ty: 5.713, tw: 1.821, x: 1.545, y: 6.101, w: 3.011, h: 0.675, align: 'center', title: 'Product Barokah', body: T.CARD3 });
++  card(s, { tx: 5.756, ty: 5.713, tw: 1.821, x: 5.161, y: 6.101, w: 3.011, h: 0.675, align: 'center', title: 'Product Barokah', body: T.CARD3 });
++  card(s, { tx: 9.372, ty: 5.713, tw: 1.821, x: 8.777, y: 6.101, w: 3.011, h: 0.675, align: 'center', title: 'Product Barokah', body: T.CARD3 });
++  text(s, 'There Is No Love Sincerer Than The Love Of Food', { x: 2.887, y: 1.466, w: 7.559, h: 1.178, fontSize: 32, bold: true, align: 'center' });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 1.356, 3.416, 3.39, 1.881);
++  photo(s, 4.972, 3.416, 3.39, 1.881);
++  photo(s, 8.588, 3.416, 3.39, 1.881);
++}
++
++function slide24(s) {
++  photo(s, 4.719, 0.971, 4.072, 5.559);
++  box(s, 10.271, 0.698, 3.06, 1.076, YELLOW);
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  iconTile(s, 3.971, 3.395, 1.022, 'steak');
++  iconTile(s, 3.971, 1.573, 1.022, 'cloche');
++  iconTile(s, 3.971, 5.268, 1.022, 'cutlery');
++  card(s, { tx: 1.049, ty: 1.553, tw: 1.821, x: 1.049, y: 1.941, w: 2.284, h: 0.675, align: 'left', title: 'Tiitle Section', body: T.CARD });
++  card(s, { tx: 1.049, ty: 3.375, tw: 1.821, x: 1.049, y: 3.763, w: 2.284, h: 0.675, align: 'left', title: 'Tiitle Section', body: T.CARD });
++  card(s, { tx: 1.049, ty: 5.248, tw: 1.821, x: 1.049, y: 5.636, w: 2.284, h: 0.675, align: 'left', title: 'Tiitle Section', body: T.CARD });
++  photo(s, 9.028, 1.564, 3.203, 4.373);
++}
++
++function slide25(s) {
++  text(s, 'Cakes are healthy too, you just eat a small slice.', { x: 8.094, y: 2.776, w: 4.311, h: 2.794, fontSize: 40, bold: true, align: 'right' });
++  text(s, T.LEAD15, { x: 9.083, y: 1.016, w: 3.351, h: 0.978, fontSize: 12, fontFace: BODY, align: 'right', lh: 1.5 });
++  box(s, 0, 6.224, 2.799, 0.21, YELLOW);
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  text(s, 'BAROKAH', { x: 4.152, y: 1.366, w: 3.152, h: 1.077, fontSize: 18, bold: true, align: 'center', valign: 'middle', fill: YELLOW });
++  photo(s, 0.432, 1.316, 3.152, 3.929);
++  photo(s, 4.152, 2.776, 3.152, 3.929);
++}
++
++function slide26(s) {
++  card(s, { tx: 2.318, ty: 0.723, tw: 1.821, x: 2.133, y: 1.133, w: 2.191, h: 0.675, align: 'center', title: 'Product Barokah', body: T.CARD5 });
++  box(s, 0, 2.621, 13.333, 1.724, YELLOW);
++  text(s, 'Probably one of the most private things in the world is an egg before it is broken.', { x: 1.813, y: 5.086, w: 9.707, h: 1.043, fontSize: 28, bold: true, align: 'center' });
++  card(s, { tx: 5.756, ty: 0.723, tw: 1.821, x: 5.571, y: 1.133, w: 2.191, h: 0.675, align: 'center', title: 'Product Barokah', body: T.CARD5 });
++  card(s, { tx: 9.195, ty: 0.723, tw: 1.821, x: 9.01, y: 1.133, w: 2.191, h: 0.675, align: 'center', title: 'Product Barokah', body: T.CARD5 });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 0.295, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  text(s, T.LEAD15, { x: 2.08, y: 6.208, w: 9.174, h: 0.372, fontSize: 12, fontFace: BODY, align: 'center', lh: 1.5 });
++  photo(s, 1.956, 2.328, 2.543, 2.238);
++  photo(s, 5.395, 2.328, 2.543, 2.238);
++  photo(s, 8.833, 2.328, 2.543, 2.238);
++}
++
++function slide27(s) {
++  text(s, 'Product Barokah', { x: 0, y: 3.404, w: 3.333, h: 0.553, fontSize: 14, bold: true, align: 'center', valign: 'middle', fill: YELLOW });
++  box(s, 1.345, 3.957, 10.643, 2.402, WHITE, { shadow: panelShadow() });
++  text(s, 'The only time to eat diet food is while you\'re waiting for the steak to cook.', { x: 2.386, y: 4.565, w: 8.561, h: 1.178, fontSize: 32, bold: true, align: 'center' });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 0.191, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  text(s, 'Product Barokah', { x: 3.333, y: 3.404, w: 3.333, h: 0.553, fontSize: 14, bold: true, align: 'center', valign: 'middle', fill: YELLOW });
++  text(s, 'Product Barokah', { x: 6.667, y: 3.404, w: 3.333, h: 0.553, fontSize: 14, bold: true, align: 'center', valign: 'middle', fill: YELLOW });
++  text(s, 'Product Barokah', { x: 10, y: 3.404, w: 3.333, h: 0.553, fontSize: 14, bold: true, align: 'center', valign: 'middle', fill: YELLOW });
++  photo(s, 0, 1.001, 3.333, 2.402);
++  photo(s, 3.333, 1.001, 3.333, 2.402);
++  photo(s, 6.667, 1.001, 3.333, 2.402);
++  photo(s, 10, 1.001, 3.333, 2.402);
++}
++
++function slide28(s) {
++  text(s, T.LEAD16, { x: 5.916, y: 3.311, w: 6.553, h: 1.28, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  text(s, 'All Product Barokah', { x: 5.916, y: 0.83, w: 4.967, h: 2.12, fontSize: 60, bold: true });
++  statBadge(s, 6.046, 5.313, 0.539, 'cloche', '250K', 'Simple Text Here');
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  statBadge(s, 9.231, 5.313, 0.539, 'cloche', '250K', 'Simple Text Here');
++  photo(s, 1.522, 0.479, 2.935, 2.935);
++  photo(s, 1.522, 4.086, 2.935, 2.935);
++}
++
++function slide29(s) {
++  box(s, 8.471, 0, 3.135, 2.244, YELLOW);
++  box(s, 3.185, 5.256, 3.135, 2.244, YELLOW);
++  text(s, 'I am a better person when I have less on my plate.', { x: 1.434, y: 1.201, w: 4.967, h: 1.717, fontSize: 32, bold: true });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 6.802, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  statBadge(s, 7.235, 4.256, 0.539, 'cloche', '250K', 'Simple Text Here');
++  statBadge(s, 10.42, 4.256, 0.539, 'cloche', '250K', 'Simple Text Here');
++  text(s, T.LEAD17, { x: 7.235, y: 5.295, w: 5.557, h: 0.978, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  photo(s, 0, 4.129, 5.908, 2.622);
++  photo(s, 7.426, 0.749, 5.908, 2.622);
++}
++
++function slide30(s) {
++  text(s, T.LEAD16, { x: 1.349, y: 3.581, w: 6.798, h: 1.28, fontSize: 12, fontFace: BODY, lh: 1.5 });
++  text(s, 'Opened Barokah With App Mobile', { x: 1.349, y: 1.304, w: 6.651, h: 1.582, fontSize: 44, bold: true });
++  statBadge(s, 1.48, 5.583, 0.539, 'cloche', '250K', 'Simple Text Here');
++  statBadge(s, 5.487, 5.583, 0.539, 'steak', '570K', 'Simple Text Here');
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, 'BAROKAH', { x: 11.76, y: 0.222, w: 1.344, h: 0.303, fontSize: 12, bold: true, align: 'center', fill: YELLOW });
++  photo(s, 9.545, 1.129, 2.478, 5.242);
++  phoneMockup(s, 9.417, 0.992, 2.735, 5.517);
++}
++
++function slide31(s) {
++  box(s, -0, 5.098, 13.333, 2.402, YELLOW);
++  text(s, 'Mockup Slides', { x: 2.887, y: 0.648, w: 7.559, h: 0.909, fontSize: 48, bold: true, align: 'center' });
++  logoMark(s, 0, 0, 0.59, YELLOW);
++  text(s, T.LEAD17, { x: 2.547, y: 1.613, w: 8.24, h: 0.675, fontSize: 12, fontFace: BODY, align: 'center', lh: 1.5 });
++  logoMark(s, 12.743, 0, 0.59, YELLOW);
++  photo(s, 7.583, 3.384, 4.546, 2.869);
++  photo(s, 1.234, 3.384, 4.546, 2.869);
++  laptopMockup(s, 0.505, 3.196, 5.99, 3.635);
++  laptopMockup(s, 6.861, 3.196, 5.99, 3.635);
++}
++
++function slide32(s) {
++  photo(s, 0, 0, 13.333, 7.5);
++  gradientWash(s);
++  text(s, 'Thanks You', { x: 1.109, y: 2.033, w: 6.25, h: 3.063, fontSize: 88, bold: true });
++  text(s, 'Food & Culinary Presentation Template', { x: 1.292, y: 5.066, w: 5.111, h: 0.37, fontSize: 16, bold: true });
++  logoMark(s, 0, 0, 0.875, DARK);
++  text(s, T.LEAD, { x: 8.263, y: 4.433, w: 4.167, h: 0.978, fontSize: 12, fontFace: BODY, align: 'justify', lh: 1.5 });
++  box(s, 8.388, 4.184, 3.656, 0.05, DARK);
++  text(s, 'Barokah.io', { x: 8.263, y: 3.703, w: 2.844, h: 0.37, fontSize: 16 });
++  text(s, 'BAROKAH', { x: 11.76, y: 0.33, w: 1.344, h: 0.37, fontSize: 16, bold: true, color: YELLOW, align: 'center', fill: DARK });
++}
++
++// ---------------------------------------------------------------- build
++const SLIDES = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
++  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
++  slide25, slide26, slide27, slide28, slide29, slide30, slide31, slide32,
++];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++pptx.layout = 'WIDE';
++pptx.author = 'Barokah';
++pptx.title = 'Barokah - Food & Culinary Presentation Template';
++
++SLIDES.forEach((build) => build(pptx.addSlide()));
++
++pptx.writeFile({
++  fileName: path.join(__dirname, '046896b0-f53e-4840-b7bf-c07ced816c7e_grok_final.pptx'),
++}).then((f) => console.log('wrote', f));

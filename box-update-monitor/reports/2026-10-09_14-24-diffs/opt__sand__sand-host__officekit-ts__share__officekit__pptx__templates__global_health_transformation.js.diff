@@ -1,0 +1,760 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/global_health_transformation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/global_health_transformation.js
+@@ -0,0 +1,757 @@
++/**
++ * "Buxom" — Medical Health Presentation, 30 slides, 13.333 x 7.5 in (16:9).
++ * Rebuilt from scratch with pptxgenjs.  Run: `node <this file>`
++ *
++ * Design notes
++ *  - Brand gradient (5963C4 -> 212677) runs diagonally top-left to bottom-right.
++ *    pptxgenjs has no gradient fill, so gradients are painted as a mosaic of flat
++ *    tiles (see gradTiles / gradRect / gradRound / gradBackground below).
++ *  - The reference deck's only bitmaps are small monochrome medical glyphs; they are
++ *    redrawn here with native pptxgenjs shapes (see ICONS).
++ *  - Empty picture placeholders in the reference render as nothing, so nothing is drawn.
++ */
++'use strict';
++
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++const W = 13.333;             // slide width  (in)
++const H = 7.5;                // slide height (in)
++
++/* ------------------------------------------------------------------ palette */
++const NAVY = '000046';        // deep brand navy — headlines, buttons
++const INK = '122658';         // softer headline navy
++const BODY = '000000';
++const WHITE = 'FFFFFF';
++const GRAD_A = '5963C4';      // gradient stop @0
++const GRAD_B = '212677';      // gradient stop @50%  (the deck never reaches stop @100%)
++
++const FT = 'Poppins Medium';  // titles / labels
++const FB = 'DM Sans';         // body copy
++
++/* card drop shadow used all over the deck: blur 14pt, 12pt @45deg, black 10%.
++   Returns a fresh object every call — pptxgenjs rewrites shadow options in place. */
++const shadow = () => ({ type: 'outer', blur: 14, offset: 12, angle: 45, color: '000000', opacity: 0.1 });
++
++/* ------------------------------------------------------- gradient machinery */
++const hex2rgb = h => [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16));
++const rgb2hex = c => c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('').toUpperCase();
++
++/** colour of the brand gradient at position t (0 = top-left .. 1 = bottom-right) */
++function gradColor(t) {
++  const a = hex2rgb(GRAD_A), b = hex2rgb(GRAD_B), k = Math.max(0, Math.min(1, t));
++  return rgb2hex([0, 1, 2].map(i => a[i] + (b[i] - a[i]) * k));
++}
++
++/** tile edge length that keeps the visible colour step of a w x h area small */
++const tileFor = (w, h) => Math.max(0.16, Math.min(0.36, 0.035 * (w + h)));
++
++/**
++ * Paint the window (x,y,w,h) with flat tiles taken from the gradient of `box`
++ * (defaults to the window itself).
++ */
++function gradTiles(slide, x, y, w, h, cell, box) {
++  const b = box || { x, y, w, h };
++  const nx = Math.max(1, Math.round(w / cell)), ny = Math.max(1, Math.round(h / cell));
++  const ov = 0.02;  // tiles bleed into each other so no hairline seams show
++  for (let i = 0; i < nx; i++) {
++    for (let j = 0; j < ny; j++) {
++      const x0 = Math.max(x, x + w * i / nx - ov), x1 = Math.min(x + w, x + w * (i + 1) / nx + ov);
++      const y0 = Math.max(y, y + h * j / ny - ov), y1 = Math.min(y + h, y + h * (j + 1) / ny + ov);
++      const cx = x + w * (i + 0.5) / nx, cy = y + h * (j + 0.5) / ny;
++      slide.addShape('rect', {
++        x: x0, y: y0, w: x1 - x0, h: y1 - y0,
++        fill: { color: gradColor(((cx - b.x) + (cy - b.y)) / (b.w + b.h)) }, line: { type: 'none' },
++      });
++    }
++  }
++}
++
++/** full-bleed slide gradient, painted as 40 diagonal bands (no clipping needed) */
++function gradBackground(slide, bands) {
++  const n = bands || 40, S = W + H, L = 2 * S, T = S / n / Math.SQRT2 + 0.02;
++  for (let k = 0; k < n; k++) {
++    const d = (S * (k + 0.5) / n - S / 2) / 2;
++    slide.addShape('rect', {
++      x: W / 2 + d - L / 2, y: H / 2 + d - T / 2, w: L, h: T, rotate: -45,
++      fill: { color: gradColor((k + 0.5) / n) }, line: { type: 'none' },
++    });
++  }
++}
++
++/**
++ * 12-spoke starburst — the "o" of the Buxom wordmark and the giant watermark
++ * on the cover / closing slides.  Spokes run from 42% to 100% of the radius.
++ */
++function burst(slide, x, y, d, color, transparency) {
++  const R = d / 2, cx = x + R, cy = y + R, rm = 0.71 * R;
++  for (let i = 0; i < 12; i++) {
++    const a = 4 + i * 30;
++    slide.addShape('rect', {
++      x: cx + rm * Math.cos(a * Math.PI / 180) - 0.29 * R,
++      y: cy + rm * Math.sin(a * Math.PI / 180) - 0.10 * R,
++      w: 0.58 * R, h: 0.20 * R, rotate: a,
++      fill: { color, transparency }, line: { type: 'none' },
++    });
++  }
++}
++
++/** gradient-filled rectangle */
++function gradRect(slide, x, y, w, h) {
++  gradTiles(slide, x, y, w, h, tileFor(w, h));
++}
++
++/**
++ * Gradient-filled rounded rectangle: a flat base carries the outline + shadow,
++ * four circles form the corners, then straight bands cover the middle.
++ */
++function gradRound(slide, x, y, w, h, r, opts) {
++  const o = opts || {}, cell = tileFor(w, h), box = { x, y, w, h };
++  slide.addShape('roundRect', {
++    x, y, w, h, rectRadius: r, fill: { color: gradColor(0.5) }, line: { type: 'none' },
++    shadow: o.shadow === false ? undefined : shadow(),
++  });
++  [[x, y], [x + w - 2 * r, y], [x, y + h - 2 * r], [x + w - 2 * r, y + h - 2 * r]].forEach(p => {
++    slide.addShape('ellipse', {
++      x: p[0], y: p[1], w: 2 * r, h: 2 * r, line: { type: 'none' },
++      fill: { color: gradColor(((p[0] + r - x) + (p[1] + r - y)) / (w + h)) },
++    });
++  });
++  gradTiles(slide, x + r, y, w - 2 * r, r, cell, box);              // top edge
++  gradTiles(slide, x + r, y + h - r, w - 2 * r, r, cell, box);      // bottom edge
++  gradTiles(slide, x, y + r, w, h - 2 * r, cell, box);              // middle
++}
++
++/* ------------------------------------------------------------ text helpers */
++const head = (s, t, o) => s.addText(t, Object.assign(
++  { fontFace: FT, fontSize: 54, color: NAVY, margin: 0, valign: 'top' }, o));
++const para = (s, t, o) => s.addText(t, Object.assign(
++  { fontFace: FB, fontSize: 10, color: BODY, margin: 0, valign: 'top', lineSpacingMultiple: 1.5 }, o));
++const cap = (s, t, o) => s.addText(t, Object.assign(
++  { fontFace: FT, fontSize: 14, color: NAVY, margin: 0, valign: 'top' }, o));
++
++/* --------------------------------------------------------------- components */
++/** "Bux(*)m" wordmark, top-left of every slide (or huge, on the cover) */
++function logo(slide, color, o) {
++  const p = Object.assign({ x: 0.443, y: 0.342, size: 24, gap: 0.99, sun: [1.162, 0.415, 0.258] }, o);
++  slide.addText('Bux', { x: p.x, y: p.y, w: 0.706, h: 0.404, fontFace: FT, fontSize: p.size, color, align: 'right', margin: 0, valign: 'top' });
++  slide.addText('m', { x: p.x + p.gap, y: p.y - 0.002, w: 0.706, h: 0.404, fontFace: FT, fontSize: p.size, color, margin: 0, valign: 'top' });
++  burst(slide, p.sun[0], p.sun[1], p.sun[2], color);
++}
++
++/** navy pill button, e.g. "Read More" */
++function button(slide, x, y, label, fill, textColor) {
++  slide.addShape('roundRect', { x, y, w: 1.377, h: 0.388, rectRadius: 0.065, fill: { color: fill || NAVY }, line: { type: 'none' } });
++  slide.addText(label, { x: x + 0.05, y: y + 0.093, w: 1.276, h: 0.202, fontFace: FT, fontSize: 12, color: textColor || WHITE, align: 'center', margin: 0, valign: 'top' });
++}
++
++/** the little infinity mark that prefixes "Your Awesome Title Here" rows */
++function infinity(slide, x, y, color) {
++  const c = color || gradColor(0.35);
++  slide.addShape('donut', { x, y, w: 0.262, h: 0.223, fill: { color: c }, line: { type: 'none' } });
++  slide.addShape('donut', { x: x + 0.222, y, w: 0.262, h: 0.223, fill: { color: c }, line: { type: 'none' } });
++}
++
++/* White medical glyphs, redrawn from native shapes (reference uses tiny PNG/SVG icons). */
++const ICONS = {
++  /* heart crossed by an ECG trace */
++  heart: (s, x, y, d, c) => {
++    s.addShape('heart', { x, y: y + 0.06 * d, w: d, h: 0.88 * d, fill: { color: c }, line: { type: 'none' } });
++    const ecg = [[0.16, 0.52], [0.30, 0.52], [0.37, 0.42], [0.45, 0.62], [0.54, 0.45], [0.61, 0.52], [0.84, 0.52]];
++    for (let i = 0; i < ecg.length - 1; i++) {
++      const dx = (ecg[i + 1][0] - ecg[i][0]) * d, dy = (ecg[i + 1][1] - ecg[i][1]) * d;
++      const len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
++      s.addShape('rect', {
++        x: x + ecg[i][0] * d + dx / 2 - len / 2, y: y + ecg[i][1] * d + dy / 2 - 0.03 * d,
++        w: len, h: 0.06 * d, rotate: ang, fill: { color: gradColor(0.3) }, line: { type: 'none' },
++      });
++    }
++  },
++  /* ringed medical cross */
++  cross: (s, x, y, d, c) => {
++    s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('ellipse', { x: x + 0.07 * d, y: y + 0.07 * d, w: 0.86 * d, h: 0.86 * d, fill: { color: gradColor(0.3) }, line: { type: 'none' } });
++    s.addShape('plus', { x: x + 0.21 * d, y: y + 0.21 * d, w: 0.58 * d, h: 0.58 * d, fill: { color: c }, line: { type: 'none' } });
++  },
++  /* first-aid case with a star-of-life */
++  kit: (s, x, y, d, c) => {
++    s.addShape('rect', { x: x + 0.32 * d, y: y + 0.08 * d, w: 0.36 * d, h: 0.12 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('roundRect', { x: x + 0.04 * d, y: y + 0.2 * d, w: 0.92 * d, h: 0.62 * d, rectRadius: 0.07 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('star6', { x: x + 0.32 * d, y: y + 0.34 * d, w: 0.36 * d, h: 0.36 * d, fill: { color: gradColor(0.3) }, line: { type: 'none' } });
++  },
++  /* IV drip bag */
++  drip: (s, x, y, d, c) => {
++    s.addShape('roundRect', { x: x + 0.26 * d, y: y + 0.06 * d, w: 0.48 * d, h: 0.7 * d, rectRadius: 0.16 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('rect', { x: x + 0.46 * d, y: y + 0.74 * d, w: 0.08 * d, h: 0.2 * d, fill: { color: c }, line: { type: 'none' } });
++  },
++  /* ambulance seen from the side */
++  ambulance: (s, x, y, d, c) => {
++    s.addShape('roundRect', { x, y: y + 0.26 * d, w: 0.6 * d, h: 0.42 * d, rectRadius: 0.05 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('roundRect', { x: x + 0.54 * d, y: y + 0.4 * d, w: 0.46 * d, h: 0.28 * d, rectRadius: 0.05 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('ellipse', { x: x + 0.12 * d, y: y + 0.62 * d, w: 0.22 * d, h: 0.22 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('ellipse', { x: x + 0.62 * d, y: y + 0.62 * d, w: 0.22 * d, h: 0.22 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('plus', { x: x + 0.18 * d, y: y + 0.34 * d, w: 0.22 * d, h: 0.22 * d, fill: { color: gradColor(0.3) }, line: { type: 'none' } });
++  },
++  /* hospital block with a gabled roof */
++  hospital: (s, x, y, d, c) => {
++    s.addShape('triangle', { x: x + 0.18 * d, y: y + 0.02 * d, w: 0.64 * d, h: 0.24 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('rect', { x: x + 0.06 * d, y: y + 0.26 * d, w: 0.88 * d, h: 0.68 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('plus', { x: x + 0.39 * d, y: y + 0.3 * d, w: 0.22 * d, h: 0.22 * d, fill: { color: gradColor(0.3) }, line: { type: 'none' } });
++  },
++  /* molar */
++  tooth: (s, x, y, d, c) => {
++    s.addShape('ellipse', { x: x + 0.09 * d, y: y + 0.04 * d, w: 0.82 * d, h: 0.66 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('rect', { x: x + 0.16 * d, y: y + 0.34 * d, w: 0.24 * d, h: 0.56 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('rect', { x: x + 0.6 * d, y: y + 0.34 * d, w: 0.24 * d, h: 0.56 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('ellipse', { x: x + 0.16 * d, y: y + 0.76 * d, w: 0.24 * d, h: 0.2 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('ellipse', { x: x + 0.6 * d, y: y + 0.76 * d, w: 0.24 * d, h: 0.2 * d, fill: { color: c }, line: { type: 'none' } });
++  },
++  /* pill bottle */
++  bottle: (s, x, y, d, c) => {
++    s.addShape('rect', { x: x + 0.3 * d, y: y + 0.04 * d, w: 0.4 * d, h: 0.14 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('roundRect', { x: x + 0.18 * d, y: y + 0.2 * d, w: 0.64 * d, h: 0.62 * d, rectRadius: 0.08 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('rect', { x: x + 0.3 * d, y: y + 0.42 * d, w: 0.4 * d, h: 0.1 * d, fill: { color: gradColor(0.3) }, line: { type: 'none' } });
++    s.addShape('rect', { x: x + 0.45 * d, y: y + 0.32 * d, w: 0.1 * d, h: 0.3 * d, fill: { color: gradColor(0.3) }, line: { type: 'none' } });
++  },
++  /* head in profile with a brain */
++  brain: (s, x, y, d, c) => {
++    s.addShape('ellipse', { x: x + 0.04 * d, y: y + 0.08 * d, w: 0.86 * d, h: 0.76 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('rect', { x: x + 0.14 * d, y: y + 0.46 * d, w: 0.5 * d, h: 0.44 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('cloud', { x: x + 0.2 * d, y: y + 0.2 * d, w: 0.54 * d, h: 0.4 * d, fill: { color: gradColor(0.3) }, line: { type: 'none' } });
++  },
++  /* thin circled right arrow — the pricing-table bullet */
++  arrow: (s, x, y, d, c) => {
++    s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: c, width: 1 } });
++    s.addShape('rect', { x: x + 0.24 * d, y: y + 0.465 * d, w: 0.34 * d, h: 0.07 * d, fill: { color: c }, line: { type: 'none' } });
++    s.addShape('triangle', { x: x + 0.5 * d, y: y + 0.33 * d, w: 0.24 * d, h: 0.34 * d, rotate: 90, fill: { color: c }, line: { type: 'none' } });
++  },
++};
++const icon = (slide, name, x, y, d, color) => ICONS[name](slide, x, y, d, color || WHITE);
++
++/* ---------------------------------------------------------- shared copy ---- */
++const J = (...p) => p.join(' ');
++const S1 = 'Praesent ultrices metus sed libero venenatis viverra.';
++const S2 = 'Nulla finibus neque sit amet dolor scelerisque tempus.';
++const S3 = 'Sed ac ornare nunc, in eleifend libero.';
++const S4 = 'Donec eget justo faucibus, aliquet enim vel, tincidunt nulla.';
++const S5 = 'Cras euismod orci nec eros placerat, sed tincidunt nisl interdum.';
++const S6 = 'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.';
++const S7 = 'Morbi rhoncus, metus sed tincidunt semper.';
++const N1 = 'Nullam sed sapien eu orci congue facilisis maximus auctor nibh.';
++const N2 = 'Curabitur nec aliquam odio, vitae feugiat nunc.';
++const N3 = 'Ut venenatis lobortis tortor.';
++const C1 = 'Curabitur fermentum lorem non turpis sagittis sollicitudin.';
++const C2 = 'Curabitur ut ligula ut orci venenatis efficitur dictum sed urna.';
++const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
++const LOREM_LONG = J(LOREM, 'Integer condimentum nibh vitae quam varius volutpat.');
++const AWESOME = 'Your Awesome Title Here';
++const TITLE_HERE = 'Your Title Here';
++const LIFESTYLE = 'Lifestyle and Environmental Factors';
++
++/* ================================================================== slides */
++const slides = [];
++
++/* 1 — cover: giant wordmark on the brand gradient */
++slides.push(s => {
++  gradBackground(s);
++  burst(s, 7.561, -0.361, 9.244, WHITE, 90);
++  logo(s, WHITE);
++  s.addText('Bux', { x: -0.026, y: 2.333, w: 3.337, h: 1.935, fontFace: FT, fontSize: 115, color: WHITE, align: 'right', margin: 0, valign: 'top' });
++  burst(s, 3.328, 2.699, 1.214, WHITE);
++  s.addText('m', { x: 4.54, y: 2.333, w: 2.257, h: 1.935, fontFace: FT, fontSize: 115, color: WHITE, margin: 0, valign: 'top' });
++  cap(s, 'Global Health Transformation', { x: 0.564, y: 5.879, w: 3.217, h: 0.236, color: WHITE });
++  para(s, J(S1, S2, 'Sed ac ornare nunc, in.'), { x: 0.564, y: 6.219, w: 5.039, h: 0.482, color: WHITE });
++  s.addText('\u00aeMedical Health Presentation', { x: 11.609, y: 6.761, w: 1.318, h: 0.337, fontFace: FT, fontSize: 10, color: WHITE, align: 'right', margin: 0, valign: 'top' });
++});
++
++/* 2 — The Growing Importance of Health Issues */
++slides.push(s => {
++  gradRect(s, 11.46, 0, 1.873, 6.222);
++  logo(s, NAVY);
++  head(s, 'The Growing Importance', { x: 0.575, y: 1.545, w: 10.092, h: 0.909 });
++  head(s, 'of Health Issues', { x: 0.575, y: 2.453, w: 6.578, h: 0.909 });
++  cap(s, 'Overview of Global Health Priorities', { x: 0.564, y: 4.764, w: 3.755, h: 0.236 });
++  para(s, J('Praesent interdum luctus fringilla.', 'In posuere nisi ex, sit amet volutpat sem cursus nec.',
++    'Vestibulum ultricies mollis nisl, et aliquam augue ullamcorper vitae.',
++    'Curabitur vehicula purus ex, ac porttitor metus lacinia eget.',
++    'Cras eros metus, pellentesque eu placerat congue, imperdiet id nisi.',
++    'Nulla tempor urna sed augue commodo rutrum.', 'Nulla luctus, tellus id laoreet scelerisque.'),
++    { x: 0.564, y: 5.11, w: 5.092, h: 1.239 });
++});
++
++/* 3 — Leading The Way In Medical Excellence. */
++slides.push(s => {
++  logo(s, NAVY);
++  head(s, 'Leading The Way In', { x: 0.58, y: 1.891, w: 8.038, h: 0.909 });
++  head(s, 'Medical Excellence.', { x: 0.58, y: 2.722, w: 8.038, h: 0.909 });
++  para(s, J(S1, S2, S3, S4, S5, S6, S7), { x: 0.564, y: 4.717, w: 4.118, h: 1.744 });
++  cap(s, 'Impacts on Healthcare Systems', { x: 5.946, y: 4.717, w: 3.582, h: 0.236 });
++  para(s, J(N1, N2, 'Ut venenatis lobortis tortor, eu viverra turpis rhoncus eu.',
++    'Duis eu neque non leo condimentum tincidunt.\u00a0'), { x: 5.946, y: 5.223, w: 3.19, h: 1.238 });
++});
++
++/* 4 — Bringing Health To Life for the Whole Family. */
++slides.push(s => {
++  logo(s, NAVY);
++  ['Bringing Health', 'To Life for the', 'Whole Family.'].forEach((t, i) =>
++    head(s, t, { x: 7.523, y: 1.187 + i * 0.7405, w: [5.277, 4.646, 4.8][i], h: 0.74, fontSize: 44, color: INK }));
++  cap(s, LIFESTYLE, { x: 7.523, y: 4.195, w: 3.835, h: 0.236 });
++  para(s, J(S1, S2, S3, S4, S5), { x: 7.523, y: 4.578, w: 5.007, h: 0.987 });
++  para(s, J(N1, N2, N3), { x: 7.523, y: 5.831, w: 5.007, h: 0.482 });
++});
++
++/* 5 — Best Care & Best Doctor. (full gradient) */
++slides.push(s => {
++  gradBackground(s);
++  head(s, 'Best Care &', { x: 0.568, y: 1.984, w: 5.116, h: 0.909, color: WHITE });
++  head(s, 'Best Doctor.', { x: 0.568, y: 2.722, w: 5.079, h: 0.909, color: WHITE });
++  cap(s, 'Predictive Healthcare Models', { x: 0.575, y: 4.369, w: 3.484, h: 0.236, color: WHITE });
++  para(s, J(S1, S2, S3, S4, S5, S6, S7), { x: 0.575, y: 4.752, w: 4.332, h: 1.744, color: WHITE });
++  logo(s, WHITE);
++});
++
++/* 6 — three icon cards + "Making Health Care Better Together." */
++slides.push(s => {
++  logo(s, NAVY);
++  const cards = [
++    { x: 0.564, icon: 'heart', ix: 1.15, iy: 1.492, body: J(S1, S2, 'Sed ac ornare nunc, in eleifend.') },
++    { x: 5.015, icon: 'cross', ix: 5.601, iy: 1.498, body: J(C1, C2) },
++    { x: 9.466, icon: 'kit', ix: 10.052, iy: 1.498, body: J(N1, N2) },
++  ];
++  cards.forEach(c => {
++    gradRound(s, c.x, 1.751, 3.303, 2.548, 0.425);
++    gradRound(s, c.x + 0.385, 1.304, 0.921, 0.894, 0.149, { shadow: false });
++    s.addShape('roundRect', { x: c.x + 0.385, y: 1.304, w: 0.921, h: 0.894, rectRadius: 0.149, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
++    icon(s, c.icon, c.ix, c.iy, 0.518);
++    cap(s, TITLE_HERE, { x: c.x + 0.385, y: 2.427, w: 1.968, h: 0.269, fontSize: 16, color: WHITE });
++    para(s, c.body, { x: c.x + 0.385, y: 2.851, w: 2.534, h: 1.036, fontSize: 10.5, color: WHITE });
++  });
++  head(s, 'Making Health Care', { x: 0.564, y: 5.157, w: 5.973, h: 0.673, fontSize: 40, color: INK });
++  head(s, 'Better Together.', { x: 0.564, y: 5.83, w: 4.967, h: 0.673, fontSize: 40, color: INK });
++  para(s, J(S1, S2, S3, S4, S5), { x: 8.012, y: 5.157, w: 4.3, h: 1.239 });
++});
++
++/* 7 — "We Are Here For Your Care." + 2x2 infinity list */
++slides.push(s => {
++  gradRect(s, 0, 0, 6.667, 3.759);
++  head(s, 'We Are Here', { x: 0.575, y: 1.522, w: 4.65, h: 0.808, fontSize: 48, color: WHITE });
++  head(s, 'For Your Care.', { x: 0.575, y: 2.33, w: 5.183, h: 0.808, fontSize: 48, color: WHITE });
++  [
++    { mx: 0.607, tx: 1.403, y: 4.479, w: 4.355, h: 0.734, body: J(S1, S2, S3, 'Donec eget justo faucibus.') },
++    { mx: 7.312, tx: 8.108, y: 4.479, w: 4.454, h: 0.482, body: J(C1, C2) },
++    { mx: 0.607, tx: 1.403, y: 5.973, w: 4.355, h: 0.482, body: J(N1, N2, 'Ut venenatis.') },
++    { mx: 7.312, tx: 8.108, y: 5.973, w: 4.548, h: 0.482, body: J(S6, S7) },
++  ].forEach(r => {
++    infinity(s, r.mx, r.y + 0.008);
++    cap(s, AWESOME, { x: r.tx, y: r.y, w: 3.01, h: 0.236 });
++    para(s, r.body, { x: r.tx, y: r.y + 0.351, w: r.w, h: r.h });
++  });
++  logo(s, WHITE);
++});
++
++/* 8 — "The Most Valuable Thing Is Your Health." */
++slides.push(s => {
++  gradRect(s, 6.667, 4.583, 6.26, 2.917);
++  logo(s, NAVY);
++  head(s, 'The Most Valuable', { x: 7.041, y: 5.436, w: 5.512, h: 0.606, fontSize: 36, color: WHITE, align: 'center' });
++  head(s, 'Thing Is Your Health.', { x: 6.968, y: 6.042, w: 5.659, h: 0.606, fontSize: 36, color: WHITE, align: 'center' });
++  cap(s, LIFESTYLE, { x: 0.568, y: 1.619, w: 3.835, h: 0.236 });
++  para(s, J(S1, S2, S3, S4, S5), { x: 0.568, y: 2.002, w: 5.007, h: 0.987 });
++  [
++    { y: 4.232, w: 3.972, h: 0.734, body: J(S1, S2, S3, 'Donec eget justo faucibus.') },
++    { y: 5.726, w: 4.18, h: 0.482, body: J(N1, N2, 'Ut venenatis.') },
++  ].forEach(r => {
++    infinity(s, 0.607, r.y + 0.008);
++    cap(s, AWESOME, { x: 1.403, y: r.y, w: 3.01, h: 0.236 });
++    para(s, r.body, { x: 1.403, y: r.y + 0.351, w: r.w, h: r.h });
++  });
++});
++
++/* 9 — Medical Made With Care. */
++slides.push(s => {
++  logo(s, NAVY);
++  head(s, 'Medical Made With Care.', { x: 3.743, y: 1.776, w: 8.257, h: 0.74, fontSize: 44 });
++  para(s, J(S1, S2, S3, S4, S5, S6, S7), { x: 3.748, y: 2.991, w: 4.686, h: 1.492 });
++  para(s, J(S1, S2, 'Sed ac ornare nunc.'), { x: 9.565, y: 2.991, w: 2.894, h: 0.734 });
++  infinity(s, 3.743, 5.286);
++  cap(s, AWESOME, { x: 4.54, y: 5.269, w: 3.01, h: 0.236 });
++  para(s, J(S1, S2, S3, 'Donec eget justo faucibus.'), { x: 4.54, y: 5.621, w: 3.972, h: 0.734 });
++  cap(s, AWESOME, { x: 9.565, y: 5.278, w: 3.01, h: 0.236 });
++  para(s, J(N1, N2), { x: 9.565, y: 5.629, w: 2.723, h: 0.734 });
++});
++
++/* 10 — We Provide Top Medical Service. */
++slides.push(s => {
++  gradBackground(s);
++  s.addShape('rect', { x: 8.621, y: 1.151, w: 3.543, h: 3.275, fill: { color: '4472C4' }, line: { type: 'none' } });
++  logo(s, WHITE);
++  head(s, 'We Provide Top', { x: 0.591, y: 2.535, w: 6.13, h: 0.808, fontSize: 48, color: WHITE });
++  head(s, 'Medical Service.', { x: 0.591, y: 3.343, w: 6.416, h: 0.808, fontSize: 48, color: WHITE });
++  para(s, J(N1, N2, N3), { x: 0.591, y: 4.483, w: 5.012, h: 0.482, color: WHITE });
++  cap(s, 'Educating the Next Generation', { x: 8.621, y: 4.979, w: 3.543, h: 0.236, color: WHITE });
++  para(s, J(S1, S2, S3, S4), { x: 8.621, y: 5.362, w: 3.541, h: 0.987, color: WHITE });
++});
++
++/* 11 — Medical Issues. + four bottom cards */
++slides.push(s => {
++  logo(s, NAVY);
++  head(s, 'Medical Issues.', { x: 0.575, y: 1.507, w: 5.201, h: 0.74, fontSize: 44 });
++  para(s, J(S1, S2, S3), { x: 0.575, y: 2.447, w: 4.894, h: 0.482 });
++  button(s, 7.79, 1.63, 'Read More');
++  para(s, J(S1, S2, S3, S4), { x: 7.79, y: 2.194, w: 4.686, h: 0.734 });
++  [
++    { x: 0.564, icon: 'heart', ix: 1.656, h: 1.301, body: J(S1, S2, 'Sed ac ornare nunc, in eleifend.') },
++    { x: 3.732, icon: 'kit', ix: 4.824, h: 1.036, body: J(C1, 'Curabitur ut ligula ut orci venenatis efficitur dictum sed.') },
++    { x: 6.9, icon: 'cross', ix: 7.992, h: 1.036, body: J(N1, 'Curabitur nec aliquam odio, vitae feugiat.') },
++    { x: 10.068, icon: 'drip', ix: 11.159, h: 1.301, body: J(S6, 'Morbi rhoncus, metus sed.') },
++  ].forEach(c => {
++    gradRound(s, c.x, 4.148, 2.702, 2.758, 0.45);
++    gradRound(s, c.x + 0.891, 3.75, 0.921, 0.894, 0.149, { shadow: false });
++    icon(s, c.icon, c.ix, 3.938, 0.518);
++    cap(s, TITLE_HERE, { x: c.x + 0.367, y: 4.843, w: 1.968, h: 0.269, fontSize: 16, color: WHITE, align: 'center' });
++    para(s, c.body, { x: c.x + 0.367, y: 5.267, w: 1.968, h: c.h, fontSize: 10.5, color: WHITE, align: 'center' });
++  });
++});
++
++/* 12 — First Aid Solution. + three stacked cards on the left */
++slides.push(s => {
++  logo(s, NAVY);
++  head(s, 'First Aid Solution.', { x: 6.79, y: 1.885, w: 5.731, h: 0.74, fontSize: 44, color: INK });
++  para(s, J(S1, S2, S3, S4, S5, 'Pellentesque habitant morbi tristique senectus.'), { x: 6.79, y: 2.96, w: 5.303, h: 0.987 });
++  infinity(s, 6.779, 4.463);
++  cap(s, AWESOME, { x: 7.576, y: 4.447, w: 3.01, h: 0.236 });
++  para(s, J(S1, S2, S3), { x: 6.79, y: 4.844, w: 5.18, h: 0.482 });
++  button(s, 6.79, 5.579, 'Read More');
++  [
++    { y: 1.178, icon: 'cross', iy: 1.371, w: 3.822, body: J(S1, S2, 'Sed ac') },
++    { y: 3.149, icon: 'heart', iy: 3.346, w: 3.822, body: J(S1, S2, 'Sed ac') },
++    { y: 5.116, icon: 'kit', iy: 5.312, w: 4.034, body: J(N1, N2) },
++  ].forEach(c => {
++    gradRound(s, 0.564, c.y, 4.996, 1.826, 0.3);
++    icon(s, c.icon, 4.786, c.iy, 0.518);
++    cap(s, AWESOME, { x: 1.045, y: c.y + 0.471, w: 3.01, h: 0.236, color: WHITE });
++    para(s, c.body, { x: 1.045, y: c.y + 0.852, w: c.w, h: 0.482, color: WHITE });
++  });
++});
++
++/* 13 — Care & Support. */
++slides.push(s => {
++  logo(s, NAVY);
++  head(s, 'Care & Support.', { x: 0.57, y: 1.673, w: 6.096, h: 0.808, fontSize: 48, color: INK });
++  para(s, J(S1, S2, S3, S4, 'Cras euismod orci nec eros.'), { x: 0.57, y: 2.763, w: 8.232, h: 0.482 });
++  [
++    { x: 0.564, icon: 'heart', ix: 3.408, title: 'Mental Health & Welbeing', tw: 1.711, body: J(S1, S2) },
++    { x: 4.647, icon: 'kit', ix: 7.49, title: 'Back and Neck Pain Assessment', tw: 2.019, body: J(S6.replace(' ac turpis egestas.', ''), 'ac turpis egestas. Morbi rhoncus, metus.') },
++    { x: 8.676, icon: 'cross', ix: 11.519, title: 'Aged Care & Medical Check-Up', tw: 2.176, body: J(N1, N2) },
++  ].forEach(c => {
++    gradRound(s, c.x, 4.192, 3.616, 2.497, 0.301);
++    icon(s, c.icon, c.ix, 4.54, 0.518);
++    cap(s, c.title, { x: c.x + 0.413, y: 4.765, w: c.tw, h: 0.539, fontSize: 16, color: WHITE });
++    para(s, c.body, { x: c.x + 0.413, y: 5.566, w: 2.791, h: 0.771, fontSize: 10.5, color: WHITE });
++  });
++});
++
++/* 14 — Coffee Break. */
++slides.push(s => {
++  logo(s, NAVY);
++  head(s, 'Coffee', { x: 0.572, y: 1.845, w: 6.13, h: 1.935, fontSize: 115, color: INK });
++  head(s, 'Break.', { x: 0.572, y: 3.399, w: 5.333, h: 1.935, fontSize: 115, color: INK });
++  cap(s, 'Let\u2019s Start Again in 15 Minutes', { x: 0.564, y: 6.175, w: 3.518, h: 0.236, color: INK });
++  para(s, J(S1, 'Nulla finibus neque sit amet.'), { x: 0.564, y: 6.492, w: 5.341, h: 0.168, lineSpacingMultiple: 1 });
++});
++
++/* 15 — Dr. Louis Robert. */
++slides.push(s => {
++  gradRect(s, 0, 0, 3.217, 7.5);
++  head(s, 'Dr. Louis Robert.', { x: 7.072, y: 1.516, w: 5.221, h: 0.74, fontSize: 44, color: INK });
++  s.addText('Job Position', { x: 7.118, y: 2.279, w: 1.758, h: 0.269, fontFace: FB, fontSize: 16, italic: true, color: INK, margin: 0, valign: 'top' });
++  para(s, J(S1, S2, S3, S4, S5, 'Pellentesque habitant morbi tristique senectus.'), { x: 7.082, y: 3.025, w: 5.303, h: 0.987 });
++  infinity(s, 7.072, 4.528);
++  cap(s, AWESOME, { x: 7.868, y: 4.512, w: 3.01, h: 0.236 });
++  para(s, J(S1, S2, S3), { x: 7.082, y: 4.909, w: 5.18, h: 0.482 });
++  infinity(s, 7.082, 5.711);
++  cap(s, AWESOME, { x: 7.879, y: 5.695, w: 3.01, h: 0.236 });
++  para(s, J(N1, 'Curabitur nec.'), { x: 7.093, y: 6.092, w: 5.068, h: 0.229 });
++  logo(s, WHITE);
++});
++
++/* 16 — Our Dedicated Doctor. (four portrait slots, names below) */
++slides.push(s => {
++  gradRect(s, 0, 0, 13.333, 4.729);
++  head(s, 'Our Dedicated Doctor.', { x: 2.785, y: 1.199, w: 7.763, h: 0.74, fontSize: 44, color: WHITE, align: 'center' });
++  para(s, J(S1, S2, S3, S4, 'Cras euismod orci nec eros.'), { x: 2.551, y: 2.055, w: 8.232, h: 0.482, color: WHITE, align: 'center' });
++  [
++    { name: 'Dr. David Faux', nx: 0.538, nw: 2.564, jx: 1.098 },
++    { name: 'Dr. Laura Anna', nx: 3.819, nw: 2.564, jx: 4.379 },
++    { name: 'Dr. Ray Poller', nx: 7.242, nw: 2.283, jx: 7.66 },
++    { name: 'Dr. Rose Bianca', nx: 10.242, nw: 2.553, jx: 10.796 },
++  ].forEach(d => {
++    s.addText(d.name, { x: d.nx, y: 6.25, w: d.nw, h: 0.337, fontFace: FT, fontSize: 20, color: NAVY, align: 'center', margin: 0, valign: 'top' });
++    s.addText('Job Position', { x: d.jx, y: 6.619, w: 1.446, h: 0.236, fontFace: FB, fontSize: 14, italic: true, color: INK, align: 'center', margin: 0, valign: 'top' });
++  });
++  logo(s, WHITE);
++});
++
++/* 17 — We Are The Team Of Excellence. */
++slides.push(s => {
++  gradRect(s, 5.251, 0, 2.72, 7.5);
++  logo(s, NAVY);
++  ['We Are', 'The Team Of', 'Excellence.'].forEach((t, i) =>
++    head(s, t, { x: 0.575, y: 1.882 + i * 0.673, w: [2.653, 3.986, 3.84][i], h: 0.673, fontSize: 40 }));
++  para(s, J(S1, S2, S3, S4, S5), { x: 0.576, y: 4.398, w: 3.716, h: 1.239 });
++  button(s, 0.575, 5.922, 'Read More');
++});
++
++/* 18 — Hospital Facilities. (2 x 3 facility cards) */
++slides.push(s => {
++  logo(s, NAVY);
++  head(s, 'Hospital Facilities.', { x: 3.414, y: 1.173, w: 6.506, h: 0.74, fontSize: 44, color: INK, align: 'center' });
++  para(s, J(S1, S2, 'Sed ac ornare nunc, '), { x: 2.164, y: 2.055, w: 9.005, h: 0.168, align: 'center', lineSpacingMultiple: 1 });
++  [
++    { col: 0, row: 0, title: 'Ambulance Service', tw: 1.662, th: 0.606, icon: 'ambulance', id: 0.612, body: J(S1, 'Nulla finibus neque sit.'), bw: 2.805 },
++    { col: 1, row: 0, title: 'Dental Facilities', tw: 2.271, th: 0.303, icon: 'tooth', id: 0.573, body: J(C1, 'Curabitur ut ligula ut.'), bw: 2.842 },
++    { col: 2, row: 0, title: 'Radiology/X-Ray Facility', tw: 1.817, th: 0.606, icon: 'brain', id: 0.612, body: J(N1, 'Curabitur nec.'), bw: 2.808 },
++    { col: 0, row: 1, title: 'Blood Banks Facility', tw: 1.817, th: 0.606, icon: 'drip', id: 0.588, body: J(C1, 'Curabitur ut ligula ut.'), bw: 2.805 },
++    { col: 1, row: 1, title: 'Pharmacy Facility', tw: 2.383, th: 0.303, icon: 'bottle', id: 0.612, body: J(N1, 'Curabitur nec.'), bw: 2.842 },
++    { col: 2, row: 1, title: 'Birth Centers Facility', tw: 1.817, th: 0.606, icon: 'hospital', id: 0.612, body: J(S1, 'Nulla finibus neque sit.'), bw: 2.808 },
++  ].forEach(c => {
++    const x = 0.889 + c.col * 4.003, y = 2.827 + c.row * 2.262;
++    gradRound(s, x, y, 3.549, 1.852, 0.224);
++    icon(s, c.icon, x + 3.549 - 0.315 - c.id, y + 0.28, c.id);
++    cap(s, c.title, { x: x + 0.315, y: y + (c.th > 0.4 ? 0.304 : 0.42), w: c.tw, h: c.th, fontSize: 18, color: WHITE });
++    para(s, c.body, { x: x + 0.315, y: y + 1.042, w: c.bw, h: 0.482, color: WHITE });
++  });
++});
++
++/* 19 — Medical Facilities. (five service pills) */
++slides.push(s => {
++  gradRect(s, 0, 0, 5.429, 7.5);
++  head(s, 'Medical', { x: 0.574, y: 1.824, w: 3.84, h: 0.909, color: WHITE });
++  head(s, 'Facilities.', { x: 0.574, y: 2.676, w: 3.84, h: 0.909, color: WHITE });
++  para(s, J(S1, S2, S3, S4, 'Cras euismod orci nec eros placerat.'), { x: 0.576, y: 4.037, w: 3.546, h: 1.239, color: WHITE });
++  para(s, J(N1, 'Curabitur nec aliquam odio, vitae feugiat.'), { x: 0.574, y: 5.556, w: 3.466, h: 0.482, color: WHITE });
++  [
++    { title: 'Ambulance Service', icon: 'ambulance', id: 0.612, ix: 6.307, iy: 1.297 },
++    { title: 'Dental Facilities', icon: 'tooth', id: 0.494, ix: 6.365, iy: 2.502 },
++    { title: 'Radiology/X-Ray', icon: 'brain', id: 0.507, ix: 6.359, iy: 3.642 },
++    { title: 'Blood Banks Facility', icon: 'drip', id: 0.502, ix: 6.362, iy: 4.791 },
++    { title: 'Ambulance Service', icon: 'bottle', id: 0.479, ix: 6.373, iy: 5.947 },
++  ].forEach((p, i) => {
++    const y = 1.193 + i * 1.1465;
++    gradRound(s, 6.117, y, 6.595, 0.82, 0.099);
++    icon(s, p.icon, p.ix, p.iy, p.id);
++    cap(s, p.title, { x: 7.108, y: y + 0.259, w: 2.586, h: 0.303, fontSize: 18, color: WHITE });
++    s.addShape('ellipse', { x: 9.826, y: y + 0.368, w: 0.084, h: 0.084, fill: { color: WHITE }, line: { type: 'none' } });
++    para(s, J(LOREM, 'Integer condimentum'), { x: 10.271, y: y + 0.217, w: 2.184, h: 0.385, fontSize: 8, color: WHITE });
++  });
++  logo(s, WHITE);
++});
++
++/* 20 — Pharmacy Facilities. + stats panel */
++slides.push(s => {
++  gradRect(s, 9.112, 1.11, 4.221, 3.287);
++  logo(s, NAVY);
++  head(s, 'Pharmacy', { x: 0.574, y: 4.868, w: 4.349, h: 0.909 });
++  head(s, 'Facilities.', { x: 0.574, y: 5.72, w: 4.04, h: 0.909 });
++  para(s, J(S1, S2, S3, S4, 'Cras euismod orci ne.'), { x: 7.17, y: 5.122, w: 5.258, h: 0.734 });
++  button(s, 7.169, 6.095, 'Read More');
++  head(s, '786+', { x: 9.553, y: 1.563, w: 1.664, h: 0.673, fontSize: 40, color: WHITE });
++  para(s, 'Curabitur fermentum lorem non turpis sagittis it. Curabitur ut ligula ut. Tincidunt nulla. ', { x: 9.553, y: 2.236, w: 3.224, h: 0.482, color: WHITE });
++  head(s, '78%', { x: 9.553, y: 3.214, w: 1.419, h: 0.673, fontSize: 40, color: WHITE });
++  para(s, J(S1, 'Nulla finibus neque sit amet dolor.'), { x: 10.905, y: 3.211, w: 1.872, h: 0.734, color: WHITE });
++});
++
++/* 21 — Radiology Facilities. + 78% stat block */
++slides.push(s => {
++  logo(s, NAVY);
++  gradRect(s, 3.798, 1.11, 3.467, 2.369);
++  head(s, '78%', { x: 4.237, y: 1.503, w: 1.763, h: 0.808, fontSize: 48, color: WHITE });
++  para(s, J(S1, S2, 'Sed ac.'), { x: 4.237, y: 2.353, w: 2.59, h: 0.734, color: WHITE });
++  head(s, 'Radiology', { x: 8.386, y: 1.855, w: 4.134, h: 0.909 });
++  head(s, 'Facilities.', { x: 8.386, y: 2.707, w: 3.84, h: 0.909 });
++  para(s, J(N1, 'Curabitur nec aliquam odio, vitae feugiat.'), { x: 8.385, y: 4.083, w: 3.84, h: 0.482 });
++  para(s, J(S1, S2, S3, S4, S5), { x: 8.386, y: 4.843, w: 3.716, h: 1.239 });
++  button(s, 8.385, 6.367, 'Read More');
++});
++
++/* 22 — What Our Patient Says. (three testimonial cards) */
++slides.push(s => {
++  const quote = (x, y) => s.addText('\u201d', { x, y, w: 0.4, h: 0.3, fontFace: FT, fontSize: 24, bold: true, color: WHITE, align: 'center', margin: 0, valign: 'top' });
++  gradRound(s, 1.402, 4.363, 3.367, 2.04, 0.246);
++  gradRound(s, 8.564, 4.363, 3.367, 2.04, 0.246);
++  logo(s, NAVY);
++  head(s, 'What Our Patient Says.', { x: 2.692, y: 1.163, w: 7.95, h: 0.74, fontSize: 44, align: 'center' });
++  para(s, J(S1, S2, S3, S4, 'Cras euismod orci nec eros.'), { x: 2.551, y: 2.055, w: 8.232, h: 0.482, align: 'center' });
++  gradRound(s, 4.306, 3.877, 4.722, 2.861, 0.345);
++  s.addText('Paul Holligan', { x: 5.525, y: 4.899, w: 2.283, h: 0.269, fontFace: FT, fontSize: 16, color: WHITE, align: 'center', margin: 0, valign: 'top' });
++  s.addText('Job Position', { x: 5.944, y: 5.234, w: 1.446, h: 0.185, fontFace: FB, fontSize: 11, italic: true, color: WHITE, align: 'center', margin: 0, valign: 'top' });
++  quote(6.453, 5.66);
++  para(s, J(S1, 'Nulla finibus neque sit amet dolor scelerisque.'), { x: 4.983, y: 5.922, w: 3.367, h: 0.482, color: WHITE, align: 'center' });
++  [
++    { name: 'Milla Vesia', nx: 2.236, jx: 2.593, tx: 1.889, qx: 2.921 },
++    { name: 'Jessie Noble', nx: 9.402, jx: 9.758, tx: 9.055, qx: 10.087 },
++  ].forEach(t => {
++    s.addText(t.name, { x: t.nx, y: 5.067, w: 1.692, h: 0.202, fontFace: FT, fontSize: 12, color: WHITE, align: 'center', margin: 0, valign: 'top' });
++    s.addText('Job Position', { x: t.jx, y: 5.317, w: 0.978, h: 0.135, fontFace: FB, fontSize: 8, italic: true, color: WHITE, align: 'center', margin: 0, valign: 'top' });
++    quote(t.qx, 5.6);
++    para(s, J(S1, 'Nulla finibus neque sit amet dolor.'), { x: t.tx, y: 5.781, w: 2.385, h: 0.385, fontSize: 8, color: WHITE, align: 'center' });
++  });
++  gradRect(s, 0, 7.108, 13.333, 0.392);
++});
++
++/* 23 — Cases Overview. + two counters */
++slides.push(s => {
++  gradRect(s, 7.553, 0, 5.78, 7.5);
++  logo(s, NAVY);
++  head(s, 'Cases', { x: 8.481, y: 1.786, w: 2.953, h: 0.909, color: WHITE });
++  head(s, 'Overview.', { x: 8.481, y: 2.639, w: 4.283, h: 0.909, color: WHITE });
++  para(s, J(S1, S2, S3, S4, S5), { x: 8.481, y: 3.953, w: 3.716, h: 1.239, color: WHITE });
++  s.addShape('roundRect', { x: 10.306, y: 5.607, w: 1.725, h: 0.983, rectRadius: 0.119, fill: { color: WHITE }, line: { type: 'none' }, shadow: shadow() });
++  head(s, '84,574', { x: 8.481, y: 5.769, w: 1.509, h: 0.471, fontSize: 28, color: WHITE });
++  s.addText('Total Cases', { x: 8.481, y: 6.241, w: 1.264, h: 0.202, fontFace: FB, fontSize: 12, color: WHITE, margin: 0, valign: 'top' });
++  head(s, '674+', { x: 10.502, y: 5.762, w: 1.227, h: 0.471, fontSize: 28 });
++  s.addText('Death', { x: 10.502, y: 6.233, w: 0.722, h: 0.202, fontFace: FB, fontSize: 12, color: NAVY, margin: 0, valign: 'top' });
++});
++
++/* 24 — The Pandemic Disease. */
++slides.push(s => {
++  gradRect(s, 0, 3.75, 6.667, 3.75);
++  logo(s, NAVY);
++  head(s, 'The Pandemic', { x: 7.358, y: 1.451, w: 5.295, h: 0.808, fontSize: 48 });
++  head(s, 'Disease.', { x: 7.358, y: 2.258, w: 3.265, h: 0.808, fontSize: 48 });
++  cap(s, LIFESTYLE, { x: 0.568, y: 1.619, w: 3.835, h: 0.236 });
++  para(s, J(S1, S2, S3, S4, S5), { x: 0.568, y: 2.002, w: 5.007, h: 0.987 });
++  [
++    { y: 4.395, w: 3.972, h: 0.734, body: J(S1, S2, S3, 'Donec eget justo faucibus.') },
++    { y: 5.889, w: 4.18, h: 0.482, body: J(N1, N2, 'Ut venenatis.') },
++  ].forEach(r => {
++    infinity(s, 0.607, r.y + 0.009, WHITE);
++    cap(s, AWESOME, { x: 1.403, y: r.y, w: 3.01, h: 0.236, color: WHITE });
++    para(s, r.body, { x: 1.403, y: r.y + 0.352, w: r.w, h: r.h, color: WHITE });
++  });
++});
++
++/* 25 — Further Disease Handling. + two cards on the right */
++slides.push(s => {
++  logo(s, NAVY);
++  head(s, 'Further Disease', { x: 0.574, y: 1.761, w: 5.584, h: 0.808, fontSize: 48 });
++  head(s, 'Handling.', { x: 0.574, y: 2.568, w: 3.952, h: 0.808, fontSize: 48 });
++  para(s, J(S1, S2, S3, S4, S5, 'Pellentesque habitant morbi.'), { x: 0.585, y: 4.124, w: 5.242, h: 0.987 });
++  infinity(s, 0.574, 5.628);
++  cap(s, AWESOME, { x: 1.371, y: 5.61, w: 3.01, h: 0.236 });
++  para(s, J(S1, S2, 'Sed ac ornare.'), { x: 0.585, y: 6.007, w: 4.181, h: 0.482 });
++  gradRound(s, 7.507, 1.205, 4.996, 3.534, 0.303);
++  icon(s, 'heart', 11.369, 1.402, 0.877);
++  cap(s, 'Screening and Early Detection', { x: 7.988, y: 1.725, w: 2.631, h: 0.808, fontSize: 24, color: WHITE });
++  para(s, J(S1, S2, S3, 'Donec eget justo faucibus.'), { x: 7.988, y: 2.791, w: 4.109, h: 0.734, color: WHITE });
++  para(s, J(N1, N2, 'Ut venenatis.'), { x: 7.988, y: 3.738, w: 4.18, h: 0.482, color: WHITE });
++  gradRound(s, 7.507, 4.953, 4.996, 1.826, 0.3);
++  icon(s, 'kit', 11.729, 5.149, 0.518);
++  cap(s, 'Early Warning Systems', { x: 7.988, y: 5.453, w: 3.01, h: 0.236, color: WHITE });
++  para(s, J(N1, N2), { x: 7.988, y: 5.804, w: 4.034, h: 0.482, color: WHITE });
++});
++
++/* 26 — Break Slide. */
++slides.push(s => {
++  gradRect(s, 0, 7.097, 5.292, 0.403);
++  logo(s, NAVY);
++  head(s, 'Break', { x: 0.578, y: 1.934, w: 3.61, h: 1.346, fontSize: 80 });
++  head(s, 'Slide.', { x: 0.578, y: 3.156, w: 3.61, h: 1.346, fontSize: 80 });
++  para(s, J(S1, S2, S3, S4, S5), { x: 0.578, y: 4.835, w: 3.61, h: 1.239 });
++});
++
++/* 27 — Pricing Table. (two plans) */
++slides.push(s => {
++  gradRect(s, 5.724, 0, 7.609, 5.797);
++  logo(s, NAVY);
++  [
++    { x: 0.564, name: 'Reguler Package', nw: 2.151, price: '$79', pw: 2.393 },
++    { x: 4.155, name: 'Premium Package', nw: 2.305, price: '$129', pw: 2.602 },
++  ].forEach(p => {
++    gradRound(s, p.x, 1.861, 3.255, 5.042, 0.393);
++    cap(s, p.name, { x: p.x + 0.336, y: 2.237, w: p.nw, h: 0.269, fontSize: 16, color: WHITE });
++    s.addText([
++      { text: p.price, options: { fontSize: 60 } },
++      { text: '/Month', options: { fontSize: 12 } },
++    ], { x: p.x + 0.336, y: 2.719, w: p.pw, h: 1.01, fontFace: FT, color: WHITE, margin: 0, valign: 'top' });
++    para(s, LOREM_LONG, { x: p.x + 0.336, y: 3.987, w: 2.461, h: 0.661, fontSize: 9, color: WHITE });
++    [0, 1, 2].forEach(i => {
++      icon(s, 'arrow', p.x + 0.336, 4.905 + i * 0.5325, 0.21);
++      para(s, LOREM, { x: p.x + 0.652, y: 4.861 + i * 0.5325, w: 2.194, h: 0.385, fontSize: 8, color: WHITE });
++    });
++  });
++  head(s, 'Pricing', { x: 8.244, y: 1.113, w: 3.131, h: 0.909, color: WHITE });
++  head(s, 'Table.', { x: 8.244, y: 2.022, w: 3.131, h: 0.909, color: WHITE });
++  para(s, J(S1, S2, S3, S4, 'Cras euismod orci nec eros placerat.'), { x: 8.244, y: 3.245, w: 4.307, h: 0.987, color: WHITE });
++  button(s, 8.244, 4.545, 'Read More', WHITE, NAVY);
++});
++
++/* 28 — Pricing Table. (three plans) */
++slides.push(s => {
++  gradRect(s, 6.667, 0, 6.667, 7.5);
++  logo(s, NAVY);
++  head(s, 'Pricing Table.', { x: 0.574, y: 1.377, w: 5.116, h: 0.808, fontSize: 48 });
++  para(s, J(S1, S2, S3, 'Donec eget justo faucibus, aliquet enim.'), { x: 7.736, y: 1.377, w: 4.761, h: 0.734, color: WHITE });
++  [
++    { x: 0.574, name: 'Basic Package', nw: 2.586, price: '$349', pw: 3.008, dw: 3.008 },
++    { x: 4.814, name: 'Reguler Package', nw: 2.586, price: '$799', pw: 2.882, dw: 3.008 },
++    { x: 9.053, name: 'Premium Package', nw: 2.772, price: '$1199', pw: 3.035, dw: 3.066 },
++  ].forEach(p => {
++    gradRound(s, p.x, 2.685, 3.706, 4.257, 0.447);
++    cap(s, p.name, { x: p.x + 0.336, y: 3.06, w: p.nw, h: 0.303, fontSize: 18, color: WHITE });
++    s.addText([
++      { text: p.price, options: { fontSize: 60 } },
++      { text: '/Month', options: { fontSize: 12 } },
++    ], { x: p.x + 0.336, y: 3.543, w: p.pw, h: 1.01, fontFace: FT, color: WHITE, margin: 0, valign: 'top' });
++    para(s, J(LOREM, 'Integer condimentum nibh.'), { x: p.x + 0.336, y: 4.81, w: p.dw, h: 0.434, fontSize: 9, color: WHITE });
++    icon(s, 'arrow', p.x + 0.336, 5.437, 0.21);
++    para(s, J(S1, 'Nulla finibus neque sit amet'), { x: p.x + 0.652, y: 5.394, w: 2.692, h: 0.385, fontSize: 8, color: WHITE });
++    [0, 1].forEach(i => {
++      icon(s, 'arrow', p.x + 0.336, 5.931 + i * 0.365, 0.21);
++      para(s, 'Nullam sed sapien eu orci congue facilisis.', { x: p.x + 0.652, y: 5.969 + i * 0.364, w: 2.27, h: 0.135, fontSize: 8, color: WHITE, lineSpacingMultiple: 1 });
++    });
++  });
++});
++
++/* 29 — Let's Get In Touch With Us. */
++slides.push(s => {
++  gradRect(s, 0, 4.735, 13.333, 2.765);
++  logo(s, NAVY);
++  head(s, 'Let\u2019s Get In', { x: 0.564, y: 1.575, w: 3.844, h: 0.74, fontSize: 44 });
++  head(s, 'Touch With Us.', { x: 0.564, y: 2.315, w: 4.895, h: 0.74, fontSize: 44 });
++  [
++    { x: 7.37, w: 2.568, tx: 7.723, ty: 1.85, title: 'Follow Us', lines: ['www.companyinfo.com', 'company@info.com'], lx: 7.723, ly: 2.316, lw: 1.863 },
++    { x: 10.218, w: 2.179, tx: 10.57, ty: 1.841, title: 'Get In Touch', lines: ['+214-704-76532', '+214-704-76533'], lx: 10.57, ly: 2.307, lw: 1.623 },
++  ].forEach(c => {
++    gradRound(s, c.x, 1.596, c.w, 1.437, 0.173);
++    cap(s, c.title, { x: c.tx, y: c.ty, w: 1.623, h: 0.269, fontSize: 16, color: WHITE });
++    c.lines.forEach((t, i) => s.addText(t, { x: c.lx, y: c.ly + i * 0.2625, w: c.lw, h: 0.202, fontFace: FB, fontSize: 12, color: WHITE, margin: 0, valign: 'top' }));
++  });
++});
++
++/* 30 — Thank's! */
++slides.push(s => {
++  gradBackground(s);
++  burst(s, 7.561, -0.361, 9.244, WHITE, 90);
++  head(s, 'Thank\u2019s!', { x: 0.574, y: 2.465, w: 7.082, h: 1.935, fontSize: 115, color: WHITE });
++  logo(s, WHITE);
++  cap(s, 'Global Health Presentation', { x: 0.564, y: 5.691, w: 3.217, h: 0.236, color: WHITE });
++  para(s, J(S1, S2, 'Sed ac ornare nunc, in.'), { x: 0.564, y: 6.03, w: 5.039, h: 0.482, color: WHITE });
++  /* social row: twitter bird, facebook f, instagram square */
++  s.addShape('teardrop', { x: 11.948, y: 6.78, w: 0.215, h: 0.215, rotate: 135, fill: { color: WHITE }, line: { type: 'none' } });
++  s.addText('f', { x: 12.31, y: 6.735, w: 0.25, h: 0.28, fontFace: FT, fontSize: 15, bold: true, color: WHITE, align: 'center', margin: 0, valign: 'middle' });
++  s.addShape('roundRect', { x: 12.699, y: 6.798, w: 0.193, h: 0.193, rectRadius: 0.055, fill: { type: 'none' }, line: { color: WHITE, width: 1.25 } });
++  s.addShape('ellipse', { x: 12.757, y: 6.856, w: 0.077, h: 0.077, fill: { type: 'none' }, line: { color: WHITE, width: 1.25 } });
++});
++
++/* ==================================================================== build */
++const pres = new pptxgen();
++pres.defineLayout({ name: 'BUXOM_16x9', width: W, height: H });
++pres.layout = 'BUXOM_16x9';
++pres.author = 'Buxom';
++pres.title = 'Medical Health Presentation';
++
++slides.forEach(build => build(pres.addSlide()));
++
++pres.writeFile({ fileName: path.join(__dirname, '10846042-4c78-4303-9dbe-43ebace66ebc_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

@@ -1,0 +1,634 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_brand_campaign_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_brand_campaign_presentation.js
+@@ -0,0 +1,631 @@
++/**
++ * Amartha — fashion lookbook deck (31 slides, 13.333in x 7.5in)
++ * Rebuilt with pptxgenjs. Photographs in the original are replaced by flat
++ * grey rectangles of the same position/size (see `photo()`).
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens
++ * ------------------------------------------------------------------ */
++const C = {
++  brown: '96683C',   // primary brand brown
++  tan:   'C5996D',   // secondary accent
++  cream: 'E3E1D2',   // light background / light type
++  white: 'FFFFFF',
++  ink:   '000000',
++  ink90: '0D0D0D',
++  body:  '404040',   // 9pt paragraph grey
++  photo: '6F6F6F'    // stand-in for photographic content
++};
++
++const NOLINE = { type: 'none' };
++
++/* Slide canvas: 16:9 widescreen, same as the reference deck. */
++const SW = 13.3333333;
++const SH = 7.5;
++
++const F = {
++  serif:   'Libre Baskerville', // headings, brand mark, accents
++  sans:    'Open Sans',         // body copy
++  display: 'Vidaloka'           // timeline year numerals
++};
++
++/* Body copy reused verbatim across the deck. */
++const LOREM_HEAD = 'Lore pellentesque. Morbi orci dui, fermentum m ipsum dolor sit amet, conse lectus orn fermentum eget lectus ornare, viverra dignissim risus. ';
++const LOREM_MID = 'Donec lacinia nli lectus ornare, viverra ctetur adipiscing elit. ';
++const LOREM_ALT = 'Lore pellente fermentum eget lectus ornare, viverra sque. Morbi orci dui, fermentum m ipsum dolor sit amet, conse lectus orn fermentum eget lectus ornare, viverra dignissim risus. ';
++
++const P = {
++  short:    LOREM_HEAD,
++  mid:      LOREM_HEAD + LOREM_MID,
++  midSlash: LOREM_HEAD + 'Donec lacinia nli lectus \\ornare, viverra ctetur adipiscing elit. ',
++  midPe:    LOREM_HEAD + LOREM_MID + 'Pe Lorem are',
++  midPev:   LOREM_HEAD + LOREM_MID + 'Pe Lorem are, viverra',
++  long:     LOREM_HEAD + LOREM_MID + 'Pe Lorem are, viverra ctetur adipiscing elit. ',
++  longer:   LOREM_HEAD + LOREM_MID + 'Pe Lorem are, viverra ctetur adipiscing elit. Pellentesque scelerisque',
++  full:     LOREM_HEAD + LOREM_MID + 'Pe Lorem are, viverra ctetur adipiscing elit. Pellentesque scelerisque malesuada libero',
++  huge:     LOREM_HEAD + LOREM_MID + 'Pe Lorem are, viverra ctetur adipiscing elit. Pellentesque scelerisque malesua eget lectus ornare, viverra dignissim risus. Donec lacinia nli lectus ornare, viverra ctetur adipiscing elit. Pe Lorem are, viverra da libero',
++  trim:     LOREM_HEAD + 'Donec lacinia nli',
++  orcorn:   'Lore pellentesque. Morbi orcorn fermentum eget lectus ornare, viverra dignissim risus. Donec lacinia nli lectus ornare, viverra ctetur adipiscing elit. ',
++  altShort: LOREM_ALT,
++  altMid:   LOREM_ALT + 'Donec lacinia nli fermentum eget lectus ornare, viverra lectus ornare, viverra ctetur adipiscing elit. ',
++  altLong:  LOREM_ALT + 'Donec lacinia nli fermentum eget lectus ornare, viverra lectus ornare, viverra ctetur adipiscing elit. Pe Lorem are, viverra ctetur',
++  altHuge:  LOREM_ALT + 'Donec lacinia nli fermentum eget lectus ornare, viverra lectus ornare, viverra ctetur adipiscing elit. Pe Lorem are, viv ornare, viverra sque. Morbi orci dui, fermentum m ipsum dolor sit amet, conse lectus orn fermentum eget lectus ornare'
++};
++
++const QUOTE_DRESS = 'Don\u2019t stress about the dress, we\u2019ll dress you to impress.';
++const QUOTE_PAULA = 'Paula Lishman. Timeless, elegant, sustainable.';
++
++/* ------------------------------------------------------------------ *
++ * Shape / text helpers
++ * ------------------------------------------------------------------ */
++
++/** Colour panel. */
++function panel(s, x, y, w, h, color) {
++  s.addShape('rect', { x, y, w, h, fill: { color }, line: NOLINE });
++}
++
++/** Full-bleed background panel. */
++function bg(s, color) {
++  panel(s, 0, 0, SW, SH, color);
++}
++
++/** Grey block standing in for a photograph. */
++function photo(s, x, y, w, h) {
++  s.addShape('rect', { x, y, w, h, fill: { color: C.photo }, line: NOLINE });
++}
++
++/** Libre Baskerville headline. */
++function heading(s, x, y, w, h, text, opts) {
++  s.addText(text, Object.assign(
++    { x, y, w, h, fontFace: F.serif, fontSize: 36, color: C.ink, valign: 'top' }, opts));
++}
++
++/** 12pt bold "Amartha" brand mark. */
++function brand(s, x, y, color, align) {
++  s.addText('Amartha', {
++    x, y, w: 1.479, h: 0.303, fontFace: F.serif, fontSize: 12, bold: true,
++    color, align: align || 'left', valign: 'top'
++  });
++}
++
++/** 9pt Open Sans paragraph, 200% leading. */
++function body(s, x, y, w, h, text, opts) {
++  s.addText(text, Object.assign(
++    { x, y, w, h, fontFace: F.sans, fontSize: 9, color: C.body,
++      lineSpacingMultiple: 2, valign: 'top' }, opts));
++}
++
++/** 14pt italic serif accent / kicker line. */
++function accent(s, x, y, w, h, text, color) {
++  s.addText(text, {
++    x, y, w, h, fontFace: F.serif, fontSize: 14, italic: true, color, valign: 'top'
++  });
++}
++
++/** Thin horizontal rule. */
++function rule(s, x, y, w, color) {
++  s.addShape('line', { x, y, w, h: 0, line: { color, width: 0.5 } });
++}
++
++const DOT_COLORS = [C.brown, C.tan, C.cream];
++const DOT_COLORS_WHITE = [C.brown, C.tan, C.white];
++
++/**
++ * Row (or column) of three brand dots.
++ * `opts.vertical` stacks them; `opts.ring` draws tan outlines instead of discs.
++ */
++function dots(s, x, y, d, gap, colors, opts) {
++  const o = opts || {};
++  colors.forEach((c, i) => {
++    const disc = { x: x + (o.vertical ? 0 : i * gap), y: y + (o.vertical ? i * gap : 0), w: d, h: d };
++    if (o.ring) s.addShape('ellipse', Object.assign(disc, { line: { color: c, width: 3 } }));
++    else s.addShape('ellipse', Object.assign(disc, { fill: { color: c }, line: NOLINE }));
++  });
++}
++
++/* Decorative comma glyph, expressed as cubic bezier segments on a 0..1 grid.
++ * The ornament is this glyph plus a 180-degree rotated copy beside it. */
++const COMMA_PATH = [
++  ['M', 0.943, 0.1704],
++  ['C', 0.8984, 0.1151, 0.8297, 0.0705, 0.7464, 0.0427],
++  ['C', 0.6458, 0.0097, 0.5342, -0.0046, 0.4228, 0.0013],
++  ['L', 0.4207, 0.0013],
++  ['C', 0.0903, 0.0296, 0.0407, 0.1796, 0.0422, 0.2280],
++  ['C', 0.0479, 0.3484, 0.1558, 0.4209, 0.2820, 0.4209],
++  ['C', 0.3832, 0.4209, 0.5066, 0.3317, 0.4228, 0.2398],
++  ['C', 0.3226, 0.1362, 0.1771, 0.2324, 0.1596, 0.1890],
++  ['C', 0.1558, 0.1788, 0.2179, 0.0440, 0.4892, 0.0517],
++  ['L', 0.4924, 0.0517],
++  ['C', 0.6554, 0.0677, 0.7064, 0.1568, 0.7284, 0.2614],
++  ['C', 0.7709, 0.4788, 0.5594, 0.6740, 0.4092, 0.7765],
++  ['C', 0.2896, 0.8645, 0.0920, 0.9446, 0.0094, 0.9832],
++  ['C', 0.0007, 0.9871, -0.0024, 0.9948, 0.0020, 1.0013],
++  ['L', 0.0020, 1.0013],
++  ['C', 0.0066, 1.0087, 0.0191, 1.0121, 0.0299, 1.0089],
++  ['C', 0.0302, 1.0088, 0.0304, 1.0088, 0.0307, 1.0087],
++  ['C', 0.4475, 0.8767, 0.9596, 0.6393, 1.0067, 0.3855],
++  ['C', 1.0194, 0.3110, 0.9971, 0.2357, 0.9430, 0.1704],
++  ['Z']
++];
++
++function commaPoints(w, h) {
++  return COMMA_PATH.map(seg => {
++    if (seg[0] === 'Z') return { close: true };
++    if (seg[0] === 'M') return { x: seg[1] * w, y: seg[2] * h, moveTo: true };
++    if (seg[0] === 'L') return { x: seg[1] * w, y: seg[2] * h };
++    return {
++      x: seg[5] * w, y: seg[6] * h,
++      curve: { type: 'cubic', x1: seg[1] * w, y1: seg[2] * h, x2: seg[3] * w, y2: seg[4] * h }
++    };
++  });
++}
++
++/** Mirrored pair of comma glyphs used as the Amartha monogram. */
++function ornament(s, x, y, w, h, color) {
++  const gw = w / 2;
++  const gh = h * 0.985;
++  const pts = commaPoints(gw, gh);
++  s.addShape('custGeom', { x: x + gw, y: y + h - gh, w: gw, h: gh, points: pts,
++    fill: { color }, line: NOLINE });
++  s.addShape('custGeom', { x, y, w: gw, h: gh, points: pts, rotate: 180,
++    fill: { color }, line: NOLINE });
++}
++
++/**
++ * Smartphone mockup: black body, notch, grey screen.
++ * (x, y, w, h) describe the phone body.
++ */
++function phoneMockup(s, x, y, w, h) {
++  s.addShape('roundRect', { x, y, w, h, rectRadius: w * 0.153,
++    fill: { color: '0A0A0A' }, line: NOLINE });
++  s.addShape('roundRect', { x: x + 0.059 * w, y: y + 0.0675 * h,
++    w: 0.880 * w, h: 0.9028 * h, rectRadius: w * 0.115,
++    fill: { color: C.photo }, line: NOLINE });
++  s.addShape('roundRect', { x: x + 0.257 * w, y, w: 0.486 * w, h: 0.078 * h,
++    rectRadius: 0.03 * w, fill: { color: '0A0A0A' }, line: NOLINE });
++}
++
++/**
++ * Laptop mockup: lid, bezel, grey screen and desk-level base.
++ * (x, y, w, h) describe the whole assembly.
++ */
++function laptopMockup(s, x, y, w, h) {
++  s.addShape('roundRect', { x: x + 0.0914 * w, y, w: 0.8170 * w, h: 0.9992 * h,
++    rectRadius: 0.010 * w, fill: { color: 'C9CBCC' }, line: NOLINE });
++  s.addShape('roundRect', { x: x + 0.0952 * w, y: y + 0.0065 * h, w: 0.8095 * w, h: 0.9865 * h,
++    rectRadius: 0.008 * w, fill: { color: '111111' }, line: NOLINE });
++  s.addShape('rect', { x: x + 0.0976 * w, y: y + 0.9245 * h, w: 0.8048 * w, h: 0.0646 * h,
++    fill: { color: '181818' }, line: NOLINE });
++  s.addShape('rect', { x: x + 0.1239 * w, y: y + 0.0737 * h, w: 0.7522 * w, h: 0.8151 * h,
++    fill: { color: C.photo }, line: NOLINE });
++  s.addShape('roundRect', { x, y: y + 0.9648 * h, w: w, h: 0.0352 * h,
++    rectRadius: 0.010 * w, fill: { color: 'A5A6A8' }, line: NOLINE });
++  s.addShape('rect', { x: x + 0.4047 * w, y: y + 0.9651 * h, w: 0.1907 * w, h: 0.0133 * h,
++    fill: { color: 'C2C4C5' }, line: NOLINE });
++}
++
++/* Reusable "label + rule + paragraph" callout used on several layouts.
++ * `ruleX/ruleW` position the connecting hairline. */
++function callout(s, tx, ty, tw, label, text, ruleX, ruleY, ruleW, textH) {
++  accent(s, tx, ty, 1.937, 0.337, label, C.tan);
++  body(s, tx, ty + 0.384, tw, textH || 0.967, text);
++  rule(s, ruleX, ruleY, ruleW, C.tan);
++}
++
++/* ------------------------------------------------------------------ *
++ * Charts (native pptxgenjs chart API)
++ * ------------------------------------------------------------------ */
++const CHART_FONT = { catAxisLabelFontFace: F.sans, valAxisLabelFontFace: F.sans };
++
++function bubbleChart(pptx, s, x, y, w, h) {
++  s.addChart(pptx.ChartType.bubble, [
++    { name: 'X-Values', values: [0.7, 1.8, 2.6] },
++    { name: 'Y-Values', values: [2.7, 3.2, 0.8], sizes: [10, 4, 8] }
++  ], Object.assign({
++    x, y, w, h,
++    chartColors: [C.tan], lineSize: 0, showLegend: false,
++    catAxisLineColor: C.brown, valAxisLineColor: C.brown,
++    catAxisLabelColor: C.brown, valAxisLabelColor: C.brown,
++    catAxisLabelFontSize: 10, valAxisLabelFontSize: 10,
++    catGridLine: { color: C.brown, size: 0.75, style: 'solid' },
++    valGridLine: { color: C.brown, size: 0.75, style: 'solid' }
++  }, CHART_FONT));
++}
++
++function doughnutChart(pptx, s, x, y, w, h) {
++  s.addChart(pptx.ChartType.doughnut, [{
++    name: 'Sales',
++    labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'],
++    values: [8.2, 3.2, 1.4, 1.2]
++  }], {
++    x, y, w, h,
++    chartColors: [C.brown, C.tan, 'F2F2F2', C.cream],
++    holeSize: 75, dataBorder: { pt: 0, color: C.white },
++    showLegend: true, legendPos: 'b', legendFontFace: F.sans, legendFontSize: 9,
++    showValue: false
++  });
++}
++
++const BAR_SERIES = [
++  { name: 'Series 1', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [4.3, 2.5, 3.5, 4.5] },
++  { name: 'Series 2', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [2.4, 4.4, 1.8, 2.8] },
++  { name: 'Series 3', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [2, 2, 3, 5] }
++];
++
++function barChart(pptx, s, x, y, w, h, dir, grouping) {
++  s.addChart(pptx.ChartType.bar, BAR_SERIES, Object.assign({
++    x, y, w, h,
++    barDir: dir, barGrouping: grouping, barGapWidthPct: 150,
++    barOverlapPct: grouping === 'stacked' ? 100 : 0,
++    chartColors: [C.brown, C.cream, C.tan],
++    showLegend: false,
++    catAxisLineColor: 'D9D9D9', valAxisLineColor: 'D9D9D9',
++    catAxisLabelColor: '595959', valAxisLabelColor: '595959',
++    catAxisLabelFontSize: 9, valAxisLabelFontSize: 9,
++    valGridLine: { color: 'D9D9D9', size: 0.75, style: 'solid' },
++    catGridLine: { style: 'none' }
++  }, CHART_FONT));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++const SLIDES = [
++
++  // 1 — Cover
++  (pptx, s) => {
++    bg(s, C.brown);
++    heading(s, 3.385, 3.245, 6.563, 1.582, 'Amartha',
++      { fontSize: 88, bold: true, color: C.cream, align: 'center' });
++    ornament(s, 6.255, 2.515, 0.824, 0.614, C.tan);
++    s.addText('2020', { x: 5.967, y: 5.995, w: 1.4, h: 0.337, fontFace: F.serif,
++      fontSize: 14, color: C.cream, align: 'center', valign: 'top' });
++  },
++
++  // 2 — Runway
++  (pptx, s) => {
++    photo(s, 6.214, 0.865, 6.24, 5.844);
++    heading(s, 0.877, 2.791, 6.243, 1.919, 'Every day is a fashion show and the world is your runway');
++    body(s, 1.62, 5.136, 3.851, 1.572, P.full);
++    brand(s, 0.88, 0.864, C.brown);
++  },
++
++  // 3 — Already famous
++  (pptx, s) => {
++    panel(s, 0, 0, 4.068, SH, C.cream);
++    heading(s, 7.66, 1.765, 4.697, 1.313, 'Dress like you\u2019re already famous.');
++    body(s, 8.604, 5.202, 3.851, 1.572, P.full);
++    brand(s, 7.757, 1.083, C.brown);
++    accent(s, 8.604, 4.422, 3.26, 0.572, QUOTE_DRESS, C.brown);
++    photo(s, 0.878, 1.108, 5.898, 2.691);
++    photo(s, 0.878, 4.083, 5.898, 2.691);
++    dots(s, 6.032, 5.308, 0.427, 0.6005, DOT_COLORS);
++  },
++
++  // 4 — Life isn't perfect (brown)
++  (pptx, s) => {
++    bg(s, C.brown);
++    heading(s, 1.213, 1.107, 6.243, 1.313, 'Life isn\u2019t perfect but your outfit can be.', { color: C.cream });
++    accent(s, 1.213, 2.829, 6.707, 0.337, QUOTE_DRESS, C.white);
++    photo(s, 8.108, 1.236, 4.309, 2.337);
++    photo(s, 1.212, 3.75, 11.205, 2.998);
++  },
++
++  // 5 — Lifts and separates
++  (pptx, s) => {
++    heading(s, 6.646, 1.087, 6.135, 0.707, 'Lifts and separates');
++    body(s, 7.579, 5.852, 4.267, 0.967, P.mid);
++    dots(s, 11.999, 2.7525, 0.427, 0.6005, DOT_COLORS, { vertical: true });
++    photo(s, 1.122, 1.087, 4.267, 6.413);
++    photo(s, 4.181, 2.752, 3.247, 2.54);
++    photo(s, 7.694, 2.752, 3.247, 2.54);
++  },
++
++  // 6 — Jantzen (cream)
++  (pptx, s) => {
++    bg(s, C.cream);
++    heading(s, 0.877, 2.791, 6.243, 1.313, 'Jantzen. Keep our beaches beautiful.', { color: C.brown });
++    body(s, 0.887, 5.282, 2.717, 1.572, P.midSlash);
++    brand(s, 0.88, 0.864, C.brown);
++    body(s, 3.768, 5.282, 2.717, 1.572, P.midSlash);
++    accent(s, 10.592, 0.648, 2.401, 0.808, QUOTE_PAULA, C.tan);
++    photo(s, 6.905, 0.648, 3.132, 4.681);
++    photo(s, 9.188, 2.257, 3.286, 4.681);
++  },
++
++  // 7 — Pull quote
++  (pptx, s) => {
++    bg(s, C.brown);
++    s.addText('\u201CFashion is nothing but a choice\u201D', { x: 3.062, y: 5.306, w: 7.21, h: 0.64,
++      fontFace: F.serif, fontSize: 32, italic: true, color: C.cream, align: 'center', valign: 'top' });
++    s.addText('Paula Albion \u2013 Fashion Enthusiast', { x: 3.396, y: 6.079, w: 6.542, h: 0.286,
++      fontFace: F.serif, fontSize: 10.5, color: C.cream, align: 'center', valign: 'top' });
++    photo(s, 2.425, 1.297, 8.483, 3.616);
++  },
++
++  // 8 — White card over full-bleed photo
++  (pptx, s) => {
++    photo(s, 0, 0, SW, SH);
++    panel(s, 6.864, 1.35, 5.476, 5.32, C.white);
++    heading(s, 7.66, 2.309, 3.32, 1.515, [
++      { text: 'Dress how ', options: { breakLine: true } },
++      { text: 'you want to be addressed.' }
++    ], { fontSize: 28 });
++    body(s, 7.66, 4.656, 3.748, 1.27, P.midPe);
++    dots(s, 5.388, 4.656, 0.427, 0.6005, DOT_COLORS);
++  },
++
++  // 9 — Fashion story (cream)
++  (pptx, s) => {
++    bg(s, C.cream);
++    body(s, 3.354, 5.746, 4.267, 0.967, P.mid);
++    body(s, 7.757, 5.746, 4.267, 0.967, P.mid);
++    accent(s, 1.092, 5.904, 1.937, 0.808, QUOTE_PAULA, C.tan);
++    photo(s, 1.092, 0.917, 6.267, 4.229);
++    heading(s, 6.142, 3.094, 6.188, 1.313, 'Each day is a page in your fashion story.', { color: C.brown });
++    brand(s, 7.757, 2.354, C.brown);
++  },
++
++  // 10 — Keep calm and stay classy
++  (pptx, s) => {
++    bg(s, C.brown);
++    body(s, 8.18, 1.028, 3.851, 1.27, P.midPev, { color: C.white });
++    brand(s, 1.345, 1.045, C.white);
++    body(s, 8.18, 5.488, 3.851, 1.27, P.midPev, { color: C.white });
++    accent(s, 8.18, 4.733, 3.26, 0.572, QUOTE_DRESS, C.cream);
++    rule(s, 8.262, 4.264, 3.867, C.white);
++    photo(s, 3.524, 1.122, 3.955, 5.635);
++    heading(s, 1.204, 4.459, 6.135, 1.919, 'Keep calm and stay classy', { fontSize: 54, color: C.cream });
++  },
++
++  // 11 — Always wear what you want
++  (pptx, s) => {
++    heading(s, 3.146, 0.927, 6.078, 1.313, 'Always wear what you want to wear');
++    dots(s, 1.155, 1.058, 0.294, 0.414, DOT_COLORS);
++    photo(s, 1.155, 2.786, 7.069, 4.714);
++    callout(s, 9.342, 5.566, 3.144, 'Elegant Fashion', P.short, 7.68, 5.734, 1.544);
++    callout(s, 9.342, 3.672, 3.144, 'Mediterannia', P.short, 7.68, 3.84, 1.544);
++  },
++
++  // 12 — Delight in the details
++  (pptx, s) => {
++    panel(s, 2.641, 0, SW - 2.641, SH, C.brown);
++    brand(s, 5.521, 0.864, C.white);
++    heading(s, 5.521, 1.936, 5.343, 1.313, 'Delight in the details', { color: C.cream });
++    body(s, 5.521, 3.715, 4.809, 1.27, P.full, { color: C.white });
++    body(s, 7.644, 5.439, 4.809, 1.27, P.full, { color: C.white });
++    photo(s, 0.88, 0.865, 3.663, 5.844);
++  },
++
++  // 13 — Be my fashionista
++  (pptx, s) => {
++    panel(s, 7.243, 0, SW - 7.243, SH, C.cream);
++    heading(s, 0.934, 0.963, 4.031, 1.717, 'Be my fashionista', { fontSize: 48 });
++    body(s, 0.882, 5.153, 3.138, 1.572, P.long);
++    dots(s, 9.806, 5.512, 0.427, 0.6, DOT_COLORS_WHITE);
++    accent(s, 0.934, 2.953, 1.937, 0.337, 'Elegant Fashion', C.tan);
++    rule(s, 2.67, 3.117, 2.029, C.tan);
++    photo(s, 5.387, 2.679, 4.148, 4.821);
++    photo(s, 9.757, 0.774, 2.807, 4.469);
++  },
++
++  // 14 — Life isn't perfect (three photos)
++  (pptx, s) => {
++    bg(s, C.brown);
++    heading(s, 1.47, 4.716, 8.267, 1.313, 'Life isn\u2019t perfect but your outfit can be.', { color: C.cream });
++    accent(s, 1.47, 6.438, 8.743, 0.337, QUOTE_DRESS, C.white);
++    photo(s, 1.47, 0.922, 3.375, 3.139);
++    photo(s, 5.024, 0.922, 2.422, 3.139);
++    photo(s, 9.738, 0.922, SW - 9.738, 6.578);
++  },
++
++  // 15 — Alexandra
++  (pptx, s) => {
++    photo(s, 6.667, 1.087, 4.267, 6.413);
++    panel(s, 5.476, 4.971, 3.777, 1.592, C.cream);
++    accent(s, 5.888, 5.363, 1.974, 0.808, QUOTE_PAULA, C.tan);
++    ornament(s, 7.861, 5.447, 0.824, 0.614, C.tan);
++    heading(s, 0.934, 0.963, 4.031, 3.332, 'Alexandra. Clothes that mean business.', { fontSize: 48 });
++    body(s, 0.934, 4.991, 3.974, 1.572, P.altLong);
++    photo(s, 9.252, 2.108, 3.177, 4.455);
++  },
++
++  // 16 — Keep our beaches beautiful (three columns)
++  (pptx, s) => {
++    bg(s, C.cream);
++    heading(s, 0.88, 4.105, 10.644, 0.707, 'Amartha. Keep our beaches beautiful.', { color: C.brown });
++    body(s, 3.604, 5.37, 2.717, 1.572, P.midSlash);
++    brand(s, 0.88, 0.864, C.brown);
++    body(s, 6.485, 5.37, 2.717, 1.572, P.midSlash);
++    body(s, 9.367, 5.37, 2.717, 1.572, P.midSlash);
++    photo(s, 3.604, 0, 8.958, 3.635);
++  },
++
++  // 17 — Paula Lishman split
++  (pptx, s) => {
++    bg(s, C.brown);
++    photo(s, 0, 0, 6.667, SH);
++    heading(s, 7.66, 1.765, 5.087, 1.919, QUOTE_PAULA, { color: C.cream });
++    body(s, 8.395, 4.503, 4.144, 2.178, P.huge, { color: C.white });
++    brand(s, 7.757, 1.083, C.white);
++    dots(s, 5.853, 5.298, 0.427, 0.6, [C.tan, C.tan, C.tan], { ring: true });
++  },
++
++  // 18 — Our models
++  (pptx, s) => {
++    photo(s, 0, 0, SW, SH);
++    panel(s, 0, 0, 5.534, SH, C.cream);
++    heading(s, 0.874, 1.163, 3.32, 4.14, [
++      { text: 'Our models ', options: { italic: true } },
++      { text: 'can beat up ' },
++      { text: 'their models', options: { italic: true } },
++      { text: '.' }
++    ], { fontSize: 48 });
++    body(s, 0.874, 5.714, 3.748, 0.967, P.trim);
++    ornament(s, 2.61, 1.344, 0.662, 0.493, C.white);
++  },
++
++  // 19 — Fashion story (light)
++  (pptx, s) => {
++    heading(s, 1.043, 1.818, 6.188, 1.313, 'Each day is a page in your fashion story.', { color: C.ink90 });
++    brand(s, 1.092, 0.967, C.brown);
++    body(s, 5.541, 4.488, 3.258, 0.967, P.orcorn);
++    accent(s, 5.541, 4.032, 2.996, 0.337, 'Paula Lishman', C.tan);
++    body(s, 5.541, 5.593, 3.258, 1.27, P.mid);
++    photo(s, 0, 4.281, 4.641, 3.219);
++    photo(s, 9.66, 0.797, 2.997, 6.066);
++  },
++
++  // 20 — LookBook
++  (pptx, s) => {
++    bg(s, C.brown);
++    heading(s, 1.031, 0.961, 3.781, 0.841, 'LookBook', { fontSize: 44, color: C.white });
++    body(s, 1.031, 5.556, 3.851, 1.27, P.midPev, { color: C.white });
++    accent(s, 1.031, 4.801, 3.26, 0.572, QUOTE_DRESS, C.cream);
++    rule(s, 1.113, 4.332, 3.867, C.white);
++    photo(s, 9.321, 0.941, 3.417, 5.884);
++    photo(s, 5.748, 0.941, 3.417, 5.884);
++  },
++
++  // 21 — Not just fashion, but design
++  (pptx, s) => {
++    photo(s, 4.486, 0, 4.222, SH);
++    heading(s, 0.848, 1.345, 3.311, 1.717, 'Not just fashion, but design.', { fontSize: 32 });
++    dots(s, 9.602, 1.379, 0.539, 0.757, DOT_COLORS);
++    callout(s, 9.513, 5.276, 3.144, 'Elegant Fashion', P.short, 7.851, 5.445, 1.544);
++    callout(s, 0.848, 5.229, 3.144, 'Mediterannia', P.short, 2.484, 5.397, 2.692);
++    callout(s, 9.5, 2.966, 3.144, 'Oldskool Style', P.short, 7.838, 3.135, 1.544);
++  },
++
++  // 22 — Timeline
++  (pptx, s) => {
++    const years = [
++      { x: 1.988, fill: C.brown, label: '2005', labelX: 1.998, color: C.white, textX: 1.024 },
++      { x: 5.770, fill: C.tan,   label: '2017', labelX: 5.815, color: C.white, textX: 4.840 },
++      { x: 9.552, fill: C.cream, label: '2020', labelX: 9.590, color: C.brown, textX: 8.615 }
++    ];
++    years.forEach(y => {
++      s.addShape('ellipse', { x: y.x, y: 3.517, w: 1.793, h: 1.793,
++        fill: { color: y.fill }, line: NOLINE });
++      s.addText(y.label, { x: y.labelX, y: y.label === '2005' ? 4.13 : 4.128, w: 1.704, h: 0.572,
++        fontFace: F.display, fontSize: 28, color: y.color, align: 'center', valign: 'top' });
++    });
++    heading(s, 3.572, 1.594, 6.188, 1.313, 'Each day is a page in Amartha History.',
++      { color: C.ink90, align: 'center' });
++    brand(s, 5.927, 0.984, C.brown, 'center');
++    years.forEach(y => body(s, y.textX, 5.505, 3.653, 1.27, P.mid, { align: 'center' }));
++  },
++
++  // 23 — Bubble chart
++  (pptx, s) => {
++    panel(s, 0, 0, 7.728, SH, C.cream);
++    bubbleChart(pptx, s, 1.223, 3.524, 5.214, 3.189);
++    heading(s, 1.223, 1.726, 4.697, 1.313, 'Dress like you\u2019re already famous.', { color: C.brown });
++    brand(s, 1.223, 1.065, C.brown);
++    body(s, 8.527, 1.726, 3.974, 1.572, P.altLong);
++    body(s, 8.527, 3.524, 3.974, 2.178, P.altHuge);
++    accent(s, 8.527, 6.091, 3.479, 0.337, 'Paula Lishman. Timeless, elegant, ', C.tan);
++  },
++
++  // 24 — Doughnut chart
++  (pptx, s) => {
++    doughnutChart(pptx, s, 7.282, 0.864, 4.967, 5.694);
++    heading(s, 0.877, 2.791, 6.243, 1.313, 'Shopping is cheaper than a psychiatrist.');
++    body(s, 1.62, 4.985, 3.851, 1.572, P.full);
++    brand(s, 0.88, 0.864, C.brown);
++  },
++
++  // 25 — Stacked bar chart
++  (pptx, s) => {
++    barChart(pptx, s, 5.621, 1.262, 6.825, 5.283, 'bar', 'stacked');
++    heading(s, 0.934, 0.963, 4.031, 0.909, 'Statistic', { fontSize: 48 });
++    body(s, 0.934, 5.275, 3.924, 1.27, P.long);
++    accent(s, 0.934, 2.953, 1.937, 0.337, 'Elegant Fashion', C.tan);
++    rule(s, 2.67, 3.117, 1.272, C.tan);
++  },
++
++  // 26 — Clustered column chart
++  (pptx, s) => {
++    barChart(pptx, s, 1.117, 1.378, 5.301, 5.335, 'col', 'clustered');
++    callout(s, 9.073, 5.362, 3.144, 'Elegant Fashion', P.short, 7.411, 5.531, 1.544);
++    callout(s, 9.073, 3.469, 3.144, 'Mediterannia', P.short, 7.411, 3.637, 1.544);
++    heading(s, 7.411, 1.378, 5.104, 1.313, [
++      { text: 'Amartha Statistic', options: { breakLine: true } },
++      { text: 'In 2019-2020' }
++    ], { color: C.ink90 });
++  },
++
++  // 27 — Phone mockup, split background
++  (pptx, s) => {
++    panel(s, -0.018, 0, 6.554, SH, C.brown);
++    panel(s, 6.536, 0, SW - 6.536, SH, C.cream);
++    phoneMockup(s, 8.058, 1.083, 2.82, 5.623);
++    heading(s, 0.877, 2.791, 4.866, 1.178, 'Jantzen. Keep our beaches beautiful.',
++      { fontSize: 32, color: C.cream });
++    brand(s, 0.877, 0.959, C.cream);
++    body(s, 0.877, 4.784, 3.974, 1.572, P.altMid, { color: C.white });
++    dots(s, 10.551, 5.053, 0.427, 0.6, DOT_COLORS_WHITE);
++  },
++
++  // 28 — Two phones
++  (pptx, s) => {
++    phoneMockup(s, 6.752, 1.190, 2.82, 5.623);
++    phoneMockup(s, 3.689, 1.202, 2.82, 5.623);
++    callout(s, 10.277, 3.345, 2.199, 'Elegant Fashion', P.short, 8.528, 3.542, 1.544, 1.572);
++    callout(s, 1.114, 3.386, 2.070, 'Mediterannia', P.short, 2.844, 3.546, 1.544, 1.572);
++  },
++
++  // 29 — Where art and science collide
++  (pptx, s) => {
++    phoneMockup(s, 1.156, 1.936, 3.373, 6.726);
++    brand(s, 5.521, 0.864, C.brown);
++    heading(s, 5.521, 1.936, 5.343, 1.313, 'Where art and science collide.', { color: C.ink90 });
++    body(s, 5.521, 3.715, 4.809, 1.27, P.full, { color: C.ink90 });
++    body(s, 7.644, 5.439, 4.809, 1.27, P.full, { color: C.ink90 });
++  },
++
++  // 30 — Device mockup (laptop)
++  (pptx, s) => {
++    panel(s, 8.77, 0, SW - 8.77, SH, C.cream);
++    laptopMockup(s, 5.311, 1.138, 9.352, 5.398);
++    heading(s, 0.856, 1.628, 4.697, 1.582, [
++      { text: 'Device ', options: { breakLine: true } },
++      { text: 'Mockup' }
++    ], { fontSize: 44 });
++    body(s, 0.856, 4.96, 3.707, 1.572, P.longer);
++    accent(s, 0.856, 4.181, 3.26, 0.572, QUOTE_DRESS, C.brown);
++  },
++
++  // 31 — Closing laptop
++  (pptx, s) => {
++    laptopMockup(s, 3.341, 3.008, 6.65, 3.839);
++    heading(s, 2.587, 1.273, 8.159, 1.313, 'The most innovative company in the outdoors.',
++      { color: C.ink90, align: 'center' });
++    brand(s, 5.927, 0.78, C.brown, 'center');
++    body(s, 0.915, 4.213, 2.347, 1.572, P.altShort);
++    body(s, 10.071, 4.213, 2.347, 1.572, P.altShort);
++  }
++];
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'AMARTHA', width: SW, height: SH });
++  pptx.layout = 'AMARTHA';
++  pptx.title = 'Amartha';
++
++  SLIDES.forEach(fn => fn(pptx, pptx.addSlide()));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '1216824b-1ac1-4a70-910b-6eb3c4484fc5_grok_final.pptx')
++  });
++}
++
++build().then(f => console.log('wrote', f)).catch(e => { console.error(e); process.exit(1); });

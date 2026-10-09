@@ -1,0 +1,26 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2020-02-main.xsd
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2020-02-main.xsd
+@@ -0,0 +1,23 @@
++<xsd:schema elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/office/powerpoint/2020/02/main" xmlns="http://schemas.microsoft.com/office/powerpoint/2020/02/main" xmlns:p202="http://schemas.microsoft.com/office/powerpoint/2020/02/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:s="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
++  <xsd:import namespace="http://schemas.openxmlformats.org/drawingml/2006/main" schemaLocation="dml-main.xsd"/>
++  <xsd:import namespace="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" schemaLocation="shared-commonSimpleTypes.xsd"/>
++  <xsd:import namespace="http://schemas.openxmlformats.org/presentationml/2006/main" schemaLocation="pml.xsd"/>
++  <xsd:complexType name="CT_DesignerTag">
++    <xsd:attribute name="name" type="xsd:string" use="required"/>
++    <xsd:attribute name="val" type="xsd:string" use="required"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_DesignerTagList">
++    <xsd:sequence>
++      <xsd:element name="designTag" type="CT_DesignerTag" minOccurs="0" maxOccurs="unbounded"/>
++    </xsd:sequence>
++  </xsd:complexType>
++  <xsd:element name="designTagLst" type="CT_DesignerTagList"/>
++  <xsd:complexType name="CT_DesignerDrawingProps">
++    <xsd:sequence>
++      <xsd:element ref="p202:designTagLst" minOccurs="0" maxOccurs="1"/>
++      <xsd:element name="extLst" type="p:CT_ExtensionList" minOccurs="0" maxOccurs="1"/>
++    </xsd:sequence>
++    <xsd:attribute name="edtDesignElem" type="xsd:boolean" use="optional" default="false"/>
++  </xsd:complexType>
++  <xsd:element name="designPr" type="CT_DesignerDrawingProps"/>
++</xsd:schema>

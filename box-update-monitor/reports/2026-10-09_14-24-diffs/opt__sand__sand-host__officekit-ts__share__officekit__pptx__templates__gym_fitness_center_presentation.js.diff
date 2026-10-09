@@ -1,0 +1,765 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/gym_fitness_center_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/gym_fitness_center_presentation.js
+@@ -0,0 +1,762 @@
++/**
++ * "GYMFINITY" gym presentation template - 34 slides, 10 x 5.625 in (16:9).
++ *
++ * Rebuilt with pptxgenjs only. The photographs in the source deck are flat grey
++ * plates, so each one is reproduced as a solid rectangle in the same position
++ * (see `photo()`); device mock-ups and icons are drawn from native shapes.
++ *
++ *   node 03c3fa37-706f-48e3-99f4-2f6801671c36_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++
++const C = {
++  bg: '000000',      // slide background (theme lt1)
++  white: 'FFFFFF',
++  body: 'BFBFBF',    // paragraph grey
++  note: 'FEFEFE',
++  red: 'EB2B02',     // accent3
++  orange: 'FD6B07',  // accent2
++  card: '262626',    // dark panel + oversized watermark type
++  card2: '191919',   // pricing panel
++  metal: 'D2D2D2',
++  metalDark: 'A8A8A8',
++  bezel: '141414',
++};
++
++/* The template ships three flat grey photo plates, reused across the deck. */
++const PHOTO = { a: '757575', b: 'B7B6B4', c: 'DDDCDA' };
++
++const OX = 'Oxanium';      // display face
++const OS = 'Open Sans';    // text face
++
++/* Text-frame insets shared by every box in the deck (68575 / 34275 EMU). */
++const INSET = [5.4, 5.4, 2.7, 2.7];
++
++/* --------------------------------------------------------------- primitives */
++
++const hex2 = (v) => Math.round(v).toString(16).padStart(2, '0').toUpperCase();
++
++/**
++ * Every accent shape uses the same 45-degree linear gradient: FD6B07 at the
++ * top-left corner ramping to EB2B02 at 69% of the diagonal. pptxgenjs emits
++ * solid fills only, so `ramp()` samples that ramp by diagonal distance and
++ * `grad()` paints plain rectangles as thin bands stepping along it.
++ */
++function ramp(dist, w, h) {
++  const t = Math.max(0, Math.min(1, dist / (0.69 * (w + h))));
++  return hex2(0xfd + (0xeb - 0xfd) * t) + hex2(0x6b + (0x2b - 0x6b) * t) + hex2(0x07 + (0x02 - 0x07) * t);
++}
++
++const BAND = 0.14; // inches per gradient band
++
++function band(slide, x, y, w, h, color) {
++  slide.addShape('rect', { x, y, w, h, fill: { color }, line: { type: 'none' } });
++}
++
++function grad(slide, o) {
++  const { x, y, w, h } = o;
++  const shape = o.shape || 'rect';
++  if (shape !== 'rect' || o.rotate) {
++    // Non-rectangular / rotated: one flat fill sampled at the ramp midpoint.
++    slide.addShape(shape, {
++      x, y, w, h, rotate: o.rotate, rectRadius: o.rectRadius,
++      fill: { color: ramp(0.345 * (w + h), w, h) },
++    });
++    return;
++  }
++  const vertical = h >= w;                       // band along the longer axis
++  const span = vertical ? h : w;
++  const n = Math.max(2, Math.min(40, Math.round(span / BAND)));
++  const step = span / n;
++  const bleed = 0.01;                            // hide hairline seams between bands
++  for (let i = 0; i < n; i++) {
++    const grow = i < n - 1 ? bleed : 0;
++    const color = ramp((i + 0.5) * step + (vertical ? w : h) / 2, w, h);
++    if (vertical) band(slide, x, y + i * step, w, step + grow, color);
++    else band(slide, x + i * step, y, step + grow, h, color);
++  }
++}
++
++/** Gradient pill: banded straight section between two round end caps. */
++function gradPill(slide, x, y, w, h) {
++  const r = h / 2;
++  slide.addShape('ellipse', { x, y, w: h, h, fill: { color: ramp(r + r, w, h) } });
++  slide.addShape('ellipse', { x: x + w - h, y, w: h, h, fill: { color: ramp(w - r + r, w, h) } });
++  const n = Math.max(2, Math.round((w - h) / BAND));
++  const step = (w - h) / n;
++  for (let i = 0; i < n; i++) {
++    band(slide, x + r + i * step, y, step + 0.01, h, ramp(r + (i + 0.5) * step + r, w, h));
++  }
++}
++
++/**
++ * Cog wheel: a gradient disc ringed by evenly-spaced rectangular teeth.
++ * pptxgenjs's gear9 preset has far fewer, chunkier teeth than the template's.
++ */
++function cog(slide, x, y, w, h, teeth) {
++  const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2;
++  const toothH = r * 0.30, toothW = (2 * Math.PI * r / teeth) * 0.55, ringR = r - toothH / 2;
++  const color = ramp(0.345 * (w + h), w, h);
++  for (let i = 0; i < teeth; i++) {
++    const a = (i * 2 * Math.PI) / teeth;
++    slide.addShape('rect', {
++      x: cx + ringR * Math.cos(a) - toothW / 2, y: cy + ringR * Math.sin(a) - toothH / 2,
++      w: toothW, h: toothH, rotate: (i * 360) / teeth + 90, fill: { color },
++    });
++  }
++  const hub = r * 0.855;
++  slide.addShape('ellipse', { x: cx - hub, y: cy - hub, w: 2 * hub, h: 2 * hub, fill: { color } });
++}
++
++function text(slide, str, o) {
++  slide.addText(str, Object.assign({ margin: INSET, valign: 'top', fontFace: OS, color: C.white }, o));
++}
++
++/** 30 pt Oxanium headline (the deck's standard section title). */
++function title(slide, str, x, y, w, h, o) {
++  text(slide, str, Object.assign({ x, y, w, h, fontFace: OX, fontSize: 30, bold: true }, o));
++}
++
++/** 12 pt Oxanium eyebrow / item label. */
++function label(slide, str, x, y, w, o) {
++  text(slide, str, Object.assign({ x, y, w, h: 0.278, fontFace: OX, fontSize: 12, bold: true }, o));
++}
++
++/** 9 pt Open Sans body copy, justified with 1.5 line spacing. */
++function body(slide, str, x, y, w, h, o) {
++  text(slide, str, Object.assign({
++    x, y, w, h, fontSize: 9, color: C.body, align: 'justify', lineSpacingMultiple: 1.5,
++  }, o));
++}
++
++/** Flat placeholder standing in for a photograph. */
++function photo(slide, x, y, w, h, tone) {
++  slide.addShape('rect', { x, y, w, h, fill: { color: tone } });
++}
++
++/** Pill button ("READ MORE" / "BUY NOW"). */
++function button(slide, x, y, caption) {
++  gradPill(slide, x, y, 1.177, 0.333);
++  text(slide, caption || 'READ MORE', {
++    x: x + 0.143, y: y + 0.053, w: 0.89, h: 0.227,
++    fontFace: OX, fontSize: 9, bold: true, align: 'center',
++  });
++}
++
++/** Brand lockup: carried by the slide master, so it sits under slide content. */
++function brand(slide, x, y) {
++  slide.addShape('lightningBolt', { x: x - 0.226, y: y - 0.005, w: 0.198, h: 0.295, fill: { type: 'none' }, line: { color: C.red, width: 1.25 } });
++  text(slide, 'GYMFINITY', { x, y, w: 1.194, h: 0.278, fontFace: OX, fontSize: 12, bold: true });
++}
++
++/** Three gradient tiles carrying facebook / linkedin / x glyphs. */
++function socialRow(slide, x, y) {
++  ['f', 'in', 'X'].forEach((glyph, i) => {
++    const gx = x + i * 0.4995;
++    grad(slide, { x: gx, y, w: 0.293, h: 0.293 });
++    text(slide, glyph, { x: gx, y: y + 0.04, w: 0.293, h: 0.22, fontSize: 10, bold: true, align: 'center' });
++  });
++}
++
++/** Dark panel with centred eyebrow, copy and a button (about / mission cards). */
++function infoCard(slide, x, y, heading, copy) {
++  slide.addShape('rect', { x, y, w: 2.066, h: 2.314, fill: { color: C.card } });
++  label(slide, heading, x + 0.136, y + 0.276, 1.795, { align: 'center' });
++  body(slide, copy, x + 0.136, y + 0.72, 1.795, 0.733, { align: 'center' });
++  button(slide, x + 0.444, y + 1.704);
++}
++
++/** Team name plate: dark slab plus an offset gradient tab. */
++function namePlate(slide, x, y, name, tabAbove) {
++  const cardY = tabAbove ? y + 0.102 : y;
++  grad(slide, { x: x + 0.501, y: tabAbove ? y : y + 0.523, w: 0.776, h: 0.284 });
++  slide.addShape('rect', { x, y: cardY, w: 1.778, h: 0.693, fill: { color: C.card } });
++  label(slide, name, x + 0.107, cardY + 0.108, 1.565, { align: 'center' });
++  body(slide, 'Your Position', x + 0.107, cardY + 0.326, 1.565, 0.279, { align: 'center' });
++}
++
++/* -------------------------------------------------------------------- icons */
++
++/**
++ * Icons are drawn from preset shapes. Each glyph is a function
++ * (slide, x, y, w, h, color) so it can be dropped on a gradient tile (white)
++ * or used bare (orange outline), exactly as the template does.
++ */
++
++/** Stroked preset shape filling the icon box. */
++const stroked = (name, opts) => (s, x, y, w, h, color) =>
++  s.addShape(name, Object.assign({ x, y, w, h, fill: { type: 'none' }, line: { color, width: 1.75 } }, opts));
++
++/** Rect centred on (cx, cy) - handy because pptxgenjs rotates about the centre. */
++const spoke = (s, cx, cy, w, h, rot, color) =>
++  s.addShape('rect', { x: cx - w / 2, y: cy - h / 2, w, h, rotate: rot, fill: { color } });
++
++/** Dumbbell: a 45-degree bar carrying two plates at each end. */
++const barbell = (s, x, y, w, h, color) => {
++  const cx = x + w / 2, cy = y + h / 2, d = w * 0.30;
++  spoke(s, cx, cy, w * 0.72, h * 0.09, -45, color);
++  [-1, 1].forEach((k) => {
++    spoke(s, cx + k * d * 0.82, cy - k * d * 0.82, w * 0.10, h * 0.34, -45, color);
++    spoke(s, cx + k * d * 1.15, cy - k * d * 1.15, w * 0.08, h * 0.22, -45, color);
++  });
++};
++
++/** Heartbeat trace: flat, spike up, spike down, flat. */
++const pulse = (s, x, y, w, h, color) => {
++  const line = { color, width: 1.75 };
++  const seg = (x1, y1, x2, y2) => s.addShape('line', {
++    x: x + w * Math.min(x1, x2), y: y + h * Math.min(y1, y2),
++    w: w * Math.abs(x2 - x1), h: h * Math.abs(y2 - y1),
++    flipV: y2 < y1, line,
++  });
++  seg(0, 0.55, 0.26, 0.55); seg(0.26, 0.55, 0.40, 0.14);
++  seg(0.40, 0.14, 0.58, 0.90); seg(0.58, 0.90, 0.72, 0.55); seg(0.72, 0.55, 1, 0.55);
++};
++
++/** Stick figure in motion. */
++const athlete = (s, x, y, w, h, color) => {
++  const line = { color, width: 1.75 };
++  s.addShape('ellipse', { x: x + w * 0.40, y, w: w * 0.2, h: h * 0.2, fill: { color } });
++  s.addShape('line', { x: x + w * 0.5, y: y + h * 0.2, w: 0.001, h: h * 0.42, line });
++  s.addShape('line', { x: x + w * 0.16, y: y + h * 0.26, w: w * 0.68, h: h * 0.1, flipV: true, line });
++  s.addShape('line', { x: x + w * 0.18, y: y + h * 0.62, w: w * 0.32, h: h * 0.38, flipV: true, line });
++  s.addShape('line', { x: x + w * 0.5, y: y + h * 0.62, w: w * 0.32, h: h * 0.38, line });
++};
++
++/** Stopwatch: ring, crown and a needle. */
++const stopwatch = (s, x, y, w, h, color) => {
++  const line = { color, width: 1.75 };
++  s.addShape('ellipse', { x, y: y + h * 0.14, w, h: h * 0.86, fill: { type: 'none' }, line });
++  s.addShape('rect', { x: x + w * 0.37, y, w: w * 0.26, h: h * 0.08, fill: { color } });
++  s.addShape('line', { x: x + w * 0.5, y: y + h * 0.3, w: w * 0.24, h: h * 0.27, flipV: true, line });
++};
++
++/** Ring wrapped around a heartbeat trace. */
++const pulseRing = (s, x, y, w, h, color) => {
++  s.addShape('ellipse', { x, y, w, h, fill: { type: 'none' }, line: { color, width: 1.75 } });
++  pulse(s, x + w * 0.2, y + h * 0.28, w * 0.6, h * 0.44, color);
++};
++
++/** Ring wrapped around a stick figure (the "activity" icon). */
++const activityRing = (s, x, y, w, h, color) => {
++  s.addShape('ellipse', { x, y, w, h, fill: { type: 'none' }, line: { color, width: 1.75 } });
++  athlete(s, x + w * 0.26, y + h * 0.2, w * 0.48, h * 0.6, color);
++};
++
++/** Sneaker: slanted upper sitting on a flat sole. */
++const sneaker = (s, x, y, w, h, color) => {
++  const line = { color, width: 1.75 };
++  s.addShape('round2SameRect', { x: x + w * 0.34, y: y + h * 0.2, w: w * 0.66, h: h * 0.36, fill: { type: 'none' }, line });
++  s.addShape('rect', { x, y: y + h * 0.52, w, h: h * 0.28, fill: { type: 'none' }, line });
++  s.addShape('line', { x: x + w * 0.1, y: y + h * 0.36, w: w * 0.26, h: h * 0.17, line });
++};
++
++/** Rising zig-zag chart inside a triangular frame. */
++const growth = (s, x, y, w, h, color) => {
++  const line = { color, width: 1.75 };
++  s.addShape('rtTriangle', { x, y, w, h, flipH: true, fill: { type: 'none' }, line });
++  [[0.10, 0.72, 0.34, 0.42], [0.34, 0.42, 0.50, 0.56], [0.50, 0.56, 0.82, 0.18]].forEach(([x1, y1, x2, y2]) => {
++    s.addShape('line', {
++      x: x + w * x1, y: y + h * Math.min(y1, y2),
++      w: w * (x2 - x1), h: h * Math.abs(y2 - y1), flipV: y2 < y1, line,
++    });
++  });
++};
++
++/** Refresh loop: an open ring closed off by an arrowhead. */
++const loop = (s, x, y, w, h, color) => {
++  s.addShape('ellipse', { x, y, w, h: h * 0.9, fill: { type: 'none' }, line: { color, width: 1.75 } });
++  s.addShape('triangle', { x: x + w * 0.62, y: y + h * 0.62, w: w * 0.3, h: h * 0.3, rotate: 135, fill: { color } });
++};
++
++const GLYPH = {
++  plus: (s, x, y, w, h, color) => s.addShape('plus', { x, y, w, h, fill: { color } }),
++  loop,
++  ring: stroked('ellipse'),
++  tape: stroked('donut'),
++  megaphone: (s, x, y, w, h, color) => {
++    s.addShape('triangle', { x: x + w * 0.05, y: y + h * 0.15, w: w * 0.8, h: h * 0.7, rotate: -90, fill: { type: 'none' }, line: { color, width: 1.75 } });
++    s.addShape('line', { x: x + w * 0.78, y: y + h * 0.2, w: 0.001, h: h * 0.6, line: { color, width: 1.75 } });
++  },
++  barbell, pulse, athlete, stopwatch, pulseRing, activityRing, sneaker, growth,
++};
++
++/** Gradient tile with a white pictograph on it. */
++function iconTile(slide, x, y, glyph) {
++  grad(slide, { x, y, w: 0.65, h: 0.65 });
++  glyph(slide, x + 0.103, y + 0.103, 0.443, 0.443, C.white);
++}
++
++/** Bare orange pictograph (no tile). */
++function iconMark(slide, x, y, glyph) {
++  glyph(slide, x, y, 0.443, 0.443, C.orange);
++}
++
++/* ------------------------------------------------------------- mock-up props */
++
++function phoneMock(slide, x, y, w, h, tone) {
++  slide.addShape('roundRect', { x, y, w, h, rectRadius: 0.2, fill: { color: C.bezel }, line: { color: '9A9A9A', width: 1 } });
++  slide.addShape('roundRect', { x: x + w * 0.043, y: y + h * 0.021, w: w * 0.914, h: h * 0.958, rectRadius: 0.17, fill: { color: tone } });
++  slide.addShape('roundRect', { x: x + w * 0.30, y: y + h * 0.021, w: w * 0.40, h: h * 0.035, rectRadius: 0.02, fill: { color: C.bezel } });
++}
++
++function tabletMock(slide, x, y, w, h, tone) {
++  slide.addShape('roundRect', { x, y, w, h, rectRadius: 0.2, fill: { color: '1C1C1C' }, line: { color: '3C3C3C', width: 1 } });
++  slide.addShape('rect', { x: x + w * 0.09, y: y + h * 0.085, w: w * 0.82, h: h * 0.82, fill: { color: tone } });
++  slide.addShape('ellipse', { x: x + w * 0.47, y: y + h * 0.028, w: w * 0.06, h: h * 0.04, fill: { color: '3C3C3C' } });
++  slide.addShape('ellipse', { x: x + w * 0.465, y: y + h * 0.925, w: w * 0.07, h: h * 0.047, fill: { type: 'none' }, line: { color: '3C3C3C', width: 1 } });
++}
++
++function watchMock(slide, x, y, w, h, tone) {
++  slide.addShape('roundRect', { x: x + w * 0.24, y: y + h * 0.04, w: w * 0.52, h: h * 0.89, rectRadius: 0.34, fill: { color: 'F2F2F2' } });
++  slide.addShape('roundRect', { x: x + w * 0.90, y: y + h * 0.34, w: w * 0.055, h: h * 0.10, rectRadius: 0.03, fill: { color: C.metalDark } });
++  slide.addShape('roundRect', { x: x + w * 0.082, y: y + h * 0.22, w: w * 0.836, h: h * 0.535, rectRadius: 0.34, fill: { color: C.metal }, line: { color: '8E8E8E', width: 1 } });
++  slide.addShape('roundRect', { x: x + w * 0.10, y: y + h * 0.235, w: w * 0.80, h: h * 0.505, rectRadius: 0.3, fill: { color: '0A0A0A' } });
++  slide.addShape('rect', { x: x + w * 0.138, y: y + h * 0.255, w: w * 0.722, h: h * 0.44, fill: { color: tone } });
++}
++
++function monitorMock(slide, x, y, w, h, tone) {
++  slide.addShape('roundRect', { x: x + w * 0.018, y: y + h * 0.025, w: w * 0.924, h: h * 0.645, rectRadius: 0.04, fill: { color: C.bezel } });
++  slide.addShape('rect', { x: x + w * 0.053, y: y + h * 0.065, w: w * 0.883, h: h * 0.58, fill: { color: tone } });
++  slide.addShape('roundRect', { x: x + w * 0.012, y: y + h * 0.665, w: w * 0.965, h: h * 0.135, rectRadius: 0.05, fill: { color: C.metal } });
++  slide.addShape('trapezoid', { x: x + w * 0.39, y: y + h * 0.80, w: w * 0.21, h: h * 0.13, fill: { color: C.metalDark } });
++  slide.addShape('trapezoid', { x: x + w * 0.333, y: y + h * 0.925, w: w * 0.322, h: h * 0.05, fill: { color: C.metal } });
++}
++
++/* ------------------------------------------------------------- copy fragments */
++
++const L = {
++  full: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in aliquam sem fringilla ut morbi tincidunt augue. Integer eget aliquet nibh praesent tristique. Velit laoreet id',
++  cc: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in aliquam sem fringilla ut morbi tincidunt augue. CC',
++  aug: 'Lorem ipsum dolor sit amet, consecr adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in aliquam sem fringilla ut morbi tincidunt augue. ',
++  tri: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in aliquam sem fringilla ut morbi tincidunt augue. Integer eget aliquet nibh praesent tristique. ',
++  short: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit,',
++  ultr: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. ',
++  tincid: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in aliquam sem fringilla ut morbi tincid',
++  inAl: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in al',
++  inV: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in',
++  labo: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labo',
++  labore: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore e',
++  lab1: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ',
++  lab2: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore',
++  svc: 'Lorem ipsum dolor sit amet, consecr adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit',
++  svcLa: 'Lorem ipsum dolor sit amet, consecr adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit la',
++  svcId: 'Lorem ipsum dolor sit amet, consecr adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id',
++  dolore: 'Lorem ipsum dolor sit amet, consecr adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore',
++  doloreM: 'Lorem ipsum dolor sit amet, consecr adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore m',
++  spectrum: 'Lorem ipsum dolor sit amet, consecr adng elit, sed do eiusmod tempor incididunt ut labore e',
++  tin: 'Lorem ipsum dolor sit amet, consecr adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in aliquam sem fringilla ut morbi tin',
++  brk: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt u',
++  sem: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in aliquam sem',
++  velit: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Id interdum velit laoreet id donec ultrices. Viverra mauris in aliquam sem fringilla ut morbi tincidunt augue. Integer eget aliquet nibh praesent tristique. Velit',
++  cover: 'PLACEHOLDER',
++  end: 'PLACEHOLDER',
++};
++
++/* ------------------------------------------------------------------- slides */
++
++const slides = [
++  /* 1 - cover */
++  (s) => {
++    photo(s, 4.406, 0, 4.909, 5.625, PHOTO.a);
++    text(s, 'Gym Presentation Template ', { x: 0.473, y: 0.346, w: 2.754, h: 0.252, fontSize: 11 });
++    text(s, L.cover, { x: 0.473, y: 4.701, w: 4.197, h: 0.506, fontSize: 9, italic: true, lineSpacingMultiple: 1.5 });
++    text(s, [
++      { text: 'GYM', options: { color: C.red } },
++      { text: 'FINITY', options: { color: C.white } },
++    ], { x: 0.473, y: 2.219, w: 5.775, h: 1.186, fontFace: OX, fontSize: 66, bold: true });
++    socialRow(s, 8.316, 4.914);
++    brand(s, 8.534, 0.277);
++  },
++
++  /* 2 - welcome */
++  (s) => {
++    grad(s, { x: 8.202, y: 1.322, w: 1.132, h: 0.404 });
++    grad(s, { x: 5.638, y: 4.649, w: 1.132, h: 0.409 });
++    title(s, 'Welcome To Gymfinity', 0.868, 1.063, 3.09, 1.085);
++    body(s, L.full, 0.868, 2.401, 3.342, 1.415);
++    button(s, 0.991, 4.228);
++    photo(s, 7.536, 1.512, 2.464, 4.113, PHOTO.b);
++    photo(s, 5.0, 0.567, 2.536, 4.267, PHOTO.a);
++  },
++
++  /* 3 - redefining fitness */
++  (s) => {
++    title(s, 'Redefining Fitness for a Better You', 0.926, 0.806, 4.008, 1.085);
++    body(s, L.cc, 5.238, 0.868, 3.836, 0.96);
++    infoCard(s, 7.008, 2.443, 'ABOUT US', L.short);
++    photo(s, 0.926, 2.443, 5.847, 2.314, PHOTO.a);
++  },
++
++  /* 4 - beyond fitness */
++  (s) => {
++    photo(s, 1.001, 0.667, 3.734, 4.292, PHOTO.a);
++    grad(s, { x: 0.795, y: 1.904, w: 0.584, h: 1.817 });
++    title(s, 'Beyond Fitness, Toward Wellness Excellence', 5.471, 0.876, 3.734, 1.59);
++    body(s, L.tri, 5.471, 2.718, 3.734, 1.188);
++    body(s, L.ultr, 5.471, 4.016, 3.734, 0.733);
++  },
++
++  /* 5 - a journey */
++  (s) => {
++    title(s, 'A Journey to Health and Strength', 5.265, 1.025, 4.139, 1.085);
++    body(s, L.tincid, 1.369, 3.744, 3.734, 0.96);
++    label(s, 'ABOUT US', 1.369, 3.301, 1.795);
++    grad(s, { x: 0.795, y: 3.095, w: 0.146, h: 1.817 });
++    photo(s, 0, 0.452, 4.735, 2.218, PHOTO.a);
++    photo(s, 5.532, 2.894, 4.468, 2.218, PHOTO.b);
++  },
++
++  /* 6 - our commitment */
++  (s) => {
++    photo(s, 5.719, 0.874, 4.281, 3.878, PHOTO.a);
++    title(s, 'Our Commitment to Your Well-being', 0.798, 0.917, 4.139, 1.085);
++    body(s, L.inAl, 0.798, 2.728, 4.139, 0.733);
++    label(s, 'YOUR TITLE HERE', 0.798, 2.404, 1.795);
++    body(s, L.inV, 0.798, 3.975, 4.139, 0.733);
++    label(s, 'YOUR TITLE HERE', 0.798, 3.651, 1.795);
++    grad(s, { x: 5.573, y: 3.651, w: 0.505, h: 1.26 });
++  },
++
++  /* 7 - making waves */
++  (s) => {
++    photo(s, 3.184, 0.717, 2.17, 4.192, PHOTO.b);
++    photo(s, 0.824, 0.717, 2.17, 4.192, PHOTO.a);
++    grad(s, { x: 2.836, y: 2.182, w: 0.505, h: 1.26 });
++    title(s, 'Making Waves in the Fitness World', 6.204, 1.086, 2.972, 1.59);
++    body(s, L.aug, 6.204, 2.795, 2.972, 1.188);
++    button(s, 6.327, 4.325);
++  },
++
++  /* 8 - vision */
++  (s) => {
++    title(s, 'Vision Of Gymfinity', 2.93, 0.787, 4.139, 0.581, { align: 'center' });
++    s.addShape('rect', { x: 5.19, y: 1.925, w: 3.855, h: 1.371, fill: { color: C.card } });
++    grad(s, { x: 5.19, y: 3.387, w: 3.855, h: 1.371 });
++    body(s, L.labo, 5.425, 3.982, 3.385, 0.506);
++    label(s, 'VISION TWO', 5.425, 3.658, 1.795);
++    body(s, L.labore, 5.425, 2.52, 3.385, 0.506);
++    label(s, 'VISION ONE', 5.425, 2.196, 1.795);
++    photo(s, 0.955, 1.925, 4.093, 2.833, PHOTO.a);
++  },
++
++  /* 9 - mission */
++  (s) => {
++    title(s, 'Mission Of Gymfinity', 5.03, 1.192, 4.433, 0.581);
++    infoCard(s, 5.03, 2.443, 'MISSION ONE', L.short);
++    infoCard(s, 7.247, 2.443, 'MISSION TWO', L.short);
++    photo(s, 0.654, 0, 3.682, 5.625, PHOTO.a);
++  },
++
++  /* 10 - warriors */
++  (s) => {
++    photo(s, 0.842, 2.449, 4.045, 2.357, PHOTO.a);
++    photo(s, 4.998, 2.449, 4.045, 2.357, PHOTO.b);
++    title(s, 'Meet the Gymfinity Warriors', 3.036, 0.409, 3.925, 1.085, { align: 'center' });
++    body(s, L.aug, 0.825, 1.647, 8.349, 0.506, { align: 'center' });
++    namePlate(s, 1.975, 4.409, 'LEONAL MUSO', false);
++    namePlate(s, 6.132, 4.409, 'HAZEL MORES', false);
++  },
++
++  /* 11 - dream team */
++  (s) => {
++    title(s, 'Introducing the Gymfinity Dream Team', 0.778, 0.771, 3.139, 1.59);
++    body(s, L.lab1, 0.778, 3.102, 3.222, 0.506);
++    label(s, '01. ROGER HUWER', 0.778, 2.778, 1.795);
++    body(s, L.lab2, 0.778, 4.348, 3.222, 0.506);
++    label(s, '02. MOUSES HORASE', 0.778, 4.024, 2.103);
++    photo(s, 4.699, 0.771, 2.564, 4.854, PHOTO.a);
++    photo(s, 7.436, 0.771, 2.564, 4.854, PHOTO.b);
++  },
++
++  /* 12 - supportive crew */
++  (s) => {
++    photo(s, 0, 2.261, 2.564, 3.364, PHOTO.a);
++    photo(s, 2.737, 2.261, 2.564, 3.364, PHOTO.b);
++    photo(s, 5.473, 2.261, 2.564, 3.364, PHOTO.c);
++    title(s, 'Your Supportive Fitness Crew', 0.843, 0.631, 7.128, 0.581);
++    grad(s, { x: 8.21, y: 2.261, w: 1.79, h: 3.364 });
++    title(s, 'GYMFINITY', 7.45, 3.288, 2.391, 0.581, { align: 'center', rotate: 90 });
++    s.addShape('rect', { x: 8.963, y: 2.261, w: 0.056, h: 2.824, fill: { color: C.red } });
++    [['GERMA YOIER', 5.867], ['RULLI GEMA', 3.13], ['DEVIDER GER', 0.393]].forEach(([name, x]) => {
++      namePlate(s, x, 1.903, name, true);
++    });
++  },
++
++  /* 13 - champions */
++  (s) => {
++    grad(s, { x: 0.784, y: 0, w: 2.746, h: 5.625 });
++    title(s, 'Champions of Fitness', 6.094, 1.603, 3.09, 1.085);
++    body(s, L.aug, 6.094, 2.834, 2.972, 1.188);
++    photo(s, 1.406, 0.731, 3.734, 4.206, PHOTO.a);
++  },
++
++  /* 14 - elevating */
++  (s) => {
++    title(s, 'Elevating Your Fitness Experience', 5.261, 1.447, 4.318, 1.085);
++    iconTile(s, 0.861, 3.883, GLYPH.athlete);
++    iconMark(s, 5.364, 3.986, GLYPH.barbell);
++    label(s, 'SERVICE ONE', 1.767, 3.813, 1.795);
++    body(s, L.svc, 1.767, 4.178, 2.972, 0.733);
++    label(s, 'SERVICE TWO', 6.167, 3.813, 1.795);
++    body(s, L.svcLa, 6.167, 4.178, 2.972, 0.733);
++    photo(s, 0.861, 0, 3.878, 3.321, PHOTO.a);
++  },
++
++  /* 15 - holistic wellness */
++  (s) => {
++    title(s, 'Gymfinity Holistic Wellness Services', 1.004, 0.91, 4.246, 1.085);
++    iconTile(s, 1.105, 2.414, GLYPH.plus);
++    label(s, 'BEST SERVICE ONE', 2.051, 2.6, 1.795);
++    iconMark(s, 1.208, 3.343, GLYPH.loop);
++    label(s, 'BEST SERVICE TWO', 2.051, 3.426, 1.795);
++    iconMark(s, 1.208, 4.169, GLYPH.pulse);
++    label(s, 'BEST SERVICE THREE', 2.051, 4.252, 2.077);
++    photo(s, 5.547, 0.983, 3.449, 3.732, PHOTO.a);
++  },
++
++  /* 16 - spectrum of services */
++  (s) => {
++    [
++      ['SERVICE ONE', 0.779, 0.779, GLYPH.stopwatch],
++      ['SERVICE TWO', 2.263, 2.319, GLYPH.pulseRing],
++      ['SERVICE THREE', 3.747, 3.747, GLYPH.growth],
++    ].forEach(([name, ty, iy, glyph]) => {
++      iconMark(s, 0.905, iy, glyph);
++      label(s, name, 1.566, ty, 2.136);
++      body(s, L.svc, 1.566, ty + 0.366, 3.538, 0.733);
++    });
++    title(s, 'A Spectrum of Fitness Services', 6.345, 1.254, 2.549, 1.59);
++    body(s, L.spectrum, 6.356, 2.986, 2.549, 0.733, { align: 'left' });
++    button(s, 6.443, 4.038);
++  },
++
++  /* 17 - lifestyle services */
++  (s) => {
++    title(s, 'Gymfinity Lifestyle Services', 0.936, 0.783, 3.853, 1.085);
++    s.addShape('rect', { x: 0.936, y: 2.389, w: 2.452, h: 2.524, fill: { color: C.card } });
++    [
++      [1.201, 1.318, 2.694, GLYPH.sneaker],
++      [4.291, 4.401, 2.614, GLYPH.megaphone],
++      [7.025, 7.136, 2.614, GLYPH.tape],
++    ].forEach(([tx, ix, iy, glyph]) => {
++      iconMark(s, ix, iy, glyph);
++      label(s, 'SERVICE ONE', tx, 3.348, 1.437);
++      body(s, L.dolore, tx, 3.714, 1.922, 0.96);
++    });
++    grad(s, { x: 5.392, y: 1.733, w: 3.75, h: 0.051 });
++    body(s, L.doloreM, 5.314, 1.119, 3.743, 0.506);
++  },
++
++  /* 18 - premium services */
++  (s) => {
++    title(s, 'Gymfinity Premium Fitness Services', 5.033, 0.828, 4.139, 1.085);
++    [[2.402, GLYPH.barbell], [3.852, GLYPH.activityRing]].forEach(([y, glyph], i) => {
++      iconMark(s, 5.18, y + (i ? 0.057 : 0), glyph);
++      label(s, 'SERVICE ONE', 5.923, y, 2.136);
++      body(s, L.svc, 5.923, y + 0.366, 3.161, 0.733);
++    });
++    photo(s, 0, 0.538, 4.456, 2.195, PHOTO.a);
++    photo(s, 0, 2.892, 4.456, 2.195, PHOTO.b);
++  },
++
++  /* 19 - break slide */
++  (s) => {
++    photo(s, 0, 0, 10, 5.625, PHOTO.a);
++    s.addShape('rect', { x: 0, y: 0, w: 10, h: 5.625, fill: { color: '000000', transparency: 29 } });
++    text(s, 'Break- Slide', { x: 6.367, y: 2.344, w: 3.243, h: 2.297, fontFace: OX, fontSize: 66, bold: true });
++    body(s, L.brk, 6.367, 4.654, 3.243, 0.506, { align: 'left' });
++    socialRow(s, 0.535, 4.914);
++    brand(s, 0.717, 0.277);
++  },
++
++  /* 20 - visual journey */
++  (s) => {
++    title(s, 'A Visual Journey of Fitness Excellence', 0.798, 0.615, 4.452, 1.085);
++    grad(s, { x: 9.0, y: 2.252, w: 1.0, h: 2.53 });
++    grad(s, { x: 5.146, y: 0.758, w: 0.104, h: 0.855 });
++    body(s, L.doloreM, 5.43, 0.925, 3.743, 0.506);
++    photo(s, 0.798, 2.252, 2.217, 2.53, PHOTO.a);
++    photo(s, 3.25, 2.023, 3.064, 2.987, PHOTO.b);
++    photo(s, 6.548, 2.252, 2.217, 2.53, PHOTO.c);
++  },
++
++  /* 21 - diverse portfolio */
++  (s) => {
++    title(s, 'Gymfinity Diverse Portfolio', 5.844, 1.597, 3.676, 1.085);
++    grad(s, { x: 0, y: 0, w: 2.473, h: 1.0 });
++    grad(s, { x: 2.699, y: 4.625, w: 2.473, h: 1.0 });
++    body(s, L.tin, 5.844, 2.926, 3.501, 0.96);
++    button(s, 5.946, 4.271);
++    photo(s, 0, 1.187, 2.473, 4.438, PHOTO.a);
++    photo(s, 2.699, 0, 2.473, 4.438, PHOTO.b);
++  },
++
++  /* 22 - visual odyssey */
++  (s) => {
++    title(s, 'A Visual Odyssey of Achievements', 0.905, 0.826, 3.321, 1.59);
++    grad(s, { x: 7.527, y: 5.071, w: 2.473, h: 0.554 });
++    s.addShape('rect', { x: 0.905, y: 2.585, w: 3.143, h: 2.524, fill: { color: C.card } });
++    iconMark(s, 1.309, 2.97, GLYPH.sneaker);
++    label(s, 'BEST PORTFOLIO', 1.192, 3.624, 1.724);
++    body(s, L.dolore, 1.192, 3.99, 2.568, 0.733);
++    photo(s, 7.527, 0.893, 2.473, 3.976, PHOTO.b);
++    photo(s, 4.873, 0.893, 2.473, 4.732, PHOTO.a);
++  },
++
++  /* 23 - portfolio unveiled */
++  (s) => {
++    grad(s, { x: 2.024, y: 2.608, w: 5.952, h: 2.812 });
++    title(s, 'Gymfinity Fitness Portfolio Unveiled', 2.984, 0.525, 4.032, 1.085, { align: 'center' });
++    body(s, L.aug, 0.825, 1.814, 8.349, 0.506, { align: 'center' });
++    photo(s, 0, 2.812, 10, 2.812, PHOTO.a);
++  },
++
++  /* 24 - impressive portfolio */
++  (s) => {
++    title(s, 'Gymfinity Impressive Portfolio', 0.783, 0.894, 4.301, 1.085);
++    body(s, L.cc, 5.381, 0.957, 3.836, 0.96);
++    photo(s, 0, 2.812, 3.726, 2.812, PHOTO.a);
++    photo(s, 3.976, 2.812, 3.726, 2.812, PHOTO.b);
++    photo(s, 7.952, 2.812, 2.048, 2.812, PHOTO.c);
++  },
++
++  /* 25 - phone mock-ups */
++  (s) => {
++    phoneMock(s, 5.351, 0.907, 1.732, 3.498, PHOTO.a);
++    phoneMock(s, 7.324, 1.313, 1.732, 3.498, PHOTO.b);
++    title(s, 'A Sneak Peek Through Mockups', 0.861, 1.17, 3.818, 1.085);
++    body(s, L.tri, 0.868, 2.576, 3.621, 1.188);
++    button(s, 0.944, 4.215);
++  },
++
++  /* 26 - watch mock-up */
++  (s) => {
++    watchMock(s, 0.709, 0.492, 3.267, 4.64, PHOTO.a);
++    title(s, 'Gymfinity Conceptual Mockup Showcase', 4.445, 1.229, 4.532, 1.085);
++    body(s, L.velit, 4.445, 2.539, 4.532, 0.96);
++    body(s, L.sem, 4.445, 3.663, 4.532, 0.733);
++  },
++
++  /* 27 - desktop mock-up */
++  (s) => {
++    monitorMock(s, 1.116, 2.586, 2.851, 2.214, PHOTO.a);
++    photo(s, 4.826, 1.001, 4.532, 2.583, PHOTO.a);
++    title(s, 'Gymfinity Mockup Journey', 0.861, 1.001, 3.627, 1.085);
++    body(s, L.velit, 4.826, 3.932, 4.532, 0.96);
++    grad(s, { x: 9.139, y: 1.999, w: 0.393, h: 1.585 });
++  },
++
++  /* 28 - mockup evolution */
++  (s) => {
++    monitorMock(s, 0.905, 2.007, 2.851, 2.214, PHOTO.a);
++    monitorMock(s, 6.243, 2.007, 2.851, 2.214, PHOTO.c);
++    title(s, 'Gymfinity Mockup Evolution', 3.115, 0.46, 3.77, 1.085, { align: 'center' });
++    body(s, L.aug, 0.825, 4.646, 8.349, 0.506, { align: 'center' });
++    monitorMock(s, 3.322, 1.811, 3.356, 2.606, PHOTO.b);
++  },
++
++  /* 29 - tablet mock-up */
++  (s) => {
++    grad(s, { x: 0, y: 1.533, w: 2.234, h: 2.56 });
++    tabletMock(s, 0.986, 0.655, 2.877, 4.314, PHOTO.a);
++    title(s, 'Gymfinity Fitness Mockup Unveiling', 5.111, 1.417, 3.808, 1.085);
++    body(s, L.velit, 5.111, 2.766, 3.675, 1.188);
++    button(s, 5.229, 4.279);
++  },
++
++  /* 30 - quote */
++  (s) => {
++    photo(s, 0, 0, 10, 5.625, PHOTO.a);
++    s.addShape('rect', { x: 0, y: 0, w: 10, h: 5.625, fill: { color: '000000', transparency: 29 } });
++    text(s, '\u201C', { x: 2.329, y: 0.759, w: 5.342, h: 1.287, fontFace: OX, fontSize: 72, bold: true, color: C.orange, align: 'center' });
++    text(s, 'Strength does not come from the body. It comes from the will.', {
++      x: 1.833, y: 1.788, w: 6.333, h: 1.742, fontFace: OX, fontSize: 33, bold: true, align: 'center',
++    });
++    grad(s, { x: 4.14, y: 4.128, w: 1.72, h: 0.509 });
++    label(s, 'Mr. Robertsen', 4.14, 4.22, 1.72, { align: 'center' });
++  },
++
++  /* 31 - infographic gears */
++  (s) => {
++    cog(s, 6.519, 2.63, 2.203, 2.184, 24);
++    cog(s, 7.059, 1.108, 1.622, 1.612, 20);
++    text(s, 'Your Title', { x: 6.921, y: 1.77, w: 1.897, h: 0.252, fontFace: OX, fontSize: 11, bold: true, align: 'center' });
++    cog(s, 6.032, 1.796, 1.166, 1.151, 16);
++    text(s, 'Your Title', { x: 5.768, y: 2.242, w: 1.693, h: 0.227, fontFace: OX, fontSize: 9, bold: true, align: 'center' });
++    GLYPH.barbell(s, 7.172, 3.274, 0.897, 0.897, C.white);
++    title(s, 'Gymfinity Infographic Snapshot', 0.861, 0.723, 4.411, 1.085);
++    [['SERVICE ONE', 2.153], ['SERVICE TWO', 3.108], ['SERVICE THREE', 4.064]].forEach(([name, y]) => {
++      label(s, name, 0.861, y, 2.136);
++      body(s, L.svcId, 0.861, y + 0.239, 4.411, 0.506);
++    });
++  },
++
++  /* 32 - pricing */
++  (s) => {
++    title(s, 'Pricing Plan Gymfinity', 4.298, 0.996, 4.93, 0.581);
++    [[4.298, '$ 199', 'Basic'], [6.873, '$ 399', 'VVIP']].forEach(([x, price, tag]) => {
++      s.addShape('rect', { x, y: 2.296, w: 2.075, h: 2.434, fill: { color: C.card2 } });
++      text(s, price, { x: x + 0.281, y: 2.565, w: 1.795, h: 0.48, fontFace: OX, fontSize: 24, bold: true });
++      ['- Lorem ipsum dolor ', '- Lorem ipsum', '- Lorem ipsum dolor '].forEach((line, i) => {
++        body(s, line, x + 0.235, 3.188 + i * 0.3435, 1.501, 0.279, { align: 'left' });
++      });
++      button(s, x + 0.438, 4.545, 'BUY NOW');
++      grad(s, { x: x + 1.684, y: 2.34, w: 0.513, h: 0.832, rotate: -90 });
++      label(s, tag, x + 1.573, 2.618, 0.74, { align: 'center' });
++    });
++    photo(s, 0, 0, 3.51, 5.625, PHOTO.a);
++  },
++
++  /* 33 - contact */
++  (s) => {
++    photo(s, 0, 0, 10, 3.931, PHOTO.a);
++    s.addShape('rect', { x: 0, y: 3.931, w: 10, h: 1.694, fill: { color: C.card } });
++    [
++      [5.0, 1.418, 'Hours', 'EVERYDAY\n07:00 – 17:00'],
++      [6.399, 1.418, 'Get In Touch', '(+62) 8123 4567 819\n(+62) 908 467 123'],
++      [8.125, 1.911, 'Follow Us', 'www.gymfinity.com\n@gymfinity.com'],
++    ].forEach(([x, w, head, lines]) => {
++      text(s, head, { x, y: 4.414, w: 1.418, h: 0.252, fontSize: 11, bold: true, color: C.orange, align: 'justify' });
++      body(s, lines, x, 4.636, w, 0.506, { color: C.note });
++    });
++    title(s, 'Gymfinity Contact Information', 0.572, 4.235, 3.782, 1.085);
++  },
++
++  /* 34 - end */
++  (s) => {
++    [-3.431, -2.484, -1.65].forEach((x) => {
++      text(s, 'GYMFINITY', {
++        x, y: 0.597, w: 8.238, h: 1.818, rotate: -90,
++        fontFace: OX, fontSize: 104, bold: true, color: C.card,
++      });
++    });
++    text(s, 'Gym Presentation Template ', { x: 7.502, y: 4.941, w: 2.754, h: 0.252, fontSize: 11 });
++    text(s, L.end, { x: 3.826, y: 4.334, w: 2.864, h: 0.506, fontSize: 9, italic: true, lineSpacingMultiple: 1.5 });
++    text(s, 'End', { x: 7.187, y: 2.938, w: 2.307, h: 1.186, fontFace: OX, fontSize: 66, bold: true, color: C.red, align: 'right' });
++    brand(s, 8.534, 0.277);
++    grad(s, { x: 3.875, y: 4.941, w: 1.0, h: 0.075 });
++    photo(s, 3.875, 0, 2.815, 3.938, PHOTO.a);
++  },
++];
++
++/* -------------------------------------------------------------------- build */
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'GYMFINITY', width: 10, height: 5.625 });
++pptx.layout = 'GYMFINITY';
++pptx.title = 'Gymfinity - Gym Presentation Template';
++
++slides.forEach((buildSlide) => {
++  const slide = pptx.addSlide();
++  slide.background = { color: C.bg };
++  brand(slide, 8.534, 0.277);   // slide-master lockup sits beneath slide content
++  buildSlide(slide);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, '03c3fa37-706f-48e3-99f4-2f6801671c36_grok_final.pptx') })
++  .then((f) => console.log('wrote', f));

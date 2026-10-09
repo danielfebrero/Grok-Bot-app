@@ -1,0 +1,1066 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fresh_fruits_brand_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fresh_fruits_brand_presentation.js
+@@ -0,0 +1,1063 @@
++/**
++ * "Yumia Fresh Fruits" — 25-slide deck rebuilt with pptxgenjs.
++ *
++ * Photographs and SVG fruit illustrations from the original are replaced by
++ * flat colour placeholders (their approximate average colour, same box);
++ * every other element — blobs, ribbons, callouts, charts, table, world map —
++ * is native pptxgenjs geometry.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette ---
++const C = {
++  pink: 'D90057', // accent1
++  rose: 'FF8C93', // accent2
++  blush: 'FCCCC0', // accent3
++  sun: 'F2C744', // accent4
++  olive: '94A00C', // accent5
++  amber: 'F9A901', // accent6
++  white: 'FFFFFF',
++  ink: '262626', // tx1 lum85/off15 — headings
++  body: '404040', // tx1 lum75/off25 — paragraphs
++  grey95: 'F2F2F2', // bg1 lum95 — image placeholder panel
++  grey50: '808080', // bg1 lum50 — "Image Placeholder" caption
++  cream: 'FCF4DA', // accent4 lum20/off80
++  limeTint: 'F6FAC0', // accent5 lum20/off80
++  gridline: 'E8E8E8',
++};
++
++const MAJOR = 'Poppins ExtraBold'; // theme major font
++const MINOR = 'Poppins Light'; // theme minor font
++
++// Approximate colours of the raster art the template ships with.
++const IMG = {
++  berries: 'E6D9D4', citrus: 'E7DBB2', market: 'E5CACD', laptopArt: 'DFE0E0',
++  strawberry: 'CC3C24', kiwi: 'B4CC54', apple: 'CC240C', cherry: 'CC5424',
++  banana: 'E4B424', watermelon: 'CC3C24', lemon: 'E4B424', avocado: 'CCCC84',
++  grapes: '6C3C9C',
++};
++
++// Soft glows / drop shadows reused across the template.
++const glow = (color, opacity) => ({ type: 'outer', color, opacity, blur: 100, offset: 0, angle: 0 });
++const SOFT = glow('000000', 0.05); // the ubiquitous 5 % black halo
++const SH = {
++  drop: { type: 'outer', color: '000000', opacity: 0.41, blur: 40, offset: 3, angle: 90 },
++  card: { type: 'outer', color: '000000', opacity: 0.1, blur: 16, offset: 4, angle: 90 },
++  title: { type: 'outer', color: '000000', opacity: 0.21, blur: 30, offset: 3, angle: 45 },
++  photo: { type: 'outer', color: C.sun, opacity: 0.37, blur: 73, offset: 3, angle: 90 },
++};
++
++// ------------------------------------------------------- custom geometry ---
++// Normalised (0..1) outlines taken from the template's freeform shapes.
++// An entry is either [x, y] (move/line) or [x1, y1, x2, y2, x, y] (cubic);
++// a leading 'L' forces a straight segment.
++const PATHS = {
++  // Two circles joined at the waist — the deck's signature doodle & blob.
++  blob: [
++    [0.7308, 0], [0.8795, 0, 1, 0.1205, 1, 0.2692], [1, 0.4179, 0.8795, 0.5385, 0.7308, 0.5385],
++    [0.5949, 0.5385, 0.5385, 0.5948, 0.5385, 0.7308], [0.5384, 0.8795, 0.4179, 1, 0.2692, 1],
++    [0.1205, 1, 0, 0.8794, 0, 0.7308], [0, 0.5821, 0.1206, 0.4615, 0.2692, 0.4615],
++    [0.4051, 0.4615, 0.4615, 0.4052, 0.4615, 0.2692], [0.4615, 0.1205, 0.5821, 0, 0.7308, 0],
++  ],
++  // Plus sign between the fruit pairs on the pricing slide.
++  plus: [
++    [0.3137, 0], ['L', 0.6843, 0], ['L', 0.6843, 0.3235], ['L', 1, 0.3235], ['L', 1, 0.6765],
++    ['L', 0.6843, 0.6765], ['L', 0.6843, 1], ['L', 0.3137, 1], ['L', 0.3137, 0.6765],
++    ['L', 0, 0.6765], ['L', 0, 0.3235], ['L', 0.3137, 0.3235],
++  ],
++  // Five strips of the golden ribbon on the "fruit season" infographic.
++  ribbon1: [
++    [0.9007, 0.0067], [0.7885, 0, 0.6694, 0.245, 0.4901, 0.5355], [0.2829, 0.8701, 0.0193, 0.5676, 0, 0.1339],
++    [0.0188, 0.4726, 0.0896, 0.8568, 0.2721, 0.9558], [0.3537, 1, 0.4369, 0.9264, 0.5024, 0.8193],
++    [0.5722, 0.7068, 0.628, 0.6064, 0.6957, 0.4806], [0.774, 0.3347, 0.8658, 0.1379, 0.964, 0.1714],
++    [0.9769, 0.1754, 0.9887, 0.1821, 1, 0.1914], [0.9689, 0.087, 0.9442, 0.0094, 0.9007, 0.0067],
++  ],
++  ribbon2: [
++    [0.965, 0.0567], [0.7427, 0.4179, 0.2432, 1, 0, 0.6163], [0.028, 0.6576, 0.1071, 0.8087, 0.2052, 0.8229],
++    [0.4585, 0.8583, 0.6597, 0.634, 0.959, 0.2267], [0.974, 0.2066, 1, 0, 0.965, 0.0567],
++  ],
++  ribbon3: [
++    [0.6079, 0.5862], [0.5016, 0.416, 0.3416, 0.0234, 0, 0], [0.1353, 0.0245, 0.2331, 0.1936, 0.2986, 0.3117],
++    [0.3974, 0.4894, 0.4586, 0.667, 0.5693, 0.8245], [0.6423, 0.9309, 0.7014, 0.9553, 0.7766, 0.9777],
++    [0.8507, 1, 0.928, 0.9862, 1, 0.9617], [0.8453, 0.983, 0.7293, 0.7798, 0.6079, 0.5862],
++  ],
++  ribbon4: [
++    [0.3795, 0.0023], [0.4939, 0, 0.5581, 0.0081, 0.6239, 0.0313], [0.7608, 0.0788, 1, 0.1816, 0.844, 0.3323],
++    [0.7149, 0.4575, 0.299, 0.6917, 0.279, 0.8277], [0.2678, 0.9092, 0.3128, 0.9679, 0.3917, 0.9861],
++    [0.4237, 0.9938, 0.4601, 0.9985, 0.5173, 0.9992], [0.4575, 1, 0.4099, 0.9973, 0.3137, 0.9753],
++    [0.1473, 0.9378, 0.0078, 0.8609, 0.0043, 0.7662], [0, 0.6387, 0.1464, 0.5178, 0.4489, 0.2767],
++    [0.7886, 0.0062, 0.3804, 0.0027, 0.3795, 0.0023],
++  ],
++  ribbon5: [
++    [0, 0.683], [0, 0.683, 0.5103, 0.1777, 0.6605, 0.0723], [0.8107, -0.0332, 0.8499, -0.0077, 0.9011, 0.0501],
++    [1.0436, 0.211, 0.9902, 0.3953, 0.9902, 0.3953], [0.9902, 0.3953, 1.0364, 0.1435, 0.8804, 0.2208],
++    [0.7271, 0.2966, 0.2802, 0.9712, 0.2684, 1], [0.1457, 0.8588, 0.1389, 0.8467, 0, 0.683],
++  ],
++};
++
++/** Convert a normalised outline into pptxgenjs `points` for a w x h box. */
++function pathPoints(spec, w, h) {
++  const pts = spec.map((seg, i) => {
++    if (seg[0] === 'L') return { x: seg[1] * w, y: seg[2] * h };
++    if (i === 0 || seg.length === 2) return { x: seg[0] * w, y: seg[1] * h };
++    return {
++      x: seg[4] * w, y: seg[5] * h,
++      curve: { type: 'cubic', x1: seg[0] * w, y1: seg[1] * h, x2: seg[2] * w, y2: seg[3] * h },
++    };
++  });
++  pts.push({ close: true });
++  return pts;
++}
++
++/** Freeform shape from a normalised outline. */
++function freeform(slide, spec, o) {
++  slide.addShape('custGeom', {
++    x: o.x, y: o.y, w: o.w, h: o.h, points: pathPoints(spec, o.w, o.h),
++    fill: o.fill ? { color: o.fill } : { type: 'none' },
++    line: o.line ? { color: o.line, width: o.lineW || 1 } : { type: 'none' },
++    rotate: o.rotate || 0, flipH: !!o.flipH, flipV: !!o.flipV, shadow: o.shadow,
++  });
++}
++
++/** Filled polygon from absolute-inch points. */
++function polygon(slide, pts, color) {
++  const x = Math.min(...pts.map((p) => p[0]));
++  const y = Math.min(...pts.map((p) => p[1]));
++  const w = Math.max(...pts.map((p) => p[0])) - x;
++  const h = Math.max(...pts.map((p) => p[1])) - y;
++  slide.addShape('custGeom', {
++    x, y, w, h, fill: { color }, line: { type: 'none' },
++    points: pts.map((p) => ({ x: p[0] - x, y: p[1] - y })).concat([{ close: true }]),
++  });
++}
++
++/**
++ * The template's big decorative blob is one SVG cropped by `srcRect`; the
++ * visible part is reproduced by drawing the whole blob oversized and letting
++ * the slide edges do the cropping.
++ * `cropR` / `cropT` are the fractions trimmed from right / top.
++ */
++function croppedBlob(slide, o) {
++  const full = o.w / (1 - o.cropR);
++  freeform(slide, PATHS.blob, {
++    x: o.flipH ? o.x + o.w - full : o.x, y: o.y - o.cropT * full,
++    w: full, h: full, fill: o.fill, flipH: o.flipH,
++  });
++}
++
++/** Thin two-circle outline scattered across nearly every slide. */
++function doodle(slide, o) {
++  freeform(slide, PATHS.blob, { ...o, line: o.color, lineW: 1 });
++}
++
++// ---------------------------------------------------- image stand-ins ------
++/**
++ * Empty picture placeholder inherited from the layout: 95 %-white panel,
++ * coloured frame and the grey "Image Placeholder" caption.
++ */
++function imagePlaceholder(slide, o) {
++  slide.addShape('rect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: { color: C.grey95, transparency: 50 },
++    line: o.frame ? { color: o.frame, width: o.frameW || 12 } : { type: 'none' },
++  });
++  slide.addText('Image Placeholder', {
++    x: o.x, y: o.y + 0.06, w: o.w, h: 0.3, margin: 0,
++    align: 'center', valign: 'top', fontFace: MINOR, fontSize: 12, color: C.grey50,
++  });
++  pictureGlyph(slide, o.x + o.w / 2, o.y + o.h / 2);
++}
++
++/** The little "picture" icon PowerPoint parks in the middle of an empty frame. */
++function pictureGlyph(slide, cx, cy) {
++  slide.addShape('rect', { x: cx - 0.43, y: cy - 0.33, w: 0.86, h: 0.67, fill: { color: C.white }, line: { color: '787878', width: 1 } });
++  slide.addShape('triangle', { x: cx - 0.34, y: cy - 0.08, w: 0.68, h: 0.42, fill: { color: '83BEEC' }, line: { type: 'none' } });
++  slide.addShape('ellipse', { x: cx - 0.28, y: cy - 0.22, w: 0.11, h: 0.11, fill: { color: 'F8DB8F' }, line: { type: 'none' } });
++}
++
++/** Flat colour chip standing in for a photo or a fruit illustration. */
++function imageChip(slide, o) {
++  slide.addShape('rect', {
++    x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.color }, line: { type: 'none' },
++    rotate: o.rotate || 0, shadow: o.shadow,
++  });
++  if (o.label) {
++    slide.addText(o.label, {
++      x: o.x, y: o.y + o.h / 2 - 0.16, w: o.w, h: 0.32, margin: 0,
++      align: 'center', fontFace: MINOR, fontSize: 11, color: C.grey50,
++    });
++  }
++}
++
++/** Stand-in for the white line-art icons that sit inside the coloured dots. */
++function glyphChip(slide, x, y, w, h, color) {
++  slide.addShape('roundRect', {
++    x, y, w, h: h === undefined ? w : h, rectRadius: Math.min(w, h === undefined ? w : h) * 0.18,
++    fill: { type: 'none' }, line: { color: color || C.white, width: 1.5 },
++  });
++}
++
++// ------------------------------------------------------------ text bits ----
++const TITLE = { fontFace: MAJOR, fontSize: 48, charSpacing: -1.5, lineSpacing: 48 * 0.9, color: C.ink };
++const BODY = { fontFace: MINOR, fontSize: 12, color: C.body, lineSpacingMultiple: 1.3, valign: 'top' };
++const LEAD = { fontFace: MAJOR, fontSize: 14, color: C.ink, lineSpacingMultiple: 1.3, valign: 'top' };
++const DOT = { characterCode: '25CB', indent: 13.5 };
++
++const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis vel';
++const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis vel sem nulla. Duis blandit nibh aliquet dui';
++const LOREM_XL = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis vel sem nulla. Duis blandit nibh aliquet dui mollis interdum. Aliquam id quam iaculis, ornare';
++const LOREM_CONS = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ';
++
++/** Headline: black first line, optional coloured second line. */
++function headline(slide, o) {
++  const size = o.fontSize || 48;
++  const runs = [{ text: o.line1, options: { color: o.color1 || C.ink, breakLine: o.line2 !== undefined } }];
++  if (o.line2 !== undefined) runs.push({ text: o.line2, options: { color: o.color2 } });
++  slide.addText(runs, {
++    x: o.x, y: o.y, w: o.w, h: o.h, align: o.align || 'left', valign: 'top',
++    ...TITLE, fontSize: size, lineSpacing: size * 0.9,
++  });
++}
++
++/** Bold lead line plus a grey paragraph underneath. */
++function leadAndBody(slide, o) {
++  slide.addText(o.lead, { x: o.x, y: o.y, w: o.leadW || o.w, h: 0.386, align: o.align || 'left', ...LEAD });
++  slide.addText(o.body, { x: o.x, y: o.y + 0.41, w: o.w, h: o.bodyH || 0.87, align: o.align || 'left', ...BODY });
++}
++
++/** The page number the master prints in the lower-right corner. */
++function pageNumber(slide, n, color) {
++  slide.addText(String(n), {
++    x: 12.4, y: 6.93, w: 0.55, h: 0.3, margin: 0, wrap: false,
++    fontFace: MAJOR, fontSize: 12, color: color || C.pink, align: 'left', valign: 'top',
++  });
++}
++
++// ================================================================ SLIDES ====
++
++// 1 — cover: rose field, tilted wordmark, blob-framed photo panel.
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.rose };
++  s.addShape('ellipse', { x: 10.884, y: 3.181, w: 1.175, h: 1.175, fill: { color: C.amber }, line: { type: 'none' }, shadow: SOFT });
++  s.addShape('ellipse', { x: 1.089, y: 2.761, w: 0.747, h: 0.747, fill: { color: C.rose }, line: { type: 'none' }, shadow: SOFT });
++
++  imageChip(s, { x: 10.018, y: -1.202, w: 5.034, h: 4.75, color: IMG.berries, shadow: SH.photo });
++  imageChip(s, { x: -2.358, y: 4.74, w: 5.034, h: 4.75, color: IMG.berries, rotate: 328, shadow: SH.photo });
++  imagePlaceholder(s, { x: 2.932, y: 0.099, w: 7.338, h: 7.338, frame: C.white, frameW: 10 });
++
++  s.addText('Yumia', {
++    x: 0.729, y: 1.134, w: 6.434, h: 1.569, rotate: 345,
++    fontFace: MAJOR, fontSize: 96, color: C.white, lineSpacing: 86, valign: 'top', shadow: SH.drop,
++  });
++  s.addText('Fresh Fruits', {
++    x: 8.297, y: 3.802, w: 6.348, h: 2.536, rotate: 345,
++    fontFace: MAJOR, fontSize: 80, color: C.white, lineSpacing: 72, valign: 'top', shadow: SH.drop,
++  });
++}
++
++// 2 — alternate cover: cream + pink blob cut-outs on a golden field.
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.sun };
++  croppedBlob(s, { x: 5.131, y: 0, w: 8.202, cropR: 0.39703, cropT: 0.44864, fill: C.cream });
++  croppedBlob(s, { x: 5.758, y: 0, w: 7.575, cropR: 0.32773, cropT: 0.38984, fill: C.pink });
++
++  imageChip(s, { x: -2.947, y: -0.837, w: 7.949, h: 7.5, color: IMG.citrus, shadow: SH.photo });
++  imageChip(s, { x: 2.355, y: 2.137, w: 5.294, h: 4.995, color: IMG.berries, rotate: 292, shadow: SH.photo });
++
++  s.addText([
++    { text: 'YUMIA', options: { breakLine: true } },
++    { text: 'FRESH ', options: { breakLine: true } },
++    { text: 'FRUITS' },
++  ], {
++    x: 5.86, y: 2.033, w: 6.159, h: 3.747,
++    align: 'center', valign: 'top', fontFace: MAJOR, fontSize: 80, color: C.white, lineSpacing: 72,
++  });
++}
++
++// 3 — section divider.
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  s.addShape('rect', { x: 0, y: 0, w: 3.153, h: 7.5, fill: { color: C.rose }, line: { type: 'none' }, shadow: SOFT });
++  s.addShape('ellipse', { x: 4.138, y: 3.163, w: 1.175, h: 1.175, fill: { color: C.pink }, line: { type: 'none' }, shadow: SOFT });
++  doodle(s, { x: 10.14, y: -0.881, w: 3.964, h: 3.964, color: C.pink });
++  doodle(s, { x: 5.764, y: 5.402, w: 2.946, h: 2.946, color: C.olive, rotate: 300 });
++
++  imagePlaceholder(s, { x: 1.434, y: 0.066, w: 3.33, h: 7.367, frame: C.pink, frameW: 14 });
++
++  s.addShape('roundRect', {
++    x: 5.978, y: 1.962, w: 2.043, h: 0.653, rectRadius: 0.326,
++    fill: { color: C.pink }, line: { type: 'none' }, shadow: SOFT,
++  });
++  s.addText('Section 1', {
++    x: 5.978, y: 1.962, w: 2.043, h: 0.653,
++    align: 'center', valign: 'middle', fontFace: MINOR, fontSize: 18, color: C.white,
++  });
++  headline(s, { x: 5.894, y: 2.878, w: 6.711, h: 1.744, line1: 'Write Your Section Title Here', fontSize: 54 });
++  pageNumber(s, 3);
++}
++
++// 4 — full-bleed crimson title slide with two picture panels.
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.pink };
++  doodle(s, { x: 10.958, y: -0.907, w: 3.156, h: 3.156, color: C.olive });
++  doodle(s, { x: 1.067, y: 5.386, w: 2.946, h: 2.946, color: C.pink, rotate: 300 });
++
++  imagePlaceholder(s, { x: 0.104, y: 0.102, w: 4.655, h: 4.655, frame: C.white, frameW: 12 });
++  imagePlaceholder(s, { x: 9.417, y: 3.528, w: 3.917, h: 3.917, frame: C.white, frameW: 12 });
++
++  s.addShape('ellipse', { x: 2.988, y: 2.888, w: 1.175, h: 1.175, fill: { color: C.amber }, line: { type: 'none' }, shadow: SOFT });
++  s.addShape('ellipse', { x: 10.058, y: 4.127, w: 0.901, h: 0.901, fill: { color: C.amber }, line: { type: 'none' }, shadow: SOFT });
++
++  s.addShape('roundRect', {
++    x: 5.431, y: 2.456, w: 2.472, h: 0.653, rectRadius: 0.326,
++    fill: { color: C.pink }, line: { color: C.white, width: 3 }, shadow: SOFT,
++  });
++  s.addText('The Variant of', {
++    x: 5.431, y: 2.456, w: 2.472, h: 0.653,
++    align: 'center', valign: 'middle', fontFace: MINOR, fontSize: 16, color: C.white,
++  });
++  headline(s, { x: 3.575, y: 3.341, w: 6.711, h: 1.927, line1: 'Colorful & Fresh Fruits', color1: C.white, align: 'center', fontSize: 60 });
++  s.addText(LOREM, {
++    x: 4.27, y: 5.268, w: 5.147, h: 0.776,
++    align: 'center', fontFace: MINOR, fontSize: 16, color: C.white, lineSpacingMultiple: 1.3, valign: 'top',
++  });
++  pageNumber(s, 4, C.white);
++}
++
++// 5 — INTRO.
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  doodle(s, { x: 4.67, y: -1.404, w: 2.946, h: 2.946, color: C.amber, rotate: 300 });
++  doodle(s, { x: 10.14, y: -0.881, w: 3.964, h: 3.964, color: C.pink });
++  doodle(s, { x: 6.712, y: 5.402, w: 2.946, h: 2.946, color: C.olive, rotate: 300 });
++
++  imageChip(s, { x: 0, y: 0.358, w: 6.307, h: 7.142, color: IMG.citrus, shadow: SH.card });
++  imagePlaceholder(s, { x: 2.552, y: 0.833, w: 4.655, h: 4.655, frame: C.sun, frameW: 12 });
++
++  s.addShape('ellipse', { x: 5.438, y: 1.389, w: 1.175, h: 1.175, fill: { color: C.pink }, line: { type: 'none' }, shadow: SOFT });
++  glyphChip(s, 5.709, 1.659, 0.634);
++
++  headline(s, { x: 7.982, y: 2.577, w: 6.711, h: 1.569, line1: 'INTRO', fontSize: 96 });
++  s.addText(LOREM, {
++    x: 7.982, y: 4.146, w: 4.754, h: 0.776,
++    fontFace: MINOR, fontSize: 16, color: C.ink, lineSpacingMultiple: 1.3, valign: 'top',
++  });
++  pageNumber(s, 5);
++}
++
++// 6 — "Fresh fruit, So yummy".
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  headline(s, { x: 0.727, y: 0.833, w: 6.711, h: 1.562, line1: 'Fresh fruit,', line2: 'So yummy', color2: C.pink });
++  doodle(s, { x: 6.667, y: -1.752, w: 3.964, h: 3.964, color: C.pink });
++  doodle(s, { x: 10.594, y: 4.903, w: 2.946, h: 2.946, color: C.olive, rotate: 277.93 });
++
++  leadAndBody(s, { x: 0.727, y: 3.24, w: 4.877, lead: 'Fresh Fruit', body: LOREM_XL });
++
++  s.addShape('roundRect', {
++    x: 0.826, y: 4.93, w: 4.677, h: 1.537, rectRadius: 0.147,
++    fill: { color: C.pink }, line: { type: 'none' }, shadow: SH.card,
++  });
++  glyphChip(s, 1.141, 5.133, 1.0);
++  s.addText('Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis vel sem nulla. ', {
++    x: 2.495, y: 5.263, w: 2.663, h: 0.87,
++    fontFace: MAJOR, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, valign: 'top',
++  });
++
++  imagePlaceholder(s, { x: 6.462, y: 0.75, w: 5.913, h: 5.913, frame: C.amber, frameW: 12 });
++  pageNumber(s, 6);
++}
++
++// 7 — two stat cards, each paired with a tall picture frame.
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  doodle(s, { x: 10.958, y: -0.907, w: 3.156, h: 3.156, color: C.olive });
++  doodle(s, { x: 4.241, y: 4.296, w: 2.946, h: 2.946, color: C.pink, rotate: 300 });
++
++  const cards = [
++    { card: 2.104, text: 3.802, stat: '2000+', statColor: C.pink, dotX: 3.916, dot: C.rose, glyph: 4.089, glyphY: 3.348, glyphD: 0.356, ph: 0.97, frame: C.pink },
++    { card: 8.292, text: 9.989, stat: '5000+', statColor: C.olive, dotX: 10.104, dot: C.amber, glyph: 10.305, glyphY: 3.377, glyphD: 0.297, ph: 7.157, frame: C.olive },
++  ];
++  cards.forEach((c) => {
++    s.addShape('roundRect', {
++      x: c.card, y: 1.396, w: 4.198, h: 4.885, rectRadius: 0.374,
++      fill: { color: C.white }, line: { type: 'none' }, shadow: glow(c.frame, 0.15),
++    });
++    imagePlaceholder(s, { x: c.ph, y: 1.007, w: 2.48, h: 5.487, frame: c.frame, frameW: 12 });
++    s.addShape('ellipse', { x: c.dotX, y: 3.176, w: 0.7, h: 0.7, fill: { color: c.dot }, line: { type: 'none' }, shadow: SOFT });
++    glyphChip(s, c.glyph, c.glyphY, c.glyphD);
++    s.addText(c.stat, {
++      x: c.text, y: 1.757, w: 2.067, h: 0.914,
++      fontFace: MAJOR, fontSize: 40, color: c.statColor, lineSpacingMultiple: 1.3, valign: 'top',
++    });
++    leadAndBody(s, { x: c.text, y: 4.133, w: 2.159, leadW: 2.067, lead: 'Fresh Fruit', body: LOREM_LONG, bodyH: 1.395 });
++  });
++  pageNumber(s, 7);
++}
++
++// 8 — "How to pick fresh fruit" + four coloured tiles.
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  doodle(s, { x: 5.672, y: -0.579, w: 3.156, h: 3.156, color: C.olive });
++  doodle(s, { x: -0.454, y: 2.924, w: 2.946, h: 2.946, color: C.pink, rotate: 300 });
++  headline(s, { x: 0.727, y: 0.833, w: 5.356, h: 1.562, line1: 'How to pick ', line2: 'fresh fruit', color2: C.amber });
++
++  const tiles = [
++    { x: 0.826, color: C.pink, glyph: 1.048 },
++    { x: 3.85, color: C.rose, glyph: 4.148 },
++    { x: 6.873, color: C.olive, glyph: 7.094 },
++    { x: 9.896, color: C.amber, glyph: 10.201 },
++  ];
++  tiles.forEach((t) => {
++    s.addShape('roundRect', {
++      x: t.x, y: 3.628, w: 2.611, h: 3.039, rectRadius: 0.232,
++      fill: { color: t.color }, line: { type: 'none' }, shadow: glow(C.pink, 0.05),
++    });
++    glyphChip(s, t.glyph, 3.882, 1.0);
++    s.addText('Lorem ipsum dolor sit amet, parturient montes', {
++      x: t.x + 0.193, y: 5.41, w: 2.225, h: 0.998,
++      fontFace: MAJOR, fontSize: 14, color: C.white, lineSpacingMultiple: 1.3, valign: 'top',
++    });
++  });
++
++  imagePlaceholder(s, { x: 6.967, y: 0.791, w: 5.487, h: 2.48, frame: C.pink, frameW: 12 });
++  pageNumber(s, 8);
++}
++
++// 9 — "Exploring yumia": five vertical picture panels on a crimson field.
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.pink };
++  imageChip(s, { x: -1.085, y: -0.721, w: 3.294, h: 3.108, color: IMG.berries, rotate: 292, shadow: SH.photo });
++  s.addText('Exploring yumia ', { x: 3.082, y: 0.833, w: 7.169, h: 0.835, align: 'center', valign: 'top', ...TITLE, color: C.white });
++
++  [0.977, 3.347, 5.717, 8.087, 10.456].forEach((x) => {
++    imagePlaceholder(s, { x, y: 2.403, w: 1.903, h: 4.21, frame: C.white, frameW: 8 });
++  });
++  [[2.922, C.amber], [5.291, C.pink], [7.66, C.amber], [10.028, C.pink]].forEach(([x, color]) => {
++    s.addShape('ellipse', { x, y: 4.317, w: 0.383, h: 0.383, fill: { color }, line: { type: 'none' }, shadow: SOFT });
++  });
++  pageNumber(s, 9, C.white);
++}
++
++// 10 — "Explore fresh fruit": three bullets + three stacked picture frames.
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  headline(s, { x: 0.727, y: 0.833, w: 5.356, h: 1.562, line1: 'Explore ', line2: 'fresh fruit', color2: C.amber });
++  doodle(s, { x: 4.939, y: -0.543, w: 3.156, h: 3.156, color: C.olive, rotate: 289.11 });
++  doodle(s, { x: 6.598, y: 5.644, w: 2.461, h: 2.461, color: C.pink, rotate: 337.24 });
++
++  [[3.03, C.rose], [4.308, C.amber], [5.586, C.olive]].forEach(([y, color], i) => {
++    s.addShape('ellipse', { x: 0.826, y, w: 0.522, h: 0.522, fill: { color }, line: { type: 'none' }, shadow: SOFT });
++    glyphChip(s, 0.951, y + 0.124, 0.275);
++    leadAndBody(s, {
++      x: 1.399, y: 3.099 + i * 1.277, w: 4.877, leadW: 3.537,
++      lead: 'Write your text here', body: LOREM_LONG, bodyH: 0.608,
++    });
++  });
++
++  [[8.17, -0.79, C.rose], [9.045, 1.911, C.amber], [10.003, 4.611, C.olive]].forEach(([x, y, frame]) => {
++    imagePlaceholder(s, { x, y, w: 3.247, h: 3.247, frame, frameW: 8 });
++  });
++  pageNumber(s, 10);
++}
++
++// 11 — "Best provide": four square picture frames with captions.
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  headline(s, { x: 0.727, y: 0.833, w: 7.412, h: 1.562, line1: 'Yumia fresh fruits', line2: 'Best provide', color2: C.olive });
++  doodle(s, { x: 8.642, y: -1.916, w: 3.964, h: 3.964, color: C.pink });
++  doodle(s, { x: 11.133, y: 0.812, w: 2.946, h: 2.946, color: C.olive, rotate: 277.93 });
++
++  const cols = [
++    { ph: 1.399, frame: C.amber, dot: 1.795, dotColor: C.amber, glyph: 1.904, glyphD: 0.304, cap: 0.839, body: 0.959 },
++    { ph: 4.381, frame: C.pink, dot: 4.777, dotColor: C.pink, glyph: 4.899, glyphD: 0.278, cap: 3.82, body: 3.941 },
++    { ph: 7.363, frame: C.olive, dot: 7.759, dotColor: C.olive, glyph: 7.881, glyphD: 0.278, cap: 6.802, body: 6.923 },
++    { ph: 10.345, frame: C.rose, dot: 10.741, dotColor: C.rose, glyph: 10.863, glyphD: 0.278, cap: 9.784, body: 9.904 },
++  ];
++  cols.forEach((c) => {
++    imagePlaceholder(s, { x: c.ph, y: 3.064, w: 1.314, h: 1.314, frame: c.frame, frameW: 6 });
++    s.addShape('ellipse', { x: c.dot, y: 4.738, w: 0.522, h: 0.522, fill: { color: c.dotColor }, line: { type: 'none' }, shadow: SOFT });
++    glyphChip(s, c.glyph, 4.86, c.glyphD);
++    s.addText('Write your text here', { x: c.cap, y: 5.428, w: 2.435, h: 0.386, align: 'center', ...LEAD });
++    s.addText('Lorem ipsum dolor sit amet, consectetur', { x: c.body, y: 5.838, w: 2.194, h: 0.608, align: 'center', ...BODY });
++  });
++  pageNumber(s, 11);
++}
++
++// 12 — crimson panel on the left, four icon rows on the right.
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  imagePlaceholder(s, { x: 2.523, y: 0, w: 5.893, h: 7.5 });
++  s.addShape('round1Rect', {
++    x: 0, y: 0, w: 4.917, h: 7.597, rectRadius: 2.458,
++    fill: { color: C.pink }, line: { type: 'none' }, shadow: SOFT,
++  });
++  s.addText([
++    { text: 'Yumia fresh fruits', options: { breakLine: true } },
++    { text: 'Best provide' },
++  ], { x: 0.727, y: 1.927, w: 3.593, h: 3.743, valign: 'top', ...TITLE, color: C.white, shadow: SH.title });
++
++  const rows = [
++    { y: 0.886, dotX: 7.656, color: C.rose, textX: 8.635, glyph: 7.843, glyphD: 0.494 },
++    { y: 2.525, dotX: 7.955, color: C.olive, textX: 8.934, glyph: 8.158, glyphD: 0.462 },
++    { y: 4.165, dotX: 7.973, color: C.amber, textX: 8.953, glyph: 8.195, glyphD: 0.426 },
++    { y: 5.804, dotX: 7.973, color: C.pink, textX: 8.953, glyph: 8.181, glyphD: 0.455 },
++  ];
++  rows.forEach((r) => {
++    s.addShape('ellipse', { x: r.dotX, y: r.y, w: 0.869, h: 0.869, fill: { color: r.color }, line: { type: 'none' }, shadow: SOFT });
++    glyphChip(s, r.glyph, r.y + (0.869 - r.glyphD) / 2, r.glyphD);
++    s.addText('Lorem ipsum dolor sit amet', { x: r.textX, y: r.y + 0.221, w: 3.537, h: 0.426, ...LEAD, fontSize: 16 });
++  });
++  pageNumber(s, 12);
++}
++
++// 13 — paragraph card.
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  doodle(s, { x: 8.642, y: 0.002, w: 3.964, h: 3.964, color: C.pink, flipV: true });
++  doodle(s, { x: 11.133, y: -1.708, w: 2.946, h: 2.946, color: C.olive, rotate: 82.07, flipV: true });
++
++  headline(s, { x: 0.727, y: 0.833, w: 7.412, h: 1.562, line1: 'Yumia fresh fruits', line2: 'Paragraph slide', color2: C.pink });
++  s.addShape('roundRect', {
++    x: 0.826, y: 3.146, w: 11.663, h: 3.517, rectRadius: 0.315,
++    fill: { color: C.white }, line: { type: 'none' }, shadow: glow(C.pink, 0.1),
++  });
++  imageChip(s, { x: 1.288, y: 3.352, w: 0.64, h: 0.82, color: IMG.strawberry });
++  s.addText('Write your text here', { x: 1.288, y: 4.377, w: 3.537, h: 0.386, ...LEAD });
++  s.addText(
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim. Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo. Nullam dictum felis eu pede mollis pretium. Integer tincidunt. Cras dapibus. Vivamus elementum semper nisi. Aenean vulputate eleifend tellus. Aenean leo ligula, porttitor eu, consequat vitae, ',
++    { x: 1.288, y: 4.787, w: 10.74, h: 1.395, ...BODY },
++  );
++  pageNumber(s, 13);
++}
++
++// 14 — clustered bar chart card.
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  s.addShape('round1Rect', {
++    x: 7.406, y: 0, w: 5.927, h: 7.5, rectRadius: 2.964, flipH: true,
++    fill: { color: C.sun }, line: { type: 'none' }, shadow: SOFT,
++  });
++  headline(s, { x: 0.727, y: 0.833, w: 7.412, h: 1.562, line1: 'Yumia fresh fruits', line2: 'Chart slide', color2: C.amber });
++  doodle(s, { x: 9.788, y: 1.187, w: 3.964, h: 3.964, color: C.pink, flipV: true });
++  doodle(s, { x: 12.279, y: -0.523, w: 2.946, h: 2.946, color: C.white, rotate: 82.07, flipV: true });
++
++  s.addShape('roundRect', {
++    x: 0.826, y: 3.146, w: 11.663, h: 3.517, rectRadius: 0.315,
++    fill: { color: C.white }, line: { type: 'none' }, shadow: glow(C.amber, 0.1),
++  });
++  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++  s.addChart('bar', [
++    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Series 3', labels: cats, values: [2, 2, 3, 5] },
++  ], {
++    x: 1.234, y: 3.394, w: 5.665, h: 3.021,
++    barDir: 'col', barGapWidthPct: 150, chartColors: [C.amber, C.olive, C.sun],
++    showLegend: false, showTitle: false,
++    catAxisLineShow: false, valAxisLineShow: false,
++    catGridLine: { style: 'none' }, valGridLine: { color: C.gridline, size: 1 },
++    catAxisLabelFontFace: MINOR, catAxisLabelFontSize: 12, catAxisLabelColor: C.body,
++    valAxisLabelFontFace: MINOR, valAxisLabelFontSize: 12, valAxisLabelColor: C.body,
++  });
++
++  s.addShape('ellipse', { x: 7.134, y: 3.726, w: 0.7, h: 0.7, fill: { color: C.amber }, line: { type: 'none' }, shadow: SOFT });
++  glyphChip(s, 7.326, 3.919, 0.315);
++  s.addText('2000+', {
++    x: 8.069, y: 3.619, w: 2.067, h: 0.914,
++    fontFace: MAJOR, fontSize: 40, color: C.amber, lineSpacingMultiple: 1.3, valign: 'top',
++  });
++  leadAndBody(s, {
++    x: 8.139, y: 4.56, w: 3.96, leadW: 2.803, lead: 'Write your text here',
++    body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis vel sem nulla. Duis blandit', bodyH: 0.608,
++  });
++  s.addText('Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis vel sem nulla. ', {
++    x: 8.139, y: 5.625, w: 3.96, h: 0.565, ...BODY, fontSize: 11, bullet: DOT,
++  });
++  pageNumber(s, 14, C.white);
++}
++
++// 15 — line chart card + two doughnut cards.
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  s.addText([
++    { text: 'Yumia', options: { breakLine: true } },
++    { text: 'fresh fruits', options: { breakLine: true } },
++    { text: 'Chart slide', options: { color: C.pink } },
++  ], { x: 0.727, y: 2.606, w: 3.825, h: 2.289, valign: 'top', ...TITLE });
++  doodle(s, { x: 0.74, y: -1.742, w: 3.964, h: 3.964, color: C.pink, flipV: true });
++  doodle(s, { x: 0.287, y: 5.467, w: 2.946, h: 2.946, color: C.olive, rotate: 82.07, flipV: true });
++
++  s.addShape('roundRect', {
++    x: 6.177, y: 0.833, w: 6.312, h: 2.917, rectRadius: 0.262,
++    fill: { color: C.white }, line: { type: 'none' }, shadow: glow(C.amber, 0.1),
++  });
++  s.addText('Write your chart title here', { x: 7.565, y: 1.017, w: 3.537, h: 0.386, align: 'center', ...LEAD });
++  const ticks = ['Text here', 'Text here', 'Text here', 'Text here', 'Text here'];
++  s.addChart('line', [
++    { name: 'Series 1', labels: ticks, values: [32, 32, 28, 12, 15] },
++    { name: 'Series 12', labels: ticks, values: [25, 35, 20, 30, 26] },
++    { name: 'Series 13', labels: ticks, values: [15, 23, 60, 48, 52] },
++    { name: 'Series 2', labels: ticks, values: [12, 12, 12, 21, 28] },
++  ], {
++    x: 6.389, y: 1.458, w: 5.888, h: 2.177,
++    chartColors: [C.pink, C.rose, C.blush, C.sun], chartColorsOpacity: 70,
++    lineSize: 2.25, lineDataSymbol: 'none', showLegend: false, showTitle: false,
++    catAxisLineShow: false, valAxisLineShow: false,
++    catGridLine: { style: 'none' }, valGridLine: { color: C.gridline, size: 1 },
++    catAxisLabelFontFace: MINOR, catAxisLabelFontSize: 9, catAxisLabelColor: C.body,
++    valAxisLabelFontFace: MINOR, valAxisLabelFontSize: 9, valAxisLabelColor: C.body,
++  });
++
++  // Slice colours are accent1..accent5 at 70 % alpha; pre-blended with the card.
++  const donuts = [
++    {
++      x: 6.177, textX: 6.475, chartX: 6.716, card: C.pink, values: [32, 32, 28, 12, 15],
++      slices: ['D90057', 'F36281', 'F18FA0', 'EA8B49', 'A87022'],
++    },
++    {
++      x: 9.545, textX: 9.842, chartX: 10.083, card: C.olive, values: [32, 40, 28, 8, 10],
++      slices: ['C42F40', 'DF916A', 'DDBE8A', 'D5BB33', '94A00C'],
++    },
++  ];
++  donuts.forEach((d) => {
++    s.addShape('roundRect', { x: d.x, y: 4.094, w: 2.945, h: 2.569, rectRadius: 0.23, fill: { color: d.card }, line: { type: 'none' } });
++    s.addText('Write your chart title', {
++      x: d.textX, y: 4.337, w: 2.349, h: 0.337,
++      align: 'center', fontFace: MAJOR, fontSize: 14, color: C.white, valign: 'top',
++    });
++    s.addChart('doughnut', [{ name: 'Series 1', labels: ticks, values: d.values }], {
++      x: d.chartX, y: 4.84, w: 1.867, h: 1.643,
++      holeSize: 50, chartColors: d.slices, dataBorder: { pt: 2.75, color: C.white },
++      showLegend: false, showTitle: false, showValue: false,
++    });
++  });
++  pageNumber(s, 15);
++}
++
++// 16 — pricing table.
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  doodle(s, { x: -1.569, y: 0.022, w: 3.964, h: 3.964, color: C.amber, flipV: true });
++  doodle(s, { x: 11.231, y: -1.095, w: 2.946, h: 2.946, color: C.olive, rotate: 82.07, flipV: true });
++
++  s.addShape('round1Rect', {
++    x: 0, y: 4.885, w: 13.333, h: 2.615, rectRadius: 1.307, flipH: true,
++    fill: { color: C.sun }, line: { type: 'none' }, shadow: SOFT,
++  });
++  s.addShape('roundRect', {
++    x: 0.826, y: 2.792, w: 11.663, h: 3.872, rectRadius: 0.347,
++    fill: { color: C.white }, line: { type: 'none' }, shadow: glow(C.olive, 0.1),
++  });
++  headline(s, { x: 2.961, y: 0.833, w: 7.412, h: 1.562, line1: 'Yumia fresh fruits', line2: 'Table slide', color2: C.olive, align: 'center' });
++
++  // Header row sits on its own rounded olive pill behind the table.
++  s.addShape('roundRect', {
++    x: 1.156, y: 3.092, w: 11.021, h: 0.591, rectRadius: 0.295,
++    fill: { color: C.olive }, line: { type: 'none' }, shadow: SOFT,
++  });
++
++  const cell = { fontFace: MINOR, fontSize: 12, color: C.ink, align: 'center', valign: 'middle' };
++  const rows = [
++    ['Lorem ipsum dolor sit amet', 'A', '$2500', '$1500', '$2500', '500gr'],
++    ['Lorem ipsum dolor sit amet', 'B', '$1500', '$2500', '$2500', '500gr'],
++    ['Lorem ipsum dolor sit amet', 'A', '$2000', '$2500', '$2500', '500gr'],
++    ['Lorem ipsum dolor sit amet', 'A', '$2000', '$2500', '$1500', '500gr'],
++  ];
++  const table = [
++    ['Text here', 'Grade', 'Text here', 'Text here', 'Text here', 'Text here']
++      .map((t) => ({ text: t, options: { ...cell, fontFace: MAJOR, color: C.white } })),
++  ];
++  rows.forEach((r) => table.push(r.map((t) => ({ text: t, options: { ...cell, fill: { color: C.white } } }))));
++  table.push([
++    { text: 'Average total', options: { ...cell, colspan: 5, fill: { color: C.limeTint } } },
++    { text: '500gr/pack', options: { ...cell, fill: { color: C.white } } },
++  ]);
++  s.addTable(table, {
++    x: 1.139, y: 3.087, w: 11.038,
++    colW: [3.581, 1.041, 1.604, 1.604, 1.604, 1.604],
++    rowH: [0.587, 0.531, 0.531, 0.531, 0.531, 0.531],
++    margin: [3, 3, 3, 3], border: { type: 'none' },
++  });
++  pageNumber(s, 16, C.white);
++}
++
++// 17 — market illustration ringed by four speech bubbles.
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  imageChip(s, { x: 2.76, y: 1.906, w: 7.812, h: 5.208, color: IMG.market, label: '[image]' });
++  s.addText('Yumia fresh fruits', { x: 2.961, y: 0.833, w: 7.412, h: 0.835, align: 'center', valign: 'top', ...TITLE });
++
++  const bubbles = [
++    { x: 0.826, y: 2.094, fill: C.white, lead: C.pink, body: C.body, halo: C.pink, flipH: false, textX: 1.097, leadX: 1.097 },
++    { x: 1.097, y: 4.535, fill: C.olive, lead: C.white, body: C.white, halo: C.olive, flipH: false, textX: 1.369, leadX: 1.369 },
++    { x: 9.398, y: 2.094, fill: C.amber, lead: C.white, body: C.white, halo: C.amber, flipH: true, textX: 9.669, leadX: 9.773 },
++    { x: 9.669, y: 4.535, fill: C.white, lead: C.rose, body: C.body, halo: C.rose, flipH: true, textX: 9.94, leadX: 10.045 },
++  ];
++  bubbles.forEach((b) => {
++    s.addShape('wedgeRoundRectCallout', {
++      x: b.x, y: b.y, w: 2.838, h: 1.75, flipH: b.flipH,
++      fill: { color: b.fill }, line: { type: 'none' }, shadow: glow(b.halo, 0.15),
++    });
++    s.addText('Write your text', {
++      x: b.leadX, y: b.y + 0.235, w: 2.191, h: 0.386,
++      fontFace: MAJOR, fontSize: 14, color: b.lead, lineSpacingMultiple: 1.3, valign: 'top',
++    });
++    s.addText(LOREM_CONS, {
++      x: b.textX, y: b.y + 0.645, w: 2.295, h: 0.87,
++      fontFace: MINOR, fontSize: 12, color: b.body, lineSpacingMultiple: 1.3, valign: 'top',
++    });
++  });
++
++  doodle(s, { x: 10.644, y: 0.008, w: 3.964, h: 3.964, color: C.amber, flipV: true });
++  doodle(s, { x: -1.473, y: 5.467, w: 2.946, h: 2.946, color: C.olive, rotate: 82.07, flipV: true });
++  pageNumber(s, 17);
++}
++
++// 18 — "fruit season": golden ribbon with three circular milestones.
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  // The ribbon lives in a group that maps (1.216,1.106)-(13.894,7.676) of its
++  // child space onto (2.166,2.470)-(11.168,7.135) on the slide.
++  const gx = 2.166;
++  const gy = 2.470;
++  const sx = 9.002 / 12.678;
++  const sy = 4.665 / 6.570;
++  [
++    { p: PATHS.ribbon1, x: 7.164, y: 4.433, w: 4.171, h: 1.729, c: C.sun },
++    { p: PATHS.ribbon2, x: 11.658, y: 2.330, w: 2.236, h: 1.960, c: C.sun },
++    { p: PATHS.ribbon3, x: 10.473, y: 2.699, w: 2.083, h: 2.174, c: 'D9A70F' },
++    { p: PATHS.ribbon4, x: 5.969, y: 1.106, w: 2.584, h: 5.987, c: 'D9A70F' },
++    { p: PATHS.ribbon5, x: 1.216, y: 2.794, w: 7.235, h: 4.882, c: C.sun },
++  ].forEach((r) => {
++    freeform(s, r.p, {
++      x: gx + (r.x - 1.216) * sx, y: gy + (r.y - 1.106) * sy,
++      w: r.w * sx, h: r.h * sy, fill: r.c, rotate: 141.33, flipH: true, flipV: true,
++    });
++  });
++
++  headline(s, { x: 2.961, y: 0.833, w: 7.412, h: 1.562, line1: 'Yumia fresh fruits', line2: 'fruit season', color2: C.amber, align: 'center' });
++
++  [
++    { ring: [3.331, 4.035], ringColor: C.olive, chip: [3.601, 4.297, 0.797, 0.782], chipColor: IMG.kiwi, stat: '2000+', statAt: [0.829, 4.16], statColor: C.olive },
++    { ring: [6.010, 3.181], ringColor: C.pink, chip: [6.316, 3.366, 0.622, 0.859], chipColor: IMG.apple, stat: '1050+', statAt: [7.518, 3.205], statColor: C.pink },
++    { ring: [8.949, 4.031], ringColor: C.rose, chip: [9.175, 4.325, 0.862, 0.750], chipColor: IMG.cherry, stat: '500+', statAt: [10.373, 4.69], statColor: C.rose },
++  ].forEach((m) => {
++    s.addShape('ellipse', {
++      x: m.ring[0], y: m.ring[1], w: 1.314, h: 1.314,
++      fill: { color: C.white }, line: { color: m.ringColor, width: 6 },
++    });
++    imageChip(s, { x: m.chip[0], y: m.chip[1], w: m.chip[2], h: m.chip[3], color: m.chipColor });
++    s.addText(m.stat, {
++      x: m.statAt[0], y: m.statAt[1], w: 2.067, h: 0.914,
++      fontFace: MAJOR, fontSize: 40, color: m.statColor, lineSpacingMultiple: 1.3, valign: 'top',
++    });
++  });
++
++  s.addText([
++    { text: LOREM_CONS, options: { bullet: DOT, breakLine: true } },
++    { text: 'Aenean commodo ligula eget dolor. Aenean massa. ', options: { bullet: DOT } },
++  ], { x: 0.899, y: 5.051, w: 2.236, h: 1.598, ...BODY, fontSize: 11 });
++  s.addText(LOREM_CONS, { x: 10.443, y: 5.58, w: 2.236, h: 0.806, ...BODY, fontSize: 11, bullet: DOT });
++  pageNumber(s, 18);
++}
++
++// 19 — nested circles infographic.
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  doodle(s, { x: 3.049, y: -1.037, w: 2.824, h: 2.824, color: C.pink, rotate: 12.32, flipH: true, flipV: true });
++  doodle(s, { x: 1.307, y: 5.467, w: 2.946, h: 2.946, color: C.olive, rotate: 277.93, flipH: true, flipV: true });
++
++  [
++    { x: 3.885, y: 0.969, d: 5.562, color: C.pink, halo: C.pink },
++    { x: 4.635, y: 2.469, d: 4.062, color: C.amber, halo: C.olive },
++    { x: 5.469, y: 4.136, d: 2.395, color: C.olive, halo: C.olive },
++  ].forEach((r) => s.addShape('ellipse', {
++    x: r.x, y: r.y, w: r.d, h: r.d, fill: { color: r.color }, line: { type: 'none' }, shadow: glow(r.halo, 0.1),
++  }));
++
++  [
++    { amount: '$85.9M', y: 1.215, capY: 1.704, capX: 5.427, capW: 2.479, split: true },
++    { amount: '$50.5M', y: 2.833, capY: 3.323, capX: 5.552, capW: 2.229, split: true },
++    { amount: '$25M', y: 4.866, capY: 5.355, capX: 5.718, capW: 1.897, split: false },
++  ].forEach((l) => {
++    s.addText(l.amount, {
++      x: 5.718, y: l.y, w: 1.897, h: 0.572,
++      align: 'center', valign: 'bottom', fontFace: MAJOR, fontSize: 28, bold: true, color: C.white,
++    });
++    s.addText(l.split
++      ? [{ text: 'Fruit season ', options: { breakLine: true } }, { text: '(month)' }]
++      : 'Fruit season (month)', {
++      x: l.capX, y: l.capY, w: l.capW, h: 0.692,
++      align: 'center', valign: 'top', fontFace: MINOR, fontSize: 14, color: C.white,
++    });
++  });
++
++  s.addText('Yumia fresh fruits', { x: 0.727, y: 2.606, w: 3.158, h: 2.289, valign: 'top', ...TITLE });
++
++  [
++    { y: 0.785, ring: C.pink, chip: [10.311, 0.969, 0.515, 0.475], chipColor: IMG.watermelon },
++    { y: 2.893, ring: C.amber, chip: [10.255, 3.172, 0.601, 0.332], chipColor: IMG.banana },
++    { y: 5.001, ring: C.olive, chip: [10.311, 5.197, 0.487, 0.478], chipColor: IMG.kiwi },
++  ].forEach((r, i) => {
++    s.addShape('ellipse', {
++      x: 10.121, y: r.y, w: 0.869, h: 0.869,
++      fill: { color: C.white }, line: { color: r.ring, width: 4.75 }, shadow: SOFT,
++    });
++    imageChip(s, { x: r.chip[0], y: r.chip[1], w: r.chip[2], h: r.chip[3], color: r.chipColor });
++    s.addText('Lorem ipsum dolor sit amet', { x: 10.132, y: 1.722 + i * 2.108, w: 2.474, h: 0.776, ...LEAD, fontSize: 16 });
++  });
++  pageNumber(s, 19);
++}
++
++// 20 — "The variety of": stacked partial circles.
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  s.addShape('rect', { x: 0, y: 0, w: 5.472, h: 7.5, fill: { color: C.rose }, line: { type: 'none' }, shadow: SOFT });
++  s.addText([
++    { text: 'The ', options: { breakLine: true } },
++    { text: 'variety ', options: { breakLine: true } },
++    { text: 'of  yumia fresh fruits' },
++  ], { x: 0.727, y: 2.242, w: 4.19, h: 3.016, align: 'center', valign: 'top', ...TITLE, color: C.white, shadow: SH.title });
++
++  [
++    { x: 7.685, y: 0.0, color: C.pink, angleRange: [0, 180] },
++    { x: 7.685, y: 4.537, color: C.olive, angleRange: [0, 180] },
++    { x: 7.653, y: 2.268, color: C.amber, angleRange: [180, 360] },
++  ].forEach((a) => s.addShape('pie', {
++    x: a.x, y: a.y, w: 2.963, h: 2.963, rotate: 90,
++    angleRange: a.angleRange, fill: { color: a.color }, line: { type: 'none' },
++  }));
++  [0.69, 2.959, 5.227].forEach((y) => {
++    s.addShape('ellipse', { x: 8.375, y, w: 1.583, h: 1.583, fill: { color: C.white }, line: { type: 'none' } });
++  });
++
++  [
++    { x: 8.417, y: 0.846, w: 1.152, h: 1.476, color: IMG.strawberry, halo: C.pink },
++    { x: 8.698, y: 2.810, w: 1.438, h: 1.453, color: IMG.lemon, halo: C.amber },
++    { x: 8.238, y: 4.477, w: 1.438, h: 2.125, color: IMG.avocado, halo: C.olive },
++  ].forEach((f) => imageChip(s, {
++    ...f, shadow: { type: 'outer', color: f.halo, opacity: 0.4, blur: 21, offset: 3, angle: 135 },
++  }));
++
++  const caption = { fontFace: MAJOR, fontSize: 14, color: C.ink, lineSpacingMultiple: 1.3, valign: 'top' };
++  s.addText('Lorem ipsum dolor sit amet, consectetur ', { x: 10.09, y: 1.128, w: 2.803, h: 0.692, ...caption });
++  s.addText('Lorem ipsum dolor sit amet, consectetur ', { x: 5.642, y: 3.302, w: 2.803, h: 0.692, align: 'right', ...caption });
++  s.addText('Lorem ipsum dolor sit amet, consectetur ', { x: 10.09, y: 5.67, w: 2.803, h: 0.692, ...caption });
++
++  doodle(s, { x: -0.884, y: -0.818, w: 2.882, h: 2.882, color: C.white, flipV: true });
++  doodle(s, { x: 0.76, y: 5.859, w: 2.946, h: 2.946, color: C.white, rotate: 82.07, flipV: true });
++  pageNumber(s, 20);
++}
++
++// 21 — world map with a commodity legend card.
++// Continent outlines traced from the template's freeform cluster.
++const MAP = {
++  grey: [
++    [[3.99, 4.48], [3.77, 4.79], [3.77, 4.96], [3.94, 5.16], [4.19, 5.12], [4.33, 5.17], [4.31, 5.29], [4.41, 5.48], [4.37, 5.65], [4.5, 6.01], [4.65, 5.99], [4.83, 5.78], [4.82, 5.68], [4.94, 5.58], [4.93, 5.32], [5.16, 5.02], [5.0, 5.04], [4.85, 4.78], [4.62, 4.8], [4.62, 4.57], [4.49, 4.6], [4.35, 4.55], [4.32, 4.44], [4.28, 4.52], [4.36, 4.77], [4.18, 4.86], [3.92, 4.68], [4.08, 4.55]],
++    [[4.51, 3.47], [4.23, 3.8], [4.35, 3.83], [4.56, 3.5], [4.59, 3.99], [4.3, 3.91], [4.02, 4.15], [4.09, 4.28], [4.46, 4.39], [4.42, 4.22], [4.57, 4.44], [4.66, 4.32], [4.86, 4.44], [5.01, 4.98], [5.28, 4.87], [5.29, 4.7], [5.59, 4.73], [5.77, 4.31], [5.31, 4.24], [5.23, 4.46], [5.0, 4.3], [4.69, 4.34], [4.93, 4.12], [4.63, 3.83], [4.74, 3.45]],
++    [[2.64, 5.02], [2.46, 5.08], [2.46, 5.23], [2.52, 5.3], [2.41, 5.37], [2.51, 5.57], [2.64, 5.65], [2.57, 6.3], [2.53, 6.33], [2.54, 6.44], [2.64, 6.51], [2.62, 6.55], [2.7, 6.56], [2.64, 6.43], [2.71, 6.36], [2.68, 6.3], [2.73, 6.18], [2.88, 6.11], [2.89, 6.03], [2.96, 6.02], [3.08, 5.88], [3.08, 5.81], [3.24, 5.73], [3.29, 5.53], [3.37, 5.42], [3.27, 5.33], [3.06, 5.27], [3.0, 5.16]],
++    [[3.85, 2.97], [3.65, 2.98], [3.64, 2.91], [3.49, 2.87], [3.21, 2.88], [3.13, 2.94], [2.83, 2.96], [2.71, 3.03], [2.75, 3.04], [2.73, 3.09], [2.59, 3.12], [2.67, 3.21], [2.84, 3.21], [2.93, 3.29], [2.95, 3.4], [3.0, 3.4], [2.97, 3.48], [3.05, 3.47], [2.99, 3.61], [3.1, 3.77], [3.2, 3.8], [3.28, 3.62], [3.65, 3.44], [3.64, 3.33], [3.71, 3.24], [3.66, 3.19], [3.72, 3.18], [3.66, 3.1]],
++    [[1.13, 3.49], [0.81, 3.43], [0.61, 3.53], [0.7, 3.57], [0.71, 3.62], [0.64, 3.6], [0.59, 3.63], [0.62, 3.66], [0.72, 3.66], [0.72, 3.7], [0.62, 3.76], [0.66, 3.82], [0.7, 3.82], [0.71, 3.85], [0.8, 3.85], [0.8, 3.89], [0.74, 3.94], [0.83, 3.88], [0.88, 3.9], [0.86, 3.83], [0.89, 3.8], [0.93, 3.83], [0.99, 3.78], [1.13, 3.8]],
++    [[5.96, 4.14], [6.01, 4.18], [6.01, 4.23], [6.09, 4.26], [6.11, 4.3], [6.2, 4.3], [6.28, 4.32], [6.32, 4.3], [6.38, 4.3], [6.42, 4.28], [6.42, 4.24], [6.46, 4.24], [6.51, 4.23], [6.53, 4.2], [6.59, 4.19], [6.57, 4.18], [6.51, 4.17], [6.52, 4.12], [6.47, 4.12], [6.42, 4.14], [6.37, 4.14], [6.3, 4.11], [6.24, 4.11], [6.21, 4.08], [6.17, 4.06], [6.15, 4.08], [6.14, 4.12], [6.08, 4.12], [6.04, 4.1]],
++    [[5.8, 4.62], [5.85, 4.66], [5.96, 4.68], [5.97, 4.79], [6.04, 4.8], [6.07, 4.91], [6.14, 4.91], [6.15, 5.08], [6.18, 5.12], [6.16, 4.99], [6.24, 4.99], [6.29, 5.07], [6.36, 5.02], [6.36, 4.94], [6.29, 4.89], [6.33, 4.81], [6.3, 4.78], [6.24, 4.79], [6.22, 4.82], [6.17, 4.8], [6.13, 4.75], [6.13, 4.66], [6.08, 4.75], [6.02, 4.77], [6.02, 4.73], [5.97, 4.72], [5.97, 4.68], [6.01, 4.67], [5.94, 4.68]],
++  ],
++  pink: [
++    [[4.69, 3.89], [4.95, 4.11], [4.9, 4.24], [5.1, 4.33], [5.1, 4.09], [5.55, 3.95], [5.94, 4.12], [6.7, 4.01], [6.92, 4.16], [6.89, 4.29], [7.04, 4.06], [7.11, 4.13], [6.93, 3.99], [7.06, 3.84], [7.53, 3.76], [7.39, 4.07], [7.53, 3.81], [8.07, 3.62], [7.07, 3.33], [6.85, 3.45], [6.37, 3.34], [6.46, 3.23], [6.25, 3.16], [5.82, 3.39], [5.6, 3.34], [5.55, 3.52], [4.97, 3.61], [4.74, 3.49]],
++  ],
++  olive: [
++    [[1.15, 3.49], [1.15, 3.8], [1.49, 4.14], [2.29, 4.13], [2.39, 4.29], [2.8, 4.24], [2.71, 4.09], [2.98, 4.17], [2.75, 3.81], [2.48, 3.74], [2.44, 4.08], [2.1, 3.85], [2.4, 3.69], [2.39, 3.46], [2.59, 3.54], [2.48, 3.66], [2.74, 3.7], [2.81, 3.59], [2.47, 3.34], [2.23, 3.36], [2.29, 3.57], [2.15, 3.31], [2.04, 3.56], [1.89, 3.33], [1.47, 3.38], [1.67, 3.52]],
++    [[2.8, 2.93], [2.64, 2.89], [2.44, 2.9], [2.37, 2.93], [2.24, 2.95], [2.22, 2.96], [2.22, 3.01], [2.15, 2.99], [2.1, 3.02], [2.1, 3.05], [2.14, 3.06], [2.18, 3.12], [2.26, 3.12], [2.26, 3.18], [2.24, 3.19], [2.42, 3.21], [2.46, 3.19], [2.43, 3.19], [2.43, 3.16], [2.46, 3.13], [2.52, 3.12], [2.53, 3.06], [2.55, 3.04], [2.6, 3.04], [2.72, 2.98], [2.72, 2.95]],
++  ],
++  amber: [
++    [[7.3, 5.88], [7.24, 5.76], [7.15, 5.68], [7.07, 5.51], [7.04, 5.65], [6.92, 5.59], [6.93, 5.54], [6.87, 5.52], [6.82, 5.55], [6.8, 5.6], [6.74, 5.57], [6.61, 5.7], [6.5, 5.74], [6.47, 5.79], [6.52, 6.03], [6.84, 5.95], [6.9, 5.97], [6.93, 6.02], [6.98, 6.01], [7.02, 6.09], [7.16, 6.13], [7.22, 6.1]],
++  ],
++};
++
++function slide21(pptx) {
++  const s = pptx.addSlide();
++  headline(s, { x: 2.961, y: 0.833, w: 7.412, h: 1.562, line1: 'Yumia fresh fruits', line2: 'fruit season', color2: C.amber, align: 'center' });
++
++  MAP.grey.forEach((p) => polygon(s, p, 'D9D9D9'));
++  MAP.olive.forEach((p) => polygon(s, p, C.olive));
++  MAP.pink.forEach((p) => polygon(s, p, C.pink));
++  MAP.amber.forEach((p) => polygon(s, p, C.amber));
++
++  s.addShape('roundRect', {
++    x: 8.406, y: 2.881, w: 4.083, h: 3.786, rectRadius: 0.329,
++    fill: { color: C.white }, line: { type: 'none' }, shadow: glow(C.olive, 0.1),
++  });
++  s.addShape('roundRect', {
++    x: 8.648, y: 3.115, w: 1.822, h: 0.484, rectRadius: 0.138,
++    fill: { color: C.blush }, line: { type: 'none' }, shadow: SOFT,
++  });
++  s.addText('commodity', {
++    x: 8.648, y: 3.115, w: 1.822, h: 0.484,
++    align: 'center', valign: 'middle', fontFace: MAJOR, fontSize: 14, color: C.pink,
++  });
++
++  [
++    { y: 4.124, dot: C.pink, chip: [9.154, 3.910, 0.654, 0.641], chipColor: IMG.kiwi },
++    { y: 5.061, dot: C.olive, chip: [9.136, 4.810, 0.689, 0.635], chipColor: IMG.watermelon },
++    { y: 5.999, dot: C.amber, chip: [9.209, 5.664, 0.543, 0.765], chipColor: IMG.grapes },
++  ].forEach((l, i) => {
++    s.addShape('ellipse', { x: 8.665, y: l.y, w: 0.214, h: 0.214, fill: { color: l.dot }, line: { type: 'none' }, shadow: SOFT });
++    imageChip(s, { x: l.chip[0], y: l.chip[1], w: l.chip[2], h: l.chip[3], color: l.chipColor });
++    s.addText('Lorem ipsum dolor sit', { x: 9.94, y: 4.058 + i * 0.938, w: 2.295, h: 0.345, ...BODY });
++  });
++  pageNumber(s, 21);
++}
++
++// 22 — team grid.
++function slide22(pptx) {
++  const s = pptx.addSlide();
++  doodle(s, { x: 2.691, y: 5.467, w: 2.946, h: 2.946, color: C.olive, rotate: 82.07, flipV: true });
++  doodle(s, { x: 10.333, y: 0, w: 2.982, h: 2.982, color: C.pink, flipV: true });
++  headline(s, { x: 2.961, y: 0.833, w: 7.412, h: 1.562, line1: 'Yumia fresh fruits', line2: 'Gardeners', color2: C.olive, align: 'center' });
++
++  [
++    { ph: [1.088, 3.151], frame: C.amber, dot: [2.387, 3.113], dotColor: 'FFEECB', name: [0.826, 5.397], role: [0.947, 5.807] },
++    { ph: [4.170, 4.200], frame: C.olive, dot: [5.469, 5.629], dotColor: 'F6FAC0', name: [3.908, 3.113], role: [4.029, 3.522] },
++    { ph: [7.251, 3.151], frame: C.pink, dot: [8.551, 3.113], dotColor: 'FFC4DC', name: [6.99, 5.397], role: [7.11, 5.807] },
++    { ph: [10.333, 4.200], frame: C.blush, dot: [11.632, 5.629], dotColor: 'FAAA96', name: [10.072, 3.113], role: [10.192, 3.522] },
++  ].forEach((p) => {
++    imagePlaceholder(s, { x: p.ph[0], y: p.ph[1], w: 1.913, h: 1.913, frame: p.frame, frameW: 6 });
++    s.addShape('ellipse', { x: p.dot[0], y: p.dot[1], w: 0.522, h: 0.522, fill: { color: p.dotColor }, line: { type: 'none' }, shadow: SOFT });
++    s.addText('John Doe', { x: p.name[0], y: p.name[1], w: 2.435, h: 0.508, align: 'center', ...LEAD, fontSize: 20 });
++    s.addText('gardener', { x: p.role[0], y: p.role[1], w: 2.194, h: 0.345, align: 'center', ...BODY });
++  });
++  pageNumber(s, 22);
++}
++
++// 23 — three price packages.
++function slide23(pptx) {
++  const s = pptx.addSlide();
++  s.addText([
++    { text: 'Yumia fresh fruits ', options: { color: C.ink } },
++    { text: 'Price package', options: { color: C.pink } },
++  ], { x: 1.167, y: 0.833, w: 11.0, h: 0.835, align: 'center', valign: 'top', ...TITLE });
++
++  [
++    {
++      card: 0.826, price: '$800', color: C.olive, priceX: 1.598, priceW: 2.067, sub: 1.513,
++      pill: 1.416, ribbon: 1.014, ribbonText: 1.259, plus: 2.485,
++      fruitA: [1.438, 2.055, 0.985, 1.456, IMG.avocado], fruitB: [2.840, 2.152, 0.985, 1.262, IMG.strawberry],
++    },
++    {
++      card: 4.862, price: '$1200', color: C.pink, priceX: 5.333, priceW: 2.667, sub: 5.548,
++      pill: 5.451, ribbon: 5.049, ribbonText: 5.294, plus: 6.521,
++      fruitA: [5.385, 2.023, 1.073, 1.510, IMG.grapes], fruitB: [6.780, 2.284, 1.380, 1.272, IMG.watermelon],
++    },
++    {
++      card: 8.897, price: '$1350', color: C.amber, priceX: 9.479, priceW: 2.445, sub: 9.584,
++      pill: 9.486, ribbon: 9.084, ribbonText: 9.329, plus: 10.556,
++      fruitA: [9.208, 2.419, 1.214, 1.056, IMG.cherry], fruitB: [10.483, 2.517, 1.584, 0.877, IMG.banana],
++    },
++  ].forEach((p) => {
++    s.addShape('roundRect', { x: p.card, y: 4.041, w: 3.61, h: 2.626, rectRadius: 0.233, fill: { color: C.white }, line: { type: 'none' }, shadow: SOFT });
++    imageChip(s, { x: p.fruitA[0], y: p.fruitA[1], w: p.fruitA[2], h: p.fruitA[3], color: p.fruitA[4] });
++    imageChip(s, { x: p.fruitB[0], y: p.fruitB[1], w: p.fruitB[2], h: p.fruitB[3], color: p.fruitB[4] });
++    freeform(s, PATHS.plus, { x: p.plus, y: 2.778, w: 0.292, h: 0.292, fill: p.color, shadow: SOFT });
++    s.addShape('roundRect', { x: p.pill, y: 3.75, w: 2.432, h: 0.556, rectRadius: 0.158, fill: { color: C.grey95 }, line: { type: 'none' }, shadow: SOFT });
++    s.addText('Fruit package name', {
++      x: p.pill, y: 3.75, w: 2.432, h: 0.556,
++      align: 'center', valign: 'middle', fontFace: MAJOR, fontSize: 14, color: '000000',
++    });
++    s.addText(p.price, {
++      x: p.priceX, y: 4.281, w: p.priceW, h: 1.077,
++      align: 'center', fontFace: MAJOR, fontSize: 48, color: p.color, lineSpacingMultiple: 1.3, valign: 'top',
++    });
++    s.addText('/500gr bundle', { x: p.sub, y: 5.153, w: 2.236, h: 0.325, align: 'center', ...BODY, fontSize: 11 });
++    s.addShape('roundRect', { x: p.ribbon, y: 5.671, w: 3.235, h: 0.802, rectRadius: 0.134, fill: { color: p.color }, line: { type: 'none' }, shadow: SOFT });
++    s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing', {
++      x: p.ribbonText, y: 5.768, w: 2.745, h: 0.608,
++      align: 'center', fontFace: MINOR, fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, valign: 'top',
++    });
++  });
++  pageNumber(s, 23);
++}
++
++// 24 — "Let's Online Order" over a laptop mock-up.
++function slide24(pptx) {
++  const s = pptx.addSlide();
++  doodle(s, { x: 0.74, y: -1.742, w: 3.964, h: 3.964, color: C.pink, flipV: true });
++  doodle(s, { x: 0.287, y: 5.467, w: 2.946, h: 2.946, color: C.olive, rotate: 82.07, flipV: true });
++  s.addShape('round1Rect', {
++    x: 5.042, y: 0, w: 8.292, h: 7.5, rectRadius: 3.75, flipH: true,
++    fill: { color: C.sun }, line: { type: 'none' }, shadow: SOFT,
++  });
++
++  // Laptop mock-up: dark bezel, screen, then the three tones of the base.
++  s.addShape('rect', { x: -2.089, y: 1.351, w: 9.539, h: 5.13, fill: { color: '18191D' }, line: { type: 'none' } });
++  s.addShape('rect', { x: -1.95, y: 1.5, w: 9.26, h: 4.83, fill: { color: '3A3B3D' }, line: { type: 'none' } });
++  s.addShape('roundRect', { x: -3, y: 6.42, w: 11.1, h: 0.24, rectRadius: 0.1, fill: { color: 'E9E9EB' }, line: { type: 'none' } });
++  s.addShape('roundRect', { x: -3, y: 6.64, w: 11.35, h: 0.16, rectRadius: 0.08, fill: { color: '8E9097' }, line: { type: 'none' } });
++  s.addShape('roundRect', { x: -3, y: 6.79, w: 10.55, h: 0.14, rectRadius: 0.07, fill: { color: 'DCDCDC' }, line: { type: 'none' } });
++  s.addShape('rect', { x: 0.062, y: 1.665, w: 7.244, h: 4.516, fill: { color: C.body }, line: { type: 'none' } });
++  imagePlaceholder(s, { x: 0.049, y: 1.625, w: 7.29, h: 4.584 });
++
++  [
++    { x: 6.903, y: 1.506, w: 3.875, fill: C.white, text: 'Let’s', color: C.ink, textX: 7.706, textW: 2.362 },
++    { x: 8.416, y: 2.693, w: 4.271, fill: C.pink, text: 'Online', color: C.white, textX: 9.004, textW: 3.211 },
++    { x: 8.061, y: 3.986, w: 3.682, fill: C.olive, text: 'Order', color: C.white, textX: 8.428, textW: 2.949 },
++  ].forEach((p) => {
++    s.addShape('roundRect', {
++      x: p.x, y: p.y, w: p.w, h: 1.456, rectRadius: 0.728, flipH: true,
++      fill: { color: p.fill }, line: { type: 'none' }, shadow: glow(C.rose, 0.15),
++    });
++    s.addText(p.text, {
++      x: p.textX, y: p.y + 0.274, w: p.textW, h: 1.018,
++      align: 'center', valign: 'top', ...TITLE, fontSize: 60, lineSpacing: 54, color: p.color,
++    });
++  });
++  pageNumber(s, 24);
++}
++
++// 25 — thank-you.
++function slide25(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.sun };
++  s.addShape('rect', { x: 0, y: 0, w: 7.575, h: 6.875, fill: { color: C.grey95, transparency: 50 }, line: { type: 'none' } });
++  s.addText('Image Placeholder', {
++    x: 0, y: 0.06, w: 7.575, h: 0.3, margin: 0,
++    align: 'center', valign: 'top', fontFace: MINOR, fontSize: 12, color: C.grey50,
++  });
++  croppedBlob(s, { x: 0, y: 0, w: 8.202, cropR: 0.39703, cropT: 0.44864, fill: C.white, flipH: true });
++
++  s.addText('THANK YOU', {
++    x: 8.729, y: 2.277, w: 3.929, h: 2.292,
++    align: 'center', valign: 'top', ...TITLE, fontSize: 72, lineSpacing: 65, color: C.white,
++  });
++  s.addShape('roundRect', {
++    x: 9.458, y: 4.57, w: 2.472, h: 0.653, rectRadius: 0.326,
++    fill: { color: C.pink }, line: { color: C.white, width: 3 }, shadow: SOFT,
++  });
++  s.addText('Website here', {
++    x: 9.458, y: 4.57, w: 2.472, h: 0.653,
++    align: 'center', valign: 'middle', fontFace: MINOR, fontSize: 16, color: C.white,
++  });
++  doodle(s, { x: 10.873, y: -0.833, w: 3.964, h: 3.964, color: C.white, flipV: true });
++  doodle(s, { x: 6.729, y: 5.715, w: 2.946, h: 2.946, color: C.white, rotate: 82.07, flipV: true });
++}
++
++// ================================================================== BUILD ===
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5 in
++  pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
++  pptx.author = 'Yumia';
++  pptx.title = 'Yumia Fresh Fruits';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++    slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++    slide19, slide20, slide21, slide22, slide23, slide24, slide25].forEach((fn) => fn(pptx));
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '07f1a73c-8eff-4ad9-9aa8-05bcc6922cde_grok_final.pptx') });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

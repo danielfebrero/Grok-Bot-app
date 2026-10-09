@@ -1,0 +1,1112 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/barbershop_2021_hairstyles_promo.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/barbershop_2021_hairstyles_promo.js
+@@ -0,0 +1,1109 @@
++/**
++ * "The Barber Shop" — 30-slide deck rebuilt with pptxgenjs.
++ * Raster photos in the original are replaced by flat grey placeholder rectangles.
++ *
++ *   node 0a7a11ae-2a67-449d-bd83-da5b844f9bf9_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------------------
++// Palette / typography (theme "Barber")
++// ---------------------------------------------------------------------------
++const C = {
++  dark: '44403F',      // accent2 - charcoal
++  cream: 'E8E2D0',     // accent1 - paper
++  gold: 'BF8034',      // accent3
++  rust: 'B9593B',      // accent4
++  white: 'FFFFFF',
++  black: '000000',
++  ink: '404040',       // body copy on light backgrounds
++  rustPale: 'D89A86',  // accent4 lightened — chrome on the rust slides
++  grey: 'A6A6A6',
++  grey80: '808080',
++  navy: '44546A',
++  navyDk: '222A35',
++  slate: '51647E',
++  img: 'CCCCCC',       // photo placeholder fill
++  imgLabel: 'BFBFBF',
++};
++
++const F = { head: 'Alfa Slab One', body: 'Open Sans' };
++
++// Shadow presets lifted from the source deck
++const SH = {
++  soft: { type: 'outer', color: C.black, blur: 20, offset: 10, angle: 45, opacity: 0.2 },
++  card: { type: 'outer', color: C.black, blur: 3, offset: 1, angle: 90, opacity: 0.5 },
++  wide: { type: 'outer', color: C.black, blur: 28, offset: 3, angle: 180, opacity: 0.4 },
++  halo: { type: 'outer', color: C.black, blur: 52, offset: 0, angle: 0, opacity: 0.2 },
++};
++
++const SLIDE_H = 7.5;
++const SLIDE_W = SLIDE_H * 16 / 9;   // 13.333" widescreen == 12192000 EMU
++
++// PowerPoint's default text-box inset, in points (pptxgenjs `margin` is [l,r,b,t]).
++const INSET = [7.2, 7.2, 3.6, 3.6];
++
++// ---------------------------------------------------------------------------
++// Thin wrappers over the pptxgenjs primitives
++// ---------------------------------------------------------------------------
++
++/** Filled / outlined shape (rectangle unless `o.shape` says otherwise). */
++function box(s, x, y, w, h, o = {}) {
++  const opts = { x, y, w, h };
++  opts.fill = o.fill ? (typeof o.fill === 'string' ? { color: o.fill } : o.fill) : { type: 'none' };
++  opts.line = o.line || { type: 'none' };
++  if (o.rotate) opts.rotate = o.rotate;
++  if (o.flipH) opts.flipH = true;
++  if (o.flipV) opts.flipV = true;
++  if (o.shadow) opts.shadow = o.shadow;
++  if (o.points) opts.points = o.points;
++  if (o.rectRadius) opts.rectRadius = o.rectRadius;
++  if (o.angleRange) opts.angleRange = o.angleRange;
++  if (o.arcThicknessRatio) opts.arcThicknessRatio = o.arcThicknessRatio;
++  s.addShape(o.shape || 'rect', opts);
++}
++
++/** Straight connector / rule. */
++function line(s, x, y, w, h, color, width, o = {}) {
++  const ln = { color, width };
++  if (o.arrow) ln.endArrowType = o.arrow;
++  if (o.headArrow) ln.beginArrowType = o.headArrow;
++  s.addShape('line', { x, y, w, h, line: ln, flipH: o.flipH, flipV: o.flipV });
++}
++
++/**
++ * Text box. `runs` is a string, or an array of paragraphs; each paragraph is a
++ * string or an array of `{text, ...runProps}` pieces.
++ */
++function text(s, runs, x, y, w, h, o = {}) {
++  const base = {
++    fontFace: o.face || F.body, fontSize: o.size || 11, color: o.color || C.ink,
++    bold: o.bold, italic: o.italic, charSpacing: o.spc,
++    align: o.align, lineSpacingMultiple: o.lnSpc, lineSpacing: o.lnPts,
++    paraSpaceAfter: o.spcAft,
++  };
++  const paras = Array.isArray(runs) ? runs : [runs];
++  const items = [];
++  paras.forEach((para, pi) => {
++    const pieces = Array.isArray(para) ? para : [para];
++    pieces.forEach((piece, ri) => {
++      const isStr = typeof piece === 'string';
++      items.push({
++        text: isStr ? piece : piece.text,
++        options: Object.assign({}, base, isStr ? {} : piece, {
++          breakLine: ri === pieces.length - 1 && pi < paras.length - 1,
++          bullet: o.bullet || false,
++        }),
++      });
++    });
++  });
++  const opts = {
++    x, y, w, h,
++    valign: o.valign || 'top',
++    align: o.align || 'left',
++    margin: o.margin === undefined ? INSET : o.margin,
++    wrap: o.wrap !== false,
++    fontFace: o.face || F.body,
++    fontSize: o.size || 11,
++    color: o.color || C.ink,
++  };
++  if (o.rotate) opts.rotate = o.rotate;
++  if (o.fill) opts.fill = { color: o.fill };
++  if (o.shadow) opts.shadow = o.shadow;
++  s.addText(items, opts);
++}
++
++/** Grey rectangle standing in for a photograph. */
++function photo(s, x, y, w, h, o = {}) {
++  box(s, x, y, w, h, { fill: C.img, rotate: o.rotate });
++  if (w > 1.2 && h > 0.55) {
++    text(s, '[image]', x, y + h / 2 - 0.2, w, 0.4,
++      { size: 11, color: C.imgLabel, align: 'center', spc: 2 });
++  }
++}
++
++// ---------------------------------------------------------------------------
++// Page furniture
++// ---------------------------------------------------------------------------
++
++/**
++ * Translucent diagonal bands in the top-left and bottom-right corners — the
++ * freeform artwork carried by every slide layout of the source template.
++ * Each band is the strip of a 4.353" corner square between the lines
++ * x + y = a and x + y = b.
++ */
++function stripes(s, color) {
++  const D = 4.353;
++  const fill = { color, transparency: 92 };
++  const quad = (a, b) => [{ x: a, y: 0, moveTo: true }, { x: b, y: 0 },
++    { x: 0, y: b }, { x: 0, y: a }, { close: true }];
++  [[0.921, 1.842], [1.909, 2.955], [3.033, D]].forEach(([a, b]) => {
++    box(s, 0, 0, D, D, { shape: 'custGeom', points: quad(a, b), fill });
++    box(s, SLIDE_W - D, SLIDE_H - D, D, D,
++      { shape: 'custGeom', points: quad(a, b), fill, rotate: 180 });
++  });
++}
++
++/** Three stacked squares bottom-left, top tick, corner rule and side label. */
++function chrome(s, o) {
++  box(s, 0, 6.958, 0.253, 0.253, { fill: o.tint[0] });
++  box(s, 0, 6.640, 0.253, 0.253, { fill: o.tint[1] });
++  box(s, 0, 6.323, 0.253, 0.253, { fill: o.tint[2] });
++  box(s, 12.611, 0.263, 0.723, 0.053, { fill: o.rule });
++  box(s, 0.768, 0.0, 0.968, 0.146, { fill: o.tick });
++  text(s, 'THE BARBER SHOP', 10.368, 0.146, 2.230, 0.286,
++    { size: 11, bold: true, spc: 3, color: o.head, wrap: false });
++  text(s, '2021 Hair Style', -0.684, 5.162, 1.906, 0.286,
++    { size: 10.5, spc: 3, color: o.side, rotate: 270, wrap: false });
++}
++
++/** Chrome colouring keyed by the slide's background family. */
++const CHROME = {
++  dark: { tint: [C.rust, C.gold, C.rust], rule: C.gold, tick: C.rust, head: C.gold, side: C.white },
++  cream: { tint: [C.dark, C.gold, C.rust], rule: C.gold, tick: C.rust, head: C.gold, side: C.ink },
++  rust: { tint: [C.rustPale, C.rustPale, C.rustPale], rule: C.rustPale, tick: C.rustPale, head: C.white, side: C.white },
++  white: { tint: [C.dark, C.gold, C.rust], rule: C.gold, tick: C.rust, head: C.gold, side: C.ink },
++};
++const BG = { dark: C.dark, cream: C.cream, rust: C.rust, white: C.white };
++const STRIPE = { dark: '222020', cream: '948148', rust: '8B432C' };
++
++/**
++ * Every slide starts the same way: background wash, watermark stripes.
++ * The chrome is drawn last (see `finish`) so it always sits on top.
++ */
++function shell(pptx, kind) {
++  const s = pptx.addSlide();
++  s._kind = kind;
++  s.background = { color: BG[kind] };
++  if (STRIPE[kind]) stripes(s, STRIPE[kind]);
++  return s;
++}
++
++function finish(s) {
++  chrome(s, CHROME[s._kind]);
++  return s;
++}
++
++/** Trio of short colour bars sitting under every section title. */
++function dashes(s, x, y, colors, gap = 0.478) {
++  colors.forEach((col, i) => box(s, x + i * gap, y, 0.403, 0.137, { fill: col }));
++}
++
++/** Two-tone slab-serif headline: `parts` = [[text, color], ...]. */
++function headline(s, parts, x, y, w, h, o = {}) {
++  text(s, [parts.map(([t, c]) => ({ text: t, color: c }))], x, y, w, h,
++    { face: F.head, size: o.size || 40, align: o.align, spc: o.spc, wrap: false });
++}
++
++/** Shared title block of the "Infographic Section" slides (19-29). */
++function infographicHead(s) {
++  headline(s, [['Infographic ', C.ink], ['Section', C.gold]], 3.635, 0.905, 6.064, 0.774,
++    { align: 'center' });
++  dashes(s, 5.988, 1.758, [C.dark, C.gold, C.rust]);
++}
++
++// Body copy reused verbatim throughout the template
++const LOREM = {
++  a: 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectur',
++  b: 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing',
++  c: 'Lorem ipsum, ectetur cic ing amet, adipis adip is, adipis ectetur',
++  d: 'Lorem ipsum dolor sit amet, adipis sitdol',
++  e: 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet',
++  wonder: 'A wonderful serenity has taken possession of my entire soul',
++  quis: 'Quis tellus id nulla mollis iaculis. Nam nec auctor arcu. Aenean molestie',
++  eiusmod: 'eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad',
++  company: 'A Company Is An Association Or Collection Of Individuals, Whether',
++  block: 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole possession of my entire soul, like these sweet mornings of spring which I enjoy',
++  option: 'Lorem ipsum dolor sit amet, consectetuer, . Lorem ipsum amet, adipiscing elit. Lorem ipsum dolor sit amet, consectetuer adipiscing elit. sit amet, consec tetuer . Lorem ipsum dolor sit amet adipiscing elit. Lorem ipsum dolor sit amet',
++  ipsumStd: "Lorem Ipsum has been the industry's standard",
++  showcase: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever",
++};
++
++// Bullet glyphs (source uses Wingdings arrow/tick — Unicode equivalents here).
++// 13.5pt hanging indent matches the deck's marL/indent of 171450 EMU.
++const IND = 13.5;
++const BUL = {
++  arrow: { characterCode: '27A2', indent: IND }, tick: { characterCode: '2713', indent: IND },
++  dot: { characterCode: '2022', indent: IND }, oh: { characterCode: '006F', indent: IND },
++};
++
++// ===========================================================================
++// Slide builders
++// ===========================================================================
++
++// --- 1 / 30 : cover + closing (identical furniture, different word) --------
++function coverSlide(pptx, title, spc) {
++  const s = shell(pptx, 'dark');
++  box(s, 0, 3.707, SLIDE_W, 1.629, { fill: C.rust });
++  box(s, 0.747, 2.200, 11.842, 4.642, { fill: C.gold });
++  photo(s, 0.938, 2.377, 11.462, 4.288);
++  finish(s);
++  box(s, 2.674, 0.822, 7.989, 2.304, { fill: C.rust });
++  text(s, title, spc ? 3.305 : 3.195, 1.211, spc ? 6.723 : 6.944, 1.111,
++    { face: F.head, size: 60, color: C.white, align: 'center', spc, wrap: false, shadow: SH.soft });
++  [5.097, 6.205, 7.313].forEach(x => box(s, x, 2.394, 0.934, 0.175, { fill: C.white, shadow: SH.soft }));
++  box(s, 2.857, 0.986, 7.623, 1.976, { line: { color: C.gold, width: 1.5 } });
++  [0.752, 11.063].forEach(x0 => [0, 0.6265, 1.253].forEach(dx =>
++    box(s, x0 + dx, 1.280, 0.242, 0.242, { line: { color: C.gold, width: 1.5 } })));
++  return s;
++}
++
++// --- 2 : Barber Office -----------------------------------------------------
++function slide02(pptx) {
++  const s = shell(pptx, 'cream');
++  photo(s, 0.0, 0.567, 3.053, 6.391);
++  photo(s, 10.281, 0.567, 3.053, 3.053);
++  photo(s, 10.281, 3.905, 3.053, 3.053);
++  box(s, 2.905, 5.686, 0.147, 1.526, { fill: C.rust });
++  box(s, 10.222, 0.569, 0.058, 1.526, { fill: C.rust });
++  box(s, 10.222, 3.905, 0.058, 1.526, { fill: C.rust });
++  finish(s);
++
++  headline(s, [['Barber ', C.ink], ['Office', C.gold]], 3.516, 1.337, 4.166, 0.774);
++  dashes(s, 3.621, 2.189, [C.dark, C.gold, C.rust]);
++
++  [['West Barbershop', '564.576 Office', 3.519], ['South Barbershop', '985.875 Office', 6.867]]
++    .forEach(([shop, num, x]) => {
++      text(s, [
++        [{ text: shop, bold: true, color: C.gold, fontSize: 18 }],
++        [{ text: num, bold: true, italic: true, color: C.ink, fontSize: 11, charSpacing: 3 }],
++        [{ text: LOREM.a, color: C.ink, fontSize: 10.5 }],
++      ], x, 2.579, 2.881, 1.363, { align: 'justify', lnSpc: 1.5 });
++    });
++  box(s, 3.621, 4.066, 0.403, 0.05, { fill: C.gold });
++  box(s, 6.978, 4.066, 0.403, 0.05, { fill: C.gold });
++
++  box(s, 3.488, 4.605, 6.358, 0.703, { fill: C.gold });
++  text(s, 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit', 3.697, 4.774, 5.939, 0.338,
++    { size: 10.5, italic: true, spc: 3, color: C.white, align: 'center', lnSpc: 1.5 });
++
++  box(s, 3.488, 5.516, 6.358, 1.442, { fill: C.rust });
++  text(s, ['Special', 'Barber'], 3.840, 5.775, 1.384, 0.909,
++    { size: 24, bold: true, color: C.white, wrap: false });
++  [5.401, 7.537].forEach(x =>
++    text(s, 'Lorem ipsum, adipis ectetur cicing amet, adi pis, adipis', x, 5.770, 1.957, 0.934,
++      { size: 11, color: C.white, align: 'justify', lnSpc: 1.5, bullet: BUL.arrow }));
++  return s;
++}
++
++// --- 3 : Clasic Barber -----------------------------------------------------
++function slide03(pptx) {
++  const s = shell(pptx, 'dark');
++  photo(s, 3.286, 3.197, 3.853, 4.289);
++  box(s, 7.325, 3.197, 6.008, 1.789, { fill: C.gold });
++  box(s, 3.286, 1.218, 3.853, 1.789, { fill: C.rust });
++  box(s, 3.212, 5.908, 0.147, 1.526, { fill: C.rust });
++  finish(s);
++
++  headline(s, [['Clasic', C.white], [' ', C.ink], ['Barber', C.gold]], 7.789, 1.484, 4.195, 0.774);
++  dashes(s, 7.895, 2.337, [C.rust, C.gold, C.rust]);
++
++  [['+657.85', 1.312, 12], ['+849.94', 3.317, 11], ['+738.98', 5.321, 12]].forEach(([n, y, sz]) => {
++    text(s, [
++      [{ text: n, bold: true, italic: true, charSpacing: 3, fontSize: sz }],
++      [{ text: LOREM.e, fontSize: sz - 1 }],
++    ], 0.843, y, 1.831, 1.2, { color: C.white, align: 'justify', lnSpc: 1.5 });
++  });
++
++  text(s, '\u201CLorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet, adipis sit dolor adipis sit ectetur adipis, adipis cing\u201D',
++    7.760, 3.511, 5.139, 1.161,
++    { size: 14, bold: true, italic: true, color: C.white, align: 'justify', lnSpc: 1.5 });
++
++  // Website card
++  box(s, 3.704, 1.689, 0.489, 0.489, { shape: 'ellipse', fill: C.white });
++  box(s, 3.784, 1.769, 0.329, 0.329, { shape: 'ellipse', line: { color: C.rust, width: 1.5 } });
++  line(s, 3.784, 1.933, 0.329, 0, C.rust, 1.5);
++  box(s, 3.868, 1.769, 0.161, 0.329, { shape: 'ellipse', line: { color: C.rust, width: 1.5 } });
++  text(s, 'Website', 4.325, 1.571, 1.375, 0.555, { size: 18, bold: true, color: C.white, lnSpc: 1.5 });
++  text(s, 'Lorem ipsum dolor sit amet ipsum dolor sit amet', 4.334, 2.028, 2.386, 0.627,
++    { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++
++  [5.331, 6.200].forEach(y => {
++    box(s, 7.863, y + 0.122, 0.147, 0.147, { fill: C.gold });
++    text(s, 'PLACEHOLDER',
++      8.182, y, 4.545, 0.656, { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++  });
++  return s;
++}
++
++// --- 4 : Professional Cutting ---------------------------------------------
++function slide04(pptx) {
++  const s = shell(pptx, 'rust');
++  photo(s, 8.607, 0.0, 3.326, 6.403);
++  photo(s, 5.009, 3.750, 3.326, 2.653);
++  photo(s, 1.411, 3.750, 3.326, 3.750);
++  box(s, 1.263, 5.974, 0.147, 1.526, { fill: C.rustPale });
++  box(s, 4.862, 4.903, 0.147, 1.526, { fill: C.rustPale });
++  box(s, 8.460, 0.0, 0.147, 1.526, { fill: C.rustPale });
++  finish(s);
++
++  headline(s, [['Professional Cutting', C.white]], 1.389, 1.150, 6.294, 0.774);
++  dashes(s, 1.495, 2.002, [C.white, C.white, C.white]);
++  text(s, LOREM.b, 2.909, 2.445, 3.618, 0.841,
++    { size: 11, color: C.white, align: 'justify', lnSpc: 2 });
++  text(s, '24/96', 1.411, 2.580, 1.368, 0.572, { size: 28, bold: true, color: C.white });
++  box(s, 6.757, 2.645, 1.430, 0.505, { fill: C.white, shadow: SH.card });
++  text(s, 'Download', 6.757, 2.645, 1.430, 0.505,
++    { size: 14, bold: true, color: C.rust, align: 'center', valign: 'middle' });
++  return s;
++}
++
++// --- 5 : Cutting Style -----------------------------------------------------
++function slide05(pptx) {
++  const s = shell(pptx, 'cream');
++  photo(s, 0.0, 0.0, 7.504, SLIDE_H);
++  box(s, 0.866, 5.329, 0.268, 1.526, { fill: C.rust, rotate: 351.4 });
++  box(s, 6.335, 0.454, 0.268, 1.526, { fill: C.rust, rotate: 351.4 });
++  finish(s);
++
++  headline(s, [['Cutting ', C.ink], ['Style', C.gold]], 7.887, 1.257, 4.132, 0.774);
++  dashes(s, 7.992, 2.110, [C.dark, C.gold, C.rust]);
++  box(s, 8.096, 2.657, 0.064, 3.010, { fill: C.rust });
++
++  [['Pompador Style', 2.570], ['Mulet Style', 3.876], ['Two Block Style', 5.183]]
++    .forEach(([title, y]) => {
++      box(s, 8.002, y + 0.161, 0.253, 0.253, { fill: C.gold });
++      text(s, [
++        [{ text: title, bold: true, color: C.gold, fontSize: 18 }],
++        [{ text: 'Lorem ipsum dolor sit amet, adipis sit dolor sit amet, adipis sit dolor cons sit amet, adipis ectur', color: C.ink, fontSize: 10.5 }],
++      ], 8.355, y, 4.047, 1.085, { align: 'justify', lnSpc: 1.5 });
++    });
++  return s;
++}
++
++// --- 6 : Perfect Barber ----------------------------------------------------
++function slide06(pptx) {
++  const s = shell(pptx, 'dark');
++  photo(s, 6.667, 2.347, 6.667, 2.805);
++  photo(s, 0.0, 4.695, 4.353, 2.805);
++  box(s, 4.353, 4.695, 2.314, 2.805, { fill: C.gold });
++  box(s, 6.667, 5.153, 6.667, 2.347, { fill: C.rust });
++  box(s, 6.519, 2.347, 0.147, 1.526, { fill: C.rust });
++  box(s, 3.516, 3.858, 0.147, 1.526, { fill: C.rust, rotate: 90 });
++  finish(s);
++
++  text(s, 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ecte',
++    0.905, 1.027, 8.290, 0.471, { size: 11, color: C.white, spc: 3, align: 'justify', lnSpc: 2 });
++  line(s, 9.556, 1.306, 1.583, 0, C.white, 0.75, { arrow: 'triangle' });
++
++  headline(s, [['Perfect', C.white], [' ', C.ink], ['Barber', C.gold]], 0.919, 2.054, 4.607, 0.774);
++  dashes(s, 1.024, 2.906, [C.rust, C.gold, C.rust]);
++  text(s, '84%', 0.929, 3.360, 1.368, 0.572, { size: 28, bold: true, color: C.white });
++  text(s, LOREM.b, 2.084, 3.351, 3.960, 0.656,
++    { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++
++  text(s, '\u201CLorem ipsu  dolor sit am et, adipis sit dolor cons\u201D', 4.788, 5.340, 1.444, 1.515,
++    { size: 14, bold: true, italic: true, color: C.white, align: 'justify', lnSpc: 1.5 });
++  text(s, [
++    [{ text: 'About Barber', bold: true, fontSize: 18 }],
++    [{ text: '$758.686.978 Price', bold: true, fontSize: 11 }],
++    [{ text: 'The Best Burber Shop', fontSize: 11 }],
++  ], 7.318, 5.768, 2.071, 1.111, { color: C.white, align: 'justify', lnSpc: 1.5 });
++  text(s, 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet, adipis sit dolor cons sit',
++    9.389, 5.747, 3.293, 1.212, { size: 11, color: C.white, align: 'justify', lnSpc: 2 });
++  return s;
++}
++
++// --- 7 : Barber Description ------------------------------------------------
++function slide07(pptx) {
++  const s = shell(pptx, 'rust');
++  photo(s, 0.768, 0.0, 4.0, SLIDE_H);
++  box(s, 4.768, 5.974, 0.147, 1.526, { fill: C.rustPale });
++  box(s, 0.635, 0.160, 0.147, 1.526, { fill: C.rustPale });
++  finish(s);
++
++  headline(s, [['Barber Description', C.white]], 5.648, 1.270, 5.891, 0.774);
++  dashes(s, 5.753, 2.122, [C.white, C.white, C.white]);
++
++  [['Short Cutting', 6.156, 2.786, 5.758, 2.953],
++    ['Long Cutting', 6.156, 4.612, 5.758, 4.778],
++    ['Medium Cutting', 9.613, 2.786, 9.215, 2.953],
++    ['Best of Cutting', 9.613, 4.612, 9.215, 4.778]].forEach(([title, tx, ty, mx, my]) => {
++    box(s, mx, my, 0.292, 0.251, { shape: 'triangle', fill: C.white, rotate: 90 });
++    text(s, [
++      [{ text: title, bold: true, fontSize: 18 }],
++      [{ text: 'New Barber Shop ', bold: true, fontSize: 11 }],
++      [{ text: LOREM.b, fontSize: 10.5 }],
++    ], tx, ty, 2.559, 1.628, { color: C.white, align: 'justify', lnSpc: 1.5 });
++  });
++  return s;
++}
++
++// --- 8 : Point About Barber ------------------------------------------------
++function slide08(pptx) {
++  const s = shell(pptx, 'cream');
++  photo(s, 9.326, 0.0, 4.007, SLIDE_H);
++  box(s, 9.179, 5.974, 0.147, 1.526, { fill: C.rust });
++  box(s, 13.186, 0.678, 0.147, 1.526, { fill: C.rust });
++  finish(s);
++
++  headline(s, [['Point About ', C.ink], ['Barber', C.gold]], 0.739, 1.199, 6.269, 0.774);
++  dashes(s, 0.844, 2.052, [C.dark, C.gold, C.rust]);
++
++  text(s, 'New Barber Shop Style', 0.737, 2.371, 2.295, 0.418, { size: 11, color: C.ink, lnSpc: 2 });
++  text(s, '857.857++', 6.549, 2.332, 2.295, 0.418,
++    { size: 11, bold: true, spc: 6, color: C.gold, align: 'right', lnSpc: 2 });
++  line(s, 0.853, 2.905, 7.874, 0, C.ink, 0.75);
++  text(s, 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet, adipis sit ectetur adipis, adipis cing',
++    0.737, 3.087, 8.133, 0.656, { size: 11, color: C.ink, align: 'justify', lnSpc: 1.5 });
++
++  [['Customer', C.dark, 0.812, 1.101, 1.265, personIcon],
++    ['Order Cutting', C.gold, 3.568, 3.856, 4.037, planeIcon],
++    ['Price Order', C.rust, 6.323, 6.611, 6.693, moneyIcon]].forEach(
++    ([label, col, bx, tx, ix, icon]) => {
++      box(s, bx, 4.242, 2.568, 2.763, { fill: col });
++      icon(s, ix, 4.580, 0.44, C.white);
++      text(s, label, tx, 5.172, 1.991, 0.462,
++        { size: 16, bold: true, color: C.white, align: 'justify', lnSpc: 1.5 });
++      text(s, LOREM.c, tx, 5.696, 1.991, 0.934,
++        { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++    });
++  return s;
++}
++
++/** Line-art person glyph: head circle above a shoulders arc. */
++function personIcon(s, x, y, d, col) {
++  const w = 2;
++  box(s, x + d * 0.28, y, d * 0.44, d * 0.44, { shape: 'ellipse', line: { color: col, width: w } });
++  box(s, x + d * 0.05, y + d * 0.52, d * 0.90, d * 0.90,
++    { shape: 'blockArc', line: { color: col, width: w }, angleRange: [180, 360], arcThicknessRatio: 0.02 });
++}
++
++/** Line-art paper-plane glyph. */
++function planeIcon(s, x, y, d, col) {
++  box(s, x, y, d, d, {
++    shape: 'custGeom', line: { color: col, width: 2 },
++    points: [
++      { x: d, y: 0, moveTo: true }, { x: 0, y: d * 0.45 },
++      { x: d * 0.38, y: d * 0.60 }, { x: d * 0.52, y: d },
++      { close: true }],
++  });
++}
++
++/** Line-art banknote glyph (tilted rectangle with a coin in the middle). */
++function moneyIcon(s, x, y, d, col) {
++  box(s, x, y + d * 0.15, d, d * 0.66,
++    { line: { color: col, width: 2 }, rotate: 345 });
++  box(s, x + d * 0.36, y + d * 0.34, d * 0.28, d * 0.28,
++    { shape: 'ellipse', line: { color: col, width: 2 } });
++}
++
++// --- 9 : Two Best Seller Cut ----------------------------------------------
++function slide09(pptx) {
++  const s = shell(pptx, 'dark');
++  box(s, 0, 4.352, SLIDE_W, 3.148, { fill: { color: '33302F', transparency: 70 } });
++  photo(s, 1.642, 2.642, 2.516, 3.537);
++  photo(s, 6.674, 2.642, 2.516, 3.537);
++  box(s, 4.158, 2.642, 2.516, 3.537, { fill: C.gold });
++  box(s, 9.189, 2.642, 2.516, 3.537, { fill: C.rust });
++  box(s, 1.642, 4.796, 0.147, 1.526, { fill: C.rust });
++  box(s, 6.667, 4.796, 0.147, 1.526, { fill: C.rust });
++  finish(s);
++
++  headline(s, [['Two Best ', C.white], ['Seller Cut', C.gold]], 3.605, 1.232, 6.124, 0.774,
++    { align: 'center' });
++  dashes(s, 5.988, 2.084, [C.rust, C.gold, C.rust]);
++
++  [['Shot Cutting', '$65.876', 4.415, 4.425, 4.519, C.gold],
++    ['Formal Cutting', '$89.486', 9.447, 9.457, 9.551, C.rust]].forEach(
++    ([title, price, x1, x2, x3, btnColor]) => {
++      text(s, [[{ text: title, bold: true, fontSize: 16 }], [{ text: price, bold: true, fontSize: 16 }]],
++        x1, 3.005, 1.991, 0.909, { color: C.white, align: 'justify', lnSpc: 1.5 });
++      text(s, LOREM.c, x2, 3.960, 1.991, 1.159, { size: 11, color: C.white, align: 'justify', lnSpc: 2 });
++      box(s, x3, 5.311, 1.807, 0.505, { fill: C.white, shadow: SH.card });
++      text(s, 'Order Now', x3, 5.311, 1.807, 0.505,
++        { size: 14, bold: true, color: btnColor, align: 'center', valign: 'middle' });
++    });
++  return s;
++}
++
++// --- 10 : Best Barber Shop (vertical title) --------------------------------
++function slide10(pptx) {
++  const s = shell(pptx, 'rust');
++  photo(s, 6.512, 0.0, 3.172, SLIDE_H);
++  photo(s, 3.211, 0.0, 3.172, SLIDE_H);
++  box(s, 3.061, 0.0, 0.147, 1.526, { fill: C.rustPale });
++  box(s, 9.682, 5.977, 0.147, 1.526, { fill: C.rustPale });
++  finish(s);
++
++  text(s, 'Best Barber Shop', -0.979, 3.363, 5.421, 0.774,
++    { face: F.head, size: 40, color: C.white, rotate: 270, wrap: false });
++  // the dash trio is rotated 270deg with the title, so it stacks vertically
++  [0, 1, 2].forEach(i => box(s, 2.172, 4.986 + i * 0.478, 0.137, 0.403, { fill: C.white }));
++
++  [1.110, 2.562, 4.013, 5.465].forEach(y => {
++    box(s, 10.348, y + 0.147, 0.292, 0.251, { shape: 'triangle', fill: C.white, rotate: 90 });
++    text(s, LOREM.c, 10.773, y, 1.991, 0.934, { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++  });
++  return s;
++}
++
++// --- 11 : Barber Quotes ----------------------------------------------------
++function slide11(pptx) {
++  const s = shell(pptx, 'cream');
++  photo(s, 6.667, 1.041, 5.418, 5.418);
++  box(s, 1.018, 3.274, 5.648, 4.226, { fill: C.gold });
++  box(s, 12.084, 1.047, 0.147, 1.526, { fill: C.rust });
++  box(s, 6.667, 5.680, 0.147, 1.526, { fill: C.rust });
++  finish(s);
++
++  headline(s, [['Barber ', C.ink], ['Quotes', C.gold]], 0.937, 1.605, 4.518, 0.774);
++  dashes(s, 1.042, 2.457, [C.dark, C.gold, C.rust]);
++
++  text(s, '\u201C', 1.718, 3.058, 1.991, 1.59, { size: 66, bold: true, color: C.white });
++  text(s, '\u201C', 3.963, 5.989, 1.991, 1.59, { size: 66, bold: true, color: C.white, rotate: 180 });
++  text(s, 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet, adipis sit dolor cons sit ametcing amet, adipis sit ectetur adipis, adipis cing',
++    1.731, 3.990, 4.223, 2.794,
++    { size: 16, bold: true, italic: true, color: C.white, align: 'justify', lnSpc: 2 });
++  return s;
++}
++
++// --- 12 : Barber Modern ----------------------------------------------------
++function slide12(pptx) {
++  const s = shell(pptx, 'dark');
++  photo(s, 0.768, 2.232, 5.902, 5.268);
++  box(s, 1.737, 0.0, 3.965, 2.758, { fill: C.gold });
++  box(s, 6.670, 2.232, 6.663, 1.518, { fill: C.rust });
++  box(s, 0.621, 2.232, 0.147, 1.526, { fill: C.rust });
++  box(s, 6.667, 5.974, 0.147, 1.526, { fill: C.rust });
++  finish(s);
++
++  [['07.30', 0.341], ['18.00', 1.051], ['22.30', 1.761]].forEach(([time, y]) => {
++    text(s, time, 2.064, y + 0.042, 1.368, 0.572, { size: 28, bold: true, color: C.white });
++    text(s, LOREM.d, 3.562, y, 1.812, 0.656, { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++  });
++
++  text(s, '\u201CLorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet, adipis sit dolor cons\u201D',
++    7.416, 2.637, 5.172, 0.707,
++    { size: 12, bold: true, italic: true, color: C.white, align: 'justify', lnSpc: 1.5 });
++
++  headline(s, [['Barber', C.white], [' ', C.ink], ['Modern', C.gold]], 7.418, 4.489, 4.834, 0.774);
++  dashes(s, 7.523, 5.341, [C.rust, C.gold, C.rust]);
++
++  box(s, 7.523, 5.868, 4.128, 0.825, { fill: C.gold });
++  text(s, 'Lorem ipsum d dolor amet, olor amet, adipis sit dolor cons, adipis ectetur',
++    7.850, 6.045, 3.474, 0.471, { size: 11, color: C.white, align: 'justify' });
++  box(s, 11.650, 5.861, 0.943, 0.832, { fill: C.rust });
++  text(s, '31%', 11.650, 5.861, 0.943, 0.832,
++    { size: 20, bold: true, color: C.white, align: 'center', valign: 'middle' });
++  return s;
++}
++
++// --- 13 : Barber Employee's ------------------------------------------------
++function slide13(pptx) {
++  const s = shell(pptx, 'rust');
++  photo(s, 0.768, 0.750, 11.830, 2.998);
++  photo(s, 8.503, 3.751, 4.096, 3.049);
++  box(s, 0.695, 2.222, 0.147, 1.526, { fill: C.rustPale });
++  box(s, 12.601, 3.001, 0.147, 1.526, { fill: C.rustPale });
++  finish(s);
++
++  headline(s, [['Barber Employee\u2019s', C.white]], 1.142, 4.423, 5.780, 0.774);
++  dashes(s, 1.247, 5.276, [C.white, C.white, C.white]);
++
++  [['+84.9', 1.149, 2.395], ['+77.5', 4.983, 6.228]].forEach(([n, nx, tx]) => {
++    text(s, n, nx, 5.814, 1.368, 0.572, { size: 28, bold: true, color: C.white });
++    text(s, LOREM.d, tx, 5.772, 1.812, 0.656, { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++  });
++  line(s, 4.526, 5.814, 0, 0.509, C.white, 0.75);
++  return s;
++}
++
++// --- 14 : About Barber -----------------------------------------------------
++function slide14(pptx) {
++  const s = shell(pptx, 'cream');
++  photo(s, 3.777, 0.0, 3.505, 5.321);
++  photo(s, 0.0, 1.0, 3.505, 5.323);
++  box(s, 3.777, 5.594, 3.505, 1.906, { fill: C.gold });
++  box(s, 7.555, 5.594, 5.509, 1.906, { fill: C.rust });
++  box(s, 3.372, 4.796, 0.147, 1.526, { fill: C.rust });
++  box(s, 7.130, 0.0, 0.147, 1.526, { fill: C.rust });
++  finish(s);
++
++  headline(s, [['About ', C.ink], ['Barber', C.gold]], 7.853, 1.525, 4.264, 0.774);
++  dashes(s, 7.958, 2.377, [C.dark, C.gold, C.rust]);
++  text(s, 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet, adipis sit ectetur adipis',
++    7.849, 2.793, 4.782, 1.212, { size: 11, color: C.ink, align: 'justify', lnSpc: 2 });
++  line(s, 7.954, 4.168, 4.589, 0, C.ink, 0.75, { arrow: 'triangle' });
++  text(s, [
++    [{ text: 'Lorem ipsum dolor sit amet, adipis', bold: true, italic: true, fontSize: 14, color: C.ink }],
++    [{ text: '$56.987.905', bold: true, fontSize: 18, color: C.gold }],
++  ], 7.879, 4.236, 4.782, 0.909, { align: 'justify', lnSpc: 1.5 });
++
++  text(s, '\u201CLorem ipsum dolor sit amet, adipis sit dolor cons sit amet, amet, adipis sit dolor cons\u201D',
++    4.212, 6.042, 2.636, 1.010,
++    { size: 12, bold: true, italic: true, color: C.white, align: 'justify', lnSpc: 1.5 });
++  text(s, [
++    [{ text: 'Great Styles', bold: true, fontSize: 16 }],
++    [{ text: 'Barber Shop', bold: true, fontSize: 11 }],
++    [{ text: '54%  |  Percentage', fontSize: 11 }],
++  ], 7.969, 5.992, 2.559, 1.060, { color: C.white, align: 'justify', lnSpc: 1.5 });
++  text(s, 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet, adipis sit dolor',
++    9.726, 5.960, 2.935, 1.212, { size: 11, color: C.white, align: 'justify', lnSpc: 2 });
++  return s;
++}
++
++// --- 15 : Cutting Percent --------------------------------------------------
++function slide15(pptx) {
++  const s = shell(pptx, 'dark');
++  [6.667, 8.681, 10.695].forEach(x => photo(s, x, 1.335, 1.674, 3.263));
++  box(s, 8.193, 1.335, 0.147, 1.526, { fill: C.rust });
++  box(s, 10.207, 1.326, 0.147, 1.526, { fill: C.rust });
++  box(s, 12.221, 1.335, 0.147, 1.526, { fill: C.rust });
++  finish(s);
++
++  headline(s, [['Cutting', C.white], [' ', C.ink], ['Percent', C.gold]], 0.990, 1.495, 4.953, 0.774);
++  dashes(s, 1.096, 2.347, [C.rust, C.gold, C.rust]);
++  text(s, '45%', 0.917, 2.850, 1.006, 0.572, { size: 28, bold: true, color: C.white });
++  text(s, 'Special Cutting', 1.923, 2.961, 2.889, 0.337, { size: 14, color: C.white });
++  text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamco rper nibh euismod',
++    1.923, 3.376, 4.144, 0.656, { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++  line(s, 1.096, 4.379, 4.252, 0, C.white, 0.75, { arrow: 'triangle' });
++
++  [[C.rust, 0.965, '+903', 1.387, 2.639, 4.834], [C.gold, 6.667, '+749', 7.089, 8.340, 10.535]]
++    .forEach(([col, bx, num, nx, tx, btnx]) => {
++      box(s, bx, 4.978, 5.702, 1.206, { fill: col });
++      text(s, num, nx, 5.295, 1.274, 0.572, { size: 28, bold: true, color: C.white });
++      text(s, LOREM.d, tx, 5.253, 2.015, 0.656, { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++      box(s, btnx, 5.424, 1.411, 0.355, { fill: C.white, shadow: SH.card });
++      text(s, 'Order Now', btnx, 5.424, 1.411, 0.355,
++        { size: 12, bold: true, color: C.rust, align: 'center', valign: 'middle' });
++    });
++  return s;
++}
++
++// --- 16 : Hair Cutting -----------------------------------------------------
++function slide16(pptx) {
++  const s = shell(pptx, 'rust');
++  photo(s, 0.804, 0.956, 3.379, 3.379);
++  photo(s, 4.522, 3.186, 3.379, 3.379);
++  photo(s, 8.287, 3.186, 4.242, 3.379);
++  box(s, 0.695, 0.956, 0.147, 1.526, { fill: C.rustPale });
++  box(s, 4.405, 3.186, 0.147, 1.526, { fill: C.rustPale });
++  box(s, 8.165, 3.186, 0.147, 1.526, { fill: C.rustPale });
++  finish(s);
++
++  headline(s, [['Hair Cutting', C.white]], 4.744, 1.333, 3.925, 0.774);
++  dashes(s, 4.850, 2.186, [C.white, C.white, C.white]);
++  text(s, '\u201CLorem ipsum dolor sit amet, adipis sit dolor cons sit amet, amet, adipis sit dolor cons\u201D',
++    1.0, 4.808, 2.765, 1.515,
++    { size: 14, bold: true, italic: true, color: C.white, align: 'justify', lnSpc: 1.5 });
++  box(s, 9.190, 1.536, 0.292, 0.251, { shape: 'triangle', fill: C.white, rotate: 90 });
++  text(s, LOREM.c, 9.615, 1.389, 1.991, 0.934, { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++  text(s, '#45', 11.287, 1.753, 1.274, 0.572, { size: 28, bold: true, color: C.white, rotate: 90 });
++  return s;
++}
++
++// --- 17 : Best of Type Barber ----------------------------------------------
++function slide17(pptx) {
++  const s = shell(pptx, 'cream');
++  photo(s, 1.632, 2.789, 4.801, 2.347);
++  photo(s, 6.910, 2.789, 4.801, 2.347);
++  box(s, 1.495, 2.789, 0.147, 1.526, { fill: C.rust });
++  box(s, 6.763, 2.789, 0.147, 1.526, { fill: C.rust });
++  finish(s);
++
++  headline(s, [['Best of Type ', C.ink], ['Barber', C.gold]], 3.586, 1.147, 6.161, 0.774,
++    { align: 'center' });
++  dashes(s, 5.988, 2.0, [C.dark, C.gold, C.rust]);
++
++  [['Straigh Cutting', C.gold, 2.727, 2.867, 2.333, 1.632, 2.072],
++    ['Curly Cutting', C.rust, 8.003, 8.315, 1.991, 6.931, 7.372]].forEach(
++    ([label, col, bx, lx, lw, cx, tx]) => {
++      box(s, bx, 4.711, 2.614, 0.852, { fill: col });
++      text(s, label, lx, 4.935, lw, 0.404, { size: 18, bold: true, color: C.white, align: 'center' });
++      box(s, cx, 5.687, 4.759, 0.953, { fill: col });
++      text(s, 'Lorem ipsum dolor sit amet, adipis sit dolor cons sit amet, adipis ectetur adipis cing amet',
++        tx, 5.836, 3.878, 0.656, { size: 11, color: C.white, align: 'center', lnSpc: 1.5 });
++    });
++  return s;
++}
++
++// --- 18 : four style cards -------------------------------------------------
++function slide18(pptx) {
++  const s = shell(pptx, 'dark');
++  photo(s, 1.305, 1.255, 1.758, 2.421);
++  photo(s, 4.835, 3.837, 1.758, 2.421);
++  photo(s, 6.737, 1.255, 1.758, 2.421);
++  photo(s, 10.267, 3.837, 1.758, 2.421);
++  box(s, 3.207, 1.255, 3.386, 2.421, { fill: C.rust });
++  box(s, 1.305, 3.837, 3.386, 2.421, { fill: C.gold });
++  box(s, 6.737, 3.837, 3.386, 2.421, { fill: C.gold });
++  box(s, 8.639, 1.255, 3.386, 2.421, { fill: C.rust });
++  box(s, 1.179, 1.255, 0.147, 1.526, { fill: C.rustPale });
++  box(s, 12.021, 4.732, 0.147, 1.526, { fill: C.rustPale });
++  box(s, 5.140, 5.965, 0.147, 0.717, { fill: C.rustPale, rotate: 90 });
++  box(s, 8.063, 0.810, 0.147, 0.717, { fill: C.rustPale, rotate: 90 });
++  finish(s);
++
++  [['Sort Mohawk', 3.549, 1.555, 3.657, C.rust], ['Two Block', 8.980, 1.555, 9.089, C.rust],
++    ['Q - STyle', 1.647, 4.137, 1.756, C.gold], ['Curly Cut', 7.079, 4.137, 7.187, C.gold]]
++    .forEach(([title, x, y, bx, btnColor]) => {
++      text(s, title, x, y, 1.991, 0.507,
++        { size: 18, bold: true, color: C.white, align: 'justify', lnSpc: 1.5 });
++      text(s, LOREM.c, x, y + 0.523, 2.703, 0.656,
++        { size: 11, color: C.white, align: 'justify', lnSpc: 1.5 });
++      box(s, bx, y + 1.340, 1.411, 0.355, { fill: C.white, shadow: SH.card });
++      text(s, 'Order Now', bx, y + 1.340, 1.411, 0.355,
++        { size: 12, bold: true, color: btnColor, align: 'center', valign: 'middle' });
++    });
++  return s;
++}
++
++// --- 19 : nested arches ----------------------------------------------------
++/**
++ * Arch: flat bottom, rounded shoulders, drawn as a custGeom path.
++ * custGeom point coordinates are relative to the shape's own bounding box.
++ */
++function arch(s, x, y, w, h, fill, o = {}) {
++  const pts = [
++    { x: w, y: h, moveTo: true },
++    { x: w * 0.703, y: 0, curve: { type: 'cubic', x1: w, y1: h * 0.448, x2: w * 0.867, y2: 0 } },
++    { x: w * 0.297, y: 0 },
++    { x: 0, y: h, curve: { type: 'cubic', x1: w * 0.133, y1: 0, x2: 0, y2: h * 0.448 } },
++    { close: true },
++  ];
++  box(s, x, y, w, h, Object.assign({ shape: 'custGeom', points: pts, fill }, o));
++}
++
++function slide19(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  // Four nested arches, back (smallest, right) to front (largest, left).
++  // Each is a solid arch, a half-width darker face, and (bar the smallest)
++  // a pale highlight arch tucked inside.
++  [[11.326, 4.860, 1.613, 1.367, C.navy],
++    [9.682, 4.239, 2.172, 1.988, C.dark],
++    [7.943, 3.490, 2.579, 2.734, C.gold],
++    [5.983, 3.048, 2.799, 3.179, C.rust]].forEach(([x, y, w, h, col]) => {
++    arch(s, x, y, w, h, col, { shadow: SH.wide });
++    arch(s, x, y, w * 0.594, h, { color: C.black, transparency: 70 });   // shaded inner face
++    if (h > 1.5) {                                                        // inner highlight arch
++      arch(s, x + w * 0.11, y + h * 0.257, w * 0.40, h * 0.743,
++        { color: C.white, transparency: 70 });
++    }
++  });
++
++  box(s, 1.061, 3.129, 3.950, 0.621, { fill: C.rust });
++  text(s, 'Creative Infograph', 1.277, 3.237, 3.647, 0.404,
++    { size: 24, bold: true, color: C.white, align: 'center', margin: 0 });
++  [0.952, 3.158].forEach(x =>
++    text(s, LOREM.wonder, x, 3.932, 2.129, 0.750,
++      { size: 11, color: C.black, lnSpc: 1.2, bullet: BUL.dot }));
++  text(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with serenity has taken',
++    1.129, 4.992, 4.278, 0.750, { size: 11, color: C.black, lnSpc: 1.2 });
++  return s;
++}
++
++// --- 20 : six dotted-circle icons ------------------------------------------
++function slide20(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  [[1.971, 2.897, C.rust, 3.085, 3.050], [1.971, 4.208, C.dark, 3.085, 4.360],
++    [1.953, 5.470, C.gold, 3.066, 5.622], [7.344, 2.880, C.rust, 8.457, 3.032],
++    [7.344, 4.190, C.dark, 8.457, 4.342], [7.325, 5.452, C.gold, 8.439, 5.605]]
++    .forEach(([cx, cy, col, tx, ty]) => {
++      box(s, cx, cy, 0.958, 0.967,
++        { shape: 'ellipse', line: { color: col, width: 1.25, dashType: 'sysDot' } });
++      box(s, cx + 0.079, cy + 0.082, 0.785, 0.787, { shape: 'ellipse', fill: col });
++      recycleIcon(s, cx + 0.285, cy + 0.295, 0.39, C.white);
++      text(s, LOREM.eiusmod, tx, ty, 2.942, 0.978,
++        { size: 12, color: C.grey, align: 'justify', lnSpc: 1.5 });
++    });
++  return s;
++}
++
++/** Two half-ring arrows chasing each other (the "refresh"/recycle mark). */
++function recycleIcon(s, x, y, d, col) {
++  [0, 180].forEach(rot => {
++    box(s, x, y, d, d, { shape: 'blockArc', fill: col, rotate: rot,
++      angleRange: [200, 350], arcThicknessRatio: 0.44 });
++    box(s, x + d * (rot ? 0.02 : 0.62), y + d * 0.30, d * 0.36, d * 0.30,
++      { shape: 'triangle', fill: col, rotate: rot ? 270 : 90 });
++  });
++}
++
++// --- 21 : atom + four agenda blocks ---------------------------------------
++function slide21(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  // Stylised atom: three rotated ellipse orbits around a nucleus.
++  [0, 60, 120].forEach(rot =>
++    box(s, 5.110, 3.693, 2.910, 1.450,
++      { shape: 'ellipse', line: { color: C.rust, width: 5 }, rotate: rot }));
++  box(s, 6.415, 4.268, 0.300, 0.300, { shape: 'ellipse', fill: C.rust });
++
++  [['right', 1.640, 3.264, 2.732, 2.943, 4.463, 3.075, C.cream, 270, true],
++    ['right', 1.639, 5.652, 2.731, 5.332, 4.463, 5.576, C.dark, 270, true],
++    ['left', 9.003, 3.293, 9.002, 2.958, 8.622, 3.134, C.dark, 90, false],
++    ['left', 9.002, 5.682, 9.031, 5.353, 8.622, 5.635, C.cream, 90, false]].forEach(
++    ([align, bx, by, tx, ty, mx, my, col, rot, flip]) => {
++      box(s, mx, my, 0.319, 0.275, { shape: 'triangle', fill: col, rotate: rot, flipH: flip });
++      text(s, 'Agenda Here', tx, ty, 1.823, 0.370, { size: 16, bold: true, color: C.black, align });
++      text(s, LOREM.company, bx, by, 2.791, 0.457, { size: 10.6, color: C.grey, align });
++    });
++  return s;
++}
++
++// --- 22 : four-step circle journey -----------------------------------------
++function slide22(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  text(s, "Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting industry.  Lorem Ipsum has been the industry's standard dummy text industry.  Lorem Ipsum has been the industry's standard dummy textIpsum has",
++    1.902, 1.952, 9.530, 0.630, { size: 11, color: C.ink, align: 'center', lnSpc: 1.5 });
++
++  [[3.514, 3.978, 1.190, 1.492, false], [4.618, 4.726, 2.381, 0.709, true],
++    [8.027, 3.515, 2.187, 0.738, true]].forEach(([x, y, w, h, flipV]) =>
++    line(s, x, y, w, h, 'F2F2F2', 6, { flipV }));
++
++  [[2.189, 2.983, C.rust, 1.735, 4.641], [4.479, 4.655, C.gold, 4.479, 6.291],
++    [6.790, 3.507, C.rust, 6.790, 5.166], [9.578, 2.793, C.gold, 9.172, 4.397]]
++    .forEach(([x, y, col, tx, ty]) => {
++      box(s, x, y, 1.429, 1.429, { shape: 'ellipse', fill: col });
++      text(s, 'Main topic', x, y, 1.429, 1.429,
++        { size: 12, color: C.white, align: 'center', valign: 'middle' });
++      text(s, 'Lorem ipsum dolor sit amet, consectetur', tx, ty, 1.899, 0.728,
++        { size: 10, color: C.grey80, lnSpc: 1.5, bullet: BUL.tick });
++    });
++  return s;
++}
++
++// --- 23 : four triangle bars -----------------------------------------------
++function slide23(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  [[1.074, 2.542, 2.915, C.cream, 'C4B486', '23%', C.cream],
++    [2.568, 2.291, 3.172, C.dark, '33302F', '75%', C.cream],
++    [4.057, 3.446, 2.013, C.gold, '8F6027', '35%', C.cream],
++    [5.551, 3.115, 2.344, C.rust, '8B432C', '27%', C.rust]].forEach(
++    ([x, y, h, light, dark, pct, labelColor], i) => {
++      box(s, x, y, 0.718, h, { shape: 'rtTriangle', fill: dark, flipH: true });
++      box(s, x + 0.710, y, 0.719, h, { shape: 'rtTriangle', fill: light });
++      text(s, pct, x + 0.30, 4.867, 0.75, 0.415,
++        { size: 18.7, bold: true, color: C.white, align: 'center', wrap: false });
++      text(s, 'Insert text', 1.064 + i * 1.5045, 5.548, 1.420, 0.370,
++        { size: 16, bold: true, color: labelColor, align: 'center', wrap: false });
++    });
++  line(s, 0.829, 5.457, 6.286, 0.007, C.grey80, 4, { arrow: 'oval', headArrow: 'oval', flipH: true });
++
++  [[7.752, 2.994], [10.237, 2.994], [7.752, 4.099], [10.237, 4.099]].forEach(([x, y]) =>
++    text(s, LOREM.quis, x, y, 2.333, 0.903,
++      { size: 11, color: C.navyDk, lnSpc: 1.5, bullet: BUL.dot }));
++  return s;
++}
++
++// --- 24 : four concentric-ring steps ---------------------------------------
++function slide24(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  [[3.756, 3.527], [6.260, 3.515], [8.767, 3.515]].forEach(([x, y]) =>
++    line(s, x, y, 1.1, 0, 'D9D9D9', 0.75));
++
++  [[2.351, C.rust, C.rust, 1.963, 2.106], [4.856, C.gold, C.gold, 4.471, 2.136],
++    [7.363, C.cream, C.gold, 7.008, 2.114], [9.877, C.cream, C.gold, 9.522, 2.114]]
++    .forEach(([x, ring, titleColor, tx, tw]) => {
++      box(s, x, 2.824, 1.405, 1.405, { shape: 'ellipse', fill: { color: ring, transparency: 80 } });
++      box(s, x + 0.101, 2.925, 1.203, 1.203, { shape: 'ellipse', fill: { color: ring, transparency: 65 } });
++      box(s, x + 0.207, 3.031, 0.992, 0.992, { shape: 'ellipse', fill: ring });
++      monitorIcon(s, x + 0.398, 3.301, 0.61, C.white);
++      text(s, [
++        [{ text: 'TITLE GOES HERE', bold: true, fontSize: 16, color: titleColor }],
++        [{ text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do', fontSize: 11, color: C.black }],
++      ], tx, 4.575, tw, 1.229, { align: 'center', valign: 'middle', margin: 0, lnSpc: 1.0 });
++    });
++  return s;
++}
++
++/** Line-art monitor-with-code glyph. */
++function monitorIcon(s, x, y, w, col) {
++  const h = w * 0.62;
++  box(s, x, y, w, h, { line: { color: col, width: 1.5 } });
++  box(s, x + w * 0.40, y + h, w * 0.20, h * 0.20, { fill: col });
++  box(s, x + w * 0.24, y + h * 1.20, w * 0.52, h * 0.11, { fill: col });
++  text(s, '</>', x, y + h * 0.16, w, h * 0.55, { size: 6, color: col, align: 'center', margin: 0 });
++}
++
++// --- 25 : three overlapping circles ----------------------------------------
++function slide25(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  [[4.045, 3.796, C.rust, 4.246, 4.859], [2.352, 2.130, C.cream, 2.554, 3.192],
++    [1.583, 4.169, C.dark, 1.811, 5.231]].forEach(([x, y, col, tx, ty]) => {
++    box(s, x, y, 2.713, 2.713, { shape: 'ellipse', fill: col });
++    text(s, LOREM.ipsumStd, tx, ty, 2.336, 0.922,
++      { size: 12, color: C.white, align: 'center', lnSpc: 1.4 });
++  });
++
++  [2.740, 4.164, 5.588].forEach(y =>
++    text(s, [[
++      { text: 'Of the printing and typesetting ', color: C.rust },
++      { text: "industry Lorem Ipsum has been the industry's standard the printing .", color: C.black },
++    ]], 7.793, y, 3.976, 0.989, { size: 11, lnSpc: 1.5, bullet: BUL.oh }));
++  return s;
++}
++
++// --- 26 : three isometric slabs --------------------------------------------
++/** Isometric box: dark-left face, light-right face, lozenge top. */
++function slab(s, x, y, w, h, left, right, top) {
++  const topH = h * 0.548;
++  const faceH = h * 0.722;
++  const fy = y + h - faceH;
++  const half = w / 2;
++  box(s, x, fy, half, faceH, {
++    shape: 'custGeom', fill: left,
++    points: [{ x: half, y: faceH, moveTo: true }, { x: 0, y: faceH * 0.625 },
++      { x: 0, y: 0 }, { x: half, y: faceH * 0.375 }, { close: true }],
++  });
++  box(s, x + half, fy, half, faceH, {
++    shape: 'custGeom', fill: right,
++    points: [{ x: half, y: faceH * 0.625, moveTo: true }, { x: 0, y: faceH },
++      { x: 0, y: faceH * 0.375 }, { x: half, y: 0 }, { close: true }],
++  });
++  box(s, x, y, w, topH, {
++    shape: 'custGeom', fill: top,
++    points: [{ x: w, y: topH * 0.505, moveTo: true }, { x: half, y: topH },
++      { x: 0, y: topH * 0.505 }, { x: half, y: 0 }, { close: true }],
++  });
++}
++
++function slide26(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  slab(s, 2.384, 2.534, 1.700, 0.888, '222020', C.dark, '33302F');
++  slab(s, 2.242, 3.857, 1.984, 1.037, '60401A', C.gold, '8F6027');
++  slab(s, 1.902, 5.237, 2.661, 1.391, '8B432C', C.rust, '5C2C1D');
++
++  [2.483, 3.899, 5.289].forEach(y =>
++    text(s, LOREM.block, 5.905, y, 5.288, 0.691, { size: 10, color: C.grey, lnSpc: 1.2 }));
++  return s;
++}
++
++// --- 27 : 34% ring ---------------------------------------------------------
++function slide27(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  box(s, 7.312, 2.430, 3.733, 3.733, { shape: 'ellipse', fill: C.white, shadow: SH.halo });
++  box(s, 7.312, 2.430, 3.733, 3.733,
++    { shape: 'blockArc', fill: C.cream, angleRange: [330, 240], arcThicknessRatio: 0.5 });
++  box(s, 7.761, 2.859, 2.838, 2.838, { shape: 'ellipse', fill: C.white, shadow: SH.halo });
++  box(s, 7.761, 2.859, 2.838, 2.838,
++    { shape: 'blockArc', fill: C.dark, angleRange: [157, 65], arcThicknessRatio: 0.5 });
++  box(s, 8.235, 3.282, 2.013, 2.013, { shape: 'ellipse', fill: C.rust, shadow: SH.halo });
++  text(s, '34%', 8.178, 3.912, 2.127, 0.841,
++    { size: 44, bold: true, color: C.white, align: 'center', margin: 3.6 });
++
++  text(s, LOREM.showcase + ' since the 1500s, when', 1.293, 3.352, 4.833, 1.145,
++    { size: 11, color: C.ink, lnPts: 20.2 });
++  text(s, LOREM.showcase, 1.293, 4.411, 4.833, 0.685, { size: 11, color: C.ink, lnPts: 20.2 });
++  box(s, 1.381, 5.497, 1.392, 0.370, { fill: C.rust });
++  text(s, 'Show more', 1.381, 5.497, 1.392, 0.370, { size: 16, color: C.white, wrap: false });
++  return s;
++}
++
++// --- 28 : two doughnut charts ----------------------------------------------
++function slide28(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  const data = [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'], values: [40, 50, 20, 39] }];
++  const chartOpts = {
++    x: 1.621, w: 2.550, h: 2.459, holeSize: 75, firstSliceAng: 0,
++    chartColors: [C.navy, 'A6A6A6', '262626', C.rust],
++    showLegend: false, showTitle: false, showValue: false, showPercent: false,
++    dataNoEffects: true, dataBorder: { pt: 0.75, color: 'FFFFFF' },
++  };
++
++  [[1.970, 2.949, 2.130, 2.690, 3.663, 5.019], [4.459, 5.438, 4.619, 5.179, 6.092, 5.024]]
++    .forEach(([chartY, labelY, headY, bodyY, btnY, btnX]) => {
++      s.addChart('doughnut', data, Object.assign({}, chartOpts, { y: chartY }));
++      text(s, '2020', 1.621, labelY, 2.550, 0.522,
++        { size: 28, bold: true, color: C.rust, align: 'center', margin: [3.6, 3.6, 1.8, 1.8] });
++      text(s, 'Option #1', 4.927, headY, 2.486, 0.370, { size: 16, bold: true, color: C.slate });
++      text(s, LOREM.option, 4.927, bodyY, 7.327, 0.707, { size: 12, color: '0D0D0D' });
++      box(s, btnX, btnY, 1.392, 0.370, { fill: C.rust });
++      text(s, 'Show more', btnX, btnY, 1.392, 0.370, { size: 16, color: C.white, wrap: false });
++    });
++  return s;
++}
++
++// --- 29 : three outlined circles -------------------------------------------
++function slide29(pptx) {
++  const s = shell(pptx, 'white');
++  finish(s);
++  infographicHead(s);
++
++  [[1.977, 2.284, 1.928, 4.381, 1.959, 1.954, C.dark, 2.598],
++    [5.598, 2.274, 5.548, 4.390, 5.550, 5.567, C.gold, 6.230],
++    [9.193, 2.286, 9.144, 4.379, 9.347, 9.181, C.rust, 9.862]].forEach(
++    ([cx, cy, px, py, lx, bx, col, ix]) => {
++      box(s, cx, cy, 2.086, 2.086, { shape: 'ellipse', fill: C.white, line: { color: col, width: 7 } });
++      barChartIcon(s, ix, 2.950, 0.821, 0.755, col);
++      box(s, px, py, 2.185, 0.654, { shape: 'flowChartAlternateProcess', fill: C.white, line: { color: col, width: 6 } });
++      text(s, [[{ text: 'Subtitle ', color: C.navyDk }, { text: 'Here', color: col }]],
++        lx, py + 0.116, 2.127, 0.404, { size: 18, align: 'center', wrap: false });
++      text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed', bx, 5.340, 2.110, 0.976,
++        { size: 12, color: C.black, align: 'center', lnSpc: 1.5 });
++    });
++  return s;
++}
++
++/** Descending bar-chart glyph: four shrinking bars under a downward trend line. */
++function barChartIcon(s, x, y, w, h, col) {
++  [[0.048, 0.268, 0.171, 0.732], [0.285, 0.520, 0.171, 0.480],
++    [0.522, 0.535, 0.171, 0.465], [0.759, 0.783, 0.166, 0.217]]
++    .forEach(([dx, dy, bw, bh]) =>
++      box(s, x + w * dx, y + h * dy, w * bw, h * bh, { fill: col }));
++  box(s, x, y, w, h * 0.68, {
++    shape: 'custGeom', fill: col,
++    points: [{ x: 0, y: 0, moveTo: true }, { x: w, y: h * 0.68 },
++      { x: w, y: h * 0.56 }, { x: 0, y: h * 0.12 }, { close: true }],
++  });
++}
++
++// ===========================================================================
++// Assemble
++// ===========================================================================
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'WIDE';
++  pptx.author = 'The Barber Shop';
++  pptx.title = 'The Barber Shop';
++
++  coverSlide(pptx, 'BARBER SHOP');
++  slide02(pptx); slide03(pptx); slide04(pptx); slide05(pptx); slide06(pptx);
++  slide07(pptx); slide08(pptx); slide09(pptx); slide10(pptx); slide11(pptx);
++  slide12(pptx); slide13(pptx); slide14(pptx); slide15(pptx); slide16(pptx);
++  slide17(pptx); slide18(pptx); slide19(pptx); slide20(pptx); slide21(pptx);
++  slide22(pptx); slide23(pptx); slide24(pptx); slide25(pptx); slide26(pptx);
++  slide27(pptx); slide28(pptx); slide29(pptx);
++  coverSlide(pptx, 'THANK YOU', 6);
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '0a7a11ae-2a67-449d-bd83-da5b844f9bf9_grok_final.pptx'),
++  });
++}
++
++build().then(f => console.log('wrote', f)).catch(e => { console.error(e); process.exit(1); });

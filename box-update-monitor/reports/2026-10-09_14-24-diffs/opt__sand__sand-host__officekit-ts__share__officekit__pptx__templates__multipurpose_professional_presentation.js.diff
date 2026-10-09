@@ -1,0 +1,5824 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/multipurpose_professional_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/multipurpose_professional_presentation.js
+@@ -0,0 +1,5821 @@
++'use strict';
++
++/* ------------------------------------------------------------------ *
++ *  "RAYS" — multipurpose professional template  (52 slides, 26.67x15) *
++ *  Rebuilt with pptxgenjs.  Photographs in the original deck are      *
++ *  replaced by flat grey placeholder rectangles.                      *
++ * ------------------------------------------------------------------ */
++const PptxGenJS = require('pptxgenjs');
++
++const path = require('path');
++
++
++const SLIDE_W = 26.6667, SLIDE_H = 15;
++
++
++/* ---- palette ----------------------------------------------------- */
++const W      = 'FFFFFF',   // white
++      K      = '000000',   // black
++      SLATE  = '53585F',
++      ORANGE = 'E78E3E',
++      TEAL   = '21A0A0',
++      MIST   = 'DCDEE0',
++      STONE  = 'A6AAA9',
++      GOLD   = 'DCBD23',
++      FB     = '3C5997',   // facebook blue
++      TW     = '36B9FD',   // twitter blue
++      IG     = '313438',   // instagram charcoal
++      IN     = '0077B5';
++   // linkedin blue
++
++/* background gradient pairs used by the deck's layouts */
++const SUN = 'FFE92D', DEEP = '046865', RUST = 'E53D07', BONE = 'FCFFF7',
++      PAPER = 'CBCBCB', ASH = '929292';
++
++
++/* ---- type ramp ---------------------------------------------------- *
++ * [ fontSize, fontFace, charSpacing, lineSpacingMultiple ]            */
++const MONO_R = 'Montserrat Regular', MONO_B = 'Montserrat Bold', RALE = 'Raleway';
++
++const H1  = [ 50, MONO_B, 0,    1   ],   // slide title
++      H2  = [ 40, MONO_R, 0,    1   ],   // section heading
++      H3  = [ 30, MONO_R, 0,    1   ],   // small heading
++      BIG = [125, MONO_R, 0,    0.9 ],   // display numeral
++      TXT = [ 25, RALE,   0.75, 1.2 ],   // body copy
++      CAP = [ 25, MONO_B, 0,    1   ],   // caption
++      FTR = [ 25, MONO_R, 2.5,  1   ];
++   // footer / kicker
++
++const IMG_GREY = 'A9A9A9';
++               // stand-in for the photo placeholders
++
++let INK = K;
++                             // dominant text colour of current slide
++const ink = c => {
++ INK = c;
++ }
++;
++
++
++/* ---- helpers ------------------------------------------------------ */
++
++/** Diagonal two-stop gradient, painted as a fan of rotated bands
++ *  (pptxgenjs cannot emit a gradient slide background). */
++function wash(s, from, to, deg = 60, bands = 44) {
++
++  const a = deg * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a);
++
++  const cx = SLIDE_W / 2, cy = SLIDE_H / 2;
++
++  const proj = [[0, 0], [SLIDE_W, 0], [0, SLIDE_H], [SLIDE_W, SLIDE_H]]
++                 .map(([x, y]) => (x - cx) * ux + (y - cy) * uy);
++
++  const t0 = Math.min(...proj), step = (Math.max(...proj) - t0) / bands;
++
++  const len = Math.hypot(SLIDE_W, SLIDE_H);
++
++  const rgb = h => [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16));
++
++  const A = rgb(from), B = rgb(to);
++
++  for (let i = 0;
++ i < bands;
++ i++) {
++
++    const f = (i + 0.5) / bands, t = t0 + (i + 0.5) * step;
++
++    const c = A.map((v, k) => Math.round(v + (B[k] - v) * f))
++               .map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
++
++    s.addShape('rect', {
++ x: cx + t * ux - step / 2, y: cy + t * uy - len / 2,
++                         w: step * 1.03, h: len, fill: {
++ color: c }
++, rotate: deg }
++);
++
++  }
++
++}
++
++
++/** Common fill / outline / transform options shared by every shape. */
++function skin(o = {
++}
++) {
++
++  const r = {
++}
++;
++
++  if (o.fill)   r.fill = {
++ color: o.fill, transparency: o.tr || 0 }
++;
++
++  else          r.fill = {
++ type: 'none' }
++;
++
++  if (o.line)   r.line = {
++ color: o.line, width: o.lw || 1,
++                           transparency: o.ltr || 0, dashType: o.dash || 'solid' }
++;
++
++  if (o.rot)    r.rotate = o.rot;
++
++  if (o.flipH)  r.flipH = true;
++
++  if (o.flipV)  r.flipV = true;
++
++  if (o.rad)    r.rectRadius = o.rad;
++
++  if (o.shadow) r.shadow = {
++ type: 'outer', angle: 90, blur: 100,
++                             offset: 50, color: K, opacity: 0.25 }
++;
++
++  return r;
++
++}
++
++
++/** Preset autoshape. */
++function sh(s, kind, x, y, w, h, o) {
++
++  s.addShape(kind, Object.assign({
++ x, y, w, h }
++, skin(o)));
++
++}
++
++
++/** Hairline / rule. */
++function rule(s, x, y, w, h, o) {
++
++  s.addShape('line', Object.assign({
++ x, y, w, h }
++, skin(o)));
++
++}
++
++
++/** Photo placeholder: flat grey block standing in for a raster image. */
++function photo(s, x, y, w, h, transparency = 0) {
++
++  s.addShape('rect', {
++ x, y, w, h, fill: {
++ color: IMG_GREY, transparency }
++ }
++);
++
++  if (transparency < 40 && w > 2 && h > 1) {
++
++    s.addText('[image]', {
++ x, y, w, h, align: 'center', valign: 'middle',
++                           fontFace: MONO_R, fontSize: 24, color: W }
++);
++
++  }
++
++}
++
++
++/** Two-slice pie (the deck stacks several of these into concentric rings). */
++function pie(s, x, y, w, h, pct, c1, c2, tr = 0) {
++
++  s.addChart('pie', [{
++ name: 'Chart', labels: ['a', 'b'], values: [pct, 100 - pct] }
++], {
++
++    x, y, w, h, chartColors: [c1, c2], chartColorsOpacity: 100 - tr,
++    showLegend: false, showValue: false, showTitle: false,
++    dataBorder: {
++ pt: 0, color: c1 }
++, firstSliceAng: 0,
++    chartArea: {
++ fill: {
++ color: W, transparency: 100 }
++ }
++,
++    plotArea:  {
++ fill: {
++ color: W, transparency: 100 }
++ }
++,
++  }
++);
++
++}
++
++
++/* --- custom-geometry icons ----------------------------------------- *
++ * Every glyph is stored as a mini SVG-ish path string on a square grid:
++ *   M dx dy      move    (relative)
++ *   L dx dy      line    (relative)
++ *   C dx dy ...  cubic   (three relative control/end points)
++ *   Z            close
++ * `ICONS[name] = [gridSize, pathData]`.                               */
++function decode(spec, x, y, w, h) {
++
++  const [g, d] = spec, sx = w / g, sy = h / g;
++
++  const tok = d.match(/[MLCZ]|-?\d+/g);
++
++  const pts = [];
++
++  let cx = 0, cy = 0, i = 0;
++
++  const at = () => {
++ cx += +tok[i++];
++ cy += +tok[i++];
++ return {
++ x: x + cx * sx, y: y + cy * sy }
++;
++ }
++;
++
++  while (i < tok.length) {
++
++    const c = tok[i++];
++
++    if (c === 'Z') {
++ pts.push({
++ close: true }
++);
++ }
++
++    else if (c === 'M') {
++ pts.push(Object.assign(at(), {
++ moveTo: true }
++));
++ }
++
++    else if (c === 'L') {
++ pts.push(at());
++ }
++
++    else {
++ const a = at(), b = at(), e = at();
++
++           pts.push({
++ x: e.x, y: e.y, curve: {
++ type: 'cubic', x1: a.x, y1: a.y, x2: b.x, y2: b.y }
++ }
++);
++ }
++
++  }
++
++  return pts;
++
++}
++
++
++function icon(s, spec, x, y, w, h, o) {
++
++  const opt = Object.assign({
++ x, y, w, h, points: decode(spec, 0, 0, w, h) }
++,
++                            skin(Object.assign({
++ fill: INK }
++, o)));
++
++  s.addShape('custGeom', opt);
++
++}
++
++
++/** Text block.  `st` is one of the type-ramp presets above. */
++function tx(s, st, body, x, y, w, h, o = {
++}
++) {
++
++  const runs = Array.isArray(body)
++    ? body.map(([t, ro = {
++}
++]) => ({
++ text: t, options: {
++
++        bold: !!ro.b, underline: ro.u ? {
++ style: 'sng' }
++ : undefined,
++        fontSize: ro.sz || o.sz || st[0], fontFace: ro.ff || o.ff || st[1],
++        color: ro.col || o.col || INK, breakLine: !!ro.brk }
++ }
++))
++    : body;
++
++  s.addText(runs, {
++
++    x, y, w, h,
++    fontSize: o.sz || st[0], fontFace: o.ff || st[1],
++    charSpacing: o.spc !== undefined ? o.spc : st[2],
++    lineSpacingMultiple: o.ls || st[3],
++    color: o.col || INK,
++    align: o.al || 'left',
++    valign: o.va === 'ctr' ? 'middle' : (o.va === 'b' ? 'bottom' : 'top'),
++    wrap: !o.nowrap, margin: 4, rotate: o.rot,
++    bullet: o.bullet ? {
++ characterCode: '2022', indent: o.ind ? o.ind * 72 : 18 }
++ : false,
++    fill: o.fill ? {
++ color: o.fill, transparency: o.tr || 0 }
++ : undefined,
++    isTextBox: true,
++  }
++);
++
++}
++
++
++/** Repeating page furniture: title (top-left), url (top-right), footer. */
++function chrome(s, title, c, o = {
++}
++) {
++
++  if (title) tx(s, H1, title, 1.04, 0.69, 17.78, 0.96, {
++ col: c }
++);
++
++  if (!o.noSite) tx(s, CAP, 'creathrive.com', 19.32, 0.91, 6.25, 0.53,
++                    {
++ col: o.siteCol || c, al: 'right' }
++);
++
++  if (!o.noFoot) tx(s, FTR, 'multipurpose professional template', 1.04, 13.58, 24.58, 0.53,
++                    {
++ col: o.footCol || c }
++);
++
++}
++
++
++/* ---- boilerplate copy reused across the deck ---------------------- */
++const L1='lorem sit unde omnis iste natus error sit volup tatem Sed ut perspiciatis iste. Sed ut perspi ciatis lorem sit unde omnis iste natus error sit volup tatem.';
++
++const L2='multipurpose professional template';
++
++const L3='Insert title here';
++
++const L4='creathrive.com';
++
++const L5='Duis aute irure dolor in reprehenderit in voluptate velit. Lorem ipsum dolor sit amet, consectetur adipiscing elit,';
++
++const L6=' sit ame sit amet, consect lorem etur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem sit enim ad minim veniam.';
++
++const L7='Lorem ipsum dolor sit ame sit amet, consectetur adipiscing elit, sed do eius loremmod tempor incididunt ut labore et dolore magna aliqua.';
++
++const L8='Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
++
++const L9='Duis aute irure lorem dolor in reprehenderit in voluptate velit. Lorem ipsum dolor.';
++
++const L10='Lorem ipsum dolor sit ame sit amet, consectetur adipiscing elit, sed.';
++
++const L11='Sed ut perspi ciatis ';
++
++const L12='Lorem ipsum dolor';
++
++const L13='Duis aute irure lorem dolor in reprehenderit lorem in voluptate velit.';
++
++const L14='Lorem ipsum dolor sit ame lorem sit amet, conse.';
++
++const L15='Duis aute irure lorem dolor.';
++
++const L16='Sed rel loredit sir ut perspics lor ciatis unde dor sit omnisa iste.';
++
++const L17='Insert subtitle here.';
++
++const L18='Ciatis lorem sit unde omnis iste natus error sit volup.';
++
++const L19='Sed ut perspi ciatis lorem sit unde omnis iste natus.';
++
++const L20='Title here.';
++
++const L21=' sit ame sit amet, consectetur adipiscing elit,';
++
++const L22='Perspi ciatis lorem sit unde omnis.';
++
++const L23='Insert title here.';
++
++const L24='six steps process';
++
++const L25='Please put something awesome here.';
++
++const L26='Jan 2018';
++
++const L27='project timeline';
++
++const L28=' sit ame sit amet.';
++
++
++/* ---- icon path library -------------------------------------------- */
++const I = {
++
++  dot:      [61, 'M30 0C17 0 14 13 0 18C0 17-14 13-17 0C-16 0-14-13 0-17C0-18 14-13 16 0'],
++  person:   [24, 'M12 0C-1 0-2 0-1 1C-2 0 0 2 2 1C2 1 4 0 2-1C2-1 0-2-2 0C-1-1-2 0-1 0ZM-7 5C-3 0-2 1 0 1L0 7C0 1 1 0 1 0C2 0 1 0 0-1L0-6C0 7 0 4 0 2L0 2C0 0 2 1 2 0C1 0 2-1 0 0L0-8C0 4 0 2 0 1L0 1C0 0 2 1 2 0C1 0 2-1 0 0L0-15C0 3 0 2 0 0L0 1C0 1 2 0 1 0C1 0 1 0 0-1L0-7C0-1-2-1-3 0L-14 0Z'],
++  circle:   [41, 'M41 20C0 12-9 9-11 0C-12 0-9-9 0-12C0-11 9-9 12 0C11 0 9 9 0 11'],
++  person2:  [24, 'M12 0C-1 0-2 0-1 1C-2 0 0 2 2 1C2 1 4 0 2-1C2-1 0-2-2 0C-1-1-2 0-1 0ZM-7 5C-3 0-2 1 0 1L0 7C0 1 1 0 1 0C2 0 1 0 0-1L0-6C0 7 0 4 0 2L0 2C0 0 2 1 2 0C1 0 2-1 0 0L0-8C0 4 0 2 0 1L0 1C0 0 2 1 2 0C1 0 2-1 0 0L0-15C0 3 0 2 0 0L0 1C0 1 2 0 1 0C1 0 1 0 0-1L0-7C0-1-2-1-3 0L-14 0Z'],
++  person3:  [24, 'M12 0C-1 0-2 0-1 1C-2 0 0 2 2 1C2 1 4 0 2-1C2-1 0-2-2 0C-1-1-2 0-1 0ZM-7 5C-3 0-2 1 0 1L0 7C0 1 1 0 1 0C2 0 1 0 0-1L0-6C0 7 0 4 0 2L0 2C0 0 2 1 2 0C1 0 2-1 0 0L0-8C0 4 0 2 0 1L0 1C0 0 2 1 2 0C1 0 2-1 0 0L0-15C0 3 0 2 0 0L0 1C0 1 2 0 1 0C1 0 1 0 0-1L0-7C0-1-2-1-3 0L-14 0Z'],
++  person4:  [24, 'M12 0C-1 0-2 0-1 1C-2 0 0 2 2 1C2 1 4 0 2-1C2-1 0-2-2 0C-1-1-2 0-1 0ZM-7 5C-3 0-2 1 0 1L0 7C0 1 1 0 1 0C2 0 1 0 0-1L0-6C0 7 0 4 0 2L0 2C0 0 2 1 2 0C1 0 2-1 0 0L0-8C0 4 0 2 0 1L0 1C0 0 2 1 2 0C1 0 2-1 0 0L0-15C0 3 0 2 0 0L0 1C0 1 2 0 1 0C1 0 1 0 0-1L0-7C0-1-2-1-3 0L-14 0Z'],
++  figure:   [58, 'M45 0L-32 0C-7 0-6 3 0 4L0 21C0 2 3 1 2 0C4 0 2-1 0-2L0-18C1 0 1 0 0 0C0 21 0 11 0 6L0 6C0 2 3 2 5 0C4 0 3-2 0-2C0-22 0-1 0 0C1 0 1 0 0 0C0 11 0 6 0 3L0 3C0 2 3 2 5 0C4 0 3-2 0-2C0-43 0-1 0 0C1 0 1 0 0 0C0 9 0 5 0 2L0 2C0 2 3 1 3 0C3 0 2-1 0-2L0-21C0-4-5-3-8 0Z'],
++  ribbonL:  [50, 'M50 31L-50 19L0-31L50-19L0 31Z'],
++  ribbonR:  [51, 'M51 51L-51-19L0-32L51 19L0 32Z'],
++  hexBlock: [96, 'M48 0L-48 26L0 1L0 43L48 26L48-26L0-43L0-1L-48-26Z'],
++  calendar: [24, 'M22 3L-2 0L0 2L-4 0L0-2L-8 0L0 2L-4 0L0-2L-2 0C-1 0-1 1 0 1L0 17C0 1 1 1 1 0L20 0C1 0 1-1 0-1L0-17C0-1-1-1-1 0ZM0 19L-20 0L0-11L20 0L0 11ZM-15-22L-2 0L0 5L2 0L0-5ZM12 0L-2 0L0 5L2 0L0-5Z'],
++  callout:  [96, 'M7 0L82 0C1 0 1 0 0 0C1 0 1 0 0 1C1 0 0 1 1 1C0 0 0 1 1 2C0 1 0 1 0 1C0 1 0 2 0 2L0 49C0 2 0 1 0 1C0 2 0 1 0 1C-1 1 0 1 0 1C-1 1 0 0-1 1C0 0-1 0-1 0C0 0-1 0-1 0L-21 0L-10 0L-10 20L-10-20L-10 0L-21 0C-1 0-1 0 0 0C-1 0-1 0 0 0C-1-1 0 0-1-1C0-1 0-1-1-1C0-1 0-1 0-2C0-1 0-1 0-2L0-50C0-1 0-2 0-1C0-1 0-1 0-1C1-2 0-1 0 0C1-1 0-1 1 0C0-1 1 0 1 0C0 0 1 0 1 0Z'],
++  userPlus: [36, 'M22 27C-4-2-2-1 0-3C0-2 1 0 1-3C1-2 1 2 0-4C0-1-1 0 0 0C0 0 1-2 0-2C0-2-1-5-6 0C-7 0-1 5 0 2C0 2 1 2 0 0C0 0-1 0 0 1C0 4 1-2 1 2C1 3 1 0 0 2C0 3-2 1-4 2C0 0-2 0-1 1L0 8L29 0C0 0 0-3 0-1C0-1-2-2-5-2ZM9-11L0-6L-4 0L0 6L-5 0L0 4L5 0L0 6L4 0L0-6L5 0L0-4L-5 0Z'],
++  roundSq:  [24, 'M21 0L-18 0C-2 0-1 1 0 2L0 18C0 1 1 2 2 0L18 0C2 0 1-2 0-1L0-18C0-2-1-1-2 0ZM0 21L-18 0L0-18L18 0L0 18ZM-10-6L-6 0L0 3L6 0L0-3ZM0-4L-6 0L0 2L6 0L0-2ZM0-5L-6 0L0 3L6 0L0-3ZM8 9C0 0-2 0 0-1C0-2 1 0 0-3C0-1 0-2-2 0C-1 0-1 2 0 1C0 3 1 0 0 2C0 1-2 0 0 0L0 3L6 0L0-3Z'],
++  couple:   [24, 'M24 24C0 0 0-5 0-1C-1 0-1-1-1-1C-2-1-1-1 0-1C0-1 1 0 0-1C0-1 1 1 0-2C0-1-1 0 0 0C0 0 1-1 0-1C0-1-1-2-2 0C-3 0 0 2 0 1C0 1 0 1 0 0C0 0 0 0 0 1C0 2 0-1 1 1C0 1 0 0 0 1C0 1 0 1-1 0C4 3 0 0 0 2L0 4L6 0ZM-12-7C-2-1-1-1 0-2C0-2 1 1 0-3C0 0 1 0 0-2L0-1C0 0 0-1 0-1C0-1-1-3-3 0C-3 0-1 3 0 1C0 1 0 1 0 0C0 0 0 0 0 1C0 2 1 0 0 0C0 3 1-1 0 2C0 2-1 1-2 1C-1 0-1 1 0 1L0 5L17 0C0 0 0-3 0-1C0-1-2-1-3-1Z'],
++  mapPin:   [24, 'M12 0C-7 0-5 3 0 5C0 6 12 10 0 0C0 0 12-10 0-6C0-5-5-3-7 0ZM0 12C-3 0-4-2 0-2C0-3 4-2 3 0C3 0 4 2 0 3C0 2-4 2-3 0Z'],
++  trophy:   [24, 'M13 18C0-2 2-1 2-2C3-1 4-3 0-5C0-1 0 0-1 0L-4 0C-1-2-2-1-4 0C-4 0-2 1-1 2L-4 0C-1 0 0 0 0 1C0 5 3 3 4 1C2 2 2 1 0 2L0 1C-3 1-2 1 0 1C0 1 3 1 3 0C3 0 3-1 0-1C0-1-2-1-3-1L0-1ZM4-7C1-1 1-3 0-2L3 0C0 3-2 2-3 1ZM-5-9C4 0 1 1 0 1C0 0-1 2-4 0C-4 0-1-2 0 0C0-1 1-1 4 0ZM-10 3L3 0C0 2 1 3 1 1C-3-1-2-2 0-3Z'],
++  home:     [24, 'M24 12L-11-11C-1-1 0 0-1 1L-11 11C0 1 0 0 1 0L2 0L0 10C0 0 0 1 1 0L5 0L0-10L6 0L0 10L5 0C1 0 0-1 0 0L0-10L2 0C1 0 0 0 0-1'],
++  shieldU:  [44, 'M0 0L0 2C0 12 0 6 1 7C1 7 3 5 4 3C3 2 3 0 7 0C7 0 3 0 3-2C4-3 3-5 1-7C1-7 0-6 0-12L0-2L-44 0Z'],
++  disc:     [24, 'M12 0C-7 0-5 5 0 7C0 7 6 5 6 0C7 0 5-6 0-6C0-7-6-5-6 0ZM0 19C-1 0-1-1 0-1C0 0 1-1 1 0C1 0 0 1 0 0C0 2 0 0-1 0ZM4-8C0 0-1 0 0 1L-1 1L-1 0L0 1L-3 0C0-1 0 0 1-1C1-1 1-1 0 0C0-1 1 0 0 0C0-1-1 0 0 0C0-1 0 0-1 0C0 0-1 0 0 1C-1 0 0 0 0 1L-3 0C0-2 1-1 1-1C1 0 1 0 1 0C1 0 1 0 1 1C1 0 1 1 0 1C0 1 0 1-1 1Z'],
++  disc2:    [24, 'M12 0C-6 0-6 5 0 7C0 6 6 6 6 0C6 0 6-6 0-6C0-7-6-5-6 0ZM0 2C5 0 4 5 0 5C0 5-4 4-5 0C-5 0-4-4 0-5C0-5 4-5 5 0ZM-1 3L0 7L5 5L0-2L-3-4L0-6L-2 0Z'],
++  slashBar: [96, 'M96 96L-96-63L0-33L96 62L0 34Z'],
++  triangle: [24, 'M12 0L-12 24L24 0L-12-24Z'],
++  wedge:    [48, 'M16 0L-16 48L48 0L-16-48L-16 0Z'],
++  book:     [24, 'M24 4L-6-4C0 0 0 0-1 0L-5 4L-5-4L-1 0L-6 4L0 1L0 18C0 1 1 0 0-1L5-3L6 3C0 1 0 0 0-1L6-3L5 3L0 1C0 0 1 0 0-1L0-18C0 0 0 0 0-1ZM-18 14L-4 3L0-15L4-3L0 15ZM5 3L-4-3L0-15L4 3L0 15ZM6-3L-4 3L0-15L4-3L0 15ZM5 3L-4-3L0-15L4 3L0 15Z'],
++  slashBar2: [96, 'M96 33L-96 63L0-34L96-62L0 33Z'],
++  diamond:  [96, 'M48 0L-48 38L0 20L48 38L48-38L0-20L-48-38Z'],
++  speech:   [96, 'M96 0L-96 0L0 71L83 0L13 25L0-96Z'],
++  info:     [24, 'M18 0C4 0 1 1 0 2C0 1-3 2-3 0C-4 0-2-1 0-2C0-1 3-2 4 0ZM-11 24C-2 0-2-1 2-3L3-6C0-1 0-1 0 0C-1 0-3 1-2 1L-2-1C7-3 8-1 3 0C2 0 1 1-2 2L-3 7C0 1 0 1 1 0C0 0 2-1 3-1L2 1C-6 3-8 1-3 0Z'],
++  share:    [24, 'M18 21L-15 0L0-14L3 0C0 0 0-1 2-2L-7 0C-1 0 0 1 0 0L0 17C0 2 0 0 1 0L18 0C1 0 1 0 0-2L0-5L-3 2L0 2ZM-2-11L0 6L8-8L-8-8L0 5C-10 0 0 12 0 0C3-5 2-2 5 0Z'],
++  halfDisc: [96, 'M0 0L0 96C25 0 24-5 19-9C37-19 0-30-37-19C-19-9-24-5-25 0Z'],
++  avatar:   [24, 'M19 18C-3-1-1-1 0-3C0-1 1 1 0-2C0-1 1 1 0-3L0-1C0 0 0-1 0-1C0-2 0-3-5 0C-5 0 0 3 0 2C0 1 0 1 0 0C0 0 0 0 0 1C0 3 1-1 0 1C0 2 1-1 0 1C0 3-1 1-3 1C-3 1-2 2 0 1L0 2L12 0L12 0L0-2C0-1-2-2-3-1'],
++  thumbDown: [24, 'M7 16C0 0-6 5 3 3C1 1 3-5 3-2C2-1 5-3 0-1L0-10C0-1-8-2-5 0C-2 0-3 11 0 2C0 2 6 0 1 1ZM13-1C1 0 3 0 0-4L0-6C0-4-3 0-1 0C-1 0 2 0 0 3L0 8C0 3-2 0 1 0Z'],
++  sun:      [26, 'M25 12C0 0-1 0-1 0L-1 1C0 1 1 0 0 0C1 0 1 0 0 0C1 0 0 0 0-1C0 0 0-1-1 0ZM-12-6C-4 0-3 3 0 4C0 4 3 3 4 0C4 0 3-3 0-4C0-4-3-3-4 0ZM0 12C-3 0-2-2 0-3C0-3 2-2 3 0C3 0 2 2 0 3C0 3-2 2-3 0ZM-9-5L-1-1C-1 0-1 0 0 0C-1 0 0 1 0 0C0 1 0 0 1 0C0 0 1 0 1 0C0 0 1 0 0-1ZM9-9L1-1C0-1 0 0 0-1L-1-1L-1 1C0 1 0 0 0 1L1 1ZM0 18C0 0-1 1 0 1L0 1C0 1 1 0 0 0C0 0 1 0 0-1L0-1C0-1-1-1 0 0ZM10-17C0 0 0-1 0-1C-1 0 0 0-1 1C0 0-1 0 0 1L0 1C0 1 1 0 1-1C0 0 0-1 1 0ZM-19 15C0 0 0 1-1 0C0 1 0 0 0 1C1 0 0 0 1 0L1-1C0-1 0-1 0 0C0 0-1 0-1 0ZM1-16C-1-1 0 0-1 0C0 1 0 1 0 0C1 0 0 1 0 0C1 1 1 0 0-1L0-1C0-1-1 0 0 0ZM15 18L1 1C1 0 0 0 1 0C0-1 0 0 0-1C-1 0 0-1 0 0C-1 0-1 0 0 0C0 0 0 1 0 1Z'],
++  heart:    [27, 'M19 0C-2 0-1 1-2 1L-1 2L0-2C-2-1-1-1-2 0C-3 0-1 1-2 1C-1 2-1 2 0 3C0 2 1 2 1 2L10 11L1 1C1 0 0 0 1-1L10-11C1-2 1-2 0-2C0-3-1-2-1-2C-2-1-2-1-2 0'],
++  thumbUp:  [24, 'M17 9C0-1 6-4-3-4C-1-1-3 5-3 2C-3 2-4 2 0 2L0 9C0 2 7 1 6 0C2 0 3-11 0-2C0-2-6 0-1 0ZM-13 0C-1 0-3 0 0 4L0 6C0 4 3 1 1 0C1 0-2-1 0-2L0-9C0-2 2-1-1 0Z'],
++  part01:   [96, 'M40 0C-11 0-5 2-1 2C-1 2 0 2 1 1C1 1 4 1 0 0L0 1C0 1 0 0-3 0C-2 1 0 1-6 1C-2 1-3 0-3 0C-3 0-2 0-2 1C-2 0 0 1 0 1C1 1 1 2 1 2C1 0 0 1 0 0C1 1 1 1 1 1C2 1 2 0 1 1C2 1 1 1 0 0C1 1-1 1-1 2C-1 1-1 0-2 1C-1 2-1 1 0 1C-1 1 0 1-1 0C0 1-1 1-1 1C-1 2-1 2 1 0C1 1 2 0 3 0C2 0 2 1 1 0C1 0 0 1 0 1C0 0-1 1 0 1C-1 2 0 2-1 2C0 2-1 2-1 1C-1 2 0 1 0 2C-1 2 0 2-1 1C0 1 0 1 0 1C0 1 0 1 0 0C0 1 0 2 2 1C3 1-2 2 1 2C0 2 8 1 8 0C7 0-4-3-1-2C-1-2-4-2 2 0C2 0 0-1 0-1C0-2 6-3 0-2C0-2 2-6 1-2C1-1 1-1 1-2C1-2 2-3 0 0C0 0 0 1 0 2C0 1 0 1 0 0C-1 1 0 1 0 1C-1 1 3 2-2 2C-3 1 3 4 3 1C1 0-1 1-1 1C-1 1-2 1-1 0C2 1 1 0 1 1C1 0 0 1-1 1C1 1 0 0 8 0C6 0-1-1 0 0C0 0 1 0 2 1C1 0 2 0 2 0C1 0 4 0 4 1C4 0 5 0 3 0C3-1 1 0 0 0C0-1 0 0-2 0C-1 0-1-1-2 0C-3 0-3-1-2 0C-3 0-3-1-2 0C-2-1-1-1 0 0C-2-2 0-2 0-3C1-3 1-3 3-4C1 0 0-1 0 0C3-4 2-5 0-1C0 0 1 0 1 0C2 0 1 0 2-1C1 0-4-3-3-4C-1-1-1-2 0-1C-1-4-1-4 0 0C0 0 1 0 1 0C1 0 2 0 3 1C3 0 4 0 3-1C3 0 2-1 1-1C0-1 0-1-2-1C-1-1-1 0-2-1C-1 0-1 0 0-1C-2 0-2-1-2-1C-2-1-1-1-1 0C-2-1-1-1-2 0C-2-1-2 0-2 0C-3 0-3-1-3 0C-2 0-3-1 0 0C-2 0-2-1 0-1C0 0 0-1 1 0C0-1 0 0 0-1C1 0 1 0 1 0L1 0C1 0 0-1 1 0C0-1 1-1 0-3C0-3-10-2-7 0Z'],
++  part02:   [24, 'M23 17L-19-17C-1 0-2 0-1 2C0 1 0 3 1 0L19 17C1 0 0 1 0 0C1 0 1-1 1-1C0-2 0-2-1-1Z'],
++  part03:   [75, 'M38 0L-38 21L37 21L0 33L38-21L0-33L-37-21Z'],
++  part04:   [24, 'M7 0L17 14L-7 10L-17-19C0 0 3-4 4-1Z'],
++  part05:   [96, 'M48 0C-13 0-12 5-9 9C-9 9-5 12 0 13C0 13 5 12 9 9C9 9 12 5 13 0C13 0 12-5 9-9C9-9 5-12 0-13C0-26-21-22-27 0ZM0 12C10 0 9 4 6 7C7 7 4 9 0 9C0 10-4 8-7 7C-7 7-9 4-9 0C-20 0-16-16 0-20C0-10 4-8 7-7C7-7 9-4 9 0Z'],
++  part06:   [89, 'M13 10C0 0 13-9 17-1C0 0 29-2 16 22C0 0 3 16-3 8C0 0-13 18 0 2L-8 17C0 0-1 8-4 0L-33 0C0 0-5 0 0-6C0 0-7-17-4-5C0 0-12-19 0-6C0 0-6-12 18-14Z'],
++  part07:   [75, 'M75 0L-38 14L0 23L-37 14L0 24L38-14L37-15L0-46Z'],
++  part08:   [24, 'M6 5C0 0 4-5 6 0C5 0 3 4 0 5C0 5-7 4-4 1C-4 1-6 2-1 2C-1 2-5-19 10-2Z'],
++  part09:   [96, 'M0 0L0 96L96 0L0-96L-75 0L0 16C1-1 2 0 2 0C6 0 4 3 4 6C4 5 2 8 0 10C0 9-2 9-4 6C-4 6-5 3-6 0C-7 0-6-5-5-9L6-16C0 0 1 1 1 2C1 1 1 1 2 2C2 3 2 1 3 0C2 0 2-2 1-2C2-2 1-3 0-5C0-4-1-4-2-2C-2-2-2-2-3 0C-3 0-3 2-4 4L-5-10L0-29L-9 0Z'],
++  part10:   [29, 'M29 19L-22-19C1 1-1 3-2 2C-2 3-2 2-1-1L22 19C0 0 3 0 2-3L0-1C0 0 0 0 1 0C1-3 0-3 0 0Z'],
++  part11:   [96, 'M0 0L96 0L-47 96L-49-96Z'],
++  part12:   [37, 'M37 37L-37-14L0-23L37 14L0 23Z'],
++  part13:   [24, 'M18 5C0 0-4-5-6 0C-5 0-3 4 0 5C0 5 7 4 4 1C4 1 6 2 1 2C1 2 5-19-10-2Z'],
++  part14:   [68, 'M53 9C-1-7-8-2-10 0C-51 0 22 64 0 0C8 11 21-17 0 0C0 0 20 17 9-11C0 0 16-52-26-3Z'],
++  part15:   [96, 'M0 0L0 96L96 0L0-96L-96 0ZM22 20C2 0 2 2 0 3C0 4-2 2-2 0C-2 0-1-2 0-4C0-3 1-2 2 0ZM21 16C4 0 3 6 0 11L0 22C-3 0-2 0-1 0L-1 0C0-20 0 0 0-1C0-4 0-4-3 0C-2 0-1 3-1 2C0 0 0 1 0 1L0 22C-3 0-2 0-1 0L0-25C0-3 0-2 0-2C0-2 0-2 0-2C2 0 2 0 0 0L1 0C1 3 0 1 0 0L0 1C0-2 3-4 4 0ZM-24 1C3 0 2 0 1 0L1 0C0 19 0 10 0 5L0 4L-7 0C0-19 0-10 0-4L0-5Z'],
++  part16:   [96, 'M0 68L12-9L12 3L12-7L12-2L12-20L12 5L12-13L12-25L0 96L-96 0L0-28Z'],
++  part17:   [61, 'M53 8C-7-8-15 0 0 0C0 0-16 0-7 8C-7 8-2 8 1 15C0 0 3 17 3 4C2 5-5-19 5-3C6-3 8 0 9-4C9-3 5-4 2-2C2 5 4 3 2 6C2 7-4 17 2-5C3-4 3-17 0 0C1-15-2-8-7-8Z'],
++  part18:   [26, 'M4 0C0 6-4 0 0 4C0 2 2 2 2 0C3 0 2-2 0-2C0-4-4 0-1-6ZM18 0C-1 6-4 0 0 4C0 2 2 2 3 0C2 0 2-2 0-2C0-4-4 0 0-6ZM-9 12C-1 5-4 1 0 4C0 2 2 2 3 0C3 0 2-2 0-2C0-4-4-1-1-5Z'],
++  part19:   [24, 'M12 0C-7 0-5 5 0 7C0 7 5 5 7 0C6 0 6-5 0-7C0-7-6-5-6 0ZM1 22L0-6L-2 0L0 6C-5-1-4-3 0-5L5 0L0-2L-5 0C0-5 4-3 5-1L0 6L2 0L0-6C5 1 3 3 0 5L-5 0L0 2L5 0C0 5-3 3-5 1Z'],
++  part20:   [96, 'M0 0L0 96L96 0L0-96L-96 0ZM63 17L10 0C2 0 1 0 1 0C1 0 1 1 1 0C1 1 1 1 1 1C1 2 0 1 1 2C0 2 0 1 0 2C0 3 0 2 0 3L0 18C0 3 0 3 0 2C0 2 0 1 0 2C-1 2 0 1-1 2C-1 1-1 1-1 1C-1 0-1 1-1 0C-1 0-2 0-1 0L-10 0C-2 0-1 0-2 0C-1 0-1-1-1 0C-1-1-1-1 0-1C-1-2-1-1 0-2C0-2-1-1 0-2C0-3 0-2 0-3L0-18C0-3 0-3 0-2C0-2 1-1 0-2C0-2 1-1 1-2C0-1 1-1 1-1C1 0 1-1 1 0C2 0 1 0 2 0ZM1 5C-2 0-1 0-1 0C-1 0-1 1-1 0C0 1-1 1-1 1C0 1-1 1 0 2C-1 1 0 2 0 1C0 2 0 2 0 3L0 14C0 3 0 2 0 2C0 1 0 2 1 1C0 2 1 1 0 1C1 1 1 1 0 1C1 0 1 1 1 0C1 0 1 0 2 0L8 0C1 0 1 0 1 0C1 0 1-1 1 0C1-1 1-1 0-1C1-1 0-1 1-2C0-1 0-2 0-1C0-2 0-2 0-3L0-14C0-3 0-2 0-2C0-1 0-2 0-1C-1-2 0-1-1-1C0-1-1-1-1-1C-1 0-1-1-1 0C-1 0-1 0-1 0L-8 0ZM13 6C0 0 1 0 0 1C1 1 0 2-1 2C-1 1-1 0-1-1C0-2 0-2 0-1C1-1 0 0 1 0ZM-9 5C2 0 2 1 2 3C3 6 0 10-3 6C-4 6-5 0-3-6C-4-6 0-10 4-6C1-3 3-1 2 0Z'],
++  part21:   [96, 'M96 67C-1-8-1-8-2-2C-3-5-20-13-4-2C-3-1-1-5-1-6C-1-5 0-12 0 0L-11 7L-11-7C0 0 0 12-1 5C-1 6-1 5-3 1C-4 2-20 13-3 5C-2 2-1 7-1 8C12 18 16 11 18 1C1 0 0 0 1 0C1 0 1 0 0 0C18-1 16-11 12-17Z'],
++  part22:   [34, 'M2 7C-4 4 2 8 5 7C0 0 3 2 4 1C1 1 1 1 2 1L1 0C0 1 1 0 1 1C4-1 3-4 4-4C6-7-1-10-8-5C-5-4-7 0-6 3C-3 1-2 1-2 3Z'],
++  part23:   [24, 'M23 0L-23 0C0 0 0 0 0 1L0 3L24 0L0-3C0-1 0 0-1 0ZM-22 22C0 1 1 1 1 0L18 0C1 0 1-1 0-1L0-16L-22 0L0 16ZM7-13L8 0L0 3L-8 0L0-3Z'],
++  part24:   [24, 'M0 0L24 0C0 14-6 10-6 0C-6 0-6-10 0-14Z'],
++  part25:   [24, 'M4 22C0 1 1 1 2 0C1 0 1-1 0-1C0-2-1-1-1 0C-2 0-1 1 0 2ZM13 0C0 1 2 1 1 0C2 0 1-1 0-1C0-2-1-1-2 0C-1 0-2 1 0 2ZM-8-7L15-4C0 0 0 0 0-1L0-7L-19 0L0-2L0-1L-5 0L0 1L0 2L2 0L3 12L0 1L0 2C0 1 1 0 0 0L1 0L13 0L4 0C0 0 0 0 0-1L0-2L-15 0C-2 0 0-1 2 0Z'],
++  part26:   [96, 'M0 0L0 30C6 6 7 4 8 0C-2 0 0-3 0-2C0-15 7-13 9 0C4 0 4 5 3 5C3-2 3-3 3-2C0 7-3 5-3 3C3 0 3-3 3-2C-3 7-2 3-4 5L0 2C0 21-5 23-10 15L62 0L0-96L-96 0ZM0 87L0 9L1 0C2-2 2-2 2-2C-3 0-2-1-2-2Z'],
++  part27:   [24, 'M22 0L-20 0C-1 0-1 4 0 7C0 9 1 4 1 0L20 0C1 0 1-4 0-9C0-7-1-4-1 0Z'],
++  part28:   [96, 'M0 0L0 96C12 0 6 0 24 0C-2-4-5-10-5-10C-4-11-4-12 3-5C0 0 0 0 9-3C9-3 18-6 35-12C0 0 0 0-1 0C-2-1-3 0-5-2C0 0 0 0-9 3C-8 2-17 5-33 10C0 0 0 0-1-5C-1-5-2-9-3-18C0 0 0 0-3 0C-1 0-4 0-3 0Z'],
++  part29:   [24, 'M24 0C-1-1-1 1-3 1C-7 4-12 7 0 0L11 1L1 11C0 0 7-12 3-8C2-2 1-1-1-1ZM-3 3L-8 14L0-6L8-8Z'],
++  part30:   [26, 'M24 0L-22 0C-1 0-1 5 0 5L0 7C0 4 1 5 1 0L22 0C1 0 1-5 0-4L0-7C0-5-1-5-1 0Z'],
++  part31:   [86, 'M46 86C20-1 13-16 3-5C3-5 1-15 0 0C-9-16-32-28 0 0L-1 0L-1 0C0 0-55 0 14 44C0 0 2 15 3 5C3 5 13 16 20 1C0 0 0 0 1 0C1 0 1 0 0 0Z'],
++  part32:   [24, 'M20 19C-3-3-4-4-3-4C-2-2-2-2-1-1C-1-1-1-1-1-1L-1 1C0 1-1 1 0 0C1 1 1 1 1 1C1 2 2 1 2 2C4 3 4 4 3 2C3 3 2 1 0 0C0 0-2-2-2-3Z'],
++  part33:   [46, 'M9 44C1-2 1-1 0-2C1-3 1-3 0-2C2-7 1-6-1-7C-1-4-1-6-7-1C-3 0-3 1 0 2C0 2 2 3 2 2C3 1 3 1 3 0C4 0 4 0 3-1C3-1 3-2 0-3C0-2-1-2-4-1C-2 0-3 1 0 2C-1 3 2 3 3 2C6 4 10-1 4-5C1-2 3-5-4-1C-3 0-3 3-1 1C-1 3-1 3 0 2C-1 3 0 3 0 2C0 6 1 5 1 6C0 2 1 3 0 3C0 0 2 0 0-1C0-9-2-8 0-9C0-5 0-5 2-4C1-1 1-1 1-1C1 0-1 0 0 0C0 0 1 0 0 1L0 1C0 3-1 4-4 1C-3 1-4 0-3-2C-3-1-2-3-1-2C0-2 0-3 3 1C3 1 0 3-1 2C-1 2-2 1-4 1C-5 0-7 0-3-4C-2-1-1-3 1-2C0-1 1 1 2 0C1 1 0 0 1 1C4 3 0 5 0 4C1 6-1 6-1 5C-1 4-1 5-3 3C0 1 2 0 1-1Z'],
++  part34:   [24, 'M23 0C-2-1-4 1-3 3C2 1 1 1 0 0C0 0 0 1 0 1C0 1 0 2-3 3C-3 3-3 1-1 1C-1 0-1 0 0 0C0 0-1-1-2-1C-2 3-1 3 2 1L0 1C3 1 7-4 6-6C6-6 3-7-3-2Z'],
++  part35:   [96, 'M0 63L12-18L12-11L12 12L12-9L12-23L12 15L12-26L12-3L0 96L-96 0L0-33Z'],
++  part36:   [29, 'M27 9C-4-3-3-4-1-1C-6-2-7 1-3 4C-3 4-1 5 1 5C1 3 2 3 2 2C6 5 8-2 4-6C3-4 2-4 1-3C0 0 0 0 0-1C-1-1 0 0-1-1Z'],
++  part37:   [24, 'M11 24C6 0 7-1 0-1L0-20C0-1-7-1-6 0C-7 0-4 1 0 1L0 20C0 1 4 1 7 0Z'],
++  part38:   [24, 'M2 24L1 0C2 0 1-1 1 0L16-19C2-2-1-1-2-1C-2 0-2 0-1 1L-17 19C0 1 0 2 2 1Z'],
++  part39:   [96, 'M0 0L0 96L73 0L0-22L-24 0L0-25L12-49L-61 0ZM75 0L-11 45L9 0L0-26L12 0L0 26L7 0L0 29L-7 0L0 22L11 0L0-96L-21 0Z'],
++  part40:   [46, 'M0 19C0 0 0-1 0 1C0 0 0 0 0 1L1 0C0 3 2 4 3 2C-3-3 2-5 6-1C8 0 2 8 0 3C0 3-3 2 0 3C0 4 3 3 4 0C-2 0-2-3 0-1C0-2 0-2 1-1C1-2 3-1 2-2C2-1 2-2 1-2C1-1 0 0 0-1C1 4 3 5 0 0C-1-3 3-3 0 0C9-8-4-6 0 0C-2-8-9-6-11 0C-12 0-11 8 0 10C0 0 0 0 0 1Z'],
++  part41:   [37, 'M37 23L-37 14L0-23L37-14L0 23Z'],
++  part42:   [96, 'M82 37C-11 6-5 2-3 2L-2 1C-2-8 1-5 1-2C1-2 1 0 0 0C17-9 8-5 4-3L4-2C-3-2-2-1-1-1L-1 0C-15 8-8 4-4 2L-4 2C-2-12-1-6 0-3L0-3C-5 0-2 0-1 0L-1 0C-2 18-1 9-1 5L0 5C-18-10-9-5-4-2L-5-3C-3 2-1 0-1 1L-1 0C19 12 9 6 5 3L5 3C2 5-3 12-2 11C-2 10-3 10-1 4C22 0 11 0 5 0L6 0C-1-4-2-5-1-6C-2-7-2-9-3-8C13-8 7-4 3-1L3-2L-6-5Z'],
++  part43:   [96, 'M96 17L-27 0C-4 0-3 2 0 4L0 11L34 0L0 15L-34 0L0 47L-31 0L0-47L-31 0L0-15L31 0L0-9C0-14 14-11 24 0L27 0L0 17'],
++  part44:   [96, 'M50 0C-9 0-7 2-2 2C-2 2-1 0 0 1C1 0-1 2-1 1C0 2-2 1-4 1C-2 1-1 0 0 0L0 1C0 0-3 0-3 0C-3 1-4 0-1 1C-3 2 0 2-1 2C0 1 0 0-1 0C-1 2 1 3 3 1C2 1 2 1 2 0C2 0 2 0 0 0C0 0 0 1 0 1C0 1 0 1 0 1L-5 7L0 1L7 0C0 1 1 2 1 2C1 1 1 1 1 2C2 2 3 2 3 3C0 0 0 0 0 1C0 1 0 1 1 0C0 0 0 0 0 1C0 0 0 0 0 1C0 1 1 2 2 1C3 3 7 5 0 2C0 2-3 3-4 1C-4 1-5 2 2 0C2 1 2 0 1 0C2 0 2 0 2 0C1-1 1 0 1 0L1 0C0 1-1 0 0 1C-2 1 2 3 5 0C1 0 1 0 1 0C2 0 2-1 1 0C2-1 1-1 0-1C-1-2 2-1-1-1C-2-1 2-1 3-2C3-2 10-10 0-2C-1-2-1-1 1-1C0-1 0 0 0-1C0 0 1-1 0-1L6-8C1-2 1-1 0-1C1-2 0-1 0-2C0 0 0 0 1 0C1 0 0 0 1 0C1 0 1 0 0 0C1 0 1-1 0 0C-3-2-2-2-1-2C-1-1 0 0 0-1C0 0 11 0 1-3C1-2 1-4-2-2C0-1 0 0-1 0C0 0 0 0 0-1C0 0-1 0 0-1C-1-1-1-2-1-1C-2-1-2-1-2 0C-2 0-2 0-2 0C-2 0-1-1 0 0C0 0 3-1-4-1C-4-1-2 0 0-1C1-1 0-1 0 0C0-1-1-1 0 0C-1-2-3-5-14 0Z'],
++  part45:   [64, 'M64 64C-25-29-22-21-17-14'],
++  part46:   [30, 'M27 4C-5 1-24 8 26 14C3 1-2 1-3 1C0 0-2 0-1 0C-2 0-2-1-1 0C-32-17 31-10 7-1C2-1 5 0 1 1C3 1 0 1-4 1Z'],
++  part47:   [24, 'M23 17L-19-16C-2-2-1 1-1 2C0 2 0 2 1 1L19 16L1 1C1 0 1-1 1-1C0-2 0-2-1-1Z'],
++  part48:   [24, 'M18 7C0 0 0 0-1 0C-1-4-2-3-3 0C-3 0-3 5 0 5L0 1C0 0 0 0-1 0C-2 0-2 3 0 4C0 3 2 3 2 0L14 0C3 0 3-3 0-6C0-4-3-4-3 0ZM-4 8C-1 1-2 4-1 1C0 0 0 0-1 0C0 0 0 0 0-1L0-1L2-4L-1 0C-1-1 0 0 0-1C0 0 0 0 0-1C1-1 2-4 0 0L1-1C0 1 1 0 0 0C0 0-1 0 0 1L-1 4L1 1C1 0 0 0 0 1L0 1Z'],
++  part49:   [29, 'M27 0L-25 0C-1 0-1 5 0 6L0 7C0 6 1 5 1 0L25 0C1 0 1-5 0-6L0-7C0-6-1-5-1 0Z'],
++  part50:   [24, 'M20 0L-19 17C-1 1 0 3 0 1C1 1 1 1 1 0C0 0 0 0 1-1L19-16C1-2 0-1 0-2C-1-2-2 0-1 0Z'],
++  part51:   [24, 'M17 0L-17 14L7 10L17-19C0 0-3-4-4-1Z'],
++  part52:   [24, 'M21 3L-2 3L-14 0L-3-3C-1 0-1 0 0 1L0 18C0 2 1 0 1 0L19 0C2 0 1 0 0-2L0-18C0-1-1 0-2 0ZM-3 2L2-2L-4 0L-2-3L-5 0L-1 3L-4 0L2 2L12 0Z'],
++  part53:   [96, 'M0 0L11 16L7 7L6 17L6 13L6 13L7 2L8-1L6 17L7-17L6 27L8-17L7-8L11 27'],
++  part54:   [58, 'M5 0C-1 0-2 0-1 1C-1 2 0 3 1 2C0 0 0 0 7 7C-1 4 1 3 3 3C0 0 0 0 30 30C4 4 6 0 4-4C4-4 0-6-4-4C0 0 0 0-30-30C-3-3-4-1-3 1C0 0 0 0-7-7C-1-1-1 0-1 0Z'],
++  part55:   [96, 'M0 0L0 96L57 0L14-25C3-6 2-4 2-4C1-3 1-4 0-3C0-3-1-3-1-2C-1-2-2-1-1 0C-4 0-3 4-3 9L-10-11C3-7 2-5 3-4C3-3 4-2 5 0C5 0 4 3 3 5C4 5 2 8 0 9C0 5-1 5-1 4C-2 5-2 6-4 7L-10 17L24 0L0-96L-96 0Z'],
++  part56:   [76, 'M38 76L-19 0C-17-19-2-21 0 0C-3-21 41-15 0 0C0 0 41 15-3 21C0 0-1 21-18 19L-19 0Z'],
++  part57:   [24, 'M24 11C0-7-1-4-1 0L-20 0C-1 0-1 4 0 7C0 9 1 4 1 0L20 0C1 0 1-4 0-9Z'],
++  part58:   [75, 'M38 0L-38 20L0 1L0 34L38 20L0-34L37-20L0-1L-37-20Z'],
++  part59:   [75, 'M38 0L-38 20L0 1L13 7L-13-7L0 34L37 20L1 0L37-20L0-34L0-1L-37-20Z'],
++  part60:   [96, 'M0 0L0 96L89 0C2 0 1 0 1 0C1-1 1-1 1-1C0-1 0-1 0-3L0-80C0-3 0-1 0-1C-1-1-1-1-1-1C-1 0-1 0-2 0L-89 0Z'],
++  part61:   [24, 'M17 23C1 1 1 0 1 0C1 0 0 0 1 0C2-1 1-1-2-1L-16-20C-1-1-2 0-2 0C-2 1-1 1 2 2L16 19Z'],
++  part62:   [96, 'M0 0L25 3L8 51L29-5L14 47L20-2'],
++  part63:   [92, 'M46 0C-25 0-21 15 0 19C0 7 2 5 4 5C11 16 3 8 2 8C2 7 2 2 7 0C3 0 5 0 5 0C5 0 5 0 3 0C7 0 2-2 2-7C1-8 4-8 11-16C3-5 3-5 0-7C0-19-21-15-25 0ZM36 50C-11 15-3 9-2 9C-1 1 0 3-2 1C0 1-1 0-3 0L-13 0L-13 0C-3 0-1 0 0-1C-2-1 0-3-1-1C-2-9-3-9-11-15C-4-5-2-5 0-6C0-17 19-14 23 0C23 0 19 14 0 17C0 6-2 5-4 5Z'],
++  part64:   [96, 'M0 0L0 96L74 0L0-60L-12 0L0-22L26 0L0 82L8 0L0-96L-96 0Z'],
++  part65:   [24, 'M18 0C-3 0-2 6 0 6C0 3 0 2 1 2L-4 0C1-2 0-2 0-3C0-6-2-6-3 0C-3 0-3 6 0 6C0 6 3 6 3 0L12 0C3 0 3-6 0-6C0-6-3-6-3 0ZM-15 12C0-4 1-2 2 0C1 0 2 2 0 4C0 4-2 3-1 0C-2 0-1-3 0-4ZM15 7C-1 0-2-3 0-4C0-4 2-2 1 0C2 0 1 2 0 4C0 4-1 3-2 0Z'],
++  part66:   [75, 'M38 0L-38 21L0 33L38 21L0-33L37-21L-37-21Z'],
++  part67:   [24, 'M2 0C-1 3-1 2 0 4C0 8 5 7 7 0C7 0 5-7 0-8C0-4-1-2-1-3L-20 0Z'],
++  part68:   [44, 'M22 44C9 0 7-5 6-7C-1 0-1-1-1 0C-3-2-2-5 0-6C-1-5 0-13 0 0L-13 8L-13-8C0 0 0 13-1 5C0 6-2 5-3 2C-1 0-1 1-1 0C6 7 7 5 9 0Z'],
++  part69:   [96, 'M0 0L0 96L27 0C0-4-1-3-1-3C-1-3-3-1-2 0C-2 0-2 1-3 2L0-20L9-27L-14 0L0-23L28 0L0 19L-9 28C4 1 2 4 3 7C2 6 1 8 0 8L58 0L0-96L-96 0Z'],
++  part70:   [96, 'M0 30L11 8L9-38L5 27L8-8L5 22L7 7L7-2L5 17L7 6L6 19L6 8L8-28L12 0'],
++  part71:   [75, 'M38 0L-38 20L0 1L37 20L0 34L38-20L0-34L0-1L-37-20Z'],
++  part72:   [31, 'M29 0L-27 0C-1 0-1 5 0 7L0 7C0 7 1 5 1 0L27 0C1 0 1-5 0-7L0-7C0-7-1-5-1 0Z'],
++  part73:   [96, 'M0 50L12-1L12 25L12-20L12-36L12-18L12 17L12 22L12-39L0 96L-96 0L0-46Z'],
++  part74:   [24, 'M2 24C1 0 0-1 1 0L19-16C1-1 0-3 0-1C-1-2-2-1-1 2L-19 16C-1 1 0 2 0 2C1 1 1 1 0 0Z'],
++  part75:   [96, 'M0 0L12 1L6 14L6 9L8-15L6 14L6 23L7-4L6 21L6-3L6 36L7-18L7 14L13-43'],
++  part76:   [24, 'M12 9C-2 0-1 2 0 2C0 3 1 2 2 0C2 0 1-2 0-3C0-2-1-2-2 0ZM9-5L-2 0L-1 0L-1-4L-1 0L-8 0L-1 0L-1 4C0 0 0 0-1 0L-2 0C-2 0-1 2 0 1L0 14C0 1 1 2 2 0L18 0C2 0 1-2 0-1L0-14C0-1-1-2-2 0ZM-9 17C-3 0-3-3 0-5C0-4 3-3 3 0C3 0 3 3 0 4C0 5-3 3-3 0ZM9-11C-1 0 0-1 0 0C0-1 0-1 1 0C0 0 0 1 0 1L0 1Z'],
++  part77:   [75, 'M0 0L0 47L37 14L38 14L0-24L-37-14L0-23L-38-14Z'],
++  part78:   [48, 'M48 42C0 0 0 0-1-1C-5-4-20-18-12-11C-1 0 0-1-1 0L0-1C-1-1-1-1-1 0C-2-2-3-2 0 0C0 1 4 4 3 3C1 1 0 1 1 0C11 13 19 19 5 5C0 1 1 0 0 0C1 0 0-1 1-1C1-1 0-1 0-1L0-1Z'],
++  part79:   [96, 'M0 0L0 96L54 0C0-6 0-6 0-6C0-12 0-10 2-9C1-9 1-7 2-5C4-10 5-5 5 0C3 0 2 0 2 2C2 2 2 2 1 2C1 1 1 3 2 3L-6 20C0-1 0-1-1-1C0-1-1-2-2-2C-2-2-1-1-2 0C-3 0-2 3-2 5C-2 5-1 8 0 9C3-5 3-3 4 0C4 0 4 4 3 8C3 7 2 9 0 11L5 0L0-96L-96 0ZM74 81C-3 0-1 2-2 3C-1 3-1 3 0 4L15 0C-1-3 0-3-1-3C-1-4-2-2-2 0Z'],
++}
++;
++
++
++/* ------------------------------------------------------------------ *
++ *  SLIDES                                                             *
++ * ------------------------------------------------------------------ */
++function slide01(s){
++
++  wash(s,SUN,TEAL);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  tx(s,BIG,'-RAYS-',7.296,5.965,12.074,3.069,{
++sz:175,spc:43.75,al:'ctr',va:'ctr',nowrap:1}
++);
++
++  chrome(s,'',W);
++
++}
++
++function slide02(s){
++
++  photo(s,8.889,2.292,8.889,5.208);
++
++  photo(s,8.889,7.5,8.889,5.208);
++
++  photo(s,0,2.292,8.889,5.208);
++
++  photo(s,0,7.5,8.889,5.208);
++
++  tx(s,BIG,'2017.',19.125,3.75,5.896,2.222);
++
++  tx(s,TXT,[['Sed ut perspi ciatis',{
++b:1}
++],[' lorem sit unde omnis iste natus error sit volup tatem Sed ut perspiciatis unde omnis iste. Sed ut perspi ciatis lorem sit unde omnis iste natus error sit volup tatem Sed ut perspiciatis unde.']],19.125,6.111,5.896,3.528,{
++al:'just'}
++);
++
++  tx(s,H2,L26,20.242,10.027,4.167,.792);
++
++  tx(s,TXT,L3,20.242,10.722,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,19.243,10.082,.582,.582,{
++fill:K}
++);
++
++  chrome(s,'images and words',K);
++
++}
++
++function slide03(s){
++
++  wash(s,SUN,TEAL);
++
++  ink(W);
++
++  sh(s,'ellipse',12.017,3.934,2.703,2.703,{
++line:W,lw:5}
++);
++
++  icon(s,I.dot,12.316,4.249,2.143,2.072,{
++fill:W}
++);
++
++  rule(s,6.584,7.774,13.499,0,{
++line:W,lw:5}
++);
++
++  icon(s,I.dot,13.095,7.51,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,19.762,7.51,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,6.359,7.51,.546,.528,{
++fill:W}
++);
++
++  tx(s,H2,'Workshop',10.556,8.559,5.556,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L9,10.556,9.573,5.556,1.528,{
++al:'ctr'}
++);
++
++  tx(s,H2,'Closing',17.257,8.559,5.556,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L9,17.257,9.573,5.556,1.528,{
++al:'ctr'}
++);
++
++  tx(s,H2,'Explanation',3.854,8.559,5.556,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L9,3.854,9.573,5.556,1.528,{
++al:'ctr'}
++);
++
++  sh(s,'ellipse',5.281,3.934,2.703,2.703,{
++line:W,lw:5}
++);
++
++  sh(s,'ellipse',18.683,3.934,2.703,2.703,{
++line:W,lw:5}
++);
++
++  icon(s,I.userPlus,6.124,4.831,1.016,.908,{
++fill:W}
++);
++
++  icon(s,I.disc2,12.896,4.834,.944,.929,{
++fill:ORANGE}
++);
++
++  icon(s,I.thumbUp,19.635,4.75,.799,.911,{
++fill:W}
++);
++
++  chrome(s,'presentation agenda',W);
++
++}
++
++function slide04(s){
++
++  wash(s,TEAL,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  tx(s,H2,'Numeric fourth option.',16.694,7.856,7.639,.792);
++
++  tx(s,TXT,L7,16.694,8.862,7.639,2.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'04',13.937,7.494,2.729,2.222);
++
++  tx(s,H2,'Numeric third option.',5.091,7.856,7.639,.792);
++
++  tx(s,TXT,L7,5.091,8.862,7.639,2.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'03',2.334,7.494,2.729,2.222);
++
++  tx(s,H2,'Numeric second option.',16.694,3.999,7.639,.792);
++
++  tx(s,TXT,L7,16.694,5.005,7.639,2.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'02',13.937,3.637,2.729,2.222);
++
++  tx(s,H2,'Numeric first option.',5.091,3.999,7.639,.792);
++
++  tx(s,TXT,L7,5.091,5.005,7.639,2.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'01',2.334,3.637,2.729,2.222);
++
++  chrome(s,'numeric lists',W);
++
++}
++
++function slide05(s){
++
++  wash(s,TEAL,DEEP);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'roundRect',2.292,2.292,22.083,10.417,{
++fill:W,tr:25,rad:.544,shadow:1}
++);
++
++  tx(s,H2,'Fifth option.',16.172,6.664,6.25,.792);
++
++  tx(s,TXT,L10,16.172,7.67,6.25,1.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'5',14.505,6.302,1.736,2.222);
++
++  tx(s,H2,'Second option.',5.912,6.664,6.25,.792);
++
++  tx(s,TXT,L10,5.912,7.67,6.25,1.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'2',4.245,6.302,1.736,2.222);
++
++  tx(s,H2,'Sixth option.',16.172,9.56,6.25,.792);
++
++  tx(s,TXT,L10,16.172,10.566,6.25,1.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'6',14.505,9.198,1.736,2.222);
++
++  tx(s,H2,'Third option.',5.912,9.56,6.25,.792);
++
++  tx(s,TXT,L10,5.912,10.566,6.25,1.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'3',4.245,9.198,1.736,2.222);
++
++  tx(s,H2,'Fourth option.',16.172,3.769,6.25,.792);
++
++  tx(s,TXT,L10,16.172,4.775,6.25,1.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'4',14.505,3.406,1.736,2.222);
++
++  tx(s,H2,'First option.',5.912,3.769,6.25,.792);
++
++  tx(s,TXT,L10,5.912,4.775,6.25,1.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'1',4.245,3.406,1.736,2.222);
++
++  chrome(s,'numeric lists',W);
++
++}
++
++function slide06(s){
++
++  wash(s,DEEP,RUST);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'rect',0,2.292,26.667,10.417,{
++fill:W,tr:50}
++);
++
++  sh(s,'rect',0,2.292,26.667,10.417,{
++fill:W,tr:50,shadow:1}
++);
++
++  tx(s,H2,'Less time.',10.556,7.899,5.556,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L9,10.556,8.913,5.556,1.528,{
++al:'ctr'}
++);
++
++  tx(s,H2,'Great quality.',17.257,7.899,5.556,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L9,17.257,8.913,5.556,1.528,{
++al:'ctr'}
++);
++
++  tx(s,H2,'More clients.',3.854,7.899,5.556,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L9,3.854,8.913,5.556,1.528,{
++al:'ctr'}
++);
++
++  sh(s,'ellipse',12.017,4.594,2.703,2.703,{
++line:K,lw:5}
++);
++
++  sh(s,'ellipse',5.281,4.594,2.703,2.703,{
++line:K,lw:5}
++);
++
++  sh(s,'ellipse',18.683,4.594,2.703,2.703,{
++line:K,lw:5}
++);
++
++  icon(s,I.userPlus,6.124,5.491,1.016,.908,{
++fill:K}
++);
++
++  icon(s,I.disc2,12.896,5.494,.944,.929,{
++fill:K}
++);
++
++  icon(s,I.thumbUp,19.635,5.41,.799,.911,{
++fill:K}
++);
++
++  chrome(s,'company targets',W);
++
++}
++
++function slide07(s){
++
++  photo(s,0,2.292,13.333,10.417);
++
++  sh(s,'rect',13.333,2.292,13.333,10.417,{
++fill:W,shadow:1}
++);
++
++  tx(s,TXT,'Lorem ipsum dolor sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.',16.563,6.188,6.873,1.528,{
++al:'just'}
++);
++
++  tx(s,H2,'The partner that we are proud to working with.',16.563,4.381,6.873,1.472);
++
++  tx(s,H2,L26,17.662,8.05,4.167,.792);
++
++  tx(s,TXT,L3,17.662,8.745,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,16.662,8.105,.582,.582,{
++fill:K}
++);
++
++  tx(s,H2,'Best Company',17.654,9.395,5.651,0);
++
++  tx(s,TXT,L3,17.654,10.091,4.167,0,{
++al:'just'}
++);
++
++  icon(s,I.trophy,16.654,9.474,.582,.601,{
++fill:K}
++);
++
++  chrome(s,'our special partner',K);
++
++}
++
++function slide08(s){
++
++  ink(W);
++
++  photo(s,0,2.292,26.667,10.417);
++
++  sh(s,'rect',13.333,2.292,13.333,10.417,{
++fill:TEAL,tr:10}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[' sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. Lorem ipsum dolor sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. Lorem ipsum.']],16.354,7.489,7.292,3.028,{
++al:'just'}
++);
++
++  tx(s,H1,'The best project we had.',16.354,6.375,7.292,.792,{
++sz:40}
++);
++
++  tx(s,BIG,'2017.',16.354,4.206,7.292,2.222,{
++va:'ctr'}
++);
++
++  chrome(s,'our featured projects',K);
++
++}
++
++function slide09(s){
++
++  photo(s,8.889,2.292,8.889,10.417);
++
++  photo(s,17.778,2.292,8.889,10.417);
++
++  tx(s,TXT,[['Lorem ipsum',{
++b:1}
++],[' dolor sit ame sit lorem amet, consect diluk wa etur lor adipiscing elit, lorem sed do.']],2.406,3.854,4.167,2.528,{
++al:'just'}
++);
++
++  rule(s,2.457,7.271,4.167,0,{
++line:K,lw:8,ltr:50.1}
++);
++
++  rule(s,2.457,7.271,3.306,0,{
++line:K,lw:8}
++);
++
++  tx(s,TXT,L3,2.457,7.463,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',4.998,6.552,1.545,.528,{
++al:'ctr'}
++);
++
++  tx(s,H2,L26,3.466,8.426,4.167,.792);
++
++  tx(s,TXT,L3,3.466,9.121,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,2.466,8.481,.582,.582,{
++fill:K}
++);
++
++  tx(s,H2,'Best selling',3.443,9.923,4.167,.792);
++
++  tx(s,TXT,L3,3.443,10.618,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.trophy,2.443,10.002,.582,.601,{
++fill:K}
++);
++
++  chrome(s,'product details',K);
++
++}
++
++function slide10(s){
++
++  photo(s,0,2.292,8.889,10.417,75);
++
++  photo(s,8.889,2.292,8.889,10.417);
++
++  tx(s,TXT,[['Lorem ipsum',{
++b:1}
++],[' dolor sit ame sit lorem amet, consect diluk wa etur lor adipiscing elit, lorem sed do.']],19.831,3.854,4.167,2.528,{
++al:'just'}
++);
++
++  rule(s,19.882,7.271,4.167,0,{
++line:K,lw:8,ltr:50.1}
++);
++
++  rule(s,19.882,7.271,3.306,0,{
++line:K,lw:8}
++);
++
++  tx(s,TXT,L3,19.882,7.463,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',22.423,6.552,1.545,.528,{
++al:'ctr'}
++);
++
++  tx(s,H2,L26,20.891,8.426,4.167,.792);
++
++  tx(s,TXT,L3,20.891,9.121,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,19.891,8.481,.582,.582,{
++fill:K}
++);
++
++  tx(s,H2,'Best selling',20.868,9.923,4.167,.792);
++
++  tx(s,TXT,L3,20.868,10.618,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.trophy,19.868,10.002,.582,.601,{
++fill:K}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L6]],2.193,6.922,4.998,3.528,{
++al:'just'}
++);
++
++  tx(s,H2,'The most great ideas that we ever thought.',2.193,4.55,4.998,2.153,{
++va:'b'}
++);
++
++  chrome(s,'project details.',K);
++
++}
++
++function slide11(s){
++
++  wash(s,SUN,TEAL);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  tx(s,BIG,'“',1.756,2.239,3.474,8.583,{
++sz:500}
++);
++
++  tx(s,H2,'- Paul Rand',4.792,10.486,5.934,.792);
++
++  tx(s,BIG,[['Design is the',{
++brk:1}
++],['silent ambassador of your brand.”']],4.743,4.184,17.18,6.022);
++
++  chrome(s,'special quote',W);
++
++}
++
++function slide12(s){
++
++  sh(s,'roundRect',2.292,2.292,22.083,10.417,{
++fill:W,rad:.544,shadow:1}
++);
++
++  sh(s,'roundRect',2.292,2.292,22.083,10.417,{
++fill:W,rad:.544,shadow:1}
++);
++
++  sh(s,'rect',2.292,6.207,22.083,1.389,{
++fill:ORANGE}
++);
++
++  tx(s,H1,'Basic',4.392,6.505,1.683,.792,{
++sz:40,col:W,al:'ctr',nowrap:1}
++);
++
++  tx(s,H1,'Home',9.696,6.505,1.874,.792,{
++sz:40,col:W,al:'ctr',nowrap:1}
++);
++
++  tx(s,H1,'Professional',14.183,6.505,3.701,.792,{
++sz:40,col:W,al:'ctr',nowrap:1}
++);
++
++  tx(s,H1,'Ultimate',20.099,6.505,2.669,.792,{
++sz:40,col:W,al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Pro Tools',15.192,9.931,1.682,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Medium pack',14.819,9.259,2.429,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Starter kit',15.149,8.595,1.769,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Basic features',14.773,7.923,2.521,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,BIG,'19',9.729,3.402,1.809,2.222,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'per month',9.691,5.351,1.884,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,BIG,'24',14.924,3.402,2.219,2.222,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'per month',15.091,5.351,1.884,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,BIG,'29',20.349,3.402,2.168,2.222,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'per month',20.491,5.351,1.884,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,BIG,'9',4.642,3.402,1.182,2.222,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'per month',4.291,5.351,1.884,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'$',9.235,4.697,.35,.528,{
++al:'just',nowrap:1}
++);
++
++  tx(s,TXT,'$',14.569,4.697,.35,.528,{
++al:'just',nowrap:1}
++);
++
++  tx(s,TXT,'$',19.904,4.697,.35,.528,{
++al:'just',nowrap:1}
++);
++
++  tx(s,TXT,'$',4.178,4.697,.35,.528,{
++al:'just',nowrap:1}
++);
++
++  tx(s,TXT,'Medium pack',9.419,9.259,2.429,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Starter kit',9.749,8.595,1.769,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Basic features',9.373,7.923,2.521,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Starter kit',4.349,8.595,1.769,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Basic features',3.973,7.923,2.521,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Pro Tools',20.592,9.931,1.682,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Add-ons',20.641,10.595,1.584,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Medium pack',20.219,9.259,2.429,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Starter kit',20.549,8.595,1.769,.528,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Basic features',20.173,7.923,2.521,.528,{
++al:'ctr',nowrap:1}
++);
++
++  chrome(s,'subscription plans',K);
++
++}
++
++function slide13(s){
++
++  ink(W);
++
++  photo(s,0,0,26.667,15);
++
++  sh(s,'rect',0,2.292,26.667,10.417,{
++fill:TEAL,tr:10}
++);
++
++  tx(s,H2,'Threats',19.476,5.456,2.188,.792,{
++nowrap:1}
++);
++
++  tx(s,TXT,[[L19,{
++brk:1}
++],[L22,{
++brk:1}
++],[L18]],19.476,6.851,4.043,4.028,{
++al:'just',bullet:1,ind:.25}
++);
++
++  tx(s,H2,'Opportunities',14.033,5.456,4.031,.792,{
++nowrap:1}
++);
++
++  tx(s,TXT,[[L19,{
++brk:1}
++],[L22,{
++brk:1}
++],[L18]],14.033,6.851,4.043,4.028,{
++al:'just',bullet:1,ind:.25}
++);
++
++  tx(s,H2,'Weaknesses',8.59,5.456,3.559,.792,{
++nowrap:1}
++);
++
++  tx(s,TXT,[[L19,{
++brk:1}
++],[L22,{
++brk:1}
++],[L18]],8.59,6.851,4.043,4.028,{
++al:'just',bullet:1,ind:.25}
++);
++
++  tx(s,H2,'Strengths',3.147,5.456,2.875,.792,{
++nowrap:1}
++);
++
++  tx(s,TXT,[[L19,{
++brk:1}
++],[L22,{
++brk:1}
++],[L18]],3.147,6.851,4.043,4.028,{
++al:'just',bullet:1,ind:.25}
++);
++
++  icon(s,I.sun,13.945,4.122,1.092,1.092,{
++fill:W}
++);
++
++  icon(s,I.part18,19.608,4.121,1.014,1.095,{
++fill:W}
++);
++
++  icon(s,I.heart,3.227,4.171,1.134,.994,{
++fill:W}
++);
++
++  icon(s,I.thumbDown,8.725,4.174,.857,.989,{
++fill:W}
++);
++
++  chrome(s,'SWOT analysis',W);
++
++}
++
++function slide14(s){
++
++  photo(s,8.889,2.292,8.889,10.417);
++
++  tx(s,H1,'Happy is the purpose of life.',2.21,4.375,5.803,1.806);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],['lorem sit unde omnis iste natus error sit volup tatem Sed ut perspiciatis iste. Sed ut perspi ciatis lorem sit unde omnis iste natus.']],2.209,6.607,4.861,3.028,{
++al:'just'}
++);
++
++  tx(s,H2,'Best Designer',3.297,10.165,4.167,.792);
++
++  tx(s,TXT,L3,3.297,10.861,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.trophy,2.297,10.244,.582,.601,{
++fill:K}
++);
++
++  tx(s,H2,'Designer :',2.21,3.612,4.861,.792);
++
++  tx(s,H2,'Skills :',20.014,3.612,4.861,.792);
++
++  sh(s,'rect',21.82,6.866,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',20.959,6.866,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',22.681,6.866,.694,.278,{
++fill:K,tr:49.7}
++);
++
++  sh(s,'rect',23.542,6.866,.694,.278,{
++fill:K,tr:49.7}
++);
++
++  sh(s,'rect',20.098,6.866,.694,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,20.097,7.227,4.167,0,{
++al:'just'}
++);
++
++  tx(s,CAP,'3/5',20.097,6.269,4.167,0,{
++al:'r'}
++);
++
++  sh(s,'rect',21.82,8.628,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',20.959,8.628,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',22.681,8.628,.694,.278,{
++fill:K,tr:49.7}
++);
++
++  sh(s,'rect',23.542,8.628,.694,.278,{
++fill:K,tr:49.7}
++);
++
++  sh(s,'rect',20.098,8.628,.694,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,20.097,8.99,4.167,0,{
++al:'just'}
++);
++
++  tx(s,CAP,'3/5',20.097,8.032,4.167,0,{
++al:'r'}
++);
++
++  sh(s,'rect',21.82,10.391,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',20.959,10.391,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',22.681,10.391,.694,.278,{
++fill:K,tr:49.7}
++);
++
++  sh(s,'rect',23.542,10.391,.694,.278,{
++fill:K,tr:49.7}
++);
++
++  sh(s,'rect',20.098,10.391,.694,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,20.097,10.753,4.167,0,{
++al:'just'}
++);
++
++  tx(s,CAP,'3/5',20.097,9.795,4.167,0,{
++al:'r'}
++);
++
++  sh(s,'rect',21.82,5.103,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',20.959,5.103,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',22.681,5.103,.694,.278,{
++fill:K,tr:49.7}
++);
++
++  sh(s,'rect',23.542,5.103,.694,.278,{
++fill:K,tr:49.7}
++);
++
++  sh(s,'rect',20.098,5.103,.694,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,20.097,5.465,4.167,0,{
++al:'just'}
++);
++
++  tx(s,CAP,'3/5',20.097,4.507,4.167,0,{
++al:'r'}
++);
++
++  sh(s,'roundRect',12.248,10.025,6.539,1.806,{
++fill:TEAL,tr:10,rad:.208,shadow:1}
++);
++
++  tx(s,H2,'Katherine Doe.',12.673,10.315,5.687,.792,{
++col:W}
++);
++
++  tx(s,TXT,'Fashion designer.',12.673,11.013,5.687,.528,{
++col:W,al:'just'}
++);
++
++  chrome(s,'meet our fashion designer',K);
++
++}
++
++function slide15(s){
++
++  ink(W);
++
++  photo(s,0,0,26.667,15);
++
++  sh(s,'rect',19.507,2.292,7.16,10.417,{
++fill:K,tr:20}
++);
++
++  sh(s,'rect',0,2.292,11.055,10.417,{
++fill:W,tr:25}
++);
++
++  tx(s,H2,'Skills :',20.656,3.612,4.861,.792);
++
++  tx(s,H1,'Jonathan Stephen Works.',2.403,4.676,6.25,1.806,{
++col:K}
++);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],['lorem sit unde omnis iste natus error sit volup tatem Sed ut perspiciatis iste. Sed ut perspi ciatis lorem sit unde omnis iste natus.']],2.402,6.812,6.25,2.528,{
++col:K,al:'just'}
++);
++
++  tx(s,H2,'Best Designer',3.437,9.864,4.167,.792,{
++col:K}
++);
++
++  tx(s,TXT,L3,3.437,10.559,4.167,.528,{
++col:K,al:'just'}
++);
++
++  icon(s,I.trophy,2.437,9.942,.582,.601,{
++fill:K}
++);
++
++  tx(s,H2,'The project manager:',2.403,3.913,6.25,.792,{
++col:K}
++);
++
++  sh(s,'rect',20.741,6.774,4.167,.278,{
++fill:W,tr:50.5}
++);
++
++  sh(s,'rect',20.741,6.774,3.472,.278,{
++fill:W,tr:10}
++);
++
++  tx(s,TXT,L3,20.741,7.127,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',20.741,6.172,4.167,.528,{
++al:'r'}
++);
++
++  sh(s,'rect',20.741,8.4,4.167,.278,{
++fill:W,tr:50.5}
++);
++
++  sh(s,'rect',20.741,8.4,3.472,.278,{
++fill:W,tr:10}
++);
++
++  tx(s,TXT,L3,20.741,8.753,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',20.741,7.798,4.167,.528,{
++al:'r'}
++);
++
++  sh(s,'rect',20.769,10.026,4.167,.278,{
++fill:W,tr:50.5}
++);
++
++  sh(s,'rect',20.769,10.026,3.472,.278,{
++fill:W,tr:10}
++);
++
++  tx(s,TXT,L3,20.769,10.378,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',20.769,9.424,4.167,.528,{
++al:'r'}
++);
++
++  sh(s,'rect',20.769,5.149,4.167,.278,{
++fill:W,tr:50.5}
++);
++
++  sh(s,'rect',20.769,5.149,3.472,.278,{
++fill:W,tr:10}
++);
++
++  tx(s,TXT,L3,20.769,5.501,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',20.769,4.546,4.167,.528,{
++al:'r'}
++);
++
++  chrome(s,'',K);
++
++}
++
++function slide16(s){
++
++  ink(W);
++
++  photo(s,0,2.292,13.333,10.417);
++
++  photo(s,13.333,2.292,13.333,10.417);
++
++  sh(s,'rect',0,9.581,26.667,3.127,{
++fill:TEAL,tr:20}
++);
++
++  tx(s,H2,'John Doe',14.548,10.507,4.167,.792);
++
++  tx(s,TXT,'Illustrator expert.',14.548,11.254,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,H2,'Jeniffer Doe',1.202,10.507,4.167,.792);
++
++  tx(s,TXT,'Illustrator expert.',1.202,11.254,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],['lorem sit unde omnis iste natus error sit volup tatem Sed ut perspiciatis.']],19.134,10.381,6.117,1.528,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],['lorem sit unde omnis iste natus error sit volup tatem Sed ut perspiciatis.']],6.068,10.381,6.117,1.528,{
++al:'just'}
++);
++
++  chrome(s,'meet our design team',K);
++
++}
++
++function slide17(s){
++
++  photo(s,0,0,26.667,15);
++
++  icon(s,I.part64,0,0,26.667,15,{
++fill:W,tr:25}
++);
++
++  tx(s,BIG,[['Research',{
++u:1}
++],[' is creating new knowledge.']],2.499,3.939,11.752,6.022);
++
++  tx(s,H2,'Neil Armstrong :',2.611,3.197,4.646,.792,{
++va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L6]],2.669,10.275,11.752,1.528,{
++al:'just'}
++);
++
++  chrome(s,'six steps process',K);
++
++}
++
++function slide18(s){
++
++  ink(W);
++
++  photo(s,0,0,26.667,15);
++
++  icon(s,I.part55,0,0,26.667,15,{
++fill:K,tr:25}
++);
++
++  tx(s,BIG,'Validate.',2.626,3.288,12.251,2.222);
++
++  tx(s,H2,'Please put something here.',4.982,9.808,11.111,.792);
++
++  tx(s,TXT,L5,4.982,10.684,11.111,1.028,{
++al:'just'}
++);
++
++  tx(s,H2,L25,4.982,7.342,11.111,.792);
++
++  tx(s,TXT,L5,4.982,8.217,11.111,1.028,{
++al:'just'}
++);
++
++  tx(s,H2,'2',3.482,9.808,1.389,.792);
++
++  tx(s,H2,'1',3.482,7.342,1.389,.792);
++
++  tx(s,TXT,L5,2.626,5.63,10.333,1.028,{
++al:'just'}
++);
++
++  chrome(s,'six steps process',W);
++
++}
++
++function slide19(s){
++
++  ink(W);
++
++  photo(s,0,2.292,26.667,10.417);
++
++  icon(s,I.part69,0,2.292,26.667,10.417,{
++fill:K,tr:25}
++);
++
++  tx(s,BIG,'Production.',12.093,4.347,11.752,2.222);
++
++  tx(s,H2,'The third steps.',12.205,3.605,4.379,.792,{
++va:'ctr',nowrap:1}
++);
++
++  tx(s,H2,L25,12.2,6.667,11.111,.792);
++
++  tx(s,TXT,'Duis aute irure dolor in reprehenderit in voluptate velit. Lorem ipsum dolor sit amet, consectetur adipiscing elit, Duis aute irure dolor in reprehenderit in voluptate velit.',12.2,7.542,11.111,1.528,{
++al:'just'}
++);
++
++  tx(s,H2,'28 hours',19.457,9.729,4.167,.792);
++
++  tx(s,TXT,L3,19.457,10.424,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.disc2,18.446,9.886,.605,.596,{
++fill:W}
++);
++
++  tx(s,H2,L26,13.257,9.729,4.167,.792);
++
++  tx(s,TXT,L3,13.257,10.424,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,12.257,9.784,.582,.582,{
++fill:W}
++);
++
++  chrome(s,'six steps process',K);
++
++}
++
++function slide20(s){
++
++  photo(s,0,2.292,26.667,10.417);
++
++  icon(s,I.part39,0,2.292,26.667,10.417,{
++fill:W,tr:20}
++);
++
++  tx(s,H2,L26,3.729,8.357,4.167,.792);
++
++  tx(s,TXT,L3,3.729,9.052,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,2.729,8.412,.582,.582,{
++fill:K}
++);
++
++  tx(s,BIG,'Launch.',2.499,3.487,11.752,2.222);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L6]],2.669,5.795,8.295,2.028,{
++al:'just'}
++);
++
++  tx(s,H2,'18°',8.364,8.357,4.167,.792);
++
++  tx(s,TXT,L3,8.364,9.052,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.part48,7.33,8.533,.651,.42,{
++fill:K}
++);
++
++  tx(s,TXT,L3,3.729,10.985,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,5.826,10.114,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,7.499,10.114,.332,.8,{
++fill:K,tr:49.8}
++);
++
++  icon(s,I.person3,6.245,10.114,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,7.08,10.114,.332,.8,{
++fill:K,tr:49.8}
++);
++
++  icon(s,I.person4,6.663,10.114,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,3.735,10.114,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,5.408,10.114,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person3,4.153,10.114,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,4.989,10.114,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person4,4.572,10.114,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.avatar,2.718,10.214,.605,.577,{
++fill:K}
++);
++
++  chrome(s,'six steps process',K);
++
++}
++
++function slide21(s){
++
++  ink(W);
++
++  photo(s,0,0,26.667,15);
++
++  icon(s,I.part09,0,0,26.667,15,{
++fill:K,tr:25}
++);
++
++  tx(s,BIG,'Collecting.',14.279,2.167,10.333,2.222);
++
++  tx(s,H2,'Please put something here.',16.635,9.728,7.639,1.472);
++
++  tx(s,TXT,L5,16.635,11.305,7.639,1.528,{
++al:'just'}
++);
++
++  tx(s,H2,L25,16.635,6.221,7.639,1.472);
++
++  tx(s,TXT,L5,16.635,7.798,7.639,1.528,{
++al:'just'}
++);
++
++  tx(s,H2,'2',15.135,9.728,1.389,.792);
++
++  tx(s,H2,'1',15.135,6.221,1.389,.792);
++
++  tx(s,TXT,L5,14.279,4.508,10.333,1.028,{
++al:'just'}
++);
++
++  chrome(s,'six steps process',W);
++
++}
++
++function slide22(s){
++
++  photo(s,0,2.292,26.667,10.417);
++
++  icon(s,I.part79,0,2.292,26.667,10.417,{
++fill:W,tr:20}
++);
++
++  tx(s,BIG,'2.0 Release.',2.499,4.084,11.752,2.222);
++
++  tx(s,H2,'Update version.',2.611,3.342,4.454,.792,{
++va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L6]],2.669,6.392,10.633,1.528,{
++al:'just'}
++);
++
++  tx(s,H2,L26,3.729,8.502,4.167,.792);
++
++  tx(s,TXT,L3,3.729,9.197,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,2.729,8.557,.582,.582,{
++fill:K}
++);
++
++  tx(s,TXT,L3,3.729,11.13,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,5.826,10.259,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,7.499,10.259,.332,.8,{
++fill:K,tr:49.8}
++);
++
++  icon(s,I.person3,6.245,10.259,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,7.08,10.259,.332,.8,{
++fill:K,tr:49.8}
++);
++
++  icon(s,I.person4,6.663,10.259,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,3.735,10.259,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,5.408,10.259,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person3,4.153,10.259,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,4.989,10.259,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person4,4.572,10.259,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.avatar,2.718,10.359,.605,.577,{
++fill:K}
++);
++
++  chrome(s,'six steps process',K);
++
++}
++
++function slide23(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  rule(s,3.639,10.005,19.388,0,{
++line:W,lw:5}
++);
++
++  icon(s,I.dot,22.849,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,18.934,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,11.103,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,7.187,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,15.018,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,2.532,9.026,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,2.282,8.784,2.526,2.444,{
++line:W,lw:5}
++);
++
++  tx(s,H2,L26,2.301,11.489,2.488,.792,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,H1,'28',2.933,9.526,1.223,.958,{
++col:K,al:'ctr'}
++);
++
++  tx(s,BIG,'Project launch.',2.279,2.948,13.951,2.222);
++
++  tx(s,TXT,[[L8,{
++b:1}
++],[' Ut enim ad minim veniam.  Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore. Lorem ipsum dolor sit amet, eiusmod sed.']],2.279,5.203,13.951,2.528,{
++al:'just'}
++);
++
++  chrome(s,'project timeline',W);
++
++}
++
++function slide24(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  rule(s,3.639,10.005,19.388,0,{
++line:W,lw:5}
++);
++
++  icon(s,I.dot,22.849,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,18.934,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,11.103,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,3.272,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,15.018,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,6.448,9.026,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,6.197,8.784,2.526,2.444,{
++line:W,lw:5}
++);
++
++  tx(s,H2,'Feb 2018',6.181,11.489,2.559,.792,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,H1,'16',6.849,9.526,1.223,.958,{
++col:K,al:'ctr'}
++);
++
++  tx(s,BIG,'Team meeting.',6.13,2.948,13.951,2.222);
++
++  tx(s,TXT,[[L8,{
++b:1}
++],[' Ut enim ad minim veniam.  Quis nostrud exercitation ullamco.']],6.13,5.203,13.951,1.028,{
++al:'just'}
++);
++
++  tx(s,H2,'28 hours',11.959,6.466,4.167,.792);
++
++  tx(s,TXT,L3,11.959,7.162,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.disc2,10.948,6.624,.605,.596,{
++fill:W}
++);
++
++  tx(s,H2,L26,7.278,6.466,4.167,.792);
++
++  tx(s,TXT,L3,7.278,7.162,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,6.279,6.66,.582,.582,{
++fill:W}
++);
++
++  tx(s,H2,'Dave Doe',16.675,6.466,4.167,.792);
++
++  tx(s,TXT,L3,16.675,7.162,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.part76,15.641,6.589,.651,.517,{
++fill:W}
++);
++
++  chrome(s,'project timeline',W);
++
++}
++
++function slide25(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  rule(s,3.639,10.005,19.388,0,{
++line:W,lw:5}
++);
++
++  icon(s,I.dot,22.849,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,18.934,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,3.272,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,7.187,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,15.018,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,10.363,9.026,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,10.113,8.784,2.526,2.444,{
++line:W,lw:5}
++);
++
++  tx(s,H2,'Mar 2018',10.082,11.489,2.587,.792,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,H1,'18',10.764,9.526,1.223,.958,{
++col:K,al:'ctr'}
++);
++
++  tx(s,BIG,'Ver. 2.0 launch.',10.096,2.948,13.951,2.222);
++
++  tx(s,TXT,[[L8,{
++b:1}
++],[' Ut enim ad minim veniam. Lorem sit douis nostrud exercitation ullamco. Ut enim ad minim veniam.  Lorem sit douis nostrud exercitation ullamco.']],10.096,5.203,8.161,2.528,{
++al:'just'}
++);
++
++  sh(s,'rect',19.244,7.076,4.167,.278,{
++fill:W,tr:50.5}
++);
++
++  sh(s,'rect',19.244,7.076,3.472,.278,{
++fill:W,tr:10}
++);
++
++  tx(s,TXT,L3,19.244,7.428,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',19.244,6.473,4.167,.528,{
++al:'r'}
++);
++
++  tx(s,H2,L26,20.226,5.193,4.167,.792);
++
++  tx(s,TXT,L3,20.226,5.888,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,19.226,5.387,.582,.582,{
++fill:W}
++);
++
++  chrome(s,'project timeline',W);
++
++}
++
++function slide26(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  rule(s,3.639,10.005,19.388,0,{
++line:W,lw:5}
++);
++
++  icon(s,I.dot,22.849,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,18.934,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,11.103,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,7.187,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,3.272,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,14.278,9.026,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,14.028,8.784,2.526,2.444,{
++line:W,lw:5}
++);
++
++  tx(s,H2,'Apr 2018',14.039,11.489,2.503,.792,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,H1,'22',14.68,9.526,1.223,.958,{
++col:K,al:'ctr'}
++);
++
++  tx(s,BIG,'Conference.',2.579,2.948,13.951,2.222);
++
++  tx(s,TXT,[[L8,{
++b:1}
++],[' Ut enim ad minim veniam.  Quis nostrud exercitation ullamco.']],2.579,5.203,13.951,1.028,{
++al:'just'}
++);
++
++  icon(s,I.sun,13.315,6.777,.866,.866,{
++fill:W}
++);
++
++  icon(s,I.heart,2.654,6.816,.899,.788,{
++fill:W}
++);
++
++  icon(s,I.thumbDown,7.878,6.734,.68,.784,{
++fill:W,rot:180,flipH:1}
++);
++
++  tx(s,H2,'Ideas',14.718,6.814,3.701,.792);
++
++  tx(s,H2,'Heart',4.073,6.814,3.701,.792);
++
++  tx(s,H2,'Popularity',9.077,6.814,3.701,.792);
++
++  chrome(s,'project timeline',W);
++
++}
++
++function slide27(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  rule(s,3.639,10.005,19.388,0,{
++line:W,lw:5}
++);
++
++  icon(s,I.dot,22.849,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,3.272,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,11.103,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,7.187,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,15.018,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,18.194,9.026,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,17.943,8.784,2.526,2.444,{
++line:W,lw:5}
++);
++
++  tx(s,H2,'May 2018',17.877,11.489,2.659,.792,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,H1,'12',18.595,9.526,1.223,.958,{
++col:K,al:'ctr'}
++);
++
++  tx(s,BIG,'Board meeting.',7.099,2.948,13.951,2.222);
++
++  tx(s,TXT,[[L8,{
++b:1}
++],[' Ut enim ad minim veniam. Lorem sit douis nostrud exercitation ullamco. Ut enim ad minim veniam.  Lorem sit douis nostrud exercitation ullamco.']],7.099,5.203,8.161,2.528,{
++al:'just'}
++);
++
++  sh(s,'rect',16.247,7.076,4.167,.278,{
++fill:W,tr:50.5}
++);
++
++  sh(s,'rect',16.247,7.076,3.472,.278,{
++fill:W,tr:10}
++);
++
++  tx(s,TXT,L3,16.247,7.428,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',16.247,6.473,4.167,.528,{
++al:'r'}
++);
++
++  tx(s,H2,L26,17.228,5.193,4.167,.792);
++
++  tx(s,TXT,L3,17.228,5.888,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.calendar,16.229,5.387,.582,.582,{
++fill:W}
++);
++
++  chrome(s,'project timeline',W);
++
++}
++
++function slide28(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  rule(s,3.639,10.005,19.388,0,{
++line:W,lw:5}
++);
++
++  icon(s,I.dot,3.272,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,18.934,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,11.103,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,7.187,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,15.018,9.742,.546,.528,{
++fill:W}
++);
++
++  icon(s,I.dot,22.109,9.026,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,21.859,8.784,2.526,2.444,{
++line:W,lw:5}
++);
++
++  tx(s,H2,'Jun 2018',21.855,11.489,2.534,.792,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,H1,'18',22.511,9.526,1.223,.958,{
++col:K,al:'ctr'}
++);
++
++  tx(s,BIG,'Open source.',10.534,2.948,13.951,2.222);
++
++  tx(s,TXT,[[L8,{
++b:1}
++],[' Ut enim ad minim veniam.  Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore. Lorem ipsum dolor sit amet, eiusmod sed.']],10.534,5.203,13.951,2.528,{
++al:'just'}
++);
++
++  chrome(s,'project timeline',W);
++
++}
++
++function slide29(s){
++
++  wash(s,RUST,DEEP);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'rect',0,0,26.667,12.708,{
++fill:W,tr:50}
++);
++
++  sh(s,'rect',0,0,26.667,12.708,{
++fill:W,tr:50}
++);
++
++  for(let i=0;
++i<3;
++i++){
++
++    rule(s,9.62,10.237+i*-2.947,14.033,0,{
++line:K,lw:5,ltr:50}
++);
++
++  }
++
++  sh(s,'rect',10.896,8.395,.444,4.312,{
++fill:K}
++);
++
++  sh(s,'rect',12.736,5.616,.444,7.091,{
++fill:K}
++);
++
++  sh(s,'rect',14.575,4.005,.444,8.701,{
++fill:ORANGE}
++);
++
++  sh(s,'rect',16.415,7.768,.444,4.939,{
++fill:K}
++);
++
++  sh(s,'rect',18.254,6.382,.444,6.325,{
++fill:K}
++);
++
++  sh(s,'rect',21.934,8.816,.444,3.891,{
++fill:K}
++);
++
++  sh(s,'rect',20.094,9.471,.444,3.236,{
++fill:K}
++);
++
++  tx(s,TXT,'5000K',24.086,7.026,2.305,.528,{
++al:'just'}
++);
++
++  tx(s,TXT,'2500K',24.086,9.973,2.305,.528,{
++al:'just'}
++);
++
++  tx(s,TXT,'7500K',24.086,4.079,2.305,.528,{
++al:'just'}
++);
++
++  sh(s,'roundRect',11.528,2.196,6.539,1.806,{
++fill:ORANGE,rad:.208,shadow:1}
++);
++
++  tx(s,H2,'7824K downloads.',11.954,2.485,5.687,.792,{
++col:W}
++);
++
++  tx(s,TXT,'Total user based on 2017 data.',11.954,3.184,5.687,.528,{
++col:W,al:'just'}
++);
++
++  tx(s,H1,'User counts based on download statistic.',2.441,4.835,6.746,3.5);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],2.441,7.851,5.518,3.028,{
++al:'just'}
++);
++
++  sh(s,'roundRect',2.458,3.121,4.687,1.119,{
++line:K,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',2.718,3.284,4.167,0,{
++al:'ctr'}
++);
++
++  tx(s,TXT,'Item',12.149,12.928,1.618,.528,{
++col:W,al:'ctr'}
++);
++
++  tx(s,TXT,'Our product.',13.989,12.928,1.618,1.028,{
++col:W,al:'ctr'}
++);
++
++  tx(s,TXT,'Item',15.828,12.928,1.618,.528,{
++col:W,al:'ctr'}
++);
++
++  tx(s,TXT,'Item',17.668,12.928,1.618,.528,{
++col:W,al:'ctr'}
++);
++
++  tx(s,TXT,'Item',19.507,12.928,1.618,.528,{
++col:W,al:'ctr'}
++);
++
++  tx(s,TXT,'Item',21.347,12.928,1.618,.528,{
++col:W,al:'ctr'}
++);
++
++  tx(s,TXT,'Item',10.309,12.928,1.618,.528,{
++col:W,al:'ctr'}
++);
++
++  chrome(s,'vector column charts',K,{
++noFoot:1}
++);
++
++}
++
++function slide30(s){
++
++  wash(s,BONE,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  rule(s,16.058,5.563,0,6.452,{
++line:W,lw:5,ltr:50}
++);
++
++  rule(s,19.758,5.563,0,6.452,{
++line:W,lw:5,ltr:50}
++);
++
++  rule(s,21.608,5.563,0,6.452,{
++line:W,lw:5,ltr:50}
++);
++
++  rule(s,23.458,5.563,0,6.452,{
++line:W,lw:5,ltr:50}
++);
++
++  rule(s,17.918,5.563,0,6.452,{
++line:W,lw:5,ltr:50}
++);
++
++  rule(s,3.107,5.563,0,6.452,{
++line:W,lw:5,ltr:50,flipH:1}
++);
++
++  rule(s,14.208,5.563,0,6.452,{
++line:W,lw:5,ltr:50,flipH:1}
++);
++
++  rule(s,6.807,5.563,0,6.452,{
++line:W,lw:5,ltr:50,flipH:1}
++);
++
++  rule(s,8.657,5.563,0,6.452,{
++line:W,lw:5,ltr:50,flipH:1}
++);
++
++  rule(s,10.508,5.563,0,6.452,{
++line:W,lw:5,ltr:50,flipH:1}
++);
++
++  rule(s,12.357,5.563,0,6.452,{
++line:W,lw:5,ltr:50,flipH:1}
++);
++
++  rule(s,4.968,5.563,0,6.452,{
++line:W,lw:5,ltr:50,flipH:1}
++);
++
++  icon(s,I.part70,-.337,6.657,27.304,4.615,{
++line:W,lw:5,rot:342.87}
++);
++
++  icon(s,I.part53,.078,7.248,26.519,4.447,{
++line:W,lw:5,rot:342.87}
++);
++
++  icon(s,I.part75,-.067,7.495,27.304,3.581,{
++line:W,lw:8,rot:342.87}
++);
++
++  icon(s,I.callout,2.803,6.431,4.329,2.271,{
++fill:W,shadow:1}
++);
++
++  tx(s,H2,'Value.',3.232,6.72,3.472,.792,{
++col:K,al:'ctr'}
++);
++
++  tx(s,TXT,L17,3.232,7.419,3.472,.528,{
++col:K,al:'ctr'}
++);
++
++  tx(s,TXT,'Feb',4.584,12.263,.767,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Mar',6.422,12.263,.77,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Apr',8.294,12.263,.727,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'May',10.091,12.263,.832,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Jun',11.992,12.263,.732,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Jul',13.896,12.263,.624,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Aug',15.654,12.263,.808,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Sep',17.526,12.263,.785,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Oct',19.396,12.263,.724,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Nov',21.204,12.263,.807,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Des',23.069,12.263,.777,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Jan',2.751,12.263,.713,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[' sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. Lorem ipsum dolor sit ame sit amet, consectetur adipiscing.']],9.075,2.73,8.153,2.028,{
++al:'just'}
++);
++
++  tx(s,H1,'Best year we had.',2.929,4.112,7.292,.792,{
++sz:40}
++);
++
++  sh(s,'roundRect',2.884,2.876,4.167,1.119,{
++line:W,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',2.884,3.039,4.167,.792,{
++al:'ctr'}
++);
++
++  for(let i=0;
++i<3;
++i++){
++
++    rule(s,19.063,3.057+i*.68,1.389,0,{
++line:W,lw:5}
++);
++
++  }
++
++  tx(s,TXT,[[L23,{
++b:1}
++]],20.982,3.48,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L23,{
++b:1}
++]],20.982,4.153,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L23,{
++b:1}
++]],20.982,2.793,4.167,.528,{
++al:'just'}
++);
++
++  chrome(s,'line charts infograph',W);
++
++}
++
++function slide31(s){
++
++  wash(s,ASH,K);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,75);
++
++  rule(s,3.314,6.698,0,7.639,{
++line:W,lw:5,ltr:75,flipH:1}
++);
++
++  rule(s,23.352,6.698,0,7.639,{
++line:W,lw:5,ltr:75}
++);
++
++  rule(s,10.042,6.698,0,7.639,{
++line:W,lw:5,ltr:75,flipH:1}
++);
++
++  rule(s,13.333,6.698,0,7.639,{
++line:W,lw:5,ltr:75,flipH:1}
++);
++
++  rule(s,16.625,6.698,0,7.639,{
++line:W,lw:5,ltr:75}
++);
++
++  rule(s,19.988,6.698,0,7.639,{
++line:W,lw:5,ltr:75}
++);
++
++  rule(s,6.678,6.698,0,7.639,{
++line:W,lw:5,ltr:75,flipH:1}
++);
++
++  icon(s,I.part35,0,9.585,26.667,5.423,{
++fill:W}
++);
++
++  icon(s,I.part16,0,8.974,26.667,6.033,{
++fill:TEAL,tr:10}
++);
++
++  icon(s,I.part73,0,12.221,26.667,2.793,{
++fill:K,tr:50}
++);
++
++  icon(s,I.callout,21.188,2.932,4.329,2.271,{
++fill:W,shadow:1}
++);
++
++  tx(s,H2,'Value.',21.616,3.222,3.472,.792,{
++col:K,al:'ctr'}
++);
++
++  tx(s,TXT,L17,21.616,3.92,3.472,.528,{
++col:K,al:'ctr'}
++);
++
++  tx(s,TXT,'Feb',6.295,5.949,.767,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Mar',9.657,5.949,.77,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Apr',12.97,5.949,.727,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'May',16.209,5.949,.832,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Jun',19.622,5.949,.732,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Jul',23.041,5.949,.624,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,'Jan',2.958,5.949,.713,.528,{
++al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[' sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. Lorem ipsum dolor sit ame sit amet, consectetur adipiscing.']],7.922,2.787,8.153,2.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'2017.',2.929,2.479,5.055,2.222);
++
++  rule(s,0,9.651,26.653,0,{
++line:W,lw:5}
++);
++
++  sh(s,'roundRect',2.188,8.748,6.539,1.806,{
++fill:W,rad:.208,shadow:1}
++);
++
++  tx(s,H2,L23,2.613,9.038,5.687,.792,{
++col:K}
++);
++
++  tx(s,TXT,L17,2.613,9.737,5.687,.528,{
++col:K,al:'just'}
++);
++
++  chrome(s,'line charts infograph',W,{
++noFoot:1}
++);
++
++}
++
++function slide32(s){
++
++  ink(W);
++
++  sh(s,'roundRect',2.292,2.292,22.083,10.417,{
++fill:W,rad:.544,shadow:1}
++);
++
++  sh(s,'roundRect',2.292,2.292,22.083,10.417,{
++fill:W,rad:.544,shadow:1}
++);
++
++  icon(s,I.part60,13.333,2.292,11.042,10.417,{
++fill:K}
++);
++
++  pie(s,8.995,3.194,8.676,8.676,22,W,MIST,75);
++
++  pie(s,9.706,3.901,7.264,7.264,38,MIST,MIST,50);
++
++  pie(s,10.492,4.691,5.683,5.683,58,STONE,MIST,25);
++
++  pie(s,11.155,5.322,4.357,4.357,82,SLATE,MIST);
++
++  sh(s,'ellipse',11.808,5.975,3.05,3.05,{
++fill:TEAL,tr:10}
++);
++
++  icon(s,I.halfDisc,13.333,5.975,1.525,3.05,{
++fill:K,tr:90,shadow:1}
++);
++
++  icon(s,I.userPlus,12.898,7.036,.871,.778,{
++fill:W}
++);
++
++  rule(s,16.276,6.44,2.077,0,{
++line:W,lw:5}
++);
++
++  rule(s,15.579,4.281,2.774,0,{
++line:W,lw:5}
++);
++
++  rule(s,13.41,10.052,4.94,0,{
++line:W,lw:5}
++);
++
++  rule(s,14.747,8.502,3.599,0,{
++line:W,lw:5}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L21]],18.738,5.676,4.613,1.528,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L21]],18.738,7.738,4.613,1.528,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L28]],18.738,9.538,4.613,1.028,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L21]],18.738,3.517,4.613,1.528,{
++al:'just'}
++);
++
++  tx(s,H2,'Awesome analytics.',3.55,4.628,4.514,1.472,{
++col:K}
++);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],3.55,6.344,4.514,4.028,{
++col:K,al:'just'}
++);
++
++  chrome(s,'smart pie chart infographics',K);
++
++}
++
++function slide33(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  pie(s,9.079,3.245,8.509,8.509,58,W,MIST);
++
++  sh(s,'ellipse',10.725,4.891,5.217,5.217,{
++fill:TEAL,tr:10}
++);
++
++  icon(s,I.halfDisc,13.333,4.891,2.609,5.217,{
++fill:K,tr:90,shadow:1}
++);
++
++  icon(s,I.userPlus,12.588,5.939,1.49,1.331,{
++fill:W}
++);
++
++  tx(s,H1,'Sed ut perspiciatis unde omnis iste natus.',11.86,7.58,2.946,1.481,{
++sz:24,ff:'Raleway Light',ls:1.2,al:'just'}
++);
++
++  tx(s,H2,'Latest product.',18.737,5.279,4.514,.792);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],18.736,6.344,4.514,4.028,{
++al:'just'}
++);
++
++  tx(s,H2,'First product.',3.445,5.279,4.514,.792);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],3.445,6.344,4.514,4.028,{
++al:'just'}
++);
++
++  tx(s,BIG,'2017.',18.722,3.424,4.514,2.222);
++
++  chrome(s,'smart pie charts',W);
++
++}
++
++function slide34(s){
++
++  wash(s,W,PAPER);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'rect',0,2.292,26.667,10.417,{
++fill:W,tr:25,shadow:1}
++);
++
++  sh(s,'rect',0,2.292,26.667,10.417,{
++fill:W,tr:25,shadow:1}
++);
++
++  icon(s,I.part58,11.981,9.094,3.117,1.63,{
++fill:MIST}
++);
++
++  icon(s,I.part71,18.214,9.094,3.117,1.63,{
++fill:MIST}
++);
++
++  icon(s,I.part07,13.539,8.389,3.117,2.335,{
++fill:K,tr:50}
++);
++
++  icon(s,I.part66,13.539,7.937,3.117,1.602,{
++fill:MIST}
++);
++
++  icon(s,I.part77,16.655,8.389,3.119,2.335,{
++fill:K,tr:75}
++);
++
++  icon(s,I.part03,16.655,7.937,3.117,1.608,{
++fill:MIST}
++);
++
++  icon(s,I.part59,15.096,6.753,3.119,1.63,{
++fill:ORANGE}
++);
++
++  icon(s,I.part01,16.184,4.276,.943,3.17,{
++fill:IG}
++);
++
++  icon(s,I.ribbonR,15.096,7.206,1.561,1.177,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,16.655,7.206,1.559,1.177,{
++fill:K,tr:50}
++);
++
++  icon(s,I.part41,18.213,8.389,1.559,1.155,{
++fill:K,tr:50}
++);
++
++  icon(s,I.ribbonL,19.771,9.547,1.559,1.177,{
++fill:K,tr:50}
++);
++
++  icon(s,I.part12,13.539,8.389,1.561,1.15,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonR,11.981,9.547,1.561,1.177,{
++fill:K,tr:75}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L28]],19.236,6.986,3.9,1.028,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L28]],20.787,8.259,3.9,1.028,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L28]],8.711,8.259,3.9,1.028,{
++al:'r'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[L28]],10.263,6.986,3.9,1.028,{
++al:'r'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[' sit ame sit amet. Lorem ipsum dolor sit ame sit amet.']],17.664,4.442,5.697,1.528,{
++al:'just'}
++);
++
++  tx(s,H1,'80.512K',9.924,4.727,5.697,.958,{
++al:'r'}
++);
++
++  tx(s,H2,'The most experienced team ever existed.',2.554,4.815,5.556,2.153);
++
++  tx(s,TXT,'Sed ut perspi ciatis lorem sit unde omnis iste natus error sit volup tatem Sed ut perspiciatis unde omnis iste. Sed ut. Sed ut perspi ciatis lorem sit unde omnis iste natus.',2.554,7.157,5.556,3.028,{
++al:'just'}
++);
++
++  chrome(s,'infographics',K);
++
++}
++
++function slide35(s){
++
++  wash(s,BONE,TEAL);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  icon(s,I.part42,9.079,7.514,3.074,7.482,{
++fill:W,flipH:1}
++);
++
++  icon(s,I.part28,10.514,7.514,1.638,7.482,{
++fill:K,tr:75}
++);
++
++  sh(s,'ellipse',8.031,9.394,1.868,1.868,{
++fill:W}
++);
++
++  sh(s,'ellipse',11.277,7.74,1.868,1.868,{
++fill:ORANGE}
++);
++
++  sh(s,'ellipse',7.904,5.415,2.122,2.122,{
++fill:ORANGE}
++);
++
++  sh(s,'ellipse',11.223,4.994,1.868,1.868,{
++fill:W}
++);
++
++  sh(s,'ellipse',6.618,6.619,1.771,1.771,{
++fill:W}
++);
++
++  sh(s,'ellipse',9.325,4.052,2.227,2.227,{
++fill:ORANGE}
++);
++
++  sh(s,'ellipse',11.483,9.14,2.122,2.122,{
++fill:W}
++);
++
++  sh(s,'ellipse',13.18,8.69,1.868,1.868,{
++fill:W}
++);
++
++  sh(s,'ellipse',13.179,7.151,1.868,1.868,{
++fill:W}
++);
++
++  sh(s,'ellipse',8.003,4.149,1.646,1.646,{
++fill:W}
++);
++
++  sh(s,'ellipse',10.909,3.176,2.122,2.122,{
++fill:W}
++);
++
++  sh(s,'ellipse',6.39,9.394,1.482,1.482,{
++fill:W}
++);
++
++  sh(s,'ellipse',11.939,6.1,2.054,2.054,{
++fill:ORANGE}
++);
++
++  icon(s,I.part29,12.247,9.938,.538,.535,{
++fill:K}
++);
++
++  icon(s,I.part19,13.847,7.817,.534,.534,{
++fill:K}
++);
++
++  icon(s,I.disc,12.677,6.843,.578,.568,{
++fill:W}
++);
++
++  icon(s,I.home,11.929,8.421,.565,.506,{
++fill:W}
++);
++
++  icon(s,I.mapPin,12.004,5.677,.308,.499,{
++fill:K}
++);
++
++  icon(s,I.book,11.659,3.988,.622,.499,{
++fill:K}
++);
++
++  icon(s,I.info,10.293,4.857,.291,.618,{
++fill:W}
++);
++
++  icon(s,I.roundSq,8.654,6.226,.622,.499,{
++fill:W}
++);
++
++  icon(s,I.couple,8.521,4.71,.618,.543,{
++fill:K}
++);
++
++  icon(s,I.part23,7.226,7.314,.556,.494,{
++fill:K}
++);
++
++  icon(s,I.part25,6.829,9.857,.556,.556,{
++fill:K}
++);
++
++  icon(s,I.part65,8.654,10.183,.622,.291,{
++fill:K}
++);
++
++  icon(s,I.roundSq,13.802,9.375,.622,.499,{
++fill:K}
++);
++
++  sh(s,'ellipse',9.414,5.745,2.403,2.403,{
++fill:W}
++);
++
++  icon(s,I.share,10.307,6.701,.618,.49,{
++fill:K}
++);
++
++  sh(s,'ellipse',8.031,7.15,1.868,1.868,{
++fill:W,shadow:1}
++);
++
++  sh(s,'ellipse',7.081,8.119,1.868,1.868,{
++fill:ORANGE}
++);
++
++  icon(s,I.userPlus,8.654,7.782,.622,.556,{
++fill:K}
++);
++
++  icon(s,I.part52,7.792,8.744,.445,.618,{
++fill:W}
++);
++
++  icon(s,I.speech,1.729,4.154,5.687,2.532,{
++fill:W,shadow:1}
++);
++
++  tx(s,H2,L23,2.142,4.488,4.861,.792,{
++col:K}
++);
++
++  tx(s,TXT,L17,2.142,5.186,4.861,.528,{
++col:K,al:'just'}
++);
++
++  icon(s,I.speech,12.445,11.173,5.23,2.356,{
++fill:W,rot:180,shadow:1}
++);
++
++  tx(s,TXT,'Sed do eiusmod tempor incididunt.',12.858,12.112,4.263,0,{
++col:K,al:'just'}
++);
++
++  icon(s,I.dot,2.34,9.011,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,2.09,8.768,2.526,2.444,{
++line:W,lw:5}
++);
++
++  tx(s,H1,'80%',2.521,9.511,1.664,.958,{
++col:K,al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,[['Based on last year data.',{
++b:1}
++]],1.953,11.503,2.799,1.028,{
++al:'ctr'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[' sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. Lorem ipsum dolor sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. Lorem ipsum.']],17.542,6.824,6.25,3.528,{
++al:'just'}
++);
++
++  tx(s,H1,'Growing pattern.',17.542,5.71,6.25,.792,{
++sz:40}
++);
++
++  tx(s,BIG,'2017.',17.542,3.541,6.25,2.222,{
++va:'ctr'}
++);
++
++  chrome(s,'tree infographics',W);
++
++}
++
++function slide36(s){
++
++  wash(s,ASH,K);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,75);
++
++  sh(s,'rect',17.778,0,8.889,15,{
++fill:W,tr:25,shadow:1}
++);
++
++  sh(s,'rect',17.778,0,8.889,15,{
++fill:W,tr:25,shadow:1}
++);
++
++  icon(s,I.diamond,4.382,8.615,8.08,2.938,{
++fill:W}
++);
++
++  icon(s,I.diamond,5.098,7.841,6.647,2.417,{
++fill:W}
++);
++
++  icon(s,I.diamond,5.865,7.223,5.114,1.859,{
++fill:W}
++);
++
++  icon(s,I.diamond,6.569,5.905,3.707,1.347,{
++fill:ORANGE}
++);
++
++  icon(s,I.slashBar,5.865,7.966,2.561,1.117,{
++fill:K,tr:75}
++);
++
++  icon(s,I.slashBar2,8.421,7.966,2.558,1.117,{
++fill:K,tr:50}
++);
++
++  icon(s,I.slashBar,5.098,8.806,3.328,1.451,{
++fill:K,tr:75}
++);
++
++  icon(s,I.slashBar2,8.42,8.806,3.325,1.451,{
++fill:K,tr:50}
++);
++
++  icon(s,I.slashBar,4.382,9.788,4.046,1.764,{
++fill:K,tr:75}
++);
++
++  icon(s,I.slashBar2,8.42,9.788,4.042,1.764,{
++fill:K,tr:50}
++);
++
++  icon(s,I.slashBar,6.569,6.443,1.856,.809,{
++fill:K,tr:75}
++);
++
++  icon(s,I.slashBar2,8.421,6.443,1.854,.809,{
++fill:K,tr:50}
++);
++
++  icon(s,I.callout,6.257,3.447,4.329,2.271,{
++fill:W}
++);
++
++  tx(s,H2,'Value.',6.686,3.737,3.472,.792,{
++col:K}
++);
++
++  tx(s,TXT,L17,6.686,4.436,3.472,.528,{
++col:K,al:'ctr'}
++);
++
++  tx(s,H1,'Always on the top at any circumstance.',19.515,3.713,5.413,2.653,{
++col:K,va:'b'}
++);
++
++  tx(s,TXT,'Lorem ipsum dolor sit ame sit lorem amet, consect diluk wa etur lor adipiscing elit, sed do.',19.515,6.612,5.413,1.528,{
++col:K,al:'just'}
++);
++
++  rule(s,19.566,10.567,4.167,0,{
++line:K,lw:8,ltr:50.1}
++);
++
++  rule(s,19.566,10.567,3.306,0,{
++line:K,lw:8}
++);
++
++  tx(s,TXT,L3,19.566,10.759,4.167,.528,{
++col:K,al:'just'}
++);
++
++  tx(s,CAP,'90%',22.107,9.847,1.545,.528,{
++col:K,al:'ctr'}
++);
++
++  rule(s,19.566,9.098,4.167,0,{
++line:K,lw:8,ltr:50.1}
++);
++
++  rule(s,19.566,9.098,3.306,0,{
++line:K,lw:8}
++);
++
++  tx(s,TXT,L3,19.566,9.29,4.167,.528,{
++col:K,al:'just'}
++);
++
++  tx(s,CAP,'90%',22.107,8.379,1.545,.528,{
++col:K,al:'ctr'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[' sit ame sit amet, consect.']],11.702,7.282,4.537,1.028,{
++al:'just'}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[' sit ame sit amet, consectetur.']],2.565,5.655,3.328,1.528,{
++al:'r'}
++);
++
++  tx(s,H1,'78%',13.05,9.577,2.206,.958);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[' sit ame sit amet, consect.']],13.014,10.684,3.467,1.528,{
++al:'just'}
++);
++
++  chrome(s,'pyramid infographic',W,{
++siteCol:K}
++);
++
++}
++
++function slide37(s){
++
++  wash(s,BONE,TEAL);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'rect',0,2.292,26.667,12.708,{
++fill:W,tr:50}
++);
++
++  sh(s,'rect',0,2.292,26.667,12.708,{
++fill:W,tr:50}
++);
++
++  icon(s,I.hexBlock,20.383,6.703,3.205,1.676,{
++fill:ORANGE}
++);
++
++  icon(s,I.ribbonR,20.383,7.169,1.605,1.211,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,21.984,7.169,1.603,1.211,{
++fill:K,tr:50}
++);
++
++  icon(s,I.hexBlock,18.429,7.263,3.205,1.676,{
++fill:W}
++);
++
++  icon(s,I.ribbonR,18.429,7.728,1.605,1.211,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,20.031,7.728,1.603,1.211,{
++fill:K,tr:50}
++);
++
++  icon(s,I.hexBlock,16.477,7.849,3.205,1.676,{
++fill:W}
++);
++
++  icon(s,I.ribbonR,16.476,8.314,1.605,1.211,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,18.078,8.314,1.603,1.211,{
++fill:K,tr:50}
++);
++
++  icon(s,I.hexBlock,14.46,8.437,3.205,1.676,{
++fill:W}
++);
++
++  icon(s,I.ribbonR,14.46,8.902,1.605,1.211,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,16.062,8.902,1.603,1.211,{
++fill:K,tr:50}
++);
++
++  icon(s,I.hexBlock,12.457,9.028,3.205,1.676,{
++fill:W}
++);
++
++  icon(s,I.ribbonR,12.457,9.494,1.605,1.211,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,14.059,9.494,1.603,1.211,{
++fill:K,tr:50}
++);
++
++  rule(s,18.079,6.047,0,2.232,{
++line:K,lw:5}
++);
++
++  rule(s,14.059,6.047,0,3.454,{
++line:K,lw:5}
++);
++
++  rule(s,21.984,5.995,0,1.211,{
++line:K,lw:5}
++);
++
++  rule(s,20.032,7.635,0,3.011,{
++line:K,lw:5}
++);
++
++  rule(s,16.063,8.841,0,1.806,{
++line:K,lw:5}
++);
++
++  tx(s,TXT,L15,16.343,4.689,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,H2,L20,16.343,3.826,3.472,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L15,12.323,4.689,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,H2,L20,12.323,3.826,3.472,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L15,14.327,11.812,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,H2,L20,14.327,10.949,3.472,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L15,20.25,4.689,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,H2,L20,20.25,3.826,3.472,.792,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L15,18.295,11.812,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,H2,L20,18.295,10.949,3.472,.792,{
++al:'ctr'}
++);
++
++  tx(s,H1,'Likes based on happy costumers.',2.992,6.111,6.746,1.806);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],2.991,8.123,5.518,3.028,{
++al:'just'}
++);
++
++  sh(s,'roundRect',3.008,4.397,4.687,1.119,{
++line:K,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',3.268,4.56,4.167,0,{
++al:'ctr'}
++);
++
++  chrome(s,'blocks infographics',W,{
++footCol:K}
++);
++
++}
++
++function slide38(s){
++
++  wash(s,W,PAPER);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'rect',0,0,26.667,7.5,{
++fill:W,tr:25,shadow:1}
++);
++
++  sh(s,'rect',0,0,26.667,7.5,{
++fill:W,tr:25,shadow:1}
++);
++
++  sh(s,'rect',0,6.806,3.333,1.389,{
++fill:W,tr:10}
++);
++
++  sh(s,'rect',6.667,6.806,3.333,1.389,{
++fill:ORANGE}
++);
++
++  sh(s,'rect',10,6.806,3.333,1.389,{
++fill:STONE,tr:10}
++);
++
++  sh(s,'rect',13.333,6.806,3.333,1.389,{
++fill:TEAL,tr:10}
++);
++
++  sh(s,'rect',16.667,6.806,3.333,1.389,{
++fill:W,tr:10}
++);
++
++  sh(s,'rect',20,6.806,3.333,1.389,{
++fill:STONE,tr:10}
++);
++
++  sh(s,'rect',23.333,6.806,3.333,1.389,{
++fill:MIST,tr:10}
++);
++
++  sh(s,'rect',3.333,6.806,3.333,1.389,{
++fill:MIST,tr:10}
++);
++
++  sh(s,'rect',0,7.5,3.333,.694,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',6.667,7.5,3.333,.694,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',10,7.5,3.333,.694,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',13.333,7.5,3.333,.694,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',16.667,7.5,3.333,.694,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',20,7.5,3.333,.694,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',23.333,7.5,3.333,.694,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',3.333,7.5,3.333,.694,{
++fill:K,tr:75}
++);
++
++  tx(s,H2,'2012',4.339,5.811,1.321,.792,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,H2,'2013',11.007,5.811,1.319,.792,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,H2,'2013',14.341,5.811,1.319,.792,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,H2,'2013',17.674,5.811,1.319,.792,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,H2,'2013',21.007,5.811,1.319,.792,{
++al:'ctr',nowrap:1}
++);
++
++  tx(s,H2,'2013',7.674,5.811,1.319,.792,{
++al:'ctr',nowrap:1}
++);
++
++  icon(s,I.callout,6.169,3.337,4.329,2.271,{
++fill:K,shadow:1}
++);
++
++  tx(s,H2,'25.123K',6.597,3.627,3.472,.792,{
++col:W,al:'ctr'}
++);
++
++  tx(s,TXT,'Total users.',6.597,4.325,3.472,.528,{
++col:W,al:'ctr'}
++);
++
++  icon(s,I.callout,12.836,3.337,4.329,2.271,{
++fill:TEAL,tr:10,shadow:1}
++);
++
++  tx(s,H2,'28.152K.',13.264,3.627,3.472,.792,{
++col:W,al:'ctr'}
++);
++
++  tx(s,TXT,'Total users',13.264,4.325,3.472,.528,{
++col:W,al:'ctr'}
++);
++
++  tx(s,TXT,'Sed rel loredit sir ut perspics lor ciatis unde dor sit omnisa iste. Sed rel loredit sir ut perspics lor',7.031,8.662,2.605,3.528,{
++al:'just'}
++);
++
++  tx(s,TXT,L16,10.364,8.662,2.605,2.528,{
++al:'just'}
++);
++
++  tx(s,TXT,'Sed rel loredit sir ut perspics lor ciatis unde dor sit omnisa iste. Sed rel loredit sir ut perspics lor',13.698,8.662,2.605,3.528,{
++al:'just'}
++);
++
++  tx(s,TXT,L16,17.031,8.662,2.605,2.528,{
++al:'just'}
++);
++
++  tx(s,TXT,L16,20.364,8.662,2.605,2.528,{
++al:'just'}
++);
++
++  tx(s,TXT,L16,3.698,8.662,2.605,2.528,{
++al:'just'}
++);
++
++  chrome(s,'timeline infographics',K);
++
++}
++
++function slide39(s){
++
++  wash(s,RUST,DEEP);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'rect',0,0,26.667,12.708,{
++fill:W,tr:50}
++);
++
++  sh(s,'rect',0,0,26.667,12.708,{
++fill:W,tr:50}
++);
++
++  icon(s,I.hexBlock,2.821,8.414,4.204,2.198,{
++fill:W}
++);
++
++  icon(s,I.ribbonR,2.821,9.024,2.105,1.588,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,4.922,9.024,2.103,1.588,{
++fill:K,tr:50}
++);
++
++  icon(s,I.hexBlock,19.662,8.414,4.204,2.198,{
++fill:W}
++);
++
++  icon(s,I.ribbonR,19.662,9.024,2.105,1.588,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,21.763,9.024,2.103,1.588,{
++fill:K,tr:50}
++);
++
++  icon(s,I.hexBlock,11.231,8.414,4.204,2.198,{
++fill:ORANGE}
++);
++
++  icon(s,I.ribbonR,11.231,9.024,2.105,1.588,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,13.332,9.024,2.103,1.588,{
++fill:K,tr:50}
++);
++
++  icon(s,I.hexBlock,7.033,9.421,4.204,2.198,{
++fill:W}
++);
++
++  icon(s,I.ribbonR,7.033,10.032,2.105,1.588,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,9.134,10.032,2.103,1.588,{
++fill:K,tr:50}
++);
++
++  icon(s,I.hexBlock,15.454,9.421,4.204,2.198,{
++fill:W}
++);
++
++  icon(s,I.ribbonR,15.454,10.032,2.105,1.588,{
++fill:K,tr:75}
++);
++
++  icon(s,I.ribbonL,17.555,10.032,2.103,1.588,{
++fill:K,tr:50}
++);
++
++  icon(s,I.callout,11.169,2.189,4.329,2.271,{
++fill:W,shadow:1}
++);
++
++  tx(s,H2,'Value.',11.597,2.478,3.472,.792);
++
++  tx(s,TXT,L17,11.597,3.177,3.472,.528,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L13,15.296,7.207,4.861,1.528,{
++al:'ctr'}
++);
++
++  tx(s,H3,L20,15.296,6.566,4.861,.625,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L13,19.333,5.31,4.861,1.528,{
++al:'ctr'}
++);
++
++  tx(s,H3,L20,19.333,4.669,4.861,.625,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L13,6.454,7.267,4.861,1.528,{
++al:'ctr'}
++);
++
++  tx(s,H3,L20,6.454,6.626,4.861,.625,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L13,2.492,5.333,4.861,1.528,{
++al:'ctr'}
++);
++
++  tx(s,H3,L20,2.492,4.692,4.861,.625,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L13,10.903,5.333,4.861,1.528,{
++al:'ctr'}
++);
++
++  tx(s,H3,L20,10.903,4.692,4.861,.625,{
++al:'ctr'}
++);
++
++  rule(s,13.333,7.109,0,1.843,{
++line:K,lw:5,flipV:1}
++);
++
++  rule(s,21.764,7.109,0,1.843,{
++line:K,lw:5,flipV:1}
++);
++
++  rule(s,4.923,7.109,0,1.843,{
++line:K,lw:5,flipV:1}
++);
++
++  chrome(s,'blocks infographics',K,{
++footCol:W}
++);
++
++}
++
++function slide40(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'ellipse',5.195,4.091,6.795,6.795,{
++fill:W,tr:75}
++);
++
++  icon(s,I.part06,7.173,6.904,2.824,3.726,{
++fill:GOLD}
++);
++
++  icon(s,I.part63,7.096,6.853,2.98,3.848,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part27,10.269,8.212,.595,.103,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part74,10.116,7.154,.525,.354,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part38,9.477,6.259,.346,.534,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part02,6.443,7.105,.529,.355,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part47,10.116,8.974,.525,.352,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part50,6.443,9.024,.529,.348,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part61,7.259,6.213,.354,.523,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part37,8.514,5.947,.103,.595,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part57,6.322,8.212,.595,.103,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part46,7.424,7.627,.334,1.261,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part72,7.948,10.702,1.291,.186,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part49,7.985,10.971,1.216,.204,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part30,8.059,11.249,1.068,.172,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part24,8.254,11.494,.678,.186,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.part33,7.899,8.606,1.379,1.917,{
++fill:W,shadow:1}
++);
++
++  icon(s,I.circle,8.826,3.82,1.692,1.691,{
++fill:W}
++);
++
++  icon(s,I.circle,12.035,10.178,1.342,1.338,{
++fill:W}
++);
++
++  icon(s,I.circle,12.146,3.211,1.12,1.118,{
++fill:W}
++);
++
++  icon(s,I.circle,9.955,10.879,.913,.911,{
++fill:W}
++);
++
++  icon(s,I.circle,3.435,5.636,1.295,1.297,{
++fill:W}
++);
++
++  icon(s,I.circle,11.515,8.453,.686,.686,{
++fill:W}
++);
++
++  icon(s,I.circle,4.474,10.133,1.429,1.429,{
++fill:W}
++);
++
++  icon(s,I.circle,12.672,6.086,.909,.911,{
++fill:W}
++);
++
++  icon(s,I.circle,7.042,3.39,1.12,1.118,{
++fill:W}
++);
++
++  icon(s,I.disc,12.476,3.544,.461,.452,{
++fill:SLATE}
++);
++
++  icon(s,I.home,12.901,6.34,.45,.404,{
++fill:SLATE}
++);
++
++  icon(s,I.mapPin,12.583,10.632,.246,.397,{
++fill:SLATE}
++);
++
++  icon(s,I.book,9.424,4.466,.496,.397,{
++fill:SLATE}
++);
++
++  icon(s,I.info,11.742,8.55,.232,.493,{
++fill:SLATE}
++);
++
++  icon(s,I.roundSq,7.354,3.75,.496,.397,{
++fill:SLATE}
++);
++
++  icon(s,I.couple,10.213,11.104,.492,.433,{
++fill:SLATE}
++);
++
++  icon(s,I.share,4.943,10.652,.492,.39,{
++fill:SLATE}
++);
++
++  icon(s,I.userPlus,3.835,6.062,.496,.443,{
++fill:SLATE}
++);
++
++  icon(s,I.circle,4.437,3.49,1.342,1.338,{
++fill:W}
++);
++
++  icon(s,I.circle,4.238,8.009,.913,.911,{
++fill:W}
++);
++
++  icon(s,I.mapPin,4.985,3.961,.246,.397,{
++fill:SLATE}
++);
++
++  icon(s,I.couple,4.496,8.235,.492,.433,{
++fill:SLATE}
++);
++
++  sh(s,'rect',10.06,6.745,2.659,1.333,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',9.75,4.203,2.603,3.192,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',7.713,4.497,.49,2.404,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',9.969,8.798,1.546,.008,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',9.686,9.354,2.419,1.196,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',9.081,5.484,.378,1.452,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',5.51,4.695,1.971,2.632,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',4.648,6.601,2.48,1.391,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',5.803,9.448,1.728,1.032,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',5.149,8.505,2.007,.18,{
++line:W,lw:4}
++);
++
++  sh(s,'rect',9.433,9.979,.712,.986,{
++line:W,lw:4}
++);
++
++  tx(s,BIG,'Ideas.',15.788,3.873,6.944,2.222);
++
++  tx(s,TXT,[[L8,{
++b:1}
++],[' Ut enim ad minim veniam.  Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore. Lorem ipsum dolor sit amet, eiusmod sed lorem dolor.']],15.788,6.127,6.944,5.528,{
++al:'just'}
++);
++
++  tx(s,H2,'Make it happen.',15.788,3.345,6.944,.792);
++
++  chrome(s,'ideas infographics',W);
++
++}
++
++function slide41(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  icon(s,I.shieldU,5.625,10.134,1.834,.938,{
++fill:W,rot:90}
++);
++
++  sh(s,'rect',7.22,9.686,11.481,1.834,{
++fill:W,tr:40.1}
++);
++
++  icon(s,I.triangle,21.156,10.118,.603,.97,{
++fill:W,rot:90}
++);
++
++  icon(s,I.wedge,19.066,9.613,1.834,1.979,{
++fill:W,tr:40.1,rot:90}
++);
++
++  sh(s,'rect',12.09,6.047,.603,10.343,{
++fill:ORANGE,rot:90}
++);
++
++  sh(s,'rect',11.37,6.134,.639,8.939,{
++fill:ORANGE,tr:25,rot:90}
++);
++
++  sh(s,'rect',9.455,7.451,.603,5.074,{
++fill:ORANGE,tr:50,rot:90}
++);
++
++  rule(s,16.156,7.11,0,4.403,{
++line:W,lw:5}
++);
++
++  rule(s,12.322,5.87,0,5.643,{
++line:W,lw:5,flipH:1}
++);
++
++  rule(s,17.576,8.508,0,3.005,{
++line:W,lw:5}
++);
++
++  tx(s,TXT,L14,17.216,6.274,5.556,1.028,{
++al:'just'}
++);
++
++  icon(s,I.circle,15.6,6.229,1.12,1.118,{
++fill:W}
++);
++
++  icon(s,I.roundSq,15.912,6.589,.496,.397,{
++fill:SLATE}
++);
++
++  tx(s,TXT,L14,18.658,7.646,5.556,1.028,{
++al:'just'}
++);
++
++  icon(s,I.circle,17.042,7.601,1.12,1.118,{
++fill:W}
++);
++
++  icon(s,I.roundSq,17.354,7.962,.496,.397,{
++fill:SLATE}
++);
++
++  tx(s,TXT,L14,13.379,4.879,5.556,1.028,{
++al:'just'}
++);
++
++  icon(s,I.circle,11.762,4.833,1.12,1.118,{
++fill:W}
++);
++
++  icon(s,I.roundSq,12.074,5.194,.496,.397,{
++fill:SLATE}
++);
++
++  tx(s,BIG,'Pencil.',2.81,3.082,6.944,2.222);
++
++  tx(s,TXT,[[L8,{
++b:1}
++],[' Ut enim ad minim veniam.  Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo.']],2.81,5.336,6.944,2.528,{
++al:'just'}
++);
++
++  sh(s,'roundRect',13.358,3.437,4.687,1.119,{
++line:W,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',13.618,3.601,4.167,0,{
++al:'ctr'}
++);
++
++  chrome(s,'pencil infographics',W);
++
++}
++
++function slide42(s){
++
++  icon(s,I.part01,16.865,3.378,2.451,8.243,{
++fill:TEAL,tr:10}
++);
++
++  icon(s,I.part44,14.802,3.586,2.058,7.827,{
++fill:ORANGE}
++);
++
++  sh(s,'rect',9.796,4.522,4.167,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',9.796,4.522,3.472,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,9.796,4.875,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',9.796,3.92,4.167,.528,{
++al:'r'}
++);
++
++  sh(s,'rect',11.519,8.355,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',10.658,8.355,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',12.38,8.355,.694,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',13.241,8.355,.694,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',9.797,8.355,.694,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,9.796,8.717,4.167,0,{
++al:'just'}
++);
++
++  tx(s,CAP,'3/5',9.796,7.759,4.167,0,{
++al:'r'}
++);
++
++  sh(s,'rect',9.796,6.442,4.167,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',9.796,6.442,3.472,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,9.796,6.794,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',9.796,5.84,4.167,.528,{
++al:'r'}
++);
++
++  tx(s,H1,'Most favorites by genders.',2.467,5.837,5.517,1.806);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],2.466,7.849,5.518,3.028,{
++al:'just'}
++);
++
++  sh(s,'roundRect',2.483,4.123,4.687,1.119,{
++line:K,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',2.743,4.286,4.167,0,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L3,9.796,10.552,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,11.894,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,13.567,9.682,.332,.8,{
++fill:K,tr:75}
++);
++
++  icon(s,I.person3,12.312,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,13.147,9.682,.332,.8,{
++fill:K,tr:75}
++);
++
++  icon(s,I.person4,12.73,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,9.802,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,11.476,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person3,10.221,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,11.056,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person4,10.639,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',20.034,4.522,4.167,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',20.034,4.522,3.472,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,20.034,4.875,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',20.034,3.92,4.167,.528,{
++al:'r'}
++);
++
++  sh(s,'rect',21.756,8.355,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',20.895,8.355,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',22.617,8.355,.694,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',23.479,8.355,.694,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',20.034,8.355,.694,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,20.034,8.717,4.167,0,{
++al:'just'}
++);
++
++  tx(s,CAP,'3/5',20.034,7.759,4.167,0,{
++al:'r'}
++);
++
++  sh(s,'rect',20.034,6.442,4.167,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',20.034,6.442,3.472,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,20.034,6.794,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',20.034,5.84,4.167,.528,{
++al:'r'}
++);
++
++  tx(s,TXT,L3,20.034,10.552,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,22.131,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,23.804,9.682,.332,.8,{
++fill:K,tr:75}
++);
++
++  icon(s,I.person3,22.549,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,23.385,9.682,.332,.8,{
++fill:K,tr:75}
++);
++
++  icon(s,I.person4,22.968,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,20.04,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,21.713,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person3,20.458,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,21.293,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person4,20.876,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  chrome(s,'people infographics',K);
++
++}
++
++function slide43(s){
++
++  wash(s,SUN,DEEP);
++
++  ink(W);
++
++  sh(s,'roundRect',2.292,2.292,6.209,10.417,{
++fill:W,tr:25,rad:.544,shadow:1}
++);
++
++  sh(s,'ellipse',14.041,5.172,6.795,6.795,{
++fill:W,tr:75}
++);
++
++  icon(s,I.part21,15.119,9.678,4.638,2.789,{
++fill:K}
++);
++
++  icon(s,I.part68,16.516,9.678,1.845,1.209,{
++fill:W}
++);
++
++  icon(s,I.part14,16.034,6.343,2.831,2.183,{
++fill:K}
++);
++
++  icon(s,I.part31,16.257,6.48,2.304,3.586,{
++fill:W}
++);
++
++  icon(s,I.part13,15.996,8.151,.44,.866,{
++fill:W}
++);
++
++  icon(s,I.part08,18.448,8.151,.438,.866,{
++fill:W}
++);
++
++  icon(s,I.part17,16.172,6.422,2.53,2.185,{
++fill:K}
++);
++
++  icon(s,I.part67,17.193,10.887,.484,.381,{
++fill:W}
++);
++
++  icon(s,I.part04,16.516,10.367,.922,.901,{
++fill:K}
++);
++
++  icon(s,I.part51,17.438,10.367,.922,.901,{
++fill:K}
++);
++
++  icon(s,I.circle,17.545,3.61,1.692,1.691,{
++fill:W}
++);
++
++  icon(s,I.circle,20.754,9.969,1.342,1.338,{
++fill:W}
++);
++
++  icon(s,I.circle,20.363,2.77,1.12,1.118,{
++fill:W}
++);
++
++  icon(s,I.circle,20.418,5.204,.913,.911,{
++fill:W}
++);
++
++  icon(s,I.circle,12.154,5.426,1.295,1.297,{
++fill:W}
++);
++
++  icon(s,I.circle,20.234,8.244,.686,.686,{
++fill:W}
++);
++
++  icon(s,I.circle,13.193,9.924,1.429,1.429,{
++fill:W}
++);
++
++  icon(s,I.circle,21.721,6.154,.909,.911,{
++fill:W}
++);
++
++  icon(s,I.circle,15.76,3.18,1.12,1.118,{
++fill:W}
++);
++
++  icon(s,I.disc,20.692,3.103,.461,.452,{
++fill:SLATE}
++);
++
++  icon(s,I.home,21.95,6.408,.45,.404,{
++fill:SLATE}
++);
++
++  icon(s,I.mapPin,21.302,10.422,.246,.397,{
++fill:SLATE}
++);
++
++  icon(s,I.book,18.143,4.257,.496,.397,{
++fill:SLATE}
++);
++
++  icon(s,I.info,20.461,8.341,.232,.493,{
++fill:SLATE}
++);
++
++  icon(s,I.roundSq,16.072,3.541,.496,.397,{
++fill:SLATE}
++);
++
++  icon(s,I.couple,20.677,5.429,.492,.433,{
++fill:SLATE}
++);
++
++  icon(s,I.share,13.661,10.443,.492,.39,{
++fill:SLATE}
++);
++
++  icon(s,I.userPlus,12.554,5.853,.496,.443,{
++fill:SLATE}
++);
++
++  icon(s,I.circle,13.156,3.281,1.342,1.338,{
++fill:W}
++);
++
++  icon(s,I.circle,12.957,7.8,.913,.911,{
++fill:W}
++);
++
++  icon(s,I.mapPin,13.704,3.752,.246,.397,{
++fill:SLATE}
++);
++
++  icon(s,I.couple,13.215,8.026,.492,.433,{
++fill:SLATE}
++);
++
++  sh(s,'rect',18.799,5.862,1.923,2.075,{
++line:W,lw:5}
++);
++
++  sh(s,'rect',16.429,4.288,.419,2.122,{
++line:W,lw:5}
++);
++
++  sh(s,'rect',14.197,4.508,1.848,2.791,{
++line:W,lw:5}
++);
++
++  icon(s,I.part45,13.377,6.373,2.661,1.873,{
++line:W,lw:5}
++);
++
++  sh(s,'rect',13.852,8.381,2.577,.736,{
++line:W,lw:5}
++);
++
++  sh(s,'rect',14.582,9.649,2.158,.754,{
++line:W,lw:5}
++);
++
++  sh(s,'rect',18.013,5.287,.218,1.133,{
++line:W,lw:5}
++);
++
++  sh(s,'rect',18.88,6.709,3.127,1.845,{
++line:W,lw:5}
++);
++
++  sh(s,'rect',18.157,9.627,2.627,.813,{
++line:W,lw:5}
++);
++
++  sh(s,'rect',18.443,8.673,1.802,.47,{
++line:W,lw:5}
++);
++
++  sh(s,'rect',18.804,3.813,1.841,3.21,{
++line:W,lw:5}
++);
++
++  tx(s,TXT,L14,21.865,2.565,2.675,2.028,{
++al:'just'}
++);
++
++  tx(s,TXT,'Lorem ipsum dolor sit ame lorem.',21.302,8.056,3.433,1.028,{
++al:'just'}
++);
++
++  tx(s,TXT,L14,9.87,3.186,2.675,2.028,{
++al:'r'}
++);
++
++  tx(s,TXT,L14,10.021,9.874,2.675,2.028,{
++al:'r'}
++);
++
++  tx(s,TXT,[['Sed ut perspi ciatis lorem ',{
++b:1}
++],['sit unde omnis iste natus error sit volup tatem Sed ut. Sed ut perspi ciatis lorem sit unde error sit volup tatem Sed ut. Sed ut perspi ciatis lorem sit unde.']],3.313,3.491,4.167,4.528,{
++col:K,al:'just'}
++);
++
++  tx(s,TXT,L3,3.313,10.981,4.167,.528,{
++col:K,al:'just'}
++);
++
++  icon(s,I.person,5.41,10.111,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,7.083,10.111,.332,.8,{
++fill:K,tr:75}
++);
++
++  icon(s,I.person3,5.829,10.111,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,6.664,10.111,.332,.8,{
++fill:K,tr:75}
++);
++
++  icon(s,I.person4,6.247,10.111,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,3.319,10.111,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,4.992,10.111,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person3,3.737,10.111,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,4.573,10.111,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person4,4.155,10.111,.332,.8,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',5.036,8.903,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',4.175,8.903,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',5.897,8.903,.694,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',6.758,8.903,.694,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',3.313,8.903,.694,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,3.313,9.265,4.167,0,{
++col:K,al:'just'}
++);
++
++  tx(s,CAP,'3/5',3.313,8.307,4.167,0,{
++col:K,al:'r'}
++);
++
++  chrome(s,'people infographics',W);
++
++}
++
++function slide44(s){
++
++  wash(s,SUN,DEEP);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'roundRect',2.292,2.292,22.083,10.417,{
++fill:W,tr:25,rad:.544}
++);
++
++  for(let i=0;
++i<3;
++i++){
++
++    rule(s,11.036,10.179+i*-2.571,10.982,0,{
++line:K,lw:5,ltr:75}
++);
++
++  }
++
++  tx(s,TXT,'6.000K',22.219,7.343,1.323,.528,{
++al:'just',nowrap:1}
++);
++
++  tx(s,TXT,'4.000K',22.219,9.915,1.304,.528,{
++al:'just',nowrap:1}
++);
++
++  tx(s,TXT,'8.000K',22.219,4.78,1.32,.528,{
++al:'just',nowrap:1}
++);
++
++  tx(s,H2,'No bad review, no un-happy customers.',3.885,4.574,4.861,2.153);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],3.885,6.898,4.861,3.528,{
++al:'just'}
++);
++
++  icon(s,I.callout,14.363,8.896,4.329,2.271,{
++fill:W,rot:180,flipH:1,shadow:1}
++);
++
++  tx(s,H2,'Value.',14.791,9.594,3.472,.792);
++
++  tx(s,TXT,L17,14.791,10.293,3.472,.528,{
++al:'ctr'}
++);
++
++  sh(s,'rect',19.261,0,1.22,5.556,{
++fill:SLATE}
++);
++
++  sh(s,'rect',12.574,0,1.22,9.722,{
++fill:SLATE}
++);
++
++  icon(s,I.shieldU,15.917,7.778,1.22,.624,{
++fill:SLATE}
++);
++
++  icon(s,I.shieldU,12.573,9.861,1.22,.624,{
++fill:SLATE}
++);
++
++  icon(s,I.shieldU,19.261,5.694,1.22,.624,{
++fill:SLATE}
++);
++
++  sh(s,'rect',16.736,0,.402,7.639,{
++fill:ORANGE,tr:50}
++);
++
++  sh(s,'rect',16.319,0,.482,7.639,{
++fill:ORANGE,tr:25}
++);
++
++  sh(s,'rect',15.917,0,.402,7.639,{
++fill:ORANGE}
++);
++
++  chrome(s,'',W,{
++noSite:1}
++);
++
++}
++
++function slide45(s){
++
++  wash(s,SUN,DEEP);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'roundRect',2.292,2.292,22.083,10.417,{
++fill:W,tr:25,rad:.544}
++);
++
++  tx(s,H2,'We have best creativity per year.',3.885,4.507,4.861,2.153);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],3.885,6.965,4.861,3.528,{
++al:'just'}
++);
++
++  for(let i=0;
++i<3;
++i++){
++
++    rule(s,11.036,10.179+i*-2.571,10.982,0,{
++line:K,lw:5,ltr:75}
++);
++
++  }
++
++  sh(s,'rect',16.736,6.605,.402,8.395,{
++fill:ORANGE,tr:50}
++);
++
++  icon(s,I.triangle,16.326,4.645,.402,.645,{
++fill:K}
++);
++
++  icon(s,I.wedge,15.917,5.29,1.22,1.317,{
++fill:W}
++);
++
++  sh(s,'rect',19.261,8.552,1.22,6.442,{
++fill:K}
++);
++
++  icon(s,I.triangle,19.67,6.592,.402,.645,{
++fill:K}
++);
++
++  icon(s,I.wedge,19.261,7.237,1.22,1.317,{
++fill:W}
++);
++
++  sh(s,'rect',12.574,9.911,1.22,5.088,{
++fill:K}
++);
++
++  icon(s,I.triangle,12.983,7.951,.402,.645,{
++fill:K}
++);
++
++  icon(s,I.wedge,12.573,8.596,1.22,1.317,{
++fill:W}
++);
++
++  sh(s,'rect',16.319,6.605,.482,8.395,{
++fill:ORANGE,tr:25}
++);
++
++  sh(s,'rect',15.917,6.605,.402,8.395,{
++fill:ORANGE}
++);
++
++  icon(s,I.callout,14.363,2.049,4.329,2.271,{
++fill:K,shadow:1}
++);
++
++  tx(s,H2,'Value.',14.791,2.339,3.472,.792,{
++col:W}
++);
++
++  tx(s,TXT,L17,14.791,3.037,3.472,.528,{
++col:W,al:'ctr'}
++);
++
++  icon(s,I.dot,12.171,5.017,2.025,1.959,{
++fill:K}
++);
++
++  icon(s,I.dot,11.921,4.774,2.526,2.444,{
++line:K,lw:5}
++);
++
++  tx(s,H1,'78%',12.382,5.517,1.604,.958,{
++col:W,al:'ctr',va:'ctr',nowrap:1}
++);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],['lorem sit unde.']],18.063,5.29,3.616,1.028,{
++al:'just'}
++);
++
++  tx(s,TXT,'6.000K',22.219,7.343,1.323,.528,{
++al:'just',nowrap:1}
++);
++
++  tx(s,TXT,'4.000K',22.219,9.915,1.304,.528,{
++al:'just',nowrap:1}
++);
++
++  tx(s,TXT,'8.000K',22.219,4.78,1.32,.528,{
++al:'just',nowrap:1}
++);
++
++  chrome(s,'pencil vector charts',W,{
++noFoot:1}
++);
++
++}
++
++function slide46(s){
++
++  wash(s,RUST,SUN);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  icon(s,I.part40,20.143,4.521,1.097,1.921,{
++fill:W,rot:50.44,flipH:1}
++);
++
++  icon(s,I.part56,22.012,2.081,1.62,3.176,{
++fill:W,rot:50.44}
++);
++
++  sh(s,'ellipse',22.528,2.942,1.075,1.075,{
++fill:ORANGE}
++);
++
++  icon(s,I.part62,3.99,3.638,16.181,8.036,{
++line:W,lw:10,rot:320.54}
++);
++
++  icon(s,I.dot,2.455,8.894,1.547,1.497,{
++fill:W}
++);
++
++  icon(s,I.dot,5.966,6.512,1.547,1.497,{
++fill:W}
++);
++
++  icon(s,I.dot,9.518,8.444,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,12.96,5.165,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,12.71,4.922,2.526,2.444,{
++line:W,lw:5}
++);
++
++  icon(s,I.dot,16.82,6.505,2.025,1.959,{
++fill:W}
++);
++
++  icon(s,I.dot,16.57,6.263,2.526,2.444,{
++line:W,lw:5}
++);
++
++  tx(s,TXT,L15,1.492,11.184,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,H3,L20,1.492,10.603,3.472,.625,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L15,8.794,11.177,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,H3,L20,8.794,10.596,3.472,.625,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L15,16.097,9.03,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L15,5.003,5.179,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,H3,L20,5.003,4.598,3.472,.625,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L15,12.237,3.57,3.472,1.028,{
++al:'ctr'}
++);
++
++  tx(s,H3,L20,12.237,2.989,3.472,.625,{
++al:'ctr'}
++);
++
++  tx(s,H2,'Award-winning products.',20.942,6.15,5.32,1.472);
++
++  tx(s,TXT,'Lorem ipsum dolor sit ame sit lorem amet, consect diluk.',20.942,7.684,4.167,1.528,{
++al:'just'}
++);
++
++  icon(s,I.disc,17.603,7.258,.461,.452,{
++fill:ORANGE}
++);
++
++  icon(s,I.home,22.84,3.278,.45,.404,{
++fill:W}
++);
++
++  icon(s,I.book,2.98,9.444,.496,.397,{
++fill:ORANGE}
++);
++
++  icon(s,I.roundSq,13.725,5.876,.496,.397,{
++fill:ORANGE}
++);
++
++  icon(s,I.userPlus,10.283,9.202,.496,.443,{
++fill:ORANGE}
++);
++
++  icon(s,I.couple,6.493,7.044,.492,.433,{
++fill:ORANGE}
++);
++
++  icon(s,I.callout,15.668,10.354,4.329,2.271,{
++fill:W,rot:180,flipH:1,shadow:1}
++);
++
++  tx(s,H2,'Value.',16.097,11.052,3.472,.792,{
++col:K}
++);
++
++  tx(s,TXT,L17,16.097,11.75,3.472,.528,{
++col:K,al:'ctr'}
++);
++
++  chrome(s,'rocket infographics',W);
++
++}
++
++function slide47(s){
++
++  wash(s,RUST,SUN);
++
++  ink(W);
++
++  photo(s,0,0,26.667,15,85);
++
++  sh(s,'ellipse',13.075,4.386,.55,.551,{
++fill:W}
++);
++
++  icon(s,I.figure,12.714,4.994,1.262,2.436,{
++fill:W}
++);
++
++  sh(s,'ellipse',9.158,4.907,.362,.362,{
++fill:W,tr:65}
++);
++
++  icon(s,I.figure,8.921,5.307,.83,1.602,{
++fill:W,tr:65}
++);
++
++  sh(s,'ellipse',11.042,4.907,.362,.362,{
++fill:W,tr:50}
++);
++
++  icon(s,I.figure,10.805,5.307,.83,1.602,{
++fill:W,tr:50}
++);
++
++  sh(s,'ellipse',10.103,4.907,.362,.362,{
++fill:W,tr:60}
++);
++
++  icon(s,I.figure,9.866,5.307,.83,1.602,{
++fill:W,tr:60}
++);
++
++  sh(s,'ellipse',8.221,4.907,.362,.362,{
++fill:W,tr:75}
++);
++
++  icon(s,I.figure,7.984,5.307,.83,1.602,{
++fill:W,tr:75}
++);
++
++  sh(s,'ellipse',11.983,4.907,.362,.362,{
++fill:W}
++);
++
++  icon(s,I.figure,11.746,5.307,.83,1.602,{
++fill:W}
++);
++
++  sh(s,'ellipse',7.276,4.907,.362,.362,{
++fill:W,tr:85}
++);
++
++  icon(s,I.figure,7.039,5.307,.83,1.602,{
++fill:W,tr:85}
++);
++
++  sh(s,'ellipse',6.337,4.907,.362,.362,{
++fill:W,tr:95}
++);
++
++  icon(s,I.figure,6.1,5.307,.83,1.602,{
++fill:W,tr:95}
++);
++
++  sh(s,'ellipse',15.291,4.907,.362,.362,{
++fill:W,tr:50}
++);
++
++  icon(s,I.figure,15.054,5.307,.83,1.602,{
++fill:W,tr:50}
++);
++
++  sh(s,'ellipse',14.346,4.907,.362,.362,{
++fill:W}
++);
++
++  icon(s,I.figure,14.109,5.307,.83,1.602,{
++fill:W}
++);
++
++  sh(s,'ellipse',18.113,4.907,.362,.362,{
++fill:W,tr:65}
++);
++
++  icon(s,I.figure,17.876,5.307,.83,1.602,{
++fill:W,tr:65}
++);
++
++  sh(s,'ellipse',17.168,4.907,.362,.362,{
++fill:W,tr:60}
++);
++
++  icon(s,I.figure,16.931,5.307,.83,1.602,{
++fill:W,tr:60}
++);
++
++  sh(s,'ellipse',16.23,4.907,.362,.362,{
++fill:W,tr:50}
++);
++
++  icon(s,I.figure,15.992,5.307,.83,1.602,{
++fill:W,tr:50}
++);
++
++  sh(s,'ellipse',20.32,4.907,.362,.362,{
++fill:W,tr:95}
++);
++
++  icon(s,I.figure,20.082,5.307,.83,1.602,{
++fill:W,tr:95}
++);
++
++  sh(s,'ellipse',20.021,4.907,.362,.362,{
++fill:W,tr:85}
++);
++
++  icon(s,I.figure,19.784,5.307,.83,1.602,{
++fill:W,tr:85}
++);
++
++  sh(s,'ellipse',19.082,4.907,.362,.362,{
++fill:W,tr:75}
++);
++
++  icon(s,I.figure,18.845,5.307,.83,1.602,{
++fill:W,tr:75}
++);
++
++  icon(s,I.part05,10.338,2.912,5.992,5.991,{
++fill:W}
++);
++
++  icon(s,I.part54,15.228,7.802,2.427,2.436,{
++fill:W}
++);
++
++  tx(s,TXT,[[L12,{
++b:1}
++],[' sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. Lorem ipsum dolor sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. Lorem ipsum dolor sis']],2.839,10.543,9.891,2.028,{
++al:'just'}
++);
++
++  tx(s,TXT,'empor incididunt. Lorem ipsum dolor sit ame sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. Lorem ipsum.',13.855,10.543,9.891,1.528,{
++al:'just'}
++);
++
++  icon(s,I.callout,5.34,7.073,4.329,2.271,{
++fill:W,rot:180,flipH:1,shadow:1}
++);
++
++  tx(s,H2,'Value.',5.768,7.771,3.472,.792,{
++col:K}
++);
++
++  tx(s,TXT,L17,5.768,8.469,3.472,.528,{
++col:K,al:'ctr'}
++);
++
++  tx(s,TXT,L3,19.491,9.191,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,21.588,8.321,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,23.261,8.321,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person3,22.006,8.321,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,22.842,8.321,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person4,22.425,8.321,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,19.497,8.321,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,21.17,8.321,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person3,19.915,8.321,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,20.75,8.321,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person4,20.333,8.321,.332,.8,{
++fill:W,tr:10}
++);
++
++  tx(s,H2,L26,3.011,2.791,4.167,.792);
++
++  tx(s,TXT,L3,3.011,3.486,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.speech,13.375,1.797,5.687,2.532,{
++fill:W,flipH:1,shadow:1}
++);
++
++  tx(s,H2,L23,13.788,2.131,4.861,.792,{
++col:K}
++);
++
++  tx(s,TXT,L17,13.788,2.83,4.861,.528,{
++col:K,al:'just'}
++);
++
++  chrome(s,'people infographics',W);
++
++}
++
++function slide48(s){
++
++  icon(s,I.part11,14.844,7.603,17.668,8.928,{
++rot:315}
++);
++
++  sh(s,'ellipse',17.618,8.627,8.274,2.144,{
++fill:K,rot:315,flipH:1}
++);
++
++  sh(s,'ellipse',18.032,8.707,7.446,1.984,{
++fill:STONE,rot:315,flipH:1}
++);
++
++  sh(s,'ellipse',19.273,8.957,4.964,1.484,{
++fill:W,rot:315,flipH:1}
++);
++
++  sh(s,'ellipse',20.514,9.285,2.482,.827,{
++fill:TEAL,tr:10,rot:315,flipH:1}
++);
++
++  icon(s,I.part32,21.423,9.296,.424,.439,{
++fill:SLATE}
++);
++
++  icon(s,I.part10,20.459,8.254,1.044,1.225,{
++fill:TEAL,tr:10}
++);
++
++  icon(s,I.part34,20.445,8.247,.271,.441,{
++fill:K,tr:50}
++);
++
++  icon(s,I.part36,17.986,6.512,1.07,1.2,{
++fill:TEAL,tr:10}
++);
++
++  icon(s,I.part22,18.562,5.524,.922,1.408,{
++fill:TEAL,tr:10}
++);
++
++  icon(s,I.part78,18.695,6.575,1.944,2.002,{
++fill:K}
++);
++
++  sh(s,'rect',11.25,4.522,4.167,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',11.25,4.522,3.472,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,11.25,4.875,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',11.25,3.92,4.167,.528,{
++al:'r'}
++);
++
++  sh(s,'rect',12.973,8.355,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',12.112,8.355,.694,.278,{
++fill:K,tr:10}
++);
++
++  sh(s,'rect',13.834,8.355,.694,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',14.695,8.355,.694,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',11.251,8.355,.694,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,11.25,8.717,4.167,0,{
++al:'just'}
++);
++
++  tx(s,CAP,'3/5',11.25,7.759,4.167,0,{
++al:'r'}
++);
++
++  sh(s,'rect',11.25,6.442,4.167,.278,{
++fill:K,tr:75}
++);
++
++  sh(s,'rect',11.25,6.442,3.472,.278,{
++fill:K,tr:10}
++);
++
++  tx(s,TXT,L3,11.25,6.794,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',11.25,5.84,4.167,.528,{
++al:'r'}
++);
++
++  tx(s,TXT,L3,11.25,10.552,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,13.348,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,15.021,9.682,.332,.8,{
++fill:K,tr:75}
++);
++
++  icon(s,I.person3,13.766,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,14.601,9.682,.332,.8,{
++fill:K,tr:75}
++);
++
++  icon(s,I.person4,14.184,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,11.256,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person,12.929,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person3,11.674,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person2,12.51,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  icon(s,I.person4,12.093,9.682,.332,.8,{
++fill:K,tr:10}
++);
++
++  tx(s,H1,'Specifically target markets.',3.163,5.837,6.25,1.806);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],3.163,7.849,6.25,3.028,{
++al:'just'}
++);
++
++  sh(s,'roundRect',3.18,4.123,4.687,1.119,{
++line:K,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',3.44,4.286,4.167,0,{
++al:'ctr'}
++);
++
++  chrome(s,'darts infographics',K);
++
++}
++
++function slide49(s){
++
++  ink(W);
++
++  photo(s,0,0,26.667,15);
++
++  sh(s,'rect',0,0,13.333,15,{
++fill:FB,tr:5}
++);
++
++  icon(s,I.part43,15.058,2.206,9.665,17.987,{
++fill:FB,tr:5}
++);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],2.719,4.676,7.895,2.028,{
++al:'just'}
++);
++
++  sh(s,'roundRect',2.736,3.131,4.687,1.119,{
++line:W,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',2.996,3.295,4.167,0,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L3,2.725,9.829,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,4.822,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,6.495,8.959,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person3,5.24,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,6.076,8.959,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person4,5.659,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,2.731,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,4.404,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person3,3.149,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,3.984,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person4,3.567,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  tx(s,H2,'9.142.314',2.725,7.129,4.167,.792);
++
++  tx(s,TXT,L3,2.725,7.824,4.167,.528,{
++al:'just'}
++);
++
++  rule(s,2.725,11.149,4.167,0,{
++line:W,lw:8,ltr:75}
++);
++
++  rule(s,2.725,11.149,3.306,0,{
++line:W,lw:8}
++);
++
++  tx(s,TXT,L3,2.725,11.341,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',5.266,10.43,1.545,.528,{
++al:'ctr'}
++);
++
++  chrome(s,'our social media',W,{
++noSite:1}
++);
++
++}
++
++function slide50(s){
++
++  ink(W);
++
++  photo(s,0,0,26.667,15);
++
++  icon(s,I.part26,0,0,26.667,15,{
++fill:TW,tr:5}
++);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],16.704,4.676,7.895,2.028,{
++al:'just'}
++);
++
++  sh(s,'roundRect',16.721,3.131,4.687,1.119,{
++line:W,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',16.981,3.295,4.167,0,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L3,16.71,9.829,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,18.807,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,20.48,8.959,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person3,19.226,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,20.061,8.959,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person4,19.644,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,16.716,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,18.389,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person3,17.134,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,17.969,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person4,17.552,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  tx(s,H2,'9.142.314',16.71,7.129,4.167,.792);
++
++  tx(s,TXT,L3,16.71,7.824,4.167,.528,{
++al:'just'}
++);
++
++  rule(s,16.71,11.149,4.167,0,{
++line:W,lw:8,ltr:75}
++);
++
++  rule(s,16.71,11.149,3.306,0,{
++line:W,lw:8}
++);
++
++  tx(s,TXT,L3,16.71,11.341,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',19.251,10.43,1.545,.528,{
++al:'ctr'}
++);
++
++  chrome(s,'',W,{
++noFoot:1}
++);
++
++}
++
++function slide51(s){
++
++  ink(W);
++
++  photo(s,0,0,26.667,15);
++
++  icon(s,I.part20,0,0,26.667,15,{
++fill:K,tr:20}
++);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],[L1]],3.212,4.676,7.895,2.028,{
++al:'just'}
++);
++
++  sh(s,'roundRect',3.229,3.131,4.687,1.119,{
++line:W,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',3.489,3.295,4.167,0,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L3,3.217,9.829,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,5.315,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,6.988,8.959,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person3,5.733,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,6.569,8.959,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person4,6.151,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,3.224,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,4.897,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person3,3.642,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,4.477,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person4,4.06,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  tx(s,H2,'9.142.314',3.217,7.129,4.167,.792);
++
++  tx(s,TXT,L3,3.217,7.824,4.167,.528,{
++al:'just'}
++);
++
++  rule(s,3.217,11.149,4.167,0,{
++line:W,lw:8,ltr:75}
++);
++
++  rule(s,3.217,11.149,3.306,0,{
++line:W,lw:8}
++);
++
++  tx(s,TXT,L3,3.217,11.341,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',5.759,10.43,1.545,.528,{
++al:'ctr'}
++);
++
++  chrome(s,'our social media',W);
++
++}
++
++function slide52(s){
++
++  ink(W);
++
++  photo(s,0,0,26.667,15);
++
++  icon(s,I.part15,0,0,26.667,15,{
++fill:IN}
++);
++
++  tx(s,TXT,[[L11,{
++b:1}
++],['lorem sit unde omnis iste natus error sit volup tatem Sed ut perspiciatis iste. Sed ut perspi ciatis lorem sit unde.']],15.601,4.676,6.717,2.028,{
++al:'just'}
++);
++
++  sh(s,'roundRect',15.618,3.131,4.687,1.119,{
++line:W,lw:5,rad:.559}
++);
++
++  tx(s,H2,'2017',15.879,3.295,4.167,0,{
++al:'ctr'}
++);
++
++  tx(s,TXT,L3,15.607,9.829,4.167,.528,{
++al:'just'}
++);
++
++  icon(s,I.person,17.704,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,19.377,8.959,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person3,18.123,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,18.958,8.959,.332,.8,{
++fill:W,tr:75}
++);
++
++  icon(s,I.person4,18.541,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,15.613,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person,17.286,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person3,16.031,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person2,16.866,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  icon(s,I.person4,16.449,8.959,.332,.8,{
++fill:W,tr:10}
++);
++
++  tx(s,H2,'9.142.314',15.607,7.129,4.167,.792);
++
++  tx(s,TXT,L3,15.607,7.824,4.167,.528,{
++al:'just'}
++);
++
++  rule(s,15.607,11.149,4.167,0,{
++line:W,lw:8,ltr:75}
++);
++
++  rule(s,15.607,11.149,3.306,0,{
++line:W,lw:8}
++);
++
++  tx(s,TXT,L3,15.607,11.341,4.167,.528,{
++al:'just'}
++);
++
++  tx(s,CAP,'90%',18.148,10.43,1.545,.528,{
++al:'ctr'}
++);
++
++  tx(s,CAP,L4,19.319,.91,6.25,.528,{
++al:'r'}
++);
++
++  chrome(s,'our social media',W);
++
++}
++
++
++/* ------------------------------------------------------------------ */
++const DECK = [
++  slide01, slide02, slide03, slide04, slide05, slide06,
++  slide07, slide08, slide09, slide10, slide11, slide12,
++  slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24,
++  slide25, slide26, slide27, slide28, slide29, slide30,
++  slide31, slide32, slide33, slide34, slide35, slide36,
++  slide37, slide38, slide39, slide40, slide41, slide42,
++  slide43, slide44, slide45, slide46, slide47, slide48,
++  slide49, slide50, slide51, slide52,
++];
++
++
++const pptx = new PptxGenJS();
++
++pptx.defineLayout({
++ name: 'RAYS', width: SLIDE_W, height: SLIDE_H }
++);
++
++pptx.layout = 'RAYS';
++
++pptx.author = 'creathrive.com';
++
++pptx.title  = 'RAYS - multipurpose professional template';
++
++
++DECK.forEach(build => {
++ INK = K;
++ build(pptx.addSlide());
++ }
++);
++
++
++pptx.writeFile({
++ fileName: path.join(__dirname, '132f963f-863a-484a-8c70-b171d6c17563_grok_final.pptx') }
++)
++    .then(f => console.log('wrote', f));
++

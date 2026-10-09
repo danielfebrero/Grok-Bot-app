@@ -1,0 +1,758 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/medical_pharmacy_innovations.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/medical_pharmacy_innovations.js
+@@ -0,0 +1,755 @@
++/**
++ * "Medical Pharmacy Innovations" — 20 slide deck rebuilt with pptxgenjs.
++ * Run: node 141edebe-ddcc-4088-8f56-2848b5ef9176_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ tokens */
++
++const W = 10;            // slide width  (in)
++const H = 5.625;         // slide height (in)
++
++const PINK = 'D91656';   // theme accent1
++const ROSE = 'EE66A6';   // theme accent2
++const BLUSH = 'FACCDB';  // pale card fill
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const GREY = '7F7F7F';
++const GREY_D = '595959';
++const PLACEHOLDER = 'F2F2F2';
++
++const HEAD = 'Sora';     // display / headline face
++const BODY = 'Inter';    // body face
++
++const INSET = [5.4, 5.4, 2.7, 2.7];   // l, r, b, t (pt) — matches the source deck
++
++const TITLE = { fontFace: HEAD, fontSize: 41, color: PINK };
++const SECTION = { fontFace: HEAD, fontSize: 18, color: PINK };
++const CARD_HEAD = { fontFace: HEAD, fontSize: 15, color: PINK };
++const LEAD = { fontFace: BODY, fontSize: 11, color: BLACK, lineSpacingMultiple: 1.2 };
++const SMALL = { fontFace: BODY, fontSize: 9, color: BLACK, lineSpacingMultiple: 1.2 };
++const STAT = { fontFace: HEAD, fontSize: 24, color: PINK };
++
++/* ----------------------------------------------------------------- helpers */
++
++function text(slide, str, opts) {
++  slide.addText(str, Object.assign({ valign: 'top', align: 'left', margin: INSET }, opts));
++}
++
++function box(slide, shape, opts) {
++  slide.addShape(shape, opts);
++}
++
++function mix(from, to, t) {
++  const f = Math.max(0, Math.min(1, t));
++  let out = '';
++  for (let i = 0; i < 3; i++) {
++    const a = parseInt(from.substr(i * 2, 2), 16);
++    const b = parseInt(to.substr(i * 2, 2), 16);
++    out += Math.round(a + (b - a) * f).toString(16).padStart(2, '0');
++  }
++  return out.toUpperCase();
++}
++
++/**
++ * Large areas of the deck carry a gradient that runs from accent2 at a focus
++ * point out to accent1.  Its iso-lines are diamonds: the mix depends on the
++ * Manhattan distance |dx| + |dy| from the focus, reaching the far colour after
++ * `stop` x (width + height).  pptxgenjs has no gradient fill, so it is redrawn
++ * either as nested diamonds (backgrounds, clipped by the page) or as a grid of
++ * flat tiles (shapes, where the paint must stay inside the box).
++ */
++function gradientRun(w, h, stop) {
++  return (stop === undefined ? 0.47 : stop) * (w + h);
++}
++
++function glowRings(slide, fx, fy, run, shape) {
++  const steps = 26;
++  for (let i = steps; i >= 1; i--) {
++    const d = (run * i) / steps;
++    box(slide, shape, {
++      x: fx - d, y: fy - d, w: 2 * d, h: 2 * d, fill: { color: mix(ROSE, PINK, i / steps) },
++    });
++  }
++}
++
++/**
++ * Full-bleed pink page: flat accent1 plus the deck's glow.  Title-style pages
++ * put the focus in the middle and use a true circular ramp; the rest push it
++ * into the bottom-right corner, where the ramp reads as a diamond.
++ */
++function pinkPage(slide, focus) {
++  const f = Object.assign({ x: W, y: H, run: gradientRun(W, H), shape: 'diamond' }, focus);
++  slide.background = { color: PINK };
++  glowRings(slide, f.x, f.y, f.run, f.shape);
++}
++
++/** Rectangle carrying the same gradient, tiled so the paint stays inside it. */
++function gradientRect(slide, x, y, w, h, opts) {
++  const o = Object.assign({ near: ROSE, far: PINK, fx: x + w, fy: y + h, run: gradientRun(w, h, opts && opts.stop) }, opts);
++  const cols = Math.max(1, Math.min(24, Math.round(w / 0.18)));
++  const rows = Math.max(1, Math.min(24, Math.round(h / 0.18)));
++  const cw = w / cols, ch = h / rows;
++  for (let c = 0; c < cols; c++) {
++    for (let r = 0; r < rows; r++) {
++      const d = Math.abs(x + (c + 0.5) * cw - o.fx) + Math.abs(y + (r + 0.5) * ch - o.fy);
++      box(slide, 'rect', {
++        x: x + c * cw, y: y + r * ch, w: cw + 0.01, h: ch + 0.01,
++        fill: { color: mix(o.near, o.far, d / o.run) },
++      });
++    }
++  }
++}
++
++/** Right half of a disc, painted with the same gradient (slide 20's blob). */
++function gradientHalfDisc(slide, cx, cy, r, glow) {
++  const cols = 18, rows = 20;
++  const cw = r / cols;
++  for (let c = 0; c < cols; c++) {
++    const dx = (c + 0.5) * cw;
++    const half = Math.sqrt(Math.max(0, r * r - dx * dx));
++    const ch = (2 * half) / rows;
++    for (let k = 0; k < rows; k++) {
++      const py = cy - half + (k + 0.5) * ch;
++      const d = Math.abs(cx + dx - glow.fx) + Math.abs(py - glow.fy);
++      box(slide, 'rect', {
++        x: cx + c * cw, y: cy - half + k * ch, w: cw + 0.012, h: ch + 0.012,
++        fill: { color: mix(ROSE, PINK, d / glow.run) },
++      });
++    }
++  }
++}
++
++/** Thin decorative rule. */
++function rule(slide, x, y, w, opts) {
++  const o = Object.assign({ color: PINK, width: 1, transparency: 0 }, opts);
++  box(slide, 'line', {
++    x: x, y: y, w: w, h: 0,
++    line: { color: o.color, width: o.width, transparency: o.transparency },
++  });
++}
++
++/** Outlined circle used for the deck's concentric background rings. */
++function ring(slide, x, y, d, color, transparency) {
++  box(slide, 'ellipse', {
++    x: x, y: y, w: d, h: d,
++    fill: { type: 'none' },
++    line: { color: color, width: 1, transparency: transparency },
++  });
++}
++
++/** Arrow-with-tail glyph, traced from the deck's vector icon. */
++const ARROW = [
++  [0.703, 0.436], [0.283, 0.091], [0.399, 0.000], [1.000, 0.503],
++  [0.399, 1.000], [0.283, 0.909], [0.703, 0.564], [0.000, 0.564], [0.000, 0.436],
++];
++
++function arrowGlyph(slide, x, y, w, h, color, rotate) {
++  box(slide, 'custGeom', {
++    x: x, y: y, w: w, h: h, rotate: rotate || 0,
++    fill: { color: color },
++    points: ARROW.map(function (p) { return { x: p[0] * w, y: p[1] * h }; }).concat([{ close: true }]),
++  });
++}
++
++/**
++ * Small stroked line-icons, drawn in a 0..1 box.  Each entry is a list of
++ * primitives: r = rounded rect, e = ellipse, p = polyline, d = filled dot.
++ */
++const ICONS = {
++  bag: [['r', 0.05, 0.28, 0.9, 0.67, 0.18], ['p', [[0.3, 0.28], [0.3, 0.16], [0.42, 0.05], [0.58, 0.05], [0.7, 0.16], [0.7, 0.28]]],
++    ['d', 0.34, 0.55, 0.09], ['d', 0.57, 0.55, 0.09]],
++  funnel: [['p', [[0.04, 0.08], [0.96, 0.08], [0.6, 0.5], [0.6, 0.98], [0.4, 0.85], [0.4, 0.5]], true]],
++  wallet: [['r', 0.05, 0.15, 0.9, 0.72, 0.2], ['p', [[0.55, 0.42], [0.95, 0.42], [0.95, 0.62], [0.55, 0.62]], true], ['d', 0.22, 0.35, 0.16]],
++  cart: [['p', [[0.02, 0.1], [0.2, 0.1], [0.34, 0.72], [0.9, 0.72]]], ['p', [[0.26, 0.3], [0.98, 0.3], [0.88, 0.6], [0.32, 0.6]], true],
++    ['d', 0.4, 0.9, 0.13], ['d', 0.78, 0.9, 0.13]],
++  compose: [['p', [[0.95, 0.35], [0.95, 0.9], [0.05, 0.9], [0.05, 0.1], [0.6, 0.1]]], ['p', [[0.2, 0.42], [0.6, 0.42]]],
++    ['p', [[0.2, 0.62], [0.5, 0.62]]], ['p', [[0.72, 0.05], [0.72, 0.32]]], ['p', [[0.59, 0.185], [0.86, 0.185]]]],
++  search: [['p', [[0.9, 0.5], [0.9, 0.9], [0.05, 0.9], [0.05, 0.1], [0.9, 0.1], [0.9, 0.3]]], ['p', [[0.2, 0.36], [0.62, 0.36]]],
++    ['p', [[0.2, 0.58], [0.45, 0.58]]], ['e', 0.6, 0.5, 0.3], ['p', [[0.85, 0.78], [0.98, 0.94]]]],
++};
++
++function icon(slide, name, x, y, size, color) {
++  const stroke = { color: color, width: 1.15 };
++  const at = function (u, v) { return { x: x + u * size, y: y + v * size }; };
++  ICONS[name].forEach(function (part) {
++    const kind = part[0];
++    if (kind === 'r') {
++      box(slide, 'roundRect', {
++        x: x + part[1] * size, y: y + part[2] * size, w: part[3] * size, h: part[4] * size,
++        rectRadius: part[5] * size, fill: { type: 'none' }, line: stroke,
++      });
++    } else if (kind === 'e') {
++      box(slide, 'ellipse', {
++        x: x + (part[1] - part[3] / 2) * size, y: y + (part[2] - part[3] / 2) * size,
++        w: part[3] * size, h: part[3] * size, fill: { type: 'none' }, line: stroke,
++      });
++    } else if (kind === 'd') {
++      box(slide, 'ellipse', {
++        x: x + (part[1] - part[3] / 2) * size, y: y + (part[2] - part[3] / 2) * size,
++        w: part[3] * size, h: part[3] * size, fill: { color: color },
++      });
++    } else {
++      const pts = part[1].map(function (p) { return at(p[0], p[1]); });
++      const xs = pts.map(function (p) { return p.x; });
++      const ys = pts.map(function (p) { return p.y; });
++      const ox = Math.min.apply(null, xs), oy = Math.min.apply(null, ys);
++      box(slide, 'custGeom', {
++        x: ox, y: oy, w: Math.max(0.01, Math.max.apply(null, xs) - ox), h: Math.max(0.01, Math.max.apply(null, ys) - oy),
++        fill: { type: 'none' }, line: stroke,
++        points: pts.map(function (p) { return { x: p.x - ox, y: p.y - oy }; }).concat(part[2] ? [{ close: true }] : []),
++      });
++    }
++  });
++}
++
++/** Repeated page furniture: logo, centred kicker, year chip. */
++function chrome(slide, opts) {
++  const o = Object.assign({ color: BLACK, kicker: true, year: null }, opts);
++  text(slide, 'YOUR LOGO', { x: 0.441, y: 0.137, w: 1.085, h: 0.252, fontFace: HEAD, fontSize: 11, color: o.color });
++  if (o.kicker) {
++    text(slide, 'MEDICAL PHARMACY', { x: 4.23, y: 0.15, w: 1.54, h: 0.227, fontFace: HEAD, fontSize: 9, color: o.color });
++  }
++  text(slide, '2025', {
++    x: 8.94, y: 0.137, w: 0.669, h: 0.213, align: 'right', valign: 'middle',
++    fontFace: BODY, fontSize: 11, color: o.year || o.color,
++  });
++}
++
++/** "Lorem Ipsum Dolor" call-to-action pill. */
++function pill(slide, x, y, opts) {
++  const o = Object.assign({ light: false }, opts);
++  const w = 2.1, h = 0.389;
++  if (o.light) {
++    box(slide, 'rect', { x: x, y: y, w: w, h: h, fill: { color: WHITE } });
++  } else {
++    gradientRect(slide, x, y, w, h, { stop: 1, near: PINK, far: ROSE });
++  }
++  arrowGlyph(slide, x + 0.115, y + 0.135, 0.2, 0.13, o.light ? BLACK : WHITE);
++  text(slide, 'Lorem Ipsum Dolor', {
++    x: x, y: y, w: w, h: h, align: 'right', valign: 'middle',
++    fontFace: HEAD, fontSize: 12, color: o.light ? BLACK : WHITE,
++  });
++}
++
++/** Grey block standing in for a photo in the original deck. */
++function photo(slide, x, y, w, h, opts) {
++  const o = Object.assign({ round: false }, opts);
++  box(slide, o.round ? 'ellipse' : 'rect', { x: x, y: y, w: w, h: h, fill: { color: PLACEHOLDER } });
++  text(slide, '[image]', {
++    x: x, y: y + h / 2 - 0.16, w: w, h: 0.32,
++    align: 'center', valign: 'middle', fontFace: BODY, fontSize: 9, color: GREY,
++  });
++}
++
++/** Big number over a caption — used by several stat rows. */
++function stat(slide, x, y, value, caption, opts) {
++  const o = Object.assign({ color: PINK, capColor: BLACK, w: 1.222 }, opts);
++  text(slide, value, { x: x, y: y, w: o.w, h: 0.48, fontFace: HEAD, fontSize: 24, color: o.color });
++  if (caption) {
++    text(slide, caption, Object.assign({}, SMALL, { x: x, y: y + 0.397, w: 1.377, h: 0.242, color: o.capColor }));
++  }
++}
++
++/* ------------------------------------------------------------------ slides */
++
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  pinkPage(s, { x: W / 2, y: H / 2, run: 2.68, shape: 'ellipse' });
++  ring(s, 1.922, -0.266, 6.157, WHITE, 89);
++  ring(s, 2.652, 0.478, 4.695, WHITE, 70);
++  ring(s, 3.321, 1.139, 3.374, WHITE, 38);
++  ring(s, 4.005, 1.823, 2.007, WHITE, 38);
++  text(s, 'MEDICAL \t\t\t\t\t\t\t        PHARMACY INNOVATIONS', {
++    x: 0.567, y: 1.087, w: 9.165, h: 3.711, fontFace: HEAD, fontSize: 72, color: WHITE,
++  });
++  photo(s, 5.665, 1.242, 3.603, 0.827);
++  photo(s, 0.73, 2.458, 2.083, 0.827);
++  text(s, 'Lorem ipsum dolor sit', Object.assign({}, LEAD, { x: 8.615, y: 3.744, w: 0.783, h: 0.694, color: WHITE }));
++  chrome(s, { color: WHITE });
++}
++
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  text(s, 'THE ROLE OF PHARMACY IN HEALTHCARE', Object.assign({}, TITLE, { x: 0.433, y: 0.77, w: 7.45, h: 1.439 }));
++  rule(s, 0, 2.33, W, { width: 1 });
++  rule(s, 0, 2.842, W, { width: 0.75, transparency: 56 });
++  rule(s, 0, 3.334, W, { width: 0.75, transparency: 76 });
++  rule(s, 0, 4.042, W, { width: 0.75, transparency: 93 });
++  const cols = [
++    { x: 0.42, head: 'Budgeting Strategy' },
++    { x: 3.614, head: 'forecasting Strategy' },
++    { x: 6.834, head: 'Revenue Models' },
++  ];
++  cols.forEach(function (c) {
++    text(s, c.head, { x: c.x, y: 3.603, w: 2.18, h: 0.303, fontFace: HEAD, fontSize: 14, color: PINK });
++    text(s, 'Lorem ipsum dolor sit amet, consect\netur seddo adipiscing elit, seddo eiu\nsmod temporLorem ipsum dolor sit a\nmet, consectetur sed.',
++      Object.assign({}, LEAD, { x: c.x, y: 3.931, w: 2.772, h: 0.902 }));
++  });
++  chrome(s);
++}
++
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  box(s, 'rect', { x: 7.042, y: 0.469, w: 2.458, h: 1.594, fill: { color: BLUSH, transparency: 60 } });
++  text(s, 'ROLE OF PHARMACISTS', Object.assign({}, TITLE, { x: 0.36, y: 0.826, w: 4.51, h: 1.439 }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venen atis tristique. Morbi tortor justo, porta.',
++    Object.assign({}, LEAD, { x: 3.076, y: 2.343, w: 3.705, h: 0.743, lineSpacingMultiple: 1.3 }));
++  text(s, 'More Than Medication', { x: 7.042, y: 3.558, w: 1.551, h: 0.227, fontFace: BODY, fontSize: 9, color: GREY });
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis.',
++    Object.assign({}, LEAD, { x: 7.042, y: 3.785, w: 2.048, h: 0.906 }));
++  text(s, 'Mini details', Object.assign({}, LEAD, {
++    x: 7.042, y: 4.77, w: 1.876, h: 0.27, color: PINK, italic: true, underline: { style: 'sng' },
++  }));
++  text(s, '43%', { x: 7.838, y: 0.747, w: 1.122, h: 0.631, fontFace: HEAD, fontSize: 33, color: PINK });
++  text(s, 'Lorem ipsum dol\nor sit amet. ', Object.assign({}, SMALL, { x: 7.886, y: 1.284, w: 1.122, h: 0.392, fontSize: 8 }));
++  box(s, 'line', { x: 7.657, y: 0.858, w: 0, h: 0.781, line: { color: PINK, width: 2.75 } });
++  photo(s, 0, 3.419, 6.782, 2.206);
++  chrome(s);
++}
++
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  text(s, 'THE RISE OF E-PHARMACY', Object.assign({}, TITLE, { x: 0.441, y: 0.717, w: 8.151, h: 0.757 }));
++  photo(s, 0.5, 1.794, 4.9, 3.362);
++  [{ y: 1.794, kicker: 'Rise 1' }, { y: 3.034, kicker: 'Rise 2' }].forEach(function (r) {
++    text(s, r.kicker, { x: 5.697, y: r.y, w: 1.634, h: 0.278, fontFace: BODY, fontSize: 12, color: GREY });
++    text(s, 'PROMPT E-PHARMACY', Object.assign({}, SECTION, { x: 5.681, y: r.y + 0.296, w: 3.259, h: 0.379 }));
++    text(s, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt.',
++      Object.assign({}, LEAD, { x: 5.681, y: r.y + 0.674, w: 4.019, h: 0.482 }));
++  });
++  pill(s, 5.77, 4.519);
++  text(s, '30%', { x: 8.304, y: 4.469, w: 1.01, h: 0.48, fontFace: HEAD, fontSize: 24, color: PINK });
++  chrome(s);
++}
++
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  const cards = [
++    { x: 0.5, y: 1.715, dark: true, head: 'PRICING', icon: 'bag' },
++    { x: 3.541, y: 1.715, dark: false, head: 'REVENUE', icon: 'funnel' },
++    { x: 6.583, y: 1.715, dark: true, head: 'SUBSCRIPTION', icon: 'wallet' },
++    { x: 0.5, y: 3.346, dark: false, head: 'B2C CHANNELS', icon: 'cart' },
++    { x: 3.541, y: 3.346, dark: true, head: 'B2B CHANNELS', icon: 'compose' },
++    { x: 6.583, y: 3.346, dark: false, head: 'BUSINESS MODEL', icon: 'search' },
++  ];
++  cards.forEach(function (c) {
++    if (c.dark) gradientRect(s, c.x, c.y, 2.917, 1.512, { stop: 0.49 });
++    else box(s, 'rect', { x: c.x, y: c.y, w: 2.917, h: 1.512, fill: { color: BLUSH, transparency: 60 } });
++    const fg = c.dark ? WHITE : PINK;
++    text(s, c.head, Object.assign({}, CARD_HEAD, { x: c.x + 0.234, y: c.y + 0.25, w: 2.11, h: 0.328, color: fg }));
++    text(s, 'Lorem ipsum dolor sit amet, cons\nectetur sed do adipiscing elit, se\nddo eiusmodtempor',
++      Object.assign({}, LEAD, { x: c.x + 0.234, y: c.y + 0.553, w: 2.45, h: 0.694, color: c.dark ? WHITE : BLACK }));
++    icon(s, c.icon, c.x + 2.51, c.y + 0.15, 0.225, fg);
++  });
++  text(s, 'LEGAL RESPONSIBILITIES', Object.assign({}, TITLE, { x: 0.369, y: 0.663, w: 7.894, h: 0.757 }));
++  chrome(s);
++}
++
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  text(s, 'IMPACT DRUGS FOR HEALTH', Object.assign({}, TITLE, { x: 0.404, y: 0.652, w: 8.672, h: 0.757 }));
++  box(s, 'rect', { x: -0.004, y: 1.545, w: 10.004, h: 1.004, fill: { color: BLUSH, transparency: 60 } });
++  [0.448, 2.353, 4.258, 6.163, 8.068].forEach(function (x, i) {
++    text(s, 'Lorem Ipsum Dolor Sit Amet. ', {
++      x: x, y: 1.807, w: 1.432, h: 0.487, valign: 'top', margin: INSET,
++      fontFace: HEAD, fontSize: 11, color: i % 2 ? PINK : BLACK, lineSpacingMultiple: 1.2,
++    });
++  });
++  photo(s, 0.5, 2.812, 3.285, 2.344);
++  text(s, 'IMPORTANCE OF A SOCIAL MEDIA', Object.assign({}, SECTION, { x: 4.062, y: 2.943, w: 4.621, h: 0.379 }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ',
++    Object.assign({}, LEAD, { x: 4.078, y: 3.307, w: 5.255, h: 0.906 }));
++  pill(s, 4.175, 4.477);
++  text(s, '211K', Object.assign({}, STAT, { x: 6.846, y: 4.477, w: 1.222, h: 0.48 }));
++  text(s, 'Lorem ipsum dolor.', Object.assign({}, SMALL, { x: 8.033, y: 4.477, w: 0.894, h: 0.424 }));
++  chrome(s);
++}
++
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  text(s, 'A REAL-WORLD EXAMPLE', Object.assign({}, TITLE, { x: 0.567, y: 0.679, w: 7.691, h: 0.757 }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venen atis tristique. Morbi tortor justo, porta.',
++    Object.assign({}, LEAD, { x: 2.926, y: 1.437, w: 3.705, h: 0.743, lineSpacingMultiple: 1.3 }));
++  [{ x: 8.239, dir: 180 }, { x: 8.94, dir: 0 }].forEach(function (nav) {
++    ring(s, nav.x, 1.752, 0.538, PINK, 0);
++    arrowGlyph(s, nav.x + 0.135, 1.945, 0.27, 0.15, PINK, nav.dir);
++  });
++  [
++    { x: 0.5, head: 'EXAMPLE 01' },
++    { x: 3.605, head: 'EXAMPLE 02' },
++    { x: 6.711, head: 'EXAMPLE 03' },
++  ].forEach(function (c, i) {
++    photo(s, c.x, 2.48, 2.789, 1.671);
++    const tx = [0.41, 3.544, 6.65][i];
++    text(s, c.head, { x: tx, y: 4.23, w: 2.911, h: 0.303, fontFace: HEAD, fontSize: 14, color: PINK });
++    text(s, 'Lorem ipsum dolor sit amet, consectet adiiscing elit, sed do.',
++      Object.assign({}, LEAD, { x: tx + 0.008, y: 4.476, w: 2.871, h: 0.482 }));
++  });
++  chrome(s);
++}
++
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  pinkPage(s);
++  text(s, 'NAVIGATING HURDLES', Object.assign({}, TITLE, { x: 2.424, y: 0.767, w: 7.057, h: 0.757, color: WHITE }));
++  [1.838, 2.812, 3.826, 4.8].forEach(function (y) { rule(s, 0, y, W, { color: WHITE, width: 1 }); });
++  const rows = [
++    { n: '01', label: 'DRUG SHORTAGES', ny: 2.113, ly: 2.074, by: 1.943 },
++    { n: '02', label: 'REGULATORY SHIFTS', ny: 3.085, ly: 3.067, by: 2.944 },
++    { n: '03', label: 'STAFF SHORTAGES', ny: 4.1, ly: 4.097, by: 3.921 },
++  ];
++  rows.forEach(function (r) {
++    text(s, r.n, { x: 0.441, y: r.ny, w: 0.972, h: 0.48, fontFace: HEAD, fontSize: 24, color: WHITE });
++    text(s, r.label, { x: 2.443, y: r.ly, w: 3.86, h: 0.48, fontFace: HEAD, fontSize: 24, color: WHITE });
++    text(s, 'Lorem ipsum dolor sit amet, consec\ntetur adipiscing elit. Proin bibendum risus sit amet.',
++      Object.assign({}, LEAD, { x: 6.669, y: r.by, w: 2.702, h: 0.743, color: WHITE, lineSpacingMultiple: 1.3 }));
++  });
++  chrome(s, { color: WHITE });
++}
++
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  gradientRect(s, 0, 0.564, W, 2.906, { stop: 0.49 });
++  text(s, 'EDUCATING AND SUPPORTING PUBLIC HEALTH',
++    Object.assign({}, TITLE, { x: 0.38, y: 0.957, w: 5.706, h: 2.121, color: WHITE }));
++  [{ y: 1.063, label: 'AWARENESS' }, { y: 2.017, label: 'WELLNESS EVENTS' }].forEach(function (c) {
++    box(s, 'rect', { x: 6.467, y: c.y, w: 3.033, h: 0.954, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
++    text(s, c.label, Object.assign({}, SECTION, { x: 6.677, y: c.y + 0.147, w: 2.614, h: 0.379, color: WHITE }));
++    arrowGlyph(s, 6.702, c.y + 0.532, 0.187, 0.227, WHITE, 315);
++  });
++  text(s, 'COMMUNITY ENGAGEMENT', { x: 0.402, y: 3.704, w: 5.328, h: 0.48, fontFace: HEAD, fontSize: 24, color: PINK });
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut. ',
++    Object.assign({}, LEAD, { x: 0.441, y: 4.2, w: 6.661, h: 0.694 }));
++  pill(s, 7.4, 4.235);
++  chrome(s);
++}
++
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  gradientRect(s, 5.67, 2.57, 1.682, 2.207, {});
++  text(s, 'Market Size', { x: 5.815, y: 3.818, w: 1.296, h: 0.278, fontFace: BODY, fontSize: 12, color: WHITE });
++  text(s, '11%', { x: 5.824, y: 4.095, w: 1.296, h: 0.581, fontFace: HEAD, fontSize: 30, color: WHITE });
++  gradientRect(s, 7.818, 1.098, 1.682, 3.679, {});
++  text(s, 'Lorem ipsum dolor sit amet, consectetur sed do adipiscing',
++    Object.assign({}, LEAD, { x: 8.032, y: 1.294, w: 1.267, h: 0.906, color: WHITE }));
++  text(s, 'Global Trends', { x: 8.012, y: 3.818, w: 1.407, h: 0.278, fontFace: BODY, fontSize: 12, color: WHITE });
++  text(s, '21%', { x: 7.978, y: 4.095, w: 1.423, h: 0.581, fontFace: HEAD, fontSize: 30, color: WHITE });
++  text(s, '+13%', { x: 5.63, y: 1.026, w: 1.39, h: 0.682, fontFace: HEAD, fontSize: 36, color: PINK });
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint.', Object.assign({}, SMALL, { x: 5.65, y: 1.648, w: 1.632, h: 0.366, fontSize: 8 }));
++  text(s, 'INDUSTRY OVERVIEW', Object.assign({}, TITLE, { x: 0.367, y: 0.879, w: 3.573, h: 1.439 }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venen atis tristique. Morbi tortor justo, porta eget consequat ac, semper sit amet sem. Donec condimentum.',
++    Object.assign({}, LEAD, { x: 0.425, y: 2.973, w: 4.051, h: 0.972, lineSpacingMultiple: 1.3 }));
++  pill(s, 0.5, 4.298);
++  text(s, '211K', Object.assign({}, STAT, { x: 3.034, y: 4.298, w: 0.907, h: 0.48 }));
++  text(s, 'Lorem ipsum dolor.', Object.assign({}, SMALL, { x: 4.03, y: 4.298, w: 0.894, h: 0.424 }));
++  chrome(s);
++}
++
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  ring(s, 4.25, -0.342, 6.35, PINK, 82);
++  ring(s, 4.971, 0.366, 4.933, PINK, 50);
++  photo(s, 5.651, 1.038, 3.549, 3.549, { round: true });
++  text(s, "A TRUSTED PHARMACY ISN'T JUST WHERE MEDICINE IS DISPENSED—IT'S WHERE CARE, KNOWLEDGE",
++    { x: 0.427, y: 0.635, w: 5.773, h: 3.408, fontFace: HEAD, fontSize: 33, color: PINK });
++  arrowGlyph(s, 0.62, 4.132, 0.501, 0.599, PINK, 315);
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor inc\nididunt ut labore et dolore.',
++    Object.assign({}, LEAD, { x: 1.208, y: 4.16, w: 2.996, h: 0.694 }));
++  chrome(s);
++}
++
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  pinkPage(s);
++  ring(s, 4.769, -1.356, 6.294, WHITE, 89);
++  ring(s, 5.516, -0.595, 4.8, WHITE, 70);
++  ring(s, 6.199, 0.08, 3.449, WHITE, 38);
++  ring(s, 6.898, 0.779, 2.051, WHITE, 38);
++  text(s, 'CONNECT WITH US', { x: 0.42, y: 0.609, w: 5.684, h: 2.499, fontFace: HEAD, fontSize: 72, color: WHITE });
++  photo(s, 6.551, 0.847, 2.73, 1.887);
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies.',
++    Object.assign({}, LEAD, { x: 5.371, y: 3.347, w: 3.985, h: 0.743, color: WHITE, lineSpacingMultiple: 1.3 }));
++  [
++    { x: 5.387, w: 1.38, label: 'Phone', value: '+1234567890' },
++    { x: 6.66, w: 1.528, label: 'Website', value: 'www.web.com' },
++    { x: 8.101, w: 1.092, label: 'Email', value: 'mail@mail.com' },
++  ].forEach(function (c) {
++    text(s, c.label, { x: c.x, y: 4.181, w: c.w, h: 0.32, fontFace: HEAD, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.3 });
++    text(s, c.value, Object.assign({}, LEAD, { x: c.x, y: 4.501, w: c.w, h: 0.289, color: WHITE, lineSpacingMultiple: 1.3 }));
++  });
++  arrowGlyph(s, 0.524, 3.413, 0.375, 0.448, WHITE, 315);
++  text(s, 'OFFICE ADDRESS:', { x: 1.05, y: 3.346, w: 2.972, h: 0.502, fontFace: HEAD, fontSize: 21, color: WHITE });
++  text(s, 'Orlando City, Downtown, Main Street 233, Building A, 4th Floor, Suite 405, Near City Park, Florida, 32801, United States',
++    Object.assign({}, LEAD, { x: 1.061, y: 3.848, w: 3.147, h: 0.743, color: WHITE, lineSpacingMultiple: 1.3 }));
++  chrome(s, { color: WHITE });
++}
++
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  text(s, 'HISTORY OF PHARMACY', Object.assign({}, TITLE, { x: 0.375, y: 0.636, w: 3.733, h: 1.439 }));
++  box(s, 'rect', { x: 4.839, y: 0.718, w: 4.661, h: 1.357, fill: { color: BLUSH, transparency: 60 } });
++  text(s, 'IMPORTANCE OF A SOCIAL', Object.assign({}, SECTION, { x: 5.07, y: 0.857, w: 4.124, h: 0.379 }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ',
++    Object.assign({}, LEAD, { x: 5.087, y: 1.221, w: 4.197, h: 0.694, color: PINK }));
++  const items = [
++    { x: 0.5, cx: 0.553, date: 'January 24' },
++    { x: 2.797, cx: 2.787, date: 'February 29' },
++    { x: 5.114, cx: 5.111, date: 'March 28' },
++    { x: 7.444, cx: 7.436, date: 'April 21' },
++  ];
++  items.forEach(function (it, i) {
++    photo(s, [0.5, 2.83, 5.161, 7.491][i], 2.4, 2.009, 1.543);
++    s.addText([
++      { text: it.date, options: { fontFace: HEAD, fontSize: 15, color: PINK } },
++      { text: 'th', options: { fontFace: HEAD, fontSize: 15, color: PINK, superscript: true } },
++      { text: ' ', options: { fontFace: HEAD, fontSize: 15, color: PINK } },
++    ], { x: it.x, y: 4.015, w: 1.8, h: 0.328, valign: 'top', align: 'left', margin: INSET });
++    text(s, 'Lorem ipsum dolor sit amet. Qui sint.', Object.assign({}, SMALL, { x: it.cx, y: 4.343, w: 1.956, h: 0.422 }));
++  });
++  chrome(s);
++}
++
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  box(s, 'rect', { x: -0.004, y: 4.004, w: 10.004, h: 1.357, fill: { color: BLUSH, transparency: 60 } });
++  text(s, 'DIFFERENT PHARMACY MODELS', Object.assign({}, TITLE, { x: 5.784, y: 0.825, w: 3.56, h: 2.121 }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod temporLorem ipsum dolor sit amet, consectetur sed. dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod temporLorem ipsum dolor sit amet, consectetur sed.',
++    Object.assign({}, LEAD, { x: 0.656, y: 0.869, w: 4.587, h: 0.906 }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod temporLorem ipsum dolor sit amet, consectetur sed. dolor sit amet, consectetur',
++    Object.assign({}, LEAD, { x: 0.656, y: 2.039, w: 4.587, h: 0.694 }));
++  pill(s, 0.704, 3.201);
++  text(s, 'Lorem ipsum dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod',
++    Object.assign({}, LEAD, { x: 5.817, y: 3.075, w: 3.066, h: 0.482 }));
++  [
++    { x: 0.578, v: '110%', c: BLACK },
++    { x: 3.087, v: '211K', c: PINK },
++    { x: 5.596, v: '30%', c: BLACK },
++    { x: 8.106, v: '30$', c: PINK },
++  ].forEach(function (it) {
++    stat(s, it.x, 4.32, it.v, 'Lorem ipsum dolor.', { color: it.c });
++  });
++  chrome(s);
++}
++
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  pinkPage(s);
++  ring(s, 5.961, 1.6, 7.078, WHITE, 89);
++  ring(s, 6.801, 2.456, 5.398, WHITE, 70);
++  ring(s, 7.57, 3.215, 3.879, WHITE, 38);
++  ring(s, 8.356, 4.001, 2.307, WHITE, 38);
++  text(s, 'BEHIND THE COUNTER', Object.assign({}, TITLE, { x: 5.357, y: 0.977, w: 3.879, h: 1.439, color: WHITE }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod temporLorem ipsum dolor sit amet, consectetur sed. dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod temporLorem ipsum dolor sit amet, consectetur sed.',
++    Object.assign({}, LEAD, { x: 5.378, y: 2.51, w: 3.615, h: 1.33, color: WHITE }));
++  pill(s, 5.469, 4.074, { light: true });
++  photo(s, 0.5, 1.163, 4.017, 2.512);
++  text(s, 'OVERVIEW OF DISPENSING', Object.assign({}, CARD_HEAD, { x: 0.441, y: 3.813, w: 4.076, h: 0.328, color: WHITE }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod',
++    Object.assign({}, LEAD, { x: 0.441, y: 4.206, w: 4.189, h: 0.482, color: WHITE }));
++  chrome(s, { color: WHITE });
++}
++
++/* Dotted world map of slide 16: '.' = grey dot, '#' = accent dot. */
++const WORLD_MAP = [
++  '                                                   ....  ...       .. ..   .......',
++  '                                             .............        ...          .... ..  ....',
++  '                                      ...................            .       ..    .. ........',
++  '                                   ....................           ..............................#',
++  '                               .......       .............      ................................########',
++  '                           . . ...........   ....     ..     . .................................#########... .',
++  '                          ...............     ..           ..   ................................########........',
++  '                       ................ .                  ........................................####............',
++  '                    ............ . .......                  ..........................................................',
++  '                  ............   ......... .                 ............................................................',
++  '             ..................... .........               ....   .. .........................................  .........',
++  '          ...............................                  ........  .. .......................................  ..  .  ..',
++  '       ...............................                     ......... ..    .....................................  ....',
++  '      ......    ...................                      ....................................................  .  ..',
++  '    .....        .................                       ........................ ............................ .. .',
++  '    ... .        ................     . .      .. .    ..............................  ...................   ........ .',
++  '     .          ................      ...              ..............................    ..................  .   ....',
++  '   . .           ..........   ...    ...      ..       .............................      ....  .............    .....  ..',
++  ' ....             . .....    ... .. ..          ..     .........................          ...     .......    . .   .........',
++  '...                ...... ..  . .. .           .   .   . ..........................         .       ....    .. ..   .. ......',
++  '                    ........# .      #                     ...  .................             .     . ...   .. ...    ..  .....',
++  '                        ....   #########                          .............. .                  ...      ....      ... . .',
++  '                           .###############                      ..............                      ..    .. . .. . . .....',
++  '                              #################                    ...........                       ......... .        ...',
++  '                             ##################                     ............                      . ....... .',
++  '                            .###################                    ...........    .                   . ..  . . ..',
++  '                             #################                     ............. ..                    .  ..   .     .... .',
++  '                            ##################                     ...........   ..                  . ....   .      .......',
++  '                              ###############                       ........     ..                   ....... .   .......  . .',
++  '                               ###########                          ........                           .       ...........',
++  '                               ##########                            ......                             .     ...............',
++  '                               #########                                                                      ..............',
++  '                                #######                                                                         ...............',
++  '                               ######   #                                                                       ..... .........',
++  '                              ####    ## #                                                                              ........',
++  '                              ####     ## #                                                                               .....',
++  '                              ###   #',
++  '                               ##',
++];
++
++function worldMap(slide, x0, y0, w, h) {
++  const cols = 128, rows = WORLD_MAP.length;
++  const dx = w / (cols - 1), dy = h / (rows - 1);
++  WORLD_MAP.forEach(function (line, r) {
++    for (let c = 0; c < line.length; c++) {
++      const ch = line[c];
++      if (ch === ' ') continue;
++      slide.addShape('ellipse', {
++        x: x0 + c * dx - 0.019, y: y0 + r * dy - 0.014, w: 0.038, h: 0.028,
++        fill: { color: ch === '#' ? PINK : 'BFBFBF' },
++      });
++    }
++  });
++}
++
++/** Map marker: teardrop rotated to point down, with a punched-out centre. */
++function mapPin(slide, x, y, w, h) {
++  slide.addShape('teardrop', { x: x, y: y, w: w, h: w, rotate: 135, fill: { color: PINK } });
++  slide.addShape('ellipse', { x: x + w * 0.3, y: y + w * 0.24, w: w * 0.4, h: w * 0.4, fill: { color: WHITE } });
++}
++
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  worldMap(s, 0.501, 1.191, 8.996, 2.594);
++  mapPin(s, 2.977, 2.774, 0.208, 0.312);
++  text(s, 'Place 01', { x: 0.653, y: 2.736, w: 1.788, h: 0.303, fontFace: HEAD, fontSize: 14, color: PINK });
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.',
++    Object.assign({}, SMALL, { x: 0.653, y: 3.029, w: 1.788, h: 0.602, color: GREY_D }));
++  mapPin(s, 7.476, 1.222, 0.208, 0.312);
++  text(s, 'Place 02', { x: 7.832, y: 0.814, w: 1.583, h: 0.303, fontFace: HEAD, fontSize: 14, color: PINK });
++  text(s, 'Lorem ipsum dolor.', Object.assign({}, SMALL, { x: 7.832, y: 1.069, w: 1.336, h: 0.239, color: GREY_D }));
++  box(s, 'rect', { x: 5.537, y: 3.047, w: 3.962, h: 0.698, fill: { color: BLUSH, transparency: 60 } });
++  box(s, 'rect', { x: 5.745, y: 3.203, w: 0.395, h: 0.395, fill: { color: PINK } });
++  arrowGlyph(s, 5.833, 3.325, 0.22, 0.15, WHITE);
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint.',
++    Object.assign({}, SMALL, { x: 6.291, y: 3.195, w: 1.354, h: 0.392, fontSize: 8, color: PINK }));
++  text(s, '48,21%', { x: 7.467, y: 3.12, w: 1.793, h: 0.53, align: 'right', valign: 'top', margin: INSET, fontFace: BODY, fontSize: 27, color: PINK });
++  text(s, 'GLOBAL PHARMACY MARKET', {
++    x: 1.063, y: 4.002, w: 7.873, h: 0.682, align: 'center', fontFace: HEAD, fontSize: 36, color: PINK,
++  });
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod.',
++    Object.assign({}, LEAD, { x: 2.406, y: 4.683, w: 5.188, h: 0.27, align: 'center', color: PINK }));
++  chrome(s);
++}
++
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  const cards = [
++    { x: 0.5, dark: false, head: 'FDA' },
++    { x: 2.806, dark: true, head: 'WHO' },
++    { x: 5.111, dark: false, head: 'GMP' },
++    { x: 7.417, dark: true, head: 'local licensing' },
++  ];
++  cards.forEach(function (c) {
++    if (c.dark) gradientRect(s, c.x, 2.812, 2.083, 2.062, {});
++    else box(s, 'rect', { x: c.x, y: 2.812, w: 2.083, h: 2.062, fill: { color: BLUSH, transparency: 60 } });
++    const fg = c.dark ? WHITE : PINK;
++    text(s, c.head, Object.assign({}, CARD_HEAD, { x: c.x + 0.222, y: 3.043, w: 1.711, h: 0.328, color: fg }));
++    text(s, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore',
++      Object.assign({}, LEAD, { x: c.x + 0.222, y: 3.371, w: 1.624, h: 1.118, color: c.dark ? WHITE : BLACK }));
++  });
++  text(s, 'ENSURING SAFETY AND COMPLIANCE', Object.assign({}, TITLE, { x: 0.401, y: 0.888, w: 5.96, h: 1.439 }));
++  rule(s, 6.456, 1.135, 3.044, { width: 0.75 });
++  rule(s, 6.456, 1.648, 3.044, { width: 0.75, transparency: 56 });
++  rule(s, 6.456, 2.14, 3.044, { width: 0.75, transparency: 76 });
++  chrome(s);
++}
++
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  text(s, 'PRESCRIPTION PROCESS', Object.assign({}, TITLE, { x: 0.392, y: 0.816, w: 7.599, h: 0.757 }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod',
++    Object.assign({}, LEAD, { x: 0.441, y: 1.569, w: 5.851, h: 0.27 }));
++  rule(s, 0.524, 2.741, 8.964, { width: 1.25 });
++  const steps = [
++    { mark: 0.5, x: 0.434, phase: 'Phase 1', head: 'PROCESS 01', body: 'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do' },
++    { mark: 2.873, x: 2.82, phase: 'Phase 2', head: 'PROCESS 02', body: 'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do eiusmod tempor' },
++    { mark: 5.392, x: 5.347, phase: 'Phase 3', head: 'PROCESS 03', body: 'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do eiusmod tempor' },
++    { mark: 7.749, x: 7.7, phase: 'Phase 4', head: 'PROCESS 04', body: 'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do' },
++  ];
++  steps.forEach(function (st) {
++    gradientRect(s, st.mark, 2.617, 0.242, 0.242, { stop: 0.59 });
++    box(s, 'custGeom', {
++      x: st.mark + 0.05, y: 2.694, w: 0.138, h: 0.095,
++      line: { color: WHITE, width: 1.25 },
++      points: [{ x: 0, y: 0.05 }, { x: 0.05, y: 0.095 }, { x: 0.138, y: 0 }],
++    });
++    text(s, st.phase, { x: st.x, y: 3.193, w: 1.634, h: 0.278, fontFace: BODY, fontSize: 12, color: BLACK });
++    text(s, st.head, Object.assign({}, CARD_HEAD, { x: st.x, y: 3.593, w: 1.86, h: 0.328 }));
++    text(s, st.body, Object.assign({}, SMALL, { x: st.x, y: 3.951, w: 1.86, h: 0.7 }));
++  });
++  chrome(s);
++}
++
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  pinkPage(s);
++  ring(s, 4.41, -0.727, 7.078, WHITE, 89);
++  ring(s, 5.25, 0.129, 5.398, WHITE, 70);
++  ring(s, 6.019, 0.889, 3.879, WHITE, 38);
++  ring(s, 6.805, 1.675, 2.307, WHITE, 38);
++  text(s, 'MEDICATION ADHERENCE', Object.assign({}, TITLE, { x: 0.408, y: 0.881, w: 4.342, h: 1.439, color: WHITE }));
++  arrowGlyph(s, 4.549, 1.724, 0.375, 0.448, WHITE, 315);
++  photo(s, 0.5, 2.644, 2.042, 2.124);
++  photo(s, 6.398, 1.067, 3.102, 3.701);
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venen atis tristique. Morbi tortor justo, porta eget consequat ac, semper sit amet sem. Donec condimentum.',
++    Object.assign({}, LEAD, { x: 3.021, y: 2.629, w: 2.971, h: 1.198, color: WHITE, lineSpacingMultiple: 1.3 }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit.',
++    Object.assign({}, LEAD, { x: 3.021, y: 4.025, w: 3.191, h: 0.509, color: WHITE, italic: true, lineSpacingMultiple: 1.3 }));
++  chrome(s, { color: WHITE });
++}
++
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  ring(s, -0.853, -0.845, 7.315, PINK, 0);
++  // Full-height blob rounded on its right edge; its glow sits low and right.
++  const glow = { fx: 5.6, fy: 5.6, run: gradientRun(5.625, 5.642) };
++  gradientRect(s, 0, -0.008, 2.82, 5.642, { fx: glow.fx, fy: glow.fy, run: glow.run });
++  gradientHalfDisc(s, 2.82, 2.813, 2.82, glow);
++  text(s, 'MONITORING DRUG SAFETY', Object.assign({}, TITLE, { x: 0.748, y: 1.208, w: 4.252, h: 1.439, color: WHITE }));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod temporLorem ipsum dolor sit amet, consectetur sed. dolor sit amet, consectetur seddo adipiscing elit, seddo eiusmod temporLorem ipsum dolor sit amet, consectetur sed.',
++    Object.assign({}, LEAD, { x: 0.799, y: 2.812, w: 3.615, h: 1.33, color: WHITE }));
++  pill(s, 0.891, 4.377, { light: true });
++  [
++    { dot: [5.775, 0.768], x: 6.54, y: 0.493 },
++    { dot: [6.295, 2.096], x: 7.065, y: 1.761 },
++    { dot: [6.258, 3.431], x: 7.065, y: 3.085 },
++    { dot: [5.642, 4.806], x: 6.54, y: 4.353 },
++  ].forEach(function (it) {
++    box(s, 'ellipse', { x: it.dot[0], y: it.dot[1], w: 0.242, h: 0.242, fill: { color: PINK, transparency: 80 } });
++    box(s, 'ellipse', { x: it.dot[0] + 0.051, y: it.dot[1] + 0.051, w: 0.139, h: 0.139, fill: { color: PINK } });
++    text(s, '30%', Object.assign({}, STAT, { x: it.x, y: it.y, w: 1.222, h: 0.48 }));
++    text(s, 'Lorem ipsum dolor sit amet, consectetur sed do adipiscing',
++      Object.assign({}, SMALL, { x: it.x, y: it.y + 0.377, w: 2.027, h: 0.424 }));
++  });
++  chrome(s, { color: WHITE, kicker: false, year: BLACK });
++}
++
++/* -------------------------------------------------------------------- main */
++
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'DECK', width: W, height: H });
++  pptx.layout = 'DECK';
++  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++  pptx.title = 'Medical Pharmacy Innovations';
++  BUILDERS.forEach(function (fn) { fn(pptx); });
++  return pptx;
++}
++
++build().writeFile({ fileName: path.join(__dirname, '141edebe-ddcc-4088-8f56-2848b5ef9176_grok_final.pptx') })
++  .then(function (f) { console.log('wrote', f); })
++  .catch(function (e) { console.error(e); process.exit(1); });

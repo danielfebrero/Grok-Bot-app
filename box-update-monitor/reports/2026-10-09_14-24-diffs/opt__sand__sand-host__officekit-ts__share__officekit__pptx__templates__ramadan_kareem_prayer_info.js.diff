@@ -1,0 +1,918 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/ramadan_kareem_prayer_info.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/ramadan_kareem_prayer_info.js
+@@ -0,0 +1,915 @@
++/**
++ * Ramadan Kareem - 22 slide deck, rebuilt with PptxGenJS.
++ * Run: node 0e9f91db-ef02-4b92-ad26-1428483a2ea8_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++
++const NAVY = '14336C';
++const GOLD = 'AC822B';
++const YELLOW = 'FFCC0D';
++const AMBER = 'FFC000';
++const BLUE = '4472C4';
++const BLACK = '000000';
++const WHITE = 'FFFFFF';
++const GREY_LINE = 'BFBFBF';
++const GREY_BAND = 'F2F2F2';
++
++function blend(c1, c2, t) {
++	let out = '';
++	for (let i = 0; i < 3; i++) {
++		const a = parseInt(c1.substr(i * 2, 2), 16);
++		const b = parseInt(c2.substr(i * 2, 2), 16);
++		out += Math.round(a + (b - a) * t).toString(16).padStart(2, '0');
++	}
++	return out.toUpperCase();
++}
++/** Point on the deck's signature navy (top) -> gold (bottom) ramp. */
++const tone = f => blend(NAVY, GOLD, f);
++const NAVY_GOLD = tone(0.5);
++const GOLD_NAVY = blend(GOLD, NAVY, 0.7);      // gold -> navy ramp (Esha tile, quote marks)
++const HOLD = -0.205;                           // mosque gradients stay navy for the first 17%
++
++/* -------------------------------------------------------------- typography */
++
++const POPPINS = 'Poppins';
++const POPPINS_MED = 'Poppins Medium';
++const POPPINS_SEMI = 'Poppins SemiBold';
++const JOST = 'Jost';
++const JOST_SEMI = 'Jost SemiBold';
++const MARGIN = [7.2, 7.2, 3.6, 3.6]; // lIns/rIns/bIns/tIns of the source deck, in points
++
++/* ------------------------------------------------------------ body copy */
++
++const LEAD = 'There are many variations of passages of Lorem Ipsum available, but the have suffered alteration in some form, by ';
++const MID = 'are many variations of passages ';
++const TAIL = 'many variations of passages of Lorem Ipsum available, but the have suffered alteration in some form, by injected humor, or randomized words which.';
++
++const LOREM_FULL = LEAD + MID + TAIL + ' are many variations of passages';
++const LOREM_MED = LEAD + MID + 'many variations of passages of Lorem Ipsum available, but the have suffered';
++const LOREM_INJ = LEAD + MID + 'many variations of passages of Lorem Ipsum available, but the have suffered alteration in some form, by injected';
++const LOREM_SHORT = LEAD + MID + 'many';
++const LOREM_TINY = LEAD + 'are many variations';
++const LOREM_ONE = LEAD + 'injected';
++
++const CARD_BODY = 'There are many variations of passages of Lorem Ipsum available, but the variations of passages are many variations of passages';
++const TILE_BODY = 'There are many variations of passages of Lorem Ipsum available, ';
++const GUIDE_BODY = 'There are many variations of passages of Lorem Ipsum available, are many variations of passages of Lorem Ipsum available, are many variations of passages';
++const IFTAR_BODY = 'There are many variations of passages of Lorem Ipsum available, are many variations of passages of Lorem Ipsum';
++const MINI_BODY = 'There are many variations of passages of Lorem Ipsum available, but the variations';
++const RAMADAN_LINES = ['Ramadan', 'Kareem Experience And Try To Create Pray For Insights'];
++const TICKS = ['The have suffered alteration', 'Passages of Lorem Ipsum available, ', 'There are many variations '];
++/** Same three lines, in the wider boxes used by the 12pt tick lists. */
++const TICK_ROWS = [
++	{ text: TICKS[0], x: 1.565, w: 2.213 },
++	{ text: TICKS[1], x: 1.586, w: 2.642 },
++	{ text: TICKS[2], x: 1.565, w: 1.974 },
++];
++
++/* --------------------------------------------------- custom geometry paths */
++
++/* Ornate arch frame (hero panel on slides 1, 7 and 22). */
++const ARCH = [['M', 0.681, 1], ['L', 0.319, 1], ['C', 0.29, 1, 0.268, 0.987, 0.254, 0.962],
++	['C', 0.236, 0.929, 0.237, 0.887, 0.237, 0.875], ['C', 0.212, 0.874, 0.193, 0.863, 0.183, 0.842],
++	['C', 0.171, 0.818, 0.173, 0.787, 0.174, 0.777], ['C', 0.161, 0.776, 0.107, 0.767, 0.107, 0.668],
++	['C', 0.107, 0.568, 0.017, 0.505, 0.009, 0.503], ['L', 0, 0.5], ['L', 0.009, 0.497],
++	['C', 0.01, 0.497, 0.107, 0.438, 0.107, 0.332], ['C', 0.107, 0.233, 0.161, 0.224, 0.174, 0.223],
++	['C', 0.173, 0.213, 0.171, 0.182, 0.183, 0.158], ['C', 0.193, 0.137, 0.212, 0.126, 0.237, 0.125],
++	['C', 0.237, 0.113, 0.236, 0.071, 0.254, 0.038], ['C', 0.268, 0.013, 0.29, 0, 0.319, 0], ['L', 0.681, 0],
++	['C', 0.71, 0, 0.732, 0.013, 0.746, 0.038], ['C', 0.764, 0.071, 0.763, 0.113, 0.763, 0.125],
++	['C', 0.788, 0.126, 0.807, 0.137, 0.817, 0.158], ['C', 0.829, 0.182, 0.827, 0.213, 0.826, 0.223],
++	['C', 0.839, 0.224, 0.893, 0.233, 0.893, 0.332], ['C', 0.893, 0.438, 0.99, 0.497, 0.991, 0.497],
++	['L', 1, 0.5], ['L', 0.991, 0.503], ['C', 0.983, 0.505, 0.893, 0.568, 0.893, 0.668],
++	['C', 0.893, 0.767, 0.839, 0.776, 0.826, 0.777], ['C', 0.827, 0.787, 0.829, 0.818, 0.817, 0.842],
++	['C', 0.807, 0.863, 0.788, 0.874, 0.763, 0.875], ['C', 0.763, 0.887, 0.764, 0.929, 0.746, 0.962],
++	['C', 0.732, 0.987, 0.71, 1, 0.681, 1], ['Z']];
++
++/* Winged content card used for the "Your Title Text Here" panels. */
++const CARD = [['M', 0.234, 0.126], ['C', 0.154, 0.126, 0.171, 0.224, 0.171, 0.224],
++	['C', 0.157, 0.224, 0.102, 0.232, 0.102, 0.331], ['C', 0.102, 0.437, 0.005, 0.498, 0, 0.5],
++	['C', 0.005, 0.502, 0.102, 0.563, 0.102, 0.669], ['C', 0.102, 0.768, 0.157, 0.776, 0.171, 0.776],
++	['C', 0.171, 0.776, 0.154, 0.874, 0.234, 0.874], ['C', 0.234, 0.874, 0.223, 1, 0.316, 1],
++	['C', 0.393, 1, 0.593, 1, 0.684, 1], ['C', 0.777, 1, 0.766, 0.874, 0.766, 0.874],
++	['C', 0.846, 0.874, 0.829, 0.776, 0.829, 0.776], ['C', 0.843, 0.776, 0.898, 0.768, 0.898, 0.669],
++	['C', 0.898, 0.563, 0.995, 0.502, 1, 0.5], ['C', 0.995, 0.498, 0.898, 0.437, 0.898, 0.331],
++	['C', 0.898, 0.232, 0.843, 0.224, 0.829, 0.224], ['C', 0.829, 0.224, 0.846, 0.126, 0.766, 0.126],
++	['C', 0.766, 0.126, 0.777, 0, 0.684, 0], ['C', 0.593, 0, 0.393, 0, 0.316, 0],
++	['C', 0.223, 0, 0.234, 0.126, 0.234, 0.126], ['Z']];
++
++/* Rounded eight-lobed blob (slide 19 photo frame). */
++const BLOB = [['M', 0.948, 0.403], ['L', 0.883, 0.337], ['L', 0.883, 0.257],
++	['C', 0.883, 0.173, 0.818, 0.107, 0.737, 0.107], ['L', 0.659, 0.107], ['L', 0.593, 0.04],
++	['C', 0.568, 0.014, 0.536, 0, 0.499, 0], ['C', 0.464, 0, 0.431, 0.014, 0.405, 0.04],
++	['L', 0.341, 0.107], ['L', 0.263, 0.107], ['C', 0.182, 0.107, 0.116, 0.173, 0.116, 0.257],
++	['L', 0.116, 0.337], ['L', 0.052, 0.403], ['C', 0, 0.456, 0, 0.543, 0.052, 0.596], ['L', 0.116, 0.663],
++	['L', 0.116, 0.743], ['C', 0.116, 0.827, 0.182, 0.893, 0.263, 0.893], ['L', 0.341, 0.893],
++	['L', 0.405, 0.96], ['C', 0.431, 0.986, 0.464, 1, 0.499, 1], ['C', 0.536, 1, 0.568, 0.986, 0.593, 0.96],
++	['L', 0.659, 0.893], ['L', 0.737, 0.893], ['C', 0.818, 0.893, 0.883, 0.827, 0.883, 0.743],
++	['L', 0.883, 0.663], ['L', 0.948, 0.596], ['C', 1, 0.543, 1, 0.456, 0.948, 0.403], ['Z']];
++
++/* Single 66-style quotation glyph (the deck draws two of them side by side). */
++const QUOTE = [['M', 0.028, 1], ['L', 0, 0.957], ['C', 0.15, 0.926, 0.262, 0.888, 0.346, 0.851],
++	['C', 0.43, 0.814, 0.505, 0.766, 0.561, 0.702], ['C', 0.654, 0.612, 0.71, 0.527, 0.729, 0.441],
++	['C', 0.664, 0.452, 0.608, 0.457, 0.57, 0.457], ['C', 0.439, 0.457, 0.346, 0.436, 0.262, 0.394],
++	['C', 0.187, 0.351, 0.15, 0.298, 0.15, 0.234], ['C', 0.15, 0.17, 0.187, 0.112, 0.262, 0.069],
++	['C', 0.346, 0.021, 0.439, 0, 0.542, 0], ['C', 0.682, 0, 0.785, 0.032, 0.869, 0.09],
++	['C', 0.953, 0.154, 1, 0.234, 1, 0.335], ['C', 1, 0.431, 0.953, 0.532, 0.869, 0.628],
++	['C', 0.785, 0.723, 0.673, 0.803, 0.533, 0.867], ['C', 0.393, 0.936, 0.224, 0.979, 0.028, 1], ['Z']];
++
++/* Hand drawn tick used in the bullet lists. */
++const CHECK = [['M', 0.972, 0], ['L', 1, 0.029], ['C', 0.889, 0.118, 0.778, 0.235, 0.639, 0.412],
++	['C', 0.528, 0.588, 0.417, 0.735, 0.361, 0.882], ['L', 0.306, 0.941], ['C', 0.25, 0.971, 0.222, 1, 0.222, 1],
++	['C', 0.222, 0.971, 0.194, 0.941, 0.167, 0.882], ['L', 0.167, 0.853],
++	['C', 0.111, 0.765, 0.111, 0.706, 0.083, 0.676], ['C', 0.056, 0.647, 0.028, 0.618, 0, 0.618],
++	['C', 0.028, 0.559, 0.083, 0.529, 0.139, 0.529], ['C', 0.167, 0.529, 0.222, 0.588, 0.25, 0.676],
++	['L', 0.278, 0.735], ['C', 0.361, 0.588, 0.472, 0.441, 0.583, 0.324],
++	['C', 0.722, 0.176, 0.833, 0.059, 0.972, 0], ['Z']];
++
++/* Eight pointed star (badges behind the tile icons). */
++const OCTAGRAM = [['M', 0.854, 0.146], ['L', 0.854, 0.354], ['L', 1, 0.5], ['L', 0.854, 0.646],
++	['L', 0.854, 0.854], ['L', 0.646, 0.854], ['L', 0.5, 1], ['L', 0.354, 0.854], ['L', 0.146, 0.854],
++	['L', 0.146, 0.646], ['L', 0, 0.5], ['L', 0.146, 0.354], ['L', 0.146, 0.146], ['L', 0.354, 0.146],
++	['L', 0.5, 0], ['L', 0.646, 0.146], ['Z']];
++
++/* Pill with one rounded end (price tags on slide 10). */
++const TAG = [['M', 0, 0], ['L', 0.844, 0], ['C', 0.93, 0, 1, 0.224, 1, 0.5], ['L', 1, 0.5],
++	['C', 1, 0.776, 0.93, 1, 0.844, 1], ['L', 0, 1], ['Z']];
++
++/* Left hand navy sidebar with a bulging right edge (slides 6 and 11). */
++const SIDEBAR = [['M', 0, 0], ['L', 0.581, 0], ['C', 0.812, 0, 1, 0.048, 1, 0.106], ['L', 1, 0.894],
++	['C', 1, 0.953, 0.812, 1, 0.581, 1], ['L', 0, 1], ['Z']];
++
++/* Mosque silhouette pieces (bottom corners of the title / closing slides). */
++const DOME = [['M', 0.597, 0.23], ['C', 0.632, 0.067, 0.517, 0.007, 0.497, 0],
++	['C', 0.478, 0.007, 0.363, 0.067, 0.403, 0.23], ['C', 0.403, 0.23, 0, 0.452, 0.08, 1], ['L', 0.915, 1],
++	['C', 1, 0.452, 0.597, 0.23, 0.597, 0.23], ['Z']];
++const SPIRE = [['M', 0, 1], ['L', 0.412, 0], ['L', 1, 1], ['Z']];
++const SMALL_DOME = [['M', 0.646, 0.638], ['C', 0.646, 0.638, 0.707, 0.466, 0.524, 0.362],
++	['L', 0.5, 0], ['L', 0.463, 0.362], ['C', 0.305, 0.483, 0.354, 0.638, 0.354, 0.638],
++	['C', 0.11, 0.793, 0, 1, 0, 1], ['L', 1, 1], ['C', 1, 1, 0.902, 0.793, 0.646, 0.638], ['Z']];
++
++/* A single mandala petal - twelve of these make one rosette. */
++const PETAL = [['M', 0.5, 0], ['C', 0.95, 0.3, 0.95, 0.7, 0.5, 1], ['C', 0.05, 0.7, 0.05, 0.3, 0.5, 0], ['Z']];
++
++/* --------------------------------------------------------- shape utilities */
++
++/** Turn a compact path table into the point list PptxGenJS expects. */
++function pts(pathData, w, h) {
++	const out = [];
++	for (const seg of pathData) {
++		if (seg[0] === 'M') out.push({ x: seg[1] * w, y: seg[2] * h, moveTo: true });
++		else if (seg[0] === 'L') out.push({ x: seg[1] * w, y: seg[2] * h });
++		else if (seg[0] === 'Z') out.push({ close: true });
++		else out.push({
++			x: seg[5] * w, y: seg[6] * h,
++			curve: { type: 'cubic', x1: seg[1] * w, y1: seg[2] * h, x2: seg[3] * w, y2: seg[4] * h },
++		});
++	}
++	return out;
++}
++
++/** Same path scaled about its own centre - used to build the arch ring. */
++function shrink(pathData, k) {
++	return pathData.map(seg => seg.map((v, i) => (i === 0 ? v : 0.5 + (v - 0.5) * k)));
++}
++
++/** Freeform shape from one of the path tables above. */
++function poly(s, pathData, o) {
++	s.addShape('custGeom', Object.assign({ points: pts(pathData, o.w, o.h) }, o));
++}
++
++/** Onion dome silhouettes that make up the lantern body. */
++const LAMP_TOP = [['M', 0.5, 0], ['C', 0.62, 0.16, 1, 0.42, 1, 1], ['L', 0, 1],
++	['C', 0, 0.42, 0.38, 0.16, 0.5, 0], ['Z']];
++const LAMP_BOTTOM = [['M', 0.5, 1], ['C', 0.62, 0.84, 1, 0.58, 1, 0], ['L', 0, 0],
++	['C', 0, 0.58, 0.38, 0.84, 0.5, 1], ['Z']];
++
++/** Regular five point star as a closed polygon, normalised to a unit box. */
++function starPath() {
++	const p = [];
++	for (let i = 0; i < 10; i++) {
++		const a = ((i * 36 - 90) * Math.PI) / 180;
++		const r = i % 2 ? 0.191 : 0.5;
++		p.push([0.5 + r * Math.cos(a), 0.5 + r * Math.sin(a)]);
++	}
++	const xs = p.map(q => q[0]);
++	const ys = p.map(q => q[1]);
++	const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
++	return p.map((q, i) => [i ? 'L' : 'M', (q[0] - x0) / (x1 - x0), (q[1] - y0) / (y1 - y0)]).concat([['Z']]);
++}
++const STAR5 = starPath();
++
++/** Flatten a path table into a polyline so it can be scanned row by row. */
++function flatten(pathData) {
++	const line = [];
++	let cur = [0, 0];
++	let start = [0, 0];
++	for (const seg of pathData) {
++		if (seg[0] === 'M') { cur = [seg[1], seg[2]]; start = cur; line.push(cur); }
++		else if (seg[0] === 'L') { cur = [seg[1], seg[2]]; line.push(cur); }
++		else if (seg[0] === 'Z') { line.push(start); }
++		else {
++			const [ax, ay, bx, by, cx2, cy2] = seg.slice(1);
++			for (let i = 1; i <= 8; i++) {
++				const t = i / 8;
++				const u = 1 - t;
++				line.push([
++					u * u * u * cur[0] + 3 * u * u * t * ax + 3 * u * t * t * bx + t * t * t * cx2,
++					u * u * u * cur[1] + 3 * u * u * t * ay + 3 * u * t * t * by + t * t * t * cy2,
++				]);
++			}
++			cur = [cx2, cy2];
++		}
++	}
++	return line;
++}
++
++/** Where a horizontal line at `y` enters and leaves the given contours. */
++function crossings(contours, y) {
++	const xs = [];
++	for (const line of contours) {
++		for (let i = 0; i < line.length - 1; i++) {
++			const [x1, y1] = line[i];
++			const [x2, y2] = line[i + 1];
++			if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) xs.push(x1 + ((y - y1) / (y2 - y1)) * (x2 - x1));
++		}
++	}
++	return xs.sort((a, b) => a - b);
++}
++
++/**
++ * Vertical navy -> gold gradient inside an arbitrary outline.
++ * PptxGenJS only emits solid fills, so the outline is painted in a mid tone and
++ * then striped with horizontal bars clipped to it, one bar per gradient step.
++ */
++function gradShape(s, pathData, o, opt = {}) {
++	const { bands = 22, from = 0, to = 1 } = opt;
++	const shade = f => tone(Math.min(1, Math.max(0, from + (to - from) * f)));
++	poly(s, pathData, { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: shade(0.5) } });
++	const outline = [flatten(pathData)];
++	for (let i = 0; i < bands; i++) {
++		const y0 = i / bands;
++		const y1 = (i + 1) / bands;
++		const a = crossings(outline, y0 + 1e-4);
++		const b = crossings(outline, y1 - 1e-4);
++		if (a.length !== b.length || a.length % 2) continue;
++		for (let k = 0; k < a.length; k += 2) {
++			const left = Math.max(a[k], b[k]);
++			const right = Math.min(a[k + 1], b[k + 1]);
++			if (right - left < 0.002) continue;
++			s.addShape('rect', {
++				x: o.x + left * o.w, y: o.y + y0 * o.h,
++				w: (right - left) * o.w, h: (y1 - y0) * o.h + 0.006,
++				fill: { color: shade((y0 + y1) / 2) },
++			});
++		}
++	}
++}
++
++/** Gradient five point star (used for the scattered star clusters). */
++function gradStar(s, x, y, size, rotate) {
++	if (rotate) { s.addShape('star5', { x, y, w: size, h: size, fill: { color: NAVY_GOLD }, rotate }); return; }
++	gradShape(s, STAR5, { x, y, w: size, h: size }, { bands: 7 });
++}
++
++/** Text box matching the source deck's insets and top anchoring. */
++function txt(s, text, o) {
++	s.addText(text, Object.assign({
++		fontFace: POPPINS, color: BLACK, valign: 'top', margin: MARGIN, align: 'left',
++	}, o));
++}
++
++/** Multi-paragraph text box (each entry becomes its own line). */
++function lines(s, arr, o) {
++	txt(s, arr.map((t, i) => ({ text: t, options: { breakLine: i < arr.length - 1 } })), o);
++}
++
++/* --------------------------------------------------------- deck decoration */
++
++/** Two-tone section heading: black line on top, gold line underneath. */
++function heading(s, top, bottom, o) {
++	txt(s, [
++		{ text: top, options: { color: BLACK, breakLine: true } },
++		{ text: bottom, options: { color: GOLD } },
++	], Object.assign({ fontFace: POPPINS_MED, fontSize: 32, lineSpacingMultiple: 1.25 }, o));
++}
++
++/** Heading whose two halves sit on one line ("Umrah Places"). */
++function inlineHeading(s, first, second, o) {
++	txt(s, [
++		{ text: first, options: { color: BLACK } },
++		{ text: second, options: { color: GOLD } },
++	], Object.assign({ fontFace: POPPINS_MED, fontSize: 32, lineSpacingMultiple: 1.25 }, o));
++}
++
++/** Rounded gradient pill + label used for the "MORE VIEW" call to action. */
++function moreViewButton(s, x, y) {
++	const w = 2.09;
++	const h = 0.542;
++	const r = h / 2;
++	// Navy is held for the first 35% of the width, then ramps to yellow.
++	const at = f => blend(NAVY, YELLOW, Math.max(0, (f - 0.35) / 0.65));
++	s.addShape('roundRect', { x, y, w, h, rectRadius: r, fill: { color: at(0) } });
++	s.addShape('ellipse', { x: x + w - h, y, w: h, h, fill: { color: at(1 - r / w / 2) } });
++	const bands = 28;
++	for (let i = 0; i < bands; i++) {
++		const f0 = i / bands;
++		const f1 = (i + 1) / bands;
++		const left = Math.max(x + r, x + f0 * w);
++		const right = Math.min(x + w - r, x + f1 * w);
++		if (right > left) s.addShape('rect', { x: left, y, w: right - left + 0.004, h, fill: { color: at((f0 + f1) / 2) } });
++	}
++	txt(s, 'MORE VIEW', { x: x + 0.07, y: y + 0.129, w: 1.948, h: 0.297, fontSize: 10, color: WHITE, align: 'center', lineSpacingMultiple: 1.4 });
++}
++
++/** The "Details :" label with its oversized quotation mark. */
++function detailsMark(s, x, y, color) {
++	poly(s, QUOTE, { x, y, w: 0.245, h: 0.435, fill: { color }, rotate: 180 });
++	poly(s, QUOTE, { x: x + 0.285, y, w: 0.245, h: 0.435, fill: { color }, rotate: 180 });
++}
++
++/** Three faint rules that sit behind the tick lists. */
++function underlines(s, x, y, w, h) {
++	for (let i = 0; i < 3; i++) {
++		s.addShape('line', { x, y: y + (h / 2) * i, w, h: 0, line: { color: GREY_LINE, width: 0.75 } });
++	}
++}
++
++/** A pair of overlapping ticks (the deck's bullet glyph). */
++function tickPair(s, x, y, color) {
++	poly(s, CHECK, { x, y, w: 0.266, h: 0.252, fill: { color } });
++	poly(s, CHECK, { x: x + 0.11, y, w: 0.266, h: 0.252, fill: { color } });
++}
++
++/** Five small stars used as a rating row. */
++function ratingStars(s, x, y) {
++	[NAVY, GOLD, YELLOW, AMBER, BLUE].forEach((c, i) => {
++		s.addShape('star5', { x: x + i * 0.1, y, w: 0.09, h: 0.09, fill: { color: c } });
++	});
++}
++
++/** One petal outline pointing away from (cx, cy) at angle `a` radians. */
++function petal(s, cx, cy, inner, len, wide, a, color, width) {
++	const r = inner + len / 2;
++	poly(s, PETAL, {
++		x: cx + Math.sin(a) * r - wide / 2, y: cy - Math.cos(a) * r - len / 2,
++		w: wide, h: len, rotate: (a * 180) / Math.PI,
++		fill: { type: 'none' }, line: { color, width },
++	});
++}
++
++/** Twelve-fold rosette: alternating navy/gold petals in two concentric rings. */
++function mandala(s, x, y, size) {
++	const cx = x + size / 2;
++	const cy = y + size / 2;
++	const lw = Math.max(0.9, size * 0.8);
++	for (let i = 0; i < 12; i++) {
++		const a = (i * Math.PI) / 6;
++		const c = i % 2 ? GOLD : NAVY;
++		petal(s, cx, cy, 0.2 * size, 0.3 * size, 0.16 * size, a, c, lw);
++		petal(s, cx, cy, 0.245 * size, 0.19 * size, 0.075 * size, a, c, lw * 0.8);
++		petal(s, cx, cy, 0.055 * size, 0.16 * size, 0.085 * size, a + Math.PI / 12, i % 2 ? NAVY : GOLD, lw * 0.85);
++	}
++	s.addShape('star12', { x: cx - 0.05 * size, y: cy - 0.05 * size, w: 0.1 * size, h: 0.1 * size, fill: { type: 'none' }, line: { color: GOLD, width: lw * 0.8 } });
++}
++
++/** Hairline ornate arch: gradient outline with the interior knocked back out. */
++function archFrame(s, x, y, w, h) {
++	gradShape(s, ARCH, { x, y, w, h }, { bands: 40 });
++	poly(s, shrink(ARCH, 0.9915), { x, y, w, h, fill: { color: WHITE } });
++}
++
++/** Ornamental five point star: gradient body with a fine inner tracery. */
++function ornateStar(s, x, y, w, h) {
++	gradShape(s, STAR5, { x, y, w, h }, { bands: 10 });
++	s.addShape('star5', { x: x + w * 0.15, y: y + h * 0.15, w: w * 0.7, h: h * 0.7, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
++	s.addShape('star5', { x: x + w * 0.33, y: y + h * 0.33, w: w * 0.34, h: h * 0.34, fill: { type: 'none' }, line: { color: WHITE, width: 0.75 } });
++}
++
++/** Hanging lantern: ring, onion dome, arcaded body and pointed base. */
++function lantern(s, x, y, w, h) {
++	s.addShape('ellipse', { x: x + w * 0.41, y, w: w * 0.18, h: h * 0.05, fill: { type: 'none' }, line: { color: NAVY, width: 1.5 } });
++	s.addShape('rect', { x: x + w * 0.44, y: y + h * 0.05, w: w * 0.12, h: h * 0.03, fill: { color: tone(0.05) } });
++	gradShape(s, LAMP_TOP, { x: x + w * 0.09, y: y + h * 0.08, w: w * 0.82, h: h * 0.24 }, { bands: 8, from: 0.08, to: 0.32 });
++	s.addShape('rect', { x: x + w * 0.04, y: y + h * 0.31, w: w * 0.92, h: h * 0.045, fill: { color: tone(0.33) } });
++	s.addShape('rect', { x: x + w * 0.1, y: y + h * 0.355, w: w * 0.8, h: h * 0.235, fill: { color: tone(0.45) } });
++	for (let i = 0; i < 3; i++) {
++		s.addShape('round2SameRect', { x: x + w * (0.18 + i * 0.22), y: y + h * 0.385, w: w * 0.15, h: h * 0.2, fill: { color: WHITE } });
++	}
++	s.addShape('rect', { x: x + w * 0.04, y: y + h * 0.59, w: w * 0.92, h: h * 0.045, fill: { color: tone(0.61) } });
++	gradShape(s, LAMP_BOTTOM, { x: x + w * 0.09, y: y + h * 0.635, w: w * 0.82, h: h * 0.28 }, { bands: 8, from: 0.64, to: 0.92 });
++	s.addShape('ellipse', { x: x + w * 0.43, y: y + h * 0.91, w: w * 0.14, h: h * 0.06, fill: { color: GOLD } });
++}
++
++/** Slimmer lantern without windows, hung at the outer edge. */
++function miniLantern(s, x, y, w, h) {
++	gradShape(s, LAMP_TOP, { x, y, w, h: h * 0.36 }, { bands: 6, to: 0.36 });
++	s.addShape('rect', { x, y: y + h * 0.34, w, h: h * 0.3, fill: { color: tone(0.5) } });
++	for (let i = 0; i < 3; i++) {
++		s.addShape('rect', { x: x + w * (0.19 + i * 0.24), y: y + h * 0.36, w: w * 0.12, h: h * 0.26, fill: { color: WHITE } });
++	}
++	gradShape(s, LAMP_BOTTOM, { x, y: y + h * 0.63, w, h: h * 0.37 }, { bands: 6, from: 0.63 });
++}
++
++/** The lantern-and-star cluster hanging from the top right of nearly every slide. */
++function hangingDecor(s) {
++	const dashed = { color: GOLD, width: 0.75, dashType: 'dashDot' };
++	s.addShape('line', { x: 12.664, y: 0, w: 0, h: 1.193, line: dashed });
++	s.addShape('line', { x: 11.887, y: 0.006, w: 0, h: 0.801, line: dashed });
++	s.addShape('line', { x: 11.079, y: 0, w: 0, h: 0.745, line: dashed });
++	miniLantern(s, 12.465, 1.169, 0.397, 0.785);
++	lantern(s, 11.503, 0.815, 0.767, 2.07);
++	ornateStar(s, 10.749, 0.715, 0.669, 0.638);
++}
++
++/** Mirrored copy of the hanging cluster (title slide only). */
++function hangingDecorLeft(s) {
++	const dashed = { color: GOLD, width: 0.75, dashType: 'dashDot' };
++	s.addShape('line', { x: 0.606, y: 0, w: 0, h: 1.193, line: dashed });
++	s.addShape('line', { x: 1.383, y: 0.001, w: 0, h: 0.801, line: dashed });
++	s.addShape('line', { x: 2.191, y: 0, w: 0, h: 0.745, line: dashed });
++	miniLantern(s, 0.408, 1.164, 0.397, 0.785);
++	lantern(s, 1.0, 0.81, 0.767, 2.07);
++	ornateStar(s, 1.852, 0.711, 0.669, 0.638);
++}
++
++/** Domes + minaret silhouette; dx shifts the whole cluster sideways. */
++function mosqueCluster(s, dx, parts) {
++	if (parts !== 'small') {
++		gradShape(s, DOME, { x: 1.266 + dx, y: 5.728, w: 2.621, h: 1.772 }, { bands: 40, from: HOLD });
++		poly(s, SPIRE, { x: 2.521 + dx, y: 5.238, w: 0.117, h: 0.538, fill: { color: NAVY } });
++	}
++	gradShape(s, SMALL_DOME, { x: 0.403 + dx, y: 6.734, w: 1.069, h: 0.766 }, { bands: 18, from: HOLD });
++	minaret(s, -0.252 + dx, 5.934, 0.814, 1.566);
++}
++
++/** Tower with an arcaded gallery, a small dome and a spire. */
++function minaret(s, x, y, w, h) {
++	poly(s, SPIRE, { x: x + w * 0.42, y, w: w * 0.16, h: h * 0.16, fill: { color: tone(0.08) } });
++	gradShape(s, SMALL_DOME, { x: x + w * 0.24, y: y + h * 0.1, w: w * 0.52, h: h * 0.22 }, { bands: 6, from: 0.1, to: 0.32 });
++	s.addShape('rect', { x: x + w * 0.28, y: y + h * 0.3, w: w * 0.44, h: h * 0.04, fill: { color: tone(0.32) } });
++	s.addShape('rect', { x: x + w * 0.14, y: y + h * 0.34, w: w * 0.72, h: h * 0.2, fill: { color: tone(0.44) } });
++	for (let i = 0; i < 3; i++) {
++		s.addShape('round2SameRect', { x: x + w * (0.24 + i * 0.19), y: y + h * 0.38, w: w * 0.11, h: h * 0.16, fill: { color: WHITE } });
++	}
++	s.addShape('rect', { x: x + w * 0.1, y: y + h * 0.54, w: w * 0.8, h: h * 0.05, fill: { color: tone(0.56) } });
++	for (let i = 0; i < 8; i++) {
++		s.addShape('rect', { x: x + w * 0.22, y: y + h * (0.59 + i * 0.0513), w: w * 0.56, h: h * 0.06, fill: { color: tone(0.6 + i * 0.05) } });
++	}
++}
++
++/** Crescent moon and companion star (title slide centrepiece). */
++function moonAndStar(s, x, y, size) {
++	// The crescent is a disc with a second, offset disc punched out of it.
++	for (let i = 0; i < 24; i++) {
++		const f = i / 24;
++		const t = (i + 1) / 24;
++		const yy = y + size * (0.06 + f * 0.9);
++		const r = Math.sqrt(Math.max(0, 0.25 - (f - 0.5) * (f - 0.5)));
++		s.addShape('rect', { x: x + size * (0.42 - r * 0.84), y: yy, w: size * r * 1.68, h: size * (t - f) * 0.9 + 0.01, fill: { color: tone(f) } });
++	}
++	s.addShape('ellipse', { x: x + size * 0.24, y: y + size * 0.06, w: size * 0.9, h: size * 0.9, fill: { color: WHITE } });
++	ornateStar(s, x + size * 0.42, y + size * 0.22, size * 0.34, size * 0.33);
++}
++
++/* ------------------------------------------------------------- tile icons */
++
++/**
++ * The tile icons are line drawings; each is sized to fit a `size` x `size` box
++ * and stroked in `color` (always white or the tile's accent in the source deck).
++ */
++function iconStar(s, x, y, size, color) {
++	s.addShape('star5', { x, y, w: size, h: size, fill: { type: 'none' }, line: { color, width: size * 4.6 } });
++}
++function iconMoon(s, x, y, size, color) {
++	const ln = { color, width: size * 4.6 };
++	s.addShape('moon', { x, y: y + size * 0.03, w: size * 0.78, h: size * 0.94, fill: { type: 'none' }, line: ln, rotate: 180 });
++	s.addShape('star4', { x: x + size * 0.72, y: y + size * 0.13, w: size * 0.3, h: size * 0.3, fill: { color } });
++	s.addShape('star4', { x: x + size * 0.83, y: y + size * 0.51, w: size * 0.22, h: size * 0.22, fill: { color } });
++}
++function iconAtom(s, x, y, size, color) {
++	const ln = { color, width: size * 4.2 };
++	for (const rot of [0, 60, 120]) {
++		s.addShape('ellipse', { x, y: y + size * 0.25, w: size, h: size * 0.5, fill: { type: 'none' }, line: ln, rotate: rot });
++	}
++	s.addShape('ellipse', { x: x + size * 0.4, y: y + size * 0.4, w: size * 0.2, h: size * 0.2, fill: { color } });
++}
++function iconBulb(s, x, y, size, color) {
++	s.addShape('ellipse', { x: x + size * 0.16, y, w: size * 0.68, h: size * 0.72, fill: { type: 'none' }, line: { color, width: size * 4.2 } });
++	s.addShape('rect', { x: x + size * 0.33, y: y + size * 0.76, w: size * 0.34, h: size * 0.1, fill: { color } });
++	s.addShape('rect', { x: x + size * 0.37, y: y + size * 0.92, w: size * 0.26, h: size * 0.08, fill: { color } });
++}
++const ICONS = { star: iconStar, moon: iconMoon, atom: iconAtom, bulb: iconBulb };
++function icon(s, kind, x, y, size, color) { ICONS[kind](s, x, y, size, color); }
++
++/** Grey stand-in for a bitmap that the source deck embedded. */
++function imagePlaceholder(s, x, y, w, h) {
++	s.addShape('rect', { x, y, w, h, fill: { color: 'D9D9D9' }, line: { color: 'A6A6A6', width: 1 } });
++	txt(s, '[image]', { x, y: y + h / 2 - 0.18, w, h: 0.36, fontSize: 12, color: '808080', align: 'center' });
++}
++
++/* ------------------------------------------------------------ slide bodies */
++
++function slide01(s) {
++	mosqueCluster(s, 0);
++	mosqueCluster(s, 9.6875);
++	hangingDecorLeft(s);
++	hangingDecor(s);
++	archFrame(s, 2.653, 1.147, 8.031, 5.134);
++	mandala(s, 3.265, 0.826, 2.351);
++	mandala(s, 7.997, 4.27, 2.351);
++	moonAndStar(s, 3.54, 3.004, 1.573);
++	const stars = [[7.304, 1.39], [7.799, 1.667], [7.992, 1.26], [8.128, 1.991], [8.394, 1.687],
++		[8.22, 0.619], [8.715, 0.896], [8.908, 0.489], [9.044, 1.22], [9.31, 0.916]];
++	for (const [x, y] of stars) gradStar(s, x, y, 0.355);
++	txt(s, 'Ramadan', { x: 5.337, y: 2.745, w: 4.181, h: 0.872, fontFace: POPPINS_SEMI, fontSize: 56, lineSpacingMultiple: 0.982 });
++	txt(s, 'Kareem', { x: 5.347, y: 3.551, w: 2.368, h: 0.558, fontFace: POPPINS_SEMI, fontSize: 36, color: GOLD, lineSpacingMultiple: 0.833 });
++	txt(s, LOREM_ONE, { x: 5.349, y: 4.045, w: 4.087, h: 0.521, fontSize: 7, lineSpacingMultiple: 2.286 });
++	moreViewButton(s, 5.487, 5.181);
++	txt(s, 'www.example.com', { x: 4.957, y: 6.734, w: 3.538, h: 0.303, fontSize: 12, align: 'center' });
++}
++
++function slide02(s) {
++	hangingDecor(s);
++	heading(s, 'Welcome To', 'Ramadan Kareem', { x: 1.101, y: 0.765, w: 4.739, h: 1.223 });
++	const stars = [[5.284, 3.227], [5.887, 3.556], [5.927, 2.948], [6.32, 4.442], [6.498, 3.65],
++		[6.155, 2.307], [6.651, 2.583], [6.843, 2.177], [6.98, 2.908], [7.245, 2.603]];
++	for (const [x, y] of stars) gradStar(s, x, y, 0.355);
++	lines(s, RAMADAN_LINES, { x: 1.045, y: 2.41, w: 4.049, h: 0.942, fontSize: 18, lineSpacingMultiple: 1.111 });
++	detailsMark(s, 1.232, 4.256, NAVY_GOLD);
++	txt(s, 'Details :', { x: 1.809, y: 4.23, w: 1.343, h: 0.487, fontFace: POPPINS_MED, fontSize: 18, lineSpacingMultiple: 1.667 });
++	txt(s, LOREM_FULL, { x: 1.809, y: 4.749, w: 3.393, h: 1.447, fontSize: 7, lineSpacingMultiple: 2.286 });
++	txt(s, 'www.example.com', { x: 1.207, y: 6.505, w: 3.538, h: 0.303, fontSize: 12 });
++}
++
++/** Winged card + icon + copy, used on slides 3 and 6. */
++function wingCard(s, x, y, w, h, fill, kind, iconColor) {
++	poly(s, CARD, { x, y, w, h, fill: { color: fill } });
++	icon(s, kind, x + 0.9, y + 0.185, 0.5, iconColor);
++	txt(s, 'Your Title Text Here', { x: x + 0.761, y: y + 0.689, w: 1.587, h: 0.284, fontSize: 9, bold: true, color: WHITE, lineSpacingMultiple: 1.556 });
++	txt(s, CARD_BODY, { x: x + 0.761, y: y + 0.973, w: 2.348, h: 0.886, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.75 });
++}
++
++function slide03(s) {
++	hangingDecor(s);
++	heading(s, 'Get Ready For', 'Ramadan', { x: 1.101, y: 0.765, w: 3.55, h: 1.223 });
++	detailsMark(s, 4.06, 2.544, NAVY_GOLD);
++	txt(s, 'Details :', { x: 4.637, y: 2.518, w: 1.343, h: 0.487, fontFace: POPPINS_MED, fontSize: 18, lineSpacingMultiple: 1.667 });
++	txt(s, LOREM_MED, { x: 4.59, y: 3.054, w: 2.792, h: 1.223, fontSize: 7, lineSpacingMultiple: 2.286 });
++	wingCard(s, 7.785, 2.409, 3.498, 2.264, NAVY, 'star', WHITE);
++	wingCard(s, 4.261, 4.837, 3.498, 2.264, GOLD, 'moon', WHITE);
++	wingCard(s, 7.785, 4.837, 3.498, 2.264, YELLOW, 'atom', WHITE);
++}
++
++function slide04(s) {
++	hangingDecor(s);
++	mosqueCluster(s, 0, 'small');
++	heading(s, 'Five Time ', 'Pray In A Day', { x: 1.101, y: 0.765, w: 3.253, h: 1.223 });
++	underlines(s, 1.663, 2.428, 2.174, 1.901);
++	TICK_ROWS.forEach((row, i) => {
++		tickPair(s, 1.171, 2.641 + i * 0.93, GOLD);
++		txt(s, row.text, { x: row.x, y: 2.516 + i * 0.92, w: row.w, h: 0.802, fontSize: 12, lineSpacingMultiple: 2.083 });
++	});
++	mandala(s, 1.307, 5.321, 2.059);
++	const prayers = [
++		{ name: 'Fajor', fill: NAVY, dot: '44546A', kind: 'bulb' },
++		{ name: 'Zohor', fill: GOLD, dot: GOLD, kind: 'star' },
++		{ name: 'Asar', fill: BLACK, dot: BLACK, kind: 'moon' },
++		{ name: 'Magrib', fill: YELLOW, dot: YELLOW, kind: 'moon' },
++		{ name: 'Esha', fill: GOLD_NAVY, dot: GOLD_NAVY, kind: 'atom' },
++	];
++	prayers.forEach((p, i) => {
++		const x = 4.514 + i * 1.632;
++		s.addShape('roundRect', { x, y: 2.946, w: 1.31, h: 1.303, rectRadius: 0.217, fill: { color: p.fill } });
++		s.addShape('rect', { x: x + 0.424, y: 3.242, w: 0.463, h: 0.463, fill: { color: WHITE } });
++		s.addShape('ellipse', { x: x + 0.489, y: 3.307, w: 0.333, h: 0.333, fill: { color: p.dot } });
++		icon(s, p.kind, x + 0.535, 3.353, 0.24, WHITE);
++		txt(s, p.name, { x: x + 0.2, y: 3.826, w: 0.91, h: 0.297, fontSize: 12, color: WHITE, align: 'center', lineSpacingMultiple: 1.167 });
++	});
++	txt(s, LOREM_INJ, { x: 4.277, y: 6.385, w: 8.517, h: 0.55, fontSize: 7, lineSpacingMultiple: 2.286 });
++}
++
++function slide05(s) {
++	hangingDecor(s);
++	heading(s, 'Special Service', 'For Ramadan', { x: 1.101, y: 0.765, w: 4.597, h: 1.223 });
++	detailsMark(s, 5.877, 1.357, NAVY_GOLD);
++	txt(s, 'Details :', { x: 6.455, y: 1.331, w: 1.343, h: 0.487, fontFace: POPPINS_MED, fontSize: 18, lineSpacingMultiple: 1.667 });
++	txt(s, LOREM_TINY, { x: 6.455, y: 1.85, w: 4.517, h: 0.55, fontSize: 7, lineSpacingMultiple: 2.286 });
++	const cols = [
++		{ card: GOLD, badge: NAVY, kind: 'star' },
++		{ card: NAVY, badge: YELLOW, kind: 'moon' },
++		{ card: GOLD, badge: NAVY, kind: 'atom' },
++		{ card: NAVY, badge: YELLOW, kind: 'bulb' },
++	];
++	cols.forEach((c, i) => {
++		const x = 1.232 + i * 2.821;
++		s.addShape('roundRect', { x, y: 3.52, w: 2.55, h: 3.079, rectRadius: 0.425, fill: { color: c.card } });
++		poly(s, OCTAGRAM, { x: x + 0.478, y: 2.723, w: 1.594, h: 1.594, fill: { color: c.badge } });
++		icon(s, c.kind, x + 0.955, 3.2, 0.64, WHITE);
++		txt(s, 'Your Subtitle Here', { x: x + 0.418, y: 4.42, w: 1.714, h: 0.297, fontSize: 10.5, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1.333 });
++		txt(s, TILE_BODY, { x: x + 0.402, y: 4.739, w: 1.745, h: 0.774, fontSize: 8, color: WHITE, align: 'center', lineSpacingMultiple: 2 });
++		txt(s, '+150K', { x: x + 0.262, y: 5.644, w: 1.886, h: 0.791, fontSize: 36, color: WHITE, align: 'center', lineSpacingMultiple: 1.333 });
++	});
++}
++
++function slide06(s) {
++	poly(s, SIDEBAR, { x: 0, y: 0, w: 2.708, h: 7.5, fill: { color: NAVY } });
++	hangingDecor(s);
++	heading(s, 'Special Month', 'Of Muslim', { x: 5.726, y: 0.938, w: 3.503, h: 1.223 });
++	detailsMark(s, 5.677, 2.936, NAVY_GOLD);
++	txt(s, 'Details :', { x: 6.255, y: 2.911, w: 1.343, h: 0.487, fontFace: POPPINS_MED, fontSize: 18, lineSpacingMultiple: 1.667 });
++	txt(s, LOREM_FULL, { x: 6.255, y: 3.43, w: 3.393, h: 1.447, fontSize: 7, lineSpacingMultiple: 2.286 });
++	[[5.775, NAVY], [9.197, GOLD]].forEach(([x, fill]) => {
++		poly(s, CARD, { x, y: 5.208, w: 3.255, h: 1.729, fill: { color: fill } });
++		txt(s, 'Your Title Text Here', { x: x + 0.663, y: 5.495, w: 1.587, h: 0.284, fontSize: 9, bold: true, color: WHITE, lineSpacingMultiple: 1.556 });
++		txt(s, CARD_BODY, { x: x + 0.663, y: 5.779, w: 2.348, h: 0.886, fontSize: 8, color: WHITE, lineSpacingMultiple: 1.75 });
++	});
++}
++
++function slide07(s) {
++	hangingDecor(s);
++	heading(s, 'Spiritual Benefits', 'Of Fasting', { x: 1.101, y: 0.765, w: 4.441, h: 1.223 });
++	txt(s, 'Details :', { x: 1.101, y: 2.473, w: 1.343, h: 0.487, fontFace: POPPINS_MED, fontSize: 18, lineSpacingMultiple: 1.667 });
++	txt(s, LOREM_FULL, { x: 1.101, y: 2.992, w: 3.982, h: 1.223, fontSize: 7, lineSpacingMultiple: 2.286 });
++	archFrame(s, 5.781, 2.447, 6.414, 2.555);
++	for (const [x, y] of [[6.0, 2.792], [6.025, 1.925], [6.553, 2.32], [6.819, 2.016]]) gradStar(s, x, y, 0.355);
++	lines(s, RAMADAN_LINES, { x: 6.126, y: 2.879, w: 5.772, h: 1.574, fontSize: 24, align: 'center', lineSpacingMultiple: 1.458 });
++	[[5.94, 6.334, GOLD], [9.628, 10.022, NAVY]].forEach(([tickX, textX, color]) => {
++		underlines(s, tickX + 0.547, 5.758, 2.465, 0.863);
++		TICKS.forEach((t, i) => {
++			tickPair(s, tickX, 5.408 + i * 0.446, color);
++			txt(s, t, { x: textX, y: 5.266 + i * 0.451, w: i === 2 ? 2.115 : 2.832, h: 0.403, fontSize: 10, lineSpacingMultiple: 2.5 });
++		});
++	});
++}
++
++function slide08(s) {
++	hangingDecor(s);
++	heading(s, 'Tarabeeh Prayer', 'Together', { x: 1.101, y: 0.765, w: 4.441, h: 1.223 });
++	const bullets = ['THERE ARE MANY VARIATIONS', ' OF PASSAGES OF LOREM IPSUM', ' AVAILABLE, MAJORITY', 'HAVE SUFFERED ALTERATION'];
++	[[1.921, NAVY, 'moon'], [3.865, GOLD, 'star']].forEach(([y, fill, kind]) => {
++		poly(s, OCTAGRAM, { x: 7.224, y, w: 0.702, h: 0.702, fill: { color: fill } });
++		icon(s, kind, 7.399, y + 0.175, 0.35, WHITE);
++		txt(s, 'Example Here', { x: 8.167, y: y - 0.086, w: 1.866, h: 0.306, fontFace: POPPINS_MED, fontSize: 12, lineSpacingMultiple: 1.25 });
++		txt(s, TILE_BODY, { x: 8.167, y: y + 0.217, w: 2.712, h: 0.423, fontSize: 7, lineSpacingMultiple: 1.714 });
++		txt(s, bullets.map((b, i) => ({
++			text: b,
++			options: { breakLine: i < bullets.length - 1, bullet: { characterCode: '2714', indent: 13.5 } },
++		})), { x: 8.167, y: y + 0.589, w: 2.103, h: 0.774, fontSize: 7, lineSpacingMultiple: 1.714 });
++	});
++	[[7.239, NAVY, '30 Days'], [9.523, GOLD, '01 Month']].forEach(([x, fill, label]) => {
++		s.addShape('rect', { x, y: 5.809, w: 1.857, h: 1.0, fill: { color: fill } });
++		lines(s, ['Full', label], { x: x - 0.015, y: 5.897, w: 1.866, h: 0.802, fontFace: POPPINS_MED, fontSize: 16, color: WHITE, align: 'center', lineSpacingMultiple: 1.563 });
++	});
++}
++
++function slide09(s) {
++	hangingDecor(s);
++	s.addShape('rect', { x: 0, y: 3.721, w: 5.333, h: 3.779, fill: { color: GOLD } });
++	inlineHeading(s, 'Umrah ', 'Places', { x: 1.101, y: 0.765, w: 3.375, h: 0.662 });
++	lines(s, RAMADAN_LINES, { x: 1.045, y: 1.991, w: 4.049, h: 0.942, fontSize: 18, lineSpacingMultiple: 1.111 });
++	detailsMark(s, 1.232, 4.188, WHITE);
++	txt(s, LOREM_FULL, { x: 1.809, y: 4.142, w: 2.935, h: 1.672, fontSize: 7, color: WHITE, lineSpacingMultiple: 2.286 });
++	txt(s, 'www.example.com', { x: 1.207, y: 6.505, w: 3.538, h: 0.303, fontSize: 12, color: WHITE });
++	mandala(s, 8.054, 0.765, 2.059);
++	['Places 01', 'Places 02', 'Places 03'].forEach((t, i) => {
++		txt(s, t, { x: [5.513, 7.777, 9.994][i], y: 3.034, w: 1.278, h: 0.452, fontFace: POPPINS_MED, fontSize: 16, lineSpacingMultiple: 1.563 });
++	});
++}
++
++function slide10(s) {
++	inlineHeading(s, 'Umrah ', 'Packages', { x: 1.101, y: 0.765, w: 4.107, h: 0.662 });
++	const packs = [
++		{ x: 1.101, color: NAVY, label: '8 Night Marshals' },
++		{ x: 4.823, color: GOLD, label: '9 Night Marshals' },
++		{ x: 8.547, color: YELLOW, label: '7 Night Marshals' },
++	];
++	packs.forEach(p => {
++		poly(s, TAG, { x: p.x, y: 3.478, w: 2.288, h: 0.714, fill: { color: p.color } });
++		txt(s, p.label, { x: p.x - 0.014, y: 3.572, w: 2.273, h: 0.452, fontFace: POPPINS_MED, fontSize: 16, color: WHITE, lineSpacingMultiple: 1.563 });
++		s.addShape('rect', { x: p.x + 0.015, y: 5.08, w: 1.857, h: 0.864, fill: { color: p.color } });
++		txt(s, '30 Days', { x: p.x + 0.015, y: 5.08, w: 1.197, h: 0.452, fontFace: POPPINS_MED, fontSize: 16, color: WHITE, lineSpacingMultiple: 1.563 });
++		txt(s, '$70.01', { x: p.x + 0.373, y: 5.492, w: 1.499, h: 0.452, fontFace: POPPINS_MED, fontSize: 28, color: WHITE, lineSpacingMultiple: 0.893 });
++		txt(s, LOREM_SHORT, { x: p.x - 0.115, y: 6.149, w: 3.43, h: 0.774, fontSize: 7, lineSpacingMultiple: 2.286 });
++	});
++}
++
++function slide11(s) {
++	poly(s, SIDEBAR, { x: 0, y: 0, w: 2.708, h: 7.5, fill: { color: NAVY } });
++	hangingDecor(s);
++	inlineHeading(s, 'Meet Our  ', 'Professional Team', { x: 5.417, y: 1.14, w: 4.878, h: 1.223 });
++	txt(s, 'Our Agency Details :', { x: 5.417, y: 3.392, w: 2.979, h: 0.522, fontFace: POPPINS_MED, fontSize: 18, lineSpacingMultiple: 1.667 });
++	txt(s, LOREM_FULL, { x: 5.417, y: 3.912, w: 5.188, h: 0.999, fontSize: 7, lineSpacingMultiple: 2.286 });
++	txt(s, LOREM_SHORT, { x: 5.417, y: 5.313, w: 5.188, h: 0.521, fontSize: 7, bold: true, lineSpacingMultiple: 2.286 });
++	txt(s, 'www.example.com', { x: 5.417, y: 6.63, w: 3.538, h: 0.303, fontSize: 12 });
++	for (const [x, y] of [[11.479, 6.536], [11.504, 5.668], [12.032, 6.064], [12.298, 5.759]]) gradStar(s, x, y, 0.355);
++}
++
++function slide12(s) {
++	hangingDecor(s);
++	inlineHeading(s, 'Special Team ', 'Ramadan', { x: 1.101, y: 0.765, w: 4.107, h: 1.208 });
++	detailsMark(s, 5.423, 1.404, NAVY_GOLD);
++	txt(s, 'Details :', { x: 6.001, y: 1.378, w: 1.343, h: 0.487, fontFace: POPPINS_MED, fontSize: 18, lineSpacingMultiple: 1.667 });
++	txt(s, LOREM_TINY, { x: 6.001, y: 1.898, w: 4.517, h: 0.55, fontSize: 7, lineSpacingMultiple: 2.286 });
++	const team = [
++		{ x: 1.206, dy: 0, name: 'Robertson', role: 'Manager' },
++		{ x: 3.911, dy: 0.042, name: 'Anthony Mike', role: 'Designer' },
++		{ x: 6.564, dy: 0, name: 'Robertson', role: 'Manager' },
++		{ x: 9.314, dy: 0, name: 'Alaska Ethan', role: 'Manager' },
++	];
++	team.forEach(m => {
++		txt(s, m.name, { x: m.x, y: 5.772 + m.dy, w: 1.648, h: 0.337, fontFace: POPPINS_MED, fontSize: 14 });
++		txt(s, m.role, { x: m.x + 0.008, y: 6.034 + m.dy, w: 0.712, h: 0.325, fontSize: 7, lineSpacingMultiple: 2.286 });
++		ratingStars(s, m.x + 0.1, 6.433);
++		txt(s, TILE_BODY, { x: m.x, y: 6.462, w: 2.149, h: 0.494, fontSize: 6, lineSpacingMultiple: 2.333 });
++	});
++}
++
++function slide13(s) {
++	hangingDecor(s);
++	inlineHeading(s, 'Program During ', 'Ramadan', { x: 1.101, y: 0.765, w: 4.107, h: 1.208 });
++	lines(s, RAMADAN_LINES, { x: 1.045, y: 2.616, w: 4.049, h: 0.942, fontSize: 18, lineSpacingMultiple: 1.111 });
++	txt(s, LOREM_FULL, { x: 1.045, y: 3.973, w: 3.872, h: 1.223, fontSize: 7, lineSpacingMultiple: 2.286 });
++	txt(s, 'www.example.com', { x: 1.045, y: 6.42, w: 3.538, h: 0.303, fontSize: 12 });
++	s.addShape('rect', { x: 6.107, y: 1.974, w: 2.776, h: 2.613, fill: { color: GOLD } });
++	const tiles = [
++		{ x: 6.593, y: 2.987, icon: 'star', ix: 7.185, iy: 2.393, color: WHITE, iconColor: WHITE },
++		{ x: 9.414, y: 2.987, icon: 'moon', ix: 10.061, iy: 2.445, color: BLACK, iconColor: YELLOW },
++		{ x: 6.593, y: 5.789, icon: 'atom', ix: 7.243, iy: 5.263, color: BLACK, iconColor: NAVY },
++	];
++	tiles.forEach(t => {
++		icon(s, t.icon, t.ix, t.iy, 0.5, t.iconColor);
++		txt(s, 'Your Subtitle Here', { x: t.x + 0.015, y: t.y, w: 1.714, h: 0.297, fontSize: 10.5, bold: true, color: t.color, align: 'center', lineSpacingMultiple: 1.333 });
++		txt(s, TILE_BODY, { x: t.x, y: t.y + 0.319, w: 1.745, h: 0.774, fontSize: 8, color: t.color, align: 'center', lineSpacingMultiple: 2 });
++	});
++}
++
++function slide14(s) {
++	hangingDecor(s);
++	s.addShape('rect', { x: 3.789, y: 1.917, w: 7.294, h: 4.063, fill: { color: GOLD } });
++	lines(s, ['Break', 'Slide'], { x: 4.039, y: 2.686, w: 4.274, h: 2.606, fontFace: POPPINS_MED, fontSize: 88, color: WHITE, lineSpacingMultiple: 1 });
++	s.addShape('line', { x: 8.113, y: 2.438, w: 0, h: 3.125, line: { color: WHITE, width: 0.75, dashType: 'dashDot' } });
++	txt(s, '30 Days', { x: 8.608, y: 2.747, w: 1.197, h: 0.452, fontFace: POPPINS_MED, fontSize: 16, color: WHITE, lineSpacingMultiple: 1.563 });
++	txt(s, 'Your Subtitle Here', { x: 8.479, y: 3.458, w: 1.714, h: 0.297, fontSize: 10.5, bold: true, color: WHITE, lineSpacingMultiple: 1.333 });
++	txt(s, LOREM_SHORT, { x: 8.479, y: 3.815, w: 2.521, h: 0.999, fontSize: 7, color: WHITE, lineSpacingMultiple: 2.286 });
++	mandala(s, 11.744, 5.855, 2.059);
++}
++
++function slide15(s) {
++	hangingDecor(s);
++	txt(s, [
++		{ text: 'History and Organic', options: { color: BLACK, breakLine: true } },
++		{ text: 'Of', options: { color: GOLD } },
++		{ text: ' ', options: { color: BLACK } },
++		{ text: 'Ramadan', options: { color: GOLD } },
++	], { x: 1.101, y: 0.765, w: 5.628, h: 1.223, fontFace: POPPINS_MED, fontSize: 32, lineSpacingMultiple: 1.25 });
++	txt(s, 'Our History Details :', { x: 1.101, y: 2.184, w: 2.979, h: 0.487, fontFace: POPPINS_MED, fontSize: 18, lineSpacingMultiple: 1.667 });
++	txt(s, LOREM_FULL, { x: 1.101, y: 2.703, w: 5.188, h: 0.999, fontSize: 7, lineSpacingMultiple: 2.286 });
++	mandala(s, 8.43, 1.16, 2.059);
++	s.addShape('rect', { x: 0, y: 4.625, w: 13.333, h: 0.792, fill: { color: GREY_BAND } });
++	const steps = [
++		{ x: 1.228, badge: NAVY, kind: 'star', num: '01' },
++		{ x: 4.2, badge: GOLD, kind: 'moon', num: '02' },
++		{ x: 7.173, badge: BLACK, kind: 'atom', num: '03' },
++		{ x: 10.145, badge: YELLOW, kind: 'bulb', num: '04' },
++	];
++	steps.forEach((st, i) => {
++		poly(s, OCTAGRAM, { x: st.x, y: 4.476, w: 1.086, h: 1.086, fill: { color: st.badge } });
++		icon(s, st.kind, st.x + 0.29, 4.74, 0.51, WHITE);
++		txt(s, st.num, { x: st.x + 1.218, y: 4.699, w: 0.811, h: 0.662, fontFace: POPPINS_MED, fontSize: 32, lineSpacingMultiple: 1.25 });
++		txt(s, 'Your Subtitle Here', { x: [1.216, 4.196, 7.176, 10.172][i], y: 5.733, w: 1.714, h: 0.297, fontSize: 10.5, bold: true, lineSpacingMultiple: 1.333 });
++		txt(s, TILE_BODY, { x: [1.201, 4.181, 7.16, 10.156][i], y: 6.051, w: 1.745, h: 0.774, fontSize: 8, lineSpacingMultiple: 2 });
++	});
++}
++
++function slide16(s) {
++	hangingDecor(s);
++	heading(s, 'Our Guide To Fasting', 'Praying and Giving', { x: 1.101, y: 0.765, w: 5.628, h: 1.223 });
++	lines(s, RAMADAN_LINES, { x: 1.045, y: 2.616, w: 4.049, h: 0.942, fontSize: 18, lineSpacingMultiple: 1.111 });
++	txt(s, LOREM_FULL, { x: 1.045, y: 3.973, w: 3.872, h: 1.223, fontSize: 7, lineSpacingMultiple: 2.286 });
++	moreViewButton(s, 1.101, 6.097);
++	[[2.984, NAVY, 'star', 6.146, 3.211], [5.133, GOLD, 'moon', 6.242, 5.437]].forEach(([y, fill, kind, ix, iy]) => {
++		s.addShape('rect', { x: 6.0, y, w: 4.096, h: 1.977, fill: { color: fill } });
++		icon(s, kind, ix, iy, 0.82, WHITE);
++		txt(s, 'Your Subtitle Here', { x: 7.142, y: y + 0.387, w: 1.714, h: 0.297, fontSize: 10.5, bold: true, color: WHITE, lineSpacingMultiple: 1.333 });
++		txt(s, GUIDE_BODY, { x: 7.126, y: y + 0.706, w: 2.779, h: 0.974, fontSize: 8, color: WHITE, lineSpacingMultiple: 2 });
++	});
++}
++
++/** Navy caption card with an octagram icon to its left (slides 17 and 18). */
++function iconCallout(s) {
++	poly(s, OCTAGRAM, { x: 1.247, y: 5.762, w: 1.086, h: 1.086, fill: { color: GOLD } });
++	icon(s, 'moon', 1.533, 6.027, 0.55, WHITE);
++	s.addShape('roundRect', { x: 2.768, y: 5.722, w: 2.434, h: 1.108, rectRadius: 0.23, fill: { color: NAVY } });
++	txt(s, 'Your Title Text Here', { x: 2.948, y: 5.834, w: 1.792, h: 0.297, fontSize: 9, bold: true, color: WHITE, lineSpacingMultiple: 1.556 });
++	txt(s, MINI_BODY, { x: 2.948, y: 6.043, w: 1.993, h: 0.69, fontSize: 7, color: WHITE, lineSpacingMultiple: 2 });
++}
++
++function slide17(s) {
++	hangingDecor(s);
++	s.addShape('ellipse', { x: 6.874, y: 2.016, w: 4.843, h: 4.843, fill: { color: YELLOW, transparency: 54 } });
++	mandala(s, 6.322, 1.607, 5.94);
++	heading(s, 'The Ramadan', 'Donate Mosque\u2019s', { x: 1.101, y: 0.765, w: 5.628, h: 1.223 });
++	txt(s, LOREM_FULL, { x: 1.045, y: 2.29, w: 5.146, h: 0.999, fontSize: 7, lineSpacingMultiple: 2.286 });
++	underlines(s, 1.625, 3.69, 4.003, 1.188);
++	TICKS.forEach((t, i) => {
++		tickPair(s, 1.101, 3.934 + i * 0.541, GOLD);
++		txt(s, t, { x: 1.495, y: 3.808 + i * 0.532, w: i === 2 ? 3.242 : 4.34, h: 0.452, fontSize: 16, lineSpacingMultiple: 1.563 });
++	});
++	iconCallout(s);
++}
++
++function slide18(s) {
++	hangingDecor(s);
++	heading(s, 'Study and Read', 'Al-Qur\u2019an', { x: 1.101, y: 0.765, w: 5.628, h: 1.223 });
++	txt(s, 'Ramadan Details :', { x: 1.101, y: 2.392, w: 2.979, h: 0.487, fontFace: POPPINS_MED, fontSize: 18, lineSpacingMultiple: 1.667 });
++	txt(s, LOREM_FULL, { x: 1.101, y: 2.912, w: 5.188, h: 0.999, fontSize: 7, lineSpacingMultiple: 2.286 });
++	txt(s, LOREM_SHORT, { x: 1.101, y: 4.313, w: 5.188, h: 0.521, fontSize: 7, bold: true, lineSpacingMultiple: 2.286 });
++	iconCallout(s);
++}
++
++function slide19(s) {
++	hangingDecor(s);
++	heading(s, 'Ramadan', 'If-tar Party', { x: 1.101, y: 0.765, w: 2.899, h: 1.223 });
++	gradShape(s, BLOB, { x: 0.731, y: 2.135, w: 5.082, h: 4.932 }, { bands: 60 });
++	const rows = [
++		{ y: 2.052, card: NAVY, badge: GOLD, kind: 'moon' },
++		{ y: 3.778, card: GOLD, badge: NAVY, kind: 'star' },
++		{ y: 5.504, card: BLACK, badge: YELLOW, kind: 'atom' },
++	];
++	rows.forEach(r => {
++		s.addShape('rect', { x: 7.062, y: r.y, w: 3.771, h: 1.48, fill: { color: r.card } });
++		poly(s, OCTAGRAM, { x: 6.519, y: r.y + 0.203, w: 1.086, h: 1.086, fill: { color: r.badge } });
++		icon(s, r.kind, 6.806, r.y + 0.469, 0.55, WHITE);
++		txt(s, 'Your Subtitle Here', { x: 7.744, y: r.y + 0.179, w: 1.714, h: 0.297, fontSize: 10.5, bold: true, color: WHITE, lineSpacingMultiple: 1.333 });
++		txt(s, IFTAR_BODY, { x: 7.728, y: r.y + 0.498, w: 2.779, h: 0.774, fontSize: 8, color: WHITE, lineSpacingMultiple: 2 });
++	});
++}
++
++function slide20(s) {
++	hangingDecor(s);
++	txt(s, [
++		{ text: 'Get Discount', options: { color: BLACK, breakLine: true } },
++		{ text: '30% With Oder in', options: { color: GOLD, breakLine: true } },
++		{ text: 'With Apps', options: { color: BLACK } },
++	], { x: 1.101, y: 0.765, w: 4.253, h: 1.784, fontFace: POPPINS_MED, fontSize: 32, lineSpacingMultiple: 1.25 });
++	txt(s, LOREM_FULL, { x: 1.101, y: 2.912, w: 3.816, h: 1.223, fontSize: 7, lineSpacingMultiple: 2.286 });
++	txt(s, LOREM_SHORT, { x: 1.101, y: 4.501, w: 3.816, h: 0.774, fontSize: 7, bold: true, lineSpacingMultiple: 2.286 });
++	moreViewButton(s, 1.101, 6.097);
++	imagePlaceholder(s, 5.685, 1.934, 5.892, 3.453);
++	[{ x: 5.354, color: GOLD, price: '$71000.01K' }, { x: 9.073, color: NAVY, price: '$10000.01K' }].forEach(t => {
++		s.addShape('roundRect', { x: t.x, y: 6.014, w: 2.786, h: 0.622, rectRadius: 0.311, fill: { color: t.color } });
++		txt(s, t.price, { x: t.x + 0.164, y: 6.061, w: 1.92, h: 0.414, fontFace: JOST_SEMI, fontSize: 20, color: WHITE, lineSpacingMultiple: 1.1 });
++		txt(s, 'There are many variations of passages of Lorem Ipsum', { x: t.x + 0.214, y: 6.338, w: 2.45, h: 0.297, fontFace: JOST, fontSize: 7, color: WHITE, lineSpacingMultiple: 2 });
++	});
++}
++
++function slide21(s) {
++	hangingDecor(s);
++	mosqueCluster(s, 0, 'small');
++	heading(s, 'Ramadan', 'Gallery', { x: 1.101, y: 0.765, w: 2.586, h: 1.223 });
++	underlines(s, 1.663, 2.428, 2.174, 1.901);
++	TICK_ROWS.forEach((row, i) => {
++		tickPair(s, 1.171, 2.641 + i * 0.93, GOLD);
++		txt(s, row.text, { x: row.x, y: 2.516 + i * 0.92, w: row.w, h: 0.802, fontSize: 12, lineSpacingMultiple: 2.083 });
++	});
++	mandala(s, 1.307, 5.321, 2.059);
++}
++
++function slide22(s) {
++	mosqueCluster(s, 9.6875);
++	hangingDecor(s);
++	archFrame(s, 3.569, 1.168, 8.031, 5.134);
++	const upper = [[8.22, 1.307], [8.716, 1.583], [8.909, 1.177], [9.045, 1.908], [9.311, 1.604],
++		[9.136, 0.536], [9.632, 0.812], [9.824, 0.406], [9.961, 1.137], [10.226, 0.833]];
++	for (const [x, y] of upper) gradStar(s, x, y, 0.355);
++	const lower = [[11.609, 4.155], [11.273, 4.613], [12.028, 4.666], [10.911, 4.899], [11.555, 5.013]];
++	for (const [x, y] of lower) gradStar(s, x, y, 0.355, 97);
++	txt(s, 'THANK YOU', { x: 6.483, y: 3.307, w: 4.181, h: 2.01, fontFace: POPPINS_SEMI, fontSize: 80, lineSpacingMultiple: 0.813 });
++	txt(s, 'www.example.com', { x: 6.561, y: 6.755, w: 3.538, h: 0.303, fontSize: 12 });
++}
++
++/* ------------------------------------------------------------------- build */
++
++const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++	slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17,
++	slide18, slide19, slide20, slide21, slide22];
++
++function build() {
++	const pptx = new PptxGenJS();
++	pptx.defineLayout({ name: 'RAMADAN_16x9', width: 13.333, height: 7.5 });
++	pptx.layout = 'RAMADAN_16x9';
++	pptx.theme = { headFontFace: POPPINS_MED, bodyFontFace: POPPINS };
++	for (const builder of SLIDES) {
++		const slide = pptx.addSlide();
++		slide.background = { color: WHITE };
++		builder(slide);
++	}
++	return pptx.writeFile({ fileName: path.join(__dirname, '0e9f91db-ef02-4b92-ad26-1428483a2ea8_grok_final.pptx') });
++}
++
++build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });

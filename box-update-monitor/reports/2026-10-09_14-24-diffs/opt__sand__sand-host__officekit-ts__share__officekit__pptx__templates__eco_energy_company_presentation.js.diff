@@ -1,0 +1,716 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/eco_energy_company_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/eco_energy_company_presentation.js
+@@ -0,0 +1,713 @@
++/**
++ * Econgi — "Eco-Energy Presentation"
++ * 15 slides, 13.333in x 7.5in (16:9), rebuilt with pptxgenjs only.
++ *
++ * Photographs from the source deck are replaced by flat grey placeholder
++ * shapes that keep the original position, size and corner rounding.
++ *
++ *   node 099893a9-3cd1-4677-a020-7e5477340b1d_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Palette — theme colours already resolved to plain hex
++ * ------------------------------------------------------------------ */
++const C = {
++  green: '2B893F',        // primary brand green
++  greenMid: '33A34B',     // lighter accent green
++  greenDark: '247235',    // deep green (slide 10 hill, slide 13 background)
++  white: 'FFFFFF',
++  ink: '262626',          // headline near-black      (tx1 85 %)
++  sub: '404040',          // sub-heading grey         (tx1 75 %)
++  body: '808080',         // body copy grey           (tx1 50 %)
++  paper: 'F2F2F2',        // page tint                (bg1 95 %)
++  offWhite: 'F2F2F2',     // body copy on green
++  photo: '7F7F7F',        // image placeholder fill
++  screen: '0D0D0D',       // device screen / bezel    (tx1 95 %)
++  phoneCase: '404040',
++  tabletCase: 'D9D9D9',
++  tabletBtn: 'A6A6A6',
++  monitorCase: 'C9C9C9',
++  monitorStand: '9C9E9D',
++  monitorBase: 'D0D0D0',
++  sideBtn: '808080',
++  lens: '171717',
++  lensDot: '1D2787',
++};
++
++const FONT = {
++  head: 'Poppins',
++  headMed: 'Poppins Medium',
++  headSemi: 'Poppins SemiBold',
++  body: 'Montserrat',
++  bodyMed: 'Montserrat Medium',
++  bodySemi: 'Montserrat SemiBold',
++};
++
++/** Soft drop shadow used by the white cards on slides 5 and 9. */
++const CARD_SHADOW = { type: 'outer', blur: 52, offset: 31, angle: 135, color: '000000', opacity: 0.1 };
++/** Hairline in the card's own colour; without it renderers draw the shadow edge over the fill. */
++const CARD_EDGE = { color: 'FFFFFF', width: 0.75 };
++
++const NO_LINE = { type: 'none' };
++
++/* ------------------------------------------------------------------ *
++ * Geometry helpers
++ * ------------------------------------------------------------------ */
++
++/** Bezier handle length for a quarter-circle corner. */
++const KAPPA = 0.4477;
++
++/**
++ * custGeom point list for a rectangle with individual corner radii,
++ * given in inches as [topLeft, topRight, bottomRight, bottomLeft].
++ */
++function roundedRectPoints(w, h, [tl, tr, br, bl]) {
++  const p = [{ x: tl, y: 0, moveTo: true }, { x: w - tr, y: 0 }];
++  if (tr) p.push({ x: w, y: tr, curve: { type: 'cubic', x1: w - tr * KAPPA, y1: 0, x2: w, y2: tr * KAPPA } });
++  p.push({ x: w, y: h - br });
++  if (br) p.push({ x: w - br, y: h, curve: { type: 'cubic', x1: w, y1: h - br * KAPPA, x2: w - br * KAPPA, y2: h } });
++  p.push({ x: bl, y: h });
++  if (bl) p.push({ x: 0, y: h - bl, curve: { type: 'cubic', x1: bl * KAPPA, y1: h, x2: 0, y2: h - bl * KAPPA } });
++  p.push({ x: 0, y: tl });
++  if (tl) p.push({ x: tl, y: 0, curve: { type: 'cubic', x1: 0, y1: tl * KAPPA, x2: tl * KAPPA, y2: 0 } });
++  p.push({ close: true });
++  return p;
++}
++
++/** Filled rectangle with per-corner radii (inches): radii = [tl, tr, br, bl]. */
++function panel(slide, { x, y, w, h, radii = [0, 0, 0, 0], fill, transparency, shadow }) {
++  slide.addShape('custGeom', {
++    x, y, w, h,
++    points: roundedRectPoints(w, h, radii),
++    fill: transparency ? { color: fill, transparency } : { color: fill },
++    line: NO_LINE,
++    shadow,
++  });
++}
++
++/** Closed polygon from normalised [0..1] coordinates inside the given box. */
++function poly(slide, x, y, w, h, pts, color) {
++  slide.addShape('custGeom', {
++    x, y, w, h,
++    points: pts.map(([px, py], i) => (i === 0 ? { x: px * w, y: py * h, moveTo: true } : { x: px * w, y: py * h }))
++      .concat([{ close: true }]),
++    fill: { color }, line: NO_LINE,
++  });
++}
++
++/** Grey stand-in for a photograph; radii = [tl, tr, br, bl] in inches. */
++function photo(slide, x, y, w, h, radii = [0, 0, 0, 0]) {
++  panel(slide, { x, y, w, h, radii, fill: C.photo });
++}
++
++/** Circular stand-in for a photograph. */
++function photoCircle(slide, x, y, d) {
++  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: C.photo }, line: NO_LINE });
++}
++
++/**
++ * The Econgi leaf mark: two mirrored "round-2-diagonal" blades.
++ * `full` adds the smaller lower-right blade (cover slides only).
++ */
++function leafMark(slide, x, y, color, { h = 1.151, full = false } = {}) {
++  const w = 0.991;
++  panel(slide, { x, y, w, h, radii: [0, w / 2, 0, w / 2], fill: color });
++  if (full) {
++    panel(slide, { x: x + 0.663, y: y + 1.228, w: 0.655, h: 0.761, radii: [0.3275, 0, 0.3275, 0], fill: color });
++  }
++}
++
++/** Three-bar "hamburger" mark in the top-right of the cover slides. */
++function hamburger(slide, x, y, color) {
++  [[0.300, 0.000], [0.200, 0.089], [0.100, 0.177]].forEach(([w, dy]) => {
++    slide.addShape('rect', { x: x + 0.300 - w, y: y + dy, w, h: 0.040, fill: { color }, line: NO_LINE });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Pictogram glyphs used inside the round / square icon chips
++ * ------------------------------------------------------------------ */
++
++/** Origami dove: swept wing, tail, head and beak. */
++const BIRD_POLYS = [
++  [[0.04, 0.28], [0.66, 0.54], [0.28, 0.54]],   // swept upper wing
++  [[0.28, 0.58], [0.78, 0.58], [0.40, 1.00]],   // body and tail
++  [[0.50, 0.00], [0.68, 0.54], [0.84, 0.24]],   // head
++  [[0.70, 0.16], [1.00, 0.26], [0.72, 0.34]],   // beak
++];
++
++function glyphBird(slide, x, y, w, h, color) {
++  BIRD_POLYS.forEach(pts => poly(slide, x, y, w, h, pts, color));
++}
++
++/** Briefcase: hollow handle over a wide body with a centre latch. */
++function glyphBriefcase(slide, x, y, w, h, color, chip) {
++  slide.addShape('roundRect', { x: x + 0.28 * w, y, w: 0.44 * w, h: 0.46 * h, rectRadius: 0.11 * w, fill: { color }, line: NO_LINE });
++  slide.addShape('roundRect', { x: x + 0.36 * w, y: y + 0.11 * h, w: 0.28 * w, h: 0.42 * h, rectRadius: 0.07 * w, fill: { color: chip }, line: NO_LINE });
++  slide.addShape('roundRect', { x, y: y + 0.30 * h, w, h: 0.70 * h, rectRadius: 0.09 * w, fill: { color }, line: NO_LINE });
++  slide.addShape('rect', { x: x + 0.18 * w, y: y + 0.55 * h, w: 0.64 * w, h: 0.05 * h, fill: { color: chip }, line: NO_LINE });
++  slide.addShape('rect', { x: x + 0.40 * w, y: y + 0.48 * h, w: 0.20 * w, h: 0.20 * h, fill: { color: chip }, line: NO_LINE });
++}
++
++/** Two overlapping speech bubbles with three dots. */
++function glyphChat(slide, x, y, w, h, color, chip) {
++  slide.addShape('roundRect', { x, y, w: 0.58 * w, h: 0.62 * h, rectRadius: 0.14 * h, fill: { color }, line: NO_LINE });
++  poly(slide, x, y, w, h, [[0.06, 0.55], [0.30, 0.55], [0.10, 0.85]], color);
++  slide.addShape('roundRect', { x: x + 0.40 * w, y: y + 0.30 * h, w: 0.60 * w, h: 0.62 * h, rectRadius: 0.14 * h, fill: { color }, line: NO_LINE });
++  poly(slide, x, y, w, h, [[0.62, 0.85], [0.86, 0.85], [0.82, 1.00]], color);
++  [0.52, 0.66, 0.80].forEach(cx => {
++    slide.addShape('ellipse', { x: x + cx * w - 0.035 * w, y: y + 0.55 * h, w: 0.07 * w, h: 0.07 * w, fill: { color: chip }, line: NO_LINE });
++  });
++}
++
++/** Draw a named glyph centred in a chip of the given size. */
++function drawGlyph(slide, chipX, chipY, chipD, name, color, chipColor) {
++  const boxes = { bird: [0.55, 0.61], briefcase: [0.52, 0.39], chat: [0.56, 0.33] };
++  const [rw, rh] = boxes[name];
++  const w = chipD * rw, h = chipD * rh;
++  const x = chipX + (chipD - w) / 2, y = chipY + (chipD - h) / 2;
++  if (name === 'bird') glyphBird(slide, x, y, w, h, color);
++  else if (name === 'briefcase') glyphBriefcase(slide, x, y, w, h, color, chipColor);
++  else glyphChat(slide, x, y, w, h, color, chipColor);
++}
++
++/** Round icon chip. */
++function iconCircle(slide, x, y, d, glyph, { chip = C.green, glyphColor = C.white, transparency } = {}) {
++  slide.addShape('ellipse', {
++    x, y, w: d, h: d,
++    fill: transparency ? { color: chip, transparency } : { color: chip },
++    line: NO_LINE,
++  });
++  drawGlyph(slide, x, y, d, glyph, glyphColor, transparency ? 'DCEBDF' : chip);
++}
++
++/** Rounded-square icon chip. */
++function iconSquare(slide, x, y, d, glyph) {
++  slide.addShape('roundRect', { x, y, w: d, h: d, rectRadius: d / 6, fill: { color: C.green }, line: NO_LINE });
++  drawGlyph(slide, x, y, d, glyph, C.white, C.green);
++}
++
++/** White check-mark glyph (slide 12 bullet list). */
++function checkGlyph(slide, x, y) {
++  poly(slide, x, y, 0.121, 0.077, [
++    [0.339, 0.981], [0.000, 0.391], [0.191, 0.391], [0.382, 0.742],
++    [0.820, 0.017], [1.000, 0.017], [0.400, 1.000],
++  ], C.white);
++}
++
++/* ------------------------------------------------------------------ *
++ * Text helpers — each mirrors one text box of the source deck
++ * ------------------------------------------------------------------ */
++
++/** Pill-shaped "eyebrow" badge, e.g. "About Econgi". */
++function badge(slide, { x, y, w, text, fill = C.green, color = C.green }) {
++  slide.addText(text, {
++    shape: 'roundRect', rectRadius: 0.15,
++    x, y, w, h: 0.300,
++    fill: { color: fill, transparency: 80 }, line: NO_LINE,
++    align: 'center', valign: 'middle',
++    fontFace: FONT.headMed, fontSize: 11, charSpacing: 0.5, color,
++  });
++}
++
++/** Poppins Bold headline. */
++function heading(slide, { x, y, w, h, text, size = 40, color = C.ink, align, font = FONT.head }) {
++  slide.addText(text, { x, y, w, h, fontFace: font, fontSize: size, bold: true, color, align, valign: 'top' });
++}
++
++/** Small uppercase Poppins Bold kicker above a paragraph. */
++function kicker(slide, { x, y, w, text, color = C.sub, charSpacing = 1.2 }) {
++  slide.addText(text, {
++    x, y, w, h: 0.303, fontFace: FONT.head, fontSize: 12, bold: true, charSpacing, color, valign: 'top',
++  });
++}
++
++/** Montserrat body copy at 1.5 line spacing (justified by default). */
++function paragraph(slide, { x, y, w, h, text, align = 'justify', color = C.body, font = FONT.body }) {
++  slide.addText(text, {
++    x, y, w, h, fontFace: font, fontSize: 11, color, align, lineSpacingMultiple: 1.5, valign: 'top',
++  });
++}
++
++/** Short accent rule that sits under each headline. */
++function rule(slide, x, y, w = 1.143, h = 0.050, color = C.green) {
++  slide.addShape('rect', { x, y, w, h, fill: { color }, line: NO_LINE });
++}
++
++/** Cover-slide furniture shared by slides 1 and 15. */
++function coverChrome(slide) {
++  slide.addText('Econgi', { x: 0.296, y: 0.346, w: 1.577, h: 0.404, fontFace: FONT.headSemi, fontSize: 18, bold: true, color: C.white });
++  hamburger(slide, 12.596, 0.398, C.white);
++  slide.addShape('line', { x: 0.505, y: 6.844, w: 12.323, h: 0, line: { color: C.white, width: 1 } });
++  slide.addText('Eco-Energy for better future', { x: 0.371, y: 6.979, w: 3.823, h: 0.303, fontFace: FONT.body, fontSize: 12, italic: true, color: C.white });
++  slide.addText('www.econgi.com', { x: 11.233, y: 6.996, w: 1.711, h: 0.303, fontFace: FONT.body, fontSize: 12, color: C.white, align: 'right' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Copy that appears on more than one slide
++ * ------------------------------------------------------------------ */
++const LOREM_INTRO =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt labore dolore magna aliqua. ' +
++  'Suspendisse potenti nullam tortor vitae purus faucibus ornare. Tellus elementum sagittis diam condimentum. ';
++const LOREM_SHORT =
++  'Voluptate velit esse cillum ipsum dolor ipsum siabes magna aliqua uta enimvas vederico esse magna.';
++const SERVICE_BLURB =
++  'Voluptate reprehend ipessesa vederico ipsum aliquasi vedericos consectetur internase nostusa ultricies.';
++
++/* ------------------------------------------------------------------ *
++ * Slide builders
++ * ------------------------------------------------------------------ */
++
++// 1 — Cover
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 0, 0, 13.333, 7.5);
++  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: C.greenDark, transparency: 20 }, line: NO_LINE });
++
++  leafMark(s, 3.191, 2.037, C.white, { full: true });
++  s.addText([{ text: 'Eco-Energy', options: { breakLine: true } }, { text: 'Presentation' }],
++    { x: 4.599, y: 2.494, w: 1.655, h: 0.640, fontFace: FONT.body, fontSize: 16, color: C.white });
++  heading(s, { x: 4.509, y: 2.909, w: 5.699, h: 1.818, text: 'Econgi', size: 102, color: C.white });
++
++  s.addText('LET’S STARTED', {
++    shape: 'roundRect', rectRadius: 0.0476, x: 4.885, y: 4.943, w: 1.709, h: 0.470,
++    fill: { color: C.white }, line: NO_LINE, align: 'center', valign: 'middle',
++    fontFace: FONT.bodySemi, fontSize: 10.5, charSpacing: 1, color: C.green,
++  });
++  s.addText('EXPLORE', {
++    shape: 'roundRect', rectRadius: 0.0476, x: 6.821, y: 4.943, w: 1.627, h: 0.470,
++    fill: { type: 'none' }, line: { color: C.white, width: 1.5 }, align: 'center', valign: 'middle',
++    fontFace: FONT.bodySemi, fontSize: 10.5, charSpacing: 1, color: C.white,
++  });
++  coverChrome(s);
++}
++
++// 2 — Welcome / about
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 1.294, 0, 5.039, 6.497, [0, 0, 0.840, 0]);
++  leafMark(s, 0.799, 0.987, C.green, { h: 1.041 });
++
++  badge(s, { x: 7.206, y: 1.563, w: 1.428, text: 'About Econgi' });
++  heading(s, { x: 7.092, y: 1.926, w: 5.167, h: 1.447, text: 'Welcome! We are Econgy' });
++  rule(s, 7.206, 3.547);
++  paragraph(s, { x: 7.097, y: 3.852, w: 5.148, h: 1.180, text: LOREM_INTRO });
++  kicker(s, { x: 7.098, y: 5.243, w: 3.138, text: 'WE ARE THE BEST ECO ENERGY' });
++  paragraph(s, { x: 7.097, y: 5.562, w: 5.148, h: 0.625, text: LOREM_SHORT });
++}
++
++// 3 — Best solution for our future
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  panel(s, { x: 8.556, y: 0.722, w: 4.777, h: 6.778, radii: [0.630, 0, 0, 0], fill: C.green });
++  photo(s, 7.381, 1.137, 2.211, 3.214, [0.157, 0.157, 0.157, 0.157]);
++  photo(s, 9.835, 1.137, 2.211, 3.214, [0.180, 0.180, 0.180, 0.180]);
++  photo(s, 7.381, 4.543, 4.664, 1.836, [0.127, 0.127, 0.127, 0.127]);
++
++  badge(s, { x: 1.267, y: 1.322, w: 1.428, text: 'About Econgi' });
++  heading(s, { x: 1.135, y: 1.637, w: 5.031, h: 1.447, text: 'Best solution for our future' });
++  rule(s, 1.262, 3.265, 1.000);
++  kicker(s, { x: 1.156, y: 3.650, w: 4.071, text: 'WE ARE THE BEST ECO ENERGY' });
++  paragraph(s, {
++    x: 1.169, y: 3.959, w: 5.031, h: 1.458,
++    text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et ' +
++      'dolore magna aliqua. Suspendisse potenti nullam ac tortor vitae purus faucibus ornare elementum sagittis ' +
++      'vitae duis ut diam quam sed lectus vestibulum mattis ullamcorper velit sed. ',
++  });
++
++  [[1.262, 'briefcase', 2.026], [3.952, 'bird', 4.651]].forEach(([chipX, glyph, textX]) => {
++    iconCircle(s, chipX, 5.658, 0.576, glyph);
++    paragraph(s, {
++      x: textX, y: 5.626, w: 1.577, h: 0.625,
++      text: 'Replace with your description', align: 'left', color: C.sub, font: FONT.bodySemi,
++    });
++  });
++}
++
++// 4 — Save energy for our future
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 3.156, 1.183, 2.785, 4.648, [0.465, 0, 0.465, 0]);
++  photo(s, 0, 3.177, 2.922, 4.323, [0, 0.596, 0, 0]);
++  leafMark(s, 1.931, 1.831, C.green);
++
++  badge(s, { x: 7.263, y: 1.360, w: 1.428, text: 'About Econgi' });
++  heading(s, { x: 7.138, y: 1.720, w: 5.017, h: 1.447, text: 'Save energy for our future' });
++  rule(s, 7.231, 3.377, 1.063, 0.059);
++  paragraph(s, {
++    x: 7.120, y: 3.620, w: 4.979, h: 0.903,
++    text: 'Consectetur adipiscing elit, sed doitas eiusmod tempor incididunt ut labore et dolore magna aliqua. ' +
++      'Suspendisse potenti nullam tortor vitae purus faucibus ornare.',
++  });
++
++  s.addShape('line', { x: 7.516, y: 5.325, w: 0, h: 0.249, line: { color: C.green, width: 1.5 } });
++  [['01', 4.756, 4.752, 4.999], ['02', 5.574, 5.575, 5.823]].forEach(([num, chipY, titleY, textY]) => {
++    s.addShape('roundRect', { x: 7.231, y: chipY, w: 0.569, h: 0.569, rectRadius: 0.0948, fill: { color: C.green }, line: NO_LINE });
++    s.addText(num, { x: 7.253, y: chipY + 0.130, w: 0.525, h: 0.337, align: 'center', fontFace: FONT.head, fontSize: 14, bold: true, charSpacing: 1, color: C.white });
++    kicker(s, { x: 8.027, y: titleY, w: 4.071, text: 'REPLACE THIS WITH YOUR TEXT', color: C.ink, charSpacing: 1 });
++    paragraph(s, { x: 8.027, y: textY, w: 4.071, h: 0.347, text: 'Lectus proin nibh nisl condimentum id venenatis. ' });
++  });
++}
++
++// 5 — Econgi save energy for future (stat cards)
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.paper };
++  panel(s, { x: 8.214, y: 0, w: 5.120, h: 6.806, radii: [0, 0, 0, 0.733], fill: C.green });
++  photo(s, 7.296, 1.090, 2.309, 5.320, [0.206, 0.206, 0.206, 0.206]);
++  photo(s, 9.879, 1.090, 2.309, 5.320, [0.206, 0.206, 0.206, 0.206]);
++
++  badge(s, { x: 1.335, y: 1.305, w: 1.428, text: 'About Econgi' });
++  heading(s, { x: 1.163, y: 1.602, w: 5.227, h: 1.447, text: 'Econgi save energy for future' });
++  rule(s, 1.317, 3.156, 1.063, 0.059);
++  paragraph(s, {
++    x: 1.209, y: 3.387, w: 5.181, h: 1.180,
++    text: 'Consectetur elit eiusmod tempor incididunt labore et dolore magna aliqua. Suspendisse potenti nullam ac ' +
++      'PLACEHOLDER' +
++      'potenti nullam ac tortor vitae purus',
++  });
++
++  const stats = [
++    { value: '2500+', cardX: 1.262, numX: 1.539, numW: 1.864, capX: 1.528, capW: 1.875 },
++    { value: '350+', cardX: 3.921, numX: 4.231, numW: 1.816, capX: 4.220, capW: 1.827 },
++  ];
++  stats.forEach(t => {
++    s.addShape('roundRect', {
++      x: t.cardX, y: 4.848, w: 2.419, h: 1.276, rectRadius: 0.1017,
++      fill: { color: C.white }, line: CARD_EDGE,
++      shadow: { type: 'outer', blur: 50, offset: 50, angle: 135, color: '000000', opacity: 0.1 },
++    });
++    s.addText(t.value, { x: t.numX, y: 5.007, w: t.numW, h: 0.707, align: 'center', fontFace: FONT.body, fontSize: 36, bold: true, color: C.green });
++    paragraph(s, { x: t.capX, y: 5.632, w: t.capW, h: 0.347, text: 'Replace with yours', align: 'center', color: C.sub });
++  });
++}
++
++// 6 — Renewable energy for better future
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 0, 0.958, 5.889, 5.833, [0, 0, 0.624, 0]);
++
++  badge(s, { x: 7.032, y: 1.249, w: 1.428, text: 'About Econgi' });
++  heading(s, { x: 6.926, y: 1.591, w: 5.406, h: 1.313, text: 'Renewable Energy for better future', size: 36 });
++  rule(s, 7.032, 3.111);
++  paragraph(s, {
++    x: 6.940, y: 3.368, w: 5.406, h: 0.897,
++    text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et ' +
++      'dolore magna aliqua. Suspendisse potenti nullam ac tortor vitae purus faucibus ornare. ',
++  });
++
++  const rows = [
++    { y: 4.496, glyph: 'bird', text: 'PLACEHOLDER' },
++    { y: 5.568, glyph: 'briefcase', text: 'PLACEHOLDER' },
++  ];
++  rows.forEach(r => {
++    iconCircle(s, 7.122, r.y, 0.576, r.glyph);
++    kicker(s, { x: 7.931, y: r.y - 0.023, w: 4.415, text: 'REPLACE THIS TEXT TITLE', charSpacing: 1 });
++    paragraph(s, { x: 7.931, y: r.y + 0.266, w: 4.415, h: 0.625, text: r.text });
++  });
++}
++
++// 7 — Why you should choose Econgi (three numbered cards)
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  panel(s, { x: -0.005, y: 0, w: 6.616, h: 4.303, radii: [0, 0, 0.445, 0], fill: C.green });
++  photo(s, 0, 0, 6.524, 4.651, [0, 0, 0.416, 0]);
++
++  badge(s, { x: 7.586, y: 1.376, w: 1.428, text: 'Our Services' });
++  heading(s, { x: 7.494, y: 1.707, w: 4.904, h: 1.313, text: 'Why you should choose Econgi?', size: 36 });
++  paragraph(s, {
++    x: 7.494, y: 3.123, w: 4.904, h: 1.180,
++    text: 'PLACEHOLDER' +
++      'siabes dolore magna aliqua veniam consectetur adipiscinc elita vederico laborum vederico esse cillum magna. ',
++  });
++
++  const cards = [
++    { n: '01', cardX: 0.714, cardY: 5.238, dotX: 0.986, numX: 0.981, titleX: 0.993, titleW: 3.243, textX: 0.986, textW: 3.280 },
++    { n: '02', cardX: 4.769, cardY: 5.238, dotX: 5.006, numX: 5.012, titleX: 5.017, titleW: 3.317, textX: 5.001, textW: 3.356 },
++    { n: '03', cardX: 8.823, cardY: 5.228, dotX: 9.120, numX: 9.125, titleX: 9.121, titleW: 3.233, textX: 9.115, textW: 3.233 },
++  ];
++  cards.forEach(c => {
++    s.addShape('roundRect', {
++      x: c.cardX, y: c.cardY, w: 3.783, h: 1.667, rectRadius: 0.135,
++      fill: { type: 'none' }, line: { color: C.greenMid, width: 1.5 },
++    });
++    s.addShape('ellipse', { x: c.dotX, y: 5.010, w: 0.450, h: 0.450, fill: { color: C.green }, line: { color: C.white, width: 3 } });
++    s.addText(c.n, { x: c.numX, y: 5.098, w: 0.450, h: 0.303, align: 'center', fontFace: FONT.headSemi, fontSize: 12, charSpacing: 1.2, color: C.white });
++    kicker(s, { x: c.titleX, y: 5.543, w: c.titleW, text: 'ECONGI’S SERVICES ' + Number(c.n) });
++    paragraph(s, { x: c.textX, y: 5.827, w: c.textW, h: 0.897, text: SERVICE_BLURB });
++  });
++}
++
++// 8 — We always think the best for client
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  panel(s, { x: 0, y: 0, w: 4.542, h: 6.875, radii: [0, 0, 0.667, 0], fill: C.green });
++  photo(s, 1.181, 0.964, 4.618, 2.682, [0.102, 0.102, 0.102, 0.102]);
++  photo(s, 1.885, 3.854, 4.618, 2.682, [0.102, 0.102, 0.102, 0.102]);
++
++  badge(s, { x: 7.572, y: 1.362, w: 1.428, text: 'Our Services' });
++  heading(s, { x: 7.409, y: 1.681, w: 4.855, h: 1.313, text: 'We always think the best for client', size: 36 });
++  paragraph(s, {
++    x: 7.451, y: 3.095, w: 4.813, h: 0.903,
++    text: 'Lectus proin idas reprehenderit voluptate velit esse condimentum id venenatis. Aliquam maecenas ' +
++      'ultricies misl voluptate velit aliqua veniam consectetur.',
++  });
++
++  const rows = [
++    { y: 4.201, glyph: 'briefcase', title: 'ECONGI’S SERVICES 1', titleW: 2.264, text: 'Lectus proin nibhisal condimentum idaliam venenatis aliquam id diam maecenas ultricies. ' },
++    { y: 5.264, glyph: 'chat', title: 'ECONGI’S SERVICES 2', titleW: 2.298, text: 'Lectus proin nibhisal condimentum idaliam venenatis aliquam diam maecenas ultricies. ' },
++  ];
++  rows.forEach(r => {
++    iconSquare(s, 7.582, r.y, 0.500, r.glyph);
++    kicker(s, { x: 8.323, y: r.y - 0.026, w: r.titleW, text: r.title });
++    paragraph(s, { x: 8.323, y: r.y + 0.270, w: 3.941, h: 0.625, text: r.text });
++  });
++}
++
++// 9 — We have the best employees
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.paper };
++  leafMark(s, 2.653, 1.225, C.green);
++
++  const cards = [
++    { x: 3.963, y: 1.288, w: 2.704, h: 3.410, r: 0.1875 },
++    { x: 0.968, y: 2.684, w: 2.704, h: 3.410, r: 0.2031 },
++    { x: 3.963, y: 5.009, w: 2.704, h: 1.032, r: 0.0938 },
++  ];
++  cards.forEach(c => s.addShape('roundRect', {
++    x: c.x, y: c.y, w: c.w, h: c.h, rectRadius: c.r,
++    fill: { color: C.white }, line: CARD_EDGE, shadow: CARD_SHADOW,
++  }));
++  photo(s, 4.127, 1.460, 2.376, 2.437, [0.114, 0.114, 0.114, 0.114]);
++  photo(s, 1.132, 2.856, 2.376, 2.437, [0.100, 0.100, 0.100, 0.100]);
++
++  iconCircle(s, 4.209, 5.246, 0.576, 'briefcase', { glyphColor: C.green, transparency: 80 });
++  paragraph(s, { x: 4.973, y: 5.214, w: 1.577, h: 0.625, text: 'Replace with your description', align: 'left', color: C.sub, font: FONT.bodySemi });
++
++  const people = [
++    { name: 'Aubrey Grace', nameX: 1.164, nameW: 2.288, nameY: 5.413, role: 'FOUNDER', roleX: 1.365, roleW: 1.875, roleY: 5.715 },
++    { name: 'Liza Febrian', nameX: 4.277, nameW: 2.100, nameY: 4.008, role: 'CO FOUNDER', roleX: 4.365, roleW: 1.897, roleY: 4.309 },
++  ];
++  people.forEach(p => {
++    s.addText(p.name, { x: p.nameX, y: p.nameY, w: p.nameW, h: 0.337, align: 'center', fontFace: FONT.bodySemi, fontSize: 14, color: C.sub });
++    s.addText(p.role, { x: p.roleX, y: p.roleY, w: p.roleW, h: 0.278, align: 'center', fontFace: FONT.headMed, fontSize: 10.5, charSpacing: 1, color: C.green });
++  });
++
++  badge(s, { x: 7.597, y: 1.335, w: 1.313, text: 'Our Team' });
++  heading(s, { x: 7.473, y: 1.665, w: 4.893, h: 1.447, text: 'We have the best employees' });
++  rule(s, 7.597, 3.229, 1.000, 0.050, C.greenMid);
++  paragraph(s, {
++    x: 7.513, y: 3.470, w: 4.852, h: 1.458,
++    text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et ' +
++      'dolore magna aliqua. Suspendisse potenti nullam ac tortor vitae purus faucibus ornare. Tellus elementum ' +
++      'sagittis id vederico esse venenatis mattis velit sed',
++  });
++  kicker(s, { x: 7.508, y: 5.088, w: 3.555, text: 'HIGHLY SKILLED TEAM' });
++  paragraph(s, { x: 7.513, y: 5.391, w: 4.852, h: 0.625, text: LOREM_SHORT });
++}
++
++// 10 — Introducing our best team (green hill + three portraits)
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  const W = 13.333, H = 2.804;
++  s.addShape('custGeom', {                                        // dome-topped hill
++    x: 0, y: 4.696, w: W, h: H,
++    points: [
++      { x: 0.500 * W, y: 0, moveTo: true },
++      { x: 0.972 * W, y: 0.302 * H, curve: { type: 'cubic', x1: 0.666 * W, y1: 0, x2: 0.825 * W, y2: 0.107 * H } },
++      { x: W, y: 0.340 * H },
++      { x: W, y: H },
++      { x: 0, y: H },
++      { x: 0, y: 0.340 * H },
++      { x: 0.028 * W, y: 0.302 * H },
++      { x: 0.500 * W, y: 0, curve: { type: 'cubic', x1: 0.175 * W, y1: 0.107 * H, x2: 0.334 * W, y2: 0 } },
++      { close: true },
++    ],
++    fill: { color: C.greenDark }, line: NO_LINE,
++  });
++
++  badge(s, { x: 6.005, y: 0.966, w: 1.323, text: 'Our Team', fill: C.greenMid, color: C.greenDark });
++  heading(s, { x: 2.310, y: 1.318, w: 8.714, h: 0.774, text: 'Introducing our best team', align: 'center' });
++  paragraph(s, {
++    x: 2.310, y: 2.179, w: 8.714, h: 0.625, align: 'center',
++    text: 'PLACEHOLDER' +
++      'ultricies misl voluptate velit esse magna esse aliqua veniam consectetur.',
++  });
++
++  const team = [
++    { name: 'Daniel Smith', picX: 1.842, picY: 3.389, d: 2.366, nameX: 1.971, nameW: 2.100, roleX: 2.112, roleW: 1.911 },
++    { name: 'Abigail Gold', picX: 5.483, picY: 3.371, d: 2.384, nameX: 5.532, nameW: 2.288, roleX: 5.733, roleW: 1.875 },
++    { name: 'Alfred Brian', picX: 9.107, picY: 3.371, d: 2.384, nameX: 9.262, nameW: 2.100, roleX: 9.350, roleW: 1.897 },
++  ];
++  team.forEach(m => {
++    photoCircle(s, m.picX, m.picY, m.d);
++    s.addText(m.name, { x: m.nameX, y: 6.157, w: m.nameW, h: 0.337, align: 'center', fontFace: FONT.body, fontSize: 14, bold: true, color: C.white });
++    s.addText('JOB POSITION', { x: m.roleX, y: 6.459, w: m.roleW, h: 0.252, align: 'center', fontFace: FONT.bodyMed, fontSize: 9, charSpacing: 1, color: C.white });
++  });
++}
++
++// 11 — Mobile app mock-up
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  panel(s, { x: 8.728, y: 0.556, w: 4.605, h: 6.944, radii: [0.756, 0, 0, 0], fill: C.green });
++
++  [[11.517, 3.267, 1.076, 0.154], [7.449, 2.043, 0.402, 0.153],
++   [7.317, 2.868, 0.666, 0.153], [7.317, 3.667, 0.666, 0.153]].forEach(([x, y, w, h]) => {
++    s.addShape('roundRect', { x, y, w, h, rotate: 90, rectRadius: h / 2, fill: { color: C.sideBtn }, line: NO_LINE });
++  });
++
++  panel(s, { x: 7.618, y: 0.953, w: 4.461, h: 6.547, radii: [0.552, 0.552, 0, 0], fill: C.phoneCase });
++  panel(s, { x: 7.704, y: 1.035, w: 4.287, h: 6.465, radii: [0.425, 0.425, 0, 0], fill: C.screen });
++  photo(s, 7.805, 1.123, 4.086, 6.377, [0.389, 0.389, 0, 0]);
++
++  panel(s, { x: 8.728, y: 1.132, w: 2.228, h: 0.363, radii: [0, 0, 0.1815, 0.1815], fill: C.screen });   // notch
++  s.addShape('rect', { x: 7.625, y: 1.642, w: 0.097, h: 0.081, fill: { color: C.ink }, line: NO_LINE });
++  s.addShape('rect', { x: 11.975, y: 1.642, w: 0.097, h: 0.081, fill: { color: C.ink }, line: NO_LINE });
++  s.addShape('ellipse', { x: 9.057, y: 1.238, w: 0.118, h: 0.118, fill: { color: C.lens }, line: NO_LINE });
++  s.addShape('ellipse', { x: 9.092, y: 1.271, w: 0.049, h: 0.049, fill: { color: C.lensDot }, line: NO_LINE });
++  s.addShape('roundRect', { x: 9.581, y: 1.259, w: 0.485, h: 0.081, rectRadius: 0.0405, fill: { color: C.ink }, line: NO_LINE });
++
++  badge(s, { x: 1.354, y: 1.608, w: 1.756, text: 'Device Mockup', fill: C.greenMid });
++  heading(s, { x: 1.241, y: 1.967, w: 5.167, h: 1.447, text: 'Introducing our new mobile apps' });
++  rule(s, 1.354, 3.588, 1.143, 0.050, C.greenMid);
++  paragraph(s, { x: 1.245, y: 3.894, w: 5.148, h: 1.180, text: LOREM_INTRO });
++  kicker(s, { x: 1.247, y: 5.285, w: 3.138, text: 'WE ARE THE BEST ECO ENERGY' });
++  paragraph(s, { x: 1.245, y: 5.604, w: 5.148, h: 0.625, text: LOREM_SHORT });
++}
++
++// 12 — Tablet mock-up
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  panel(s, { x: 0, y: 0, w: 4.212, h: 6.953, radii: [0, 0, 0.645, 0], fill: C.green });
++
++  s.addShape('roundRect', { x: 5.064, y: 0.965, w: 0.256, h: 0.086, rectRadius: 0.0414, fill: { color: C.tabletBtn }, line: NO_LINE });
++  [1.422, 1.644].forEach(y => {
++    s.addShape('roundRect', { x: 5.426, y, w: 0.213, h: 0.086, rotate: 90, rectRadius: 0.0414, fill: { color: C.tabletBtn }, line: NO_LINE });
++  });
++  panel(s, { x: 1.299, y: 0.989, w: 4.251, h: 5.546, radii: [0.289, 0.289, 0.289, 0.289], fill: C.tabletCase });
++  panel(s, { x: 1.342, y: 1.032, w: 4.165, h: 5.460, radii: [0.258, 0.258, 0.258, 0.258], fill: C.screen });
++  photo(s, 1.451, 1.136, 3.940, 5.234, [0.214, 0.214, 0.214, 0.214]);
++
++  [3.129, 3.245, 3.654].forEach(x => {
++    s.addShape('ellipse', { x, y: 1.070, w: 0.063, h: 0.063, fill: { color: C.ink }, line: NO_LINE });
++  });
++  s.addShape('ellipse', { x: 3.392, y: 1.070, w: 0.063, h: 0.063, fill: { color: C.lens }, line: NO_LINE });
++  s.addShape('ellipse', { x: 3.410, y: 1.088, w: 0.026, h: 0.026, fill: { color: C.lensDot }, line: NO_LINE });
++
++  badge(s, { x: 6.799, y: 1.457, w: 1.756, text: 'Device Mockup', fill: C.greenMid });
++  heading(s, { x: 6.722, y: 1.802, w: 5.417, h: 1.447, text: 'Preview our apps in tablet view' });
++  rule(s, 6.827, 3.384, 1.063, 0.059);
++  paragraph(s, {
++    x: 6.709, y: 3.665, w: 5.402, h: 1.180,
++    text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et ' +
++      'dolore magna aliqua. Suspendisse potenti nullam ac tortor vitae purus faucibus ornare. Tellus elementum ' +
++      'sagittis vitae et leo duis',
++  });
++
++  const bullets = [
++    { y: 5.093, text: 'Replace this with your text' },
++    { y: 5.554, text: 'Put and replace this with your text' },
++    { y: 6.023, text: 'Replace this text with yours' },
++  ];
++  bullets.forEach(b => {
++    s.addShape('ellipse', { x: 6.794, y: b.y, w: 0.240, h: 0.240, fill: { color: C.green }, line: NO_LINE });
++    checkGlyph(s, 6.856, b.y + 0.087);
++    s.addText(b.text, { x: 7.232, y: b.y - 0.015, w: 2.998, h: 0.286, fontFace: FONT.headSemi, fontSize: 11, color: C.sub });
++  });
++}
++
++// 13 — Desktop mock-up on solid green
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.greenDark };
++
++  // iMac-style monitor: casing, black bezel, screen, chin, stand, base
++  panel(s, { x: 1.116, y: 1.419, w: 5.550, h: 3.293, radii: [0.156, 0.156, 0, 0], fill: C.monitorCase });
++  poly(s, 3.071, 5.193, 1.643, 0.801,
++    [[0.184, 0.00], [0.835, 0.02], [0.881, 0.77], [1.00, 0.96],
++     [0.98, 1.00], [0.02, 1.00], [0.00, 0.96], [0.130, 0.77]], C.monitorStand);
++  panel(s, { x: 1.135, y: 1.439, w: 5.512, h: 3.288, radii: [0.148, 0.148, 0, 0], fill: C.screen });
++  photo(s, 1.344, 1.655, 5.088, 2.871);
++  panel(s, { x: 1.116, y: 4.726, w: 5.550, h: 0.501, radii: [0, 0, 0.132, 0.132], fill: C.monitorCase });
++  panel(s, { x: 2.978, y: 5.831, w: 1.828, h: 0.187, radii: [0.0935, 0.0935, 0, 0], fill: C.monitorBase });
++  [3.653, 3.747, 4.079].forEach(x => {
++    s.addShape('ellipse', { x, y: 1.516, w: 0.051, h: 0.051, fill: { color: C.ink }, line: NO_LINE });
++  });
++  s.addShape('ellipse', { x: 3.866, y: 1.516, w: 0.051, h: 0.051, fill: { color: C.lens }, line: NO_LINE });
++  s.addShape('ellipse', { x: 3.881, y: 1.530, w: 0.021, h: 0.021, fill: { color: C.lensDot }, line: NO_LINE });
++
++  badge(s, { x: 7.663, y: 1.463, w: 1.756, text: 'Device Mockup', fill: C.white, color: C.white });
++  heading(s, { x: 7.550, y: 1.949, w: 4.725, h: 1.313, text: 'Preview our app on desktop view', size: 36, color: C.white });
++  rule(s, 7.672, 3.449, 1.143, 0.050, C.white);
++  kicker(s, { x: 7.571, y: 3.807, w: 3.502, text: 'SAVE ENERGY FOR BETTER FUTURE', color: C.white });
++  paragraph(s, {
++    x: 7.563, y: 4.129, w: 4.712, h: 2.013, color: C.offWhite,
++    text: 'PLACEHOLDER' +
++      'PLACEHOLDER' +
++      'PLACEHOLDER' +
++      'velit esse cillum magna aliqua minimasa ipsum voluptate.',
++  });
++}
++
++// 14 — Get in touch
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 0, 0, 13.333, 5.558);
++  panel(s, { x: 6.097, y: 0, w: 5.847, h: 6.458, radii: [0, 0, 0.777, 0], fill: C.green });
++
++  badge(s, { x: 6.952, y: 1.058, w: 1.278, text: 'Contact Us', fill: C.white, color: C.white });
++  heading(s, { x: 6.816, y: 1.431, w: 4.454, h: 0.774, text: 'Get in touch', color: C.white, font: FONT.body });
++  rule(s, 6.952, 2.413, 1.143, 0.059, C.white);
++  paragraph(s, {
++    x: 6.857, y: 2.704, w: 4.389, h: 0.903, color: C.offWhite,
++    text: 'Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. ' +
++      'Suspendisse potenti nullam tortor vitae purus faucibus ornare. ',
++  });
++
++  const details = [
++    { label: 'OUR ADDRESS', labelX: 6.851, labelW: 1.725, labelY: 3.979, valueX: 6.857, valueW: 2.227, valueY: 4.262, valueH: 0.625, value: 'Street Name, 45, Building 85, 445566, Soho, NY' },
++    { label: 'OFFICE HOURS', labelX: 9.491, labelW: 1.780, labelY: 3.979, valueX: 9.491, valueW: 1.975, valueY: 4.262, valueH: 0.620, value: 'Monday –Friday\n08:00 – 17:00' },
++    { label: 'EMAIL', labelX: 6.846, labelW: 0.856, labelY: 5.221, valueX: 6.860, valueW: 2.227, valueY: 5.503, valueH: 0.347, value: 'email@econgi.com' },
++    { label: 'PHONE', labelX: 9.491, labelW: 0.947, labelY: 5.210, valueX: 9.491, valueW: 1.975, valueY: 5.492, valueH: 0.347, value: '0800 123 456' },
++  ];
++  details.forEach(d => {
++    s.addText(d.label, { x: d.labelX, y: d.labelY, w: d.labelW, h: 0.337, fontFace: FONT.head, fontSize: 14, bold: true, charSpacing: 1, color: C.white });
++    paragraph(s, { x: d.valueX, y: d.valueY, w: d.valueW, h: d.valueH, text: d.value, align: 'left', color: C.offWhite });
++  });
++}
++
++// 15 — Thanks!
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 0.007, 0, 13.333, 7.5);
++  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: C.greenDark, transparency: 20 }, line: NO_LINE });
++
++  leafMark(s, 2.718, 2.190, C.white, { full: true });
++  s.addText('Eco-Energy Presentation', { x: 4.051, y: 2.869, w: 3.776, h: 0.370, fontFace: FONT.body, fontSize: 16, color: C.white });
++  heading(s, { x: 4.037, y: 3.062, w: 6.616, h: 1.818, text: 'Thanks!', size: 102, color: C.white });
++  coverChrome(s);
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'ECONGI_16x9', width: 13.333, height: 7.5 });
++  pptx.layout = 'ECONGI_16x9';
++  pptx.author = 'Econgi';
++  pptx.title = 'Eco-Energy Presentation';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++   slide09, slide10, slide11, slide12, slide13, slide14, slide15]
++    .forEach(fn => fn(pptx));
++
++  const out = path.join(__dirname, '099893a9-3cd1-4677-a020-7e5477340b1d_grok_final.pptx');
++  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote', out));
++}
++
++build().catch(err => { console.error(err); process.exit(1); });

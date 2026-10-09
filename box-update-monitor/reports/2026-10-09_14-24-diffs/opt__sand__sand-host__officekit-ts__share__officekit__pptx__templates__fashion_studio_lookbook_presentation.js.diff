@@ -1,0 +1,826 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_studio_lookbook_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_studio_lookbook_presentation.js
+@@ -0,0 +1,823 @@
++/**
++ * "CARRASA" studio-design / lookbook template — 30 slides, 13.335 x 7.5 in.
++ *
++ * Rebuilt with pptxgenjs only.  Raster artwork of the original deck (the tiled
++ * "insert your image here" picture placeholders, the three device mock-up
++ * photos) is replaced by grey `[image]` rectangles of the same geometry; the
++ * two vector maps are approximated by grey silhouettes plus their real pins.
++ *
++ *   node 143af599-3253-4c2a-8272-f79dd769b5bb_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const SLIDE_W = 13.3351;
++const SLIDE_H = 7.5;
++
++const C = {
++    teal: '12959F', // theme accent1
++    blue: '31A8DF', // theme accent2
++    white: 'FFFFFF',
++    body: '808080', // running body copy
++    sub: '595959', // small bold sub headings
++    dark: '404040',
++    chrome: 'A6A6A6', // "CARRASA TEMPLATE" / "PAGE / n"
++    footer: 'BFBFBF',
++    image: 'F2F2F2', // picture-placeholder fill
++    imageInk: 'C9C9C9', // picture-placeholder caption
++    device: 'D5D7DA', // mock-up keyboard base
++    deviceInk: '2C2F36', // mock-up device bezels
++    mapUs: 'BFBFBF', // USA map silhouette (bg1 lumMod 75%)
++    mapWorld: 'E4E4E4' // world map silhouette (bg1 lumMod 65% @ 30% alpha)
++};
++
++const FONT = { head: 'Montserrat SemiBold', body: 'Roboto' };
++
++/* Body copy of the template (verbatim from the deck). */
++const LOREM = {
++    ipsum:
++        'PLACEHOLDER' +
++        'PLACEHOLDER' +
++        'officia maxime ipsum iusto possimus autem quas rerum',
++    ipsumShort:
++        'PLACEHOLDER' +
++        'PLACEHOLDER',
++    asuscipit:
++        'PLACEHOLDER' +
++        'PLACEHOLDER' +
++        'lacus vitae tristique',
++    viverra:
++        'PLACEHOLDER' +
++        'PLACEHOLDER' +
++        'elementum ipsum',
++    mollis:
++        'PLACEHOLDER' +
++        'PLACEHOLDER' +
++        'PLACEHOLDER',
++    dapibus: 'PLACEHOLDER',
++    sint: 'sint sapiente assumenda nulla aut quas voluto temporibus'
++};
++LOREM.mollisLong = LOREM.mollis + ' integer mollis dallas vel magna';
++LOREM.asuscipitLong = LOREM.asuscipit + ' quam aliquam sied pretium viverra ';
++
++/* --------------------------------------------------------------- helpers */
++
++/** Filled rectangle (the deck is built almost entirely out of these). */
++function rect(slide, x, y, w, h, color, opts) {
++    slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, opts));
++}
++
++/** Dark bezel + light screen: stand-in for the device mock-up photographs. */
++function deviceFrame(slide, x, y, w, h, bezel, radius) {
++    slide.addShape('roundRect', {
++        x, y, w, h, fill: { color: C.deviceInk }, line: { type: 'none' }, rectRadius: radius
++    });
++    slide.addShape('rect', {
++        x: x + bezel, y: y + bezel, w: w - 2 * bezel, h: h - 2 * bezel,
++        fill: { color: C.white }, line: { type: 'none' }
++    });
++}
++
++/** Grey stand-in for a raster image / picture placeholder. */
++function imageBox(slide, x, y, w, h, color) {
++    slide.addText('[image]', {
++        x, y, w, h,
++        fill: { color: color || C.image },
++        align: 'center', valign: 'middle',
++        fontFace: FONT.body, fontSize: 11, color: C.imageInk
++    });
++}
++
++/** Any text run; `str` may be a string, "a\nb", or an array of rich runs. */
++function text(slide, str, o) {
++    slide.addText(str, Object.assign({ fontFace: FONT.body, fontSize: 12, color: C.body, margin: 0, valign: 'top' }, o));
++}
++
++/** Big Montserrat headline (wrap disabled, exactly like the source deck). */
++function title(slide, x, y, w, h, str, o) {
++    text(slide, str, Object.assign({ x, y, w, h, fontFace: FONT.head, fontSize: 28, color: C.blue, wrap: false }, o));
++}
++
++/** Small bold sub-heading such as "Description" / "Image 01". */
++function label(slide, x, y, w, h, str, o) {
++    text(slide, str, Object.assign({ x, y, w, h, fontSize: 14, bold: true, color: C.sub, lineSpacingMultiple: 1.5, wrap: false }, o));
++}
++
++/** Justified paragraph at 150 % leading — the deck's standard body block. */
++function para(slide, x, y, w, h, str, o) {
++    text(slide, str, Object.assign({ x, y, w, h, align: 'justify', lineSpacingMultiple: 1.5 }, o));
++}
++
++/** "Description" label + paragraph, the most repeated pairing in the deck. */
++function described(slide, x, labelY, bodyY, w, h, str, o) {
++    o = o || {};
++    label(slide, x, labelY, 1.0133, 0.3141, 'Description', { align: o.align, color: o.labelColor });
++    para(slide, x, bodyY, w, h, str, { align: o.align === 'right' ? 'right' : 'justify' });
++}
++
++/** Per-slide furniture: corner wordmark, page number, copyright line. */
++function chrome(slide, n, o) {
++    o = o || {};
++    text(slide, [
++        { text: 'CARRASA', options: { bold: true } },
++        { text: ' TEMPLATE' }
++    ], {
++        x: 0.1008, y: 0.1441, w: 2.9245, h: 0.2524, wrap: false,
++        fontFace: FONT.head, fontSize: 9, charSpacing: 6, color: o.header || C.chrome, margin: 7.2
++    });
++    text(slide, [
++        { text: 'PAGE / ' },
++        { text: n === 1 ? '01' : String(n), options: { bold: true } }
++    ], {
++        x: n === 1 ? 12.0894 : 12.137, y: 0.1862, w: 1.0957, h: 0.1683, wrap: false, valign: 'middle',
++        fontFace: FONT.head, fontSize: 10, charSpacing: 3, color: o.number || C.chrome
++    });
++    text(slide, [
++        { text: '\u00a9 2023  ' },
++        { text: 'Ourslide ~ Template  ', options: { bold: true } },
++        { text: 'all rights reserved' }
++    ], {
++        x: o.footer === C.white ? 5.2072 : 5.1406, y: 7.1886, w: 2.9872, h: 0.1683, wrap: false,
++        fontSize: 10, color: o.footer || C.footer
++    });
++}
++
++/**
++ * Draws a coarse pixel silhouette of a '#'/'.' grid.  Horizontal runs of '#'
++ * are merged into one rectangle and identical runs on consecutive rows are
++ * stacked into a single taller rectangle, which keeps the shape count (and
++ * the hairline seams between abutting fills) down.  Used for the two vector
++ * maps of the infographic slides.
++ */
++function silhouette(slide, grid, x0, y0, cell, color) {
++    const used = grid.map(function (row) { return new Array(row.length).fill(false); });
++    grid.forEach(function (row, r) {
++        let c = 0;
++        while (c < row.length) {
++            if (row[c] !== '#' || used[r][c]) { c++; continue; }
++            let end = c;
++            while (row[end + 1] === '#' && !used[r][end + 1]) end++;
++            const span = row.slice(c, end + 1);
++            let last = r;
++            while (grid[last + 1] && grid[last + 1].slice(c, end + 1) === span &&
++                   grid[last + 1][c - 1] !== '#' && grid[last + 1][end + 1] !== '#') last++;
++            for (let k = r; k <= last; k++) for (let i = c; i <= end; i++) used[k][i] = true;
++            slide.addShape('rect', {
++                x: x0 + c * cell, y: y0 + r * cell,
++                w: span.length * cell, h: (last - r + 1) * cell + cell * 0.08,
++                fill: { color }, line: { type: 'none' }
++            });
++            c = end + 1;
++        }
++    });
++}
++
++/** Map pin: round head + downward triangle + white centre dot. */
++function pin(slide, x, y, w, h, color) {
++    slide.addShape('ellipse', { x, y, w, h: w, fill: { color }, line: { type: 'none' } });
++    slide.addShape('triangle', {
++        x: x + w * 0.17, y: y + w * 0.6, w: w * 0.66, h: h - w * 0.6,
++        fill: { color }, line: { type: 'none' }, flipV: true
++    });
++    const d = w * 0.36;
++    slide.addShape('ellipse', {
++        x: x + (w - d) / 2, y: y + (w - d) / 2, w: d, h: d,
++        fill: { color: C.white }, line: { type: 'none' }
++    });
++}
++
++/** Male / female pictogram used by the social-stats slide. */
++function personIcon(slide, x, y, w, h, color, female) {
++    const blob = function (bx, by, bw, bh, radius) {
++        slide.addShape('roundRect', {
++            x: bx, y: by, w: bw, h: bh, fill: { color }, line: { type: 'none' }, rectRadius: radius
++        });
++    };
++    const head = w * 0.42;
++    const bodyTop = y + head * 1.18;
++    const bodyH = h * 0.40;
++    const legTop = bodyTop + bodyH;
++    slide.addShape('ellipse', { x: x + (w - head) / 2, y, w: head, h: head, fill: { color }, line: { type: 'none' } });
++    blob(x + w * 0.26, bodyTop, w * 0.48, bodyH, 0.09); // torso
++    blob(x + w * 0.08, bodyTop, w * 0.15, bodyH * 0.9, 0.08); // left arm
++    blob(x + w * 0.77, bodyTop, w * 0.15, bodyH * 0.9, 0.08); // right arm
++    if (female) {
++        slide.addShape('triangle', { x, y: bodyTop, w, h: bodyH * 1.12, fill: { color }, line: { type: 'none' } });
++        blob(x + w * 0.33, legTop + bodyH * 0.14, w * 0.13, h - (legTop - y) - bodyH * 0.14, 0.06);
++        blob(x + w * 0.54, legTop + bodyH * 0.14, w * 0.13, h - (legTop - y) - bodyH * 0.14, 0.06);
++    } else {
++        blob(x + w * 0.28, legTop, w * 0.19, h - (legTop - y), 0.06);
++        blob(x + w * 0.53, legTop, w * 0.19, h - (legTop - y), 0.06);
++    }
++}
++
++/**
++ * Social monogram standing in for the deck's freeform brand glyphs; `glyphH`
++ * is the wanted cap height in inches, optionally on a coloured disc of `d`.
++ */
++function socialIcon(slide, x, y, d, glyphH, glyph, color, disc) {
++    if (disc) slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: disc }, line: { type: 'none' } });
++    text(slide, glyph, {
++        x, y, w: d, h: d, align: 'center', valign: 'middle',
++        fontFace: FONT.head, fontSize: Math.round(glyphH * 72 / 0.7), bold: true, color
++    });
++}
++
++/* ------------------------------------------------------------------- maps */
++
++/* Coarse 0.06" raster tracings of the deck's two vector maps. */
++const US_MAP = [
++    '.......................................................................................##',
++    '....#..#####...........................................................................###',
++    '....#############.......................##............................................####',
++    '....#####################.......#.....#####...........................................#####',
++    '....####################################..#######.....................................######',
++    '....###########################..#######.###########..................................######',
++    '....###########################..#######################.............................#####',
++    '....##################################################....#.....####............#########',
++    '...##################################################...####.#####.##..........##.######',
++    '...######..####################################################.#..##..........##..#####',
++    '..########.##################################################...####...........#########',
++    '..##########################################################....####...........#########',
++    '.###########################################################...####...........###########',
++    '.#######..###################################################.#####.#......####..########',
++    '.#######..###################################################.#######......####..######',
++    '.################################################..##########..######.....###########',
++    '.#######################################..#######..##########..######....#############',
++    '.#######################################..###################..#####....############',
++    '#############################################################..######.##############',
++    '##############..##################..################################################',
++    '##############..##################..################################################',
++    '###################################################################################',
++    '.###########################################...##################################.##',
++    '.############################################.#######################..##########',
++    '..###################################################################..###########',
++    '..################################################################################',
++    '..#################################################################################',
++    '..#################################################################################',
++    '..########.#########################################################################',
++    '...#######..########################################################################',
++    '...############################################..##################################',
++    '...############################################..##################################',
++    '...###############################################################################',
++    '.....############################..##############################################',
++    '......###########################..#############################################',
++    '.......########################################################################',
++    '........##########################################################..###########',
++    '.........#########################################################.###########',
++    '.........####################################################################',
++    '..............###############################################################',
++    '...............################################################################',
++    '.................###########################################################.##',
++    '...................#########.##############..###############################.##',
++    '.............................##############..#################################',
++    '..............................####################################..###.######',
++    '...............................##############################............#####',
++    '................................#############################..............####',
++    '................................####..##############......##...............####',
++    '.................................##....############........................#####',
++    '........................................##########.........................#####',
++    '........................................#######.............................#####',
++    '.........................................######..............................####',
++    '..........................................####................................###',
++    '..........................................####.................................#',
++    '...........................................###',
++    '............................................##'
++];
++
++const WORLD_MAP = [
++    '.....................................###',
++    '...................................#######...####',
++    '.................................#################.........................##',
++    '............................#.##.##################................###......##',
++    '.........................##.#.#########.###########..............####........###.........####',
++    '.........................##.....#.#################........###.................##........##',
++    '..........................##########.#############........###..................####.......##',
++    '...........###.........##.....######..############........###..........#......######.......###..#...######',
++    '.........#######......####.#.######....###########.........#..........##....#############.#################',
++    '.........########......############.....##########...................##.....###############################',
++    '.......###############.#####.######.....##########..................##.....##############################',
++    '.......#####################.#######....#########...................##..#################################',
++    '........#######################.#####...#########...................##..#################################',
++    '.......##########################.###...#########...........###.......##################################',
++    '......###########################.####..########..........#######..#####################################',
++    '.......#########################..####..######..###......##########################################.##',
++    '.......#####.###################.####...####....##.......##########################################.##',
++    '.......###....###############...##.##...###.............#######################################.....##',
++    '......##.......#############.....##......##.............#######################################....###',
++    '...............#############....#####...............#...#######################################.....##',
++    '...............###############..#####...............##..###.#####################################...#',
++    '................###############.######.............###..#########################################',
++    '................#######################............##############################################',
++    '.................######################..............############################################',
++    '.................###################.##..............##########################################.#',
++    '.................####################..............############.####.#########################..##',
++    '.................#################.................####.#############.#######################...#',
++    '.................#################.................####.#.#.#########.#####################.#...#',
++    '.................###############...................######.....#############################.#.##',
++    '.................###############...................#######..#...###########################..##',
++    '..................#############...................#########################################',
++    '...................###########....................#########################################',
++    '...................#######....#..................#######################..#################',
++    '....................#####.......................########################...#####..######',
++    '......................###..##.###...............#######################.....###...#####..#',
++    '.......................#####.....#...............#################.##.......##.....####..##',
++    '.........................#####..................####################........##.....#.#....##',
++    '..........................#.##..#####............####################..............#....#.##',
++    '..............................#########...........###################.............###..##',
++    '................................########...........###..############...............##.#####.#',
++    '...............................###########...............##########................#############',
++    '...............................##############............#########..................##........######',
++    '...............................##############.............########....................####.#...####',
++    '................................#############.............########...........................#..#',
++    '................................############..............########..#......................####.#',
++    '.................................###########..............########.##.....................#######',
++    '...................................#########..............#######..#....................##########.....#',
++    '...................................#######................######...#...................############',
++    '...................................#######.................#####.......................#############',
++    '...................................######..................####.........................############',
++    '...................................#####...................###..........................###..######',
++    '...................................#####.......................................................####......#',
++    '...................................####.........................................................##.......#',
++    '...................................###...........................................................#......#',
++    '...................................###.................................................................#',
++    '....................................##',
++    '....................................##',
++    '.....................................##'
++];
++
++/* -------------------------------------------------------- slide builders */
++
++/* 1 — cover */
++function slide1(s) {
++    s.background = { color: C.blue };
++    s.addShape('rect', { x: 9.595, y: 0.4826, w: 3.254, h: 6.5347, fill: { type: 'none' }, line: { color: C.white, width: 1 } });
++    rect(s, 9.004, 0.8214, 3.254, 5.8571, C.teal);
++    imageBox(s, 7.1944, 1.127, 3.254, 5.246);
++    title(s, 1.0771, 2.2718, 4.8279, 1.1444, 'CARRASA', { fontSize: 68, color: C.white });
++    s.addShape('line', { x: 1.0771, y: 3.5625, w: 6.1173, h: 0, line: { color: C.white, width: 1 } });
++    [
++        { x: 1.0771, w: 1.2219, head: 'Studio Design' },
++        { x: 3.8428, w: 1.6251, head: 'Lookbook concept' }
++    ].forEach(function (col) {
++        text(s, col.head, {
++            x: col.x, y: 3.9036, w: col.w, h: 0.2688, wrap: false,
++            fontFace: FONT.head, fontSize: 12, bold: true, color: C.white, lineSpacingMultiple: 1.5
++        });
++        text(s, 'PLACEHOLDER', {
++            x: col.x, y: 4.3187, w: 2.0623, h: 0.8022, fontSize: 11, color: C.white, lineSpacingMultiple: 1.5
++        });
++    });
++    chrome(s, 1, { header: C.white, number: C.white, footer: C.white });
++}
++
++/* 2 — welcome */
++function slide2(s) {
++    rect(s, 0, 2.5417, 4.8748, 4.9583, C.blue);
++    imageBox(s, 0, 3.0159, 3.3651, 4.4841);
++    imageBox(s, 3.9224, 1.1111, 3.3651, 4.9201);
++    title(s, 8.2263, 2.9931, 3.2046, 0.9424, 'WELCOME\nPRESENTATION');
++    para(s, 8.2263, 4.5503, 4.1478, 1.481, LOREM.ipsum);
++    rect(s, 12.3741, 0, 0.9609, 1.625, C.teal);
++    chrome(s, 2);
++}
++
++/* 3 — introduce */
++function slide3(s) {
++    s.background = { color: C.blue };
++    rect(s, 0, 4.5238, SLIDE_W, 2.9762, C.teal);
++    imageBox(s, 7.4678, 1.22, 4.4866, 5.1597);
++    title(s, 1.5057, 1.7305, 2.4823, 1.6156, 'INTRO-\nDUCE', { fontSize: 48, color: C.white });
++    para(s, 1.5057, 4.9733, 4.1478, 1.481, LOREM.ipsum, { color: C.white });
++    chrome(s, 3, { header: C.white, number: C.white });
++}
++
++/* 4 — about us */
++function slide4(s) {
++    rect(s, 0, 0, 4.0635, SLIDE_H, C.teal);
++    rect(s, 0.6589, 1.9206, 2.7457, 3.6587, C.blue);
++    imageBox(s, 4.0635, 1.0381, 3.7302, 5.4237);
++    title(s, 8.3374, 2.9389, 2.1002, 1.3464, 'ABOUT\nUS', { fontSize: 40 });
++    para(s, 8.3374, 4.9809, 4.1478, 1.481, LOREM.ipsum);
++    imageBox(s, 0.7066, 1.9841, 2.6504, 3.5317);
++    chrome(s, 4);
++}
++
++/* 5 — hallo */
++function slide5(s) {
++    rect(s, 7.9524, 0, 5.3827, SLIDE_H, C.teal);
++    imageBox(s, 6.6349, 1.22, 6.7001, 6.28);
++    title(s, 4.9257, 1.6034, 3.4185, 2.4234, 'HALLO,\nMY NAME\nIS JESICA', { fontSize: 48 });
++    para(s, 1.2541, 4.4156, 4.1478, 1.481, LOREM.ipsum);
++    chrome(s, 5);
++}
++
++/* 6 — agenda */
++function slide6(s) {
++    rect(s, 0, 0, SLIDE_W, 2.7386, C.teal);
++    imageBox(s, 0, 0, SLIDE_W, 2.5397);
++    title(s, 4.5156, 3.7008, 4.3038, 0.4712, 'TODAY LIST AGENDA', { align: 'center' });
++    [
++        { n: '01', nx: 2.0668, nw: 0.2963, lx: 1.4787, lw: 1.4726, bx: 1.0694, head: 'Company Profile', body: LOREM.sint },
++        { n: '02', nx: 5.0072, nw: 0.3524, lx: 4.4471, lw: 1.4726, bx: 4.0378, head: 'Meet Our Teams', body: LOREM.sint },
++        { n: '03', nx: 7.9756, nw: 0.3524, lx: 7.5408, lw: 1.2219, bx: 7.0062, head: 'Image Gallery', body: LOREM.sint },
++        { n: '04', nx: 10.9299, nw: 0.3804, lx: 10.5627, lw: 1.1149, bx: 9.9746, head: 'Infographics', body: 'sint sapiente assumenda nulla aut quas voluto omnis' }
++    ].forEach(function (col) {
++        title(s, col.nx, 4.8471, col.nw, 0.3366, col.n, { fontSize: 20, align: 'center' });
++        label(s, col.lx, 5.3178, col.lw, 0.3141, col.head, { align: 'center' });
++        para(s, col.bx, 5.6963, 2.291, 0.5722, col.body, { align: 'center' });
++    });
++    chrome(s, 6);
++}
++
++/* 7 — about branded */
++function slide7(s) {
++    rect(s, 12.1364, 0, 1.1987, 3.3095, C.teal);
++    imageBox(s, 4.6251, 1.4832, 4.5634, 2.5781);
++    imageBox(s, 9.4847, 1.4832, 3.2133, 4.8554);
++    title(s, 4.6251, 4.9562, 2.4105, 1.0771, 'ABOUT\nBRANDED', { fontSize: 32 });
++    para(s, 0.9137, 1.9745, 3.0574, 2.0868, LOREM.ipsum);
++    rect(s, 0, 7.0174, 2.5397, 0.4826, C.blue);
++    chrome(s, 7);
++}
++
++/* 8 — simple us */
++function slide8(s) {
++    rect(s, 0, 0, 2.1905, 7.5463, C.teal);
++    para(s, 5.2508, 1.1867, 7.3844, 0.8751, LOREM.asuscipitLong);
++    title(s, 1.3243, 5.3911, 3.0433, 0.9424, 'SIMPLE US\nOUR CONCEPT');
++    imageBox(s, 1.3243, 0, 3.2133, 4.8554);
++    imageBox(s, 5.2508, 2.6446, 3.2133, 4.8554);
++    described(s, 8.9088, 4.0797, 4.5503, 3.7264, 1.481, LOREM.asuscipit);
++    chrome(s, 8);
++}
++
++/* 9 / 16 / 21 / 26 — numbered section dividers (same skeleton) */
++function sectionSlide(s, o) {
++    imageBox(s, 7.7617, 0.9653, 5.5734, o.imageH);
++    rect(s, 0, 2.6071, 1.7866, 2.2857, o.band);
++    title(s, o.numX, 3.3798, o.numW, 0.6059, o.num, { fontSize: 36, align: 'center', color: o.numColor });
++    title(s, 2.8554, o.titleY, o.titleW, o.titleH, o.title);
++    described(s, 2.8554, o.labelY, o.labelY + 0.398, 3.7769, 1.481, LOREM.asuscipit);
++    rect(s, 9.2222, 0, 4.1128, 0.9653, o.corner);
++    chrome(s, o.n, { number: o.pageColor });
++}
++
++/* 10 — carrasa concept */
++function slide10(s) {
++    rect(s, 4.7839, 0, 8.5512, 3.2857, C.teal);
++    imageBox(s, 0, 1.2287, 7.7177, 4.3563);
++    title(s, 8.4736, 1.8164, 4.1057, 0.4712, 'CARRASA CONCEPT');
++    described(s, 8.4736, 3.7059, 4.104, 4.1057, 1.481, LOREM.asuscipit);
++    para(s, 1.4127, 5.8852, 6.305, 0.8751, LOREM.asuscipit);
++    chrome(s, 10);
++}
++
++/* 11 — our story */
++function slide11(s) {
++    rect(s, 0, 5.7917, 3.3808, 1.7083, C.teal);
++    para(s, 0.8878, 2.8378, 6.5852, 1.1781, LOREM.mollisLong);
++    imageBox(s, 8.0176, 1.8537, 4.8313, 4.8313);
++    imageBox(s, 0.8878, 4.5243, 2.4931, 2.4931);
++    title(s, 0.8878, 1.8537, 2.3999, 0.4712, 'OUR STORY');
++    label(s, 3.9255, 4.5243, 0.8625, 0.2693, 'Description', { fontSize: 12 });
++    para(s, 3.9255, 4.9695, 3.5475, 0.8751,
++        'PLACEHOLDER');
++    chrome(s, 11);
++}
++
++/* 12 — a new plann */
++function slide12(s) {
++    rect(s, 0, 0, 6.8194, 2.8056, C.teal);
++    [
++        { x: 1.1875, lw: 1.3954, head: 'Concept Design' },
++        { x: 4.3264, lw: 1.5304, head: 'Lookbook Design' }
++    ].forEach(function (col) {
++        label(s, col.x, 4.8929, col.lw, 0.3141, col.head);
++        para(s, col.x, 5.3021, 2.6042, 0.5722, LOREM.dapibus);
++        imageBox(s, col.x, 1.6257, 2.4931, 2.8368);
++    });
++    title(s, 8.0522, 2.2309, 2.5069, 0.9424, 'A NEW\nPLANN 2023');
++    para(s, 8.0522, 4.3933, 4.1478, 1.481, LOREM.ipsum);
++    chrome(s, 12);
++}
++
++/* 13 — a vision */
++function slide13(s) {
++    rect(s, 10.2222, 0.4826, 2.6267, 6.5347, C.teal);
++    imageBox(s, 6.9583, 0.4826, 3.2639, 6.5347);
++    title(s, 2.4171, 1.721, 1.8337, 0.4712, 'A VISION', { align: 'center' });
++    para(s, 1.4597, 2.595, 3.7487, 2.0812, LOREM.asuscipit, { align: 'center', fontSize: 14, bold: true });
++    para(s, 1.2791, 4.9039, 4.1098, 0.8751,
++        'PLACEHOLDER',
++        { align: 'center' });
++    chrome(s, 13);
++}
++
++/* 14 — branded */
++function slide14(s) {
++    rect(s, 0, 0, 5.9306, 1.5208, C.teal);
++    imageBox(s, 0.4861, 0.9653, 9.8985, 4.5496);
++    rect(s, 9.6128, 4.0793, 3.2361, 1.0775, C.blue);
++    title(s, 10.0257, 4.3488, 2.4105, 0.5385, 'BRANDED', { fontSize: 32, color: C.white });
++    para(s, 2.5346, 5.9315, 7.85, 0.8751, LOREM.mollisLong);
++    chrome(s, 14);
++}
++
++/* 15 — new item brand */
++function slide15(s) {
++    rect(s, 10.7083, 1.3532, 2.6267, 6.1468, C.blue);
++    title(s, 6.2313, 1.3532, 3.7673, 0.4712, 'NEW ITEM BRAND', { bold: true, lineSpacingMultiple: 1 });
++    imageBox(s, 6.2313, 2.4226, 6.1667, 4.067);
++    para(s, 1.3125, 2.4226, 3.6716, 0.8751,
++        'PLACEHOLDER');
++    [4.3019, 5.5083].forEach(function (y) {
++        label(s, 1.3125, y, 1.0133, 0.3141, 'Description');
++        para(s, 1.3125, y + 0.4091, 3.6716, 0.5722, LOREM.dapibus + ' feugiat iste');
++    });
++    chrome(s, 15);
++}
++
++/* 17 — meet designer */
++function slide17(s) {
++    rect(s, 10.125, 0, 3.2101, 3.4861, C.teal);
++    imageBox(s, 10.4017, 1.9461, 2.9334, 5.5539);
++    para(s, 4.7571, 3.7854, 4.3522, 1.1774, LOREM.viverra, { align: 'right' });
++    label(s, 8.096, 3.3653, 1.0133, 0.3141, 'Description', { align: 'right' });
++    title(s, 5.2964, 2.5372, 3.862, 0.5385, 'MEET DESIGNER', { fontSize: 32, align: 'right' });
++    rect(s, 0, 6.0891, 1.7639, 1.4146, C.blue);
++    imageBox(s, 0, 1.9461, 3.5139, 4.143);
++    chrome(s, 17);
++}
++
++/* 18 — meet influencer */
++function slide18(s) {
++    rect(s, 0, 0, 4.1128, SLIDE_H, C.blue);
++    imageBox(s, 3.0729, 1.2023, 2.0799, 2.0799);
++    imageBox(s, 3.0729, 4.2179, 2.0799, 2.0799);
++    para(s, 6.771, 3.7854, 4.3522, 1.1774, LOREM.viverra);
++    label(s, 6.771, 3.3653, 1.0133, 0.3141, 'Description');
++    title(s, 6.771, 2.5372, 4.4598, 0.5385, 'MEET INFLUENCER', { fontSize: 32 });
++    [2.3008, 5.3164].forEach(function (y) {
++        label(s, 0.7266, y, 0.9659, 0.3141, 'Name here', { color: C.white });
++        text(s, 'malesuada nulla seds massa sad', {
++            x: 0.7266, y: y + 0.4091, w: 1.9818, h: 0.5722, color: C.white, lineSpacingMultiple: 1.5
++        });
++    });
++    rect(s, 12.849, 1.7275, 0.4861, 4.045, C.teal);
++    chrome(s, 18, { header: C.white });
++}
++
++/* 19 — awesome team */
++function slide19(s) {
++    rect(s, 0, 5, SLIDE_W, 2.5, C.blue);
++    imageBox(s, 1.1907, 3.2688, 5.3528, 2.2204);
++    imageBox(s, 6.7707, 3.2688, 2.2416, 2.2204);
++    imageBox(s, 9.2395, 3.2688, 2.9048, 2.2204);
++    title(s, 4.4192, 1.0225, 4.4966, 0.6059, 'AWESOME TEAM', { fontSize: 36, align: 'center' });
++    para(s, 1.6823, 1.911, 9.9705, 0.5722, LOREM.mollis, { align: 'center' });
++    para(s, 1.6823, 5.9053, 9.9705, 0.5722, LOREM.mollis, { align: 'center', color: C.white });
++    chrome(s, 19);
++}
++
++/* 20 — a leader */
++function slide20(s) {
++    rect(s, 0.4861, 1.1633, 1.5573, 4.3677, C.blue);
++    text(s, 'A LEADER', {
++        x: -0.0667, y: 3.0443, w: 2.6629, h: 0.6059, rotate: 90, wrap: false,
++        fontFace: FONT.head, fontSize: 36, bold: true, italic: true, color: C.white
++    });
++    imageBox(s, 2.2798, 1.1701, 3.7484, 5.1597);
++    label(s, 7.2093, 2.0218, 0.5785, 0.3141, 'Jesica');
++    para(s, 7.206, 2.4225, 4.4653, 1.481, LOREM.ipsum);
++    label(s, 7.2093, 4.2024, 0.7906, 0.3141, 'About us');
++    para(s, 7.206, 4.6031, 4.4653, 0.8751, LOREM.ipsumShort);
++    rect(s, 12.849, 4.4286, 0.4861, 3.0714, C.teal);
++    chrome(s, 20);
++}
++
++/* 22 — portfolio */
++function slide22(s) {
++    imageBox(s, 0, 0.4826, 3.7484, 6.5347);
++    rect(s, 3.9583, 0.4826, 3.2222, 3.1424, C.teal);
++    imageBox(s, 3.9583, 3.875, 3.2222, 3.1424);
++    title(s, 4.3029, 1.3806, 2.5332, 1.3464, 'PORTO \u2013\nFOLIO', { fontSize: 40 });
++    label(s, 7.9037, 2.0218, 1.013, 0.3141, 'Image 01');
++    para(s, 7.9004, 2.4225, 4.4653, 1.481, LOREM.ipsum);
++    label(s, 7.9037, 4.2024, 0.8257, 0.3141, 'Image 02');
++    para(s, 7.9004, 4.6031, 4.4653, 0.8751, LOREM.ipsumShort);
++    [
++        { x: 3.1095, y: 0.4826, n: '01' },
++        { x: 6.5417, y: 3.875, n: '02' }
++    ].forEach(function (b) {
++        text(s, b.n, {
++            x: b.x, y: b.y, w: 0.6389, h: 0.6389, fill: { color: C.blue },
++            align: 'center', valign: 'middle', fontSize: 18, color: C.white
++        });
++    });
++    chrome(s, 22);
++}
++
++/* 23 — image popular */
++function slide23(s) {
++    rect(s, 0, 0, 2.4167, 1.0833, C.teal);
++    imageBox(s, 8.7809, 2.2753, 4.5542, 4.143);
++    described(s, 3.9297, 3.1034, 3.5235, 4.3522, 1.1774, LOREM.viverra, { labelColor: C.dark });
++    title(s, 3.9297, 2.2753, 3.4991, 0.4712, 'IMAGE POPULAR');
++    imageBox(s, -0.0036, 0.5579, 3.2347, 4.143);
++    rect(s, 10.777, 6.4183, 2.5581, 1.0817, C.blue);
++    chrome(s, 23);
++}
++
++/* 24 — new image (laptop mock-up) */
++function slide24(s) {
++    rect(s, 0, 5.7249, SLIDE_W, 1.7751, C.teal);
++    rect(s, 1.1429, 5.3908, 5.4996, 0.5246, C.device, { rectRadius: 0.05 }); // keyboard base
++    deviceFrame(s, 1.5665, 1.9655, 4.6353, 3.4253, 0.09, 0.06);
++    imageBox(s, 1.7111, 2.1173, 4.3595, 3.266);
++    title(s, 7.4009, 1.9655, 3.5692, 0.6732, 'NEW IMAGE', { fontSize: 40 });
++    para(s, 7.4009, 3.3936, 4.1478, 1.481, LOREM.ipsum);
++    [
++        { x: 7.4009, glyph: 'B\u0113' },
++        { x: 8.0091, glyph: 'f' },
++        { x: 8.6173, glyph: 'd' }
++    ].forEach(function (icon) {
++        socialIcon(s, icon.x, 6.0747, 0.4657, 0.258, icon.glyph, C.white, C.blue);
++    });
++    chrome(s, 24);
++}
++
++/* 25 — mockup device (phone + tablet) */
++function slide25(s) {
++    deviceFrame(s, 6.2467, 1.4667, 1.9148, 3.9874, 0.09, 0.22);
++    imageBox(s, 6.3192, 1.5448, 1.7698, 3.7912);
++    rect(s, 9.2222, 4.5397, 4.1128, 2.9603, C.teal);
++    deviceFrame(s, 8.4437, 2.4203, 3.8563, 3.0445, 0.11, 0.14);
++    imageBox(s, 8.5739, 2.5556, 3.6154, 2.6967);
++    described(s, 0.9653, 3.3653, 3.7854, 4.3522, 1.1774, LOREM.viverra);
++    title(s, 0.9653, 2.5372, 3.5289, 0.4712, 'MOCKUP DEVICE');
++    chrome(s, 25);
++}
++
++/* 27 — infographic: USA sales map */
++function slide27(s) {
++    title(s, 5.2064, 0.7992, 2.9224, 0.4712, 'INFOGRAPHIC', { align: 'center' });
++    silhouette(s, US_MAP, 6.80, 2.92, 0.06, C.mapUs);
++    [
++        [7.5160, 3.9646, 0.320, 0.480, C.teal], [7.2687, 3.3641, 0.305, 0.457, C.teal],
++        [7.2134, 3.6257, 0.281, 0.422, C.teal], [7.3007, 4.5287, 0.281, 0.422, C.blue],
++        [11.5526, 3.3304, 0.281, 0.422, C.teal], [11.2433, 5.2932, 0.281, 0.422, C.teal],
++        [9.0949, 3.0646, 0.281, 0.422, C.teal], [9.3155, 5.3665, 0.281, 0.422, C.teal],
++        [9.1062, 3.7912, 0.281, 0.422, C.teal], [9.3831, 4.1411, 0.281, 0.422, C.blue],
++        [8.7526, 3.9830, 0.281, 0.422, C.teal], [10.6368, 3.3236, 0.281, 0.422, C.teal],
++        [10.6605, 4.9730, 0.281, 0.422, C.teal], [8.5644, 3.1365, 0.320, 0.480, C.blue],
++        [8.6813, 4.8204, 0.320, 0.480, C.blue], [9.5325, 4.6133, 0.320, 0.480, C.teal],
++        [9.6493, 3.7275, 0.320, 0.480, C.blue], [11.4389, 3.5970, 0.320, 0.480, C.blue],
++        [10.8146, 4.1942, 0.320, 0.480, C.teal]
++    ].forEach(function (p) { pin(s, p[0], p[1], p[2], p[3], p[4]); });
++    [
++        { y: 2.9214, num: '60', numW: 0.8594, color: C.blue, head: 'Male Sales', headW: 0.8274 },
++        { y: 4.3959, num: '40%', numW: 1.3204, color: C.teal, head: 'Female Sales', headW: 1.0098 }
++    ].forEach(function (row) {
++        text(s, row.num, {
++            x: 1.1037, y: row.y, w: row.numW, h: 0.7068, wrap: false, margin: [7.2, 7.2, 3.6, 3.6],
++            fontFace: FONT.head, fontSize: 36, bold: true, color: row.color
++        });
++        label(s, 2.6098, row.y + 0.0434, row.headW, 0.2693, row.head, { fontSize: 12, color: C.dark });
++        text(s, 'lorem ipsum dolor sit amet consectetuer adipiscing elit. maecenas porttitor congue massa fusce posuere', {
++            x: 2.5324, y: row.y + 0.3062, w: 3.6249, h: 0.9812, lineSpacingMultiple: 1.5, margin: [7.2, 7.2, 3.6, 3.6]
++        });
++    });
++    chrome(s, 27);
++}
++
++/* 28 — infographic: world map */
++function slide28(s) {
++    title(s, 5.2064, 0.7992, 2.9224, 0.4712, 'INFOGRAPHIC', { align: 'center' });
++    silhouette(s, WORLD_MAP, 5.70, 2.50, 0.06, C.mapWorld);
++    [
++        [6.9973, 3.5160, 0.1782, C.teal], [6.7998, 4.0782, 0.3951, C.teal], [7.3540, 4.2146, 0.1246, C.teal],
++        [7.2294, 4.6412, 0.1246, C.blue], [7.6277, 4.9020, 0.1736, C.blue], [7.9515, 5.0577, 0.2194, C.blue],
++        [7.8101, 5.4552, 0.1414, C.blue], [8.7009, 4.5638, 0.2055, C.teal], [9.1261, 4.7374, 0.2572, C.teal],
++        [9.0970, 3.3955, 0.2988, C.teal], [9.1149, 3.9112, 0.1414, C.teal], [10.5286, 3.2426, 0.1841, C.blue],
++        [9.9441, 3.5300, 0.2124, C.teal], [10.2457, 3.6503, 0.2795, C.blue], [10.3507, 4.3759, 0.1159, C.blue],
++        [10.9986, 5.2464, 0.2795, C.blue]
++    ].forEach(function (d) {
++        s.addShape('ellipse', { x: d[0], y: d[1], w: d[2], h: d[2], fill: { color: d[3] }, line: { type: 'none' } });
++    });
++    [
++        { y: 2.8425, color: C.teal, head: 'Target Female', headW: 1.6211 },
++        { y: 4.4894, color: C.blue, head: 'Target Male', headW: 1.3792 }
++    ].forEach(function (row) {
++        s.addShape('ellipse', { x: 1.1675, y: row.y, w: 0.3125, h: 0.3125, fill: { color: row.color }, line: { type: 'none' } });
++        text(s, row.head, {
++            x: 1.6229, y: row.y - 0.0778, w: row.headW, h: 0.3488, wrap: false, valign: 'middle',
++            fontSize: 16, bold: true, color: C.dark, margin: [5.67, 5.67, 2.83, 2.83]
++        });
++        para(s, 1.6077, row.y + 0.2271, 3.2942, 0.9761,
++            'PLACEHOLDER',
++            { margin: [7.2, 7.2, 3.6, 3.6] });
++    });
++    chrome(s, 28);
++}
++
++/* 29 — infographic: social audience */
++function slide29(s) {
++    title(s, 5.2064, 0.7992, 2.9224, 0.4712, 'INFOGRAPHIC', { align: 'center' });
++    [
++        { x: 3.5709, glyph: 't', gx: 4.0355, count: '12K Tweet', cx: 3.5839, cw: 1.1778, name: 'Fashion', nx: 3.6944, nw: 0.9567, dx: 3.2412 },
++        { x: 6.0717, glyph: 'f', gx: 6.6109, count: '12K publish', cx: 6.0199, cw: 1.3073, name: 'Style', nx: 6.3407, nw: 0.6657, dx: 5.7360 },
++        { x: 8.5724, glyph: 'P', gx: 9.0519, count: '12K post', cx: 8.6521, cw: 1.0443, name: 'Casual', nx: 8.7494, nw: 0.8497, dx: 8.2307 }
++    ].forEach(function (col) {
++        personIcon(s, col.x, 2.2903, 0.578, 1.4678, C.teal, false);
++        personIcon(s, col.x + 0.6773, 2.2908, 0.5264, 1.4667, C.blue, true);
++        socialIcon(s, col.gx - 0.15, 4.16, 0.42, 0.28, col.glyph, C.dark);
++        text(s, col.count, {
++            x: col.cx, y: 4.7837, w: col.cw, h: 0.332, wrap: false, align: 'center', valign: 'middle',
++            fontFace: FONT.head, fontSize: 16, color: C.sub
++        });
++        text(s, col.name, {
++            x: col.nx, y: 5.2406, w: col.nw, h: 0.332, wrap: false, align: 'center', valign: 'middle',
++            fontSize: 16, bold: true, color: C.sub
++        });
++        text(s, 'isdictum pellentesque nullam amet', {
++            x: col.dx, y: 5.5908, w: 1.8631, h: 0.5772, align: 'center', lineSpacingMultiple: 1.5
++        });
++    });
++    chrome(s, 29);
++}
++
++/* 30 — thank you */
++function slide30(s) {
++    s.background = { color: C.blue };
++    s.addShape('rect', { x: 0.4861, y: 0.4826, w: 3.254, h: 6.5347, fill: { type: 'none' }, line: { color: C.white, width: 1 } });
++    rect(s, 1.0771, 0.8214, 3.254, 5.8571, C.teal);
++    imageBox(s, 2.8867, 1.127, 3.254, 5.246);
++    title(s, 6.97, 2.2718, 4.7491, 0.9088, 'THANK YOU', { fontSize: 54, color: C.white });
++    s.addShape('line', { x: 6.1406, y: 3.5625, w: 6.1173, h: 0, line: { color: C.white, width: 1 } });
++    [
++        { x: 6.97, glyph: 'P' },
++        { x: 9.7356, glyph: 'f' }
++    ].forEach(function (col) {
++        socialIcon(s, col.x - 0.05, 3.88, 0.36, 0.28, col.glyph, C.white);
++        text(s, 'PLACEHOLDER', {
++            x: col.x, y: 4.3187, w: 2.2366, h: 0.5245, fontSize: 11, color: C.white, lineSpacingMultiple: 1.5
++        });
++    });
++    chrome(s, 30, { header: C.white, number: C.white, footer: C.white });
++}
++
++/* ------------------------------------------------------------------ build */
++
++const BUILDERS = [
++    slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8,
++    function (s) {
++        sectionSlide(s, {
++            n: 9, imageH: 6.5347, band: C.blue, corner: C.teal, num: '01', numColor: C.teal,
++            numX: 0.6268, numW: 0.5329, title: 'ABOUT PROFILE', titleW: 3.3571, titleH: 0.4712,
++            titleY: 2.6071, labelY: 3.2649
++        });
++    },
++    slide10, slide11, slide12, slide13, slide14, slide15,
++    function (s) {
++        sectionSlide(s, {
++            n: 16, imageH: 6.5347, band: C.blue, corner: C.teal, num: '02', numColor: C.teal,
++            numX: 0.576, numW: 0.6346, title: 'MEET OUR TEAM', titleW: 3.4535, titleH: 0.4712,
++            titleY: 2.6071, labelY: 3.2649
++        });
++    },
++    slide17, slide18, slide19, slide20,
++    function (s) {
++        sectionSlide(s, {
++            n: 21, imageH: 6.0521, band: C.teal, corner: C.blue, num: '02', numColor: C.blue,
++            numX: 0.576, numW: 0.6346, title: 'ALBUM GALLERY', titleW: 3.4991, titleH: 0.4712,
++            titleY: 2.6071, labelY: 3.2649, pageColor: C.white
++        });
++    },
++    slide22, slide23, slide24, slide25,
++    function (s) {
++        sectionSlide(s, {
++            n: 26, imageH: 6.0521, band: C.teal, corner: C.blue, num: '02', numColor: C.blue,
++            numX: 0.576, numW: 0.6346, title: 'INFOGRAPHIC\nSECTION', titleW: 2.9224, titleH: 0.9424,
++            titleY: 2.2197, labelY: 3.4013, pageColor: C.white
++        });
++    },
++    slide27, slide28, slide29, slide30
++];
++
++function build() {
++    const pptx = new PptxGenJS();
++    pptx.defineLayout({ name: 'CARRASA', width: SLIDE_W, height: SLIDE_H });
++    pptx.layout = 'CARRASA';
++    pptx.author = 'Ourslide ~ Template';
++    pptx.title = 'CARRASA TEMPLATE';
++    BUILDERS.forEach(function (builder) { builder(pptx.addSlide()); });
++    return pptx.writeFile({ fileName: path.join(__dirname, '143af599-3253-4c2a-8272-f79dd769b5bb_grok_final.pptx') });
++}
++
++build().then(function (f) { console.log('wrote ' + f); }).catch(function (e) { console.error(e); process.exit(1); });

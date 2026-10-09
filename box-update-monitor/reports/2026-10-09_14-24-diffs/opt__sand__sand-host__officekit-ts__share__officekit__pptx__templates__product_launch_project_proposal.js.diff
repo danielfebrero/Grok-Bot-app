@@ -1,0 +1,948 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/product_launch_project_proposal.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/product_launch_project_proposal.js
+@@ -0,0 +1,945 @@
++/**
++ * "Our Product Launch Project Proposal" — 25-slide deck rebuilt with pptxgenjs.
++ *
++ * Run:  node 03144841-f521-4bd7-8456-df073988d8d9_grok_final.js
++ * Out:  03144841-f521-4bd7-8456-df073988d8d9_grok_final.pptx (next to this file)
++ *
++ * Slide size 13.333 x 7.5 in (16:9).  Every slide carries the same top
++ * navigation strip; most carry a "Next Slide / Discover More" call to action.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens (from the deck theme)
++ * ------------------------------------------------------------------ */
++const C = {
++  bg: 'F0F0F0',      // page background (theme dk1, mapped to tx1)
++  navy: '1A2261',    // theme lt1 -> bg1: headings and dark cards
++  muted: '141949',   // navy at 75% luminance: body copy
++  white: 'F0F0F0',   // default run colour (theme tx1)
++  purple: '5753DA',  // accent1
++  green: '3CD451',   // accent2
++  yellow: 'F4C114',  // accent3
++  softGray: 'F2F2F2',// accent4 / navy panel behind risk list
++  teal: '00D7AF',    // one line-chart series
++  gridline: 'FDFDFD',// chart gridlines (tx1 lumMod 15% / lumOff 85%)
++  donutGray: 'E6E6E6',
++  amber: 'EFC95D',  // mid-tone of the FAAE62 -> E3E656 marker gradient
++  photo: 'EDEDED',   // stand-in tint for the deck's empty picture frames
++};
++
++const F = {
++  major: 'Plus Jakarta Sans Bold',    // theme major latin
++  minor: 'Plus Jakarta Sans Regular', // theme minor latin
++  plain: 'Plus Jakarta Sans',
++};
++
++/* Body copy reused across slides. */
++const L = {
++  intro: 'Sed vulputate mi sit amet mauris commodo quis imperdiet. Tempor orci eu lobortis elementum nibh tellus molestie nunc non. Auctor elite sed vulputate mi sit amet mauris. In tellus integer feugiat scelerisque varius.',
++  ultricies: 'Ultricies tristique nulla aliquet enim tortor. A iaculis at alat pellentesque adipiscing. Sagittis orci a scelerisque purus semper.',
++  ultriciesShort: 'Ultricies tristique nulla aliquet enim tortor. Sagittis orci a scelerisque purus semper.',
++  ultriciesCard: 'Ultricies tristique nulla aliquet enim tortor. A iaculis at alat pellentesque',
++  nunc: 'Nunc vel risus commodo viverra. Fermentum odio eu feugiat pretium nibh ipsum consequat. Vulputate dignissim suspendisse in est. Ac felis donec et.',
++  nuncDup: 'Nunc vel risus commodo viverra. Fermentum odio eu feugiat pretium nibh ipsum consequat. Vulputate dignissimNunc vel risus commodo viverra. ',
++  silent: 'Silent vel quam elementum pulvinar etiam non. Facilisis gravida neque convallis a cras semper.',
++  arcuLong: 'Arcu odio ut sem nulla pharetra silent. Viverra adipiscing at in tellus integer feugiat scelerisque.',
++  arcuShort: 'Arcu odio ut sem nulla pharetra silent. Viverra adipiscing at in tellus.',
++  interdum: 'Interdum velit laoreet id donec ultrices tincidunt. Neque viverra justo nec.',
++  market: 'Conduct market research and analysis, refine target audience and messaging.',
++  finalize: 'Finalize product features and packaging design.',
++  milestone: 'Sit amet risus nullam eget felis eget. Sit amet commodo quis',
++  address: '123 Street Name City Name, State, Country, 12345',
++};
++
++/* ------------------------------------------------------------------ *
++ * Primitive helpers
++ * ------------------------------------------------------------------ */
++
++/** Text box.  Defaults mirror the deck: minor font, 18pt, theme-light colour. */
++function txt(slide, text, o) {
++  slide.addText(text, Object.assign({
++    fontFace: F.minor, fontSize: 18, color: C.white, valign: 'top',
++  }, o));
++}
++
++/** Filled rounded rectangle. `r` is the corner radius in inches. */
++function card(slide, x, y, w, h, color, r) {
++  slide.addShape('roundRect', {
++    x, y, w, h, rectRadius: r,
++    fill: { color }, line: { type: 'none' },
++  });
++}
++
++/**
++ * Card whose top corners are rounded and bottom corners square
++ * (PowerPoint's "Rectangle: Top Corners Rounded").
++ */
++function topRoundedCard(slide, x, y, w, h, color, r) {
++  card(slide, x, y, w, h, color, r);
++  slide.addShape('rect', { x, y: y + r, w, h: h - r, fill: { color }, line: { type: 'none' } });
++}
++
++/** Fully rounded "pill". */
++function pill(slide, x, y, w, h, color) {
++  card(slide, x, y, w, h, color, Math.min(w, h) / 2);
++}
++
++/** Tiny amber marker dot used on timeline and list slides. */
++function markerDot(slide, x, y, size) {
++  slide.addShape('ellipse', {
++    x, y, w: size || 0.101, h: size || 0.101,
++    fill: { color: C.amber }, line: { type: 'none' },
++  });
++}
++
++/** Diagonal "open in new tab" arrow used in the nav bar (rotate 315 = up-right). */
++function arrowGlyph(slide, x, y, size, color, rotate) {
++  // custGeom points are relative to the shape's own box.
++  const p = (fx, fy) => ({ x: fx * size, y: fy * size });
++  slide.addShape('custGeom', {
++    x, y, w: size, h: size, rotate,
++    fill: { color }, line: { type: 'none' },
++    points: [
++      p(0.7625, 0.5625), p(0, 0.5625), p(0, 0.4375), p(0.7625, 0.4375),
++      p(0.4125, 0.0875), p(0.5, 0), p(1, 0.5), p(0.5, 1), p(0.4125, 0.9125),
++      { close: true },
++    ],
++  });
++}
++
++/**
++ * Wi-fi / signal mark: a dot plus two concentric arcs.  All three pieces share
++ * the same centre, so rotating each one about itself rotates the whole mark.
++ */
++function signalIcon(slide, x, y, w, h, color, rotate) {
++  const rad = (rotate * Math.PI) / 180;
++  // Dot sits 35.3% of the height below the frame centre before rotation.
++  const off = 0.353 * h;
++  const cx = x + w / 2 - off * Math.sin(rad);
++  const cy = y + h / 2 + off * Math.cos(rad);
++  const at = (radius, extra) => Object.assign({
++    x: cx - radius, y: cy - radius, w: radius * 2, h: radius * 2,
++    rotate, fill: { color }, line: { type: 'none' },
++  }, extra);
++  slide.addShape('blockArc', at(0.853 * h, { angleRange: [218, 322], arcThicknessRatio: 0.207 }));
++  slide.addShape('blockArc', at(0.500 * h, { angleRange: [214, 326], arcThicknessRatio: 0.353 }));
++  slide.addShape('ellipse', at(0.147 * h, {}));
++}
++
++/** Small telephone handset glyph (contact slide). */
++function phoneGlyph(slide, x, y, size, color) {
++  const p = (fx, fy) => ({ x: fx * size, y: fy * size });
++  slide.addShape('custGeom', {
++    x, y, w: size, h: size, fill: { color }, line: { type: 'none' },
++    points: [
++      p(0.06, 0), p(0.28, 0), p(0.38, 0.24), p(0.22, 0.44), p(0.56, 0.78),
++      p(0.76, 0.63), p(1, 0.72), p(1, 0.94), p(0.94, 1), p(0.6, 0.92),
++      p(0.29, 0.71), p(0.07, 0.39), { close: true },
++    ],
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Composite, repeated page furniture
++ * ------------------------------------------------------------------ */
++
++const NAV_LINKS = [
++  { label: 'Home', x: 4.417, w: 0.66 },
++  { label: 'About', x: 5.598, w: 0.66 },
++  { label: 'Product', x: 6.78, w: 0.771 },
++  { label: 'Contact', x: 7.918, w: 0.771 },
++];
++
++/** Top navigation strip — identical on all 25 slides. */
++function navBar(slide) {
++  pill(slide, 4.187, 0.387, 4.745, 0.34, C.green);
++  NAV_LINKS.forEach(l =>
++    txt(slide, l.label, { x: l.x, y: 0.42, w: l.w, h: 0.269, fontSize: 10, fontFace: F.major, color: C.navy }));
++  txt(slide, 'Your Company', { x: 0.509, y: 0.42, w: 1.419, h: 0.269, fontSize: 10, fontFace: F.major, color: C.navy });
++  txt(slide, 'Let\u2019s Talk', { x: 12.013, y: 0.42, w: 0.836, h: 0.269, fontSize: 10, fontFace: F.major, color: C.navy });
++  arrowGlyph(slide, 11.836, 0.495, 0.147, C.navy, 315);
++}
++
++/**
++ * Green pill button with a label ("Next Slide", "Get Started", ...).
++ * `labelDx` overrides the default label inset for the few off-centre buttons.
++ */
++function pillButton(slide, x, y, label, labelDx) {
++  pill(slide, x, y, 1.614, 0.364, C.green);
++  txt(slide, label, {
++    x: x + (labelDx === undefined ? 0.112 : labelDx), y: y - 0.042, w: 1.389, h: 0.364,
++    fontSize: 12, fontFace: F.major, color: C.navy,
++    align: 'center', lineSpacingMultiple: 1.5,
++  });
++}
++
++/** Outlined play button plus its "Discover More" caption. */
++function playButton(slide, x, y, label) {
++  slide.addShape('ellipse', {
++    x, y, w: 0.364, h: 0.364,
++    fill: { type: 'none' }, line: { color: C.navy, width: 1 },
++  });
++  slide.addShape('triangle', {
++    x: x + 0.113, y: y + 0.107, w: 0.173, h: 0.149, rotate: 90,
++    fill: { color: C.navy }, line: { type: 'none' },
++  });
++  txt(slide, label || 'Discover More', {
++    x: x + 0.464, y: y - 0.043, w: 1.389, h: 0.364,
++    fontSize: 12, fontFace: F.major, color: C.navy,
++    align: 'center', lineSpacingMultiple: 1.5,
++  });
++}
++
++/** The "Next Slide  (>) Discover More" call-to-action pair. */
++function cta(slide, px, py, ox, oy, labelDx) {
++  pillButton(slide, px, py, 'Next Slide', labelDx);
++  playButton(slide, ox, oy === undefined ? py : oy);
++}
++
++/** Big number + caption stat block. */
++function stat(slide, x, y, value, caption, captionX) {
++  txt(slide, value, { x, y, w: 1.554, h: 0.64, fontSize: 32, fontFace: F.major, color: C.navy });
++  txt(slide, caption, {
++    x: captionX === undefined ? x : captionX, y: y + 0.521, w: 1.666, h: 0.32,
++    fontSize: 10, color: C.muted, lineSpacingMultiple: 1.5,
++  });
++}
++
++/** Stand-in for an empty picture placeholder frame. */
++function imageFrame(slide, x, y, w, h) {
++  slide.addShape('roundRect', {
++    x, y, w, h, rectRadius: 0.06904 * Math.min(w, h),
++    fill: { color: C.photo }, line: { type: 'none' },
++  });
++}
++
++/* Shorthand text presets used again and again. */
++const H1 = { fontSize: 40, fontFace: F.major, color: C.navy };
++const BODY = { fontSize: 10, color: C.muted, align: 'justify', lineSpacingMultiple: 1.5 };
++const BODY_NAVY = { fontSize: 10, color: C.navy, align: 'justify', lineSpacingMultiple: 1.5 };
++const CARD_TITLE = { fontSize: 12, fontFace: F.major, color: C.navy };
++const BULLET = { code: '2022', indent: 13.5 };
++/** One bulleted paragraph (breakLine keeps each item in its own <a:p>). */
++const bulletItem = text => ({ text, options: { bullet: BULLET, breakLine: true } });
++
++/* ------------------------------------------------------------------ *
++ * Charts
++ * ------------------------------------------------------------------ */
++const CHART_CATS = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++/* Manual plot-area insets copied from the source charts. */
++const BAR_LAYOUT = { x: 0.0958, y: 0.0992, w: 0.9042, h: 0.8589 };
++const LINE_LAYOUT = { x: 0.0555, y: 0.0921, w: 0.9018, h: 0.8627 };
++const CHART_SERIES = [
++  { name: 'Series 1', labels: CHART_CATS, values: [4.3, 2.5, 3.5, 4.5] },
++  { name: 'Series 2', labels: CHART_CATS, values: [2.4, 4.4, 1.8, 2.8] },
++  { name: 'Series 3', labels: CHART_CATS, values: [2.0, 2.0, 3.0, 5.0] },
++];
++
++const AXIS_BASE = {
++  showLegend: false,
++  catAxisHidden: true,
++  valAxisLineShow: false,
++  valGridLine: { style: 'solid', size: 0.75, color: C.gridline },
++  valAxisLabelFontFace: F.minor,
++  valAxisLabelFontSize: 12,
++  valAxisMajorUnit: 1,
++  valAxisMaxVal: 6,
++  chartArea: { fill: { type: 'none' } },
++  plotArea: { fill: { type: 'none' } },
++};
++
++function barChart(slide, pptx, x, y, w, h, colors, labelColor, layout) {
++  slide.addChart(pptx.ChartType.bar, CHART_SERIES, Object.assign({}, AXIS_BASE, {
++    x, y, w, h, layout,
++    chartColors: colors,
++    barGapWidthPct: 219,
++    barOverlapPct: -27,
++    valAxisLabelColor: labelColor,
++  }));
++}
++
++function lineChart(slide, pptx, x, y, w, h, colors, labelColor, layout) {
++  slide.addChart(pptx.ChartType.line, CHART_SERIES, Object.assign({}, AXIS_BASE, {
++    x, y, w, h, layout,
++    chartColors: colors,
++    lineSize: 2.25,
++    lineSmooth: false,
++    lineDataSymbol: 'none',
++    valAxisLabelColor: labelColor,
++  }));
++}
++
++function donutChart(slide, pptx, x, y, w, h, share) {
++  slide.addChart(pptx.ChartType.doughnut, [
++    { name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [share, 100 - share] },
++  ], {
++    x, y, w, h,
++    holeSize: 75,
++    showLegend: false,
++    showValue: false,
++    chartColors: [C.navy, C.donutGray],
++    dataBorder: { pt: 0, color: C.bg },
++    chartArea: { fill: { type: 'none' } },
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide builders
++ * ------------------------------------------------------------------ */
++
++/* 1 — Title slide */
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++  // Three coloured panels anchored to the bottom edge.
++  topRoundedCard(s, 0.509, 3.75, 2.675, 3.75, C.purple, 0.174);
++  topRoundedCard(s, 10.051, 3.75, 2.798, 3.75, C.purple, 0.182);
++  topRoundedCard(s, 4.208, 5.765, 4.972, 1.735, C.green, 0.154);
++
++  txt(s, 'Unveiling Success :', { x: 3.972, y: 1.539, w: 5.032, h: 0.438, fontSize: 20, color: C.navy, align: 'center' });
++  txt(s, 'Our Product Launch Project Proposal', {
++    x: 3.548, y: 2.024, w: 6.117, h: 1.582, fontSize: 44, fontFace: F.major, color: C.navy, align: 'center',
++  });
++
++  txt(s, '5.0', { x: 0.505, y: 2.367, w: 0.697, h: 0.404, fontFace: F.major, color: C.navy });
++  txt(s, 'Client Ratings', { x: 0.505, y: 2.72, w: 0.929, h: 0.581, fontSize: 10, color: C.muted, lineSpacingMultiple: 1.5 });
++  txt(s, '95%', { x: 11.993, y: 2.462, w: 0.836, h: 0.404, fontFace: F.major, color: C.navy });
++  txt(s, 'Customer Happy', { x: 11.993, y: 2.816, w: 0.929, h: 0.581, fontSize: 10, color: C.muted, lineSpacingMultiple: 1.5 });
++
++  pillButton(s, 4.741, 4.134, 'Get Started', 0.085);
++  playButton(s, 6.667, 4.134);
++
++  // Left stat card
++  signalIcon(s, 0.755, 4.122, 0.523, 0.371, C.yellow, 90);
++  txt(s, '24.5K', { x: 0.788, y: 4.945, w: 2.009, h: 0.802, fontSize: 32, fontFace: F.major, lineSpacingMultiple: 1.5 });
++  txt(s, 'Artwork', { x: 0.821, y: 5.642, w: 1.867, h: 0.269, fontSize: 10, fontFace: F.major });
++  pill(s, 0.931, 6.377, 1.865, 0.433, C.yellow);
++  txt(s, 'Learn More', { x: 1.195, y: 6.344, w: 1.389, h: 0.419, fontSize: 14, color: C.navy, align: 'center', lineSpacingMultiple: 1.5 });
++
++  // Right stat card
++  signalIcon(s, 10.441, 4.122, 0.523, 0.371, C.yellow, 90);
++  txt(s, '527.642', { x: 10.446, y: 4.988, w: 2.009, h: 0.802, fontSize: 32, fontFace: F.major, align: 'center', lineSpacingMultiple: 1.5 });
++  txt(s, 'Total Project  Completed', { x: 10.369, y: 5.734, w: 2.085, h: 0.269, fontSize: 10, fontFace: F.major, align: 'center' });
++  pill(s, 10.522, 6.377, 1.865, 0.433, C.yellow);
++  txt(s, 'Learn More', { x: 10.749, y: 6.344, w: 1.389, h: 0.419, fontSize: 14, color: C.navy, align: 'center', lineSpacingMultiple: 1.5 });
++
++  // Green banner
++  signalIcon(s, 4.462, 6.044, 0.279, 0.198, C.navy, 90);
++  signalIcon(s, 8.605, 6.044, 0.279, 0.198, C.navy, 90);
++  txt(s, 'We Are', { x: 5.879, y: 6.459, w: 1.63, h: 0.269, fontSize: 10, fontFace: F.major, color: C.navy, align: 'center' });
++  txt(s, 'Project Proposal Company Presentation', {
++    x: 4.319, y: 6.664, w: 4.751, h: 0.37, fontSize: 16, fontFace: F.major, color: C.navy, align: 'center',
++  });
++}
++
++/* 2 — Table of Content */
++const TOC = [
++  { n: '01.', label: 'Introduction', col: 0, row: 0, w: 1.839 },
++  { n: '02.', label: 'Market Analysis', col: 0, row: 1, w: 1.839 },
++  { n: '03.', label: 'Product Overview', col: 1, row: 0, w: 2.0 },
++  { n: '04.', label: 'Marketing Strategy', col: 1, row: 1, w: 2.264 },
++  { n: '05.', label: 'Launch Plan', col: 2, row: 0, w: 1.839 },
++  { n: '06.', label: 'Sales Forecast', col: 2, row: 1, w: 2.0 },
++  { n: '07.', label: 'Distribution Strategy', col: 3, row: 0, w: 2.273 },
++  { n: '08.', label: 'Budget Allocation', col: 3, row: 1, w: 2.0 },
++  { n: '09.', label: 'Risk Analysis', col: 4, row: 0, w: 1.455 },
++  { n: '10.', label: 'Conclusion', col: 4, row: 1, w: 1.839 },
++];
++const TOC_NUM_X = [0.633, 3.072, 5.931, 8.235, 11.072];
++const TOC_LBL_X = [0.633, 3.060, 5.928, 8.232, 11.069];
++
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++  TOC.forEach(item => {
++    const numY = item.row === 0 ? 1.819 : 2.865;
++    const lblY = item.row === 0 ? 2.167 : 3.185;
++    txt(s, item.n, { x: TOC_NUM_X[item.col], y: numY, w: 0.594, h: 0.335, fontSize: 14, fontFace: F.major, color: C.navy });
++    txt(s, item.label, { x: TOC_LBL_X[item.col], y: lblY, w: item.w, h: 0.337, fontSize: 14, color: C.navy });
++  });
++  txt(s, 'Table of Content', { x: 0.603, y: 4.632, w: 5.462, h: 0.656, fontSize: 40, fontFace: F.major, color: C.navy, lineSpacingMultiple: 0.8 });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore',
++    Object.assign({ x: 0.633, y: 5.468, w: 4.444, h: 0.572 }, BODY_NAVY));
++  cta(s, 0.772, 6.488, 2.698, undefined, 0.085);
++  imageFrame(s, 7.993, 4.65, 4.737, 2.226);
++}
++
++/* 3 — Introduction */
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  imageFrame(s, 7.091, 1.61, 4.319, 5.12);
++  card(s, 9.922, 5.154, 2.482, 1.218, C.purple, 0.164);
++  txt(s, 'We are Company.', { x: 10.088, y: 5.326, w: 1.731, h: 0.303, fontSize: 12, fontFace: F.major });
++  txt(s, 'Silent vel quam elementum pulvinar etiam non.', { x: 10.088, y: 5.632, w: 2.111, h: 0.572, fontSize: 10, lineSpacingMultiple: 1.5 });
++  navBar(s);
++  txt(s, 'Introduction', Object.assign({ x: 0.715, y: 1.61, w: 3.7, h: 0.774 }, H1));
++  txt(s, L.intro, Object.assign({ x: 0.715, y: 2.851, w: 5.351, h: 0.825 }, BODY));
++  txt(s, L.ultricies, Object.assign({ x: 0.715, y: 4.353, w: 5.351, h: 0.572 }, BODY));
++  cta(s, 0.797, 5.88, 2.972);
++}
++
++/* 4 — Market Analysis */
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  card(s, 0.664, 1.825, 5.594, 3.267, C.navy, 0.233);
++  barChart(s, pptx, 0.953, 2.245, 4.76, 2.147, [C.purple, C.white, C.green], C.white, BAR_LAYOUT);
++  ['Company A', 'Company B', 'Company C'].forEach((label, i) =>
++    txt(s, label, { x: [1.015, 2.777, 4.541][i], y: [4.477, 4.495, 4.51][i], w: 1.406, h: 0.337, fontSize: 14, fontFace: F.major }));
++  txt(s, 'Market Analysis', Object.assign({ x: 7.295, y: 1.808, w: 5.554, h: 0.774 }, H1));
++  navBar(s);
++  txt(s, L.intro, Object.assign({ x: 7.318, y: 3.064, w: 5.351, h: 0.825 }, BODY));
++  cta(s, 7.43, 4.669, 9.605);
++  stat(s, 7.49, 6.059, '95%', 'Customer Happy');
++  stat(s, 9.367, 6.059, '$125B', 'Profit Last Years', 9.55);
++  stat(s, 11.458, 6.059, '92%', 'Customer Satisfied');
++  imageFrame(s, 0.664, 5.376, 5.594, 1.641);
++}
++
++/* 5 — Product Overview */
++const FEATURES = [
++  { title: 'Voice Controlled Convenience', x: 6.038, y: 1.919, fill: C.green, r: 0.163, tx: 6.231, ty: 2.043, th: 0.629, bx: 6.243, by: 2.795, dark: true },
++  { title: 'Intuitive User Interface', x: 9.113, y: 1.919, fill: C.purple, r: 0.19, tx: 9.326, ty: 2.043, th: 0.629, bx: 9.326, by: 2.795, dark: false },
++  { title: 'Multi-Functional', x: 6.777, y: 4.58, fill: C.purple, r: 0.165, tx: 6.97, ty: 4.847, th: 0.351, bx: 7.017, by: 5.378, dark: false },
++  { title: 'Compatibility', x: 10.004, y: 4.58, fill: C.green, r: 0.165, tx: 10.231, ty: 4.847, th: 0.351, bx: 10.231, by: 5.378, dark: true },
++];
++
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  FEATURES.forEach(f => card(s, f.x, f.y, 2.482, 1.961, f.fill, f.r));
++  txt(s, 'Product Overview', Object.assign({ x: 0.732, y: 1.757, w: 4.745, h: 1.447 }, H1));
++  FEATURES.forEach(f => {
++    txt(s, f.title, {
++      x: f.tx, y: f.ty, w: 1.623, h: f.th, fontSize: 11, fontFace: F.major,
++      color: f.dark ? C.navy : C.white, lineSpacingMultiple: 1.5,
++    });
++    txt(s, L.ultriciesCard, {
++      x: f.bx, y: f.by, w: 2.028, h: 0.825, fontSize: 10,
++      color: f.dark ? C.muted : C.white, align: 'justify', lineSpacingMultiple: 1.5,
++    });
++  });
++  navBar(s);
++  cta(s, 0.805, 3.612, 2.979);
++  imageFrame(s, 0.805, 4.431, 4.272, 2.11);
++}
++
++/* 6 — Marketing Strategy */
++const MKT_ITEMS = [
++  { n: '01.', nx: 0.535, ny: 1.787, title: 'Channels and Tactics', tx: 1.036, ty: 1.783, tw: 2.2, th: 0.303, bx: 1.036, by: 2.329 },
++  { n: '02.', nx: 4.102, ny: 1.827, title: 'Measurement and Analysis', tx: 4.603, ty: 1.823, tw: 2.687, th: 0.303, bx: 4.572, by: 2.329 },
++  { n: '03.', nx: 0.535, ny: 4.213, title: 'Segmentation, Targeting, and Positioning', tx: 1.036, ty: 4.209, tw: 2.522, th: 0.505, bx: 1.036, by: 5.049 },
++  { n: '04.', nx: 4.149, ny: 4.226, title: 'Collaboration with Sales Team', tx: 4.65, ty: 4.222, tw: 1.901, th: 0.505, bx: 4.572, by: 5.049 },
++];
++
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  txt(s, 'Marketing Strategy', Object.assign({ x: 8.526, y: 1.485, w: 3.28, h: 1.447 }, H1));
++  txt(s, L.nunc, Object.assign({ x: 8.564, y: 3.377, w: 4.368, h: 0.825 }, BODY));
++  MKT_ITEMS.forEach(it => {
++    txt(s, it.n, Object.assign({ x: it.nx, y: it.ny, w: 0.594, h: 0.303 }, CARD_TITLE));
++    txt(s, it.title, Object.assign({ x: it.tx, y: it.ty, w: it.tw, h: it.th }, CARD_TITLE));
++    txt(s, L.silent, Object.assign({ x: it.bx, y: it.by, w: 2.672, h: 0.825 }, BODY));
++  });
++  navBar(s);
++  cta(s, 8.689, 5.51, 10.863);
++}
++
++/* 7 — Launch Strategy Plan */
++const LAUNCH_CARDS = [
++  { x: 1.041, y: 5.02, tx: 1.205, ty: 5.29, by: 5.648, fill: C.green, title: 'Product Launch Project Timeline', dark: true },
++  { x: 5.02, y: 5.02, tx: 5.159, ty: 5.29, by: 5.648, fill: C.purple, title: 'Roles and Responsibilities of Team', dark: false },
++  { x: 9.095, y: 5.016, tx: 9.268, ty: 5.295, by: 5.683, tw: 3.024, fill: C.green, title: 'Key Milestones and Deliverables', dark: true },
++];
++
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  LAUNCH_CARDS.forEach(c => card(s, c.x, c.y, 3.197, 1.526, c.fill, 0.206));
++  txt(s, 'Launch Strategy Plan', Object.assign({ x: 0.944, y: 1.519, w: 3.873, h: 1.447 }, H1));
++  txt(s, L.ultricies, Object.assign({ x: 0.944, y: 3.167, w: 4.83, h: 0.581 }, BODY));
++  LAUNCH_CARDS.forEach(c => {
++    txt(s, c.title, {
++      x: c.tx, y: c.ty, w: c.tw || 3.154, h: 0.303, fontSize: 12, fontFace: F.major,
++      color: c.dark ? C.navy : C.white,
++    });
++    txt(s, L.ultriciesShort, {
++      x: c.tx, y: c.by, w: 2.918, h: 0.833, fontSize: 10,
++      color: c.dark ? C.muted : C.white, lineSpacingMultiple: 1.5,
++    });
++  });
++  navBar(s);
++  pillButton(s, 3.316, 1.737, 'Next Side');
++  imageFrame(s, 7.104, 1.557, 5.188, 2.193);
++}
++
++/* 8 — Timeline of the Product Launch Project */
++const MONTHS = [
++  { name: 'January', x: 0.481, y: 1.516, dot: 0.656, dy: 1.836, tx: 0.901, ty: 1.718, by: 2.091, bw: 2.362, fill: C.purple, body: L.finalize, dark: false },
++  { name: 'February', x: 0.481, y: 3.444, dot: 0.656, dy: 3.703, tx: 0.901, ty: 3.585, by: 4.019, bw: 2.329, fill: C.purple, body: L.finalize, dark: false },
++  { name: 'March', x: 0.481, y: 5.597, dot: 0.656, dy: 5.880, tx: 0.901, ty: 5.762, tw: 2.254, by: 6.136, fill: C.purple, body: 'Official product launch across all marketing channels.', dark: false },
++  { name: 'April', x: 3.713, y: 5.597, dot: 3.853, dy: 5.884, tx: 4.099, ty: 5.766, by: 6.140, fill: C.green, body: L.market, dark: true },
++  { name: 'May', x: 6.840, y: 5.597, dot: 7.051, dy: 5.884, tx: 7.296, ty: 5.766, by: 6.140, fill: C.green, body: L.market, dark: true },
++  { name: 'June', x: 9.940, y: 5.597, dot: 10.249, dy: 5.884, tx: 10.494, ty: 5.766, by: 6.140, fill: C.green, body: L.market, dark: true },
++];
++
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  MONTHS.forEach(m => {
++    card(s, m.x, m.y, 2.889, 1.321, m.fill, 0.178);
++    markerDot(s, m.dot, m.dy);
++    txt(s, m.name, {
++      x: m.tx, y: m.ty, w: m.tw || 2.2, h: 0.303, fontSize: 12, fontFace: F.major,
++      color: m.dark ? C.navy : C.white,
++    });
++    txt(s, m.body, {
++      x: m.dot, y: m.by, w: m.bw || 2.608, h: 0.581, fontSize: 10,
++      color: m.dark ? C.muted : C.white, lineSpacingMultiple: 1.5,
++    });
++  });
++  navBar(s);
++  txt(s, 'Timeline of the Product Launch Project', Object.assign({ x: 3.961, y: 1.709, w: 6.612, h: 1.447 }, H1));
++  txt(s, L.nunc, Object.assign({ x: 3.961, y: 3.662, w: 4.368, h: 0.825 }, BODY));
++  cta(s, 8.701, 2.621, 10.824, 2.622);
++  stat(s, 8.682, 3.654, '95%', 'Customer Happy');
++  stat(s, 10.824, 3.654, '92%', 'Customer Satisfied');
++}
++
++/* 9 — Roles and Responsibility of Team Member */
++const TEAM_CARDS = [
++  { x: 5.955, y: 1.682, w: 3.3, h: 2.321, fill: C.green, title: 'Marketing Team', tx: 6.098, ty: 2.046, tw: 2.343, th: 0.37,
++    bx: 6.098, by: 2.597, bw: 2.948, dark: true,
++    bullets: ['Lead the development and execution of marketing campaigns', 'Manage social media, email marketing, and advertising efforts'] },
++  { x: 9.509, y: 1.467, w: 3.359, h: 2.568, fill: C.purple, title: 'Product Development Team', tx: 9.857, ty: 1.777, tw: 2.352, th: 0.64,
++    bx: 9.697, by: 2.651, bw: 2.884, dark: false,
++    bullets: ['Ensure the product is ready for launch, addressing any last', 'Coordinate with manufacturing and supply chain partners'] },
++  { x: 6.0, y: 4.352, w: 3.358, h: 2.686, fill: C.purple, title: 'Sales Team', tx: 6.248, ty: 4.875, tw: 2.408, th: 0.37,
++    bx: 6.285, by: 5.499, bw: 2.701, dark: false,
++    bullets: ['Prepare sales collateral and training materials for retail ', 'PLACEHOLDER'] },
++  { x: 9.573, y: 4.333, w: 3.359, h: 2.438, fill: C.green, title: 'Executive Leadership', tx: 9.866, ty: 4.678, tw: 2.545, th: 0.37,
++    bx: 9.835, by: 5.366, bw: 2.884, dark: true,
++    bullets: ['PLACEHOLDER', 'Oversee budget allocation and resource management for the'] },
++];
++
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  TEAM_CARDS.forEach(c => {
++    card(s, c.x, c.y, c.w, c.h, c.fill, 0.0573 * Math.min(c.w, c.h));
++    txt(s, c.title, { x: c.tx, y: c.ty, w: c.tw, h: c.th, fontSize: 16, fontFace: F.major, color: c.dark ? C.navy : C.white });
++    s.addText(c.bullets.map(bulletItem), {
++      x: c.bx, y: c.by, w: c.bw, h: 1.087, fontSize: 10, fontFace: F.minor,
++      color: c.dark ? C.navy : C.white, valign: 'top', align: 'justify',
++      lineSpacingMultiple: 1.5,
++    });
++  });
++  txt(s, 'Roles and Responsibility of Team Member', {
++    x: 0.388, y: 1.682, w: 5.21, h: 1.722, fontSize: 40, fontFace: F.major, color: C.navy, lineSpacingMultiple: 0.8,
++  });
++  txt(s, 'Nunc vel risus commodo viverra. Fermentum odio eu feugiat pretium nibh ipsum consequat. Vulputate dignissimNunc vel risus commodo viverra. Fermentum odio eu feugiat pretium nibh',
++    Object.assign({ x: 0.401, y: 3.766, w: 4.676, h: 0.825 }, BODY_NAVY));
++  navBar(s);
++  cta(s, 0.498, 5.308, 2.873);
++  stat(s, 0.509, 6.231, '95%', 'Customer Happy');
++  stat(s, 2.873, 6.231, '92%', 'Customer Satisfied');
++}
++
++/* 10 — Key Milestone and Deliverables */
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++  [0, 1, 2, 3, 4, 5].forEach(i => {
++    const x = i < 3 ? 0.569 : 4.018;
++    const y = [1.912, 3.471, 5.156][i % 3];
++    txt(s, 'Milestone ' + (i + 1), { x, y, w: 1.611, h: 0.337, fontSize: 14, fontFace: F.major, color: C.navy });
++    txt(s, L.milestone, Object.assign({ x, y: y + 0.397, w: 2.272, h: 0.572 }, BODY_NAVY));
++  });
++  txt(s, 'Key Milestone and Deliverables', Object.assign({ x: 8.111, y: 1.71, w: 4.777, h: 1.447 }, H1));
++  cta(s, 8.208, 3.728, 10.383);
++  imageFrame(s, 8.208, 4.663, 4.427, 1.659);
++}
++
++/* 11 — Sales Forecast */
++const REVENUE_ROWS = [
++  { label: 'Product 1', value: '$250.00', lx: 0.761, vx: 2.139 },
++  { label: 'Product 2', value: '$500.00', lx: 0.761, vx: 2.139 },
++  { label: 'Product 3', value: '$750.00', lx: 0.761, vx: 2.139 },
++  { label: 'Product 4', value: '$500.00', lx: 3.655, vx: 4.993 },
++  { label: 'Product 5', value: '$450.00', lx: 3.655, vx: 4.993 },
++  { label: 'Product 6', value: '$900.00', lx: 3.655, vx: 4.993 },
++];
++const USP = [
++  { label: 'Sales Revenue', value: '$32B', lx: 7.293, lw: 1.451, vx: 7.402 },
++  { label: 'Customers', value: '820', lx: 9.303, lw: 1.37, vx: 9.392 },
++  { label: 'Sales Forecast', value: '$21B', lx: 11.206, lw: 1.491, vx: 11.343 },
++];
++
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  card(s, 7.266, 3.799, 5.533, 3.219, C.purple, 0.328);
++  card(s, 7.262, 2.12, 5.533, 1.307, C.purple, 0.218);
++  card(s, 0.469, 4.224, 5.672, 2.794, C.green, 0.23);
++  navBar(s);
++
++  txt(s, 'Sales Forecast', Object.assign({ x: 0.349, y: 1.548, w: 5.792, h: 0.774 }, H1));
++  txt(s, 'Ultricies tristique nulla aliquet enim tortor. A iaculis at alat pellentesque adipiscing. Sagittis orci a scelerisque purus . Enim dolor sit amet la cum mesiis',
++    Object.assign({ x: 0.369, y: 2.489, w: 5.89, h: 0.58 }, BODY_NAVY));
++
++  txt(s, 'Unique Selling Points:', { x: 7.166, y: 1.571, w: 2.057, h: 0.375, fontSize: 12, fontFace: F.major, color: C.navy, lineSpacingMultiple: 1.5 });
++  USP.forEach(u => {
++    txt(s, u.label, { x: u.lx, y: 2.344, w: u.lw, h: 0.375, fontSize: 12, align: 'center', lineSpacingMultiple: 1.5 });
++    txt(s, u.value, { x: u.vx, y: 2.672, w: 1.19, h: 0.649, fontSize: 24, fontFace: F.major, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++
++  txt(s, 'Revenue by Product', { x: 0.469, y: 3.675, w: 1.969, h: 0.375, fontSize: 12, fontFace: F.major, color: C.navy, lineSpacingMultiple: 1.5 });
++  txt(s, 'Product', { x: 0.761, y: 4.538, w: 0.974, h: 0.375, fontSize: 12, fontFace: F.major, color: C.navy, lineSpacingMultiple: 1.5 });
++  txt(s, 'Revenue', { x: 2.103, y: 4.538, w: 0.974, h: 0.375, fontSize: 12, fontFace: F.major, color: C.navy, lineSpacingMultiple: 1.5 });
++  txt(s, 'Product', { x: 3.655, y: 4.542, w: 0.974, h: 0.375, fontSize: 12, fontFace: F.major, color: C.navy, lineSpacingMultiple: 1.5 });
++  txt(s, 'Revenue', { x: 4.993, y: 4.542, w: 0.974, h: 0.375, fontSize: 12, fontFace: F.major, color: C.navy, lineSpacingMultiple: 1.5 });
++  REVENUE_ROWS.forEach((r, i) => {
++    const y = [5.347, 5.891, 6.436][i % 3];
++    txt(s, r.label, { x: r.lx, y, w: 1.059, h: 0.375, fontSize: 12, color: C.navy, lineSpacingMultiple: 1.5 });
++    txt(s, r.value, { x: r.vx, y: i < 3 ? y : y - 0.045, w: 0.974, h: 0.375, fontSize: 12, color: C.navy, lineSpacingMultiple: 1.5 });
++  });
++
++  lineChart(s, pptx, 7.576, 4.212, 4.912, 2.257, [C.teal, C.green, C.yellow], C.white, LINE_LAYOUT);
++  ['Company A', 'Company B', 'Company C'].forEach((label, i) =>
++    txt(s, label, { x: [7.719, 9.483, 11.303][i], y: [6.642, 6.657, 6.675][i], w: 1.406, h: 0.286, fontSize: 11, fontFace: F.major }));
++}
++
++/* 12 — Distribution Strategy */
++const DIST_CARDS = [
++  { n: '01.', title: 'Channels', tw: 1.611, x: 2.47, y: 1.497, fill: C.purple, r: 0.201, dark: false },
++  { n: '02.', title: 'Logistics and Fulfilment', tw: 2.259, x: 6.154, y: 1.511, fill: C.green, r: 0.243, dark: true },
++  { n: '03.', title: 'Geographical Reach', tw: 1.905, x: 6.154, y: 4.374, fill: C.green, r: 0.243, dark: true },
++  { n: '04.', title: 'Inventory Management', tw: 2.358, x: 9.837, y: 4.374, fill: C.purple, r: 0.215, dark: false },
++];
++
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  // Green blob bleeding off the left edge (a 90deg-rotated card in the original).
++  card(s, -0.058, 1.496, 1.884, 2.286, C.green, 0.175);
++  DIST_CARDS.forEach(c => {
++    card(s, c.x, c.y, 3.012, 2.286, c.fill, c.r);
++    const color = c.dark ? C.navy : C.white;
++    txt(s, c.n, { x: c.x + 0.202, y: c.y + 0.31, w: 0.736, h: 0.405, fontFace: F.major, color });
++    txt(s, c.title, { x: c.x + 0.202, y: c.y + 0.809, w: c.tw, h: 0.304, fontSize: 12, fontFace: F.major, color });
++    txt(s, L.arcuLong, {
++      x: c.x + 0.202, y: c.y + 1.158, w: 2.608, h: 0.833, fontSize: 10,
++      color: c.dark ? C.muted : C.white, lineSpacingMultiple: 1.5,
++    });
++  });
++  navBar(s);
++  txt(s, 'Distribution\nStrategy', { x: 0.532, y: 4.678, w: 3.547, h: 1.178, fontSize: 40, fontFace: F.major, color: C.navy, lineSpacingMultiple: 0.8 });
++  txt(s, L.nuncDup, Object.assign({ x: 9.81, y: 2.711, w: 3.131, h: 1.077 }, BODY_NAVY));
++  cta(s, 0.565, 6.197, 2.74);
++}
++
++/* 13 — Promotion Strategy */
++const PROMO = [
++  { n: '01.', title: 'Digital Marketing Initiatives', nx: 0.691, tx: 1.246 },
++  { n: '02.', title: 'Content Creation and Distribution', nx: 3.79, tx: 4.345 },
++  { n: '03.', title: 'Measurement and Analytics', nx: 6.882, tx: 7.438 },
++  { n: '04.', title: 'Community Engagement and PR', nx: 9.977, tx: 10.532, small: true },
++];
++
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++  [0.848, 3.894, 7.035, 10.081].forEach(x => imageFrame(s, x, 1.442, 2.404, 2.308));
++  PROMO.forEach(p => {
++    txt(s, p.n, { x: p.nx, y: 4.068, w: 0.735, h: 0.404, fontFace: F.major, color: C.navy });
++    txt(s, p.title, {
++      x: p.tx, y: 4.02, w: 1.611, h: p.small ? 0.572 : 0.667,
++      fontSize: p.small ? 10 : 12, fontFace: F.plain, color: C.navy, lineSpacingMultiple: 1.5,
++    });
++  });
++  txt(s, 'Promotion Strategy', Object.assign({ x: 1.022, y: 5.145, w: 4.054, h: 1.447 }, H1));
++  txt(s, 'Nunc vel risus commodo viverra. Fermentum odio eu feugiat pretium nibh ipsum consequat. Vulputate dignissimNunc vel risus',
++    Object.assign({ x: 7.749, y: 5.319, w: 4.528, h: 0.572 }, BODY_NAVY));
++  cta(s, 7.858, 6.255, 10.033);
++}
++
++/* 14 — Let's Take a Break */
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++  imageFrame(s, 0.484, 1.476, 6.182, 5.56);
++  txt(s, 'Let\u2019s Take a Break', { x: 7.551, y: 1.609, w: 4.255, h: 1.717, fontSize: 48, fontFace: F.major, color: C.navy });
++  txt(s, 'We are Company.', { x: 7.605, y: 3.75, w: 2.168, h: 0.303, fontSize: 12, fontFace: F.plain, color: C.navy });
++  txt(s, L.arcuLong, { x: 7.605, y: 4.114, w: 3.623, h: 0.581, fontSize: 10, color: C.navy, lineSpacingMultiple: 1.5 });
++  cta(s, 7.551, 6.07, 9.725);
++}
++
++/* 15 — Budget Allocation */
++const BUDGET = [
++  { title: 'Marketing Expenses', pct: '40%', share: 60, x: 7.429, y: 1.483, h: 2.536, fill: C.green, dark: true, tx: 7.700, ty: 1.630, tw: 1.611, th: 0.304 },
++  { title: 'Sales & Distribution Costa', pct: '20%', share: 80, x: 10.322, y: 1.483, h: 2.536, fill: C.purple, dark: false, tx: 10.299, ty: 1.630, tw: 2.198, th: 0.304 },
++  { title: 'Product Development and Manufacturing', pct: '25%', share: 75, x: 7.429, y: 4.491, h: 2.538, fill: C.purple, dark: false, tx: 7.601, ty: 4.524, tw: 1.809, th: 0.53 },
++  { title: 'Promotional Events and Sponsorships', pct: '10%', share: 90, x: 10.322, y: 4.491, h: 2.538, fill: C.green, dark: true, tx: 10.593, ty: 4.524, tw: 1.611, th: 0.53 },
++];
++const BUDGET_NOTES = [
++  { title: 'Financial Reporting and Accountability', tx: 0.547, ty: 4.08, th: 0.505, bx: 0.549, by: 4.723, dot: [0.384, 4.291] },
++  { title: 'Monitoring and Evaluation', tx: 4.201, ty: 4.224, th: 0.304, bx: 4.201, by: 4.721, dot: [4.149, 4.291] },
++  { title: 'Flexibility and Adaptability', tx: 0.544, ty: 5.813, th: 0.302, bx: 0.569, by: 6.226, dot: [0.347, 6.028] },
++];
++
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  txt(s, 'Budget Allocation', { x: 0.499, y: 1.63, w: 5.427, h: 1.726, fontSize: 60, fontFace: F.major, color: C.navy, lineSpacingMultiple: 0.8 });
++  BUDGET.forEach(b => {
++    card(s, b.x, b.y, 2.191, b.h, b.fill, 0.222);
++    const color = b.dark ? C.navy : C.white;
++    donutChart(s, pptx, b.x + 0.304, b.y + 0.528, 1.545, 1.596, b.share);
++    txt(s, b.title, { x: b.tx, y: b.ty, w: b.tw, h: b.th, fontSize: 9, fontFace: F.major, color, align: 'center', lineSpacingMultiple: 1.5 });
++    txt(s, b.pct, { x: b.x + 0.596, y: b.y + 1.059, w: 0.962, h: 0.46, fontSize: 16, fontFace: F.major, color, align: 'center', lineSpacingMultiple: 1.5 });
++    txt(s, 'Nulla pharetra silent.', { x: b.x + 0.172, y: b.y + 2.019, w: 1.809, h: 0.328, fontSize: 10, fontFace: F.major, color, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++  BUDGET_NOTES.forEach(n => {
++    s.addShape('ellipse', { x: n.dot[0], y: n.dot[1], w: 0.102, h: 0.102, fill: { color: C.bg }, line: { type: 'none' } });
++    txt(s, n.title, { x: n.tx, y: n.ty, w: 2.497, h: n.th, fontSize: 12, fontFace: F.major, color: C.navy });
++    txt(s, L.arcuShort, Object.assign({ x: n.bx, y: n.by, w: 2.608, h: 0.58 }, BODY_NAVY));
++  });
++  navBar(s);
++  cta(s, 4.201, 5.846, 4.201, 6.44);
++}
++
++/* 16 — Risk Analysis */
++const RISKS = [
++  { title: 'Identification of Potential Risks and Challenges', x: 0.621, y: 1.907, bx: 0.816 },
++  { title: 'Mitigation Strategies for Managing Risks', x: 4.172, y: 1.907, bx: 4.367 },
++  { title: 'Contingency Plans for Unforeseen Circumstances', x: 0.621, y: 3.503, bx: 0.816 },
++  { title: 'Risk Monitoring and Review Mechanisms', x: 4.212, y: 3.503, bx: 4.367 },
++];
++
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  card(s, 0, 1.695, 7.195, 3.045, C.softGray, 0.211);
++  txt(s, 'Risk Analysis', Object.assign({ x: 8.532, y: 1.754, w: 3.915, h: 0.774 }, H1));
++  RISKS.forEach(r => {
++    s.addText(r.title, {
++      x: r.x, y: r.y, w: 3.208, h: 0.505, fontSize: 12, fontFace: F.minor, color: C.navy,
++      valign: 'top', bullet: BULLET,
++    });
++    txt(s, L.ultriciesShort, { x: r.bx, y: r.y + 0.56, w: 2.918, h: 0.572, fontSize: 10, color: C.muted, lineSpacingMultiple: 1.5 });
++  });
++  txt(s, 'Nunc vel risus commodo viverra. Fermentum odio eu feugiat pretium nibh ipsum consequat. Vulputate dignissimNunc vel risus commodo viverra. Fermentum odio eu',
++    Object.assign({ x: 8.532, y: 3.039, w: 4.447, h: 0.825 }, BODY_NAVY));
++  navBar(s);
++  cta(s, 8.532, 4.782, 10.706);
++  stat(s, 8.532, 5.953, '95%', 'Customer Happy');
++  stat(s, 10.897, 5.953, '92%', 'Customer Satisfied');
++  imageFrame(s, 0.716, 5.292, 6.664, 1.744);
++}
++
++/* 17 — Evaluation Metrics */
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  card(s, 7.177, 4.158, 5.476, 2.783, C.navy, 0.149);
++  card(s, 0.686, 3.727, 4.898, 3.22, C.navy, 0.139);
++  txt(s, 'Evaluation Metrics', Object.assign({ x: 0.686, y: 1.535, w: 5.425, h: 0.774 }, H1));
++  txt(s, 'Dolor sit amet consectetur adipiscing elite. Massa sapien faucibus et. Eu tincidunt tortor aliquam nulla. Facilisis gravida neque convallis a cras semper..',
++    Object.assign({ x: 0.705, y: 2.551, w: 5.804, h: 0.582 }, BODY_NAVY));
++  txt(s, 'Sales Performance', { x: 7.115, y: 3.739, w: 2.497, h: 0.304, fontSize: 12, color: C.navy });
++  txt(s, 'Customer Satisfaction Ratings', { x: 0.994, y: 3.904, w: 3.175, h: 0.302, fontSize: 12 });
++  lineChart(s, pptx, 0.994, 4.256, 4.307, 2.245, [C.purple, C.green, C.white], C.white);
++  barChart(s, pptx, 7.552, 4.465, 4.622, 2.087, [C.purple, C.green, C.white], C.navy);
++  ['2030', '2031', '2032'].forEach((year, i) => {
++    const w = [0.835, 0.752, 0.817][i];
++    txt(s, year, { x: [1.218, 2.804, 4.549][i], y: [6.432, 6.439, 6.439][i], w, h: 0.404, fontFace: F.major, wrap: false });
++    txt(s, year, { x: [7.729, 9.316, 11.061][i], y: [6.481, 6.488, 6.488][i], w, h: 0.404, fontFace: F.major, wrap: false });
++  });
++  navBar(s);
++  cta(s, 7.173, 2.594, 9.348);
++}
++
++/* 18 — Customer Engagement */
++const ENGAGEMENT = [
++  { title: 'Strategies for Engaging and Retaining Customers', y: 1.648, w: 2.497 },
++  { title: 'Customer Support and Feedback Mechanisms', y: 3.464, w: 2.497 },
++  { title: 'Loyalty Programs and Incentives for Repeat Purchases', y: 5.281, w: 2.865 },
++];
++
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  txt(s, 'Customer Engagement', Object.assign({ x: 9.053, y: 1.531, w: 3.796, h: 1.447 }, H1));
++  ENGAGEMENT.forEach(e => {
++    markerDot(s, 0.705, e.y + 0.141, 0.139);
++    txt(s, e.title, { x: 0.944, y: e.y, w: e.w, h: 0.677, fontSize: 12, fontFace: F.major, color: C.navy, lineSpacingMultiple: 1.5 });
++    txt(s, L.arcuShort, Object.assign({ x: 0.944, y: e.y + 0.73, w: 2.608, h: 0.581 }, BODY));
++  });
++  txt(s, L.nuncDup, Object.assign({ x: 9.13, y: 3.464, w: 3.796, h: 0.825 }, BODY_NAVY));
++  navBar(s);
++  cta(s, 9.157, 4.917, 11.099);
++  stat(s, 9.157, 5.998, '$125B', 'Profit Last Years', 9.257);
++  stat(s, 11.373, 5.998, '92%', 'Customer Satisfied');
++  imageFrame(s, 4.86, 1.563, 3.424, 5.276);
++}
++
++/* 19 — Sustainability Initiatives */
++const SUSTAIN = [
++  { title: 'Manufacturing & Packaging Practices', x: 6.18, y: 1.854, fill: C.purple, tx: 6.372, ty: 2.139, tw: 2.538, by: 3.135, bw: 2.538, dark: false },
++  { title: 'Commitment to Corporate Social Responsibility (CSR)', x: 9.41, y: 1.854, fill: C.purple, tx: 9.601, ty: 2.272, tw: 2.524, by: 3.001, bw: 2.524, dark: false },
++  { title: 'Measuring and Reporting Sustainability Performance', x: 6.177, y: 4.18, fill: C.green, tx: 6.372, ty: 4.598, tw: 2.538, by: 5.327, bw: 2.538, dark: true },
++  { title: 'Continuous Improvement and Innovation', x: 9.41, y: 4.18, fill: C.green, tx: 9.601, ty: 4.598, tw: 2.354, by: 5.327, bw: 2.608, dark: true },
++];
++
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  imageFrame(s, 1.327, 4.18, 4.293, 2.131);
++  SUSTAIN.forEach(c => {
++    card(s, c.x, c.y, 2.921, 2.137, c.fill, 0.139);
++    txt(s, c.title, { x: c.tx, y: c.ty, w: c.tw, h: 0.667, fontSize: 12, fontFace: F.major, color: c.dark ? C.navy : C.white, lineSpacingMultiple: 1.5 });
++    txt(s, L.arcuShort, { x: c.tx, y: c.by, w: c.bw, h: 0.581, fontSize: 10, color: c.dark ? C.navy : C.white, lineSpacingMultiple: 1.5 });
++  });
++  txt(s, 'Sustainability\nInitiatives', Object.assign({ x: 1.208, y: 1.745, w: 4.549, h: 1.447 }, H1));
++  txt(s, 'Dolor sit amet consectetur adipiscing elite. Massa sapien faucibus et molestie ac feugiat sed lectus. Eget nunclerisque.',
++    { x: 1.208, y: 3.38, w: 4.228, h: 0.572, fontSize: 10, color: C.navy, lineSpacingMultiple: 1.5 });
++  navBar(s);
++  // CTA on this slide is a single pill with an inline arrow.
++  pill(s, 3.874, 5.75, 1.596, 0.415, C.green);
++  txt(s, 'Next Slide', { x: 3.994, y: 5.831, w: 1.095, h: 0.269, fontSize: 10, fontFace: F.plain, color: C.navy });
++  arrowGlyph(s, 5.175, 5.899, 0.147, C.navy, 0);
++}
++
++/* 20 — Team and Partnership */
++const PEOPLE = [
++  { name: 'Fanny Price', role: 'CEO of Company', nx: 0.479, nw: 1.752, rx: 0.439, rw: 1.429 },
++  { name: 'Nelly Dean', role: 'Head of Marketing', nx: 3.033, nw: 1.752, rx: 2.993, rw: 1.708 },
++  { name: 'Michael Brown', role: 'Head of Operation', nx: 5.633, nw: 2.146, rx: 5.671, rw: 1.752 },
++];
++
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++  [0.492, 3.059, 5.626].forEach(x => imageFrame(s, x, 2.163, 2.244, 2.99));
++  txt(s, 'Team and Partnership', Object.assign({ x: 8.932, y: 2.163, w: 4.946, h: 1.447 }, H1));
++  txt(s, 'Sed vulputate mi sit amet mauris commodo quis. Tempor orci eu lobortis elementum nibh tellus molestie nunc non Sed vulputate mi sit amet mauris commodo ',
++    Object.assign({ x: 8.932, y: 4.025, w: 3.917, h: 0.825 }, BODY_NAVY));
++  PEOPLE.forEach(p => {
++    txt(s, p.name, { x: p.nx, y: 5.463, w: p.nw, h: 0.404, fontFace: F.major, color: C.navy });
++    txt(s, p.role, { x: p.rx, y: 5.881, w: p.rw, h: 0.271, fontSize: 10, color: C.navy });
++  });
++  cta(s, 8.917, 5.705, 10.859);
++}
++
++/* 21 — In Conclusion */
++function slide21(pptx) {
++  const s = pptx.addSlide();
++  card(s, 7.551, 5.372, 2.013, 1.082, C.purple, 0.159);
++  card(s, 10.299, 5.372, 2.013, 1.082, C.purple, 0.177);
++  [{ x: 7.551, title: 'Do and Don\u2019t', tw: 1.309 }, { x: 10.299, title: 'This Just Example', tw: 1.605 }].forEach(c => {
++    txt(s, c.title, { x: c.x + 0.158, y: 5.487, w: c.tw, h: 0.303, fontSize: 12, fontFace: F.major });
++    txt(s, 'Vulputate dignissim suspendisse in est.', { x: c.x + 0.16, y: 5.769, w: 1.505, h: 0.581, fontSize: 10, lineSpacingMultiple: 1.5 });
++  });
++  txt(s, 'In Conclusion', Object.assign({ x: 0.652, y: 1.826, w: 4.19, h: 0.774 }, H1));
++  txt(s, 'Accumsan in nisl nisi scelerisque eu ultrices vitae auctor eu. Pharetra pharetra massa massa ultricies mi quis hendrerit dolor magna. Arcu non sodales neque sodales ut etiam sit amet nisl.',
++    Object.assign({ x: 0.652, y: 2.989, w: 4.615, h: 0.833 }, BODY_NAVY));
++  txt(s, L.nunc, Object.assign({ x: 0.652, y: 4.21, w: 4.615, h: 0.833 }, BODY_NAVY));
++  navBar(s);
++  cta(s, 0.749, 5.944, 2.691);
++  imageFrame(s, 7.567, 2.128, 4.745, 2.695);
++}
++
++/* 22 — Next Steps */
++const NEXT_STEPS = [
++  { title: 'Secondary Sale', x: 0.58, fill: C.green, r: 0.183, tx: 0.785, tw: 1.143, bx: 0.855, dark: true },
++  { title: 'Buyback Agreement', x: 3.615, fill: C.purple, r: 0.142, tx: 3.903, tw: 1.545, bx: 3.903, dark: false },
++  { title: 'IPO (Initial Public Offering)', x: 6.8, fill: C.green, r: 0.167, tx: 7.072, tw: 1.545, bx: 7.072, dark: true },
++  { title: 'Strategic Acquisition', x: 9.921, fill: C.purple, r: 0.167, tx: 10.209, tw: 1.545, bx: 10.209, dark: false },
++];
++
++function slide22(pptx) {
++  const s = pptx.addSlide();
++  NEXT_STEPS.forEach(c => {
++    card(s, c.x, 4.525, 2.643, 1.967, c.fill, c.r);
++    txt(s, c.title, { x: c.tx, y: 4.681, w: c.tw, h: 0.675, fontSize: 12, fontFace: F.major, color: c.dark ? C.navy : C.white, lineSpacingMultiple: 1.5 });
++    txt(s, L.interdum, {
++      x: c.bx, y: 5.41, w: 2.068, h: 0.833, fontSize: 10,
++      color: c.dark ? C.navy : C.white, align: 'justify', lineSpacingMultiple: 1.5,
++    });
++  });
++  txt(s, 'Next Steps', Object.assign({ x: 0.509, y: 1.349, w: 3.796, h: 0.774 }, H1));
++  txt(s, 'Accumsan in nisl nisi scelerisque eu ultrices vitae auctor eu. Pharetra pharetra massa massa ultricies mi quioto hendrerit dolor magna non',
++    Object.assign({ x: 0.58, y: 2.338, w: 4.745, h: 0.572 }, BODY));
++  navBar(s);
++  cta(s, 0.621, 3.386, 2.563);
++  imageFrame(s, 6.8, 1.515, 5.764, 2.235);
++}
++
++/* 23 — Q&A Session */
++function slide23(pptx) {
++  const s = pptx.addSlide();
++  txt(s, 'Q&A Session', { x: 0.387, y: 1.639, w: 5.871, h: 1.111, fontSize: 60, fontFace: F.major, color: C.navy });
++  txt(s, 'Open floor for questions and answers', { x: 0.413, y: 3.178, w: 4.333, h: 0.408, fontSize: 14, fontFace: F.plain, color: C.navy, lineSpacingMultiple: 1.5 });
++  txt(s, L.nuncDup, Object.assign({ x: 0.413, y: 3.803, w: 5.845, h: 0.572 }, BODY_NAVY));
++  navBar(s);
++  cta(s, 0.509, 5.147, 2.451);
++  stat(s, 0.484, 6.239, '95%', 'Customer Happy');
++  stat(s, 2.849, 6.239, '92%', 'Customer Satisfied');
++  imageFrame(s, 7.264, 1.775, 5.585, 5.204);
++}
++
++/* 24 — Contact Information */
++const CONTACTS = [
++  { label: 'General inquiries', x: 2.935, y: 4.951, dot: [2.683, 5.029],
++    lines: [{ t: 'www.example.com', y: 5.271, w: 1.609 }, { t: '+555 555 5555', y: 5.536, w: 1.609 }, { t: 'example.org', y: 5.802, w: 1.771 }] },
++  { label: 'Our Address 2', x: 6.032, y: 4.951, dot: [5.781, 5.027], block: { t: L.address, y: 5.269, w: 1.425 } },
++  { label: 'Our Address 1', x: 9.206, y: 4.92, dot: [8.794, 4.998], block: { t: L.address, y: 5.239, w: 1.444 } },
++];
++
++function slide24(pptx) {
++  const s = pptx.addSlide();
++  txt(s, 'Contact Information', Object.assign({ x: 8.303, y: 1.634, w: 3.796, h: 1.447 }, H1));
++  CONTACTS.forEach(c => {
++    markerDot(s, c.dot[0], c.dot[1], 0.132);
++    txt(s, c.label, { x: c.x, y: c.y, w: 1.444, h: 0.286, fontSize: 11, fontFace: F.plain, color: C.navy });
++    (c.lines || []).forEach(l => txt(s, l.t, { x: c.x, y: l.y, w: l.w, h: 0.269, fontSize: 10, color: C.muted }));
++    if (c.block) txt(s, c.block.t, { x: c.x, y: c.block.y, w: c.block.w, h: 0.833, fontSize: 10, color: '000000', lineSpacingMultiple: 1.5 });
++  });
++  pill(s, 8.411, 3.305, 3.142, 0.432, C.green);
++  txt(s, 'Contact Us', { x: 8.566, y: 3.39, w: 1.053, h: 0.269, fontSize: 10, fontFace: F.plain, color: C.navy });
++  phoneGlyph(s, 11.145, 3.477, 0.124, C.navy);
++  navBar(s);
++  imageFrame(s, 1.161, 1.906, 6.147, 1.844);
++}
++
++/* 25 — Thank You */
++function slide25(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++  txt(s, 'Thank You For The Attention', { x: 0.399, y: 2.04, w: 6.644, h: 2.322, fontSize: 66, fontFace: F.major, color: C.navy });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodori ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis dolor.',
++    { x: 0.399, y: 4.745, w: 5.751, h: 0.58, fontSize: 10, color: C.navy, lineSpacingMultiple: 1.5 });
++  // Footer contact strip with hairline separators.
++  txt(s, 'www.example.com', { x: 7.301, y: 6.438, w: 1.303, h: 0.269, fontSize: 10, color: C.muted, wrap: false });
++  txt(s, '+555 555 5555', { x: 9.353, y: 6.438, w: 1.054, h: 0.269, fontSize: 10, color: C.muted, wrap: false });
++  txt(s, 'example.org', { x: 11.251, y: 6.438, w: 0.912, h: 0.269, fontSize: 10, color: C.muted, wrap: false });
++  [9.173, 10.986].forEach(x => s.addShape('line', { x, y: 6.538, w: 0, h: 0.069, line: { color: C.navy, width: 1 } }));
++  // The button group sits at the bottom-left.
++  pillButton(s, 0.586, 6.412, 'Get Started', 0.085);
++  playButton(s, 2.512, 6.412);
++  imageFrame(s, 7.084, 1.906, 5.765, 4.034);
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25,
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.title = 'Our Product Launch Project Proposal';
++  pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333333, height: 7.5 });
++  pptx.layout = 'WIDE_16x9';
++  pptx.defineSlideMaster({ title: 'BASE', background: { color: C.bg } });
++  const original = pptx.addSlide.bind(pptx);
++  pptx.addSlide = () => original({ masterName: 'BASE' });
++  BUILDERS.forEach(fn => fn(pptx));
++  return pptx.writeFile({ fileName: path.join(__dirname, '03144841-f521-4bd7-8456-df073988d8d9_grok_final.pptx') });
++}
++
++build().then(f => console.log('wrote ' + f)).catch(e => { console.error(e); process.exit(1); });

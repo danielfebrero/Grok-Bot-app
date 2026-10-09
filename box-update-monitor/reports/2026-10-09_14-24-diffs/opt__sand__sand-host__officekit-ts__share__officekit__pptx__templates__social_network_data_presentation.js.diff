@@ -1,0 +1,1175 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/social_network_data_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/social_network_data_presentation.js
+@@ -0,0 +1,1172 @@
++/**
++ * Social Network Presentation - recreated with pptxgenjs.
++ * Slide size 26.6"x15" (widescreen, oversized master). Theme palette "Blue".
++ *
++ * Raster artwork in the source deck (people, hands, devices, maps, megaphones)
++ * is replaced by tinted placeholder blocks; everything else is drawn natively.
++ */
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++const SW = 26.6007, SH = 15.0;
++
++/* ---------------------------------------------------------- palette ----- */
++const BLUE = '0F6FC6', SKY = '009DD9', CYAN = '0BD0D9', MINT = '10CF9B', GREEN = '7CCA62', OLIVE = 'A5C249';
++const D_BLUE = '0B5394', D_SKY = '0076A3', D_CYAN = '089CA3', D_MINT = '0C9B74',
++      D_GREEN = '5D984A', D_OLIVE = '7C9237';
++const WHITE = 'FFFFFF', GREY = '808080', GREY2 = 'A6A6A6', SILVER = 'D9D9D9',
++      PANEL = 'EFEDED', RING = 'EFEFF0', RED = 'F05260', BLACK = '000000';
++const DARK = { [BLUE]: D_BLUE, [SKY]: D_SKY, [CYAN]: D_CYAN, [MINT]: D_MINT, [GREEN]: D_GREEN, [OLIVE]: D_OLIVE };
++
++const LATO = 'Lato', BLACKF = 'Lato Black', LIGHT = 'Lato Light';
++
++/* ------------------------------------------------- normalised outlines ---
++ * Each outline is a list of [x,y] line points and ['c',x1,y1,x2,y2,x,y]
++ * cubic segments, expressed in 0..1 of the shape box.                      */
++const P = {
++  // rectangle whose right-hand corners are rounded (the wide info bands)
++  band:    [[0, 0], [0.967, 0], ['c', 0.987, 0, 1, 0.078, 1, 0.156], [1, 0.844], ['c', 1, 0.922, 0.987, 1, 0.967, 1], [0, 1]],
++  // narrow tapered "fold" that sits at the end of a band (four orientations)
++  foldR:   [[0, 0], [1, 0.157], [1, 0.843], [0, 1]],
++  foldL:   [[1, 0], [0, 0.157], [0, 0.843], [1, 1]],
++  foldT:   [[0.157, 0], [0.843, 0], [1, 1], [0, 1]],
++  // pill: straight left edge, fully rounded right edge
++  pill:    [[0, 0], [0.892, 0], ['c', 0.952, 0, 1, 0.228, 1, 0.5], ['c', 1, 0.781, 0.952, 1, 0.892, 1], [0, 1]],
++  pill2:   [[0.874, 0], [0, 0], [0, 1], [0.874, 1], ['c', 0.942, 1, 1, 0.787, 1, 0.507], ['c', 1, 0.227, 0.942, 0, 0.874, 0]],
++  // panel with rounded bottom corners / rounded top corners
++  panelB:  [[0, 0], [1, 0], [1, 0.921], ['c', 1, 0.965, 0.967, 1, 0.931, 1], [0.069, 1], ['c', 0.029, 1, 0, 0.965, 0, 0.921]],
++  panelT:  [[0.069, 0], [0.931, 0], ['c', 0.967, 0, 1, 0.146, 1, 0.325], [1, 1], [0, 1], [0, 0.325], ['c', 0, 0.146, 0.029, 0, 0.069, 0]],
++  cardB:   [[1, 0.886], ['c', 1, 0.952, 0.979, 1, 0.954, 1], [0.046, 1], ['c', 0.021, 1, 0, 0.952, 0, 0.886], [0, 0.105], ['c', 0, 0.048, 0.021, 0, 0.046, 0], [0.954, 0], ['c', 0.979, 0, 1, 0.048, 1, 0.105]],
++  cardT:   [[1, 1], [1, 0.25], ['c', 1, 0.114, 0.979, 0, 0.954, 0], [0.046, 0], ['c', 0.021, 0, 0, 0.114, 0, 0.25], [0, 1]],
++  // pentagon "feature name" card (body + header cap)
++  pentB:   [[1, 0.131], [1, 1], [0, 1], [0, 0.131], [0.497, 0]],
++  pentT:   [[1, 1], [1, 0.387], [0.497, 0], [0, 0.387], [0, 1]],
++  // wide banner with a pointed left end
++  bannerL: [[0.127, 0], [1, 0], [1, 1], [0.127, 1], [0, 0.506]],
++  // funnel slice: straight top, bowl-shaped bottom
++  bowl:    [[0, 0], [1, 0], [0.902, 0.811], [0.902, 0.815], ['c', 0.902, 0.917, 0.722, 1, 0.5, 1], ['c', 0.278, 1, 0.098, 0.917, 0.098, 0.815], [0.098, 0.811]],
++  // big funnel (slide 39)
++  funnel:  [[1, 0], [0, 0], [0.424, 0.679], [0.424, 1], [0.604, 1], [0.604, 0.67]],
++  // ribbon arrows used on slide 37
++  arrowR:  [[0, 0.159], [0.636, 0.159], [0.636, 0.017], [0.837, 0.017], [0.798, 0.157], [1, 0.502], [0.798, 0.842], [0.837, 0.983], [0.636, 0.983], [0.636, 0.84], [0, 0.84]],
++  arrowL:  [[1, 0.159], [0.364, 0.159], [0.364, 0.017], [0.163, 0.017], [0.202, 0.157], [0, 0.502], [0.202, 0.842], [0.163, 0.983], [0.364, 0.983], [0.364, 0.84], [1, 0.84]],
++  // check mark
++  check:   [[0.367, 0.997], ['c', 0.34, 0.997, 0.317, 0.972, 0.29, 0.947], [0.027, 0.624], ['c', 0, 0.573, 0, 0.525, 0.053, 0.5], ['c', 0.107, 0.449, 0.157, 0.472, 0.183, 0.5], [0.367, 0.725], [0.787, 0.076], ['c', 0.84, 0.025, 0.891, 0, 0.944, 0.025], ['c', 0.997, 0.051, 0.997, 0.126, 0.97, 0.174], [0.473, 0.947], ['c', 0.447, 0.972, 0.42, 0.997, 0.367, 0.997]],
++  // facebook "f"
++  fbF:     [[0.72, 0.33], [0.44, 0.33], [0.44, 0.17], ['c', 0.44, 0.10, 0.47, 0.08, 0.55, 0.08], [0.72, 0.08], [0.72, 0], [0.48, 0], ['c', 0.24, 0, 0.20, 0.13, 0.20, 0.30], [0.20, 0.33], [0, 0.33], [0, 0.50], [0.20, 0.50], [0.20, 1], [0.44, 1], [0.44, 0.50], [0.68, 0.50]],
++  // twitter bird (simplified)
++  bird:    [[1, 0.09], ['c', 0.93, 0.12, 0.86, 0.14, 0.78, 0.15], ['c', 0.86, 0.10, 0.92, 0.03, 0.95, 0], ['c', 0.87, 0.05, 0.79, 0.08, 0.70, 0.10], ['c', 0.63, 0.03, 0.52, 0, 0.41, 0.03], ['c', 0.24, 0.08, 0.15, 0.25, 0.19, 0.42], ['c', 0.11, 0.41, 0.04, 0.34, 0, 0.26], ['c', -0.02, 0.38, 0.03, 0.50, 0.13, 0.56], ['c', 0.08, 0.56, 0.04, 0.55, 0, 0.53], ['c', 0.02, 0.66, 0.11, 0.76, 0.24, 0.78], ['c', 0.16, 0.85, 0.06, 0.88, -0.03, 0.86], ['c', 0.13, 0.97, 0.34, 1, 0.52, 0.95], ['c', 0.76, 0.86, 0.88, 0.62, 0.85, 0.36], ['c', 0.91, 0.31, 0.96, 0.21, 1, 0.09]],
++  // rounded "play" badge used for youtube
++  yt:      [[0.08, 0], [0.92, 0], ['c', 0.97, 0, 1, 0.12, 1, 0.28], [1, 0.72], ['c', 1, 0.88, 0.97, 1, 0.92, 1], [0.08, 1], ['c', 0.03, 1, 0, 0.88, 0, 0.72], [0, 0.28], ['c', 0, 0.12, 0.03, 0, 0.08, 0]],
++  // thumbs-up
++  thumb:   [[0.30, 0.42], [0.30, 1], [0.06, 1], ['c', 0.02, 1, 0, 0.97, 0, 0.93], [0, 0.49], ['c', 0, 0.45, 0.02, 0.42, 0.06, 0.42], [0.36, 0.42], [0.52, 0.05], ['c', 0.55, 0, 0.62, 0, 0.67, 0.03], ['c', 0.72, 0.07, 0.73, 0.13, 0.71, 0.19], [0.63, 0.38], [0.94, 0.38], ['c', 0.98, 0.38, 1, 0.42, 0.99, 0.46], [0.87, 0.93], ['c', 0.86, 0.97, 0.82, 1, 0.78, 1], [0.36, 1], [0.36, 0.42]],
++  // tapered pyramid slices
++  pyr1:    [[1, 1], [0.496, 0], [0, 1]], pyr2:    [[1, 1], [0.829, 0], [0.167, 0], [0, 1]],
++  pyr3:    [[1, 1], [0.875, 0], [0.122, 0], [0, 1]], pyr4:    [[1, 1], [0.898, 0], [0.099, 0], [0, 1]],
++  // devices
++  screen:  [[0.05, 0], [0.95, 0], ['c', 0.98, 0, 1, 0.02, 1, 0.04], [1, 0.96], ['c', 1, 0.98, 0.98, 1, 0.95, 1], [0.05, 1], ['c', 0.02, 1, 0, 0.98, 0, 0.96], [0, 0.04], ['c', 0, 0.02, 0.02, 0, 0.05, 0]],
++};
++
++/* ------------------------------------------------------------ helpers ---- */
++// Convert a normalised outline into pptxgenjs custGeom points.
++function pts(outline, w, h) {
++  const out = [];
++  outline.forEach((p, i) => { if (p[0] === 'c') { out.push({ x: p[5] * w, y: p[6] * h,
++                 curve: { type: 'cubic', x1: p[1] * w, y1: p[2] * h, x2: p[3] * w, y2: p[4] * h } });
++    } else { out.push(i === 0 ? { x: p[0] * w, y: p[1] * h, moveTo: true } : { x: p[0] * w, y: p[1] * h });
++    }
++  });
++  out.push({ close: true });
++  return out;
++}
++
++// Freeform shape from an outline (o = {fill, rotate, line})
++function poly(s, outline, x, y, w, h, fill, o = {}) {
++  s.addShape('custGeom', Object.assign({ x, y, w, h, points: pts(outline, w, h),
++                                         fill: fill ? { color: fill } : { type: 'none' }, line: { type: 'none' } }, o));
++}
++
++function rect(s, x, y, w, h, fill, o = {}) {
++  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color: fill }, line: { type: 'none' } }, o));
++}
++function oval(s, x, y, w, h, fill, o = {}) {
++  s.addShape('ellipse', Object.assign({ x, y, w, h, fill: { color: fill }, line: { type: 'none' } }, o));
++}
++
++// Text box. `runs` is a string or an array of {text, options} pieces.
++function txt(s, runs, x, y, w, h, o = {}) {
++  const base = { x, y, w, h, margin: [7.2, 7.2, 3.6, 3.6], fontFace: LATO, fontSize: 24,
++                 color: GREY, align: 'left', valign: 'top', isTextBox: true };
++  s.addText(runs, Object.assign(base, o));
++}
++
++// Text rotated 90° CCW inside an upright box of w x h (used for vertical ribbons).
++function vtxt(s, runs, x, y, w, h, o = {}) {
++  const cx = x + w / 2, cy = y + h / 2;
++  txt(s, runs, cx - h / 2, cy - w / 2, h, w, Object.assign({ rotate: 270 }, o));
++}
++
++/* Placeholder for a raster illustration from the source deck. */
++function art(s, x, y, w, h, tint, label) { s.addShape('roundRect', { x, y, w, h, rectRadius: Math.min(w, h) * 0.06,
++                            fill: { color: tint, transparency: 55 }, line: { color: tint, width: 1, dashType: 'dash' } });
++  s.addText(label || '[image]', { x, y: y + h / 2 - 0.3, w, h: 0.6, margin: 0, align: 'center',
++                                  fontFace: LATO, fontSize: 14, color: tint, isTextBox: true });
++}
++
++/* White ring + coloured disc + optional glyph — the recurring "badge" icon. */
++function badge(s, cx, cy, d, color, glyph, ink) {
++  oval(s, cx - d * 0.67, cy - d * 0.67, d * 1.34, d * 1.34, RING);
++  oval(s, cx - d / 2, cy - d / 2, d, d, color);
++  if (glyph) glyph(s, cx, cy, d, ink || WHITE);
++}
++
++/* Line-art glyphs drawn inside a badge. `k` is the ink colour. */
++function ring(s, x, y, w, h, k, shape) {
++  s.addShape(shape || 'rect', { x, y, w, h, fill: { type: 'none' }, line: { color: k, width: 1.5 } });
++}
++const ICON = {
++  // org chart: one node on top, three below, joined by lines
++  chart(s, cx, cy, d, k = WHITE) {
++    const r = d * 0.055;
++    oval(s, cx - r, cy - d * 0.27, 2 * r, 2 * r, k);
++    [-1, 0, 1].forEach(i => oval(s, cx + i * d * 0.2 - r, cy + d * 0.15, 2 * r, 2 * r, k));
++    rect(s, cx - d * 0.2, cy + d * 0.06, d * 0.4, d * 0.02, k);
++    [-1, 0, 1].forEach(i => rect(s, cx + i * d * 0.2 - d * 0.01, cy + d * 0.06, d * 0.02, d * 0.09, k));
++    rect(s, cx - d * 0.01, cy - d * 0.16, d * 0.02, d * 0.22, k);
++  },
++  // hourglass
++  glass(s, cx, cy, d, k = WHITE) { poly(s, [[0, 0], [1, 0], [0.5, 0.5], [1, 1], [0, 1], [0.5, 0.5]],
++         cx - d * 0.15, cy - d * 0.19, d * 0.3, d * 0.38, k);
++    rect(s, cx - d * 0.19, cy - d * 0.24, d * 0.38, d * 0.045, k);
++    rect(s, cx - d * 0.19, cy + d * 0.195, d * 0.38, d * 0.045, k);
++  },
++  // binoculars
++  bino(s, cx, cy, d, k = WHITE) {
++    ring(s, cx - d * 0.21, cy - d * 0.18, d * 0.15, d * 0.36, k);
++    ring(s, cx + d * 0.06, cy - d * 0.18, d * 0.15, d * 0.36, k);
++    rect(s, cx - d * 0.07, cy - d * 0.11, d * 0.14, d * 0.045, k);
++    rect(s, cx - d * 0.07, cy + d * 0.055, d * 0.14, d * 0.045, k);
++  },
++  // calendar
++  cal(s, cx, cy, d, k = WHITE) {
++    ring(s, cx - d * 0.19, cy - d * 0.18, d * 0.38, d * 0.36, k);
++    rect(s, cx - d * 0.19, cy - d * 0.18, d * 0.38, d * 0.085, k);
++    for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++)
++      rect(s, cx - d * 0.135 + c * d * 0.105, cy - d * 0.045 + r * d * 0.10, d * 0.055, d * 0.055, k);
++  },
++  // stacked database drums
++  db(s, cx, cy, d, k = WHITE) {
++    for (let i = 0; i < 3; i++) {
++      ring(s, cx - d * 0.2, cy - d * 0.2 + i * d * 0.145, d * 0.4, d * 0.105, k);
++      oval(s, cx + d * 0.09, cy - d * 0.175 + i * d * 0.145, d * 0.045, d * 0.05, k);
++    }
++  },
++  // globe
++  globe(s, cx, cy, d, k = WHITE) {
++    ring(s, cx - d * 0.2, cy - d * 0.2, d * 0.4, d * 0.4, k, 'ellipse');
++    ring(s, cx - d * 0.085, cy - d * 0.2, d * 0.17, d * 0.4, k, 'ellipse');
++    rect(s, cx - d * 0.2, cy - d * 0.012, d * 0.4, d * 0.024, k);
++  },
++  // clipboard
++  clip(s, cx, cy, d, k = WHITE) {
++    ring(s, cx - d * 0.15, cy - d * 0.19, d * 0.3, d * 0.38, k);
++    rect(s, cx - d * 0.07, cy - d * 0.235, d * 0.14, d * 0.075, k);
++    for (let i = 0; i < 4; i++) rect(s, cx - d * 0.09, cy - d * 0.09 + i * d * 0.075, d * 0.18, d * 0.02, k);
++  },
++  // shield
++  shield(s, cx, cy, d, k = WHITE) { poly(s, [[0.5, 0], [1, 0.2], [1, 0.58], [0.5, 1], [0, 0.58], [0, 0.2]],
++         cx - d * 0.17, cy - d * 0.2, d * 0.34, d * 0.4, null, { line: { color: k, width: 1.5 } });
++  },
++  // pie chart
++  pie(s, cx, cy, d, k = WHITE) { s.addShape('pie', { x: cx - d * 0.2, y: cy - d * 0.2, w: d * 0.4, h: d * 0.4,
++                        angleRange: [10, 265], fill: { color: k }, line: { type: 'none' } });
++    s.addShape('pie', { x: cx - d * 0.15, y: cy - d * 0.23, w: d * 0.4, h: d * 0.4,
++                        angleRange: [275, 5], fill: { color: k }, line: { type: 'none' } });
++  },
++  // megaphone
++  mega(s, cx, cy, d, k = WHITE) {
++    poly(s, [[0, 0.32], [0.62, 0], [0.62, 1], [0, 0.68]], cx - d * 0.19, cy - d * 0.17, d * 0.36, d * 0.34, k);
++    rect(s, cx + d * 0.05, cy - d * 0.045, d * 0.14, d * 0.09, k);
++  },
++  // clock
++  clock(s, cx, cy, d, k = WHITE) {
++    ring(s, cx - d * 0.2, cy - d * 0.2, d * 0.4, d * 0.4, k, 'ellipse');
++    rect(s, cx - d * 0.012, cy - d * 0.14, d * 0.024, d * 0.15, k);
++    rect(s, cx - d * 0.012, cy - d * 0.012, d * 0.12, d * 0.024, k);
++  },
++  // monitor
++  monitor(s, cx, cy, d, k = WHITE) {
++    ring(s, cx - d * 0.22, cy - d * 0.19, d * 0.44, d * 0.28, k);
++    rect(s, cx - d * 0.05, cy + d * 0.09, d * 0.1, d * 0.06, k);
++    rect(s, cx - d * 0.15, cy + d * 0.15, d * 0.3, d * 0.03, k);
++  }, };
++
++/* Flat social glyphs (solid white on a coloured disc). */
++const SOCIAL = { fb(s, cx, cy, d, k = WHITE) { poly(s, P.fbF, cx - d * 0.16, cy - d * 0.26, d * 0.32, d * 0.52, k); },
++  tw(s, cx, cy, d, k = WHITE) { poly(s, P.bird, cx - d * 0.26, cy - d * 0.21, d * 0.52, d * 0.42, k); },
++  // youtube: rounded badge with a play triangle punched out
++  yt(s, cx, cy, d, k = WHITE, bg) {
++    poly(s, P.yt, cx - d * 0.28, cy - d * 0.2, d * 0.56, d * 0.4, k);
++    poly(s, [[0, 0], [1, 0.5], [0, 1]], cx - d * 0.06, cy - d * 0.1, d * 0.18, d * 0.2, bg || BLUE);
++  },
++  // youtube on a disc: white ring with a play triangle
++  ytRing(s, cx, cy, d, k = WHITE, bg) {
++    oval(s, cx - d * 0.28, cy - d * 0.28, d * 0.56, d * 0.56, k);
++    poly(s, [[0, 0], [1, 0.5], [0, 1]], cx - d * 0.07, cy - d * 0.12, d * 0.2, d * 0.24, bg || OLIVE);
++  }, gp(s, cx, cy, d, k = WHITE) {
++    s.addText('g+', { x: cx - d * 0.4, y: cy - d * 0.36, w: d * 0.8, h: d * 0.72, margin: 0,
++                      align: 'center', valign: 'middle', fontFace: BLACKF, fontSize: d * 36,
++                      color: k, isTextBox: true });
++  }, ig(s, cx, cy, d, k = WHITE, bg) {
++    s.addShape('roundRect', { x: cx - d * 0.23, y: cy - d * 0.21, w: d * 0.46, h: d * 0.42,
++                              rectRadius: d * 0.09, fill: { color: k }, line: { type: 'none' } });
++    oval(s, cx - d * 0.115, cy - d * 0.105, d * 0.23, d * 0.23, bg || CYAN);
++    oval(s, cx - d * 0.055, cy - d * 0.05, d * 0.11, d * 0.11, k);
++    rect(s, cx + d * 0.10, cy - d * 0.16, d * 0.06, d * 0.05, bg || CYAN);
++  }, like(s, cx, cy, d, k = WHITE) {
++    poly(s, P.thumb, cx - d * 0.2, cy - d * 0.22, d * 0.4, d * 0.44, k); }, };
++
++/* ------------------------------------------------- artwork placeholders --
++ * The source deck uses large flat-vector illustrations (people, hands,
++ * gadgets, maps). They are represented here by simple native stand-ins.   */
++P.heart = [[0.5, 1], ['c', 0.1, 0.65, 0, 0.45, 0, 0.3], ['c', 0, 0.13, 0.13, 0, 0.28, 0],
++           ['c', 0.4, 0, 0.47, 0.08, 0.5, 0.15], ['c', 0.53, 0.08, 0.6, 0, 0.72, 0],
++           ['c', 0.87, 0, 1, 0.13, 1, 0.3], ['c', 1, 0.45, 0.9, 0.65, 0.5, 1]];
++const SKIN = 'F6CE9D', HAIR = '4A3728';
++
++function heart(s, x, y, w, h, color, rot) {
++  poly(s, P.heart, x, y, w, h, color, rot ? { rotate: rot } : {});
++}
++
++/* Bust silhouette: shoulders whose lower edge follows the avatar disc, so the
++ * body stays inside the circle exactly as in the source artwork. */
++P.bust = [[0.16, 0.66], ['c', 0.16, 0.615, 0.30, 0.60, 0.50, 0.60],
++          ['c', 0.70, 0.60, 0.84, 0.615, 0.84, 0.66], [0.84, 0.867], ['c', 0.771, 0.930, 0.594, 1.0, 0.50, 1.0],
++          ['c', 0.406, 1.0, 0.229, 0.930, 0.16, 0.867]];
++
++/* round profile picture: coloured disc with head and shoulders */
++function avatar(s, x, y, d, bg, skin = SKIN, cloth = '3A3A44') {
++  oval(s, x, y, d, d, bg);
++  poly(s, P.bust, x, y, d, d, cloth);
++  oval(s, x + 0.395 * d, y + 0.52 * d, 0.21 * d, 0.16 * d, skin);          // neck
++  s.addShape('roundRect', { x: x + 0.315 * d, y: y + 0.185 * d, w: 0.37 * d, h: 0.42 * d,
++                            rectRadius: 0.16 * d, fill: { color: skin }, line: { type: 'none' } });
++  poly(s, [[0.5, 0], ['c', 0.88, 0, 1, 0.28, 1, 0.62], [0.86, 0.5], [0.72, 0.62], [0.28, 0.62],
++           [0.14, 0.5], [0, 0.62], ['c', 0, 0.28, 0.12, 0, 0.5, 0]],
++       x + 0.29 * d, y + 0.15 * d, 0.42 * d, 0.34 * d, HAIR);              // hair
++  oval(s, x + 0.405 * d, y + 0.33 * d, 0.035 * d, 0.045 * d, '2B2B33');    // eyes
++  oval(s, x + 0.56 * d, y + 0.33 * d, 0.035 * d, 0.045 * d, '2B2B33');
++}
++
++/* full-length person */
++function figure(s, x, y, w, h, cloth, trouser = '3F6E9A') {
++  const hw = 0.30 * w;
++  s.addShape('roundRect', { x: x + 0.35 * w, y: y + 0.09 * h, w: hw, h: 0.16 * h,
++                            rectRadius: 0.1 * w, fill: { color: SKIN }, line: { type: 'none' } });
++  poly(s, [[0.5, 0], ['c', 0.9, 0, 1, 0.3, 1, 0.66], [0.82, 0.52], [0.66, 0.66], [0.34, 0.66],
++           [0.18, 0.52], [0, 0.66], ['c', 0, 0.3, 0.1, 0, 0.5, 0]],
++       x + 0.335 * w, y + 0.065 * h, 0.33 * w, 0.115 * h, HAIR);
++  oval(s, x + 0.44 * w, y + 0.145 * h, 0.025 * w, 0.014 * h, '2B2B33');
++  oval(s, x + 0.55 * w, y + 0.145 * h, 0.025 * w, 0.014 * h, '2B2B33');
++  rect(s, x + 0.44 * w, y + 0.24 * h, 0.12 * w, 0.05 * h, SKIN);            // neck
++  poly(s, [[0.22, 0], [0.78, 0], ['c', 1, 0.06, 1, 0.3, 1, 0.55], [0.86, 0.55], [0.86, 1],
++           [0.14, 1], [0.14, 0.55], [0, 0.55], ['c', 0, 0.3, 0, 0.06, 0.22, 0]],
++       x + 0.10 * w, y + 0.28 * h, 0.80 * w, 0.36 * h, cloth);              // torso + arms
++  rect(s, x + 0.30 * w, y + 0.63 * h, 0.17 * w, 0.31 * h, trouser);
++  rect(s, x + 0.53 * w, y + 0.63 * h, 0.17 * w, 0.31 * h, trouser);
++  rect(s, x + 0.27 * w, y + 0.93 * h, 0.21 * w, 0.05 * h, '43352C');
++  rect(s, x + 0.52 * w, y + 0.93 * h, 0.21 * w, 0.05 * h, '43352C');
++}
++
++/* props */
++const PROP = { megaphone(s, x, y, w, h) {
++    poly(s, [[0, 0.28], [0.62, 0], [0.62, 1], [0, 0.72]], x, y + 0.10 * h, 0.62 * w, 0.62 * h, 'F26647');
++    rect(s, x + 0.30 * w, y + 0.34 * h, 0.22 * w, 0.30 * h, 'F8BE38', { rotate: 20 });
++    rect(s, x + 0.52 * w, y + 0.02 * h, 0.07 * w, 0.86 * h, '333C3E', { rotate: 20 });
++  }, papers(s, x, y, w, h) {
++    rect(s, x, y + 0.08 * h, 0.86 * w, 0.9 * h, 'E8DECA', { rotate: 6 });
++    rect(s, x + 0.12 * w, y + 0.18 * h, 0.5 * w, 0.08 * h, 'EC9631', { rotate: 6 });
++    for (let i = 0; i < 7; i++)
++      rect(s, x + 0.10 * w, y + (0.32 + i * 0.075) * h, 0.62 * w, 0.022 * h, 'D7CAB2', { rotate: 6 });
++  }, hand(s, x, y, w, h, cuff, flipV) {
++    poly(s, P.thumb, x, y, w * 0.78, h, SKIN, flipV ? { flipV: true } : {});
++    rect(s, x + 0.60 * w, y + (flipV ? 0.48 : 0.10) * h, 0.34 * w, 0.42 * h, cuff);
++  }, keyboard(s, x, y, w, h) {
++    rect(s, x, y, w, h, 'E8DECA', { rotate: -12 });
++    for (let r = 0; r < 5; r++) for (let c = 0; c < 13; c++)
++      rect(s, x + 0.04 * w + c * 0.072 * w, y + 0.12 * h + r * 0.165 * h, 0.05 * w, 0.10 * h,
++           'C9C1B0', { rotate: -12 });
++  },
++  // little video player used as a prop on the cover
++  tvClip(s, x, y, w, h) { s.addShape('roundRect', { x, y, w, h, rectRadius: 0.08, rotate: -12,
++                              fill: { color: 'E8DECA' }, line: { type: 'none' } });
++    rect(s, x + 0.08 * w, y + 0.12 * h, 0.84 * w, 0.62 * h, '333C3E', { rotate: -12 });
++    poly(s, [[0, 0], [1, 0.5], [0, 1]], x + 0.42 * w, y + 0.30 * h, 0.2 * w, 0.28 * h, 'F26647', { rotate: -12 });
++    rect(s, x + 0.14 * w, y + 0.80 * h, 0.72 * w, 0.05 * h, 'F26647', { rotate: -12 });
++  },
++  // stylised map of the United States built from state-sized tiles
++  usmap(s, x, y, w, h) { const cells = [ [0.00, 0.03, 0.15, 0.31, OLIVE], [0.15, 0.00, 0.13, 0.26, CYAN],
++      [0.28, 0.00, 0.13, 0.25, CYAN],  [0.41, 0.01, 0.11, 0.24, GREEN],
++      [0.52, 0.03, 0.11, 0.20, GREEN], [0.63, 0.05, 0.09, 0.20, CYAN],
++      [0.72, 0.07, 0.12, 0.18, GREEN], [0.84, 0.05, 0.11, 0.17, GREEN],
++      [0.00, 0.34, 0.13, 0.30, GREEN], [0.13, 0.26, 0.14, 0.28, OLIVE],
++      [0.27, 0.25, 0.14, 0.26, CYAN],  [0.41, 0.25, 0.11, 0.25, OLIVE],
++      [0.52, 0.23, 0.11, 0.23, GREEN], [0.63, 0.25, 0.10, 0.22, GREEN],
++      [0.73, 0.25, 0.11, 0.20, CYAN],  [0.84, 0.22, 0.10, 0.19, GREEN],
++      [0.05, 0.64, 0.14, 0.24, GREEN], [0.19, 0.51, 0.14, 0.30, OLIVE],
++      [0.33, 0.50, 0.13, 0.28, GREEN], [0.46, 0.48, 0.12, 0.26, OLIVE],
++      [0.58, 0.47, 0.11, 0.26, CYAN],  [0.69, 0.45, 0.11, 0.24, GREEN], [0.80, 0.41, 0.10, 0.22, OLIVE],
++      [0.33, 0.78, 0.17, 0.22, OLIVE], [0.72, 0.69, 0.09, 0.28, GREEN]];
++    cells.forEach(c => rect(s, x + c[0] * w, y + c[1] * h, c[2] * w, c[3] * h, c[4],
++                            { line: { color: WHITE, width: 1 } }));
++  }, };
++
++/* gadgets (flat-design mockups used on the closing slides) */
++const DEV = {
++  // flat "video player" screen with a play button (slide 27)
++  tvClip(s, x, y, w, h) { s.addShape('roundRect', { x, y, w, h, rectRadius: 0.25,
++                              fill: { color: 'E8DECA' }, line: { type: 'none' } });
++    rect(s, x + 0.045 * w, y + 0.07 * h, 0.91 * w, 0.80 * h, '333C3E');
++    poly(s, [[0, 0], [1, 0.5], [0, 1]], x + 0.44 * w, y + 0.34 * h, 0.14 * w, 0.28 * h, 'F26647');
++    rect(s, x + 0.09 * w, y + 0.78 * h, 0.82 * w, 0.025 * h, 'FFFFFF');
++    rect(s, x + 0.09 * w, y + 0.78 * h, 0.34 * w, 0.025 * h, 'F26647');
++    oval(s, x + 0.41 * w, y + 0.755 * h, 0.045 * w, 0.07 * h, 'F26647');
++  }, monitor(s, x, y, w, h) {
++    poly(s, P.screen, x, y, w, h * 0.746, '101010');
++    rect(s, x, y, w, h * 0.04, '1E1E1E');
++    rect(s, x, y + h * 0.746, w, h * 0.11, 'DFE4E5');
++    poly(s, [[0.1, 0], [0.9, 0], [1, 1], [0, 1]], x + w * 0.34, y + h * 0.853, w * 0.335, h * 0.147, 'DFE4E5');
++    rect(s, x + w * 0.404, y + h * 0.853, w * 0.209, h * 0.023, 'D8D8D8');
++  }, laptop(s, x, y, w, h) {
++    poly(s, P.screen, x + w * 0.119, y, w * 0.761, h * 0.974, '101010');
++    rect(s, x + w * 0.119, y, w * 0.761, h * 0.08, '1E1E1E');
++    oval(s, x + w * 0.492, y + h * 0.024, w * 0.016, h * 0.030, '1E1E1E');
++    rect(s, x + w * 0.324, y + h * 0.924, w * 0.351, h * 0.015, 'C9C9C9');
++    poly(s, [[0.02, 0], [0.98, 0], [1, 1], [0, 1]], x, y + h * 0.924, w, h * 0.076, 'F0F0F0');
++    rect(s, x, y + h * 0.963, w, h * 0.037, 'C9C9C9');
++    [0.022, 0.046, 0.069].forEach(k => {
++      oval(s, x + w * k, y + h * 0.930, w * 0.0152, h * 0.028, 'C9C9C9');
++      oval(s, x + w * (k + 0.0024), y + h * 0.934, w * 0.0105, h * 0.020, '676767');
++    });
++  }, tablet(s, x, y, w, h) { s.addShape('roundRect', { x, y, w, h, rectRadius: Math.min(w, h) * 0.06,
++                              fill: { color: 'DFE4E5' }, line: { type: 'none' } });
++    oval(s, x + w * 0.472, y + h * 0.030, w * 0.037, h * 0.025, '818181');
++  }, phone(s, x, y, w, h, tilt = 0) {
++    const r = tilt ? { rotate: tilt } : {};
++    s.addShape('roundRect', Object.assign({ x, y, w, h, rectRadius: Math.min(w, h) * 0.05,
++                                            fill: { color: '101010' }, line: { type: 'none' } }, r));
++    rect(s, x + w * 0.389, y + h * 0.052, w * 0.216, h * 0.009, '818181', r);
++    s.addShape('ellipse', Object.assign({ x: x + w * 0.459, y: y + h * 0.917, w: w * 0.108,
++                                          h: h * 0.058, fill: { type: 'none' },
++                                          line: { color: '232323', width: 1.5 } }, r));
++  }, };
++
++/* ------------------------------------------------- shared slide parts --- */
++function header(s, title, color = BLUE) { txt(s, title, 8.76, 0.33, 9.46, 0.77,
++      { fontSize: 40, bold: true, color, align: 'center' });
++  txt(s, 'Your great subtitle in this line', 11.43, 1.00, 4.02, 0.64,
++      { fontSize: 20, fontFace: LIGHT, color: BLACK });
++}
++
++const LOREM_FOOT = [
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut efficitur ipsum vitae tortor accumsan, ' +
++  'a pulvinar lorem lacinia. Donec eu arcu justo. Fusce eget consequat risus Proin est lacus, ' +
++  'interdum vitae feugiat quis, faucibus vel mi.  Vivamus accumsan nisi vel nulla viverra semper. ',
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut efficitur ipsum vitae tortor accumsan, ' +
++  'a pulvinar lorem lacinia.'];
++
++function footerBar(s) {
++  rect(s, -0.03, 11.75, 26.63, 3.27, BLUE);
++  txt(s, LOREM_FOOT.map(t => ({ text: t, options: { breakLine: true } })),
++      1.77, 12.42, 23.30, 2.08, { fontSize: 26, color: WHITE, align: 'center' });
++}
++
++const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam tincidunt ante nec ' +
++  'sem congue convallis. Pellentesque vel mauris quis nisl ornare rutrum in id risus. Proin vehicula ' +
++  'ut sem et tempus. Interdum et malesuada fames ac ante ipsum primis in faucibus. ';
++const LOREM_MID = LOREM_LONG.slice(0, 166);   // ends after '...in id risus.'
++
++/* Body copy that recurs across the deck. */
++const L_TWO   = 'Lorem Ipsum has two main data statistical this methodologies',
++      L_SHORT = 'Lorem Ipsum has two main data statistical', L_STAT  = L_SHORT + ' important.', L_METH  = L_TWO + '.',
++      L_IMP   = L_TWO + ' important.', L_SUMM  = L_TWO + ' summarizes.',
++      L_ANAL  = L_TWO + ' important Data analysis.', L_FULL  = L_TWO + ' important Data analysis which summarizes.',
++      L_SMALL = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam tincidunt.',
++      DESC    = 'DESCRIPTION  HERE';
++
++/* "Information" heading plus a justified grey paragraph. */
++function infoBlock(s, x, y, w, color, body, bodyH = 1.32) {
++  txt(s, 'Information', x + 0.12, y, 5.49, 0.71, { fontSize: 36, bold: true, fontFace: BLACKF, color });
++  txt(s, body, x, y + 0.80, w, bodyH, { fontSize: 24, color: GREY, align: 'justify', valign: 'middle' });
++}
++
++/* small circular check bullet with a caption */
++function checkNote(s, x, y, color, text = L_SHORT) {
++  oval(s, x, y + 0.32, 0.85, 0.85, color);
++  poly(s, P.check, x + 0.17, y + 0.47, 0.48, 0.51, WHITE);
++  txt(s, text, x + 1.01, y, 4.07, 1.05, { fontSize: 24, color: GREY2 });
++}
++
++/* ====================================================== slide builders === */
++const S = {};
++
++/* 1 — cover */
++S[1] = s => { txt(s, [{ text: 'SOCIAL ', options: { color: CYAN } }, { text: 'NETWORK', options: { color: SKY } }],
++      1.38, 1.22, 12.66, 1.62, { fontSize: 90, bold: true, fontFace: BLACKF });
++  txt(s, 'PRESENTATIONs', 1.46, 2.56, 8.51, 1.19, { fontSize: 65, bold: true, fontFace: BLACKF, color: BLUE });
++  txt(s, 'Your great subtitle in this line', 1.43, 3.61, 4.02, 0.64, { fontSize: 20, fontFace: LIGHT, color: BLACK });
++  avatar(s, 4.83, 7.41, 4.82, '30A2DC');            // man with glasses
++  avatar(s, 16.47, 7.05, 5.10, 'BED65C', SKIN, '2F2F38');
++  avatar(s, 14.06, 6.42, 2.85, 'F3991F', 'AF6A59', '2B2B33');
++  avatar(s, 8.66, 4.06, 5.33, '06A14B', SKIN, 'F26D60');
++  avatar(s, 15.83, 2.34, 4.62, '4F82C3', SKIN, 'BED65C');
++  heart(s, 11.03, 10.36, 2.32, 2.15, RED);
++  heart(s, 14.12, 4.28, 1.42, 1.32, RED, 320);
++  heart(s, 7.03, 6.17, 0.96, 0.89, RED, 85);
++  heart(s, 20.28, 5.95, 1.63, 1.51, RED, 12);
++  heart(s, 9.69, 10.08, 1.12, 1.04, GREEN, 320);
++  heart(s, 20.33, 3.45, 1.13, 1.05, GREEN, 45);
++  heart(s, 19.12, 1.92, 1.14, 1.06, CYAN, 348);
++  oval(s, 13.78, 10.52, 2.81, 2.81, '007FC5'); SOCIAL.like(s, 15.19, 11.93, 2.4);
++  oval(s, 4.37, 6.42, 1.65, 1.65, BLUE);   SOCIAL.fb(s, 5.20, 7.25, 1.6);
++  oval(s, 21.72, 4.36, 1.57, 1.56, CYAN);  SOCIAL.tw(s, 22.50, 5.14, 1.5);
++  oval(s, 12.02, 12.64, 1.67, 1.67, SKY);  SOCIAL.gp(s, 12.86, 13.48, 1.6);
++  oval(s, 21.86, 1.92, 1.67, 1.67, OLIVE); SOCIAL.ytRing(s, 22.70, 2.76, 1.6, WHITE, OLIVE);
++  oval(s, 12.88, 8.60, 1.46, 1.46, BLUE);  SOCIAL.fb(s, 13.61, 9.33, 1.4);
++  s.addShape('roundRect', { x: 21.63, y: 7.02, w: 1.67, h: 1.70, rectRadius: 0.12, rotate: 28,
++                            fill: { color: 'C7E9F2' }, line: { color: '515151', width: 4 } });
++  PROP.tvClip(s, 8.85, 11.95, 2.33, 1.50);
++};
++
++/* 2 — two feature cards + two big percentages */
++S[2] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  // reaction icon cloud (left)
++  const cloud = [[2.68, 10.09, 2.37, CYAN], [5.94, 7.10, 2.98, CYAN], [3.13, 3.72, 1.97, 'FFD215'],
++                 [1.22, 7.83, 1.96, 'FFD215'], [8.42, 9.86, 2.98, CYAN], [6.10, 10.42, 1.97, 'FFD215']];
++  cloud.forEach(c => {
++    oval(s, c[0], c[1], c[2], c[2], c[3]); PROP.hand(s, c[0] + c[2] * 0.22, c[1] + c[2] * 0.16, c[2] * 0.7, c[2] * 0.68, '3F6E9A'); });
++  PROP.hand(s, 10.27, 7.85, 3.55, 2.92, 'F15C51');
++  heart(s, 6.47, 4.83, 2.31, 2.15, RED);
++  heart(s, 4.06, 8.25, 1.42, 1.32, RED, 320);
++  heart(s, 6.03, 2.83, 1.62, 1.51, RED, 59);
++  oval(s, 9.76, 4.55, 2.80, 2.80, '007FC5'); SOCIAL.like(s, 11.16, 5.95, 2.4);
++  oval(s, 3.92, 5.47, 2.03, 2.03, '007FC5'); SOCIAL.like(s, 4.94, 6.49, 1.8);
++  featureCard(s, 14.96, 2.56, BLUE, SILVER);
++  featureCard(s, 20.04, 2.58, SKY, PANEL);
++  bigPercent(s, 14.96, 9.56, 'DATA 01', '64%', BLUE);
++  bigPercent(s, 20.54, 9.56, 'DATA 02', '83%', SKY);
++};
++
++/* pentagon-headed "Feature Name" card (slides 2, 14, 38) */
++function featureCard(s, x, y, color, body) {
++  poly(s, P.pentB, x, y, 5.12, 6.39, body);
++  poly(s, P.pentT, x, y, 5.12, 1.35, color);
++  txt(s, 'Feature Name', x + 0.45, y + 0.41, 4.20, 0.63, { fontSize: 40, bold: true, color: WHITE, align: 'center' });
++  txt(s, L_SUMM, x + 0.45, y + 1.74, 4.27, 1.80, { align: 'center' });
++  rect(s, x + 0.93, y + 3.83, 3.16, 0.11, SILVER);
++  txt(s, L_SUMM, x + 0.41, y + 3.92, 4.27, 1.80, { align: 'center' });
++}
++
++function bigPercent(s, x, y, label, value, color) {
++  txt(s, label, x + 0.89, y, 2.53, 0.77, { fontSize: 40, bold: true, color, align: 'center' });
++  txt(s, value, x + 0.49, y + 0.50, 3.59, 1.99,
++      { fontSize: 112, bold: true, fontFace: BLACKF, color, align: 'center' });
++  txt(s, L_SMALL, x, y + 2.35, 4.82, 1.68, { align: 'center' });
++}
++
++/* 3, 10, 12, 24, 27, 39 — four right-pointing bands with a badge at the end */
++const BAND_COLORS = [OLIVE, GREEN, BLUE, SKY];
++function bandRow(s, x, y, label, body, i, opts = {}) {
++  const w = opts.w || 12.78, h = 2.33, gap = opts.gap || 2.31;
++  const yy = y + i * gap;
++  poly(s, P.band, x, yy, w, h, BAND_COLORS[i]);
++  txt(s, label, x + (opts.tx || 3.13), yy + 0.11, 5.77, 1.02, { fontSize: 36, bold: true, color: WHITE });
++  txt(s, body, x + (opts.tx || 3.13), yy + 0.74, opts.tw || 9.14, 1.32, { fontSize: 24, color: WHITE });
++}
++const BADGE_ICONS = [ICON.chart, ICON.glass, ICON.bino, ICON.cal];
++function bandBadges(s, x, y, gap = 2.31, d = 1.57) {
++  BADGE_ICONS.forEach((g, i) => badge(s, x, y + i * gap, d, BAND_COLORS[i], g));
++}
++function bandSlide(s, title, x, y, labels, body, artFn, opts = {}) {
++  header(s, title);
++  if (artFn) artFn(s);
++  labels.forEach((l, i) => bandRow(s, x, y, l, body, i, opts));
++  bandBadges(s, x + (opts.bx || 12.0), y + 1.16, opts.gap || 2.31);
++}
++
++S[3] = s => { bandSlide(s, 'DATA PRESENT', 9.02, 3.60, ['Data A', 'Data B', 'Data C', 'Data D'], L_IMP,
++            sl => {
++              PROP.papers(sl, 4.65, 6.03, 6.50, 7.72);
++                    PROP.megaphone(sl, 2.69, 1.34, 8.27, 8.09);
++                    DEV.phone(sl, 2.30, 8.60, 3.10, 5.60, -22); }, { tx: 3.13, tw: 7.80, bx: 12.35 });
++};
++
++/* 4 — coloured data rows over a blue footer */
++S[4] = s => {
++  header(s, 'DATA PRESENT');
++  txt(s, 'INFORMATIONs', 8.12, 2.32, 10.59, 0.61,
++      { fontSize: 30, bold: true, fontFace: BLACKF, color: OLIVE, align: 'center' });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam tincidunt ante nec sem congue convallis.',
++      7.80, 2.83, 11.19, 1.32, { align: 'center', valign: 'middle' });
++  const rows = [[4.83, OLIVE, '79%'], [6.10, BLUE, '43%'], [7.40, SKY, '98%'], [8.69, CYAN, '54%']];
++  rows.forEach(r => {
++    rect(s, 9.78, r[0], 6.07, 1.21, r[1]);
++    rect(s, 15.95, r[0], 1.68, 1.21, r[1]);
++    txt(s, 'Lorem Ipsum has two main data statistical.', 10.16, r[0] + 0.08, 4.82, 1.05,
++        { fontSize: 24, color: WHITE });
++    txt(s, r[2], 15.90, r[0] + 0.17, 1.71, 0.86,
++        { fontSize: 48, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++  });
++  oval(s, 18.79, 7.54, 3.65, 3.67, BLUE);  SOCIAL.fb(s, 20.62, 9.38, 3.5);
++  oval(s, 19.72, 2.25, 4.15, 4.13, CYAN);  SOCIAL.tw(s, 21.80, 4.32, 4.0);
++  oval(s, 2.87, 2.31, 4.42, 4.40, SKY);    SOCIAL.gp(s, 5.08, 4.51, 4.3);
++  oval(s, 4.47, 6.68, 4.42, 4.40, OLIVE);  SOCIAL.ytRing(s, 6.68, 8.88, 4.3);
++  footerBar(s);
++};
++
++/* 5 — four numbered columns */
++S[5] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  const cols = [[2.82, 6.06, BLUE, '01', SOCIAL.fb, 3.37, 2.58, 2.95],
++                [8.46, 6.08, OLIVE, '02', SOCIAL.ytRing, 8.92, 2.59, 2.99],
++                [13.90, 6.06, CYAN, '03', SOCIAL.tw, 14.66, 2.46, 2.81],
++                [19.55, 6.08, SKY, '04', SOCIAL.gp, 20.14, 2.56, 3.00]];
++  // the top cap is a plain rounded band, the body a rounded-bottom panel
++  cols.forEach(c => {
++    poly(s, P.panelT, c[0], c[1], 4.33, 0.98, c[2]);
++    poly(s, P.panelB, c[0], c[1] + 3.80, 4.33, 4.04, c[2]);
++    txt(s, c[3], c[0], c[1] + 0.94, 4.33, 2.32,
++        { fontSize: 138, bold: true, fontFace: BLACKF, color: c[2], align: 'center', valign: 'middle' });
++    txt(s, 'BUSINESS  MARKETING', c[0] + 0.06, c[1] + 4.09, 4.27, 1.18,
++        { fontSize: 32, bold: true, fontFace: BLACKF, color: WHITE });
++    txt(s, L_FULL, c[0] + 0.01, c[1] + 5.18, 4.30, 2.26, { fontSize: 24, color: WHITE });
++    oval(s, c[5], c[6], c[7], c[7], c[2]);
++    c[4](s, c[5] + c[7] / 2, c[6] + c[7] / 2, c[7] * 0.95, WHITE, c[2]);
++  });
++};
++
++/* 6, 7 — two wide pills with an avatar and a percentage ring */
++function pillRow(s, y, color, avatarBg, avatarSkin, cloth, pct) {
++  poly(s, P.pill, 8.32, y, 14.26, 3.18, color);
++  txt(s, 'Information Here', 11.56, y + 0.59, 4.93, 0.81, { fontSize: 36, bold: true, color: WHITE });
++  txt(s, L_IMP, 11.56, y + 1.20, 7.80, 1.40, { fontSize: 23, color: WHITE });
++  oval(s, 19.87, y + 0.30, 2.58, 2.58, RING);
++  oval(s, 20.02, y + 0.45, 2.28, 2.28, WHITE);
++  oval(s, 20.30, y + 0.73, 1.72, 1.72, color);
++  txt(s, pct, 19.96, y + 1.13, 2.12, 0.88, { fontSize: 40, bold: true, color: WHITE, align: 'center' });
++  avatar(s, 4.71, y - 1.10, 5.10, avatarBg, avatarSkin, cloth);
++}
++S[6] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  pillRow(s, 3.44, SKY, 'BED65C', SKIN, '2F2F38', '25%');
++  pillRow(s, 9.22, OLIVE, '4F82C3', SKIN, 'BED65C', '75%');
++};
++S[7] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  pillRow(s, 3.44, CYAN, 'F3991F', 'AF6A59', '2B2B33', '25%');
++  pillRow(s, 9.22, BLUE, '06A14B', SKIN, 'F26D60', '75%');
++};
++
++/* 8, 30 — two rounded side panels with a big illustration in the middle */
++function sidePanel(s, x, y, color, pct, iconFn) {
++  poly(s, P.panelB, x, y, 6.58, 7.50, color);
++  const tx = x + 1.09;
++  txt(s, pct, tx, y + 1.59, 4.27, 0.94,
++      { fontSize: 50, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++  txt(s, 'DATA ANALYSIS', tx, y + 2.78, 4.27, 0.64,
++      { fontSize: 32, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++  txt(s, L_FULL, tx + 0.09, y + 3.44, 4.24, 2.26, { fontSize: 24, color: WHITE, align: 'center' });
++  badge(s, x + 2.46, y + 8.44, 2.67, color);
++  iconFn(s, x + 2.46, y + 8.44, 2.5);
++}
++function panelSlide(s, headingColor, leftColor, rightColor, middle) {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  middle(s);
++  sidePanel(s, 0.38, 0.00, leftColor, '45%', SOCIAL.fb);
++  sidePanel(s, 19.56, -0.09, rightColor, '62%', SOCIAL.tw);
++  infoBlock(s, 2.58, 11.89, 21.89, headingColor, LOREM_LONG + 'Pellentesque. Lorem ipsum dolor sit amet.', 1.84);
++}
++S[8] = s => panelSlide(s, BLUE, SKY, CYAN, sl => {
++  figure(sl, 9.4, 1.67, 7.6, 8.3, 'F15C51', '4790CD');
++  PROP.megaphone(sl, 7.55, 2.30, 3.10, 2.90);
++  oval(sl, 7.90, 8.10, 10.70, 3.10, '00B8E8');           // cloud he is sitting on
++  DEV.laptop(sl, 10.10, 7.60, 6.40, 3.00);
++});
++S[30] = s => panelSlide(s, BLUE, BLUE, OLIVE, sl => {
++  PROP.hand(sl, 10.70, 2.44, 5.55, 4.66, '2F51A1');
++  PROP.hand(sl, 10.89, 7.47, 5.55, 4.66, 'F15C51', { flip: true });
++});
++
++/* 9, 11, 39 — narrow left bands + a full-height figure on the right */
++const BAND_LABELS4 = ['MARKETING', 'STRATEGY', 'FINANCIAL', 'ADVERTISE'];
++function narrowBands(s, x, y) { BAND_LABELS4.forEach((l, i) => {
++  const yy = y + i * 2.30;
++    poly(s, P.band, x, yy, 11.88, 2.33, BAND_COLORS[i]);
++    txt(s, l, x + 1.06, yy + 0.23, 3.60, 0.81, { fontSize: 36, bold: true, color: WHITE });
++    txt(s, L_IMP, x + 1.06, yy + 0.85, 5.70, 1.40, { fontSize: 23, color: WHITE });
++  });
++}
++S[9] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  infoBlock(s, 1.72, 2.35, 13.21, SKY, LOREM_MID);
++  narrowBands(s, 5.10, 5.09);
++  figure(s, 13.54, 1.38, 8.70, 13.62, 'BED65C', '4F82C3');
++  s.addShape('roundRect', { x: 19.90, y: 2.20, w: 4.60, h: 4.60, rectRadius: 0.6,
++                            fill: { color: '4F82C3' }, line: { type: 'none' } });
++  SOCIAL.fb(s, 22.20, 4.50, 4.0);
++  rect(s, 21.60, 6.60, 0.50, 4.20, 'CE8F50', { rotate: 8 });
++};
++S[11] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  infoBlock(s, 1.72, 2.35, 13.21, SKY, LOREM_MID);
++  narrowBands(s, 5.10, 5.09);
++  figure(s, 13.63, 1.64, 8.40, 13.36, '67CAD8', '4F82C3');
++  oval(s, 19.90, 2.20, 4.60, 4.60, '67CAD8'); SOCIAL.tw(s, 22.20, 4.50, 4.4);
++  rect(s, 21.60, 6.60, 0.50, 4.20, 'CE8F50', { rotate: 8 });
++};
++S[10] = s => bandSlide(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }], 9.43, 3.60,
++  ['Data A', 'Data B', 'Data C', 'Data D'], L_IMP, sl => {
++    figure(sl, 2.60, 0.46, 8.90, 14.54, '06A14B', 'F26647');
++          PROP.megaphone(sl, 0.86, 1.60, 4.60, 4.10); }, { tx: 4.15, tw: 7.80, bx: 12.35 });
++S[12] = s => bandSlide(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }], 9.43, 3.60,
++  ['Data A', 'Data B', 'Data C', 'Data D'], L_IMP, sl => {
++    figure(sl, 3.30, 1.16, 8.60, 13.88, 'F8BE38', '4F82C3');
++    s.addShape('roundRect', { x: 1.08, y: 1.90, w: 4.40, h: 4.40, rectRadius: 0.6,
++                              fill: { color: '4F82C3' }, line: { type: 'none' } });
++    SOCIAL.like(sl, 3.28, 4.10, 3.8);
++    rect(sl, 2.40, 6.10, 0.50, 4.20, 'CE8F50', { rotate: -8 });
++  }, { tx: 4.15, tw: 7.80, bx: 12.35 });
++
++/* 13 — five avatars in the middle, four stat cards at the sides */
++S[13] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  avatar(s, 8.49, 9.11, 4.58, '30A2DC');
++  avatar(s, 12.21, 5.97, 4.86, 'BED65C', SKIN, '2F2F38');
++  avatar(s, 11.96, 2.55, 2.71, 'F3991F', 'AF6A59', '2B2B33');
++  avatar(s, 7.73, 4.03, 5.07, '06A14B', SKIN, 'F26D60');
++  avatar(s, 14.92, 2.31, 4.39, '4F82C3', SKIN, 'BED65C');
++  [[1.08, 2.58, OLIVE], [1.05, 5.99, GREEN], [20.36, 2.87, BLUE], [20.33, 6.28, SKY]]
++    .forEach(c => statCard(s, c[0], c[1], 5.39, 2.38, c[2], '25%', L_METH));
++  [[1.49, 9.90, OLIVE], [20.75, 9.87, SKY]].forEach(c => { txt(s, 'DATA ANALYSIS', c[0], c[1], 4.27, 0.64,
++        { fontSize: 32, bold: true, fontFace: BLACKF, color: c[2], align: 'center' });
++    txt(s, L_FULL, c[0] + 0.10, c[1] + 0.66, 4.24, 2.26, { align: 'center' });
++  });
++};
++
++/* rounded card with a coloured cap (slides 13, 14) */
++function statCard(s, x, y, w, h, color, title, body, capH) {
++  const cap = capH || h * 0.42;
++  poly(s, P.cardB, x, y, w, h, PANEL);
++  poly(s, P.cardT, x, y, w, cap, color);
++  txt(s, title, x + 0.08, y + 0.09, w - 0.08, 0.77,
++      { fontSize: 40, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++  txt(s, body, x + 0.08, y + cap, w - 0.08, h - cap - 0.1, { align: 'center' });
++}
++
++/* 14 — funnel with three figures on top, options at the sides */
++S[14] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  figure(s, 10.48, 1.73, 2.16, 6.51, 'F05260');
++  figure(s, 12.14, 1.66, 2.32, 6.76, '3FC2D1', 'FBB019');
++  figure(s, 14.12, 1.52, 2.35, 6.59, '06A14B', '5F3A16');
++  // funnel: four stacked bowls, each labelled A-D with a caption to its right
++  //         x      y      w     rim   body  colour letter  textY  textH
++  const slices = [[9.30, 7.58, 8.33, 0.89, 1.83, OLIVE, 'A', 8.50, 1.25, L_SHORT],
++                  [10.09, 9.33, 6.80, 0.85, 1.75, SKY, 'B', 10.19, 1.25, L_SHORT],
++                  [10.56, 10.94, 5.93, 0.85, 1.75, CYAN, 'C', 12.00, 0.92, 'Lorem Ipsum has two main data'],
++                  [11.05, 12.69, 5.02, 0.78, 1.60, BLUE, 'D', 13.50, 0.92, 'Lorem Ipsum has two main data']];
++  slices.forEach(c => {
++    oval(s, c[0], c[1], c[2], c[3], DARK[c[5]]);
++    poly(s, P.bowl, c[0], c[1] + c[3] / 2, c[2], c[4], c[5]);
++    txt(s, c[6], 12.16, c[7] + 0.34, 0.52, 0.53, { fontSize: 40, bold: true, color: WHITE });
++    txt(s, c[9], 12.75, c[7], 2.93, c[8], { fontSize: 20, color: WHITE });
++  });
++  featureCard(s, 1.22, 8.61, OLIVE, PANEL);
++  featureCard(s, 20.34, 8.61, SKY, PANEL);
++  const opts = [[0.92, 1.35, SKY, 'Option 1'], [0.93, 4.63, OLIVE, 'Option 2'],
++                [19.79, 1.33, BLUE, 'Option 3'], [19.80, 4.62, CYAN, 'Option 4']];
++  opts.forEach(o => statCard(s, o[0], o[1], 5.75, 2.53, o[2], o[3], L_METH, 1.06));
++};
++
++/* 15, 16 — four staggered arrow bands over a big thumb icon */
++S[15] = s => arrowStack(s, sl => {
++  oval(sl, 2.73, 4.11, 9.51, 9.51, '00B8E8');
++                                   PROP.hand(sl, 4.4, 5.6, 6.5, 6.5, '007CAB'); });
++S[16] = s => arrowStack(s, sl => {
++  oval(sl, 2.73, 4.11, 9.51, 9.51, '00B8E8');
++                                   PROP.hand(sl, 3.66, 6.81, 6.67, 5.60, 'F15C51'); });
++function arrowStack(s, middle) {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  infoBlock(s, 2.35, 1.58, 21.89, SKY, LOREM_LONG);
++  middle(s);
++  const rows = [[9.60, 5.68, BLUE, 'A', 11.61, 21.29, 9.67], [10.95, 7.43, OLIVE, 'B', 12.96, 22.63, 9.67],
++                [10.36, 9.34, GREEN, 'C', 12.37, 20.80, 8.43], [8.56, 11.09, SKY, 'D', 10.57, 19.08, 8.51]];
++  rows.forEach((r, i) => {
++    rect(s, r[0], r[1], 12.90, 1.81, r[2]);
++    poly(s, P.foldR, r[0] + 12.90, r[1], 0.54, 1.81, DARK[r[2]]);
++    const body = i < 2 ? L_FULL
++                       : L_ANAL;
++    txt(s, body, r[4], r[1] + 0.35, r[6], 1.05, { color: WHITE, align: 'right' });
++    txt(s, r[3], r[5], r[1] + 0.31, 1.15, 1.04, { fontSize: 50, bold: true, color: WHITE });
++  });
++}
++
++/* 17 — four notched banners next to a phone mock-up */
++S[17] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  DEV.phone(s, 16.55, 1.66, 6.60, 12.47);
++  rect(s, 17.35, 2.60, 5.05, 9.35, 'C7E9F2');
++  [[3.01, 3.17, SKY], [2.98, 5.67, BLUE], [2.99, 8.07, OLIVE], [2.97, 10.58, CYAN]].forEach((b, i) => {
++    poly(s, P.bannerL, b[0], b[1], 14.68, 2.51, b[2]);
++    txt(s, DESC, 6.22, b[1] + 0.43, 5.53, 0.79, { fontSize: 35, bold: true, fontFace: BLACKF, color: WHITE });
++    txt(s, L_FULL, 6.19, b[1] + 1.04, 10.35, 1.05, { color: WHITE });
++  });
++  // reaction icons floating over the phone
++  heart(s, 21.38, 2.72, 2.11, 1.96, RED, 20);
++  heart(s, 18.12, 7.73, 1.80, 1.68, RED, 329);
++  oval(s, 17.64, 4.46, 2.56, 2.56, '007FC5'); SOCIAL.like(s, 18.92, 5.74, 2.3);
++  [[20.65, 5.03, 3.44, '00B8E8'], [18.27, 1.83, 2.84, 'FFD215'],
++   [22.56, 8.46, 1.86, 'FFD215'], [17.80, 10.05, 1.87, '00B8E8']].forEach(c => {
++    oval(s, c[0], c[1], c[2], c[2], c[3]);
++    PROP.hand(s, c[0] + c[2] * 0.22, c[1] + c[2] * 0.16, c[2] * 0.7, c[2] * 0.68, '007CAB');
++  });
++  PROP.hand(s, 19.67, 9.37, 2.86, 2.40, 'F15C51', true);
++};
++
++/* 18 — stacked percentage blocks between two figures */
++S[18] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  figure(s, 20.13, 1.75, 4.25, 11.92, '06A14B', '5F3A16');
++  figure(s, 2.35, 1.70, 4.20, 12.22, '3FC2D1', 'FBB019');
++  const bandY = [4.23, 6.48, 8.73, 10.97], bandC = [OLIVE, GREEN, CYAN, SKY];
++  const bandIcon = [ICON.mega, ICON.clock, ICON.shield, ICON.monitor];
++  bandY.forEach((y, i) => {
++    poly(s, P.pill2, 10.56, y, 8.81, 2.25, bandC[i]);
++    oval(s, 17.25, y + 0.18, 1.92, 1.92, WHITE);
++    bandIcon[i](s, 18.21, y + 1.14, 1.8, bandC[i]);
++    txt(s, L_STAT, 12.85, y + 0.50, 3.75, 1.45, { color: WHITE });
++  });
++  const rows = [[2.55, 6.94, OLIVE, 'TARGETING', '78%'], [5.14, 6.88, GREEN, 'ADVERTISE', '54%'],
++                [7.72, 6.86, CYAN, 'TARGETING', '87%'], [10.41, 6.85, SKY, 'ADVERTISE', '69%']];
++  rows.forEach(r => {
++    poly(s, [[0, 1], [0.12, 0], [1, 0], [0.88, 1]], r[1], r[0], 4.41, 0.52, DARK[r[2]]);
++    rect(s, r[1], r[0] + 0.52, 4.41, 2.33, r[2]);
++    txt(s, r[4], r[1] + 0.35, r[0] + 1.07, 3.65, 0.77,
++        { fontSize: 34, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++    txt(s, r[3], r[1], r[0] + 1.70, 4.17, 0.71,
++        { fontSize: 30, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++  });
++};
++
++/* 19 — 2x2 tile grid with icon badges */
++S[19] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  const tiles = [[5.30, 2.60, GREEN, 'Big Data', ICON.db, 9.50, 2.91, 9.65],
++                 [13.43, 2.58, SKY, 'Partners', ICON.pie, 17.73, 2.99, 17.88],
++                 [9.34, 6.64, OLIVE, 'Advertise', ICON.mega, 5.30, 7.33, 5.45],
++                 [17.49, 6.69, CYAN, 'Social', ICON.globe, 13.80, 7.49, 13.95]];
++  const labelColor = [GREEN, SKY, OLIVE, CYAN];
++  tiles.forEach((t, i) => {
++    rect(s, t[0], t[1], 4.06, 4.08, t[2]);
++    badge(s, t[0] + 2.03, t[1] + 2.04, 2.28, t[2], t[4]);
++    txt(s, t[3], t[7], t[6], 3.2, 0.77, { fontSize: 40, bold: true, color: labelColor[i] });
++    rect(s, t[7] - 0.01, t[6] + 0.83, 2.48, 0.17, 'F2F2F2');
++    txt(s, L_SUMM, t[5], t[6] + 1.00, 3.73, 1.86, {});
++  });
++  footerBar(s);
++};
++
++/* 20 — clustered bar chart + four social captions */
++S[20] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  infoBlock(s, 1.97, 1.58, 21.89, SKY, LOREM_LONG);
++  s.addChart('bar', [
++    { name: 'Series 1', labels: ['January', 'February', 'March', 'April', 'May'], values: [32, 32, 38, 27, 32] },
++    { name: 'Series 3', labels: ['January', 'February', 'March', 'April', 'May'], values: [35, 25, 20, 24, 26] },
++    { name: 'Series 2', labels: ['January', 'February', 'March', 'April', 'May'], values: [22, 12, 12, 21, 28] },
++    { name: 'Series 4', labels: ['January', 'February', 'March', 'April', 'May'], values: [18, 12, 11, 13, 12] }],
++    { x: 3.13, y: 4.03, w: 20.32, h: 5.52, barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 150,
++      chartColors: [OLIVE, BLUE, CYAN, MINT], showLegend: false, valAxisMaxVal: 50,
++      catAxisLabelFontSize: 22, catAxisLabelFontBold: true, catAxisLabelColor: 'D9D9D9',
++      valAxisLabelFontSize: 14, valAxisLabelColor: 'D9D9D9',
++      catAxisLineColor: 'D9D9D9', valAxisLineColor: 'D9D9D9', valGridLine: { color: 'D9D9D9', size: 0.25 },
++      catGridLine: { style: 'none' }, chartArea: { fill: { type: 'none' } } });
++  const caps = [[4.16, CYAN, SOCIAL.ig, 3.23], [9.49, BLUE, SOCIAL.fb, 8.57],
++                [14.91, OLIVE, SOCIAL.tw, 13.98], [20.41, MINT, SOCIAL.gp, 19.48]];
++  caps.forEach(c => {
++    oval(s, c[0], 10.03, 1.89, 1.89, c[1]);
++    c[2](s, c[0] + 0.945, 10.98, 1.8, WHITE, c[1]);
++    txt(s, L_SUMM, c[3], 12.14, 3.73, 1.86, { align: 'center' });
++  });
++};
++
++/* 21, 22 — two interlocking rings with figures inside */
++function ringSlide(s, topColor, botColor, topIcon, botIcon) {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  poly(s, [[0.502, 0.218], ['c', 0.656, 0.218, 0.783, 0.344, 0.783, 0.499],
++           ['c', 0.783, 0.656, 0.656, 0.780, 0.502, 0.780],
++           ['c', 0.344, 0.780, 0.221, 0.656, 0.221, 0.499], [0, 0.499],
++           ['c', 0, 0.776, 0.224, 1, 0.502, 1], ['c', 0.776, 1, 1, 0.776, 1, 0.499],
++           ['c', 1, 0.224, 0.776, 0, 0.502, 0]], 9.82, 1.75, 7.08, 7.09, topColor);
++  poly(s, [[0.502, 0.783], ['c', 0.344, 0.783, 0.221, 0.656, 0.221, 0.502],
++           ['c', 0.221, 0.347, 0.344, 0.221, 0.502, 0.221],
++           ['c', 0.656, 0.221, 0.783, 0.347, 0.783, 0.502], [1, 0.502],
++           ['c', 1, 0.227, 0.776, 0, 0.502, 0], ['c', 0.224, 0, 0, 0.227, 0, 0.502],
++           ['c', 0, 0.776, 0.224, 1, 0.502, 1]], 9.82, 7.31, 7.08, 7.09, botColor);
++  badge(s, 13.23, 5.24, 3.30, topColor); topIcon(s, 13.23, 5.24, 3.1, WHITE, topColor);
++  badge(s, 13.55, 10.74, 3.30, botColor); botIcon(s, 13.55, 10.74, 3.1, WHITE, botColor);
++  // right-hand and left-hand pill callouts
++  poly(s, P.pill2, 15.61, 3.05, 8.81, 2.25, topColor);
++  oval(s, 22.29, 3.23, 1.92, 1.92, WHITE);
++  txt(s, '45%', 22.63, 3.80, 1.32, 0.77, { fontSize: 40, bold: true, fontFace: BLACKF, color: topColor, align: 'center' });
++  txt(s, L_STAT, 17.31, 3.66, 4.64, 1.05, { color: WHITE });
++  poly(s, P.pill2, 2.13, 10.88, 8.81, 2.25, botColor, { rotate: 180 });
++  oval(s, 2.34, 11.03, 1.92, 1.92, WHITE);
++  txt(s, '75%', 2.63, 11.58, 1.34, 0.77,
++      { fontSize: 40, bold: true, fontFace: BLACKF, color: botColor, align: 'center' });
++  txt(s, L_STAT, 4.58, 11.44, 4.64, 1.05, { color: WHITE, align: 'right' });
++  // side statistics
++  [[2.63, 3.98, topColor, '84', 5.44, 3.97], [17.31, 10.35, botColor, '75', 20.12, 10.34]].forEach(c => {
++    txt(s, c[3] + '%', c[0], c[1], 2.42, 1.36, { fontSize: 75, bold: true, fontFace: BLACKF, color: c[2] });
++    rect(s, c[0] + 2.59, c[1] + 0.16, 0.13, 1.12, c[2]);
++    txt(s, L_TWO, c[4], c[5], 4.44, 1.45, { color: GREY2 });
++  });
++  [[2.93, 6.01], [16.92, 9.88]].forEach(l => s.addShape('line', { x: l[0], y: l[1], w: 6.79, h: 0,
++                         line: { color: GREEN, width: 1.8, dashType: 'sysDash' } }));
++  [[3.26, 7.50, botColor], [19.36, 5.90, topColor]].forEach(c => { txt(s, 'Data Here', c[0] + 0.15, c[1], 3.04, 0.82,
++        { fontSize: 35, bold: true, fontFace: BLACKF, color: c[2], align: 'center' });
++    txt(s, L_TWO, c[0], c[1] + 0.82, 3.27, 1.86, { color: GREY2, align: 'center' });
++  });
++}
++S[21] = s => ringSlide(s, BLUE, GREEN, SOCIAL.fb, SOCIAL.ig);
++S[22] = s => ringSlide(s, OLIVE, SKY, SOCIAL.gp, SOCIAL.tw);
++
++/* 23 — four label/connector/icon rows next to a seated figure */
++S[23] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  footerBar(s);
++  figure(s, 3.4, 0.99, 5.2, 8.6, '3FC2D1', 'FBB019');
++  DEV.laptop(s, 4.3, 4.4, 3.6, 2.2);
++  rect(s, 2.63, 6.65, 6.51, 0.32, 'FBB019');       // desk top
++  rect(s, 2.90, 6.97, 0.26, 4.28, 'FDCD81');
++  rect(s, 8.62, 6.97, 0.26, 4.28, 'FDCD81');
++  const rows = [[3.08, OLIVE, 'Event', ICON.cal], [5.09, GREEN, 'Global', ICON.globe],
++                [7.04, BLUE, 'Database', ICON.db], [9.04, CYAN, 'Research', ICON.clip]];
++  rows.forEach((r, i) => {
++    rect(s, 9.88, r[0], 3.78, 1.11, r[1]);
++    txt(s, 'Lorem Ipsum has two main data .', 9.95, r[0] + 0.03, 3.63, 1.05, { color: WHITE });
++    s.addShape('line', { x: 14.35, y: r[0] + 0.55, w: 2.66, h: 0,
++                         line: { color: GREY, width: 3.5, dashType: 'sysDot' } });
++    oval(s, 17.65, r[0] - 0.35, 1.69, 1.69, r[1]);
++    r[3](s, 18.50, r[0] + 0.50, 1.6, WHITE);
++    txt(s, r[2], 20.05, r[0] - 0.30, 2.6, 0.77, { fontSize: 40, bold: true, color: r[1] });
++    txt(s, L_STAT, 19.94, r[0] + 0.22, 4.64, 1.05, {});
++  });
++};
++
++/* 24, 27 — right-hand bands, left figure and stat blocks */
++function bandFigureSlide(s, y0, artFn, statRows, noteY) {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  artFn(s);
++  ['Data Here A', 'Data Here B', 'Data Here C', 'Data Here D'].forEach((l, i) =>
++    bandRow(s, 8.85, y0, l, L_IMP, i, { tx: 4.56, tw: 8.15 }));
++  bandBadges(s, 21.94, y0 + 1.16);
++  statRows.forEach(r => { txt(s, r[3], r[0] + 0.35, r[1], 3.65, 0.77,
++        { fontSize: 34, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++    txt(s, r[2], r[0], r[1] + 0.63, 4.17, 0.71,
++        { fontSize: 30, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++  });
++  [[2.97, BLUE], [8.59, CYAN], [13.96, GREEN], [19.58, SKY]]
++    .forEach((c, i) => checkNote(s, c[0], noteY - (i === 0 ? 0 : 0.05), c[1]));
++}
++S[24] = s => bandFigureSlide(s, 2.58, sl => {
++  figure(sl, 4.55, 0.76, 7.75, 11.30, 'FCF1E9', '3C6481');
++  DEV.laptop(sl, 5.0, 8.0, 6.4, 3.2);
++  [[3.44, 8.08, 1.43], [4.92, 4.87, 1.80], [3.20, 4.24, 1.19], [5.30, 3.40, 1.19]]
++    .forEach((c, i) => {
++      oval(sl, c[0], c[1], c[2], c[2], i % 2 ? '00B8E8' : 'FFD215');
++                         PROP.hand(sl, c[0] + c[2] * 0.22, c[1] + c[2] * 0.16, c[2] * 0.7, c[2] * 0.68, '007CAB'); });
++  heart(sl, 3.84, 2.81, 1.40, 1.30, RED);
++  heart(sl, 3.22, 5.91, 1.55, 1.44, RED, 320);
++  oval(sl, 5.23, 1.43, 1.22, 1.22, '007FC5'); SOCIAL.like(sl, 5.84, 2.04, 1.1);
++}, [[5.61, 3.88, 'TARGETING', '89%'], [5.61, 7.63, 'PROFIT', '56%'], [5.70, 9.38, 'GOAL', '43%']], 13.00);
++S[27] = s => bandFigureSlide(s, 2.37, sl => {
++  PROP.papers(sl, 6.40, 6.81, 4.84, 5.76);
++  PROP.keyboard(sl, 1.97, 9.15, 4.48, 2.10);
++  DEV.tvClip(sl, 2.93, 2.03, 8.00, 5.15);
++}, [[6.20, 3.67, 'TARGETING', '89%'], [6.28, 5.42, 'STRATEGY', '43%'],
++    [6.20, 7.42, 'PROFIT', '56%'], [5.65, 9.17, 'GOAL', '43%']], 12.81);
++
++/* 25 — four vertical description ribbons between two figures */
++S[25] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  figure(s, 19.90, 2.13, 4.20, 12.22, '3FC2D1', 'FBB019');
++  figure(s, 1.42, 2.08, 5.97, 11.70, 'BED65C', 'C09D84');
++  const cols = [[7.94, 5.15, GREEN, ICON.chart, 8.39, 8.92, 9.10],
++                [10.95, 5.06, BLUE, ICON.bino, 11.30, 11.82, 12.00],
++                [13.97, 5.07, CYAN, ICON.glass, 14.40, 14.93, 15.10],
++                [16.92, 5.07, SKY, ICON.cal, 17.31, 17.83, 18.00]];
++  cols.forEach(c => {
++    rect(s, c[0], c[1], 2.32, 9.92, c[2]);
++    poly(s, P.foldT, c[0], c[1] - 0.41, 2.32, 0.41, DARK[c[2]]);
++    vtxt(s, DESC, c[4], c[1] + 0.70, 0.71, 5.53,
++         { fontSize: 30, bold: true, fontFace: BLACKF, color: WHITE, align: 'right' });
++    vtxt(s, 'Lorem Ipsum has two main data statistical this methodologies important Data analysis which.',
++         c[5], c[1] + 0.60, 1.05, 8.75, { color: WHITE, align: 'right' });
++    badge(s, c[0] + 1.16, 3.76, 2.02, c[2], c[3], WHITE);
++  });
++};
++
++/* 26 — four cylinders topped by figures */
++S[26] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  infoBlock(s, 1.97, 1.58, 21.89, SKY, LOREM_LONG);
++  const cols = [[1.72, 8.60, SKY, '73%', 2.86, 3.38, 'BED65C', 'C09D84'],
++                [7.68, 8.65, BLUE, '62%', 8.75, 8.66, '4790CD', 'FBB019'],
++                [13.60, 8.65, OLIVE, '78%', 14.71, 15.32, 'F05260', '3F6E9A'],
++                [19.61, 8.65, CYAN, '52%', 20.65, 21.28, '3FC2D1', 'FBB019']];
++  cols.forEach(c => {
++    figure(s, c[5], 4.2, 2.8, 5.3, c[6], c[7]);
++    poly(s, P.bowl, c[0], c[1] + 0.63, 5.46, 2.60, c[2]);
++    oval(s, c[0], c[1], 5.46, 1.26, DARK[c[2]]);
++    txt(s, c[3], c[4], c[1] + 1.60, 3.65, 1.19,
++        { fontSize: 59, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++  });
++  [[2.55, BLUE], [8.17, CYAN], [13.54, GREEN], [19.17, SKY]]
++    .forEach((c, i) => checkNote(s, c[0], 13.00 - (i ? 0.05 : 0), c[1]));
++};
++
++/* 28 — four arrow banners around a seated figure */
++S[28] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  figure(s, 9.65, 1.42, 7.47, 11.4, 'FCF1E9', '3C6481');
++  DEV.laptop(s, 10.4, 8.6, 6.0, 4.6);
++  const rows = [[14.70, 2.85, BLUE, 'A', 15.91, 21.29, 'right'], [4.37, 3.08, OLIVE, 'B', 5.85, 4.78, 'left'],
++                [15.33, 7.36, GREEN, 'C', 16.55, 21.93, 'right'], [3.48, 7.52, SKY, 'D', 4.84, 3.77, 'left']];
++  rows.forEach(r => {
++    const left = r[6] === 'left';
++    rect(s, r[0], r[1], 7.73, 1.81, r[2]);
++    poly(s, left ? P.foldL : P.foldR, left ? r[0] - 0.32 : r[0] + 7.73, r[1], 0.32, 1.81, DARK[r[2]]);
++    txt(s, L_METH, r[4], r[1] + 0.38, 5.38, 1.08, { color: WHITE, align: left ? 'left' : 'right' });
++    txt(s, r[3], r[5], r[1] + 0.38, 1.15, 1.04, { fontSize: 50, bold: true, color: WHITE });
++  });
++  [[4.48, 11.10, SKY], [4.47, 12.44, OLIVE], [17.66, 11.08, GREEN], [17.69, 12.42, BLUE]]
++    .forEach(c => checkNote(s, c[0], c[1], c[2]));
++};
++
++/* 29 — pyramid with information callouts */
++S[29] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  footerBar(s);
++  const pyr = [[12.52, 2.31, 3.44, 3.44, P.pyr1, OLIVE], [11.65, 5.75, 5.19, 1.78, P.pyr2, GREEN],
++               [10.79, 7.53, 6.92, 1.73, P.pyr3, SKY], [9.90, 9.27, 8.73, 1.75, P.pyr4, CYAN]];
++  pyr.forEach(p => poly(s, p[4], p[0], p[1], p[2], p[3], p[5]));
++  const rows = [[5.59, 3.51, OLIVE, 6.51, ICON.chart, 4.26, 13.71], [4.88, 5.30, GREEN, 5.80, ICON.bino, 6.27, 13.41],
++                [4.06, 7.02, SKY, 4.99, ICON.glass, 8.03, 13.36], [3.35, 8.81, CYAN, 4.28, ICON.shield, 9.70, 13.36]];
++  rows.forEach((r, i) => {
++    poly(s, P.pill, r[0], r[1], 7.97, 1.78, r[2]);
++    txt(s, 'Information', r[3] + 0.01, r[1] + 0.09, 3.68, 0.79, { fontSize: 30, bold: true, color: WHITE });
++    txt(s, 'Lorem Ipsum has two main data statistical.', r[3] + 0.01, r[1] + 0.65, 5.96, 1.02,
++        { fontSize: 20, color: WHITE });
++    badge(s, r[0] + 6.11 - i * 0.81, r[1] + 1.05, 1.11, r[2], r[4]);
++    txt(s, '25%', r[6], r[5], 2.18, 0.85,
++        { fontSize: 35, bold: true, fontFace: BLACKF, color: WHITE, align: 'center' });
++    s.addShape('line', { x: 15.68 + i * 0.81, y: 4.15 + i * 1.84, w: 2.83, h: 0,
++                         line: { color: GREY, width: 3.5, dashType: 'sysDot' } });
++  });
++  [[18.89, 3.21, 1.59, OLIVE, SOCIAL.ytRing], [19.56, 5.05, 1.57, BLUE, SOCIAL.fb],
++   [20.35, 7.03, 1.59, SKY, SOCIAL.gp], [21.22, 8.98, 1.49, CYAN, SOCIAL.tw]].forEach(c => {
++    oval(s, c[0], c[1], c[2], c[2], c[3]);
++    c[4](s, c[0] + c[2] / 2, c[1] + c[2] / 2, c[2] * 0.95, WHITE, c[3]);
++  });
++};
++
++/* 31 — US map with avatars and social captions */
++S[31] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  PROP.usmap(s, 7.69, 2.12, 12.78, 7.85);
++  [[22.03, 5.57, 2.93, '30A2DC', SKIN, '3A3A44'], [2.60, 4.98, 3.11, 'BED65C', SKIN, '2F2F38'],
++   [2.57, 2.68, 1.73, 'F3991F', 'AF6A59', '2B2B33'], [4.79, 7.34, 3.24, '06A14B', SKIN, 'F26D60'],
++   [4.53, 2.75, 2.81, '4F82C3', SKIN, 'BED65C'], [21.86, 2.46, 2.47, 'BED65C', SKIN, '2F2F38'],
++   [19.79, 4.87, 2.20, 'F3991F', 'AF6A59', '2B2B33'], [19.38, 7.51, 2.58, '06A14B', SKIN, 'F26D60']]
++    .forEach(a => avatar(s, a[0], a[1], a[2], a[3], a[4], a[5]));
++  [[1.65, CYAN, SOCIAL.ig, 3.70], [7.54, GREEN, SOCIAL.fb, 9.60],
++   [13.53, OLIVE, SOCIAL.tw, 15.58], [19.59, MINT, SOCIAL.gp, 21.65]].forEach(c => {
++    oval(s, c[0], 11.48, 1.89, 1.89, c[1]);
++    c[2](s, c[0] + 0.945, 12.43, 1.8, WHITE, c[1]);
++    txt(s, L_SUMM, c[3], 11.56, 3.73, 1.86, {});
++  });
++};
++
++/* 32 — four wide ribbons + figure with megaphone */
++S[32] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  figure(s, 3.80, 1.90, 9.60, 13.10, '06A14B', 'F26647');
++  PROP.megaphone(s, 2.13, 2.90, 4.60, 4.10);
++  const rows = [[10.04, 2.70, BLUE, 'A', 12.03, 21.70, 9.67], [10.14, 4.46, OLIVE, 'B', 12.07, 21.75, 9.67],
++                [9.51, 6.27, GREEN, 'C', 12.79, 21.22, 8.43], [9.23, 8.00, SKY, 'D', 12.41, 20.92, 8.51]];
++  rows.forEach((r, i) => {
++    rect(s, r[0], r[1], 12.90, 1.81, r[2]);
++    poly(s, P.foldR, r[0] + 12.90, r[1], 0.54, 1.81, DARK[r[2]]);
++    const body = i < 2 ? L_FULL
++                       : L_ANAL;
++    txt(s, body, r[4], r[1] + 0.33, r[6], 1.05, { color: WHITE, align: 'right' });
++    txt(s, r[3], r[5], r[1] + 0.30, 1.15, 1.04, { fontSize: 50, bold: true, color: WHITE });
++  });
++  [[15.39, 11.60, BLUE], [15.37, 12.94, GREEN], [20.79, 11.55, OLIVE], [20.83, 12.89, SKY]]
++    .forEach(c => checkNote(s, c[0], c[1], c[2]));
++};
++
++/* 33-36 — four corner ribbons around a big social disc */
++function quadSlide(s, discColor, glyph, colors) {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  txt(s, 'Description Here', 1.72, 1.75, 9.63, 0.79, { fontSize: 35, bold: true, fontFace: BLACKF, color: OLIVE });
++  txt(s, L_FULL, 1.72, 2.37, 17.93, 1.05, { color: GREY2 });
++  const rows = [[0.03, 4.36, colors[0], 9.92, 1.41, 1.38, 'left'], [0.03, 9.69, colors[1], 9.92, 1.41, 1.38, 'left'],
++                [16.63, 4.33, colors[2], 9.97, 17.41, 17.38, 'right'],
++                [16.61, 9.75, colors[3], 9.97, 17.41, 17.38, 'right']];
++  rows.forEach(r => {
++    const left = r[6] === 'left';
++    rect(s, r[0], r[1], r[3], 2.32, r[2]);
++    poly(s, left ? P.foldR : P.foldL, left ? r[0] + r[3] : r[0] - 0.42, r[1], 0.42, 2.32, DARK[r[2]]);
++    txt(s, DESC, r[4], r[1] + 0.34, 5.53, 0.79, { fontSize: 35, bold: true, fontFace: BLACKF, color: WHITE });
++    txt(s, L_ANAL, r[5], r[1] + 0.95, 7.09, 1.05, { color: WHITE });
++  });
++  badge(s, 13.25, 8.64, 5.66, discColor);
++  glyph(s, 13.25, 8.64, 5.4, WHITE, discColor);
++}
++S[33] = s => quadSlide(s, BLUE, SOCIAL.fb, [BLUE, OLIVE, GREEN, SKY]);
++S[34] = s => quadSlide(s, CYAN, SOCIAL.ig, [CYAN, BLUE, MINT, SKY]);
++S[35] = s => quadSlide(s, SKY, SOCIAL.tw, [BLUE, OLIVE, GREEN, SKY]);
++S[36] = s => quadSlide(s, OLIVE, SOCIAL.gp, [CYAN, BLUE, MINT, SKY]);
++
++/* 37 — four pennant banners with percentages */
++S[37] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  const rows = [ { y: 2.60, x: 11.05, w: 9.35, c: OLIVE, dir: 'left', pct: ['76%', 6.29, 2.50, OLIVE],
++      lbl: 'Data Here A', lx: 12.72, tx: 12.63, note: [6.15, 3.46] },
++    { y: 5.45, x: 6.17, w: 9.09, c: SKY, dir: 'right', pct: ['43%', 15.87, 5.66, SKY],
++      lbl: 'Data Here B', lx: 7.84, tx: 7.75, note: [15.72, 6.62] },
++    { y: 8.29, x: 11.05, w: 9.35, c: BLUE, dir: 'left', pct: ['81%', 6.55, 8.67, BLUE],
++      lbl: 'Data Here C', lx: 12.94, tx: 12.85, note: [6.41, 9.62] },
++    { y: 11.20, x: 6.17, w: 9.09, c: GREEN, dir: 'right', pct: ['89%', 16.13, 11.83, GREEN],
++      lbl: 'Data Here D', lx: 7.77, tx: 7.77, note: [15.98, 12.78] }];
++  rows.forEach(r => {
++    poly(s, r.dir === 'left' ? P.arrowL : P.arrowR, r.x, r.y, r.w, 2.71, r.c);
++    txt(s, r.lbl, r.lx, r.y + 0.43, 4.59, 0.81, { fontSize: 36, bold: true, color: WHITE });
++    txt(s, L_METH, r.tx, r.y + 1.02, 7.03, 1.05, { color: WHITE });
++    txt(s, r.pct[0], r.pct[1], r.pct[2], 2.43, 1.01, { fontSize: 54, bold: true, fontFace: BLACKF, color: r.pct[3] });
++    txt(s, L_SHORT, r.note[0], r.note[1], 3.73, 1.05, {});
++  });
++  badge(s, 5.93, 6.68, 2.45, SKY, ICON.cal);
++  badge(s, 21.24, 9.59, 2.45, BLUE, ICON.chart);
++  badge(s, 5.83, 12.42, 2.45, GREEN, ICON.bino);
++};
++
++/* 38 — three feature cards with big percentages */
++S[38] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  figure(s, 22.38, 2.53, 2.92, 8.82, 'F05260', '3F6E9A');
++  figure(s, 0.88, 2.86, 4.64, 8.76, '4790CD', 'FBB019');
++  featureCard(s, 6.03, 2.75, OLIVE, PANEL);
++  featureCard(s, 11.11, 2.73, BLUE, SILVER);
++  featureCard(s, 16.23, 2.75, SKY, PANEL);
++  bigPercent(s, 6.13, 9.81, 'DATA 01', '73%', OLIVE);
++  bigPercent(s, 11.39, 9.73, 'DATA 02', '62%', BLUE);
++  bigPercent(s, 16.72, 9.73, 'DATA 03', '75%', SKY);
++};
++
++/* 39 — big funnel with social icons falling in */
++S[39] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  poly(s, P.funnel, 3.74, 4.95, 9.41, 9.06, OLIVE);
++  oval(s, 3.67, 3.90, 9.54, 1.78, D_OLIVE);
++  txt(s, '100%', 6.00, 6.35, 3.05, 1.18, { fontSize: 70, bold: true, color: WHITE, align: 'center' });
++  txt(s, L_STAT, 5.30, 7.55, 3.75, 1.25, { fontSize: 20, color: WHITE, align: 'center' });
++  heart(s, 5.79, 0.74, 2.32, 2.15, RED, 330);
++  heart(s, 5.31, 4.22, 1.12, 1.04, GREEN, 320);
++  heart(s, 8.36, 4.60, 1.14, 1.06, CYAN, 348);
++  oval(s, 9.08, 2.28, 2.81, 2.81, '007FC5'); SOCIAL.like(s, 10.49, 3.69, 2.5);
++  oval(s, 3.88, 0.42, 1.57, 1.56, CYAN);  SOCIAL.tw(s, 4.66, 1.20, 1.5);
++  oval(s, 6.88, 3.18, 1.67, 1.67, SKY);   SOCIAL.gp(s, 7.72, 4.02, 1.6);
++  oval(s, 8.26, 0.92, 1.67, 1.67, OLIVE); SOCIAL.ytRing(s, 9.10, 1.76, 1.6, WHITE, OLIVE);
++  oval(s, 4.44, 2.36, 1.46, 1.46, BLUE);  SOCIAL.fb(s, 5.17, 3.09, 1.4);
++  BAND_LABELS4.forEach((l, i) => {
++    const yy = 4.58 + i * 2.30;
++    poly(s, P.band, 9.05, yy, 12.78, 2.33, BAND_COLORS[i]);
++    txt(s, l, 14.47, yy + 0.13, 3.60, 0.81, { fontSize: 36, bold: true, color: WHITE });
++    txt(s, L_IMP, 14.47, yy + 0.75, 5.70, 1.40, { fontSize: 23, color: WHITE });
++  });
++  bandBadges(s, 21.63, 5.74);
++};
++
++/* 40-45 — product mock-up slides */
++S[40] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  DEV.monitor(s, 12.27, 3.17, 12.49, 10.16);
++  DEV.tablet(s, 7.13, 5.78, 5.21, 7.63);
++  DEV.phone(s, 4.43, 8.77, 2.62, 4.63);
++  [[2.38, OLIVE, 9.85, 1.05], [4.32, SKY, 8.52, 1.45], [6.50, BLUE, 5.71, 1.86]].forEach(c => {
++    oval(s, 0.76, c[0] + 0.22, 1.01, 1.01, c[1]);
++    poly(s, P.check, 0.97, c[0] + 0.40, 0.58, 0.61, WHITE);
++    txt(s, L_FULL, 1.78, c[0], c[2], c[3], {});
++  });
++};
++S[41] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  DEV.laptop(s, 7.13, 3.35, 13.58, 7.31);
++  txt(s, 'FEATURE PRODUCT', 7.87, 11.17, 12.33, 0.71,
++      { fontSize: 36, bold: true, fontFace: BLACKF, color: OLIVE, align: 'center' });
++  txt(s, LOREM_LONG + 'Pellentesque.', 7.80, 11.84, 12.40, 2.37, { align: 'center', valign: 'middle' });
++};
++/* 42-44 — device + two "Data Analysis" cards */
++function productSlide(s, tx, titleColor, cardColors, deviceFn) {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  deviceFn(s);
++  txt(s, 'FEATURE PRODUCT', tx.tX, tx.tY, tx.tW, 0.71,
++      { fontSize: 36, bold: true, fontFace: BLACKF, color: titleColor, align: 'center' });
++  txt(s, LOREM_LONG + 'Pellentesque.', tx.bX, tx.bY, tx.bW, tx.bH, { align: 'center', valign: 'middle' });
++  const cardBody = 'Lorem ipsum dolor sit amet, Aliquam tincidunt ante nec sem congue conva ornare ' +
++                   'ante Lorem ipsum dolor sit amet, consectetur adipiscing elit. ';
++  [[tx.cX, cardColors[0]], [tx.cX + 5.67, cardColors[1]]].forEach((c, i) => {
++    rect(s, c[0], tx.cY, 5.20, 4.34, c[1]);
++    rect(s, c[0] + 0.13, tx.cY + 0.94, 4.94, 3.23, WHITE);
++    txt(s, 'Data Analysis', c[0] + 0.14, tx.cY + 0.10, 3.66, 0.77, { fontSize: 40, bold: true, color: WHITE });
++    txt(s, cardBody, c[0] + 0.16, tx.cY + 1.19, 4.91, 2.73, { align: 'center' });
++  });
++}
++S[42] = s => productSlide(s, { tX: 13.51, tY: 3.48, tW: 12.33, bX: 13.44, bY: 4.15, bW: 12.40, bH: 2.37,
++                               cX: 14.05, cY: 7.64 }, SKY, [GREEN, BLUE],
++  sl => DEV.tablet(sl, 5.84, 3.01, 6.71, 9.82));
++S[43] = s => productSlide(s, { tX: 2.47, tY: 3.78, tW: 12.33, bX: 2.40, bY: 4.45, bW: 12.40, bH: 2.37,
++                               cX: 3.01, cY: 7.94 }, SKY, [OLIVE, BLUE],
++  sl => DEV.phone(sl, 15.22, 2.67, 5.92, 10.45));
++S[44] = s => productSlide(s, { tX: 14.94, tY: 3.49, tW: 11.03, bX: 15.51, bY: 4.17, bW: 9.96, bH: 2.89,
++                               cX: 14.88, cY: 7.83 }, BLUE, [OLIVE, SKY],
++  sl => DEV.monitor(sl, 1.79, 3.17, 12.49, 10.16));
++S[45] = s => {
++  header(s, [{ text: 'SOCIAL ' }, { text: 'PRESENT' }]);
++  DEV.laptop(s, 6.70, 3.14, 17.85, 9.61);
++  [[4.26, OLIVE, 2.31, 1.29], [6.76, SKY, 2.51, 1.49], [9.31, BLUE, 2.51, 1.49]].forEach(c => {
++    oval(s, c[3], c[0] + 0.22, 1.01, 1.01, c[1]);
++    poly(s, P.check, c[3] + 0.21, c[0] + 0.40, 0.58, 0.61, WHITE);
++    txt(s, L_FULL, c[2], c[0], 5.71, 1.86, {});
++  });
++};
++
++/* ============================================================== build === */
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'CUSTOM', width: SW, height: SH });
++pptx.layout = 'CUSTOM';
++pptx.author = 'pptxgenjs';
++pptx.title = 'SOCIAL NETWORK PRESENTATIONs';
++
++for (let i = 1; i <= 45; i++) {
++  const slide = pptx.addSlide();
++  slide.background = { color: WHITE };
++  S[i](slide);
++}
++
++pptx.writeFile({ fileName: path.join(__dirname, '153fdea0-f246-4383-bd1e-843daf400ac2_grok_final.pptx') })
++    .then(f => console.log('wrote', f));

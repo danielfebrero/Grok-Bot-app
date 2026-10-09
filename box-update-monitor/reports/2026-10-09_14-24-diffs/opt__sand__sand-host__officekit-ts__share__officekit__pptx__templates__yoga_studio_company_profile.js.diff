@@ -1,0 +1,977 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/yoga_studio_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/yoga_studio_company_profile.js
+@@ -0,0 +1,974 @@
++/*
++ * Yoga Studio presentation - rebuilt with PptxGenJS.
++ *
++ * 30 slides, 13.333in x 7.5in (16:9).  Every slide is described below with plain
++ * pptxgenjs calls: shape(), freeform() and tx().  The source file ships with no
++ * media parts at all - its picture placeholders are empty frames that render as
++ * nothing - so there is no raster artwork to stand in for here.
++ *
++ *   node <thisfile>.js   ->   writes <thisfile>.pptx next to the script
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette / fonts
++const PURPLE = '7F3E97';   // brand purple
++const GREEN = '46D68C';    // brand green
++const MINT = 'D4F5E4';     // pale green panels
++const GRAY = '808080';     // body copy
++const DGRAY = '595959';    // darker body copy
++const WHITE = 'FFFFFF';
++
++const PLAYFAIR = 'Playfair Display Medium';
++const OPENSANS = 'Open Sans';
++
++// ---------------------------------------------------------------- text presets
++const BUL = { indent: 13.5 };                                        // 0.1875" hanging bullet
++const TITLE  = { fontFace: PLAYFAIR, fontSize: 32, color: PURPLE, charSpacing: 1 };
++const SUB    = { fontFace: PLAYFAIR, fontSize: 16, color: PURPLE, charSpacing: 1, wrap: false };
++const TOCNUM = { fontFace: PLAYFAIR, fontSize: 14, color: PURPLE, align: 'right', wrap: false };
++const BODY   = { fontFace: OPENSANS, fontSize: 11, color: GRAY, lineSpacingMultiple: 1.5 };
++const BULLET = { fontFace: OPENSANS, fontSize: 11, color: GRAY, lineSpacingMultiple: 1.5, bullet: BUL };
++const LABEL  = { fontFace: OPENSANS, fontSize: 11, color: GRAY, wrap: false };
++
++// ---------------------------------------------------------------- primitives
++// Freeform path commands.  Coordinates are fractions of the shape's own box, so a
++// path can be re-used at any size.
++const M = (x, y) => ['M', x, y];
++const L = (x, y) => ['L', x, y];
++const C = (x1, y1, x2, y2, x, y) => ['C', x1, y1, x2, y2, x, y];
++const Z = ['Z'];
++
++function shape(slide, kind, x, y, w, h, opts) {
++  slide.addShape(kind, Object.assign({ x, y, w, h }, opts));
++}
++
++function freeform(slide, pathDef, x, y, w, h, opts) {
++  const pts = [];
++  for (const c of pathDef) {
++    if (c[0] === 'M') pts.push({ x: c[1] * w, y: c[2] * h, moveTo: true });
++    else if (c[0] === 'L') pts.push({ x: c[1] * w, y: c[2] * h });
++    else if (c[0] === 'C') pts.push({
++      x: c[5] * w, y: c[6] * h,
++      curve: { type: 'cubic', x1: c[1] * w, y1: c[2] * h, x2: c[3] * w, y2: c[4] * h },
++    });
++    else pts.push({ close: true });
++  }
++  slide.addShape('custGeom', Object.assign({ x, y, w, h, points: pts }, opts));
++}
++
++// Rectangle with two opposite corners rounded by r1 and the other two by r2
++// (PowerPoint's "round2DiagRect": top-left/bottom-right use r1).
++function diagRounded(w, h, r1, r2) {
++  const a = r1 / w, b = r1 / h, c = r2 / w, e = r2 / h, k = 0.4477;
++  return [
++    M(a, 0), L(1 - c, 0), C(1 - c * k, 0, 1, e * k, 1, e), L(1, 1 - b),
++    C(1, 1 - b * k, 1 - a * k, 1, 1 - a, 1), L(c, 1),
++    C(c * k, 1, 0, 1 - e * k, 0, 1 - e), L(0, b), C(0, b * k, a * k, 0, a, 0), Z,
++  ];
++}
++
++// Text box.  Every box in the deck is top-anchored and "resize shape to fit text"
++// (pptxgenjs centres text vertically by default, hence the explicit valign).
++function tx(slide, x, y, w, h, text, opts) {
++  slide.addText(text, Object.assign({ x, y, w, h, valign: 'top', fit: 'resize' }, opts));
++}
++
++// The deck's only call-to-action: a pill with a centred caption.  Mint pills use
++// grey text, green pills white.
++function button(slide, x, y, fill, label) {
++  shape(slide, 'roundRect', x, y, 1.547, 0.485, { rectRadius: 0.111, fill });
++  tx(slide, x + 0.187, y + 0.099, 1.173, 0.286, label,
++    { ...LABEL, color: fill === MINT ? GRAY : WHITE, charSpacing: 1, align: 'center' });
++}
++
++// ---------------------------------------------------------------- shared chrome
++// Every slide carries: a 3x3 dot grid top-left, the studio name + hamburger mark
++// top-right, three page numbers bottom-left (one underlined) and a play triangle
++// bottom-right.
++const DOT_XS = [0.457, 0.703, 0.949];
++const DOT_YS = [0.443, 0.689, 0.935];
++const NUM_XS = [0.339, 0.823, 1.306];
++const RULE_XS = [0.457, 0.941, 1.425];
++
++function chrome(slide, o) {
++  for (const dx of DOT_XS) {
++    for (const dy of DOT_YS) shape(slide, 'ellipse', dx, dy, 0.072, 0.072, { fill: o.dotColor || GREEN });
++  }
++  for (let i = 0; i < 3; i++) {
++    const label = String(o.start + i).padStart(2, '0');
++    tx(slide, NUM_XS[i], 6.891, 0.377, 0.286, label,
++      { ...LABEL, color: o.numColor || GRAY });
++  }
++  shape(slide, 'line', RULE_XS[o.active], 7.194, 0.159, 0,
++    { line: { color: o.ruleColor || o.numColor || GRAY, width: 0.75 } });
++  freeform(slide, HAMBURGER, 12.702, 0.387, 0.18, 0.142, { fill: GREEN });
++  tx(slide, 10.792, 0.306, 1.808, 0.303, 'Yoga Studio Name',
++    { fontFace: PLAYFAIR, fontSize: 12, color: PURPLE, charSpacing: 1, align: 'right', wrap: false });
++  shape(slide, 'triangle', 12.716, 6.968, 0.173, 0.149, { fill: o.arrowColor || PURPLE, rotate: 90 });
++}
++
++// ---------------------------------------------------------------- freeform paths
++
++const HAMBURGER = [
++  M(0, 0.8082), L(1, 0.8082), L(1, 1), L(0, 1), Z, M(0, 0.4041), L(1, 0.4041), L(1, 0.5959),
++  L(0, 0.5959), Z, M(0, 0), L(1, 0), L(1, 0.1918), L(0, 0.1918), Z
++];
++
++const ARC_OUTLINE_TALL = [
++  M(0, 0), L(0.7761, 0), L(0.7784, 0.002), C(0.9145, 0.125, 1, 0.3026, 1, 0.5),
++  C(1, 0.6974, 0.9145, 0.875, 0.7784, 0.998), L(0.7761, 1), L(0, 1), Z
++];
++
++const CARD_ROUND_LEFT = [
++  M(0.1129, 0), L(1, 0), L(1, 1), L(0.1129, 1), C(0.0505, 1, 0, 0.8971, 0, 0.7702), L(0, 0.2298),
++  C(0, 0.1029, 0.0505, 0, 0.1129, 0), Z
++];
++
++const CARD_WAVE_LEFT = [
++  M(0, 0), L(0.9225, 0), C(0.9653, 0, 1, 0.0746, 1, 0.1667), L(1, 0.8333),
++  C(1, 0.9254, 0.9653, 1, 0.9225, 1), L(0, 1), L(0.0091, 0.9785),
++  C(0.059, 0.8485, 0.089, 0.6818, 0.089, 0.5), C(0.089, 0.3182, 0.059, 0.1515, 0.0091, 0.0215),
++  Z
++];
++
++const PANEL_LENS_RIGHT = [
++  M(1, 0), L(0.4714, 0), L(0.4565, 0.006), C(0.1777, 0.1234, 0, 0.3011, 0, 0.5),
++  C(0, 0.6989, 0.1777, 0.8766, 0.4565, 0.994), L(0.4714, 1), L(1, 1), Z
++];
++
++const BLOB_TL_NOTCHED = [
++  M(0, 0), L(0.9596, 0), L(0.9661, 0.0179), C(0.9881, 0.089, 1, 0.1646, 1, 0.243),
++  C(1, 0.2692, 0.9987, 0.295, 0.9961, 0.3204), L(0.9853, 0.3919), L(0.6498, 0.3919),
++  C(0.5695, 0.3919, 0.5044, 0.4573, 0.5044, 0.5381), L(0.5044, 0.9536), L(0.4708, 0.966),
++  C(0.4, 0.9881, 0.3248, 1, 0.2468, 1), C(0.1688, 1, 0.0935, 0.9881, 0.0228, 0.966),
++  L(0, 0.9576), Z
++];
++
++const BLOB_BR_NOTCHED = [
++  M(0.6925, 0), C(0.7881, 0, 0.8792, 0.0194, 0.962, 0.0544), L(1, 0.0727), L(1, 1), L(0.0727, 1),
++  L(0.0544, 0.962), C(0.0194, 0.8792, 0, 0.7881, 0, 0.6925),
++  C(0, 0.6447, 0.0048, 0.598, 0.0141, 0.5529), L(0.023, 0.5182), L(0.2395, 0.5182),
++  C(0.3396, 0.5182, 0.4208, 0.437, 0.4208, 0.3369), L(0.4208, 0.0554), L(0.4229, 0.0544),
++  C(0.5058, 0.0194, 0.5969, 0, 0.6925, 0), Z
++];
++
++const CARD_CLIP_TOPRIGHT = [
++  M(0.0871, 0), L(1, 0), L(0.9979, 0.0074), C(0.9894, 0.0457, 0.9847, 0.0879, 0.9847, 0.1321),
++  L(0.9847, 1), L(0.0871, 1), C(0.039, 1, 0, 0.9254, 0, 0.8333), L(0, 0.1667),
++  C(0, 0.0746, 0.039, 0, 0.0871, 0), Z
++];
++
++const SLIVER_LENS = [
++  M(0.7975, 0), L(1, 0), C(0.5595, 0, 0.2025, 0.0525, 0.2025, 0.1173), L(0.2025, 0.8827),
++  C(0.2025, 0.9475, 0.5595, 1, 1, 1), L(0.7975, 1), C(0.3571, 1, 0, 0.9475, 0, 0.8827),
++  L(0, 0.1173), C(0, 0.0525, 0.3571, 0, 0.7975, 0), Z
++];
++
++const PANEL_LENS_LEFT = [
++  M(0.2465, 0), L(1, 0), L(1, 1), L(0.2465, 1), L(0.2387, 0.994),
++  C(0.0929, 0.8766, 0, 0.6989, 0, 0.5), C(0, 0.3011, 0.0929, 0.1234, 0.2387, 0.006), Z
++];
++
++const STADIUM_OUTLINE = [
++  M(0, 0), L(0.6403, 0), C(0.8389, 0, 1, 0.2239, 1, 0.5), C(1, 0.7761, 0.8389, 1, 0.6403, 1),
++  L(0, 1), Z
++];
++
++const BLOB_BL_NOTCHED = [
++  M(0.426, 0), C(0.4459, 0, 0.4654, 0.0012, 0.4847, 0.0034), L(0.506, 0.0072), L(0.506, 0.419),
++  C(0.506, 0.5049, 0.5658, 0.5745, 0.6397, 0.5745), L(0.9938, 0.5745), L(0.997, 0.5992),
++  C(0.999, 0.6217, 1, 0.6444, 1, 0.6675), C(1, 0.7826, 0.9749, 0.891, 0.9307, 0.9856),
++  L(0.9232, 1), L(0, 1), L(0, 0.2213), L(0.0202, 0.1955), C(0.1241, 0.0747, 0.2676, 0, 0.426, 0),
++  Z
++];
++
++const SLIVER_LEAF_RIGHT = [
++  M(1, 0), L(1, 1), L(0.8054, 0.9894), C(0.3078, 0.9567, 0, 0.9115, 0, 0.8616), L(0, 0.1384),
++  C(0, 0.0885, 0.3078, 0.0433, 0.8054, 0.0106), Z
++];
++
++const CARD_BOWED_RIGHT = [
++  M(0.0541, 0), L(0.9876, 0), L(0.9788, 0.0741),
++  C(0.9666, 0.1944, 0.9601, 0.3223, 0.9601, 0.455),
++  C(0.9601, 0.6318, 0.9717, 0.8003, 0.9927, 0.9535), L(1, 1), L(0.0541, 1),
++  C(0.0242, 1, 0, 0.9254, 0, 0.8333), L(0, 0.1667), C(0, 0.0746, 0.0242, 0, 0.0541, 0), Z
++];
++
++const PANEL_BITE_LEFT = [
++  M(0, 0), L(1, 0), L(1, 1), L(0, 1), L(0, 0.8415),
++  C(0.4121, 0.8415, 0.7462, 0.6886, 0.7462, 0.5), C(0.7462, 0.3114, 0.4121, 0.1585, 0, 0.1585),
++  Z
++];
++
++const BLOB_TL_STEPPED = [
++  M(0, 0), L(0.973, 0), L(0.9861, 0.0583), C(0.9952, 0.1093, 1, 0.1621, 1, 0.2162),
++  C(1, 0.2703, 0.9952, 0.3231, 0.9861, 0.3742), L(0.9713, 0.4397), L(0.9401, 0.4397),
++  C(0.7074, 0.4397, 0.516, 0.6418, 0.493, 0.9007), L(0.4907, 0.9532), L(0.4916, 0.9725),
++  L(0.4523, 0.9841), C(0.4076, 0.9945, 0.3614, 1, 0.314, 1),
++  C(0.2193, 1, 0.1291, 0.9781, 0.0471, 0.9384), L(0, 0.9125), Z
++];
++
++const CARD_BOWED_SIDES = [
++  M(0.1049, 0), L(1, 0), L(0.9974, 0.0081), C(0.9912, 0.0328, 0.9878, 0.0598, 0.9878, 0.0882),
++  L(0.9878, 0.9117), C(0.9878, 0.9402, 0.9912, 0.9673, 0.9974, 0.9919), L(1, 1), L(0.1049, 1),
++  C(0.0469, 1, 0, 0.9211, 0, 0.8238), L(0, 0.1762), C(0, 0.0789, 0.0469, 0, 0.1049, 0), Z
++];
++
++const BLOB_TR_STEPPED = [
++  M(0.1309, 0), L(1, 0), L(1, 0.8115), L(0.9747, 0.8383),
++  C(0.8849, 0.9254, 0.769, 0.9831, 0.6407, 0.9968), L(0.5813, 1), L(0.5813, 0.5619),
++  C(0.5813, 0.4654, 0.5071, 0.3872, 0.4155, 0.3872), L(0, 0.3872),
++  C(0, 0.2603, 0.0366, 0.1424, 0.0993, 0.0446), Z
++];
++
++const BLOB_TL_ROUNDED = [
++  M(0, 0), L(0.8673, 0), L(0.8878, 0.026), C(0.9586, 0.1257, 1, 0.2459, 1, 0.3753),
++  C(1, 0.7203, 0.7057, 1, 0.3428, 1), C(0.2293, 1, 0.1226, 0.9727, 0.0295, 0.9246), L(0, 0.9076),
++  Z
++];
++
++const BLOB_BR_ROUNDED = [
++  M(0.6731, 0), C(0.7892, 0, 0.8985, 0.0436, 0.9939, 0.1205), L(1, 0.126), L(1, 1), L(0.0001, 1),
++  L(0, 0.998), C(0, 0.4468, 0.3013, 0, 0.6731, 0), Z
++];
++
++const LENS_WIDE = [
++  M(0.5, 0), C(0.7156, 0, 0.9031, 0.1058, 0.9992, 0.2617), L(1, 0.2631), L(1, 0.7369),
++  L(0.9992, 0.7383), C(0.9031, 0.8942, 0.7156, 1, 0.5, 1),
++  C(0.2845, 1, 0.097, 0.8942, 0.0008, 0.7383), L(0, 0.7368), L(0, 0.2632), L(0.0008, 0.2617),
++  C(0.097, 0.1058, 0.2845, 0, 0.5, 0), Z
++];
++
++const PANEL_DOME_BOTTOM = [
++  M(0, 0), L(1, 0), L(1, 0.7049), L(0.9884, 0.7238), C(0.8786, 0.8912, 0.7007, 1, 0.5, 1),
++  C(0.2993, 1, 0.1215, 0.8912, 0.0117, 0.7238), L(0, 0.7048), Z
++];
++
++const BLOB_TR_SWOOSH = [
++  M(0, 0), L(1, 0), L(1, 0.8419), L(0.9778, 0.8648), C(0.8877, 0.9518, 0.7885, 1, 0.6844, 1),
++  C(0.3852, 1, 0.1267, 0.6019, 0.005, 0.0251), Z
++];
++
++const CARD_ROUND_LEFT_WIDE = [
++  M(0.0497, 0), L(1, 0), L(1, 1), L(0.0497, 1), C(0.0222, 1, 0, 0.9199, 0, 0.8211), L(0, 0.1789),
++  C(0, 0.0801, 0.0222, 0, 0.0497, 0), Z
++];
++
++const SLIVER_LEAF_SMALL = [
++  M(1, 0), L(1, 1), L(0.7577, 0.9387), C(0.2609, 0.797, 0, 0.6503, 0, 0.5),
++  C(0, 0.3497, 0.2609, 0.203, 0.7577, 0.0613), Z
++];
++
++const CARD_ROUND_LEFT_SM = [
++  M(0.1205, 0), L(1, 0), L(1, 1), L(0.1205, 1), C(0.054, 1, 0, 0.9254, 0, 0.8333), L(0, 0.1667),
++  C(0, 0.0746, 0.054, 0, 0.1205, 0), Z
++];
++
++const ARC_OUTLINE_TL = [
++  M(0.0129, 0), L(0.8184, 0), L(0.8288, 0.0094), C(0.9346, 0.1144, 1, 0.2595, 1, 0.4197),
++  C(1, 0.7402, 0.7384, 1, 0.4157, 1), C(0.2543, 1, 0.1082, 0.9351, 0.0025, 0.83), L(0, 0.8274),
++  L(0, 0.0121), L(0.0025, 0.0094), Z
++];
++
++const ARC_OUTLINE_TR = [
++  M(0.9407, 0), L(0.0185, 0), L(0.0035, 0.0162), L(0, 0.0209), L(0, 0.7929), L(0.0025, 0.7961),
++  C(0.1082, 0.9221, 0.2543, 1, 0.4157, 1), C(0.7384, 1, 1, 0.6884, 1, 0.3039),
++  C(1, 0.2078, 0.9837, 0.1163, 0.9541, 0.033), Z
++];
++
++// ---------------------------------------------------------------- slides
++// 1. Title slide — big "Y O G A" wordmark on a rounded diagonal mint panel
++function cover(s) {
++  freeform(s, diagRounded(10.663, 4.304, 0.638, 2.152), 1.335, 1.734, 10.663, 4.304, { fill: MINT });
++  tx(s, 2.298, 2.121, 8.738, 2.895,
++    'Y O G A',
++    { fontFace: PLAYFAIR, fontSize: 166, color: PURPLE, charSpacing: 6, wrap: false, align: 'center' });
++  chrome(s, { start: 1, active: 0 });
++  tx(s, 2.691, 4.83, 2.551, 0.37,
++    'Presentation',
++    { fontFace: OPENSANS, fontSize: 16, color: GRAY, charSpacing: 6, wrap: false });
++  tx(s, 9.224, 4.83, 1.859, 0.37,
++    'Template',
++    { fontFace: OPENSANS, fontSize: 16, color: GRAY, charSpacing: 6, wrap: false, align: 'right' });
++}
++
++// 2. Table of content — six entries in two rows inside a mint rounded card
++function tableOfContent(s) {
++  chrome(s, { start: 1, active: 1 });
++  tx(s, 4.714, 0.687, 3.904, 0.64, 'Table Of Content', { ...TITLE, wrap: false, align: 'center' });
++  shape(s, 'roundRect', 1.891, 3.729, 9.551, 1.904, { fill: MINT });
++  tx(s, 2.492, 4.345, 0.863, 0.286, 'Welcome', LABEL);
++  tx(s, 4.612, 4.31, 0.409, 0.337, '03', TOCNUM);
++  tx(s, 2.492, 4.764, 0.637, 0.286, 'About', LABEL);
++  tx(s, 4.621, 4.728, 0.4, 0.337, '05', TOCNUM);
++  shape(s, 'line', 2.591, 4.648, 2.331, 0, { line: { color: GRAY } });
++  shape(s, 'line', 2.591, 5.067, 2.331, 0, { line: { color: GRAY } });
++  tx(s, 5.402, 4.339, 0.71, 0.286, 'Service', LABEL);
++  tx(s, 7.562, 4.303, 0.368, 0.337, '12', TOCNUM);
++  shape(s, 'line', 5.501, 4.641, 2.331, 0, { line: { color: GRAY } });
++  tx(s, 5.402, 4.756, 0.6, 0.286, 'Team', LABEL);
++  tx(s, 7.557, 4.721, 0.374, 0.337, '19', TOCNUM);
++  shape(s, 'line', 5.501, 5.059, 2.331, 0, { line: { color: GRAY } });
++  tx(s, 8.312, 4.331, 0.821, 0.286, 'Portfolio', LABEL);
++  tx(s, 10.448, 4.296, 0.393, 0.337, '24', TOCNUM);
++  tx(s, 8.312, 4.75, 0.754, 0.286, 'Contact', LABEL);
++  tx(s, 10.444, 4.715, 0.397, 0.337, '29', TOCNUM);
++  shape(s, 'line', 8.411, 4.634, 2.331, 0, { line: { color: GRAY } });
++  shape(s, 'line', 8.411, 5.053, 2.331, 0, { line: { color: GRAY } });
++  tx(s, 0.971, 5.961, 11.392, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    { ...BODY, align: 'center' });
++}
++
++// 3. Welcome message — notched mint blob top-left, copy + highlight card right
++function welcomeMessage(s) {
++  freeform(s, BLOB_TL_NOTCHED, 0, 0, 2.848, 2.834, { fill: MINT });
++  chrome(s, { start: 1, active: 2, dotColor: PURPLE });
++  tx(s, 7.117, 1.042, 4.897, 0.64, 'Welcome Message', TITLE);
++  tx(s, 7.117, 1.837, 5.183, 0.905,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco laboris nisi ut.',
++    BODY);
++  shape(s, 'roundRect', 7.169, 4.34, 4.974, 1.584, { fill: MINT });
++  tx(s, 7.669, 5.004, 4.184, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut',
++    BODY);
++  tx(s, 7.669, 4.634, 1.987, 0.37, 'Your Title Here', SUB);
++  tx(s, 7.117, 2.746, 5.183, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod veniam, quis nostrud exercitation ullamco laboris nisi ut.',
++    BODY);
++  shape(s, 'ellipse', 6.793, 4.879, 0.508, 0.508, { fill: PURPLE });
++}
++
++// 4. Welcome message (wide) — purple blob bottom-right, mint highlight card left
++function welcomeMessageWide(s) {
++  freeform(s, BLOB_BR_NOTCHED, 10.534, 4.701, 2.799, 2.799, { fill: PURPLE });
++  freeform(s, CARD_CLIP_TOPRIGHT, 1.621, 3.404, 3.031, 1.584, { fill: MINT });
++  chrome(s, { start: 4, active: 0, arrowColor: WHITE });
++  tx(s, 1.504, 1.1, 2.726, 1.178, 'Welcome Message', TITLE);
++  tx(s, 4.457, 1.1, 7.373, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderiti voluptate velit esse cillum dolore eu fugiat nulla sunt in culpa qui officia deserunt mollit anim id est laborum.',
++    BODY);
++  shape(s, 'ellipse', 1.367, 3.943, 0.508, 0.508, { fill: GREEN });
++  tx(s, 1.504, 5.604, 2.215, 0.627, 'Lorem ipsum dolor sit amet, consectetur adipiscing', BODY);
++  tx(s, 2.265, 4.068, 2.215, 0.628, 'Lorem ipsum dolor sit\nUt enim ad minim', BULLET);
++  tx(s, 2.265, 3.698, 1.369, 0.37, 'Title Here', SUB);
++}
++
++// 5. About our yoga studio — outlined arc, two stacked mint cards on the right
++function aboutOurStudio(s) {
++  freeform(s, ARC_OUTLINE_TALL, -0.147, -0.087, 7.634, 7.675, { line: { color: GREEN } });
++  freeform(s, CARD_ROUND_LEFT, 7.081, 1.966, 3.433, 1.686, { fill: MINT });
++  freeform(s, CARD_ROUND_LEFT, 7.081, 3.847, 3.433, 1.686, { fill: MINT });
++  chrome(s, { start: 4, active: 1 });
++  tx(s, 1.504, 1.613, 3.715, 1.178, 'About Our Yoga Studio', TITLE);
++  tx(s, 1.504, 3.059, 4.677, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    BODY);
++  button(s, 1.605, 5.403, MINT, 'Learn More');
++  freeform(s, SLIVER_LENS, 10.363, 1.215, 0.746, 5.069, { fill: GREEN });
++  shape(s, 'ellipse', 6.911, 2.633, 0.352, 0.352, { fill: PURPLE });
++  shape(s, 'ellipse', 6.911, 4.517, 0.352, 0.352, { fill: PURPLE });
++  tx(s, 1.504, 4.242, 4.677, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do laboris nisi ut aliquip ex ea commodo consequat.',
++    BODY);
++  tx(s, 7.6, 2.681, 2.4, 0.628, 'Lorem ipsum dolor sit amet\nUt enim minim veniam', BULLET);
++  tx(s, 7.6, 2.311, 1.369, 0.37, 'Title Here', SUB);
++  tx(s, 7.6, 4.562, 2.4, 0.628, 'Lorem ipsum dolor sit amet\nUt enim minim veniam', BULLET);
++  tx(s, 7.6, 4.192, 1.369, 0.37, 'Title Here', SUB);
++}
++
++// 6. History of our yoga studio — mint lens panel right, two green cards left
++function historyOfStudio(s) {
++  freeform(s, PANEL_LENS_LEFT, 6.013, 0, 7.32, 7.5, { fill: MINT });
++  shape(s, 'roundRect', 0.886, 3.879, 5.985, 1.688, { fill: GREEN });
++  shape(s, 'roundRect', 0.886, 1.933, 5.985, 1.688, { fill: GREEN });
++  shape(s, 'ellipse', 0.716, 4.549, 0.352, 0.352, { fill: PURPLE });
++  tx(s, 1.405, 4.594, 2.4, 0.628,
++    'Lorem ipsum dolor sit amet\nUt enim minim veniam',
++    { ...BULLET, color: WHITE });
++  tx(s, 1.405, 4.223, 1.369, 0.37, 'Title Here', { ...SUB, color: WHITE });
++  shape(s, 'ellipse', 0.716, 2.602, 0.352, 0.352, { fill: PURPLE });
++  tx(s, 1.405, 2.647, 2.4, 0.628,
++    'Lorem ipsum dolor sit amet\nUt enim minim veniam',
++    { ...BULLET, color: WHITE });
++  tx(s, 1.405, 2.277, 1.369, 0.37, 'Title Here', { ...SUB, color: WHITE });
++  chrome(s, { start: 4, active: 2, dotColor: PURPLE });
++  tx(s, 7.862, 2.122, 3.715, 1.178, 'History Of Our Yoga Studio', TITLE);
++  tx(s, 7.862, 3.568, 4.466, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation laboris nisi ut aliquip ex ea commodo consequat.',
++    BODY);
++  tx(s, 7.862, 4.751, 4.466, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed laboris nisi ut aliquip ex ea commodo consequat.',
++    BODY);
++}
++
++// 7. Training program — stadium outline left, two flag cards right
++function trainingProgram(s) {
++  freeform(s, CARD_WAVE_LEFT, 8.477, 4.252, 3.629, 1.688, { fill: MINT });
++  freeform(s, CARD_WAVE_LEFT, 8.477, 1.559, 3.629, 1.688, { fill: MINT });
++  chrome(s, { start: 7, active: 0 });
++  freeform(s, STADIUM_OUTLINE, -0.102, 1.834, 5.327, 3.833, { line: { color: GREEN } });
++  tx(s, 1.306, 2.622, 3.011, 2.255, 'Training Program In Our Yoga Studio', TITLE);
++  shape(s, 'ellipse', 5.049, 3.574, 0.352, 0.352, { fill: GREEN });
++  shape(s, 'ellipse', 11.93, 2.227, 0.352, 0.352, { fill: PURPLE });
++  shape(s, 'ellipse', 11.93, 4.92, 0.352, 0.352, { fill: PURPLE });
++  tx(s, 9.209, 2.275, 2.4, 0.628, 'Lorem ipsum dolor sit amet\nUt enim minim veniam', BULLET);
++  tx(s, 9.209, 1.905, 2.162, 0.37, 'Regular Training', SUB);
++  tx(s, 9.209, 4.968, 2.4, 0.628, 'Lorem ipsum dolor sit amet\nUt enim minim veniam', BULLET);
++  tx(s, 9.209, 4.598, 2.085, 0.37, 'Private Training', SUB);
++}
++
++// 8. Regular class training program — purple blob bottom-left, stats card
++function regularClass(s) {
++  freeform(s, BLOB_BL_NOTCHED, 0, 4.465, 3.53, 3.035, { fill: PURPLE });
++  freeform(s, SLIVER_LEAF_RIGHT, 13.162, 3.487, 0.172, 2.61, { fill: GREEN });
++  chrome(s, { start: 7, active: 1, numColor: WHITE });
++  tx(s, 1.684, 1.116, 4.291, 1.178, 'Regular Class Training Program', TITLE);
++  shape(s, 'roundRect', 5.052, 3.798, 7.161, 2, { fill: MINT });
++  tx(s, 6.818, 1.116, 5.546, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elitdo eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi aliquip commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse.',
++    BODY);
++  tx(s, 6.818, 2.294, 5.546, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elitdo eiusmod tempor Duis aute irure dolor in reprehenderit in voluptate velit esse.',
++    BODY);
++  shape(s, 'ellipse', 12.037, 4.616, 0.352, 0.352, { fill: PURPLE });
++  tx(s, 7.31, 4.473, 0.894, 0.64, '12+', { ...TITLE, wrap: false });
++  tx(s, 8.337, 4.525, 3.357, 0.905,
++    'Lorem ipsum dolor sit amet, consectetur\nUt enim ad minim veniam nostrud\nDuis aute irure dolor in reprehenderit',
++    BULLET);
++  tx(s, 8.337, 4.155, 2.236, 0.37, 'Year Of Existence', SUB);
++}
++
++// 9. Private class training program — bowed green banner, mint lens panel right
++function privateClass(s) {
++  freeform(s, CARD_BOWED_RIGHT, 1.425, 2.84, 6.161, 2, { fill: GREEN });
++  freeform(s, PANEL_BITE_LEFT, 9.901, 0, 3.432, 7.5, { fill: MINT });
++  chrome(s, { start: 7, active: 2 });
++  tx(s, 1.504, 1.129, 5.163, 1.178, 'Private Class Training Program', TITLE);
++  tx(s, 1.504, 5.743, 2.4, 0.628, 'Lorem ipsum dolor sit amet\nUt enim minim veniam', BULLET);
++  tx(s, 1.504, 5.373, 1.369, 0.37, 'Title Here', SUB);
++  tx(s, 4.387, 5.743, 2.4, 0.628, 'Lorem ipsum dolor sit amet\nUt enim minim veniam', BULLET);
++  tx(s, 4.387, 5.373, 1.369, 0.37, 'Title Here', SUB);
++  tx(s, 3.793, 3.249, 3.155, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua enim ad minim veniam quis',
++    { ...BODY, color: WHITE });
++  shape(s, 'ellipse', 1.335, 3.662, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 10. Best yoga studio in town — stepped mint blob top-left, stats row
++function bestStudioInTown(s) {
++  freeform(s, BLOB_TL_STEPPED, 0, 0, 2.933, 2.567, { fill: MINT });
++  chrome(s, { start: 10, active: 0, dotColor: PURPLE });
++  tx(s, 7.599, 1.129, 3.981, 1.178, 'Best Yoga Studio In Town', TITLE);
++  tx(s, 7.599, 2.567, 4.689, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    BODY);
++  shape(s, 'roundRect', 5.429, 4.755, 6.785, 1.616, { rectRadius: 0.364, fill: MINT });
++  shape(s, 'ellipse', 5.247, 5.387, 0.352, 0.352, { fill: PURPLE });
++  tx(s, 2.214, 5.433, 2.727, 0.627, 'Lorem ipsum dolor consectetur\nUt enim ad minim veniam', BULLET);
++  tx(s, 2.214, 5.063, 2.236, 0.37, 'Year Of Existence', SUB);
++  tx(s, 5.92, 5.433, 3.357, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur\nUt enim ad minim veniam nostrud',
++    BULLET);
++  tx(s, 5.92, 5.063, 1.987, 0.37, 'Your Title Here', SUB);
++  tx(s, 1.32, 5.117, 0.894, 0.64, '12+', { ...TITLE, wrap: false });
++  shape(s, 'ellipse', 6.248, 2.271, 0.352, 0.352, { fill: GREEN });
++}
++
++// 11. We have the best yoga instructor — mint lens panel left, copy right
++function bestInstructor(s) {
++  freeform(s, PANEL_LENS_RIGHT, 0, 0, 3.828, 7.5, { fill: MINT, flipH: true });
++  chrome(s, { start: 10, active: 1, dotColor: PURPLE });
++  tx(s, 7.772, 1.532, 4.244, 1.178, 'We Have The Best Yoga Instructor', TITLE);
++  tx(s, 7.772, 3.059, 4.677, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    BODY);
++  button(s, 7.873, 5.403, GREEN, 'Learn More');
++  tx(s, 7.772, 4.242, 4.677, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do laboris nisi ut aliquip ex ea commodo consequat.',
++    BODY);
++  shape(s, 'ellipse', 1.304, 3.574, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 12. Our yoga studio services — bowed mint stats card, two mini lists
++function studioServicesStats(s) {
++  chrome(s, { start: 10, active: 2 });
++  tx(s, 1.425, 5.179, 4.194, 1.178, 'Our Yoga Studio Services', TITLE);
++  tx(s, 6.076, 5.179, 6.21, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing sedo eiusmod tempor incididunt labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
++    BODY);
++  freeform(s, CARD_BOWED_SIDES, 1.504, 1.281, 4.922, 2.93, { fill: MINT });
++  tx(s, 1.997, 1.86, 0.905, 0.64, '76k', { ...TITLE, wrap: false });
++  tx(s, 1.997, 2.986, 0.979, 0.64, '91%', { ...TITLE, wrap: false });
++  tx(s, 3.045, 2.86, 2.859, 0.905,
++    'Lorem ipsum dolor sit consectetur\nUt enim minim veniam nostrud\nDuis aute irure dolor reprehender',
++    BULLET);
++  tx(s, 3.045, 1.727, 2.859, 0.905,
++    'Lorem ipsum dolor sit consectetur\nUt enim minim veniam nostrud\nDuis aute irure dolor reprehender',
++    BULLET);
++  tx(s, 10.288, 1.912, 1.998, 0.628, 'Lorem ipsum dolor sit\nUt enim ad minim', BULLET);
++  tx(s, 10.288, 1.541, 1.369, 0.37, 'Title Here', SUB);
++  tx(s, 10.288, 3.323, 1.998, 0.628, 'Lorem ipsum dolor sit\nUt enim ad minim', BULLET);
++  tx(s, 10.288, 2.953, 1.369, 0.37, 'Title Here', SUB);
++}
++
++// 13. Our excellent services — 2x2 service list in a mint rounded card
++function excellentServices(s) {
++  shape(s, 'roundRect', 1.2, 2.877, 5.491, 3.14, { rectRadius: 0.419, fill: MINT });
++  chrome(s, { start: 13, active: 0 });
++  tx(s, 1.425, 1.22, 3.438, 1.178, 'Our Excellent Services', TITLE);
++  tx(s, 1.814, 3.724, 1.998, 0.628, 'Lorem ipsum dolor sit\nUt enim ad minim', BULLET);
++  tx(s, 1.814, 3.354, 1.561, 0.37, 'Service One', SUB);
++  tx(s, 1.814, 4.913, 1.998, 0.628, 'Lorem ipsum dolor sit\nUt enim ad minim', BULLET);
++  tx(s, 1.814, 4.542, 1.773, 0.37, 'Service Three', SUB);
++  tx(s, 4.157, 3.724, 1.998, 0.628, 'Lorem ipsum dolor sit\nUt enim ad minim', BULLET);
++  tx(s, 4.157, 3.354, 1.582, 0.37, 'Service Two', SUB);
++  tx(s, 4.157, 4.913, 1.998, 0.628, 'Lorem ipsum dolor sit\nUt enim ad minim', BULLET);
++  tx(s, 4.157, 4.542, 1.641, 0.37, 'Service Four', SUB);
++  tx(s, 7.609, 5.221, 4.497, 0.905,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunti labore dolore magna aliqua enim ad minim veniam, quis nostrud exercitation',
++    BODY);
++}
++
++// 14. Three service cards — mint / green / purple
++function threeServiceCards(s) {
++  freeform(s, BLOB_TR_STEPPED, 10.014, 0, 3.319, 3.149, { fill: MINT });
++  shape(s, 'roundRect', 4.955, 4.655, 3.422, 1.626, { rectRadius: 0.304, fill: GREEN });
++  shape(s, 'roundRect', 8.521, 4.655, 3.422, 1.626, { rectRadius: 0.304, fill: PURPLE });
++  chrome(s, { start: 13, active: 1 });
++  shape(s, 'roundRect', 1.39, 4.655, 3.422, 1.626, { rectRadius: 0.304, fill: MINT });
++  tx(s, 1.799, 5.343, 2.685, 0.627, 'Lorem ipsum dolor consectetur\nUt enim ad minim veniam', BULLET);
++  tx(s, 1.799, 4.973, 1.561, 0.37, 'Service One', SUB);
++  tx(s, 5.364, 5.343, 2.685, 0.627,
++    'Lorem ipsum dolor consectetur\nUt enim ad minim veniam',
++    { ...BULLET, color: WHITE });
++  tx(s, 5.364, 4.973, 1.582, 0.37, 'Service Two', { ...SUB, color: WHITE });
++  tx(s, 8.93, 5.343, 2.685, 0.627,
++    'Lorem ipsum dolor consectetur\nUt enim ad minim veniam',
++    { ...BULLET, color: WHITE });
++  tx(s, 8.93, 4.973, 1.773, 0.37, 'Service Three', { ...SUB, color: WHITE });
++  shape(s, 'ellipse', 1.214, 2.694, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 15. Four service panel — big mint rounded card bleeding off the right edge
++function fourServicePanel(s) {
++  chrome(s, { start: 13, active: 2 });
++  shape(s, 'ellipse', 1.13, 3.574, 0.352, 0.352, { fill: PURPLE });
++  shape(s, 'roundRect', 4.939, 1.492, 9.054, 4.516, { rectRadius: 0.624, fill: MINT });
++  tx(s, 5.947, 2.661, 2.892, 0.905,
++    'Lorem ipsum dolor sit consectetur\nUt enim ad minim veniam\nDuis aute irure dolor reprehenderi',
++    BULLET);
++  tx(s, 5.947, 2.29, 1.561, 0.37, 'Service One', SUB);
++  tx(s, 5.947, 4.304, 2.892, 0.905,
++    'Lorem ipsum dolor sit consectetur\nUt enim ad minim veniam\nDuis aute irure dolor reprehenderi',
++    BULLET);
++  tx(s, 5.947, 3.934, 1.773, 0.37, 'Service Three', SUB);
++  tx(s, 9.466, 2.661, 2.892, 0.905,
++    'Lorem ipsum dolor sit consectetur\nUt enim ad minim veniam\nDuis aute irure dolor reprehenderi',
++    BULLET);
++  tx(s, 9.466, 2.29, 1.582, 0.37, 'Service Two', SUB);
++  tx(s, 9.466, 4.304, 2.892, 0.905,
++    'Lorem ipsum dolor sit consectetur\nUt enim ad minim veniam\nDuis aute irure dolor reprehenderi',
++    BULLET);
++  tx(s, 9.466, 3.934, 1.641, 0.37, 'Service Four', SUB);
++}
++
++// 16. Services we provide — arc outline, two mint cards right
++function servicesWeProvide(s) {
++  freeform(s, ARC_OUTLINE_TALL, -0.432, -0.087, 7.634, 7.675, { line: { color: GREEN } });
++  chrome(s, { start: 16, active: 0 });
++  tx(s, 1.39, 1.575, 3.438, 1.178, 'Services We Provide', TITLE);
++  shape(s, 'roundRect', 8.425, 1.965, 3.518, 1.626, { rectRadius: 0.304, fill: MINT });
++  tx(s, 8.93, 2.653, 2.685, 0.627, 'Lorem ipsum dolor consectetur\nUt enim ad minim veniam', BULLET);
++  tx(s, 8.93, 2.283, 1.561, 0.37, 'Service One', SUB);
++  shape(s, 'roundRect', 8.425, 3.909, 3.518, 1.626, { rectRadius: 0.304, fill: MINT });
++  tx(s, 8.93, 4.597, 2.685, 0.627, 'Lorem ipsum dolor consectetur\nUt enim ad minim veniam', BULLET);
++  tx(s, 8.93, 4.227, 1.582, 0.37, 'Service Two', SUB);
++  shape(s, 'ellipse', 8.249, 2.602, 0.352, 0.352, { fill: PURPLE });
++  shape(s, 'ellipse', 8.249, 4.546, 0.352, 0.352, { fill: PURPLE });
++  tx(s, 1.39, 3.059, 3.89, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim aminim veniam quis nostrud exercitation ullamco laboris nisi.',
++    BODY);
++  button(s, 1.491, 5.403, MINT, 'Learn More');
++  tx(s, 1.39, 4.242, 3.89, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing nostrud exercitation ullamco laboris nisi.',
++    BODY);
++}
++
++// 17. Our best yoga studio services — big mint circle left, numbered items right
++function bestStudioServices(s) {
++  freeform(s, BLOB_TL_ROUNDED, 0, 0, 6.145, 6.465, { fill: MINT });
++  chrome(s, { start: 16, active: 1 });
++  tx(s, 1.495, 1.571, 2.816, 1.717, 'Our Best Yoga Studio Services', TITLE);
++  tx(s, 1.495, 3.46, 3.175, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua enim minim veniam quis nostrud',
++    BODY);
++  button(s, 1.589, 5.043, GREEN, 'Learn More');
++  tx(s, 6.145, 5.848, 2.868, 0.627,
++    'Lorem ipsum dolor sit consectetur\nUt enim ad minim veniam',
++    BULLET);
++  tx(s, 6.145, 5.477, 1.571, 0.37, 'Service One', SUB);
++  tx(s, 6.145, 4.838, 0.674, 0.64, '01', { ...TITLE, wrap: false });
++  tx(s, 9.592, 5.848, 2.868, 0.627,
++    'Lorem ipsum dolor sit consectetur\nUt enim ad minim veniam',
++    BULLET);
++  tx(s, 9.592, 5.477, 1.594, 0.37, 'Service Two', SUB);
++  tx(s, 9.592, 4.838, 0.726, 0.64, '02', { ...TITLE, wrap: false });
++}
++
++// 18. Break slide — rounded mint blob bottom-right
++function breakSlide(s) {
++  freeform(s, BLOB_BR_ROUNDED, 9.061, 4.624, 4.272, 2.881, { fill: MINT });
++  chrome(s, { start: 16, active: 2 });
++  tx(s, 1.306, 1.598, 2.816, 0.64, 'Break Slide', TITLE);
++  tx(s, 4.694, 1.007, 7.372, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderiti voluptate velit esse cillum dolore eu fugiat nulla officia deserunt mollit anim id est laborum.',
++    BODY);
++  shape(s, 'ellipse', 1.221, 4.401, 0.352, 0.352, { fill: GREEN });
++}
++
++// 19. Meet our instructors — wide mint lens background, purple portrait panel
++function meetOurInstructors(s) {
++  freeform(s, LENS_WIDE, 0, 0.458, 13.333, 6.576, { fill: MINT });
++  chrome(s, { start: 19, active: 0 });
++  tx(s, 1.495, 1.966, 2.816, 1.178, 'Meet Our Instructors', TITLE);
++  tx(s, 1.495, 3.402, 3.12, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua enim minim veniam quis nostrud',
++    BODY);
++  button(s, 1.589, 5.049, GREEN, 'Learn More');
++  shape(s, 'roundRect', 5.674, 1.495, 1.923, 4.509, { rectRadius: 0.505, fill: PURPLE });
++  tx(s, 8.33, 2.409, 3.932, 0.905,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
++    BODY);
++  tx(s, 8.33, 2.039, 2.008, 0.37, 'Bonnie Bohman', SUB);
++  tx(s, 8.33, 4.554, 3.932, 0.905,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
++    BODY);
++  tx(s, 8.33, 4.183, 2.064, 0.37, 'Shannon Wright', SUB);
++  shape(s, 'ellipse', 7.643, 2.5, 0.352, 0.352, { fill: GREEN });
++  shape(s, 'ellipse', 7.643, 4.645, 0.352, 0.352, { fill: GREEN });
++}
++
++// 20. Our yoga instructors — mint dome, purple stadium bar with four names
++function ourYogaInstructors(s) {
++  freeform(s, PANEL_DOME_BOTTOM, 0, 0, 13.333, 5.211, { fill: MINT });
++  shape(s, 'roundRect', 1.083, 4.031, 11.167, 1.181, { rectRadius: 0.59, fill: PURPLE });
++  chrome(s, { start: 19, active: 1 });
++  tx(s, 4.275, 0.687, 4.783, 0.64, 'Our Yoga Instructors', { ...TITLE, wrap: false, align: 'center' });
++  tx(s, 0.971, 1.422, 11.392, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    { ...BODY, align: 'center' });
++  tx(s, 1.296, 5.997, 2.513, 0.627,
++    'Lorem ipsum dolor consectetur adipiscing sed eiusmod',
++    { ...BODY, align: 'center' });
++  tx(s, 1.681, 5.627, 1.743, 0.37, 'Jayne Shriver', { ...SUB, align: 'center' });
++  tx(s, 4.039, 5.997, 2.513, 0.627,
++    'Lorem ipsum dolor consectetur adipiscing sed eiusmod',
++    { ...BODY, align: 'center' });
++  tx(s, 4.523, 5.627, 1.547, 0.37, 'Erica Kreps', { ...SUB, align: 'center' });
++  tx(s, 6.79, 5.997, 2.513, 0.627,
++    'Lorem ipsum dolor consectetur adipiscing sed eiusmod',
++    { ...BODY, align: 'center' });
++  tx(s, 7.229, 5.627, 1.634, 0.37, 'Laura Miller', { ...SUB, align: 'center' });
++  tx(s, 9.527, 5.997, 2.513, 0.627,
++    'Lorem ipsum dolor consectetur adipiscing sed eiusmod',
++    { ...BODY, align: 'center' });
++  tx(s, 9.952, 5.627, 1.664, 0.37, 'Mary Lozada', { ...SUB, align: 'center' });
++  shape(s, 'ellipse', 10.618, 4.942, 0.352, 0.352, { fill: GREEN });
++  shape(s, 'ellipse', 7.861, 4.942, 0.352, 0.352, { fill: GREEN });
++  shape(s, 'ellipse', 5.12, 4.942, 0.352, 0.352, { fill: GREEN });
++  shape(s, 'ellipse', 2.376, 4.942, 0.352, 0.352, { fill: GREEN });
++}
++
++// 21. Our best yoga trainer — mint swoosh, two green name cards
++function bestYogaTrainer(s) {
++  shape(s, 'roundRect', 1.362, 3.002, 5.898, 1.638, { rectRadius: 0.293, fill: GREEN });
++  freeform(s, BLOB_TR_SWOOSH, 4.609, 0, 8.724, 3.821, { fill: MINT });
++  chrome(s, { start: 19, active: 2 });
++  tx(s, 1.425, 1.007, 3.505, 1.178, 'Our Best Yoga Trainer', TITLE);
++  tx(s, 1.425, 5.588, 10.484, 0.905,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla sunt in culpa qui officia deserunt mollit anim id est laborum.',
++    BODY);
++  freeform(s, CARD_ROUND_LEFT_WIDE, 7.435, 3.002, 5.898, 1.638, { fill: GREEN });
++  tx(s, 9.896, 1.467, 2.013, 0.628, 'Lorem ipsum dolor sit\nUt enim ad minim', BULLET);
++  tx(s, 9.896, 1.097, 1.369, 0.37, 'Title Here', SUB);
++  tx(s, 7.493, 1.467, 2.013, 0.628, 'Lorem ipsum dolor sit\nUt enim ad minim', BULLET);
++  tx(s, 7.493, 1.097, 1.369, 0.37, 'Title Here', SUB);
++  tx(s, 4.458, 3.693, 2.458, 0.627,
++    'Lorem ipsum dolor consectetur adipiscing sed eiusmod',
++    { ...BODY, color: WHITE });
++  tx(s, 4.458, 3.322, 1.978, 0.37, 'Sandra Howard', { ...SUB, color: WHITE });
++  tx(s, 10.535, 3.693, 2.458, 0.627,
++    'Lorem ipsum dolor consectetur adipiscing sed eiusmod',
++    { ...BODY, color: WHITE });
++  tx(s, 10.535, 3.322, 1.948, 0.37, 'Natasha Powell', { ...SUB, color: WHITE });
++  shape(s, 'ellipse', 3.869, 3.645, 0.352, 0.352, { fill: PURPLE });
++  shape(s, 'ellipse', 9.942, 3.645, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 22. Shannon Wright — mint lens panel left, two dot-rating rows
++function shannonWright(s) {
++  freeform(s, PANEL_LENS_RIGHT, 0, 0, 3.828, 7.5, { fill: MINT, flipH: true });
++  chrome(s, { start: 22, active: 0 });
++  tx(s, 8.137, 1.588, 3.84, 0.64, 'Shannon Wright', { ...TITLE, wrap: false });
++  shape(s, 'ellipse', 8.239, 4.766, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 8.61, 4.766, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 8.981, 4.766, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 9.352, 4.766, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 9.722, 4.766, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 10.093, 4.766, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 10.463, 4.766, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 10.834, 4.766, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 11.207, 4.766, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 11.579, 4.766, 0.267, 0.267, { fill: MINT });
++  tx(s, 11.37, 4.392, 0.581, 0.337, '90%', TOCNUM);
++  tx(s, 8.137, 4.392, 1.568, 0.337, 'Your Title Here', { ...TOCNUM, align: 'left' });
++  shape(s, 'ellipse', 8.239, 5.685, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 8.61, 5.685, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 8.981, 5.685, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 9.352, 5.685, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 9.722, 5.685, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 10.093, 5.685, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 10.463, 5.685, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 10.834, 5.685, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 11.207, 5.685, 0.267, 0.267, { fill: MINT });
++  shape(s, 'ellipse', 11.579, 5.685, 0.267, 0.267, { fill: MINT });
++  tx(s, 11.369, 5.312, 0.582, 0.337, '80%', TOCNUM);
++  tx(s, 8.137, 5.312, 1.568, 0.337, 'Your Title Here', { ...TOCNUM, align: 'left' });
++  tx(s, 8.138, 2.532, 3.839, 1.461,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Utenimad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    BODY);
++  freeform(s, SLIVER_LEAF_SMALL, 13.113, 1.86, 0.221, 3.78, { fill: PURPLE });
++  shape(s, 'ellipse', 1.18, 3.574, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 23. Jayne Shriver — dot ratings in a mint card, green bullet bar
++function jayneShriver(s) {
++  shape(s, 'roundRect', 1.306, 1.073, 8.73, 1.397, { rectRadius: 0.347, fill: MINT });
++  chrome(s, { start: 22, active: 1 });
++  tx(s, 1.463, 3.09, 3.102, 0.64, 'Jayne Shriver', { ...TITLE, wrap: false });
++  tx(s, 1.463, 3.966, 5.891, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
++    BODY);
++  shape(s, 'roundRect', -0.536, 5.289, 7.821, 1.139, { rectRadius: 0.266, fill: GREEN });
++  tx(s, 0.395, 5.547, 2.396, 0.627,
++    'Lorem ipsum dolor sit amet\nUt enim minim veniam',
++    { ...BULLET, color: WHITE });
++  tx(s, 2.974, 5.547, 2.396, 0.627,
++    'Lorem ipsum dolor sit amet\nUt enim minim veniam',
++    { ...BULLET, color: WHITE });
++  shape(s, 'ellipse', 1.816, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 2.187, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 2.557, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 2.928, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 3.299, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 3.669, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 4.04, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 4.41, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 4.783, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 5.156, 1.825, 0.267, 0.267, { fill: PURPLE });
++  tx(s, 4.947, 1.451, 0.581, 0.337, '90%', TOCNUM);
++  tx(s, 1.714, 1.451, 1.568, 0.337, 'Your Title Here', { ...TOCNUM, align: 'left' });
++  shape(s, 'ellipse', 5.917, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 6.288, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 6.659, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 7.029, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 7.4, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 7.771, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 8.141, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 8.512, 1.825, 0.267, 0.267, { fill: GREEN });
++  shape(s, 'ellipse', 8.884, 1.825, 0.267, 0.267, { fill: PURPLE });
++  shape(s, 'ellipse', 9.257, 1.825, 0.267, 0.267, { fill: PURPLE });
++  tx(s, 9.046, 1.451, 0.582, 0.337, '80%', TOCNUM);
++  tx(s, 5.815, 1.451, 1.568, 0.337, 'Your Title Here', { ...TOCNUM, align: 'left' });
++  shape(s, 'ellipse', 7.05, 5.696, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 24. Our yoga studio gallery — green highlight card and stat rows
++function studioGallery(s) {
++  shape(s, 'roundRect', 1.562, 2.866, 6.518, 1.695, { fill: GREEN });
++  freeform(s, CARD_ROUND_LEFT_SM, 9.353, 3.544, 3.981, 2.879, { fill: MINT });
++  chrome(s, { start: 22, active: 2 });
++  tx(s, 1.425, 1.007, 3.916, 1.178, 'Our Yoga Studio Gallery', TITLE);
++  tx(s, 5.99, 1.007, 5.919, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse nulla pariatur.',
++    BODY);
++  tx(s, 1.425, 4.979, 0.905, 0.64, '76k', { ...TITLE, wrap: false });
++  tx(s, 2.473, 4.985, 2.859, 0.627,
++    'Lorem ipsum dolor sit consectetur\nUt enim minim veniam nostrud',
++    BULLET);
++  tx(s, 1.425, 5.829, 0.979, 0.64, '91%', { ...TITLE, wrap: false });
++  tx(s, 2.473, 5.835, 2.859, 0.627,
++    'Lorem ipsum dolor sit consectetur\nUt enim minim veniam nostrud',
++    BULLET);
++  tx(s, 2.086, 3.622, 3.436, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur\nUt enim ad minim veniam, nostrud',
++    { ...BULLET, color: WHITE });
++  tx(s, 2.086, 3.251, 1.987, 0.37, 'Your Title Here', { ...SUB, color: WHITE });
++  shape(s, 'ellipse', 1.385, 3.538, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 25. Our great studio gallery — outlined blob, two stat rows
++function greatStudioGallery(s) {
++  freeform(s, ARC_OUTLINE_TL, -0.101, -0.101, 5.435, 5.473, { line: { color: GREEN } });
++  chrome(s, { start: 25, active: 0 });
++  tx(s, 1.425, 1.337, 2.778, 1.717, 'Our Great Studio Gallery', TITLE);
++  tx(s, 7.453, 4.291, 0.894, 0.64, '12+', { ...TITLE, color: GREEN, wrap: false });
++  tx(s, 8.481, 4.483, 3.939, 0.627,
++    'Lorem ipsum dolor amet, consectetur adipiscing\nUt enim ad minim veniam nostrud',
++    BULLET);
++  tx(s, 8.481, 4.113, 2.236, 0.37, 'Year Of Existence', SUB);
++  tx(s, 7.453, 5.678, 0.979, 0.64, '91%', { ...TITLE, color: GREEN, wrap: false });
++  tx(s, 8.481, 5.869, 3.939, 0.627,
++    'Lorem ipsum dolor amet, consectetur adipiscing\nUt enim ad minim veniam nostrud',
++    BULLET);
++  tx(s, 8.481, 5.499, 2.125, 0.37, 'Happy Customer', SUB);
++  shape(s, 'ellipse', 6.49, 5.128, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 26. Our best yoga studio — mint rounded card with CTA button
++function bestYogaStudioCard(s) {
++  shape(s, 'roundRect', 6.942, 1.17, 5.058, 5.159, { rectRadius: 0.365, fill: MINT });
++  chrome(s, { start: 25, active: 1 });
++  tx(s, 7.962, 1.966, 2.983, 1.178, 'Our Best Yoga Studio', TITLE);
++  tx(s, 7.962, 3.402, 3.12, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua enim minim veniam quis nostrud',
++    BODY);
++  button(s, 8.055, 5.049, GREEN, 'Learn More');
++  freeform(s, ARC_OUTLINE_TR, 10.243, -0.101, 3.192, 2.679, { line: { color: GREEN }, flipH: true });
++  shape(s, 'ellipse', 6.76, 2.402, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 27. Our excellent portfolio — wide mint header card, two stat rows
++function excellentPortfolio(s) {
++  shape(s, 'roundRect', 1.205, 1.007, 10.923, 2.196, { fill: MINT });
++  chrome(s, { start: 25, active: 2 });
++  tx(s, 2.083, 1.516, 3.604, 1.178, 'Our Excellent Portfolio', TITLE);
++  tx(s, 6.025, 1.516, 5.361, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi aliquip commodo aute irure dolor in reprehenderit in voluptate velit esse.',
++    BODY);
++  tx(s, 8.367, 5.678, 0.979, 0.64, '91%', { ...TITLE, color: GREEN, wrap: false });
++  tx(s, 9.5, 5.869, 2.734, 0.627, 'Lorem ipsum dolor consectetur\nUt enim ad minim veniam', BULLET);
++  tx(s, 9.5, 5.499, 2.125, 0.37, 'Happy Customer', SUB);
++  tx(s, 8.367, 4.291, 0.894, 0.64, '12+', { ...TITLE, color: GREEN, wrap: false });
++  tx(s, 9.5, 4.483, 2.734, 0.627, 'Lorem ipsum dolor consectetur\nUt enim ad minim veniam', BULLET);
++  tx(s, 9.5, 4.113, 2.236, 0.37, 'Year Of Existence', SUB);
++  shape(s, 'ellipse', 7.422, 4.759, 0.352, 0.352, { fill: PURPLE });
++}
++
++// 28. Pricing table — three package cards with price bubbles
++function pricingTable(s) {
++  chrome(s, { start: 28, active: 0, numColor: DGRAY, ruleColor: GRAY });
++  tx(s, 4.865, 0.687, 3.604, 0.64, 'Pricing Table', { ...TITLE, align: 'center' });
++  tx(s, 1.224, 1.422, 10.885, 0.627,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    { ...BODY, align: 'center' });
++  shape(s, 'roundRect', 1.486, 2.552, 3.331, 3.836, { fill: MINT });
++  shape(s, 'roundRect', 5.001, 2.552, 3.331, 3.836, { fill: MINT });
++  shape(s, 'roundRect', 8.516, 2.552, 3.331, 3.836, { fill: MINT });
++  shape(s, 'ellipse', 5.954, 2.993, 1.426, 1.426, { fill: PURPLE });
++  shape(s, 'ellipse', 2.439, 2.993, 1.426, 1.426, { fill: PURPLE });
++  shape(s, 'ellipse', 9.469, 2.993, 1.426, 1.426, { fill: PURPLE });
++  button(s, 9.408, 6.146, GREEN, 'Learn More');
++  button(s, 5.893, 6.146, GREEN, 'Learn More');
++  button(s, 2.378, 6.146, GREEN, 'Learn More');
++  tx(s, 1.895, 5.154, 2.513, 0.627,
++    'Lorem ipsum dolor consectetur adipiscing sed eiusmod',
++    { ...BODY, align: 'center' });
++  tx(s, 2.32, 4.783, 1.664, 0.37, 'Package One', { ...SUB, align: 'center' });
++  tx(s, 5.41, 5.154, 2.513, 0.627,
++    'Lorem ipsum dolor consectetur adipiscing sed eiusmod',
++    { ...BODY, align: 'center' });
++  tx(s, 5.823, 4.783, 1.687, 0.37, 'Package Two', { ...SUB, align: 'center' });
++  tx(s, 8.925, 5.154, 2.513, 0.627,
++    'Lorem ipsum dolor consectetur adipiscing sed eiusmod',
++    { ...BODY, align: 'center' });
++  tx(s, 9.242, 4.783, 1.88, 0.37, 'Package Three', { ...SUB, align: 'center' });
++  tx(s, 2.687, 3.386, 0.929, 0.64, '$10', { ...TITLE, color: WHITE, wrap: false, align: 'center' });
++  tx(s, 6.176, 3.386, 0.982, 0.64, '$20', { ...TITLE, color: WHITE, wrap: false, align: 'center' });
++  tx(s, 9.697, 3.386, 0.97, 0.64, '$30', { ...TITLE, color: WHITE, wrap: false, align: 'center' });
++}
++
++// 29. Contact information — circle outline left, two flag cards right
++function contactInformation(s) {
++  shape(s, 'ellipse', 0.823, 0.817, 5.867, 5.867, { line: { color: GREEN } });
++  chrome(s, { start: 28, active: 1, numColor: DGRAY, ruleColor: GRAY });
++  tx(s, 1.954, 1.966, 3.604, 1.178, 'Contact Information', { ...TITLE, align: 'center' });
++  tx(s, 2.196, 3.402, 3.12, 1.183,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua enim minim veniam quis nostrud',
++    { ...BODY, align: 'center' });
++  button(s, 2.983, 5.049, GREEN, 'Learn More');
++  freeform(s, CARD_WAVE_LEFT, 8.477, 4.252, 3.629, 1.688, { fill: MINT });
++  freeform(s, CARD_WAVE_LEFT, 8.477, 1.559, 3.629, 1.688, { fill: MINT });
++  shape(s, 'ellipse', 11.93, 2.227, 0.352, 0.352, { fill: PURPLE });
++  shape(s, 'ellipse', 11.93, 4.92, 0.352, 0.352, { fill: PURPLE });
++  tx(s, 9.209, 2.275, 2.4, 0.628, 'Lorem ipsum dolor sit amet\nUt enim minim veniam', BULLET);
++  tx(s, 9.209, 1.905, 1.901, 0.37, 'Phone Number', SUB);
++  tx(s, 9.209, 4.968, 2.4, 0.628, 'Lorem ipsum dolor sit amet\nUt enim minim veniam', BULLET);
++  tx(s, 9.209, 4.598, 1.85, 0.37, 'Email Address', SUB);
++}
++
++// 30. Thank you — closing wordmark on a rounded diagonal mint panel
++function thankYou(s) {
++  freeform(s, diagRounded(10.045, 3.557, 0.527, 1.778), 1.644, 2.111, 10.045, 3.557, { fill: MINT });
++  tx(s, 2.621, 2.643, 8.091, 2.036,
++    'Thank You',
++    { fontFace: PLAYFAIR, fontSize: 115, color: PURPLE, wrap: false, align: 'center' });
++  tx(s, 2.691, 4.52, 1.909, 0.337,
++    'For Watching',
++    { fontFace: OPENSANS, fontSize: 14, color: GRAY, charSpacing: 3, wrap: false });
++  tx(s, 8.134, 4.52, 2.509, 0.337,
++    'This Presentation',
++    { fontFace: OPENSANS, fontSize: 14, color: GRAY, charSpacing: 3, wrap: false, align: 'right' });
++  chrome(s, { start: 28, active: 2, numColor: DGRAY, ruleColor: GRAY });
++}
++
++
++// ---------------------------------------------------------------- assemble
++const SLIDES = [
++  cover,
++  tableOfContent,
++  welcomeMessage,
++  welcomeMessageWide,
++  aboutOurStudio,
++  historyOfStudio,
++  trainingProgram,
++  regularClass,
++  privateClass,
++  bestStudioInTown,
++  bestInstructor,
++  studioServicesStats,
++  excellentServices,
++  threeServiceCards,
++  fourServicePanel,
++  servicesWeProvide,
++  bestStudioServices,
++  breakSlide,
++  meetOurInstructors,
++  ourYogaInstructors,
++  bestYogaTrainer,
++  shannonWright,
++  jayneShriver,
++  studioGallery,
++  greatStudioGallery,
++  bestYogaStudioCard,
++  excellentPortfolio,
++  pricingTable,
++  contactInformation,
++  thankYou
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.layout = 'LAYOUT_WIDE';           // 13.333in x 7.5in
++  pptx.author = 'Yoga Studio';
++  pptx.title = 'Yoga Studio Presentation';
++  for (const make of SLIDES) make(pptx.addSlide());
++  return pptx;
++}
++
++const outFile = path.join(__dirname, path.basename(__filename, '.js') + '.pptx');
++build().writeFile({ fileName: outFile }).then(() => console.log('wrote ' + outFile));

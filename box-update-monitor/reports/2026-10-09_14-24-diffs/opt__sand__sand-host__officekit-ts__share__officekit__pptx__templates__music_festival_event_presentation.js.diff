@@ -1,0 +1,1426 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/music_festival_event_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/music_festival_event_presentation.js
+@@ -0,0 +1,1423 @@
++/*
++ * FES.MUSIC - Music Event Presentation
++ * Recreated with PptxGenJS. Slide size 20 x 11.25 in (16:9).
++ *
++ * Raster images in the source deck are replaced by programmatic placeholders:
++ *   photo()  - flat grey rectangle standing in for a photograph
++ *   icon()   - small vector pictogram drawn from native shapes / glyphs
++ */
++'use strict';
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette
++const C = {
++  ink: '0B091C', ink2: '0E091E', night: '1F0C2A', plum: '911F7B', plum2: '8F1F7A',
++  wine: '811C70', violet: '5815A0', lime: 'A0EE62', white: 'FFFFFF', paper: 'F2F2F2',
++  red: 'FF0101', grey: 'A5A5A5'
++};
++
++// ---------------------------------------------------------------- text styles
++const S = {
++  body:    { fontFace: 'Roboto', fontSize: 18, color: C.paper, lineSpacingMultiple: 1.5 },
++  bodyW:   { fontFace: 'Roboto', fontSize: 18, color: C.white, lineSpacingMultiple: 1.5 },
++  label:   { fontFace: 'Roboto', fontSize: 18, color: C.paper, bold: true, lineSpacingMultiple: 1.5 },
++  labelW:  { fontFace: 'Roboto', fontSize: 18, color: C.white, bold: true },
++  body20:  { fontFace: 'Roboto', fontSize: 20, color: C.white, lineSpacingMultiple: 1.5 },
++  lead20:  { fontFace: 'Roboto', fontSize: 20, color: C.white, bold: true },
++  small:   { fontFace: 'Roboto', fontSize: 16, color: C.paper, bold: true },
++  smallW:  { fontFace: 'Roboto', fontSize: 16, color: C.white, bold: true },
++  tiny:    { fontFace: 'Roboto', fontSize: 14, color: C.white, bold: true },
++  eyebrow: { fontFace: 'Oswald SemiBold', fontSize: 20, color: C.paper, bold: true },
++  h1:      { fontFace: 'Russo One', fontSize: 36, color: C.white },
++  logo:    { fontFace: 'Russo One', fontSize: 16, color: C.white },
++  hero:    { fontFace: 'Russo One', fontSize: 138, color: C.white },
++  hero2:   { fontFace: 'Russo One', fontSize: 150, color: C.white },
++  sub:     { fontFace: 'Figtree ExtraBold', fontSize: 20, color: C.white, bold: true, lineSpacingMultiple: 1.5 },
++  name:    { fontFace: 'Figtree ExtraBold', fontSize: 20, color: C.white },
++  stat:    { fontFace: 'Figtree ExtraBold', fontSize: 32, color: C.lime, bold: true },
++  stat24:  { fontFace: 'Figtree ExtraBold', fontSize: 24, color: C.lime, bold: true },
++  btn:     { fontFace: 'Montserrat', fontSize: 16, color: C.white, bold: true }
++};
++
++// ---------------------------------------------------------------- primitives
++function t(s, text, x, y, w, h, style, extra) {
++  s.addText(text, Object.assign({ x: x, y: y, w: w, h: h, valign: 'top', isTextBox: true,
++    margin: [3.6, 7.2, 3.6, 7.2] }, style || {}, extra || {}));
++}
++
++/* Shorthand: shape at (x,y,w,h) with a solid colour (or null for no fill). */
++function sh(s, kind, x, y, w, h, fill, extra) {
++  s.addShape(kind, Object.assign({ x: x, y: y, w: w, h: h,
++    fill: fill ? (typeof fill === 'string' ? { color: fill } : fill) : { type: 'none' } }, extra || {}));
++}
++
++/* Outline descriptor. */
++function ln(color, width) { return { color: color, width: width }; }
++
++/* Flat grey stand-in for a photograph. */
++function photo(s, x, y, w, h, tone, extra) {
++  sh(s, 'rect', x, y, w, h, tone || 'BFBFBF', extra);
++}
++
++// ---------------------------------------------------------------- gradients
++// PptxGenJS cannot emit gradient fills, so every gradient is painted as a
++// stack of solid colour bands clipped to the shape outline.
++function mix(a, b, u) {
++  let o = '';
++  for (let i = 0; i < 6; i += 2) {
++    const va = parseInt(a.substr(i, 2), 16), vb = parseInt(b.substr(i, 2), 16);
++    o += Math.round(va + (vb - va) * u).toString(16).padStart(2, '0');
++  }
++  return o.toUpperCase();
++}
++
++/* Colour + transparency of a [pos, hex, alpha?] stop list at position u (0..1). */
++function stopAt(stops, u) {
++  let i = 0;
++  while (i < stops.length - 2 && u > stops[i + 1][0]) i++;
++  const a = stops[i], b = stops[i + 1], span = b[0] - a[0];
++  const k = span <= 0 ? 0 : Math.min(1, Math.max(0, (u - a[0]) / span));
++  const tr = (a[2] || 0) + ((b[2] || 0) - (a[2] || 0)) * k;
++  const f = { color: mix(a[1], b[1], k) };
++  if (tr > 0.5) f.transparency = Math.round(tr);
++  return f;
++}
++
++const BANDS = 40;
++
++/* Axis-aligned rectangle filled with a linear gradient ('v' top->bottom, 'h' left->right). */
++function gradRect(s, x, y, w, h, stops, dir) {
++  for (let i = 0; i < BANDS; i++) {
++    const f = stopAt(stops, (i + 0.5) / BANDS);
++    if (dir === 'h') s.addShape('rect', { x: x + w * i / BANDS, y: y, w: w / BANDS + 0.02, h: h, fill: f });
++    else s.addShape('rect', { x: x, y: y + h * i / BANDS, w: w, h: h / BANDS + 0.02, fill: f });
++  }
++}
++
++// --- outlines used when a gradient has to follow a non-rectangular shape ---
++/* Rectangle with the given corners snipped: cuts = [topLeft, topRight, botRight, botLeft]. */
++function snipPts(w, h, cuts) {
++  const c = cuts, p = [];
++  p.push([c[0], 0], [w - c[1], 0], [w, c[1]], [w, h - c[2]], [w - c[2], h], [c[3], h], [0, h - c[3]], [0, c[0]]);
++  return p.filter(function (q, i, a) { return i === 0 || q[0] !== a[i - 1][0] || q[1] !== a[i - 1][1]; });
++}
++
++/* Stadium / rounded rectangle outline sampled as a polygon. */
++function roundPts(w, h, r) {
++  const p = [], seg = 8;
++  const cs = [[w - r, r, -90], [w - r, h - r, 0], [r, h - r, 90], [r, r, 180]];
++  cs.forEach(function (c) {
++    for (let i = 0; i <= seg; i++) {
++      const a = (c[2] + 90 * i / seg) * Math.PI / 180;
++      p.push([c[0] + r * Math.cos(a), c[1] + r * Math.sin(a)]);
++    }
++  });
++  return p;
++}
++
++function rotatePts(pts, w, h, deg) {
++  if (!deg) return pts;
++  const a = deg * Math.PI / 180, co = Math.cos(a), si = Math.sin(a), cx = w / 2, cy = h / 2;
++  return pts.map(function (p) {
++    const dx = p[0] - cx, dy = p[1] - cy;
++    return [cx + dx * co - dy * si, cy + dx * si + dy * co];
++  });
++}
++
++/* Sutherland-Hodgman clip of a polygon against one half-plane of an axis. */
++function clipHalf(poly, axis, limit, keepBelow) {
++  const out = [];
++  const inside = function (p) { return keepBelow ? p[axis] <= limit : p[axis] >= limit; };
++  for (let i = 0; i < poly.length; i++) {
++    const a = poly[i], b = poly[(i + 1) % poly.length];
++    const ia = inside(a), ib = inside(b);
++    if (ia) out.push(a);
++    if (ia !== ib) {
++      const t = (limit - a[axis]) / (b[axis] - a[axis]);
++      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
++    }
++  }
++  return out;
++}
++
++/* Fill an arbitrary polygon with a linear gradient by slicing it into bands. */
++function gradPoly(s, x, y, w, h, poly, stops, dir, extra) {
++  const axis = dir === 'h' ? 0 : 1, span = dir === 'h' ? w : h;
++  const lo = Math.min.apply(null, poly.map(function (p) { return p[axis]; }));
++  const hi = Math.max.apply(null, poly.map(function (p) { return p[axis]; }));
++  for (let i = 0; i < BANDS; i++) {
++    const a = lo + (hi - lo) * i / BANDS, b = lo + (hi - lo) * (i + 1) / BANDS;
++    let band = clipHalf(poly, axis, a - 0.004, false);
++    if (band.length) band = clipHalf(band, axis, b + 0.004, true);
++    if (band.length < 3) continue;
++    const bx = Math.min.apply(null, band.map(function (p) { return p[0]; }));
++    const by = Math.min.apply(null, band.map(function (p) { return p[1]; }));
++    const bw = Math.max.apply(null, band.map(function (p) { return p[0]; })) - bx;
++    const bh = Math.max.apply(null, band.map(function (p) { return p[1]; })) - by;
++    const pts = band.map(function (p) { return { x: +(p[0] - bx).toFixed(3), y: +(p[1] - by).toFixed(3) }; });
++    pts.push({ close: true });
++    s.addShape('custGeom', { x: +(x + bx).toFixed(3), y: +(y + by).toFixed(3),
++      w: Math.max(bw, 0.004), h: Math.max(bh, 0.004), points: pts,
++      fill: stopAt(stops, (i + 0.5) / BANDS) });
++  }
++  if (extra && extra.line) {
++    s.addShape('custGeom', { x: x, y: y, w: w, h: h,
++      points: poly.map(function (p) { return { x: +p[0].toFixed(3), y: +p[1].toFixed(3) }; }).concat([{ close: true }]),
++      fill: { type: 'none' }, line: extra.line });
++  }
++}
++
++// ---------------------------------------------------------------- decorations
++/* The recurring 4-column equaliser block, repeated three times. */
++const EQ_HEIGHTS = [5, 7, 3, 6];
++const EQ_TONES = [
++  ['000000', '000000', C.lime, '000000'],
++  [C.white, '000000', C.lime, '000000'],
++  ['000000', C.white, '000000', C.lime]
++];
++function eqStrip(s, x, yBottom, pitchX, pitchY, bw, bh) {
++  EQ_TONES.forEach(function (tones, blk) {
++    tones.forEach(function (tone, col) {
++      const cx = x + (blk * 8 + col) * pitchX;
++      for (let r = 0; r < EQ_HEIGHTS[col]; r++) {
++        s.addShape('rect', { x: cx, y: yBottom - bh - r * pitchY, w: bw, h: bh, fill: { color: tone } });
++      }
++    });
++  });
++}
++
++/* Compact equaliser pictogram (4 columns of stacked blocks). */
++function eqBlock(s, x, y, w, h, color, extra) {
++  const heights = [5, 7, 3, 6], cw = w / 4.9, gap = w / 4, bh = h / 8.6, rows = 7;
++  for (let c = 0; c < 4; c++) {
++    for (let r = 0; r < heights[c]; r++) {
++      s.addShape('rect', Object.assign({ x: x + c * gap, y: y + h - (r + 1) * h / rows, w: cw, h: bh,
++        fill: { color: color } }, extra || {}));
++    }
++  }
++}
++
++/* Audio waveform: symmetric vertical bars of varying height. */
++const WAVE = [.30, .55, .40, .80, .35, .95, .50, .70, .28, .60, .85, .45, .34, .72, .52, .90, .38, .62, .30, .48];
++function waveform(s, x, y, w, h, color, extra) {
++  const step = w / WAVE.length, bw = Math.max(0.012, step * 0.34);
++  WAVE.forEach(function (f, i) {
++    s.addShape('rect', Object.assign({ x: x + i * step + (step - bw) / 2, y: y + h * (1 - f) / 2,
++      w: bw, h: h * f, fill: { color: color } }, extra || {}));
++  });
++}
++
++/* Faint music-staff artwork used as a corner decoration. */
++function staff(s, x, y, w, h, color, extra) {
++  const o = extra || {};
++  for (let i = 0; i < 5; i++) {
++    s.addShape('rect', Object.assign({ x: x + w * 0.05, y: y + h * (0.34 + i * 0.075), w: w * 0.9,
++      h: h * 0.012, fill: { color: color }, rotate: 352 }, o));
++  }
++  s.addText('\u266B', Object.assign({ x: x + w * 0.12, y: y + h * 0.18, w: w * 0.35, h: h * 0.4,
++    fontFace: 'DejaVu Sans', fontSize: Math.round(h * 34), color: color, align: 'center', valign: 'middle' }, o));
++  s.addText('\u266A', Object.assign({ x: x + w * 0.48, y: y + h * 0.26, w: w * 0.3, h: h * 0.34,
++    fontFace: 'DejaVu Sans', fontSize: Math.round(h * 26), color: color, align: 'center', valign: 'middle' }, o));
++}
++
++/* Pinwheel petal: rounded square with the given quadrant bitten out.
++   quad 0 = top-left, 1 = top-right, 2 = bottom-right, 3 = bottom-left. */
++function petal(s, x, y, w, h, quad, color) {
++  const r = Math.min(w, h) * 0.24, m = w / 2;
++  sh(s, 'roundRect', x, y, w, h, color, { rectRadius: r });
++  sh(s, 'roundRect', x + (quad === 1 || quad === 2 ? m : 0), y + (quad >= 2 ? m : 0),
++     m, h / 2, color, { rectRadius: r * 0.9 });
++}
++
++/* Thin diagonal cross connecting the pinwheel petals. */
++function crossLines(s, x, y, w, h, color) {
++  s.addShape('line', { x: x, y: y, w: w, h: h, line: ln(color, 0.75) });
++  s.addShape('line', { x: x, y: y + h, w: w, h: -h, line: ln(color, 0.75) });
++}
++
++// ---------------------------------------------------------------- icons
++/* Filled polygon given as fractions of the box. */
++function poly(s, x, y, w, h, pts, opts) {
++  s.addShape('custGeom', Object.assign({ x: x, y: y, w: w, h: h,
++    points: pts.map(function (q) { return { x: +(q[0] * w).toFixed(3), y: +(q[1] * h).toFixed(3) }; })
++      .concat([{ close: true }]) }, opts));
++}
++
++function glyph(s, ch, x, y, w, h, color, size, extra) {
++  s.addText(ch, Object.assign({ x: x, y: y, w: w, h: h, fontFace: 'DejaVu Sans', fontSize: size,
++    color: color, align: 'center', valign: 'middle', margin: 0 }, extra || {}));
++}
++
++/* Small pictograms standing in for the deck's icon images. */
++function icon(s, kind, x, y, w, h, color, extra) {
++  const o = extra || {}, cx = x + w / 2, cy = y + h / 2, pt = Math.round(Math.min(w, h) * 62);
++  const F = Object.assign({ fill: { color: color } }, o);
++  switch (kind) {
++    case 'play':
++      s.addShape('triangle', Object.assign({ x: x + w * 0.2, y: y + h * 0.18, w: w * 0.64, h: h * 0.64,
++        rotate: 90 }, F)); break;
++    case 'pause':
++      s.addShape('rect', Object.assign({ x: x + w * 0.28, y: y + h * 0.22, w: w * 0.14, h: h * 0.56 }, F));
++      s.addShape('rect', Object.assign({ x: x + w * 0.58, y: y + h * 0.22, w: w * 0.14, h: h * 0.56 }, F));
++      break;
++    case 'next': case 'prev': {
++      const rot = kind === 'prev' ? 270 : 90;
++      const bar = kind === 'prev' ? x : x + w * 0.88;
++      s.addShape('triangle', Object.assign({ x: x + w * (kind === 'prev' ? 0.12 : 0.02), y: y,
++        w: w * 0.5, h: h, rotate: rot }, F));
++      s.addShape('triangle', Object.assign({ x: x + w * (kind === 'prev' ? 0.5 : 0.4), y: y,
++        w: w * 0.5, h: h, rotate: rot }, F));
++      s.addShape('rect', Object.assign({ x: bar, y: y + h * 0.02, w: w * 0.12, h: h * 0.96 }, F));
++      break;
++    }
++    case 'note': glyph(s, '\u266A', x, y, w, h, color, pt, o); break;
++    case 'notes': glyph(s, '\u266B', x, y, w, h, color, pt, o); break;
++    case 'clef': glyph(s, '\uD834\uDD1E', x, y, w, h, color, pt, o); break;
++    case 'phone': glyph(s, '\u260E', x, y, w, h, color, pt, o); break;
++    case 'mail': glyph(s, '\u2709', x, y, w, h, color, pt, o); break;
++    case 'kebab': glyph(s, '\u22EE', x, y, w, h, color, pt, o); break;
++    case 'chev': glyph(s, '\u276F', x, y, w, h, color, Math.round(pt * 0.8), o); break;
++    case 'plus': s.addShape('mathPlus', Object.assign({ x: x, y: y, w: w, h: h }, F)); break;
++    case 'check':
++      s.addShape('ellipse', Object.assign({ x: x, y: y, w: w, h: h, fill: { type: 'none' },
++        line: ln(color, Math.max(1.5, w * 7)) }, o));
++      poly(s, x, y, w, h, [[.24, .52], [.42, .72], [.78, .30], [.86, .40], [.42, .88], [.16, .60]], F);
++      break;
++    case 'disc':
++      s.addShape('ellipse', Object.assign({ x: x, y: y, w: w, h: h }, F));
++      s.addShape('ellipse', { x: cx - w * 0.11, y: cy - h * 0.11, w: w * 0.22, h: h * 0.22,
++        fill: { color: '222224' } });
++      break;
++    case 'spotify':
++      s.addShape('ellipse', Object.assign({ x: x, y: y, w: w, h: h }, F));
++      for (let i = 0; i < 3; i++) {
++        s.addShape('rect', { x: cx - w * (0.30 - i * 0.06), y: y + h * (0.34 + i * 0.15),
++          w: w * (0.60 - i * 0.12), h: h * 0.07, fill: { color: '0B091C' } });
++      }
++      break;
++    case 'youtube':
++      s.addShape('roundRect', Object.assign({ x: x, y: y + h * 0.16, w: w, h: h * 0.68,
++        rectRadius: Math.min(w, h) * 0.18, fill: { color: C.red } }, o));
++      s.addShape('triangle', { x: cx - w * 0.10, y: cy - h * 0.16, w: w * 0.22, h: h * 0.32,
++        rotate: 90, fill: { color: C.white } });
++      break;
++    case 'phones':
++      s.addShape('blockArc', Object.assign({ x: x, y: y + h * 0.06, w: w, h: h * 0.94,
++        angleRange: [180, 360], arcThicknessRatio: 0.24 }, F));
++      s.addShape('roundRect', Object.assign({ x: x + w * 0.02, y: y + h * 0.48, w: w * 0.22, h: h * 0.42,
++        rectRadius: Math.min(w, h) * 0.1 }, F));
++      s.addShape('roundRect', Object.assign({ x: x + w * 0.76, y: y + h * 0.48, w: w * 0.22, h: h * 0.42,
++        rectRadius: Math.min(w, h) * 0.1 }, F));
++      break;
++    case 'mic':
++      s.addShape('roundRect', Object.assign({ x: cx - w * 0.15, y: y + h * 0.08, w: w * 0.30, h: h * 0.46,
++        rectRadius: Math.min(w, h) * 0.15 }, F));
++      s.addShape('blockArc', Object.assign({ x: cx - w * 0.30, y: y + h * 0.30, w: w * 0.60, h: h * 0.46,
++        angleRange: [0, 180], arcThicknessRatio: 0.22 }, F));
++      s.addShape('rect', Object.assign({ x: cx - w * 0.04, y: y + h * 0.70, w: w * 0.08, h: h * 0.22 }, F));
++      s.addShape('rect', Object.assign({ x: cx - w * 0.22, y: y + h * 0.88, w: w * 0.44, h: h * 0.08 }, F));
++      break;
++    case 'guitar':
++      s.addShape('ellipse', Object.assign({ x: x + w * 0.04, y: y + h * 0.42, w: w * 0.52, h: h * 0.54 }, F));
++      s.addShape('rect', Object.assign({ x: x + w * 0.44, y: y + h * 0.10, w: w * 0.10, h: h * 0.52,
++        rotate: 315 }, F));
++      s.addShape('rect', Object.assign({ x: x + w * 0.70, y: y + h * 0.04, w: w * 0.22, h: h * 0.14,
++        rotate: 315 }, F));
++      break;
++    case 'violin':
++      s.addShape('ellipse', Object.assign({ x: x + w * 0.04, y: y + h * 0.46, w: w * 0.46, h: h * 0.50 }, F));
++      s.addShape('ellipse', Object.assign({ x: x + w * 0.14, y: y + h * 0.34, w: w * 0.30, h: h * 0.30 }, F));
++      s.addShape('rect', Object.assign({ x: x + w * 0.48, y: y + h * 0.04, w: w * 0.07, h: h * 0.52,
++        rotate: 315 }, F));
++      s.addShape('rect', Object.assign({ x: x + w * 0.30, y: y + h * 0.14, w: w * 0.74, h: h * 0.035,
++        rotate: 330 }, F));
++      break;
++    case 'piano':
++      s.addShape('rect', Object.assign({ x: x + w * 0.06, y: y + h * 0.20, w: w * 0.88, h: h * 0.60 }, F));
++      for (let i = 1; i < 7; i++) {
++        s.addShape('rect', { x: x + w * (0.06 + 0.88 * i / 7) - w * 0.035, y: y + h * 0.20,
++          w: w * 0.07, h: h * 0.38, fill: { color: '1B1B22' } });
++      }
++      break;
++    case 'speaker':
++      s.addShape('roundRect', Object.assign({ x: x + w * 0.08, y: y + h * 0.08, w: w * 0.84, h: h * 0.84,
++        rectRadius: Math.min(w, h) * 0.1 }, F));
++      [0.34, 0.66].forEach(function (f) {
++        s.addShape('ellipse', { x: cx - w * 0.16, y: y + h * f - h * 0.16, w: w * 0.32, h: h * 0.32,
++          fill: { color: '222224' } });
++      });
++      break;
++    case 'radio':
++      s.addShape('roundRect', Object.assign({ x: x, y: y + h * 0.28, w: w, h: h * 0.52,
++        rectRadius: Math.min(w, h) * 0.08 }, F));
++      s.addShape('rect', Object.assign({ x: x + w * 0.62, y: y + h * 0.04, w: w * 0.05, h: h * 0.30,
++        rotate: 20 }, F));
++      break;
++    case 'mega':
++      s.addShape('trapezoid', Object.assign({ x: x + w * 0.10, y: y + h * 0.24, w: w * 0.76, h: h * 0.5,
++        rotate: 285 }, F));
++      break;
++    case 'ticket':
++      s.addShape('rect', Object.assign({ x: x + w * 0.04, y: y + h * 0.28, w: w * 0.92, h: h * 0.44 }, F));
++      s.addShape('ellipse', { x: cx - w * 0.09, y: cy - w * 0.09, w: w * 0.18, h: w * 0.18,
++        fill: { color: '911F7B' } });
++      s.addShape('rect', { x: x + w * 0.12, y: y + h * 0.36, w: w * 0.20, h: h * 0.06,
++        fill: { color: '911F7B' } });
++      s.addShape('rect', { x: x + w * 0.12, y: y + h * 0.56, w: w * 0.20, h: h * 0.06,
++        fill: { color: '911F7B' } });
++      break;
++    case 'clock':
++      s.addShape('ellipse', Object.assign({ x: x + w * 0.08, y: y + h * 0.12, w: w * 0.84, h: h * 0.8,
++        fill: { type: 'none' }, line: { color: color, width: 2 } }, o));
++      s.addShape('rect', Object.assign({ x: cx - w * 0.01, y: cy - h * 0.24, w: w * 0.05, h: h * 0.26 }, F));
++      s.addShape('rect', Object.assign({ x: cx, y: cy - h * 0.03, w: w * 0.22, h: h * 0.05 }, F));
++      break;
++    case 'bell':
++      s.addShape('teardrop', Object.assign({ x: x + w * 0.14, y: y + h * 0.10, w: w * 0.7, h: h * 0.66,
++        rotate: 225 }, F));
++      s.addShape('rect', Object.assign({ x: x + w * 0.10, y: y + h * 0.74, w: w * 0.78, h: h * 0.09 }, F));
++      break;
++    case 'people':
++      [0.30, 0.70].forEach(function (f) {
++        s.addShape('ellipse', Object.assign({ x: x + w * f - w * 0.13, y: y + h * 0.10, w: w * 0.26,
++          h: h * 0.26 }, F));
++        s.addShape('roundRect', Object.assign({ x: x + w * f - w * 0.20, y: y + h * 0.42, w: w * 0.40,
++          h: h * 0.48, rectRadius: Math.min(w, h) * 0.12 }, F));
++      });
++      break;
++    case 'person':
++      s.addShape('ellipse', Object.assign({ x: cx - w * 0.17, y: y + h * 0.10, w: w * 0.34, h: h * 0.34 }, F));
++      s.addShape('roundRect', Object.assign({ x: cx - w * 0.30, y: y + h * 0.50, w: w * 0.60, h: h * 0.42,
++        rectRadius: Math.min(w, h) * 0.14 }, F));
++      break;
++    case 'monitor':
++      s.addShape('rect', Object.assign({ x: x, y: y + h * 0.12, w: w, h: h * 0.58 }, F));
++      s.addShape('rect', Object.assign({ x: cx - w * 0.08, y: y + h * 0.70, w: w * 0.16, h: h * 0.16 }, F));
++      s.addShape('rect', Object.assign({ x: cx - w * 0.28, y: y + h * 0.86, w: w * 0.56, h: h * 0.08 }, F));
++      break;
++    case 'logo':
++      s.addShape('ellipse', Object.assign({ x: x, y: y, w: w, h: h }, F));
++      s.addShape('ellipse', { x: cx - w * 0.17, y: cy - h * 0.17, w: w * 0.34, h: h * 0.34,
++        fill: { type: 'none' }, line: { color: C.ink, width: 1.5 } });
++      break;
++    case 'chat':
++      s.addShape('roundRect', Object.assign({ x: x, y: y + h * 0.06, w: w * 0.68, h: h * 0.56,
++        rectRadius: Math.min(w, h) * 0.16 }, F));
++      s.addShape('roundRect', Object.assign({ x: x + w * 0.32, y: y + h * 0.34, w: w * 0.68, h: h * 0.56,
++        rectRadius: Math.min(w, h) * 0.16 }, F));
++      break;
++    case 'blob':                       // rounded quadrant with one square corner
++      s.addShape('round2SameRect', Object.assign({ x: x, y: y, w: w, h: h,
++        rectRadius: Math.min(w, h) * 0.48 }, F));
++      break;
++    case 'wave': waveform(s, x, y, w, h, color, o); break;
++    case 'eq': eqBlock(s, x, y, w, h, color, o); break;
++    case 'staff': staff(s, x, y, w, h, color, o); break;
++    default: glyph(s, '\u266A', x, y, w, h, color, pt, o);
++  }
++}
++
++// ---------------------------------------------------------------- deck
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'W20', width: 20, height: 11.25 });
++pptx.layout = 'W20';
++pptx.author = 'FES.MUSIC';
++pptx.title = 'Music Event Presentation';
++
++/* The shared page background: a dark plum vertical gradient. */
++const BG = [[0, C.ink], [0.14, C.night], [0.88, C.wine], [1, C.plum]];
++function background(s) { gradRect(s, 0, 0, 20, 11.25, BG, 'v'); }
++
++// Gradient stop tables lifted from the source deck.
++const G1 = [[0, C.violet], [0.505, C.plum], [0.99, C.lime], [1, C.lime]];
++const G2 = [[0, C.lime], [0.5, C.plum], [1, C.violet]];
++const G3 = [[0, '9FEB63'], [0.505, C.plum], [0.99, '5C169E'], [1, '5C169E']];
++const G4 = [[0, C.plum], [0.505, '9EE164'], [0.99, '5C169E'], [1, '5C169E']];
++const G5 = [[0, '9EDF64'], [0.505, '922A7A'], [0.99, '5C169E'], [1, '5C169E']];
++const G6 = [[0, '761A68'], [1, C.ink2]];
++const G7 = [[0, C.ink, 95.3], [0.01, C.ink, 95.3], [1, C.plum]];
++const G8 = [[0, C.ink, 100], [0.01, C.ink, 100], [1, '8D1E78']];
++const G9 = [[0, C.ink], [0.04, C.ink], [1, '901F7A']];
++const G10 = [[0, C.plum], [0.505, C.violet], [0.99, C.lime], [1, C.lime]];
++const G11 = [[0, '9FEB63'], [0.5, '8F1F7C'], [1, '59159F']];
++const G12 = [[0, C.violet], [0.505, C.plum], [0.99, '0F0A1F'], [1, '0F0A1F']];
++const G13 = [[0, C.violet], [0.5, C.plum], [1, C.ink]];
++const G14 = [[0, C.ink, 100], [0.01, C.ink, 100], [0.66, '8F1F79', 5.1], [1, C.plum]];
++const G15 = [[0, C.ink, 100], [1, C.ink2, 40]];
++const G16 = [[0, C.ink, 80], [0.01, C.ink, 80], [1, C.plum]];
++const G17 = [[0, C.ink], [1, C.lime]];
++const G18 = [[0, C.ink], [1, C.plum]];
++
++/* 2_Title Slide */
++function art01(s) {
++  eqStrip(s, 7.767, 11.264, 0.618, 0.345, 0.483, 0.207);
++  icon(s, 'eq', 9.756, 8.469, 3.313, 3.313, '101010');
++  icon(s, 'eq', 14.698, 8.469, 3.313, 3.313, '101010');
++  icon(s, 'staff', 0.095, -0.638, 5.394, 5.394, '3D103F', { rotate: 332.93, transparency: 72 });
++  icon(s, 'staff', -0.268, 6.716, 4.199, 4.199, '8C1D77', { rotate: 332.93, transparency: 72 });
++}
++
++/* 5_Title Slide */
++function art02(s) {
++  icon(s, 'staff', -0.268, 6.716, 4.199, 4.199, '8C1D77', { rotate: 332.93, transparency: 72 });
++  icon(s, 'staff', 0.019, -0.462, 4.199, 4.199, '3B103F', { rotate: 332.93, transparency: 72 });
++  icon(s, 'plus', 0.209, 0.194, 1, 1, C.lime);
++}
++
++/* 6_Title Slide */
++function art03(s) {
++  s.addShape('custGeom', { x: 7.563, y: -1.187, w: 4.875, h: 20, points: [{ x: 0, y: 0 }, { x: 4.56, y: 0 }, { x: 4.574, y: 0.058 }, { x: 2.782, y: 11.832, curve: { type: 'cubic', x1: 5.627, y1: 4.97, x2: 3.648, y2: 7.96 } }, { x: 3.25, y: 19.611, curve: { type: 'cubic', x1: 2.107, y1: 14.846, x2: 3.025, y2: 16.743 } }, { x: 3.275, y: 20 }, { x: 0, y: 20 }, { close: true }], fill: { color: C.plum, transparency: 70.2 }, rotate: 270 });
++  gradPoly(s, 1.314, 1.094, 8.049, 9.062, snipPts(8.049, 9.062, [2.912, 0, 2.912, 0]), G1, 'v');
++  icon(s, 'staff', 16.025, 0.57, 4.199, 4.199, '3B103F', { rotate: 22, transparency: 72 });
++}
++
++/* 7_Title Slide */
++function art04(s) {
++  gradPoly(s, 0, 6.265, 7.395, 4.985, snipPts(7.395, 4.985, [0, 1.63, 0, 0]), G2, 'v');
++}
++
++/* 8_Title Slide */
++function art05(s) {
++  eqStrip(s, 0, 11.273, 0.435, 0.243, 0.34, 0.146);
++  icon(s, 'eq', 1.398, 9.308, 2.329, 2.329, '101010');
++  icon(s, 'eq', 4.872, 9.308, 2.329, 2.329, '101010');
++}
++
++/* 9_Title Slide */
++function art06(s) {
++  icon(s, 'staff', -0.239, -0.971, 5.394, 5.394, '330E38', { rotate: 332.93, transparency: 72 });
++  icon(s, 'staff', -0.268, 7.024, 4.199, 4.199, '8C1D77', { rotate: 332.93, transparency: 72 });
++}
++
++/* 10_Title Slide */
++function art07(s) {
++  icon(s, 'staff', 0.019, -0.668, 4.199, 4.199, '3B103F', { rotate: 332.93, transparency: 72 });
++  icon(s, 'staff', 15.782, 7.4, 4.199, 4.199, '6E1862', { rotate: 27.07, flipH: true, transparency: 72 });
++}
++
++/* 11_Title Slide */
++function art08(s) {
++  eqStrip(s, 0.008, 11.235, 0.343, 0.191, 0.268, 0.115);
++  icon(s, 'eq', 1.112, 9.683, 1.84, 1.84, '101010');
++  icon(s, 'eq', 3.857, 9.683, 1.84, 1.84, '101010');
++}
++
++/* 13_Title Slide */
++function art09(s) {
++  gradPoly(s, 8.807, 0.58, 10.094, 10.089, snipPts(10.094, 10.089, [3.65, 0, 3.65, 0]), G1, 'v');
++  sh(s, 'rect', 1.332, 1.973, 7.681, 7.303, C.ink, { line: ln(C.white, 10) });
++  sh(s, 'rect', 8.807, 0.944, 10.094, 9.361, C.ink);
++}
++
++/* 14_Title Slide */
++function art10(s) {
++  icon(s, 'staff', 17.93, 9.204, 1.86, 1.86, '921F7C');
++  icon(s, 'staff', -0.268, 7.239, 4.199, 4.199, '8C1D77', { rotate: 332.93, transparency: 72 });
++}
++
++/* 15_Title Slide */
++function art11(s) {
++  icon(s, 'staff', 16.025, 0.57, 4.199, 4.199, '3B103F', { rotate: 22, transparency: 72 });
++}
++
++/* 16_Title Slide */
++function art12(s) {
++  gradPoly(s, 10.594, 0.963, 8.306, 9.037, snipPts(8.306, 9.037, [3.005, 0, 3.005, 0]), G3, 'v');
++  gradPoly(s, 0.008, 4.375, 8.306, 5.625, snipPts(8.306, 5.625, [2.035, 0, 2.035, 0]), G4, 'v');
++}
++
++/* 17_Title Slide */
++function art13(s) {
++  sh(s, 'roundRect', 1.791, 3.281, 7.07, 2.845, null, { rectRadius: 1.423, line: ln(C.violet, 3) });
++  sh(s, 'roundRect', 11.139, 3.281, 7.07, 2.845, null, { rectRadius: 1.423, line: ln(C.violet, 3) });
++}
++
++/* 18_Title Slide */
++function art14(s) {
++  s.addShape('custGeom', { x: 7.338, y: -1.387, w: 5.325, h: 20, points: [{ x: 0, y: 0 }, { x: 4.981, y: 0 }, { x: 4.996, y: 0.058 }, { x: 3.038, y: 11.832, curve: { type: 'cubic', x1: 6.147, y1: 4.97, x2: 3.985, y2: 7.96 } }, { x: 3.55, y: 19.611, curve: { type: 'cubic', x1: 2.302, y1: 14.846, x2: 3.305, y2: 16.743 } }, { x: 3.577, y: 20 }, { x: 0, y: 20 }, { close: true }], fill: { color: C.plum, transparency: 75.3 }, rotate: 270 });
++  gradPoly(s, 10.934, 0, 8.594, 9.4, snipPts(8.594, 9.4, [3.109, 0, 3.109, 0]), G5, 'v');
++  eqStrip(s, 11.25, 11.27, 0.442, 0.246, 0.345, 0.148);
++  icon(s, 'eq', 12.67, 9.273, 2.367, 2.367, '101010');
++  icon(s, 'eq', 16.202, 9.273, 2.367, 2.367, '101010');
++}
++
++/* 19_Title Slide */
++function art15(s) {
++  icon(s, 'staff', 0.019, -0.462, 4.199, 4.199, '3B103F', { rotate: 332.93, transparency: 72 });
++  gradPoly(s, 0, 10, 20, 1.25, snipPts(20, 1.25, [0.208, 0.208, 0, 0]), G6, 'v');
++}
++
++/* 21_Title Slide */
++function art16(s) {
++  s.addShape('custGeom', { x: 2.7, y: 0, w: 3.2, h: 4.95, points: [{ x: 0, y: 0 }, { x: 2.993, y: 0 }, { x: 3.002, y: 0.014 }, { x: 1.826, y: 2.929, curve: { type: 'cubic', x1: 3.694, y1: 1.23, x2: 2.394, y2: 1.97 } }, { x: 2.133, y: 4.854, curve: { type: 'cubic', x1: 1.383, y1: 3.674, x2: 1.986, y2: 4.144 } }, { x: 2.15, y: 4.95 }, { x: 0, y: 4.95 }, { close: true }], fill: { color: C.lime } });
++}
++
++/* 22_Title Slide */
++function art17(s) {
++  sh(s, 'rect', 1.529, 1.134, 7.916, 8.983, C.ink, { line: ln(C.white, 10) });
++}
++
++/* 23_Title Slide */
++function art18(s) {
++  [[0, 0], [16.344, 0]].forEach(function (d) {
++    icon(s, 'wave', d[0] + -0.21, d[1] + 6.847, 1.99, 2.327, C.paper, { transparency: 82 });
++    icon(s, 'wave', d[0] + 1.727, d[1] + 6.847, 1.99, 2.327, C.paper, { transparency: 82 });
++  });
++  sh(s, 'rect', 1.352, 5.625, 17.296, 4.762, C.ink, { line: ln(C.white, 10) });
++  icon(s, 'wave', 10.825, 5.968, 3.487, 4.076, C.white, { transparency: 96 });
++  icon(s, 'wave', 14.218, 5.968, 3.487, 4.076, C.white, { transparency: 96 });
++}
++
++/* 24_Title Slide */
++function art19(s) {
++  icon(s, 'staff', -0.268, 7.171, 4.199, 4.199, '8C1D77', { rotate: 332.93, transparency: 72 });
++}
++
++/* 25_Title Slide */
++function art20(s) {
++  s.addShape('custGeom', { x: 6.318, y: 0, w: 1.023, h: 4.455, points: [{ x: 0, y: 0 }, { x: 0.957, y: 0 }, { x: 0.96, y: 0.013 }, { x: 0.584, y: 2.635, curve: { type: 'cubic', x1: 1.181, y1: 1.107, x2: 0.765, y2: 1.773 } }, { x: 0.682, y: 4.368, curve: { type: 'cubic', x1: 0.442, y1: 3.307, x2: 0.635, y2: 3.729 } }, { x: 0.687, y: 4.455 }, { x: 0, y: 4.455 }, { close: true }], fill: { color: C.lime } });
++}
++
++/* 26_Title Slide */
++function art21(s) {
++  [[0, 0], [16.345, 0]].forEach(function (d) {
++    icon(s, 'wave', d[0] + -0.084, d[1] + 4.469, 1.99, 2.327, C.paper, { transparency: 82 });
++    icon(s, 'wave', d[0] + 1.853, d[1] + 4.469, 1.99, 2.327, C.paper, { transparency: 82 });
++  });
++  sh(s, 'rect', 1.327, 1.134, 17.346, 8.983, C.ink, { line: ln(C.white, 10) });
++}
++
++/* 27_Title Slide */
++function art22(s) {
++  icon(s, 'staff', 0.095, -0.638, 5.394, 5.394, '3D103F', { rotate: 332.93, transparency: 72 });
++  icon(s, 'staff', -0.268, 6.716, 4.199, 4.199, '8C1D77', { rotate: 332.93, transparency: 72 });
++}
++
++/* 29_Title Slide */
++function art23(s) {
++  sh(s, 'rect', 1.529, 1.134, 7.916, 8.983, C.ink, { line: ln(C.white, 10) });
++  icon(s, 'staff', 16.025, 0.57, 4.199, 4.199, '3B103F', { rotate: 22, transparency: 72 });
++}
++
++/* 31_Title Slide */
++function art24(s) {
++  icon(s, 'staff', 16.025, -0.255, 4.199, 4.199, '3B103F', { rotate: 22, transparency: 72 });
++  eqStrip(s, 0, 11.251, 0.263, 0.147, 0.205, 0.088);
++  icon(s, 'eq', 0.845, 10.063, 1.408, 1.408, '101010');
++  icon(s, 'eq', 2.945, 10.063, 1.408, 1.408, '101010');
++  icon(s, 'wave', -0.21, 6.348, 1.99, 2.327, C.paper, { transparency: 82 });
++  icon(s, 'wave', 18.267, 3.135, 1.99, 2.327, C.paper, { flipH: true, transparency: 82 });
++}
++
++/* 33_Title Slide */
++function art25(s) {
++  icon(s, 'staff', 0.019, -0.462, 4.199, 4.199, '3B103F', { rotate: 332.93, transparency: 72 });
++  gradPoly(s, 0, 10, 20, 1.25, snipPts(20, 1.25, [0.208, 0.208, 0, 0]), G6, 'v');
++}
++
++function slide01(s) {
++  background(s);
++  art01(s);
++  icon(s, 'logo', 17.754, 0.401, 0.653, 0.653, C.lime);
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 18.011, 0.542, 1.443, 0.37, S.logo, { align: 'right' });
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 4.574, 4.69, 11.057, 2.457, S.hero);
++  t(s, 'MUSIC EVENT PRESENTATION', 5.226, 4.158, 4.646, 0.438, S.eyebrow);
++  icon(s, 'play', 4.641, 4.136, 0.481, 0.481, C.lime);
++  icon(s, 'next', 2.737, 5.127, 1.55, 1.55, '8D1E79');
++  icon(s, 'next', 15.714, 5.127, 1.55, 1.55, '8D1E79', { flipH: true });
++}
++
++function slide02(s) {
++  background(s);
++  gradRect(s, 0, 0.041, 20, 11.25, G7, 'v');
++  photo(s, 0, 0, 20, 11.29, '5B5B5B');
++  gradPoly(s, 15.837, 0, 4.165, 1.674, [[0, 0], [2.499, 0], [4.165, 0.837], [2.499, 1.674], [0, 1.674]], G8, 'v');
++  gradPoly(s, 1.887, 8.791, 16.225, 1.827, roundPts(16.225, 1.827, 0.913), G9, 'v', { line: ln(C.white, 2.25) });
++  t(s, 'CONTACT US', 17.241, 0.635, 1.892, 0.404, S.labelW);
++  t(s, 'HOME\t\t    ABOUT TICKETS\t        SELECTED EVENTS\t      COST\t        SIGN UP / LOGIN', 2.031, 0.628, 13.202, 0.404, S.labelW);
++  t(s, 'MUSIC EVENT PRESENTATION', 2.59, 3.661, 4.633, 0.438, S.eyebrow, { align: 'center' });
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 2.031, 4.088, 10.906, 2.423, S.hero);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus sit amet est placerat in egestas. ', 2.031, 6.556, 10.992, 1.055, S.body20);
++  icon(s, 'play', 2.116, 3.639, 0.481, 0.481, C.lime);
++  t(s, '200+', 3.034, 9.132, 1.7, 0.64, S.stat);
++  t(s, 'Studio Room', 3.034, 9.772, 2.351, 0.505, S.label);
++  t(s, '110+', 5.492, 9.132, 1.7, 0.64, S.stat);
++  t(s, 'Creative Team', 5.492, 9.772, 2.351, 0.505, S.label);
++  t(s, '250+', 7.95, 9.132, 1.7, 0.64, S.stat);
++  t(s, 'Event Projects', 7.95, 9.772, 2.593, 0.505, S.label);
++  icon(s, 'wave', 13.448, 2.953, 5.492, 5.205, C.white, { transparency: 62 });
++  gradPoly(s, 14.41, 3.845, 3.559, 3.559, [[1.78, 0], [2.763, 0], [3.559, 0.797], [3.559, 1.78], [3.559, 2.763], [2.763, 3.559], [1.78, 3.559], [0.797, 3.559], [0, 2.763], [0, 1.78], [0, 0.797], [0.797, 0], [1.78, 0]], G10, 'v');
++  sh(s, 'ellipse', 14.626, 4.061, 3.134, 3.134, { color: C.white, transparency: 50.2 });
++  icon(s, 'pause', 15.546, 4.981, 1.294, 1.294, C.white);
++  gradPoly(s, 13.815, 9.227, 3.383, 0.954, roundPts(3.383, 0.954, 0.477), G11, 'v');
++  t(s, 'GET A TICKET', 14.215, 9.519, 1.781, 0.37, S.btn);
++  icon(s, 'chev', 16.25, 9.43, 0.549, 0.549, C.white);
++}
++
++function slide03(s) {
++  background(s);
++  art02(s);
++  s.addShape('custGeom', { x: 14.061, y: 4.727, w: 5.939, h: 6.523, points: [{ x: 2.97, y: 0 }, { x: 5.939, y: 0 }, { x: 5.939, y: 6.524 }, { x: 0, y: 6.524 }, { x: 0, y: 3.554 }, { x: 2.97, y: 3.554 }, { close: true }], fill: { color: '5B5B5B' } });
++  t(s, 'Phasellus vestibulum lorem sed risus ultricies tristique nulla aliquet enim. a sed arcu non odio euismod. Massa tincidunt nunc pulvinar sapien et ligula. Amet cursus sit amet dictum sit amet justo donec. Est placerat in egestas erat sed. Ultrices tincidunt arcu non sodales neque sodales ut tellus integer. Tellus integer feugiat scelerisque varius.', 2.099, 5.557, 10.175, 1.868, S.body);
++  t(s, 'MUSIC EVENT', 8.119, 1.871, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 7.489, 1.849, 0.481, 0.481, C.lime);
++  t(s, 'Find Pieces Of You By Attending Live Music Events, Festivals And Concerts. ', 7.489, 2.562, 10.636, 1.313, S.h1);
++  icon(s, 'notes', 2.099, 4.466, 1, 1, C.lime);
++  t(s, 'YOUR TITLE HERE', 2.099, 7.745, 4.56, 0.55, S.sub);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac tincidunt vitae. Ut libero volutpat sed cras cras pulvinar mattis nunc.', 2.099, 8.442, 10.175, 0.959, S.body);
++  t(s, 'Music Festivals 2024', 2.099, 3.076, 2.176, 0.959, S.label, { align: 'center' });
++  sh(s, 'ellipse', 2.366, 2.143, 0.795, 0.795, C.red);
++  icon(s, 'guitar', 2.511, 2.288, 0.505, 0.505, C.white);
++  sh(s, 'ellipse', 2.815, 2.143, 0.795, 0.795, C.ink, { line: ln('280E31', 1) });
++  icon(s, 'note', 2.974, 2.302, 0.477, 0.477, C.white);
++  sh(s, 'ellipse', 3.212, 2.143, 0.795, 0.795, C.violet, { line: ln('280E31', 1) });
++  icon(s, 'phones', 3.357, 2.288, 0.505, 0.505, C.white);
++  photo(s, 14.502, 5.121, 3.269, 4.098, 'C3C3C3', { line: ln(C.white, 2.25) });
++  icon(s, 'wave', 16.637, 7.732, 2.287, 2.168, C.white, { transparency: 45 });
++}
++
++function slide04(s) {
++  background(s);
++  art03(s);
++  t(s, 'MUSIC EVENT', 12.042, 2.173, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 11.412, 2.151, 0.481, 0.481, C.lime);
++  t(s, 'Everyday Is Music & You\'ll Never Walk Alone', 11.412, 2.865, 6.874, 1.313, S.h1);
++  [[0, 0], [0, 2.534]].forEach(function (d) {
++    t(s, 'YOUR TITLE HERE', d[0] + 11.412, d[1] + 4.553, 4.56, 0.55, S.sub);
++    t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac tincidunt vitae. Ut libero volutpat sed cras cras pulvinar mattis nunc fermentum odio eu feugiat.', d[0] + 11.412, d[1] + 5.152, 7.274, 1.414, S.body);
++  });
++  s.addShape('custGeom', { x: 1.314, y: 1.532, w: 8.049, h: 8.186, points: [{ x: 0, y: 0 }, { x: 6.708, y: 0 }, { x: 8.049, y: 1.12 }, { x: 8.049, y: 8.186 }, { x: 0, y: 8.186 }, { close: true }], fill: { color: '5B5B5B' }, line: ln(C.plum, 2.25) });
++}
++
++function slide05(s) {
++  background(s);
++  art04(s);
++  s.addShape('custGeom', { x: 0.442, y: 6.651, w: 6.605, h: 4.599, points: [{ x: 0, y: 0 }, { x: 5.101, y: 0 }, { x: 6.605, y: 1.504 }, { x: 6.605, y: 4.599 }, { x: 0, y: 4.599 }, { close: true }], fill: { color: '5B5B5B' } });
++  s.addShape('custGeom', { x: 5.122, y: 6.422, w: 9.757, h: 4.828, points: [{ x: 4.878, y: 0 }, { x: 7.317, y: 0.604, curve: { type: 'cubic', x1: 5.75, y1: 0, x2: 6.621, y2: 0.201 } }, { x: 9.746, y: 4.503, curve: { type: 'cubic', x1: 8.732, y1: 1.42, x2: 9.638, y2: 2.887 } }, { x: 9.757, y: 4.828 }, { x: 6.221, y: 4.828 }, { x: 6.209, y: 4.65 }, { x: 5.55, y: 3.666, curve: { type: 'cubic', x1: 6.154, y1: 4.241, x2: 5.913, y2: 3.875 } }, { x: 4.207, y: 3.666, curve: { type: 'cubic', x1: 5.134, y1: 3.426, x2: 4.622, y2: 3.426 } }, { x: 3.536, y: 4.828, curve: { type: 'cubic', x1: 3.792, y1: 3.905, x2: 3.536, y2: 4.349 } }, { x: 0, y: 4.828 }, { x: 0.011, y: 4.503 }, { x: 2.439, y: 0.604, curve: { type: 'cubic', x1: 0.118, y1: 2.887, x2: 1.024, y2: 1.42 } }, { x: 4.878, y: 0, curve: { type: 'cubic', x1: 3.136, y1: 0.201, x2: 4.007, y2: 0 } }, { close: true }], fill: { color: 'C3C3C3' } });
++  icon(s, 'wave', 7.802, 8.966, 2.291, 2.171, C.white, { transparency: 45 });
++  icon(s, 'wave', 9.908, 8.966, 2.291, 2.171, C.white, { flipH: true, transparency: 45 });
++  t(s, '200k', 0.744, 6.951, 1.7, 0.505, S.stat24, { align: 'center' });
++  t(s, 'Minimum Ticket', 0.581, 7.386, 2.025, 0.415, S.tiny, { color: C.paper, lineSpacingMultiple: 1.5, align: 'center' });
++  t(s, 'MUSIC EVENT', 8.952, 1.062, 2.493, 0.438, S.eyebrow, { align: 'center' });
++  icon(s, 'play', 8.555, 1.04, 0.481, 0.481, C.lime);
++  t(s, 'PLACEHOLDER', 5.016, 1.723, 9.969, 1.313, S.h1, { align: 'center' });
++  t(s, '200+', 16.341, 6.381, 1.7, 0.64, S.stat, { align: 'center' });
++  t(s, ' Singers & Bands', 16.011, 7.021, 2.36, 0.505, S.label, { align: 'center' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris. ', 15.555, 7.708, 3.262, 0.959, S.bodyW, { align: 'center' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus sit amet est placerat in egestas. Sem integer vitae justo eget magna fermentum. Fermentum odio eu feugiat pretium nibh ipsum consequat nisl aenean pharetra magna. Erat nam at lectus urna duis convallis convallis tellus id. Turpis egestas pretium aenean pharetra magna. Semper risus in hendrerit gravida rutrum quisque. Mauris commodo quis imperdiet massa.', 2.256, 3.425, 15.487, 1.868, S.bodyW, { align: 'center' });
++  icon(s, 'guitar', 16.806, 8.949, 0.761, 0.761, C.white);
++}
++
++function slide06(s) {
++  background(s);
++  art05(s);
++  t(s, '50+', 11.497, 2.735, 1.7, 0.64, S.stat, { align: 'center' });
++  t(s, 'Concert Experience', 10.974, 3.375, 2.745, 0.505, S.label, { align: 'center' });
++  t(s, 'Music Event Collaboration', 15.733, 7.34, 2.467, 0.959, S.label, { align: 'center' });
++  t(s, 'MUSIC EVENT', 2.152, 3.096, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 1.522, 3.075, 0.481, 0.481, C.lime);
++  t(s, 'Relax And Cheerful On The Music Stage Until The End', 1.522, 3.788, 7.504, 1.313, S.h1);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris. Ac nunc tincidunt vitae. Ut ornare lectus sit amet est placerat in egestas. Semper risus in hendrerit gravida rutrum.  Phasellus vestibulum lorem sed risus ultricies tristique nulla aliquet enim. Commodo  ullamcorper a lacus vestibulum sed arcu non odio euismod. Massa tincidunt nunc pulvinar ornare lectus sit.', 1.522, 5.399, 7.504, 2.777, S.bodyW);
++  sh(s, 'ellipse', 16.146, 8.686, 0.795, 0.795, C.red);
++  icon(s, 'guitar', 16.291, 8.831, 0.505, 0.505, C.white);
++  sh(s, 'ellipse', 16.595, 8.686, 0.795, 0.795, C.ink, { line: ln('721A65', 1) });
++  icon(s, 'note', 16.754, 8.845, 0.477, 0.477, C.white);
++  sh(s, 'ellipse', 16.992, 8.686, 0.795, 0.795, C.violet, { line: ln('721A65', 1) });
++  icon(s, 'phones', 17.137, 8.831, 0.505, 0.505, C.white);
++  icon(s, 'logo', 0.472, 0.401, 0.653, 0.653, C.lime);
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 0.729, 0.542, 1.443, 0.37, S.logo, { align: 'right' });
++  s.addShape('custGeom', { x: 10.974, y: 4.487, w: 4.364, h: 5.315, points: [{ x: 0, y: 0 }, { x: 4.364, y: 0 }, { x: 4.364, y: 5.315 }, { x: 0.727, y: 5.315 }, { x: 0, y: 4.588 }, { close: true }], fill: { color: '5B5B5B' } });
++  s.addShape('custGeom', { x: 14.114, y: 1.448, w: 4.364, h: 5.315, points: [{ x: 0.727, y: 0 }, { x: 4.364, y: 0 }, { x: 4.364, y: 5.315 }, { x: 0, y: 5.315 }, { x: 0, y: 0.727 }, { close: true }], fill: { color: 'C3C3C3' }, line: ln(C.white, 2.25) });
++}
++
++function slide07(s) {
++  background(s);
++  art06(s);
++  photo(s, 7.55, 0, 5.65, 11.25, 'C3C3C3');
++  gradPoly(s, 11.872, 1.205, 6.821, 8.84, snipPts(6.821, 8.84, [2.468, 0, 2.468, 0]), G1, 'v');
++  sh(s, 'snip1Rect', 11.872, 1.544, 6.821, 8.162, C.ink, { rectRadius: 1.898, line: ln(C.white, 2.25) });
++  t(s, 'MUSIC EVENT', 1.938, 4.33, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 1.308, 4.309, 0.481, 0.481, C.lime);
++  t(s, 'Music Makes People Happy & It\'s Time To Get Funky With Music', 1.308, 5.022, 5.286, 2.524, S.h1);
++  t(s, 'YOUR TITLE HERE', 12.627, 3.086, 4.56, 0.55, S.sub);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac enim tincidunt vitae. Ut libero volutpat sed cras cras pulvinar mattis nunc libero.', 12.627, 3.684, 5.306, 1.868, S.body);
++  t(s, '30+', 12.627, 7.896, 1.7, 0.64, S.stat);
++  t(s, 'Orchestral Music', 12.627, 8.519, 2.351, 0.505, S.label);
++  icon(s, 'notes', 16.809, 8.01, 0.899, 0.899, C.white);
++  t(s, '200+', 12.627, 6.445, 1.7, 0.64, S.stat);
++  t(s, 'Singers & Bands', 12.627, 7.068, 2.351, 0.505, S.label);
++  icon(s, 'piano', 16.773, 6.56, 0.899, 0.899, C.white);
++  icon(s, 'mic', 12.627, 2.226, 0.811, 0.811, C.lime);
++  icon(s, 'plus', 7.058, 8.706, 1, 1, C.lime);
++}
++
++function slide08(s) {
++  background(s);
++  art07(s);
++  t(s, 'MUSIC EVENT', 8.952, 0.945, 2.493, 0.438, S.eyebrow, { align: 'center' });
++  icon(s, 'play', 8.555, 0.923, 0.481, 0.481, C.lime);
++  t(s, 'Here Is A Guide To Our Biggest Concerts And Music Festivals', 4.601, 1.606, 10.799, 1.313, S.h1, { align: 'center' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus sit amet est placerat in egestas. Sem integer vitae justo eget magna fermentum. ', 1.412, 8.437, 7.07, 1.868, S.bodyW, { align: 'center' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus sit amet est placerat in egestas. Sem integer vitae justo eget magna fermentum. ', 11.518, 8.437, 7.07, 1.868, S.bodyW, { align: 'center' });
++  icon(s, 'wave', 9.143, 9.058, 0.869, 0.823, C.white, { transparency: 45 });
++  icon(s, 'wave', 9.988, 9.058, 0.869, 0.823, C.white, { flipH: true, transparency: 45 });
++  t(s, 'YOUR TITLE HERE', 2.667, 7.72, 4.56, 0.55, S.sub, { align: 'center' });
++  t(s, 'YOUR TITLE HERE', 12.773, 7.72, 4.56, 0.55, S.sub, { align: 'center' });
++  sh(s, 'ellipse', 12.463, 3.827, 2.845, 2.845, '5B5B5B', { line: ln('3F1141', 2.25) });
++  sh(s, 'ellipse', 11.285, 3.827, 2.845, 2.845, 'C3C3C3', { line: ln('3F1141', 2.25) });
++  sh(s, 'ellipse', 10.106, 3.827, 2.845, 2.845, '7F7F7F', { line: ln('3F1141', 2.25) });
++  sh(s, 'roundRect', 4.529, 3.827, 7.07, 2.845, null, { rectRadius: 1.423, line: ln(C.violet, 3) });
++  sh(s, 'roundRect', 4.853, 3.993, 6.421, 2.584, 'C3C3C3', { rectRadius: 1.292 });
++}
++
++function slide09(s) {
++  background(s);
++  art08(s);
++  gradPoly(s, 0, 0, 8.302, 8.656, snipPts(8.302, 8.656, [3.004, 0, 3.004, 0]), G12, 'v');
++  t(s, '250+', 2.98, 6.217, 1.7, 0.64, S.stat);
++  t(s, 'Event Projects', 2.98, 6.84, 2.351, 0.505, S.label);
++  t(s, '110k+', 1.755, 4.451, 1.7, 0.64, S.stat);
++  t(s, 'Creative Team', 1.755, 5.074, 2.351, 0.505, S.label);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris. Nulla in aliquet enim Elementum', 1.746, 2.108, 3.585, 1.414, S.bodyW);
++  icon(s, 'guitar', 3.08, 1.076, 0.917, 0.917, C.white);
++  t(s, 'MUSIC EVENT', 14.205, 1.076, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 13.575, 1.055, 0.481, 0.481, C.lime);
++  t(s, 'Music Is Harmony. Don\'t Let It Not Feel It Now', 13.575, 1.768, 5.475, 1.919, S.h1);
++  gradPoly(s, 13.25, 1.906, 4.25, 9.25, rotatePts(snipPts(4.25, 9.25, [0, 1.182, 0, 0]), 4.25, 9.25, 270), G13, 'v', { line: ln(C.white, 2.25) });
++  t(s, 'YOUR TITLE HERE', 13.575, 5.298, 4.56, 0.55, S.sub);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac enim tincidunt vitae. Ut libero volutpat sed in cras pulvinar mattis commodo quis nulla.', 13.575, 5.896, 5.235, 1.868, S.body);
++  icon(s, 'spotify', 13.63, 9.683, 0.512, 0.512, C.lime);
++  t(s, 'Spotify', 14.27, 9.737, 1.495, 0.404, S.labelW);
++  icon(s, 'youtube', 15.935, 9.76, 0.512, 0.358, C.red);
++  t(s, 'Youtube Channel', 16.599, 9.742, 2.873, 0.404, S.labelW);
++  photo(s, 5.696, 1.614, 7.144, 9.636, 'C3C3C3');
++}
++
++function slide10(s) {
++  background(s);
++  gradRect(s, 0, 0, 20, 11.25, G14, 'h');
++  photo(s, 0, 0, 20, 11.25, '5B5B5B');
++  icon(s, 'logo', 0.472, 0.401, 0.653, 0.653, C.lime);
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 0.729, 0.542, 1.443, 0.37, S.logo, { align: 'right' });
++  t(s, 'EVENT TEAM', 2.309, 4.691, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 1.679, 4.67, 0.481, 0.481, C.lime);
++  t(s, 'Chiko Bruno Waldaya', 1.679, 5.383, 6.708, 0.707, S.h1);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac tincidunt vitae. Ut libero volutpat sed cras cras pulvinar mattis Ut ornare lectus sit amet est placerat.', 1.679, 6.884, 7.511, 1.414, S.body);
++  t(s, 'Job Position', 1.679, 6.103, 2.493, 0.505, null, { fontFace: 'Figtree ExtraBold', fontSize: 18, color: C.paper, bold: true, italic: true, lineSpacingMultiple: 1.5 });
++  icon(s, 'wave', 1.679, 9.217, 1.305, 1.237, C.white, { transparency: 45 });
++  icon(s, 'wave', 2.879, 9.217, 1.305, 1.237, C.white, { transparency: 45 });
++  sh(s, 'rect', 10.641, 1.038, 7.681, 7.303, C.ink, { line: ln(C.white, 10) });
++  [[0, 0], [0, 3.338]].forEach(function (d) {
++    t(s, 'YOUR SKILL HERE', d[0] + 13.205, d[1] + 2, 4.122, 0.55, S.sub);
++    t(s, 'PLACEHOLDER', d[0] + 11.635, d[1] + 3.25, 5.692, 1.055, S.body20, { color: C.paper });
++    sh(s, 'snip1Rect', d[0] + 11.635, d[1] + 1.734, 1.013, 1.081, C.plum, { rectRadius: 0.282, line: ln(C.white, 2.25) });
++  });
++  t(s, [{ text: 'Music' }, { text: ' – ' }, { text: 'Live Streaming', options: { color: C.lime } }], 10.504, 9.774, 4.731, 0.438, S.lead20);
++  sh(s, 'line', 12.118, 9.261, 6.342, 0, null, { line: ln(C.ink, 6) });
++  sh(s, 'line', 10.562, 9.261, 5.09, 0, null, { line: ln(C.lime, 6) });
++  sh(s, 'ellipse', 15.529, 9.042, 0.438, 0.438, C.white);
++  icon(s, 'phones', 11.8, 1.933, 0.683, 0.683, C.white);
++  icon(s, 'guitar', 11.8, 5.271, 0.683, 0.683, C.white, { flipH: true });
++  t(s, '90%', 17.163, 9.774, 1.305, 0.438, S.lead20, { align: 'right' });
++}
++
++function slide11(s) {
++  background(s);
++  art09(s);
++  sh(s, 'roundRect', 9.743, 1.579, 4.287, 7.097, '5B5B5B', { rectRadius: 0.257, line: ln(C.white, 2.25) });
++  sh(s, 'roundRect', 15.151, 1.579, 2.813, 2.735, 'C3C3C3', { rectRadius: 0.164, line: ln(C.white, 2.25) });
++  sh(s, 'roundRect', 15.151, 5.941, 2.813, 2.735, 'C3C3C3', { rectRadius: 0.164, line: ln(C.white, 2.25) });
++  [[0, 0], [0, 4.362]].forEach(function (d) {
++    t(s, 'Your Name Here', d[0] + 15.151, d[1] + 4.69, 2.813, 0.438, S.name, { align: 'center' });
++    t(s, 'Job Position', d[0] + 15.151, d[1] + 5.151, 2.813, 0.37, S.small, { align: 'center' });
++  });
++  icon(s, 'spotify', 9.743, 9.188, 0.512, 0.512, C.lime);
++  t(s, 'Spotify', 10.384, 9.249, 1.495, 0.404, S.labelW);
++  t(s, 'Your Name Here', 11.129, 2.103, 2.541, 0.438, S.name);
++  t(s, 'Job Position', 11.129, 2.564, 2.541, 0.37, S.small);
++  sh(s, 'snip1Rect', 10.104, 2.251, 0.502, 0.536, C.plum, { rectRadius: 0.14, line: ln(C.white, 2.25) });
++  icon(s, 'phones', 10.185, 2.349, 0.339, 0.339, C.white);
++  t(s, [{ text: 'Music' }, { text: ' – ' }, { text: 'Live Streaming', options: { color: C.lime } }], 10.052, 7.692, 3.67, 0.37, S.smallW, { align: 'center' });
++  sh(s, 'line', 10.815, 7.151, 2.426, 0, null, { line: ln(C.paper, 6) });
++  sh(s, 'line', 10.533, 7.151, 1.878, 0, null, { line: ln(C.lime, 6) });
++  sh(s, 'ellipse', 12.142, 7.002, 0.299, 0.299, C.lime);
++  icon(s, 'prev', 10.566, 6.209, 0.303, 0.23, C.paper);
++  icon(s, 'next', 12.975, 6.209, 0.303, 0.23, C.paper);
++  sh(s, 'ellipse', 11.619, 6.004, 0.604, 0.604, { color: C.grey, transparency: 35.3 });
++  icon(s, 'pause', 11.802, 6.187, 0.238, 0.238, C.white);
++  sh(s, 'roundRect', 2.326, 7.259, 5.544, 1.055, C.paper, { line: ln('1C3052', 1) });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac ut ornare lectus sit amet est placerat lacus vestibulum.', 2.326, 5.217, 5.692, 1.414, S.body);
++  t(s, 'CREW TEAM', 2.944, 2.958, 4.037, 0.438, S.eyebrow);
++  icon(s, 'play', 2.314, 2.936, 0.481, 0.481, C.lime);
++  t(s, 'Some Great People Our Creative Team', 2.314, 3.65, 5.762, 1.313, S.h1);
++  icon(s, 'prev', 3.16, 7.671, 0.304, 0.23, C.ink);
++  icon(s, 'next', 6.733, 7.671, 0.303, 0.23, C.ink);
++  sh(s, 'ellipse', 4.796, 7.484, 0.604, 0.604, C.ink);
++  sh(s, 'triangle', 5.02, 7.686, 0.156, 0.201, C.white, { rotate: 90 });
++  [[0, 0], [0, 4.357]].forEach(function (d) {
++    sh(s, 'snip1Rect', d[0] + 17.569, d[1] + 3.832, 0.502, 0.536, C.plum, { rectRadius: 0.14, line: ln(C.white, 2.25) });
++    icon(s, 'phones', d[0] + 17.651, d[1] + 3.931, 0.339, 0.339, C.white);
++  });
++}
++
++function slide12(s) {
++  background(s);
++  art10(s);
++  [[0, 0], [9.384, 0]].forEach(function (d) {
++    t(s, 'Your Name Here', d[0] + 1.555, d[1] + 6.365, 2.813, 0.438, S.name, { align: 'center' });
++    t(s, 'Job Position', d[0] + 1.555, d[1] + 6.826, 2.813, 0.37, S.small, { align: 'center' });
++    t(s, 'Your Name Here', d[0] + 6.247, d[1] + 6.365, 2.813, 0.438, S.name, { align: 'center' });
++    t(s, 'Job Position', d[0] + 6.247, d[1] + 6.826, 2.813, 0.37, S.small, { align: 'center' });
++  });
++  t(s, 'OUR MUSIC EVENTS TEAM', 8.869, 1.215, 3.998, 0.438, S.eyebrow, { align: 'center' });
++  icon(s, 'play', 8.722, 1.194, 0.481, 0.481, C.lime);
++  t(s, 'Some Great People Our Creative Team', 4.601, 1.876, 11.281, 0.707, S.h1, { align: 'center' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus sit amet est placerat in egestas. Sem integer vitae justo eget magna fermentum. Fermentum odio eu feugiat pretium nibh ipsum consequat nisl', 2.256, 7.715, 15.487, 0.959, S.bodyW, { align: 'center' });
++  sh(s, 'ellipse', 5.562, 9.381, 0.803, 0.803, C.plum2, { line: ln(C.white, 1) });
++  t(s, [{ text: 'FREE DELIVERY', options: { breakLine: true } }, { text: 'PACKAGE' }], 6.548, 9.497, 1.578, 0.572, S.tiny);
++  sh(s, 'ellipse', 8.657, 9.384, 0.803, 0.803, C.plum2, { line: ln(C.white, 1) });
++  t(s, [{ text: 'MONEY BACK', options: { breakLine: true } }, { text: 'GUARANTEE' }], 9.643, 9.499, 1.485, 0.572, S.tiny);
++  sh(s, 'ellipse', 11.753, 9.386, 0.803, 0.803, null, { line: ln(C.white, 1) });
++  t(s, [{ text: 'FREE RETURN UP', options: { breakLine: true } }, { text: 'TO 30 DAYS' }], 12.739, 9.502, 1.746, 0.572, S.tiny);
++  icon(s, 'radio', 8.814, 9.54, 0.49, 0.49, C.white);
++  icon(s, 'phones', 5.667, 9.486, 0.593, 0.593, C.white);
++  icon(s, 'disc', 11.817, 9.45, 0.675, 0.675, C.white);
++  [[0, 0], [9.384, 0]].forEach(function (d) {
++    s.addShape('custGeom', { x: d[0] + 1.805, y: d[1] + 3.442, w: 2.313, h: 2.469, points: [{ x: 0, y: 0 }, { x: 1.67, y: 0 }, { x: 2.313, y: 0.644 }, { x: 2.313, y: 2.469 }, { x: 0, y: 2.469 }, { close: true }], fill: { color: 'C3C3C3' }, line: ln(C.white, 2.25) });
++    s.addShape('custGeom', { x: d[0] + 6.497, y: d[1] + 3.442, w: 2.313, h: 2.469, points: [{ x: 0, y: 0 }, { x: 1.67, y: 0 }, { x: 2.313, y: 0.644 }, { x: 2.313, y: 2.469 }, { x: 0, y: 2.469 }, { close: true }], fill: { color: 'C3C3C3' }, line: ln(C.white, 2.25) });
++  });
++}
++
++function slide13(s) {
++  background(s);
++  art11(s);
++  gradRect(s, 0, 0, 8.515, 11.25, G15, 'v');
++  photo(s, 0, 0, 8.515, 11.25, '5B5B5B');
++  icon(s, 'wave', 0.818, 7.045, 3.487, 4.076, C.white, { transparency: 76 });
++  icon(s, 'wave', 4.21, 7.045, 3.487, 4.076, C.white, { transparency: 76 });
++  t(s, 'PROFESSIONAL TEAM', 11.354, 1.207, 3.414, 0.438, S.eyebrow);
++  icon(s, 'play', 10.724, 1.186, 0.481, 0.481, C.lime);
++  t(s, 'Rendy Wilson Andreas', 10.724, 1.899, 7.313, 0.707, S.h1);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac tincidunt vitae. Ut libero volutpat', 10.724, 3.571, 7.313, 0.959, S.body);
++  sh(s, 'snip1Rect', 10.85, 8.983, 1.013, 1.081, C.plum, { rectRadius: 0.282, line: ln(C.white, 2.25) });
++  icon(s, 'phones', 11.015, 9.182, 0.683, 0.683, C.white);
++  sh(s, 'snip1Rect', 12.411, 8.983, 1.013, 1.081, C.plum, { rectRadius: 0.282, line: ln(C.white, 2.25) });
++  [[0, 0], [0, 1.866]].forEach(function (d) {
++    t(s, 'YOUR TITLE HERE', d[0] + 10.724, d[1] + 4.938, 4.56, 0.55, S.sub);
++    t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac tincidunt vitae. Ut libero volutpat', d[0] + 10.724, d[1] + 5.537, 7.313, 0.959, S.body);
++  });
++  icon(s, 'youtube', 14.563, 9.339, 0.512, 0.358, C.red);
++  t(s, 'Youtube Channel', 15.227, 9.322, 2.873, 0.404, S.labelW);
++  t(s, 'Job Position', 10.718, 2.633, 4.56, 0.55, S.sub, { italic: true });
++  sh(s, 'roundRect', 1.347, 8.606, 5.544, 1.228, C.white);
++  icon(s, 'prev', 2.181, 9.105, 0.304, 0.23, C.ink);
++  icon(s, 'next', 5.754, 9.105, 0.303, 0.23, C.ink);
++  t(s, [{ text: 'Music' }, { text: ' – ' }, { text: 'Live Streaming', options: { color: C.lime } }], 1.754, 7.107, 4.731, 0.505, null, { fontFace: 'Roboto', fontSize: 24, color: C.white, bold: true, align: 'center' });
++  t(s, 'Rendy Wilson Andreas', 1.839, 7.612, 4.56, 0.505, null, { fontFace: 'Figtree', fontSize: 18, color: C.white, bold: true, lineSpacingMultiple: 1.5, align: 'center' });
++  icon(s, 'disc', 12.588, 9.194, 0.659, 0.659, C.white);
++  sh(s, 'ellipse', 3.817, 8.918, 0.604, 0.604, { color: C.grey, transparency: 40 });
++  icon(s, 'pause', 4, 9.101, 0.238, 0.238, C.white);
++  icon(s, 'logo', 0.472, 0.401, 0.653, 0.653, C.lime);
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 0.729, 0.542, 1.443, 0.37, S.logo, { align: 'right' });
++}
++
++function slide14(s) {
++  background(s);
++  art12(s);
++  photo(s, 10.859, 0, 9.141, 4.636, 'C3C3C3');
++  t(s, 'OUR SERVICE', 2.09, 1.588, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 1.46, 1.567, 0.481, 0.481, C.lime);
++  t(s, 'List Of Music Genres At Our Best Music Festivals', 1.46, 2.28, 7.274, 1.313, S.h1);
++  sh(s, 'rect', 1.46, 4.709, 7.681, 4.974, C.ink, { line: ln(C.white, 10) });
++  t(s, 'MUSICIANS & BANDS', 4.211, 5.475, 4.122, 0.55, S.sub);
++  t(s, '01. Mauris nunc congue nisi vitae', 4.211, 6.099, 4.122, 0.505, S.body);
++  t(s, '02. Mauris nunc congue nisi vitae', 4.211, 6.677, 4.122, 0.505, S.body);
++  t(s, '03. Mauris nunc congue nisi vitae', 4.211, 7.255, 4.122, 0.505, S.body);
++  t(s, '04. Mauris nunc congue nisi vitae', 4.211, 7.834, 4.122, 0.505, S.body);
++  t(s, '05. Mauris nunc congue nisi vitae', 4.211, 8.512, 4.122, 0.505, S.body);
++  sh(s, 'snip1Rect', 2.318, 6.184, 1.013, 1.081, C.plum, { rectRadius: 0.282, line: ln(C.white, 2.25) });
++  t(s, 'CLASSICAL MUSIC', 2.194, 7.636, 1.297, 0.572, null, { fontFace: 'Figtree ExtraBold', fontSize: 14, color: C.white, bold: true });
++  icon(s, 'notes', 2.481, 6.381, 0.686, 0.686, C.white);
++  sh(s, 'rect', 10.859, 4.709, 7.681, 4.974, C.ink, { line: ln(C.white, 10) });
++  t(s, 'MUSICIANS & BANDS', 13.61, 5.475, 4.122, 0.55, S.sub);
++  t(s, '01. Mauris nunc congue nisi vitae', 13.61, 6.099, 4.122, 0.505, S.body);
++  t(s, '02. Mauris nunc congue nisi vitae', 13.61, 6.677, 4.122, 0.505, S.body);
++  t(s, '03. Mauris nunc congue nisi vitae', 13.61, 7.255, 4.122, 0.505, S.body);
++  t(s, '04. Mauris nunc congue nisi vitae', 13.61, 7.834, 4.122, 0.505, S.body);
++  t(s, '05. Mauris nunc congue nisi vitae', 13.61, 8.412, 4.122, 0.505, S.body);
++  sh(s, 'snip1Rect', 11.717, 6.184, 1.013, 1.081, C.plum, { rectRadius: 0.282, line: ln(C.white, 2.25) });
++  t(s, 'COUNTRY MUSIC', 11.657, 7.636, 1.443, 0.572, null, { fontFace: 'Figtree ExtraBold', fontSize: 14, color: C.white, bold: true });
++  icon(s, 'guitar', 11.88, 6.381, 0.686, 0.686, C.white);
++}
++
++function slide15(s) {
++  background(s);
++  art13(s);
++  s.addShape('custGeom', { x: 2.147, y: 3.411, w: 6.358, h: 2.584, points: [{ x: 0, y: 1.292 }, { x: 0, y: 1.292 }, { x: 0, y: 1.292 }, { close: true }, { x: 1.292, y: 0, moveTo: true }, { x: 5.066, y: 0 }, { x: 6.358, y: 1.292, curve: { type: 'cubic', x1: 5.779, y1: 0, x2: 6.358, y2: 0.578 } }, { x: 6.358, y: 1.292 }, { x: 5.066, y: 2.584, curve: { type: 'cubic', x1: 6.358, y1: 2.005, x2: 5.779, y2: 2.584 } }, { x: 1.292, y: 2.584 }, { x: 0.026, y: 1.552, curve: { type: 'cubic', x1: 0.668, y1: 2.584, x2: 0.147, y2: 2.141 } }, { x: 0, y: 1.292 }, { x: 0.026, y: 1.032 }, { x: 1.292, y: 0, curve: { type: 'cubic', x1: 0.147, y1: 0.443, x2: 0.668, y2: 0 } }, { close: true }], fill: { color: 'C3C3C3' } });
++  s.addShape('custGeom', { x: 11.495, y: 3.411, w: 6.358, h: 2.584, points: [{ x: 0, y: 1.292 }, { x: 0, y: 1.292 }, { x: 0, y: 1.292 }, { close: true }, { x: 1.292, y: 0, moveTo: true }, { x: 5.066, y: 0 }, { x: 6.358, y: 1.292, curve: { type: 'cubic', x1: 5.779, y1: 0, x2: 6.358, y2: 0.578 } }, { x: 6.358, y: 1.292 }, { x: 5.066, y: 2.584, curve: { type: 'cubic', x1: 6.358, y1: 2.005, x2: 5.779, y2: 2.584 } }, { x: 1.292, y: 2.584 }, { x: 0.026, y: 1.552, curve: { type: 'cubic', x1: 0.668, y1: 2.584, x2: 0.147, y2: 2.141 } }, { x: 0, y: 1.292 }, { x: 0.026, y: 1.032 }, { x: 1.292, y: 0, curve: { type: 'cubic', x1: 0.147, y1: 0.443, x2: 0.668, y2: 0 } }, { close: true }], fill: { color: 'C3C3C3' } });
++  t(s, 'MUSICIANS & BANDS', 4.739, 6.61, 4.122, 0.55, S.sub);
++  t(s, '01. Mauris nunc congue nisi vitae', 4.739, 7.233, 4.122, 0.505, S.body);
++  t(s, '02. Mauris nunc congue nisi vitae', 4.739, 7.812, 4.122, 0.505, S.body);
++  t(s, '03. Mauris nunc congue nisi vitae', 4.739, 8.39, 4.122, 0.505, S.body);
++  t(s, '04. Mauris nunc congue nisi vitae', 4.739, 8.968, 4.122, 0.505, S.body);
++  t(s, '05. Mauris nunc congue nisi vitae', 4.739, 9.647, 4.122, 0.505, S.body);
++  sh(s, 'ellipse', 2.179, 7.514, 0.803, 0.803, C.plum2, { line: ln(C.white, 1) });
++  t(s, 'JAZZ', 2.239, 8.676, 0.682, 0.337, S.tiny, { align: 'center' });
++  sh(s, 'leftBrace', 3.825, 6.831, 0.527, 3.1, null, { line: ln(C.white, 2.25) });
++  t(s, 'MUSICIANS & BANDS', 11.139, 6.61, 4.122, 0.55, S.sub);
++  t(s, '01. Mauris nunc congue nisi vitae', 11.139, 7.233, 4.122, 0.505, S.body);
++  t(s, '02. Mauris nunc congue nisi vitae', 11.139, 7.812, 4.122, 0.505, S.body);
++  t(s, '03. Mauris nunc congue nisi vitae', 11.139, 8.39, 4.122, 0.505, S.body);
++  t(s, '04. Mauris nunc congue nisi vitae', 11.139, 8.968, 4.122, 0.505, S.body);
++  t(s, '05. Mauris nunc congue nisi vitae', 11.139, 9.647, 4.122, 0.505, S.body);
++  sh(s, 'ellipse', 17.018, 7.514, 0.803, 0.803, C.plum2, { line: ln(C.white, 1), flipH: true });
++  t(s, 'POP MUSIC', 16.796, 8.676, 1.247, 0.337, S.tiny, { align: 'center' });
++  sh(s, 'leftBrace', 15.648, 6.831, 0.527, 3.1, null, { line: ln(C.white, 2.25), flipH: true });
++  t(s, 'OUR SERVICE', 8.952, 1.12, 2.493, 0.438, S.eyebrow, { align: 'center' });
++  icon(s, 'play', 8.555, 1.098, 0.481, 0.481, C.lime);
++  t(s, 'List Of Music Genres At Our Best Music Festivals', 2.982, 1.781, 14.036, 0.707, S.h1, { align: 'center' });
++  icon(s, 'mic', 17.178, 7.674, 0.483, 0.483, C.white);
++  icon(s, 'clef', 2.305, 7.64, 0.55, 0.55, C.white);
++}
++
++function slide16(s) {
++  background(s);
++  art14(s);
++  photo(s, 11.225, 0, 8.825, 9.076, '5B5B5B');
++  sh(s, 'ellipse', 15.096, 3.306, 1.082, 1.082, { color: C.white, transparency: 10.2 });
++  sh(s, 'ellipse', 15.176, 3.386, 0.923, 0.923, { color: 'D0CECE', transparency: 10.2 });
++  sh(s, 'rect', 15.555, 3.706, 0.245, 0.283, '010103');
++  t(s, [{ text: 'Music' }, { text: ' – ' }, { text: 'Live Entertainment', options: { color: C.lime } }], 13.272, 4.759, 4.731, 0.505, null, { fontFace: 'Roboto', fontSize: 24, color: C.white, bold: true, align: 'center' });
++  t(s, 'SAFIRA CASSSANDRA', 13.357, 5.264, 4.56, 0.505, null, { fontFace: 'Figtree', fontSize: 18, color: C.white, bold: true, lineSpacingMultiple: 1.5, align: 'center' });
++  sh(s, 'rect', 1.56, 4.866, 7.274, 1.059, C.ink);
++  t(s, 'OUR SERVICE', 2.19, 1.588, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 1.56, 1.567, 0.481, 0.481, C.lime);
++  t(s, 'Spectacular Event With Various Genre', 1.56, 2.28, 7.274, 1.313, S.h1);
++  t(s, 'ROCK MUSIC', 1.56, 3.973, 4.56, 0.55, S.body20, { bold: true });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus', 1.997, 5.068, 5.994, 0.505, S.body);
++  icon(s, 'kebab', 7.984, 5.178, 0.436, 0.436, C.white, { rotate: 270 });
++  sh(s, 'rect', 1.56, 7.099, 7.274, 2.584, C.ink);
++  t(s, 'TECHNO MUSIC', 1.56, 6.206, 4.56, 0.55, S.sub);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus is mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus sit amet.', 1.997, 7.684, 5.573, 1.414, S.body);
++  icon(s, 'kebab', 7.984, 8.173, 0.436, 0.436, C.white, { rotate: 270 });
++  icon(s, 'kebab', 19.201, 0.391, 0.436, 0.436, C.white, { rotate: 270 });
++}
++
++function slide17(s) {
++  background(s);
++  art15(s);
++  sh(s, 'octagon', 10.257, 4.573, 2.512, 2.512, 'C3C3C3', { line: ln(C.lime, 2.25) });
++  sh(s, 'octagon', 4.806, 6.293, 2.512, 2.512, 'C3C3C3', { line: ln(C.lime, 2.25) });
++  sh(s, 'octagon', 4.806, 2.586, 2.512, 2.512, 'C3C3C3', { line: ln(C.lime, 2.25) });
++  icon(s, 'logo', 17.73, 0.32, 0.653, 0.653, C.lime);
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 17.988, 0.461, 1.443, 0.37, S.logo, { align: 'right' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac ut ornare lectus sit amet est placerat.', 13.72, 4.178, 4.986, 1.414, S.body);
++  t(s, 'OUR SERVICE', 10.888, 2.036, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 10.257, 2.014, 0.481, 0.481, C.lime);
++  t(s, 'Step By Step Create A Music Event', 10.144, 2.599, 7.322, 1.313, S.h1);
++  sh(s, 'leftBrace', 8.652, 3.315, 0.809, 4.762, null, { line: ln(C.white, 2.25), flipH: true });
++  t(s, 'EVENT GOALS CREATE A BUDGET', 10.471, 7.572, 2.084, 1.01, S.labelW, { align: 'center' });
++  t(s, 'TARGET AUDIENCE', 1.294, 3.217, 2.178, 0.707, S.labelW);
++  sh(s, 'snip1Rect', 1.389, 2.289, 0.536, 0.572, C.plum, { rectRadius: 0.149, line: ln(C.white, 2.25) });
++  icon(s, 'mega', 1.476, 2.394, 0.362, 0.362, C.white);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim.', 1.294, 3.982, 2.782, 1.414, S.body);
++  t(s, 'GET YOUR STAFF', 1.294, 6.924, 1.456, 0.707, S.labelW);
++  sh(s, 'snip1Rect', 1.389, 5.996, 0.536, 0.572, C.plum, { rectRadius: 0.149, line: ln(C.white, 2.25) });
++  icon(s, 'mega', 1.476, 6.101, 0.362, 0.362, C.white);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim.', 1.294, 7.689, 2.782, 1.414, S.body);
++  [[0, 0], [0, 0.78], [0, 1.56], [0, 2.251]].forEach(function (d) {
++    t(s, ' Phasellus Vestibulum Lorem', d[0] + 14.223, d[1] + 5.925, 4.122, 0.55, S.sub);
++    icon(s, 'check', d[0] + 13.727, d[1] + 6.068, 0.315, 0.315, C.lime);
++  });
++  [[0, 0], [0, 4.672]].forEach(function (d) {
++    sh(s, 'ellipse', d[0] + 8.239, d[1] + 3.099, 0.496, 0.496, C.white, { flipH: true });
++    sh(s, 'ellipse', d[0] + 8.315, d[1] + 3.175, 0.344, 0.344, C.lime, { flipH: true });
++  });
++}
++
++function slide18(s) {
++  background(s);
++  gradRect(s, 0, 0, 20, 11.25, G16, 'v');
++  photo(s, 0, 0, 20, 11.25, '5B5B5B');
++  sh(s, 'roundRect', 7.228, 7.31, 5.544, 1.228, C.lime);
++  icon(s, 'prev', 8.062, 7.809, 0.304, 0.23, C.ink);
++  icon(s, 'next', 11.634, 7.809, 0.304, 0.23, C.ink);
++  sh(s, 'ellipse', 9.698, 7.622, 0.604, 0.604, C.ink);
++  icon(s, 'pause', 9.881, 7.805, 0.238, 0.238, C.white);
++  t(s, [{ text: 'BREAK' }, { text: '.', options: { color: C.lime } }, { text: 'FAST' }], 3.256, 4.312, 13.488, 2.625, S.hero2, { align: 'center' });
++  t(s, 'MUSIC EVENT PRESENTATION', 7.677, 3.787, 4.646, 0.438, S.eyebrow, { align: 'center' });
++  [[0, 0], [16.345, 0]].forEach(function (d) {
++    icon(s, 'wave', d[0] + -0.084, d[1] + 4.469, 1.99, 2.327, C.paper, { transparency: 82 });
++    icon(s, 'wave', d[0] + 1.853, d[1] + 4.469, 1.99, 2.327, C.paper, { transparency: 82 });
++  });
++  icon(s, 'spotify', 13.63, 10.133, 0.512, 0.512, C.lime);
++  t(s, 'Spotify', 14.27, 10.187, 1.495, 0.404, S.labelW);
++  icon(s, 'youtube', 15.935, 10.21, 0.512, 0.358, C.red);
++  t(s, 'Youtube Channel', 16.599, 10.192, 2.873, 0.404, S.labelW);
++  icon(s, 'logo', 0.472, 0.401, 0.653, 0.653, C.lime);
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 0.729, 0.542, 1.443, 0.37, S.logo, { align: 'right' });
++}
++
++function slide19(s) {
++  background(s);
++  art16(s);
++  t(s, [{ text: 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac ut ornare lectus sit amet est placerat  cras pulvinar. ', options: { breakLine: true } }, { text: '', options: { color: C.white, breakLine: true } }, { text: 'Mauris nunc congue nisi vitae suscipit tellus mauris integer enim neque volutpat ac tincidunt vitae. Ut libero volutpat sed cras cras pulvinar odio eu feugiat. Lorem ipsum dolor sit amet, consectetur adipiscing elit.' }], 9.65, 3.353, 8.3, 2.777, S.body);
++  t(s, 'PORTFOLIO', 10.28, 1.068, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 9.65, 1.047, 0.481, 0.481, C.lime);
++  t(s, 'Upcoming Pop Music Events, Don\'t Forget !', 9.65, 1.76, 8.3, 1.313, S.h1);
++  t(s, 'POPULAR MUSIC APPS', 6.19, 4.914, 1.548, 0.572, S.tiny, { align: 'center' });
++  sh(s, 'ellipse', 6.563, 3.797, 0.803, 0.803, C.plum2, { line: ln(C.white, 1) });
++  icon(s, 'phones', 6.668, 3.902, 0.593, 0.593, C.white);
++  sh(s, 'ellipse', 6.57, 1.544, 0.803, 0.803, C.plum2, { line: ln(C.white, 1) });
++  t(s, 'LIVE STREAMING CONCERTS', 6.031, 2.657, 1.867, 0.572, S.tiny, { align: 'center' });
++  icon(s, 'note', 6.733, 1.708, 0.477, 0.477, C.white);
++  s.addShape('custGeom', { x: 0, y: 0, w: 8.05, h: 11.25, points: [{ x: 0, y: 0 }, { x: 5.408, y: 0 }, { x: 5.366, y: 0.219 }, { x: 4.593, y: 4.594, curve: { type: 'cubic', x1: 4.996, y1: 1.832, x2: 3.48, y2: 2.899 } }, { x: 7.552, y: 11.217, curve: { type: 'cubic', x1: 6.024, y1: 6.773, x2: 9.292, y2: 8.454 } }, { x: 7.53, y: 11.25 }, { x: 0, y: 11.25 }, { close: true }], fill: { color: '5B5B5B' } });
++  sh(s, 'roundRect', 11.165, 7.208, 6.461, 2.584, { color: '000000', transparency: 60 }, { rectRadius: 1.292 });
++  sh(s, 'roundRect', 2.372, 7.161, 6.421, 2.595, { color: '000000', transparency: 55.3 }, { rectRadius: 1.298 });
++  sh(s, 'roundRect', 10.88, 7.041, 7.07, 2.845, null, { rectRadius: 1.423, line: ln(C.violet, 3) });
++  sh(s, 'roundRect', 11.164, 7.208, 6.461, 2.548, '5B5B5B', { rectRadius: 1.274 });
++  sh(s, 'roundRect', 2.048, 7.041, 7.07, 2.845, null, { rectRadius: 1.423, line: ln(C.violet, 3) });
++  sh(s, 'roundRect', 2.372, 7.161, 6.421, 2.595, 'C3C3C3', { rectRadius: 1.298 });
++  [[0, 0], [-8.832, 0]].forEach(function (d) {
++    gradPoly(s, d[0] + 12.723, d[1] + 9.339, 3.383, 0.954, roundPts(3.383, 0.954, 0.477), G11, 'v');
++    t(s, 'BUY TICKET', d[0] + 13.525, d[1] + 9.631, 1.781, 0.37, S.btn, { align: 'center' });
++  });
++  t(s, [{ text: 'CIRCLE OF FIFTY', options: { breakLine: true } }, { text: 'Jul 09 Monday, 2024, 10:10 PM', options: { color: C.paper, fontSize: 18, bold: false } }], 12.154, 7.845, 4.483, 1.01, S.sub, { align: 'center' });
++  t(s, [{ text: 'ZIAD FAUZAN', options: { breakLine: true } }, { text: 'Jul 09 Monday, 2024, 10:10 PM', options: { color: C.paper, fontSize: 18, bold: false } }], 3.341, 7.804, 4.483, 1.01, S.sub, { align: 'center' });
++}
++
++function slide20(s) {
++  background(s);
++  art17(s);
++  photo(s, 2.129, 1.754, 3.125, 7.741, 'C3C3C3');
++  sh(s, 'rect', 11.191, 4.131, 7.274, 2.584, C.ink);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim neque volutpat ac tincidunt vitae. Ut sit ornare lectus it amet est placerat', 11.678, 4.716, 5.201, 1.414, S.body);
++  icon(s, 'kebab', 17.59, 5.205, 0.436, 0.436, C.white, { rotate: 270 });
++  sh(s, 'rect', 11.197, 7.147, 7.274, 2.584, null, { line: ln(C.white, 1) });
++  icon(s, 'kebab', 17.596, 8.221, 0.436, 0.436, C.white, { rotate: 270 });
++  t(s, 'PORTFOLIO', 11.821, 1.541, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 11.191, 1.519, 0.481, 0.481, C.lime);
++  t(s, 'History Of Our Best Events In Music Festivals', 11.191, 2.233, 7.274, 1.313, S.h1);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim neque volutpat ac tincidunt vitae. Ut sit ornare lectus it amet est placerat', 11.671, 7.732, 5.201, 1.414, S.body);
++  photo(s, 5.787, 1.754, 3.125, 7.741, 'C3C3C3');
++}
++
++function slide21(s) {
++  background(s);
++  art18(s);
++  sh(s, 'octagon', 2.296, 6.346, 3.319, 3.319, '5B5B5B', { line: ln(C.violet, 2.25) });
++  sh(s, 'octagon', 6.262, 6.346, 3.319, 3.319, '5B5B5B', { line: ln(C.violet, 2.25) });
++  sh(s, 'ellipse', 7.52, 7.176, 0.803, 0.803, C.plum2, { line: ln(C.white, 1) });
++  t(s, 'MUSIC LIVE STREAMING', 7, 8.263, 1.844, 0.572, S.tiny, { align: 'center' });
++  sh(s, 'ellipse', 3.554, 7.176, 0.803, 0.803, C.plum2, { line: ln(C.white, 1) });
++  t(s, 'EVENT MANAGEMENT ENTERTAINMENT', 2.774, 8.263, 2.363, 0.572, S.tiny, { align: 'center' });
++  t(s, 'PORTFOLIO', 8.952, 0.945, 2.493, 0.438, S.eyebrow, { align: 'center' });
++  icon(s, 'play', 8.555, 0.923, 0.481, 0.481, C.lime);
++  t(s, 'Music Festival Marketing And Promotion', 4.601, 1.606, 10.799, 0.707, S.h1, { align: 'center' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus sit amet est placerat in egestas. Sem integer vitae justo eget magna fermentum. Fermentum odio eu feugiat pretium nibh ipsum consequat nisl Sed faucibus turpis in eu. Phasellus vestibulum lorem sed risus ultricies tristique nulla aliquet enim.', 2.256, 2.596, 15.487, 1.414, S.bodyW, { align: 'center' });
++  sh(s, 'snip1Rect', 11.039, 6.876, 1.013, 1.081, C.plum, { rectRadius: 0.282, line: ln(C.white, 2.25) });
++  t(s, 'OUR UPCOMING EVENT', 10.915, 8.328, 1.233, 0.808, S.tiny);
++  icon(s, 'mega', 11.204, 7.075, 0.683, 0.683, C.white);
++  t(s, 'EVENT 01', 13.248, 6.74, 4.122, 0.55, S.sub);
++  t(s, 'Mauris nunc congue nisi vitae tellus mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus sit amet est placerat in', 13.248, 7.404, 4.444, 1.868, S.bodyW);
++  icon(s, 'mic', 3.719, 7.342, 0.472, 0.472, C.white);
++  icon(s, 'guitar', 7.702, 7.358, 0.44, 0.44, C.white, { flipH: true });
++  t(s, 'SATURDAY :  10AM - 20PM', 8.341, 4.36, 3.319, 0.46, S.small, { bold: false, color: C.white, lineSpacingMultiple: 1.5 });
++}
++
++function slide22(s) {
++  background(s);
++  art19(s);
++  s.addShape('custGeom', { x: 8.35, y: 1.56, w: 4.725, h: 5.043, points: [{ x: 0, y: 0 }, { x: 4.725, y: 0 }, { x: 4.725, y: 3.728 }, { x: 3.41, y: 5.043 }, { x: 0, y: 5.043 }, { close: true }], fill: { color: '5B5B5B' }, line: ln(C.white, 2.25) });
++  s.addShape('custGeom', { x: 13.918, y: 1.56, w: 4.725, h: 5.043, points: [{ x: 0, y: 0 }, { x: 3.41, y: 0 }, { x: 4.725, y: 1.314 }, { x: 4.725, y: 5.043 }, { x: 0, y: 5.043 }, { close: true }], fill: { color: '5B5B5B' }, line: ln(C.white, 2.25) });
++  t(s, 'PORTFOLIO', 2.129, 3.005, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 1.499, 2.984, 0.481, 0.481, C.lime);
++  t(s, 'This Year\'s Schedule & Popoler Singers!', 1.499, 3.697, 5.692, 1.313, S.h1);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus sed mauris integer enim neque volutpat ac ut ornare lectus sit amet est placerat lacus vestibulum. Blandit libero volutpat sed cras. Nibh cras mattis nunc sed blandit. Mauris commodo quis massa.', 1.499, 5.944, 5.692, 2.322, S.body);
++  t(s, 'EVENT 01', 1.499, 5.27, 4.122, 0.55, S.sub);
++  icon(s, 'logo', 0.472, 0.401, 0.653, 0.653, C.lime);
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 0.729, 0.542, 1.443, 0.37, S.logo, { align: 'right' });
++  sh(s, 'ellipse', 11.992, 5.52, 1.082, 1.082, C.plum2, { line: ln(C.white, 2.25) });
++  sh(s, 'ellipse', 17.561, 1.56, 1.082, 1.082, C.plum2, { line: ln(C.white, 2.25), rotate: 180, flipH: true });
++  t(s, 'MAIN GUEST STAR NAME', 8.847, 7.068, 4.228, 0.55, S.sub);
++  icon(s, 'check', 8.35, 7.21, 0.315, 0.315, C.lime);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim neque volutpat ac tincidunt vitae. Ut sit ornare lectus it amet est.', 8.35, 7.772, 4.98, 1.414, S.body);
++  t(s, ' MAIN GUEST STAR NAME', 14.415, 7.068, 4.228, 0.55, S.sub);
++  icon(s, 'check', 13.918, 7.21, 0.315, 0.315, C.lime);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim neque volutpat ac tincidunt vitae. Ut sit ornare lectus it amet est.', 13.918, 7.772, 4.98, 1.414, S.body);
++  icon(s, 'people', 12.134, 5.662, 0.799, 0.799, C.white);
++  icon(s, 'phones', 17.729, 1.728, 0.745, 0.745, C.white);
++  t(s, '23 Februari 2024', 8.35, 9.185, 4.725, 0.505, S.label);
++  t(s, '26 Februari 2024', 13.918, 9.185, 4.725, 0.505, S.label);
++}
++
++function slide23(s) {
++  background(s);
++  art20(s);
++  icon(s, 'logo', 17.754, 0.401, 0.653, 0.653, C.lime);
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 18.011, 0.542, 1.443, 0.37, S.logo, { align: 'right' });
++  sh(s, 'rect', 11.196, 4.211, 6.736, 1.354, '0F0A1F');
++  t(s, 'PORTFOLIO', 11.072, 1.53, 2.493, 0.438, S.eyebrow);
++  icon(s, 'play', 10.442, 1.508, 0.481, 0.481, C.lime);
++  t(s, 'This Year\'s Schedule & Popoler Singers!', 10.442, 2.222, 7.274, 1.313, S.h1);
++  t(s, 'EVENT 01', 10.442, 6.116, 4.122, 0.55, S.sub);
++  t(s, 'Mauris nunc congue nisi vitae tellus mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus.', 10.442, 6.78, 7.569, 0.959, S.bodyW);
++  t(s, 'YOUR TITLE HERE', 10.442, 8.118, 4.122, 0.55, S.sub);
++  t(s, 'Mauris nunc congue nisi vitae tellus mauris. Elementum integer enim neque volutpat ac tincidunt vitae. Ut ornare lectus.', 10.442, 8.783, 7.569, 0.959, S.bodyW);
++  sh(s, 'snip1Rect', 10.497, 4.211, 1.292, 1.354, C.plum, { rectRadius: 0.359, line: ln(C.white, 2.25) });
++  t(s, [{ text: 'SAT - SUN : ', options: { breakLine: true } }, { text: '10AM - 20PM' }], 12.407, 4.408, 2.079, 0.959, S.bodyW);
++  sh(s, 'line', 14.789, 4.449, 0, 0.879, null, { line: ln(C.white, 0.75) });
++  t(s, 'MON – FRI : 9AM - 5PM', 15.439, 4.408, 1.901, 0.959, S.bodyW);
++  icon(s, 'clock', 10.724, 4.469, 0.838, 0.838, C.white);
++  s.addShape('custGeom', { x: 2.864, y: 0, w: 5.205, h: 11.25, points: [{ x: 0, y: 0 }, { x: 3.579, y: 0 }, { x: 3.551, y: 0.219 }, { x: 4.948, y: 3.958, curve: { type: 'cubic', x1: 3.306, y1: 1.832, x2: 6.021, y2: 2.5 } }, { x: 4.998, y: 11.217, curve: { type: 'cubic', x1: 1.975, y1: 8, x2: 6.15, y2: 8.454 } }, { x: 4.983, y: 11.25 }, { x: 0, y: 11.25 }, { close: true }], fill: { color: 'C3C3C3' }, line: ln(C.white, 2.25) });
++  s.addShape('custGeom', { x: 0, y: 0, w: 4.477, h: 11.25, points: [{ x: 0, y: 0 }, { x: 3.079, y: 0 }, { x: 3.055, y: 0.219 }, { x: 4.257, y: 3.958, curve: { type: 'cubic', x1: 2.844, y1: 1.832, x2: 5.18, y2: 2.5 } }, { x: 4.3, y: 11.217, curve: { type: 'cubic', x1: 1.699, y1: 8, x2: 5.29, y2: 8.454 } }, { x: 4.287, y: 11.25 }, { x: 0, y: 11.25 }, { close: true }], fill: { color: '5B5B5B' }, line: ln(C.violet, 2.25) });
++  icon(s, 'staff', 4.476, 4.463, 4.199, 4.199, 'C8B4C8', { rotate: 43.59, transparency: 72 });
++}
++
++function slide24(s) {
++  background(s);
++  art21(s);
++  sh(s, 'rect', 11.5, 5.275, 6.288, 3.974, { color: '100A1F', transparency: 70.2 });
++  photo(s, 11.5, 5.275, 6.288, 4.006, '5B5B5B', { line: ln(C.lime, 2.25) });
++  photo(s, 2.212, 1.969, 4.028, 7.311, '5B5B5B');
++  photo(s, 6.572, 1.965, 4.028, 7.311, '5B5B5B');
++  t(s, 'PORTFOLIO', 15.693, 2.001, 2.1, 0.438, S.eyebrow, { align: 'right' });
++  icon(s, 'play', 15.212, 1.98, 0.481, 0.481, C.lime);
++  t(s, 'The Process Behind Hit Songs To Concerts', 12.812, 2.693, 4.976, 1.919, S.h1, { align: 'right' });
++  sh(s, 'snip2SameRect', 2.212, 6.45, 4.028, 2.826, C.violet);
++  sh(s, 'snip2SameRect', 6.572, 6.45, 4.028, 2.835, C.violet);
++  [[0, 0], [-4.361, -0.004], [6.057, -0.004]].forEach(function (d) {
++    t(s, 'YOUR TITLE HERE', d[0] + 6.83, d[1] + 7.427, 3.513, 0.55, S.sub, { align: 'center' });
++    icon(s, 'check', d[0] + 8.442, d[1] + 6.941, 0.315, 0.315, C.lime);
++    t(s, 'Mauris nunc congue nisi vitae is suscipit tellus.', d[0] + 6.996, d[1] + 7.977, 3.181, 0.959, S.body, { align: 'center' });
++  });
++}
++
++function slide25(s) {
++  background(s);
++  art22(s);
++  photo(s, 10.201, 1.05, 7.931, 6.586, 'A8A9AA');
++  sh(s, 'roundRect', 10, 8.2, 2.6, 1.75, C.white);
++  sh(s, 'snip1Rect', 10.834, 8.577, 0.933, 0.995, { color: C.plum, transparency: 75.3 }, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  sh(s, 'roundRect', 12.867, 8.2, 2.6, 1.75, C.ink);
++  sh(s, 'roundRect', 15.733, 8.2, 2.6, 1.75, C.ink);
++  t(s, 'MOCKUP DEVICE', 2.297, 2.262, 2.953, 0.438, S.eyebrow);
++  icon(s, 'play', 1.667, 2.241, 0.481, 0.481, C.lime);
++  t(s, 'Easy Access With The Website We Provide', 1.667, 2.954, 6.708, 1.313, S.h1);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim sed semper  mauris integer neque volutpat ac ut ornare lectus sit amet est placerat lacus vestibulum. Blandit libero volutpat sed cras. Nibh cras mattis nunc sed ut blandit. Mauris commodo quis massa amet justo donec.', 1.667, 5.201, 6.708, 2.322, S.body);
++  t(s, 'YOUR TITLE HERE', 1.667, 4.527, 4.122, 0.55, S.sub);
++  gradPoly(s, 1.667, 8.055, 3.383, 0.954, roundPts(3.383, 0.954, 0.477), G11, 'v');
++  t(s, 'LEARN MORE ', 2.066, 8.347, 1.781, 0.37, S.btn);
++  icon(s, 'chev', 4.101, 8.258, 0.549, 0.549, C.white);
++  sh(s, 'snip1Rect', 13.7, 8.577, 0.933, 0.995, C.plum, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  sh(s, 'snip1Rect', 16.567, 8.577, 0.933, 0.995, C.plum, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  icon(s, 'disc', 11.033, 8.808, 0.535, 0.535, C.white);
++  t(s, 'EVENT INFO & SCHEDULE', 10.454, 8.789, 1.691, 0.64, S.small, { color: C.ink, align: 'center' });
++  icon(s, 'disc', 13.866, 8.775, 0.601, 0.601, C.white);
++  icon(s, 'mic', 16.749, 8.791, 0.568, 0.568, C.white);
++  photo(s, 10.609, 1.425, 7.116, 3.975, '5B5B5B');
++}
++
++function slide26(s) {
++  background(s);
++  art23(s);
++  photo(s, 2.065, 4.06, 2.995, 5.311, '4C4C4C');
++  sh(s, 'roundRect', 5.822, 1.879, 2.995, 5.76, 'C3C3C3', { rectRadius: 0.18 });
++  sh(s, 'roundRect', 2.185, 4.166, 2.756, 5.041, '5B5B5B', { rectRadius: 0.165 });
++  t(s, 'TOP CHART MUSIC', 2.065, 2.996, 2.568, 0.505, S.label, { align: 'center' });
++  sh(s, 'ellipse', 2.529, 1.997, 0.795, 0.795, C.red);
++  icon(s, 'guitar', 2.674, 2.142, 0.505, 0.505, C.white);
++  sh(s, 'ellipse', 2.977, 1.997, 0.795, 0.795, C.ink, { line: ln('280E31', 1) });
++  icon(s, 'note', 3.137, 2.156, 0.477, 0.477, C.white);
++  sh(s, 'ellipse', 3.375, 1.997, 0.795, 0.795, C.violet, { line: ln('280E31', 1) });
++  icon(s, 'phones', 3.52, 2.142, 0.505, 0.505, C.white);
++  sh(s, 'ellipse', 8.062, 2.097, 0.505, 0.505, C.ink, { line: ln('280E31', 1) });
++  icon(s, 'note', 8.163, 2.198, 0.303, 0.303, C.white);
++  t(s, '300+', 6.469, 8.133, 1.7, 0.64, S.stat, { align: 'center' });
++  t(s, 'Music Event', 6.144, 8.773, 2.351, 0.505, S.label, { align: 'center' });
++  sh(s, 'roundRect', 5.822, 5.317, 2.995, 2.322, C.violet, { rectRadius: 0.175 });
++  t(s, 'Mauris nunc congue nisi vitae is suscipit.', 5.977, 5.998, 2.665, 0.959, S.body, { align: 'center' });
++  t(s, 'MOCKUP DEVICE', 12.898, 2.244, 2.974, 0.438, S.eyebrow);
++  icon(s, 'play', 12.268, 2.222, 0.481, 0.481, C.lime);
++  t(s, 'Easy Access With The App We Provide', 12.268, 2.936, 6.243, 1.313, S.h1);
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus sed mauris integer enim neque volutpat ac ut ornare lectus sit amet est placerat lacus vestibulum. Blandit libero volutpat sed cras. Nibh cras mattis nunc sed blandit. Mauris commodo quis massa.', 12.268, 5.183, 6.243, 2.322, S.body);
++  t(s, 'YOUR TITLE HERE', 12.268, 4.509, 4.122, 0.55, S.sub);
++  gradPoly(s, 12.268, 8.073, 2.772, 0.954, roundPts(2.772, 0.954, 0.477), G11, 'v');
++  t(s, 'DOWNLOAD', 12.68, 8.365, 1.948, 0.37, S.btn, { align: 'center' });
++}
++
++function slide27(s) {
++  background(s);
++  photo(s, 1.164, 4.597, 8.493, 4.916, '55565A');
++  t(s, 'MOCKUP DEVICE', 2.448, 1.917, 2.953, 0.438, S.eyebrow);
++  icon(s, 'play', 1.818, 1.895, 0.481, 0.481, C.lime);
++  t(s, 'Easy Download App Windows', 1.818, 2.608, 5.762, 1.313, S.h1);
++  sh(s, 'roundRect', 10.502, 7.762, 2.6, 1.75, C.white);
++  sh(s, 'snip1Rect', 11.336, 8.14, 0.933, 0.995, { color: C.plum, transparency: 75.3 }, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  sh(s, 'roundRect', 13.369, 7.762, 2.6, 1.75, C.ink);
++  sh(s, 'roundRect', 16.236, 7.762, 2.6, 1.75, C.ink);
++  sh(s, 'snip1Rect', 14.203, 8.14, 0.933, 0.995, C.plum, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  sh(s, 'snip1Rect', 17.069, 8.14, 0.933, 0.995, C.plum, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  icon(s, 'disc', 11.535, 8.37, 0.535, 0.535, C.white);
++  t(s, 'EVENT INFO & SCHEDULE', 10.787, 8.318, 2.031, 0.64, S.small, { color: C.ink, align: 'center' });
++  icon(s, 'bell', 17.169, 8.271, 0.733, 0.733, C.white);
++  icon(s, 'disc', 14.369, 8.337, 0.601, 0.601, C.white);
++  sh(s, 'rect', 10.502, 4.393, 7.362, 2.584, C.ink);
++  t(s, 'YOUR TITLE HERE', 10.502, 1.738, 4.56, 0.55, S.sub);
++  icon(s, 'kebab', 16.841, 5.467, 0.436, 0.436, C.white, { rotate: 270 });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim sed semper  mauris integer neque volutpat ac ut ornare lectus sit amet est placerat lacus vestibulum. Blandit libero volutpat ac tincidunt vitae ut ornare.', 10.502, 2.462, 8.333, 1.414, S.body);
++  [[0, 0], [0, 0.78]].forEach(function (d) {
++    t(s, ' Phasellus Vestibulum Lorem', d[0] + 12.026, d[1] + 5.02, 4.122, 0.55, S.sub);
++    icon(s, 'check', d[0] + 11.529, d[1] + 5.163, 0.315, 0.315, C.lime);
++  });
++  photo(s, 2.135, 4.847, 6.551, 4.057, '5B5B5B');
++}
++
++function slide28(s) {
++  background(s);
++  art24(s);
++  t(s, 'PRICING PLAN', 8.952, 0.971, 2.493, 0.438, S.eyebrow, { align: 'center' });
++  icon(s, 'play', 8.555, 0.949, 0.481, 0.481, C.lime);
++  t(s, 'The Tickets Are On Sale At A Starting Price Of Approximately', 1.904, 1.632, 16.193, 0.707, S.h1, { align: 'center' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim sed semper  mauris integer neque volutpat ac ut ornare lectus sit amet est placerat lacus vestibulum. Blandit libero volutpat ac tincidunt vitae ut ornare. Blandit libero volutpat sed cras nibh cras.', 2.207, 2.701, 15.587, 0.959, S.body, { align: 'center' });
++  sh(s, 'parallelogram', 15.816, 14.578, 4.52, 1.36, C.white);
++  t(s, 'GET STARTED', 16.154, 14.939, 3.845, 0.64, null, { fontFace: 'Hind SemiBold', fontSize: 32, color: '222224', align: 'center' });
++  sh(s, 'snip1Rect', 1.301, 4.525, 5.05, 5.776, C.ink, { rectRadius: 1.405, line: ln(C.white, 2.25) });
++  sh(s, 'snip1Rect', 5.142, 4.758, 0.933, 0.995, C.plum, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  [[0, 0], [0, 1.342]].forEach(function (d) {
++    t(s, 'Phasellus Vestibulum', d[0] + 2.427, d[1] + 7.104, 3.124, 0.55, S.sub);
++    icon(s, 'check', d[0] + 1.93, d[1] + 7.246, 0.315, 0.315, C.lime);
++    t(s, 'Phasellus Vestibulum', d[0] + 2.427, d[1] + 7.775, 3.124, 0.55, S.sub);
++    icon(s, 'check', d[0] + 1.93, d[1] + 7.917, 0.315, 0.315, C.lime);
++  });
++  t(s, 'REGULAR', 1.93, 5.119, 2.695, 0.505, null, { fontFace: 'Oswald SemiBold', fontSize: 24, color: C.white });
++  t(s, '$35', 1.911, 5.84, 1.665, 0.909, null, { fontFace: 'Roboto', fontSize: 48, color: C.white, bold: true });
++  sh(s, 'snip1Rect', 7.475, 4.525, 5.05, 5.776, C.ink, { rectRadius: 1.405, line: ln(C.white, 2.25) });
++  sh(s, 'snip1Rect', 11.316, 4.758, 0.933, 0.995, C.plum, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  [[0, 0], [0, 1.342]].forEach(function (d) {
++    t(s, 'Phasellus Vestibulum', d[0] + 8.601, d[1] + 7.104, 3.124, 0.55, S.sub);
++    icon(s, 'check', d[0] + 8.104, d[1] + 7.246, 0.315, 0.315, C.lime);
++    t(s, 'Phasellus Vestibulum', d[0] + 8.601, d[1] + 7.775, 3.124, 0.55, S.sub);
++    icon(s, 'check', d[0] + 8.104, d[1] + 7.917, 0.315, 0.315, C.lime);
++  });
++  t(s, 'ON THE SPOT', 8.104, 5.119, 2.695, 0.505, null, { fontFace: 'Oswald SemiBold', fontSize: 24, color: C.white });
++  t(s, '$50', 8.085, 5.84, 1.703, 0.909, null, { fontFace: 'Roboto', fontSize: 48, color: C.white, bold: true });
++  sh(s, 'snip1Rect', 13.649, 4.525, 5.05, 5.776, C.ink, { rectRadius: 1.405, line: ln(C.white, 2.25) });
++  sh(s, 'snip1Rect', 17.489, 4.758, 0.933, 0.995, C.plum, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  [[0, 0], [0, 1.342]].forEach(function (d) {
++    t(s, 'Phasellus Vestibulum', d[0] + 14.775, d[1] + 7.104, 3.124, 0.55, S.sub);
++    icon(s, 'check', d[0] + 14.278, d[1] + 7.246, 0.315, 0.315, C.lime);
++    t(s, 'Phasellus Vestibulum', d[0] + 14.775, d[1] + 7.775, 3.124, 0.55, S.sub);
++    icon(s, 'check', d[0] + 14.278, d[1] + 7.917, 0.315, 0.315, C.lime);
++  });
++  t(s, 'VIP', 14.278, 5.119, 2.695, 0.505, null, { fontFace: 'Oswald SemiBold', fontSize: 24, color: C.white });
++  t(s, '$75', 14.258, 5.84, 1.895, 0.909, null, { fontFace: 'Roboto', fontSize: 48, color: C.white, bold: true });
++  icon(s, 'ticket', 5.302, 4.949, 0.614, 0.614, C.white);
++  icon(s, 'ticket', 11.475, 4.949, 0.614, 0.614, C.white);
++  icon(s, 'ticket', 17.649, 4.949, 0.614, 0.614, C.white);
++}
++
++function slide29(s) {
++  background(s);
++  art25(s);
++  crossLines(s, 8.166, 5.427, 3.997, 3.997, 'E7E6E6');
++  petal(s, 7.591, 7.487, 2.516, 2.516, 1, C.ink);
++  petal(s, 7.591, 4.851, 2.517, 2.517, 2, C.white);
++  petal(s, 10.227, 7.487, 2.516, 2.517, 0, C.lime);
++  petal(s, 10.227, 4.851, 2.516, 2.517, 3, C.violet);
++  t(s, 'Lorem Ipsum', 3.445, 4.851, 3.2, 0.438, S.lead20, { align: 'right', valign: 'bottom', margin: 0 });
++  t(s, 'Nibh ipsum consequat nisl vel. Eget mi proin sed libero enim sed. Amet porttitor eget dolor morbi non arcu. Posuere ac ut consequat semper viverra nam. Erat nam at lectus urna duis convallis convallis', 2, 5.458, 4.709, 1.616, S.body, { lineSpacingMultiple: 1, align: 'right', margin: 0 });
++  t(s, 'INFOGRAPHIC', 8.952, 0.971, 2.493, 0.438, S.eyebrow, { align: 'center' });
++  icon(s, 'play', 8.555, 0.949, 0.481, 0.481, C.lime);
++  t(s, ' Event Planning Process To Be Carried Out Properly', 4.601, 1.632, 10.799, 1.313, S.h1, { align: 'center' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim sed semper  mauris integer neque volutpat ac ut ornare lectus sit amet est placerat lacus vestibulum. Blandit libero volutpat ac tincidunt vitae ut ornare. Blandit libero volutpat sed cras nibh cras.', 2.95, 3.069, 14.1, 0.959, S.body, { align: 'center' });
++  icon(s, 'speaker', 7.894, 5.13, 1, 1, '101010');
++  icon(s, 'violin', 11.545, 8.751, 0.94, 0.94, '101010');
++  icon(s, 'notes', 7.908, 8.733, 0.805, 0.805, C.white);
++  icon(s, 'phones', 11.591, 5.237, 0.894, 0.894, C.white);
++  t(s, 'Lorem Ipsum', 3.445, 7.781, 3.2, 0.438, S.lead20, { align: 'right', valign: 'bottom', margin: 0 });
++  t(s, 'Nibh ipsum consequat nisl vel. Eget mi proin sed libero enim sed. Amet porttitor eget dolor morbi non arcu. Posuere ac ut consequat semper viverra nam. Erat nam at lectus urna duis convallis convallis', 2, 8.387, 4.709, 1.616, S.body, { lineSpacingMultiple: 1, align: 'right', margin: 0 });
++  [[0, 0], [-0.002, 2.93]].forEach(function (d) {
++    t(s, 'Lorem Ipsum', d[0] + 13.627, d[1] + 4.851, 3.2, 0.438, S.lead20, { valign: 'bottom', margin: 0 });
++    t(s, 'Nibh ipsum consequat nisl vel. Eget mi proin sed libero enim sed. Amet porttitor eget dolor morbi non arcu. Posuere ac ut consequat semper viverra nam. Erat nam at lectus urna duis convallis convallis', d[0] + 13.627, d[1] + 5.458, 4.709, 1.616, S.body, { lineSpacingMultiple: 1, margin: 0 });
++  });
++  sh(s, 'roundRect', 9.169, 6.429, 1.999, 1.999, 'C3C3C3', { rectRadius: 0.12, line: ln(C.violet, 2.25) });
++}
++
++function slide30(s) {
++  background(s);
++  art24(s);
++  sh(s, 'roundRect', 11.212, 2.61, 7.158, 3.356, C.ink, { rectRadius: 0.307 });
++  icon(s, 'wave', 16.383, 3.124, 1.99, 2.327, 'F4F4F4', { flipH: true, transparency: 90 });
++  sh(s, 'roundRect', 1.667, 6.148, 7.158, 3.356, C.ink, { rectRadius: 0.307 });
++  icon(s, 'wave', 1.727, 6.663, 1.99, 2.327, 'EFEFEF', { transparency: 94 });
++  t(s, 'TESTIMONIAL', 2.297, 1.767, 2.953, 0.438, S.eyebrow);
++  icon(s, 'play', 1.667, 1.745, 0.481, 0.481, C.lime);
++  t(s, 'What They Say About Our Festival', 1.667, 2.459, 7.158, 1.313, S.h1);
++  t(s, 'YOUR NAME HERE', 4.921, 6.571, 3.054, 0.404, S.labelW, { align: 'right' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim sed semper  mauris integer neque volutpat ac ut', 2.34, 7.837, 5.811, 0.959, S.body);
++  t(s, 'Job Position', 5.224, 6.98, 2.751, 0.415, S.tiny, { bold: false, color: C.paper, lineSpacingMultiple: 1.5, align: 'right' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit sed mauris integer enim neque volutpat ac ut ornare lectus sit amet est placerat lacus sed cras. Nibh cras mattis nunc sed blandit. ', 11.212, 8.496, 7.121, 1.414, S.body);
++  t(s, 'TOP CHART MUSIC', 11.212, 7.933, 2.901, 0.505, S.label);
++  sh(s, 'ellipse', 11.321, 6.949, 0.795, 0.795, C.red);
++  icon(s, 'guitar', 11.466, 7.094, 0.505, 0.505, C.white);
++  sh(s, 'ellipse', 11.769, 6.949, 0.795, 0.795, C.ink, { line: ln('68185E', 1) });
++  icon(s, 'note', 11.928, 7.108, 0.477, 0.477, C.white);
++  sh(s, 'ellipse', 12.167, 6.949, 0.795, 0.795, C.violet, { line: ln('68185E', 1) });
++  icon(s, 'phones', 12.312, 7.094, 0.505, 0.505, C.white);
++  t(s, 'YOUR NAME HERE', 14.466, 3.032, 3.054, 0.404, S.labelW, { align: 'right' });
++  t(s, 'Mauris nunc congue nisi vitae suscipit tellus enim sed semper  mauris integer neque volutpat ac ut', 11.886, 4.298, 5.811, 0.959, S.body);
++  t(s, 'Job Position', 14.77, 3.441, 2.751, 0.415, S.tiny, { bold: false, color: C.paper, lineSpacingMultiple: 1.5, align: 'right' });
++  sh(s, 'octagon', 2.589, 4.879, 2.362, 2.362, 'C3C3C3', { line: ln(C.lime, 2.25) });
++  sh(s, 'octagon', 12.134, 1.34, 2.362, 2.362, 'C3C3C3', { line: ln(C.lime, 2.25) });
++  [[0, 0], [9.546, -3.538]].forEach(function (d) {
++    sh(s, 'octagon', d[0] + 4.567, d[1] + 5.796, 0.808, 0.808, C.plum, { line: ln(C.white, 2.25) });
++    icon(s, 'phones', d[0] + 4.746, d[1] + 5.975, 0.451, 0.451, C.white);
++  });
++}
++
++function slide31(s) {
++  background(s);
++  photo(s, 0, 5.625, 20, 5.625, 'C3C3C3');
++  t(s, '+ 2 123 4567 8900', 11.242, 3.304, 2.618, 0.404, S.body, { color: C.white, lineSpacingMultiple: 1 });
++  t(s, '+ 2 176 4567 8900', 11.242, 3.825, 2.618, 0.404, S.body, { color: C.white, lineSpacingMultiple: 1 });
++  t(s, 'PHONE', 11.242, 2.718, 2.618, 0.438, S.name);
++  t(s, 'support@fesmusic', 16.331, 3.302, 2.912, 0.404, S.body, { color: C.white, lineSpacingMultiple: 1 });
++  t(s, 'www.fes.music.com', 16.331, 3.824, 2.912, 0.404, S.body, { color: C.white, lineSpacingMultiple: 1 });
++  t(s, 'EMAIL & WEB', 16.331, 2.726, 2.502, 0.438, S.name);
++  sh(s, 'snip1Rect', 9.597, 2.976, 0.933, 0.995, C.plum, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  icon(s, 'phone', 9.795, 3.329, 0.658, 0.217, C.white);
++  sh(s, 'snip1Rect', 1.274, 2.172, 6.969, 6.907, C.ink, { rectRadius: 1.922, line: ln('F5F7FC', 2.25) });
++  t(s, 'COMPANY ADDRESS', 2.682, 3.345, 3.197, 0.438, S.eyebrow);
++  icon(s, 'play', 2.052, 3.323, 0.481, 0.481, C.lime);
++  t(s, 'Let\'s Keep In Touch With Us', 2.052, 4.037, 5.414, 1.313, S.h1);
++  t(s, 'Mauris nunc congue nisi vitae suscipit sed mauris integer enim neque volutpat ac ut ornare lectus sit amet est placerat lacus sed cras. Nibh cras mattis nunc sed blandit. Eu Mauris commodo quis massa eget magna.', 2.052, 5.604, 5.414, 2.322, S.body);
++  sh(s, 'snip1Rect', 14.708, 2.979, 0.933, 0.995, C.plum, { rectRadius: 0.26, line: ln(C.white, 2.25) });
++  icon(s, 'chat', 14.919, 3.298, 0.479, 0.43, C.white);
++}
++
++function slide32(s) {
++  background(s);
++  sh(s, 'rect', 0, 0, 20, 11.25, { color: C.ink, transparency: 70.2 });
++  photo(s, 0, 0, 20, 11.25, '5B5B5B');
++  icon(s, 'logo', 17.754, 0.401, 0.653, 0.653, C.lime);
++  t(s, [{ text: 'FES' }, { text: '.', options: { color: C.lime } }, { text: 'MUSIC' }], 18.011, 0.542, 1.443, 0.37, S.logo, { align: 'right' });
++  t(s, [{ text: 'THANK' }, { text: '.', options: { color: C.lime } }, { text: 'YOU' }], 3.74, 4.615, 12.521, 2.625, S.hero2, { align: 'center' });
++  t(s, 'MUSIC EVENT PRESENTATION', 7.677, 4.009, 4.646, 0.438, S.eyebrow, { align: 'center' });
++  gradPoly(s, 10.594, 1.844, 2.975, 15.837, rotatePts([[0, 0], [2.783, 0], [2.791, 0.046], [3.434, 3.936], [2.226, 6.303], [1.698, 9.37], [1.286, 11.756], [1.846, 13.258], [1.983, 15.529], [1.998, 15.838], [0, 15.838]], 2.975, 15.837, 90), G17, 'v');
++  gradPoly(s, 8.125, -0.625, 3.75, 20, rotatePts([[0, 0], [3.508, 0], [3.518, 0.058], [4.329, 4.97], [2.806, 7.96], [2.14, 11.832], [1.621, 14.846], [2.327, 16.743], [2.5, 19.611], [2.519, 20], [0, 20]], 3.75, 20, 270), G18, 'v');
++  icon(s, 'spotify', 13.63, 10.058, 0.512, 0.512, C.lime);
++  t(s, 'Spotify', 14.27, 10.112, 1.495, 0.404, S.labelW);
++  icon(s, 'youtube', 15.935, 10.135, 0.512, 0.358, C.red);
++  t(s, 'Youtube Channel', 16.599, 10.117, 2.873, 0.404, S.labelW);
++  icon(s, 'eq', 1.525, 9.104, 2.542, 2.542, '101010');
++  eqStrip(s, 0, 11.249, 0.474, 0.265, 0.371, 0.159);
++  icon(s, 'eq', 5.317, 9.104, 2.542, 2.542, '101010');
++}
++
++const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30, slide31, slide32];
++SLIDES.forEach(function (build) { build(pptx.addSlide()); });
++
++pptx.writeFile({ fileName: path.join(__dirname, '0b4a9b09-fe7f-4f51-ad9c-6564647ff6ca_grok_final.pptx') })
++  .then(function (f) { console.log('wrote ' + f); });

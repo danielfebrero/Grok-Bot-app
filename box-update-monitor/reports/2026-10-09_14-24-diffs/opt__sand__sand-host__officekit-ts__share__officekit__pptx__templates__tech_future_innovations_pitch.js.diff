@@ -1,0 +1,713 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tech_future_innovations_pitch.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tech_future_innovations_pitch.js
+@@ -0,0 +1,710 @@
++/**
++ * Recreation of "175ecd2b-a3c0-40e4-b093-8864c2791ec2.pptx" with pptxgenjs.
++ *
++ * A 10-slide 16:9 (13.333 x 7.5 in) marketing deck: soft pink -> periwinkle
++ * diagonal background wash, "logoipsum" mark top-left, a 3-dash pager
++ * bottom-right, and per-slide gradient / frosted-glass cards.
++ *
++ * Photographs in the original are empty picture placeholders, so nothing is
++ * embedded here; the few raster icons are rebuilt from native shapes.
++ *
++ * Run: node 175ecd2b-a3c0-40e4-b093-8864c2791ec2_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Theme                                                               *
++ * ------------------------------------------------------------------ */
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++const C = {
++  navy: '10439F', // accent1
++  violet: '874CCC', // accent2
++  orchid: 'C65BCF', // accent3
++  pink: 'F27BBD', // accent4
++  white: 'FFFFFF', // accent5
++  ink: '262626', // tx1 lumMod 85%
++  body: '404040', // tx1 lumMod 75%
++  pagerOff: '85ACF3', // accent1 lumMod 40% / lumOff 60%
++  grid: 'B2B2B2', // accent6 lumMod 60% / lumOff 40%
++  star: 'FBC200',
++  phoneFrame: '414041',
++  phoneEdge: '919191',
++};
++
++// Background wash: pink at the top-left corner -> periwinkle at bottom-right.
++const BG_FROM = 'FCE5F2';
++const BG_TO = 'C2D6F9';
++
++const HEAD = 'Space Grotesk'; // theme major font
++const TEXT = 'Open Sans'; // theme minor font
++
++const LOREM =
++  'PLACEHOLDER' +
++  'doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo.';
++const LOREM_SHORT = 'PLACEHOLDER';
++const LOREM_SERVICE =
++  'Sed ut perspiciatis unde omnis iste natus error sit voluptatem minim enim set do a sit dolor.';
++
++/* ------------------------------------------------------------------ *
++ * Small helpers                                                       *
++ * ------------------------------------------------------------------ */
++
++const mix = (from, to, t) => {
++  const ch = (i) => {
++    const a = parseInt(from.substr(i * 2, 2), 16);
++    const b = parseInt(to.substr(i * 2, 2), 16);
++    return Math.round(a + (b - a) * Math.max(0, Math.min(1, t)))
++      .toString(16)
++      .padStart(2, '0');
++  };
++  return (ch(0) + ch(1) + ch(2)).toUpperCase();
++};
++
++/** Background wash colour under an absolute point (used to tint cut-outs). */
++const bgAt = (x, y) => mix(BG_FROM, BG_TO, (x + y) / (SLIDE_W + SLIDE_H));
++
++const noLine = { type: 'none' };
++
++/* ------------------------------------------------------------------ *
++ * 45-degree gradient fills (pptxgenjs shapes only take solid colours,  *
++ * so a gradient is painted as diagonal bands clipped to the shape)     *
++ * ------------------------------------------------------------------ */
++
++/** Outline of a rounded rectangle as a polygon (5 segments per corner). */
++function roundRectPath(x, y, w, h, r) {
++  if (!r) return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
++  const seg = 5;
++  const corners = [
++    [x + w - r, y + r, -90],
++    [x + w - r, y + h - r, 0],
++    [x + r, y + h - r, 90],
++    [x + r, y + r, 180],
++  ];
++  const pts = [];
++  corners.forEach(([cx, cy, a0]) => {
++    for (let i = 0; i <= seg; i++) {
++      const a = ((a0 + (90 * i) / seg) * Math.PI) / 180;
++      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
++    }
++  });
++  return pts;
++}
++
++/** Sutherland-Hodgman clip of a polygon by a half-plane `inside(pt) >= 0`. */
++function clipPoly(poly, inside) {
++  const out = [];
++  for (let i = 0; i < poly.length; i++) {
++    const a = poly[i];
++    const b = poly[(i + 1) % poly.length];
++    const da = inside(a);
++    const db = inside(b);
++    if (da >= 0) out.push(a);
++    if (da >= 0 !== db >= 0) {
++      const t = da / (da - db);
++      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
++    }
++  }
++  return out;
++}
++
++/**
++ * Fill a rounded rectangle with a 45-degree gradient.
++ * `colorAt(s)` maps the absolute diagonal coordinate (x + y) to a hex colour.
++ */
++function gradientRect(slide, box, colorAt, bands) {
++  const { x, y, w, h, r = 0 } = box;
++  const outline = roundRectPath(x, y, w, h, r);
++  const span = w + h;
++  const n = bands || Math.max(10, Math.min(26, Math.round(span * 7)));
++  const bleed = span / n / 20;
++  for (let i = 0; i < n; i++) {
++    const s0 = (span * i) / n - bleed;
++    const s1 = (span * (i + 1)) / n + bleed;
++    const diag = (pt) => pt[0] - x + (pt[1] - y);
++    let poly = clipPoly(outline, (pt) => diag(pt) - s0);
++    if (poly.length) poly = clipPoly(poly, (pt) => s1 - diag(pt));
++    if (poly.length < 3) continue;
++    const xs = poly.map((p) => p[0]);
++    const ys = poly.map((p) => p[1]);
++    const bx = Math.min(...xs);
++    const by = Math.min(...ys);
++    slide.addShape('custGeom', {
++      x: bx,
++      y: by,
++      w: Math.max(...xs) - bx,
++      h: Math.max(...ys) - by,
++      fill: { color: colorAt(x + y + (span * (i + 0.5)) / n) },
++      line: noLine,
++      points: poly
++        .map((p) => ({ x: +(p[0] - bx).toFixed(4), y: +(p[1] - by).toFixed(4) }))
++        .concat([{ close: true }]),
++    });
++  }
++}
++
++/** Navy -> orchid card, the deck's signature "filled" panel. */
++function gradientCard(slide, box) {
++  const s0 = box.x + box.y;
++  const s1 = s0 + box.w + box.h;
++  gradientRect(slide, box, (s) => mix(C.navy, C.orchid, (s - s0) / (s1 - s0)));
++}
++
++/** Rounded window that lets the slide background show through. */
++function backgroundRect(slide, box) {
++  gradientRect(slide, box, (s) => mix(BG_FROM, BG_TO, s / (SLIDE_W + SLIDE_H)), 14);
++}
++
++/** Frosted-glass card: 50% white over the wash, hairline white border. */
++function glassCard(slide, box) {
++  slide.addShape('roundRect', {
++    x: box.x,
++    y: box.y,
++    w: box.w,
++    h: box.h,
++    rectRadius: box.r,
++    fill: { color: C.white, transparency: 50 },
++    line: { color: C.white, width: 0.75 },
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Text helpers                                                        *
++ * ------------------------------------------------------------------ */
++
++const textBox = (slide, box, runs, opts = {}) =>
++  slide.addText(runs, {
++    x: box.x,
++    y: box.y,
++    w: box.w,
++    h: box.h,
++    valign: 'top',
++    align: opts.align || 'left',
++    margin: [7.2, 7.2, 3.6, 3.6], // PowerPoint default 0.1" / 0.05" insets
++    fontFace: opts.fontFace || TEXT,
++    fontSize: opts.fontSize,
++    color: opts.color,
++    bold: opts.bold,
++    italic: opts.italic,
++    lineSpacingMultiple: opts.lineSpacing,
++  });
++
++/**
++ * Two-tone headline: plain navy words + bold-italic orchid words.
++ * `parts` alternate plain / emphasised, e.g. ['Future Technology ', 'Innovations'].
++ */
++function headline(slide, box, parts, fontSize, align) {
++  const runs = parts.map((text, i) => ({
++    text,
++    options: {
++      fontFace: HEAD,
++      fontSize,
++      color: i % 2 ? C.orchid : C.navy,
++      bold: i % 2 === 1,
++      italic: i % 2 === 1,
++    },
++  }));
++  textBox(slide, box, runs, { align });
++}
++
++/** 11pt body copy at 150% line spacing. */
++const bodyCopy = (slide, box, text, color, align) =>
++  textBox(slide, box, text, {
++    fontSize: 11,
++    color: color || C.body,
++    lineSpacing: 1.5,
++    align,
++  });
++
++/* ------------------------------------------------------------------ *
++ * Recurring chrome: logo, pager, buttons, icons                       *
++ * ------------------------------------------------------------------ */
++
++/**
++ * "logoipsum" lock-up: an orchid mark of seven dots chained by diagonal
++ * links, followed by the violet word-mark.
++ */
++function logo(slide) {
++  const DOT = 0.053;
++  const STEP = 0.065; // each link runs down-left by (-STEP, +STEP)
++  // Upper end of each of the four diagonal links.
++  const links = [[0.558, 0.367], [0.628, 0.375], [0.563, 0.438], [0.637, 0.445]];
++  links.forEach(([cx, cy]) => {
++    const len = STEP * Math.SQRT2 + DOT;
++    slide.addShape('roundRect', {
++      x: cx - STEP / 2 - len / 2,
++      y: cy + STEP / 2 - DOT / 2,
++      w: len,
++      h: DOT,
++      rectRadius: DOT / 2,
++      fill: { color: C.orchid },
++      line: noLine,
++      rotate: 135,
++    });
++  });
++  slide.addText(
++    [
++      { text: 'logoipsum', options: { fontFace: HEAD, fontSize: 10, bold: true, color: C.violet } },
++      { text: '\u00b0', options: { fontFace: HEAD, fontSize: 10, bold: true, color: C.violet } },
++    ],
++    { x: 0.732, y: 0.341, w: 0.78, h: 0.198, valign: 'middle', margin: 0 }
++  );
++}
++
++/** Bottom-right progress dashes; `active` is the highlighted index. */
++function pager(slide, active, wide) {
++  const w = wide ? 0.45 : 0.351;
++  const step = wide ? 0.6026 : 0.47;
++  for (let i = 0; i < 3; i++) {
++    slide.addShape('line', {
++      x: 11.462 + i * step,
++      y: 7.075,
++      w,
++      h: 0,
++      line: { color: i === active ? C.navy : C.pagerOff, width: 2.75 },
++    });
++  }
++}
++
++/** Pill button filled with the navy -> orchid gradient. */
++function gradientButton(slide, box, label, labelBox, fontSize, align) {
++  gradientCard(slide, box);
++  textBox(slide, labelBox, label, { fontSize, color: C.white, fontFace: HEAD, align });
++}
++
++/* --- icons rebuilt from native shapes ----------------------------- *
++ * Each icon is drawn in a unit square anchored at (x, y) and scaled by
++ * `s`, so the fractions below read straight off the original artwork.
++ * Rotation in OOXML happens about a shape's centre, so `piece()` places
++ * shapes by centre rather than by top-left corner.
++ */
++
++const iconPen = (x, y, s, color) => (shape, cx, cy, w, h, opt = {}) =>
++  ({
++    shape,
++    x: x + (cx - w / 2) * s,
++    y: y + (cy - h / 2) * s,
++    w: w * s,
++    h: h * s,
++    fill: opt.fill === 'none' ? { type: 'none' } : { color: opt.color || color },
++    line: opt.line || noLine,
++    rotate: opt.rotate,
++    rectRadius: opt.radius === undefined ? undefined : opt.radius * s,
++    angleRange: opt.angleRange,
++  });
++
++function drawIcon(slide, x, y, s, color, parts) {
++  const piece = iconPen(x, y, s, color);
++  parts.forEach((p) => {
++    const o = piece(p[0], p[1], p[2], p[3], p[4], p[5] || {});
++    slide.addShape(o.shape, o);
++  });
++}
++
++/** Two cog wheels, each a white gear with a punched-out hub (slide 2 pill). */
++function iconGear(slide, x, y, s, cardColor) {
++  drawIcon(slide, x, y, s, C.white, [
++    ['gear6', 0.72, 0.26, 0.46, 0.46],
++    ['ellipse', 0.72, 0.26, 0.17, 0.17, { color: cardColor }],
++    ['gear6', 0.38, 0.62, 0.62, 0.62],
++    ['ellipse', 0.38, 0.62, 0.23, 0.23, { color: cardColor }],
++  ]);
++}
++
++/** Robot arm (slide 4, service 1). */
++function iconRobotArm(slide, x, y, s) {
++  drawIcon(slide, x, y, s, C.orchid, [
++    ['rect', 0.44, 0.80, 0.52, 0.1], // base plate
++    ['trapezoid', 0.35, 0.56, 0.2, 0.42, { rotate: 8 }], // tapered column
++    ['donut', 0.24, 0.28, 0.22, 0.22], // shoulder joint
++    ['rect', 0.43, 0.28, 0.28, 0.06], // horizontal arm
++    ['rect', 0.56, 0.30, 0.09, 0.28], // wrist post
++    ['rect', 0.71, 0.17, 0.26, 0.06, { rotate: -28 }], // gripper, upper jaw
++    ['rect', 0.71, 0.42, 0.26, 0.06, { rotate: 28 }], // gripper, lower jaw
++  ]);
++}
++
++/** Speed gauge (slide 4, service 2): half disc plus a tapered needle. */
++function iconGauge(slide, x, y, s) {
++  drawIcon(slide, x, y, s, C.orchid, [
++    ['pie', 0.5, 0.68, 0.94, 0.94, { angleRange: [180, 360] }],
++    ['rect', 0.5, 0.79, 0.94, 0.28],
++    ['triangle', 0.55, 0.46, 0.2, 0.42, { color: C.white, rotate: 235 }],
++  ]);
++}
++
++/** Bar-chart glyph (slide 6). */
++function iconBars(slide, x, y, s) {
++  const tops = [0.47, 0.26, 0.38, 0.12];
++  const parts = tops.map((top, i) => [
++    'roundRect', 0.19 + i * 0.213, (top + 0.75) / 2, 0.14, 0.75 - top, { radius: 0.06 },
++  ]);
++  parts.push(['roundRect', 0.51, 0.83, 0.84, 0.09, { radius: 0.045 }]);
++  drawIcon(slide, x, y, s, C.orchid, parts);
++}
++
++/** Four arrows meeting in the middle (slide 9, top pill). */
++function iconMove(slide, x, y, s) {
++  drawIcon(slide, x, y, s, C.white, [
++    ['homePlate', 0.50, 0.24, 0.28, 0.2, { rotate: 90 }],
++    ['homePlate', 0.50, 0.76, 0.28, 0.2, { rotate: 270 }],
++    ['homePlate', 0.24, 0.50, 0.28, 0.2, { rotate: 0 }],
++    ['homePlate', 0.76, 0.50, 0.28, 0.2, { rotate: 180 }],
++  ]);
++}
++
++/** Sprinting figure with motion lines (slide 9, bottom pill). */
++function iconRunner(slide, x, y, s) {
++  drawIcon(slide, x, y, s, C.white, [
++    ['ellipse', 0.83, 0.26, 0.14, 0.14], // head
++    ['rect', 0.55, 0.35, 0.32, 0.07], // shoulders
++    ['rect', 0.83, 0.45, 0.2, 0.07, { rotate: 55 }], // forward arm
++    ['rect', 0.60, 0.46, 0.24, 0.08, { rotate: 24 }], // torso
++    ['rect', 0.68, 0.60, 0.24, 0.07, { rotate: -42 }], // front leg
++    ['rect', 0.42, 0.62, 0.44, 0.07, { rotate: 42 }], // trailing leg
++    ['rect', 0.22, 0.26, 0.18, 0.06], // motion lines
++    ['rect', 0.14, 0.39, 0.18, 0.06],
++    ['rect', 0.20, 0.51, 0.18, 0.06],
++  ]);
++}
++
++/** Telephone handset (slide 10): two earpieces on a diagonal bar. */
++function iconPhone(slide, x, y, s) {
++  drawIcon(slide, x, y, s, C.white, [
++    ['roundRect', 0.74, 0.76, 0.34, 0.24, { radius: 0.11, rotate: 45 }],
++    ['roundRect', 0.26, 0.24, 0.34, 0.24, { radius: 0.11, rotate: 45 }],
++    ['rect', 0.5, 0.5, 0.58, 0.14, { rotate: -45 }],
++  ]);
++}
++
++/**
++ * Globe (slide 10): a white disc whose "oceans" are two card-coloured
++ * ellipses sweeping from top-centre to lower-right, leaving continents.
++ */
++function iconGlobe(slide, x, y, s, cardColor) {
++  const sea = { color: cardColor };
++  drawIcon(slide, x, y, s, C.white, [
++    ['ellipse', 0.5, 0.5, 1, 1],
++    ['ellipse', 0.30, 0.34, 0.34, 0.58, sea],
++    ['ellipse', 0.66, 0.72, 0.48, 0.4, sea],
++  ]);
++}
++
++/** Envelope (slide 10). */
++function iconMail(slide, x, y, s, cardColor) {
++  drawIcon(slide, x, y, s, C.white, [
++    ['rect', 0.5, 0.5, 1, 0.64],
++    ['rect', 0.28, 0.32, 0.5, 0.07, { color: cardColor, rotate: 34 }],
++    ['rect', 0.72, 0.32, 0.5, 0.07, { color: cardColor, rotate: -34 }],
++  ]);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides                                                              *
++ * ------------------------------------------------------------------ */
++
++function slide1(slide) {
++  headline(slide, { x: 2.65, y: 1.934, w: 8.032, h: 1.919 },
++    ['Future Technology ', 'Innovations'], 54, 'center');
++  bodyCopy(slide, { x: 3.412, y: 4.023, w: 6.509, h: 0.627 }, LOREM, C.body, 'center');
++
++  gradientButton(slide,
++    { x: 5.348, y: 5.146, w: 1.262, h: 0.419, r: 0.066 },
++    'Get Started',
++    { x: 5.348, y: 5.213, w: 1.262, h: 0.286 }, 11, 'center');
++  // "Learn more" repeats the button in frosted glass with violet type.
++  glassCard(slide, { x: 6.723, y: 5.146, w: 1.262, h: 0.419, r: 0.066 });
++  textBox(slide, { x: 6.723, y: 5.213, w: 1.262, h: 0.286 }, 'Learn more',
++    { fontSize: 11, color: C.violet, fontFace: HEAD, align: 'center' });
++}
++
++function slide2(slide) {
++  headline(slide, { x: 1.872, y: 1.217, w: 5.666, h: 1.447 },
++    ['Explore The Future ', 'Innovations'], 40);
++
++  gradientCard(slide, { x: 4.974, y: 3.372, w: 2.168, h: 0.586, r: 0.098 });
++  iconGear(slide, 5.136, 3.473, 0.385, mix(C.navy, C.orchid, 0.13));
++  textBox(slide, { x: 5.623, y: 3.498, w: 1.519, h: 0.337 }, 'Lorem Ipsum',
++    { fontSize: 14, color: C.white, fontFace: HEAD });
++
++  bodyCopy(slide, { x: 7.807, y: 4.666, w: 4.104, h: 0.907 }, LOREM);
++  glassCard(slide, { x: 7.912, y: 5.742, w: 1.262, h: 0.419, r: 0.066 });
++  textBox(slide, { x: 7.912, y: 5.809, w: 1.262, h: 0.286 }, 'Learn more',
++    { fontSize: 11, color: C.violet, fontFace: HEAD });
++  // ">>" made of four hairlines.
++  [8.937, 8.979].forEach((cx) => {
++    slide.addShape('line', { x: cx, y: 5.882, w: 0.071, h: 0.071, line: { color: C.violet, width: 1 } });
++    slide.addShape('line', { x: cx, y: 5.95, w: 0.071, h: 0.071, line: { color: C.violet, width: 1 }, flipH: true });
++  });
++}
++
++function slide3(slide) {
++  headline(slide, { x: 1.665, y: 1.557, w: 5.356, h: 1.447 },
++    ['The Vision Behind Future ', 'Technology'], 40);
++
++  gradientCard(slide, { x: 2.5, y: 4.026, w: 2.813, h: 1.917, r: 0.177 });
++  textBox(slide, { x: 2.844, y: 4.362, w: 1.507, h: 0.337 }, 'Subtitle 1',
++    { fontSize: 14, bold: true, color: C.white, fontFace: HEAD });
++  bodyCopy(slide, { x: 2.844, y: 4.699, w: 2.125, h: 0.907 }, LOREM_SHORT, C.white);
++
++  glassCard(slide, { x: 5.552, y: 4.026, w: 2.813, h: 1.917, r: 0.177 });
++  textBox(slide, { x: 5.896, y: 4.362, w: 1.507, h: 0.337 }, 'Subtitle 2',
++    { fontSize: 14, bold: true, color: C.orchid });
++  bodyCopy(slide, { x: 5.896, y: 4.699, w: 2.125, h: 0.907 }, LOREM_SHORT);
++}
++
++function slide4(slide) {
++  headline(slide, { x: 7.986, y: 1.206, w: 4.224, h: 2.121 },
++    ['Amazing', ' Solutions', ' We Offer'], 40);
++
++  iconRobotArm(slide, 7.986, 3.912, 0.337);
++  textBox(slide, { x: 8.323, y: 3.912, w: 1.264, h: 0.337 }, 'Service 1',
++    { fontSize: 14, bold: true, color: C.ink, fontFace: HEAD });
++  bodyCopy(slide, { x: 7.986, y: 4.325, w: 3.832, h: 0.627 }, LOREM_SERVICE);
++
++  iconGauge(slide, 8.073, 5.285, 0.348);
++  textBox(slide, { x: 8.419, y: 5.29, w: 1.264, h: 0.337 }, 'Service 2',
++    { fontSize: 14, bold: true, color: C.ink, fontFace: HEAD });
++  bodyCopy(slide, { x: 7.986, y: 5.668, w: 3.832, h: 0.627 }, LOREM_SERVICE);
++}
++
++function slide5(slide) {
++  gradientCard(slide, { x: 5.82, y: 0.921, w: 2.596, h: 4.729, r: 0.155 });
++  glassCard(slide, { x: 9.117, y: 1.85, w: 2.596, h: 4.729, r: 0.172 });
++
++  const people = [
++    { x: 5.977, y: 4.916, name: 'Jackson Doe', role: 'Founder', nameColor: C.white, roleColor: C.white },
++    { x: 9.274, y: 5.845, name: 'Leona Doe', role: 'CEO', nameColor: C.ink, roleColor: C.body },
++  ];
++  people.forEach((p) => {
++    textBox(slide, { x: p.x, y: p.y, w: 1.765, h: 0.337 }, p.name,
++      { fontSize: 14, color: p.nameColor, fontFace: HEAD });
++    textBox(slide, { x: p.x, y: p.y + 0.278, w: 1.765, h: 0.286 }, p.role,
++      { fontSize: 11, italic: true, color: p.roleColor, fontFace: HEAD });
++  });
++
++  headline(slide, { x: 1.735, y: 2.187, w: 3.656, h: 2.121 },
++    ['Meet Our Technology ', 'Experts'], 40);
++  bodyCopy(slide, { x: 1.735, y: 4.683, w: 3.411, h: 0.629 },
++    'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium.');
++}
++
++function slide6(slide) {
++  headline(slide, { x: 1.942, y: 1.163, w: 4.36, h: 1.447 },
++    ['Data Explain ', 'Everything'], 40);
++
++  iconBars(slide, 7.776, 1.001, 0.384);
++  textBox(slide, { x: 7.697, y: 1.431, w: 2.333, h: 0.337 }, 'Add Subtitle Here',
++    { fontSize: 14, color: C.ink, fontFace: HEAD });
++  bodyCopy(slide, { x: 7.697, y: 1.812, w: 4.104, h: 0.907 }, LOREM);
++
++  // Hand-built bar chart on a frosted panel. Its labels carry the deck's
++  // 130% chart line spacing.
++  const CHART_LNSPC = 1.3;
++  glassCard(slide, { x: 1.533, y: 3.433, w: 4.691, h: 3.141, r: 0.176 });
++  textBox(slide, { x: 1.742, y: 3.549, w: 3.119, h: 0.385 }, 'Company Growth Trend:',
++    { fontSize: 14, color: C.ink, fontFace: HEAD, lineSpacing: CHART_LNSPC });
++
++  const axis = [['100%', 4.213], ['75%', 4.61], ['50%', 5.007], ['25%', 5.404], ['0%', 5.801]];
++  axis.forEach(([label, y]) => {
++    slide.addShape('line', {
++      x: 2.189, y: y + 0.164, w: 3.861, h: 0,
++      line: { color: C.grid, width: 1, transparency: 45, dashType: 'dash' },
++    });
++    textBox(slide, { x: 1.485, y, w: 0.704, h: 0.301 }, label,
++      { fontSize: 10, color: C.body, align: 'right', lineSpacing: CHART_LNSPC });
++  });
++
++  const bars = [
++    { label: 'Year 1', x: 2.55, y: 4.944, color: C.navy, labelX: 2.321, labelW: 0.683 },
++    { label: 'Year 2', x: 3.278, y: 4.692, color: C.pink, labelX: 3.039, labelW: 0.703 },
++    { label: 'Year 3', x: 4.007, y: 4.377, color: C.navy, labelX: 3.771, labelW: 0.697 },
++    { label: 'Year 4', x: 4.736, y: 4.511, color: C.pink, labelX: 4.471, labelW: 0.755 },
++    { label: 'Year 5', x: 5.465, y: 4.267, color: C.navy, labelX: 5.21, labelW: 0.733 },
++  ];
++  const baseline = 5.969; // 0% gridline
++  bars.forEach((b) => {
++    slide.addShape('rect', {
++      x: b.x, y: b.y, w: 0.225, h: baseline - b.y,
++      fill: { color: b.color }, line: noLine,
++    });
++    textBox(slide, { x: b.labelX, y: 6.086, w: b.labelW, h: 0.321 }, b.label,
++      { fontSize: 11, color: C.body, align: 'center', lineSpacing: CHART_LNSPC });
++  });
++}
++
++function slide7(slide) {
++  headline(slide, { x: 8.514, y: 2.026, w: 3.534, h: 2.524 }, ['Break ', 'Slide'], 72);
++  gradientButton(slide,
++    { x: 6.453, y: 4.955, w: 3.106, h: 0.519, r: 0.076 },
++    'Back on 30 minutes',
++    { x: 6.927, y: 5.046, w: 2.177, h: 0.337 }, 14);
++}
++
++function slide8(slide) {
++  headline(slide, { x: 2.293, y: 1.08, w: 5.082, h: 1.447 },
++    ['Showcasing Our ', 'Innovations'], 40);
++
++  gradientCard(slide, { x: 8.125, y: 1.443, w: 2.75, h: 2.307, r: 0.213 });
++  textBox(slide, { x: 8.427, y: 1.675, w: 1.25, h: 0.505 }, '130K+',
++    { fontSize: 24, bold: true, color: C.white, fontFace: HEAD });
++  textBox(slide, { x: 8.427, y: 2.105, w: 2.125, h: 0.337 }, 'New Innovations',
++    { fontSize: 14, color: C.white, fontFace: HEAD });
++  bodyCopy(slide, { x: 8.427, y: 2.61, w: 2.312, h: 0.904 },
++    'PLACEHOLDER', C.white);
++}
++
++function slide9(slide) {
++  // Phone mock-up: dark frame, background-coloured screen, notch details.
++  slide.addShape('roundRect', {
++    x: 10.83, y: 2.371, w: 0.042, h: 0.577, rectRadius: 0.02,
++    fill: { color: C.phoneEdge }, line: noLine,
++  });
++  slide.addShape('roundRect', {
++    x: 8.27, y: 1.867, w: 0.041, h: 1.21, rectRadius: 0.02,
++    fill: { color: C.phoneEdge }, line: noLine,
++  });
++  slide.addShape('roundRect', {
++    x: 8.291, y: 1.157, w: 2.559, h: 5.185, rectRadius: 0.42,
++    fill: { color: C.phoneFrame }, line: noLine,
++  });
++  slide.addShape('roundRect', {
++    x: 8.33, y: 1.196, w: 2.481, h: 5.107, rectRadius: 0.39,
++    fill: { color: '131313' }, line: noLine,
++  });
++  backgroundRect(slide, { x: 8.428, y: 1.305, w: 2.285, h: 4.9, r: 0.3 });
++  // Notch with its speaker slot and camera dot.
++  slide.addShape('round2SameRect', {
++    x: 8.922, y: 1.3, w: 1.273, h: 0.19, rectRadius: 0.09,
++    fill: { color: '131313' }, line: noLine, rotate: 180,
++  });
++  slide.addShape('roundRect', {
++    x: 9.412, y: 1.339, w: 0.313, h: 0.044, rectRadius: 0.022,
++    fill: { color: C.phoneEdge }, line: noLine,
++  });
++  slide.addShape('ellipse', {
++    x: 9.802, y: 1.324, w: 0.073, h: 0.073,
++    fill: { color: C.phoneFrame }, line: noLine,
++  });
++
++  gradientCard(slide, { x: 9.802, y: 1.765, w: 1.992, h: 0.577, r: 0.084 });
++  iconMove(slide, 9.956, 1.893, 0.333);
++  textBox(slide, { x: 10.301, y: 1.89, w: 1.423, h: 0.337 }, 'Lorem ipsum',
++    { fontSize: 14, italic: true, color: C.white, fontFace: HEAD });
++
++  gradientCard(slide, { x: 7.273, y: 5.171, w: 1.992, h: 0.577, r: 0.084 });
++  iconRunner(slide, 7.397, 5.295, 0.337);
++  textBox(slide, { x: 7.772, y: 5.295, w: 1.423, h: 0.337 }, 'Lorem ipsum',
++    { fontSize: 14, italic: true, color: C.white, fontFace: HEAD });
++
++  headline(slide, { x: 1.621, y: 1.637, w: 5.041, h: 1.447 },
++    ['Visualizing Better ', 'Solutions'], 40);
++  bodyCopy(slide, { x: 1.621, y: 3.479, w: 5.757, h: 0.627 }, LOREM);
++
++  // Rating badge.
++  glassCard(slide, { x: 1.701, y: 4.964, w: 3.394, h: 0.887, r: 0.093 });
++  slide.addShape('line', {
++    x: 3.433, y: 5.079, w: 0, h: 0.657, line: { color: C.white, width: 1 },
++  });
++  textBox(slide, { x: 1.804, y: 5.091, w: 0.869, h: 0.505 }, '5.0',
++    { fontSize: 24, bold: true, color: C.orchid, fontFace: HEAD });
++  textBox(slide, { x: 2.498, y: 5.131, w: 0.866, h: 0.572 }, 'Rating Apps',
++    { fontSize: 14, color: C.navy, fontFace: HEAD });
++  [1.907, 2.015, 2.128, 2.236, 2.347].forEach((x) => {
++    slide.addShape('star5', {
++      x, y: 5.532, w: 0.11, h: 0.11, fill: { color: C.star }, line: noLine,
++    });
++  });
++  bodyCopy(slide, { x: 3.54, y: 5.076, w: 1.449, h: 0.627 }, 'Sed ut minim eni perspiciatis un');
++}
++
++function slide10(slide) {
++  slide.addText(
++    [
++      { text: 'Thank ', options: { fontFace: HEAD, fontSize: 66, bold: true, color: C.navy } },
++      { text: 'You', options: { fontFace: HEAD, fontSize: 66, bold: true, color: C.orchid } },
++    ],
++    { x: 6.956, y: 0.899, w: 5.445, h: 1.212, valign: 'top', margin: [7.2, 7.2, 3.6, 3.6] }
++  );
++
++  const card = { x: 1.732, y: 4.386, w: 3.509, h: 2.349, r: 0.201 };
++  gradientCard(slide, card);
++  textBox(slide, { x: 2.036, y: 4.704, w: 3.082, h: 0.337 }, 'Get Connected With Us!',
++    { fontSize: 14, color: C.white, fontFace: HEAD });
++
++  const cardTint = (x, y) =>
++    mix(C.navy, C.orchid, (x + y - card.x - card.y) / (card.w + card.h));
++  const rows = [
++    { icon: iconPhone, iy: 5.29, is: 0.244, ty: 5.26, tw: 1.653, text: '012-3456 7894' },
++    { icon: iconGlobe, iy: 5.713, is: 0.248, ty: 5.69, tw: 2.418, text: 'www.uniquewebsite.com' },
++    { icon: iconMail, iy: 6.15, is: 0.244, ty: 6.12, tw: 2.686, text: 'uniquemailname@email.com' },
++  ];
++  rows.forEach((r) => {
++    r.icon(slide, 2.155, r.iy, r.is, cardTint(2.155 + r.is / 2, r.iy + r.is / 2));
++    textBox(slide, { x: 2.513, y: r.ty, w: r.tw, h: 0.303 }, r.text,
++      { fontSize: 12, color: C.white });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build                                                               *
++ * ------------------------------------------------------------------ */
++
++const SLIDES = [
++  { build: slide1, pager: 0 },
++  { build: slide2, pager: 1, widePager: true },
++  { build: slide3, pager: 2 },
++  { build: slide4, pager: 0 },
++  { build: slide5, pager: 1, widePager: true },
++  { build: slide6, pager: 2 },
++  { build: slide7, pager: 0 },
++  { build: slide8, pager: 1, widePager: true },
++  { build: slide9, pager: 2 },
++  { build: slide10, pager: 0 },
++];
++
++function main() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE_13x75', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'WIDE_13x75';
++  pptx.author = 'PptxGenJS';
++  pptx.title = 'Future Technology Innovations';
++
++  // The wash lives on the master: rotated bands stepping across the diagonal.
++  const BANDS = 48;
++  const diag = SLIDE_W + SLIDE_H;
++  const bandThickness = diag / BANDS;
++  const washObjects = [];
++  for (let i = 0; i < BANDS; i++) {
++    const s = (diag * (i + 0.5)) / BANDS;
++    washObjects.push({
++      rect: {
++        x: s / 2 - 12,
++        y: s / 2 - bandThickness,
++        w: 24,
++        h: bandThickness * 2,
++        fill: { color: mix(BG_FROM, BG_TO, s / diag) },
++        rotate: 315,
++      },
++    });
++  }
++  pptx.defineSlideMaster({ title: 'WASH', objects: washObjects });
++
++  SLIDES.forEach((def) => {
++    const slide = pptx.addSlide({ masterName: 'WASH' });
++    def.build(slide);
++    logo(slide);
++    pager(slide, def.pager, def.widePager);
++  });
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '175ecd2b-a3c0-40e4-b093-8864c2791ec2_grok_final.pptx'),
++  });
++}
++
++main().then((f) => console.log('wrote', f));

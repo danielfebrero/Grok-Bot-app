@@ -1,0 +1,16 @@
+--- 2026-10-09_14-11:/opt/sand/deps/cursor-proclist/package.json
++++ 2026-10-09_14-24:/opt/sand/deps/cursor-proclist/package.json
+@@ -4,6 +4,13 @@
+   "description": "Native Node.js module for process listing",
+   "main": "index.js",
+   "private": true,
++  "files": [
++    "index.js",
++    "build",
++    "rebuild-with-lock.js",
++    "binding.gyp",
++    "src"
++  ],
+   "scripts": {
+     "install": "node rebuild-with-lock.js"
+   },

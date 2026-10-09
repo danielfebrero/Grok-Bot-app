@@ -1,0 +1,628 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/luxury_fashion_brand_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/luxury_fashion_brand_presentation.js
+@@ -0,0 +1,625 @@
++/**
++ * VogueRise — fashion brand deck (16 slides, 13.333" x 7.5").
++ * Recreated with pptxgenjs. Raster artwork in the source deck (photo
++ * placeholders, icon PNGs, 3D phone renders) is redrawn here with native
++ * shapes or stands in as flat placeholder rectangles.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Theme
++ * ------------------------------------------------------------------ */
++
++const C = {
++  orange: 'D5451B', // theme accent1
++  orangeDark: 'A03414', // accent1 lumMod 75%
++  blush: 'F9D9CF', // accent1 lumMod 20% / lumOff 80% — the pink slide background
++  black: '000000',
++  white: 'FFFFFF',
++  gray: '808080', // bg1 brightness -50% — body copy
++  grayDark: '7F7F7F',
++  panel: 'F2F2F2', // bg1 brightness -5%
++  panelDeep: 'D9D9D9', // bg1 brightness -15%
++  phoneBody: '24262B',
++  phoneScreen: 'F5F5F9',
++};
++
++const SERIF = 'Lora'; // theme major font
++const SANS = 'Urbanist Medium'; // theme minor font
++
++const LINE = { color: C.orange, width: 0.5 }; // theme line style 1
++
++/* ------------------------------------------------------------------ *
++ * Small helpers
++ * ------------------------------------------------------------------ */
++
++// Every text frame in the deck is top-anchored; pptxgenjs centres by default.
++function text(slide, content, opts) {
++  slide.addText(content, Object.assign({ fontFace: SANS, fontSize: 18, color: C.black, valign: 'top' }, opts));
++}
++
++function rect(slide, x, y, w, h, opts) {
++  slide.addShape('rect', Object.assign({ x, y, w, h }, opts));
++}
++
++/**
++ * The source deck reserves picture frames on most slides but ships them
++ * empty, so they render as bare background. They are kept here as invisible
++ * geometry so the layout intent stays readable in the code.
++ */
++function photoFrame(slide, x, y, w, h) {
++  slide.addShape('rect', { x, y, w, h, fill: { type: 'none' } });
++}
++
++// Round-capped bar, the building block of both asterisk glyphs.
++function spoke(slide, cx, cy, span, thick, angle, color) {
++  slide.addShape('roundRect', {
++    x: cx - span / 2, y: cy - thick / 2, w: span, h: thick,
++    fill: { color }, rectRadius: thick / 2, rotate: angle,
++  });
++}
++
++// Eight-spoke asterisk glyph: four bars crossing at 45 degree steps.
++function asterisk(slide, x, y, w, h, color) {
++  const span = 0.916 * w; // artwork fills ~92% of its frame
++  const thick = 0.084 * Math.min(w, h);
++  [0, 45, 90, 135].forEach(function (angle) {
++    spoke(slide, x + w / 2, y + h / 2, span, thick, angle, color);
++  });
++}
++
++// Six-spoke asterisk inside the pricing octagons: upright bar plus an X,
++// drawn with flat caps unlike the eight-spoke mark.
++function asteriskSix(slide, x, y, size, color) {
++  [30, 90, 150].forEach(function (angle) {
++    rect(slide, x + 0.15 * size, y + (size - 0.147 * size) / 2, 0.70 * size, 0.147 * size,
++      { fill: { color }, rotate: angle });
++  });
++}
++
++// Wireframe globe: outline, three latitude chords, one meridian line and
++// two meridian ellipses.
++function globe(slide, x, y, w, h, color) {
++  const d = 0.885; // circle diameter as a fraction of the frame
++  const gw = w * d;
++  const gh = h * d;
++  const cx = x + w / 2;
++  const cy = y + h / 2;
++  const stroke = { color, width: 1.4 * w };
++  slide.addShape('ellipse', { x: cx - gw / 2, y: cy - gh / 2, w: gw, h: gh, line: stroke });
++  [-0.42, 0, 0.42].forEach(function (f) {
++    const chord = gw * Math.sqrt(1 - f * f);
++    slide.addShape('line', { x: cx - chord / 2, y: cy + f * gh / 2, w: chord, h: 0, line: stroke });
++  });
++  slide.addShape('line', { x: cx, y: cy - gh / 2, w: 0, h: gh, line: stroke });
++  [0.5].forEach(function (f) {
++    slide.addShape('ellipse', { x: cx - gw * f / 2, y: cy - gh / 2, w: gw * f, h: gh, line: stroke });
++  });
++}
++
++// Handset render: dark rounded body, pale screen inset, pill camera cutout.
++// The cutout is offset along the tilt so it stays centred on the screen.
++function phone(slide, x, y, w, h, tilt) {
++  const rad = tilt * Math.PI / 180;
++  const inset = 0.024 * w;
++  slide.addShape('roundRect', {
++    x, y, w, h, fill: { color: C.phoneBody }, rectRadius: 0.50, rotate: tilt,
++  });
++  slide.addShape('roundRect', {
++    x: x + inset, y: y + inset, w: w - 2 * inset, h: h - 2 * inset,
++    fill: { color: C.phoneScreen }, rectRadius: 0.42, rotate: tilt,
++  });
++  const pillW = 0.30 * w;
++  const pillH = 0.055 * w;
++  const dy = -0.5 * h + 0.145 * w; // distance from the phone centre to the notch
++  slide.addShape('roundRect', {
++    x: x + w / 2 - pillW / 2 - dy * Math.sin(rad),
++    y: y + h / 2 - pillH / 2 + dy * Math.cos(rad),
++    w: pillW, h: pillH, fill: { color: C.phoneBody }, rectRadius: 0.1, rotate: tilt,
++  });
++}
++
++// Brand mark: a thick "C" ring cut open on the right, with a slanted bar
++// standing in the counter.
++function brandMark(slide, x, y, w, h, color) {
++  slide.addShape('blockArc', {
++    x, y, w, h, fill: { color }, angleRange: [35, 325], arcThicknessRatio: 0.43,
++  });
++  rect(slide, x + 0.30 * w, y + 0.39 * h, 0.40 * w, 0.22 * h, { fill: { color }, rotate: 113 });
++}
++
++// Shared top bar: brand mark + wordmark on the left, section label right.
++function header(slide, o) {
++  const opt = o || {};
++  const ink = opt.ink || C.black;
++  brandMark(slide, 0.371, 0.231, 0.431, 0.442, opt.mark || C.orange);
++  text(slide, 'VogueRise', { x: 0.802, y: 0.306, w: 1.147, h: 0.337, fontSize: 14, color: ink });
++  text(slide, 'Fashion', {
++    x: opt.fashionX || 11.184, y: 0.306, w: 1.778, h: 0.337,
++    fontSize: 14, align: 'right', color: opt.label || C.gray,
++  });
++}
++
++// Two-tone display heading: upright lead-in plus an italic accent word.
++function heading(slide, o) {
++  text(slide, o.parts.map(function (p) {
++    return { text: p[0], options: { italic: !!p[1], color: p[2] || o.color || C.black, breakLine: !!p[3] } };
++  }), {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: SERIF, fontSize: o.size, align: o.align, color: o.color || C.black,
++  });
++}
++
++// "01/" style caption stacked over a paragraph of body copy.
++function numberedNote(slide, o) {
++  text(slide, o.num, {
++    x: o.x, y: o.y, w: o.numW || 1.12, h: o.numH || 0.55,
++    fontFace: o.numFont || SERIF, fontSize: o.numSize || 20, bold: o.numBold !== false,
++    color: o.numColor || C.black, align: 'justify', lineSpacingMultiple: 1.5,
++  });
++  text(slide, o.body, {
++    x: o.x, y: o.bodyY, w: o.bodyW, h: o.bodyH,
++    fontSize: o.bodySize || 14, color: o.bodyColor || C.black, lineSpacingMultiple: 1.5,
++  });
++}
++
++// Serif sub-heading with a grey paragraph beneath it.
++function titledNote(slide, o) {
++  text(slide, o.title, {
++    x: o.x, y: o.y, w: o.titleW, h: o.titleH || 0.642,
++    fontFace: SERIF, fontSize: o.titleSize || 24, color: o.titleColor || C.black,
++    align: 'justify', lineSpacingMultiple: 1.5,
++  });
++  text(slide, o.body, {
++    x: o.x, y: o.bodyY, w: o.bodyW, h: o.bodyH,
++    fontSize: o.bodySize || 16, color: C.gray, lineSpacingMultiple: 1.5,
++  });
++}
++
++// Big orange figure above a grey caption.
++function stat(slide, o) {
++  text(slide, o.value, {
++    x: o.x, y: o.y, w: o.w, h: 1.318,
++    fontFace: SERIF, fontSize: 54, color: C.orange, align: 'center', lineSpacingMultiple: 1.5,
++  });
++  text(slide, o.label, {
++    x: o.labelX, y: o.labelY, w: o.labelW, h: 0.55,
++    fontSize: 20, color: C.gray, align: 'center', lineSpacingMultiple: 1.5,
++  });
++}
++
++const BOILERPLATE =
++  ' is a contemporary fashion brand redefining style for a new generation of dreamers, creators,' +
++  ' and leaders. We merge timeless craftsmanship with bold innovation, presenting collections that' +
++  ' stand at the crossroads of culture, art, and expression.';
++
++const CONTACT = 'hello@voguerise.com | www.voguerise.com';
++
++// Orange contact line preceded by a short rule.
++function contactLine(slide, ruleX, ruleY, textX, textY) {
++  text(slide, CONTACT, {
++    x: textX, y: textY, w: 4.844, h: 0.46,
++    fontSize: 16, color: C.orange, align: 'justify', lineSpacingMultiple: 1.5,
++  });
++  slide.addShape('line', { x: ruleX, y: ruleY, w: 0.533, h: 0, line: LINE });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++// 1 — Cover: "Where Style Meets Identity."
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.white };
++  header(s, { fashionX: 11.069 });
++  rect(s, 0.628, 1.958, 0.695, 3.385, { fill: { color: C.orange } });
++  photoFrame(s, 1.323, 1.958, 4.75, 3.385);
++  heading(s, {
++    x: 6.556, y: 1.596, w: 6.6, h: 3.433, size: 66,
++    parts: [['Where', false, C.black, true], ['Style', true, C.orange], [' Meets Identity.']],
++  });
++  asterisk(s, 10.635, 1.093, 1.006, 1.006, C.orange);
++  contactLine(s, 6.667, 5.322, 7.263, 5.029);
++  text(s, 'This cover should feel cinematic and luxurious, like the opening page of a high-end fashion' +
++    ' magazine. It announces the brand with confidence, setting the tone for sophistication and modern elegance.', {
++    x: 1.776, y: 6.062, w: 7.235, h: 0.976, fontSize: 12, color: C.gray, lineSpacingMultiple: 1.5,
++  });
++  globe(s, 0.628, 6.062, 1.051, 0.723, C.black);
++}
++
++// 2 — "Our story is not just about clothing"
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.blush };
++  header(s, { fashionX: 6.857 });
++  photoFrame(s, 9.021, 0, 4.312, 7.5);
++  heading(s, {
++    x: 0.371, y: 2.36, w: 8.385, h: 2.322, size: 66,
++    parts: [['Our story is not just about '], ['clothing', true, C.orange]],
++  });
++  text(s, [{ text: 'VogueRise' }, { text: BOILERPLATE }], {
++    x: 0.467, y: 5.126, w: 6.296, h: 1.279,
++    fontSize: 12, color: C.gray, align: 'justify', lineSpacingMultiple: 1.5,
++  });
++  asterisk(s, 0.299, 1.095, 1.006, 1.006, C.orange);
++  globe(s, 7.704, 6.365, 1.051, 0.723, C.black);
++}
++
++// 3 — Black statement slide with three numbered pillars.
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.black };
++  header(s, { ink: C.white, label: C.white, mark: C.white });
++  heading(s, {
++    x: 2.474, y: 1.503, w: 8.385, h: 2.121, size: 60, align: 'center', color: C.white,
++    parts: [['We merge timeless '], ['craftsmanship', true]],
++  });
++  asterisk(s, 1.724, 2.145, 1.006, 1.006, C.orange);
++  asterisk(s, 10.588, 2.06, 1.006, 1.006, C.orange);
++  [
++    { x: 1.341, num: '01/', body: 'Established with a vision to inspire.', bodyH: 1.055 },
++    { x: 5.317, num: '02/', body: 'Designed for individuals who dare to be different.', bodyH: 1.56 },
++    { x: 9.292, num: '03/', body: 'Rooted in creativity, growth, and authenticity.', bodyH: 1.56 },
++  ].forEach(function (col) {
++    numberedNote(s, {
++      x: col.x, y: 4.082, num: col.num, numFont: SANS, numSize: 36, numBold: false,
++      numH: 0.909, numColor: C.white,
++      body: col.body, bodyY: 5.009, bodyW: 3.002, bodyH: col.bodyH, bodySize: 20, bodyColor: C.white,
++    });
++  });
++}
++
++// 4 — Vision & Mission.
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.blush };
++  header(s, { fashionX: 11.069 });
++  heading(s, {
++    x: 4.38, y: 0.842, w: 5.085, h: 2.322, size: 66,
++    parts: [['Our Vision & '], ['Mission', true, C.orange]],
++  });
++  photoFrame(s, 0.365, 2.208, 3.74, 2.438);
++  photoFrame(s, 10.417, 1.0, 2.333, 1.745);
++  titledNote(s, {
++    x: 0.365, y: 5.103, title: 'Vision', titleW: 5.657, titleSize: 24,
++    body: 'To become the most influential fashion house that merges modernity, sustainability, and cultural identity.',
++    bodyY: 5.743, bodyW: 5.657, bodyH: 0.864,
++  });
++  text(s, 'Mission', {
++    x: 7.603, y: 3.522, w: 4.293, h: 0.64, fontSize: 24, lineSpacingMultiple: 1.5,
++  });
++  [
++    'Empower customers to express individuality through design.',
++    'Build sustainable and ethically responsible collections.',
++    'Innovate with fabrics, design, and customer experience.',
++  ].forEach(function (line, i) {
++    const y = 4.311 + i * 0.996;
++    asterisk(s, 7.705, y + 0.034, 0.606, 0.606, C.orange);
++    text(s, line, { x: 8.375, y: y, w: 3.376, h: 0.64, fontSize: 16, color: C.gray });
++  });
++  globe(s, 4.489, 3.522, 1.051, 0.723, C.black);
++}
++
++// 5 — Brand Identity with two outlined cards.
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.white };
++  header(s);
++  photoFrame(s, 9.741, 1.06, 2.994, 4.662);
++  heading(s, {
++    x: 4.293, y: 1.552, w: 6.568, h: 3.972, size: 115,
++    parts: [['Brand '], ['Identity', true, C.orange]],
++  });
++  text(s, [
++    { text: 'VogueRise' },
++    { text: ' is a contemporary fashion brand redefining style for a ' },
++    { text: 'new generation ', options: { bold: true } },
++    { text: 'of dreamers, creators, and leaders. We merge timeless craftsmanship with bold innovation,' +
++      ' presenting collections that stand at the crossroads of culture, art, and expression.' },
++  ], {
++    x: 0.371, y: 5.873, w: 6.568, h: 1.279,
++    fontSize: 12, color: C.gray, align: 'justify', lineSpacingMultiple: 1.5,
++  });
++  asterisk(s, 8.222, 0.941, 1.006, 1.006, C.orange);
++  globe(s, 9.175, 6.15, 1.051, 0.723, C.black);
++  [
++    { y: 1.552, title: 'Logo', body: 'Minimalist mark combining elegance and strength.' },
++    { y: 3.733, title: 'Brand Colors', body: 'Jet Black, Ivory White, and Accent Gold.' },
++  ].forEach(function (card) {
++    rect(s, 0.371, card.y, 3.241, 1.772, { fill: { type: 'none' }, line: { color: C.black, width: 1 } });
++    titledNote(s, {
++      x: 0.527, y: card.y + 0.1, title: card.title, titleW: 2.928,
++      body: card.body, bodyY: card.y + 0.775, bodyW: 2.928, bodyH: 0.769, bodySize: 14,
++    });
++  });
++}
++
++// 6 — Target Market over three full-height photo columns.
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.white };
++  header(s, { fashionX: 11.221 });
++  [5.08, 7.831, 10.582].forEach(function (x) { photoFrame(s, x, 0, 2.751, 7.5); });
++  heading(s, {
++    x: 0.23, y: 1.071, w: 3.466, h: 2.322, size: 66,
++    parts: [['Target ', false, C.black, true], ['Market', true, C.orange]],
++  });
++  asterisk(s, 3.885, 1.729, 1.006, 1.006, C.orange);
++  [
++    { y: 3.674, num: '01/', body: 'Ages 20–40, 60% women, 40% men, urban professionals.' },
++    { y: 5.516, num: '02/', body: 'The Trendsetter, The Minimalist, The Bold Explorer.' },
++  ].forEach(function (item) {
++    numberedNote(s, {
++      x: 0.371, y: item.y, num: item.num,
++      body: item.body, bodyY: item.y + 0.683, bodyW: 4.071, bodyH: 0.769,
++    });
++  });
++}
++
++// 7 — Product Timeline: an axis with five alternating milestones.
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.blush };
++  header(s, { fashionX: 11.069 });
++  heading(s, {
++    x: 2.8, y: 0.822, w: 7.733, h: 0.909, size: 48, align: 'center',
++    parts: [['Product '], ['Timeline', true, C.orange]],
++  });
++  globe(s, 10.322, 1.004, 1.051, 0.723, C.black);
++  s.addShape('line', { x: 0.426, y: 4.458, w: 11.464, h: 0, line: LINE });
++  const stops = [
++    { tick: 0.8, above: false, x: 2.658, photoX: 0.802, num: '01/', body: 'Every Piece Tells a Story', bodyH: 0.769 },
++    { tick: 2.587, above: true, x: 4.375, photoX: 2.588, num: '02/', body: 'Design Meets Functionality', bodyH: 0.769 },
++    { tick: 4.964, above: false, x: 6.86, photoX: 4.966, num: '03/', body: 'From bold streetwear to elegant essentials,', bodyH: 0.769 },
++    { tick: 6.751, above: true, x: 8.578, photoX: 6.753, num: '04/', body: 'Every stitch and material choice symbolizes', bodyH: 1.122 },
++    { tick: 9.129, above: false, x: 10.993, photoX: 9.131, num: '05/', body: 'The product line offers more than clothing', bodyH: 1.122 },
++  ];
++  stops.forEach(function (stop) {
++    s.addShape('line', { x: stop.tick, y: stop.above ? 2.61 : 4.458, w: 0, h: 1.848, line: LINE });
++    photoFrame(s, stop.photoX, stop.above ? 2.269 : 5.015, 1.595, 1.481);
++    const numY = stop.above ? 2.1 : (stop.num === '05/' ? 4.846 : 4.909);
++    numberedNote(s, {
++      x: stop.x, y: numY, num: stop.num,
++      body: stop.body, bodyY: numY + 0.683, bodyW: 2.11, bodyH: stop.bodyH,
++    });
++  });
++}
++
++// 8 — "The Most Influential Fashion House".
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.white };
++  rect(s, 0.628, 1.559, 0.413, 2.285, { fill: { color: C.orange } });
++  rect(s, 3.621, 4.156, 0.413, 2.285, { fill: { color: C.orange } });
++  photoFrame(s, 1.041, 1.56, 2.994, 2.285);
++  photoFrame(s, 4.034, 4.156, 2.994, 2.285);
++  header(s);
++  heading(s, {
++    x: 4.293, y: 1.742, w: 7.474, h: 1.919, size: 54,
++    parts: [['The Most Influential Fashion '], ['House', true, C.orange]],
++  });
++  asterisk(s, 12.025, 2.199, 1.006, 1.006, C.orange);
++  text(s, 'We merge timeless craftsmanship with bold innovation, presenting collections that stand at' +
++    ' the crossroads of culture, art, and expression.', {
++    x: 0.628, y: 4.445, w: 2.75, h: 1.582,
++    fontSize: 12, color: C.gray, align: 'justify', lineSpacingMultiple: 1.5,
++  });
++  globe(s, 1.998, 5.88, 1.089, 0.749, C.black);
++  [
++    { x: 7.526, title: 'Step 01' },
++    { x: 10.187, title: 'Step 02' },
++  ].forEach(function (step) {
++    titledNote(s, {
++      x: step.x, y: 4.445, title: step.title, titleW: 1.563, titleH: 0.552, titleSize: 20,
++      body: 'Empower customers to express individuality through design.',
++      bodyY: 5.029, bodyW: 2.496, bodyH: 1.122, bodySize: 14,
++    });
++  });
++}
++
++// 9 — Black divider: "Where design meets lifestyle".
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.black };
++  header(s, { ink: C.white, label: C.white, mark: C.white });
++  heading(s, {
++    x: 2.474, y: 1.903, w: 8.385, h: 2.794, size: 80, align: 'center', color: C.white,
++    parts: [['Where design meets '], ['lifestyle', true]],
++  });
++  asterisk(s, 1.492, 2.839, 1.006, 1.006, C.orange);
++  asterisk(s, 10.836, 2.755, 1.006, 1.006, C.orange);
++  text(s, 'The Trendsetter, The Minimalist, The Bold Explorer.', {
++    x: 3.333, y: 4.826, w: 6.667, h: 0.404, align: 'center', color: C.white,
++  });
++}
++
++// 10 — Design Inspiration.
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.blush };
++  header(s);
++  photoFrame(s, 0, 1.044, 5.767, 3.278);
++  photoFrame(s, 7.366, 4.978, 2.267, 1.944);
++  photoFrame(s, 10.344, 4.978, 2.267, 1.944);
++  heading(s, {
++    x: 6.258, y: 1.226, w: 5.767, h: 2.524, size: 72,
++    parts: [['Design ', false, C.black, true], ['Inspiration', true, C.orange]],
++  });
++  asterisk(s, 12.025, 2.199, 1.006, 1.006, C.orange);
++  text(s, 'Our Fall/Winter inspiration draws from contrasts: city architecture vs. natural landscapes,' +
++    ' muted tones vs. metallic shine. We blend nostalgia with futurism.', {
++    x: 1.949, y: 5.054, w: 4.633, h: 1.868, color: C.gray, lineSpacingMultiple: 1.5,
++  });
++  globe(s, 0.619, 5.575, 1.089, 0.749, C.black);
++}
++
++// 11 — Collection Preview: four product frames with captions.
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.white };
++  header(s);
++  heading(s, {
++    x: 2.8, y: 0.673, w: 7.733, h: 0.909, size: 48, align: 'center',
++    parts: [['Collection '], ['Preview', true, C.orange]],
++  });
++  [0.311, 3.489, 6.667, 9.844].forEach(function (x, i) {
++    photoFrame(s, x, 1.849 + i * 0.0167, 3.178, 3.702);
++  });
++  [
++    { x: 0.311, titleW: 3.289, title: 'Signature Jacket', body: 'A fusion of vintage military design with modern tailoring.', bodyW: 3.178 },
++    { x: 3.844, titleW: 3.289, title: 'Statement Dress', titleColor: C.orange, body: 'Flowing fabric designed for bold confidence.', bodyW: 2.822 },
++    { x: 6.844, titleW: 3.0, title: 'Accessories Capsule', body: 'Minimal, durable, versatile.', bodyW: 1.956 },
++  ].forEach(function (item) {
++    titledNote(s, {
++      x: item.x, y: 5.817, title: item.title, titleW: item.titleW, titleH: 0.552,
++      titleSize: 20, titleColor: item.titleColor,
++      body: item.body, bodyY: 6.4, bodyW: item.bodyW, bodyH: 0.769, bodySize: 14,
++    });
++  });
++  globe(s, 10.889, 6.093, 1.089, 0.749, C.black);
++}
++
++// 12 — Pricing Strategy: three tier cards.
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.white };
++  header(s);
++  heading(s, {
++    x: 2.8, y: 0.642, w: 7.733, h: 0.909, size: 48, align: 'center',
++    parts: [['Pricing '], ['Strategy', true, C.orange]],
++  });
++  [
++    { x: 1.309, card: C.orange, badge: C.orangeDark, ink: C.white, name: 'Entry Products', price: '$80–$150' },
++    { x: 5.095, card: C.panel, badge: C.panelDeep, ink: C.orange, name: 'Core Apparel', price: '$300–$500' },
++    { x: 8.881, card: C.orange, badge: C.orangeDark, ink: C.white, name: 'Premium Line', price: '$1,000+' },
++  ].forEach(function (tier) {
++    s.addShape('round1Rect', {
++      x: tier.x, y: 2.044, w: 3.143, h: 4.498, fill: { color: tier.card }, rectRadius: 0.644,
++    });
++    s.addShape('octagon', { x: tier.x + 0.716, y: 2.351, w: 1.533, h: 1.533, fill: { color: tier.badge } });
++    asteriskSix(s, tier.x + 0.969, 2.604, 1.028, C.white);
++    text(s, tier.name, {
++      x: tier.x + 0.288, y: 4.191, w: 2.465, h: 1.043, fontFace: SERIF, fontSize: 28, color: tier.ink,
++    });
++    text(s, tier.price, { x: tier.x + 0.251, y: 5.563, w: 2.465, h: 0.572, fontSize: 28, color: tier.ink });
++  });
++  text(s, 'Luxury-inspired fashion that\u2019s aspirational but attainable.', {
++    x: 2.8, y: 6.834, w: 7.733, h: 0.404, align: 'center', color: C.gray,
++  });
++}
++
++// 13 — Marketing Strategy.
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.blush };
++  header(s);
++  photoFrame(s, 7.567, 1.044, 5.767, 3.278);
++  heading(s, {
++    x: 0.503, y: 1.226, w: 5.375, h: 2.524, size: 72,
++    parts: [['Marketing ', false, C.black, true], ['Strategy', true, C.orange]],
++  });
++  asterisk(s, 6.025, 2.199, 1.006, 1.006, C.orange);
++  [
++    { x: 0.503, title: 'Social Media', body: 'Instagram reels, TikTok campaigns, editorial shoots.', bodyW: 3.179 },
++    { x: 4.441, title: 'Influencer Collabs', body: '10+ fashion KOLs with combined reach of 3M followers.', bodyW: 3.489 },
++  ].forEach(function (item) {
++    titledNote(s, {
++      x: item.x, y: 4.906, title: item.title, titleW: 3.289,
++      body: item.body, bodyY: 5.597, bodyW: item.bodyW, bodyH: 0.864,
++    });
++  });
++  stat(s, { value: '300%', x: 8.831, y: 4.729, w: 3.289, label: 'Followers Grow', labelX: 8.705, labelY: 5.915, labelW: 3.489 });
++}
++
++// 14 — Sales Channels.
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.blush };
++  header(s);
++  photoFrame(s, 0, 0.967, 2.706, 3.322);
++  photoFrame(s, 0, 4.967, 2.706, 2.533);
++  photoFrame(s, 3.439, 1.044, 4.633, 6.456);
++  heading(s, {
++    x: 8.247, y: 1.15, w: 4.715, h: 2.524, size: 72,
++    parts: [['Sales ', false, C.black, true], ['Channels', true, C.orange]],
++  });
++  asterisk(s, 1.517, 3.076, 3.011, 3.011, C.orange);
++  [
++    { y: 4.078, title: 'E-Commerce', body: 'Branded online store with personalized shopping.' },
++    { y: 5.655, title: 'Retail', body: 'Flagship boutique in major fashion capitals.' },
++  ].forEach(function (item) {
++    asterisk(s, 8.46, item.y + 0.185, 0.606, 0.606, C.orange);
++    text(s, item.title, { x: 9.331, y: item.y, w: 3.376, h: 0.438, fontSize: 20, bold: true });
++    text(s, item.body, { x: 9.331, y: item.y + 0.471, w: 3.376, h: 0.64, fontSize: 16, color: C.gray });
++  });
++}
++
++// 15 — Mockup Strategy, with two tilted phone renders.
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.blush };
++  // Two 3D phone renders in the source deck, redrawn as tilted handsets.
++  [{ x: 8.150, y: 2.764 }, { x: 10.892, y: 0.398 }].forEach(function (p) {
++    phone(s, p.x, p.y, 2.954, 6.018, 344);
++  });
++  header(s);
++  heading(s, {
++    x: 0.503, y: 1.226, w: 5.375, h: 2.524, size: 72,
++    parts: [['Mockup ', false, C.black, true], ['Strategy', true, C.orange]],
++  });
++  asterisk(s, 5.003, 2.107, 1.006, 1.006, C.orange);
++  text(s, 'Every line is a whisper of identity. Every shade, a declaration of confidence.', {
++    x: 0.56, y: 4.051, w: 5.715, h: 0.707,
++  });
++  stat(s, { value: '85%', x: 0.331, y: 5.059, w: 2.604, label: 'Retention Rate', labelX: 0.205, labelY: 6.245, labelW: 2.762 });
++  stat(s, { value: '4.8★', x: 3.523, y: 5.059, w: 2.604, label: 'Average Rating', labelX: 3.398, labelY: 6.245, labelW: 2.762 });
++  globe(s, 12.141, 6.564, 1.089, 0.749, C.black);
++}
++
++// 16 — Closing: "Thank You For Your Attention".
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.white };
++  photoFrame(s, 9.241, 1.026, 3.648, 5.752);
++  photoFrame(s, 6.052, 1.026, 2.826, 2.989);
++  header(s);
++  text(s, 'We are not just selling clothes. We are shaping identities, creating movements, and writing' +
++    ' the future of fashion', {
++    x: 0.444, y: 1.661, w: 4.844, h: 1.268,
++    fontSize: 16, color: C.gray, align: 'justify', lineSpacingMultiple: 1.5,
++  });
++  contactLine(s, 0.522, 3.496, 1.118, 3.202);
++  heading(s, {
++    x: 0.444, y: 4.015, w: 9.098, h: 1.582, size: 88,
++    parts: [['Thank You ', true, C.orange], ['For']],
++  });
++  heading(s, {
++    x: 2.943, y: 5.288, w: 9.098, h: 1.582, size: 88,
++    parts: [['Your '], ['Attention', true, C.orange]],
++  });
++  globe(s, 0.749, 5.597, 1.89, 1.127, C.grayDark);
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++  pptx.layout = 'WIDE';
++  pptx.theme = { headFontFace: SERIF, bodyFontFace: SANS };
++  pptx.title = 'VogueRise';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++    slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16]
++    .forEach(function (fn) { fn(pptx); });
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '05c2b5bc-be07-44ad-885f-a20b0e7d4bb1_grok_final.pptx'),
++  });
++}
++
++build().then(function (f) { console.log('wrote', f); }, function (e) { console.error(e); process.exit(1); });

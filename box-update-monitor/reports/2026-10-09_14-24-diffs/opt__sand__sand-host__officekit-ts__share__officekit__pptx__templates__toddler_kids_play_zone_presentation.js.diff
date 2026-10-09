@@ -1,0 +1,965 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/toddler_kids_play_zone_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/toddler_kids_play_zone_presentation.js
+@@ -0,0 +1,962 @@
++// Toddler - Kids Zone Presentation Template (40 slides, 13.333 x 7.5 in).
++// Rebuilt with pptxgenjs. The original deck's photographs, icons and device
++// mockups are bitmaps; here they are drawn as flat coloured placeholders that
++// keep the same position, size and clipping outline.
++'use strict';
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ------------------------------------------------------------ palette & fonts
++const C = {
++  BLUE:'5F93FF', RED:'FF4A66', GREEN:'9DCB45', AMBER:'FFAE2C',   // theme accents
++  INK:'1C1C23', WHITE:'FFFFFF',
++  BLUE_SH:'0757FF', RED_SH:'F60026', GREEN_SH:'789F2C', AMBER_SH:'E08A00', // dot shadows
++  PHOTO:'FA8C8C',      // stand-in tint for the template's photography
++  PHONE:'16171A', LAPTOP:'B9BCC2',   // device mockup bezel / laptop shell
++};
++const F = { HEAD:'Paytone One', BODY:'Balsamiq Sans' };
++
++// Text styles used throughout the template (font / size / colour / alignment).
++const T = {
++  hero:   { fontSize:96, fontFace:F.HEAD, color:C.INK, align:'center' }, // cover title
++  h1:     { fontSize:60, fontFace:F.HEAD, color:C.INK, align:'left' },   // section title
++  h2:     { fontSize:36, fontFace:F.HEAD, color:C.INK, align:'left' },   // slide heading
++  h2c:    { fontSize:36, fontFace:F.HEAD, color:C.INK, align:'center' },
++  h2w:    { fontSize:36, fontFace:F.HEAD, color:C.WHITE, align:'center' },
++  stat:   { fontSize:36, fontFace:F.BODY, color:C.INK, bold:true, align:'left' },   // 4.328, 84%
++  statc:  { fontSize:36, fontFace:F.BODY, color:C.INK, bold:true, align:'center' }, // $250
++  num:    { fontSize:72, fontFace:F.BODY, color:C.INK, bold:true, align:'left' },   // the big 27
++  plan:   { fontSize:16, fontFace:F.BODY, color:C.INK, bold:true, align:'center' }, // Basic / Pro
++  body:   { fontSize:13, fontFace:F.BODY, color:C.INK, align:'left' },
++  para:   { fontSize:13, fontFace:F.BODY, color:C.INK, align:'left', lineSpacingMultiple:1.5 },
++  parac:  { fontSize:13, fontFace:F.BODY, color:C.INK, align:'center', lineSpacingMultiple:1.5 },
++  label:  { fontSize:13, fontFace:F.BODY, color:C.INK, bold:true, align:'left' },   // card titles
++  labelc: { fontSize:13, fontFace:F.BODY, color:C.INK, bold:true, align:'center' },
++  caption:{ fontSize:13, fontFace:F.BODY, color:C.INK, align:'center' },
++  onDark: { fontSize:13, fontFace:F.BODY, color:C.WHITE, align:'center' },          // button text
++};
++
++// Four accent dots decorate nearly every slide, always in this colour order.
++const DOT_FILL   = [C.BLUE, C.RED, C.GREEN, C.AMBER];
++const DOT_SHADOW = [C.BLUE_SH, C.RED_SH, C.GREEN_SH, C.AMBER_SH];
++
++// ------------------------------------------------------------ helpers
++const sh = (color, blur, offset, opacity) => ({ type:'outer', color, blur, offset, angle:90, opacity });
++const CARD = color => sh(color, 40, 20, 0.098);   // white cards / big rounded panels
++const LIFT = color => sh(color, 30, 10, 0.098);   // photo frames lifted off the page
++const GLOW = color => sh(color, 15, 8, 0.2);      // accent dots and small blobs
++
++// Freeform path builders. Coordinates are fractions (0..1) of the shape's own box,
++// matching how the source deck stores its custom geometry.
++const m = (x, y) => ({ x, y, moveTo:true });
++const l = (x, y) => ({ x, y });
++const c = (x1, y1, x2, y2, x, y) => ({ x, y, curve:{ type:'cubic', x1, y1, x2, y2 } });
++const q = (x1, y1, x, y) => ({ x, y, curve:{ type:'quadratic', x1, y1 } });
++const z = { close:true };
++
++// Every element is positioned with an explicit inch box.
++const at = (x, y, w, h) => ({ x, y, w, h });
++
++// Outlines are stored as fractions; `fit` maps one onto a w x h inch box.
++function fit(pts, w, h) {
++  const fx = v => Math.round(v * w * 1e4) / 1e4, fy = v => Math.round(v * h * 1e4) / 1e4;
++  return pts.map(p => {
++    if (p.close) return p;
++    const o = { x:fx(p.x), y:fy(p.y) };
++    if (p.moveTo) o.moveTo = true;
++    if (p.curve) {
++      o.curve = { type:p.curve.type, x1:fx(p.curve.x1), y1:fy(p.curve.y1) };
++      if (p.curve.type === 'cubic') { o.curve.x2 = fx(p.curve.x2); o.curve.y2 = fy(p.curve.y2); }
++    }
++    return o;
++  });
++}
++
++// Every text box in the deck is transparent, top-anchored and uses Slides' insets.
++// `box` is {x,y,w,h}, `style` one of T.*, `extra` an optional per-shape override.
++function tx(s, text, box, style, extra) {
++  s.addText(text, Object.assign({ isTextBox:true, valign:'top', wrap:true,
++    margin:[7.2, 7.2, 3.6, 3.6] }, box, style, extra));
++}
++
++// Freeform shape: `pts` is a fractional outline, stretched to the option box.
++function blob(s, pts, o) {
++  s.addShape('custGeom', Object.assign({ points:fit(pts, o.w, o.h) }, o));
++}
++
++// Photograph placeholder - flat tint. Clipped to `pts` when the original photo
++// had a freeform crop, else a plain (optionally rounded) rectangle.
++function photo(s, o, pts) {
++  const opts = Object.assign({ fill:{ color:C.PHOTO } }, o);
++  if (pts) blob(s, pts, opts);
++  else s.addShape(opts.rectRadius ? 'roundRect' : 'rect', opts);
++}
++
++// Line-art icon placeholder: an outlined tile with a filled cap bar, roughly
++// matching the visual weight of the original pictograms.
++function icon(s, color, o) {
++  const line = { color, width:2 };
++  s.addShape('roundRect', Object.assign({ rectRadius:0.06, line }, o));
++  s.addShape('roundRect', { ...at(o.x + o.w * 0.2, o.y + o.h * 0.2, o.w * 0.6, o.h * 0.24),
++    rectRadius:0.02, fill:{ color } });
++  s.addShape('line', { ...at(o.x + o.w * 0.2, o.y + o.h * 0.62, o.w * 0.6, 0), line });
++  s.addShape('line', { ...at(o.x + o.w * 0.2, o.y + o.h * 0.78, o.w * 0.6, 0), line });
++}
++
++// Phone mockup body: the dark handset, drawn before its screen photo.
++function phone(s, x, y, w, h, rot) {
++  s.addShape('roundRect', { x:x + 0.009 * w, y:y + 0.003 * h, w:0.983 * w, h:0.986 * h,
++    rectRadius:0.42, fill:{ color:C.PHONE }, rotate:rot });
++}
++
++// ...and the speaker notch, drawn after it so it sits above the screen.
++function notch(s, x, y, w, h, rot) {
++  s.addShape('roundRect', { x:x + 0.26 * w, y:y + 0.024 * h, w:0.48 * w, h:0.042 * h,
++    rectRadius:0.06, fill:{ color:C.PHONE }, rotate:rot });
++}
++
++// Laptop mockup: silver lid behind the screen photo, plus the wider base bar.
++function laptop(s, x, y, w, h) {
++  s.addShape('roundRect', { ...at(x + 0.093 * w, y, 0.815 * w, 0.93 * h),
++    rectRadius:0.04, fill:{ color:C.PHONE } });
++  s.addShape('roundRect', { ...at(x, y + 0.935 * h, w, 0.045 * h),
++    rectRadius:0.02, fill:{ color:C.LAPTOP } });
++}
++
++// 10 x 6 grid of small dots used as a texture (box is 1.533 x 0.867 in).
++function dotGrid(s, x, y, color) {
++  for (let row = 0; row < 6; row++) {
++    for (let col = 0; col < 10; col++) {
++      s.addShape('ellipse', { ...at(x + 0.017 + col * 0.1667, y + 0.001 + row * 0.1667,
++        0.052, 0.052), fill:{ color } });
++    }
++  }
++}
++
++// The four corner dots; `spec` gives [x, y, diameter] for each colour slot.
++function dots(s, spec) {
++  spec.forEach(([x, y, d], i) => s.addShape('ellipse', { ...at(x, y, d, d),
++    fill:{ color:DOT_FILL[i] }, shadow:GLOW(DOT_SHADOW[i]) }));
++}
++
++// Blue pill button with its centred caption - used on 17 slides.
++function button(s, x, y, label) {
++  s.addShape('roundRect', { ...at(x, y, 2.39, 0.66), rectRadius:0.33,
++    fill:{ color:C.BLUE }, shadow:sh(C.BLUE, 25, 15, 0.2) });
++  tx(s, label, at(x + 0.662, y + 0.171, 1.173, 0.32), T.onDark);
++}
++
++// ------------------------------------------------------------ freeform outlines
++const P1 = [m(.731,.032),c(.792,.072,.827,.161,.875,.244),c(.924,.328,.986,.406,.998,.492),c(1.01,.578,.973,.671,.917,.74),c(.861,.81,.788,.855,.714,.894),c(.641,.934,.569,.967,.486,.986),c(.404,1.005,.312,1.01,.247,.965),c(.181,.921,.143,.827,.097,.739),c(.05,.651,-.006,.567,.001,.488),c(.007,.409,.076,.334,.129,.259),c(.183,.183,.222,.108,.281,.066),c(.339,.024,.418,.015,.501,.007),c(.583,-.002,.67,-.009,.731,.032),z]; // decor blob
++const P2 = [m(.594,0),c(.645,-.001,.693,.006,.731,.032),c(.792,.072,.827,.161,.875,.244),c(.924,.328,.985,.406,.998,.491),c(1.01,.577,.973,.671,.917,.74),c(.861,.81,.787,.855,.714,.894),c(.641,.934,.569,.967,.486,.986),c(.404,1.005,.312,1.01,.247,.965),c(.181,.921,.143,.827,.097,.739),c(.05,.651,-.006,.567,.001,.488),c(.007,.409,.076,.334,.129,.259),c(.183,.183,.222,.108,.281,.066),c(.339,.023,.418,.015,.501,.006),c(.532,.003,.563,0,.594,0),z]; // photo clip
++const P3 = [m(.166,0),l(.702,0),l(.755,0),l(1,0),l(1,1),l(.755,1),l(.702,1),l(.679,1),c(.651,.87,.503,.972,.466,.829),c(.428,.685,.365,.711,.277,.653),c(.188,.594,.323,.526,.263,.461),c(.202,.396,.072,.457,.018,.35),c(-.065,.185,.166,0,.166,0),z]; // photo clip
++const P4 = [m(.156,0),l(1,0),l(1,1),l(.156,1),l(.152,.995),c(.055,.845,0,.677,0,.5),c(0,.323,.055,.155,.152,.005),z]; // decor blob
++const P5 = [m(.938,.408),c(1.119,.563,.884,.885,.491,.984),c(.098,1.082,.23,.701,.068,.465),c(-.099,.224,.039,0,.491,0),c(.942,0,.757,.254,.938,.408),z]; // decor blob
++const P6 = [m(.491,0),c(.943,0,.757,.254,.938,.409),c(1.119,.563,.884,.886,.491,.984),c(.098,1.082,.23,.702,.068,.466),c(-.098,.224,.04,0,.491,0),z]; // photo clip
++const P7 = [m(.063,0),l(.592,0),l(.573,.014),c(.486,.083,.431,.188,.431,.305),c(.431,.514,.606,.683,.822,.683),c(.876,.683,.927,.672,.974,.653),l(1,.641),l(1,1),l(.423,1),l(.396,.985),c(.158,.846,0,.593,0,.305),c(0,.209,.018,.117,.05,.032),z]; // photo clip
++const P8 = [m(.69,0),c(.69,0,1.182,.194,.926,.374),c(.67,.555,.935,.577,.727,.733),c(.506,.899,.302,.818,.327,1),l(0,1),l(0,0),z]; // decor blob
++const P9 = [m(.403,.06),l(.016,.809),c(-.015,.869,.003,.946,.057,.981),c(.074,.992,.093,.998,.113,.998),l(.888,.998),c(.95,.998,1,.941,1,.872),c(1,.85,.995,.828,.985,.809),l(.598,.06),c(.567,0,.498,-.02,.444,.015),c(.427,.025,.413,.041,.403,.06),z]; // decor blob
++const P10 = [m(.123,0),c(.131,.001,.138,.002,.146,.004),l(.915,.207),c(.934,.212,.952,.222,.966,.236),c(1.011,.281,1.011,.355,.966,.4),l(.4,.966),c(.386,.98,.368,.991,.348,.996),c(.287,1.013,.223,.976,.207,.915),l(.004,.146),c(-.001,.127,-.001,.106,.004,.086),c(.019,.032,.069,-.003,.123,0),z]; // photo clip
++const P11 = [m(0,0),l(1,0),l(1,.582),l(.995,.592),c(.845,.853,.677,1,.5,1),c(.323,1,.155,.853,.005,.592),l(0,.582),z]; // photo clip
++const P12 = [m(.194,0),l(1,0),l(1,1),l(.194,1),l(.189,.995),c(.068,.845,0,.677,0,.5),c(0,.323,.068,.155,.189,.005),z]; // photo clip
++const P13 = [m(.5,0),c(.776,0,1,.224,1,.5),c(1,.776,.776,1,.5,1),c(.224,1,0,.776,0,.5),c(0,.224,.224,0,.5,0),z]; // photo clip
++const P14 = [m(0,0),l(.595,0),l(.605,.005),c(.858,.155,1,.323,1,.5),c(1,.677,.858,.845,.605,.995),l(.595,1),l(0,1),z]; // photo clip
++const P15 = [m(.705,.291),c(.741,.366,.767,.401,.802,.437),c(.839,.473,.883,.511,.928,.574),c(.972,.637,1.017,.723,.993,.779),c(.97,.836,.879,.861,.798,.903),c(.718,.945,.649,1.005,.583,1),c(.517,.996,.454,.927,.355,.894),c(.256,.862,.122,.866,.056,.815),c(-.011,.763,-.01,.657,.018,.565),c(.047,.474,.105,.399,.145,.306),c(.186,.213,.211,.101,.281,.044),c(.35,-.013,.465,-.016,.545,.042),c(.624,.099,.669,.215,.705,.291),z]; // decor blob
++const P16 = [m(.732,.001),c(.749,-.001,.765,.001,.779,.007),c(.836,.03,.861,.121,.903,.202),c(.945,.282,1.004,.351,1,.417),c(.996,.483,.927,.547,.894,.645),c(.862,.744,.866,.878,.815,.944),c(.763,1.011,.656,1.01,.565,.982),c(.474,.953,.399,.895,.306,.855),c(.212,.814,.101,.789,.044,.72),c(-.013,.65,-.016,.535,.042,.455),c(.099,.376,.215,.331,.291,.295),c(.366,.26,.401,.233,.436,.198),c(.473,.161,.511,.117,.574,.072),c(.621,.039,.681,.005,.732,.001),z]; // photo clip
++const P17 = [m(.14,0),l(.324,0),l(.816,0),l(1,0),l(1,1),l(.816,1),l(.592,1),l(.408,1),c(.43,.867,.281,.904,.316,.808),c(.373,.651,.142,.711,.189,.572),c(.266,.35,.064,.506,.01,.285),c(-.045,.059,.14,0,.14,0),z]; // decor blob
++const P18 = [m(.666,.107),c(.749,.11,.859,.108,.925,.163),c(.992,.218,1.015,.329,.991,.424),c(.967,.519,.896,.599,.842,.677),c(.786,.757,.748,.836,.69,.898),c(.632,.96,.554,1.006,.48,1),c(.406,.993,.334,.935,.295,.861),c(.256,.785,.249,.693,.191,.621),c(.134,.547,.025,.494,.004,.426),c(-.017,.359,.049,.277,.102,.193),c(.154,.108,.192,.021,.251,.004),c(.312,-.014,.395,.037,.463,.067),c(.531,.096,.584,.104,.666,.107),z]; // decor blob
++const P19 = [m(.275,0),c(.332,-.002,.403,.04,.463,.067),c(.531,.096,.584,.103,.666,.107),c(.749,.11,.859,.108,.925,.163),c(.992,.218,1.015,.329,.991,.424),c(.967,.519,.896,.599,.841,.677),c(.786,.757,.748,.836,.69,.898),c(.632,.96,.554,1.006,.48,.999),c(.406,.993,.334,.935,.295,.861),c(.256,.785,.249,.693,.191,.621),c(.134,.547,.025,.494,.004,.426),c(-.017,.359,.049,.277,.102,.192),c(.154,.108,.192,.021,.251,.004),c(.259,.002,.267,0,.275,0),z]; // photo clip
++const P20 = [m(0,0),l(.776,0),l(.776,0),l(.881,0),l(1,0),l(1,1),l(.881,1),l(.864,1),l(.776,1),l(.773,1),l(.641,1),c(.648,.795,.299,.885,.342,.64),c(.367,.499,.31,.44,.163,.35),c(.016,.26,0,0,0,0),z]; // decor blob
++const P21 = [m(.746,.108),c(.822,.164,.893,.227,.94,.31),c(.987,.393,1.009,.496,.997,.595),c(.985,.694,.938,.787,.872,.855),c(.806,.921,.721,.962,.634,.983),c(.548,1.005,.459,1.008,.381,.98),c(.303,.952,.234,.894,.163,.827),c(.092,.759,.018,.682,.003,.594),c(-.012,.506,.034,.406,.085,.32),c(.136,.234,.193,.161,.264,.102),c(.335,.043,.42,-.002,.503,0),c(.587,.003,.669,.052,.746,.108),z]; // decor blob
++const P22 = [m(.503,0),c(.587,.003,.669,.052,.746,.108),c(.822,.164,.893,.227,.94,.31),c(.986,.393,1.009,.496,.997,.595),c(.985,.694,.938,.787,.872,.855),c(.806,.921,.721,.962,.634,.983),c(.548,1.005,.459,1.007,.381,.98),c(.303,.952,.234,.894,.163,.826),c(.092,.759,.018,.682,.003,.594),c(-.012,.506,.034,.406,.085,.32),c(.136,.234,.193,.161,.264,.102),c(.335,.043,.42,-.002,.503,0),z]; // photo clip
++const P23 = [m(.788,.013),c(.844,.045,.859,.149,.887,.234),c(.913,.319,.951,.386,.976,.466),c(1.001,.547,1.013,.642,.98,.717),c(.947,.791,.869,.844,.789,.902),c(.708,.959,.625,1.023,.558,.992),c(.492,.963,.441,.841,.338,.796),c(.235,.752,.079,.785,.024,.741),c(-.029,.696,.019,.574,.045,.467),c(.072,.36,.077,.269,.111,.19),c(.145,.11,.21,.043,.286,.023),c(.363,.003,.453,.03,.545,.025),c(.637,.019,.732,-.019,.788,.013),z]; // decor blob
++const P24 = [m(.74,0),c(.758,.001,.774,.005,.788,.013),c(.844,.045,.859,.149,.886,.234),c(.913,.319,.951,.386,.976,.466),c(1.001,.547,1.013,.642,.98,.717),c(.947,.791,.869,.844,.789,.902),c(.708,.959,.625,1.022,.558,.992),c(.492,.963,.441,.841,.338,.796),c(.235,.752,.079,.785,.024,.741),c(-.029,.696,.019,.574,.045,.467),c(.072,.36,.076,.269,.111,.19),c(.145,.11,.21,.043,.286,.023),c(.363,.003,.453,.03,.545,.025),c(.614,.02,.685,-.002,.74,0),z]; // photo clip
++const P25 = [m(.5,0),c(.677,0,.845,.076,.995,.211),l(1,.216),l(1,.398),l(1,.517),l(1,.612),l(1,.699),l(1,.699),l(1,.913),l(1,1),l(0,1),l(0,.913),l(0,.612),l(0,.398),l(0,.216),l(.005,.211),c(.155,.076,.323,0,.5,0),z]; // photo clip
++const P26 = [m(.216,0),l(.398,0),l(.517,0),l(.612,0),l(.699,0),l(.699,0),l(.913,0),l(1,0),l(1,1),l(.913,1),l(.612,1),l(.398,1),l(.216,1),l(.211,.995),c(.076,.845,0,.677,0,.5),c(0,.323,.076,.155,.211,.005),z]; // photo clip
++const P27 = [m(.782,.053),c(.846,.095,.896,.158,.911,.228),c(.927,.298,.908,.373,.925,.46),c(.941,.546,.993,.642,.999,.751),c(1.006,.861,.966,.982,.886,.998),c(.806,1.014,.684,.926,.596,.865),c(.508,.806,.454,.775,.367,.762),c(.28,.75,.162,.755,.103,.706),c(.045,.657,.047,.553,.029,.439),c(.011,.325,-.026,.201,.029,.146),c(.085,.091,.233,.108,.338,.09),c(.442,.073,.502,.021,.572,.005),c(.641,-.01,.718,.011,.782,.053),z]; // decor blob
++const P28 = [m(.625,0),c(.678,.002,.734,.021,.782,.053),c(.846,.095,.895,.158,.911,.227),c(.927,.297,.908,.373,.925,.46),c(.941,.546,.993,.642,.999,.751),c(1.006,.86,.966,.982,.886,.998),c(.806,1.014,.684,.925,.596,.865),c(.508,.806,.453,.775,.367,.762),c(.28,.75,.162,.754,.103,.706),c(.045,.657,.047,.553,.029,.439),c(.011,.325,-.026,.201,.029,.146),c(.084,.091,.233,.108,.338,.09),c(.442,.073,.502,.021,.571,.005),c(.589,.001,.607,0,.625,0),z]; // photo clip
++const P29 = [m(0,0),l(1,0),l(1,.087),l(1,.388),l(1,.602),l(1,.784),l(.995,.789),c(.845,.924,.677,1,.5,1),c(.323,1,.155,.924,.005,.789),l(0,.784),l(0,.602),l(0,.483),l(0,.388),l(0,.301),l(0,.301),l(0,.087),z]; // photo clip
++const P30 = [m(.578,0),l(.676,0),l(.698,0),l(.701,0),l(.78,0),l(.795,0),l(.795,0),l(.798,0),l(.878,0),l(.892,0),l(.902,0),l(1,0),l(1,1),l(.902,1),l(.892,1),l(.798,1),l(.795,1),l(.701,1),l(.098,1),l(0,1),c(0,1,.014,.74,.147,.65),c(.28,.56,.331,.501,.309,.36),c(.27,.115,.585,.205,.578,0),z]; // photo clip
++const P31 = [m(.5,1),c(.677,1,.845,.924,.995,.789),l(1,.784),l(1,.602),l(1,.483),l(1,.388),l(1,.301),l(1,.301),l(1,.087),l(1,0),l(0,0),l(0,.087),l(0,.087),l(0,.388),l(0,.388),l(0,.602),l(0,.602),l(0,.784),l(.005,.789),c(.155,.924,.323,1,.5,1),z]; // decor blob
++const P32 = [m(0,0),l(1,0),l(.805,.849),c(.782,.95,.687,1.015,.587,.997),l(0,.894),z]; // photo clip
++const P33 = [m(.773,.026),c(.856,.051,.922,.121,.954,.199),c(.987,.277,.986,.364,.992,.454),c(.999,.545,1.013,.638,.971,.701),c(.929,.765,.831,.798,.741,.849),c(.652,.9,.572,.97,.477,.992),c(.382,1.014,.274,.99,.211,.925),c(.148,.859,.131,.754,.09,.668),c(.049,.583,-.016,.517,.004,.461),c(.023,.406,.128,.36,.169,.276),c(.211,.192,.19,.068,.233,.023),c(.277,-.021,.384,.011,.487,.017),c(.591,.023,.69,.002,.773,.026),z]; // decor blob
++const P34 = [m(.754,0),c(.757,0,.761,0,.765,.001),c(.821,.014,.839,.123,.88,.215),c(.919,.307,.98,.38,.996,.464),c(1.012,.548,.982,.642,.932,.713),c(.881,.783,.809,.829,.737,.884),c(.665,.939,.594,1.002,.524,1),c(.453,.999,.383,.933,.302,.884),c(.221,.836,.129,.805,.07,.735),c(.01,.667,-.016,.56,.01,.471),c(.037,.382,.117,.311,.17,.229),c(.223,.147,.249,.056,.303,.043),c(.357,.029,.44,.094,.528,.084),c(.61,.075,.697,-.001,.754,0),z]; // photo clip
++const P35 = [m(.755,0),c(.835,-.002,.907,.074,.952,.17),c(.997,.267,1.014,.383,.988,.481),c(.962,.578,.892,.656,.841,.739),c(.79,.822,.758,.909,.703,.957),c(.649,1.005,.574,1.014,.514,.978),c(.455,.942,.413,.859,.364,.807),c(.315,.755,.26,.734,.188,.687),c(.116,.641,.027,.57,.005,.484),c(-.016,.398,.03,.296,.095,.233),c(.159,.17,.241,.145,.311,.141),c(.381,.136,.439,.151,.513,.118),c(.586,.085,.675,.003,.755,0),z]; // decor blob
++const P36 = [m(.652,0),c(.709,-.002,.769,.019,.823,.052),c(.909,.106,.977,.194,.995,.292),c(1.013,.39,.98,.498,.967,.599),c(.955,.7,.963,.793,.932,.867),c(.901,.94,.832,.994,.759,.999),c(.685,1.006,.608,.962,.538,.948),c(.467,.934,.405,.95,.315,.955),c(.225,.959,.107,.954,.049,.895),c(-.011,.835,-.011,.721,.023,.629),c(.057,.536,.126,.466,.191,.419),c(.257,.372,.32,.349,.376,.277),c(.432,.204,.481,.081,.557,.029),c(.586,.01,.618,.001,.652,0),z]; // photo clip
++const P37 = [m(.016,0),l(1,0),l(1,1),l(.308,1),c(.293,.864,-.129,.755,.103,.595),c(.26,.487,.219,.405,.062,.245),c(-.013,.169,-.009,.076,.016,0),z]; // photo clip
++const P38 = [m(.757,.281),l(.412,.608),l(.246,.438),l(.189,.492),l(.409,.719),l(.467,.665),l(.811,.338),z,m(.5,0),c(.776,0,1,.224,1,.5),c(1,.776,.776,1,.5,1),c(.224,1,0,.776,0,.5),c(0,.224,.224,0,.5,0),z]; // decor blob
++const P39 = [m(.734,.145),c(.806,.156,.894,.174,.942,.236),c(.99,.298,.996,.404,.999,.513),c(1.002,.622,1.002,.733,.956,.799),c(.911,.865,.82,.887,.744,.879),c(.669,.871,.608,.834,.535,.861),c(.462,.89,.377,.983,.292,.998),c(.207,1.012,.123,.949,.068,.854),c(.013,.759,-.013,.635,.007,.525),c(.026,.415,.092,.32,.146,.221),c(.198,.122,.238,.019,.303,.002),c(.368,-.013,.458,.056,.531,.093),c(.604,.13,.661,.134,.734,.145),z]; // decor blob
++const P40 = [m(.328,0),c(.39,.004,.467,.061,.531,.093),c(.604,.13,.661,.134,.734,.145),c(.806,.156,.894,.173,.942,.236),c(.99,.298,.996,.404,.999,.513),c(1.002,.622,1.002,.733,.956,.799),c(.911,.865,.82,.887,.744,.879),c(.669,.871,.608,.834,.535,.861),c(.462,.89,.377,.983,.291,.998),c(.207,1.012,.123,.948,.068,.854),c(.013,.759,-.013,.635,.007,.525),c(.026,.415,.092,.32,.146,.221),c(.198,.122,.238,.019,.303,.002),c(.311,0,.319,0,.328,0),z]; // photo clip
++const P41 = [m(.806,.01),c(.9,.033,.99,.103,.999,.198),c(1.009,.293,.938,.414,.893,.507),c(.85,.599,.833,.664,.818,.748),c(.803,.833,.79,.937,.739,.978),c(.688,1.018,.6,.995,.522,.976),c(.443,.957,.374,.942,.305,.914),c(.236,.884,.168,.841,.105,.775),c(.041,.71,-.015,.622,.004,.547),c(.023,.471,.118,.408,.166,.313),c(.213,.216,.211,.088,.261,.037),c(.311,-.015,.411,.01,.511,.011),c(.611,.012,.711,-.013,.806,.01),z]; // decor blob
++const P42 = [m(.735,0),c(.74,0,.744,0,.748,.001),c(.814,.012,.832,.115,.873,.202),c(.913,.289,.975,.361,.994,.457),c(1.012,.553,.988,.674,.908,.741),c(.83,.807,.695,.821,.596,.839),c(.497,.859,.434,.884,.354,.923),c(.275,.962,.178,1.015,.122,.996),c(.066,.977,.05,.886,.034,.807),c(.019,.726,.004,.658,0,.581),c(-.002,.503,.008,.416,.039,.321),c(.07,.226,.124,.123,.198,.093),c(.271,.063,.365,.107,.468,.089),c(.565,.071,.669,-.001,.735,0),z]; // photo clip
++const P43 = [m(1,0),l(1,1),l(.308,1),c(.292,.864,-.129,.755,.103,.595),c(.26,.487,.219,.405,.062,.245),c(-.013,.169,-.009,.076,.016,0),z]; // decor blob
++
++// ------------------------------------------------------------ slides
++// 1. Toddler
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(0,0,13.333,7.5));
++  s.addShape('ellipse', {...at(2.625,1.863,8.083,3.775), fill:{color:C.WHITE}, rotate:15});
++  tx(s, 'Toddler', at(3.888,2.565,5.558,1.717), T.hero);
++  tx(s, 'Kids Zone Presentation Template', at(5.182,4.282,2.97,0.32), T.caption);
++  s.addShape('ellipse', {...at(4.777,1.264,0.81,0.81), fill:{color:C.BLUE}, shadow:sh(C.BLUE,40,15,0.2)});
++  icon(s, C.WHITE, at(4.976,1.463,0.411,0.411));
++  s.addShape('ellipse', {...at(8.339,5.356,0.81,0.81), fill:{color:C.RED}, shadow:sh(C.RED,40,15,0.2)});
++  icon(s, C.WHITE, at(8.538,5.555,0.411,0.411));
++}
++
++// 2. About
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'About', at(1.783,1.81,2.8,1.111), T.h1);
++  tx(s, 'About Our Company', at(1.783,2.921,1.862,0.32), T.body);
++  blob(s, P1, {...at(5.578,1.016,6.05,5.468), fill:{color:C.BLUE}, shadow:GLOW(C.BLUE_SH)});
++  dotGrid(s, 3.65, 5.061, C.BLUE);
++  photo(s, at(5.776,1.195,5.654,5.11), P2);
++}
++
++// 3. AboutToddler
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(5.251,0,8.082,7.5), P3);
++  tx(s, 'Kids Play Zone', at(1.51,2.458,1.422,0.32), T.body);
++  tx(s, 'About\nToddler', at(1.51,1.146,2.211,1.313), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minimas', at(1.51,3.531,3.507,1.384), T.para);
++  button(s, 1.647, 5.576, 'toddler.com');
++  dots(s, [[4.512,1.146,0.32], [6.667,2.994,0.756], [5.26,6.336,0.65], [0.529,3.42,0.32]]);
++}
++
++// 4. We AlwaysCare Your Children
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P4, {...at(7.797,0,5.536,7.5), fill:{color:C.BLUE}});
++  tx(s, 'We Always\nCare Your\nChildren', at(1.123,1.761,2.961,1.919), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minimas', at(1.123,4.328,3.507,1.384), T.para);
++  blob(s, P5, {...at(6.008,0.651,5.147,6.197), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  photo(s, at(6.171,0.848,4.817,5.8), P6);
++  s.addShape('roundRect', {...at(5.355,2.679,2.624,3.298), rectRadius:0.276, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Lorem ipsum dolor sit amet, consec adipiscing elit, sed do eiusmod et incididunt labore dolore magna ad minimas tetur', at(5.584,4.076,2.195,1.714), T.para);
++  tx(s, 'About Toddler', at(5.584,3.756,1.38,0.32), T.label);
++  s.addShape('roundRect', {...at(5.711,2.908,0.656,0.656), rectRadius:0.109, fill:{color:C.BLUE}, shadow:sh(C.BLUE,40,15,0.2)});
++  icon(s, C.WHITE, at(5.872,3.069,0.333,0.333));
++  dots(s, [[0.917,1.095,0.32], [4.864,0.372,0.756], [3.504,6.399,0.65], [0.372,5.977,0.32]]);
++}
++
++// 5. We Provide The Best Environment
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(6.079,0,7.254,7.5), P7);
++  tx(s, 'About Toddler', at(1.592,3.071,1.368,0.32), T.body);
++  tx(s, 'We Provide\nThe Best\nEnvironment', at(1.592,1.152,3.573,1.919), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore', at(1.592,3.931,3.507,1.058), T.para);
++  button(s, 1.729, 5.848, 'toddler.com');
++  s.addShape('roundRect', {...at(5.763,3.811,3.808,2.038), rectRadius:0.214, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Lorem ipsum dolor sit, consec tetur adipiscing elit, sed do amet eiusmod tempor incididunt labore et dolore magna aliqua minimas', at(6.397,4.326,3.08,1.384), T.para);
++  tx(s, 'Kids Play Zone', at(6.397,4.007,1.436,0.32), T.label);
++  icon(s, C.BLUE, at(5.982,4,0.333,0.333));
++  dots(s, [[0.757,3.384,0.32], [11.07,2.474,0.756], [5.763,1.199,0.65], [5.135,6.189,0.32]]);
++}
++
++// 6. We ProvideThe Main KidsActivities
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P8, {...at(0,0,5.331,7.5), fill:{color:C.RED}});
++  tx(s, 'Toddler Kids Play Zone', at(8.442,3.32,2.111,0.32), T.body);
++  tx(s, 'We Provide\nThe Main Kids\nActivities', at(8.442,1.401,3.796,1.919), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minimas', at(8.442,4.46,3.507,1.384), T.para);
++  blob(s, P9, {...at(1.308,0.591,6.306,5.65), fill:{color:C.WHITE}, shadow:LIFT(C.INK), rotate:75});
++  photo(s, at(1.258,1.068,5.817,5.74), P10);
++  s.addShape('roundRect', {...at(3.642,4.271,3.808,2.038), rectRadius:0.214, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.RED)});
++  tx(s, 'Lorem ipsum dolor sit, consec tetur adipiscing elit, sed do amet eiusmod tempor incididunt labore et dolore magna aliqua minimas', at(4.276,4.786,3.08,1.384), T.para);
++  tx(s, 'Kids Play Zone', at(4.276,4.466,1.436,0.32), T.label);
++  icon(s, C.RED, at(3.861,4.46,0.333,0.333));
++  dots(s, [[6.801,0.818,0.74], [11.871,0.869,0.204], [12.181,4.184,0.65], [8.675,6.612,0.32]]);
++}
++
++// 7. Your Kid’s Life Changes Everything
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(0,0,13.333,4.326), P11);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minimas', at(4.389,5.519,4.554,1.058), T.parac);
++  blob(s, P11, {...at(0,0,13.333,4.326), fill:{color:C.INK, transparency:50}});
++  tx(s, 'Toddler Kids Play Zone', at(5.894,2.245,2.111,0.32), T.onDark);
++  tx(s, 'Your Kid’s Life\nChanges Everything', at(4.256,0.932,5.388,1.313), T.h2w);
++  s.addShape('roundRect', {...at(3.178,3.228,3.361,1.701), rectRadius:0.179, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Lorem ipsum dolor sit amet, sed do eiusmod incididunt ut labore dolore magna tempor', at(3.761,3.714,2.684,1.056), T.para);
++  tx(s, 'Comfort Zone', at(3.761,3.394,1.368,0.32), T.label);
++  s.addShape('roundRect', {...at(6.795,3.228,3.361,1.701), rectRadius:0.179, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.RED)});
++  tx(s, 'Lorem ipsum dolor sit amet, sed do eiusmod incididunt ut labore dolore magna tempor', at(7.378,3.714,2.684,1.056), T.para);
++  tx(s, 'Best Partner', at(7.378,3.394,1.266,0.32), T.label);
++  icon(s, C.BLUE, at(3.353,3.387,0.333,0.333));
++  icon(s, C.RED, at(6.97,3.387,0.333,0.333));
++  dots(s, [[11.664,5.47,0.32], [1.211,4.079,0.756], [11.847,2.737,0.65], [2.716,5.888,0.32]]);
++}
++
++// 8. Our Children Are A Gift From God
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  s.addShape('roundRect', {...at(7.227,0.75,4.385,6), rectRadius:0.731, fill:{color:C.BLUE}});
++  s.addShape('roundRect', {...at(6.011,1.112,4.125,5.275), rectRadius:0.688, fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  photo(s, {...at(6.186,1.286,3.777,4.927), rectRadius:0.282});
++  tx(s, 'Toddler Kids Play Zone', at(1.408,2.819,2.111,0.32), T.body);
++  tx(s, 'Our Children\nAre A Gift\nFrom God', at(1.408,0.901,3.473,1.919), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod incididunt ut labore tempor dolore magna aliqua. Ut enim ad minimas', at(1.408,3.728,2.609,1.714), T.para);
++  button(s, 1.524, 6.09, 'toddler.com');
++  s.addShape('roundRect', {...at(5.354,2.99,2.382,2.652), rectRadius:0.251, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Lorem ipsum dolor sit amet, sed do eiusmod incididunt ut dolore magna tempor labore', at(5.544,4.056,2.091,1.386), T.para);
++  tx(s, 'Comfort Zone', at(5.544,3.737,1.368,0.32), T.label);
++  icon(s, C.BLUE, at(5.607,3.238,0.333,0.333));
++  dots(s, [[0.291,3.728,0.32], [5.21,0.356,0.756], [6.489,6.009,0.65], [12.309,2.138,0.32]]);
++}
++
++// 9. Our Team IsCool And Fun
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P12, {...at(7.704,0,5.629,7.5), fill:{color:C.BLUE}});
++  tx(s, 'Toddler Tean', at(1.18,1.464,1.317,0.32), T.body);
++  tx(s, 'Our Team Is\nCool And Fun', at(1.18,1.784,3.526,1.313), T.h2);
++  button(s, 1.302, 5.699, 'toddler.com');
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore', at(1.18,4.227,3.331,1.058), T.para);
++  tx(s, 'Toddler Team', at(1.18,3.907,1.364,0.32), T.label);
++  s.addShape('ellipse', {...at(5.83,0.75,2.921,2.921), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  s.addShape('ellipse', {...at(7.111,3.829,2.921,2.921), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  s.addShape('ellipse', {...at(9.186,1.285,2.921,2.921), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  dots(s, [[0.517,2.936,0.32], [5.218,5.272,0.756], [3.883,0.568,0.65], [6.335,3.816,0.32]]);
++  photo(s, at(6.009,0.929,2.562,2.562), P13);
++  photo(s, at(9.365,1.464,2.562,2.562), P13);
++  photo(s, at(7.29,4.009,2.562,2.562), P13);
++}
++
++// 10. Meet TheFounders
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Toddler Founders', at(0.917,1.228,1.678,0.32), T.body);
++  tx(s, 'Meet The\nFounders', at(0.917,1.548,2.562,1.313), T.h2);
++  s.addShape('roundRect', {...at(4.51,1.091,3.242,4.146), rectRadius:0.54, fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  s.addShape('roundRect', {...at(8.498,2.112,3.242,4.146), rectRadius:0.54, fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  button(s, 0.989, 4.577, 'toddler.com');
++  photo(s, {...at(4.647,1.228,2.968,3.872), rectRadius:0.221});
++  photo(s, {...at(8.635,2.249,2.968,3.872), rectRadius:0.221});
++  s.addShape('roundRect', {...at(5.598,4.307,2.268,1.081), rectRadius:0.197, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Alexandre Jorche', at(5.799,4.527,1.664,0.32), T.label);
++  tx(s, 'Founder', at(5.799,4.846,0.9,0.32), T.body);
++  s.addShape('roundRect', {...at(9.586,5.328,2.268,1.081), rectRadius:0.197, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Prasasti Jacob', at(9.788,5.548,1.445,0.32), T.label);
++  tx(s, 'Co-Founder', at(9.788,5.867,1.199,0.32), T.body);
++  dots(s, [[11.625,1.284,0.32], [8.405,0.338,0.756], [4.185,6.258,0.65], [3.478,3.399,0.32]]);
++}
++
++// 11. Our Creative Team
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(0,0,2.696,7.5), P14);
++  photo(s, {...at(6.928,0.75,2.049,1.982), rectRadius:0.162});
++  photo(s, {...at(9.724,0.75,2.049,1.982), rectRadius:0.162});
++  photo(s, {...at(7.572,4.021,2.049,1.982), rectRadius:0.162});
++  photo(s, {...at(10.368,4.021,2.049,1.982), rectRadius:0.162});
++  tx(s, 'Jason Blue', at(6.928,2.839,1.129,0.32), T.label);
++  tx(s, 'Senior Instructor', at(6.928,3.159,1.608,0.32), T.body);
++  tx(s, 'Sam Johnny', at(9.724,2.839,1.212,0.32), T.label);
++  tx(s, 'Instructor', at(9.724,3.159,1.028,0.32), T.body);
++  tx(s, 'John Doe', at(7.572,6.111,0.989,0.32), T.label);
++  tx(s, 'Instructor', at(7.572,6.43,1.028,0.32), T.body);
++  tx(s, 'Dave Smith', at(10.368,6.111,1.145,0.32), T.label);
++  tx(s, 'Instructor', at(10.368,6.43,1.028,0.32), T.body);
++  tx(s, 'Toddler Team', at(3.422,2.554,1.364,0.32), T.body);
++  tx(s, 'Our\nCreative\nTeam', at(3.422,0.635,2.334,1.919), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod incididunt ut labore tempor dolore magna', at(3.422,3.273,2.558,1.386), T.para);
++  button(s, 3.544, 5.343, 'toddler.com');
++  dots(s, [[12.479,2.045,0.32], [1.871,0.985,0.756], [6.072,6.425,0.65], [5.992,2.374,0.32]]);
++}
++
++// 12. Our Team
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Jason Blue', at(1.655,5.463,1.129,0.32), T.labelc);
++  tx(s, 'Senior Instructor', at(1.416,5.783,1.608,0.32), T.caption);
++  tx(s, 'Sam Johnny', at(4.527,6.111,1.212,0.32), T.labelc);
++  tx(s, 'Instructor', at(4.619,6.43,1.028,0.32), T.caption);
++  tx(s, 'John Doe', at(7.55,5.463,0.989,0.32), T.labelc);
++  tx(s, 'Instructor', at(7.531,5.783,1.028,0.32), T.caption);
++  tx(s, 'Dave Smith', at(10.385,6.111,1.145,0.32), T.labelc);
++  tx(s, 'Instructor', at(10.443,6.43,1.028,0.32), T.caption);
++  tx(s, 'Toddler Creative Team', at(5.609,1.457,2.116,0.32), T.caption);
++  tx(s, 'Our Team', at(5.326,0.75,2.681,0.707), T.h2c);
++  dots(s, [[3.689,1.151,0.32], [3.093,6.27,0.756], [9.676,1.151,0.65], [12.257,2.234,0.32]]);
++  photo(s, {...at(1.086,2.222,2.268,2.913), rectRadius:0.185});
++  photo(s, {...at(3.998,2.869,2.268,2.913), rectRadius:0.185});
++  photo(s, {...at(6.911,2.222,2.268,2.913), rectRadius:0.185});
++  photo(s, {...at(9.823,2.869,2.268,2.913), rectRadius:0.185});
++}
++
++// 13. Jason Blue
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(6.344,0,6.989,7.5), P12);
++  tx(s, 'Senior Instructor', at(1.208,1.896,1.582,0.32), T.body);
++  tx(s, 'Jason Blue', at(1.208,1.189,2.932,0.707), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minimas', at(1.208,2.969,4.528,1.058), T.para);
++  s.addShape('roundRect', {...at(1.343,4.779,7.444,1.26), rectRadius:0.63, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  icon(s, C.BLUE, at(1.821,5.101,0.33,0.33));
++  tx(s, '@jasonblue', at(2.2,5.411,1.261,0.32), T.label);
++  tx(s, 'Username', at(2.2,5.091,1.153,0.32), T.body);
++  icon(s, C.BLUE, at(3.806,5.101,0.33,0.33));
++  tx(s, 'jason@toddler.com', at(4.185,5.411,1.939,0.32), T.label);
++  tx(s, 'Email', at(4.185,5.091,1.524,0.32), T.body);
++  icon(s, C.BLUE, at(6.326,5.101,0.33,0.33));
++  tx(s, 'toddler.jason.com', at(6.705,5.411,1.939,0.32), T.label);
++  tx(s, 'Website', at(6.705,5.091,1.524,0.32), T.body);
++  dots(s, [[4.905,0.851,0.32], [6.051,1.896,0.756], [0.422,4.416,0.65], [3.976,6.491,0.32]]);
++}
++
++// 14. Services &Features
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P15, {...at(1.39,1.079,4.864,5.189), fill:{color:C.RED}, shadow:GLOW(C.RED_SH), rotate:-90});
++  tx(s, 'Services &\nFeatures', at(7.897,2.72,4.308,2.12), T.h1);
++  tx(s, 'Our Services And Features', at(7.897,4.84,2.43,0.32), T.body);
++  dots(s, [[1.623,0.769,0.766], [11.551,1.083,0.32], [6.219,5.773,0.766], [7.455,1.657,0.32]]);
++  dotGrid(s, 10.671, 5.673, C.RED);
++  photo(s, at(1.425,1.528,4.795,4.363), P16);
++}
++
++// 15. 10+ PlayAreas
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(6.243,0.761,5.989,5.989), P13);
++  tx(s, '10+ Play\nAreas', at(1.083,1.224,2.385,1.313), T.h2);
++  button(s, 1.22, 5.32, 'toddler.com');
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod incididunt ut labore et dolore magna aliqua. Ut enim ad minimas tempor', at(1.083,3.003,2.698,1.714), T.para);
++  tx(s, 'Our Services', at(1.083,0.904,1.268,0.32), T.body);
++  s.addShape('ellipse', {...at(4.793,2.792,3.185,3.182), fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Lorem ipsum dolor sit amet, ad consec tetur adipiscing elit, sed do eiusmod magna incididunt ut labore et dolore', at(5.064,3.818,2.643,1.386), T.parac);
++  tx(s, 'Toddler Services', at(5.582,3.498,1.606,0.32), T.labelc);
++  s.addShape('ellipse', {...at(5.173,5.31,0.656,0.656), fill:{color:C.BLUE}, shadow:sh(C.BLUE,40,15,0.2), rotate:2.57});
++  icon(s, C.WHITE, at(5.329,5.471,0.333,0.333));
++  dots(s, [[11.422,0.909,0.32], [4.647,1.168,0.756], [11.742,5.804,0.65], [4.201,6.295,0.32]]);
++}
++
++// 16. Beautiful Area For Babies
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P17, {...at(6.021,0,7.305,7.5), fill:{color:C.BLUE}});
++  tx(s, 'Our Services', at(1.37,2.684,1.268,0.32), T.body);
++  tx(s, 'Beautiful\nArea For\nBabies', at(1.37,0.765,2.646,1.919), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod incididunt ut labore tempor dolore magna aliqua. Ut enim ad minimas', at(1.37,3.596,2.646,1.714), T.para);
++  button(s, 1.437, 5.904, 'toddler.com');
++  s.addShape('roundRect', {...at(5.023,1.024,3.242,4.146), rectRadius:0.54, fill:{color:C.WHITE}, shadow:LIFT(C.INK), rotate:-5.3});
++  s.addShape('roundRect', {...at(8.784,2.381,3.242,4.146), rectRadius:0.54, fill:{color:C.WHITE}, shadow:LIFT(C.INK), rotate:9.62});
++  photo(s, {...at(5.153,1.156,2.983,3.882), rectRadius:0.219, rotate:-5});
++  photo(s, {...at(8.911,2.511,2.987,3.885), rectRadius:0.167, rotate:10});
++  s.addShape('ellipse', {...at(6.217,4.019,1.887,1.885), fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, '20+', at(6.551,4.727,1.218,0.639), { fontSize:32, fontFace:F.BODY, color:C.INK, bold:true, align:'center' });
++  tx(s, 'Play Areas', at(6.468,5.265,1.385,0.32), T.caption);
++  icon(s, C.BLUE, at(6.993,4.394,0.333,0.333));
++  dots(s, [[0.362,2.684,0.32], [5.041,6.185,0.756], [4.634,0.267,0.65], [3.82,2.999,0.32]]);
++}
++
++// 17. Features
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Features', at(8.085,1.067,2.395,0.707), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod incididunt ut labore tempor dolore magna aliqua minimas', at(8.085,2.854,3.817,1.058), T.para);
++  tx(s, 'Our Service & Facilities', at(8.085,1.781,2.127,0.32), T.body);
++  blob(s, P1, {...at(1.143,0.75,6.28,6), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  photo(s, at(1.348,0.947,5.869,5.608), P2);
++  s.addShape('roundRect', {...at(5.123,4.561,7.145,1.638), rectRadius:0.326, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Education Toy', at(8.085,4.873,1.639,0.32), T.label);
++  tx(s, 'Blanditiis vero mus et dignis', at(8.085,5.193,1.521,0.73), T.para);
++  icon(s, C.RED, at(7.676,4.858,0.333,0.333));
++  tx(s, 'Baby Zone', at(5.818,4.873,1.261,0.32), T.label);
++  tx(s, 'Mus et dignis simos blanditiis', at(5.818,5.193,1.521,0.73), T.para);
++  icon(s, C.BLUE, at(5.404,4.858,0.333,0.333));
++  tx(s, 'PLayground', at(10.47,4.873,1.375,0.32), T.label);
++  tx(s, 'Eos acusa mus et dignissimos', at(10.47,5.193,1.521,0.73), T.para);
++  icon(s, C.GREEN, at(10.06,4.858,0.333,0.333));
++  dots(s, [[11.684,1.417,0.32], [0.97,3.941,0.756], [12.268,3.876,0.65], [7.003,1.557,0.32]]);
++}
++
++// 18. ToddlerFeatures
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(7.61,0,5.723,7.5), P12);
++  s.addShape('roundRect', {...at(4.7,0.821,2.17,2.403), rectRadius:0.431, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  s.addShape('roundRect', {...at(7.297,1.398,2.17,2.403), rectRadius:0.431, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.RED)});
++  s.addShape('roundRect', {...at(7.297,4.188,2.17,2.403), rectRadius:0.431, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  s.addShape('roundRect', {...at(4.7,3.614,2.17,2.403), rectRadius:0.431, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.RED)});
++  tx(s, 'Toddler\nFeatures', at(0.917,1.158,2.395,1.313), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec adipiscing elit, sed do eiusmod tetur tempor incididunt ut labore dolore magna aliqua ad minimas et', at(0.917,3.509,2.542,1.714), T.para);
++  tx(s, 'Our Services & Facilities', at(0.917,0.838,2.216,0.32), T.body);
++  icon(s, C.BLUE, at(5.1,1.099,0.33,0.33));
++  tx(s, '24/7 Support', at(4.993,1.563,1.54,0.32), T.label);
++  tx(s, 'Lorem ipsum dolor amet, consec tetur adipiscing elit sit', at(4.993,1.902,1.813,1.054), T.para);
++  tx(s, 'PLayground', at(4.993,4.37,1.447,0.32), T.label);
++  tx(s, 'Lorem ipsum dolor amet, consec tetur adipiscing elit sit', at(4.993,4.71,1.813,1.054), T.para);
++  tx(s, 'Baby ZOne', at(7.58,2.139,1.328,0.32), T.label);
++  tx(s, 'Lorem ipsum dolor amet, consec tetur adipiscing elit sit', at(7.58,2.479,1.813,1.058), T.para);
++  tx(s, 'Education Toy', at(7.58,4.946,1.696,0.32), T.label);
++  tx(s, 'Lorem ipsum dolor amet, consec tetur adipiscing elit sit', at(7.58,5.286,1.813,1.054), T.para);
++  icon(s, C.BLUE, at(7.687,4.463,0.333,0.333));
++  icon(s, C.RED, at(7.687,1.676,0.333,0.333));
++  icon(s, C.RED, at(5.092,3.893,0.333,0.333));
++  button(s, 0.984, 5.931, 'toddler.com');
++  dots(s, [[3.711,1.158,0.32], [-0.222,2.63,0.756], [4.766,6.401,0.65], [3.992,3.926,0.32]]);
++}
++
++// 19. Portfolio & Gallery
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Portfolio\n& Gallery', at(0.917,1.324,4.104,2.12), T.h1);
++  tx(s, 'Our Awards And Photo Gallery', at(0.917,3.445,2.658,0.32), T.body);
++  blob(s, P18, {...at(5.865,1.559,5.643,4.788), fill:{color:C.GREEN}, shadow:GLOW(C.GREEN_SH)});
++  dotGrid(s, 11.108, 5.281, C.GREEN);
++  dots(s, [[5.082,5.657,0.543], [8.482,0.478,0.543], [2.246,4.498,0.32], [12.352,2.851,0.32]]);
++  photo(s, at(6.129,1.776,5.14,4.304), P19);
++}
++
++// 20. Best ActivityFor Baby
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P20, {...at(5.645,0,7.687,7.5), fill:{color:C.RED}});
++  tx(s, 'Best\nActivity\nFor Baby', at(1.353,1.514,2.53,1.919), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod incididunt ut labore tempor dolore magna aliqua. ', at(1.353,4.001,3.542,1.058), T.para);
++  tx(s, 'Our Gallery', at(1.353,1.194,1.136,0.32), T.body);
++  s.addShape('ellipse', {...at(5.238,0.749,3.253,3.253), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  s.addShape('ellipse', {...at(7.004,3.776,2.973,2.973), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  button(s, 1.42, 5.628, 'toddler.com');
++  dots(s, [[3.662,0.749,0.795], [5.292,6.044,0.353], [0.307,3.351,0.65], [4.722,3.237,0.32]]);
++  photo(s, at(5.378,0.888,2.973,2.973), P13);
++  photo(s, at(7.132,3.904,2.717,2.717), P13);
++}
++
++// 21. Gallery
++function slide21(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P11, {...at(0,3.625,13.333,3.875), fill:{color:C.BLUE}, rotate:180, flipH:true});
++  tx(s, 'Gallery', at(5.612,0.75,2.109,0.707), T.h2c);
++  tx(s, 'Our Documentation', at(5.757,1.457,1.82,0.32), T.caption);
++  s.addShape('roundRect', {...at(1.17,2.106,3.242,4.146), rectRadius:0.54, fill:{color:C.WHITE}, shadow:LIFT(C.INK), rotate:-7.07});
++  s.addShape('roundRect', {...at(5.046,2.424,3.242,4.146), rectRadius:0.54, fill:{color:C.WHITE}, shadow:LIFT(C.INK), rotate:3.99});
++  s.addShape('roundRect', {...at(9.041,2.179,3.242,4.146), rectRadius:0.54, fill:{color:C.WHITE}, shadow:LIFT(C.INK), rotate:-3.81});
++  photo(s, {...at(1.305,2.242,2.971,3.874), rectRadius:0.221, rotate:-7});
++  photo(s, {...at(5.183,2.561,2.968,3.872), rectRadius:0.221, rotate:4});
++  photo(s, {...at(9.173,2.312,2.977,3.878), rectRadius:0.233, rotate:-4});
++  dots(s, [[3.791,1.261,0.32], [11.875,3.625,0.756], [0.792,2.638,0.65], [9.959,0.843,0.32]]);
++}
++
++// 22. Gallery
++function slide22(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Gallery', at(5.612,0.75,2.109,0.707), T.h2c);
++  tx(s, 'Our Activity', at(6.078,1.457,1.177,0.32), T.caption);
++  tx(s, 'Baby Zone', at(1.67,5.36,2.322,0.32), T.labelc);
++  tx(s, 'Duis aute reprehenderit in voluptate velit esse cillum', at(1.616,5.679,2.429,0.727), T.parac);
++  tx(s, 'Education For Baby', at(5.506,5.36,2.322,0.32), T.labelc);
++  tx(s, 'Excepteur sinteu occaec cupidatat non proident', at(5.452,5.679,2.429,0.727), T.parac);
++  tx(s, 'Our Best Program', at(9.314,5.36,2.322,0.32), T.labelc);
++  tx(s, 'Voluptate duis aute irure dolor in reprehenderit in', at(9.261,5.679,2.429,0.727), T.parac);
++  blob(s, P21, {...at(1.485,2.164,2.691,2.479), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  blob(s, P21, {...at(5.321,2.164,2.691,2.479), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  blob(s, P21, {...at(9.129,2.164,2.691,2.479), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  photo(s, at(9.261,2.274,2.429,2.237), P22);
++  photo(s, at(1.616,2.274,2.429,2.237), P22);
++  dots(s, [[11.459,1.137,0.32], [1.513,2.359,0.756], [9.317,3.861,0.65], [4.578,4.655,0.32]]);
++  photo(s, at(5.452,2.274,2.429,2.237), P22);
++}
++
++// 23. Timeline
++function slide23(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Timeline', at(7.601,1.915,3.996,1.111), T.h1);
++  tx(s, 'Project Roadmap', at(7.601,3.026,1.641,0.32), T.body);
++  blob(s, P23, {...at(1.653,1.119,5.406,5.261), fill:{color:C.AMBER}, shadow:GLOW(C.AMBER_SH)});
++  dots(s, [[0.535,1.534,0.763], [8.421,4.911,0.763], [7.71,0.75,0.32], [1.861,6.061,0.32]]);
++  dotGrid(s, 10.097, 4.647, C.AMBER);
++  photo(s, at(1.862,1.323,4.989,4.856), P24);
++}
++
++// 24. Project Timeline
++function slide24(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(0,3.93,13.333,3.57), P25);
++  tx(s, 'Timeline', at(0.917,1.836,0.908,0.32), T.body);
++  tx(s, 'Project Timeline', at(0.917,1.125,4.339,0.707), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipis cing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minimas tempor', at(7.014,1.125,4.628,1.058), T.para);
++  s.addShape('roundRect', {...at(0.917,2.986,11.5,2.196), rectRadius:0.436, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Ideation', at(1.365,3.611,0.891,0.32), T.label);
++  tx(s, 'Sed iste perspiciatis unde omnis natus', at(1.365,3.93,2.021,0.726), T.para);
++  tx(s, 'Develop', at(4.161,3.611,0.879,0.32), T.label);
++  tx(s, 'Sed ut perspiciatis sit unde omnis iste natus', at(4.161,3.93,2.021,0.726), T.para);
++  tx(s, 'Launch', at(7.014,3.611,0.816,0.32), T.label);
++  tx(s, 'Sed ut perspiciatis unde omnis iste natus', at(7.014,3.93,2.021,0.726), T.para);
++  tx(s, 'Learn', at(9.948,3.611,0.691,0.32), T.label);
++  tx(s, 'Sed ut perspiciatis unde omnis iste natus', at(9.948,3.93,2.021,0.726), T.para);
++  s.addShape('line', {...at(2.511,3.766,1.303,0), line:{color:C.BLUE, width:3, endArrowType:'stealth'}});
++  s.addShape('line', {...at(5.307,3.766,1.36,0), line:{color:C.RED, width:3, endArrowType:'stealth'}});
++  s.addShape('line', {...at(8.16,3.766,1.441,0), line:{color:C.GREEN, width:3, endArrowType:'stealth'}});
++  dots(s, [[11.594,0.43,0.32], [5.085,-0.31,0.756], [0.592,2.732,0.65], [5.827,2.276,0.32]]);
++}
++
++// 25. Learning Path
++function slide25(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(7.27,0,6.064,7.5), P26);
++  tx(s, 'Timeline', at(1.361,2.213,0.908,0.32), T.body);
++  tx(s, 'Learning\nPath', at(1.361,0.9,2.558,1.313), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor inci', at(1.361,3.05,2.656,1.058), T.para);
++  s.addShape('roundRect', {...at(5.512,0.861,3.456,1.725), rectRadius:0.343, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Basic', at(6.443,1.042,1.286,0.32), T.label);
++  tx(s, 'PLACEHOLDER', at(6.443,1.362,2.379,1.058), T.para);
++  s.addShape('roundRect', {...at(5.765,1.075,0.512,0.512), rectRadius:0.109, fill:{color:C.BLUE}, shadow:CARD(C.BLUE)});
++  icon(s, C.WHITE, at(5.854,1.164,0.333,0.333));
++  s.addShape('roundRect', {...at(5.512,4.877,3.456,1.725), rectRadius:0.343, fill:{color:C.WHITE}, line:{color:C.GREEN, width:1}, shadow:CARD(C.GREEN)});
++  tx(s, 'Professional', at(6.443,5.058,1.286,0.32), T.label);
++  tx(s, 'PLACEHOLDER', at(6.443,5.378,2.379,1.058), T.para);
++  s.addShape('roundRect', {...at(5.765,5.091,0.512,0.512), rectRadius:0.109, fill:{color:C.GREEN}, shadow:CARD(C.GREEN)});
++  icon(s, C.WHITE, at(5.852,5.18,0.333,0.333));
++  s.addShape('roundRect', {...at(5.512,2.869,3.456,1.725), rectRadius:0.343, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.RED)});
++  tx(s, 'Advance', at(6.443,3.05,1.286,0.32), T.label);
++  tx(s, 'PLACEHOLDER', at(6.443,3.37,2.379,1.058), T.para);
++  s.addShape('roundRect', {...at(5.765,3.083,0.512,0.512), rectRadius:0.109, fill:{color:C.RED}, shadow:CARD(C.RED)});
++  icon(s, C.WHITE, at(5.852,3.172,0.333,0.333));
++  button(s, 1.468, 4.877, 'toddler.com');
++  dots(s, [[0.628,2.426,0.32], [4.318,-0.327,0.756], [3.133,6.425,0.65], [4.605,4.108,0.32]]);
++}
++
++// 26. Meeting With Kreev Studio
++function slide26(pptx) {
++  const s = pptx.addSlide();
++  s.addShape('round2SameRect', {...at(7.798,1.964,7.5,3.571), fill:{color:C.BLUE}, rotate:-90});
++  photo(s, {...at(6.667,0.75,5.75,6), rectRadius:0.275});
++  tx(s, 'Meeting With\nKreev Studio', at(0.917,1.125,3.804,1.313), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, incididunt ut labore et dolore magna aliqua enim minimas', at(0.917,3.19,2.575,1.386), T.para);
++  icon(s, C.GREEN, at(1.002,5.577,0.333,0.333));
++  tx(s, 'Notes', at(1.335,5.59,0.698,0.32), T.label);
++  tx(s, 'Please bring a laptop and stationery', at(1.335,5.91,2.156,0.73), T.para);
++  s.addShape('roundRect', {...at(4.769,3.222,3.082,3.418), rectRadius:0.5, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Monday , Feb 2022', at(5.136,4.514,1.914,0.32), T.label);
++  tx(s, '27', at(5.136,3.361,1.396,1.313), T.num);
++  icon(s, C.BLUE, at(5.24,5.245,0.333,0.333));
++  tx(s, '08.00 – 10.00 AM', at(5.675,5.245,1.692,0.32), T.label);
++  icon(s, C.RED, at(5.24,5.827,0.333,0.333));
++  tx(s, 'Plenary Hall,\nNew Jersey 88767', at(5.675,5.827,1.746,0.538), T.label);
++  dots(s, [[4.195,2.871,0.32], [6.268,1.076,0.756], [8.367,6.475,0.65], [0.261,3.698,0.32]]);
++}
++
++// 27. Table &Overview
++function slide27(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Table &\nOverview', at(1.757,4.079,4.153,2.12), T.h1);
++  tx(s, 'Table & Chart Overview', at(1.757,6.199,2.157,0.32), T.body);
++  dots(s, [[5.747,0.524,0.32], [12.075,2.386,0.684], [3.394,2.474,0.684], [7.799,6.286,0.32]]);
++  blob(s, P27, {...at(5.716,0.92,5.861,5.66), fill:{color:C.BLUE}, shadow:GLOW(C.BLUE_SH)});
++  dotGrid(s, 0.583, 2.383, C.BLUE);
++  photo(s, at(5.907,1.105,5.479,5.208), P28);
++}
++
++// 28. Full Table
++function slide28(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(0,0,13.333,2.976), P29);
++  s.addTable([
++    [{ text:'Table Header 1', options:{ fill:{color:C.BLUE}, color:C.WHITE, bold:true } }, { text:'Table Header 2', options:{ fill:{color:C.BLUE}, color:C.WHITE, bold:true } }, { text:'Table Header 3', options:{ fill:{color:C.BLUE}, color:C.WHITE, bold:true } }, { text:'Table Header 4', options:{ fill:{color:C.BLUE}, color:C.WHITE, bold:true } }],
++    [{ text:'Text here', options:{ fill:{color:C.BLUE, transparency:75}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:75}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:75}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:75}, color:C.INK, bold:false } }],
++    [{ text:'Text here', options:{ fill:{color:C.BLUE, transparency:90}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:90}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:90}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:90}, color:C.INK, bold:false } }],
++    [{ text:'Text here', options:{ fill:{color:C.BLUE, transparency:75}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:75}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:75}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:75}, color:C.INK, bold:false } }],
++    [{ text:'Text here', options:{ fill:{color:C.BLUE, transparency:90}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:90}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:90}, color:C.INK, bold:false } }, { text:'Text here', options:{ fill:{color:C.BLUE, transparency:90}, color:C.INK, bold:false } }],
++  ], {
++    ...at(5.454,3.93,3.281,3.281),
++    colW:[1.632, 1.632, 1.632, 1.632], rowH:[0.692, 0.534, 0.534, 0.534, 0.534],
++    fontFace:F.BODY, fontSize:10, align:'center', valign:'middle', margin:6,
++    border:{ type:'solid', pt:1, color:C.BLUE },
++  });
++  tx(s, 'Toddler Table', at(1.24,4.524,1.357,0.32), T.body);
++  tx(s, 'Full Table', at(1.24,3.817,3.003,0.707), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minimas', at(1.24,5.468,3.337,1.384), T.para);
++  dots(s, [[6.507,3.237,0.32], [11.379,2.22,0.756], [0.421,2.865,0.65], [4.186,4.828,0.32]]);
++}
++
++// 29. Company Overview
++function slide29(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(4.82,0,8.518,7.5), P30);
++  tx(s, 'Company\nOverview', at(1.167,1.677,2.75,1.313), T.h2);
++  tx(s, 'Toddler Overview', at(1.167,1.358,1.653,0.32), T.body);
++  tx(s, 'PLACEHOLDER', at(1.167,3.81,2.569,1.058), T.para);
++  tx(s, '2018 – 2022 Statistics', at(1.167,3.49,2.087,0.32), T.label);
++  button(s, 1.346, 5.379, 'toddler.com');
++  s.addShape('roundRect', {...at(4.82,1.41,1.931,1.915), rectRadius:0.27, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, '4.328', at(5.013,2.305,1.512,0.707), T.stat);
++  tx(s, 'Satisfied Clients', at(5.013,2.861,1.534,0.32), T.body);
++  s.addShape('roundRect', {...at(5.05,1.6,0.512,0.512), rectRadius:0.109, fill:{color:C.BLUE}, shadow:CARD(C.BLUE)});
++  icon(s, C.WHITE, at(5.139,1.689,0.333,0.333));
++  s.addShape('roundRect', {...at(6.943,1.408,1.931,1.915), rectRadius:0.27, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, '352', at(7.136,2.302,1.105,0.707), T.stat);
++  tx(s, 'Awards', at(7.136,2.858,0.83,0.32), T.body);
++  s.addShape('roundRect', {...at(7.172,1.598,0.512,0.512), rectRadius:0.109, fill:{color:C.RED}, shadow:CARD(C.BLUE)});
++  icon(s, C.WHITE, at(7.261,1.687,0.333,0.333));
++  s.addShape('roundRect', {...at(5.978,3.465,1.931,1.915), rectRadius:0.27, fill:{color:C.WHITE}, line:{color:C.GREEN, width:1}, shadow:CARD(C.GREEN)});
++  tx(s, '4.9', at(6.171,4.359,0.907,0.707), T.stat);
++  tx(s, 'Rating', at(6.171,4.915,0.742,0.32), T.body);
++  s.addShape('roundRect', {...at(6.207,3.655,0.512,0.512), rectRadius:0.109, fill:{color:C.GREEN}, shadow:CARD(C.GREEN)});
++  icon(s, C.WHITE, at(6.296,3.744,0.333,0.333));
++  dots(s, [[4.794,4.019,0.32], [4.635,6.078,0.756], [9.194,0.425,0.65], [2.66,0.59,0.32]]);
++}
++
++// 30. Overview
++function slide30(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P31, {...at(7.056,1.222,7.5,5.056), fill:{color:C.BLUE}, rotate:90, flipH:true});
++  s.addShape('roundRect', {...at(6.186,0.865,4.477,5.725), rectRadius:0.746, fill:{color:C.WHITE}, shadow:LIFT(C.INK), rotate:3.99});
++  tx(s, 'Overview', at(1.167,1.726,2.569,0.707), T.h2);
++  tx(s, 'Last 5 Years', at(1.167,2.433,1.234,0.32), T.body);
++  tx(s, 'Omnis iste natus error sit ab doloremque laudantium illo quae totam, acu voluptatem', at(1.167,3.572,2.569,1.058), T.para);
++  tx(s, '2018 – 2022 Statistics', at(1.167,3.253,2.087,0.32), T.label);
++  s.addShape('roundRect', {...at(1.218,5.272,2.39,0.66), rectRadius:0.33, fill:{color:C.BLUE}, shadow:sh(C.BLUE,25,15,0.2)});
++  photo(s, {...at(6.375,1.053,4.099,5.347), rectRadius:0.306, rotate:4});
++  tx(s, 'toddler.com', at(1.88,5.442,1.173,0.32), T.onDark);
++  s.addShape('roundRect', {...at(4.538,4.524,6.399,1.408), rectRadius:0.328, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:sh(C.BLUE,30,20,0.098)});
++  tx(s, '4.328', at(5.31,4.77,1.512,0.707), T.stat);
++  tx(s, 'Satisfied Clients', at(5.31,5.352,1.534,0.32), T.body);
++  tx(s, '352', at(7.684,4.77,1.105,0.707), T.stat);
++  tx(s, 'Projects', at(7.684,5.352,0.88,0.32), T.body);
++  tx(s, '4.9', at(9.636,4.77,0.907,0.707), T.stat);
++  tx(s, 'Rating', at(9.636,5.352,0.742,0.32), T.body);
++  icon(s, C.BLUE, at(4.976,4.894,0.333,0.333));
++  icon(s, C.RED, at(7.351,4.894,0.333,0.333));
++  icon(s, C.GREEN, at(9.302,4.894,0.333,0.333));
++  dots(s, [[4.912,3.067,0.32], [5.884,1.537,0.756], [0.842,6.413,0.65], [2.05,0.653,0.32]]);
++}
++
++// 31. Overview
++function slide31(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(0,0,7.781,6.765), P32);
++  tx(s, 'Overview', at(9.139,1.629,2.569,0.707), T.h2);
++  tx(s, 'Last 5 Years', at(9.139,2.336,1.234,0.32), T.body);
++  tx(s, 'Sed perspiciatis unde ipsa omnis iste natus error sit ab doloremque laudantium illo quae totam, acu voluptatem', at(9.139,3.475,2.569,1.384), T.para);
++  tx(s, '2018 – 2022 Statistics', at(9.139,3.155,2.087,0.32), T.label);
++  button(s, 9.178, 5.541, 'toddler.com');
++  s.addShape('roundRect', {...at(3.552,3.155,2.247,2.124), rectRadius:0.299, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, '84%', at(3.735,4.165,1.28,0.707), T.stat);
++  tx(s, 'Product Sales', at(3.735,4.721,1.361,0.32), T.body);
++  s.addShape('roundRect', {...at(3.771,3.354,0.512,0.512), rectRadius:0.109, fill:{color:C.BLUE}, shadow:CARD(C.BLUE)});
++  s.addShape('roundRect', {...at(6.195,3.155,2.247,2.124), rectRadius:0.299, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, '96%', at(6.378,4.165,1.282,0.707), T.stat);
++  tx(s, 'Product Usage', at(6.378,4.721,1.434,0.32), T.body);
++  s.addShape('roundRect', {...at(6.414,3.354,0.512,0.512), rectRadius:0.109, fill:{color:C.RED}, shadow:CARD(C.BLUE)});
++  icon(s, C.WHITE, at(3.861,3.442,0.333,0.333));
++  icon(s, C.WHITE, at(6.503,3.442,0.333,0.333));
++  dots(s, [[11.909,2.691,0.32], [7.163,0.735,0.756], [7.456,6.031,0.65], [1.243,6.196,0.32]]);
++}
++
++// 32. Break Slides
++function slide32(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Break\nSlides', at(1.538,2.248,2.777,2.12), T.h1);
++  tx(s, 'Take A Short Break', at(1.538,4.369,1.804,0.32), T.body);
++  dots(s, [[5.244,1.73,0.32], [10.42,5.883,0.32], [2.628,5.404,0.639], [11.129,1.171,0.639]]);
++  blob(s, P33, {...at(5.664,1.155,4.716,5.191), fill:{color:C.RED}, shadow:GLOW(C.RED_SH), rotate:60});
++  dotGrid(s, 1.067, 0.864, C.RED);
++  photo(s, at(5.601,1.659,4.913,4.313), P34);
++}
++
++// 33. Package
++function slide33(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Package', at(7.17,2.013,3.911,1.111), T.h1);
++  tx(s, 'Pricing Plan', at(7.17,3.124,1.173,0.32), T.body);
++  dots(s, [[1.186,2.03,0.614], [11.649,1.723,0.614], [7.498,0.75,0.32], [7.151,5.585,0.32]]);
++  blob(s, P35, {...at(1.392,1.978,5.67,4.513), fill:{color:C.GREEN}, shadow:GLOW(C.GREEN_SH), rotate:-30});
++  dotGrid(s, 9.208, 4.417, C.GREEN);
++  photo(s, at(1.772,1.667,4.646,4.237), P36);
++}
++
++// 34. PricingPackage
++function slide34(pptx) {
++  const s = pptx.addSlide();
++  photo(s, at(8.783,0,4.549,7.5), P37);
++  tx(s, 'Pricing\nPackage', at(1.17,1.343,2.425,1.313), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, incididunt labore et dolore', at(1.17,3.728,2.542,1.058), T.para);
++  tx(s, 'Toddler Price List', at(1.17,2.655,1.661,0.32), T.body);
++  button(s, 1.282, 5.729, 'toddler.com');
++  s.addShape('roundRect', {...at(4.869,1.16,3.151,4.907), rectRadius:0.417, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Basic', at(6.057,1.478,0.775,0.37), T.plan);
++  tx(s, [{ text:'$', options:{ superscript:true } }, { text:'250' }], at(5.778,2.826,1.333,0.707), T.statc);
++  blob(s, P38, {...at(5.471,3.828,0.19,0.18), fill:{color:C.RED}});
++  tx(s, 'Sed ut perspiciatis', at(5.732,3.758,1.96,0.32), T.body);
++  blob(s, P38, {...at(5.471,4.224,0.19,0.18), fill:{color:C.RED}});
++  tx(s, 'Duis aute irure nulla', at(5.732,4.154,1.96,0.32), T.body);
++  blob(s, P38, {...at(5.471,4.62,0.19,0.18), fill:{color:C.RED, transparency:70}});
++  tx(s, 'Reprehendet volup', at(5.732,4.55,1.96,0.32), T.body);
++  blob(s, P38, {...at(5.471,5.016,0.19,0.18), fill:{color:C.RED, transparency:70}});
++  tx(s, 'Sint occaecat cupid', at(5.732,4.946,1.96,0.32), T.body);
++  blob(s, P38, {...at(5.471,5.411,0.19,0.18), fill:{color:C.RED, transparency:70}});
++  tx(s, 'Cupidata proident', at(5.732,5.341,1.96,0.32), T.body);
++  s.addShape('roundRect', {...at(8.287,1.478,3.151,4.907), rectRadius:0.417, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Pro', at(9.583,1.796,0.56,0.37), T.plan);
++  tx(s, [{ text:'$', options:{ superscript:true } }, { text:'350' }], at(9.196,3.144,1.333,0.707), T.statc);
++  blob(s, P38, {...at(8.89,4.146,0.19,0.18), fill:{color:C.BLUE}});
++  tx(s, 'Sed ut perspiciatis', at(9.15,4.076,1.96,0.32), T.body);
++  blob(s, P38, {...at(8.89,4.542,0.19,0.18), fill:{color:C.BLUE}});
++  tx(s, 'Duis aute irure nulla', at(9.15,4.472,1.96,0.32), T.body);
++  blob(s, P38, {...at(8.89,4.938,0.19,0.18), fill:{color:C.BLUE}});
++  tx(s, 'Reprehendet volup', at(9.15,4.868,1.96,0.32), T.body);
++  blob(s, P38, {...at(8.89,5.334,0.19,0.18), fill:{color:C.BLUE}});
++  tx(s, 'Sint occaecat cupid', at(9.15,5.264,1.96,0.32), T.body);
++  blob(s, P38, {...at(8.89,5.729,0.19,0.18), fill:{color:C.BLUE, transparency:70}});
++  tx(s, 'Cupidata proident', at(9.15,5.66,1.96,0.32), T.body);
++  icon(s, C.RED, at(6.159,2.045,0.57,0.57));
++  icon(s, C.BLUE, at(9.575,2.361,0.57,0.57));
++  dots(s, [[4.142,2.59,0.32], [7.284,6.517,0.756], [3.386,0.371,0.65], [0.597,4.848,0.32]]);
++}
++
++// 35. Pricing Package
++function slide35(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Pricing Package', at(4.423,0.752,4.483,0.707), { fontSize:36, fontFace:F.HEAD, color:C.INK, bold:true, align:'center' });
++  s.addShape('roundRect', {...at(1.673,1.869,3.151,4.907), rectRadius:0.417, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Basic', at(2.861,2.187,0.775,0.37), T.plan);
++  tx(s, [{ text:'$', options:{ superscript:true } }, { text:'250' }], at(2.582,3.536,1.333,0.707), T.statc);
++  blob(s, P38, {...at(2.275,4.537,0.19,0.18), fill:{color:C.RED}});
++  tx(s, 'Sed ut perspiciatis', at(2.536,4.468,1.96,0.32), T.body);
++  blob(s, P38, {...at(2.275,4.933,0.19,0.18), fill:{color:C.RED}});
++  tx(s, 'Duis aute irure nulla', at(2.536,4.863,1.96,0.32), T.body);
++  blob(s, P38, {...at(2.275,5.329,0.19,0.18), fill:{color:C.RED, transparency:70}});
++  tx(s, 'Reprehendet volup', at(2.536,5.259,1.96,0.32), T.body);
++  blob(s, P38, {...at(2.275,5.725,0.19,0.18), fill:{color:C.RED, transparency:70}});
++  tx(s, 'Sint occaecat cupid', at(2.536,5.655,1.96,0.32), T.body);
++  blob(s, P38, {...at(2.275,6.121,0.19,0.18), fill:{color:C.RED, transparency:70}});
++  tx(s, 'Cupidata proident', at(2.536,6.051,1.96,0.32), T.body);
++  s.addShape('roundRect', {...at(5.091,1.872,3.151,4.907), rectRadius:0.417, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Pro', at(6.387,2.19,0.56,0.37), T.plan);
++  tx(s, [{ text:'$', options:{ superscript:true } }, { text:'350' }], at(6,3.538,1.333,0.707), T.statc);
++  blob(s, P38, {...at(5.694,4.54,0.19,0.18), fill:{color:C.BLUE}});
++  tx(s, 'Sed ut perspiciatis', at(5.954,4.47,1.96,0.32), T.body);
++  blob(s, P38, {...at(5.694,4.936,0.19,0.18), fill:{color:C.BLUE}});
++  tx(s, 'Duis aute irure nulla', at(5.954,4.866,1.96,0.32), T.body);
++  blob(s, P38, {...at(5.694,5.332,0.19,0.18), fill:{color:C.BLUE}});
++  tx(s, 'Reprehendet volup', at(5.954,5.262,1.96,0.32), T.body);
++  blob(s, P38, {...at(5.694,5.727,0.19,0.18), fill:{color:C.BLUE}});
++  tx(s, 'Sint occaecat cupid', at(5.954,5.657,1.96,0.32), T.body);
++  blob(s, P38, {...at(5.694,6.123,0.19,0.18), fill:{color:C.BLUE, transparency:70}});
++  tx(s, 'Cupidata proident', at(5.954,6.053,1.96,0.32), T.body);
++  s.addShape('roundRect', {...at(8.51,1.869,3.151,4.907), rectRadius:0.417, fill:{color:C.WHITE}, line:{color:C.GREEN, width:1}, shadow:CARD(C.GREEN)});
++  tx(s, 'Platinum', at(9.536,2.187,1.098,0.37), T.plan);
++  tx(s, [{ text:'$', options:{ superscript:true } }, { text:'500' }], at(9.414,3.536,1.343,0.707), T.statc);
++  blob(s, P38, {...at(9.112,4.537,0.19,0.18), fill:{color:C.GREEN}});
++  tx(s, 'Sed ut perspiciatis', at(9.373,4.468,1.96,0.32), T.body);
++  blob(s, P38, {...at(9.112,4.933,0.19,0.18), fill:{color:C.GREEN}});
++  tx(s, 'Duis aute irure nulla', at(9.373,4.863,1.96,0.32), T.body);
++  blob(s, P38, {...at(9.112,5.329,0.19,0.18), fill:{color:C.GREEN}});
++  tx(s, 'Reprehendet volup', at(9.373,5.259,1.96,0.32), T.body);
++  blob(s, P38, {...at(9.112,5.725,0.19,0.18), fill:{color:C.GREEN}});
++  tx(s, 'Sint occaecat cupid', at(9.373,5.655,1.96,0.32), T.body);
++  blob(s, P38, {...at(9.112,6.121,0.19,0.18), fill:{color:C.GREEN}});
++  tx(s, 'Cupidata proident', at(9.373,6.051,1.96,0.32), T.body);
++  icon(s, C.RED, at(2.963,2.755,0.57,0.57));
++  icon(s, C.BLUE, at(6.379,2.755,0.57,0.57));
++  icon(s, C.GREEN, at(9.8,2.755,0.57,0.57));
++  dots(s, [[11.634,1.285,0.32], [12.039,4.148,0.756], [1.348,0.794,0.65], [0.444,4.148,0.32]]);
++}
++
++// 36. Mockup
++function slide36(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Mockup', at(8.132,3.385,3.527,1.111), T.h1);
++  tx(s, 'Device Mockup', at(8.132,4.496,1.482,0.32), T.body);
++  dots(s, [[10.736,2.481,0.64], [5.423,6.211,0.64], [1.391,1.151,0.32], [8.219,1.151,0.32]]);
++  dotGrid(s, 9.843, 5.664, C.AMBER);
++  blob(s, P39, {...at(1.2,1.188,6.035,4.75), fill:{color:C.AMBER}, shadow:GLOW(C.AMBER_SH)});
++  photo(s, at(1.431,1.37,5.572,4.386), P40);
++}
++
++// 37. Try Our Mobile Apps
++function slide37(pptx) {
++  const s = pptx.addSlide();
++  phone(s, 5.62, 0.674, 2.738, 5.523, -6.74);
++  photo(s, {...at(5.715,0.821,2.527,5.231), rectRadius:0.147, rotate:-7});
++  notch(s, 5.62, 0.674, 2.738, 5.523, -6.74);
++  tx(s, 'Try Our\nMobile\nApps', at(1.668,1.354,2.094,1.919), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, incididunt labore et dolore magna aliqua ad minimas', at(1.668,3.711,2.744,1.386), T.para);
++  tx(s, 'Compatible With All Devices', at(1.668,1.035,2.518,0.32), T.body);
++  button(s, 1.756, 5.847, 'toddler.com');
++  phone(s, 7.893, 1.45, 2.738, 5.523, 13.83);
++  photo(s, {...at(7.992,1.595,2.519,5.228), rectRadius:0.094, rotate:14});
++  notch(s, 7.893, 1.45, 2.738, 5.523, 13.83);
++  s.addShape('roundRect', {...at(6.22,3.685,2.987,1.983), rectRadius:0.365, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Lorem ipsum dolor sit amet, sed do eiusmod incididunt ut', at(6.501,4.676,2.684,0.73), T.para);
++  tx(s, 'Many Features', at(6.501,4.357,1.45,0.32), T.label);
++  icon(s, C.BLUE, at(6.562,3.947,0.333,0.333));
++  s.addShape('roundRect', {...at(9.429,3.685,2.987,1.983), rectRadius:0.365, fill:{color:C.WHITE}, line:{color:C.RED, width:1}, shadow:CARD(C.RED)});
++  tx(s, 'Lorem ipsum dolor sit amet, sed do eiusmod incididunt ut', at(9.705,4.676,2.684,0.73), T.para);
++  tx(s, 'Easy To Use', at(9.705,4.357,1.229,0.32), T.label);
++  icon(s, C.RED, at(9.763,3.947,0.333,0.333));
++  dots(s, [[0.575,4.114,0.32], [5.25,1.557,0.756], [11.818,2.091,0.65], [4.511,3.453,0.32]]);
++}
++
++// 38. Our Website Services
++function slide38(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P35, {...at(4.954,0.702,7.923,6.306), fill:{color:C.BLUE}, rotate:-5.81});
++  laptop(s, 5.077, 1.549, 7.677, 4.481);
++  tx(s, 'Our Website\nServices', at(0.917,1.51,3.291,1.313), T.h2);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, sed do eiusmod tempor incididunt labore et dolore', at(0.917,3.567,3.486,1.058), T.para);
++  tx(s, 'Our Website', at(0.917,2.823,1.233,0.32), T.body);
++  button(s, 1.025, 5.369, 'toddler.com');
++  photo(s, at(5.979,1.781,5.887,3.729));
++  s.addShape('roundRect', {...at(4.857,3.479,3.354,1.528), rectRadius:0.281, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, 'Lorem ipsum dolor sit amet, sed do eiusmod incididunt ut', at(5.505,4.015,2.548,0.73), T.para);
++  tx(s, 'Many Features', at(5.505,3.695,1.45,0.32), T.label);
++  icon(s, C.BLUE, at(5.075,3.695,0.333,0.333));
++  dots(s, [[2.149,0.63,0.32], [11.727,3.773,0.756], [4.562,6.386,0.65], [4.242,2.548,0.32]]);
++}
++
++// 39. Contact
++function slide39(pptx) {
++  const s = pptx.addSlide();
++  tx(s, 'Contact', at(1.438,2.956,3.533,1.111), T.h1);
++  tx(s, 'Get In Touch', at(1.438,4.066,1.275,0.32), T.body);
++  dots(s, [[12.263,1.373,0.32], [2.712,1.793,0.32], [5.476,0.459,0.582], [11.165,6.127,0.582]]);
++  dotGrid(s, 3.108, 5.26, C.BLUE);
++  blob(s, P41, {...at(5.892,0.552,5.274,6.395), fill:{color:C.BLUE}, shadow:GLOW(C.BLUE_SH), rotate:60});
++  photo(s, at(5.918,1.359,5.925,4.84), P42);
++}
++
++// 40. Get In Touch
++function slide40(pptx) {
++  const s = pptx.addSlide();
++  blob(s, P43, {...at(8.655,0,4.678,7.5), fill:{color:C.BLUE}});
++  tx(s, 'Get In\nTouch', at(1.189,2.613,1.713,1.313), T.h2);
++  tx(s, 'Contact Us', at(1.189,2.293,1.122,0.32), T.body);
++  tx(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit, incididunt labore et dolore', at(1.189,4.436,2.64,1.058), T.para);
++  blob(s, P1, {...at(6.107,0.75,6.28,6), fill:{color:C.WHITE}, shadow:LIFT(C.INK)});
++  photo(s, at(6.313,0.947,5.869,5.608), P2);
++  s.addShape('roundRect', {...at(4.246,2.293,3.372,3.485), rectRadius:0.462, fill:{color:C.WHITE}, line:{color:C.BLUE, width:1}, shadow:CARD(C.BLUE)});
++  tx(s, '+74 882 8281 43', at(5.02,4.176,1.62,0.32), T.label);
++  icon(s, C.RED, at(4.616,4.172,0.333,0.333));
++  tx(s, 'Dave Blue', at(5.021,2.755,1.054,0.32), T.label);
++  tx(s, 'Grand Street 878, London', at(5.021,3.466,2.367,0.32), T.label);
++  icon(s, C.RED, at(4.617,3.463,0.333,0.333));
++  tx(s, 'dave@toddler.com', at(5.02,4.887,1.774,0.32), T.label);
++  icon(s, C.BLUE, at(4.616,4.88,0.333,0.333));
++  icon(s, C.BLUE, at(4.616,2.755,0.333,0.333));
++  dots(s, [[0.369,3.26,0.32], [5.976,0.485,0.756], [3.596,6.289,0.65], [2.904,1.525,0.32]]);
++}
++
++// ------------------------------------------------------------ build
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name:'DECK', width:13.333, height:7.5 });
++pptx.layout = 'DECK';
++pptx.title = 'Toddler - Kids Zone Presentation Template';
++
++[
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
++  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
++  slide25, slide26, slide27, slide28, slide29, slide30, slide31, slide32,
++  slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
++].forEach(build => build(pptx));
++
++pptx.writeFile({ fileName: path.join(__dirname, '10be9159-a7c7-421d-b0ac-1c8d39ea7355_grok_final.pptx') })
++  .then(f => console.log('wrote ' + f));

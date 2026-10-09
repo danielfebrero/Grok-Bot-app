@@ -1,0 +1,565 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/green_energy_business_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/green_energy_business_pitch_deck.js
+@@ -0,0 +1,562 @@
++/**
++ * "Green Energy Business Deck" — rebuilt with pptxgenjs.
++ * Slide size 13.333in x 7.5in (LAYOUT_WIDE). Run: node <thisfile>
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette ---
++const DARK = '262626'; // tx1 lumMod 85% — buttons, cards, number chips
++const YELLOW = 'FFFF21'; // accent5 — highlight cards / badges
++const PANEL = 'ECEFEE'; // bg2 lumMod 20% — light panels & row backgrounds
++const GRAY = '808080'; // tx1 lumMod 50% — de-emphasised half of each headline
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++
++const MAJOR = 'Manrope'; // theme major font — headlines
++const MINOR = 'Lato'; // theme minor font — body copy
++
++// ---------------------------------------------------------------- helpers ---
++// PowerPoint stores a roundRect corner as a fraction of the shape's short side.
++const PILL = 0.5;
++const radius = (w, h, adj) => Math.min(w, h) * adj;
++
++// pptxgenjs rewrites the shadow object in place while serialising, so every
++// shape needs its own copy — hence factories rather than shared constants.
++const shadow = (blur, offset) => ({ type: 'outer', blur, offset, angle: 90, color: BLACK, opacity: 0.1 });
++const softShadow = () => shadow(14, 3); // pills & badges
++const cardShadow = () => shadow(24, 24); // big white cards
++
++/** Plain text box: top-anchored, transparent, Lato black unless overridden. */
++function textBox(slide, text, opts) {
++    slide.addText(text, Object.assign({ valign: 'top', fontFace: MINOR, color: BLACK }, opts));
++}
++
++/** Filled shape that carries centered text. */
++function shapeText(slide, shape, text, opts) {
++    slide.addText(text || '', Object.assign({ shape, align: 'center', valign: 'middle', fontFace: MINOR }, opts));
++}
++
++const hexToRgb = (hex) => [0, 2, 4].map((i) => parseInt(hex.substr(i, 2), 16));
++const rgbToHex = (rgb) => rgb.map((v) => Math.round(v).toString(16).padStart(2, '0').toUpperCase()).join('');
++
++// The corner "glow" panels fade from PANEL to nothing. On the panels whose
++// shadow falls onto the slide, the faded end stays fractionally off-white.
++const FADE_END = 'FBFBFB';
++const FADE_END_CLEAN = 'FEFEFE';
++
++/**
++ * pptxgenjs has no gradient fill, so paint the vertical ramp as a stack of
++ * solid bands over a white rectangle that casts the panel's soft shadow.
++ * `shadowAngle` follows the source deck: 135deg, or 315deg on flipped panels.
++ */
++function fadePanel(slide, { x, y, w, h, from, to, bands = 40, shadowAngle = 135 }) {
++    slide.addShape('rect', {
++        x, y, w, h, fill: { color: WHITE }, line: { type: 'none' },
++        shadow: { type: 'outer', blur: 92, offset: 84, angle: shadowAngle, color: BLACK, opacity: 0.022 },
++    });
++    const a = hexToRgb(from);
++    const b = hexToRgb(to);
++    const band = h / bands;
++    for (let i = 0; i < bands; i++) {
++        const t = (i + 0.5) / bands;
++        slide.addShape('rect', {
++            x, y: y + i * band, w, h: band + 0.004,
++            fill: { color: rgbToHex(a.map((c, j) => c + (b[j] - c) * t)) },
++            line: { type: 'none' },
++        });
++    }
++}
++
++/**
++ * Twitter / Facebook / Google+ chips docked in the top-right corner.
++ * Each glyph is a white outline traced with custGeom; coordinates below are in
++ * inches relative to the glyph's own bounding box.
++ */
++const q = (x1, y1, x, y) => ({ curve: { type: 'quadratic', x1, y1 }, x, y });
++
++const SOCIAL_GLYPHS = [
++    { // twitter bird
++        w: 0.1, h: 0.072, dx: -0.05, dy: -0.036,
++        points: [
++            { x: 0.1, y: 0 }, q(0.082, 0.014, 0.078, 0.03), q(0.07, 0.066, 0.028, 0.072),
++            q(0.012, 0.072, 0, 0.062), { x: 0.03, y: 0.058 }, q(0.012, 0.046, 0.014, 0.026),
++            q(0.04, 0.04, 0.058, 0.03), q(0.062, 0.006, 0.1, 0), { close: true },
++        ],
++    },
++    { // facebook "f"
++        w: 0.056, h: 0.1, dx: -0.028, dy: -0.05,
++        points: [
++            { x: 0.056, y: 0 }, { x: 0.036, y: 0 }, q(0.014, 0.002, 0.014, 0.026),
++            { x: 0.014, y: 0.036 }, { x: 0, y: 0.036 }, { x: 0, y: 0.056 }, { x: 0.014, y: 0.056 },
++            { x: 0.014, y: 0.1 }, { x: 0.038, y: 0.1 }, { x: 0.038, y: 0.056 },
++            { x: 0.054, y: 0.056 }, { x: 0.056, y: 0.036 }, { x: 0.038, y: 0.036 },
++            { x: 0.038, y: 0.026 }, q(0.04, 0.02, 0.056, 0.02), { close: true },
++        ],
++    },
++    { // google "G" (the "+" bar is drawn separately below)
++        w: 0.06, h: 0.084, dx: -0.052, dy: -0.042,
++        points: [
++            { x: 0.06, y: 0.03 }, { x: 0.03, y: 0.03 }, { x: 0.03, y: 0.046 }, { x: 0.042, y: 0.046 },
++            q(0.036, 0.062, 0.022, 0.062), q(0, 0.062, 0, 0.04), q(0, 0.016, 0.024, 0.016),
++            q(0.04, 0.016, 0.046, 0.024), { x: 0.058, y: 0.01 }, q(0.044, 0, 0.024, 0),
++            q(-0.014, 0.004, -0.014, 0.04), q(-0.014, 0.08, 0.024, 0.08), q(0.06, 0.08, 0.06, 0.03),
++            { close: true },
++        ],
++        extras: [{ x: 0.024, y: -0.03, w: 0.012, h: 0.05 }, { x: 0.012, y: -0.012, w: 0.036, h: 0.013 }],
++    },
++];
++
++function socialIcons(slide) {
++    const d = 0.218;
++    SOCIAL_GLYPHS.forEach((g, i) => {
++        const x = 11.942 + i * 0.3195;
++        const cx = x + d / 2;
++        const cy = 0.582 + d / 2;
++        slide.addShape('ellipse', { x, y: 0.582, w: d, h: d, fill: { color: DARK }, line: { type: 'none' } });
++        slide.addShape('custGeom', {
++            x: cx + g.dx, y: cy + g.dy, w: g.w, h: g.h,
++            fill: { color: WHITE }, line: { type: 'none' }, points: g.points,
++        });
++        (g.extras || []).forEach((r) => slide.addShape('rect', {
++            x: cx + r.x, y: cy + r.y, w: r.w, h: r.h, fill: { color: WHITE }, line: { type: 'none' },
++        }));
++    });
++}
++
++// Both raster icons in the source deck are 96x96 monochrome glyphs; they are
++// redrawn from native geometry here instead of being embedded as images.
++
++/** Flame: tall tongue on the right, a small notched tongue on the left. */
++function flameIcon(slide, x, y, w, h) {
++    const c = (x1, y1, x2, y2, px, py) =>
++        ({ curve: { type: 'cubic', x1: x1 * w, y1: y1 * h, x2: x2 * w, y2: y2 * h }, x: px * w, y: py * h });
++    slide.addShape('custGeom', {
++        x, y, w, h, fill: { color: BLACK }, line: { type: 'none' },
++        points: [
++            { x: w * 0.58, y: 0 },
++            c(0.86, 0.13, 1.0, 0.42, 1.0, 0.62),
++            c(1.0, 0.87, 0.79, 1.0, 0.52, 1.0),
++            c(0.22, 1.0, 0.0, 0.84, 0.0, 0.58),
++            c(0.0, 0.42, 0.06, 0.30, 0.16, 0.22),
++            c(0.17, 0.36, 0.22, 0.44, 0.31, 0.47),
++            c(0.30, 0.30, 0.40, 0.11, 0.58, 0),
++            { close: true },
++        ],
++    });
++}
++
++/** "Duplicate" glyph: a back card peeking out behind a plus-marked front card. */
++function plusIcon(slide, x, y, size) {
++    const card = size * 0.78;
++    const step = size - card;
++    slide.addShape('roundRect', {
++        x: x + step, y: y + step, w: card, h: card, rectRadius: size * 0.18,
++        fill: { color: BLACK }, line: { type: 'none' },
++    });
++    slide.addShape('roundRect', {
++        x, y, w: card, h: card, rectRadius: size * 0.18,
++        fill: { color: BLACK }, line: { color: YELLOW, width: 1.25 },
++    });
++    const plus = { fill: { color: YELLOW }, line: { type: 'none' } };
++    const cx = x + card / 2;
++    const cy = y + card / 2;
++    slide.addShape('rect', Object.assign({ x: cx - 0.012, y: cy - 0.043, w: 0.024, h: 0.086 }, plus));
++    slide.addShape('rect', Object.assign({ x: cx - 0.043, y: cy - 0.012, w: 0.086, h: 0.024 }, plus));
++}
++
++/** Yellow badge circle with a white rim, wrapping the duplicate glyph. */
++function badgeCircle(slide, x, y) {
++    const d = 0.437;
++    slide.addShape('ellipse', {
++        x, y, w: d, h: d, fill: { color: YELLOW }, line: { color: WHITE, width: 1.5 },
++    });
++    plusIcon(slide, x + 0.1075, y + 0.1075, 0.222);
++}
++
++/** Translucent quote pill: rounded bar + yellow dot + flame + italic caption. */
++function quotePill(slide, { x, y, barTransparency }) {
++    slide.addShape('roundRect', {
++        x, y, w: 4.938, h: 0.757, rectRadius: radius(4.938, 0.757, PILL),
++        fill: { color: WHITE, transparency: barTransparency }, line: { type: 'none' },
++    });
++    slide.addShape('ellipse', {
++        x: x + 0.108, y: y + 0.066, w: 0.625, h: 0.625,
++        fill: { color: YELLOW }, line: { type: 'none' },
++    });
++    flameIcon(slide, x + 0.344, y + 0.271, 0.153, 0.208);
++    textBox(slide, [
++        { text: '\u201Cgreen energy company focused on ', options: { italic: true } },
++        { text: 'delivering clean', options: { bold: true, italic: true } },
++        { text: '\u201D', options: { italic: true } },
++    ], { x: x + 0.841, y: y + 0.227, w: 3.847, h: 0.303, fontSize: 12, color: WHITE });
++}
++
++/** Two-tone headline: gray lead-in + bold black emphasis. */
++const splitHeadline = (lead, strong) => [
++    { text: lead, options: { color: GRAY } },
++    { text: strong, options: { bold: true, color: BLACK } },
++];
++
++const LOREM_LONG =
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++    'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing';
++const LOREM_MED = 'dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore';
++const KEY_SEGMENTS = 'Key Segments: Solar Home Systems, Microgrids, Utility-scale Wind';
++
++// ------------------------------------------------------------ slide 1: cover
++function slideCover(pptx) {
++    const s = pptx.addSlide();
++
++    // Light panel inherited from the layout — sits behind everything else.
++    s.addShape('roundRect', {
++        x: 5.917, y: 0.167, w: 7.24, h: 7.104, rectRadius: radius(7.24, 7.104, 0.04122),
++        fill: { color: PANEL }, line: { type: 'none' },
++    });
++
++    s.addShape('roundRect', {
++        x: 6.769, y: 4.93, w: 1.836, h: 0.496, rectRadius: radius(1.836, 0.496, PILL),
++        fill: { color: DARK }, line: { type: 'none' }, shadow: softShadow(),
++    });
++
++    quotePill(s, { x: 0.531, y: 6.076, barTransparency: 54 });
++    socialIcons(s);
++
++    textBox(s, [
++        { text: 'Green Energy ', options: { bold: true, color: DARK } },
++        { text: 'Business Deck', options: { color: GRAY } },
++    ], { x: 6.667, y: 2.152, w: 5.903, h: 1.919, fontFace: MAJOR, fontSize: 54 });
++
++    textBox(s, 'Sustainable Solutions for a Cleaner Future', { x: 6.742, y: 4.262, w: 4.847, h: 0.337, fontSize: 14 });
++    textBox(s, 'Start Presentation', {
++        x: 6.861, y: 5.035, w: 1.65, h: 0.286, align: 'center', fontSize: 11, color: WHITE,
++    });
++}
++
++// -------------------------------------------------------- slide 2: about us
++function slideAbout(pptx) {
++    const s = pptx.addSlide();
++    fadePanel(s, { x: 9.647, y: 0, w: 3.686, h: 3.24, from: PANEL, to: FADE_END });
++
++    textBox(s, [
++        { text: 'We are - ' },
++        { text: 'a', options: { bold: true } },
++        { text: ' ' },
++        { text: 'forward thinking green energy ', options: { bold: true } },
++        {
++            text: 'company focused on delivering clean, affordable, and accessible power through ' +
++                'innovative renewable technologies. Our mission is to drive the transition toward a ' +
++                'more sustainable and energy-independent future.',
++        },
++    ], { x: 5.865, y: 1.62, w: 6.771, h: 3.078, fontFace: MAJOR, fontSize: 20, lineSpacingMultiple: 1.5 });
++
++    shapeText(s, 'roundRect', 'Portoflio', {
++        x: 6.016, y: 5.317, w: 1.836, h: 0.496, rectRadius: radius(1.836, 0.496, PILL),
++        fill: { color: DARK }, line: { type: 'none' }, shadow: softShadow(), fontSize: 14, color: WHITE,
++    });
++    shapeText(s, 'roundRect', 'Company', {
++        x: 8.114, y: 5.317, w: 1.836, h: 0.496, rectRadius: radius(1.836, 0.496, PILL),
++        fill: { type: 'none' }, line: { color: DARK, width: 1 }, shadow: softShadow(), fontSize: 14, color: DARK,
++    });
++
++    socialIcons(s);
++}
++
++// -------------------------------------------------- slide 3: industry overview
++const INDUSTRY_ROWS = [
++    { y: 1.022, w: 4.694, text: 'Global shift towards renewable energy sources' },
++    { y: 2.218, w: 4.694, text: 'Rapid adoption of solar, wind, and clean technologies' },
++    { y: 3.415, w: 4.694, text: 'Supportive government regulations & incentives' },
++    {
++        y: 4.611, w: 5.523, text: [
++            { text: 'Green energy market projected to reach ' },
++            { text: '$2.15 trillion', options: { bold: true } },
++            { text: ' by 2030' },
++        ],
++    },
++    { y: 5.807, w: 5.523, text: 'Green infrastructure investment boom' },
++];
++
++function slideIndustry(pptx) {
++    const s = pptx.addSlide();
++    // This panel is the 180deg-rotated twin of the others, so it fades upward
++    // and throws its shadow off the top-left edge of the slide.
++    fadePanel(s, { x: 0, y: 4.26, w: 3.686, h: 3.24, from: FADE_END_CLEAN, to: PANEL, shadowAngle: 315 });
++
++    textBox(s, [
++        { text: 'Industry', options: { color: GRAY } },
++        { text: ' ' },
++        { text: 'Overview', options: { bold: true } },
++    ], { x: 0.845, y: 1.078, w: 3.785, h: 1.582, fontFace: MAJOR, fontSize: 44 });
++
++    textBox(s, 'We offer scalable, smart, and sustainable energy solutions', {
++        x: 0.845, y: 2.748, w: 3.217, h: 0.667, fontSize: 12, lineSpacingMultiple: 1.5,
++    });
++
++    INDUSTRY_ROWS.forEach((row, i) => {
++        s.addShape('roundRect', {
++            x: 5.492, y: row.y, w: 6.996, h: 0.857, rectRadius: radius(6.996, 0.857, 0.17935),
++            fill: { color: PANEL }, line: { type: 'none' },
++        });
++        shapeText(s, 'roundRect', '0' + (i + 1), {
++            x: 5.672, y: row.y + 0.116, w: 0.612, h: 0.625, rectRadius: radius(0.612, 0.625, 0.17935),
++            fill: { color: DARK }, line: { type: 'none' }, fontSize: 18, color: WHITE,
++        });
++        textBox(s, row.text, { x: 6.53, y: row.y + 0.26, w: row.w, h: 0.337, fontSize: 14 });
++    });
++}
++
++// ------------------------------------------------------- slide 4: the problem
++const PROBLEM_CARDS = [
++    { tabX: 2.308, cardX: 1.32, textX: 1.732, labelX: 2.734, tab: DARK, label: 'PROBLEM', labelColor: WHITE },
++    { tabX: 7.908, cardX: 6.92, textX: 7.332, labelX: 8.334, tab: YELLOW, label: 'OPPORTUNITIES', labelColor: BLACK },
++];
++
++function slideProblem(pptx) {
++    const s = pptx.addSlide();
++
++    PROBLEM_CARDS.forEach((c) => {
++        s.addShape('roundRect', {
++            x: c.tabX, y: 3.323, w: 3.118, h: 0.884, rectRadius: radius(3.118, 0.884, 0.17935),
++            fill: { color: c.tab }, line: { type: 'none' },
++        });
++        s.addShape('roundRect', {
++            x: c.cardX, y: 3.851, w: 5.093, h: 2.847, rectRadius: radius(5.093, 2.847, 0.08716),
++            fill: { color: WHITE }, line: { type: 'none' }, shadow: cardShadow(),
++        });
++        textBox(s, LOREM_LONG, {
++            x: c.textX, y: 4.54, w: 4.153, h: 1.468, fontSize: 14, lineSpacingMultiple: 1.5,
++        });
++        textBox(s, c.label, {
++            x: c.labelX, y: 3.378, w: 2.266, h: 0.372, align: 'center',
++            fontSize: 14, color: c.labelColor, lineSpacingMultiple: 1.3,
++        });
++    });
++
++    textBox(s, splitHeadline('High carbon emissions from ', 'fossil fuels'), {
++        x: 3.333, y: 1.027, w: 6.667, h: 1.447, align: 'center', fontFace: MAJOR, fontSize: 40,
++    });
++
++    socialIcons(s);
++}
++
++// ------------------------------------------------------ slide 5: our solution
++function slideSolution(pptx) {
++    const s = pptx.addSlide();
++    fadePanel(s, { x: 0, y: -0.005, w: 3.686, h: 3.24, from: PANEL, to: FADE_END });
++
++    textBox(s, [
++        { text: 'Our', options: { color: GRAY } },
++        { text: ' ' },
++        { text: 'Solution', options: { bold: true } },
++    ], { x: 3.333, y: 1.038, w: 6.667, h: 0.774, align: 'center', fontFace: MAJOR, fontSize: 40 });
++
++    textBox(s, [
++        { text: 'We offer scalable', options: { bold: true, underline: { style: 'sng' } } },
++        {
++            text: ', smart, and sustainable energy solutions\u2014ranging from residential solar systems ' +
++                'to commercial-scale wind installations\u2014all integrated with IoT monitoring for efficiency.',
++        },
++    ], {
++        x: 2.25, y: 2.135, w: 8.833, h: 1.417, align: 'center',
++        fontFace: MAJOR, fontSize: 18, lineSpacingMultiple: 1.5,
++    });
++
++    socialIcons(s);
++    badgeCircle(s, 0.849, 5.472);
++}
++
++// ---------------------------------------------------- slide 6: market analysis
++const MARKET_BARS = [
++    { x: 4.495, y: 4.75, h: 2.041, textX: 4.656, fill: PANEL, pct: '34%', pctBold: false, color: BLACK },
++    { x: 7.281, y: 2.74, h: 4.051, textX: 7.539, fill: YELLOW, pct: '76%', pctBold: true, color: DARK },
++    { x: 10.068, y: 3.75, h: 3.041, textX: 10.331, fill: PANEL, pct: '54%', pctBold: false, color: DARK },
++];
++
++function slideMarket(pptx) {
++    const s = pptx.addSlide();
++
++    textBox(s, [
++        { text: 'Market', options: { bold: true } },
++        { text: ' ' },
++        { text: 'Analysis', options: { color: GRAY } },
++    ], { x: 0.885, y: 1.012, w: 3.938, h: 0.64, fontFace: MAJOR, fontSize: 32 });
++
++    textBox(s, KEY_SEGMENTS, { x: 0.885, y: 1.652, w: 3.208, h: 0.62, fontSize: 11, lineSpacingMultiple: 1.5 });
++
++    MARKET_BARS.forEach((bar) => {
++        s.addShape('roundRect', {
++            x: bar.x, y: bar.y, w: 2.635, h: bar.h, rectRadius: radius(2.635, bar.h, 0.08367),
++            fill: { color: bar.fill }, line: { type: 'none' },
++        });
++        textBox(s, bar.pct, {
++            x: bar.textX, y: 5.334, w: 1.396, h: 0.572,
++            fontFace: MAJOR, fontSize: 28, bold: bar.pctBold, color: bar.color,
++        });
++        textBox(s, LOREM_SHORT, {
++            x: bar.textX, y: 5.868, w: 2.101, h: 0.62, fontSize: 11, color: bar.color, lineSpacingMultiple: 1.5,
++        });
++    });
++
++    textBox(s, '$567B+', { x: 0.885, y: 5.646, w: 2.792, h: 0.841, fontFace: MAJOR, fontSize: 44, bold: true });
++    textBox(s, 'TAM (Total Addressable Market)', { x: 0.878, y: 6.488, w: 3.208, h: 0.286, fontSize: 11 });
++
++    // Speech balloon: rounded body plus a separate slanted tail, because
++    // pptxgenjs cannot set the callout preset's tail-position adjust values.
++    s.addShape('roundRect', {
++        x: 8.51, y: 1.291, w: 1.766, h: 0.981, rectRadius: radius(1.766, 0.981, 0.16667),
++        fill: { color: WHITE }, line: { type: 'none' }, shadow: shadow(14, 13),
++    });
++    s.addShape('custGeom', {
++        x: 8.806, y: 2.262, w: 0.416, h: 0.372,
++        fill: { color: WHITE }, line: { type: 'none' }, shadow: shadow(14, 13),
++        points: [{ x: 0, y: 0 }, { x: 0.416, y: 0 }, { x: 0.014, y: 0.372 }, { close: true }],
++    });
++    textBox(s, '$567B+', {
++        x: 8.694, y: 1.579, w: 1.399, h: 0.404, align: 'center', fontSize: 18, bold: true, color: DARK,
++    });
++
++    socialIcons(s);
++}
++
++// ------------------------------------------------- slide 7: sustainability KPI
++const IMPACT_CARDS = [
++    { x: 4.972, fill: DARK, ink: WHITE, head: 'CO2 Emissions Reduced:', tail: ' 120K Tons/year' },
++    { x: 8.972, fill: YELLOW, ink: BLACK, head: 'Communities Powered:', tail: ' 300+ villages' },
++];
++
++function slideImpact(pptx) {
++    const s = pptx.addSlide();
++
++    IMPACT_CARDS.forEach((c) => {
++        const ink = c.ink === WHITE ? WHITE : DARK; // body copy uses the near-black tone
++        s.addShape('roundRect', {
++            x: c.x, y: 3.073, w: 3.598, h: 2.783, rectRadius: radius(3.598, 2.783, 0.08716),
++            fill: { color: c.fill }, line: { type: 'none' },
++        });
++        textBox(s, [
++            { text: c.head, options: { bold: true } },
++            { text: c.tail },
++        ], { x: c.x + 0.295, y: 3.619, w: 2.781, h: 0.64, fontSize: 16, color: c.ink });
++        textBox(s, [
++            { text: 'Lorem ipsum ', options: { bold: true, underline: { style: 'sng' } } },
++            { text: LOREM_MED },
++        ], { x: c.x + 0.295, y: 4.412, w: 3.007, h: 0.897, fontSize: 11, color: ink, lineSpacingMultiple: 1.5 });
++    });
++
++    textBox(s, [
++        { text: 'Sustainability', options: { bold: true } },
++        { text: ' ' },
++        { text: 'for', options: { color: GRAY } },
++        { text: ' ' },
++        { text: 'Impact', options: { color: GRAY } },
++    ], { x: 1.51, y: 0.992, w: 4.896, h: 1.717, fontFace: MAJOR, fontSize: 48 });
++
++    socialIcons(s);
++}
++
++// ---------------------------------------------------- slide 8: leadership team
++const TEAM = [
++    { x: 1.204, name: 'Aira Zulkarnain', role: 'visionary', fill: DARK, ink: WHITE },
++    { x: 3.526, name: 'Dimas Raharja', role: 'wind tech', fill: YELLOW, ink: DARK },
++    { x: 5.848, name: 'Sarah Fernando', role: 'green finance', fill: DARK, ink: WHITE },
++    { x: 8.17, name: 'Laura Robenson', role: 'infrastructure', fill: YELLOW, ink: DARK },
++    { x: 10.491, name: 'Benji Tanuwijaya', role: 'visionary', fill: DARK, ink: WHITE },
++];
++
++function slideTeam(pptx) {
++    const s = pptx.addSlide();
++    fadePanel(s, { x: 0, y: -0.005, w: 2.709, h: 2.38, from: PANEL, to: FADE_END });
++
++    TEAM.forEach((m) => {
++        textBox(s, m.name, { x: m.x, y: 4.865, w: 1.638, h: 0.774, align: 'center', fontSize: 20 });
++        shapeText(s, 'roundRect', m.role, {
++            x: m.x + 0.022, y: 5.735, w: 1.594, h: 0.355, rectRadius: radius(1.594, 0.355, PILL),
++            fill: { color: m.fill }, line: { type: 'none' }, shadow: softShadow(), fontSize: 11, color: m.ink,
++        });
++    });
++
++    socialIcons(s);
++
++    textBox(s, splitHeadline('Leadership & ', 'Expertise'), {
++        x: 2.896, y: 0.948, w: 7.542, h: 0.774, align: 'center', fontFace: MAJOR, fontSize: 40,
++    });
++    textBox(s, KEY_SEGMENTS, { x: 3.531, y: 1.818, w: 6.271, h: 0.286, align: 'center', fontSize: 11 });
++}
++
++// ------------------------------------------------------- slide 9: call to join
++function slideJoin(pptx) {
++    const s = pptx.addSlide();
++
++    s.addShape('roundRect', {
++        x: 0.329, y: 0.355, w: 12.738, h: 6.79, rectRadius: radius(12.738, 6.79, 0.04913),
++        fill: { color: BLACK, transparency: 75 }, line: { type: 'none' },
++    });
++
++    textBox(s, [
++        { text: 'Join us in powering the planet responsibly. Partner with us or invest in a ' },
++        { text: 'cleaner tomorrow.', options: { bold: true } },
++    ], { x: 1.073, y: 3.554, w: 8.635, h: 1.919, fontFace: MAJOR, fontSize: 36, color: WHITE });
++
++    quotePill(s, { x: 1.073, y: 5.707, barTransparency: 65 });
++}
++
++// ---------------------------------------------------------- slide 10: contact
++function slideContact(pptx) {
++    const s = pptx.addSlide();
++    fadePanel(s, { x: 9.344, y: 0, w: 1.698, h: 1.492, from: PANEL, to: FADE_END, bands: 24 });
++
++    textBox(s, splitHeadline('Ready to Build a Sustainable Partnership? ', 'Reach Out to Us'), {
++        x: 1.218, y: 1.077, w: 6.99, h: 2.121, fontFace: MAJOR, fontSize: 40,
++    });
++    textBox(s, 'Let\u2019s Discuss How We Can Drive Green Innovation Together', {
++        x: 1.218, y: 3.334, w: 5.063, h: 0.303, fontSize: 12,
++    });
++
++    s.addShape('roundRect', {
++        x: 1.218, y: 4.67, w: 6.99, h: 2.121, rectRadius: radius(6.99, 2.121, 0.08367),
++        fill: { color: DARK }, line: { type: 'none' },
++    });
++
++    socialIcons(s);
++
++    textBox(s, 'Phone Number', {
++        x: 1.991, y: 5.178, w: 1.86, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true, color: WHITE,
++    });
++    textBox(s, '+1234 5678 90', { x: 1.991, y: 5.678, w: 2.028, h: 0.286, fontSize: 11, color: WHITE });
++    textBox(s, '+1221 5221 9122', { x: 1.991, y: 5.991, w: 2.028, h: 0.286, fontSize: 11, color: WHITE });
++
++    textBox(s, 'Company Address', {
++        x: 5.277, y: 5.178, w: 2.138, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true, color: WHITE,
++    });
++    textBox(s, 'Street Dahlia, number 06, Malang, Indonesia', {
++        x: 5.277, y: 5.601, w: 2.272, h: 0.62, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5,
++    });
++
++    s.addShape('line', { x: 4.553, y: 5.304, w: 0, h: 0.979, line: { color: GRAY, width: 1 } });
++
++    badgeCircle(s, 0.999, 5.512);
++}
++
++// -------------------------------------------------------------------- build --
++function build() {
++    const pptx = new PptxGenJS();
++    pptx.layout = 'LAYOUT_WIDE'; // 13.333in x 7.5in
++    pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
++    pptx.title = 'Green Energy Business Deck';
++
++    [slideCover, slideAbout, slideIndustry, slideProblem, slideSolution,
++        slideMarket, slideImpact, slideTeam, slideJoin, slideContact].forEach((fn) => fn(pptx));
++
++    return pptx.writeFile({
++        fileName: path.join(__dirname, '10545590-cea6-4dd7-86b9-b1fcfa7bbda4_grok_final.pptx'),
++    });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => {
++    console.error(e);
++    process.exit(1);
++});

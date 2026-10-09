@@ -1,0 +1,743 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/corporate_business_overview.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/corporate_business_overview.js
+@@ -0,0 +1,740 @@
++/**
++ * Recreation of "KISE Business" template deck (20 slides, 13.333 x 7.5 in)
++ * with pptxgenjs. Raster artwork in the source deck is replaced by
++ * programmatic "[image]" placeholder rectangles.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++const BLUE = '0102FD';   // accent4
++const GREEN = '6AD78A';  // accent3
++const RUST = 'C55B46';   // accent1
++const GRAYBG = 'F1F1F1'; // accent5 - card background
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const GRAY = '595959';   // body copy
++const MAJOR = 'Montserrat';
++const MINOR = 'Lato';
++const LIGHT = 'Lato Light';
++
++const SLIDE_W = 13.333333;
++
++/* ------------------------------------------------------- reusable strings */
++const LOREM_FULL = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur eget est et nibh blandit viverra. Sed gravida, lorem eu bibendum blandit, quam nisi volutpat diam, at vulputate enim turpis id ipsum. In fringilla quam at arcu mollis.';
++const LOREM_HALF = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur eget est et nibh blandit viverra. Sed gravida, lorem eu bibendum blandit, ';
++const LOREM_TINY = 'Lorem ipsum dolor sit amet, consectetur.';
++const LOREM_TEAM = 'Lorem ipsum dolor sit amet, elit adipiscing.';
++const FUSCE = 'Fusce finibus turpis vel dui posuere, dapibus rutrum magna viverra. Phasellus rhoncus tincidunt accumsan. Integer interdum posuere velit ut dapibus.';
++const DONEC = 'Donec vulputate leo felis, vitae accumsan nunc dignissim a. Morbi lorem orci, malesuada ac metus eget, ultricies luctus purus. Etiam pellentesque molestie diam, eget placerat risus congue sit amet.';
++const ETIAM = 'Etiam scelerisque lorem ligula, vitae consequat lacus dignissim nec.';
++const PELLENTESQUE = 'Pellentesque in sapien id sem tincidunt aliquam vel et odio. Maecenas in ante rhoncus, sagittis lacus sit amet, ultricies est. Morbi vestibulum faucibus tincidunt. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices.';
++const BULLETS3 = [
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur eget est et nibh blandit viverra.',
++  'Sed gravida, lorem eu bibendum blandit, quam nisi volutpat diam, at vulputate enim turpis id ipsum.',
++  'In fringilla quam at arcu mollis.'
++];
++const PRICE_BULLETS = [
++  'Lorem ipsum dolor sit amet, consectetur elit.',
++  'Curabitur eget est et nibh blandit viverra. '
++];
++const QUOTE = '\u201C Lorem ipsum dolor sit amet, consectetur elit. Curabitur eget est et nibh blandit viverra. \u201C';
++
++/* ------------------------------------------------------------- primitives */
++// Every text frame in the deck has zero insets and is top anchored.
++const TEXT_BASE = { margin: 0, valign: 'top', isTextBox: true };
++
++function text(slide, content, box, opts) {
++  slide.addText(content, Object.assign({ x: box[0], y: box[1], w: box[2], h: box[3] }, TEXT_BASE, opts));
++}
++
++// Body copy: 10pt Lato Light italic, grey, 150% leading.
++function body(slide, str, box, opts) {
++  text(slide, str, box, Object.assign({ fontFace: LIGHT, fontSize: 10, italic: true, color: GRAY, lineSpacingMultiple: 1.5 }, opts));
++}
++
++// Sub-heading: 14pt Lato bold.
++function heading(slide, str, box, opts) {
++  text(slide, str, box, Object.assign({ fontFace: MINOR, fontSize: 14, bold: true, color: BLACK, lineSpacingMultiple: 1.5 }, opts));
++}
++
++// Big Montserrat headline (default 44pt, 90% leading).
++function headline(slide, str, box, opts) {
++  text(slide, str, box, Object.assign({ fontFace: MAJOR, fontSize: 44, bold: true, color: BLACK, lineSpacingMultiple: 0.9 }, opts));
++}
++
++// Rounded rectangle. `adj` is the OOXML corner ratio (default 16667).
++function roundRect(slide, box, fill, opts) {
++  const o = opts || {};
++  const adj = o.adj === undefined ? 0.16667 : o.adj;
++  slide.addShape('roundRect', Object.assign({
++    x: box[0], y: box[1], w: box[2], h: box[3],
++    rectRadius: adj * Math.min(box[2], box[3]),
++    fill: fill ? { color: fill } : { type: 'none' },
++    line: o.line || { type: 'none' }
++  }, o.rotate ? { rotate: o.rotate } : {}, o.flipH ? { flipH: true } : {}));
++}
++
++function rect(slide, box, fill) {
++  slide.addShape('rect', { x: box[0], y: box[1], w: box[2], h: box[3], fill: { color: fill }, line: { type: 'none' } });
++}
++
++function hLine(slide, x, y, w, color, width) {
++  slide.addShape('line', { x: x, y: y, w: w, h: 0, line: { color: color, width: width } });
++}
++
++function vLine(slide, x, y, h, color, width) {
++  slide.addShape('line', { x: x, y: y, w: 0, h: h, line: { color: color, width: width } });
++}
++
++// Stand-in for a photo / logo bitmap in the source deck.
++function imagePlaceholder(slide, box) {
++  slide.addShape('rect', { x: box[0], y: box[1], w: box[2], h: box[3], fill: { color: 'FBFBFB' }, line: { color: 'E4E4E4', width: 0.75 } });
++  text(slide, '[image]', box, { fontFace: MINOR, fontSize: 9, color: 'B8B8B8', align: 'center', valign: 'middle' });
++}
++
++// The two mockup slides show a device photo. Both are rebuilt from native
++// shapes: a dark rounded body with a white "screen" holding the placeholder.
++function deviceMockup(slide, body, screen, extras) {
++  (extras || []).forEach(function (e) {
++    roundRect(slide, e.box, e.fill, { adj: e.adj === undefined ? 0.5 : e.adj });
++  });
++  roundRect(slide, body, '111214', { adj: 0.03 });
++  roundRect(slide, screen, WHITE, { adj: 0.005 });
++  imagePlaceholder(slide, [
++    screen[0] + screen[2] / 2 - 0.45, screen[1] + screen[3] / 2 - 0.32, 0.9, 0.64
++  ]);
++}
++
++/* ------------------------------------------------------- shared furniture */
++// The ">" glyph used in the footer, drawn as an outline chevron.
++const CHEVRON_PATH = [
++  [0, 0.025], [0.881, 0.5], [0, 0.975], [0, 1], [0.05, 1],
++  [1, 0.517], [1, 0.483], [0.05, 0], [0, 0]
++];
++
++function chevrons(slide) {
++  const colors = ['CCCCFF', '9999FF', '6667FE', BLUE];
++  colors.forEach(function (color, i) {
++    const x = 0.3581 + i * 0.2031, y = 7.0097, w = 0.1312, h = 0.1873;
++    slide.addShape('custGeom', {
++      x: x, y: y, w: w, h: h,
++      fill: { color: color }, line: { type: 'none' },
++      points: CHEVRON_PATH.map(function (p) { return { x: p[0] * w, y: p[1] * h }; }).concat([{ close: true }])
++    });
++  });
++}
++
++// "KISE Corp." lock-up: quincunx of small squares plus wordmark.
++function logo(slide) {
++  [[0, 0], [0.0624, 0.0624], [0.1249, 0], [0, 0.1249], [0.1249, 0.1249]].forEach(function (d) {
++    rect(slide, [0.3581 + d[0], 0.303 + d[1], 0.0624, 0.0624], BLUE);
++  });
++  headline(slide, 'KISE Corp.', [0.6116, 0.303, 1.2431, 0.1873], { fontSize: 14, color: BLUE });
++}
++
++function pill(slide, x, w, label) {
++  roundRect(slide, [x, 0.303, w, 0.3214], BLUE, { adj: 0.5 });
++  text(slide, label, [x, 0.3167, w, 0.291],
++    { fontFace: MINOR, fontSize: 10, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++}
++
++/**
++ * Header / footer furniture repeated on every slide.
++ *  year        - text of the bottom-right stamp
++ *  businessPill- show the small "Business" pill (all slides but 15)
++ *  railL/railR - the blue vertical rules at the slide edges
++ */
++function chrome(slide, o) {
++  const opt = o || {};
++  logo(slide);
++  if (opt.businessPill !== false) pill(slide, 9.5885, 1.2431, 'Business');
++  pill(slide, 10.9306, 2.0447, 'Template Presentation');
++  if (opt.railL !== false) vLine(slide, 0.3581, 1.7891, 4.0717, BLUE, 2);
++  if (opt.railR !== false) vLine(slide, 12.9752, 1.7891, 4.0717, BLUE, 2);
++  chevrons(slide);
++  text(slide, opt.year || '2024', [10.9306, 6.9681, 2.0447, 0.229],
++    { fontFace: MINOR, fontSize: 10, bold: true, color: BLUE, align: 'right', lineSpacingMultiple: 1.5 });
++  hLine(slide, 5.4114, 7.1034, 0.9306, BLUE, 1);
++  slide.addShape('ellipse', { x: 6.5859, y: 7.0226, w: 0.1615, h: 0.1615, fill: { type: 'none' }, line: { color: BLUE, width: 1 } });
++}
++
++// White card holding a big blue number plus a caption; used on slides 1/2/4/12.
++function statCard(slide, x, y, value) {
++  roundRect(slide, [x, y, 1.8542, 1.5252], WHITE);
++  headline(slide, value, [x + 0.3403, y + 0.2925, 1.1736, 0.3717], { fontSize: 28, color: BLUE, align: 'center' });
++  body(slide, LOREM_TINY, [x + 0.3403, y + 0.6819, 1.1736, 0.5496], { align: 'center' });
++}
++
++// "Created By / Speaker" credit line (slides 1 and 20).
++function credits(slide) {
++  [['Created By: ', 'Francisco Andrade', 1.3169], ['Speaker: ', 'Francois Mercer', 3.9905]].forEach(function (c) {
++    text(slide, [{ text: c[0], options: { bold: true } }, { text: c[1] }], [c[2], 5.7009, 2.4167, 0.229],
++      { fontFace: MINOR, fontSize: 11, color: BLACK, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// Bulleted paragraph list (Arial bullet, 0.25" hanging indent, 10pt before).
++function bulletList(slide, items, box, opts) {
++  const runs = items.map(function (str) {
++    return { text: str, options: { breakLine: true, bullet: { characterCode: '2022', indent: 18 }, paraSpaceBefore: 10 } };
++  });
++  body(slide, runs, box, opts);
++}
++
++/* ------------------------------------------------------------ the slides  */
++
++// 1 - Title slide
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024' });
++  roundRect(s, [9.0508, 2.9304, 3.7077, 2.2431], GRAYBG, { adj: 0.16347, rotate: 90 });
++  roundRect(s, [9.7478, 3.5534, 0.353, 0.9181], GRAYBG, { adj: 0.16347, rotate: 90 });
++  roundRect(s, [7.8039, 4.0658, 4.2222, 1.8641], GRAYBG);
++  headline(s, 'KISE', [1.2383, 1.478, 6.1055, 0.9245], { fontSize: 80 });
++  headline(s, 'BUSINESS', [1.2383, 2.4025, 6.1055, 0.9245], { fontSize: 80 });
++  headline(s, '01', [1.2383, 4.1236, 0.7117, 0.4896], { fontSize: 36, color: BLUE });
++  body(s, 'Success Strategies in Modern Business: Breaking Through Competitive Markets with Innovation and Competitive Advantage',
++    [2.0104, 4.0658, 3.9409, 1.0228], { fontSize: 14 });
++  statCard(s, 9.9793, 2.3712, '+19k');
++  statCard(s, 8.0053, 4.2353, '+1m');
++  statCard(s, 9.9793, 4.2353, '+14m');
++  roundRect(s, [8.5292, 3.6027, 1.2539, 0.4631], WHITE, { adj: 0.5 });
++  credits(s);
++}
++
++// 2 - Welcome message
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024' });
++  headline(s, 'Welcome', [1.5593, 1.8792, 3.8728, 0.58]);
++  headline(s, 'Message', [1.5593, 2.4449, 3.8728, 0.58]);
++  roundRect(s, [9.2004, 1.8792, 2.5736, 3.8341], GRAYBG, { adj: 0.11958 });
++  statCard(s, 9.5601, 2.1979, '+19k');
++  statCard(s, 9.5601, 3.8693, '+14m');
++  body(s, LOREM_FULL, [1.5593, 3.7817, 3.2723, 0.972]);
++  body(s, PELLENTESQUE, [5.3889, 3.7817, 3.2049, 0.972]);
++  body(s, FUSCE, [1.5593, 5.2552, 7.0344, 0.458], { fontFace: MINOR, italic: false, bold: true });
++}
++
++// 3 - Table of content
++const TOC = [
++  ['01', 'About Our Kise', 1.8207, 3.5007],
++  ['04', 'Kise Services', 1.8207, 4.8678],
++  ['02', 'Vision & Mission', 5.3172, 3.5007],
++  ['05', 'Meet The Team', 5.3172, 4.8678],
++  ['03', 'Kise Timeline', 8.8136, 3.5007],
++  ['06', 'Break Slide', 8.8136, 4.8678]
++];
++
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024' });
++  headline(s, 'Table Of', [1.8207, 1.7258, 3.8728, 0.58]);
++  headline(s, 'Content', [1.8207, 2.2916, 3.8728, 0.58]);
++  TOC.forEach(function (item) {
++    const num = item[0], label = item[1], x = item[2], y = item[3];
++    headline(s, num, [x, y + 0.0481, 0.7117, 0.4896], { fontSize: 36, color: BLUE });
++    heading(s, label, [x + 0.7117, y, 1.9873, 0.2929]);
++    body(s, ETIAM, [x + 0.7117, y + 0.4168, 1.9873, 0.4896]);
++  });
++}
++
++// 4 - About our Kise
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 01' });
++  headline(s, 'About Our', [1.8302, 1.8792, 3.8728, 0.58]);
++  headline(s, 'Kise', [1.8302, 2.4449, 3.8728, 0.58]);
++  imagePlaceholder(s, [6.9375, 2.0667, 1.6181, 1.2309]);
++  body(s, DONEC, [9.1569, 2.0667, 2.3463, 1.2309]);
++  body(s, LOREM_FULL, [6.9375, 3.8512, 4.5657, 0.7582]);
++  body(s, FUSCE, [6.9375, 4.9826, 4.5657, 0.7306], { fontFace: MINOR, italic: false, bold: true });
++  roundRect(s, [1.8302, 3.848, 4.2222, 1.8641], GRAYBG);
++  statCard(s, 2.0315, 4.0175, '+1m');
++  statCard(s, 4.0056, 4.0175, '+14m');
++}
++
++// 5 - Simple Mission
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 02' });
++  headline(s, 'Simple', [1.3725, 1.9751, 3.8728, 0.58]);
++  headline(s, 'Mission', [1.3725, 2.5409, 3.8728, 0.58]);
++  heading(s, 'Mission 1', [5.5749, 1.957, 1.3482, 0.3041]);
++  body(s, LOREM_FULL, [5.5749, 2.3245, 3.9842, 0.972]);
++  heading(s, 'Mission 2', [5.5749, 3.6739, 1.3482, 0.3041]);
++  bulletList(s, BULLETS3, [5.5749, 4.0413, 3.9842, 1.5016]);
++  [[1.3725, 3.8983], [3.1731, 3.8983], [10.3162, 3.8983], [10.3162, 2.0487]].forEach(function (p) {
++    imagePlaceholder(s, [p[0], p[1], 1.6446, 1.6446]);
++  });
++}
++
++// 6 - Simple Vision
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  imagePlaceholder(s, [1.0331, 1.48, 3.4882, 4.54]);
++  roundRect(s, [2.4685, 3.3825, 3.8735, 2.3021], WHITE);
++  chrome(s, { year: '2024 - 02' });
++  headline(s, 'Simple', [5.7093, 1.4776, 3.8728, 0.58]);
++  headline(s, 'Vision', [5.7093, 2.0434, 3.8728, 0.58]);
++  heading(s, 'Vision 1', [2.9186, 3.75, 1.3482, 0.3041]);
++  body(s, LOREM_FULL, [2.9186, 4.1175, 3.9842, 0.972]);
++  heading(s, 'Vision 2', [7.4758, 3.75, 1.3482, 0.3041]);
++  bulletList(s, BULLETS3, [7.4758, 4.1175, 3.9842, 1.5016]);
++  imagePlaceholder(s, [9.3234, 1.4945, 1.4165, 1.4165]);
++  imagePlaceholder(s, [10.8838, 1.4945, 1.4165, 1.4165]);
++}
++
++// 7 & 8 - Kise Timeline (same layout, different left margin / year)
++const TIMELINE_STEPS = [
++  { num: '01', title: 'First Time', bar: 3.3573, barDy: 0, textDy: 0 },
++  { num: '02', title: 'Second Time', bar: 3.3573, barDy: 0.2391, textDy: 0.2391 },
++  { num: '03', title: 'Third Time', bar: 2.0823, barDy: 0.4782, textDy: 0.4796 },
++  { num: '04', title: 'Fourth Time', bar: 3.3573, barDy: 0, textDy: 0 }
++];
++
++function timelineSlide(pptx, opts) {
++  const s = pptx.addSlide();
++  chrome(s, { year: opts.year, railL: opts.railL, railR: opts.railR });
++  const x0 = opts.x0, step = 2.5696;
++  headline(s, 'Kise', [x0, 1.3728, 3.8728, 0.58]);
++  headline(s, 'Timeline', [x0, 1.9386, 3.8728, 0.58]);
++  body(s, LOREM_HALF, [x0 + 5.1393, 1.9528, 4.652, 0.524]);
++  text(s, opts.yearLabel, [x0, 2.9155, 1.0551, 0.3851],
++    { fontFace: MINOR, fontSize: 18, bold: true, color: BLACK, lineSpacingMultiple: 1.5 });
++  for (let i = 0; i < 5; i++) vLine(s, x0 + i * step, 3.3649, 0.3851, GREEN, 1);
++  TIMELINE_STEPS.forEach(function (st, i) {
++    const x = x0 + i * step;
++    text(s, st.num, [x + 0.0729, 3.5599, 0.3547, 0.1901],
++      { fontFace: MINOR, fontSize: 10, bold: true, color: BLACK, lineSpacingMultiple: 1.5 });
++    roundRect(s, [x, 4.0092 + st.barDy, st.bar, 0.1873], GREEN, { adj: 0.5 });
++    heading(s, st.title, [x, 4.3864 + st.textDy, 1.3482, 0.3041]);
++    body(s, LOREM_HALF, [x, 4.7539 + st.textDy, 2.0823, 0.972]);
++  });
++}
++
++function slide07(pptx) { timelineSlide(pptx, { year: '2024 - 03', yearLabel: '2019', x0: 1.5593, railR: false }); }
++function slide08(pptx) { timelineSlide(pptx, { year: '2024 - 04', yearLabel: '2020', x0: 0.9168, railL: false }); }
++
++// 9 - Kise Services
++const SERVICES = [
++  { num: '01', name: 'Business Consulting', y: 1.7295 },
++  { num: '02', name: 'Product Development', y: 3.1052 },
++  { num: '03', name: 'Digital Marketing', y: 4.4372 }
++];
++
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 05' });
++  headline(s, 'Kise', [1.5593, 1.7295, 3.8728, 0.58]);
++  headline(s, 'Services', [1.5593, 2.2953, 3.8728, 0.58]);
++  body(s, LOREM_FULL, [1.5593, 3.3389, 3.466, 0.972]);
++  SERVICES.forEach(function (svc) {
++    hLine(s, 6.1683, svc.y, 5.2331, RUST, 1);
++    headline(s, svc.num, [6.1476, svc.y + 0.2136, 0.7117, 0.4896], { fontSize: 36, color: BLUE });
++    heading(s, svc.name, [6.9432, svc.y + 0.1568, 3.0786, 0.289]);
++    body(s, LOREM_HALF, [6.9432, svc.y + 0.5243, 4.4582, 0.4874]);
++  });
++  hLine(s, 6.1683, 5.7705, 5.2331, RUST, 1);
++}
++
++// 10 - Meet the team
++// card x, text-column x (the source deck nudges columns 2 and 3 slightly right)
++const TEAM_COLS = [[1.7562, 2.4756], [5.5062, 6.256], [9.2562, 10.0181]];
++const TEAM = ['Donna Stroupe', 'Eleanor Fitzgerald', 'Estelle Darcy', 'Daniel Gallego', 'Drew Feig', 'Francisco Andrade'];
++
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 06' });
++  headline(s, 'Meet The', [1.3005, 1.3772, 3.8728, 0.58]);
++  headline(s, 'Team', [1.3005, 1.943, 3.8728, 0.58]);
++  body(s, LOREM_HALF, [9.2562, 1.5847, 2.7767, 0.6877]);
++  TEAM.forEach(function (name, i) {
++    const col = TEAM_COLS[i % 3], y = 3.0297 + Math.floor(i / 3) * 1.6252;
++    const x = col[0], tx = col[1];
++    roundRect(s, [x, y, 2.7767, 1.3919], GRAYBG);
++    imagePlaceholder(s, [x - 0.4557, y + 0.4446, 0.9114, 0.9114]);
++    heading(s, name, [tx, y + 0.1232, 1.7328, 0.289]);
++    body(s, 'Marketing', [tx, y + 0.3924, 0.6274, 0.2332], { color: RUST });
++    body(s, LOREM_TEAM, [tx, y + 0.6765, 1.7328, 0.4876]);
++  });
++}
++
++// 11 - Meet the leader
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 06' });
++  headline(s, 'Meet The', [3.4941, 1.3981, 3.8728, 0.58]);
++  headline(s, 'Leader', [3.4941, 1.9639, 3.8728, 0.58]);
++  roundRect(s, [1.8522, 3.1712, 4.7123, 2.8757], GRAYBG);
++  imagePlaceholder(s, [1.2668, 2.6391, 1.8999, 1.8999]);
++  heading(s, 'Daniel Gallego', [3.4941, 3.6804, 2.3337, 0.289], { fontSize: 20 });
++  body(s, 'Marketing', [3.4941, 4.0782, 0.9483, 0.2332], { fontSize: 12, color: RUST });
++  body(s, LOREM_HALF, [3.4941, 4.6158, 2.586, 0.6877]);
++  body(s, 'Fusce finibus turpis vel dui posuere, dapibus rutrum magna viverra. Phasellus rhoncus tincidunt accumsan. ',
++    [8.7045, 1.3981, 2.7766, 0.7306], { fontFace: MINOR, italic: false, bold: true });
++  body(s, DONEC, [8.7045, 4.0726, 2.7766, 1.2309]);
++  body(s, LOREM_HALF, [8.7045, 5.3591, 2.7767, 0.6877]);
++}
++
++// 12 - Break slide (quote)
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  imagePlaceholder(s, [8.6068, 1.48, 3.4882, 4.54]);
++  chrome(s, { year: '2024' });
++  headline(s, 'Break', [1.2383, 1.48, 6.1055, 0.9245], { fontSize: 80 });
++  headline(s, 'Slide', [1.2383, 2.4045, 6.1055, 0.9245], { fontSize: 80 });
++  body(s, '"Success is not final, failure is not fatal: It is the courage to continue that counts."',
++    [5.2509, 4.0658, 2.8671, 1.2814], { fontSize: 18, color: RUST });
++  body(s, ' - Winston Churchill', [5.2509, 5.7009, 2.8671, 0.229], { fontSize: 11 });
++  roundRect(s, [8.9937, 2.9304, 3.7077, 2.2431], GRAYBG, { adj: 0.16347, rotate: 90 });
++  statCard(s, 9.9222, 2.3712, '+19k');
++  statCard(s, 9.9222, 4.2353, '+14m');
++  imagePlaceholder(s, [1.2383, 4.33, 1.69, 1.69]);
++  imagePlaceholder(s, [3.0722, 4.33, 1.69, 1.69]);
++  imagePlaceholder(s, [6.7729, 1.48, 1.69, 1.69]);
++}
++
++// 13 - SWOT analysis
++const SWOT = [
++  ['S', 'Strengths', BLUE], ['W', 'Weaknesses', GREEN],
++  ['O', 'Opportunities', BLUE], ['T', 'Threats', GREEN]
++];
++
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 08' });
++  headline(s, 'SWOT Analysis', [3.8387, 1.729, 5.6559, 0.58], { align: 'center' });
++  SWOT.forEach(function (q, i) {
++    const x = 1.439 + i * 2.7475;
++    // "Rectangle: Diagonal Corners Rounded", mirrored horizontally
++    s.addShape('round2DiagRect', {
++      x: x, y: 3.1438, w: 2.4212, h: 2.7169, flipH: true,
++      fill: { color: q[2] }, line: { type: 'none' }
++    });
++    slide13Badge(s, x - 0.2083, q[0], q[2]);
++    heading(s, q[1], [x + 0.3087, 3.8644, 1.8039, 0.3041], { color: WHITE });
++    body(s, LOREM_HALF, [x + 0.3087, 4.2319, 1.8039, 1.2471], { color: WHITE });
++  });
++}
++
++function slide13Badge(s, x, letter, color) {
++  s.addShape('ellipse', { x: x, y: 2.9355, w: 0.784, h: 0.784, fill: { color: WHITE }, line: { type: 'none' } });
++  headline(s, letter, [x, 3.0827, 0.7916, 0.4896], { fontSize: 36, color: color, align: 'center' });
++}
++
++// 14 - Gallery
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 09' });
++  headline(s, 'Gallery', [1.3005, 1.5629, 2.6023, 0.58]);
++  headline(s, 'Kise', [1.3005, 2.1286, 2.6023, 0.58]);
++  body(s, LOREM_FULL, [1.3005, 3.7812, 2.7015, 1.256]);
++  [3.6691, 6.1287, 8.5832].forEach(function (x) {
++    roundRect(s, [x, 2.5199, 4.5286, 2.2431], GRAYBG, { adj: 0.16347, rotate: 90 });
++  });
++  [5.0082, 7.4627, 9.9222].forEach(function (x) {
++    imagePlaceholder(s, [x, 1.5886, 1.8542, 1.947]);
++    imagePlaceholder(s, [x, 3.7812, 1.8542, 1.947]);
++  });
++}
++
++// 15 - Pricing list
++const PLANS = [
++  { x: 1.8882, priceX: 2.2553, priceW: 1.453, price: '$99.99', name: 'Basic' },
++  { x: 4.237, priceX: 4.5035, priceW: 1.6544, price: '$199.99', name: 'Advanced' },
++  { x: 9.2579, priceX: 9.5243, priceW: 1.6544, price: '$299.99', name: 'Premium' }
++];
++
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 10', businessPill: false });
++  headline(s, 'Pricing List', [1.8882, 1.2766, 4.5362, 0.58]);
++  PLANS.forEach(function (p) {
++    roundRect(s, [p.x, 2.5413, 2.1873, 3.6821], null, { line: { color: BLUE, width: 2 } });
++    headline(s, p.price, [p.priceX, 2.8752, p.priceW, 0.4896], { fontSize: 28, color: BLUE, align: 'center' });
++    body(s, '/Session', [p.x + 0.4623, 3.2531, 1.2626, 0.2344], { color: BLACK, align: 'center' });
++    heading(s, p.name, [p.x + 0.2664, 3.6832, 1.6544, 0.3041], { align: 'center' });
++    bulletList(s, PRICE_BULLETS, [p.x + 0.2664, 4.0506, 1.6544, 1.1038], { color: BLACK });
++    roundRect(s, [p.x + 0.4721, 5.536, 1.2431, 0.3435], BLUE, { adj: 0.5 });
++    text(s, 'Book Now', [p.x + 0.4721, 5.5445, 1.2431, 0.3111],
++      { fontFace: MINOR, fontSize: 12, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++  // Highlighted VIP plan sits slightly taller than the rest.
++  roundRect(s, [6.5859, 2.2694, 2.5104, 4.2259], null, { line: { color: GREEN, width: 2 } });
++  headline(s, '$499.99', [6.8867, 2.6703, 1.9089, 0.4896], { fontSize: 32, color: GREEN, align: 'center' });
++  body(s, '/Session', [7.2098, 3.0482, 1.2626, 0.2344], { color: BLACK, align: 'center' });
++  heading(s, 'VIP', [7.0139, 3.551, 1.6544, 0.3675], { fontSize: 18, align: 'center' });
++  bulletList(s, PRICE_BULLETS, [7.0139, 4.0428, 1.6544, 1.1038], { color: BLACK });
++  roundRect(s, [7.0905, 5.6721, 1.5011, 0.4148], GREEN, { adj: 0.5 });
++  text(s, 'Book Now', [7.0905, 5.684, 1.5011, 0.3756],
++    { fontFace: MINOR, fontSize: 14, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++}
++
++// Two-up feature card used on the mockup slides (16 and 17).
++function featureCards(s, x, y, leftTitle, capW) {
++  const w = capW || 1.1736;
++  roundRect(s, [x, y, 4.2222, 1.8641], GRAYBG);
++  [[leftTitle, 0.2014], ['Information', 2.1754]].forEach(function (c) {
++    roundRect(s, [x + c[1], y + 0.1695, 1.8542, 1.5252], WHITE);
++    headline(s, c[0], [x + c[1] + 0.2204, y + 0.5666, 1.4134, 0.2077], { fontSize: 14, align: 'center' });
++    body(s, LOREM_TINY, [x + c[1] + 0.9271 - w / 2, y + 0.849, w, 0.5055], { align: 'center' });
++  });
++}
++
++// 16 - Laptop mockup
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  deviceMockup(s,
++    [5.05, 1.681, 5.855, 3.92],       // laptop lid
++    [5.202, 1.833, 5.551, 3.62],      // screen
++    [{ box: [4.357, 5.601, 7.228, 0.25], fill: 'D6D7D9' }]); // base
++  chrome(s, { year: '2024 - 11' });
++  headline(s, 'Unique', [1.6667, 1.5629, 2.6023, 0.58]);
++  headline(s, 'Mockup', [1.6667, 2.1286, 2.6023, 0.58]);
++  featureCards(s, 1.6667, 3.572, 'Website');
++}
++
++// 17 - Phone mockup
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  deviceMockup(s,
++    [1.818, 2.556, 3.024, 4.944],     // phone body, cropped by the slide edge
++    [2.04, 3.389, 2.58, 4.111]);      // screen
++  chrome(s, { year: '2024 - 11' });
++  headline(s, '01.', [1.7079, 1.7938, 2.6023, 0.58], { fontSize: 32 });
++  headline(s, 'Unique', [8.4162, 1.7989, 2.6023, 0.58]);
++  headline(s, 'Mockup', [8.4162, 2.3647, 2.6023, 0.58]);
++  body(s, DONEC, [8.4162, 4.6307, 3.2092, 1.2309]);
++  featureCards(s, 3.6091, 4.6803, 'Mobile', 1.4297);
++}
++
++// 18 - Simple map. The map of Canada is redrawn as custom-geometry polygons,
++// one per province/territory, in 0..1 coordinates of the original artwork box.
++const MAP_REGIONS = [
++  [
++    [0.6403,0.4052],[0.6719,0.4298],[0.6933,0.4286],[0.7051,0.4813],[0.7273,0.4895],[0.7399,0.4614],
++    [0.7383,0.4333],[0.7612,0.4602],[0.7747,0.5222],[0.7929,0.5386],[0.796,0.562],[0.7589,0.5644],
++    [0.751,0.5913],[0.785,0.6428],[0.8095,0.6451],[0.8103,0.624],[0.8245,0.6276],[0.8901,0.5819],
++    [0.8972,0.5901],[0.8774,0.651],[0.7952,0.7013],[0.7636,0.7996],[0.7865,0.7446],[0.8197,0.7106],
++    [0.8348,0.7118],[0.8387,0.7294],[0.7905,0.768],[0.7747,0.8487],[0.7589,0.8698],[0.7265,0.8803],
++    [0.7154,0.8651],[0.6624,0.8698],[0.6387,0.837],[0.6269,0.727],[0.6348,0.6966],[0.6127,0.6311],
++    [0.6482,0.5807],[0.6111,0.5211],[0.6174,0.4836],[0.6016,0.4204],[0.6403,0.4052],
++  ],
++  [
++    [0.1858,0.087],[0.2301,0.101],[0.2348,0.1174],[0.2499,0.1057],[0.2475,0.1396],[0.2625,0.1314],
++    [0.2609,0.1537],[0.2799,0.156],[0.2641,0.2063],[0.3004,0.2964],[0.3265,0.3339],[0.3834,0.3701],
++    [0.3645,0.4801],[0.2562,0.4392],[0.1629,0.376],[0.1661,0.3502],[0.1479,0.3385],[0.1431,0.2835],
++    [0.1542,0.2484],[0.151,0.2016],[0.1692,0.1513],[0.1574,0.1303],[0.1858,0.087],
++  ],
++  [
++    [0.3447,0.5866],[0.3929,0.6252],[0.4245,0.6264],[0.4285,0.6814],[0.4569,0.7247],[0.4688,0.7258],
++    [0.4791,0.83],[0.5004,0.8674],[0.5613,0.8698],[0.5312,0.9259],[0.517,0.9236],[0.4933,0.947],
++    [0.5044,0.9505],[0.502,0.9622],[0.449,0.9985],[0.4427,0.9891],[0.4506,0.9798],[0.4625,0.9154],
++    [0.4554,0.9002],[0.4814,0.9142],[0.4688,0.8815],[0.415,0.8733],[0.4032,0.8323],[0.3898,0.8323],
++    [0.3771,0.8089],[0.3581,0.8054],[0.3328,0.8347],[0.2664,0.8078],[0.268,0.6931],[0.3447,0.5866],
++  ],
++  [
++    [0.038,0.2496],[0.1945,0.4006],[0.136,0.5632],[0.1692,0.6755],[0.1645,0.7177],[0.0617,0.651],
++    [0.0436,0.5995],[0.0499,0.658],[0.0341,0.6521],[0.0143,0.5772],[0.0143,0.5527],[0.0262,0.5597],
++    [0.0262,0.5363],[0.038,0.5234],[0.0285,0.4977],[0.042,0.4848],[0.0277,0.4848],[0.0293,0.4555],
++    [0.0617,0.4181],[0.0538,0.3748],[0.0625,0.2894],[0.0372,0.2882],[0.038,0.2496],
++  ],
++  [
++    [0.4641,0.1057],[0.4909,0.1139],[0.4648,0.17],[0.4893,0.2672],[0.4996,0.2426],[0.5138,0.2952],
++    [0.5281,0.2496],[0.5225,0.2274],[0.5447,0.2262],[0.5573,0.2496],[0.5502,0.2648],[0.5605,0.2999],
++    [0.536,0.3268],[0.5194,0.3198],[0.5257,0.3327],[0.5083,0.3865],[0.4838,0.4029],[0.4435,0.493],
++    [0.3708,0.4813],[0.3811,0.3947],[0.3834,0.3701],[0.3257,0.3327],[0.2996,0.2952],[0.2649,0.2028],
++    [0.2823,0.1665],[0.3155,0.211],[0.317,0.2239],[0.3044,0.2309],[0.3415,0.2449],[0.3502,0.2824],
++    [0.3534,0.2566],[0.366,0.2496],[0.3518,0.2379],[0.366,0.2332],[0.3771,0.2332],[0.3984,0.273],
++    [0.4348,0.2824],[0.4261,0.2625],[0.4482,0.2754],[0.4633,0.259],[0.4561,0.2508],[0.4648,0.2391],
++    [0.4443,0.211],[0.4641,0.1057],
++  ],
++  [
++    [0.502,0.5866],[0.5502,0.6252],[0.5818,0.6264],[0.5866,0.6837],[0.6261,0.7258],[0.6364,0.8288],
++    [0.6577,0.8674],[0.7201,0.8756],[0.6901,0.9248],[0.6577,0.9365],[0.6506,0.947],[0.6609,0.961],
++    [0.6,0.995],[0.6166,0.9517],[0.6134,0.899],[0.6372,0.9154],[0.6387,0.899],[0.6261,0.8815],
++    [0.5715,0.8721],[0.5605,0.8323],[0.5463,0.8312],[0.5344,0.8089],[0.5162,0.8054],[0.498,0.8347],
++    [0.4807,0.8288],[0.4696,0.7258],[0.4332,0.6884],[0.502,0.5866],
++  ],
++  [
++    [0.1961,0.4041],[0.2902,0.4555],[0.2728,0.4836],[0.2838,0.4871],[0.2261,0.7141],[0.219,0.7434],
++    [0.1661,0.7188],[0.17,0.6755],[0.1376,0.5702],[0.1961,0.4041],
++  ],
++  [
++    [0.5083,0.1139],[0.5218,0.115],[0.517,0.1677],[0.5202,0.1303],[0.5423,0.115],[0.5502,0.1572],
++    [0.5652,0.1373],[0.5826,0.1384],[0.6008,0.1654],[0.6111,0.1583],[0.649,0.1841],[0.6443,0.2005],
++    [0.6577,0.2005],[0.6498,0.2239],[0.717,0.2461],[0.7122,0.3011],[0.6696,0.2789],[0.6743,0.2976],
++    [0.717,0.3374],[0.7201,0.3678],[0.7138,0.3666],[0.6822,0.3561],[0.7122,0.3783],[0.7146,0.3935],
++    [0.668,0.3935],[0.634,0.3526],[0.5945,0.3654],[0.5961,0.3339],[0.6269,0.3233],[0.6182,0.314],
++    [0.6269,0.2718],[0.6016,0.2356],[0.5897,0.2484],[0.5937,0.2309],[0.5747,0.2087],[0.5463,0.225],
++    [0.4988,0.211],[0.4941,0.1946],[0.5075,0.1946],[0.4917,0.1853],[0.4917,0.1548],[0.5083,0.1139],
++  ],
++  [
++    [0.1653,0.0483],[0.1787,0.094],[0.1558,0.1326],[0.1684,0.1525],[0.1503,0.204],[0.1526,0.2531],
++    [0.1424,0.2859],[0.1471,0.3374],[0.1653,0.3537],[0.1621,0.3725],[0.1447,0.3608],[0.053,0.266],
++    [0.0309,0.2215],[0.1653,0.0483],
++  ],
++  [
++    [0.291,0.4579],[0.3684,0.4907],[0.3629,0.5351],[0.351,0.5503],[0.3566,0.5913],[0.3463,0.5843],
++    [0.2672,0.6943],[0.2641,0.7411],[0.2601,0.7621],[0.2206,0.7387],[0.2854,0.4801],[0.306,0.4801],
++    [0.2894,0.4696],[0.291,0.4579],
++  ],
++  [
++    [0.37,0.4836],[0.4419,0.4953],[0.4419,0.5246],[0.4585,0.5316],[0.4625,0.5784],[0.5012,0.5831],
++    [0.4648,0.6404],[0.4301,0.6837],[0.4222,0.624],[0.3905,0.6229],[0.3605,0.6018],[0.37,0.4836],
++  ],
++  [
++    [0.7407,0.4216],[0.8,0.4836],[0.8016,0.5047],[0.8269,0.5222],[0.8648,0.5164],[0.864,0.5281],
++    [0.8917,0.5339],[0.9067,0.5597],[0.9012,0.5901],[0.8925,0.5796],[0.8292,0.6229],[0.8158,0.6264],
++    [0.8071,0.603],[0.8095,0.6428],[0.7826,0.6404],[0.7533,0.6006],[0.7597,0.5667],[0.7968,0.5562],
++    [0.7407,0.4216],
++  ],
++  [
++    [0.3842,0.1104],[0.4008,0.1279],[0.3969,0.1806],[0.4158,0.2227],[0.4048,0.2204],[0.3992,0.2449],
++    [0.3732,0.2215],[0.3242,0.2262],[0.3052,0.17],[0.3526,0.1934],[0.3724,0.1186],[0.3811,0.1501],
++    [0.3842,0.1104],
++  ],
++  [
++    [0.9122,0.5749],[0.9193,0.6299],[0.9249,0.6147],[0.9336,0.6276],[0.9581,0.61],[0.9691,0.6311],
++    [0.9778,0.6217],[0.9778,0.6474],[0.981,0.6322],[0.9873,0.6498],[0.9952,0.6404],[0.9976,0.672],
++    [0.9841,0.6779],[0.9731,0.6568],[0.9636,0.6954],[0.9604,0.6779],[0.9502,0.6767],[0.9083,0.7083],
++    [0.9027,0.5889],[0.9122,0.5749],
++  ],
++  [
++    [0.8332,0.7457],[0.8632,0.7902],[0.8585,0.8124],[0.8213,0.8358],[0.7905,0.7867],[0.7913,0.7668],
++    [0.8332,0.7457],
++  ],
++  [
++    [0.3439,0.0916],[0.3534,0.0916],[0.3684,0.1338],[0.3534,0.1911],[0.3131,0.1712],[0.3257,0.1677],
++    [0.3423,0.1759],[0.3091,0.1525],[0.3099,0.1361],[0.3257,0.1361],[0.3131,0.1338],[0.3099,0.1162],
++    [0.3439,0.0916],
++  ],
++  [
++    [0.3068,0.0308],[0.3431,0.0577],[0.3487,0.0799],[0.3099,0.1045],[0.3012,0.1186],[0.2807,0.1186],
++    [0.2759,0.087],[0.3068,0.0308],
++  ],
++  [
++    [0.4633,0.0226],[0.4878,0.0355],[0.498,0.0671],[0.5455,0.0612],[0.5518,0.0823],[0.5439,0.094],
++    [0.4814,0.0952],[0.4807,0.0636],[0.4625,0.0437],[0.4633,0.0226],
++  ],
++  [
++    [0.898,0.7762],[0.9083,0.7879],[0.8727,0.8288],[0.8624,0.8663],[0.8529,0.8639],[0.8458,0.8405],
++    [0.8632,0.7902],[0.898,0.7762],
++  ],
++  [
++    [0.5312,0.3303],[0.5352,0.3467],[0.5795,0.3842],[0.5723,0.397],[0.5526,0.3853],[0.5368,0.4111],
++    [0.5154,0.4006],[0.5312,0.3303],
++  ],
++  [
++    [0.4443,0.1033],[0.4522,0.1572],[0.4475,0.1747],[0.4301,0.1771],[0.4143,0.1314],[0.4277,0.1396],
++    [0.4269,0.1104],[0.4443,0.1033],
++  ],
++  [
++    [0.3676,0.0097],[0.3771,0.0109],[0.3882,0.0519],[0.3834,0.0694],[0.3653,0.0718],[0.3605,0.0565],
++    [0.3692,0.0542],[0.3494,0.032],[0.3676,0.0097],
++  ],
++  [
++    [0.4206,0.0261],[0.4309,0.039],[0.4538,0.0343],[0.4514,0.0718],[0.4364,0.0788],[0.4388,0.0624],
++    [0.4269,0.0601],[0.4206,0.0261],
++  ],
++  [[0.3992,0.0144],[0.415,0.0437],[0.4016,0.0694],[0.3866,0.0659],[0.3992,0.0144]],
++  [[0.4332,0.2215],[0.453,0.2519],[0.4403,0.2625],[0.4214,0.2473],[0.4332,0.2215]],
++  [[0.898,0.7317],[0.9185,0.7481],[0.9122,0.7726],[0.8956,0.7703],[0.898,0.7317]],
++  [[0.5953,0.2531],[0.6182,0.2566],[0.6079,0.2718],[0.5913,0.2859],[0.5953,0.2531]],
++  [[0.5447,0.1127],[0.566,0.1127],[0.5731,0.1349],[0.5534,0.1408],[0.5447,0.1127]],
++  [[0.0088,0.431],[0.0222,0.4497],[0.0064,0.4918],[0.0009,0.4591],[0.0088,0.431]],
++];
++
++const MAP_BOX = [5.4088, 1.6884, 6.325, 4.2731];
++
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 11' });
++  headline(s, 'Simple', [2.0257, 1.7989, 2.6023, 0.58]);
++  headline(s, 'Map', [2.0257, 2.3647, 2.6023, 0.58]);
++  body(s, DONEC, [2.0257, 4.6307, 3.2092, 1.2309]);
++  headline(s, '01.', [10.5504, 1.8771, 1.1072, 0.58], { fontSize: 32 });
++  const mx = MAP_BOX[0], my = MAP_BOX[1], mw = MAP_BOX[2], mh = MAP_BOX[3];
++  MAP_REGIONS.forEach(function (region) {
++    s.addShape('custGeom', {
++      x: mx, y: my, w: mw, h: mh,
++      fill: { color: GREEN }, line: { color: WHITE, width: 1 },
++      points: region.map(function (p) { return { x: p[0] * mw, y: p[1] * mh }; }).concat([{ close: true }])
++    });
++  });
++}
++
++// 19 - Client testimonial
++const TESTIMONIALS = [
++  { name: 'Jonathan Patterson', nameX: 5.1264, nameW: 1.6544 },
++  { name: 'Eleanor Fitzgerald', nameX: 7.5608, nameW: 1.4245 },
++  { name: 'Phyllis Schwaiger', nameX: 9.8802, nameW: 1.4245 }
++];
++
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { year: '2024 - 12' });
++  headline(s, 'Client', [1.6667, 1.5629, 2.6023, 0.58]);
++  headline(s, 'Testi-monial', [1.6667, 2.2552, 2.6023, 0.9602], { lineSpacing: 40 });
++  body(s, LOREM_FULL, [1.6667, 4.1772, 2.1483, 1.7631]);
++  TESTIMONIALS.forEach(function (t, i) {
++    const x = 4.8795 + i * 2.3194;
++    rect(s, [x, 2.2552, 2.1483, 3.6819], GRAYBG);
++    imagePlaceholder(s, [x + 0.3553, 1.5629, 1.4245, 1.4245]);
++    heading(s, t.name, [t.nameX, 3.4469, t.nameW, 0.429], { align: 'center', lineSpacingMultiple: 1 });
++    body(s, QUOTE, [x + 0.2469, 4.0553, 1.6544, 1.0009], { color: BLACK, align: 'center' });
++    for (let k = 0; k < 5; k++) {
++      s.addShape('star5', {
++        x: x + 0.4462 + k * 0.2686, y: 5.2667, w: 0.1857, h: 0.1857,
++        fill: { color: k < 4 ? BLUE : WHITE }, line: { type: 'none' }
++      });
++    }
++  });
++}
++
++// 20 - Closing break slide with contact card
++const CONTACT = [
++  ['Phone:', '+123-456-7890', 8.5466, 4.2655, 0.7669, 1.4219, 0.2585],
++  ['Website:', 'www.yourwebsite.com', 10.3190, 4.2655, 0.7229, 1.3404, 0.2585],
++  ['Address', '+ABC Solutions Inc. 123 Main Street Suite 456 Cityville, State 78901 United States', 8.5466, 4.8173, 0.7669, 3.1128, 0.5884]
++];
++
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  imagePlaceholder(s, [5.6513, 1.4829, 3.2395, 3.2395]);
++  chrome(s, { year: '2024' });
++  headline(s, 'Break', [1.2383, 1.48, 6.1055, 0.9245], { fontSize: 80 });
++  headline(s, 'Slide', [1.2383, 2.4045, 6.1055, 0.9245], { fontSize: 80 });
++  body(s, LOREM_FULL, [1.3005, 4.087, 3.4706, 0.9503]);
++  credits(s);
++  roundRect(s, [7.8787, 3.2116, 4.4487, 2.7821], BLUE, { adj: 0.14056 });
++  text(s, 'Get In Touch', [8.5466, 3.6402, 2.6825, 0.4468],
++    { fontFace: MINOR, fontSize: 18, bold: true, color: GRAYBG, lineSpacingMultiple: 1.5 });
++  CONTACT.forEach(function (c) {
++    text(s, c[0], [c[2] + 0.0039, c[3], c[4], 0.1994],
++      { fontFace: MINOR, fontSize: 10, bold: true, color: GRAYBG, lineSpacingMultiple: 1 });
++    body(s, c[1], [c[2], c[3] + 0.1459, c[5], c[6]], { color: GRAYBG });
++  });
++  imagePlaceholder(s, [9.0308, 1.4829, 1.5767, 1.5767]);
++  imagePlaceholder(s, [10.7506, 1.4829, 1.5767, 1.5767]);
++}
++
++/* ------------------------------------------------------------------ build */
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'KISE_16x9', width: SLIDE_W, height: 7.5 });
++  pptx.layout = 'KISE_16x9';
++  pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
++  pptx.title = 'KISE Business';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20
++  ].forEach(function (fn) { fn(pptx); });
++
++  return pptx.writeFile({ fileName: path.join(__dirname, OUT_NAME) });
++}
++
++const OUT_NAME = '120e2e0f-e5c4-4b5a-b127-4fca72b75f91_grok_final.pptx';
++build().then(function (f) { console.log('wrote', f); });

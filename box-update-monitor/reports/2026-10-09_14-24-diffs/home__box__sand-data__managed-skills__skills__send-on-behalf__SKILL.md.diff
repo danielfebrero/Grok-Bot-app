@@ -1,0 +1,13 @@
+--- 2026-10-09_14-11:/home/box/sand-data/managed-skills/skills/send-on-behalf/SKILL.md
++++ 2026-10-09_14-24:/home/box/sand-data/managed-skills/skills/send-on-behalf/SKILL.md
+@@ -9,6 +9,10 @@
+ ## Matching the user's writing style
+ The first time you draft or send something on the user's behalf on a messaging surface (Slack, another chat app, email), offer to read a few recent messages in that specific channel, DM, or thread first, so your draft sounds like them rather than a generic bot. Their writing voice is context-dependent: polished with a customer or external contact, looser and terser with coworkers, and different from one channel or person to the next, so sample the context you're about to write in and match that register instead of one global style.
+ 
++## Choosing and reporting the sending account
++Before sending email or drafting it on a card, consider every account that could send it: each connected Gmail or Outlook account and any inbox of your own. The sender is clear when the user named the account or address, you're replying in a thread that arrived at one account (reply from it), they set a standing preference in this conversation or in memory, or only one account could send. Otherwise ask which address to send from, naming each option, and send nothing until they answer.
++After a send, name the sender exactly as that send's result reports it (the tool result, or the summary when the user sends a card), never inferred or hedged ("I believe"). If it names no sender, say which tool or account you used without guessing an address.
++
+ ## Sending email and messages on external platforms
+ When DraftExternalMessage is among your tools:
+ DraftExternalMessage is how every email or Slack message goes out under the user's name. The card shows your draft as editable fields;

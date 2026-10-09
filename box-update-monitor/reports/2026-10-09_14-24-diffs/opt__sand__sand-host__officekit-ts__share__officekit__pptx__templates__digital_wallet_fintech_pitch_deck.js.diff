@@ -1,0 +1,806 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/digital_wallet_fintech_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/digital_wallet_fintech_pitch_deck.js
+@@ -0,0 +1,803 @@
++/**
++ * "Digital Wallet" — 30-slide business template rebuilt with pptxgenjs.
++ *
++ * Slide size 10 x 5.625 in (16:9).  The source deck is a template whose photo
++ * frames are *empty* picture placeholders, so they contribute nothing visually;
++ * the single embedded raster (the phone mock-up on slide 27) is replaced here
++ * by a flat "[image]" placeholder rectangle.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette ---
++const BLUE = '027DBA';    // theme accent1
++const SILVER = 'D8D8D8';  // theme accent2
++const GREY = '808080';    // body copy
++const GREY_L = 'A6A6A6';  // eyebrow labels
++const GREY_M = 'A2A2A2';  // muted card fill
++const GREY_XL = 'D9D9D9'; // breadcrumb chips
++const BFBFBF = 'BFBFBF';  // hamburger bars / centred eyebrows
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const F2 = 'F2F2F2';      // progress-bar track
++
++const HEAD = 'Raleway Black'; // theme major font
++const BODY = 'Open Sans';     // theme minor font
++
++const PH = 'E4E4E4';     // image placeholder fill
++const PH_LBL = '9A9A9A'; // image placeholder caption
++
++// pptxgenjs mutates the shadow object it is handed, so each shape needs its own.
++const shadow = (opacity = 0.1, offset = 0, angle = 0) =>
++  ({ type: 'outer', color: BLACK, opacity, blur: 25, offset, angle });
++
++// PowerPoint "Normal" text insets used throughout the source: 0.1" / 0.05".
++const INSET = [7.2, 7.2, 3.6, 3.6]; // pptxgenjs order: [left, right, bottom, top] in points
++
++// ------------------------------------------------------------- primitives ---
++const rect = (s, x, y, w, h, o = {}) =>
++  s.addShape('rect', { x, y, w, h, line: { type: 'none' }, ...o });
++
++/** Solid rectangle with a transparency percentage (0-100). */
++const wash = (s, x, y, w, h, color, transparency) =>
++  s.addShape('rect', { x, y, w, h, line: { type: 'none' }, fill: { type: 'solid', color, transparency } });
++
++const lerpHex = (from, to, t) => [0, 2, 4]
++  .map(i => Math.round(parseInt(from.substr(i, 2), 16) * (1 - t) + parseInt(to.substr(i, 2), 16) * t))
++  .map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('');
++
++/**
++ * Linear gradient faked with a stack of opaque, rotated colour bands
++ * (pptxgenjs has no gradient-fill API).  `angle` is the gradient direction in
++ * degrees measured clockwise from "left to right"; bands run perpendicular.
++ */
++function gradientBands(s, from, to, angle, steps = 90) {
++  const rad = (angle * Math.PI) / 180;
++  const ux = Math.cos(rad), uy = Math.sin(rad);
++  const corners = [[0, 0], [10, 0], [0, 5.625], [10, 5.625]].map(([x, y]) => x * ux + y * uy);
++  const lo = Math.min(...corners), hi = Math.max(...corners);
++  const thickness = (hi - lo) / steps;
++  const mid = 5 * ux + 2.8125 * uy;
++  for (let i = 0; i < steps; i++) {
++    const t = (i + 0.5) / steps;
++    const off = lo + t * (hi - lo) - mid;
++    const w = 12, h = thickness * 2.2;
++    s.addShape('rect', {
++      x: 5 + off * ux - w / 2, y: 2.8125 + off * uy - h / 2, w, h,
++      rotate: angle + 90, line: { type: 'none' }, fill: { color: lerpHex(from, to, t) },
++    });
++  }
++}
++
++const hline = (s, x, y, w, color, width = 1, o = {}) =>
++  s.addShape('line', { x, y, w, h: 0, line: { color, width }, ...o });
++
++/** Text box.  `runs` is a string or an array of pptxgenjs {text, options} runs. */
++function text(s, runs, x, y, w, h, o = {}) {
++  s.addText(runs, {
++    x, y, w, h,
++    fontFace: BODY, fontSize: 8.25, color: GREY, margin: INSET,
++    valign: 'top', paraSpaceBefore: 0, paraSpaceAfter: 0,
++    ...o,
++  });
++}
++
++/** Grey 8.25pt justified paragraph at 150% leading — the deck's workhorse. */
++const body = (s, str, x, y, w, h, o = {}) =>
++  text(s, str, x, y, w, h, { align: 'justify', lineSpacingMultiple: 1.5, ...o });
++
++/** Bold 10.5pt coloured sub-heading. */
++const subtitle = (s, str, x, y, w, h, o = {}) =>
++  text(s, str, x, y, w, h, { fontSize: 10.5, bold: true, color: BLUE, lineSpacingMultiple: 1.5, ...o });
++
++/** Big Raleway-Black slide heading; `lines` is an array of strings. */
++function heading(s, lines, x, y, w, h, o = {}) {
++  text(s, lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })),
++    x, y, w, h, { fontFace: HEAD, fontSize: 30, color: BLACK, ...o });
++}
++
++/** Centred Raleway-Black heading used by the "title on top" slides. */
++const centreHeading = (s, str, x, y, w, h, o = {}) =>
++  text(s, str, x, y, w, h, { align: 'center', fontFace: HEAD, fontSize: 30, color: BLACK, ...o });
++
++/** The circled-chevron glyph that precedes every eyebrow label. */
++function eyebrowMark(s, x, y, color, rotate = 0) {
++  // `rectRadius` drives the donut's "adj" adjust value, i.e. its ring thickness.
++  s.addShape('donut', {
++    x, y, w: 0.109, h: 0.113, rotate, rectRadius: 0.017,
++    fill: { color }, line: { type: 'none' },
++  });
++  s.addShape('rtTriangle', {
++    x: x + 0.038, y: y + 0.031, w: 0.03, h: 0.05, rotate: rotate + 135,
++    fill: { color }, line: { type: 'none' },
++  });
++}
++
++/** Eyebrow: chevron mark + small bold 9pt label. */
++function eyebrow(s, label, markX, markY, textX, textY, o = {}) {
++  eyebrowMark(s, markX, markY, o.markColor || BLUE, o.rotate);
++  text(s, label, textX, textY, o.w || 2.743, 0.253,
++    { fontSize: 9, bold: true, color: o.color || GREY_L, align: o.align, rotate: o.rotate });
++}
++
++/** Checkmark-bulleted paragraph (Wingdings "ü" in the source). */
++const checkPara = (s, str, x, y, w, h, o = {}) =>
++  text(s, str, x, y, w, h,
++    { align: 'justify', lineSpacingMultiple: 1.5, bullet: { characterCode: '2713', indent: 10 }, ...o });
++
++/** Programmatic stand-in for the one embedded photo in the source deck. */
++function image(s, x, y, w, h, o = {}) {
++  rect(s, x, y, w, h, { fill: { color: o.color || PH } });
++  text(s, '[image]', x, y + h / 2 - 0.14, w, 0.28,
++    { align: 'center', color: PH_LBL, fontSize: 8 });
++}
++
++/** Simple stand-in for the deck's small line-art vector icons. */
++const icon = (s, x, y, w, h, color) =>
++  s.addShape('rect', { x, y, w, h, fill: { color }, line: { type: 'none' } });
++
++// ------------------------------------------------------- persistent chrome ---
++/** Hamburger glyph (3 grey bars) at the top of the right-hand rail. */
++function hamburger(s) {
++  for (let i = 0; i < 3; i++) rect(s, 9.7, 0.206 + i * 0.05, 0.215, 0.026, { fill: { color: BFBFBF } });
++}
++
++/** Right-edge rail: colour band, rotated "Digital Wallet", page number. */
++function rail(s, n, o = {}) {
++  rect(s, 9.604, 0, 0.396, 5.625, { fill: { color: o.railColor || WHITE }, shadow: shadow(0.1, 3, 180) });
++  text(s, 'Digital Wallet', 8.977, o.labelY || 2.674, 1.649, 0.278, {
++    rotate: 270, align: 'center', fontSize: o.labelSize || 10.5,
++    bold: o.labelBold, color: o.labelColor || BLUE,
++  });
++  hamburger(s);
++  if (n) {
++    text(s, String(n).padStart(2, '0'), 9.634, 5.247, 0.342, 0.252,
++      { align: 'right', fontSize: 9, bold: true, color: SILVER, wrap: false });
++  }
++}
++
++/** "▪ 2021  ▪ New Design" breadcrumb. */
++function breadcrumb(s, y, color = GREY_XL) {
++  rect(s, 0.38, y + 0.106, 0.068, 0.066, { fill: { color: BLUE } });
++  text(s, '2021', 0.448, y, 0.56, 0.278, { fontSize: 10.5, color });
++  rect(s, 1.021, y + 0.106, 0.068, 0.066, { fill: { color: SILVER } });
++  text(s, 'New Design', 1.089, y, 1.766, 0.278, { fontSize: 10.5, color });
++}
++
++/** Everything that repeats on nearly every slide. */
++function chrome(s, n, o = {}) {
++  rail(s, n, o);
++  breadcrumb(s, o.breadcrumbY === undefined ? 0.21 : o.breadcrumbY);
++}
++
++/** Two-tone vertical divider used by the layouts behind slides 2 and 23. */
++function divider(s, x, w) {
++  rect(s, x, 0, w, 2.812, { fill: { color: SILVER } });
++  rect(s, x, 2.812, w, 2.813, { fill: { color: BLUE } });
++}
++
++// --------------------------------------------------------- shared strings ---
++const LOREM = 'Lorem Ipsum\u00A0is simply dummy text of the printing and typese tting industry. ';
++const L = {
++  full: LOREM + "Lorem Ipsum has been the industry's standard dummy dummy text of the printing. the printing and typese tting industry. Lorem Ipsum has been the of the printing and typese industry's standard dummy dummy text of the printing. the printing typese tting industry. Lorem Ipsum",
++  med: LOREM + "Lorem Ipsum has been the industry's standard dummy dummy text of the printing. the printing and",
++  short: LOREM + "Lorem Ipsum has been the industry's",
++  tiny: LOREM + 'Lorem Ipsum',
++  card: LOREM + 'Lorem',
++  half: LOREM + 'Lorem Ipsum has been the',
++  prin: 'Lorem Ipsum\u00A0is simply dummy text of the prin ting and typese tting in simply dummy text of the prin ting and typese tting dustry. ',
++  benefits: LOREM + 'Lorem Ipsum has been the industry\u2019s dummy text of the printing and typese tting industry. Lorem dummy text of the printing and typese tting industry. Lorem ',
++  gallery: LOREM + 'Lorem Ipsum has been the industry\u2019s dummy text of the printing',
++  bullet: 'Lorem Ipsum\u00A0is simply du mmy text of the printing',
++  micro: 'Lorem Ipsum\u00A0is simply dummy text of the printing and type',
++  standard: LOREM + "Lorem Ipsum has been the industry's standard dummy dummy text.",
++};
++
++// ================================================================= slides ===
++
++// 1 — Title slide: dark diagonal gradient wash over the hero photo frame.
++function slide01(s) {
++  // The source lays a 96%→12% opaque black gradient (315°) over the hero photo;
++  // the composite runs near-black at the bottom-left to light grey at top-right.
++  gradientBands(s, '141414', 'D2D2D2', -45);
++  rail(s, null, { railColor: BLUE, labelY: 2.693, labelSize: 8.25, labelBold: true, labelColor: WHITE });
++  text(s, '2021', 9.63, 4.844, 0.28, 0.707, { align: 'right', fontSize: 9, bold: true, color: WHITE });
++  breadcrumb(s, 0.304, WHITE);
++
++  text(s, 'DIGITAL WALLET', 0.842, 1.314, 2.741, 0.253, { fontSize: 9, bold: true, color: SILVER });
++  text(s, [
++    { text: 'Your ', options: { color: WHITE } },
++    { text: 'Saving Security ', options: { color: BLUE } },
++    { text: 'Is Our Priority', options: { color: WHITE } },
++  ], 0.842, 1.46, 4.043, 1.918, { fontFace: HEAD, fontSize: 36 });
++  body(s, LOREM.replace('industry. ', "industry. has been the Lorem Ipsum industry's standard dummy"),
++    0.842, 3.352, 4.321, 0.517, { color: WHITE });
++  rect(s, 0.899, 4.078, 1.429, 0.406, { fill: { color: BLUE } });
++  text(s, 'Start Presentation', 0.899, 4.078, 1.429, 0.406,
++    { align: 'center', valign: 'middle', fontSize: 8.25, bold: true, color: WHITE });
++}
++
++// 2 — "Welcome Messages." intro card plus two headline statistics.
++function slide02(s) {
++  divider(s, 3.547, 0.095);
++  rail(s, 2, { labelY: 2.693, labelSize: 8.25, labelBold: true });
++
++  eyebrow(s, 'Introduction', 4.97, 0.955, 5.054, 0.898);
++  heading(s, ['Welcome ', 'Messages.'], 4.905, 1.043, 4.043, 1.111);
++
++  rect(s, 2.262, 2.799, 2.762, 1.74, { fill: { color: WHITE }, line: { color: SILVER, width: 3 } });
++  text(s, 'Digital Wallet -', 2.543, 2.958, 2.33, 0.358,
++    { fontSize: 10.13, bold: true, color: BLACK, align: 'justify', lineSpacingMultiple: 1.5 });
++  body(s, 'Aliquaet nibh praesent tristique magna sit amet. Risus pretium quam vulputate digni praesent tristique magna',
++    2.543, 3.375, 2.33, 0.726);
++  text(s, 'Read More.....', 3.92, 4.141, 0.986, 0.309,
++    { align: 'right', fontSize: 8.25, bold: true, color: BLACK, lineSpacingMultiple: 1.5 });
++
++  text(s, [
++    { text: '2015 ', options: { color: BLUE } },
++    { text: '- Build Our Company Here.', options: { color: BLACK } },
++  ], 5.639, 2.915, 2.384, 0.606, { fontSize: 15, bold: true });
++  hline(s, 5.72, 3.634, 2.302, BLUE);
++  [
++    { x: 5.639, vx: 5.609, label: 'Members', value: '+580 ', unit: 'K', color: BLUE },
++    { x: 6.969, vx: 6.938, label: 'Transaction', value: '+1000', unit: '', color: SILVER },
++  ].forEach(st => {
++    text(s, st.label, st.x, 3.74, 1.651, 0.366,
++      { fontSize: 10.5, color: BLACK, align: 'justify', lineSpacingMultiple: 1.5 });
++    text(s, [
++      { text: st.value, options: { fontSize: 21 } },
++      { text: st.unit, options: { fontSize: 10.13 } },
++    ], st.vx, 3.892, 1.651, 0.63, { bold: true, color: st.color, align: 'justify', lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 3 — "About Digital Wallet Here." with the blue feature tile.
++function slide03(s) {
++  chrome(s, 3);
++  rect(s, 0, 2.892, 9.604, 0.068, { fill: { color: SILVER } }); // full-width hairline (layout)
++  eyebrow(s, 'Overview', 1.155, 1.142, 1.238, 1.085);
++  heading(s, ['About Digital ', 'Wallet Here.'], 1.089, 1.231, 4.043, 1.111);
++  body(s, L.full, 4.439, 1.142, 4.38, 1.142);
++
++  rect(s, 3.2, 2.944, 3.198, 2.681, { fill: { color: BLUE } });
++  icon(s, 4.604, 3.595, 0.389, 0.47, WHITE); // money-bag glyph
++  text(s, LOREM + "Lorem Ipsum has been the industry's standard dummy dummy text of the ",
++    3.576, 4.285, 2.444, 0.934, { align: 'center', color: WHITE, lineSpacingMultiple: 1.5 });
++}
++
++// 4 — "Digital Wallet Guiding Values." two icon rows plus a dashed note box.
++function slide04(s) {
++  chrome(s, 4);
++  eyebrow(s, 'About Us', 5.434, 0.918, 5.517, 0.861);
++  heading(s, ['Digital Wallet', 'Guiding Values.'], 5.366, 1.007, 4.045, 1.111);
++
++  s.addShape('rect', {
++    x: 1.41, y: 3.415, w: 3.45, h: 1.368,
++    fill: { type: 'none' }, line: { color: GREY_L, width: 2.25, dashType: 'dash' },
++  });
++  body(s, L.med, 1.688, 3.637, 2.92, 0.934);
++
++  [
++    { y: 2.564, ty: 2.418, by: 2.731, fill: BLUE, glyph: WHITE },
++    { y: 3.911, ty: 3.793, by: 4.106, fill: WHITE, glyph: BLUE },
++  ].forEach(r => {
++    rect(s, 5.488, r.y, 0.601, 0.599,
++      { fill: { color: r.fill }, shadow: r.fill === WHITE ? shadow() : undefined });
++    s.addShape('donut', { x: 5.647, y: r.y + 0.159, w: 0.282, h: 0.282, fill: { color: r.glyph }, line: { type: 'none' } });
++    subtitle(s, 'Insert Subtitle Here', 6.205, r.ty, 2.519, 0.366, { align: 'justify' });
++    body(s, L.short, 6.205, r.by, 2.519, 0.726);
++  });
++}
++
++// 5 — "Executive Team": four name cards below a full-width rule.
++function slide05(s) {
++  chrome(s, 5);
++  eyebrow(s, 'Our Team', 0.887, 1.003, 0.97, 0.946);
++  heading(s, ['Executive Team'], 0.819, 1.092, 4.181, 0.606);
++  body(s, L.med.replace('the printing and', 'the printing and typese tting industry. '),
++    4.799, 0.946, 4.181, 0.726);
++  hline(s, 0.884, 2.0, 8.146, BLUE);
++
++  [
++    { x: 0.884, w: 1.913, role: 'President And CEO', nameColor: BLUE },
++    { x: 2.96, w: 1.915, role: 'SPV Of Technology', nameColor: GREY },
++    { x: 5.038, w: 1.915, role: 'Chief Commercial Officer', nameColor: BLUE },
++    { x: 7.115, w: 1.913, role: 'SPV Of Custommer', nameColor: GREY },
++  ].forEach(m => {
++    rect(s, m.x, 4.431, m.w, 0.717, { fill: { color: WHITE }, shadow: shadow() });
++    text(s, 'WRITE NAME HERE', m.x + 0.01, 4.528, m.w, 0.366,
++      { align: 'center', fontSize: 10.5, bold: true, color: m.nameColor, lineSpacingMultiple: 1.5 });
++    text(s, m.role, m.x + 0.01, 4.74, m.w, 0.31,
++      { align: 'center', fontSize: 8.25, italic: true, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 6 — "Digital Wallet Vision Company." with the +11 Million customer stat.
++function slide06(s) {
++  chrome(s, 6);
++  eyebrow(s, 'About Us', 1.043, 1.023, 1.127, 0.965);
++  heading(s, ['Digital Wallet', 'Vision Company.'], 0.976, 1.113, 4.043, 1.109);
++  body(s, L.prin + 'Lorem Ipsum has.', 1.026, 2.255, 4.891, 0.491);
++
++  text(s, [
++    { text: '+11 ', options: { fontSize: 21 } },
++    { text: 'Million', options: { fontSize: 10.5 } },
++  ], 3.028, 3.083, 2.521, 0.63, { bold: true, color: BLUE, align: 'justify', lineSpacingMultiple: 1.5 });
++  subtitle(s, 'Our Customers', 3.099, 3.516, 2.521, 0.366, { align: 'justify' });
++  body(s, L.prin + "Lorem Ipsum has been the industry's", 3.099, 3.828, 2.818, 0.934);
++}
++
++// 7 — "Digital Wallet Missions Here." — numbered 01/02/03 mission rows.
++function slide07(s) {
++  wash(s, 5.561, 0.332, 2.491, 4.957, WHITE, 30);
++  const ROWS = [
++    { y: 2.186, ny: 2.297, ty: 2.321, num: '01.', fill: WHITE, fg: GREY, numColor: BLUE },
++    { y: 3.135, ny: 3.267, ty: 3.283, num: '02.', fill: BLUE, fg: WHITE, numColor: WHITE },
++    { y: 4.083, ny: 4.189, ty: 4.181, num: '03.', fill: WHITE, fg: GREY, numColor: BLUE },
++  ];
++  ROWS.forEach(r => rect(s, 1.052, r.y, 3.8, 0.813, { fill: { color: r.fill }, shadow: shadow() }));
++  chrome(s, 7);
++  eyebrow(s, 'Introduction', 1.24, 0.884, 1.323, 0.826);
++  heading(s, ['Digital Wallet', 'Missions Here.'], 1.172, 0.972, 3.307, 1.111);
++
++  rect(s, 6.538, 1.516, 2.49, 2.594, { fill: { color: WHITE }, shadow: shadow() });
++  ROWS.forEach(r => {
++    text(s, r.num, 1.205, r.ny, 0.995, 0.556,
++      { fontSize: 18, bold: true, color: r.numColor, align: 'justify', lineSpacingMultiple: 1.5 });
++    text(s, L.tiny, 1.727, r.ty, 2.835, 0.495, { color: r.fg, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 8 — "Revolutionizing On Mobile & Digital Wallet." with a vertical breadcrumb.
++function slide08(s) {
++  rail(s, 8);
++  rect(s, 0.405, 0.339, 0.066, 0.066, { fill: { color: BLUE } });
++  text(s, '2021', 0.15, 0.553, 0.575, 0.278, { rotate: 90, fontSize: 10.5, color: GREY_XL });
++  rect(s, 0.405, 0.979, 0.066, 0.066, { fill: { color: SILVER } });
++  text(s, 'New Design', -0.446, 1.79, 1.767, 0.278, { rotate: 90, fontSize: 10.5, color: GREY_XL });
++
++  s.addShape('line', { x: 6.347, y: 1.316, w: 1.0, h: 0.696, flipH: true, line: { color: BLUE, width: 1 } });
++  text(s, '2021', 7.425, 0.828, 1.12, 0.556, { fontFace: HEAD, fontSize: 27, color: GREY_XL });
++  eyebrow(s, 'Overview', 5.068, 1.99, 5.151, 1.932);
++  heading(s, ['Revolutionizing', 'On Mobile &', 'Digital Wallet.'], 5.0, 2.078, 4.043, 1.767, { fontSize: 33 });
++  body(s, L.prin + 'dummy text of the prin ting and typese tting in simply',
++    5.868, 4.139, 2.878, 0.934);
++}
++
++// 9 — "Provide The Best Services" with two floating caption cards.
++function slide09(s) {
++  chrome(s, 9);
++  eyebrow(s, 'Our Services', 0.752, 1.493, 0.835, 1.436);
++  heading(s, ['Provide', 'The Best ', 'Services'], 0.686, 1.583, 2.892, 1.615);
++  body(s, L.benefits, 0.717, 3.345, 3.102, 1.142);
++
++  [
++    { x: 3.639, y: 1.276, tx: 3.861, ty: 1.448, bx: 3.554, by: 1.182, n: '1', chip: SILVER },
++    { x: 6.219, y: 3.543, tx: 6.46, ty: 3.715, bx: 8.13, by: 4.174, n: '2', chip: BLUE },
++  ].forEach(c => {
++    rect(s, c.x, c.y, 2.076, 0.812, { fill: { color: WHITE }, shadow: shadow() });
++    text(s, 'Lorem Ipsum\u00A0is simply dum text of the printing', c.tx, c.ty, 1.634, 0.517,
++      { italic: true, align: 'justify', lineSpacingMultiple: 1.5 });
++    rect(s, c.bx, c.by, 0.266, 0.266, { fill: { color: c.chip } });
++    text(s, c.n, c.bx, c.by, 0.266, 0.266,
++      { align: 'center', valign: 'middle', fontSize: 9, color: WHITE });
++  });
++}
++
++// 10 — "Professional Services": dark hero band over four service cards.
++function slide10(s) {
++  wash(s, 0, 0, 9.592, 3.418, BLACK, 50);
++  chrome(s, 10, { breadcrumbY: 5.22 });
++  eyebrowMark(s, 4.945, 0.706, BLUE, 90);
++  text(s, 'Our Services', 3.628, 0.889, 2.743, 0.253,
++    { align: 'center', fontSize: 9, bold: true, color: WHITE });
++  centreHeading(s, 'Professional Services', 2.266, 1.003, 5.469, 0.606, { color: WHITE });
++
++  [
++    { x: 0.583, fill: BLUE, title: 'Inovative Thing' },
++    { x: 2.766, fill: GREY_M, title: 'Technical Support' },
++    { x: 4.948, fill: BLUE, title: 'Account Management' },
++    { x: 7.13, fill: GREY_M, title: 'Verified Company' },
++  ].forEach(c => {
++    rect(s, c.x, 2.153, 2.071, 2.502, { fill: { color: c.fill }, shadow: shadow() });
++    icon(s, c.x + 0.9, 2.49, 0.27, 0.38, WHITE);
++    text(s, c.title, c.x + 0.068, 3.0, 1.936, 0.366,
++      { align: 'center', fontSize: 10.5, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
++    text(s, L.card, c.x + 0.118, 3.325, 1.837, 0.726,
++      { align: 'center', color: WHITE, lineSpacingMultiple: 1.5 });
++    rect(s, c.x + 0.335, 4.34, 1.401, 0.441, { fill: { color: c.fill }, shadow: shadow(0.15) });
++    text(s, 'Detail Here', c.x + 0.335, 4.34, 1.401, 0.441,
++      { align: 'center', valign: 'middle', fontSize: 9, bold: true, color: WHITE });
++  });
++}
++
++// 11 — "Get More Benefits." with a three-item feature checklist.
++function slide11(s) {
++  chrome(s, 11);
++  eyebrow(s, 'Our Services', 5.068, 1.0, 5.151, 0.943);
++  heading(s, ['Get More', 'Benefits.'], 5.0, 1.089, 3.307, 1.111);
++  text(s, L.benefits + 'the printing and typese', 4.988, 2.297, 4.012, 0.934, { lineSpacingMultiple: 1.5 });
++  text(s, 'Features :', 4.988, 3.351, 1.104, 0.328,
++    { fontSize: 9, bold: true, align: 'justify', lineSpacingMultiple: 1.5 });
++
++  [
++    { y: 3.783, ty: 3.677, w: 2.358, label: 'Savings With High Interest' },
++    { y: 4.128, ty: 4.024, w: 2.786, label: 'Easy Digital Wallet Balance Top Up' },
++    { y: 4.469, ty: 4.365, w: 2.01, label: 'Safety Is First Preority' },
++  ].forEach(f => {
++    s.addShape('ellipse', { x: 5.068, y: f.y, w: 0.165, h: 0.161, fill: { color: BLUE }, line: { type: 'none' } });
++    subtitle(s, f.label, 5.307, f.ty, f.w, 0.366, { align: 'justify' });
++  });
++  rect(s, 2.2, 2.766, 2.005, 1.823, { fill: { color: WHITE }, shadow: shadow() });
++}
++
++// 12 — "Easy Allocate Money As Needed." blue banner + three icon columns.
++function slide12(s) {
++  rect(s, 0, 0.556, 5.957, 2.318, { fill: { color: BLUE } });
++  chrome(s, 12);
++  eyebrow(s, 'Our Services', 1.043, 1.125, 1.127, 1.068, { markColor: WHITE, color: WHITE });
++  heading(s, ['Easy Allocate Money As Needed.'], 0.976, 1.214, 4.102, 1.111, { color: WHITE });
++
++  [
++    { ix: 1.74, tx: 0.806, bx: 0.71, color: GREY_M },
++    { ix: 4.658, tx: 3.684, bx: 3.547, color: BLUE },
++    { ix: 7.534, tx: 6.562, bx: 6.385, color: GREY_M },
++  ].forEach(c => {
++    icon(s, c.ix, 3.432, 0.3, 0.31, c.color);
++    text(s, 'Insert Subtitle', c.tx, 3.823, 2.253, 0.405,
++      { align: 'center', fontSize: 12, bold: true, color: c.color, lineSpacingMultiple: 1.5 });
++    text(s, L.short, c.bx, 4.217, 2.528, 0.726,
++      { align: 'center', fontSize: 8, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 13 — "Digital Wallet Card." two bullet cards, blue and grey.
++function slide13(s) {
++  chrome(s, 13);
++  eyebrowMark(s, 4.945, 0.416, BLUE, 90);
++  text(s, 'Our Products', 3.628, 0.599, 2.743, 0.253,
++    { align: 'center', fontSize: 9, bold: true, color: BFBFBF });
++  centreHeading(s, 'Digital Wallet Card.', 2.266, 0.714, 5.469, 0.606);
++
++  [
++    { x: 0.451, tx: 0.641, fill: BLUE, title: 'M-Card Detail :', tw: 1.302 },
++    { x: 5.196, tx: 5.378, fill: GREY_M, title: 'E-card Detail:', tw: 1.406 },
++  ].forEach(card => {
++    rect(s, card.x, 2.101, 2.156, 2.755, { fill: { color: card.fill }, shadow: shadow() });
++    text(s, card.title, card.tx, 2.436, card.tw, 0.366,
++      { fontSize: 10.5, bold: true, color: WHITE, align: 'justify', lineSpacingMultiple: 1.5 });
++    [2.835, 3.399, 3.962].forEach(y => checkPara(s, L.bullet, card.tx, y, 1.778, 0.518, { color: WHITE }));
++  });
++}
++
++// 14 — "Balance Checking." blue card + two rule-topped paragraphs.
++function slide14(s) {
++  chrome(s, 14);
++  rect(s, 1.021, 1.049, 2.984, 2.149, { fill: { color: BLUE }, shadow: shadow() });
++  eyebrow(s, 'Our Products', 1.458, 1.559, 1.542, 1.502, { markColor: WHITE, color: WHITE });
++  heading(s, ['Balance', 'Checking.'], 1.391, 1.648, 2.359, 1.111, { color: WHITE });
++
++  const note = L.med.replace('the printing and', 'dummy text.');
++  hline(s, 6.712, 0.873, 0.415, SILVER, 4.5);
++  body(s, note, 6.613, 1.049, 2.33, 0.934);
++  hline(s, 3.688, 3.833, 0.413, BLUE, 4.5);
++  body(s, note, 3.602, 3.969, 2.328, 0.934);
++}
++
++// 15 — "Digital Wallet Features Here." blue panel + two checklist lines.
++function slide15(s) {
++  chrome(s, 15);
++  rect(s, 0.858, 1.122, 4.142, 2.649, { fill: { color: BLUE }, shadow: shadow() });
++  eyebrow(s, 'Our Products', 1.349, 1.502, 1.432, 1.444, { markColor: WHITE, color: WHITE });
++  heading(s, ['Digital Wallet', 'Features Here.'], 1.281, 1.59, 3.307, 1.111, { color: WHITE });
++  body(s, L.standard + ' dummy text of the', 1.281, 2.675, 3.401, 0.727, { color: WHITE });
++
++  [1.122, 1.674].forEach(y =>
++    checkPara(s, LOREM + 'Lorem Ipsum has', 5.481, y, 3.286, 0.517));
++}
++
++// 16 — "About Our Features." progress bars on a white card.
++function slide16(s) {
++  rect(s, 0.477, 1.34, 3.502, 2.953, { fill: { color: WHITE }, shadow: shadow() });
++  chrome(s, 16);
++  eyebrow(s, 'Our Features', 6.401, 1.316, 6.484, 1.259);
++  heading(s, ['About Our', 'Features.'], 6.333, 1.405, 3.307, 1.111);
++  body(s, L.benefits, 6.333, 2.613, 3.012, 1.142);
++  rect(s, 6.413, 3.936, 1.41, 0.431, { fill: { color: BLUE }, shadow: shadow() });
++  text(s, 'More Information ', 6.413, 3.936, 1.41, 0.431,
++    { align: 'center', valign: 'middle', fontSize: 9, bold: true, color: WHITE });
++
++  [
++    { y: 1.918, label: 'Subtitle Here #1', color: GREY, bar: GREY_M, pct: SILVER },
++    { y: 3.167, label: 'Subtitle Here #2', color: BLUE, bar: BLUE, pct: BLUE },
++  ].forEach(r => {
++    s.addShape('roundRect', { x: 0.771, y: r.y, w: 2.019, h: 0.253, rectRadius: 0.126, fill: { color: F2 }, line: { type: 'none' } });
++    s.addShape('roundRect', { x: 0.788, y: r.y, w: 1.422, h: 0.253, rectRadius: 0.126, fill: { color: r.bar }, line: { type: 'none' } });
++    text(s, r.label, 0.764, r.y - 0.303, 1.278, 0.309,
++      { fontSize: 8.25, bold: true, color: r.color, align: 'justify', lineSpacingMultiple: 1.5 });
++    text(s, '90%', 2.312, r.y - 0.036, 0.469, 0.31,
++      { align: 'right', fontSize: 8.25, bold: true, color: r.pct, lineSpacingMultiple: 1.5 });
++    body(s, L.tiny, 0.764, r.y + 0.311, 3.014, 0.517);
++  });
++}
++
++// 17 — "2-Lavel Authentication": blue checklist panel + two white cards.
++function slide17(s) {
++  chrome(s, 17);
++  rect(s, 0.326, 1.821, 2.835, 3.304, { fill: { color: BLUE }, shadow: shadow() });
++  eyebrowMark(s, 4.945, 0.416, BLUE, 90);
++  text(s, 'Features', 3.628, 0.599, 2.743, 0.253,
++    { align: 'center', fontSize: 9, bold: true, color: BFBFBF });
++  centreHeading(s, '2-Lavel Authentication', 2.266, 0.714, 5.469, 0.606);
++
++  [2.394, 3.536].forEach(y =>
++    checkPara(s, L.standard, 0.58, y, 2.399, 0.934, { color: WHITE, align: 'left' }));
++
++  [
++    { x: 3.509, tx: 3.766, bx: 3.628, color: BLUE },
++    { x: 6.536, tx: 6.821, bx: 6.684, color: GREY },
++  ].forEach(c => {
++    rect(s, c.x, 1.821, 2.764, 3.304, { fill: { color: WHITE }, shadow: shadow() });
++    text(s, 'Insert Subtitle', c.tx, 3.738, 2.253, 0.405,
++      { align: 'center', fontSize: 12, bold: true, color: c.color, lineSpacingMultiple: 1.5 });
++    text(s, L.short, c.bx, 4.085, 2.528, 0.681,
++      { align: 'center', fontSize: 8, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 18 — "More Additional Security Feature." pull-quote layout.
++function slide18(s) {
++  chrome(s, 18);
++  rect(s, 0.976, 1.372, 0.528, 0.523, { fill: { color: SILVER }, shadow: shadow() });
++  rect(s, 3.448, 5.036, 0.528, 0.523, { fill: { color: BLUE }, shadow: shadow() });
++
++  eyebrow(s, 'Features', 4.903, 1.134, 4.986, 1.076);
++  heading(s, ['More Additional', 'Security Feature.'], 4.835, 1.224, 3.848, 1.109);
++  [[4.925, 2.328], [7.931, 3.061]].forEach(([x, y]) =>
++    text(s, '\u201C', x, y, 0.62, 0.858,
++      { fontSize: 30, bold: true, color: SILVER, align: 'justify', lineSpacingMultiple: 1.5 }));
++  body(s, LOREM + 'Lorem Ipsum has been the industry\u2019s dummy text of the printing and',
++    4.903, 2.812, 3.5, 0.726, { bold: true, italic: true });
++  text(s, L.benefits + 'has been the industry\u2019s.', 4.91, 3.717, 3.91, 0.934, { lineSpacingMultiple: 1.5 });
++}
++
++// 19 — Break slide: big blue panel over the layout's vertical grey band.
++function slide19(s) {
++  chrome(s, 19);
++  rect(s, 2.257, 0, 0.455, 5.625, { fill: { color: GREY_M } }); // layout band
++  rect(s, 0.944, 1.333, 5.285, 3.188, { fill: { color: BLUE }, shadow: shadow() });
++  eyebrow(s, 'Break Section', 1.733, 2.033, 1.816, 1.976, { markColor: WHITE, color: WHITE });
++  heading(s, ['Break Slide Presentation'], 1.665, 2.123, 4.109, 1.464, { fontSize: 40.5, color: WHITE });
++  rect(s, 0.712, 4.135, 0.528, 0.523, { fill: { color: GREY_M }, shadow: shadow() });
++  text(s, 'We\u2019ll Be Back In 20 Minutes', 2.165, 3.946, 3.865, 0.405,
++    { align: 'right', fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 });
++}
++
++// 20 — "About Push Notifications." blue panel with 01/02 blocks.
++function slide20(s) {
++  chrome(s, 20);
++  rect(s, 4.604, 0.932, 1.977, 1.814, { fill: { color: GREY_M } }); // layout tiles
++  rect(s, 4.604, 2.905, 1.977, 1.814, { fill: { color: GREY_M } });
++  rect(s, 5.335, 0.464, 3.899, 4.681, { fill: { color: BLUE } });
++
++  eyebrow(s, 'Features', 0.892, 1.22, 0.976, 1.165);
++  heading(s, ['About Push', 'Notifications.'], 0.825, 1.311, 3.307, 1.109);
++  text(s, L.benefits + 'Lorem Ipsum has been the industry\u2019s dummy text of the printing and typese tting industry. ',
++    0.825, 2.542, 3.307, 1.288, { fontSize: 8, lineSpacingMultiple: 1.5 });
++  body(s, LOREM + 'Lorem Ipsum has been the industry\u2019s', 0.825, 3.991, 3.307, 0.517, { italic: true });
++
++  [{ y: 1.155, n: '01' }, { y: 3.089, n: '02' }].forEach(b => {
++    text(s, b.n, 6.75, b.y, 0.719, 0.556,
++      { fontSize: 18, bold: true, color: WHITE, align: 'justify', lineSpacingMultiple: 1.5 });
++    subtitle(s, 'Insert Subtitle', 6.75, b.y + 0.395, 1.753, 0.366, { color: WHITE, align: 'justify' });
++    text(s, L.tiny, 6.75, b.y + 0.708, 2.012, 0.726, { color: WHITE, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 21 — "Optimization Key Features" — centred title, caption and rule.
++function slide21(s) {
++  chrome(s, 21);
++  eyebrowMark(s, 4.945, 0.617, BLUE, 90);
++  text(s, 'Features', 3.628, 0.8, 2.743, 0.253,
++    { align: 'center', fontSize: 9, bold: true, color: BFBFBF });
++  centreHeading(s, 'Optimization Key Features', 1.884, 0.915, 6.233, 0.606);
++  text(s, 'Insert Subtitle', 3.873, 3.922, 2.253, 0.405,
++    { align: 'center', fontSize: 12, bold: true, color: BLUE, lineSpacingMultiple: 1.5 });
++  hline(s, 4.118, 4.328, 1.877, GREY);
++  text(s, L.benefits + 'has been the industry\u2019s. has been the industry\u2019s dummy text of the printing and typese tting industry. ',
++    1.651, 4.399, 6.698, 0.726, { align: 'center', lineSpacingMultiple: 1.5 });
++}
++
++// 22 — "Digital Wallet Withdrawal." tinted panel below a full-width rule.
++function slide22(s) {
++  wash(s, 0.705, 3.307, 4.887, 2.052, BLUE, 40);
++  chrome(s, 22);
++  hline(s, 0, 3.097, 9.101, BLUE);
++  eyebrow(s, 'Feature', 6.128, 0.818, 6.212, 0.76);
++  heading(s, ['Digital Wallet', 'Withdrawal.'], 6.061, 0.906, 3.306, 1.111);
++  body(s, L.tiny, 6.061, 2.071, 3.003, 0.517);
++
++  text(s, 'Insert Subtitle', 1.28, 4.101, 2.253, 0.405,
++    { fontSize: 12, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
++  hline(s, 2.677, 4.328, 2.297, WHITE);
++  body(s, LOREM + 'Lorem Ipsum has been the industry\u2019s dummy', 1.278, 4.446, 3.774, 0.519, { color: WHITE });
++}
++
++// 23 — "The Real Transfer Fee." — 2x2 grid of subtitle + copy.
++function slide23(s) {
++  chrome(s, 23);
++  divider(s, 6.16, 0.097);
++  eyebrow(s, 'Featuress', 0.887, 1.09, 0.97, 1.033);
++  heading(s, ['The Real ', 'Transfer Fee.'], 0.819, 1.179, 3.307, 1.111);
++
++  [
++    { x: 0.819, y: 2.62, w: 1.337, bw: 2.198, color: SILVER },
++    { x: 3.283, y: 2.62, w: 1.335, bw: 2.196, color: BLUE },
++    { x: 0.819, y: 3.927, w: 1.337, bw: 2.198, color: BLUE },
++    { x: 3.283, y: 3.927, w: 1.335, bw: 2.196, color: SILVER },
++  ].forEach(c => {
++    subtitle(s, 'Insert Subtitle', c.x, c.y, c.w, 0.366, { color: c.color });
++    body(s, L.half, c.x, c.y + 0.288, c.bw, 0.726);
++  });
++}
++
++// 24 — "About Our Gallery." with the blue "25" statistic tile.
++function slide24(s) {
++  chrome(s, 24);
++  rect(s, 7.062, 1.016, 1.682, 1.628, { fill: { color: BLUE }, shadow: shadow() });
++  text(s, '25', 7.297, 1.394, 1.214, 0.707,
++    { align: 'center', fontSize: 24, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
++  text(s, 'About Benefits', 7.297, 1.957, 1.214, 0.309,
++    { align: 'center', fontSize: 8.25, italic: true, color: WHITE, lineSpacingMultiple: 1.5 });
++
++  eyebrow(s, 'Gallery', 1.238, 2.639, 1.321, 2.582);
++  heading(s, ['About Our', 'Gallery.'], 1.17, 2.727, 3.307, 1.111);
++  body(s, L.gallery, 1.201, 3.905, 2.922, 0.726);
++  hline(s, 1.285, 4.78, 0.415, SILVER, 4.5);
++}
++
++// 25 — Quotes section: rotated title at the left, blue quote card at the right.
++function slide25(s) {
++  chrome(s, 25);
++  rect(s, 5.122, 1.755, 4.186, 2.516, { fill: { color: BLUE }, shadow: shadow() });
++
++  eyebrowMark(s, 0.873, 4.436, BLUE, 270);
++  text(s, 'Introduction', -0.444, 2.966, 2.743, 0.252,
++    { rotate: 270, fontSize: 9, bold: true, color: GREY_L });
++  text(s, 'Quotes Section', -0.375, 2.679, 3.307, 0.606,
++    { rotate: 270, fontFace: HEAD, fontSize: 30, color: BLACK });
++
++  text(s, '\u201CIf you push through that feeling of being scared, that feeling of taking risk, really amazing things can happen\u201D',
++    5.597, 2.325, 3.234, 1.111, { align: 'justify', fontSize: 15, italic: true, color: WHITE });
++  text(s, '- Marissa Mayer', 6.75, 3.557, 2.082, 0.271,
++    { align: 'right', fontSize: 10.13, bold: true, color: WHITE });
++}
++
++// 26 — "Various Deposit Method." two tinted vertical columns.
++function slide26(s) {
++  chrome(s, 26);
++  wash(s, 4.325, 0, 2.644, 5.625, BLUE, 50);
++  wash(s, 6.96, 0, 2.644, 5.625, SILVER, 50);
++
++  eyebrow(s, 'Features', 0.832, 1.068, 0.915, 1.01);
++  heading(s, ['Various', 'Deposit Method.'], 0.764, 1.156, 3.24, 1.111);
++  [2.861, 3.66].forEach(y => checkPara(s, L.gallery + ' and', 0.627, y, 3.24, 0.726));
++  rect(s, 0.832, 4.51, 1.41, 0.431, { fill: { color: SILVER }, shadow: shadow() });
++  text(s, 'More Information ', 0.832, 4.51, 1.41, 0.431,
++    { align: 'center', valign: 'middle', fontSize: 9, bold: true, color: WHITE });
++
++  [
++    { x: 4.865, ny: 3.503, ty: 3.995, by: 4.307, n: '01' },
++    { x: 7.401, ny: 2.79, ty: 3.262, by: 3.575, n: '02' },
++  ].forEach(b => {
++    text(s, b.n, b.x, b.ny, 0.863, 0.63,
++      { fontSize: 21, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
++    subtitle(s, 'Insert Subtitle', b.x, b.ty, 1.337, 0.366, { color: WHITE });
++    text(s, L.micro, b.x, b.by, 1.901, 0.517, { color: WHITE, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 27 — "Our Digital Wallet Apps Mockup." — the deck's only real photo.
++function slide27(s) {
++  image(s, -0.141, 0.799, 4.224, 4.222);
++  chrome(s, 27);
++  rect(s, 0, 2.812, 6.675, 2.812, { fill: { color: BLUE } }); // layout band
++  eyebrow(s, 'Mockup', 3.849, 1.047, 3.932, 0.99);
++  heading(s, ['Our Digital Wallet ', 'Apps Mockup.'], 3.783, 1.135, 5.648, 1.111);
++
++  subtitle(s, 'Insert Subtitle', 3.441, 3.231, 1.337, 0.366, { color: WHITE });
++  text(s, L.tiny, 3.441, 3.568, 1.894, 0.726, { color: WHITE, lineSpacingMultiple: 1.5 });
++  text(s, 'Lorem Ipsum\u00A0is simply dummy text of the printing and', 3.441, 4.271, 1.894, 0.495,
++    { color: WHITE, lineSpacingMultiple: 1.5 });
++
++  [
++    { x: 5.755, tx: 5.931, cx: 5.899, fill: BLUE, sub: 'Members Review ', big: [{ text: '381 K', options: { fontSize: 21 } }] },
++    { x: 7.613, tx: 7.786, cx: 7.757, fill: GREY_M, sub: 'Apps Rating', big: [{ text: '4.5/', options: { fontSize: 21 } }, { text: '5.0', options: { fontSize: 10.13 } }] },
++  ].forEach(t => {
++    rect(s, t.x, 3.283, 1.684, 1.628, { fill: { color: t.fill }, shadow: shadow() });
++    text(s, t.big, t.tx, 3.451, 1.337, 0.63,
++      { align: 'center', bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
++    text(s, t.sub, t.cx, 3.863, 1.396, 0.309,
++      { align: 'center', fontSize: 8.25, italic: true, color: WHITE, lineSpacingMultiple: 1.5 });
++    text(s, 'Lorem Ipsum\u00A0is simply dummy text of', t.cx, 4.128, 1.396, 0.519,
++      { align: 'center', color: WHITE, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 28 — "About Clients Testimony." blue testimonial card.
++function slide28(s) {
++  chrome(s, 28);
++  rect(s, 1.089, 2.812, 4.536, 2.13, { fill: { color: BLUE }, shadow: shadow() });
++  rect(s, 0.979, 4.686, 0.318, 0.302, { fill: { color: SILVER } });
++  eyebrow(s, 'Testimony', 1.201, 1.276, 1.285, 1.219);
++  heading(s, ['About Clients ', 'Testimony.'], 1.134, 1.365, 3.307, 1.111);
++
++  text(s, 'Insert Name Here', 1.528, 3.04, 2.123, 0.405,
++    { fontSize: 12, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
++  hline(s, 1.606, 3.432, 3.469, WHITE);
++  text(s, 'June, 20 2021', 1.533, 3.398, 1.108, 0.309,
++    { align: 'justify', fontSize: 8.25, italic: true, color: WHITE, lineSpacingMultiple: 1.5 });
++  text(s, '\u201C' + LOREM + 'Lorem Ipsum Ipsum\u00A0is simply dummy text of the printing and typese tting industry......\u201D',
++    1.528, 3.807, 3.651, 0.726, { color: WHITE, lineSpacingMultiple: 1.5 });
++  text(s, 'Read More....', 4.149, 4.424, 1.054, 0.309,
++    { align: 'right', fontSize: 8.25, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
++}
++
++// 29 — "Get In Touch" contact card.
++function slide29(s) {
++  chrome(s, 29, { breadcrumbY: 5.104 });
++  rect(s, 2.299, 1.988, 6.715, 3.059, { fill: { color: BLUE }, shadow: shadow() });
++  eyebrow(s, 'Contact Us', 2.849, 2.562, 2.932, 2.505, { markColor: WHITE, color: WHITE });
++  heading(s, ['Get In Touch'], 2.781, 2.651, 3.307, 0.606, { color: WHITE });
++  body(s, L.benefits.replace('Lorem ', 'Lorem Ipsum has been the industry\u2019s dummy text of ') + 'dummy text of ',
++    2.781, 3.337, 3.071, 1.142, { color: WHITE });
++
++  s.addShape('line', { x: 6.089, y: 2.405, w: 0, h: 2.09, line: { color: WHITE, width: 1 } });
++  [
++    { y: 2.575, label: 'Phones', value: '+10 283 133 13 / +10 222 222 12', w: 2.375 },
++    { y: 3.269, label: 'Email', value: 'Digital.wallet@domain,com', w: 2.252 },
++    { y: 3.943, label: 'Apps', value: 'Digital Wallet/Apps', w: 2.252 },
++  ].forEach(f => {
++    text(s, f.label, 6.302, f.y, 1.646, 0.272,
++      { fontFace: HEAD, fontSize: 10.13, bold: true, color: WHITE });
++    text(s, f.value, 6.302, f.y + 0.208, f.w, 0.366,
++      { align: 'justify', fontSize: 10.5, bold: true, color: WHITE, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 30 — "Thank You For Watching." closing slide.
++function slide30(s) {
++  rail(s, 30);
++  rect(s, -0.019, 0, 5.439, 5.625, { fill: { color: WHITE }, shadow: shadow() });
++  breadcrumb(s, 0.21);
++  eyebrow(s, 'Testimony', 0.981, 1.273, 1.064, 1.215);
++  heading(s, ['Thank You For', 'Watching.'], 0.913, 1.361, 2.717, 1.918, { fontSize: 36 });
++  text(s, '2021', 0.913, 3.786, 0.597, 0.358,
++    { rotate: 270, align: 'justify', fontSize: 10.13, bold: true, color: SILVER, lineSpacingMultiple: 1.5 });
++  text(s, L.benefits.slice(0, 155), 1.979, 3.696, 2.535, 0.934, { lineSpacingMultiple: 1.5 });
++
++  wash(s, 6.267, 2.38, 1.731, 3.245, SILVER, 51);
++  wash(s, 7.474, 3.109, 1.075, 2.516, BLUE, 51);
++}
++
++// ================================================================== build ===
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'DW16x9', width: 10, height: 5.625 });
++pptx.layout = 'DW16x9';
++pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++pptx.title = 'Digital Wallet';
++
++BUILDERS.forEach(build => {
++  const slide = pptx.addSlide();
++  slide.background = { color: WHITE };
++  build(slide);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, '08103c4c-9050-48e9-8140-29bc6997c4b7_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

@@ -1,0 +1,670 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/ecommerce_conversion_funnel.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/ecommerce_conversion_funnel.js
+@@ -0,0 +1,667 @@
++/**
++ * "Conversion Funnel" — 25-slide deck rebuilt with pptxgenjs.
++ *
++ * Run:  node 02865a8a-8604-44cb-828b-bc08fa8f4c75_grok_final.js
++ * Out:  02865a8a-8604-44cb-828b-bc08fa8f4c75_grok_final.pptx  (next to this file)
++ *
++ * The original's picture areas are redrawn as flat placeholder cards built
++ * from native shapes (see `photo()`), and its two raster device mock-ups are
++ * replaced by plain rectangles (`laptopMockup()` / `phoneMockup()`).
++ * No image data is embedded anywhere.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const SLIDE_W = 13.333333333333334;
++const SLIDE_H = 7.5;
++
++const HEAD = 'Montserrat SemiBold'; // theme major font
++const BODY = 'Inter Light'; // theme minor font
++
++const C = {
++  bg: 'F2F2F2', // slide background (bg1 lumMod 95%)
++  ink: '404040', // headings  (tx1 lumMod 75% / lumOff 25%)
++  grey: '666666', // literal grey used by a few sub-titles
++  label: '595959', // image-placeholder caption
++  white: 'FFFFFF',
++  card: 'E7E6E6', // bg2 - photo placeholder card
++  line: 'BFBFBF', // bg1 lumMod 75%
++  axis: 'A6A6A6', // bg1 lumMod 65%
++  cone: 'D9D8D8', // grey cone on the "Data Funnel" slide
++  a1: '48CAE4',
++  a2: '00B4D8',
++  a3: '0096C7',
++  a4: '0077B6',
++  a1d: '3698AB', // accent tints at lumMod 75% (shaded faces)
++  a2d: '0087A2',
++  a3d: '007195',
++  a4d: '005988',
++};
++
++/* --------------------------------------------------------------- helpers */
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
++pptx.layout = 'WIDE';
++pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++
++/** New slide: grey canvas + the running header from the slide master. */
++function newSlide() {
++  const s = pptx.addSlide();
++  s.background = { color: C.bg };
++  s.addText('Conversion Funnel', {
++    x: 0.61, y: 0.623, w: 1.83, h: 0.303,
++    fontFace: HEAD, fontSize: 12, color: C.ink, valign: 'top', wrap: false,
++  });
++  s.addText('2050', {
++    x: 12.171, y: 0.623, w: 0.63, h: 0.303,
++    fontFace: HEAD, fontSize: 12, color: C.ink, valign: 'top', wrap: false,
++  });
++  return s;
++}
++
++/** Big Montserrat heading. */
++function title(s, text, o) {
++  s.addText(text, Object.assign({
++    fontFace: HEAD, fontSize: 40, color: C.ink, valign: 'top',
++  }, o));
++}
++
++/** 12 pt Inter body copy (1.5 line spacing is the deck default). */
++function body(s, text, o) {
++  s.addText(text, Object.assign({
++    fontFace: BODY, fontSize: 12, color: C.ink, valign: 'top', lineSpacingMultiple: 1.5,
++  }, o));
++}
++
++/** Small Montserrat accent label (kicker, stat caption, name...). */
++function kicker(s, text, o) {
++  s.addText(text, Object.assign({
++    fontFace: HEAD, fontSize: 16, color: C.a3, valign: 'top',
++  }, o));
++}
++
++/**
++ * Rounded "chip" with a centred caption, e.g. `90% Develop`.
++ * `tw` is the width of the inner text box: in the source deck it is narrower
++ * than the chip, which is what makes a few captions wrap onto two lines.
++ */
++function chip(s, o) {
++  const tw = o.tw || o.w;
++  s.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    rectRadius: o.r === undefined ? Math.min(o.w, o.h) * 0.29 : o.r,
++    fill: { color: o.fill || C.a3 },
++  });
++  s.addText(o.text, {
++    x: o.x + (o.w - tw) / 2, y: o.y + (o.h - 0.34) / 2, w: tw, h: 0.34,
++    align: 'center', valign: 'top', wrap: !!o.tw,
++    fontFace: o.font || BODY, fontSize: o.size || 14, color: o.color || C.white,
++  });
++}
++
++/* ------------------------------------------------- custom-geometry helper */
++
++const K = 0.5523; // circle -> cubic-bezier magic constant
++
++/** Convert fractional path commands (M/L/C/Z) into pptxgenjs `points`. */
++function pts(cmds, w, h) {
++  return cmds.map(c => {
++    if (c[0] === 'Z') return { close: true };
++    if (c[0] === 'M') return { x: c[1] * w, y: c[2] * h, moveTo: true };
++    if (c[0] === 'L') return { x: c[1] * w, y: c[2] * h };
++    return {
++      x: c[5] * w, y: c[6] * h,
++      curve: { type: 'cubic', x1: c[1] * w, y1: c[2] * h, x2: c[3] * w, y2: c[4] * h },
++    };
++  });
++}
++
++/** Free-form shape from fractional path commands. */
++function shape(s, cmds, o) {
++  s.addShape('custGeom', Object.assign({ points: pts(cmds, o.w, o.h) }, o));
++}
++
++/** Half ellipse as two cubics: side = -1 upper arc, +1 lower arc. */
++function arc(cx, cy, rx, ry, side) {
++  const sx = side > 0 ? 1 : -1; // travel direction along x
++  const dy = side * ry;
++  return [
++    ['C', cx + sx * rx, cy + K * dy, cx + sx * K * rx, cy + dy, cx, cy + dy],
++    ['C', cx - sx * K * rx, cy + dy, cx - sx * rx, cy + K * dy, cx - sx * rx, cy],
++  ];
++}
++
++/** Funnel band: wide elliptical rim on top, narrow rim at the bottom. */
++function bandPath(rxT, cyT, ryT, rxB, cyB, ryB) {
++  return [['M', 0.5 + rxT, cyT], ['L', 0.5 + rxB, cyB]]
++    .concat(arc(0.5, cyB, rxB, ryB, 1))
++    .concat([['L', 0.5 - rxT, cyT]])
++    .concat(arc(0.5, cyT, rxT, ryT, -1).map(c => c))
++    .concat([['Z']]);
++}
++
++/** Cone tip: apex at the top, elliptical bottom. */
++function conePath(cyB, ryB) {
++  return [['M', 0.5, 0], ['L', 1, cyB]]
++    .concat(arc(0.5, cyB, 0.5, ryB, 1))
++    .concat([['Z']]);
++}
++
++/* ------------------------------------------------------ image placeholders */
++
++const ICON_W = 0.88;
++const ICON_H = 0.693;
++const MOUNTAINS = [['M', 0, 1], ['L', 0.3, 0.28], ['L', 0.46, 0.6], ['L', 0.7, 0],
++  ['L', 1, 0.62], ['L', 1, 1], ['Z']];
++
++/** The little "picture" glyph drawn inside every photo placeholder. */
++function pictureIcon(s, cx, cy) {
++  const x = cx - ICON_W / 2, y = cy - ICON_H / 2;
++  s.addShape('rect', { x, y, w: ICON_W, h: ICON_H, fill: { color: 'FAFAFA' }, line: { color: '808080', width: 1 } });
++  s.addShape('ellipse', { x: x + 0.147, y: y + 0.12, w: 0.153, h: 0.147, fill: { color: 'F8DB8F' }, line: { color: 'E8A33D', width: 1 } });
++  shape(s, MOUNTAINS, { x: x + 0.1, y: y + 0.267, w: 0.68, h: 0.353, fill: { color: '83BEEC' } });
++}
++
++/**
++ * Stand-in for a picture area: flat grey card, centred prompt and the picture
++ * glyph — the same thing an empty picture placeholder shows in the original.
++ * `bullet:false` matches the two layouts whose prompt has no bullet character.
++ */
++function photo(s, o) {
++  s.addShape('rect', { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: C.card } });
++  s.addText((o.bullet === false ? '' : '\u2022   ') + 'Image Placeholder', {
++    x: o.x - 0.6, y: o.y - 0.032, w: o.w + 1.2, h: 0.32,
++    align: 'center', valign: 'top', wrap: false,
++    fontFace: BODY, fontSize: o.size || 14, color: C.label,
++  });
++  pictureIcon(s, o.x + o.w / 2, o.y + o.h / 2);
++}
++
++/** Flat laptop stand-in (slide 9). */
++function laptopMockup(s) {
++  s.addShape('roundRect', { x: 7.963, y: 3.518, w: 4.574, h: 3.06, rectRadius: 0.08, fill: { color: '1A1A1A' } });
++  s.addShape('rect', { x: 8.086, y: 3.734, w: 4.327, h: 2.731, fill: { color: C.bg } });
++  s.addShape('roundRect', { x: 7.439, y: 6.573, w: 5.631, h: 0.34, rectRadius: 0.1, fill: { color: '2A2A2A' } });
++}
++
++/** Flat phone stand-in (slide 10). */
++function phoneMockup(s) {
++  s.addShape('roundRect', { x: 6.72, y: 2.13, w: 3.162, h: 6.355, rectRadius: 0.45, fill: { color: '555554' } });
++  s.addShape('roundRect', { x: 6.782, y: 2.251, w: 2.953, h: 6.234, rectRadius: 0.4, fill: { color: '000000' } });
++}
++
++/* ------------------------------------------------------------ tiny glyphs */
++
++/** Simple white pictograms used on the funnel segments and accent tiles. */
++function glyph(s, kind, x, y, w, h, color) {
++  const f = { color: color || C.white };
++  if (kind === 'person') {
++    s.addShape('ellipse', { x: x + w * 0.28, y, w: w * 0.44, h: h * 0.4, fill: f });
++    s.addShape('roundRect', { x, y: y + h * 0.48, w, h: h * 0.52, rectRadius: w * 0.25, fill: f });
++  } else if (kind === 'people') {
++    s.addShape('ellipse', { x: x + w * 0.32, y, w: w * 0.36, h: h * 0.34, fill: f });
++    s.addShape('roundRect', { x: x + w * 0.15, y: y + h * 0.38, w: w * 0.7, h: h * 0.36, rectRadius: w * 0.15, fill: f });
++    s.addShape('ellipse', { x, y: y + h * 0.62, w: w * 0.38, h: h * 0.38, fill: f });
++    s.addShape('ellipse', { x: x + w * 0.62, y: y + h * 0.62, w: w * 0.38, h: h * 0.38, fill: f });
++  } else if (kind === 'shirt') {
++    s.addShape('rect', { x, y, w, h: h * 0.25, fill: f });
++    s.addShape('rect', { x, y: y + h * 0.25, w: w * 0.42, h: h * 0.75, fill: f });
++    s.addShape('rect', { x: x + w * 0.58, y: y + h * 0.25, w: w * 0.42, h: h * 0.75, fill: f });
++  } else if (kind === 'phone') {
++    s.addShape('roundRect', { x, y, w, h, rectRadius: w * 0.18, fill: f });
++    s.addShape('rect', { x: x + w * 0.18, y: y + h * 0.12, w: w * 0.64, h: h * 0.68, fill: { color: C.a3 } });
++  } else if (kind === 'note') {
++    s.addShape('roundRect', { x, y, w, h, rectRadius: w * 0.15, fill: f });
++    s.addShape('rect', { x: x + w * 0.2, y: y + h * 0.24, w: w * 0.6, h: h * 0.08, fill: { color: C.a4 } });
++    s.addShape('rect', { x: x + w * 0.2, y: y + h * 0.46, w: w * 0.6, h: h * 0.08, fill: { color: C.a4 } });
++  } else if (kind === 'tag') {
++    s.addShape('roundRect', { x, y, w, h, rectRadius: w * 0.2, rotate: 45, fill: f });
++    s.addShape('ellipse', { x: x + w * 0.3, y: y + h * 0.3, w: w * 0.2, h: h * 0.2, fill: { color: C.white } });
++  } else if (kind === 'pin') {
++    s.addShape('teardrop', { x, y, w, h: h * 0.8, rotate: 225, fill: f });
++  } else if (kind === 'bag') {
++    s.addShape('roundRect', { x, y: y + h * 0.28, w, h: h * 0.72, rectRadius: w * 0.15, fill: f });
++    s.addShape('ellipse', { x: x + w * 0.22, y, w: w * 0.56, h: h * 0.5, fill: f });
++  } else if (kind === 'chat') {
++    s.addShape('ellipse', { x, y, w, h: h * 0.85, fill: f });
++    shape(s, [['M', 0, 0], ['L', 1, 0], ['L', 0.2, 1], ['Z']],
++      { x: x + w * 0.05, y: y + h * 0.6, w: w * 0.4, h: h * 0.4, fill: f });
++  } else if (kind === 'cart') {
++    shape(s, [['M', 1, 0], ['L', 0.005, 0], ['L', 0, 1], ['L', 0.85, 1], ['Z']],
++      { x: x + w * 0.24, y, w: w * 0.76, h: h * 0.55, fill: f });
++    s.addShape('rect', { x, y, w: w * 0.2, h: h * 0.12, fill: f });
++    s.addShape('rect', { x: x + w * 0.14, y, w: w * 0.08, h: h * 0.75, fill: f });
++    s.addShape('ellipse', { x: x + w * 0.3, y: y + h * 0.82, w: w * 0.16, h: h * 0.18, fill: f });
++    s.addShape('ellipse', { x: x + w * 0.78, y: y + h * 0.82, w: w * 0.16, h: h * 0.18, fill: f });
++  }
++}
++
++/* ============================================================== the slides */
++
++/* 1 — cover ---------------------------------------------------------------*/
++function slide01() {
++  const s = newSlide();
++  title(s, 'Conversion Funnel', { x: 1.679, y: 3.211, w: 9.975, h: 1.078, fontSize: 72, align: 'center', lineSpacingMultiple: 0.8 });
++  body(s, 'PLACEHOLDER',
++    { x: 2.397, y: 4.226, w: 8.539, h: 0.368, align: 'center', color: C.grey });
++  chip(s, { x: 5.486, y: 4.845, w: 2.361, h: 0.546, r: 0.134, tw: 1.952, text: 'Presentation Template', size: 12 });
++}
++
++/* 2 — understanding the conversion funnels --------------------------------*/
++function slide02() {
++  const s = newSlide();
++  title(s, 'Understanding the Conversion funnels', { x: 1.139, y: 1.818, w: 5.528, h: 2.322, fontSize: 44 });
++  kicker(s, 'Conversion', { x: 1.139, y: 5.024, w: 1.554, h: 0.37 });
++  body(s, 'PLACEHOLDER',
++    { x: 1.139, y: 5.429, w: 4.369, h: 0.974, color: C.grey });
++  photo(s, { x: 7.282, y: 3.889, w: 4.921, h: 2.514, bullet: false });
++}
++
++/* 3 — stages of the e-commerce funnel -------------------------------------*/
++function slide03() {
++  const s = newSlide();
++  title(s, 'Understanding the Stages of the E-Commerce Funnel', { x: 1.357, y: 2.532, w: 5.245, h: 2.794 });
++  s.addShape('roundRect', { x: 7.657, y: 3.103, w: 4.319, h: 1.295, rectRadius: 0.125, fill: { color: C.a3 } });
++  body(s, 'No one rejects, dislikes, or avoids pleasure itself, because it is pleasure, but because those who do not know how to pursue pleasure.',
++    { x: 7.874, y: 3.252, w: 3.971, h: 0.974, color: C.white });
++  body(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising pain was born and I will give you a complete account.',
++    { x: 6.378, y: 5.038, w: 4.19, h: 0.974 });
++}
++
++/* 4 — developing an effective funnel --------------------------------------*/
++function slide04() {
++  const s = newSlide();
++  photo(s, { x: 1.104, y: 1.667, w: 4.029, h: 4.938 });
++  title(s, 'Developing an Effective Funnel', { x: 6.482, y: 1.592, w: 5.036, h: 1.447 });
++  body(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising pain was born .',
++    { x: 6.482, y: 3.133, w: 5.212, h: 0.671 });
++  s.addText('+15.8K', { x: 6.509, y: 4.854, w: 1.455, h: 0.572, fontFace: HEAD, fontSize: 28, color: C.a3, align: 'center', valign: 'top' });
++  kicker(s, 'Joined', { x: 7.48, y: 5.016, w: 1.722, h: 0.37, align: 'center' });
++  body(s, 'PLACEHOLDER', { x: 6.579, y: 5.481, w: 3.33, h: 0.671 });
++  chip(s, { x: 4.115, y: 3.95, w: 1.757, h: 0.566, r: 0.166, text: '90% Develop' });
++}
++
++/* 5 — sustainable efficient funnel ----------------------------------------*/
++function slide05() {
++  const s = newSlide();
++  title(s, 'Creating a Sustainable Efficient Funnel', { x: 1.459, y: 1.729, w: 5.036, h: 2.121 });
++  kicker(s, 'Our Vision', { x: 1.732, y: 4.462, w: 1.146, h: 0.572, fontSize: 14 });
++  body(s, 'PLACEHOLDER', { x: 3.043, y: 4.413, w: 3.29, h: 0.671 });
++  s.addShape('roundRect', { x: 1.564, y: 5.549, w: 4.825, h: 0.868, rectRadius: 0.145, fill: { color: C.a3 } });
++  kicker(s, 'Our Mission', { x: 1.732, y: 5.701, w: 1.146, h: 0.572, fontSize: 14, color: C.white });
++  body(s, 'PLACEHOLDER', { x: 2.998, y: 5.613, w: 3.211, h: 0.671, color: C.white });
++  photo(s, { x: 9.32, y: 1.729, w: 2.873, h: 1.726 });
++  photo(s, { x: 8.199, y: 3.729, w: 4.19, h: 2.687 });
++  chip(s, { x: 8.199, y: 2.267, w: 2.287, h: 0.566, r: 0.166, text: '90% Implemented' });
++}
++
++/* 6 — effective funnel development services -------------------------------*/
++function slide06() {
++  const s = newSlide();
++  title(s, 'Effective Funnel Development Services', { x: 0.937, y: 1.847, w: 7.557, h: 1.582, fontSize: 44 });
++  body(s, 'But I must explain to you how all this mistaken idea', { x: 9.748, y: 1.967, w: 2.648, h: 0.671, align: 'right' });
++  photo(s, { x: 0.986, y: 4.123, w: 5.476, h: 2.356, bullet: false, size: 12 });
++
++  // two service cards — filled and outlined variant
++  [{ x: 6.773, fill: C.a3, tile: C.white, ico: C.a3, txt: C.white, kick: C.white, kind: 'tag' },
++   { x: 9.698, fill: C.white, tile: C.a3, ico: C.white, txt: C.ink, kick: C.a3, kind: 'pin' }].forEach(card => {
++    s.addShape('roundRect', { x: card.x, y: 4.136, w: 2.648, h: 2.356, rectRadius: 0.219, fill: { color: card.fill } });
++    s.addShape('roundRect', { x: card.x + 0.309, y: 4.44, w: 0.525, h: 0.525, rectRadius: 0.07, fill: { color: card.tile } });
++    glyph(s, card.kind, card.x + 0.43, 4.57, 0.26, 0.26, card.ico);
++    kicker(s, 'Services 1', { x: card.x + 0.268, y: 5.19, w: 1.175, h: 0.414, fontSize: 14, color: card.kick, lineSpacingMultiple: 1.5 });
++    body(s, 'But I must explain to you how all this mistaken idea ', { x: card.x + 0.256, y: 5.55, w: 2.219, h: 0.671, color: card.txt });
++  });
++}
++
++/* 7 — analytics team ------------------------------------------------------*/
++function slide07() {
++  const s = newSlide();
++  title(s, [{ text: 'Analytics ', options: { breakLine: true } }, { text: 'Team Identifies In Conversion Funnel' }],
++    { x: 1.264, y: 4.329, w: 6.501, h: 2.322, fontSize: 44 });
++
++  // white card (top) + accent card (bottom); both avatar frames are empty
++  // placeholders in the source and stay invisible, so nothing is drawn for them
++  s.addShape('roundRect', { x: 4.92, y: 2.359, w: 3.27, h: 1.322, rectRadius: 0.148, fill: { color: C.white } });
++  kicker(s, 'Every Davis', { x: 6.144, y: 2.669, w: 1.533, h: 0.414, fontSize: 14, lineSpacingMultiple: 1.5 });
++  body(s, 'Content Creator ', { x: 6.144, y: 2.983, w: 1.533, h: 0.368 });
++
++  s.addShape('roundRect', { x: 8.571, y: 4.01, w: 3.27, h: 1.847, rectRadius: 0.207, fill: { color: C.a3 } });
++  kicker(s, 'Estelle Darcy', { x: 9.799, y: 4.229, w: 1.533, h: 0.414, fontSize: 14, color: C.white, lineSpacingMultiple: 1.5 });
++  body(s, 'Manager', { x: 9.799, y: 4.543, w: 1.175, h: 0.368, color: C.white });
++  body(s, 'But I must explain to you how all', { x: 8.882, y: 5.236, w: 2.755, h: 0.368, color: C.white });
++  body(s, 'But I must explain to you how all this mistaken idea', { x: 8.571, y: 3.047, w: 2.251, h: 0.671, color: C.grey });
++}
++
++/* 8 / 18 — break-time interludes ------------------------------------------*/
++function breakSlide(titleY, subY, chipX, chipY, titleX, subX) {
++  const s = newSlide();
++  title(s, 'It\u2019s Break Time', { x: titleX, y: titleY, w: 7.971, h: 1.078, fontSize: 72, align: 'center', lineSpacingMultiple: 0.8 });
++  body(s, 'PLACEHOLDER',
++    { x: subX, y: subY, w: 3.833, h: 0.671, color: C.grey });
++  chip(s, { x: chipX, y: chipY, w: 1.131, h: 0.424, r: 0.104, tw: 0.982, text: '10 Minute', size: 12 });
++  return s;
++}
++const slide08 = () => breakSlide(3.263, 4.41, 10.097, 3.647, 2.042, 2.195);
++const slide18 = () => breakSlide(5.478, 4.476, 9.208, 5.805, 1.011, 1.201);
++
++/* 9 — increase sales with funnels -----------------------------------------*/
++function slide09() {
++  const s = newSlide();
++  laptopMockup(s);
++  title(s, 'Increase Sales With Funnels', { x: 1.46, y: 1.933, w: 5.207, h: 1.447 });
++  body(s, 'PLACEHOLDER', { x: 8.012, y: 2.556, w: 4.064, h: 0.671 });
++  photo(s, { x: 8.081, y: 3.724, w: 4.344, h: 2.747 });
++
++  [{ x: 1.46, big: '$90.9K' }, { x: 4.293, big: '+120' }].forEach(col => {
++    s.addText(col.big, { x: col.x, y: 5.047, w: 1.4, h: 0.505, fontFace: HEAD, fontSize: 24, color: C.a3, valign: 'top', wrap: false });
++    body(s, 'But I must explain to you how all this mistaken idea', { x: col.x, y: 5.524, w: 2.307, h: 0.671 });
++  });
++
++  s.addShape('roundRect', { x: 7.549, y: 4.524, w: 0.927, h: 0.813, rectRadius: 0.127, fill: { color: C.a3 } });
++  glyph(s, 'cart', 7.79, 4.75, 0.45, 0.36);
++}
++
++/* 10 — funnel analysis for growth -----------------------------------------*/
++function slide10() {
++  const s = newSlide();
++  phoneMockup(s);
++  photo(s, { x: 6.921, y: 2.284, w: 2.775, h: 6.044 });
++  title(s, 'Funnel Analysis For Growth', { x: 1.257, y: 2.284, w: 4.982, h: 1.447 });
++  kicker(s, 'Growth', { x: 1.249, y: 5.22, w: 1.068, h: 0.37, wrap: false });
++  body(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising.', { x: 1.257, y: 5.585, w: 3.785, h: 0.671 });
++  s.addText('80%', { x: 10.291, y: 2.855, w: 1.182, h: 0.64, fontFace: HEAD, fontSize: 32, color: C.a3, valign: 'top', wrap: false });
++  s.addText('But I must explain ', { x: 10.291, y: 3.428, w: 1.632, h: 0.303, fontFace: BODY, fontSize: 12, color: C.ink, valign: 'top' });
++  s.addShape('roundRect', { x: 8.893, y: 5.056, w: 2.926, h: 1.526, rectRadius: 0.254, fill: { color: C.white } });
++  body(s, 'PLACEHOLDER', { x: 9.195, y: 5.293, w: 2.19, h: 0.974 });
++}
++
++/* 11 — sales performance bars ---------------------------------------------*/
++function slide11() {
++  const s = newSlide();
++  title(s, 'Sales Performance', { x: 1.304, y: 1.48, w: 4.982, h: 1.447 });
++  s.addText('100%', { x: 8.196, y: 1.752, w: 0.93, h: 0.438, fontFace: HEAD, fontSize: 20, color: C.a3, valign: 'top', wrap: false });
++  s.addText('Sales Results', { x: 9.036, y: 1.857, w: 1.334, h: 0.303, fontFace: HEAD, fontSize: 12, color: C.a3, valign: 'top', wrap: false });
++  body(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure.', { x: 8.196, y: 2.19, w: 3.747, h: 0.671 });
++
++  [{ y: 3.635, w: 10.433, v: '100%', c: C.a2 },
++   { y: 4.372, w: 8.194, v: '80%', c: C.a3 },
++   { y: 5.109, w: 7.075, v: '70%', c: C.a4 }].forEach(bar => {
++    s.addText(bar.v, {
++      shape: 'roundRect', x: 1.45, y: bar.y, w: bar.w, h: 0.449, rectRadius: 0.075,
++      fill: { color: bar.c }, align: 'right', valign: 'middle',
++      fontFace: BODY, fontSize: 12, color: C.white,
++    });
++  });
++
++  // axis: hairline with 10 nodes and percentage captions
++  s.addShape('line', { x: 1.681, y: 6.148, w: 10.055, h: 0, line: { color: C.line, width: 0.75 } });
++  for (let i = 0; i < 10; i++) {
++    s.addShape('ellipse', { x: 1.556 + i * 1.1196, y: 6.09, w: 0.124, h: 0.114, fill: { color: C.white }, line: { color: C.line, width: 0.5 } });
++    s.addText((i + 1) * 10 + '%', {
++      x: 1.24 + i * 1.1171, y: 6.492, w: 0.799, h: 0.329, margin: 0,
++      align: 'center', valign: 'middle', fontFace: BODY, fontSize: 12, color: C.axis,
++    });
++  }
++}
++
++/* 12 — money flow line ----------------------------------------------------*/
++const MONEY_CURVE = [['M', 0, 1],
++  ['C', 0.0445, 0.8652, 0.0889, 0.7305, 0.1283, 0.7082], ['C', 0.1677, 0.6859, 0.2021, 0.8409, 0.2363, 0.8663],
++  ['C', 0.2705, 0.8916, 0.3039, 0.8906, 0.3333, 0.8602], ['C', 0.3628, 0.8298, 0.3858, 0.7153, 0.4131, 0.6839],
++  ['C', 0.4405, 0.6525, 0.4726, 0.6839, 0.4977, 0.6717], ['C', 0.5227, 0.6596, 0.5339, 0.6059, 0.5634, 0.6109],
++  ['C', 0.5929, 0.616, 0.638, 0.7558, 0.6745, 0.7021], ['C', 0.711, 0.6484, 0.7561, 0.3516, 0.7825, 0.2887],
++  ['C', 0.8088, 0.2259, 0.807, 0.3728, 0.8326, 0.3252], ['C', 0.8326, 0.3252, 0.9079, 0.0253, 0.9358, 0.003],
++  ['C', 0.9637, -0.0193, 0.9819, 0.0861, 1, 0.1915]];
++
++function slide12() {
++  const s = newSlide();
++  title(s, 'Money Flow', { x: 1.52, y: 1.754, w: 3.861, h: 0.774 });
++  body(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure.', { x: 1.52, y: 2.627, w: 4.059, h: 0.671 });
++
++  shape(s, MONEY_CURVE, { x: -0.127, y: 3.253, w: 13.587, h: 3.498, line: { color: C.a3, width: 2 } });
++  [[1.71, 5.625], [4.628, 6.013], [7.577, 5.291], [10.441, 4.124], [12.433, 3.193]].forEach(p => {
++    s.addShape('ellipse', { x: p[0], y: p[1], w: 0.211, h: 0.211, fill: { color: C.a4 } });
++  });
++
++  s.addShape('roundRect', { x: 8.411, y: 2.962, w: 2.03, h: 0.729, rectRadius: 0.21, fill: { color: C.a3 } });
++  s.addShape('triangle', { x: 9.903, y: 3.468, w: 0.538, h: 0.418, rotate: 180, fill: { color: C.a3 } });
++  s.addText('$9.500', { x: 8.655, y: 3.07, w: 1.348, h: 0.505, fontFace: HEAD, fontSize: 24, color: C.white, align: 'center', valign: 'top', wrap: false });
++}
++
++/* 13 — zig-zag funnel -----------------------------------------------------*/
++const ZIG = {
++  // front faces (light) and the folded side faces (dark), top to bottom
++  faces: [
++    { p: [['M', 0.9279, 1.0044], ['L', 1.0018, 0], ['L', 0, 0], ['L', 0.074, 1.0044], ['Z']], x: 6.809, y: 2.179, w: 3.536, h: 0.554, c: C.a2 },
++    { p: [['M', 1.0015, 0], ['L', 0.4533, 0], ['L', 0, 1.0029], ['L', 0.5482, 1.0029], ['Z']], x: 7.332, y: 2.72, w: 2.754, h: 0.554, c: C.a2d },
++    { p: [['M', 0.1052, 1.0044], ['L', 0.8961, 1.0044], ['L', 1.0013, 0], ['L', 0, 0], ['Z']], x: 7.332, y: 3.26, w: 2.493, h: 0.554, c: C.a3 },
++    { p: [['M', 1.0043, 0], ['L', 0.4254, 0], ['L', 0, 1.0044], ['L', 0.5789, 1.0044], ['Z']], x: 7.856, y: 3.814, w: 1.703, h: 0.554, c: C.a3d },
++    { p: [['M', 0, 0], ['L', 0.1814, 1.0044], ['L', 0.8232, 1.0044], ['L', 1.0045, 0], ['Z']], x: 7.856, y: 4.364, w: 1.442, h: 0.554, c: C.a4 },
++    { p: [['M', 0.2795, 0], ['L', 0, 0.4367], ['L', 0.3648, 1.0058], ['L', 1.0102, 0], ['Z']], x: 8.319, y: 4.914, w: 0.717, h: 0.978, c: C.a4d },
++  ],
++  labels: [
++    { t: 'Experience', c: C.a2, tx: 4.917, ty: 2.044, bx: 4.105, by: 2.367, align: 'right' },
++    { t: 'Service', c: C.a3, tx: 10.191, ty: 3.135, bx: 10.198, by: 3.459, align: 'left' },
++    { t: 'Interactive', c: C.a4, tx: 5.954, ty: 4.251, bx: 5.141, by: 4.575, align: 'right' },
++  ],
++};
++
++function slide13() {
++  const s = newSlide();
++  ZIG.faces.forEach(f => shape(s, f.p, { x: f.x, y: f.y, w: f.w, h: f.h, fill: { color: f.c } }));
++  ZIG.labels.forEach(l => {
++    s.addText(l.t, { x: l.tx, y: l.ty, w: 1.499, h: 0.399, fontFace: HEAD, fontSize: 16, bold: true, color: l.c, align: l.align, valign: 'top', lineSpacingMultiple: 1.2 });
++    body(s, 'But I must explain to you how all this mistaken idea', { x: l.bx, y: l.by, w: 2.307, h: 0.671, align: l.align });
++  });
++  glyph(s, 'person', 8.44, 2.295, 0.217, 0.307);
++  glyph(s, 'person', 8.432, 3.428, 0.245, 0.258);
++  glyph(s, 'people', 8.423, 4.495, 0.246, 0.288);
++  title(s, 'Strategy to Increase Store', { x: 0.829, y: 5.239, w: 5.187, h: 1.582, fontSize: 44 });
++}
++
++/* 14 — three tilted rings -------------------------------------------------*/
++const RING_CAP = [['M', 0.2115, 1],
++  ['C', 0.293, 0.9366, 0.3926, 0.8991, 0.5, 0.8991], ['C', 0.6075, 0.8991, 0.707, 0.9364, 0.7885, 1],
++  ['C', 0.9165, 0.9004, 1, 0.736, 1, 0.5505], ['C', 1, 0.2465, 0.7761, 0, 0.5, 0],
++  ['C', 0.2239, 0, 0, 0.2463, 0, 0.5505], ['C', 0, 0.736, 0.0835, 0.9002, 0.2115, 1], ['Z']];
++const RING_BODY = [['M', 0.4999, 0.3006],
++  ['C', 0.245, 0.3006, 0.0343, 0.1703, 0, 0.001], ['L', 0.0895, 0.7204],
++  ['C', 0.1034, 0.8765, 0.2818, 1, 0.4999, 1], ['C', 0.718, 1, 0.8964, 0.8765, 0.9103, 0.7204],
++  ['L', 1, 0], ['C', 0.9663, 0.1699, 0.7553, 0.3006, 0.4999, 0.3006], ['Z']];
++
++const RINGS = [
++  { rot: 120, c: C.a2, d: C.a2d, cap: [7.622, 4.007, 2.113, 0.248], body: [7.352, 3.721, 2.113, 0.538] },
++  { rot: 105, c: C.a3, d: C.a3d, cap: [8.008, 4.208, 3.026, 0.344], body: [7.661, 3.995, 3.025, 0.601] },
++  { rot: 90, c: C.a4, d: C.a4d, cap: [8.358, 4.228, 4.035, 0.482], body: [7.944, 4.144, 3.988, 0.65] },
++];
++const RING_STATS = [
++  { v: '1.200', c: C.a2, x: 6.667, y: 2.395 },
++  { v: '10.000', c: C.a4, x: 10.387, y: 1.642 },
++  { v: '3.500', c: C.a3, x: 6.939, y: 5.466 },
++];
++
++function slide14() {
++  const s = newSlide();
++  title(s, 'E-Commerce Conversion Funnel', { x: 1.118, y: 1.474, w: 4.543, h: 2.322, fontSize: 44 });
++  RINGS.forEach(r => {
++    shape(s, RING_CAP, { x: r.cap[0], y: r.cap[1], w: r.cap[2], h: r.cap[3], rotate: r.rot, fill: { color: r.d } });
++    shape(s, RING_BODY, { x: r.body[0], y: r.body[1], w: r.body[2], h: r.body[3], rotate: r.rot, fill: { color: r.c } });
++  });
++  RING_STATS.forEach(t => {
++    s.addText(t.v, { x: t.x, y: t.y, w: 1.701, h: 0.572, fontFace: HEAD, fontSize: 28, color: t.c, valign: 'top' });
++    s.addText('But I must explain ', { x: t.x, y: t.y + 0.513, w: 1.742, h: 0.303, fontFace: BODY, fontSize: 12, color: C.ink, valign: 'top' });
++  });
++  body(s, 'PLACEHOLDER', { x: 1.118, y: 5.601, w: 3.231, h: 0.671 });
++}
++
++/* 15 — digital sales flow (upright funnel) --------------------------------*/
++function funnelStack(s, bands) {
++  bands.forEach(b => {
++    shape(s, bandPath(b.rxT, b.cyT, b.ryT, 0.5, b.cyB, b.ryB),
++      { x: b.x, y: b.y, w: b.w, h: b.h, rotate: b.rot || 0, flipV: true, fill: { color: b.c } });
++    if (b.lip) s.addShape('ellipse', { x: b.lip[0], y: b.lip[1], w: b.lip[2], h: b.lip[3], rotate: b.rot || 0, fill: { color: b.d } });
++  });
++}
++
++function slide15() {
++  const s = newSlide();
++  title(s, 'Digital Sales Flow', { x: 1.314, y: 1.75, w: 4.076, h: 1.582, fontSize: 44 });
++  body(s, 'But I must explain to you how all this mistaken idea', { x: 1.337, y: 3.459, w: 2.99, h: 0.671 });
++  chip(s, { x: 1.337, y: 5.801, w: 1.974, h: 0.566, r: 0.166, text: '+198.8K Joined' });
++
++  funnelStack(s, [
++    { x: 6.649, y: 1.873, w: 3.655, h: 1.718, rxT: 0.375, cyT: 0.2, ryT: 0.2, cyB: 0.733, ryB: 0.267, c: C.a2, d: C.a2d, lip: [7.106, 2.904, 2.741, 0.687] },
++    { x: 7.257, y: 3.228, w: 2.472, h: 1.366, rxT: 0.333, cyT: 0.154, ryT: 0.154, cyB: 0.769, ryB: 0.231, c: C.a3, d: C.a3d, lip: [7.669, 4.173, 1.648, 0.42] },
++  ]);
++  shape(s, conePath(0.889, 0.111), { x: 7.782, y: 4.448, w: 1.423, h: 1.649, flipV: true, fill: { color: C.a4 } });
++
++  glyph(s, 'shirt', 8.304, 2.235, 0.346, 0.306);
++  glyph(s, 'phone', 8.352, 3.547, 0.203, 0.33);
++  glyph(s, 'note', 8.327, 4.8, 0.322, 0.321);
++
++  [{ v: '40%', vx: 10.647, vy: 2.683, t: 'Search for Products', tx: 10.662, ty: 3.124, tw: 1.757, a: 'left' },
++   { v: '25%', vx: 6.034, vy: 3.79, t: 'Open the Page', tx: 5.359, ty: 4.172, tw: 1.602, a: 'right' },
++   { v: '15%', vx: 9.495, vy: 5.223, t: 'Save to Wishlist', tx: 9.51, ty: 5.664, tw: 1.602, a: 'left' }].forEach(l => {
++    s.addText(l.v, { x: l.vx, y: l.vy, w: 0.94, h: 0.505, fontFace: HEAD, fontSize: 24, color: C.a2, align: l.a, valign: 'top', wrap: false });
++    body(s, l.t, { x: l.tx, y: l.ty, w: l.tw, h: 0.368, align: l.a });
++  });
++}
++
++/* 16 — data funnel conversion (side-on cone) ------------------------------*/
++function slide16() {
++  const s = newSlide();
++  s.addShape('triangle', { x: 2.249, y: 1.801, w: 3.059, h: 5.174, rotate: 264.8, fill: { color: C.cone } });
++  s.addShape('ellipse', { x: 6.046, y: 2.679, w: 0.837, h: 2.933, rotate: 354.8, fill: { color: C.a4 } });
++  s.addShape('ellipse', { x: 4.389, y: 3.312, w: 0.662, h: 1.961, fill: { color: C.a3 } });
++  s.addShape('ellipse', { x: 3.059, y: 3.861, w: 0.345, h: 1.151, fill: { color: C.a2 } });
++
++  [{ v: '30%', x: 2.217, y: 3.333, c: C.a2 }, { v: '40%', x: 3.775, y: 5.395, c: C.a3 }, { v: '80%', x: 5.448, y: 2.111, c: C.a4 }]
++    .forEach(l => s.addText(l.v, { x: l.x, y: l.y, w: 0.94, h: 0.505, fontFace: HEAD, fontSize: 24, color: l.c, valign: 'top', wrap: false }));
++
++  title(s, 'Data Funnel Conversion ', { x: 8.21, y: 2.32, w: 4.983, h: 1.447 });
++  kicker(s, 'Growth', { x: 8.21, y: 5.012, w: 1.068, h: 0.37, wrap: false });
++  body(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising.', { x: 8.218, y: 5.377, w: 3.785, h: 0.671 });
++}
++
++/* 17 — tilted funnel guide ------------------------------------------------*/
++function slide17() {
++  const s = newSlide();
++  funnelStack(s, [
++    { x: 6.084, y: 2.376, w: 4.109, h: 1.932, rot: 325.5, rxT: 0.375, cyT: 0.2, ryT: 0.2, cyB: 0.733, ryB: 0.267, c: C.a2, d: C.a2d, lip: [6.926, 3.433, 3.082, 0.773] },
++    { x: 7.515, y: 3.656, w: 2.779, h: 1.536, rot: 325.5, rxT: 0.333, cyT: 0.154, ryT: 0.154, cyB: 0.769, ryB: 0.231, c: C.a3, d: C.a3d, lip: [8.279, 4.626, 1.853, 0.473] },
++  ]);
++  s.addShape('roundRect', { x: 9.305, y: 2.006, w: 0.698, h: 0.688, rectRadius: 0.115, fill: { color: C.a1d } });
++  glyph(s, 'bag', 9.53, 2.219, 0.241, 0.216);
++  s.addShape('roundRect', { x: 7.61, y: 4.958, w: 0.698, h: 0.688, rectRadius: 0.115, fill: { color: C.a3d } });
++  glyph(s, 'shirt', 7.802, 5.188, 0.3, 0.265);
++
++  title(s, 'E-Commerce Conversion Funnel Guide', { x: 0.864, y: 1.681, w: 4.801, h: 2.121 });
++  s.addText('+198.8K Joined', { x: 0.943, y: 5.154, w: 2.125, h: 0.404, fontFace: HEAD, fontSize: 18, color: C.a4, align: 'center', valign: 'top', wrap: false });
++  body(s, 'PLACEHOLDER', { x: 0.943, y: 5.558, w: 2.784, h: 0.671 });
++
++  [{ t: 'Interested', c: C.a2, tx: 10.392, ty: 2.131, bx: 10.399, by: 2.455, a: 'left' },
++   { t: 'Product', c: C.a4, tx: 6.127, ty: 5.263, bx: 5.018, by: 5.586, a: 'right' }].forEach(l => {
++    s.addText(l.t, { x: l.tx, y: l.ty, w: 1.499, h: 0.399, fontFace: HEAD, fontSize: 16, bold: true, color: l.c, align: l.a, valign: 'top', lineSpacingMultiple: 1.2 });
++    body(s, 'But I must explain to you how all this mistaken idea', { x: l.bx, y: l.by, w: 2.307, h: 0.671, align: l.a });
++  });
++  body(s, 'But I must explain to you how all this mistaken idea', { x: 10.346, y: 5.586, w: 2.307, h: 0.671, align: 'right' });
++}
++
++/* 19 — visual optimization ------------------------------------------------*/
++function slide19() {
++  const s = newSlide();
++  title(s, 'Visual Optimization For Conversion', { x: 1.128, y: 1.889, w: 6.063, h: 1.447 });
++  body(s, 'PLACEHOLDER', { x: 8.532, y: 2.538, w: 3.306, h: 0.671 });
++  photo(s, { x: 1.281, y: 3.877, w: 3.306, h: 2.77 });
++  photo(s, { x: 8.503, y: 3.877, w: 3.306, h: 2.77 });
++
++  s.addShape('roundRect', { x: 4.892, y: 3.877, w: 3.306, h: 2.77, rectRadius: 0.317, fill: { color: C.a3 } });
++  s.addText('85%', { x: 5.947, y: 4.293, w: 1.196, h: 0.673, fontFace: HEAD, fontSize: 34, color: C.white, align: 'center', valign: 'top', wrap: false });
++  s.addText('Optimization', { x: 5.781, y: 4.956, w: 1.529, h: 0.337, fontFace: HEAD, fontSize: 14, color: C.white, align: 'center', valign: 'top', wrap: false });
++  body(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure.', { x: 5.423, y: 5.248, w: 2.245, h: 0.974, align: 'center', color: C.white });
++}
++
++/* 20 — product gallery ----------------------------------------------------*/
++function slide20() {
++  const s = newSlide();
++  title(s, 'Sales Driving Product Gallery', { x: 1.204, y: 1.975, w: 5.147, h: 1.582, fontSize: 44 });
++  body(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising.', { x: 1.204, y: 4.129, w: 2.987, h: 0.974 });
++  photo(s, { x: 9.447, y: 1.302, w: 2.854, h: 3.71 });
++  photo(s, { x: 6.667, y: 4.129, w: 2.437, h: 2.356 });
++  body(s, 'But I must explain to you how all this mistaken idea', { x: 9.275, y: 5.253, w: 2.854, h: 0.671 });
++  chip(s, { x: 5.687, y: 4.918, w: 1.615, h: 0.566, r: 0.166, text: '+180 Product' });
++}
++
++/* 21 — image optimization -------------------------------------------------*/
++function slide21() {
++  const s = newSlide();
++  photo(s, { x: 1.2, y: 1.749, w: 3.321, h: 4.673 });
++  photo(s, { x: 4.888, y: 1.749, w: 2.437, h: 2.356 });
++  title(s, 'Image Optimization For Sales', { x: 8.028, y: 1.749, w: 3.988, h: 2.121 });
++  [{ v: '+12.3K', vx: 4.883, vw: 1.256, bx: 4.888 }, { v: '80%', vx: 8.73, vw: 0.936, bx: 8.575 }].forEach(col => {
++    s.addText(col.v, { x: col.vx, y: 5.252, w: col.vw, h: 0.505, fontFace: HEAD, fontSize: 24, color: C.a3, align: 'center', valign: 'top', wrap: false });
++    body(s, 'PLACEHOLDER', { x: col.bx, y: 5.751, w: 3.321, h: 0.671 });
++  });
++}
++
++/* 22 — customer feedback --------------------------------------------------*/
++function slide22() {
++  const s = newSlide();
++  title(s, 'Customer Feedback', { x: 1.255, y: 1.764, w: 3.109, h: 1.447, align: 'right' });
++  photo(s, { x: 1.508, y: 4.699, w: 1.929, h: 1.788 });
++  kicker(s, 'Every Davis', { x: 3.875, y: 5.624, w: 1.533, h: 0.459, lineSpacingMultiple: 1.5 });
++  body(s, 'Client', { x: 3.875, y: 5.972, w: 1.533, h: 0.368 });
++  s.addText('\u201C', { x: 6.04, y: 2.36, w: 0.9, h: 0.9, fontFace: HEAD, fontSize: 72, color: C.ink, valign: 'top' });
++  s.addText('Customer journeys are becoming more focused and conversions are increasing rapidly.',
++    { x: 6.667, y: 2.783, w: 5.475, h: 1.986, fontFace: HEAD, fontSize: 28, color: C.ink, valign: 'top' });
++  for (let i = 0; i < 5; i++) {
++    s.addShape('star5', { x: 6.799 + i * 0.251, y: 5.019, w: 0.228, h: 0.232, fill: { color: C.a3 } });
++  }
++}
++
++/* 23 — contact ------------------------------------------------------------*/
++function slide23() {
++  const s = newSlide();
++  title(s, 'Optimize Contacts Towards Conversion', { x: 1.371, y: 1.617, w: 7.245, h: 1.582, fontSize: 44 });
++  body(s, 'PLACEHOLDER', { x: 8.554, y: 2.408, w: 3.302, h: 0.671 });
++  photo(s, { x: 1.371, y: 3.75, w: 6.311, h: 2.896 });
++  s.addShape('roundRect', { x: 7.336, y: 4.337, w: 0.762, h: 0.762, rectRadius: 0.127, fill: { color: C.a3 } });
++  glyph(s, 'chat', 7.544, 4.547, 0.342, 0.342);
++
++  [['Phone ', '123-456-7890', 5.601, 5.623], ['Web ', 'www.reallygreatsite.com', 5.916, 5.945], ['Email ', 'hello@reallygreatsite.com', 6.238, 6.239]]
++    .forEach(row => {
++      s.addText(row[0], { x: 8.554, y: row[2], w: 0.9, h: 0.303, fontFace: BODY, fontSize: 12, color: C.ink, valign: 'top', wrap: false });
++      s.addText(row[1], { x: 9.639, y: row[3], w: 2.3, h: 0.303, fontFace: BODY, fontSize: 12, color: C.ink, valign: 'top', wrap: false });
++    });
++}
++
++/* 24 — optimize every step ------------------------------------------------*/
++function slide24() {
++  const s = newSlide();
++  title(s, 'Optimize Every Step Purchase', { x: 1.329, y: 1.581, w: 5.462, h: 1.582, fontSize: 44 });
++  s.addText('+15.8K', { x: 8.671, y: 1.738, w: 1.455, h: 0.572, fontFace: HEAD, fontSize: 28, color: C.a3, align: 'center', valign: 'top' });
++  kicker(s, 'Joined', { x: 9.643, y: 1.899, w: 1.722, h: 0.37, align: 'center' });
++  body(s, 'PLACEHOLDER', { x: 8.703, y: 2.372, w: 3.302, h: 0.671 });
++  photo(s, { x: 1.329, y: 4.047, w: 10.766, h: 2.64 });
++}
++
++/* 25 — thank you ----------------------------------------------------------*/
++function slide25() {
++  const s = newSlide();
++  title(s, 'Thank You For Your Attention', { x: 2.587, y: 2.676, w: 8.158, h: 2.047, fontSize: 72, align: 'center', lineSpacingMultiple: 0.8 });
++  body(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising.',
++    { x: 3.092, y: 4.747, w: 7.149, h: 0.368, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ build */
++
++[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25].forEach(fn => fn());
++
++pptx.writeFile({ fileName: path.join(__dirname, '02865a8a-8604-44cb-828b-bc08fa8f4c75_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

@@ -1,0 +1,699 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/real_estate_red_black_sales_pitch.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/real_estate_red_black_sales_pitch.js
+@@ -0,0 +1,696 @@
++/*
++ * "How The Real Estate Industry Is Evolving" — 20 slide deck, rebuilt with pptxgenjs.
++ *
++ * Slide size 13.333 x 7.5 in (16:9).  Theme fonts: Outfit (headings) / Open Sans (body).
++ * Every photograph in the source deck is a grey "replace your image" plate, so each one is
++ * recreated here as a grey rounded rectangle labelled [image].
++ *
++ *   node 08e28041-6a0f-4ea3-8e24-e915ac41a272_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ tokens */
++
++const MAJOR = 'Outfit';      // theme major latin font
++const MINOR = 'Open Sans';   // theme minor latin font
++
++const C = {
++  red: 'D90529',       // accent3 - brand red
++  redMid: 'BE0424',    // flat stand-in for the A3041F -> D90529 gradient
++  redPure: 'FF0000',   // literal red used by the headline runs
++  redSoft: 'FB5672',   // pink accent on the infographic slides
++  black: '000000',
++  ink: '010101',       // accent1
++  ink2: '282828',      // accent2
++  chip: '1E1E1E',      // "Learn More" pill
++  white: 'FFFFFF',
++  plate: 'CCCCCC',     // image placeholder plate
++  plateInk: 'AAAAAA',  // caption on the plate
++  device: 'F2F2F2',    // laptop shell / map light grey
++  deviceEdge: 'DDDDDD',
++  phone: '1A1A1A',
++  logoWord: '000000',
++  logoWordLight: 'D1D1D1',
++  pageNum: 'AEAEAE',
++  search: '808080',
++  body2: '404040',
++  star: 'FFC000',
++  starOff: 'D1D1D1',
++};
++
++// pptxgenjs rewrites shadow options in place, so hand every shape its own copy.
++function softShadow() {
++  return { type: 'outer', color: '000000', opacity: 0.2, blur: 22, offset: 3, angle: 90 };
++}
++
++/* ----------------------------------------------------------------- helpers */
++
++/** Solid / gradient-free shape. */
++function shape(slide, type, o) {
++  slide.addShape(type, Object.assign({ line: { type: 'none' } }, o));
++}
++
++/** Plain text block. Reference text frames are top anchored unless stated. */
++function text(slide, runs, o) {
++  slide.addText(runs, Object.assign({ valign: 'top', fontFace: MINOR, color: C.black }, o));
++}
++
++/**
++ * The deck's signature two-tone headline: a bold red phrase followed by a
++ * regular black phrase, both in the major font.
++ */
++function headline(slide, o) {
++  slide.addText(
++    [
++      { text: o.red, options: { bold: true, color: C.redPure } },
++      { text: o.rest, options: { bold: !!o.restBold, color: C.black } },
++    ],
++    { x: o.x, y: o.y, w: o.w, h: o.h, fontFace: MAJOR, fontSize: o.size, align: o.align || 'left', valign: 'top' }
++  );
++}
++
++/**
++ * Grey plate that stands in for a photograph.
++ * `bleed` extends the plate past a slide edge so the rounded corners on that side fall
++ * out of view, matching source pictures that are square where they meet the edge.
++ */
++function plate(slide, x, y, w, h, opts) {
++  const o = opts || {};
++  const r = o.r === undefined ? 0.28 : o.r;
++  const b = o.bleed || '';
++  if (b.includes('l')) { x -= r; w += r; }
++  if (b.includes('r')) { w += r; }
++  if (b.includes('t')) { y -= r; h += r; }
++  if (b.includes('b')) { h += r; }
++  slide.addText(w > 1.2 && h > 0.8 ? '[image]' : '', {
++    shape: r > 0 ? 'roundRect' : 'rect',
++    rectRadius: r,
++    x, y, w, h,
++    fill: { color: o.color || C.plate },
++    line: { type: 'none' },
++    align: 'center', valign: 'middle',
++    fontFace: MINOR, fontSize: 11, color: C.plateInk,
++  });
++}
++
++/** Rounded square tile with the brand red, used behind every pictogram. */
++function iconTile(slide, x, y, size) {
++  shape(slide, 'roundRect', { x, y, w: size, h: size, rectRadius: size * 0.16667, fill: { color: C.redMid } });
++  iconGlyph(slide, x + size * 0.23, y + size * 0.23, size * 0.54, C.white);
++}
++
++/** Neutral pictogram stand-in: a thin rounded outline square. */
++function iconGlyph(slide, x, y, size, color) {
++  shape(slide, 'roundRect', {
++    x, y, w: size, h: size, rectRadius: size * 0.18,
++    fill: { type: 'none' }, line: { color: color, width: Math.max(1, size * 4) },
++  });
++}
++
++/** Pill button ("Learn More", "Start presentation", ...). */
++function pill(slide, o) {
++  shape(slide, 'roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: Math.min(o.w, o.h) / 2,
++    fill: { color: o.fill || C.chip },
++  });
++  slide.addText(o.label, {
++    x: o.tx, y: o.ty, w: o.tw, h: o.th,
++    align: 'center', valign: 'middle',
++    fontFace: MAJOR, fontSize: o.size, bold: o.bold !== false, color: C.white,
++  });
++}
++
++/** Small "Learn More" chip — same geometry on every slide that uses it. */
++function learnMore(slide, x, y, fill) {
++  pill(slide, {
++    x, y, w: 1.279, h: 0.332, fill: fill || C.chip,
++    label: 'Learn More', tx: x + 0.184, ty: y + 0.04, tw: 0.911, th: 0.252, size: 9,
++  });
++}
++
++/**
++ * Logoipsum mark from the slide master: a red disc with a dark shield notched over
++ * its top-left, followed by the wordmark.
++ */
++function logo(slide, x, y, wordColor) {
++  shape(slide, 'ellipse', { x: x + 0.028, y: y + 0.028, w: 0.196, h: 0.196, fill: { color: C.red } });
++  poly(slide, x, y, 0.145, 0.20, [[0, 0], [0.145, 0], [0.145, 0.11], [0.072, 0.20], [0, 0.11]],
++    { fill: { color: wordColor } });
++  shape(slide, 'star4', { x: x + 0.10, y: y + 0.07, w: 0.11, h: 0.11, fill: { color: C.white } });
++  slide.addText('Logoipsum', {
++    x: x + 0.235, y: y - 0.025, w: 1.35, h: 0.28, wrap: false,
++    fontFace: MAJOR, fontSize: 11.5, bold: true, color: wordColor, valign: 'middle',
++  });
++}
++
++/** "page N" marker in the bottom right corner. */
++function pageTag(slide, n) {
++  slide.addText(
++    [
++      { text: 'page', options: { bold: false } },
++      { text: ' ' + n, options: { bold: true } },
++    ],
++    { x: 12.196, y: 7.013, w: 0.753, h: 0.252, align: 'right', valign: 'middle', fontFace: MAJOR, fontSize: 9, color: C.pageNum }
++  );
++}
++
++/** Search field shown on the cover / closing slides. */
++function searchPill(slide) {
++  shape(slide, 'roundRect', { x: 11.61, y: 0.405, w: 1.339, h: 0.31, rectRadius: 0.155, fill: { color: C.white } });
++  slide.addText('Search…', {
++    x: 11.638, y: 0.434, w: 0.696, h: 0.252, align: 'center', valign: 'middle',
++    fontFace: MINOR, fontSize: 9, color: C.search,
++  });
++}
++
++/** Left-to-right black -> deep red wash used on the cover and closing slides. */
++function coverWash(slide) {
++  const STRIPS = 64;
++  const step = 13.3333 / STRIPS;
++  for (let i = 0; i < STRIPS; i++) {
++    const t = Math.min(((i + 0.5) / STRIPS) / 0.92, 1);
++    shape(slide, 'rect', {
++      x: i * step, y: 0, w: step + 0.02, h: 7.5,
++      fill: { color: mix(C.ink, '6C0314', t) },
++    });
++  }
++}
++
++function mix(a, b, t) {
++  let out = '';
++  for (let i = 0; i < 6; i += 2) {
++    const v = Math.round(parseInt(a.substr(i, 2), 16) * (1 - t) + parseInt(b.substr(i, 2), 16) * t);
++    out += v.toString(16).padStart(2, '0');
++  }
++  return out.toUpperCase();
++}
++
++/** Free-form polygon; `pts` are [x, y] pairs in inches relative to the shape box. */
++function poly(slide, x, y, w, h, pts, opts) {
++  const points = pts.map(function (p) { return { x: p[0], y: p[1] }; });
++  points.push({ close: true });
++  slide.addShape('custGeom', Object.assign({ x, y, w, h, points, line: { type: 'none' } }, opts));
++}
++
++/**
++ * Laptop mock-up: bezel around the screen plate, then the keyboard deck seen in
++ * perspective (a trapezoid running from `top` at the hinge out to `bot` at the front).
++ * `keys` / `pad`, when given, draw the dark key field and the trackpad on the deck.
++ */
++function laptop(slide, s) {
++  shape(slide, 'roundRect', {
++    x: s.bez[0], y: s.bez[1], w: s.bez[2], h: s.bez[3], rectRadius: 0.12,
++    fill: { color: C.device }, line: { color: C.deviceEdge, width: 1 },
++  });
++  const x0 = Math.min(s.top[0], s.bot[0]);
++  const w = Math.max(s.top[1], s.bot[1]) - x0;
++  poly(slide, x0, s.deckY, w, s.deckH, [
++    [s.top[0] - x0, 0], [s.top[1] - x0, 0], [s.bot[1] - x0, s.deckH], [s.bot[0] - x0, s.deckH],
++  ], { fill: { color: 'E6E6E6' } });
++  if (s.keys) poly(slide, s.keys[0], s.keys[1], s.keys[2], s.keys[3], [
++    [s.keys[4], 0], [s.keys[2], 0], [s.keys[2] - s.keys[4], s.keys[3]], [0, s.keys[3]],
++  ], { fill: { color: s.keyColor || '3A3A3A' } });
++  if (s.pad) poly(slide, s.pad[0], s.pad[1], s.pad[2], s.pad[3], [
++    [s.pad[4], 0], [s.pad[2], 0], [s.pad[2] - s.pad[4], s.pad[3]], [0, s.pad[3]],
++  ], { fill: { color: 'CACACA' } });
++  shape(slide, 'roundRect', {
++    x: s.bot[0], y: s.deckY + s.deckH, w: s.bot[1] - s.bot[0], h: s.footH, rectRadius: s.footH / 2,
++    fill: { color: 'F4F4F4' }, line: { color: C.deviceEdge, width: 1 },
++  });
++}
++
++/** Pointy-top hexagon. */
++function hexagon(slide, cx, cy, w, h, opts) {
++  poly(slide, cx - w / 2, cy - h / 2, w, h, [
++    [w / 2, 0], [w, h * 0.25], [w, h * 0.75], [w / 2, h], [0, h * 0.75], [0, h * 0.25],
++  ], opts);
++}
++
++/**
++ * The coloured "cap" behind each hexagon on slide 18: a thick chevron stroke made of
++ * two vertical legs joined by the sloped shoulders of a hexagon. `up` points the apex up.
++ */
++function hexCap(slide, x, y, w, h, color, up) {
++  const t = w * 0.058;      // stroke thickness
++  const apex = h * 0.023;   // outer apex, just inside the box
++  const apexIn = h * 0.108; // inner apex sits one stroke below it
++  const sh = h * 0.561;     // where the sloped shoulders meet the vertical legs
++  const pts = [[0, h], [0, sh], [w / 2, apex], [w, sh], [w, h],
++    [w - t, h], [w - t, sh], [w / 2, apexIn], [t, sh], [t, h]];
++  poly(slide, x, y, w, h, up ? pts : pts.map(function (p) { return [p[0], h - p[1]]; }), { fill: { color } });
++}
++
++/* ------------------------------------------------------- shared body copy */
++
++const LOREM_LONG =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque non elit mauris. Cras euismod, ' +
++  'metus ac finibus finibus, felis dui suscipit maximus leo Phasellus a lacus sit amet urna tempor ' +
++  'sollicitudin. Cras pretium tempor elit blandit egestas. ';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ';
++const CRAS = 'Cras euismod, metus ac finibus finibus, felis dui suscipit maximus leo Phasellus a lacus sit amet urna tempor sollicitudin. ';
++const CRAS_SHORT = 'Cras euismod, metus ac finibus finibus, felis dui suscipit maximus leo Phasellus a lacus';
++const CONDIMENTUM =
++  'condimentum augue, eget vehicula nisi. Integer quis nisl nec erat ornare egestas. Nunc fringilla ' +
++  'quis nisi eget luctus. Mauris posuere diam eu tincidunt pretium. Sed pharetra ornare nulla eu ' +
++  'eleifend. Integer vitae urna quis elit lobortis';
++const FRINGILLA = 'fringilla quis nisi eget luctus. Mauris posuere diam eu tincidunt pretium. Sed pharetra';
++const EOS = 'Eos et accusamus et iusto odio dignissimos ducimus';
++
++/* --------------------------------------------------------------- slide 1  */
++
++function slide01(s) {
++  coverWash(s);
++  logo(s, 0.523, 0.491, C.logoWordLight);
++  searchPill(s);
++  plate(s, 6.174, 0, 6.25, 7.5, { r: 0 });
++
++  s.addText(
++    [
++      { text: 'How The Real Estate ', options: { color: C.red } },
++      { text: 'Industry Is Evolving', options: { color: C.white } },
++    ],
++    { x: 1.287, y: 1.796, w: 5.565, h: 2.827, fontFace: MAJOR, fontSize: 54, bold: true, valign: 'top' }
++  );
++  pill(s, {
++    x: 1.253, y: 5.034, w: 2.883, h: 0.67, fill: C.red,
++    label: 'Start presentation', tx: 1.549, ty: 5.184, tw: 2.293, th: 0.37, size: 16, bold: false,
++  });
++}
++
++/* --------------------------------------------------------------- slide 2  */
++
++function slide02(s) {
++  plate(s, 6.288, 0.874, 4.232, 5.685, { r: 0.337 });
++  headline(s, { x: 1.279, y: 1.798, w: 3.696, h: 1.919, size: 36, red: 'The Power Of Red & ', rest: 'Black In Real Estate' });
++  text(s, 'Red Black Real Estate', { x: 1.279, y: 3.865, w: 2.908, h: 0.404, fontFace: MAJOR, fontSize: 18 });
++  text(s, LOREM_LONG, { x: 1.279, y: 4.366, w: 3.582, h: 1.336, fontSize: 10, lineSpacingMultiple: 1.5 });
++
++  const cards = [
++    { y: 2.186, title: 'Smart Investments ' },
++    { y: 3.945, title: 'with Red Black' },
++  ];
++  cards.forEach(function (c) {
++    shape(s, 'roundRect', { x: 9.309, y: c.y, w: 3.081, h: 1.532, rectRadius: 0.255, fill: { color: C.redMid } });
++    text(s, c.title, { x: 9.645, y: c.y + 0.224, w: 2.233, h: 0.37, fontFace: MAJOR, fontSize: 16, bold: true, color: C.white });
++    text(s, 'elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit maximus leo Phasellus', {
++      x: 9.666, y: c.y + 0.549, w: 2.388, h: 0.758, fontSize: 9, color: C.white, lineSpacingMultiple: 1.5,
++    });
++  });
++}
++
++/* --------------------------------------------------------------- slide 3  */
++
++function slide03(s) {
++  plate(s, 1.222, 3.246, 3.792, 3.341, { r: 0.266 });
++  plate(s, 5.345, 3.246, 7.988, 3.341, { r: 0.266, bleed: 'r' });
++  iconTile(s, 1.779, 2.661, 1.114);
++  text(s, '$439,229', { x: 1.921, y: 1.24, w: 2.112, h: 0.572, fontFace: MAJOR, fontSize: 28, bold: true });
++  text(s, 'Cost Production ', { x: 1.921, y: 1.762, w: 1.943, h: 0.37, fontFace: MAJOR, fontSize: 16, bold: true, color: C.ink2 });
++  headline(s, { x: 6.317, y: 0.813, w: 6.136, h: 1.313, size: 36, red: 'Your Future In Bold ', rest: 'Colors Red Black Real Estate' });
++  pill(s, {
++    x: 6.415, y: 2.296, w: 1.012, h: 0.263, label: 'Learn More',
++    tx: 6.56, ty: 2.318, tw: 0.721, th: 0.219, size: 7,
++  });
++}
++
++/* --------------------------------------------------------------- slide 4  */
++
++function slide04(s) {
++  plate(s, 6.667, 1.114, 5.381, 6.386, { r: 0.365 });
++  headline(s, { x: 1.396, y: 1.583, w: 4.356, h: 1.447, size: 40, red: 'How Red Black ', rest: 'Closes Deals' });
++  text(s, 'amet, consectetur adipiscing elit. Quisque non elit mauris. Cras euismod, metus ac finibus finibus', {
++    x: 1.383, y: 5.61, w: 4.331, h: 0.579, fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++
++  const stats = [
++    { x: 1.383, tx: 1.729, r: 0.169, value: '76%', fill: C.white, ink: C.black, shadow: true },
++    { x: 3.574, tx: 3.920, r: 0.182, value: '83%', fill: C.redMid, ink: C.white },
++    { x: 5.739, tx: 6.085, r: 0.195, value: '90%', fill: C.redMid, ink: C.white },
++  ];
++  stats.forEach(function (st) {
++    const o = { x: st.x, y: 3.499, w: 1.969, h: 1.472, rectRadius: st.r, fill: { color: st.fill } };
++    if (st.shadow) o.shadow = softShadow();
++    shape(s, 'roundRect', o);
++    text(s, st.value, {
++      x: st.tx, y: 3.881, w: 1.277, h: 0.707, align: 'center',
++      fontFace: MAJOR, fontSize: 36, bold: true, color: st.ink,
++    });
++  });
++}
++
++/* --------------------------------------------------------------- slide 5  */
++
++function slide05(s) {
++  plate(s, 0, 1.047, 6.667, 4.85, { r: 0.394, bleed: 'l' });
++  iconTile(s, 4.195, 5.34, 1.114);
++  headline(s, { x: 8.159, y: 1.523, w: 4.2, h: 1.919, size: 36, red: 'The Psychology Behind ', rest: 'Red Black Sales' });
++  text(s, 'Selling The Red Black Way', { x: 8.159, y: 3.654, w: 3.733, h: 0.404, fontFace: MAJOR, fontSize: 18 });
++  text(s, CONDIMENTUM, { x: 8.159, y: 4.273, w: 4.333, h: 1.084, fontSize: 10, lineSpacingMultiple: 1.5 });
++  learnMore(s, 8.159, 5.645);
++}
++
++/* --------------------------------------------------------------- slide 6  */
++
++function slide06(s) {
++  plate(s, 4.876, 0.975, 3.757, 5.55, { r: 0.299 });
++  headline(s, { x: 0.94, y: 1.591, w: 3.161, h: 1.919, size: 36, red: 'Real Estate Sales ', rest: 'With A Bold Edge' });
++  text(s, 'Investment Insights', { x: 0.94, y: 3.614, w: 2.756, h: 0.404, fontFace: MAJOR, fontSize: 18 });
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque non elit mauris. Cras euismod, metus  finibus finibus, felis dui suscipit maximus leo', {
++    x: 0.94, y: 4.123, w: 3.035, h: 1.084, fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++  learnMore(s, 0.965, 5.577, C.red);
++
++  [1.999, 4.265].forEach(function (y) {
++    text(s, 'Through Red Black', { x: 9.383, y: y, w: 2.655, h: 0.404, fontFace: MAJOR, fontSize: 18, color: C.red });
++    text(s, CRAS, { x: 9.383, y: y + 0.404, w: 3.339, h: 0.831, fontSize: 10, lineSpacingMultiple: 1.5 });
++  });
++}
++
++/* --------------------------------------------------------------- slide 7  */
++
++function slide07(s) {
++  plate(s, 6.544, 4.43, 4.013, 3.07, { r: 0.297, bleed: 'b' });
++  plate(s, 0.92, 1.04, 5.342, 3.307, { r: 0.263 });
++  headline(s, { x: 7.732, y: 1.518, w: 4.783, h: 1.313, size: 36, red: 'Your Dream Home ', rest: 'In Red And Black' });
++  text(s, 'Cras euismod, metus ac finibus finibus, felis dui suscipit maximus leo Phasellus a lacus sit amet urna tempor', {
++    x: 7.732, y: 2.903, w: 4.421, h: 0.579, fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++
++  [5.063, 6.219].forEach(function (y) {
++    iconTile(s, 1.363, y, 0.617);
++    text(s, 'Through Red Black', { x: 2.396, y: y - 0.059, w: 2.655, h: 0.337, fontFace: MAJOR, fontSize: 14, color: C.red });
++    text(s, CRAS_SHORT, { x: 2.396, y: y + 0.193, w: 3.151, h: 0.483, fontSize: 8, lineSpacingMultiple: 1.5 });
++  });
++}
++
++/* --------------------------------------------------------------- slide 8  */
++
++function slide08(s) {
++  plate(s, 0.9, 4.784, 3.245, 2.716, { r: 0.263, bleed: 'b' });
++  plate(s, 6.823, 0.784, 6.511, 3.583, { r: 0.285, bleed: 'r' });
++  headline(s, { x: 0.9, y: 1.609, w: 4.644, h: 1.313, size: 36, red: 'The Modern Family ', rest: 'Home, Reimagined' });
++  learnMore(s, 0.95, 3.21);
++
++  [{ tile: 5.056, body: 6.275 }, { tile: 9.37, body: 10.589 }].forEach(function (col) {
++    iconTile(s, col.tile, 5.727, 0.83);
++    text(s, FRINGILLA, { x: col.body, y: 5.763, w: 2.184, h: 0.758, fontSize: 9, lineSpacingMultiple: 1.5 });
++  });
++}
++
++/* --------------------------------------------------------------- slide 9  */
++
++function slide09(s) {
++  plate(s, 1.241, 1.054, 4.57, 4.478, { r: 0.23 });
++  shape(s, 'roundRect', { x: 6.886, y: 4.069, w: 2.601, h: 2.051, rectRadius: 0.163, fill: { color: C.white }, shadow: softShadow() });
++  shape(s, 'roundRect', { x: 9.918, y: 4.069, w: 2.601, h: 2.051, rectRadius: 0.163, fill: { color: C.redMid } });
++  headline(s, { x: 7.034, y: 1.38, w: 4.212, h: 1.313, size: 36, red: 'Where Business ', rest: 'Finds A Home' });
++  text(s, 'Integer quis nisl nec erat ornare egestas. Nunc fringilla quis nisi eget luctus. Mauris posuere diam eu tincidunt pretium. Sed pharetra', {
++    x: 7.034, y: 2.783, w: 5.257, h: 0.579, fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++
++  [{ x: 7.263, sx: 7.523, value: '65%', ink: C.black }, { x: 10.295, sx: 10.556, value: '85%', ink: C.white }]
++    .forEach(function (st) {
++      text(s, st.value, { x: st.sx, y: 4.357, w: 1.326, h: 0.707, align: 'center', fontFace: MAJOR, fontSize: 36, bold: true, color: st.ink });
++      text(s, LOREM_SHORT, { x: st.x, y: 5.029, w: 1.848, h: 0.803, align: 'center', fontSize: 11, color: st.ink, lineSpacingMultiple: 1.3 });
++    });
++
++  iconTile(s, 1.515, 6.053, 0.617);
++  text(s, CRAS_SHORT, { x: 2.548, y: 6.12, w: 3.151, h: 0.483, fontSize: 8, lineSpacingMultiple: 1.5 });
++}
++
++/* --------------------------------------------------------------- slide 10 */
++
++function slide10(s) {
++  plate(s, 4.5, 4.839, 2.807, 2.661, { r: 0.324, bleed: 'b' });
++  plate(s, 7.307, 0.75, 5.36, 3.883, { r: 0.309 });
++  headline(s, { x: 1.389, y: 1.498, w: 4.247, h: 2.524, size: 36, red: 'How To Close Deals ', rest: 'Faster In A Competitive Market' });
++  text(s, '+74,90', { x: 1.389, y: 5.423, w: 1.599, h: 0.572, fontFace: MAJOR, fontSize: 28, bold: true, color: C.red });
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque non elit mauris. ', {
++    x: 1.423, y: 5.981, w: 2.065, h: 0.831, fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++  iconTile(s, 8.5, 4.156, 0.955);
++  text(s, 'Successful Home Selling', { x: 8.5, y: 5.527, w: 3.023, h: 0.404, fontFace: MAJOR, fontSize: 18, color: C.red });
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque non elit mauris. Cras euismod, metus  finibus finibus, felis dui suscipit maximus leo', {
++    x: 8.5, y: 5.981, w: 4.0, h: 0.831, fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* --------------------------------------------------------------- slide 11 */
++
++function slide11(s) {
++  plate(s, 6.295, 3.841, 7.038, 3.045, { r: 0.301, bleed: 'r' });
++  plate(s, 2.943, 0, 3.352, 3.659, { r: 0.309, bleed: 't' });
++  headline(s, { x: 7.594, y: 0.986, w: 4.827, h: 1.919, size: 36, red: 'What Know Before You Buy ', rest: 'Real Estate Roadmap' });
++  iconTile(s, 2.523, 1.409, 0.841);
++  text(s, 'euismod, metus ac finibus finibus, felis dui suscipit', {
++    x: 0.488, y: 1.414, w: 1.473, h: 0.831, align: 'right', fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++  text(s, 'Turning Listings Into Offers', { x: 0.756, y: 4.58, w: 3.509, h: 0.438, fontFace: MAJOR, fontSize: 20, color: C.red });
++  text(s, CONDIMENTUM, { x: 0.756, y: 5.064, w: 4.517, h: 1.084, fontSize: 10, lineSpacingMultiple: 1.5 });
++}
++
++/* --------------------------------------------------------------- slide 12 */
++
++function slide12(s) {
++  plate(s, 0.633, 1.057, 6.784, 3.863, { r: 0.307 });
++  headline(s, { x: 1.066, y: 5.548, w: 7.04, h: 1.313, size: 36, red: 'Urban Renewal Through Real ', rest: 'Estate Development' });
++  text(s, 'The Modern Market', { x: 8.244, y: 1.3, w: 2.77, h: 0.438, fontFace: MAJOR, fontSize: 20, color: C.red });
++  text(s, 'condimentum augue, eget vehicula nisi. Integer quis nisl nec erat ornare egestas. Nunc fringilla quis nisi eget luctus. ', {
++    x: 8.244, y: 1.738, w: 4.457, h: 0.579, fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++
++  const cards = [
++    { x: 7.926, fill: C.redMid, ink: C.white, tx: 8.105, gx: 8.638, gy: 3.184, gs: 0.635, shadow: false },
++    { x: 10.494, fill: C.white, ink: C.black, tx: 10.674, gx: 11.327, gy: 3.172, gs: 0.541, shadow: true },
++  ];
++  cards.forEach(function (c) {
++    const o = { x: c.x, y: 2.932, w: 2.207, h: 1.988, rectRadius: 0.259, fill: { color: c.fill } };
++    if (c.shadow) o.shadow = softShadow();
++    shape(s, 'roundRect', o);
++    iconGlyph(s, c.gx, c.gy, c.gs, c.ink);
++    text(s, LOREM_SHORT, { x: c.tx, y: 3.875, w: 1.848, h: 0.739, align: 'center', fontSize: 10, color: c.ink, lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* --------------------------------------------------------------- slide 13 */
++
++function slide13(s) {
++  const team = [
++    { x: 0.708, name: 'Avery Davis', ny: 5.729 },
++    { x: 3.785, name: 'Sacha Dubois', ny: 5.729 },
++    { x: 6.863, name: 'Soo Jin Ae', ny: 5.729 },
++    { x: 9.941, name: 'Soo Jin Ae', ny: 5.774 },
++  ];
++  headline(s, { x: 3.158, y: 0.875, w: 7.017, h: 0.841, size: 44, align: 'center', restBold: true, red: 'Meet Our ', rest: 'Best Team' });
++
++  team.forEach(function (m) {
++    plate(s, m.x, 2.346, 2.685, 3.065, { r: 0.214 });
++    text(s, m.name, { x: m.x + 0.201, y: m.ny, w: 2.282, h: 0.471, align: 'center', fontFace: MAJOR, fontSize: 22 });
++    for (let i = 0; i < 5; i++) {
++      shape(s, 'star5', {
++        x: m.x + 0.699 + i * 0.2506, y: 6.341, w: 0.284, h: 0.284,
++        fill: { color: i < 4 ? C.star : C.starOff },
++      });
++    }
++  });
++}
++
++/* --------------------------------------------------------------- slide 14 */
++
++function slide14(s) {
++  // laptop seen head on, screen filling the right edge of the slide
++  laptop(s, {
++    bez: [7.36, 1.03, 6.10, 4.77], top: [7.36, 13.46], bot: [6.96, 13.46],
++    deckY: 5.80, deckH: 0.30, footH: 0.22,
++    keys: [7.45, 5.79, 6.00, 0.16, 0.02], keyColor: 'D9D9D9', // key rows seen almost edge-on
++    pad: [9.30, 6.02, 1.60, 0.09, 0.01],
++  });
++  shape(s, 'roundRect', { x: 10.08, y: 1.10, w: 0.72, h: 0.11, rectRadius: 0.05, fill: { color: '3C3C3C' } });
++  plate(s, 7.502, 1.17, 6.813, 4.486, { r: 0.157 });
++  headline(s, { x: 1.168, y: 1.644, w: 4.727, h: 1.919, size: 36, red: 'Net-Zero Homes  A New ', rest: 'Real Estate Standard' });
++  text(s, '$88,65', { x: 1.168, y: 3.848, w: 1.895, h: 0.64, fontFace: MAJOR, fontSize: 32, bold: true, color: C.red });
++  text(s, CONDIMENTUM, { x: 1.168, y: 4.772, w: 4.516, h: 1.084, fontSize: 10, lineSpacingMultiple: 1.5 });
++}
++
++/* --------------------------------------------------------------- slide 15 */
++
++function slide15(s) {
++  // phone mock-up: dark rear body with its camera bump, front body over it, screen on top
++  shape(s, 'roundRect', { x: 3.55, y: 0.93, w: 2.30, h: 5.55, rectRadius: 0.42, fill: { color: C.phone } });
++  shape(s, 'roundRect', { x: 3.76, y: 1.13, w: 0.82, h: 1.28, rectRadius: 0.25, fill: { color: '2C2C2C' } });
++  [1.25, 1.78].forEach(function (cy) {
++    shape(s, 'ellipse', { x: 3.86, y: cy, w: 0.29, h: 0.29, fill: { color: '3F3F3F' } });
++  });
++  shape(s, 'ellipse', { x: 4.30, y: 1.28, w: 0.10, h: 0.10, fill: { color: '4A4A4A' } });
++  shape(s, 'roundRect', { x: 4.70, y: 0.86, w: 2.79, h: 5.68, rectRadius: 0.46, fill: { color: '303030' } });
++  plate(s, 4.841, 0.975, 2.572, 5.474, { r: 0.403 });
++  shape(s, 'roundRect', { x: 5.62, y: 1.10, w: 1.00, h: 0.19, rectRadius: 0.095, fill: { color: '303030' } });
++
++  headline(s, { x: 8.455, y: 1.457, w: 4.143, h: 1.919, size: 36, red: 'The What Buyers Want ', rest: 'In Today\u2019s Market' });
++  text(s, 'How to Profit from Them', { x: 8.455, y: 3.559, w: 3.541, h: 0.438, fontFace: MAJOR, fontSize: 20, color: C.red });
++  text(s, CONDIMENTUM, { x: 8.455, y: 4.128, w: 4.245, h: 1.084, fontSize: 10, lineSpacingMultiple: 1.5 });
++  learnMore(s, 8.481, 5.711);
++
++  [2.38, 4.102].forEach(function (y) {
++    text(s, '+44,86', { x: 0.633, y: y, w: 1.756, h: 0.64, fontFace: MAJOR, fontSize: 32, color: C.red });
++    text(s, 'condimentum augue', { x: 0.633, y: y + 0.602, w: 2.387, h: 0.417, fontSize: 14, lineSpacingMultiple: 1.5 });
++  });
++}
++
++/* --------------------------------------------------------------- slide 16 */
++
++function slide16(s) {
++  // three-quarter view: the deck sweeps forward and to the left of the screen
++  laptop(s, {
++    bez: [7.50, 1.30, 4.46, 3.12], top: [7.30, 11.68], bot: [5.83, 11.30],
++    deckY: 4.42, deckH: 1.72, footH: 0.16,
++    keys: [6.95, 4.48, 4.55, 0.68, 0.20], pad: [6.40, 5.32, 3.35, 0.60, 0.18],
++  });
++  shape(s, 'roundRect', { x: 9.35, y: 1.34, w: 0.72, h: 0.11, rectRadius: 0.05, fill: { color: '3C3C3C' } });
++  plate(s, 7.68, 1.41, 4.099, 2.839, { r: 0.14 });
++
++  headline(s, { x: 1.342, y: 1.34, w: 3.987, h: 1.919, size: 36, red: 'The Impact of Interest ', rest: 'Rates Housing' });
++  text(s, 'fringilla quis nisi eget luctus. Mauris posuere diam eu tincidunt pretium. Sed pharetra ornare nulla eu eleifend. ', {
++    x: 1.342, y: 3.398, w: 4.248, h: 0.579, fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++  shape(s, 'roundRect', { x: 4.256, y: 4.498, w: 2.947, h: 1.661, rectRadius: 0.176, fill: { color: C.redMid } });
++  text(s, '$32,90', { x: 1.342, y: 4.76, w: 1.599, h: 0.572, fontFace: MAJOR, fontSize: 28, bold: true, color: C.red });
++  text(s, LOREM_SHORT, { x: 1.376, y: 5.319, w: 2.065, h: 0.579, fontSize: 10, lineSpacingMultiple: 1.5 });
++  text(s, 'Housing Market ', { x: 4.575, y: 4.859, w: 2.002, h: 0.37, fontFace: MAJOR, fontSize: 16, bold: true, color: C.white });
++  text(s, 'Mauris posuere diam eu tincidunt pretium. Sed pharetra ornare nulla. ', {
++    x: 4.575, y: 5.268, w: 2.309, h: 0.531, fontSize: 9, color: C.white, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* --------------------------------------------------------------- slide 17 */
++
++function infographicTitle(s) {
++  headline(s, { x: 0.84, y: 0.765, w: 11.653, h: 0.841, size: 44, align: 'center', red: 'Infographic ', rest: 'Slide Design' });
++}
++
++function slide17(s) {
++  infographicTitle(s);
++
++  // Coloured disc with two white discs fanned off-centre over it, leaving a crescent.
++  // Rings 1 and 3 open upwards (disc sits high); rings 2 and 4 open downwards.
++  const rings = [
++    { color: C.ink, disc: [1.689, 3.302], w1: [1.655, 3.781], w2: [1.554, 3.680], icon: [2.321, 4.467], label: 5.666, desc: 6.062, tx: 1.195 },
++    { color: C.ink2, disc: [4.349, 3.876], w1: [4.585, 3.600], w2: [4.484, 3.498], icon: [5.250, 4.234], label: 2.233, desc: 2.629, tx: 4.111 },
++    { color: C.red, disc: [7.162, 3.302], w1: [7.128, 3.781], w2: [7.027, 3.680], icon: [7.817, 4.444], label: 5.666, desc: 6.062, tx: 6.716 },
++    { color: C.redSoft, disc: [9.822, 3.876], w1: [10.058, 3.600], w2: [9.957, 3.498], icon: [10.739, 4.234], label: 2.233, desc: 2.629, tx: 9.547 },
++  ];
++
++  rings.forEach(function (r) {
++    shape(s, 'ellipse', { x: r.disc[0], y: r.disc[1], w: 1.877, h: 1.877, fill: { color: r.color } });
++    shape(s, 'ellipse', { x: r.w1[0], y: r.w1[1], w: 1.675, h: 1.675, fill: { color: C.white }, shadow: softShadow() });
++    shape(s, 'ellipse', { x: r.w2[0], y: r.w2[1], w: 1.61, h: 1.61, fill: { color: C.white } });
++    iconGlyph(s, r.icon[0], r.icon[1], 0.313, C.ink2);
++    text(s, 'Option Here', { x: r.tx, y: r.label, w: 2.591, h: 0.46, align: 'center', fontFace: MAJOR, fontSize: 16, lineSpacingMultiple: 1.5 });
++    text(s, EOS, { x: r.tx, y: r.desc, w: 2.591, h: 0.673, align: 'center', fontSize: 12, color: C.body2, lineSpacingMultiple: 1.5 });
++  });
++}
++
++/* --------------------------------------------------------------- slide 18 */
++
++function slide18(s) {
++  infographicTitle(s);
++
++  // The row alternates: caps 1 and 3 open downwards, caps 2 and 4 upwards.
++  const cells = [
++    { color: C.ink, x: 1.873, capY: 4.392, up: false, label: 2.206, tx: 1.828, ty: 6.042, icon: 2.958, hex: 2.220 },
++    { color: C.ink2, x: 4.252, capY: 3.056, up: true, label: 4.569, tx: 4.207, ty: 2.127, icon: 5.346, hex: 4.598 },
++    { color: C.red, x: 6.598, capY: 4.392, up: false, label: 6.931, tx: 6.553, ty: 6.042, icon: 7.696, hex: 6.945 },
++    { color: C.redSoft, x: 8.952, capY: 3.056, up: true, label: 9.285, tx: 8.907, ty: 2.127, icon: 10.055, hex: 9.307 },
++  ];
++
++  cells.forEach(function (c) {
++    hexCap(s, c.x, c.capY, 2.508, 1.481, c.color, c.up);
++    hexagon(s, c.hex + 0.908, 4.465, 1.816, 2.069, { fill: { color: C.white }, shadow: softShadow() });
++    iconGlyph(s, c.icon, 3.941, 0.32, C.ink2);
++    text(s, 'Option Here', { x: c.label, y: 4.603, w: 1.842, h: 0.37, align: 'center', fontFace: MAJOR, fontSize: 16 });
++    text(s, EOS, { x: c.tx, y: c.ty, w: 2.598, h: 0.673, align: 'center', fontSize: 12, color: C.body2, lineSpacingMultiple: 1.5 });
++  });
++}
++
++/* --------------------------------------------------------------- slide 19 */
++
++function slide19(s) {
++  // The source art is a 25-piece vector map of Costa Rica in a very light grey.
++  // Two overlapping polygons trace the same north-west to south-east silhouette.
++  poly(s, 3.639, 0.955, 5.16, 3.60, [
++    [0.55, 0.35], [1.55, 0.10], [2.30, 0.60], [3.05, 0.35], [3.85, 0.95], [4.60, 1.60],
++    [5.16, 2.35], [4.70, 3.05], [3.85, 2.70], [3.10, 2.95], [2.35, 2.45], [1.55, 2.60],
++    [0.85, 2.10], [0.10, 1.75], [0.00, 1.00],
++  ], { fill: { color: C.device } });
++  poly(s, 5.95, 2.70, 3.30, 3.90, [
++    [0.35, 0.00], [1.35, 0.40], [2.30, 0.95], [3.05, 1.75], [3.30, 2.60], [2.85, 3.35],
++    [2.20, 3.90], [1.75, 3.35], [1.95, 2.55], [1.35, 1.95], [0.60, 1.55], [0.00, 0.85],
++  ], { fill: { color: C.device } });
++
++  headline(s, { x: 0.722, y: 4.472, w: 4.641, h: 1.313, size: 36, red: 'What\u2019s Your ', rest: 'Home Really Worth' });
++  learnMore(s, 0.828, 6.018);
++
++  shape(s, 'roundRect', { x: 8.509, y: 1.309, w: 3.907, h: 1.661, rectRadius: 0.264, fill: { color: C.redMid } });
++  text(s, 'Appraisal Process', { x: 9.018, y: 1.661, w: 2.245, h: 0.37, fontFace: MAJOR, fontSize: 16, bold: true, color: C.white });
++  text(s, FRINGILLA, { x: 9.018, y: 2.088, w: 2.89, h: 0.531, fontSize: 9, color: C.white, lineSpacingMultiple: 1.5 });
++
++  text(s, '650%', { x: 0.753, y: 1.626, w: 1.346, h: 0.572, fontFace: MAJOR, fontSize: 28, color: C.red });
++  text(s, 'condimentum augue', { x: 0.722, y: 2.2, w: 1.945, h: 0.349, fontSize: 11, lineSpacingMultiple: 1.5 });
++  text(s, 'condimentum augue, eget vehicula nisi. Integer quis', {
++    x: 11.022, y: 4.953, w: 1.589, h: 0.831, fontSize: 10, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* --------------------------------------------------------------- slide 20 */
++
++function slide20(s) {
++  coverWash(s);
++  logo(s, 0.523, 0.491, C.logoWordLight);
++  searchPill(s);
++  plate(s, 5.812, 0, 6.467, 7.5, { r: 0 });
++
++  s.addText(
++    [
++      { text: 'Thanks For ', options: { bold: true, color: C.red } },
++      { text: 'Attention', options: { bold: false, color: C.white } },
++    ],
++    { x: 1.287, y: 1.796, w: 5.565, h: 2.524, fontFace: MAJOR, fontSize: 72, valign: 'top' }
++  );
++  pill(s, {
++    x: 1.253, y: 5.034, w: 2.883, h: 0.67, fill: C.red,
++    label: 'End  presentation', tx: 1.549, ty: 5.184, tw: 2.293, th: 0.37, size: 16, bold: false,
++  });
++}
++
++/* -------------------------------------------------------------------- run */
++
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++];
++
++// slides 1 and 20 carry their own dark-background logo; the rest inherit the master's
++const OWN_CHROME = { 1: true, 20: true };
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'DECK', width: 13.3333, height: 7.5 });
++  pptx.layout = 'DECK';
++  pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
++
++  BUILDERS.forEach(function (builder, idx) {
++    const slide = pptx.addSlide();
++    const num = idx + 1;
++    if (!OWN_CHROME[num]) logo(slide, 0.421, 0.365, C.logoWord);
++    builder(slide);
++    pageTag(slide, num);
++  });
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '08e28041-6a0f-4ea3-8e24-e915ac41a272_grok_final.pptx') });
++}
++
++build().then(function (f) { console.log('wrote ' + f); }).catch(function (e) { console.error(e); process.exit(1); });

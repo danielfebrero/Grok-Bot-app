@@ -1,0 +1,772 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/artha_creative_storytelling_template.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/artha_creative_storytelling_template.js
+@@ -0,0 +1,769 @@
++/*
++ * Artha — Presentation Template Design (30 slides, 13.333 x 7.5 in)
++ * Recreation of the reference deck with pptxgenjs.
++ *
++ * The original's photographs and device mockups become `photo()` / `device()`
++ * placeholders labelled "[image]" — no raster data is embedded. Its empty
++ * picture placeholders carry no artwork and are therefore not drawn.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const C = {
++  accent1: 'DAB6DE', // light orchid — rules, corner square, series 1
++  accent2: '917AA8', // muted violet — series 2
++  accent3: 'CC8DB7', // dusty pink   — corner square, series 3
++  accent4: 'F7C3D2', // pale pink    — series 4
++  slate: '44546A', // tx2 — oversized numerals, line-art icons
++  text: '000000',
++  white: 'FFFFFF',
++  gray: '595959', // tx1 @ 65% — muted body copy (slide 27)
++  label: '7F7F7F', // tx1 @ 50% — chart data labels
++  grid: 'D9D9D9', // tx1 @ 15% — chart gridlines / axis lines
++  photo: 'D6D5D6', // average tone of the deck's photographs
++  star: 'FFC000',
++  starOff: 'ADACAC',
++  screen: 'E9E9EA', // blank device screen
++  bezel: '1A1A1A',
++  metal: 'C9CACC',
++  watch: 'E32D2D', // watch face artwork
++};
++
++const MAJOR = 'Roboto Slab'; // headings and numerals
++const MINOR = 'Raleway'; // body copy
++
++const TITLE_SZ = 32;
++const BODY_SZ = 12;
++const HEAD_SZ = 14;
++const RULE_PT = 3;
++
++/* ---------------------------------------------------------------- helpers */
++
++/** Thin accent rule — the deck's signature hairline. */
++function rule(slide, [x, y, w, h]) {
++  slide.addShape('line', { x, y, w, h, line: { color: C.accent1, width: RULE_PT } });
++}
++
++/** Corner squares bleeding off top-left and bottom-right + the slide's rules. */
++function frame(slide, rules) {
++  slide.addShape('rect', { x: 0, y: 0, w: 0.653, h: 0.653, fill: { color: C.accent1 } });
++  slide.addShape('rect', { x: 12.68, y: 6.847, w: 0.653, h: 0.653, fill: { color: C.accent3 } });
++  rules.forEach((r) => rule(slide, r));
++}
++
++/** Section title — 32pt Roboto Slab bold, 90% line spacing. */
++function title(slide, text, [x, y, w, h], o = {}) {
++  slide.addText(text, {
++    x, y, w, h,
++    fontFace: MAJOR, fontSize: o.size || TITLE_SZ, bold: true, color: C.text,
++    align: o.align || 'left', valign: o.valign || 'top',
++    lineSpacingMultiple: 0.9, rotate: o.rotate, charSpacing: o.charSpacing,
++  });
++}
++
++/** Bold sub-heading: "Description One", people's names, "Creative Story." */
++function heading(slide, text, [x, y, w, h], o = {}) {
++  slide.addText(text, {
++    x, y, w, h,
++    fontFace: MAJOR, fontSize: o.size || HEAD_SZ, bold: true, italic: o.italic,
++    color: o.color || C.text, align: o.align || 'left', valign: o.valign || 'top',
++    rotate: o.rotate, margin: o.margin,
++  });
++}
++
++/** Body copy — 12pt Raleway, justified, 1.5 line spacing. */
++function body(slide, text, [x, y, w, h], o = {}) {
++  slide.addText(text, {
++    x, y, w, h,
++    fontFace: MINOR, fontSize: BODY_SZ, color: o.color || C.text,
++    align: o.align || 'justify', valign: 'top', lineSpacingMultiple: 1.5,
++    rotate: o.rotate, margin: o.margin,
++  });
++}
++
++/** Oversized rotated statistic: "89%", "153k.", "2020." */
++function stat(slide, text, [x, y, w, h], o = {}) {
++  slide.addText(text, {
++    x, y, w, h,
++    fontFace: MAJOR, fontSize: o.size || 36, bold: true, color: o.color || C.slate,
++    align: o.align || 'right', valign: 'top', rotate: o.rotate === undefined ? 270 : o.rotate,
++  });
++}
++
++/** Stand-in for a photograph in the reference deck. */
++function photo(slide, [x, y, w, h], o = {}) {
++  slide.addShape(o.shape || 'rect', { x, y, w, h, fill: { color: C.photo } });
++  slide.addText('[image]', {
++    x, y: y + h / 2 - 0.18, w, h: 0.36,
++    fontFace: MINOR, fontSize: 10, color: '6F6F6F', align: 'center', valign: 'middle',
++  });
++}
++
++/** Stand-in for a device mockup: dark bezel wrapping a blank screen. */
++function device(slide, [x, y, w, h], o = {}) {
++  const b = o.bezel === undefined ? 0.14 : o.bezel;
++  const by = o.bezelY === undefined ? b : o.bezelY;
++  slide.addShape('roundRect', {
++    x, y, w, h, rectRadius: o.radius === undefined ? 0.06 : o.radius, fill: { color: C.bezel },
++  });
++  slide.addShape(o.screenRadius ? 'roundRect' : 'rect', {
++    x: x + b, y: y + by, w: w - 2 * b, h: h - 2 * by,
++    rectRadius: o.screenRadius, fill: { color: o.screen || C.screen },
++  });
++  if (o.caption !== false) {
++    slide.addText('[image]', {
++      x, y: y + h / 2 - 0.18, w, h: 0.36,
++      fontFace: MINOR, fontSize: 10, color: o.captionColor || '6F6F6F',
++      align: 'center', valign: 'middle',
++    });
++  }
++}
++
++/** Smartwatch stand-in: strap behind, dark case, coloured watch face. */
++function watch(slide, o) {
++  slide.addShape('roundRect', {
++    x: o.bandX, y: o.bandY, w: o.bandW, h: o.bandH, rectRadius: 0.12, fill: { color: '3B3B3D' },
++  });
++  slide.addShape('roundRect', {
++    x: o.caseX, y: o.caseY, w: o.caseW, h: o.caseH, rectRadius: 0.16, fill: { color: '4A4A4C' },
++  });
++  slide.addShape('roundRect', {
++    x: o.caseX + 0.25, y: o.caseY + 0.11, w: o.caseW - 0.5, h: o.caseH - 0.22,
++    rectRadius: 0.05, fill: { color: C.watch },
++  });
++  if (o.caption) {
++    slide.addText('[image]', {
++      x: o.caseX, y: o.caseY + o.caseH / 2 - 0.18, w: o.caseW, h: 0.36,
++      fontFace: MINOR, fontSize: 10, color: 'FFFFFF', align: 'center', valign: 'middle',
++    });
++  }
++}
++
++/**
++ * Browser-window pictogram: rounded frame, title bar with three dots and a
++ * filled motif — stands in for the deck's outlined browser / monitor glyphs.
++ */
++function iconTile(slide, [x, y, w, h], o = {}) {
++  const color = o.color || C.slate;
++  const bar = h * 0.22;
++  slide.addShape('roundRect', {
++    x, y, w, h, rectRadius: 0.12, fill: { color: o.fill || C.white }, line: { color, width: 2 },
++  });
++  slide.addShape('rect', { x, y, w, h: bar, fill: { color } });
++  for (let i = 0; i < 3; i++) {
++    slide.addShape('ellipse', {
++      x: x + w * (0.1 + i * 0.09), y: y + bar * 0.32, w: bar * 0.32, h: bar * 0.32,
++      fill: { color: o.fill || C.white },
++    });
++  }
++  slide.addShape('ellipse', {
++    x: x + w * 0.42, y: y + bar + h * 0.13, w: w * 0.16, h: h * 0.2, fill: { color },
++  });
++  slide.addShape('chord', {
++    x: x + w * 0.3, y: y + bar + h * 0.3, w: w * 0.4, h: h * 0.55, fill: { color },
++  });
++}
++
++/**
++ * Round line-art pictogram. `motif` picks the inner mark so the deck's
++ * globe / gear / stopwatch / pie glyphs stay distinguishable.
++ */
++function iconRing(slide, [x, y, w, h], o = {}) {
++  const color = o.color || C.slate;
++  const ring = { color, width: 2.25 };
++  slide.addShape('ellipse', { x, y, w, h, fill: { type: 'none' }, line: ring });
++  if (o.motif === 'gear') {
++    slide.addShape('gear6', {
++      x: x + w * 0.2, y: y + h * 0.2, w: w * 0.6, h: h * 0.6, fill: { color },
++    });
++  } else if (o.motif === 'clock') {
++    slide.addShape('pie', {
++      x: x + w * 0.18, y: y + h * 0.18, w: w * 0.64, h: h * 0.64,
++      angleRange: [90, 260], fill: { color },
++    });
++    slide.addShape('rect', { x: x + w * 0.42, y: y - h * 0.06, w: w * 0.16, h: h * 0.12, fill: { color } });
++  } else if (o.motif === 'pie') {
++    slide.addShape('pie', {
++      x: x + w * 0.14, y: y + h * 0.14, w: w * 0.72, h: h * 0.72,
++      angleRange: [0, 250], fill: { color },
++    });
++  } else {
++    slide.addShape('ellipse', {
++      x: x + w * 0.3, y: y + h * 0.12, w: w * 0.4, h: h * 0.76,
++      fill: { type: 'none' }, line: { color, width: 1.25 },
++    });
++    slide.addShape('line', { x, y: y + h / 2, w, h: 0, line: { color, width: 1.25 } });
++  }
++}
++
++/** Envelope / handset / globe marks beside the contact lines on slide 29. */
++function contactIcon(slide, kind, [x, y, w, h]) {
++  const line = { color: C.accent1, width: 1.5 };
++  if (kind === 'mail') {
++    slide.addShape('roundRect', { x, y, w, h, rectRadius: 0.12, fill: { color: C.white }, line });
++    slide.addShape('line', { x: x + w * 0.1, y: y + h * 0.2, w: w * 0.4, h: h * 0.45, line });
++    slide.addShape('line', { x: x + w * 0.5, y: y + h * 0.2, w: w * 0.4, h: h * 0.45, flipH: true, line });
++  } else if (kind === 'phone') {
++    slide.addShape('roundRect', { x, y, w, h, rectRadius: 0.2, fill: { color: C.accent1 } });
++    slide.addShape('rect', {
++      x: x + w * 0.14, y: y + h * 0.13, w: w * 0.72, h: h * 0.62, fill: { color: C.white },
++    });
++  } else {
++    slide.addShape('ellipse', { x, y, w, h, fill: { color: C.white }, line });
++    slide.addShape('line', { x, y: y + h / 2, w, h: 0, line });
++    slide.addShape('ellipse', { x: x + w * 0.28, y, w: w * 0.44, h, fill: { type: 'none' }, line });
++  }
++}
++
++/* ---------------------------------------------------- repeated copy blocks */
++
++const T = {
++  section: 'No Road Is Too Long When You Have Good Company',
++  vivamus: 'Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis, metus tellus consectetur massa, eget viverra ipsum leo ac magna.',
++  vivamusShort: 'Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. ',
++  vivamusCut: 'Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan',
++  nullam: 'Nullam a ligula luctus, porttitor libero nec, lacinia libero. Integer ut diam eu lorem convallis consectetur. Nulla laoreet fermentum ex eget pulvinar. Vivamus at diam vestibulum, varius quam eu, pellentesque nisl',
++  morbi: 'Morbi malesuada neque sit amet sem dapibus scelerisque. ',
++  morbiLong: 'Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.',
++  vestibulum: 'Vestibulum tempor ante sit amet eros suscipit auctor. In tempus rhoncus elit, eu auctor mauris ultricies in.',
++  mauris: 'Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. Nullam a ligula luctus, porttitor libero nec, lacinia libero. Integer ut diam eu lorem convallis consectetur. Nulla laoreet fermentum ex eget pulvinar. Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis.',
++  augue: 'In augue orci, rutrum id aliquam fringilla, dapibus eu metus.',
++};
++
++/* --------------------------------------------------------- chart templates */
++
++/** Options shared by all four charts: no legend/title, theme palette, no frame. */
++function chartOpts(extra) {
++  return Object.assign({
++    showLegend: false,
++    showTitle: false,
++    chartColors: [C.accent1, C.accent2, C.accent3, C.accent4],
++    dataLabelFontFace: MINOR, dataLabelFontSize: 10.5, dataLabelColor: C.label,
++    dataLabelFormatCode: 'General',
++    catAxisLabelFontFace: MINOR, catAxisLabelFontSize: 10.5, catAxisLabelColor: C.gray,
++    valAxisLabelFontFace: MINOR, valAxisLabelFontSize: 10.5, valAxisLabelColor: C.gray,
++  }, extra);
++}
++
++const CATS4 = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++const MONTHS = ['5/1/2020', '6/1/2020', '7/1/2020', '8/1/2020', '9/1/2020'];
++
++/* --------------------------------------------- slide 21 / 27 set pieces */
++
++/** Desktop monitor mockup: bezel, screen, silver lip, tapered neck and foot. */
++function monitor(slide, x, y, w, h) {
++  device(slide, [x, y, w, h], { bezel: 0.16, radius: 0.02 });
++  slide.addShape('rect', { x, y: y + h, w, h: 0.59, fill: { color: C.metal } });
++  slide.addShape('trapezoid', { x: x + 2.37, y: y + h + 0.59, w: 1.4, h: 0.76, fill: { color: C.metal } });
++  slide.addShape('rect', { x: x + 2.13, y: y + h + 1.31, w: 1.88, h: 0.15, fill: { color: C.metal } });
++}
++
++/** Dashed looping trajectory the four milestones of slide 27 sit on. */
++function flightPath(slide) {
++  const W = 9777, H = 9975; // source path units
++  const w = 4.367, h = 8.379; // inches
++  const raw = [
++    [2647, 9975],
++    [1546, 9500, 764, 8761, 511, 7955],
++    [258, 7152, 537, 6290, 1271, 5601],
++    [1682, 5222, 2254, 4880, 2979, 4763],
++    [3700, 4644, 4578, 4800, 4928, 5200],
++    [5408, 5744, 4652, 6470, 3656, 6597],
++    [2660, 6722, 1634, 6380, 987, 5903],
++    [96, 5248, -223, 4323, 161, 3506],
++    [542, 2690, 1616, 2003, 2940, 1730],
++    [3429, 1627, 3971, 1582, 4456, 1688],
++    [4941, 1794, 5343, 2083, 5299, 2393],
++    [5255, 2708, 4766, 2958, 4246, 2979],
++    [3731, 3000, 3224, 2825, 2914, 2576],
++    [2280, 2069, 2411, 1309, 3062, 810],
++    [3709, 314, 4770, 60, 5815, 17],
++    [6934, -72, 8952, 221, 9777, 275],
++  ];
++  const points = raw.map((p) => (p.length === 2
++    ? { x: (p[0] / W) * w, y: (p[1] / H) * h }
++    : {
++      x: (p[4] / W) * w, y: (p[5] / H) * h,
++      curve: { type: 'cubic', x1: (p[0] / W) * w, y1: (p[1] / H) * h, x2: (p[2] / W) * w, y2: (p[3] / H) * h },
++    }));
++  slide.addShape('custGeom', {
++    x: 3.243, y: -0.164, w, h, rotate: 253.27, points,
++    fill: { type: 'none' }, line: { color: C.text, width: 1.75, dashType: 'dash' },
++  });
++}
++
++/** Origami paper plane of slide 27 — four flat triangular facets. */
++function paperPlane(slide) {
++  const facets = [
++    { box: [9.936, 2.051, 1.894, 1.051], u: [960, 534], color: C.accent1, alpha: 0,
++      pts: [[800, 283], [960, 534], [933, 160], [0, 0]] },
++    { box: [9.216, 2.161, 2.517, 0.315], u: [12170, 1519], color: C.accent2, alpha: 0,
++      pts: [[8902, 1519], [12170, 61], [0, 0]] },
++    { box: [10.048, 2.795, 0.56, 0.496], u: [284, 252], color: C.accent1, alpha: 60,
++      pts: [[0, 145], [282, 252], [123, 0]] },
++    { box: [10.302, 1.995, 1.578, 1.437], u: [7629, 6958], color: C.accent3, alpha: 0,
++      pts: [[4033, 6958], [7629, 2694], [0, 0]] },
++  ];
++  facets.forEach((f) => {
++    const [x, y, w, h] = f.box;
++    slide.addShape('custGeom', {
++      x, y, w, h, rotate: 342.6,
++      points: f.pts.map((p) => ({ x: (p[0] / f.u[0]) * w, y: (p[1] / f.u[1]) * h })).concat([{ close: true }]),
++      fill: { color: f.color, transparency: f.alpha }, line: { width: 0 },
++    });
++  });
++}
++
++/** Slides 1 and 30 share the cover: tinted field, circle, band and word mark. */
++function cover(slide, wordmark, tagline) {
++  slide.addShape('ellipse', { x: 5.573, y: 1.475, w: 4.55, h: 4.55, fill: { color: C.accent3, transparency: 50 } });
++  slide.addShape('rect', { x: 3.211, y: 2.676, w: 4.637, h: 2.147, fill: { color: C.accent1, transparency: 50 } });
++  title(slide, wordmark, [3.057, 2.946, 7.219, 1.42], { size: 72, align: 'center', valign: 'middle' });
++  slide.addText(tagline, {
++    x: 3.92, y: 4.129, w: 5.493, h: 0.37,
++    fontFace: MINOR, fontSize: 16, bold: true, charSpacing: 3, align: 'center', valign: 'middle',
++  });
++  frame(slide, [[0.626, 0.778, 0, 3.888], [7.333, 6.888, 5.153, 0]]);
++  slide.addText('2020.', {
++    x: 11.725, y: 6.535, w: 1.202, h: 0.303,
++    fontFace: MINOR, fontSize: 12, color: C.white, charSpacing: 3, valign: 'middle',
++  });
++}
++
++/* ------------------------------------------------------------ slide bodies */
++
++const SLIDES = [
++  // 1 — cover
++  (s) => cover(s, 'ARTHA', 'Presentation Template Design'),
++
++  // 2 — intro: two panels, rotated year, single paragraph
++  (s) => {
++    title(s, T.section, [0.791, 0.857, 5.165, 1.717]);
++    frame(s, [[0.626, 0.778, 0, 3.888], [3.877, 6.888, 5.153, 0], [6.848, 2.888, 5.153, 0]]);
++    s.addText('2020.', {
++      x: 11.725, y: 6.535, w: 1.202, h: 0.303,
++      fontFace: MINOR, fontSize: 12, color: C.white, charSpacing: 3, valign: 'middle',
++    });
++    body(s, 'Nullam a ligula luctus, porttitor libero nec, lacinia libero. Integer ut diam eu lorem convallis consectetur. Nulla laoreet fermentum ex eget pulvinar. Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis, metus tellus consectetur massa, eget viverra ipsum leo ac magna.', [5.956, 4.171, 4.779, 1.919]);
++    stat(s, '2020.', [4.576, 4.811, 2.052, 0.64], { size: 32, align: 'center' });
++  },
++
++  // 3 — wide panel + circular inset + "Creative Story."
++  (s) => {
++    title(s, T.section, [0.791, 0.857, 5.165, 1.717]);
++    frame(s, [[0.626, 0.778, 0, 3.888], [7.333, 5.727, 5.153, 0]]);
++    body(s, T.nullam, [9.035, 2.897, 3.289, 1.919]);
++    heading(s, 'Creative Story.', [9.035, 2.458, 2.414, 0.438], { size: 20 });
++  },
++
++  // 4 — text left, three panels right
++  (s) => {
++    title(s, T.section, [0.791, 0.857, 5.165, 1.717]);
++    frame(s, [[0.791, 6.888, 5.153, 0], [12.173, 0.778, 0, 4.56]]);
++    body(s, 'Nullam a ligula luctus, porttitor libero nec, lacinia libero. Integer ut diam eu lorem convallis consectetur. Nulla laoreet fermentum ex eget pulvinar. Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis, metus.', [0.791, 2.628, 4.779, 1.616]);
++  },
++
++  // 5 — three icon + description rows
++  (s) => {
++    title(s, T.section, [0.791, 0.857, 5.165, 1.717]);
++    frame(s, [[0.626, 2.001, 0, 3.888], [7.095, 1.197, 5.392, 0]]);
++    [['Description One', 1.746, 7.08, 1.567, 0.601, 0.475, 'globe'],
++      ['Description Two', 3.392, 7.095, 3.173, 0.514, 0.523, 'gear'],
++      ['Description Three', 5.038, 7.099, 4.803, 0.487, 0.571, 'clock'],
++    ].forEach(([label, y, gx, gy, gw, gh, motif]) => {
++      heading(s, label, [7.707, y - 0.294, 2.39, 0.337]);
++      body(s, T.vivamus, [7.707, y, 4.779, 1.01]);
++      iconRing(s, [gx, gy, gw, gh], { motif });
++    });
++  },
++
++  // 6 — timeline: rotated title, two dated columns
++  (s) => {
++    title(s, T.section, [-1.018, 3.388, 5.165, 1.717], { rotate: 270 });
++    frame(s, [[0.626, 0.778, 0, 3.888], [5.863, 6.477, 5.153, 0]]);
++    [['Description One', '2019.', 3.473, 2.341], ['Description Two', '2020.', 8.488, 7.355]].forEach(
++      ([label, year, x, sx]) => {
++        heading(s, label, [x, 1.261, 2.39, 0.337]);
++        body(s, T.vivamus, [x, 1.555, 3.674, 1.313]);
++        stat(s, year, [sx, 1.687, 1.558, 0.707]);
++      });
++  },
++
++  // 7 — company profile with KPI pair
++  (s) => {
++    title(s, T.section, [0.769, 1.535, 4.696, 1.717]);
++    body(s, 'Donec dui ligula, aliquam in finibus in, ullamcorper a dolor. Morbi eget arcu vulputate, interdum nibh et, efficitur ipsum. Donec molestie eros at dictum lobortis. Vestibulum tempor ante sit amet eros suscipit auctor. In tempus rhoncus elit, eu auctor mauris ultricies in.', [0.759, 3.7, 5.588, 1.313]);
++    heading(s, 'Creative Company.', [0.759, 3.314, 3.135, 0.438], { size: 20 });
++    frame(s, [[0.626, 0.778, 0, 3.888], [7.333, 6.888, 5.153, 0], [7.333, 0.601, 5.153, 0]]);
++    stat(s, '153k.', [0.759, 5.114, 1.558, 0.572], { size: 28, align: 'left', rotate: 0 });
++    stat(s, '100%', [2.216, 5.114, 1.558, 0.572], { size: 28, align: 'left', rotate: 0 });
++    heading(s, 'Followers', [0.755, 5.579, 1.836, 0.303], { size: 12 });
++    heading(s, 'Quality Guarantee', [2.199, 5.579, 1.836, 0.303], { size: 12 });
++  },
++
++  // 8 — stat pair + circular panel + overlapping icon bubbles
++  (s) => {
++    title(s, T.section, [0.791, 4.678, 5.165, 1.717]);
++    frame(s, [[0.626, 0.778, 0, 3.888], [7.333, 6.888, 5.153, 0],
++      [7.333, 2.124, 5.153, 0], [11.596, 0.778, 0, 3.888]]);
++    [['Description One', 1.106, '89%', C.accent1], ['Description Two', 2.703, '207k.', C.accent2]].forEach(
++      ([label, y, num, col]) => {
++        heading(s, label, [1.608, y, 2.39, 0.337]);
++        body(s, T.vivamus, [1.608, y + 0.294, 4.957, 1.01]);
++        stat(s, num, [0.475, y + 0.425, 1.558, 0.707], { color: col });
++      });
++    s.addShape('ellipse', { x: 6.667, y: 4.261, w: 1.022, h: 1.022, fill: { color: C.accent1 } });
++    s.addShape('ellipse', { x: 7.461, y: 5.38, w: 1.022, h: 1.022, fill: { color: C.accent2 } });
++    iconTile(s, [6.9, 4.568, 0.555, 0.409], { color: C.white, fill: C.accent1 });
++    iconTile(s, [7.694, 5.7, 0.555, 0.486], { color: C.white, fill: C.accent2 });
++  },
++
++  // 9 — right-aligned title over twin circular panels
++  (s) => {
++    title(s, T.section, [5.981, 1.149, 5.165, 1.717], { align: 'right' });
++    frame(s, [[0.626, 0.778, 0, 3.888], [7.333, 6.888, 5.153, 0], [0.803, 6.271, 5.153, 0]]);
++    body(s, T.vivamus, [1.106, 1.596, 4.089, 1.313]);
++  },
++
++  // 10 — centred title, full-bleed band, two captions
++  (s) => {
++    title(s, T.section, [2.877, 0.745, 7.578, 1.125], { align: 'center' });
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442], [7.333, 2.168, 5.153, 0]]);
++    [['Description One', 1.608], ['Description Two', 7.547]].forEach(([label, x]) => {
++      heading(s, label, [x, 4.889, 2.39, 0.337]);
++      body(s, T.vivamus, [x, 5.183, 4.277, 1.313]);
++    });
++  },
++
++  // 11 — building photo cropped to a circle
++  (s) => {
++    photo(s, [0, 3.255, 2.817, 3.137], { shape: 'ellipse' });
++    title(s, T.section, [0.936, 1.112, 4.853, 1.717]);
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442], [5.438, 3.755, 5.153, 0]]);
++    body(s, T.vivamus, [3.062, 5.057, 4.953, 1.01]);
++    [['Description One', 1.452], ['Description Two', 4.157]].forEach(([label, y]) => {
++      heading(s, label, [9.32, y, 2.39, 0.337]);
++      body(s, T.vivamus, [9.32, y + 0.294, 3.167, 1.616]);
++    });
++  },
++
++  // 12 — rotated "Creative Company." + crossing rules
++  (s) => {
++    title(s, T.section, [0.791, 4.734, 5.165, 1.717]);
++    frame(s, [[0.626, 0.778, 0, 4.442], [7.333, 6.888, 5.153, 0],
++      [7.626, 2.015, 0, 3.206], [5.428, 4.072, 2.965, 0.05]]);
++    body(s, ' Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus.', [1.783, 1.415, 3.147, 1.616]);
++    heading(s, 'Creative Company.', [0.228, 1.476, 2.335, 0.774], { size: 20, color: C.slate, rotate: 270 });
++    heading(s, 'Description', [8.393, 1.415, 2.39, 0.337]);
++    body(s, T.vivamus, [8.393, 1.709, 3.715, 1.313]);
++    body(s, 'Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis, metus tellus consectetur massa, ', [9.721, 4.237, 2.651, 1.616]);
++    stat(s, '89%', [8.639, 4.662, 1.558, 0.707]);
++  },
++
++  // 13 — three panels over three text blocks
++  (s) => {
++    title(s, T.section, [1.869, 1.781, 5.165, 1.717]);
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442], [7.716, 1.477, 5.153, 0]]);
++    body(s, ' ' + T.morbiLong, [0.845, 4.728, 4.115, 1.919]);
++    [['Description One', 5.764], ['Description Two', 9.534]].forEach(([label, x]) => {
++      heading(s, label, [x, 4.728, 2.39, 0.337]);
++      body(s, T.vivamusCut, [x, 5.022, 2.853, 1.01]);
++    });
++  },
++
++  // 14 — team member profile
++  (s) => {
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442],
++      [7.341, 0.778, 0, 1.869], [3.407, 1.205, 5.153, 0]]);
++    body(s, 'Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis, metus tellus consectetur massa, eget viverra ipsum leo', [1.568, 1.4, 2.234, 2.221]);
++    stat(s, '89%', [0.502, 1.913, 1.6, 0.572], { size: 28 });
++    body(s, T.vestibulum, [1.568, 4.08, 2.304, 1.277]);
++    stat(s, '153k.', [0.45, 4.645, 1.702, 0.572], { size: 28 });
++    s.addText(
++      [{ text: 'Sandra ', options: { color: C.text } }, { text: 'Bullock', options: { color: C.slate } }],
++      { x: 8.391, y: 1.98, w: 3.926, h: 0.64, fontFace: MAJOR, fontSize: 32, bold: true, valign: 'top' });
++    heading(s, 'Graphic Designer', [8.461, 2.659, 2.897, 0.337], { italic: true });
++    body(s, T.morbiLong, [8.461, 3.113, 3.646, 2.221]);
++  },
++
++  // 15 — two stats left, two people right
++  (s) => {
++    title(s, T.section, [0.9, 0.925, 4.652, 1.717]);
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442],
++      [7.907, 1.24, 3.637, 0], [8.333, 0.35, 0, 1.575]]);
++    heading(s, 'Ken Miles', [5.668, 4.542, 2.798, 0.37], { size: 16 });
++    body(s, 'Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. ', [5.67, 4.867, 2.91, 1.313]);
++    heading(s, 'George Lewis', [9.346, 4.542, 2.897, 0.37], { size: 16 });
++    body(s, 'Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi.', [9.346, 4.867, 2.913, 1.01]);
++    [['153k.', 3.076], ['92%', 4.542]].forEach(([num, y]) => {
++      body(s, T.vestibulum, [1.453, y, 3.516, 1.01]);
++      stat(s, num, [0.335, y + 0.565, 1.702, 0.572], { size: 28 });
++    });
++  },
++
++  // 16 — four-up team grid
++  (s) => {
++    ['Ken Miles', 'Robert Vanko', 'Diana Mellisa', 'Juan Pablo'].forEach((name, i) => {
++      const x = 0.893 + i * 2.962;
++      heading(s, name, [x, 5.463, 2.66, 0.337], { align: 'center' });
++      body(s, T.morbi, [x, 5.748, 2.66, 0.671], { align: 'center' });
++    });
++    title(s, T.section, [3.333, 0.732, 6.667, 1.268], { align: 'center' });
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442],
++      [11.684, 1.536, 0, 1.779], [1.313, 2.601, 7.525, 0]]);
++  },
++
++  // 17 — testimonial with 5-star rating
++  (s) => {
++    title(s, T.section, [0.791, 1.577, 5.165, 1.717]);
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442],
++      [8.773, 0.778, 0, 2.03], [6.391, 1.432, 5.153, 0]]);
++    body(s, 'Donec molestie eros at dictum lobortis. Vestibulum tempor ante sit amet eros suscipit auctor. In tempus rhoncus elit, eu auctor mauris ultricies in.', [9.694, 2.17, 2.626, 1.58]);
++    heading(s, 'Jane Shelby', [9.694, 1.726, 2.743, 0.438], { size: 20 });
++    body(s, T.mauris, [1.229, 5.015, 6.97, 1.313]);
++    heading(s, 'Our Team', [0.049, 5.463, 1.922, 0.438], { size: 20, color: C.slate, rotate: 270, align: 'center' });
++    for (let i = 0; i < 5; i++) {
++      s.addShape('star5', {
++        x: 9.748 + i * 0.368, y: 3.956, w: 0.324, h: 0.324,
++        fill: { color: i < 4 ? C.star : C.starOff },
++      });
++    }
++  },
++
++  // 18 — three panels, title bottom-right
++  (s) => {
++    title(s, T.section, [7.301, 4.257, 5.165, 1.717], { align: 'right' });
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442],
++      [6.407, 0.918, 2.577, 0], [7.949, 0.327, 0, 4.442]]);
++    heading(s, 'Description One', [0.926, 4.603, 2.39, 0.337]);
++    body(s, T.vivamusCut, [0.926, 4.897, 2.938, 1.01]);
++    body(s, T.vivamus, [4.439, 1.167, 2.587, 1.919]);
++  },
++
++  // 19 — portfolio grid
++  (s) => {
++    title(s, T.section, [7.891, 1.304, 4.721, 1.717]);
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442],
++      [2.18, 1.432, 5.334, 0], [6.934, 0.778, 0, 1.898]]);
++    [['Portfolio One', 0.84], ['Portfolio Two', 4.502]].forEach(([label, x]) => {
++      heading(s, label, [x, 4.212, 2.897, 0.337]);
++      body(s, 'Nullam a ligula luctus, porttitor libero nec, lacinia libero.', [x, 4.542, 2.653, 0.707]);
++    });
++    heading(s, 'Portfolio Three', [8.164, 5.507, 2.897, 0.337]);
++    body(s, 'Morbi malesuada neque sit amet sem dapibus scelerisque. Sed Bibendum.', [8.164, 5.837, 3.546, 0.707]);
++    body(s, 'Integer sit amet malesuada ipsum, euismod consectetur lectus. Vivamus nec feugiat tortor. Donec dui ligula, aliquam in finibus in, ullamcorper a dolor.', [0.84, 5.75, 6.493, 0.707]);
++  },
++
++  // 20 — tablet mockup
++  (s) => {
++    device(s, [8.99, 0.97, 3.65, 5.56], { bezel: 0.14, bezelY: 0.53, radius: 0.04 });
++    s.addShape('ellipse', {
++      x: 10.65, y: 6.06, w: 0.36, h: 0.36, fill: { color: C.bezel }, line: { color: '6E6E6E', width: 1 },
++    });
++    title(s, T.section, [1.712, 1.505, 5.165, 1.717]);
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442], [1.514, 3.222, 5.153, 0]]);
++    [['Portfolio One', 3.553, 3.619], ['Portfolio Two', 6.45, 6.541]].forEach(([label, x, gx]) => {
++      iconTile(s, [gx, 4.0, 0.79, 0.585]);
++      heading(s, label, [x, 4.712, 2.366, 0.337]);
++      body(s, 'Nulla laoreet fermentum ex eget pulvinar. Vivamus at diam vestibulum, varius quam eu, pellentesque nisl.', [x, 5.042, 2.366, 1.313]);
++    });
++  },
++
++  // 21 — desktop monitor mockup
++  (s) => {
++    monitor(s, -0.36, 1.536, 6.146, 3.66);
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442], [3.9, 2.961, 3.57, 0]]);
++    body(s, T.mauris, [7.772, 3.75, 4.568, 1.919]);
++    heading(s, 'Mockup.', [6.37, 4.492, 1.922, 0.438], { size: 20, color: C.slate, rotate: 270, align: 'right' });
++    title(s, T.section, [7.175, 1.476, 5.165, 1.717]);
++  },
++
++  // 22 — phone mockups + stats
++  (s) => {
++    device(s, [8.92, 0.71, 2.98, 6.04], { bezel: 0.19, bezelY: 0.15, radius: 0.1, screenRadius: 0.08 });
++    device(s, [8.03, 2.0, 1.72, 3.49], { bezel: 0.12, radius: 0.1, screenRadius: 0.08, caption: false });
++    title(s, T.section, [0.791, 1.056, 5.165, 1.717]);
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442],
++      [11.39, 0.327, 0, 2.453], [9.115, 2.418, 3.018, 0]]);
++    body(s, 'Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis, metus tellus consectetur massa, eget viverra ipsum.', [1.405, 4.402, 2.509, 1.919]);
++    stat(s, '93%', [0.34, 4.936, 1.558, 0.572], { size: 28 });
++    body(s, 'Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis.', [4.788, 4.446, 2.509, 1.313]);
++    stat(s, '153k.', [3.701, 4.959, 1.602, 0.572], { size: 28 });
++    body(s, 'Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. Nullam a ligula luctus, porttitor libero nec, lacinia libero. Integer ut diam eu lorem convallis consectetur. Nulla laoreet fermentum ex eget pulvinar. ', [0.836, 2.981, 6.605, 1.01]);
++  },
++
++  // 23 — smartwatch trio
++  (s) => {
++    watch(s, { caseX: 3.97, caseY: 3.3, caseW: 1.48, caseH: 2.12, bandX: 4.36, bandW: 1.22, bandY: 2.46, bandH: 3.79 });
++    watch(s, { caseX: 7.83, caseY: 3.3, caseW: 1.48, caseH: 2.12, bandX: 7.7, bandW: 1.22, bandY: 2.46, bandH: 3.79 });
++    watch(s, {
++      caseX: 5.41, caseY: 3.15, caseW: 2.42, caseH: 2.47, bandX: 5.91, bandW: 1.43, bandY: 2.06, bandH: 4.59,
++      caption: true,
++    });
++    title(s, T.section, [3.459, 0.706, 6.415, 1.125], { align: 'center' });
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442]]);
++    [['Description One', 1.412, 1.991, 2.72], ['Description Two', 0.967, 1.546, 4.16],
++      ['Description Three', 1.412, 1.991, 5.572]].forEach(([label, bx, hx, y]) => {
++      heading(s, label, [hx, y - 0.282, 2.39, 0.337]);
++      body(s, T.augue, [bx, y, 2.781, 0.671], { align: 'left' });
++      iconTile(s, [bx, y - 0.535, 0.588, 0.515]);
++    });
++    heading(s, 'Smartwatch.', [9.716, 2.597, 2.414, 0.438], { size: 20 });
++    body(s, T.nullam, [9.716, 2.991, 2.492, 2.524]);
++  },
++
++  // 24 — clustered column chart with four captions
++  (s) => {
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442]]);
++    title(s, T.section, [3.333, 0.732, 6.667, 1.268], { align: 'center' });
++    s.addChart('bar', [
++      { name: 'Series 1', labels: CATS4, values: [4.3, 2.5, 3.5, 4.5] },
++      { name: 'Series 2', labels: CATS4, values: [2.4, 4.4, 1.8, 2.8] },
++    ], chartOpts({
++      x: 1.387, y: 1.771, w: 10.56, h: 3.45,
++      barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 444, barOverlapPct: -90,
++      catAxisHidden: true, valAxisHidden: true,
++      catGridLine: { color: C.grid, style: 'solid', size: 1 }, valGridLine: { style: 'none' },
++      showValue: true, dataLabelPosition: 'outEnd',
++    }));
++    for (let i = 0; i < 4; i++) {
++      const x = 1.747 + i * 2.5605;
++      heading(s, 'Description One', [x - 0.122, 5.411, 2.39, 0.337], { align: 'center' });
++      body(s, T.vivamusShort, [x, 5.688, 2.146, 1.01], { align: 'center' });
++    }
++  },
++
++  // 25 — 100% stacked bar chart
++  (s) => {
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442]]);
++    s.addChart('bar', [
++      { name: 'Series 1', labels: ['1', '2', '3', '4'], values: [4.3, 2.5, 3.5, 4.5] },
++      { name: 'Series 2', labels: ['1', '2', '3', '4'], values: [2.4, 4.4, 1.8, 2.8] },
++      { name: 'Series 3', labels: ['1', '2', '3', '4'], values: [2, 2, 3, 5] },
++    ], chartOpts({
++      x: 2.889, y: 0.787, w: 8.889, h: 4.434,
++      barDir: 'bar', barGrouping: 'percentStacked', barGapWidthPct: 150, barOverlapPct: 100,
++      catAxisLineColor: C.grid, valAxisLineShow: false, valAxisLabelFormatCode: '0%',
++      catGridLine: { style: 'none' }, valGridLine: { color: C.grid, style: 'solid', size: 1 },
++    }));
++    body(s, 'Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus..', [2.889, 5.55, 8.5, 1.01]);
++    title(s, T.section, [-0.997, 3.084, 5.926, 1.332], { align: 'center', rotate: 270 });
++  },
++
++  // 26 — area chart
++  (s) => {
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442]]);
++    // Passing the area chart in combo form makes pptxgenjs emit
++    // crossBetween="midCat", so the plot meets both axes like the original.
++    s.addChart([{ type: 'area', data: [
++      { name: 'Series 1', labels: MONTHS, values: [32, 32, 28, 12, 15] },
++      { name: 'Series 2', labels: MONTHS, values: [12, 12, 12, 21, 28] },
++      { name: 'Series 3', labels: MONTHS, values: [13, 14, 12, 16, 18] },
++    ] }], chartOpts({
++      x: 0.626, y: 1.204, w: 7.308, h: 5.38,
++      catAxisLineColor: C.grid, valAxisLineShow: false,
++      catGridLine: { style: 'none' }, valGridLine: { color: C.grid, style: 'solid', size: 1 },
++    }));
++    body(s, T.mauris, [8.455, 2.763, 3.198, 2.827]);
++    heading(s, 'Chart.', [7.495, 3.241, 1.394, 0.438], { size: 20, color: C.slate, rotate: 270, align: 'right' });
++    title(s, T.section, [7.974, 0.843, 4.717, 1.717]);
++  },
++
++  // 27 — dotted flight path with four milestones
++  (s) => {
++    flightPath(s);
++    paperPlane(s);
++    [['Description One', 1.683, 2.475, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris ligula sem, mollis ut blandit vel.', 3.086, 1.01],
++      ['Description Two', 5.378, 2.023, 'Duis rhoncus, nulla nec accumsan facilisis, metus tellus consectetur massa.', 3.548, 0.707],
++      ['Description Three', 6.406, 5.786, 'Morbi malesuada neque sit amet sem dapibus scelerisque. ', 3.214, 0.707],
++      ['Description Four', 9.548, 4.294, 'Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet', 3.091, 1.01],
++    ].forEach(([label, x, y, copy, cw, ch]) => {
++      heading(s, label, [x, y, 2.779, 0.337], { valign: 'bottom', margin: [0, 0, 0.05, 0.05] });
++      body(s, copy, [x + 0.007, y + 0.271, cw, ch], { align: 'left', color: C.gray, margin: [0, 0, 0.05, 0.05] });
++    });
++    [[0.688, 2.572, C.accent1], [5.678, 3.189, C.accent2],
++      [5.427, 5.781, C.accent3], [9.437, 3.353, C.accent4]].forEach(([x, y, color]) => {
++      s.addShape('ellipse', { x, y, w: 0.728, h: 0.728, fill: { color } });
++    });
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442]]);
++    title(s, T.section, [0.709, 0.706, 7.396, 1.294]);
++  },
++
++  // 28 — logo band, two icon captions, four-series column chart
++  (s) => {
++    frame(s, [[7.333, 6.888, 5.153, 0], [0.626, 0.778, 0, 4.442]]);
++    body(s, 'Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. Nullam a ligula luctus, porttitor libero nec, lacinia libero. ', [0.836, 2.688, 5.59, 0.671]);
++    title(s, T.section, [0.836, 0.9, 5.165, 1.717]);
++    const CATS28 = ['Description 1', 'Description 2', '', '']; // sheet has 4 rows, 2 filled
++    s.addChart('bar', [
++      { name: 'Series 1', labels: CATS28, values: [4.3, 2.5, null, null] },
++      { name: 'Series 2', labels: CATS28, values: [2.4, 4.4, null, null] },
++      { name: 'Series 3', labels: CATS28, values: [2.7, 3.7, null, null] },
++      { name: 'Series 32', labels: CATS28, values: [3.1, 2.7, null, null] },
++    ], chartOpts({
++      x: 1.105, y: 3.529, w: 9.791, h: 3.365,
++      barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 444, barOverlapPct: -90,
++      valAxisHidden: true, catAxisLineColor: C.grid,
++      catAxisLabelFontSize: 10.5, catGridLine: { style: 'none' }, valGridLine: { style: 'none' },
++      showValue: true, dataLabelPosition: 'outEnd',
++    }));
++    [[2.806, 6.867, 2.813, 0.649, 0.661, 'gear'], [4.902, 6.903, 4.847, 0.576, 0.668, 'pie']].forEach(
++      ([y, gx, gy, gw, gh, motif]) => {
++        heading(s, 'Description Two', [7.673, y, 2.39, 0.337]);
++        body(s, T.vivamus, [7.673, y + 0.288, 4.347, 1.313]);
++        iconRing(s, [gx, gy, gw, gh], { motif });
++      });
++  },
++
++  // 29 — contact details
++  (s) => {
++    title(s, T.section, [1.086, 0.932, 5.293, 1.789], { align: 'center' });
++    frame(s, [[0.626, 0.778, 0, 4.442], [7.333, 6.888, 5.153, 0]]);
++    s.addText('Get in touch with us', {
++      x: 2.128, y: 2.788, w: 3.209, h: 0.404,
++      fontFace: MINOR, fontSize: 18, bold: true, align: 'center', valign: 'middle',
++    });
++    body(s, 'Integer sit amet malesuada ipsum, euismod consectetur lectus. Vivamus nec feugiat tortor. Donec dui ligula, aliquam in finibus in.', [1.856, 3.205, 3.754, 1.01], { align: 'center' });
++    [['Email Address', 'message@email.com', 2.876, 4.421, 'mail', 2.275, 4.551, 0.281, 0.209],
++      ['Phone', '+24 246 2324 7543', 2.855, 5.124, 'phone', 2.297, 5.233, 0.193, 0.295],
++      ['Url Website', 'www.yourwebsite.com', 2.871, 5.817, 'globe', 2.281, 5.995, 0.257, 0.26],
++    ].forEach(([label, value, x, y, kind, gx, gy, gw, gh]) => {
++      s.addText(label, { x, y, w: 2.314, h: 0.441, fontFace: MINOR, fontSize: HEAD_SZ, bold: true, valign: 'middle' });
++      s.addText(value, {
++        x, y: y + 0.255, w: 2.314, h: 0.37,
++        fontFace: MINOR, fontSize: BODY_SZ, lineSpacingMultiple: 1.5, valign: 'top',
++      });
++      contactIcon(s, kind, [gx, gy, gw, gh]);
++    });
++  },
++
++  // 30 — closing cover
++  (s) => cover(s, 'Thank You', 'Artha Presentation Template Design'),
++];
++
++/* -------------------------------------------------------------------- main */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5 in — matches the reference exactly
++  pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
++  pptx.title = 'Artha Presentation Template Design';
++
++  SLIDES.forEach((draw) => {
++    const slide = pptx.addSlide();
++    slide.background = { color: C.white };
++    draw(slide);
++  });
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '13a2ba49-3b87-41bc-be5a-574c223f83ee_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => {
++  console.error(e);
++  process.exit(1);
++});

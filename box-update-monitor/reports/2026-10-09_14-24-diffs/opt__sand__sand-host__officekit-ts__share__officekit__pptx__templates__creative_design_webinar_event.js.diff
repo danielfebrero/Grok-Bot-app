@@ -1,0 +1,771 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/creative_design_webinar_event.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/creative_design_webinar_event.js
+@@ -0,0 +1,768 @@
++/**
++ * Kraftudio webinar deck — recreated with pptxgenjs.
++ * Run: node 1475a68d-ecd6-469e-96bc-f296b4fe7258_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette ---
++const C = {
++  dark: '0E042A',        // accent1  - deep indigo
++  plum: '751E84',        // accent2  - card purple
++  magenta: 'E047EB',     // accent3  - highlight magenta
++  plumDark: '581763',    // accent2 @ 75% luminance - gradient origin
++  magentaDark: '820F8A', // accent3 @ 50% luminance
++  white: 'FFFFFF',
++  offWhite: 'F2F2F2',    // bg1 @ 95%
++  grey: 'BFBFBF',        // bg1 @ 75%
++  imgFill: 'CCCCCC',     // stand-in tone for the deck's photographs
++  imgLabel: '9A9AA2'
++};
++
++const FONT_D = 'Bebas Neue';   // display / headline face
++const FONT_T = 'Roboto';       // body face
++const FONT_S = 'Roboto SemiBold';
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++// Repeated copy blocks.
++const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent ut nunc eget felis commodo interdum. Etiam odio sapien, gravida laoreet magna vel, sollicitudin pretium metus. Nunc malesuada';
++const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent ut nunc eget felis commodo interdum. Etiam odio sapien, gravida laoreet';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent ut nunc eget';
++
++const NO_LINE = { type: 'none' };
++
++// ------------------------------------------------------------- primitives ---
++
++function hexMix(a, b, t) {
++  const ch = (s, i) => parseInt(s.substr(i, 2), 16);
++  return [0, 2, 4]
++    .map(i => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, '0'))
++    .join('')
++    .toUpperCase();
++}
++
++function rect(slide, x, y, w, h, color) {
++  slide.addShape('rect', { x, y, w, h, fill: { color }, line: NO_LINE });
++}
++
++function roundRect(slide, x, y, w, h, color, radius) {
++  slide.addShape('roundRect', { x, y, w, h, rectRadius: radius, fill: { color }, line: NO_LINE });
++}
++
++// Every slide shares one 45-degree gradient running plumDark (top-left) to dark
++// (bottom-right); DIAG is its length along the gradient axis.
++const DIAG = (SLIDE_W + SLIDE_H) / Math.SQRT2;
++
++/** Paints the shared gradient as a fan of rotated bands. */
++function deckBackdrop(slide) {
++  const bands = 48;
++  const band = DIAG / bands;
++  slide.background = { color: C.dark };
++  for (let i = 0; i < bands; i++) {
++    const t = (i + 0.5) / bands;
++    const shift = ((t - 0.5) * DIAG) / Math.SQRT2;
++    slide.addShape('rect', {
++      x: SLIDE_W / 2 + shift - band / 2 - 0.01,
++      y: SLIDE_H / 2 + shift - (DIAG + 2) / 2,
++      w: band + 0.02,
++      h: DIAG + 2,
++      rotate: 45,
++      fill: { color: hexMix(C.plumDark, C.dark, t) },
++      line: NO_LINE
++    });
++  }
++}
++
++/**
++ * Arc segment: a band of a circle running from angle a0 to a1 (degrees, 0 = 3
++ * o'clock). Where the reference artwork runs off the slide the angles below are
++ * widened slightly so the band bleeds past the edge instead of ending in mid-air.
++ */
++function arcBand(slide, cx, cy, rOuter, thickness, a0, a1, color) {
++  slide.addShape('blockArc', {
++    x: cx - rOuter, y: cy - rOuter, w: rOuter * 2, h: rOuter * 2,
++    angleRange: [(a0 + 360) % 360, (a1 + 360) % 360],
++    arcThicknessRatio: thickness / rOuter,
++    fill: { color }, line: NO_LINE
++  });
++}
++
++/** Closed ring, drawn as two half arcs (pptxgenjs has no adjustable donut). */
++function ring(slide, cx, cy, rOuter, thickness, color) {
++  arcBand(slide, cx, cy, rOuter, thickness, 0, 180, color);
++  arcBand(slide, cx, cy, rOuter, thickness, 180, 360, color);
++}
++
++/** Circular segment: the cap of a circle, `depth` deep, measured down from the top. */
++function circleCap(slide, cx, cy, r, depth, color) {
++  const half = (Math.acos(Math.max(-1, Math.min(1, 1 - depth / r))) * 180) / Math.PI;
++  slide.addShape('chord', {
++    x: cx - r, y: cy - r, w: r * 2, h: r * 2,
++    angleRange: [270 - half, 270 + half],
++    fill: { color }, line: NO_LINE
++  });
++}
++
++/**
++ * The deck's signature "quarter tile": a square with one corner swept out into a
++ * quarter circle. Unrotated the sweep sits at the top-left.
++ */
++function quarterTile(slide, x, y, size, color, rotate) {
++  const s = size;
++  slide.addShape('custGeom', {
++    x, y, w: s, h: s, rotate: rotate || 0,
++    fill: { color }, line: NO_LINE,
++    points: [
++      { x: s, y: 0 },
++      { x: s, y: s },
++      { x: 0, y: s },
++      { x: s * 0.0107, y: s * 0.8938 },
++      { curve: { type: 'cubic', x1: s * 0.1008, y1: s * 0.4538, x2: s * 0.4476, y2: s * 0.1071 }, x: s * 0.8881, y: s * 0.0170 },
++      { close: true }
++    ]
++  });
++}
++
++/** 3 x 5 grid of small dots — the deck's recurring texture patch. */
++function dotGrid(slide, x, y, w, h, color, rotate) {
++  const cols = [0.1174, 0.4996, 0.8826];
++  const rows = [0.0644, 0.2700, 0.4755, 0.7055, 0.9356];
++  const d = 0.2348 * w;
++  const rad = ((rotate || 0) * Math.PI) / 180;
++  const cos = Math.cos(rad), sin = Math.sin(rad);
++  cols.forEach(cx => rows.forEach(cy => {
++    const px = (cx - 0.5) * w, py = (cy - 0.5) * h;
++    slide.addShape('ellipse', {
++      x: x + w / 2 + px * cos - py * sin - d / 2,
++      y: y + h / 2 + px * sin + py * cos - d / 2,
++      w: d, h: d, fill: { color }, line: NO_LINE
++    });
++  }));
++}
++
++/** Small "hamburger" menu glyph at the top-right of every slide. */
++function menuGlyph(slide, x, y, w, h) {
++  for (let i = 0; i < 3; i++) {
++    const ty = y + h * (i * 0.3794);
++    rect(slide, x, ty + h * 0.0179, w * 0.150, h * 0.205, C.offWhite);
++    rect(slide, x + w * 0.2324, ty, w * 0.7676, h * 0.2407, C.offWhite);
++  }
++}
++
++/** Kraftudio mark: a stylised magenta tulip built from two polygons. */
++function brandMark(slide, x, y, w, h) {
++  const scale = pts => pts.map(([px, py]) => ({ x: px * w, y: py * h }));
++  slide.addShape('custGeom', {
++    x, y, w, h, fill: { color: C.magenta }, line: NO_LINE,
++    points: scale([[0.7607, 0.2184], [0.7607, 0.3412], [0.5002, 0.4593], [0.2393, 0.3411],
++      [0.2393, 0.2183], [0.5002, 0.3364], [0.5002, 0.1181], [0.2393, 0.0000],
++      [0.2393, 0.2181], [0.0000, 0.1097], [0.0000, 0.5549], [0.2393, 0.6633],
++      [0.2393, 0.5592], [0.5000, 0.6776], [0.7607, 0.5593], [0.7607, 0.6636],
++      [1.0000, 0.5552], [1.0000, 0.1098]]).concat([{ close: true }])
++  });
++  slide.addShape('custGeom', {
++    x, y, w, h, fill: { color: C.magenta }, line: NO_LINE,
++    points: scale([[0.5000, 0.7817], [0.5000, 1.0000], [0.7607, 0.8819], [0.7607, 0.6636]])
++      .concat([{ close: true }])
++  });
++}
++
++// ---------------------------------------------------------------- text ------
++
++function text(slide, str, o) {
++  slide.addText(str, Object.assign({ fontFace: FONT_T, color: C.offWhite, valign: 'top' }, o));
++}
++
++/** Multi-line display headline; one array entry per line. */
++function headline(slide, lines, o) {
++  const runs = lines.map((line, i) => ({ text: line, options: { breakLine: i < lines.length - 1 } }));
++  slide.addText(runs, Object.assign({
++    fontFace: FONT_D, color: C.offWhite, fontSize: 36, valign: 'top', wrap: false
++  }, o));
++}
++
++/** Small magenta kicker label sitting above a headline. */
++function kicker(slide, str, x, y, w, o) {
++  text(slide, str, Object.assign({
++    x, y, w, h: 0.337, fontFace: FONT_S, fontSize: 14, color: C.magenta, wrap: false
++  }, o));
++}
++
++/** Grey body paragraph at 150% line spacing. */
++function body(slide, str, x, y, w, h, o) {
++  text(slide, str, Object.assign({
++    x, y, w, h, fontSize: 11, color: C.grey, lineSpacingMultiple: 1.5
++  }, o));
++}
++
++// --------------------------------------------------------- image stand-ins --
++
++/**
++ * Placeholder standing in for a photograph in the original deck.
++ * `bleed` names the sides that run off the slide, so their corners stay square.
++ */
++function photo(slide, x, y, w, h, opts) {
++  const o = opts || {};
++  const r = o.radius === undefined ? 0.18 : o.radius;
++  let px = x, py = y, pw = w, ph = h;
++  (o.bleed || []).forEach(side => {
++    if (side === 'left') { px -= r; pw += r; }
++    if (side === 'right') { pw += r; }
++    if (side === 'top') { py -= r; ph += r; }
++    if (side === 'bottom') { ph += r; }
++  });
++  if (r > 0) roundRect(slide, px, py, pw, ph, C.imgFill, r);
++  else rect(slide, px, py, pw, ph, C.imgFill);
++  if (o.label !== false) {
++    text(slide, '[image]', {
++      x, y: Math.min(y + h / 2 - 0.16, SLIDE_H - 0.55), w, h: 0.32,
++      align: 'center', fontSize: 11, color: C.imgLabel
++    });
++  }
++}
++
++/**
++ * Portrait card: a photo placeholder veiled by a scrim that starts clear at
++ * `fadeTop` and reaches full dark at the bottom edge, as in the reference deck.
++ */
++function photoFade(slide, x, y, w, h, radius, fadeTop, bleed) {
++  photo(slide, x, y, w, h, { radius, bleed, label: false });
++  const steps = 34;
++  const span = y + h - fadeTop;
++  for (let i = 0; i < steps; i++) {
++    const t = (i + 0.5) / steps;
++    rect(slide, x, fadeTop + (span * i) / steps, w, span / steps + 0.012,
++      hexMix(C.imgFill, C.dark, t));
++  }
++  if (!(bleed || []).includes('bottom')) {
++    roundRect(slide, x, y + h - 3 * radius, w, 3 * radius, C.dark, radius);
++  }
++  text(slide, '[image]', {
++    x, y: y + 0.30, w, h: 0.32, align: 'center', fontSize: 11, color: C.imgLabel
++  });
++}
++
++/**
++ * Round photo placeholder veiled by a scrim that runs opaque plum at the top of
++ * the circle to fully transparent at the bottom. Painted as nested caps whose
++ * colours are the scrim composited over the placeholder grey.
++ */
++function photoDisc(slide, cx, cy, r) {
++  const steps = 46;
++  slide.addShape('ellipse', {
++    x: cx - r, y: cy - r, w: r * 2, h: r * 2, fill: { color: C.imgFill }, line: NO_LINE
++  });
++  for (let i = steps; i >= 1; i--) {
++    const t = i / steps;               // fraction of the disc height covered
++    const veil = hexMix(C.plum, C.dark, t);
++    circleCap(slide, cx, cy, r, 2 * r * t, hexMix(C.imgFill, veil, 1 - t));
++  }
++}
++
++// ------------------------------------------------- shared slide furniture ---
++
++/** Top navigation bar repeated on every slide. */
++function chrome(slide) {
++  brandMark(slide, 0.866, 0.645, 0.223, 0.277);
++  text(slide, 'Kraftudio', { x: 1.223, y: 0.640, w: 1.769, h: 0.286, fontSize: 11, bold: true });
++  text(slide, 'Dashboard', { x: 8.890, y: 0.640, w: 1.769, h: 0.286, fontSize: 11, align: 'right' });
++  text(slide, 'Speakers', { x: 10.587, y: 0.640, w: 1.347, h: 0.286, fontSize: 11, align: 'right' });
++  menuGlyph(slide, 12.396, 0.710, 0.201, 0.147);
++}
++
++// ================================================================ slides ====
++
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  arcBand(s, 0.889, -0.295, 2.375, 0.313, 5.1, 117.8, C.magenta);   // top-left swoosh
++  arcBand(s, 13.919, 8.217, 4.467, 1.197, 187.4, 264.4, C.magenta);  // bottom-right swoosh
++
++  dotGrid(s, 0.553, 6.532, 0.672, 1.224, C.plum);
++  dotGrid(s, 12.226, 3.144, 0.542, 0.987, C.plum);
++  dotGrid(s, 3.555, 0.328, 0.479, 0.890, C.plum, 90);
++  quarterTile(s, 11.036, 5.785, 0.720, C.plum, 270);
++  quarterTile(s, 1.225, 3.691, 0.585, C.plum, 0);
++
++  chrome(s);
++  text(s, '07 March 2026', {
++    x: 5.543, y: 1.474, w: 2.248, h: 0.606, fontFace: FONT_D, fontSize: 30, align: 'center', wrap: false
++  });
++  s.addText([
++    { text: 'Unleash Your', options: { color: C.offWhite, breakLine: true } },
++    { text: 'Creativity', options: { color: C.magenta } }
++  ], {
++    x: 2.790, y: 2.355, w: 7.754, h: 3.551, fontFace: FONT_D, fontSize: 120,
++    lineSpacing: 120, align: 'center', valign: 'top', wrap: false
++  });
++  text(s, 'Unleashing creativity through insights for innovative design solutions that help transform your vision into a unique masterpiece.', {
++    x: 3.829, y: 5.574, w: 5.675, h: 0.673, fontSize: 12, align: 'center', lineSpacingMultiple: 1.5
++  });
++}
++
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  // Layout artwork: two rounded photo tiles behind a magenta ring.
++  photo(s, 7.029, 1.299, 2.746, 3.065, { radius: 0.222 });
++  photo(s, 10.073, 3.597, 2.746, 2.895, { radius: 0.187 });
++  ring(s, 9.924, 4.028, 1.281, 0.344, C.magenta);
++  dotGrid(s, 10.704, 2.439, 0.479, 0.890, C.plum, 90);
++  quarterTile(s, 8.550, 4.948, 0.720, C.plum, 270);
++  arcBand(s, 0.293, 9.788, 3.732, 1.048, 261.8, 324.1, C.magenta); // bottom-left swoosh
++
++  chrome(s);
++  kicker(s, 'Welcome', 1.266, 1.781, 1.017);
++  headline(s, ['SHOWCASING INNOVATION, ', 'SHAPING FUTURE DESIGN', 'TRENDS AND IDEAS'],
++    { x: 1.240, y: 2.120, w: 4.253, h: 1.919 });
++  body(s, LOREM_LONG, 1.223, 4.038, 5.158, 0.903);
++  text(s, 'Main Topic', { x: 1.274, y: 5.270, w: 1.045, h: 0.303, fontFace: FONT_S, fontSize: 12, color: C.magenta, wrap: false });
++  text(s, 'Design Graphic', { x: 2.560, y: 5.214, w: 1.575, h: 0.438, fontFace: FONT_D, fontSize: 20, color: C.white, wrap: false });
++
++  quarterTile(s, 4.934, 1.085, 0.495, C.plum, 180);
++  dotGrid(s, 6.345, 5.808, 0.479, 0.890, C.plum, 90);
++  quarterTile(s, 9.505, 1.580, 0.540, C.plum, 90);
++}
++
++/** Tiny magenta pictograms used on the slide-3 benefit cards. */
++function benefitIcon(slide, kind, x, y) {
++  if (kind === 'head') {
++    slide.addShape('ellipse', { x: x + 0.015, y, w: 0.215, h: 0.215, fill: { color: C.magenta }, line: NO_LINE });
++    rect(slide, x + 0.035, y + 0.125, 0.125, 0.125, C.magenta);
++    rect(slide, x + 0.113, y + 0.055, 0.018, 0.105, C.plum);
++    rect(slide, x + 0.095, y + 0.093, 0.055, 0.02, C.plum);
++  } else if (kind === 'badge') {
++    ring(slide, x + 0.118, y + 0.10, 0.105, 0.028, C.magenta);
++    slide.addShape('triangle', { x: x + 0.03, y: y + 0.165, w: 0.075, h: 0.105, rotate: 205, fill: { color: C.magenta }, line: NO_LINE });
++    slide.addShape('triangle', { x: x + 0.135, y: y + 0.165, w: 0.075, h: 0.105, rotate: 155, fill: { color: C.magenta }, line: NO_LINE });
++    slide.addShape('ellipse', { x: x + 0.082, y: y + 0.055, w: 0.075, h: 0.085, fill: { color: C.magenta }, line: NO_LINE });
++  } else {
++    slide.addShape('trapezoid', { x: x + 0.06, y: y + 0.005, w: 0.155, h: 0.125, rotate: 180, fill: { color: C.magenta }, line: NO_LINE });
++    rect(slide, x + 0.118, y + 0.11, 0.04, 0.085, C.magenta);
++    rect(slide, x + 0.075, y + 0.185, 0.125, 0.032, C.magenta);
++    rect(slide, x + 0.043, y + 0.008, 0.03, 0.065, C.magenta);
++    rect(slide, x + 0.203, y + 0.008, 0.03, 0.065, C.magenta);
++  }
++}
++
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  arcBand(s, 14.014, 8.164, 3.675, 0.984, 188.4, 261.3, C.magenta);
++  photo(s, 8.029, 1.467, 4.096, 6.033, { radius: 0.264, bleed: ['bottom'] });
++
++  chrome(s);
++  kicker(s, 'Reason to Joiin', 1.266, 1.477, 1.566);
++  headline(s, ['The Reason Why You', 'Should Join This Webinar'], { x: 1.240, y: 1.837, w: 4.339, h: 1.313 });
++  body(s, LOREM_LONG, 1.223, 3.150, 5.158, 0.903);
++  quarterTile(s, 4.934, 1.085, 0.495, C.plum, 180);
++  dotGrid(s, 7.673, 3.066, 0.479, 0.890, C.plum, 90);
++
++  const cards = [
++    { x: 1.266, icon: 'head', title: 'World Class Speakers', lines: ['Sertified excellent speaker who', 'Exceed in design prospects'] },
++    { x: 4.308, icon: 'badge', title: 'Best Experience', lines: ['Experience the vast majority of', 'Ddsign expert\u2019s way'] },
++    { x: 7.351, icon: 'trophy', title: 'Social Networking', lines: ['Helping the attendee to gain', 'High-rank networking'] }
++  ];
++  cards.forEach(card => {
++    roundRect(s, card.x, 4.384, 2.788, 2.040, C.plum, 0.109);
++    benefitIcon(s, card.icon, card.x + 0.24, 4.79);
++    text(s, card.title, { x: card.x + 0.262, y: 5.203, w: 2.4, h: 0.337, fontFace: FONT_S, fontSize: 14, wrap: false });
++    text(s, card.lines.join('\n'), {
++      x: card.x + 0.262, y: 5.497, w: 2.370, h: 0.625, fontSize: 11, color: C.grey, lineSpacingMultiple: 1.5
++    });
++  });
++}
++
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  // Magenta sweep, then the big photo disc that partly covers it.
++  arcBand(s, 11.716, -1.669, 4.545, 0.691, 63.2, 160.3, C.magenta);
++  photoDisc(s, 12.170, 5.702, 4.090);
++  text(s, '[image]', { x: 9.4, y: 3.2, w: 2.4, h: 0.32, align: 'center', fontSize: 11, color: '9E7CAB' });
++
++  chrome(s);
++  const steps = [
++    { y: 1.586, title: 'Create Account' },
++    { y: 3.423, title: 'Purchase Tickets' },
++    { y: 5.129, title: 'Join Seminar' }
++  ];
++  steps.forEach(step => {
++    text(s, step.title, { x: 2.333, y: step.y, w: 2.2, h: 0.438, fontFace: FONT_D, fontSize: 20, color: C.white, wrap: false });
++    body(s, LOREM_MED, 2.333, step.y + 0.460, 3.750, 0.903);
++  });
++
++  // Quarter-tile clusters marking each step.
++  quarterTile(s, 1.183, 1.580, 0.745, C.magenta, 0);
++  quarterTile(s, 1.719, 1.805, 0.412, C.plum, 180);
++  quarterTile(s, 1.164, 3.375, 0.771, C.plum, 180);
++  quarterTile(s, 1.633, 3.861, 0.302, C.magenta, 90);
++  quarterTile(s, 1.089, 5.348, 0.555, C.plum, 270);
++  quarterTile(s, 1.399, 5.010, 0.557, C.magenta, 90);
++
++  dotGrid(s, 7.719, 1.731, 0.542, 0.987, C.plum, 90);
++  quarterTile(s, 6.146, 1.151, 0.720, C.plum, 90);
++  ring(s, 0.126, 7.992, 1.424, 0.383, C.magenta);
++
++  text(s, 'How To Register', { x: 7.353, y: 4.926, w: 1.662, h: 0.337, fontFace: FONT_S, fontSize: 14, wrap: false });
++  headline(s, ['How To Join Our Creative ', 'Webinar Through Our Web'], { x: 7.327, y: 5.286, w: 4.520, h: 1.313 });
++}
++
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  ring(s, 6.756, 4.016, 0.612, 0.164, C.magentaDark);
++  arcBand(s, 13.340, 8.836, 3.673, 0.988, 199.4, 272.0, C.magenta);
++
++  chrome(s);
++  kicker(s, 'Meet Us Here', 1.583, 1.574, 1.399);
++  headline(s, ['Location  of Our Design', 'Webinar Are Here'], { x: 1.557, y: 1.923, w: 4.062, h: 1.313 });
++  text(s, 'Explore bold ideas & cutting-edge design at Modern expo 20 where creativity meets future.', {
++    x: 1.547, y: 3.149, w: 3.682, h: 0.625, fontSize: 11, color: C.grey, lineSpacingMultiple: 1.5
++  });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent ut nunc eget felis commodo interdum. Etiam odio sapien, gravida laoreet magna vel, sollicitudin pretium metus. Nunc',
++    7.643, 4.038, 4.740, 0.903);
++
++  // Date card (plum) and location card (magenta).
++  roundRect(s, 7.029, 1.650, 5.279, 2.100, C.plum, 0.152);
++  text(s, 'Date', { x: 9.359, y: 2.030, w: 0.607, h: 0.337, fontFace: FONT_S, fontSize: 14, color: C.magenta, align: 'center', wrap: false });
++  text(s, 'Premiere on November 2025\n20th to 25th ', {
++    x: 7.366, y: 2.370, w: 4.494, h: 1.043, fontFace: FONT_D, fontSize: 28, align: 'center'
++  });
++  roundRect(s, 1.223, 4.264, 5.279, 2.100, C.magenta, 0.152);
++  text(s, 'Location', { x: 3.360, y: 4.644, w: 0.965, h: 0.337, fontFace: FONT_S, fontSize: 14, color: C.plum, wrap: false });
++  text(s, 'Design District Hall, 123 Creative Avenue, Palo Alto, CA', {
++    x: 1.560, y: 4.984, w: 4.494, h: 1.043, fontFace: FONT_D, fontSize: 28, align: 'center'
++  });
++
++  quarterTile(s, 10.131, 5.777, 0.720, C.plum, 270);
++  dotGrid(s, 6.894, 1.792, 0.256, 0.476, C.magenta, 90);
++  quarterTile(s, 6.063, 3.329, 0.440, C.magenta, 0);
++  dotGrid(s, 7.932, 5.919, 0.479, 0.890, C.plum, 90);
++}
++
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  arcBand(s, 13.340, 1.104, 3.672, 0.985, 88.0, 206.3, C.magenta);
++
++  chrome(s);
++  kicker(s, 'Speaker\u2019s Schedule', 1.266, 1.770, 1.929);
++  headline(s, ['Schedule'], { x: 1.240, y: 2.064, w: 1.745, h: 0.707 });
++  body(s, LOREM_LONG, 3.963, 1.714, 5.158, 0.903);
++  quarterTile(s, 4.934, 1.085, 0.495, C.plum, 180);
++  dotGrid(s, 12.000, 2.762, 0.479, 0.890, C.plum, 180);
++
++  const days = [
++    { x: 2.541, photoX: 2.081, photoY: 3.777, name: 'John Smith', nameX: 2.598, nameW: 1.199 },
++    { x: 6.000, photoX: 5.528, photoY: 3.750, name: 'Michael Dennis', nameX: 5.919, nameW: 1.601 },
++    { x: 9.459, photoX: 9.018, photoY: 3.750, name: 'Sarah Michelle', nameX: 9.320, nameW: 1.632 }
++  ];
++  days.forEach((day, i) => {
++    photo(s, day.photoX, day.photoY, 2.278, 1.762, { radius: 0.140 });
++    roundRect(s, day.x, 3.197, 1.333, 0.655, C.plum, 0.054);
++    text(s, 'Day ' + (i + 1), { x: day.x + 0.269, y: 3.272, w: 0.796, h: 0.505, fontFace: FONT_D, fontSize: 24, wrap: false });
++    text(s, day.name, { x: day.nameX, y: 5.637, w: day.nameW, h: 0.438, fontFace: FONT_D, fontSize: 20, align: 'center', wrap: false });
++    const mid = day.x + 0.6665;
++    text(s, 'Introduction Creative Design', {
++      x: mid - 1.293, y: 5.971, w: 2.586, h: 0.303, fontFace: FONT_S, fontSize: 12, color: C.grey, align: 'center'
++    });
++    s.addShape('line', { x: mid - 0.349, y: 6.361, w: 0.698, h: 0, line: { color: C.magenta, width: 0.75 } });
++    text(s, '08.00 \u2013 10.00 AM', {
++      x: mid - 1.293, y: 6.439, w: 2.586, h: 0.337, fontFace: FONT_S, fontSize: 14, color: C.magenta, align: 'center'
++    });
++  });
++}
++
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  photo(s, 0.002, 1.318, 6.665, 2.761, { radius: 0.143, bleed: ['left'] });
++  arcBand(s, -0.574, 9.557, 3.669, 0.990, 277.1, 328.0, C.magenta);
++  ring(s, 13.233, 7.385, 1.129, 0.303, C.magenta);
++
++  chrome(s);
++  kicker(s, 'Counter', 7.342, 1.857, 0.903);
++  headline(s, ['Our Happy Fun Numbers'], { x: 7.316, y: 2.207, w: 4.115, h: 0.707 });
++  body(s, LOREM_LONG, 7.299, 2.872, 5.158, 0.903);
++
++  // Three counters, each with its own quarter-tile ornament above.
++  quarterTile(s, 2.724, 4.733, 0.745, C.magenta, 0);
++  quarterTile(s, 3.260, 4.958, 0.412, C.plum, 180);
++  quarterTile(s, 6.101, 4.708, 0.771, C.plum, 180);
++  quarterTile(s, 6.570, 5.193, 0.302, C.magenta, 90);
++  quarterTile(s, 9.474, 5.007, 0.555, C.plum, 270);
++  quarterTile(s, 10.000, 4.686, 0.552, C.magenta, 90);
++
++  const stats = [
++    { value: '89K', vx: 2.642, vw: 0.814, valign: 'left', label: 'Total\nMembers', lx: 3.469, lw: 1.550 },
++    { value: '200+', vx: 5.963, vw: 1.008, valign: 'center', label: 'Completed\nWebinar', lx: 7.124, lw: 1.582 },
++    { value: '$900', vx: 9.173, vw: 1.008, valign: 'center', label: 'Total\nRevenue', lx: 10.352, lw: 1.582 }
++  ];
++  stats.forEach(stat => {
++    text(s, stat.value, { x: stat.vx, y: 5.823, w: stat.vw, h: 0.707, fontFace: FONT_D, fontSize: 36, align: stat.valign, wrap: false });
++    text(s, stat.label, { x: stat.lx, y: 5.891, w: stat.lw, h: 0.572, fontFace: FONT_S, fontSize: 14, color: C.magenta });
++  });
++
++  quarterTile(s, 6.383, 1.054, 0.495, C.plum, 90);
++  dotGrid(s, 12.105, 1.397, 0.416, 0.758, C.plum, 90);
++  dotGrid(s, 12.597, 5.772, 0.416, 0.758, C.plum, 180);
++}
++
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  ring(s, 7.733, 1.708, 0.925, 0.248, C.magenta);
++  photo(s, 7.563, 1.429, 4.611, 3.849, { radius: 0.177 });
++
++  chrome(s);
++  kicker(s, 'News', 1.266, 1.770, 0.693);
++  headline(s, ['Our Latest Blog And ', 'Tips for Your Design'], { x: 1.240, y: 2.120, w: 3.647, h: 1.313 });
++  body(s, LOREM_LONG, 1.223, 3.411, 5.158, 0.903);
++
++  const posts = [
++    { x: 1.352, tx: 1.751, tw: 3.256, lines: ['The Way Golden Rule\u2019s  effect', 'Applied To Our design '], by: 'By \u2013 John Doe', bx: 1.785, date: '02 Oct 2025', dx: 3.537 },
++    { x: 5.857, tx: 6.257, tw: 3.386, lines: ['How Important is color theory', 'When we make out design?'], by: 'By - Jos Sulas,', bx: 6.291, date: '05 May 2025', dx: 8.042 }
++  ];
++  posts.forEach(post => {
++    roundRect(s, post.x, 4.693, 4.222, 1.825, C.dark, 0.129);
++    headline(s, post.lines, { x: post.tx, y: 5.064, w: post.tw, h: 0.841, fontSize: 22 });
++    text(s, post.by, { x: post.bx, y: 5.950, w: 1.550, h: 0.286, fontSize: 11, color: C.magenta });
++    text(s, post.date, { x: post.dx, y: 5.950, w: 1.550, h: 0.286, fontSize: 11, color: C.magenta, align: 'right' });
++  });
++
++  quarterTile(s, 9.852, 4.551, 0.933, C.plum, 180);
++  quarterTile(s, 9.578, 4.220, 0.548, C.magenta, 0);
++  quarterTile(s, 12.001, 6.295, 0.495, C.plum, 180);
++  dotGrid(s, 1.071, 6.118, 0.479, 0.890, C.plum, 90);
++}
++
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  arcBand(s, 6.667, 11.469, 7.568, 1.655, 209.9, 330.1, C.magenta);
++
++  chrome(s);
++  kicker(s, 'Meet The Experts', 5.792, 1.330, 1.750, { align: 'center' });
++  headline(s, ['The Speaker of our design Webinar'], { x: 3.664, y: 1.640, w: 6.005, h: 0.707, align: 'center' });
++
++  const speakers = [
++    { x: 1.409, name: 'John Smith', nw: 1.997 },
++    { x: 5.060, name: 'Michael Wilson', nw: 2.770 },
++    { x: 8.711, name: 'Sarah Doe', nw: 1.880 }
++  ];
++  speakers.forEach(sp => {
++    photoFade(s, sp.x, 2.730, 3.214, 4.770, 0.275, 3.556, ['bottom']);
++    text(s, sp.name, { x: sp.x + 0.258, y: 5.860, w: sp.nw, h: 0.707, fontFace: FONT_D, fontSize: 36, wrap: false });
++    text(s, 'Expert Designer', { x: sp.x + 0.248, y: 6.391, w: 2.215, h: 0.303, fontFace: FONT_S, fontSize: 12, color: C.grey });
++  });
++
++  quarterTile(s, 11.686, 1.607, 0.495, C.plum, 180);
++  dotGrid(s, 1.294, 2.285, 0.479, 0.890, C.plum, 90);
++}
++
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  const tiles = [
++    { x: 6.405, y: 1.365, w: 3.540, h: 2.397, r: 0.212 },
++    { x: 10.167, y: 1.365, w: 3.165, h: 2.397, r: 0.254, bleed: ['right'] },
++    { x: 1.405, y: 3.984, w: 3.859, h: 2.397, r: 0.275 },
++    { x: 5.486, y: 3.984, w: 3.540, h: 2.397, r: 0.285 },
++    { x: 9.248, y: 3.984, w: 4.083, h: 2.397, r: 0.212, bleed: ['right'] }
++  ];
++  tiles.forEach(t => photo(s, t.x, t.y, t.w, t.h, { radius: t.r, bleed: t.bleed }));
++  arcBand(s, 0.120, 8.852, 3.672, 0.989, 265.5, 340.4, C.magenta);
++
++  chrome(s);
++  kicker(s, 'Gallery', 1.607, 1.575, 0.816);
++  headline(s, ['Documentation of our ', 'previous webinar'], { x: 1.581, y: 1.924, w: 3.985, h: 1.313 });
++  dotGrid(s, 1.188, 3.363, 0.584, 0.890, C.plum, 90);
++  quarterTile(s, 11.740, 6.165, 0.495, C.plum, 180);
++}
++
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  arcBand(s, 0.293, 9.788, 3.732, 1.048, 261.8, 324.1, C.magenta);
++
++  chrome(s);
++  kicker(s, 'Portfolio', 5.768, 1.485, 0.968, { align: 'center' });
++  headline(s, ['Attendee\u2019s Satisfaction'], { x: 4.137, y: 1.795, w: 4.230, h: 0.707, align: 'center' });
++
++  const cards = [
++    { px: 0.002, pw: 4.229, bleed: ['left'], title: 'Visual Insights', tx: 1.696, tw: 2.160, date: '18 August 2024', dx: 1.641, align: 'right' },
++    { px: 4.551, pw: 4.230, bleed: [], title: 'Creative Mastery', tx: 5.372, tw: 2.498, date: '06 June 2024', dx: 5.513, align: 'center' },
++    { px: 9.103, pw: 4.229, bleed: ['right'], title: 'Aesthetic Vision', tx: 9.532, tw: 2.304, date: '14 April 2024', dx: 9.532, align: 'left' }
++  ];
++  cards.forEach(card => {
++    photoFade(s, card.px, 2.762, card.pw, 3.024, 0.146, 3.103, card.bleed);
++    text(s, card.title, { x: card.tx, y: 4.810, w: card.tw, h: 0.572, fontFace: FONT_D, fontSize: 28, align: card.align, wrap: false });
++    text(s, card.date, { x: card.dx, y: 5.222, w: 2.215, h: 0.303, fontFace: FONT_S, fontSize: 12, color: C.grey, align: card.align });
++  });
++
++  quarterTile(s, 11.898, 6.386, 0.495, C.plum, 180);
++  dotGrid(s, 1.495, 1.158, 0.479, 0.890, C.plum, 90);
++  dotGrid(s, 11.659, 2.281, 0.479, 0.890, C.plum, 90);
++}
++
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  circleCap(s, 6.761, 12.444, 6.546, 1.602, C.magenta); // wide dome behind the cards
++
++  chrome(s);
++  headline(s, ['Choose the upcoming webinar ticket'], { x: 3.520, y: 1.495, w: 6.294, h: 0.707 });
++  dotGrid(s, 1.635, 1.194, 0.479, 0.890, C.plum, 90);
++
++  const plans = [
++    { x: 1.043, name: 'Day Pass', nx: 2.250, nw: 0.849, price: '49.99', px: 2.036, dx: 1.779, sub: '1st Day Ticket', sx: 2.065, sw: 1.236 },
++    { x: 5.035, name: 'Full Pass', nx: 6.122, nw: 0.901, price: '69.99', px: 5.939, dx: 5.681, sub: 'Full 3 Day Ticket', sx: 5.868, sw: 1.457 },
++    { x: 9.027, name: 'Group Pass', nx: 10.075, nw: 1.024, price: '59.99', px: 10.051, dx: 9.794, sub: '2 Days Ticket', sx: 10.106, sw: 1.226 }
++  ];
++  plans.forEach(plan => {
++    roundRect(s, plan.x, 2.516, 3.263, 4.343, C.plum, 0.107);
++    text(s, plan.name, { x: plan.nx, y: 3.020, w: plan.nw, h: 0.370, fontFace: FONT_D, fontSize: 16, color: C.magenta, align: 'center', wrap: false });
++    text(s, '$', { x: plan.dx, y: 3.595, w: 0.337, h: 0.505, fontFace: FONT_D, fontSize: 24, wrap: false });
++    text(s, plan.price, { x: plan.px, y: 3.296, w: 1.408, h: 0.909, fontFace: FONT_D, fontSize: 48, wrap: false });
++    if (plan.sub === '1st Day Ticket') {
++      s.addText([
++        { text: '1' }, { text: 'st', options: { superscript: true } }, { text: ' Day Ticket' }
++      ], { x: plan.sx, y: 4.053, w: plan.sw, h: 0.303, fontFace: FONT_S, fontSize: 12, color: C.offWhite, align: 'center' });
++    } else {
++      text(s, plan.sub, { x: plan.sx, y: 4.040, w: plan.sw, h: 0.303, fontFace: FONT_S, fontSize: 12, align: 'center' });
++    }
++    text(s, LOREM_SHORT, {
++      x: plan.x + 0.367, y: 4.504, w: 2.529, h: 0.903, fontSize: 11, color: C.grey, align: 'center', lineSpacingMultiple: 1.5
++    });
++    ['Conference Tickets', 'Free Lunch Nad Coffee'].forEach((perk, i) => {
++      ring(s, plan.x + 0.661, 5.796 + i * 0.367, 0.075, 0.020, C.magenta);
++      text(s, perk, { x: plan.x + 0.904, y: 5.632 + i * 0.379, w: 1.94, h: 0.303, fontFace: FONT_S, fontSize: 12 });
++    });
++  });
++
++  // "Recommended" corner ribbon on the middle plan.
++  s.addShape('custGeom', {
++    x: 4.814, y: 2.225, w: 1.923, h: 1.885, fill: { color: C.magenta }, line: NO_LINE,
++    points: [{ x: 1.286, y: 0 }, { x: 1.923, y: 0 }, { x: 0, y: 1.885 }, { x: 0, y: 1.260 }, { close: true }]
++  });
++  s.addShape('triangle', { x: 6.457, y: 2.214, w: 0.280, h: 0.302, fill: { color: C.dark }, line: NO_LINE });
++  s.addShape('triangle', { x: 4.823, y: 3.887, w: 0.204, h: 0.221, rotate: 270, fill: { color: C.dark }, line: NO_LINE });
++  text(s, 'Recommended', {
++    x: 4.847, y: 2.869, w: 1.526, h: 0.337, rotate: 315.5, fontFace: FONT_S, fontSize: 14, align: 'center', wrap: false
++  });
++}
++
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  arcBand(s, 11.809, -1.643, 4.531, 1.217, 60.7, 160.6, C.magenta);
++  arcBand(s, 0.864, 7.865, 2.895, 0.777, 243.7, 354.9, C.magenta);
++  ring(s, 13.175, 7.449, 1.006, 0.271, C.magenta);
++
++  chrome(s);
++  text(s, '\u201C', { x: 2.647, y: 2.426, w: 0.674, h: 1.784, fontFace: FONT_D, fontSize: 100, wrap: false });
++  text(s, '\u201C', { x: 9.913, y: 3.019, w: 0.674, h: 1.784, fontFace: FONT_D, fontSize: 100, rotate: 180, wrap: false });
++  headline(s, ['The webinar had completely exceeded ', 'my Earlier expectation!'],
++    { x: 3.321, y: 3.094, w: 6.692, h: 1.313, align: 'center' });
++  text(s, 'Joseph Anderson', { x: 5.864, y: 4.670, w: 1.606, h: 0.404, fontFace: FONT_D, fontSize: 18, align: 'center', wrap: false });
++  text(s, 'Attendee', { x: 6.280, y: 4.971, w: 0.773, h: 0.269, fontFace: FONT_S, fontSize: 10, color: C.magenta, align: 'center', wrap: false });
++  text(s, 'Break', { x: 6.343, y: 6.413, w: 0.647, h: 0.370, fontFace: FONT_D, fontSize: 16, color: C.magenta, align: 'center', wrap: false });
++
++  quarterTile(s, 11.179, 5.947, 0.495, C.plum, 180);
++  quarterTile(s, 0.841, 4.714, 0.495, C.plum, 270);
++  quarterTile(s, 1.443, 1.648, 0.495, C.plum, 0);
++  dotGrid(s, 8.651, 1.389, 0.479, 0.890, C.plum, 90);
++  dotGrid(s, 2.861, 5.553, 0.479, 0.890, C.plum, 0);
++}
++
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  arcBand(s, -0.987, 8.652, 6.682, 1.790, 276.8, 351.8, C.magenta);
++  photo(s, 1.223, 1.175, 4.547, 6.325, { radius: 0 });
++
++  chrome(s);
++  kicker(s, 'Contact', 6.260, 1.992, 0.891);
++  headline(s, ['Give Us Your Idea or suggestion', 'For the next webinar Topic'], { x: 6.234, y: 2.341, w: 5.423, h: 1.313 });
++  body(s, LOREM_LONG, 6.217, 3.614, 5.158, 0.903);
++
++  const rows = [
++    { label: 'Phone', value: '+123 4567 890', y: 4.748, vw: 1.531 },
++    { label: '', value: 'email@yourcompany.com', y: 5.189, vw: 2.493 },
++    { label: 'Website', value: 'www.yourwebsite.com', y: 5.677, vw: 2.207 }
++  ];
++  rows.forEach(row => {
++    if (row.label) {
++      text(s, row.label, { x: 6.217, y: row.y + 0.016, w: 0.9, h: 0.303, fontFace: FONT_S, fontSize: 12, color: C.magenta, wrap: false });
++    }
++    text(s, row.value, { x: 7.503, y: row.y, w: row.vw, h: 0.337, fontFace: FONT_S, fontSize: 14, color: C.white, wrap: false });
++  });
++
++  dotGrid(s, 11.995, 5.894, 0.479, 0.890, C.plum, 90);
++  quarterTile(s, 5.198, 0.875, 0.495, C.plum, 180);
++}
++
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  deckBackdrop(s);
++
++  arcBand(s, 12.843, -0.721, 3.093, 0.407, 77.3, 168.4, C.magenta);
++  arcBand(s, -0.518, 9.395, 4.467, 1.204, 274.8, 336.8, C.magenta);
++  ring(s, 12.842, 7.291, 0.908, 0.244, C.magenta);
++
++  chrome(s);
++  s.addText([
++    { text: 'Thank You', options: { breakLine: true } },
++    { text: 'For Attention' }
++  ], {
++    x: 2.689, y: 2.067, w: 7.956, h: 3.551, fontFace: FONT_D, fontSize: 120, color: C.offWhite,
++    lineSpacing: 120, align: 'center', valign: 'top', wrap: false
++  });
++  text(s, 'Unleashing creativity through insights for innovative design solutions that help transform your vision into a unique masterpiece.', {
++    x: 3.829, y: 5.286, w: 5.675, h: 0.673, fontSize: 12, align: 'center', lineSpacingMultiple: 1.5
++  });
++
++  quarterTile(s, 2.590, 6.248, 0.561, C.plum, 0);
++  quarterTile(s, 1.035, 1.959, 0.585, C.plum, 0);
++  dotGrid(s, 4.542, 0.533, 0.479, 0.890, C.plum, 90);
++  dotGrid(s, 11.929, 5.771, 0.523, 0.953, C.plum, 0);
++}
++
++// ================================================================= build ====
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'WIDE';
++  pptx.author = 'Kraftudio';
++  pptx.title = 'Unleash Your Creativity';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++    slide09, slide10, slide11, slide12, slide13, slide14, slide15]
++    .forEach(fn => fn(pptx));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '1475a68d-ecd6-469e-96bc-f296b4fe7258_grok_final.pptx')
++  });
++}
++
++build().then(f => console.log('wrote ' + f)).catch(err => { console.error(err); process.exit(1); });

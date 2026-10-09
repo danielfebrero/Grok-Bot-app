@@ -1,0 +1,1056 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_brand_presentation_2.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_brand_presentation_2.js
+@@ -0,0 +1,1053 @@
++/**
++ * Inghain - Fashion Presentation Template
++ * Standalone pptxgenjs recreation of a 36-slide deck (10 x 5.625 in).
++ *
++ * Photographs in the source deck are replaced by flat colour placeholders
++ * (see `photo*` helpers); every other element is drawn with native shapes.
++ *
++ * Run:  node this-file.js   ->  writes the .pptx next to this script.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens                                                       *
++ * ------------------------------------------------------------------ */
++
++const C = {
++  CREAM: 'FCFBF6', // slide background
++  INK: '000000',
++  WHITE: 'FFFFFF',
++  PEACH: 'E9B384', // accent 2
++  SKY: 'A1CCD1',   // accent 3
++  SAGE: '7C9D96',  // accent 5
++  OLIVE: '726C4B',
++};
++
++// Flat stand-ins for the three photographs used throughout the deck.
++const P = { DARK: '757575', MID: 'B7B6B4', LITE: 'DDDCDA' };
++
++const F = {
++  DISPLAY: 'Playfair Display',
++  BODY: 'Open Sans',
++  SERIF: 'Cormorant Garamond SemiBold',
++  LORA: 'Lora',
++};
++
++// Filler copy that repeats across the template.
++const L = {
++  CLAUSE: 'Lorem ipsum dolor sita amet, consectetur adipiscing elit',
++  SHORT: 'Lorem ipsum dolor sita amet, consectetur adipiscing elit.',
++  TEMPOR: 'Lorem ipsum dolor sita amet, consectetur adipiscing elit doloranes eiusmod tempor.',
++  LABORE: 'Lorem ipsum dolor sita amet, consectetur adipiscing elit doloranes eiusmod tempor incididunt ut labore.',
++  LABORE_IPSUM: 'Lorem ipsum dolor sita amet, consectetur adipiscing elit doloranes eiusmod tempor incididunt ut labore. ipsum',
++  NOSTRUD: 'Lorem ipsum dolor sita amet, consectetur adipiscing elit doloranes eiusmod tempor incididunt ut labore dolore magna aliqua Cit enim minim venia nostrud.',
++  PARA: 'Lorem ipsum dolor sita amet, consectetur adipiscing elit doloranes eiusmod tempor incididunt ut labore. ipsum consectetur adipiscing elit doloranes eiusmod tempor incididunt ut labore. ipsum dolor sita amet,',
++  PRICE: 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor incididunt ut labore et',
++};
++
++// Google Slides text insets, in points: [left, right, bottom, top].
++const INSET = [5.4, 5.4, 2.7, 2.7];
++
++/* ------------------------------------------------------------------ *
++ * Generic drawing helpers                                             *
++ * ------------------------------------------------------------------ */
++
++/** Text box. `o.lead` is a line-spacing multiple, `o.size` a point size. */
++function txt(s, body, o) {
++  const opts = {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: o.font || F.BODY,
++    fontSize: o.size || 12,
++    color: o.color || C.INK,
++    bold: !!o.bold,
++    italic: !!o.italic,
++    align: o.align || 'left',
++    valign: o.valign || 'top',
++    margin: INSET,
++    isTextBox: true,
++    wrap: true,
++  };
++  if (o.lead) opts.lineSpacingMultiple = o.lead;
++  if (o.rotate) opts.rotate = o.rotate;
++  if (o.fill) opts.fill = { color: o.fill };
++  if (o.line) opts.line = { color: o.line, width: o.lineW || 1 };
++  s.addText(body, opts);
++}
++
++/** Solid rectangle. */
++function block(s, x, y, w, h, color) {
++  s.addShape('rect', { x, y, w, h, fill: { color } });
++}
++
++/**
++ * Diagonal two-stop gradient: `from` sits in the top-left corner and `to`
++ * in the bottom-right. Painted as opaque bands because pptxgenjs fills are solid.
++ */
++function gradBlock(s, x, y, w, h, from, to) {
++  const bands = 16;
++  for (let k = bands; k >= 1; k--) {
++    const u = k / bands;            // distance along the diagonal, 0..1
++    const d = 2 * u;
++    const p = d <= 1
++      ? [[0, 0], [d, 0], [0, d]]
++      : [[0, 0], [1, 0], [1, d - 1], [d - 1, 1], [0, 1]];
++    s.addShape('custGeom', {
++      x, y, w, h, fill: { color: mix(from, to, u) },
++      points: p.map(q => ({ x: q[0] * w, y: q[1] * h })).concat([{ close: true }]),
++    });
++  }
++}
++
++/** Linear blend of two hex colours, `t` = 0 gives `a`, 1 gives `b`. */
++function mix(a, b, t) {
++  const ch = (hex, i) => parseInt(hex.substr(i * 2, 2), 16);
++  const v = i => Math.round(ch(a, i) * (1 - t) + ch(b, i) * t).toString(16).padStart(2, '0');
++  return (v(0) + v(1) + v(2)).toUpperCase();
++}
++
++/** Outlined rectangle. */
++function frame(s, x, y, w, h, color, width) {
++  s.addShape('rect', { x, y, w, h, fill: { type: 'none' }, line: { color, width } });
++}
++
++/** Outlined ellipse. */
++function ring(s, x, y, w, h, color, width) {
++  s.addShape('ellipse', { x, y, w, h, fill: { type: 'none' }, line: { color, width } });
++}
++
++/** Straight rule / connector. */
++function rule(s, x, y, w, h, color, width) {
++  s.addShape('line', { x, y, w, h, line: { color, width } });
++}
++
++/* ------------------------------------------------------------------ *
++ * Photo placeholders                                                  *
++ * ------------------------------------------------------------------ */
++
++function photo(s, x, y, w, h, shade) {
++  s.addShape('rect', { x, y, w, h, fill: { color: shade } });
++}
++
++function photoCircle(s, x, y, w, h, shade, line) {
++  const o = { x, y, w, h, fill: { color: shade } };
++  if (line) o.line = { color: line, width: 3 };
++  s.addShape('ellipse', o);
++}
++
++function photoRound(s, x, y, w, h, shade) {
++  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.16, fill: { color: shade } });
++}
++
++/** Right-triangle crop; `corner` names the square corner that survives. */
++function photoTri(s, x, y, w, h, shade, corner) {
++  const c = { tl: [[0, 0], [1, 0], [0, 1]], tr: [[0, 0], [1, 0], [1, 1]],
++              br: [[1, 0], [1, 1], [0, 1]], bl: [[0, 0], [1, 1], [0, 1]] }[corner];
++  s.addShape('custGeom', {
++    x, y, w, h, fill: { color: shade },
++    points: c.map(p => ({ x: p[0] * w, y: p[1] * h })).concat([{ close: true }]),
++  });
++}
++
++/** Square with a thin diagonal band of background cut through it. */
++function photoSplit(s, x, y, w, h, shade) {
++  photoTri(s, x, y, w, h, shade, 'tr');
++  photoTri(s, x, y + h * 0.066, w * 0.934, h * 0.934, shade, 'bl');
++}
++
++/* ------------------------------------------------------------------ *
++ * Decorative motifs                                                   *
++ * ------------------------------------------------------------------ */
++
++/** Concave-sided four-point star ("sparkle"). */
++function sparkle(s, x, y, size, color, rotate) {
++  curvedStar(s, x, y, size, 4, 0.5, color, null, rotate);
++}
++
++/** Same four-point star drawn as an outline only. */
++function quadArc(s, x, y, w, h, color) {
++  curvedStar(s, x, y, Math.max(w, h), 4, 0.5, null, color, 0);
++}
++
++/** Eight thin tapered spikes around a small solid disc. */
++function spark8(s, x, y, size, color, rotate) {
++  spikeStar(s, x, y, size, 8, 0.075, color, rotate);
++  const d = size * 0.3;
++  s.addShape('ellipse', { x: x + (size - d) / 2, y: y + (size - d) / 2, w: d, h: d, fill: { color } });
++}
++
++/** Sunburst: eight bars crossed at the centre, i.e. sixteen rays. */
++function burst(s, x, y, size, color) {
++  bars(s, x, y, size, 8, color);
++}
++
++/** Four bars crossed at the centre, i.e. eight straight spokes. */
++function aster(s, x, y, size, color, rotate) {
++  bars(s, x, y, size, 4, color, rotate);
++}
++
++function bars(s, x, y, size, count, color, rotate) {
++  const t = size * 0.0725;
++  for (let i = 0; i < count; i++) {
++    s.addShape('rect', {
++      x, y: y + (size - t) / 2, w: size, h: t,
++      rotate: (rotate || 0) + (180 * i) / count, fill: { color },
++    });
++  }
++}
++
++/** Star with straight edges: `tips` points, valleys at `inner` x radius. */
++function spikeStar(s, x, y, size, tips, inner, color, rotate) {
++  const r = size / 2, pts = [];
++  for (let i = 0; i < tips * 2; i++) {
++    const a = (Math.PI * i) / tips - Math.PI / 2;
++    const rr = i % 2 === 0 ? r : r * inner;
++    pts.push({ x: r + rr * Math.cos(a), y: r + rr * Math.sin(a) });
++  }
++  pts.push({ close: true });
++  s.addShape('custGeom', { x, y, w: size, h: size, rotate: rotate || 0, fill: { color }, points: pts });
++}
++
++/** Star whose sides bow inwards; `waist` pulls the bezier handles to the centre. */
++function curvedStar(s, x, y, size, tips, waist, fillColor, lineColor, rotate) {
++  const r = size / 2, k = r * waist, pts = [];
++  for (let i = 0; i < tips; i++) {
++    const a = (2 * Math.PI * i) / tips - Math.PI / 2;
++    const b = a + (2 * Math.PI) / tips;
++    if (i === 0) pts.push({ x: r + r * Math.cos(a), y: r + r * Math.sin(a), moveTo: true });
++    pts.push({
++      x: r + r * Math.cos(b), y: r + r * Math.sin(b),
++      curve: { type: 'cubic', x1: r + k * Math.cos(a), y1: r + k * Math.sin(a),
++               x2: r + k * Math.cos(b), y2: r + k * Math.sin(b) },
++    });
++  }
++  pts.push({ close: true });
++  s.addShape('custGeom', {
++    x, y, w: size, h: size, rotate: rotate || 0, points: pts,
++    fill: fillColor ? { color: fillColor } : { type: 'none' },
++    line: lineColor ? { color: lineColor, width: 1.5 } : undefined,
++  });
++}
++
++/** Five concentric thin circles. */
++function rings(s, x, y, size, color) {
++  for (let i = 0; i < 5; i++) {
++    const d = size * (1 - i * 0.2);
++    ring(s, x + (size - d) / 2, y + (size - d) / 2, d, d, color, 1.25);
++  }
++}
++
++/** Three overlapping hand-drawn loops climbing to the right. */
++function coil(s, x, y, w, h, color) {
++  const ew = w * 0.78, eh = h * 0.72;
++  [[0, 0.28], [0.11, 0.14], [0.22, 0]].forEach(p => {
++    ring(s, x + p[0] * w, y + p[1] * h, ew, eh, color, 1.5);
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Pictogram helpers                                                   *
++ * ------------------------------------------------------------------ */
++
++/** Black rounded tile used behind the small contact pictograms. */
++function iconTile(s, x, y, w, h) {
++  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.05, fill: { color: C.INK } });
++}
++
++/** Head-and-shoulders silhouette knocked out of a black tile. */
++function iconPerson(s, x, y, w, h) {
++  s.addShape('ellipse', { x: x + w * 0.16, y: y + h * 0.16, w: w * 0.26, h: h * 0.33,
++    fill: { color: C.WHITE } });
++  s.addShape('ellipse', { x: x + w * 0.06, y: y + h * 0.55, w: w * 0.46, h: h * 0.5,
++    fill: { color: C.WHITE } });
++}
++
++/** Contact-card icon: person on the left, text lines on the right. */
++function iconContact(s, x, y, w, h) {
++  iconTile(s, x, y, w, h);
++  iconPerson(s, x, y, w, h);
++  for (let i = 0; i < 3; i++) {
++    block(s, x + w * 0.6, y + h * (0.26 + i * 0.2), w * 0.28, h * 0.09, C.WHITE);
++  }
++}
++
++/** Contact-card icon with an envelope in the right half. */
++function iconLinkedin(s, x, y, w, h) {
++  iconTile(s, x, y, w, h);
++  iconPerson(s, x, y, w, h);
++  frame(s, x + w * 0.58, y + h * 0.2, w * 0.32, h * 0.36, C.WHITE, 1.5);
++  rule(s, x + w * 0.58, y + h * 0.2, w * 0.16, h * 0.18, C.WHITE, 1.5);
++  rule(s, x + w * 0.74, y + h * 0.38, w * 0.16, -h * 0.18, C.WHITE, 1.5);
++}
++
++/** Envelope icon. */
++function iconMail(s, x, y, w, h) {
++  iconTile(s, x, y, w, h);
++  rule(s, x + w * 0.14, y + h * 0.26, w * 0.36, h * 0.3, C.WHITE, 2);
++  rule(s, x + w * 0.5, y + h * 0.56, w * 0.36, -h * 0.3, C.WHITE, 2);
++}
++
++function iconClock(s, x, y, w, h) {
++  ring(s, x, y, w, h, C.INK, 3);
++  rule(s, x + w / 2, y + h * 0.24, 0, h * 0.26, C.INK, 2);
++  rule(s, x + w / 2, y + h / 2, w * 0.22, 0, C.INK, 2);
++}
++
++function iconCalendar(s, x, y, w, h) {
++  s.addShape('roundRect', { x, y: y + h * 0.12, w, h: h * 0.88, rectRadius: 0.03,
++    fill: { type: 'none' }, line: { color: C.INK, width: 3 } });
++  block(s, x, y + h * 0.12, w, h * 0.2, C.INK);
++  block(s, x + w * 0.24, y, w * 0.1, h * 0.22, C.INK);
++  block(s, x + w * 0.66, y, w * 0.1, h * 0.22, C.INK);
++}
++
++/** Map pin: a ring over a tapering point, with a hole in the middle. */
++function pinShape(s, x, y, w, h, color, weight) {
++  ring(s, x, y, w, w, color, weight);
++  s.addShape('triangle', { x: x + w * 0.2, y: y + w * 0.62, w: w * 0.6, h: h - w * 0.62,
++    rotate: 180, fill: { color } });
++  s.addShape('ellipse', { x: x + w * 0.28, y: y + w * 0.28, w: w * 0.44, h: w * 0.44,
++    fill: { color: C.CREAM }, line: { color, width: weight } });
++}
++
++function iconPin(s, x, y, w, h, color) { pinShape(s, x, y, w, h, color, 2); }
++function iconPinSolid(s, x, y, w, h) { pinShape(s, x, y, w, h, C.INK, 3); }
++
++/** Handset glyph: a thick rounded square with two opposite corners cut away. */
++function iconPhone(s, x, y, w, h, color) {
++  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.09, fill: { type: 'none' },
++    line: { color, width: 3 } });
++  block(s, x + w * 0.5, y - 0.03, w * 0.6, h * 0.55, C.CREAM);
++  block(s, x - 0.03, y + h * 0.5, w * 0.6, h * 0.55, C.CREAM);
++}
++
++/** Thin right-pointing arrow with a two-stroke head. */
++function arrowRight(s, x, y, w, h) {
++  rule(s, x, y + h / 2, w, 0, C.INK, 1.25);
++  rule(s, x + w * 0.7, y + h * 0.14, w * 0.3, h * 0.36, C.INK, 1.25);
++  s.addShape('line', { x: x + w * 0.7, y: y + h * 0.5, w: w * 0.3, h: h * 0.36,
++    flipV: true, line: { color: C.INK, width: 1.25 } });
++}
++
++/**
++ * Solid border between an outer box and an inner "screen" hole, so that
++ * whatever was drawn earlier (the photo placeholder) shows through the hole.
++ */
++function bezel(s, ox, oy, ow, oh, ix, iy, iw, ih, color) {
++  block(s, ox, oy, ow, iy - oy, color);
++  block(s, ox, iy + ih, ow, oy + oh - iy - ih, color);
++  block(s, ox, iy, ix - ox, ih, color);
++  block(s, ix + iw, iy, ox + ow - ix - iw, ih, color);
++}
++
++/** Laptop mock-up: dark lid around the screen, then the silver base. */
++function laptop(s, x, y, w, h) {
++  bezel(s, x + w * 0.097, y, w * 0.806, h * 0.885,
++        x + w * 0.126, y + h * 0.06, w * 0.749, h * 0.774, '2E2E2E');
++  block(s, x, y + h * 0.885, w, h * 0.055, 'D6D8DA');
++  block(s, x + w * 0.017, y + h * 0.94, w * 0.966, h * 0.03, 'B4B8BC');
++  block(s, x + w * 0.42, y + h * 0.885, w * 0.16, h * 0.018, '9AA0A5');
++}
++
++/** Desktop monitor mock-up: dark bezel, silver chin, stand and foot. */
++function monitor(s, x, y, w, h) {
++  bezel(s, x + w * 0.018, y + h * 0.146, w * 0.962, h * 0.565,
++        x + w * 0.056, y + h * 0.185, w * 0.886, h * 0.495, '1C1C1C');
++  block(s, x + w * 0.018, y + h * 0.711, w * 0.962, h * 0.1, 'D6D8DA');
++  block(s, x + w * 0.4, y + h * 0.811, w * 0.2, h * 0.115, 'C6CACD');
++  s.addShape('roundRect', { x: x + w * 0.334, y: y + h * 0.913, w: w * 0.331, h: h * 0.057,
++    rectRadius: 0.04, fill: { color: 'C6CACD' } });
++}
++
++/** Phone mock-up: rounded dark body, screen and notch. */
++function phone(s, x, y, w, h) {
++  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.2, fill: { color: '2E2E2E' } });
++  s.addShape('roundRect', { x: x + w * 0.068, y: y + h * 0.066, w: w * 0.862, h: h * 0.894,
++    rectRadius: 0.15, fill: { color: P.MID } });
++  s.addShape('roundRect', { x: x + w * 0.32, y: y + h * 0.066, w: w * 0.36, h: h * 0.03,
++    rectRadius: 0.02, fill: { color: '2E2E2E' } });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides                                                              *
++ * ------------------------------------------------------------------ */
++
++/** Slide 1 - Cover */
++function slide01(s) {
++  frame(s, 5.138, 0.77, 3.589, 3.589, C.PEACH, 2.25);
++  coil(s, 0.42, 4.481, 1.874, 1.833, C.PEACH);
++  ring(s, -0.421, -0.499, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 0.631, 0.74, 0.458, C.SAGE);
++  ring(s, 8.999, -0.865, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 8.983, 0.278, 0.458, C.PEACH, 273.585);
++  burst(s, 8.635, 4.307, 0.669, C.SAGE);
++  txt(s, 'Inghain', { x: 1.274, y: 2.812, w: 3.327, h: 1.186, font: F.DISPLAY, size: 66 });
++  txt(s, 'Fashion Presentation Template', { x: 1.274, y: 3.963, w: 2.804, h: 0.261, font: F.DISPLAY, size: 11 });
++  photo(s, 1.332, 1.018, 3.353, 1.612, P.DARK);
++  photo(s, 5.381, 1.018, 3.589, 3.589, P.MID);
++}
++
++/** Slide 2 - Cover alt */
++function slide02(s) {
++  txt(s, 'Inghain', { x: 1.274, y: 3.204, w: 3.327, h: 1.186, font: F.DISPLAY, size: 66 });
++  txt(s, 'Fashion Presentation Template', { x: 1.274, y: 4.354, w: 2.733, h: 0.261, font: F.DISPLAY, size: 11 });
++  quadArc(s, 1.304, 0.837, 1.282, 1.287, C.SKY);
++  spark8(s, 3.593, 4.325, 0.564, C.PEACH);
++  coil(s, 8.063, 3.619, 1.504, 1.471, C.PEACH);
++  sparkle(s, 1.008, 0.622, 0.627, C.SAGE);
++  photo(s, 2.976, 1.018, 1.807, 1.612, P.DARK);
++  photo(s, 5.381, 1.018, 3.589, 3.589, P.MID);
++}
++
++/** Slide 3 - About Inghain Co. */
++function slide03(s) {
++  txt(s, 'About Inghain Co.', { x: 4.52, y: 0.877, w: 2.312, h: 1.085, font: F.DISPLAY, size: 30 });
++  txt(s, 'About Our Company', { x: 4.52, y: 2.045, w: 1.556, h: 0.252, font: F.BODY, size: 11, bold: true, italic: true });
++  txt(s, L.NOSTRUD, { x: 6.76, y: 3.334, w: 2.224, h: 1.415, font: F.BODY, size: 9, lead: 1.5 });
++  sparkle(s, 7.005, 1.927, 1.008, C.SAGE);
++  spark8(s, 8.619, 4.616, 0.73, C.PEACH);
++  burst(s, 9.571, -0.429, 0.857, C.SKY);
++  ring(s, -0.625, -0.849, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 0.427, 0.391, 0.458, C.SAGE);
++  coil(s, 3.087, 4.981, 0.982, 0.96, C.PEACH);
++  photo(s, 1.016, 0.877, 3.053, 3.872, P.DARK);
++  photo(s, 4.52, 2.537, 1.875, 2.212, P.MID);
++}
++
++/** Slide 4 - We Are Inghain Co. */
++function slide04(s) {
++  photo(s, 5.338, 1.018, 3.589, 3.589, P.DARK);
++  block(s, 4.313, 1.018, 1.375, 1.469, C.PEACH);
++  txt(s, L.TEMPOR, { x: 4.339, y: 1.228, w: 1.322, h: 1.049, font: F.BODY, size: 8, align: 'center', lead: 1.5 });
++  sparkle(s, 4.24, 2.825, 0.736, C.SAGE);
++  txt(s, 'We Are Inghain Co.', { x: 1.09, y: 1.041, w: 2.312, h: 1.085, font: F.DISPLAY, size: 30 });
++  txt(s, 'About Our Company', { x: 1.09, y: 2.209, w: 1.826, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  txt(s, L.NOSTRUD, { x: 1.087, y: 2.599, w: 2.64, h: 0.961, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, 'www.inghain.com', { x: 1.165, y: 4.231, w: 1.55, h: 0.348, font: F.SERIF, size: 12, bold: true, align: 'center', valign: 'middle', line: C.INK, lineW: 2.25 });
++  spark8(s, 0.356, 4.675, 0.73, C.PEACH);
++  coil(s, 9.089, -0.646, 1.504, 1.471, C.PEACH);
++  burst(s, 3.352, 0.674, 0.381, C.SKY);
++}
++
++/** Slide 5 - About Inghain Co. (framed) */
++function slide05(s) {
++  frame(s, 1.158, 1.215, 3.053, 3.053, C.PEACH, 2.25);
++  txt(s, 'About Inghain Co.', { x: 4.601, y: 1.906, w: 2.312, h: 1.085, font: F.DISPLAY, size: 30 });
++  txt(s, 'About Our Company', { x: 4.6, y: 3.074, w: 2.002, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  txt(s, L.NOSTRUD, { x: 4.597, y: 3.464, w: 2.809, h: 0.96, font: F.BODY, size: 9, lead: 1.5 });
++  rings(s, 0.364, -0.652, 1.304, C.SKY);
++  spark8(s, 8.619, 4.045, 0.73, C.SAGE);
++  coil(s, 7.13, 0.953, 0.982, 0.96, C.PEACH);
++  ring(s, 1.996, 5.222, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 2.85, 5.036, 0.458, C.PEACH, 64.394);
++  photo(s, 1.016, 1.357, 3.053, 3.053, P.DARK);
++  photo(s, 7.497, 2.937, 1.487, 1.487, P.MID);
++}
++
++/** Slide 6 - This is Inghain Co. */
++function slide06(s) {
++  txt(s, 'This is Inghain Co.', { x: 1.09, y: 1.041, w: 2.312, h: 1.085, font: F.DISPLAY, size: 30 });
++  txt(s, 'About Our Company', { x: 1.09, y: 2.209, w: 1.876, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  txt(s, L.NOSTRUD, { x: 1.087, y: 2.599, w: 3.913, h: 0.733, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, 'Lorem ipsum dolor sita amet, consectetur adipiscing elit doloranes eiusmod tempor incididunt ut labore dolore magna aliqua Cit enim minim venia nostrud. eiusmod tempor incididunt ut labore dolore magna eiusmod tempor incididunt ut labore dolore magna eiusmod tempor incididunt ut labore dolore', { x: 1.087, y: 3.47, w: 3.913, h: 1.188, font: F.BODY, size: 9, lead: 1.5 });
++  quadArc(s, 0.74, 0.693, 0.346, 0.348, C.PEACH);
++  sparkle(s, 0.66, 0.635, 0.169, C.PEACH);
++  rings(s, 8.441, 4.973, 1.304, C.SKY);
++  spark8(s, 4.607, 4.526, 0.73, C.SAGE);
++  coil(s, 5.628, -0.836, 1.504, 1.471, C.PEACH);
++  frame(s, 5.504, 0.852, 3.589, 3.589, C.SKY, 2.25);
++  photo(s, 3.513, 1.019, 1.487, 1.487, P.DARK);
++  photo(s, 5.338, 1.018, 3.589, 3.589, P.MID);
++}
++
++/** Slide 7 - Inghain / Fashion / Special */
++function slide07(s) {
++  photo(s, 2.302, 1.202, 2.54, 3.221, P.DARK);
++  photo(s, 5.955, 3.063, 2.54, 1.301, P.MID);
++  burst(s, 8.112, 0.661, 0.857, C.SKY);
++  txt(s, 'Inghain', { x: 0.639, y: 2.542, w: 2.312, h: 0.581, font: F.DISPLAY, size: 30, align: 'center', rotate: 270 });
++  txt(s, 'Fashion', { x: 2.425, y: 0.479, w: 2.312, h: 0.581, font: F.DISPLAY, size: 30, align: 'center' });
++  txt(s, 'Special', { x: 4.193, y: 2.522, w: 2.312, h: 0.581, font: F.DISPLAY, size: 30, align: 'center', rotate: 90 });
++  sparkle(s, 1.796, 3.782, 1.008, C.PEACH, 45);
++  txt(s, 'About Our Company', { x: 5.895, y: 1.597, w: 1.808, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  txt(s, L.NOSTRUD, { x: 5.895, y: 1.85, w: 2.6, h: 0.96, font: F.BODY, size: 9, lead: 1.5 });
++  rings(s, -0.652, -0.643, 1.304, C.PEACH);
++  coil(s, 9.242, 4.861, 0.982, 0.96, C.PEACH);
++}
++
++/** Slide 8 - Modest Man Fashion */
++function slide08(s) {
++  frame(s, 1.163, 1.108, 2.54, 3.221, C.PEACH, 2.25);
++  photo(s, 3.9, 1.296, 1.543, 1.957, P.MID);
++  photo(s, 0.965, 1.296, 2.54, 3.221, P.DARK);
++  ring(s, 8.999, -0.865, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 8.983, 0.278, 0.458, C.PEACH, 273.585);
++  block(s, 4.952, 1.296, 1.375, 1.469, C.PEACH);
++  txt(s, L.TEMPOR, { x: 4.979, y: 1.505, w: 1.322, h: 1.049, font: F.BODY, size: 8, align: 'center', lead: 1.5 });
++  txt(s, 'Fashion Critic', { x: 3.886, y: 3.838, w: 1.153, h: 0.252, font: F.BODY, size: 11, bold: true });
++  txt(s, 'Joan Smalls', { x: 3.886, y: 3.462, w: 1.557, h: 0.379, font: F.DISPLAY, size: 18, bold: true });
++  txt(s, 'About Inghain', { x: 6.617, y: 1.316, w: 1.945, h: 0.311, font: F.BODY, size: 14, bold: true, italic: true });
++  txt(s, 'Modest Man Fashion', { x: 6.617, y: 1.569, w: 2.418, h: 2.575, font: F.SERIF, size: 50 });
++  sparkle(s, 5.495, 3.943, 0.268, C.SKY);
++  sparkle(s, 5.696, 3.716, 0.363, C.SKY);
++  spark8(s, 8.287, 3.984, 0.73, C.PEACH);
++  coil(s, -0.169, -0.48, 0.982, 0.96, C.PEACH);
++  rings(s, 3.113, 4.973, 1.304, C.SKY);
++}
++
++/** Slide 9 - Company mission */
++function slide09(s) {
++  photo(s, 1.315, 1.193, 2.54, 3.221, P.DARK);
++  block(s, 3.167, 2.946, 1.375, 1.469, C.PEACH);
++  txt(s, L.TEMPOR, { x: 3.194, y: 3.155, w: 1.322, h: 1.049, font: F.BODY, size: 8, align: 'center', lead: 1.5 });
++  txt(s, 'Our Company Mission', { x: 4.175, y: 1.193, w: 2.09, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  txt(s, 'Keep Up With The Trends To Be Stylish', { x: 4.175, y: 1.446, w: 4.51, h: 1.186, font: F.DISPLAY, size: 33 });
++  txt(s, L.NOSTRUD, { x: 4.845, y: 2.871, w: 2.6, h: 0.96, font: F.BODY, size: 9, lead: 1.5 });
++  coil(s, -0.73, 5, 1.279, 1.251, C.PEACH);
++  ring(s, -0.421, -0.499, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 0.631, 0.74, 0.458, C.SAGE);
++  burst(s, 7.748, 2.993, 0.36, C.SAGE);
++  rings(s, 7.456, -0.652, 1.304, C.SKY);
++  spark8(s, 5.535, 4.269, 0.73, C.PEACH);
++}
++
++/** Slide 10 - Our team intro */
++function slide10(s) {
++  sparkle(s, 8.133, 0.875, 0.671, C.PEACH);
++  txt(s, 'Our Team', { x: 1.677, y: 1.434, w: 1.217, h: 0.261, font: F.LORA, size: 11, bold: true, italic: true });
++  txt(s, 'Our Team Is Incredible And Fantastic', { x: 1.677, y: 1.687, w: 3.04, h: 1.742, font: F.DISPLAY, size: 33 });
++  txt(s, L.LABORE, { x: 1.677, y: 3.428, w: 2.631, h: 0.734, font: F.BODY, size: 9, lead: 1.5 });
++  spark8(s, 0.445, 4.627, 0.73, C.SKY);
++  burst(s, 8.987, 4.812, 0.36, C.SAGE);
++  rings(s, -1.175, -1.175, 2.35, C.SKY);
++  ring(s, 3.932, 4.472, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 4.482, 4.27, 0.458, C.SAGE, 212.458);
++  photo(s, 6.348, 1.193, 2.54, 3.221, P.DARK);
++  photo(s, 5.593, 2.185, 1.51, 1.914, P.MID);
++}
++
++/** Slide 11 - Our Great Owner */
++function slide11(s) {
++  frame(s, 3.943, 1.016, 5.058, 2.26, C.PEACH, 3);
++  txt(s, 'CEO & Co Founder Inghain', { x: 6.995, y: 4.394, w: 1.508, h: 0.215, font: F.BODY, size: 8, italic: true, align: 'center' });
++  txt(s, 'Dhruv Jacob', { x: 7.216, y: 4.128, w: 1.067, h: 0.278, font: F.DISPLAY, size: 12, align: 'center' });
++  txt(s, 'Founder Inghain', { x: 4.719, y: 4.394, w: 0.996, h: 0.215, font: F.BODY, size: 8, italic: true, align: 'center' });
++  txt(s, 'Alexander Bell', { x: 4.595, y: 4.128, w: 1.243, h: 0.278, font: F.DISPLAY, size: 12, align: 'center' });
++  txt(s, 'Inghain Founder', { x: 1.201, y: 1.166, w: 1.874, h: 0.311, font: F.BODY, size: 14, bold: true, italic: true });
++  txt(s, 'Our Great Owner', { x: 0.999, y: 1.398, w: 2.418, h: 2.575, font: F.SERIF, size: 50 });
++  spark8(s, 2.669, 3.813, 0.73, C.SAGE);
++  coil(s, 0.42, 4.481, 1.874, 1.833, C.PEACH);
++  burst(s, 9.666, -0.334, 0.669, C.SAGE);
++  sparkle(s, 2.815, 1.422, 0.671, C.SKY);
++  photo(s, 4.102, 1.22, 2.229, 2.827, P.DARK);
++  photo(s, 6.635, 1.22, 2.229, 2.827, P.MID);
++}
++
++/** Slide 12 - Team on a diagonal */
++function slide12(s) {
++  rule(s, 0.565, 0.542, 8.87, 3.196, C.SKY, 3);
++  txt(s, 'Fashion Designer', { x: 7.236, y: 4.798, w: 1.027, h: 0.215, font: F.BODY, size: 8, italic: true, align: 'center' });
++  txt(s, 'Camila Caniva', { x: 7.129, y: 4.532, w: 1.24, h: 0.278, font: F.DISPLAY, size: 12, align: 'center' });
++  txt(s, 'Fashion Designer', { x: 1.737, y: 3.666, w: 1.027, h: 0.215, font: F.BODY, size: 8, italic: true, align: 'center' });
++  txt(s, 'Jacob Dean', { x: 1.756, y: 3.399, w: 0.989, h: 0.278, font: F.DISPLAY, size: 12, align: 'center' });
++  txt(s, 'Fashion Designer', { x: 4.462, y: 4.292, w: 1.027, h: 0.215, font: F.BODY, size: 8, italic: true, align: 'center' });
++  txt(s, 'Camila Caniva', { x: 4.356, y: 4.026, w: 1.24, h: 0.278, font: F.DISPLAY, size: 12, align: 'center' });
++  coil(s, -0.73, 5, 1.279, 1.251, C.PEACH);
++  ring(s, 3.242, 4.726, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 3.372, 4.671, 0.458, C.SAGE, 180);
++  burst(s, 8.805, 4.742, 0.543, C.SAGE);
++  rings(s, 9.348, -0.652, 1.304, C.SKY);
++  spark8(s, 7.243, 0.353, 0.888, C.PEACH);
++  photo(s, 1.136, 0.491, 2.229, 2.827, P.DARK);
++  photo(s, 3.861, 1.118, 2.229, 2.827, P.MID);
++  photo(s, 6.635, 1.624, 2.229, 2.827, P.LITE);
++}
++
++/** Slide 13 - Our Great Team */
++function slide13(s) {
++  txt(s, 'Fashion Designer', { x: 1.65, y: 4.695, w: 1.027, h: 0.215, font: F.BODY, size: 8, italic: true, align: 'center' });
++  txt(s, 'Jacob Dean', { x: 1.669, y: 4.428, w: 0.989, h: 0.278, font: F.DISPLAY, size: 12, align: 'center' });
++  txt(s, 'Fotographer', { x: 4.607, y: 4.695, w: 0.787, h: 0.215, font: F.BODY, size: 8, italic: true, align: 'center' });
++  txt(s, 'Fana Abigail', { x: 4.466, y: 4.428, w: 1.068, h: 0.278, font: F.DISPLAY, size: 12, align: 'center' });
++  txt(s, 'Fashion Designer', { x: 7.323, y: 4.695, w: 1.027, h: 0.215, font: F.BODY, size: 8, italic: true, align: 'center' });
++  txt(s, 'Lawani Ashman', { x: 7.163, y: 4.428, w: 1.347, h: 0.278, font: F.DISPLAY, size: 12, align: 'center' });
++  txt(s, 'Our Great Team', { x: 2.404, y: 0.369, w: 5.193, h: 0.909, font: F.SERIF, size: 50, align: 'center' });
++  coil(s, -0.7, 4.909, 1.399, 1.369, C.PEACH);
++  burst(s, 0.732, 0.355, 0.669, C.SAGE);
++  ring(s, 8.939, 4.819, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 8.943, 4.838, 0.458, C.PEACH);
++  sparkle(s, 7.889, 1.051, 0.671, C.SKY);
++  ring(s, 8.999, -0.865, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 8.983, 0.278, 0.458, C.PEACH, 273.585);
++  photo(s, 6.722, 1.52, 2.229, 2.827, P.LITE);
++  photo(s, 1.049, 1.52, 2.229, 2.827, P.DARK);
++  photo(s, 3.885, 1.52, 2.229, 2.827, P.MID);
++}
++
++/** Slide 14 - Kain Ahmad contact card */
++function slide14(s) {
++  frame(s, 7.201, 1.188, 1.674, 2.26, C.PEACH, 3);
++  txt(s, 'Meidha Founder', { x: 1.342, y: 1.326, w: 1.614, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  txt(s, 'Kain Ahmad', { x: 1.342, y: 1.723, w: 3.29, h: 0.757, font: F.DISPLAY, size: 41 });
++  txt(s, L.LABORE, { x: 1.342, y: 2.505, w: 2.393, h: 0.734, font: F.BODY, size: 9, lead: 1.5 });
++  iconContact(s, 1.411, 3.524, 0.375, 0.3);
++  iconLinkedin(s, 4.06, 2.757, 0.375, 0.3);
++  iconMail(s, 1.411, 4.006, 0.375, 0.3);
++  txt(s, '@kain.ahmad', { x: 4.587, y: 2.767, w: 1.373, h: 0.278, font: F.BODY, size: 12, bold: true });
++  txt(s, 'kain-ahmad@mail.co.id', { x: 1.925, y: 4.017, w: 2.228, h: 0.278, font: F.BODY, size: 12, bold: true });
++  txt(s, 'Linkedin/KainAhmad', { x: 1.937, y: 3.535, w: 2.069, h: 0.278, font: F.BODY, size: 12, bold: true });
++  burst(s, 4.817, 3.524, 0.669, C.PEACH);
++  sparkle(s, 5.457, 1.305, 0.671, C.SKY, 45);
++  ring(s, -0.421, -0.499, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 0.631, 0.74, 0.458, C.SAGE);
++  ring(s, 8.632, 4.765, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 8.524, 4.981, 0.458, C.SAGE, 153.698);
++  photo(s, 6.297, 1.402, 2.393, 3.035, P.DARK);
++}
++
++/** Slide 15 - Offerings & Attributes */
++function slide15(s) {
++  frame(s, 1.157, 0.727, 1.674, 2.26, C.PEACH, 3);
++  txt(s, 'Offerings & Attributes', { x: 4.663, y: 3.072, w: 3.464, h: 1.59, font: F.DISPLAY, size: 45 });
++  txt(s, 'Our Best Services And Facilities', { x: 6.395, y: 2.735, w: 2.54, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  coil(s, 9.115, -0.493, 1.399, 1.369, C.PEACH);
++  burst(s, 7.909, 3.93, 0.669, C.SAGE);
++  sparkle(s, 7.573, 1.284, 0.671, C.SKY);
++  ring(s, -0.35, 4.818, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 0.572, 4.687, 0.458, C.PEACH, 240);
++  photo(s, 1.422, 1.026, 2.817, 3.573, P.DARK);
++  photo(s, 4.663, 1.026, 1.663, 1.961, P.MID);
++}
++
++/** Slide 16 - We Handle Orders For Exclusive Outfits */
++function slide16(s) {
++  txt(s, 'We Handle Orders For Exclusive Outfits', { x: 0.98, y: 1.478, w: 3.464, h: 2.802, font: F.DISPLAY, size: 41 });
++  txt(s, L.LABORE, { x: 3.451, y: 3.413, w: 2.393, h: 0.734, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, 'Lorem ipsum dolor sita amet, consectetur adipiscing elit doloranes eiusmod tempor incididunt ut labore elit doloranes eiusmod tempor elit doloranes eiusmod tempor .', { x: 4.152, y: 1.478, w: 1.692, h: 1.869, font: F.BODY, size: 9, lead: 1.5 });
++  frame(s, 7.478, 2.02, 1.674, 2.26, C.PEACH, 3);
++  ring(s, 8.999, -0.865, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 8.983, 0.278, 0.458, C.PEACH, 273.585);
++  coil(s, -0.42, -0.42, 1.399, 1.369, C.SKY);
++  burst(s, 3.775, 0.613, 0.669, C.PEACH);
++  sparkle(s, 0.516, 4.475, 0.671, C.SAGE);
++  photo(s, 6.203, 1.478, 2.817, 2.67, P.DARK);
++}
++
++/** Slide 17 - We Certify The Standard Of Our Products */
++function slide17(s) {
++  photo(s, 0.991, 2.405, 3.21, 2.142, P.DARK);
++  photo(s, 6.274, 1.078, 2.817, 3.468, P.MID);
++  txt(s, 'We Certify The Standard Of Our Products', { x: 0.909, y: 1.078, w: 5.227, h: 1.186, font: F.DISPLAY, size: 33 });
++  txt(s, 'Lorem ipsum dolor sita amet, consectetur adipiscing elit doloranes eiusmod tempor incididunt ut labore elit doloranes eiusmod tempor elit doloranes eiusmod tempor . tempor incididunt ut labore.', { x: 4.444, y: 2.427, w: 1.692, h: 2.096, font: F.BODY, size: 9, lead: 1.5 });
++  frame(s, 0.811, 3.519, 1.674, 1.186, C.PEACH, 3);
++  burst(s, 8.756, 4.189, 0.669, C.SAGE);
++  sparkle(s, 0.475, 0.493, 0.671, C.PEACH);
++  ring(s, 9.179, -0.813, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 9.24, 0.37, 0.458, C.SKY, 270);
++}
++
++/** Slide 18 - Attributes (2x2 grid) */
++function slide18(s) {
++  block(s, 1.58, 2.446, 0.389, 0.389, C.PEACH);
++  txt(s, L.SHORT, { x: 1.687, y: 2.811, w: 1.896, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, '24 / 7 Support', { x: 1.687, y: 2.499, w: 1.896, h: 0.346, font: F.DISPLAY, size: 12, bold: true, lead: 1.5 });
++  block(s, 2.446, 3.729, 0.389, 0.389, C.PEACH);
++  txt(s, L.SHORT, { x: 2.553, y: 4.095, w: 1.896, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, 'Modern & Fashionable', { x: 2.553, y: 3.783, w: 2.103, h: 0.346, font: F.DISPLAY, size: 12, bold: true, lead: 1.5 });
++  block(s, 4.001, 2.446, 0.389, 0.389, C.PEACH);
++  txt(s, L.SHORT, { x: 4.108, y: 2.811, w: 1.896, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, 'The Best Designer', { x: 4.108, y: 2.499, w: 1.896, h: 0.346, font: F.DISPLAY, size: 12, bold: true, lead: 1.5 });
++  block(s, 4.906, 3.727, 0.389, 0.389, C.PEACH);
++  txt(s, L.SHORT, { x: 5.013, y: 4.092, w: 1.896, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, 'Best Selling Point', { x: 5.013, y: 3.78, w: 1.896, h: 0.346, font: F.DISPLAY, size: 12, bold: true, lead: 1.5 });
++  txt(s, 'Attributes', { x: 1.299, y: 1.023, w: 4.079, h: 0.909, font: F.DISPLAY, size: 50 });
++  txt(s, 'Our Best Services And Facilities', { x: 1.299, y: 1.876, w: 2.819, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  coil(s, 9.3, -0.684, 1.399, 1.369, C.PEACH);
++  burst(s, 7.227, 4.07, 0.669, C.SKY);
++  sparkle(s, 1.215, 3.733, 0.671, C.SAGE);
++  ring(s, -0.421, -0.499, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 0.631, 0.74, 0.458, C.SAGE);
++  photoTri(s, 4.974, 1.163, 3.727, 3.436, P.DARK, 'tr');
++}
++
++/** Slide 19 - Attributes (stacked list) */
++function slide19(s) {
++  block(s, 5.356, 1.352, 0.389, 0.389, C.PEACH);
++  txt(s, L.SHORT, { x: 7.078, y: 1.504, w: 1.896, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, 'Modern & Fashionable', { x: 5.464, y: 1.417, w: 1.896, h: 0.682, font: F.DISPLAY, size: 18 });
++  block(s, 5.356, 2.475, 0.389, 0.389, C.PEACH);
++  txt(s, L.SHORT, { x: 7.078, y: 2.627, w: 1.896, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, 'The Best Designer', { x: 5.464, y: 2.539, w: 1.896, h: 0.682, font: F.DISPLAY, size: 18 });
++  block(s, 5.356, 3.597, 0.389, 0.389, C.PEACH);
++  txt(s, L.SHORT, { x: 7.078, y: 3.749, w: 1.896, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, 'Best Selling Point', { x: 5.464, y: 3.662, w: 1.614, h: 0.682, font: F.DISPLAY, size: 18 });
++  burst(s, 4.441, 4.064, 0.559, C.SAGE);
++  sparkle(s, 0.369, -0.657, 1.315, C.SKY);
++  ring(s, 9.179, -0.813, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 9.24, 0.37, 0.458, C.PEACH, 270);
++  photoTri(s, 1.027, 1.094, 3.727, 3.436, P.DARK, 'tr');
++  photoTri(s, 1.027, 1.818, 2.943, 2.713, P.MID, 'bl');
++}
++
++/** Slide 20 - Projects & Photos */
++function slide20(s) {
++  txt(s, 'Projects & Photos', { x: 4.142, y: 1.078, w: 2.817, h: 1.439, font: F.DISPLAY, size: 41 });
++  txt(s, 'Our Awards And Photo Gallery', { x: 4.142, y: 2.517, w: 2.544, h: 0.278, font: F.BODY, size: 12, bold: true, italic: true });
++  ring(s, -0.451, 4.94, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 0.273, 4.748, 0.458, C.SAGE, 225);
++  burst(s, 0.836, 0.852, 0.543, C.PEACH);
++  rings(s, 9.348, 2.19, 1.304, C.SKY);
++  photo(s, 1.054, 1.078, 2.817, 3.468, P.DARK);
++  photo(s, 4.142, 2.951, 2.817, 1.596, P.MID);
++  photo(s, 7.231, 1.078, 1.715, 3.468, P.LITE);
++}
++
++/** Slide 21 - Portfolio wide */
++function slide21(s) {
++  ring(s, 5.532, 1.786, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 5.689, 1.712, 0.458, C.PEACH, 15);
++  txt(s, 'We Possess A Selection Of Clothes', { x: 0.713, y: 1.362, w: 4.575, h: 1.186, font: F.DISPLAY, size: 33 });
++  txt(s, 'Inghain Portfolio & Galleries', { x: 0.713, y: 1.098, w: 2.978, h: 0.328, font: F.BODY, size: 15, bold: true, italic: true });
++  txt(s, L.PARA, { x: 0.713, y: 2.651, w: 3.416, h: 0.961, font: F.LORA, size: 9, lead: 1.5 });
++  txt(s, L.CLAUSE, { x: 0.713, y: 3.715, w: 1.708, h: 0.734, font: F.LORA, size: 9, lead: 1.5 });
++  burst(s, 4.373, 4.255, 0.543, C.SAGE);
++  rings(s, 8.511, -0.652, 1.304, C.SKY);
++  photo(s, 4.644, 2.651, 1.54, 1.896, P.DARK);
++  photo(s, 6.47, 1.078, 2.817, 3.468, P.MID);
++}
++
++/** Slide 22 - Portfolio trio */
++function slide22(s) {
++  ring(s, 4.73, 1.953, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 4.887, 1.879, 0.458, C.PEACH, 15);
++  txt(s, 'We Possess A Selection Of Clothes', { x: 1.194, y: 1.123, w: 3.902, h: 1.742, font: F.DISPLAY, size: 33 });
++  txt(s, 'Inghain Portfolio & Galleries', { x: 1.194, y: 0.859, w: 2.978, h: 0.328, font: F.BODY, size: 15, bold: true, italic: true });
++  rings(s, -0.38, 4.832, 1.445, C.SKY);
++  sparkle(s, 0.573, 0.402, 0.621, C.SAGE);
++  coil(s, 9.137, 4.908, 1.399, 1.369, C.PEACH);
++  photo(s, 1.194, 2.901, 1.682, 1.865, P.DARK);
++  photo(s, 3.413, 2.901, 1.682, 1.865, P.MID);
++  photo(s, 5.632, 0.859, 3.174, 3.908, P.LITE);
++}
++
++/** Slide 23 - Photos gallery */
++function slide23(s) {
++  coil(s, 2.1, 1.197, 1.015, 0.993, C.SAGE);
++  ring(s, 3.911, 3.078, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 3.972, 4.262, 0.458, C.PEACH, 270);
++  txt(s, 'Photos', { x: 3.049, y: 0.829, w: 3.902, h: 0.631, font: F.DISPLAY, size: 33, align: 'center' });
++  txt(s, 'Inghain Galleries', { x: 4.08, y: 0.565, w: 1.84, h: 0.328, font: F.BODY, size: 15, bold: true, italic: true, align: 'center' });
++  sparkle(s, 6.951, 1.918, 0.621, C.SAGE);
++  rings(s, 7.725, -0.723, 1.445, C.SKY);
++  ring(s, -0.35, 4.818, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 0.572, 4.687, 0.458, C.PEACH, 240);
++  photo(s, 0.83, 1.725, 1.682, 2.102, P.DARK);
++  photo(s, 3.049, 1.725, 1.682, 2.102, P.MID);
++  photo(s, 5.268, 2.539, 1.682, 2.102, P.DARK);
++  photo(s, 7.488, 2.539, 1.682, 2.102, P.MID);
++}
++
++/** Slide 24 - Timeline quarters */
++function slide24(s) {
++  block(s, 3.174, 1.246, 0.389, 0.389, C.PEACH);
++  txt(s, 'January - March', { x: 3.281, y: 1.31, w: 2.286, h: 0.379, font: F.DISPLAY, size: 18 });
++  txt(s, L.LABORE_IPSUM, { x: 3.174, y: 1.754, w: 2.774, h: 0.734, font: F.LORA, size: 9, lead: 1.5 });
++  block(s, 6.306, 1.246, 0.389, 0.389, C.PEACH);
++  txt(s, 'April - June', { x: 6.413, y: 1.31, w: 2.286, h: 0.379, font: F.DISPLAY, size: 18 });
++  txt(s, L.LABORE_IPSUM, { x: 6.306, y: 1.754, w: 2.774, h: 0.734, font: F.LORA, size: 9, lead: 1.5 });
++  block(s, 3.174, 3.137, 0.389, 0.389, C.PEACH);
++  txt(s, 'July - September', { x: 3.281, y: 3.202, w: 2.286, h: 0.379, font: F.DISPLAY, size: 18 });
++  txt(s, L.LABORE_IPSUM, { x: 3.174, y: 3.645, w: 2.774, h: 0.734, font: F.LORA, size: 9, lead: 1.5 });
++  block(s, 6.306, 3.137, 0.389, 0.389, C.PEACH);
++  txt(s, 'October - Desemeber', { x: 6.413, y: 3.202, w: 2.774, h: 0.379, font: F.DISPLAY, size: 18 });
++  txt(s, L.LABORE_IPSUM, { x: 6.306, y: 3.645, w: 2.774, h: 0.734, font: F.LORA, size: 9, lead: 1.5 });
++  txt(s, 'We Possess A Selection Of Clothes', { x: 0.812, y: 1.498, w: 2.147, h: 2.853, font: F.DISPLAY, size: 33 });
++  txt(s, 'Inghain Timline', { x: 0.812, y: 1.246, w: 1.693, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  arrowRight(s, 8.073, 4.634, 1.254, 0.559);
++  burst(s, 2.505, 4.498, 0.669, C.PEACH);
++  sparkle(s, 5.433, 0.388, 0.671, C.SKY, 45);
++  ring(s, -0.411, -0.849, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 0.642, 0.391, 0.458, C.SAGE);
++  ring(s, 8.775, -0.205, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 8.572, 0.412, 0.458, C.SAGE, 123.602);
++}
++
++/** Slide 25 - Project Date plans */
++function slide25(s) {
++  txt(s, 'Aug \u2013 Sept 2023', { x: 5, y: 2.365, w: 1.253, h: 0.28, font: F.BODY, size: 9, italic: true, lead: 1.5 });
++  txt(s, 'Plan 1', { x: 5, y: 2.014, w: 1.896, h: 0.414, font: F.DISPLAY, size: 15, bold: true, lead: 1.5 });
++  txt(s, L.TEMPOR, { x: 6.276, y: 2.11, w: 2.664, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  rule(s, 5.097, 2.014, 3.679, 0, C.SAGE, 1);
++  txt(s, 'Oct \u2013 Dec 2023', { x: 5, y: 3.333, w: 1.253, h: 0.28, font: F.BODY, size: 9, italic: true, lead: 1.5 });
++  txt(s, 'Plan 2', { x: 5, y: 2.982, w: 1.896, h: 0.414, font: F.DISPLAY, size: 15, bold: true, lead: 1.5 });
++  txt(s, L.TEMPOR, { x: 6.276, y: 3.077, w: 2.664, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  rule(s, 5.097, 2.982, 3.679, 0, C.SAGE, 1);
++  txt(s, 'Jan 2024', { x: 5, y: 4.3, w: 1.253, h: 0.28, font: F.BODY, size: 9, italic: true, lead: 1.5 });
++  txt(s, 'Plan 3', { x: 5, y: 3.949, w: 1.896, h: 0.414, font: F.DISPLAY, size: 15, bold: true, lead: 1.5 });
++  txt(s, L.TEMPOR, { x: 6.276, y: 4.045, w: 2.664, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  rule(s, 5.097, 3.949, 3.679, 0, C.SAGE, 1);
++  txt(s, 'Project Date', { x: 5, y: 1.171, w: 3.94, h: 0.631, font: F.DISPLAY, size: 33 });
++  txt(s, 'Timeline', { x: 5, y: 1.045, w: 0.744, h: 0.252, font: F.BODY, size: 11, bold: true, italic: true });
++  txt(s, L.PARA, { x: 1.06, y: 1.874, w: 3.416, h: 0.961, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, L.CLAUSE, { x: 1.06, y: 2.938, w: 1.708, h: 0.734, font: F.BODY, size: 9, lead: 1.5 });
++  rings(s, 1.06, 3.954, 1.264, C.SKY);
++  sparkle(s, 8.156, 0.996, 0.621, C.SAGE);
++  ring(s, -0.366, -0.441, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 0.839, 0.657, 0.458, C.PEACH, 345);
++}
++
++/** Slide 26 - Meet Our Fashion Designer */
++function slide26(s) {
++  photo(s, 4.652, 0.751, 4.39, 4.161, P.DARK);
++  frame(s, 6.639, 1.596, 2.609, 3.522, C.PEACH, 3);
++  txt(s, 'Meet Our Fashion Designer', { x: 1.076, y: 0.695, w: 2.862, h: 2.121, font: F.DISPLAY, size: 41 });
++  iconClock(s, 1.206, 2.935, 0.373, 0.373);
++  iconCalendar(s, 1.206, 3.542, 0.373, 0.373);
++  iconPinSolid(s, 1.257, 4.229, 0.272, 0.373);
++  txt(s, '08:00 \u2013 10:00', { x: 1.76, y: 2.981, w: 1.163, h: 0.278, font: F.BODY, size: 12, bold: true, italic: true });
++  txt(s, [{ text: 'Plenary Hall, ', options: { breakLine: true } }, { text: 'New Jersey 88776' }], { x: 1.76, y: 3.537, w: 1.539, h: 0.48, font: F.BODY, size: 12, bold: true, italic: true });
++  txt(s, [{ text: 'Notes', options: { breakLine: true } }, { text: 'Please bring a laptop & stationary', options: { fontSize: 9, bold: false, italic: false, lineSpacingMultiple: 1.5 } }], { x: 1.76, y: 4.221, w: 1.797, h: 0.709, font: F.BODY, size: 12, bold: true, italic: true });
++  block(s, 4.225, 3.525, 1.157, 1.387, C.PEACH);
++  txt(s, 'Monday', { x: 4.194, y: 4.417, w: 1.22, h: 0.333, font: F.BODY, size: 12, bold: true, italic: true, color: C.WHITE, align: 'center', valign: 'middle', fill: C.SAGE });
++  txt(s, [{ text: 'April 2022', options: { breakLine: true } }, { text: '25', options: { fontSize: 30 } }], { x: 4.302, y: 3.662, w: 1.003, h: 0.732, font: F.BODY, size: 9, bold: true, align: 'center' });
++  rings(s, -0.654, 3.396, 1.264, C.SKY);
++  sparkle(s, 3.604, 1.445, 0.621, C.SAGE);
++}
++
++/** Slide 27 - Overview (last 6 years) */
++function slide27(s) {
++  photo(s, 1.149, 1.199, 3.946, 3.214, P.DARK);
++  txt(s, 'Overview', { x: 5.545, y: 1.455, w: 2.764, h: 0.757, font: F.DISPLAY, size: 41 });
++  txt(s, 'Last 6 Years', { x: 5.609, y: 1.199, w: 1.347, h: 0.328, font: F.BODY, size: 15, bold: true, italic: true });
++  arrowRight(s, 6.658, 3.992, 0.898, 0.434);
++  txt(s, L.LABORE, { x: 5.609, y: 2.306, w: 3.242, h: 0.507, font: F.BODY, size: 9, lead: 1.5 });
++  txt(s, '2017', { x: 5.647, y: 4.035, w: 0.656, h: 0.379, font: F.LORA, size: 18, bold: true, italic: true });
++  txt(s, '2023', { x: 7.911, y: 4.035, w: 0.71, h: 0.379, font: F.LORA, size: 18, bold: true, italic: true });
++  txt(s, '1245', { x: 5.566, y: 3.044, w: 0.919, h: 0.48, font: F.BODY, size: 24, bold: true, align: 'center' });
++  txt(s, 'Products', { x: 5.609, y: 3.466, w: 0.833, h: 0.227, font: F.BODY, size: 9, italic: true, align: 'center' });
++  txt(s, '158', { x: 6.867, y: 3.044, w: 0.727, h: 0.48, font: F.BODY, size: 24, bold: true, align: 'center' });
++  txt(s, 'Awards', { x: 6.814, y: 3.466, w: 0.833, h: 0.227, font: F.BODY, size: 9, italic: true, align: 'center' });
++  txt(s, '4.9', { x: 8.118, y: 3.044, w: 0.631, h: 0.48, font: F.BODY, size: 24, bold: true, align: 'center' });
++  txt(s, 'Rating', { x: 8.019, y: 3.466, w: 0.833, h: 0.227, font: F.BODY, size: 9, italic: true, align: 'center' });
++  rule(s, 5.689, 3.044, 0.651, 0, C.PEACH, 1);
++  rule(s, 6.905, 3.044, 0.651, 0, C.SAGE, 1);
++  rule(s, 8.108, 3.044, 0.651, 0, C.PEACH, 1);
++  burst(s, 8.818, 4.454, 0.506, C.PEACH);
++  sparkle(s, 0.817, 0.876, 0.671, C.SAGE, 45);
++  ring(s, 8.523, -0.516, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 8.903, 0.842, 0.458, C.PEACH, 50.903);
++}
++
++/** Slide 28 - Overview (stats left) */
++function slide28(s) {
++  photo(s, 6.765, 1.205, 2.308, 3.214, P.MID);
++  photo(s, 4.673, 1.205, 1.851, 3.214, P.DARK);
++  txt(s, 'Overview', { x: 0.928, y: 1.317, w: 2.764, h: 0.757, font: F.DISPLAY, size: 41 });
++  txt(s, '1245', { x: 0.949, y: 3.671, w: 0.919, h: 0.48, font: F.BODY, size: 24, bold: true, align: 'center' });
++  txt(s, 'Products', { x: 0.992, y: 4.093, w: 0.833, h: 0.227, font: F.BODY, size: 9, italic: true, align: 'center' });
++  txt(s, '158', { x: 2.25, y: 3.671, w: 0.727, h: 0.48, font: F.BODY, size: 24, bold: true, align: 'center' });
++  txt(s, 'Awards', { x: 2.197, y: 4.093, w: 0.833, h: 0.227, font: F.BODY, size: 9, italic: true, align: 'center' });
++  txt(s, '4.9', { x: 3.501, y: 3.671, w: 0.631, h: 0.48, font: F.BODY, size: 24, bold: true, align: 'center' });
++  txt(s, 'Rating', { x: 3.402, y: 4.093, w: 0.833, h: 0.227, font: F.BODY, size: 9, italic: true, align: 'center' });
++  rule(s, 1.072, 3.671, 0.651, 0, C.SAGE, 1);
++  rule(s, 2.288, 3.671, 0.651, 0, C.PEACH, 1);
++  rule(s, 3.491, 3.671, 0.651, 0, C.SAGE, 1);
++  txt(s, L.PARA, { x: 0.928, y: 2.317, w: 3.416, h: 0.961, font: F.BODY, size: 9, lead: 1.5 });
++  burst(s, 8.822, 3.671, 0.506, C.PEACH);
++  sparkle(s, 3.422, 1.166, 0.671, C.SAGE, 45);
++  ring(s, -0.366, -0.441, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 0.839, 0.657, 0.458, C.PEACH, 345);
++}
++
++/** Slide 29 - Company Price */
++function slide29(s) {
++  photo(s, 5.957, 0.873, 3.086, 3.673, P.MID);
++  photo(s, 4.299, 2.876, 1.403, 1.67, P.DARK);
++  frame(s, 7.859, 2.876, 1.389, 1.876, C.PEACH, 3);
++  txt(s, 'Company Price', { x: 0.928, y: 1.317, w: 3.561, h: 1.893, font: F.DISPLAY, size: 54 });
++  sparkle(s, 4.409, 1.287, 0.671, C.SAGE, 45);
++  rings(s, -1.457, 4.168, 2.913, C.SKY);
++}
++
++/** Slide 30 - Company Pricing table */
++function slide30(s) {
++  gradBlock(s, 3.657, 1.451, 2.693, 3.663, C.SKY, C.SAGE);
++  block(s, 6.9, 1.703, 2.329, 3.163, 'FCF6F1');
++  block(s, 0.772, 1.703, 2.329, 3.163, 'FCF6F1');
++  txt(s, '$20.00', { x: 0.777, y: 2.241, w: 2.323, h: 0.48, font: F.DISPLAY, size: 24, bold: true, color: C.PEACH, align: 'center' });
++  txt(s, 'PER MONTH', { x: 0.777, y: 2.787, w: 2.323, h: 0.227, font: F.BODY, size: 9, color: '0C0C0C', align: 'center' });
++  rule(s, 1.162, 3.169, 1.566, 0, 'D8D8D8', 1);
++  txt(s, L.PRICE, { x: 0.783, y: 3.285, w: 2.323, h: 0.686, font: F.BODY, size: 9, color: '0C0C0C', align: 'center', lead: 1.6667 });
++  txt(s, 'GET START', { x: 1.315, y: 4.171, w: 1.26, h: 0.425, font: F.BODY, size: 9, bold: true, color: C.WHITE, align: 'center', valign: 'middle', fill: C.PEACH });
++  txt(s, '$40.00', { x: 6.9, y: 2.241, w: 2.323, h: 0.48, font: F.DISPLAY, size: 24, bold: true, color: C.PEACH, align: 'center' });
++  txt(s, 'PER MONTH', { x: 6.9, y: 2.787, w: 2.323, h: 0.227, font: F.BODY, size: 9, color: '0C0C0C', align: 'center' });
++  rule(s, 7.284, 3.169, 1.566, 0, 'D8D8D8', 1);
++  txt(s, L.PRICE, { x: 6.905, y: 3.285, w: 2.323, h: 0.686, font: F.BODY, size: 9, color: '0C0C0C', align: 'center', lead: 1.6667 });
++  txt(s, 'GET START', { x: 7.437, y: 4.171, w: 1.26, h: 0.425, font: F.BODY, size: 9, bold: true, color: C.WHITE, align: 'center', valign: 'middle', fill: C.PEACH });
++  txt(s, '$60.00', { x: 3.661, y: 2.1, w: 2.693, h: 0.682, font: F.DISPLAY, size: 36, bold: true, color: C.PEACH, align: 'center' });
++  txt(s, 'PER MONTH', { x: 3.661, y: 2.791, w: 2.693, h: 0.227, font: F.BODY, size: 9, color: '262626', align: 'center' });
++  rule(s, 4.107, 3.234, 1.816, 0, '262626', 1);
++  txt(s, L.PRICE, { x: 3.858, y: 3.368, w: 2.313, h: 0.686, font: F.BODY, size: 9, color: '262626', align: 'center', lead: 1.6667 });
++  txt(s, 'GET START', { x: 4.285, y: 4.312, w: 1.461, h: 0.492, font: F.BODY, size: 9, bold: true, color: C.PEACH, align: 'center', valign: 'middle', fill: C.WHITE });
++  s.addShape('diagStripe', { x: 3.657, y: 1.451, w: 1.071, h: 0.883, fill: { color: C.PEACH } });
++  txt(s, 'RECOMENDED', { x: 3.6, y: 1.717, w: 0.892, h: 0.189, font: F.BODY, size: 7, color: C.WHITE, align: 'center', rotate: 320.349 });
++  rule(s, 1.028, 3.169, 1.816, 0, '262626', 1);
++  rule(s, 7.156, 3.169, 1.816, 0, '262626', 1);
++  txt(s, 'Company Pricing', { x: 2.773, y: 0.328, w: 4.454, h: 0.682, font: F.DISPLAY, size: 36, align: 'center' });
++  txt(s, 'Service Plan', { x: 4.358, y: 1.001, w: 1.218, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true, align: 'center' });
++  sparkle(s, 8.887, 1.368, 0.671, C.SKY, 90);
++  rings(s, -0.877, -0.821, 1.754, C.SKY);
++}
++
++/** Slide 31 - Let's Break */
++function slide31(s) {
++  photoSplit(s, 5.684, 1.094, 3.727, 3.436, P.DARK);
++  txt(s, 'Let\u2019s Break', { x: 1.194, y: 2.1, w: 3.902, h: 0.909, font: F.DISPLAY, size: 50 });
++  txt(s, '15 Minutes Break', { x: 1.194, y: 1.836, w: 1.88, h: 0.328, font: F.BODY, size: 15, bold: true, italic: true });
++  ring(s, -0.366, -0.441, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 0.839, 0.657, 0.458, C.PEACH, 345);
++  sparkle(s, 2.2, 3.008, 0.671, C.SKY, 90);
++  rings(s, 7.94, 5.033, 1.184, C.SKY);
++  frame(s, 7.859, 0.937, 1.389, 0.731, C.PEACH, 3);
++}
++
++/** Slide 32 - Inghain Mockup (phone) */
++function slide32(s) {
++  sparkle(s, 4.957, 2.216, 0.671, C.SKY, 45);
++  photoRound(s, 6.227, 0.767, 2.008, 4.053, P.MID);
++  photo(s, 3.363, 0.711, 2.525, 1.84, P.DARK);
++  phone(s, 6.148, 0.659, 2.126, 4.307);
++  txt(s, 'Inghain Mockup', { x: 1.726, y: 3.224, w: 3.902, h: 1.742, font: F.DISPLAY, size: 50 });
++  txt(s, 'Device Mockup', { x: 1.726, y: 2.96, w: 1.637, h: 0.328, font: F.BODY, size: 15, bold: true, italic: true });
++  ring(s, -0.366, -0.441, 1.642, 1.642, C.SKY, 1.5);
++  sparkle(s, 0.839, 0.657, 0.458, C.SKY, 345);
++  burst(s, 7.982, 0.621, 0.506, C.PEACH);
++  ring(s, 8.981, 4.476, 1.642, 1.642, C.SAGE, 1.5);
++  sparkle(s, 8.97, 4.549, 0.458, C.SAGE, 166.183);
++}
++
++/** Slide 33 - Inghain Website (laptop) */
++function slide33(s) {
++  photo(s, 4.786, 1.801, 3.686, 2.326, P.DARK);
++  laptop(s, 4.186, 1.641, 4.892, 2.941);
++  txt(s, 'Inghain Website', { x: 1.098, y: 1.942, w: 3.902, h: 1.742, font: F.DISPLAY, size: 50 });
++  txt(s, 'Device Mockup', { x: 1.098, y: 1.475, w: 1.637, h: 0.328, font: F.BODY, size: 15, bold: true, italic: true });
++  rule(s, 6.257, 1.043, 0.752, 0, C.CREAM, 3);
++  ring(s, 8.523, -0.516, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 8.903, 0.842, 0.458, C.PEACH, 50.903);
++  rings(s, 0.653, 4.993, 1.264, C.SKY);
++  sparkle(s, 3.025, 1.187, 0.621, C.SAGE);
++  aster(s, -0.279, 0.264, 0.558, C.SAGE);
++}
++
++/** Slide 34 - Inghain Mockup (monitor) */
++function slide34(s) {
++  photo(s, 1.297, 1.255, 3.813, 2.1, P.DARK);
++  monitor(s, 1.114, 0.552, 4.201, 4.084);
++  txt(s, 'Inghain Mockup', { x: 6.141, y: 1.794, w: 2.745, h: 1.742, font: F.DISPLAY, size: 50 });
++  txt(s, 'Device Mockup', { x: 6.141, y: 1.53, w: 1.637, h: 0.328, font: F.BODY, size: 15, bold: true, italic: true });
++  sparkle(s, 7.351, 3.759, 0.621, C.PEACH);
++  aster(s, 4.185, 0.885, 0.558, C.SAGE);
++  rings(s, 7.687, -0.632, 1.264, C.SKY);
++  coil(s, 0.317, 4.553, 1.776, 1.737, C.PEACH);
++}
++
++/** Slide 35 - Contact */
++function slide35(s) {
++  photoCircle(s, 5.053, 0.791, 4.043, 4.043, P.DARK);
++  txt(s, 'Contact', { x: 0.903, y: 0.837, w: 3.464, h: 0.909, font: F.DISPLAY, size: 50 });
++  txt(s, 'Get In Touch With Us', { x: 0.95, y: 1.582, w: 1.945, h: 0.261, font: F.BODY, size: 11, bold: true, italic: true });
++  txt(s, 'CONTACT US', { x: 0.95, y: 2.043, w: 2.361, h: 0.265, font: F.BODY, size: 11, bold: true });
++  txt(s, 'OFFICE HOURS', { x: 0.95, y: 3.532, w: 2.255, h: 0.265, font: F.BODY, size: 11, bold: true });
++  iconPin(s, 1.011, 2.461, 0.253, 0.253, C.SAGE);
++  txt(s, '200 Broadway Av New Canberra Wa 5024 West Australia', { x: 1.393, y: 2.337, w: 2.59, h: 0.475, font: F.BODY, size: 9, align: 'justify', lead: 1.6667 });
++  txt(s, 'Monday - Thursday', { x: 0.95, y: 3.827, w: 1.406, h: 0.265, font: F.BODY, size: 9, align: 'justify', lead: 1.6667 });
++  txt(s, 'Friday - Saturday', { x: 0.95, y: 4.147, w: 1.406, h: 0.265, font: F.BODY, size: 9, align: 'justify', lead: 1.6667 });
++  txt(s, '7am\u20134pm', { x: 3.151, y: 3.807, w: 0.833, h: 0.265, font: F.BODY, size: 9, align: 'right', lead: 1.6667 });
++  txt(s, '9am-4pm', { x: 3.151, y: 4.11, w: 0.833, h: 0.265, font: F.BODY, size: 9, align: 'right', lead: 1.6667 });
++  iconPhone(s, 1.011, 2.998, 0.255, 0.255, C.SAGE);
++  txt(s, '(+62) 81234567790', { x: 1.396, y: 2.982, w: 2.14, h: 0.265, font: F.BODY, size: 9, align: 'justify', lead: 1.6667 });
++  txt(s, 'Sunday', { x: 0.95, y: 4.406, w: 1.406, h: 0.265, font: F.BODY, size: 9, align: 'justify', lead: 1.6667 });
++  txt(s, 'Closed', { x: 3.151, y: 4.377, w: 0.833, h: 0.265, font: F.BODY, size: 9, align: 'right', lead: 1.6667 });
++  ring(s, 6.766, -2.693, 5.654, 5.654, C.PEACH, 3);
++  sparkle(s, 3.469, 0.63, 0.621, C.SKY);
++  aster(s, 5.4, 3.981, 0.558, C.SAGE);
++}
++
++/** Slide 36 - Thank You */
++function slide36(s) {
++  txt(s, [{ text: 'Thank ', options: { breakLine: true } }, { text: 'You' }], { x: 6.176, y: 1.727, w: 2.569, h: 1.893, font: F.DISPLAY, size: 54 });
++  txt(s, 'For Your Attention', { x: 6.176, y: 3.62, w: 1.621, h: 0.278, font: F.BODY, size: 12, bold: true, italic: true });
++  ring(s, 9.179, -0.813, 1.642, 1.642, C.PEACH, 1.5);
++  sparkle(s, 9.24, 0.37, 0.458, C.PEACH, 270);
++  rings(s, -1.431, 4.194, 2.861, C.SKY);
++  sparkle(s, 0.81, 0.73, 0.621, C.PEACH);
++  aster(s, 5.589, 1.468, 0.558, C.SAGE);
++  photoCircle(s, 0.81, 0.452, 3.147, 3.147, P.DARK, C.WHITE);
++  photoCircle(s, 2.416, 2.026, 3.147, 3.147, P.MID, C.WHITE);
++}
++
++/* ------------------------------------------------------------------ *
++ * Build                                                               *
++ * ------------------------------------------------------------------ */
++
++const SLIDES = [
++  slide01,
++  slide02,
++  slide03,
++  slide04,
++  slide05,
++  slide06,
++  slide07,
++  slide08,
++  slide09,
++  slide10,
++  slide11,
++  slide12,
++  slide13,
++  slide14,
++  slide15,
++  slide16,
++  slide17,
++  slide18,
++  slide19,
++  slide20,
++  slide21,
++  slide22,
++  slide23,
++  slide24,
++  slide25,
++  slide26,
++  slide27,
++  slide28,
++  slide29,
++  slide30,
++  slide31,
++  slide32,
++  slide33,
++  slide34,
++  slide35,
++  slide36
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'INGHAIN', width: 10, height: 5.625 });
++  pptx.layout = 'INGHAIN';
++  pptx.author = 'Inghain';
++  pptx.title = 'Inghain - Fashion Presentation Template';
++
++  SLIDES.forEach(fn => {
++    const s = pptx.addSlide();
++    s.background = { color: C.CREAM };
++    fn(s);
++  });
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '0fe72ac6-e885-4f59-a396-ceaeda1b222a_grok_final.pptx'),
++  });
++}
++
++build().then(f => console.log('wrote ' + f));

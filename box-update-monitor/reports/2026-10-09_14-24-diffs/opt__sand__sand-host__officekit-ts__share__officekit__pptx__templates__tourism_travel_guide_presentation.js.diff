@@ -1,0 +1,725 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tourism_travel_guide_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tourism_travel_guide_presentation.js
+@@ -0,0 +1,722 @@
++/**
++ * "Discover the World - Your Ultimate Travel Guide"
++ * 20 slides, 13.333 x 7.5 in, rebuilt with pptxgenjs only.
++ *
++ * Photographs in the original deck are reproduced as flat grey
++ * rectangles with a caption (see `photo()`), no raster data is embedded.
++ */
++'use strict';
++
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ theme */
++
++const C = {
++  cream: 'F2F4ED', // theme lt1 / bg1 - slide background & light text
++  ink: '131313', // theme dk1 / tx1
++  purple: '433C99', // accent1 - panels
++  orange: 'F9A340', // accent2 - highlight word / eyebrows
++  blue: '3E94EB', // accent4 - hairlines & the arrow badge
++  white: 'FFFFFF', // accent6 - background decorations
++  photo: '727176', // stand-in fill for photo placeholders
++};
++
++const FONT = 'Bricolage Grotesque';
++const FONT_XB = 'Bricolage Grotesque ExtraBold';
++
++const SLIDE_W = 13.3333333;
++const SLIDE_H = 7.5;
++
++const TITLE_PT = 60; // every big headline
++const LEAD_PT = 18; // orange "eyebrow" lines
++const BODY_PT = 14; // paragraph copy
++const RULE = { color: C.blue, width: 1.5 }; // theme line style (19050 EMU)
++const CUT = 0.8333; // 45-degree corner cut on every purple panel
++
++/* ------------------------------------------------- normalised path outlines
++ * Paths are stored 0..1 and scaled to a shape box by `toPoints()`.
++ *   ['M', x, y]                     move
++ *   ['L', x, y]                     line
++ *   ['C', x1, y1, x2, y2, x, y]     cubic bezier
++ *   ['Z']                           close
++ */
++
++// Rounded square with a north-east arrow punched out of it (the deck's badge).
++const BADGE = [
++  ['M', 0.841, 0], ['L', 0.159, 0], ['C', 0.071, 0, 0, 0.071, 0, 0.159],
++  ['L', 0, 0.841], ['C', 0, 0.929, 0.071, 1, 0.159, 1],
++  ['L', 0.841, 1], ['C', 0.929, 1, 1, 0.929, 1, 0.841],
++  ['L', 1, 0.159], ['C', 1, 0.071, 0.929, 0, 0.841, 0], ['Z'],
++  ['M', 0.846, 0.846], ['L', 0.689, 0.846], ['L', 0.689, 0.422],
++  ['L', 0.344, 0.766], ['L', 0.234, 0.656], ['L', 0.578, 0.311],
++  ['L', 0.154, 0.311], ['L', 0.154, 0.154], ['L', 0.846, 0.154],
++  ['L', 0.846, 0.846], ['Z'],
++];
++
++// Rounded card with a clipped top-right corner (slide 15 step cards).
++const STEP_CARD = [
++  ['M', 0.6548, 0], ['L', 0.049, 0], ['C', 0.0219, 0, 0, 0.013, 0, 0.0289],
++  ['L', 0, 0.9711], ['C', 0, 0.987, 0.0219, 1, 0.049, 1],
++  ['L', 0.951, 1], ['C', 0.9781, 1, 1, 0.987, 1, 0.9711],
++  ['L', 1, 0.2039], ['L', 0.6548, 0], ['Z'],
++];
++
++// White ornaments that live on the slide layouts of the original deck.
++const DECOR = {
++  crescentBL: [
++    ['M', 0.9927, 0], ['L', 0.7444, 0],
++    ['C', 0.7522, 0.042, 0.7564, 0.086, 0.7564, 0.1313],
++    ['C', 0.7564, 0.4299, 0.5766, 0.6719, 0.3549, 0.6719],
++    ['C', 0.2011, 0.6719, 0.0674, 0.5554, 0, 0.3844],
++    ['L', 0, 0.8569], ['C', 0.1018, 0.9473, 0.2238, 1, 0.3549, 1],
++    ['C', 0.7112, 1, 1, 0.611, 1, 0.1313],
++    ['C', 1, 0.0866, 0.9975, 0.0428, 0.9927, 0], ['Z'],
++  ],
++  ringLeftHalf: [
++    ['M', 1, 0.2141], ['L', 1, 0],
++    ['C', 0.4205, 0.0666, 0, 0.2653, 0, 0.5],
++    ['C', 0, 0.7347, 0.4205, 0.9334, 1, 1], ['L', 1, 0.7859],
++    ['C', 0.7252, 0.7305, 0.5388, 0.6232, 0.5388, 0.5],
++    ['C', 0.5388, 0.3767, 0.7252, 0.2695, 1, 0.2141], ['Z'],
++  ],
++  ringBottomHalf: [
++    ['M', 0.9828, 0], ['L', 0.7826, 0],
++    ['C', 0.8009, 0.0629, 0.8112, 0.133, 0.8112, 0.2069],
++    ['C', 0.8112, 0.4795, 0.6718, 0.7005, 0.5, 0.7005],
++    ['C', 0.3282, 0.7005, 0.1888, 0.4795, 0.1888, 0.2069],
++    ['C', 0.1888, 0.133, 0.1991, 0.0629, 0.2174, 0], ['L', 0.0172, 0],
++    ['C', 0.006, 0.0659, 0, 0.1353, 0, 0.2069],
++    ['C', 0, 0.6449, 0.2239, 1, 0.5, 1],
++    ['C', 0.7761, 1, 1, 0.6449, 1, 0.2069],
++    ['C', 1, 0.1353, 0.994, 0.0659, 0.9828, 0], ['Z'],
++  ],
++  ringTopHalf: [
++    ['M', 0.0172, 1], ['L', 0.2174, 1],
++    ['C', 0.1991, 0.9371, 0.1888, 0.867, 0.1888, 0.7931],
++    ['C', 0.1888, 0.5205, 0.3282, 0.2995, 0.5, 0.2995],
++    ['C', 0.6718, 0.2995, 0.8112, 0.5205, 0.8112, 0.7931],
++    ['C', 0.8112, 0.867, 0.8009, 0.9371, 0.7826, 1], ['L', 0.9828, 1],
++    ['C', 0.994, 0.9341, 1, 0.8647, 1, 0.7931],
++    ['C', 1, 0.3551, 0.7761, 0, 0.5, 0],
++    ['C', 0.2239, 0, 0, 0.3551, 0, 0.7931],
++    ['C', 0, 0.8647, 0.006, 0.9341, 0.0172, 1], ['Z'],
++  ],
++  ringFull: [
++    ['M', 0.5, 0], ['C', 0.2239, 0, 0, 0.2239, 0, 0.5],
++    ['C', 0, 0.7761, 0.2239, 1, 0.5, 1],
++    ['C', 0.7761, 1, 1, 0.7761, 1, 0.5],
++    ['C', 1, 0.2239, 0.7761, 0, 0.5, 0], ['Z'],
++    ['M', 0.5, 0.8112], ['C', 0.3282, 0.8112, 0.1888, 0.6718, 0.1888, 0.5],
++    ['C', 0.1888, 0.3281, 0.3282, 0.1888, 0.5, 0.1888],
++    ['C', 0.6719, 0.1888, 0.8112, 0.3282, 0.8112, 0.5],
++    ['C', 0.8112, 0.6718, 0.6718, 0.8112, 0.5, 0.8112], ['Z'],
++  ],
++  cornerSwoosh: [
++    ['M', 0, 1], ['L', 0.598, 1],
++    ['C', 0.7099, 0.8562, 0.8482, 0.7604, 1, 0.7331], ['L', 1, 0],
++    ['C', 0.5682, 0.0481, 0.1974, 0.4396, 0, 1], ['Z'],
++  ],
++  quarterArc: [
++    ['M', 0.4285, 0], ['L', 0, 0],
++    ['C', 0.0418, 0.523, 0.4645, 0.9427, 1, 1], ['L', 1, 0.5835],
++    ['C', 0.7003, 0.5312, 0.4666, 0.295, 0.4285, 0], ['Z'],
++  ],
++  ringSide: [
++    ['M', 1, 0], ['C', 0.4077, 0.0907, 0, 0.2805, 0, 0.5],
++    ['C', 0, 0.7195, 0.4077, 0.9093, 1, 1], ['L', 1, 0.7448],
++    ['C', 0.799, 0.6822, 0.6748, 0.5956, 0.6748, 0.5],
++    ['C', 0.6748, 0.4044, 0.799, 0.3178, 1, 0.2552], ['L', 1, 0], ['Z'],
++  ],
++  archTop: [
++    ['M', 0.7997, 0], ['C', 0.7557, 0.3044, 0.6381, 0.5222, 0.5, 0.5222],
++    ['C', 0.3619, 0.5222, 0.2443, 0.3044, 0.2003, 0], ['L', 0, 0],
++    ['C', 0.0493, 0.5714, 0.2544, 1, 0.5, 1],
++    ['C', 0.7456, 1, 0.9508, 0.5714, 1, 0], ['L', 0.7997, 0], ['Z'],
++  ],
++  cornerArc: [
++    ['M', 0, 1], ['L', 0.4612, 1],
++    ['C', 0.4612, 0.7147, 0.6882, 0.4734, 1, 0.3945], ['L', 1, 0],
++    ['C', 0.4312, 0.0867, 0, 0.5014, 0, 1], ['Z'],
++  ],
++};
++
++// Globe on slide 20: a light disc with a purple land mass laid over it.
++const GLOBE_DISC = [
++  ['M', 1, 0.5], ['C', 1, 0.7426, 0.8272, 0.9449, 0.5979, 0.9904],
++  ['C', 0.5663, 0.9967, 0.5335, 1, 0.5, 1],
++  ['C', 0.3865, 1, 0.2819, 0.9622, 0.1979, 0.8985],
++  ['C', 0.089, 0.8158, 0.015, 0.6895, 0.002, 0.5456],
++  ['C', 0.0007, 0.5306, 0, 0.5154, 0, 0.5],
++  ['C', 0, 0.2239, 0.2239, 0, 0.5, 0],
++  ['C', 0.7088, 0, 0.8878, 0.1281, 0.9626, 0.3099],
++  ['C', 0.9867, 0.3685, 1, 0.4327, 1, 0.5], ['Z'],
++];
++const GLOBE_LAND_N = [
++  [0.980, 0.329], [0.989, 0.348], [0.966, 0.353], [0.938, 0.325], [0.869, 0.291],
++  [0.862, 0.259], [0.826, 0.240], [0.825, 0.224], [0.834, 0.193], [0.831, 0.180],
++  [0.799, 0.156], [0.782, 0.167], [0.729, 0.164], [0.709, 0.151], [0.695, 0.118],
++  [0.677, 0.112], [0.663, 0.132], [0.626, 0.156], [0.609, 0.178], [0.604, 0.195],
++  [0.608, 0.215], [0.644, 0.242], [0.631, 0.276], [0.636, 0.297], [0.649, 0.315],
++  [0.717, 0.367], [0.792, 0.393], [0.810, 0.407], [0.805, 0.431], [0.741, 0.485],
++  [0.733, 0.507], [0.752, 0.561], [0.792, 0.589], [0.806, 0.613], [0.809, 0.646],
++  [0.850, 0.674], [0.861, 0.700], [0.854, 0.726], [0.839, 0.737], [0.782, 0.755],
++  [0.754, 0.773], [0.740, 0.799], [0.731, 0.841], [0.710, 0.853], [0.687, 0.842],
++  [0.662, 0.804], [0.638, 0.786], [0.561, 0.767], [0.485, 0.705], [0.394, 0.686],
++  [0.367, 0.660], [0.366, 0.604], [0.350, 0.493], [0.361, 0.459], [0.396, 0.426],
++  [0.389, 0.381], [0.397, 0.347], [0.414, 0.330], [0.442, 0.322], [0.454, 0.310],
++  [0.441, 0.215], [0.433, 0.207], [0.398, 0.216], [0.389, 0.211], [0.382, 0.192],
++  [0.370, 0.186], [0.288, 0.193], [0.264, 0.198], [0.245, 0.210], [0.225, 0.236],
++  [0.166, 0.252], [0.150, 0.275], [0.137, 0.317], [0.075, 0.362], [0.059, 0.438],
++  [0.034, 0.482], [0.026, 0.515], [0.002, 0.546], [0.000, 0.500], [0.026, 0.342],
++  [0.100, 0.205], [0.213, 0.096], [0.355, 0.025], [0.519, 0.000], [0.645, 0.015],
++  [0.760, 0.057], [0.860, 0.122], [0.941, 0.208], [1.000, 0.310], [0.984, 0.317],
++];
++const GLOBE_LAND_S = [
++  [0.568, 0.980], [0.503, 0.948], [0.424, 0.927], [0.394, 0.881], [0.334, 0.858],
++  [0.325, 0.844], [0.318, 0.797], [0.280, 0.725], [0.256, 0.719], [0.225, 0.739],
++  [0.224, 0.755], [0.236, 0.780], [0.226, 0.829], [0.242, 0.864], [0.237, 0.878],
++  [0.206, 0.898], [0.260, 0.934], [0.320, 0.962], [0.383, 0.983], [0.450, 0.996],
++  [0.519, 1.000], [0.621, 0.990], [0.597, 0.977], [0.568, 0.980],
++];
++
++/* -------------------------------------------------------------- primitives */
++
++function toPoints(cmds, w, h) {
++  return cmds.map((c) => {
++    if (c[0] === 'Z') return { close: true };
++    if (c[0] === 'M') return { x: c[1] * w, y: c[2] * h, moveTo: true };
++    if (c[0] === 'L') return { x: c[1] * w, y: c[2] * h };
++    return {
++      x: c[5] * w, y: c[6] * h,
++      curve: { type: 'cubic', x1: c[1] * w, y1: c[2] * h, x2: c[3] * w, y2: c[4] * h },
++    };
++  });
++}
++
++function polyPoints(poly, w, h) {
++  const pts = poly.map(([px, py], i) => ({ x: px * w, y: py * h, moveTo: i === 0 }));
++  pts.push({ close: true });
++  return pts;
++}
++
++function freeform(slide, cmds, x, y, w, h, color) {
++  slide.addShape('custGeom', {
++    x, y, w, h, points: toPoints(cmds, w, h),
++    fill: { color }, line: { type: 'none' },
++  });
++}
++
++/** Purple panel whose top-right corner is cut off at 45 degrees. */
++function panel(slide, x, y, w, h, color) {
++  slide.addShape('custGeom', {
++    x, y, w, h,
++    points: [
++      { x: w, y: CUT }, { x: w, y: h }, { x: 0, y: h },
++      { x: 0, y: 0 }, { x: w - CUT, y: 0 }, { close: true },
++    ],
++    fill: { color: color || C.purple }, line: { type: 'none' },
++  });
++}
++
++/** White layout ornament, e.g. decor(slide, 'ringFull', 2.611, 0.97, 4.959, 4.959). */
++function decor(slide, key, x, y, w, h) {
++  freeform(slide, DECOR[key], x, y, w, h, C.white);
++}
++
++/** The blue arrow badge that appears once on nearly every slide. */
++function badge(slide, x, y, size) {
++  freeform(slide, BADGE, x, y, size || 0.319, size || 0.319, C.blue);
++}
++
++function rule(slide, x, y, w, h) {
++  slide.addShape('line', { x, y, w: w || 0, h: h || 0, line: RULE });
++}
++
++function rect(slide, x, y, w, h, color) {
++  slide.addShape('rect', { x, y, w, h, fill: { color }, line: { type: 'none' } });
++}
++
++/** Grey stand-in for one of the deck's photo placeholders. */
++function photo(slide, x, y, w, h, captionPt) {
++  rect(slide, x, y, w, h, C.photo);
++  slide.addText('PLACE YOUR IMAGE', {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontFace: FONT, fontSize: captionPt || 18, bold: true, color: C.white,
++  });
++}
++
++/* ------------------------------------------------------------------- text */
++
++// margin is [left, right, bottom, top] in points - PowerPoint's textbox defaults.
++// `fit: resize` emits <a:spAutoFit/>, which every text box in the source deck has.
++const TEXT_BASE = {
++  valign: 'top', margin: [7.2, 7.2, 3.6, 3.6], isTextBox: true, fit: 'resize',
++};
++
++/**
++ * paras: array of paragraphs, each an array of runs `[text, color?, extraOpts?]`.
++ * Runs without a colour inherit the box colour.
++ */
++function runsOf(paras) {
++  const out = [];
++  paras.forEach((para, pi) => {
++    para.forEach((run, ri) => {
++      out.push({
++        text: run[0],
++        options: Object.assign({
++          color: run[1],
++          breakLine: ri === para.length - 1 && pi < paras.length - 1,
++        }, run[2]),
++      });
++    });
++  });
++  return out;
++}
++
++/** 60 pt ExtraBold headline; `paras` lets a single word switch to orange. */
++function title(slide, x, y, w, h, paras, color) {
++  slide.addText(runsOf(paras), Object.assign({}, TEXT_BASE, {
++    x, y, w, h, wrap: false,
++    fontFace: FONT_XB, fontSize: TITLE_PT, bold: false, color: color || C.ink,
++  }));
++}
++
++/** 18 pt orange kicker above/below a headline. */
++function lead(slide, x, y, w, h, text, color) {
++  slide.addText(text, Object.assign({}, TEXT_BASE, {
++    x, y, w, h, wrap: false,
++    fontFace: FONT, fontSize: LEAD_PT, bold: false, color: color || C.orange,
++  }));
++}
++
++/** 14 pt paragraph copy; `opts` overrides colour, spacing, alignment, wrap. */
++function body(slide, x, y, w, h, text, opts) {
++  slide.addText(text, Object.assign({}, TEXT_BASE, {
++    x, y, w, h, fontFace: FONT, fontSize: BODY_PT, color: C.ink,
++    lineSpacingMultiple: 1.5,
++  }, opts));
++}
++
++/** Small 14 pt caption ("Travel Guide Presentation", "Timeline Infographic", ...). */
++function caption(slide, x, y, w, text, color) {
++  slide.addText(text, Object.assign({}, TEXT_BASE, {
++    x, y, w, h: 0.337, wrap: false, align: 'left',
++    fontFace: FONT, fontSize: BODY_PT, color: color || C.ink,
++  }));
++}
++
++/* ------------------------------------------------------------ slide bodies */
++
++function slide01(s) {
++  decor(s, 'crescentBL', 0, 0, 3.843, 2.854);
++  panel(s, 2.25, 1.362, 6.722, 6.138);
++  photo(s, 8.972, 0, 4.361, 7.5, 21.5);
++  caption(s, 2.25, 0.471, 2.574, 'Travel Guide Presentation');
++  lead(s, 2.669, 3.393, 2.505, 0.404, 'Discover the World:');
++  title(s, 2.669, 3.798, 5.956, 2.121,
++    [[['Your Ultimate']], [['Travel', C.orange], [' Guide']]], C.cream);
++  body(s, 2.669, 6.692, 5.721, 0.337,
++    'Presented by Global Nomad Experiences \u2022 Updated for 2025',
++    { color: C.cream, wrap: false, lineSpacingMultiple: null });
++  body(s, 0.446, 6.12, 1.406, 0.909, 'Explore.\nExperience.\nElevate.',
++    { color: C.orange, fontSize: 16, wrap: false, lineSpacingMultiple: null });
++  rule(s, 0.578, 4.78, 0, 1.138);
++  badge(s, 0.55, 4.136);
++}
++
++function slide02(s) {
++  decor(s, 'ringLeftHalf', 11.596, 2.233, 1.738, 4.733);
++  panel(s, 8.955, 0, 4.378, 3.778);
++  photo(s, 0.578, 0, 8.378, 3.779, 20.5);
++  lead(s, 9.352, 3.092, 3.149, 0.404, 'Your Journey Starts Here');
++  title(s, 0.578, 4.32, 5.803, 2.121,
++    [[['What\u2019s Inside']], [['This '], ['Guide', C.orange]]]);
++  body(s, 9.377, 4.426, 0.363, 2.54, '1.\n2.\n3.\n4.\n5.\n6.\n7.',
++    { align: 'center', wrap: false });
++  body(s, 9.788, 4.426, 2.821, 2.54, [
++    'About This Guide', 'Choosing Your Destination', 'Travel Styles & Experiences',
++    'Practical Planning Tips', 'Budget & Packing Essentials', 'Top Destinations 2025',
++    'Travel Smart & Safe',
++  ].join('\n'), { wrap: false });
++  rule(s, 2.639, 6.859, 2.319, 0);
++  badge(s, 8.636, 6.54);
++}
++
++function slide03(s) {
++  decor(s, 'ringBottomHalf', 1.507, 0, 4.959, 3.126);
++  panel(s, 9.834, 3.75, 2.922, 3.75);
++  photo(s, 3.375, 0, 9.38, 3.75, 23);
++  lead(s, 10.353, 6.27, 1.883, 0.707, 'Travel Experts\nSince 2010');
++  title(s, 0.578, 4.084, 8.582, 2.121,
++    [[['About '], ['Global', C.orange]], [['Nomad Experiences']]]);
++  body(s, 0.578, 6.204, 8.582, 0.772,
++    'We\u2019re a passionate group of seasoned travelers, storytellers, and local ' +
++    'guides. Our mission is to curate purposeful and immersive travel experiences ' +
++    'that go beyond the itinerary.');
++  rule(s, 0.578, 1.347, 0, 2.403);
++  badge(s, 0.55, 0.523);
++}
++
++function slide04(s) {
++  decor(s, 'ringTopHalf', 1.44, 4.374, 4.959, 3.126);
++  panel(s, 7.055, 0, 6.278, 6.305);
++  photo(s, 0, 0, 4.014, 7.5, 20);
++  lead(s, 4.335, 0.712, 2.399, 0.707, 'Too Many Options,\nToo Little Clarity');
++  title(s, 7.597, 0.712, 4.502, 3.13,
++    [[['The '], ['Travel', C.orange]], [['Planning']], [['Problem']]], C.cream);
++  body(s, 7.597, 4.553, 5.264, 1.126,
++    'Over 64% of travelers report feeling overwhelmed by conflicting information, ' +
++    'unclear visa requirements, and hidden costs when planning their trips.',
++    { color: C.cream });
++  rule(s, 7.056, 6.859, 2.319, 0);
++  badge(s, 4.455, 6.54);
++  caption(s, 10.287, 6.686, 2.574, 'Travel Guide Presentation');
++}
++
++function slide05(s) {
++  decor(s, 'ringBottomHalf', 5.879, 0, 4.959, 3.126);
++  panel(s, 5.226, 0.929, 7.078, 5.64);
++  photo(s, 0, 0.931, 5.226, 5.639, 26);
++  lead(s, 5.708, 1.319, 1.845, 0.404, 'Your Solution:');
++  title(s, 5.73, 1.723, 4.55, 1.111,
++    [[['This '], ['Guide', C.orange]]], C.cream);
++  lead(s, 5.73, 4.651, 5.226, 0.404, 'Simplified, Smart, and Experience-Oriented');
++  body(s, 5.73, 5.055, 6.071, 1.126,
++    'We\u2019ve compiled expert advice, route planning tools, budget tips, and insider ' +
++    'intel to make trip planning easier, more informed, and tailored to your travel ' +
++    'personality.', { color: C.cream });
++  rule(s, 12.787, 1.808, 0, 1.484);
++  badge(s, 12.467, 0.931);
++}
++
++function slide06(s) {
++  decor(s, 'cornerSwoosh', 11.337, 6.217, 1.996, 1.283);
++  panel(s, 1.444, -0.001, 2.15, 4.037);
++  photo(s, 3.595, 0, 9.738, 4.036, 24);
++  caption(s, 1.583, 0.514, 1.341, 'Travel Guide', C.orange);
++  lead(s, 10.531, 4.633, 2.227, 0.707, 'Designed with\nTravelers in Mind');
++  title(s, 1.444, 4.44, 8.394, 1.111,
++    [[['Why Use This '], ['Guide', C.orange]]]);
++  body(s, 1.444, 5.955, 3.278, 0.771,
++    '\u2714 Save hours of research\n\u2714 Avoid common travel mistakes');
++  body(s, 5.516, 5.955, 4.323, 0.771,
++    '\u2714 Discover unique, off-the-beaten-path spots\n' +
++    '\u2714 Travel more confidently and safely');
++  rule(s, 0.578, 4.653, 0, 0.667);
++  badge(s, 0.55, 0.523);
++}
++
++function slide07(s) {
++  decor(s, 'ringFull', 2.611, 0.97, 4.959, 4.959);
++  panel(s, 0, 2.458, 6.068, 5.042);
++  photo(s, 6.068, 0, 4.654, 7.5, 23);
++  lead(s, 11.314, 2.944, 1.469, 1.01, 'Tools for\nEvery Kind\nof Traveler');
++  title(s, 0.594, 2.894, 4.883, 2.121,
++    [[['What You\u2019ll']], [['Get', C.orange], [' Inside']]], C.cream);
++  body(s, 0.594, 5.263, 3.226, 1.479, [
++    '\u25b6 Destination comparison charts', '\u25b6 Packing checklists by climate',
++    '\u25b6 Budget and itinerary planners', '\u25b6 Local etiquette and safety tips',
++  ].join('\n'), { color: C.cream });
++  rule(s, 12.783, 1.514, 0, 0.944);
++  badge(s, 12.464, 0.523);
++}
++
++function slide08(s) {
++  decor(s, 'ringTopHalf', 3.531, 4.374, 4.959, 3.126);
++  panel(s, 5.227, 0, 8.107, 5.638);
++  photo(s, 0, 1.569, 5.221, 5.931, 25.5);
++  lead(s, 0.552, 0.526, 3.11, 0.404, 'Real Stories, Real Impact');
++  title(s, 6.011, 1.29, 6.538, 2.121,
++    [[['What '], ['Travelers', C.orange]], [['Are Saying']]], C.cream);
++  s.addText(runsOf([
++    [['"This guide took the stress out of planning! I found hidden gems in Portugal ' +
++      'and saved so much time and money."\u00a0', C.cream, { italic: true }]],
++    [['Alex M., ', C.cream, { bold: true }], ['Backpacker and Freelance Photographer']],
++  ]), Object.assign({}, TEXT_BASE, {
++    x: 6.011, y: 3.896, w: 6.538, h: 1.126, fontFace: FONT, fontSize: BODY_PT,
++    color: C.cream, lineSpacingMultiple: 1.5,
++  }));
++  rule(s, 6.96, 6.859, 2.319, 0);
++  badge(s, 6.011, 6.54);
++  caption(s, 9.975, 6.686, 2.574, 'Travel Guide Presentation');
++}
++
++function slide09(s) {
++  decor(s, 'cornerSwoosh', 11.337, 6.217, 1.996, 1.283);
++  panel(s, 8.135, 0, 5.198, 3.208);
++  photo(s, 0, 3.209, 8.136, 4.291, 26.5);
++  lead(s, 0.672, 0.886, 2.348, 0.404, 'Traveler Spotlight:');
++  title(s, 0.672, 1.29, 6.792, 1.111, [[['Exploring Japan']]]);
++  lead(s, 8.713, 1.492, 3.4, 0.707,
++    'How the Guide Helped\nCassie Plan Her Dream Trip');
++  body(s, 8.713, 3.697, 3.949, 1.833,
++    'Using our cultural tips, train pass recommendations, and sample itineraries, ' +
++    'Cassie spent 10 days in Japan visiting 5 cities\u2014while staying under budget ' +
++    'and avoiding overwhelm.');
++  rule(s, 9.722, 6.859, 2.939, 0);
++  badge(s, 8.84, 6.54);
++}
++
++function slide10(s) {
++  const TEAM = [
++    [0.582, 'Sanji Torres', 'Adventure Strategist'],
++    [3.028, 'Kenji Sato', 'Japan Region Specialist'],
++    [5.475, 'Leah Clarke', 'Logistics & Visa Advisor'],
++    [7.921, 'Omar Diouf', 'Budget Travel Analyst'],
++  ];
++  decor(s, 'quarterArc', 9.137, 0, 2.196, 2.271);
++  panel(s, 10.56, 0, 2.773, 7.5);
++  lead(s, 11.163, 1.065, 1.568, 1.01, 'Our Travel\n& Research\nTeam');
++  title(s, 0.583, 0.509, 8.121, 2.121,
++    [[['Meet the '], ['Explorers', C.orange]], [['Behind the Guide']]]);
++  TEAM.forEach(([x, name, role]) => {
++    photo(s, x, 3.278, 2.056, 2.744, 10);
++    s.addText(runsOf([[[name, C.ink, { bold: true }]], [[role]]]),
++      Object.assign({}, TEXT_BASE, {
++        x: x - 0.032, y: 6.292, w: 2.12, h: 0.572, align: 'center', wrap: false,
++        fontFace: FONT, fontSize: BODY_PT, color: C.ink, lineSpacingMultiple: 1.0,
++      }));
++  });
++  rule(s, 12.602, 3.278, 0, 1.75);
++  badge(s, 12.283, 6.419);
++}
++
++function slide11(s) {
++  decor(s, 'ringSide', 11.946, 3.047, 1.388, 4.453);
++  panel(s, 0, 0, 1.523, 3.75);
++  photo(s, 1.523, 0, 4.503, 7.5, 22);
++  title(s, 6.667, 0.988, 6.02, 2.121,
++    [[['Ready to '], ['Plan', C.orange]], [['Your Journey?']]]);
++  lead(s, 6.667, 3.346, 4.502, 0.404, 'Let\u2019s Make Your Dream Trip a Reality');
++  body(s, 6.667, 5.356, 4.502, 1.126,
++    'Download the full travel guide now and start crafting your perfect adventure. ' +
++    'Your journey begins with a single, well-informed step.');
++  rule(s, 0.578, 5.356, 0, 1.138);
++  badge(s, 0.55, 4.223);
++}
++
++function slide12(s) {
++  decor(s, 'archTop', 3.867, 0, 4.849, 1.96);
++  panel(s, 0, 0, 6.667, 3.75);
++  photo(s, 0.656, 3.75, 12.021, 3.75, 29.5);
++  title(s, 0.656, 0.498, 4.031, 2.121,
++    [[['Ask', C.orange], [' ', C.ink], ['Us', C.cream]], [['Anything', C.cream]]]);
++  lead(s, 0.656, 2.619, 5.654, 0.404, 'We\'re Here to Help With Your Travel Questions');
++  body(s, 7.319, 1.897, 5.358, 1.126, [
++    'Not sure where to go first?',
++    'Need help navigating COVID-19 rules or travel insurance?',
++    'Let our experts guide you every step of the way.',
++  ].join('\n'));
++  badge(s, 12.358, 0.725);
++}
++
++function slide13(s) {
++  decor(s, 'ringFull', 6.953, 1.251, 4.959, 4.959);
++  panel(s, 8.732, 0, 4.602, 7.5);
++  photo(s, 8.732, 1.29, 4.602, 4.92, 22.5);
++  title(s, 0.553, 1.86, 7.614, 2.121,
++    [[['Thanks for']], [['Exploring', C.orange], [' With Us']]]);
++  lead(s, 0.553, 3.981, 3.265, 0.404, 'Here\u2019s to New Adventures');
++  body(s, 0.553, 5.438, 6.114, 0.772,
++    'We appreciate your curiosity, courage, and wanderlust. Stay adventurous\u2014and ' +
++    'let the world change you one step at a time.');
++  caption(s, 5.593, 0.471, 2.574, 'Travel Guide Presentation');
++  rule(s, 0.65, 0.627, 2.989, 0);
++  badge(s, 12.354, 6.695);
++}
++
++function slide14(s) {
++  decor(s, 'cornerArc', 11.303, 5.061, 2.03, 2.439);
++  panel(s, 0, 0, 10.862, 7.5);
++  photo(s, 6.815, 2.684, 5.702, 3.479, 18.5);
++  title(s, 0.816, 0.786, 8.93, 1.111,
++    [[['Let\u2019s '], ['Stay', C.orange], [' Connected']]], C.cream);
++  lead(s, 0.816, 2.684, 3.549, 0.404, 'We\u2019d Love to Hear From You');
++  body(s, 0.816, 4.683, 1.142, 1.479, 'Email\nWebsite\nInstagram\nYouTube',
++    { color: C.cream });
++  body(s, 1.93, 4.683, 3.92, 1.479, [
++    ':   hello@globalnomadexperiences.com', ':   www.globalnomadguides.com',
++    ':   @NomadTravelGuide\u00a0', ':   Global Nomad Journeys',
++  ].join('\n'), { color: C.cream });
++  badge(s, 12.198, 1.186);
++}
++
++function slide15(s) {
++  const STEPS = [
++    [0.984, 1.119, 0.505, 0.981, 'Choose Destination'],
++    [3.394, 3.532, 0.717, 3.394, 'Set Budget & Timeframe'],
++    [5.804, 5.942, 0.716, 5.804, 'Book Flights & Stay'],
++    [8.214, 8.352, 0.738, 8.211, 'Plan Activities & Insurance'],
++    [10.624, 10.762, 0.719, 10.623, 'Pack & Prepare for Takeoff'],
++  ];
++  caption(s, 0.981, 0.471, 2.535, 'Process Flow Infographic');
++  title(s, 0.981, 1.227, 7.361, 2.121,
++    [[['Planning a '], ['Trip', C.orange], [' in']], [['5 Simple Steps']]]);
++  lead(s, 10.321, 2.443, 2.03, 0.707, 'From Dreaming\nto Doing');
++  STEPS.forEach(([cardX, numX, numW, labelX, label], i) => {
++    freeform(s, STEP_CARD, cardX, 3.947, 1.728, 2.925, C.purple);
++    title(s, numX, 3.947, numW, 1.111, [[[String(i + 1), C.orange]]]);
++    body(s, labelX, 5.812, 1.731, 0.772, label, { color: C.cream });
++  });
++  rule(s, 5.561, 0.627, 1.605, 0);
++  badge(s, 12.032, 0.627);
++}
++
++function slide16(s) {
++  const STAGES = [
++    [0.698, '6 Months\nBefore', 'Choose location\n& budget'],
++    [3.148, '3 Months\nBefore', 'Book flights/\nlodging'],
++    [5.599, '1 Month\nBefore', 'Finalize itinerary\n& documents'],
++    [8.05, '1 Week\nBefore', 'Start\npacking'],
++    [10.501, 'Day of\nTravel', 'Go\nexplore!'],
++  ];
++  rule(s, 0, 5.156, 13.3333333, 0);
++  title(s, 0.698, 0.641, 7.602, 2.121,
++    [[['Ideal Travel']], [['Planning', C.orange], [' Timeline']]]);
++  lead(s, 9.769, 0.785, 2.867, 0.707, 'When to Do What\nBefore Your Departure');
++  STAGES.forEach(([x, when, what]) => {
++    rect(s, x, 4.143, 2.134, 1.497, C.white);
++    rect(s, x + 0.222, 3.618, 1.689, 1.049, C.purple);
++    s.addText(when, Object.assign({}, TEXT_BASE, {
++      x: x + 0.222, y: 3.789, w: 1.689, h: 0.707, align: 'center', wrap: false,
++      fontFace: FONT, fontSize: LEAD_PT, bold: false, color: C.orange,
++    }));
++    body(s, x + 0.222, 4.867, 1.689, 0.572, what,
++      { align: 'center', wrap: false, lineSpacingMultiple: null });
++  });
++  badge(s, 0.698, 6.54);
++  caption(s, 10.563, 6.686, 2.072, 'Timeline Infographic');
++}
++
++function slide17(s) {
++  const COLS = [
++    [0.605, 2.239, ['Feature', 'Flexibility', 'Planning Time Needed', 'Cost Efficiency',
++      'Personal Control']],
++    [3.818, 1.695, ['Package Tour', 'Low', 'Minimal', 'Often higher', 'Limited']],
++    [6.487, 2.44, ['Independent Travel', 'High', 'Moderate to High', 'Can be lower',
++      'Complete']],
++  ];
++  rect(s, 0, 0, 13.3333333, 3.424, C.purple);
++  title(s, 0.605, 0.641, 8.322, 2.121,
++    [[['Package Tour vs.']], [['Independent '], ['Travel', C.orange]]], C.cream);
++  caption(s, 9.41, 0.633, 2.423, 'Comparison Infographic', C.cream);
++  lead(s, 0.605, 3.873, 3.445, 0.404, 'Which One is Right for You?', C.ink);
++  COLS.forEach(([x, w, cells]) => {
++    // first cell is the 16 pt bold column header, the rest are 14 pt values
++    s.addText(runsOf(cells.map((t, i) => (
++      i === 0 ? [[t, C.ink, { fontSize: 16, bold: true }]] : [[t, C.ink]]
++    ))), Object.assign({}, TEXT_BASE, {
++      x, y: 4.399, w, h: 2.46, fontFace: FONT, fontSize: BODY_PT, color: C.ink,
++      lineSpacingMultiple: 2.0,
++    }));
++  });
++  [5.008, 5.475, 5.943, 6.411].forEach((y) => rule(s, 0, y, 13.3333333, 0));
++  rule(s, 12.748, 1.586, 0, 1.123);
++  badge(s, 12.408, 0.627);
++}
++
++function slide18(s) {
++  const STATS = [
++    [0.667, '71%', 'of travelers prioritize experience over luxury'],
++    [3.755, '58%', 'plan trips solo in small groups'],
++    [6.843, '33%', 'prefer slow, immersive travel'],
++    [9.931, '26%', 'sustainable travel interest since 2023'],
++  ];
++  title(s, 2.088, 0.477, 9.157, 1.111,
++    [[['Travel', C.orange], [' Trends in 2025']]]);
++  lead(s, 4.699, 1.688, 3.936, 0.404, 'Insights Shaping Modern Travel', C.ink);
++  STATS.forEach(([x, pct, note]) => {
++    rect(s, x, 3.131, 2.736, 1.477, C.purple);
++    s.addText(pct, Object.assign({}, TEXT_BASE, {
++      x: x + 0.313, y: 3.314, w: 2.109, h: 1.111, align: 'center', wrap: false,
++      fontFace: FONT_XB, fontSize: TITLE_PT, bold: false, color: C.orange,
++    }));
++    badge(s, x + 2.416, 3.131);
++    rect(s, x, 4.608, 2.736, 1.111, C.white);
++    body(s, x + 0.196, 4.714, 2.343, 0.772, note);
++  });
++  caption(s, 5.285, 6.686, 2.763, 'Data / Statistics Infographic');
++}
++
++function slide19(s) {
++  // x, y, width of the auto-fit digit box, caption under the card
++  const LEVELS = [
++    [1.138, 5.049, 0.505, 'Basic itinerary and lodging travel guide'],
++    [3.902, 3.938, 0.717, 'Budget optimization and transport'],
++    [6.667, 2.829, 0.716, 'Activity coordination & local insights'],
++    [9.431, 1.718, 0.738, 'Contingency plans, apps, and upgrades'],
++  ];
++  title(s, 1.063, 0.477, 6.636, 2.121,
++    [[['Levels of '], ['Travel', C.orange]], [['Planning']]]);
++  lead(s, 1.063, 2.598, 3.989, 0.404, 'From Basics to Pro-Level Moves');
++  LEVELS.forEach(([x, y, numW, note], i) => {
++    rect(s, x, y, 2.764, 1.111, C.purple);
++    lead(s, x + 0.337, y + 0.354, 0.812, 0.404, 'Level', C.cream);
++    s.addText(String(i + 1), Object.assign({}, TEXT_BASE, {
++      x: x + 2.427 - numW, y, w: numW, h: 1.111, align: 'right', wrap: false,
++      fontFace: FONT_XB, fontSize: TITLE_PT, bold: false, color: C.orange,
++    }));
++    badge(s, x + 2.445, y + 0.791);
++    body(s, x, y + 1.141, 2.764, 0.772, note);
++  });
++  rule(s, 9.437, 0.78, 2.764, 0);
++  caption(s, 8.941, 6.686, 3.254, 'Hierarchy / Structure Infographic');
++}
++
++function slide20(s) {
++  rect(s, 0, 0, 13.3333333, 3.007, C.purple);
++  title(s, 0.73, 0.487, 8.256, 2.121,
++    [[['Top 5 Emerging']], [['Travel', C.orange], [' Destinations']]], C.cream);
++  lead(s, 10.366, 0.762, 2.237, 0.707, 'Where to Explore\nNext in 2025');
++  s.addShape('ellipse', {
++    x: 1.953, y: 3.329, w: 3.595, h: 3.595, fill: { type: 'none' }, line: RULE,
++  });
++  freeform(s, GLOBE_DISC, 2.174, 3.551, 3.151, 3.151, C.white);
++  [GLOBE_LAND_N, GLOBE_LAND_S].forEach((poly) => {
++    s.addShape('custGeom', {
++      x: 2.174, y: 3.551, w: 3.033, h: 3.151,
++      points: polyPoints(poly, 3.033, 3.151),
++      fill: { color: C.purple }, line: { type: 'none' },
++    });
++  });
++  [[4.909, 3.75, 3.181], [5.416, 4.441, 2.674], [5.547, 5.127, 2.543],
++    [5.416, 5.823, 2.674], [4.909, 6.514, 3.181]].forEach(([x, y, w]) => rule(s, x, y, w, 0));
++  body(s, 8.131, 3.229, 3.249, 3.51, [
++    '\ud83d\udccd Georgia (Tbilisi, Kazbegi)',
++    '\ud83d\udccd Colombia (Medell\u00edn, Cartagena)',
++    '\ud83d\udccd Slovenia (Ljubljana, Lake Bled)\u00a0',
++    '\ud83d\udccd Japan (Tohoku region)\u00a0',
++    '\ud83d\udccd Egypt (Siwa Oasis)',
++  ].join('\n'), { lineSpacingMultiple: 3.0 });
++}
++
++/* ------------------------------------------------------------------- build */
++
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20,
++];
++
++function build() {
++  const pptx = new pptxgen();
++  pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'DECK';
++  pptx.theme = { headFontFace: FONT_XB, bodyFontFace: FONT };
++
++  BUILDERS.forEach((make) => {
++    const slide = pptx.addSlide();
++    slide.background = { color: C.cream };
++    make(slide);
++  });
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '07549cdc-f4be-4113-ac84-8b664dde8314_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => {
++  console.error(e);
++  process.exit(1);
++});

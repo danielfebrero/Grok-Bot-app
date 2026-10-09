@@ -1,0 +1,769 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/project_status_proposal.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/project_status_proposal.js
+@@ -0,0 +1,766 @@
++/**
++ * Recreation of "Modern - Project Status Proposal" (27 slides, 20" x 11.25" widescreen)
++ * with pptxgenjs only. Raster photos in the source deck are replaced by flat
++ * placeholder rectangles labelled "[image]".
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++
++const C = {
++  red: 'E91730',      // accent4 - the brand red
++  pureRed: 'FF0000',
++  white: 'FFFFFF',
++  bg: 'EEF0F6',       // page background
++  ink: '3F3F3F',      // body copy
++  muted: 'B2B2B2',    // 60% lightened subtitle
++  orange: 'EC7809',
++  yellow: 'FFC000',
++  green: '6CB937',
++  teal: '02BA96',
++  blue: '2A6CC0',
++  ok: '00B050',
++  star: 'FFC400',
++  photo: 'D9D9D9',    // stand-in for raster imagery
++  screen: '2D2D2D'
++};
++
++const F = {
++  xbold: 'Montserrat ExtraBold',
++  xlight: 'Montserrat ExtraLight',
++  light: 'Montserrat Light',
++  medium: 'Montserrat Medium',
++  body: 'Roboto Light',
++  bodyReg: 'Roboto',
++  black: 'Roboto Black'
++};
++
++const SLIDE_W = 20;
++const SLIDE_H = 11.2517;
++
++/* ------------------------------------------------- free-form outlines (0..1) */
++/* Every entry is a list of [x, y] pairs in unit space; `null` starts a new
++   sub-path (used for holes / multi-part icons).                              */
++
++const P = {
++  s1Red: [[0,0],[1,0],[0.805,1],[0,1]],
++  s1Corner: [[0.103,0],[1,0],[1,1],[0,1]],
++  sweep: [[0.996,0],[1,0],[1,0.662],[0,1],[0,0.697],[0.996,0]],
++  s2Top: [[1,0],[1,1],[0,1],[0,0.372],[1,0]],
++  s4Wave: [[0,1],[0.084,1],[0.26,0.723],[0.272,0.782],[0.292,0.809],[0.324,0.832],[0.353,0.844],[0.393,0.848],[0.459,0.828],[0.35,1],[0.648,1],[0.872,0.646],[0.886,0.602],[0.884,0.574],[0.87,0.536],[0.822,0.491],[0.788,0.479],[0.752,0.475],[0.686,0.495],[1,0],[0.702,0],[0.555,0.232],[0.553,0.2],[0.538,0.166],[0.517,0.141],[0.48,0.118],[0.436,0.108],[0.406,0.109],[0.37,0.12],[0.335,0.143],[0,0.664],[0,1]],
++  s6Arrow: [[0.5,0.179],[0.962,1],[0.038,1],null,[0.863,0],[1,0],[1,0.244],null,[0,0],[0.137,0],[0,0.244]],
++  s8Chevron: [[0.354,1],[1,1],[0.693,0.629],[0.665,0.568],[0.655,0.5],[0.665,0.432],[0.693,0.371],[1,0],[0.354,0],[0.033,0.387],[0.011,0.433],[0,0.491],[0.006,0.551],[0.024,0.599],[0.354,1]],
++  s11Wave: [[0.171,0],[0.232,0.048],[0.278,0.17],[0.299,0.341],[0.3,0.639],[0.307,0.727],[0.342,0.844],[0.389,0.886],[0.444,0.839],[0.476,0.723],[0.483,0.647],[0.485,0.318],[0.506,0.165],[0.549,0.051],[0.61,0],[0.679,0.048],[0.709,0.114],[0.731,0.201],[0.746,0.341],[0.748,0.678],[0.768,0.793],[0.817,0.88],[0.875,0.864],[0.909,0.788],[0.926,0.699],[0.93,0.336],[0.94,0.229],[0.965,0.121],[1,0.043],[1,0.181],[0.981,0.25],[0.971,0.335],[0.964,0.732],[0.94,0.859],[0.891,0.968],[0.834,1],[0.772,0.949],[0.737,0.865],[0.712,0.736],[0.706,0.353],[0.696,0.254],[0.659,0.147],[0.603,0.116],[0.561,0.163],[0.53,0.273],[0.521,0.696],[0.494,0.859],[0.466,0.933],[0.432,0.981],[0.394,1],[0.355,0.985],[0.304,0.906],[0.27,0.771],[0.26,0.645],[0.26,0.353],[0.245,0.232],[0.205,0.136],[0.161,0.114],[0.118,0.156],[0.088,0.25],[0.077,0.348],[0.076,0.647],[0.069,0.747],[0.042,0.875],[0,0.965],[0,0.833],[0.023,0.76],[0.035,0.665],[0.037,0.336],[0.05,0.213],[0.071,0.121],[0.102,0.051],[0.171,0]],
++  s12Cards: [[0.778,0.525],[1,0.525],[1,0.941],[0.991,0.985],[0.975,1],[0.778,1],null,[0,0.525],[0.222,0.525],[0.222,1],[0.022,1],[0.006,0.976],[0,0.934],null,[0.778,0],[0.978,0],[0.994,0.024],[1,0.066],[1,0.475],[0.778,0.475],null,[0.025,0],[0.222,0],[0.222,0.475],[0,0.475],[0,0.059],[0.009,0.015],[0.025,0]],
++  s19Blob: [[0.1,0],[1,0],[1,1],[0.781,0.938],[0.542,0.837],[0.326,0.705],[0.15,0.552],[0.052,0.419],[0.003,0.281],[0.013,0.143],[0.091,0.009]],
++
++  ring1: [[0.57,0.93],[0.589,0.809],[0.451,0.858],[0.296,0.996],[0.319,0.66],[0.307,0.611],[0,0.55],[0.171,0.359],[0.343,0.241],[0.505,0.182],[0.7,0.168],[0.726,0.025],[0.746,0.001],[0.772,0.005],[0.995,0.591],[0.999,0.634],[0.982,0.668],[0.622,0.994],[0.582,0.99],[0.57,0.93]],
++  ring2: [[0.244,0.72],[0.338,0.684],[0.185,0.563],[0,0.487],[0.244,0.353],[0.258,0.331],[0.253,0.299],[0.07,0],[0.301,0.069],[0.51,0.179],[0.691,0.324],[0.84,0.498],[0.953,0.458],[1,0.492],[0.786,0.975],[0.753,1],[0.236,0.795],[0.216,0.752],[0.244,0.72]],
++  ring3: [[0.31,0],[0.951,0.055],[0.988,0.071],[1,0.104],[0.93,0.623],[0.9,0.651],[0.851,0.651],[0.754,0.562],[0.663,0.734],[0.633,0.925],[0.393,0.74],[0.341,0.729],[0.004,1],[0.015,0.738],[0.073,0.544],[0.168,0.362],[0.341,0.153],[0.248,0.049],[0.258,0.017],[0.31,0]],
++  ring4: [[0.093,0.49],[0.212,0.533],[0.224,0.413],[0.16,0.215],[0.499,0.309],[0.557,0.307],[0.778,0],[0.867,0.161],[0.925,0.384],[0.91,0.593],[0.844,0.764],[0.984,0.816],[0.992,0.864],[0.955,0.881],[0.264,0.999],[0.218,0.996],[0.189,0.972],[0,0.529],[0.025,0.493],[0.093,0.49]],
++  ring5: [[0.014,0.331],[0.418,0.011],[0.453,0],[0.489,0.01],[0.915,0.321],[0.925,0.348],[0.899,0.378],[0.764,0.384],[0.846,0.502],[1,0.627],[0.699,0.652],[0.66,0.673],[0.7,1],[0.537,0.897],[0.348,0.717],[0.259,0.594],[0.168,0.394],[0.022,0.39],[0,0.358],[0.014,0.331]],
++  ring6: [[1,0.213],[0.883,0.434],[0.752,0.601],[0.617,0.724],[0.447,0.832],[0.464,0.958],[0.44,0.996],[0.407,0.996],[0.003,0.652],[0.007,0.605],[0.288,0.123],[0.339,0.145],[0.359,0.266],[0.495,0.133],[0.576,0],[0.639,0.282],[0.657,0.311],[0.688,0.315],[1,0.213]],
++  ring7: [[1,0.952],[0.821,0.996],[0.588,0.988],[0.412,0.938],[0.197,0.814],[0.124,0.944],[0.081,0.949],[0.056,0.898],[0.004,0.118],[0.038,0.084],[0.569,0.01],[0.586,0.079],[0.517,0.218],[0.659,0.261],[0.846,0.251],[0.699,0.569],[0.691,0.618],[0.711,0.659],[1,0.952]],
++
++  arrowUpL: [[0.331,0],[0.331,0.049],[1,0.049],[1,1],[0.561,1],[0.561,0.228],[0.331,0.228],[0.331,0.278],[0,0.139]],
++  arrowUpR: [[0.669,0],[1,0.139],[0.669,0.278],[0.669,0.228],[0.439,0.228],[0.439,1],[0,1],[0,0.049],[0.669,0.049]],
++  baseA: [[0,1],[0.657,1],[1,0],[0.657,0],[0,1]],
++  baseB: [[0,1],[0.985,1],[1,0],[0.486,0],[0,1]],
++  baseC: [[0.014,1],[1,1],[0.514,0],[0,0],[0.014,1]],
++  baseD: [[0.343,1],[1,1],[0.344,0],[0,0],[0.343,1]],
++
++  petalHeart: [[0.293,0],[0.403,0.023],[0.5,0.094],[0.637,0.009],[0.791,0.013],[0.914,0.094],[0.992,0.244],[0.995,0.382],[0.943,0.51],[0.5,1],[0.075,0.535],[0.008,0.397],[0.005,0.259],[0.057,0.131],[0.157,0.037],[0.286,0]],
++  petal1: [[1,0],[0.811,0.247],[0.716,0.509],[0.553,0.57],[0.449,0.684],[0.433,0.86],[0.532,1],[0.328,0.897],[0.138,0.759],[0,0.606],[0.029,0.542],[0.198,0.313],[0.409,0.156],[0.705,0.038],[1,0]],
++  petal2: [[0.222,0],[0.48,0.074],[0.704,0.281],[0.882,0.598],[1,1],[0.774,0.889],[0.413,0.858],[0.311,0.893],[0.222,1],[0.121,0.885],[0,0.861],[0.081,0.392],[0.222,0]],
++  petal3: [[0.218,0],[0.633,0.024],[0.923,0.075],[0.995,0.267],[0.974,0.483],[0.867,0.669],[0.659,0.851],[0.371,1],[0.333,0.723],[0.141,0.449],[0.277,0.331],[0.288,0.201],[0.181,0.08],[0,0.005],[0.218,0]],
++  petal4: [[0.045,0],[0.255,0.216],[0.615,0.42],[1,0.747],[0.778,0.886],[0.564,0.971],[0.441,1],[0.346,0.933],[0.151,0.73],[0.039,0.509],[0,0.247],[0.045,0]],
++  petal5: [[0.875,0],[0.951,0.248],[0.992,0.492],[0.995,0.775],[0.955,0.813],[0.728,0.954],[0.473,1],[0.229,0.945],[0,0.789],[0.228,0.671],[0.443,0.462],[0.49,0.527],[0.875,0]],
++
++  fnBody: [[0.5,0.154],[0.241,0.112],[0,0],[0.108,0.846],[0.313,0.965],[0.5,1],[0.687,0.965],[0.892,0.846],[1,0],[0.759,0.112],[0.5,0.154]],
++  fnBodyTip: [[0.5,0.098],[0.241,0.072],[0,0],[0.5,1],[1,0],[0.76,0.072],[0.5,0.098]],
++  fnRim: [[1,0.499],[0.759,0.864],[0.5,1],[0.241,0.864],[0,0.499],[0.262,0.115],[0.5,0],[0.738,0.115],[1,0.499]],
++  fnCone: [[0,0],[0.501,0.04],[1,0],[0.892,0.961],[0.501,1],[0.108,0.961],[0,0]],
++  fnConeTip: [[0,0],[1,0.001],[0.5,1],[0,0]],
++  banner: [[0,0],[0.961,0],[1,0.5],[0.961,1],[0,1]],
++  hexTile: [[0.634,0],[1,0.366],[0.866,0.866],[0.366,1],[0,0.634],[0.067,0.384],[0.134,0.134],[0.634,0]],
++
++  logoMark: [[0.368,0.767],[0.5,0.898],[0.632,0.767],[0.682,0.817],[0.5,1],[0.318,0.817],null,[0.449,0.584],[0.5,0.635],[0.551,0.584],[0.682,0.716],[0.632,0.767],[0.5,0.635],[0.368,0.767],[0.318,0.716],null,[0.365,0.5],[0.416,0.551],[0.285,0.683],[0.234,0.632],null,[0.715,0.317],[0.766,0.368],[0.817,0.317],[1,0.5],[0.817,0.683],[0.766,0.632],[0.715,0.683],[0.584,0.551],[0.635,0.5],[0.766,0.632],[0.898,0.5],[0.766,0.368],[0.635,0.5],[0.584,0.449],null,[0.285,0.317],[0.416,0.449],[0.365,0.5],[0.234,0.368],null,[0.183,0.317],[0.234,0.368],[0.102,0.5],[0.234,0.632],[0.183,0.683],[0,0.5],null,[0.368,0.233],[0.5,0.365],[0.632,0.233],[0.682,0.284],[0.551,0.416],[0.5,0.365],[0.449,0.416],[0.318,0.284],null,[0.5,0],[0.682,0.183],[0.632,0.233],[0.5,0.102],[0.368,0.233],[0.318,0.183]],
++  tick: [[0.376,0.608],[0.847,0.004],[0.875,0.011],[0.997,0.171],[0.991,0.203],[0.37,1],[0,0.499],[0.146,0.319],[0.376,0.608]],
++  cross: [[0.804,0],[1,0.194],[0.687,0.497],[1,0.803],[0.804,0.991],[0.506,0.689],[0.199,1],[0.004,0.801],[0.314,0.5],[0,0.195],[0.194,0.002],[0.499,0.308],[0.804,0]],
++  star5: [[0.5,0],[0.665,0.313],[0.972,0.36],[0.999,0.396],[0.766,0.641],[0.808,0.995],[0.5,0.844],[0.197,0.998],[0.234,0.641],[0.001,0.379],[0.335,0.313],[0.5,0]],
++  pin: [[0.5,0],[0.854,0.098],[1,0.337],[0.612,0.954],[0.5,1],[0.391,0.956],[0,0.337],[0.146,0.098],[0.5,0],null,[0.5,0.167],[0.323,0.216],[0.25,0.333],[0.323,0.451],[0.5,0.5],[0.677,0.451],[0.75,0.333],[0.677,0.216],[0.5,0.167]],
++  phone: [[0.316,0],[0.425,0.219],[0.303,0.36],[0.403,0.563],[0.574,0.707],[0.77,0.675],[0.998,0.856],[0.73,0.996],[0.345,0.831],[0.042,0.433],[0.021,0.133],[0.316,0]],
++  mail: [[0,0.322],[0.499,0.727],[1,0.322],[0.999,0.898],[0.945,0.991],[0.085,1],[0,0.886],null,[0.089,0],[0.92,0.001],[0.999,0.136],[0.919,0.295],[0.491,0.635],[0.04,0.242],[0.004,0.085],[0.089,0]],
++
++  gear: [[0.5,0.333],[0.382,0.382],[0.333,0.5],[0.382,0.618],[0.5,0.667],[0.618,0.618],[0.667,0.5],[0.618,0.382],[0.5,0.333],null,[0.428,0],[0.586,0.004],[0.673,0.163],[0.795,0.093],[0.908,0.213],[0.862,0.387],[1,0.426],[0.995,0.587],[0.836,0.674],[0.908,0.794],[0.782,0.912],[0.615,0.861],[0.576,1],[0.415,0.996],[0.327,0.837],[0.206,0.908],[0.092,0.786],[0.138,0.612],[0,0.574],[0.005,0.413],[0.164,0.325],[0.094,0.204],[0.218,0.088],[0.385,0.139],[0.428,0]],
++  flag: [[0.455,0.083],[0.745,0.172],[0.988,0.094],[0.991,0.649],[0.785,0.738],[0.473,0.649],[0.16,0.739],[0.152,0.207],[0.455,0.083],null,[0.074,0],[0.148,0.083],[0.111,0.155],[0.093,1],[0.037,0.981],[0.037,0.155],[0,0.083],[0.074,0]],
++  envelope: [[0,0.322],[0.387,0.677],[0.499,0.727],[0.613,0.677],[1,0.322],[0.999,0.898],[0.945,0.991],[0.085,1],[0,0.886],null,[0.089,0],[0.92,0.001],[0.982,0.046],[0.999,0.136],[0.919,0.295],[0.491,0.635],[0.04,0.242],[0.004,0.085],[0.089,0]],
++  gradcap: [[0.23,0.461],[0.499,0.583],[0.77,0.461],[0.778,0.672],[0.698,0.784],[0.5,0.833],[0.302,0.784],[0.222,0.667],null,[0.5,0],[0.999,0.257],[0.502,0.5],[0.213,0.365],[0.167,0.554],[0.194,0.617],[0.169,0.695],[0.194,0.985],[0.09,0.997],[0.109,0.695],[0.084,0.614],[0.154,0.338],[0.002,0.239],[0.5,0]],
++  heart: [[0.267,0],[0.383,0.038],[0.5,0.141],[0.662,0.015],[0.82,0.012],[0.929,0.081],[0.99,0.206],[0.995,0.362],[0.938,0.508],[0.51,0.998],[0.105,0.571],[0.01,0.382],[0.005,0.237],[0.054,0.102],[0.143,0.026],[0.267,0]],
++  medplus: [[0.458,0.208],[0.418,0.242],[0.417,0.417],[0.242,0.418],[0.208,0.458],[0.229,0.577],[0.417,0.583],[0.418,0.758],[0.458,0.792],[0.577,0.771],[0.583,0.583],[0.756,0.583],[0.791,0.548],[0.771,0.423],[0.583,0.417],[0.582,0.242],[0.542,0.208],null,[0.5,0],[0.694,0.039],[0.854,0.146],[0.961,0.306],[1,0.5],[0.961,0.694],[0.854,0.854],[0.694,0.961],[0.5,1],[0.306,0.961],[0.146,0.854],[0.039,0.694],[0,0.5],[0.039,0.306],[0.146,0.146],[0.306,0.039],[0.5,0]],
++  house: [[0.5,0.202],[0.857,0.571],[0.843,0.989],[0.579,1],[0.579,0.701],[0.421,0.701],[0.421,1],[0.165,0.995],[0.143,0.571],null,[0.5,0],[0.699,0.179],[0.705,0.009],[0.852,0.01],[0.857,0.345],[0.999,0.501],[0.956,0.581],[0.5,0.133],[0.044,0.582],[0.006,0.488],[0.5,0]],
++  trophy: [[0.769,0.25],[0.725,0.492],[0.888,0.395],[0.923,0.25],null,[0.077,0.25],[0.112,0.395],[0.275,0.492],[0.231,0.25],null,[0.327,0],[0.702,0.005],[0.76,0.059],[0.769,0.167],[0.994,0.202],[0.995,0.352],[0.94,0.457],[0.674,0.583],[0.583,0.7],[0.598,0.813],[0.756,0.889],[0.758,0.998],[0.233,0.988],[0.259,0.869],[0.408,0.804],[0.416,0.697],[0.326,0.583],[0.06,0.457],[0,0.223],[0.046,0.168],[0.231,0.167],[0.245,0.05],[0.327,0]],
++  globe: [[0.639,0.725],[0.572,0.91],[0.801,0.787],[0.639,0.725],null,[0.45,0.095],[0.147,0.279],[0.302,0.59],[0.274,0.512],[0.574,0.77],[0.425,0.559],[0.576,0.579],[0.79,0.288],[0.615,0.191],[0.584,0.309],[0.468,0.249],[0.562,0.128],[0.45,0.095],null,[0.5,0],[0.854,0.146],[1,0.5],[0.854,0.854],[0.5,1],[0.146,0.854],[0,0.5],[0.146,0.146],[0.5,0]],
++  plane: [[0.917,0.001],[0.991,0.031],[0.99,0.124],[0.798,0.362],[0.91,0.875],[0.784,0.949],[0.58,0.58],[0.395,0.765],[0.433,0.915],[0.33,0.997],[0.189,0.811],[0,0.655],[0.086,0.567],[0.235,0.605],[0.42,0.42],[0.049,0.189],[0.16,0.087],[0.639,0.201],[0.791,0.055],[0.917,0.001]],
++  gearRing: [[0.5,0.682],[0.318,0.5],[0.5,0.318],[0.682,0.5],[0.5,0.682],null,[0.5,0.273],[0.273,0.5],[0.5,0.727],[0.727,0.5],[0.5,0.273],null,[0.955,0.556],[0.782,0.861],[0.444,0.955],[0.139,0.782],[0.045,0.444],[0.218,0.139],[0.556,0.045],[0.861,0.218],[0.955,0.556],null,[0.967,0.4],[0.803,0.096],[0.43,0],[0.097,0.196],[0,0.57],[0.197,0.904],[0.57,1],[0.905,0.801],[0.967,0.4]],
++  gemstone: [[0.562,0.849],[0.721,0.318],[0.934,0.318],[0.562,0.849],null,[0.5,0.898],[0.326,0.318],[0.674,0.318],[0.5,0.898],null,[0.066,0.318],[0.279,0.318],[0.438,0.849],[0.066,0.318],null,[0.305,0.045],[0.395,0.045],[0.282,0.273],[0.077,0.273],[0.305,0.045],null,[0.554,0.045],[0.668,0.273],[0.332,0.273],[0.446,0.045],[0.554,0.045],null,[0.695,0.045],[0.923,0.273],[0.718,0.273],[0.605,0.045],[0.695,0.045],null,[1,0.295],[0.705,0],[0.288,0.001],[0,0.295],[0.5,1],[1,0.295]],
++  thumbUp: [[0.58,0.964],[0.343,0.929],[0.343,0.428],[0.489,0.421],[0.749,0.001],[0.821,0.167],[0.737,0.404],[0.971,0.424],[0.99,0.643],[0.942,0.716],[0.963,0.773],[0.91,0.951],[0.58,0.964],null,[0.228,1],[0.002,0.965],[0.03,0.363],[0.27,0.393],[0.272,0.955],[0.228,1]]
++};
++
++/* --------------------------------------------------------------- primitives */
++
++const NOLINE = { type: 'none' };
++
++/** Draws one of the outlines from `P`, scaled into the box x/y/w/h. */
++function poly(slide, key, x, y, w, h, opts = {}) {
++  const pts = [];
++  let fresh = true;
++  P[key].forEach(p => {
++    if (p === null) { pts.push({ close: true }); fresh = true; return; }
++    const pt = { x: +(p[0] * w).toFixed(4), y: +(p[1] * h).toFixed(4) };
++    if (fresh && pts.length) pt.moveTo = true;
++    fresh = false;
++    pts.push(pt);
++  });
++  pts.push({ close: true });
++  slide.addShape('custGeom', Object.assign({
++    x, y, w, h, points: pts, fill: { color: opts.color || C.red }, line: NOLINE
++  }, opts.extra));
++}
++
++function rect(slide, x, y, w, h, color, extra) {
++  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: NOLINE }, extra));
++}
++
++/** Fully-rounded "pill" bar (roundRect with adj = 0.5). */
++function pill(slide, x, y, w, h, color) {
++  slide.addShape('roundRect', {
++    x, y, w, h, fill: { color }, line: NOLINE, rectRadius: Math.min(w, h) / 2
++  });
++}
++
++function ellipse(slide, x, y, w, h, color) {
++  slide.addShape('ellipse', { x, y, w, h, fill: { color }, line: NOLINE });
++}
++
++function text(slide, content, opts) {
++  slide.addText(content, opts);
++}
++
++/** Stand-in for a photograph that was embedded in the source deck. */
++function imagePlaceholder(slide, x, y, w, h, color) {
++  slide.addText('[image]', {
++    x, y, w, h, fill: { color: color || C.photo }, line: NOLINE,
++    align: 'center', valign: 'middle', fontFace: F.bodyReg, fontSize: 16, color: '8A8A8A'
++  });
++}
++
++/* --------------------------------------------------------- shared text roles */
++
++const bigTitle = (color, align) => ({ fontFace: F.xbold, fontSize: 70, color, align: align || 'left' });
++const midTitle = (color, align) => ({ fontFace: F.xbold, fontSize: 45, color, align: align || 'left' });
++const subtitle = color => ({ fontFace: F.xlight, fontSize: 15, color, h: 0.353 });
++const bodyCopy = (color, align) => ({
++  fontFace: F.body, fontSize: 20, color, align: align || 'left', lineSpacingMultiple: 1.5
++});
++const leadIn = color => ({ fontFace: F.bodyReg, fontSize: 25, bold: true, color });
++
++const SUBTITLE_TEXT = 'Please write your great title is here';
++
++/** Section header used by most content slides: 70pt title + 15pt subtitle. */
++function header(slide, title, o) {
++  text(slide, title, Object.assign({ x: o.x, y: o.y, w: o.w, h: 1.279 }, bigTitle(o.color, o.align)));
++  text(slide, SUBTITLE_TEXT, Object.assign(
++    { x: o.sx, y: o.y + 1.285, w: o.sw }, subtitle(o.subColor || o.color), { align: o.align || 'left' }));
++}
++
++/** Compact header used by the infographic slides: 45pt title + subtitle. */
++function headerSm(slide, title, o) {
++  text(slide, title, Object.assign({ x: o.x, y: o.y, w: o.w, h: 0.858 }, midTitle(C.ink, o.align)));
++  text(slide, SUBTITLE_TEXT, Object.assign(
++    { x: o.sx, y: o.y + 0.857, w: o.sw }, subtitle(C.muted), { align: o.align || 'left' }));
++}
++
++/** Rounded progress bar: white track + red fill + right-aligned percentage. */
++function progressBar(slide, x, y, w, h, fillW, label, labelX) {
++  pill(slide, x, y, w, h, C.white);
++  pill(slide, x, y, fillW, h, C.red);
++  text(slide, label, {
++    x: labelX, y: y + 0.033, w: 1.086, h: 0.522, align: 'right',
++    fontFace: F.bodyReg, fontSize: 25, bold: true, color: C.white
++  });
++}
++
++/* -------------------------------------------------------------------- slides */
++
++function slide01(s) {
++  poly(s, 's1Red', 0, 2.914, 11.458, 8.338);
++  text(s, 'Modern', { x: 0.944, y: 4.459, w: 7.648, h: 1.952, fontFace: F.xbold, fontSize: 110, color: C.white });
++  text(s, 'Project Status Proposal', { x: 0.944, y: 6.017, w: 6.944, h: 0.858, fontFace: F.light, fontSize: 45, color: C.white });
++  text(s, 'PROFESSIONAL TEMPLATE BUILDER', { x: 0.944, y: 9.185, w: 7.786, h: 0.522, fontFace: F.xlight, fontSize: 25, color: C.white });
++  poly(s, 's1Corner', 12.452, 0, 7.548, 2.914);
++  poly(s, 'logoMark', 14.155, 0.976, 0.964, 0.963, { color: C.white });
++  text(s, [{ text: 'LOGO ' }, { text: 'PLACEMENT', options: { bold: true } }],
++    { x: 15.235, y: 1.238, w: 3.062, h: 0.438, fontFace: F.xbold, fontSize: 20, color: C.white });
++}
++
++function slide02(s) {
++  poly(s, 'sweep', 9.685, 3.705, 10.46, 3.749, { extra: { rotate: 175 } });
++  poly(s, 'sweep', 0, 2.046, 20, 7.168, { color: C.white, extra: { rotate: 180 } });
++  poly(s, 's2Top', 0, 0, 20, 6.504, { extra: { rotate: 180 } });
++  text(s, 'Welcome note!', { x: 10.63, y: 1.43, w: 8.412, h: 1.279, fontFace: F.xbold, fontSize: 70, color: C.white });
++  text(s, SUBTITLE_TEXT, Object.assign({ x: 10.63, y: 2.714, w: 4.623 }, subtitle(C.white)));
++  text(s, 'But I must explain to you how all this mistaken idea of, and produces to you how all of, and produces no resultant pleasure?',
++    Object.assign({ x: 10.63, y: 8.679, w: 6.946, h: 1.563 }, bodyCopy(C.ink)));
++  imagePlaceholder(s, 2.425, 2.403, 6.445, 6.445, C.red);
++}
++
++function slide03(s) {
++  rect(s, 0, 0, 20, 2.972, C.red);
++  header(s, 'Our news', { x: 0.963, y: 0.973, w: 7.368, sx: 0.963, sw: 4.623, color: C.white });
++  text(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising pain resultant pleasure?',
++    Object.assign({ x: 0.984, y: 3.412, w: 6.165, h: 1.616 }, bodyCopy(C.ink)));
++
++  [[6.025, 'gearRing', 5.953, 6.116, 0.339], [8.379, 'gemstone', 8.307, 8.479, 0.344]].forEach(([ty, icon, cy, iy, isz]) => {
++    text(s, 'Description Here', Object.assign({ x: 2.169, y: ty, w: 3.045, h: 0.522 }, leadIn(C.ink)));
++    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, elit, sed quis nostrud.',
++      Object.assign({ x: 2.169, y: ty + 0.471, w: 5.278, h: 1.054 }, bodyCopy(C.ink)));
++    ellipse(s, 1.1, cy, 0.665, 0.665, C.red);
++    poly(s, icon, 1.263, iy, isz, isz, { color: C.white });
++  });
++}
++
++function slide04(s) {
++  rect(s, 0, 0, 20, SLIDE_H, C.red);
++  poly(s, 's4Wave', 0, 0, 10.252, SLIDE_H, { color: C.white });
++  text(s, [{ text: 'Let\u2019s make things', options: { breakLine: true } }, { text: 'better!' }],
++    { x: 10.985, y: 2.001, w: 8.47, h: 4.14, fontFace: F.xbold, fontSize: 80, color: C.white, align: 'center' });
++  text(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising pain resultant pleasure?',
++    Object.assign({ x: 12.835, y: 7.183, w: 4.771, h: 2.063 }, bodyCopy(C.white, 'center')));
++}
++
++function slide05(s) {
++  text(s, 'We create solutions!', { x: 3.792, y: 0.973, w: 12.417, h: 1.279, fontFace: F.xbold, fontSize: 70, color: C.ink, align: 'center' });
++  text(s, SUBTITLE_TEXT, Object.assign({ x: 6.649, y: 2.258, w: 6.702 }, subtitle(C.muted), { align: 'center' }));
++  text(s, 'But I must explain to you how all this mistaken idea explain to you how all this mistaken idea of denouncing of denouncing pleasure and praising give you a, no pleasure?',
++    Object.assign({ x: 3.566, y: 9.249, w: 12.869, h: 1.053 }, bodyCopy(C.ink, 'center')));
++}
++
++function slide06(s) {
++  poly(s, 's6Arrow', 0, 0, 20, SLIDE_H);
++  text(s, 'Our values', { x: 6.039, y: 6.146, w: 7.922, h: 1.279, fontFace: F.xbold, fontSize: 70, color: C.white, align: 'center' });
++  text(s, SUBTITLE_TEXT, Object.assign({ x: 7.689, y: 7.43, w: 4.623 }, subtitle(C.white), { align: 'center' }));
++  text(s, [{ text: 'PLACEHOLDER', options: { breakLine: true } },
++           { text: 'resultant pleasure?' }],
++    Object.assign({ x: 5.521, y: 8.791, w: 8.958, h: 1.563 }, bodyCopy(C.white, 'center')));
++}
++
++function slide07(s) {
++  header(s, 'Our vision', { x: 0.963, y: 0.973, w: 5.912, sx: 0.963, sw: 4.623, color: C.ink, subColor: C.muted });
++  text(s, 'Description Here', Object.assign({ x: 0.963, y: 3.775, w: 3.045, h: 0.522 }, leadIn(C.ink)));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, elit, sed quis nostrud.',
++    Object.assign({ x: 0.963, y: 4.246, w: 5.278, h: 1.054 }, bodyCopy(C.ink)));
++  progressBar(s, 0.963, 5.96, 5.912, 0.586, 3.045, '45%', 2.806);
++  progressBar(s, 0.963, 6.939, 5.912, 0.586, 4.451, '75%', 4.212);
++  text(s, 'But I must explain to you how all this mistaken idea of denouncing a pain that produces no resultant pleasure?',
++    Object.assign({ x: 0.998, y: 8.813, w: 5.813, h: 1.616 }, bodyCopy(C.ink)));
++}
++
++function slide08(s) {
++  poly(s, 's8Chevron', 4.667, 0, 13.539, SLIDE_H);
++  text(s, [{ text: 'We keep', options: { breakLine: true } }, { text: 'your', options: { breakLine: true } }, { text: 'promises!' }],
++    { x: 6.346, y: 3.556, w: 6.647, h: 4.14, fontFace: F.xbold, fontSize: 80, color: C.white, align: 'center' });
++}
++
++function slide09(s) {
++  header(s, 'About us', { x: 0.963, y: 0.973, w: 5.912, sx: 0.963, sw: 4.623, color: C.ink, subColor: C.muted });
++  text(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising pain resultant explain to you how all this mistaken idea of denouncing explain to you how all this mistaken idea of denouncing pleasure?',
++    Object.assign({ x: 0.984, y: 3.412, w: 5.653, h: 3.073 }, bodyCopy(C.ink)));
++
++  const hexes = [
++    { x: 2.709, y: 8.297, pct: '43%', px: 3.204, py: 9.809, year: '2024', yx: 3.407, yy: 9.276 },
++    { x: 5.444, y: 5.609, pct: '68%', px: 5.925, py: 7.118, year: '2025', yx: 6.129, yy: 6.584 },
++    { x: 8.172, y: 2.884, pct: '75%', px: 8.667, py: 4.392, year: '2026', yx: 8.871, yy: 3.858 }
++  ];
++  hexes.forEach(h => poly(s, 'hexTile', h.x, h.y, 3.929, 3.93));
++  hexes.forEach(h => {
++    text(s, h.year, { x: h.yx, y: h.yy, w: 2.532, h: 0.774, align: 'center', fontFace: F.bodyReg, fontSize: 40, color: C.white, transparency: 50 });
++    text(s, h.pct, { x: h.px, y: h.py, w: 2.939, h: 1.447, align: 'center', fontFace: F.bodyReg, fontSize: 80, bold: true, color: C.white });
++  });
++}
++
++function slide10(s) {
++  rect(s, 0, 0, 20, 6.388, C.red);
++  text(s, 'Our team', { x: 4.902, y: 0.973, w: 10.197, h: 1.279, fontFace: F.xbold, fontSize: 70, color: C.white, align: 'center' });
++  text(s, SUBTITLE_TEXT, Object.assign({ x: 7.469, y: 2.258, w: 5.062 }, subtitle(C.white), { align: 'center' }));
++  rect(s, 0.875, 3.312, 18.25, 7.054, C.white);
++
++  const team = [
++    { x: 1.355, name: ['Daniel Reynolds'] },
++    { x: 5.792, name: ['Paula Peterson'] },
++    { x: 10.229, name: ['Julie', 'Gonzales'] },
++    { x: 14.667, name: ['Scott', 'Freeman'] }
++  ];
++  team.forEach(m => {
++    text(s, m.name.map((t, i) => ({ text: t, options: { breakLine: i < m.name.length - 1 } })),
++      Object.assign({ x: m.x + 0.705, y: 3.846, w: 2.569, h: 0.942, align: 'center' }, leadIn(C.ink)));
++    text(s, 'But I must explain to you how all',
++      Object.assign({ x: m.x + 0.651, y: 4.79, w: 2.675, h: 1.054 }, bodyCopy(C.ink, 'center')));
++    imagePlaceholder(s, m.x, 6.388, 3.979, 3.979);
++  });
++}
++
++function slide11(s) {
++  poly(s, 's11Wave', 0, 3.47, 20, 7.039);
++  [[1.924, 4.67], [6.404, 6.412], [10.865, 4.67], [15.325, 6.412]].forEach(([x, y]) => ellipse(s, x, y, 2.881, 2.881, C.white));
++  headerSm(s, 'Timeline', { x: 6.021, y: 0.973, w: 7.958, sx: 7.689, sw: 4.623, align: 'center' });
++  s.addText('Timeline', { x: 6.021, y: 0.973, w: 7.958, h: 1.279, fontFace: F.xbold, fontSize: 70, color: C.ink, align: 'center' });
++
++  const stops = [
++    { year: '2025', yx: 2.351, yy: 5.723, tx: 1.63, ty: 8.117 },
++    { year: '2026', yx: 6.832, yy: 7.465, tx: 6.104, ty: 4.194 },
++    { year: '2027', yx: 11.293, yy: 5.723, tx: 10.564, ty: 8.117 },
++    { year: '2028', yx: 15.753, yy: 7.465, tx: 15.025, ty: 4.194 }
++  ];
++  stops.forEach(st => {
++    text(s, st.year, { x: st.yx, y: st.yy, w: 2.026, h: 0.774, align: 'center', fontFace: F.bodyReg, fontSize: 40, bold: true, color: C.ink });
++    text(s, [{ text: 'Lorem ipsum dolor sit amet, adipiscing elit, ', options: { breakLine: true } }, { text: 'sed eiusmod.' }],
++      Object.assign({ x: st.tx, y: st.ty, w: 3.482, h: 1.559 }, bodyCopy(C.ink, 'center')));
++  });
++}
++
++function slide12(s) {
++  poly(s, 's12Cards', 0.758, 3.571, 18.484, 6.922);
++  headerSm(s, 'Our services', { x: 6.643, y: 0.973, w: 6.713, sx: 7.689, sw: 4.623, align: 'center' });
++  s.addText('Our services', { x: 6.643, y: 0.973, w: 6.713, h: 1.279, fontFace: F.xbold, fontSize: 70, color: C.ink, align: 'center' });
++
++  const cards = [
++    { icon: 'trophy', ix: 2.41, iy: 4.276, iw: 0.807, ih: 0.745, tx: 1.682, ty: 5.207 },
++    { icon: 'medplus', ix: 16.787, iy: 4.289, iw: 0.799, ih: 0.799, tx: 16.055, ty: 5.207 },
++    { icon: 'globe', ix: 2.411, iy: 7.873, iw: 0.804, ih: 0.804, tx: 1.682, ty: 8.84 },
++    { icon: 'heart', ix: 16.744, iy: 7.896, iw: 0.885, ih: 0.758, tx: 16.055, ty: 8.84 }
++  ];
++  cards.forEach(c => {
++    poly(s, c.icon, c.ix, c.iy, c.iw, c.ih, { color: C.white });
++    text(s, [{ text: 'Service', options: { bold: true, breakLine: true } }, { text: 'here', options: { fontFace: F.body } }],
++      { x: c.tx, y: c.ty, w: 2.263, h: 0.942, align: 'center', fontFace: F.bodyReg, fontSize: 25, color: C.white });
++  });
++  imagePlaceholder(s, 5.212, 3.571, 9.575, 6.922, C.red);
++}
++
++function slide13(s) {
++  rect(s, 0, 6.653, 15.562, 3.348, C.red);
++  rect(s, 0, 3.306, 15.562, 3.348, C.white);
++  imagePlaceholder(s, 11.761, 1.146, 8.239, 10.106, C.screen);
++  header(s, 'Devices', { x: 0.967, y: 0.973, w: 5.004, sx: 0.967, sw: 4.623, color: C.ink, subColor: C.muted });
++
++  [{ y: 4.172, color: C.ink, big: '1.53k' }, { y: 7.519, color: C.white, big: '5.78k' }].forEach(row => {
++    text(s, 'But I must explain to you how all this mistaken idea of denouncing a pain that produces no resultant pleasure?',
++      Object.assign({ x: 0.967, y: row.y, w: 5.115, h: 1.616 }, bodyCopy(row.color)));
++    text(s, 'Tittle Here', { x: 7.8, y: row.y + 0.051, w: 1.917, h: 0.438, align: 'center', fontFace: F.bodyReg, fontSize: 20, color: row.color });
++    text(s, row.big, { x: 7.288, y: row.y + 0.538, w: 2.941, h: 1.027, align: 'center', fontFace: F.bodyReg, fontSize: 55, bold: true, color: row.color });
++  });
++}
++
++function slide14(s) {
++  [[14.962, -1.349], [14.722, 3.241], [14.481, 7.832]].forEach(([x, y]) =>
++    rect(s, x, y, 4.363, 4.597, C.photo, { rotate: 3 }));
++  header(s, 'Portfolio', { x: 0.965, y: 3.269, w: 6.4, sx: 0.965, sw: 4.623, color: C.ink, subColor: C.muted });
++  text(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising pain was born and I will give a pain that produces no resultant pleasure?',
++    Object.assign({ x: 0.987, y: 5.415, w: 4.632, h: 2.568 }, bodyCopy(C.ink)));
++
++  const badges = [
++    { x: 11.481, y: 1.091, rot: 0, fill: C.red, tc: C.white, hx: 12.738, hy: 2.377, bx: 12.417, by: 2.963, bh: 1.825, trot: 3 },
++    { x: 6.341, y: 5.023, rot: 15, fill: C.white, tc: C.ink, hx: 7.477, hy: 6.328, bx: 7.344, by: 7.042, bh: 1.559, trot: -6 }
++  ];
++  badges.forEach(b => {
++    s.addShape('star24', { x: b.x, y: b.y, w: 4.958, h: 4.958, rotate: b.rot, fill: { color: b.fill }, line: NOLINE });
++    text(s, 'Portfolio', { x: b.hx, y: b.hy, w: 2.532, h: 0.606, rotate: b.trot, align: 'center', fontFace: F.bodyReg, fontSize: 30, bold: true, color: b.tc });
++    text(s, 'Lorem ipsum dolor sit amet, adipiscing elit, sed tempor.',
++      Object.assign({ x: b.bx, y: b.by, w: 3.05, h: b.bh, rotate: b.trot }, bodyCopy(b.tc, 'center')));
++  });
++}
++
++/** Darkens a hex colour by `f` (0..1) - used for the 3-D funnel shading. */
++function shade(hex, f) {
++  const n = parseInt(hex, 16);
++  const p = v => Math.round(v * f).toString(16).padStart(2, '0').toUpperCase();
++  return p((n >> 16) & 255) + p((n >> 8) & 255) + p(n & 255);
++}
++
++function slide15(s) {
++  headerSm(s, 'Different statistics infographics', { x: 3.375, y: 0.973, w: 13.25, sx: 7.689, sw: 4.623, align: 'center' });
++
++  const rows = [
++    { color: C.red, bx: 7.584, bw: 10.825, by: 3.29, label: 'Lorem ipsum tittle A', lx: 10.771, ly: 3.725,
++      icon: 'plane', ix: 16.67, iy: 3.739, iw: 0.663, ih: 0.663,
++      rim: [1.591, 3.008, 6.886, 0.566], body: [1.591, 3.29, 6.886, 1.841], cone: [3.413, 3.508, 3.249, 1.622] },
++    { color: C.orange, bx: 6.674, bw: 10.916, by: 5.182, label: 'Lorem ipsum tittle B', lx: 9.974, ly: 5.618,
++      icon: 'globe', ix: 15.906, iy: 5.614, iw: 0.699, ih: 0.699,
++      rim: [2.491, 4.969, 5.086, 0.429], body: [2.491, 5.182, 5.086, 1.797], cone: [3.843, 5.348, 2.39, 1.63] },
++    { color: C.yellow, bx: 5.72, bw: 11.043, by: 7.076, label: 'Lorem ipsum tittle C', lx: 9.052, ly: 7.509,
++      icon: 'trophy', ix: 15.022, iy: 7.53, iw: 0.702, ih: 0.648,
++      rim: [3.393, 6.833, 3.281, 0.488], body: [3.393, 7.076, 3.281, 1.788], cone: [4.29, 7.267, 1.495, 1.598] },
++    { color: C.green, bx: 5.034, bw: 10.908, by: 8.962, label: 'Lorem ipsum tittle D', lx: 8.246, ly: 9.399,
++      icon: 'house', ix: 14.117, iy: 9.438, iw: 0.769, ih: 0.612, tip: true,
++      rim: [4.293, 8.815, 1.481, 0.307], body: [4.293, 8.966, 1.481, 1.559], cone: [4.716, 9.089, 0.644, 1.427] }
++  ];
++
++  rows.forEach(r => poly(s, 'banner', r.bx, r.by, r.bw, 1.561, { color: r.color }));
++  rows.forEach(r => {
++    poly(s, 'fnRim', r.rim[0], r.rim[1], r.rim[2], r.rim[3], { color: shade(r.color, 0.75) });
++    poly(s, r.tip ? 'fnBodyTip' : 'fnBody', r.body[0], r.body[1], r.body[2], r.body[3], { color: shade(r.color, 0.87) });
++    poly(s, r.tip ? 'fnConeTip' : 'fnCone', r.cone[0], r.cone[1], r.cone[2], r.cone[3], { color: r.color });
++  });
++  rows.forEach(r => {
++    poly(s, r.icon, r.ix, r.iy, r.iw, r.ih, { color: C.white });
++    text(s, r.label, { x: r.lx, y: r.ly, w: 5.395, h: 0.69, align: 'right', fontFace: F.bodyReg, fontSize: 35, bold: true, color: C.white });
++  });
++}
++
++function slide16(s) {
++  const arrows = [
++    ['ring1', 7.74, 2.885, 3.493, 2.196, C.red],
++    ['ring2', 10.518, 3.317, 2.745, 2.894, C.orange],
++    ['ring3', 6.608, 4.049, 2.246, 2.795, C.blue],
++    ['ring4', 11.499, 5.213, 2.029, 3.177, C.yellow],
++    ['ring5', 6.276, 6.078, 2.478, 3.244, C.teal],
++    ['ring6', 9.902, 7.575, 3.111, 2.562, C.red],
++    ['ring7', 7.906, 8.025, 2.878, 1.93, C.green]
++  ];
++  arrows.forEach(a => poly(s, a[0], a[1], a[2], a[3], a[4], { color: a[5] }));
++  headerSm(s, 'Arrow process infographics', { x: 4.972, y: 0.973, w: 10.056, sx: 7.689, sw: 4.623, align: 'center' });
++
++  const labels = [
++    { t: 'Tittle A', tx: 2.902, ty: 3.303, bx: 1.657, by: 4.056, align: 'right' },
++    { t: 'Tittle B', tx: 2.257, ty: 5.027, bx: 1.012, by: 5.78, align: 'right' },
++    { t: 'Tittle C', tx: 2.257, ty: 6.75, bx: 1.012, by: 7.503, align: 'right' },
++    { t: 'Tittle D', tx: 2.902, ty: 8.473, bx: 1.657, by: 9.226, align: 'right' },
++    { t: 'Tittle E', tx: 14.129, ty: 3.884, bx: 14.129, by: 4.637, align: 'left' },
++    { t: 'Tittle F', tx: 14.838, ty: 5.888, bx: 14.838, by: 6.641, align: 'left' },
++    { t: 'Tittle G', tx: 14.136, ty: 7.893, bx: 14.136, by: 8.646, align: 'left' }
++  ];
++  labels.forEach(l => {
++    text(s, l.t, { x: l.tx, y: l.ty, w: 2.905, h: 0.774, align: l.align, fontFace: F.bodyReg, fontSize: 40, bold: true, color: C.ink });
++    text(s, 'Lorem ipsum dolor sit amet', Object.assign({ x: l.bx, y: l.by, w: 4.151, h: 0.549 }, bodyCopy(C.ink, l.align)));
++  });
++
++  [['gear', 9.826, 3.641, 0.661, 0.68], ['flag', 10.686, 8.701, 0.712, 0.65], ['envelope', 11.856, 4.954, 0.716, 0.579],
++   ['star5', 8.451, 8.482, 0.736, 0.702], ['gradcap', 7.086, 6.929, 0.86, 0.574], ['heart', 7.572, 4.721, 0.737, 0.632],
++   ['medplus', 12.149, 7.048, 0.708, 0.708]].forEach(i => poly(s, i[0], i[1], i[2], i[3], i[4], { color: C.white }));
++}
++
++function slide17(s) {
++  const bases = [['baseA', 5.489, 3.22, C.red], ['baseB', 7.787, 2.151, C.orange],
++                 ['baseC', 10.062, 2.145, C.yellow], ['baseD', 11.285, 3.226, C.green]];
++  bases.forEach(b => poly(s, b[0], b[1], 9.531, b[2], 1.721, { color: shade(b[3], 0.85) }));
++
++  poly(s, 'arrowUpL', 6.197, 5.83, 2.513, 3.702, { color: C.red });
++  poly(s, 'arrowUpL', 7.425, 3.356, 2.513, 6.175, { color: C.orange });
++  poly(s, 'arrowUpR', 10.062, 3.356, 2.513, 6.175, { color: C.yellow });
++  poly(s, 'arrowUpR', 11.285, 5.83, 2.519, 3.702, { color: C.green });
++
++  headerSm(s, 'Arrow process infographics', { x: 4.972, y: 0.973, w: 10.056, sx: 7.689, sw: 4.623, align: 'center' });
++
++  const labels = [
++    { t: 'Tittle A', tx: 2.519, ty: 4.357, bx: 1.273, by: 5.11, align: 'right' },
++    { t: 'Tittle B', tx: 2.519, ty: 6.964, bx: 1.273, by: 7.717, align: 'right' },
++    { t: 'Tittle C', tx: 14.576, ty: 4.357, bx: 14.576, by: 5.11, align: 'left' },
++    { t: 'Tittle D', tx: 14.576, ty: 6.964, bx: 14.576, by: 7.717, align: 'left' }
++  ];
++  labels.forEach(l => {
++    text(s, l.t, { x: l.tx, y: l.ty, w: 2.905, h: 0.774, align: l.align, fontFace: F.bodyReg, fontSize: 40, bold: true, color: C.ink });
++    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing',
++      Object.assign({ x: l.bx, y: l.by, w: 4.151, h: 1.054 }, bodyCopy(C.ink, l.align)));
++  });
++
++  [['medplus', 8.138, 3.93, 0.566, 0.566], ['gradcap', 11.285, 4.001, 0.638, 0.426],
++   ['star5', 6.806, 6.388, 0.586, 0.559], ['envelope', 12.537, 6.437, 0.57, 0.461]]
++    .forEach(i => poly(s, i[0], i[1], i[2], i[3], i[4], { color: C.white }));
++}
++
++function slide18(s) {
++  poly(s, 'petal1', 6.977, 3.363, 2.956, 3.623, { color: C.red });
++  poly(s, 'petal2', 9.142, 3.363, 3.857, 2.135, { color: C.orange });
++  poly(s, 'petal3', 11.177, 5.273, 1.998, 3.798, { color: C.yellow });
++  poly(s, 'petal4', 6.825, 5.62, 2.969, 3.491, { color: C.teal });
++  poly(s, 'petal5', 8.185, 7.01, 3.701, 2.705, { color: C.green });
++  poly(s, 'petalHeart', 8.228, 5.194, 3.544, 3.241, { color: C.white });
++
++  headerSm(s, 'Medical infographics', { x: 6.318, y: 0.973, w: 7.365, sx: 7.689, sw: 4.623, align: 'center' });
++
++  const labels = [
++    { t: 'Tittle A', tx: 2.605, ty: 3.053, bx: 1.36, by: 3.806, align: 'right' },
++    { t: 'Tittle B', tx: 1.897, ty: 5.661, bx: 0.651, by: 6.414, align: 'right' },
++    { t: 'Tittle C', tx: 2.605, ty: 8.268, bx: 1.36, by: 9.021, align: 'right' },
++    { t: 'Tittle D', tx: 14.576, ty: 4.357, bx: 14.576, by: 5.11, align: 'left' },
++    { t: 'Tittle E', tx: 14.576, ty: 6.964, bx: 14.576, by: 7.717, align: 'left' }
++  ];
++  labels.forEach(l => {
++    text(s, l.t, { x: l.tx, y: l.ty, w: 2.905, h: 0.774, align: l.align, fontFace: F.bodyReg, fontSize: 40, bold: true, color: C.ink });
++    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing',
++      Object.assign({ x: l.bx, y: l.by, w: 4.151, h: 1.054 }, bodyCopy(C.ink, l.align)));
++  });
++
++  [['gear', 10.202, 3.991, 0.581, 0.598], ['flag', 12.125, 6.513, 0.626, 0.572], ['envelope', 10.56, 8.426, 0.63, 0.509],
++   ['medplus', 7.933, 4.536, 0.626, 0.626], ['gradcap', 7.947, 7.74, 0.756, 0.504]]
++    .forEach(i => poly(s, i[0], i[1], i[2], i[3], i[4], { color: C.white }));
++  text(s, 'Tittle', { x: 9.253, y: 6.237, w: 1.494, h: 0.606, align: 'center', fontFace: F.bodyReg, fontSize: 30, bold: true, color: C.ink });
++}
++
++function slide19(s) {
++  headerSm(s, 'Sample illustration', { x: 0.965, y: 0.973, w: 7.348, sx: 0.965, sw: 4.623 });
++  text(s, 'Description Here', Object.assign({ x: 0.999, y: 3.374, w: 3.045, h: 0.522 }, leadIn(C.ink)));
++  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, elit, sed quis nostrud.',
++    Object.assign({ x: 0.999, y: 3.845, w: 5.278, h: 1.054 }, bodyCopy(C.ink)));
++  progressBar(s, 0.999, 5.56, 5.912, 0.586, 3.045, '45%', 2.842);
++  progressBar(s, 0.999, 6.538, 5.912, 0.586, 4.451, '74%', 4.248);
++  text(s, 'But I must explain to you how all this mistaken idea of denouncing pleasure and praising pain was born and I will give you a complete no resultant pleasure?',
++    Object.assign({ x: 0.999, y: 8.546, w: 7.061, h: 1.559 }, bodyCopy(C.ink)));
++  poly(s, 's19Blob', 13.708, 0, 6.292, 10.941);
++  imagePlaceholder(s, 6.952, 0.152, 12.042, 10.947);
++}
++
++function slide20(s) {
++  headerSm(s, 'Competitors', { x: 7.486, y: 1.015, w: 5.028, sx: 7.689, sw: 4.623, align: 'center' });
++
++  const cols = [2.056, 8.411, 11.589, 14.766];
++  const rowY = [3.85, 5.16, 6.471, 7.781, 9.092];
++  cols.forEach(cx => rowY.forEach((ry, i) => rect(s, cx, ry, 3.177, 1.311, i % 2 ? C.bg : C.white)));
++
++  ['Competitor 1', 'Competitor 3', 'Competitor 4'].forEach((t, i) =>
++    text(s, t, { x: cols[i + 1] + 0.239, y: 4.244, w: 2.701, h: 0.522, align: 'center', fontFace: F.bodyReg, fontSize: 25, color: C.ink }));
++  ['Offering 1', 'Offering 2', 'Offering 3', 'Offering 4'].forEach((t, i) =>
++    text(s, t, { x: 2.533, y: rowY[i + 1] + 0.394, w: 2.224, h: 0.522, align: 'center', fontFace: F.bodyReg, fontSize: 25, color: C.ink }));
++
++  // true = green check, false = red cross; one row per offering, one entry per competitor
++  const matrix = [[true, false, true], [false, true, false], [true, false, true], [false, true, false]];
++  matrix.forEach((row, r) => row.forEach((yes, c) => {
++    const cx = cols[c + 1];
++    if (yes) poly(s, 'tick', cx + 1.334, rowY[r + 1] + 0.458, 0.509, 0.394, { color: C.ok });
++    else poly(s, 'cross', cx + 1.391, rowY[r + 1] + 0.457, 0.395, 0.397, { color: C.pureRed });
++  }));
++
++  rect(s, 5.234, 3.85, 3.177, 6.553, C.red);
++  text(s, 'Our company', { x: 5.472, y: 4.244, w: 2.701, h: 0.522, align: 'center', fontFace: F.bodyReg, fontSize: 25, color: C.white });
++  rowY.slice(1).forEach(ry => poly(s, 'tick', 6.568, ry + 0.458, 0.509, 0.394, { color: C.white }));
++}
++
++function slide21(s) {
++  imagePlaceholder(s, 3.833, 1.239, 2.334, 2.332, C.pureRed);
++  const stats = [
++    { label: 'Audience', value: '47,5k', y: 4.75, barY: 5.535, fill: 5.019 },
++    { label: 'Activity', value: '12,3k', y: 6.774, barY: 7.559, fill: 3.96 },
++    { label: 'Applause', value: '35,8k', y: 8.798, barY: 9.583, fill: 2.956 }
++  ];
++  stats.forEach(st => {
++    text(s, st.label, Object.assign({ x: 2.044, y: st.y, w: 3.045, h: 0.522 }, leadIn(C.ink)));
++    text(s, st.value, Object.assign({ x: 6.461, y: st.y, w: 1.425, h: 0.522, align: 'right' }, leadIn(C.ink)));
++    pill(s, 2.044, st.barY, 5.912, 0.279, C.white);
++    pill(s, 2.044, st.barY, st.fill, 0.279, C.pureRed);
++  });
++
++  rect(s, 10, 0, 10, SLIDE_H, C.pureRed);
++  poly(s, 'thumbUp', 14.458, 1.382, 1.083, 0.974, { color: C.white });
++  text(s, 'Followers:', { x: 12.25, y: 2.547, w: 5.5, h: 0.858, align: 'center', fontFace: F.medium, fontSize: 45, color: C.white });
++  text(s, '3,4k', { x: 10.646, y: 5.146, w: 8.708, h: 3.467, align: 'center', fontFace: F.xbold, fontSize: 200, color: C.white });
++  text(s, 'user@name', { x: 12.836, y: 8.607, w: 4.328, h: 0.858, align: 'right', fontFace: F.medium, fontSize: 45, color: C.white });
++}
++
++function slide22(s) {
++  rect(s, 0, 0, 10.073, SLIDE_H, C.red);
++  s.addShape('roundRect', { x: 6.828, y: 3.716, w: 13.984, h: 6.096, fill: { color: C.white }, line: NOLINE, rectRadius: 0.625 });
++
++  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
++  const features = [
++    ['2,600', '1,500', '8,400', '3,500', '5,500', '1,500', '8,400', '6,500', '3,500', '5,500', '2,600', '6,500'],
++    ['6,500', '8,400', '1,500', '2,600', '6,500', '5,500', '3,500', '8,400', '5,500', '1,500', '8,400', '5,500'],
++    ['8,400', '5,500', '3,500', '1,500', '6,500', '5,500', '1,500', '2,600', '5,500', '6,500', '5,500', '1,500'],
++    ['2,600', '1,500', '8,400', '3,500', '5,500', '1,500', '8,400', '6,500', '3,500', '5,500', '2,600', '6,500'],
++    ['6,500', '8,400', '1,500', '2,600', '6,500', '5,500', '3,500', '8,400', '5,500', '1,500', '8,400', '5,500']
++  ];
++  const totals = ['58,400', '14,500', '12,200', '52,400', '73,500', '58,400', '12,200', '52,400', '73,500', '12,200', '52,400', '73,500'];
++  const colW = [1.102].concat(new Array(12).fill(0.866));
++  const cellBase = { align: 'center', valign: 'middle', fontSize: 14, color: C.ink, margin: [0.115, 0.058, 0.115, 0.058],
++                     border: [{ type: 'none' }, { type: 'solid', color: C.white, pt: 1 }, { type: 'none' }, { type: 'solid', color: C.white, pt: 1 }] };
++
++  const head = [Object.assign({ text: 'Project', options: Object.assign({}, cellBase, { fontFace: F.black, fill: { color: C.white } }) })]
++    .concat(months.map(m => ({ text: m, options: Object.assign({}, cellBase, { fontFace: F.bodyReg, fill: { color: C.white } }) })));
++  const bodyRows = features.map((vals, i) =>
++    [{ text: 'Feature ' + (i + 1), options: Object.assign({}, cellBase, { fontFace: F.bodyReg, fill: { color: C.white } }) }]
++      .concat(vals.map(v => ({ text: v, options: Object.assign({}, cellBase, { fontFace: F.body, fill: { color: C.white } }) }))));
++  s.addTable([head].concat(bodyRows), {
++    x: 7.236, y: 4.026, w: 11.488, colW, rowH: [0.614, 0.769, 0.769, 0.769, 0.769, 0.769]
++  });
++
++  const totalRow = [{ text: 'Total', options: Object.assign({}, cellBase, { fontFace: F.black, fill: { color: C.white } }) }]
++    .concat(totals.map(v => ({ text: v, options: Object.assign({}, cellBase, { fontFace: F.bodyReg, bold: true, fill: { color: C.bg } }) })));
++  s.addTable([totalRow], { x: 7.236, y: 8.693, w: 11.488, colW, rowH: [0.744] });
++
++  text(s, '78,000$', { x: 1.007, y: 5.411, w: 4.431, h: 1.279, fontFace: F.black, fontSize: 70, color: C.white });
++  text(s, 'Target: 69,000$', { x: 1.007, y: 6.65, w: 2.66, h: 0.522, fontFace: F.bodyReg, fontSize: 25, color: C.white });
++  rect(s, 1.047, 7.431, 2.147, 0.686, C.ok);
++  s.addShape('triangle', { x: 1.388, y: 7.58, w: 0.449, h: 0.387, fill: { color: C.white }, line: NOLINE });
++  text(s, '16%', { x: 1.886, y: 7.497, w: 1.001, h: 0.606, align: 'center', fontFace: F.black, fontSize: 30, color: C.white });
++
++  text(s, 'Annual report', { x: 0.965, y: 0.973, w: 6.473, h: 0.858, fontFace: F.xbold, fontSize: 45, color: C.white });
++  text(s, SUBTITLE_TEXT, Object.assign({ x: 0.965, y: 1.83, w: 4.623 }, subtitle(C.white)));
++  text(s, '2026', { x: 14.042, y: 0.668, w: 4.678, h: 1.784, align: 'right', fontFace: F.black, fontSize: 100, color: C.white });
++}
++
++function slide23(s) {
++  const boxes = [
++    { x: 6.521, y: 3.698 }, { x: 15.908, y: 3.698 }, { x: 15.908, y: 5.787 },
++    { x: 15.908, y: 7.877 }, { x: 11.15, y: 6.832 }
++  ];
++  boxes.forEach(b => {
++    rect(s, b.x, b.y, 2.265, 0.858, C.red);
++    text(s, 'Description', { x: b.x + 0.26, y: b.y + 0.21, w: 1.744, h: 0.438, align: 'center', fontFace: F.bodyReg, fontSize: 20, color: C.white });
++  });
++  s.addShape('flowChartDecision', { x: 10.769, y: 3.113, w: 3.027, h: 2.028, fill: { color: C.orange }, line: NOLINE });
++  text(s, 'Description', { x: 11.413, y: 3.908, w: 1.739, h: 0.438, align: 'center', fontFace: F.bodyReg, fontSize: 20, color: C.white });
++
++  [['Start', 5.664, 5.942], ['End', 9.08, 9.358]].forEach(([label, y, ty]) => {
++    s.addShape('roundRect', { x: 1.427, y, w: 3.065, h: 1.161, fill: { color: C.white }, line: NOLINE, rectRadius: 0.58 });
++    text(s, label, { x: 2.087, y: ty, w: 1.744, h: 0.606, align: 'center', fontFace: F.bodyReg, fontSize: 30, bold: true, color: C.ink });
++  });
++
++  // connector runs: [x, y, w, h, flipH, flipV, bent]
++  const conn = { color: C.ink, width: 1.5, endArrowType: 'triangle' };
++  const lines = [
++    { x: 4.492, y: 6.245, w: 2.425, h: 0, tail: false },     // Start -> up-riser
++    { x: 6.917, y: 3.82, w: 0, h: 2.425, up: true },
++    { x: 8.785, y: 4.127, w: 1.983, h: 0 },
++    { x: 13.796, y: 4.127, w: 2.113, h: 0 },
++    { x: 12.282, y: 5.141, w: 0, h: 1.691 },
++    { x: 17.041, y: 4.556, w: 0, h: 1.231 },
++    { x: 17.041, y: 6.645, w: 0, h: 1.231 },
++    { x: 12.282, y: 7.261, w: 0, h: 1.045, plain: true },
++    { x: 12.282, y: 8.306, w: 3.626, h: 0, plain: true },
++    { x: 4.492, y: 9.661, w: 12.549, h: 0 },
++    { x: 17.041, y: 8.735, w: 0, h: 0.926, plain: true }
++  ];
++  lines.forEach(l => s.addShape('line', {
++    x: l.x, y: l.y, w: l.w, h: l.h,
++    line: l.plain ? { color: C.ink, width: 1.5 } : conn
++  }));
++
++  text(s, 'No', { x: 14.481, y: 3.691, w: 0.736, h: 0.438, align: 'center', fontFace: F.bodyReg, fontSize: 20, color: C.ink });
++  text(s, 'Yes', { x: 11.55, y: 5.762, w: 0.736, h: 0.438, align: 'center', fontFace: F.bodyReg, fontSize: 20, color: C.ink });
++  headerSm(s, 'Flow chart infographics', { x: 5.042, y: 0.973, w: 9.917, sx: 7.689, sw: 4.623, align: 'center' });
++}
++
++function slide24(s, pptx) {
++  rect(s, 2.716, 0, 17.284, 8.63, C.white);
++  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++  s.addChart(pptx.ChartType.bar, [
++    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: cats, values: [1.9, 4.4, 1.7, 2.8] }
++  ], {
++    x: 1.092, y: 3.503, w: 17.815, h: 6.945,
++    barDir: 'bar', barGrouping: 'percentStacked', barGapWidthPct: 80,
++    chartColors: [C.red, C.orange],
++    showValue: true, dataLabelFontFace: F.body, dataLabelFontSize: 15, dataLabelColor: C.white, dataLabelFontBold: true,
++    showLegend: true, legendPos: 'b', legendFontFace: F.body, legendFontSize: 25, legendColor: C.ink,
++    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 20, catAxisLabelColor: C.ink,
++    catAxisLineColor: C.ink, valAxisLineColor: C.bg,
++    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 20, valAxisLabelColor: C.ink,
++    valAxisLabelFormatCode: '0%', valGridLine: { color: C.bg, size: 1 }
++  });
++  headerSm(s, 'Chart tittle', { x: 7.75, y: 0.973, w: 4.5, sx: 7.689, sw: 4.623, align: 'center' });
++}
++
++function slide25(s, pptx) {
++  rect(s, 15.224, 6.483, 3.939, 3.939, C.red);
++  rect(s, 15.224, 2.39, 3.939, 3.939, C.white);
++  rect(s, 0.837, 2.39, 14.229, 8.033, C.white);
++
++  s.addChart(pptx.ChartType.doughnut, [{ name: 'Visitors', labels: ['S1', 'S2'], values: [40, 60] }], {
++    x: 15.869, y: 3.439, w: 2.639, h: 2.549,
++    holeSize: 68, chartColors: [C.red, C.bg], showLegend: false, showValue: false
++  });
++  text(s, '40%', { x: 16.473, y: 4.411, w: 1.431, h: 0.606, align: 'center', fontFace: F.black, fontSize: 30, color: C.ink });
++  text(s, 'Mobile visitors', { x: 15.914, y: 2.681, w: 2.549, h: 0.522, align: 'center', fontFace: F.bodyReg, fontSize: 25, color: C.ink });
++  text(s, [{ text: 'Visitors this ', options: { breakLine: true } }, { text: 'month' }],
++    { x: 16.101, y: 6.774, w: 2.176, h: 0.942, align: 'center', fontFace: F.bodyReg, fontSize: 25, color: C.white });
++  text(s, '23,000', { x: 15.432, y: 7.898, w: 3.538, h: 1.111, align: 'center', fontFace: F.black, fontSize: 60, color: C.white });
++  s.addShape('triangle', { x: 16.517, y: 9.45, w: 0.438, h: 0.378, fill: { color: C.ok }, line: NOLINE });
++  text(s, '50%', { x: 17.001, y: 9.409, w: 0.87, h: 0.522, fontFace: F.black, fontSize: 25, color: C.white });
++
++  s.addChart(pptx.ChartType.bar, [{ name: 'Series 1', labels: ['2019', '2020', '2021', '2022'], values: [10, 25, 45, 35] }], {
++    x: 1.242, y: 2.82, w: 13.282, h: 7.111,
++    barDir: 'col', barGapWidthPct: 129, barOverlapPct: -11, chartColors: [C.red],
++    showLegend: false, showValue: false,
++    catAxisLabelFontFace: F.bodyReg, catAxisLabelFontSize: 20, catAxisLabelColor: C.ink, catAxisLineShow: false,
++    valAxisLabelFontFace: F.bodyReg, valAxisLabelFontSize: 20, valAxisLabelColor: C.ink,
++    valAxisLineColor: C.bg, valGridLine: { color: C.bg, size: 1 }
++  });
++  headerSm(s, 'Traffic and conversion dashboard', { x: 2.683, y: 0.973, w: 14.635, sx: 7.689, sw: 4.623, align: 'center' });
++}
++
++function slide26(s) {
++  const cards = [
++    { x: 2.271, name: 'ELLEN HUDSON', quote: 'Simply a joy to work with. Feel like a pro with little or no design experience needed to use it. Well done guys...', qh: 1.267 },
++    { x: 7.667, name: 'ENNIO HOLMES', quote: 'Without them, I wouldn\u2019t have completed my presentation they way I imagined it, and they have helped me greatly via email. Documentation was of great help as well. Therefore, my full recommendation this team behind it. Great job guys!', qh: 2.883 },
++    { x: 13.063, name: 'LANA WATSON', quote: 'Hello Evgeny!  The best theme. Easy to use, VERY AWESOME SUPPORT and well-programmed too! If you are in doubt about it just forget any concernings...', qh: 2.075 }
++  ];
++  cards.forEach(c => {
++    s.addShape('roundRect', { x: c.x, y: 4.004, w: 4.666, h: 5.616, fill: { color: C.white }, line: NOLINE, rectRadius: 0.202 });
++  });
++  cards.forEach(c => {
++    imagePlaceholder(s, c.x + 1.448, 3.12, 1.771, 1.771);
++    text(s, c.name, { x: c.x + 0.874, y: 5.079, w: 2.919, h: 0.462, align: 'center', fontFace: F.body, fontSize: 16, color: C.ink, lineSpacingMultiple: 1.5 });
++    for (let i = 0; i < 5; i++) poly(s, 'star5', c.x + 1.726 + i * 0.2585, 5.706, 0.181, 0.172, { color: C.star });
++    text(s, c.quote, { x: c.x + 0.328, y: 6.208, w: 4.011, h: c.qh, align: 'center', fontFace: F.body, fontSize: 16, color: C.ink, lineSpacingMultiple: 1.5 });
++  });
++  headerSm(s, 'What our customers say', { x: 5.271, y: 0.973, w: 9.458, sx: 6.515, sw: 6.97, align: 'center' });
++}
++
++function slide27(s) {
++  rect(s, 0, 8.171, 20, 3.08, C.red);
++  rect(s, 0, 0, 20, 3.08, C.white);
++  text(s, 'website@domain.com', Object.assign({ x: 14.905, y: 3.821, w: 3.725, h: 0.522 }, leadIn(C.ink)));
++
++  const socials = [
++    { ix: 1.37, iy: 3.826, isz: 0.509, tx: 1.967, color: '25D366' },
++    { ix: 4.631, iy: 3.826, isz: 0.509, tx: 5.23, color: '2AABEE' },
++    { ix: 7.894, iy: 3.844, isz: 0.476, tx: 8.485, color: 'E1306C' },
++    { ix: 11.149, iy: 3.828, isz: 0.507, tx: 11.75, color: '1877F2' }
++  ];
++  socials.forEach(so => {
++    rect(s, so.ix, so.iy, so.isz, so.isz, so.color);
++    text(s, 'Social network', { x: so.tx, y: 3.905, w: 2.008, h: 0.353, fontFace: F.body, fontSize: 15, color: C.ink });
++  });
++
++  header(s, 'Contact us', { x: 6.758, y: 0.973, w: 6.484, sx: 7.689, sw: 4.623, color: C.ink, subColor: C.muted, align: 'center' });
++
++  poly(s, 'pin', 1.481, 9.989, 0.349, 0.523, { color: C.white });
++  text(s, '3619 Villa Drive, Indiana, United States', Object.assign({ x: 2.229, y: 9.78, w: 4.084, h: 0.942 }, leadIn(C.white)));
++  poly(s, 'phone', 8.431, 9.969, 0.413, 0.564, { color: C.white });
++  text(s, [{ text: '+(1) 961-928-21-82', options: { breakLine: true } }, { text: '+(1) 909-607-86-85' }],
++    Object.assign({ x: 9.209, y: 9.78, w: 3.324, h: 0.942 }, leadIn(C.white)));
++  poly(s, 'mail', 14.65, 10.108, 0.407, 0.329, { color: C.white });
++  text(s, 'mail@domain.com', Object.assign({ x: 15.428, y: 10.011, w: 3.202, h: 0.522 }, leadIn(C.white)));
++}
++
++/* ------------------------------------------------------------------- driver */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'DECK';
++  pptx.defineSlideMaster({ title: 'BASE', background: { color: C.bg } });
++
++  const builders = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++    slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19,
++    slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27];
++
++  builders.forEach(fn => fn(pptx.addSlide({ masterName: 'BASE' }), pptx));
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '00f11864-1e2f-4962-a6b5-341e45003932_grok_final.pptx') });
++}
++
++build().then(f => console.log('wrote ' + f)).catch(e => { console.error(e); process.exit(1); });

@@ -1,0 +1,737 @@
+/**
+ * "Futurizm" deck - recreated with pptxgenjs.
+ *
+ * Notes on fidelity:
+ *  - pptxgenjs has no gradient-fill API, so every gradient in the source deck is
+ *    painted as a stack of flat-coloured slices (see `gradPoly`).
+ *  - The reference deck's photo frames are empty picture placeholders; the one
+ *    real raster (the laptop mockup on slide 12) is redrawn as flat shapes
+ *    labelled "[image]", and icon graphics become simple tinted squares.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ---------------------------------------------------------------------------
+// Palette / typography
+// ---------------------------------------------------------------------------
+const C = {
+	blue: '283EBD',     // brand blue (gradient start)
+	navy: '111A7E',     // deep navy (gradient end)
+	ink: '1F0D68',      // darkest violet
+	violet: '5531E3',
+	pink: 'D585DF',
+	ice: 'C4ECFF',      // primary text
+	white: 'EDF0F5',
+	grey: 'C2C5CC',
+	greyDk: '808080',
+	black: '18181A',
+};
+const F = { title: 'Space Grotesk', body: 'Roboto', alt: 'DM Sans' };
+
+const W = 13.3333;   // slide width  (in)
+const H = 7.5;       // slide height (in)
+
+// ---------------------------------------------------------------------------
+// Colour + geometry helpers
+// ---------------------------------------------------------------------------
+function mix (a, b, t) {
+	const A = parseInt(a, 16), B = parseInt(b, 16);
+	return [16, 8, 0].map(sh => {
+		const x = (A >> sh) & 255, y = (B >> sh) & 255;
+		return Math.round(x + (y - x) * t).toString(16).padStart(2, '0');
+	}).join('').toUpperCase();
+}
+
+/** Rectangle as a polygon (array of [x,y] corners). */
+const rectPoly = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+
+/** PowerPoint's default corner-snip size: one sixth of the shorter side. */
+const snipSize = (w, h) => Math.min(w, h) / 6;
+
+/** "snip2DiagRect": top-right + bottom-left corners cut (the deck's default). */
+function snipDiag (x, y, w, h, c) {
+	const k = c === undefined ? snipSize(w, h) : c;
+	return [[x, y], [x + w - k, y], [x + w, y + k], [x + w, y + h], [x + k, y + h], [x, y + h - k]];
+}
+
+/** "snip2DiagRect" flipped: top-left + bottom-right corners cut. */
+function snipDiagAlt (x, y, w, h, c) {
+	const k = c === undefined ? snipSize(w, h) : c;
+	return [[x + k, y], [x + w, y], [x + w, y + h - k], [x + w - k, y + h], [x, y + h], [x, y + k]];
+}
+
+function bbox (poly) {
+	const xs = poly.map(p => p[0]), ys = poly.map(p => p[1]);
+	return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+
+/** Sutherland-Hodgman clip of a polygon by the half plane n.p <= d. */
+function clipHalf (poly, nx, ny, d) {
+	const out = [];
+	for (let i = 0; i < poly.length; i++) {
+		const a = poly[i], b = poly[(i + 1) % poly.length];
+		const da = nx * a[0] + ny * a[1] - d, db = nx * b[0] + ny * b[1] - d;
+		if (da <= 1e-9) out.push(a);
+		if ((da < -1e-9 && db > 1e-9) || (da > 1e-9 && db < -1e-9)) {
+			const t = da / (da - db);
+			out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+		}
+	}
+	return out;
+}
+
+function addPoly (slide, poly, opts) {
+	const [x0, y0, x1, y1] = bbox(poly);
+	slide.addShape('custGeom', Object.assign({
+		x: x0, y: y0, w: x1 - x0, h: y1 - y0,
+		points: poly.map(p => ({ x: p[0] - x0, y: p[1] - y0 })).concat([{ close: true }]),
+		line: { type: 'none' },
+	}, opts));
+}
+
+/**
+ * Paint a gradient over `poly` as N flat slices perpendicular to `dir`
+ * (`dir` is expressed in normalised bbox space, [1,1] = top-left -> bottom-right).
+ * `a0`/`a1` optionally ramp transparency alongside the colour.
+ */
+function gradPoly (slide, poly, o) {
+	const [x0, y0, x1, y1] = bbox(poly);
+	const w = (x1 - x0) || 1e-6, h = (y1 - y0) || 1e-6;
+	const dx = o.dir ? o.dir[0] : 1, dy = o.dir ? o.dir[1] : 1;
+	const nx = dx / w, ny = dy / h;
+	const base = nx * x0 + ny * y0 + Math.min(0, nx) * w + Math.min(0, ny) * h;
+	const span = Math.abs(nx) * w + Math.abs(ny) * h;
+	const n = o.steps || 14, over = span / n * 0.7;
+	for (let i = 0; i < n; i++) {
+		let band = clipHalf(poly, nx, ny, base + span * ((i + 1) / n));
+		band = clipHalf(band, -nx, -ny, -(base + span * (i / n) - (i ? over : 0)));
+		if (band.length < 3) continue;
+		const f = Math.min(1, (i + 0.5) / n / (o.stop || 1));
+		const fill = { color: mix(o.from, o.to, f) };
+		if (o.a0 !== undefined) fill.transparency = Math.round(o.a0 + ((o.a1 - o.a0) * f));
+		addPoly(slide, band, { fill: fill });
+	}
+}
+
+/** Page background: brand blue at the top-left fading to navy at the bottom-right. */
+function background (slide) {
+	gradPoly(slide, rectPoly(0, 0, W, H), { from: C.blue, to: C.navy, dir: [0.635, 0.36], steps: 26 });
+}
+
+/** Card fill used all over the deck: blue -> navy diagonally. */
+function card (slide, poly, stop) {
+	gradPoly(slide, poly, { from: C.blue, to: C.navy, dir: [1, 1], stop: stop, steps: 13 });
+}
+
+/** Nested translucent squares decorating the top-right corner of most slides. */
+function decoSquares (slide, boxes) {
+	boxes.forEach(b => {
+		gradPoly(slide, snipDiagAlt(b[0], b[1], b[2], b[2]),
+			{ from: C.blue, to: C.ink, a0: 0, a1: 100, stop: 0.63, dir: [-1, -1], steps: 12 });
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Text: the deck's boxes are top-anchored with zero inset
+// ---------------------------------------------------------------------------
+function txt (slide, text, o) {
+	slide.addText(text, Object.assign({
+		fontFace: F.body, fontSize: 9, color: C.ice,
+		valign: 'top', align: 'left',
+	}, o));
+}
+
+// The "Futurizm" asterisk, traced from the source SVG (40x48 viewBox): four
+// stroked arms, each a straight run, a quarter-turn cubic, then another run.
+const LOGO_ARMS = [
+	[[20, 4], [20, 16.3604], [20, 19.087, 16.6569, 20.3998, 14.8016, 18.4017], [7, 10]],
+	[[40, 24], [27.6396, 24], [24.913, 24, 23.6002, 20.6569, 25.5983, 18.8016], [34, 11]],
+	[[20, 44], [20, 31.6396], [20, 28.913, 23.3431, 27.6002, 25.1984, 29.5983], [33, 38]],
+	[[0, 24], [12.3604, 24], [15.087, 24, 16.3998, 27.3431, 14.4017, 29.1984], [6, 37]],
+];
+
+function logo (slide, x, y, w, color) {
+	const h = w * 48 / 40, sx = w / 40, sy = h / 48;
+	LOGO_ARMS.forEach(arm => {
+		const pts = arm.map(seg => seg.length === 2
+			? { x: seg[0] * sx, y: seg[1] * sy }
+			: {
+				curve: { type: 'cubic', x1: seg[0] * sx, y1: seg[1] * sy, x2: seg[2] * sx, y2: seg[3] * sy },
+				x: seg[4] * sx, y: seg[5] * sy,
+			});
+		slide.addShape('custGeom', { x, y, w, h, points: pts, line: { color: color || C.ice, width: w * 7.2 } });
+	});
+}
+
+/** Logo + wordmark in the top-left corner of nearly every slide. */
+function brandMark (slide) {
+	logo(slide, 0.413, 0.286, 0.277);
+	txt(slide, 'Futurizm', { x: 0.691, y: 0.301, w: 1.28, h: 0.3, fontFace: F.title, fontSize: 12 });
+}
+
+/** Footer rule + captions on the "presentation" slides. */
+function footer (slide, rightColor) {
+	slide.addShape('line', { x: 0.826, y: 6.698, w: 11.682, h: 0, line: { color: C.violet, width: 1 } });
+	txt(slide, 'Futuristic Presentation', { x: 0.713, y: 6.882, w: 1.62, h: 0.3, color: C.violet, lineSpacingMultiple: 1.5 });
+	txt(slide, 'Pixslides Studio', { x: 10.879, y: 6.882, w: 1.62, h: 0.3, color: rightColor || C.ice, align: 'right', lineSpacingMultiple: 1.5 });
+}
+
+// ---------------------------------------------------------------------------
+// Shared body copy
+// ---------------------------------------------------------------------------
+const LOREM = 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi';
+const LOREM_SHORT = 'Sed ut perspiciatis unde omnis iste natus error sit';
+const LOREM_MED = 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam';
+
+// ---------------------------------------------------------------------------
+// Slide 1 - title / hero
+// ---------------------------------------------------------------------------
+function slide01 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	gradPoly(s, rectPoly(7.844, 0, 5.49, H), { from: C.blue, to: C.navy, dir: [1, 1], steps: 18 });
+	s.addShape('triangle', { x: 11.152, y: 0.845, w: 1.307, h: 0.634, rotate: 45, fill: { color: C.blue }, line: { type: 'none' } });
+	s.addShape('triangle', { x: 6.081, y: 6.028, w: 1.564, h: 0.759, rotate: 225, fill: { color: C.blue }, line: { type: 'none' } });
+	brandMark(s);
+
+	txt(s, 'Designing the Future Life', { x: 0.854, y: 2.226, w: 4.96, h: 1.58, fontFace: F.title, fontSize: 44 });
+	txt(s, LOREM, { x: 0.875, y: 3.947, w: 4.25, h: 0.76, lineSpacingMultiple: 1.5 });
+
+	// "SHOW MORE" (solid + arrow tab) and "CONTACT US" (outline) buttons
+	addPoly(s, snipDiag(0.947, 5.002, 1.437, 0.472, 0.079), { fill: { color: C.blue } });
+	txt(s, 'SHOW MORE', { x: 1.109, y: 5.125, w: 0.945, h: 0.25 });
+	gradPoly(s, snipDiag(2.136, 5.002, 0.384, 0.472, 0.064), { from: C.blue, to: C.navy, dir: [0, 1], steps: 6 });
+	s.addShape('triangle', { x: 2.263, y: 5.199, w: 0.117, h: 0.119, rotate: 90, fill: { color: C.white }, line: { type: 'none' } });
+	addPoly(s, snipDiag(2.81, 5.002, 1.575, 0.472, 0.079), { fill: { type: 'none' }, line: { color: C.blue, width: 1 } });
+	txt(s, 'CONTACT US', { x: 3.108, y: 5.115, w: 0.965, h: 0.25 });
+
+	// vertical accent bars
+	s.addShape('flowChartManualOperation', { x: 6.034, y: 2.662, w: 1.062, h: 0.223, rotate: 270, fill: { color: C.violet }, line: { type: 'none' } });
+	s.addShape('flowChartManualOperation', { x: 11.661, y: 5.238, w: 1.062, h: 0.223, rotate: 90, fill: { color: C.pink }, line: { type: 'none' } });
+	footer(s);
+}
+
+// ---------------------------------------------------------------------------
+// Slide 2 - full-bleed statement
+// ---------------------------------------------------------------------------
+function slide02 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	gradPoly(s, rectPoly(0, 0, W, 4.348), { from: C.violet, to: C.navy, a0: 100, a1: 0, dir: [1, 1], steps: 16 });
+	brandMark(s);
+
+	txt(s, 'Futurizm', { x: 0.781, y: 0.984, w: 5.89, h: 1.58, fontFace: F.title, fontSize: 88 });
+	txt(s, LOREM + ' architecto be', { x: 7.988, y: 1.394, w: 4.09, h: 0.76, lineSpacingMultiple: 1.5 });
+
+	// "READ MORE" pill: violet fading to pink, one corner snipped
+	gradPoly(s, [[1.823, 6.411], [3.658, 6.411], [3.915, 6.668], [3.915, 6.924], [1.823, 6.924]],
+		{ from: C.violet, to: C.pink, a0: 60, a1: 0, dir: [1, 1], steps: 14 });
+	txt(s, 'READ MORE', { x: 2.322, y: 6.482, w: 1.09, h: 0.31, fontFace: F.alt, align: 'center', charSpacing: 1, lineSpacingMultiple: 1.5 });
+}
+
+// ---------------------------------------------------------------------------
+// Slide 3 - "About us" list
+// ---------------------------------------------------------------------------
+function slide03 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	decoSquares(s, [[9.77, 0.567, 2.683], [11.532, 0.949, 1.254]]);
+	brandMark(s);
+
+	txt(s, 'ABOUT US', { x: 6.288, y: 0.949, w: 1.3, h: 0.31, fontFace: F.alt, charSpacing: 1, lineSpacingMultiple: 1.5 });
+	txt(s, 'A Glimpse into the Futuristic Lifestyle', { x: 6.288, y: 1.348, w: 5.44, h: 1.18, fontFace: F.title, fontSize: 32 });
+
+	const ROWS = [
+		{ y: 2.912, n: '01', title: 'Artificial Intelegence', w: 4.33 },
+		{ y: 4.100, n: '02', title: 'Robotic in Bussiness', w: 3.74 },
+		{ y: 5.286, n: '02', title: 'Robotic in Bussiness', w: 4.02 },
+	];
+	ROWS.forEach(r => {
+		card(s, snipDiag(6.323, r.y, 5.434, 1.038));
+		s.addShape('ellipse', { x: 6.579, y: r.y + 0.172, w: 0.674, h: 0.674, fill: { color: C.ink }, line: { type: 'none' } });
+		txt(s, r.n, { x: 6.639, y: r.y + 0.31, w: 0.554, h: 0.44, fontFace: F.title, fontSize: 20, color: C.grey, align: 'center' });
+		txt(s, r.title, { x: 7.52, y: r.y + 0.175, w: 3.08, h: 0.4, fontFace: F.title, fontSize: 18 });
+		txt(s, LOREM_SHORT, { x: 7.52, y: r.y + 0.512, w: r.w, h: 0.3, lineSpacingMultiple: 1.5 });
+	});
+
+	// bottom-left caption card ("snip1Rect" rotated: bottom-right corner cut)
+	addPoly(s, [[0.713, 4.949], [4.732, 4.949], [4.732, 5.756], [4.070, 6.418], [0.713, 6.418]],
+		{ fill: { color: C.blue, transparency: 35 } });
+	txt(s, 'PLACEHOLDER',
+		{ x: 1.186, y: 5.194, w: 2.73, h: 0.81, fontFace: F.title, fontSize: 14, color: C.white, lineSpacingMultiple: 1.15 });
+	s.addShape('triangle', { x: 0.446, y: 6.143, w: 0.722, h: 0.351, rotate: 225, fill: { color: C.violet }, line: { type: 'none' } });
+	s.addShape('snip2SameRect', { x: 4.12, y: 3.7, w: 1.212, h: 0.203, rotate: 270, fill: { color: C.pink }, line: { type: 'none' } });
+	footer(s, C.violet);
+}
+
+// ---------------------------------------------------------------------------
+// Slide 4 - three feature cards
+// ---------------------------------------------------------------------------
+function slide04 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	decoSquares(s, [[4.057, 0.557, 2.683], [5.775, 1.211, 1.254]]);
+	brandMark(s);
+
+	txt(s, 'ABOUT US', { x: 0.92, y: 1.433, w: 1.3, h: 0.31, fontFace: F.alt, charSpacing: 1, lineSpacingMultiple: 1.5 });
+	txt(s, 'Revolutionizing Technology with Futurizm', { x: 0.92, y: 1.833, w: 4.48, h: 1.72, fontFace: F.title, fontSize: 32 });
+
+	const CARDS = [
+		{ x: 1.019, title: 'The Future of Work' },
+		{ x: 4.882, title: 'Futuristic Healthcare' },
+		{ x: 8.714, title: 'The Future of Energy' },
+	];
+	CARDS.forEach(c => {
+		card(s, snipDiag(c.x, 3.932, 3.389, 2.37));
+		addPoly(s, snipDiag(c.x + 2.665, 3.932, 0.722, 0.743), { fill: { color: C.pink, transparency: 31 } });
+		logo(s, c.x + 2.875, 4.129, 0.277);
+		txt(s, c.title, { x: c.x + 0.259, y: 4.335, w: 2.41, h: 0.71, fontFace: F.title, fontSize: 18, bold: true, lineSpacingMultiple: 1.15 });
+		txt(s, 'Lorem ipsum dolor sit consectetur adipiscing elit, sed', { x: c.x + 0.259, y: 5.089, w: 2.48, h: 0.53, lineSpacingMultiple: 1.5 });
+	});
+
+	s.addShape('snip2SameRect', { x: 6.739, y: 1.897, w: 1.885, h: 0.37, rotate: 90, fill: { color: C.pink, transparency: 71 }, line: { type: 'none' } });
+	s.addShape('triangle', { x: 7.327, y: 7.168, w: 0.786, h: 0.382, rotate: 225, fill: { color: C.pink, transparency: 57 }, line: { type: 'none' } });
+}
+
+// ---------------------------------------------------------------------------
+// Slide 5 - VR/AR stats
+// ---------------------------------------------------------------------------
+function slide05 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	decoSquares(s, [[9.317, 0.745, 2.683], [11.413, 1.279, 1.254]]);
+	brandMark(s);
+
+	txt(s, 'Virtual Reality and Augmented Reality', { x: 1.043, y: 1.178, w: 4.78, h: 1.18, fontFace: F.title, fontSize: 32 });
+	txt(s, LOREM + ' architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit',
+		{ x: 6.769, y: 1.25, w: 5.17, h: 0.99, fontFace: F.alt, lineSpacingMultiple: 1.5 });
+
+	// wide trapezoid bar under the heading
+	addPoly(s, [[1.365, 2.875], [5.368, 2.875], [5.368, 3.124], [5.119, 3.372], [1.614, 3.372], [1.365, 3.124]],
+		{ fill: { color: C.grey, transparency: 71 } });
+
+	addPoly(s, snipDiagAlt(6.964, 3.939, 5.694, 2.667, 0.24), { fill: { color: C.navy, transparency: 26 } });
+	txt(s, 'Tittle tex here', { x: 7.524, y: 4.196, w: 3.48, h: 0.51, fontFace: F.title, fontSize: 24, color: 'FFFFFF' });
+	txt(s, 'PLACEHOLDER', { x: 7.524, y: 4.957, w: 3.08, h: 0.47, fontSize: 11, color: 'FFFFFF' });
+	txt(s, '150', { x: 11.163, y: 4.79, w: 1.2, h: 0.64, fontFace: F.title, fontSize: 32, color: 'FFFFFF' });
+	s.addShape('line', { x: 7.696, y: 5.566, w: 4.962, h: 0, line: { color: C.grey, width: 1 } });
+	txt(s, 'Overview of rigorous physical and mental training programs', { x: 7.524, y: 5.74, w: 3.08, h: 0.47, fontSize: 11, color: 'FFFFFF' });
+	txt(s, '96', { x: 11.163, y: 5.632, w: 1.13, h: 0.64, fontFace: F.title, fontSize: 32, color: 'FFFFFF' });
+}
+
+// ---------------------------------------------------------------------------
+// Slide 6 - team grid
+// ---------------------------------------------------------------------------
+function slide06 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	brandMark(s);
+	decoSquares(s, [[9.076, 0.613, 2.683], [11.185, 1.152, 1.254]]);
+	txt(s, 'Your Expert Team', { x: 1.574, y: 1.348, w: 10.19, h: 0.64, fontFace: F.title, fontSize: 32, align: 'center' });
+
+	// per column: rotated role label, name plate, blurb
+	const COLS = [
+		{ role: 0.116, plate: 0.703, blurb: 0.819 },
+		{ role: 3.207, plate: 3.712, blurb: 3.793 },
+		{ role: 6.205, plate: 6.734, blurb: 6.927 },
+		{ role: 9.236, plate: 9.745, blurb: 9.901 },
+	];
+	COLS.forEach(c => {
+		txt(s, 'Position here', { x: c.role, y: 3.576, w: 1.403, h: 0.252, rotate: 270 });
+		addPoly(s, snipDiag(c.plate, 4.626, 2.613, 0.677), { fill: { color: C.blue } });
+		txt(s, 'Your name here', { x: c.plate, y: 4.79, w: 2.613, h: 0.35, fontFace: F.title, fontSize: 14, align: 'center' });
+		txt(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem',
+			{ x: c.blurb, y: 5.645, w: 2.684, h: 0.53, align: 'center', lineSpacingMultiple: 1.5 });
+	});
+
+	// notched strip along the bottom edge
+	card(s, [
+		[0, 7.082], [1.331, 7.082], [1.553, 7.218], [3.336, 7.218], [3.558, 7.082],
+		[7.829, 7.082], [8.077, 7.258], [8.840, 7.258], [9.088, 7.082],
+		[12.994, 7.082], [W, 7.290], [W, H], [0, H],
+	]);
+}
+
+// ---------------------------------------------------------------------------
+// Slide 7 - profile with skill bars
+// ---------------------------------------------------------------------------
+function slide07 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	addPoly(s, [[0, 0], [1.735, 0], [3.469, 1.735], [3.469, H], [0, H]], { fill: { color: C.blue } });
+	decoSquares(s, [[7.294, 0.599, 5.057], [11.062, 1.477, 1.643]]);
+
+	txt(s, 'OUR TEAM', { x: 6.547, y: 1.641, w: 1.3, h: 0.31, fontFace: F.alt, charSpacing: 1, lineSpacingMultiple: 1.5 });
+	txt(s, 'Lester D. Jones', { x: 6.547, y: 2.041, w: 5.44, h: 0.64, fontFace: F.title, fontSize: 32 });
+
+	// each skill row: a track of 10 ticks, `filled` of them coloured, plus a knob
+	const SKILLS = [
+		{ y: 3.811, pct: '80%', color: C.ice, label: C.ice, filled: 7, knob: 10.472, knobFill: C.black },
+		{ y: 4.745, pct: '90%', color: C.pink, label: C.pink, filled: 9, knob: 11.355, knobFill: '404040' },
+		{ y: 5.712, pct: '70%', color: C.blue, label: C.ice, filled: 6, knob: 9.769, knobFill: C.grey },
+	];
+	SKILLS.forEach(sk => {
+		for (let i = 0; i < 10; i++) {
+			const x = 6.6 + i * 0.5535;
+			if (i < sk.filled) addPoly(s, snipDiag(x, sk.y, 0.513, 0.072, 0.024), { fill: { color: sk.color } });
+			else s.addShape('rect', { x: x + 0.008, y: sk.y, w: 0.512, h: 0.072, fill: { color: C.greyDk, transparency: 80 }, line: { type: 'none' } });
+		}
+		addPoly(s, snipDiag(sk.knob, sk.y - 0.075, 0.222, 0.222, 0.068), { fill: { color: sk.knobFill }, line: { color: C.white, width: 0.75 } });
+		txt(s, 'Skill here', { x: 6.547, y: sk.y - 0.552, w: 3.06, h: 0.37, fontFace: F.title, fontSize: 16 });
+		txt(s, sk.pct, { x: 10.726, y: sk.y - 0.592, w: 1.37, h: 0.44, fontFace: F.title, fontSize: 20, bold: true, align: 'right', color: sk.label });
+	});
+
+	card(s, snipDiag(1.439, 5.523, 3.325, 0.847, 0.336));
+	txt(s, 'Head Of Futurizm', { x: 1.523, y: 5.79, w: 3.16, h: 0.4, fontFace: F.title, fontSize: 18, bold: true, align: 'center', color: 'FFFFFF' });
+}
+
+// ---------------------------------------------------------------------------
+// Slide 8 - six service cards
+// ---------------------------------------------------------------------------
+
+/** Card outline used on slides 8 and 9: cut corners plus a small tab notch. */
+function notchCard (x, y, flip) {
+	const w = 3.057, h = 2.183, c = 0.364;
+	return flip
+		? [[x, y], [x + 1.609, y], [x + 1.713, y + 0.104], [x + 2.482, y + 0.104], [x + 2.586, y],
+			[x + 2.693, y], [x + w, y + c], [x + w, y + 0.915], [x + 2.943, y + 1.019],
+			[x + 2.943, y + 1.788], [x + w, y + 1.892], [x + w, y + h], [x + c, y + h], [x, y + h - c]]
+		: [[x, y], [x + 2.693, y], [x + w, y + c], [x + w, y + h], [x + 2.763, y + h],
+			[x + 2.599, y + h - 0.164], [x + 1.585, y + h - 0.164], [x + 1.421, y + h],
+			[x + c, y + h], [x, y + h - c], [x, y + 1.333], [x + 0.119, y + 1.214],
+			[x + 0.119, y + 0.201], [x, y + 0.082]];
+}
+
+function slide08 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	decoSquares(s, [[9.309, 0.529, 2.683], [11.21, 1.158, 1.254]]);
+
+	// backdrop panel: notched along the top, chamfered bottom-right
+	card(s, [
+		[0, 2.759], [2.029, 2.759], [2.455, 3.080], [6.398, 3.080], [6.824, 2.759],
+		[12.285, 2.759], [W, 3.549], [W, H], [0, H],
+	], 0.36);
+
+	const CARDS = [
+		{ x: 1.238, y: 2.118, n: '01', flip: false }, { x: 4.998, y: 2.114, n: '02', flip: true }, { x: 8.675, y: 2.132, n: '03', flip: false },
+		{ x: 1.238, y: 4.559, n: '04', flip: false }, { x: 4.998, y: 4.555, n: '05', flip: true }, { x: 8.675, y: 4.571, n: '03', flip: false },
+	];
+	CARDS.forEach(c => {
+		card(s, notchCard(c.x, c.y, c.flip));
+		txt(s, c.n, { x: c.x + 0.19, y: c.y + 0.079, w: 1.16, h: 1.01, fontFace: F.title, fontSize: 54, color: C.ice, transparency: 84, align: 'center' });
+		txt(s, 'Our Service here', { x: c.x + 0.673, y: c.y + 0.561, w: 1.98, h: 0.37, fontFace: F.title, fontSize: 16 });
+		txt(s, LOREM_MED, { x: c.x + 0.363, y: c.y + 1.026, w: 2.392, h: 0.76, lineSpacingMultiple: 1.5 });
+	});
+
+	brandMark(s);
+	txt(s, 'Unlocking the Next Frontier', { x: 1.67, y: 0.969, w: 9.99, h: 0.64, fontFace: F.title, fontSize: 32, align: 'center' });
+}
+
+// ---------------------------------------------------------------------------
+// Slide 9 - charts
+// ---------------------------------------------------------------------------
+function slide09 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+
+	// full-width notched banner behind the heading
+	gradPoly(s, [
+		[0, 0], [1.422, 0], [1.839, 0.417], [4.187, 0.417], [4.604, 0], [W, 0], [W, 4.741],
+		[11.304, 4.741], [10.878, 4.420], [6.935, 4.420], [6.510, 4.741], [1.048, 4.741], [0, 3.951],
+	], { from: C.blue, to: C.navy, a0: 100, a1: 24, dir: [1, 1], steps: 14 });
+
+	// doughnut card (left) and line-chart card (right)
+	card(s, [
+		[0.934, 3.109], [1.493, 2.667], [2.240, 2.667], [2.423, 2.811], [3.980, 2.811], [4.163, 2.667],
+		[4.290, 2.667], [4.290, 5.938], [3.731, 6.380], [0.934, 6.380], [0.934, 6.024],
+		[1.186, 5.824], [1.186, 4.593], [0.934, 4.394],
+	], 0.36);
+	card(s, snipDiag(4.623, 2.667, 7.91, 3.769, 0.63), 0.36);
+
+	txt(s, 'STATISTIC CHART', { x: 1.259, y: 3.087, w: 2.62, h: 0.34, fontSize: 14, bold: true, color: C.white, align: 'center' });
+	txt(s, 'STATISTIC CHART', { x: 4.991, y: 2.877, w: 3.44, h: 0.34, fontSize: 14, bold: true, color: C.white });
+
+	s.addChart(pptx.ChartType.doughnut, [{
+		name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [8.2, 3.2],
+	}], {
+		x: 0.5, y: 3.451, w: 4.161, h: 2.705,
+		chartColors: [C.grey, '6B76C4'], holeSize: 84,
+		showLegend: true, legendPos: 'b', legendColor: '7E86B0', legendFontFace: F.body, legendFontSize: 9,
+		showValue: false, dataBorder: { pt: 0, color: C.navy },
+		chartArea: { fill: { color: C.navy, transparency: 100 } },
+		plotArea: { fill: { color: C.navy, transparency: 100 } },
+	});
+	txt(s, '81%', { x: 1.903, y: 4.337, w: 1.42, h: 0.71, fontFace: F.title, fontSize: 36, color: C.white, align: 'center' });
+
+	const CATS = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+	s.addChart(pptx.ChartType.line, [
+		{ name: 'Series 1', labels: CATS, values: [4.3, 2.5, 3.5, 4.5] },
+		{ name: 'Series 2', labels: CATS, values: [2.4, 4.4, 1.8, 2.8] },
+		{ name: 'Series 3', labels: CATS, values: [2, 2, 3, 5] },
+	], {
+		x: 5.017, y: 3.375, w: 6.979, h: 2.88,
+		chartColors: [C.white, C.grey, 'B7B7A4'], lineSize: 1, lineSmooth: true,
+		lineDataSymbol: 'circle', lineDataSymbolSize: 5,
+		showLegend: true, legendPos: 'b', legendColor: '7E86B0', legendFontFace: F.body, legendFontSize: 8,
+		catAxisLabelColor: '7E86B0', catAxisLabelFontFace: F.body, catAxisLabelFontSize: 8,
+		valAxisLabelColor: '7E86B0', valAxisLabelFontFace: F.body, valAxisLabelFontSize: 8,
+		valAxisMaxVal: 6, valAxisMinVal: 0, valAxisMajorUnit: 1, valAxisLineShow: false,
+		valGridLine: { color: '3A4BA8', size: 0.5 }, catGridLine: { style: 'none' },
+		chartArea: { fill: { color: C.navy, transparency: 100 } },
+		plotArea: { fill: { color: C.navy, transparency: 100 } },
+	});
+
+	brandMark(s);
+	txt(s, 'Immersive Experiences and Interactive', { x: 1.333, y: 1.312, w: 10.67, h: 0.64, fontFace: F.title, fontSize: 32, align: 'center' });
+}
+
+// ---------------------------------------------------------------------------
+// Slide 10 - six-step icon timeline
+// ---------------------------------------------------------------------------
+function slide10 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	decoSquares(s, [[9.608, 0.526, 2.683], [11.592, 5.962, 1.254]]);
+	brandMark(s);
+	txt(s, 'Saluting the heroes', { x: 3.08, y: 0.901, w: 7.17, h: 0.84, fontFace: F.title, fontSize: 44, align: 'center' });
+
+	// interlocking blue discs, then the light disc + dashed inner ring on top
+	const DISCS = [1.502, 3.323, 5.146, 6.964, 8.726, 10.502];
+	DISCS.forEach(x => s.addShape('ellipse', { x: x - 0.146, y: 3.516, w: 1.525, h: 1.523, fill: { color: C.blue }, line: { type: 'none' } }));
+	DISCS.forEach(x => {
+		s.addShape('ellipse', { x, y: 3.658, w: 1.233, h: 1.231, fill: { color: C.ice }, line: { type: 'none' } });
+		s.addShape('ellipse', { x: x + 0.107, y: 3.764, w: 1.014, h: 1.012, fill: { color: C.ice }, line: { color: C.navy, width: 1, dashType: 'dash' } });
+		s.addShape('roundRect', { x: x + 0.4, y: 3.985, w: 0.44, h: 0.44, rectRadius: 0.06, fill: { color: C.navy, transparency: 15 }, line: { type: 'none' } });
+	});
+
+	// callouts alternate above / below the disc row
+	const STEPS = [
+		{ n: '01', x: 1.163, tick: 2.111, up: true, body: 'Sed ut perspiciatis unde omnis iste natus error sit volu' },
+		{ n: '02', x: 3.083, tick: 3.917, up: false, body: 'Sed ut perspiciatis unde omnis iste natus' },
+		{ n: '03', x: 4.842, tick: 5.757, up: true, body: 'Sed ut perspiciatis unde omnis iste natus error sit volu' },
+		{ n: '04', x: 6.686, tick: 7.592, up: false, body: 'Sed ut perspiciatis unde omnis iste natus' },
+		{ n: '05', x: 8.392, tick: 9.307, up: true, body: 'Sed ut perspiciatis unde omnis iste natus error sit volu' },
+		{ n: '06', x: 10.172, tick: 11.078, up: false, body: 'Sed ut perspiciatis unde omnis iste natus' },
+	];
+	STEPS.forEach((st, i) => {
+		if (st.up) {
+			txt(s, st.n, { x: DISCS[i] + 0.19, y: 2.926, w: 0.851, h: 0.505, fontFace: F.title, fontSize: 24, align: 'center' });
+			s.addShape('line', { x: st.tick, y: 5.024, w: 0, h: 0.469, line: { color: C.greyDk, width: 1, dashType: 'sysDash', endArrowType: 'oval' } });
+			txt(s, 'LOREM IPSUM', { x: st.x, y: 5.66, w: 1.83, h: 0.302, fontFace: F.title, fontSize: 12, align: 'center' });
+			txt(s, st.body, { x: st.x - 0.158, y: 5.965, w: 2.144, h: 0.481, color: C.greyDk, align: 'center', lineSpacingMultiple: 1.3 });
+		} else {
+			txt(s, st.n, { x: DISCS[i] + 0.19, y: 5.156, w: 0.851, h: 0.505, fontFace: F.title, fontSize: 24, align: 'center' });
+			s.addShape('line', { x: st.tick, y: 3.112, w: 0, h: 0.41, line: { color: C.greyDk, width: 1, dashType: 'sysDash', beginArrowType: 'oval' } });
+			txt(s, 'LOREM IPSUM', { x: st.x, y: 2.184, w: 1.83, h: 0.303, fontFace: F.title, fontSize: 12, align: 'center' });
+			txt(s, st.body, { x: st.x, y: 2.455, w: 1.686, h: 0.481, color: C.greyDk, align: 'center', lineSpacingMultiple: 1.3 });
+		}
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Slide 11 - portfolio gallery
+// ---------------------------------------------------------------------------
+function slide11 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	brandMark(s);
+
+	txt(s, '#1. Our gallery', { x: 4.074, y: 0.908, w: 2.84, h: 0.405, fontFace: F.title, fontSize: 18, align: 'center' });
+	txt(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, ',
+		{ x: 4.074, y: 1.312, w: 2.84, h: 0.759, align: 'center', lineSpacingMultiple: 1.5 });
+	txt(s, '#2. Our gallery', { x: 0.606, y: 5.6, w: 2.839, h: 0.403, fontFace: F.title, fontSize: 18, align: 'center' });
+	txt(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, ',
+		{ x: 0.606, y: 6.002, w: 2.839, h: 0.76, align: 'center', lineSpacingMultiple: 1.5 });
+
+	// logo card floating over the top-right gallery frame
+	addPoly(s, snipDiag(8.078, 1.331, 2.306, 2.006, 0.334), { fill: { color: C.navy, transparency: 11 } });
+	logo(s, 8.859, 1.576, 0.745);
+	txt(s, 'Futurizm', { x: 8.593, y: 2.47, w: 1.277, h: 0.303, fontFace: F.title, fontSize: 12, align: 'center' });
+
+	// thin tapered accent bars
+	card(s, [[7.087, 4.759], [7.087, 6.466], [6.929, 6.318], [6.929, 4.907]]);
+	card(s, [[0.552, 2.023], [0.691, 2.163], [0.691, 3.557], [0.552, 3.697]]);
+
+	txt(s, 'OUR PORTFOLIO', { x: 8.005, y: 4.713, w: 2.075, h: 0.326, fontSize: 10, color: C.grey, charSpacing: 1, lineSpacingMultiple: 1.5 });
+	txt(s, 'Unlocking the Next Frontier', { x: 7.859, y: 5.111, w: 3.943, h: 1.178, fontFace: F.title, fontSize: 32 });
+}
+
+// ---------------------------------------------------------------------------
+// Slide 12 - laptop mockup (the deck's one raster image)
+// ---------------------------------------------------------------------------
+function slide12 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	card(s, [
+		[0, 2.031], [1.756, 2.031], [2.223, 2.472], [4.393, 2.472], [4.859, 2.031], [W, 2.031],
+		[W, 6.516], [11.304, 6.516], [10.878, 6.212], [6.935, 6.212], [6.510, 6.516], [1.048, 6.516], [0, 5.768],
+	], 0.36);
+
+	// lid, screen and base of the laptop, standing in for the photograph
+	addPoly(s, [[3.538, 2.389], [9.670, 2.389], [9.670, 6.500], [3.538, 6.500]], { fill: { color: '2B2B2E' } });
+	addPoly(s, rectPoly(3.802, 2.694, 5.605, 3.500), { fill: { color: '2132A9' } });
+	addPoly(s, [[2.872, 6.500], [10.339, 6.500], [10.130, 6.720], [3.080, 6.720]], { fill: { color: 'C3C6CC' } });
+	txt(s, 'MacBook', { x: 5.8, y: 6.52, w: 1.7, h: 0.16, fontSize: 6, color: '6E7076', align: 'center' });
+	txt(s, '[image]', { x: 3.802, y: 4.28, w: 5.605, h: 0.32, fontSize: 11, color: C.grey, fontFace: F.alt, align: 'center' });
+
+	[1.576, 11.119].forEach(x => logo(s, x, 3.541, 0.56));
+	txt(s, 'Tittle text here', { x: 0.861, y: 4.248, w: 2.031, h: 0.37, fontFace: F.title, fontSize: 16, align: 'center' });
+	txt(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.',
+		{ x: 0.545, y: 4.583, w: 2.663, h: 0.76, align: 'center', lineSpacingMultiple: 1.5 });
+	txt(s, 'Tittle text here', { x: 10.384, y: 4.248, w: 2.031, h: 0.37, fontFace: F.title, fontSize: 16, align: 'center' });
+	txt(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.',
+		{ x: 10.068, y: 4.583, w: 2.663, h: 0.76, align: 'center', lineSpacingMultiple: 1.5 });
+
+	brandMark(s);
+	txt(s, 'Autonomous Weapons and Cyber Battles', { x: 3.08, y: 0.761, w: 7.174, h: 1.178, fontFace: F.title, fontSize: 32, align: 'center' });
+}
+
+// ---------------------------------------------------------------------------
+// Slide 13 - "What's New" petal infographic
+// ---------------------------------------------------------------------------
+
+// Six petals surrounding the hub. Each entry is a list of path segments in
+// absolute inches: [x,y] = line/move, [x1,y1,x2,y2,x,y] = cubic bezier.
+const PETALS = [
+	[[4.723, 3.204], [5.499, 3.656, 5.499, 3.656, 5.499, 3.656], [5.571, 3.548, 5.661, 3.457, 5.770, 3.379],
+		[5.962, 3.493, 5.962, 3.493, 5.962, 3.493], [5.962, 3.271, 5.962, 3.271, 5.962, 3.271],
+		[6.071, 3.216, 6.197, 3.186, 6.323, 3.180], [6.323, 2.283, 6.323, 2.283, 6.323, 2.283],
+		[6.323, 2.175, 6.227, 2.090, 6.119, 2.103], [5.529, 2.181, 5.017, 2.494, 4.674, 2.939],
+		[4.608, 3.030, 4.632, 3.150, 4.723, 3.204]],
+	[[6.468, 2.283], [6.468, 3.180, 6.468, 3.180, 6.468, 3.180], [6.600, 3.186, 6.727, 3.222, 6.841, 3.277],
+		[6.841, 3.493, 6.841, 3.493, 6.841, 3.493], [7.028, 3.385, 7.028, 3.385, 7.028, 3.385],
+		[7.130, 3.457, 7.220, 3.548, 7.292, 3.656], [8.069, 3.204, 8.069, 3.204, 8.069, 3.204],
+		[8.159, 3.150, 8.183, 3.030, 8.117, 2.939], [7.774, 2.494, 7.262, 2.181, 6.673, 2.103],
+		[6.564, 2.090, 6.468, 2.175, 6.468, 2.283]],
+	[[5.522, 4.250], [5.323, 4.142, 5.323, 4.142, 5.323, 4.142], [5.335, 4.010, 5.371, 3.889, 5.425, 3.781],
+		[4.649, 3.329, 4.649, 3.329, 4.649, 3.329], [4.559, 3.275, 4.438, 3.317, 4.396, 3.414],
+		[4.288, 3.673, 4.228, 3.955, 4.228, 4.250], [4.228, 4.551, 4.288, 4.834, 4.396, 5.093],
+		[4.438, 5.189, 4.559, 5.231, 4.649, 5.177], [5.425, 4.726, 5.425, 4.726, 5.425, 4.726],
+		[5.371, 4.617, 5.335, 4.497, 5.323, 4.365], [5.522, 4.250]],
+	[[8.140, 3.329], [7.364, 3.781, 7.364, 3.781, 7.364, 3.781], [7.418, 3.889, 7.454, 4.016, 7.466, 4.148],
+		[7.280, 4.250, 7.280, 4.250, 7.280, 4.250], [7.466, 4.359, 7.466, 4.359, 7.466, 4.359],
+		[7.454, 4.491, 7.418, 4.617, 7.364, 4.726], [8.140, 5.177, 8.140, 5.177, 8.140, 5.177],
+		[8.230, 5.231, 8.350, 5.189, 8.393, 5.093], [8.501, 4.834, 8.561, 4.551, 8.561, 4.250],
+		[8.561, 3.955, 8.501, 3.673, 8.393, 3.414], [8.350, 3.317, 8.230, 3.275, 8.140, 3.329]],
+	[[5.962, 5.239], [5.962, 5.016, 5.962, 5.016, 5.962, 5.016], [5.770, 5.130, 5.770, 5.130, 5.770, 5.130],
+		[5.661, 5.052, 5.571, 4.962, 5.499, 4.853], [4.723, 5.305, 4.723, 5.305, 4.723, 5.305],
+		[4.632, 5.359, 4.608, 5.480, 4.674, 5.564], [5.017, 6.015, 5.529, 6.328, 6.119, 6.407],
+		[6.227, 6.419, 6.323, 6.334, 6.323, 6.226], [6.323, 5.329, 6.323, 5.329, 6.323, 5.329],
+		[6.197, 5.323, 6.071, 5.287, 5.962, 5.239]],
+	[[7.292, 4.853], [7.220, 4.956, 7.130, 5.052, 7.028, 5.124], [6.841, 5.016, 6.841, 5.016, 6.841, 5.016],
+		[6.841, 5.233, 6.841, 5.233, 6.841, 5.233], [6.727, 5.287, 6.600, 5.317, 6.468, 5.329],
+		[6.468, 6.226, 6.468, 6.226, 6.468, 6.226], [6.468, 6.334, 6.564, 6.419, 6.673, 6.407],
+		[7.262, 6.328, 7.774, 6.015, 8.117, 5.564], [8.183, 5.480, 8.159, 5.359, 8.069, 5.305],
+		[7.292, 4.853]],
+];
+
+/** Icon squares sitting inside each petal (stand-ins for the source SVG icons). */
+const PETAL_ICONS = [[5.269, 2.781], [6.859, 2.771], [4.398, 4.122], [7.664, 4.167], [5.283, 5.554], [6.780, 5.495]];
+
+function slide13 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	decoSquares(s, [[9.608, 0.526, 2.683], [11.211, 0.96, 1.254]]);
+	brandMark(s);
+	txt(s, 'Futurizm Infographic', { x: 3.08, y: 0.616, w: 7.174, h: 0.842, fontFace: F.title, fontSize: 44, align: 'center' });
+
+	PETALS.forEach(segs => {
+		const xs = [], ys = [];
+		segs.forEach(sg => { xs.push(sg[sg.length - 2]); ys.push(sg[sg.length - 1]); });
+		const x0 = Math.min(...xs), y0 = Math.min(...ys);
+		const pts = segs.map(sg => sg.length === 2
+			? { x: sg[0] - x0, y: sg[1] - y0 }
+			: { curve: { type: 'cubic', x1: sg[0] - x0, y1: sg[1] - y0, x2: sg[2] - x0, y2: sg[3] - y0 }, x: sg[4] - x0, y: sg[5] - y0 });
+		s.addShape('custGeom', {
+			x: x0, y: y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0,
+			points: pts.concat([{ close: true }]),
+			fill: { color: mix(C.blue, C.navy, 0.45) }, line: { color: C.blue, width: 0.75 },
+		});
+	});
+	PETAL_ICONS.forEach(p => addPoly(s, rectPoly(p[0], p[1], 0.6, 0.6), { fill: { color: C.ice, transparency: 82 } }));
+
+	const HUB = { x: 6.393, y: 4.239 };
+	s.addShape('ellipse', { x: HUB.x - 0.84, y: HUB.y - 0.84, w: 1.68, h: 1.68, fill: { color: C.ice, transparency: 70 }, line: { type: 'none' } });
+	s.addShape('ellipse', { x: HUB.x - 0.688, y: HUB.y - 0.688, w: 1.375, h: 1.375, fill: { color: C.ice }, line: { type: 'none' } });
+	txt(s, 'What\u2019s New', { x: HUB.x - 0.587, y: HUB.y - 0.328, w: 1.173, h: 0.809, fontFace: F.title, fontSize: 20, bold: true, color: '121228', align: 'center' });
+
+	const SIDE = [
+		{ y: 2.101, tx: 8.805, bx: 8.805, bw: 3.033, align: 'left' },
+		{ y: 3.820, tx: 9.313, bx: 9.313, bw: 3.033, align: 'left' },
+		{ y: 5.538, tx: 8.805, bx: 8.805, bw: 3.033, align: 'left' },
+		{ y: 2.094, tx: 0.788, bx: 0.705, bw: 3.474, align: 'right' },
+		{ y: 3.733, tx: 0.280, bx: 0.638, bw: 3.033, align: 'right' },
+		{ y: 5.452, tx: 0.705, bx: 1.063, bw: 3.033, align: 'right' },
+	];
+	SIDE.forEach(b => {
+		txt(s, 'Your Title Here', { x: b.tx, y: b.y, w: 3.391, h: 0.37, fontFace: F.title, fontSize: 16, bold: true, align: b.align });
+		txt(s, LOREM_MED + ' rem', { x: b.bx, y: b.y + 0.33, w: b.bw, h: 0.903, fontSize: 11, align: b.align, lineSpacingMultiple: 1.5 });
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Slide 14 - thank you
+// ---------------------------------------------------------------------------
+function slide14 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	decoSquares(s, [[9.379, 0.453, 2.683], [11.211, 0.96, 1.254], [-0.012, 5.017, 2.683]]);
+	brandMark(s);
+	logo(s, 5.629, 1.610, 1.610);
+	txt(s, 'Thank You', { x: 2.850, y: 3.542, w: 7.167, h: 1.582, fontFace: F.title, fontSize: 88, align: 'center' });
+	txt(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem',
+		{ x: 4.18, y: 6.358, w: 4.507, h: 0.303, color: C.blue, align: 'center', lineSpacingMultiple: 1.5 });
+}
+
+// ---------------------------------------------------------------------------
+// Slide 15 - brand / style guide
+// ---------------------------------------------------------------------------
+function slide15 (pptx) {
+	const s = pptx.addSlide();
+	background(s);
+	s.addShape('line', { x: 0, y: 4.309, w: 4.867, h: 0, line: { color: C.violet, width: 0.75 } });
+	s.addShape('line', { x: 4.867, y: 3.776, w: 8.467, h: 0, line: { color: C.violet, width: 0.75 } });
+	s.addShape('line', { x: 4.875, y: 0, w: 0, h: H, line: { color: C.violet, width: 0.75 } });
+
+	logo(s, 1.819, 1.045, 0.833);
+	txt(s, 'Futurizm', { x: 1.070, y: 1.998, w: 2.452, h: 0.707, fontFace: F.title, fontSize: 36, align: 'center' });
+	txt(s, 'Logo \u2013 Space Grotesk', { x: 0.959, y: 2.633, w: 2.675, h: 0.352, fontFace: F.alt, fontSize: 11, align: 'center', lineSpacingMultiple: 1.5 });
+
+	const SWATCHES = [C.ink, C.violet, C.pink, C.ice, C.greyDk, 'D9D9D9'];
+	SWATCHES.forEach((color, i) => {
+		s.addShape('ellipse', {
+			x: 1.663 + (i % 3) * 0.459, y: 5.214 + Math.floor(i / 3) * 0.419,
+			w: 0.348, h: 0.348, fill: { color: color }, line: { type: 'none' },
+		});
+	});
+	txt(s, 'Pallete', { x: 1.703, y: 6.053, w: 1.189, h: 0.352, fontFace: F.alt, fontSize: 11, align: 'center', lineSpacingMultiple: 1.5 });
+
+	txt(s, 'Tittle  \u2013 Space Grotesk', { x: 5.691, y: 1.049, w: 4.240, h: 0.352, fontFace: F.alt, fontSize: 11, lineSpacingMultiple: 1.5 });
+	txt(s, 'Sed Ut Perspiciatis Unde Omnis Iste Natus Error Sit', { x: 5.691, y: 1.414, w: 7.071, h: 1.313, fontFace: F.title, fontSize: 36 });
+	txt(s, 'Long Text - DM Sans', { x: 5.691, y: 4.637, w: 2.188, h: 0.352, fontFace: F.alt, fontSize: 11, lineSpacingMultiple: 1.5 });
+	txt(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam',
+		{ x: 5.691, y: 5.099, w: 6.432, h: 1.442, fontFace: F.alt, lineSpacingMultiple: 1.5 });
+}
+
+// ---------------------------------------------------------------------------
+// Build
+// ---------------------------------------------------------------------------
+function build () {
+	const pptx = new PptxGenJS();
+	pptx.defineLayout({ name: 'WIDE_16x9', width: W, height: H });
+	pptx.layout = 'WIDE_16x9';
+	pptx.title = 'Futurizm';
+	pptx.author = 'Pixslides Studio';
+
+	[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+		slide09, slide10, slide11, slide12, slide13, slide14, slide15].forEach(fn => fn(pptx));
+
+	return pptx.writeFile({
+		fileName: path.join(__dirname, '1541ba6c-4aba-4269-862d-3abf26d5a199_grok_final.pptx'),
+	});
+}
+
+build().then(f => console.log('Wrote', f)).catch(err => { console.error(err); process.exit(1); });

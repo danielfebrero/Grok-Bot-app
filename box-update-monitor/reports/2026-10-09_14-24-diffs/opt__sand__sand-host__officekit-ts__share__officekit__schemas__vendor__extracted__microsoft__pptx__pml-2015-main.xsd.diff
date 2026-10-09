@@ -1,0 +1,12 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2015-main.xsd
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2015-main.xsd
+@@ -0,0 +1,9 @@
++<xsd:schema elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/office/powerpoint/2015/main" xmlns="http://schemas.microsoft.com/office/powerpoint/2015/main" xmlns:p16="http://schemas.microsoft.com/office/powerpoint/2015/main" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:s="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes">
++  <xsd:import namespace="http://schemas.openxmlformats.org/drawingml/2006/main" schemaLocation="dml-main.xsd"/>
++  <xsd:import namespace="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" schemaLocation="shared-commonSimpleTypes.xsd"/>
++  <xsd:import namespace="http://schemas.openxmlformats.org/presentationml/2006/main" schemaLocation="pml.xsd"/>
++  <xsd:complexType name="CT_DesignElement">
++    <xsd:attribute name="val" type="xsd:boolean"/>
++  </xsd:complexType>
++  <xsd:element name="designElem" type="CT_DesignElement"/>
++</xsd:schema>

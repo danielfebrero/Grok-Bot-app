@@ -1,0 +1,24 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2022-03-main.xsd
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2022-03-main.xsd
+@@ -0,0 +1,21 @@
++<xsd:schema elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/office/powerpoint/2022/03/main" xmlns="http://schemas.microsoft.com/office/powerpoint/2022/03/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:s="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
++  <xsd:complexType name="CT_ReactionInstance" xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
++    <xsd:sequence>
++      <xsd:element name="extLst" type="p:CT_ExtensionList" minOccurs="0" maxOccurs="1"/>
++    </xsd:sequence>
++    <xsd:attribute name="time" type="xsd:dateTime" use="required"/>
++    <xsd:attribute name="authorId" type="p188:ST_AuthorId" use="required"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_Reaction" xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
++    <xsd:sequence>
++      <xsd:element name="instance" type="CT_ReactionInstance" minOccurs="0" maxOccurs="unbounded"/>
++    </xsd:sequence>
++    <xsd:attribute name="type" type="xsd:string" use="required"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_Reactions" xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
++    <xsd:sequence>
++      <xsd:element name="rxn" type="CT_Reaction" minOccurs="0" maxOccurs="unbounded"/>
++    </xsd:sequence>
++  </xsd:complexType>
++  <xsd:element name="reactions" type="CT_Reactions" xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>
++</xsd:schema>

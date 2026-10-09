@@ -1,0 +1,6 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/docx/wml-word16du-2023.xsd
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/docx/wml-word16du-2023.xsd
+@@ -0,0 +1,3 @@
++<xsd:schema xmlns="http://schemas.microsoft.com/office/word/2023/wordml/word16du" xmlns:xsd="http://www.w3.org/2001/XMLSchema" blockDefault="#all" elementFormDefault="qualified" attributeFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/office/word/2023/wordml/word16du">
++   <xsd:attribute name="dateUtc" type="xsd:dateTime"/>
++ </xsd:schema>

@@ -1,0 +1,730 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/industrial_engineering_infographics.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/industrial_engineering_infographics.js
+@@ -0,0 +1,727 @@
++/**
++ * Recreation of "Industrial Engineering Infographic" deck (17 slides, 26.67" x 15").
++ * Illustrations in the original are large vector artwork groups; they are replaced by
++ * labelled placeholder rectangles at the same position/size.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++
++const C = {
++  tx2: '44546A',          // dk2 - headline / body slate
++  body: '656D78',         // explicit grey used for secondary paragraphs
++  white: 'FFFFFF',
++  a1: 'EF5350',
++  a2: 'F44336',
++  a3: 'E53935',
++  a4: 'D32F2F',
++  a5: 'C62828',
++  a6: 'B71C1C',
++  // accent lumMod 75% - flat stand-ins for the deck's radial red gradients
++  a1d: 'DB1814',
++  a2d: 'D4190C',
++  a3d: 'BB1C18',
++  a4d: 'A02222',
++  a5d: '941E1E',
++  a6d: '891515',
++  heading5: 'B02424',     // accent5 lumMod 89% (gradient heading on slide 5)
++  user: 'C03232',         // accent6 theme-style fill on slide 11
++  donutTrack: 'D1D4D5',
++  donutRing: 'EDEDED',
++  cardGrey: 'D8DADD',
++  placeholder: 'EEF0F4',
++  placeholderEdge: 'C8CDD8',
++};
++
++// Title-slide background: accent3 circular gradient, bright core -> dark rim.
++// Approximated with nested circles [radius in inches, colour], drawn largest first.
++const BG_RADIUS = 15.3; // half the slide diagonal
++const BG_RINGS = [
++  [1.00, 'AF1A17'], [0.95, 'B11A17'], [0.90, 'B31A17'], [0.85, 'B61B17'],
++  [0.80, 'B81B18'], [0.75, 'BA1B18'], [0.70, 'BD1C18'], [0.65, 'BF1C19'],
++  [0.60, 'C11C19'], [0.55, 'C41D19'], [0.50, 'C61D19'], [0.45, 'C8201D'],
++  [0.40, 'CC2521'], [0.35, 'CE2521'], [0.30, 'D02522'], [0.25, 'D32925'],
++  [0.20, 'D52925'], [0.15, 'D72622'], [0.10, 'DA2623'], [0.05, 'DC2623'],
++];
++
++/* --------------------------------------------------------------- typography */
++
++const F = {
++  light: 'Source Sans Pro Light',
++  reg: 'Source Sans Pro',
++  xlight: 'Source Sans Pro ExtraLight',
++  black: 'Source Sans Pro Black',
++  roboto: 'Roboto',
++  robotoBlack: 'Roboto Black',
++};
++
++// Text boxes in the source deck use 0.1" side / 0.05" top-bottom insets by default.
++// pptxgenjs expects margins in points: [left, right, bottom, top].
++const INSET = [7.2, 7.2, 3.6, 3.6];
++const NOINSET = [0, 0, 0, 0];
++
++/* -------------------------------------------------------- generic helpers */
++
++// runs: array of [text, {opts}] pairs -> pptxgenjs rich-text array
++function runs(pairs, common) {
++  return pairs.map(([text, o]) => ({ text, options: Object.assign({}, common, o) }));
++}
++
++function addText(slide, content, o) {
++  slide.addText(content, Object.assign({ margin: INSET, valign: 'top', wrap: true }, o));
++}
++
++// Solid rectangle/ellipse convenience.
++function shape(slide, type, o) {
++  slide.addShape(type, o);
++}
++
++/* ---------------------------------------------------------- shared blocks */
++
++// Every content slide (2..16) carries the same two-line header.
++function header(slide) {
++  addText(slide, runs([
++    ['Industrial Engineering ', { color: C.tx2 }],
++    ['Infographic', { color: C.a3 }],
++    [' ', { color: C.a1 }],
++    ['Slide', { color: C.tx2 }],
++  ], { fontFace: F.light, fontSize: 64 }),
++  { x: 5.074, y: 0.893, w: 16.522, h: 1.178, align: 'center' });
++
++  addText(slide, runs([
++    ['Letterpress next level trust fund, ', {}],
++    ['before', { color: C.a3 }],
++    [' they sold out +1 meh gluten-free locavore tacos PBR&B tofu. ', {}],
++  ], { fontFace: F.light, fontSize: 24, color: C.tx2 }),
++  { x: 6.445, y: 2.054, w: 13.779, h: 0.505, align: 'center', wrap: false });
++}
++
++// Stand-in for the deck's small line-art pictograms (gear, rocket, bulb, ...).
++function glyph(slide, x, y, size, color) {
++  shape(slide, 'ellipse', { x, y, w: size, h: size,
++    fill: { type: 'none' }, line: { color, width: 1 } });
++  shape(slide, 'plus', { x: x + size * 0.24, y: y + size * 0.24,
++    w: size * 0.52, h: size * 0.52, fill: { type: 'none' }, line: { color, width: 1 } });
++}
++
++// Illustration stand-in: the reference has a detailed isometric vector drawing here.
++function illustration(slide, x, y, w, h) {
++  shape(slide, 'rect', {
++    x, y, w, h,
++    fill: { color: C.placeholder },
++    line: { color: C.placeholderEdge, width: 1, dashType: 'dash' },
++  });
++  slide.addText('[illustration]', {
++    x, y: y + h / 2 - 0.4, w, h: 0.8,
++    align: 'center', valign: 'middle',
++    fontFace: F.light, fontSize: 24, color: C.placeholderEdge, margin: 0,
++  });
++}
++
++// The long lorem paragraph reused on most slides.
++const LOREM = 'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
++  'authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. Kitsch authentic offal, ' +
++  'narwhal tilde etsy four loko selvage normcore messenger bag put a bird on it heirloom gastropub.';
++const LOREM_SHORT = 'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest ' +
++  'umami authentic brooklyn YOLO.';
++const LOREM_TINY = 'Hashtag fashion axe fingerstache brooklyn YOLO.';
++const SYNTH = 'Synth chartreuse XOXO, tacos brooklyn VHS plaid.';
++const BICYCLE = 'Bicycle rights +1 actually shoreditch, vinyl fixie small batch pop-up';
++
++// "quote + kicker + caption + paragraph" column shared by slides 3, 7, 8, 15.
++function quoteColumn(slide, x, y, quote, opts) {
++  const o = opts || {};
++  addText(slide, quote, { x, y, w: o.quoteW || 11.058, h: o.quoteH || 1.717,
++    fontFace: F.roboto, fontSize: o.quoteSize || 48 });
++  addText(slide, BICYCLE, { x, y: o.kickerY, w: 9.436, h: 1.043,
++    fontFace: F.xlight, fontSize: 28, color: o.kickerColor || C.a4 });
++  addText(slide, SYNTH, { x, y: o.captionY, w: 6.099, h: 0.522,
++    fontFace: F.light, fontSize: 21, color: C.tx2, lineSpacingMultiple: 1.3, wrap: false });
++  addText(slide, LOREM, { x, y: o.loremY, w: 10.64, h: 2.461,
++    fontFace: F.light, fontSize: 24, color: C.tx2, lineSpacingMultiple: 1.5 });
++}
++
++// Bold/coloured words inside the big Roboto quotes.
++function quote(parts, size) {
++  return runs(parts.map(([t, c]) => [t, c ? { bold: true, color: c } : { color: C.tx2 }]),
++    { fontFace: F.roboto, fontSize: size || 48 });
++}
++
++/* --------------------------------------------------- radial gauge (donut) */
++
++// A percentage gauge: grey outer ring, grey track, pie chart arc, white hub.
++function gauge(pres, slide, x, y, size, value, color) {
++  const inset = size * 0.037;
++  shape(slide, 'donut', { x, y, w: size, h: size, fill: { color: C.donutRing } });
++  shape(slide, 'donut', { x: x + inset, y: y + inset, w: size - 2 * inset, h: size - 2 * inset,
++    fill: { color: C.donutTrack } });
++  slide.addChart(pres.ChartType.pie,
++    [{ name: 'Region 1', labels: ['Quarter', 'Blank'], values: [value, 130] }], {
++      x: x + inset, y: y + inset, w: size - 2 * inset, h: size - 2 * inset,
++      chartColors: [color, 'FFFFFF'], chartColorsOpacity: 100,
++      showLegend: false, showTitle: false, showValue: false,
++      layout: { x: 0.005, y: 0.005, w: 0.99, h: 0.9875 },
++      chartArea: { fill: { color: 'FFFFFF', transparency: 100 } },
++      plotArea: { fill: { color: 'FFFFFF', transparency: 100 } },
++      dataBorder: { pt: 0.1, color: 'FFFFFF' },
++    });
++  const hub = size * 0.547;
++  shape(slide, 'ellipse', { x: x + (size - hub) / 2, y: y + (size - hub) / 2, w: hub, h: hub,
++    fill: { color: C.white } });
++}
++
++// Gauge + "19%" + "Type A" caption, laid out as on slides 3, 8, 10.
++function gaugeRow(pres, slide, x, y, items) {
++  items.forEach((it, i) => {
++    const gx = x + i * 2.9835;
++    gauge(pres, slide, gx, y, 1.693, it.value, it.color);
++    addText(slide, it.pct, { x: gx + 1.796, y: y + 0.349, w: 0.985, h: 0.573, margin: NOINSET,
++      fontFace: F.roboto, fontSize: 32, bold: true, color: it.color });
++    addText(slide, it.label, { x: gx + 1.796, y: y + 0.947, w: 0.985, h: 0.452, margin: NOINSET,
++      fontFace: F.roboto, fontSize: 20, bold: true, color: C.tx2 });
++  });
++}
++
++/* ------------------------------------------------------------- slide 1/17 */
++
++function titleSlide(slide, kicker, kickerOpts, footer) {
++  shape(slide, 'rect', { x: 0, y: 0, w: 26.667, h: 15,
++    fill: { color: BG_RINGS[0][1] }, line: { type: 'none' } });
++  BG_RINGS.forEach(([f, color]) => {
++    const d = 2 * BG_RADIUS * f;
++    shape(slide, 'ellipse', { x: 13.334 - d / 2, y: 7.5 - d / 2, w: d, h: d,
++      fill: { color }, line: { type: 'none' } });
++  });
++  // Faint white swashes from the original background artwork.
++  [[1.9, 6.0], [5.5, 0.0]].forEach(([x, y]) => {
++    shape(slide, 'ellipse', { x, y, w: 26.57, h: 23.44,
++      fill: { color: C.white, transparency: 97 }, line: { type: 'none' } });
++  });
++
++  addText(slide, kicker, Object.assign({ x: 5.663, y: 4.663, w: 15.344, h: 0.767,
++    align: 'center', lineSpacingMultiple: 0.9 }, kickerOpts));
++
++  addText(slide, 'INDUSTRIAL ENGINEERING', { x: 1.858, y: 6.33, w: 22.953, h: 2.339,
++    align: 'center', wrap: false, fontFace: F.black, fontSize: 133, bold: true, color: C.white });
++
++  addText(slide, footer.text, { x: footer.x, y: 9.626, w: footer.w, h: 0.505,
++    align: 'center', wrap: false, fontFace: F.light, fontSize: 24, color: C.white });
++}
++
++function slide01(pres) {
++  const s = pres.addSlide();
++  titleSlide(s,
++    runs([
++      ['We\u2019ve been ', {}],
++      ['crafting', { bold: true }],
++      [' beautiful ', {}],
++      ['presentation', { italic: true }],
++      [' & making ', {}],
++      ['clients', { bold: true, italic: true }],
++      [' happy for years.', {}],
++    ], { fontFace: F.reg, fontSize: 32, color: C.white }),
++    {},
++    { text: 'Letterpress next level trust fund, before. ', x: 10.517, w: 5.636 });
++  // Scroll-down affordance.
++  shape(s, 'ellipse', { x: 12.867, y: 11.393, w: 0.936, h: 0.936,
++    fill: { type: 'none' }, line: { color: C.white, width: 1 } });
++  shape(s, 'downArrow', { x: 13.155, y: 11.62, w: 0.36, h: 0.48, fill: { color: C.white } });
++  return s;
++}
++
++function slide17(pres) {
++  const s = pres.addSlide();
++  titleSlide(s, 'CLOSING SLIDE',
++    { fontFace: F.reg, fontSize: 44, bold: true, color: C.white },
++    { text: 'Pulsecolor', x: 12.513, w: 1.645 });
++  return s;
++}
++
++/* ------------------------------------------------------------------ slide 2 */
++
++function slide02(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 1.666, 3.367, 10.212, 10.215);
++
++  addText(s, quote([
++    ['Engineering', C.a1], [' is the art of ', null], ['directing', C.a2],
++    ['PLACEHOLDER', null],
++    ['humankind', C.a3], ['.', null],
++  ]), { x: 13.916, y: 3.936, w: 11.058, h: 3.332 });
++
++  addText(s, BICYCLE, { x: 13.876, y: 7.221, w: 9.436, h: 1.043,
++    fontFace: F.xlight, fontSize: 28, color: C.a4 });
++  addText(s, SYNTH, { x: 13.876, y: 8.213, w: 6.099, h: 0.522, wrap: false,
++    fontFace: F.light, fontSize: 21, color: C.tx2, lineSpacingMultiple: 1.3 });
++  addText(s, LOREM, { x: 13.876, y: 8.737, w: 10.64, h: 2.461,
++    fontFace: F.light, fontSize: 24, color: C.tx2, lineSpacingMultiple: 1.5 });
++
++  [[13.916, 25, C.a1], [16.5, 75, C.a2], [19.22, 19, C.a3], [21.939, 350, C.a4]]
++    .forEach(([x, v, c]) => gauge(pres, s, x, 11.675, 2.244, v, c));
++  return s;
++}
++
++/* ------------------------------------------------------------------ slide 3 */
++
++function slide03(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 14.862, 3.509, 9.436, 9.437);
++
++  quoteColumn(s, 1.975, 4.566, quote([
++    ['The ', null], ['engineer', C.a1], [' has ', null],
++    ['been', null], [', and is, a ', null], ['maker', C.a2], [' of ', null],
++    ['history', C.a3], ['.', null],
++  ]), { kickerY: 6.246, kickerColor: C.a3, captionY: 7.238, loremY: 7.762 });
++
++  gaugeRow(pres, s, 1.975, 10.563, [
++    { value: 30, color: C.a1, pct: '19%', label: 'Type A' },
++    { value: 130, color: C.a2, pct: '50%', label: 'Type B' },
++    { value: 365, color: C.a3, pct: '74%', label: 'Type C' },
++  ]);
++  return s;
++}
++
++/* ------------------------------------------------------------------ slide 4 */
++
++// Four "Analysis" cards: rounded icon tile + heading + two paragraphs.
++function analysisCard(slide, x, y, title, accent, accentDark) {
++  shape(slide, 'roundRect', { x, y, w: 1.311, h: 1.311, rectRadius: 0.65,
++    fill: { color: accentDark }, line: { type: 'none' },
++    shadow: { type: 'outer', blur: 6, offset: 1, angle: 90, color: '000000', opacity: 0.15 } });
++  glyph(slide, x + 0.356, y + 0.35, 0.611, C.white);
++
++  addText(slide, title, { x: x + 1.641, y: y + 0.352, w: 3.868, h: 0.558, margin: NOINSET,
++    valign: 'middle', fontFace: F.robotoBlack, fontSize: 28, bold: true, color: C.tx2,
++    lineSpacingMultiple: 1.3 });
++
++  slide.addText([
++    { text: SYNTH, options: { fontFace: F.light, fontSize: 22, color: accent, breakLine: true } },
++    { text: LOREM_SHORT, options: { fontFace: F.light, fontSize: 20, color: C.body } },
++  ], { x, y: y + 1.709, w: 6.18, h: 1.732, margin: NOINSET, valign: 'top',
++    lineSpacingMultiple: 1.5 });
++}
++
++function slide04(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 1.412, 4.398, 9.068, 9.068);
++
++  analysisCard(s, 12.712, 4.481, 'Analysis 01', C.a1, C.a1d);
++  analysisCard(s, 19.757, 4.398, 'Analysis 02', C.a2, C.a2d);
++  analysisCard(s, 12.712, 9.038, 'Analysis 03', C.a4, C.a4d);
++  analysisCard(s, 19.757, 9.027, 'Analysis 04', C.a3, C.a3d);
++  return s;
++}
++
++/* ------------------------------------------------------------------ slide 5 */
++
++function slide05(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 14.45, 3.65, 10.5, 9.66);
++
++  // Left rail: five ringed icons with a bold lead line + supporting sentence.
++  const rail = [
++    { y: 4.559, w: 3.958, accent: C.a1 },
++    { y: 6.441, w: 3.654, accent: C.a2 },
++    { y: 8.203, w: 3.888, accent: C.a3 },
++    { y: 10.028, w: 3.621, accent: C.a4 },
++    { y: 11.896, w: 3.621, accent: C.a5 },
++  ];
++  rail.forEach((r) => {
++    shape(s, 'ellipse', { x: 2.289, y: r.y, w: 1.024, h: 1.024,
++      fill: { color: r.accent }, line: { type: 'none' } });
++    shape(s, 'ellipse', { x: 2.371, y: r.y + 0.084, w: 0.858, h: 0.858,
++      fill: { color: C.white }, line: { type: 'none' } });
++    glyph(s, 2.564, r.y + 0.277, 0.472, r.accent);
++    s.addText([
++      { text: SYNTH, options: { fontFace: F.black, fontSize: 16, bold: true, color: C.tx2, breakLine: true } },
++      { text: LOREM_TINY, options: { fontFace: F.light, fontSize: 16, color: C.tx2 } },
++    ], { x: 3.44, y: r.y - 0.385, w: r.w, h: 1.674, margin: INSET, valign: 'top',
++      lineSpacingMultiple: 1.5 });
++  });
++
++  addText(s, 'Engineering Analysis', { x: 8.036, y: 4.024, w: 5.762, h: 0.871, margin: NOINSET,
++    fontFace: F.robotoBlack, fontSize: 28, bold: true, color: C.tx2 });
++  addText(s, 'Process Engineering Information Analysis',
++    { x: 8.036, y: 4.694, w: 5.388, h: 1.453, margin: NOINSET,
++      fontFace: F.robotoBlack, fontSize: 28, bold: true, color: C.heading5,
++      lineSpacingMultiple: 1.2 });
++
++  s.addText([
++    { text: LOREM, options: { breakLine: true } },
++    { text: 'Kitsch authentic offal, narwhal tilde etsy four loko selvage normcore messenger.', options: {} },
++  ], { x: 7.836, y: 5.964, w: 4.919, h: 7.913, margin: INSET, valign: 'top',
++    fontFace: F.light, fontSize: 24, color: C.tx2, lineSpacingMultiple: 1.5 });
++  return s;
++}
++
++/* ------------------------------------------------------------------ slide 6 */
++
++function slide06(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 2.17, 3.85, 10.14, 10.11);
++
++  addText(s, quote([
++    ['Engineers', C.a1], [' like to ', null], ['solve problems', C.a2],
++    ['. If there are no problems ', null], ['handily', C.a3], [' available, they will ', null],
++    ['create', C.a4], [' their own problems.', null],
++  ]), { x: 13.85, y: 4.355, w: 12.061, h: 2.524 });
++
++  addText(s, LOREM, { x: 13.85, y: 6.927, w: 12.232, h: 1.709,
++    fontFace: F.light, fontSize: 22, color: C.body, lineSpacingMultiple: 1.5 });
++
++  // Two bullet blocks with gradient-red icon circles.
++  [[9.087, C.a1, C.a1d], [11.523, C.a2, C.a2d]].forEach(([y, accent, dark]) => {
++    shape(s, 'ellipse', { x: 13.993, y, w: 1.496, h: 1.496, fill: { color: dark },
++      line: { type: 'none' } });
++    glyph(s, 14.397, y + 0.394, 0.709, C.white);
++    addText(s, SYNTH, { x: 15.893, y: y + 0.079, w: 6.227, h: 0.467, margin: NOINSET,
++      wrap: false, fontFace: F.light, fontSize: 18, color: accent, lineSpacingMultiple: 1.3 });
++    addText(s, LOREM_SHORT, { x: 15.914, y: y + 0.57, w: 8.685, h: 1.077, margin: NOINSET,
++      fontFace: F.light, fontSize: 24, color: C.body, lineSpacingMultiple: 1.5 });
++  });
++  return s;
++}
++
++/* ------------------------------------------------------------------ slide 7 */
++
++// Small outlined check bullet used on slides 7 and 16.
++function checkBullet(slide, x, y, accent, text) {
++  shape(slide, 'ellipse', { x, y, w: 0.604, h: 0.604,
++    fill: { color: C.white }, line: { color: accent, width: 1.38 } });
++  slide.addText('\u2713', { x, y, w: 0.604, h: 0.604, margin: 0,
++    align: 'center', valign: 'middle', fontFace: F.light, fontSize: 18, color: accent });
++  addText(slide, text, { x: x + 0.75, y: y - 0.061, w: 6.944, h: 0.583, wrap: false,
++    fontFace: F.light, fontSize: 24, color: C.tx2, lineSpacingMultiple: 1.3 });
++}
++
++function slide07(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 14.75, 3.67, 10.07, 10.07);
++
++  quoteColumn(s, 2.129, 4.588, quote([
++    ['Engineering', C.a1], [' is the ', null], ['closest', C.a2], [' thing to ', null],
++    ['magic', C.a3], [' that ', null], ['exists', C.a4], [' in the ', null],
++    ['world', C.a5], ['.', null],
++  ]), { quoteW: 10.416, kickerY: 6.189, captionY: 7.181, loremY: 7.705 });
++
++  checkBullet(s, 2.152, 10.56, C.a4, SYNTH);
++  checkBullet(s, 2.152, 11.563, C.a4, SYNTH);
++  return s;
++}
++
++/* ------------------------------------------------------------------ slide 8 */
++
++function slide08(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 2.01, 3.72, 10.17, 10.16);
++
++  quoteColumn(s, 13.995, 3.873, quote([
++    ['The scientist ', null], ['discovers', C.a1], [' a new type of ', null],
++    ['material', C.a2], [' or energy and the ', null], ['engineer', C.a3],
++    [' discovers a ', null], ['new', C.a4], [' use for it.', null],
++  ]), { quoteH: 2.524, kickerY: 6.408, captionY: 7.4, loremY: 7.924 });
++
++  gaugeRow(pres, s, 13.995, 10.726, [
++    { value: 30, color: C.a1, pct: '19%', label: 'Type A' },
++    { value: 130, color: C.a2, pct: '50%', label: 'Type B' },
++    { value: 365, color: C.a3, pct: '74%', label: 'Type C' },
++  ]);
++  return s;
++}
++
++/* ------------------------------------------------------------------ slide 9 */
++
++function slide09(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 15.37, 3.9, 9.4, 9.07);
++
++  const cards = [
++    { x: 1.818, y: 3.904, title: 'Problem Solving', tw: 4.193, bw: 4.522, accent: C.a1, ring: C.a1 },
++    { x: 8.399, y: 3.901, title: 'Innovation', tw: 2.682, bw: 4.551, accent: C.a2, ring: C.a2 },
++    { x: 1.825, y: 8.631, title: 'Teamwork', tw: 2.682, bw: 4.687, accent: C.a3, ring: C.a3 },
++    { x: 8.35, y: 8.625, title: 'Adaptation', tw: 2.78, bw: 4.551, accent: C.a4, ring: C.a6 },
++  ];
++  cards.forEach((c) => {
++    shape(s, 'ellipse', { x: c.x, y: c.y, w: 1.181, h: 1.183,
++      fill: { color: c.ring, transparency: 71 }, line: { type: 'none' } });
++    shape(s, 'ellipse', { x: c.x + 0.103, y: c.y + 0.113, w: 0.943, h: 0.945,
++      fill: { color: c.ring, transparency: 71 }, line: { type: 'none' } });
++    shape(s, 'ellipse', { x: c.x + 0.238, y: c.y + 0.251, w: 0.668, h: 0.669,
++      fill: { color: c.accent }, line: { type: 'none' } });
++    const tx = c.x + 0.55;
++    addText(s, c.title, { x: tx, y: c.y + 0.489, w: c.tw, h: 0.774, margin: [0, 0, 3.6, 3.6],
++      wrap: false, fontFace: F.robotoBlack, fontSize: 40, bold: true, color: C.tx2 });
++    s.addText([
++      { text: 'Synth chartreuse XOXO, tacos VHS plaid.',
++        options: { color: c.accent, breakLine: true } },
++      { text: LOREM_SHORT, options: { color: C.body } },
++    ], { x: tx, y: c.y + 1.634, w: c.bw, h: 2.067, margin: [0, 0, 3.6, 3.6], valign: 'top',
++      fontFace: F.light, fontSize: 20, lineSpacingMultiple: 1.5 });
++  });
++  return s;
++}
++
++/* ----------------------------------------------------------------- slide 10 */
++
++function slide10(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 1.86, 3.23, 10.35, 10.34);
++
++  s.addText([
++    { text: 'Engineering Plan', options: { color: C.tx2, breakLine: true } },
++    { text: 'Info', options: { color: C.a3, breakLine: true } },
++    { text: ' ', options: { fontSize: 8, breakLine: true } },
++    { text: 'ENGINEERING', options: { fontSize: 85.34, color: C.a3 } },
++    { text: ' PLAN', options: { fontSize: 85.34, color: C.tx2 } },
++  ], { x: 13.315, y: 4.535, w: 12.443, h: 2.614, margin: INSET, valign: 'top',
++    fontFace: F.robotoBlack, fontSize: 28, bold: true });
++
++  addText(s, 'CONTENT TITLE', { x: 13.338, y: 7.079, w: 4.098, h: 0.55,
++    fontFace: F.robotoBlack, fontSize: 26.66, bold: true, color: C.tx2 });
++  addText(s, LOREM, { x: 13.35, y: 7.78, w: 12.232, h: 1.709,
++    fontFace: F.light, fontSize: 22, color: C.body, lineSpacingMultiple: 1.5 });
++
++  gaugeRow(pres, s, 13.276, 10.119, [
++    { value: 30, color: C.a1, pct: '19%', label: 'Type A' },
++    { value: 130, color: C.a2, pct: '50%', label: 'Type B' },
++    { value: 365, color: C.a3, pct: '74%', label: 'Type C' },
++  ]);
++  gauge(pres, s, 22.502, 10.085, 1.689, 280, C.a4);
++  addText(s, '68%', { x: 24.363, y: 10.424, w: 0.985, h: 0.573, margin: NOINSET,
++    fontFace: F.roboto, fontSize: 32, bold: true, color: C.a4 });
++  addText(s, 'Type D', { x: 24.363, y: 11.022, w: 0.985, h: 0.452, margin: NOINSET,
++    fontFace: F.roboto, fontSize: 20, bold: true, color: C.tx2 });
++  return s;
++}
++
++/* ----------------------------------------------------------------- slide 11 */
++
++function slide11(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 14.76, 3.72, 9.47, 9.8);
++
++  addText(s, quote([
++    ['The ', null], ['engineer\'s', C.a1], [' first problem in any design situation is to ', null],
++    ['discover', C.a2], [' what the ', null], ['problem', C.a3], [' really is.', null],
++  ]), { x: 1.745, y: 4.008, w: 10.912, h: 2.524 });
++
++  addText(s, 'CONTENT TITLE', { x: 1.723, y: 6.494, w: 4.098, h: 0.55,
++    fontFace: F.robotoBlack, fontSize: 26.66, bold: true, color: C.tx2 });
++  addText(s, LOREM, { x: 1.741, y: 7.027, w: 10.64, h: 2.461,
++    fontFace: F.light, fontSize: 24, color: C.tx2, lineSpacingMultiple: 1.5 });
++
++  addText(s, LOREM_SHORT, { x: 1.735, y: 9.789, w: 8.513, h: 1.57,
++    margin: [28.4, 28.4, 3.6, 3.6], valign: 'middle', wrap: true,
++    fontFace: F.light, fontSize: 20, color: C.tx2, lineSpacingMultiple: 1.3,
++    shape: 'roundRect', rectRadius: 0.35, fill: { color: C.cardGrey } });
++
++  // Two user-count stats.
++  [
++    { x: 1.807, value: '2.888 K', label: 'Male User', lw: 1.257 },
++    { x: 6.064, value: '1.074 K', label: 'Female User', lw: 1.56 },
++  ].forEach((u) => {
++    shape(s, 'ellipse', { x: u.x, y: 11.711, w: 1.2, h: 1.2, fill: { color: C.user },
++      line: { type: 'none' } });
++    glyph(s, u.x + 0.286, 11.996, 0.611, C.white);
++    addText(s, u.value, { x: u.x + 1.472, y: 11.656, w: 2.151, h: 0.774, wrap: false,
++      fontFace: F.roboto, fontSize: 40, bold: true, color: C.tx2 });
++    addText(s, u.label, { x: u.x + 1.695, y: 12.48, w: u.lw, h: 0.337, margin: NOINSET,
++      wrap: false, fontFace: F.roboto, fontSize: 20, color: C.tx2 });
++  });
++  return s;
++}
++
++/* ----------------------------------------------------------------- slide 12 */
++
++// Concentric "target" badge used by slides 12 and 13:
++// accent ring, dark accent ring, white gap, accent ring, white disc + pictogram.
++function badge(slide, x, y, size, accent, accentDark) {
++  const ring = (inset, color) => shape(slide, 'ellipse', {
++    x: x + size * inset, y: y + size * inset,
++    w: size * (1 - 2 * inset), h: size * (1 - 2 * inset),
++    fill: { color }, line: { type: 'none' },
++  });
++  ring(0, accent);
++  ring(0.074, accentDark);
++  ring(0.121, C.white);
++  ring(0.222, accent);
++  ring(0.267, C.white);
++  glyph(slide, x + size * 0.395, y + size * 0.395, size * 0.21, accentDark);
++}
++
++function slide12(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 1.14, 3.46, 10.48, 10.48);
++
++  const cards = [
++    { bx: 13.735, by: 5.097, tx: 15.287, ty: 4.998, tw: 3.958, accent: C.a4, dark: C.a4d, bold: true },
++    { bx: 19.357, by: 5.099, tx: 20.94, ty: 4.989, tw: 3.791, accent: C.a3, dark: C.a3d },
++    { bx: 13.72, by: 7.691, tx: 15.284, ty: 7.503, tw: 3.888, accent: C.a2, dark: C.a2d },
++    { bx: 19.414, by: 7.637, tx: 20.94, ty: 7.442, tw: 3.791, accent: C.a1, dark: C.a1d },
++  ];
++  cards.forEach((c) => {
++    badge(s, c.bx, c.by, 1.457, c.accent, c.dark);
++    s.addText([
++      { text: SYNTH, options: { fontFace: F.black, bold: true, breakLine: true } },
++      { text: LOREM_TINY, options: { fontFace: F.light, bold: !!c.bold } },
++    ], { x: c.tx, y: c.ty, w: c.tw, h: 1.674, margin: INSET, valign: 'top',
++      fontSize: 16, color: C.tx2, lineSpacingMultiple: 1.5 });
++  });
++
++  addText(s, 'Engineering Info', { x: 14.327, y: 10.237, w: 5.762, h: 0.67, margin: NOINSET,
++    fontFace: F.robotoBlack, fontSize: 22, bold: true, color: C.tx2 });
++  addText(s, 'Engineering Information Analysis',
++    { x: 14.327, y: 10.907, w: 3.34, h: 2.15, margin: NOINSET,
++      fontFace: F.robotoBlack, fontSize: 24, bold: true, color: C.a3, lineSpacingMultiple: 1.2 });
++  addText(s, 'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
++    'authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. ',
++  { x: 18.025, y: 10.062, w: 6.706, h: 1.709,
++    fontFace: F.light, fontSize: 22, color: C.tx2, lineSpacingMultiple: 1.5 });
++  return s;
++}
++
++/* ----------------------------------------------------------------- slide 13 */
++
++function slide13(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 14.88, 3.72, 9.81, 9.81);
++
++  const rows = [
++    { bx: 1.085, by: 4.722, tx: 3.438, ty: 4.856, title: 'Analysis 01', accent: C.a1, dark: C.a1d },
++    { bx: 7.902, by: 4.718, tx: 10.289, ty: 4.856, title: 'Analysis 02', accent: C.a2, dark: C.a2d },
++    { bx: 1.1, by: 7.297, tx: 3.438, ty: 7.222, title: 'Analysis 03', accent: C.a3, dark: C.a3d,
++      caption: 'Synth chartreuase XOXO, tacos brooklyn VHS plaid.' },
++    { bx: 7.966, by: 7.33, tx: 10.289, ty: 7.251, title: 'Analysis 04', accent: C.a4, dark: C.a4d },
++    { bx: 1.124, by: 9.951, tx: 3.438, ty: 9.889, title: 'Analysis 05', accent: C.a5, dark: C.a5d },
++    { bx: 7.91, by: 10.094, tx: 10.289, ty: 9.889, title: 'Analysis 06', accent: C.a6, dark: C.a6d },
++  ];
++  rows.forEach((r) => {
++    badge(s, r.bx, r.by, 2.087, r.accent, r.dark);
++    s.addText([
++      { text: r.title, options: { fontFace: F.robotoBlack, fontSize: 28, bold: true, breakLine: true } },
++      { text: r.caption || SYNTH, options: { fontFace: F.light, fontSize: 21 } },
++    ], { x: r.tx, y: r.ty, w: 4.47, h: 1.594, margin: INSET, valign: 'top',
++      color: C.tx2, lineSpacingMultiple: 1.3 });
++  });
++  return s;
++}
++
++/* ----------------------------------------------------------------- slide 14 */
++
++function slide14(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 2.1, 3.53, 9.9, 9.89);
++
++  // Pill-shaped tags with a text block underneath; left column is right-aligned.
++  const tags = [
++    { px: 15.396, py: 3.773, title: 'Analysis 01', accent: C.a1, dark: C.a1d, align: 'right',
++      tx: 13.214, ty: 4.606, tw: 5.058, bx: 13.193, by: 5.034, bw: 5.099, bh: 1.482 },
++    { px: 19.848, py: 3.827, title: 'Analysis 02', accent: C.a2, dark: C.a2d, align: 'left',
++      tx: 19.866, ty: 4.587, tw: 5.026, bx: 19.888, by: 5.078, bw: 5.005, bh: 1.077 },
++    { px: 15.46, py: 7.443, title: 'Analysis 03', accent: C.a3, dark: C.a3d, align: 'right',
++      tx: 13.22, ty: 8.229, tw: 5.058, bx: 13.198, by: 8.657, bw: 5.099, bh: 1.482 },
++    { px: 19.848, py: 7.443, title: 'Analysis 04', accent: C.a4, dark: C.a4d, align: 'left',
++      tx: 19.861, ty: 8.203, tw: 5.026, bx: 19.882, by: 8.694, bw: 5.005, bh: 1.077 },
++    { px: 15.412, py: 11.066, title: 'Analysis 05', accent: C.a5, dark: C.a5d, align: 'right',
++      tx: 13.214, ty: 11.917, tw: 5.058, bx: 13.193, by: 12.344, bw: 5.099, bh: 1.482 },
++    { px: 19.882, py: 11.109, title: 'Analysis 06', accent: C.a6, dark: C.a6d, align: 'left',
++      tx: 19.9, ty: 11.859, tw: 5.026, bx: 19.921, by: 12.35, bw: 5.005, bh: 1.077 },
++  ];
++  tags.forEach((t) => {
++    shape(s, 'roundRect', { x: t.px, y: t.py, w: 2.836, h: 0.564, rectRadius: 0.09,
++      fill: { color: t.dark }, line: { color: C.white, width: 0.5 } });
++    shape(s, 'roundRect', { x: t.px + 0.065, y: t.py + 0.065, w: 2.707, h: 0.434,
++      rectRadius: 0.07, fill: { color: t.accent }, line: { color: C.white, width: 0.5 } });
++    addText(s, t.title, { x: t.px + 0.2, y: t.py + 0.03, w: 2.426, h: 0.5, margin: NOINSET,
++      align: 'center', valign: 'middle', fontFace: F.robotoBlack, fontSize: 20, bold: true,
++      color: C.white });
++    addText(s, SYNTH, { x: t.tx, y: t.ty, w: t.tw, h: 0.467, margin: NOINSET, align: t.align,
++      fontFace: F.light, fontSize: 18, color: t.accent, lineSpacingMultiple: 1.3 });
++    addText(s, LOREM_SHORT, { x: t.bx, y: t.by, w: t.bw, h: t.bh, margin: NOINSET,
++      align: t.align, fontFace: F.light, fontSize: 20, color: C.body, lineSpacingMultiple: 1.5 });
++  });
++  return s;
++}
++
++/* ----------------------------------------------------------------- slide 15 */
++
++function slide15(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 14.53, 3.55, 9.91, 9.91);
++
++  quoteColumn(s, 1.504, 4.452, quote([
++    ['Engineers', C.a1], [' are not mere ', null], ['technicians', C.a2],
++    [' and should not approve or lend their name to any ', null], ['project', C.a3],
++    [' that does not promise to be beneficent to man and the ', null],
++    ['advancement', C.a4], [' of civilization.', null],
++  ]), { quoteW: 11.681, quoteH: 4.14, kickerY: 8.501, kickerColor: C.a1,
++    captionY: 9.453, loremY: 9.885 });
++  return s;
++}
++
++/* ----------------------------------------------------------------- slide 16 */
++
++function slide16(pres) {
++  const s = pres.addSlide();
++  header(s);
++  illustration(s, 2.17, 3.83, 9.82, 9.82);
++
++  addText(s, quote([
++    ['Engineering', C.a1], [' is not only the ', null], ['study', C.a2],
++    [' of 45 subjects but it is moral ', null], ['studies', C.a3], [' of ', null],
++    ['intellectual', C.a4], [' life.', null],
++  ], 54), { x: 13.766, y: 4.688, w: 11.909, h: 2.827 });
++
++  addText(s, LOREM, { x: 13.766, y: 7.51, w: 10.64, h: 2.461,
++    fontFace: F.light, fontSize: 24, color: C.tx2, lineSpacingMultiple: 1.5 });
++
++  [10.4, 11.392, 12.395].forEach((y) => checkBullet(s, 13.955, y, C.a5, SYNTH));
++  return s;
++}
++
++/* --------------------------------------------------------------------- main */
++
++function build() {
++  const pres = new PptxGenJS();
++  pres.defineLayout({ name: 'WIDE', width: 26.6701, height: 15 });
++  pres.layout = 'WIDE';
++  pres.title = 'Industrial Engineering Infographic Slide';
++
++  slide01(pres);
++  slide02(pres);
++  slide03(pres);
++  slide04(pres);
++  slide05(pres);
++  slide06(pres);
++  slide07(pres);
++  slide08(pres);
++  slide09(pres);
++  slide10(pres);
++  slide11(pres);
++  slide12(pres);
++  slide13(pres);
++  slide14(pres);
++  slide15(pres);
++  slide16(pres);
++  slide17(pres);
++
++  return pres;
++}
++
++const outFile = path.join(__dirname, '07b98d45-cafb-45e6-85f4-463ba0ecae3d_grok_final.pptx');
++build().writeFile({ fileName: outFile }).then(() => console.log('wrote ' + outFile));

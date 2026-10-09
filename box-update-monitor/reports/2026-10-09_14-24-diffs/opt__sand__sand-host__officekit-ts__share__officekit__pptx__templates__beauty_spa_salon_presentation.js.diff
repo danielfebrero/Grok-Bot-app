@@ -1,0 +1,733 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/beauty_spa_salon_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/beauty_spa_salon_presentation.js
+@@ -0,0 +1,730 @@
++/**
++ * "darya" spa & beauty deck - recreated with pptxgenjs.
++ * 31 slides, 13.333 x 7.5 in (16:9 widescreen).
++ *
++ * The original deck's photographs are replaced with flat colour
++ * placeholders (`photo` / `prop`, tinted with the average colour of the
++ * picture they stand in for); its leaf bitmaps and line-art spa icons are
++ * redrawn from native pptxgenjs shapes (`leafMark`, `cornerLeaf`, `branch`
++ * and the `ICONS` table).  Empty picture placeholders of the original
++ * layouts render as nothing, so they are simply not emitted here.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * palette + typography - theme "Custom New" / font scheme "Custom 2"
++ * ------------------------------------------------------------------ */
++const INK = '110F10'; // tx2, headings
++const DARK = '404040';
++const MID = '595959';
++const GREY = '808080'; // body copy
++const SILVER = 'BFBFBF';
++const CREAM = 'F6F2F3'; // accent1, page tint
++const LTGREY = 'E7E6E6'; // bg2
++const SAGE = '95AA73'; // accent3, brand green
++const SAGE_LT = 'D5DDC7'; // accent3 lightened 40%
++const PEACH = 'FFD6C8'; // accent2
++const WHITE = 'FFFFFF';
++const LEAF = '4FA02A'; // stand-in green for the leaf photographs
++const LEAF_DK = '2F7A17';
++const STEM = '6B7F3F';
++const ICONK = '1B171B'; // line-art icon stroke
++
++const TITLE_F = 'Prata';
++const BODY_F = 'Lato';
++
++const NONE = { type: 'none' };
++const UL = { underline: { style: 'sng' } };
++
++/* ------------------------------------------------------------------ *
++ * re-used copy
++ * ------------------------------------------------------------------ */
++const L_HEAD = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. ';
++const L_MID = L_HEAD + 'Donec quam felis, ultricies nec, ';
++const L_MED = L_HEAD + 'Donec quam felis, ultricies nec';
++const L_ELIT = L_HEAD + 'Donec quam felis, ultricies nec consectetuer adipiscing elit. ';
++const L_TAIL = 'Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. ';
++const L_LONG = L_HEAD + 'Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim. Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur';
++const L_CARD = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque';
++const L_TINY = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. ';
++const L_PACK = 'consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque';
++const L_DESC = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean';
++const STONE = 'Hot\u00a0stone massage\u00a0is a type of\u00a0massage\u00a0therapy that involves the use of smooth, heated\u00a0stones. The\u00a0massage\u00a0therapist places the hot\u00a0stones\u00a0on specific points on your body and may also hold the\u00a0stones\u00a0while giving the\u00a0massage.';
++const STONE_CUT = 'Hot\u00a0stone massage\u00a0is a type of\u00a0massage\u00a0therapy that involves the use of smooth, heated\u00a0stones. The\u00a0massage\u00a0therapist places the hot\u00a0stones\u00a0on specific points on your body and may also hold';
++const TAGLINE = ['this is a spa or beauty template', 'focues on the female audience.'];
++
++/* ------------------------------------------------------------------ *
++ * small building blocks
++ * ------------------------------------------------------------------ */
++// PowerPoint text boxes anchor at the top; pptxgenjs defaults to middle
++function tx(s, content, o) {
++  s.addText(content, Object.assign({ valign: 'top' }, o));
++}
++
++// list of paragraphs (string, or array of {text, options} runs) -> rich text
++function paras(list) {
++  const out = [];
++  list.forEach(function (p, i) {
++    const runs = (Array.isArray(p) ? p : [p]).map(function (r) {
++      return typeof r === 'string' ? { text: r } : r;
++    });
++    runs.forEach(function (r, j) {
++      const opts = Object.assign({}, r.options);
++      if (j === runs.length - 1 && i < list.length - 1) opts.breakLine = true;
++      out.push({ text: r.text, options: opts });
++    });
++  });
++  return out;
++}
++
++// full-bleed background tint that the slide layout contributes
++function pageTint(s, color) {
++  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: color }, line: NONE });
++}
++
++function frame(s, x, y, w, h, color, pt) {
++  s.addShape('rect', { x: x, y: y, w: w, h: h, fill: NONE, line: { color: color, width: pt || 1 } });
++}
++
++// short rule under the centred section titles
++function rule(s, x, y) {
++  s.addShape('rect', { x: x, y: y, w: 0.547, h: 0.05, fill: { color: SAGE_LT }, line: NONE });
++}
++
++// outlined "darya beauty" button
++function button(s, x, y, o) {
++  o = o || {};
++  tx(s, o.text || 'darya beauty', {
++    x: x, y: y, w: o.w || 1.861, h: 0.531, shape: 'rect',
++    fill: NONE, line: { color: o.line || SAGE, width: 1 },
++    align: 'center', valign: 'middle', bold: true, fontSize: 14,
++    color: o.color || DARK, rotate: o.rotate,
++  });
++}
++
++// oversized opening quote glyph (the original rotates the box 180 deg)
++function quoteMark(s, x, y, w, h, size, color) {
++  tx(s, '\u201c', { x: x, y: y, w: w, h: h, rotate: 180, wrap: false, fontFace: TITLE_F, fontSize: size, color: color });
++}
++
++/* --- stand-ins for the bitmaps ------------------------------------- */
++// flat panel where the original placed a logo or photo block
++function photo(s, x, y, w, h, color) {
++  s.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: color }, line: NONE });
++}
++
++// small tilted product shot (honey dipper, coconut, aloe leaf, ...): the
++// picture only fills the middle of its frame, so the stand-in is an ellipse
++function prop(s, x, y, w, h, color, rot) {
++  s.addShape('ellipse', {
++    x: x + w * 0.10, y: y + h * 0.14, w: w * 0.80, h: h * 0.72, rotate: rot,
++    fill: { color: color }, line: NONE,
++  });
++}
++
++// the small two-tone leaf logo that dots most headlines
++// two teardrops back to back make the pointed leaf outline; a chord laid over
++// them splits it into the light and dark halves of the original logo
++function leafMark(s, x, y, w, h) {
++  const d = h * 1.22, ox = x + (w - d) / 2, oy = y + (h - d) / 2, tilt = -20;
++  s.addShape('teardrop', { x: ox, y: oy, w: d, h: d, rotate: 45 + tilt, fill: { color: LEAF_DK }, line: NONE });
++  s.addShape('teardrop', { x: ox, y: oy, w: d, h: d, rotate: 225 + tilt, fill: { color: LEAF_DK }, line: NONE });
++  s.addShape('chord', { x: ox + d * 0.05, y: oy + d * 0.05, w: d * 0.90, h: d * 0.90, rotate: 190 + tilt, fill: { color: LEAF }, line: NONE });
++}
++
++// the big soft leaf that bleeds off a slide corner: three overlapping lobes,
++// tips fanning into the slide. `dir` is 'se' (leaf in a top corner) or 'ne'.
++function cornerLeaf(s, x, y, w, h, dir) {
++  const up = dir === 'ne';
++  // [x, y from the leaf's own corner, size, tip angle, colour]
++  const LOBES = [[0.06, 0.00, 0.58, 35, LEAF], [0.00, 0.22, 0.52, 8, LEAF_DK], [0.24, 0.24, 0.48, 62, LEAF_DK]];
++  LOBES.forEach(function (k) {
++    const lw = w * k[2], lh = h * k[2] * 0.95;
++    s.addShape('teardrop', {
++      x: x + w * k[0], y: up ? y + h - h * k[1] - lh : y + h * k[1],
++      w: lw, h: lh, rotate: up ? -k[3] : k[3],
++      fill: { color: k[4] }, line: NONE,
++    });
++  });
++}
++
++// leafy branch photo -> a thin stem with small leaves paired along it
++function branch(s, x, y, w, h) {
++  const x0 = x + w * 0.05, y0 = y + h * 0.66, x1 = x + w * 0.95, y1 = y + h * 0.30;
++  s.addShape('line', { x: x0, y: y1, w: x1 - x0, h: y0 - y1, flipV: true, line: { color: STEM, width: 1.25 } });
++  const lw = w * 0.095, lh = h * 0.15, off = h * 0.13;
++  for (let i = 0; i < 7; i++) {
++    const t = 0.05 + i * 0.145;
++    const px = x0 + (x1 - x0) * t - lw / 2, py = y0 + (y1 - y0) * t - lh / 2;
++    s.addShape('teardrop', { x: px, y: py - off, w: lw, h: lh, rotate: 305, fill: { color: LEAF }, line: NONE });
++    s.addShape('teardrop', { x: px, y: py + off, w: lw, h: lh, rotate: 145, fill: { color: LEAF_DK }, line: NONE });
++  }
++  s.addShape('teardrop', { x: x1 - lw * 0.5, y: y1 - lh * 0.7, w: lw * 1.4, h: lh * 1.3, rotate: 315, fill: { color: LEAF }, line: NONE });
++}
++
++/* --- line-art spa icons -------------------------------------------- *
++ * every icon draws inside the box (x, y, w, h) using hairline outlines  */
++function stroke(c) { return { fill: NONE, line: { color: c, width: 1 } }; }
++
++function ICON_STONES(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.06, y: y + h * 0.68, w: w * 0.88, h: h * 0.20 }, o));
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.16, y: y + h * 0.42, w: w * 0.68, h: h * 0.21 }, o));
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.26, y: y + h * 0.17, w: w * 0.48, h: h * 0.20 }, o));
++}
++function ICON_MORTAR(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('blockArc', Object.assign({ x: x + w * 0.04, y: y + h * 0.42, w: w * 0.92, h: h * 0.50, rotate: 180 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.04, y: y + h * 0.42, w: w * 0.92, h: 0 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.52, y: y + h * 0.10, w: w * 0.34, h: h * 0.30, flipV: true }, o));
++}
++function ICON_TOWEL(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('line', Object.assign({ x: x + w * 0.10, y: y + h * 0.16, w: w * 0.80, h: 0 }, o)); // rail
++  s.addShape('rect', Object.assign({ x: x + w * 0.28, y: y + h * 0.16, w: w * 0.46, h: h * 0.68 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.28, y: y + h * 0.34, w: w * 0.46, h: 0 }, o));
++  [0.40, 0.51, 0.62].forEach(function (dx) {
++    s.addShape('line', Object.assign({ x: x + w * dx, y: y + h * 0.38, w: 0, h: h * 0.46 }, o));
++  });
++}
++function ICON_FEET(s, x, y, w, h, c) {
++  const o = stroke(c);
++  [0.02, 0.48].forEach(function (dx, i) {
++    s.addShape('teardrop', Object.assign({
++      x: x + w * (dx + 0.06), y: y + h * (0.30 + i * 0.10), w: w * 0.30, h: h * 0.52,
++      rotate: i ? 135 : 225,
++    }, o));
++    for (var k = 0; k < 3; k++) {
++      s.addShape('ellipse', Object.assign({
++        x: x + w * (dx + 0.05 + k * 0.10), y: y + h * (0.16 + i * 0.10), w: w * 0.08, h: h * 0.11,
++      }, o));
++    }
++  });
++}
++function ICON_LOTION(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('trapezoid', Object.assign({ x: x + w * 0.08, y: y + h * 0.28, w: w * 0.38, h: h * 0.64 }, o));
++  s.addShape('rect', Object.assign({ x: x + w * 0.19, y: y + h * 0.10, w: w * 0.16, h: h * 0.18 }, o));
++  s.addShape('flowChartAlternateProcess', Object.assign({ x: x + w * 0.48, y: y + h * 0.52, w: w * 0.44, h: h * 0.40 }, o));
++}
++function ICON_POOL(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('line', Object.assign({ x: x + w * 0.24, y: y + h * 0.16, w: 0, h: h * 0.50 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.62, y: y + h * 0.16, w: 0, h: h * 0.50 }, o));
++  [0.30, 0.44, 0.58].forEach(function (dy) {
++    s.addShape('line', Object.assign({ x: x + w * 0.24, y: y + h * dy, w: w * 0.38, h: 0 }, o));
++  });
++  s.addShape('doubleWave', Object.assign({ x: x + w * 0.04, y: y + h * 0.70, w: w * 0.92, h: h * 0.22 }, o));
++}
++function ICON_BAMBOO(s, x, y, w, h, c) {
++  const o = stroke(c);
++  [0.16, 0.44].forEach(function (dx) {
++    s.addShape('rect', Object.assign({ x: x + w * dx, y: y + h * 0.06, w: w * 0.18, h: h * 0.88 }, o));
++    [0.34, 0.62].forEach(function (dy) {
++      s.addShape('line', Object.assign({ x: x + w * dx, y: y + h * dy, w: w * 0.18, h: 0 }, o));
++    });
++  });
++  s.addShape('teardrop', Object.assign({ x: x + w * 0.64, y: y + h * 0.16, w: w * 0.30, h: h * 0.24, rotate: 45 }, o));
++  s.addShape('teardrop', Object.assign({ x: x + w * 0.64, y: y + h * 0.52, w: w * 0.30, h: h * 0.24, rotate: 45 }, o));
++}
++function ICON_CANDLE(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('rect', Object.assign({ x: x + w * 0.18, y: y + h * 0.34, w: w * 0.20, h: h * 0.44 }, o));
++  s.addShape('rect', Object.assign({ x: x + w * 0.52, y: y + h * 0.46, w: w * 0.20, h: h * 0.32 }, o));
++  s.addShape('teardrop', Object.assign({ x: x + w * 0.22, y: y + h * 0.14, w: w * 0.13, h: h * 0.17, rotate: 225 }, o));
++  s.addShape('teardrop', Object.assign({ x: x + w * 0.56, y: y + h * 0.26, w: w * 0.13, h: h * 0.17, rotate: 225 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.08, y: y + h * 0.80, w: w * 0.80, h: 0 }, o));
++}
++function ICON_DROP(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('teardrop', Object.assign({ x: x + w * 0.30, y: y + h * 0.08, w: w * 0.40, h: h * 0.46, rotate: 225 }, o));
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.08, y: y + h * 0.60, w: w * 0.84, h: h * 0.28 }, o));
++}
++function ICON_LOTUS(s, x, y, w, h, c) {
++  const o = stroke(c);
++  [-40, -20, 0, 20, 40].forEach(function (a) {
++    s.addShape('teardrop', Object.assign({
++      x: x + w * (0.38 + a / 260), y: y + h * (0.26 + Math.abs(a) / 420),
++      w: w * 0.26, h: h * 0.50, rotate: 180 + a,
++    }, o));
++  });
++}
++function ICON_TEAPOT(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('chord', Object.assign({ x: x + w * 0.14, y: y + h * 0.34, w: w * 0.62, h: h * 0.56, rotate: 180 }, o));
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.34, y: y + h * 0.16, w: w * 0.22, h: h * 0.16 }, o));
++  s.addShape('blockArc', Object.assign({ x: x + w * 0.68, y: y + h * 0.42, w: w * 0.26, h: h * 0.34, rotate: 270 }, o));
++}
++function ICON_BATH(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('chord', Object.assign({ x: x + w * 0.08, y: y + h * 0.40, w: w * 0.84, h: h * 0.42, rotate: 180 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.20, y: y + h * 0.82, w: 0, h: h * 0.14 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.78, y: y + h * 0.82, w: 0, h: h * 0.14 }, o));
++  s.addShape('blockArc', Object.assign({ x: x + w * 0.66, y: y + h * 0.10, w: w * 0.28, h: h * 0.30, rotate: 180 }, o));
++}
++function ICON_SCISSORS(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('line', Object.assign({ x: x + w * 0.24, y: y + h * 0.10, w: w * 0.50, h: h * 0.56 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.24, y: y + h * 0.10, w: w * 0.50, h: h * 0.56, flipH: true }, o));
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.16, y: y + h * 0.66, w: w * 0.24, h: h * 0.24 }, o));
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.60, y: y + h * 0.66, w: w * 0.24, h: h * 0.24 }, o));
++}
++function ICON_SPRAY(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('flowChartAlternateProcess', Object.assign({ x: x + w * 0.26, y: y + h * 0.36, w: w * 0.44, h: h * 0.56 }, o));
++  s.addShape('rect', Object.assign({ x: x + w * 0.38, y: y + h * 0.18, w: w * 0.20, h: h * 0.18 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.58, y: y + h * 0.18, w: w * 0.22, h: 0 }, o));
++}
++function ICON_MIRROR(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.20, y: y + h * 0.08, w: w * 0.60, h: h * 0.60 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.50, y: y + h * 0.68, w: 0, h: h * 0.24 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.34, y: y + h * 0.92, w: w * 0.32, h: 0 }, o));
++}
++function ICON_STAR(s, x, y, w, h, c) {
++  s.addShape('star5', Object.assign({ x: x + w * 0.06, y: y + h * 0.08, w: w * 0.88, h: h * 0.84 }, stroke(c)));
++}
++function ICON_TIMER(s, x, y, w, h, c) {
++  const o = stroke(c);
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.12, y: y + h * 0.22, w: w * 0.76, h: h * 0.70 }, o));
++  s.addShape('rect', Object.assign({ x: x + w * 0.40, y: y + h * 0.06, w: w * 0.20, h: h * 0.14 }, o));
++  s.addShape('line', Object.assign({ x: x + w * 0.50, y: y + h * 0.38, w: w * 0.16, h: h * 0.20 }, o));
++}
++const ICONS = [ICON_STONES, ICON_BAMBOO, ICON_CANDLE, ICON_DROP, ICON_MORTAR,
++  ICON_LOTUS, ICON_LOTION, ICON_TOWEL, ICON_POOL, ICON_FEET,
++  ICON_TEAPOT, ICON_BATH, ICON_SCISSORS, ICON_SPRAY, ICON_MIRROR,
++  ICON_STAR, ICON_TIMER];
++
++/* ------------------------------------------------------------------ *
++ * slides
++ * ------------------------------------------------------------------ */
++
++// 1 + 30 - cover / closing: quote mark, word mark, dash, tagline
++function cover(s, word, wordW, dashX) {
++  quoteMark(s, 6.958, 1.75, 0.603, 1.313, 72, INK);
++  tx(s, word, { x: 7.404, y: 2.968, w: wordW, h: 1.01, wrap: false, fontFace: TITLE_F, fontSize: 54, color: INK });
++  s.addShape('rect', { x: dashX, y: 3.43, w: 0.492, h: 0.086, fill: { color: INK }, line: NONE });
++  tx(s, paras(TAGLINE), { x: 7.562, y: 3.984, w: 3.115, h: 0.633, fontFace: TITLE_F, fontSize: 11, color: GREY, lineSpacingMultiple: 1.5 });
++}
++function slide01(s) { cover(s, 'darya', 2.286, 9.831); }
++function slide30(s) { cover(s, 'thank you', 3.801, 11.325); }
++
++// 2 - vendor logos
++function slide02(s) {
++  tx(s, 'our vendor list', { x: 4.661, y: 1.783, w: 4.011, h: 0.707, align: 'center', fontFace: TITLE_F, fontSize: 36, color: INK });
++  rule(s, 6.393, 2.906);
++  tx(s, L_MED, { x: 2.172, y: 3.373, w: 8.99, h: 1.115, align: 'center', fontFace: BODY_F, fontSize: 14, color: GREY, lineSpacingMultiple: 1.5 });
++  leafMark(s, 8.236, 1.329, 0.872, 0.49);
++  [[1.656, 5.151, 1.919, 1.535, 'EEEEEE'], [4.796, 5.399, 0.957, 0.982, 'D6D6D6'],
++    [6.799, 5.122, 2.37, 1.564, 'F0F0F0'], [10.215, 5.419, 0.837, 0.97, 'D0CECD']]
++    .forEach(function (p) { photo(s, p[0], p[1], p[2], p[3], p[4]); });
++}
++
++// 3 - awards
++function slide03(s) {
++  tx(s, 'our awards', { x: 4.661, y: 1.015, w: 4.011, h: 0.707, align: 'center', fontFace: TITLE_F, fontSize: 36, color: INK });
++  tx(s, 'and milestones', { x: 5.366, y: 1.722, w: 2.601, h: 0.408, align: 'center', fontFace: BODY_F, fontSize: 14, color: MID, lineSpacingMultiple: 1.5 });
++  rule(s, 6.393, 2.378);
++  tx(s, 'We pride ourselves on always striving to be better, that is why we are so proud of our achievements and awards over the years.', {
++    x: 3.828, y: 2.677, w: 5.677, h: 0.596, align: 'center', fontFace: BODY_F, fontSize: 10.5, color: GREY, lineSpacingMultiple: 1.5,
++  });
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  const AWARDS = [
++    [1, 1.794, 4.283, 2.394, 3.555, 'best echo brand awards ', 'USA, 2010'],
++    [2, 7.669, 4.283, 8.269, 3.27, 'kick startup brand', 'England, 2012'],
++    [3, 1.794, 5.636, 2.394, 3.27, 'france beauty awards', 'France, 2015'],
++    [4, 7.669, 5.636, 8.269, 3.27, 'local best brand', 'USA, 2018'],
++  ];
++  AWARDS.forEach(function (a) {
++    tx(s, String(a[0]), {
++      x: a[1], y: a[2], w: 0.466, h: 0.466, shape: 'ellipse', fill: { color: SAGE }, line: NONE,
++      align: 'center', valign: 'middle', fontSize: 12, color: WHITE,
++    });
++    tx(s, a[5], { x: a[3], y: a[2] - 0.197, w: a[4], h: 0.471, fontFace: TITLE_F, fontSize: 16, color: MID, lineSpacingMultiple: 1.5 });
++    tx(s, a[6], { x: a[3], y: a[2] + 0.156, w: 2.601, h: 0.342, fontFace: BODY_F, fontSize: 11, color: MID, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 4 - welcome
++function slide04(s) {
++  pageTint(s, CREAM);
++  tx(s, 'welcome to our salon', { x: 1.194, y: 2.533, w: 5.473, h: 0.707, fontFace: TITLE_F, fontSize: 36, color: INK });
++  tx(s, L_LONG, { x: 1.194, y: 3.607, w: 5.473, h: 1.207, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  quoteMark(s, 0.591, 0.93, 0.603, 1.313, 72, '262626');
++  button(s, 4.691, 5.71);
++  leafMark(s, 5.62, 1.94, 0.872, 0.49);
++}
++
++// 5 - about us
++function slide05(s) {
++  pageTint(s, CREAM);
++  tx(s, 'about us', { x: 4.661, y: 1.707, w: 4.011, h: 0.707, align: 'center', fontFace: TITLE_F, fontSize: 36, color: INK });
++  rule(s, 6.393, 2.906);
++  leafMark(s, 7.803, 1.611, 0.737, 0.415);
++  [3.448, 4.813].forEach(function (y) {
++    tx(s, L_LONG, { x: 3.273, y: y, w: 6.788, h: 0.98, align: 'center', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  });
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++}
++
++// 6 - four service cards + heading
++function slide06(s) {
++  pageTint(s, CREAM);
++  const CARDS = [
++    [0.469, 0.458, LTGREY, ICON_LOTION, 1.661, 0.971, 'the services 1', 1.010, 0.729],
++    [3.516, 0.458, SAGE, ICON_MORTAR, 4.681, 0.971, 'the services 2', 4.057, 3.776],
++    [0.469, 3.812, LTGREY, ICON_STONES, 1.632, 4.304, 'the services 3', 1.005, 0.724],
++    [3.506, 3.812, LTGREY, ICON_FEET, 4.666, 4.309, 'the services 4', 4.052, 3.771],
++  ];
++  CARDS.forEach(function (c) {
++    frame(s, c[0], c[1], 2.853, 3.229, c[2], 3);
++    c[3](s, c[4], c[5], 0.52, 0.52, ICONK);
++    tx(s, c[6], { x: c[7], y: c[1] + 1.427, w: 1.771, h: 0.303, align: 'center', bold: true, fontFace: TITLE_F, fontSize: 12, color: INK });
++    tx(s, L_CARD, { x: c[8], y: c[1] + 1.917, w: 2.333, h: 0.98, align: 'center', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  });
++  tx(s, paras([['our '], [{ text: 'beauty ' }, { text: 'services', options: UL }]]), {
++    x: 7.486, y: 2.654, w: 4.056, h: 1.313, fontFace: TITLE_F, fontSize: 36, color: INK,
++  });
++  tx(s, '* ' + L_CARD + ' sey', { x: 7.486, y: 4.196, w: 3.816, h: 0.525, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  leafMark(s, 8.602, 2.626, 0.872, 0.49);
++}
++
++// 7 - buddha quote
++function slide07(s) {
++  frame(s, 1.438, 1.042, 10.458, 5.417, SAGE, 1);
++  tx(s, 'The secret of health for both mind and body is not to mourn for the past, not to worry about the future, or not to anticipate troubles, but to live in the present moment wisely and earnestly.', {
++    x: 2.837, y: 3.214, w: 7.66, h: 1.881, align: 'center', italic: true, fontFace: TITLE_F, fontSize: 18, color: DARK, lineSpacingMultiple: 1.5,
++  });
++  quoteMark(s, 2.114, 1.11, 0.842, 2.036, 115, SAGE);
++  tx(s, '- buddha', { x: 8.875, y: 5.61, w: 2.333, h: 0.364, align: 'right', fontFace: BODY_F, fontSize: 12, color: GREY, lineSpacingMultiple: 1.5 });
++  cornerLeaf(s, -1.139, 4.982, 4.39, 3.473, 'ne');
++}
++
++// 8 - natural product
++function slide08(s) {
++  s.addShape('rect', { x: 8.347, y: 0, w: 4.987, h: 7.5, fill: { color: WHITE }, line: NONE });
++  s.addShape('swooshArrow', { x: 6.969, y: 5.2, w: 2.137, h: 1.237, flipH: true, fill: NONE, line: { color: PEACH, width: 0.75 } });
++  tx(s, paras([[{ text: 'natural ', options: UL }], ['product we used.']]), {
++    x: 2.069, y: 2.751, w: 5.012, h: 1.313, fontFace: TITLE_F, fontSize: 36, color: INK,
++  });
++  tx(s, L_MID, { x: 2.069, y: 4.275, w: 4.565, h: 0.753, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  ICON_BAMBOO(s, 1.094, 6.193, 0.427, 0.427, SAGE);
++  tx(s, 'Lorem ipsum dolor sit amet', { x: 1.602, y: 6.075, w: 1.983, h: 0.298, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  tx(s, 'The Tree Tea Oil', { x: 1.602, y: 6.241, w: 1.983, h: 0.452, align: 'justify', bold: true, fontFace: BODY_F, fontSize: 16, color: DARK, lineSpacingMultiple: 1.5 });
++  button(s, 4.805, 1.458);
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  frame(s, 8.99, 0.917, 3.894, 5.608, SAGE, 3);
++}
++
++// 9 - product caption between two (empty) photo panels
++function slide09(s) {
++  tx(s, paras([[{ text: 'natural ', options: UL }], ['product we used.']]), {
++    x: 5.106, y: 3.833, w: 2.646, h: 0.774, fontFace: TITLE_F, fontSize: 20, color: INK,
++  });
++  tx(s, L_MID, { x: 5.106, y: 4.898, w: 3.122, h: 1.207, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  button(s, 5.106, 1.521);
++  ICON_LOTION(s, 5.112, 2.727, 0.47, 0.523, SAGE);
++  tx(s, '100+', { x: 5.644, y: 2.879, w: 0.721, h: 0.37, wrap: false, bold: true, fontSize: 16, color: DARK });
++}
++
++// 10 - real nature skin care + "99.9% nature" seal
++function slide10(s) {
++  tx(s, paras([['real '], [{ text: 'nature ', options: UL }, { text: 'skin care' }]]), {
++    x: 7.54, y: 2.437, w: 5.012, h: 1.313, fontFace: TITLE_F, fontSize: 36, color: INK,
++  });
++  tx(s, L_MID, { x: 7.54, y: 4.094, w: 4.079, h: 0.98, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  button(s, 9.758, 5.613);
++  s.addShape('ellipse', { x: 11.15, y: 0.658, w: 1.231, h: 1.231, rotate: -30, fill: NONE, line: { color: SAGE, width: 2.5 } });
++  tx(s, paras([['99.9%'], [{ text: 'nature', options: { fontSize: 14 } }]]), {
++    x: 10.923, y: 0.954, w: 1.687, h: 0.64, rotate: -30, align: 'center', bold: true, fontSize: 18, color: SAGE,
++  });
++}
++
++// 11 - jar product sheet
++function slide11(s) {
++  s.addShape('rect', { x: 7.618, y: 0.703, w: 5.046, h: 6.093, fill: { color: LTGREY }, line: NONE });
++  s.addShape('teardrop', { x: 7.35, y: 2.75, w: 1.20, h: 1.30, rotate: 300, fill: { color: LEAF_DK }, line: NONE });
++  s.addShape('teardrop', { x: 7.00, y: 3.85, w: 1.60, h: 1.35, rotate: 330, fill: { color: LEAF }, line: NONE });
++  branch(s, 3.333, 3.75, 5.238, 2.91);
++  tx(s, paras([['real '], [{ text: 'nature', options: UL }]]), { x: 0.922, y: 1.578, w: 2.74, h: 1.313, fontFace: TITLE_F, fontSize: 36, color: INK });
++  tx(s, paras([['face and neck'], ['cream/lotion']]), { x: 0.922, y: 3.22, w: 1.564, h: 0.64, wrap: false, fontSize: 16, color: SAGE });
++  tx(s, '200ml', { x: 0.922, y: 4.543, w: 0.842, h: 0.37, wrap: false, bold: true, fontSize: 16, color: SAGE });
++  tx(s, L_MID, { x: 0.922, y: 5.163, w: 2.57, h: 1.434, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  tx(s, 'beauty', { x: 8.929, y: 1.832, w: 2.74, h: 0.707, bold: true, italic: true, fontFace: TITLE_F, fontSize: 36, color: INK });
++  tx(s, 'Jar', { x: 10.077, y: 2.721, w: 2.74, h: 1.111, bold: true, italic: true, fontFace: TITLE_F, fontSize: 60, color: INK });
++  s.addShape('line', { x: 9.031, y: 3.079, w: 0.904, h: 0, line: { color: SAGE, width: 1 } });
++  const BULLET = { bullet: { characterCode: '2022' }, indentLevel: 0 };
++  tx(s, paras([
++    [{ text: 'Lorem ipsum dolor sit amet ', options: BULLET }],
++    [{ text: 'Lorem ipsum dolor sit amet ', options: BULLET }],
++    [{ text: 'Lorem ipsum dolor sit amet ', options: BULLET }],
++  ]), { x: 9.786, y: 4.21, w: 2.57, h: 1.104, align: 'justify', fontFace: BODY_F, fontSize: 10.5, color: GREY, lineSpacingMultiple: 2 });
++  tx(s, 'www.yourwebgoeshere.com', { x: 9.418, y: 6.071, w: 2.57, h: 0.342, align: 'justify', italic: true, fontFace: BODY_F, fontSize: 11, color: DARK, lineSpacingMultiple: 1.5 });
++  s.addShape('line', { x: 9.536, y: 6.437, w: 1.719, h: 0, line: { color: SAGE, width: 1 } });
++}
++
++// 12 - package product with callouts
++function slide12(s) {
++  branch(s, 2.839, 4.02, 4.973, 2.763);
++  tx(s, paras([['the '], [{ text: 'package ' }, { text: 'product', options: UL }]]), {
++    x: 7.812, y: 1.95, w: 4.347, h: 1.313, fontFace: TITLE_F, fontSize: 36, color: INK,
++  });
++  leafMark(s, 8.787, 1.864, 0.872, 0.49);
++  tx(s, L_MID, { x: 7.812, y: 3.861, w: 4.347, h: 0.753, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  button(s, 10.298, 5.254);
++  [[4.086, 3.75], [5.095, 4.582], [4.758, 2.571]].forEach(function (p) {
++    s.addShape('ellipse', { x: p[0], y: p[1], w: 0.197, h: 0.197, fill: { color: SAGE }, line: NONE });
++  });
++  s.addShape('line', { x: 3.363, y: 3.848, w: 0.723, h: 0, line: { color: 'A6A6A6', width: 1 } });
++  s.addShape('line', { x: 2.936, y: 4.681, w: 2.159, h: 0, line: { color: 'A6A6A6', width: 1 } });
++  s.addShape('line', { x: 4.856, y: 2.109, w: 0, h: 0.447, line: { color: 'A6A6A6', width: 1 } });
++  // three "description" callouts: [x, y, alignment of the block]
++  [[4.283, 0.875, 'left'], [0.718, 3.154, 'right'], [0.455, 4.655, 'right']].forEach(function (g) {
++    const dx = g[2] === 'left' ? 0 : 0.61;
++    tx(s, 'description', { x: g[0] + dx, y: g[1], w: 1.771, h: 0.303, align: g[2], bold: true, fontFace: TITLE_F, fontSize: 12, color: INK });
++    tx(s, L_DESC, { x: g[0], y: g[1] + 0.339, w: 2.383, h: 0.525, align: g[2], fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 13 - back therapy
++function slide13(s) {
++  s.addShape('rect', { x: 7.231, y: 0, w: 6.103, h: 4.128, fill: { color: CREAM }, line: NONE });
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  tx(s, paras([['relaxation'], [{ text: 'experience', options: UL }]]), { x: 8.55, y: 1.274, w: 4.056, h: 0.909, fontFace: TITLE_F, fontSize: 24, color: INK });
++  tx(s, 'back', { x: 2.043, y: 1.33, w: 2.74, h: 0.707, bold: true, italic: true, fontFace: TITLE_F, fontSize: 36, color: INK });
++  tx(s, 'therapy', { x: 2.581, y: 2.05, w: 3.496, h: 1.01, bold: true, italic: true, fontFace: TITLE_F, fontSize: 54, color: INK });
++  [2.746, 4.435].forEach(function (y) {
++    tx(s, L_MID, { x: 9.391, y: y, w: 3.214, h: 1.207, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  });
++  leafMark(s, 10.453, 1.089, 0.872, 0.49);
++  button(s, 10.744, 6.071);
++}
++
++// 14 - real nature, single column
++function slide14(s) {
++  tx(s, paras([['real '], [{ text: 'nature', options: UL }]]), { x: 2.208, y: 1.373, w: 2.25, h: 1.313, fontFace: TITLE_F, fontSize: 36, color: INK });
++  tx(s, paras([[L_ELIT], [L_TAIL]]), { x: 1.375, y: 3.347, w: 3.917, h: 1.889, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  ICON_MORTAR(s, 1.375, 1.483, 0.511, 0.449, SAGE);
++  button(s, 2.403, 5.895);
++}
++
++// 15 - wellness is beauty (green page)
++function slide15(s) {
++  s.addShape('rect', { x: 5.692, y: 0, w: 7.641, h: 7.5, fill: { color: SAGE }, line: NONE });
++  tx(s, 'wellness is', { x: 7.731, y: 1.574, w: 2.808, h: 0.572, fontFace: TITLE_F, fontSize: 28, color: WHITE });
++  tx(s, 'beauty', { x: 9.442, y: 2.246, w: 2.571, h: 0.841, fontFace: TITLE_F, fontSize: 44, color: WHITE, underline: { style: 'sng' } });
++  s.addShape('rect', { x: 8.959, y: 2.645, w: 0.4, h: 0.05, fill: { color: WHITE }, line: NONE });
++  tx(s, 'www.yourwebgoeshere.com', { x: 10.909, y: 0.323, w: 2.57, h: 0.342, align: 'justify', italic: true, fontFace: BODY_F, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++  s.addShape('line', { x: 11.027, y: 0.689, w: 1.719, h: 0, line: { color: WHITE, width: 1 } });
++  tx(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget', {
++    x: 7.731, y: 3.586, w: 4.688, h: 0.761, bold: true, italic: true, fontFace: BODY_F, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.5,
++  });
++  tx(s, L_MID, { x: 7.812, y: 4.485, w: 4.347, h: 0.753, align: 'justify', fontFace: BODY_F, fontSize: 9, color: WHITE, lineSpacingMultiple: 1.5 });
++  button(s, 10.298, 6.007, { line: WHITE, color: WHITE });
++}
++
++// 16 - real nature on a cream panel
++function slide16(s) {
++  s.addShape('rect', { x: 2.07, y: 1.111, w: 9.194, h: 5.278, fill: { color: CREAM }, line: NONE });
++  tx(s, paras([['real '], [{ text: 'nature', options: UL }]]), { x: 2.863, y: 2.019, w: 2.773, h: 1.313, fontFace: TITLE_F, fontSize: 36, color: INK });
++  leafMark(s, 4.039, 1.966, 0.872, 0.49);
++  tx(s, paras([[L_ELIT], [L_TAIL]]), { x: 2.863, y: 3.718, w: 4.63, h: 1.661, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++}
++
++// 17 - beauty scrub
++function slide17(s) {
++  s.addShape('rect', { x: 0.507, y: 0.527, w: 12.319, h: 6.446, fill: { color: CREAM }, line: NONE });
++  s.addShape('rect', { x: 8.506, y: 1.234, w: 4.827, h: 6.266, fill: { color: SAGE }, line: NONE });
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  tx(s, 'beauty', { x: 9.207, y: 2.24, w: 2.74, h: 0.841, bold: true, italic: true, fontFace: TITLE_F, fontSize: 44, color: WHITE });
++  tx(s, 'scrub', { x: 9.936, y: 3.155, w: 2.74, h: 1.111, bold: true, italic: true, fontFace: TITLE_F, fontSize: 60, color: WHITE });
++  tx(s, L_MID, { x: 9.936, y: 4.657, w: 2.572, h: 1.434, align: 'justify', fontFace: BODY_F, fontSize: 9, color: WHITE, lineSpacingMultiple: 1.5 });
++  tx(s, paras([[{ text: 'natural ', options: UL }], ['product '], ['we used.']]), {
++    x: 1.666, y: 1.831, w: 2.418, h: 1.919, fontFace: TITLE_F, fontSize: 36, color: SAGE,
++  });
++  tx(s, L_HEAD, { x: 1.666, y: 4.053, w: 2.918, h: 1.207, align: 'justify', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  button(s, 1.666, 5.791);
++  s.addShape('swooshArrow', { x: 4.463, y: 2.208, w: 2.137, h: 1.237, flipH: true, fill: NONE, line: { color: SAGE, width: 0.75 } });
++}
++
++// 18 - three packages
++function slide18(s) {
++  tx(s, 'the package', { x: 2.551, y: 1.618, w: 3.319, h: 0.707, fontFace: TITLE_F, fontSize: 36, color: INK });
++  leafMark(s, 5.511, 1.295, 0.872, 0.49);
++  tx(s, '* consectetuer adipiscing elit aenean', { x: 2.551, y: 2.325, w: 2.972, h: 0.364, fontFace: BODY_F, fontSize: 12, color: '262626', lineSpacingMultiple: 1.5 });
++  frame(s, 0.595, 3.444, 3.535, 3.13, SAGE, 1.5);
++  frame(s, 4.372, 3.444, 4.555, 3.13, SAGE_LT, 1.5);
++  frame(s, 9.203, 1.618, 3.535, 4.955, SAGE_LT, 1.5);
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  ICON_MORTAR(s, 2.101, 4.033, 0.523, 0.459, ICONK); // package 1
++  ICON_MORTAR(s, 5.85, 4.033, 0.523, 0.459, ICONK); // package 2
++  tx(s, '+', { x: 6.321, y: 4.177, w: 0.658, h: 0.438, align: 'center', bold: true, fontFace: TITLE_F, fontSize: 20, color: SAGE });
++  ICON_TOWEL(s, 6.958, 4.125, 0.525, 0.458, ICONK);
++  ICON_MORTAR(s, 10.154, 2.38, 0.523, 0.459, ICONK); // package 3
++  tx(s, '+', { x: 10.624, y: 2.992, w: 0.658, h: 0.707, align: 'center', bold: true, fontFace: TITLE_F, fontSize: 36, color: SAGE });
++  ICON_TOWEL(s, 11.262, 2.472, 0.525, 0.458, ICONK);
++  ICON_POOL(s, 10.149, 3.629, 0.527, 0.474, ICONK);
++  ICON_FEET(s, 11.282, 3.605, 0.533, 0.52, ICONK);
++  // [card x, card w, title, copy x, price x]
++  [[0.595, 3.535, 'package 1', 1.196, 2.034], [4.372, 4.555, 'package 2', 5.503, 6.341],
++    [9.203, 3.535, 'package 2', 9.805, 10.642]].forEach(function (p) {
++    tx(s, p[2], { x: p[0], y: 4.902, w: p[1], h: 0.303, align: 'center', bold: true, fontFace: TITLE_F, fontSize: 12, color: INK });
++    tx(s, '$200', { x: p[4], y: 5.216, w: 0.658, h: 0.408, wrap: false, align: 'center', fontFace: BODY_F, fontSize: 14, color: SAGE, lineSpacingMultiple: 1.5 });
++    tx(s, L_PACK, { x: p[3], y: 5.62, w: 2.333, h: 0.753, align: 'center', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 19 - quote inside an open frame
++function slide19(s) {
++  [[1.117, 0.753, 0.065, 5.052], [12.152, 0.753, 0.065, 5.052],
++    [1.160, 0.7535, 11.024, 0.067], [10.806, 5.7385, 1.378, 0.067]].forEach(function (r) {
++    s.addShape('rect', { x: r[0], y: r[1], w: r[2], h: r[3], fill: { color: SAGE }, line: NONE });
++  });
++  tx(s, L_MED, { x: 2.172, y: 2.674, w: 8.99, h: 1.115, align: 'center', italic: true, fontFace: BODY_F, fontSize: 14, color: GREY, lineSpacingMultiple: 1.5 });
++  tx(s, '\u201c', { x: 1.696, y: 1.907, w: 0.951, h: 1.447, bold: true, fontFace: TITLE_F, fontSize: 80, color: SAGE });
++}
++
++// 20 - four products in a row
++function slide20(s) {
++  s.addShape('line', { x: 0.807, y: 7.019, w: 11.72, h: 0, line: { color: MID, width: 1 } });
++  s.addShape('rect', { x: 4.357, y: 6.994, w: 1.468, h: 0.05, fill: { color: PEACH }, line: NONE });
++  [0.833, 4.015, 7.166, 10.347].forEach(function (x, i) {
++    tx(s, 'product ' + (i + 1), { x: x + 0.191, y: 5.454, w: 1.771, h: 0.303, align: 'center', bold: true, fontFace: TITLE_F, fontSize: 12, color: INK });
++    tx(s, L_TINY, { x: x, y: 5.828, w: 2.153, h: 0.753, align: 'center', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 21 + 22 - product detail sheets
++function productSheet(s, size, sizeX, name1, name2) {
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  tx(s, size, { x: sizeX, y: 6.338, w: 2.153, h: 0.364, align: 'center', fontFace: BODY_F, fontSize: 12, color: DARK, lineSpacingMultiple: 1.5 });
++  tx(s, 'facial', { x: 6.706, y: 1.481, w: 0.638, h: 0.342, align: 'justify', fontFace: BODY_F, fontSize: 11, color: DARK, lineSpacingMultiple: 1.5 });
++  s.addShape('ellipse', { x: 7.383, y: 1.652, w: 0.079, h: 0.079, fill: { color: DARK }, line: NONE });
++  tx(s, 'treatment', { x: 7.567, y: 1.481, w: 0.89, h: 0.342, align: 'justify', fontFace: BODY_F, fontSize: 11, color: DARK, lineSpacingMultiple: 1.5 });
++  tx(s, paras([[name1], [name2]]), { x: 6.667, y: 2.156, w: 4.574, h: 0.909, fontFace: TITLE_F, fontSize: 24, color: INK });
++  tx(s, 'himalaya\u2019s mountain rose oil', { x: 6.667, y: 3.162, w: 2.601, h: 0.408, fontFace: BODY_F, fontSize: 14, color: MID, lineSpacingMultiple: 1.5 });
++  ICON_LOTION(s, 9.384, 3.212, 0.275, 0.306, SAGE);
++  s.addShape('line', { x: 6.757, y: 3.981, w: 4.194, h: 0, line: { color: SILVER, width: 1 } });
++  tx(s, 'overnight reedemer enhanced with vitamins B, C, E and F. offers immediate and sustained hydration to balance skin and brighten its appearance.', {
++    x: 6.67, y: 4.393, w: 4.281, h: 0.525, fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5,
++  });
++  button(s, 9.783, 5.57, { text: '$ 199', w: 1.458, color: SAGE });
++}
++function slide21(s) { productSheet(s, '2.0  fl oz', 2.415, 'darya rose facial ', 'treatment'); }
++function slide22(s) { productSheet(s, '12.0  fl oz', 2.568, 'darya honey facial', 'night cream'); }
++
++// 23 + 25 - service page framed on the right
++function servicePageRight(s, line1, line2, props) {
++  frame(s, 6.667, 0.25, 6.333, 7.0, SAGE_LT, 2);
++  tx(s, paras([[line1], [{ text: line2, options: UL }]]), {
++    x: 6.667, y: 1.727, w: 6.286, h: 1.313, align: 'center', fontFace: TITLE_F, fontSize: 36, color: INK,
++  });
++  leafMark(s, 10.601, 1.625, 0.872, 0.49);
++  tx(s, STONE, { x: 7.741, y: 3.624, w: 4.137, h: 0.98, align: 'center', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  button(s, 8.879, 5.242);
++  props.forEach(function (p) { prop(s, p[0], p[1], p[2], p[3], p[4], p[5]); });
++}
++function slide23(s) {
++  servicePageRight(s, 'stone ', 'massage', [
++    [5.819, 1.475, 2.474, 1.393, 'F0EDEB'], // coconut
++    [10.407, 5.743, 3.74, 2.106, 'CFE0B4', 30], // aloe
++    [6.276, 0.076, 2.812, 1.583, 'E4C9AE', 43.8], // honey dipper
++  ]);
++}
++function slide25(s) {
++  servicePageRight(s, 'facial ', 'treatment', [
++    [6.055, 6.053, 2.57, 1.447, 'E5C79E', -30.7], // honey bowl
++    [5.585, -0.688, 3.74, 2.106, 'CFE0B4', -149.8], // aloe
++    [11.547, 4.468, 2.562, 1.443, 'D8D9A8', -30], // avocado
++  ]);
++}
++
++// 24 - traditional spa massage, framed on the left
++function slide24(s) {
++  frame(s, 0.333, 0.25, 6.333, 7.0, SAGE_LT, 2);
++  tx(s, paras([['traditional '], [{ text: 'spa ' }, { text: 'massage', options: UL }]]), {
++    x: 0.344, y: 1.727, w: 6.323, h: 1.313, align: 'center', fontFace: TITLE_F, fontSize: 36, color: INK,
++  });
++  leafMark(s, 4.781, 1.625, 0.872, 0.49);
++  tx(s, L_ELIT, { x: 1.437, y: 3.651, w: 4.137, h: 0.98, align: 'center', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  button(s, 2.575, 5.242);
++  prop(s, -0.509, 5.764, 3.083, 1.736, 'DFC3A6'); // oil bottle
++  prop(s, 4.355, 5.965, 2.828, 1.593, 'EDEDEB', 160.6); // cream tube
++  branch(s, -0.309, -0.414, 3.083, 1.713);
++}
++
++// 26 + 27 - gallery pages (all frames are empty picture placeholders)
++function slide26(s) {
++  s.addShape('rect', { x: 0, y: 2.0, w: 4.514, h: 5.5, fill: { color: CREAM }, line: NONE });
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  tx(s, paras([[{ text: 'our ' }, { text: 'gallery', options: UL }]]), { x: 2.174, y: 1.016, w: 3.826, h: 0.841, fontFace: TITLE_F, fontSize: 44, color: INK });
++  button(s, 0.093, 5.946, { rotate: -90 });
++  tx(s, STONE_CUT, { x: 3.163, y: 2.111, w: 4.087, h: 0.753, fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++}
++function slide27(s) {
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  tx(s, paras([[{ text: 'our ' }, { text: 'gallery', options: UL }]]), { x: 2.174, y: 1.016, w: 3.826, h: 0.841, fontFace: TITLE_F, fontSize: 44, color: INK });
++  tx(s, STONE_CUT, { x: 3.353, y: 2.1, w: 4.087, h: 0.753, fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++}
++
++// 28 - salons / contact
++function slide28(s) {
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  tx(s, 'our salons', { x: 4.661, y: 1.301, w: 4.011, h: 0.707, align: 'center', fontFace: TITLE_F, fontSize: 36, color: INK });
++  rule(s, 6.393, 2.182);
++  tx(s, STONE, { x: 3.316, y: 2.572, w: 6.701, h: 0.525, align: 'center', fontFace: BODY_F, fontSize: 9, color: GREY, lineSpacingMultiple: 1.5 });
++  [[1.024, 1.098, 'new york'], [5.031, 5.106, 'paris'], [8.965, 9.039, 'seoul']].forEach(function (c) {
++    tx(s, c[2], { x: c[0], y: 4.074, w: 3.27, h: 0.656, align: 'center', fontFace: TITLE_F, fontSize: 24, color: SAGE, lineSpacingMultiple: 1.5 });
++    tx(s, paras([['21 st avenue, suite 191. 6th floor'], [c[2] + ' 14402']]), {
++      x: c[1], y: 4.787, w: 3.122, h: 0.62, align: 'center', fontFace: BODY_F, fontSize: 11, color: MID, lineSpacingMultiple: 1.5,
++    });
++    tx(s, paras([
++      [{ text: 'email : ', options: { color: SAGE } }, { text: 'daryanew@yourmail.com ' }],
++      [{ text: 'phone ', options: { color: SAGE } }, { text: ': 1-984-8721 ' }],
++    ]), { x: c[1], y: 5.637, w: 3.122, h: 0.62, align: 'center', fontFace: BODY_F, fontSize: 11, color: MID, lineSpacingMultiple: 1.5 });
++  });
++  prop(s, 9.901, 0.368, 3.565, 2.007, 'E5C79E', -36.3); // honey bowl
++}
++
++// 29 - customer review
++function slide29(s) {
++  tx(s, 'customer review', { x: 4.463, y: 1.56, w: 4.408, h: 0.707, align: 'center', fontFace: TITLE_F, fontSize: 36, color: INK });
++  rule(s, 6.393, 2.441);
++  cornerLeaf(s, -1.171, -0.722, 4.39, 3.473, 'se');
++  tx(s, L_MED, { x: 2.06, y: 3.493, w: 9.213, h: 0.761, align: 'center', italic: true, fontFace: BODY_F, fontSize: 14, color: GREY, lineSpacingMultiple: 1.5 });
++  tx(s, '\u201c', { x: 1.609, y: 2.406, w: 0.451, h: 1.01, rotate: 180, align: 'center', bold: true, fontFace: TITLE_F, fontSize: 54, color: SAGE });
++  tx(s, 'felix joao', { x: 4.889, y: 4.982, w: 3.555, h: 0.564, align: 'center', fontFace: TITLE_F, fontSize: 20, color: MID, lineSpacingMultiple: 1.5 });
++  tx(s, 'designer', { x: 5.366, y: 5.462, w: 2.601, h: 0.408, align: 'center', fontFace: BODY_F, fontSize: 14, color: MID, lineSpacingMultiple: 1.5 });
++  s.addShape('ellipse', { x: 6.588, y: 6.213, w: 0.157, h: 0.157, fill: { color: SAGE }, line: NONE });
++}
++
++// 31 - icon sheet, 10 columns x 5 rows
++function slide31(s) {
++  const COLS = [0.644, 1.963, 3.274, 4.624, 5.89, 7.13, 8.463, 9.731, 11.05, 12.338];
++  const ROWS = [1.273, 2.433, 3.577, 4.713, 5.836];
++  ROWS.forEach(function (y, r) {
++    COLS.forEach(function (x, c) {
++      ICONS[(r * COLS.length + c) % ICONS.length](s, x, y, 0.5, 0.5, ICONK);
++    });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * build
++ * ------------------------------------------------------------------ */
++const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28,
++  slide29, slide30, slide31];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'WIDE16x9', width: 13.333, height: 7.5 });
++pptx.layout = 'WIDE16x9';
++pptx.theme = { headFontFace: TITLE_F, bodyFontFace: BODY_F };
++pptx.title = 'darya - spa & beauty';
++
++BUILDERS.forEach(function (build) { build(pptx.addSlide()); });
++
++pptx.writeFile({ fileName: path.join(__dirname, '0e5e5bc6-57a7-4c27-abb5-60fc975203fb_grok_final.pptx') })
++  .then(function (f) { console.log('wrote ' + f); });

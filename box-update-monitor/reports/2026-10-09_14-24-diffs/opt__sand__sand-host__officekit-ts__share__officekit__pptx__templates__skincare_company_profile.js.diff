@@ -1,0 +1,718 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/skincare_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/skincare_company_profile.js
+@@ -0,0 +1,715 @@
++/**
++ * "Keera" — Skincare Company Profile deck (25 slides, 16:9 @ 13.333in x 7.5in)
++ * Rebuilt from scratch with pptxgenjs. Run: node <this-file>.js
++ */
++'use strict';
++
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ *
++ * Theme
++ * ------------------------------------------------------------------ */
++const CREAM = 'FFF9F3'; // theme lt1 / lt2  (page background)
++const INK = '000000';   // theme dk1 / dk2  (body copy)
++const RUST = 'AE5726';  // theme accent1
++const HEAD = 'Marcellus';       // theme major latin
++const BODY = 'Poppins Regular'; // theme minor latin
++
++const SLIDE_W = 13.3333333; // 12192000 EMU (16:9 widescreen)
++const SLIDE_H = 7.5;
++
++/* Reused lorem strings (the source deck repeats the same few blocks). */
++const L = {
++  hero: 'Enim parturient quisque gravida adipiscing iaculis justo gravida integer Metus amet natoque fermentum hendrerit.',
++  toc: 'Enim parturient quisque gravida adipiscing iaculis justo',
++  full: 'PLACEHOLDER',
++  urna: 'PLACEHOLDER',
++  urnaLong: 'PLACEHOLDER',
++  short: 'Risus leo convallis enim himenaeos sapien vitae Ut condimentum',
++  facilisis: 'PLACEHOLDER',
++  duisSed: 'PLACEHOLDER',
++  enVitae: 'PLACEHOLDER',
++  malesuada: 'Risus leo convallis enim himenaeos sapien vitae Ut condimentum fusce duis sed facilisis lacinia nibh congue justo eu. Malesuada',
++  gravida: 'PLACEHOLDER',
++  cras: 'Risus leo convallis enim himenaeos sapien vitae Ut condimentummass luctus pretium, cras cras',
++  about3: 'Malesuada dis fringilla urna integer neque bibenm neque. Dui tristique tempor vivamus fusce',
++  review: 'Sapien suscipit est adipiscg odio phasellus suspendisiro Rhoncus metus mattis.',
++  quote: 'Beauty begins the moment you decide to be yourself.',
++};
++
++/* ------------------------------------------------------------------ *
++ * Text helpers — every text box in the deck is one of these five styles
++ * ------------------------------------------------------------------ */
++function text(s, str, x, y, w, h, opts) {
++  s.addText(str, Object.assign({ x, y, w, h, valign: 'top', color: INK }, opts));
++}
++/** 40pt Marcellus display title. */
++function title(s, str, x, y, w, h, color, opts) {
++  text(s, str, x, y, w, h, Object.assign({ fontFace: HEAD, fontSize: 40, color: color || INK }, opts));
++}
++/** 14pt Marcellus section label. */
++function label(s, str, x, y, w, h, color, opts) {
++  text(s, str, x, y, w, h, Object.assign({ fontFace: HEAD, fontSize: 14, color: color || RUST }, opts));
++}
++/** 10pt Poppins body copy, 150% leading. */
++function body(s, str, x, y, w, h, color, opts) {
++  text(s, str, x, y, w, h,
++    Object.assign({ fontFace: BODY, fontSize: 10, color: color || INK, lineSpacingMultiple: 1.5 }, opts));
++}
++/** Ghosted 36pt numeral (18% opacity) that sits behind each section label. */
++function numeral(s, str, x, y, color) {
++  text(s, str, x, y, 0.922, 0.707, { fontFace: HEAD, fontSize: 36, color, transparency: 82 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Vector decoration helpers
++ * ------------------------------------------------------------------ */
++
++/* pptxgenjs falls back to a dark 1pt outline unless the line is typed "none". */
++const NO_LINE = { type: 'none' };
++
++/** Hairline rules (0.25pt) used as column/timeline dividers. */
++function vLine(s, x, y1, y2, color) {
++  s.addShape('line', { x, y: y1, w: 0, h: y2 - y1, line: { color, width: 0.25 } });
++}
++function hLine(s, y, x1, x2, color) {
++  s.addShape('line', { x: x1, y, w: x2 - x1, h: 0, line: { color, width: 0.25 } });
++}
++/** Small timeline bullet. */
++function dot(s, x, y, color) {
++  s.addShape('ellipse', { x, y, w: 0.104, h: 0.104, fill: { color }, line: NO_LINE });
++}
++/** Flat colour panel. `alpha` is the source fill alpha in percent (100 = opaque). */
++function panel(s, x, y, w, h, color, alpha) {
++  const fill = alpha === undefined ? { color } : { color, transparency: 100 - alpha };
++  s.addShape('rect', { x, y, w, h, fill, line: NO_LINE });
++}
++
++/**
++ * Soft "glow" circle. The source fills these with a radial accent1 gradient
++ * that fades from ~33% opacity in the middle out to the rim; pptxgenjs emits
++ * solid fills only, so the falloff is stacked from concentric faint discs.
++ */
++const BLOB_RINGS = 18;
++const BLOB_CORE_ALPHA = 0.30; // tint opacity at the centre of the glow
++const BLOB_RIM_ALPHA = 0.11;  // tint opacity left at the outer edge
++function blob(s, x, y, w, h, color) {
++  const cx = x + w / 2;
++  const cy = y + h / 2;
++  let stacked = 0;
++  for (let i = BLOB_RINGS; i >= 1; i--) {
++    const f = i / BLOB_RINGS;
++    // Each disc contributes just enough for the stack's composite opacity to
++    // fall off linearly from BLOB_CORE_ALPHA at the centre to BLOB_RIM_ALPHA.
++    const target = BLOB_RIM_ALPHA + (BLOB_CORE_ALPHA - BLOB_RIM_ALPHA) * (1 - f);
++    const alpha = 1 - (1 - target) / (1 - stacked);
++    stacked = target;
++    s.addShape('ellipse', {
++      x: cx - (w * f) / 2, y: cy - (h * f) / 2, w: w * f, h: h * f,
++      fill: { color: color || RUST, transparency: Math.round((1 - alpha) * 1000) / 10 }, line: NO_LINE,
++    });
++  }
++}
++
++/** Draw a custom path given in an arbitrary WxH design grid. */
++function pathShape(s, x, y, w, h, gw, gh, path, fill, line) {
++  // custGeom points are relative to the shape origin.
++  const sx = (v) => (v / gw) * w;
++  const sy = (v) => (v / gh) * h;
++  const pts = path.map((p) => {
++    if (p.length === 1) return { close: true };
++    if (p.length === 6) {
++      return {
++        x: sx(p[4]), y: sy(p[5]),
++        curve: { type: 'cubic', x1: sx(p[0]), y1: sy(p[1]), x2: sx(p[2]), y2: sy(p[3]) },
++      };
++    }
++    return { x: sx(p[0]), y: sy(p[1]) };
++  });
++  s.addShape('custGeom', Object.assign({ x, y, w, h, points: pts }, fill, line));
++}
++
++/* Four-point sparkle (the deck's recurring "star" motif), grid 77x77. */
++const SPARKLE_PATH = [
++  [77, 39], [43, 41, 41, 43, 39, 77], [36, 43, 34, 41, 0, 39],
++  [34, 36, 36, 34, 39, 0], [41, 34, 43, 36, 77, 39], ['z'],
++];
++function sparkle(s, x, y, size, color) {
++  pathShape(s, x, y, size, size, 77, 77, SPARKLE_PATH, { fill: { color } }, { line: NO_LINE });
++}
++
++/* Crescent moon of the "Keera" wordmark, grid 56x60. */
++const MOON_PATH = [
++  [56, 45], [54, 47, 52, 49, 50, 51], [37, 60, 19, 58, 10, 45], [0, 32, 3, 14, 16, 4],
++  [18, 3, 21, 1, 23, 0], [16, 10, 15, 24, 23, 35], [31, 46, 44, 50, 56, 45], ['z'],
++];
++/* Tiny sparkle tucked into the moon, grid 26x26. */
++const MINISTAR_PATH = [
++  [26, 13], [15, 14, 14, 14, 13, 26], [12, 14, 12, 14, 0, 13],
++  [12, 12, 12, 11, 13, 0], [14, 11, 15, 12, 26, 13], ['z'],
++];
++function moonMark(s, x, y, color) {
++  const w = 0.216, h = 0.232;
++  pathShape(s, x, y, w, h, 56, 60, MOON_PATH, { fill: { color } }, { line: NO_LINE });
++  pathShape(s, x + w * 0.536, y + h * 0.053, w * 0.464, h * 0.433, 26, 26, MINISTAR_PATH,
++    { fill: { color } }, { line: NO_LINE });
++}
++
++/* ------------------------------------------------------------------ *
++ * Repeating page furniture
++ * ------------------------------------------------------------------ */
++
++/** Top navigation bar: wordmark, three menu links and the "2040" chip. */
++function navbar(s, c) {
++  moonMark(s, 0.589, 0.548, c.logo);
++  text(s, 'Keera', 0.901, 0.513, 0.756, 0.303, { fontFace: HEAD, fontSize: 12, color: c.logo });
++  const menu = [['Home', 4.756, 0.673, c.home], ['About', 6.226, 0.673, c.about], ['Contact', 7.696, 0.882, c.contact]];
++  menu.forEach(([str, x, w, color]) =>
++    text(s, str, x, 0.561, w, 0.269, { fontFace: BODY, fontSize: 10, color, align: 'center' }));
++  s.addShape('roundRect', {
++    x: 11.880, y: 0.561, w: 0.851, h: 0.269, rectRadius: 0.1345,
++    fill: { color: CREAM, transparency: 100 }, line: { color: c.year, width: 0.25 },
++  });
++  s.addShape('line', { x: 11.696, y: 0.696, w: 0.399, h: 0, line: { color: c.year, width: 0.25 } });
++  s.addShape('line', { x: 11.994, y: 0.637, w: 0.066, h: 0.059, line: { color: c.year, width: 0.25 } });
++  s.addShape('line', { x: 11.994, y: 0.696, w: 0.066, h: 0.059, flipV: true, line: { color: c.year, width: 0.25 } });
++  text(s, '2040', 12.022, 0.561, 0.673, 0.269, { fontFace: BODY, fontSize: 10, color: c.year, align: 'right' });
++}
++
++/* Navbar palettes. Each nav item is recoloured to cream where a rust panel
++   runs underneath it, so the variants are named by how far the panel reaches. */
++const NAV_ON_CREAM = { logo: RUST, home: INK, about: INK, contact: INK, year: RUST };
++const NAV_ON_RUST = { logo: CREAM, home: CREAM, about: CREAM, contact: CREAM, year: CREAM };
++const NAV_PANEL_TO_LOGO = { logo: CREAM, home: INK, about: INK, contact: INK, year: RUST };
++const NAV_PANEL_TO_HOME = { logo: CREAM, home: CREAM, about: INK, contact: INK, year: RUST };
++const NAV_PANEL_FROM_CONTACT = { logo: RUST, home: INK, about: INK, contact: CREAM, year: CREAM };
++const NAV_PANEL_FROM_ABOUT = { logo: RUST, home: INK, about: CREAM, contact: CREAM, year: CREAM };
++
++/* Near-closed ring of the "play" button — an almost-full circle with a small
++   gap at the upper right, drawn as a filled stroke band. Grid 44484x58998. */
++const PLAY_RING_PATH = [
++  [39006, 56207], [40816, 55683, 42569, 54978, 44245, 54112], [41616, 55988, 38682, 57407, 35577, 58303],
++  [19385, 61560, 3611, 51083, 354, 34890], [-2513, 20679, 5231, 6458, 18718, 1153],
++  [27176, -1391, 36320, -28, 43674, 4867], [29919, -1972, 13222, 3639, 6383, 17393],
++  [-456, 31147, 5154, 47835, 18909, 54674], [25147, 57779, 32320, 58426, 39006, 56493], ['z'],
++];
++/** Outlined "play" circle used next to the "Experience More" caption. */
++function playMark(s, x, y, color) {
++  const w = 0.278, h = 0.369;
++  pathShape(s, x, y, w, h, 44484, 58998, PLAY_RING_PATH, { fill: { color } }, { line: NO_LINE });
++  pathShape(s, x + 0.168, y + 0.141, 0.061, 0.089, 10, 14,
++    [[0, 0], [10, 7], [0, 14], ['z']], { fill: { color } }, { line: NO_LINE });
++}
++
++/** "Learn More" pill + "Experience More" play link. Positions are locked together. */
++function ctaCluster(s, bx, by) {
++  s.addShape('roundRect', {
++    x: bx, y: by, w: 1.201, h: 0.369, rectRadius: 0.1845,
++    fill: { color: RUST }, line: NO_LINE,
++    shadow: { type: 'outer', color: RUST, blur: 26, offset: 9, angle: 65, opacity: 0.59 },
++  });
++  text(s, 'Learn More', bx + 0.070, by + 0.010, 1.063, 0.307,
++    { fontFace: BODY, fontSize: 9, color: CREAM, align: 'center', lineSpacingMultiple: 1.5 });
++  playMark(s, bx + 1.468, by - 0.006, INK);
++  text(s, 'Experience More', bx + 1.804, by + 0.025, 1.400, 0.307,
++    { fontFace: BODY, fontSize: 9, color: INK, lineSpacingMultiple: 1.5 });
++}
++
++/** Rounded product tag button (Product Two on the product slides). */
++function tagButton(s, str, x, y, w) {
++  s.addShape('roundRect', {
++    x, y, w, h: 0.369, rectRadius: 0.1845, fill: { color: RUST }, line: NO_LINE,
++    shadow: { type: 'outer', color: RUST, blur: 26, offset: 9, angle: 65, opacity: 0.59 },
++  });
++  label(s, str, x + 0.191, y + 0.009, 1.498, 0.337, CREAM, { align: 'center' });
++}
++
++/** Pull-quote block: big opening quote mark, rule and the quote itself. */
++function pullQuote(s, x, y, w) {
++  text(s, '\u201C', x, y, 0.922, 0.707, { fontFace: HEAD, fontSize: 36, color: CREAM, transparency: 66 });
++  hLine(s, y + 0.252, x + 0.423, x + 2.259, CREAM);
++  body(s, L.quote, x + 0.002, y + 0.408, w, 0.582, CREAM);
++}
++
++/** Trophy pictogram (Awards Received): handled cup on a stem and plinth. */
++function trophyIcon(s, x, y, w, h) {
++  // Handle rings sit behind the cup, so only their outer arcs stay visible.
++  const ring = { fill: { color: CREAM, transparency: 100 }, line: { color: RUST, width: 0.9 } };
++  s.addShape('ellipse', Object.assign({ x, y: y + h * 0.08, w: w * 0.32, h: h * 0.36 }, ring));
++  s.addShape('ellipse', Object.assign({ x: x + w * 0.68, y: y + h * 0.08, w: w * 0.32, h: h * 0.36 }, ring));
++  // Cup: straight rim over a bowl that curves in to a narrow base.
++  pathShape(s, x + w * 0.08, y, w * 0.84, h * 0.52, 100, 100,
++    [[0, 0], [100, 0], [95, 55, 82, 100, 66, 100], [34, 100, 21, 55, 0, 0], ['z']],
++    { fill: { color: RUST } }, { line: NO_LINE });
++  panel(s, x + w * 0.08, y, w * 0.84, h * 0.11, RUST); // rim
++  panel(s, x + w * 0.44, y + h * 0.48, w * 0.12, h * 0.26, RUST); // stem
++  panel(s, x + w * 0.24, y + h * 0.74, w * 0.52, h * 0.11, RUST); // collar
++  panel(s, x + w * 0.10, y + h * 0.87, w * 0.80, h * 0.13, RUST); // plinth
++}
++
++/** Bar-chart pictogram (Major Achievement): axes, rising bars and a trend arrow. */
++function chartIcon(s, x, y, w, h) {
++  panel(s, x, y, w * 0.09, h, RUST);            // y axis
++  panel(s, x, y + h * 0.91, w, h * 0.09, RUST); // x axis
++  [[0.20, 0.58], [0.46, 0.38], [0.74, 0.10]].forEach(([bx, by]) =>
++    panel(s, x + w * bx, y + h * by, w * 0.18, h * (0.91 - by), RUST));
++  // Trend arrow sweeping up over the two shorter bars.
++  s.addShape('line', {
++    x: x + w * 0.18, y: y + h * 0.12, w: w * 0.50, h: h * 0.42, flipV: true,
++    line: { color: RUST, width: 1.1, endArrowType: 'triangle' },
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide builders
++ * ------------------------------------------------------------------ */
++
++function slide01(s) { // Hero / cover
++  blob(s, 4.170, 5.179, 3.806, 3.806);
++  blob(s, 10.935, -2.240, 4.479, 4.479);
++  navbar(s, NAV_PANEL_TO_HOME);
++  text(s, 'COMPANY PROFILE PRESENTATION', 7.013, 1.891, 3.441, 0.269, { fontFace: BODY, fontSize: 10, color: RUST });
++  title(s, 'Secrets To Healthy', 6.991, 2.240, 4.945, 0.774);
++  title(s, 'Glowing Skin', 8.945, 3.021, 3.472, 0.774);
++  sparkle(s, 12.035, 2.240, 0.330, RUST);
++  body(s, L.hero, 7.013, 4.241, 5.081, 0.630, INK, { fontSize: 11 });
++  ctaCluster(s, 9.056, 6.038);
++  sparkle(s, 1.717, 5.454, 0.344, CREAM);
++  sparkle(s, 0.608, 5.818, 0.177, CREAM);
++}
++
++function slide02(s) { // Table of content
++  s.background = { color: RUST };
++  blob(s, -1.299, -1.420, 2.996, 3.072, CREAM);
++  blob(s, 12.002, 6.169, 2.662, 2.662, CREAM);
++  navbar(s, NAV_ON_RUST);
++  title(s, 'Table Of Content', 0.713, 2.063, 2.736, 1.447, CREAM);
++  sparkle(s, 3.449, 2.641, 0.330, CREAM);
++  vLine(s, 9.033, 2.120, 6.639, CREAM);
++  const items = [
++    ['01', 'About Our Company', 5.429, 2.120, 2.153],
++    ['02', 'Skincare Product Range', 10.164, 2.120, 2.508],
++    ['03', 'Our Product', 5.429, 5.060, 2.153],
++    ['04', 'Future Plans', 10.164, 5.060, 2.153],
++  ];
++  items.forEach(([num, name, x, y, w]) => {
++    text(s, num, x, y, 0.673, 0.404, { fontFace: HEAD, fontSize: 18, color: CREAM });
++    label(s, name, x, y + 0.518, w, 0.337, CREAM);
++    body(s, L.toc, x, y + 0.996, 3.062, 0.582, CREAM);
++  });
++}
++
++function slide03(s) { // About our company
++  blob(s, 2.773, 1.654, 5.427, 5.427);
++  blob(s, 11.520, -2.240, 3.893, 3.893);
++  blob(s, 12.002, 6.169, 2.662, 2.662, CREAM);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'About Our Company', 8.734, 2.022, 3.286, 1.447);
++  sparkle(s, 11.979, 2.771, 0.330, RUST);
++  label(s, 'Who We Are?', 8.734, 4.185, 1.872, 0.337);
++  body(s, L.full, 8.734, 4.755, 3.997, 0.582);
++  body(s, L.about3, 8.734, 5.466, 3.997, 0.582);
++  text(s, '$12.4M', 1.143, 2.583, 1.099, 0.404, { fontFace: HEAD, fontSize: 18, color: RUST });
++  text(s, 'Revenue', 1.143, 3.101, 1.468, 0.337, { fontFace: BODY, fontSize: 14 });
++  text(s, '98.%', 1.143, 5.194, 1.280, 0.404, { fontFace: HEAD, fontSize: 18, color: RUST });
++  text(s, 'Project Succes', 1.143, 5.712, 2.153, 0.337, { fontFace: BODY, fontSize: 14 });
++  sparkle(s, 1.364, 4.046, 0.588, RUST);
++}
++
++function slide04(s) { // Company values
++  blob(s, -1.159, 3.094, 2.640, 2.640);
++  blob(s, 11.340, -2.197, 3.893, 3.893);
++  panel(s, 0, 4.342, 13.333, 3.158, RUST);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Company Values', 0.805, 1.766, 3.286, 1.447);
++  body(s, L.full, 4.833, 2.198, 3.997, 0.582);
++  sparkle(s, 3.545, 2.615, 0.330, RUST);
++  const cols = [['01', 'First Value', 0.755, 1.096], ['02', 'Second Value', 5.182, 5.523], ['03', 'Third Value', 9.609, 9.950]];
++  cols.forEach(([num, name, nx, tx]) => {
++    numeral(s, num, nx, 5.028, CREAM);
++    label(s, name, tx, 5.213, 1.872, 0.337, CREAM);
++    body(s, L.full, tx, 5.741, 2.779, 0.834, CREAM);
++  });
++  vLine(s, 4.451, 5.364, 6.575, CREAM);
++  vLine(s, 8.966, 5.364, 6.575, CREAM);
++}
++
++function slide05(s) { // Meet our team
++  blob(s, -1.749, -1.732, 3.893, 3.893);
++  blob(s, 11.387, 5.230, 3.893, 3.893);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Meet Our Team', 0.501, 1.854, 3.286, 1.447);
++  sparkle(s, 2.507, 2.821, 0.330, RUST);
++  panel(s, 4.290, 4.389, 2.833, 0.841, RUST);
++  panel(s, 7.624, 4.014, 2.301, 0.743, RUST, 46);
++  panel(s, 10.427, 4.014, 2.300, 0.743, RUST, 46);
++  const team = [['Oliv Alexandra', 4.771, 4.508], ['Grace Middleton', 7.839, 4.088], ['Lily Prescott', 10.641, 4.088]];
++  team.forEach(([name, x, y]) => {
++    label(s, name, x, y, 1.872, 0.337, CREAM, { align: 'center' });
++    text(s, 'Job Tittle', x, y + 0.312, 1.872, 0.269, { fontFace: BODY, fontSize: 10, color: CREAM, align: 'center' });
++  });
++  body(s, L.full, 4.182, 6.046, 3.997, 0.582);
++  text(s, '90%', 8.853, 5.982, 1.099, 0.404, { fontFace: HEAD, fontSize: 18, color: RUST });
++  text(s, 'Team Operasional', 8.853, 6.419, 1.468, 0.252, { fontFace: BODY, fontSize: 9 });
++  text(s, '10,7K', 11.514, 5.982, 1.099, 0.404, { fontFace: HEAD, fontSize: 18, color: RUST });
++  text(s, 'Statistic Point', 11.500, 6.419, 1.468, 0.252, { fontFace: BODY, fontSize: 9 });
++  sparkle(s, 10.649, 6.043, 0.404, RUST);
++  ctaCluster(s, 0.639, 4.861);
++}
++
++function slide06(s) { // Vision & mission
++  blob(s, 9.797, -1.501, 3.231, 3.231);
++  blob(s, -1.363, 6.208, 2.655, 2.655);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Vision & Mission Statement', 0.621, 4.630, 4.582, 1.447);
++  sparkle(s, 4.079, 5.656, 0.330, RUST);
++  label(s, 'Vision Statement', 0.645, 2.021, 1.872, 0.337);
++  body(s, L.urnaLong, 0.645, 2.549, 3.598, 0.834);
++  vLine(s, 6.403, 2.187, 4.885, RUST);
++  dot(s, 6.351, 2.138, RUST);
++  dot(s, 6.351, 4.831, RUST);
++  [['Mission One', 2.021], ['Mission Two', 4.715]].forEach(([name, y]) => {
++    label(s, name, 7.537, y, 1.872, 0.337);
++    body(s, L.urna, 7.537, y + 0.528, 2.733, 0.834);
++  });
++}
++
++function slide07(s) { // Our service
++  blob(s, 11.597, -1.382, 2.962, 3.091);
++  blob(s, 0.619, 6.290, 3.650, 3.650);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Our Service', 0.763, 4.095, 3.400, 0.774);
++  sparkle(s, 4.174, 4.151, 0.330, RUST);
++  body(s, L.full, 0.766, 5.094, 3.997, 0.582);
++  const cols = [['01', 'Service One', 0.773, 1.087], ['02', 'Service Two', 5.171, 5.485], ['03', 'Service Three', 9.568, 9.883]];
++  cols.forEach(([num, name, nx, tx]) => {
++    numeral(s, num, nx, 1.722, RUST);
++    label(s, name, tx, 1.900, 1.872, 0.337);
++    body(s, L.short, tx, 2.428, 2.733, 0.582);
++  });
++  vLine(s, 4.339, 1.900, 3.019, RUST);
++  vLine(s, 8.896, 1.900, 3.019, RUST);
++}
++
++function slide08(s) { // Problem statement
++  blob(s, 12.029, -1.824, 2.962, 3.091);
++  panel(s, 0, 0, 4.154, 7.5, RUST);
++  blob(s, 2.725, 5.502, 2.962, 3.091);
++  navbar(s, NAV_PANEL_TO_LOGO);
++  title(s, 'Problem Statement', 9.880, 1.836, 3.400, 1.447);
++  sparkle(s, 12.455, 1.818, 0.330, RUST);
++  [['Problem One', 6.004, 2.021], ['Problem Two', 6.004, 4.715], ['Problem Three', 9.963, 4.715]].forEach(([name, x, y]) => {
++    label(s, name, x, y, 1.872, 0.337);
++    body(s, L.urna, x, y + 0.528, 2.733, 0.834);
++  });
++}
++
++function slide09(s) { // Best solution
++  blob(s, -1.825, -1.824, 3.650, 3.650);
++  panel(s, 7.270, 0, 6.063, 7.5, RUST);
++  navbar(s, NAV_PANEL_FROM_CONTACT);
++  title(s, 'Best Solution', 1.263, 2.312, 3.676, 0.774);
++  sparkle(s, 5.097, 2.534, 0.330, RUST);
++  body(s, L.full, 1.241, 3.531, 3.997, 0.582);
++  ctaCluster(s, 1.348, 4.835);
++  vLine(s, 8.452, 1.623, 6.467, CREAM);
++  dot(s, 8.403, 3.010, CREAM);
++  dot(s, 8.403, 4.989, CREAM);
++  [['Solution One', 1.531], ['Solution Two', 3.485], ['Solution Three', 5.440]].forEach(([name, y]) => {
++    label(s, name, 9.016, y, 1.872, 0.337, CREAM);
++    body(s, L.facilisis, 9.016, y + 0.528, 3.632, 0.582, CREAM);
++  });
++  blob(s, 5.612, 5.930, 3.650, 3.650);
++}
++
++function slide10(s) { // Innovations & technology
++  blob(s, 11.605, -1.519, 2.962, 3.091);
++  blob(s, -1.252, 5.955, 2.962, 3.091);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Innovations & Technology', 8.800, 4.590, 3.676, 1.447);
++  sparkle(s, 11.997, 2.426, 0.330, RUST);
++  label(s, 'Personalized Skincare Solution', 8.826, 2.015, 2.733, 0.572);
++  body(s, L.short + ' ', 8.826, 2.725, 2.733, 0.582);
++  label(s, 'Innovative Formulations', 0.774, 4.715, 2.403, 0.337);
++  body(s, L.short, 0.774, 5.243, 2.733, 0.582);
++  label(s, 'Technology Integration', 5.107, 4.715, 2.278, 0.337);
++  body(s, L.short + ' ', 5.107, 5.243, 2.733, 0.582);
++  vLine(s, 4.307, 4.774, 5.893, RUST);
++}
++
++function slide11(s) { // Skincare product range
++  blob(s, -1.514, -1.607, 3.151, 3.288);
++  blob(s, 11.991, 6.056, 2.962, 3.091);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Skincare Product Range', 3.429, 1.309, 6.475, 0.774, INK, { align: 'center' });
++  body(s, L.malesuada, 4.003, 2.246, 5.327, 0.582, INK, { align: 'center' });
++  sparkle(s, 2.860, 1.531, 0.330, RUST);
++  sparkle(s, 10.143, 1.531, 0.330, RUST);
++  label(s, 'Product One', 2.205, 6.056, 1.498, 0.337, RUST, { align: 'center' });
++  label(s, 'Product Three', 9.559, 6.056, 1.498, 0.337, RUST, { align: 'center' });
++  tagButton(s, 'Product Two', 5.736, 6.493, 1.880);
++}
++
++function slide12(s) { // Achievement & awards
++  blob(s, 8.578, 2.158, 2.962, 3.091);
++  blob(s, -1.363, 6.172, 2.962, 3.091);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Achievement & Awards', 0.755, 1.861, 3.676, 1.447);
++  sparkle(s, 3.825, 2.795, 0.330, RUST);
++  body(s, L.enVitae, 5.090, 2.299, 3.212, 0.582);
++  trophyIcon(s, 0.887, 4.462, 0.245, 0.277);
++  chartIcon(s, 5.214, 4.454, 0.290, 0.294);
++  label(s, 'Awards Received', 0.774, 5.081, 2.403, 0.337);
++  body(s, L.short, 0.774, 5.609, 2.733, 0.582);
++  label(s, 'Major Achievement', 5.107, 5.081, 2.278, 0.337);
++  body(s, L.short + ' ', 5.107, 5.609, 2.733, 0.582);
++}
++
++function slide13(s) { // Market trends
++  blob(s, 11.806, -1.560, 2.962, 3.091);
++  panel(s, 0, 0, 6.226, 7.5, RUST);
++  navbar(s, NAV_PANEL_TO_HOME);
++  title(s, 'Market Trends', 8.252, 2.464, 4.395, 0.774);
++  sparkle(s, 12.534, 4.097, 0.330, RUST);
++  body(s, L.full, 8.269, 3.577, 3.997, 0.582);
++  ctaCluster(s, 8.376, 4.881);
++  vLine(s, 0.759, 1.623, 6.467, CREAM);
++  dot(s, 0.710, 3.010, CREAM);
++  dot(s, 0.710, 4.989, CREAM);
++  [['Trend One', 1.531], ['Trend Two', 3.485], ['Trend Three', 5.440]].forEach(([name, y]) => {
++    label(s, name, 1.323, y, 1.872, 0.337, CREAM);
++    body(s, L.duisSed, 1.323, y + 0.528, 3.433, 0.582, CREAM);
++  });
++  blob(s, 4.514, 6.001, 2.962, 3.091);
++}
++
++function slide14(s) { // SWOT analysis
++  blob(s, -1.635, -1.816, 3.552, 3.707);
++  blob(s, 12.022, 6.191, 2.962, 3.091);
++  panel(s, 8.032, 4.774, 3.204, 1.653, RUST, 46);
++  navbar(s, NAV_ON_CREAM);
++  s.addText([{ text: 'SWOT ', options: { breakLine: true } }, { text: 'Analysis' }],
++    { x: 0.493, y: 2.453, w: 2.733, h: 1.447, valign: 'top', fontFace: HEAD, fontSize: 40, color: INK });
++  sparkle(s, 2.569, 2.656, 0.330, RUST);
++  const quads = [
++    ['Strength', 4.328, 2.649, RUST, INK],
++    ['Weaknesses', 0.496, 5.081, RUST, INK],
++    ['Opportunities', 4.328, 5.081, RUST, INK],
++    ['Threats', 8.300, 5.081, CREAM, CREAM],
++  ];
++  quads.forEach(([name, x, y, lc, bc]) => {
++    label(s, name, x, y, name === 'Threats' ? 1.064 : 2.403, 0.337, lc);
++    body(s, L.short, x, y + 0.528, 2.733, 0.582, bc);
++  });
++}
++
++function slide15(s) { // Break section
++  s.background = { color: RUST };
++  blob(s, 11.542, -1.420, 2.996, 3.072, CREAM);
++  blob(s, -1.394, 6.169, 2.662, 2.662, CREAM);
++  navbar(s, NAV_ON_RUST);
++  text(s, 'Let\u2019s Take A Break', 0.805, 2.267, 3.930, 1.919, { fontFace: HEAD, fontSize: 54, color: CREAM });
++  sparkle(s, 3.825, 3.585, 0.330, CREAM);
++  hLine(s, 5.629, 0.901, 2.664, CREAM);
++  text(s, 'Break Section', 2.875, 5.419, 1.401, 0.352, { fontFace: BODY, fontSize: 11, color: CREAM, lineSpacingMultiple: 1.5 });
++}
++
++function slide16(s) { // Market strategy
++  blob(s, 0.395, 6.038, 2.917, 3.044);
++  blob(s, 11.784, -1.478, 2.917, 3.044);
++  panel(s, 3.000, 1.830, 3.421, 2.317, RUST, 46);
++  navbar(s, NAV_PANEL_TO_LOGO);
++  title(s, 'Market Strategy', 7.900, 1.749, 4.344, 0.774);
++  sparkle(s, 12.402, 2.020, 0.330, RUST);
++  const items = [
++    ['01', 'Target Market', 7.875, 2.981, 8.215, 3.176],
++    ['02', 'Sales Strategy', 7.875, 5.138, 8.215, 5.333],
++    ['03', 'Positioning Strategy', 2.847, 5.138, 3.187, 5.333],
++  ];
++  items.forEach(([num, name, nx, ny, tx, ty]) => {
++    numeral(s, num, nx, ny, RUST);
++    label(s, name, tx, ty, 2.403, 0.337);
++    body(s, L.gravida, tx, ty + 0.512, 4.029, 0.582);
++  });
++  pullQuote(s, 3.210, 2.862, 2.858);
++}
++
++function slide17(s) { // Sales strategy
++  blob(s, 11.427, 5.719, 2.917, 3.044);
++  blob(s, -1.719, -1.948, 2.917, 3.044);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Sales Strategy', 0.469, 1.623, 4.344, 0.774);
++  sparkle(s, 4.304, 1.881, 0.330, RUST);
++  body(s, L.full, 0.478, 2.554, 3.997, 0.582);
++  [['Strategy One', 5.856], ['Strategy Two', 10.142]].forEach(([name, x]) => {
++    label(s, name, x, 1.938, 2.403, 0.337);
++    body(s, L.short, x, 2.554, 2.733, 0.582);
++  });
++  ctaCluster(s, 8.359, 5.219);
++}
++
++function slide18(s) { // Our product
++  blob(s, 11.681, 5.978, 2.917, 3.044);
++  blob(s, -1.803, -1.877, 2.917, 3.044);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Our Product', 8.606, 2.520, 3.741, 0.774);
++  sparkle(s, 12.292, 2.791, 0.330, RUST);
++  body(s, L.full, 8.625, 3.577, 3.997, 0.582);
++  text(s, '90%', 8.635, 4.741, 1.099, 0.404, { fontFace: HEAD, fontSize: 18, color: RUST });
++  text(s, 'Best Product', 8.635, 5.178, 1.468, 0.252, { fontFace: BODY, fontSize: 9 });
++  text(s, '10,7K', 11.060, 4.741, 1.099, 0.404, { fontFace: HEAD, fontSize: 18, color: RUST });
++  text(s, 'Client Happy', 11.046, 5.178, 1.468, 0.252, { fontFace: BODY, fontSize: 9 });
++  sparkle(s, 10.098, 4.899, 0.404, RUST);
++  label(s, 'Product One', 0.819, 5.367, 1.498, 0.337, RUST, { align: 'center' });
++  label(s, 'Product Three', 5.504, 5.367, 1.498, 0.337, RUST, { align: 'center' });
++  tagButton(s, 'Product Two', 3.123, 2.474, 1.574);
++}
++
++function slide19(s) { // Development product
++  blob(s, -1.458, 6.389, 2.917, 3.044);
++  blob(s, 6.146, -1.522, 2.917, 3.044);
++  panel(s, 7.270, 0, 6.063, 7.5, RUST);
++  navbar(s, NAV_PANEL_FROM_CONTACT);
++  title(s, 'Development Product', 8.431, 1.728, 3.741, 1.447, CREAM, { align: 'center' });
++  sparkle(s, 10.137, 3.460, 0.330, CREAM);
++  [['01', 'Development Plan', 1.759, 1.937], ['02', 'Launch Plan', 4.611, 4.789]].forEach(([num, name, ny, ty]) => {
++    numeral(s, num, 2.458, ny, RUST);
++    label(s, name, 2.794, ty, 2.403, 0.337);
++    body(s, L.cras, 2.794, ty + 0.553, 2.863, 0.834);
++  });
++}
++
++function slide20(s) { // Financial project
++  blob(s, -1.458, -1.522, 2.917, 3.044);
++  blob(s, 4.208, 6.191, 2.917, 3.044);
++  panel(s, 8.051, 0, 2.572, 7.5, RUST, 46);
++  panel(s, 10.607, 0, 2.727, 7.5, RUST);
++  panel(s, 5.666, 0, 2.401, 7.5, RUST);
++  navbar(s, NAV_PANEL_FROM_ABOUT);
++  title(s, 'Financial Project', 0.730, 2.015, 2.876, 1.447);
++  sparkle(s, 2.925, 2.919, 0.330, RUST);
++  body(s, L.duisSed, 0.764, 3.921, 3.403, 0.582);
++  [['$12.4M', 'Revenue', 6.135, 6.133], ['80%', 'Profit', 8.598, 8.596], ['$25.7', 'Balance', 11.238, 11.236]].forEach(
++    ([big, cap, bx, cx]) => {
++      text(s, big, bx, 3.295, 1.464, 0.572, { fontFace: HEAD, fontSize: 28, color: CREAM, align: 'center' });
++      text(s, cap, cx, 3.868, 1.468, 0.337, { fontFace: BODY, fontSize: 14, color: CREAM, align: 'center' });
++    });
++}
++
++function slide21(s) { // Partnerships & collaborations
++  blob(s, 11.875, 1.649, 2.917, 3.044);
++  blob(s, -0.929, 1.541, 1.857, 1.938);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Partnerships & Collaborations', 2.460, 1.546, 8.413, 0.774, INK, { align: 'center' });
++  body(s, L.malesuada, 4.003, 2.500, 5.327, 0.582, INK, { align: 'center' });
++  sparkle(s, 3.315, 2.674, 0.330, RUST);
++  sparkle(s, 9.688, 2.690, 0.330, RUST);
++  [['01', 'Development Collaborations', 3.330, 3.665, 2.748], ['02', 'Technology Partnership', 9.584, 9.919, 2.403]].forEach(
++    ([num, name, nx, tx, tw]) => {
++      numeral(s, num, nx, 4.934, RUST);
++      label(s, name, tx, 5.113, tw, 0.337);
++      body(s, L.cras, tx, 5.666, 2.863, 0.834);
++    });
++}
++
++function slide22(s) { // Risk analysis
++  blob(s, 4.341, 2.918, 3.546, 3.700);
++  blob(s, 12.282, -0.964, 2.102, 2.194);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Risk Analysis', 4.813, 1.850, 3.708, 0.774, INK, { align: 'center' });
++  sparkle(s, 7.722, 2.919, 0.330, RUST);
++  sparkle(s, 4.720, 5.758, 0.504, RUST);
++  const risks = [
++    ['Market Risks', 0.785, 2.013], ['Strategic Risks', 0.785, 4.779],
++    ['Technologycal Risks', 9.998, 2.013], ['Financial Risks', 9.998, 4.779],
++  ];
++  risks.forEach(([name, x, y]) => {
++    label(s, name, x, y, 2.403, 0.337);
++    body(s, L.short + ' ', x, y + 0.617, 2.733, 0.582);
++  });
++}
++
++function slide23(s) { // Future plans
++  blob(s, 11.259, 5.379, 2.933, 3.061);
++  blob(s, -1.467, -1.725, 2.933, 3.061);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Future Plans', 1.071, 1.946, 3.708, 0.774, INK, { align: 'center' });
++  body(s, L.duisSed, 1.361, 5.937, 3.403, 0.582);
++  vLine(s, 6.716, 1.899, 6.389, RUST);
++  dot(s, 6.667, 2.804, RUST);
++  dot(s, 6.667, 5.380, RUST);
++  [['01', 'Development Plan', 1.971, 2.149], ['02', 'Launch Plan', 4.823, 5.001]].forEach(([num, name, ny, ty]) => {
++    numeral(s, num, 7.541, ny, RUST);
++    label(s, name, 7.876, ty, 2.403, 0.337);
++    body(s, L.cras, 7.876, ty + 0.553, 2.863, 0.834);
++  });
++}
++
++function slide24(s) { // Customer testimonial
++  blob(s, -1.467, -1.531, 2.933, 3.061);
++  blob(s, 12.297, 6.242, 2.933, 3.061);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Cutomer Testimonial', 9.232, 2.503, 3.708, 1.447);
++  sparkle(s, 11.900, 2.737, 0.330, RUST);
++  body(s, L.duisSed, 9.245, 4.303, 3.403, 0.582);
++  ctaCluster(s, 9.344, 5.573);
++  [0.910, 4.958].forEach((cx) => {
++    panel(s, cx, 2.662, 2.708, 3.291, RUST);
++    label(s, 'Anna Putao', cx + 0.278, 3.140, 1.291, 0.337, CREAM);
++    text(s, 'Customer ', cx + 0.278, 3.449, 0.963, 0.307,
++      { fontFace: BODY, fontSize: 9, color: CREAM, lineSpacingMultiple: 1.5 });
++    text(s, '\u201C', cx + 0.255, 4.089, 0.922, 0.707, { fontFace: HEAD, fontSize: 36, color: CREAM, transparency: 66 });
++    hLine(s, 4.341, cx + 0.677, cx + 2.264, CREAM);
++    body(s, L.review, cx + 0.257, 4.498, 2.351, 0.834, CREAM);
++  });
++}
++
++function slide25(s) { // Thank you
++  blob(s, 11.533, 5.490, 2.933, 3.061);
++  blob(s, -1.613, -1.781, 2.933, 3.061);
++  navbar(s, NAV_ON_CREAM);
++  title(s, 'Thank You For', 0.925, 2.078, 4.119, 0.774);
++  title(s, 'Your Attention', 1.981, 2.807, 4.312, 0.774);
++  sparkle(s, 1.441, 3.032, 0.330, RUST);
++  panel(s, 1.022, 4.909, 2.953, 2.591, RUST, 46);
++  pullQuote(s, 1.274, 5.814, 2.858);
++  label(s, 'Call To Action :', 7.366, 2.281, 1.978, 0.370, RUST, { fontSize: 16 });
++  vLine(s, 9.966, 2.302, 3.396, RUST);
++  dot(s, 9.913, 2.241, RUST);
++  dot(s, 9.913, 3.346, RUST);
++  const contact = [
++    ['example@gmail.com', 7.410, 2.972], ['www.example.com', 10.543, 2.290], ['(+11) 123 456 7890', 10.553, 2.972],
++  ];
++  contact.forEach(([str, x, y]) =>
++    text(s, str, x, y, 1.978, 0.352, { fontFace: BODY, fontSize: 11, color: INK, lineSpacingMultiple: 1.5 }));
++}
++
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25,
++];
++
++/* ------------------------------------------------------------------ *
++ * Build + write
++ * ------------------------------------------------------------------ */
++function build() {
++  const pres = new PptxGenJS();
++  pres.defineLayout({ name: 'KEERA_16x9', width: SLIDE_W, height: SLIDE_H });
++  pres.layout = 'KEERA_16x9';
++  pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++  pres.title = 'Keera Company Profile';
++
++  BUILDERS.forEach((buildSlide) => {
++    const s = pres.addSlide();
++    s.background = { color: CREAM };
++    buildSlide(s);
++  });
++  return pres;
++}
++
++build()
++  .writeFile({ fileName: path.join(__dirname, '148abc9d-d1a0-4da4-9c49-4def4c96d282_grok_final.pptx') })
++  .then((f) => console.log('wrote', f))
++  .catch((e) => { console.error(e); process.exit(1); });

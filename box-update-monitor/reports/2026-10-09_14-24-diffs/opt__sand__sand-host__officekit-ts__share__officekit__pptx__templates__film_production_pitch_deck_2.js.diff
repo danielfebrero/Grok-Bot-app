@@ -1,0 +1,573 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/film_production_pitch_deck_2.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/film_production_pitch_deck_2.js
+@@ -0,0 +1,570 @@
++/**
++ * "HORIJON MOVIE — Producing a Film" pitch deck, rebuilt with pptxgenjs.
++ * 20 slides, 13.333 x 7.5 in (16:9).
++ *
++ * Photographs and icon artwork of the original are replaced by native
++ * pptxgenjs placeholder shapes (outline rings for the line-art icons,
++ * tinted panels for the picture areas).
++ *
++ * Run:  node 030f841f-1a84-46d4-b2a3-2ea591342a2b_grok_final.js
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++const OUT_NAME = '030f841f-1a84-46d4-b2a3-2ea591342a2b_grok_final.pptx';
++
++/* ------------------------------------------------------------------ */
++/* palette + typography (from the deck's "Movie Production" theme)     */
++/* ------------------------------------------------------------------ */
++const ORANGE   = 'EE6330';  // accent2 - the deck's signature colour
++const WHITE    = 'FFFFFF';
++const BLACK    = '000000';
++const BG       = '211D1B';  // master radial gradient 26221F -> 1E1A18, flattened
++const GHOST    = '2A2625';  // giant watermark words (3B3838 @ 40% over BG)
++const GREY_TX  = 'D0CECE';  // body copy on dark backgrounds
++const OFFWHITE = 'F4F4F4';  // accent3 - light cards
++const PALE     = 'F2F2F2';
++const RULE     = 'E7E6E6';  // lt2 - hairline rules
++const AXIS     = '767171';  // chart tick labels
++const GRID     = 'D9D9D9';  // chart gridlines
++const BAND_A   = 'CCCCCC';  // banded table rows
++const BAND_B   = 'E7E7E7';
++const ICON_DIM = '6C3722';  // the oversized orange reel on the cover (36% alpha)
++
++const HEAD = 'Oswald';      // theme major font
++const BODY = 'Open Sans';   // theme minor font
++
++const LOREM1 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.';
++const LOREM2 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
++const LOREM3 = LOREM2 + ' Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.';
++
++/* ------------------------------------------------------------------ */
++/* helpers                                                             */
++/* ------------------------------------------------------------------ */
++
++// Every text frame in the source deck is top-anchored, 18pt Open Sans by default.
++function txt(s, content, o) {
++  s.addText(content, Object.assign({ valign: 'top', fontFace: BODY, fontSize: 18 }, o));
++}
++
++// Oversized watermark word sitting behind the content of nearly every slide.
++function ghost(s, content, o) {
++  txt(s, content, Object.assign({ fontFace: HEAD, fontSize: 199, color: GHOST }, o));
++}
++
++// The deck's recurring title pair: orange kicker above a white headline.
++function kicker(s, t, o)   { txt(s, t, Object.assign({ fontFace: HEAD, fontSize: 32, color: ORANGE }, o)); }
++function headline(s, t, o) { txt(s, t, Object.assign({ fontFace: HEAD, fontSize: 48, color: WHITE  }, o)); }
++
++// Icon placeholder: an outline ring covering the original artwork's box.
++function icon(s, x, y, d, color) {
++  const inset = d * 0.07;
++  s.addShape('ellipse', {
++    x: x + inset, y: y + inset, w: d - 2 * inset, h: d - 2 * inset,
++    line: { color: color, width: Math.max(0.75, d * 3.6) },
++  });
++}
++
++// Small icon sitting inside a filled disc (the deck's bullet badges).
++function badge(s, cx, cy, cd, discColor, ix, iy, id, iconColor) {
++  s.addShape('ellipse', { x: cx, y: cy, w: cd, h: cd, fill: { color: discColor } });
++  icon(s, ix, iy, id, iconColor);
++}
++
++function panel(s, x, y, w, h, fill, radius, transparency) {
++  const o = { x: x, y: y, w: w, h: h, fill: { color: fill } };
++  if (transparency) o.fill.transparency = transparency;
++  if (radius) o.rectRadius = radius;
++  s.addShape(radius ? 'roundRect' : 'rect', o);
++}
++
++function hline(s, x, y, w, color, width) {
++  s.addShape('line', { x: x, y: y, w: w, h: 0, line: { color: color, width: width || 0.5 } });
++}
++function vline(s, x, y, h, color, width) {
++  s.addShape('line', { x: x, y: y, w: 0, h: h, line: { color: color, width: width || 0.5 } });
++}
++
++// Orange header row + banded body, matching "Medium Style 2 - Accent 1".
++function dataTable(s, cfg) {
++  const rows = [cfg.head.map(function (h) {
++    return { text: h, options: { fill: { color: ORANGE }, color: WHITE, bold: true, fontFace: cfg.headFace || BODY, fontSize: cfg.headSize } };
++  })];
++  cfg.body.forEach(function (r, i) {
++    const fill = cfg.bodyFill[i % cfg.bodyFill.length];
++    rows.push(r.map(function (c) {
++      return { text: c, options: { fill: { color: fill }, color: BLACK, fontSize: cfg.bodySize } };
++    }));
++  });
++  const rowH = [cfg.headH].concat(cfg.body.map(function () { return cfg.rowH; }));
++  s.addTable(rows, {
++    x: cfg.x, y: cfg.y, colW: cfg.colW, rowH: rowH,
++    w: cfg.colW.reduce(function (a, b) { return a + b; }),
++    h: rowH.reduce(function (a, b) { return a + b; }),
++    align: 'center', valign: 'middle', fontFace: BODY, autoPage: false,
++    border: { type: 'solid', color: WHITE, pt: 1 },
++  });
++}
++
++// "Your Company" lockup carried by the slide master on every slide.
++function logo(s) {
++  txt(s, 'Your Company', {
++    x: 11.688, y: 0.455, w: 1.359, h: 0.368,
++    fontFace: HEAD, fontSize: 12, color: ORANGE, align: 'right', lineSpacingMultiple: 1.5,
++  });
++  icon(s, 11.665, 0.455, 0.368, ORANGE);
++}
++
++/* ------------------------------------------------------------------ */
++/* slides                                                              */
++/* ------------------------------------------------------------------ */
++
++function slide01(s) {                                    // Cover
++  ghost(s, 'HORIJON MOVIE', { x: 0.184, y: 0.134, w: 10.399, h: 6.799, charSpacing: 6 });
++  icon(s, 5.167, 0.142, 6.791, ICON_DIM);
++  kicker(s, 'PRODUCING A FILM', { x: 1.702, y: 3.519, w: 5.765, h: 0.707, fontSize: 36, charSpacing: 3 });
++  txt(s, 'HORIJON MOVIE', {
++    x: 1.663, y: 4.059, w: 8.604, h: 1.582,
++    fontFace: HEAD, fontSize: 88, charSpacing: 6, color: WHITE,
++  });
++  txt(s, 'From Concept to Cinema', { x: 1.663, y: 5.641, w: 5.101, h: 0.572, fontFace: HEAD, fontSize: 28, color: WHITE });
++  // slanted "/" accent to the left of the kicker (a sheared parallelogram)
++  s.addShape('custGeom', {
++    x: 1.142, y: 3.653, w: 0.403, h: 0.572, fill: { color: ORANGE },
++    points: [{ x: 0.262, y: 0 }, { x: 0.403, y: 0 }, { x: 0.141, y: 0.572 }, { x: 0, y: 0.572 }, { close: true }],
++  });
++  txt(s, [
++    { text: 'Presentation Template', options: { breakLine: true } },
++    { text: '2023' },
++  ], {
++    x: 1.052, y: 0.476, w: 2.481, h: 0.671,
++    fontFace: HEAD, fontSize: 12, charSpacing: 3, color: WHITE, lineSpacingMultiple: 1.5,
++  });
++}
++
++function slide02(s) {                                    // A Tale of Adventure
++  ghost(s, 'TALE OF',    { x: 0.345, y: -0.052, w: 12.988, h: 4.931, fontSize: 287 });
++  ghost(s, 'ADVENTURE',  { x: 2.768, y:  4.599, w: 10.748, h: 2.895, fontSize: 166 });
++  kicker(s, 'Crafting the story', { x: 1.058, y: 1.718, w: 3.825, h: 0.64 });
++  headline(s, 'A TALE OF ADVENTURE', { x: 1.058, y: 2.358, w: 6.175, h: 0.909 });
++  icon(s, 1.056, 0.569, 1.041, WHITE);
++  txt(s, LOREM1, { x: 9.079, y: 6.114, w: 3.343, h: 0.627, fontSize: 11, color: GREY_TX, lineSpacingMultiple: 1.5 });
++
++  panel(s, 7.459, 1.857, 4.725, 3.469, ORANGE, 0.182);
++  badge(s, 8.363, 2.522, 0.866, WHITE, 8.539, 2.692, 0.515, ORANGE);
++  txt(s, [
++    { text: "We've developed a thrilling adventure story with compelling characters,", options: { breakLine: true } },
++    { text: 'set in a breathtaking landscape.' },
++  ], { x: 8.316, y: 3.702, w: 3.54, h: 0.978, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 });
++
++  vline(s, 8.891, 5.575, 1.355, RULE);
++  txt(s, 'Your Tittle here', { x: 9.086, y: 5.731, w: 1.479, h: 0.412, fontFace: HEAD, fontSize: 14, color: GREY_TX, lineSpacingMultiple: 1.5 });
++}
++
++function slide03(s) {                                    // Securing Investments (white slide)
++  s.background = { color: WHITE };
++  panel(s, 4.334, -0.024, 4.714, 7.512, ORANGE, 0, 15);
++  txt(s, [
++    { text: 'We plan to secure', options: { breakLine: true } },
++    { text: 'funding through :' },
++  ], { x: 9.742, y: 2.161, w: 2.678, h: 0.909, fontFace: HEAD, fontSize: 24, color: BLACK });
++
++  txt(s, [
++    { text: 'SECURING', options: { breakLine: true } },
++    { text: 'INVESTMENTS' },
++  ], { x: 4.947, y: 2.358, w: 4.092, h: 1.717, fontFace: HEAD, fontSize: 48, color: WHITE });
++  txt(s, 'Financial Support', { x: 4.947, y: 4.075, w: 3.981, h: 0.64, fontFace: HEAD, fontSize: 32, color: WHITE });
++  txt(s, LOREM2, { x: 5.006, y: 5.81, w: 3.249, h: 0.868, fontSize: 10.5, color: PALE, lineSpacingMultiple: 1.5 });
++  icon(s, 5.028, 1.45, 0.77, WHITE);
++  hline(s, 5.062, 4.972, 1.388, WHITE);
++
++  [ { label: 'Investors',               ty: 3.541, tw: 1.524, disc: 3.618, iy: 3.704, id: 0.246, ruleX: 9.728, ruleY: 4.278 },
++    { label: 'Sponsorships, and',       ty: 4.598, tw: 2.003, disc: 4.647, iy: 4.731, id: 0.230, ruleX: 9.792, ruleY: 5.335 },
++    { label: 'crowdfunding campaigns.', ty: 5.655, tw: 2.393, disc: 5.709, iy: 5.808, id: 0.210 },
++  ].forEach(function (r) {
++    badge(s, 10.004, r.disc, 0.418, ORANGE, 10.09, r.iy, r.id, WHITE);
++    txt(s, r.label, { x: 10.656, y: r.ty, w: r.tw, h: 0.349, fontSize: 11, color: BLACK, lineSpacingMultiple: 1.5 });
++    if (r.ruleY) hline(s, r.ruleX, r.ruleY, 3.225, '808080');
++  });
++}
++
++function slide04(s) {                                    // Preparing for the Journey
++  ghost(s, 'PREPARING', { x: 0.152, y: 0.154, w: 11.958, h: 3.45 });
++  ghost(s, 'JOURNEY',   { x: 0.212, y: 3.490, w: 11.958, h: 4.123, fontSize: 239 });
++
++  // four milestone cards - the last one is highlighted in orange
++  const CARDS = [
++    { x: 6.667, y: 1.403, fill: WHITE,  ink: BLACK, months: '2 Month ', label: 'Script Development', iconX: 7.375, iconY: 1.786, iconD: 1.208, mx: 7.069, lx: 6.822, lw: 2.315 },
++    { x: 9.493, y: 1.403, fill: WHITE,  ink: BLACK, months: '1 Month ', label: 'Casting',            iconX: 10.323, iconY: 1.897, iconD: 1.016, mx: 9.839, lx: 9.569, lw: 2.524 },
++    { x: 6.667, y: 4.236, fill: WHITE,  ink: BLACK, months: '2 Month ', label: 'Location Scouting',  iconX: 7.430, iconY: 4.616, iconD: 1.098, mx: 7.013, lx: 6.743, lw: 2.524 },
++    { x: 9.493, y: 4.236, fill: ORANGE, ink: WHITE, months: '1 Month ', label: 'Crew Hiring',        iconX: 10.323, iconY: 4.680, iconD: 1.016, mx: 9.839, lx: 9.569, lw: 2.524 },
++  ];
++  CARDS.forEach(function (c) { panel(s, c.x, c.y, 2.677, 2.677, c.fill, 0.188); });
++
++  kicker(s, 'Key Pre-Production Milestones', { x: 1.023, y: 2.354, w: 5.402, h: 0.64 });
++  txt(s, [
++    { text: 'PREPARING FOR', options: { breakLine: true } },
++    { text: 'THE JOURNEY' },
++  ], { x: 1.023, y: 3.087, w: 5.095, h: 1.717, fontFace: HEAD, fontSize: 48, color: WHITE });
++  icon(s, 1.094, 1.234, 0.952, WHITE);
++
++  CARDS.forEach(function (c) {
++    icon(s, c.iconX, c.iconY, c.iconD, c.ink);
++    txt(s, c.months, { x: c.mx, y: c.y + 1.698, w: 1.984, h: 0.404, fontFace: HEAD, color: c.ink, align: 'center' });
++    txt(s, c.label,  { x: c.lx, y: c.y + 2.068, w: c.lw, h: 0.303, fontSize: 12, color: c.ink, align: 'center' });
++  });
++
++  txt(s, LOREM1, { x: 2.207, y: 6.078, w: 3.343, h: 0.627, fontSize: 11, color: GREY_TX, lineSpacingMultiple: 1.5 });
++  vline(s, 1.947, 5.323, 1.59, RULE);
++  txt(s, 'Your Tittle here', { x: 2.685, y: 5.575, w: 1.479, h: 0.412, fontFace: HEAD, fontSize: 14, color: GREY_TX, lineSpacingMultiple: 1.5 });
++  badge(s, 2.207, 5.551, 0.418, WHITE, 2.303, 5.648, 0.224, ORANGE);
++}
++
++function slide05(s) {                                    // Staying on Schedule
++  ghost(s, [
++    { text: ' STAYING ON', options: { breakLine: true } },
++    { text: 'SCHEDULE' },
++  ], { x: -0.312, y: 0.268, w: 13.254, h: 6.799 });
++  headline(s, ' STAYING ON SCHEDULE', { x: 0.888, y: 6.158, w: 6.667, h: 0.909 });
++  kicker(s, 'Production Timeline', { x: 1.047, y: 5.629, w: 4.086, h: 0.64 });
++  panel(s, 8.304, 4.0, 3.861, 2.885, ORANGE, 0.139);
++  badge(s, 8.998, 4.695, 0.641, WHITE, 9.082, 4.779, 0.473, ORANGE);
++  txt(s, [
++    { text: 'The film production is expected to take 12 months, from', options: { breakLine: true } },
++    { text: 'pre-production to distribution.' },
++  ], { x: 8.948, y: 5.461, w: 2.824, h: 0.978, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 });
++}
++
++function slide06(s) {                                    // Shooting Schedule (table)
++  ghost(s, [
++    { text: 'SHOOT', options: { breakLine: true } },
++    { text: 'ING' },
++  ], { x: 4.292, y: -0.125, w: 10.992, h: 8.145, fontSize: 239 });
++  kicker(s, 'Day-by-Day Overview', { x: 5.0, y: 2.049, w: 4.097, h: 0.64 });
++  headline(s, 'SHOOTING SCHEDULE', { x: 5.0, y: 2.689, w: 5.639, h: 0.909 });
++
++  dataTable(s, {
++    x: 5.105, y: 3.75, colW: [1.911, 2.051, 3.187], headH: 0.512, rowH: 0.557,
++    headFace: HEAD, headSize: 14, bodySize: 11, bodyFill: [OFFWHITE],
++    head: ['Day', 'Location', 'Scenes to Shoot'],
++    body: [
++      ['Monday',    'Studio',        'Opening Sequence, Interior Scenes'],
++      ['Tuesday',   'Studio',        'Key Dialogue Scenes'],
++      ['Wednesday', 'On Location 1', 'Exterior Shots, Action Sequences'],
++      ['Thursday',  'On Location 2', 'Outdoor Dialogue Scenes, Continuity'],
++      ['Friday',    'Studio',        'Indoor Scenes, Close-Ups'],
++    ],
++  });
++  icon(s, 5.053, 1.349, 0.64, WHITE);
++}
++
++function slide07(s) {                                    // Essential Items
++  ghost(s, 'ESSENTIAL', { x: 0.029, y: 0.454, w: 13.276, h: 4.123, fontSize: 239, align: 'center' });
++  panel(s, 0, 4.348, 13.333, 3.152, ORANGE, 0, 15);
++  headline(s, 'ESSENTIAL ITEMS', { x: 3.847, y: 2.243, w: 5.639, h: 0.909, align: 'center' });
++  kicker(s, 'What We Need On Set', { x: 4.618, y: 1.555, w: 4.097, h: 0.64, align: 'center' });
++
++  [ { card:  1.163, lx:  0.414, lw: 2.378, iconX:  1.378, iconY: 3.983, iconD: 0.719, label: 'Cameras and Lenses' },
++    { card:  3.645, lx:  3.314, lw: 1.811, iconX:  3.820, iconY: 3.943, iconD: 0.798, label: 'Lighting Equipment' },
++    { card:  6.126, lx:  5.727, lw: 1.948, iconX:  6.303, iconY: 3.970, iconD: 0.797, label: 'Props and Costumes' },
++    { card:  8.608, lx:  8.124, lw: 2.117, iconX:  8.772, iconY: 3.970, iconD: 0.822, label: 'Makeup and Hair Stylists' },
++    { card: 11.090, lx: 10.825, lw: 1.725, iconX: 11.195, iconY: 3.873, iconD: 0.939, label: 'Catering Services' },
++  ].forEach(function (it) {
++    panel(s, it.card, 3.773, 1.15, 1.15, WHITE, 0.081);
++    icon(s, it.iconX, it.iconY, it.iconD, ORANGE);
++    txt(s, it.label, { x: it.lx, y: 5.16, w: it.lw, h: 0.412, fontFace: HEAD, fontSize: 14, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++
++  txt(s, LOREM3, { x: 1.737, y: 6.096, w: 9.639, h: 0.675, fontSize: 12, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++  icon(s, 6.197, 0.598, 0.939, WHITE);
++  hline(s, 5.975, 6.905, 1.383, WHITE);
++}
++
++function slide08(s) {                                    // Calculating the Costs
++  ghost(s, 'Calculating the Costs', { x: 0.718, y: 0.35, w: 12.616, h: 6.799 });
++  kicker(s, 'Financial Overview', { x: 8.057, y: 3.11, w: 4.0, h: 0.64 });
++  txt(s, [
++    { text: 'Calculating', options: { breakLine: true } },
++    { text: 'the Costs' },
++  ], { x: 8.057, y: 3.75, w: 3.415, h: 1.717, fontFace: HEAD, fontSize: 48, color: WHITE });
++  icon(s, 8.132, 2.369, 0.562, WHITE);
++  txt(s, LOREM1, { x: 8.642, y: 6.266, w: 3.415, h: 0.627, fontSize: 11, color: GREY_TX, lineSpacingMultiple: 1.5 });
++
++  panel(s, 0.358, 0.541, 2.593, 2.529, ORANGE, 0.163);
++  badge(s, 1.334, 0.897, 0.641, WHITE, 1.422, 0.984, 0.466, ORANGE);
++  txt(s, [
++    { text: 'The total budget',            options: { breakLine: true } },
++    { text: 'needed for the film project', options: { breakLine: true } },
++    { text: 'is approximately ' },
++    { text: '$750,000', options: { fontFace: HEAD } },
++    { text: '.' },
++  ], { x: 0.49, y: 1.674, w: 2.329, h: 0.977, fontSize: 12, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++
++  vline(s, 8.508, 5.635, 1.26, RULE);
++  badge(s, 8.694, 5.732, 0.418, WHITE, 8.737, 5.774, 0.333, ORANGE);
++}
++
++function slide09(s) {                                    // Pre-Production Costs (table)
++  ghost(s, 'PRODUCTION', { x: 0.789, y: 4.027, w: 11.756, h: 2.895, fontSize: 166 });
++  ghost(s, 'PRE-',       { x: 5.776, y: 0.675, w:  6.433, h: 4.123, fontSize: 239 });
++  kicker(s, 'Budget Allocation', { x: 1.063, y: 1.631, w: 6.667, h: 0.64 });
++  headline(s, 'PRE-PRODUCTION COSTS', { x: 1.063, y: 2.271, w: 6.667, h: 0.909 });
++
++  dataTable(s, {
++    x: 1.19, y: 3.612, colW: [3.119, 3.119], headH: 0.643, rowH: 0.643,
++    headSize: 18, bodySize: 14, bodyFill: [BAND_A, BAND_B],
++    head: ['Expense', 'Estimated Cost'],
++    body: [
++      ['Script Development', '$20,000'],
++      ['Casting',            '$15,000'],
++      ['Location Scouting',  '$25,000'],
++      ['Crew Hiring',        '$10,000'],
++    ],
++  });
++  icon(s, 1.063, 0.591, 1.017, WHITE);
++
++  txt(s, 'Budget Planning', { x: 8.139, y: 3.612, w: 1.479, h: 0.412, fontFace: HEAD, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.5 });
++  txt(s, LOREM2, { x: 8.139, y: 4.013, w: 3.469, h: 0.904, fontSize: 11, color: GREY_TX, lineSpacingMultiple: 1.5 });
++  txt(s, LOREM1, { x: 8.924, y: 6.052, w: 3.353, h: 0.627, fontSize: 11, color: GREY_TX, lineSpacingMultiple: 1.5 });
++  vline(s, 8.749, 5.333, 1.462, RULE);
++  badge(s, 9.014, 5.635, 0.418, WHITE, 9.099, 5.715, 0.247, ORANGE);
++}
++
++function slide10(s) {                                    // Post-Production Costs (table)
++  ghost(s, 'POLISHING', { x: 0, y: 0.618, w: 12.976, h: 3.45, align: 'center' });
++  headline(s, 'POLISHING THE FILM', { x: 6.484, y: 3.09, w: 6.255, h: 0.909 });
++  kicker(s, 'Post-Production Costs', { x: 6.484, y: 2.451, w: 4.088, h: 0.64 });
++
++  dataTable(s, {
++    x: 1.149, y: 2.285, colW: [2.37, 2.37], headH: 0.779, rowH: 0.779,
++    headSize: 18, bodySize: 14, bodyFill: [PALE],
++    head: ['Expense', 'Estimated Cost'],
++    body: [
++      ['Editing',           '$60,000'],
++      ['Sound Design',      '$30,000'],
++      ['Visual Effects',    '$80,000'],
++      ['Music Composition', '$40,000'],
++    ],
++  });
++  icon(s, 6.612, 1.632, 0.653, WHITE);
++  txt(s, LOREM2, { x: 1.086, y: 1.199, w: 3.882, h: 0.904, fontSize: 11, color: GREY_TX, lineSpacingMultiple: 1.5 });
++  badge(s, 1.149, 0.757, 0.418, WHITE, 1.216, 0.801, 0.284, ORANGE);
++}
++
++function slide11(s) {                                    // Setting the Stage
++  panel(s, 0, 0, 5.681, 7.5, ORANGE);
++  ghost(s, 'STAGE', { x: 4.709, y: 4.6, w: 8.775, h: 3.45, align: 'center' });
++  headline(s, 'SETTING THE STAGE', { x: 6.548, y: 5.629, w: 5.097, h: 0.909 });
++  kicker(s, 'Planning and Preparation', { x: 6.548, y: 6.427, w: 4.376, h: 0.64 });
++  txt(s, [
++    { text: 'Pre-production involves script development, casting, location scouting, and hiring a skilled crew. Estimated budget: ' },
++    { text: '$100,000.', options: { bold: true, fontFace: HEAD } },
++  ], { x: 1.646, y: 6.028, w: 3.5, h: 0.904, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++  badge(s, 1.167, 6.115, 0.418, WHITE, 1.278, 6.221, 0.196, ORANGE);
++}
++
++function slide12(s) {                                    // Lights, Camera, Action
++  ghost(s, 'ACTION', { x: 4.397, y: 0.69, w: 9.109, h: 3.45, align: 'center' });
++  kicker(s, 'Filming the Story', { x: 5.951, y: 2.086, w: 3.825, h: 0.64 });
++  headline(s, 'LIGHTS, CAMERA, ACTION', { x: 5.951, y: 2.726, w: 6.665, h: 0.909 });
++  icon(s, 5.949, 0.753, 1.041, WHITE);
++
++  panel(s, 4.904, 3.75, 3.569, 3.181, ORANGE, 0.155);
++  badge(s, 5.452, 4.217, 0.641, WHITE, 5.595, 4.352, 0.396, ORANGE);
++  txt(s, [
++    { text: 'This phase includes shooting, director fees, equipment rentals, and daily expenses. Estimated budget' },
++    { text: ': $300,000.', options: { bold: true, fontFace: HEAD } },
++  ], { x: 5.367, y: 5.081, w: 2.915, h: 1.178, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++
++  panel(s, 8.639, 3.75, 3.569, 3.181, OFFWHITE, 0.155);
++  badge(s, 9.187, 4.217, 0.641, ORANGE, 9.328, 4.372, 0.357, WHITE);
++  txt(s, LOREM2, { x: 9.187, y: 5.081, w: 2.748, h: 1.182, fontSize: 11, color: BLACK, lineSpacingMultiple: 1.5 });
++}
++
++function slide13(s) {                                    // Meet Our Lead Actor
++  ghost(s, [
++    { text: 'JOHN', options: { breakLine: true } },
++    { text: 'SMITH' },
++  ], { x: 0.364, y: 0.35, w: 8.9, h: 6.799 });
++  kicker(s, 'MEET OUR LEAD ACTOR', { x: 1.0, y: 2.163, w: 4.387, h: 0.64 });
++  headline(s, 'JOHN SMITH', { x: 1.0, y: 2.802, w: 4.387, h: 0.909 });
++  icon(s, 1.125, 1.085, 0.956, WHITE);
++
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.',
++    { x: 1.643, y: 3.854, w: 3.199, h: 0.627, fontSize: 11, color: GREY_TX, lineSpacingMultiple: 1.5 });
++  badge(s, 1.125, 3.999, 0.436, WHITE, 1.234, 4.083, 0.245, ORANGE);
++
++  panel(s, 2.768, 4.827, 4.563, 2.09, ORANGE, 0.102);
++  txt(s, [
++    { text: 'JOHN ', options: { bold: true, fontFace: HEAD, fontSize: 12 } },
++    { text: 'SMITH', options: { bold: true, fontFace: HEAD, fontSize: 14 } },
++  ], { x: 3.136, y: 5.176, w: 1.365, h: 0.412, color: WHITE, lineSpacingMultiple: 1.5 });
++  txt(s, 'a versatile actor with 15 years of experience, has starred in multiple award-winning films. His exceptional talent and dedication have made him a sought-after performer in the industry.',
++    { x: 3.136, y: 5.539, w: 3.764, h: 1.182, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++}
++
++function slide14(s) {                                    // Meet Our Lead Actress
++  panel(s, -0.004, 0, 4.898, 7.5, ORANGE, 0, 40);
++  txt(s, 'Emily Johnson', { x: 8.206, y: 2.603, w: 1.479, h: 0.412, fontFace: HEAD, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.5 });
++  txt(s, 'an accomplished actress, has a successful career spanning 10 years. Her captivating performances have garnered critical acclaim and have been the highlight of several blockbuster films.',
++    { x: 8.206, y: 2.956, w: 3.829, h: 1.182, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++  badge(s, 8.206, 2.11, 0.436, WHITE, 8.311, 2.197, 0.263, ORANGE);
++
++  panel(s, 7.244, 4.485, 4.964, 2.431, ORANGE, 0.119);
++  txt(s, 'Meet Our Lead Actress', { x: 7.67, y: 4.901, w: 4.366, h: 0.64, fontFace: HEAD, fontSize: 32, color: WHITE });
++  headline(s, 'EMILY JOHNSON', { x: 7.67, y: 5.541, w: 4.539, h: 0.909 });
++}
++
++function slide15(s) {                                    // Supporting Cast
++  ghost(s, 'TALENTED', { x: 0.220, y: 0.358, w: 11.78, h: 3.45 });
++  ghost(s, 'TALENTED', { x: 1.507, y: 3.827, w: 11.78, h: 3.45, align: 'right' });
++  headline(s, 'OUR TALENTED SUPPORTING CAST', { x: 2.262, y: 2.443, w: 8.809, h: 0.909, align: 'center' });
++  kicker(s, 'A STELLAR ENSEMBLE', { x: 3.333, y: 1.764, w: 6.667, h: 0.64, align: 'center' });
++  icon(s, 6.265, 0.805, 0.804, WHITE);
++
++  [ { x: 1.13, tx: 1.941, name: 'Sarah Davis'  },
++    { x: 4.86, tx: 5.671, name: 'James Lee'    },
++    { x: 8.59, tx: 9.401, name: 'Olivia White' },
++  ].forEach(function (c) {
++    panel(s, c.x, 6.187, 3.618, 0.731, ORANGE);
++    txt(s, c.name, { x: c.tx, y: 6.295, w: 1.996, h: 0.501, fontFace: HEAD, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++}
++
++function slide16(s) {                                    // Breakdown of Project Budget (pie)
++  ghost(s, 'PROJECT', { x: 0.275, y: 0.124, w: 11.440, h: 3.45 });
++  ghost(s, 'BUDGET',  { x: 3.241, y: 4.109, w:  9.458, h: 3.45, align: 'right' });
++
++  // 75 / 25 split drawn as two exploded pie wedges, exactly as in the source
++  s.addShape('pie', { x: 1.248, y: 1.036, w: 5.841, h: 5.841, fill: { color: OFFWHITE }, rotate: 273.321, angleRange: [0, 270] });
++  s.addShape('pie', { x: 1.024, y: 0.829, w: 5.841, h: 5.841, fill: { color: ORANGE },   rotate: 183.285, angleRange: [0.05, 89.274] });
++  txt(s, '75%', { x: 3.910, y: 4.208, w: 2.455, h: 0.909, fontFace: HEAD, fontSize: 48, color: BLACK, align: 'center' });
++  txt(s, '25%', { x: 1.691, y: 1.776, w: 2.455, h: 0.909, fontFace: HEAD, fontSize: 48, color: WHITE, align: 'center' });
++
++  headline(s, 'BREAKDOWN OF PROJECT BUDGET', { x: 7.57, y: 2.767, w: 4.857, h: 1.717 });
++  kicker(s, 'Budget Allocation Chart', { x: 7.57, y: 2.128, w: 4.638, h: 0.64 });
++  icon(s, 7.57, 1.165, 0.8, WHITE);
++
++  hline(s, 6.605, 5.138, 2.321, ORANGE);
++  txt(s, 'Your Tittle here', { x: 8.863, y: 5.504, w: 1.479, h: 0.412, fontFace: HEAD, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.5 });
++  txt(s, LOREM2, { x: 8.863, y: 5.891, w: 3.404, h: 0.904, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++  badge(s, 8.926, 4.922, 0.436, WHITE, 9.031, 5.008, 0.263, ORANGE);
++}
++
++function slide17(s) {                                    // Shooting Progress Overview (column chart)
++  ghost(s, 'OVERVIEW', { x: 0.171, y: 0.300, w: 11.717, h: 3.45 });
++  ghost(s, 'OVERVIEW', { x: 1.616, y: 4.216, w: 11.717, h: 3.45, align: 'right' });
++  panel(s, 4.597, 2.822, 7.611, 4.095, OFFWHITE, 0.129);
++  headline(s, 'SHOOTING PROGRESS OVERVIEW', { x: 1.903, y: 1.694, w: 9.528, h: 0.909, align: 'center' });
++  kicker(s, 'Days of Shooting Completed', { x: 4.069, y: 1.055, w: 5.194, h: 0.64, align: 'center' });
++
++  panel(s, 1.083, 2.822, 3.356, 4.095, ORANGE, 0.129);
++  txt(s, '598+',            { x: 1.505, y: 4.143, w: 1.641, h: 0.723, fontFace: HEAD, fontSize: 28, color: WHITE, lineSpacingMultiple: 1.5 });
++  txt(s, 'Your Tittle here',{ x: 1.505, y: 4.724, w: 1.479, h: 0.412, fontFace: HEAD, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.5 });
++  txt(s, LOREM2,            { x: 1.433, y: 5.354, w: 2.792, h: 1.182, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++  icon(s, 3.536, 3.01, 0.632, WHITE);
++
++  // hand-drawn column chart: gridlines, paired bars, value + category labels
++  const ZERO = 6.285;                 // y of the baseline
++  const UNIT = 3.074 / 300;           // inches per data unit
++  for (let i = 0; i < 7; i++) hline(s, 5.319, 3.2 + i * 0.5123, 6.569, GRID, 0.75);
++  [ { m: 'Jan', dark: 174, orange: 200, x:  5.492, lx:  5.568, lw: 0.425 },
++    { m: 'Feb', dark: 151, orange: 170, x:  6.437, lx:  6.485, lw: 0.448 },
++    { m: 'Mar', dark: 197, orange: 249, x:  7.381, lx:  7.425, lw: 0.484 },
++    { m: 'Apr', dark: 119, orange: 179, x:  8.326, lx:  8.401, lw: 0.446 },
++    { m: 'May', dark: 228, orange: 157, x:  9.265, lx:  9.339, lw: 0.499 },
++    { m: 'Jun', dark: 247, orange: 108, x: 10.209, lx: 10.329, lw: 0.432 },
++    { m: 'Jul', dark: 142, orange: 260, x: 11.153, lx: 11.253, lw: 0.383 },
++  ].forEach(function (b) {
++    panel(s, b.x,         ZERO - b.dark   * UNIT, 0.281, b.dark   * UNIT, '26221F');
++    panel(s, b.x + 0.286, ZERO - b.orange * UNIT, 0.281, b.orange * UNIT, ORANGE);
++    txt(s, b.m, { x: b.lx, y: 6.349, w: b.lw, h: 0.303, fontSize: 12, color: AXIS, align: 'right', wrap: false });
++  });
++  [ ['300', 4.803, 3.046, 0.460], ['250', 4.803, 3.560, 0.460], ['200', 4.803, 4.077, 0.460],
++    ['150', 4.803, 4.592, 0.460], ['100', 4.803, 5.099, 0.460], ['50',  4.889, 5.617, 0.374],
++    ['0',   4.975, 6.147, 0.288],
++  ].forEach(function (t) {
++    txt(s, t[0], { x: t[1], y: t[2], w: t[3], h: 0.303, fontSize: 12, color: AXIS, align: 'right', wrap: false });
++  });
++}
++
++function slide18(s) {                                    // Reaching the Audience
++  ghost(s, 'REACHING', { x: 0.571, y: 0.423, w: 12.063, h: 3.45 });
++  ghost(s, 'AUDIENCE', { x: 1.494, y: 4.054, w: 11.141, h: 3.45, align: 'right' });
++  txt(s, [
++    { text: 'REACHING', options: { breakLine: true } },
++    { text: 'THE AUDIENCE' },
++  ], { x: 0.971, y: 2.743, w: 4.153, h: 1.717, fontFace: HEAD, fontSize: 48, color: WHITE });
++  kicker(s, 'Promoting the Film', { x: 0.971, y: 4.277, w: 3.931, h: 0.64 });
++  icon(s, 1.083, 1.838, 0.729, WHITE);
++
++  panel(s, 9.075, 1.363, 3.133, 2.238, ORANGE, 0.102);
++  txt(s, [
++    { text: 'Marketing costs involve promotional campaigns, film festivals, and distribution expenses. Estimated budget: ' },
++    { text: '$200,000.', options: { bold: true, fontFace: HEAD } },
++  ], { x: 9.406, y: 2.181, w: 2.63, h: 1.132, fontSize: 10.5, color: WHITE, lineSpacingMultiple: 1.5 });
++  badge(s, 9.489, 1.632, 0.436, WHITE, 9.581, 1.718, 0.253, ORANGE);
++
++  txt(s, LOREM2, { x: 0.971, y: 5.842, w: 3.49, h: 0.904, fontSize: 11, color: GREY_TX, lineSpacingMultiple: 1.5 });
++  hline(s, 1.084, 6.914, 1.355, RULE);
++}
++
++function slide19(s) {                                    // A Bright Future
++  ghost(s, 'BRIGHT', { x: 5.365, y: -0.063, w: 7.968, h: 3.45, align: 'right' });
++  ghost(s, 'FUTURE', { x: 0.054, y:  4.232, w: 8.583, h: 3.45 });
++  panel(s, 5.542, 3.389, 6.667, 3.528, ORANGE);
++  headline(s, 'A BRIGHT FUTURE', { x: 6.458, y: 4.778, w: 5.333, h: 0.909 });
++  txt(s, 'Creating Cinematic Magic', { x: 6.458, y: 5.687, w: 4.5, h: 0.64, fontFace: HEAD, fontSize: 32, color: WHITE });
++  icon(s, 6.458, 3.823, 0.892, WHITE);
++
++  txt(s, 'We are excited to bring this extraordinary film to life, and your support will help us make this vision a reality.',
++    { x: 8.524, y: 1.956, w: 3.215, h: 0.904, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++  badge(s, 8.637, 1.489, 0.436, WHITE, 8.723, 1.575, 0.264, ORANGE);
++
++  txt(s, 'Your Tittle here', { x: 1.647, y: 5.633, w: 1.479, h: 0.412, fontFace: HEAD, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.5 });
++  txt(s, LOREM2, { x: 1.647, y: 6.021, w: 3.404, h: 0.904, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++  badge(s, 1.106, 5.687, 0.436, WHITE, 1.186, 5.77, 0.278, ORANGE);
++}
++
++function slide20(s) {                                    // Thank You
++  txt(s, 'THANK YOU!', {
++    x: 3.333, y: 2.64, w: 6.667, h: 1.582,
++    fontFace: HEAD, fontSize: 88, charSpacing: 6, color: WHITE, align: 'center',
++  });
++  txt(s, 'Your Support Matters', { x: 4.516, y: 4.22, w: 4.301, h: 0.64, fontFace: HEAD, fontSize: 32, color: ORANGE, align: 'center' });
++  txt(s, [
++    { text: 'We appreciate your support and look forward',        options: { breakLine: true } },
++    { text: 'to bringing this captivating film to life.',         options: { breakLine: true } },
++    { text: 'Thank you for joining us on this cinematic journey.' },
++  ], { x: 0.998, y: 0.69, w: 4.057, h: 0.904, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++  hline(s, 1.084, 1.799, 1.355, RULE);
++
++  txt(s, '0123 – 4567 – 89',     { x:  0.988, y: 6.652, w: 1.966, h: 0.349, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++  txt(s, '@yoursocialmedia',     { x:  5.684, y: 6.652, w: 1.966, h: 0.349, fontSize: 11, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++  txt(s, 'www.yourwebsite.com',  { x: 10.506, y: 6.674, w: 1.966, h: 0.349, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 });
++}
++
++/* ------------------------------------------------------------------ */
++/* build                                                               */
++/* ------------------------------------------------------------------ */
++const SLIDES = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++];
++
++const pptx = new PptxGenJS();
++// 12192000 x 6858000 EMU - the source deck's exact 16:9 canvas
++pptx.defineLayout({ name: 'W16x9', width: 40 / 3, height: 7.5 });
++pptx.layout = 'W16x9';
++pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++pptx.title = 'HORIJON MOVIE';
++
++SLIDES.forEach(function (build) {
++  const s = pptx.addSlide();
++  s.background = { color: BG };
++  build(s);
++  logo(s);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, OUT_NAME) })
++  .then(function (f) { console.log('wrote ' + f); });

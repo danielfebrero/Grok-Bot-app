@@ -1,0 +1,423 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/surgery_medical_services_overview.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/surgery_medical_services_overview.js
+@@ -0,0 +1,420 @@
++/**
++ * "Surgery Medical" deck — rebuilt with pptxgenjs.
++ * Slide size 13.333 x 7.5 in (16:9), 20 slides. Run: node <this file>
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ---------------------------------------------------------------- palette */
++const NAVY = '272E6C';   // brand navy: dark backgrounds, headings
++const PALE = 'E7F1FF';   // pale blue card / light text on navy
++const AQUA = 'D8F5FF';   // aqua card
++const ORANGE = 'FFAB48'; // accent orange
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const GREY = 'EDEFF3';   // stand-in fill for the one photograph in the deck
++
++const HEAD = 'Poppins';  // headings and bold labels
++const BODY = 'Inter';    // body copy
++
++/* ---------------------------------------------------------------- lorem  */
++const L_TINY = 'Lorem ipsum dolor sit amet';
++const L_ELIT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
++const L_DOLORE = L_ELIT + ' Sed do eiusmod tempor incididunt ut labore et dolore.';
++const L_MAGNA = L_ELIT + ' Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
++const L_LABORIS = L_MAGNA + ' Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.';
++const L_FULL = L_LABORIS.slice(0, -1) + ' nisi ut aliquip ex ea commodo consequat.';
++
++/* -------------------------------------------------------------- helpers */
++const SHADOW = { type: 'outer', color: BLACK, opacity: 0.2, blur: 10, offset: 3, angle: 45 };
++
++/** Rounded-rectangle corner radius: OOXML stores `adj` as 1/100000 of min(w,h). */
++const radius = (adj, w, h) => (adj / 100000) * Math.min(w, h);
++
++/** Plain text box, top anchored, auto-fit height — the deck's default text frame. */
++function txt(slide, text, o) {
++    slide.addText(text, {
++        x: o.x, y: o.y, w: o.w, h: o.h,
++        fontFace: o.font || BODY, fontSize: o.size || 14,
++        color: o.color || BLACK, bold: !!o.bold, italic: !!o.italic,
++        align: o.align || 'left', valign: 'top', wrap: o.wrap !== false, fit: 'resize',
++    });
++}
++
++/** Bold heading (Poppins 40pt navy by default) — one array entry per line. */
++function heading(slide, lines, o) {
++    txt(slide, lines.join('\n'), {
++        x: o.x, y: o.y, w: o.w, h: o.h, font: HEAD, size: o.size || 40,
++        bold: true, italic: !!o.italic, color: o.color || NAVY, align: o.align, wrap: false,
++    });
++}
++
++/** Filled / outlined rectangle or rounded rectangle card. */
++function card(slide, o) {
++    slide.addShape(o.round ? 'roundRect' : 'rect', {
++        x: o.x, y: o.y, w: o.w, h: o.h,
++        fill: o.fill ? { color: o.fill } : { type: 'none' },
++        line: o.lineColor ? { color: o.lineColor, width: o.lineWidth || 1 } : { type: 'none' },
++        rectRadius: o.round ? radius(o.round, o.w, o.h) : undefined,
++        shadow: o.shadow ? SHADOW : undefined,
++    });
++}
++
++/** Pill / chip with centred bold text ("$4,000", "01", "Explore More"). */
++function chip(slide, label, o) {
++    card(slide, o.fill ? o : Object.assign({ fill: ORANGE }, o));
++    slide.addText(label, {
++        x: o.x, y: o.y, w: o.w, h: o.h, align: 'center', valign: 'middle',
++        fontFace: HEAD, fontSize: o.size || 20, bold: true, color: o.color || NAVY,
++    });
++}
++
++/** Horizontal rule. */
++function rule(slide, x, y, w, color, dash) {
++    slide.addShape('line', { x, y, w, h: 0, line: { color, width: 1, dashType: dash || 'solid' } });
++}
++
++/** Bold label above a body paragraph — the deck's most repeated text pattern. */
++function labelPara(slide, o) {
++    txt(slide, o.label, {
++        x: o.x, y: o.y, w: o.w, h: o.labelH || 0.37, font: HEAD, size: 16,
++        bold: true, color: o.labelColor || NAVY, align: o.align,
++    });
++    txt(slide, o.body, {
++        x: o.x, y: o.y + (o.gap || 0.37), w: o.w, h: o.bodyH || 0.572,
++        size: 14, color: o.bodyColor || BLACK, align: o.align,
++    });
++}
++
++/* ------------------------------------------------- image placeholders --
++ * The deck's picture placeholders are empty in the source and render as
++ * nothing, so they are not recreated. The single embedded photograph
++ * (slide 17) and the pictogram icons become native shapes instead of
++ * bitmaps.                                                              */
++
++/** Stand-in for the one photograph: flat grey panel labelled "[image]". */
++function photo(slide, o) {
++    card(slide, { x: o.x, y: o.y, w: o.w, h: o.h, fill: o.fill || GREY });
++    slide.addText('[image]', {
++        x: o.x, y: o.y, w: o.w, h: o.h, align: 'center', valign: 'middle',
++        fontFace: BODY, fontSize: 14, color: '8894AE',
++    });
++}
++
++/* Each pictogram in the source deck is redrawn as the closest native
++ * pptxgenjs shape, filled in navy at roughly the glyph's visual weight. */
++const GLYPH = {
++    cross: 'plus', heartbeat: 'wave', skeleton: 'plus', heart: 'heart',
++    arm: 'teardrop', robot: 'roundRect', warning: 'triangle', hands: 'teardrop',
++    diploma: 'can', checklist: 'roundRect', stethoscope: 'donut', clap: 'sun',
++};
++
++/** Stand-in for a pictogram: navy glyph centred in a `box`-inch square. */
++function icon(slide, x, y, box, name) {
++    const s = box * 0.7;
++    const h = name === 'heartbeat' ? s * 0.5 : s;   // the ECG glyph is a flat line
++    slide.addShape(GLYPH[name] || 'ellipse', {
++        x: x + (box - s) / 2, y: y + (box - h) / 2, w: s, h,
++        fill: { color: NAVY }, line: { type: 'none' }, rectRadius: s * 0.22,
++    });
++}
++
++/* ================================================================ slides */
++
++function slide01(pptx) {                                    // title / cover
++    const s = pptx.addSlide();
++    s.background = { color: NAVY };
++    heading(s, ['Surgery Medical'], { x: 0.696, y: 0.601, w: 11.941, h: 1.784, size: 100, color: PALE, align: 'center' });
++    txt(s, 'Pioneering Precision \nTransforming Recovery',
++        { x: 0.602, y: 2.841, w: 4.492, h: 1.043, size: 28, italic: true, color: WHITE, wrap: false });
++    txt(s, 'Presented by', { x: 10.213, y: 2.841, w: 2.518, h: 0.337, color: WHITE });
++    rule(s, 10.252, 3.279, 2.441, WHITE);
++    txt(s, 'Dr. Elena Marquez', { x: 10.213, y: 3.38, w: 2.518, h: 0.37, font: HEAD, size: 16, bold: true, color: PALE });
++    chip(s, 'Explore More', { x: 0.602, y: 6.348, w: 2.047, h: 0.551, size: 16 });
++}
++
++function slide02(pptx) {                                    // introduction
++    const s = pptx.addSlide();
++    card(s, { x: 7.269, y: 1.203, w: 4.859, h: 5.094, fill: AQUA, round: 3539 });
++    heading(s, ['Introduction'], { x: 0.602, y: 1.574, w: 3.799, h: 0.774 });
++    labelPara(s, { x: 0.602, y: 2.748, w: 6.064, label: 'Definition', body: L_FULL, bodyH: 1.043 });
++    [['+35%', 0.602], ['$27.8K', 3.159]].forEach(([value, x]) => {
++        card(s, { x, y: 4.666, w: 2.047, h: 1.26, fill: PALE });
++        txt(s, value, { x: x + 0.169, y: 4.79, w: 1.711, h: 0.505, font: HEAD, size: 24, bold: true, color: NAVY });
++        txt(s, L_TINY, { x: x + 0.169, y: 5.298, w: 1.711, h: 0.505, size: 12 });
++    });
++}
++
++function slide03(pptx) {                                    // the challenge
++    const s = pptx.addSlide();
++    heading(s, ['The Surgical Care ', 'Challenge'], { x: 4.846, y: 1.046, w: 5.403, h: 1.447 });
++    ['Limited Access', 'Lengthy Wait Times', 'High Risk of Complications'].forEach((label, i) => {
++        labelPara(s, { x: 4.846, y: 2.871 + i * 1.3206, w: 7.885, label, body: L_MAGNA });
++    });
++    card(s, { x: 2.984, y: 5.64, w: 1.26, h: 1.26, fill: ORANGE, round: 14903 });
++    icon(s, 3.141, 5.797, 0.945, 'cross');
++}
++
++function slide04(pptx) {                                    // our objectives
++    const s = pptx.addSlide();
++    ['Limited Access', 'Prioritize Patient Safety', 'Improve Recovery Outcomes', 'Expand Accessibility']
++        .forEach((label, i) => {
++            const y = 0.601 + i * 1.6725;
++            card(s, { x: 0.602, y, w: 6.448, h: 1.28, fill: PALE, round: 13080 });
++            labelPara(s, { x: 0.935, y: y + 0.169, w: 5.782, label, body: L_DOLORE });
++        });
++    heading(s, ['Our Objectives'], { x: 7.653, y: 2.78, w: 4.457, h: 0.774 });
++    txt(s, L_MAGNA, { x: 7.653, y: 3.946, w: 5.078, h: 0.808 });
++}
++
++function slide05(pptx) {                                    // trusted partner
++    const s = pptx.addSlide();
++    heading(s, ['Your Trusted Partner ', 'in Surgical Excellence'],
++        { x: 0.602, y: 1.377, w: 6.436, h: 1.447, italic: true });
++    txt(s, L_LABORIS, { x: 0.602, y: 3.346, w: 6.663, h: 0.808 });
++    [['15+', AQUA], ['+35%', PALE], ['$342K', AQUA], ['7.8/10', PALE]].forEach(([value, fill], i) => {
++        const x = 0.602 + i * 2.6285;
++        card(s, { x, y: 4.863, w: 2.047, h: 1.26, fill, round: 8509 });
++        txt(s, value, { x: x + 0.169, y: 4.986, w: 1.711, h: 0.505, font: HEAD, size: 24, bold: true, color: NAVY });
++        txt(s, L_TINY, { x: x + 0.169, y: 5.495, w: 1.711, h: 0.505, size: 12 });
++    });
++}
++
++function slide06(pptx) {                                    // types of surgery
++    const s = pptx.addSlide();
++    s.background = { color: PALE };
++    heading(s, ['Types of Surgeries We Offer'], { x: 0.602, y: 0.601, w: 8.129, h: 0.774 });
++    [['General Surgery', WHITE, 'heartbeat'], ['Orthopedic Surgery', AQUA, 'skeleton'],
++     ['Cardiovascular Surgery', WHITE, 'heart'], ['Neurosurgery', AQUA, 'arm'],
++     ['Robotic Surgery', WHITE, 'robot'], ['Emergency Surgery', AQUA, 'warning']]
++        .forEach(([label, fill, glyph], i) => {
++            const x = 0.602 + (i % 3) * 4.1745;
++            const y = 1.976 + Math.floor(i / 3) * 2.659;
++            card(s, { x, y, w: 3.78, h: 2.264, fill, shadow: true });
++            icon(s, x + 0.25, y + 0.215, 0.787, glyph);
++            labelPara(s, { x: x + 0.198, y: y + 1.106, w: 3.386, label, body: L_ELIT + ' ' });
++        });
++}
++
++function slide07(pptx) {                                    // innovations
++    const s = pptx.addSlide();
++    heading(s, ['Innovations ', 'in Surgical ', 'Techniques'], { x: 0.602, y: 2.69, w: 3.775, h: 2.12 });
++    [['Robotic-Assisted Surgery', PALE], ['Minimally Invasive Procedures', ORANGE], ['AI-Driven Diagnostics', PALE]]
++        .forEach(([label, fill], i) => {
++            const y = 0.601 + i * 2.2305;
++            card(s, { x: 7.69, y, w: 5.039, h: 1.838, fill, round: 6106, shadow: true });
++            labelPara(s, { x: 7.989, y: y + 0.329, w: 4.44, label, body: L_MAGNA, bodyH: 0.808 });
++        });
++}
++
++function slide08(pptx) {                                    // patient journey
++    const s = pptx.addSlide();
++    heading(s, ['Patient Journey Overview'], { x: 2.857, y: 1.722, w: 7.619, h: 0.774, align: 'center' });
++    const steps = ['Initial Consultation', 'Pre-Surgical Preparation', 'Surgical Procedure',
++        'Post-Operative Recovery', 'Follow-Up and Support'];
++    steps.forEach((label, i) => {
++        const x = 0.602 + i * 2.5046;
++        chip(s, '0' + (i + 1), { x: x + 0.068, y: 3.102, w: 0.709, h: 0.709, round: 8869, shadow: true });
++        labelPara(s, { x, y: 4.089, w: 2.111, label, body: L_ELIT, labelH: 0.639, gap: 0.646, bodyH: 1.043 });
++        if (i < steps.length - 1) rule(s, x + 0.777, 3.456, 1.796, NAVY, 'dash');
++    });
++}
++
++function slide09(pptx) {                                    // pricing
++    const s = pptx.addSlide();
++    s.background = { color: NAVY };
++    heading(s, ['Transparent Pricing ', 'for Quality Care'], { x: 0.602, y: 0.601, w: 6.057, h: 1.447, color: PALE });
++    [['Initial Consultation', '$4,000'], ['Gallbladder Removal', '$5,000'], ['Hernia Repair', '$2,000'],
++     ['Knee Replacement', '$15,000'], ['Heart Bypass Surgery', '$40,000'], ['Robotic-Assisted Surgery', '$50,000']]
++        .forEach(([label, price], i) => {
++            const col = Math.floor(i / 3), row = i % 3;
++            const x = 0.602 + col * 6.366;
++            const y = 2.648 + row * 1.6543;
++            labelPara(s, { x, y, w: 4.044, label, body: L_ELIT + ' ', labelColor: PALE, bodyColor: WHITE });
++            chip(s, price, { x: 4.791 + col * 6.365, y: y + 0.117, w: 1.575, h: 0.709, round: 11333, shadow: true });
++            if (row < 2) rule(s, 0.649 + col * 6.366, 3.947 + row * 1.6543, 5.669, ORANGE);
++        });
++}
++
++function slide10(pptx) {                                    // case study
++    const s = pptx.addSlide();
++    s.background = { color: PALE };
++    heading(s, ['Surgical Real ', 'Case Study'], { x: 0.602, y: 1.189, w: 4.092, h: 1.447 });
++    txt(s, L_ELIT + ' ', { x: 0.602, y: 2.95, w: 3.99, h: 0.572 });
++    ['4.5/5', '4.2/5'].forEach((score, i) => {
++        const x = 5.25 + i * 3.937;
++        card(s, { x, y: 1.586, w: 3.543, h: 4.724, fill: WHITE, round: 3322, shadow: true });
++        labelPara(s, { x: x + 0.246, y: 3.051, w: 3.052, label: 'Procedure Name', body: L_ELIT + ' ' });
++        labelPara(s, { x: x + 0.246, y: 4.28, w: 3.052, label: 'Recovery Time', body: L_ELIT + ' ' });
++        slideStar(s, x + 1.166, 5.51);
++        txt(s, score, { x: x + 1.582, y: 5.538, w: 0.797, h: 0.337 });
++    });
++}
++
++function slideStar(slide, x, y) {
++    slide.addShape('star5', { x, y, w: 0.394, h: 0.394, fill: { color: ORANGE }, line: { type: 'none' } });
++}
++
++function slide11(pptx) {                                    // SWOT
++    const s = pptx.addSlide();
++    s.background = { color: NAVY };
++    [['S', 'Strengths', PALE], ['W', 'Weaknesses', AQUA], ['O', 'Opportunities', AQUA], ['T', 'Threats', PALE]]
++        .forEach(([letter, label, fill], i) => {
++            const x = 0.602 + (i % 2) * 6.262;
++            const y = 0.612 + Math.floor(i / 2) * 3.346;
++            card(s, { x, y, w: 5.867, h: 2.941, fill, round: 5213, shadow: true });
++            txt(s, letter, {
++                x: x + 0.428, y: y + 0.453, w: 1.909, h: 2.036,
++                font: HEAD, size: 115, bold: true, color: NAVY, align: 'center',
++            });
++            labelPara(s, { x: x + 2.524, y: y + 0.646, w: 2.917, label, body: L_MAGNA, bodyH: 1.279 });
++        });
++}
++
++function slide12(pptx) {                                    // facilities
++    const s = pptx.addSlide();
++    heading(s, ['Advanced Surgical Facilities'], { x: 2.478, y: 0.601, w: 8.378, h: 0.774, align: 'center' });
++    [['Cutting-Edge Equipment', PALE, 'robot'], ['Smart Monitoring Systems', AQUA, 'heart'],
++     ['Sterile & Safe Environment', PALE, 'clap']]
++        .forEach(([label, fill, glyph], i) => {
++            const x = 0.602 + i * 4.1745;
++            card(s, { x, y: 1.977, w: 3.78, h: 1.968, fill, shadow: true });
++            icon(s, x + 0.237, 2.162, 0.551, glyph);
++            labelPara(s, { x: x + 0.184, y: 2.818, w: 3.412, label, body: L_ELIT });
++        });
++}
++
++function slide13(pptx) {                                    // accreditation
++    const s = pptx.addSlide();
++    [['Sterilization \nProtocols', 'hands'], ['Staff \nCertifications', 'diploma'],
++     ['Emergency Preparedness', 'cross'], ['International Compliance', 'checklist']]
++        .forEach(([label, glyph], i) => {
++            const x = 0.602 + i * 3.1307;
++            s.addShape('ellipse', {
++                x: x + 0.07, y: 1.137, w: 2.598, h: 2.598,
++                fill: { color: PALE }, line: { type: 'none' }, shadow: SHADOW,
++            });
++            s.addShape('ellipse', {
++                x: x + 1.881, y: 2.948, w: 0.787, h: 0.787,
++                fill: { color: ORANGE }, line: { type: 'none' }, shadow: SHADOW,
++            });
++            icon(s, x + 1.999, 3.066, 0.551, glyph);
++            txt(s, label, { x, y: 4.209, w: 2.737, h: 0.639, font: HEAD, size: 16, bold: true, color: NAVY, align: 'center' });
++            txt(s, L_MAGNA + ' ', { x, y: 4.849, w: 2.737, h: 1.515, align: 'center' });
++        });
++}
++
++function slide14(pptx) {                                    // specialists
++    const s = pptx.addSlide();
++    heading(s, ['Our Surgical Specialists'], { x: 3.148, y: 0.601, w: 7.037, h: 0.774, align: 'center' });
++    [['Dr. Nathaniel Brooks', 'Cardiothoracic Surgeon', PALE],
++     ['Dr. Amelia Carter', 'Orthopedic Surgeon', AQUA],
++     ['Dr. Ethan Patel', 'Neurosurgeon', PALE]].forEach(([name, role, fill], i) => {
++        const x = 0.602 + i * 4.1745;
++        card(s, { x, y: 1.977, w: 3.78, h: 4.922, fill, round: 4887, shadow: true });
++        txt(s, name, { x: x + 0.315, y: 5.954, w: 3.15, h: 0.37, font: HEAD, size: 16, bold: true, color: NAVY, align: 'center' });
++        txt(s, role, { x: x + 0.315, y: 6.321, w: 3.15, h: 0.337, italic: true, align: 'center' });
++    });
++}
++
++function slide15(pptx) {                                    // testimonials
++    const s = pptx.addSlide();
++    s.background = { color: PALE };
++    heading(s, ['Hear from ', 'Our Patients'], { x: 0.602, y: 3.026, w: 3.771, h: 1.447 });
++    ['Sophia Bennett', 'Liam Carter', 'Isabella Lawrence'].forEach((name, i) => {
++        const y = 0.601 + i * 2.2305;
++        card(s, { x: 6.0, y, w: 6.731, h: 1.838, lineColor: NAVY });
++        s.addShape('ellipse', {
++            x: 5.335, y: y + 0.249, w: 1.339, h: 1.339,
++            fill: { color: ORANGE }, line: { type: 'none' }, shadow: SHADOW,
++        });
++        txt(s, name, { x: 7.051, y: y + 0.234, w: 5.303, h: 0.37, font: HEAD, size: 16, bold: true, color: NAVY });
++        rule(s, 7.104, y + 0.7, 5.197, NAVY);
++        txt(s, L_MAGNA, { x: 7.051, y: y + 0.795, w: 5.303, h: 0.808 });
++    });
++}
++
++function slide16(pptx) {                                    // statistics
++    const s = pptx.addSlide();
++    s.background = { color: NAVY };
++    [['5,000+', 'Successful Surgeries'], ['40%', 'Faster Recovery Time'],
++     ['25+', 'Surgical Techniques'], ['95%', 'Accuracy']].forEach(([value, label], i) => {
++        const x = 0.602 + i * 3.1307;
++        txt(s, value, { x, y: 0.601, w: 2.737, h: 0.774, font: HEAD, size: 40, bold: true, color: ORANGE });
++        labelPara(s, { x, y: 1.375, w: 2.737, label, body: L_ELIT + ' ', labelColor: PALE, bodyColor: WHITE, bodyH: 0.808 });
++    });
++    heading(s, ['Statistics ', 'and Achievements'], { x: 0.602, y: 5.452, w: 5.659, h: 1.447, color: PALE });
++}
++
++function slide17(pptx) {                                    // future goals
++    const s = pptx.addSlide();
++    photo(s, { x: 0.465, y: 1.645, w: 5.016, h: 4.432 });
++    heading(s, ['Surgery Medical ', 'Future Goals'], { x: 6.002, y: 0.852, w: 5.016, h: 1.447 });
++    ['Expand Robotic Surgery Capabilities', 'Enhance Post-Operative Recovery Programs',
++     'Adopt AI & Data-Driven Tools'].forEach((label, i) => {
++        const y = 2.806 + i * 1.45;
++        s.addShape('ellipse', {
++            x: 6.069, y: y + 0.087, w: 0.197, h: 0.197, fill: { color: ORANGE }, line: { type: 'none' },
++        });
++        labelPara(s, { x: 6.305, y, w: 6.426, label, body: L_MAGNA });
++    });
++    [[3.367, 1.543, 'stethoscope'], [0.88, 4.774, 'robot']].forEach(([x, y, glyph]) => {
++        card(s, { x, y, w: 0.63, h: 0.63, fill: AQUA, round: 11375, shadow: true });  // icon tile
++        icon(s, x + 0.079, y + 0.079, 0.472, glyph);
++    });
++}
++
++function slide18(pptx) {                                    // challenges
++    const s = pptx.addSlide();
++    heading(s, ['Overcoming Challenges'], { x: 3.069, y: 0.601, w: 7.195, h: 0.774, align: 'center' });
++    [['Increasing Surgical Complexity', AQUA], ['Patient Safety Concerns', PALE],
++     ['Rapid Technology Changes', PALE], ['Workforce Shortage', AQUA]].forEach(([label, fill], i) => {
++        const x = 0.602 + (i % 2) * 6.366;
++        const y = 1.977 + Math.floor(i / 2) * 2.659;
++        card(s, { x, y, w: 5.763, h: 2.263, fill, round: 7536, shadow: true });
++        labelPara(s, { x: x + 0.471, y: y + 0.543, w: 4.822, label, body: L_MAGNA, bodyH: 0.808 });
++    });
++}
++
++function slide19(pptx) {                                    // closing statement
++    const s = pptx.addSlide();
++    card(s, { x: 0.602, y: 0.601, w: 6.782, h: 3.149, fill: NAVY, round: 6874, shadow: true });
++    txt(s, 'Empowering Healing Through Innovation',
++        { x: 1.139, y: 1.049, w: 5.708, h: 1.313, font: HEAD, size: 36, bold: true, color: PALE });
++    rule(s, 1.186, 2.546, 5.615, PALE);
++    txt(s, 'Discover how advanced surgical techniques can transform lives.',
++        { x: 1.139, y: 2.73, w: 5.708, h: 0.572, color: WHITE });
++}
++
++function slide20(pptx) {                                    // call to action
++    const s = pptx.addSlide();
++    s.background = { color: NAVY };
++    heading(s, ['Ready for Exceptional ', 'Surgical Care?'],
++        { x: 0.602, y: 1.49, w: 8.783, h: 1.919, size: 54, color: PALE });
++    txt(s, 'Experience World-Class Surgery With Expert Care and Cutting-Edge Technology',
++        { x: 0.602, y: 4.047, w: 6.064, h: 0.774, size: 20, italic: true, color: WHITE });
++    const cta = { x: 0.602, y: 5.459, w: 5.197, h: 0.551 };
++    card(s, Object.assign({ fill: ORANGE }, cta));
++    s.addText([
++        { text: 'Learn More at ', options: { bold: true } },
++        { text: 'www.loremipsumcompany.com' },
++    ], Object.assign({ align: 'center', valign: 'middle', fontFace: HEAD, fontSize: 14, color: NAVY }, cta));
++}
++
++/* ================================================================== main */
++
++function build() {
++    const pptx = new PptxGenJS();
++    pptx.layout = 'LAYOUT_WIDE';           // 13.333 x 7.5 in
++    pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++    pptx.title = 'Surgery Medical';
++
++    [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++     slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++        .forEach(fn => fn(pptx));
++
++    return pptx;
++}
++
++build().writeFile({ fileName: path.join(__dirname, '0a428296-44ba-49f9-9bd0-68c0c88fb73d_grok_final.pptx') })
++    .then(f => console.log('wrote', f));

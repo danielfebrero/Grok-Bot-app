@@ -1,0 +1,868 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_digital_health_tech.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_digital_health_tech.js
+@@ -0,0 +1,865 @@
++/**
++ * "HealthTechnology" pitch deck - 15 slides, 13.333 x 7.5 in (16:9).
++ *
++ * Recreated with pptxgenjs only. Raster artwork in the source deck is replaced
++ * by native-shape stand-ins: photo frames become grey "[image]" rectangles,
++ * the soft blue background blobs become stacks of translucent ellipses, and the
++ * laptop / monitor mock-ups are drawn from rectangles.
++ *
++ *   node 068b1d60-0b81-4cf3-8bba-79f7c2b886ce_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const HEAD = 'Plus Jakarta Sans'; // theme major font
++const BODY = 'Open Sans';         // theme minor font
++
++const C = {
++  bg: 'F2F7FA',      // lt1 - slide background
++  white: 'FFFFFF',   // lt2
++  ink: '000000',     // dk1 - body copy
++  slate: '3F3F3F',   // dk2
++  blue: '0180FF',    // accent1
++  sky: 'B6D8F6',     // accent2 - light end of the card gradients
++  grad: 'D4E7F8',    // flat stand-in for the B6D8F6 -> F2F7FA gradient
++  deco: 'CEE1EC',    // decorative squares (bg1 lumMod 90%)
++  hair: '99C0D8',    // hairline outline (bg1 lumMod 75%)
++  photo: 'CCCCCC',   // image placeholder body
++  photoInk: 'A8A8A8' // image placeholder caption
++};
++
++// outer shadows used by the original cards
++const SH_CARD = { type: 'outer', color: '000000', opacity: 0.1, blur: 20, offset: 15, angle: 45 };
++const SH_LIFT = { type: 'outer', color: '000000', opacity: 0.05, blur: 20, offset: 3, angle: 45 };
++const SH_DROP = { type: 'outer', color: '000000', opacity: 0.05, blur: 20, offset: 6, angle: 0 };
++const SH_FLAT = { type: 'outer', color: '000000', opacity: 0.04, blur: 20, offset: 0, angle: 0 };
++const SH_HALO = { type: 'outer', color: '000000', opacity: 0.1, blur: 20, offset: 0, angle: 0 };
++
++/* --------------------------------------------------------------- helpers */
++
++// PowerPoint stores roundRect corners as a fraction of the shorter side.
++const corner = (w, h, adj = 0.16667) => adj * Math.min(w, h);
++
++function shape(slide, kind, o) {
++  slide.addShape(kind, o);
++}
++
++/* Diagonal two-stop gradient card (accent2 -> bg1, corner to corner).
++   pptxgenjs has no gradient fill, so the ramp is painted as a stack of
++   custom-geometry regions {x/w + y/h <= u} anchored at the accent corner. Each
++   step is a little smaller than the last and adds the same amount of colour,
++   so the composite is a linear corner-to-corner ramp. */
++const GRAD_STEPS = 14;
++
++/* Outline of {x/w + y/h <= u} clipped to a rounded rectangle, walking
++   clockwise from the top of the accent corner's arc. */
++function diagonalRegion(w, h, r, u) {
++  const k = 0.5523 * r;                        // circle-to-bezier constant
++  const arc = (x, y, x1, y1, x2, y2) => ({ x: x, y: y, curve: { type: 'cubic', x1: x1, y1: y1, x2: x2, y2: y2 } });
++  const pts = [{ x: r, y: 0, moveTo: true }];
++  if (u <= 1) {
++    pts.push({ x: u * w, y: 0 }, { x: 0, y: u * h });
++  } else {
++    // the cut now clips the far corner instead: it meets the right edge at
++    // y = b and the bottom edge at x = a
++    const a = Math.max((u - 1) * w, r);
++    const b = Math.max((u - 1) * h, r);
++    pts.push({ x: w - r, y: 0 }, arc(w, r, w - r + k, 0, w, r - k));
++    pts.push({ x: w, y: b }, { x: a, y: h }, { x: r, y: h });
++    pts.push(arc(0, h - r, r - k, h, 0, h - r + k));
++  }
++  pts.push({ x: 0, y: r }, arc(r, 0, 0, r - k, r - k, 0), { close: true });
++  return pts;
++}
++
++/* `dark` names the corner holding the accent2 end: 'tl', 'tr', 'bl' or 'br'. */
++function gradCard(slide, o) {
++  const w = o.w, h = o.h, r = o.rectRadius;
++  const flipX = o.dark.indexOf('r') >= 0;
++  const flipY = o.dark.indexOf('b') >= 0;
++  const uMin = Math.max(r / w, r / h);         // keep the cut clear of the corner arc
++
++  shape(slide, 'roundRect', {
++    x: o.x, y: o.y, w: w, h: h, rotate: o.rotate || 0, rectRadius: r,
++    fill: { color: C.bg }, line: { type: 'none' }
++  });
++
++  for (let j = 1; j <= GRAD_STEPS; j++) {
++    const u = 2 - uMin - (2 - 2 * uMin) * (j - 1) / (GRAD_STEPS - 1);
++    slide.addShape('custGeom', {
++      x: o.x, y: o.y, w: w, h: h, rotate: o.rotate || 0,
++      fill: { color: C.sky, transparency: 100 * (1 - 1 / (GRAD_STEPS - j + 1)) },
++      line: { type: 'none' },
++      points: diagonalRegion(w, h, r, u).map(function (pt) {
++        if (pt.close) return pt;
++        const out = { x: flipX ? w - pt.x : pt.x, y: flipY ? h - pt.y : pt.y };
++        if (pt.moveTo) out.moveTo = true;
++        if (pt.curve) {
++          out.curve = {
++            type: 'cubic',
++            x1: flipX ? w - pt.curve.x1 : pt.curve.x1, y1: flipY ? h - pt.curve.y1 : pt.curve.y1,
++            x2: flipX ? w - pt.curve.x2 : pt.curve.x2, y2: flipY ? h - pt.curve.y2 : pt.curve.y2
++          };
++        }
++        return out;
++      })
++    });
++  }
++}
++
++// Plain text box: top aligned, theme body font, black, like the source deck.
++function text(slide, body, o) {
++  slide.addText(body, Object.assign({ fontFace: BODY, fontSize: 10, color: C.ink, valign: 'top' }, o));
++}
++
++// Heading-font text box.
++function head(slide, body, o) {
++  text(slide, body, Object.assign({ fontFace: HEAD }, o));
++}
++
++// Body paragraph: 1.5 line spacing, as used for every lorem block.
++function para(slide, body, o) {
++  text(slide, body, Object.assign({ lineSpacingMultiple: 1.5 }, o));
++}
++
++/* The soft blue radial glows in the background. The original is a PNG whose
++   alpha falls off smoothly from ~19% at the centre to 0 at the rim; stacking
++   equally-faint ellipses whose radii follow that curve rebuilds the same ramp
++   out of native shapes. Diameters are fractions of the blob's bounding box. */
++const BLOB_RINGS = [0.709, 0.615, 0.552, 0.504, 0.463, 0.427, 0.395, 0.364, 0.334,
++  0.307, 0.280, 0.253, 0.226, 0.197, 0.167, 0.132, 0.086, 0.030];
++const BLOB_TRANSPARENCY = 98.97;
++
++function blob(slide, x, y, w, h) {
++  BLOB_RINGS.forEach(function (f) {
++    slide.addShape('ellipse', {
++      x: x + (w * (1 - f)) / 2,
++      y: y + (h * (1 - f)) / 2,
++      w: w * f,
++      h: h * f,
++      fill: { color: '0090FF', transparency: BLOB_TRANSPARENCY },
++      line: { type: 'none' }
++    });
++  });
++}
++
++// Grey stand-in for a photograph.
++function photo(slide, x, y, w, h, radius) {
++  slide.addShape(radius ? 'roundRect' : 'rect', {
++    x: x, y: y, w: w, h: h,
++    fill: { color: C.photo },
++    line: { type: 'none' },
++    rectRadius: radius || 0
++  });
++  if (w > 0.7 && h > 0.45) {
++    slide.addText('[image]', {
++      x: x, y: y + h / 2 - 0.16, w: w, h: 0.32,
++      align: 'center', valign: 'middle',
++      fontFace: BODY, fontSize: Math.min(12, Math.max(8, w * 2.4)), color: C.photoInk
++    });
++  }
++}
++
++/* Four rounded squares in a 3x3 grid - two outlined, two tinted. The group is
++   mirrored horizontally or vertically on some slides. */
++const DECO_CELLS = [
++  { col: 2, row: 0, solid: false },
++  { col: 1, row: 1, solid: true },
++  { col: 2, row: 2, solid: true },
++  { col: 0, row: 2, solid: false }
++];
++
++function decoSquares(slide, x, y, size, variant) {
++  const unit = size / 3;
++  DECO_CELLS.forEach(function (cell) {
++    const col = variant === 'mirrorX' ? 2 - cell.col : cell.col;
++    const row = variant === 'mirrorY' ? 2 - cell.row : cell.row;
++    slide.addShape('roundRect', {
++      x: x + col * unit, y: y + row * unit, w: unit, h: unit,
++      rectRadius: corner(unit, unit),
++      fill: cell.solid ? { color: C.deco, transparency: 50 } : { type: 'none' },
++      line: cell.solid ? { type: 'none' } : { color: C.deco, width: 0.5 }
++    });
++  });
++}
++
++/* ------------------------------------------------------------------ icons */
++
++/* Small pictogram approximations built from preset shapes; the originals are
++   thin single-weight line icons, so everything here is stroked, not filled.
++   `x,y,w,h` is the glyph box and `color` the stroke colour. */
++function icon(slide, kind, x, y, w, h, color) {
++  const hair = { color: color, width: 0.75 };
++  const none = { type: 'none' };
++  // place a shape using fractions of the glyph box
++  const put = (kindName, fx, fy, fw, fh, opts) => shape(slide, kindName, Object.assign(
++    { x: x + fx * w, y: y + fy * h, w: fw * w, h: fh * h, fill: none, line: hair }, opts || {}));
++
++  switch (kind) {
++    case 'gear':
++      put('gear6', 0, 0, 1, 1);
++      put('ellipse', 0.35, 0.35, 0.3, 0.3);
++      break;
++    case 'swap': // two arrows chasing each other
++      put('line', 0.05, 0.28, 0.9, 0, { line: { color: color, width: 0.75, endArrowType: 'triangle' } });
++      put('line', 0.05, 0.74, 0.9, 0, { line: { color: color, width: 0.75, beginArrowType: 'triangle' } });
++      break;
++    case 'cloudSync':
++      put('cloud', 0, 0, 1, 0.78);
++      put('upDownArrow', 0.38, 0.28, 0.24, 0.72, { fill: { color: C.blue } });
++      break;
++    case 'cloudSearch':
++      put('cloud', 0, 0, 1, 0.76);
++      put('ellipse', 0.4, 0.5, 0.33, 0.33, { fill: { color: C.blue } });
++      put('line', 0.68, 0.79, 0.22, 0.2);
++      break;
++    case 'emblem': // shield inside a ring
++      put('ellipse', 0, 0, 1, 1);
++      put('homePlate', 0.24, 0.24, 0.52, 0.52, { rotate: 90 });
++      [0.38, 0.5, 0.62].forEach(function (fx) { put('line', fx, 0.24, 0, 0.22); });
++      break;
++    case 'link': // two interlocking pills on a diagonal
++      put('roundRect', 0.24, 0.06, 0.28, 0.62, { rectRadius: 0.13 * h, rotate: -45 });
++      put('roundRect', 0.48, 0.32, 0.28, 0.62, { rectRadius: 0.13 * h, rotate: -45 });
++      break;
++    case 'database':
++      put('roundRect', 0.04, 0.05, 0.62, 0.26, { rectRadius: 0.05 * h });
++      put('roundRect', 0.04, 0.37, 0.62, 0.26, { rectRadius: 0.05 * h });
++      put('roundRect', 0.04, 0.69, 0.62, 0.26, { rectRadius: 0.05 * h });
++      put('can', 0.42, 0.34, 0.54, 0.62, { fill: { color: C.white } });
++      break;
++    case 'person': // outlined head and shoulders
++      put('ellipse', 0.26, 0.0, 0.48, 0.42);
++      put('round2SameRect', 0.04, 0.5, 0.92, 0.5, { rectRadius: 0.3 });
++      break;
++    case 'send': // paper plane
++      put('triangle', 0.0, 0.05, 1, 0.9, { fill: { color: color }, line: none, rotate: 90 });
++      break;
++    case 'world':
++      put('ellipse', 0, 0, 1, 1);
++      put('ellipse', 0.3, 0.0, 0.4, 1);
++      put('line', 0.02, 0.5, 0.96, 0);
++      break;
++    case 'phone': // handset = a thick arc tipped onto the diagonal
++      put('blockArc', 0, 0, 1, 1, {
++        fill: { color: color }, line: none, rotate: 135, angleRange: [190, 350], arcThicknessRatio: 0.42
++      });
++      break;
++    case 'email': // open envelope
++      put('rect', 0.04, 0.24, 0.92, 0.56);
++      put('line', 0.04, 0.24, 0.46, 0.32);
++      put('line', 0.5, 0.56, 0.46, -0.32);
++      break;
++    case 'marker': // map pin
++      put('teardrop', 0.12, 0.04, 0.78, 0.78, { fill: { color: color }, line: none, rotate: 135 });
++      put('ellipse', 0.37, 0.22, 0.26, 0.26, { fill: { color: C.blue }, line: none });
++      break;
++  }
++}
++
++/* -------------------------------------------------------- shared furniture */
++
++const NAV = [
++  { label: 'Home', x: 8.575, bold: true },
++  { label: 'About Us', x: 10.16, bold: false },
++  { label: 'Experience', x: 11.745, bold: false }
++];
++
++function chrome(slide, pageNo) {
++  head(slide, [
++    { text: 'Health', options: { bold: true } },
++    { text: 'Technology' }
++  ], { x: 0.383, y: 0.453, w: 2.104, h: 0.303, fontSize: 12 });
++
++  NAV.forEach(function (item) {
++    text(slide, item.label, {
++      x: item.x, y: 0.473, w: 1.277, h: 0.269,
++      align: 'center', valign: 'bottom', fontSize: 10, bold: item.bold, charSpacing: 1
++    });
++  });
++
++  text(slide, 'www.reallygreatsite.com', {
++    x: 0.394, y: 6.791, w: 2.731, h: 0.269, fontSize: 10, charSpacing: 1, valign: 'middle'
++  });
++
++  text(slide, String(pageNo), {
++    x: 12.312, y: 6.717, w: 0.612, h: 0.399, fontSize: 12, bold: true, align: 'right', valign: 'middle'
++  });
++}
++
++/* ------------------------------------------------------ reusable mock-ups */
++
++/* Laptop drawn inside a square box, matching the proportions of the original
++   mock-up PNG. `clipBottom` trims the drawing for the half-visible laptop. */
++function laptop(slide, x, y, size, clipBottom) {
++  const bottom = clipBottom === undefined ? 1 : clipBottom;
++  const at = (fx, fy, fw, fh) => ({ x: x + fx * size, y: y + fy * size, w: fw * size, h: fh * size });
++  if (bottom > 0.775) {
++    // closed lower half: a light slab with a slightly narrower darker lip
++    shape(slide, 'roundRect', Object.assign(at(0.024, 0.741, 0.951, 0.024),
++      { fill: { color: 'C0C4C7' }, line: { type: 'none' }, rectRadius: 0.008 * size }));
++    shape(slide, 'roundRect', Object.assign(at(0.06, 0.762, 0.88, 0.014),
++      { fill: { color: 'A9ADB0' }, line: { type: 'none' }, rectRadius: 0.007 * size }));
++  }
++  const frameH = Math.min(0.743, bottom) - 0.228;
++  shape(slide, 'roundRect', Object.assign(at(0.111, 0.228, 0.776, frameH),
++    { fill: { color: '161616' }, line: { type: 'none' }, rectRadius: 0.02 * size }));
++  const screenH = Math.min(0.711, bottom) - 0.257;
++  shape(slide, 'rect', Object.assign(at(0.136, 0.257, 0.726, screenH),
++    { fill: { color: C.white }, line: { type: 'none' } }));
++}
++
++/* Desktop monitor with stand, keyboard, trackpad and mouse. */
++function monitor(slide, x, y, w, h) {
++  const at = (fx, fy, fw, fh) => ({ x: x + fx * w, y: y + fy * h, w: fw * w, h: fh * h });
++  const dark = { fill: { color: '111111' }, line: { type: 'none' } };
++  const stand = { fill: { color: '9BA0A1' }, line: { type: 'none' } };
++  const metal = { fill: { color: 'D5D9DA' }, line: { type: 'none' } };
++  shape(slide, 'roundRect', Object.assign(at(0.052, 0.039, 0.884, 0.677), dark, { rectRadius: 0.02 * w }));
++  shape(slide, 'rect', Object.assign(at(0.089, 0.085, 0.81, 0.585), { fill: { color: C.white }, line: { type: 'none' } }));
++  shape(slide, 'trapezoid', Object.assign(at(0.391, 0.716, 0.211, 0.185), stand));
++  shape(slide, 'roundRect', Object.assign(at(0.287, 0.898, 0.337, 0.022), stand, { rectRadius: 0.005 * w }));
++  shape(slide, 'roundRect', Object.assign(at(0.039, 0.942, 0.542, 0.04), metal, { rectRadius: 0.008 * w }));
++  shape(slide, 'roundRect', Object.assign(at(0.625, 0.942, 0.207, 0.04), metal, { rectRadius: 0.008 * w }));
++  shape(slide, 'ellipse', Object.assign(at(0.882, 0.938, 0.105, 0.048), metal));
++}
++
++/* ------------------------------------------------------------- lorem text */
++
++const LOREM_HERO = 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, ' +
++  'a maximus leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit euismod, metus ac Cras ' +
++  'euismod, metus ac finibus ac';
++const LOREM_LONG = 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, ' +
++  'a maximus leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit euismod, metus ac Cras ' +
++  'finibus finibus, felis dui suscipit purus, a maximus leo ';
++const LOREM_TINY = 'Quisque non elit mas. Cras euismod, metus ac finibu finibus, felis';
++const LOREM_CARD = 'Quisque non elit mauris. Cras euismod, metu s ac finibus finibus, felis dui';
++const LOREM_COL = 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit';
++const LOREM_QUOTE = 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, ' +
++  'a maximus leo ligula';
++const LOREM_NAME = 'Quisque non elit mauris. Cras';
++const LOREM_TILE = 'Quisque non elit ma uris. Cras euismod, metus ac finibus fin bus, felis dui suscip purus, a maxim';
++
++/* ----------------------------------------------------------- slide 1 / 15 */
++
++/* Opening and closing slides share the same collage: a white stepped panel,
++   two photo tiles, two gradient squares and a pill-shaped call to action. */
++function heroSlide(slide, opts) {
++  blob(slide, 6.377, 5.389, 4.891, 4.854);
++
++  // white stepped panel == two overlapping rounded squares
++  [[6.97, 1.114], [9.253, 3.317]].forEach(function (p) {
++    shape(slide, 'roundRect', {
++      x: p[0], y: p[1], w: 3.068, h: 3.068, rectRadius: 0.467,
++      fill: { color: C.white }, line: { type: 'none' }, shadow: SH_LIFT
++    });
++  });
++
++  photo(slide, opts.tall.x, opts.tall.y, opts.tall.w, opts.tall.h, 0);
++  photo(slide, 7.387, 1.526, 2.293, 2.293, 0.382);
++  blob(slide, -2.308, -0.879, 4.891, 4.854);
++
++  gradCard(slide, { x: 10.258, y: 1.114, w: 1.993, h: 1.993, rectRadius: corner(1.993, 1.993), dark: 'tl' });
++  gradCard(slide, { x: 6.97, y: 4.392, w: 1.993, h: 1.993, rectRadius: corner(1.993, 1.993), dark: 'tr' });
++
++  head(slide, opts.title, { x: 0.934, y: 1.873, w: 5.732, h: 1.717, fontSize: 48 });
++  head(slide, 'Healthcare in the Digital Era', { x: 0.934, y: 1.457, w: 3.958, h: 0.337, fontSize: 14 });
++  head(slide, 'Smarter', { x: 10.496, y: 1.414, w: 1.203, h: 0.269, fontSize: 10 });
++  head(slide, '123,4K+', { x: 10.509, y: 1.699, w: 1.9, h: 0.505, fontSize: 24, bold: true, color: C.slate });
++  para(slide, 'Quisque non elit mauris.', { x: 10.509, y: 2.19, w: 1.531, h: 0.281, fontSize: 8 });
++  head(slide, '123K+', { x: 7.254, y: 4.682, w: 2.285, h: 0.572, fontSize: 28 });
++  para(slide, LOREM_TINY, { x: 7.254, y: 5.284, w: 1.709, h: 0.758, fontSize: 9 });
++  para(slide, LOREM_HERO, { x: 1.007, y: 3.977, w: 5.512, h: 0.831, fontSize: 10 });
++
++  // call-to-action button: blue pill + white icon bubble inside a hairline pill
++  shape(slide, 'roundRect', { x: 1.007, y: 5.432, w: 2.227, h: 0.467, rectRadius: 0.2335, fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_CARD });
++  text(slide, opts.cta, { x: 1.082, y: 5.514, w: 1.73, h: 0.303, fontSize: 12, color: C.bg });
++  shape(slide, 'ellipse', { x: 2.803, y: 5.491, w: 0.349, h: 0.349, fill: { color: C.bg }, line: { type: 'none' } });
++  icon(slide, 'send', 2.872, 5.566, 0.195, 0.195, C.ink);
++  shape(slide, 'roundRect', { x: 0.934, y: 5.36, w: 2.373, h: 0.609, rectRadius: 0.3045, fill: { type: 'none' }, line: { color: C.hair, width: 0.5 }, shadow: SH_CARD });
++
++  decoSquares(slide, 4.181, 5.345, 2.167, 'plain');
++}
++
++function slide1(slide) {
++  heroSlide(slide, {
++    title: 'Smart Solutions for Better Health',
++    cta: 'Start Presentation',
++    tall: { x: 9.543, y: 2.603, w: 2.557, h: 3.783 }
++  });
++  chrome(slide, 1);
++}
++
++function slide15(slide) {
++  heroSlide(slide, {
++    title: 'Thanks for Your Attention',
++    cta: 'End Presentation',
++    tall: { x: 9.359, y: 2.576, w: 2.936, h: 3.809 }
++  });
++  chrome(slide, 15);
++}
++
++/* ----------------------------------------------------------- slide 2: TOC */
++
++const TOC_ITEMS = [
++  { num: '01', card: [2.249, 4.094], label: [3.406, 4.363], digit: [2.411, 4.161, 0.909], dot: [1.27, 4.346] },
++  { num: '02', card: [1.268, 5.426], label: [2.438, 5.694], digit: [1.43, 5.492, 1.008], dot: [5.952, 5.665] },
++  { num: '03', card: [7.748, 4.094], label: [8.918, 4.363], digit: [7.91, 4.161, 1.008], dot: [6.77, 4.346] },
++  { num: '04', card: [6.768, 5.426], label: [7.938, 5.694], digit: [6.93, 5.492, 1.008], dot: [11.464, 5.64] }
++];
++
++function slide2(slide) {
++  decoSquares(slide, 0.005, 3.061, 2.167, 'mirrorX');
++  blob(slide, 2.392, -2.558, 4.891, 4.854);
++  blob(slide, 10.798, 2.814, 4.891, 4.854);
++  chrome(slide, 2);
++
++  TOC_ITEMS.forEach(function (item) {
++    shape(slide, 'roundRect', {
++      x: item.card[0], y: item.card[1], w: 4.117, h: 0.907, rectRadius: corner(4.117, 0.907),
++      fill: { color: C.bg }, line: { type: 'none' }, shadow: SH_CARD
++    });
++    head(slide, 'Your Subtitle Goes Here', { x: item.label[0], y: item.label[1], w: 3.147, h: 0.37, fontSize: 16 });
++    head(slide, item.num, {
++      x: item.digit[0], y: item.digit[1], w: item.digit[2], h: 0.774,
++      fontSize: 40, bold: true, color: C.ink, transparency: 95
++    });
++    shape(slide, 'ellipse', { x: item.dot[0], y: item.dot[1], w: 0.424, h: 0.424, fill: { color: C.blue }, line: { type: 'none' } });
++    shape(slide, 'line', {
++      x: item.dot[0] + 0.115, y: item.dot[1] + 0.212, w: 0.195, h: 0,
++      line: { color: C.bg, width: 1, endArrowType: 'triangle' }
++    });
++  });
++
++  head(slide, 'Table Of', { x: 1.268, y: 1.314, w: 2.491, h: 0.774, fontSize: 40 });
++  head(slide, 'Content', { x: 1.268, y: 1.96, w: 4.773, h: 1.447, fontSize: 80 });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, a maximus ' +
++    'leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit euismod, metus ac Cras euismod, metus ac ' +
++    'finibus ac finibus finibus, felis dui suscipit purus, a maximus leo ligula',
++    { x: 7.206, y: 1.742, w: 5.053, h: 1.084 });
++}
++
++/* ------------------------------------------------------------- slide 3 */
++
++function slide3(slide) {
++  blob(slide, -2.269, -0.401, 4.891, 4.854);
++  blob(slide, 9.938, 3.922, 4.891, 4.854);
++  chrome(slide, 3);
++
++  gradCard(slide, { x: 5.993, y: 1.415, w: 3.113, h: 1.418, rectRadius: 0.1665, dark: 'tl' });
++  shape(slide, 'roundRect', { x: 9.271, y: 4.667, w: 3.113, h: 1.418, rectRadius: 0.1665, fill: { color: C.white }, line: { type: 'none' }, shadow: SH_CARD });
++  [[8.473, 1.591], [11.745, 4.866]].forEach(function (p) {
++    shape(slide, 'roundRect', { x: p[0], y: p[1], w: 0.435, h: 0.435, rectRadius: corner(0.435, 0.435), fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_CARD });
++  });
++
++  head(slide, '123,4K+', { x: 6.137, y: 1.523, w: 2.285, h: 0.572, fontSize: 28 });
++  para(slide, LOREM_CARD, { x: 6.137, y: 2.124, w: 2.849, h: 0.531, fontSize: 9 });
++  head(slide, 'Conversions from Organic Traffic', { x: 9.408, y: 4.838, w: 1.903, h: 0.505, fontSize: 12 });
++  para(slide, LOREM_CARD, { x: 9.408, y: 5.385, w: 2.849, h: 0.531, fontSize: 9 });
++  icon(slide, 'swap', 11.841, 4.97, 0.243, 0.223, C.bg);
++  icon(slide, 'gear', 8.567, 1.688, 0.243, 0.244, C.bg);
++
++  head(slide, 'The Evolution of Health Tech', { x: 0.95, y: 1.743, w: 4.425, h: 1.447, fontSize: 40 });
++  head(slide, 'Robotics in Modern Surgery', { x: 0.95, y: 3.585, w: 2.837, h: 0.337, fontSize: 14 });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, a maximus ' +
++    'leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit euismod, metus ac Cras euismod, metus ac ' +
++    'finibus ac finibus finibus, felis', { x: 0.95, y: 3.998, w: 4.536, h: 1.084 });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, a maximus ' +
++    'leo ligula at dolor. ', { x: 0.95, y: 5.179, w: 4.536, h: 0.579 });
++
++  decoSquares(slide, 4.142, -0.009, 1.59, 'mirrorY');
++  photo(slide, 9.271, 1.415, 3.113, 3.113, 0.519);
++  photo(slide, 5.993, 2.972, 3.113, 3.113, 0.519);
++}
++
++/* ------------------------------------------------------------- slide 4 */
++
++function slide4(slide) {
++  blob(slide, 5.115, -2.545, 4.891, 4.854);
++  blob(slide, 2.266, 3.75, 4.891, 4.854);
++  chrome(slide, 4);
++
++  shape(slide, 'roundRect', { x: 3.185, y: 3.181, w: 1.829, h: 2.979, rectRadius: corner(1.829, 2.979), fill: { color: C.white }, line: { type: 'none' }, shadow: SH_DROP });
++  shape(slide, 'roundRect', { x: 1.243, y: 3.181, w: 1.829, h: 2.979, rectRadius: corner(1.829, 2.979), fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_CARD });
++  gradCard(slide, { x: 1.236, y: 1.34, w: 3.777, h: 1.689, rectRadius: corner(3.777, 1.689), dark: 'tl' });
++
++  head(slide, '123,45K', { x: 1.462, y: 1.535, w: 2.46, h: 0.774, fontSize: 40 });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus fini bus, felis dui suscipit',
++    { x: 1.462, y: 2.184, w: 3.198, h: 0.579 });
++
++  head(slide, 'Medicine', { x: 3.363, y: 4.13, w: 1.548, h: 0.337, fontSize: 14 });
++  para(slide, LOREM_TILE, { x: 3.363, y: 4.482, w: 1.65, h: 1.336 });
++  head(slide, '02', { x: 3.369, y: 3.352, w: 1.199, h: 0.774, fontSize: 40, bold: true, color: C.ink, transparency: 95 });
++
++  head(slide, 'Telemedicine', { x: 1.41, y: 4.13, w: 1.509, h: 0.337, fontSize: 14, color: C.bg });
++  para(slide, LOREM_TILE, { x: 1.41, y: 4.482, w: 1.65, h: 1.336, color: C.bg });
++  head(slide, '01', { x: 1.416, y: 3.352, w: 1.199, h: 0.774, fontSize: 40, bold: true, color: C.bg, transparency: 80 });
++
++  head(slide, 'Precision Medicine through Technology', { x: 5.735, y: 1.971, w: 6.356, h: 1.447, fontSize: 40 });
++  para(slide, LOREM_LONG, { x: 5.735, y: 3.706, w: 6.547, h: 0.831 });
++  para(slide, LOREM_LONG, { x: 5.735, y: 4.698, w: 6.547, h: 0.831 });
++
++  decoSquares(slide, 11.378, 1.359, 1.955, 'plain');
++}
++
++/* ------------------------------------------------------------- slide 5 */
++
++function slide5(slide) {
++  photo(slide, 6.347, 4.074, 2.642, 1.928, 0.3213);
++  decoSquares(slide, 0.005, 0.932, 1.381, 'mirrorX');
++  blob(slide, 2.334, 5.43, 4.891, 4.854);
++  blob(slide, 9.898, -0.204, 4.891, 4.854);
++  chrome(slide, 5);
++
++  shape(slide, 'rect', { x: 8.495, y: 4.074, w: 4.839, h: 1.927, fill: { color: C.blue }, line: { type: 'none' } });
++  head(slide, '123,45K+', { x: 8.852, y: 4.27, w: 2.358, h: 0.64, fontSize: 32, color: C.bg });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus fini bus, felis dui suscipit purus, ' +
++    'a maximus leo ligula euismod, metus euismod', { x: 8.852, y: 4.876, w: 3.437, h: 0.831, color: C.bg });
++
++  // north-east arrow assembled from three strokes
++  const arrow = { color: C.bg, width: 1.5 };
++  shape(slide, 'line', { x: 12.548, y: 4.433, w: 0.29, h: 0, line: arrow });
++  shape(slide, 'line', { x: 12.832, y: 4.422, w: 0, h: 0.29, line: arrow });
++  shape(slide, 'line', { x: 12.508, y: 4.43, w: 0.327, h: 0.327, line: arrow, flipH: true });
++
++  gradCard(slide, { x: 2.644, y: 2.474, w: 1.928, h: 5.127, rotate: 90, rectRadius: 0.2307, dark: 'bl' });
++  head(slide, '123,45K', { x: 1.391, y: 4.352, w: 2.494, h: 0.774, fontSize: 40 });
++  para(slide, 'Quisque non elit mauris. Cras euismod, met us ac finibus fini bus, felis dui suscipit purus, ' +
++    'a maximus leo ligula euismod', { x: 1.391, y: 5.059, w: 4.492, h: 0.579 });
++
++  head(slide, 'Precision Medicine through Technology', { x: 1.044, y: 1.318, w: 6.356, h: 1.447, fontSize: 40 });
++  shape(slide, 'roundRect', { x: 7.582, y: 1.637, w: 4.707, h: 0.828, rectRadius: corner(4.707, 0.828), fill: { color: C.white }, line: { type: 'none' }, shadow: SH_CARD });
++  head(slide, 'Health Tech Startups to Watch', { x: 8.495, y: 1.863, w: 3.577, h: 0.37, fontSize: 16 });
++  shape(slide, 'roundRect', { x: 7.78, y: 1.819, w: 0.458, h: 0.458, rectRadius: corner(0.458, 0.458), fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_CARD });
++  icon(slide, 'cloudSync', 7.889, 1.941, 0.241, 0.215, C.bg);
++
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, a maximus ' +
++    'leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit euismod, metus ac Cras euismod, metus ac ' +
++    'finibus ac finibus finibus, felis euismod, metus ac finibus finibus, felis dui ',
++    { x: 1.044, y: 3.044, w: 11.593, h: 0.579 });
++}
++
++/* ------------------------------------------------------------- slide 6 */
++
++const STAT_BARS = [
++  { pct: '50%', value: '123,45K+', x: 6.804, tx: 6.91, lx: 7.712, vx: 6.71, blue: false },
++  { pct: '90%', value: '546,88K+', x: 9.945, tx: 10.051, lx: 10.854, vx: 9.852, blue: true }
++];
++
++function slide6(slide) {
++  blob(slide, -2.605, -0.861, 4.891, 4.854);
++  blob(slide, 3.315, 3.53, 4.891, 4.854);
++  chrome(slide, 6);
++
++  STAT_BARS.forEach(function (bar) {
++    const pill = { x: bar.x, y: 4.22, w: 1.817, h: 0.415, rectRadius: 0.2075 };
++    if (bar.blue) {
++      shape(slide, 'roundRect', Object.assign({ fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_CARD }, pill));
++    } else {
++      gradCard(slide, Object.assign({ dark: 'tl' }, pill));
++    }
++    head(slide, bar.pct, { x: bar.tx, y: 4.285, w: 0.668, h: 0.286, fontSize: 10.5, color: bar.blue ? C.bg : C.ink });
++    shape(slide, 'line', {
++      x: bar.lx, y: 4.424, w: 0.693, h: 0,
++      line: { color: bar.blue ? C.bg : C.ink, width: 1, endArrowType: 'triangle' }
++    });
++    head(slide, bar.value, { x: bar.vx, y: 4.795, w: 2.358, h: 0.64, fontSize: 32 });
++    para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus fini bus, ', { x: bar.vx, y: 5.48, w: 2.765, h: 0.579 });
++  });
++
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus fini bus, felis dui suscipit purus, ' +
++    'a maximus leo ligula euis mod, metus euismod, metus ac finibus finibus', { x: 6.727, y: 3.147, w: 5.965, h: 0.579 });
++  head(slide, 'Cloud Computing in Medicine', { x: 6.71, y: 1.355, w: 5.236, h: 1.447, fontSize: 40 });
++
++  decoSquares(slide, 11.947, 1.421, 1.381, 'plain');
++  photo(slide, 0.946, 1.484, 4.981, 4.533, 0.7555);
++}
++
++/* ------------------------------------------------------------- slide 7 */
++
++const TREND_ROWS = [
++  'Future-Proofing Healthcare Systems',
++  'Smart Diagnostics, Smart Healing',
++  'Revolutionizing Patient Experience',
++  'The Age of Personalized Health Tech'
++];
++
++function slide7(slide) {
++  decoSquares(slide, 0.005, 2.439, 1.381, 'mirrorX');
++  blob(slide, 1.759, -2.449, 4.891, 4.854);
++  blob(slide, 9.213, 3.093, 4.891, 4.854);
++  chrome(slide, 7);
++
++  shape(slide, 'roundRect', { x: 7.533, y: 1.707, w: 4.637, h: 1.283, rectRadius: corner(4.637, 1.283), fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_CARD });
++  head(slide, 'Healthcare Meets Innovation', { x: 7.818, y: 1.981, w: 2.837, h: 0.286, fontSize: 11, color: C.white });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus fini bus, felis dui susci pit purus, ' +
++    'a maximus leo ligula euismod, metus', { x: 7.818, y: 2.222, w: 4.189, h: 0.483, fontSize: 8, color: C.white });
++
++  TREND_ROWS.forEach(function (label, i) {
++    const y = 3.24 + i * 0.6665;
++    shape(slide, 'roundRect', { x: 7.959, y: y, w: 3.786, h: 0.563, rectRadius: corner(3.786, 0.563), fill: { color: C.bg }, line: { type: 'none' }, shadow: SH_FLAT });
++    head(slide, label, { x: 8.243, y: y + 0.139, w: 3.352, h: 0.286, fontSize: 11 });
++  });
++
++  head(slide, 'Artificial Intelligence in Drug Discovery', { x: 0.862, y: 1.486, w: 5.605, h: 1.447, fontSize: 40 });
++  head(slide, '123,45K+', { x: 0.867, y: 3.281, w: 2.358, h: 0.64, fontSize: 32 });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, ' +
++    'a maximus leo ligula at dolor. ', { x: 0.862, y: 3.955, w: 2.48, h: 1.084 });
++  head(slide, 'Future Trends in Health Technology', { x: 3.752, y: 3.85, w: 3.057, h: 0.774, fontSize: 20 });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, ' +
++    'a maximus leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit euismod, metus ac Cras ' +
++    'finibus finibus, felis dui suscipit purus, ', { x: 0.862, y: 5.182, w: 5.805, h: 0.831 });
++}
++
++/* ------------------------------------------------------------- slide 8 */
++
++const FEATURE_COLS = [
++  { title: 'Digital Health', tx: 0.873, ty: 4.79, tile: 0.962, glyph: 'emblem', gx: 1.077, gy: 4.279, gh: 0.203 },
++  { title: 'Tech and Wellness', tx: 4.97, ty: 4.791, tile: 5.059, glyph: 'link', gx: 5.174, gy: 4.278, gh: 0.208 },
++  { title: 'Medical Innovation', tx: 9.067, ty: 4.791, tile: 9.145, glyph: 'cloudSearch', gx: 9.26, gy: 4.286, gh: 0.193 }
++];
++
++function slide8(slide) {
++  blob(slide, 1.869, 5.127, 4.891, 4.854);
++  blob(slide, 10.602, -0.028, 4.891, 4.854);
++  chrome(slide, 8);
++
++  FEATURE_COLS.forEach(function (col) {
++    head(slide, col.title, { x: col.tx, y: col.ty, w: 2.196, h: 0.337, fontSize: 14 });
++    para(slide, LOREM_COL, { x: col.tx, y: 5.149, w: 3.303, h: 0.579 });
++    shape(slide, 'roundRect', {
++      x: col.tile, y: col.tile === 0.962 ? 4.163 : 4.168, w: 0.432, h: 0.428, rotate: 90,
++      rectRadius: corner(0.432, 0.428), fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_CARD
++    });
++    icon(slide, col.glyph, col.gx, col.gy, 0.201, col.gh, C.bg);
++  });
++
++  head(slide, 'Empowering Patients with Technology', { x: 0.862, y: 1.696, w: 6.305, h: 1.447, fontSize: 40 });
++  para(slide, LOREM_LONG, { x: 7.445, y: 1.941, w: 4.669, h: 1.084 });
++  decoSquares(slide, 5.885, -0.009, 1.59, 'mirrorY');
++}
++
++/* ------------------------------------------------------------- slide 9 */
++
++const CEO_TAGS = [
++  { label: 'Financial Performance', x: 1.031, y: 4.903, w: 2.224, tw: 1.686, blue: true },
++  { label: 'Optimize Financial', x: 1.031, y: 5.59, w: 1.958, tw: 1.441, blue: false },
++  { label: 'Performance in Manufacturing Success', x: 3.842, y: 4.903, w: 3.285, tw: 2.795, blue: false },
++  { label: 'Maintaining Strong Financial', x: 3.842, y: 5.59, w: 2.57, tw: 2.13, blue: true }
++];
++
++function slide9(slide) {
++  blob(slide, 2.651, -2.193, 4.891, 4.854);
++  blob(slide, 6.35, 1.153, 6.287, 6.24);
++  chrome(slide, 9);
++
++  head(slide, 'Benjamin Esteban', { x: 1.032, y: 3.156, w: 2.582, h: 0.37, fontSize: 16 });
++  para(slide, LOREM_NAME, { x: 1.031, y: 3.497, w: 2.412, h: 0.326 });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscip it purus, ' +
++    'a maximus leo ligula at dolor. Morbi et malesuada purus. Phasellus a', { x: 1.031, y: 3.949, w: 6.235, h: 0.579 });
++
++  CEO_TAGS.forEach(function (tag) {
++    const pill = { x: tag.x, y: tag.y, w: tag.w, h: 0.447, rectRadius: 0.2235 };
++    if (tag.blue) {
++      shape(slide, 'roundRect', Object.assign({ fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_CARD }, pill));
++    } else {
++      gradCard(slide, Object.assign({ dark: 'bl' }, pill));
++    }
++    head(slide, tag.label, {
++      x: tag.x + 0.424, y: tag.y + 0.089, w: tag.tw, h: 0.269, fontSize: 10, color: tag.blue ? C.bg : C.ink
++    });
++    shape(slide, 'ellipse', { x: tag.x + 0.057, y: tag.y + 0.059, w: 0.329, h: 0.329, fill: { color: C.white }, line: { type: 'none' }, shadow: SH_FLAT });
++    icon(slide, 'person', tag.x + 0.16, tag.y + 0.143, 0.122, 0.161, C.ink);
++  });
++
++  head(slide, 'Meet Our Best CEO Here', { x: 1.029, y: 1.463, w: 4.902, h: 1.447, fontSize: 40 });
++  decoSquares(slide, 11.947, 1.421, 1.381, 'plain');
++  photo(slide, 7.168, 0.742, 5.215, 6.758, 0);
++}
++
++/* ------------------------------------------------------------ slide 10 */
++
++const TEAM = [
++  { name: 'Benjamin Esteban', nx: 1.103, nw: 3.216, cx: 1.21, px: 1.568 },
++  { name: 'Bryan Govanchy', nx: 5.141, nw: 3.052, cx: 5.165, px: 5.517 },
++  { name: 'Benjamin Esteban', nx: 9.013, nw: 3.216, cx: 9.119, px: 9.466 }
++];
++
++function slide10(slide) {
++  blob(slide, 2.651, -2.193, 4.891, 4.854);
++  blob(slide, 6.874, 5.017, 4.891, 4.854);
++  chrome(slide, 10);
++
++  TEAM.forEach(function (member) {
++    head(slide, member.name, { x: member.nx, y: 5.468, w: member.nw, h: 0.37, fontSize: 16, align: 'center' });
++    para(slide, LOREM_NAME, { x: member.cx, y: 5.809, w: 3.004, h: 0.326, align: 'center' });
++  });
++
++  head(slide, 'Meet Our Best Team Here', { x: 2.746, y: 1.392, w: 7.841, h: 0.774, fontSize: 40, align: 'center' });
++  decoSquares(slide, 0.005, 1.208, 1.381, 'mirrorX');
++  TEAM.forEach(function (member) {
++    photo(slide, member.px, 2.589, 2.299, 2.323, 0.3832);
++  });
++}
++
++/* ------------------------------------------------------------ slide 11 */
++
++function slide11(slide) {
++  blob(slide, 8.353, 5.296, 4.891, 4.854);
++  blob(slide, 4.069, -0.636, 4.891, 4.854);
++  chrome(slide, 11);
++
++  laptop(slide, 0.383, -0.077, 7.372);          // full laptop
++  laptop(slide, 0.383, 4.407, 7.372, 0.42);     // second one, cropped by the slide edge
++
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, ' +
++    'a maximus leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacusmetus ac finibus finibus, ' +
++    'felis dui suscipit purus finibus finibus, felis dui suscipit purus euismod, metus  metus ac metus ac ' +
++    'finibus finibus, felis dui suscipit purus, a metus ac finibus', { x: 8.246, y: 4.132, w: 4.255, h: 1.589 });
++  head(slide, 'Smart Sensors for Smarter Care', { x: 8.246, y: 3.59, w: 3.643, h: 0.37, fontSize: 16 });
++  head(slide, 'Data Security in Health Tech', { x: 8.246, y: 1.936, w: 4.255, h: 1.447, fontSize: 40 });
++
++  decoSquares(slide, 11.947, 1.421, 1.381, 'plain');
++  photo(slide, 1.338, 1.791, 5.466, 3.457, 0);
++  photo(slide, 1.338, 6.275, 5.466, 1.225, 0);
++}
++
++/* ------------------------------------------------------------ slide 12 */
++
++const LIFESAVER_ROWS = [
++  { label: 'Collaborating for Excellence', y: 4.108, ty: 4.365, tw: 3.289, glyph: 'cloudSearch', gy: 4.425, gh: 0.216, blue: false },
++  { label: 'We Grow When You Grow', y: 5.275, ty: 5.529, tw: 2.745, glyph: 'database', gy: 5.59, gh: 0.226, blue: true }
++];
++
++function slide12(slide) {
++  blob(slide, -1.522, 3.72, 4.891, 4.854);
++  blob(slide, 9.576, -0.489, 4.891, 4.854);
++  chrome(slide, 12);
++
++  monitor(slide, 6.286, 1.348, 6.172, 4.852);
++  head(slide, 'Technology as a Lifesaver', { x: 0.875, y: 1.375, w: 4.199, h: 1.447, fontSize: 40 });
++
++  LIFESAVER_ROWS.forEach(function (row) {
++    const card = { x: 0.875, y: row.y, w: 4.199, h: 0.85, rectRadius: corner(4.199, 0.85) };
++    if (row.blue) {
++      shape(slide, 'roundRect', Object.assign({ fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_DROP }, card));
++    } else {
++      gradCard(slide, Object.assign({ dark: 'tl' }, card));
++    }
++    text(slide, row.label, { x: 1.96, y: row.ty, w: row.tw, h: 0.337, fontSize: 14, color: row.blue ? C.white : C.ink });
++    shape(slide, 'roundRect', { x: 1.012, y: row.y + 0.135, w: 0.581, h: 0.581, rectRadius: corner(0.581, 0.581), fill: { color: C.white }, line: { type: 'none' }, shadow: SH_FLAT });
++    icon(slide, row.glyph, 1.189, row.gy, 0.226, row.gh, C.ink);
++  });
++
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui susci pit purus, ' +
++    'a maximus leo ligula at', { x: 0.875, y: 3.081, w: 4.649, h: 0.579 });
++  decoSquares(slide, 4.315, -0.009, 1.59, 'mirrorY');
++  photo(slide, 6.827, 1.754, 5.04, 2.871, 0);
++}
++
++/* ------------------------------------------------------------ slide 13 */
++
++const TESTIMONIALS = [
++  { name: 'Isabel Mercado Angel', cardX: 2.794, adj: 0.11938, tx: 1.546, px: 4.812, blue: true },
++  { name: 'Justin Sonny Timberfile', cardX: 8.755, adj: 0.11128, tx: 7.438, px: 10.705, blue: false }
++];
++
++function slide13(slide) {
++  blob(slide, 10.644, -0.172, 4.891, 4.854);
++  blob(slide, 4.349, 5.073, 4.891, 4.854);
++  chrome(slide, 13);
++
++  TESTIMONIALS.forEach(function (item) {
++    // the quote cards are 90 deg rotated rounded rectangles in the source deck
++    const card = { x: item.cardX, y: 2.566, w: 1.715, h: 4.969, rotate: 90, rectRadius: item.adj * 1.715 };
++    if (item.blue) {
++      shape(slide, 'roundRect', Object.assign({ fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_HALO }, card));
++    } else {
++      gradCard(slide, Object.assign({ dark: 'bl' }, card));
++    }
++    head(slide, item.name, {
++      x: item.tx, y: 4.513, w: 2.693, h: 0.405, fontSize: 16,
++      lineSpacingMultiple: 1.2, color: item.blue ? C.bg : C.ink
++    });
++    para(slide, LOREM_QUOTE, { x: item.tx, y: 4.959, w: 4.59, h: 0.579, color: item.blue ? C.bg : C.ink });
++  });
++
++  head(slide, 'What They Say About Us?', { x: 1.236, y: 1.592, w: 4.366, h: 1.447, fontSize: 40 });
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, a maximus ' +
++    'leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit amet urna tempor sollicitudin. Cras ' +
++    'pretium Quisque non elit mauris. Cras euismod, metus ac finibus finibus, ', { x: 7.128, y: 1.801, w: 5.142, h: 1.084 });
++
++  decoSquares(slide, 0.005, 1.208, 1.381, 'mirrorX');
++  TESTIMONIALS.forEach(function (item) {
++    photo(slide, item.px, 3.639, 1.083, 1.083, 0.1803);
++  });
++}
++
++/* ------------------------------------------------------------ slide 14 */
++
++const CONTACTS = [
++  { label: '123 Anywhere St., Any City', tileX: 6.705, tileY: 4.278, textX: 7.265, textY: 4.32, glyph: 'marker', gx: 6.779, gy: 4.352, gs: 0.291, blue: true },
++  { label: '+123-456-7890', tileX: 6.711, tileY: 5.0, textX: 7.265, textY: 5.042, glyph: 'phone', gx: 6.814, gy: 5.103, gs: 0.232, blue: false },
++  { label: 'www.reallygreatsite.com', tileX: 9.653, tileY: 4.278, textX: 10.213, textY: 4.32, glyph: 'world', gx: 9.756, gy: 4.381, gs: 0.232, blue: false },
++  { label: 'hello@reallygreatsite.com', tileX: 9.653, tileY: 5.0, textX: 10.213, textY: 5.042, glyph: 'email', gx: 9.756, gy: 5.103, gs: 0.232, blue: true }
++];
++
++function slide14(slide) {
++  blob(slide, 6.066, 5.36, 4.891, 4.854);
++  blob(slide, 2.944, -0.687, 4.891, 4.854);
++  chrome(slide, 14);
++
++  head(slide, 'Our Contact Information Here', { x: 6.569, y: 1.592, w: 4.986, h: 1.447, fontSize: 40 });
++
++  CONTACTS.forEach(function (row) {
++    const tile = { x: row.tileX, y: row.tileY, w: 0.438, h: 0.438, rectRadius: corner(0.438, 0.438) };
++    if (row.blue) {
++      shape(slide, 'roundRect', Object.assign({ fill: { color: C.blue }, line: { type: 'none' }, shadow: SH_CARD }, tile));
++    } else {
++      gradCard(slide, Object.assign({ dark: 'tl' }, tile));
++    }
++    para(slide, row.label, { x: row.textX, y: row.textY, w: 1.977, h: 0.353 });
++    icon(slide, row.glyph, row.gx, row.gy, row.gs, row.gs, row.blue ? C.bg : C.ink);
++  });
++
++  para(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, ' +
++    'a maximus leo ligula at dolor. Morbi et', { x: 6.569, y: 3.31, w: 5.661, h: 0.579 });
++  decoSquares(slide, 11.947, 1.421, 1.381, 'plain');
++  photo(slide, 1.033, 1.36, 4.767, 4.78, 0.7945);
++}
++
++/* ---------------------------------------------------------------- build */
++
++const BUILDERS = [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8,
++  slide9, slide10, slide11, slide12, slide13, slide14, slide15];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5 in
++  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++  pptx.author = 'HealthTechnology';
++  pptx.company = 'HealthTechnology';
++  pptx.title = 'Smart Solutions for Better Health';
++
++  pptx.defineSlideMaster({ title: 'BASE', background: { color: C.bg } });
++
++  BUILDERS.forEach(function (builder) {
++    const slide = pptx.addSlide({ masterName: 'BASE' });
++    slide.background = { color: C.bg };
++    builder(slide);
++  });
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '068b1d60-0b81-4cf3-8bba-79f7c2b886ce_grok_final.pptx') });
++}
++
++build().then(function (file) {
++  console.log('wrote ' + file);
++}).catch(function (err) {
++  console.error(err);
++  process.exit(1);
++});

@@ -1,0 +1,11 @@
+--- 2026-10-09_14-11:/exec-daemon/agent-sdk/grok/package.json
++++ 2026-10-09_14-24:/exec-daemon/agent-sdk/grok/package.json
+@@ -5,7 +5,7 @@
+   "description": "Shipped Grok SDK declarations for agent-authored canvases.",
+   "exports": {
+     "./canvas": {
+-      "types": "./canvas/index.d.ts"
++      "types": "./canvas/compile-env.d.ts"
+     }
+   }
+ }

@@ -1,0 +1,896 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/cricket_tournament_strategy_highlights.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/cricket_tournament_strategy_highlights.js
+@@ -0,0 +1,893 @@
++/**
++ * "Cricket Power 2028" — 20-slide deck rebuilt with pptxgenjs.
++ *
++ * Photographs in the source deck are replaced by flat colour blocks labelled
++ * "[image]"; everything else (type, geometry, colour) is recreated natively.
++ *
++ *   node 11359b14-454a-45d0-a5d3-f901576364b7_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const GREEN = '1B623A'; // accent3
++const GREEN_DK = '144A2C'; // accent3, lumMod 75%
++const RED = 'E4281F'; // accent1
++const BALL_RED = 'E52222';
++const BALL_DK = 'B01418';
++const INK = '404040'; // tx1 lumMod 75% / lumOff 25%
++const INK_85 = '262626'; // tx1 lumMod 85% / lumOff 15%
++const BLACK = '000000';
++const PAGE = 'F2F2F2';
++const WHITE = 'FFFFFF';
++const SOFT = 'F2F2F2'; // bg1 lumMod 95% — cards, arc tracks
++const GREY_75 = 'BFBFBF'; // bg1 lumMod 75% — muted captions
++const PHOTO = 'E6E6E6'; // stand-in for a photograph
++const PHOTO_INK = '9B9B9B';
++const DEVICE = '3A3A3C'; // laptop / phone / watch bodies
++const DEVICE_LT = 'B4B4B8';
++
++const HEAD = 'Lexend SemiBold'; // theme major latin
++const BODY = 'Open Sans'; // theme minor latin
++
++const SHADOW = { type: 'outer', color: '000000', opacity: 0.1, blur: 10, offset: 3, angle: 90 };
++const SHADOW_S = { type: 'outer', color: '000000', opacity: 0.08, blur: 6, offset: 2, angle: 90 };
++
++const SLIDE_W = 13.333;
++
++/* ---------------------------------------------------------------- helpers */
++
++/** Turn an array of strings into pptxgenjs paragraph runs. */
++const para = (arr) => arr.map((t, i) => ({ text: t, options: { breakLine: i < arr.length - 1 } }));
++
++/** 12 pt supporting copy, 130 % leading (the deck's default body block). */
++function body(slide, x, y, w, arr, o = {}) {
++  slide.addText(para(arr), {
++    x, y, w, h: 0.08 + arr.length * 0.262,
++    fontFace: o.fontFace || BODY, fontSize: o.fontSize || 12, color: o.color || INK,
++    bold: !!o.bold, align: o.align || 'left', valign: 'top', lineSpacingMultiple: 1.3,
++  });
++}
++
++/** A single-line label (no extra leading). */
++function label(slide, x, y, w, text, o = {}) {
++  slide.addText(text, {
++    x, y, w, h: o.h || 0.303,
++    fontFace: o.fontFace || BODY, fontSize: o.fontSize || 12, color: o.color || INK,
++    bold: !!o.bold, align: o.align || 'left', valign: o.valign || 'top',
++  });
++}
++
++/** Section heading, one paragraph per line. */
++function heading(slide, x, y, arr, o = {}) {
++  const size = o.fontSize || 32;
++  slide.addText(para(arr), {
++    x, y, w: o.w || 6.456, h: o.h || (0.1 + arr.length * size * 1.2 / 72),
++    fontFace: HEAD, fontSize: size, color: o.color || INK, valign: 'top',
++    ...(o.lineSpacing ? { lineSpacing: o.lineSpacing } : {}),
++    ...(o.align ? { align: o.align } : {}),
++  });
++}
++
++/** Photograph stand-in: flat block + "[image]" caption. */
++function photo(slide, o) {
++  const shape = o.shape || 'roundRect';
++  const geo = { x: o.x, y: o.y, w: o.w, h: o.h };
++  slide.addShape(shape, {
++    ...geo,
++    fill: { color: o.fill || PHOTO },
++    line: o.ring === false ? { type: 'none' } : { color: WHITE, width: o.ring || 18 },
++    ...(shape === 'roundRect' ? { rectRadius: o.r === undefined ? 0.25 : o.r } : {}),
++    ...(o.rotate ? { rotate: o.rotate } : {}),
++  });
++  slide.addText('[image]', {
++    ...geo, align: 'center', valign: 'middle', fontFace: BODY,
++    fontSize: o.fontSize || 11, color: PHOTO_INK, ...(o.rotate ? { rotate: o.rotate } : {}),
++  });
++}
++
++/** White "Competitive Dominance" chip; `flip` mirrors the dot to the right. */
++function tagPill(slide, x, y, o = {}) {
++  const text = o.text || 'Competitive Dominance';
++  slide.addShape('roundRect', {
++    x: x + (o.flip ? 0.052 : 0), y, w: 2.34, h: 0.472,
++    fill: { color: WHITE }, line: { type: 'none' }, rectRadius: 0.236, shadow: SHADOW,
++  });
++  slide.addShape('ellipse', {
++    x: x + (o.flip ? 2.029 : 0.148), y: y + 0.129, w: 0.214, h: 0.214, fill: { color: RED },
++  });
++  slide.addText(text, {
++    x: x + (o.flip ? -0.001 : 0.399), y: y + 0.102, w: 1.993, h: 0.269,
++    fontFace: BODY, fontSize: 10, color: INK, align: o.flip ? 'right' : 'left', valign: 'top',
++  });
++}
++
++/** Rounded "button" used for the pitch-type lists. */
++function chip(slide, x, y, text, o = {}) {
++  slide.addShape('roundRect', {
++    x, y, w: 2.108, h: 0.463, fill: { color: o.fill || WHITE },
++    line: { type: 'none' }, rectRadius: 0.2315,
++  });
++  slide.addText(text, {
++    x: x + 0.124, y: y + 0.080, w: 1.860, h: 0.303,
++    fontFace: BODY, fontSize: 12, color: o.color || INK, align: 'center', valign: 'top',
++  });
++}
++
++/** Coloured dot + big percentage + caption (the KPI pairs). */
++function kpi(slide, x, y, o) {
++  slide.addShape('ellipse', {
++    x, y: y + 0.115, w: 0.208, h: 0.208, fill: { color: o.dot },
++    line: { color: WHITE, width: 2 }, shadow: SHADOW_S,
++  });
++  slide.addText(o.value, {
++    x: x + 0.333, y, w: o.w || 2.114, h: 0.438,
++    fontFace: HEAD, fontSize: 20, color: INK, valign: 'top',
++  });
++  if (o.caption) label(slide, x + 0.333, y + 0.438, o.w || 2.114, o.caption);
++}
++
++/** Solid disc with a white keyline and a pictogram in the middle. */
++function iconCircle(slide, o) {
++  slide.addShape('ellipse', {
++    x: o.x, y: o.y, w: o.d, h: o.d, fill: { color: o.fill },
++    line: { color: WHITE, width: o.ring || 8 }, shadow: SHADOW,
++  });
++  const h = o.iconH || o.d * 0.42;
++  ICONS[o.icon](slide, o.x + o.d / 2, o.y + o.d / 2, h, o.fill);
++}
++
++/** Big disc carrying a headline number plus a caption ("50% / Determination"). */
++function statCircle(slide, o) {
++  const d = o.d;
++  slide.addShape('ellipse', {
++    x: o.x, y: o.y, w: d, h: d, fill: { color: o.fill },
++    line: { color: WHITE, width: o.ring || 8 }, shadow: SHADOW,
++  });
++  slide.addText(o.value, {
++    x: o.x + d * 0.15, y: o.y + d * 0.288, w: d * 0.70, h: d * 0.306,
++    fontFace: HEAD, fontSize: o.valueSize || 28, color: WHITE, align: 'center', valign: 'top',
++  });
++  slide.addText(o.label === undefined ? 'Determination' : o.label, {
++    x: o.x + d * 0.064, y: o.y + d * 0.549, w: d * 0.872, h: d * 0.162,
++    fontFace: BODY, fontSize: o.labelSize || 12, color: WHITE, align: 'center', valign: 'top',
++  });
++}
++
++/** Ring chart: light track plus a green value arc, with a centred percentage. */
++function donut(slide, o) {
++  const geo = { x: o.x, y: o.y, w: o.d, h: o.d };
++  slide.addShape('arc', { ...geo, line: { color: SOFT, width: o.width }, angleRange: [167, 271] });
++  slide.addShape('arc', { ...geo, line: { color: GREEN, width: o.width }, angleRange: [270, 169] });
++  slide.addText(o.text, {
++    x: o.x - 0.2, y: o.y + o.d / 2 - 0.171, w: o.d + 0.4, h: 0.342,
++    fontFace: HEAD, fontSize: 12, color: INK_85, align: 'center', valign: 'middle',
++  });
++}
++
++/** Red leather cricket ball: shaded rim, bright leather, curved seam stitching. */
++function cricketBall(slide, o) {
++  const { x, y, d } = o;
++  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: BALL_DK } });
++  slide.addShape('ellipse', { x: x + d * 0.02, y: y - d * 0.02, w: d * 0.95, h: d * 0.95, fill: { color: BALL_RED } });
++  for (let i = 0; i < 6; i++) {
++    slide.addShape('arc', {
++      x: x + d * 0.05, y: y + d * (0.20 + i * 0.072), w: d * 0.90, h: d * 0.52,
++      line: { color: WHITE, width: Math.max(0.4, d * 0.42) },
++      angleRange: [208, 332], rotate: 344,
++    });
++  }
++}
++
++/* ----------------------------------------------------------- pictogram set */
++
++const ICONS = {
++  /** Medal hanging from a V-shaped ribbon; the star is cut out of the disc. */
++  medal(slide, cx, cy, h, disc) {
++    slide.addShape('rect', { x: cx - 0.40 * h, y: cy - 0.46 * h, w: 0.30 * h, h: 0.40 * h, fill: { color: WHITE }, rotate: -20 });
++    slide.addShape('rect', { x: cx + 0.10 * h, y: cy - 0.46 * h, w: 0.30 * h, h: 0.40 * h, fill: { color: WHITE }, rotate: 20 });
++    slide.addShape('ellipse', { x: cx - 0.34 * h, y: cy - 0.16 * h, w: 0.68 * h, h: 0.68 * h, fill: { color: WHITE } });
++    slide.addShape('star5', { x: cx - 0.23 * h, y: cy - 0.05 * h, w: 0.46 * h, h: 0.46 * h, fill: { color: disc } });
++  },
++  /** Batting helmet — dome, chin band, face grill — beside a ball. */
++  helmet(slide, cx, cy, h, disc) {
++    slide.addShape('ellipse', { x: cx - 0.48 * h, y: cy - 0.46 * h, w: 0.62 * h, h: 0.52 * h, fill: { color: WHITE } });
++    slide.addShape('ellipse', { x: cx - 0.24 * h, y: cy - 0.38 * h, w: 0.14 * h, h: 0.07 * h, fill: { color: disc } });
++    slide.addShape('rect', { x: cx - 0.50 * h, y: cy - 0.02 * h, w: 0.66 * h, h: 0.10 * h, fill: { color: WHITE } });
++    slide.addShape('rect', { x: cx - 0.30 * h, y: cy + 0.08 * h, w: 0.09 * h, h: 0.34 * h, fill: { color: WHITE } });
++    slide.addShape('rect', { x: cx - 0.48 * h, y: cy + 0.24 * h, w: 0.40 * h, h: 0.08 * h, fill: { color: WHITE } });
++    slide.addShape('ellipse', { x: cx + 0.10 * h, y: cy + 0.08 * h, w: 0.34 * h, h: 0.34 * h, fill: { color: WHITE }, rotate: -35 });
++  },
++  /** Cricket bat angled down-left, with the ball at its toe. */
++  bat(slide, cx, cy, h, disc) {
++    slide.addShape('roundRect', { x: cx - 0.31 * h, y: cy - 0.11 * h, w: 0.34 * h, h: 0.50 * h, fill: { color: WHITE }, rectRadius: 0.1 * h, rotate: 45 });
++    slide.addShape('rect', { x: cx + 0.11 * h, y: cy - 0.33 * h, w: 0.10 * h, h: 0.34 * h, fill: { color: WHITE }, rotate: 45 });
++    slide.addShape('rect', { x: cx + 0.20 * h, y: cy - 0.34 * h, w: 0.20 * h, h: 0.09 * h, fill: { color: WHITE }, rotate: 45 });
++    slide.addShape('ellipse', { x: cx + 0.10 * h, y: cy + 0.14 * h, w: 0.26 * h, h: 0.26 * h, fill: { color: WHITE } });
++  },
++  /** Envelope. */
++  mail(slide, cx, cy, h, disc) {
++    slide.addShape('rect', { x: cx - 0.58 * h, y: cy - 0.40 * h, w: 1.16 * h, h: 0.80 * h, fill: { color: WHITE } });
++    slide.addShape('rect', { x: cx - 0.36 * h, y: cy - 0.34 * h, w: 0.52 * h, h: 0.11 * h, fill: { color: disc }, rotate: 34 });
++    slide.addShape('rect', { x: cx - 0.16 * h, y: cy - 0.34 * h, w: 0.52 * h, h: 0.11 * h, fill: { color: disc }, rotate: -34 });
++  },
++  /** Globe with meridian and equator. */
++  globe(slide, cx, cy, h, disc) {
++    slide.addShape('ellipse', { x: cx - 0.5 * h, y: cy - 0.5 * h, w: h, h, fill: { color: WHITE } });
++    slide.addShape('ellipse', { x: cx - 0.22 * h, y: cy - 0.5 * h, w: 0.44 * h, h, fill: { type: 'none' }, line: { color: disc, width: 0.75 } });
++    slide.addShape('rect', { x: cx - 0.5 * h, y: cy - 0.04 * h, w: h, h: 0.08 * h, fill: { color: disc } });
++  },
++  /** Telephone handset. */
++  phone(slide, cx, cy, h, disc) {
++    slide.addShape('arc', {
++      x: cx - 0.34 * h, y: cy - 0.34 * h, w: 0.68 * h, h: 0.68 * h,
++      line: { color: WHITE, width: 0.26 * h * 72 }, angleRange: [205, 25], rotate: 135,
++    });
++  },
++};
++
++/* --------------------------------------------------------------- chrome */
++
++/** "Crickunity" wordmark that the master repeats on every content slide. */
++function brandMark(slide) {
++  slide.addShape('roundRect', {
++    x: 11.921, y: 0.407, w: 0.177, h: 0.141,
++    fill: { color: GREEN }, rectRadius: 0.045, rotate: -25,
++  });
++  slide.addShape('rect', { x: 11.975, y: 0.468, w: 0.070, h: 0.022, fill: { color: SOFT } });
++  slide.addText('Crickunity', {
++    x: 12.129, y: 0.360, w: 0.966, h: 0.236,
++    fontFace: HEAD, fontSize: 8, color: INK, valign: 'top',
++  });
++}
++
++/* ------------------------------------------------------------ deck build */
++
++const pres = new PptxGenJS();
++pres.defineLayout({ name: 'WIDE', width: SLIDE_W, height: 7.5 });
++pres.layout = 'WIDE';
++pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++
++/** Light content slide: page colour, brand mark, page number. */
++function contentSlide() {
++  const slide = pres.addSlide();
++  slide.background = { color: PAGE };
++  brandMark(slide);
++  slide.slideNumber = {
++    x: 11.667, y: 6.827, w: 1.365, h: 0.399,
++    align: 'right', valign: 'middle', fontFace: HEAD, fontSize: 14, color: GREEN,
++  };
++  return slide;
++}
++
++/** Dark cover slide: 60-degree green wash, no chrome. */
++function coverSlide() {
++  const slide = pres.addSlide();
++  slide.background = { color: GREEN_DK };
++  const FROM = [0x40, 0x6b, 0x53], TO = [0x12, 0x47, 0x29];
++  const ux = Math.cos(Math.PI / 3), uy = Math.sin(Math.PI / 3); // 60-degree gradient axis
++  const bands = 48, span = SLIDE_W * ux + 7.5 * uy, step = span / bands;
++  const perp = -(SLIDE_W / 2) * uy + (7.5 / 2) * ux; // slide centre, measured across the axis
++  for (let i = 0; i < bands; i++) {
++    const d = (i + 0.5) * step;
++    const hex = FROM.map((v, k) => Math.round(v + (TO[k] - v) * (i / (bands - 1))))
++      .map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase();
++    slide.addShape('rect', {
++      x: d * ux - perp * uy - step * 0.75, y: d * uy + perp * ux - 9,
++      w: step * 1.5, h: 18, fill: { color: hex }, line: { type: 'none' }, rotate: 60,
++    });
++  }
++  return slide;
++}
++
++/* ------------------------------------------------------------- slide 1 */
++
++function slide01() {
++  const s = coverSlide();
++  s.addText('CRICKET', {
++    x: 1.240, y: 1.805, w: 8.062, h: 2.036,
++    fontFace: HEAD, fontSize: 115, color: WHITE, valign: 'top',
++  });
++  s.addText('POWER', {
++    x: 1.698, y: 3.659, w: 10.396, h: 2.036,
++    fontFace: HEAD, fontSize: 115, color: WHITE, align: 'right', valign: 'top',
++  });
++  s.addShape('ellipse', { x: 6.725, y: 3.765, w: 1.834, h: 1.834, fill: { color: GREEN_DK }, shadow: SHADOW });
++  cricketBall(s, { x: 6.924, y: 3.960, d: 1.435 });
++  body(s, 0.997, 4.333, 4.274,
++    ['The cricket tournament thrilling ', 'moments on every pitch '],
++    { fontSize: 14, color: WHITE, align: 'right' });
++  s.addText('2028 ', {
++    x: 9.302, y: 2.402, w: 3.035, h: 0.841,
++    fontFace: HEAD, fontSize: 44, color: WHITE, valign: 'top',
++  });
++}
++
++/* ------------------------------------------------------------- slide 2 */
++
++function slide02() {
++  const s = contentSlide();
++  photo(s, { shape: 'ellipse', x: 6.727, y: -0.601, w: 5.031, h: 5.031 });
++  photo(s, { shape: 'ellipse', x: 1.902, y: 4.094, w: 5.031, h: 5.031 });
++  heading(s, 0.881, 1.968, ['The Strategies That', 'Define the Game'], { h: 1.178 });
++  tagPill(s, 0.867, 1.310);
++  iconCircle(s, { x: 11.123, y: 1.923, d: 1.268, fill: RED, icon: 'medal', iconH: 0.557 });
++  body(s, 7.684, 5.353, 6.456, ['Inspirational resilience'], { fontFace: HEAD });
++  body(s, 7.695, 5.811, 6.456,
++    ['The cricket tournament showcases passion, teamwork, ',
++      'strategy, and thrilling moments on every pitch']);
++
++  s.addShape('roundRect', {
++    x: 0.994, y: 3.750, w: 2.128, h: 2.182,
++    fill: { color: WHITE }, line: { type: 'none' }, rectRadius: 0.142, shadow: SHADOW,
++  });
++  s.addText('Keyword Ranking', {
++    x: 1.290, y: 3.930, w: 1.537, h: 0.278,
++    fontFace: HEAD, fontSize: 10, color: INK, align: 'center', valign: 'top',
++  });
++  donut(s, { x: 1.549, y: 4.484, d: 1.019, width: 18, text: '75%' });
++  iconCircle(s, { x: 5.665, y: 4.256, d: 1.268, fill: GREEN, icon: 'helmet', iconH: 0.557 });
++}
++
++/* ------------------------------------------------------------- slide 3 */
++
++function slide03() {
++  const s = contentSlide();
++  photo(s, { shape: 'ellipse', x: 6.718, y: 1.015, w: 5.470, h: 5.470 });
++  heading(s, 0.881, 2.179, ['Pitch Conditions ', 'and Weather Impact'], { h: 1.178 });
++  tagPill(s, 0.867, 1.521);
++  body(s, 0.892, 3.781, 6.456,
++    ['The cricket tournament showcases passion, teamwork, ',
++      'strategy, and thrilling moments on every green pitch.']);
++  chip(s, 0.999, 4.871, 'Dry vs Damp Pitch', { fill: RED, color: WHITE });
++  chip(s, 0.999, 5.515, 'Green Pitch', { fill: GREEN, color: WHITE });
++  chip(s, 3.313, 4.871, 'Cracked Pitch');
++  chip(s, 3.313, 5.515, 'Swing Bowling');
++  iconCircle(s, { x: 11.027, y: 1.501, d: 1.268, fill: RED, icon: 'medal', iconH: 0.557 });
++  iconCircle(s, { x: 6.611, y: 4.730, d: 1.268, fill: GREEN, icon: 'helmet', iconH: 0.557 });
++}
++
++/* ------------------------------------------------------------- slide 4 */
++
++function slide04() {
++  const s = contentSlide();
++  photo(s, { x: 6.714, y: -0.419, w: 7.083, h: 6.611, r: 0.489 });
++  iconCircle(s, { x: 6.051, y: 5.390, d: 1.464, fill: GREEN, icon: 'bat', iconH: 0.643 });
++  heading(s, 0.881, 1.972, ['Power Plays & Game-Changing Moments'], { h: 1.178 });
++  tagPill(s, 0.867, 1.314);
++  label(s, 0.887, 3.624, 3.668, 'Strategic Brilliance', { fontFace: HEAD });
++  body(s, 0.892, 4.147, 6.456,
++    ['Cricket tournament showcases passion, teamwork, strategy, ',
++      'and thrilling moments on every green pitch with unstoppable ',
++      'energy and crowd excitement.']);
++  kpi(s, 0.997, 5.446, { dot: RED, value: '80,2%', caption: 'Momentum shifts.' });
++  kpi(s, 3.409, 5.446, { dot: GREEN, value: '73,5%', caption: 'Excellence prevails.' });
++}
++
++/* ------------------------------------------------------------- slide 5 */
++
++function slide05() {
++  const s = contentSlide();
++  photo(s, { shape: 'ellipse', x: 9.584, y: -0.898, w: 4.356, h: 4.356, fill: 'F4F4F4' });
++  photo(s, { shape: 'ellipse', x: -0.485, y: 4.437, w: 4.356, h: 4.356, fill: 'F4F4F4' });
++  iconCircle(s, { x: 2.769, y: 4.593, d: 1.125, fill: RED, ring: 5, icon: 'medal', iconH: 0.450 });
++  heading(s, 0.881, 1.434, ['Pitch Conditions ', 'and Weather ', 'Impact'], { h: 1.717 });
++  tagPill(s, 9.959, 5.016, { flip: true });
++  body(s, 0.889, 3.362, 6.456, ['Cricket inspires greatness.']);
++  body(s, 5.895, 5.811, 6.456,
++    ['Cricket tournament showcases passion, ',
++      'teamwork, strategy, and thrilling moments on every ',
++      'green pitch with unstoppable energy and crowd excitement.'], { align: 'right' });
++  photo(s, { shape: 'ellipse', x: 4.488, y: 1.570, w: 4.356, h: 4.356, fill: 'F4F4F4' });
++  statCircle(s, { x: 9.700, y: 2.446, d: 1.870, fill: GREEN, ring: 10, value: '50%' });
++}
++
++/* ------------------------------------------------------------- slide 6 */
++
++function slide06() {
++  const s = contentSlide();
++  photo(s, { x: 7.206, y: -0.417, w: 6.456, h: 5.131, r: 0.37 });
++  photo(s, { x: 0.897, y: 4.714, w: 6.309, h: 3.217, r: 0.37, fill: 'F4F4F4' });
++  statCircle(s, { x: 6.425, y: 3.779, d: 1.870, fill: GREEN, ring: 10, value: '180+' });
++  heading(s, 0.874, 1.912, ['Power Plays and Game-Changing Moments'], { h: 1.178 });
++  tagPill(s, 0.867, 1.253);
++  body(s, 0.888, 3.345, 6.456,
++    ['The cricket tournament showcases passion, teamwork, ',
++      'strategy, and thrilling moments on every iconic cricket pitch.']);
++  body(s, 8.341, 5.651, 6.456, ['Inspirational resilience'], { fontFace: HEAD });
++  body(s, 8.352, 6.109, 6.456,
++    ['Cricket tournament showcases passion, teamwork, ',
++      'strategy, and thrilling moments on every pitch']);
++}
++
++/* ------------------------------------------------------------- slide 7 */
++
++/** Open laptop: thin dark bezel round the screen, silver base and lip. */
++function laptop(slide, o) {
++  const bezel = 0.055, chin = 0.14;
++  slide.addShape('roundRect', {
++    x: o.x - bezel, y: o.y - bezel, w: o.w + bezel * 2, h: o.h + bezel + chin,
++    fill: { color: '0C0C0E' }, line: { type: 'none' }, rectRadius: 0.06,
++  });
++  photo(slide, { shape: 'rect', x: o.x, y: o.y, w: o.w, h: o.h, ring: false });
++  slide.addShape('roundRect', {
++    x: o.x - o.w * 0.085, y: o.y + o.h + chin - bezel, w: o.w * 1.17, h: 0.15,
++    fill: { color: 'C9C9CE' }, line: { type: 'none' }, rectRadius: 0.05,
++  });
++}
++
++function slide07() {
++  const s = contentSlide();
++  laptop(s, { x: 5.250, y: 1.698, w: 4.571, h: 2.990 });
++  laptop(s, { x: 10.561, y: 4.031, w: 2.773, h: 3.066 });
++  iconCircle(s, { x: 0.962, y: 5.794, d: 0.907, fill: GREEN, ring: 5, icon: 'medal', iconH: 0.363 });
++  heading(s, 0.867, 1.936, ['Strategies ', 'That Define ', 'the Game'], { fontSize: 44, h: 2.322 });
++  tagPill(s, 0.867, 1.278);
++  label(s, 0.885, 4.449, 2.486, 'Inspirational resilience', { bold: true });
++  body(s, 2.309, 5.946, 6.456,
++    ['The Cricket tournament showcases passion, teamwork, strategy, ',
++      'and thrilling moments on every green pitch with unstoppable energy.']);
++  label(s, 10.545, 2.622, 2.486, 'Professionalism', { fontFace: HEAD });
++  body(s, 10.561, 2.969, 2.640, ['The cricket brings nations ', 'together passionately.']);
++  statCircle(s, { x: 8.765, y: 1.091, d: 1.870, fill: RED, value: '50%' });
++}
++
++/* ------------------------------------------------------------- slide 8 */
++
++/** Tilted smartphone: chunky dark body wrapped round a lighter screen. */
++function phone(slide, o) {
++  const dx = o.w * 0.09, dy = o.h * 0.045; // the source mock-ups sit inset in their frame
++  const x = o.x + dx, y = o.y + dy, w = o.w - dx * 2, h = o.h - dy * 2;
++  const frame = 0.17;
++  slide.addShape('roundRect', {
++    x, y, w, h, fill: { color: '141416' },
++    line: { type: 'none' }, rectRadius: 0.62, rotate: o.rotate,
++  });
++  photo(slide, {
++    shape: 'roundRect', x: x + frame, y: y + frame, w: w - frame * 2, h: h - frame * 2,
++    r: 0.50, ring: false, rotate: o.rotate,
++  });
++}
++
++function slide08() {
++  const s = contentSlide();
++  phone(s, { x: 7.155, y: -1.453, w: 4.057, h: 6.553, rotate: 30 });
++  phone(s, { x: 2.662, y: 2.846, w: 4.057, h: 6.076, rotate: 30 });
++  statCircle(s, { x: 1.599, y: 4.740, d: 1.870, fill: RED, value: '180+' });
++  heading(s, 0.881, 1.801, ['Run Rate, Wickets ', 'and Winning ', 'Margins'], { h: 1.717 });
++  tagPill(s, 0.867, 1.143);
++  label(s, 0.885, 3.805, 2.486, 'Inspirational resilience', { bold: true });
++  body(s, 6.987, 6.120, 6.456,
++    ['Cricket tournament showcases passion, teamwork, strategy, and ',
++      'thrilling moments on every green pitch with unstoppable energy.']);
++  s.addShape('roundRect', {
++    x: 7.099, y: 5.425, w: 2.340, h: 0.472,
++    fill: { color: WHITE }, line: { type: 'none' }, rectRadius: 0.236, shadow: SHADOW,
++  });
++  s.addText('Strategic Brilliance', {
++    x: 7.253, y: 5.510, w: 2.031, h: 0.303,
++    fontFace: HEAD, fontSize: 12, color: INK, align: 'center', valign: 'top',
++  });
++  iconCircle(s, { x: 10.159, y: 2.014, d: 0.907, fill: GREEN, ring: 5, icon: 'medal', iconH: 0.363 });
++  s.addText('80,2%', {
++    x: 10.579, y: 3.166, w: 2.114, h: 0.640,
++    fontFace: HEAD, fontSize: 32, color: INK, valign: 'top',
++  });
++  label(s, 10.582, 3.790, 2.114, 'Momentum shifts');
++}
++
++/* ------------------------------------------------------------- slide 9 */
++
++function slide09() {
++  const s = contentSlide();
++  // Smart-watch, back to front: straps, silver case, screen, crown and side button.
++  s.addShape('roundRect', {
++    x: 8.40, y: 3.40, w: 3.30, h: 5.00, fill: { color: '242426' },
++    line: { type: 'none' }, rectRadius: 0.45, rotate: 22,
++  });
++  s.addShape('roundRect', {
++    x: 6.80, y: 1.40, w: 4.16, h: 5.16, fill: { color: 'C3C3C7' },
++    line: { type: 'none' }, rectRadius: 0.92,
++  });
++  s.addShape('ellipse', { x: 10.80, y: 2.30, w: 0.34, h: 0.34, fill: { color: '75757A' } });
++  s.addShape('roundRect', {
++    x: 10.88, y: 3.10, w: 0.18, h: 0.66, fill: { color: '75757A' },
++    line: { type: 'none' }, rectRadius: 0.09,
++  });
++  photo(s, { x: 6.917, y: 1.523, w: 3.922, h: 4.915, r: 0.82, ring: false });
++
++  heading(s, 0.867, 1.954, ['Injury Management ', 'and Player Fitness'], { h: 1.178 });
++  tagPill(s, 0.867, 1.228);
++  label(s, 0.885, 3.371, 2.486, 'Inspirational resilience', { bold: true });
++  body(s, 0.892, 4.103, 6.456,
++    ['Cricket tournament showcases passion, teamwork, strategy, ',
++      'and thrilling moments on every green pitch with unstoppable ',
++      'energy and crowd excitement.']);
++  kpi(s, 0.997, 5.531, { dot: RED, value: '80,2%', caption: 'Momentum shifts.' });
++  kpi(s, 3.409, 5.531, { dot: GREEN, value: '73,5%', caption: 'Excellence prevails.' });
++  iconCircle(s, { x: 6.349, y: 4.810, d: 1.125, fill: GREEN, ring: 5, icon: 'helmet', iconH: 0.450 });
++  iconCircle(s, { x: 9.015, y: 1.138, d: 1.125, fill: RED, ring: 5, icon: 'medal', iconH: 0.450 });
++}
++
++/* ------------------------------------------------------------ slide 10 */
++
++function slide10() {
++  const s = contentSlide();
++  photo(s, { shape: 'rect', x: 3.046, y: 1.015, w: 9.731, h: 6.485, ring: false, fontSize: 14 });
++  heading(s, 0.839, 2.116, ['Let\u2019s Take', 'a Break'], { fontSize: 54, h: 1.919 });
++  tagPill(s, 0.853, 1.401);
++  body(s, 0.891, 4.723, 6.456, ['Inspirational resilience'], { fontFace: HEAD });
++  body(s, 0.898, 5.233, 6.456,
++    ['The cricket tournament celebrates ', 'skill, unity, passion, and global ', 'pride worldwide.']);
++  s.addShape('roundRect', {
++    x: 8.904, y: 5.391, w: 3.873, h: 1.279,
++    fill: { color: WHITE }, line: { type: 'none' }, rectRadius: 0.263, shadow: SHADOW,
++  });
++  s.addText('60 Minutes', {
++    x: 8.753, y: 5.643, w: 4.174, h: 0.774,
++    fontFace: HEAD, fontSize: 40, color: INK, align: 'center', valign: 'top',
++  });
++  body(s, 9.803, 4.200, 2.640,
++    ['The cricket event brings nations together proudly.'], { align: 'right' });
++  s.addShape('roundRect', {
++    x: 11.928, y: 3.686, w: 0.422, h: 0.422, fill: { color: GREEN },
++    line: { color: WHITE, width: 2 }, rectRadius: 0.211, shadow: SHADOW_S,
++  });
++  s.addText('\u201D', {
++    x: 11.928, y: 3.686, w: 0.422, h: 0.422,
++    fontFace: HEAD, fontSize: 16, bold: true, color: WHITE, align: 'center', valign: 'middle',
++  });
++  statCircle(s, {
++    x: 9.287, y: 1.300, d: 1.426, fill: RED, ring: 5,
++    value: '180+', valueSize: 20, labelSize: 10,
++  });
++}
++
++/* ------------------------------------------------------------ slide 11 */
++
++function slide11() {
++  const s = contentSlide();
++  heading(s, 0.867, 1.775, ['Key Match Highlights ', 'and Turning Points'], { h: 1.178 });
++  tagPill(s, 0.867, 1.049);
++  label(s, 7.323, 1.700, 3.510, 'Strategic Brilliance', { fontFace: HEAD, fontSize: 18, h: 0.404 });
++  body(s, 7.323, 2.273, 6.456,
++    ['The cricket tournament showcases passion, teamwork, ',
++      'strategy, and thrilling moments on every green pitch.']);
++
++  const rows = [
++    { y: 3.779, w: 8.502, text: 'Exceptional performance', ballX: 7.813 },
++    { y: 5.538, w: 6.524, text: 'Inspirational leadership', ballX: 5.834 },
++  ];
++  rows.forEach((r) => {
++    s.addShape('roundRect', {
++      x: 0.593, y: r.y, w: r.w, h: 1.000, fill: { color: SOFT },
++      line: { color: WHITE, width: 8 }, rectRadius: 0.5,
++    });
++    s.addShape('ellipse', {
++      x: r.ballX, y: r.y - 0.191, w: 1.382, h: 1.382,
++      fill: { color: SOFT }, line: { color: WHITE, width: 8 }, shadow: SHADOW,
++    });
++    cricketBall(s, { x: r.ballX + 0.069, y: r.y - 0.126, d: 1.244 });
++    s.addShape('ellipse', { x: 1.018, y: r.y + 0.377, w: 0.245, h: 0.245, fill: { color: RED } });
++    s.addText(r.text, {
++      x: 1.490, y: r.y + 0.315, w: 4.212, h: 0.370,
++      fontFace: BODY, fontSize: 16, color: BLACK, valign: 'top',
++    });
++  });
++
++  const stats = [
++    { x: 9.664, y: 3.779, fill: SOFT, color: BLACK, text: '82,5%' },
++    { x: 7.685, y: 5.538, fill: RED, color: WHITE, text: '63,2%' },
++  ];
++  stats.forEach((st) => {
++    s.addShape('roundRect', {
++      x: st.x, y: st.y, w: 2.651, h: 1.000, fill: { color: st.fill },
++      line: { color: WHITE, width: 8 }, rectRadius: 0.5, shadow: SHADOW,
++    });
++    s.addText(st.text, {
++      x: st.x + 0.157, y: st.y + 0.180, w: 2.337, h: 0.640,
++      fontFace: BODY, fontSize: 32, color: st.color, align: 'center', valign: 'top',
++    });
++  });
++}
++
++/* ------------------------------------------------------------ slide 12 */
++
++function slide12() {
++  const s = contentSlide();
++  photo(s, { x: 6.171, y: 0.837, w: 7.732, h: 5.826, r: 0.42 });
++  heading(s, 0.867, 2.105, ['Strategies ', 'That Define ', 'the Game'], { fontSize: 44, h: 2.322 });
++  tagPill(s, 0.867, 1.447);
++  body(s, 0.898, 4.695, 6.456,
++    ['The cricket tournament showcases passion, ', 'teamwork, strategy, and thrilling moments.']);
++  kpi(s, 0.997, 5.615, { dot: RED, value: '80,2%', w: 1.587 });
++  kpi(s, 2.921, 5.615, { dot: GREEN, value: '73,5%' });
++  iconCircle(s, { x: 5.588, y: 2.063, d: 0.907, fill: GREEN, icon: 'medal', iconH: 0.363 });
++  iconCircle(s, { x: 5.588, y: 3.296, d: 0.907, fill: INK, icon: 'bat', iconH: 0.363 });
++  iconCircle(s, { x: 5.588, y: 4.530, d: 0.907, fill: RED, icon: 'helmet', iconH: 0.363 });
++}
++
++/* ------------------------------------------------------------ slide 13 */
++
++function slide13() {
++  const s = contentSlide();
++  photo(s, { shape: 'ellipse', x: 4.982, y: 1.547, w: 4.599, h: 4.599 });
++  heading(s, 0.881, 1.827, ['Pitch Conditions ', 'and Weather ', 'Impact'], { h: 1.717 });
++  tagPill(s, 0.867, 1.169);
++  body(s, 0.891, 3.782, 6.456, ['Inspirational resilience'], { fontFace: HEAD });
++  kpi(s, 0.997, 5.237, { dot: RED, value: '80,2%' });
++  kpi(s, 2.925, 5.237, { dot: GREEN, value: '73,5%' });
++  body(s, 0.901, 5.920, 6.456,
++    ['Cricket tournament showcases passion, teamwork, ',
++      'strategy, and thrilling moments on every pitch.']);
++  iconCircle(s, { x: 4.433, y: 3.393, d: 0.907, fill: GREEN, ring: 5, icon: 'medal', iconH: 0.363 });
++
++  const steps = [
++    { n: '01', cx: 8.274, cy: 1.594, tx: 9.510, ty: 1.725, title: 'Explosive confrontation', tw: 2.999 },
++    { n: '02', cx: 9.181, cy: 3.393, tx: 10.417, ty: 3.524, title: 'Strategic Brilliance', tw: 2.566 },
++    { n: '03', cx: 8.274, cy: 5.192, tx: 9.510, ty: 5.324, title: 'Inspirational leadership', tw: 2.792 },
++  ];
++  steps.forEach((st) => {
++    s.addShape('ellipse', {
++      x: st.cx, y: st.cy, w: 0.907, h: 0.907, fill: { color: SOFT },
++      line: { color: WHITE, width: 5 }, shadow: SHADOW,
++    });
++    s.addText(st.n, {
++      x: st.cx - 0.110, y: st.cy + 0.252, w: 1.128, h: 0.404,
++      fontFace: HEAD, fontSize: 18, color: BLACK, align: 'center', valign: 'top',
++    });
++    label(s, st.tx, st.ty, st.tw, st.title, { fontFace: HEAD });
++    body(s, st.tx - 0.005, st.ty + 0.304, st.tw + 0.005, ['Unstoppable momentum']);
++  });
++}
++
++/* ------------------------------------------------------------ slide 14 */
++
++function calendar(slide, o) {
++  const { x, y } = o; // top-left of the white card
++  slide.addShape('roundRect', {
++    x, y, w: 4.180, h: 4.180, fill: { color: WHITE },
++    line: { type: 'none' }, rectRadius: 0.280, shadow: SHADOW,
++  });
++  slide.addText('February 2026', {
++    x: x + 0.694, y: y + 0.483, w: 2.792, h: 0.404,
++    fontFace: HEAD, fontSize: 18, color: INK, align: 'center', valign: 'top',
++  });
++  slide.addShape('roundRect', {
++    x: x + 0.454, y: y + 1.232, w: 3.272, h: 0.454,
++    fill: { color: SOFT }, line: { type: 'none' }, rectRadius: 0.095,
++  });
++
++  const col = (i) => x + 0.740 + i * 0.4476; // centre of column i
++  const row = (i) => y + 2.061 + i * 0.4976; // centre of week i
++
++  ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach((d, i) => {
++    slide.addText(d, {
++      x: col(i) - 0.22, y: y + 1.310, w: 0.44, h: 0.303,
++      fontFace: BODY, fontSize: 12, bold: true, color: INK, align: 'center', valign: 'top',
++    });
++  });
++
++  const weeks = [
++    [1, 2, 3, 4, 5, 6, 7],
++    [8, 9, 10, 11, 12, 13, 14],
++    [15, 16, 17, 18, 19, 20, 21],
++    [22, 23, 24, 25, 26, 27, 28],
++  ];
++  const highlighted = [9, 10, 11];
++  weeks.forEach((week, r) => {
++    week.forEach((day, c) => {
++      if (highlighted.includes(day)) {
++        slide.addShape('roundRect', {
++          x: col(c) - 0.171, y: row(r) - 0.171, w: 0.342, h: 0.342,
++          fill: { color: RED }, line: { type: 'none' }, rectRadius: 0.057,
++        });
++      }
++      slide.addText(String(day), {
++        x: col(c) - 0.25, y: row(r) - 0.143, w: 0.50, h: 0.286,
++        fontFace: BODY, fontSize: 10.5, bold: c === 0,
++        color: highlighted.includes(day) ? WHITE : (c === 0 || day === 6 || day === 12 ? INK : '332C2B'),
++        align: 'center', valign: 'middle',
++      });
++    });
++  });
++}
++
++function slide14() {
++  const s = contentSlide();
++  photo(s, { x: 5.546, y: -0.625, w: 8.385, h: 5.838, r: 0.68 });
++  heading(s, 0.881, 1.799, ['The Match ', 'Calendar and', 'Kick-off Times'],
++    { fontSize: 36, h: 2.151, lineSpacing: 50 });
++  tagPill(s, 0.867, 1.084);
++  body(s, 0.891, 5.223, 6.456, ['Inspirational resilience'], { fontFace: HEAD });
++  body(s, 0.892, 5.786, 6.456,
++    ['Cricket tournament showcases passion, teamwork, strategy, ',
++      'and thrilling moments on every green pitch with unstoppable ',
++      'energy and crowd excitement.']);
++  calendar(s, { x: 8.157, y: 2.483 });
++  iconCircle(s, { x: 4.921, y: 3.960, d: 1.029, fill: GREEN, icon: 'bat', iconH: 0.412 });
++}
++
++/* ------------------------------------------------------------ slide 15 */
++
++function slide15() {
++  const s = contentSlide();
++  photo(s, { x: 6.859, y: 4.716, w: 5.478, h: 3.298, r: 0.55, fill: 'F4F4F4' });
++  photo(s, { x: 0.997, y: 0.938, w: 5.478, h: 3.298, r: 0.55, fill: 'F4F4F4' });
++  heading(s, 7.179, 2.090, ['Injury Management ', 'and Player Fitness'], { h: 1.178 });
++  tagPill(s, 7.179, 1.364);
++  label(s, 7.198, 3.507, 2.486, 'Inspirational resilience', { bold: true });
++  chip(s, 1.124, 4.974, 'Dry vs Damp Pitch', { fill: RED, color: WHITE });
++  chip(s, 3.438, 4.974, 'Cracked Pitch');
++  body(s, 1.017, 5.695, 6.456,
++    ['Cricket tournament showcases passion, teamwork, strategy, ',
++      'and thrilling moments on every green pitch with unstoppable ',
++      'energy and crowd excitement.']);
++  iconCircle(s, { x: 10.407, y: 4.154, d: 1.125, fill: GREEN, icon: 'medal', iconH: 0.450 });
++}
++
++/* ------------------------------------------------------------ slide 16 */
++
++function slide16() {
++  const s = contentSlide();
++  photo(s, { x: 8.750, y: 4.693, w: 4.939, h: 3.307, r: 0.55 });
++  photo(s, { x: 4.569, y: -0.613, w: 4.181, h: 5.306, r: 0.55 });
++  heading(s, 0.867, 1.786, ['Strategies ', 'That Define ', 'the Game'], { fontSize: 36, h: 1.919 });
++  tagPill(s, 0.867, 1.128);
++  body(s, 0.891, 3.934, 6.456, ['Inspirational resilience'], { fontFace: HEAD });
++  kpi(s, 0.997, 5.117, { dot: RED, value: '80,2%' });
++  kpi(s, 2.925, 5.117, { dot: GREEN, value: '73,5%' });
++  body(s, 0.892, 5.773, 6.456,
++    ['Cricket tournament showcases passion, teamwork, strategy, ',
++      'and thrilling moments on every green pitch with unstoppable ',
++      'energy and crowd excitement.']);
++
++  const notes = [
++    { n: '01', x: 9.475, y: 1.128, title: 'Explosive confrontation', copy: 'Momentum shifts dramatically.' },
++    { n: '02', x: 10.422, y: 2.888, title: 'Strategic brilliance', copy: 'Cricket inspires unity.' },
++  ];
++  notes.forEach((it) => {
++    s.addText(it.n, {
++      x: it.x, y: it.y, w: 2.486, h: 0.572,
++      fontFace: HEAD, fontSize: 28, color: INK, valign: 'top',
++    });
++    label(s, it.x, it.y + 0.647, 2.486, it.title, { fontFace: HEAD });
++    body(s, it.x + 0.005, it.y + 0.950, 2.640, [it.copy]);
++  });
++
++  s.addShape('roundRect', {
++    x: 6.971, y: 2.888, w: 2.938, h: 3.208,
++    fill: { color: WHITE }, line: { type: 'none' }, rectRadius: 0.196, shadow: SHADOW,
++  });
++  donut(s, { x: 7.837, y: 3.479, d: 1.205, width: 20, text: '75%' });
++  body(s, 7.261, 5.081, 2.356,
++    ['Cricket brings nations ', 'together passionately'], { align: 'center' });
++}
++
++/* ------------------------------------------------------------ slide 17 */
++
++function slide17() {
++  const s = contentSlide();
++  const cards = [
++    { x: 5.581, y: 2.423, px: 5.901, py: 2.712, name: 'Rahul Sharma', ny: 5.649 },
++    { x: 9.175, y: 0.938, px: 9.495, py: 1.227, name: 'James Cooper', ny: 4.164 },
++  ];
++  cards.forEach((c) => {
++    s.addShape('roundRect', {
++      x: c.x, y: c.y, w: 3.274, h: 4.240,
++      fill: { color: WHITE }, line: { type: 'none' }, rectRadius: 0.378,
++    });
++  });
++  heading(s, 0.881, 1.997, ['Team Line-Up ', '& Key Players ', 'to Watch'],
++    { fontSize: 36, h: 2.151, lineSpacing: 50 });
++  tagPill(s, 0.867, 1.281);
++  body(s, 0.891, 4.789, 6.456, ['Inspirational resilience'], { fontFace: HEAD });
++  body(s, 0.892, 5.352, 6.456,
++    ['Cricket tournament showcases passion, teamwork, ',
++      'and thrilling moments on every pitch with energy ',
++      'and crowd excitement.'], { color: BLACK });
++  s.addText('15%', {
++    x: 9.175, y: 5.667, w: 3.274, h: 0.707,
++    fontFace: HEAD, fontSize: 36, color: INK, valign: 'top',
++  });
++  label(s, 10.535, 5.698, 2.486, 'Strategic brilliance', { fontFace: HEAD });
++  body(s, 10.541, 6.001, 2.640, ['Cricket inspires unity.']);
++  cards.forEach((c) => {
++    photo(s, { x: c.px, y: c.py, w: 2.634, h: 2.679, r: 0.214, ring: false });
++    s.addText(c.name, {
++      x: c.px + 0.074, y: c.ny, w: 2.486, h: 0.303,
++      fontFace: HEAD, fontSize: 12, color: INK, align: 'center', valign: 'top',
++    });
++    body(s, c.px - 0.003, c.ny + 0.352, 2.640, ['Cricket builds character'],
++      { align: 'center', color: GREY_75 });
++  });
++  statCircle(s, { x: 7.895, y: 1.515, d: 1.870, fill: RED, value: '180+' });
++}
++
++/* ------------------------------------------------------------ slide 18 */
++
++function slide18() {
++  const s = contentSlide();
++  photo(s, { x: 8.014, y: -0.198, w: 5.521, h: 7.897, r: 0.094 });
++  heading(s, 0.867, 1.954, ['Injury Management ', 'and Player Fitness'], { h: 1.178 });
++  tagPill(s, 0.867, 1.228);
++  body(s, 0.898, 3.524, 6.456,
++    ['The cricket tournament showcases passion, teamwork, strategy, ',
++      'and thrilling moments on every green pitch with unstoppable energy.']);
++
++  const cards = [
++    { x: 0.666, n: '01', title: 'Explosive confrontation' },
++    { x: 4.192, n: '02', title: 'Unpredictable intensity' },
++  ];
++  cards.forEach((c) => {
++    s.addShape('roundRect', {
++      x: c.x, y: 4.526, w: 3.131, h: 1.860,
++      fill: { color: WHITE }, line: { type: 'none' }, rectRadius: 0.217, shadow: SHADOW,
++    });
++    s.addText(c.n, {
++      x: c.x + 0.217, y: 4.781, w: 2.486, h: 0.572,
++      fontFace: HEAD, fontSize: 28, color: INK, valign: 'top',
++    });
++    label(s, c.x + 0.217, 5.429, 2.486, c.title, { fontFace: HEAD });
++    body(s, c.x + 0.222, 5.732, 2.640, ['Momentum shifts dramatically']);
++  });
++  statCircle(s, { x: 7.079, y: 1.579, d: 1.870, fill: RED, value: '50%' });
++}
++
++/* ------------------------------------------------------------ slide 19 */
++
++function slide19() {
++  const s = contentSlide();
++  heading(s, 0.868, 2.354, ['Reach Our', 'Support Team'], { fontSize: 44, h: 1.582 });
++  tagPill(s, 0.854, 1.639);
++  photo(s, { shape: 'ellipse', x: 6.062, y: -1.563, w: 6.403, h: 6.403 });
++  body(s, 0.898, 4.319, 6.456,
++    ['Cricket tournament showcases passion, teamwork, strategy, and ',
++      'thrilling moments on every green pitch with unstoppable energy.']);
++
++  const contacts = [
++    { x: 1.003, w: 3.358, icon: 'mail', text: 'addmail@yourmail.com', tw: 2.482 },
++    { x: 5.320, w: 3.295, icon: 'globe', text: 'www.yourwebsite.com', tw: 2.419 },
++    { x: 9.580, w: 2.756, icon: 'phone', text: '+012 3456 7890', tw: 1.880 },
++  ];
++  contacts.forEach((c) => {
++    s.addShape('roundRect', {
++      x: c.x, y: 5.647, w: c.w, h: 0.851,
++      fill: { color: WHITE }, line: { type: 'none' }, rectRadius: 0.4255, shadow: SHADOW,
++    });
++    s.addShape('ellipse', { x: c.x + 0.181, y: 5.799, w: 0.547, h: 0.547, fill: { color: GREEN } });
++    ICONS[c.icon](s, c.x + 0.4545, 6.0725, 0.25, GREEN);
++    label(s, c.x + 0.876, 5.914, c.tw, c.text, { color: INK });
++  });
++}
++
++/* ------------------------------------------------------------ slide 20 */
++
++function slide20() {
++  const s = coverSlide();
++  s.addText('THANK YOU', {
++    x: 0, y: 2.460, w: 13.333, h: 2.036,
++    fontFace: HEAD, fontSize: 115, color: WHITE, align: 'center', valign: 'top',
++  });
++  s.addShape('ellipse', { x: 8.841, y: 2.569, w: 1.834, h: 1.834, fill: { color: GREEN_DK }, shadow: SHADOW });
++  cricketBall(s, { x: 9.041, y: 2.765, d: 1.435 });
++  s.addText('The cricket event brings nations together proudly.', {
++    x: 2.611, y: 4.578, w: 8.111, h: 0.461,
++    fontFace: BODY, fontSize: 18, color: WHITE, align: 'center', valign: 'top',
++    lineSpacingMultiple: 1.3,
++  });
++}
++
++/* ------------------------------------------------------------------ run */
++
++[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++  .forEach((build) => build());
++
++pres.writeFile({
++  fileName: path.join(__dirname, '11359b14-454a-45d0-a5d3-f901576364b7_grok_final.pptx'),
++}).then((f) => console.log('wrote', f));

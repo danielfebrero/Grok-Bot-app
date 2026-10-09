@@ -1,0 +1,503 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/corporate_financial_report.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/corporate_financial_report.js
+@@ -0,0 +1,500 @@
++#!/usr/bin/env node
++/**
++ * "Financial Report" — business presentation template, rebuilt with pptxgenjs.
++ *
++ * 10 slides, 13.333 x 7.5 in (16:9).  The original deck's photographs are
++ * reproduced here as flat grey placeholder rectangles labelled "[image]".
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens (from the deck's "Financial Report" theme)
++ * ------------------------------------------------------------------ */
++const YELLOW = 'FFBE00'; // accent1
++const DARK = '414141'; // accent2
++const INK = '262626'; // tx1 @ lumMod 85% / lumOff 15%
++const WHITE = 'FFFFFF';
++const PHOTO = 'CCCCCC'; // stand-in for the deck's raster photos
++const CAPTION = '9E9E9E';
++
++const HEAD = 'Archivo'; // display / headline face
++const BODY = 'Work Sans'; // UI + copy face
++
++const SZ_COPY = 10.5; // nav links and body copy
++const SZ_LEAD = 18; // presentation default size (sub-headings, buttons)
++const SZ_TITLE = 37; // section titles
++
++/* Body copy reused verbatim across the deck. */
++const LOREM = {
++  cover:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++    'PLACEHOLDER',
++  welcome:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++    'PLACEHOLDER' +
++    'PLACEHOLDER',
++  visionCard:
++    'Lorem ipsum dolor sit amet, consectetur adi piscing elit, sed do amet, consec tetur ' +
++    'adipiscing elit, adipiscing',
++  vision:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do amet, consectetur ' +
++    'adipiscing elit, sed do Excepteur sint occaecat. do eiusmod adipiscing',
++  facility:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod adipiscing ' +
++    'elit, sed do amet, consectetur',
++  project:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++    'incididunt. adipiscing elit, sed do eiusmod tempor incididunt. amet, consectetur ',
++  service: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod',
++  serviceIntro:
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++    'incididunt. elit, sed',
++};
++
++/* ------------------------------------------------------------------ *
++ * Small building blocks
++ * ------------------------------------------------------------------ */
++
++/** Flat rectangle. */
++function rect(slide, x, y, w, h, color, opts) {
++  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, opts));
++}
++
++/** Grey stand-in for one of the deck's photographs. */
++function photo(slide, x, y, w, h, valign) {
++  slide.addText('[image]', {
++    shape: 'rect',
++    x, y, w, h,
++    fill: { color: PHOTO },
++    align: 'center',
++    valign: valign || 'middle',
++    fontFace: BODY,
++    fontSize: 12,
++    color: CAPTION,
++  });
++}
++
++/** Single-line auto-sized label (the deck's non-wrapping text boxes). */
++function label(slide, text, opts) {
++  slide.addText(
++    text,
++    Object.assign(
++      { fontFace: BODY, fontSize: SZ_COPY, color: INK, wrap: false, valign: 'top', h: 0.278 },
++      opts
++    )
++  );
++}
++
++/** Justified 10.5pt paragraph on 150% leading — the deck's body-copy style. */
++function para(slide, text, opts) {
++  slide.addText(
++    text,
++    Object.assign(
++      {
++        fontFace: BODY,
++        fontSize: SZ_COPY,
++        color: INK,
++        align: 'justify',
++        valign: 'top',
++        lineSpacingMultiple: 1.5,
++      },
++      opts
++    )
++  );
++}
++
++/** Archivo section title. */
++function title(slide, text, opts) {
++  slide.addText(
++    text,
++    Object.assign(
++      { fontFace: HEAD, fontSize: SZ_TITLE, bold: true, color: DARK, valign: 'top' },
++      opts
++    )
++  );
++}
++
++/** Filled rectangle carrying a centred bold caption (buttons, name plates). */
++function chip(slide, text, x, y, w, h, fill, color, fontSize) {
++  slide.addText(text, {
++    shape: 'rect',
++    x, y, w, h,
++    fill: { color: fill },
++    color,
++    align: 'center',
++    valign: 'middle',
++    bold: true,
++    fontFace: BODY,
++    fontSize: fontSize || SZ_LEAD,
++  });
++}
++
++/** Row of three small squares used as a decorative "…" marker. */
++function dots(slide, x, y) {
++  for (let i = 0; i < 3; i++) rect(slide, x + i * 0.1355, y, 0.09, 0.09, DARK);
++}
++
++/* ------------------------------------------------------------------ *
++ * The navigation bar repeated on every slide
++ * ------------------------------------------------------------------ */
++const NAV_LINKS = [
++  { text: 'Home', x: 5.8, w: 0.623 },
++  { text: 'Contact', x: 6.735, w: 0.772 },
++  { text: 'Project', x: 7.819, w: 0.705 },
++  { text: 'Setting', x: 8.837, w: 0.712 },
++];
++
++function navBar(slide) {
++  label(slide, 'Financial Report', {
++    x: 1.063, y: 0.474, w: 1.35, fontFace: HEAD, bold: true, align: 'center',
++  });
++  NAV_LINKS.forEach((l) => label(slide, l.text, { x: l.x, y: 0.474, w: l.w }));
++  label(slide, 'Search', { x: 11.123, y: 0.474, w: 0.707, bold: true });
++  // magnifier icon (a custom vector shape in the source deck)
++  slide.addShape('ellipse', {
++    x: 11.985, y: 0.519, w: 0.135, h: 0.135,
++    fill: { color: WHITE, transparency: 100 },
++    line: { color: DARK, width: 1.5 },
++  });
++  slide.addShape('line', {
++    x: 12.101, y: 0.635, w: 0.064, h: 0.064,
++    line: { color: DARK, width: 1.5 },
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 1 — cover
++ * ------------------------------------------------------------------ */
++function slideCover(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 0, 4.547, 4.337, 2.953);
++  photo(s, 4.337, 1.379, 2.33, 2.371);
++  navBar(s);
++
++  rect(s, 0, 1.379, 4.337, 3.168, YELLOW);
++  s.addText('Business Presentation Template', {
++    x: 1.217, y: 2.309, w: 1.902, h: 1.01,
++    fontFace: BODY, fontSize: SZ_LEAD, bold: true, italic: false, color: DARK, valign: 'top',
++  });
++  dots(s, 1.342, 3.527);
++
++  // language switch
++  label(s, 'EN', { x: 4.991, y: 3.944, w: 0.405, bold: true });
++  s.addShape('line', { x: 5.194, y: 4.222, w: 0, h: 0.326, line: { color: DARK, width: 1 } });
++  label(s, 'FR', { x: 4.991, y: 4.547, w: 0.393, bold: true });
++  label(s, '2025', { x: 4.909, y: 6.521, w: 0.558, bold: true, rotate: 270 });
++
++  // right column
++  s.addShape('line', { x: 9.821, y: 1.4, w: 2.349, h: 0, line: { color: DARK, width: 1 } });
++  para(s, LOREM.cover, { x: 7.358, y: 2.047, w: 4.898, h: 0.867 });
++  label(s, 'Business', { x: 7.358, y: 3.56, w: 0.835 });
++  ['FINANCIAL', 'REPORT'].forEach((word, i) => {
++    s.addText(word, {
++      x: 6.5, y: 4.203 + i * 1.024, w: i === 0 ? 5.756 : 4.499, h: 1.313,
++      fontFace: HEAD, fontSize: 72, bold: true, color: INK,
++      wrap: false, valign: 'top', align: 'center',
++    });
++  });
++
++  // media-player glyphs, bottom right: |< , || , >|
++  rect(s, 11.576, 6.803, 0.022, 0.114, DARK);
++  s.addShape('triangle', { x: 11.585, y: 6.817, w: 0.114, h: 0.093, rotate: 270, fill: { color: DARK } });
++  rect(s, 11.822, 6.807, 0.042, 0.119, DARK);
++  rect(s, 11.896, 6.807, 0.042, 0.119, DARK);
++  s.addShape('triangle', { x: 12.047, y: 6.817, w: 0.114, h: 0.093, rotate: 90, fill: { color: DARK } });
++  rect(s, 12.148, 6.803, 0.022, 0.114, DARK);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 2 — welcome
++ * ------------------------------------------------------------------ */
++function slideWelcome(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 6.689, 1.394, 3.953, 3.953);
++  navBar(s);
++
++  s.addText('Welcome To Financial Report', {
++    x: 1.063, y: 1.221, w: 4.621, h: 1.346,
++    fontFace: HEAD, fontSize: SZ_TITLE, bold: true, color: DARK, valign: 'top',
++  });
++  chip(s, 'About Our Planning', 1.147, 3.526, 3.105, 0.589, YELLOW, DARK);
++  para(s, LOREM.welcome, { x: 1.074, y: 4.777, w: 4.158, h: 1.397 });
++
++  rect(s, 9.821, 3.757, 2.349, 2.349, WHITE); // white mat behind the small photo
++  rect(s, 11.411, 1.394, 0.19, 2.349, YELLOW); // vertical accent bar
++  rect(s, 7.769, 4.836, 0.19, 2.349, YELLOW, { rotate: 270 }); // horizontal accent bar
++  photo(s, 9.98, 3.921, 2.206, 2.185);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 3 — vision & mission
++ * ------------------------------------------------------------------ */
++function slideVision(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++
++  rect(s, 3.837, 1.403, 2.821, 2.137, YELLOW);
++  para(s, LOREM.visionCard, { x: 4.205, y: 1.773, w: 2.084, h: 1.397 });
++
++  title(s, 'Vision & Mission', { x: 7.79, y: 1.256, w: 4.621, h: 0.724 });
++  [
++    { head: '1. Vision', headW: 1.217, headY: 2.752, bodyY: 3.307 },
++    { head: '2. Mission', headW: 1.452, headY: 4.816, bodyY: 5.37 },
++  ].forEach((item) => {
++    label(s, item.head, {
++      x: 7.789, y: item.headY, w: item.headW, h: 0.404, fontSize: SZ_LEAD, bold: true,
++    });
++    para(s, LOREM.vision, { x: 7.789, y: item.bodyY, w: 4.474, h: 0.867 });
++  });
++
++  rect(s, 1.167, 6.126, 2.344, 0.196, YELLOW);
++  photo(s, 1.167, 1.791, 2.344, 4.012);
++  photo(s, 3.837, 3.876, 2.821, 3.624);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 4 — best facilities
++ * ------------------------------------------------------------------ */
++const FACILITY_CARDS = [
++  { head: '1. Facilities', chipX: 1.163, textX: 1.085 },
++  { head: '2. Facilities', chipX: 5.103, textX: 5.024 },
++  { head: '3. Facilities', chipX: 9.042, textX: 8.964 },
++];
++
++function slideFacilities(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 0, 0, 13.333, 3.75); // full-bleed banner
++  rect(s, 1.163, 1.42, 4.953, 0.91, YELLOW);
++  navBar(s);
++  title(s, 'Best Facilities', {
++    x: 1.554, y: 1.513, w: 4.171, h: 0.724, align: 'center',
++  });
++
++  FACILITY_CARDS.forEach((card) => {
++    chip(s, card.head, card.chipX, 4.479, 2.419, 0.556, YELLOW, DARK);
++    para(s, LOREM.facility, { x: card.textX, y: 5.256, w: 3.285, h: 0.867 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 5 — best our project
++ * ------------------------------------------------------------------ */
++function slideProject(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 0, 1.358, 5.084, 4.737);
++  navBar(s);
++
++  title(s, 'Best Our Project', { x: 7.327, y: 1.224, w: 4.621, h: 0.724 });
++  chip(s, '1. Project Title', 7.455, 2.538, 2.689, 0.499, YELLOW, DARK);
++  para(s, LOREM.project, { x: 7.377, y: 3.259, w: 4.889, h: 0.867 });
++  chip(s, '2. Project Title', 7.474, 4.631, 2.663, 0.47, YELLOW, DARK);
++  para(s, LOREM.project, { x: 7.395, y: 5.322, w: 4.889, h: 0.867 });
++
++  rect(s, 2.705, 2.2, 3.961, 3.122, WHITE); // white mat overlapping the big photo
++  photo(s, 2.872, 2.367, 3.406, 2.79);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 6 — meet our team
++ * ------------------------------------------------------------------ */
++const TEAM = [
++  { name: 'Harper Russo', mat: 1.163, photoX: 1.33, w: 2.342, h: 4.102, photoY: 1.569, plateX: 1.163, plateW: 2.485 },
++  { name: 'Drew Feig', mat: null, photoX: 4.333, w: 2.003, h: 2.937, photoY: 2.42, plateX: 4.333, plateW: 2.003 },
++  { name: 'Murad Naser', mat: null, photoX: 6.997, w: 2.003, h: 2.937, photoY: 2.42, plateX: 6.997, plateW: 2.003 },
++  { name: 'Ndemi Otieno', mat: 9.828, photoX: 9.661, w: 2.342, h: 4.102, photoY: 1.569, plateX: 9.685, plateW: 2.485 },
++];
++
++function slideTeam(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++  title(s, 'Meet Our Team', {
++    x: 4.356, y: 1.224, w: 4.621, h: 0.724, align: 'center',
++  });
++
++  TEAM.forEach((m) => {
++    if (m.mat !== null) rect(s, m.mat, 1.403, 2.342, 4.102, YELLOW);
++  });
++  TEAM.forEach((m) => chip(s, m.name, m.plateX, 5.933, m.plateW, 0.54, DARK, WHITE, 16));
++  TEAM.forEach((m) => photo(s, m.photoX, m.photoY, m.w, m.h));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 7 — best our service
++ * ------------------------------------------------------------------ */
++const SERVICE_CARDS = [
++  { iconX: 1.181, panelX: 1.963, textX: 2.404, glyph: 'gears', glyphX: 1.423 },
++  { iconX: 5.921, panelX: 6.703, textX: 7.144, glyph: 'hourglass', glyphX: 6.203 },
++];
++
++/** White pictograms centred in the dark service tiles. */
++function serviceGlyph(slide, kind, x, y) {
++  if (kind === 'gears') {
++    slide.addShape('gear9', { x, y: y + 0.08, w: 0.22, h: 0.22, fill: { color: WHITE } });
++    slide.addShape('gear9', { x: x + 0.15, y: y - 0.02, w: 0.16, h: 0.16, fill: { color: WHITE } });
++  } else {
++    slide.addShape('flowChartCollate', { x: x + 0.02, y: y + 0.02, w: 0.177, h: 0.26, fill: { color: WHITE } });
++    rect(slide, x, y, 0.217, 0.032, WHITE);
++    rect(slide, x, y + 0.268, 0.217, 0.032, WHITE);
++  }
++}
++
++function slideService(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++
++  title(s, 'Best Our Service', { x: 1.063, y: 1.221, w: 4.621, h: 0.724 });
++  para(s, LOREM.serviceIntro, { x: 1.06, y: 2.384, w: 4.372, h: 0.601 });
++
++  photo(s, 10.589, 1.368, 2.744, 4.761);
++  photo(s, 6.703, 1.368, 3.176, 2.379);
++
++  SERVICE_CARDS.forEach((card) => {
++    rect(s, card.iconX, 4.512, 0.782, 0.782, DARK);
++    rect(s, card.panelX, 3.75, 3.176, 2.379, YELLOW);
++    label(s, 'Service', { x: card.textX, y: 4.264, w: 1.124, h: 0.404, fontSize: SZ_LEAD, bold: true, color: DARK });
++    para(s, LOREM.service, { x: card.textX, y: 4.749, w: 2.294, h: 0.867 });
++    serviceGlyph(s, card.glyph, card.glyphX, 4.753);
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 8 — best portfolio
++ * ------------------------------------------------------------------ */
++function slidePortfolio(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++  title(s, 'Best Portfolio', { x: 8.14, y: 1.224, w: 4.621, h: 0.724 });
++
++  rect(s, 1.151, 1.392, 3.154, 4.531, YELLOW);
++  rect(s, 8.374, 2.42, 3.796, 3.544, YELLOW);
++  photo(s, 1.318, 1.585, 3.154, 4.531);
++  photo(s, 5.072, 1.384, 2.358, 2.116);
++  photo(s, 5.077, 4.0, 2.358, 2.116);
++  photo(s, 8.207, 2.571, 3.796, 3.544);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 9 — contact us
++ * ------------------------------------------------------------------ */
++const CONTACT_ROWS = [
++  { y: 1.398, text: '+123 4567 8910', textW: 1.334, icon: 'phone' },
++  { y: 2.287, text: 'yourmail@mail.com', textW: 1.643, icon: 'mail' },
++  { y: 3.176, text: 'www.yourwebsite.com', textW: 1.904, icon: 'web' },
++  { y: 4.065, text: '123 Anywhere ST,, Any City', textW: 2.141, icon: 'home' },
++];
++
++/** The four small dark pictograms sitting inside the yellow tiles. */
++function contactIcon(slide, kind, cx, cy) {
++  if (kind === 'phone') {
++    // handset = a thick arc open towards the top right
++    slide.addShape('blockArc', {
++      x: cx - 0.1, y: cy - 0.101, w: 0.2, h: 0.202, rotate: 225, fill: { color: DARK },
++    });
++  } else if (kind === 'mail') {
++    rect(slide, cx - 0.115, cy - 0.072, 0.23, 0.143, DARK);
++    slide.addShape('line', { x: cx - 0.115, y: cy - 0.072, w: 0.115, h: 0.09, line: { color: YELLOW, width: 1 } });
++    slide.addShape('line', { x: cx, y: cy - 0.072, w: 0.115, h: 0.09, line: { color: YELLOW, width: 1 }, flipH: true });
++  } else if (kind === 'web') {
++    slide.addShape('ellipse', {
++      x: cx - 0.103, y: cy - 0.103, w: 0.206, h: 0.206,
++      fill: { color: YELLOW }, line: { color: DARK, width: 1.5 },
++    });
++    slide.addShape('ellipse', {
++      x: cx - 0.045, y: cy - 0.103, w: 0.09, h: 0.206,
++      fill: { color: YELLOW, transparency: 100 }, line: { color: DARK, width: 1 },
++    });
++    slide.addShape('line', { x: cx - 0.103, y: cy, w: 0.206, h: 0, line: { color: DARK, width: 1 } });
++  } else {
++    slide.addShape('triangle', { x: cx - 0.113, y: cy - 0.103, w: 0.225, h: 0.108, fill: { color: DARK } });
++    slide.addShape('rect', {
++      x: cx - 0.083, y: cy + 0.001, w: 0.166, h: 0.102,
++      fill: { color: YELLOW }, line: { color: DARK, width: 1.5 },
++    });
++    rect(slide, cx - 0.028, cy + 0.035, 0.056, 0.068, DARK);
++  }
++}
++
++function slideContact(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++
++  title(s, 'Contact Us', { x: 1.063, y: 1.221, w: 3.315, h: 0.724 });
++  para(s, LOREM.service, { x: 1.06, y: 2.384, w: 3.393, h: 0.601 });
++
++  CONTACT_ROWS.forEach((row) => {
++    rect(s, 5.101, row.y, 0.462, 0.462, YELLOW);
++    rect(s, 5.832, row.y, 2.334, 0.462, DARK);
++    label(s, row.text, {
++      x: 5.964, y: row.y + 0.09, w: row.textW, h: 0.278, color: WHITE,
++    });
++    contactIcon(s, row.icon, 5.332, row.y + 0.231);
++  });
++
++  chip(s, 'More Information', 5.101, 5.337, 3.16, 0.811, DARK, WHITE);
++  photo(s, 1.141, 3.75, 3.16, 2.397);
++  photo(s, 9.011, 1.398, 3.16, 4.749);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 10 — thank you
++ * ------------------------------------------------------------------ */
++function slideThanks(pptx) {
++  const s = pptx.addSlide();
++  navBar(s);
++
++  rect(s, 9.051, 1.389, 3.119, 2.361, YELLOW);
++  s.addText('See You Next Time', {
++    x: 9.659, y: 1.916, w: 1.902, h: 0.707,
++    fontFace: BODY, fontSize: SZ_LEAD, bold: true, italic: false, color: DARK, valign: 'top',
++  });
++  dots(s, 9.783, 3.135);
++
++  s.addText('THANK YOU', {
++    x: 5.779, y: 4.373, w: 6.632, h: 1.38,
++    fontFace: HEAD, fontSize: 76, bold: true, color: INK,
++    wrap: false, valign: 'top', align: 'center',
++  });
++  s.addText('FOR WATCHING US', {
++    x: 5.788, y: 5.838, w: 2.635, h: 0.404,
++    fontFace: HEAD, fontSize: SZ_LEAD, bold: true, color: INK,
++    wrap: false, valign: 'top', align: 'center',
++  });
++  rect(s, 9.021, 6.04, 3.142, 0.05, DARK);
++
++  photo(s, 1.158, 1.389, 3.947, 4.701);
++  photo(s, 5.851, 1.4, 2.377, 2.361);
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'DECK_16x9', width: 12192000 / 914400, height: 6858000 / 914400 });
++  pptx.layout = 'DECK_16x9';
++  pptx.title = 'Financial Report';
++
++  [
++    slideCover,
++    slideWelcome,
++    slideVision,
++    slideFacilities,
++    slideProject,
++    slideTeam,
++    slideService,
++    slidePortfolio,
++    slideContact,
++    slideThanks,
++  ].forEach((make) => make(pptx));
++
++  const out = path.join(__dirname, '1a1c79ab-754e-4978-bdaa-089672efbe02_grok_final.pptx');
++  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote', out));
++}
++
++build().catch((err) => {
++  console.error(err);
++  process.exit(1);
++});

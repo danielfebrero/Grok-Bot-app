@@ -1,0 +1,659 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/travel_adventure_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/travel_adventure_pitch_deck.js
+@@ -0,0 +1,656 @@
++/**
++ * Wanderlust Adventures — travel-agency pitch deck (25 slides, 20 x 11.25 in).
++ *
++ * Recreated with pptxgenjs only. Photographs in the source deck were "Your Photo
++ * Here" placeholders; they are redrawn here as flat grey cards with the same
++ * caption, geometry and rotation.
++ *
++ * Run: node 02e1c6fd-b6aa-4133-8757-1e5722ef4a9f_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette ---
++const NAVY = '27364E';   // brand ink
++const SKY = 'ADE6F5';    // pale background / soft cards
++const CYAN = '78D6EF';   // accent cards, dots, arrow bubbles
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const PHOTO_FILL = 'F2F2F2';   // flat stand-in for the striped photo placeholders
++const PHOTO_INK = '3F3F3F';    // "Your Photo Here" caption colour
++const AXIS_GREY = 'D9D9D9';
++
++const HEAD_FONT = 'Bricolage Grotesque ExtraBold';
++const BODY_FONT = 'Poppins';
++const BODY_SIZE = 18;          // deck-wide default text size
++
++// ------------------------------------------------------------- primitives ---
++function newSlide(pptx, bg) {
++  const s = pptx.addSlide();
++  s.background = { color: bg };
++  return s;
++}
++
++// `round` / `diag` are the raw OOXML adjust values (1/100000 of the short side).
++function radius(o) {
++  return ((o.round || o.diag) / 100000) * Math.min(o.w, o.h);
++}
++
++function shape(s, kind, o) {
++  s.addShape(kind, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: o.fill ? { color: o.fill } : { type: 'none' },
++    line: o.line ? { color: o.line, width: o.lw || 0.75 } : { type: 'none' },
++    rectRadius: o.round ? radius(o) : undefined,
++    angleRange: o.diag ? [o.diag / 60000, 0] : undefined,
++    rotate: o.rot || undefined,
++    flipH: o.flip || undefined,
++  });
++}
++
++function textBox(s, str, o, font, size, color) {
++  s.addText(str, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: font, fontSize: size, color: color,
++    bold: o.bold || undefined,
++    align: o.align || 'left',
++    valign: o.valign || 'top',
++    wrap: o.wrap === false ? false : true,
++    bullet: o.bullet ? { indent: o.bullet } : undefined,
++  });
++}
++
++// Section titles set in the heavy display face (66 pt unless overridden).
++function heading(s, str, o) {
++  textBox(s, str, o, HEAD_FONT, o.size || 66, o.color || BLACK);
++}
++
++// Smaller display type: stat numbers, card labels, timeline years.
++function display(s, str, o) {
++  textBox(s, str, o, HEAD_FONT, o.size, o.color || BLACK);
++}
++
++// Running text in Poppins.
++function body(s, str, o) {
++  textBox(s, str, o, BODY_FONT, o.size || BODY_SIZE, o.color || BLACK);
++}
++
++// Thin navy hairline used for the page frame and the timeline spine.
++function rule(s, o) {
++  s.addShape('line', { x: o.x, y: o.y, w: o.w, h: o.h, line: { color: NAVY, width: 1 } });
++}
++
++// Rounded square holding a step number, e.g. "01".
++function chip(s, str, o) {
++  shape(s, 'roundRect', o);
++  display(s, str, { x: o.x, y: o.y, w: o.w, h: o.h, size: 28, color: NAVY, align: 'center', valign: 'middle' });
++}
++
++// Circular bubble with an arrow, used between photo cards.
++function badge(s, o) {
++  shape(s, 'ellipse', { x: o.x, y: o.y, w: 0.94, h: 0.873, fill: o.fill });
++  shape(s, 'rightArrow', {
++    x: o.x + 0.227, y: o.y + 0.236, w: 0.448, h: 0.395,
++    fill: o.arrow, flip: o.dir === 'right' ? false : true,
++  });
++}
++
++/**
++ * Photo placeholder standing in for a raster image.
++ *
++ * Every "Your Photo Here" frame in the source deck shows the same square
++ * swatch scaled to cover its frame, so the caption size follows the covering
++ * square's side, S = max(w, h): wide cards get big type, small ones small.
++ */
++const CAPTION_SCALE = 5.5552;  // caption points per inch of swatch
++
++function photo(s, o) {
++  shape(s, o.diag ? 'round2DiagRect' : 'roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h, round: o.round, diag: o.diag, rot: o.rot,
++    fill: PHOTO_FILL, line: o.line === 'none' ? null : (o.line || NAVY),
++  });
++  s.addText('Your Photo Here', {
++    x: o.x, y: o.y, w: o.w, h: o.h, rotate: o.rot || undefined,
++    fontFace: BODY_FONT, fontSize: Math.round(CAPTION_SCALE * Math.max(o.w, o.h)), color: PHOTO_INK,
++    align: 'center', valign: 'middle', wrap: false,
++  });
++}
++
++// Paper-plane icon (outline traced from the deck's vector glyph, 45.5 pt grid).
++const PLANE_SIZE = 1.097;
++const PLANE_PATH = [
++  { x: 14.79, y: 45.5 }, { x: 14.79, y: 42.09 }, { x: 19.34, y: 38.68 }, { x: 19.34, y: 26.16 },
++  { x: 0, y: 31.85 }, { x: 0, y: 27.3 }, { x: 19.34, y: 15.93 }, { x: 19.34, y: 3.41 },
++  { x: 20.34, y: 0.99, c: [19.34, 2.46, 19.67, 1.66] },
++  { x: 22.75, y: 0, c: [21, 0.33, 21.8, 0] },
++  { x: 25.17, y: 1, c: [23.7, 0, 24.5, 0.33] },
++  { x: 26.17, y: 3.42, c: [25.83, 1.66, 26.17, 2.47] },
++  { x: 26.17, y: 15.93 }, { x: 45.5, y: 27.3 }, { x: 45.5, y: 31.85 }, { x: 26.16, y: 26.16 },
++  { x: 26.16, y: 38.67 }, { x: 30.71, y: 42.08 }, { x: 30.71, y: 45.49 }, { x: 22.75, y: 43.21 },
++];
++
++function plane(s, o) {
++  const u = PLANE_SIZE / 45.5;
++  const pts = PLANE_PATH.map(p => (p.c
++    ? { x: p.x * u, y: p.y * u, curve: { type: 'cubic', x1: p.c[0] * u, y1: p.c[1] * u, x2: p.c[2] * u, y2: p.c[3] * u } }
++    : { x: p.x * u, y: p.y * u }));
++  s.addShape('custGeom', {
++    x: o.x, y: o.y, w: PLANE_SIZE, h: PLANE_SIZE, rotate: o.rot,
++    fill: { color: NAVY }, line: { type: 'none' },
++    points: pts.concat([{ close: true }]),
++  });
++}
++
++// ----------------------------------------------------------------- chrome ---
++const NAV = [
++  { t: 'Tour', w: 0.854 },
++  { t: 'Holiday', w: 1.297 },
++  { t: 'Traveling', w: 1.537 },
++];
++const NAV_GAP = 0.391;
++
++function navLinks(s, x, color) {
++  let cursor = x;
++  NAV.forEach(link => {
++    body(s, link.t, { x: cursor, y: 0.48, w: link.w, h: 0.404, align: 'center', color: color });
++    cursor += link.w + NAV_GAP;
++  });
++}
++
++// Cover / closing slides: centred nav, full-height side rules, no page number.
++function coverChrome(s, o) {
++  if (o.brand) body(s, 'Dretions', { x: 1.104, y: 0.48, w: 1.537, h: 0.404, color: NAVY });
++  navLinks(s, 7.766, NAVY);
++  if (o.year) body(s, o.year, { x: 18.247, y: 0.48, w: 0.817, h: 0.404, align: 'right', color: NAVY });
++  rule(s, { x: 1.019, y: 1.603, w: 0, h: o.h });
++  rule(s, { x: 19.016, y: 1.659, w: 0, h: o.h });
++}
++
++// Header, page number, side rules — repeated on every interior slide.
++function interiorChrome(s, page, color) {
++  const ink = color || BLACK;
++  body(s, 'Dretions', { x: 1.104, y: 0.48, w: 1.537, h: 0.404, color: ink });
++  navLinks(s, 14.427, ink);
++  rule(s, { x: 1.019, y: 4.283, w: 0, h: 1.785 });
++  rule(s, { x: 19.016, y: 1.659, w: 0, h: 8.952 });
++  body(s, page, { x: 0.771, y: 3.648, w: 0.604, h: 0.404, align: 'center', color: ink });
++  body(s, '2030', { x: 0.774, y: 6.249, w: 0.495, h: 1.313, align: 'center', color: ink });
++}
++
++// ------------------------------------------------------------- chart data ---
++const CYAN_LINE = '4CC8EA';
++const PRODUCTS = ['Product 1', 'Product 2', 'Product 3', 'Product 4'];
++const PHOTOS = ['Photo 1', 'Photo 2', 'Photo 3', 'Photo 4'];
++const TRENDS = [[4.3, 2.5, 3.5, 4.5], [2.4, 4.4, 1.8, 2.8], [2, 2, 3, 5]];
++
++const SALES_SERIES = TRENDS.map((values, i) => ({ name: 'Series ' + (i + 1), labels: PRODUCTS, values: values }));
++const FINANCE_SERIES = TRENDS.map((values, i) => ({ name: 'Series ' + (i + 1), labels: PHOTOS, values: values }));
++
++// ----------------------------------------------------------------- slides ---
++function slide01(pptx) {  // Cover
++  const s = newSlide(pptx, SKY);
++  coverChrome(s, { year: '2030', brand: true, h: 7.917 });
++  photo(s, { x: 2.563, y: 2.033, w: 6.625, h: 7.153, round: 6487, rot: 3.7, line: WHITE });
++  shape(s, 'roundRect', { x: 5.183, y: 5.158, w: 4.522, h: 4.908, round: 6667, rot: 355.69, fill: WHITE });
++  heading(s, 'Wanderlust Adventures', { x: 10.45, y: 2.49, w: 8.674, h: 3.063, size: 88, color: NAVY });
++  plane(s, { x: 8.725, y: 1.761, rot: 110.67 });
++  shape(s, 'roundRect', { x: 14.766, y: 7.872, w: 3.705, h: 0.88, round: 22457, fill: NAVY });
++  display(s, 'Book Now!', { x: 15.46, y: 8.025, w: 2.319, h: 0.572, size: 28, color: WHITE });
++  body(s, '"Experience the World Like Never Before with Our Personalized Travel Services, Offering You the Ultimate in Adventure, Relaxation, and Discovery"', { x: 10.45, y: 6.271, w: 7.984, h: 1.01, color: NAVY });
++  badge(s, { x: 13.51, y: 7.878, fill: WHITE, arrow: NAVY });
++  photo(s, { x: 5.312, y: 5.286, w: 4.296, h: 4.628, round: 6487, rot: 355.76, line: 'none' });
++}
++
++function slide02(pptx) {  // Table of contents
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '02');
++  heading(s, 'Table Of Content', { x: 6.013, y: 1.001, w: 7.973, h: 1.212 });
++  body(s, 'Introduction', { x: 4.288, y: 3.076, w: 2.403, h: 0.438, size: 20, bold: true, bullet: 27 });
++  body(s, 'Lorem ipsum dolor sit amet', { x: 4.288, y: 3.513, w: 3.824, h: 0.404 });
++  body(s, 'Target Market', { x: 4.31, y: 4.474, w: 3.267, h: 0.438, size: 20, bold: true, bullet: 27 });
++  body(s, 'Nec feugiat in fermentum', { x: 4.31, y: 4.912, w: 3.824, h: 0.404 });
++  body(s, 'Marketing Strategy', { x: 4.288, y: 5.873, w: 3.846, h: 0.438, size: 20, bold: true, bullet: 27 });
++  body(s, 'Urna nec tincidunt. Et molestie', { x: 4.288, y: 6.311, w: 4.506, h: 0.404 });
++  body(s, 'Financial Plan', { x: 4.277, y: 7.222, w: 3.314, h: 0.438, size: 20, bold: true, bullet: 27 });
++  body(s, 'Ac feugiat sed. Senectus et ne', { x: 4.277, y: 7.659, w: 4.506, h: 0.404 });
++  body(s, 'Contact Information', { x: 4.277, y: 8.651, w: 4.086, h: 0.438, size: 20, bold: true, bullet: 27 });
++  body(s, 'Tus et malesuada fames adipisc', { x: 4.277, y: 9.089, w: 4.506, h: 0.404 });
++  chip(s, '03', { x: 2.248, y: 2.98, w: 1.423, h: 1.066, round: 12200, fill: SKY });
++  chip(s, '07', { x: 2.244, y: 4.379, w: 1.423, h: 1.066, round: 12200, fill: SKY });
++  chip(s, '12', { x: 2.229, y: 5.76, w: 1.423, h: 1.066, round: 12200, fill: SKY });
++  chip(s, '20', { x: 2.248, y: 7.183, w: 1.423, h: 1.066, round: 12200, fill: SKY });
++  chip(s, '24', { x: 2.229, y: 8.564, w: 1.423, h: 1.066, round: 12200, fill: SKY });
++  photo(s, { x: 10.599, y: 2.986, w: 6.984, h: 3.542, round: 5687 });
++  photo(s, { x: 10.599, y: 7.143, w: 6.984, h: 2.381, round: 7540 });
++}
++
++function slide03(pptx) {  // Introduction
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '03');
++  shape(s, 'roundRect', { x: 7.659, y: 8.418, w: 2.355, h: 1.333, round: 10325, fill: SKY });
++  shape(s, 'roundRect', { x: 10.595, y: 8.431, w: 2.355, h: 1.333, round: 7200, fill: CYAN });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Gravida neque con vallis a cras semper auctor neque vitae tempus. ', { x: 7.639, y: 7.052, w: 9.72, h: 1.01 });
++  heading(s, 'Intro - duction', { x: 2.405, y: 7.388, w: 4.904, h: 2.322 });
++  display(s, '290K+', { x: 7.997, y: 8.588, w: 1.689, h: 0.572, size: 28, color: NAVY, align: 'center' });
++  display(s, '148M+', { x: 11.074, y: 8.591, w: 1.469, h: 0.572, size: 28, color: NAVY, align: 'center' });
++  body(s, 'Many Travels', { x: 7.878, y: 9.179, w: 1.928, h: 0.404, color: NAVY, align: 'center' });
++  body(s, 'Many People', { x: 10.887, y: 9.163, w: 1.844, h: 0.404, color: NAVY, align: 'center' });
++  photo(s, { x: 2.641, y: 2.152, w: 14.718, h: 4.296, diag: 6049 });
++}
++
++function slide04(pptx) {  // Problem statement
++  const s = newSlide(pptx, SKY);
++  interiorChrome(s, '04', NAVY);
++  photo(s, { x: 10.533, y: 2.171, w: 7.435, h: 4.14, round: 4750, rot: 356.15 });
++  heading(s, 'Problem Statement', { x: 11.522, y: 7.254, w: 6.272, h: 2.322, color: NAVY, align: 'right' });
++  body(s, 'Lorem ipsum dolor sit ameadipiscing elit, sed do eiusmod tempor incididunt ut labore et dolorme ma gna aliqua. Gravida neque', { x: 2.143, y: 2.857, w: 6.277, h: 1.01, color: NAVY });
++  body(s, 'Problem One ', { x: 2.143, y: 2.299, w: 3.401, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 36 });
++  body(s, 'Iang at in tellus integer feugiat scelerisque varius. Maecenas pharetra convallis posuere morbi leo. Vel pretium lectus quam id.', { x: 2.143, y: 5.609, w: 6.429, h: 1.01, color: NAVY });
++  body(s, 'Problem Two', { x: 2.143, y: 5.051, w: 3.401, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 36 });
++  body(s, 'Luctus accumsan tortor posuere ac. Nullam ac tortor vitae purus faucibus ornare suspendisse. Duis ultricies lacus sed turpis', { x: 2.143, y: 8.415, w: 6.277, h: 1.01, color: NAVY });
++  body(s, 'Problem Three', { x: 2.143, y: 7.857, w: 3.401, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 36 });
++  plane(s, { x: 9.969, y: 1.969, rot: 247.19 });
++}
++
++function slide05(pptx) {  // Our solution
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '05');
++  heading(s, 'Our Solution', { x: 7.445, y: 6.855, w: 4.18, h: 2.322 });
++  body(s, 'Lorem ipsum dolor sit ameadipiscing elit, sed do eiusmod tempor incidid', { x: 12.762, y: 2.873, w: 5.365, h: 0.707 });
++  body(s, 'Solution One ', { x: 12.762, y: 2.314, w: 3.401, h: 0.438, size: 20, bold: true, bullet: 36 });
++  body(s, 'Phasellus egestas tellus rutrum tellus. Nibh sed pulvinar proin gravida', { x: 12.762, y: 5.625, w: 5.365, h: 0.707 });
++  body(s, 'Solution Two', { x: 12.762, y: 5.067, w: 3.401, h: 0.438, size: 20, bold: true, bullet: 36 });
++  body(s, 'Hendrerit. Odio euismod lacinia at quis risus sed vulputate odio. Vitae', { x: 12.762, y: 8.431, w: 5.365, h: 0.707 });
++  body(s, 'Solution Three', { x: 12.762, y: 7.872, w: 3.401, h: 0.438, size: 20, bold: true, bullet: 36 });
++  display(s, '234+', { x: 2.22, y: 1.966, w: 1.689, h: 0.572, size: 28 });
++  display(s, '98%', { x: 4.396, y: 3.307, w: 1.689, h: 0.572, size: 28 });
++  body(s, 'Many Solution', { x: 2.22, y: 2.556, w: 2.121, h: 0.404 });
++  body(s, 'Problem Solved', { x: 4.366, y: 3.879, w: 2.289, h: 0.404 });
++  photo(s, { x: 7.195, y: 1.802, w: 4.362, h: 4.296, diag: 7666 });
++  photo(s, { x: 2.224, y: 4.882, w: 4.362, h: 4.296, diag: 7666 });
++}
++
++function slide06(pptx) {  // Market analysis
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '06');
++  photo(s, { x: 9.641, y: 4.323, w: 3.691, h: 5.691, round: 5687 });
++  photo(s, { x: 13.958, y: 4.323, w: 3.691, h: 5.691, round: 5687 });
++  heading(s, 'Market Analysis', { x: 9.641, y: 1.882, w: 7.687, h: 1.212 });
++  chip(s, '01', { x: 1.984, y: 2.036, w: 1.423, h: 1.066, round: 12200, fill: SKY });
++  body(s, 'Size of the market', { x: 3.895, y: 2.175, w: 2.859, h: 0.438, size: 20, bold: true });
++  body(s, 'Growth rate the market', { x: 3.895, y: 4.555, w: 3.71, h: 0.438, size: 20, bold: true });
++  body(s, 'Segmentation of customers', { x: 3.895, y: 6.665, w: 4.38, h: 0.438, size: 20, bold: true });
++  body(s, 'Assessment of the competition', { x: 3.927, y: 9.057, w: 4.835, h: 0.438, size: 20, bold: true });
++  chip(s, '02', { x: 1.989, y: 4.323, w: 1.423, h: 1.066, round: 12200, fill: SKY });
++  chip(s, '03', { x: 1.98, y: 6.599, w: 1.423, h: 1.066, round: 12200, fill: SKY });
++  chip(s, '04', { x: 2.017, y: 8.886, w: 1.423, h: 1.066, round: 12200, fill: SKY });
++  badge(s, { x: 13.138, y: 6.783, fill: CYAN, arrow: WHITE });
++  body(s, 'Lorem ipsum dolor sit amet', { x: 3.895, y: 2.705, w: 3.996, h: 0.404 });
++  body(s, 'Nunc sed velit dignissi soda', { x: 3.895, y: 5.067, w: 3.996, h: 0.404 });
++  body(s, 'Les ut. Elementum nibh tellus', { x: 3.895, y: 7.158, w: 3.996, h: 0.404 });
++  body(s, 'Molestie nunc non blandit. Sit', { x: 3.927, y: 9.532, w: 3.996, h: 0.404 });
++}
++
++function slide07(pptx) {  // Target market
++  const s = newSlide(pptx, SKY);
++  interiorChrome(s, '07', NAVY);
++  shape(s, 'rect', { x: 4.358, y: 7.534, w: 5.158, h: 0.099, fill: WHITE });
++  shape(s, 'rect', { x: 4.333, y: 9.336, w: 5.158, h: 0.099, fill: WHITE });
++  shape(s, 'roundRect', { x: 11.493, y: 2.392, w: 6.241, h: 7.113, round: 6667, rot: 4.6, fill: WHITE });
++  heading(s, 'Target Market', { x: 2.196, y: 1.759, w: 7.029, h: 1.212, color: NAVY });
++  shape(s, 'rect', { x: 2.196, y: 7.49, w: 6.791, h: 0.179, fill: NAVY });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Gravida neque con vallis a cras', { x: 2.204, y: 4.949, w: 7.872, h: 1.01, color: NAVY });
++  body(s, 'Our primary focus is on young professionals and families seeking unique and memorable travel experiences.', { x: 2.179, y: 3.885, w: 7.872, h: 0.707, color: NAVY, bold: true });
++  shape(s, 'rect', { x: 2.171, y: 9.283, w: 5.158, h: 0.179, fill: NAVY });
++  body(s, 'Customers Aged', { x: 2.183, y: 6.951, w: 2.898, h: 0.438, size: 20, color: NAVY, bold: true });
++  body(s, '19-30 Years', { x: 7.751, y: 6.951, w: 1.928, h: 0.438, size: 20, color: NAVY, bold: true });
++  body(s, 'Income Level', { x: 2.196, y: 8.744, w: 2.898, h: 0.438, size: 20, color: NAVY, bold: true });
++  body(s, '97%', { x: 8.781, y: 8.744, w: 0.813, h: 0.438, size: 20, color: NAVY, bold: true });
++  photo(s, { x: 11.645, y: 2.546, w: 5.976, h: 6.817, round: 6971, rot: 4.64, line: 'none' });
++  plane(s, { x: 11.397, y: 1.812, rot: 249.79 });
++}
++
++function slide08(pptx) {  // Competitive analysis
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '08');
++  heading(s, 'Competitive Analysis', { x: 1.967, y: 5.583, w: 6.594, h: 2.322 });
++  body(s, 'Lorem ipsum dolor sit ameadipiscing elit, sed do eiusmod tempor incidid', { x: 11.271, y: 2.211, w: 5.365, h: 0.707 });
++  body(s, 'Threats', { x: 11.271, y: 1.652, w: 3.401, h: 0.438, size: 20, bold: true, bullet: 36 });
++  body(s, 'Amet venenatis urna cursus eget nunc scelerisque. Enim sit amet', { x: 11.271, y: 4.244, w: 5.365, h: 0.707 });
++  body(s, 'Opportunities', { x: 11.271, y: 3.686, w: 3.401, h: 0.438, size: 20, bold: true, bullet: 36 });
++  shape(s, 'roundRect', { x: 2.04, y: 8.476, w: 2.355, h: 1.333, round: 10325, fill: SKY });
++  shape(s, 'roundRect', { x: 5.043, y: 8.476, w: 2.355, h: 1.333, round: 7200, fill: CYAN });
++  display(s, '300K+', { x: 2.378, y: 8.646, w: 1.689, h: 0.572, size: 28, color: NAVY, align: 'center' });
++  display(s, '84%', { x: 5.522, y: 8.635, w: 1.469, h: 0.572, size: 28, color: NAVY, align: 'center' });
++  body(s, 'Competitive', { x: 2.259, y: 9.237, w: 1.928, h: 0.404, color: NAVY, align: 'center' });
++  body(s, 'Comp Succeed', { x: 5.166, y: 9.207, w: 2.179, h: 0.404, color: NAVY, align: 'center' });
++  photo(s, { x: 2.04, y: 1.595, w: 7.359, h: 3.514, diag: 8025 });
++  photo(s, { x: 10.748, y: 5.946, w: 7.359, h: 3.863, diag: 8746 });
++}
++
++function slide09(pptx) {  // SWOT analysis
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '09');
++  heading(s, ' SWOT Analysis', { x: 10.475, y: 1.917, w: 7.409, h: 1.212 });
++  shape(s, 'roundRect', { x: 6.115, y: 6.515, w: 3.75, h: 3.354, round: 6667, fill: SKY });
++  body(s, 'Venenatis urna cursus eget nunc scelerisqu e. Vel quam elemenw tum pulvinar etiam. Ib endu neque', { x: 6.541, y: 7.569, w: 2.992, h: 1.616 });
++  body(s, 'Weaknesses', { x: 6.471, y: 6.965, w: 2.604, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 27 });
++  shape(s, 'roundRect', { x: 10.251, y: 6.515, w: 3.691, h: 3.354, round: 6667, fill: SKY });
++  body(s, 'Egestas congue quis que egestas diam.Ru tellus pellentesque eu tincidunt tortor aliqu am nulla facilisi', { x: 10.677, y: 7.569, w: 2.944, h: 1.616 });
++  body(s, 'Opportunities', { x: 10.532, y: 6.965, w: 2.779, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 36 });
++  shape(s, 'roundRect', { x: 14.328, y: 6.462, w: 3.691, h: 3.354, round: 6667, fill: SKY });
++  body(s, 'Cras. Rhoncus mattis rhoncus urna neque viverra justo nec ultrc es dui. Integer vitae justo eget magna', { x: 14.767, y: 7.569, w: 2.944, h: 1.616 });
++  body(s, 'Threats', { x: 14.767, y: 6.965, w: 2.563, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 36 });
++  shape(s, 'roundRect', { x: 2.039, y: 6.515, w: 3.691, h: 3.354, round: 6667, fill: SKY });
++  body(s, 'Lorem ipsum dolor sit ameadipiscing elit, se d do eiusmod tempor incididunt ut labor et dolorme ma gna', { x: 2.451, y: 7.569, w: 2.944, h: 1.616 });
++  body(s, 'Strengths', { x: 2.451, y: 6.965, w: 2.563, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 36 });
++  body(s, '"Experience the World Like Never Before with Our Personalized Travel Services, Offering You the Ultimate in Adventure, Relaxation, and Discovery"', { x: 10.698, y: 3.759, w: 7.984, h: 1.01 });
++  photo(s, { x: 2.299, y: 1.672, w: 6.896, h: 3.578, round: 3649 });
++}
++
++function slide10(pptx) {  // Business model
++  const s = newSlide(pptx, SKY);
++  interiorChrome(s, '10', NAVY);
++  photo(s, { x: 9.083, y: 1.836, w: 3.686, h: 7.511, round: 6464, rot: 2.86 });
++  heading(s, 'Business Model', { x: 13.365, y: 2.87, w: 4.399, h: 2.322, color: NAVY });
++  body(s, 'Lorem ipsum dolor sit ameadipiscing elit, sed do eiusmod tempor incidid', { x: 2.236, y: 3.428, w: 5.365, h: 0.707, color: NAVY });
++  body(s, 'Value Proposition', { x: 2.236, y: 2.87, w: 3.401, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 36 });
++  body(s, 'Fermentum iaculis eu non. Posuere morbi leo urna molestie at elementum eu', { x: 2.236, y: 5.461, w: 5.365, h: 0.707, color: NAVY });
++  body(s, 'Customer Segments', { x: 2.236, y: 4.903, w: 4.64, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 36 });
++  plane(s, { x: 8.886, y: 1.254, rot: 247.19 });
++  body(s, 'Facilisis sed. Arcu vitae elementum cura bitur vitae nunc sed. Non curabitur', { x: 2.236, y: 7.65, w: 5.365, h: 0.707, color: NAVY });
++  body(s, 'Revenue Streams', { x: 2.236, y: 7.092, w: 3.401, h: 0.438, size: 20, color: NAVY, bold: true, bullet: 36 });
++  photo(s, { x: 13.472, y: 5.679, w: 3.679, h: 3.866, round: 6100, rot: 356.07 });
++}
++
++function slide11(pptx) {  // Best our service
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '11');
++  photo(s, { x: 2.02, y: 3.648, w: 4.918, h: 3.514, diag: 4468 });
++  photo(s, { x: 7.541, y: 3.648, w: 4.918, h: 3.514, diag: 4468 });
++  photo(s, { x: 13.062, y: 3.624, w: 4.918, h: 3.514, diag: 4468 });
++  heading(s, 'Best Our Service ', { x: 2.061, y: 1.451, w: 7.92, h: 1.212 });
++  badge(s, { x: 6.738, y: 5.167, fill: CYAN, arrow: WHITE });
++  badge(s, { x: 12.28, y: 5.167, fill: CYAN, arrow: WHITE });
++  body(s, 'Lorem ipsum dolor sit ameadipiscing elit, se d do eiusmod tempor incidid unt ut labor et dolorme ma gna', { x: 2.061, y: 8.485, w: 4.904, h: 1.01 });
++  body(s, 'Personalized Itineraries', { x: 2.061, y: 7.882, w: 4.677, h: 0.438, size: 20, bold: true, bullet: 36 });
++  body(s, 'Eu ultrices vitae auctor eu augue ut lectus. Tincidunt lobortis feugiat viva mus at augue eget. Non tellus', { x: 7.529, y: 8.485, w: 4.904, h: 1.01 });
++  body(s, 'Exclusive Partnerships', { x: 7.529, y: 7.882, w: 4.751, h: 0.438, size: 20, bold: true, bullet: 36 });
++  body(s, 'Orci ac auctor augue mauris. Ligula ullamcorper malesuada proin libero nunc consequat interdum. ', { x: 13.077, y: 8.485, w: 4.904, h: 1.01 });
++  body(s, 'Luxury Accommodations', { x: 13.077, y: 7.882, w: 4.862, h: 0.438, size: 20, bold: true, bullet: 36 });
++}
++
++function slide12(pptx) {  // Marketing strategy
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '12');
++  heading(s, 'Marketing Strategy', { x: 2.123, y: 1.659, w: 5.258, h: 2.322 });
++  display(s, 'Product', { x: 2.123, y: 6.294, w: 3.298, h: 0.438, size: 20, bullet: 27 });
++  body(s, 'Felis imperdiet proin ferment um leo vel orci', { x: 2.123, y: 6.881, w: 4.167, h: 0.707 });
++  display(s, 'Price', { x: 2.123, y: 8.49, w: 3.298, h: 0.438, size: 20, bullet: 27 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipis', { x: 2.123, y: 9.078, w: 4.167, h: 0.707 });
++  display(s, 'Place', { x: 8.005, y: 6.319, w: 3.298, h: 0.438, size: 20, bullet: 27 });
++  body(s, 'Platea dictumst quisque. Pellentes que divitae', { x: 8.005, y: 6.907, w: 4.167, h: 0.707 });
++  display(s, 'Promotion', { x: 8.005, y: 8.555, w: 3.298, h: 0.438, size: 20, bullet: 27 });
++  body(s, 'Tempor incididunt ut labore dolore magna aliqua. ', { x: 8.005, y: 9.143, w: 4.167, h: 0.707 });
++  body(s, 'Lorem ipsum dolor sit ameadipiscing elit, se d do eiusmod', { x: 2.123, y: 4.31, w: 4.904, h: 0.707 });
++  photo(s, { x: 8.005, y: 1.839, w: 4.601, h: 3.786, round: 3911 });
++  photo(s, { x: 13.224, y: 1.839, w: 4.896, h: 7.946, round: 2832 });
++}
++
++function slide13(pptx) {  // Sales strategy (line chart)
++  const s = newSlide(pptx, SKY);
++  interiorChrome(s, '13', NAVY);
++  heading(s, 'Sales Strategy', { x: 1.985, y: 1.443, w: 6.81, h: 1.212, color: NAVY });
++  s.addChart('line', SALES_SERIES, {
++    x: 1.764, y: 3.214, w: 9.601, h: 6.763,
++    chartColors: [CYAN_LINE, NAVY, NAVY], lineSize: 2.25, lineDataSymbol: 'none',
++    showLegend: false, valAxisMaxVal: 6,
++    catAxisLabelColor: NAVY, valAxisLabelColor: NAVY,
++    catAxisLabelFontFace: BODY_FONT, valAxisLabelFontFace: BODY_FONT,
++    catAxisLabelFontSize: 12, valAxisLabelFontSize: 12,
++    catAxisLineColor: AXIS_GREY, valAxisLineShow: false,
++    catGridLine: { style: 'none' }, valGridLine: { style: 'none' },
++    layout: { x: 0.031, y: 0.138, w: 0.944, h: 0.768 },
++  });
++  display(s, 'Product 1', { x: 14.076, y: 2.556, w: 4.2, h: 0.438, size: 20, color: NAVY });
++  display(s, 'Product 2', { x: 14.076, y: 4.504, w: 4.2, h: 0.438, size: 20, color: NAVY });
++  display(s, 'Product 3', { x: 14.076, y: 6.503, w: 4.2, h: 0.438, size: 20, color: NAVY });
++  display(s, 'Product 4', { x: 14.076, y: 8.203, w: 4.2, h: 0.438, size: 20, color: NAVY });
++  body(s, 'Lorem ipsum dolor sit amet, adipiscing elit ', { x: 14.076, y: 3.116, w: 4.364, h: 0.707, color: NAVY });
++  body(s, 'Vestibulum mattis ullamcorper velit sed. Tempus', { x: 14.076, y: 5.064, w: 4.364, h: 0.707, color: NAVY });
++  body(s, 'Egestas sed sed risus pretium quam. Tempus', { x: 14.076, y: 7.065, w: 4.364, h: 0.707, color: NAVY });
++  body(s, 'Limperdiet nulla malesuada pellentesque elit eget. ', { x: 14.076, y: 8.763, w: 4.364, h: 0.707, color: NAVY });
++  plane(s, { x: 9.746, y: 1.558, rot: 270 });
++  chip(s, '01', { x: 12.077, y: 2.68, w: 1.423, h: 1.066, round: 12200, fill: WHITE });
++  chip(s, '02', { x: 12.077, y: 4.588, w: 1.423, h: 1.066, round: 12200, fill: WHITE });
++  chip(s, '03', { x: 12.077, y: 6.496, w: 1.423, h: 1.066, round: 12200, fill: WHITE });
++  chip(s, '04', { x: 12.077, y: 8.404, w: 1.423, h: 1.066, round: 12200, fill: WHITE });
++}
++
++function slide14(pptx) {  // Operations plan
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '14');
++  heading(s, 'Operations Plan', { x: 10.27, y: 7.93, w: 5.692, h: 2.322 });
++  body(s, 'Lorem ipsum dolor sit am et, consectetur adipisci n gelit, sed do eiusmod ', { x: 2.161, y: 7.772, w: 3.377, h: 1.01 });
++  body(s, 'Fermentum odio eu feug I at pretium nibh ipsum co nsequat nisl vel. Viverra', { x: 6.148, y: 2.851, w: 3.493, h: 1.01 });
++  body(s, 'Ipsum nunc aliquet bibendum enim facilisis gravida. Velit egestas dui id ornare. ', { x: 14.205, y: 3.547, w: 3.986, h: 1.01 });
++  display(s, 'Responsibility', { x: 14.205, y: 2.825, w: 3.564, h: 0.438, size: 20, bullet: 27 });
++  display(s, 'Budget', { x: 6.129, y: 2.135, w: 3.564, h: 0.438, size: 20, bullet: 27 });
++  display(s, 'Strategic', { x: 2.143, y: 7.049, w: 3.564, h: 0.438, size: 20, bullet: 27 });
++  photo(s, { x: 2.021, y: 1.659, w: 3.518, h: 4.589, round: 3385 });
++  photo(s, { x: 6.108, y: 4.611, w: 3.518, h: 4.589, round: 3385 });
++  photo(s, { x: 10.27, y: 2.662, w: 3.518, h: 4.589, round: 3385 });
++}
++
++function slide15(pptx) {  // Technology plan
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '15');
++  heading(s, 'Technology Plan', { x: 10.514, y: 2.027, w: 7.623, h: 1.212 });
++  display(s, 'Online Booking Platform', { x: 10.685, y: 3.856, w: 4.725, h: 0.438, size: 20, color: BLACK, bullet: 27 });
++  body(s, 'Faucibus ornare suspendisse sed nisi lacus. Ullam corper a lacus vestibulum sed arcu non odio euismod ', { x: 10.685, y: 4.473, w: 7.35, h: 0.707 });
++  body(s, 'Ut porttitor leo a diam sollicitudin tempor id. Sed viverra ipsum nunc', { x: 10.685, y: 5.461, w: 6.643, h: 0.707 });
++  body(s, '"Experience the World Like Never Before with Our Travel Services, Offering You the Ultimate in Adventure, Relaxation, and Discovery"', { x: 2.016, y: 8.6, w: 7.166, h: 1.01 });
++  display(s, 'Data Analytics and Business Intelligence', { x: 10.675, y: 7.196, w: 6.191, h: 0.438, size: 20, color: BLACK, bullet: 27 });
++  body(s, 'Aenean et tortor at risus. Aenean sed adipiscing diam donec adipiscing tristique. Dapibus ultrices', { x: 10.675, y: 7.813, w: 7.35, h: 0.707 });
++  body(s, 'in iaculis nunc sed augue lacus. Consectetur adipiscing elit pellentesque', { x: 10.675, y: 8.802, w: 6.643, h: 0.707 });
++  photo(s, { x: 2.046, y: 2.054, w: 7.181, h: 5.531, round: 3649 });
++}
++
++function slide16(pptx) {  // Product development plan
++  const s = newSlide(pptx, SKY);
++  interiorChrome(s, '16', NAVY);
++  heading(s, 'Product Development Plan', { x: 9.501, y: 1.863, w: 8.4, h: 2.322, color: NAVY });
++  display(s, 'Develop Strategy', { x: 14.976, y: 7.837, w: 3.225, h: 0.438, size: 20, color: NAVY, bullet: 27 });
++  display(s, 'Roadsmap', { x: 8.078, y: 7.805, w: 2.286, h: 0.438, size: 20, color: NAVY, bullet: 27 });
++  display(s, 'Milestones', { x: 11.505, y: 7.837, w: 2.286, h: 0.438, size: 20, color: NAVY, bullet: 27 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur ad ipisci ng elit, sed do ei usmod tempor', { x: 8.078, y: 8.68, w: 2.931, h: 1.313, color: NAVY });
++  body(s, 'Sed faucibus turpis in eu mi bibendum neai qu e egestas. Orci por ta non pulvinar', { x: 11.505, y: 8.647, w: 2.931, h: 1.313, color: NAVY });
++  body(s, 'Neque. Bibendum arc uvitae elementum cu rabitur vitae nunc. Dol or sit amet conse', { x: 14.976, y: 8.647, w: 2.931, h: 1.313, color: NAVY });
++  body(s, '"Discover the World\'s Hidden Gems and Create Unforgettable Memories with Our Tailor-Made Travel Experiences"', { x: 9.501, y: 4.835, w: 8.245, h: 0.707, color: NAVY });
++  chip(s, '01', { x: 8.078, y: 6.561, w: 1.423, h: 1.066, round: 12200, fill: WHITE });
++  chip(s, '02', { x: 11.505, y: 6.561, w: 1.423, h: 1.066, round: 12200, fill: WHITE });
++  chip(s, '03', { x: 14.976, y: 6.561, w: 1.423, h: 1.066, round: 12200, fill: WHITE });
++  photo(s, { x: 2.043, y: 2.109, w: 6.288, h: 2.765, round: 6662, rot: 357.17 });
++  photo(s, { x: 2.02, y: 5.525, w: 5.168, h: 4.468, round: 6662 });
++  plane(s, { x: 7.645, y: 1.421, rot: 111.65 });
++}
++
++function slide17(pptx) {  // Lets meet the founders
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '17');
++  heading(s, 'Lets Meet The Founders', { x: 2.101, y: 2.282, w: 7.201, h: 2.322 });
++  display(s, '+25 Years', { x: 2.101, y: 8.162, w: 2.121, h: 0.572, size: 28 });
++  body(s, 'Work in company', { x: 2.101, y: 8.752, w: 2.918, h: 0.404 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing eli ti sed do eiusmod tempor incididunt ut labore et dolor re magna aliqua. Gravida neque con vallis a cras sem per auctor neque vitae tempus. ', { x: 2.101, y: 6.293, w: 6.944, h: 1.313 });
++  body(s, '"Explore Beyond Boundaries: Embark on Unforgettable Journeys to Discover New Horizons and Cultures"', { x: 2.101, y: 5.231, w: 6.944, h: 0.707 });
++  photo(s, { x: 10.393, y: 2.111, w: 6.358, h: 7.916, diag: 3736 });
++}
++
++function slide18(pptx) {  // Key team members
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '18');
++  photo(s, { x: 14.527, y: 1.659, w: 3.266, h: 4.589, round: 4638 });
++  photo(s, { x: 10.609, y: 4.426, w: 3.266, h: 4.589, round: 4152 });
++  heading(s, 'Key Team Members', { x: 2.08, y: 7.122, w: 5.3, h: 2.322 });
++  body(s, 'Lorem ipsum dolor sit am consectetur adscingi elit, se d do eiusmod', { x: 10.482, y: 3.043, w: 3.504, h: 1.01 });
++  body(s, 'Donec enim diam vulp uti adte ut pharetra sit. Sc ele ri squ e purus sem', { x: 5.871, y: 4.656, w: 3.518, h: 1.01 });
++  body(s, 'Rebecca Lynn', { x: 14.527, y: 6.668, w: 2.789, h: 0.454, size: 20, bold: true });
++  body(s, 'Catherine Marie', { x: 5.871, y: 3.578, w: 2.993, h: 0.454, size: 20, bold: true });
++  body(s, 'Luca Hawthorne', { x: 10.482, y: 1.901, w: 2.993, h: 0.454, size: 20, bold: true });
++  body(s, 'Financial Officer (CFO)', { x: 5.871, y: 4.033, w: 3.366, h: 0.438, size: 20, wrap: false });
++  body(s, 'Technology Officer (CTO)', { x: 10.482, y: 2.378, w: 3.75, h: 0.438, size: 20, wrap: false });
++  body(s, 'Marketing Officer (CMO)', { x: 14.527, y: 7.141, w: 3.605, h: 0.438, size: 20, wrap: false });
++  body(s, 'Bore et dolore magna aliq ua. Fames ac turpis egest as sed tempus urna et', { x: 14.527, y: 7.738, w: 3.518, h: 1.01 });
++  badge(s, { x: 13.73, y: 4.828, fill: CYAN, arrow: WHITE, dir: 'right' });
++  photo(s, { x: 2.249, y: 1.659, w: 3.266, h: 4.589, round: 5124 });
++}
++
++function slide19(pptx) {  // Human resources plan
++  const s = newSlide(pptx, SKY);
++  interiorChrome(s, '19', NAVY);
++  heading(s, 'Human Resources Plan', { x: 7.37, y: 1.803, w: 7.491, h: 2.322, color: NAVY });
++  display(s, 'Demand Forecasting', { x: 10.785, y: 4.993, w: 3.49, h: 0.438, size: 20, color: NAVY, bullet: 27 });
++  body(s, 'Orci nulla pellentesque d ignissim enim sit amet venenatis urna. ', { x: 10.785, y: 5.661, w: 3.35, h: 1.01, color: NAVY });
++  body(s, 'Ultrices in iaculis nunc sed. Eleifend mi in nulla posuere sollicitudin.', { x: 14.632, y: 5.684, w: 3.368, h: 1.01, color: NAVY });
++  display(s, 'Supply Forecasting', { x: 14.75, y: 5.009, w: 3.638, h: 0.438, size: 20, color: NAVY, bullet: 27 });
++  display(s, 'Determining HRR', { x: 10.785, y: 7.417, w: 3, h: 0.438, size: 20, color: NAVY, bullet: 27 });
++  body(s, 'Proin fermentum leo. In nibh mauris cursus mattis. Justo', { x: 10.785, y: 8.088, w: 3, h: 1.01, color: NAVY });
++  body(s, 'Sed odio morbi quis. vulp utate eu sceler isque felis impe', { x: 14.75, y: 8.088, w: 3, h: 1.01, color: NAVY });
++  display(s, 'Action Planning', { x: 14.75, y: 7.432, w: 3, h: 0.438, size: 20, color: NAVY, bullet: 27 });
++  shape(s, 'roundRect', { x: 2.065, y: 1.792, w: 3.916, h: 5.249, round: 8440, rot: 356.23, fill: WHITE });
++  plane(s, { x: 5.194, y: 1.191, rot: 107.26 });
++  photo(s, { x: 2.208, y: 1.889, w: 3.64, h: 5.027, round: 9443, rot: 356.05, line: 'none' });
++  photo(s, { x: 2.162, y: 7.651, w: 3.373, h: 2.76, round: 6746, line: WHITE });
++  photo(s, { x: 6.621, y: 5.503, w: 3.171, h: 4.157, round: 7752, rot: 5.31, line: WHITE });
++}
++
++function slide20(pptx) {  // Financial plan (bar chart)
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '20');
++  heading(s, 'Financial Plan', { x: 2.351, y: 7.817, w: 7.179, h: 1.212 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipisci ng elit, sed do eiusmod tempor incididunt ut labo re et dolore magna aliqua. ', { x: 2.389, y: 2.672, w: 7.102, h: 1.01 });
++  body(s, 'Eget magna fermentum iaculis eu. Velit ut tortor pretium viverra suspendisse. Amet nisl purus in mollis ', { x: 2.389, y: 3.926, w: 7.102, h: 0.707 });
++  s.addChart('bar', FINANCE_SERIES, {
++    x: 10.586, y: 2.035, w: 7.774, h: 7.715,
++    chartColors: [CYAN, NAVY, SKY], barGapWidthPct: 219, barOverlapPct: -27,
++    showLegend: false, valAxisMaxVal: 6,
++    catAxisLabelColor: BLACK, valAxisLabelColor: BLACK,
++    catAxisLabelFontFace: BODY_FONT, valAxisLabelFontFace: BODY_FONT,
++    catAxisLabelFontSize: 12, valAxisLabelFontSize: 12,
++    catAxisLineColor: AXIS_GREY, valAxisLineShow: false,
++    catGridLine: { style: 'none' }, valGridLine: { style: 'none' },
++    layout: { x: 0.04, y: 0.034, w: 0.931, h: 0.914 },
++  });
++  shape(s, 'roundRect', { x: 2.389, y: 5.722, w: 2.355, h: 1.333, round: 10325, fill: SKY });
++  shape(s, 'roundRect', { x: 5.511, y: 5.722, w: 2.355, h: 1.333, round: 7200, fill: CYAN });
++  display(s, '436K+', { x: 2.727, y: 5.893, w: 1.689, h: 0.572, size: 28, color: NAVY, align: 'center' });
++  display(s, '99%', { x: 5.99, y: 5.882, w: 1.469, h: 0.572, size: 28, color: NAVY, align: 'center' });
++  body(s, 'visiting abroad', { x: 2.54, y: 6.454, w: 2.136, h: 0.404, color: NAVY, align: 'center' });
++  body(s, 'Save Trip', { x: 5.633, y: 6.454, w: 2.179, h: 0.404, color: NAVY, align: 'center' });
++}
++
++function slide21(pptx) {  // Company timeline
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '21');
++  rule(s, { x: 2.762, y: 3.626, w: 12.092, h: 0 });
++  heading(s, 'Company Timeline', { x: 13.189, y: 7.157, w: 4.801, h: 2.322 });
++  shape(s, 'ellipse', { x: 2.573, y: 3.39, w: 0.506, h: 0.47, fill: CYAN });
++  display(s, '2014-2017', { x: 2.588, y: 4.39, w: 3.298, h: 0.438, size: 20 });
++  body(s, 'Felis imperdiet proin ferment um leo vel orci. Elementum ni bh tellus molestie', { x: 2.573, y: 4.827, w: 4.001, h: 1.01 });
++  display(s, '2017- 2020', { x: 5.913, y: 1.629, w: 3.298, h: 0.438, size: 20 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod', { x: 5.913, y: 2.061, w: 4.167, h: 1.01 });
++  display(s, '2020-2022', { x: 10.808, y: 4.367, w: 3.298, h: 0.438, size: 20 });
++  body(s, 'Platea dictumst quisque. Pellentes que divitae turpis massa sed. ', { x: 10.793, y: 4.804, w: 4.167, h: 1.01 });
++  display(s, '2022-2025', { x: 14.115, y: 1.659, w: 3.298, h: 0.438, size: 20 });
++  body(s, 'Tempor incididunt ut labore et dolore magna aliqua. Ut sem nulla pharetra diam. ', { x: 14.115, y: 2.097, w: 3.875, h: 1.01 });
++  shape(s, 'ellipse', { x: 5.807, y: 3.375, w: 0.506, h: 0.47, fill: CYAN });
++  shape(s, 'ellipse', { x: 10.793, y: 3.375, w: 0.506, h: 0.47, fill: CYAN });
++  shape(s, 'ellipse', { x: 14.028, y: 3.36, w: 0.506, h: 0.47, fill: CYAN });
++  photo(s, { x: 2.641, y: 6.635, w: 9.988, h: 3.656, diag: 7740 });
++}
++
++function slide22(pptx) {  // Strategic partnerships
++  const s = newSlide(pptx, SKY);
++  interiorChrome(s, '22');
++  heading(s, 'Strategic Partnerships', { x: 2.357, y: 1.958, w: 6.772, h: 2.322, color: NAVY });
++  display(s, 'Brand Vision', { x: 10.587, y: 1.958, w: 2.877, h: 0.438, size: 20, color: NAVY, bullet: 27 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipisci ng elit, sed do eiusmod', { x: 10.587, y: 2.627, w: 5.639, h: 0.707 });
++  display(s, 'Business Goals', { x: 10.587, y: 3.917, w: 2.877, h: 0.438, size: 20, color: NAVY, bullet: 27 });
++  body(s, 'Id eu nisl nunc mi ipsum. Vitae elementum curabitur vitae nunc. Commodo', { x: 10.587, y: 4.605, w: 5.639, h: 0.707 });
++  body(s, 'Odio aenean sed adipiscing diam donec adipisc ing tristique. Dignissim cras tincidunt lobortis', { x: 2.357, y: 6.359, w: 6.609, h: 0.707 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipisci ng elit, sed do eiusmod tempor incididunt ut labo re et dolore magna aliqua. ', { x: 2.357, y: 5.034, w: 6.757, h: 1.01 });
++  shape(s, 'roundRect', { x: 2.432, y: 7.958, w: 2.355, h: 1.333, round: 10325, fill: WHITE });
++  shape(s, 'roundRect', { x: 5.365, y: 7.958, w: 2.355, h: 1.333, round: 7200, fill: NAVY });
++  display(s, '179K+', { x: 2.771, y: 8.129, w: 1.689, h: 0.572, size: 28, color: NAVY, align: 'center' });
++  display(s, '567M+', { x: 5.844, y: 8.118, w: 1.469, h: 0.572, size: 28, color: WHITE, align: 'center' });
++  body(s, 'Succes Partner', { x: 2.542, y: 8.69, w: 2.136, h: 0.404, color: NAVY, align: 'center' });
++  body(s, 'Many People', { x: 5.657, y: 8.69, w: 1.844, h: 0.404, color: WHITE, align: 'center' });
++  photo(s, { x: 10.568, y: 6.298, w: 6.988, h: 3.843, round: 6317, rot: 356.49 });
++  plane(s, { x: 10.073, y: 6.035, rot: 61.83 });
++}
++
++function slide23(pptx) {  // Customer testimonials
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '23');
++  heading(s, 'Customer Testimonials', { x: 11.093, y: 2.07, w: 6.489, h: 2.322 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipisci ng elit, sed do eiusmod tempor incididunt ut labo re et dolore magna aliqua. ', { x: 11.266, y: 4.926, w: 6.316, h: 1.01 });
++  body(s, 'Placerat orci nulla pellentesque dignissim enim sit. Fermentum odio eu feugiat pretium', { x: 11.266, y: 6.18, w: 6.143, h: 0.707 });
++  body(s, 'Target age', { x: 11.198, y: 8.697, w: 3.569, h: 0.404 });
++  body(s, 'Good rating', { x: 14.766, y: 8.69, w: 3.45, h: 0.404 });
++  display(s, '+28 Years', { x: 11.198, y: 7.939, w: 2.496, h: 0.606, size: 30 });
++  display(s, '97%', { x: 14.766, y: 7.913, w: 1.581, h: 0.606, size: 30 });
++  body(s, 'Proin nibh nisl condiment mid venenatis a condime ntum vitae. Aliquet lectus proin nibh nis con', { x: 6.542, y: 7.926, w: 3.544, h: 1.313 });
++  display(s, 'Arabella Hayes', { x: 6.522, y: 7.202, w: 3.564, h: 0.505, size: 24 });
++  body(s, 'Vitae tortor condimentum lacinia quis vel eros donec ac. Leo vel orci porta nopu lvinar neque laoreet', { x: 2.337, y: 3.639, w: 3.592, h: 1.313 });
++  display(s, 'Theodore Sterling', { x: 2.317, y: 2.915, w: 3.564, h: 0.505, size: 24 });
++  photo(s, { x: 2.238, y: 5.412, w: 3.59, h: 4.589, round: 3649 });
++  photo(s, { x: 6.41, y: 2.123, w: 3.59, h: 4.589, round: 3649 });
++}
++
++function slide24(pptx) {  // Contact information
++  const s = newSlide(pptx, WHITE);
++  interiorChrome(s, '24');
++  heading(s, 'Contact Information', { x: 2.407, y: 7.377, w: 6.407, h: 2.322 });
++  body(s, 'Phone', { x: 9.127, y: 7.102, w: 2.23, h: 0.438, size: 20, bold: true });
++  body(s, '(+12) 3456-7890-1234', { x: 9.127, y: 7.699, w: 4.095, h: 0.404 });
++  body(s, 'Location', { x: 9.127, y: 8.833, w: 2.23, h: 0.438, size: 20, bold: true });
++  body(s, '123 Main Street Your City', { x: 9.127, y: 9.425, w: 4.095, h: 0.404 });
++  body(s, 'Mail', { x: 14.064, y: 7.069, w: 2.327, h: 0.438, size: 20, bold: true });
++  body(s, 'dretionsly@gmail.com', { x: 14.064, y: 7.667, w: 4.272, h: 0.404 });
++  body(s, 'Website', { x: 14.064, y: 8.797, w: 2.327, h: 0.438, size: 20, bold: true });
++  body(s, 'www.dretionsly.com', { x: 14.064, y: 9.367, w: 4.272, h: 0.404 });
++  photo(s, { x: 2.628, y: 1.944, w: 8.37, h: 4.343, round: 3649 });
++  photo(s, { x: 11.664, y: 1.944, w: 5.807, h: 4.343, round: 3649 });
++}
++
++function slide25(pptx) {  // Thank you
++  const s = newSlide(pptx, SKY);
++  coverChrome(s, { h: 8.944 });
++  heading(s, 'Thank You', { x: 11.236, y: 2.992, w: 6.567, h: 4.746, size: 138, color: NAVY, align: 'right' });
++  body(s, 'Dretions', { x: 16.266, y: 2.235, w: 1.537, h: 0.438, size: 20, color: NAVY });
++  shape(s, 'roundRect', { x: 2.04, y: 2.546, w: 7.639, h: 6.802, round: 6299, rot: 356.93, fill: WHITE });
++  badge(s, { x: 11.982, y: 6.209, fill: WHITE, arrow: NAVY });
++  body(s, '"From Hidden Gems to Iconic Destinations, Curates Bespoke Travel Experiences “Tailored Just for You ', { x: 12.352, y: 8.057, w: 5.451, h: 1.01, color: NAVY, align: 'right' });
++  photo(s, { x: 2.231, y: 2.695, w: 7.297, h: 6.512, round: 6041, rot: 356.77, line: 'none' });
++  plane(s, { x: 8.789, y: 2.028, rot: 107.26 });
++}
++
++
++// ------------------------------------------------------------------ main ---
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25,
++];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'DECK', width: 20, height: 11.25 });
++pptx.layout = 'DECK';
++pptx.theme = { headFontFace: HEAD_FONT, bodyFontFace: BODY_FONT };
++
++BUILDERS.forEach(build => build(pptx));
++
++pptx.writeFile({ fileName: path.join(__dirname, '02e1c6fd-b6aa-4133-8757-1e5722ef4a9f_grok_final.pptx') })
++  .then(f => console.log('wrote ' + f));

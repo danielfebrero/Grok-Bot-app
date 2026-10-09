@@ -1,0 +1,1218 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/architecture_firm_portfolio_2.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/architecture_firm_portfolio_2.js
+@@ -0,0 +1,1215 @@
++/**
++ * "Architecture" deck — rebuilt with pptxgenjs.
++ *
++ * Slide size 13.333 x 7.5 in (LAYOUT_WIDE).  Theme fonts: Outfit SemiBold (headings)
++ * / Poppins (body).  Photographs in the source are empty picture placeholders that
++ * paint as light-grey blocks;
++ they are recreated here as plain grey rectangles.
++ *
++ * Run: node 1a8c47dc-f3a8-4475-a431-cdb101228b83_grok_final.js
++ */
++'use strict';
++
++
++const path = require('path');
++
++const PptxGenJS = require('pptxgenjs');
++
++
++// ---------------------------------------------------------------- design tokens
++const HEAD = 'Outfit SemiBold';
++ // theme major font
++const BODY = 'Poppins';
++ // theme minor font
++
++const INK = '262626';
++ // tx1 @ 85% — headline ink
++const MUTED = '404040';
++ // tx1 @ 75% — paragraph grey
++const BLACK = '0D0D0D';
++ // accent1 — panels & icon tiles
++const NEAR = '0C0C0C';
++ // accent2 — list headings
++const LIGHT = 'F2F2F2';
++ // accent4 — text on dark panels
++const WHITE = 'FFFFFF';
++
++const PHOTO = 'F2F2F2';
++ // picture-placeholder block
++const AXIS = 'D9D9D9';
++ // tx1 @ 15% — chart axis line
++const AXTXT = '595959';
++ // tx1 @ 65% — chart axis labels
++
++const TITLE_SZ = 54;
++ // recurring headline size
++const LEAD_SZ = 18;
++ // recurring kicker/label size
++const TEXT_SZ = 14;
++ // recurring paragraph size
++
++// -------------------------------------------------------------------- copy deck
++const NB = '\u00A0';
++
++const TAKEN = `A${
++NB}
++wonderful serenity has taken`;
++
++const LEAD = `${
++TAKEN}
++ possession`;
++
++const SOUL = `${
++LEAD}
++ of my entire soul`;
++
++const SPRING = `${
++SOUL}
++, like these sweet mornings of spring`;
++
++const MORN = `${
++SOUL}
++, like these mornings of spring`;
++
++const HEART = ' which I enjoy with my whole heart. ';
++
++const ALONE = 'I am alone, and feel the charm of existence in this spot';
++
++const BLISS = ', which was created for the bliss.';
++
++
++// ------------------------------------------------------------- vector icon data
++// Outlines normalised to a 0..1000 box;
++ entries are [x,y] or [x,y,c1x,c1y,c2x,c2y].
++const ICONS = {
++
++	// diagonal "north-east/south-east" arrow used all over the deck
++	arrow: [[[716, 834], [0, 118], [118, 0], [834, 716], [834, 85], [1000, 85], [1000, 1000], [85, 1000], [85, 834]]],
++	// office block
++	office: [[[1000, 1000], [0, 1000], [0, 889], [50, 889], [50, 56], [100, 0, 50, 25, 72, 0], [800, 0], [850, 56, 828, 0, 850, 25], [850, 333], [950, 333], [950, 889], [1000, 889], [1000, 1000]], [[750, 889], [850, 889], [850, 444], [550, 444], [550, 889], [650, 889], [650, 556], [750, 556], [750, 889]], [[750, 333], [750, 111], [150, 111], [150, 889], [450, 889], [450, 333], [750, 333]], [[250, 444], [350, 444], [350, 556], [250, 556], [250, 444]], [[250, 667], [350, 667], [350, 778], [250, 778], [250, 667]], [[250, 222], [350, 222], [350, 333], [250, 333], [250, 222]]],
++	// classical bank / museum
++	bank: [[[0, 900], [1000, 900], [1000, 1000], [0, 1000], [0, 900]], [[100, 500], [200, 500], [200, 850], [100, 850], [100, 500]], [[350, 500], [450, 500], [450, 850], [350, 850], [350, 500]], [[550, 500], [650, 500], [650, 850], [550, 850], [550, 500]], [[800, 500], [900, 500], [900, 850], [800, 850], [800, 500]], [[0, 250], [500, 0], [1000, 250], [1000, 450], [0, 450], [0, 250]], [[100, 312], [100, 350], [900, 350], [900, 312], [500, 112], [100, 312]], [[500, 300], [450, 250, 472, 300, 450, 278], [500, 200, 450, 222, 472, 200], [550, 250, 528, 200, 550, 222], [500, 300, 550, 278, 528, 300]]],
++	// set-square / ruler
++	ruler: [[[778, 889], [889, 889], [889, 611], [389, 611], [389, 111], [111, 111], [111, 222], [222, 222], [222, 333], [111, 333], [111, 444], [278, 444], [278, 556], [111, 556], [111, 667], [222, 667], [222, 778], [111, 778], [111, 889], [222, 889], [222, 778], [333, 778], [333, 889], [444, 889], [444, 722], [556, 722], [556, 889], [667, 889], [667, 778], [778, 778], [778, 889]], [[500, 500], [944, 500], [1000, 556, 975, 500, 1000, 525], [1000, 944], [944, 1000, 1000, 975, 975, 1000], [56, 1000], [0, 944, 25, 1000, 0, 975], [0, 56], [56, 0, 0, 25, 25, 0], [444, 0], [500, 56, 475, 0, 500, 25], [500, 500]]],
++	// skyline / growth chart
++	skyline: [[[91, 899], [91, 227], [121, 179, 91, 205, 103, 186], [560, 2], [590, 17, 572, -3, 585, 4], [591, 25, 590, 19, 591, 22], [591, 276], [878, 382], [909, 430, 897, 389, 909, 408], [909, 899], [1000, 899], [1000, 1000], [0, 1000], [0, 899], [91, 899]], [[182, 899], [500, 899], [500, 133], [182, 262], [182, 899]], [[818, 899], [818, 466], [591, 382], [591, 899], [818, 899]]],
++	// house + tower block
++	city: [[[950, 1000], [50, 1000], [0, 944, 22, 1000, 0, 975], [0, 527], [17, 485, 0, 511, 6, 496], [200, 308], [200, 56], [250, 0, 200, 25, 222, 0], [950, 0], [1000, 56, 978, 0, 1000, 25], [1000, 944], [950, 1000, 1000, 975, 978, 1000]], [[350, 889], [500, 889], [500, 552], [300, 359], [100, 552], [100, 889], [250, 889], [250, 667], [350, 667], [350, 889]], [[600, 889], [900, 889], [900, 111], [300, 111], [300, 229], [333, 243, 312, 229, 323, 234], [583, 485], [600, 527, 594, 496, 600, 511], [600, 889]], [[700, 444], [800, 444], [800, 556], [700, 556], [700, 444]], [[700, 667], [800, 667], [800, 778], [700, 778], [700, 667]], [[700, 222], [800, 222], [800, 333], [700, 333], [700, 222]], [[500, 222], [600, 222], [600, 333], [500, 333], [500, 222]]],
++	// paint roller
++	roller: [[[105, 105], [105, 263], [842, 263], [842, 105], [105, 105]], [[53, 0], [895, 0], [947, 53, 924, 0, 947, 24], [947, 316], [895, 368, 947, 345, 924, 368], [53, 368], [0, 316, 24, 368, 0, 345], [0, 53], [53, 0, 0, 24, 24, 0]], [[158, 474], [474, 474], [526, 526, 503, 474, 526, 497], [526, 684], [579, 684], [579, 1000], [368, 1000], [368, 684], [421, 684], [421, 579], [105, 579], [53, 526, 76, 579, 53, 555], [53, 421], [158, 421], [158, 474]], [[775, 565], [868, 472], [961, 565], [961, 751, 1013, 616, 1013, 700], [775, 751, 910, 802, 827, 802], [775, 565, 724, 700, 724, 616]]],
++	// home
++	home: [[[818, 1000], [182, 1000], [136, 949, 157, 1000, 136, 977], [136, 491], [0, 491], [469, 13], [531, 13, 487, -4, 513, -4], [1000, 491], [864, 491], [864, 949], [818, 1000, 864, 977, 843, 1000]], [[545, 898], [773, 898], [773, 397], [500, 120], [227, 397], [227, 898], [455, 898], [455, 593], [545, 593], [545, 898]]],
++	// globe
++	globe: [[[500, 1000], [0, 500, 224, 1000, 0, 776], [500, 0, 0, 224, 224, 0], [1000, 500, 776, 0, 1000, 224], [500, 1000, 1000, 776, 776, 1000]], [[386, 883], [301, 550, 336, 779, 308, 666], [103, 550], [386, 883, 123, 707, 234, 838]], [[401, 550], [500, 888, 409, 672, 444, 786], [599, 550, 558, 784, 591, 668], [401, 550]], [[897, 550], [699, 550], [614, 883, 692, 666, 664, 779], [897, 550, 766, 838, 877, 707]], [[103, 450], [301, 450], [386, 117, 308, 334, 336, 221], [103, 450, 234, 162, 123, 293]], [[402, 450], [598, 450], [500, 112, 591, 332, 558, 216], [401, 450, 442, 216, 409, 332]], [[614, 117], [699, 450, 664, 221, 692, 334], [897, 450], [614, 117, 877, 293, 766, 162]]],
++	// handset
++	phone: [[[354, 427], [573, 646, 406, 518, 482, 594], [622, 578], [694, 561, 639, 555, 670, 548], [949, 637, 773, 604, 860, 630], [1000, 692, 978, 639, 1000, 663], [1000, 940], [950, 995, 1000, 969, 978, 993], [861, 1000, 921, 999, 891, 1000], [0, 139, 386, 1000, 0, 614], [5, 50, 0, 109, 1, 79], [60, 0, 7, 22, 31, 0], [308, 0], [363, 51, 337, 0, 361, 22], [439, 306, 370, 140, 396, 227], [422, 378, 452, 330, 445, 361], [354, 427]], [[214, 390], [319, 315], [258, 111, 289, 250, 269, 182], [112, 111], [111, 139, 111, 120, 111, 130], [861, 889, 111, 553, 447, 889], [889, 888, 870, 889, 880, 889], [889, 742], [685, 681, 818, 731, 750, 711], [610, 786], [521, 745, 579, 775, 550, 761], [518, 743], [257, 482, 409, 681, 319, 591], [255, 479], [214, 390, 239, 450, 225, 421]]],
++	// envelope
++	mail: [[[50, 0], [950, 0], [1000, 56, 978, 0, 1000, 25], [1000, 944], [950, 1000, 1000, 975, 978, 1000], [50, 1000], [0, 944, 22, 1000, 0, 975], [0, 56], [50, 0, 0, 25, 22, 0]], [[900, 235], [504, 630], [100, 234], [100, 889], [900, 889], [900, 235]], [[126, 111], [503, 481], [875, 111], [126, 111]]],
++	// pickaxe
++	pick: [[[893, 1000], [831, 978, 872, 1000, 849, 993], [50, 355], [27, 193, 3, 317, -7, 245], [97, 147, 44, 169, 69, 152], [176, 169, 125, 143, 153, 150], [957, 792], [979, 953, 1004, 829, 1014, 902], [893, 1000, 959, 984, 926, 1000]], [[113, 213], [106, 214, 111, 213, 108, 213], [77, 233, 95, 216, 84, 223], [86, 300, 63, 255, 67, 285], [867, 923], [929, 913, 887, 939, 915, 935], [920, 846, 944, 892, 939, 861], [139, 223], [113, 213, 131, 217, 122, 213]], [[129, 965], [83, 919], [94, 352, -32, 806, -27, 573], [111, 321], [317, 484], [300, 511], [134, 897, 204, 664, 141, 812], [129, 965]], [[131, 419], [87, 815, 58, 567, 43, 719], [232, 500, 111, 728, 162, 617], [131, 419]], [[369, 407], [164, 243], [187, 215], [682, 34, 345, 25, 549, -50], [736, 68], [678, 95], [388, 381, 605, 127, 494, 237], [369, 407]], [[257, 233], [358, 314], [592, 70, 440, 207, 522, 121], [257, 233, 494, 53, 365, 114]]],
++	// hard-hat worker
++	worker: [[[500, 603], [396, 578, 462, 603, 426, 594], [315, 482, 354, 555, 325, 521], [268, 312], [274, 292, 266, 305, 268, 298], [295, 283, 279, 287, 287, 283], [704, 283], [726, 292, 713, 283, 721, 287], [731, 312, 731, 298, 733, 305], [685, 481], [604, 578, 674, 521, 645, 555], [500, 603, 573, 594, 538, 603]], [[331, 331], [369, 471], [425, 537, 376, 498, 396, 522], [574, 537, 469, 561, 531, 561], [631, 471, 604, 522, 624, 498], [669, 331], [331, 331]], [[723, 331], [277, 331], [215, 278, 243, 331, 215, 307], [215, 271], [277, 218, 215, 241, 243, 218], [723, 218], [785, 271, 757, 218, 785, 241], [785, 278], [723, 331, 785, 307, 757, 331]], [[277, 265], [271, 271, 274, 265, 271, 268], [271, 278], [277, 283, 271, 281, 274, 283], [723, 283], [729, 278, 726, 283, 729, 281], [729, 271], [723, 265, 729, 268, 726, 265], [277, 265]], [[704, 265], [296, 265], [268, 241, 280, 265, 268, 255], [268, 233], [447, 42, 268, 142, 343, 62], [470, 47, 455, 41, 463, 42], [480, 65, 477, 51, 480, 58], [480, 134], [500, 151, 480, 144, 489, 151], [519, 134, 511, 151, 519, 144], [519, 65], [530, 47, 519, 58, 523, 52], [553, 42, 536, 42, 545, 41], [732, 233, 657, 62, 732, 142], [732, 242], [704, 265, 732, 255, 720, 265]], [[324, 218], [676, 218], [575, 98, 669, 165, 630, 120], [575, 135], [500, 199, 575, 170, 541, 199], [425, 135, 459, 199, 425, 170], [425, 98], [324, 218, 370, 120, 331, 165]], [[500, 199], [425, 135, 459, 199, 425, 170], [425, 64], [500, 0, 425, 29, 459, 0], [553, 19, 520, 0, 539, 7], [575, 64, 567, 31, 575, 47], [575, 135], [500, 199, 575, 170, 541, 199]], [[500, 48], [481, 64, 489, 48, 481, 55], [481, 135], [500, 151, 481, 144, 489, 151], [520, 135, 511, 151, 520, 144], [520, 64], [514, 52, 520, 60, 517, 56], [500, 48, 510, 49, 505, 48]], [[972, 1000], [28, 1000], [0, 976, 12, 1000, 0, 989], [0, 916], [194, 648, 0, 801, 74, 699], [349, 617, 243, 627, 295, 617], [411, 617], [438, 640, 426, 617, 438, 627], [438, 654], [500, 707, 462, 674, 479, 688], [562, 654], [562, 640], [589, 617, 562, 627, 574, 617], [651, 617], [806, 648, 705, 617, 758, 627], [1000, 916, 926, 699, 1000, 801], [1000, 976], [972, 1000, 1000, 989, 987, 1000]], [[56, 952], [944, 952], [944, 916], [781, 691, 944, 820, 882, 733], [651, 664, 741, 673, 697, 664], [617, 664], [609, 681, 617, 670, 614, 676], [520, 757], [481, 757, 509, 766, 491, 766], [391, 681, 446, 727, 426, 711], [383, 664, 386, 676, 383, 670], [349, 664], [218, 691, 304, 664, 260, 673], [56, 916, 118, 733, 56, 820], [56, 952]], [[500, 764], [480, 757, 493, 764, 486, 762], [391, 681, 445, 727, 426, 711], [383, 664, 386, 676, 383, 670], [383, 557], [397, 537, 383, 549, 388, 541], [426, 537, 406, 532, 417, 533], [574, 537, 469, 561, 531, 561], [603, 537, 583, 533, 594, 532], [617, 557, 612, 541, 617, 549], [617, 664], [609, 681, 617, 670, 614, 676], [520, 757], [500, 764, 514, 762, 507, 764]], [[438, 654], [500, 707, 462, 674, 478, 688], [562, 654], [562, 595], [438, 595, 522, 606, 478, 606], [438, 654]], [[794, 1000], [206, 1000], [178, 976, 191, 1000, 178, 989], [178, 669], [194, 648, 178, 660, 184, 652], [349, 617, 242, 627, 295, 617], [411, 617], [438, 640, 426, 617, 438, 627], [438, 654], [500, 707, 462, 674, 479, 688], [562, 654], [562, 640], [589, 617, 562, 627, 574, 617], [651, 617], [806, 648, 705, 617, 758, 627], [822, 669, 816, 652, 822, 660], [822, 976], [794, 1000, 822, 989, 809, 1000]], [[234, 952], [766, 952], [766, 684], [651, 664, 730, 671, 691, 664], [617, 664], [609, 681, 617, 670, 614, 676], [520, 757], [481, 757, 509, 766, 491, 766], [391, 681, 446, 727, 426, 711], [383, 664, 386, 676, 383, 670], [349, 664], [234, 684, 309, 664, 271, 671], [234, 952]], [[500, 1000], [472, 976, 485, 1000, 472, 989], [472, 740], [500, 717, 472, 727, 485, 717], [528, 740, 515, 717, 528, 727], [528, 976], [500, 1000, 528, 989, 515, 1000]]],
++}
++;
++
++
++// -------------------------------------------------------------------- primitives
++const pptx = new PptxGenJS();
++
++pptx.layout = 'LAYOUT_WIDE';
++
++pptx.theme = {
++ headFontFace: HEAD, bodyFontFace: BODY }
++;
++
++
++/** Grey block standing in for a photograph. */
++function photo(slide, x, y, w, h) {
++
++	slide.addShape(pptx.ShapeType.rect, {
++ x, y, w, h, fill: {
++ color: PHOTO }
++, line: {
++ type: 'none' }
++ }
++);
++
++}
++
++
++/** Solid panel / card. */
++function panel(slide, x, y, w, h, color) {
++
++	slide.addShape(pptx.ShapeType.rect, {
++ x, y, w, h, fill: {
++ color: color || BLACK }
++, line: {
++ type: 'none' }
++ }
++);
++
++}
++
++
++// These two outlines are ring-shaped (outer contour + inner cut-out per stroke), so each
++// consecutive pair of contours has to become its own shape to keep the holes punched out.
++const RINGED = ['worker', 'pick'];
++
++
++/** Freeform icon drawn from the normalised outlines above. */
++function icon(slide, name, x, y, w, h, color, rotate) {
++
++	const contours = ICONS[name];
++
++	const step = RINGED.includes(name) ? 2 : contours.length;
++
++	for (let start = 0;
++ start < contours.length;
++ start += step) {
++
++		const pts = [];
++
++		contours.slice(start, start + step).forEach(sub => {
++
++			sub.forEach((p, i) => {
++
++				const pt = {
++ x: (p[0] / 1000) * w, y: (p[1] / 1000) * h }
++;
++
++				if (i === 0) pt.moveTo = true;
++
++				if (p.length === 6) {
++
++					pt.curve = {
++ type: 'cubic', x1: (p[2] / 1000) * w, y1: (p[3] / 1000) * h, x2: (p[4] / 1000) * w, y2: (p[5] / 1000) * h }
++;
++
++				}
++
++				pts.push(pt);
++
++			}
++);
++
++			pts.push({
++ close: true }
++);
++
++		}
++);
++
++		slide.addShape(pptx.ShapeType.custGeom, {
++ x, y, w, h, points: pts, fill: {
++ color }
++, line: {
++ type: 'none' }
++, rotate: rotate || 0 }
++);
++
++	}
++
++}
++
++
++/** Icon tile: dark square with a white glyph centred inside it. */
++function iconTile(slide, x, y, side, name, iw, ih, tile, glyph) {
++
++	panel(slide, x, y, side, side, tile || BLACK);
++
++	icon(slide, name, x + (side - iw) / 2, y + (side - ih) / 2, iw, ih, glyph || WHITE);
++
++}
++
++
++/** Headline set in the major typeface. */
++function head(slide, text, o) {
++
++	slide.addText(text, Object.assign({
++
++		fontFace: HEAD, fontSize: TITLE_SZ, color: INK, valign: 'top', align: 'left', lineSpacingMultiple: 0.9,
++	}
++, o));
++
++}
++
++
++/** Small kicker / caption set in the major typeface. */
++function lead(slide, text, o) {
++
++	slide.addText(text, Object.assign({
++
++		fontFace: HEAD, fontSize: LEAD_SZ, color: INK, valign: 'top', align: 'left',
++	}
++, o));
++
++}
++
++
++/** Body paragraph set in the minor typeface. */
++function para(slide, text, o) {
++
++	slide.addText(text, Object.assign({
++
++		fontFace: BODY, fontSize: TEXT_SZ, color: MUTED, valign: 'top', align: 'left',
++		lineSpacingMultiple: 1.3, paraSpaceAfter: 8,
++	}
++, o));
++
++}
++
++
++/** Big number over a caption, e.g. "700+ / Customer". */
++function statBlock(slide, x, y, w, runs, caption, color) {
++
++	slide.addText(runs.map(r => ({
++ text: r[0], options: {
++ superscript: !!r[1] }
++ }
++)), {
++
++		x, y, w, h: 0.707, fontFace: HEAD, fontSize: 40, color: color || INK, valign: 'top', lineSpacingMultiple: 0.9,
++	}
++);
++
++	lead(slide, caption, {
++ x, y: y + 0.707, w, h: 0.404, color: color || INK }
++);
++
++}
++
++
++/** Page number, bottom-right, exactly where the slide master puts it. */
++function pageNum(slide, n, color) {
++
++	slide.addText(String(n), {
++
++		x: 12.833, y: 7.063, w: 0.5, h: 0.37, fontFace: HEAD, fontSize: 16, color: color || BLACK, align: 'center', valign: 'top',
++	}
++);
++
++}
++
++
++// ------------------------------------------------------------------ slide 1 — cover
++function slide01() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 0, 3.75, 13.333, 3.75);
++
++	head(s, 'Architecture ', {
++ x: 0.5, y: 1.271, w: 10.016, h: 1.662, fontSize: 115, lineSpacingMultiple: 0.8 }
++);
++
++	icon(s, 'arrow', 11.8, 1.428, 1.033, 1.033, '000000');
++
++}
++
++
++// ------------------------------------------------------- slide 2 — section divider 01
++function slide02() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 6.667, 3.75, 6.167, 3.25);
++
++	photo(s, 0, 0.5, 6.667, 1.952);
++
++	head(s, 'Featured Works', {
++ x: 0.5, y: 3.955, w: 5.5, h: 2.1, fontSize: 66 }
++);
++
++	para(s, `${
++MORN}
++.`, {
++ x: 0.5, y: 6.308, w: 5.5, h: 0.692 }
++);
++
++	head(s, '01', {
++ x: 6.675, y: 0.104, w: 6.167, h: 3.115, fontSize: 199, align: 'right' }
++);
++
++}
++
++
++// ------------------------------------------------------- slide 3 — section divider 02
++function slide03() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 0.5, 3.75, 4.973, 3.75);
++
++	photo(s, 7.065, 0, 5.769, 3.75);
++
++	head(s, [{
++ text: 'Setting ', options: {
++ breakLine: true }
++ }
++, {
++ text: 'the Stage' }
++],
++		{
++ x: 7.065, y: 4.718, w: 5.769, h: 2.282, fontSize: 72, valign: 'bottom' }
++);
++
++	head(s, '02', {
++ x: 0.511, y: 0.509, w: 6.156, h: 2.615, fontSize: 166 }
++);
++
++	iconTile(s, 6.635, 1.387, 0.86, 'office', 0.4, 0.375);
++
++	iconTile(s, 5.043, 5.14, 0.86, 'bank', 0.4, 0.417);
++
++}
++
++
++// -------------------------------------------------- slide 4 — Design Beyond Walls
++function slide04() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 1.21, 0.5, 5.129, 6.5);
++
++	panel(s, 0, 4.031, 3.286, 3.469);
++
++	lead(s, 'Structural Project', {
++ x: 0.5, y: 4.382, w: 2.298, h: 0.404, color: LIGHT, align: 'right' }
++);
++
++	head(s, '500K', {
++ x: 0.5, y: 6.081, w: 2.298, h: 0.919, color: LIGHT }
++);
++
++
++	head(s, [{
++ text: 'Design ', options: {
++ breakLine: true }
++ }
++, {
++ text: 'Beyond Walls' }
++],
++		{
++ x: 6.875, y: 1.012, w: 5.958, h: 1.737 }
++);
++
++	para(s, `${
++SPRING}
++${
++HEART}
++${
++ALONE}
++${
++BLISS}
++`, {
++ x: 6.875, y: 3.481, w: 5.958, h: 1.305 }
++);
++
++	head(s, '45K', {
++ x: 6.875, y: 5.347, w: 5.958, h: 0.767, fontSize: 44 }
++);
++
++	lead(s, 'Project Architecture ', {
++ x: 6.875, y: 6.115, w: 5.958, h: 0.374 }
++);
++
++	icon(s, 'arrow', 12.0, 5.843, 0.521, 0.521, INK);
++
++	pageNum(s, 4);
++
++}
++
++
++// -------------------------------------------------------------- slide 5 — Who We Are
++function slide05() {
++
++	const s = pptx.addSlide();
++
++	// the layout's picture placeholder is a three-rectangle freeform on the right
++	photo(s, 6.312, 0, 1.937, 4.145);
++
++	photo(s, 8.384, 1.021, 2.375, 6.479);
++
++	photo(s, 10.895, 0, 1.937, 5.324);
++
++
++	head(s, 'Who We Are', {
++ x: 0.5, y: 1.021, w: 5.254, h: 0.919 }
++);
++
++	para(s, `${
++SPRING}
++${
++HEART}
++`, {
++ x: 0.5, y: 3.148, w: 5.254, h: 0.998 }
++);
++
++	lead(s, 'What We Do', {
++ x: 0.5, y: 5.075, w: 2.375, h: 0.404 }
++);
++
++	para(s, `${
++SOUL}
++.`, {
++ x: 0.5, y: 5.478, w: 2.375, h: 0.998 }
++);
++
++	head(s, '50.000+', {
++ x: 3.379, y: 5.075, w: 4.037, h: 0.707, fontSize: 36, lineSpacingMultiple: 1 }
++);
++
++	para(s, `${
++SOUL}
++. `, {
++ x: 3.379, y: 5.785, w: 4.037, h: 0.692 }
++);
++
++	iconTile(s, 7.948, 5.602, 0.86, 'ruler', 0.375, 0.375);
++
++	pageNum(s, 5);
++
++}
++
++
++// ------------------------------------------------- slide 6 — Reimagining the Skyline
++function slide06() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 0, 0, 13.333, 3.75);
++
++	panel(s, 0.5, 2.833, 12.333, 4.167);
++
++	head(s, 'Reimagining the Skyline', {
++ x: 0.93, y: 3.529, w: 5.445, h: 1.737, color: LIGHT }
++);
++
++	head(s, '4.7K', {
++ x: 6.958, y: 3.529, w: 3.733, h: 1.555, fontSize: 96, color: WHITE, valign: 'bottom' }
++);
++
++	para(s, `${
++SPRING}
++${
++HEART}
++`, {
++ x: 6.958, y: 5.306, w: 5.445, h: 0.998, color: LIGHT }
++);
++
++	icon(s, 'arrow', 11.192, 3.856, 0.852, 0.852, WHITE);
++
++	pageNum(s, 6);
++
++}
++
++
++// ---------------------------------------------- slide 7 — Breaking Down the Process
++function slide07() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 0.5, 1.812, 2.333, 5.688);
++
++	photo(s, 3.021, 0.021, 2.333, 6.478);
++
++	iconTile(s, 2.587, 0.701, 0.86, 'skyline', 0.458, 0.412);
++
++
++	head(s, [{
++ text: 'Breaking Down ', options: {
++ breakLine: true }
++ }
++, {
++ text: 'the Process ' }
++],
++		{
++ x: 5.938, y: 0.5, w: 6.896, h: 1.737 }
++);
++
++	lead(s, 'Main Takeaways', {
++ x: 5.938, y: 3.238, w: 6.896, h: 0.404 }
++);
++
++	para(s, `${
++SPRING}
++${
++HEART}
++${
++ALONE}
++.`, {
++ x: 5.938, y: 3.658, w: 6.896, h: 0.998 }
++);
++
++
++	const stats = [
++		[5.938, [['700', false], ['+', true]], 'Customer '],
++		[8.42, [['57.5', false], ['%', true]], 'Growth'],
++		[10.903, [['$', true], ['2.8B', false]], 'Income'],
++	];
++
++	stats.forEach(([x, runs, caption]) => statBlock(s, x, 5.368, 1.931, runs, caption));
++
++	pageNum(s, 7);
++
++}
++
++
++// ------------------------------------------------------ slide 8 — Residential Projects
++function slide08() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 0, 0, 8.42, 4.617);
++
++	photo(s, 8.42, 4.617, 4.913, 2.883);
++
++	head(s, 'Residential Projects', {
++ x: 0.5, y: 5.263, w: 6.167, h: 1.737, valign: 'bottom' }
++);
++
++	head(s, '+75.76K', {
++ x: 8.85, y: 0.5, w: 3.983, h: 1.101, fontSize: 66 }
++);
++
++	para(s, `${
++SPRING}
++. `, {
++ x: 8.85, y: 3.179, w: 3.983, h: 0.998 }
++);
++
++	iconTile(s, 7.99, 5.702, 0.86, 'city', 0.417, 0.375);
++
++	pageNum(s, 8, WHITE);
++
++}
++
++
++// -------------------------------------------------------- slide 9 — Geometry in Motion
++function slide09() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 1.167, 1.177, 4.854, 5.823);
++
++
++	panel(s, 0.5, 0.5, 2.583, 2.608);
++
++	lead(s, 'Architectural', {
++ x: 0.708, y: 0.774, w: 2.167, h: 0.404, color: WHITE }
++);
++
++	head(s, '3.4K', {
++ x: 0.708, y: 1.938, w: 2.167, h: 0.841, fontSize: 44, color: WHITE, valign: 'bottom', lineSpacingMultiple: 1 }
++);
++
++	icon(s, 'arrow', 2.408, 2.168, 0.41, 0.41, WHITE);
++
++
++	head(s, [{
++ text: 'Geometry ', options: {
++ breakLine: true }
++ }
++, {
++ text: 'in Motion' }
++],
++		{
++ x: 6.667, y: 1.043, w: 6.167, h: 1.737 }
++);
++
++	lead(s, 'Building Blocks of Design', {
++ x: 6.688, y: 3.778, w: 6.146, h: 0.404 }
++);
++
++	para(s, `${
++SPRING}
++ which I enjoy.`, {
++ x: 6.688, y: 4.189, w: 6.146, h: 0.692, color: INK }
++);
++
++	statBlock(s, 6.688, 5.439, 2.892, [['57.5', false], ['%', true]], 'Highlights ');
++
++	statBlock(s, 9.941, 5.439, 2.892, [['$', true], ['2.8B', false]], 'In Summary ');
++
++	pageNum(s, 9);
++
++}
++
++
++// ------------------------------------------------------------- slide 10 — Our Portfolio
++function slide10() {
++
++	const s = pptx.addSlide();
++
++	panel(s, 6.896, 4.104, 5.917, 2.896);
++
++	head(s, 'Our Portfolio ', {
++ x: 8.569, y: 4.996, w: 3.739, h: 1.737, color: WHITE, valign: 'middle' }
++);
++
++	icon(s, 'arrow', 7.398, 4.53, 0.669, 0.669, WHITE, 180);
++
++
++	[[0.5, 0.5, 2.583, 3.25], [3.5, 0.5, 5.583, 3.25], [9.5, 0.5, 3.312, 3.25], [0.5, 4.167, 5.979, 2.833]]
++		.forEach(r => photo(s, r[0], r[1], r[2], r[3]));
++
++	pageNum(s, 10);
++
++}
++
++
++// ----------------------------------------------------- slide 11 — Structural Innovation
++function slide11() {
++
++	const s = pptx.addSlide();
++
++	head(s, 'Structural Innovation', {
++ x: 0.5, y: 1.042, w: 4.188, h: 1.737 }
++);
++
++	lead(s, 'Structural Elements', {
++ x: 0.521, y: 4.964, w: 4.167, h: 0.404 }
++);
++
++	para(s, `${
++MORN}
++ which I enjoy.`, {
++ x: 0.5, y: 5.368, w: 4.188, h: 0.998 }
++);
++
++	photo(s, 5.146, 0.5, 3.661, 6.5);
++
++
++	const eras = [
++		['Ancient', 1.042, 'worker', 0.446, 0.522],
++		['Medieval', 2.542, 'ruler', 0.417, 0.4],
++		['Renaissance', 4.042, 'roller', 0.446, 0.446],
++		['Contemporary', 5.542, 'office', 0.417, 0.375],
++	];
++
++	eras.forEach(([name, y, glyph, iw, ih]) => {
++
++		iconTile(s, 8.367, y, 0.86, glyph, iw, ih);
++
++		lead(s, name, {
++ x: 9.514, y: y + 0.035, w: 3.319, h: 0.404, color: NEAR }
++);
++
++		para(s, `${
++TAKEN}
++.`, {
++ x: 9.514, y: y + 0.439, w: 3.319, h: 0.386 }
++);
++
++	}
++);
++
++	pageNum(s, 11);
++
++}
++
++
++// ---------------------------------------------------------- slide 12 — The Focal Point
++function slide12() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 0, 0, 3.25, 7.5);
++
++	head(s, 'The Focal Point', {
++ x: 3.882, y: 0.643, w: 8.118, h: 0.919 }
++);
++
++
++	const cards = [
++		[1.511, 'Draws Attention', true],
++		[5.434, 'Defines Character', false],
++		[9.356, 'Shapes Experience', false],
++	];
++
++	cards.forEach(([x, title, dark]) => {
++
++		if (dark) {
++
++			panel(s, x, 2.229, 3.477, 4.771);
++
++		}
++ else {
++
++			s.addShape(pptx.ShapeType.rect, {
++ x, y: 2.229, w: 3.477, h: 4.771, line: {
++ color: BLACK, width: 0.25 }
++ }
++);
++
++		}
++
++		lead(s, title, {
++ x: x + 0.367, y: 2.637, w: 2.745, h: 0.404, color: dark ? LIGHT : INK }
++);
++
++		icon(s, 'arrow', x + 0.44, 4.459, 0.577, 0.577, dark ? WHITE : BLACK);
++
++		para(s, `${
++MORN}
++.`, {
++ x: x + 0.367, y: 5.338, w: 2.745, h: 1.305, color: dark ? LIGHT : INK }
++);
++
++	}
++);
++
++	pageNum(s, 12);
++
++}
++
++
++// -------------------------------------------------------- slide 13 — About This Project
++function slide13() {
++
++	const s = pptx.addSlide();
++
++	head(s, 'About This Project', {
++ x: 0.5, y: 0.521, w: 6.167, h: 1.737 }
++);
++
++	head(s, '70.000+', {
++ x: 0.5, y: 4.756, w: 5.604, h: 0.919 }
++);
++
++	para(s, `${
++MORN}
++ which I enjoy with my heart. ${
++ALONE}
++${
++BLISS}
++`, {
++ x: 0.5, y: 5.695, w: 5.604, h: 1.305 }
++);
++
++
++	const rows = [
++		[0.521, 'Key Features', 'ruler', 0.414, 0.414],
++		[2.906, 'Context & Purpose', 'worker', 0.475, 0.557],
++		[5.292, 'Design Concept', 'pick', 0.475, 0.437],
++	];
++
++	rows.forEach(([y, title, glyph, iw, ih]) => {
++
++		panel(s, 6.794, y + 0.105, 0.86, 0.86);
++
++		icon(s, glyph, 7.224 - iw / 2, y + 0.535 - ih / 2, iw, ih, WHITE);
++
++		lead(s, title, {
++ x: 7.938, y, w: 4.896, h: 0.404 }
++);
++
++		para(s, `${
++MORN}
++ which I enjoy with my heart. ${
++ALONE}
++.`, {
++ x: 7.938, y: y + 0.404, w: 4.896, h: 1.305 }
++);
++
++	}
++);
++
++	pageNum(s, 13);
++
++}
++
++
++// ------------------------------------------------ slide 14 — The Idea Behind the Space
++function slide14() {
++
++	const s = pptx.addSlide();
++
++	head(s, 'The Idea Behind the Space', {
++ x: 0.5, y: 0.521, w: 5.958, h: 1.737 }
++);
++
++	s.addText([{
++ text: '500.000K' }
++, {
++ text: '+', options: {
++ superscript: true }
++ }
++],
++		{
++ x: 0.507, y: 3.75, w: 6.16, h: 0.909, fontFace: HEAD, fontSize: 48, color: INK, valign: 'bottom' }
++);
++
++	para(s, [
++		{
++ text: `${
++SPRING}
++${
++HEART}
++I am alone, and feel the charm of existence. `, options: {
++ breakLine: true }
++ }
++,
++		{
++ text: 'I am so happy, my dear friend, so absorbed in the exquisite sense of mere tranquil existence, that I neglect my talents. I should be incapable of drawing a single stroke.' }
++,
++	], {
++ x: 0.507, y: 4.739, w: 6.16, h: 2.029 }
++);
++
++
++	panel(s, 7.375, 2.562, 5.958, 4.375);
++
++	lead(s, 'Important Point', {
++ x: 7.882, y: 3.037, w: 4.944, h: 0.404, color: LIGHT }
++);
++
++	const bullets = [
++		`${
++LEAD}
++. `,
++		'my entire soul, like these sweet mornings. ',
++		'I enjoy with my whole heart. ',
++		'I am alone, and feel the charm of existence.',
++		'which was created for the bliss of souls.',
++		'I am so happy, my dear friend, so absorbed.',
++		'the exquisite sense of mere tranquil.',
++	];
++
++	para(s, bullets.map((t, i) => ({
++
++		text: t,
++		options: {
++ breakLine: i < bullets.length - 1, bullet: {
++ characterCode: '003E', indent: 22.5 }
++ }
++,
++	}
++)), {
++ x: 7.882, y: 3.566, w: 4.944, h: 2.897, color: LIGHT }
++);
++
++	pageNum(s, 14);
++
++}
++
++
++// -------------------------------------------------------- slide 15 — Efficiency Design
++function slide15() {
++
++	const s = pptx.addSlide();
++
++	panel(s, 0, 0, 7.292, 7.5);
++
++
++	const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec   '];
++
++	const actual = {
++ name: 'Series 1', labels: months, values: [1.2, 0.7, 1.7, 2.6, 3.7, 2.3, 4, 3.5, 5.4, 4.7, 6.4, 7.2] }
++;
++
++	const trend = {
++ name: 'Series 2', labels: months, values: [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6] }
++;
++
++	s.addChart([
++		{
++ type: pptx.charts.LINE, data: [actual], options: {
++ chartColors: [LIGHT], lineSize: 3.5 }
++ }
++,
++		{
++ type: pptx.charts.LINE, data: [trend], options: {
++ chartColors: ['7A7A7A'], lineSize: 1 }
++ }
++,
++	], {
++
++		x: 0.527, y: 1.368, w: 6.238, h: 5.627,
++		showLegend: false, showTitle: false, lineDataSymbol: 'none', lineSmooth: false,
++		catAxisLabelColor: WHITE, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 12,
++		catAxisLineColor: AXIS, catAxisLineSize: 0.75, catAxisMajorTickMark: 'none', catAxisLabelPos: 'nextTo',
++		valAxisLabelColor: WHITE, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12,
++		valAxisLineShow: false, valAxisMajorTickMark: 'none',
++		valGridLine: {
++ color: INK, size: 0.25 }
++,
++	}
++);
++
++
++	head(s, 'Efficiency Design', {
++ x: 8.021, y: 0.5, w: 4.812, h: 1.737 }
++);
++
++	lead(s, 'Revenue Growth', {
++ x: 8.021, y: 4.642, w: 4.812, h: 0.404 }
++);
++
++	s.addText([{
++ text: '+', options: {
++ superscript: true }
++ }
++, {
++ text: '67.8%' }
++],
++		{
++ x: 8.021, y: 5.059, w: 4.812, h: 1.555, fontFace: HEAD, fontSize: 96, color: INK, valign: 'bottom', lineSpacingMultiple: 0.9 }
++);
++
++	para(s, `${
++TAKEN}
++.`, {
++ x: 8.021, y: 6.614, w: 4.812, h: 0.386 }
++);
++
++	pageNum(s, 15);
++
++}
++
++
++// --------------------------------------------------------- slide 16 — Growth Over Time
++function slide16() {
++
++	const s = pptx.addSlide();
++
++	head(s, 'Growth Over Time', {
++ x: 0.5, y: 0.521, w: 7.412, h: 0.919 }
++);
++
++	s.addChart(pptx.charts.BAR, [{
++ name: 'Series 1', labels: ['2022', '2023', '2024', '2025'], values: [2.5, 4.3, 3.5, 6] }
++], {
++
++		x: 2.982, y: 0.787, w: 9.851, h: 6.213,
++		barDir: 'col', barGapWidthPct: 51, barOverlapPct: -55, chartColors: [BLACK],
++		showLegend: false, showTitle: false,
++		catAxisLabelColor: AXTXT, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 12,
++		catAxisLineColor: AXIS, catAxisLineSize: 0.75, catAxisMajorTickMark: 'none', catAxisLabelPos: 'nextTo',
++		valAxisLabelColor: AXTXT, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12,
++		valAxisLineShow: false, valAxisLabelPos: 'high', valAxisMajorTickMark: 'none',
++		valGridLine: {
++ style: 'none' }
++,
++	}
++);
++
++	para(s, `${
++SOUL}
++, like these mornings.`, {
++ x: 0.5, y: 2.419, w: 2.482, h: 1.305 }
++);
++
++	head(s, '603K', {
++ x: 10.51, y: 1.141, w: 1.531, h: 0.525, fontSize: 28, align: 'right' }
++);
++
++	icon(s, 'arrow', 10.562, 1.258, 0.25, 0.25, BLACK, 225);
++
++	pageNum(s, 16);
++
++}
++
++
++// --------------------------------------------- slide 17 — Famous Architects (table)
++function slide17() {
++
++	const s = pptx.addSlide();
++
++	panel(s, 4.123, 2.036, 9.211, 5.464);
++
++	head(s, 'Famous Architects at a Glance', {
++ x: 0.5, y: 0.52, w: 12.333, h: 0.919 }
++);
++
++
++	const headings = ['No', 'Architect ', 'Nationality', 'Signature Style', 'Iconic Work'];
++
++	const architects = [
++		['01', 'Frank Lloyd Wright', 'American', 'Organic architecture', 'Fallingwater'],
++		['02', 'Zaha Hadid', 'British', 'Futuristic, Fluid', 'Heydar Aliyev Centre '],
++		['03', 'Norman Foster', 'British', 'Modernism', 'The Gherkin '],
++		['04', 'Tadao Ando', 'Japanese ', 'Concrete minimalism', 'Church of the Light'],
++	];
++
++	const headCell = (text, i) => ({
++
++		text,
++		options: i < 2
++			? {
++ fill: {
++ color: BLACK }
++, color: WHITE, align: 'left', fontFace: HEAD, fontSize: LEAD_SZ }
++
++			: {
++ fill: {
++ color: LIGHT }
++, color: BLACK, align: 'center', fontFace: HEAD, fontSize: LEAD_SZ }
++,
++	}
++);
++
++	const bodyCell = (text, i) => ({
++
++		text,
++		options: i === 0
++			? {
++ color: INK, align: 'left', fontFace: HEAD, fontSize: LEAD_SZ }
++
++			: i === 1
++				? {
++ color: MUTED, align: 'left', fontFace: BODY, fontSize: TEXT_SZ }
++
++				: {
++ color: LIGHT, align: 'center', fontFace: BODY, fontSize: TEXT_SZ }
++,
++	}
++);
++
++
++	s.addTable([headings.map(headCell)].concat(architects.map(r => r.map(bodyCell))), {
++
++		x: 0.5, y: 2.368, w: 12.333,
++		colW: [0.875, 2.748, 2.904, 2.904, 2.904],
++		rowH: [0.8, 0.928, 0.928, 0.928, 0.928],
++		valign: 'middle', margin: [0.05, 0.1, 0.05, 0.3],
++		border: {
++ type: 'none' }
++,
++	}
++);
++
++	pageNum(s, 17, WHITE);
++
++}
++
++
++// ---------------------------------------------------- slide 18 — Architecture in Motion
++function slide18() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 0, 3.75, 13.333, 3.75);
++
++	head(s, 'Architecture in Motion', {
++ x: 0.5, y: 0.521, w: 9.944, h: 0.919 }
++);
++
++	panel(s, 0.5, 2.45, 12.333, 2.717);
++
++
++	const cols = [
++		[0.933, 'Dynamic Forms', 'worker', 0.318, 0.373],
++		[3.966, 'Flow of Space', 'roller', 0.283, 0.283],
++		[7.0, 'Environment', 'pick', 0.31, 0.286],
++		[10.033, 'Innovative', 'home', 0.373, 0.333],
++	];
++
++	cols.forEach(([x, title, glyph, iw, ih]) => {
++
++		iconTile(s, x + 0.127, 2.841, 0.603, glyph, iw, ih, WHITE, '000000');
++
++		lead(s, title, {
++ x, y: 3.68, w: 2.367, h: 0.404, color: WHITE }
++);
++
++		para(s, `${
++LEAD}
++.`, {
++ x, y: 4.084, w: 2.367, h: 0.692, color: WHITE }
++);
++
++	}
++);
++
++	pageNum(s, 18);
++
++}
++
++
++// --------------------------------------------------------- slide 19 — Project Timeline
++function slide19() {
++
++	const s = pptx.addSlide();
++
++	panel(s, 4.395, 2.065, 4.532, 5.435);
++
++	head(s, 'Project Timeline', {
++ x: 0.5, y: 0.5, w: 6.167, h: 0.919 }
++);
++
++
++	[[0.5, '2024', false], [4.946, '2025', true], [9.392, '2026', false]].forEach(([x, year, onDark]) => {
++
++		head(s, year, {
++ x, y: 2.529, w: 3.442, h: 0.909, fontSize: 48, color: onDark ? WHITE : BLACK, lineSpacingMultiple: 1 }
++);
++
++		para(s, `${
++MORN}
++${
++HEART}
++`, {
++ x, y: 3.556, w: 3.442, h: 1.305, color: onDark ? WHITE : MUTED }
++);
++
++		icon(s, 'arrow', x + 3.017, 2.842, 0.284, 0.284, onDark ? WHITE : BLACK, 315);
++
++	}
++);
++
++	head(s, 'Here we are!', {
++ x: 4.946, y: 6.562, w: 3.442, h: 0.438, fontSize: 20, color: WHITE, lineSpacingMultiple: 1 }
++);
++
++	pageNum(s, 19);
++
++}
++
++
++// ------------------------------------------------------------- slide 20 — Closing card
++function slide20() {
++
++	const s = pptx.addSlide();
++
++	photo(s, 0, 0, 13.333, 3.75);
++
++	head(s, 'Let\u2019s work together! ', {
++ x: 0.5, y: 4.718, w: 6.167, h: 2.282, fontSize: 72 }
++);
++
++
++	const contacts = [
++		['+1 234 567 8920', 4.836, 'phone', 4.893, 0.259, 0.274],
++		['alpenique@gmail.com', 5.616, 'mail', 5.683, 0.303, 0.253],
++		['www.alpenique.com', 6.396, 'globe', 6.449, 0.265, 0.281],
++	];
++
++	contacts.forEach(([text, y, glyph, iy, iw, ih]) => {
++
++		icon(s, glyph, 8.097, iy, iw, ih, INK);
++
++		para(s, text, {
++ x: 8.538, y, w: 4.296, h: 0.387, color: INK, paraSpaceAfter: 0 }
++);
++
++	}
++);
++
++	pageNum(s, 20);
++
++}
++
++
++// ------------------------------------------------------------------------- assemble
++[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++	slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++	.forEach(build => build());
++
++
++const outFile = path.join(__dirname, '1a8c47dc-f3a8-4475-a431-cdb101228b83_grok_final.pptx');
++
++pptx.writeFile({
++ fileName: outFile }
++).then(() => console.log('wrote', outFile));
++

@@ -1,0 +1,676 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_blood_donation_campaign.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_blood_donation_campaign.js
+@@ -0,0 +1,673 @@
++/**
++ * BloodCare deck — recreated with pptxgenjs.
++ *
++ * Source of truth: 044f72e0-a3aa-4286-a395-e0b0cfb47bf5.pptx (20 slides, 13.333 x 7.5 in).
++ * Raster mock-ups in the original (laptop / phone photos) are replaced by
++ * labelled "[image]" placeholder rectangles; every other element is rebuilt
++ * from native pptxgenjs shapes and text.
++ *
++ * Run:  node 044f72e0-a3aa-4286-a395-e0b0cfb47bf5_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const C = {
++  ink: '000000',      // headline black
++  ink85: '262626',    // tx1 lum 85%
++  body: '404040',     // tx1 lum 75% - body copy
++  white: 'FFFFFF',
++  track: 'F2F2F2',    // progress-bar track
++  rule: 'D9D9D9',     // table hair-line
++  ph: 'E8E8EA',       // image-placeholder grey
++  plum: '641220',     // accent1
++  wine: '85182A',     // accent2
++  red: 'A71E34',      // accent3
++  rose: 'BD1F36',     // accent4
++  ruby: 'C71F37',     // accent5
++  bright: 'E01E37',   // accent6
++};
++
++const HEAD = 'Mulish';   // +mj-lt
++const BODY = 'Inter';    // +mn-lt
++
++// Soft card shadow used by every "raised" white/plum card in the deck.
++// Returns a fresh object each call: pptxgenjs rewrites the options it is given.
++const cardShadow = () => ({ type: 'outer', angle: 45, blur: 50, offset: 3, color: '000000', opacity: 0.1 });
++
++/* --------------------------------------------------- geometry primitives */
++
++// Normalised outline of the BloodCare drop (from the deck's master shape).
++const DROP = [
++  ['M', 0.0668, 0.4602],
++  ['L', 0.3956, 0.0446],
++  ['C', 0.4064, 0.0310, 0.4219, 0.0197, 0.4407, 0.0119],
++  ['C', 0.4595, 0.0041, 0.4808, 0.0000, 0.5025, 0.0000],
++  ['C', 0.5241, 0.0000, 0.5454, 0.0042, 0.5641, 0.0121],
++  ['C', 0.5828, 0.0200, 0.5983, 0.0313, 0.6089, 0.0450],
++  ['L', 0.9437, 0.4732],
++  ['L', 0.9432, 0.4732],
++  ['C', 0.9807, 0.5246, 1.0002, 0.5819, 1.0000, 0.6400],
++  ['C', 1.0000, 0.8389, 0.7761, 1.0000, 0.5000, 1.0000],
++  ['C', 0.2238, 1.0000, 0.0000, 0.8389, 0.0000, 0.6401],
++  ['C', 0.0000, 0.5778, 0.0220, 0.5192, 0.0606, 0.4681],
++  ['L', 0.0605, 0.4681],
++  ['L', 0.0636, 0.4642],
++  ['L', 0.0668, 0.4602],
++  ['Z'],
++];
++
++// Thin three-stroke arrow used inside the pill buttons (drawn rotated 90deg).
++const ARROW = [
++  ['M', 0.5, 1.0], ['L', 0.5, 0.0],
++  ['M', 0.5, 0.0], ['L', 0.0, 0.375],
++  ['M', 0.5, 0.0], ['L', 1.0, 0.375],
++];
++
++// Opening double-quote glyph (the closing one is the same path, flipped).
++const QUOTE = [
++  ['M', 0.8753, 0.0000], ['L', 0.9972, 0.1734],
++  ['C', 0.9344, 0.2497, 0.8892, 0.3180, 0.8615, 0.3782],
++  ['C', 0.8476, 0.4084, 0.8359, 0.4414, 0.8262, 0.4774],
++  ['L', 0.8243, 0.4871], ['L', 1.0000, 0.4871],
++  ['L', 0.9391, 1.0000], ['L', 0.5512, 1.0000], ['L', 0.5983, 0.6199],
++  ['C', 0.6094, 0.5363, 0.6242, 0.4600, 0.6427, 0.3911],
++  ['C', 0.6611, 0.3223, 0.6888, 0.2558, 0.7258, 0.1919],
++  ['C', 0.7627, 0.1279, 0.8126, 0.0640, 0.8753, 0.0000],
++  ['Z'],
++  ['M', 0.3241, 0.0000], ['L', 0.4460, 0.1734],
++  ['C', 0.3832, 0.2497, 0.3379, 0.3180, 0.3102, 0.3782],
++  ['C', 0.2964, 0.4084, 0.2846, 0.4414, 0.2749, 0.4774],
++  ['L', 0.2730, 0.4871], ['L', 0.4488, 0.4871],
++  ['L', 0.3878, 1.0000], ['L', 0.0000, 1.0000], ['L', 0.0471, 0.6199],
++  ['C', 0.0582, 0.5363, 0.0729, 0.4600, 0.0914, 0.3911],
++  ['C', 0.1099, 0.3223, 0.1376, 0.2558, 0.1745, 0.1919],
++  ['C', 0.2114, 0.1279, 0.2613, 0.0640, 0.3241, 0.0000],
++  ['Z'],
++];
++
++// The big teardrop on the "Blood Types & Compatibility" slide, band by band.
++const TEARDROP_BANDS = [
++  {
++    x: 5.845, y: 2.233, w: 1.644, h: 1.065, fill: C.bright, label: 'A',
++    path: [
++      ['M', 0.5024, 0.0000],
++      ['C', 0.5428, 0.0001, 0.5825, 0.0169, 0.6174, 0.0485],
++      ['C', 0.6523, 0.0800, 0.6811, 0.1254, 0.7010, 0.1798],
++      ['L', 1.0000, 1.0000], ['L', 0.0000, 1.0000], ['L', 0.3032, 0.1782],
++      ['C', 0.3232, 0.1239, 0.3522, 0.0788, 0.3871, 0.0475],
++      ['C', 0.4222, 0.0162, 0.4619, 0.0000, 0.5024, 0.0000],
++      ['Z'],
++    ],
++  },
++  {
++    x: 5.256, y: 3.298, w: 2.821, h: 1.065, fill: C.ruby, label: 'B',
++    path: [
++      ['M', 0.2100, 0.0000], ['L', 0.7927, 0.0000], ['L', 0.9824, 0.8927],
++      ['L', 0.9818, 0.8927], ['L', 1.0000, 1.0000], ['L', 0.0000, 1.0000],
++      ['L', 0.0225, 0.8725], ['L', 0.0224, 0.8725], ['L', 0.0258, 0.8567],
++      ['L', 0.0293, 0.8407], ['Z'],
++    ],
++  },
++  {
++    x: 5.133, y: 4.363, w: 3.067, h: 1.065, fill: C.rose, label: 'AB',
++    path: [
++      ['M', 0.0399, 0.0000], ['L', 0.9599, 0.0000], ['L', 0.9679, 0.0511],
++      ['C', 0.9892, 0.2133, 1.0001, 0.3858, 1.0000, 0.5602],
++      ['C', 1.0000, 0.7093, 0.9921, 0.8531, 0.9775, 0.9883],
++      ['L', 0.9760, 1.0000], ['L', 0.0239, 1.0000], ['L', 0.0225, 0.9885],
++      ['C', 0.0079, 0.8533, 0.0000, 0.7095, 0.0000, 0.5605],
++      ['C', 0.0000, 0.3735, 0.0124, 0.1949, 0.0348, 0.0311],
++      ['Z'],
++    ],
++  },
++  {
++    x: 5.207, y: 5.427, w: 2.920, h: 1.065, fill: C.red, label: 'O',
++    path: [
++      ['M', 0.0000, 0.0000], ['L', 1.0000, 0.0000], ['L', 0.9839, 0.1206],
++      ['C', 0.9108, 0.5944, 0.7479, 0.9385, 0.5537, 0.9926],
++      ['L', 0.5001, 1.0000], ['L', 0.5000, 1.0000], ['L', 0.4463, 0.9926],
++      ['C', 0.2521, 0.9385, 0.0892, 0.5944, 0.0161, 0.1208],
++      ['Z'],
++    ],
++  },
++];
++
++/* ------------------------------------------------------------- helpers */
++
++// Turn a normalised path table into pptxgenjs custGeom points (inches, shape-local).
++function scalePath(ops, w, h) {
++  return ops.map(op => {
++    const k = op[0];
++    if (k === 'Z') return { close: true };
++    if (k === 'M') return { x: op[1] * w, y: op[2] * h, moveTo: true };
++    if (k === 'L') return { x: op[1] * w, y: op[2] * h };
++    return {
++      x: op[5] * w, y: op[6] * h,
++      curve: { type: 'cubic', x1: op[1] * w, y1: op[2] * h, x2: op[3] * w, y2: op[4] * h },
++    };
++  });
++}
++
++function freeform(slide, ops, o) {
++  slide.addShape('custGeom', Object.assign({ points: scalePath(ops, o.w, o.h) }, o));
++}
++
++// roundRect where `adj` is the OOXML corner-radius ratio (0.5 == pill/circle).
++function card(slide, o) {
++  const adj = o.adj === undefined ? 0.16667 : o.adj;
++  slide.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: o.fill ? { color: o.fill } : undefined,
++    line: o.line,
++    shadow: o.shadow ? cardShadow() : undefined,
++    rectRadius: adj * Math.min(o.w, o.h),
++  });
++}
++
++function text(slide, runs, o) {
++  slide.addText(runs, Object.assign({
++    fontFace: BODY, fontSize: 12, color: C.body,
++    valign: 'top', fit: 'resize', lineSpacingMultiple: 1.3,
++  }, o));
++}
++
++// 54pt two-tone headline (plain part + accent part).
++function headline(slide, o) {
++  text(slide, [{ text: o.plain }, { text: o.accent, options: { color: o.accentColor || C.red } }], {
++    x: o.x, y: o.y, w: o.w, h: o.h || 0.919,
++    fontFace: HEAD, fontSize: o.size || 54, bold: true, color: o.color || C.ink,
++    lineSpacingMultiple: 0.9, align: o.align,
++  });
++}
++
++// 18pt bold kicker above a paragraph.
++function kicker(slide, x, y, w, str, color, align) {
++  text(slide, str, { x, y, w, h: 0.457, fontFace: HEAD, fontSize: 18, bold: true, color: color || C.rose, align });
++}
++
++// Blood drop, optionally with the white "shine" arc inside it.
++function drop(slide, x, y, w, h, fill, shine, shineWidth) {
++  freeform(slide, DROP, { x, y, w, h, fill: { color: fill } });
++  if (shine) {
++    slide.addShape('arc', {
++      x: x + 0.028 * w, y: y + 0.281 * h, w: 0.833 * w, h: 0.600 * h,
++      angleRange: [29.44, 77.51], rotate: 352.64,
++      line: { width: shineWidth || 1.5, color: shine },
++    });
++  }
++}
++
++// The three drops that sit in the top-right corner of every slide.
++function dropTrio(slide, colors) {
++  const cols = colors || [C.wine, C.rose, C.bright];
++  [[12.141, 0.315], [12.298, 0.318], [12.457, 0.315]].forEach((p, i) =>
++    drop(slide, p[0], p[1], 0.116, 0.162, cols[i]));
++}
++
++/**
++ * Start a slide and lay down the master layer first: the corner drop trio plus
++ * (unless `num` is null) the "BloodCare" mark and page number. Drawing it first
++ * matters - slides 1 and 2 deliberately cover the footer with full-bleed art.
++ */
++function newSlide(pptx, num, trioColors) {
++  const s = pptx.addSlide();
++  if (num !== null) {
++    text(s, 'BloodCare', { x: 0.76, y: 6.913, w: 3, h: 0.399, fontSize: 10, color: C.wine, valign: 'middle', fit: 'none' });
++    text(s, String(num), { x: 9.573, y: 6.913, w: 3, h: 0.399, fontSize: 10, color: C.wine, align: 'right', valign: 'middle', fit: 'none' });
++  }
++  dropTrio(s, trioColors);
++  return s;
++}
++
++// Rounded "Donate Blood" style button (2.504 x 0.54) with optional arrow.
++function pill(slide, x, y, o) {
++  const w = 2.504, h = 0.54;
++  card(slide, { x, y, w, h, adj: 0.5, fill: o.fill, line: o.line, shadow: o.shadow });
++  text(slide, o.label, {
++    x: x + (o.align === 'center' ? 0.159 : 0.143), y: y + 0.089,
++    w: o.align === 'center' ? 2.184 : 1.65, h: 0.338,
++    fontFace: HEAD, fontSize: 12, bold: true, color: o.color, align: o.align,
++  });
++  if (o.arrow) {
++    freeform(slide, ARROW, { x: x + 2.048, y: y + 0.177, w: 0.168, h: 0.211, rotate: 90, line: { width: 1.5, color: o.color } });
++  }
++}
++
++// Blood-bag pictogram: rounded bag with a neck tab, fluid pooled in the bottom
++// third, a drip tube below and the blood type printed across the upper half.
++function bloodBag(slide, x, y, w, h, color, label) {
++  // Body is unfilled so the card colour behind shows through, as in the original.
++  const stroke = Math.max(0.75, w * 3.6);
++  card(slide, { x, y: y + 0.08 * h, w: w, h: 0.70 * h, adj: 0.18, line: { width: stroke, color } });
++  card(slide, { x: x + 0.36 * w, y: y + 0.01 * h, w: 0.28 * w, h: 0.13 * h, adj: 0.35, fill: color });
++  card(slide, { x: x + 0.09 * w, y: y + 0.50 * h, w: 0.82 * w, h: 0.26 * h, adj: 0.28, fill: color });
++  slide.addShape('rect', { x: x + 0.40 * w, y: y + 0.76 * h, w: 0.20 * w, h: 0.08 * h, fill: { color } });
++  slide.addShape('rect', { x: x + 0.475 * w, y: y + 0.82 * h, w: 0.05 * w, h: 0.18 * h, fill: { color } });
++  if (label) {
++    text(slide, label, {
++      x: x - 0.20 * w, y: y + 0.14 * h, w: 1.4 * w, h: 0.32 * h,
++      fontFace: HEAD, fontSize: Math.max(4, Math.round(h * 17)), bold: true,
++      color, align: 'center', valign: 'middle', fit: 'none', wrap: false,
++    });
++  }
++}
++
++// Stand-in for a photograph / device mock-up from the original deck.
++// The label is clamped to the visible part of the slide so it stays readable
++// even when the placeholder itself bleeds off the edge.
++function imagePlaceholder(slide, x, y, w, h, label) {
++  slide.addShape('rect', { x, y, w, h, fill: { color: C.ph }, line: { width: 1, color: C.rule } });
++  const top = Math.max(y, 0), bottom = Math.min(y + h, 7.5);
++  text(slide, label || '[image]', {
++    x, y: (top + bottom) / 2 - 0.2, w, h: 0.4, fontSize: 12, color: '9A9AA2',
++    align: 'center', valign: 'middle', fit: 'none',
++  });
++}
++
++/* --------------------------------------------------------------- slides */
++
++// 1 - Cover
++function slide01(pptx) {
++  const s = newSlide(pptx, 1);
++  s.addShape('rect', { x: 0, y: 5.322, w: 13.333, h: 2.178, fill: { color: C.plum } });
++  text(s, [
++    { text: 'Blood', options: { color: C.ink85 } },
++    { text: 'Care.', options: { color: C.red } },
++  ], { x: 0.76, y: 1.959, w: 11.812, h: 1.434, fontFace: HEAD, fontSize: 88, bold: true, align: 'center', lineSpacingMultiple: 0.9 });
++  text(s, 'Stronger Together Through Blood Donation', {
++    x: 0.76, y: 6.049, w: 5.647, h: 0.374, fontFace: HEAD, fontSize: 18, bold: true, color: C.white, lineSpacingMultiple: 0.9,
++  });
++  text(s, 'Lorem ipsum dolor sit amet, adipiscing elit porttitor congue massa. ', {
++    x: 0.76, y: 6.467, w: 6.61, h: 0.338, color: C.white,
++  });
++  pill(s, 10.069, 6.141, { label: 'Donate Blood', color: C.white, line: { width: 1.5, color: C.white }, arrow: true });
++  [[0.76, 4.707, C.wine], [1.04, 4.712, C.rose], [1.324, 4.707, C.bright]]
++    .forEach(d => drop(s, d[0], d[1], 0.208, 0.289, d[2]));
++}
++
++// 2 - Your Donation Makes a Real Difference
++function slide02(pptx) {
++  const s = newSlide(pptx, 2);
++  s.addShape('ellipse', { x: -1.031, y: -1.031, w: 1.934, h: 1.934, fill: { color: C.rose } });
++  s.addShape('ellipse', { x: 7.707, y: 3.024, w: 6.707, h: 6.707, fill: { color: C.wine } });
++  headline(s, { x: 0.764, y: 0.706, w: 6.69, h: 2.555, plain: 'Your Donation Makes a ', accent: 'Real Difference' });
++  kicker(s, 0.76, 3.92, 5.087, 'Saving Lives, Creating Hope');
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus.',
++    { x: 0.76, y: 4.515, w: 5.087, h: 0.863 });
++  pill(s, 0.76, 6.038, { label: 'Be the Hero', fill: C.wine, color: C.white, arrow: true });
++  // Page number is re-stated in white here: the wine oval swallows the master one.
++  text(s, '2', { x: 9.573, y: 6.913, w: 3, h: 0.399, fontSize: 10, color: C.white, align: 'right', valign: 'middle', fit: 'none' });
++}
++
++// 3 - Your Blood, Their Future
++function slide03(pptx) {
++  const s = newSlide(pptx, 3);
++  card(s, { x: 9.5, y: 3.253, w: 3.073, h: 3.302, adj: 0.09736, fill: C.plum });
++  headline(s, { x: 0.764, y: 0.706, w: 5.194, h: 1.737, plain: 'Your Blood, ', accent: 'Their Future' });
++  kicker(s, 7.439, 0.944, 5.087, 'The Power of Donation');
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus.',
++    { x: 7.439, y: 1.556, w: 5.087, h: 0.863 });
++  bloodBag(s, 10.845, 3.745, 0.384, 0.552, C.white);
++  kicker(s, 9.714, 4.605, 2.644, 'Help Someone Live', C.white, 'center');
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue massa.',
++    { x: 9.807, y: 5.201, w: 2.458, h: 0.863, color: C.white, align: 'center' });
++}
++
++// 4 - Pull quote
++function slide04(pptx) {
++  const s = newSlide(pptx, null);
++  text(s, 'Blood is the bridge between hope and healing. Let\u2019s strengthen that bridge together.',
++    { x: 7.074, y: 2.206, w: 5.499, h: 2.632, fontFace: HEAD, fontSize: 32, italic: true, color: C.ink, lineSpacingMultiple: 1.2 });
++  freeform(s, QUOTE, { x: 6.836, y: 1.959, w: 0.329, h: 0.247, fill: { color: C.red } });
++  freeform(s, QUOTE, { x: 11.549, y: 4.837, w: 0.329, h: 0.247, fill: { color: C.red }, flipH: true, flipV: true });
++  kicker(s, 7.165, 5.085, 5.087, '- Nadine K.');
++  drop(s, 5.051, 1.698, 0.731, 1.016, C.rose, C.white, 3.5);
++}
++
++// 5 - Power of Your Blood Donation
++function slide05(pptx) {
++  const s = newSlide(pptx, 5);
++  headline(s, { x: 0.764, y: 0.706, w: 6.034, h: 1.737, plain: 'Power of Your ', accent: 'Blood Donation' });
++  kicker(s, 0.764, 2.86, 5.087, 'Lifesaver in You');
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
++    { x: 0.764, y: 3.472, w: 5.087, h: 0.601 });
++  const tiles = [
++    { x: 0.764, tx: 1.035, fill: C.plum, value: '25%', valueColor: C.white, copyColor: C.white, shadow: false },
++    { x: 3.951, tx: 4.222, fill: C.white, value: '75%', valueColor: C.plum, copyColor: C.body, shadow: true },
++  ];
++  tiles.forEach(t => {
++    card(s, { x: t.x, y: 4.55, w: 2.716, h: 2.074, adj: 0.15319, fill: t.fill, shadow: t.shadow });
++    text(s, t.value, { x: t.tx, y: 4.655, w: 2.173, h: 0.891, fontFace: HEAD, fontSize: 40, bold: true, color: t.valueColor });
++    text(s, 'Pellentesque habitant morbi tristique.', { x: t.tx, y: 5.715, w: 2.173, h: 0.601, color: t.copyColor });
++  });
++  card(s, { x: 7.361, y: 1.386, w: 0.899, h: 0.899, adj: 0.19819, fill: C.red });
++  bloodBag(s, 7.662, 1.626, 0.299, 0.42, C.white, 'AB+');
++}
++
++// 6 - Flow of Hope
++function slide06(pptx) {
++  const s = newSlide(pptx, 6);
++  headline(s, { x: 0.764, y: 0.706, w: 5.264, plain: 'Flow of ', accent: 'Hope' });
++  kicker(s, 0.764, 2.088, 5.087, 'Lifesaver in You');
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
++    { x: 0.764, y: 2.7, w: 5.087, h: 0.601 });
++  [
++    { x: 7.542, value: '-180', label: 'Give Blood' },
++    { x: 10.399, value: '+390', label: 'Donate Blood' },
++  ].forEach(col => {
++    text(s, col.value, { x: col.x, y: 4.2, w: 2.173, h: 0.891, fontFace: HEAD, fontSize: 40, bold: true, color: C.plum });
++    kicker(s, col.x, 5.207, 2.173, col.label);
++    text(s, 'Pellentesque habitant morbi tristique senectus et netus et.', { x: col.x, y: 5.78, w: 2.173, h: 0.863 });
++  });
++  card(s, { x: 6.217, y: 3.3, w: 0.899, h: 0.899, adj: 0.19819, fill: C.red });
++  bloodBag(s, 6.517, 3.54, 0.299, 0.42, C.white, 'AB+');
++}
++
++// 7 - The Gift of Blood
++function slide07(pptx) {
++  const s = newSlide(pptx, 7);
++  headline(s, { x: 0.764, y: 0.706, w: 11.809, plain: 'The Gift of ', accent: 'Blood', align: 'center' });
++  card(s, { x: 6.667, y: 5.057, w: 5.906, h: 1.736, adj: 0.15319, fill: C.plum });
++  text(s, '+470', { x: 0.76, y: 5.057, w: 1.953, h: 0.891, fontFace: HEAD, fontSize: 40, bold: true, color: C.plum });
++  kicker(s, 0.76, 6.065, 1.953, 'Donate Blood');
++  kicker(s, 3.251, 5.058, 2.878, 'Vital Act');
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit porttitor congue magna.',
++    { x: 3.251, y: 5.67, w: 2.878, h: 0.863 });
++  kicker(s, 8.952, 5.367, 3.215, 'Flow of Hope', C.white);
++  text(s, 'Lorem ipsum dolor sit amet adipiscing elit porttitor congue massa. ',
++    { x: 8.952, y: 5.879, w: 3.215, h: 0.601, color: C.white });
++}
++
++// 8 - From You, For All
++function slide08(pptx) {
++  const s = newSlide(pptx, 8);
++  headline(s, { x: 5.903, y: 0.706, w: 6.67, plain: 'From You, ', accent: 'For All' });
++  text(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa.',
++    { x: 5.903, y: 1.808, w: 6.67, h: 0.338 });
++  const rows = [
++    { y: 2.811, fill: C.plum, value: '+310', valueColor: C.white, copyColor: C.white, shadow: false },
++    { y: 4.283, fill: C.white, value: '-180', valueColor: C.rose, copyColor: C.body, shadow: true },
++    { y: 5.756, fill: C.plum, value: '+290', valueColor: C.white, copyColor: C.white, shadow: false },
++  ];
++  rows.forEach(r => {
++    card(s, { x: 5.903, y: r.y, w: 6.67, h: 1.019, adj: 0.15319, fill: r.fill, shadow: r.shadow });
++    text(s, r.value, { x: 6.246, y: r.y + 0.077, w: 2.173, h: 0.733, fontFace: HEAD, fontSize: 32, bold: true, color: r.valueColor });
++    text(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa posuere.',
++      { x: 7.704, y: r.y + 0.21, w: 4.526, h: 0.601, color: r.copyColor });
++  });
++}
++
++// 9 - Blood for Life
++function slide09(pptx) {
++  const s = newSlide(pptx, 9);
++  headline(s, { x: 0.764, y: 0.706, w: 11.809, plain: 'Blood for ', accent: 'Life', align: 'center' });
++  [
++    { dx: 1.084, tx: 1.639, color: C.red, title: 'The Power of Blood' },
++    { dx: 7.236, tx: 7.787, color: C.ruby, title: 'The Gift of Blood' },
++  ].forEach(col => {
++    drop(s, col.dx, 5.126, 0.28, 0.388, col.color, C.white, 1.5);
++    kicker(s, col.tx, 5.058, 4.46, col.title, col.color);
++    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa posuere, magna.',
++      { x: col.tx, y: 5.67, w: 4.46, h: 0.863 });
++  });
++}
++
++// 10 - Let's Save Lives Together
++function slide10(pptx) {
++  const s = newSlide(pptx, null);
++  s.addShape('ellipse', { x: 3.419, y: -0.789, w: 1.916, h: 1.916, fill: { color: C.bright } });
++  s.addShape('ellipse', { x: 11.818, y: 5.609, w: 3.259, h: 3.259, fill: { color: C.rose } });
++  headline(s, { x: 5.089, y: 1.778, w: 7.484, h: 1.737, plain: 'Let\u2019s Save Lives ', accent: 'Together', accentColor: C.rose });
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa magna sed pulvinar.',
++    { x: 5.089, y: 4.048, w: 5.573, h: 0.601 });
++  pill(s, 5.089, 5.182, { label: 'Give Blood Today', fill: C.white, color: C.rose, align: 'center', shadow: true });
++  pill(s, 8.126, 5.182, { label: 'Donate Blood', fill: C.wine, color: C.white, align: 'center' });
++}
++
++// 11 - Give. Heal. Repeat the Kindness.
++function slide11(pptx) {
++  const s = newSlide(pptx, 11);
++  const rows = [
++    { y: 0.765, fill: C.plum, shadow: false, dropFill: C.white, shine: C.plum, title: 'Give Blood', textColor: C.white },
++    { y: 2.921, fill: C.white, shadow: true, dropFill: C.ruby, shine: C.white, title: 'Recovery', textColor: C.body },
++    { y: 5.077, fill: C.plum, shadow: false, dropFill: C.white, shine: C.plum, title: 'Donate Blood', textColor: C.white },
++  ];
++  rows.forEach(r => {
++    card(s, { x: 0.76, y: r.y, w: 5.906, h: 1.636, adj: 0.15319, fill: r.fill, shadow: r.shadow });
++    drop(s, 1.298, r.y + 0.439, 0.529, 0.735, r.dropFill, r.shine, 2.5);
++    kicker(s, 2.174, r.y + 0.281, 3.955, r.title, r.textColor);
++    text(s, 'Lorem ipsum dolor sit amet, consectetuer elit porttitor congue massa posuere, magna.',
++      { x: 2.174, y: r.y + 0.754, w: 3.955, h: 0.601, color: r.textColor });
++  });
++  headline(s, { x: 7.975, y: 2.105, w: 4.598, h: 2.555, plain: 'Give. Heal. ', accent: 'Repeat the Kindness.' });
++  kicker(s, 7.975, 4.938, 4.46, 'Repeat as Long as You Can.');
++}
++
++// 12 - Be the Type Who Gives Blood & Life
++function slide12(pptx) {
++  const s = newSlide(pptx, 12);
++  const rows = [
++    { y: 0.790, fill: C.plum, icon: C.white, value: '48%', label: 'Type A+', tag: 'A+' },
++    { y: 2.934, fill: C.white, icon: C.plum, value: '29%', label: 'Type B-', tag: 'B-', shadow: true },
++    { y: 5.077, fill: C.plum, icon: C.white, value: '32%', label: 'Type O+', tag: 'O+' },
++  ];
++  rows.forEach(r => {
++    card(s, { x: 6.667, y: r.y, w: 1.633, h: 1.633, adj: 0.5, fill: r.fill, shadow: r.shadow });
++    bloodBag(s, 7.284, r.y + 0.532, 0.399, 0.57, r.icon, r.tag);
++    text(s, r.value, { x: 8.805, y: r.y + 0.143, w: 1.48, h: 0.891, fontFace: HEAD, fontSize: 40, bold: true, color: C.plum });
++    kicker(s, 8.805, r.y + 1.034, 1.48, r.label);
++    text(s, 'Lorem ipsum dolor sit amet adipiscing elit porttitor congue massa.',
++      { x: 10.513, y: r.y + 0.385, w: 2.221, h: 0.863 });
++  });
++  headline(s, { x: 0.761, y: 2.172, w: 4.848, h: 2.555, plain: 'Be the Type Who Gives ', accent: 'Blood & Life' });
++  kicker(s, 0.76, 4.871, 4.46, 'No Matter Your Blood Type');
++}
++
++// 13 - What Your Blood Can Do
++function slide13(pptx) {
++  const s = newSlide(pptx, 13);
++  s.addShape('ellipse', { x: 11.021, y: 6.244, w: 4.114, h: 4.114, fill: { color: C.wine } });
++  s.addShape('ellipse', { x: -1.031, y: -1.031, w: 1.934, h: 1.934, fill: { color: C.rose } });
++  headline(s, { x: 0.764, y: 0.706, w: 11.809, plain: 'What Your Blood ', accent: 'Can Do' });
++  [
++    { x: 0.760, dx: 0.853, color: C.plum, title: 'Facts You Should Know' },
++    { x: 5.019, dx: 5.112, color: C.red, title: 'Make a Difference' },
++    { x: 9.272, dx: 9.364, color: C.ruby, title: 'Saving Lives' },
++  ].forEach(col => {
++    drop(s, col.dx, 2.572, 0.29, 0.402, col.color, C.white, 1.5);
++    kicker(s, col.x, 3.256, 3.295, col.title, col.color);
++    text(s, [
++      { text: 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus libero.', options: { breakLine: true } },
++      { text: 'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. ' },
++    ], { x: col.x, y: 3.994, w: 3.295, h: 2.25, paraSpaceAfter: 24 });
++  });
++}
++
++// 14 - Donation Frequency by Blood Type (bar chart drawn with rounded bars)
++function slide14(pptx) {
++  const s = newSlide(pptx, 14);
++  const BASE = 6.075;              // common baseline of every bar
++  const bars = [
++    { x: 7.535, h: 1.950, fill: C.red, label: 'Type AB', value: '+190' },
++    { x: 8.881, h: 3.412, fill: C.plum, label: 'Type A', value: '+480' },
++    { x: 10.227, h: 2.950, fill: C.red, label: 'Type B', value: '+440' },
++    { x: 11.573, h: 4.181, fill: C.red, label: 'Type O', value: '+530' },
++  ];
++  bars.forEach(b => {
++    card(s, { x: b.x, y: BASE - b.h, w: 1.0, h: b.h, fill: b.fill });
++    text(s, b.value, { x: b.x, y: BASE - b.h - 0.559, w: 1.0, h: 0.496, fontFace: HEAD, fontSize: 20, bold: true, color: b.fill, align: 'center' });
++    text(s, b.label, { x: b.x, y: 6.309, w: 1.0, h: 0.378, fontFace: HEAD, fontSize: 14, bold: true, color: b.fill, align: 'center' });
++  });
++  headline(s, { x: 0.764, y: 0.706, w: 8.011, h: 1.737, plain: 'Donation Frequency by ', accent: 'Blood Type' });
++  kicker(s, 0.764, 3.022, 5.132, 'The Power of Blood');
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
++    { x: 0.764, y: 3.633, w: 5.132, h: 0.601 });
++  [
++    { x: 0.781, value: '25%', color: C.plum },
++    { x: 3.579, value: '75%', color: C.red },
++  ].forEach(st => {
++    text(s, st.value, { x: st.x, y: 4.868, w: 2.173, h: 0.891, fontFace: HEAD, fontSize: 40, bold: true, color: st.color });
++    text(s, 'Pellentesque habitant morbi tristique.', { x: st.x, y: 5.927, w: 2.173, h: 0.601 });
++  });
++}
++
++// 15 - Blood Supply Status (table + gantt-style bars)
++function slide15(pptx) {
++  const s = newSlide(pptx, 15);
++  headline(s, { x: 0.764, y: 0.706, w: 11.809, plain: 'Blood ', accent: 'Supply Status' });
++
++  const head = ['Blood Type', '1', '2', '3', '4', '5'];
++  const rowLabels = ['Type A', 'Type B', 'Type AB', 'Type O'];
++  // Only a hair-line under every row but the last; margins in inches [t,r,b,l].
++  const withRule = on => ({
++    fontFace: BODY, fontSize: 14, color: C.body, valign: 'middle', fill: { color: C.white },
++    border: [{ type: 'none' }, { type: 'none' }, on ? { type: 'solid', color: C.rule, pt: 1 } : { type: 'none' }, { type: 'none' }],
++    margin: [0, 0.05, 0, 0.0787],
++  });
++  const rows = [head].concat(rowLabels.map(l => [l, '', '', '', '', '']))
++    .map((cells, r) => cells.map(t => ({ text: t, options: withRule(r < 4) })));
++  s.addTable(rows, {
++    x: 5.097, y: 2.204, w: 7.476, colW: [2.225, 1.023, 1.023, 1.078, 1.064, 1.064], rowH: 0.898,
++  });
++
++  [
++    { x: 7.330, y: 3.479, w: 3.115, fill: C.bright },
++    { x: 8.351, y: 4.365, w: 3.156, fill: C.wine },
++    { x: 7.330, y: 5.250, w: 2.031, fill: C.bright },
++    { x: 11.391, y: 5.250, w: 1.182, fill: C.rose },
++    { x: 8.351, y: 6.135, w: 4.222, fill: C.rose },
++  ].forEach(b => card(s, { x: b.x, y: b.y, w: b.w, h: 0.181, fill: b.fill }));
++
++  [
++    { y: 2.545, color: C.wine, title: 'Total Donations' },
++    { y: 4.088, color: C.rose, title: 'Units Collected' },
++    { y: 5.631, color: C.bright, title: 'People Helped' },
++  ].forEach(item => {
++    drop(s, 0.847, item.y, 0.29, 0.402, item.color, C.white, 1.5);
++    kicker(s, 1.444, item.y - 0.028, 2.876, item.title, item.color);
++    text(s, 'Lorem ipsum dolor sit amet elit.', { x: 1.444, y: item.y + 0.428, w: 2.876, h: 0.338 });
++  });
++}
++
++// 16 - Blood Types & Compatibility
++function slide16(pptx) {
++  const s = newSlide(pptx, 16);
++  TEARDROP_BANDS.slice().reverse().forEach(b => freeform(s, b.path, { x: b.x, y: b.y, w: b.w, h: b.h, fill: { color: b.fill } }));
++  TEARDROP_BANDS.forEach((b, i) => text(s, b.label, {
++    x: 5.58, y: 2.589 + i * 1.002, w: 2.173, h: 0.575,
++    fontFace: HEAD, fontSize: 24, bold: true, color: C.white, align: 'center',
++  }));
++  headline(s, { x: 0.764, y: 0.706, w: 11.809, plain: 'Blood Types & ', accent: 'Compatibility', align: 'center' });
++  [
++    { x: 1.132, y: 2.609, align: 'right', title: 'Type A', color: C.bright },
++    { x: 8.910, y: 2.609, align: 'left', title: 'Type B', color: C.ruby },
++    { x: 1.132, y: 4.703, align: 'right', title: 'Type O', color: C.red },
++    { x: 8.910, y: 4.703, align: 'left', title: 'Type AB', color: C.rose },
++  ].forEach(col => {
++    kicker(s, col.x, col.y, 3.291, col.title, col.color, col.align);
++    text(s, 'Lorem ipsum dolor sit amet, adipiscing elit porttitor congue massa. ',
++      { x: col.x, y: col.y + 0.612, w: 3.291, h: 0.601, align: col.align });
++  });
++}
++
++// 17 - Step-by-Step Blood Donation
++function slide17(pptx) {
++  const s = newSlide(pptx, 17);
++  const steps = [
++    { x: 0.760, y: 0.826, dropX: 4.948, align: 'right', title: 'Registration', color: C.red },
++    { x: 8.054, y: 0.826, dropX: 7.724, align: 'left', title: 'Health Check', color: C.rose },
++    { x: 0.760, y: 4.477, dropX: 4.948, align: 'right', title: 'Recovery', color: C.bright },
++    { x: 8.054, y: 4.477, dropX: 7.724, align: 'left', title: 'Donation', color: C.ruby },
++  ];
++  steps.forEach(st => {
++    card(s, { x: st.x, y: st.y, w: 4.519, h: 2.196, adj: 0.0969, fill: C.white, shadow: true });
++    drop(s, st.dropX, st.y + 0.639, 0.662, 0.919, st.color, C.white, 2.5);
++    const tx = st.align === 'right' ? 1.132 : 8.910;
++    kicker(s, tx, st.y + 0.361, 3.291, st.title, st.color, st.align);
++    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
++      { x: tx, y: st.y + 0.973, w: 3.291, h: 0.863, align: st.align });
++  });
++  headline(s, { x: 4.834, y: 3.215, w: 3.666, h: 1.07, size: 32, plain: 'Step-by-Step ', accent: 'Blood Donation', align: 'center' });
++}
++
++// 18 - How It Looks in Action
++function slide18(pptx) {
++  const s = newSlide(pptx, 18);
++  imagePlaceholder(s, 6.833, 0.972, 6.5, 5.458, '[image] laptop mock-up');
++  headline(s, { x: 0.764, y: 0.706, w: 5.264, h: 1.737, plain: 'How It Looks in ', accent: 'Action' });
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
++    { x: 0.764, y: 2.75, w: 5.087, h: 0.601 });
++  [
++    { y: 4.149, title: 'Volunteer Count', pct: '45%', fillW: 1.686, color: C.red },
++    { y: 5.428, title: 'Total Donations', pct: '50%', fillW: 1.910, color: C.ruby },
++  ].forEach(m => {
++    kicker(s, 0.76, m.y, 3.851, m.title, m.color);
++    card(s, { x: 0.76, y: m.y + 0.663, w: 3.851, h: 0.236, fill: C.track });
++    card(s, { x: 0.799, y: m.y + 0.703, w: m.fillW, h: 0.154, fill: m.color });
++    kicker(s, 4.782, m.y + 0.475, 0.808, m.pct, m.color);
++  });
++  card(s, { x: 6.837, y: 1.962, w: 3.008, h: 1.334, adj: 0.15319, fill: C.plum });
++  kicker(s, 7.069, 2.196, 2.544, 'Give Blood', C.white);
++  text(s, 'Lorem ipsum dolor sit amet, ', { x: 7.069, y: 2.668, w: 2.544, h: 0.338, color: C.white });
++}
++
++// 19 - Concept to Campaign
++function slide19(pptx) {
++  const s = newSlide(pptx, 19);
++  imagePlaceholder(s, 0.764, -0.477, 2.812, 5.633, '[image] phone');
++  imagePlaceholder(s, 3.975, 2.377, 2.812, 5.633, '[image] phone');
++  headline(s, { x: 7.830, y: 0.706, w: 4.568, h: 1.737, plain: 'Concept to ', accent: 'Campaign', accentColor: C.rose });
++  card(s, { x: 2.231, y: 3.083, w: 3.008, h: 1.334, adj: 0.15319, fill: C.plum });
++  kicker(s, 2.463, 3.317, 2.544, 'Daily Donor', C.white, 'center');
++  text(s, 'Lorem ipsum dolor sit amet. ', { x: 2.463, y: 3.79, w: 2.544, h: 0.338, color: C.white, align: 'center' });
++  kicker(s, 7.830, 3.023, 4.077, 'Give from the Heart');
++  text(s, [
++    { text: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa magna sed pulvinar ultricies.', options: { breakLine: true } },
++    { text: 'Pellentesque habitant morbi tristique senectus et netus et fames ac turpis egestas.' },
++  ], { x: 7.830, y: 3.635, w: 4.077, h: 1.725, paraSpaceAfter: 24 });
++  pill(s, 7.830, 6.038, { label: 'Help Save Lives', fill: C.wine, color: C.white, arrow: true });
++}
++
++// 20 - Thank You
++function slide20(pptx) {
++  const s = newSlide(pptx, null, [C.white, C.white, C.white]);
++  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 5.322, fill: { color: C.plum } });
++  text(s, 'Thank You.', {
++    x: 0.76, y: 2.126, w: 11.812, h: 1.434,
++    fontFace: HEAD, fontSize: 88, bold: true, color: C.white, align: 'center', lineSpacingMultiple: 0.9,
++  });
++  [
++    { dx: 0.760, tx: 1.260, color: C.wine, label: 'www.BloodCare.com' },
++    { dx: 5.404, tx: 5.904, color: C.rose, label: '@Blood_Care' },
++    { dx: 10.047, tx: 10.547, color: C.bright, label: '+123 \u2013 456 \u2013 789 ' },
++  ].forEach(item => {
++    drop(s, item.dx, 6.606, 0.208, 0.289, item.color);
++    text(s, item.label, {
++      x: item.tx, y: 6.556, w: 3.851, h: 0.338,
++      fontFace: HEAD, fontSize: 12, bold: true, color: item.color,
++    });
++  });
++}
++
++/* ----------------------------------------------------------------- build */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'BLOODCARE_16x9', width: 13.333, height: 7.5 });
++  pptx.layout = 'BLOODCARE_16x9';
++  pptx.author = 'BloodCare';
++  pptx.title = 'BloodCare - Stronger Together Through Blood Donation';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++    .forEach(fn => fn(pptx));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '044f72e0-a3aa-4286-a395-e0b0cfb47bf5_grok_final.pptx'),
++  });
++}
++
++build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });

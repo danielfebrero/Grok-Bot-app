@@ -1,0 +1,858 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/automotive_motogen_product_showcase.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/automotive_motogen_product_showcase.js
+@@ -0,0 +1,855 @@
++/**
++ * "Motogen Automotive" — 25 slide deck, rebuilt with pptxgenjs.
++ *
++ *   node 0d8716d0-5b2c-4de2-a9c1-9cb72d1045bc_grok_final.js
++ *
++ * Stage is 10 x 5.625in (16:9); every coordinate below is inches.
++ * Photographs in the source deck are drawn as flat "[image]" plates.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const C = {
++  white: 'FFFFFF',    black: '000000',
++  red: 'E40002',      redLite: 'FA0000',   redDark: 'CA0001',
++  redHot: 'FF3537',   maroon: 'BB0000',
++  pink: 'FF6363',     pinkPale: 'FF9797',
++  orange: 'FF882A',   orangeDeep: 'F97030', amber: 'EDAA20',
++  ink: '262626',      slate: '3F3F3F',      gray: '595959',
++  mist: 'E7E6E6',     ghost: 'F2F2F2',      rule: 'D8D8D8',
++  plate: 'F2F2F2',    plateInk: '9A9A9A',
++};
++
++const HEAD = 'Bebas Neue';   // condensed display face, all headlines
++const BODY = 'Inter Tight';  // paragraph / caption face
++
++/* --------------------------------------------------------- text run styles */
++const hd = (size, color, more) => ({ fontFace: HEAD, fontSize: size, color, bold: true, italic: true, ...more });
++const hb = (size, color, more) => ({ fontFace: HEAD, fontSize: size, color, bold: true, ...more });
++const bd = (size, color, more) => ({ fontFace: BODY, fontSize: size, color, ...more });
++
++/* --------------------------------------------------------------- primitives */
++const INSET = [5.4, 5.4, 2.7, 2.7];   // pt — the deck's uniform text-box padding
++
++/** text(slide, [[string, runStyle], ...], { x, y, w, h, align, valign, ls }) */
++function text(s, runs, o) {
++  s.addText(runs.map(([t, st]) => ({ text: t, options: st })), {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    align: o.align || 'left', valign: o.valign || 'top',
++    margin: INSET, lineSpacingMultiple: o.ls || 1, wrap: true, fit: 'none',
++  });
++}
++
++function place(o) {
++  const p = { x: o.x, y: o.y, w: o.w, h: o.h };
++  if (o.rot) p.rotate = o.rot;
++  if (o.fH) p.flipH = true;
++  if (o.fV) p.flipV = true;
++  return p;
++}
++const tint = a => (a === undefined ? 0 : Math.round(100 - a));
++const stroke = l => ({ color: l.c, width: l.pt, dashType: l.dash || 'solid', transparency: tint(l.alpha) });
++
++/** shape(slide, { g, adj, x, y, w, h, rot, fH, fV, fill, alpha, line, path }) */
++function shape(s, o) {
++  const p = place(o);
++  if (o.fill) p.fill = { color: o.fill, transparency: tint(o.alpha) };
++  if (o.line) p.line = stroke(o.line);
++  if (o.path) {                                     // freeform outline, unit coords
++    p.points = o.path.map(v => v.length === 6
++      ? { x: v[0] * o.w, y: v[1] * o.h,
++          curve: { type: 'cubic', x1: v[2] * o.w, y1: v[3] * o.h, x2: v[4] * o.w, y2: v[5] * o.h } }
++      : { x: v[0] * o.w, y: v[1] * o.h });
++    p.points.push({ close: true });
++    s.addShape('custGeom', p);
++    return;
++  }
++  if (o.g === 'arc') { p.angleRange = o.deg; s.addShape('arc', p); return; }
++  const g = o.g || 'rect';
++  if (o.adj !== undefined && POLY[g]) {              // emulate the <a:gd adj> value
++    p.points = POLY[g](o.w, o.h, o.adj).map(v => ({ x: v[0], y: v[1] })).concat([{ close: true }]);
++    s.addShape('custGeom', p);
++    return;
++  }
++  s.addShape(g, p);
++}
++
++/** line(slide, { x, y, w, h, rot, fH, fV, c, alpha, pt, dash }) */
++function line(s, o) {
++  s.addShape('line', { ...place(o), line: stroke(o) });
++}
++
++/* ------------------------------------------------- preset geometry outlines
++ * pptxgenjs cannot set <a:avLst> adjust handles, so the handful of adjustable
++ * presets the deck uses are traced out as explicit polygons instead. */
++const POLY = {
++  parallelogram: (w, h, adj) => { const d = skew(w, h, adj); return [[0, h], [d, 0], [w, 0], [w - d, h]]; },
++  chevron: (w, h, adj) => { const d = skew(w, h, adj); return [[0, 0], [w - d, 0], [w, h / 2], [w - d, h], [0, h], [d, h / 2]]; },
++  homePlate: (w, h, adj) => { const d = skew(w, h, adj); return [[0, 0], [w - d, 0], [w, h / 2], [w - d, h], [0, h]]; },
++  flowChartInputOutput: (w, h) => [[0, h], [w / 5, 0], [w, 0], [w * 4 / 5, h]],
++  rtTriangle: (w, h) => [[0, h], [0, 0], [w, h]],
++  rect: (w, h) => [[0, 0], [w, 0], [w, h], [0, h]],
++};
++const skew = (w, h, adj) => Math.min(w, Math.min(w, h) * adj / 100000);
++
++/* ------------------------------------------------------------------ gradient
++ * pptxgenjs exposes no gradient fill, so a linear ramp is approximated by
++ * stacking thin bands clipped out of the shape's outline. */
++function grad(s, o, stops) {
++  const outline = (POLY[o.g] || POLY.rect)(o.w, o.h, o.adj);
++  const a = (o.ang || 0) * Math.PI / 180, nx = Math.cos(a), ny = Math.sin(a);
++  let lo = Infinity, hi = -Infinity;
++  outline.forEach(p => { const v = nx * p[0] + ny * p[1]; lo = Math.min(lo, v); hi = Math.max(hi, v); });
++  const bands = Math.max(10, Math.min(96, Math.round((hi - lo) / 0.055)));  // ~0.055in per band
++  for (let i = 0; i < bands; i++) {
++    const f0 = i / bands, f1 = (i + 1) / bands;
++    const eps = (hi - lo) / bands * 0.5;   // overlap so band seams do not show
++    let band = halfPlane(outline, nx, ny, lo + (hi - lo) * f1 + eps);
++    band = halfPlane(band, -nx, -ny, -(lo + (hi - lo) * f0 - eps));
++    if (band.length < 3) continue;
++    const [color, alpha] = sample(stops, (f0 + f1) / 2 * 100);
++    if (alpha < 1) continue;
++    const p = place(o);
++    p.fill = { color, transparency: tint(alpha) };
++    p.points = band.map(v => ({ x: v[0], y: v[1] })).concat([{ close: true }]);
++    s.addShape('custGeom', p);
++  }
++}
++/** Sutherland–Hodgman clip of a polygon to the half plane n·p <= d */
++function halfPlane(poly, nx, ny, d) {
++  const out = [];
++  for (let i = 0; i < poly.length; i++) {
++    const a = poly[i], b = poly[(i + 1) % poly.length];
++    const da = nx * a[0] + ny * a[1] - d, db = nx * b[0] + ny * b[1] - d;
++    if (da <= 0) out.push(a);
++    if ((da < 0 && db > 0) || (da > 0 && db < 0)) {
++      const t = da / (da - db);
++      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
++    }
++  }
++  return out;
++}
++function sample(stops, at) {
++  let k = 1;
++  while (k < stops.length - 1 && stops[k][0] < at) k++;
++  const [p0, c0, a0] = stops[k - 1], [p1, c1, a1] = stops[k];
++  const u = p1 === p0 ? 0 : Math.max(0, Math.min(1, (at - p0) / (p1 - p0)));
++  return [blend(c0, c1, u), a0 + (a1 - a0) * u];
++}
++function blend(c0, c1, u) {
++  if (c0 === c1) return c0;
++  let out = '';
++  for (let i = 0; i < 3; i++) {
++    const v0 = parseInt(c0.substr(i * 2, 2), 16), v1 = parseInt(c1.substr(i * 2, 2), 16);
++    out += Math.round(v0 + (v1 - v0) * u).toString(16).padStart(2, '0');
++  }
++  return out.toUpperCase();
++}
++
++/* -------------------------------------------------------------- photo plate
++ * Stand-in for a raster photograph: flat grey fill following the original
++ * outline plus a small "[image]" caption. */
++function photo(s, o) {
++  const p = place(o);
++  p.fill = { color: C.plate };
++  if (o.oval) {
++    s.addShape('ellipse', p);
++  } else if (o.pts) {
++    p.points = o.pts.map(v => ({ x: v[0] * o.w, y: v[1] * o.h })).concat([{ close: true }]);
++    s.addShape('custGeom', p);
++  } else {
++    s.addShape('rect', p);
++  }
++  text(s, [['[image]', bd(Math.max(7, Math.min(11, o.w * 3)), C.plateInk)]],
++    { x: o.x, y: o.y + o.h / 2 - 0.16, w: o.w, h: 0.32, align: 'center', valign: 'middle' });
++}
++
++/* ------------------------------------------------------------------- glyph
++ * The deck's line-art pictograms (tools, avatars) are dozens of bezier
++ * fragments each; they are redrawn here as a simple ringed dot. */
++function glyph(s, x, y, w, h, color) {
++  const c = color || C.white;
++  shape(s, { g: 'ellipse', x, y, w, h, line: { c, pt: 1.5 } });
++  shape(s, { g: 'ellipse', x: x + w * 0.3, y: y + h * 0.3, w: w * 0.4, h: h * 0.4, fill: c });
++}
++
++/* ------------------------------------------------------- repeated furniture
++ * The red corner badge (with page number) and the copyright line that most
++ * content slides inherit from their master. */
++function badge(s, page) {
++  shape(s, { g: 'parallelogram', adj: 41552, x: -0.134, y: 0.312, w: 2.042, h: 0.3, fill: C.redLite });
++  shape(s, { g: 'parallelogram', adj: 46208, x: 1.813, y: 0.312, w: 0.268, h: 0.3, fill: C.pink });
++  shape(s, { g: 'parallelogram', adj: 46208, x: 1.984, y: 0.312, w: 0.268, h: 0.3, fill: C.pinkPale });
++  text(s, [['Motogen Automotive', hb(8, C.white)]], { x: 0.323, y: 0.361, w: 1.511, h: 0.215 });
++  text(s, [[String(page), hd(12, C.orange)]], { x: 0.074, y: 0.332, w: 0.464, h: 0.278 });
++}
++function footer(s, color) {
++  text(s, [['2024', bd(8, color, { bold: true })], [' All Rights Reserved', bd(8, color)]],
++    { x: 8.437, y: 5.142, w: 1.284, h: 0.202 });
++}
++
++/** Full-bleed gradient background (used by the three dark slides). */
++function gradBg(s, stops, ang) {
++  grad(s, { x: 0, y: 0, w: 10, h: 5.625, ang }, stops);
++}
++
++/* ---------------------------------------------------- shared copy fragments */
++const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';
++const LOREM_LONG = LOREM + 'Consectetur libero id faucibus nisl tincidunt. Sem et tortor consequat id porta nibh venenatis cras. ';
++const LOREM_MED = LOREM + 'Dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Praesent elementum facilisis';
++const QUI_SINT = 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi';
++const MAECENAS = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue';
++
++/* ========================================================== slide builders */
++
++/* Slide 1 — Cover — "Motogen / AUTOMOTIVE" over a red diagonal ramp */
++function slide01(s) {
++  photo(s, { x: -0.003, y: -0.006, w: 10, h: 5.63 });
++  line(s, { x: 6.356, y: 3.589, w: 1.165, h: 2.036, fH: true, c: C.white, alpha: 42, pt: 2 });
++  line(s, { x: 6.166, y: 4.419, w: 0.673, h: 1.206, fH: true, c: C.white, alpha: 42, pt: 2 });
++  grad(s, { g: 'parallelogram', adj: 77490, x: 2.5, y: -0.006, w: 5.913, h: 5.281, ang: 270 }, [[0, C.redLite, 0], [2, C.redLite, 0], [100, C.redLite, 100]]);
++  text(s, [['AUTOMOTIVE', hd(72, C.white)]], { x: 1.772, y: 2.484, w: 6.741, h: 2.015, ls: 0.8 });
++  grad(s, { g: 'parallelogram', adj: 77490, x: 0.423, y: 2.761, w: 3.208, h: 2.821, ang: 270 }, [[0, C.redLite, 0], [33, C.redLite, 0], [100, C.redLite, 100]]);
++  text(s, [['Motogen', hd(125, C.white)]], { x: 1.436, y: 1.055, w: 7.998, h: 1.759, ls: 0.8 });
++  text(s, [['AUTOMOTIVE TEMPLATE', bd(12, C.white)]], { x: 6.463, y: 3.44, w: 1.592, h: 0.48, align: 'right' });
++  line(s, { x: 3.506, y: 3.546, w: 2.982, h: 0, c: C.white, pt: 2 });
++}
++
++/* Slide 2 — Title card — red wedge with three skewed swatches */
++function slide02(s) {
++  photo(s, { x: 0, y: 0, w: 10, h: 5.625 });
++  text(s, [['Motogen', hd(125, C.white)]], { x: 0.546, y: 1.441, w: 6.432, h: 1.857, ls: 0.8 });
++  shape(s, { g: 'rtTriangle', x: 6.737, y: 0, w: 3.262, h: 2.96, rot: 180, fill: C.red });
++  grad(s, { g: 'rtTriangle', x: 3.013, y: 2.269, w: 6.987, h: 3.328, fH: true, ang: 270 }, [[0, C.redLite, 0], [46, C.redLite, 100], [100, C.redLite, 100]]);
++  text(s, [[LOREM, bd(8, C.white)]], { x: 6.275, y: 4.633, w: 3.33, h: 0.419, align: 'right', ls: 1.3 });
++  text(s, [['PRESENTATION TEMPLATE', hb(24, C.white)]], { x: 6.528, y: 4.25, w: 3.077, h: 0.48, align: 'right' });
++  text(s, [['AUTOMOTIVE', hd(60, C.orange)]], { x: 0.546, y: 2.883, w: 5.008, h: 0.934, ls: 0.8 });
++  shape(s, { g: 'parallelogram', adj: 46208, x: 4.588, y: 2.941, w: 0.692, h: 0.583, fill: C.redLite, alpha: 42.7 });
++  shape(s, { g: 'parallelogram', adj: 46208, x: 5.133, y: 2.941, w: 0.692, h: 0.583, fill: C.redLite, alpha: 63.9 });
++  shape(s, { g: 'parallelogram', adj: 46208, x: 5.705, y: 2.941, w: 0.692, h: 0.583, fill: C.red });
++}
++
++/* Slide 3 — Break slide — "It’s Time to for Break / 60 Minutes" */
++function slide03(s) {
++  shape(s, { g: 'parallelogram', adj: 93373, x: 11.019, y: 2.609, w: 0.665, h: 1.888, fH: true, fill: C.white, alpha: 20 });
++  shape(s, { g: 'parallelogram', adj: 94034, x: 8.187, y: -0.138, w: 1.538, h: 1.428, fill: C.white, alpha: 32.9 });
++  shape(s, { x: 0, y: 0, w: 7.612, h: 5.625, path: [[0, 0], [1, 0], [0.229, 1], [0, 1]], fill: C.orangeDeep, alpha: 66.7 });
++  shape(s, { g: 'parallelogram', adj: 93755, x: 4.484, y: 3.37, w: 5.1, h: 2.255, fill: C.red, alpha: 84.7 });
++  footer(s, C.white);
++  badge(s, 3);
++  text(s, [['It’s Time to for Break', hd(72, C.white)]], { x: 0.667, y: 0.982, w: 2.978, h: 3.378, ls: 0.9 });
++  text(s, [['BREAK UNTIL FOR ', bd(15, C.white)]], { x: 6.395, y: 3.795, w: 2.127, h: 0.278, ls: 0.8 });
++  text(s, [
++    ['60 ', hd(66, C.white)],
++    ['Minutes', hd(21, C.white)]], { x: 5.977, y: 4.044, w: 1.911, h: 1.103, ls: 0.9 });
++  shape(s, { g: 'parallelogram', adj: 94034, x: 3.934, y: 3.865, w: 1.835, h: 1.888, fill: C.white, alpha: 31.8 });
++  photo(s, { x: 0, y: 0, w: 10, h: 5.625 });
++}
++
++/* Slide 4 — Intro — dark left column behind red stripes */
++function slide04(s) {
++  photo(s, { x: 0, y: 0, w: 10, h: 5.63 });
++  shape(s, { x: -0.001, y: 0, w: 4.974, h: 5.63, fH: true, path: [[1, 0], [0.337, 0], [0, 1], [1, 1]], fill: C.black, alpha: 73.7 });
++  shape(s, { x: 3.275, y: 0, w: 2.45, h: 5.62, fH: true, path: [[1, 0], [0.708, 0], [0, 1], [0.292, 1]], fill: C.redLite, alpha: 38.8 });
++  shape(s, { x: 3.986, y: -0.005, w: 2.124, h: 5.625, path: [[0, 0], [0.346, 0], [1, 0.661], [0.666, 1], [0.265, 1], [0.542, 0.661]], fill: C.red, alpha: 85.9 });
++  badge(s, 4);
++  text(s, [
++    ['motogen', hd(44, C.pink)],
++    [' automotive', hd(44, C.white)]], { x: 0.304, y: 1.869, w: 3.522, h: 1.261, ls: 0.8 });
++  text(s, [[LOREM_MED, bd(11, C.white)]], { x: 0.304, y: 3.521, w: 3.682, h: 0.972, ls: 1.3 });
++  footer(s, C.white);
++}
++
++/* Slide 5 — "Our motogen automotive" — banner across a photo plate */
++function slide05(s) {
++  badge(s, 5);
++  footer(s, C.silver);
++  line(s, { x: 8.03, y: -0.006, w: 1.158, h: 1.502, fH: true, c: C.amber, pt: 3 });
++  text(s, [['GET CONNECT WITH US', bd(15, C.white)]], { x: 0.469, y: 3.159, w: 2.718, h: 0.278, ls: 0.8 });
++  grad(s, { g: 'parallelogram', adj: 77490, x: 0.763, y: 4.108, w: 1.872, h: 1.508, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 100]]);
++  grad(s, { g: 'homePlate', adj: 37879, x: 3.228, y: 2.525, w: 6.772, h: 2.421, fH: true, ang: 140 }, [[0, C.amber, 100], [46, C.orange, 100], [100, C.orangeDeep, 100]]);
++  shape(s, { g: 'homePlate', adj: 37879, x: 3.503, y: 2.402, w: 6.497, h: 2.421, fH: true, fill: C.red });
++  text(s, [[LOREM_MED + ' leo vel fringilla. Purus in massa', bd(11, C.white)]], { x: 4.557, y: 3.483, w: 5.088, h: 0.972, ls: 1.3 });
++  text(s, [['MOTOGEN AUTOMOTIVE', bd(12, C.white)]], { x: 4.568, y: 2.85, w: 2.718, h: 0.237, ls: 0.8 });
++  text(s, [['TOGETHER WE CAN CHANGE THE FUTURE AUTOMOTIVE', hd(20, C.white)]], { x: 4.531, y: 3.107, w: 5.215, h: 0.355, ls: 0.8 });
++  text(s, [
++    ['Our ', hd(48, C.white)],
++    ['motogen', hd(48, C.pink)],
++    [' automotive', hd(48, C.white)]], { x: 0.469, y: 1.66, w: 4.333, h: 1.596, ls: 0.9 });
++  photo(s, { x: 0, y: 1.087, w: 8.983, h: 3.251, pts: [[0.001, 0], [1, 0], [0.789, 1], [0, 1], [0, 0.004]] });
++}
++
++/* Slide 6 — Product face-off — KaWISIKI RR20 vs DACUTI 2024 */
++function slide06(s) {
++  badge(s, 6);
++  footer(s, C.silver);
++  photo(s, { x: 4.882, y: -0.024, w: 3.841, h: 3.528, pts: [[0.254, 0], [1, 0], [0.746, 1], [0, 1]] });
++  photo(s, { x: 1.278, y: 2.121, w: 3.841, h: 3.528, pts: [[0.254, 0], [1, 0], [0.746, 1], [0, 1]] });
++  grad(s, { g: 'parallelogram', adj: 50738, x: 8.419, y: 0, w: 1.581, h: 3.083, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  grad(s, { g: 'parallelogram', adj: 50738, x: 0.126, y: 2.542, w: 1.581, h: 3.083, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  text(s, [['KaWISIKI RR20', hb(36, C.ink)]], { x: 1.003, y: 0.843, w: 3.484, h: 0.597, ls: 0.8 });
++  text(s, [['PREMIUM MOTOR', bd(15, C.slate)]], { x: 1.003, y: 1.516, w: 2.065, h: 0.279, ls: 0.8 });
++  text(s, [['DACUTI 2024', hb(36, C.pink)]], { x: 5.493, y: 3.868, w: 3.641, h: 0.597, ls: 0.8 });
++  text(s, [['STANDARD MOTOR', bd(15, C.slate)]], { x: 5.493, y: 4.596, w: 2.065, h: 0.279, ls: 0.8 });
++  line(s, { x: 1.085, y: 1.411, w: 3.073, h: 0, c: C.rule, pt: 0.75 });
++  line(s, { x: 5.575, y: 4.469, w: 3.167, h: 0, c: C.rule, pt: 0.75 });
++  line(s, { x: 5.19, y: -0.561, w: 0.465, h: 1.687, fH: true, c: C.redLite, pt: 2 });
++  line(s, { x: 4.201, y: 4.557, w: 0.507, h: 1.773, fH: true, c: C.red, pt: 2 });
++  grad(s, { g: 'parallelogram', adj: 42592, x: 4.534, y: 1.804, w: 1.33, h: 0.936, ang: 270 }, [[0, C.ink, 100], [78, C.slate, 100], [100, C.slate, 100]]);
++  text(s, [['VS', hb(36, C.white)]], { x: 4.708, y: 1.944, w: 0.964, h: 0.682, align: 'center' });
++}
++
++/* Slide 7 — Stat card — 1000+ speedo accuracy over a dark caption panel */
++function slide07(s) {
++  badge(s, 7);
++  footer(s, C.silver);
++  photo(s, { x: -0.181, y: 0.718, w: 7.275, h: 4.896, pts: [[0.519, 0], [1, 0], [0.481, 1], [0, 1]] });
++  grad(s, { g: 'parallelogram', adj: 77490, x: 7.094, y: 2.812, w: 3.359, h: 2.813, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  line(s, { x: 8.03, y: 0.029, w: 1.158, h: 1.502, fH: true, c: C.orange, pt: 2 });
++  line(s, { x: 0, y: 0.78, w: 2.71, h: 3.438, fH: true, c: C.orange, pt: 2 });
++  shape(s, { x: 5.111, y: 1.315, w: 4.024, h: 1.529, fill: C.ink });
++  text(s, [['MOTOGEN AUTOMOTIVE', bd(12, C.white)]], { x: 5.366, y: 1.653, w: 2.151, h: 0.237, ls: 0.8 });
++  text(s, [['TOGETHER WE CAN CHANGE THE FUTURE AUTOMOTIVE', hb(21, C.red)]], { x: 5.355, y: 1.91, w: 3.865, h: 0.659, ls: 0.8 });
++  shape(s, { x: 4.135, y: 3.121, w: 4.548, h: 1.458, fill: C.white });
++  text(s, [['AMAZING IN THE WORLD', hd(14, C.slate)]], { x: 5.807, y: 3.445, w: 2.574, h: 0.264, ls: 0.8 });
++  text(s, [[QUI_SINT + ' quo numquam. ', bd(11, C.gray)]], { x: 5.807, y: 3.79, w: 2.574, h: 0.511, ls: 1.3 });
++  text(s, [['1000+', hd(38, C.redHot)]], { x: 4.39, y: 3.405, w: 1.441, h: 0.612, valign: 'middle', ls: 0.8 });
++  text(s, [
++    ['SPEEDO ', bd(11, C.slate, { breakLine: true })],
++    ['ACCURACY', bd(11, C.slate)]], { x: 4.471, y: 3.898, w: 1.36, h: 0.429 });
++}
++
++/* Slide 8 — "Wonder around with experience" — red column between two plates */
++function slide08(s) {
++  badge(s, 8);
++  footer(s, C.silver);
++  photo(s, { x: 0, y: 0, w: 5.345, h: 3.883, pts: [[0, 0], [1, 0], [0.744, 1], [0, 1]] });
++  photo(s, { x: 4.339, y: 1.742, w: 5.661, h: 3.283, pts: [[0.21, 0], [1, 0], [1, 1], [0, 1]] });
++  grad(s, { g: 'parallelogram', adj: 59438, x: 0.782, y: 4.372, w: 1.347, h: 1.253, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  badge(s, 8);
++  shape(s, { g: 'parallelogram', adj: 46208, x: 8.429, y: 4.153, w: 0.513, h: 0.452, fill: C.white });
++  shape(s, { g: 'parallelogram', adj: 46208, x: 8.798, y: 4.153, w: 0.513, h: 0.452, fill: C.white });
++  shape(s, { g: 'parallelogram', adj: 46208, x: 9.167, y: 4.153, w: 0.513, h: 0.452, fill: C.white });
++  shape(s, { g: 'parallelogram', adj: 46208, x: 9.536, y: 4.153, w: 0.513, h: 0.452, fill: C.white });
++  grad(s, { g: 'parallelogram', adj: 59438, x: 7.908, y: 0, w: 1.347, h: 1.253, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  shape(s, { x: 3.427, y: 1.253, w: 3.146, h: 4.372, fill: C.red });
++  text(s, [['MOTOGEN AUTOMOTIVE', bd(12, C.white)]], { x: 3.759, y: 1.635, w: 2.718, h: 0.237, ls: 0.8 });
++  text(s, [['Wonder around  with experience', hd(25, C.white)]], { x: 3.678, y: 1.893, w: 2.786, h: 0.749, ls: 0.8 });
++  text(s, [[LOREM_MED + ' leo vel', bd(10, C.white)]], { x: 3.732, y: 2.859, w: 2.564, h: 1.335, ls: 1.3 });
++  text(s, [['aliqua. Dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Praesent elementum facilisis leo vel', bd(10, C.white)]], { x: 3.732, y: 4.378, w: 2.564, h: 0.695, ls: 1.3 });
++}
++
++/* Slide 9 — "The power of new engine" — dark skewed slab */
++function slide09(s) {
++  badge(s, 9);
++  footer(s, C.silver);
++  grad(s, { g: 'parallelogram', adj: 77490, x: 4.796, y: 2.565, w: 6.143, h: 3.06, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  shape(s, { x: 0.406, y: 1.141, w: 9.594, h: 3.625, path: [[0.293, 0], [1, 0], [1, 0.15], [0.751, 1], [0, 1]], fill: C.ink });
++  line(s, { x: 9.015, y: -0.259, w: 1.501, h: 1.948, fH: true, c: C.orange, pt: 3 });
++  line(s, { x: -0.111, y: 1.757, w: 1.254, h: 1.615, fH: true, c: C.orange, pt: 3.25 });
++  text(s, [[LOREM_MED.slice(0, 168), bd(9, C.white)]], { x: 5, y: 3.533, w: 2.602, h: 0.844, ls: 1.3 });
++  text(s, [['STABLE COUNTER ATTACK', hb(18, C.white)]], { x: 5.032, y: 3.239, w: 2.906, h: 0.333, ls: 0.8 });
++  grad(s, { g: 'parallelogram', adj: 68434, x: 2.729, y: 2.541, w: 2.174, h: 1.966, rot: 180, ang: 90 }, [[0, C.white, 18.8], [85, C.white, 0], [100, C.white, 0]]);
++  text(s, [
++    ['The ', hd(40, C.white)],
++    ['power ', hd(40, C.pink)],
++    ['of new engine', hd(40, C.white)]], { x: 5.33, y: 1.558, w: 3.685, h: 1.288, ls: 0.9 });
++  photo(s, { x: 0.338, y: 0.734, w: 5.412, h: 3.553, pts: [[0.439, 0], [1, 0], [0.561, 1], [0, 1]] });
++}
++
++/* Slide 10 — Testimonial — red quote parallelogram plus dark caption bar */
++function slide10(s) {
++  badge(s, 10);
++  footer(s, C.silver);
++  photo(s, { x: 2.984, y: 0, w: 7.016, h: 3.579, pts: [[0.184, 0], [1, 0], [1, 1], [0, 1]] });
++  shape(s, { x: 3.132, y: 3.541, w: 6.868, h: 2.078, path: [[0.109, 0], [1, 0], [1, 1], [0, 1]], fill: C.ink });
++  shape(s, { g: 'parallelogram', adj: 36143, x: 1.253, y: 2.812, w: 3.816, h: 2.28, fill: C.red });
++  text(s, [
++    ['It’s AMAZING ', hd(35, C.ink)],
++    ['Good Motor', hd(35, C.pink)]], { x: 0.469, y: 0.989, w: 3.337, h: 1.136, ls: 0.9 });
++  text(s, [['MOTOGEN AUTOMOTIVE', bd(11, C.white)]], { x: 5, y: 3.93, w: 1.83, h: 0.217, ls: 0.8 });
++  text(s, [['AMAZING STYLE FOR YOUR MOTORCYCLE', hd(24, C.white)]], { x: 4.898, y: 4.147, w: 4.81, h: 0.419, ls: 0.8 });
++  shape(s, { x: 2.201, y: 3.294, w: 0.434, h: 0.385, path: [[0.901, 0], [1, 0.009, 0.932, -0.001, 0.965, 0.002], [0.976, 0.21], [0.851, 0.24, 0.923, 0.205, 0.881, 0.215], [0.788, 0.347, 0.82, 0.265, 0.799, 0.301], [0.78, 0.502, 0.777, 0.393, 0.774, 0.444], [1, 0.502], [1, 1], [0.576, 1], [0.576, 0.483], [0.682, 0.1, 0.576, 0.314, 0.611, 0.186], [0.901, 0, 0.735, 0.035, 0.808, 0.002]], fill: C.white, alpha: 33.7 });
++  shape(s, { x: 2.201, y: 3.294, w: 0.434, h: 0.385, path: [[0.325, 0], [0.424, 0.009, 0.356, -0.001, 0.389, 0.002], [0.4, 0.21], [0.275, 0.24, 0.348, 0.205, 0.306, 0.215], [0.212, 0.347, 0.244, 0.265, 0.223, 0.301], [0.204, 0.502, 0.201, 0.393, 0.199, 0.444], [0.424, 0.502], [0.424, 1], [0, 1], [0, 0.483], [0.106, 0.1, 0, 0.314, 0.035, 0.186], [0.325, 0, 0.16, 0.035, 0.233, 0.002]], fill: C.white, alpha: 33.7 });
++  text(s, [
++    ['Lorem ipsum dolor sit ', bd(12, C.white, { i: true, b: true })],
++    ['amet, consectetur adipiscing elit, sed do eiusmod tempor parturient montes nasce', bd(12, C.white, { i: true })]], { x: 2.202, y: 3.4, w: 2.279, h: 1.025, ls: 1.2 });
++  text(s, [['By Jhon Doe', hb(12, C.white)]], { x: 2.424, y: 4.473, w: 0.88, h: 0.323, ls: 1.3 });
++  line(s, { x: 2.271, y: 4.631, w: 0.165, h: 0, c: C.white, pt: 0.75 });
++  text(s, [[LOREM_MED.slice(0, 145), bd(10, C.white)]], { x: 4.899, y: 4.544, w: 4.723, h: 0.482, ls: 1.3 });
++  footer(s, C.white);
++  grad(s, { g: 'parallelogram', adj: 59438, x: -0.258, y: 3.553, w: 1.347, h: 2.105, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  line(s, { x: 1.084, y: 2.857, w: 0.474, h: 1.196, fH: true, c: C.orange, pt: 1.75 });
++}
++
++/* Slide 11 — "Showcase of automotive" — three skewed stat pills */
++function slide11(s) {
++  photo(s, { x: 0, y: 0, w: 10, h: 5.63 });
++  text(s, [['SHOWCASE OF AUTOMOTIVE', hd(50, C.white)]], { x: 0.886, y: 0.785, w: 8.247, h: 0.846, align: 'center', ls: 0.9 });
++  grad(s, { g: 'chevron', adj: 50000, x: 8.462, y: 1.635, w: 1.274, h: 2.12, fH: true, ang: 180 }, [[0, C.white, 0], [21, C.white, 0], [100, C.white, 22]]);
++  grad(s, { g: 'chevron', adj: 50000, x: 9.263, y: 1.635, w: 1.274, h: 2.12, fH: true, ang: 180 }, [[0, C.white, 0], [100, C.white, 22]]);
++  grad(s, { g: 'chevron', adj: 50000, x: 0.181, y: 1.635, w: 1.274, h: 2.12, ang: 180 }, [[0, C.white, 0], [21, C.white, 0], [100, C.white, 22]]);
++  grad(s, { g: 'chevron', adj: 50000, x: -0.621, y: 1.635, w: 1.274, h: 2.12, ang: 180 }, [[0, C.white, 0], [100, C.white, 22]]);
++  grad(s, { g: 'parallelogram', adj: 83056, x: 8.777, y: 0, w: 1.523, h: 0.689, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  line(s, { x: 9.64, y: 4.83, w: 0.846, h: 1.043, c: C.white, alpha: 18.8, pt: 2 });
++  line(s, { x: 9.315, y: 4.26, w: 0.567, h: 0.699, c: C.white, alpha: 18.8, pt: 2 });
++  grad(s, { g: 'parallelogram', adj: 83056, x: -0.416, y: 5.137, w: 1.098, h: 0.497, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  footer(s, C.white);
++  badge(s, 11);
++  // three skewed stat pills across the foot of the slide
++  const PILLS = [
++    { x: 1.631, w: 2.481, num: '250+', cap: 'SPEEDO ACCURACY', capW: 1.157 },
++    { x: 3.842, w: 2.315, num: '1.9B', cap: 'PRICE RANGE',     capW: 1.027 },
++    { x: 6.053, w: 2.315, num: '620',  cap: 'HIGHER MILEAGE',  capW: 1.027 },
++  ];
++  PILLS.forEach(p => {
++    grad(s, { g: 'flowChartInputOutput', x: p.x, y: 4.329, w: p.w, h: 0.812, ang: 230 },
++         [[0, C.red, 0], [25, C.red, 0], [100, C.red, 100]]);
++    text(s, [[p.num, hd(30, C.white)]], { x: p.x + 0.442, y: 4.425, w: 1.205, h: 0.492, valign: 'middle', ls: 0.8 });
++    text(s, [[p.cap, bd(8, C.orange)]], { x: p.x + 0.42, y: 4.84, w: p.capW, h: 0.202 });
++  });
++  badge(s, 11);
++  footer(s, C.white);
++}
++
++/* Slide 12 — Three-up gallery with numbered tags */
++function slide12(s) {
++  badge(s, 12);
++  footer(s, C.silver);
++  photo(s, { x: 0.879, y: 1.096, w: 2.311, h: 2.852, pts: [[0.003, 0], [1, 0.205], [0.997, 1], [0, 0.795]] });
++  photo(s, { x: 3.845, y: 1.096, w: 2.311, h: 2.852, pts: [[0.003, 0], [1, 0.205], [0.997, 1], [0, 0.795]] });
++  photo(s, { x: 6.81, y: 1.096, w: 2.311, h: 2.852, pts: [[0.003, 0], [1, 0.205], [0.997, 1], [0, 0.795]] });
++  text(s, [[LOREM.slice(0, 115), bd(9, C.gray)]], { x: 0.868, y: 4.121, w: 2.319, h: 0.647, ls: 1.3 });
++  text(s, [[LOREM.slice(0, 115), bd(9, C.gray)]], { x: 3.84, y: 4.121, w: 2.319, h: 0.647, ls: 1.3 });
++  text(s, [[LOREM.slice(0, 115), bd(9, C.gray)]], { x: 6.806, y: 4.121, w: 2.319, h: 0.647, ls: 1.3 });
++  grad(s, { g: 'parallelogram', adj: 83056, x: 8.777, y: 0, w: 1.523, h: 0.689, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  grad(s, { g: 'parallelogram', adj: 59438, x: -0.228, y: 4.954, w: 1.372, h: 0.671, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  photo(s, { x: 0.896, y: 3.683, w: 0.368, h: 0.368 });
++  photo(s, { x: 3.911, y: 3.683, w: 0.368, h: 0.368 });
++  photo(s, { x: 6.876, y: 3.683, w: 0.368, h: 0.368 });
++  shape(s, { g: 'parallelogram', adj: 25000, x: 1.199, y: 0.99, w: 0.85, h: 0.639, rot: 14.23, fH: true, fill: C.red });
++  shape(s, { g: 'parallelogram', adj: 25000, x: 4.165, y: 0.99, w: 0.85, h: 0.639, rot: 14.23, fH: true, fill: C.red });
++  shape(s, { g: 'parallelogram', adj: 25000, x: 7.209, y: 0.99, w: 0.85, h: 0.639, rot: 14.23, fH: true, fill: C.red });
++  line(s, { x: 2.115, y: 1.271, w: 1.028, h: 0.263, c: C.orange, pt: 1.25 });
++  line(s, { x: 5.061, y: 1.254, w: 1.028, h: 0.263, c: C.orange, pt: 1.25 });
++  line(s, { x: 8.066, y: 1.254, w: 1.028, h: 0.263, c: C.orange, pt: 1.25 });
++  text(s, [['01', hd(30, C.white)]], { x: 1.265, y: 1.104, w: 0.635, h: 0.48, align: 'center', valign: 'middle', ls: 0.8 });
++  text(s, [['02', hd(30, C.white)]], { x: 4.335, y: 1.104, w: 0.635, h: 0.48, align: 'center', valign: 'middle', ls: 0.8 });
++  text(s, [['03', hd(30, C.white)]], { x: 7.49, y: 1.104, w: 0.635, h: 0.48, align: 'center', valign: 'middle', ls: 0.8 });
++}
++
++/* Slide 13 — "Our story about Motogen" — versus shield on a dark slab */
++function slide13(s) {
++  badge(s, 13);
++  footer(s, C.silver);
++  shape(s, { g: 'parallelogram', adj: 35182, x: 0.284, y: 2.801, w: 9.433, h: 2.28, fill: C.ink });
++  text(s, [[LOREM_LONG, bd(11, C.gray)]], { x: 1.393, y: 1.676, w: 7.213, h: 0.513, align: 'center', ls: 1.3 });
++  text(s, [[LOREM_LONG.slice(0, 171), bd(9, C.white)]], { x: 1.442, y: 3.955, w: 2.804, h: 0.844, ls: 1.3 });
++  text(s, [['RUBICAN 2024', hb(21, C.redHot)]], { x: 6.679, y: 3.293, w: 2.621, h: 0.376, ls: 0.8 });
++  text(s, [['AMAZING TRACKING MOTOR', bd(11, C.white)]], { x: 6.679, y: 3.565, w: 2.297, h: 0.283, ls: 1.3 });
++  text(s, [[LOREM_LONG.slice(0, 171), bd(9, C.white)]], { x: 5.875, y: 3.955, w: 2.864, h: 0.844, ls: 1.3 });
++  grad(s, { g: 'parallelogram', adj: 37240, x: 2.884, y: 2.476, w: 4.188, h: 0.477, ang: 210 }, [[0, C.red, 0], [10, C.red, 0], [51, C.red, 100], [93, C.redDark, 0], [100, C.redDark, 0]]);
++  text(s, [['AMAZING OF MOTOGEN', hb(17, C.white)]], { x: 3.729, y: 2.572, w: 2.361, h: 0.333, align: 'center', ls: 0.9 });
++  line(s, { x: 3.212, y: 2.726, w: 0.655, h: 0, c: C.white, pt: 0.75 });
++  line(s, { x: 6.046, y: 2.726, w: 0.698, h: 0, c: C.white, pt: 0.75 });
++  shape(s, { g: 'parallelogram', adj: 94840, x: 0.186, y: 0.999, w: 0.668, h: 0.653, fH: true, fill: C.white, alpha: 24.7 });
++  shape(s, { x: 4.523, y: 3.594, w: 0.955, h: 0.865, path: [[1.008, 0.19], [0.504, 0], [0.504, 0], [0.504, 0], [0.504, 0], [0.504, 0], [0, 0.19], [0.185, 0.825], [0.504, 1.012], [0.504, 1.012], [0.504, 1.012], [0.504, 1.012], [0.504, 1.012], [0.825, 0.825]], fill: C.white });
++  shape(s, { x: 4.64, y: 3.692, w: 0.721, h: 0.667, path: [[0.19, 0.827], [0, 0.186], [0.505, 0], [1.012, 0.186], [0.823, 0.827], [0.505, 1.011]], fill: C.red });
++  text(s, [['VS', hb(27, C.white)]], { x: 4.569, y: 3.74, w: 0.863, h: 0.413, align: 'center' });
++  text(s, [['FERARUZ 6500', hd(21, C.pink)]], { x: 2.282, y: 3.293, w: 1.988, h: 0.376, ls: 0.8 });
++  text(s, [['AMAZING SPEEDS MOTOR', bd(11, C.white)]], { x: 2.282, y: 3.565, w: 2.297, h: 0.283, ls: 1.3 });
++  grad(s, { g: 'parallelogram', adj: 90081, x: 8.584, y: 0, w: 1.95, h: 1.106, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  shape(s, { g: 'parallelogram', adj: 99774, x: 8.32, y: 2.473, w: 1.344, h: 0.504, fill: C.red });
++  shape(s, { g: 'parallelogram', adj: 99774, x: 8.197, y: 2.612, w: 0.49, h: 0.366, fill: C.orange });
++  shape(s, { g: 'parallelogram', adj: 99774, x: 0.337, y: 2.54, w: 1.344, h: 0.504, fH: true, fill: C.red });
++  shape(s, { g: 'parallelogram', adj: 99774, x: 1.315, y: 2.678, w: 0.49, h: 0.366, fH: true, fill: C.orange });
++  text(s, [
++    ['Our STORY ABOUT  ', hd(35, C.ink)],
++    ['MOTOGEN', hd(35, C.pink)]], { x: 1.031, y: 0.848, w: 7.937, h: 0.606, align: 'center', ls: 0.9 });
++  grad(s, { g: 'parallelogram', adj: 90081, x: -0.402, y: 1.379, w: 1.344, h: 1.106, ang: 270 }, [[0, C.orange, 0], [78, C.orangeDeep, 100], [100, C.orangeDeep, 100]]);
++  glyph(s, 1.51, 3.293, 0.506, 0.497);   // spanner + screwdriver
++  glyph(s, 5.927, 3.318, 0.501, 0.497);  // hammer + screwdriver
++}
++
++/* Slide 14 — Radar chart — three overlaid pentagon series with an A/B/C legend */
++function slide14(s) {
++  gradBg(s, [[0, C.slate, 100], [78, C.ink, 100], [100, C.ink, 100]], 70);
++  badge(s, 14);
++  footer(s, C.silver);
++  grad(s, { g: 'parallelogram', adj: 75922, x: 0.876, y: 4.351, w: 1.575, h: 1.274, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 71]]);
++  text(s, [['8000+', hb(24, C.redLite)]], { x: 8.194, y: 1.139, w: 1.116, h: 0.48 });
++  text(s, [[QUI_SINT.slice(0, 36), bd(9, C.white)]], { x: 8.194, y: 1.544, w: 1.231, h: 0.451, ls: 1.3 });
++  text(s, [
++    ['CHART DATA ', hd(35, C.white)],
++    ['OUR MOTOGEN', hd(35, C.pink)]], { x: 0.556, y: 1.093, w: 2.977, h: 1.666, ls: 0.9 });
++  text(s, [[LOREM_MED.slice(0, 154), bd(11, C.white)]], { x: 0.556, y: 3.901, w: 2.768, h: 0.972, ls: 1.3 });
++  text(s, [['DATA REPORT MOTOGEN', hd(21, C.pink)]], { x: 0.556, y: 3.55, w: 2.237, h: 0.376, ls: 0.8 });
++  text(s, [['DECRIPTION', bd(11, C.white)]], { x: 0.562, y: 3.242, w: 2.297, h: 0.283, ls: 1.3 });
++  shape(s, { g: 'parallelogram', adj: 36143, x: 7.267, y: 1.222, w: 0.821, h: 0.537, fill: C.red });
++  shape(s, { g: 'parallelogram', adj: 36143, x: 7.267, y: 2.567, w: 0.821, h: 0.537, fill: C.orangeDeep });
++  shape(s, { g: 'parallelogram', adj: 36143, x: 7.267, y: 3.912, w: 0.821, h: 0.537, fill: C.amber });
++  text(s, [['5500+', hb(24, C.orangeDeep)]], { x: 8.194, y: 2.531, w: 1.116, h: 0.48 });
++  text(s, [[QUI_SINT.slice(0, 36), bd(9, C.white)]], { x: 8.194, y: 2.936, w: 1.231, h: 0.451, ls: 1.3 });
++  text(s, [['3000+', hb(24, C.amber)]], { x: 8.194, y: 3.821, w: 1.116, h: 0.48 });
++  text(s, [[QUI_SINT.slice(0, 36), bd(9, C.white)]], { x: 8.194, y: 4.226, w: 1.231, h: 0.451, ls: 1.3 });
++  text(s, [['A.', hd(30, C.white)]], { x: 7.347, y: 1.291, w: 0.612, h: 0.505, align: 'center', valign: 'middle', ls: 0.8 });
++  text(s, [['B.', hd(30, C.white)]], { x: 7.33, y: 2.648, w: 0.612, h: 0.505, align: 'center', valign: 'middle', ls: 0.8 });
++  text(s, [['C.', hd(30, C.white)]], { x: 7.33, y: 3.973, w: 0.612, h: 0.505, align: 'center', valign: 'middle', ls: 0.8 });
++  grad(s, { g: 'parallelogram', adj: 59438, x: 6.028, y: 0, w: 0.938, h: 0.758, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  // radar grid: six concentric pentagons, outside in
++  [[3.576, 1.512, 3.027, 2.883], [3.771, 1.739, 2.589, 2.466], [4.093, 1.998, 2.043, 1.945],
++   [4.312, 2.275, 1.594, 1.518], [4.588, 2.605, 1.003, 0.955], [4.831, 2.882, 0.516, 0.492],
++  ].forEach(([x, y, w, h]) => shape(s, { g: 'pentagon', x, y, w, h, line: { c: C.slate, pt: 1 } }));
++
++  // three data series, each a closed polyline with a dot at every vertex
++  const SERIES = [
++    { c: C.amber,   pts: [[4.408, 4.085], [3.827, 2.678], [5.135, 1.893], [6.492, 2.678], [5.862, 4.077]] },
++    { c: C.redLite, pts: [[4.691, 3.772], [4.211, 2.813], [5.144, 1.779], [6.145, 2.789], [5.726, 3.928]] },
++    { c: C.orange,  pts: [[4.901, 3.371], [4.743, 2.971], [5.144, 2.221], [5.918, 2.844], [5.549, 3.726]] },
++  ];
++  SERIES.forEach(ser => {
++    ser.pts.forEach((a, i) => {
++      const b = ser.pts[(i + 1) % ser.pts.length];
++      line(s, { x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]),
++                w: Math.abs(b[0] - a[0]), h: Math.abs(b[1] - a[1]),
++                fH: (b[0] - a[0]) * (b[1] - a[1]) < 0, c: ser.c, pt: 2.25 });
++    });
++    ser.pts.forEach(([x, y]) => shape(s, { g: 'ellipse', x: x - 0.033, y: y - 0.035, w: 0.066, h: 0.07,
++                                           fill: C.white, line: { c: ser.c, pt: 2.25 } }));
++  });
++
++  [['Pace', 4.519, 1.231], ['Physical', 3.533, 4.424], ['Defending', 5.438, 4.424],
++   ['Shooting', 6.379, 2.47], ['Passsing', 2.572, 2.435],
++  ].forEach(([t, x, y]) => text(s, [[t, bd(9, C.white)]], { x, y, w: 1.231, h: 0.257, align: 'center', ls: 1.3 }));
++
++  // pale decorative slashes, upper-centre and lower-right
++  [[8.809, 3.737], [3.639, 0.308]].forEach(([x, y]) => {
++    line(s, { x, y, w: 0.846, h: 1.043, fH: true, c: C.white, alpha: 18.8, pt: 2 });
++    line(s, { x: x + 0.604, y: y - 0.57, w: 0.567, h: 0.699, fH: true, c: C.white, alpha: 18.8, pt: 2 });
++  });
++}
++
++/* Slide 15 — Three bar charts (2020-2024) with headline figures */
++function slide15(s) {
++  badge(s, 15);
++  footer(s, C.silver);
++  grad(s, { g: 'parallelogram', adj: 99774, x: -1.71, y: 1.171, w: 6.139, h: 4.454, fH: true, ang: 270 }, [[0, C.orange, 0], [12, C.orange, 0], [100, C.orangeDeep, 17.6]]);
++  shape(s, { g: 'parallelogram', adj: 97226, x: 3.532, y: 4.597, w: 1.339, h: 1.308, fH: true, fill: C.amber, alpha: 12.9 });
++  text(s, [['2.502', hd(30, C.orange)]], { x: 7.561, y: 3.694, w: 1.055, h: 0.581, align: 'center' });
++  text(s, [['3.700', hd(30, C.redLite)]], { x: 4.429, y: 3.694, w: 1.243, h: 0.581, align: 'center' });
++  text(s, [['11.200', hd(30, C.red)]], { x: 1.384, y: 3.694, w: 1.246, h: 0.581, align: 'center' });
++  text(s, [['REPORTS TWO', hb(15, C.ink)]], { x: 4.423, y: 4.182, w: 1.257, h: 0.328, align: 'center' });
++  text(s, [[QUI_SINT, bd(11, C.gray)]], { x: 4.03, y: 4.491, w: 2.042, h: 0.511, align: 'center', ls: 1.3 });
++  text(s, [['REPORTS THREE', hb(15, C.ink)]], { x: 7.315, y: 4.182, w: 1.547, h: 0.328, align: 'center' });
++  text(s, [[QUI_SINT, bd(11, C.gray)]], { x: 7.04, y: 4.491, w: 2.097, h: 0.511, align: 'center', ls: 1.3 });
++  text(s, [['REPORTS ONE', hb(15, C.ink)]], { x: 1.384, y: 4.182, w: 1.246, h: 0.328, align: 'center' });
++  text(s, [[QUI_SINT, bd(11, C.gray)]], { x: 0.958, y: 4.491, w: 2.097, h: 0.511, align: 'center', ls: 1.3 });
++  text(s, [
++    ['SHOW REPORTS  ', hd(35, C.ink)],
++    ['AUTOMOTIVE', hd(35, C.pink)]], { x: 0.876, y: 0.814, w: 8.247, h: 0.606, align: 'center', ls: 0.9 });
++  grad(s, { g: 'parallelogram', adj: 102552, x: 7.746, y: 0, w: 1.516, h: 0.976, fH: true, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  shape(s, { g: 'parallelogram', adj: 97226, x: 8.41, y: 0, w: 0.714, h: 0.689, fH: true, fill: C.amber, alpha: 12.9 });
++  // three identical bar panels 3.028in apart; only the bar colour changes
++  const BARS = [0.789, 0.484, 0.645, 1.28, 0.902];   // bar heights in inches (0-8 scale)
++  [C.red, C.orangeDeep, C.amber].forEach((col, panel) => {
++    const ox = 3.028 * panel;
++    line(s, { x: 1.023 + ox, y: 1.844, w: 0, h: 1.445, c: C.mist, pt: 0.75 });
++    line(s, { x: 1.023 + ox, y: 3.289, w: 2.156, h: 0, c: C.mist, pt: 0.75 });
++    [1.242, 1.477, 1.695, 1.883, 2.102, 2.336, 2.555, 2.75, 2.969].forEach(gx =>
++      line(s, { x: gx + ox, y: 1.844, w: 0, h: 1.445, c: C.mist, pt: 0.75 }));
++    BARS.forEach((h, i) => shape(s, { x: 1.164 + ox + i * 0.432, y: 3.297 - h, w: 0.156, h, fill: col }));
++    ['2020', '2021', '2022', '2023', '2024'].forEach((yr, i) =>
++      text(s, [[yr, bd(9, C.gray)]], { x: 1.024 + ox + i * 0.4295, y: 3.286, w: 0.454, h: 0.257, align: 'center', ls: 1.3 }));
++    [['0', 3.125], ['2', 2.761], ['4', 2.433], ['6', 2.068], ['8', 1.693]].forEach(([tick, ty]) =>
++      text(s, [[tick, bd(9, C.gray)]], { x: 0.532 + ox, y: ty, w: 0.454, h: 0.257, align: 'right', ls: 1.3 }));
++  });
++}
++
++/* Slide 16 — Comparison table, five columns, on a dark slab */
++function slide16(s) {
++  badge(s, 16);
++  footer(s, C.silver);
++  grad(s, { g: 'parallelogram', adj: 100096, x: -0.348, y: 2.254, w: 7.947, h: 0.799, fH: true, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  shape(s, { x: 0, y: 2.379, w: 9.609, h: 2.508, fH: true, path: [[0.261, 0], [1, 0], [1, 0.971], [0.992, 1], [0, 1]], fill: C.ink });
++  grad(s, { g: 'parallelogram', adj: 100096, x: 6.419, y: 3.121, w: 2.913, h: 0.799, fH: true, ang: 230 }, [[0, C.red, 0], [28, C.red, 0], [58, C.red, 100], [100, C.red, 100]]);
++  text(s, [
++    ['2024', hb(18, C.white, { breakLine: true })],
++    ['CARS DATA', hb(18, C.white)]], { x: 7.654, y: 3.238, w: 1.58, h: 0.626, valign: 'middle', ls: 0.9 });
++  grad(s, { g: 'parallelogram', adj: 100096, x: 7.321, y: 0, w: 2.179, h: 1.402, ang: 270 }, [[0, C.orange, 0], [8, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  grad(s, { g: 'parallelogram', adj: 100096, x: 0, y: 4.99, w: 1.2, h: 0.635, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  text(s, [
++    ['MOTOR SUPER', hd(35, C.ink)],
++    [' LIMITED EDITION', hd(35, C.pink)]], { x: 0.542, y: 0.892, w: 7.989, h: 0.606, ls: 0.9 });
++  text(s, [[LOREM_LONG + 'Faucibus in', bd(9, C.gray)]], { x: 0.613, y: 1.493, w: 7.213, h: 0.451, ls: 1.3 });
++  line(s, { x: 8.974, y: 0, w: 0.717, h: 0.744, fH: true, c: C.orangeDeep, pt: 2 });
++  // 5-column comparison table sitting on the dark slab
++  const TICK = '\u2714';
++  const GRID = [
++    ['HEADING', TICK, '-',  TICK, TICK],
++    ['CONTENT', '-',  TICK, '-',  '-' ],
++    ['PICTURE', TICK, TICK, TICK, '-' ],
++  ];
++  const TINTED = { '1,4': [C.amber, 48.6], '2,2': [C.orange, 32.9], '3,1': [C.red, 38.8] };
++  const border = { type: 'solid', color: C.slate, pt: 0.75 };
++  const head = ['VARIOUS CONTENT TITLE', 'COLUM ONE', 'COLUMN TWO', 'COLUMN THREE', 'COLUMN FOUR'];
++  const rows = [head.map(t => ({ text: t, options: {
++    fontFace: HEAD, fontSize: 14, bold: true, color: C.white, align: 'center', valign: 'middle', border } }))];
++  GRID.forEach((row, r) => rows.push(row.map((t, c) => {
++    const paint = TINTED[(r + 1) + ',' + c];
++    return { text: t, options: {
++      fontFace: c === 0 ? HEAD : BODY, fontSize: 11, bold: c === 0, color: C.white,
++      align: 'center', valign: 'middle', border,
++      fill: paint ? { color: paint[0], transparency: Math.round(100 - paint[1]) } : undefined } };
++  })));
++  s.addTable(rows, { x: 0.23, y: 2.574, w: 6.392, colW: [1.565, 1.107, 1.189, 1.287, 1.244],
++                     rowH: [0.68, 0.467, 0.467, 0.467], margin: [4, 8, 4, 8] });
++}
++
++/* Slide 17 — Process loop — two red arcs joined by a block arc */
++function slide17(s) {
++  badge(s, 17);
++  footer(s, C.silver);
++  grad(s, { g: 'rtTriangle', x: 0, y: 2.044, w: 3.581, h: 3.581, ang: 270 }, [[0, C.orange, 0], [17, C.orange, 0], [100, C.orangeDeep, 51.8]]);
++  shape(s, { x: 2.6, y: 1.497, w: 2.31, h: 2.214, rot: 270, path: [[0.07, 0.5], [0.07, 0.5], [0.467, 0.068, 0.07, 0.274, 0.243, 0.086], [0.925, 0.434, 0.691, 0.051, 0.89, 0.21], [0.598, 0.921, 0.959, 0.657, 0.817, 0.87], [0.594, 0.985], [0.472, 0.879], [0.611, 0.746], [0.607, 0.809], [0.812, 0.426, 0.76, 0.753, 0.849, 0.589], [0.464, 0.174, 0.775, 0.264, 0.626, 0.156], [0.18, 0.5, 0.302, 0.193, 0.18, 0.333]], fill: C.red });
++  shape(s, { x: 3.928, y: 2.112, w: 2.31, h: 2.214, rot: 270, path: [[0.811, 0.202], [0.734, 0.276], [0.379, 0.197, 0.643, 0.177, 0.502, 0.145], [0.18, 0.508, 0.256, 0.248, 0.177, 0.372], [0.394, 0.809, 0.183, 0.644, 0.268, 0.764], [0.389, 0.746], [0.528, 0.879], [0.406, 0.985], [0.402, 0.921], [0.402, 0.921], [0.072, 0.543, 0.223, 0.879, 0.091, 0.727], [0.321, 0.107, 0.054, 0.359, 0.154, 0.184], [0.811, 0.202, 0.488, 0.029, 0.685, 0.068]], fill: C.red });
++  shape(s, { g: 'blockArc', deg: [225, 180], thick: 0.255, x: 5.415, y: 1.651, w: 1.985, h: 1.903, rot: 270, fill: C.red });
++  text(s, [['CUSTOMER', hb(14, C.slate)]], { x: 3.129, y: 2.112, w: 1.228, h: 0.427, align: 'center', valign: 'middle', ls: 0.9 });
++  text(s, [
++    ['CAR', hb(15, C.red)],
++    ['SIDE', hb(15, C.slate)]], { x: 4.543, y: 3.178, w: 1.031, h: 0.427, align: 'center', valign: 'middle', ls: 0.9 });
++  text(s, [['END USER', hb(14, C.slate)]], { x: 5.961, y: 2.063, w: 0.892, h: 0.427, align: 'center', valign: 'middle', ls: 0.9 });
++  text(s, [[MAECENAS, bd(9, C.gray)]], { x: 0.513, y: 3.621, w: 2.656, h: 0.451, align: 'center', ls: 1.3 });
++  text(s, [[MAECENAS, bd(9, C.gray)]], { x: 3.578, y: 4.683, w: 2.889, h: 0.451, align: 'center', ls: 1.3 });
++  text(s, [[MAECENAS + ' massa.', bd(9, C.gray)]], { x: 7.117, y: 3.531, w: 2.442, h: 0.647, align: 'center', ls: 1.3 });
++  text(s, [['CUSTOMER', hd(21, C.ink)]], { x: 0.907, y: 3.282, w: 1.867, h: 0.429, align: 'center' });
++  text(s, [['MONTEER', hd(21, C.ink)]], { x: 3.875, y: 4.326, w: 2.25, h: 0.429, align: 'center' });
++  text(s, [['END USER', hd(21, C.ink)]], { x: 7.213, y: 3.189, w: 2.25, h: 0.429, align: 'center' });
++  grad(s, { g: 'parallelogram', adj: 102552, x: 7.537, y: 0, w: 1.516, h: 0.976, fH: true, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  shape(s, { g: 'parallelogram', adj: 97226, x: 8.201, y: 0, w: 0.714, h: 0.689, fH: true, fill: C.redLite, alpha: 12.9 });
++  text(s, [
++    ['SHOW REPORTS  ', hd(35, C.ink)],
++    ['AUTOMOTIVE', hd(35, C.pink)]], { x: 0.876, y: 0.723, w: 8.247, h: 0.606, align: 'center', ls: 0.9 });
++  glyph(s, 3.507, 2.494, 0.472, 0.472, C.red);   // customer avatar
++  glyph(s, 6.189, 2.507, 0.446, 0.446, C.red);   // end-user avatar
++}
++
++/* Slide 18 — Arrow process — four numbered cards ending in an arrowhead */
++function slide18(s) {
++  badge(s, 18);
++  footer(s, C.silver);
++  grad(s, { g: 'rtTriangle', x: 8.062, y: 0, w: 1.938, h: 1.759, rot: 180, ang: 270 }, [[0, C.orangeDeep, 89.8], [14, C.orangeDeep, 89.8], [100, C.orange, 0]]);
++  grad(s, { g: 'parallelogram', adj: 90081, x: -0.293, y: 1.042, w: 1.591, h: 1.106, fH: true, ang: 270 }, [[0, C.orange, 0], [8, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  grad(s, { g: 'parallelogram', adj: 94840, x: -0.164, y: 1.417, w: 0.668, h: 0.653, fH: true, ang: 270 }, [[0, C.redLite, 0], [100, C.redLite, 100]]);
++  grad(s, { g: 'parallelogram', adj: 96873, x: 8.735, y: 0.972, w: 1.257, h: 1.23, rot: -3.8, fH: true, ang: 270 }, [[0, C.red, 0], [66, C.red, 100], [100, C.red, 100]]);
++  text(s, [
++    ['OUR MOTOGEN ', hd(35, C.ink)],
++    ['ARROW PROCESS', hd(35, C.pink)]], { x: 0.605, y: 1.092, w: 8.565, h: 0.606, ls: 0.9 });
++  text(s, [[LOREM_LONG + 'Faucibus in', bd(9, C.gray)]], { x: 0.676, y: 1.746, w: 7.213, h: 0.451, ls: 1.3 });
++  // four process cards; the last is an arrowhead that closes the row
++  const CARDS = [
++    { x: 0.734, num: '01', fill: C.red,        capX: 0.839, capW: 1.779, tx: 0.839 },
++    { x: 2.838, num: '02', fill: C.redLite,    capX: 2.938, capW: 1.713, tx: 2.938 },
++    { x: 4.941, num: '03', fill: C.orange,     capX: 5.11,  capW: 1.728, tx: 5.111 },
++    { x: 7.044, num: '04', fill: C.orangeDeep, capX: 7.133, capW: 1.713, tx: 7.183, arrow: true },
++  ];
++  CARDS.forEach(c => {
++    if (c.arrow) shape(s, { g: 'rightArrow', x: c.x, y: 2.367, w: 2.445, h: 1.989, fill: c.fill });
++    else         shape(s, { x: c.x, y: 2.646, w: 2.019, h: 1.427, fill: c.fill });
++    text(s, [['Epic engine performance.', hb(15, C.white)]], { x: c.tx, y: 3.392, w: 1.416, h: 0.581 });
++    text(s, [[LOREM.slice(0, 78), bd(9, C.gray)]], { x: c.capX, y: 4.22, w: c.capW, h: 0.647, ls: 1.3 });
++    text(s, [[c.num, hd(27, C.white)]], { x: c.x + 1.272, y: 2.766, w: 0.619, h: 0.479, align: 'right', ls: 0.85 });
++  });
++}
++
++/* Slide 19 — Three ringed photo nodes joined by dashed connectors */
++function slide19(s) {
++  badge(s, 19);
++  footer(s, C.silver);
++  grad(s, { g: 'parallelogram', adj: 90081, x: 8.983, y: 0, w: 1.045, h: 0.517, ang: 270 }, [[0, C.orange, 0], [8, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  grad(s, { g: 'parallelogram', adj: 94840, x: 9.368, y: 0.343, w: 0.548, h: 0.537, ang: 270 }, [[0, C.redLite, 0], [100, C.redLite, 100]]);
++  grad(s, { g: 'parallelogram', adj: 93554, x: -0.003, y: 1.132, w: 1.004, h: 1.23, ang: 270 }, [[0, C.red, 0], [66, C.red, 100], [100, C.red, 100]]);
++  shape(s, { g: 'arc', deg: [66.6, 330.9], x: 7.176, y: 0.825, w: 2.095, h: 2.095, line: { c: C.red, pt: 5 } });
++  shape(s, { g: 'arc', deg: [191.9, 130.6], x: 7.23, y: 0.879, w: 1.987, h: 1.987, line: { c: C.orange, pt: 5 } });
++  shape(s, { g: 'arc', deg: [23.5, 304.9], x: 4.18, y: 2.983, w: 2.095, h: 2.095, line: { c: C.red, pt: 5 } });
++  shape(s, { g: 'arc', deg: [93.3, 353.5], x: 4.234, y: 3.037, w: 1.987, h: 1.987, line: { c: C.orange, pt: 5 } });
++  shape(s, { g: 'arc', deg: [124.9, 10.4], x: 1.041, y: 1.889, w: 2.095, h: 2.095, line: { c: C.red, pt: 5 } });
++  shape(s, { g: 'arc', deg: [261.1, 172.3], x: 1.095, y: 1.943, w: 1.987, h: 1.987, line: { c: C.orange, pt: 5 } });
++  line(s, { x: 3.159, y: 3.484, w: 0.875, h: 0.38, c: C.red, pt: 1, dash: 'dash' });
++  line(s, { x: 6.253, y: 2.616, w: 0.938, h: 0.747, fH: true, c: C.red, pt: 1, dash: 'dash' });
++  text(s, [
++    ['ROADS OF', hd(35, C.ink)],
++    [' MOTORCYCLE', hd(35, C.pink)]], { x: 1.153, y: 0.89, w: 5.916, h: 1.136, ls: 0.9 });
++  grad(s, { g: 'rtTriangle', x: 8.531, y: 4.292, w: 1.469, h: 1.333, fH: true, ang: 270 }, [[0, C.orange, 0], [8, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  photo(s, { x: 1.172, y: 2.02, w: 1.833, h: 1.833, oval: true });
++  photo(s, { x: 4.311, y: 3.115, w: 1.833, h: 1.833, oval: true });
++  photo(s, { x: 7.3, y: 0.948, w: 1.833, h: 1.833, oval: true });
++  // three skewed stat pills, each tethered to a photo node
++  const PILLS = [
++    { x: 0.679, y: 4.164, num: '250+', cap: 'SPEEDO ACCURACY',   capW: 1.157, mid: 67 },
++    { x: 3.86,  y: 1.906, num: '380+', cap: 'PERFORMANCE MOTOR', capW: 1.352, mid: 72 },
++    { x: 6.722, y: 3.249, num: '800+', cap: 'LIMITED EDITION',   capW: 1.157, mid: 67 },
++  ];
++  PILLS.forEach(p => {
++    grad(s, { g: 'flowChartInputOutput', x: p.x, y: p.y, w: 2.481, h: 0.812, ang: 230 },
++         [[0, C.red, 0], [22, C.red, 0], [p.mid, C.red, 100], [100, C.red, 100]]);
++    text(s, [[p.num, hd(30, C.white)]], { x: p.x + 0.453, y: p.y + 0.101, w: 1.205, h: 0.505, valign: 'middle', ls: 0.8 });
++    text(s, [[p.cap, bd(8, C.white)]], { x: p.x + 0.429, y: p.y + 0.497, w: p.capW, h: 0.202 });
++  });
++}
++
++/* Slide 20 — Website mock-up with two value plates */
++function slide20(s) {
++  badge(s, 20);
++  footer(s, C.silver);
++  grad(s, { g: 'parallelogram', adj: 100096, x: 6.111, y: 3.277, w: 4.378, h: 2.348, fH: true, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  grad(s, { g: 'parallelogram', adj: 100096, x: 6.741, y: 0, w: 4.455, h: 2.88, fH: true, ang: 270 }, [[0, C.red, 0], [19, C.red, 0], [82, C.red, 89.8], [100, C.red, 89.8]]);
++  shape(s, { g: 'rtTriangle', x: 0, y: 4.593, w: 3.114, h: 1.032, fill: C.ghost });
++  text(s, [
++    ['OUR WEBSITE ', hd(35, C.ink)],
++    ['AUTOMOTIVE', hd(35, C.pink)]], { x: 0.761, y: 0.924, w: 3.576, h: 1.666, ls: 0.9 });
++  text(s, [[QUI_SINT + ' quo numquam. Non exercitationem reiciendis qui consequatur', bd(9, C.gray)]], { x: 0.761, y: 2.514, w: 3.315, h: 0.451, ls: 1.3 });
++  photo(s, { x: 4.346, y: 0.636, w: 5.221, h: 4.628 });
++  shape(s, { g: 'parallelogram', adj: 36143, x: 3.162, y: 3.276, w: 2.64, h: 1.231, fill: C.red });
++  text(s, [['Target Value', bd(12, C.white)]], { x: 3.602, y: 3.972, w: 1.565, h: 0.313, ls: 1.3 });
++  text(s, [['$21.000', hd(36, C.white)]], { x: 3.602, y: 3.276, w: 1.565, h: 0.818, valign: 'bottom', ls: 1.3 });
++  shape(s, { g: 'parallelogram', adj: 36143, x: 0.627, y: 3.276, w: 2.64, h: 1.231, fill: C.ink });
++  text(s, [['First Value', bd(12, C.white)]], { x: 1.066, y: 3.972, w: 1.565, h: 0.313, ls: 1.3 });
++  text(s, [['$5.560', hd(36, C.white)]], { x: 1.066, y: 3.276, w: 1.565, h: 0.818, valign: 'bottom', ls: 1.3 });
++  photo(s, { x: 4.524, y: 1.101, w: 4.808, h: 2.82 });
++}
++
++/* Slide 21 — Leader profile with two score bars */
++function slide21(s) {
++  badge(s, 21);
++  footer(s, C.silver);
++  grad(s, { g: 'parallelogram', adj: 31765, x: 7.709, y: 0, w: 2.748, h: 3.149, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  grad(s, { g: 'parallelogram', adj: 100455, x: 8.881, y: 2.64, w: 1.652, h: 1.627, rot: -24.96, ang: 45 }, [[0, C.white, 32.9], [41, C.white, 32.9], [100, C.white, 100]]);
++  grad(s, { g: 'parallelogram', adj: 41937, x: 4.997, y: 2.039, w: 2.826, h: 3.586, ang: 270 }, [[0, C.red, 0], [82, C.red, 89.8], [100, C.red, 89.8]]);
++  shape(s, { x: 0.879, y: 1.164, w: 4.003, h: 0.983, fill: C.red });
++  text(s, [['REONARDO H.', hb(34, C.white)]], { x: 1.1, y: 1.286, w: 3.63, h: 0.562, ls: 0.85 });
++  shape(s, { g: 'parallelogram', adj: 33779, x: 2.823, y: 2.042, w: 2.445, h: 0.39, fill: C.orange });
++  line(s, { x: 2.577, y: 2.358, w: 1.876, h: 0, c: C.maroon, pt: 2.5 });
++  text(s, [['JOB POSITION', hd(11, C.white)]], { x: 3.403, y: 2.083, w: 1.286, h: 0.233, align: 'center', ls: 0.85 });
++  line(s, { x: 0.69, y: 1.01, w: 0.732, h: 0, c: C.red, pt: 2.5 });
++  text(s, [[LOREM_LONG.slice(0, 218), bd(10, C.gray)]], { x: 0.843, y: 3.056, w: 4.375, h: 0.695, ls: 1.3 });
++  shape(s, { g: 'parallelogram', adj: 31765, x: 3.798, y: 4.005, w: 1.516, h: 0.745, fill: C.orange });
++  grad(s, { g: 'parallelogram', adj: 31765, x: 5.056, y: 4.005, w: 1.836, h: 0.745, ang: 270 }, [[0, C.ink, 100], [78, C.slate, 100], [100, C.slate, 100]]);
++  text(s, [['9,5', hb(33, C.white)]], { x: 4.139, y: 4.152, w: 0.883, h: 0.548, ls: 0.8 });
++  text(s, [['PERFORMANCE', hb(15, C.white)]], { x: 5.327, y: 4.184, w: 2.074, h: 0.284, ls: 0.8 });
++  text(s, [['“BEST ACCURACY”', bd(9, C.orange)]], { x: 5.312, y: 4.427, w: 1.725, h: 0.197, ls: 0.8 });
++  grad(s, { g: 'parallelogram', adj: 31765, x: 2.014, y: 4.005, w: 1.836, h: 0.745, ang: 270 }, [[0, C.ink, 100], [78, C.slate, 100], [100, C.slate, 100]]);
++  shape(s, { g: 'parallelogram', adj: 31765, x: 0.766, y: 4.005, w: 1.485, h: 0.745, fill: C.red });
++  text(s, [['8,0', hb(33, C.white)]], { x: 1.105, y: 4.159, w: 0.908, h: 0.548, ls: 0.8 });
++  text(s, [['WORKING MOTOR', hb(15, C.white)]], { x: 2.267, y: 4.184, w: 1.26, h: 0.29, ls: 0.8 });
++  text(s, [['“GOOD ACCURACY”', bd(9, C.orange)]], { x: 2.251, y: 4.427, w: 1.725, h: 0.197, ls: 0.8 });
++  text(s, [['OUR AMAZING LEADER MOTOGEN', hb(18, C.ink)]], { x: 0.843, y: 2.732, w: 3.077, h: 0.379 });
++  photo(s, { x: 5.827, y: 0, w: 3.888, h: 5.625 });
++}
++
++/* Slide 22 — Team — four skewed portrait plates on a dark gradient */
++function slide22(s) {
++  gradBg(s, [[0, C.slate, 100], [68, C.ink, 100], [100, C.ink, 100]], 40);
++  badge(s, 22);
++  footer(s, C.silver);
++  line(s, { x: -0.287, y: 4.657, w: 0.846, h: 1.043, fH: true, c: C.white, alpha: 18.8, pt: 2 });
++  line(s, { x: 0.105, y: 4.048, w: 0.76, h: 0.937, fH: true, c: C.white, alpha: 18.8, pt: 2 });
++  text(s, [['WE ARE BEST TEAM AUTOMOTIVE', hd(35, C.white)]], { x: 1.791, y: 0.747, w: 6.418, h: 1.136, align: 'center', ls: 0.9 });
++  grad(s, { g: 'parallelogram', adj: 90081, x: 8.239, y: 0, w: 1.755, h: 0.913, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  grad(s, { g: 'parallelogram', adj: 90081, x: 9.198, y: 0.333, w: 1.187, h: 0.913, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  // four team plates; alternating members sit 0.376in higher
++  const TEAM = [
++    { x: 0.346, y: 1.966, name: 'JAMES GRED', nx: 0.597, nw: 1.684, tag: C.red     },
++    { x: 2.616, y: 1.59,  name: 'THEOS JACO', nx: 2.859, nw: 1.644, tag: C.redLite },
++    { x: 4.801, y: 1.966, name: 'ALEX FERDO', nx: 5.059, nw: 1.684, tag: C.red     },
++    { x: 7.149, y: 1.59,  name: 'WILLY SONK', nx: 7.372, nw: 1.644, tag: C.redLite },
++  ];
++  TEAM.forEach((m, i) => {
++    if (i % 2 === 0) {   // red ticks sit above the low plates, below the raised ones
++      shape(s, { g: 'parallelogram', adj: 31918, x: m.x + 0.323, y: m.y - 0.155, w: 0.63,  h: 0.46,  fill: m.tag });
++      shape(s, { g: 'parallelogram', adj: 31918, x: m.x + 0.931, y: m.y - 0.331, w: 0.283, h: 0.215, fill: m.tag });
++    } else {
++      shape(s, { g: 'parallelogram', adj: 31918, x: m.x + 1.572, y: m.y + 2.636, w: 0.58,  h: 0.435, fill: m.tag });
++      shape(s, { g: 'parallelogram', adj: 31918, x: m.x + 1.29,  y: m.y + 3.069, w: 0.283, h: 0.215, fill: m.tag });
++    }
++    grad(s, { g: 'parallelogram', adj: 25772, x: m.x, y: m.y, w: 2.51, h: 2.924, ang: 270 },
++         [[0, C.red, 89.8], [56, C.red, 0], [100, C.red, 0]]);
++    text(s, [[m.name, hd(24, C.white)]], { x: m.nx, y: m.y + 2.192, w: m.nw, h: 0.419, valign: 'middle', ls: 0.8 });
++    text(s, [['NAME POSITION', bd(9, C.white)]], { x: m.nx + 0.01, y: m.y + 2.566, w: 1.184, h: 0.197, ls: 0.8 });
++  });
++  // portraits sit on top, exactly as in the source deck
++  TEAM.forEach(m => photo(s, { x: m.x, y: m.y, w: 2.51, h: 2.924, pts: [[0.258, 0], [1, 0], [0.742, 1], [0, 1]] }));
++}
++
++/* Slide 23 — Gallery — three overlapping skewed plates */
++function slide23(s) {
++  badge(s, 23);
++  footer(s, C.silver);
++  grad(s, { g: 'parallelogram', adj: 46876, x: 3.724, y: 0, w: 4.307, h: 5.625, ang: 270 }, [[0, C.redLite, 0], [90, C.redLite, 100], [100, C.redLite, 100]]);
++  grad(s, { g: 'parallelogram', adj: 64560, x: 0.101, y: 5.107, w: 0.732, h: 0.518, rot: 180, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  grad(s, { g: 'parallelogram', adj: 63679, x: 2.418, y: 0, w: 1.991, h: 3.5, ang: 270 }, [[0, C.redLite, 0], [90, C.redLite, 100], [100, C.redLite, 100]]);
++  line(s, { x: 3.524, y: -0.015, w: 1.123, h: 3.05, fH: true, c: C.orange, pt: 1.75 });
++  line(s, { x: 7.884, y: 0, w: 0.371, h: 1.134, fH: true, c: C.orange, pt: 1.75 });
++  text(s, [
++    ['OUR MOTOGEN ', hd(35, C.ink)],
++    ['FOR', hd(35, C.pink)],
++    [' ', hd(35, C.ink)],
++    ['GALLERY', hd(35, C.pink)]], { x: 0.529, y: 3.787, w: 3.734, h: 1.666, ls: 0.9 });
++  badge(s, 23);
++  photo(s, { x: 0.469, y: 0, w: 3.941, h: 3.5, pts: [[0.321, 0], [1, 0], [0.679, 1], [0, 1]] });
++  photo(s, { x: 3.501, y: 0.672, w: 3.89, h: 3.911, pts: [[0.361, 0], [1, 0], [0.639, 1], [0, 1]] });
++  photo(s, { x: 6.343, y: 1.552, w: 3.657, h: 4.073, pts: [[0.403, 0], [1, 0], [1, 0.29], [0.714, 1], [0, 1]] });
++}
++
++/* Slide 24 — Picture collection — four skewed plates on a dark gradient */
++function slide24(s) {
++  gradBg(s, [[0, C.ink, 100], [100, C.slate, 100]], 250);
++  badge(s, 24);
++  footer(s, C.silver);
++  grad(s, { g: 'parallelogram', adj: 69334, x: 4.906, y: 4.306, w: 0.795, h: 0.982, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  grad(s, { g: 'parallelogram', adj: 69286, x: 8.958, y: 0, w: 1.07, h: 0.842, ang: 270 }, [[0, C.orange, 0], [100, C.orangeDeep, 72.9]]);
++  grad(s, { g: 'parallelogram', adj: 94840, x: 9.246, y: 0.596, w: 0.668, h: 0.653, rot: -7.25, ang: 270 }, [[0, C.redLite, 0], [100, C.redLite, 100]]);
++  text(s, [[LOREM_LONG + 'Faucibus in', bd(9, C.white)]], { x: 1.095, y: 1.453, w: 7.81, h: 0.451, align: 'center', ls: 1.3 });
++  text(s, [
++    ['PICTURE COLLECTION ', hd(35, C.white)],
++    ['MOVIES', hd(35, C.pink)]], { x: 0.876, y: 0.73, w: 8.247, h: 0.606, align: 'center', ls: 0.9 });
++  line(s, { x: 4.564, y: 4.818, w: 0.449, h: 0.807, fH: true, c: C.white, alpha: 16.9, pt: 3.5 });
++  photo(s, { x: 0, y: 2.181, w: 1.841, h: 2.45, pts: [[0, 0], [1, 0], [0.283, 1], [0, 1]] });
++  photo(s, { x: 0.574, y: 2.435, w: 4.281, h: 2.383, pts: [[0.3, 0], [1, 0], [0.7, 1], [0, 1]] });
++  photo(s, { x: 3.894, y: 2.181, w: 4.412, h: 2.45, pts: [[0.299, 0], [1, 0], [0.701, 1], [0, 1]] });
++  photo(s, { x: 7.053, y: 2.435, w: 2.947, h: 2.571, pts: [[0.47, 0], [1, 0], [1, 1], [0, 1]] });
++}
++
++/* Slide 25 — Closing — "Thank you!!" over an orange wedge */
++function slide25(s) {
++  photo(s, { x: 0, y: 0, w: 10, h: 5.625 });
++  text(s, [['Thank you!!', hd(114, C.white)]], { x: 0.546, y: 1.046, w: 4.933, h: 3.146, ls: 0.8 });
++  shape(s, { g: 'rtTriangle', x: 6.737, y: 0, w: 3.262, h: 2.96, rot: 180, fill: C.orangeDeep });
++  grad(s, { g: 'rtTriangle', x: 3.013, y: 1.562, w: 6.987, h: 4.062, fH: true, ang: 270 }, [[0, C.orange, 0], [46, C.orangeDeep, 89.8], [100, C.orangeDeep, 89.8]]);
++  text(s, [[LOREM_LONG.slice(0, 184), bd(8, C.white)]], { x: 6.275, y: 4.426, w: 3.33, h: 0.6, align: 'right', ls: 1.3 });
++  text(s, [['SEE YOU NEXT PRESENTATION', hb(24, C.white)]], { x: 6.528, y: 4.044, w: 3.077, h: 0.48, align: 'right' });
++}
++/* ================================================================== render */
++const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++                  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++                  slide19, slide20, slide21, slide22, slide23, slide24, slide25];
++
++// Slides 1-4, 11 and 25 sit on the pale photo backdrop; the rest are white.
++const PALE = new Set([1, 2, 3, 4, 11, 25]);
++
++const deck = new PptxGenJS();
++deck.author = 'Motogen Automotive';
++deck.title = 'Motogen Automotive';
++deck.defineLayout({ name: 'WIDE', width: 10, height: 5.625 });
++deck.layout = 'WIDE';
++
++BUILDERS.forEach((build, i) => {
++  const s = deck.addSlide();
++  s.background = { color: PALE.has(i + 1) ? C.ghost : C.white };
++  build(s);
++});
++
++deck.writeFile({ fileName: path.join(__dirname, '0d8716d0-5b2c-4de2-a9c1-9cb72d1045bc_grok_final.pptx') })
++  .then(f => console.log('wrote ' + f));

@@ -1,0 +1,614 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/agriculture_farming_infographics.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/agriculture_farming_infographics.js
+@@ -0,0 +1,611 @@
++/*
++ * "Agriculture Infographic" deck - 35 slides, 13.333in x 7.5in.
++ * Rebuilt with pptxgenjs only. The original vector illustrations are replaced by
++ * programmatic placeholders (dashed ring + soft blob + "[image]" caption).
++ */
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ palette */
++const C = {
++  body: '656D78',      // theme tx1 - default body gray
++  dark: '44546A',      // theme tx2 - headline gray-blue
++  a1: '42A5F5', a2: '2196F3', a3: '1E88E5', a4: '1976D2', a5: '1565C0',
++  // flattened stand-ins for the deck's radial accent gradients (lumMod 89%)
++  g1: '2296F3', g2: '0D87E9', g3: '1879CF', g4: '1669BB', g5: '135AAB',
++  gradCircle1: '1484DE',   // radial accent1 circle fill
++  gradCircle3: '156BB8',   // radial accent3 circle fill
++  blob: 'F2F2F2', ring: 'F6F6F6', ring2: 'D8DADD',
++  pieBack: 'EDEDED', pieMid: 'D1D4D4', swirlGray: 'DAE2E2',
++  card: 'EFF0F1', white: 'FFFFFF', navy: '115394', navyMid: '1D6DBD',
++};
++
++const F = {
++  light: 'Source Sans Pro Light',
++  reg: 'Source Sans Pro',
++  xlight: 'Source Sans Pro ExtraLight',
++  black: 'Roboto Black',
++  roboto: 'Roboto',
++};
++
++/* ---------------------------------------------------------- shared copy text */
++const T = {
++  lorem12: 'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
++    'authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. Kitsch authentic offal, ' +
++    'narwhal tilde etsy four loko selvage normcore messenger bag put a bird on it heirloom gastropub.',
++  lorem11: 'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
++    'authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. Kitsch authentic offal, ' +
++    'narwhal tilde etsy four loko selvage normcore messenger bag put a bird on it heirloom gastropub.',
++  short: 'Hashtag fashion axe fingerstache, everyday carry shoreditch brooklyn YOLO.',
++  medium: 'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami authentic brooklyn YOLO.',
++  synth: 'Synth chartreuse XOXO, tacos brooklyn VHS plaid.',
++  synthShort: 'Synth chartreuse XOXO, tacos VHS plaid.',
++  bicycle: 'Bicycle rights +1 actually shoreditch, vinyl fixie small batch pop-up',
++  headTitle: 'Agriculture Infographic Slide',
++  headSub: 'Letterpress next level trust fund, before they sold out +1 meh gluten-free locavore tacos PBR&B tofu. ',
++  analysisLabel: 'Agriculture Analysis',
++  analysisTitle: 'Process Agriculture Information Analysis',
++  contentTitle: 'CONTENT TITLE',
++};
++
++/* ---------------------------------------------------------- headline phrases */
++/* each entry: [text, accentColorOrNull] - accent entries render bold + colored */
++const QUOTES = {
++  farm: [['Farming ', null], ['looks mighty ', C.g1],
++    ['easy when your plow is a pencil, and you\u2019re a ', null], ['thousand', C.g2],
++    [' ', C.g2], ['miles', C.g2], [' from the ', null], ['corn', C.g4], [' field.', null]],
++  soil: [['The ', null], ['farmer', C.g1], [' works the ', null], ['soil', C.g3],
++    [', The ', null], ['agriculturist', C.g3], [' works the ', null], ['farmer', C.g5], ['.\u00a0', null]],
++  foundation: [['Agriculture', C.g1], [' is the ', null], ['foundation', C.g3],
++    [' of manufactures, since the ', null], ['productions', C.g2], [' of ', null], ['nature', C.g5],
++    [' are the ', null], ['materials', C.g3], [' of art.', null]],
++  impossible: [['It is ', null], ['impossible', C.g1], [' to have a ', null], ['healthy', C.g2],
++    [' and sound ', null], ['society', C.g3], [' without a ', null], ['proper', C.g5],
++    [' respect for the ', null], ['soil', C.g5], ['.', null]],
++  engenders: [['Agriculture', C.g1], [' engenders good ', null], ['sense', C.g3],
++    [', and good sense of an ', null], ['excellent', C.g4], [' kind.', null]],
++  sustainable: [['A sustainable ', null], ['agriculture', C.g1], [' is one which ', null],
++    ['depletes', C.g3], [' neither the ', null], ['people', C.g4], [' nor the ', null],
++    ['land', C.g5], ['.', null]],
++};
++
++let SH; // pptx.ShapeType, assigned in main()
++
++/* ============================================================ small helpers */
++const run = (text, options) => ({ text, options });
++
++function richText(slide, parts, opts) {
++  slide.addText(parts.map(([t, accent]) => run(t, accent ? { bold: true, color: accent } : { color: C.dark })), opts);
++}
++
++/** Illustration stand-in: dashed ring + soft gray blob + caption. */
++function artwork(slide, [x, y, w, h]) {
++  const d = Math.min(w, h), cx = x + w / 2, cy = y + h / 2, b = d * 0.77;
++  slide.addShape(SH.ellipse, {
++    x: cx - d / 2, y: cy - d / 2, w: d, h: d,
++    line: { color: C.dark, width: 1.5, dashType: 'dash' },
++  });
++  slide.addShape(SH.ellipse, { x: cx - b / 2, y: cy - b / 2, w: b, h: b, fill: { color: C.blob } });
++  slide.addText('[image]', {
++    x: cx - 1, y: cy - 0.16, w: 2, h: 0.32, align: 'center', margin: 0,
++    fontFace: F.light, fontSize: 12, color: 'B3B8BF',
++  });
++}
++
++/** Ring-with-checkmark icon, drawn centred on (cx, cy) at diameter d. */
++function checkIcon(slide, cx, cy, d, color) {
++  slide.addShape(SH.ellipse, {
++    x: cx - d / 2, y: cy - d / 2, w: d, h: d, line: { color, width: 1.1 },
++  });
++  slide.addText('\u2713', {
++    x: cx - d / 2, y: cy - d / 2, w: d, h: d,
++    align: 'center', valign: 'middle', margin: 0, wrap: false,
++    fontFace: F.reg, fontSize: d * 44, color,
++  });
++}
++
++/** Solid circle carrying a white ring-and-check - used for badges. */
++function checkBadge(slide, x, y, size, fillColor) {
++  slide.addShape(SH.ellipse, { x, y, w: size, h: size, fill: { color: fillColor } });
++  checkIcon(slide, x + size / 2, y + size / 2, size * 0.47, C.white);
++}
++
++/** Donut + block-arc percentage dial. */
++function dial(slide, x, y, size, backColor, arcColor, angles, thickness) {
++  slide.addShape(SH.donut, { x, y, w: size, h: size, fill: { color: backColor } });
++  slide.addShape(SH.blockArc, {
++    x, y, w: size, h: size, fill: { color: arcColor },
++    angleRange: angles, arcThicknessRatio: thickness,
++  });
++}
++
++/** Flat pie chip used along the bottom of the "statement" slides. */
++function pieChip(slide, x, y, size, chip) {
++  const c = (f) => ({ x: x + size * (1 - f) / 2, y: y + size * (1 - f) / 2, w: size * f, h: size * f });
++  slide.addShape(SH.ellipse, Object.assign(c(1), { fill: { color: C.pieBack } }));
++  slide.addShape(SH.pie, Object.assign(c(1), { fill: { color: chip.outer }, angleRange: chip.angles }));
++  slide.addShape(SH.ellipse, Object.assign(c(0.55), { fill: { color: C.pieMid } }));
++  slide.addShape(SH.pie, Object.assign(c(0.55), { fill: { color: chip.inner }, angleRange: chip.angles }));
++  slide.addShape(SH.ellipse, Object.assign(c(0.36), { fill: { color: C.white } }));
++  slide.addShape(SH.ellipse, Object.assign(c(0.12), { fill: { color: C.pieMid } }));
++}
++
++/** Three nested rings overlaid with coloured brush arcs. */
++function swirl(slide, x, y, arcs) {
++  const rings = [[0, 0, 1.0], [0.083, 0.083, 0.831], [0.171, 0.171, 0.659]];
++  rings.forEach(([dx, dy, s]) => slide.addShape(SH.ellipse, {
++    x: x + dx, y: y + dy, w: s, h: s, line: { color: C.swirlGray, width: 0.88 },
++  }));
++  arcs.forEach(([ring, color, a0, a1]) => {
++    const [dx, dy, s] = rings[ring];
++    slide.addShape(SH.arc, {
++      x: x + dx, y: y + dy, w: s, h: s, angleRange: [a0, a1],
++      line: { color, width: 4.25 },
++    });
++  });
++}
++
++/** Soft glowing dot used by the four-card slides. */
++function glowDot(slide, x, y) {
++  [[0, 0.543], [0.079, 0.384], [0.191, 0.161]].forEach(([d, s]) =>
++    slide.addShape(SH.ellipse, { x: x + d, y: y + d, w: s, h: s, fill: { color: C.a1, transparency: 71 } }));
++}
++
++/* ================================================== recurring text fragments */
++function slideHeader(slide) {
++  slide.addText([
++    run('Agriculture ', { color: C.body }),
++    run('Infographic', { color: C.a4 }),
++    run(' ', { color: C.a1 }),
++    run('Slide', { color: C.body }),
++  ], { x: 2.543, y: 0.446, w: 8.261, h: 0.64, align: 'center', fontFace: F.light, fontSize: 32 });
++
++  slide.addText([
++    run('Letterpress next level trust fund, ', { color: C.body }),
++    run('before', { color: C.a4 }),
++    run(' they sold out +1 meh gluten-free locavore tacos PBR&B tofu. ', { color: C.body }),
++  ], { x: 3.2, y: 1.027, w: 6.946, h: 0.303, align: 'center', wrap: false, fontFace: F.light, fontSize: 12 });
++}
++
++const bodyOpts = (x, y, w, h, size) => ({
++  x, y, w, h, fontFace: F.light, fontSize: size, color: C.body,
++  lineSpacingMultiple: 1.5, valign: 'top',
++});
++
++function synthLine(slide, x, y, w, h, size, color, wrap) {
++  slide.addText(T.synth, {
++    x, y, w, h, margin: 0, fontFace: F.light, fontSize: size, color,
++    lineSpacingMultiple: 1.3, valign: 'top', wrap: wrap !== false,
++  });
++}
++
++/** "Agriculture Analysis" / "Process Agriculture Information Analysis" pair. */
++function analysisCaption(slide, x, y, w, labelH, titleW, titleH, size) {
++  slide.addText(T.analysisLabel, {
++    x, y, w, h: labelH, margin: 0, fontFace: F.black, bold: true, fontSize: size, color: C.body,
++  });
++  slide.addText(T.analysisTitle, {
++    x, y: y + labelH, w: titleW, h: titleH, margin: 0, fontFace: F.black, bold: true,
++    fontSize: size + 1, color: C.g1, lineSpacingMultiple: 1.2,
++  });
++}
++
++/** Circle badge + big number + caption. */
++function statBadge(slide, x, y, value, caption, captionW, color) {
++  checkBadge(slide, x, y + 0.028, 0.6, color);
++  slide.addText(value, {
++    x: x + 0.736, y, w: 1.187, h: 0.438, margin: 0, wrap: false,
++    fontFace: F.black, bold: true, fontSize: 20, color: C.body,
++  });
++  slide.addText(caption, {
++    x: x + 0.848, y: y + 0.418, w: captionW, h: 0.168, margin: 0, wrap: false,
++    fontFace: F.reg, fontSize: 10, color: C.body,
++  });
++}
++
++/* ======================================================= slide-type builders */
++
++/** Cover / closing: dark radial-blue field with centred white type. */
++function buildTitleSlide(slide, opts) {
++  const edge = [0x11, 0x53, 0x94], core = [0x26, 0x76, 0xc1], steps = 18;
++  slide.addShape(SH.rect, { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: C.navy } });
++  for (let i = steps; i >= 1; i--) {
++    const f = i / steps, w = 17 * f, h = 13.5 * f;
++    const hex = edge.map((e, k) => Math.round(e + (core[k] - e) * (1 - f)).toString(16).padStart(2, '0'));
++    slide.addShape(SH.ellipse, {
++      x: 6.5 - w / 2, y: 3.6 - h / 2, w, h, fill: { color: hex.join('').toUpperCase() },
++    });
++  }
++  // faint concentric halos, echoing the original background artwork
++  [11.4, 9.6, 7.9, 6.3, 4.8, 3.4, 2.1].forEach((d) => slide.addShape(SH.ellipse, {
++    x: 6.4 - d / 2, y: 3.4 - d / 2, w: d, h: d,
++    line: { color: C.white, width: 0.75, transparency: 90 },
++  }));
++  slide.addShape(SH.ellipse, { x: -2.6, y: 2.4, w: 8.5, h: 8.5, fill: { color: C.white, transparency: 96 } });
++  slide.addShape(SH.ellipse, { x: 6.4, y: -3.2, w: 9.5, h: 9.5, fill: { color: C.white, transparency: 96 } });
++
++  if (opts.kicker) {
++    slide.addText(opts.kicker.text, Object.assign({
++      align: 'center', fontFace: F.reg, fontSize: opts.kicker.size, bold: opts.kicker.bold,
++      color: C.white, lineSpacingMultiple: 0.9, wrap: opts.kicker.wrap,
++    }, opts.kicker.box));
++  }
++  slide.addText('AGRICULTURE', {
++    x: opts.bigX, y: 2.96, w: 7.943, h: 1.582, align: 'center', wrap: false,
++    fontFace: F.reg, fontSize: 88, bold: true, color: C.white,
++  });
++  slide.addText(opts.footnote.text, Object.assign({
++    align: 'center', fontFace: F.light, fontSize: 12, color: C.white, wrap: false,
++  }, opts.footnote.box));
++  if (opts.arrow) {
++    slide.addShape(SH.ellipse, { x: 6.433, y: 5.041, w: 0.468, h: 0.468, line: { color: C.white, width: 1 } });
++    slide.addText('\u2193', {
++      x: 6.433, y: 5.041, w: 0.468, h: 0.468, align: 'center', valign: 'middle', margin: 0, wrap: false,
++      fontFace: F.reg, fontSize: 18, color: C.white,
++    });
++  }
++}
++
++/** Type A - headline, paragraph and three ticked one-liners. */
++function buildQuoteBullets(slide, s) {
++  const { x, y } = s;
++  richText(slide, QUOTES.farm, { x, y, w: 6.334, h: 1.313, fontFace: F.roboto, fontSize: 24, valign: 'top' });
++  slide.addText(T.lorem12, bodyOpts(x, y + 1.269, 5.32, 1.313, 12));
++  for (let i = 0; i < 3; i++) {
++    const by = y + 2.684 + i * 0.496;
++    checkIcon(slide, x + 0.245, by + 0.182, 0.302, C.a1);
++    synthLine(slide, x + 0.469, by, 3.548, 0.342, 12, C.body, false);
++  }
++}
++
++/** Type B - oversized section title (+ optional badges, card or dials). */
++function buildBigTitle(slide, s) {
++  const [tx, ty, tw] = s.title;
++  const heading = [
++    run(s.kicker, { fontSize: 14, bold: true, color: C.body, breakLine: true }),
++    run(s.kickerSub, { fontSize: 14, bold: true, color: s.kickerColor, breakLine: true }),
++    run(' ', { fontSize: 4, breakLine: true }),
++  ].concat(s.big.map(([t, col]) => run(t, { fontSize: 42.67, bold: true, color: col || C.body })));
++  slide.addText(heading, { x: tx, y: ty, w: tw, h: 1.358, fontFace: F.black, valign: 'top' });
++
++  slide.addText(T.contentTitle, {
++    x: s.contentTitle[0], y: s.contentTitle[1], w: 2.049, h: 0.325,
++    fontFace: F.black, bold: true, fontSize: 13.33, color: C.body,
++  });
++  slide.addText(T.lorem11, bodyOpts(s.body[0], s.body[1], s.body[2], 0.934, 11));
++
++  (s.tickRows || []).forEach((r) => {
++    checkBadge(slide, r.circle[0], r.circle[1], 0.748, r.color);
++    synthLine(slide, r.text[0], r.text[1], 3.113, 0.233, 10.5, r.color);
++    slide.addText(T.short, bodyOpts(r.text[0] + 0.01, r.text[1] + 0.246, 4.343, 0.538, 12));
++  });
++
++  if (s.card) {
++    slide.addShape(SH.roundRect, {
++      x: s.card[0], y: s.card[1], w: 4.257, h: 0.785, rectRadius: 0.3925, fill: { color: C.card },
++    });
++    slide.addText(T.short, {
++      x: s.card[0] + 0.197, y: s.card[1], w: 3.863, h: 0.785, valign: 'middle', margin: 0,
++      fontFace: F.light, fontSize: 10, color: C.body, lineSpacingMultiple: 1.3,
++    });
++  }
++  (s.stats || []).forEach((st) => statBadge(slide, st[0], st[1], st[2], st[3], st[4], st[5]));
++  (s.dials || []).forEach((d) => {
++    dial(slide, d.x, d.y, 0.775, C.ring2, d.color, d.angles, d.thickness);
++    slide.addText(d.pct, {
++      x: d.x + 0.861, y: d.y + 0.152, w: 0.492, h: 0.287, margin: 0, wrap: false,
++      fontFace: F.black, bold: true, fontSize: 16, color: d.color,
++    });
++    slide.addText(d.label, {
++      x: d.x + 0.861, y: d.y + 0.451, w: 0.492, h: 0.226, margin: 0, wrap: false,
++      fontFace: F.black, bold: true, fontSize: 10, color: C.body,
++    });
++  });
++}
++
++/** Type C - four labelled cards, each with a glowing dot. */
++const CARD_TITLES = ['Shifting Cultivation', 'Nomadic Herding', 'Commercial Plantations', 'Mixed Farming'];
++function buildCards(slide, s) {
++  const cols = s.cols, rows = [s.row1, s.row2];
++  CARD_TITLES.forEach((title, i) => {
++    const bx = cols[i % 2], by = rows[Math.floor(i / 2)];
++    glowDot(slide, bx, by);
++    slide.addText(title, {
++      x: bx + 0.288, y: by + 0.22, w: 2.9, h: 0.404, margin: 0, wrap: false,
++      fontFace: F.black, bold: true, fontSize: 14, color: C.body,
++    });
++    slide.addText([
++      run(T.synthShort, { color: C.a1, breakLine: true }),
++      run(T.medium, { color: C.body }),
++    ], {
++      x: bx + 0.288, y: by + 0.792, w: 2.32, h: 1.096, margin: 0,
++      fontFace: F.light, fontSize: 10, lineSpacingMultiple: 1.5, valign: 'top',
++    });
++  });
++}
++
++/** Type D - headline, sub-lines, paragraph and three donut dials. */
++function buildQuoteDials(slide, s) {
++  richText(slide, QUOTES[s.quote], {
++    x: s.head[0], y: s.head[1], w: s.head[2], h: 1.313,
++    fontFace: F.roboto, fontSize: s.headSize, valign: 'top',
++  });
++  slide.addText(T.bicycle, {
++    x: s.col, y: s.rows[0], w: 4.718, h: 0.572, fontFace: F.xlight, fontSize: 14, color: C.a1, valign: 'top',
++  });
++  synthLine(slide, s.col, s.rows[1], 3.154, 0.312, 10.5, C.body, false);
++  slide.addText(T.lorem12, bodyOpts(s.col, s.rows[2], 5.32, 1.313, 12));
++
++  const dials = [
++    { dx: 0, pct: '89%', label: 'Type A', color: C.a1, angles: [271.06, 213.4], thickness: 0.497, pw: 0.788, lw: 0.658 },
++    { dx: 1.25, pct: '74%', label: 'Type B', color: C.a3, angles: [271.06, 165.61], thickness: 0.495, pw: 0.895, lw: 0.895 },
++    { dx: 2.582, pct: '53%', label: 'Type C', color: C.a4, angles: [342.74, 165.61], thickness: 0.495, pw: 0.895, lw: 0.895 },
++  ];
++  dials.forEach((d) => {
++    const x = s.dial[0] + d.dx, y = s.dial[1];
++    dial(slide, x, y, 0.6, C.ring, d.color, d.angles, d.thickness);
++    slide.addText(d.pct, {
++      x: x + 0.669, y: y + 0.114, w: d.pw, h: 0.293, margin: 0, wrap: false,
++      fontFace: F.black, bold: true, fontSize: 12, color: d.color,
++    });
++    slide.addText(d.label, {
++      x: x + 0.669, y: y + 0.338, w: d.lw, h: 0.183, margin: 0, wrap: false,
++      fontFace: F.black, bold: true, fontSize: 10, color: C.body,
++    });
++  });
++}
++
++/** Type E - statement block above a row of four flat pie chips. */
++const PIE_CHIPS = [
++  { outer: C.a4, inner: '12589D', angles: [270, 342] },
++  { outer: C.a1, inner: '317BB7', angles: [270, 44] },
++  { outer: C.a3, inner: '1666AB', angles: [270, 300] },
++  { outer: C.a2, inner: '1870B6', angles: [270, 119] },
++];
++function buildStatementPies(slide, s) {
++  const [x, y] = s.at;
++  richText(slide, QUOTES.foundation, { x, y, w: 5.764, h: 1.313, fontFace: F.roboto, fontSize: 24, valign: 'top' });
++  slide.addText(T.bicycle, {
++    x, y: y + 1.168, w: 4.718, h: 0.572, fontFace: F.xlight, fontSize: 14, color: C.a1, valign: 'top',
++  });
++  synthLine(slide, x, y + 1.664, 3.154, 0.312, 10.5, C.body, false);
++  slide.addText(T.lorem12, bodyOpts(x, y + 1.926, 5.32, 1.313, 12));
++  [0, 1.309, 2.690, 4.037].forEach((dx, i) =>
++    pieChip(slide, x + dx, y + 3.409, 1.108, PIE_CHIPS[i]));
++}
++
++/** Type F - four "Analysis 0N" cards with gradient badges. */
++function buildAnalysisCards(slide, s) {
++  s.at.forEach(([gx, gy], i) => {
++    checkBadge(slide, gx, gy, 0.655, C.gradCircle3);
++    slide.addText('Analysis 0' + (i + 1), {
++      x: gx + 0.82, y: gy + 0.175, w: 1.934, h: 0.281, margin: 0, valign: 'middle', wrap: false,
++      fontFace: F.black, bold: true, fontSize: 14, color: C.body, lineSpacingMultiple: 1.3,
++    });
++    slide.addText([
++      run(T.synth, { fontSize: 11, color: C.a3, breakLine: true }),
++      run(T.medium, { fontSize: 10, color: C.body }),
++    ], {
++      x: gx, y: gy + 0.855, w: 3.09, h: 0.866, margin: 0,
++      fontFace: F.light, lineSpacingMultiple: 1.5, valign: 'top',
++    });
++  });
++}
++
++/** Type G - headline, paragraph, two stat badges (slide 8). */
++function buildQuoteStats(slide, s) {
++  richText(slide, QUOTES.impossible, {
++    x: 6.667, y: 2.458, w: 5.227, h: 1.313, fontFace: F.roboto, fontSize: 24, valign: 'top',
++  });
++  slide.addText(T.lorem12, bodyOpts(6.69, 3.6, 5.32, 1.313, 12));
++  statBadge(slide, 6.8, 5.039, '2.888 K', 'Male User', 0.577, C.a4);
++  statBadge(slide, 8.929, 5.064, '1.074 K', 'Female User', 0.731, C.a1);
++}
++
++/** Type H - icon + one-liner rows plus an analysis caption block. */
++function buildIconRows(slide, s) {
++  s.rows.forEach(([ix, iy, tx, ty, tw]) => {
++    slide.addShape(SH.ellipse, { x: ix, y: iy, w: 0.42, h: 0.42, line: { color: C.a5, width: 1.4 } });
++    slide.addShape(SH.ellipse, { x: ix + 0.13, y: iy + 0.13, w: 0.16, h: 0.16, fill: { color: C.a1 } });
++    slide.addText(T.synth, {
++      x: tx, y: ty, w: tw, h: 0.626, margin: 0, fontFace: F.light, fontSize: 12,
++      color: C.body, lineSpacingMultiple: 1.3, valign: 'top',
++    });
++  });
++  analysisCaption(slide, s.caption[0], s.caption[1], 2.881, s.caption[2], s.caption[3], s.caption[4], s.captionSize);
++  slide.addText(s.paras.map((p, i) => run(p, { breakLine: i < s.paras.length - 1 })),
++    bodyOpts(s.para[0], s.para[1], s.para[2], s.para[3], 11));
++}
++
++/** Type I - headline, paragraph and three brush-stroke rings. */
++const SWIRLS = [
++  { at: [0.686, 4.652], arcs: [[0, C.a2, 300, 130], [1, '12589D', 40, 200], [2, C.a1, 330, 150]] },
++  { at: [2.808, 4.651], arcs: [[0, C.a3, 200, 20], [1, C.a1, 300, 140], [2, C.a4, 20, 220]] },
++  { at: [4.955, 4.618], arcs: [[0, C.a4, 240, 300], [1, C.a3, 300, 120], [2, C.a1, 60, 250]] },
++];
++const SWIRL_LABELS = [['54%', 'Type A', 1.863, 4.978], ['85%', 'Type B', 4.013, 4.971], ['35%', 'Type C', 6.174, 4.975]];
++function buildQuoteSwirls(slide) {
++  richText(slide, QUOTES.engenders, {
++    x: 0.591, y: 2.217, w: 5.879, h: 0.909, fontFace: F.roboto, fontSize: 24, valign: 'top',
++  });
++  slide.addText(T.lorem12, bodyOpts(0.591, 3.13, 5.32, 1.313, 12));
++  SWIRLS.forEach((s) => swirl(slide, s.at[0], s.at[1], s.arcs));
++  SWIRL_LABELS.forEach(([pct, label, lx, ly]) => {
++    slide.addText(pct, {
++      x: lx, y: ly, w: 0.492, h: 0.287, margin: 0,
++      fontFace: F.roboto, bold: true, fontSize: 16, color: C.a5,
++    });
++    slide.addText(label, {
++      x: lx, y: ly + 0.299, w: 0.492, h: 0.226, margin: 0,
++      fontFace: F.roboto, bold: true, fontSize: 10, color: C.body,
++    });
++  });
++}
++
++/** Slide 30 - six analysis blocks flanking the artwork. */
++function buildSixAnalysis(slide, s) {
++  s.blocks.forEach((b) => {
++    const align = b.align;
++    checkBadge(slide, b.circle[0], b.circle[1], 0.516, C.gradCircle1);
++    slide.addText(b.label, {
++      x: b.title[0], y: b.title[1], w: b.title[2], h: 0.314, margin: 0, align,
++      fontFace: F.black, bold: true, fontSize: 14, color: C.body,
++    });
++    slide.addText(T.synth, {
++      x: b.synth[0], y: b.synth[1], w: 2.513, h: 0.233, margin: 0, align,
++      fontFace: F.light, fontSize: 9, color: C.a1, lineSpacingMultiple: 1.3,
++    });
++    slide.addText(T.short, {
++      x: b.body[0], y: b.body[1], w: 2.51, h: b.body[2], margin: 0, align,
++      fontFace: F.light, fontSize: 10, color: C.body, lineSpacingMultiple: 1.5,
++    });
++  });
++}
++
++/* ================================================================ deck table */
++const ART = {
++  2: [0.84, 1.44, 5.65, 5.61], 3: [6.74, 1.43, 5.78, 5.61], 4: [0.72, 1.38, 5.52, 5.69],
++  5: [6.84, 1.42, 5.67, 5.64], 6: [0.73, 1.49, 5.53, 5.45], 7: [7.31, 1.45, 5.47, 5.50],
++  8: [0.63, 1.41, 5.91, 5.54], 9: [6.62, 1.58, 6.08, 5.39], 10: [0.79, 1.34, 5.58, 5.75],
++  11: [7.08, 1.52, 5.43, 5.46], 12: [0.69, 1.33, 5.85, 5.71], 13: [6.80, 1.39, 5.74, 5.75],
++  14: [0.97, 1.52, 5.57, 5.53], 15: [6.86, 1.26, 5.64, 5.73], 16: [0.76, 1.42, 5.72, 5.63],
++  17: [6.73, 1.43, 5.65, 5.54], 18: [0.72, 1.58, 4.96, 5.05], 19: [7.03, 1.38, 5.52, 5.60],
++  20: [0.84, 1.47, 5.59, 5.58], 21: [7.04, 1.44, 5.45, 5.50], 22: [0.76, 1.39, 5.76, 5.68],
++  23: [7.01, 1.50, 5.49, 5.46], 24: [0.83, 1.43, 5.51, 5.51], 25: [6.92, 1.41, 5.45, 5.54],
++  26: [0.91, 1.44, 5.50, 5.54], 27: [6.46, 1.23, 6.17, 5.77], 28: [0.67, 1.41, 5.81, 5.70],
++  29: [6.67, 1.42, 5.66, 5.67], 30: [4.47, 1.71, 4.39, 4.38], 31: [0.81, 1.33, 5.95, 5.79],
++  32: [6.62, 1.38, 5.77, 5.65], 33: [0.56, 1.49, 5.27, 5.05], 34: [6.74, 1.52, 5.79, 5.61],
++};
++
++const DIALS_4 = (base) => [
++  { x: base[0], y: base[1] + 0.039, pct: '20%', label: 'Type A', color: C.g1, angles: [271.06, 346.78], thickness: 0.491 },
++  { x: base[0] + 1.476, y: base[1] + 0.042, pct: '50%', label: 'Type B', color: C.g2, angles: [271.06, 89.44], thickness: 0.479 },
++  { x: base[0] + 3.091, y: base[1] + 0.042, pct: '80%', label: 'Type C', color: C.g5, angles: [255.23, 187.88], thickness: 0.500 },
++  { x: base[0] + 4.611, y: base[1], pct: '60%', label: 'Type D', color: C.g4, angles: [255.23, 155.06], thickness: 0.514 },
++];
++
++const PLANTING = (leftArt) => ({
++  title: [0.758, 1.762, 6.456], kicker: 'Planting', kickerSub: 'Seeds', kickerColor: C.g1,
++  big: [['PLANTING ', null], ['SEEDS', C.g1]],
++  contentTitle: [0.769, 3.034], body: [0.775, 3.384, 5.785],
++  tickRows: [
++    { circle: [0.846, 4.464], text: [1.797, 4.503], color: C.a1 },
++    { circle: [0.862, 5.682], text: [1.793, 5.682], color: C.a4 },
++  ],
++});
++
++const DECK = [
++  { n: 1, build: (s) => buildTitleSlide(s, {
++    kicker: { text: 'We\u2019ve been crafting beautiful presentation & making clients happy for years.',
++      size: 16, bold: false, wrap: true, box: { x: 2.831, y: 2.552, w: 7.672, h: 0.343 } },
++    bigX: 2.698, arrow: true,
++    footnote: { text: 'Letterpress next level trust fund, before. ', box: { x: 5.219, y: 4.542, w: 2.895, h: 0.303 } },
++  }) },
++  { n: 2, build: (s) => buildQuoteBullets(s, { x: 6.695, y: 2.23 }) },
++  { n: 3, build: (s) => buildBigTitle(s, PLANTING()) },
++  { n: 4, build: (s) => buildCards(s, { cols: [6.694, 9.984], row1: 1.909, row2: 4.273 }) },
++  { n: 5, build: (s) => buildQuoteDials(s, {
++    quote: 'soil', head: [0.713, 2.251, 5.619], headSize: 28, col: 0.726,
++    rows: [3.232, 3.729, 3.991], dial: [0.829, 5.49] }) },
++  { n: 6, build: (s) => buildStatementPies(s, { at: [6.667, 1.91] }) },
++  { n: 7, build: (s) => buildAnalysisCards(s, { at: [[0.686, 2.187], [4.208, 2.146], [0.686, 4.466], [4.208, 4.46]] }) },
++  { n: 8, build: (s) => buildQuoteStats(s) },
++  { n: 9, build: (s) => buildIconRows(s, {
++    rows: [[1.183, 2.517, 1.642, 2.4, 2.025], [3.963, 2.475, 4.44, 2.421, 2.025],
++      [3.944, 3.685, 4.44, 3.616, 2.025], [1.183, 3.715, 1.645, 3.648, 1.944]],
++    caption: [1.264, 4.882, 0.335, 1.755, 1.075], captionSize: 11,
++    para: [3.113, 4.794, 3.353, 0.934],
++    paras: ['Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. '] }) },
++  { n: 10, build: (s) => buildBigTitle(s, {
++    title: [6.65, 2.124, 5.807], kicker: 'Biotechnology', kickerSub: 'Analysis', kickerColor: C.a2,
++    big: [['BIOTECHNOLOGY', null]], contentTitle: [6.661, 3.396], body: [6.667, 3.747, 6.116],
++    card: [6.661, 4.737],
++    stats: [[6.696, 5.671, '2.888 K', 'Male User', 0.577, C.a1], [8.825, 5.696, '1.074 K', 'Female User', 0.731, C.a2]] }) },
++  { n: 11, build: (s) => buildQuoteSwirls(s) },
++  { n: 12, build: (s) => buildBigTitle(s, {
++    title: [6.566, 2.373, 6.57], kicker: 'Irrigating The Land', kickerSub: 'Analysis', kickerColor: C.a2,
++    big: [['IRRIGATING THE LAND', null]], contentTitle: [6.577, 3.645], body: [6.583, 3.996, 6.116],
++    dials: DIALS_4([6.667, 5.067]) }) },
++  { n: 13, build: (s) => buildQuoteBullets(s, { x: 0.721, y: 2.139 }) },
++  { n: 14, build: (s) => buildQuoteDials(s, {
++    quote: 'sustainable', head: [7.11, 2.039, 5.399], headSize: 24, col: 7.124,
++    rows: [3.233, 3.729, 3.991], dial: [7.228, 5.49] }) },
++  { n: 15, build: (s) => buildQuoteSwirls(s) },
++  { n: 16, build: (s) => buildIconRows(s, {
++    rows: [[6.98, 2.394, 7.439, 2.277, 2.025], [9.76, 2.352, 10.238, 2.298, 2.025],
++      [9.741, 3.563, 10.238, 3.493, 2.025], [6.98, 3.592, 7.442, 3.526, 1.944]],
++    caption: [7.061, 4.76, 0.335, 1.755, 1.075], captionSize: 11,
++    para: [8.91, 4.672, 3.353, 0.934],
++    paras: ['Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. '] }) },
++  { n: 17, build: (s) => buildBigTitle(s, {
++    title: [0.671, 1.932, 5.919], kicker: 'Farm Automation', kickerSub: 'Analysis', kickerColor: C.a2,
++    big: [['FARM ', null], ['AUTOMATION', C.g1]], contentTitle: [0.682, 3.204], body: [0.688, 3.554, 6.116],
++    card: [0.682, 4.545],
++    stats: [[0.718, 5.478, '2.888 K', 'Male User', 0.577, C.a1], [2.846, 5.503, '1.074 K', 'Female User', 0.731, C.a2]] }) },
++  { n: 18, build: (s) => buildAnalysisCards(s, { at: [[6.069, 2.012], [9.591, 1.971], [6.069, 4.291], [9.591, 4.285]] }) },
++  { n: 19, build: (s) => buildQuoteBullets(s, { x: 0.721, y: 2.139 }) },
++  { n: 20, build: (s) => buildStatementPies(s, { at: [6.782, 1.882] }) },
++  { n: 21, build: (s) => buildBigTitle(s, PLANTING()) },
++  { n: 22, build: (s) => buildQuoteDials(s, {
++    quote: 'soil', head: [6.917, 2.269, 5.619], headSize: 28, col: 6.93,
++    rows: [3.25, 3.747, 4.008], dial: [7.034, 5.507] }) },
++  { n: 23, build: (s) => buildCards(s, { cols: [0.758, 4.049], row1: 1.904, row2: 4.267 }) },
++  { n: 24, build: (s) => buildBigTitle(s, {
++    title: [6.566, 2.373, 6.57], kicker: 'Weather Tracking', kickerSub: 'Analysis', kickerColor: C.a2,
++    big: [['WEATHER ', null], ['TRACKING', C.g1]], contentTitle: [6.577, 3.645], body: [6.583, 3.996, 6.116],
++    dials: DIALS_4([6.667, 5.067]) }) },
++  { n: 25, build: (s) => buildQuoteSwirls(s) },
++  { n: 26, build: (s) => buildQuoteBullets(s, { x: 6.795, y: 2.123 }) },
++  { n: 27, build: (s) => buildIconRows(s, {
++    rows: [[1.291, 2.294, 1.696, 2.137, 2.025], [1.316, 3.277, 1.699, 3.199, 1.944],
++      [1.308, 4.37, 1.686, 4.258, 2.025], [1.316, 5.362, 1.698, 5.25, 2.025]],
++    caption: [4.076, 1.91, 0.435, 2.694, 0.726], captionSize: 14,
++    para: [3.976, 2.88, 2.46, 4.007],
++    paras: [T.lorem12, 'Kitsch authentic offal, narwhal tilde etsy four loko selvage normcore messenger.'] }) },
++  { n: 28, build: (s) => buildBigTitle(s, {
++    title: [6.792, 2.034, 6.134], kicker: 'Farming Precision', kickerSub: 'Analysis', kickerColor: C.a2,
++    big: [['FARMING ', null], ['PRECISION', C.g1]], contentTitle: [6.803, 3.306], body: [6.81, 3.656, 6.116],
++    card: [6.803, 4.647],
++    stats: [[6.839, 5.581, '2.888 K', 'Male User', 0.577, C.a1], [8.968, 5.606, '1.074 K', 'Female User', 0.731, C.a2]] }) },
++  { n: 29, build: (s) => buildCards(s, { cols: [0.758, 4.049], row1: 1.904, row2: 4.267 }) },
++  { n: 30, build: (s) => buildSixAnalysis(s, { blocks: [
++    { align: 'right', label: 'Analysis 01', circle: [3.521, 1.866], title: [0.935, 1.666, 2.388], synth: [0.79, 2.027], body: [0.779, 2.241, 0.741] },
++    { align: 'right', label: 'Analysis 03', circle: [3.504, 3.508], title: [0.779, 3.351, 2.513], synth: [0.779, 3.649], body: [0.79, 3.882, 0.595] },
++    { align: 'right', label: 'Analysis 05', circle: [3.506, 5.136], title: [0.781, 4.967, 2.513], synth: [0.791, 5.29], body: [0.791, 5.508, 0.514] },
++    { align: 'left', label: 'Analysis 02', circle: [9.343, 1.866], title: [10.035, 1.666, 2.513], synth: [10.035, 1.974], body: [10.046, 2.22, 0.538] },
++    { align: 'left', label: 'Analysis 04', circle: [9.343, 3.542], title: [10.035, 3.383, 2.513], synth: [10.035, 3.725], body: [10.046, 3.926, 0.594] },
++    { align: 'left', label: 'Analysis 06', circle: [9.343, 5.156], title: [10.04, 5.002, 2.513], synth: [10.04, 5.311], body: [10.051, 5.529, 0.514] },
++  ] }) },
++  { n: 31, build: (s) => buildStatementPies(s, { at: [7.111, 1.886] }) },
++  { n: 32, build: (s) => buildQuoteSwirls(s) },
++  { n: 33, build: (s) => buildAnalysisCards(s, { at: [[6.069, 2.012], [9.591, 1.971], [6.069, 4.291], [9.591, 4.285]] }) },
++  { n: 34, build: (s) => buildQuoteBullets(s, { x: 0.721, y: 2.139 }) },
++  { n: 35, build: (s) => buildTitleSlide(s, {
++    kicker: { text: 'CLOSING', size: 32, bold: true, wrap: false, box: { x: 5.681, y: 2.339, w: 1.971, h: 0.64 } },
++    bigX: 2.696, arrow: false,
++    footnote: { text: 'Pulsecolor', box: { x: 6.208, y: 4.397, w: 0.918, h: 0.303 } },
++  }) },
++];
++
++/* ===================================================================== main */
++function main() {
++  const pptx = new PptxGenJS();
++  SH = pptx.ShapeType;
++  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++  pptx.layout = 'WIDE';
++  pptx.author = 'Pulsecolor';
++  pptx.title = 'Agriculture Infographic';
++
++  DECK.forEach((def) => {
++    const slide = pptx.addSlide();
++    if (def.n !== 1 && def.n !== 35) {
++      slideHeader(slide);
++      if (ART[def.n]) artwork(slide, ART[def.n]);
++    }
++    def.build(slide);
++  });
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '15f0cebe-e111-40c4-877d-0cc7fd78e04c_grok_final.pptx') });
++}
++
++main().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

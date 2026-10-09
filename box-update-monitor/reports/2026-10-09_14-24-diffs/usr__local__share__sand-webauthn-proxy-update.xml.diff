@@ -1,0 +1,10 @@
+--- 2026-10-09_14-11:/usr/local/share/sand-webauthn-proxy-update.xml
++++ 2026-10-09_14-24:/usr/local/share/sand-webauthn-proxy-update.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <gupdate xmlns="http://www.google.com/update2/response" protocol="2.0">
+-  <app appid="agbllaojcpnneljifnhgkibkiaefijgf">
++  <app appid="mpfkaohnmdhkmmoekeammpleipnbgjjd">
+     <updatecheck codebase="file:///usr/local/share/sand-webauthn-proxy.crx" version="0.1.14" />
+   </app>
+ </gupdate>

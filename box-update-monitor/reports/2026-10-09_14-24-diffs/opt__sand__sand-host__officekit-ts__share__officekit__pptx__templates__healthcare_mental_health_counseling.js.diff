@@ -1,0 +1,639 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_mental_health_counseling.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_mental_health_counseling.js
+@@ -0,0 +1,636 @@
++/**
++ * Psyminar - Mental Health Counseling Presentation
++ * 30 slides, 13.333" x 7.5" (16:9), rebuilt with pptxgenjs.
++ *
++ * The source deck fills most of its picture placeholders with nothing, so those
++ * areas stay empty here too. The three layouts that really do embed a raster
++ * photo (phone / tablet / laptop mockups) get a labelled placeholder rectangle.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++const ORANGE = 'B03C18'; // accent1
++const DEEP   = '371207'; // accent2
++const RUST   = '7D2B11'; // accent3
++const INK    = '0C0C0C'; // tx1
++const SLATE  = '595959'; // dk2
++const GRAY   = '7F7F7F'; // accent6
++const PEACH  = 'F0A892'; // accent1 lumMod 40% / lumOff 60%
++const CORAL  = 'EB8060';
++const WHITE  = 'FFFFFF';
++const TAG    = 'B9B9B9'; // accent6 at 55% alpha over white
++const SILVER = 'B2B2B2';
++
++const HEAD = 'Exo Black';         // theme major latin
++const BODY = 'Poppins';           // theme minor latin
++const SEMI = 'Open Sans SemiBold';// contact headings
++const ICON = 'DejaVu Sans';       // only for the dingbat glyphs below
++
++const NOLINE = { type: 'none' };
++
++// pptxgenjs rewrites the shadow object it is handed, so hand it a fresh one each time
++function softShadow(blur) {
++	return { type: 'outer', blur: blur, offset: 0, angle: 90, color: '000000', opacity: 0.1 };
++}
++
++/* ------------------------------------------------------------- copy decks */
++const LOREM     = 'PLACEHOLDER';
++const LOREM_MED = 'PLACEHOLDER';
++const LOREM_XL  = LOREM + 'PLACEHOLDER';
++const LOREM_19  = 'PLACEHOLDER';
++const LOREM_23  = 'PLACEHOLDER';
++const STORY     = 'PLACEHOLDER';
++const STORY_L   = 'PLACEHOLDER';
++const TRISTIQUE = 'Tristique nulla aliquet enim tortor at auctor urna nunc id. Maecenas accumsan nulla aliquet enim aliquet enim tortor at auctor urna nunc id. aliquet enim tortor at auctor urna ';
++const ALIQUAET  = 'Aliquaet nibh praesent tris tiqu emagn asit am risus pretiu. m attis enim orn';
++const ALIQUET   = 'PLACEHOLDER';
++const CRACK     = 'There is a crack in everything, that\u2019s how the light gets in.';
++const CRACK_TC  = 'There Is A Crack In Everything, That\u2019s How The Light Gets In.';
++const EYEBROW   = 'Mental Health Counseling';
++
++/* ----------------------------------------------------------- tiny helpers */
++
++/** text box - every textbox in the source deck is top anchored */
++function T(s, content, o) {
++	s.addText(content, Object.assign({ fontFace: BODY, fontSize: 18, color: INK, valign: 'top' }, o));
++}
++
++/** body copy: 10pt grey, 150% leading */
++function body(s, x, y, w, h, txt, o) {
++	T(s, txt, Object.assign({ x: x, y: y, w: w, h: h, fontSize: 10, color: GRAY, lineSpacingMultiple: 1.5 }, o));
++}
++
++/** 36pt section title + 1.016" rule + eyebrow caption */
++function heading(s, x, y, w, parts, ruleY, o) {
++	o = o || {};
++	const ink = o.white ? WHITE : INK;
++	T(s, parts.map(function (p) { return { text: p[0], options: { color: p[1] || ink } }; }),
++		{ x: x, y: y, w: w, h: 1.313, fontSize: 36, fontFace: HEAD, color: ink });
++	s.addShape('line', { x: x + 0.094, y: ruleY, w: 1.016, h: 0, line: { color: o.white ? WHITE : ORANGE, width: 1.5 } });
++	T(s, EYEBROW, { x: x + 1.235, y: ruleY - 0.143, w: 2.178, h: 0.286, fontSize: 11, color: ink, wrap: false });
++}
++
++/** the four dots in the top-left corner */
++function dots(s, big) {
++	const d = big ? 0.14 : 0.089;
++	const gap = big ? 0.2836 : 0.1815;
++	[PEACH, PEACH, ORANGE, PEACH].forEach(function (c, i) {
++		s.addShape('ellipse', { x: 0.246 + i * gap, y: 0.345, w: d, h: d, fill: { color: c }, line: NOLINE });
++	});
++}
++
++/** running header (top-right) or footer (bottom-left) tag */
++function pageTag(s, n, where) {
++	const txt = 'PSYCHOLOGICAL COUNSELING | PAGE ' + n;
++	if (where === 'footer') {
++		T(s, txt, { x: 0.225, y: 7.063, w: 3.152, h: 0.202, fontSize: 6, color: TAG, charSpacing: 3, wrap: false });
++	} else {
++		T(s, txt, { x: 9.818, y: 0.293, w: 3.27, h: 0.202, fontSize: 6, color: TAG, charSpacing: 3, align: 'right', wrap: false });
++	}
++}
++
++/**
++ * Placeholders for the three device photographs baked into layouts 10-12.
++ * Each is drawn as a hollow bezel so the coloured band behind shows through the
++ * screen, exactly as the transparent picture placeholder does in the original.
++ */
++const BEZEL = '242424';
++const CHROME = 'D3D0CD';
++
++function screenLabel(s, x, y, w) {
++	T(s, '[image]', { x: x, y: y, w: w, h: 0.3, fontSize: 11, color: '8C8C8C', align: 'center' });
++}
++
++function phoneMockup(s) {
++	// rear phone: silver body peeking out on the left
++	s.addShape('roundRect', { x: 1.51, y: 1.7, w: 1.4, h: 5.8, fill: { color: CHROME }, line: { color: '9E9E9E', width: 1 }, rectRadius: 0.24 });
++	// front phone: hollow bezel so the orange band shows through the screen
++	s.addShape('roundRect', { x: 2.9, y: 1.68, w: 3.6, h: 5.82, fill: NOLINE, line: { color: BEZEL, width: 7 }, rectRadius: 0.36 });
++	s.addShape('roundRect', { x: 3.95, y: 1.74, w: 1.5, h: 0.24, fill: { color: BEZEL }, line: NOLINE, rectRadius: 0.12 });
++	screenLabel(s, 2.9, 4.4, 3.6);
++}
++
++function tabletMockup(s) {
++	s.addShape('roundRect', { x: 7.62, y: 0.96, w: 6.0, h: 7.0, fill: NOLINE, line: { color: BEZEL, width: 22 }, rectRadius: 0.45 });
++	screenLabel(s, 7.92, 3.6, 5.1);
++}
++
++function laptopMockup(s) {
++	s.addShape('roundRect', { x: 0.935, y: 1.615, w: 5.665, h: 3.69, fill: NOLINE, line: { color: BEZEL, width: 12.5 }, rectRadius: 0.1 });
++	s.addShape('roundRect', { x: 0.0, y: 5.43, w: 7.37, h: 0.13, fill: { color: CHROME }, line: NOLINE, rectRadius: 0.04 });
++	s.addShape('roundRect', { x: 0.0, y: 5.56, w: 7.37, h: 0.12, fill: { color: '6A6A6E' }, line: NOLINE, rectRadius: 0.05 });
++	screenLabel(s, 0.935, 3.3, 5.665);
++}
++
++/** orange bullet with a white tick + caption */
++function checkItem(s, x, y, labelX, labelY, labelW, label) {
++	s.addShape('ellipse', { x: x, y: y, w: 0.287, h: 0.287, fill: { color: ORANGE }, line: NOLINE });
++	T(s, '\u2714', { x: x, y: y, w: 0.287, h: 0.287, fontSize: 11, color: WHITE, fontFace: ICON, align: 'center', valign: 'middle', margin: 0 });
++	T(s, label, { x: labelX, y: labelY, w: labelW, h: 0.337, fontSize: 14, color: SLATE, fontFace: HEAD });
++}
++
++/** twitter / facebook / linkedin badge row, `w` is the width of the whole row */
++function socialIcons(s, x, y, w) {
++	const d = w * 0.271;
++	const step = w * 0.371;
++	const pt = d * 72;
++	s.addShape('ellipse', { x: x, y: y, w: d, h: d, fill: { color: ORANGE }, line: NOLINE });
++	T(s, '\u27A4', { x: x, y: y, w: d, h: d, fontSize: pt * 0.58, color: WHITE, fontFace: ICON, align: 'center', valign: 'middle', margin: 0 });
++	s.addShape('ellipse', { x: x + step, y: y, w: d, h: d, fill: { color: ORANGE }, line: NOLINE });
++	T(s, 'f', { x: x + step, y: y, w: d, h: d, fontSize: pt * 0.72, bold: true, color: WHITE, align: 'center', valign: 'middle', margin: 0 });
++	s.addShape('roundRect', { x: x + 2 * step, y: y + d * 0.06, w: d, h: d, fill: { color: ORANGE }, line: NOLINE, rectRadius: d * 0.22 });
++	T(s, 'in', { x: x + 2 * step, y: y + d * 0.06, w: d, h: d, fontSize: pt * 0.5, bold: true, color: WHITE, align: 'center', valign: 'middle', margin: 0 });
++}
++
++/** "01 / The Solution One / body" 2x2 grid used on slides 5, 14, 17, 21 */
++function numberGrid(s, x0, x1, y0, items) {
++	const dy = 1.726;
++	items.forEach(function (it, i) {
++		const x = (i % 2 === 0) ? x0 : x1;
++		const y = y0 + Math.floor(i / 2) * dy;
++		T(s, it[0], { x: x, y: y, w: 1.557, h: 0.562, fontSize: 20, color: ORANGE, fontFace: HEAD, align: 'justify', lineSpacingMultiple: 1.5 });
++		T(s, it[1], { x: x, y: y + 0.448, w: 2.579, h: 0.424, fontSize: 14, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++		body(s, x - 0.015, y + 0.822, 2.922, 0.577, ALIQUAET);
++	});
++}
++
++/** KPI block: big number, label, italic caption */
++function stat(s, o) {
++	const al = o.align;
++	T(s, o.value, { x: o.vx, y: o.vy, w: o.vw, h: 0.505, fontSize: 24, color: WHITE, fontFace: HEAD, align: al });
++	T(s, o.label, { x: o.lx, y: o.vy + 0.597, w: o.lw, h: 0.337, fontSize: 14, color: WHITE, fontFace: HEAD, align: al });
++	T(s, 'Detail Description', { x: o.cx, y: o.vy + 0.878, w: 1.822, h: 0.307, fontSize: 9, color: WHITE, italic: true, align: al, lineSpacingMultiple: 1.5 });
++}
++
++/** skill bar: coral track + dark fill + percentage on the right */
++function skillBar(s, x, y, fillW, pct) {
++	T(s, 'Type The Skill Here', { x: x - 0.109, y: y - 0.421, w: 3.26, h: 0.375, fontSize: 12, bold: true, color: SLATE, align: 'justify', lineSpacingMultiple: 1.5 });
++	s.addShape('rect', { x: x, y: y, w: 3.6, h: 0.073, fill: { color: CORAL }, line: NOLINE });
++	s.addShape('rect', { x: x, y: y, w: fillW, h: 0.073, fill: { color: DEEP }, line: NOLINE });
++	T(s, pct, { x: x + 3.838, y: y - 0.121, w: 0.579, h: 0.24, fontSize: 10.5, color: GRAY, align: 'justify', lineSpacingMultiple: 1.5, margin: 0 });
++}
++
++/** headline + italic kicker + short paragraph */
++function storyCard(s, x, y, title, kicker, txt, bw, color) {
++	const c = color || null;
++	T(s, title, { x: x, y: y, w: 2.431, h: 0.467, fontSize: 16, color: c || SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	T(s, kicker, { x: x + 0.016, y: y + 0.394, w: 1.905, h: 0.33, fontSize: 10, color: c || GRAY, italic: true, lineSpacingMultiple: 1.5 });
++	body(s, x + 0.016, y + 0.722, bw, 0.582, txt, { color: c || GRAY });
++}
++
++/** pricing card (slide 24) */
++function priceCard(s, o) {
++	s.addShape('rect', { x: o.x, y: o.y, w: 2.506, h: o.h, fill: { color: WHITE }, line: NOLINE, shadow: softShadow(15) });
++	s.addShape('rect', { x: o.x + 0.003, y: o.bandY, w: 2.506, h: 1.147, fill: { color: o.band }, line: NOLINE });
++	T(s, o.name, { x: o.nameX, y: o.y + 0.221, w: o.nameW, h: 0.37, fontSize: 16, color: SLATE, fontFace: HEAD, align: 'center', wrap: false });
++	T(s, [{ text: o.price, options: { fontSize: 32 } }, { text: '/nett', options: { fontSize: 9 } }],
++		{ x: o.x + 0.155, y: o.bandY + 0.1, w: 2.201, h: 0.832, color: WHITE, fontFace: HEAD, align: 'center', lineSpacingMultiple: 1.5 });
++	o.rows.forEach(function (r, i) {
++		T(s, r, {
++			x: o.x + 0.22, y: o.rowY + i * o.rowDY, w: (i % 3 === 1) ? 2.359 : 2.0, h: 0.348, fontSize: 11, color: GRAY,
++			bullet: { characterCode: '2713', indent: 13.5 }, lineSpacingMultiple: 1.5
++		});
++	});
++	s.addShape('rect', { x: o.x + 0.511, y: o.btnY, w: 1.49, h: 0.471, fill: { color: ORANGE }, line: NOLINE });
++	T(s, 'Purchase Now', { x: o.x + 0.511, y: o.btnY, w: 1.49, h: 0.471, fontSize: 9, bold: true, color: WHITE, align: 'center', valign: 'middle' });
++}
++
++/* -------------------------------------------------- layout backgrounds */
++
++/** flat orange block */
++function band(s, x, y, w, h) {
++	s.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: ORANGE }, line: NOLINE });
++}
++/** left orange panel whose right edge leans in (slide 2) */
++function slantLeft(s) {
++	s.addShape('custGeom', {
++		x: 0, y: 0, w: 5.688, h: 7.5, fill: { color: ORANGE }, line: NOLINE,
++		points: [{ x: 0, y: 0 }, { x: 5.688, y: 0 }, { x: 3.596, y: 7.5 }, { x: 0, y: 7.5 }, { close: true }]
++	});
++}
++/** right orange panel whose left edge leans out (slides 11, 14) */
++function slantRight(s) {
++	s.addShape('custGeom', {
++		x: 8.802, y: 0, w: 4.531, h: 7.5, fill: { color: ORANGE }, line: NOLINE,
++		points: [{ x: 0, y: 0 }, { x: 4.531, y: 0 }, { x: 4.531, y: 7.5 }, { x: 2.09, y: 7.5 }, { close: true }]
++	});
++}
++/** left orange panel with a bulging right edge (slide 23) */
++function bulgeLeft(s) {
++	s.addShape('custGeom', {
++		x: 0, y: 0, w: 7.233, h: 7.5, fill: { color: ORANGE }, line: NOLINE,
++		points: [
++			{ x: 0, y: 0 }, { x: 6.392, y: 0 }, { x: 6.564, y: 0.385 },
++			{ x: 7.233, y: 3.75, curve: { type: 'cubic', x1: 6.995, y1: 1.421, x2: 7.233, y2: 2.558 } },
++			{ x: 6.544, y: 7.163, curve: { type: 'cubic', x1: 7.233, y1: 4.96, x2: 6.987, y2: 6.114 } },
++			{ x: 6.392, y: 7.5 }, { x: 0, y: 7.5 }, { close: true }
++		]
++	});
++}
++
++/* ----------------------------------------------------------- slide builds */
++const slides = [];
++
++// 1 - cover
++slides.push(function (s) {
++	band(s, 7.669, 0, 5.665, 7.5);
++	T(s, [{ text: 'Psy', options: { color: ORANGE } }, { text: 'minar' }],
++		{ x: 0.527, y: 2.184, w: 6.182, h: 1.582, fontSize: 88, fontFace: HEAD });
++	T(s, 'Mental Health Counseling Presentation', { x: 0.547, y: 4.001, w: 5.075, h: 0.404, wrap: false });
++	dots(s, true);
++	T(s, 'Our Address:', { x: 0.564, y: 5.278, w: 2.296, h: 0.47, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	T(s, 'Everyroad 000, Everycountry', { x: 0.564, y: 5.716, w: 3.051, h: 0.345, fontSize: 14, color: GRAY, lineSpacingMultiple: 1.07, paraSpaceBefore: 0, paraSpaceAfter: 8 });
++});
++
++// 2 - about, with a KPI bar on a dark rounded panel
++slides.push(function (s) {
++	slantLeft(s);
++	s.addShape('roundRect', { x: 5.703, y: 4.771, w: 6.958, h: 2.062, fill: { color: DEEP, transparency: 5 }, line: NOLINE, rectRadius: 0.344 });
++	heading(s, 7.186, 1.42, 5.042, [['About Psyminar Mental '], ['Health Here', ORANGE]], 2.853);
++	body(s, 7.186, 3.371, 5.316, 0.834, LOREM);
++	stat(s, { value: '100%',   vx: 6.033,  vy: 5.194, vw: 1.077, lx: 6.031,  lw: 2.341, cx: 6.034,  label: 'Psychological Analysis' });
++	stat(s, { value: '2023',   vx: 8.637,  vy: 5.194, vw: 1.077, lx: 8.635,  lw: 1.931, cx: 8.638,  label: 'Best Counseling' });
++	stat(s, { value: '2,200+', vx: 10.766, vy: 5.194, vw: 1.54,  lx: 10.765, lw: 1.931, cx: 10.768, label: 'Total Clients' });
++	pageTag(s, 2);
++});
++
++// 3 - floating white card over an orange footer band
++slides.push(function (s) {
++	band(s, 0, 4.75, 7.667, 2.75);
++	s.addShape('roundRect', { x: 0.643, y: 0.75, w: 6.464, h: 6.0, fill: { color: WHITE, transparency: 5 }, line: NOLINE, rectRadius: 0.25, shadow: softShadow(20) });
++	heading(s, 1.256, 1.296, 5.042, [['We Always Bring '], ['The Best ', ORANGE], ['Solutions']], 2.729);
++	T(s, '01. The Solution One Here', { x: 1.288, y: 3.335, w: 3.155, h: 0.467, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 1.288, 3.793, 5.122, 0.903, TRISTIQUE, { fontSize: 11 });
++	T(s, '02. The Solution Two Here', { x: 1.288, y: 4.883, w: 3.155, h: 0.467, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 1.288, 5.324, 5.122, 0.903, TRISTIQUE, { fontSize: 11 });
++});
++
++// 4 - consultant stories
++slides.push(function (s) {
++	band(s, 0, 0, 4.688, 7.5);
++	heading(s, 7.249, 1.341, 5.042, [['About Psyminar Consultant '], ['Stories', ORANGE]], 2.774);
++	T(s, 'General Description Here', { x: 7.249, y: 3.314, w: 3.1, h: 0.47, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 7.265, 3.771, 5.316, 0.834, LOREM);
++	storyCard(s, 7.249, 4.86, 'Story, 20 Jan 2018', 'Detail Story Here', STORY, 2.516);
++	storyCard(s, 10.049, 4.86, 'Story, 20 Jan 2018', 'Detail Story Here', STORY, 2.516);
++	pageTag(s, 4);
++});
++
++// 5 - company missions
++slides.push(function (s) {
++	band(s, 9.708, 0, 3.625, 7.5);
++	numberGrid(s, 0.934, 4.122, 3.129, [
++		['01', 'The Mission One'], ['02', 'The Mission Two'],
++		['03', 'The Mission Three'], ['04', 'The Mission Four']
++	]);
++	heading(s, 0.938, 1.257, 5.042, [['About Psyminar Company '], ['Missions', ORANGE]], 2.69);
++	dots(s);
++	pageTag(s, 5, 'footer');
++});
++
++// 6 - philosophy
++slides.push(function (s) {
++	s.addShape('roundRect', { x: 0.646, y: 4.75, w: 4.021, h: 1.992, fill: { color: ORANGE }, line: NOLINE, rectRadius: 0.332 });
++	heading(s, 7.27, 1.214, 5.042, [['About Psyminar '], ['Philosophy', ORANGE], [' Here']], 2.647);
++	T(s, CRACK, { x: 7.27, y: 3.367, w: 3.605, h: 0.874, fontSize: 16, color: ORANGE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 7.265, 4.45, 5.316, 0.834, LOREM);
++	body(s, 7.265, 5.41, 5.316, 0.834, LOREM);
++	stat(s, { value: '100%', vx: 2.118, vy: 5.213, vw: 1.077, lx: 1.486, lw: 2.341, cx: 1.745, label: 'Psychological Analysis', align: 'center' });
++	pageTag(s, 6);
++});
++
++// 7 - motivation
++slides.push(function (s) {
++	band(s, 9.604, 0, 3.729, 7.5);
++	s.addShape('roundRect', { x: 8.885, y: 0.997, w: 2.562, h: 2.527, fill: { color: WHITE, transparency: 8 }, line: NOLINE, rectRadius: 0.211, shadow: softShadow(20) });
++	T(s, '2023', { x: 9.201, y: 1.573, w: 1.931, h: 0.572, fontSize: 28, color: ORANGE, fontFace: HEAD, align: 'center' });
++	T(s, 'Best Counseling', { x: 8.957, y: 2.297, w: 2.42, h: 0.404, color: SLATE, fontFace: HEAD, align: 'center' });
++	T(s, 'Detail Description Here', { x: 9.256, y: 2.659, w: 1.822, h: 0.33, fontSize: 10, color: GRAY, italic: true, align: 'center', lineSpacingMultiple: 1.5 });
++	heading(s, 0.923, 1.26, 5.042, [['The Motivation For '], ['Your Better ', ORANGE], ['Life']], 2.693);
++	checkItem(s, 1.008, 3.537, 1.383, 3.516, 2.313, 'The Quality Services');
++	checkItem(s, 1.008, 4.1, 1.383, 4.079, 2.672, '5,219,209+ Achievements');
++	body(s, 0.923, 4.675, 5.316, 0.834, LOREM);
++	body(s, 0.923, 5.658, 5.316, 0.582, LOREM_MED);
++	dots(s);
++	pageTag(s, 7, 'footer');
++});
++
++// 8 - two consultant cards
++slides.push(function (s) {
++	s.addShape('round1Rect', { x: 2.667, y: 0.729, w: 10.667, h: 3.021, fill: { color: ORANGE }, line: NOLINE, rectRadius: 0.358, flipH: true });
++	[0.667, 4.033].forEach(function (x) {
++		s.addShape('roundRect', { x: x, y: 1.75, w: 3.062, h: 5.021, fill: { color: WHITE }, line: NOLINE, rectRadius: 0.219, shadow: softShadow(20) });
++	});
++	heading(s, 7.688, 1.828, 4.724, [['About Psyminar\u2019s Consultant Here']], 3.303, { white: true });
++	T(s, 'Detail Description Here', { x: 7.688, y: 4.176, w: 3.155, h: 0.467, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 7.688, 4.725, 5.375, 1.339, LOREM_XL);
++	[['Picky L. Ronald', 'Consultant Team One', 0.893, 1.287, 1.703],
++	 ['Somar L. Ronald', 'Consultant Team Two', 4.26, 4.654, 5.069]].forEach(function (p) {
++		T(s, p[0], { x: p[2], y: 4.868, w: 2.61, h: 0.438, fontSize: 20, color: SLATE, fontFace: HEAD, align: 'center' });
++		T(s, p[1], { x: p[3], y: 5.225, w: 1.822, h: 0.341, fontSize: 10, color: GRAY, italic: true, align: 'center', lineSpacingMultiple: 1.5 });
++		socialIcons(s, p[4], 5.88, 0.99);
++	});
++});
++
++// 9 - three experts stacked on the right
++slides.push(function (s) {
++	s.addShape('round1Rect', { x: 0, y: 3.75, w: 6.667, h: 3.229, fill: { color: DEEP }, line: NOLINE, rectRadius: 0.538 });
++	s.addShape('roundRect', { x: 7.646, y: 0.521, w: 5.062, h: 2.047, fill: { color: ORANGE }, line: NOLINE, rectRadius: 0.206 });
++	s.addShape('roundRect', { x: 7.646, y: 2.727, w: 5.062, h: 2.047, fill: { color: WHITE }, line: NOLINE, rectRadius: 0.251, shadow: softShadow(20) });
++	s.addShape('roundRect', { x: 7.646, y: 4.932, w: 5.062, h: 2.047, fill: { color: ORANGE }, line: NOLINE, rectRadius: 0.251 });
++	T(s, 'Detail Description Here', { x: 0.625, y: 4.176, w: 3.155, h: 0.467, fontSize: 16, color: WHITE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 0.625, 4.725, 5.375, 1.339, LOREM_XL, { color: WHITE });
++	heading(s, 0.604, 1.385, 5.375, [['About Psyminar '], ['Mental ', ORANGE], ['Health Expert']], 2.818);
++	[['Rahmad L. Ronald', 0.978, WHITE], ['Juliana L. Ronald', 3.184, null], ['Procarla L. Ronald', 5.39, WHITE]].forEach(function (p) {
++		T(s, p[0], { x: 9.933, y: p[1], w: 2.431, h: 0.467, fontSize: 16, color: p[2] || SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++		T(s, 'Detail Expert Here', { x: 9.949, y: p[1] + 0.436, w: 1.905, h: 0.33, fontSize: 10, color: p[2] || GRAY, italic: true, lineSpacingMultiple: 1.5 });
++		socialIcons(s, 10.05, p[1] + 0.934, 0.735);
++	});
++});
++
++// 10 - marketing manager + skill bars
++slides.push(function (s) {
++	s.addShape('round1Rect', { x: 0.677, y: 2.815, w: 4.034, h: 4.685, fill: { color: ORANGE }, line: NOLINE, rectRadius: 0.36, flipH: true });
++	skillBar(s, 7.539, 5.558, 3.3, '95%');
++	skillBar(s, 7.539, 6.337, 3.0, '90%');
++	body(s, 7.412, 4.007, 5.317, 0.834, LOREM);
++	T(s, 'Pablo K. Ronald', { x: 7.409, y: 3.363, w: 2.61, h: 0.404, color: SLATE, fontFace: HEAD });
++	T(s, 'Marketing Manager', { x: 7.413, y: 3.671, w: 1.822, h: 0.307, fontSize: 9, color: GRAY, italic: true, lineSpacingMultiple: 1.5 });
++	heading(s, 7.389, 1.301, 5.375, [['Let\u2019s Meet Our '], ['Marketing', ORANGE], [' Manager']], 2.734);
++	pageTag(s, 10);
++});
++
++// 11 - CEO + skill bars
++slides.push(function (s) {
++	slantRight(s);
++	skillBar(s, 0.947, 5.495, 3.3, '95%');
++	skillBar(s, 0.947, 6.274, 3.0, '90%');
++	body(s, 0.82, 3.945, 5.317, 0.834, LOREM);
++	T(s, 'Lily P. Ronald', { x: 0.817, y: 3.3, w: 2.61, h: 0.404, color: SLATE, fontFace: HEAD });
++	T(s, 'Our CEO and Founder', { x: 0.821, y: 3.609, w: 1.822, h: 0.307, fontSize: 9, color: SILVER, italic: true, lineSpacingMultiple: 1.5 });
++	heading(s, 0.796, 1.28, 4.568, [['Let\u2019s Meet Our '], ['CEO and', ORANGE], [' Founder']], 2.714);
++	dots(s);
++	pageTag(s, 11, 'footer');
++});
++
++// 12 - three services listed down the right edge
++slides.push(function (s) {
++	s.addShape('round1Rect', { x: 0, y: 0.758, w: 5.708, h: 4.014, fill: { color: ORANGE, transparency: 8 }, line: NOLINE, rectRadius: 0.669 });
++	[['01. The Service One', 0.866, 0.47], ['02. The Service Two', 3.057, 0.466], ['03. The Service Three', 5.248, 0.466]].forEach(function (r) {
++		T(s, r[0], { x: 10.118, y: r[1], w: 2.606, h: r[2], fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++		T(s, 'Detail Description', { x: 10.136, y: r[1] + 0.369, w: 2.625, h: 0.349, fontSize: 11, color: GRAY, italic: true, lineSpacingMultiple: 1.5, paraSpaceBefore: 0, paraSpaceAfter: 0 });
++		body(s, 10.118, r[1] + 0.756, 2.806, 0.63, ALIQUET, { fontSize: 11 });
++	});
++	heading(s, 0.609, 1.912, 4.724, [['About Psyminar\u2019s Services Here']], 3.387, { white: true });
++});
++
++// 13 - top rated, copy on a big orange panel
++slides.push(function (s) {
++	s.addShape('round2SameRect', { x: 3.583, y: 3.396, w: 9.0, h: 4.104, fill: { color: ORANGE }, line: NOLINE });
++	heading(s, 6.458, 1.155, 5.542, [['Top Rated For Mental '], ['Health ', ORANGE], ['Counseling']], 2.609);
++	T(s, 'General Description Here', { x: 6.458, y: 3.725, w: 3.1, h: 0.47, fontSize: 16, color: WHITE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 6.474, 4.182, 5.316, 0.834, LOREM, { color: WHITE });
++	storyCard(s, 6.458, 5.345, '01. The Service One', 'Detail Description', STORY, 2.516, WHITE);
++	storyCard(s, 9.258, 5.345, '02. The Service Two', 'Detail Description', STORY, 2.516, WHITE);
++});
++
++// 14 - alternative solution
++slides.push(function (s) {
++	slantRight(s);
++	numberGrid(s, 0.934, 4.122, 3.149, [
++		['01', 'The Solution One'], ['02', 'The Solution Two'],
++		['03', 'The Solution Three'], ['04', 'The Solution Four']
++	]);
++	heading(s, 0.938, 1.236, 5.375, [['We Always Bring The '], ['Alternative ', ORANGE], ['Solution']], 2.67);
++	dots(s);
++	pageTag(s, 14, 'footer');
++});
++
++// 15 - smart solution
++slides.push(function (s) {
++	band(s, 1.667, 0, 4.021, 7.5);
++	heading(s, 7.353, 1.214, 4.647, [['Smart Solution For '], ['Mental ', ORANGE], ['Health']], 2.647);
++	T(s, CRACK, { x: 7.353, y: 3.367, w: 3.605, h: 0.874, fontSize: 16, color: ORANGE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 7.348, 4.45, 5.316, 0.834, LOREM);
++	body(s, 7.348, 5.41, 5.316, 0.834, LOREM);
++	pageTag(s, 15);
++});
++
++// 16 - achieve your need
++slides.push(function (s) {
++	s.addShape('roundRect', { x: 7.708, y: 2.708, w: 2.941, h: 4.062, fill: { color: ORANGE }, line: NOLINE, rectRadius: 0.361 });
++	heading(s, 0.955, 1.254, 5.042, [['We Help You To '], ['Achieve', ORANGE], [' Your Need']], 2.688);
++	T(s, '01. The Solution One Here', { x: 0.987, y: 3.356, w: 3.155, h: 0.467, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 0.987, 3.814, 5.122, 0.903, TRISTIQUE, { fontSize: 11 });
++	T(s, '02. The Solution Two Here', { x: 0.987, y: 4.946, w: 3.155, h: 0.467, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 0.987, 5.387, 5.122, 0.903, TRISTIQUE, { fontSize: 11 });
++	dots(s);
++	pageTag(s, 16, 'footer');
++});
++
++// 17 - effective counseling
++slides.push(function (s) {
++	band(s, 0.688, 0, 2.979, 7.5);
++	numberGrid(s, 6.551, 9.739, 3.149, [
++		['01', 'The Solution One'], ['02', 'The Solution Two'],
++		['03', 'The Solution Three'], ['04', 'The Solution Four']
++	]);
++	heading(s, 6.554, 1.236, 5.375, [['Effective Counseling For You '], ['Everyday', ORANGE]], 2.67);
++	pageTag(s, 17);
++});
++
++// 18 - break time interlude
++slides.push(function (s) {
++	band(s, 5.667, 0, 7.013, 7.5);
++	s.addShape('rect', { x: 2.646, y: 1.708, w: 10.688, h: 5.069, fill: { color: DEEP, transparency: 25 }, line: NOLINE });
++	s.addShape('line', { x: 5.997, y: 0, w: 0, h: 7.5, line: { color: 'D9D9D9', width: 3, transparency: 95 } });
++	T(s, 'Break Time', { x: 4.258, y: 2.458, w: 6.008, h: 1.313, fontSize: 72, color: WHITE, fontFace: HEAD });
++	T(s, 'It\u2019s Time To Break Now', { x: 4.3, y: 3.774, w: 4.048, h: 0.505, fontSize: 24, color: WHITE, wrap: false });
++	T(s, '30\u2019', { x: 4.3, y: 4.872, w: 1.478, h: 0.841, fontSize: 44, color: WHITE, fontFace: HEAD });
++	T(s, 'Break Estimation', { x: 4.293, y: 5.73, w: 2.067, h: 0.37, fontSize: 16, color: WHITE, wrap: false });
++});
++
++// 19 - latest project + quote card with a chat bubble
++slides.push(function (s) {
++	band(s, 8.708, 0, 4.625, 7.5);
++	s.addShape('roundRect', { x: 9.688, y: 2.75, w: 3.006, h: 3.482, fill: { color: WHITE, transparency: 5 }, line: NOLINE, rectRadius: 0.222, shadow: softShadow(20) });
++	s.addShape('ellipse', { x: 10.589, y: 3.199, w: 1.204, h: 1.204, fill: { color: RUST }, line: NOLINE });
++	s.addShape('roundRect', { x: 10.958, y: 3.589, w: 0.465, h: 0.33, fill: { color: WHITE }, line: NOLINE, rectRadius: 0.05 });
++	s.addShape('triangle', { x: 10.995, y: 3.889, w: 0.13, h: 0.124, fill: { color: WHITE }, line: NOLINE, rotate: 180 });
++	[0.09, 0.203, 0.316].forEach(function (dx) {
++		s.addShape('ellipse', { x: 10.958 + dx, y: 3.719, w: 0.058, h: 0.058, fill: { color: RUST }, line: NOLINE });
++	});
++	T(s, CRACK_TC, { x: 9.808, y: 4.558, w: 2.765, h: 1.278, fontSize: 16, color: SLATE, fontFace: HEAD, align: 'center', lineSpacingMultiple: 1.5 });
++	heading(s, 0.64, 1.34, 5.021, [['About Psyminar '], ['Latest', ORANGE], [' Project Here']], 2.773);
++	body(s, 0.64, 3.262, 5.694, 0.834, LOREM_19);
++	storyCard(s, 3.168, 5.029, 'Project, 20 Jan 2022', 'Detail Story Here', STORY_L, 3.15);
++});
++
++// 20 - consultant project
++slides.push(function (s) {
++	s.addShape('round1Rect', { x: 0, y: 0, w: 4.632, h: 6.737, fill: { color: ORANGE }, line: NOLINE, rectRadius: 1.246, flipV: true });
++	s.addShape('roundRect', { x: 0.688, y: 4.536, w: 5.979, h: 1.491, fill: { color: DEEP }, line: NOLINE, rectRadius: 0.248, flipH: true });
++	heading(s, 7.402, 1.28, 4.827, [['We Create The '], ['Consultant', ORANGE], [' Project']], 2.714);
++	checkItem(s, 7.487, 3.558, 7.862, 3.537, 2.313, 'The Quality Services');
++	checkItem(s, 7.487, 4.121, 7.862, 4.1, 2.672, '5,219,209+ Achievements');
++	body(s, 7.402, 4.696, 5.316, 0.834, LOREM);
++	body(s, 7.402, 5.679, 5.316, 0.582, LOREM_MED);
++	T(s, CRACK, { x: 1.542, y: 4.824, w: 4.27, h: 0.874, fontSize: 16, color: WHITE, fontFace: HEAD, align: 'center', lineSpacingMultiple: 1.5 });
++});
++
++// 21 - change your outlook
++slides.push(function (s) {
++	band(s, 7.625, 0, 5.708, 7.5);
++	numberGrid(s, 0.807, 3.995, 3.254, [
++		['01', 'The Solution One'], ['02', 'The Solution Two'],
++		['03', 'The Solution Three'], ['04', 'The Solution Four']
++	]);
++	heading(s, 0.81, 1.257, 5.375, [['Change Your Outlook With '], ['Psyminar ', ORANGE], ['Here']], 2.69);
++	dots(s);
++	pageTag(s, 21, 'footer');
++});
++
++// 22 - consultant for you, with a pull quote top-right
++slides.push(function (s) {
++	band(s, 8.658, 0, 4.675, 2.75);
++	heading(s, 0.819, 3.298, 5.375, [['The Mental Health '], ['Consultant', ORANGE], [' For You']], 4.732);
++	T(s, 'Detail Description Here', { x: 0.819, y: 5.164, w: 3.155, h: 0.467, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 0.819, 5.671, 6.752, 1.087, LOREM_XL);
++	T(s, CRACK, { x: 9.161, y: 1.167, w: 3.669, h: 0.874, fontSize: 16, color: WHITE, fontFace: HEAD, align: 'center', lineSpacingMultiple: 1.5 });
++	T(s, '\u275D', { x: 10.822, y: 0.44, w: 0.346, h: 0.55, fontSize: 48, bold: true, color: WHITE, fontFace: ICON, align: 'center', margin: 0 });
++});
++
++// 23 - project galleries, one tile replaced by a stat card
++slides.push(function (s) {
++	bulgeLeft(s);
++	s.addShape('roundRect', { x: 3.093, y: 3.839, w: 2.286, h: 2.646, fill: { color: DEEP }, line: NOLINE, rectRadius: 0.219 });
++	T(s, '2023', { x: 3.584, y: 4.469, w: 1.305, h: 0.505, fontSize: 24, color: WHITE, fontFace: HEAD, align: 'center' });
++	T(s, 'Best Counseling', { x: 3.271, y: 5.193, w: 1.931, h: 0.37, fontSize: 16, color: WHITE, fontFace: HEAD, align: 'center' });
++	T(s, 'Detail Description Here', { x: 3.389, y: 5.555, w: 1.694, h: 0.284, fontSize: 8, color: WHITE, italic: true, align: 'center', lineSpacingMultiple: 1.5 });
++	heading(s, 8.332, 1.538, 4.438, [['About Psyminar Project '], ['Galleries', ORANGE]], 2.972);
++	T(s, 'General Description Here', { x: 8.332, y: 3.574, w: 3.1, h: 0.47, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 8.348, 4.087, 4.438, 1.087, LOREM);
++	body(s, 8.348, 5.218, 4.438, 0.834, LOREM_23);
++});
++
++// 24 - pricing tables
++slides.push(function (s) {
++	priceCard(s, {
++		x: 2.415, y: 2.484, h: 3.988, band: RUST, bandY: 3.235, name: 'Standard Class', nameX: 2.787, nameW: 1.767,
++		price: '$750', rowY: 4.536, rowDY: 0.299, btnY: 5.78,
++		rows: ['Enim nec dui nunc', 'Magna sit amet risus pro', 'Risus pretium quam']
++	});
++	priceCard(s, {
++		x: 8.34, y: 2.484, h: 3.988, band: RUST, bandY: 3.235, name: 'Platinum Class', nameX: 8.71, nameW: 1.766,
++		price: '$850', rowY: 4.558, rowDY: 0.299, btnY: 5.78,
++		rows: ['Enim nec dui nunc', 'Magna sit amet risus pro', 'Risus pretium quam']
++	});
++	priceCard(s, {
++		x: 5.337, y: 2.207, h: 4.542, band: ORANGE, bandY: 2.966, name: 'Premium Class', nameX: 5.705, nameW: 1.776,
++		price: '$899', rowY: 4.283, rowDY: 0.309, btnY: 6.051,
++		rows: ['Enim nec dui nunc', 'Magna sit amet risus pro', 'Risus pretium quam', 'Enim nec dui nunc', 'Magna sit amet risus pro']
++	});
++	T(s, [{ text: 'Pricing ' }, { text: 'Tables', options: { color: ORANGE } }],
++		{ x: 3.979, y: 0.815, w: 5.375, h: 0.774, fontSize: 40, fontFace: HEAD, align: 'center' });
++	T(s, EYEBROW, { x: 5.578, y: 1.625, w: 2.178, h: 0.286, fontSize: 11, align: 'center', wrap: false });
++	dots(s);
++	pageTag(s, 24);
++});
++
++// 25 - phone mockup
++slides.push(function (s) {
++	band(s, 0, 0, 4.688, 7.5);
++	phoneMockup(s);
++	heading(s, 7.402, 1.26, 4.827, [['About Phone '], ['Mockup ', ORANGE], ['Devices']], 2.693);
++	checkItem(s, 7.487, 3.537, 7.862, 3.516, 2.313, 'The Quality Services');
++	checkItem(s, 7.487, 4.1, 7.862, 4.079, 2.672, '5,219,209+ Achievements');
++	body(s, 7.402, 4.675, 5.316, 0.834, LOREM);
++	body(s, 7.402, 5.658, 5.316, 0.582, LOREM_MED);
++	pageTag(s, 25);
++});
++
++// 26 - tablet mockup
++slides.push(function (s) {
++	band(s, 8.667, 0, 4.667, 7.5);
++	tabletMockup(s);
++	heading(s, 1.086, 1.11, 4.647, [['About The Tablet '], ['Mockup', ORANGE], [' Devices']], 2.543);
++	T(s, CRACK, { x: 1.086, y: 3.262, w: 3.605, h: 0.874, fontSize: 16, color: ORANGE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 1.081, 4.345, 5.316, 0.834, LOREM);
++	body(s, 1.081, 5.306, 5.316, 0.834, LOREM);
++	dots(s);
++	pageTag(s, 26, 'footer');
++});
++
++// 27 - laptop mockup
++slides.push(function (s) {
++	band(s, 0, 0, 3.708, 7.5);
++	laptopMockup(s);
++	heading(s, 7.686, 1.254, 4.835, [['About Psyminar '], ['Laptop', ORANGE], [' Devices']], 2.688);
++	T(s, '01. The Solution One Here', { x: 7.718, y: 3.356, w: 3.155, h: 0.467, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 7.718, 3.814, 5.122, 0.903, TRISTIQUE, { fontSize: 11 });
++	T(s, '02. The Solution Two Here', { x: 7.718, y: 4.946, w: 3.155, h: 0.467, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 7.718, 5.387, 5.122, 0.903, TRISTIQUE, { fontSize: 11 });
++	pageTag(s, 27);
++});
++
++// 28 - client testimony
++slides.push(function (s) {
++	s.addShape('roundRect', { x: 6.569, y: 3.848, w: 6.097, h: 3.01, fill: { color: DEEP }, line: NOLINE, rectRadius: 0.372 });
++	s.addShape('roundRect', { x: 6.569, y: 0.641, w: 6.097, h: 3.01, fill: { color: ORANGE }, line: NOLINE, rectRadius: 0.372 });
++	heading(s, 0.819, 1.54, 4.785, [['About Psyminar '], ['Clients ', ORANGE], ['Testimony']], 2.973);
++	T(s, 'Detail Description Here', { x: 0.819, y: 3.78, w: 3.155, h: 0.467, fontSize: 16, color: SLATE, fontFace: HEAD, lineSpacingMultiple: 1.5 });
++	body(s, 0.819, 4.329, 5.375, 1.339, LOREM_XL);
++	storyCard(s, 9.165, 1.495, 'Client, 26 Jan 2022', 'Detail Story Here', STORY_L, 3.15, WHITE);
++	storyCard(s, 9.165, 4.701, 'Client, 10 Oct 2022', 'Detail Story Here', STORY_L, 3.15, WHITE);
++	dots(s);
++	pageTag(s, 28, 'footer');
++});
++
++// 29 - contact details
++slides.push(function (s) {
++	band(s, 1.775, 0, 4.867, 7.5);
++	const rows = [
++		{ y: 3.69, dot: DEEP, title: 'Phone Number', value: '+000 000 000 00 000', lead: 1.5 },
++		{ y: 4.703, dot: ORANGE, title: 'E-mail Address', value: 'info@brainio.com', lead: 1.5 },
++		{ y: 5.716, dot: DEEP, title: 'Offices Address', value: 'Everyroad 000, Everycountry', lead: 1.07 }
++	];
++	rows.forEach(function (r) {
++		s.addShape('ellipse', { x: 7.665, y: r.y, w: 0.752, h: 0.752, fill: { color: r.dot }, line: NOLINE });
++		T(s, r.title, { x: 8.542, y: r.y - 0.045, w: 2.296, h: 0.462, fontSize: 16, bold: true, color: SLATE, fontFace: SEMI, lineSpacingMultiple: 1.5 });
++		T(s, r.value, { x: 8.542, y: r.y + 0.34, w: 2.608, h: 0.349, fontSize: 11, color: GRAY, lineSpacingMultiple: r.lead });
++	});
++	// handset, envelope and map-pin glyphs inside the three circles
++	T(s, '\u260E', { x: 7.665, y: 3.69, w: 0.752, h: 0.752, fontSize: 20, color: WHITE, fontFace: ICON, align: 'center', valign: 'middle', margin: 0 });
++	s.addShape('rect', { x: 7.881, y: 4.978, w: 0.318, h: 0.202, fill: { color: WHITE }, line: NOLINE });
++	s.addShape('triangle', { x: 7.881, y: 4.978, w: 0.318, h: 0.14, fill: { color: ORANGE }, line: { color: ORANGE, width: 0.75 }, rotate: 180 });
++	s.addShape('teardrop', { x: 7.906, y: 5.925, w: 0.27, h: 0.27, fill: { color: WHITE }, line: NOLINE, rotate: 135 });
++	s.addShape('ellipse', { x: 7.981, y: 5.996, w: 0.1, h: 0.1, fill: { color: DEEP }, line: NOLINE });
++	heading(s, 7.566, 1.498, 5.121, [['About Psyminar '], ['Contact ', ORANGE], ['Information']], 2.932);
++	pageTag(s, 29);
++});
++
++// 30 - closing
++slides.push(function (s) {
++	band(s, 0, 0, 5.665, 7.5);
++	T(s, [{ text: 'Than' }, { text: 'ks', options: { color: ORANGE } }],
++		{ x: 6.792, y: 2.601, w: 6.182, h: 2.036, fontSize: 115, fontFace: HEAD });
++	T(s, 'And See You Next Time', { x: 6.812, y: 4.668, w: 4.022, h: 0.505, fontSize: 24, wrap: false });
++});
++
++/* ---------------------------------------------------------------- render */
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'WIDE_16x9', width: 13.3333333, height: 7.5 }); // 12192000 x 6858000 EMU
++pptx.layout = 'WIDE_16x9';
++pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++pptx.author = 'Psyminar';
++pptx.title = 'Psyminar - Mental Health Counseling Presentation';
++
++slides.forEach(function (build) {
++	const slide = pptx.addSlide();
++	slide.background = { color: WHITE };
++	build(slide);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, '0ec549f8-6c19-4c32-8ebc-53e8f29801d0_grok_final.pptx') })
++	.then(function (f) { console.log('wrote ' + f); });

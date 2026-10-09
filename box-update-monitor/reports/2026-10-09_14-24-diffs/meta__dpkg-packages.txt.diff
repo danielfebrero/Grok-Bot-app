@@ -1,0 +1,29 @@
+--- 2026-10-09_14-11/meta/dpkg-packages.txt
++++ 2026-10-09_14-24/meta/dpkg-packages.txt
+@@ -69,7 +69,7 @@
+ golang-1.24-src	1.24.4-1	all
+ golang-go	2:1.24~2	amd64
+ golang-src	2:1.24~2	all
+-google-chrome-stable	154.0.8037.57-1	amd64
++google-chrome-stable	154.0.8037.97-1	amd64
+ gpg	2.4.7-21+deb13u1+b5	amd64
+ gpg-agent	2.4.7-21+deb13u1+b5	amd64
+ gpgconf	2.4.7-21+deb13u1+b5	amd64
+@@ -302,7 +302,7 @@
+ liblsan0	14.2.0-19	amd64
+ libltdl7	2.5.4-4	amd64
+ liblz4-1	1.10.0-4	amd64
+-liblzma5	5.8.1-1+deb13u1	amd64
++liblzma5	5.8.1-1+deb13u2	amd64
+ liblzo2-2	2.10-3+b1	amd64
+ libmbedcrypto16	3.6.6-0.1~deb13u1	amd64
+ libmbedtls21	3.6.6-0.1~deb13u1	amd64
+@@ -357,7 +357,7 @@
+ libpangoft2-1.0-0	1.56.3-1	amd64
+ libpaper2	2.2.5-0.3+b2	amd64
+ libpciaccess0	0.17-3+b3	amd64
+-libpcre2-8-0	10.46-1~deb13u2	amd64
++libpcre2-8-0	10.46-1~deb13u3	amd64
+ libperl5.40	5.40.1-6+deb13u1	amd64
+ libpgm-5.3-0t64	5.3.128~dfsg-2.1+b1	amd64
+ libpixman-1-0	0.44.0-3	amd64

@@ -1,0 +1,654 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/vacation_rest_presentation_template.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/vacation_rest_presentation_template.js
+@@ -0,0 +1,651 @@
++/**
++ * Min-Sa presentation template - rebuilt with pptxgenjs.
++ *
++ * 30 slides, 13.333 x 7.5 in (16:9).  Photographs in the original deck are
++ * replaced by labelled placeholder rectangles (see `imageBox`).
++ *
++ * Run:  node <this file>   ->  writes the .pptx next to this script.
++ */
++'use strict';
++
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens
++ * ------------------------------------------------------------------ */
++
++const C = {
++  ink: '262626',       // theme accent 1 - near-black blocks and headlines
++  white: 'FFFFFF',
++  grey: '808080',      // body copy
++  slate: '404040',     // emphasised small caps
++  charcoal: '595959',
++  stone: 'A6A6A6',
++  ash: 'BFBFBF',
++  silver: 'D9D9D9',    // the big "$68 / $71" numerals
++  mist: 'F2F2F2',      // pale panels
++};
++
++const F = { head: 'Playfair Display', body: 'Open Sans' };
++
++// The template uses four soft "floating panel" shadows. Each is returned by a
++// factory because pptxgenjs rewrites shadow props in place on first use.
++const SHADOWS = {
++  soft: () => ({ type: 'outer', angle: 90, blur: 25, offset: 0, color: C.stone, opacity: 0.4 }),
++  wide: () => ({ type: 'outer', angle: 90, blur: 50, offset: 0, color: C.ash, opacity: 0.4 }),
++  deep: () => ({ type: 'outer', angle: 90, blur: 42, offset: 0, color: C.ash, opacity: 0.52 }),
++  drop: () => ({ type: 'outer', angle: 135, blur: 24, offset: 18, color: C.ash, opacity: 0.4 }),
++};
++
++// The template repeats the same few lorem-ipsum blocks over and over.
++const T = {
++  L1: 'PLACEHOLDER',
++  L2: 'Sed ut perspiciatis unde omnis iste natunerroolu',
++  L3: 'PLACEHOLDER',
++  L4: 'PLACEHOLDER',
++  L5: 'Sed ut persp iciatis unde omnis iste',
++  L6: 'PLACEHOLDER',
++  L7: 'PLACEHOLDER',
++  L8: 'PLACEHOLDER',
++  L9: 'PLACEHOLDER',
++  L10: 'Sed ut persp iciatis unde omnis',
++  L11: 'PLACEHOLDER',
++};
++
++const HEADLINE = 'Have a good rest';
++
++/* ------------------------------------------------------------------ *
++ * Shape / text helpers
++ * ------------------------------------------------------------------ */
++
++// Flat colour rectangle.
++function box(s, x, y, w, h, color, o = {}) {
++  s.addShape('rect', {
++    x, y, w, h,
++    fill: { color, transparency: o.transparency },
++    line: { type: 'none' },
++    shadow: o.shadow ? SHADOWS[o.shadow]() : undefined,
++  });
++}
++
++// Flat colour circle / ellipse.
++function oval(s, x, y, w, h, color) {
++  s.addShape('ellipse', { x, y, w, h, fill: { color }, line: { type: 'none' } });
++}
++
++// Floating white panel; `kind` picks one of the four shadow recipes above.
++function card(s, x, y, w, h, kind = 'soft') {
++  s.addShape('rect', { x, y, w, h, fill: { color: C.white }, line: { type: 'none' }, shadow: SHADOWS[kind]() });
++}
++
++// Dark circle carrying the slide number, e.g. badge(s, 12.464, 6.672, '07.').
++function badge(s, x, y, label) {
++  oval(s, x, y, 0.62, 0.62, C.ink);
++  txt(s, x - 0.034, y + 0.091, 0.688, 0.372, label, {
++    align: 'center', size: 12, bold: true, color: C.white, line: 1.5,
++  });
++}
++
++// Shared text-frame geometry: top anchored, auto-height, Open Sans 11pt grey.
++function textOpts(x, y, w, h, o) {
++  return {
++    x, y, w, h,
++    valign: 'top',
++    fit: 'resize',
++    wrap: o.wrap !== false,
++    align: o.align || 'left',
++    rotate: o.rotate,
++    fontFace: o.face || F.body,
++    fontSize: o.size || 11,
++    color: o.color || C.grey,
++    bold: !!o.bold,
++    lineSpacingMultiple: o.line,
++  };
++}
++
++function txt(s, x, y, w, h, text, o = {}) {
++  s.addText(text, textOpts(x, y, w, h, o));
++}
++
++// Text frame holding several differently formatted runs.
++function runs(s, x, y, w, h, parts, o = {}) {
++  s.addText(
++    parts.map(p => ({
++      text: p.text,
++      options: { fontFace: p.face || F.body, fontSize: p.size || 11, color: p.color || C.grey, bold: !!p.bold },
++    })),
++    textOpts(x, y, w, h, o)
++  );
++}
++
++// Playfair Display headline ("Have a good rest", "Min-Sa", "Thanks").
++function display(s, x, y, w, h, text, o = {}) {
++  txt(s, x, y, w, h, text, {
++    face: F.head, size: o.size, bold: true,
++    color: o.color || C.ink, align: o.align || 'center',
++    wrap: false, rotate: o.rotate,
++  });
++}
++
++// The recurring "$68" / "$71" price pair: small dollar sign, large numerals.
++function price(s, x, y, value, o = {}) {
++  const color = o.color || C.silver;
++  runs(s, x, y, o.w || 1.125, 0.505, [
++    { text: '$', size: 14, bold: true, color },
++    { text: value, size: 24, bold: true, color },
++  ], { align: o.align, rotate: o.rotate });
++}
++
++// Small bold "presentation template" caption.
++function tagline(s, x, y, o = {}) {
++  txt(s, x, y, o.w || 2.146, 0.303, 'presentation template', {
++    size: 12, bold: o.bold !== false, color: o.color || C.grey, align: o.align, rotate: o.rotate,
++  });
++}
++
++// Stand-in for the deck's single bitmap: a laptop mock-up on slide 29.
++// Redrawn from native shapes using the source image's own proportions. The lid
++// is four bars rather than one filled rectangle because the original PNG has a
++// transparent screen, letting the panels behind it show through.
++// (The deck's other picture frames are empty layout placeholders and draw nothing.)
++function imageBox(s, x, y, w, h) {
++  const at = ([fx, fy, fw, fh]) => ({ x: x + fx * w, y: y + fy * h, w: fw * w, h: fh * h });
++  const lid = { fill: { color: '1F2124' }, line: { type: 'none' } };
++  [
++    [0.100, 0.008, 0.802, 0.052],   // top edge
++    [0.100, 0.060, 0.026, 0.776],   // left edge
++    [0.876, 0.060, 0.026, 0.776],   // right edge
++    [0.100, 0.836, 0.802, 0.058],   // chin below the screen
++  ].forEach(bar => s.addShape('rect', { ...at(bar), ...lid }));
++  s.addShape('roundRect', { ...at([0.008, 0.894, 0.983, 0.082]), rectRadius: 0.5, fill: { color: 'C6C7C9' }, line: { type: 'none' } });
++  s.addShape('rect', { ...at([0.340, 0.894, 0.120, 0.018]), fill: { color: 'A9AAAC' }, line: { type: 'none' } });
++}
++
++/* ------------------------------------------------------------------ *
++ * Charts
++ * ------------------------------------------------------------------ */
++
++// Slide 27: quarterly sales share. The source uses a 3-D pie; pptxgenjs offers
++// a flat pie, drawn here with the same slice order, greys and % labels.
++// The title is a plain text box so it can sit exactly where the original has it.
++function salesPie(s, x, y, w, h) {
++  txt(s, x + 0.86, y - 0.42, 1.56, 0.42, 'Sales', { align: 'center', size: 22, bold: true, color: C.slate });
++  s.addChart('pie', [{
++    name: 'Sales',
++    labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'],
++    values: [6.4, 5.5, 1.4, 1.2],
++  }], {
++    x, y, w, h,
++    chartColors: [C.ink, C.slate, C.stone, C.silver],
++    showTitle: false, showLegend: false,
++    showPercent: true, showValue: false,
++    dataLabelPosition: 'ctr', dataLabelColor: C.white,
++    dataLabelFontFace: F.body, dataLabelFontSize: 13, dataLabelFontBold: true,
++    showLeaderLines: false,
++    shadow: { type: 'outer', angle: 90, blur: 20, offset: 0, color: '000000', opacity: 0.2 },
++  });
++}
++
++function stackedBars(s, x, y, w, h) {
++  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++  s.addChart('bar', [
++    { name: 'Series 1', labels: cats, values: [3.5, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: cats, values: [1.9, 5.1, 1.8, 4.5] },
++    { name: 'Series 3', labels: cats, values: [4, 3, 3, 5] },
++  ], {
++    x, y, w, h,
++    barDir: 'col', barGrouping: 'percentStacked', barGapWidthPct: 150,
++    chartColors: [C.ink, '525252', 'C9C9C9'],
++    showLegend: false, showTitle: false, showValue: false,
++    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 12, catAxisLabelColor: C.charcoal,
++    catAxisLineColor: C.silver,
++    valAxisHidden: true, valAxisLineShow: false,
++    catGridLine: { style: 'none' }, valGridLine: { style: 'none' },
++    dataNoEffects: true,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++function slide01(s) {
++  box(s, 6.667, 0.003, 6.667, 7.5, C.silver);
++  badge(s, 12.464, 6.672, '01.');
++  box(s, 0, 3.75, 6.667, 3.75, C.ink);
++  price(s, 0.405, 0.384, '68', { align: 'center' });
++  price(s, 1.87, 0.384, '71', { align: 'center' });
++  tagline(s, 3.446, 0.45, { w: 2.22 });
++  box(s, 6.667, 2.68, 5.039, 2.14, C.white);
++  display(s, 7.295, 3.033, 3.671, 1.313, 'Min-Sa', { size: 72, align: 'left' });
++}
++
++function slide02(s) {
++  box(s, 11.479, 1.438, 0.875, 3.125, C.ink);
++  runs(s, 11.354, 2.065, 1.125, 0.404, [{ text: '$', color: C.white, bold: true }, { text: '68', size: 18, color: C.white, bold: true }], { rotate: 90, align: 'center' });
++  runs(s, 11.354, 3.531, 1.125, 0.404, [{ text: '$', color: C.white, bold: true }, { text: '71', size: 18, color: C.white, bold: true }], { rotate: 90, align: 'center' });
++  display(s, 1.121, 5.245, 5.925, 1.01, 'Have a good rest', { size: 54 });
++  card(s, 2.25, 0, 6.143, 4.295, 'drop');
++  txt(s, 3.121, 0.79, 4.402, 1.212, T.L1, { align: 'justify', line: 1.5 });
++  txt(s, 3.121, 2.618, 4.402, 0.934, 'PLACEHOLDER', { align: 'justify', line: 1.5 });
++  txt(s, 7.949, 6.484, 3.686, 0.287, '“Have A Good Rest And Enjoy Your Vacation”', { align: 'center', color: C.slate, bold: true });
++  badge(s, 0.24, 0.241, '02.');
++}
++
++function slide03(s) {
++  box(s, 0, 3.75, 6.667, 3.753, C.mist);
++  box(s, 6.196, 1.513, 3.554, 1.515, C.white);
++  badge(s, 12.464, 6.672, '03.');
++  display(s, 6.539, 1.766, 5.925, 1.01, 'Have a good rest', { size: 54 });
++  txt(s, 1.263, 4.942, 4.402, 1.212, T.L1, { align: 'justify', line: 1.5 });
++  price(s, 7.395, 4.942, '68', { align: 'center' });
++  price(s, 8.86, 4.942, '71', { align: 'center' });
++  tagline(s, 10.436, 5.007, { w: 2.251 });
++  txt(s, 7.628, 5.588, 2.483, 0.656, T.L2, { line: 1.5 });
++  box(s, 0, 0, 8.583, 0.792, C.ink);
++}
++
++function slide04(s) {
++  box(s, 0, 5.417, 4.042, 2.083, C.ink);
++  badge(s, 0.24, 0.241, '04.');
++  display(s, 1.148, 2.906, 5.925, 1.01, 'Have a good rest', { size: 54 });
++  price(s, 3.667, 4.637, '68', { align: 'center' });
++  price(s, 5.132, 4.637, '71', { align: 'center' });
++  tagline(s, 6.708, 4.703);
++  txt(s, 1.007, 6.307, 2.027, 0.303, 'What we do?', { align: 'center', size: 12, color: C.white });
++  card(s, 9.333, 2.646, 3.458, 4.212);
++  txt(s, 10.069, 3.271, 2.011, 2.878, T.L1, { align: 'justify', line: 1.5 });
++}
++
++function slide05(s) {
++  badge(s, 12.464, 6.672, '05.');
++  box(s, 1.083, 1.021, 4.531, 3.771, C.ink);
++  txt(s, 1.762, 2.504, 3.174, 1.489, 'PLACEHOLDER', { align: 'justify', line: 1.5, color: C.white });
++  price(s, 1.763, 1.689, '68');
++  price(s, 4.269, 1.689, '71');
++  display(s, 6.857, 3.296, 5.291, 0.909, 'Have a good rest', { rotate: 90, size: 48 });
++  box(s, 1.083, 4.792, 4.531, 2.708, C.mist);
++  tagline(s, 2.335, 6.832, { align: 'center', bold: false, w: 2.027 });
++  txt(s, 10.431, 1.115, 2.011, 2.878, T.L1, { align: 'justify', line: 1.5 });
++  txt(s, 10.431, 4.855, 2.011, 1.212, 'PLACEHOLDER', { align: 'justify', line: 1.5 });
++}
++
++function slide06(s) {
++  box(s, 8.958, 0, 4.375, 1.146, C.ink);
++  txt(s, 10.14, 2.178, 2.011, 2.878, T.L1, { align: 'justify', line: 1.5 });
++  box(s, 3.693, 1.513, 3.554, 1.515, C.white);
++  display(s, 0.992, 1.766, 5.925, 1.01, 'Have a good rest', { size: 54 });
++  price(s, 0.992, 5.056, '68');
++  price(s, 2.733, 5.056, '71', { w: 0.741 });
++  txt(s, 0.992, 5.702, 2.483, 0.627, T.L2, { line: 1.5 });
++  card(s, 8.471, 5.68, 4.321, 1.297);
++  badge(s, 8.992, 6.019, '06.');
++  tagline(s, 10.131, 6.144, { w: 2.209 });
++}
++
++function slide07(s) {
++  box(s, -0.005, 3.75, 2.442, 3.771, C.ink);
++  display(s, 1.763, 0.724, 5.925, 1.01, 'Have a good rest', { size: 54, align: 'left' });
++  card(s, 8.596, 2.542, 4.009, 4.25);
++  tagline(s, 8.491, 1.285);
++  badge(s, 12.464, 0.276, '07.');
++  txt(s, 9.434, 3.234, 2.331, 2.045, 'PLACEHOLDER', { align: 'justify', line: 1.5 });
++  price(s, 9.345, 5.859, '68');
++  price(s, 11.087, 5.859, '71', { w: 0.741 });
++  txt(s, 4.901, 3.234, 2.856, 1.767, 'PLACEHOLDER', { align: 'justify', line: 1.5 });
++  txt(s, 4.901, 5.392, 2.856, 0.934, T.L6, { align: 'justify', line: 1.5 });
++}
++
++function slide08(s) {
++  txt(s, 0.573, 3.115, 2.79, 0.337, 'Value', { align: 'center', size: 14, color: C.slate, bold: true });
++  txt(s, 0.669, 3.485, 2.599, 0.934, T.L3, { align: 'center', line: 1.5 });
++  txt(s, 3.693, 3.115, 2.79, 0.337, 'Project', { align: 'center', size: 14, color: C.ink, bold: true });
++  txt(s, 3.788, 3.485, 2.599, 0.934, T.L3, { align: 'center', line: 1.5 });
++  txt(s, 6.791, 3.115, 2.79, 0.337, 'New ', { align: 'center', size: 14, color: C.ink, bold: true });
++  txt(s, 6.887, 3.485, 2.599, 0.934, T.L3, { align: 'center', line: 1.5 });
++  txt(s, 9.97, 3.115, 2.79, 0.337, 'Food', { align: 'center', size: 14, color: C.ink, bold: true });
++  txt(s, 10.065, 3.485, 2.599, 0.934, T.L3, { align: 'center', line: 1.5 });
++  txt(s, 1.182, 2.301, 1.572, 0.572, '10', { align: 'center', size: 28, color: C.ink, bold: true, face: F.head });
++  txt(s, 1.198, 2.274, 0.609, 0.337, '$', { align: 'center', size: 14, color: C.ink, bold: true, face: F.head });
++  txt(s, 4.302, 2.301, 1.572, 0.572, '24', { align: 'center', size: 28, color: C.ink, bold: true, face: F.head });
++  txt(s, 4.317, 2.274, 0.609, 0.337, '$', { align: 'center', size: 14, color: C.ink, bold: true, face: F.head });
++  txt(s, 7.4, 2.301, 1.572, 0.572, '51', { align: 'center', size: 28, color: C.ink, bold: true, face: F.head });
++  txt(s, 7.416, 2.274, 0.609, 0.337, '$', { align: 'center', size: 14, color: C.ink, bold: true, face: F.head });
++  txt(s, 10.579, 2.301, 1.572, 0.572, '49', { align: 'center', size: 28, color: C.ink, bold: true, face: F.head });
++  txt(s, 10.594, 2.274, 0.609, 0.337, '$', { align: 'center', size: 14, color: C.ink, bold: true, face: F.head });
++  display(s, 3.704, 0.504, 5.925, 1.01, 'Have a good rest', { size: 54, align: 'left' });
++  tagline(s, 5.594, 0.262, { align: 'center' });
++  badge(s, 6.357, 5.182, '08.');
++}
++
++function slide09(s) {
++  box(s, 0, 0, 5.45, 7.5, C.mist);
++  txt(s, 7.748, 3.106, 2.091, 0.37, 'Number one', { size: 16, color: C.slate, bold: true });
++  txt(s, 7.748, 3.474, 2.769, 0.934, T.L9, { align: 'justify', line: 1.5 });
++  txt(s, 7.748, 4.981, 2.091, 0.37, 'Number two ', { size: 16, color: C.slate, bold: true });
++  txt(s, 7.748, 5.35, 2.769, 0.934, T.L9, { align: 'justify', line: 1.5 });
++  box(s, 5.45, 0.912, 3.554, 1.515, C.white);
++  display(s, 5.793, 1.164, 5.925, 1.01, 'Have a good rest', { size: 54 });
++  price(s, 5.725, 0.59, '68', { align: 'center' });
++  price(s, 7.19, 0.59, '71', { align: 'center' });
++  tagline(s, 9.572, 0.656);
++  txt(s, 1.026, 2.035, 2.011, 2.878, T.L1, { align: 'justify', line: 1.5 });
++  card(s, 0.876, 5.745, 4.321, 1.297);
++  badge(s, 1.398, 6.083, '09.');
++  tagline(s, 2.537, 6.209, { w: 2.209 });
++}
++
++function slide10(s) {
++  box(s, 1.724, 1.708, 2.255, 5.792, C.mist);
++  box(s, 4.729, 0, 4.229, 3.896, C.ink);
++  txt(s, 5.446, 1.657, 2.79, 0.337, 'Value', { align: 'center', size: 14, color: C.white, bold: true });
++  txt(s, 5.542, 2.027, 2.599, 0.934, T.L3, { align: 'center', line: 1.5, color: C.white });
++  txt(s, 6.055, 0.842, 1.572, 0.572, '10', { align: 'center', size: 28, color: C.white, bold: true, face: F.head });
++  txt(s, 6.071, 0.816, 0.609, 0.337, '$', { align: 'center', size: 14, color: C.white, bold: true, face: F.head });
++  display(s, 6.375, 5.047, 5.925, 1.01, 'Have a good rest', { size: 54 });
++  price(s, 0.17, 5.932, '68', { rotate: 270, align: 'center' });
++  price(s, 0.17, 4.466, '71', { rotate: 270, align: 'center' });
++  tagline(s, -0.377, 1.675, { rotate: 270 });
++  badge(s, 12.464, 0.276, '10.');
++  txt(s, 9.893, 2.027, 2.589, 1.767, 'PLACEHOLDER', { align: 'justify', line: 1.5 });
++}
++
++function slide11(s) {
++  box(s, 8.51, 0, 4.823, 3.75, C.ink);
++  box(s, 3.661, 1.502, 3.554, 1.515, C.white);
++  txt(s, 3.771, 6.133, 2.091, 0.337, 'step one', { size: 14, color: C.slate, bold: true });
++  txt(s, 3.771, 6.412, 2.521, 0.379, T.L10, { line: 1.5 });
++  txt(s, 3.771, 5.591, 1.667, 0.404, '267, 26', { size: 18, color: C.slate, bold: true });
++  txt(s, 7.25, 6.133, 2.091, 0.337, 'step two', { size: 14, color: C.slate, bold: true });
++  txt(s, 7.25, 6.412, 2.521, 0.379, T.L10, { line: 1.5 });
++  txt(s, 7.25, 5.591, 1.667, 0.404, '742, 51', { size: 18, color: C.slate, bold: true });
++  display(s, 0.808, 1.693, 5.925, 1.01, 'Have a good rest', { size: 54 });
++  txt(s, 10.442, 0.82, 2.011, 2.045, 'PLACEHOLDER', { align: 'justify', line: 1.5, color: C.white });
++  badge(s, 0.262, 6.666, '11.');
++  price(s, 10.363, 4.623, '68');
++  price(s, 11.792, 4.623, '71', { w: 0.741 });
++  tagline(s, 2.187, 3.896, { rotate: 270 });
++}
++
++function slide12(s) {
++  box(s, 0, 0, 3.417, 3.75, C.ink);
++  box(s, 6.375, 1.453, 2.062, 0.729, C.stone);
++  txt(s, 6.646, 1.653, 1.521, 0.337, 'step one', { align: 'center', size: 14, color: C.white, bold: true });
++  box(s, 6.667, 5.086, 3.554, 1.515, C.white);
++  display(s, 6.875, 5.23, 5.291, 0.909, 'Have a good rest', { size: 48 });
++  price(s, 8.874, 4.571, '68', { align: 'center' });
++  price(s, 11.124, 4.571, '71', { align: 'center' });
++  badge(s, 12.464, 6.672, '12.');
++  txt(s, 6.931, 6.229, 3.581, 0.606, 'PLACEHOLDER', { line: 1.5, size: 10 });
++}
++
++function slide13(s) {
++  card(s, 2.042, 0.823, 11.292, 5.854, 'wide');
++  display(s, 3.063, 1.275, 5.291, 0.909, 'Have a good rest', { size: 48 });
++  txt(s, 9.296, 2.894, 2.011, 2.878, T.L1, { align: 'justify', line: 1.5 });
++  box(s, 11.896, 0.823, 1.437, 5.854, C.ink);
++  price(s, 12.052, 5.34, '68', { rotate: 270, color: C.white });
++  price(s, 12.052, 4.29, '71', { rotate: 270, color: C.white, align: 'center' });
++  tagline(s, 11.506, 2.269, { rotate: 270, color: C.white });
++  badge(s, 0.262, 6.666, '13.');
++}
++
++function slide14(s) {
++  box(s, -0.019, 5.152, 6.686, 2.375, C.ink);
++  card(s, 0.527, 2.914, 4.321, 1.297);
++  badge(s, 1.049, 3.253, '14.');
++  tagline(s, 2.188, 3.378, { w: 2.209 });
++  display(s, 9.701, 3.565, 5.291, 0.909, 'Have a good rest', { rotate: 90, size: 48 });
++  txt(s, 1.049, 0.822, 2.091, 0.337, 'step one', { size: 14, color: C.slate, bold: true });
++  txt(s, 1.049, 1.164, 2.091, 0.934, T.L11, { align: 'justify', line: 1.5 });
++  txt(s, 4.06, 0.822, 2.091, 0.337, 'step two', { size: 14, color: C.slate, bold: true });
++  txt(s, 4.06, 1.164, 2.091, 0.934, T.L11, { align: 'justify', line: 1.5 });
++  price(s, 0.596, 6.48, '68');
++  price(s, 2.467, 6.48, '71');
++  box(s, 8.122, 6.771, 2.062, 0.729, C.white, { transparency: 8 });
++  txt(s, 8.393, 6.971, 1.521, 0.337, 'step one', { align: 'center', size: 14, color: C.ink, bold: true });
++}
++
++function slide15(s) {
++  box(s, 5.646, 0, 7.688, 7.5, C.charcoal);
++  box(s, 0, 2.375, 4.146, 4.146, C.ink);
++  display(s, 6.667, 0.733, 5.291, 0.909, 'Have a good rest', { size: 48, color: C.white });
++  price(s, 5.594, 3.245, '68', { color: C.white });
++  price(s, 7.958, 3.245, '71', { color: C.white, align: 'center' });
++  tagline(s, 9.854, 3.31, { color: C.white });
++  txt(s, 9.854, 4.103, 2.146, 2.045, 'PLACEHOLDER', { align: 'justify', line: 1.5, color: C.white });
++  badge(s, 12.464, 6.672, '15.');
++  txt(s, 2.375, 5.813, 1.521, 0.337, 'step one', { align: 'center', size: 14, color: C.white, bold: true });
++}
++
++function slide16(s) {
++  box(s, 2.812, 0, 10.521, 5.167, C.ink);
++  txt(s, 4.875, 1.188, 1.521, 0.337, 'image one', { align: 'center', size: 14, color: C.white, bold: true });
++  txt(s, 7.854, 1.188, 1.521, 0.337, 'image two', { align: 'center', size: 14, color: C.white, bold: true });
++  txt(s, 10.833, 1.188, 1.521, 0.337, 'image three', { align: 'center', size: 14, color: C.white, bold: true });
++  display(s, 1.063, 5.754, 5.291, 0.909, 'Have a good rest', { size: 48 });
++  txt(s, 4.875, 0.326, 7.479, 0.379, T.L6, { align: 'center', line: 1.5, color: C.white });
++  badge(s, 12.464, 6.672, '16.');
++  price(s, 3.031, 3.712, '68', { rotate: 270, color: C.white });
++  price(s, 3.031, 1.948, '71', { rotate: 270, color: C.white, align: 'center' });
++  txt(s, 7.792, 5.902, 4.312, 0.656, T.L6, { line: 1.5 });
++  box(s, 1.354, 0, 1.458, 2.417, C.stone);
++}
++
++function slide17(s) {
++  box(s, 0, 0, 13.333, 3.167, C.ash);
++  box(s, 1.667, 4.223, 2.062, 0.729, C.white, { transparency: 8 });
++  txt(s, 1.938, 4.424, 1.521, 0.337, 'image one', { align: 'center', size: 14, color: C.ink, bold: true });
++  box(s, 5.635, 4.223, 2.062, 0.729, C.white, { transparency: 8 });
++  txt(s, 5.906, 4.424, 1.521, 0.337, 'image two', { align: 'center', size: 14, color: C.ink, bold: true });
++  box(s, 9.604, 4.223, 2.062, 0.729, C.white, { transparency: 8 });
++  txt(s, 9.875, 4.424, 1.521, 0.337, 'image three', { align: 'center', size: 14, color: C.ink, bold: true });
++  display(s, 4.021, 5.743, 5.291, 0.909, 'Have a good rest', { size: 48 });
++  badge(s, 12.464, 6.672, '17.');
++}
++
++function slide18(s) {
++  box(s, 11.863, 0, 1.471, 3.75, C.ink);
++  card(s, 8.471, 5.68, 4.321, 1.297);
++  badge(s, 8.992, 6.019, '18.');
++  tagline(s, 10.131, 6.144, { w: 2.209 });
++  box(s, 3.715, 1.024, 3.554, 1.515, C.white);
++  display(s, 1.534, 1.271, 5.291, 0.909, 'Have a good rest', { size: 48, align: 'right' });
++  price(s, 0.128, 6.512, '68', { rotate: 270, align: 'center' });
++  price(s, 0.128, 5.047, '71', { rotate: 270, align: 'center' });
++  tagline(s, -0.418, 3.172, { rotate: 270 });
++  txt(s, 1.632, 3.141, 2.011, 2.878, T.L1, { align: 'justify', line: 1.5 });
++}
++
++function slide19(s) {
++  card(s, 6.075, 2.453, 4.321, 1.297);
++  badge(s, 6.596, 2.792, '19.');
++  tagline(s, 7.735, 2.917, { w: 2.209 });
++  display(s, 1.084, 5.313, 5.291, 0.909, 'Have a good rest', { size: 48, align: 'right' });
++  price(s, 0.235, 0.352, '68', { align: 'center' });
++  price(s, 1.701, 0.352, '71', { align: 'center' });
++  tagline(s, 3.166, 0.417);
++  box(s, 12.083, 4.667, 1.25, 2.833, C.ink);
++  txt(s, 1.174, 6.265, 4.734, 0.379, T.L2, { line: 1.5 });
++}
++
++function slide20(s) {
++  box(s, 0, 5.733, 7.167, 1.767, C.ink);
++  card(s, 0.792, 0.729, 3.458, 4.212);
++  txt(s, 1.528, 1.354, 2.011, 2.878, T.L1, { align: 'justify', line: 1.5 });
++  display(s, 6.23, 0.646, 5.291, 0.909, 'Have a good rest', { size: 48, align: 'right' });
++  txt(s, 6.32, 1.598, 4.734, 0.379, T.L2, { line: 1.5 });
++  badge(s, 12.464, 6.672, '20.');
++  price(s, 7.387, 5.481, '68');
++  price(s, 8.852, 5.481, '71');
++  tagline(s, 10.937, 5.546);
++  txt(s, 3.23, 6.858, 1.521, 0.337, 'image one', { size: 14, color: C.white, bold: true });
++}
++
++function slide21(s) {
++  card(s, 0, 0.833, 11.292, 5.854, 'wide');
++  txt(s, 3.375, 4.069, 1.415, 0.368, 'Jhenie', { size: 16, color: C.ink, bold: true, face: F.head });
++  txt(s, 3.375, 4.663, 1.772, 1.363, T.L4, { align: 'justify', line: 1.5, size: 10 });
++  txt(s, 8.604, 4.069, 1.415, 0.368, 'Geron', { size: 16, color: C.ink, bold: true, face: F.head });
++  txt(s, 8.604, 4.663, 1.772, 1.363, T.L4, { align: 'justify', line: 1.5, size: 10 });
++  display(s, 1.127, 1.581, 5.291, 0.909, 'Have a good rest', { size: 48, align: 'right' });
++  badge(s, 12.464, 6.672, '21.');
++  txt(s, 1.232, 2.526, 4.734, 0.379, T.L2, { line: 1.5 });
++  price(s, 8.179, 1.694, '68');
++  price(s, 9.644, 1.694, '71');
++  tagline(s, 11.706, 1.399, { rotate: 90 });
++}
++
++function slide22(s) {
++  card(s, 2.042, 0.823, 11.292, 5.854, 'wide');
++  badge(s, 0.24, 0.241, '22.');
++  txt(s, 3.019, 4.027, 1.415, 0.368, 'Jhenie', { size: 16, color: C.ink, bold: true, face: F.head });
++  txt(s, 3.019, 4.621, 1.772, 1.111, T.L8, { align: 'justify', line: 1.5, size: 10 });
++  txt(s, 5.674, 4.027, 1.415, 0.368, 'Andia ', { size: 16, color: C.ink, bold: true, face: F.head });
++  txt(s, 5.674, 4.621, 1.772, 1.111, T.L8, { align: 'justify', line: 1.5, size: 10 });
++  display(s, 9.82, 3.329, 4.862, 0.841, 'Have a good rest', { rotate: 90, size: 44, align: 'right' });
++  txt(s, 9.273, 3.561, 4.734, 0.379, T.L2, { rotate: 90, line: 1.5 });
++  txt(s, 8.327, 4.027, 1.415, 0.368, 'Yeni', { size: 16, color: C.ink, bold: true, face: F.head });
++  txt(s, 8.327, 4.621, 1.772, 1.111, T.L8, { align: 'justify', line: 1.5, size: 10 });
++  price(s, 0.16, 6.881, '68');
++  price(s, 1.626, 6.881, '71');
++  tagline(s, 3.711, 6.947);
++}
++
++function slide23(s) {
++  box(s, 11, 0, 2.333, 3.75, C.ink);
++  box(s, 4.853, 0.837, 1.588, 1.06, C.white);
++  display(s, 0.982, 0.852, 5.291, 0.909, 'Have a good rest', { size: 48, align: 'right' });
++  txt(s, 1.086, 1.797, 4.734, 0.379, T.L2, { line: 1.5 });
++  badge(s, 12.464, 6.672, '23.');
++  card(s, 8.58, 4.681, 3.884, 1.297);
++  txt(s, 9.097, 5.077, 2.848, 0.505, 'Aurel Vernada', { align: 'center', size: 24, color: C.ink, bold: true });
++  txt(s, 0.982, 4.307, 2.693, 2.045, T.L1, { align: 'justify', line: 1.5 });
++  price(s, 0.982, 3.371, '68');
++  price(s, 2.974, 3.371, '71');
++}
++
++function slide24(s) {
++  card(s, 5.875, 0.823, 7.458, 5.854, 'wide');
++  txt(s, 10.418, 1.665, 1.415, 0.368, 'Jhenie', { size: 16, color: C.slate, bold: true, face: F.head });
++  txt(s, 10.418, 2.034, 2.123, 1.212, T.L4, { align: 'justify', line: 1.5 });
++  txt(s, 10.418, 4.075, 1.415, 0.368, 'Hamais', { size: 16, color: C.slate, bold: true, face: F.head });
++  txt(s, 10.418, 4.443, 2.123, 1.212, T.L4, { align: 'justify', line: 1.5 });
++  badge(s, 0.24, 0.241, '24.');
++  price(s, 6.208, 5.432, '68', { rotate: 270 });
++  price(s, 6.208, 4.225, '71', { rotate: 270 });
++  tagline(s, 5.662, 2.172, { rotate: 270 });
++  display(s, -1.251, 3.725, 4.862, 0.841, 'Have a good rest', { rotate: 270, size: 44, align: 'right' });
++  txt(s, -0.575, 3.956, 4.734, 0.379, T.L2, { rotate: 270, line: 1.5 });
++  txt(s, 2.922, 1.157, 2.011, 2.878, T.L1, { align: 'justify', line: 1.5 });
++  txt(s, 2.922, 5.023, 2.011, 1.489, 'PLACEHOLDER', { align: 'justify', line: 1.5 });
++}
++
++function slide25(s) {
++  box(s, 0, 3.188, 4.958, 4.312, C.ink);
++  display(s, 0.982, 0.852, 5.291, 0.909, 'Have a good rest', { size: 48, align: 'right' });
++  txt(s, 1.086, 1.797, 4.734, 0.379, T.L2, { line: 1.5 });
++  txt(s, 7.934, 1.039, 4.402, 0.934, 'PLACEHOLDER', { align: 'justify', line: 1.5 });
++  txt(s, 0.982, 6.759, 2.873, 0.379, 'Sed ut perspiciatis unde omnis iste', { line: 1.5, color: C.white, bold: true });
++  card(s, 8.408, 5.64, 4.321, 1.297);
++  badge(s, 8.93, 5.979, '25.');
++  tagline(s, 10.105, 6.105, { color: C.ink, w: 2.209 });
++}
++
++function slide26(s) {
++  box(s, 0, 0, 3.938, 7.5, C.ink);
++  card(s, 4.908, 0.643, 4.321, 1.297);
++  badge(s, 5.43, 0.982, '26.');
++  txt(s, 6.52, 1.039, 2.209, 0.505, 'Ghina Melita', { size: 24, color: C.ink, bold: true, face: F.head });
++  txt(s, 7.693, 3.75, 4.244, 1.212, T.L1, { align: 'justify', line: 1.5 });
++  txt(s, 7.693, 5.373, 4.244, 0.934, 'PLACEHOLDER', { align: 'justify', line: 1.5 });
++  price(s, 7.693, 2.761, '68');
++  price(s, 8.669, 2.761, '71');
++  tagline(s, 9.815, 2.827);
++  display(s, -1.364, 3.612, 4.862, 0.841, 'Have a good rest', { rotate: 270, size: 44, color: C.white, align: 'right' });
++  txt(s, -0.688, 3.858, 4.734, 0.349, T.L2, { rotate: 270, line: 1.5, color: C.white });
++}
++
++function slide27(s) {
++  salesPie(s, 0.95, 2, 3.4, 2.76);
++  txt(s, 5.07, 2.411, 2.693, 2.045, T.L1, { align: 'justify', line: 1.5 });
++  price(s, 5.07, 1.475, '68');
++  price(s, 7.062, 1.475, '71', { w: 0.701 });
++  badge(s, 12.464, 6.672, '27.');
++  display(s, 1.107, 5.348, 5.291, 0.909, 'Have a good rest', { size: 48, align: 'right' });
++  txt(s, 1.211, 6.293, 4.734, 0.379, T.L2, { line: 1.5 });
++  box(s, 8.979, 0.708, 4.354, 5.548, C.ash);
++  txt(s, 9.82, 1.549, 2.091, 0.337, 'number one', { size: 14, color: C.white, bold: true });
++  txt(s, 9.82, 1.849, 2.769, 0.379, T.L5, { align: 'justify', line: 1.5, color: C.white });
++  txt(s, 9.82, 2.545, 2.091, 0.337, 'number two', { size: 14, color: C.white, bold: true });
++  txt(s, 9.82, 2.845, 2.769, 0.379, T.L5, { align: 'justify', line: 1.5, color: C.white });
++  txt(s, 9.82, 3.571, 2.091, 0.337, 'number three', { size: 14, color: C.white, bold: true });
++  txt(s, 9.82, 3.871, 2.769, 0.379, T.L5, { align: 'justify', line: 1.5, color: C.white });
++  txt(s, 9.82, 4.616, 2.091, 0.337, 'number four', { size: 14, color: C.white, bold: true });
++  txt(s, 9.82, 4.916, 2.769, 0.379, T.L5, { align: 'justify', line: 1.5, color: C.white });
++}
++
++function slide28(s) {
++  stackedBars(s, 0.92, 3.75, 5.746, 2.872);
++  card(s, 0, 0.509, 8.083, 2.44, 'deep');
++  txt(s, 0.519, 1.301, 1.553, 0.303, 'write text here', { size: 12, color: C.ink, bold: true });
++  txt(s, 0.519, 0.948, 0.97, 0.303, '01.', { size: 12, color: C.ink, bold: true });
++  txt(s, 0.519, 1.604, 1.928, 0.896, T.L7, { align: 'justify', line: 1.5, size: 10.5 });
++  txt(s, 3.043, 1.301, 1.553, 0.303, 'write text here', { size: 12, color: C.ink, bold: true });
++  txt(s, 3.043, 0.948, 0.97, 0.303, '02.', { size: 12, color: C.ink, bold: true });
++  txt(s, 3.043, 1.604, 1.928, 0.896, T.L7, { align: 'justify', line: 1.5, size: 10.5 });
++  txt(s, 5.58, 1.301, 1.553, 0.303, 'write text here', { size: 12, color: C.ink, bold: true });
++  txt(s, 5.58, 0.948, 0.97, 0.303, '03.', { size: 12, color: C.ink, bold: true });
++  txt(s, 5.58, 1.604, 1.928, 0.896, T.L7, { align: 'justify', line: 1.5, size: 10.5 });
++  display(s, 7.001, 4.044, 5.291, 0.909, 'Have a good rest', { size: 48, align: 'right' });
++  txt(s, 7.105, 4.989, 4.734, 0.379, T.L2, { line: 1.5 });
++  badge(s, 12.464, 6.672, '28.');
++}
++
++function slide29(s) {
++  box(s, 4.271, 0, 9.062, 4.125, C.mist);
++  imageBox(s, 1.785, 1.332, 4.882, 2.949);
++  display(s, 1.107, 5.348, 5.291, 0.909, 'Have a good rest', { size: 48, align: 'right' });
++  box(s, 7.355, 4.125, 5.978, 3.375, C.ink);
++  price(s, 7.887, 6.657, '68', { color: C.mist });
++  price(s, 8.985, 6.657, '71', { color: C.mist });
++  tagline(s, 10.669, 6.722, { color: C.mist });
++  txt(s, 7.999, 4.785, 4.69, 1.212, T.L1, { align: 'justify', line: 1.5, color: C.white });
++  card(s, 5.658, 1.89, 4.321, 1.297);
++  badge(s, 6.18, 2.229, '29.');
++  tagline(s, 7.355, 2.355, { color: C.ink, w: 2.209 });
++}
++
++function slide30(s) {
++  box(s, 6.667, 0.003, 6.667, 7.5, C.silver);
++  box(s, 0, 3.75, 6.667, 3.75, C.ink);
++  badge(s, 12.464, 6.672, '30.');
++  price(s, 0.405, 0.384, '68', { align: 'center' });
++  price(s, 1.87, 0.384, '71', { align: 'center' });
++  tagline(s, 3.446, 0.45, { w: 2.22 });
++  box(s, 6.667, 2.68, 5.039, 2.14, C.white);
++  display(s, 7.295, 3.033, 3.685, 1.313, 'Thanks', { size: 72, align: 'left' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++];
++
++const pres = new pptxgen();
++pres.defineLayout({ name: 'MINSA_16x9', width: 13.3333, height: 7.5 });
++pres.layout = 'MINSA_16x9';
++pres.theme = { headFontFace: F.head, bodyFontFace: F.body };
++pres.author = 'Min-Sa';
++pres.title = 'Min-Sa presentation template';
++
++BUILDERS.forEach(build => build(pres.addSlide()));
++
++pres.writeFile({ fileName: path.join(__dirname, '0e79e941-e11b-4f8b-ad5d-1d38b95d5984_grok_final.pptx') })
++  .then(f => console.log('wrote ' + f));

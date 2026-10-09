@@ -1,0 +1,740 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/church_ministry_intro_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/church_ministry_intro_presentation.js
+@@ -0,0 +1,737 @@
++/**
++ * "CHURCH" deck - 20 slides, 13.333 x 7.5 in (16:9), rebuilt with pptxgenjs.
++ *
++ * Note on pictures: every `pic` placeholder in the source deck is empty (no
++ * media is bound to it), so nothing is drawn for them here. The only real
++ * images in the source are the four 0.65" icons on slide 13; those - and all
++ * the other icon glyphs - are redrawn below from native pptxgenjs shapes.
++ */
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++// ---------------------------------------------------------------------------
++// Theme
++// ---------------------------------------------------------------------------
++const BEIGE = 'DDCCBA'; // theme accent1
++const BLUE = '0C5AAA'; // theme accent2
++const CREAM = 'F8F5F1'; // accent1 lum 20/80 - nav bar on the light slides
++const SAND = 'BB9A76'; // accent1 lum 75  - wave blob on the light slides
++const SKY = 'C2DEFB'; // accent2 lum 20/80 - wave blob on the blue slides
++const TILE = 'EBE0D6'; // accent1 lum 60/40 - second pill on slide 10
++const SKY_MID = '479CF2'; // accent2 lum 60/40 - middle circle, slide 19
++const NAVY = '062D55'; // accent2 lum 50    - dark circle, slide 19
++const INK = '0D0D0D'; // tx1 lum 95/5      - body copy on the light slides
++const WHITE = 'FFFFFF';
++const OFFWHITE = 'F2F2F2';
++const BLACK = '000000';
++
++const HEAD = 'Roboto Condensed'; // theme major font
++const BODY = 'Archivo Light'; // theme minor font
++
++const WAVE_ALPHA = 84; // the big blobs are painted at 16% opacity
++
++// ---------------------------------------------------------------------------
++// Decorative free-form geometry, normalised to the 0..1 unit square.
++// Each entry is [cmd, ...coords]: M = moveTo, L = lineTo, C = cubic bezier.
++// ---------------------------------------------------------------------------
++
++// Organic blob used as the oversized background wave.
++const WAVE_BLOB = [
++  ['M', 0.1464, 0], ['L', 0.3614, 0], ['L', 0.3612, 0.0084], ['C', 0.3594, 0.0256, 0.3546, 0.0426, 0.3464, 0.0583],
++  ['L', 0.1761, 0.3848], ['C', 0.1622, 0.4114, 0.1537, 0.4417, 0.1513, 0.4731],
++  ['C', 0.1405, 0.6165, 0.2541, 0.7256, 0.3649, 0.678], ['L', 0.368, 0.6767],
++  ['C', 0.4127, 0.6575, 0.4621, 0.6631, 0.5032, 0.6921], ['L', 0.5443, 0.7211],
++  ['C', 0.6178, 0.773, 0.7116, 0.7329, 0.7431, 0.6363], ['C', 0.7722, 0.547, 0.8554, 0.5047, 0.9273, 0.5425],
++  ['L', 1, 0.5807], ['L', 1, 0.7467], ['L', 0.9943, 0.7463], ['C', 0.9444, 0.7459, 0.8972, 0.7864, 0.8835, 0.8506],
++  ['C', 0.8662, 0.9324, 0.8077, 0.9911, 0.739, 0.9957], ['L', 0.6811, 0.9997],
++  ['C', 0.6434, 1.0022, 0.6061, 0.9894, 0.5751, 0.9631], ['L', 0.5129, 0.9107],
++  ['C', 0.4619, 0.8676, 0.3937, 0.8716, 0.3462, 0.9205], ['C', 0.2985, 0.9695, 0.2299, 0.9733, 0.1788, 0.9297],
++  ['L', 0.1417, 0.898], ['C', 0.1134, 0.8738, 0.0907, 0.8409, 0.076, 0.8025], ['L', 0.036, 0.6981],
++  ['C', 0.0123, 0.6362, 0, 0.5687, 0, 0.5003], ['L', 0, 0.4373], ['C', 0, 0.3563, 0.0173, 0.2766, 0.0501, 0.2063],
++  ['Z'],
++];
++
++// Latin cross, drawn lying on its side (placed with rotate: 90).
++const CROSS = [
++  ['M', 0, 0.5982], ['L', 0, 0.4018], ['L', 0.2293, 0.4018], ['L', 0.2293, 0], ['L', 0.3705, 0],
++  ['L', 0.3705, 0.4018], ['L', 1, 0.4018], ['L', 1, 0.5982], ['L', 0.3705, 0.5982], ['L', 0.3705, 1],
++  ['L', 0.2293, 1], ['L', 0.2293, 0.5982], ['Z'],
++];
++
++// Long hand-drawn arrow that sweeps down and to the left.
++const ARROW_SWOOSH = [
++  ['M', 0.9338, 0.0196], ['C', 0.9345, -0.0042, 0.949, -0.0054, 0.9509, 0.0242],
++  ['C', 0.9546, 0.0836, 0.9734, 0.2206, 0.9981, 0.2328], ['C', 0.9985, 0.233, 0.9988, 0.2335, 0.999, 0.2342],
++  ['C', 0.9993, 0.2349, 0.9994, 0.2358, 0.9993, 0.2367], ['L', 0.9993, 0.2369],
++  ['C', 0.9992, 0.2384, 0.9989, 0.2398, 0.9984, 0.2408], ['C', 0.9979, 0.2418, 0.9973, 0.2423, 0.9966, 0.2422],
++  ['C', 0.9742, 0.2399, 0.9461, 0.1678, 0.946, 0.151], ['C', 0.949, 0.7238, 0.7666, 0.8752, 0.564, 0.8433],
++  ['C', 0.4645, 0.8382, 0.368, 0.7733, 0.2689, 0.7641], ['C', 0.1736, 0.76, 0.0691, 0.816, 0.0046, 0.9971],
++  ['C', 0.0043, 0.998, 0.0039, 0.9987, 0.0034, 0.999], ['C', 0.0029, 0.9993, 0.0024, 0.9992, 0.0019, 0.9988],
++  ['C', 0.0017, 0.9986, 0.0014, 0.9982, 0.0012, 0.9977], ['C', 0.0011, 0.9972, 0.0009, 0.9966, 0.0008, 0.996],
++  ['C', 0.0008, 0.9953, 0.0008, 0.9946, 0.0008, 0.994], ['C', 0.0009, 0.9933, 0.001, 0.9927, 0.0012, 0.9922],
++  ['C', 0.0646, 0.8031, 0.1721, 0.7395, 0.2691, 0.7372], ['C', 0.368, 0.7399, 0.4658, 0.797, 0.5648, 0.7967],
++  ['C', 0.757, 0.8092, 0.9218, 0.6724, 0.9361, 0.1441], ['C', 0.935, 0.1824, 0.9036, 0.2312, 0.8867, 0.2377],
++  ['C', 0.8861, 0.2379, 0.8856, 0.2379, 0.885, 0.2375], ['C', 0.8845, 0.2372, 0.884, 0.2365, 0.8836, 0.2357],
++  ['C', 0.8834, 0.2354, 0.8833, 0.2351, 0.8833, 0.2348], ['C', 0.8832, 0.2344, 0.8831, 0.234, 0.8831, 0.2336],
++  ['C', 0.8831, 0.2332, 0.8832, 0.2328, 0.8833, 0.2325], ['C', 0.8833, 0.2321, 0.8834, 0.2318, 0.8836, 0.2316],
++  ['C', 0.9107, 0.1848, 0.9316, 0.0926, 0.9338, 0.0196], ['Z'], ['M', 0.8004, 0.6066],
++  ['C', 0.8006, 0.6064, 0.8009, 0.6064, 0.8011, 0.6066], ['C', 0.8013, 0.6067, 0.8015, 0.6071, 0.8016, 0.6076],
++  ['C', 0.8017, 0.608, 0.8018, 0.6086, 0.8018, 0.6092], ['C', 0.8018, 0.6097, 0.8017, 0.6103, 0.8015, 0.6107],
++  ['C', 0.7343, 0.7238, 0.6111, 0.7504, 0.5299, 0.7216], ['C', 0.5297, 0.7214, 0.5295, 0.7211, 0.5294, 0.7206],
++  ['C', 0.5293, 0.7202, 0.5292, 0.7196, 0.5292, 0.7191], ['C', 0.5293, 0.7185, 0.5293, 0.718, 0.5295, 0.7176],
++  ['C', 0.5297, 0.7172, 0.5299, 0.7169, 0.5301, 0.7168], ['C', 0.6108, 0.7243, 0.7304, 0.6992, 0.8004, 0.6066],
++  ['Z']
++];
++
++// Hand-drawn arrow that loops back on itself.
++const ARROW_CURL = [
++  ['M', 0.6447, 0.9592], ['C', 0.647, 0.9584, 0.6482, 0.9626, 0.6461, 0.964],
++  ['C', 0.5825, 1.0061, 0.4864, 1.0073, 0.4233, 0.9854], ['C', 0.423, 0.9853, 0.4227, 0.9851, 0.4226, 0.9848],
++  ['C', 0.4224, 0.9845, 0.4224, 0.9841, 0.4224, 0.9837], ['C', 0.4225, 0.9834, 0.4226, 0.9831, 0.4229, 0.9829],
++  ['C', 0.4231, 0.9826, 0.4234, 0.9825, 0.4237, 0.9826], ['C', 0.4587, 0.9841, 0.5886, 0.9794, 0.6447, 0.9592],
++  ['Z'], ['M', 0.3495, 0.4374], ['C', 0.3107, -0.0533, 0.9103, -0.1779, 0.9923, 0.3214],
++  ['C', 1.0273, 0.5332, 0.9303, 0.7595, 0.7662, 0.854], ['C', 0.5514, 0.975, 0.2879, 0.9422, 0.0765, 0.8265],
++  ['C', 0.0913, 0.8603, 0.079, 0.9188, 0.0725, 0.9369], ['C', 0.0718, 0.9383, 0.0707, 0.9394, 0.0693, 0.94],
++  ['C', 0.068, 0.9406, 0.0666, 0.9407, 0.0652, 0.9403], ['C', 0.0641, 0.9401, 0.0631, 0.9395, 0.0624, 0.9385],
++  ['C', 0.0616, 0.9375, 0.0612, 0.9363, 0.0612, 0.935], ['C', 0.0599, 0.8777, 0.0394, 0.8293, 0.0076, 0.788],
++  ['C', 0.0044, 0.783, -0.0019, 0.7727, 0.0066, 0.764], ['C', 0.0208, 0.7496, 0.0537, 0.8107, 0.1668, 0.7694],
++  ['C', 0.1673, 0.7692, 0.1677, 0.7692, 0.1682, 0.7692], ['C', 0.1686, 0.7693, 0.169, 0.7695, 0.1694, 0.7697],
++  ['C', 0.1698, 0.77, 0.1701, 0.7704, 0.1704, 0.7708], ['C', 0.1706, 0.7712, 0.1708, 0.7717, 0.1709, 0.7723],
++  ['C', 0.1711, 0.7739, 0.1709, 0.7757, 0.1702, 0.7772], ['C', 0.1696, 0.7787, 0.1685, 0.7799, 0.1673, 0.7807],
++  ['C', 0.139, 0.7974, 0.1076, 0.8055, 0.076, 0.8044], ['C', 0.3666, 0.9026, 0.8509, 0.913, 0.9408, 0.4838],
++  ['C', 0.9583, 0.3843, 0.9465, 0.2755, 0.9007, 0.1885], ['C', 0.8422, 0.0713, 0.7204, 0.024, 0.6103, 0.0477],
++  ['C', 0.4548, 0.067, 0.3494, 0.2605, 0.3614, 0.4387], ['C', 0.3614, 0.4402, 0.361, 0.4416, 0.3602, 0.4427],
++  ['C', 0.3594, 0.4438, 0.3583, 0.4445, 0.357, 0.4447], ['C', 0.3552, 0.4449, 0.3534, 0.4443, 0.352, 0.4429],
++  ['C', 0.3506, 0.4415, 0.3497, 0.4395, 0.3495, 0.4374], ['Z'], ['M', 0.8997, 0.4674],
++  ['C', 0.9004, 0.4675, 0.901, 0.4679, 0.9015, 0.4685], ['C', 0.9019, 0.4691, 0.9022, 0.4699, 0.9021, 0.4707],
++  ['C', 0.9043, 0.4893, 0.9007, 0.5082, 0.8919, 0.5238], ['C', 0.8915, 0.5245, 0.8909, 0.5249, 0.8902, 0.5251],
++  ['C', 0.8895, 0.5253, 0.8888, 0.5253, 0.8882, 0.525], ['C', 0.8875, 0.5246, 0.887, 0.524, 0.8867, 0.5233],
++  ['C', 0.8863, 0.5226, 0.8862, 0.5218, 0.8863, 0.5209], ['C', 0.8889, 0.5038, 0.8924, 0.4868, 0.8969, 0.4702],
++  ['C', 0.897, 0.4694, 0.8973, 0.4687, 0.8978, 0.4681], ['C', 0.8983, 0.4676, 0.899, 0.4673, 0.8997, 0.4674], ['Z'],
++  ['M', 0.7572, 0.1099], ['C', 0.7574, 0.1099, 0.7576, 0.1099, 0.7578, 0.11],
++  ['C', 0.8715, 0.1481, 0.917, 0.3069, 0.9031, 0.4377], ['C', 0.9031, 0.4382, 0.903, 0.4386, 0.9027, 0.4389],
++  ['C', 0.9024, 0.4393, 0.902, 0.4394, 0.9016, 0.4394], ['C', 0.9013, 0.4394, 0.9009, 0.4393, 0.9006, 0.4389],
++  ['C', 0.9003, 0.4386, 0.9002, 0.4382, 0.9002, 0.4377], ['C', 0.8951, 0.3101, 0.8598, 0.1703, 0.7567, 0.1134],
++  ['C', 0.7565, 0.1133, 0.7564, 0.1132, 0.7562, 0.113], ['C', 0.7561, 0.1128, 0.756, 0.1126, 0.7559, 0.1124],
++  ['C', 0.7558, 0.1122, 0.7557, 0.112, 0.7557, 0.1117], ['C', 0.7557, 0.1115, 0.7558, 0.1113, 0.7558, 0.111],
++  ['C', 0.7559, 0.1108, 0.756, 0.1106, 0.7561, 0.1105], ['C', 0.7563, 0.1103, 0.7564, 0.1101, 0.7566, 0.11],
++  ['C', 0.7568, 0.1099, 0.757, 0.1099, 0.7572, 0.1099], ['Z']
++];
++
++// ---------------------------------------------------------------------------
++// Helpers
++// ---------------------------------------------------------------------------
++
++/**
++ * Draw a unit-square path table scaled into the box {x, y, w, h}.
++ * custGeom points are expressed relative to the shape's own bounding box.
++ */
++function freeform(slide, pathTable, o) {
++  const sx = v => v * o.w;
++  const sy = v => v * o.h;
++  slide.addShape('custGeom', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    points: pathTable.map(([cmd, ...c]) => {
++      if (cmd === 'Z') return { close: true };
++      if (cmd === 'M') return { x: sx(c[0]), y: sy(c[1]), moveTo: true };
++      if (cmd === 'L') return { x: sx(c[0]), y: sy(c[1]) };
++      return {
++        x: sx(c[4]), y: sy(c[5]),
++        curve: { type: 'cubic', x1: sx(c[0]), y1: sy(c[1]), x2: sx(c[2]), y2: sy(c[3]) },
++      };
++    }),
++    fill: { color: o.color, ...(o.transparency ? { transparency: o.transparency } : {}) },
++    line: { type: 'none' },
++    rotate: o.rotate || 0, flipH: !!o.flipH, flipV: !!o.flipV,
++  });
++}
++
++/** The oversized background blob (16% opacity) that sits behind everything. */
++function waveBlob(slide, color) {
++  freeform(slide, WAVE_BLOB, { x: 4.132, y: 0, w: 9.201, h: 7.495, color, transparency: WAVE_ALPHA });
++}
++
++/** Heading / stat text: the condensed theme face, always bold. */
++function heading(slide, text, o) {
++  slide.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: HEAD, fontSize: o.size || 44, bold: true, italic: o.italic, color: o.color || BLUE,
++    align: o.align || 'left', valign: o.valign || 'top',
++    lineSpacingMultiple: o.lineSpacingMultiple, shape: o.shape, isTextBox: true,
++  });
++}
++
++/** Body copy: the light theme face at 14pt with 130% leading. */
++function body(slide, text, o) {
++  slide.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: BODY, fontSize: o.size || 14, bold: o.bold, italic: o.italic, color: o.color || INK,
++    align: o.align || 'left', valign: o.valign || 'top',
++    lineSpacingMultiple: o.lineSpacingMultiple === undefined ? 1.3 : o.lineSpacingMultiple,
++    shape: o.shape, isTextBox: true,
++  });
++}
++
++/** Rounded "pill" card. `adj` is the OOXML corner-radius adjust value (0..50000). */
++function card(slide, o) {
++  slide.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: { color: o.color }, line: { type: 'none' },
++    rectRadius: (o.adj / 100000) * Math.min(o.w, o.h),
++  });
++}
++
++/**
++ * Horizontal band that runs off the left edge of the slide and ends in a
++ * semicircular cap on the right (a rectangle + a circle of diameter `h`).
++ */
++function sideBand(slide, o) {
++  const fill = { color: o.color };
++  slide.addShape('rect', { x: o.x, y: o.y, w: o.w - o.h / 2, h: o.h, fill, line: { type: 'none' } });
++  slide.addShape('ellipse', { x: o.x + o.w - o.h, y: o.y, w: o.h, h: o.h, fill, line: { type: 'none' } });
++}
++
++// ---------------------------------------------------------------------------
++// Master chrome: the nav bar that repeats on every slide, plus the page number
++// ---------------------------------------------------------------------------
++const NAV_LINKS = [
++  { text: 'INTROUCTION', x: 0.585, w: 1.008 },
++  { text: 'ABOUT SERVICE', x: 2.351, w: 1.126 },
++  { text: 'ABOUT US', x: 10.283, w: 0.793 },
++  { text: 'GET STARTED', x: 11.763, w: 0.994 },
++];
++
++function navBar(slide, barColor) {
++  slide.addShape('rect', { x: 0, y: 0, w: 13.333, h: 0.73, fill: { color: barColor }, line: { type: 'none' } });
++  NAV_LINKS.forEach(l => {
++    heading(slide, l.text, { x: l.x, y: 0.23, w: l.w, h: 0.269, size: 10, align: 'center' });
++  });
++  heading(slide, 'CHURCH', { x: 6.193, y: 0.214, w: 0.948, h: 0.303, size: 12, align: 'center' });
++  // the two little crosses flanking the wordmark
++  [5.904, 7.093].forEach(x => freeform(slide, CROSS, { x, y: 0.261, w: 0.336, h: 0.242, color: BLUE, rotate: 90 }));
++}
++
++function pageNumber(slide, n, color) {
++  slide.addText(String(n), {
++    x: 12.531, y: 6.828, w: 0.477, h: 0.303,
++    fontFace: BODY, fontSize: 12, color, transparency: 30, align: 'center', valign: 'top', isTextBox: true,
++  });
++}
++
++/**
++ * Every slide gets: background colour, the background blobs, the nav bar and
++ * the page number. Beige slides show the two master blobs; the blue slides
++ * hide master shapes and paint one larger blob of their own.
++ *
++ * @param {'beige'|'blue'} tone
++ * @param {boolean} [blobOnTop] blue slides only: draw the blob last instead
++ */
++function newSlide(pptx, n, tone, blobOnTop) {
++  const slide = pptx.addSlide();
++  if (tone === 'blue') {
++    slide.background = { color: BLUE };
++    if (!blobOnTop) waveBlob(slide, SKY);
++    navBar(slide, BEIGE);
++    pageNumber(slide, n, WHITE);
++  } else {
++    slide.background = { color: BEIGE };
++    // master blobs: one flipped top-left, one flipped bottom-right
++    freeform(slide, WAVE_BLOB, { x: 0, y: 0, w: 5.951, h: 4.848, color: SAND, transparency: WAVE_ALPHA, flipH: true });
++    freeform(slide, WAVE_BLOB, { x: 7.382, y: 2.652, w: 5.951, h: 4.848, color: SAND, transparency: WAVE_ALPHA, flipV: true });
++    navBar(slide, CREAM);
++    pageNumber(slide, n, BLUE);
++  }
++  return slide;
++}
++
++// ---------------------------------------------------------------------------
++// Icon glyphs. The source deck uses line-art SVG icons; these are rebuilt from
++// native shapes so no raster/vector asset has to be embedded.
++// ---------------------------------------------------------------------------
++
++/** Small Latin cross made of two bars. */
++function crossIcon(slide, o) {
++  const t = o.w * 0.26;
++  slide.addShape('rect', { x: o.x + (o.w - t) / 2, y: o.y, w: t, h: o.h, fill: { color: o.color }, line: { type: 'none' } });
++  slide.addShape('rect', { x: o.x, y: o.y + o.h * 0.24, w: o.w, h: t, fill: { color: o.color }, line: { type: 'none' } });
++}
++
++/** Bible: outlined cover with a cross on the front. */
++function bibleIcon(slide, o) {
++  const lw = Math.max(1, o.w * 4);
++  slide.addShape('rect', { x: o.x + o.w * 0.1, y: o.y, w: o.w * 0.9, h: o.h * 0.86,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('rect', { x: o.x, y: o.y + o.h * 0.12, w: o.w * 0.16, h: o.h * 0.88,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  crossIcon(slide, { x: o.x + o.w * 0.34, y: o.y + o.h * 0.16, w: o.w * 0.42, h: o.h * 0.52, color: o.color });
++}
++
++/** Decorated egg (the deck's Easter motif). */
++function eggIcon(slide, o) {
++  slide.addShape('ellipse', { x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: { type: 'none' }, line: { color: o.color, width: Math.max(1, o.w * 4) } });
++  [0.36, 0.62].forEach(f => slide.addShape('line', {
++    x: o.x + o.w * 0.08, y: o.y + o.h * f, w: o.w * 0.84, h: 0, line: { color: o.color, width: Math.max(1, o.w * 3) },
++  }));
++}
++
++/** Church: gabled facade with a steeple cross. */
++function churchIcon(slide, o) {
++  const lw = Math.max(1, o.w * 3.5);
++  crossIcon(slide, { x: o.x + o.w * 0.4, y: o.y, w: o.w * 0.2, h: o.h * 0.2, color: o.color });
++  slide.addShape('triangle', { x: o.x + o.w * 0.22, y: o.y + o.h * 0.18, w: o.w * 0.56, h: o.h * 0.38,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('rect', { x: o.x, y: o.y + o.h * 0.52, w: o.w, h: o.h * 0.48,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('rect', { x: o.x + o.w * 0.4, y: o.y + o.h * 0.68, w: o.w * 0.2, h: o.h * 0.32,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++}
++
++/** Calendar with two rings. */
++function calendarIcon(slide, o) {
++  const lw = Math.max(1, o.w * 3.5);
++  [0.3, 0.7].forEach(f => slide.addShape('line', {
++    x: o.x + o.w * f, y: o.y, w: 0, h: o.h * 0.18, line: { color: o.color, width: lw },
++  }));
++  slide.addShape('roundRect', { x: o.x, y: o.y + o.h * 0.12, w: o.w, h: o.h * 0.88,
++    fill: { type: 'none' }, line: { color: o.color, width: lw }, rectRadius: o.w * 0.12 });
++  slide.addShape('line', { x: o.x, y: o.y + o.h * 0.36, w: o.w, h: 0, line: { color: o.color, width: lw } });
++}
++
++/** Gift box with a lid. */
++function giftIcon(slide, o) {
++  const lw = Math.max(1, o.w * 3.5);
++  slide.addShape('ellipse', { x: o.x + o.w * 0.18, y: o.y, w: o.w * 0.3, h: o.h * 0.26,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('ellipse', { x: o.x + o.w * 0.52, y: o.y, w: o.w * 0.3, h: o.h * 0.26,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('rect', { x: o.x, y: o.y + o.h * 0.24, w: o.w, h: o.h * 0.2,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('rect', { x: o.x + o.w * 0.08, y: o.y + o.h * 0.44, w: o.w * 0.84, h: o.h * 0.56,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++}
++
++/** Open envelope with a card inside. */
++function envelopeIcon(slide, o) {
++  const lw = Math.max(1, o.w * 3.5);
++  slide.addShape('rect', { x: o.x + o.w * 0.2, y: o.y, w: o.w * 0.6, h: o.h * 0.55,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('rect', { x: o.x, y: o.y + o.h * 0.36, w: o.w, h: o.h * 0.64,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('line', { x: o.x, y: o.y + o.h * 0.36, w: o.w * 0.5, h: o.h * 0.64, line: { color: o.color, width: lw } });
++  slide.addShape('line', { x: o.x + o.w * 0.5, y: o.y + o.h, w: o.w * 0.5, h: -o.h * 0.64, line: { color: o.color, width: lw } });
++}
++
++/** Bell with a clapper. */
++function bellIcon(slide, o) {
++  const lw = Math.max(1, o.w * 3.5);
++  slide.addShape('ellipse', { x: o.x + o.w * 0.44, y: o.y, w: o.w * 0.12, h: o.h * 0.12,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('arc', { x: o.x + o.w * 0.1, y: o.y + o.h * 0.1, w: o.w * 0.8, h: o.h * 1.1,
++    angleRange: [180, 360], fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('roundRect', { x: o.x, y: o.y + o.h * 0.62, w: o.w, h: o.h * 0.18,
++    fill: { type: 'none' }, line: { color: o.color, width: lw }, rectRadius: o.h * 0.09 });
++  slide.addShape('arc', { x: o.x + o.w * 0.34, y: o.y + o.h * 0.66, w: o.w * 0.32, h: o.h * 0.3,
++    angleRange: [0, 180], fill: { type: 'none' }, line: { color: o.color, width: lw } });
++}
++
++/** Wine bottle beside a glass. */
++function wineIcon(slide, o) {
++  const lw = Math.max(1, o.w * 3.2);
++  slide.addShape('rect', { x: o.x + o.w * 0.14, y: o.y, w: o.w * 0.14, h: o.h * 0.16,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('roundRect', { x: o.x + o.w * 0.02, y: o.y + o.h * 0.24, w: o.w * 0.38, h: o.h * 0.76,
++    fill: { type: 'none' }, line: { color: o.color, width: lw }, rectRadius: o.w * 0.08 });
++  [0.48, 0.72].forEach(f => slide.addShape('line', {
++    x: o.x + o.w * 0.02, y: o.y + o.h * f, w: o.w * 0.38, h: 0, line: { color: o.color, width: lw },
++  }));
++  slide.addShape('trapezoid', { x: o.x + o.w * 0.56, y: o.y + o.h * 0.38, w: o.w * 0.34, h: o.h * 0.3,
++    fill: { type: 'none' }, line: { color: o.color, width: lw }, flipV: true });
++  slide.addShape('line', { x: o.x + o.w * 0.73, y: o.y + o.h * 0.68, w: 0, h: o.h * 0.22, line: { color: o.color, width: lw } });
++  slide.addShape('line', { x: o.x + o.w * 0.6, y: o.y + o.h * 0.9, w: o.w * 0.26, h: 0, line: { color: o.color, width: lw } });
++}
++
++/** Egg in an egg-cup (slide 9). */
++function eggCupIcon(slide, o) {
++  const lw = Math.max(1, o.w * 4);
++  slide.addShape('ellipse', { x: o.x + o.w * 0.15, y: o.y, w: o.w * 0.7, h: o.h * 0.62,
++    fill: { type: 'none' }, line: { color: o.color, width: lw } });
++  slide.addShape('roundRect', { x: o.x, y: o.y + o.h * 0.48, w: o.w, h: o.h * 0.14,
++    fill: { type: 'none' }, line: { color: o.color, width: lw }, rectRadius: o.h * 0.07 });
++  slide.addShape('line', { x: o.x + o.w * 0.5, y: o.y + o.h * 0.62, w: 0, h: o.h * 0.24, line: { color: o.color, width: lw } });
++  slide.addShape('roundRect', { x: o.x + o.w * 0.18, y: o.y + o.h * 0.86, w: o.w * 0.64, h: o.h * 0.14,
++    fill: { type: 'none' }, line: { color: o.color, width: lw }, rectRadius: o.h * 0.07 });
++}
++
++// ---------------------------------------------------------------------------
++// Slides
++// ---------------------------------------------------------------------------
++
++const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor '
++  + 'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam ut labore et dolore magna aliqua. ';
++const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor '
++  + 'incididunt ut labore et dolore magna.';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur';
++const LOREM_AENEAN = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula '
++  + 'eget dolor. Aenean massa';
++
++/** Slide 1 - blue cover with the giant CHURCH wordmark. */
++function slide01(pptx) {
++  const s = newSlide(pptx, 1, 'blue');
++  heading(s, 'CHURCH', { x: 0.998, y: 0.73, w: 12.286, h: 4.123, size: 235, color: BEIGE, valign: 'middle' });
++  [{ x: 2.757, tx: 2.814, stat: '80%' }, { x: 5.097, tx: 5.154, stat: '+29K' }].forEach(c => {
++    heading(s, c.stat, { x: c.x, y: 5.067, w: 1.862, h: 0.909, size: 48, color: BEIGE });
++    body(s, LOREM_SHORT, { x: c.tx, y: 5.868, w: 2.244, h: 0.688, color: WHITE });
++  });
++  freeform(s, ARROW_SWOOSH, { x: 0.54, y: 3.691, w: 2.49, h: 1.032, color: BEIGE, rotate: 22.1, flipH: true });
++  freeform(s, ARROW_CURL, { x: 11.877, y: 3.552, w: 1.019, h: 0.862, color: BEIGE });
++}
++
++/** Slide 2 - INTRODUCTION. */
++function slide02(pptx) {
++  const s = newSlide(pptx, 2, 'beige');
++  heading(s, 'INTRODUCTION', { x: 1.155, y: 1.391, w: 5.677, h: 1.144, size: 60, lineSpacingMultiple: 1.1 });
++  body(s, LOREM_LONG, { x: 1.155, y: 2.522, w: 4.353, h: 1.295 });
++  heading(s, '+500,00K', { x: 3.609, y: 4.601, w: 3.058, h: 0.909, size: 48 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut '
++    + 'labore et magna aliqua. Ut enim ad minim veniam ut labore et dolore magna aliqua. ',
++    { x: 3.609, y: 5.537, w: 7.808, h: 0.683 });
++  freeform(s, ARROW_SWOOSH, { x: 4.891, y: 3.297, w: 2.49, h: 1.032, color: BLUE, rotate: 225, flipH: true });
++  freeform(s, ARROW_CURL, { x: 11.337, y: 4.848, w: 1.431, h: 1.21, color: BLUE });
++}
++
++/** Slide 3 - headline over a blue banner that runs off the left edge. */
++function slide03(pptx) {
++  const s = newSlide(pptx, 3, 'beige');
++  heading(s, 'A PLACE WHERE FAITH GROWS, HEARTS HEAL, AND HOPE BEGINS',
++    { x: 1.155, y: 1.21, w: 5.677, h: 2.278, size: 40, lineSpacingMultiple: 1.1 });
++  body(s, LOREM_MED, { x: 1.155, y: 3.687, w: 5.512, h: 0.683 });
++  sideBand(s, { x: 0, y: 4.826, w: 8.75, h: 2.049, color: BLUE });
++  bibleIcon(s, { x: 1.14, y: 5.558, w: 0.436, h: 0.515, color: BEIGE });
++  heading(s, 'STRENGTHENED BY FAITH, UNITED IN PURPOSE',
++    { x: 1.81, y: 5.27, w: 5.657, h: 0.438, size: 20, color: BEIGE, valign: 'middle' });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut '
++    + 'labore et dolore magna aliqua. Ut enim ad minim.', { x: 1.853, y: 5.673, w: 6.316, h: 0.683, color: WHITE });
++  freeform(s, ARROW_SWOOSH, { x: 5.684, y: 3.052, w: 2.772, h: 1.149, color: BLUE, rotate: 180, flipH: true });
++}
++
++/** Slide 4 - full-width headline plus two italic captions. */
++function slide04(pptx) {
++  const s = newSlide(pptx, 4, 'beige');
++  heading(s, 'PLACEHOLDER',
++    { x: 1.032, y: 2.062, w: 10.619, h: 3.063 });
++  body(s, LOREM_MED, { x: 1.155, y: 5.824, w: 5.512, h: 0.683 });
++  body(s, 'Building A Community That Shines',
++    { x: 7.339, y: 5.935, w: 2.283, h: 0.572, bold: true, italic: true, color: BLUE, lineSpacingMultiple: 1 });
++  body(s, 'Community That Shines His Light Into The World',
++    { x: 9.989, y: 5.935, w: 2.502, h: 0.572, bold: true, italic: true, color: BLUE, lineSpacingMultiple: 1 });
++  freeform(s, ARROW_CURL, { x: 10.694, y: 1.919, w: 1.431, h: 1.21, color: BLUE, rotate: 255 });
++  freeform(s, ARROW_SWOOSH, { x: 5.28, y: 4.551, w: 2.772, h: 1.149, color: BLUE, rotate: 180, flipH: true });
++}
++
++/** Slide 5 - blue slide, headline left, two stats plus a right-hand callout. */
++function slide05(pptx) {
++  const s = newSlide(pptx, 5, 'blue');
++  heading(s, 'TOGETHER WE WORSHIP, TOGETHER WE GROW, TOGETHER.',
++    { x: 1.155, y: 1.21, w: 5.179, h: 3.31, color: BEIGE, lineSpacingMultiple: 1.1 });
++  [{ x: 0.995, tx: 1.052, stat: '85%' }, { x: 3.477, tx: 3.534, stat: '+75K' }].forEach(c => {
++    heading(s, c.stat, { x: c.x, y: 5.067, w: 1.862, h: 0.909, size: 48, color: BEIGE });
++    body(s, LOREM_SHORT, { x: c.tx, y: 5.868, w: 2.244, h: 0.688, color: WHITE });
++  });
++  heading(s, 'ROOTED IN FAITH, RISING IN HOPE',
++    { x: 9.418, y: 5.134, w: 2.738, h: 0.774, size: 20, color: BEIGE, align: 'center', valign: 'middle' });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed.',
++    { x: 9.251, y: 5.925, w: 3.072, h: 0.683, color: WHITE, align: 'center' });
++  freeform(s, ARROW_CURL, { x: 11.387, y: 3.595, w: 1.431, h: 1.21, color: BEIGE, rotate: 301.5 });
++}
++
++/** Slide 6 - headline right, two feature blurbs (one on a blue card). */
++function slide06(pptx) {
++  const s = newSlide(pptx, 6, 'beige');
++  heading(s, 'A SACRED SPACE WHERE HEARTS ARE LIFTED',
++    { x: 7, y: 1.381, w: 5.512, h: 2.495, lineSpacingMultiple: 1.1 });
++  card(s, { x: 5.47, y: 4.429, w: 3.226, h: 2.065, color: BLUE, adj: 10436 });
++  calendarIcon(s, { x: 5.838, y: 4.695, w: 0.4375, h: 0.4062, color: OFFWHITE });
++  heading(s, 'MOVEMENT',
++    { x: 6.399, y: 4.678, w: 2.08, h: 0.474, size: 20, color: OFFWHITE, valign: 'middle', lineSpacingMultiple: 1.2 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.',
++    { x: 5.73, y: 5.241, w: 2.966, h: 0.989, color: OFFWHITE });
++  wineIcon(s, { x: 9.188, y: 4.711, w: 0.3229, h: 0.4375, color: BLUE });
++  heading(s, 'LIVES ARE RENEWED',
++    { x: 9.594, y: 4.678, w: 2.585, h: 0.474, size: 20, valign: 'middle', lineSpacingMultiple: 1.2 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempo.',
++    { x: 9.043, y: 5.241, w: 2.966, h: 0.989, color: BLACK });
++  freeform(s, ARROW_SWOOSH, { x: 9.235, y: 3.233, w: 2.772, h: 1.149, color: BLUE, rotate: 180, flipH: true });
++}
++
++/** Slide 7 - wide headline, one big stat, two body paragraphs. */
++function slide07(pptx) {
++  const s = newSlide(pptx, 7, 'beige');
++  heading(s, 'A PLACE WHERE EVERY HEART IS WELCOMED, EVERY SOUL IS LIFTED, AND THE LOVE OF GOD FLOWS '
++    + 'ENDLESSLY TO BRING.', { x: 1.032, y: 1.237, w: 11.553, h: 2.322 });
++  heading(s, '+800,00K', { x: 1.155, y: 4.048, w: 3.058, h: 0.909, size: 48 });
++  [4.984, 5.922].forEach(y => body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do '
++    + 'eiusmod tempor incididunt ut labore et', { x: 1.155, y, w: 4.512, h: 0.683 }));
++  freeform(s, ARROW_CURL, { x: 0.346, y: 2.655, w: 1.431, h: 1.21, color: BLUE, rotate: 26.7, flipH: true });
++  freeform(s, ARROW_SWOOSH, { x: 10.219, y: 1.424, w: 2.772, h: 1.149, color: BLUE, rotate: 180, flipH: true });
++}
++
++/** Slide 8 - three stats inside one wide blue card, split by hairlines. */
++function slide08(pptx) {
++  const s = newSlide(pptx, 8, 'beige');
++  heading(s, 'TOGETHER WE GROW, TOGETHER WE SHINE.', { x: 1.029, y: 1.312, w: 8.637, h: 1.582 });
++  card(s, { x: 1.155, y: 3.075, w: 8.511, h: 3.432, color: BLUE, adj: 11114 });
++  [3.923, 6.923].forEach(x => s.addShape('line', {
++    x, y: 3.436, w: 0, h: 2.848, line: { color: BEIGE, width: 1.5 },
++  }));
++  const cols = [
++    { x: 1.597, stat: '2026', icon: calendarIcon, ix: 1.766, iw: 0.4375, ih: 0.4062 },
++    { x: 4.413, stat: '85%', icon: giftIcon, ix: 4.48, iw: 0.354, ih: 0.438 },
++    { x: 7.33, stat: '+500K', icon: envelopeIcon, ix: 7.497, iw: 0.4375, ih: 0.4375 },
++  ];
++  cols.forEach(c => {
++    c.icon(s, { x: c.ix, y: 3.652, w: c.iw, h: c.ih, color: BEIGE });
++    heading(s, c.stat, { x: c.x, y: 4.211, w: 2.104, h: 0.841, size: 44, color: BEIGE, italic: true });
++    body(s, 'Lorem ipsum dolor sit amet, consectetur elit adipiscing elit, sed dolor',
++      { x: c.x, y: 5.005, w: 2.337, h: 0.989, color: WHITE });
++  });
++  freeform(s, ARROW_SWOOSH, { x: 3.981, y: 2.38, w: 2.772, h: 1.149, color: BLUE, rotate: 180, flipH: true });
++}
++
++/** Slide 9 - headline left, paragraph right, two blue caption pills. */
++function slide09(pptx) {
++  const s = newSlide(pptx, 9, 'beige');
++  heading(s, 'A PLACE WHERE EVERY HEART IS WELCOMED, EVERY SOUL IS LIFTED, AND THE LOVE OF GOD FLOWS.',
++    { x: 1.032, y: 1.545, w: 6.508, h: 3.803 });
++  body(s, LOREM_LONG, { x: 7.429, y: 1.591, w: 4.75, h: 1.295 });
++  card(s, { x: 7.429, y: 3.263, w: 4.75, h: 1.023, color: BLUE, adj: 25463 });
++  eggCupIcon(s, { x: 7.854, y: 3.555, w: 0.312, h: 0.438, color: BEIGE });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.',
++    { x: 8.481, y: 3.429, w: 3.698, h: 0.683, color: WHITE });
++  card(s, { x: 1.155, y: 5.484, w: 6.036, h: 1.023, color: BLUE, adj: 25463 });
++  eggIcon(s, { x: 1.4762, y: 5.7768, w: 0.3627, h: 0.4375, color: BEIGE });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et',
++    { x: 2.073, y: 5.641, w: 5.118, h: 0.696, color: WHITE });
++  freeform(s, ARROW_SWOOSH, { x: 3.498, y: 4.774, w: 2.772, h: 1.149, color: BLUE, rotate: 180, flipH: true });
++  freeform(s, ARROW_CURL, { x: 11.907, y: 2.44, w: 1.431, h: 1.21, color: BLUE, rotate: 313.7 });
++}
++
++/** Slide 10 - blue slide with a row of three beige pills along the bottom. */
++function slide10(pptx) {
++  const s = newSlide(pptx, 10, 'blue');
++  heading(s, 'TOGETHER AS ONE FAMILY IN CHRIST, WE WALK IN FAITH, SHARE HIS GRACE, AND SHINE.',
++    { x: 1.089, y: 1.272, w: 6.375, h: 3.063, color: BEIGE });
++  // three overlapping bands: long beige, then the lighter one, then the short beige
++  sideBand(s, { x: 3.033, y: 4.699, w: 8.168, h: 1.808, color: BEIGE });
++  sideBand(s, { x: 3.033, y: 4.699, w: 4.178, h: 1.808, color: TILE });
++  churchIcon(s, { x: 7.464, y: 5.374, w: 0.426, h: 0.458, color: BLUE });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempo.',
++    { x: 8.134, y: 5.108, w: 2.814, h: 0.989 });
++  heading(s, '2026', { x: 4.178, y: 4.847, w: 1.862, h: 0.774, size: 40 });
++  body(s, LOREM_SHORT, { x: 4.236, y: 5.621, w: 2.244, h: 0.688 });
++  sideBand(s, { x: 0, y: 4.699, w: 3.925, h: 1.808, color: BEIGE });
++  heading(s, '2026', { x: 1.058, y: 4.847, w: 1.862, h: 0.774, size: 40 });
++  body(s, LOREM_SHORT, { x: 1.116, y: 5.621, w: 2.244, h: 0.688 });
++}
++
++/** Slide 11 - centred headline and paragraph, arrows on both sides. */
++function slide11(pptx) {
++  const s = newSlide(pptx, 11, 'beige');
++  heading(s, 'TOGETHER AS ONE FAMILY IN CHRIST, WE WALK IN FAITH, SHARE HIS GRACE.',
++    { x: 1.175, y: 1.272, w: 10.984, h: 1.582, align: 'center' });
++  body(s, LOREM_LONG, { x: 2, y: 2.87, w: 9.333, h: 0.683, align: 'center' });
++  freeform(s, ARROW_CURL, { x: 11.24, y: 2.164, w: 1.431, h: 1.21, color: BLUE, rotate: 313.7 });
++  freeform(s, ARROW_CURL, { x: 0.662, y: 2.164, w: 1.431, h: 1.21, color: BLUE, rotate: 46.3, flipH: true });
++}
++
++/** Slide 12 - tall blue stat card on the left, paragraph on the right. */
++function slide12(pptx) {
++  const s = newSlide(pptx, 12, 'beige');
++  heading(s, 'ROOTED DEEPLY IN FAITH AND GUIDED BY HIS WORD, WE BUILD A STRONG',
++    { x: 1.175, y: 1.243, w: 10.984, h: 1.582 });
++  card(s, { x: 1.155, y: 3.242, w: 3.23, h: 3.265, color: BLUE, adj: 10436 });
++  churchIcon(s, { x: 1.5333, y: 3.6953, w: 0.4583, h: 0.4375, color: OFFWHITE });
++  heading(s, '125,00K', { x: 2.124, y: 3.579, w: 2.261, h: 0.774, size: 40, color: OFFWHITE });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.',
++    { x: 1.421, y: 4.341, w: 2.833, h: 1.295, color: OFFWHITE });
++  card(s, { x: 1.321, y: 5.95, w: 2.898, h: 0.396, color: BEIGE, adj: 50000 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut '
++    + 'labore et dolore magna aliqua. Ut enim ad minim.', { x: 4.593, y: 3.31, w: 6.316, h: 0.683 });
++  freeform(s, ARROW_SWOOSH, { x: 9.334, y: 2.604, w: 2.772, h: 1.149, color: BLUE, rotate: 185.9, flipH: true });
++}
++
++/** Slide 13 - four icon tiles with captions underneath. */
++function slide13(pptx) {
++  const s = newSlide(pptx, 13, 'beige');
++  heading(s, 'IN THIS HOUSE OF WORSHIP, WE OPEN OUR HEARTS, EMBRACE EVERY SOUL.',
++    { x: 1.175, y: 1.243, w: 10.984, h: 1.582, align: 'center' });
++  const tiles = [
++    { tx: 2.059, ix: 2.448, cx: 1.039, icon: bibleIcon },
++    { tx: 4.873, ix: 5.263, cx: 4.033, icon: giftIcon },
++    { tx: 7.847, ix: 8.245, cx: 6.961, icon: bellIcon },
++    { tx: 10.743, ix: 11.142, cx: 9.824, icon: wineIcon },
++  ];
++  tiles.forEach(t => {
++    card(s, { x: t.tx, y: 4.559, w: 1.446, h: 1.278, color: BLUE, adj: 13296 });
++    t.icon(s, { x: t.ix, y: 4.836, w: 0.649, h: 0.649, color: BEIGE });
++    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing.', { x: t.cx, y: 5.938, w: 2.669, h: 0.683 });
++  });
++  freeform(s, ARROW_CURL, { x: 11.687, y: 2.164, w: 1.431, h: 1.21, color: BLUE, rotate: 313.7 });
++}
++
++/** Slide 14 - mirrored stat columns with a percentage pill under each. */
++function slide14(pptx) {
++  const s = newSlide(pptx, 14, 'beige');
++  heading(s, 'WHERE THE BROKEN FIND HEALING, THE LOST FIND DIRECTION, AND EVERY.',
++    { x: 0.952, y: 1.243, w: 11.429, h: 1.582, align: 'center' });
++  const cols = [
++    { align: 'left', statX: 1.058, txtX: 1.058, pillX: 1.122, pctX: 1.302, bodyX: 2.22, stat: '650M', pct: '85%' },
++    { align: 'right', statX: 10.413, txtX: 9.461, pillX: 7.291, pctX: 7.471, bodyX: 8.389, stat: '750M', pct: '75%' },
++  ];
++  cols.forEach(c => {
++    heading(s, c.stat, { x: c.statX, y: 3.215, w: 1.862, h: 0.774, size: 40, align: c.align });
++    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempo.',
++      { x: c.txtX, y: 3.989, w: 2.814, h: 0.989, align: c.align });
++    card(s, { x: c.pillX, y: 5.484, w: 4.921, h: 1.023, color: BLUE, adj: 25463 });
++    heading(s, c.pct, { x: c.pctX, y: 5.676, w: 1.029, h: 0.64, size: 32, color: BEIGE });
++    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor',
++      { x: c.bodyX, y: 5.641, w: 3.822, h: 0.683, color: WHITE });
++  });
++}
++
++/** Slide 15 - blue slide with a big beige panel of copy on the right. */
++function slide15(pptx) {
++  const s = newSlide(pptx, 15, 'blue');
++  heading(s, 'ROOTED DEEPLY IN FAITH AND GUIDED BY HIS WORD, WE BUILD A STRONG',
++    { x: 1.256, y: 1.243, w: 5.446, h: 3.063, color: BEIGE });
++  heading(s, '650M', { x: 1.256, y: 5.09, w: 1.862, h: 0.774, size: 40, color: BEIGE });
++  body(s, LOREM_AENEAN, { x: 1.256, y: 5.864, w: 5.411, h: 0.683, color: BEIGE });
++  freeform(s, ARROW_SWOOSH, { x: 1.38, y: 4.318, w: 2.772, h: 1.149, color: BEIGE, rotate: 185.9, flipH: true });
++
++  card(s, { x: 6.845, y: 1.127, w: 5.643, h: 5.38, color: BEIGE, adj: 8229 });
++  // the panel's text frames are rounded rectangles in the source, which insets
++  // their copy slightly more than a plain text box would
++  heading(s, '2026  - HOLY COMMUNION',
++    { x: 7.01, y: 3.196, w: 4.859, h: 0.659, size: 24, lineSpacingMultiple: 1.3, shape: 'roundRect' });
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. '
++    + 'Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. '
++    + 'Donec quam felis.', { x: 7.01, y: 3.765, w: 5.194, h: 1.433, shape: 'roundRect' });
++  heading(s, '+200M',
++    { x: 7.072, y: 5.266, w: 1.931, h: 0.883, size: 36, lineSpacingMultiple: 1.2, shape: 'roundRect' });
++  heading(s, 'PARTICIPATION',
++    { x: 8.776, y: 5.172, w: 2.4, h: 0.497, size: 18, lineSpacingMultiple: 1.2, shape: 'roundRect' });
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean.',
++    { x: 8.776, y: 5.57, w: 3.712, h: 0.709, lineSpacingMultiple: 1.2, shape: 'roundRect' });
++}
++
++/** Slide 16 - headline, paragraph, one solid stat pill plus one caption pill. */
++function slide16(pptx) {
++  const s = newSlide(pptx, 16, 'beige');
++  heading(s, 'WE ARE A LIVING TESTIMONY OF FAITH, UNITY, AND THE POWER OF GOD',
++    { x: 1.256, y: 1.243, w: 5.446, h: 3.063 });
++  body(s, LOREM_AENEAN, { x: 1.256, y: 4.463, w: 5.411, h: 0.683 });
++  card(s, { x: 1.256, y: 5.484, w: 2.834, h: 1.023, color: BLUE, adj: 25463 });
++  heading(s, '++500,000K', { x: 1.256, y: 5.676, w: 2.834, h: 0.64, size: 32, color: BEIGE, align: 'center' });
++  card(s, { x: 4.305, y: 5.484, w: 4.921, h: 1.023, color: BLUE, adj: 25463 });
++  heading(s, '85%', { x: 4.485, y: 5.676, w: 1.029, h: 0.64, size: 32, color: BEIGE });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor',
++    { x: 5.403, y: 5.641, w: 3.822, h: 0.683, color: WHITE });
++}
++
++/** Slide 17 - the deck's only chart: CHURCH EXPENSES, clustered column. */
++function slide17(pptx) {
++  const s = newSlide(pptx, 17, 'beige');
++  heading(s, 'BRING LIGHT INTO THE DARKNESS OF THE WORLD', { x: 1.256, y: 1.243, w: 5.446, h: 2.322 });
++  body(s, LOREM_MED, { x: 1.155, y: 5.768, w: 5.512, h: 0.683 });
++  s.addChart(pptx.ChartType.bar, [{
++    name: 'Series 1',
++    labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'],
++    values: [0.43, 0.25, 0.35, 0.45],
++  }], {
++    x: 6.99, y: 3.75, w: 5.425, h: 2.757,
++    barDir: 'col', barGapWidthPct: 219, chartColors: [BLUE],
++    showTitle: true, title: 'CHURCH EXPENSES ', titleFontFace: HEAD, titleFontSize: 16,
++    titleBold: true, titleColor: BLUE,
++    showLegend: false, showValue: false,
++    catAxisLabelFontFace: BODY, catAxisLabelFontSize: 11, catAxisLabelColor: INK,
++    catAxisMajorTickMark: 'none', catAxisMinorTickMark: 'none',
++    valAxisLabelFontFace: BODY, valAxisLabelFontSize: 10.5, valAxisLabelColor: INK,
++    valAxisLabelFormatCode: '0%', valAxisMajorUnit: 0.1, valAxisLineShow: false,
++    valAxisMajorTickMark: 'none', valAxisMinorTickMark: 'none',
++    valGridLine: { style: 'none' },
++  });
++  freeform(s, ARROW_SWOOSH, { x: 4.424, y: 2.94, w: 1.827, h: 0.757, color: BLUE, rotate: 180, flipH: true });
++  freeform(s, ARROW_CURL, { x: 11.297, y: 2.802, w: 1.431, h: 1.21, color: BLUE, rotate: 313.7 });
++}
++
++/** Slide 18 - narrow headline column, two stat pills, three arrows. */
++function slide18(pptx) {
++  const s = newSlide(pptx, 18, 'beige');
++  heading(s, 'WE ARE A LIVING TESTIMONY', { x: 1.155, y: 1.243, w: 3.506, h: 2.322 });
++  body(s, LOREM_MED, { x: 1.155, y: 3.934, w: 3.607, h: 0.989 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed.', { x: 1.155, y: 5.251, w: 3.055, h: 0.683 });
++  card(s, { x: 4.209, y: 5.08, w: 2.834, h: 1.023, color: BLUE, adj: 25463 });
++  heading(s, '++500,000K', { x: 4.209, y: 5.272, w: 2.834, h: 0.64, size: 32, color: BEIGE, align: 'center' });
++  card(s, { x: 7.258, y: 5.08, w: 4.921, h: 1.023, color: BLUE, adj: 25463 });
++  heading(s, '95%', { x: 7.438, y: 5.272, w: 1.029, h: 0.64, size: 32, color: BEIGE });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor',
++    { x: 8.356, y: 5.237, w: 3.822, h: 0.683, color: WHITE });
++  [{ x: 3.592, y: 6.05, rotate: 105 }, { x: 11.361, y: 1.223, rotate: 255 }, { x: 0.62, y: 2.61, rotate: 90 }]
++    .forEach(a => freeform(s, ARROW_CURL, { ...a, w: 1.213, h: 1.025, color: BLUE }));
++}
++
++/** Slide 19 - three overlapping circles used as a Venn-style stat cluster. */
++function slide19(pptx) {
++  const s = newSlide(pptx, 19, 'beige');
++  heading(s, 'THROUGH FAITH AND FELLOWSHIP, WE RISE STRONGER, LOVE DEEPER, AND CARRY',
++    { x: 1.256, y: 1.498, w: 6.316, h: 3.063 });
++  heading(s, '$650,000M', { x: 1.155, y: 4.744, w: 2.734, h: 0.774, size: 40 });
++  body(s, LOREM_MED, { x: 1.155, y: 5.549, w: 5.423, h: 0.683 });
++  freeform(s, ARROW_SWOOSH, { x: 3.918, y: 4.37, w: 2.772, h: 1.149, color: BLUE, rotate: 185.9, flipH: true });
++  freeform(s, ARROW_CURL, { x: 11.188, y: 2.425, w: 1.431, h: 1.21, color: BLUE, rotate: 313.7 });
++
++  const circle = (x, y, d, color) => s.addShape('ellipse', {
++    x, y, w: d, h: d, fill: { color }, line: { type: 'none' },
++  });
++  circle(7.803, 1.7, 3.439, BLUE);
++  heading(s, '85,5%', { x: 8.633, y: 1.997, w: 1.78, h: 0.855, size: 36, color: WHITE, align: 'center',
++    lineSpacingMultiple: 1.2, shape: 'roundRect' });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed.',
++    { x: 8.068, y: 2.759, w: 2.84, h: 0.683, color: WHITE, align: 'center' });
++  circle(7.193, 3.71, 2.5, SKY_MID);
++  circle(9.357, 3.71, 2.5, NAVY);
++  heading(s, '30%', { x: 7.504, y: 4.171, w: 1.294, h: 0.855, size: 36, color: WHITE,
++    lineSpacingMultiple: 1.2, shape: 'roundRect' });
++  body(s, 'Lorem ipsum dolor sit amet', { x: 7.504, y: 4.946, w: 1.624, h: 0.688, color: WHITE });
++  heading(s, '20%', { x: 10.274, y: 4.134, w: 1.294, h: 0.855, size: 36, color: WHITE, align: 'right',
++    lineSpacingMultiple: 1.2, shape: 'roundRect' });
++  body(s, 'Lorem ipsum dolor sit amet', { x: 9.943, y: 4.862, w: 1.624, h: 0.688, color: WHITE, align: 'right' });
++}
++
++/** Slide 20 - blue closer with the oversized THANK / YOU wordmark. */
++function slide20(pptx) {
++  // here the blob is painted last, so it tints the wordmark
++  const s = newSlide(pptx, 20, 'blue', true);
++  heading(s, 'THANK', { x: 0.998, y: 0.5, w: 12.286, h: 4.056, size: 235, color: BEIGE, valign: 'middle' });
++  heading(s, 'YOU', { x: 5.233, y: 3.23, w: 6.53, h: 4.056, size: 235, color: BEIGE, valign: 'middle', align: 'right' });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit,',
++    { x: 10.935, y: 2.421, w: 1.656, h: 1.295, color: WHITE });
++  freeform(s, ARROW_SWOOSH, { x: 3.797, y: 4.684, w: 2.772, h: 1.149, color: BEIGE, rotate: 60 });
++  waveBlob(s, SKY);
++}
++
++// ---------------------------------------------------------------------------
++// Build
++// ---------------------------------------------------------------------------
++const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'CHURCH_16x9', width: 13.333, height: 7.5 });
++pptx.layout = 'CHURCH_16x9';
++pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++
++BUILDERS.forEach(build => build(pptx));
++
++pptx.writeFile({ fileName: path.join(__dirname, '06af2d83-f400-46a0-af71-37f9a94017fd_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

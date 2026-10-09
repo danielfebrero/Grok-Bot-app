@@ -1,0 +1,1076 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/risk_opportunity_infographic.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/risk_opportunity_infographic.js
+@@ -0,0 +1,1073 @@
++/**
++ * "Risk and Opportunity Infographic" - 20 slide deck rebuilt with PptxGenJS.
++ *
++ * Slide size 13.333 x 7.5 in (16:9). Theme colours and Montserrat fonts come
++ * from the original deck. Raster icons of the source file are represented by
++ * simple placeholder tiles (see `iconTile`).
++ */
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ *
++ * Theme
++ * ------------------------------------------------------------------ */
++const INK = '004358';      // accent1 - dark teal
++const TEAL = '1F8A70';     // accent2
++const LIME = 'BEDB39';     // accent3
++const YELLOW = 'FFE11A';   // accent4
++const ORANGE = 'FD7400';   // accent5
++const ACCENTS = [INK, TEAL, LIME, YELLOW, ORANGE];
++
++const BLACK = '000000';
++const TEXT = '3F3F3F';     // tx1 @ 75% luminance - body copy
++const GRAY = '7F7F7F';
++const HAIR = 'D8D8D8';     // dashed connector grey
++const PANEL = 'F2F2F2';    // light panel fill
++const WHITE = 'FFFFFF';
++const PAGE = 'FDFDFD';     // slide background
++
++const MASTER = 'BLANK';
++const MAJOR = 'Montserrat SemiBold';
++const MINOR = 'Montserrat Light';
++
++/* Filler copy used throughout the original deck (with its nbsp). */
++const NB = '\u00A0';
++const LOREM = {
++  is: `Lorem Ipsum${NB}is `,
++  simply: `Lorem Ipsum${NB}is simply`,
++  dummy: `Lorem Ipsum${NB}is simply dummy`,
++  ofThe: `Lorem Ipsum${NB}is simply dummy text of the`,
++  printing: `Lorem Ipsum${NB}is simply dummy text of the printing`,
++  printingAnd: `Lorem Ipsum${NB}is simply dummy text of the printing and`,
++  typesetting: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting`,
++  industry: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. `,
++  industryLorem: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. Lorem Ipsum`,
++  been: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's`,
++  standard: `Lorem Ipsum${NB}is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text`,
++  twice: `Lorem Ipsum${NB}is simply dummy Lorem Ipsum${NB}is simply dummy Lorem`,
++  thrice: `Lorem Ipsum${NB}is simply dummy text Lorem Ipsum${NB}is simply dummy text Lorem Ipsum${NB}is simply dummy text`,
++  period: `Lorem Ipsum${NB}is simply dummy text of the printing and. `,
++};
++
++/* ------------------------------------------------------------------ *
++ * Small drawing helpers
++ * ------------------------------------------------------------------ */
++
++/** Body/heading text with the deck defaults (top aligned, no autofit). */
++function text(slide, body, opts) {
++  slide.addText(body, Object.assign({
++    fontFace: MINOR, fontSize: 12, color: TEXT, valign: 'top', align: 'left',
++  }, opts));
++}
++
++/** Montserrat SemiBold heading text. */
++function head(slide, body, opts) {
++  text(slide, body, Object.assign({ fontFace: MAJOR, color: BLACK }, opts));
++}
++
++/** Rounded rectangle; `adj` is the corner radius as a fraction of the short side. */
++function rrect(slide, o) {
++  const adj = o.adj === undefined ? 0.1667 : o.adj;
++  slide.addShape('roundRect', Object.assign({}, o, {
++    adj: undefined, rectRadius: adj * Math.min(o.w, o.h),
++  }));
++}
++
++/** Filled ellipse. */
++function circle(slide, o) { slide.addShape('ellipse', o); }
++
++/** Convert a compact path list ['M',x,y,'L',x,y,'C',x1,y1,x2,y2,x,y,'Z'] into
++ *  PptxGenJS custGeom points. Coordinates are fractions of the shape box. */
++function pathPoints(cmds, w, h) {
++  const pts = [];
++  for (let i = 0; i < cmds.length;) {
++    const op = cmds[i++];
++    if (op === 'Z') { pts.push({ close: true }); } else if (op === 'M') {
++      pts.push({ x: cmds[i++] * w, y: cmds[i++] * h, moveTo: true });
++    } else if (op === 'L') {
++      pts.push({ x: cmds[i++] * w, y: cmds[i++] * h });
++    } else if (op === 'C') {
++      const x1 = cmds[i++] * w, y1 = cmds[i++] * h;
++      const x2 = cmds[i++] * w, y2 = cmds[i++] * h;
++      pts.push({ x: cmds[i++] * w, y: cmds[i++] * h, curve: { type: 'cubic', x1, y1, x2, y2 } });
++    }
++  }
++  return pts;
++}
++
++/** Free-form shape from a normalised path. */
++function poly(slide, o, cmds) {
++  slide.addShape('custGeom', Object.assign({}, o, { points: pathPoints(cmds, o.w, o.h) }));
++}
++
++/** Mirror a normalised path horizontally and/or vertically. */
++function mirror(cmds, flipX, flipY) {
++  const out = [];
++  for (let i = 0; i < cmds.length;) {
++    const op = cmds[i++];
++    out.push(op);
++    const n = op === 'Z' ? 0 : op === 'C' ? 6 : 2;
++    for (let k = 0; k < n; k += 2) {
++      out.push(flipX ? +(1 - cmds[i]).toFixed(4) : cmds[i]);
++      out.push(flipY ? +(1 - cmds[i + 1]).toFixed(4) : cmds[i + 1]);
++      i += 2;
++    }
++  }
++  return out;
++}
++function mirrorX(cmds) { return mirror(cmds, true, false); }
++function mirrorY(cmds) { return mirror(cmds, false, true); }
++
++/** Open poly-line / connector given absolute inch points. */
++function polyline(slide, pts, line) {
++  const xs = pts.map((p) => p[0]);
++  const ys = pts.map((p) => p[1]);
++  const x = Math.min.apply(null, xs);
++  const y = Math.min.apply(null, ys);
++  const w = Math.max(0.01, Math.max.apply(null, xs) - x);
++  const h = Math.max(0.01, Math.max.apply(null, ys) - y);
++  slide.addShape('custGeom', {
++    x, y, w, h, line,
++    points: pts.map((p, i) => (i === 0
++      ? { x: p[0] - x, y: p[1] - y, moveTo: true }
++      : { x: p[0] - x, y: p[1] - y })),
++  });
++}
++
++const DASH = { color: GRAY, width: 1.5, dashType: 'dash' };
++const ARROW = Object.assign({ endArrowType: 'triangle' }, DASH);
++
++/* Several body copy boxes in the deck carry a wide right inset (pts: l,r,b,t). */
++const WIDE_INSET = [7.2, 22.4, 5.6, 3.6];
++
++/** Placeholder standing in for a raster icon of the source deck: an outlined
++ *  rounded tile drawn in the icon's own colour. */
++function iconTile(slide, cx, cy, size, color) {
++  slide.addShape('roundRect', {
++    x: cx - size / 2, y: cy - size / 2, w: size, h: size,
++    line: { color: color, width: Math.max(0.75, size * 2.4) },
++    rectRadius: size * 0.22,
++  });
++}
++
++/* The banner headline that repeats on almost every slide. */
++function titleRuns(size) {
++  return [
++    { text: 'Risk and Opportunity ', options: { color: INK, fontSize: size, fontFace: MAJOR } },
++    { text: 'Infographic', options: { color: TEXT, fontSize: size, fontFace: MAJOR } },
++  ];
++}
++function bannerTitle(slide) {
++  slide.addText(titleRuns(28), { x: 2, y: 0.521, w: 9.333, h: 0.572, align: 'center', valign: 'top' });
++}
++function blockTitle(slide, x, y) {
++  slide.addText(titleRuns(32), { x, y, w: 4.063, h: 1.717, align: 'left', valign: 'top' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 1 - Risk vs Opportunity, five rows each
++ * ------------------------------------------------------------------ */
++function slide01(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  const ROWS = [2.734, 3.559, 4.383, 5.208, 6.033];
++  const SIDES = [
++    { color: INK, bar: 1.792, cap: 5.26, box: 5.465, txt: 1.542, num: 4.7, align: 'right', label: 'Risk', labelX: 2.109, labelW: 2.84, labelAlign: 'right' },
++    { color: TEAL, bar: 6.875, cap: 7.01, box: 7.215, txt: 8.634, num: 8.061, align: 'left', label: 'Opportunity', labelX: 8.347, labelW: 3.054, labelAlign: 'left' },
++  ];
++  SIDES.forEach((sd, si) => {
++    rrect(s, { x: sd.bar, y: 1.714, w: 4.667, h: 0.572, fill: { color: sd.color } });
++    rrect(s, { x: sd.cap, y: 1.469, w: 1.062, h: 1.062, fill: { color: WHITE } });
++    iconTile(s, sd.cap + 0.531, 2.0, 0.537, sd.color);
++    text(s, sd.label, {
++      x: sd.labelX, y: 1.781, w: sd.labelW, h: 0.438, fontFace: MAJOR,
++      fontSize: 20, color: WHITE, align: sd.labelAlign,
++    });
++    ROWS.forEach((ry, i) => {
++      rrect(s, { x: sd.box, y: ry, w: 0.652, h: 0.652, fill: { color: PANEL } });
++      if (si === 0) iconTile(s, sd.box + 0.326, ry + 0.326, 0.222, GRAY);
++      else s.addShape('mathPlus', { x: sd.box + 0.181, y: ry + 0.181, w: 0.29, h: 0.29, fill: { color: GRAY } });
++      const num = '0' + (i + 1);
++      const numW = i === 3 ? 0.644 : 0.572;
++      text(s, num, {
++        x: si === 0 ? sd.num - (numW - 0.572) : sd.num - (numW - 0.572), y: ry + 0.065,
++        w: numW, h: 0.438, fontFace: MAJOR, fontSize: 20, color: sd.color, align: 'center',
++      });
++      text(s, LOREM.typesetting, {
++        x: sd.txt, y: ry - 0.017, w: 3.157, h: 0.602, align: sd.align, lineSpacingMultiple: 1.3,
++      });
++    });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 2 - two opposing arrows
++ * ------------------------------------------------------------------ */
++const ARROW_TAIL_A = ['M', 1, 1, 'L', 0.011, 0.991, 'L', 0, 0, 'L', 1, 0.455, 'Z'];
++const ARROW_TAIL_B = ['M', 0, 0, 'L', 0.989, 0.009, 'L', 1, 1, 'L', 0, 0.545, 'Z'];
++
++function slide02(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  // fold behind each arrow
++  poly(s, { x: 6.482, y: 1.803, w: 1.511, h: 1.94, fill: { color: '176754' } }, ARROW_TAIL_A);
++  s.addShape('leftArrow', { x: 3.583, y: 2.102, w: 4.41, h: 2.386, fill: { color: TEAL } });
++  poly(s, { x: 5.34, y: 4.176, w: 1.511, h: 1.94, fill: { color: '8EA42A' } }, ARROW_TAIL_B);
++  s.addShape('leftArrow', { x: 5.34, y: 3.445, w: 4.41, h: 2.386, rotate: 180, fill: { color: LIME } });
++
++  circle(s, { x: 4.354, y: 2.873, w: 0.844, h: 0.844, fill: { color: WHITE } });
++  iconTile(s, 4.776, 3.295, 0.371, TEAL);
++  circle(s, { x: 8.132, y: 4.216, w: 0.844, h: 0.844, fill: { color: WHITE } });
++  iconTile(s, 8.554, 4.638, 0.371, LIME);
++  text(s, 'Risk', { x: 5.271, y: 3.043, w: 2.84, h: 0.505, fontFace: MAJOR, fontSize: 24, color: WHITE });
++  text(s, 'Opportunity', { x: 5.626, y: 4.386, w: 2.431, h: 0.505, fontFace: MAJOR, fontSize: 24, color: WHITE, align: 'right' });
++
++  // captions either side ("50 / Your Title Here / body")
++  const CAPS = [
++    { color: TEAL, align: 'right', num: [2.371, 2.167], rule: [2.641, 2.876], title: [0.989, 2.978], body: [0.343, 3.296] },
++    { color: LIME, align: 'left', num: [9.973, 3.511], rule: [10.077, 4.219], title: [9.973, 4.321], body: [9.973, 4.639] },
++  ];
++  CAPS.forEach((c) => {
++    text(s, '50', { x: c.num[0], y: c.num[1], w: 0.99, h: 0.707, fontFace: MAJOR, fontSize: 36, color: c.color, align: c.align });
++    s.addShape('line', { x: c.rule[0], y: c.rule[1], w: 0.615, h: 0, line: { color: c.color, width: 2.25 } });
++    text(s, 'Your Title Here', { x: c.title[0], y: c.title[1], w: 2.372, h: 0.37, fontFace: MAJOR, fontSize: 16, align: c.align });
++    text(s, LOREM.been, { x: c.body[0], y: c.body[1], w: 3.017, h: 1.127, align: c.align, lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 3 - four-petal pinwheel
++ * ------------------------------------------------------------------ */
++function slide03(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  const PETALS = [
++    { x: 6.773, y: 1.846, w: 2.081, h: 2.045, fill: TEAL, p: ['M', 0.449, 0.999, 'L', 0, 1, 'L', 0.017, 0.56, 'L', 0.568, 0, 'L', 1, 0.439, 'Z'] },
++    { x: 6.778, y: 4.071, w: 2.048, h: 2.076, fill: LIME, p: ['M', 0.001, 0.449, 'L', 0, 0, 'L', 0.44, 0.017, 'L', 1, 0.568, 'L', 0.561, 1, 'Z'] },
++    { x: 4.516, y: 4.131, w: 2.081, h: 2.045, fill: YELLOW, p: ['M', 0.551, 0.001, 'L', 1, 0, 'L', 0.984, 0.44, 'L', 0.432, 1, 'L', 0, 0.561, 'Z'] },
++    { x: 4.545, y: 1.874, w: 2.05, h: 2.078, fill: INK, p: ['M', 0.998, 0.551, 'L', 1, 1, 'L', 0.56, 0.983, 'L', 0, 0.432, 'L', 0.439, 0, 'Z'] },
++  ];
++  PETALS.forEach((p) => poly(s, { x: p.x, y: p.y, w: p.w, h: p.h, fill: { color: p.fill } }, p.p));
++
++  // numbered discs at the four corners
++  const DISCS = [
++    { x: 4.54, y: 1.86, n: '01', c: INK, tx: 4.684, tw: 0.556 },
++    { x: 7.987, y: 1.86, n: '02', c: TEAL, tx: 8.097, tw: 0.624 },
++    { x: 7.987, y: 5.318, n: '03', c: LIME, tx: 8.097, tw: 0.624 },
++    { x: 4.54, y: 5.318, n: '04', c: YELLOW, tx: 4.634, tw: 0.656 },
++  ];
++  DISCS.forEach((d) => {
++    circle(s, { x: d.x, y: d.y, w: 0.844, h: 0.844, fill: { color: WHITE } });
++    text(s, d.n, { x: d.tx, y: d.y + 0.169, w: d.tw, h: 0.505, fontFace: MAJOR, fontSize: 24, color: d.c, align: 'center' });
++  });
++
++  // four label blocks
++  const LABELS = [
++    { t: 'The Types of Risk', th: 0.37, ty: 1.75, b: LOREM.industry, by: 2.136, bh: 0.865, x: 1.22, tx: 1.22, align: 'right' },
++    { t: 'Tips for Effective Risk Management', th: 0.64, ty: 5.021, b: LOREM.printing, by: 5.67, bh: 0.602, x: 1.22, tx: 1.417, align: 'right' },
++    { t: 'Assessing and Managing Risk', th: 0.64, ty: 1.75, b: LOREM.printing, by: 2.399, bh: 0.602, x: 9.401, tx: 9.401, align: 'left' },
++    { t: 'Case Studies', th: 0.37, ty: 5.021, b: LOREM.industry, by: 5.407, bh: 0.865, x: 9.401, tx: 9.401, align: 'left' },
++  ];
++  LABELS.forEach((l) => {
++    head(s, l.t, { x: l.tx, y: l.ty, w: l.align === 'right' ? 3.97 - l.tx : 2.75, h: l.th, fontSize: 16, align: l.align });
++    text(s, l.b, { x: l.x, y: l.by, w: 2.75, h: l.bh, align: l.align, lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 4 - descending five step pipeline
++ * ------------------------------------------------------------------ */
++function slide04(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  blockTitle(s, 0.669, 5.179);
++  const STEPS = [
++    { x: 0.836, y: 1.177, label: 'Plan', size: 18, note: LOREM.printingAnd, nx: 0.836, ny: 2.054, nh: 1.606, th: 1.127 },
++    { x: 2.986, y: 2.163, label: 'Identify', size: 18, note: LOREM.printingAnd, nx: 2.986, ny: 3.004, nh: 1.606, th: 1.127 },
++    { x: 5.135, y: 3.15, label: 'Assess', size: 18, note: LOREM.dummy, nx: 5.135, ny: 3.966, nh: 0.99, th: 0.602 },
++    { x: 7.285, y: 4.137, label: 'Handle', size: 18, note: LOREM.dummy, nx: 7.285, ny: 4.934, nh: 0.99, th: 0.602 },
++    { x: 9.435, y: 5.124, label: 'Monitor & Report', size: 14, note: LOREM.dummy, nx: 9.435, ny: 5.879, nh: 0.688, th: 0.34, nw: 3.062 },
++  ];
++  // dashed feedback lines drawn behind the cards
++  const LINKS = [
++    [[3.898, 1.463], [4.517, 1.463], [4.517, 2.164]],
++    [[3.898, 1.463], [6.667, 1.463], [6.667, 3.15]],
++    [[3.898, 1.463], [8.817, 1.463], [8.817, 4.137]],
++    [[3.898, 1.463], [10.966, 1.463], [10.966, 5.124]],
++    [[6.048, 2.45], [6.375, 2.45], [6.375, 3.146]],
++    [[8.198, 3.436], [8.525, 3.436], [8.525, 4.137]],
++    [[10.348, 4.423], [10.688, 4.423], [10.688, 5.113]],
++    [[12.498, 5.41], [12.748, 5.41], [12.748, 6.722], [4.517, 6.722], [4.517, 2.736]],
++  ];
++  LINKS.forEach((pts) => polyline(s, pts, ARROW));
++
++  STEPS.forEach((st, i) => {
++    rrect(s, { x: st.nx, y: st.ny, w: st.nw || 1.898, h: st.nh, adj: 0.1042, fill: { color: PANEL } });
++    text(s, st.note, { x: st.nx + 0.206, y: st.ny + 0.24 - (st.nh < 1 ? 0.046 : 0), w: (st.nw || 1.898) - 0.41, h: st.th, lineSpacingMultiple: 1.3 });
++    rrect(s, { x: st.x, y: st.y, w: 3.062, h: 0.572, adj: 0.5, fill: { color: ACCENTS[i] } });
++    rrect(s, { x: st.x + 0.114, y: st.y - 0.244, w: 0.698, h: 0.698, fill: { color: WHITE } });
++    text(s, '0' + (i + 1), { x: st.x + 0.114, y: st.y - 0.114, w: 0.698, h: 0.438, fontFace: MAJOR, fontSize: 20, color: ACCENTS[i], align: 'center' });
++    text(s, st.label, { x: st.x + 0.927, y: st.y + 0.084, w: 1.94, h: 0.404, fontFace: MAJOR, fontSize: st.size, color: WHITE });
++  });
++
++  // rotated "Continually Identity" tag
++  rrect(s, { x: 3.853, y: 5.428, w: 1.319, h: 0.688, rotate: 270, fill: { color: WHITE } });
++  text(s, 'Continually Identity', { x: 3.747, y: 5.52, w: 1.531, h: 0.505, rotate: 270, fontFace: MAJOR, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 5 - ISO 31000 risk management process
++ * ------------------------------------------------------------------ */
++function slide05(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  rrect(s, { x: 3.912, y: 2.557, w: 5.51, h: 3.0, adj: 0.0701, fill: { color: PANEL } });
++  bannerTitle(s);
++  const BARS = [
++    { y: 1.692, color: INK, label: 'Establish the context' },
++    { y: 2.921, color: TEAL, label: 'Identify the risks' },
++    { y: 3.771, color: LIME, label: 'Analyze the risks' },
++    { y: 4.62, color: YELLOW, label: 'Evaluate the risks' },
++    { y: 5.849, color: ORANGE, label: 'Treat the risks' },
++  ];
++  BARS.forEach((b) => {
++    rrect(s, { x: 4.63, y: b.y, w: 4.073, h: 0.573, fill: { color: b.color } });
++    text(s, b.label, { x: 5.04, y: b.y + 0.085, w: 3.253, h: 0.404, fontFace: MAJOR, fontSize: 18, color: WHITE, align: 'center' });
++    [2.682, 8.844].forEach((lx) => s.addShape('line', {
++      x: lx, y: b.y + 0.287, w: 1.781, h: 0,
++      line: { color: GRAY, width: 1.25, dashType: 'dash', beginArrowType: 'triangle', endArrowType: 'triangle' },
++    }));
++  });
++  text(s, 'Risk Assessment', { x: 7.319, y: 2.542, w: 2.103, h: 0.37, fontSize: 16, align: 'center' });
++
++  // vertical side panels
++  [{ x: -0.295, tx: -0.158, label: 'Communicate & Consult' },
++   { x: 8.898, tx: 9.035, label: 'Monitor & Review' }].forEach((p) => {
++    rrect(s, { x: p.x, y: 3.643, w: 4.73, h: 0.828, rotate: 270, fill: { color: WHITE } });
++    head(s, p.label, { x: p.tx, y: 3.838, w: 4.457, h: 0.438, rotate: 270, fontSize: 20, align: 'center' });
++  });
++
++  // dashed loop over the top and under the bottom
++  polyline(s, [[11.27, 1.699], [11.27, 1.449], [6.674, 1.449], [6.674, 1.685]], Object.assign({}, ARROW, { width: 1.25 }));
++  polyline(s, [[6.674, 6.415], [6.674, 6.665], [11.27, 6.665], [11.27, 6.429]], Object.assign({}, ARROW, { width: 1.25 }));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 6 - inverted funnel of response strategies
++ * ------------------------------------------------------------------ */
++function slide06(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  const BANDS = [
++    { x: 2.308, y: 1.531, w: 8.717, h: 1.258, fill: YELLOW, p: ['M', 0.917, 1, 'L', 0.083, 1, 'L', 0, 0, 'L', 1, 0, 'Z'], left: 'Exploit', right: 'Avoid', lx: 3.87, rx: 7.706, ty: 1.904 },
++    { x: 3.029, y: 2.832, w: 7.276, h: 1.268, fill: LIME, p: ['M', 0.9, 0.996, 'L', 0.099, 1, 'L', 0, 0, 'L', 1, 0, 'Z'], left: 'Share', right: 'Transfer', lx: 4.078, rx: 7.498, ty: 3.21 },
++    { x: 3.757, y: 4.142, w: 5.819, h: 1.253, fill: TEAL, p: ['M', 1, 0, 'L', 0.875, 1, 'L', 0.125, 1, 'L', 0, 0.003, 'Z'], left: 'Enhance', right: 'Mitigate', lx: 4.498, rx: 7.078, ty: 4.513 },
++    { x: 4.478, y: 5.437, w: 4.377, h: 1.267, fill: INK, p: ['M', 0.83, 1, 'L', 0.165, 1, 'L', 0, 0, 'L', 1, 0, 'Z'] },
++  ];
++  BANDS.forEach((b) => poly(s, { x: b.x, y: b.y, w: b.w, h: b.h, fill: { color: b.fill } }, b.p));
++  s.addShape('line', { x: 6.667, y: 1.531, w: 0, h: 3.864, line: { color: WHITE, width: 2.25, dashType: 'dash' } });
++
++  const cap = { h: 0.511, fontFace: MAJOR, fontSize: 24, color: WHITE, align: 'center' };
++  BANDS.slice(0, 3).forEach((b) => {
++    text(s, b.left, Object.assign({ x: b.lx, y: b.ty, w: 1.757 }, cap));
++    text(s, b.right, Object.assign({ x: b.rx, y: b.ty, w: 1.757 }, cap));
++  });
++  text(s, 'Accept', Object.assign({ x: 5.606, y: 5.815, w: 2.12 }, cap));
++
++  // tilted side tags
++  [{ x: 1.822, tx: 2.042, rot: 60, label: 'Opportunity' },
++   { x: 8.5, tx: 8.72, rot: 300, label: 'Risk' }].forEach((t) => {
++    rrect(s, { x: t.x, y: 4.126, w: 3.011, h: 0.854, rotate: t.rot, fill: { color: WHITE } });
++    text(s, t.label, { x: t.tx, y: 4.301, w: 2.571, h: 0.505, rotate: t.rot, fontFace: MAJOR, fontSize: 24, align: 'center' });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 7 - clustered bar chart plus two notes
++ * ------------------------------------------------------------------ */
++function slide07(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  rrect(s, { x: 1.341, y: 0.07, w: 5.263, h: 7.944, rotate: 90, adj: 0.0571, fill: { color: PANEL } });
++  bannerTitle(s);
++
++  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4', 'Category 5', 'Category 6'];
++  s.addChart(pptx.ChartType.bar, [
++    { name: 'Series 1', labels: cats, values: [4, 2, 3, 4, 5, 2] },
++    { name: 'Series 2', labels: cats, values: [3, 4, 1, 2, 3, 4] },
++  ], {
++    x: 0.729, y: 1.561, w: 6.981, h: 4.963,
++    barDir: 'bar', barGrouping: 'clustered', barGapWidthPct: 182,
++    chartColors: [INK, TEAL],
++    showLegend: false, showTitle: false, showValue: false,
++    catAxisLineColor: 'D9D9D9', catAxisMajorTickMark: 'none', catAxisLabelColor: TEXT,
++    catAxisLabelFontFace: MAJOR, catAxisLabelFontSize: 12,
++    valAxisLineShow: false, valAxisMajorTickMark: 'none', valAxisLabelColor: GRAY,
++    valAxisLabelFontFace: MINOR, valAxisLabelFontSize: 12,
++    valGridLine: { style: 'solid', color: 'D9D9D9', size: 0.75 },
++    catGridLine: { style: 'none' },
++  });
++
++  [{ y: 1.756, color: INK, title: 'Provider Concerns', ty: 2.563, by: 2.967 },
++   { y: 4.253, color: TEAL, title: 'Customers Concerns', ty: 5.059, by: 5.463 }].forEach((c) => {
++    rrect(s, { x: 8.446, y: c.y, w: 0.698, h: 0.698, fill: { color: c.color } });
++    iconTile(s, 8.795, c.y + 0.349, 0.404, WHITE);
++    head(s, c.title, { x: 8.334, y: c.ty, w: 3.114, h: 0.404, fontSize: 18 });
++    text(s, LOREM.standard, { x: 8.334, y: c.by, w: 4.271, h: 0.865, lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 8 - three "input / tools / output" cards
++ * ------------------------------------------------------------------ */
++function slide08(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  const CARDS = [
++    { x: 1.154, color: INK, title: 'Inputs', tw: 1.312 },
++    { x: 5.078, color: TEAL, title: 'Tools/ Techniques', tw: 1.812 },
++    { x: 9.003, color: LIME, title: 'Outputs', tw: 1.312 },
++  ];
++  CARDS.forEach((c) => {
++    s.addShape('round1Rect', { x: c.x + 0.114, y: 2.031, w: 3.062, h: 4.114, rectRadius: 0.51, fill: { color: c.color } });
++    s.addShape('round1Rect', { x: c.x, y: 1.917, w: 3.062, h: 4.114, rectRadius: 0.51, fill: { color: WHITE } });
++    s.addShape('round2SameRect', { x: c.x + 0.114, y: 2.141, w: 0.938, h: 1.167, rotate: 90, rectRadius: 0.156, fill: { color: c.color } });
++    iconTile(s, c.x + 0.583, 2.724, 0.505, WHITE);
++    head(s, c.title, { x: c.x + 1.25, y: c.title.indexOf('/') > 0 ? 2.371 : 2.522, w: c.tw, h: c.title.indexOf('/') > 0 ? 0.639 : 0.37, fontSize: 16, color: c.color });
++    text(s, LOREM.industryLorem, { x: c.x + 0.291, y: 3.457, w: 2.479, h: 1.127, lineSpacingMultiple: 1.3, bullet: { characterCode: '2022', indent: 13.5 } });
++    text(s, LOREM.ofThe, { x: c.x + 0.291, y: 4.619, w: 2.479, h: 0.602, lineSpacingMultiple: 1.3, bullet: { characterCode: '2022', indent: 13.5 } });
++    s.addShape('line', { x: c.x, y: 5.812, w: 2.867, h: 0, line: { color: c.color, width: 1.5 } });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 9 - rising ramp with five bubbles
++ * ------------------------------------------------------------------ */
++const RAMP = 'A9A9A9';       // grey gradient of the ramp, flattened to one tone
++const RAMP_FOLD = 'BFBFBF';
++
++function slide09(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  poly(s, { x: 0, y: 3.154, w: 9.196, h: 2.336, fill: { color: RAMP } },
++    ['M', 0, 0.313, 'L', 0.97, 0, 'L', 1, 0.204, 'L', 0, 1, 'Z']);
++  poly(s, { x: 8.922, y: 3.154, w: 1.775, h: 1.697, fill: { color: RAMP_FOLD } },
++    ['M', 0, 0, 'L', 0.154, 0.281, 'L', 1, 1, 'L', 0.831, 0.789, 'Z']);
++  poly(s, { x: 10.396, y: 3.025, w: 1.272, h: 1.825, fill: { color: RAMP } },
++    ['M', 0, 0.804, 'L', 0.236, 1, 'L', 0.807, 0.369, 'L', 0.951, 0.446, 'L', 1, 0, 'L', 0.443, 0.201, 'L', 0.592, 0.275, 'Z']);
++
++  const BUBBLES = [
++    { x: 1.145, y: 2.273, d: 2.1, c: INK, bx: 2.613, bd: 0.564, bn: '1', bs: 16, ic: 0.785,
++      title: 'Cleaner Escalations', tx: 0.749, ty: 5.54, tw: 2.053, bodyY: 6.166, align: 'left' },
++    { x: 3.63, y: 2.47, d: 1.583, c: TEAL, bx: 4.771, bd: 0.458, bn: '2', bs: 14, ic: 0.616,
++      title: 'Easy to Catch the Trouble', tx: 3.023, ty: 5.016, tw: 1.884, bodyY: 5.643, align: 'left' },
++    { x: 5.548, y: 2.631, d: 1.151, c: LIME, bx: 6.414, bd: 0.369, bn: '3', bs: 12, ic: 0.453,
++      title: 'More Evidence to Support Decision Marketing', tx: 5.297, ty: 4.493, tw: 2.329, bodyY: 5.382, align: 'left', body: LOREM.simply, bodyH: 0.339 },
++    { x: 7.057, y: 2.738, d: 0.857, c: YELLOW, bx: 7.697, bd: 0.286, bn: '4', bs: 10, ic: 0.341,
++      title: 'Facilitation of Communication', tx: 7.72, ty: 3.97, tw: 2.329, bodyY: 4.596, align: 'left' },
++    { x: 11.739, y: 2.595, d: 0.857, c: ORANGE, bx: 12.421, bd: 0.286, bn: '5', bs: 8, ic: 0.319,
++      title: 'Better Estimation of Budgets', tx: 9.212, ty: 1.611, tw: 2.329, bodyY: 2.237, align: 'right' },
++  ];
++  BUBBLES.forEach((b) => {
++    circle(s, { x: b.x, y: b.y, w: b.d, h: b.d, fill: { color: b.c } });
++    iconTile(s, b.x + b.d / 2, b.y + b.d / 2, b.ic, WHITE);
++    circle(s, { x: b.bx, y: b.y - 0.023, w: b.bd, h: b.bd, fill: { color: b.c }, line: { color: WHITE, width: 1 } });
++    text(s, b.bn, { x: b.bx, y: b.y - 0.023 + (b.bd - 0.3) / 2, w: b.bd, h: 0.3, fontFace: MAJOR, fontSize: b.bs, color: WHITE, align: 'center' });
++    head(s, b.title, { x: b.tx, y: b.ty, w: b.tw, h: 0.606, fontSize: 15, color: b.c, align: b.align });
++    text(s, b.body || LOREM.ofThe, { x: b.align === 'right' ? b.tx + 0.15 : b.tx, y: b.bodyY, w: 2.179, h: b.bodyH || 0.602, align: b.align, lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 10 - five column activity table
++ * ------------------------------------------------------------------ */
++const CHEVRON_GLYPH = ['M', 1, 0.514, 'L', 0.19, 1, 'C', 0.19, 1, 0.143, 1, 0.143, 1,
++  'L', 0.095, 1, 'L', 0.048, 0.943, 'C', 0, 0.943, 0, 0.943, 0, 0.914,
++  'C', 0, 0.914, 0, 0.914, 0.048, 0.886, 'L', 0.714, 0.486, 'L', 0.048, 0.086,
++  'L', 0, 0.086, 'C', 0, 0.057, 0, 0.057, 0.048, 0.057, 'L', 0.095, 0, 'L', 0.19, 0,
++  'L', 1, 0.486, 'Z'];
++
++function slide10(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  const COLS = [
++    { x: 2.752, color: INK, head: 'Plan tasks and activities', hw: 1.645, body: ['Lorem Ipsum' + NB + 'is ', 'simply dummy text of the ', 'printing and typesetting industry. Lorem ', 'Ipsum has been'], bh: 1.764, foot: ['Lorem Ipsum' + NB + 'is '], fy: 5.337, fh: 0.32 },
++    { x: 4.736, color: TEAL, head: 'Determine issues and opportunities', hw: 1.877, body: ['Lorem Ipsum' + NB + 'is simply dummy ', 'text of the printing and ', 'typesetting'], bh: 1.282, foot: ['Lorem Ipsum' + NB + 'is '], fy: 5.337, fh: 0.32 },
++    { x: 6.719, color: INK, head: 'Review flow control', hw: 1.645, body: ['Lorem Ipsum' + NB + 'is simply dummy ', 'text of the printing and ', 'typesetting'], bh: 1.282, foot: ['Lorem Ipsum' + NB + 'is '], fy: 5.337, fh: 0.32 },
++    { x: 8.703, color: TEAL, head: 'Management and deliver', hw: 1.645, body: ['Lorem Ipsum' + NB + 'is simply dummy ', 'text of the printing and ', 'typesetting'], bh: 1.282, foot: ['Lorem Ipsum' + NB + 'is '], fy: 5.337, fh: 0.32 },
++    { x: 10.686, color: INK, head: 'Review, report, learn, and correct', hw: 1.761, body: ['Lorem Ipsum' + NB + 'is simply dummy text of the printing and typesetting ', 'industry. Lorem'], bh: 1.523, foot: ['Lorem Ipsum' + NB + 'is ', 'simply dummy'], fy: 5.217, fh: 0.56 },
++  ];
++  const BULLET = { characterCode: '2022', indent: 13.5 };
++  const para = (lines) => lines.map((t) => ({ text: t, options: { breakLine: true, bullet: BULLET } }));
++
++  COLS.forEach((c) => {
++    rrect(s, { x: c.x, y: 2.2, w: 1.877, h: 2.717, adj: 0.0707, fill: { color: PANEL } });
++    rrect(s, { x: c.x, y: 5.03, w: 1.877, h: 0.933, adj: 0.14, fill: { color: PANEL } });
++    rrect(s, { x: c.x, y: 1.405, w: 1.877, h: 0.681, adj: 0.14, fill: { color: c.color } });
++    text(s, c.head, { x: c.x + 0.075, y: 1.493, w: c.hw, h: 0.505, fontFace: MAJOR, color: WHITE });
++    text(s, para(c.body), { x: c.x + 0.135, y: 2.378, w: 1.608, h: c.bh, fontSize: 11, lineSpacingMultiple: 1.3, bullet: BULLET });
++    text(s, para(c.foot), { x: c.x + 0.135, y: c.fy, w: 1.608, h: c.fh, fontSize: 11, lineSpacingMultiple: 1.3, bullet: BULLET });
++  });
++
++  // dashed rail beneath the columns with chevron buttons
++  polyline(s, [[3.698, 5.957], [3.698, 6.488], [11.632, 6.488], [11.632, 5.971]], { color: HAIR, width: 1.5, dashType: 'dash' });
++  [5.675, 7.658, 9.641].forEach((x) => s.addShape('line', { x, y: 5.964, w: 0, h: 0.515, line: { color: HAIR, width: 1.5, dashType: 'dash' } }));
++  [4.446, 6.429, 8.413, 10.396].forEach((x) => {
++    circle(s, { x, y: 6.242, w: 0.474, h: 0.474, fill: { color: WHITE } });
++    poly(s, { x: x + 0.193, y: 6.406, w: 0.087, h: 0.147, fill: { color: TEXT } }, CHEVRON_GLYPH);
++  });
++
++  // row headers on the left
++  circle(s, { x: 1.197, y: 2.663, w: 0.833, h: 0.833, fill: { color: WHITE } });
++  iconTile(s, 1.614, 3.08, 0.517, INK);
++  rrect(s, { x: 0.835, y: 3.613, w: 1.556, h: 0.841, fill: { color: INK } });
++  text(s, 'Activity description', { x: 0.947, y: 3.781, w: 1.333, h: 0.505, fontFace: MAJOR, color: WHITE, align: 'center' });
++  rrect(s, { x: 0.835, y: 5.077, w: 1.556, h: 0.841, fill: { color: TEAL } });
++  text(s, 'Primary responsibilities', { x: 0.77, y: 5.245, w: 1.687, h: 0.505, fontFace: MAJOR, color: WHITE, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 11 - 3x3 engagement matrix of chevrons
++ * ------------------------------------------------------------------ */
++function slide11(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  s.addShape('rect', { x: 0, y: 1.844, w: 13.333, h: 5.031, fill: { color: PANEL } });
++  head(s, 'Level of Employee Engagement', { x: 0.505, y: 1.347, w: 4.495, h: 0.37, fontSize: 16 });
++
++  const axis = { color: HAIR, width: 2.25, endArrowType: 'triangle' };
++  polyline(s, [[1.913, 6.284], [1.913, 2.012]], axis);
++  polyline(s, [[1.913, 6.284], [12.628, 6.284]], axis);
++  [['High ', 2.012], ['Moderate', 3.963], ['Low', 5.914]].forEach((r) =>
++    head(s, r[0], { x: 0.528, y: r[1], w: 1.339, h: 0.37, fontSize: 16, color: TEXT, align: 'right' }));
++  [['Low', 1.735, 'center'], ['Moderate', 6.601, 'right'], ['High', 11.466, 'center']].forEach((c) =>
++    head(s, c[0], { x: c[1], y: 6.337, w: 1.339, h: 0.37, fontSize: 16, color: TEXT, align: c[2] }));
++
++  const COLS = [
++    { x: 2.173, color: INK, labels: ['Flaying high', 'Automatic pilot', 'Departure gate'], arrow: true },
++    { x: 6.073, color: TEAL, labels: ['Turbulence', 'Seat belts on', 'Transit lounge'], arrow: true },
++    { x: 9.9, color: LIME, labels: ['Red alert', 'Taxiing', 'Stormy weather'], arrow: false },
++  ];
++  const ROWS = [2.101, 3.495, 4.888];
++  COLS.forEach((c) => {
++    ROWS.forEach((y, r) => {
++      s.addShape('chevron', { x: c.x, y, w: 2.418, h: 0.43, fill: { color: c.color } });
++      text(s, c.labels[r], { x: c.x + 0.179, y: y + 0.047, w: 2.06, h: 0.337, fontFace: MAJOR, fontSize: 14, color: WHITE, align: 'center' });
++      const bullet = { characterCode: '2022', indent: 13.5 };
++      text(s, [{ text: 'Lorem Ipsum' + NB + 'is simply ', options: { breakLine: true, bullet } },
++        { text: 'dummy text of the', options: { bullet } }],
++      { x: c.x - 0.018, y: y + 0.498, w: 2.592, h: 0.602, lineSpacingMultiple: 1.3, bullet });
++      if (c.arrow) polyline(s, [[c.x + 2.418, y + 0.215], [c.x + 3.19, y + 0.215]], ARROW);
++    });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 12 - three icon circles feeding word strips
++ * ------------------------------------------------------------------ */
++function slide12(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  const GROUPS = [
++    { cx: 1.986, cy: 1.463, sx: 1.123, sy: 3.804, color: INK,
++      words: [['Fight', 1.016, 1], ['Conflict', 1.016, 1], ['Criticist', 1.016, 1]] },
++    { cx: 5.788, cy: 3.119, sx: 4.925, sy: 5.459, color: TEAL,
++      words: [['Talking About', 1.016, 2], ['On Your Own', 1.262, 2], ['Talking With', 1.016, 2]] },
++    { cx: 9.59, cy: 1.463, sx: 8.727, sy: 3.804, color: LIME,
++      words: [['Feedback', 1.232, 1], ['Consolidate', 1.016, 2], ['Flow', 1.016, 1]] },
++  ];
++  GROUPS.forEach((g) => {
++    circle(s, { x: g.cx, y: g.cy, w: 1.758, h: 1.758, fill: { color: PAGE }, line: { color: HAIR, width: 1.5, dashType: 'dash' } });
++    circle(s, { x: g.cx + 0.102, y: g.cy + 0.102, w: 1.554, h: 1.554, fill: { color: g.color } });
++    iconTile(s, g.cx + 0.879, g.cy + 0.879, 0.787, WHITE);
++
++    const stroke = { color: WHITE, width: 1.5 };
++    s.addShape('round2SameRect', { x: g.sx, y: g.sy, w: 1.031, h: 1.226, rotate: 270, rectRadius: 0.172, fill: { color: g.color }, line: stroke });
++    s.addShape('rect', { x: g.sx + 1.129, y: g.sy + 0.097, w: 1.226, h: 1.031, fill: { color: g.color }, line: stroke });
++    s.addShape('round2SameRect', { x: g.sx + 2.452, y: g.sy, w: 1.031, h: 1.226, rotate: 90, rectRadius: 0.172, fill: { color: g.color }, line: stroke });
++
++    const cellCx = [g.sx + 0.516, g.sx + 1.742, g.sx + 2.968];
++    g.words.forEach((wd, i) => {
++      const label = wd[0], w = wd[1], two = wd[2] === 2;
++      text(s, label, {
++        x: cellCx[i] - w / 2, y: two ? g.sy + 0.326 : g.sy + 0.444, w, h: two ? 0.572 : 0.337,
++        fontFace: MAJOR, fontSize: 14, color: WHITE, align: 'center',
++      });
++    });
++
++    const midX = g.cx + 0.879;
++    const railY = g.cy + 2.049;
++    const armY = g.sy + 0.612;
++    const feeder = Object.assign({}, ARROW, { color: HAIR });
++    polyline(s, [[midX, g.cy + 1.758], [midX, railY], [g.sx - 0.319, railY], [g.sx - 0.319, armY], [g.sx - 0.097, armY]], feeder);
++    polyline(s, [[midX, g.cy + 1.758], [midX, railY], [g.sx + 3.705, railY], [g.sx + 3.705, armY], [g.sx + 3.58, armY]], feeder);
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 13 - ribbon of four numbered steps
++ * ------------------------------------------------------------------ */
++const RIBBON_RIGHT = ['M', 0.835, 1, 'L', 0.385, 1, 'C', 0.338, 1, 0.291, 0.955, 0.281, 0.901,
++  'L', 0.104, 0.099, 'C', 0.092, 0.045, 0.045, 0, 0, 0, 'L', 0.165, 0, 'L', 0.615, 0,
++  'C', 0.662, 0, 0.709, 0.045, 0.719, 0.099, 'L', 0.896, 0.901, 'C', 0.908, 0.955, 0.955, 1, 1, 1, 'Z'];
++const RIBBON_LEFT = ['M', 0.165, 1, 'L', 0.617, 1, 'C', 0.662, 1, 0.709, 0.955, 0.721, 0.901,
++  'L', 0.896, 0.099, 'C', 0.908, 0.045, 0.955, 0, 1, 0, 'L', 0.837, 0, 'L', 0.385, 0,
++  'C', 0.34, 0, 0.293, 0.045, 0.281, 0.099, 'L', 0.104, 0.901, 'C', 0.092, 0.955, 0.047, 1, 0, 1, 'Z'];
++
++function slide13(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  // alternating up/down ribbon segments, dark folds first
++  const SEGS = [
++    { x: 0.802, fill: '003242', p: RIBBON_RIGHT }, { x: 9.642, fill: 'BFA813', p: RIBBON_RIGHT },
++    { x: 7.423, fill: '8EA42A', p: RIBBON_RIGHT }, { x: 5.202, fill: '176754', p: RIBBON_RIGHT },
++    { x: 2.945, fill: '003242', p: RIBBON_RIGHT }, { x: 1.872, fill: INK, p: RIBBON_LEFT },
++    { x: 4.094, fill: TEAL, p: RIBBON_LEFT }, { x: 6.312, fill: LIME, p: RIBBON_LEFT },
++    { x: 8.531, fill: YELLOW, p: RIBBON_LEFT },
++  ];
++  SEGS.forEach((g) => poly(s, { x: g.x, y: 3.07, w: 2.888, h: 1.804, fill: { color: g.fill } }, g.p));
++
++  const DISCS = [
++    { x: 2.784, n: '01', c: INK }, { x: 5.007, n: '02', c: TEAL },
++    { x: 7.226, n: '03', c: LIME }, { x: 9.442, n: '04', c: YELLOW },
++  ];
++  DISCS.forEach((d) => {
++    circle(s, { x: d.x, y: 3.441, w: 1.063, h: 1.063, fill: { color: WHITE } });
++    text(s, d.n, { x: d.x, y: 3.653, w: 1.063, h: 0.639, fontFace: MAJOR, fontSize: 32, color: d.c, align: 'center' });
++  });
++
++  const CAPS = [
++    { t: 'Diversify your portfolio', tx: 1.911, tw: 2.808, ty: 5.245, bx: 1.911, by: 5.598, body: LOREM.printingAnd, bh: 0.602 },
++    { t: 'Stay up-to-date with market trends', tx: 4.131, tw: 2.808, ty: 1.831, th: 0.606, bx: 4.131, by: 2.447, body: LOREM.dummy, bh: 0.34 },
++    { t: 'Consider your time horizon', tx: 5.867, tw: 3.775, ty: 5.245, bx: 6.35, by: 5.598, body: LOREM.printingAnd, bh: 0.602 },
++    { t: 'Don\u2019t overlook the power of compounding', tx: 8.57, tw: 2.808, ty: 1.831, th: 0.606, bx: 8.57, by: 2.447, body: LOREM.dummy, bh: 0.34 },
++  ];
++  CAPS.forEach((c) => {
++    head(s, c.t, { x: c.tx, y: c.ty, w: c.tw, h: c.th || 0.353, fontSize: 15, align: 'center' });
++    text(s, c.body, { x: c.bx, y: c.by, w: 2.808, h: c.bh, align: 'center', lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 14 - risk register hierarchy
++ * ------------------------------------------------------------------ */
++function slide14(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  blockTitle(s, 9.232, 1.404);
++  rrect(s, { x: 4.714, y: 0.823, w: 3.906, h: 0.572, fill: { color: INK } });
++  text(s, 'Portfolio Management Plan', { x: 4.755, y: 0.924, w: 3.823, h: 0.37, fontFace: MAJOR, fontSize: 16, color: WHITE, align: 'center' });
++
++  // shadowed cards: coloured plate behind, white card on top
++  const PLANS = [
++    { x: 5.674, y: 2.177, color: TEAL, label: 'Portfolio Risk & Opportunity Management Plan' },
++    { x: 4.279, y: 3.615, color: TEAL, label: 'Programs Risk & Opportunity Management Plan' },
++    { x: 7.112, y: 3.615, color: TEAL, label: 'Project Risk & Opportunity Management Plan' },
++    { x: 4.279, y: 5.062, color: TEAL, label: 'Project Risk & Opportunity Management Plan' },
++  ];
++  const REGISTERS = [
++    { x: 1.24, y: 2.406, color: LIME, label: 'Portfolio Risk Register' },
++    { x: 1.24, y: 3.844, color: YELLOW, label: 'Program Risk Register' },
++    { x: 1.24, y: 5.292, color: ORANGE, label: 'Project Risk Register' },
++    { x: 10.12, y: 3.844, color: ORANGE, label: 'Project Risk Register' },
++  ];
++  function card(c, big) {
++    rrect(s, { x: c.x, y: c.y, w: 1.818, h: 1.0, adj: 0.15, fill: { color: c.color } });
++    rrect(s, { x: c.x + 0.125, y: c.y + 0.104, w: 1.818, h: 1.0, adj: 0.1042, fill: { color: WHITE } });
++    if (big) text(s, c.label, { x: c.x + 0.083, y: c.y + 0.319, w: 1.911, h: 0.572, fontFace: MAJOR, fontSize: 14, align: 'center' });
++    else text(s, c.label, { x: c.x + 0.073, y: c.y + 0.251, w: 1.911, h: 0.707, fontSize: 12, align: 'center' });
++  }
++  const LINKS = [
++    [[6.667, 1.395], [6.667, 2.114]],
++    [[5.674, 2.677], [4.428, 2.677], [4.428, 3.01], [3.182, 3.01]],
++    [[4.279, 4.115], [3.73, 4.115], [3.73, 4.448], [3.182, 4.448]],
++    [[4.279, 5.562], [3.73, 5.562], [3.73, 5.896], [3.182, 5.896]],
++    [[9.055, 4.219], [9.603, 4.219], [9.603, 4.344], [10.151, 4.344]],
++    [[12.063, 4.448], [12.64, 4.448], [12.64, 3.48], [1.24, 3.48], [1.24, 2.906]],
++  ];
++  LINKS.forEach((pts) => polyline(s, pts, ARROW));
++  polyline(s, [[6.708, 3.281], [6.708, 3.448], [5.188, 3.448], [5.188, 3.615]], DASH);
++  polyline(s, [[6.708, 3.281], [6.708, 3.448], [8.021, 3.448], [8.021, 3.615]], DASH);
++  polyline(s, [[5.188, 5.062], [5.188, 4.719]], DASH);
++
++  PLANS.forEach((c) => card(c, false));
++  REGISTERS.forEach((c) => card(c, true));
++
++  // KPRI double arrows between registers
++  [[3.51, 3.855], [4.948, 5.293]].forEach((p) => {
++    polyline(s, [[2.24, p[1]], [2.24, p[0]]], Object.assign({}, ARROW, { width: 1.0 }));
++    polyline(s, [[2.156, p[0]], [2.156, p[1]]], Object.assign({}, ARROW, { width: 1.0 }));
++  });
++  [3.479, 4.961].forEach((y) => text(s, 'KPRI', { x: 0.844, y, w: 1.021, h: 0.303 }));
++  [3.459, 4.94].forEach((y) => text(s, 'Escalated Risk', { x: 3.18, y, w: 1.021, h: 0.505 }));
++  text(s, 'Escalated Risk', { x: 8.534, y: 6.425, w: 1.396, h: 0.303 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 15 - S-curve staircase of four steps
++ * ------------------------------------------------------------------ */
++const CURVE_A = ['M', 0.999, 0, 'C', 0.451, 0, 0, 0.448, 0, 1, 'L', 0.57, 1,
++  'C', 0.57, 0.917, 0.596, 0.83, 0.643, 0.762, 'L', 0.768, 0.762, 'L', 0.768, 0.636,
++  'C', 0.835, 0.598, 0.914, 0.568, 1, 0.568, 'Z'];
++const CURVE_B = ['M', 0, 1, 'C', 0.552, 1, 1, 0.55, 1, 0, 'L', 0.432, 0,
++  'C', 0.432, 0.09, 0.403, 0.179, 0.353, 0.252, 'L', 0.238, 0.252, 'L', 0.238, 0.357,
++  'C', 0.17, 0.403, 0.083, 0.43, 0, 0.43, 'Z'];
++
++function slide15(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  blockTitle(s, 0.638, 0.694);
++  poly(s, { x: 4.505, y: 4.524, w: 1.661, h: 1.654, fill: { color: INK } }, CURVE_A);
++  poly(s, { x: 6.329, y: 3.798, w: 1.654, h: 1.66, fill: { color: TEAL } }, CURVE_B);
++  poly(s, { x: 7.038, y: 2.05, w: 1.661, h: 1.654, fill: { color: LIME } }, CURVE_A);
++  poly(s, { x: 8.863, y: 1.324, w: 1.654, h: 1.66, fill: { color: YELLOW } }, CURVE_B);
++  // straight tails that run off the top and bottom edges
++  s.addShape('rect', { x: 9.583, y: 0, w: 0.944, h: 1.323, fill: { color: YELLOW } });
++  s.addShape('rect', { x: 4.504, y: 6.177, w: 0.944, h: 1.323, fill: { color: INK } });
++
++  const STEPS = [
++    { d: [5.702, 5.688], n: '01', c: INK, nx: 5.953, nw: 0.638,
++      title: 'Hazards identification', tx: 7.095, ty: 5.754, tw: 3.068, by: 6.158, align: 'left' },
++    { d: [5.702, 3.126], n: '02', c: TEAL, nx: 5.953, nw: 0.638,
++      title: 'Risk assessment', tx: 2.015, ty: 3.157, tw: 3.433, by: 3.561, align: 'right' },
++    { d: [8.263, 3.194], n: '03', c: LIME, nx: 8.513, nw: 0.638,
++      title: 'Opportunity assessment', tx: 9.107, ty: 4.316, tw: 3.433, by: 4.72, align: 'left' },
++    { d: [8.263, 0.635], n: '04', c: YELLOW, nx: 8.414, nw: 0.836,
++      title: 'Planning', tx: 4.573, ty: 0.696, tw: 3.433, by: 1.1, align: 'right' },
++  ];
++  STEPS.forEach((st) => {
++    circle(s, { x: st.d[0], y: st.d[1], w: 1.139, h: 1.139, fill: { color: WHITE } });
++    text(s, st.n, { x: st.nx, y: st.d[1] + 0.213, w: st.nw, h: 0.505, fontFace: MAJOR, fontSize: 24, color: st.c, align: 'center' });
++    text(s, 'Step', { x: st.d[0] + 0.244, y: st.d[1] + 0.59, w: 0.651, h: 0.337, fontSize: 14, align: 'center' });
++    head(s, st.title, { x: st.tx, y: st.ty, w: st.tw, h: 0.404, fontSize: 18, color: st.c, align: st.align });
++    text(s, LOREM.industry, { x: st.tx, y: st.by, w: 3.433, h: 0.602, align: st.align, lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 16 - two jigsaw stacks (RISK / OPPORTUNITY)
++ * ------------------------------------------------------------------ */
++const TAB_TILE = ['M', 0.797, 0.963, 'L', 0.797, 0.575, 'L', 0.844, 0.61,
++  'C', 0.859, 0.625, 0.879, 0.631, 0.898, 0.631, 'C', 0.954, 0.631, 1, 0.571, 1, 0.498,
++  'C', 1, 0.425, 0.954, 0.365, 0.898, 0.365, 'C', 0.879, 0.365, 0.859, 0.371, 0.844, 0.383,
++  'L', 0.797, 0.421, 'L', 0.797, 0, 'L', 0, 0, 'L', 0, 1, 'L', 0.797, 1, 'Z'];
++const TAB_TILE_LAST = ['M', 0.844, 0.581, 'C', 0.859, 0.595, 0.879, 0.601, 0.898, 0.601,
++  'C', 0.954, 0.601, 1, 0.543, 1, 0.473, 'C', 1, 0.403, 0.954, 0.345, 0.898, 0.345,
++  'C', 0.879, 0.345, 0.859, 0.351, 0.844, 0.363, 'L', 0.797, 0.399, 'L', 0.797, 0,
++  'L', 0, 0, 'L', 0, 1, 'L', 0.797, 1, 'L', 0.797, 0.547, 'Z'];
++
++const PLANK_W = 3.232;   // width of a jigsaw plank, inches
++const KNOB = 0.2;        // how far a knob sticks out of the plank body
++
++/**
++ * Wide jigsaw plank measured in inches and normalised to its shape box:
++ * a socket on the left edge, an optional socket in the top edge at `topKnob`
++ * and an optional knob under the bottom edge at `botKnob` (x offsets, inches).
++ */
++function plank(bodyH, topKnob, botKnob) {
++  const h = bodyH + (botKnob === null ? 0 : KNOB);
++  const X = (v) => +(v / PLANK_W).toFixed(4);
++  const Y = (v) => +(v / h).toFixed(4);
++  let p = [];
++  if (topKnob === null) {
++    p = p.concat(['M', X(PLANK_W), 0, 'L', 0, 0]);
++  } else {
++    p = p.concat([
++      'M', X(topKnob + 0.162), Y(0.039),
++      'C', X(topKnob + 0.162), Y(0.128), X(topKnob + 0.09), Y(0.199), X(topKnob), Y(0.199),
++      'C', X(topKnob - 0.09), Y(0.199), X(topKnob - 0.162), Y(0.128), X(topKnob - 0.162), Y(0.039),
++      'C', X(topKnob - 0.162), Y(0.027), X(topKnob - 0.159), Y(0.013), X(topKnob - 0.156), 0,
++      'L', 0, 0]);
++  }
++  // left edge with its socket
++  p = p.concat([
++    'L', 0, Y(0.215),
++    'C', X(0.013), Y(0.212), X(0.026), Y(0.21), X(0.039), Y(0.21),
++    'C', X(0.13), Y(0.21), X(0.198), Y(0.285), X(0.198), Y(0.375),
++    'C', X(0.198), Y(0.465), X(0.13), Y(0.54), X(0.039), Y(0.54),
++    'C', X(0.026), Y(0.54), X(0.013), Y(0.538), 0, Y(0.535),
++    'L', 0, Y(bodyH)]);
++  // bottom edge, optionally with a protruding knob
++  if (botKnob !== null) {
++    p = p.concat([
++      'L', X(botKnob - 0.058), Y(bodyH),
++      'C', X(botKnob - 0.1), Y(bodyH + 0.06), X(botKnob - 0.1), Y(bodyH + 0.14), X(botKnob), Y(h),
++      'C', X(botKnob + 0.1), Y(bodyH + 0.14), X(botKnob + 0.1), Y(bodyH + 0.06), X(botKnob + 0.058), Y(bodyH)]);
++  }
++  p = p.concat(['L', X(PLANK_W), Y(bodyH), 'L', X(PLANK_W), 0]);
++  if (topKnob !== null) {
++    p = p.concat(['L', X(topKnob + 0.156), 0,
++      'C', X(topKnob + 0.159), Y(0.013), X(topKnob + 0.162), Y(0.027), X(topKnob + 0.162), Y(0.039)]);
++  }
++  return p.concat(['Z']);
++}
++
++function slide16(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  // knob x offsets chain the planks together: each row's bottom knob plugs
++  // into the socket in the top edge of the row below it.
++  const ROWS = [
++    { y: 2.347, body: 0.789, color: INK, top: null, bot: 2.834 },
++    { y: 3.196, body: 0.759, color: TEAL, top: 2.834, bot: 2.017 },
++    { y: 4.014, body: 0.760, color: LIME, top: 2.017, bot: 1.200 },
++    { y: 4.833, body: 0.758, color: YELLOW, top: 1.200, bot: 2.017 },
++    { y: 5.651, body: 0.790, color: ORANGE, top: 2.017, bot: null },
++  ];
++  const SIDES = [
++    { tabX: 1.628, plankX: 2.477, flip: false, txt: 2.64, icon: 0.375 },
++    { tabX: 10.698, plankX: 7.614, flip: true, txt: 7.82, icon: 0.465 },
++  ];
++  SIDES.forEach((sd) => {
++    ROWS.forEach((r, i) => {
++      const tab = i === ROWS.length - 1 ? TAB_TILE_LAST : TAB_TILE;
++      poly(s, { x: sd.tabX, y: r.y, w: 0.987, h: r.body, fill: { color: r.color } },
++        sd.flip ? mirrorX(tab) : tab);
++      const pk = plank(r.body, r.top, r.bot);
++      poly(s, { x: sd.plankX, y: r.y, w: PLANK_W, h: r.body + (r.bot === null ? 0 : KNOB), fill: { color: r.color } },
++        sd.flip ? mirrorX(pk) : pk);
++      iconTile(s, sd.tabX + (sd.flip ? 0.562 : 0.425), r.y + r.body / 2, sd.icon, WHITE);
++      text(s, LOREM.industry, {
++        x: sd.txt, y: r.y + 0.13, w: 3.0, h: 0.517, fontSize: 10, color: WHITE,
++        align: 'center', lineSpacingMultiple: 1.2, charSpacing: -0.2, margin: WIDE_INSET,
++      });
++    });
++  });
++  head(s, 'RISK', { x: 1.571, y: 1.61, w: 1.047, h: 0.522, fontSize: 25 });
++  iconTile(s, 2.752, 1.853, 0.325, INK);
++  head(s, 'OPPORTUNITY', { x: 8.867, y: 1.646, w: 2.881, h: 0.522, fontSize: 25 });
++  iconTile(s, 8.7, 1.865, 0.465, TEAL);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 17 - circular four-piece puzzle ring
++ * ------------------------------------------------------------------ */
++const RING = {
++  topLeft: ['M', 0.946, 0.171, 'C', 0.934, 0.171, 0.903, 0.185, 0.883, 0.2, 'C', 0.86, 0.213, 0.838, 0.215, 0.819, 0.205,
++    'L', 0.81, 0.2, 'C', 0.804, 0.196, 0.8, 0.192, 0.795, 0.185, 'C', 0.784, 0.171, 0.776, 0.149, 0.774, 0.124,
++    'L', 0.772, 0.121, 'L', 0.772, 0, 'C', 0.351, 0.017, 0.012, 0.456, 0, 1, 'L', 0.078, 0.998,
++    'C', 0.086, 0.998, 0.097, 0.992, 0.102, 0.981, 'C', 0.109, 0.968, 0.106, 0.953, 0.101, 0.945,
++    'C', 0.097, 0.936, 0.073, 0.872, 0.073, 0.836, 'C', 0.073, 0.763, 0.125, 0.704, 0.188, 0.704,
++    'C', 0.253, 0.704, 0.305, 0.763, 0.305, 0.836, 'C', 0.305, 0.872, 0.279, 0.936, 0.277, 0.942,
++    'C', 0.272, 0.953, 0.269, 0.968, 0.276, 0.981, 'C', 0.281, 0.994, 0.294, 0.998, 0.302, 1, 'L', 0.383, 1,
++    'C', 0.394, 0.729, 0.563, 0.512, 0.772, 0.497, 'L', 0.772, 0.401, 'C', 0.776, 0.375, 0.784, 0.352, 0.795, 0.337,
++    'C', 0.8, 0.331, 0.804, 0.326, 0.81, 0.322, 'C', 0.812, 0.32, 0.815, 0.318, 0.819, 0.316,
++    'C', 0.838, 0.305, 0.86, 0.307, 0.883, 0.322, 'C', 0.903, 0.337, 0.934, 0.352, 0.946, 0.352,
++    'C', 0.975, 0.352, 1, 0.311, 1, 0.26, 'C', 1, 0.211, 0.975, 0.171, 0.946, 0.171, 'Z'],
++  topRight: ['M', 0, 0, 'L', 0, 0.092, 'C', 0.002, 0.1, 0.006, 0.112, 0.019, 0.117, 'C', 0.028, 0.122, 0.041, 0.12, 0.056, 0.115,
++    'C', 0.062, 0.112, 0.128, 0.087, 0.165, 0.087, 'C', 0.237, 0.087, 0.295, 0.14, 0.295, 0.203,
++    'C', 0.295, 0.268, 0.237, 0.32, 0.165, 0.32, 'C', 0.128, 0.32, 0.062, 0.295, 0.056, 0.293,
++    'C', 0.041, 0.287, 0.028, 0.287, 0.019, 0.292, 'C', 0.006, 0.297, 0.002, 0.31, 0, 0.318, 'L', 0, 0.388,
++    'C', 0.271, 0.4, 0.489, 0.57, 0.504, 0.782, 'L', 0.613, 0.782, 'C', 0.639, 0.783, 0.662, 0.792, 0.677, 0.803,
++    'C', 0.686, 0.812, 0.697, 0.822, 0.701, 0.848, 'L', 0.701, 0.857, 'C', 0.699, 0.872, 0.69, 0.887, 0.677, 0.908,
++    'C', 0.669, 0.925, 0.662, 0.939, 0.662, 0.947, 'C', 0.662, 0.977, 0.701, 1, 0.746, 1,
++    'C', 0.793, 1, 0.831, 0.977, 0.831, 0.947, 'C', 0.831, 0.937, 0.816, 0.908, 0.803, 0.887,
++    'C', 0.795, 0.874, 0.793, 0.862, 0.793, 0.848, 'C', 0.795, 0.834, 0.803, 0.822, 0.816, 0.803,
++    'C', 0.831, 0.792, 0.853, 0.783, 0.876, 0.782, 'L', 1, 0.782, 'C', 0.985, 0.357, 0.545, 0.013, 0, 0, 'Z'],
++  botRight: ['M', 0.911, 0, 'C', 0.903, 0.002, 0.893, 0.006, 0.888, 0.017, 'C', 0.883, 0.028, 0.884, 0.043, 0.889, 0.051,
++    'C', 0.891, 0.058, 0.916, 0.12, 0.916, 0.154, 'C', 0.916, 0.224, 0.865, 0.28, 0.804, 0.28,
++    'C', 0.743, 0.28, 0.693, 0.224, 0.693, 0.154, 'C', 0.693, 0.12, 0.718, 0.058, 0.72, 0.051,
++    'C', 0.723, 0.043, 0.726, 0.028, 0.721, 0.017, 'C', 0.716, 0.006, 0.705, 0.002, 0.696, 0, 'L', 0.617, 0,
++    'C', 0.606, 0.271, 0.437, 0.489, 0.228, 0.504, 'L', 0.228, 0.613, 'C', 0.224, 0.639, 0.218, 0.662, 0.205, 0.677,
++    'C', 0.199, 0.686, 0.19, 0.695, 0.181, 0.699, 'C', 0.163, 0.707, 0.14, 0.707, 0.119, 0.692,
++    'C', 0.097, 0.677, 0.066, 0.662, 0.056, 0.662, 'C', 0.025, 0.662, 0, 0.703, 0, 0.752,
++    'C', 0, 0.803, 0.025, 0.844, 0.056, 0.844, 'C', 0.066, 0.844, 0.097, 0.829, 0.119, 0.814,
++    'C', 0.14, 0.799, 0.163, 0.799, 0.181, 0.808, 'C', 0.19, 0.813, 0.199, 0.821, 0.205, 0.829,
++    'C', 0.216, 0.844, 0.224, 0.865, 0.228, 0.891, 'L', 0.228, 1, 'C', 0.648, 0.985, 0.988, 0.545, 1, 0, 'Z'],
++  botLeft: ['M', 0.838, 0.693, 'C', 0.874, 0.693, 0.938, 0.718, 0.944, 0.721, 'C', 0.959, 0.728, 0.972, 0.728, 0.983, 0.723,
++    'C', 0.996, 0.718, 1, 0.705, 1, 0.696, 'L', 1, 0.617, 'C', 0.729, 0.606, 0.511, 0.437, 0.496, 0.228,
++    'L', 0.385, 0.228, 'C', 0.35, 0.224, 0.321, 0.211, 0.306, 0.191, 'L', 0.299, 0.183,
++    'C', 0.291, 0.163, 0.291, 0.14, 0.306, 0.119, 'C', 0.321, 0.097, 0.336, 0.066, 0.336, 0.056,
++    'C', 0.336, 0.025, 0.295, 0, 0.244, 0, 'C', 0.194, 0, 0.154, 0.025, 0.154, 0.056,
++    'C', 0.154, 0.066, 0.169, 0.097, 0.184, 0.119, 'C', 0.197, 0.14, 0.199, 0.163, 0.19, 0.183,
++    'C', 0.186, 0.187, 0.184, 0.189, 0.184, 0.191, 'C', 0.169, 0.211, 0.141, 0.224, 0.107, 0.228,
++    'L', 0, 0.228, 'C', 0.015, 0.648, 0.455, 0.988, 1, 1, 'L', 1, 0.921,
++    'C', 0.998, 0.912, 0.994, 0.901, 0.983, 0.896, 'C', 0.972, 0.891, 0.959, 0.891, 0.944, 0.898,
++    'C', 0.938, 0.899, 0.874, 0.926, 0.838, 0.926, 'C', 0.765, 0.926, 0.705, 0.873, 0.705, 0.809,
++    'C', 0.705, 0.746, 0.765, 0.693, 0.838, 0.693, 'Z'],
++};
++
++function slide17(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  poly(s, { x: 5.036, y: 2.333, w: 2.311, h: 1.789, fill: { color: INK } }, RING.topLeft);
++  poly(s, { x: 6.927, y: 2.333, w: 1.785, h: 2.288, fill: { color: TEAL } }, RING.topRight);
++  poly(s, { x: 6.401, y: 4.226, w: 2.311, h: 1.785, fill: { color: LIME } }, RING.botRight);
++  poly(s, { x: 5.036, y: 3.698, w: 1.785, h: 2.312, fill: { color: YELLOW } }, RING.botLeft);
++
++  const leader = { color: GRAY, width: 0.5, dashType: 'sysDot' };
++  const LABELS = [
++    { title: 'Hazards identification', tx: 1.946, tw: 2.335, ty: 2.223, bx: 1.288, by: 2.974, align: 'right',
++      leg: [[5.617, 2.929], [5.262, 2.575], [4.571, 2.575]] },
++    { title: 'Opportunity assessment', tx: 9.3, tw: 2.197, ty: 2.15, bx: 8.962, by: 2.862, align: 'left',
++      leg: [[8.159, 2.903], [8.487, 2.575], [9.178, 2.575]] },
++    { title: 'Planning', tx: 9.437, tw: 1.647, ty: 5.607, bx: 8.942, by: 6.059, align: 'left',
++      leg: [[8.159, 5.449], [8.487, 5.777], [9.178, 5.777]] },
++    { title: 'Risk assessment', tx: 1.938, tw: 2.197, ty: 5.213, bx: 1.142, by: 5.921, align: 'right',
++      leg: [[5.617, 5.423], [5.262, 5.777], [4.571, 5.777]] },
++  ];
++  LABELS.forEach((l) => {
++    polyline(s, l.leg, leader);
++    circle(s, { x: l.leg[2][0] - 0.05, y: l.leg[2][1] - 0.05, w: 0.1, h: 0.1, fill: { color: GRAY } });
++    head(s, l.title, { x: l.tx, y: l.ty, w: l.tw, h: 0.774, fontSize: 20, align: 'center' });
++    text(s, LOREM.twice, { x: l.bx, y: l.by, w: 3.508, h: 0.595, align: l.align, lineSpacingMultiple: 1.2, charSpacing: -0.2, margin: WIDE_INSET });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 18 - 2x2 jigsaw
++ * ------------------------------------------------------------------ */
++function slide18(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  const stroke = { color: WHITE, width: 4.25 };
++  poly(s, { x: 4.668, y: 2.143, w: 2.585, h: 1.954, fill: { color: INK }, line: stroke },
++    ['M', 0.836, 0.287, 'C', 0.813, 0.287, 0.792, 0.293, 0.773, 0.303, 'L', 0.773, 0.145,
++      'C', 0.773, 0.065, 0.723, 0, 0.661, 0, 'L', 0.113, 0, 'C', 0.051, 0, 0, 0.065, 0, 0.145,
++      'L', 0, 0.855, 'C', 0, 0.935, 0.051, 1, 0.113, 1, 'L', 0.234, 1,
++      'C', 0.227, 0.975, 0.222, 0.948, 0.222, 0.918, 'C', 0.222, 0.801, 0.296, 0.706, 0.386, 0.706,
++      'C', 0.478, 0.706, 0.552, 0.801, 0.552, 0.918, 'C', 0.552, 0.948, 0.547, 0.975, 0.539, 1,
++      'L', 0.773, 1, 'L', 0.773, 0.697, 'C', 0.792, 0.707, 0.813, 0.713, 0.836, 0.713,
++      'C', 0.926, 0.713, 1, 0.618, 1, 0.501, 'C', 1, 0.382, 0.926, 0.287, 0.836, 0.287, 'Z']);
++  poly(s, { x: 6.667, y: 2.143, w: 1.998, h: 2.532, fill: { color: TEAL }, line: stroke },
++    ['M', 0.854, 0, 'L', 0.145, 0, 'C', 0.065, 0, 0, 0.05, 0, 0.112, 'L', 0, 0.234,
++      'C', 0.025, 0.226, 0.052, 0.221, 0.082, 0.221, 'C', 0.199, 0.221, 0.294, 0.295, 0.294, 0.386,
++      'C', 0.294, 0.477, 0.199, 0.55, 0.082, 0.55, 'C', 0.052, 0.55, 0.025, 0.546, 0, 0.539,
++      'L', 0, 0.772, 'L', 0.303, 0.773, 'C', 0.292, 0.792, 0.286, 0.813, 0.286, 0.836,
++      'C', 0.286, 0.926, 0.382, 1, 0.5, 1, 'C', 0.617, 1, 0.712, 0.926, 0.712, 0.836,
++      'C', 0.712, 0.813, 0.706, 0.792, 0.697, 0.773, 'L', 0.854, 0.773,
++      'C', 0.934, 0.773, 1, 0.722, 1, 0.66, 'L', 1, 0.112, 'C', 1, 0.05, 0.934, 0, 0.854, 0, 'Z']);
++  poly(s, { x: 4.668, y: 3.522, w: 1.998, h: 2.534, fill: { color: LIME }, line: stroke },
++    ['M', 0.918, 0.45, 'C', 0.948, 0.45, 0.975, 0.453, 1, 0.461, 'L', 1, 0.227, 'L', 0.697, 0.227,
++      'C', 0.708, 0.208, 0.714, 0.187, 0.714, 0.164, 'C', 0.714, 0.074, 0.619, 0, 0.5, 0,
++      'C', 0.383, 0, 0.288, 0.074, 0.288, 0.164, 'C', 0.288, 0.187, 0.294, 0.208, 0.303, 0.227,
++      'L', 0.146, 0.227, 'C', 0.066, 0.227, 0, 0.278, 0, 0.34, 'L', 0, 0.887,
++      'C', 0, 0.95, 0.066, 1, 0.146, 1, 'L', 0.855, 1, 'C', 0.935, 1, 1, 0.95, 1, 0.887,
++      'L', 1, 0.766, 'C', 0.975, 0.774, 0.948, 0.778, 0.918, 0.778, 'C', 0.801, 0.778, 0.706, 0.704, 0.706, 0.614,
++      'C', 0.706, 0.523, 0.801, 0.45, 0.918, 0.45, 'Z']);
++  poly(s, { x: 6.08, y: 4.098, w: 2.585, h: 1.957, fill: { color: YELLOW }, line: stroke },
++    ['M', 0.887, 0, 'L', 0.766, 0, 'C', 0.773, 0.026, 0.778, 0.054, 0.778, 0.082,
++      'C', 0.778, 0.2, 0.704, 0.295, 0.614, 0.295, 'C', 0.522, 0.295, 0.448, 0.2, 0.448, 0.082,
++      'C', 0.448, 0.054, 0.453, 0.026, 0.461, 0, 'L', 0.227, 0, 'L', 0.227, 0.303,
++      'C', 0.208, 0.294, 0.187, 0.288, 0.164, 0.288, 'C', 0.074, 0.288, 0, 0.383, 0, 0.5,
++      'C', 0, 0.619, 0.074, 0.714, 0.164, 0.714, 'C', 0.187, 0.714, 0.208, 0.708, 0.227, 0.697,
++      'L', 0.227, 0.855, 'C', 0.227, 0.935, 0.277, 1, 0.339, 1, 'L', 0.887, 1,
++      'C', 0.949, 1, 1, 0.935, 1, 0.855, 'L', 1, 0.146, 'C', 1, 0.066, 0.949, 0, 0.887, 0, 'Z']);
++
++  const NUMS = [
++    { n: '01', x: 4.86, y: 2.222, w: 0.905 },
++    { n: '02', x: 7.525, y: 2.222, w: 0.905 },
++    { n: '03', x: 4.763, y: 5.143, w: 0.905 },
++    { n: '04', x: 7.599, y: 5.213, w: 0.959 },
++  ];
++  NUMS.forEach((n) => text(s, n.n, { x: n.x, y: n.y, w: n.w, h: 0.774, fontFace: MAJOR, fontSize: 40, color: WHITE }));
++
++  const CAPS = [
++    { x: 2.254, y: 2.503, align: 'right' }, { x: 8.903, y: 2.503, align: 'left' },
++    { x: 2.217, y: 4.907, align: 'right' }, { x: 8.989, y: 4.763, align: 'left' },
++  ];
++  CAPS.forEach((c) => text(s, LOREM.twice, { x: c.x, y: c.y, w: 2.411, h: 0.837, align: c.align, lineSpacingMultiple: 1.2, charSpacing: -0.2, margin: WIDE_INSET }));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 19 - three interlocking puzzle pieces
++ * ------------------------------------------------------------------ */
++const PUZZLE = ['M', 0.866, 0.509, 'C', 0.89, 0.509, 0.924, 0.52, 0.954, 0.535, 'C', 0.975, 0.546, 1, 0.53, 1, 0.507,
++  'L', 1, 0.226, 'L', 0.72, 0.226, 'C', 0.697, 0.226, 0.682, 0.201, 0.693, 0.18,
++  'C', 0.707, 0.149, 0.718, 0.116, 0.718, 0.091, 'C', 0.718, 0.033, 0.671, 0, 0.613, 0,
++  'C', 0.555, 0, 0.508, 0.033, 0.508, 0.091, 'C', 0.508, 0.116, 0.519, 0.149, 0.535, 0.18,
++  'C', 0.545, 0.2, 0.53, 0.226, 0.506, 0.226, 'L', 0.226, 0.226, 'L', 0.226, 0.507,
++  'C', 0.226, 0.53, 0.2, 0.546, 0.179, 0.535, 'C', 0.148, 0.52, 0.116, 0.509, 0.091, 0.509,
++  'C', 0.032, 0.509, 0, 0.555, 0, 0.613, 'C', 0, 0.671, 0.032, 0.718, 0.091, 0.718,
++  'C', 0.116, 0.718, 0.149, 0.707, 0.18, 0.693, 'C', 0.2, 0.682, 0.226, 0.697, 0.226, 0.721,
++  'L', 0.226, 1, 'L', 0.506, 1, 'C', 0.53, 1, 0.545, 0.976, 0.535, 0.954,
++  'C', 0.519, 0.924, 0.508, 0.89, 0.508, 0.866, 'C', 0.508, 0.807, 0.555, 0.775, 0.613, 0.775,
++  'C', 0.671, 0.775, 0.718, 0.807, 0.718, 0.866, 'C', 0.718, 0.89, 0.707, 0.924, 0.693, 0.954,
++  'C', 0.682, 0.976, 0.697, 1, 0.72, 1, 'L', 1, 1, 'L', 1, 0.721,
++  'C', 1, 0.697, 0.975, 0.682, 0.954, 0.693, 'C', 0.924, 0.707, 0.89, 0.718, 0.866, 0.718,
++  'C', 0.806, 0.718, 0.774, 0.671, 0.774, 0.613, 'C', 0.774, 0.555, 0.806, 0.509, 0.866, 0.509, 'Z'];
++
++function slide19(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  const PIECES = [
++    { x: 4.738, y: 1.549, color: INK, p: PUZZLE },
++    { x: 6.762, y: 2.136, color: TEAL, p: mirrorY(PUZZLE) },
++    { x: 5.327, y: 3.582, color: LIME, p: mirrorX(PUZZLE) },
++  ];
++  PIECES.forEach((pc) => {
++    poly(s, { x: pc.x, y: pc.y, w: 2.617, h: 2.617, fill: { color: pc.color } }, pc.p);
++    poly(s, { x: pc.x, y: pc.y, w: 2.617, h: 2.617, line: { color: WHITE, width: 2.75 } }, pc.p);
++  });
++  iconTile(s, 6.143, 2.943, 0.706, WHITE);
++  iconTile(s, 8.283, 3.281, 0.648, WHITE);
++  iconTile(s, 6.444, 4.994, 0.786, WHITE);
++
++  polyline(s, [[5.04, 3.105], [4.167, 3.096]], { color: INK, width: 1, endArrowType: 'triangle' });
++  polyline(s, [[6.059, 5.218], [4.18, 5.218]], { color: LIME, width: 1, endArrowType: 'triangle' });
++  polyline(s, [[8.39, 4.641], [8.39, 5.455]], { color: TEAL, width: 1, endArrowType: 'triangle' });
++
++  head(s, 'Inputs', { x: 2.804, y: 2.639, w: 1.131, h: 0.438, fontSize: 20 });
++  text(s, LOREM.thrice, { x: 0.895, y: 2.923, w: 3.368, h: 1.317, fontSize: 15, align: 'right', lineSpacingMultiple: 1.2, charSpacing: -0.2, margin: WIDE_INSET });
++  head(s, 'Tools/Techniques', { x: 1.444, y: 4.695, w: 2.735, h: 0.438, fontSize: 20 });
++  text(s, LOREM.thrice, { x: 0.971, y: 5.048, w: 3.368, h: 1.317, fontSize: 15, align: 'right', lineSpacingMultiple: 1.2, charSpacing: -0.2, margin: WIDE_INSET });
++  head(s, 'Outputs', { x: 8.532, y: 5.258, w: 1.396, h: 0.438, fontSize: 20 });
++  text(s, LOREM.thrice, { x: 7.472, y: 5.62, w: 4.945, h: 1.014, fontSize: 15, lineSpacingMultiple: 1.2, charSpacing: -0.2, margin: WIDE_INSET });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 20 - two thermometer style capsules
++ * ------------------------------------------------------------------ */
++const CAPSULE = ['M', 0.492, 0, 'C', 0.468, 0.001, 0.562, 0.001, 0.562, 0.001,
++  'C', 0.585, 0.002, 0.619, 0.004, 0.659, 0.009, 'L', 0.692, 0.015, 'L', 0.788, 0.033,
++  'C', 0.877, 0.055, 0.963, 0.089, 0.997, 0.141, 'L', 0.997, 0.167, 'L', 1, 0.955,
++  'C', 1, 0.98, 0.942, 1, 0.87, 1, 'L', 0.13, 1, 'C', 0.058, 1, 0, 0.98, 0, 0.955,
++  'L', 0, 0.159, 'C', 0.002, 0.134, 0.031, 0.107, 0.077, 0.083, 'L', 0.117, 0.062,
++  'L', 0.212, 0.033, 'L', 0.305, 0.015, 'L', 0.417, 0.003, 'Z'];
++
++function slide20(pptx) {
++  const s = pptx.addSlide({ masterName: MASTER });
++  bannerTitle(s);
++  const TUBES = [
++    { color: INK, bodyX: 1.875, bodyY: 1.795, innerX: 1.955, innerY: 2.031, flip: false,
++      haloX: 1.719, haloY: 1.716, bulbX: 2.161, bulbY: 2.156,
++      label: 'RISK', labelX: 2.039, labelY: 3.647, labelW: 1.047,
++      copyX: 3.37, copyY: 2.921, copyAlign: 'left' },
++    { color: TEAL, bodyX: 9.929, bodyY: 2.422, innerX: 10.009, innerY: 2.556, flip: true,
++      haloX: 9.774, haloY: 4.697, bulbX: 10.216, bulbY: 5.137,
++      label: 'Opportunities', labelX: 9.249, labelY: 3.586, labelW: 2.728,
++      copyX: 6.501, copyY: 4.195, copyAlign: 'right' },
++  ];
++  TUBES.forEach((t) => {
++    const shell = t.flip ? mirrorY(CAPSULE) : CAPSULE;
++    poly(s, { x: t.bodyX, y: t.bodyY, w: 1.379, h: 3.877, fill: { color: t.color } }, shell);
++    circle(s, { x: t.haloX, y: t.haloY, w: 1.687, h: 1.684, fill: { color: t.color, transparency: 20 } });
++    circle(s, { x: t.haloX + 0.156, y: t.haloY + 0.155, w: 1.376, h: 1.373, fill: { color: t.color } });
++    poly(s, { x: t.innerX, y: t.innerY, w: 1.216, h: 3.507, fill: { color: WHITE } }, shell);
++    s.addShape('flowChartConnector', { x: t.bulbX, y: t.bulbY, w: 0.802, h: 0.802, fill: { color: t.color } });
++    iconTile(s, t.bulbX + 0.401, t.bulbY + 0.401, 0.403, WHITE);
++    head(s, t.label, { x: t.labelX, y: t.labelY, w: t.labelW, h: 0.522, rotate: 270, fontSize: 25 });
++    text(s, LOREM.period, { x: t.copyX, y: t.copyY, w: 3.403, h: 1.309, fontSize: 20, align: t.copyAlign, lineSpacingMultiple: 1.2, charSpacing: -0.2, margin: WIDE_INSET });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'DECK', width: 13.333, height: 7.5 });
++  pptx.layout = 'DECK';
++  pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
++  pptx.defineSlideMaster({
++    title: 'BLANK',
++    background: { color: PAGE },
++    objects: [
++      { rect: { x: 6.3, y: 7.047, w: 0.089, h: 0.089, fill: { color: 'CCD7DE' }, rectRadius: 0.045 } },
++      { rect: { x: 6.941, y: 7.047, w: 0.089, h: 0.089, fill: { color: 'CCD7DE' }, rectRadius: 0.045 } },
++    ],
++    slideNumber: { x: 6.357, y: 6.906, w: 0.616, h: 0.37, align: 'center', color: INK, fontFace: MAJOR, fontSize: 16 },
++  });
++  const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07,
++    slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15,
++    slide16, slide17, slide18, slide19, slide20];
++  SLIDES.forEach((fn) => fn(pptx));
++  return pptx.writeFile({ fileName: path.join(__dirname, '0e96aa1f-8474-4d88-985f-955e3d72a903_grok_final.pptx') });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

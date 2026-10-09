@@ -1,0 +1,491 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/creative_agency_portfolio.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/creative_agency_portfolio.js
+@@ -0,0 +1,488 @@
++/**
++ * "Agency Portfolio" deck — 18 slides, 13.333in x 7.5in.
++ *
++ * Recreated with pptxgenjs only. Photographs in the source deck are flat grey
++ * blocks, so every picture is redrawn here as a grey placeholder shape that
++ * keeps the original frame geometry (see `photo()`).
++ *
++ *   node 02d58dae-f36a-4787-9bcd-aac7ee35fb2e_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Palette & typography
++ * ------------------------------------------------------------------ */
++
++const ORANGE = 'FF782C'; // accent1
++const ORANGE_DK = 'E05100'; // accent1 at 75% luminance — the small diamonds
++const DARK = '3B3838'; // charcoal panels / headings
++const DARKER = '262626'; // corner wedge on dark slides
++const INK = '404040'; // wordmark + footer text on light slides
++const GREY = '808080'; // body copy
++const LIGHT = 'F2F2F2'; // corner wedge + skill-bar troughs on light slides
++const WHITE = 'FFFFFF';
++const PHOTO = 'CCCCCC'; // image placeholder fill
++const PHOTO_ALT = 'B3B3B3'; // the one darker image (slide 5)
++
++const HEAD = 'Montserrat';
++const BODY = 'Open Sans';
++
++const LOREM_LONG =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales lorem a nunc tincidunt convallis. Sed elit sem, molestie non placerat vel, laoreet a nisl.';
++const LOREM_MED =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales lorem a nunc tincidunt convallis. Sed elit sem ';
++const LOREM_TWO =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis sodales lorem a nunc tincidunt convallis.  ';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.  ';
++
++/* ------------------------------------------------------------------ *
++ * Low-level drawing helpers
++ * ------------------------------------------------------------------ */
++
++const NO_LINE = { type: 'none' };
++
++/** Free-form polygon; `pts` are [x, y] pairs in inches relative to the box. */
++function poly(slide, pts, o) {
++  slide.addShape('custGeom', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    rotate: o.rotate, flipH: o.flipH,
++    fill: o.fill, line: NO_LINE,
++    points: pts.map(([px, py]) => ({ x: px, y: py })).concat([{ close: true }]),
++  });
++}
++
++const NOTCH = 0.3255; // corner slice, as a fraction of the frame width
++
++/** Rectangle whose bottom-left corner is sliced off at 45deg — the deck's signature frame. */
++function notched(w, h, cut) {
++  const c = cut === undefined ? NOTCH * w : cut;
++  return [[0, 0], [w, 0], [w, h], [c, h], [0, h - c]];
++}
++
++/** Grey stand-in for a photograph; `notch` slices the bottom-left corner. */
++function photo(slide, x, y, w, h, opts) {
++  const o = opts || {};
++  const fill = { color: o.color || PHOTO };
++  if (o.notch) poly(slide, notched(w, h), { x, y, w, h, fill });
++  else slide.addShape('rect', { x, y, w, h, fill, line: NO_LINE });
++}
++
++/** Text block. `lines` is a string or an array of paragraphs. */
++function text(slide, o) {
++  const lines = Array.isArray(o.text) ? o.text : [o.text];
++  slide.addText(
++    lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })),
++    {
++      x: o.x, y: o.y, w: o.w, h: o.h,
++      fontFace: o.face || BODY, fontSize: o.size, bold: !!o.bold,
++      color: o.color, align: o.align || 'left', valign: 'top',
++      charSpacing: o.spc, lineSpacingMultiple: o.lnSpc, wrap: true,
++    }
++  );
++}
++
++/** Montserrat section heading with the short orange rule above it. */
++function heading(slide, o) {
++  slide.addShape('rect', { x: o.x + 0.094, y: o.y - 0.194, w: 0.7, h: 0.081, fill: { color: ORANGE }, line: NO_LINE });
++  text(slide, { x: o.x, y: o.y, w: o.w, h: o.h, text: o.text, face: HEAD, size: o.size || 22, bold: true, color: o.color || DARK });
++}
++
++/** Body copy — 9pt Open Sans at 1.5 line spacing. */
++function body(slide, o) {
++  text(slide, { x: o.x, y: o.y, w: o.w, h: o.h, text: o.text, size: 9, color: o.color || GREY, lnSpc: 1.5 });
++}
++
++/** Orange pill button with a centred white caption. */
++function button(slide, x, y, label) {
++  slide.addShape('roundRect', { x, y, w: 1.725, h: 0.46, fill: { color: ORANGE }, line: NO_LINE });
++  text(slide, { x: x + 0.201, y: y + 0.079, w: 1.322, h: 0.303, text: label || 'Learn More', face: HEAD, size: 12, bold: true, color: WHITE, align: 'center' });
++}
++
++/**
++ * Numbered orange tag: notched square + label + small dark diamond at its
++ * top-right. Two sizes are used through the deck.
++ */
++const TAG_LG = { size: 0.642, dia: 0.21, diaDx: 0.534, diaDy: -0.104, textDx: 0.009, textDy: 0.087, textH: 0.404, fontSize: 18 };
++const TAG_SM = { size: 0.477, dia: 0.184, diaDx: 0.385, diaDy: -0.085, textDx: 0, textDy: 0.069, textH: 0.303, fontSize: 12 };
++/** The two year markers on the history slide reuse the big tag at 12pt. */
++const TAG_YEAR = Object.assign({}, TAG_LG, { textDy: 0.153, textH: 0.303, fontSize: 12 });
++
++function tag(slide, x, y, label, preset) {
++  const p = preset || TAG_SM;
++  poly(slide, notched(p.size, p.size, NOTCH * p.size), { x, y, w: p.size, h: p.size, fill: { color: ORANGE } });
++  text(slide, { x: x + p.textDx, y: y + p.textDy, w: p.size, h: p.textH, text: label, face: HEAD, size: p.fontSize, bold: true, color: WHITE, align: 'center' });
++  slide.addShape('diamond', { x: x + p.diaDx, y: y + p.diaDy, w: p.dia, h: p.dia, fill: { color: ORANGE_DK }, line: NO_LINE });
++}
++
++/** Tag + bold title + small paragraph, laid out to the right of the tag. */
++function tagItem(slide, o) {
++  tag(slide, o.x, o.y, o.num, TAG_SM);
++  text(slide, { x: o.tx, y: o.y - 0.088, w: 1.837, h: 0.286, text: o.title, face: HEAD, size: 11, bold: true, color: DARK });
++  body(slide, { x: o.tx, y: o.y + 0.160, w: o.bw || 1.966, h: 0.652, text: o.text || LOREM_SHORT });
++}
++
++/** Skill meter: light trough with an orange fill bar and a caption above it. */
++function meter(slide, o) {
++  text(slide, { x: o.x - 0.095, y: o.y - (o.labelUp || 0.424), w: 1.879, h: 0.303, text: o.label, face: HEAD, size: 12, bold: true, color: DARK });
++  slide.addShape('rect', { x: o.x, y: o.y, w: o.w, h: 0.15, fill: { color: LIGHT }, line: NO_LINE });
++  slide.addShape('rect', { x: o.x, y: o.y, w: o.fill, h: 0.15, fill: { color: ORANGE }, line: NO_LINE });
++}
++
++/* ---- small repeated ornaments ---- */
++
++/**
++ * Pair of little orange chevrons that hang from the top edge of a photo
++ * frame. Two sizes appear: 0.4702in wide, and 0.3497in on slides 13/17/18.
++ */
++function chevrons(slide, x, y, w) {
++  const cw = w || 0.4702;
++  const ch = cw / 2;
++  [x, x + cw * 0.9505].forEach((cx) => poly(slide, [[cw / 2, 0], [cw, ch], [0, ch]], { x: cx, y, w: cw, h: ch, rotate: 180, fill: { color: ORANGE } }));
++}
++
++/** Stack of three 45deg slanted bars. `dir` = 'down' | 'right' | 'up'. */
++function stripes(slide, x, y, color, dir) {
++  const w = 0.2245;
++  const h = 0.3458;
++  const step = 0.2390;
++  const rotate = { down: 0, right: 90, up: 180 }[dir || 'down'];
++  for (let i = 0; i < 3; i++) {
++    const cx = dir === 'right' ? x + i * step : x;
++    const cy = dir === 'right' ? y : y + i * step;
++    poly(slide, [[0, 0], [w, w], [w, h], [0, h - w]], { x: cx, y: cy, w, h, rotate, fill: { color } });
++  }
++}
++
++/** Thin orange diagonal bar tucked under the bottom-left of a photo frame. */
++function slash(slide, x, y, w) {
++  const h = w * 0.0637;
++  poly(slide, [[0, 0], [w, 0.0173 * h], [0.938 * w, h], [0.0646 * w, h]], { x, y, w, h, rotate: 45, flipH: true, fill: { color: ORANGE } });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide chrome (wordmark, page number, footer, corner accents)
++ * ------------------------------------------------------------------ */
++
++/**
++ * Per-slide chrome. `panels` are the charcoal blocks inherited from the
++ * layout, `wedge` is the big [x, size, colour] triangle in the top-right.
++ */
++const CHROME = [
++  /*  1 */ { wedge: [12.359, 0.974, LIGHT], corner: [6.712, 0.420], mark: INK, page: INK, num: [12.694, 0.400], site: INK },
++  /*  2 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.537, 0.595], mark: INK, page: INK, num: [12.694, 0.400], site: INK },
++  /*  3 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.537, 0.595], mark: WHITE, page: INK, num: [12.694, 0.400], site: INK, panels: [[0, 0, 2.726, 7.5]] },
++  /*  4 */ { wedge: [11.463, 1.871, DARKER], corner: [6.537, 0.595], mark: INK, page: WHITE, num: [12.694, 0.400], panels: [[6.667, 0, 6.667, 7.5]] },
++  /*  5 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.537, 0.595], mark: INK, page: INK, num: [12.694, 0.400], site: INK },
++  /*  6 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.537, 0.595], page: INK, num: [12.694, 0.400], site: INK },
++  /*  7 */ { wedge: [11.463, 1.871, DARKER], corner: [6.537, 0.595], page: WHITE, num: [12.694, 0.400], bg: DARK },
++  /*  8 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.537, 0.595], site: INK, panels: [[10.780, 3.75, 2.553, 3.75], [0, 0, 2.553, 3.75]] },
++  /*  9 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.537, 0.595], page: INK, num: [12.694, 0.400], site: INK, panels: [[0, 0, 2.553, 3.75]] },
++  /* 10 */ { wedge: [12.359, 0.974, LIGHT], corner: [6.537, 0.595], page: INK, num: [12.694, 0.400], site: INK, panels: [[0, 0, 2.553, 3.75]] },
++  /* 11 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.537, 0.595], page: INK, num: [12.620, 0.595], site: INK, panels: [[0, 0, 2.553, 2.412]] },
++  /* 12 */ { wedge: [7.837, 5.497, DARKER], corner: [6.790, 0.341], mark: WHITE, page: WHITE, num: [12.620, 0.595], site: WHITE, bg: DARK },
++  /* 13 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.790, 0.341], page: DARKER, num: [12.620, 0.595], site: INK, panels: [[0, 0, 2.662, 7.5]] },
++  /* 14 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.790, 0.341], mark: INK, page: DARKER, num: [12.620, 0.595], site: INK },
++  /* 15 */ { wedge: [10.580, 2.753, LIGHT], corner: [6.790, 0.341], mark: INK, page: DARKER, num: [12.620, 0.595], site: INK },
++  /* 16 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.790, 0.341], mark: WHITE, page: DARKER, num: [12.620, 0.595], panels: [[0, 0, 6.069, 7.5]] },
++  /* 17 */ { wedge: [11.463, 1.871, LIGHT], corner: [6.790, 0.341], mark: INK, page: DARKER, num: [12.620, 0.595], site: INK },
++  /* 18 */ { wedge: [9.686, 3.647, DARKER], corner: [6.537, 0.595], mark: WHITE, page: WHITE, num: [12.620, 0.595], site: WHITE, siteSize: 10, bg: DARK },
++];
++
++/** Charcoal panels and the large corner wedge — always drawn first. */
++function addBackdrop(slide, c) {
++  if (c.bg) slide.background = { color: c.bg };
++  (c.panels || []).forEach(([x, y, w, h]) => slide.addShape('rect', { x, y, w, h, fill: { color: DARK }, line: NO_LINE }));
++  if (c.wedge) {
++    const [x, size, color] = c.wedge;
++    slide.addShape('rtTriangle', { x, y: -0.011, w: size, h: size, rotate: 180, fill: { color }, line: NO_LINE });
++  }
++}
++
++/** Wordmark, footer, page number and the two small corner triangles. */
++function addChrome(slide, c) {
++  slide.addShape('rtTriangle', { x: 12.502, y: 0.346, w: 0.511, h: 0.511, rotate: 180, fill: { color: ORANGE }, line: NO_LINE });
++  if (c.corner) {
++    const [y, size] = c.corner;
++    slide.addShape('rtTriangle', { x: 0.380, y, w: size, h: size, fill: { color: ORANGE }, line: NO_LINE });
++  }
++  if (c.mark) {
++    slide.addShape('diamond', { x: 0.382, y: 0.349, w: 0.253, h: 0.253, fill: { color: ORANGE }, line: NO_LINE });
++    text(slide, { x: 0.751, y: 0.267, w: 1.392, h: 0.430, text: ['AGENCY', 'PORTFOLIO'], size: 10, bold: true, spc: 3, color: c.mark });
++  }
++  if (c.site) {
++    text(slide, { x: 5.013, y: 6.913, w: 3.307, h: 0.253, text: 'YOUR WEBSITE HERE', size: c.siteSize || 9, bold: !!c.siteSize, spc: 6, color: c.site, align: 'center' });
++  }
++  if (c.page) {
++    text(slide, { x: 11.463, y: 6.878, w: 0.946, h: 0.253, text: 'PAGE', size: 11, bold: true, spc: 3, color: c.page, align: 'right' });
++    slide.addShape('rect', { x: 12.533, y: 6.873, w: 0.07, h: 0.3, fill: { color: ORANGE }, line: NO_LINE });
++    slide.slideNumber = { x: c.num[0], y: 6.869, w: c.num[1], h: 0.303, align: 'center', fontFace: BODY, fontSize: 12, bold: true, charSpacing: 3, color: ORANGE };
++  }
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++/** 1 — Title: full-bleed photo band with a translucent dark card on top. */
++function slide01(s) {
++  photo(s, 0.0133, 1.0652, 13.320, 5.3568);
++  poly(s, notched(6.0538, 3.9120, 1.0195), { x: 0.6320, y: 1.8277, w: 6.0538, h: 3.9120, fill: { color: '000000', transparency: 23 } });
++  s.addShape('rect', { x: 1.8351, y: 2.8761, w: 1.1937, h: 0.0806, fill: { color: ORANGE }, line: NO_LINE });
++  text(s, { x: 1.7337, y: 3.0386, w: 2.1148, h: 0.5722, text: 'Agence', face: HEAD, size: 28, bold: true, color: WHITE });
++  text(s, { x: 1.7665, y: 3.5769, w: 2.9457, h: 0.3029, text: 'Agency Portfolio Presentation', face: HEAD, size: 12, color: WHITE });
++  body(s, { x: 1.7337, y: 4.0389, w: 3.8064, h: 0.8237, text: LOREM_LONG, color: WHITE });
++  slash(s, 0.6234, 4.9662, 1.4258);
++  stripes(s, 6.2071, 4.6690, WHITE);
++  chevrons(s, 5.7495, 1.8277);
++}
++
++/** 2 — About: two tall photo frames beside a headline + button. */
++function slide02(s) {
++  photo(s, 4.7105, 0.9481, 3.4194, 5.5735, { notch: true });
++  s.addShape('rtTriangle', { x: 0, y: 5.3872, w: 2.0889, h: 2.0889, fill: { color: LIGHT }, line: NO_LINE });
++  heading(s, { x: 9.3159, y: 2.4776, w: 3.2873, h: 0.8415, text: ['About Our ', 'Creative Agency'] });
++  body(s, { x: 9.3159, y: 3.4059, w: 3.0884, h: 0.9697, text: LOREM_LONG });
++  button(s, 9.4110, 4.7560);
++  slash(s, 0.6620, 6.0798, 1.4258);
++  slash(s, 4.4793, 6.0858, 1.4258);
++  chevrons(s, 7.2803, 0.9287);
++  photo(s, 0.9516, 0.9632, 3.4194, 5.5735, { notch: true });
++}
++
++/** 3 — History: timeline with two year tags. */
++function slide03(s) {
++  photo(s, 0.9516, 0.9632, 3.4194, 5.5735, { notch: true });
++  [['2012', 3.7200, 3.6381, 4.0139], ['2018', 5.2560, 5.1863, 5.5621]].forEach(([year, y, ty, by], i) => {
++    tag(s, 8.3290, y, year, TAG_YEAR);
++    text(s, { x: 9.3101, y: ty, w: 3.1383, h: 0.3702, text: ['When We started?', 'We are growing bigger'][i], face: HEAD, size: 16, bold: true, color: DARK });
++    body(s, { x: 9.2900, y: by, w: 3.2460, h: 0.7069, text: LOREM_MED });
++  });
++  heading(s, { x: 5.0498, y: 1.8509, w: 3.1383, h: 0.8415, text: ['Our Agency', 'History'] });
++  body(s, { x: 7.2701, y: 1.7989, w: 3.3065, h: 0.9697, text: LOREM_LONG });
++  button(s, 10.7880, 1.9580);
++  slash(s, 4.3481, 6.1273, 1.2340);
++  chevrons(s, 0.9516, 0.9632);
++  photo(s, 4.5806, 3.5206, 3.0161, 3.0161, { notch: true });
++}
++
++/** 4 — Specialities: copy on the left, two photo frames over a charcoal half. */
++function slide04(s) {
++  heading(s, { x: 0.9935, y: 2.5317, w: 3.0444, h: 0.8415, text: ['Our Agency', 'Specialities'] });
++  body(s, { x: 1.0208, y: 3.5521, w: 3.2618, h: 0.9697, text: LOREM_LONG });
++  body(s, { x: 2.1234, y: 5.2045, w: 2.5819, h: 0.7069, text: LOREM_MED });
++  text(s, { x: 2.1270, y: 4.8287, w: 2.5783, h: 0.3758, text: 'Graphic Design ', face: HEAD, size: 16, bold: true, color: DARK });
++  tag(s, 1.0880, 5.0170, '01', TAG_LG);
++  slash(s, 8.5243, 5.7943, 1.3314);
++  stripes(s, 11.5647, 2.2052, WHITE, 'right');
++  photo(s, 4.8775, 1.4223, 3.5943, 3.5943, { notch: true });
++  photo(s, 8.7751, 2.6971, 3.5513, 3.5513, { notch: true });
++  chevrons(s, 4.8775, 1.4435);
++}
++
++/** 5 — Services: photo cluster on the left, two numbered items and a heading. */
++function slide05(s) {
++  heading(s, { x: 7.0561, y: 4.1175, w: 5.0644, h: 0.4712, text: 'Our Agency Services' });
++  body(s, { x: 7.0312, y: 4.8490, w: 3.3065, h: 0.8988, text: LOREM_LONG });
++  [[5.4390, 6.4741, '01', 'Graphic Design', 2.4582], [9.0560, 10.0912, '02', 'Web Design', 2.3297]].forEach(([tx, cx, num, title, bw]) => {
++    body(s, { x: cx, y: 1.8563, w: bw, h: 1.0021, text: LOREM_MED });
++    text(s, { x: cx + 0.0036, y: 1.4805, w: 2.5783, h: 0.3758, text: title, face: HEAD, size: 16, bold: true, color: DARK });
++    tag(s, tx, 1.6680, num, TAG_LG);
++  });
++  button(s, 10.6840, 5.0190);
++  chevrons(s, 1.0732, 1.1249);
++  slash(s, 3.3396, 5.6064, 1.0161);
++  photo(s, 1.0827, 1.1206, 3.3109, 3.3109, { notch: true });
++  photo(s, 3.5507, 3.2841, 2.6450, 2.6450, { notch: true, color: PHOTO_ALT });
++  photo(s, 0.9576, 4.6667, 2.3618, 1.9949);
++}
++
++/** 6 — Great Services: three equal photo cards with numbered captions. */
++function slide06(s) {
++  heading(s, { x: 2.1415, y: 1.3051, w: 2.6730, h: 0.5049, text: 'Great Services', size: 24 });
++  body(s, { x: 5.0917, y: 1.0139, w: 3.9282, h: 0.9697, text: LOREM_LONG });
++  button(s, 9.3690, 1.1490);
++  [[2.4615, 5.7590, '01', 'Web Design'], [5.7705, 5.7520, '02', 'Graphic Design'], [9.3557, 5.7520, '03', 'Web Development']].forEach(([x, y, num, title]) => {
++    tagItem(s, { x, y, num, tx: x + 0.6141, title });
++  });
++  stripes(s, 11.9356, 2.2500, ORANGE, 'up');
++  slash(s, 1.4227, 4.8762, 1.1424);
++  [[1.6576, 2.2556], [5.1299, 2.2411], [8.6023, 2.2556]].forEach(([x, y]) => photo(s, x, y, 3.0734, 3.0734, { notch: true }));
++}
++
++/** 7 — Break: dark slide, one wide photo, copy on the right. */
++function slide07(s) {
++  heading(s, { x: 9.2146, y: 2.6668, w: 3.2873, h: 0.4712, text: 'Let\u2019s Take A Break', color: WHITE });
++  body(s, { x: 9.2146, y: 3.2166, w: 3.0884, h: 0.9697, text: LOREM_LONG, color: WHITE });
++  button(s, 9.3090, 4.5670);
++  chevrons(s, 0.9516, 0.9632);
++  slash(s, 0.6827, 6.1504, 1.3314);
++  stripes(s, 8.5051, 0.9632, WHITE);
++  poly(s, notched(7.3310, 5.5735, 1.1129), { x: 0.9516, y: 0.9632, w: 7.3310, h: 5.5735, fill: { color: PHOTO } });
++}
++
++/** 8 — Profile: portrait frames left and right, bio and two skill meters. */
++function slide08(s) {
++  heading(s, { x: 4.9715, y: 1.9694, w: 3.4190, h: 0.5049, text: 'Johnny Doe', size: 24 });
++  text(s, { x: 4.9813, y: 2.4224, w: 1.3820, h: 0.2944, text: 'Web Designer', face: HEAD, size: 11, bold: true, color: GREY });
++  body(s, { x: 4.9809, y: 2.7870, w: 3.2618, h: 0.9697, text: LOREM_LONG });
++  meter(s, { x: 5.0661, y: 4.4930, w: 3.3065, fill: 2.6150, label: 'Web Design Skill', labelUp: 0.4235 });
++  meter(s, { x: 5.0525, y: 5.4090, w: 3.3065, fill: 2.6150, label: 'Communication', labelUp: 0.4230 });
++  slash(s, 9.4833, 6.3683, 1.1424);
++  slash(s, 0.5185, 5.2525, 1.1424);
++  photo(s, 0.7493, 0.9180, 2.8877, 4.7070, { notch: true });
++  photo(s, 9.7099, 1.9763, 2.8877, 4.7070, { notch: true });
++}
++
++/** 9 — Profile variant: portrait + square photo, right-hand copy and meters. */
++function slide09(s) {
++  meter(s, { x: 8.0674, y: 4.7793, w: 4.0000, fill: 3.1640, label: 'Graphic Design Skill', labelUp: 0.4102 });
++  meter(s, { x: 8.0538, y: 5.6958, w: 4.0000, fill: 3.1640, label: 'Communication', labelUp: 0.4102 });
++  body(s, { x: 8.0074, y: 1.5174, w: 3.9282, h: 0.9697, text: LOREM_LONG });
++  button(s, 8.1000, 2.4870);
++  stripes(s, 0.7594, 0.3189, WHITE, 'right');
++  heading(s, { x: 4.6380, y: 2.0326, w: 3.0444, h: 0.5049, text: 'John David Doe', size: 24 });
++  text(s, { x: 4.6380, y: 2.5733, w: 1.7249, h: 0.2861, text: 'Graphic Designer', face: HEAD, size: 11, bold: true, color: GREY });
++  slash(s, 3.7028, 6.1925, 1.2253);
++  photo(s, 0.7636, 0.9180, 2.8877, 4.7070, { notch: true });
++  photo(s, 3.9493, 3.6045, 3.0019, 3.0019, { notch: true });
++}
++
++/** 10 — Profile variant: two portraits, one skill meter, button below. */
++function slide10(s) {
++  photo(s, 3.6649, 1.9824, 2.6611, 4.6879);
++  body(s, { x: 7.0021, y: 3.1128, w: 3.3214, h: 0.8415, text: LOREM_LONG });
++  heading(s, { x: 7.0099, y: 2.1791, w: 2.8753, h: 0.4712, text: 'Jane Doe' });
++  button(s, 7.0890, 5.2320);
++  meter(s, { x: 7.1046, y: 4.5140, w: 3.0000, fill: 2.3730, label: 'Web Design Skill', labelUp: 0.4233 });
++  text(s, { x: 7.0029, y: 2.6503, w: 1.3820, h: 0.2944, text: 'Web Designer', face: HEAD, size: 11, bold: true, color: GREY });
++  chevrons(s, 5.4141, 1.9851);
++  photo(s, 0.7215, 0.7931, 2.6582, 4.6879);
++}
++
++/** 11 — Team: photo grid on the left, four numbered members on the right. */
++function slide11(s) {
++  heading(s, { x: 7.0177, y: 1.8769, w: 4.0343, h: 0.4712, text: 'Our Creative Team' });
++  body(s, { x: 7.0177, y: 2.4615, w: 5.1351, h: 0.8415, text: LOREM_LONG });
++  [[7.1133, 3.4980, '01', 'John Doe'], [9.8286, 3.5040, '02', 'Jane Doe'],
++   [7.1133, 4.6490, '03', 'Richard Roe'], [9.8286, 4.6540, '04', 'Janie Doe']].forEach(([x, y, num, title]) => {
++    tagItem(s, { x, y, num, tx: x + 0.6140, title });
++  });
++  [[0.8245, 0.9549, 2.7173, 2.6628], [0.8245, 3.8824, 2.7173, 2.6628],
++   [3.8122, 0.9549, 2.3961, 2.3480], [3.8122, 3.6176, 2.3961, 2.3480]].forEach(([x, y, w, h]) => photo(s, x, y, w, h));
++}
++
++/** 12 — Break (dark): copy on the left, two large photos on the right. */
++function slide12(s) {
++  heading(s, { x: 1.1909, y: 2.4776, w: 3.2873, h: 0.8415, text: ['Let\u2019s Take ', 'A Break'], color: WHITE });
++  body(s, { x: 1.1909, y: 3.4059, w: 3.0884, h: 0.9697, text: LOREM_LONG, color: WHITE });
++  button(s, 1.2860, 4.7560);
++  stripes(s, 4.5424, 1.3884, WHITE);
++  photo(s, 5.0556, 1.3884, 4.0139, 4.7145);
++  photo(s, 9.3194, 1.3884, 4.0139, 4.7145);
++}
++
++/** 13 — Portfolio: photo mosaic on a charcoal column, two numbered items. */
++function slide13(s) {
++  photo(s, 0.8841, 0.8481, 2.6576, 2.9340);
++  heading(s, { x: 7.7745, y: 1.6821, w: 4.0343, h: 0.4712, text: 'Our Portfolio' });
++  body(s, { x: 7.7745, y: 2.2666, w: 4.0343, h: 0.8415, text: LOREM_LONG });
++  button(s, 7.8630, 5.5490);
++  [[3.3680, '01', 'Graphic Design Work'], [4.4140, '02', 'Web Design Work']].forEach(([y, num, title]) => {
++    tagItem(s, { x: 7.8627, y, num, tx: 8.4768, title, bw: 3.3255, text: LOREM_TWO });
++  });
++  chevrons(s, 0.8800, 0.8266, 0.3497);
++  slash(s, 0.7083, 6.3930, 0.9746);
++  photo(s, 3.8523, 3.4858, 2.7008, 3.1979);
++  photo(s, 3.8914, 0.8244, 2.6617, 2.3368);
++  photo(s, 0.8800, 4.0401, 2.6617, 2.6439, { notch: true });
++}
++
++/** 14 — Workspace: heading left, photo trio centre, three projects right. */
++function slide14(s) {
++  heading(s, { x: 0.8878, y: 2.4670, w: 2.7746, h: 0.8078, text: ['Our Clean', 'Workspace'], size: 21 });
++  body(s, { x: 0.8878, y: 3.3954, w: 2.7746, h: 0.9697, text: LOREM_LONG });
++  button(s, 0.9830, 4.7460);
++  [[2.2160, '01', 'Project One'], [3.4180, '02', 'Project Two'], [4.5650, '01', 'Project Three']].forEach(([y, num, title]) => {
++    tagItem(s, { x: 9.9221, y, num, tx: 10.5362, title });
++  });
++  slash(s, 3.9949, 5.9640, 0.9113);
++  photo(s, 4.2168, 1.0289, 2.3056, 2.5599);
++  photo(s, 6.8067, 1.0289, 2.3056, 5.1794);
++  photo(s, 4.2168, 3.9111, 2.2972, 2.2972, { notch: true });
++}
++
++/** 15 — Latest portfolio: three tall photos framing a centred heading. */
++function slide15(s) {
++  photo(s, 0.7778, 1.1603, 2.6111, 5.1794);
++  photo(s, 3.6667, 1.1603, 2.6111, 5.1794);
++  photo(s, 10.0556, 1.1603, 2.6111, 5.1794);
++  heading(s, { x: 6.9017, y: 2.4776, w: 2.7746, h: 0.8078, text: ['Our Latest', 'Portfolio'], size: 21 });
++  body(s, { x: 6.9017, y: 3.4059, w: 2.7746, h: 0.9697, text: LOREM_LONG });
++  button(s, 6.9960, 4.7560);
++}
++
++/** 16 — Web design work: photos on a charcoal half, three projects right. */
++function slide16(s) {
++  heading(s, { x: 6.8100, y: 2.4826, w: 2.7746, h: 0.8078, text: ['Our Web', 'Design Work'], size: 21 });
++  body(s, { x: 6.8100, y: 3.4109, w: 2.7746, h: 0.9697, text: LOREM_LONG });
++  button(s, 6.9050, 4.7610);
++  [[2.3760, '01', 'Project One'], [3.5780, '02', 'Project Two'], [4.7180, '03', 'Project Three']].forEach(([y, num, title]) => {
++    tagItem(s, { x: 9.9221, y, num, tx: 10.5362, title });
++  });
++  slash(s, 2.9873, 6.2559, 0.9113);
++  photo(s, 3.1804, 0.6491, 2.2316, 3.2879);
++  photo(s, 0.7861, 2.0332, 2.0844, 3.8243);
++  photo(s, 3.1889, 4.2818, 2.2316, 2.2321, { notch: true });
++}
++
++/** 17 — Contact: text column on the left, one large photo on the right. */
++function slide17(s) {
++  photo(s, 5.9896, 1.1416, 6.1632, 5.2169);
++  heading(s, { x: 1.1806, y: 1.8633, w: 4.0343, h: 0.4712, text: 'Contact Our Team' });
++  body(s, { x: 1.1806, y: 2.4478, w: 4.0343, h: 0.7750, text: LOREM_LONG });
++  [[3.4192, 'Contact Us', LOREM_TWO, 3.1923], [4.4175, 'Visit Our Office ', 'Duis sodales lorem a nunc tincidunt convallis. Sed elit sem, molestie non placerat vel, laoreet a nisl.', 3.5972]].forEach(([y, title, copy, w]) => {
++    text(s, { x: 1.1806, y, w: 1.8370, h: 0.2861, text: title, face: HEAD, size: 11, bold: true, color: DARK });
++    body(s, { x: 1.1806, y: y + 0.2752, w, h: 0.6518, text: copy });
++  });
++  button(s, 1.2750, 5.6400);
++  chevrons(s, 5.9722, 1.1416, 0.3497);
++}
++
++/** 18 — Closing (dark): big thank-you and two photo frames. */
++function slide18(s) {
++  heading(s, { x: 0.9752, y: 3.2075, w: 3.0444, h: 1.2790, text: ['Thanks For', 'Watching'], size: 35, color: WHITE });
++  body(s, { x: 4.7807, y: 5.3349, w: 3.8204, h: 0.8123, text: LOREM_LONG, color: WHITE });
++  chevrons(s, 9.0154, 0.9632, 0.3497);
++  slash(s, 8.7490, 6.1052, 1.3161);
++  slash(s, 4.4894, 4.3321, 1.4890);
++  stripes(s, 4.3205, 0.9632, WHITE);
++  photo(s, 4.7807, 0.9632, 3.8666, 3.8666, { notch: true });
++  poly(s, notched(3.4018, 5.5735, 1.0954), { x: 9.0330, y: 0.9632, w: 3.4018, h: 5.5735, fill: { color: PHOTO } });
++}
++
++const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18];
++
++/* ------------------------------------------------------------------ *
++ * Assemble
++ * ------------------------------------------------------------------ */
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'WIDE_16x9', width: 13.3333, height: 7.5 });
++pptx.layout = 'WIDE_16x9';
++pptx.title = 'Agency Portfolio Presentation';
++
++BUILDERS.forEach((build, i) => {
++  const slide = pptx.addSlide();
++  const chrome = CHROME[i];
++  addBackdrop(slide, chrome);
++  build(slide);
++  addChrome(slide, chrome);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, '02d58dae-f36a-4787-9bcd-aac7ee35fb2e_grok_final.pptx') })
++  .then((f) => console.log('wrote', f));

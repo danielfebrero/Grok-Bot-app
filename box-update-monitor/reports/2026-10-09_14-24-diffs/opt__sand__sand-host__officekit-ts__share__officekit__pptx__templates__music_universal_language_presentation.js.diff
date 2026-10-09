@@ -1,0 +1,793 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/music_universal_language_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/music_universal_language_presentation.js
+@@ -0,0 +1,790 @@
++/**
++ * "Zase" — music-themed presentation, 30 slides at 13.333in x 7.5in.
++ * Rebuilt with pptxgenjs only. Photographs from the reference deck are drawn
++ * as flat "[image]" placeholder rectangles at the original position and size.
++ *
++ * Run:  node 055900fc-f2fd-4ed0-9253-bf3289e969ab_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette
++const BG        = '1E1E1E';   // slide background (theme bg1)
++const INK       = 'FFFFFF';   // primary text and the thin frame rules
++const LILAC     = 'A27DF3';   // accent1 lightened — highlighted words
++const GREY      = '808080';   // muted trailing sentences
++const SAND      = 'D0C8BE';   // accent2 — chart series 2
++const CREAM     = 'F6F4F2';   // accent2 lightened — chart series 3
++const PHOTO     = '3A3A3A';   // stand-in fill for photographs
++const PHOTO_TXT = '8C8C8C';
++
++// Violet -> rose diagonal washes. Each pair is [top-left, bottom-right],
++// already flattened over the dark background (the source used alpha blends
++// of accent1 6426EB into FB5173 at 45 degrees).
++const G_COVER   = ['482399', '9A3B4E'];  // full-bleed cover half
++const G_PANEL   = ['5825C8', '9A3B4E'];  // standard image panel
++const G_PANEL_B = ['5825C8', '983A4D'];  // same, a touch deeper at the rose end
++const G_CARD    = ['4B23A1', '8C3848'];  // small numbered card
++const G_COLUMN  = ['44228F', '9E1A34'];  // tall side column
++
++// ---------------------------------------------------------------- fonts
++const DISPLAY = 'Playfair Display';  // theme major font — headlines
++const BODY    = 'Open Sans';         // theme minor font — paragraphs
++const SERIF   = 'PT Serif';          // oversized enumeration numerals
++
++const HAIRLINE = 0.0365;   // thickness of the white frame rules, inches
++
++// ---------------------------------------------------------------- primitives
++function newSlide(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: BG };
++  return s;
++}
++
++/** Solid rectangle. */
++function panel(s, x, y, w, h, color, rectRadius) {
++  const o = { x, y, w, h, fill: { color }, line: { type: 'none' } };
++  if (rectRadius) o.rectRadius = rectRadius;
++  s.addShape(rectRadius ? 'roundRect' : 'rect', o);
++}
++
++/** Free polygon in inches, given as [[x, y], ...] absolute points. */
++function polygon(s, pts, color) {
++  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
++  const x = Math.min(...xs), y = Math.min(...ys);
++  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
++  if (w < 1e-4 || h < 1e-4) return;
++  s.addShape('custGeom', {
++    x, y, w, h,
++    points: pts.map((p, i) => ({ x: p[0] - x, y: p[1] - y, moveTo: i === 0 }))
++                .concat([{ close: true }]),
++    fill: { color }, line: { type: 'none' },
++  });
++}
++
++/** Clip a convex polygon against the half-plane  f(p) <= 0. */
++function clipHalfPlane(poly, f) {
++  const out = [];
++  for (let i = 0; i < poly.length; i++) {
++    const a = poly[i], b = poly[(i + 1) % poly.length];
++    const fa = f(a), fb = f(b);
++    if (fa <= 0) out.push(a);
++    if ((fa < 0 && fb > 0) || (fa > 0 && fb < 0)) {
++      const t = fa / (fa - fb);
++      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
++    }
++  }
++  return out;
++}
++
++/**
++ * A two-stop wash running at a true 45 degrees, matching the source deck's
++ * `lin ang="2700000"` fill. pptxgenjs has no gradient fill, so the box is
++ * sliced into bands perpendicular to that diagonal and each band is painted
++ * as one flat polygon. Position along the axis is (x + y) / (w + h) measured
++ * in inches, so the banding stays at 45 degrees whatever the box's shape.
++ */
++function gradient(s, x, y, w, h, stops, bands) {
++  const N = bands || 36;
++  const from = stops[0], to = stops[1];
++  const a = [0, 2, 4].map(i => parseInt(from.substr(i, 2), 16));
++  const b = [0, 2, 4].map(i => parseInt(to.substr(i, 2), 16));
++  const box = [[0, 0], [1, 0], [1, 1], [0, 1]];
++  const axis = p => (p[0] * w + p[1] * h) / (w + h);
++  const bleed = 0.6 / N;   // overlap neighbours slightly so no seam shows
++  const blend = t => a.map((c, k) => Math.round(c + (b[k] - c) * t))
++                      .map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('');
++  panel(s, x, y, w, h, blend(0.5));   // base coat: hides antialiasing between bands
++  for (let i = 0; i < N; i++) {
++    const lo = i / N, hi = (i + 1) / N;
++    let poly = clipHalfPlane(box, p => (lo - bleed) - axis(p));
++    poly = clipHalfPlane(poly, p => axis(p) - (hi + bleed));
++    if (poly.length < 3) continue;
++    polygon(s, poly.map(p => [x + p[0] * w, y + p[1] * h]), blend((lo + hi) / 2));
++  }
++}
++
++/**
++ * Knocks a background-coloured hole out of a gradient block (the source deck
++ * drew these as one freeform with an inner sub-path). A hair of bleed keeps
++ * the renderer from leaving a seam where the hole meets the block's own edge.
++ */
++function cutout(s, x, y, w, h, rectRadius) {
++  const B = 0.02;
++  panel(s, x - B, y - B, w + 2 * B, h + 2 * B, BG, rectRadius);
++}
++
++/** Placeholder standing in for a photograph in the reference deck. */
++function photo(s, x, y, w, h) {
++  panel(s, x, y, w, h, PHOTO);
++  s.addText('[image]', {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontSize: 11, fontFace: BODY, color: PHOTO_TXT,
++  });
++}
++
++/**
++ * The signature open rectangle rule. `edges` may shorten a side to one span
++ * (or a list of spans), or drop it entirely with null; the numbers are
++ * offsets measured from the frame's own top-left corner.
++ */
++function frame(s, x, y, w, h, edges) {
++  const e = edges || {};
++  const pick = (k, dflt) => (k in e ? e[k] : dflt);
++  [['t', pick('t', [0, w])], ['b', pick('b', [0, w])],
++   ['l', pick('l', [0, h])], ['r', pick('r', [0, h])]].forEach(([side, spec]) => {
++    if (!spec) return;
++    (Array.isArray(spec[0]) ? spec : [spec]).forEach(([from, to]) => {
++      if (side === 't')      panel(s, x + from, y, to - from, HAIRLINE, INK);
++      else if (side === 'b') panel(s, x + from, y + h - HAIRLINE, to - from, HAIRLINE, INK);
++      else if (side === 'l') panel(s, x, y + from, HAIRLINE, to - from, INK);
++      else                   panel(s, x + w - HAIRLINE, y + from, HAIRLINE, to - from, INK);
++    });
++  });
++}
++
++// Diagonally hatched square that anchors most slide corners. Unit-square
++// outline of seven parallel bars; 0 marks the end of a bar.
++const STRIPE_PATH = [
++  [0.676, 0.927], [0.634, 1.000], [0.507, 0.927], 0,
++  [0.765, 0.772], [0.721, 0.850], [0.374, 0.850], [0.240, 0.772], 0,
++  [0.854, 0.618], [0.810, 0.695], [0.107, 0.695], [0.000, 0.634], [0.009, 0.618], 0,
++  [0.944, 0.463], [0.899, 0.541], [0.054, 0.541], [0.098, 0.463], 0,
++  [0.902, 0.309], [1.000, 0.365], [0.988, 0.387], [0.143, 0.387], [0.187, 0.309], 0,
++  [0.635, 0.154], [0.769, 0.232], [0.232, 0.232], [0.276, 0.154], 0,
++  [0.368, 0.000], [0.502, 0.078], [0.321, 0.078], [0.365, 0.000], 0,
++];
++
++function stripes(s, x, y, size) {
++  const pts = [];
++  let start = true;
++  STRIPE_PATH.forEach(p => {
++    if (p === 0) { pts.push({ close: true }); start = true; return; }
++    pts.push({ x: p[0] * size, y: p[1] * size, moveTo: start });
++    start = false;
++  });
++  s.addShape('custGeom', {
++    x, y, w: size, h: size, points: pts,
++    fill: { color: INK }, line: { type: 'none' }, rotate: 330,
++  });
++}
++
++// Eighth-note glyph beside every "write something" kicker. Entries are either
++// a start point [x, y] or a cubic segment ['c', x1, y1, x2, y2, x, y].
++const NOTE_PATH = [
++  [0.789, 0.490],
++  ['c', 0.763, 0.519, 0.750, 0.510, 0.750, 0.490],
++  ['c', 0.776, 0.433, 0.763, 0.250, 0.566, 0.231],
++  ['c', 0.566, 0.788, 0.566, 0.788, 0.566, 0.788],
++  ['c', 0.566, 0.856, 0.487, 0.923, 0.368, 0.962],
++  ['c', 0.224, 1.000, 0.079, 0.962, 0.039, 0.885],
++  ['c', 0.000, 0.808, 0.079, 0.721, 0.224, 0.683],
++  ['c', 0.303, 0.654, 0.395, 0.654, 0.447, 0.673],
++  ['c', 0.447, 0.000, 0.447, 0.000, 0.447, 0.000],
++  ['c', 0.566, 0.000, 0.566, 0.000, 0.566, 0.000],
++  ['c', 0.566, 0.135, 1.000, 0.240, 0.789, 0.490],
++];
++
++function musicNote(s, x, y, w, h) {
++  const pts = NOTE_PATH.map(p => (p[0] === 'c'
++    ? { x: p[5] * w, y: p[6] * h, curve: { type: 'cubic', x1: p[1] * w, y1: p[2] * h, x2: p[3] * w, y2: p[4] * h } }
++    : { x: p[0] * w, y: p[1] * h, moveTo: true }));
++  pts.push({ close: true });
++  s.addShape('custGeom', {
++    x, y, w, h, points: pts, fill: { color: INK }, line: { type: 'none' },
++  });
++}
++
++/** Text helper: everything is white, top-aligned Open Sans unless overridden. */
++function text(s, body, o) {
++  s.addText(body, Object.assign({
++    color: INK, fontFace: BODY, valign: 'top', wrap: true,
++  }, o));
++}
++
++// ---------------------------------------------------------------- charts
++const CHART_BASE = {
++  showLegend: false,
++  showTitle: false,
++  chartArea: { fill: { color: BG } },
++  plotArea: { fill: { color: BG } },
++  catAxisLabelColor: '9E9E9E',
++  valAxisLabelColor: '9E9E9E',
++  catAxisLabelFontFace: BODY,
++  valAxisLabelFontFace: BODY,
++  catAxisLineColor: '4A4A4A',
++  valAxisLineColor: '4A4A4A',
++  valGridLine: { color: '4A4A4A', size: 0.5 },
++  catGridLine: { style: 'none' },
++  dataLabelFontFace: BODY,
++};
++
++const TRIPLET_SERIES = [
++  { name: 'Series 1', labels: ['1'], values: [4.3] },
++  { name: 'Series 2', labels: ['1'], values: [2.4] },
++  { name: 'Series 3', labels: ['1'], values: [3.3] },
++];
++
++/** Tiny clustered horizontal bars, repeated three times across slide 26. */
++function barTriplet(s, x, y) {
++  s.addChart('bar', TRIPLET_SERIES, Object.assign({}, CHART_BASE, {
++    x, y, w: 3.444, h: 1.38,
++    barDir: 'bar', barGrouping: 'clustered', barGapWidthPct: 182,
++    chartColors: [LILAC, SAND, CREAM],
++    showValue: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: 'General',
++    dataLabelFontSize: 5, dataLabelColor: 'BFBFBF',
++    catAxisLabelFontSize: 5, valAxisLabelFontSize: 5,
++    valAxisMaxVal: 5, valAxisMajorUnit: 0.5,
++  }));
++}
++
++/** 100%-stacked columns, slide 27. */
++function stackedColumns(s, x, y, w, h) {
++  s.addChart('bar', [
++    { name: 'Series 1', labels: ['1', '2', '3', '4'], values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: ['1', '2', '3', '4'], values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Series 3', labels: ['1', '2', '3', '4'], values: [2, 2, 3, 5] },
++  ], Object.assign({}, CHART_BASE, {
++    x, y, w, h,
++    barDir: 'col', barGrouping: 'percentStacked', barGapWidthPct: 150,
++    chartColors: [LILAC, SAND, CREAM],
++    showValue: true, dataLabelPosition: 'ctr', dataLabelFormatCode: 'General',
++    dataLabelFontSize: 8, dataLabelColor: '404040',
++    valAxisLabelFormatCode: '0%',
++    catAxisLabelFontSize: 8, valAxisLabelFontSize: 8,
++  }));
++}
++
++/** Thin ring chart, used twice on slide 28. */
++function donut(s, x, y, w, h) {
++  s.addChart('doughnut', [
++    { name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr'], values: [8.2, 3.2, 1.4] },
++  ], {
++    x, y, w, h,
++    holeSize: 75, showLegend: false, showTitle: false, showValue: false,
++    chartColors: [LILAC, SAND, CREAM],
++    dataBorder: { pt: 1, color: '343434' },
++  });
++}
++
++/** Filled radar over five monthly categories, slide 29. */
++function radar(s, x, y, w, h) {
++  const months = ['5/1/2002', '6/1/2002', '7/1/2002', '8/1/2002', '9/1/2002'];
++  s.addChart('radar', [
++    { name: 'Series 1', labels: months, values: [32, 32, 28, 12, 15] },
++    { name: 'Series 2', labels: months, values: [12, 12, 12, 21, 28] },
++  ], Object.assign({}, CHART_BASE, {
++    x, y, w, h,
++    radarStyle: 'filled',
++    chartColors: [LILAC, CREAM],
++    valAxisHidden: true,
++    catAxisLabelFontSize: 5,
++    valAxisLabelFontSize: 5,
++  }));
++}
++
++
++// ---------------------------------------------------------------- slides
++
++function slide01(pptx) {
++  const s = newSlide(pptx);
++  panel(s, 0, 0, 13.333, 7.494, BG);
++  gradient(s, 6.667, 0.006, 6.667, 7.494, G_COVER);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { b: [1.024, 11.722], l: [0, 5.01] });
++  stripes(s, 0.654, 5.784, 1.125);
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '00.', { x: 11.25, y: 1.048, w: 0.969, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Zase', { x: 4.973, y: 2.51, w: 3.837, h: 2.036, fontSize: 115, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 3.407, y: 5.697, w: 6.53, h: 0.531, fontSize: 9, fontFace: BODY, align: 'center', lineSpacingMultiple: 1.5 });
++}
++
++function slide02(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 7.158, 1.316, 4.73, 4.867, G_COVER);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { b: [0, 10.097], r: [0, 4.404] });
++  text(s, 'The World’s Most Famous And Popular Language Is Music', { x: 1.897, y: 3.226, w: 4.373, h: 1.313, fontSize: 24, fontFace: DISPLAY, bold: true });
++  stripes(s, 11.08, 5.331, 1.645);
++  text(s, 'PLACEHOLDER', { x: 1.897, y: 4.931, w: 4.278, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01', { x: 8.718, y: 2.933, w: 1.819, h: 1.717, fontSize: 96, fontFace: SERIF, align: 'center', charSpacing: -3 });
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.622, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide03(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 9.649, 1.1, 2.575, 2.15, G_CARD);
++  frame(s, 0.806, 0.743, 7.688, 6.014, { b: [1.443, 7.688], l: [0, 4.599] });
++  stripes(s, 0.601, 5.53, 1.414);
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'The World’s Most ', options: { breakLine: true } }, { text: 'Famous ', options: { color: LILAC } }, { text: 'And Popular ' }, { text: 'Language Is ', options: { color: LILAC } }, { text: 'Music' }], { x: 9.894, y: 4.072, w: 2.264, h: 2.524, fontSize: 24, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 2.19, y: 5.599, w: 4.278, h: 0.831, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '02', { x: 10.033, y: 1.569, w: 1.819, h: 1.212, fontSize: 66, fontFace: SERIF, align: 'center', charSpacing: -3 });
++}
++
++function slide04(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 1.729, 2, 3.596, 3.966, G_PANEL);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { b: [0, 10.319], r: [0, 4.649] });
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 6.463, y: 4.769, w: 4.278, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  stripes(s, 11.339, 5.571, 1.378);
++  text(s, [{ text: 'The World’s Most Famous And Popular ', options: { breakLine: true } }, { text: 'Language Is Music' }], { x: 2.427, y: 2.754, w: 2.234, h: 2.524, fontSize: 24, fontFace: DISPLAY, bold: true });
++  text(s, '03', { x: 11.25, y: 1.017, w: 0.969, h: 0.64, fontSize: 32, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++}
++
++function slide05(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 7.776, 1.71, 2.886, 4.408, G_COLUMN);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { t: [0, 10.644], b: [[0, 3.603], [8.123, 11.722]], r: [1.056, 6.014] });
++  stripes(s, 11.565, 0.592, 1.113);
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 0.626, y: 3.082, w: 3.959, h: 1.986, fontSize: 28, fontFace: DISPLAY, bold: true, rotate: 270 });
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 9.671, y: 3.775, w: 3.959, h: 0.579, fontSize: 10, fontFace: BODY, align: 'justify', lineSpacingMultiple: 1.5, rotate: 90 });
++  text(s, '04', { x: 9.028, y: 5.135, w: 1.413, h: 0.909, fontSize: 48, fontFace: SERIF, align: 'right' });
++}
++
++function slide06(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0.806, 4.752, 2.005, 2.005, G_PANEL);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { t: [0, 10.316], b: [2.309, 11.722], l: [0, 3.723], r: [1.393, 6.014] });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 1.677, y: 2.141, w: 4.992, h: 1.515, fontSize: 28, fontFace: DISPLAY, bold: true });
++  stripes(s, 11.288, 0.564, 1.433);
++  text(s, 'PLACEHOLDER', { x: 3.912, y: 3.988, w: 2.661, h: 2.094, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '05', { x: 1.103, y: 5.253, w: 1.395, h: 1.111, fontSize: 60, fontFace: SERIF, align: 'center', charSpacing: -3 });
++}
++
++function slide07(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, 0, 7.979, 3.75, G_PANEL_B);
++  cutout(s, 4.528, 0.743, 3.451, 3.007);
++  musicNote(s, 1.196, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.698, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'Service One', { x: 9.522, y: 1.507, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 9.54, y: 2.1, w: 2.116, h: 0.831, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 8.634, y: 1.461, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Service Two', { x: 9.522, y: 3.543, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 9.54, y: 4.136, w: 2.116, h: 0.831, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 8.634, y: 3.497, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular ', options: { color: LILAC, breakLine: true } }, { text: 'Language Is Music' }], { x: 1.624, y: 4.61, w: 5.461, h: 1.515, fontSize: 28, fontFace: DISPLAY, bold: true });
++  stripes(s, 11.245, 5.463, 1.496);
++  frame(s, 0.806, 0.743, 11.734, 6.014, { b: [[0, 3.724], [7.177, 10.353]], r: [0, 4.665] });
++}
++
++function slide08(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 7.685, 0, 5.649, 7.5, G_PANEL_B);
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous', options: { color: LILAC } }, { text: ' And Popular ' }, { text: 'Language Is ', options: { color: LILAC } }, { text: 'Music' }], { x: 4.492, y: 1.485, w: 2.151, h: 2.524, fontSize: 24, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 4.492, y: 4.557, w: 2.155, h: 1.589, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  frame(s, 0.806, 0.743, 11.722, 6.014);
++  text(s, 'Service One', { x: 9.184, y: 1.465, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 9.201, y: 2.058, w: 2.583, h: 0.579, fontSize: 10, fontFace: BODY, align: 'justify', lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 8.296, y: 1.418, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Service Two', { x: 9.184, y: 3.238, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 9.201, y: 3.831, w: 2.583, h: 0.579, fontSize: 10, fontFace: BODY, align: 'justify', lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 8.296, y: 3.192, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Service Three', { x: 9.184, y: 4.974, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 9.201, y: 5.567, w: 2.583, h: 0.579, fontSize: 10, fontFace: BODY, align: 'justify', lineSpacingMultiple: 1.5 });
++  text(s, '03.', { x: 8.296, y: 4.928, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide09(pptx) {
++  const s = newSlide(pptx);
++  frame(s, 0.806, 0.743, 11.722, 3.688);
++  stripes(s, 12.46, 6.626, 1.011);
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'The World’s Most Famous And Popular Language Is Music', { x: 1.921, y: 2.07, w: 4.968, h: 1.515, fontSize: 28, fontFace: DISPLAY, bold: true });
++  text(s, [{ text: 'PLACEHOLDER', options: { breakLine: true } }, { text: 'PLACEHOLDER' }], { x: 7.847, y: 2.177, w: 3.866, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'Service One', { x: 2.567, y: 5.303, w: 1.918, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 1.903, y: 5.896, w: 2.583, h: 0.579, fontSize: 10, fontFace: BODY, align: 'justify', lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 1.736, y: 5.257, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Service Two', { x: 6.106, y: 5.303, w: 1.918, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 5.441, y: 5.896, w: 2.583, h: 0.579, fontSize: 10, fontFace: BODY, align: 'justify', lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 5.275, y: 5.257, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Service Three', { x: 9.645, y: 5.31, w: 1.918, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 8.98, y: 5.903, w: 2.583, h: 0.579, fontSize: 10, fontFace: BODY, align: 'justify', lineSpacingMultiple: 1.5 });
++  text(s, '03.', { x: 8.814, y: 5.264, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++}
++
++function slide10(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, 0, 5.306, 7.5, G_PANEL_B);
++  cutout(s, 2.172, 4.242, 3.134, 3.258);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { b: [[0, 1.368], [10.359, 11.722]] });
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'The World’s Most Famous And Popular Language Is Music', { x: 3.171, y: 5.31, w: 7.274, h: 1.043, fontSize: 28, fontFace: DISPLAY, bold: true, align: 'center' });
++  text(s, 'Service One', { x: 6.744, y: 1.913, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 6.761, y: 2.506, w: 2.116, h: 0.831, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 5.887, y: 1.867, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Service Two', { x: 9.844, y: 1.913, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 9.862, y: 2.506, w: 2.116, h: 0.831, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 8.987, y: 1.867, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'PLACEHOLDER', { x: 2.093, y: 1.928, w: 2.155, h: 1.589, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide11(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, -0.006, 4.645, 7.5, G_PANEL_B);
++  text(s, 'Service One', { x: 6.37, y: 1.918, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 6.388, y: 2.511, w: 2.116, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 5.513, y: 1.872, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Service Two', { x: 9.47, y: 1.918, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 9.488, y: 2.511, w: 2.116, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 8.613, y: 1.872, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Service Three', { x: 6.37, y: 4.188, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 6.388, y: 4.782, w: 2.116, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '03.', { x: 5.513, y: 4.142, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Service Four', { x: 9.47, y: 4.188, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'PLACEHOLDER', { x: 9.488, y: 4.782, w: 2.116, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '04.', { x: 8.613, y: 4.142, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.747, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'The World’s Most Famous And Popular Language Is Music', { x: 1.709, y: 1.914, w: 2.151, h: 2.524, fontSize: 24, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 1.703, y: 4.777, w: 2.155, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  frame(s, 0.806, 0.629, 11.722, 6.128, { b: [0, 10.781], r: [0, 5.17] });
++  stripes(s, 11.654, 5.882, 1.011);
++}
++
++function slide12(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 6.667, 3.75, 6.667, 3.75, G_PANEL);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { b: [1.024, 11.722], l: [0, 5.01] });
++  stripes(s, 0.654, 5.784, 1.125);
++  musicNote(s, 1.175, 1.086, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.088, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 2.282, y: 4.314, w: 3.35, h: 1.851, fontSize: 26, fontFace: DISPLAY, bold: true });
++  text(s, 'About Portfolio Two', { x: 8.429, y: 4.413, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'PLACEHOLDER', options: { breakLine: true } }, { text: 'PLACEHOLDER' }], { x: 8.447, y: 5.006, w: 3.22, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 7.572, y: 4.367, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'About Portfolio One', { x: 8.429, y: 1.431, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'PLACEHOLDER', options: { breakLine: true } }, { text: 'PLACEHOLDER' }], { x: 8.447, y: 2.024, w: 3.22, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 7.572, y: 1.385, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++}
++
++function slide13(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, 3.76, 6.667, 3.75, G_PANEL);
++  frame(s, 0.806, 0.743, 6.872, 6.014);
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular ', options: { color: LILAC } }, { text: 'Language Is Music' }], { x: 8.77, y: 4.505, w: 3.823, h: 1.986, fontSize: 28, fontFace: DISPLAY, bold: true });
++  stripes(s, 12.471, 6.637, 0.998);
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'lorem ipsum dolor sita amet consec teturasi atil adipiscinga  hesalal nibuhase eget justo sed gravida est sedi tetura', options: { breakLine: true } }, { text: 'PLACEHOLDER' }], { x: 1.666, y: 1.845, w: 4.045, h: 1.336, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 2.037, y: 4.155, w: 0.732, h: 0.438, fontSize: 20, fontFace: SERIF, align: 'center', charSpacing: -1.5 });
++  text(s, '02.', { x: 3.634, y: 4.155, w: 0.732, h: 0.438, fontSize: 20, fontFace: SERIF, align: 'center', charSpacing: -1.5 });
++  text(s, 'About Portfolio', { x: 4.24, y: 4.905, w: 2.332, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5, rotate: 270 });
++}
++
++function slide14(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, 0, 5.549, 7.5, G_PANEL);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { b: [1.305, 11.722], l: [0, 4.721] });
++  stripes(s, 0.604, 5.449, 1.512);
++  musicNote(s, 1.175, 1.072, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.074, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Musicc' }], { x: 8.198, y: 3.923, w: 3.823, h: 1.986, fontSize: 28, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 7.482, y: 1.449, w: 4.278, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide15(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, 0, 13.333, 3.75, G_PANEL);
++  text(s, 'Portfolio ', { x: 1.002, y: 1.85, w: 1.387, h: 0.417, fontSize: 14, fontFace: DISPLAY, align: 'center', lineSpacingMultiple: 1.5, rotate: 270 });
++  text(s, 'Portfolio ', { x: 1.002, y: 3.552, w: 1.387, h: 0.417, fontSize: 14, fontFace: DISPLAY, align: 'center', lineSpacingMultiple: 1.5, rotate: 270 });
++  text(s, 'Portfolio ', { x: 1.011, y: 5.225, w: 1.37, h: 0.417, fontSize: 14, fontFace: DISPLAY, align: 'center', lineSpacingMultiple: 1.5, rotate: 270 });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular ', options: { color: LILAC } }, { text: 'Language Is Music' }], { x: 8.131, y: 4.339, w: 3.052, h: 1.717, fontSize: 24, fontFace: DISPLAY, bold: true });
++  text(s, 'write something', { x: 10.612, y: 1.044, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  musicNote(s, 11.993, 1.042, 0.239, 0.329);
++  frame(s, 0.806, 0.753, 11.722, 6.014, { b: [0, 10.515], r: [0, 4.867] });
++  stripes(s, 11.467, 5.708, 1.226);
++  text(s, 'PLACEHOLDER', { x: 8.146, y: 1.987, w: 3.097, h: 1.084, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide16(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 5.681, 0, 7.653, 7.5, G_PANEL);
++  cutout(s, 5.681, 0.764, 1.913, 5.975);
++  panel(s, 0.806, 0.743, 6.788, 6.014, BG);
++  frame(s, 0.806, 0.743, 6.788, 6.014, { b: [1.62, 6.788], l: [0, 4.551] });
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.715, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  stripes(s, 0.587, 5.335, 1.645);
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 1.715, y: 2.203, w: 4.989, h: 1.414, fontSize: 26, fontFace: DISPLAY, bold: true });
++  text(s, 'Portfolio One', { x: 11.311, y: 2.269, w: 1.552, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5, rotate: 90 });
++  text(s, '01.', { x: 11.72, y: 0.955, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5, rotate: 90 });
++  text(s, 'Portfolio Two', { x: 11.311, y: 5.73, w: 1.552, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5, rotate: 90 });
++  text(s, '02.', { x: 11.72, y: 4.416, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5, rotate: 90 });
++  text(s, 'PLACEHOLDER', { x: 3.607, y: 4.113, w: 2.661, h: 1.841, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide17(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 4, 4.53, 3.054, 2.97, G_PANEL);
++  text(s, 'write something', { x: 10.674, y: 1.044, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  musicNote(s, 12.025, 1.042, 0.239, 0.329);
++  frame(s, 0.806, 0.753, 11.722, 6.014, { b: [0, 10.515], r: [0, 4.867] });
++  stripes(s, 11.467, 5.708, 1.226);
++  text(s, 'Add Your Name', { x: 4, y: 5.738, w: 3.076, h: 0.337, fontSize: 14, fontFace: DISPLAY, bold: true, align: 'center' });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 5.84, y: 1.947, w: 5.676, h: 1.717, fontSize: 32, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 8.192, y: 4.447, w: 2.661, h: 1.589, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide18(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, 0, 13.333, 3.75, G_PANEL);
++  cutout(s, 2.271, 2.104, 2.545, 1.646);
++  cutout(s, 5.395, 2.104, 2.545, 1.646);
++  cutout(s, 8.518, 2.104, 2.545, 1.646);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { b: [1.137, 11.722], l: [0, 4.895] });
++  text(s, 'Add Your Name', { x: 3.065, y: 1.194, w: 1.814, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 2.208, y: 1.148, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Add Your Name', { x: 6.188, y: 1.194, w: 1.814, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 5.331, y: 1.148, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Add Your Name', { x: 9.312, y: 1.194, w: 1.814, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, '03.', { x: 8.455, y: 1.148, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  musicNote(s, 11.728, 1.306, 0.239, 0.329);
++  text(s, 'write something', { x: 11.192, y: 2.577, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5, rotate: 90 });
++  stripes(s, 0.643, 5.695, 1.226);
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 2.271, y: 5.73, w: 8.854, h: 0.471, fontSize: 22, fontFace: DISPLAY, bold: true, align: 'right' });
++}
++
++function slide19(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 6.317, 5.87, 5.001, 0.897, G_PANEL);
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.715, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 1.87, y: 2.094, w: 3.41, h: 1.851, fontSize: 26, fontFace: DISPLAY, bold: true });
++  text(s, 'Add Your Name', { x: 7.079, y: 4.738, w: 1.814, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 6.222, y: 4.692, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Add Your Name', { x: 9.943, y: 4.784, w: 1.814, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 9.086, y: 4.738, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'PLACEHOLDER', { x: 1.87, y: 4.687, w: 3.296, h: 1.336, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  frame(s, 0.806, 0.753, 11.722, 6.014, { b: [0, 10.515], r: [0, 4.867] });
++  stripes(s, 11.467, 5.708, 1.226);
++}
++
++function slide20(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 7.709, 0.003, 5.624, 7.497, G_PANEL);
++  frame(s, 0.806, 0.743, 7.601, 6.014, { b: [1.315, 7.601], l: [0, 4.633] });
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.778, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 1.778, y: 2.096, w: 4.952, h: 1.515, fontSize: 28, fontFace: DISPLAY, bold: true });
++  stripes(s, 0.606, 5.472, 1.488);
++  text(s, 'Tittle Here', { x: 3.324, y: 5.749, w: 1.245, h: 0.366, fontSize: 12, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 2.467, y: 5.703, w: 0.732, h: 0.438, fontSize: 20, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Tittle Here', { x: 5.551, y: 5.749, w: 1.245, h: 0.366, fontSize: 12, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 4.694, y: 5.703, w: 0.732, h: 0.438, fontSize: 20, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'PLACEHOLDER', { x: 3.346, y: 3.804, w: 3.296, h: 1.336, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide21(pptx) {
++  const s = newSlide(pptx);
++  frame(s, 0.806, 0.753, 11.722, 6.014, { b: [0, 10.515], r: [0, 4.867] });
++  stripes(s, 11.467, 5.708, 1.226);
++  text(s, 'write something', { x: 10.674, y: 1.044, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  musicNote(s, 12.025, 1.042, 0.239, 0.329);
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 7.969, y: 1.974, w: 3.41, h: 1.851, fontSize: 26, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 7.969, y: 4.526, w: 3.296, h: 1.336, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  gradient(s, 2.309, 2.258, 3.007, 2.997, G_PANEL);
++  text(s, 'About Our Team', { x: 2.309, y: 3.581, w: 3.007, h: 0.337, fontSize: 14, fontFace: DISPLAY, bold: true, align: 'center' });
++}
++
++function slide22(pptx) {
++  const s = newSlide(pptx);
++  photo(s, 6.733, 1.811, 4.007, 2.554);
++  photo(s, 6.157, 1.68, 5.165, 3.014);
++  gradient(s, 9.605, 3.895, 2.254, 2.276, G_PANEL);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { b: [1.137, 11.722], l: [0, 4.895] });
++  stripes(s, 0.643, 5.695, 1.226);
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.778, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 1.778, y: 2.111, w: 3.722, h: 1.986, fontSize: 28, fontFace: DISPLAY, bold: true });
++  text(s, 'Mockup One', { x: 2.985, y: 5.279, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'lorem ipsum dolor sita amet consel', { x: 2.982, y: 5.769, w: 2.506, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 2.105, y: 5.233, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Mockup Two', { x: 6.422, y: 5.279, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'lorem ipsum dolor sita amet consel', { x: 6.419, y: 5.769, w: 2.506, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 5.542, y: 5.233, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'PLACEHOLDER', { x: 10.027, y: 4.365, w: 1.412, h: 1.336, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide23(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, 0, 6.667, 7.5, G_PANEL);
++  cutout(s, 2.429, 1.71, 1.816, 4.344, 0.13);
++  photo(s, 2.087, 1.606, 2.278, 4.594);
++  frame(s, 5.653, 0.743, 6.875, 6.014, { b: [0, 5.66], r: [0, 4.861] });
++  stripes(s, 11.467, 5.708, 1.226);
++  text(s, 'write something', { x: 10.674, y: 1.044, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  musicNote(s, 12.025, 1.042, 0.239, 0.329);
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 7.948, y: 2.016, w: 3.41, h: 1.851, fontSize: 26, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 7.948, y: 4.443, w: 3.296, h: 1.336, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'Mockup One', { x: 0.349, y: 4.372, w: 1.552, h: 0.366, fontSize: 12, fontFace: DISPLAY, lineSpacingMultiple: 1.5, rotate: 270 });
++  text(s, '01.', { x: 0.826, y: 5.488, w: 0.599, h: 0.404, fontSize: 18, fontFace: SERIF, align: 'right', charSpacing: -1.5, rotate: 270 });
++  text(s, 'Mockup Two', { x: 0.349, y: 2.103, w: 1.552, h: 0.366, fontSize: 12, fontFace: DISPLAY, lineSpacingMultiple: 1.5, rotate: 270 });
++  text(s, '02.', { x: 0.826, y: 3.219, w: 0.599, h: 0.404, fontSize: 18, fontFace: SERIF, align: 'right', charSpacing: -1.5, rotate: 270 });
++}
++
++function slide24(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 7.709, 0.003, 5.624, 7.497, G_PANEL);
++  cutout(s, 9.511, 1.681, 2.669, 3.492);
++  frame(s, 0.806, 0.743, 7.601, 6.014, { b: [1.315, 7.601], l: [0, 4.633] });
++  stripes(s, 0.606, 5.472, 1.488);
++  text(s, 'About Mockup', { x: 9.62, y: 5.892, w: 2.503, h: 0.41, fontSize: 14, fontFace: DISPLAY, align: 'center', lineSpacingMultiple: 1.5 });
++  text(s, 'lorem ipsum dolor sita amet consel', { x: 9.617, y: 6.34, w: 2.506, h: 0.326, fontSize: 10, fontFace: BODY, align: 'center', lineSpacingMultiple: 1.5 });
++  musicNote(s, 1.212, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.835, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'About Mockup One', { x: 2.51, y: 2.002, w: 2.563, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'PLACEHOLDER' }, { text: 'justo sedanui gravida onsectetur ', options: { color: GREY } }], { x: 2.528, y: 2.595, w: 4.181, h: 0.579, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 1.622, y: 1.956, w: 0.732, h: 0.438, fontSize: 20, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'About Mockup Two', { x: 2.51, y: 3.703, w: 2.563, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'PLACEHOLDER' }, { text: 'justo sedanui gravida onsectetur ', options: { color: GREY } }], { x: 2.528, y: 4.296, w: 4.181, h: 0.579, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 1.622, y: 3.657, w: 0.732, h: 0.438, fontSize: 20, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And ', options: { color: LILAC } }, { text: 'Popular ' }, { text: 'Language', options: { color: LILAC } }, { text: ' Is Music' }], { x: 2.519, y: 5.692, w: 4.356, h: 0.64, fontSize: 16, fontFace: DISPLAY, bold: true });
++  photo(s, 9.407, 1.286, 2.914, 4.298);
++}
++
++function slide25(pptx) {
++  const s = newSlide(pptx);
++  photo(s, 6.186, 1.03, 4.914, 4.914);
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.778, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, 'Mockup One', { x: 2.505, y: 4.446, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'lorem ipsum dolor sita amet consel', { x: 2.502, y: 4.936, w: 2.506, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 1.626, y: 4.4, w: 0.732, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  gradient(s, 0.806, 5.87, 4.064, 0.897, G_PANEL);
++  frame(s, 0.806, 0.753, 11.722, 6.014, { b: [0, 10.515], r: [0, 4.867] });
++  stripes(s, 11.467, 5.708, 1.226);
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 1.778, y: 2.016, w: 3.41, h: 1.851, fontSize: 26, fontFace: DISPLAY, bold: true });
++}
++
++function slide26(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, 0, 13.333, 4.708, G_PANEL);
++  frame(s, 0.806, 0.66, 11.722, 3.398);
++  stripes(s, 12.732, 6.897, 0.697);
++  musicNote(s, 1.175, 1.016, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.019, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'The World’s Most Famous And Popular ', options: { breakLine: true } }, { text: 'Language Is Music' }], { x: 1.921, y: 1.889, w: 4.968, h: 1.515, fontSize: 28, fontFace: DISPLAY, bold: true });
++  text(s, [{ text: 'PLACEHOLDER', options: { breakLine: true } }, { text: 'PLACEHOLDER' }, { text: 'selit sed cursus misani utasisau nasat sapienanuas', options: { color: GREY } }], { x: 7.776, y: 2, w: 3.866, h: 1.336, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  barTriplet(s, 1.244, 5.391);
++  barTriplet(s, 4.976, 5.391);
++  barTriplet(s, 8.708, 5.391);
++}
++
++function slide27(pptx) {
++  const s = newSlide(pptx);
++  musicNote(s, 1.212, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.771, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  stackedColumns(s, 1.776, 1.95, 5.717, 4.385);
++  stripes(s, 12.431, 6.6, 1.042);
++  text(s, 'Chart One', { x: 10.105, y: 2.102, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'lorem ipsum dolor sita amet consec teturasi adipisci enisi', { x: 10.123, y: 2.612, w: 2.116, h: 0.579, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '01.', { x: 9.405, y: 2.132, w: 0.575, h: 0.404, fontSize: 18, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Chart Two', { x: 10.105, y: 3.514, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'lorem ipsum dolor sita amet consec teturasi adipisci enisi', { x: 10.123, y: 4.024, w: 2.116, h: 0.579, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '02.', { x: 9.405, y: 3.544, w: 0.575, h: 0.404, fontSize: 18, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Chart Three', { x: 10.105, y: 4.99, w: 1.989, h: 0.41, fontSize: 14, fontFace: DISPLAY, lineSpacingMultiple: 1.5 });
++  text(s, 'lorem ipsum dolor sita amet consec teturasi adipisci enisi', { x: 10.123, y: 5.5, w: 2.116, h: 0.579, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '03.', { x: 9.405, y: 5.02, w: 0.575, h: 0.404, fontSize: 18, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  gradient(s, 9.174, 0.743, 3.354, 0.685, G_PANEL);
++  frame(s, 0.806, 0.743, 7.601, 6.014);
++}
++
++function slide28(pptx) {
++  const s = newSlide(pptx);
++  gradient(s, 0, 0, 6.667, 7.5, G_PANEL);
++  frame(s, 5.653, 0.743, 6.875, 6.014, { b: [0, 5.66], r: [0, 4.861] });
++  stripes(s, 11.467, 5.708, 1.226);
++  donut(s, 1.377, 1.123, 3.835, 2.557);
++  donut(s, 1.377, 4.031, 3.835, 2.557);
++  text(s, 'About Chart One', { x: 0.307, y: 4.814, w: 1.552, h: 0.366, fontSize: 12, fontFace: DISPLAY, lineSpacingMultiple: 1.5, rotate: 270 });
++  text(s, '01.', { x: 0.785, y: 5.93, w: 0.599, h: 0.404, fontSize: 18, fontFace: SERIF, align: 'right', charSpacing: -1.5, rotate: 270 });
++  text(s, 'About Chart Two', { x: 0.307, y: 1.794, w: 1.552, h: 0.366, fontSize: 12, fontFace: DISPLAY, lineSpacingMultiple: 1.5, rotate: 270 });
++  text(s, '02.', { x: 0.785, y: 2.909, w: 0.599, h: 0.404, fontSize: 18, fontFace: SERIF, align: 'right', charSpacing: -1.5, rotate: 270 });
++  text(s, 'write something', { x: 10.674, y: 1.044, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  musicNote(s, 12.025, 1.042, 0.239, 0.329);
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 7.906, y: 2.016, w: 3.41, h: 1.851, fontSize: 26, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 7.906, y: 4.443, w: 3.296, h: 1.336, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++}
++
++function slide29(pptx) {
++  const s = newSlide(pptx);
++  radar(s, 5.268, 1.546, 7.333, 4.889);
++  musicNote(s, 1.212, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.859, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, [{ text: 'The World’s Most ' }, { text: 'Famous And Popular', options: { color: LILAC } }, { text: ' Language Is Music' }], { x: 1.968, y: 2.159, w: 3.41, h: 1.851, fontSize: 26, fontFace: DISPLAY, bold: true });
++  text(s, 'PLACEHOLDER', { x: 1.982, y: 4.56, w: 3.296, h: 1.336, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  frame(s, 0.806, 0.753, 11.722, 6.014, { b: [0, 10.515], r: [0, 4.867] });
++  stripes(s, 11.467, 5.708, 1.226);
++}
++
++function slide30(pptx) {
++  const s = newSlide(pptx);
++  panel(s, 0, 0, 13.333, 7.494, BG);
++  gradient(s, 6.667, 0.006, 6.667, 7.494, G_COVER);
++  frame(s, 0.806, 0.743, 11.722, 6.014, { b: [1.024, 11.722], l: [0, 5.01] });
++  stripes(s, 0.654, 5.784, 1.125);
++  musicNote(s, 1.175, 1.1, 0.239, 0.329);
++  text(s, 'write something', { x: 1.677, y: 1.102, w: 1.35, h: 0.326, fontSize: 10, fontFace: BODY, lineSpacingMultiple: 1.5 });
++  text(s, '00.', { x: 11.25, y: 1.048, w: 0.969, h: 0.505, fontSize: 24, fontFace: SERIF, align: 'right', charSpacing: -1.5 });
++  text(s, 'Thank', { x: 3.697, y: 2.51, w: 6.093, h: 2.036, fontSize: 115, fontFace: DISPLAY, bold: true, align: 'center' });
++  text(s, 'PLACEHOLDER', { x: 3.407, y: 5.697, w: 6.53, h: 0.531, fontSize: 9, fontFace: BODY, align: 'center', lineSpacingMultiple: 1.5 });
++}
++
++
++// ---------------------------------------------------------------- main
++const SLIDES = [
++  slide01,
++  slide02,
++  slide03,
++  slide04,
++  slide05,
++  slide06,
++  slide07,
++  slide08,
++  slide09,
++  slide10,
++  slide11,
++  slide12,
++  slide13,
++  slide14,
++  slide15,
++  slide16,
++  slide17,
++  slide18,
++  slide19,
++  slide20,
++  slide21,
++  slide22,
++  slide23,
++  slide24,
++  slide25,
++  slide26,
++  slide27,
++  slide28,
++  slide29,
++  slide30];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'DECK', width: 13.333, height: 7.5 });
++pptx.layout = 'DECK';
++pptx.theme = { headFontFace: DISPLAY, bodyFontFace: BODY };
++
++SLIDES.forEach(build => build(pptx));
++
++pptx.writeFile({ fileName: path.join(__dirname, '055900fc-f2fd-4ed0-9253-bf3289e969ab_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

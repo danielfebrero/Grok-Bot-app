@@ -1,0 +1,578 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/sunrise_corporate_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/sunrise_corporate_presentation.js
+@@ -0,0 +1,575 @@
++/**
++ * "SUNRISE" corporate presentation template — 30 slides, 13.333 x 7.5 in.
++ * Recreated with pptxgenjs only. Run: node <thisfile>  ->  writes the .pptx next to itself.
++ *
++ * Raster photos of the original deck are replaced by flat placeholder rectangles.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const YELLOW = 'FFC000';
++const INK = '171717';
++const WHITE = 'FFFFFF';
++const CHARCOAL = '3A3A3A';
++const PLACEHOLDER = 'D9D9D9';
++const PLACEHOLDER_TXT = '8C8C8C';
++
++const LIGHT = 'Poppins Light';
++const XLIGHT = 'Poppins ExtraLight';
++const SEMI = 'Poppins SemiBold';
++
++/* ------------------------------------------------------------------- copy */
++const LEAD = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio printer took a galley of type and scrambled it to make ';
++const LEAD_B = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio printer took a galley of type and scrambled';
++const BODY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio printer took a galley of type and scrambled it to make a type specimen. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio printer took a galley of type and scrambled it to make a type specimen';
++const BODY_B = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio printer took a galley of type and scrambled it to make a type specimen. Lorem ipsum dolor sit amet, consectetur adipiscing elit. ';
++const BODY_C = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio printer took a galley of type and scrambled it to make a type specimen. ';
++const CARD = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio printer took a galley of type';
++const CARD_B = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio printer ';
++const CARD_C = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio';
++
++/* ---------------------------------------------------------------- helpers */
++function rect(s, x, y, w, h, fill, opts) {
++  const o = opts || {};
++  s.addShape('rect', {
++    x: x, y: y, w: w, h: h,
++    fill: fill ? { color: fill, transparency: o.transparency || 0 } : { type: 'none' },
++    line: o.line ? { color: o.line, width: o.lineWidth || 1 } : { type: 'none' },
++    rotate: o.rotate || 0,
++  });
++}
++
++function txt(s, text, x, y, w, h, opts) {
++  const o = opts || {};
++  s.addText(text, {
++    x: x, y: y, w: w, h: h,
++    fontFace: o.font || LIGHT,
++    fontSize: o.size || 10,
++    color: o.color || INK,
++    align: o.align || 'left',
++    valign: 'top',
++    charSpacing: o.spc || 0,
++    lineSpacingMultiple: o.lh || undefined,
++    rotate: o.rotate || 0,
++    wrap: true,
++  });
++}
++
++/* Perforated square grid used as a decorative motif on nearly every slide. */
++function dots(s, x, y, cols, rows, color) {
++  const stepX = cols > rows ? 0.2183 : 0.2210;
++  const stepY = cols > rows ? 0.2210 : 0.2183;
++  for (let c = 0; c < cols; c++) {
++    for (let r = 0; r < rows; r++) {
++      rect(s, x + c * stepX, y + r * stepY, 0.109, 0.111, color);
++    }
++  }
++}
++
++/* Page number / footer / brand mark repeated on every slide. */
++function chrome(s, page, opts) {
++  const o = opts || {};
++  txt(s, 'P/' + page, 0.275, 0.287, 0.736, 0.404, { size: 12, spc: 1, lh: 1.5 });
++  if (o.footer !== false) {
++    txt(s, 'PRESENTATION', 0.275, 6.914, 1.525, 0.379, { size: 12, spc: 1, lh: 1.5 });
++  }
++  txt(s, 'SUNRISE', 12.029, 0.287, 0.939, 0.404, { size: 12, spc: 1, lh: 1.5, align: 'right' });
++  rect(s, 12.968, 0.422, 0.365, 0.135, o.tick || YELLOW);
++}
++
++/* Yellow tab + 36pt title + kicker + lead paragraph + body paragraph. */
++function copyBlock(s, x, y, title, opts) {
++  const o = Object.assign({
++    tab: YELLOW, titleW: 4.226, titleH: 0.707,
++    kickerDY: 0.730, kickerW: 3.583,
++    lead: LEAD, leadDY: 1.187, leadW: 5.318, leadH: 0.606, leadColor: YELLOW,
++    body: BODY, bodyDY: 1.826, bodyW: 5.318, bodyH: 1.363,
++    align: 'justify',
++  }, opts || {});
++  if (o.tab) rect(s, o.tabX === undefined ? x - 1.106 : o.tabX, y + 0.035, 1.018, 0.428, o.tab);
++  txt(s, title, x, y, o.titleW, o.titleH, { size: 36 });
++  txt(s, 'LOREM IPSUM', x, y + o.kickerDY, o.kickerW, 0.404, { size: 18 });
++  if (o.lead) {
++    txt(s, o.lead, x, y + o.leadDY, o.leadW, o.leadH,
++      { size: 10, color: o.leadColor, align: o.align, lh: 1.5 });
++  }
++  if (o.body) {
++    txt(s, o.body, x, y + o.bodyDY, o.bodyW, o.bodyH,
++      { size: 10, font: XLIGHT, align: o.align, lh: 1.5 });
++  }
++}
++
++/* Small square bullet + two stacked spaced-out caption lines. */
++function caption(s, x, y, top, bottom, opts) {
++  const o = opts || {};
++  const right = o.align === 'right';
++  rect(s, x + (right ? 1.708 : 0.102), y - 0.159, 0.169, 0.159, o.mark || YELLOW);
++  txt(s, top, x, y, 2.016, 0.454, { size: 14, spc: 3, lh: 1.5, align: o.align || 'left', color: o.color || INK });
++  txt(s, bottom, x, y + 0.322, 2.016, 0.379, { size: 12, spc: 3, lh: 1.5, align: o.align || 'left', color: o.color || INK });
++}
++
++/* Yellow heading + paragraph pair used beside the icon rows. */
++function iconCopy(s, x, y, w, h, body) {
++  txt(s, 'LOREM IPSUM', x, y, 1.546, 0.337, { size: 14, color: YELLOW });
++  txt(s, body, x, y + 0.324, w, h, { size: 10, font: XLIGHT, lh: 1.5 });
++}
++
++/* Stand-in for a photograph: flat rectangle at the original frame. */
++function imageBox(s, x, y, w, h) {
++  rect(s, x, y, w, h, PLACEHOLDER);
++  txt(s, '[image]', x, y + h / 2 - 0.2, w, 0.4, { size: 12, color: PLACEHOLDER_TXT, align: 'center' });
++}
++
++/* Device mock-up stand-in: dark body with a blank screen where the art sat. */
++function deviceBox(s, body, screen, screenFill) {
++  s.addShape('roundRect', {
++    x: body[0], y: body[1], w: body[2], h: body[3],
++    fill: { color: CHARCOAL }, line: { type: 'none' }, rectRadius: 0.18,
++  });
++  rect(s, screen[0], screen[1], screen[2], screen[3], screenFill || WHITE);
++  txt(s, '[image]', screen[0], screen[1] + screen[3] / 2 - 0.2, screen[2], 0.4,
++    { size: 12, color: screenFill ? WHITE : PLACEHOLDER_TXT, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ icons
++ * Each recipe is a list of [shape, dx, dy, w, h, paint, rotate, outlined]
++ * in multiples of the icon size, measured from the icon centre.          */
++const ICONS = {
++  pin: [['ellipse', -0.36, -0.50, 0.72, 0.72, 'fg'], ['triangle', -0.26, 0.02, 0.52, 0.48, 'fg', 180],
++        ['ellipse', -0.15, -0.29, 0.30, 0.30, 'bg']],
++  send: [['triangle', -0.46, -0.46, 0.92, 0.92, 'fg', 50], ['triangle', -0.30, 0.06, 0.50, 0.44, 'bg', 230]],
++  tag: [['homePlate', -0.48, -0.30, 0.96, 0.60, 'fg', -135], ['ellipse', -0.26, 0.06, 0.17, 0.17, 'bg']],
++  globe: [['ellipse', -0.48, -0.48, 0.96, 0.96, 'none', 0, true], ['ellipse', -0.20, -0.48, 0.40, 0.96, 'none', 0, true],
++          ['rect', -0.48, -0.05, 0.96, 0.10, 'fg']],
++  bars: [['rect', -0.45, -0.05, 0.22, 0.50, 'fg'], ['rect', -0.11, -0.30, 0.22, 0.75, 'fg'],
++         ['rect', 0.23, -0.48, 0.22, 0.93, 'fg']],
++  bulb: [['ellipse', -0.36, -0.50, 0.72, 0.72, 'none', 0, true], ['rect', -0.06, -0.16, 0.12, 0.32, 'fg'],
++         ['rect', -0.13, 0.14, 0.26, 0.12, 'fg'], ['rect', -0.10, 0.31, 0.20, 0.11, 'fg']],
++  thumb: [['roundRect', -0.14, -0.14, 0.60, 0.56, 'none', 0, true], ['rect', -0.48, -0.10, 0.26, 0.52, 'none', 0, true],
++          ['rect', -0.02, -0.48, 0.14, 0.36, 'none', 0, true], ['rect', -0.14, -0.20, 0.28, 0.14, 'bg']],
++  search: [['ellipse', -0.48, -0.48, 0.70, 0.70, 'none', 0, true], ['rect', 0.06, 0.14, 0.42, 0.13, 'fg', 45]],
++  pencil: [['rect', -0.26, -0.10, 0.80, 0.22, 'fg', -40], ['triangle', -0.52, 0.16, 0.32, 0.32, 'fg', 225]],
++  gear: [['gear6', -0.50, -0.50, 1.00, 1.00, 'fg'], ['ellipse', -0.16, -0.16, 0.32, 0.32, 'bg']],
++  truck: [['rect', -0.50, -0.28, 0.56, 0.46, 'none', 0, true], ['homePlate', 0.06, -0.10, 0.44, 0.28, 'none', 0, true],
++          ['ellipse', -0.38, 0.14, 0.20, 0.20, 'fg'], ['ellipse', 0.16, 0.14, 0.20, 0.20, 'fg']],
++  cart: [['trapezoid', -0.42, -0.24, 0.84, 0.40, 'fg', 180], ['rect', -0.52, -0.42, 0.26, 0.09, 'fg', -20],
++         ['ellipse', -0.32, 0.22, 0.18, 0.18, 'fg'], ['ellipse', 0.12, 0.22, 0.18, 0.18, 'fg']],
++  people: [['ellipse', -0.46, -0.42, 0.26, 0.26, 'fg'], ['ellipse', -0.13, -0.50, 0.26, 0.26, 'fg'],
++           ['ellipse', 0.20, -0.42, 0.26, 0.26, 'fg'], ['blockArc', -0.50, -0.30, 0.42, 0.62, 'fg'],
++           ['blockArc', -0.21, -0.38, 0.42, 0.62, 'fg'], ['blockArc', 0.08, -0.30, 0.42, 0.62, 'fg']],
++  twitter: [['moon', -0.50, -0.34, 0.90, 0.78, 'fg', 250], ['moon', -0.14, -0.50, 0.62, 0.62, 'fg', 215]],
++};
++
++function icon(s, kind, cx, cy, fg, bg, size) {
++  const u = size || 0.30;
++  (ICONS[kind] || []).forEach(function (d) {
++    const paint = d[5];
++    s.addShape(d[0], {
++      x: cx + d[1] * u, y: cy + d[2] * u, w: d[3] * u, h: d[4] * u,
++      fill: paint === 'none' ? { type: 'none' } : { color: paint === 'bg' ? bg : fg },
++      line: d[7] ? { color: fg, width: 1.25 } : { type: 'none' },
++      rotate: d[6] || 0,
++    });
++  });
++}
++
++/* Square icon chip (filled or outlined) with the glyph centred inside. */
++function iconChip(s, x, y, w, h, kind, filled) {
++  const fg = filled ? WHITE : YELLOW;
++  const bg = filled ? YELLOW : WHITE;
++  rect(s, x, y, w, h, bg, filled ? {} : { line: YELLOW, lineWidth: 1.5 });
++  icon(s, kind, x + w / 2, y + h / 2, fg, bg);
++}
++
++function circleChip(s, x, y, d, kind, filled) {
++  const fg = filled ? WHITE : YELLOW;
++  const bg = filled ? YELLOW : WHITE;
++  s.addShape('ellipse', {
++    x: x, y: y, w: d, h: d,
++    fill: { color: bg }, line: filled ? { type: 'none' } : { color: YELLOW, width: 1 },
++  });
++  icon(s, kind, x + d / 2, y + d / 2, fg, bg);
++}
++
++/* ------------------------------------------------------------------ slides */
++const build = [];
++
++// 1 — cover
++build.push(function (s) {
++  rect(s, 0.385, 1.013, 7.200, 3.854, YELLOW);
++  txt(s, 'SUN', 1.110, 1.615, 3.443, 1.717, { size: 96 });
++  txt(s, 'RISE', 1.110, 2.796, 3.443, 1.717, { size: 96 });
++  txt(s, 'CORPORATE', 1.213, 3.944, 2.477, 0.471, { size: 16, spc: 3, lh: 1.5, color: WHITE });
++  txt(s, 'PRESENTATION', 1.954, 5.144, 2.477, 0.471, { size: 16, spc: 3, lh: 1.5, align: 'right' });
++  txt(s, 'TEMPLATE', 1.954, 5.466, 2.477, 0.471, { size: 16, spc: 3, lh: 1.5, align: 'right' });
++  rect(s, 4.092, 4.985, 0.169, 0.159, YELLOW);
++  rect(s, 11.908, 6.200, 1.431, 1.315, YELLOW);
++  dots(s, 7.721, 1.015, 3, 8, YELLOW);
++  chrome(s, '01');
++});
++
++// 2 — welcome
++build.push(function (s) {
++  copyBlock(s, 1.099, 1.724, 'WELCOME');
++  txt(s, 'EDWAR MICHAEL', 4.594, 6.121, 2.477, 0.454, { size: 14, spc: 3, lh: 1.5, align: 'right' });
++  txt(s, 'DIRECTOR', 4.594, 6.443, 2.477, 0.404, { size: 12, spc: 3, lh: 1.5, align: 'right' });
++  rect(s, 6.732, 5.962, 0.169, 0.159, YELLOW);
++  dots(s, 10.557, 5.195, 8, 3, YELLOW);
++  chrome(s, '02');
++});
++
++// 3 — our company (full yellow)
++build.push(function (s) {
++  rect(s, 0, 0, 13.333, 7.5, YELLOW);
++  copyBlock(s, 1.099, 2.208, 'OUR COMPANY', { tab: INK, leadColor: INK });
++  dots(s, 12.499, 1.406, 3, 8, INK);
++  chrome(s, '03', { tick: INK });
++});
++
++// 4 — our company (right column)
++build.push(function (s) {
++  rect(s, 0, 1.877, 3.018, 3.854, YELLOW);
++  copyBlock(s, 6.684, 2.541, 'OUR COMPANY');
++  dots(s, 12.927, 3.786, 3, 8, YELLOW);
++  chrome(s, '04');
++});
++
++// 5 — our company (icon rail)
++build.push(function (s) {
++  copyBlock(s, 7.650, 3.032, 'OUR COMPANY', { leadW: 3.982, leadH: 0.858, bodyDY: 2.081, bodyW: 3.982, bodyH: 1.616 });
++  [['pin', 2.061, true], ['send', 2.963, false], ['tag', 3.851, true], ['globe', 4.753, false]]
++    .forEach(function (d) { iconChip(s, 1.438, d[1], 0.725, 0.672, d[0], d[2]); });
++  dots(s, 12.079, 6.795, 8, 3, YELLOW);
++  chrome(s, '05');
++});
++
++// 6 — meet our team
++build.push(function (s) {
++  rect(s, 0, 0, 7.561, 7.5, YELLOW);
++  rect(s, 7.617, 1.237, 4.746, 4.910, YELLOW, { transparency: 38 });
++  copyBlock(s, 1.099, 2.208, 'MEET OUR TEAM', { tab: INK, leadColor: INK });
++  txt(s, 'SUN', 8.585, 2.500, 3.443, 1.717, { size: 96, color: WHITE });
++  txt(s, 'RISE', 8.585, 3.681, 3.443, 1.717, { size: 96, color: WHITE });
++  dots(s, 6.426, 5.655, 3, 8, INK);
++  chrome(s, '06');
++});
++
++// 7 — our team
++build.push(function (s) {
++  copyBlock(s, 5.444, 1.667, 'OUR TEAM', { tab: null, kickerDY: 0.730, lead: null, bodyDY: 1.195, bodyW: 6.714, bodyH: 1.111 });
++  dots(s, 4.006, 1.033, 8, 3, YELLOW);
++  iconChip(s, 5.589, 4.238, 0.584, 0.548, 'bars', true);
++  iconCopy(s, 6.245, 4.332, 2.447, 1.111, CARD);
++  iconChip(s, 8.996, 4.238, 0.584, 0.548, 'bulb', true);
++  iconCopy(s, 9.724, 4.332, 2.295, 1.111, CARD);
++  rect(s, 4.316, 6.002, 2.106, 0.996, YELLOW);
++  caption(s, 4.405, 6.246, 'DIANA LEE', 'CREATIVE TEAM', { mark: INK });
++  chrome(s, '07');
++});
++
++// 8 — our team (two portraits)
++build.push(function (s) {
++  rect(s, 8.702, 2.741, 4.632, 2.174, YELLOW);
++  copyBlock(s, 0.848, 1.962, 'OUR TEAM', { tab: null, leadDY: 1.157, leadW: 3.982, leadH: 0.858,
++    bodyDY: 1.998, bodyW: 3.982, bodyH: 1.616 });
++  dots(s, -0.591, 1.329, 8, 3, YELLOW);
++  caption(s, 5.737, 1.692, 'THEODORE', 'CREATIVE TEAM');
++  caption(s, 9.425, 1.692, 'MISHA', 'CREATIVE TEAM');
++  iconCopy(s, 5.737, 5.276, 3.323, 0.858, CARD);
++  iconCopy(s, 9.407, 5.276, 3.408, 0.858, CARD);
++  chrome(s, '08');
++});
++
++// 9 — support team
++build.push(function (s) {
++  rect(s, 2.200, 1.398, 7.116, 4.746, YELLOW, { transparency: 38 });
++  rect(s, -1.273, 2.671, 4.746, 2.200, YELLOW, { rotate: 270 });
++  txt(s, 'SUPPORT', -1.006, 3.191, 3.778, 1.111, { size: 60, color: WHITE, rotate: 270 });
++  txt(s, 'TEAM', -0.245, 3.191, 3.778, 1.111, { size: 60, color: WHITE, rotate: 270 });
++  dots(s, 1.134, 0.724, 8, 3, YELLOW);
++  dots(s, 8.971, 3.060, 8, 3, YELLOW);
++  txt(s, 'OUR TEAM', 9.892, 3.894, 2.792, 0.707, { size: 36 });
++  txt(s, 'LOREM IPSUM', 9.916, 4.624, 2.452, 0.404, { size: 18 });
++  txt(s, BODY_B, 9.930, 5.052, 2.754, 1.616, { size: 10, font: XLIGHT, lh: 1.5 });
++  chrome(s, '09');
++});
++
++// 10 — what we do (yellow banner)
++build.push(function (s) {
++  rect(s, 0, 0, 13.333, 3.518, YELLOW);
++  rect(s, 0.435, 1.341, 7.218, 4.818, YELLOW, { transparency: 38 });
++  txt(s, 'WHAT WE DO', 8.331, 1.341, 4.226, 0.707, { size: 36 });
++  txt(s, 'LOREM IPSUM', 8.331, 2.071, 3.583, 0.404, { size: 18 });
++  txt(s, BODY_C, 8.331, 2.537, 3.827, 0.858, { size: 10, font: XLIGHT, align: 'justify', lh: 1.5 });
++  dots(s, 12.158, 1.419, 8, 3, INK);
++  [['thumb', 3.649, 3.858], ['search', 4.735, 4.989], ['pencil', 5.806, 6.120]].forEach(function (d) {
++    icon(s, d[0], 8.579, d[2], YELLOW, WHITE);
++    iconCopy(s, 8.877, d[1], 3.927, 0.606, CARD);
++  });
++  chrome(s, '10');
++});
++
++// 11 — what we do (three cards)
++build.push(function (s) {
++  copyBlock(s, 0.581, 2.111, 'WHAT WE DO', { titleW: 3.805, leadW: 3.982, leadH: 0.858,
++    bodyDY: 2.080, bodyW: 3.982, bodyH: 1.616 });
++  [4.720, 7.298, 9.824].forEach(function (x) { caption(s, x, 1.236, 'LOREM IPSUM', 'TITLE HERE'); });
++  [[4.807, 5.192, 4.968, 5.855], [7.351, 7.731, 7.508, 8.395], [9.912, 10.294, 10.070, 10.957]]
++    .forEach(function (c) {
++      rect(s, c[0], 4.405, 2.316, 2.385, YELLOW);
++      txt(s, 'LOREM IPSUM', c[1], 4.696, 1.546, 0.337, { size: 14, align: 'center' });
++      rect(s, c[3], 5.047, 0.219, 0.050, INK);
++      txt(s, CARD, c[2], 5.170, 1.993, 1.363, { size: 10, font: XLIGHT, align: 'center', lh: 1.5 });
++    });
++  chrome(s, '11');
++});
++
++// 12 — what we do (four icons)
++build.push(function (s) {
++  s.addShape('flowChartDelay', { x: 0, y: 1.778, w: 4.638, h: 4.222, fill: { color: YELLOW, transparency: 38 }, line: { type: 'none' } });
++  copyBlock(s, 5.415, 1.430, 'WHAT WE DO', { tab: null, lead: null, bodyDY: 1.195, bodyW: 6.714, bodyH: 1.111 });
++  dots(s, 3.647, 1.430, 8, 3, YELLOW);
++  [['bars', 5.560, 3.831, 6.205, 3.926, 2.504, CARD_B], ['people', 8.979, 3.831, 9.625, 3.926, 2.504, CARD_B],
++   ['cart', 5.560, 5.319, 6.205, 5.414, 2.197, CARD_C], ['bulb', 8.979, 5.319, 9.625, 5.414, 2.197, CARD_C]]
++    .forEach(function (d) {
++      iconChip(s, d[1], d[2], 0.584, 0.548, d[0], true);
++      iconCopy(s, d[3], d[4], d[5], 0.858, d[6]);
++    });
++  chrome(s, '12');
++});
++
++// 13 — our place
++build.push(function (s) {
++  copyBlock(s, 0.581, 2.111, 'OUR PLACE', { titleW: 3.805, leadW: 3.982, leadH: 0.858,
++    bodyDY: 2.080, bodyW: 3.982, bodyH: 1.616 });
++  dots(s, 10.768, 2.113, 8, 3, YELLOW);
++  caption(s, 7.241, 2.629, 'LOREM IPSUM', 'TITLE HERE', { align: 'right' });
++  caption(s, 4.886, 6.500, 'LOREM IPSUM', 'TITLE HERE');
++  caption(s, 9.311, 6.500, 'LOREM IPSUM', 'TITLE HERE');
++  chrome(s, '13');
++});
++
++// 14 — our favourite corner (full yellow)
++build.push(function (s) {
++  rect(s, 0, 0, 13.333, 7.5, YELLOW);
++  copyBlock(s, 1.099, 1.363, 'OUR FAVOURITE CORNER', { tab: INK, titleW: 6.516, leadColor: INK });
++  txt(s, 'THE MOST FAVOURITE CORNER', 7.323, 5.129, 4.598, 0.454, { size: 14, spc: 3, lh: 1.5 });
++  rect(s, 7.425, 4.970, 0.169, 0.159, INK);
++  txt(s, LEAD, 7.323, 5.543, 4.598, 0.858, { size: 10, lh: 1.5 });
++  dots(s, 11.309, 3.360, 8, 3, INK);
++  chrome(s, '14', { tick: INK });
++});
++
++// 15 — coffee break
++build.push(function (s) {
++  dots(s, 1.586, 1.166, 8, 3, YELLOW);
++  rect(s, 3.373, 1.442, 6.576, 4.627, null, { line: YELLOW, lineWidth: 0.25 });
++  rect(s, 0, 1.863, 4.043, 3.854, YELLOW);
++  txt(s, 'COFFEE', 0.222, 2.817, 3.822, 1.313, { size: 72 });
++  txt(s, 'BREAK', 0.222, 3.839, 3.720, 1.313, { size: 72 });
++  txt(s, 'I Don\u2019t Know How This Life\u2019s Going Without Coffee', 10.335, 1.504, 2.821, 4.998, { size: 48, lh: 0.75 });
++  chrome(s, '15');
++});
++
++// 16 — what's on trending
++build.push(function (s) {
++  copyBlock(s, 0.581, 2.111, 'WHAT\u2019S ON TRENDING', {
++    titleW: 3.805, titleH: 1.313, kickerDY: 1.417,
++    leadDY: 1.873, leadW: 2.848, leadH: 1.111, align: 'left', body: null,
++  });
++  txt(s, BODY_B, 9.790, 4.156, 2.863, 1.616, { size: 10, font: XLIGHT, lh: 1.5 });
++  dots(s, 7.967, 4.284, 8, 3, YELLOW);
++  caption(s, 8.360, 2.194, 'LOREM IPSUM', 'TITLE HERE', { align: 'right' });
++  chrome(s, '16');
++});
++
++// 17 — what's on trending (yellow corner)
++build.push(function (s) {
++  rect(s, 0, 0, 3.918, 4.440, YELLOW);
++  txt(s, 'WHAT\u2019S ON TRENDING', 0.581, 1.853, 3.014, 1.313, { size: 36 });
++  dots(s, 12.096, 4.164, 8, 3, YELLOW);
++  caption(s, 10.261, 1.219, 'LOREM IPSUM', 'TITLE HERE', { align: 'right' });
++  txt(s, 'LOREM IPSUM', 4.151, 4.724, 3.583, 0.404, { size: 18 });
++  txt(s, LEAD.replace('to make ', 'to make. ') + 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
++    4.151, 5.180, 7.138, 0.606, { size: 10, color: YELLOW, align: 'justify', lh: 1.5 });
++  txt(s, BODY, 4.151, 5.868, 7.138, 0.858, { size: 10, font: XLIGHT, align: 'justify', lh: 1.5 });
++  chrome(s, '17');
++});
++
++// 18 — our process
++build.push(function (s) {
++  rect(s, 0, 1.934, 4.163, 2.545, YELLOW);
++  txt(s, 'OUR PROCESS', 0.581, 2.111, 3.805, 0.707, { size: 36 });
++  txt(s, 'LOREM IPSUM', 0.641, 2.772, 2.848, 0.404, { size: 18 });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent sodales odio printer took a galley of type and scrambled it. Lorem ipsum dolor sit amet, consectetur adipiscing.',
++    0.641, 3.228, 3.359, 1.111, { size: 10, align: 'justify', lh: 1.5 });
++  dots(s, 4.161, 3.483, 8, 3, WHITE);
++  caption(s, 10.389, 1.058, 'LOREM IPSUM', 'TITLE HERE', { align: 'right' });
++  [['pencil', 1.800, false, 2.615], ['search', 5.186, true, 6.101], ['gear', 8.725, false, 9.683]]
++    .forEach(function (d) {
++      iconChip(s, d[1], 5.186, 0.725, 0.672, d[0], d[2]);
++      iconCopy(s, d[3], 5.181, 2.504, 0.858, CARD_B);
++    });
++  chrome(s, '18');
++});
++
++// 19 — process (circular icons)
++build.push(function (s) {
++  rect(s, 8.576, 2.207, 4.751, 4.181, YELLOW);
++  [['pencil', 3.075, 1.224, false, 4.004, 1.277], ['gear', 3.973, 2.561, true, 4.997, 2.636],
++   ['truck', 3.973, 4.040, false, 4.997, 4.096], ['globe', 3.075, 5.477, true, 4.045, 5.571]]
++    .forEach(function (d) {
++      circleChip(s, d[1], d[2], 0.836, d[0], d[3]);
++      iconCopy(s, d[4], d[5], 3.655, 0.606, CARD_B);
++    });
++  copyBlock(s, 8.667, 2.875, 'PROCESS', { tab: null, titleW: 3.805, leadColor: INK,
++    leadW: 3.982, leadH: 0.858, bodyDY: 2.081, bodyW: 3.982, bodyH: 1.111, body: BODY_B });
++  dots(s, 8.804, 1.931, 8, 3, INK);
++  chrome(s, '19');
++});
++
++// 20 — our service (captions grid)
++build.push(function (s) {
++  caption(s, 1.858, 3.486, 'LOREM IPSUM', 'TITLE HERE', { align: 'right' });
++  caption(s, 3.874, 2.027, 'LOREM IPSUM', 'TITLE HERE');
++  caption(s, 3.874, 5.107, 'LOREM IPSUM', 'TITLE HERE');
++  copyBlock(s, 8.048, 2.098, 'OUR SERVICE', { titleW: 3.805, lead: LEAD_B, leadW: 3.286, leadH: 0.858,
++    bodyDY: 2.081, bodyW: 3.583, bodyH: 1.868, align: 'left' });
++  chrome(s, '20');
++});
++
++// 21 — our service (full yellow)
++build.push(function (s) {
++  rect(s, 0, 0, 13.333, 7.5, YELLOW);
++  copyBlock(s, 6.711, 1.363, 'OUR SERVICE', { tab: INK, tabX: -0.007, titleW: 3.738, leadColor: INK });
++  txt(s, 'LOREM IPSUM', 6.711, 5.129, 2.361, 0.454, { size: 14, spc: 3, lh: 1.5 });
++  rect(s, 6.813, 4.970, 0.169, 0.159, INK);
++  txt(s, LEAD, 6.711, 5.543, 4.598, 0.858, { size: 10, lh: 1.5 });
++  dots(s, 4.411, 6.210, 8, 3, INK);
++  chrome(s, '21', { tick: INK });
++});
++
++// 22 — our service (three tiles)
++build.push(function (s) {
++  [[6.832, 0.816, 7.330, 1.406, 7.107, 1.880, 7.994, 1.757],
++   [4.132, 3.888, 4.584, 4.528, 4.360, 5.001, 5.247, 4.878],
++   [9.532, 3.888, 9.989, 4.528, 9.766, 5.001, 10.653, 4.878]].forEach(function (c) {
++    rect(s, c[0], c[1], 2.454, 2.884, YELLOW);
++    txt(s, 'LOREM IPSUM', c[2], c[3], 1.546, 0.337, { size: 14, align: 'center' });
++    rect(s, c[6], c[7], 0.219, 0.050, INK);
++    txt(s, CARD, c[4], c[5], 1.993, 1.363, { size: 10, font: XLIGHT, align: 'center', lh: 1.5 });
++  });
++  copyBlock(s, 0.581, 1.120, 'OUR SERVICE', { titleW: 2.604, titleH: 1.313, kickerDY: 1.432, kickerW: 2.604,
++    leadDY: 1.857, leadW: 2.823, leadH: 1.111, bodyDY: 2.968, bodyW: 2.823, bodyH: 2.373, align: 'left' });
++  dots(s, 12.303, 3.148, 8, 3, YELLOW);
++  chrome(s, '22');
++});
++
++// 23-26 — SWOT
++function swot(page, letter, title, bandX, textX, tabX, dotXY, capXY, bodyOpts) {
++  return function (s) {
++    rect(s, bandX, 2.319, 3.918, 2.913, YELLOW);
++    txt(s, letter, bandX + 0.657, 2.844, 2.604, 2.625, { size: 150, font: SEMI, color: WHITE, align: 'center' });
++    copyBlock(s, textX, 2.098, title, { tab: null, titleW: bodyOpts.titleW || 3.805,
++      lead: LEAD_B, leadW: 3.286, leadH: 0.858, align: 'left',
++      bodyDY: 2.081, bodyW: bodyOpts.bodyW, bodyH: bodyOpts.bodyH });
++    rect(s, tabX, 2.133, 1.018, 0.428, YELLOW);
++    dots(s, dotXY[0], dotXY[1], 8, 3, YELLOW);
++    caption(s, capXY[0], capXY[1], 'LOREM IPSUM', 'TITLE HERE');
++    chrome(s, page);
++  };
++}
++build.push(swot('23', 'S', 'STRENGTHS', 0, 8.447, 7.341, [2.248, 5.364], [6.118, 6.326], { bodyW: 3.583, bodyH: 1.868 }));
++build.push(swot('24', 'W', 'WEAKNESSES', 9.416, 1.090, -0.015, [11.695, 1.546], [5.393, 6.341], { bodyW: 3.805, bodyH: 1.616 }));
++build.push(swot('25', 'O', 'OPPORTUNITIES', 0, 8.447, 7.341, [0.014, 1.503], [6.074, 0.689], { titleW: 4.060, bodyW: 3.583, bodyH: 1.868 }));
++build.push(swot('26', 'T', 'THREATS', 9.416, 1.090, -0.015, [4.235, 2.085], [5.414, 0.665], { bodyW: 3.745, bodyH: 1.616 }));
++
++// 27 — client satisfaction (3-D column chart)
++build.push(function (s) {
++  rect(s, 0, 0, 4.652, 2.869, YELLOW);
++  txt(s, 'CLIENT SATISFACTION', 0.581, 1.556, 3.593, 1.313, { size: 36 });
++  txt(s, 'LOREM IPSUM', 0.581, 3.158, 3.583, 0.404, { size: 18 });
++  txt(s, LEAD_B, 0.581, 3.615, 3.286, 0.858, { size: 10, color: YELLOW, lh: 1.5 });
++  txt(s, BODY, 0.581, 4.508, 3.767, 1.616, { size: 10, font: XLIGHT, align: 'justify', lh: 1.5 });
++  dots(s, 4.835, -0.009, 8, 3, YELLOW);
++  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++  s.addChart('bar3D', [
++    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Series 3', labels: cats, values: [2, 2, 3, 5] },
++  ], {
++    x: 5.271, y: 1.663, w: 6.444, h: 4.713,
++    chartColors: [YELLOW, CHARCOAL, 'A5A5A5'],
++    barDir: 'col', barGrouping: 'standard', bar3DShape: 'box', barGapWidthPct: 150,
++    v3DRotX: 15, v3DRotY: 20, v3DRAngAx: true,
++    showTitle: true, title: 'Chart Title', titleFontFace: LIGHT, titleFontSize: 16, titleColor: '595959',
++    showLegend: true, legendPos: 'b', legendFontFace: LIGHT, legendFontSize: 12, legendColor: '595959',
++    catAxisLabelFontFace: LIGHT, catAxisLabelFontSize: 12, catAxisLabelColor: '595959',
++    valAxisLabelFontFace: LIGHT, valAxisLabelFontSize: 12, valAxisLabelColor: '595959',
++    serAxisLabelFontFace: LIGHT, serAxisLabelFontSize: 12, serAxisLabelColor: '595959',
++    valGridLine: { style: 'solid', color: 'D9D9D9', size: 0.75 },
++    catAxisLineShow: false, valAxisLineShow: false, serAxisLineShow: false,
++    catAxisMajorTickMark: 'none', valAxisMajorTickMark: 'none', serAxisMajorTickMark: 'none',
++  });
++  chrome(s, '27');
++});
++
++// 28 — mock up (phones)
++build.push(function (s) {
++  rect(s, 0, 4.196, 13.333, 3.304, YELLOW);
++  deviceBox(s, [6.882, 1.681, 2.095, 4.513], [7.006, 2.194, 1.847, 3.417]);
++  deviceBox(s, [4.162, 1.278, 2.692, 5.166], [4.578, 1.875, 2.068, 3.903]);
++  copyBlock(s, 1.090, 2.378, 'MOCK UP CREATIVE SECTION', {
++    titleW: 3.025, titleH: 1.919, kickerDY: 2.011,
++    lead: LEAD_B, leadDY: 2.467, leadW: 3.286, leadH: 0.858, leadColor: INK, align: 'left', body: null,
++  });
++  txt(s, BODY, 9.178, 4.331, 3.011, 2.121, { size: 10, font: XLIGHT, lh: 1.5 });
++  dots(s, 9.272, 3.418, 8, 3, YELLOW);
++  chrome(s, '28');
++});
++
++// 29 — mock up (monitor)
++build.push(function (s) {
++  rect(s, -0.015, -0.019, 5.957, 7.519, YELLOW);
++  deviceBox(s, [6.535, 2.278, 5.466, 3.446], [6.812, 2.489, 4.968, 2.952], CHARCOAL);
++  rect(s, 6.535, 5.724, 5.466, 0.458, 'C6C7CB');
++  rect(s, 8.616, 6.182, 1.275, 0.560, 'C6C7CB');
++  s.addShape('trapezoid', { x: 7.990, y: 6.742, w: 2.600, h: 0.280, fill: { color: 'C6C7CB' }, line: { type: 'none' } });
++  copyBlock(s, 1.090, 1.262, 'MOCK UP CREATIVE SECTION', {
++    tab: CHARCOAL, titleW: 3.805, titleH: 1.919, kickerDY: 2.010,
++    lead: LEAD_B, leadDY: 2.467, leadW: 3.286, leadH: 0.858, leadColor: INK, align: 'left', body: null,
++  });
++  txt(s, BODY, 1.090, 4.645, 3.011, 2.121, { size: 10, font: XLIGHT, lh: 1.5 });
++  dots(s, 12.029, 3.689, 8, 3, YELLOW);
++  caption(s, 6.434, 1.213, 'LOREM IPSUM', 'TITLE HERE');
++  chrome(s, '29');
++});
++
++// 30 — thank you
++build.push(function (s) {
++  rect(s, 0, 2.913, 13.349, 0.558, YELLOW, { transparency: 38 });
++  rect(s, -0.015, 3.471, 13.349, 2.232, YELLOW);
++  txt(s, 'THANK YOU', 2.449, 4.029, 8.449, 1.447, { size: 80, font: SEMI, color: WHITE, align: 'center' });
++  caption(s, 0.833, 6.194, 'GET IN TOUCH', 'WITH US');
++  [['f', 3.777, 3.988], [null, 7.024, 7.278], ['t', 10.440, 10.536]].forEach(function (d) {
++    if (d[0]) txt(s, d[0], d[1] - 0.21, 6.245, 0.42, 0.42, { size: 22, font: SEMI, color: YELLOW, align: 'center' });
++    else icon(s, 'twitter', d[1], 6.455, YELLOW, WHITE, 0.36);
++    txt(s, 'Yourcompany.account', d[2], 6.273, 2.171, 0.404, { size: 12, lh: 1.5 });
++  });
++  chrome(s, '30', { footer: false });
++});
++
++/* ------------------------------------------------------------------- write */
++const pptx = new PptxGenJS();
++pptx.author = 'SUNRISE';
++pptx.title = 'SUNRISE Corporate Presentation Template';
++pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++pptx.layout = 'WIDE';
++
++build.forEach(function (fn) { fn(pptx.addSlide()); });
++
++pptx.writeFile({ fileName: path.join(__dirname, '03026945-5021-4a2b-b38f-0d9486158858_grok_final.pptx') })
++  .then(function (f) { console.log('wrote ' + f); });

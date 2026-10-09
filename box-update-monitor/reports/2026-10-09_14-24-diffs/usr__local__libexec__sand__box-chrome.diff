@@ -1,0 +1,20 @@
+--- 2026-10-09_14-11:/usr/local/libexec/sand/box-chrome
++++ 2026-10-09_14-24:/usr/local/libexec/sand/box-chrome
+@@ -4,6 +4,17 @@
+ # <<< box-chrome port table <<<
+ /usr/local/bin/ensure-machine-id || true
+ 
++if [ -n "${CURSOR_MCP_BROWSER_OPEN_LOG:-}" ]; then
++	for sand_opened_url in "$@"; do
++		case "${sand_opened_url}" in
++		http://* | https://*)
++			printf '%s\topen\t%s\n' "$(date +%s%3N)" "${sand_opened_url}" \
++				>>"${CURSOR_MCP_BROWSER_OPEN_LOG}" 2>/dev/null || true
++			;;
++		esac
++	done
++fi
++
+ if [ -r /usr/local/bin/box-cgroups.sh ]; then
+ 	# shellcheck source=/dev/null
+ 	. /usr/local/bin/box-cgroups.sh

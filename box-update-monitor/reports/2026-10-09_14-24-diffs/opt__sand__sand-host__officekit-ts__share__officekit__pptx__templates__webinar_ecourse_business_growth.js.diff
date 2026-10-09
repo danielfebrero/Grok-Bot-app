@@ -1,0 +1,635 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/webinar_ecourse_business_growth.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/webinar_ecourse_business_growth.js
+@@ -0,0 +1,632 @@
++#!/usr/bin/env node
++/**
++ * CREATEVA — "Webinar & Ecourse Presentation"
++ * 18 slides, 13.333 x 7.5 in (16:9), rebuilt with pptxgenjs only.
++ *
++ * The reference deck contains no raster media: every picture frame in it is an
++ * empty PowerPoint picture placeholder, which renders as blank. They are therefore
++ * left blank here too (see PHOTO_FRAMES below for their positions).
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens
++ * ------------------------------------------------------------------ */
++
++const PURPLE = '7C48FA'; // theme accent1
++const PINK = 'FA1F4E'; // theme accent2
++const WHITE = 'FFFFFF';
++const DARK = '262626'; // tx1 @ 85% luminance — headings / bold lead-ins
++const GRAY = '808080'; // tx1 @ 50% luminance — body copy
++const RULE = 'D9D9D9'; // bg1 @ 85% luminance — table-of-content separators
++
++const HEAD = 'Montserrat Medium'; // display / headings / numerals
++const BODY = 'Open Sans'; // body copy and nav
++
++// pptxgenjs rewrites the shadow object it is handed, so each shape gets a fresh copy.
++// (A zero offset/angle would be replaced by the library defaults, hence the 0.01pt nudge.)
++const shadow = (blur, opacity, offset = 0.01, angle = 90) =>
++  ({ type: 'outer', blur, offset, angle, color: '000000', opacity });
++
++// The deck's card shadow is blurred 15pt AND spread to 102% of the shape, so its halo
++// grows with the shape. pptxgenjs has no spread, so the spread is folded into the blur.
++const SHADOW_CARD = (w, h) => shadow(15 + 0.72 * Math.max(w, h), 0.27);
++const SHADOW_SOFT = () => shadow(6, 0.13); // tighter shadow on the two wide panels
++const SHADOW_HERO = () => shadow(4, 0.1, 3); // cover card, offset downwards
++
++// roundRect corner "adj" values used by the deck, expressed as a fraction of the
++// shape's shorter side (PowerPoint adj 12093 / 9564 / 22685 / default 16667).
++const ADJ_CARD = 0.12093;
++const ADJ_PANEL = 0.09564;
++const ADJ_PILL = 0.22685;
++const ADJ_HERO = 0.16667;
++
++/* ------------------------------------------------------------------ *
++ * Reusable copy
++ * ------------------------------------------------------------------ */
++
++const LEAD = 'Lorem ipsum dolor sit amet, ';
++const A = 'consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';
++const B = 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ';
++const C = 'Duis aute irure dolor in reprehenderit in voluptate';
++const D = ' velit esse cillum sunt in culpa qui officia deserunt mollit anim id est laborum.';
++
++const COPY = {
++  full: A + B + C + D,
++  aboutUs: A + B + C + ' velit esse cillum dolore eu fugiat nulla sunt in culpa qui officia deserunt mollit anim id est laborum.',
++  toc: 'consectetur adipiscing elit, sed do eiusmod incididunt ut labore et dolore magna aliqua. ' + B,
++  offer: A + B,
++  short: A + B + C,
++  profile: A + B + C + ' velit esse',
++  grow: A + 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo irure dolor in reprehenderit in voluptate eu fugiat nulla pariatur. ',
++  solution: A + 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip commodo aute irure dolor in reprehenderit in voluptate velit esse',
++  brk: A + B + C + ' velit esse cillum dolore eu fugiat nulla pariatur. ',
++  qa: A + 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex commodo',
++  pricing: A + B + 'Duis aute irure dolor velit esse cillum sunt in culpa qui officia deserunt mollit anim id est laborum.',
++  testimonial: A + 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex reprehenderit in voluptate velit esse',
++  contact: A + 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi',
++  aboutCard: A,
++};
++
++const CARD_COPY = {
++  small: 'Lorem ipsum dolor sit consectetur adipiscing do eiusmod',
++  topicTwo: 'PLACEHOLDER',
++  benefit: 'PLACEHOLDER',
++  solution: 'Lorem ipsum dolor sit consectetur adipiscing elit sed eusmod',
++  team: 'Lorem ipsum dolor sit consectetur adipiscing sed eusmod',
++  quote: 'Lorem ipsum dolor sit amet, consectetur adipiscing',
++  qa: 'Lorem ipsum dolor sit consectetur',
++};
++
++/* ------------------------------------------------------------------ *
++ * Vector artwork (custom geometry, all points in inches)
++ * ------------------------------------------------------------------ */
++
++// Three stacked bars — the hamburger "menu" mark in the top-left corner.
++const HAMBURGER = [0, 0.404, 0.809].reduce((pts, top) => pts.concat([
++  { x: 0, y: top * 0.142 }, { x: 0.18, y: top * 0.142 },
++  { x: 0.18, y: (top + 0.191) * 0.142 }, { x: 0, y: (top + 0.191) * 0.142 }, { close: true },
++]), []);
++
++// Outlined caret used inside the round nav badges (unit square, apex at top).
++const CARET = [
++  { x: 0, y: 1 }, { x: 0.5, y: 0 }, { x: 1, y: 1 },
++  { x: 0.789, y: 1 }, { x: 0.5, y: 0.423 }, { x: 0.211, y: 1 }, { close: true },
++];
++
++// 4x3 grid of small squares (decorative dots on the table-of-content slide).
++const DOT_GRID = [];
++for (const row of [0, 0.213, 0.427]) {
++  for (const col of [0, 0.213, 0.427, 0.641]) {
++    DOT_GRID.push({ x: col, y: row }, { x: col + 0.047, y: row },
++      { x: col + 0.047, y: row + 0.047 }, { x: col, y: row + 0.047 }, { close: true });
++  }
++}
++
++const cubic = (x, y, x1, y1, x2, y2) => ({ x, y, curve: { type: 'cubic', x1, y1, x2, y2 } });
++
++// Purple background slabs: a rectangle with one large rounded "bite" taken out of it.
++const SLAB = {
++  // slide 2 — top-left slab, bite on the bottom-right
++  toc: [{ x: 0, y: 0 }, { x: 5.707, y: 0 }, { x: 5.707, y: 0.895 }, { x: 1.701, y: 0.895 },
++    cubic(1.239, 1.356, 1.446, 0.895, 1.239, 1.101), { x: 1.239, y: 2.28 }, { x: 0, y: 2.28 }, { close: true }],
++  // slide 4 — bottom-left slab, bite on the top-right
++  about: [{ x: 0, y: 0 }, { x: 1.45, y: 0 }, { x: 1.45, y: 0.987 },
++    cubic(1.944, 1.481, 1.45, 1.26, 1.671, 1.481), { x: 4.506, y: 1.481 },
++    { x: 4.506, y: 2.619 }, { x: 0, y: 2.619 }, { close: true }],
++  // slide 7 — bottom-right slab, bite on the top-left
++  offer: [{ x: 4.045, y: 0 }, { x: 5.379, y: 0 }, { x: 5.379, y: 3.169 }, { x: 0, y: 3.169 },
++    { x: 0, y: 2.045 }, { x: 3.597, y: 2.045 },
++    cubic(4.045, 1.597, 3.845, 2.045, 4.045, 1.845), { close: true }],
++  // slide 10 — full-width banner with a rounded notch along the bottom
++  banner: [{ x: 0, y: 0 }, { x: 13.333, y: 0 }, { x: 13.333, y: 2.284 }, { x: 12.411, y: 2.284 },
++    { x: 12.411, y: 1.396 }, cubic(11.967, 0.952, 12.411, 1.151, 12.213, 0.952),
++    { x: 1.366, y: 0.952 }, cubic(0.922, 1.396, 1.121, 0.952, 0.922, 1.151),
++    { x: 0.922, y: 2.284 }, { x: 0, y: 2.284 }, { close: true }],
++  // slide 12 — full-height left slab with a rounded notch on its right edge
++  profile: [{ x: 0, y: 0 }, { x: 4.15, y: 0 }, { x: 4.15, y: 1.266 }, { x: 2.267, y: 1.266 },
++    cubic(1.724, 1.809, 1.967, 1.266, 1.724, 1.509), { x: 1.724, y: 5.691 },
++    cubic(2.267, 6.234, 1.724, 5.991, 1.967, 6.234), { x: 4.15, y: 6.234 },
++    { x: 4.15, y: 7.5 }, { x: 0, y: 7.5 }, { close: true }],
++  // slide 13 — top-left slab, bite on the bottom-right
++  brk: [{ x: 0, y: 0 }, { x: 7.655, y: 0 }, { x: 7.655, y: 1.247 }, { x: 2.206, y: 1.247 },
++    cubic(1.632, 1.822, 1.889, 1.247, 1.632, 1.504), { x: 1.632, y: 2.972 },
++    { x: 0, y: 2.972 }, { close: true }],
++  // slide 14 — top-right slab, bite on the bottom-left
++  qa: [{ x: 0, y: 0 }, { x: 5.652, y: 0 }, { x: 5.652, y: 2.766 }, { x: 4.0, y: 2.766 },
++    { x: 4.0, y: 1.623 }, cubic(3.606, 1.228, 4.0, 1.405, 3.823, 1.228),
++    { x: 0, y: 1.228 }, { close: true }],
++};
++
++/* ------------------------------------------------------------------ *
++ * Element helpers
++ * ------------------------------------------------------------------ */
++
++// Every text frame in the deck is a top-anchored, left-aligned, auto-height text box.
++// Note: on non-wrapping frames auto-height also centres the single line inside the
++// frame, so the declared widths below are the ones the reference deck uses.
++function txt(slide, content, opts) {
++  slide.addText(content, Object.assign({
++    fontFace: BODY, fontSize: 10, color: GRAY, align: 'left', valign: 'top', fit: 'resize',
++  }, opts));
++}
++
++// Body paragraph: 10pt, 1.5 line spacing, justified by default.
++function para(slide, content, opts) {
++  txt(slide, content, Object.assign({ lineSpacingMultiple: 1.5, align: 'justify' }, opts));
++}
++
++// "Lorem ipsum dolor sit amet," lead-in (bold) followed by the gray remainder.
++// A couple of slides put the separating space in the gray run instead; `tightLead` does that.
++function leadIn(rest, opts = {}) {
++  const split = opts.tightLead ? LEAD.length - 1 : LEAD.length;
++  return [
++    { text: LEAD.slice(0, split), options: { bold: true, color: opts.leadColor || DARK } },
++    { text: LEAD.slice(split) + rest, options: { color: opts.color || GRAY } },
++  ];
++}
++
++// 28pt Montserrat section heading.
++function heading(slide, str, opts) {
++  txt(slide, str, Object.assign({ fontFace: HEAD, fontSize: 28, color: DARK, h: 0.572, wrap: false }, opts));
++}
++
++function rrect(slide, o) {
++  slide.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: { color: o.fill },
++    rectRadius: (o.adj || ADJ_CARD) * Math.min(o.w, o.h),
++    shadow: o.shadow,
++  });
++}
++
++function freeform(slide, o) {
++  slide.addShape('custGeom', { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.fill }, points: o.points, shadow: o.shadow });
++}
++
++// White disc + coloured dot + white caret. `dir` is one of up/right/down/left.
++const CARET_ROT = { up: 0, right: 90, down: 180, left: 270 };
++function badge(slide, x, y, color, dir) {
++  const D = 0.396, DOT = 0.276, CW = 0.116, CH = 0.073;
++  const cx = x + D / 2, cy = y + D / 2;
++  slide.addShape('ellipse', { x, y, w: D, h: D, fill: { color: WHITE } });
++  slide.addShape('ellipse', { x: cx - DOT / 2, y: cy - DOT / 2, w: DOT, h: DOT, fill: { color } });
++  slide.addShape('custGeom', {
++    x: cx - CW / 2, y: cy - CH / 2, w: CW, h: CH, fill: { color: WHITE }, rotate: CARET_ROT[dir],
++    points: CARET.map((p) => (p.close ? p : { x: p.x * CW, y: p.y * CH })),
++  });
++}
++
++// Top-right navigation labels + hamburger mark. Present on every slide.
++const NAV_ITEMS = [['Portfolio', 8.648, 0.765], ['Team', 9.973, 0.565], ['Service', 11.099, 0.667], ['About', 12.323, 0.598]];
++function chrome(slide, o = {}) {
++  freeform(slide, { x: 0.49, y: 0.406, w: 0.18, h: 0.142, fill: o.mark || PINK, points: HAMBURGER });
++  NAV_ITEMS.forEach(([label, x, w]) => {
++    txt(slide, label, { x, y: 0.346, w, h: 0.269, align: 'right', color: o.nav || GRAY });
++  });
++}
++
++// Bottom strip: caption on the left, page number flush against the right margin.
++const PAGE_RIGHT = 12.921;
++function footer(slide, page, o = {}) {
++  const [bold, rest, w] = o.presenter
++    ? ['Present By : ', 'Tamara Valente', 2.037]
++    : ['Back To ', 'Table Of Content', 1.878];
++  txt(slide, [
++    { text: bold, options: { bold: true, color: o.captionColor || DARK } },
++    { text: rest, options: { color: o.captionColor || GRAY } },
++  ], { x: 0.412, y: 6.883, w, h: 0.269, wrap: false });
++  txt(slide, page, {
++    x: PAGE_RIGHT - 0.35, y: 6.883, w: 0.35, h: 0.269, align: 'right', wrap: false,
++    fontFace: HEAD, color: o.pageColor || DARK,
++  });
++}
++
++/**
++ * Rounded card with a centred Montserrat title and a centred body paragraph —
++ * the repeating "topic / goal / benefit / solution / package" tile.
++ */
++function tile(slide, c) {
++  rrect(slide, { x: c.x, y: c.y, w: c.w, h: c.h, fill: c.fill, shadow: c.shadow === null ? undefined : SHADOW_CARD(c.w, c.h) });
++  txt(slide, c.title, {
++    x: c.x, y: c.y + c.titleDy, w: c.w, h: 0.303, align: 'center', wrap: false,
++    fontFace: HEAD, fontSize: c.titleSize || 12, color: c.titleColor,
++  });
++  txt(slide, c.body, {
++    x: c.x + (c.w - 2.543) / 2, y: c.y + c.bodyDy, w: 2.543, h: c.bodyH || 0.58,
++    align: 'center', lineSpacingMultiple: 1.5, color: c.bodyColor,
++  });
++}
++
++// Big numeral ("01") followed by a short paragraph — used in several layouts.
++function numberedNote(slide, n) {
++  txt(slide, n.num, {
++    x: n.x, y: n.y, w: n.num === '01' ? 0.493 : 0.551, h: 0.438, wrap: false,
++    fontFace: HEAD, fontSize: 20, color: n.numColor,
++  });
++  para(slide, n.body, { x: n.textX, y: n.textY, w: n.textW || 2.543, h: 0.58, color: n.color || GRAY });
++}
++
++// Coloured banner with a badge on its left edge, a numeral and a short note.
++function bannerRow(slide, r) {
++  rrect(slide, { x: 7.999, y: r.y, w: 3.949, h: 1.285, fill: r.fill });
++  badge(slide, 7.804, r.y + 0.445, r.fill, 'right');
++  numberedNote(slide, {
++    num: r.num, x: 8.419, y: r.y + 0.424, numColor: WHITE,
++    body: CARD_COPY.small, textX: 8.984, textY: r.y + 0.353, color: WHITE,
++  });
++}
++
++/**
++ * Testimonial / contact card: coloured panel, badge straddling its left edge,
++ * a name and a two-line quote. `nameW` is the (non-wrapping) name box width.
++ */
++function quoteCard(slide, q) {
++  if (q.fill) rrect(slide, { x: q.x, y: q.y, w: 2.975, h: 1.52, fill: q.fill });
++  badge(slide, q.x - 0.196, q.y + 0.574, q.accent, 'right');
++  txt(slide, q.name, {
++    x: q.x + 0.554, y: q.textY, w: q.nameW, h: 0.303, wrap: false,
++    fontFace: HEAD, fontSize: 12, color: q.nameColor,
++  });
++  para(slide, CARD_COPY.quote, { x: q.x + 0.554, y: q.textY + 0.303, w: 2.038, h: 0.58, color: q.textColor });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++// The cover word carries a left-to-right purple-to-pink gradient fill. pptxgenjs has no
++// gradient text, so it is approximated by colouring each letter a step along the ramp.
++function gradientRuns(word, from, to) {
++  const chan = (c, i) => parseInt(c.substr(i * 2, 2), 16);
++  return [...word].map((ch, i) => {
++    const t = i / (word.length - 1);
++    const mix = [0, 1, 2].map((k) => Math.round(chan(from, k) + (chan(to, k) - chan(from, k)) * t));
++    return { text: ch, options: { color: mix.map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase() } };
++  });
++}
++
++// Slides 1 and 18 share the same "hero card" cover layout.
++function coverSlide(pptx, o) {
++  const s = pptx.addSlide();
++  rrect(s, { x: 3.013, y: 4.271, w: 7.308, h: 2.102, fill: WHITE, adj: ADJ_HERO, shadow: SHADOW_HERO() });
++  chrome(s);
++  footer(s, o.page, { presenter: true });
++  txt(s, gradientRuns(o.title, PURPLE, PINK), {
++    x: o.titleX, y: o.titleY, w: o.titleW, h: o.titleH, align: 'center', wrap: false,
++    fontFace: HEAD, fontSize: o.titleSize, charSpacing: 3,
++  });
++  txt(s, 'Webinar & Ecourse Presentation', {
++    x: 4.093, y: o.subY, w: 5.267, h: 0.303, align: 'center', wrap: false, charSpacing: 6, fontSize: 12,
++  });
++  badge(s, 2.814, 5.124, PURPLE, 'left');
++  badge(s, 10.123, 5.124, PINK, 'right');
++  return s;
++}
++
++function slide01(pptx) {
++  coverSlide(pptx, {
++    page: '01', title: 'CREATEVA', titleSize: 60,
++    titleX: 3.996, titleY: 4.618, titleW: 5.342, titleH: 1.111, subY: 5.58,
++  });
++}
++
++// label, label box width, page number, page box width
++const TOC_ROWS = [
++  ['Welcome', 0.805, '03', 0.379], ['About', 0.598, '04', 0.391],
++  ['Service', 0.667, '07', 0.383], ['Team', 0.565, '11', 0.307],
++  ['Pricing Table', 1.033, '15', 0.335], ['Testimonials', 1.024, '16', 0.342],
++  ['Contact', 0.705, '17', 0.340],
++];
++
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  freeform(s, { x: 0, y: 0, w: 5.707, h: 2.28, fill: PURPLE, points: SLAB.toc });
++  rrect(s, { x: 8.254, y: 2.408, w: 3.84, h: 4.197, fill: WHITE, shadow: SHADOW_SOFT() });
++  chrome(s, { mark: WHITE });
++  footer(s, '02', { presenter: true });
++  heading(s, 'Table Of Content', { x: 1.297, y: 4.488, w: 3.703 });
++
++  TOC_ROWS.forEach(([label, labelW, page, pageW], i) => {
++    const y = 3.099 + i * 0.4187;
++    txt(s, label, { x: 8.91, y, w: labelW, h: 0.269, wrap: false });
++    txt(s, page, { x: 11.438 - pageW, y, w: pageW, h: 0.269, align: 'right', wrap: false, fontFace: HEAD, color: PINK });
++    s.addShape('line', { x: 9.009, y: y + 0.302, w: 2.331, h: 0, line: { color: RULE, width: 0.5 } });
++  });
++
++  para(s, leadIn(COPY.toc), { x: 1.297, y: 5.296, w: 5.803, h: 0.832 });
++  badge(s, 9.981, 2.21, PINK, 'down');
++  freeform(s, { x: 11.123, y: 1.211, w: 0.688, h: 0.474, fill: PURPLE, points: DOT_GRID });
++}
++
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { mark: PURPLE });
++  footer(s, '03');
++  heading(s, 'Welcome Message', { x: 4.676, y: 0.867, w: 3.982 });
++  para(s, leadIn(COPY.full), { x: 1.671, y: 1.637, w: 9.991, h: 0.832, align: 'center' });
++
++  // Middle tile is taller and sits above the two white ones.
++  tile(s, {
++    x: 5.144, y: 4.776, w: 3.046, h: 1.734, fill: PURPLE, title: 'Topic Two', titleColor: WHITE,
++    titleDy: 0.317, bodyDy: 0.574, bodyH: 0.832, body: CARD_COPY.topicTwo, bodyColor: WHITE,
++  });
++  [['Topic One', 1.919], ['Topic Three', 8.369]].forEach(([title, x]) => {
++    tile(s, {
++      x, y: 4.96, w: 3.046, h: 1.365, fill: WHITE, title, titleColor: PINK,
++      titleDy: 0.259, bodyDy: 0.516, body: CARD_COPY.small, bodyColor: GRAY,
++    });
++  });
++}
++
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  freeform(s, { x: 0, y: 4.881, w: 4.506, h: 2.619, fill: PURPLE, points: SLAB.about });
++  chrome(s);
++  footer(s, '04', { captionColor: WHITE });
++  heading(s, 'About Us', { x: 1.351, y: 1.828, w: 2.048 });
++  para(s, leadIn(COPY.aboutUs), { x: 4.487, y: 1.316, w: 7.493, h: 1.084 });
++  s.addShape('line', { x: 1.45, y: 1.466, w: 1.175, h: 0, line: { color: PURPLE, width: 0.5, endArrowType: 'triangle' } });
++
++  rrect(s, { x: 7.173, y: 3.849, w: 4.71, h: 2.065, fill: WHITE, shadow: SHADOW_SOFT() });
++  badge(s, 11.685, 4.683, PINK, 'right');
++  txt(s, 'How To Grow Your Business', { x: 7.743, y: 4.297, w: 2.996, h: 0.337, fontFace: HEAD, fontSize: 14, color: DARK, wrap: false });
++  para(s, leadIn(COPY.aboutCard, { leadColor: GRAY }), { x: 7.743, y: 4.634, w: 3.57, h: 0.832 });
++}
++
++const GOALS = [
++  ['Goal One', 1.726, 3.234, WHITE, PINK, GRAY],
++  ['Goal Two', 5.144, 3.234, WHITE, PINK, GRAY],
++  ['Goal Three', 8.561, 3.234, WHITE, PINK, GRAY],
++  ['Goal Four', 3.435, 5.003, PURPLE, WHITE, WHITE],
++  ['Goal Five', 6.852, 5.003, PINK, WHITE, WHITE],
++];
++
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  footer(s, '05');
++  heading(s, 'Our Webinar Goal', { x: 4.772, y: 0.867, w: 3.789, align: 'center' });
++  para(s, leadIn(COPY.full), { x: 1.671, y: 1.637, w: 9.991, h: 0.832, align: 'center' });
++  GOALS.forEach(([title, x, y, fill, titleColor, bodyColor]) => {
++    tile(s, {
++      x, y, w: 3.046, h: 1.365, fill, title, titleColor,
++      titleDy: 0.259, bodyDy: 0.516, body: CARD_COPY.small, bodyColor,
++    });
++  });
++}
++
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  s.addShape('rect', { x: 0, y: 1.394, w: 5.286, h: 2.111, fill: { color: PURPLE } });
++  chrome(s);
++  footer(s, '06');
++  heading(s, 'Let\u2019s Grow Your Business', { x: 1.476, y: 1.928, w: 3.147, h: 1.043, color: WHITE, wrap: true });
++  para(s, leadIn(COPY.grow), { x: 5.091, y: 4.643, w: 6.767, h: 0.832 });
++  [['01', 5.091, 5.656], ['02', 8.75, 9.315]].forEach(([num, x, textX]) => {
++    numberedNote(s, { num, x, y: 5.853, numColor: PINK, body: CARD_COPY.small, textX, textY: 5.782 });
++  });
++}
++
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  freeform(s, { x: 7.955, y: 4.331, w: 5.379, h: 3.169, fill: PURPLE, points: SLAB.offer });
++  chrome(s);
++  footer(s, '07', { pageColor: WHITE });
++  heading(s, 'What Do We Offer?', { x: 1.644, y: 1.083, w: 2.979, h: 1.043, wrap: true });
++  para(s, leadIn(COPY.offer), { x: 5.609, y: 1.189, w: 6.157, h: 0.832 });
++
++  rrect(s, { x: -0.649, y: 2.851, w: 5.273, h: 2.961, fill: WHITE, shadow: SHADOW_CARD(5.273, 2.961) });
++  ['01', '02', '03'].forEach((num, i) => {
++    numberedNote(s, {
++      num, x: 0.702, y: 3.459 + i * 0.653, numColor: PINK,
++      body: CARD_COPY.small, textX: 1.378, textY: 3.388 + i * 0.653,
++    });
++  });
++  badge(s, 4.425, 4.133, PINK, 'right');
++}
++
++const BENEFITS = [
++  ['Benefits One', 1.652, WHITE, PURPLE, GRAY],
++  ['Benefits Two', 5.069, PINK, WHITE, WHITE],
++  ['Benefits Three', 8.486, WHITE, PURPLE, GRAY],
++];
++
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Webinar Benefits', { x: 4.772, y: 0.867, w: 3.789, align: 'center' });
++  para(s, leadIn(COPY.full), { x: 1.671, y: 1.637, w: 9.991, h: 0.832, align: 'center' });
++  BENEFITS.forEach(([title, x, fill, titleColor, bodyColor]) => {
++    tile(s, {
++      x, y: 3.351, w: 3.196, h: 1.896, fill, title, titleColor, titleSize: 14,
++      titleDy: 0.364, bodyDy: 0.701, bodyH: 0.832, body: CARD_COPY.benefit, bodyColor,
++    });
++    badge(s, x + 1.399, 3.153, fill === PINK ? PINK : PURPLE, 'down');
++  });
++  footer(s, '08', { captionColor: WHITE, pageColor: WHITE });
++}
++
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  rrect(s, { x: 1.385, y: 4.153, w: 10.563, h: 2.338, fill: WHITE, shadow: SHADOW_CARD(10.563, 2.338) });
++  chrome(s);
++  footer(s, '09');
++  heading(s, 'Case Study', { x: 2.265, y: 5.292, w: 2.423, align: 'center' });
++  para(s, leadIn(COPY.short), { x: 5.689, y: 4.78, w: 5.379, h: 1.084 });
++  s.addShape('line', { x: 2.445, y: 4.927, w: 0.78, h: 0, line: { color: PURPLE, width: 0.5, endArrowType: 'triangle' } });
++  bannerRow(s, { y: 1.009, fill: PURPLE, num: '01' });
++  bannerRow(s, { y: 2.581, fill: PINK, num: '02' });
++}
++
++const SOLUTIONS = [
++  ['Solution One', 1.547, WHITE, PURPLE, GRAY],
++  ['Solution Two', 5.069, PINK, WHITE, WHITE],
++  ['Solution Three', 8.624, WHITE, PURPLE, GRAY],
++];
++
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  freeform(s, { x: 0, y: 0, w: 13.333, h: 2.284, fill: PURPLE, points: SLAB.banner });
++  chrome(s, { mark: WHITE, nav: WHITE });
++  footer(s, '10');
++  SOLUTIONS.forEach(([title, x, fill, titleColor, bodyColor], i) => {
++    tile(s, {
++      x, y: 2.795, w: 3.196, h: 1.642, fill, title, titleColor, titleSize: 14,
++      titleDy: 0.364, bodyDy: 0.701, body: CARD_COPY.solution, bodyColor,
++    });
++    badge(s, [2.947, 6.469, 10.024][i], 2.597, fill === PINK ? PINK : PURPLE, 'down');
++  });
++  heading(s, 'The Best Solution For Growing Business', { x: 1.405, y: 5.208, w: 4.637, h: 1.043, wrap: true });
++  para(s, leadIn(COPY.solution), { x: 6.892, y: 5.187, w: 5.037, h: 1.084 });
++}
++
++const TEAM = [['Wesley Thomas', 2.493, PURPLE, 2.31], ['Roberto Mansour', 5.578, PINK, 5.395], ['Calvin Bugarin', 8.663, PURPLE, 8.477]];
++
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  rrect(s, { x: 1.293, y: 4.32, w: 10.747, h: 2.171, fill: WHITE, shadow: SHADOW_CARD(10.747, 2.171) });
++  chrome(s);
++  footer(s, '11');
++  heading(s, 'Our Creative Team', { x: 4.696, y: 0.867, w: 3.941, align: 'center' });
++  para(s, leadIn(COPY.full), { x: 1.671, y: 1.637, w: 9.991, h: 0.832, align: 'center' });
++  TEAM.forEach(([name, x, fill, bodyX]) => {
++    rrect(s, { x, y: 4.801, w: 2.178, h: 0.461, fill, adj: ADJ_PILL });
++    txt(s, name, { x, y: 4.863, w: 2.178, h: 0.337, align: 'center', wrap: false, fontFace: HEAD, fontSize: 14, color: WHITE });
++    txt(s, CARD_COPY.team, { x: bodyX, y: 5.433, w: 2.543, h: 0.58, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++}
++
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  freeform(s, { x: 0, y: 0, w: 4.15, h: 7.5, fill: PURPLE, points: SLAB.profile });
++  chrome(s, { mark: WHITE });
++  footer(s, '12', { captionColor: WHITE });
++  heading(s, 'Hello, I am Calvin Bugarin', { x: 8.138, y: 1.66, w: 3.265, h: 1.043, wrap: true });
++  txt(s, 'Moderator', { x: 8.138, y: 2.703, w: 1.422, h: 0.303, fontSize: 12, charSpacing: 3, wrap: false });
++  para(s, leadIn(COPY.profile), { x: 8.138, y: 3.419, w: 3.627, h: 1.589 });
++  para(s, LEAD + 'consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et reprehenderit in voluptate velit esse',
++    { x: 8.138, y: 5.008, w: 3.627, h: 0.832 });
++  badge(s, 6.367, 3.552, PINK, 'right');
++}
++
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  freeform(s, { x: 0, y: 0, w: 7.655, h: 2.972, fill: PURPLE, points: SLAB.brk });
++  chrome(s, { mark: WHITE });
++  footer(s, '13');
++  heading(s, 'Let\u2019s Take A Break', { x: 1.544, y: 5.208, w: 2.615, h: 1.043, wrap: true });
++  para(s, leadIn(COPY.brk, { tightLead: true }), { x: 5.391, y: 5.187, w: 6.398, h: 1.084 });
++  badge(s, 11.504, 2.774, PINK, 'right');
++}
++
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  rrect(s, { x: 8.843, y: 4.987, w: 2.833, h: 1.285, fill: WHITE, shadow: SHADOW_CARD(2.833, 1.285) });
++  freeform(s, { x: 7.681, y: 0, w: 5.652, h: 2.766, fill: PURPLE, points: SLAB.qa });
++  rrect(s, { x: -0.852, y: 1.681, w: 6.696, h: 2.171, fill: WHITE, shadow: SHADOW_CARD(6.696, 2.171) });
++  chrome(s, { nav: WHITE });
++  footer(s, '14');
++  heading(s, 'Question And Answer Question', { x: 1.544, y: 2.245, w: 3.862, h: 1.043, wrap: true });
++  para(s, leadIn(COPY.qa, { tightLead: true }), { x: 1.544, y: 4.73, w: 2.833, h: 1.589 });
++
++  rrect(s, { x: 5.515, y: 4.987, w: 2.833, h: 1.285, fill: PINK });
++  badge(s, 5.319, 5.431, PINK, 'right');
++  numberedNote(s, { num: '01', x: 5.92, y: 5.41, numColor: WHITE, body: CARD_COPY.qa, textX: 6.485, textY: 5.339, textW: 1.456, color: WHITE });
++  badge(s, 8.648, 5.431, PURPLE, 'right');
++  numberedNote(s, { num: '02', x: 9.248, y: 5.41, numColor: PURPLE, body: CARD_COPY.qa, textX: 9.813, textY: 5.339, textW: 1.456 });
++}
++
++const PACKAGES = [
++  ['Package One', 1.53, PURPLE, '$10', PURPLE, 2.567, 2.93],
++  ['Package Two', 5.064, PINK, '$20', PINK, 6.101, 6.464],
++  ['Package Three', 8.607, PURPLE, '$30', PURPLE, 9.641, 10.007],
++];
++
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  // Card stack first (matches the reference z-order), then the copy on top.
++  PACKAGES.forEach(([, x, fill]) => rrect(s, { x, y: 4.402, w: 3.196, h: 1.918, fill, shadow: SHADOW_CARD(3.196, 1.918) }));
++  PACKAGES.forEach(([, , , , , pillX]) => rrect(s, { x: pillX, y: 5.994, w: 1.122, h: 0.638, fill: WHITE, shadow: SHADOW_CARD(1.122, 0.638) }));
++  rrect(s, { x: 1.53, y: 0.876, w: 10.273, h: 2.963, fill: WHITE, shadow: SHADOW_CARD(10.273, 2.963) });
++  chrome(s);
++  footer(s, '15');
++  heading(s, 'Pricing Table', { x: 5.259, y: 1.556, w: 2.816, align: 'center' });
++  para(s, leadIn(COPY.pricing), { x: 2.366, y: 2.326, w: 8.592, h: 0.832, align: 'center' });
++
++  PACKAGES.forEach(([title, x, fill, price, priceColor, pillX, badgeX]) => {
++    txt(s, title, { x, y: 4.815, w: 3.196, h: 0.337, align: 'center', wrap: false, fontFace: HEAD, fontSize: 14, color: WHITE });
++    txt(s, CARD_COPY.solution, { x: x + 0.327, y: 5.151, w: 2.543, h: 0.58, align: 'center', lineSpacingMultiple: 1.5, color: WHITE });
++    txt(s, price, { x: pillX, y: 6.097, w: 1.122, h: 0.438, align: 'center', wrap: false, fontFace: HEAD, fontSize: 20, color: priceColor });
++    badge(s, badgeX, 4.204, fill, 'down');
++  });
++}
++
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  rrect(s, { x: -1.091, y: 1.054, w: 8.878, h: 5.392, fill: WHITE, adj: ADJ_PANEL, shadow: SHADOW_CARD(8.878, 5.392) });
++  chrome(s);
++  footer(s, '16');
++  heading(s, 'Customer Testimonials', { x: 1.555, y: 2.092, w: 3.291, h: 1.043, wrap: true });
++  para(s, leadIn(COPY.testimonial), { x: 1.555, y: 3.491, w: 3.627, h: 1.337 });
++  para(s, LEAD + 'consectetur adipiscing reprehenderit in voluptate velit esse', { x: 1.555, y: 4.828, w: 3.627, h: 0.58 });
++
++  quoteCard(s, {
++    x: 9.114, y: 1.841, textY: 2.172, fill: PURPLE, accent: PURPLE,
++    name: 'Wesley Thomas', nameW: 1.55, nameColor: WHITE, textColor: WHITE,
++  });
++  quoteCard(s, {
++    x: 9.114, y: 4.139, textY: 4.457, fill: PINK, accent: PINK,
++    name: 'Calvin Bugarin', nameW: 1.459, nameColor: WHITE, textColor: WHITE,
++  });
++}
++
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  rrect(s, { x: 1.605, y: 2.909, w: 2.975, h: 1.52, fill: WHITE, adj: ADJ_PANEL, shadow: SHADOW_CARD(2.975, 1.52) });
++  s.addShape('rect', { x: 8.08, y: 0, w: 5.253, h: 2.806, fill: { color: PURPLE } });
++  chrome(s, { nav: WHITE });
++  footer(s, '17');
++  heading(s, 'Contact Us', { x: 4.58, y: 5.601, w: 2.4 });
++  para(s, leadIn(COPY.contact), { x: 8.08, y: 5.345, w: 3.686, h: 1.084 });
++
++  quoteCard(s, {
++    x: 1.605, y: 1.184, textY: 1.515, fill: PINK, accent: PINK,
++    name: 'Phone Number', nameW: 1.52, nameColor: WHITE, textColor: WHITE,
++  });
++  // The lower card's white panel is drawn first (above), so no fill here.
++  quoteCard(s, {
++    x: 1.605, y: 2.909, textY: 3.227, accent: PURPLE,
++    name: 'Email Address', nameW: 1.422, nameColor: PURPLE, textColor: GRAY,
++  });
++}
++
++function slide18(pptx) {
++  coverSlide(pptx, {
++    page: '18', title: 'THANK YOU', titleSize: 54,
++    titleX: 3.979, titleY: 4.665, titleW: 5.375, titleH: 1.01, subY: 5.523,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'W16x9', width: 13.333, height: 7.5 });
++  pptx.layout = 'W16x9';
++  pptx.title = 'CREATEVA — Webinar & Ecourse Presentation';
++  pptx.author = 'Tamara Valente';
++  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++    slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18]
++    .forEach((fn) => fn(pptx));
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '055e8250-2155-4e23-8caa-c382169bb29c_grok_final.pptx') });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

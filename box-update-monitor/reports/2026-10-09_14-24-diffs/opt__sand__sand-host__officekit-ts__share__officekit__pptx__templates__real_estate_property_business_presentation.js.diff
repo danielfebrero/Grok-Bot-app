@@ -1,0 +1,802 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/real_estate_property_business_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/real_estate_property_business_presentation.js
+@@ -0,0 +1,799 @@
++/**
++ * "Deluna" real-estate template - 32 slide deck, rebuilt with pptxgenjs.
++ * Raster photography from the original deck is replaced by flat placeholder
++ * rectangles (see `photo()`); everything else is drawn with native shapes.
++ *
++ *   node 0e771112-52af-4caa-afb9-62f24b2cc125_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens
++ * ------------------------------------------------------------------ */
++const C = {
++  teal: '007C76',
++  tealLight: '00A49C',
++  dark: '262626',
++  black: '000000',
++  grey: 'A5A5A5',
++  greyMid: '7F7F7F',
++  greyLight: 'BFBFBF',
++  greySoft: 'D8D8D8',
++  light: 'F2F2F2',
++  white: 'FFFFFF',
++  photo: '3E3D3F',      // average tone of the replaced photographs
++  photoCap: 'B0AFB1',   // "[image]" caption on top of a placeholder
++  device: 'D9D9D9',
++  deviceEdge: '8C8C8C',
++};
++
++const F = {
++  display: 'DM Sans',
++  medium: 'DM Sans Medium',
++  body: 'Open Sans',
++  ui: 'Prompt',
++  uiBold: 'Prompt SemiBold',
++};
++
++const NOLINE = { type: 'none' };
++const INSET = [7.2, 7.2, 3.6, 3.6]; // lIns/rIns/bIns/tIns in points, as in the original
++
++/* Lorem strings that the template re-uses across several slides. */
++const LOREM = {
++  full: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellent scelerisque malesua libero a pellentesque. Morbi orci dui, ferio eget lectus ornare,oioi viverra dignissim ris. Donec lacinia neqo non velit dictum tincidunt. Etiam lacus donec lacinia lorem ipsk \\',
++  short: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellent scelerisque malesua libero a pellentesque. Morbi orci dui, ferio eget lectus ornare,oioi viverra dignissim ris. ',
++  conse: 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesq sceler malesuada Pellentesque scelerisqada apell Pellentesque sceler scelerisq dolor sit lorem',
++  card: 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque sceler scelerisq dolor sit amet, conse malesuadad Pell scelerisq d Pellentesque entesque scelerisq olor sit amet, ',
++  tile: 'Lorem ipsu conse lectus ornare, pellentesque. viverr ctetur adipiscing elit. Pellentesq sceleriqwios lorems',
++  para: 'Lorem ipsum dolor sit amet, consectetur adipiscing apellentes Lore ipsdu ipsum dolor sit amet,ectetur a adipiscing elit. dict tincidunt. Etiam dipiscing apellentesquLor amet,ectetur a adipiscing elit. dictum tincidunt. Etiam dipiscing ipsum dolor si',
++  paraI: 'Lorem ipsum dolor sit amet, consectetur adipiscing apellentesquLore ipsdu ipsum I dolor sit amet,ectetur a adipiscing elit. dictu tincidunt. Etiam dipiscing apellentesquLor amet,ectetur a adipiscing elit. dictum ioi lore',
++  masters: 'Lorem ipsum dolor sit amet, consectetur lorem adipiscing apellentesquLore ipsdu ipsum I dolor sit amet,ectetur a adipiscing elit. dictu tincidunt. Etiam dipiscing apellentes quLor amet,ectetur a adipiscing elit. dictum ioi lore tincid',
++};
++
++/* ------------------------------------------------------------------ *
++ * Primitive helpers
++ * ------------------------------------------------------------------ */
++function rect(s, x, y, w, h, color, opts) {
++  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: NOLINE }, opts));
++}
++
++/** roundRect whose corner radius is given as the original `adj` value (1/1000 %). */
++function roundRect(s, x, y, w, h, color, adj) {
++  s.addShape('roundRect', {
++    x, y, w, h, fill: { color }, line: NOLINE,
++    rectRadius: (adj / 100000) * Math.min(w, h),
++  });
++}
++
++function line(s, x, y, w, color, width) {
++  s.addShape('line', { x, y, w, h: 0, line: { color, width: width || 0.75 } });
++}
++
++function text(s, content, opts) {
++  s.addText(content, Object.assign({
++    fontFace: F.display, fontSize: 12, color: C.dark,
++    align: 'left', valign: 'top', margin: INSET, wrap: true,
++  }, opts));
++}
++
++/** Body copy: 9pt Open Sans on double leading, as everywhere in the template. */
++function body(s, str, x, y, w, h, opts) {
++  text(s, str, Object.assign({
++    x, y, w, h, fontSize: 9, fontFace: F.body, color: C.black, lineSpacingMultiple: 2,
++  }, opts));
++}
++
++/** Small caps-ish section label above every headline. */
++function eyebrow(s, x, y, opts) {
++  text(s, 'ABOUT US', Object.assign({
++    x, y, w: 1.51, h: 0.303, fontSize: 12, fontFace: F.medium, color: C.grey,
++  }, opts));
++}
++
++/** Bold headline. */
++function heading(s, str, x, y, w, h, opts) {
++  text(s, str, Object.assign({
++    x, y, w, h, fontSize: 40, bold: true, fontFace: F.display, color: C.dark,
++  }, opts));
++}
++
++/** Teal/white sub-heading used above card body copy. */
++function subhead(s, str, x, y, w, h, color, size, align) {
++  text(s, str, { x, y, w, h, fontSize: size || 14, fontFace: F.medium, color, align: align || 'left' });
++}
++
++/** Two-run label such as "Made by **RGBRYAND**". */
++function pair(s, plain, strong, x, y, w, h, opts) {
++  const o = Object.assign({ fontSize: 12, color: C.dark, fontFace: F.display }, opts);
++  s.addText([
++    { text: plain, options: { fontFace: o.fontFace, fontSize: o.fontSize, color: o.color } },
++    { text: strong, options: { fontFace: o.strongFace || o.fontFace, bold: !o.strongFace, fontSize: o.fontSize, color: o.color } },
++  ], { x, y, w, h, align: o.align || 'left', valign: 'top', margin: INSET });
++}
++
++/** Placeholder standing in for a photograph in the source deck. */
++function photo(s, x, y, w, h, opts) {
++  const o = opts || {};
++  rect(s, x, y, w, h, o.color || C.photo);
++  if (o.label !== false && w >= 1.3 && h >= 0.7) {
++    text(s, '[image]', {
++      x, y: y + h / 2 - 0.16, w, h: 0.32,
++      align: 'center', fontSize: 10, fontFace: F.body, color: C.photoCap,
++    });
++  }
++}
++
++/** The four-diamond "Deluna" mark; (cx, cy) is the centre of the group. */
++function diamonds(s, cx, cy, size, color) {
++  const d = size * 0.7534;
++  const h = size / 2;
++  [[0, -d, 45], [d, 0, 315], [-d, 0, 315], [0, d, 225]].forEach(function (p) {
++    s.addShape('round2DiagRect', {
++      x: cx + p[0] - h, y: cy + p[1] - h, w: size, h: size,
++      rotate: p[2], flipH: true, fill: { color }, line: NOLINE,
++    });
++  });
++}
++
++/** Header/footer furniture shared by nearly every slide. */
++function chrome(s, opts) {
++  const o = opts || {};
++  diamonds(s, 0.6035, 0.5995, 0.073, o.mark || C.teal);
++  text(s, 'Deluna', { x: 0.729, y: 0.448, w: 0.852, h: 0.337, fontSize: 14, fontFace: F.ui, color: o.word || C.dark });
++  if (o.tag !== false) {
++    pair(s, 'Template ', '2021', 10.573, 0.465, 2.36, 0.303, {
++      align: 'right', color: o.tagColor || C.grey, fontFace: F.ui, strongFace: F.uiBold,
++    });
++  }
++}
++
++/* ------------------------------------------------------------------ *
++ * Line-art icons (custom geometry, taken from the original artwork)
++ * ------------------------------------------------------------------ */
++const ICON = {
++  office: {
++    w: 361, h: 360, p: [
++      [[343, 324], [343, 168], [199, 96], [199, 0], [18, 90], [18, 324], [0, 324], [0, 360], [361, 360], [361, 324], [343, 324]],
++      [[127, 306], [91, 306], [91, 270], [127, 270]],
++      [[127, 234], [91, 234], [91, 198], [127, 198]],
++      [[127, 162], [91, 162], [91, 126], [127, 126]],
++      [[271, 306], [235, 306], [235, 270], [271, 270]],
++      [[271, 234], [235, 234], [235, 198], [271, 198]],
++    ],
++  },
++  house: {
++    w: 496, h: 495, p: [
++      [[417, 238], [461, 282], [496, 248], [418, 170], [418, 10], [368, 10], [368, 121], [247, 0], [0, 246],
++        [34, 280], [76, 238], [76, 447], [3, 447], [3, 495], [417, 495], [490, 495], [490, 447], [417, 447]],
++      [[222, 374], [174, 374], [174, 325], [222, 325]],
++      [[222, 277], [174, 277], [174, 228], [222, 228]],
++      [[320, 374], [271, 374], [271, 325], [320, 325]],
++      [[320, 277], [271, 277], [271, 228], [320, 228]],
++    ],
++  },
++  towers: {
++    w: 315, h: 314, p: [
++      [[268, 31], [268, 0], [237, 0], [237, 31], [189, 31], [189, 157], [126, 157], [126, 31], [79, 31], [79, 0],
++        [48, 0], [48, 31], [0, 31], [0, 314], [126, 314], [126, 267], [189, 267], [189, 314], [315, 314], [315, 31], [268, 31]],
++      [[79, 267], [48, 267], [48, 236], [79, 236]],
++      [[79, 188], [48, 188], [48, 157], [79, 157]],
++      [[79, 110], [48, 110], [48, 79], [79, 79]],
++      [[189, 236], [126, 236], [126, 188], [189, 188]],
++      [[268, 267], [237, 267], [237, 236], [268, 236]],
++      [[268, 188], [237, 188], [237, 157], [268, 157]],
++      [[268, 110], [237, 110], [237, 79], [268, 79]],
++    ],
++  },
++};
++
++function icon(s, def, x, y, size, color) {
++  const k = size / Math.max(def.w, def.h);
++  const pts = [];
++  def.p.forEach(function (sub) {
++    sub.forEach(function (pt, i) {
++      const p = { x: +(pt[0] * k).toFixed(4), y: +(pt[1] * k).toFixed(4) };
++      if (i === 0) p.moveTo = true;
++      pts.push(p);
++    });
++    pts.push({ close: true });
++  });
++  s.addShape('custGeom', { x, y, w: def.w * k, h: def.h * k, fill: { color }, line: NOLINE, points: pts });
++}
++
++/** Rounded silver panel used to build the device mock-ups. */
++function panel(s, x, y, w, h, radius) {
++  s.addShape('roundRect', {
++    x, y, w, h, rectRadius: radius,
++    fill: { color: C.device }, line: { color: C.deviceEdge, width: 0.75 },
++  });
++}
++
++const BEZEL = 0.05; // silver rim left visible around every mock-up screen
++
++/** Smartphone standing in for the hand-held device photographs. */
++function phoneMock(s, x, y, w, h) {
++  panel(s, x, y, w, h, 0.36);
++  s.addShape('roundRect', {
++    x: x + BEZEL, y: y + BEZEL, w: w - 2 * BEZEL, h: h - 2 * BEZEL,
++    rectRadius: 0.31, fill: { color: C.photo }, line: NOLINE,
++  });
++}
++
++/** Desktop monitor: bezel + screen, then neck and foot. */
++function monitorMock(s) {
++  panel(s, 4.317, 2.467, 4.683, 3.166, 0.04);
++  rect(s, 4.333, 2.483, 4.667, 2.717, C.photo);
++  rect(s, 5.933, 5.633, 1.467, 0.617, C.device);
++  s.addShape('roundRect', { x: 4.333, y: 6.183, w: 4.65, h: 0.184, rectRadius: 0.09, fill: { color: C.device }, line: { color: C.deviceEdge, width: 0.75 } });
++}
++
++/** Laptop: lid with screen plus the wider hinge bar underneath. */
++function laptopMock(s) {
++  panel(s, 6.333, 2.633, 5.55, 3.60, 0.04);
++  rect(s, 6.35, 2.70, 5.517, 3.47, C.photo);
++  s.addShape('roundRect', { x: 5.70, y: 6.30, w: 6.80, h: 0.20, rectRadius: 0.09, fill: { color: C.device }, line: { color: C.deviceEdge, width: 0.75 } });
++}
++
++/** Progress ring: full grey track plus a teal arc sweeping clockwise from 12 o'clock. */
++function ring(s, x, y, size, pct) {
++  const thickness = size * 0.1543;
++  s.addShape('donut', { x, y, w: size, h: size, fill: { color: 'EDEDED' }, line: NOLINE, rectRadius: thickness });
++  s.addShape('blockArc', {
++    x, y, w: size, h: size, fill: { color: C.teal }, line: NOLINE,
++    angleRange: [270, 270 + 3.6 * pct], arcThicknessRatio: (thickness * 2) / size,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Chart data - the bar, line and stacked-bar slides share one data set
++ * ------------------------------------------------------------------ */
++const CHART_CATS = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++const CHART_SERIES = [
++  { name: 'Series 1', labels: CHART_CATS, values: [4.3, 2.5, 3.5, 4.5] },
++  { name: 'Series 2', labels: CHART_CATS, values: [2.4, 4.4, 1.8, 2.8] },
++  { name: 'Series 3', labels: CHART_CATS, values: [2.0, 2.0, 3.0, 5.0] },
++];
++const CHART_COLORS = [C.teal, C.greySoft, C.light];
++const AXIS = { catAxisLabelColor: '595959', valAxisLabelColor: '595959', catAxisLabelFontFace: F.body, valAxisLabelFontFace: F.body, catAxisLabelFontSize: 9, valAxisLabelFontSize: 9 };
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++const SLIDES = [];
++
++// 1 - cover
++SLIDES.push(function (s) {
++  photo(s, 0, 0, 13.333, 7.5, { label: false });
++  rect(s, 0, 0, 13.333, 7.5, C.light, { fill: { color: C.light, transparency: 20 } });
++  rect(s, 13.075, 0.601, 0.259, 3.745, C.teal);
++  diamonds(s, 2.023, 3.518, 0.803, C.teal);
++  text(s, 'Deluna', { x: 3.833, y: 2.181, w: 5.316, h: 2.036, fontSize: 115, align: 'center' });
++  text(s, 'REAL ESTATE PRESENTATION', { x: 3.755, y: 4.26, w: 5.565, h: 0.471, fontSize: 22, align: 'center' });
++  pair(s, 'Made by ', 'RGBRYAND', 0.779, 0.925, 1.832, 0.303);
++  pair(s, 'Property ', 'Business', 0.904, 6.402, 2.36, 0.303);
++  pair(s, 'Modern ', 'Slide', 5.487, 6.402, 2.36, 0.303, { align: 'center' });
++  pair(s, 'Template ', '2021', 10.07, 6.402, 2.36, 0.303, { align: 'right' });
++  line(s, 1.015, 6.0, 12.318, C.dark);
++});
++
++// 2 - about us, portrait photo left
++SLIDES.push(function (s) {
++  rect(s, 0, 0, 5.785, 3.723, C.light);
++  rect(s, 0.599, 2.375, 2.031, 5.125, C.teal);
++  photo(s, 1.201, 1.215, 4.583, 5.684);
++  chrome(s);
++  eyebrow(s, 7.048, 1.634);
++  heading(s, 'The Creativity Of The New World', 7.048, 2.215, 5.295, 1.447);
++  subhead(s, 'Beautiful Places To Live', 7.048, 4.751, 2.887, 0.337, C.teal);
++  body(s, LOREM.full, 7.048, 5.269, 5.419, 1.01);
++});
++
++// 3 - teal info bar with office icon
++SLIDES.push(function (s) {
++  photo(s, 7.875, 0, 5.458, 7.5);
++  roundRect(s, 0.606, 5.348, 8.353, 1.566, C.teal, 3895);
++  chrome(s);
++  eyebrow(s, 1.388, 1.303);
++  heading(s, 'Your Number #1 Property Advisor', 1.388, 1.884, 5.341, 1.447);
++  body(s, LOREM.short, 1.465, 3.859, 5.264, 0.707);
++  rect(s, 7.625, 0, 0.25, 1.403, C.light);
++  icon(s, ICON.office, 1.084, 5.827, 0.608, C.white);
++  text(s, 'In The Best Of Company', { x: 2.25, y: 5.827, w: 1.562, h: 0.639, fontSize: 16, bold: true, color: C.white });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellent scelerisque malesua libero a pellentesque. Morbi orci dui, ferio eget', 4.371, 5.777, 4.163, 0.664, { color: C.white });
++});
++
++// 4 - collage with teal footer band
++SLIDES.push(function (s) {
++  rect(s, 0, 6.269, 7.25, 1.231, C.teal);
++  rect(s, 0, 1.232, 5.639, 5.037, C.light);
++  photo(s, 2.208, 0, 3.431, 4.218);
++  photo(s, 5.639, 4.218, 3.194, 2.681);
++  chrome(s);
++  heading(s, 'Construction You Can Count On', 6.848, 1.611, 5.457, 1.582, { fontSize: 44 });
++  subhead(s, 'Beautiful Places To Live', 9.697, 4.543, 2.567, 0.337, C.teal);
++  body(s, LOREM.conse, 9.697, 5.025, 2.893, 1.313);
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellent scelerisque malesua libero a pellentesque. Morbi orci dui, ferio eget lectus ornare,oioi', 0.544, 4.899, 4.55, 0.707);
++  pair(s, 'Real Estate ', 'Presentation', 0.461, 1.874, 1.388, 0.471, { fontSize: 11 });
++  pair(s, 'Made by ', 'RGBRYAND', 0.461, 3.734, 1.388, 0.471, { fontSize: 11 });
++  subhead(s, 'Let Our Family Show Your Family the Way Home', 0.544, 6.725, 4.789, 0.337, C.white);
++});
++
++// 5 - two teal cards
++SLIDES.push(function (s) {
++  photo(s, 0, 0, 7.954, 7.5, { label: false });
++  rect(s, 0, 0, 7.954, 7.5, C.light, { fill: { color: C.light, transparency: 20 } });
++  roundRect(s, 7.254, 1.238, 5.192, 2.432, C.teal, 3895);
++  roundRect(s, 7.254, 4.143, 5.192, 2.432, C.teal, 3895);
++  chrome(s);
++  eyebrow(s, 1.201, 1.492, { color: C.teal });
++  heading(s, 'Helping You Get More For Your Real Estate', 1.201, 2.073, 4.64, 2.12);
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing apellentesquLore ipsdu ipsum dolor sit amet,ectetur a adipiscing elit. dictum tincidunt. Etiam dipiscing apellentesquLor amet,ectetur a adipiscing elit. dictum tincidunt. Etiam dipiscing ipsum dolor sit amet, consectetur adipiscing', 1.201, 4.933, 4.349, 1.313, { color: C.dark });
++  [1.692, 4.598].forEach(function (y) {
++    subhead(s, 'Beautiful Places To Live', 7.608, y, 4.395, 0.337, C.white);
++    body(s, LOREM.card, 7.608, y + 0.608, 4.494, 0.967, { color: C.white });
++  });
++});
++
++// 6 - money slide
++SLIDES.push(function (s) {
++  photo(s, 0, 4.169, 3.662, 3.331);
++  photo(s, 8.815, 1.446, 4.518, 6.054);
++  chrome(s);
++  rect(s, 8.815, 1.277, 2.723, 0.169, C.teal);
++  rect(s, 3.662, 6.246, 5.154, 1.254, C.light);
++  eyebrow(s, 1.581, 1.245);
++  heading(s, 'Experienced In Saving Your Money', 1.581, 1.826, 5.469, 1.447);
++  body(s, LOREM.conse, 4.395, 4.549, 4.034, 1.01);
++  subhead(s, 'Luxury Home Decoration Services.', 4.048, 6.683, 4.38, 0.37, C.dark, 16, 'center');
++});
++
++// 7 - teal background, banner photo
++SLIDES.push(function (s) {
++  s.background = { color: C.teal };
++  photo(s, 0, 0, 13.333, 3.569);
++  chrome(s);
++  rect(s, 0, 3.569, 9.877, 0.185, C.light);
++  eyebrow(s, 1.089, 4.511, { color: C.white });
++  heading(s, 'Real Value In A Changing World', 1.089, 5.091, 4.8, 1.447, { color: C.white });
++  [6.57, 9.818].forEach(function (x) {
++    subhead(s, 'Beautiful Places To Live', x, 4.608, 2.567, 0.337, C.white);
++    body(s, LOREM.conse, x, 5.09, 2.893, 1.313, { color: C.white });
++  });
++});
++
++// 8 - service you deserve
++SLIDES.push(function (s) {
++  chrome(s);
++  rect(s, 0, 4.554, 9.6, 2.946, C.light);
++  photo(s, 0.606, 1.215, 4.394, 5.684);
++  rect(s, 9.6, 4.554, 3.733, 2.946, C.teal);
++  eyebrow(s, 6.248, 1.568);
++  heading(s, 'Service You Deserve, People You Trust', 6.248, 2.148, 6.101, 1.447);
++  body(s, LOREM.conse, 5.884, 5.212, 2.893, 1.313);
++  icon(s, ICON.house, 12.103, 5.212, 0.561, C.white);
++  text(s, 'Real Estate Is Our Life', { x: 10.206, y: 5.205, w: 1.572, h: 0.639, fontSize: 16, bold: true, color: C.white });
++  body(s, 'Lorem ipsu conse lectus ornare, pellent. viverra ctetur adipiscing elit. Pellentesq', 10.206, 6.304, 2.658, 0.555, { color: C.white });
++});
++
++// 9 - photo grid
++SLIDES.push(function (s) {
++  rect(s, 0, 1.232, 4.415, 6.268, C.light);
++  photo(s, 2.814, 0, 3.324, 3.846);
++  photo(s, 6.138, 3.846, 3.062, 3.654);
++  photo(s, 0, 3.854, 2.814, 2.442);
++  chrome(s);
++  rect(s, 2.814, 3.846, 3.324, 2.45, C.teal);
++  heading(s, 'Bringing Only Professionalism', 7.372, 1.445, 4.612, 1.447);
++  body(s, LOREM.paraI + ' tincidunt. Etiam dipiscing ipsum dolor sit', 9.973, 4.411, 2.893, 1.919, { color: C.dark });
++  subhead(s, 'Beautiful Places To Live', 3.217, 4.365, 2.567, 0.303, C.white, 12);
++  body(s, 'Lorem ipsu conse lectus ornare, pellent. viverra ctetur adipiscing elit. Pellentesq sceler malesuada Pellentesqu scelerisqa', 3.217, 4.865, 2.558, 1.01, { color: C.white });
++  pair(s, 'Real Estate ', 'Presentation', 0.709, 2.308, 1.388, 0.505);
++  pair(s, 'Made by ', 'RGBRYAND', 0.599, 6.748, 2.756, 0.303);
++});
++
++// 10 - stat card
++SLIDES.push(function (s) {
++  rect(s, 8.918, 5.477, 4.415, 2.023, C.light);
++  photo(s, 0, 1.241, 6.024, 6.259);
++  roundRect(s, 5.042, 4.354, 7.689, 2.559, C.teal, 3895);
++  chrome(s);
++  eyebrow(s, 6.774, 1.474);
++  heading(s, 'Your Image Is Part Of Your Reputation', 6.774, 2.055, 5.428, 1.447);
++  text(s, '25%', { x: 5.597, y: 4.889, w: 1.178, h: 0.639, fontSize: 32, bold: true, color: C.white });
++  subhead(s, 'Beautiful Places To Live', 6.86, 4.929, 1.555, 0.572, C.white);
++  body(s, LOREM.tile, 5.559, 5.737, 3.276, 0.707, { color: C.white });
++  text(s, '37%', { x: 9.07, y: 4.889, w: 1.178, h: 0.639, fontSize: 32, bold: true, color: C.white });
++  subhead(s, 'Always Dedicated And Devoted.', 10.333, 4.929, 1.869, 0.572, C.white);
++  body(s, LOREM.tile, 9.017, 5.771, 3.276, 0.707, { color: C.white });
++});
++
++// 11 - three cards
++SLIDES.push(function (s) {
++  rect(s, 0.602, 4.058, 12.129, 2.841, C.light);
++  chrome(s);
++  eyebrow(s, 5.911, 1.01, { align: 'center' });
++  heading(s, 'Building It Better In Concrete', 2.603, 1.59, 8.127, 0.639, { fontSize: 32, align: 'center' });
++  [[1.001, 1.195, 1.195], [4.962, 5.06, 5.028], [8.924, 9.021, 8.99]].forEach(function (col) {
++    photo(s, col[0], 2.958, 3.409, 2.08);
++    rect(s, col[0], 2.847, 3.409, 0.111, C.teal);
++    text(s, 'Beautiful Places To Live', { x: col[1], y: 5.415, w: 3.214, h: 0.337, fontSize: 14, bold: true, align: 'center' });
++    body(s, LOREM.tile, col[2], 5.871, 3.276, 0.664, { color: C.dark });
++  });
++});
++
++// 12 - teal background, quality living
++SLIDES.push(function (s) {
++  s.background = { color: C.teal };
++  photo(s, 0, 0, 3.185, 4.323);
++  photo(s, 3.185, 0, 3.277, 7.5);
++  chrome(s, { tagColor: C.white });
++  rect(s, 0, 4.323, 3.185, 3.177, C.light);
++  eyebrow(s, 7.782, 1.395, { color: C.white });
++  heading(s, 'Quality Living From The Team That Cares', 7.782, 1.976, 4.488, 2.12, { color: C.white });
++  body(s, LOREM.paraI, 7.782, 4.619, 4.523, 0.967, { color: C.white });
++  pair(s, 'Real Estate ', 'Presentation', 7.782, 6.274, 2.648, 0.337, { fontSize: 14, color: C.white });
++  text(s, 'Finding The Dream For Every Owner', { x: 0.602, y: 5.889, w: 2.009, h: 1.111, fontSize: 20, bold: true });
++  icon(s, ICON.towers, 0.709, 4.935, 0.547, C.teal);
++});
++
++// 13 - your edge
++SLIDES.push(function (s) {
++  photo(s, 5.8, 0, 7.533, 4.939);
++  roundRect(s, 0.599, 4.472, 5.808, 2.441, C.teal, 3895);
++  chrome(s);
++  eyebrow(s, 1.254, 1.508);
++  heading(s, 'Your Edge in Real Estate', 1.254, 2.088, 3.667, 1.447);
++  body(s, LOREM.short + 'Donec lacinia', 7.181, 5.693, 5.55, 0.707);
++  subhead(s, 'Beautiful Places To Live', 1.073, 4.947, 2.567, 0.337, C.white);
++  body(s, LOREM.paraI + 'm ipsum dolorsia', 1.073, 5.475, 4.913, 0.967, { color: C.white });
++});
++
++// 14 - on these beams
++SLIDES.push(function (s) {
++  rect(s, 0, 4.108, 6.125, 3.392, C.light);
++  photo(s, 0, 0, 4.739, 4.108);
++  photo(s, 7.52, 4.108, 5.813, 3.392);
++  chrome(s);
++  rect(s, 4.739, 4.108, 2.781, 2.792, C.teal);
++  eyebrow(s, 5.939, 1.123);
++  heading(s, 'On These Beams, We\u2019re Building Dreams', 5.939, 1.704, 6.325, 1.447);
++  subhead(s, 'Beautiful Places To Live', 0.923, 4.738, 2.567, 0.337, C.dark);
++  body(s, LOREM.conse, 0.923, 5.22, 2.893, 1.313);
++  icon(s, ICON.office, 5.235, 4.581, 0.52, C.white);
++  text(s, 'Engineering Your Dreams With Us', { x: 5.161, y: 5.35, w: 2.075, h: 0.639, fontSize: 16, bold: true, color: C.white });
++  body(s, 'Lorem ipsu conse lectus ornare', 5.162, 6.148, 2.893, 0.361, { color: C.white });
++});
++
++// 15 - developing our people
++SLIDES.push(function (s) {
++  photo(s, 0, 3.905, 13.333, 3.595);
++  rect(s, 0, 0, 3.538, 3.905, C.light);
++  chrome(s);
++  roundRect(s, 1.155, 1.232, 4.893, 5.667, C.teal, 3895);
++  eyebrow(s, 1.728, 1.812, { color: C.white });
++  heading(s, 'Developing Our People, Growing Our Business', 1.728, 2.393, 3.8, 1.717, { fontSize: 32, color: C.white });
++  line(s, 1.769, 4.528, 3.759, C.white);
++  body(s, LOREM.para, 1.728, 4.965, 3.935, 1.161, { color: C.white });
++  [6.783, 9.871].forEach(function (x) {
++    subhead(s, 'Beautiful Places To Live', x, 1.75, 2.567, 0.337, C.dark);
++    body(s, 'Lorem ipsu conse lectus ornare, pellentesq. viverra ctetur adipiscing elit. Pellentesq sceler malesuada Pellentesque scelerisqal', x, 2.232, 2.727, 1.01, { color: C.dark });
++  });
++});
++
++// 16 - bringing it all together
++SLIDES.push(function (s) {
++  photo(s, 5.031, 0, 8.303, 7.5);
++  chrome(s);
++  eyebrow(s, 1.072, 1.611);
++  heading(s, 'Bringing It All Together', 1.072, 2.192, 3.627, 1.447);
++  roundRect(s, 6.032, 1.611, 5.618, 4.516, C.teal, 3895);
++  subhead(s, 'Beautiful Places To Live', 1.088, 4.338, 2.887, 0.337, C.teal);
++  body(s, LOREM.para, 1.072, 4.815, 3.958, 1.161);
++  icon(s, ICON.office, 6.521, 2.195, 0.407, C.white);
++  icon(s, ICON.towers, 7.183, 2.195, 0.408, C.white);
++  icon(s, ICON.house, 7.853, 2.195, 0.407, C.white);
++  heading(s, 'Our Reputation Is As Solid As Concrete', 6.44, 3.064, 4.707, 1.178, { fontSize: 32, color: C.white });
++  body(s, LOREM.paraI + 'm ipsum dolorsia', 6.44, 4.553, 4.885, 0.859, { color: C.white });
++});
++
++// 17 - package price grid
++SLIDES.push(function (s) {
++  rect(s, 5.24, 4.045, 7.491, 2.854, C.light);
++  rect(s, 0, 0, 4.603, 7.5, C.teal);
++  photo(s, 5.24, 1.192, 2.497, 2.853);
++  photo(s, 10.234, 1.192, 2.497, 2.853);
++  photo(s, 7.737, 4.045, 2.497, 2.853);
++  chrome(s, { mark: C.white, word: C.white });
++  rect(s, 7.737, 1.19, 2.497, 2.854, C.light);
++  rect(s, 6.435, 4.045, 1.302, 0.091, C.teal);
++  rect(s, 11.429, 4.045, 1.302, 0.091, C.teal);
++  rect(s, 8.932, 1.189, 1.302, 0.091, C.teal);
++  eyebrow(s, 0.729, 1.722, { color: C.white });
++  heading(s, 'Dedicated To Results', 0.729, 2.303, 3.175, 1.447, { color: C.white });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur lorem adipiscing apellentesquLore ipsdu ipsum I dolor sit amet,ectetur a adipiscing elit. dictu tincidunt. Etiam dipiscing apellentesquLor amet,ectetur a adipiscing elit. dictum ioi lore tincidunt. Etiam', 0.803, 4.585, 3.101, 1.616, { color: C.white });
++  [['Cluster Package ', '$1299', 8.012, 1.552], ['Townhouse Package ', '$2299', 5.514, 4.427], ['Residence Package ', '$3299', 10.511, 4.427]].forEach(function (p) {
++    text(s, p[0], { x: p[2], y: p[3], w: 1.946, h: 0.303, fontSize: 12, bold: true, align: 'center' });
++    text(s, p[1], { x: p[2] + 0.0015, y: p[3] + 0.397, w: 1.946, h: 0.639, fontSize: 32, bold: true, align: 'center' });
++    body(s, 'Lorem ipsum dolor sit amet, consectetur lorem adipiscing apellentesquLore ipsdu lorem', p[2] - 0.002, p[3] + 1.214, 1.948, 0.967, { align: 'center', color: C.dark });
++  });
++});
++
++// 18 - two captioned tiles
++SLIDES.push(function (s) {
++  photo(s, 0, 0, 13.333, 4.462, { label: false });
++  rect(s, 0, 0, 13.333, 4.462, C.light, { fill: { color: C.light, transparency: 20 } });
++  rect(s, 1.184, 5.882, 4.876, 1.018, C.teal);
++  rect(s, 7.244, 5.882, 4.876, 1.018, C.teal);
++  chrome(s);
++  eyebrow(s, 5.911, 1.036, { align: 'center', color: C.teal });
++  heading(s, 'Construction You Can Count On', 2.603, 1.617, 8.127, 0.707, { fontSize: 36, align: 'center' });
++  subhead(s, 'Beautiful Places To Live', 1.966, 6.189, 3.311, 0.404, C.white, 18, 'center');
++  subhead(s, 'Always Dedicated And Devoted', 7.645, 6.189, 4.074, 0.404, C.white, 18, 'center');
++  photo(s, 1.184, 3.154, 4.876, 2.728);
++  photo(s, 7.244, 3.154, 4.876, 2.728);
++});
++
++// 19 - teal background, masters of consistency
++SLIDES.push(function (s) {
++  s.background = { color: C.teal };
++  rect(s, 0, 6.277, 6.862, 1.222, C.light);
++  photo(s, 0, 1.333, 6.862, 4.945);
++  chrome(s, { mark: C.white, word: C.white, tagColor: C.white });
++  eyebrow(s, 8.242, 1.638, { color: C.white });
++  heading(s, 'Masters Of Consistency And Quality', 8.242, 2.219, 3.828, 2.12, { color: C.white });
++  body(s, LOREM.masters, 8.242, 4.965, 3.562, 1.313, { color: C.white });
++  pair(s, 'Made by ', 'RGBRYAND', 0.599, 6.748, 2.756, 0.303);
++  pair(s, 'Real Estate ', 'Presentation', 4.086, 6.748, 2.238, 0.303, { align: 'right' });
++});
++
++// 20 - colorful places
++SLIDES.push(function (s) {
++  rect(s, 8.954, 0, 4.38, 7.5, C.light);
++  photo(s, 7.308, 1.341, 6.026, 2.792);
++  photo(s, 7.308, 4.708, 6.026, 2.792);
++  chrome(s);
++  roundRect(s, 7.764, 3.268, 2.098, 2.331, C.teal, 3895);
++  eyebrow(s, 1.328, 1.595);
++  heading(s, 'Colorful Places To Live And Play', 1.328, 2.175, 4.776, 1.447);
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing apellentes Lore ipsdu ipsum dolor sit amet,ectetur a adipiscing elit. dict tincidunt. Etiam dipiscing apellentesquLor amet,ectetur a adipiscing elit. dictum tincidunt. Etiam', 1.328, 4.412, 4.594, 1.01);
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing apellentesquLorem ipsdu ipsum dolor sit amet,ectetur a adipiscing elit. dictum tincidunt. Etia', 1.328, 5.579, 4.751, 0.707);
++  icon(s, ICON.house, 8.115, 3.623, 0.445, C.white);
++  text(s, 'Finding The Dream For Every Owner', { x: 8.016, y: 4.412, w: 1.592, h: 0.909, fontSize: 16, bold: true, color: C.white });
++});
++
++// 21 - pull quote
++SLIDES.push(function (s) {
++  photo(s, 0, 0, 13.333, 7.5, { label: false });
++  rect(s, 0, 0, 13.333, 7.5, C.light, { fill: { color: C.light, transparency: 20 } });
++  chrome(s);
++  heading(s, '\u201CThe Potential Of A Property Is As Good As The Person Investing In It.\u201D', 1.431, 1.458, 8.902, 2.524, { fontSize: 48 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing apellentesquLorem ipsdu ipsum dolor sit amet,ectetur a adipiscing elit. dictum tincidunt. Etiam dipiscing apellentesquLor amet,ectetur a adipiscing elit. dictum tincidunt. Etiam dipiscing ipsum dolor sit amet, consectetur adipiscing', 1.431, 4.582, 8.611, 0.664);
++  s.addText([
++    { text: 'Aaron Wright ', options: { breakLine: true } },
++    { text: 'Chief Executive Officer', options: { bold: true } },
++  ], { x: 1.459, y: 5.846, w: 4.277, h: 0.572, fontFace: F.display, fontSize: 14, color: C.black, margin: INSET });
++});
++
++// 22 - clustered bar chart
++SLIDES.push(function (s) {
++  chrome(s);
++  s.addChart('bar', CHART_SERIES, Object.assign({
++    x: 7.167, y: 1.016, w: 5.159, h: 5.426,
++    barDir: 'col', barGapWidthPct: 108, chartColors: CHART_COLORS,
++    showLegend: false, valAxisMaxVal: 6, valAxisMajorUnit: 1,
++    valGridLine: { style: 'solid', color: 'D9D9D9', size: 0.5 },
++    catAxisLineShow: false, valAxisLineShow: false,
++  }, AXIS));
++  eyebrow(s, 1.225, 1.817);
++  heading(s, 'Building House Is Our Business', 1.225, 2.398, 4.706, 1.582, { fontSize: 44 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque scelerisque malesua libero a pellentesque. Morbi orci dui, fermentum eget lectus ornare,oioi viverra dignissim ris. Donec lacinia neque non velit dictum tincidunt. Etiam lacus', 1.225, 5.088, 4.95, 1.01);
++});
++
++// 23 - line chart + bullets
++SLIDES.push(function (s) {
++  chrome(s);
++  s.addChart('scatter', [
++    { name: 'X-Axis', values: [1, 2, 3, 4] },
++    { name: 'Series 1', values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Series 3', values: [2.0, 2.0, 3.0, 5.0] },
++  ], Object.assign({
++    x: 0.934, y: 1.032, w: 5.552, h: 5.56,
++    lineDataSymbol: 'none', lineSize: 3, chartColors: CHART_COLORS,
++    showLegend: true, legendPos: 'b', legendFontSize: 9, legendFontFace: F.body,
++    valAxisMaxVal: 6, valAxisMinVal: 0, valAxisMajorUnit: 1,
++    catAxisMaxVal: 4.5, catAxisMinVal: 0, catAxisMajorUnit: 0.5,
++    valGridLine: { style: 'solid', color: 'D9D9D9', size: 0.5 },
++    catGridLine: { style: 'solid', color: 'D9D9D9', size: 0.5 },
++    catAxisLineShow: false, valAxisLineShow: false,
++  }, AXIS));
++  eyebrow(s, 7.419, 1.386);
++  heading(s, 'Doing Everything But The Packing', 7.419, 1.967, 4.845, 1.447);
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque lorem scelerisque malesua libero a pellentesque. Morbi orci dui, fermentum ipsi', 7.419, 3.685, 4.65, 0.707);
++  s.addText([
++    'Experience Your Brand A Digi Life', 'Learn Secret Of Social Media.', 'Only individual approach',
++  ].map(function (t) {
++    return { text: t, options: { breakLine: true, bullet: { characterCode: '2022', indent: 22.5 } } };
++  }), {
++    x: 7.419, y: 4.662, w: 4.112, h: 1.453, margin: INSET, valign: 'top',
++    fontFace: F.medium, fontSize: 14, color: C.dark, lineSpacingMultiple: 2,
++  });
++});
++
++// 24 - 100% stacked bars + phase timeline
++SLIDES.push(function (s) {
++  chrome(s);
++  s.addChart('bar', CHART_SERIES, Object.assign({
++    x: 0.872, y: 0.971, w: 11.59, h: 3.46,
++    barDir: 'bar', barGrouping: 'percentStacked', barGapWidthPct: 167,
++    chartColors: CHART_COLORS, showLegend: false,
++    valGridLine: { style: 'solid', color: 'D9D9D9', size: 0.5 },
++    catAxisLineShow: false, valAxisLineShow: false, valAxisLabelFormatCode: '0%', valAxisMajorUnit: 0.2,
++  }, AXIS));
++  line(s, 0.879, 5.242, 12.454, C.greyLight, 1.75);
++  [0.872, 3.984, 7.078, 10.173].forEach(function (x) {
++    s.addShape('ellipse', { x, y: 5.168, w: 0.149, h: 0.149, fill: { color: C.teal }, line: NOLINE });
++  });
++  [[0.872, 'Phase 1'], [3.988, 'Phase 2'], [7.062, 'Phase 3'], [10.137, 'Phase 4']].forEach(function (p) {
++    text(s, p[1], { x: p[0], y: 5.752, w: 2.03, h: 0.303, fontSize: 12, fontFace: F.medium });
++    body(s, 'Lorem ipsu conse lectus ornari, pellent viverra ctetur adipiscing elit. Pellentesq', p[0], 6.084, 2.539, 0.707);
++  });
++});
++
++/** 3-D looking cylinder: straight body with a rounded base and a lighter top cap. */
++const CAP_H = 0.7;
++function cylinder(s, b) {
++  rect(s, b.bx, b.by, b.bw, b.bh - CAP_H / 2, b.body);
++  s.addShape('ellipse', { x: b.bx, y: b.by + b.bh - CAP_H, w: b.bw, h: CAP_H, fill: { color: b.body }, line: NOLINE });
++  s.addShape('ellipse', { x: b.x, y: b.y, w: b.w, h: CAP_H, fill: { color: b.cap }, line: NOLINE });
++}
++
++// 25 - income per year (cylinder columns)
++SLIDES.push(function (s) {
++  chrome(s);
++  // x/y/w = light top cap, bx/by/bw/bh = darker cylinder body
++  const bars = [
++    { x: 1.185, y: 4.206, w: 2.324, bx: 1.293, by: 4.548, bw: 2.115, bh: 1.139, cap: C.light, body: C.greySoft, value: '$378,430', vx: 1.587, vy: 3.429, vw: 1.521, tx: 1.523, ty: 6.030, cx: 1.016 },
++    { x: 4.067, y: 3.549, w: 2.321, bx: 4.172, by: 3.884, bw: 2.117, bh: 1.804, cap: C.greySoft, body: C.greyLight, value: '$529,237', vx: 4.468, vy: 2.800, vw: 1.521, tx: 4.451, ty: 6.022, cx: 3.944 },
++    { x: 6.947, y: 2.877, w: 2.324, bx: 7.049, by: 3.204, bw: 2.120, bh: 2.483, cap: C.grey, body: C.greyMid, value: '$819,671', vx: 7.348, vy: 2.144, vw: 1.521, tx: 7.348, ty: 6.022, cx: 6.842 },
++    { x: 9.826, y: 2.199, w: 2.324, bx: 9.928, by: 2.539, bw: 2.123, bh: 3.149, cap: C.tealLight, body: C.teal, value: '$1119,721', vx: 9.99, vy: 1.483, vw: 1.996, tx: 10.246, ty: 6.022, cx: 9.739 },
++  ];
++  bars.forEach(function (b) {
++    cylinder(s, b);
++    text(s, b.value, { x: b.vx, y: b.vy, w: b.vw, h: 0.438, fontSize: 20, fontFace: F.medium, align: 'center' });
++    text(s, 'Your Title Here', { x: b.tx, y: b.ty, w: 1.638, h: 0.303, fontSize: 12, fontFace: F.medium, align: 'center' });
++    body(s, 'Lorem ipsum dolor sit amet, consectetur', b.cx, b.ty + 0.348, 2.652, 0.404, { align: 'center' });
++  });
++  heading(s, 'Income Per-Year', 1.08, 1.315, 5.009, 0.774, { color: C.black });
++});
++
++// 26 - four progress rings
++SLIDES.push(function (s) {
++  chrome(s);
++  heading(s, 'Making Realty Dreams A Reality', 2.395, 1.132, 8.544, 0.707, { fontSize: 36, align: 'center' });
++  [72, 57, 79, 41].forEach(function (pct, i) {
++    const x = 0.756 + i * 3.0103;
++    ring(s, x + 0.144, 2.667, 2.483, pct);
++    text(s, pct + '%', { x: x + 0.801, y: 3.587, w: 1.13, h: 0.639, fontSize: 32, bold: true, align: 'center' });
++    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellent scelerisqu malesu',
++      [0.761, 3.766, 6.832, 9.897][i], 5.812, 2.709, 0.664, { align: 'center' });
++  });
++});
++
++// 27 - phone mock-up right
++SLIDES.push(function (s) {
++  rect(s, 9.985, 0, 3.349, 4.645, C.light);
++  rect(s, 10.124, 2.375, 1.999, 5.125, C.teal);
++  chrome(s);
++  phoneMock(s, 8.677, 1.206, 2.713, 5.471);
++  eyebrow(s, 1.373, 1.472);
++  heading(s, 'Exceptional Properties, Exceptional Clients', 1.373, 2.053, 5.866, 1.313, { fontSize: 36 });
++  line(s, 1.412, 3.978, 5.603, C.grey);
++  [1.373, 4.479].forEach(function (x) {
++    subhead(s, 'Beautiful Places To Live', x, 4.645, 2.567, 0.337, C.dark);
++    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscin elit. Pellentesque scelerisque malesua libero ame pellentesque. Morbi', x, 5.126, 2.771, 1.01, { color: C.dark });
++  });
++});
++
++// 28 - phone mock-up left
++SLIDES.push(function (s) {
++  rect(s, -0.014, 1.576, 3.46, 3.014, C.teal);
++  rect(s, 1.169, 2.954, 2.277, 4.546, C.light);
++  chrome(s);
++  phoneMock(s, 1.984, 1.037, 2.877, 5.802);
++  eyebrow(s, 6.226, 1.576);
++  heading(s, 'A Track Record That Speaks For Itself', 6.226, 2.156, 5.866, 1.447);
++  body(s, 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque sceler scelerisq dolor sit amet, conse malesuada Pellentesque scelerisq malesuada apell Pellentesque sceler scelerisq dolor sit amet, conse malesuada Pellentesque entesque scelerisq d Pellentesq', 6.226, 4.085, 5.866, 0.859, { color: C.dark });
++  pair(s, 'Aaron Wright ', 'Chief Executive Officer', 6.226, 5.761, 5.866, 0.337, { fontSize: 14, color: C.black });
++});
++
++// 29 - pricing table
++SLIDES.push(function (s) {
++  const PLANS = [
++    { x: 1.156, card: C.light, title: 'Basic Package', price: '$1.9K/year', badge: C.teal, cash: '10% Cashback', ink: C.dark, body: C.black, bonus: false },
++    { x: 5.001, card: C.light, title: 'Regular Package', price: '$2.9K/year', badge: C.teal, cash: '15% Cashback', ink: C.dark, body: C.black, bonus: C.teal },
++    { x: 8.833, card: C.teal, title: 'Luxury Package', price: '$3.9K/year', badge: C.dark, cash: '20% Cashback', ink: C.white, body: C.white, bonus: C.dark },
++  ];
++  const BULLETS = ['Lorem ipsum dolor sit amet, ', 'consectetur adipiscing elit. ', 'Pellentesque scel malesuada ', 'Morbi orci dui, fermentum eget '];
++  PLANS.forEach(function (p) {
++    roundRect(s, p.x, 1.164, 3.345, 5.388, p.card, 2558);
++    if (p.bonus) {
++      s.addShape('trapezoid', {
++        x: p.x + 2.282, y: 1.356, w: 1.425, h: 0.335, rotate: 45,
++        fill: { color: p.bonus }, line: NOLINE,
++      });
++      text(s, 'BONUS', { x: p.x + 2.611, y: 1.406, w: 0.756, h: 0.236, rotate: 45, fontSize: 8, bold: true, color: C.white, align: 'center' });
++    }
++    text(s, p.title, { x: p.x + 0.51, y: 1.612, w: 2.313, h: 0.337, fontSize: 14, bold: true, color: p.ink, align: 'center' });
++    text(s, p.price, { x: p.x + 0.13, y: 2.413, w: 3.085, h: 0.707, fontSize: 36, bold: true, color: p.ink, align: 'center' });
++    roundRect(s, p.x + 0.676, 3.308, 1.992, 0.494, p.badge, 5050);
++    text(s, p.cash, { x: p.x + 0.69, y: 3.41, w: 1.948, h: 0.303, fontSize: 12, bold: true, fontFace: F.body, color: C.white, align: 'center', valign: 'middle' });
++    text(s, 'Services', { x: p.x + 0.51, y: 4.299, w: 2.313, h: 0.337, fontSize: 14, bold: true, color: p.ink, align: 'center' });
++    s.addText(BULLETS.map(function (t, i) {
++      return { text: t, options: { breakLine: true, bold: p.card === C.teal && i === 3 } };
++    }), {
++      x: p.x + 0.331, y: 4.656, w: 2.683, h: 1.447, margin: INSET, valign: 'top', align: 'center',
++      fontFace: F.body, fontSize: 10, color: p.body, lineSpacingMultiple: 2,
++      bullet: { characterCode: '2022', indent: 13.5 },
++    });
++  });
++  chrome(s);
++});
++
++// 30 - desktop mock-up between two teal cards
++SLIDES.push(function (s) {
++  rect(s, 0, 3.947, 13.333, 3.553, C.light);
++  chrome(s);
++  monitorMock(s);
++  roundRect(s, 0.845, 2.63, 2.559, 2.798, C.teal, 3895);
++  roundRect(s, 9.929, 2.63, 2.559, 2.798, C.teal, 3895);
++  [[0.845, 1.88, 1.133, 1.027], [9.929, 10.964, 10.217, 10.111]].forEach(function (col) {
++    icon(s, ICON.office, col[1], 3.045, 0.489, C.white);
++    subhead(s, 'Beyond The Sale', col[2], 3.873, 1.984, 0.37, C.white, 16, 'center');
++    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscin elit. ', col[3], 4.372, 2.244, 0.664, { align: 'center', color: C.white });
++  });
++  heading(s, 'In The Best Of Company', 1.132, 1.194, 11.069, 0.774, { align: 'center' });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing apellentesquLorem ipsdu ipsum dolor sit amet,ectetur a adipiscing elit. dictum tincidunt. ', 2.353, 6.717, 8.611, 0.404);
++});
++
++// 31 - laptop mock-up
++SLIDES.push(function (s) {
++  rect(s, 10.573, 0, 2.76, 7.5, C.light);
++  rect(s, 8.857, 1.522, 5.419, 3.089, C.teal);
++  chrome(s);
++  laptopMock(s);
++  pair(s, 'Real Estate ', 'Presentation', 9.328, 1.909, 2.18, 0.303, { color: C.white });
++  line(s, 11.753, 2.029, 2.524, C.white);
++  eyebrow(s, 1.098, 1.448);
++  heading(s, 'Masters Of Consistency And Quality', 1.098, 2.029, 3.828, 2.12);
++  body(s, LOREM.masters, 1.098, 5.165, 3.562, 1.313);
++});
++
++// 32 - break slide
++SLIDES.push(function (s) {
++  s.background = { color: C.teal };
++  text(s, 'Break Slide', { x: 3.652, y: 1.768, w: 8.396, h: 2.036, fontSize: 115, color: C.white, align: 'center' });
++  diamonds(s, 2.06, 2.791, 0.614, C.white);
++  rect(s, 0, 6.317, 13.333, 1.183, C.light);
++  body(s, 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque sceler scelerisq dolor sit amet, conse malesuada Pellentesque scelerisq malesuada apell', 1.416, 6.716, 10.502, 0.361, { align: 'center' });
++  subhead(s, '20 MINUTES COFFEEBREAK', 3.914, 4.53, 5.505, 0.404, C.white, 18, 'center');
++  line(s, 1.158, 4.704, 3.175, C.white);
++  line(s, 9.0, 4.704, 2.917, C.white);
++});
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'DECK', width: 13.333, height: 7.5 });
++pptx.layout = 'DECK';
++pptx.author = 'RGBRYAND';
++pptx.title = 'Deluna - Real Estate Presentation';
++
++SLIDES.forEach(function (build) { build(pptx.addSlide()); });
++
++pptx.writeFile({ fileName: path.join(__dirname, '0e771112-52af-4caa-afb9-62f24b2cc125_grok_final.pptx') })
++  .then(function (f) { console.log('wrote ' + f + ' (' + SLIDES.length + ' slides)'); });

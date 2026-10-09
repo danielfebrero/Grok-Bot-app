@@ -1,0 +1,1126 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/athletes_sport_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/athletes_sport_presentation.js
+@@ -0,0 +1,1123 @@
++/**
++ * "ATHLETES — sport presentation template" (25 slides, 10 x 5.625 in)
++ * Rebuilt with pptxgenjs only.  Raster artwork in the source deck is replaced
++ * by flat colour placeholders; everything else is native pptxgenjs geometry.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++
++const NAVY = '000060';
++const BLUE = '33B7FF';
++const YELLOW = 'FEC200';
++const GREEN = '59DD87';
++const RED = 'ED002E';
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const GREY = 'D8D8D8';
++const GREY2 = 'BFBFBF';
++const GREY3 = 'A5A5A5';
++const SMOKE = 'F2F2F2';
++const INK = '3F3F3F';
++const SLATE = '595959';
++const ROYAL = '2F2FFF';
++
++const SG = 'Space Grotesk';
++const OS = 'Open Sans';
++
++const W = 10;
++const H = 5.625;
++
++/* Google-Slides text boxes all use the same 5.4pt / 2.7pt insets. */
++const PAD = [5.4, 5.4, 2.7, 2.7];
++const RAD = Math.PI / 180;
++
++/* -------------------------------------------------------------- primitives */
++
++function rect(s, x, y, w, h, color, extra) {
++  s.addShape('rect', Object.assign(
++    { x: x, y: y, w: w, h: h, fill: { color: color }, line: { type: 'none' } }, extra || {}));
++}
++
++function shape(s, kind, o) {
++  if (!o.line) o.line = { type: 'none' };
++  if (!o.fill) o.fill = { type: 'none' };
++  s.addShape(kind, o);
++}
++
++/** Text box.  `t` is a string or an array of pptxgenjs text objects. */
++function text(s, t, o) {
++  const opt = Object.assign({
++    fontFace: OS, fontSize: 11, color: BLACK, align: 'left', valign: 'top',
++    margin: PAD, wrap: true, isTextBox: true
++  }, o);
++  s.addText(t, opt);
++}
++
++/** Two-tone run pair used by the deck footer. */
++function footer(s, color) {
++  text(s, [
++    { text: 'ATHLETES ', options: { bold: true } },
++    { text: '\u2013 sport presentation template' }
++  ], { x: 0.794, y: 5.235, w: 2.524, h: 0.202, fontFace: SG, fontSize: 8, color: color });
++}
++
++function pageNumber(s, n, color) {
++  text(s, String(n), { x: 8.712, y: 5.222, w: 0.422, h: 0.215, fontFace: SG, fontSize: 8, color: color, align: 'right' });
++}
++
++/**
++ * The deck's master carries a black footer + page number.  Four slides switch
++ * it off; on the rest it sits *behind* every slide shape, so it is emitted
++ * first and is simply covered up wherever the slide has a dark panel.
++ */
++const NO_MASTER = [4, 6, 13, 25];
++function masterFurniture(s, n) {
++  if (NO_MASTER.indexOf(n) >= 0) return;
++  footer(s, BLACK);
++  pageNumber(s, n, BLACK);
++}
++
++/** Closed polygon in absolute inches. */
++function poly(s, pts, color, o) {
++  const xs = pts.map(function (p) { return p[0]; });
++  const ys = pts.map(function (p) { return p[1]; });
++  const x = Math.min.apply(null, xs), y = Math.min.apply(null, ys);
++  const w = Math.max.apply(null, xs) - x, h = Math.max.apply(null, ys) - y;
++  const list = pts.map(function (p) { return { x: p[0] - x, y: p[1] - y }; });
++  list.push({ close: true });
++  shape(s, 'custGeom', Object.assign({ x: x, y: y, w: w, h: h, fill: { color: color }, points: list }, o || {}));
++}
++
++/** Several closed sub-paths sharing one fill (used for line-art icons). */
++function polys(s, ox, oy, subpaths, color, o) {
++  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
++  subpaths.forEach(function (sp) {
++    sp.forEach(function (p) {
++      x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]);
++      x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]);
++    });
++  });
++  const list = [];
++  subpaths.forEach(function (sp) {
++    sp.forEach(function (p, i) {
++      const pt = { x: p[0] - x0, y: p[1] - y0 };
++      if (i === 0) pt.moveTo = true;
++      list.push(pt);
++    });
++    list.push({ close: true });
++  });
++  shape(s, 'custGeom', Object.assign({
++    x: ox + x0, y: oy + y0, w: x1 - x0, h: y1 - y0,
++    fill: { color: color }, points: list
++  }, o || {}));
++}
++
++/* ------------------------------------------------- concentric "track" arcs */
++/* The deck's signature motif: quarter-circle bands sharing one centre.       */
++
++function arcBand(s, cx, cy, rIn, rOut, a0, a1, fill) {
++  const at = function (r, a) { return [cx + r * Math.cos(a * RAD), cy + r * Math.sin(a * RAD)]; };
++  const xs = [], ys = [];
++  for (let i = 0; i <= 12; i++) {
++    const a = a0 + (a1 - a0) * i / 12;
++    [rIn, rOut].forEach(function (r) { const p = at(r, a); xs.push(p[0]); ys.push(p[1]); });
++  }
++  const x = Math.min.apply(null, xs), y = Math.min.apply(null, ys);
++  const w = Math.max.apply(null, xs) - x, h = Math.max.apply(null, ys) - y;
++  const p0 = at(rOut, a0), p1 = at(rIn, a1);
++  shape(s, 'custGeom', {
++    x: x, y: y, w: w, h: h, fill: fill,
++    points: [
++      { x: p0[0] - x, y: p0[1] - y },
++      { curve: { type: 'arc', wR: rOut, hR: rOut, stAng: a0, swAng: a1 - a0 } },
++      { x: p1[0] - x, y: p1[1] - y },
++      { curve: { type: 'arc', wR: rIn, hR: rIn, stAng: a1, swAng: a0 - a1 } },
++      { close: true }
++    ]
++  });
++}
++
++/**
++ * Region bounded by one arc plus a straight tail back to the start point —
++ * used for the corner wedges where a track band runs off the slide.
++ */
++function arcRegion(s, cx, cy, r, a0, a1, tail, fill) {
++  const at = function (a) { return [cx + r * Math.cos(a * RAD), cy + r * Math.sin(a * RAD)]; };
++  const pts = tail.slice();
++  for (let i = 0; i <= 8; i++) pts.push(at(a0 + (a1 - a0) * i / 8));
++  const xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
++  const x = Math.min.apply(null, xs), y = Math.min.apply(null, ys);
++  const w = Math.max.apply(null, xs) - x, h = Math.max.apply(null, ys) - y;
++  const start = at(a0);
++  const list = [{ x: start[0] - x, y: start[1] - y },
++    { curve: { type: 'arc', wR: r, hR: r, stAng: a0, swAng: a1 - a0 } }];
++  tail.forEach(function (p) { list.push({ x: p[0] - x, y: p[1] - y }); });
++  list.push({ close: true });
++  shape(s, 'custGeom', { x: x, y: y, w: w, h: h, fill: fill, points: list });
++}
++
++function mixHex(a, b, t) {
++  t = Math.max(0, Math.min(1, t));
++  let out = '';
++  for (let i = 0; i < 3; i++) {
++    const va = parseInt(a.substr(i * 2, 2), 16), vb = parseInt(b.substr(i * 2, 2), 16);
++    out += Math.round(va + (vb - va) * t).toString(16).padStart(2, '0');
++  }
++  return out.toUpperCase();
++}
++
++/**
++ * Vertical gradient across an arc band.  pptxgenjs has no gradient fill, so
++ * the band is painted as overlapping slices: every slice reaches the far end
++ * of the sweep, which hides the seams between them.
++ */
++function arcBandGradient(s, cx, cy, rIn, rOut, a0, a1, top, bottom) {
++  const N = 26;
++  const mid = (rIn + rOut) / 2;
++  const yOf = function (a) { return cy + mid * Math.sin(a * RAD); };
++  let yMin = 1e9, yMax = -1e9;
++  for (let i = 0; i <= N; i++) {
++    const y = yOf(a0 + (a1 - a0) * i / N);
++    yMin = Math.min(yMin, y); yMax = Math.max(yMax, y);
++  }
++  for (let i = 0; i < N; i++) {
++    const b0 = a0 + (a1 - a0) * i / N;
++    const t = (yOf(b0 + (a1 - a0) / N / 2) - yMin) / (yMax - yMin || 1);
++    arcBand(s, cx, cy, rIn, rOut, b0, a1, { color: mixHex(top, bottom, t) });
++  }
++}
++
++/** Linear gradient rectangle, painted as overlapping slices. */
++function gradRect(s, x, y, w, h, from, to, dir) {
++  const N = 26;
++  for (let i = 0; i < N; i++) {
++    const t = (i + 0.5) / N;
++    const c = mixHex(from, to, t);
++    if (dir === 'down') rect(s, x, y + h * i / N, w, h - h * i / N, c);
++    else rect(s, x + w * i / N, y, w - w * i / N, h, c);
++  }
++}
++
++/**
++ * Draws the family of concentric bands.
++ *  spec = { cx, cy, radii:[inner radius,...], thick, a0, a1,
++ *           colors:[...] | grad:[topColor,bottomColor] | color, transparency }
++ */
++function trackArcs(s, spec) {
++  const a0 = spec.a0 === undefined ? 180 : spec.a0;
++  const a1 = spec.a1 === undefined ? 270 : spec.a1;
++  spec.radii.forEach(function (rIn, i) {
++    const rOut = rIn + spec.thick;
++    if (spec.grad) {
++      arcBandGradient(s, spec.cx, spec.cy, rIn, rOut, a0, a1, spec.grad[0], spec.grad[1]);
++    } else {
++      const c = spec.colors ? spec.colors[i] : spec.color;
++      arcBand(s, spec.cx, spec.cy, rIn, rOut, a0, a1,
++        { color: c, transparency: spec.transparency || 0 });
++    }
++  });
++}
++
++
++
++/** Flat stand-in for a photo in the source deck. */
++function imagePlaceholder(s, x, y, w, h, label) {
++  rect(s, x, y, w, h, GREY);
++  text(s, label || '[image]', {
++    x: x, y: y + h / 2 - 0.15, w: w, h: 0.3,
++    fontSize: 10, color: SLATE, align: 'center'
++  });
++}
++
++/* ============================================================ slide builders */
++
++/* Slides 1 & 25 share the "rainbow track" artwork: a navy panel crossed by
++   four colour arcs and three horizontal bars that fade in from the left. */
++function rainbow(s, top) {
++  const cx = 5.617, cy = top + 5.605;
++  rect(s, 0, top, 10.018, 3.119, NAVY);
++  arcRegion(s, cx, cy, 7.437, 214, 231, [[0, top], [0, top + 0.682]], { color: YELLOW });
++  arcRegion(s, cx, cy, 6.874, 206, 244, [[0, top], [0, top + 2.915], [2.915, top]], { color: RED });
++  arcRegion(s, cx, cy, 5.605, 211, 270,
++    [[cx, top], [cx, top + 0.624], [0.603, top + 3.101], [0, top + 3.101], [0.688, top + 2.519]], { color: GREEN });
++  arcRegion(s, cx, cy, 4.352, 222, 270,
++    [[cx, top + 1.247], [cx, top + 1.871], [2.052, top + 3.101], [2.052, top + 3.101]], { color: YELLOW });
++  arcRegion(s, cx, cy, 3.101, 235, 270,
++    [[cx, top + 2.493], [cx, top + 3.118], [3.754, top + 3.118]], { color: BLUE });
++  [GREEN, YELLOW, BLUE].forEach(function (c, i) {
++    const y = top + i * 1.247;
++    gradRect(s, 0, y, 5.62, 0.625, NAVY, c);
++    rect(s, 5.62, y, 4.392, 0.625, c);
++  });
++}
++
++function slide01(s) {
++  rainbow(s, 2.519);
++  text(s, 'ATHLETES', { x: 0.866, y: 0.368, w: 6.389, h: 1.616, fontFace: SG, fontSize: 92, bold: true });
++  text(s, 'SPORT PRESENTATION TEMPLATE', {
++    x: 0.866, y: 1.744, w: 5.741, h: 0.44, fontFace: SG, fontSize: 18, lineSpacingMultiple: 1.3
++  });
++  text(s, [{ text: 'Presented by:', options: { breakLine: true } }, { text: ' John Doe' }],
++    { x: 7.813, y: 0.554, w: 1.321, h: 0.429, fontFace: SG });
++  text(s, [{ text: 'Date:', options: { breakLine: true } }, { text: '03 August 2025' }],
++    { x: 7.813, y: 1.755, w: 1.444, h: 0.429, fontFace: SG });
++}
++
++function slide02(s) {
++  trackArcs(s, {
++    cx: 10.0, cy: 5.616, radii: [1.243, 2.489, 3.736, 4.983, 6.243],
++    thick: 0.624, grad: [WHITE, GREY2]
++  });
++  rect(s, 0, 0, 5.547, H, WHITE);
++  text(s, 'INTRODUCTION', { x: 0.521, y: 0.863, w: 1.281, h: 0.256, fontSize: 9, lineSpacingMultiple: 1.3 });
++  text(s, [
++    { text: 'WELCOME TO THE ' },
++    { text: 'SPORTS', options: { bold: true, color: NAVY } }
++  ], {
++    x: 0.521, y: 1.306, w: 4.075, h: 2.283, fontFace: SG, fontSize: 54,
++    valign: 'middle', lineSpacingMultiple: 0.8
++  });
++  text(s, 'Sports, a universal language that transcends boundaries and unites people in the pursuit of ' +
++    'excellence. Join us on a journey through the exciting world of athleticism.',
++    { x: 0.521, y: 3.776, w: 4.312, h: 0.745, lineSpacingMultiple: 1.3 });
++}
++
++const TOC = [
++  ['Lorem ipsum dolor', '01'], ['consectetur adipiscing', '05'], ['sed do eiusmod', '07'],
++  ['tempor incididunt ut', '10'], ['labore et dolore', '13'], ['magna aliqua', '16'],
++  ['Ut enim ad minim', '22'], ['quis nostrud', '23']
++];
++
++function slide03(s) {
++  rect(s, 0, 0, 3.938, H, NAVY);
++  const cx = 3.935, cy = 3.913;
++  arcRegion(s, cx, cy, 5.211, 214, 231, [[0, -0.014], [0, 0.464]], { color: BLUE });
++  arcBandGradient(s, cx, cy, 4.382, 4.820, 206, 244, BLUE, NAVY);
++  arcRegion(s, cx, cy, 3.928, 211, 270,
++    [[cx, -0.010], [cx, 0.428], [0.423, 2.163], [0, 2.163], [0.482, 1.755]], { color: mixHex(BLUE, NAVY, 0.35) });
++  arcRegion(s, cx, cy, 3.049, 222, 270,
++    [[cx, 0.864], [cx, 1.302], [1.438, 2.163]], { color: mixHex(BLUE, NAVY, 0.62) });
++  arcRegion(s, cx, cy, 2.176, 235, 270,
++    [[cx, 1.738], [cx, 2.176], [2.630, 2.176]], { color: mixHex(BLUE, NAVY, 0.84) });
++  rect(s, 0, 2.176, 3.938, H - 2.176, NAVY);
++  rect(s, 3.938, 0, W - 3.938, H, WHITE);
++
++  const TOC_Y = [1.087, 1.546, 2.005, 2.464, 2.923, 3.383, 3.842, 4.242];
++  TOC.forEach(function (row, i) {
++    const y = TOC_Y[i];
++    const dx = 0.0064 * i;
++    text(s, row[0], { x: 4.792 + dx, y: y, w: 2.357, h: 0.21, fontSize: 12, margin: [0, 0, 0, 0.57] });
++    text(s, row[1], { x: 8.150 + dx, y: y, w: 0.478, h: 0.21, fontSize: 12, margin: [0, 0, 0, 0.57] });
++    shape(s, 'line', {
++      x: 4.799 + dx, y: y + 0.268, w: 3.648, h: 0,
++      line: { color: '2D2D2C', width: 0.82 }
++    });
++  });
++
++  text(s, 'CONTENT', { x: 0.780, y: 2.719, w: 2.464, h: 0.631, fontFace: SG, fontSize: 33, color: WHITE });
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna',
++    { x: 0.811, y: 3.744, w: 2.433, h: 0.975, color: WHITE, lineSpacingMultiple: 1.3 });
++  footer(s, WHITE);
++}
++
++function slide04(s) {
++  const cx = 4.012, cy = 7.397;
++  arcRegion(s, cx, cy, 5.314, 214, 231, [[0, 3.391], [0, 3.878]], { color: GREY });
++  arcBandGradient(s, cx, cy, 4.470, 4.916, 206, 244, GREY, WHITE);
++  arcRegion(s, cx, cy, 4.005, 211, 270,
++    [[cx, 3.395], [cx, 3.842], [0.431, 5.611], [0, 5.611], [0.480, 5.185]], { color: mixHex(GREY, WHITE, 0.34) });
++  arcRegion(s, cx, cy, 3.109, 222, 270,
++    [[cx, 4.286], [cx, 4.733], [1.466, 5.611]], { color: mixHex(GREY, WHITE, 0.62) });
++  arcRegion(s, cx, cy, 2.220, 235, 270,
++    [[cx, 5.177], [cx, 5.624], [2.682, 5.624]], { color: mixHex(GREY, WHITE, 0.85) });
++  [3.395, 4.286, 5.178].forEach(function (y, i) {
++    rect(s, 4.016, y, 0.865, 0.447, mixHex(GREY, WHITE, [0.34, 0.62, 0.85][i]));
++  });
++  rect(s, 0, 0, W, 3.391, WHITE);
++  rect(s, 4.881, 3.391, W - 4.881, H - 3.391, WHITE);
++
++  text(s, 'WRITE SOMETHING HERE', { x: 0.539, y: 1.230, w: 3.285, h: 0.227, fontSize: 9 });
++  text(s, 'ONE SLIDE PARAGRAPH',
++    { x: 0.487, y: 1.521, w: 3.794, h: 1.448, fontFace: SG, fontSize: 45, lineSpacingMultiple: 0.9 });
++  text(s, [
++    { text: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++        'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo ' +
++        'magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.', options: { breakLine: true } },
++    { text: ' ', options: { breakLine: true } },
++    { text: 'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. ' }
++  ], { x: 5.415, y: 1.127, w: 3.719, h: 2.354, lineSpacingMultiple: 1.3 });
++  text(s, [
++    'Sed ut perspiciatis unde omnis ', 'Iste natus error sit voluptatem ',
++    'Accusan dolor emque ', 'Laudantium totam rem aperiam'
++  ].map(function (t) {
++    return { text: t, options: { breakLine: true, bullet: { characterCode: '25AA', indent: 17 } } };
++  }), { x: 5.467, y: 3.743, w: 2.994, h: 0.975, lineSpacingMultiple: 1.3 });
++  footer(s, BLACK);
++  pageNumber(s, 4, BLACK);
++}
++
++function slide05(s) {
++  /* mirrored corner motif: same arcs, centred off the bottom-right */
++  const cx = 12.303, cy = -2.312;
++  arcBandGradient(s, cx, cy, 6.809, 7.100, 128, 142, WHITE, GREY);
++  arcBandGradient(s, cx, cy, 5.726, 6.297, 116, 154, WHITE, GREY);
++  arcBandGradient(s, cx, cy, 4.588, 5.160, 121, 149, WHITE, GREY);
++  arcRegion(s, cx, cy, 4.017, 128, 143, [[9.021, 0], [10.003, 0], [10.003, 0.978]], { color: mixHex(WHITE, GREY, 0.8) });
++  rect(s, 0, 0, 7.143, 2.934, WHITE);
++  rect(s, 7.143, 2.844, W - 7.143, 0.09, WHITE);
++  rect(s, 0, 2.934, W, H - 2.934, NAVY);
++
++  text(s, 'POPULAR SPORTS WORLDWIDE',
++    { x: 0.788, y: 1.007, w: 5.426, h: 1.448, fontFace: SG, fontSize: 45, lineSpacingMultiple: 0.9 });
++
++  [
++    { x: 0.933, tx: 1.606, tw: 2.984, title: 'OFFICIAL LEAGUES', ball: true },
++    { x: 5.288, tx: 5.961, tw: 2.711, title: 'TOP PLAYERS', ball: false }
++  ].forEach(function (c) {
++    rect(s, c.x, 3.385, 0.556, 0.556, RED, {
++      shadow: { type: 'outer', color: BLACK, opacity: 0.19, blur: 33, offset: 0.07, angle: 90 }
++    });
++    const ix = c.x + 0.134, iy = 3.519;
++    shape(s, 'ellipse', { x: ix, y: iy, w: 0.289, h: 0.289, line: { color: WHITE, width: 1.1 } });
++    if (c.ball) {
++      /* football: pentagon centre with three spokes */
++      shape(s, 'pentagon', { x: ix + 0.098, y: iy + 0.095, w: 0.095, h: 0.090, fill: { color: WHITE } });
++      [90, 210, 330].forEach(function (a) {
++        const r0 = 0.075, r1 = 0.142, m = 0.1445;
++        shape(s, 'line', {
++          x: ix + m + r0 * Math.cos(a * RAD), y: iy + m + r0 * Math.sin(a * RAD),
++          w: (r1 - r0) * Math.cos(a * RAD), h: (r1 - r0) * Math.sin(a * RAD),
++          line: { color: WHITE, width: 1.1 }
++        });
++      });
++    } else {
++      /* bull mascot: two horns above a small muzzle */
++      shape(s, 'ellipse', { x: ix + 0.098, y: iy + 0.115, w: 0.095, h: 0.085, fill: { color: WHITE } });
++      shape(s, 'arc', { x: ix + 0.045, y: iy + 0.045, w: 0.200, h: 0.130, line: { color: WHITE, width: 1.1 }, angleRange: [180, 0] });
++    }
++    text(s, c.title, { x: c.tx, y: 3.479, w: c.tw, h: 0.379, fontFace: SG, fontSize: 18, color: WHITE });
++    text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur',
++      { x: c.x, y: 4.116, w: 3.384, h: 0.745, color: WHITE, lineSpacingMultiple: 1.3 });
++  });
++  footer(s, WHITE);
++  pageNumber(s, 5, WHITE);
++}
++
++/* Rock-climber silhouette (simplified from the original freeform). */
++const CLIMBER = [
++  [[2.486, 1.209], [2.495, 1.580], [2.344, 1.794], [2.243, 2.232], [2.581, 2.384], [2.854, 2.362],
++   [2.853, 2.232], [2.758, 2.179], [2.755, 2.073], [2.803, 2.027], [2.501, 1.085]],
++  [[3.312, 3.071], [3.343, 3.206], [3.292, 3.305], [3.348, 3.465], [3.306, 3.543], [3.333, 3.897],
++   [3.299, 4.017], [3.249, 3.862], [3.259, 3.347], [3.189, 3.224], [3.232, 3.153], [3.130, 3.222],
++   [3.162, 3.386], [3.105, 3.438], [3.005, 3.422], [2.942, 3.263], [2.830, 3.209], [2.421, 3.259],
++   [2.475, 3.538], [2.425, 3.841], [2.469, 4.220], [2.386, 4.259], [2.166, 4.211], [2.304, 4.347],
++   [2.471, 4.947], [2.602, 5.210], [2.613, 5.446], [2.514, 5.625], [0.000, 5.625], [0.000, 0.000],
++   [2.659, 0.000], [2.582, 0.154], [2.593, 0.330], [2.511, 0.523], [2.571, 0.783], [2.511, 1.048],
++   [2.822, 2.010], [2.926, 1.992], [3.019, 2.129], [3.139, 2.119], [3.146, 2.023], [3.056, 1.866],
++   [3.073, 1.726], [3.125, 1.622], [3.230, 1.587], [3.367, 1.718], [3.383, 1.855], [3.330, 1.951],
++   [3.435, 1.969], [3.530, 2.129], [3.502, 2.591], [3.437, 2.804], [3.573, 2.857], [3.538, 3.083],
++   [3.439, 3.219], [3.343, 3.180], [3.415, 2.896]],
++  [[2.160, 2.479], [2.116, 2.640], [1.939, 2.877], [1.883, 3.116], [1.766, 3.301], [1.808, 3.512],
++   [1.935, 3.657], [1.984, 3.824]],
++  [[2.002, 3.872], [2.076, 4.036], [2.257, 3.948], [2.273, 3.857], [2.207, 3.397], [2.224, 3.114],
++   [2.290, 3.026], [2.585, 2.913], [2.612, 2.828], [2.683, 2.795], [2.471, 2.626], [2.327, 2.593],
++   [2.181, 2.496]],
++  [[2.304, 1.835], [2.218, 2.225], [2.191, 2.220], [2.156, 2.198], [2.175, 1.993], [2.212, 1.914]]
++];
++
++function slide06(s) {
++  polys(s, 0, 0, CLIMBER, NAVY);
++  text(s, 'PROCESS', {
++    x: -1.159, y: 2.519, w: 4.135, h: 0.587, fontFace: SG, fontSize: 36, color: WHITE,
++    align: 'center', rotate: 270, lineSpacingMultiple: 0.9
++  });
++  ['01', '02', '03', '04'].forEach(function (num, i) {
++    const y = 0.922 + i * 1.0113;
++    text(s, num, { x: 4.348, y: y, w: 1.052, h: 0.833, fontFace: SG, fontSize: 45 });
++    text(s, 'Insert Title Here', { x: 5.524, y: y + 0.102, w: 2.286, h: 0.252 });
++    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna',
++      { x: 5.524, y: y + 0.316, w: 3.690, h: 0.608, fontSize: 9, lineSpacingMultiple: 1.2 });
++  });
++}
++
++/* Contact glyphs used on the CV slide (phone / envelope / house). */
++const CV_ICONS = [
++  [[[0.098, 0.073], [0.094, 0.098], [0.038, 0.083], [0.007, 0.045], [0.001, 0.002], [0.027, 0.001],
++    [0.035, 0.029], [0.022, 0.039], [0.047, 0.069]]],
++  [[[0.005, 0.000], [0.107, 0.002], [0.107, 0.096], [0.002, 0.096]],
++   [[0.055, 0.047], [0.020, 0.018], [0.013, 0.026], [0.055, 0.062], [0.096, 0.026], [0.089, 0.018]]],
++  [[[0.104, 0.102], [0.020, 0.107], [0.016, 0.053], [0.000, 0.053], [0.062, 0.000], [0.120, 0.053],
++    [0.104, 0.053]],
++   [[0.038, 0.074], [0.038, 0.085], [0.082, 0.085], [0.082, 0.074]]]
++];
++
++function slide07(s) {
++  rect(s, 4.999, 0, 5.001, H, NAVY);
++  text(s, 'JOHN DOE', { x: 0.865, y: 1.078, w: 3.073, h: 0.684, fontFace: SG, fontSize: 45, color: NAVY, lineSpacingMultiple: 0.9 });
++  text(s, 'PROFESSIONAL COACH', { x: 0.865, y: 1.785, w: 2.748, h: 0.230, fontFace: SG, fontSize: 15, lineSpacingMultiple: 0.9 });
++
++  [
++    { y: 2.615, label: 'Phone :', value: '087656987019', icon: 0, ix: 0.969, iy: 2.797, iw: 0.098, ih: 0.098 },
++    { y: 3.250, label: 'E-mail : ', value: 'mail@website.com', icon: 1, ix: 0.964, iy: 3.414, iw: 0.109, ih: 0.098 },
++    { y: 3.878, label: 'Address :', value: 'Jl. Puntodewo, 45B, California', icon: 2, ix: 0.958, iy: 3.994, iw: 0.120, ih: 0.107 }
++  ].forEach(function (r, i) {
++    const x = i === 2 ? 1.207 : 1.211;
++    text(s, r.label, { x: x, y: r.y, w: 2.052, h: 0.315, fontFace: SG, lineSpacingMultiple: 1.5 });
++    text(s, r.value, { x: x, y: r.y + 0.222, w: i === 2 ? 2.150 : 2.052, h: 0.313, lineSpacingMultiple: 1.5 });
++    shape(s, 'ellipse', { x: 0.874, y: 2.702 + i * 0.6033, w: 0.289, h: 0.289, line: { color: NAVY, width: 1 } });
++    polys(s, r.ix, r.iy, CV_ICONS[r.icon], NAVY);
++  });
++
++  text(s, 'Work Experience', { x: 7.053, y: 1.208, w: 2.257, h: 0.379, fontFace: SG, fontSize: 18, color: BLUE });
++  [
++    ['2011 - First Company ', 2.015], ['2015 - Second Company ', 2.930], ['2019 - Third Company ', 3.867]
++  ].forEach(function (r) {
++    text(s, r[0], { x: 7.038, y: r[1], w: 2.052, h: 0.315, fontFace: SG, color: BLUE, lineSpacingMultiple: 1.5 });
++    text(s, 'A wonderful serenity has taken possession of my entire soul',
++      { x: 7.038, y: r[1] + 0.295, w: 2.098, h: 0.453, fontSize: 9, color: WHITE, lineSpacingMultiple: 1.3 });
++  });
++}
++
++function slide08(s) {
++  [
++    { n: '01', bx: 2.683, by: 1.161, tx: 3.464, ty: 1.161, px: 3.404, py: 1.896 },
++    { n: '02', bx: 6.659, by: 3.225, tx: 3.467, ty: 3.260, px: 3.408, py: 3.995 }
++  ].forEach(function (c) {
++    rect(s, c.bx, c.by, 0.594, 0.594, RED, { shadow: { type: 'outer', color: BLACK, opacity: 0.19, blur: 33, offset: 0.07, angle: 90 } });
++    text(s, c.n, { x: c.bx, y: c.by, w: 0.594, h: 0.594, fontSize: 18, color: WHITE, align: 'center', valign: 'middle' });
++    text(s, 'INSERT YOUR AMAZING STATEMENT HERE', { x: c.tx, y: c.ty, w: 3.132, h: 0.581, fontFace: SG, fontSize: 15 });
++    text(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet',
++      { x: c.px, y: c.py, w: 3.132, h: 0.485, lineSpacingMultiple: 1.2 });
++  });
++  pageNumber(s, 8, WHITE);
++}
++
++/* Trophy line-art used for the "Insert Title Here" badge. */
++const TROPHY9 = [
++  [[0.113, 0.316], [0.230, 0.316], [0.230, 0.261], [0.113, 0.261]],
++  [[0.127, 0.275], [0.216, 0.275], [0.216, 0.302], [0.127, 0.302]],
++  [[0.340, 0.034], [0.283, 0.027], [0.285, 0.000], [0.058, 0.000], [0.060, 0.027], [0.003, 0.027],
++   [0.031, 0.117], [0.099, 0.144], [0.025, 0.081], [0.017, 0.041], [0.062, 0.041], [0.142, 0.185],
++   [0.142, 0.227], [0.079, 0.227], [0.079, 0.350], [0.264, 0.350], [0.264, 0.227], [0.208, 0.227],
++   [0.208, 0.182], [0.244, 0.131], [0.264, 0.143], [0.312, 0.117]],
++  [[0.045, 0.371], [0.298, 0.371], [0.298, 0.357], [0.045, 0.357]]
++];
++
++function slide09(s) {
++  rect(s, 0, 0, 4.881, H, NAVY);
++  text(s, 'WRITE SOMETHING HERE', { x: 0.858, y: 1.050, w: 3.285, h: 0.227, fontSize: 9, color: WHITE });
++  text(s, 'UNLEASHING THE SPIRIT OF SPORTS',
++    { x: 0.806, y: 1.341, w: 3.794, h: 1.719, fontFace: SG, fontSize: 36, color: WHITE, lineSpacingMultiple: 0.9 });
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++    'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo',
++    { x: 0.858, y: 3.390, w: 3.580, h: 0.909, color: WHITE, lineSpacingMultiple: 1.2 });
++
++  rect(s, 5.570, 4.144, 0.591, 0.591, RED);
++  polys(s, 5.694, 4.254, TROPHY9, WHITE);
++  text(s, 'Insert Title Here', { x: 6.453, y: 4.122, w: 2.286, h: 0.252 });
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue',
++    { x: 6.453, y: 4.335, w: 2.648, h: 0.426, fontSize: 9, lineSpacingMultiple: 1.2 });
++  footer(s, WHITE);
++  pageNumber(s, 9, BLACK);
++}
++
++function slide10(s) {
++  rect(s, 0, 0, W, H, NAVY);
++  [BLUE, GREEN, RED].forEach(function (c, i) {
++    fadeColumn(s, 6.888 + i * 1.247, 0.014, 0.625, 5.620, c);
++  });
++  arcBand(s, 10.002, 5.628, 0.001, 0.618, 180, 270, { color: RED });
++  arcBand(s, 10.002, 5.628, 1.243, 1.868, 180, 270, { color: GREEN });
++  arcBand(s, 10.002, 5.628, 2.489, 3.114, 180, 270, { color: BLUE });
++
++  shape(s, 'roundRect', {
++    x: 0.618, y: 0.598, w: 3.739, h: 2.215, fill: { color: WHITE }, rectRadius: 0.02,
++    shadow: { type: 'outer', color: BLACK, opacity: 0.4, blur: 52, offset: 0, angle: 90 }
++  });
++  text(s, 'ENTER YOUR BEST TITLE', { x: 0.928, y: 0.902, w: 2.869, h: 0.252, color: GREY3 });
++  text(s, [{ text: 'TOUR DE', options: { breakLine: true } }, { text: 'ATHLETES' }],
++    { x: 0.928, y: 1.184, w: 3.429, h: 1.309, fontFace: SG, fontSize: 45, bold: true, lineSpacingMultiple: 0.8 });
++  footer(s, WHITE);
++  pageNumber(s, 10, WHITE);
++}
++
++function slide11(s) {
++  trackArcs(s, {
++    cx: 5.281, cy: 5.849, radii: [2.322, 3.492, 4.668, 5.863, 6.973],
++    thick: 0.585, grad: [WHITE, GREY]
++  });
++  [0.600, 1.768, 2.937].forEach(function (y, i) {
++    rect(s, 5.285, y, 1.135, 0.586, mixHex(GREY, WHITE, 1 - (y + 0.293) / 3.523));
++  });
++  rect(s, 0, 3.523, W, H - 3.523, WHITE);
++  rect(s, 6.420, 0, W - 6.420, H, WHITE);
++  rect(s, 0, 0, W, 0.594, WHITE);
++
++  [1.033, 3.805].forEach(function (y, i) {
++    const h = i === 0 ? 1.780 : 1.820;
++    const x = i === 0 ? 4.785 : 4.812;
++    for (let k = 0; k < 14; k++) {
++      rect(s, x, y + h * k / 14, 5.215, h / 14 + 0.01, mixHex('262626', BLACK, k / 13));
++    }
++  });
++  [2.030, 4.615].forEach(function (y) {
++    text(s, 'INSERT YOUR AMAZING STATEMENT HERE',
++      { x: 5.150, y: y, w: 2.271, h: 0.451, fontFace: SG, fontSize: 14, color: WHITE, lineSpacingMultiple: 0.8 });
++    text(s, 'A wonderful serenity has taken possession of my',
++      { x: 7.638, y: y - 0.048, w: 1.803, h: 0.426, fontSize: 9, color: WHITE, lineSpacingMultiple: 1.2 });
++  });
++  [0, 2.812].forEach(function (y, i) {
++    rect(s, 9.406, y, 0.594, 0.594, RED);
++    text(s, i === 0 ? '01' : '02', { x: 9.406, y: y, w: 0.594, h: 0.594, fontFace: SG, fontSize: 18, color: WHITE, align: 'center', valign: 'middle' });
++  });
++
++  text(s, 'ENTER YOUR BEST TITLE', { x: 0.851, y: 0.911, w: 2.716, h: 0.227, fontSize: 9 });
++  text(s, 'POPULAR SPORTS', { x: 0.851, y: 1.193, w: 3.839, h: 1.309, fontFace: SG, fontSize: 50, bold: true, lineSpacingMultiple: 0.8 });
++  text(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of ' +
++    'spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this',
++    { x: 0.851, y: 3.961, w: 2.973, h: 0.790, fontSize: 9, lineSpacingMultiple: 1.2 });
++}
++
++function slide12(s) {
++  trackArcs(s, {
++    cx: 8.750, cy: 5.618, radii: [2.479, 3.734, 4.984, 6.255, 7.437],
++    thick: 0.625, grad: [GREY2, WHITE]
++  });
++  rect(s, 0, 0, 3.132, H, WHITE);
++  rect(s, 6.862, 0, W - 6.862, H, WHITE);
++
++  text(s, 'PATH TO CHAMPION', {
++    x: -0.712, y: 1.536, w: 4.781, h: 1.720, fontFace: SG, fontSize: 60, bold: true,
++    rotate: 270, lineSpacingMultiple: 0.8
++  });
++  [
++    ['01', 0.853, 'THRILLS OF THE TRACK'],
++    ['02', 2.321, 'PRECISION AND FOCUS'],
++    ['03', 3.790, 'GRACE AND STRENGTH']
++  ].forEach(function (r) {
++    rect(s, 6.461, r[1], 0.594, 0.594, RED);
++    text(s, r[0], { x: 6.461, y: r[1], w: 0.594, h: 0.594, fontFace: SG, fontSize: 18, color: WHITE, align: 'center', valign: 'middle' });
++    text(s, r[2], { x: 7.247, y: r[1] - 0.050, w: 2.286, h: 0.278, fontFace: SG, fontSize: 12, bold: true });
++    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue',
++      { x: 7.247, y: r[1] + 0.290, w: 1.933, h: 0.608, fontSize: 9, lineSpacingMultiple: 1.2 });
++  });
++}
++
++/* Flexed-arm and running-shoe pictograms of the athlete profile. */
++const ARM13 = [[[0.126, 0.333], [0.041, 0.316], [0.001, 0.279], [0.083, 0.317], [0.167, 0.317],
++  [0.267, 0.279], [0.273, 0.230], [0.249, 0.081], [0.211, 0.036], [0.154, 0.022], [0.120, 0.067],
++  [0.204, 0.076], [0.190, 0.215], [0.107, 0.177], [0.013, 0.209], [0.107, 0.164], [0.180, 0.205],
++  [0.193, 0.082], [0.107, 0.071], [0.124, 0.021], [0.156, 0.009], [0.225, 0.031], [0.264, 0.083],
++  [0.283, 0.285]]];
++const SHOE13 = [
++  [[0.150, 0.217], [0.341, 0.067], [0.373, 0.025], [0.364, 0.004], [0.118, 0.072], [0.066, 0.163],
++   [0.041, 0.178], [0.014, 0.169], [0.000, 0.190], [0.084, 0.267]],
++  [[0.086, 0.253], [0.014, 0.194], [0.071, 0.178], [0.122, 0.083], [0.355, 0.015], [0.313, 0.074]],
++  [[0.382, 0.038], [0.104, 0.278], [0.140, 0.260], [0.161, 0.272], [0.150, 0.249], [0.174, 0.223],
++   [0.197, 0.235], [0.196, 0.203], [0.299, 0.129], [0.318, 0.142], [0.308, 0.124], [0.344, 0.097],
++   [0.361, 0.106], [0.353, 0.088]]
++];
++
++function slide13(s) {
++  trackArcs(s, {
++    cx: 5.618, cy: 5.618, radii: [2.479, 3.734, 4.984, 6.255, 7.437],
++    thick: 0.625, grad: [WHITE, GREY2]
++  });
++  rect(s, 3.730, 0, W - 3.730, H, WHITE);
++
++  text(s, [{ text: 'TOP RANK', options: { breakLine: true } }, { text: 'ATHLETE' }],
++    { x: 0.519, y: 1.026, w: 3.291, h: 2.099, fontFace: SG, fontSize: 50, bold: true, lineSpacingMultiple: 0.8 });
++  text(s, 'LOREM IPSUM DOLOR',
++    { x: 0.519, y: 3.429, w: 2.187, h: 0.221, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
++  text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut laoreet dolore',
++    { x: 0.519, y: 3.673, w: 2.452, h: 0.530, fontSize: 9, align: 'justify' });
++
++  text(s, 'HIMA KIPCHOGE', {
++    x: 7.036, y: 1.058, w: 2.312, h: 0.898, fontFace: SG, fontSize: 30,
++    align: 'right', valign: 'middle', lineSpacingMultiple: 0.8
++  });
++  shape(s, 'parallelogram', { x: 7.877, y: 2.368, w: 1.470, h: 0.223, fill: { color: RED }, rectRadius: 0 });
++  text(s, 'MARATHON RUNNER', { x: 7.978, y: 2.379, w: 1.269, h: 0.202, fontSize: 8, color: WHITE, align: 'center', valign: 'middle' });
++
++  [
++    { y: 2.869, label: 'Strength', value: '80', bar: 1.370 },
++    { y: 3.554, label: 'Pace', value: '70', bar: 1.116 }
++  ].forEach(function (r) {
++    shape(s, 'parallelogram', {
++      x: 6.038, y: r.y, w: 3.310, h: 0.560, fill: { color: WHITE }, rectRadius: 0,
++      shadow: { type: 'outer', color: BLACK, opacity: 0.27, blur: 18, offset: 0.05, angle: 90 }
++    });
++    shape(s, 'line', { x: 6.923, y: r.y + 0.382, w: 1.854, h: 0, line: { color: GREY, width: 2.5 } });
++    shape(s, 'line', { x: 6.923, y: r.y + 0.382, w: r.bar, h: 0, line: { color: RED, width: 2.5 } });
++    shape(s, 'ellipse', { x: 6.923 + r.bar - 0.047, y: r.y + 0.336, w: 0.095, h: 0.095, fill: { color: WHITE } });
++    text(s, r.label, { x: 6.834, y: r.y + 0.059, w: 0.766, h: 0.252, valign: 'middle' });
++    text(s, [{ text: r.value }, { text: '%', options: { fontSize: 8 } }],
++      { x: 8.091, y: r.y + 0.059, w: 0.766, h: 0.252, align: 'right', valign: 'middle' });
++  });
++  polys(s, 6.445, 2.968, ARM13, RED);
++  polys(s, 6.395, 3.699, SHOE13, SLATE);
++  footer(s, BLACK);
++  pageNumber(s, 13, BLACK);
++}
++
++function slide14(s) {
++  rect(s, 4.482, 0, 3.736, H, NAVY);
++  trackArcs(s, {
++    cx: 10.106, cy: 5.618, radii: [2.479, 3.734, 4.984, 6.255, 7.437],
++    thick: 0.625, color: WHITE, transparency: 85
++  });
++  rect(s, 8.218, 0, W - 8.218, H, WHITE);
++  rect(s, 0, 0, 4.482, H, WHITE);
++
++  rect(s, 4.488, 1.041, 4.646, 3.218, WHITE, {
++    shadow: { type: 'outer', color: BLACK, opacity: 0.4, blur: 52, offset: 0, angle: 90 }
++  });
++  text(s, 'WHO\u2019S GONNA CARRY THE BOAT ? AND THE LOGS ?',
++    { x: 4.829, y: 1.790, w: 4.076, h: 1.719, fontFace: SG, fontSize: 30, lineSpacingMultiple: 1.1 });
++  rect(s, 7.072, 4.262, 2.062, 0.548, RED);
++  text(s, 'JOHN DOE', { x: 7.322, y: 4.409, w: 1.636, h: 0.252, fontFace: SG, color: WHITE, align: 'right' });
++}
++
++function slide15(s) {
++  trackArcs(s, {
++    cx: 9.999, cy: 5.618, radii: [1.243, 2.489, 3.736, 4.983, 6.255, 7.437],
++    thick: 0.624, grad: [GREY2, WHITE]
++  });
++  rect(s, 0, 0, 4.380, H, WHITE);
++
++  text(s, 'OUR VALUE YEAR BY YEAR',
++    { x: 0.834, y: 1.622, w: 3.192, h: 1.552, fontFace: SG, fontSize: 36, bold: true, lineSpacingMultiple: 0.8 });
++  text(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, ',
++    { x: 0.834, y: 3.368, w: 2.458, h: 0.697, lineSpacingMultiple: 1.2 });
++
++  [
++    { x: 4.100, title: 'Build With Ease', tw: 1.702, tx: 4.422, value: '74B', vx: 4.730, vw: 1.086, ring: 4.525, sweep: 67.68 },
++    { x: 6.752, title: 'Daily Journey', tw: 1.543, tx: 7.154, value: '52B', vx: 7.378, vw: 1.093, ring: 7.177, sweep: 138.51 }
++  ].forEach(function (c) {
++    rect(s, c.x, 0.948, 2.346, 3.728, WHITE, {
++      shadow: { type: 'outer', color: BLACK, opacity: 0.4, blur: 52, offset: 0, angle: 90 }
++    });
++    text(s, c.title, { x: c.tx, y: 1.219, w: c.tw, h: 0.328, fontFace: SG, fontSize: 15, align: 'center' });
++    shape(s, 'line', { x: c.x, y: 1.720, w: 2.346, h: 0, line: { color: SLATE, width: 2.5 } });
++    shape(s, 'ellipse', { x: c.ring, y: 2.176, w: 1.497, h: 1.497, line: { color: GREY, width: 16 } });
++    shape(s, 'arc', { x: c.ring, y: 2.176, w: 1.497, h: 1.497, line: { color: NAVY, width: 10.5 }, angleRange: [270, c.sweep] });
++    text(s, c.value, { x: c.vx, y: 2.542, w: c.vw, h: 0.682, fontFace: SG, fontSize: 36, align: 'center' });
++    text(s, '/year', { x: c.x + 0.942, y: 3.043, w: 0.463, h: 0.258, fontSize: 9, align: 'center', lineSpacingMultiple: 1.3 });
++    text(s, 'What has fingers but cannot use them? ',
++      { x: c.x + 0.218, y: 3.913, w: 1.911, h: 0.429, align: 'center' });
++  });
++}
++
++/* Timeline chevron (double arrow) outline in local inches. */
++const CHEVRON = [[1.470, 1.086], [0.000, 1.086], [0.357, 0.543], [0.000, 0.000], [1.470, 0.000], [1.827, 0.543]];
++
++function slide16(s) {
++  text(s, 'TIMELINE SECTION',
++    { x: 2.456, y: 0.828, w: 5.087, h: 0.578, fontFace: SG, fontSize: 36, bold: true, align: 'center', lineSpacingMultiple: 0.8 });
++
++  ['February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024'].forEach(function (month, i) {
++    const x = 0.826 + i * 1.6305;
++    poly(s, CHEVRON.map(function (p) { return [p[0] + x, p[1] + 1.939]; }), NAVY);
++    text(s, '0' + (i + 1), { x: x, y: 1.939, w: 1.827, h: 1.086, fontFace: SG, fontSize: 30, color: WHITE, align: 'center', valign: 'middle' });
++    shape(s, 'line', { x: x + 0.913, y: 2.016, w: 0, h: 1.453, line: { color: '8A9AA8', width: 1.5, dashType: 'dash' } });
++    shape(s, 'ellipse', { x: x + 0.851, y: 3.468, w: 0.125, h: 0.125, fill: { color: BLUE } });
++    const tw = i === 0 ? 1.480 : 1.559;
++    const tx = [0.999, 2.590, 4.221, 5.851, 7.459][i];
++    text(s, month, { x: tx, y: 3.657, w: tw, h: 0.319, fontFace: SG, fontSize: 12, bold: true, align: 'center', lineSpacingMultiple: 1.3 });
++    text(s, 'Lorem dol ipsum met dolor sit amet ',
++      { x: tx + 0.02, y: 3.965, w: tw, h: 0.451, fontSize: 9, align: 'center', lineSpacingMultiple: 1.3 });
++  });
++}
++
++function slide17(s) {
++  rect(s, 4.881, 0, 5.119, H, NAVY);
++  shape(s, 'donut', { x: 5.954, y: 1.033, w: 2.964, h: 2.964, fill: { color: WHITE, transparency: 90 }, rectRadius: 0.2767 });
++  shape(s, 'blockArc', {
++    x: 5.954, y: 1.033, w: 2.964, h: 2.964, line: { color: WHITE, width: 14.5 },
++    angleRange: [239.67, 97.48], arcThicknessRatio: 0.0652
++  });
++  text(s, 'Metadata', { x: 6.726, y: 1.612, w: 1.420, h: 0.328, fontSize: 15, color: WHITE, align: 'center' });
++  text(s, '68%', { x: 6.375, y: 1.925, w: 2.121, h: 1.186, fontFace: SG, fontSize: 66, color: WHITE, align: 'center' });
++  text(s, 'Text goes here', { x: 6.590, y: 3.003, w: 1.691, h: 0.252, fontSize: 12, color: WHITE, align: 'center' });
++
++  shape(s, 'ellipse', { x: 6.296, y: 4.327, w: 0.434, h: 0.434, fill: { color: BLUE } });
++  rect(s, 6.452, 4.447, 0.122, 0.156, WHITE);
++  text(s, 'Your products', { x: 6.798, y: 4.380, w: 1.532, h: 0.303, fontFace: SG, fontSize: 14, color: WHITE });
++
++  text(s, 'WRITE SOMETHING HERE', { x: 0.915, y: 1.246, w: 3.285, h: 0.227, fontSize: 9 });
++  text(s, 'UNLEASHING THE SPIRIT OF SPORTS',
++    { x: 0.863, y: 1.646, w: 3.794, h: 1.719, fontFace: SG, fontSize: 36, bold: true, lineSpacingMultiple: 0.9 });
++  text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar',
++    { x: 0.863, y: 3.641, w: 3.319, h: 0.705, lineSpacingMultiple: 1.2 });
++  text(s, 'Page 17', { x: 8.145, y: 5.104, w: 0.956, h: 0.227, fontFace: SG, fontSize: 9, color: WHITE, align: 'right' });
++}
++
++/* Footballer silhouette (body / arm / shorts) of the infographic slide. */
++const PLAYER_BODY = [[1.059, 0.000], [2.209, 0.000], [2.658, 0.699], [3.048, 0.525], [3.120, 0.323],
++  [3.580, 0.485], [3.693, 0.705], [3.199, 0.780], [2.610, 1.164], [1.627, 0.540], [1.169, 0.964],
++  [1.010, 0.921], [0.878, 0.998], [0.925, 1.368], [0.816, 2.247], [0.093, 2.191], [0.027, 2.063],
++  [0.526, 1.869], [0.493, 0.878]];
++const PLAYER_BALL = [1.660, 2.005, 0.68];
++const PLAYER_TOP = [[0.770, 0.000], [1.049, 0.097], [1.118, 0.442], [1.078, 0.660], [1.616, 1.119],
++  [0.513, 1.119], [0.372, 0.977], [0.025, 0.427], [0.048, 0.135], [0.171, 0.129], [0.258, 0.288],
++  [0.222, 0.487], [0.580, 0.790], [0.691, 0.753], [0.512, 0.220]];
++const PLAYER_SHORTS = [[0.031, 0.000], [1.135, 0.000], [1.305, 0.382], [1.639, 0.781], [1.641, 0.906],
++  [1.405, 1.003], [1.466, 0.875], [0.935, 0.404], [0.994, 0.940], [1.224, 1.290], [0.075, 1.290]];
++const PULSE = [[[0.222, 0.444], [0.177, 0.047], [0.120, 0.191], [0.000, 0.193], [0.000, 0.175],
++  [0.109, 0.175], [0.182, 0.000], [0.224, 0.373], [0.272, 0.125], [0.288, 0.129], [0.310, 0.220],
++  [0.333, 0.158], [0.452, 0.158], [0.452, 0.175], [0.343, 0.175], [0.311, 0.260], [0.279, 0.173]]];
++
++function slide18(s) {
++  rect(s, 0, 0, 4.881, H, NAVY);
++  poly(s, PLAYER_BODY.map(function (p) { return [p[0] + 5.704, p[1] + 2.868]; }), GREY);
++  shape(s, 'ellipse', { x: 5.704 + PLAYER_BALL[0] - PLAYER_BALL[2] / 2, y: 2.868 + PLAYER_BALL[1] - PLAYER_BALL[2] / 2, w: PLAYER_BALL[2], h: PLAYER_BALL[2], fill: { color: GREY } });
++  poly(s, PLAYER_TOP.map(function (p) { return [p[0] + 6.207, p[1] + 0.460]; }), GREY2);
++  poly(s, PLAYER_SHORTS.map(function (p) { return [p[0] + 6.689, p[1] + 1.578]; }), RED);
++
++  text(s, 'SPORT INFOGRAPHIC',
++    { x: 0.600, y: 1.020, w: 3.470, h: 1.287, fontFace: SG, fontSize: 36, bold: true, color: WHITE, lineSpacingMultiple: 1.0 });
++  text(s, 'LOREM IPSUM DOLOR',
++    { x: 0.600, y: 2.462, w: 2.187, h: 0.220, fontSize: 11, bold: true, color: WHITE, valign: 'bottom', lineSpacingMultiple: 0.8 });
++  text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut laoreet dolore magna',
++    { x: 0.600, y: 2.681, w: 3.920, h: 0.379, fontSize: 9, color: WHITE });
++
++  shape(s, 'roundRect', {
++    x: 5.334, y: 2.585, w: 2.771, h: 0.953, fill: { color: WHITE }, rectRadius: 0.055,
++    shadow: { type: 'outer', color: BLACK, opacity: 0.14, blur: 35, offset: 0.03, angle: 90 }
++  });
++  shape(s, 'triangle', { x: 7.684, y: 2.439, w: 0.187, h: 0.161, fill: { color: WHITE } });
++  shape(s, 'ellipse', { x: 5.561, y: 2.733, w: 0.650, h: 0.650, fill: { color: SMOKE } });
++  polys(s, 5.660, 2.836, PULSE, RED);
++  text(s, '12%', { x: 6.357, y: 2.710, w: 1.067, h: 0.369, fontFace: SG, fontSize: 21, color: RED, valign: 'bottom', lineSpacingMultiple: 0.8 });
++  text(s, 'Ut wisi enim ad minim veniam, quis nostrud ',
++    { x: 6.394, y: 3.004, w: 1.592, h: 0.379, fontSize: 9, color: INK });
++
++  [
++    { x: 0.722, tx: 0.723, tw: 0.921, pct: '42', color: GREY3, start: 158.66 },
++    { x: 1.991, tx: 2.130, tw: 0.643, pct: '56', color: WHITE, start: 64.79 },
++    { x: 3.260, tx: 3.399, tw: 0.643, pct: '81', color: GREY3, start: 203.85 }
++  ].forEach(function (d) {
++    shape(s, 'ellipse', { x: d.x, y: 3.538, w: 0.866, h: 0.866, line: { color: ROYAL, width: 6 } });
++    shape(s, 'arc', { x: d.x, y: 3.538, w: 0.866, h: 0.866, line: { color: WHITE, width: 6 }, angleRange: [d.start, 7.27] });
++    text(s, [{ text: d.pct }, { text: '%' }], {
++      x: d.tx, y: 3.776, w: d.tw, h: 0.396, fontFace: SG, fontSize: 19, color: d.color,
++      align: 'center', valign: 'middle'
++    });
++  });
++  footer(s, WHITE);
++}
++
++/* Simple white pictograms placed on the four coloured arrow tabs. */
++function bulbIcon(s, x, y) {
++  shape(s, 'ellipse', { x: x, y: y, w: 0.30, h: 0.30, line: { color: WHITE, width: 1.6 } });
++  rect(s, x + 0.105, y + 0.31, 0.09, 0.09, WHITE);
++  rect(s, x + 0.115, y + 0.41, 0.07, 0.05, WHITE);
++}
++function personIcon(s, x, y) {
++  shape(s, 'ellipse', { x: x + 0.09, y: y, w: 0.20, h: 0.20, line: { color: WHITE, width: 1.6 } });
++  shape(s, 'arc', { x: x, y: y + 0.14, w: 0.38, h: 0.38, line: { color: WHITE, width: 1.6 }, angleRange: [180, 0] });
++}
++function targetIcon(s, x, y) {
++  shape(s, 'ellipse', { x: x, y: y, w: 0.40, h: 0.40, line: { color: WHITE, width: 1.5 } });
++  shape(s, 'ellipse', { x: x + 0.11, y: y + 0.11, w: 0.18, h: 0.18, line: { color: WHITE, width: 1.5 } });
++  shape(s, 'ellipse', { x: x + 0.17, y: y + 0.17, w: 0.06, h: 0.06, fill: { color: WHITE } });
++}
++function timerIcon(s, x, y) {
++  shape(s, 'ellipse', { x: x, y: y + 0.07, w: 0.36, h: 0.36, line: { color: WHITE, width: 1.6 } });
++  rect(s, x + 0.13, y, 0.10, 0.06, WHITE);
++  shape(s, 'line', { x: x + 0.18, y: y + 0.25, w: 0.09, h: -0.09, line: { color: WHITE, width: 1.4 } });
++}
++
++const ARROWS19 = [
++  { base: '0094E5', main: BLUE, x: 2.703, top: 1.060, color: BLACK, icon: bulbIcon },
++  { base: 'BE9100', main: YELLOW, x: 3.875, top: 2.336, color: BLACK, icon: personIcon },
++  { base: '27C05D', main: GREEN, x: 5.048, top: 3.613, color: BLACK, icon: targetIcon },
++  { base: 'B10022', main: RED, x: 6.221, top: 2.085, color: WHITE, icon: timerIcon }
++];
++
++function slide19(s) {
++  ARROWS19.forEach(function (a) {
++    rect(s, a.x, 0, 1.024, a.top, a.base);
++    shape(s, 'rtTriangle', { x: a.x, y: a.top, w: 1.024, h: 1.024, fill: { color: a.main }, rotate: 180 });
++    rect(s, a.x + 1.024, a.top, 1.655, 1.024, a.main);
++    shape(s, 'triangle', { x: a.x + 2.590, y: a.top - 0.039, w: 1.277, h: 1.101, fill: { color: a.main }, rotate: 90 });
++    text(s, 'Title Text Here', { x: a.x + 0.955, y: a.top + 0.137, w: 2.105, h: 0.278, fontSize: 12, color: a.color });
++    text(s, 'PLACEHOLDER',
++      { x: a.x + 0.955, y: a.top + 0.425, w: 2.181, h: 0.397, fontSize: 8, color: a.color, lineSpacingMultiple: 1.2 });
++    a.icon(s, a.x + 0.31, 0.29);
++  });
++  text(s, [{ text: 'INFOGRAPHIC', options: { breakLine: true } }, { text: '4 POINT' }],
++    { x: 0.748, y: 2.696, w: 3.411, h: 1.063, fontFace: SG, fontSize: 36, lineSpacingMultiple: 0.8 });
++  text(s, 'LOREM IPSUM DOLOR',
++    { x: 0.779, y: 3.930, w: 2.187, h: 0.220, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
++  text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. ',
++    { x: 0.779, y: 4.149, w: 3.910, h: 0.530, fontSize: 9, align: 'justify' });
++}
++
++/* Three arrows forming the cycle diagram; each is a rotated hooked arrow. */
++const CYCLE = [
++  { color: BLUE, x: 3.511, y: 1.193, w: 1.395, h: 2.250, rot: 57.62,
++    pts: [[1.395, 1.866], [1.135, 1.800], [0.960, 1.711], [0.806, 1.589], [0.571, 1.267], [0.457, 0.870],
++      [0.458, 0.581], [0.567, 0.613], [0.416, 0.000], [0.000, 0.448], [0.109, 0.480], [0.101, 0.912],
++      [0.155, 1.189], [0.254, 1.447], [0.393, 1.679], [0.570, 1.881], [0.778, 2.044], [1.014, 2.165],
++      [1.353, 2.250], [1.071, 2.085]] },
++  { color: ROYAL, x: 3.926, y: 2.577, w: 2.000, h: 2.287, rot: 60.36,
++    pts: [[1.622, 0.000], [1.622, 0.356], [1.303, 0.165], [1.397, 0.374], [1.448, 0.783], [1.347, 1.177],
++      [1.243, 1.353], [1.106, 1.508], [0.900, 1.657], [0.500, 1.784], [0.496, 1.679], [0.000, 2.001],
++      [0.517, 2.287], [0.513, 2.139], [0.746, 2.108], [1.068, 1.981], [1.344, 1.783], [1.528, 1.577],
++      [1.667, 1.341], [1.759, 1.084], [1.802, 0.813], [1.795, 0.537], [1.736, 0.263]] },
++  { color: NAVY, x: 4.604, y: 1.259, w: 2.104, h: 2.270, rot: 293.32,
++    pts: [[1.706, 0.000], [1.706, 0.353], [1.370, 0.164], [1.470, 0.371], [1.523, 0.778], [1.417, 1.168],
++      [1.308, 1.343], [0.947, 1.644], [0.526, 1.770], [0.522, 1.667], [0.000, 1.986], [0.544, 2.270],
++      [0.539, 2.124], [0.784, 2.092], [1.124, 1.966], [1.414, 1.770], [1.607, 1.565], [1.753, 1.331],
++      [1.896, 0.807], [1.826, 0.261]] }
++];
++
++const MOON_ICON = [
++  [[0.275, 0.004], [0.182, 0.000], [0.254, 0.011], [0.172, 0.086], [0.270, 0.088], [0.191, 0.077]],
++  [[0.138, 0.105], [0.072, 0.105], [0.121, 0.116], [0.062, 0.169], [0.138, 0.171], [0.083, 0.160]],
++  [[0.066, 0.215], [0.011, 0.215], [0.050, 0.226], [0.002, 0.268], [0.066, 0.270], [0.022, 0.259]]
++];
++const SHOE_ICON = [
++  [[0.161, 0.231], [0.364, 0.071], [0.398, 0.027], [0.388, 0.004], [0.126, 0.076], [0.070, 0.173],
++   [0.044, 0.189], [0.015, 0.180], [0.000, 0.202], [0.090, 0.285]],
++  [[0.092, 0.269], [0.015, 0.206], [0.076, 0.189], [0.130, 0.088], [0.245, 0.067], [0.379, 0.016], [0.334, 0.079]],
++  [[0.407, 0.040], [0.201, 0.201], [0.111, 0.296], [0.149, 0.277], [0.171, 0.289], [0.161, 0.266],
++   [0.185, 0.237], [0.210, 0.250], [0.197, 0.225], [0.319, 0.138], [0.340, 0.152], [0.329, 0.132],
++   [0.367, 0.103], [0.386, 0.113], [0.377, 0.094]]
++];
++const KIT_ICON = [
++  [[0.259, 0.078], [0.207, 0.078], [0.188, 0.052], [0.067, 0.052], [0.052, 0.078], [0.000, 0.071],
++   [0.044, 0.006], [0.188, 0.000], [0.238, 0.021]],
++  [[0.220, 0.065], [0.246, 0.065], [0.240, 0.045], [0.188, 0.013], [0.050, 0.017], [0.013, 0.065],
++   [0.071, 0.039], [0.194, 0.040]]
++];
++const CROSS_ICON = [
++  [[0.091, 0.136], [0.043, 0.135], [0.039, 0.097], [0.001, 0.093], [0.001, 0.043], [0.039, 0.039],
++   [0.043, 0.001], [0.094, 0.001], [0.098, 0.039], [0.136, 0.043], [0.136, 0.093], [0.098, 0.097]]
++];
++
++function slide20(s) {
++  CYCLE.forEach(function (a) {
++    shape(s, 'custGeom', {
++      x: a.x, y: a.y, w: a.w, h: a.h, rotate: a.rot, fill: { color: a.color },
++      points: a.pts.map(function (p) { return { x: p[0], y: p[1] }; }).concat([{ close: true }])
++    });
++  });
++  /* group-of-people glyph at the centre of the cycle */
++  const gx = 4.611, gy = 2.457;
++  shape(s, 'ellipse', { x: gx + 0.30, y: gy + 0.03, w: 0.17, h: 0.17, line: { color: BLACK, width: 1.2 } });
++  shape(s, 'arc', { x: gx + 0.22, y: gy + 0.22, w: 0.33, h: 0.33, line: { color: BLACK, width: 1.2 }, angleRange: [180, 0] });
++  shape(s, 'ellipse', { x: gx + 0.03, y: gy + 0.29, w: 0.15, h: 0.15, line: { color: BLACK, width: 1.2 } });
++  shape(s, 'arc', { x: gx - 0.03, y: gy + 0.46, w: 0.28, h: 0.28, line: { color: BLACK, width: 1.2 }, angleRange: [180, 0] });
++  shape(s, 'ellipse', { x: gx + 0.59, y: gy + 0.29, w: 0.15, h: 0.15, line: { color: BLACK, width: 1.2 } });
++  shape(s, 'arc', { x: gx + 0.53, y: gy + 0.46, w: 0.28, h: 0.28, line: { color: BLACK, width: 1.2 }, angleRange: [180, 0] });
++  shape(s, 'line', { x: gx + 0.10, y: gy + 0.72, w: 0.58, h: 0, line: { color: BLACK, width: 1.2 } });
++
++  text(s, [{ text: 'INFOGRAPHIC', options: { breakLine: true } }, { text: '3 POINT' }],
++    { x: 0.748, y: 0.947, w: 3.411, h: 1.063, fontFace: SG, fontSize: 36, lineSpacingMultiple: 0.8 });
++  text(s, 'LOREM IPSUM DOLOR',
++    { x: 0.779, y: 3.082, w: 2.187, h: 0.217, fontSize: 11, bold: true, color: SLATE, valign: 'bottom', lineSpacingMultiple: 0.8 });
++  text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut ' +
++    'laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud',
++    { x: 0.779, y: 3.366, w: 2.214, h: 0.984, fontSize: 9, color: INK });
++
++  [
++    { y: 1.453, tw: 1.760, bw: 2.017, draw: function (x, y) { polys(s, x + 0.153, y + 0.156, MOON_ICON, WHITE); } },
++    { y: 2.692, tw: 1.806, bw: 1.941, draw: function (x, y) { polys(s, x + 0.085, y + 0.142, SHOE_ICON, WHITE); } },
++    { y: 3.931, tw: 1.806, bw: 1.941, draw: function (x, y) {
++        polys(s, x + 0.123, y + 0.194, KIT_ICON, WHITE);
++        polys(s, x + 0.162, y + 0.129, CROSS_ICON, WHITE);
++      } }
++  ].forEach(function (r) {
++    shape(s, 'roundRect', { x: 6.876, y: r.y + 0.025, w: 0.582, h: 0.582, fill: { color: RED }, rectRadius: 0.06 });
++    r.draw(6.876, r.y + 0.025);
++    text(s, 'LOREM IPSUM DOLOR',
++      { x: 7.594, y: r.y, w: r.tw, h: 0.221, fontSize: 11, bold: true, color: INK, valign: 'bottom', lineSpacingMultiple: 0.8 });
++    text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod',
++      { x: 7.594, y: r.y + 0.220, w: r.bw, h: 0.530, fontSize: 9, color: INK });
++  });
++}
++
++/* Award cup, drawn as one filled outline. */
++const CUP21 = [
++  [[0.598, 0.805], [0.610, 0.749], [0.644, 0.702], [0.871, 0.544], [1.007, 0.399], [1.060, 0.258],
++   [1.054, 0.140], [0.834, 0.127], [0.732, 0.040], [0.535, 0.000], [0.338, 0.040], [0.236, 0.127],
++   [0.014, 0.140], [0.000, 0.170], [0.026, 0.334], [0.093, 0.455], [0.189, 0.544], [0.401, 0.680],
++   [0.467, 0.776], [0.470, 0.889], [0.291, 0.949], [0.258, 0.994], [0.280, 1.038], [0.340, 1.072],
++   [0.480, 1.100], [0.637, 1.094], [0.748, 1.056], [0.786, 1.017], [0.779, 0.964], [0.716, 0.921],
++   [0.598, 0.889]],
++  [[0.771, 0.507], [0.818, 0.384], [0.834, 0.213], [0.983, 0.213], [0.956, 0.312], [0.909, 0.392]],
++  [[0.535, 0.086], [0.717, 0.120], [0.758, 0.148], [0.768, 0.179], [0.685, 0.238], [0.535, 0.275],
++   [0.385, 0.238], [0.302, 0.179], [0.312, 0.148], [0.353, 0.120]],
++  [[0.087, 0.213], [0.236, 0.213], [0.252, 0.384], [0.299, 0.507], [0.185, 0.425], [0.126, 0.354]]
++];
++
++function slide21(s) {
++  text(s, 'AWARD COLLECTION',
++    { x: 1.693, y: 0.910, w: 6.614, h: 0.536, fontFace: SG, fontSize: 33, bold: true, align: 'center', valign: 'bottom', lineSpacingMultiple: 0.8 });
++  text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. ',
++    { x: 2.422, y: 1.439, w: 5.156, h: 0.379, fontSize: 9, align: 'center' });
++
++  ['1887', '1995', '2001'].forEach(function (year, i) {
++    const dx = i * 2.5564;
++    polys(s, 1.909 + dx, 2.347, CUP21, RED);
++    text(s, year, { x: 1.693 + dx, y: 3.648, w: 1.501, h: 0.327, fontFace: SG, fontSize: 18, bold: true, align: 'center', valign: 'bottom', lineSpacingMultiple: 0.8 });
++    text(s, [
++      { text: 'Ut wisi enim ad ', options: { bold: true } },
++      { text: 'minim veniam, quis nostrud exerci tation ullamcorper nibh euismod' }
++    ], { x: 1.410 + dx, y: 3.974, w: 2.068, h: 0.530, fontSize: 9, align: 'center' });
++  });
++}
++
++const STANDINGS = [
++  ['1', 'Steven Johnson', '15', '10', '1', '4', '90'],
++  ['2', 'Patrick Wilson', '15', '10', '2', '3', '88'],
++  ['3', 'Eduardo Claim', '15', '9', '2', '4', '84'],
++  ['4', 'Joe Carlos', '15', '9', '3', '3', '82'],
++  ['5', 'Esteban Perez', '15', '7', '3', '5', '70'],
++  ['6', 'Addison Alves', '15', '6', '3', '6', '65']
++];
++const HEADERS = ['#', 'PLAYER NAME', 'PLAY', 'WIN', 'LOSE', 'DRAW', 'PTS'];
++const HEAD_X = [1.028, 1.941, 4.179, 5.073, 6.031, 6.962, 7.856];
++const HEAD_W = [0.631, 2.253, 1.053, 1.053, 1.053, 1.053, 1.053];
++const CELL_X = [1.028, 1.941, 4.239, 5.160, 6.136, 7.058, 7.952];
++const CELL_W = [0.631, 1.694, 0.862, 0.862, 0.862, 0.862, 0.862];
++
++function slide22(s) {
++  const cx = 5.618, cy = 8.104;
++  arcBand(s, cx, cy, 7.437, 8.061, 221, 229, { color: BLUE });
++  arcBand(s, cx, cy, 6.250, 6.874, 206, 244, { color: RED });
++  arcBand(s, cx, cy, 4.975, 5.602, 211, 270, { color: GREEN });
++  arcBand(s, cx, cy, 3.718, 4.346, 222, 270, { color: YELLOW });
++  arcBand(s, cx, cy, 2.472, 3.096, 235, 270, { color: BLUE });
++  [GREEN, YELLOW, BLUE].forEach(function (c, i) {
++    rect(s, 5.617, 2.506 + i * 1.247, 4.392, 0.625, c);
++  });
++
++  text(s, 'TABLE STANDINGS',
++    { x: 1.844, y: 0.926, w: 6.312, h: 0.696, fontFace: SG, fontSize: 36, align: 'center', lineSpacingMultiple: 0.8 });
++
++  shape(s, 'roundRect', { x: 0.958, y: 1.659, w: 8.083, h: 0.552, fill: { color: NAVY }, rectRadius: 0.04 });
++  HEADERS.forEach(function (t, i) {
++    text(s, t, {
++      x: HEAD_X[i], y: i === 0 ? 1.771 : 1.821, w: HEAD_W[i], h: i === 0 ? 0.328 : 0.227,
++      fontSize: i === 0 ? 15 : 9, color: WHITE, align: i === 1 ? 'left' : 'center', valign: 'middle'
++    });
++  });
++  STANDINGS.forEach(function (row, r) {
++    const y = 2.224 + r * 0.4412;
++    shape(s, 'roundRect', { x: 0.958, y: y, w: 8.083, h: 0.428, fill: { color: SMOKE }, rectRadius: 0.04 });
++    row.forEach(function (cell, i) {
++      text(s, cell, {
++        x: CELL_X[i], y: y + 0.088, w: CELL_W[i], h: 0.252, color: INK,
++        align: i === 1 ? 'left' : 'center', valign: 'middle'
++      });
++    });
++  });
++  footer(s, BLACK);
++  pageNumber(s, 22, BLACK);
++}
++
++/* Small trophy medallion repeated three times on the history slide. */
++const CUP23 = [
++  [[0.078, 0.291], [0.238, 0.291], [0.238, 0.304], [0.078, 0.304]],
++  [[0.145, 0.258], [0.117, 0.278], [0.199, 0.278], [0.171, 0.258]],
++  [[0.243, 0.105], [0.241, 0.139], [0.231, 0.168], [0.231, 0.238], [0.244, 0.227], [0.257, 0.238], [0.257, 0.121]],
++  [[0.158, 0.035], [0.178, 0.068], [0.213, 0.073], [0.217, 0.080], [0.191, 0.107], [0.194, 0.146],
++   [0.158, 0.131], [0.124, 0.147], [0.119, 0.141], [0.125, 0.107], [0.099, 0.077], [0.138, 0.068]],
++  [[0.079, 0.000], [0.238, 0.000], [0.243, 0.021], [0.315, 0.032], [0.315, 0.119], [0.270, 0.149],
++   [0.269, 0.256], [0.220, 0.256], [0.219, 0.186], [0.179, 0.228], [0.212, 0.279], [0.249, 0.282],
++   [0.247, 0.316], [0.066, 0.312], [0.067, 0.281], [0.104, 0.279], [0.137, 0.228], [0.085, 0.168],
++   [0.073, 0.105], [0.059, 0.238], [0.093, 0.216], [0.097, 0.253], [0.047, 0.256], [0.046, 0.149],
++   [0.001, 0.119], [0.000, 0.039], [0.073, 0.021]]
++];
++
++function slide23(s) {
++  rect(s, 4.881, 0, 5.119, H, NAVY);
++  imagePlaceholder(s, 4.640, 1.262, 4.760, 2.734, '[image]');
++
++  text(s, 'ATHLETES', { x: 0.866, y: 1.227, w: 3.671, h: 0.766, fontFace: SG, fontSize: 50, lineSpacingMultiple: 0.8 });
++  ['1990', '2022', '2023'].forEach(function (year, i) {
++    polys(s, 1.066 + i * 0.8231, 2.139, CUP23, RED);
++    text(s, year, { x: 0.844 + i * 0.8226, y: 2.503, w: 0.809, h: 0.252, fontFace: SG, align: 'center' });
++  });
++  text(s, 'HISTORY', { x: 0.924, y: 3.222, w: 2.252, h: 0.266, fontFace: SG, fontSize: 14, lineSpacingMultiple: 0.8 });
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur',
++    { x: 0.924, y: 3.522, w: 2.934, h: 0.650, fontSize: 9, lineSpacingMultiple: 1.3 });
++}
++
++const PIN24 = [
++  [[0.277, 0.000], [0.385, 0.021], [0.471, 0.080], [0.528, 0.168], [0.549, 0.278], [0.537, 0.377],
++   [0.463, 0.583], [0.277, 0.887], [0.088, 0.583], [0.012, 0.377], [0.000, 0.278], [0.021, 0.168],
++   [0.079, 0.080], [0.166, 0.021]],
++  [[0.277, 0.120], [0.217, 0.133], [0.166, 0.169], [0.131, 0.219], [0.117, 0.278], [0.131, 0.335],
++   [0.166, 0.386], [0.217, 0.422], [0.277, 0.436], [0.333, 0.422], [0.382, 0.386], [0.418, 0.335],
++   [0.432, 0.278], [0.418, 0.219], [0.382, 0.169], [0.333, 0.133]]
++];
++const FACEBOOK = [[[0.196, 0.000], [0.028, 0.000], [0.005, 0.013], [0.000, 0.196], [0.013, 0.219],
++  [0.112, 0.224], [0.112, 0.144], [0.084, 0.144], [0.084, 0.107], [0.112, 0.107], [0.121, 0.064],
++  [0.158, 0.042], [0.182, 0.042], [0.182, 0.084], [0.154, 0.089], [0.154, 0.107], [0.182, 0.107],
++  [0.182, 0.144], [0.154, 0.144], [0.154, 0.224], [0.215, 0.216], [0.223, 0.028]]];
++const TWITTER = [[[0.241, 0.023], [0.214, 0.033], [0.232, 0.005], [0.204, 0.019], [0.157, 0.001],
++  [0.125, 0.023], [0.120, 0.060], [0.105, 0.060], [0.050, 0.040], [0.018, 0.010], [0.009, 0.043],
++  [0.032, 0.079], [0.009, 0.070], [0.012, 0.087], [0.051, 0.120], [0.028, 0.120], [0.038, 0.139],
++  [0.074, 0.153], [0.000, 0.176], [0.074, 0.194], [0.159, 0.168], [0.194, 0.128], [0.214, 0.051]]];
++
++function slide24(s) {
++  polys(s, 7.056, 1.619, PIN24, RED);
++  text(s, 'GET IN TOUCH',
++    { x: 0.788, y: 1.045, w: 2.867, h: 1.433, fontFace: SG, fontSize: 50, valign: 'bottom', lineSpacingMultiple: 0.8 });
++
++  rect(s, 0.788, 2.652, 5.147, 2.327, WHITE, {
++    shadow: { type: 'outer', color: BLUE, opacity: 0.7, blur: 11, offset: 0.05, angle: 250 }
++  });
++  text(s, 'Overview', { x: 1.223, y: 2.965, w: 2.187, h: 0.221, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
++  text(s, 'Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. ',
++    { x: 1.223, y: 3.249, w: 4.440, h: 0.379, fontSize: 9 });
++  shape(s, 'line', { x: 1.206, y: 3.856, w: 4.312, h: 0, line: { color: SMOKE, width: 0.75 } });
++  text(s, 'Social Media', { x: 1.223, y: 4.044, w: 2.187, h: 0.221, fontSize: 11, bold: true, valign: 'bottom', lineSpacingMultiple: 0.8 });
++  polys(s, 1.283, 4.407, FACEBOOK, BLACK);
++  polys(s, 3.226, 4.414, TWITTER, BLACK);
++  text(s, 'Ut wisi enim ad', { x: 1.580, y: 4.406, w: 1.174, h: 0.227, fontSize: 9 });
++  text(s, 'Ut wisi enim ad', { x: 3.655, y: 4.406, w: 1.174, h: 0.227, fontSize: 9 });
++}
++
++function slide25(s) {
++  rainbow(s, 0.006);
++  text(s, 'THANKYOU',
++    { x: 1.430, y: 3.412, w: 7.141, h: 1.616, fontFace: SG, fontSize: 92, align: 'center' });
++  text(s, 'SPORT PRESENTATION TEMPLATE',
++    { x: 2.129, y: 4.788, w: 5.741, h: 0.349, fontFace: SG, fontSize: 14, align: 'center', lineSpacingMultiple: 1.3 });
++}
++
++/* ===================================================================== main */
++
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'ATHLETES', width: W, height: H });
++  pptx.layout = 'ATHLETES';
++  pptx.title = 'ATHLETES - sport presentation template';
++  BUILDERS.forEach(function (fn, i) {
++    const slide = pptx.addSlide();
++    slide.background = { color: WHITE };
++    masterFurniture(slide, i + 1);
++    fn(slide);
++  });
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '0ba39950-1e90-4cba-a31b-85289dfad06d_grok_final.pptx')
++  });
++}
++
++build().then(function (f) { console.log('wrote ' + f); },
++  function (e) { console.error(e); process.exit(1); });

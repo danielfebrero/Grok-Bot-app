@@ -1,0 +1,1091 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/charity_fundraising_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/charity_fundraising_presentation.js
+@@ -0,0 +1,1088 @@
++/**
++ * "Salera" — Charity Presentation Template (42 slides, 13.333in x 7.5in)
++ * Standalone pptxgenjs rebuild of the reference deck.
++ *
++ * Raster photographs in the original are replaced with flat colour placeholder
++ * rectangles that keep the original position, size and dominant colour.
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++const pres = new PptxGenJS();
++pres.defineLayout({ name: 'WIDE', width: 13.3333333, height: 7.5 });
++pres.layout = 'WIDE';
++pres.author = 'Salera';
++pres.title = 'Salera — Charity Presentation Template';
++
++const S = pres.ShapeType;
++
++/* ------------------------------------------------------------------ *
++ * Theme palette ("Charity Presentation" colour scheme)
++ * ------------------------------------------------------------------ */
++const C = {
++  white: 'FFFFFF',
++  teal: '577371', // dk1 / tx1
++  black: '000000', // dk2 / tx2
++  mist: 'E7EDED', // lt2 / bg2
++  peach: 'FCAA7C', // accent1
++  cream: 'FEE7DA', // accent2
++  rose: 'D89898', // accent3
++  blush: 'EFD5D5', // accent4
++  peachDark: 'FB9257', // accent1 lumMod 90%
++  roseDark: 'CE7D7D', // accent3 lumMod 90%
++  gray50: '808080', // bg1 lumMod 50%
++  gray65: 'A6A6A6', // bg1 lumMod 65%
++  gray95: 'F2F2F2', // bg1 lumMod 95%
++  ink: '262626', // tx2 lumMod 85% / lumOff 15%
++  slate: '595959', // tx2 lumMod 65% / lumOff 35%
++  photoBlue: '1531BC', // dominant colour of the blue stock photos
++  photoRed: 'FD3514', // dominant colour of the red stock photos
++};
++
++const F = { serif: 'Source Serif Pro', sans: 'Roboto' };
++
++const WWW = 'W   W   W   .   S   A   L   E   R   A   .   C   O   M';
++
++/* ------------------------------------------------------------------ *
++ * Primitive helpers
++ * ------------------------------------------------------------------ */
++function box(s, kind, x, y, w, h, opts) {
++  s.addShape(kind, Object.assign({ x, y, w, h }, opts));
++}
++
++function rect(s, x, y, w, h, fill, opts) {
++  box(s, S.rect, x, y, w, h, Object.assign({ fill: { color: fill } }, opts));
++}
++
++function outline(s, x, y, w, h, lineColor, lineW) {
++  box(s, S.rect, x, y, w, h, {
++    fill: { type: 'none' },
++    line: { color: lineColor, width: lineW || 0.75 },
++  });
++}
++
++function hline(s, x, y, w, color, width) {
++  box(s, S.line, x, y, w, 0, { line: { color, width: width || 1 } });
++}
++
++function vline(s, x, y, h, color, width) {
++  box(s, S.line, x, y, 0, h, { line: { color, width: width || 1 } });
++}
++
++function text(s, str, o) {
++  s.addText(str, Object.assign({ margin: 0, valign: 'top', fontFace: F.sans, wrap: true }, o));
++}
++
++/** 36pt Source Serif Pro slide title. */
++function title(s, str, x, y, w, h, o) {
++  text(s, str, Object.assign({ x, y, w, h, fontFace: F.serif, fontSize: 36, color: C.ink, lineSpacing: 40 }, o));
++}
++
++/** 10pt Roboto body copy at 150% line spacing. */
++function body(s, str, x, y, w, h, o) {
++  text(s, str, Object.assign({ x, y, w, h, fontSize: 10, color: C.gray50, lineSpacingMultiple: 1.5 }, o));
++}
++
++/** Bold Roboto sub-heading. */
++function head(s, str, x, y, w, h, o) {
++  text(s, str, Object.assign({ x, y, w, h, fontSize: 14, bold: true, color: C.slate }, o));
++}
++
++/** Letter-spaced "www.salera.com" strap-line. */
++function www(s, x, y, w, o) {
++  text(s, WWW, Object.assign({ x, y, w, h: 0.135, fontSize: 8, color: C.white }, o));
++}
++
++/** Placeholder standing in for a raster photograph. */
++function photo(s, x, y, w, h, color) {
++  rect(s, x, y, w, h, color);
++  text(s, '[image]', {
++    x, y, w, h, align: 'center', valign: 'middle', fontSize: 11, color: C.white, transparency: 25,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Pictogram library — flat stand-ins for the deck's icon glyphs
++ * ------------------------------------------------------------------ */
++const fill = (color) => ({ fill: { color } });
++const stroke = (color, width) => ({ fill: { type: 'none' }, line: { color, width } });
++
++const GLYPHS = {
++  square: (s, x, y, w, h, c) => rect(s, x, y, w, h, c),
++  circle: (s, x, y, w, h, c) => box(s, S.ellipse, x, y, w, h, fill(c)),
++  ring: (s, x, y, w, h, c) => box(s, S.ellipse, x, y, w, h, stroke(c, 2.5)),
++  frame: (s, x, y, w, h, c) => box(s, S.rect, x, y, w, h, stroke(c, 2.5)),
++  triangle: (s, x, y, w, h, c) => box(s, S.triangle, x, y, w, h, fill(c)),
++  plus: (s, x, y, w, h, c) => {
++    rect(s, x + w * 0.38, y, w * 0.24, h, c);
++    rect(s, x, y + h * 0.38, w, h * 0.24, c);
++  },
++  plusBox: (s, x, y, w, h, c, bg) => {
++    box(s, S.roundRect, x, y, w, h, Object.assign(fill(c), { rectRadius: 0.1 }));
++    rect(s, x + w * 0.42, y + h * 0.2, w * 0.16, h * 0.6, bg);
++    rect(s, x + w * 0.2, y + h * 0.42, w * 0.6, h * 0.16, bg);
++  },
++  bars: (s, x, y, w, h, c) => {
++    rect(s, x, y + h * 0.45, w * 0.26, h * 0.55, c);
++    rect(s, x + w * 0.37, y + h * 0.15, w * 0.26, h * 0.85, c);
++    rect(s, x + w * 0.74, y, w * 0.26, h, c);
++  },
++  people: (s, x, y, w, h, c) => {
++    box(s, S.ellipse, x + w * 0.04, y, w * 0.36, h * 0.42, fill(c));
++    box(s, S.ellipse, x + w * 0.6, y, w * 0.36, h * 0.42, fill(c));
++    box(s, S.roundRect, x, y + h * 0.5, w, h * 0.5, Object.assign(fill(c), { rectRadius: 0.3 }));
++  },
++  building: (s, x, y, w, h, c, bg) => {
++    rect(s, x, y + h * 0.22, w, h * 0.78, c);
++    box(s, S.triangle, x + w * 0.15, y, w * 0.7, h * 0.25, fill(c));
++    rect(s, x + w * 0.22, y + h * 0.45, w * 0.14, h * 0.3, bg);
++    rect(s, x + w * 0.62, y + h * 0.45, w * 0.14, h * 0.3, bg);
++  },
++  bank: (s, x, y, w, h, c) => {
++    box(s, S.triangle, x, y, w, h * 0.28, fill(c));
++    rect(s, x + w * 0.1, y + h * 0.35, w * 0.14, h * 0.42, c);
++    rect(s, x + w * 0.43, y + h * 0.35, w * 0.14, h * 0.42, c);
++    rect(s, x + w * 0.76, y + h * 0.35, w * 0.14, h * 0.42, c);
++    rect(s, x, y + h * 0.86, w, h * 0.14, c);
++  },
++  van: (s, x, y, w, h, c) => {
++    rect(s, x, y + h * 0.15, w * 0.62, h * 0.55, c);
++    box(s, S.triangle, x + w * 0.6, y + h * 0.15, w * 0.4, h * 0.55, Object.assign(fill(c), { rotate: 90 }));
++    box(s, S.ellipse, x + w * 0.12, y + h * 0.62, w * 0.24, h * 0.38, fill(c));
++    box(s, S.ellipse, x + w * 0.64, y + h * 0.62, w * 0.24, h * 0.38, fill(c));
++  },
++  flag: (s, x, y, w, h, c) => {
++    rect(s, x, y, w * 0.13, h, c);
++    rect(s, x + w * 0.13, y, w * 0.87, h * 0.5, c);
++  },
++  money: (s, x, y, w, h, c) => {
++    box(s, S.rect, x, y, w, h, stroke(c, 2.5));
++    rect(s, x + w * 0.42, y + h * 0.18, w * 0.16, h * 0.64, c);
++  },
++  speaker: (s, x, y, w, h, c) => {
++    box(s, S.ellipse, x, y, w * 0.42, h * 0.46, fill(c));
++    box(s, S.roundRect, x, y + h * 0.52, w * 0.6, h * 0.48, Object.assign(fill(c), { rectRadius: 0.3 }));
++    box(s, S.ellipse, x + w * 0.6, y + h * 0.1, w * 0.4, h * 0.6, stroke(c, 2));
++  },
++  thumb: (s, x, y, w, h, c) => {
++    rect(s, x, y + h * 0.38, w * 0.28, h * 0.62, c);
++    box(s, S.roundRect, x + w * 0.34, y, w * 0.66, h, Object.assign(fill(c), { rectRadius: 0.25 }));
++  },
++  pin: (s, x, y, w, h, c, bg) => {
++    box(s, S.ellipse, x, y, w, w, fill(c));
++    box(s, S.triangle, x + w * 0.15, y + h * 0.45, w * 0.7, h * 0.55, Object.assign(fill(c), { rotate: 180 }));
++    box(s, S.ellipse, x + w * 0.3, y + w * 0.28, w * 0.4, w * 0.4, fill(bg));
++  },
++  phone: (s, x, y, w, h, c, bg) => {
++    box(s, S.roundRect, x, y, w, h, Object.assign(fill(c), { rectRadius: 0.2 }));
++    rect(s, x + w * 0.14, y + h * 0.13, w * 0.72, h * 0.62, bg);
++  },
++  globe: (s, x, y, w, h, c) => {
++    box(s, S.ellipse, x, y, w, h, stroke(c, 2.5));
++    box(s, S.ellipse, x + w * 0.3, y, w * 0.4, h, stroke(c, 1.5));
++    hline(s, x, y + h / 2, w, c, 1.5);
++  },
++  mail: (s, x, y, w, h, c, bg) => {
++    box(s, S.roundRect, x, y, w, h, Object.assign(fill(c), { rectRadius: 0.08 }));
++    box(s, S.triangle, x + w * 0.1, y + h * 0.18, w * 0.8, h * 0.5, Object.assign(fill(bg), { rotate: 180 }));
++  },
++  medkit: (s, x, y, w, h, c, bg) => {
++    rect(s, x + w * 0.28, y, w * 0.44, h * 0.2, c);
++    box(s, S.roundRect, x, y + h * 0.18, w, h * 0.82, Object.assign(fill(c), { rectRadius: 0.12 }));
++    rect(s, x + w * 0.42, y + h * 0.34, w * 0.16, h * 0.5, bg);
++    rect(s, x + w * 0.24, y + h * 0.51, w * 0.52, h * 0.16, bg);
++  },
++  calendar: (s, x, y, w, h, c, bg) => {
++    box(s, S.roundRect, x, y + h * 0.1, w, h * 0.9, Object.assign(fill(c), { rectRadius: 0.1 }));
++    rect(s, x + w * 0.18, y, w * 0.1, h * 0.24, c);
++    rect(s, x + w * 0.72, y, w * 0.1, h * 0.24, c);
++    rect(s, x + w * 0.14, y + h * 0.45, w * 0.72, h * 0.3, bg);
++  },
++  play: (s, x, y, w, h, c, bg) => {
++    box(s, S.ellipse, x, y, w, h, fill(c));
++    box(s, S.triangle, x + w * 0.3, y + h * 0.26, w * 0.44, h * 0.48, Object.assign(fill(bg), { rotate: 90 }));
++  },
++  arrow: (s, x, y, w, h, c) => {
++    rect(s, x, y + h * 0.4, w * 0.78, h * 0.2, c);
++    box(s, S.triangle, x + w * 0.62, y + h * 0.15, w * 0.38, h * 0.7, Object.assign(fill(c), { rotate: 90 }));
++  },
++  grid: (s, x, y, w, h, c) => {
++    for (let r = 0; r < 3; r += 1) {
++      for (let k = 0; k < 3; k += 1) {
++        rect(s, x + k * w * 0.38, y + r * h * 0.38, w * 0.24, h * 0.24, c);
++      }
++    }
++  },
++  doc: (s, x, y, w, h, c, bg) => {
++    rect(s, x + w * 0.1, y, w * 0.8, h, c);
++    for (let r = 0; r < 3; r += 1) rect(s, x + w * 0.24, y + h * (0.24 + r * 0.22), w * 0.52, h * 0.08, bg);
++  },
++  bell: (s, x, y, w, h, c) => {
++    box(s, S.ellipse, x + w * 0.12, y, w * 0.76, h * 0.9, fill(c));
++    rect(s, x, y + h * 0.62, w, h * 0.2, c);
++    rect(s, x + w * 0.38, y + h * 0.86, w * 0.24, h * 0.14, c);
++  },
++  clock: (s, x, y, w, h, c) => {
++    box(s, S.ellipse, x, y, w, h, stroke(c, 2.5));
++    rect(s, x + w * 0.46, y + h * 0.22, w * 0.08, h * 0.32, c);
++    rect(s, x + w * 0.5, y + h * 0.46, w * 0.26, h * 0.08, c);
++  },
++  battery: (s, x, y, w, h, c) => {
++    rect(s, x + w * 0.36, y, w * 0.28, h * 0.12, c);
++    box(s, S.roundRect, x + w * 0.18, y + h * 0.1, w * 0.64, h * 0.9, Object.assign(fill(c), { rectRadius: 0.08 }));
++  },
++  image: (s, x, y, w, h, c, bg) => {
++    box(s, S.rect, x, y, w, h, stroke(c, 2.5));
++    box(s, S.triangle, x + w * 0.18, y + h * 0.35, w * 0.5, h * 0.45, fill(c));
++    box(s, S.ellipse, x + w * 0.62, y + h * 0.16, w * 0.2, h * 0.2, fill(c));
++  },
++};
++
++/** Draw a pictogram; `bg` is the surface colour used for knocked-out details. */
++function icon(s, name, x, y, w, h, color, bg) {
++  GLYPHS[name](s, x, y, w, h, color, bg || C.white);
++}
++
++/** Solid rounded badge with the digit knocked out — "Our Target" quadrants. */
++function numberBadge(s, n, x, y, size, color, digitColor) {
++  box(s, S.roundRect, x, y, size, size, Object.assign(fill(color), { rectRadius: 0.12 }));
++  text(s, String(n), {
++    x, y, w: size, h: size, align: 'center', valign: 'middle', bold: true,
++    fontSize: Math.round(size * 42), color: digitColor,
++  });
++}
++
++/** Layered outline badge — the "counter" glyph on the world-map slide. */
++function counterBadge(s, n, x, y, size, color) {
++  box(s, S.rect, x, y + size * 0.14, size * 0.86, size * 0.86, stroke(color, 1.25));
++  box(s, S.rect, x + size * 0.14, y, size * 0.86, size * 0.86, stroke(color, 1.25));
++  text(s, String(n), {
++    x: x + size * 0.14, y, w: size * 0.86, h: size * 0.86,
++    align: 'center', valign: 'middle', bold: true, fontSize: Math.round(size * 30), color,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Repeated copy
++ * ------------------------------------------------------------------ */
++const LOREM = {
++  touch: 'User generated content in real-time will the have multiple for touchpoints. Bring to the table win-win moody any.',
++  survive: 'User generated content in real-time will the have multiple for touchpoints bring survive.',
++  short: 'User generated content in real-time will the have multiple for touchpoints. ',
++  realTime: 'User generated content in real-time will the have multiple for in real time touchpoints user generated.',
++  bring: 'User generated content in real-time will the have and multiple for touchpoints. User generated content in real-time will the have multiple bring.',
++  touchTable: 'User generated content in real-time will the have multiple for touch the points. User generated content in real-time will the have multiple for touchpoints bring to the table.',
++  plugPlay: 'Collaboratively administrate for empowered the more markets via plug and play networks.',
++  mediaPlug: 'Collaboratively administrate for media empowered markets via plug and play networks dynamic procrastinate B2C users. After installed base.',
++  mediaSpecial: 'Collaboratively administrate for media them empowered markets via plug and play from networks dynamic procrastinate B2C users. After installed base benefits dramatic with special.',
++  mediaGood: 'Collaboratively administrate for media them empowered markets via plug and play from networks dynamic procrastinate B2C users. After installed base benefits dramatic with special with products coordinate proactive e-commerce good.',
++  dataNetworks: 'Collaboratively administrate for media them more empowered markets via plug and play from data networks.',
++  globally: 'Globally incubate standards compliant channels before more scalable benefits extensible.',
++  globallyShort: 'Globally incubate standards compliant channels before more scalable.',
++  interactive: 'Interactively coordinate proactive e-commerce via them more process-centric outside the box good thinking pursue scalable customer service more through empowered markets networks pursue intellectual procedures for reliable good.',
++  interactiveOwner: 'Interactively coordinate proactive e-commerce via them process-centric outside the box good thinking pursue scalable customer service more through empowered markets networks pursue intellectual procedures for reliable good.',
++  interactiveShort: 'Interactively coordinate proactive e-commerce via them process-centric outside the box good thinking pursue scalable customer service more through empowered markets.',
++};
++
++const BUDGET_ROWS = [
++  ['Description', 'Amount', 'Cost', 'Total'],
++  ['Accomodation To School', '07', '$ 250.00', '$ 2050.00'],
++  ['Free Education Children', '3000', '$ 350.00', '$ 350.00'],
++  ['Operation Building School', '5000', '$ 150.00', '$ 150.00'],
++  ['Operation Cost', '-', '$ 2500.00', '$ 2500.00'],
++  ['', '', 'Total', '$ 5050.00'],
++];
++
++/**
++ * "Estimated Budget" table — identical data on slides 12, 18 and 24.
++ * Cells sit on outline level 2, whose 0.5" indent is folded into the left margin.
++ */
++function budgetTable(s, x, y, colW) {
++  const rows = BUDGET_ROWS.map((cells, r) => cells.map((t) => ({
++    text: t,
++    options: {
++      fontFace: F.sans,
++      fontSize: r === 0 ? 17 : 13,
++      color: r === 0 ? C.white : C.slate,
++      fill: { color: r === 0 ? C.black : (r === 1 || r === 3 ? C.peach : C.white) },
++      valign: 'middle',
++      margin: [3, 6.7, 3, 42.7],
++    },
++  })));
++  const rowH = [0.822, 0.454, 0.454, 0.454, 0.454, 0.454];
++  s.addTable(rows, { x, y, colW, rowH, border: { type: 'none' } });
++  // Table style draws a heavier rule above the summary row, over the two money columns.
++  hline(s, x + colW[0] + colW[1], y + rowH.slice(0, 5).reduce((a, b) => a + b, 0), colW[2] + colW[3], C.gray65, 1.5);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 1 — cover
++ * ------------------------------------------------------------------ */
++function slide01() {
++  const s = pres.addSlide();
++  photo(s, 0, 0, 13.333, 7.5, C.photoBlue);
++  rect(s, 0.714, 0.773, 12.619, 6.727, C.black, { fill: { color: C.black, transparency: 70 } });
++  rect(s, 2.814, 1.838, 7.704, 2.869, C.rose);
++  text(s, 'Salera', {
++    x: 4.079, y: 2.242, w: 5.176, h: 1.893, align: 'center',
++    fontFace: F.serif, fontSize: 115, color: C.white, lineSpacing: 135,
++  });
++  text(s, 'Charity Presentation Template Design  ', {
++    x: 4.079, y: 3.967, w: 5.176, h: 0.337, align: 'center', valign: 'middle', fontSize: 20, color: C.white,
++  });
++  body(s, 'Collaboratively administrate empowered markets via plug and play more networks. Dynamic procrastinate B2C users. Installed base the benefits dramatic with special products coordinate envisioned multimedia based.',
++    2.814, 5.183, 7.704, 0.478, { align: 'center', color: C.white });
++  www(s, 5.229, 6.505, 2.875, { align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 2 — About Our Company
++ * ------------------------------------------------------------------ */
++function slide02() {
++  const s = pres.addSlide();
++  photo(s, 1.883, 0.961, 3.938, 5.577, C.photoRed);
++  rect(s, 1.144, 3.75, 1.479, 2.789, C.rose);
++  title(s, 'About Our Company', 7.042, 0.964, 5.148, 0.569);
++  www(s, 9.315, 6.401, 2.875, { align: 'right', color: C.gray50 });
++  const para = 'Collaboratively administrate for media empowered markets via plug and play networks dynamic procrastinate B2C users. After installed base benefits dramatic with special with products coordinate proactive e-commerce good  via process centric special. Collaboratively more administrate empowered the people.';
++  body(s, para, 7.042, 2.719, 2.273, 2.496, { align: 'justify' });
++  body(s, para, 9.916, 2.719, 2.273, 2.496, { align: 'justify' });
++  text(s, '\u201CHelp today because tomorrow you may be the one need help\u201D', {
++    x: 0.734, y: 4.74, w: 2.298, h: 0.808, rotate: 270, fontSize: 16, color: C.white,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 3 — How To Help They
++ * ------------------------------------------------------------------ */
++function slide03() {
++  const s = pres.addSlide();
++  rect(s, 6.334, 2.298, 6.999, 3.207, C.teal);
++  const items = [
++    { y: 2.767, name: 'Search Campaign', glyph: 'flag', gx: 7.899, gy: 2.767, gw: 0.345, gh: 0.391, on: true },
++    { y: 4.209, name: 'Donate to Charity', glyph: 'money', gx: 7.843, gy: 4.209, gw: 0.458, gh: 0.368, on: true },
++    { y: 5.799, name: 'Volunteer With Us', glyph: 'speaker', gx: 7.808, gy: 5.799, gw: 0.528, gh: 0.436, on: false },
++  ];
++  items.forEach((it) => {
++    head(s, it.name, 8.781, it.y, 3.608, 0.236, { color: it.on ? C.white : C.slate });
++    body(s, LOREM.touch, 8.781, it.y + 0.347, 3.608, 0.478, { color: it.on ? C.white : C.gray50 });
++    icon(s, it.glyph, it.gx, it.gy, it.gw, it.gh, it.on ? C.white : C.teal, it.on ? C.teal : C.white);
++  });
++  title(s, 'How To Help They', 7.808, 0.876, 4.581, 0.569);
++  www(s, -0.489, 3.683, 2.875, { align: 'center', color: C.gray50, rotate: 270 });
++  photo(s, 1.897, 0.876, 4.437, 5.748, C.photoBlue);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 4 — About Donatics
++ * ------------------------------------------------------------------ */
++function slide04() {
++  const s = pres.addSlide();
++  rect(s, 0, 0, 5.835, 7.5, C.teal);
++  rect(s, 12.557, 6.39, 0.777, 1.11, C.peach);
++  title(s, 'About Donatics', 7.302, 1.11, 4.306, 0.569);
++  const cards = [
++    { x: 7.302, y: 3.048, name: 'Growing ', glyph: 'bars', gx: 7.302, gy: 2.479, gw: 0.368, gh: 0.368 },
++    { x: 9.719, y: 3.048, name: 'Helping', glyph: 'people', gx: 9.719, gy: 2.496, gw: 0.458, gh: 0.321 },
++    { x: 7.302, y: 5.312, name: 'Building', glyph: 'building', gx: 7.302, gy: 4.653, gw: 0.413, gh: 0.436 },
++    { x: 9.719, y: 5.312, name: 'Enganging', glyph: 'thumb', gx: 9.719, gy: 4.653, gw: 0.507, gh: 0.46 },
++  ];
++  cards.forEach((c) => {
++    icon(s, c.glyph, c.gx, c.gy, c.gw, c.gh, C.black, C.white);
++    head(s, c.name, c.x, c.y, 1.889, 0.236);
++    body(s, LOREM.survive, c.x, c.y + 0.347, 1.889, 0.731);
++  });
++  photo(s, 0.948, 1.11, 3.938, 5.279, C.photoRed);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 5 — Mission And Goals
++ * ------------------------------------------------------------------ */
++function slide05() {
++  const s = pres.addSlide();
++  rect(s, 0, 4.588, 13.333, 2.912, C.teal);
++  box(s, S.rect, 1.256, 2.364, 10.82, 4.165, { fill: { color: C.white }, line: { color: C.peach, width: 0.5 } });
++  vline(s, 4.968, 3.102, 2.598, C.peach, 0.5);
++  vline(s, 8.366, 3.102, 2.598, C.peach, 0.5);
++  const cols = [
++    { x: 2.126, n: '01', name: 'Quality Learning for Refugees' },
++    { x: 5.524, n: '02', name: 'Distributing Food Supplies' },
++    { x: 8.922, n: '03', name: 'Supporting to Gain Finance' },
++  ];
++  cols.forEach((c) => {
++    text(s, c.n, { x: c.x, y: 3.173, w: 0.668, h: 0.673, fontSize: 40, bold: true, color: C.teal });
++    text(s, c.name, { x: c.x, y: 4.046, w: 2.529, h: 0.202, fontSize: 12, bold: true, color: C.slate });
++    body(s, LOREM.touchTable, c.x, 4.393, 2.285, 1.234);
++  });
++  title(s, 'Mission And Goals', 1.256, 0.879, 4.581, 0.569);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 6 — The Owner
++ * ------------------------------------------------------------------ */
++function slide06() {
++  const s = pres.addSlide();
++  rect(s, 0, 0.714, 13.333, 6.072, C.blush);
++  rect(s, 4.37, 1.229, 4.175, 5.041, C.white);
++  text(s, 'The Owner', { x: 0.699, y: 1.94, w: 2.971, h: 0.606, fontFace: F.serif, fontSize: 36, color: C.ink });
++  s.addText([
++    { text: 'Globally incubate standards compliant channels before more scalable benefits extensible testing fruit to identify a ballpark value B2C users after installed generated via the data.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: LOREM.interactiveOwner },
++  ], {
++    x: 0.699, y: 3.062, w: 2.971, h: 2.496, margin: 0, fontFace: F.sans, fontSize: 10, color: C.gray50, lineSpacingMultiple: 1.5,
++  });
++  const skills = [
++    { label: 'Public Relations', y: 3.198, barY: 3.485, w: 1.624, pct: '65%', px: 10.984, pw: 0.324, color: C.rose },
++    { label: 'Team Work', y: 3.662, barY: 3.952, w: 1.902, pct: '75%', px: 11.308, pw: 0.324, color: C.peachDark },
++    { label: 'Solve The Problem', y: 4.129, barY: 4.391, w: 2.794, pct: '100% ', px: 12.196, pw: 0.438, color: C.roseDark },
++    { label: 'Development Company', y: 4.568, barY: 4.83, w: 2.37, pct: '85%', px: 11.758, pw: 0.438, color: C.teal },
++  ];
++  skills.forEach((k) => {
++    text(s, k.label, { x: 9.244, y: k.y, w: 1.624, h: 0.185, fontSize: 11, color: C.slate });
++    hline(s, 9.244, k.barY, k.w, k.color, 5);
++    text(s, k.pct, { x: k.px, y: k.barY - 0.093, w: k.pw, h: 0.168, fontSize: 10, color: C.slate });
++  });
++  text(s, 'Hendrick Watson', { x: 9.251, y: 2.595, w: 2.381, h: 0.303, fontSize: 18, bold: true, color: C.slate });
++  photo(s, 4.535, 1.437, 3.845, 4.626, C.photoBlue);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 7 — Meet Our Team
++ * ------------------------------------------------------------------ */
++function slide07() {
++  const s = pres.addSlide();
++  rect(s, 0, 4.469, 13.333, 3.031, C.rose);
++  text(s, 'Meet \nOur Team', {
++    x: 9.66, y: 2.092, w: 2.602, h: 1.13, fontFace: F.serif, fontSize: 36, color: C.ink, lineSpacing: 40,
++  });
++  body(s, 'Collaboratively administrate for them media empowered markets via more and play networks dynamic more at procrastinate B2C users after more.',
++    1.072, 0.843, 5.113, 0.477);
++  const team = [
++    { x: 1.072, name: 'Erlan Harrison', role: 'Team Causes Health', color: C.photoRed },
++    { x: 3.701, name: 'Jane Oswald', role: 'Team Causes Food Supplies', color: C.photoBlue },
++    { x: 6.33, name: 'Carlos Rionard', role: 'Team Causes Education', color: C.photoRed },
++  ];
++  team.forEach((m) => {
++    photo(s, m.x, 2.092, 2.485, 3.031, m.color);
++    text(s, m.name, { x: m.x, y: 5.492, w: 2.381, h: 0.303, fontSize: 18, bold: true, color: C.white });
++    text(s, m.role, { x: m.x, y: 5.851, w: 2.381, h: 0.185, fontSize: 11, bold: true, color: C.white });
++    body(s, LOREM.short, m.x, 6.179, 2.485, 0.478, { color: C.white });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 8 — Break Time
++ * ------------------------------------------------------------------ */
++function slide08() {
++  const s = pres.addSlide();
++  rect(s, 6.006, 0, 7.328, 1.859, C.teal);
++  photo(s, 0.901, 0.77, 7.328, 4.28, C.photoBlue);
++  text(s, 'Break Time', {
++    x: 9.124, y: 2.948, w: 3.949, h: 2.816, fontFace: F.serif, fontSize: 88, color: C.ink, lineSpacing: 100,
++  });
++  body(s, 'Collaboratively administrate for them media from the empowered markets via more and play networks dynamic more at procrastinate B2C users.',
++    9.124, 6.001, 3.308, 0.729);
++  text(s, 'Break For 30 Minutes', { x: 0.901, y: 5.922, w: 1.8, h: 0.808, fontSize: 24, bold: true, color: C.slate });
++  www(s, 9.557, 0.77, 2.875, { align: 'right' });
++  rect(s, 3.291, 3.779, 5.032, 1.271, C.white);
++  photo(s, 3.379, 3.883, 4.857, 2.847, C.photoRed);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 9 — Shortage Of Medicine
++ * ------------------------------------------------------------------ */
++function slide09() {
++  const s = pres.addSlide();
++  rect(s, 0, 0.51, 4.88, 4.77, C.peach);
++  photo(s, 2.317, 1.415, 4.35, 5.575, C.photoBlue);
++  text(s, 'Shortage Of Medicine And Clean Clothes Earthquake Victims', {
++    x: 7.761, y: 2.434, w: 5.239, h: 1.818, fontFace: F.serif, fontSize: 36, color: C.ink,
++  });
++  s.addText([
++    { text: 'Collaboratively administrate for media them empowered markets via plug and play from networks dynamic procrastinate B2C.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: 'After installed base benefits dramatic with special with products more coordinate proactive e-commerce good special intellectual.' },
++  ], {
++    x: 7.761, y: 4.737, w: 4.479, h: 1.234, margin: 0, fontFace: F.sans, fontSize: 10, color: C.gray50, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 10 — Urgent Cause (full-bleed photo left)
++ * ------------------------------------------------------------------ */
++function slide10() {
++  const s = pres.addSlide();
++  photo(s, 0, 0, 6.104, 7.5, C.photoRed);
++  rect(s, 6.104, -0.006, 7.229, 3.75, C.rose);
++  rect(s, 6.104, 3.744, 3.614, 3.75, C.teal);
++  rect(s, 9.719, 3.744, 3.614, 3.75, C.peach);
++  rect(s, 6.693, 4.619, 2.437, 0.185, C.gray95);
++  rect(s, 6.693, 4.619, 2.224, 0.185, C.peach);
++  const stats = [
++    { x: 6.693, y: 5.203, big: '$50,125  ', small: 'Needed  ' },
++    { x: 8.124, y: 5.203, big: '350', small: 'Volunteers ' },
++    { x: 6.693, y: 6.059, big: '96% ', small: 'Complete ' },
++    { x: 8.124, y: 6.059, big: '54', small: 'Donaturs ' },
++  ];
++  stats.forEach((k) => {
++    text(s, k.big, { x: k.x, y: k.y, w: 1.006, h: 0.269, fontSize: 16, bold: true, color: C.white });
++    text(s, k.small, { x: k.x, y: k.y + 0.375, w: 1.006, h: 0.185, fontSize: 11, bold: true, color: C.white });
++  });
++  text(s, '$950,999 ', { x: 10.241, y: 4.723, w: 2.57, h: 0.539, fontSize: 32, bold: true, color: C.white });
++  text(s, 'Collected ', { x: 10.241, y: 5.332, w: 2.57, h: 0.236, fontSize: 14, bold: true, color: C.white });
++  body(s, 'Collaboratively administrate for media them more empowered markets via plug and play from data networks.',
++    10.241, 5.786, 2.57, 0.729, { color: C.white });
++  title(s, 'Urgent Cause', 6.859, 0.718, 5.72, 0.569, { color: C.white });
++  head(s, 'Donated $50 Now To Medicine For Children', 6.859, 1.446, 5.72, 0.236, { color: C.white });
++  s.addText([
++    { text: 'Collaboratively administrate for media them more empowered markets via plug and play from data networks dynamic more procrastinate B2C users after installed base.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: 'Interactively coordinate proactive e-commerce via them more process-centric outside the box good thinking pursue scalable customer service more through empowered.' },
++  ], {
++    x: 6.859, y: 1.786, w: 5.72, h: 1.234, margin: 0, fontFace: F.sans, fontSize: 10, color: C.white, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 11 — Our Target (three coloured cards)
++ * ------------------------------------------------------------------ */
++function slide11() {
++  const s = pres.addSlide();
++  const cards = [
++    { x: 1.012, top: C.teal, bottom: C.mist, name: 'Building 30 Hospital', glyph: 'bank', gx: 2.381, gy: 3.003, gw: 0.951, gh: 1.054 },
++    { x: 4.822, top: C.peach, bottom: C.cream, name: 'Stock of Medicine', glyph: 'plusBox', gx: 6.216, gy: 3.079, gw: 0.902, gh: 0.902 },
++    { x: 8.632, top: C.rose, bottom: C.blush, name: 'Have Ambulance ', glyph: 'van', gx: 9.923, gy: 3.179, gw: 1.107, gh: 0.701 },
++  ];
++  cards.forEach((c) => {
++    rect(s, c.x, 2.533, 3.69, 2.6, c.top);
++    rect(s, c.x, 5.133, 3.69, 1.41, c.bottom);
++  });
++  cards.forEach((c) => {
++    icon(s, c.glyph, c.gx, c.gy, c.gw, c.gh, C.white, c.top);
++    text(s, c.name, { x: c.x + 0.32, y: 4.307, w: 3.05, h: 0.303, align: 'center', fontSize: 18, bold: true, color: C.white });
++    body(s, LOREM.plugPlay, c.x + 0.32, 5.593, 3.05, 0.477, { align: 'center' });
++  });
++  title(s, 'Our Target', 1.012, 0.957, 3.69, 0.569);
++  www(s, 9.447, 0.957, 2.875, { align: 'right', color: C.gray50 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 12 — Estimated Budget
++ * ------------------------------------------------------------------ */
++function slide12() {
++  const s = pres.addSlide();
++  rect(s, 0, 4.426, 13.333, 3.089, C.teal);
++  budgetTable(s, 1.239, 2.755, [3.667, 2.396, 2.396, 2.396]);
++  title(s, 'Estimated Budget', 1.239, 0.8, 4.153, 0.569);
++  body(s, 'Collaboratively administrate for empowered markets via plug and play networks dynamic procrastinate B2C users. After installed base benefits dramatic with special within the products coordinate proactive e-commerce good  via process centric special it outside proactively envisioned multimedia based expertise.',
++    1.239, 1.583, 10.855, 0.478);
++  www(s, 5.229, 6.604, 2.875, { align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 13 — Donation Location (two stat cards)
++ * ------------------------------------------------------------------ */
++function slide13() {
++  const s = pres.addSlide();
++  rect(s, 0.694, 1.131, 1.134, 5.238, C.rose);
++  www(s, -0.135, 3.683, 2.792, { align: 'center', rotate: 270 });
++  text(s, 'Donation Location ', { x: 8.378, y: 1.131, w: 4.261, h: 0.606, fontFace: F.serif, fontSize: 36, color: C.ink });
++  body(s, 'Collaboratively administrate for media them empowered markets via plug and play from networks dynamic procrastinate B2C. ',
++    8.378, 1.866, 4.261, 0.477);
++  const cards = [
++    { y: 2.707, pct: '30%', label: 'Donation For Medicine', border: C.teal, glyph: 'medkit', gx: 9.065, gy: 3.059, gw: 0.363, gh: 0.404, gc: C.teal },
++    { y: 4.666, pct: '70%', label: 'Donation For Hospital', border: C.peach, glyph: 'calendar', gx: 9.065, gy: 5.08, gw: 0.402, gh: 0.323, gc: C.peach },
++  ];
++  cards.forEach((c) => {
++    box(s, S.rect, 8.378, c.y, 4.261, 1.703, { fill: { color: C.white }, line: { color: c.border, width: 0.5 } });
++    icon(s, c.glyph, c.gx, c.gy, c.gw, c.gh, c.gc, C.white);
++    text(s, c.pct, { x: 9.784, y: c.y + 0.289, w: 2.364, h: 0.303, fontSize: 18, bold: true, color: C.slate });
++    text(s, c.label, { x: 9.784, y: c.y + 0.633, w: 2.364, h: 0.185, fontSize: 11, bold: true, color: C.slate });
++    body(s, LOREM.globally, 9.065, c.y + 0.968, 3.255, 0.477);
++  });
++  photo(s, 1.925, 1.131, 5.594, 5.238, C.photoBlue);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 14 — Charity Gallery (3 photos)
++ * ------------------------------------------------------------------ */
++function slide14() {
++  const s = pres.addSlide();
++  rect(s, 0.983, 4.429, 3.069, 3.071, C.teal);
++  text(s, 'Charity Gallery', { x: 1.35, y: 1.928, w: 2.334, h: 1.13, fontFace: F.serif, fontSize: 36, color: C.ink, lineSpacing: 40 });
++  body(s, 'Collaboratively administrate for them media empowered markets via more and play networks dynamic more at procrastinate B2C users. After more installed base benefits dramatic with special with products.',
++    1.35, 5.221, 2.334, 1.487, { color: C.white });
++  photo(s, 4.179, 1.233, 4.835, 6.267, C.photoRed);
++  photo(s, 9.141, 1.233, 3.21, 3.071, C.photoBlue);
++  photo(s, 9.141, 4.429, 3.21, 3.071, C.photoRed);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 15 — Damage Buildings In Food Industry
++ * ------------------------------------------------------------------ */
++function slide15() {
++  const s = pres.addSlide();
++  rect(s, 0, 0, 3.753, 7.5, C.rose);
++  text(s, 'Damage Buildings In Food Industry', {
++    x: 9.183, y: 1.998, w: 3.255, h: 1.818, fontFace: F.serif, fontSize: 36, color: C.ink,
++  });
++  body(s, 'Collaboratively administrate for media them network empowered markets via plug and play from more a networks dynamic procrastinate B2C users. After installed base benefits dramatic with special with products coordinate proactive e-commerce good  via process centric special. ',
++    9.183, 4.016, 3.255, 1.487);
++  body(s, LOREM.mediaPlug, 0.589, 2.386, 2.575, 0.982, { color: C.white });
++  body(s, LOREM.mediaPlug, 0.589, 4.133, 2.575, 0.982, { color: C.white });
++  photo(s, 3.753, 1.01, 4.536, 5.48, C.photoBlue);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 16 — Urgent Cause (three bands under a photo)
++ * ------------------------------------------------------------------ */
++function slide16() {
++  const s = pres.addSlide();
++  photo(s, -0.012, 0, 13.345, 4.522, C.photoRed);
++  rect(s, -0.012, 4.522, 4.543, 2.978, C.peach);
++  rect(s, 4.531, 4.522, 5.105, 2.978, C.teal);
++  rect(s, 9.636, 4.522, 3.697, 2.978, C.rose);
++  title(s, 'Urgent Cause', 0.662, 5.112, 3.196, 0.569, { color: C.white });
++  head(s, 'Donated $25 Now To Food Supplies', 0.662, 5.84, 3.196, 0.236, { color: C.white });
++  body(s, 'Collaboratively administrate for media them more empowered markets via plug and play from data networks dynamic more procrastinate.',
++    0.662, 6.18, 3.196, 0.729, { color: C.white });
++  text(s, '$500,890', { x: 10.2, y: 5.115, w: 2.57, h: 0.539, fontSize: 32, bold: true, color: C.white });
++  text(s, 'Collected ', { x: 10.2, y: 5.724, w: 2.57, h: 0.236, fontSize: 14, bold: true, color: C.white });
++  body(s, LOREM.dataNetworks, 10.2, 6.177, 2.57, 0.729, { color: C.white });
++  rect(s, 5.398, 5.011, 3.372, 0.185, C.gray95);
++  rect(s, 5.398, 5.011, 2.262, 0.185, C.peach);
++  const stats = [
++    { x: 5.398, y: 5.595, big: '$15,980', small: 'Needed  ' },
++    { x: 7.378, y: 5.595, big: '270', small: 'Volunteers ' },
++    { x: 5.398, y: 6.45, big: '75%', small: 'Complete' },
++    { x: 7.378, y: 6.45, big: '20', small: 'Donaturs' },
++  ];
++  stats.forEach((k) => {
++    text(s, k.big, { x: k.x, y: k.y, w: 1.392, h: 0.269, fontSize: 16, bold: true, color: C.white });
++    text(s, k.small, { x: k.x, y: k.y + 0.376, w: 1.392, h: 0.185, fontSize: 11, bold: true, color: C.white });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 17 — Our Target (three photo cards)
++ * ------------------------------------------------------------------ */
++function slide17() {
++  const s = pres.addSlide();
++  const cols = [
++    { x: 0.882, name: 'Children Filled Nutrition For Their Bodies', rule: C.peach, color: C.photoBlue },
++    { x: 4.982, name: 'Feeding the Hungry', rule: C.teal, color: C.photoRed },
++    { x: 9.082, name: 'Every Family Has Food Supplies', rule: C.rose, color: C.photoBlue },
++  ];
++  cols.forEach((c) => {
++    photo(s, c.x, 2.16, 3.37, 2.55, c.color);
++    text(s, c.name, { x: c.x, y: 5.151, w: 3.37, h: 0.202, fontSize: 12, bold: true, color: C.slate });
++    body(s, LOREM.bring, c.x, 5.498, 3.37, 0.731);
++    hline(s, c.x, 6.67, 3.37, c.rule, 1.5);
++  });
++  text(s, 'Our Target', { x: 0.882, y: 0.83, w: 3.37, h: 0.606, fontFace: F.serif, fontSize: 36, color: C.ink });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 18 — Estimated Budget
++ * ------------------------------------------------------------------ */
++function slide18() {
++  const s = pres.addSlide();
++  budgetTable(s, 1.198, 2.717, [3.674, 2.401, 2.401, 2.401]);
++  rect(s, 12.094, 0, 1.239, 1.239, C.rose);
++  rect(s, 0, 6.439, 13.333, 1.107, C.teal);
++  www(s, 5.229, 6.916, 2.875, { align: 'center' });
++  title(s, 'Estimated Budget', 1.198, 0.894, 10.019, 0.569);
++  body(s, 'Collaboratively administrate for empowered markets via plug and play networks dynamic procrastinate B2C users. After installed base benefits dramatic with special with products coordinate proactive e-commerce good  via process centric special it outside proactively envisioned multimedia based expertise with special.',
++    1.198, 1.607, 10.019, 0.478);
++}
++
++/* ------------------------------------------------------------------ *
++ * Map artwork — the original vector maps are approximated by the
++ * bounding boxes of their largest land masses. [x, y, w, h] in inches.
++ * ------------------------------------------------------------------ */
++const WORLD_MAP = [
++  [9.07, 1.11, 3.30, 1.14], [5.64, 1.26, 1.74, 0.98], [7.04, 0.83, 1.24, 0.92],
++  [10.02, 1.95, 1.21, 0.79], [5.98, 2.05, 1.17, 0.58], [7.01, 3.05, 0.80, 0.82],
++  [10.79, 3.38, 0.83, 0.62], [5.10, 1.37, 0.77, 0.54], [9.91, 2.40, 0.56, 0.59],
++  [9.46, 1.89, 0.82, 0.38], [7.02, 3.61, 0.41, 0.72], [6.67, 1.27, 0.60, 0.43],
++  [6.14, 2.46, 0.61, 0.38], [8.63, 1.37, 0.52, 0.43], [6.63, 0.84, 0.66, 0.33],
++  [10.30, 1.98, 0.63, 0.27], [8.35, 2.36, 0.42, 0.40], [6.97, 3.52, 0.17, 0.91],
++  [9.22, 2.47, 0.42, 0.34], [8.77, 3.04, 0.37, 0.38], [8.96, 2.67, 0.33, 0.41],
++  [9.41, 2.29, 0.39, 0.34], [8.75, 1.45, 0.25, 0.43], [8.27, 2.63, 0.34, 0.31],
++  [9.76, 2.36, 0.33, 0.30], [6.86, 3.16, 0.26, 0.38], [9.56, 1.15, 0.36, 0.25],
++  [8.85, 3.61, 0.32, 0.28], [8.72, 2.45, 0.30, 0.29], [6.91, 2.90, 0.24, 0.34],
++  [6.09, 1.27, 0.38, 0.20], [8.53, 2.67, 0.31, 0.24], [8.97, 1.97, 0.36, 0.21],
++  [9.12, 3.37, 0.21, 0.34], [9.65, 2.15, 0.35, 0.21], [8.95, 1.41, 0.21, 0.33],
++  [9.18, 2.85, 0.30, 0.23], [8.80, 2.67, 0.20, 0.33], [7.10, 3.36, 0.24, 0.27],
++  [8.76, 3.50, 0.25, 0.25], [7.02, 2.91, 0.27, 0.23], [10.37, 2.56, 0.17, 0.38],
++  [8.18, 2.58, 0.24, 0.26], [8.76, 3.27, 0.23, 0.25], [8.43, 2.01, 0.26, 0.22],
++  [9.34, 2.91, 0.21, 0.28], [9.04, 2.24, 0.38, 0.14], [10.43, 3.04, 0.23, 0.23],
++  [9.75, 2.33, 0.25, 0.20], [8.66, 2.11, 0.23, 0.22], [9.59, 2.23, 0.28, 0.18],
++  [10.48, 2.73, 0.16, 0.30], [9.11, 3.17, 0.22, 0.22], [9.02, 2.48, 0.22, 0.22],
++  [8.34, 2.20, 0.25, 0.18], [8.96, 3.32, 0.23, 0.20], [8.58, 2.87, 0.24, 0.19],
++  [8.26, 2.39, 0.24, 0.19], [10.57, 2.67, 0.14, 0.30], [8.39, 1.79, 0.17, 0.25],
++  [8.74, 1.00, 0.27, 0.15], [8.82, 2.93, 0.25, 0.17], [9.38, 3.40, 0.15, 0.28],
++  [6.54, 0.93, 0.24, 0.17], [11.16, 2.26, 0.23, 0.18], [6.54, 1.14, 0.36, 0.11],
++  [9.30, 2.35, 0.19, 0.19], [8.65, 1.90, 0.18, 0.20], [11.16, 3.17, 0.20, 0.17],
++  [10.70, 3.07, 0.21, 0.17], [8.92, 3.52, 0.18, 0.19], [8.70, 2.89, 0.15, 0.23],
++  [5.95, 1.24, 0.23, 0.14], [9.20, 3.05, 0.16, 0.19], [11.36, 3.22, 0.19, 0.16],
++  [7.24, 3.56, 0.17, 0.18], [8.81, 1.90, 0.19, 0.15], [9.57, 2.63, 0.16, 0.18],
++  [9.38, 2.76, 0.21, 0.13], [6.12, 1.15, 0.25, 0.11], [10.53, 2.69, 0.15, 0.18],
++  [8.99, 1.86, 0.19, 0.13], [8.75, 3.08, 0.14, 0.17], [10.72, 3.02, 0.19, 0.12],
++  [11.88, 4.05, 0.16, 0.14],
++];
++
++
++const CROATIA_MAP = [
++  [2.74, 3.25, 1.18, 1.27], [3.18, 2.20, 1.31, 0.97], [3.50, 4.40, 1.20, 1.02],
++  [5.08, 2.07, 1.02, 0.88], [2.86, 1.91, 1.21, 0.70], [2.62, 2.35, 0.73, 0.96],
++  [1.90, 2.39, 0.93, 0.74], [3.91, 1.89, 0.83, 0.73], [2.55, 3.04, 0.64, 0.93],
++  [5.60, 2.61, 0.75, 0.73], [1.38, 2.57, 0.61, 0.83], [4.34, 5.47, 1.02, 0.48],
++  [4.44, 2.00, 0.79, 0.61], [4.40, 2.72, 1.22, 0.39], [3.78, 1.55, 0.80, 0.57],
++  [4.27, 2.50, 1.00, 0.46], [3.11, 4.33, 0.73, 0.61], [3.39, 1.51, 0.74, 0.46],
++  [3.14, 1.67, 0.55, 0.41], [2.43, 3.55, 0.42, 0.46], [3.68, 1.32, 0.52, 0.31],
++  [3.29, 2.02, 0.38, 0.41], [2.04, 2.98, 0.21, 0.65], [2.49, 4.15, 0.35, 0.37],
++  [2.69, 4.17, 0.34, 0.33], [2.16, 2.89, 0.32, 0.35], [3.81, 5.27, 0.66, 0.11],
++  [3.82, 5.06, 0.42, 0.16], [4.62, 5.35, 0.26, 0.24], [4.59, 5.75, 0.37, 0.14],
++];
++
++function drawMap(s, boxes, color) {
++  boxes.forEach((b) => rect(s, b[0], b[1], b[2], b[3], color));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 19 — Donation Location (world map)
++ * ------------------------------------------------------------------ */
++function slide19() {
++  const s = pres.addSlide();
++  rect(s, 0, 5.258, 13.333, 2.256, C.rose);
++  drawMap(s, WORLD_MAP, C.peach);
++  text(s, 'Donation Location', { x: 0.938, y: 1.145, w: 3.325, h: 1.212, fontFace: F.serif, fontSize: 36, color: C.ink });
++  body(s, 'Collaboratively administrate for media them more an empowered markets via plug and play from networks dynamic procrastinate B2C users. After installed the base benefits dramatic with special with products a coordinate proactive e-commerce good  via process centric special collaboratively more.',
++    0.938, 2.626, 3.341, 1.487);
++  const supplies = [
++    { n: 1, bx: 0.938, tx: 1.721, name: 'Fruit Supplies' },
++    { n: 2, bx: 5.091, tx: 5.878, name: 'Food Supplies' },
++    { n: 3, bx: 9.248, tx: 10.037, name: 'Vegetables Supplies' },
++  ];
++  supplies.forEach((k) => {
++    counterBadge(s, k.n, k.bx, 5.973, 0.395, C.white);
++    head(s, k.name, k.tx, 5.973, 2.358, 0.236, { color: C.white });
++    body(s, LOREM.short, k.tx, 6.32, 2.358, 0.478, { color: C.white });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 20 — Charity Gallery (photo mosaic)
++ * ------------------------------------------------------------------ */
++function slide20() {
++  const s = pres.addSlide();
++  title(s, 'Charity Gallery', 0.959, 0.706, 6.464, 0.569);
++  const tiles = [
++    [0.959, 1.982, 4.340, 2.433, C.photoRed],
++    [5.381, 1.982, 2.041, 2.433, C.photoBlue],
++    [7.505, 1.982, 2.041, 2.433, C.photoRed],
++    [9.629, 1.982, 2.746, 4.948, C.photoRed],
++    [0.959, 4.497, 2.737, 2.433, C.photoBlue],
++    [3.778, 4.497, 2.737, 2.433, C.photoBlue],
++    [6.598, 4.497, 2.948, 2.433, C.photoBlue],
++  ];
++  tiles.forEach((t) => photo(s, t[0], t[1], t[2], t[3], t[4]));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 21 — Difficult Access to School
++ * ------------------------------------------------------------------ */
++function slide21() {
++  const s = pres.addSlide();
++  rect(s, 0, 2.203, 1.372, 3.094, C.peach);
++  photo(s, 1.372, 0.998, 5.295, 5.503, C.photoBlue);
++  text(s, 'Difficult Access to School', {
++    x: 7.971, y: 2.057, w: 3.99, h: 1.13, valign: 'middle', fontFace: F.serif, fontSize: 36, color: C.ink, lineSpacing: 40,
++  });
++  s.addText([
++    { text: 'Collaboratively administrate for media empowered markets via plug and play networks dynamic procrastinate B2C users. After installed base benefits dramatic with special.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: LOREM.interactive },
++  ], {
++    x: 7.971, y: 3.452, w: 3.99, h: 1.991, margin: 0, fontFace: F.sans, fontSize: 10, color: C.gray50, lineSpacingMultiple: 1.5,
++  });
++  rect(s, 11.962, 6.128, 1.372, 1.372, C.rose);
++  www(s, -0.752, 3.683, 2.875, { align: 'center', rotate: 270 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 22 — Urgent Cause (photo left, two panels right)
++ * ------------------------------------------------------------------ */
++function slide22() {
++  const s = pres.addSlide();
++  photo(s, 0, 1.127, 6.66, 5.245, C.photoRed);
++  rect(s, 6.66, 3.426, 6.673, 2.947, C.rose);
++  rect(s, 6.66, 1.127, 6.673, 2.298, C.teal);
++  text(s, 'Urgent Cause', { x: 7.141, y: 1.672, w: 2.104, h: 1.13, fontFace: F.serif, fontSize: 36, color: C.white, lineSpacing: 40 });
++  head(s, 'Donated $40 Now To Education', 9.612, 1.576, 3.247, 0.236, { color: C.white });
++  body(s, 'Collaboratively administrate for media them more empowered markets via plug and play from data networks dynamic procrastinate B2C users. After installed base benefits dramatic special.',
++    9.612, 1.916, 3.247, 0.982, { color: C.white });
++  text(s, '$750,890', { x: 7.137, y: 3.878, w: 2.73, h: 0.74, fontSize: 44, bold: true, color: C.white });
++  text(s, 'Collected', { x: 10.092, y: 4.097, w: 1.11, h: 0.303, fontSize: 18, bold: true, color: C.white });
++  rect(s, 7.137, 4.954, 5.719, 0.153, C.gray95);
++  rect(s, 7.137, 4.954, 0.585, 0.153, C.peach);
++  const stats = [
++    { x: 7.137, w: 0.909, big: '10%', small: 'Complete ' },
++    { x: 8.527, w: 0.896, big: '150', small: 'Donators' },
++    { x: 9.904, w: 1.11, big: '780', small: 'Volunteers' },
++    { x: 11.494, w: 1.11, big: '$20,980', small: 'Needed' },
++  ];
++  stats.forEach((k) => {
++    text(s, k.big, { x: k.x, y: 5.348, w: k.w, h: 0.337, fontSize: 20, bold: true, color: C.white });
++    text(s, k.small, { x: k.x, y: 5.684, w: k.w, h: 0.236, fontSize: 14, bold: true, color: C.white });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 23 — Our Target (2x2 numbered quadrants)
++ * ------------------------------------------------------------------ */
++function slide23() {
++  const s = pres.addSlide();
++  const quads = [
++    { x: 6.304, y: 0.649, fill: C.teal, n: 1, bx: 6.667, by: 1.16, tx: 6.647, ty: 2.18, name: 'Easy Access To School' },
++    { x: 9.254, y: 0.649, fill: C.rose, n: 2, bx: 9.594, by: 1.16, tx: 9.595, ty: 2.18, name: 'Children Can Learn Read' },
++    { x: 6.304, y: 3.75, fill: C.peach, n: 3, bx: 6.667, by: 4.312, tx: 6.647, ty: 5.233, name: 'There\u2019s A School Building' },
++    { x: 9.254, y: 3.75, fill: C.teal, n: 4, bx: 9.594, by: 4.308, tx: 9.595, ty: 5.233, name: 'There Are School Supplies' },
++  ];
++  quads.forEach((q) => rect(s, q.x, q.y, 2.95, 3.101, q.fill));
++  title(s, 'Our Target', 1.129, 2.327, 4.049, 0.569);
++  s.addText([
++    { text: LOREM.mediaSpecial, options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: LOREM.mediaGood },
++  ], {
++    x: 1.129, y: 3.181, w: 4.049, h: 1.991, margin: 0, fontFace: F.sans, fontSize: 10, color: C.gray50, lineSpacingMultiple: 1.5,
++  });
++  www(s, 1.129, 5.928, 2.455, { color: C.gray50 });
++  quads.forEach((q) => {
++    numberBadge(s, q.n, q.bx, q.by, 0.673, C.white, q.fill);
++    head(s, q.name, q.tx, q.ty, 2.379, 0.236, { color: C.white });
++    body(s, LOREM.realTime, q.tx, q.ty + 0.33, 2.267, 0.729, { color: C.white });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 24 — Estimated Budget
++ * ------------------------------------------------------------------ */
++function slide24() {
++  const s = pres.addSlide();
++  budgetTable(s, 1.237, 3.166, [3.294, 2.152, 2.152, 2.152]);
++  rect(s, 12.225, 0, 1.108, 7.593, C.peach);
++  www(s, 11.391, 3.729, 2.777, { align: 'center', rotate: 270 });
++  title(s, 'Estimated Budget', 1.237, 1.241, 9.751, 0.569);
++  body(s, 'Collaboratively administrate for empowered markets via plug and play networks dynamic procrastinate B2C users. After installed base benefits dramatic with special with more a products coordinate proactive e-commerce good  via process centric special it outside proactively envisioned multimedia.',
++    1.237, 1.954, 9.751, 0.477);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 25 — Donation Location (country map + callouts)
++ * ------------------------------------------------------------------ */
++function slide25() {
++  const s = pres.addSlide();
++  drawMap(s, CROATIA_MAP, C.teal);
++  const leaders = [
++    [3.886, 2.689, 0.579, 0.854],
++    [2.375, 3.444, 0.441, 1.629],
++    [3.280, 4.079, 2.340, 0.747],
++  ];
++  leaders.forEach((l) => box(s, S.line, l[0], l[1], l[2], l[3], { line: { color: C.peach, width: 2.25 } }));
++  const tags = [
++    { x: 1.124, y: 4.947, fill: C.teal, tx: 1.329, big: '6,912km', small: 'Area', tw: 1.107 },
++    { x: 4.289, y: 3.455, fill: C.rose, tx: 4.514, big: '79,541K', small: 'Populations', tw: 1.064 },
++    { x: 5.430, y: 4.688, fill: C.peach, tx: 5.655, big: '45.650', small: 'Child', tw: 1.064 },
++  ];
++  tags.forEach((t) => {
++    rect(s, t.x, t.y, 1.515, 0.858, t.fill);
++    text(s, t.big, { x: t.tx, y: t.y + 0.204, w: t.tw, h: 0.236, align: 'center', fontSize: 14, bold: true, color: C.white });
++    text(s, t.small, { x: t.tx, y: t.y + 0.468, w: t.tw, h: 0.187, align: 'center', fontSize: 11, bold: true, color: C.white });
++  });
++  title(s, 'Donation Location', 7.937, 1.615, 4.272, 0.569);
++  s.addText([
++    { text: LOREM.mediaSpecial, options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: LOREM.mediaGood },
++  ], {
++    x: 7.937, y: 2.511, w: 4.272, h: 1.991, margin: 0, fontFace: F.sans, fontSize: 10, color: C.gray50, lineSpacingMultiple: 1.5,
++  });
++  www(s, 7.937, 5.737, 2.97, { color: C.gray50 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 26 — Charity Gallery (teal panel right)
++ * ------------------------------------------------------------------ */
++function slide26() {
++  const s = pres.addSlide();
++  rect(s, 7.505, 0.698, 5.828, 3.0, C.teal);
++  title(s, 'Charity Gallery', 8.321, 1.914, 3.998, 0.569, { color: C.white });
++  s.addText([
++    { text: 'Collaboratively administrate empowered markets via plug and play networks dynamic procrastinate user.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: 'Globally incubate standards compliant channels before more the scalable benefits extensible testing fruit to identify a ballpark value B2C users after installed generated.' },
++  ], {
++    x: 8.321, y: 5.313, w: 3.998, h: 1.487, margin: 0, fontFace: F.sans, fontSize: 10, color: C.gray50, lineSpacingMultiple: 1.5,
++  });
++  text(s, 'Causes Shortage of Medicine for Child', {
++    x: 8.321, y: 4.828, w: 3.998, h: 0.269, fontSize: 16, bold: true, color: C.slate,
++  });
++  photo(s, 1.294, 0.698, 3.0, 6.103, C.photoBlue);
++  photo(s, 4.396, 0.698, 3.0, 3.0, C.photoRed);
++  photo(s, 4.396, 3.802, 3.0, 3.0, C.photoBlue);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 27 — In Easy Steps (4-step timeline)
++ * ------------------------------------------------------------------ */
++function slide27() {
++  const s = pres.addSlide();
++  title(s, 'PLACEHOLDER', 0.919, 0.955, 11.496, 1.13);
++  body(s, 'Globally incubate standards compliant channels before more scalable benefits extensible on testing fruit to identify a ballpark value B2C users after installed on generated more network Interactively coordinate proactive e-commerce via them process-centric outside the box good thinking pursue scalable customer service more through empowered.',
++    0.919, 2.407, 11.496, 0.478);
++  hline(s, 2.05, 3.93, 9.233, C.peach, 0.5);
++  const steps = [
++    { x: 0.919, dot: 1.941, chip: C.teal, label: 'Create Event', lx: 1.62, lw: 0.861, lh: 0.471, ly: 4.576 },
++    { x: 3.996, dot: 5.019, chip: C.rose, label: 'Campaign', lx: 4.652, lw: 0.952, lh: 0.236, ly: 4.682 },
++    { x: 7.074, dot: 8.096, chip: C.teal, label: 'Fundraising ', lx: 7.674, lw: 1.063, lh: 0.236, ly: 4.688 },
++    { x: 10.152, dot: 11.174, chip: C.rose, label: 'Celebrate', lx: 10.852, lw: 0.861, lh: 0.236, ly: 4.688 },
++  ];
++  steps.forEach((k) => {
++    outline(s, k.x, 4.69, 2.263, 1.854, C.teal, 0.5);
++    box(s, S.ellipse, k.dot, 3.82, 0.219, 0.219, { fill: { color: C.peach } });
++    rect(s, k.x + 0.499, 4.37, 1.265, 0.861, k.chip);
++    text(s, k.label, { x: k.lx, y: k.ly, w: k.lw, h: k.lh, align: 'center', fontSize: 14, bold: true, color: C.white });
++    body(s, LOREM.globallyShort, k.x + 0.224, 5.54, 1.814, 0.693, { align: 'center' });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 28 — Donation In Your Tablet
++ * ------------------------------------------------------------------ */
++function slide28() {
++  const s = pres.addSlide();
++  rect(s, 10.23, 2.198, 3.103, 3.103, C.teal);
++  box(s, S.roundRect, 7.416, 0.735, 4.63, 6.03, { fill: { color: '030303' }, rectRadius: 0.06 });
++  photo(s, 7.575, 0.91, 4.3, 5.698, C.photoRed);
++  text(s, 'Donation In Your Tablet', { x: 0.937, y: 0.943, w: 5.542, h: 0.606, fontFace: F.serif, fontSize: 36, color: C.ink });
++  s.addText([
++    { text: 'Globally incubate standards compliant channels before more scalable benefits generate extensible on testing fruit to identify a ballpark value B2C users after installed.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: LOREM.interactiveShort },
++  ], {
++    x: 0.937, y: 1.759, w: 5.542, h: 1.234, margin: 0, fontFace: F.sans, fontSize: 10, color: C.gray50, lineSpacingMultiple: 1.5,
++  });
++  const causes = [
++    { y: 3.623, fill: C.rose, name: 'Education Causes', goal: 'Goals $35.00' },
++    { y: 5.191, fill: C.peach, name: 'Health Causes', goal: 'Goals $95.00' },
++  ];
++  causes.forEach((c) => {
++    rect(s, 0.937, c.y, 5.542, 1.365, c.fill);
++    text(s, c.name, { x: 1.267, y: c.y + 0.406, w: 2.023, h: 0.303, fontSize: 18, bold: true, color: C.white });
++    text(s, 'Raised $50.00', { x: 1.273, y: c.y + 0.791, w: 0.994, h: 0.168, fontSize: 10, bold: true, color: C.white });
++    text(s, c.goal, { x: 2.438, y: c.y + 0.791, w: 0.858, h: 0.168, align: 'right', fontSize: 10, bold: true, color: C.white });
++    body(s, 'Globally incubate standards compliant channels before more scalable more benefits extensible on testing.',
++      3.731, c.y + 0.318, 2.418, 0.729, { color: C.white });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 29 — Contact footer
++ * ------------------------------------------------------------------ */
++function slide29() {
++  const s = pres.addSlide();
++  photo(s, 0, 0, 13.333, 5.0, C.photoBlue);
++  rect(s, 0, 5.0, 13.333, 2.5, C.teal);
++  const contacts = [
++    { glyph: 'phone', gx: 2.272, gy: 5.571, gw: 0.299, gh: 0.505, lx: 2.002, name: 'Phone', vx: 1.363, vw: 2.118, value: '12345678 / 82567819399' },
++    { glyph: 'pin', gx: 5.452, gy: 5.595, gw: 0.321, gh: 0.458, lx: 5.193, name: 'Location', vx: 4.175, vw: 2.876, value: 'W Shunk St, Philadelphia, PA 19145, USA' },
++    { glyph: 'globe', gx: 8.537, gy: 5.595, gw: 0.458, gh: 0.458, lx: 8.346, name: 'E-Mail', vx: 7.744, vw: 2.044, value: 'charitycompany@salera.com' },
++    { glyph: 'mail', gx: 10.997, gy: 5.64, gw: 0.458, gh: 0.368, lx: 10.807, name: 'Website', vx: 10.483, vw: 1.488, value: 'www.salera.com' },
++  ];
++  contacts.forEach((c) => {
++    icon(s, c.glyph, c.gx, c.gy, c.gw, c.gh, C.white, C.teal);
++    text(s, c.name, { x: c.lx, y: 6.435, w: 0.84, h: 0.236, align: 'center', fontSize: 14, bold: true, color: C.white });
++    text(s, c.value, { x: c.vx, y: 6.731, w: c.vw, h: 0.2, align: 'center', fontSize: 11, color: C.white, lineSpacing: 15 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 30 — Thanks For Watching
++ * ------------------------------------------------------------------ */
++function slide30() {
++  const s = pres.addSlide();
++  text(s, 'Thanks For Watching', {
++    x: 1.018, y: 1.453, w: 3.841, h: 1.695, fontFace: F.serif, fontSize: 54, color: C.ink, lineSpacing: 60,
++  });
++  s.addText([
++    { text: 'Globally incubate standards compliant channels before more scalable benefits extensible on testing fruit to identify a ballpark value B2C users after installed on generated.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: LOREM.interactiveShort },
++  ], {
++    x: 1.018, y: 4.724, w: 3.841, h: 1.741, margin: 0, fontFace: F.sans, fontSize: 10, color: C.gray50, lineSpacingMultiple: 1.5,
++  });
++  www(s, 10.279, 6.33, 2.455, { align: 'center', color: C.gray50 });
++  photo(s, 8.5, 0, 4.833, 5.075, C.photoBlue);
++  rect(s, 8.109, 2.355, 1.64, 2.72, C.white);
++  photo(s, 5.639, 2.425, 4.04, 4.04, C.photoRed);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides 31-42 — icon reference sheets
++ * Ten evenly spaced columns of pictograms on a white background. The
++ * original sheets are Material-style glyphs; each sheet here cycles a
++ * themed palette from the GLYPHS library at the same grid positions.
++ * ------------------------------------------------------------------ */
++const ICON_COLUMNS = [1.359, 2.535, 3.714, 4.889, 6.068, 7.245, 8.422, 9.600, 10.778, 11.955];
++
++const ICON_SHEETS = [
++  { rows: 7, y0: 0.900, dy: 0.9483, palette: ['people', 'bank', 'doc', 'circle', 'pin', 'money', 'clock', 'medkit', 'plus', 'bell', 'grid'] },
++  { rows: 7, y0: 0.880, dy: 0.9533, palette: ['grid', 'frame', 'square', 'circle', 'ring', 'triangle', 'image', 'clock', 'doc', 'arrow', 'play', 'bars', 'battery'] },
++  { rows: 7, y0: 0.880, dy: 0.9492, palette: ['mail', 'phone', 'doc', 'calendar', 'money', 'people', 'clock', 'globe', 'flag', 'grid', 'circle'] },
++  { rows: 7, y0: 0.890, dy: 0.9508, palette: ['circle', 'plus', 'doc', 'medkit', 'battery', 'ring', 'arrow', 'square', 'thumb', 'pin', 'bars', 'frame', 'play'] },
++  { rows: 7, y0: 0.900, dy: 0.9492, palette: ['image', 'doc', 'people', 'grid', 'mail', 'money', 'clock', 'circle', 'bell', 'triangle', 'phone'] },
++  { rows: 7, y0: 0.880, dy: 0.9525, palette: ['calendar', 'square', 'ring', 'arrow', 'doc', 'plus', 'globe', 'play', 'frame', 'bars', 'battery', 'medkit', 'circle'] },
++  { rows: 7, y0: 0.890, dy: 0.9525, palette: ['van', 'building', 'bank', 'people', 'thumb', 'flag', 'pin', 'money', 'doc', 'grid', 'clock'] },
++  { rows: 7, y0: 0.910, dy: 0.9517, palette: ['circle', 'square', 'ring', 'frame', 'plus', 'grid', 'triangle', 'arrow', 'play', 'battery', 'bell', 'doc', 'image'] },
++  { rows: 8, y0: 0.880, dy: 0.8136, palette: ['image', 'doc', 'arrow', 'play', 'pin', 'bars', 'circle', 'people', 'globe', 'medkit', 'mail', 'clock', 'grid'] },
++  { rows: 7, y0: 0.900, dy: 0.9492, palette: ['phone', 'mail', 'globe', 'pin', 'clock', 'calendar', 'money', 'bell', 'doc', 'people', 'ring'] },
++  { rows: 7, y0: 0.880, dy: 0.9492, palette: ['battery', 'grid', 'square', 'circle', 'plus', 'frame', 'triangle', 'bars', 'arrow', 'image', 'play', 'doc', 'ring'] },
++  { rows: 7, y0: 0.905, dy: 0.9567, last: 7, palette: ['medkit', 'people', 'flag', 'thumb', 'bank', 'van', 'building', 'money', 'speaker', 'circle', 'doc'] },
++];
++
++/** Per-row rotation of the palette so a sheet does not read as diagonal stripes. */
++const ROW_SHIFTS = [0, 4, 7, 2, 9, 5, 1, 6];
++const ICON_SIZE = 0.44;
++
++function iconSheet(sheet) {
++  const s = pres.addSlide();
++  for (let r = 0; r < sheet.rows; r += 1) {
++    const cols = (r === sheet.rows - 1 && sheet.last) ? sheet.last : ICON_COLUMNS.length;
++    for (let c = 0; c < cols; c += 1) {
++      const glyph = sheet.palette[(c + ROW_SHIFTS[r % ROW_SHIFTS.length]) % sheet.palette.length];
++      icon(s, glyph, ICON_COLUMNS[c] - ICON_SIZE / 2, sheet.y0 + r * sheet.dy - ICON_SIZE / 2,
++        ICON_SIZE, ICON_SIZE, C.black, C.white);
++    }
++  }
++}
++
++/* ------------------------------------------------------------------ *
++ * Build & save
++ * ------------------------------------------------------------------ */
++[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++].forEach((fn) => fn());
++
++ICON_SHEETS.forEach(iconSheet);
++
++pres.writeFile({ fileName: path.join(__dirname, '06fb67a3-ba59-420a-8491-34bc4bc0d5c1_grok_final.pptx') })
++  .then((f) => console.log('wrote', f))
++  .catch((e) => { console.error(e); process.exit(1); });

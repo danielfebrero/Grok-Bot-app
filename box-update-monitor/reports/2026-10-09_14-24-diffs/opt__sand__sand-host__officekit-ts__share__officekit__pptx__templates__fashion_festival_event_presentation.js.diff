@@ -1,0 +1,717 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_festival_event_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_festival_event_presentation.js
+@@ -0,0 +1,714 @@
++/*
++ * "Fashion Festival" — 20-slide deck rebuilt with pptxgenjs.
++ *
++ * Run:  node 102c5d9f-97cc-47e3-9212-34d0e0057be6_grok_final.js
++ * Out:  102c5d9f-97cc-47e3-9212-34d0e0057be6_grok_final.pptx  (next to this file)
++ */
++
++'use strict';
++
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ *
++ * Palette & typography
++ * ------------------------------------------------------------------ */
++
++const INK = '0D0D0D'; // tx1 lum 95%  — body / heading dark
++const BLACK = '000000';
++const WHITE = 'FFFFFF';
++
++const PINK = 'FF82AE'; // accent2 — highlight words, dashed outlines
++const PINK_DEEP = 'E9719B'; // accent1 — hatch artwork
++const PINK_SOFT = 'FFBBD3'; // accent3 — thin ring on slide 3
++const PINK_FILL = 'F47CA6'; // flat stand-in for the deck's E9719B->FF82AE gradient
++
++const HALFTONE = 'E7E6E6'; // bg2, drawn at 45% opacity -> the pale dot fields
++const HALFTONE_T = 55;
++const ART_GRAY = 'D9D9D9'; // bg1 lum 85%, 15% opacity -> pale hatch discs
++const ART_GRAY_T = 85;
++const MAP_GRAY = 'F2F2F2';
++const PIN_SHADOW = 'BFBFBF';
++
++const HEAD = 'Unbounded'; // theme major font
++const BODY = 'Space Grotesk'; // theme minor font
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++/* ------------------------------------------------------------------ *
++ * Small drawing helpers
++ * ------------------------------------------------------------------ */
++
++const noLine = { type: 'none' };
++
++/** Heading built from a dark run followed by a pink run. */
++function heading(s, x, y, w, h, dark, pink, size, extra) {
++  s.addText(
++    [
++      { text: dark, options: { color: INK } },
++      { text: pink, options: { color: PINK } },
++    ],
++    Object.assign({ x, y, w, h, fontFace: HEAD, fontSize: size, color: INK, valign: 'top' }, extra || {})
++  );
++}
++
++/** Single-run text box. */
++function text(s, x, y, w, h, str, o) {
++  o = o || {};
++  s.addText(str, {
++    x, y, w, h,
++    fontFace: o.head ? HEAD : BODY,
++    fontSize: o.size || 18,
++    color: o.color || BLACK,
++    align: o.align || 'left',
++    lineSpacingMultiple: o.ls,
++    valign: 'top',
++  });
++}
++
++/** 14pt-ish grey paragraph copy (the deck's "Lorem ipsum" blocks). */
++function copy(s, x, y, w, h, str, color) {
++  text(s, x, y, w, h, str, { size: 14, color: color || INK, ls: 1.3 });
++}
++
++/** Thick pink accent rule used under most headings. */
++function accentRule(s, x, y, w) {
++  s.addShape('line', { x, y, w, h: 0, line: { color: PINK, width: 4 } });
++}
++
++/** Hairline divider. */
++function rule(s, x, y, w, color, width) {
++  s.addShape('line', { x, y, w, h: 0, line: { color: color || INK, width: width || 0.75 } });
++}
++
++/**
++ * Slide-number chip, bottom-right. In the source deck this lives on the
++ * master (dark, drawn under the slide artwork — so the title slide's wave
++ * swallows it) and six slides restate it on top in their own colour.
++ */
++function pageNum(s, n, color) {
++  text(s, 12.749, 7.055, 0.462, 0.286, String(n),
++    { head: true, size: 11, color: color || INK, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Custom geometry
++ *
++ * Paths are normalised (0..1 inside the shape box); `custom()` scales them
++ * into inches because pptxgenjs expects shape-local inch coordinates.
++ * Commands: ['M',x,y] ['L',x,y] ['C',x1,y1,x2,y2,x,y] ['Z']
++ * ------------------------------------------------------------------ */
++
++const KAPPA = 0.5523; // cubic-Bezier constant for a quarter circle
++
++/**
++ * Rectangle with individually roundable corners, order [TL, TR, BR, BL].
++ * Used for the deck's "top corners rounded" bands and single-corner blocks,
++ * which need radii that pptxgenjs' rectRadius cannot express.
++ */
++function roundedBox(s, x, y, w, h, r, corners, opts) {
++  const a = r / w, b = r / h, ka = a * KAPPA, kb = b * KAPPA;
++  const [tl, tr, br, bl] = corners;
++  const p = [];
++  p.push(['M', tl ? a : 0, 0]);
++  p.push(['L', tr ? 1 - a : 1, 0]);
++  if (tr) p.push(['C', 1 - a + ka, 0, 1, kb, 1, b]);
++  p.push(['L', 1, br ? 1 - b : 1]);
++  if (br) p.push(['C', 1, 1 - b + kb, 1 - a + ka, 1, 1 - a, 1]);
++  p.push(['L', bl ? a : 0, 1]);
++  if (bl) p.push(['C', a - ka, 1, 0, 1 - b + kb, 0, 1 - b]);
++  p.push(['L', 0, tl ? b : 0]);
++  if (tl) p.push(['C', 0, b - kb, a - ka, 0, a, 0]);
++  p.push(['Z']);
++  custom(s, x, y, w, h, p, opts);
++}
++
++function custom(s, x, y, w, h, cmds, opts) {
++  const pts = cmds.map((c) => {
++    if (c[0] === 'Z') return { close: true };
++    if (c[0] === 'M') return { x: c[1] * w, y: c[2] * h, moveTo: true };
++    if (c[0] === 'L') return { x: c[1] * w, y: c[2] * h };
++    return {
++      x: c[5] * w, y: c[6] * h,
++      curve: { type: 'cubic', x1: c[1] * w, y1: c[2] * h, x2: c[3] * w, y2: c[4] * h },
++    };
++  });
++  s.addShape('custGeom', Object.assign({ x, y, w, h, points: pts }, opts));
++}
++
++// Big soft wave that anchors most slides (filled) …
++const WAVE_FILL = [
++  ['M', 0.7714, 0.037],
++  ['C', 0.589, -0.1891, 0.4885, 0.694, 0.3174, 0.7389],
++  ['C', 0.1621, 0.7802, 0.111, 0.1132, 0.0, 0.2755],
++  ['L', 0.0, 1.0], ['L', 1.0, 1.0],
++  ['C', 0.9709, 0.7152, 0.9013, 0.1981, 0.7714, 0.037],
++  ['Z'],
++];
++// … and the dashed black stroke that shadows it (three slightly different tails).
++const WAVE_DASH_A = [
++  ['M', 1.0, 1.0],
++  ['C', 0.9532, 0.6598, 0.8659, 0.203, 0.7224, 0.0434],
++  ['C', 0.4833, -0.2223, 0.3515, 0.8171, 0.1271, 0.8695],
++  ['C', 0.0207, 0.9003, 0.004, 0.8027, 0.0, 0.8018],
++];
++const WAVE_DASH_B = [
++  ['M', 1.0, 1.0],
++  ['C', 0.9536, 0.6598, 0.8672, 0.203, 0.7251, 0.0434],
++  ['C', 0.4883, -0.2223, 0.3577, 0.8171, 0.1355, 0.8695],
++  ['C', -0.0536, 0.9149, 0.0099, 0.7832, 0.0115, 0.7677],
++];
++const WAVE_DASH_WIDE = [
++  ['M', 1.0, 1.0],
++  ['C', 0.9629, 0.6598, 0.8939, 0.203, 0.7802, 0.0434],
++  ['C', 0.5909, -0.2223, 0.4865, 0.8171, 0.3089, 0.8695],
++  ['C', 0.1576, 0.9149, 0.1014, 0.2275, 0.0, 0.2997],
++];
++// Cover-slide blob (upper edge of the title-page wash).
++const BLOB = [
++  ['M', 1.0, 1.0], ['L', 1.0, 0.0],
++  ['C', 0.9831, 0.0158, 0.9662, 0.0338, 0.9493, 0.0549],
++  ['C', 0.7665, 0.2846, 0.8187, 0.5525, 0.521, 0.6979],
++  ['C', 0.2688, 0.8213, 0.1124, 0.7627, 0.0, 1.0],
++  ['L', 1.0, 1.0], ['Z'],
++];
++// Corner wave used on the demographics slide.
++const CORNER_FILL = [
++  ['M', 0.7105, 0.0005],
++  ['C', 0.7968, 0.0062, 0.8769, 0.0562, 0.9536, 0.1319],
++  ['L', 1.0, 0.1831], ['L', 1.0, 1.0], ['L', 0.0, 1.0], ['L', 0.0313, 0.8926],
++  ['C', 0.1403, 0.5499, 0.3016, 0.2006, 0.5289, 0.0539],
++  ['C', 0.5928, 0.0127, 0.653, -0.0032, 0.7105, 0.0005],
++  ['Z'],
++];
++const CORNER_DASH = [
++  ['M', 0.5906, 0.0006],
++  ['C', 0.7395, 0.0128, 0.8671, 0.2137, 0.9928, 0.444],
++  ['L', 1.0, 0.4575], ['L', 1.0, 0.8901], ['L', 0.7225, 1.0], ['L', 0.0, 1.0],
++  ['L', 0.0, 0.9663], ['L', 0.0013, 0.9607],
++  ['C', 0.0954, 0.5926, 0.2354, 0.2148, 0.4339, 0.0571],
++  ['C', 0.489, 0.0134, 0.541, -0.0035, 0.5906, 0.0006],
++];
++
++/** Filled wave + its dashed companion, positioned independently. */
++function wave(s, fill, dash, dashPath, color) {
++  custom(s, fill[0], fill[1], fill[2], fill[3], WAVE_FILL, {
++    fill: { color: color || PINK_FILL }, line: noLine,
++    flipH: !!fill[4], flipV: !!fill[5],
++  });
++  custom(s, dash[0], dash[1], dash[2], dash[3], dashPath, {
++    fill: { type: 'none' }, line: { color: INK, width: 2.5, dashType: 'dash' },
++    flipH: !!dash[4], flipV: !!dash[5],
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Halftone dot fields
++ *
++ * The template's pale "sound wave" texture is a set of concentric dot
++ * rings whose dots shrink outwards; only the part falling inside the
++ * artwork box is kept.
++ * ------------------------------------------------------------------ */
++
++const RING_R0 = 2.43;   // radius of the innermost drawn ring
++const RING_STEP = 0.295; // radial distance between rings
++const DOT_R0 = 0.0715;  // dot radius on the innermost ring
++const DOT_STEP = 0.0116; // dot shrink per ring
++const ARC_R0 = 0.268;   // arc distance between neighbouring dots
++const ARC_STEP = 0.006;
++
++function halftone(s, box, cx, cy, scale, color, transparency, rings) {
++  const [bx, by, bw, bh] = box;
++  const fill = { color: color || HALFTONE, transparency: transparency == null ? HALFTONE_T : transparency };
++  for (let k = 0; k < (rings || 6); k++) {
++    const R = (RING_R0 + RING_STEP * k) * scale;
++    const dot = (DOT_R0 - DOT_STEP * k) * scale;
++    const n = Math.max(1, Math.round((2 * Math.PI * R) / ((ARC_R0 - ARC_STEP * k) * scale)));
++    for (let i = 0; i < n; i++) {
++      const a = (2 * Math.PI * i) / n;
++      const x = cx + R * Math.cos(a) - dot;
++      const y = cy + R * Math.sin(a) - dot;
++      if (x < bx - 0.02 || y < by - 0.02 || x + 2 * dot > bx + bw + 0.02 || y + 2 * dot > by + bh + 0.02) continue;
++      s.addShape('ellipse', { x, y, w: 2 * dot, h: 2 * dot, fill, line: noLine });
++    }
++  }
++}
++
++/* ------------------------------------------------------------------ *
++ * Diagonal hatch motifs (the "/" striped disc and striped square)
++ *
++ * Both are a fan of 45-degree bars clipped to an outline. Each bar is a
++ * quadrilateral: it walks along the (1,1) normal in steps of `pitch`, and
++ * its two ends sit on the outline's chord at that offset.
++ * ------------------------------------------------------------------ */
++
++/**
++ * @param ends (t) -> [low, high] positions of the outline's chord along the
++ *             bar direction at normal offset t, measured from the centre.
++ */
++function hatchBars(s, x, y, w, h, pitch, thick, ends, color, transparency, flipH) {
++  const u = Math.SQRT1_2; // 45-degree unit vector components
++  const span = w + h;
++  const cx = w / 2, cy = h / 2;
++  const quads = [];
++  for (let t = -span; t <= span; t += pitch) {
++    const a = ends(t), b = ends(t + thick);
++    if (a[1] - a[0] <= 0 && b[1] - b[0] <= 0) continue;
++    // corner = centre + offset*(u,u) + side*(u,-u)
++    const corner = (o, sd) => ['L', (cx + o * u + sd * u) / w, (cy + o * u - sd * u) / h];
++    const q = [corner(t, a[0]), corner(t, a[1]), corner(t + thick, b[1]), corner(t + thick, b[0])];
++    q[0][0] = 'M';
++    quads.push(...q, ['Z']);
++  }
++  custom(s, x, y, w, h, quads,
++    { fill: { color, transparency: transparency || 0 }, line: noLine, flipH: !!flipH });
++}
++
++/** Striped disc — pairs with a dashed circle outline on most slides. */
++function hatchDisc(s, x, y, d, color, transparency, flipH) {
++  const R = d / 2;
++  hatchBars(s, x, y, d, d, 0.0715 * d, 0.0218 * d, (t) => {
++    const c = Math.abs(t) >= R ? 0 : Math.sqrt(R * R - t * t);
++    return [-c, c];
++  }, color, transparency, flipH);
++}
++
++/** Striped rounded square — the small "card" motif. */
++function hatchSquare(s, x, y, w, h, color, transparency) {
++  const r = 0.11 * w;
++  const A = (w / 2) * Math.SQRT2, B = (h / 2) * Math.SQRT2;
++  const cut = (w / 2 + h / 2 - r * (2 - Math.SQRT2)) * Math.SQRT1_2; // 45-degree corner chamfer
++  hatchBars(s, x, y, w, h, 0.0669 * w, 0.0214 * w, (t) => {
++    if (Math.abs(t) > cut) return [0, 0];
++    return [Math.max(-A - t, t - B, -cut), Math.min(A - t, t + B, cut)];
++  }, color, transparency);
++}
++
++/** Dashed pink circle outline. */
++function dashCircle(s, x, y, d, color) {
++  s.addShape('ellipse', {
++    x, y, w: d, h: d, fill: { type: 'none' },
++    line: { color: color || PINK, width: 2.5, dashType: 'dash' },
++  });
++}
++
++/** Dashed pink rounded-square outline. */
++function dashSquare(s, x, y, w, h) {
++  s.addShape('roundRect', {
++    x, y, w, h, rectRadius: 0.16667 * Math.min(w, h), fill: { type: 'none' },
++    line: { color: PINK, width: 2.5, dashType: 'dash' },
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Repeated content blocks
++ * ------------------------------------------------------------------ */
++
++/** Big pink number + label + copy, stacked (slides 6, 8, 9, 13). */
++function statStack(s, x, y, num, numSize, numW, label, labelY, body, bodyY, bodyW) {
++  text(s, x, y, numW, numSize > 44 ? 0.909 : 0.841, num, { head: true, size: numSize, color: PINK });
++  text(s, x, labelY, 2.6, 0.404, label, { head: true, size: 18, color: BLACK });
++  copy(s, x, bodyY, bodyW, 0.691, body);
++}
++
++/** Number on the left, label + copy on the right (slides 5, 17). */
++function statRow(s, x, numY, num, label, labelX, labelY, body, bodyY, bodyW) {
++  text(s, x, numY, 2.7, 0.774, num, { head: true, size: 40, color: PINK });
++  text(s, labelX, labelY, 3.2, 0.404, label, { head: true, size: 18, color: INK });
++  copy(s, labelX, bodyY, bodyW, 0.691, body);
++}
++
++const LOREM_LONG =
++  'Lorem ipsum dolor sit amet, consectetuer adipiscing elit aenean commodo ligula eget dolor enean massa sociis natoque.';
++const LOREM_MID = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit aenean commodo.';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit aenean commod.';
++const LOREM_TINY = 'Lorem ipsum dolor sit amet, consectetuer adipiscing.';
++const LOREM_NASC =
++  'Lorem ipsum dolor sit amet, consectetuer adipiscing elit aenean commodo ligula eget dolor enean massa sociis natoque. magnis parturient montes nascetur.';
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++// 1 — Title
++function slide01(s) {
++  custom(s, 0.001, 3.272, 6.483, 4.424, BLOB, { fill: { color: PINK_FILL }, line: noLine, flipH: true });
++  halftone(s, [-0.107, -0.152, 6.576, 7.895], 2.025, 3.99, 1.121);
++  wave(s, [4.49, 6.096, 9.708, 1.595, 1], [5.281, 6.138, 9.064, 1.709, 1], WAVE_DASH_A);
++  heading(s, 5.555, 0.772, 6.576, 2.767, 'Fashion ', 'Festival', 88, { lineSpacingMultiple: 0.9 });
++  text(s, 5.555, 3.932, 4.895, 0.404, 'Presentation Template', { head: true, color: INK });
++  copy(s, 5.555, 4.559, 6.32, 0.691, LOREM_LONG);
++}
++
++// 2 — Introduction
++function slide02(s) {
++  halftone(s, [1.03, 1.848, 7.74, 5.652], 4.924, 5.674, 0.983);
++  s.addShape('rect', { x: 0, y: 0, w: 2.93, h: 7.5, fill: { color: PINK_FILL }, line: noLine });
++  accentRule(s, 6.325, 4.107, 2.244);
++  dashSquare(s, 10.383, 5.227, 1.154, 1.173);
++  hatchSquare(s, 11.137, 5.533, 1.167, 1.092, PINK_DEEP);
++  halftone(s, [9.44, 0, 3.693, 1.848], 11.294, 0.031, 0.438);
++  heading(s, 6.204, 1.057, 6.141, 1.582, 'Introduction to ', 'Fashion Festival', 44, { color: BLACK });
++  copy(s, 6.204, 2.918, 6.32, 0.691, LOREM_LONG);
++  text(s, 6.216, 5.751, 1.812, 0.404, '2025', { head: true });
++  text(s, 6.216, 6.225, 2.083, 0.337, 'Event\u2019s History', { head: true, size: 14 });
++}
++
++// 3 — Fashion festivals influence trends
++function slide03(s) {
++  halftone(s, [8.283, -0.045, 5.242, 7.674], 12.189, 3.724, 0.977);
++  wave(s, [3.817, 6.182, 9.708, 1.595, 1], [4.608, 6.225, 9.152, 1.709, 1], WAVE_DASH_B);
++  // thin ring: solid right half, dotted left half
++  s.addShape('arc', {
++    x: 0.741, y: 0.625, w: 5.039, h: 5.031, angleRange: [270, 90],
++    fill: { type: 'none' }, line: { color: PINK_SOFT, width: 0.75 },
++  });
++  for (let i = 0; i < 28; i++) {
++    const a = ((96.3 + 6.17 * (i < 14 ? i : i + 0.02)) * Math.PI) / 180;
++    const r = 0.0403;
++    s.addShape('ellipse', {
++      x: 3.268 + 2.494 * Math.cos(a) - r, y: 3.139 + 2.494 * Math.sin(a) - r,
++      w: 2 * r, h: 2 * r, fill: { color: PINK_SOFT }, line: noLine,
++    });
++  }
++  accentRule(s, 10.179, 5.365, 2.244);
++  heading(s, 6.318, 0.98, 6.105, 1.447, 'Fashion Festivals ', 'Influence Trends', 40);
++  copy(s, 6.318, 2.729, 6.255, 0.691, LOREM_LONG);
++  copy(s, 6.318, 3.604, 6.255, 0.997,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit aenean commodo ligula eget dolor enean massa sociis natoque. magnis dis parturient montes, nascetur ridiculus mus.');
++  s.addShape('ellipse', { x: 1.118, y: 4.414, w: 2.19, h: 2.19, fill: { color: PINK_FILL }, line: noLine });
++  text(s, 1.424, 4.845, 1.577, 0.64, '85%', { head: true, size: 32, color: WHITE, align: 'center' });
++  text(s, 1.424, 5.466, 1.577, 0.707, 'Fashion Trends', { head: true, color: WHITE, align: 'center' });
++  pageNum(s, 3, WHITE);
++}
++
++// 4 — Event overview
++function slide04(s) {
++  halftone(s, [0, 0, 4.777, 5.463], 1.218, 1.958, 0.888);
++  hatchDisc(s, 7.442, 0.96, 5.096, ART_GRAY, ART_GRAY_T);
++  roundedBox(s, 0.867, 6.809, 5.435, 0.691, 0.204, [1, 1, 0, 0],
++    { fill: { color: PINK_FILL }, line: noLine });
++  heading(s, 0.867, 1.006, 4.905, 2.121, 'Event ', 'Overview', 60, { color: BLACK });
++  accentRule(s, 3.379, 3.33, 2.244);
++  copy(s, 0.76, 3.901, 5.542, 0.997,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit aenean commodo ligula eget dolor enean massa sociis natoque. magnis parturient montes nascetur.');
++  copy(s, 0.795, 5.137, 5.542, 0.691,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit aenean commod ligula eget dolor enean masa.');
++  [['56%', '01. Runway Shows', 0.795, 1.885, 2.066, 8.0],
++   ['69%', '02. Exhibitions', 2.912, 4.002, 4.184, 7.994],
++   ['85%', '03. Networking', 5.03, 6.12, 6.301, 8.099]].forEach((r) => {
++    text(s, 7.437, r[2], 3.049, 0.909, r[0], { head: true, size: 48, color: PINK });
++    rule(s, 7.536, r[3], 4.25);
++    text(s, r[5], r[4], 3.908, 0.404, r[1], { head: true, align: 'right' });
++  });
++}
++
++// 5 — Fashion industry impact
++function slide05(s) {
++  dashCircle(s, 3.798, 5.871, 0.988);
++  hatchDisc(s, 4.53, 5.912, 0.926, PINK_DEEP);
++  s.addShape('rect', { x: 0, y: 0, w: 2.45, h: 7.5, fill: { color: PINK_FILL }, line: noLine });
++  halftone(s, [8.556, 0, 4.777, 5.463], 12.115, 1.958, 0.888);
++  heading(s, 4.759, 0.845, 6.935, 1.717, 'Fashion Industry ', 'Impact 2025', 48);
++  rule(s, 4.854, 4.382, 7.029);
++  statRow(s, 4.759, 3.2, '80,5%', 'Impact One', 7.589, 3.006, LOREM_MID, 3.478, 4.378);
++  statRow(s, 4.759, 4.891, '$82.00', 'Impact Two', 7.589, 4.696, LOREM_MID, 5.169, 4.378);
++  accentRule(s, 9.722, 6.543, 2.244);
++}
++
++// 6 — Marketing strategy
++function slide06(s) {
++  dashCircle(s, 6.737, 0.528, 1.88);
++  hatchDisc(s, 7.528, 0.597, 1.762, PINK_DEEP);
++  roundedBox(s, 9.854, 2.853, 3.479, 4.647, 0.663, [1, 0, 0, 0],
++    { fill: { color: PINK_FILL }, line: noLine });
++  halftone(s, [0, -0.333, 3.627, 3.602], -0.25, -0.612, 0.952);
++  heading(s, 0.76, 1.012, 5.682, 1.919, 'Marketing ', 'Strategy', 54);
++  accentRule(s, 3.379, 3.33, 2.244);
++  [[0.76, 3.896, '01', 'Strategy One', 4.916, 5.432],
++   [4.092, 3.852, '02', 'Strategy Two', 4.872, 5.387]].forEach((c) => {
++    text(s, c[0], c[1], 1.652, 0.909, c[2], { head: true, size: 48, color: PINK });
++    text(s, c[0], c[4], 2.278, 0.404, c[3], { head: true });
++    copy(s, c[0], c[5], 2.833, 0.997, LOREM_SHORT);
++  });
++  pageNum(s, 6, WHITE);
++}
++
++// 7 — Sustainable fashion initiatives
++function slide07(s) {
++  halftone(s, [0, 0, 5.931, 4.808], 2.006, 0.887, 0.974);
++  hatchDisc(s, 10.618, 4.706, 2.144, PINK_DEEP);
++  dashCircle(s, 9.801, 4.611, 2.288);
++  [0.897, 4.849, 8.801].forEach((x, i) => {
++    s.addShape('roundRect', {
++      x, y: 0.819, w: 3.636, h: 2.921, rectRadius: 0.318,
++      fill: { color: PINK_FILL }, line: noLine,
++    });
++    const tx = x + 0.31;
++    text(s, tx, 1.901, 2.064, 0.707, 'Eco-friendly Designs', { head: true, color: WHITE });
++    copy(s, tx, 2.722, 3.015, 0.691, 'Lorem ipsum dolor consectur adipiscing elit aenean.', WHITE);
++    text(s, x + 1.05, 1.148, 2.275, 0.64, '0' + (i + 1),
++      { head: true, size: 32, color: WHITE, align: 'right' });
++  });
++  heading(s, 0.76, 4.351, 8.487, 1.919, 'Sustainable ', 'Fashion Initiatives', 54);
++  accentRule(s, 6.07, 6.612, 2.921);
++}
++
++// 8 — Event schedule
++function slide08(s) {
++  rule(s, 0, 3.75, 10.591, INK, 1);
++  halftone(s, [-0.117, 0, 6.179, 3.897], 2.14, -0.02, 0.977);
++  s.addShape('ellipse', { x: 10.965, y: 1.068, w: 1.496, h: 1.496, fill: { color: PINK_FILL }, line: noLine });
++  s.addShape('arc', {
++    x: 10.762, y: 0.911, w: 1.811, h: 1.811, angleRange: [88.6, 267.3],
++    fill: { type: 'none' }, line: { color: INK, width: 1.5, dashType: 'dash' },
++  });
++  heading(s, 0.76, 0.756, 5.682, 2.121, 'Event ', 'Schedule', 60);
++  text(s, 6.062, 1.186, 3.944, 0.404, 'Next Event Details', { head: true });
++  copy(s, 6.062, 1.725, 4.32, 0.997,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit enean commodo ligula eget dolor enean massa sociis natoque.');
++  [[0.828, '24', 'February 2025'], [3.964, '15', 'March 2025'],
++   [7.1, '27', 'April 2025'], [10.236, '10', 'May 2025']].forEach((c) => {
++    s.addShape('ellipse', {
++      x: c[0] + 0.195, y: 3.679, w: 0.16, h: 0.16, fill: { color: PINK_FILL }, line: noLine,
++    });
++    text(s, c[0], 4.168, 1.652, 0.909, c[1], { head: true, size: 48, color: PINK });
++    text(s, c[0], 5.189, 2.599, 0.404, c[2], { head: true });
++    copy(s, c[0], 5.704, 2.833, 0.997, LOREM_SHORT);
++  });
++}
++
++// 9 — Sponsorship & partners
++function slide09(s) {
++  hatchDisc(s, 1.201, 1.738, 4.69, ART_GRAY, ART_GRAY_T);
++  wave(s, [-0.338, -0.302, 13.858, 1.584, 1, 1], [0.727, -0.458, 13.243, 1.698, 1, 1], WAVE_DASH_WIDE);
++  heading(s, 0.76, 1.863, 5.871, 1.919, 'Sponsorship ', '& Partners', 54);
++  statStack(s, 0.755, 4.341, '80%', 44, 2.415, 'Sponsorship', 5.345, LOREM_TINY, 5.895, 2.833);
++  statStack(s, 3.95, 4.341, '250+', 44, 2.415, 'Media Patner', 5.345, LOREM_TINY, 5.895, 2.833);
++}
++
++// 10 — Exhibitions & booths
++function slide10(s) {
++  halftone(s, [7.024, 0, 6.31, 4.45], 10.945, 0.57, 0.977);
++  heading(s, 5.626, 0.845, 5.771, 1.919, 'Exhibitions ', '& Booths', 54);
++  accentRule(s, 8.978, 3.07, 2.244);
++  [[3.577, '326+'], [4.753, '72,3%']].forEach((r) => {
++    text(s, 5.626, r[0], 2.464, 0.774, r[1], { head: true, size: 40, color: PINK });
++    copy(s, 8.305, r[0] + 0.001, 4.153, 0.691, LOREM_MID);
++  });
++  dashSquare(s, 11.238, 5.927, 0.802, 0.815);
++  hatchSquare(s, 11.762, 6.14, 0.811, 0.759, PINK_DEEP);
++}
++
++// 11 — Runway show highlights
++function slide11(s) {
++  wave(s, [-0.912, 5.969, 9.708, 1.595], [-3.442, 6.011, 11.447, 1.709], WAVE_DASH_WIDE);
++  halftone(s, [0, 0.02, 5.703, 5.421], 1.781, 1.518, 1.002);
++  heading(s, 0.785, 0.917, 5.881, 1.717, 'Runway Show ', 'Highlights', 48);
++  accentRule(s, 4.233, 3.026, 2.244);
++  copy(s, 0.785, 3.495, 6.246, 0.691, LOREM_LONG);
++  text(s, 0.785, 4.627, 4.208, 1.01, '2025', { head: true, size: 54, color: PINK });
++  pageNum(s, 11, INK);
++}
++
++// 12 — Ticket pricing table
++function slide12(s) {
++  halftone(s, [0.035, 3.283, 4.643, 4.217], 0.76, 7.195, 0.974);
++  wave(s, [5.138, -0.146, 8.708, 1.481, 1, 1], [5.807, -0.293, 8.322, 1.588, 1, 1], WAVE_DASH_WIDE);
++  heading(s, 0.785, 1.148, 5.881, 1.717, 'Ticket Pricing ', 'Table 2025', 48);
++  priceCard(s, 9.288, 1.481, 5.419, '$450', 'Premium', 1.926, 2.914, [3.66, 4.223, 4.786, 5.349], [4.134, 4.697, 5.26]);
++  priceCard(s, 5.658, 2.669, 4.235, '$150', 'Standard', 2.993, 3.981, [4.727, 5.29], [5.201, 5.764]);
++  text(s, 0.76, 4.038, 3.721, 0.404, 'Ticket Sales Analysis', { head: true });
++  copy(s, 0.76, 4.652, 4.378, 1.304, LOREM_NASC);
++  copy(s, 0.76, 6.123, 4.378, 0.691,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit aenean commodo ligula');
++  accentRule(s, 0.936, 3.268, 2.107);
++}
++
++/** One pricing column: pink card, price, tier, feature rows, "Buy Now" pill. */
++function priceCard(s, x, y, h, price, tier, priceY, tierY, rowYs, ruleYs) {
++  s.addShape('roundRect', {
++    x, y, w: 3.285, h, rectRadius: 0.31, fill: { color: PINK_FILL }, line: noLine,
++  });
++  text(s, x + 0.381, priceY, 2.523, 0.841, price, { head: true, size: 44, color: WHITE, align: 'center' });
++  text(s, x + 0.653, tierY, 1.979, 0.505, tier, { head: true, size: 24, color: WHITE, align: 'center' });
++  rowYs.forEach((ry) => copy(s, x + 0.264, ry, 2.757, 0.385, 'Lorem ipsum dolor sit amet', WHITE));
++  ruleYs.forEach((ly) => rule(s, x + 0.381, ly, 2.523, WHITE, 1));
++  s.addShape('roundRect', {
++    x: x + 0.927, y: 6.065, w: 1.431, h: 0.388, rectRadius: 0.194,
++    fill: { color: WHITE }, line: noLine,
++  });
++  text(s, x + 1.009, 6.091, 1.266, 0.337, 'Buy Now', { head: true, size: 14, color: PINK, align: 'center' });
++}
++
++// 13 — Big brand collaborations
++function slide13(s) {
++  halftone(s, [9.078, 0, 4.255, 5.348], 12.869, 1.53, 0.98);
++  hatchDisc(s, 0.159, 0.288, 2.144, PINK_DEEP, 0, true);
++  dashCircle(s, 0.832, 0.193, 2.288);
++  roundedBox(s, 0, 5.458, 13.333, 2.121, 0.668, [1, 1, 0, 0],
++    { fill: { color: PINK_FILL }, line: noLine });
++  s.addText([{ text: 'Big Brand ', options: { color: INK, fontSize: 48 } },
++             { text: 'Collaborations', options: { color: PINK, fontSize: 44 } }],
++    { x: 6.138, y: 0.733, w: 5.764, h: 1.649, fontFace: HEAD, fontSize: 48, valign: 'top' });
++  statStack(s, 6.138, 2.855, '67%', 44, 2.415, 'Big Brand 01', 3.859, LOREM_TINY, 4.41, 2.833);
++  statStack(s, 9.319, 2.855, '79%', 44, 2.415, 'Big Brand 02', 3.859, LOREM_TINY, 4.41, 2.833);
++  text(s, 6.138, 5.918, 4.651, 0.404, 'Influencer Collaborations', { head: true, color: WHITE });
++  copy(s, 6.138, 6.428, 6.459, 0.691, LOREM_LONG, WHITE);
++  pageNum(s, 13, WHITE);
++}
++
++// 14 — Break slide
++function slide14(s) {
++  s.background = { color: PINK_FILL };
++  halftone(s, [-0.091, 0.548, 4.546, 6.654], 1.067, 3.816, 0.849, 'FDE3EB', 76);
++  hatchDisc(s, 10.993, 0.288, 2.144, WHITE);
++  dashCircle(s, 10.176, 0.193, 2.288, WHITE);
++  [5.2, 5.847].forEach((y) => s.addShape('rect', {
++    x: 11.589, y, w: 0.878, h: 0.878, rotate: 315,
++    fill: { type: 'none' }, line: { color: WHITE, width: 3.5 },
++  }));
++  text(s, 0.76, 0.943, 7.443, 3.817, 'Break Slide', { head: true, size: 138, color: WHITE, ls: 0.8 });
++  text(s, 0.76, 4.952, 5.642, 0.404, 'It is Time to Break Until 10 Minute', { head: true, color: WHITE });
++  copy(s, 5.679, 6.194, 5.217, 0.691,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit aenean commodo ligula eget dolor enean.', WHITE);
++  pageNum(s, 14, WHITE);
++}
++
++// 15 — Attendee testimonials
++function slide15(s) {
++  hatchDisc(s, 6.667, 0.964, 6.667, ART_GRAY, ART_GRAY_T);
++  wave(s, [-0.167, -0.3, 13.858, 1.584, 0, 1], [-0.617, -0.457, 13.243, 1.698, 0, 1], WAVE_DASH_WIDE);
++  heading(s, 6.178, 1.91, 5.881, 1.717, 'Attendee ', 'Testimonials', 48);
++  accentRule(s, 9.174, 3.962, 2.244);
++  text(s, 6.178, 4.519, 5.492, 1.253,
++    '\u201CStep into the world of glamour, creativity, and innovation at the Fashion Festival, where style meets artistry\u201D',
++    { color: INK, ls: 1.3 });
++  rule(s, 6.241, 6.308, 3.352, INK, 1);
++  text(s, 9.593, 6.103, 2.078, 0.404, 'Andre Tylor', { head: true, color: PINK, align: 'right' });
++}
++
++// 16 — Meet our best team
++function slide16(s) {
++  halftone(s, [0, -0.042, 4.714, 3.692], 1.607, 0.736, 0.78);
++  [3.471, 6.693, 9.968].forEach((x) => hatchSquare(s, x, 3.975, 2.49, 2.705, PINK));
++  heading(s, 0.76, 0.649, 5.391, 1.919, 'Meet Our ', 'Best  Team', 54);
++  wave(s, [5.138, -0.146, 8.708, 1.481, 1, 1], [5.807, -0.293, 8.322, 1.588, 1, 1], WAVE_DASH_WIDE);
++  [[3.148, 'Mikel Arteta'], [6.35, 'Roose Swift'], [9.649, 'Alberto Keith']].forEach((c) =>
++    text(s, c[0], 2.993, 2.38, 0.404, c[1], { head: true }));
++  s.addText([{ text: '10+', options: { fontSize: 44 } }, { text: '/Years', options: { fontSize: 12 } }],
++    { x: 0.76, y: 4.313, w: 2.146, h: 0.841, fontFace: HEAD, fontSize: 44, color: PINK, valign: 'top' });
++  text(s, 0.76, 5.239, 1.892, 0.303, 'Work Experience', { head: true, size: 12 });
++  copy(s, 0.76, 5.662, 2.222, 0.997,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing aenean');
++}
++
++// 17 — Audience & demographics
++// Outline of the template's map graphic, traced clockwise in slide inches.
++const MAP_OUTLINE = [
++  [8.07, 4.64], [8.39, 4.29], [8.55, 2.52], [8.87, 2.13], [9.19, 1.87], [9.35, 1.40],
++  [9.51, 1.28], [9.83, 1.16], [10.15, 1.13], [10.47, 0.96], [10.79, 0.79], [10.95, 2.71],
++  [11.27, 2.79], [11.43, 2.99], [11.75, 3.04], [12.07, 2.98], [12.38, 4.74], [12.23, 4.49],
++  [11.91, 4.61], [11.59, 4.61], [11.43, 5.96], [11.27, 6.71], [11.11, 6.60], [10.95, 6.01],
++  [10.63, 6.00], [10.31, 6.09], [9.99, 5.69], [9.67, 5.40], [9.35, 5.25], [9.03, 5.06],
++  [8.71, 5.10], [8.39, 4.90], [8.23, 4.79],
++];
++const PINS = [[9.33, 2.236], [10.247, 2.884], [11.164, 3.532], [9.192, 3.672], [10.185, 3.878], [10.357, 5.005]];
++
++function slide17(s) {
++  halftone(s, [-0.006, 0, 6.17, 5.71], 2.245, 2.053, 1.011);
++  custom(s, -0.1, 6.447, 3.467, 1.095, CORNER_FILL, { fill: { color: PINK_FILL }, line: noLine, flipH: true });
++  custom(s, -0.3, 6.489, 4.917, 1.298, CORNER_DASH,
++    { fill: { type: 'none' }, line: { color: INK, width: 2.5, dashType: 'dash' }, flipH: true });
++  // stylised country map (stand-in for the template's vector map artwork)
++  const mx = 8.06, my = 0.76, mw = 4.34, mh = 5.99;
++  custom(s, mx, my, mw, mh,
++    MAP_OUTLINE.map((q, i) => [i === 0 ? 'M' : 'L', (q[0] - mx) / mw, (q[1] - my) / mh]).concat([['Z']]),
++    { fill: { color: MAP_GRAY }, line: noLine });
++  PINS.forEach((q) => {
++    s.addShape('ellipse', { x: q[0] + 0.04, y: q[1] + 0.359, w: 0.175, h: 0.175, fill: { color: PIN_SHADOW }, line: noLine });
++    s.addShape('teardrop', { x: q[0], y: q[1], w: 0.299, h: 0.299, rotate: 138, fill: { color: WHITE }, line: noLine });
++    s.addShape('ellipse', { x: q[0] + 0.064, y: q[1] + 0.065, w: 0.17, h: 0.17, fill: { color: PINK }, line: noLine });
++  });
++  heading(s, 0.76, 0.649, 6.17, 1.717, 'Audience & ', 'Demographics', 48);
++  statRow(s, 0.76, 3.147, '80%', 'Audience Growth', 2.879, 2.953, LOREM_MID, 3.425, 4.378);
++  statRow(s, 0.76, 4.662, '250+', 'Engagement Levels ', 2.879, 4.468, LOREM_MID, 4.94, 4.378);
++  accentRule(s, 5.469, 6.499, 2.244);
++}
++
++// 18 — Digital marketing approach
++function slide18(s) {
++  // two phone mockups (stand-ins for the template's device screenshots)
++  phone(s, 7.684, 1.742, 2.417, 4.959, 8.611, 1.932, 0.543, 0.157);
++  phone(s, 9.467, 0.831, 2.862, 5.87, 10.564, 1.055, 0.643, 0.186);
++  hatchDisc(s, 0.98, 0.919, 5.665, ART_GRAY, ART_GRAY_T);
++  heading(s, 0.76, 0.769, 5.884, 3.231, 'Digital Marketing ', 'Approach', 60);
++  copy(s, 0.76, 4.17, 5.736, 0.997, LOREM_NASC);
++  wave(s, [-0.779, 6.182, 9.708, 1.595], [-1.013, 6.225, 9.152, 1.709], WAVE_DASH_B);
++}
++
++function phone(s, x, y, w, h, nx, ny, nw, nh) {
++  const r = w * 0.15;
++  s.addShape('roundRect', { x, y, w, h, rectRadius: r, fill: { color: '5E465D' }, line: noLine });
++  s.addShape('roundRect', {
++    x: x + 0.042, y: y + 0.04, w: w - 0.085, h: h - 0.08, rectRadius: r - 0.03,
++    fill: { color: '1D1D1B' }, line: noLine,
++  });
++  s.addShape('roundRect', { x: nx, y: ny, w: nw, h: nh, rectRadius: nh / 2, fill: { color: '231F20' }, line: noLine });
++  s.addShape('rect', { x: x + w - 0.024, y: y + 0.5 * h * 0.55, w: 0.025, h: h * 0.12, fill: { color: '68595F' }, line: noLine });
++}
++
++// 19 — Get in touch
++function slide19(s) {
++  halftone(s, [-0.167, 0, 4.991, 6.45], 0.883, 2.545, 0.973);
++  heading(s, 0.76, 1.342, 5.809, 1.919, 'Get in Touch ', 'With us', 54);
++  accentRule(s, 4.01, 3.705, 2.244);
++  text(s, 9.26, 1.926, 3.206, 0.775, 'Orlando City, Downtown Main Street 233, Florida, US',
++    { size: 16, color: INK, align: 'right', ls: 1.3 });
++  text(s, 10.935, 2.798, 1.53, 0.506, 'Phone:', { size: 20, color: INK, align: 'right', ls: 1.3 });
++  text(s, 9.102, 3.321, 3.363, 0.385, '+22 1234 5678 9000', { size: 14, color: INK, align: 'right', ls: 1.3 });
++  wave(s, [5.138, -0.146, 8.708, 1.481, 1, 1], [5.807, -0.293, 8.322, 1.588, 1, 1], WAVE_DASH_WIDE);
++}
++
++// 20 — Thank you
++function slide20(s) {
++  custom(s, 0.001, 3.272, 6.483, 4.424, BLOB, { fill: { color: PINK_FILL }, line: noLine, flipH: true });
++  wave(s, [4.49, 6.096, 9.708, 1.595, 1], [5.281, 6.138, 9.064, 1.709, 1], WAVE_DASH_A);
++  halftone(s, [-0.107, -0.152, 6.576, 7.895], 2.025, 3.99, 1.121);
++  heading(s, 5.281, 1.269, 6.731, 1.919, 'Thank You ', 'For Attention', 60, { lineSpacingMultiple: 0.9 });
++  text(s, 5.281, 3.653, 4.895, 0.404, 'Presentation Template', { head: true, color: INK });
++  copy(s, 5.281, 4.28, 6.882, 0.691,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing aenean commodo ligula eget dolor enean massa sociis natoque magnis parturient.');
++  pageNum(s, 20, WHITE);
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++function build() {
++  const pptx = new pptxgen();
++  pptx.defineLayout({ name: 'FASHION', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'FASHION';
++  pptx.title = 'Fashion Festival';
++  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++
++  const builders = [
++    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  ];
++  builders.forEach((fn, i) => {
++    const s = pptx.addSlide();
++    // Master chip goes down first so slide artwork can cover it (slide 1 does).
++    // Slide 14 switches master shapes off and paints its own.
++    if (i + 1 !== 14) pageNum(s, i + 1);
++    fn(s);
++  });
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '102c5d9f-97cc-47e3-9212-34d0e0057be6_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

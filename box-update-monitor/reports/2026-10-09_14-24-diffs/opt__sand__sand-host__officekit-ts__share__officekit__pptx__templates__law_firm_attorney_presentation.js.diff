@@ -1,0 +1,426 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/law_firm_attorney_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/law_firm_attorney_presentation.js
+@@ -0,0 +1,423 @@
++/**
++ * "HUMES" — Lawyer & Attorney presentation template, rebuilt with pptxgenjs.
++ *
++ * Widescreen 13.333in x 7.5in, 10 slides. Shapes are emitted in the same order
++ * as the source deck so z-order and reading order match.
++ *
++ * The two raster assets in the original (a stacked-layers glyph and a laptop
++ * photograph) are redrawn here with native shapes instead of embedded bitmaps.
++ *
++ *   node 0dff1a86-bd76-4810-9f5a-2e50222ff6fd_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens
++ * ------------------------------------------------------------------ */
++
++const C = {
++  ink: '262626',   // near-black body text on light slides
++  night: '0C0C0C', // full-bleed dark slide background
++  brown: '4A2C26', // brand accent
++  white: 'FFFFFF',
++  paper: 'F2F2F2', // pale grey panels
++  silver: 'E8E9EB',   // laptop base slab
++  shadow: '6E7175',   // shading under the base
++  trackpad: 'C2C3C5', // notch in the base front edge
++};
++
++const F = {
++  display: 'Manrope',   // headlines, labels, numbers
++  body: 'Open Sans',    // paragraphs
++  accent: 'Inter',      // the small "investment" caption
++};
++
++// Body copy reused throughout the deck, in the four lengths the source uses.
++const LOREM_1 =
++  'Praesent eu laoreet nulla, at congue neque. Nulla odio turpis, luctus sit amet mi sit amet, commodo pulvinar est. ';
++const LOREM_2 = LOREM_1 + 'Integer vitae tortor ipsum. ';
++const LOREM_3 = LOREM_2 + 'Vestibulum lacus ligula, eleifend ac elit id, interdum laoreet arcu. ';
++const LOREM_4 = LOREM_3 + 'Ut sit amet nunc ac arcu faucibus laoreet. ';
++
++const CAPTION = 'Investment refers to the act of allocating resources, usually money.';
++const TAGLINE = 'LAWYER  & ATTORNEY PRESENTATION TEMPLATE';
++
++// Chrome that repeats on (almost) every slide.
++const CHROME = {
++  brand: { x: 0.609, y: 0.43, w: 1.589, h: 0.236, text: 'LAW & ATTORNEY', align: 'left' },
++  signup: { x: 11.079, y: 0.43, w: 1.589, h: 0.236, text: 'SIGN - UP', align: 'right' },
++  footer: { x: 0.595, y: 6.901, w: 2.267, h: 0.236, text: 'DESIGN- PRESENTATION', align: 'left' },
++};
++
++/* ------------------------------------------------------------------ *
++ * Drawing helpers
++ * ------------------------------------------------------------------ */
++
++/** Text box anchored at its top edge, like every text frame in the source. */
++function text(slide, str, o) {
++  slide.addText(str, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: o.font || F.display,
++    fontSize: o.size,
++    bold: !!o.bold,
++    color: o.color,
++    align: o.align || 'left',
++    valign: 'top',
++    lineSpacingMultiple: o.lineSpacing,
++  });
++}
++
++/** 8pt Manrope micro-label — the header/footer chrome and every button caption. */
++function label(slide, spec, color) {
++  text(slide, spec.text, { ...spec, size: 8, color });
++}
++
++/** 10pt Open Sans paragraph on 150% leading. */
++function paragraph(slide, str, o) {
++  text(slide, str, { ...o, font: F.body, size: 10, lineSpacing: 1.5 });
++}
++
++/** Bottom-right "P.1/10" pagination pill. */
++function pageBadge(slide, dotColor, textColor) {
++  slide.addShape('ellipse', { x: 12.153, y: 6.762, w: 0.515, h: 0.515, fill: { color: dotColor } });
++  text(slide, 'P.1/10', { x: 12.084, y: 6.901, w: 0.654, h: 0.236, size: 8, color: textColor, align: 'center' });
++}
++
++/** Rounded 1.41 x 0.385in call-to-action pill (no caption — see pillText). */
++function pillShape(slide, x, y, o) {
++  const w = 1.41, h = 0.385;
++  slide.addShape('roundRect', {
++    x, y, w, h,
++    rectRadius: 0.16667 * Math.min(w, h),
++    fill: o.fill ? { color: o.fill } : { type: 'none' },
++    line: o.stroke ? { color: o.stroke, width: 0.75 } : { type: 'none' },
++  });
++}
++
++/** Caption centred over a pill drawn at (pillX, pillY). */
++function pillText(slide, pillX, pillY, caption, color) {
++  text(slide, caption, { x: pillX - 0.089, y: pillY + 0.074, w: 1.589, h: 0.236, size: 8, color, align: 'center' });
++}
++
++/** Flat white caption plate used on the photo-grid slides. */
++function plateShape(slide, x, y, w) {
++  slide.addShape('rect', { x, y, w, h: 0.428, fill: { color: C.white } });
++}
++
++/** Caption centred over a plate drawn at (plateX, plateY). */
++function plateText(slide, textX, plateY, caption) {
++  text(slide, caption, { x: textX, y: plateY + 0.096, w: 1.589, h: 0.236, size: 8, color: C.ink, align: 'center' });
++}
++
++/** Thin 0.75pt rule. */
++function rule(slide, x, y, w, color) {
++  slide.addShape('line', { x, y, w, h: 0, line: { color, width: 0.75 } });
++}
++
++/**
++ * Stacked-layers glyph, standing in for the source's raster icon: a filled
++ * diamond riding on two open chevrons.
++ */
++function layersGlyph(slide, x, y, size, color) {
++  const h = 0.62 * size;
++  const stroke = { color, width: 2 };
++  for (const tier of [2, 1]) {
++    slide.addShape('custGeom', {
++      x, y: y + 0.18 * size * tier, w: size, h,
++      points: [{ x: 0, y: h / 2 }, { x: size / 2, y: h }, { x: size, y: h / 2 }],
++      fill: { type: 'none' },
++      line: stroke,
++    });
++  }
++  slide.addShape('diamond', { x, y, w: size, h, fill: { color: C.white }, line: stroke });
++}
++
++/**
++ * Dark tile + white disc + layers glyph + caption. Appears on slides 1 and 3
++ * at different positions and with different tile colours.
++ */
++function iconTile(slide, x, y, tileColor) {
++  slide.addShape('rect', { x, y, w: 2.014, h: 2.097, fill: { color: tileColor } });
++  slide.addShape('ellipse', { x: x + 0.707, y: y + 0.224, w: 0.615, h: 0.615, fill: { color: C.white } });
++  layersGlyph(slide, x + 0.834, y + 0.351, 0.361, C.ink);
++  text(slide, CAPTION, {
++    x: x + 0.043, y: y + 0.966, w: 1.944, h: 0.829,
++    font: F.accent, size: 10, color: C.white, align: 'center', lineSpacing: 1.5,
++  });
++}
++
++/** Laptop mock-up standing in for the source's raster photo: base, lid, screen. */
++function laptopMock(slide) {
++  slide.addShape('roundRect', { x: 6.53, y: 5.26, w: 5.68, h: 0.065, rectRadius: 0.032, fill: { color: C.shadow } });
++  slide.addShape('roundRect', { x: 6.51, y: 5.156, w: 5.73, h: 0.104, rectRadius: 0.05, fill: { color: C.silver } });
++  slide.addShape('rect', { x: 8.979, y: 5.167, w: 0.802, h: 0.052, fill: { color: C.trackpad } });
++  slide.addShape('roundRect', { x: 7.063, y: 2.042, w: 4.635, h: 3.104, rectRadius: 0.1, fill: { color: '000000' } });
++  slide.addShape('rect', { x: 7.208, y: 2.24, w: 4.344, h: 2.708, fill: { color: C.white } });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++// 1 — Dark cover: oversized wordmark right, pale panel + icon tile bottom left.
++function slideCover(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.night };
++
++  text(s, 'HUMES', { x: 7.725, y: 2.822, w: 5.698, h: 1.717, size: 96, bold: true, color: C.white });
++  text(s, TAGLINE, { x: 7.789, y: 2.764, w: 3.929, h: 0.269, size: 10, color: C.white });
++  pageBadge(s, C.brown, C.white);
++  label(s, CHROME.signup, C.white);
++  paragraph(s, LOREM_1, { x: 7.789, y: 4.474, w: 4.599, h: 0.581, color: C.white });
++
++  s.addShape('rect', { x: 0, y: 4.474, w: 4.462, h: 3.019, fill: { color: C.paper } });
++  label(s, CHROME.footer, C.ink);
++  label(s, CHROME.brand, C.white);
++  iconTile(s, 2.381, 4.538, C.brown);
++}
++
++// 2 — Light slide, brown column on the right, headline + two paragraphs + buttons.
++function slideIntro(pptx) {
++  const s = pptx.addSlide();
++
++  s.addShape('rect', { x: 9.792, y: 0, w: 3.542, h: 7.5, fill: { color: C.brown } });
++  label(s, CHROME.signup, C.white);
++  label(s, CHROME.footer, C.ink);
++  label(s, CHROME.brand, C.ink);
++
++  text(s, 'Introduction to the firm and its core mission.', {
++    x: 1.342, y: 1.585, w: 5.652, h: 1.178, size: 32, bold: true, color: C.ink,
++  });
++  paragraph(s, LOREM_4, { x: 1.378, y: 3.731, w: 4.599, h: 1.086, color: C.ink });
++  paragraph(s, LOREM_1, { x: 1.378, y: 2.909, w: 4.599, h: 0.581, color: C.ink });
++
++  pageBadge(s, C.white, C.ink);
++  pillShape(s, 1.455, 5.282, { fill: C.brown });
++  pillShape(s, 3.089, 5.282, { stroke: C.brown });
++  pillText(s, 1.455, 5.282, 'LAW & ATTORNEY', C.white);
++  pillText(s, 3.089, 5.282, 'LEARN MORE', C.ink);
++}
++
++// 3 — Wide brown band across the middle, headline left, copy + buttons right.
++function slideAttorneys(pptx) {
++  const s = pptx.addSlide();
++
++  s.addShape('rect', { x: 0, y: 1.179, w: 12.669, h: 4.388, fill: { color: C.brown } });
++  label(s, CHROME.signup, C.ink);
++  label(s, CHROME.footer, C.ink);
++  label(s, CHROME.brand, C.ink);
++  pageBadge(s, C.brown, C.white);
++
++  text(s, 'Introduction to key attorneys, their credentials, and specializations.', {
++    x: 0.609, y: 1.6, w: 5.62, h: 1.515, size: 28, bold: true, color: C.white,
++  });
++  paragraph(s, LOREM_4, { x: 7.485, y: 1.814, w: 4.599, h: 1.086, color: C.white });
++  paragraph(s, LOREM_1, { x: 7.485, y: 3.343, w: 4.599, h: 0.581, color: C.white });
++
++  pillShape(s, 7.598, 4.385, { fill: C.white });
++  pillShape(s, 9.232, 4.385, { stroke: C.white });
++  pillText(s, 7.598, 4.385, 'LAW & ATTORNEY', C.ink);
++  pillText(s, 9.232, 4.385, 'LEARN MORE', C.white);
++  iconTile(s, 0.72, 3.47, C.night);
++}
++
++// 4 — Brown column right holding two named portrait plates.
++function slideLeadership(pptx) {
++  const s = pptx.addSlide();
++
++  s.addShape('rect', { x: 7.744, y: 0, w: 5.59, h: 7.5, fill: { color: C.brown } });
++  label(s, CHROME.signup, C.white);
++  pageBadge(s, C.white, C.ink);
++  label(s, CHROME.footer, C.ink);
++  label(s, CHROME.brand, C.ink);
++
++  text(s, 'Highlight leadership roles or notable achievements.', {
++    x: 0.633, y: 1.805, w: 5.29, h: 1.043, size: 28, bold: true, color: C.ink,
++  });
++  paragraph(s, LOREM_4, { x: 0.645, y: 3.699, w: 4.842, h: 1.086, color: C.ink, align: 'justify' });
++
++  pillShape(s, 0.723, 5.161, { fill: C.brown });
++  pillShape(s, 2.357, 5.161, { stroke: C.brown });
++  pillText(s, 0.723, 5.161, 'LAW & ATTORNEY', C.white);
++  pillText(s, 2.357, 5.161, 'LEARN MORE', C.ink);
++  paragraph(s, LOREM_1, { x: 0.645, y: 2.877, w: 4.842, h: 0.581, color: C.ink, align: 'justify' });
++
++  const attorneys = [
++    { name: 'ESTELLE DARCY', plateX: 6.734, textX: 6.634 },
++    { name: 'CLAUDIA ALVES', plateX: 9.617, textX: 9.517 },
++  ];
++  attorneys.forEach((a) => s.addShape('rect', { x: a.plateX, y: 4.855, w: 2.068, h: 0.451, fill: { color: C.white } }));
++  attorneys.forEach((a) => text(s, a.name, { x: a.textX, y: 4.953, w: 2.267, h: 0.269, size: 10, color: C.ink, align: 'center' }));
++}
++
++// 5 — Brown banner across the top half, three identical service columns below.
++function slideServices(pptx) {
++  const s = pptx.addSlide();
++
++  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 3.75, fill: { color: C.brown } });
++  label(s, CHROME.signup, C.white);
++  label(s, CHROME.brand, C.white);
++
++  //         copy/plate column   pill      centred caption
++  const columns = [
++    { copy: 1.073, plate: 1.317, pill: 1.765, caption: 1.676 },
++    { copy: 5.282, plate: 5.513, pill: 5.962, caption: 5.872 },
++    { copy: 9.491, plate: 9.709, pill: 10.158, caption: 10.068 },
++  ];
++
++  columns.forEach((col) => {
++    paragraph(s, LOREM_1, { x: col.copy, y: 5.477, w: 2.795, h: 0.833, color: C.ink, align: 'center' });
++  });
++  columns.forEach((col) => {
++    pillShape(s, col.pill, 6.615, { stroke: C.brown });
++    pillText(s, col.pill, 6.615, 'LEARN MORE', C.ink);
++  });
++  columns.forEach((col) => {
++    plateShape(s, col.plate, 4.518, 2.308);
++    plateText(s, col.caption, 4.518, 'LAW & ATTORNEY');
++  });
++}
++
++// 6 — Brown column right (from the source layout) carrying a laptop mock-up.
++function slideTeamwork(pptx) {
++  const s = pptx.addSlide();
++
++  s.addShape('rect', { x: 9.337, y: 0, w: 3.996, h: 7.5, fill: { color: C.brown } });
++  laptopMock(s);
++
++  label(s, CHROME.signup, C.white);
++  pageBadge(s, C.white, C.ink);
++  label(s, CHROME.footer, C.ink);
++  label(s, CHROME.brand, C.ink);
++
++  text(s, 'Commitment to professional development and teamwork.', {
++    x: 0.595, y: 1.901, w: 6.071, h: 1.043, size: 28, bold: true, color: C.ink,
++  });
++  paragraph(s, LOREM_3, { x: 0.609, y: 3.063, w: 5.404, h: 0.833, color: C.ink, align: 'justify' });
++
++  rule(s, 0.705, 4.625, 5.154, C.ink);
++  text(s, 'LAW & ATTORNEY', { x: 0.609, y: 4.301, w: 2.267, h: 0.236, size: 8, color: C.ink });
++  rule(s, 0.705, 5.253, 5.154, C.ink);
++  text(s, 'JUSTICE', { x: 0.609, y: 4.929, w: 2.267, h: 0.236, size: 8, color: C.ink });
++}
++
++// 7 — Photo mosaic with floating caption plates; brown "Family Law" card on top.
++function slidePractice(pptx) {
++  const s = pptx.addSlide();
++
++  label(s, CHROME.signup, C.ink);
++  label(s, CHROME.brand, C.ink);
++
++  const plates = [
++    { caption: 'BRIEFING & DISCUSSION', x: 1.29, y: 5.993, w: 2.308, textX: 1.65 },
++    { caption: 'DISCUSSION', x: 9.38, y: 3.173, w: 2.308, textX: 9.739 },
++    { caption: 'LAW & ATTORNEY', x: 5.789, y: 5.993, w: 2.308, textX: 6.148 },
++    { caption: 'BRIEFING IMPORTANT', x: 10.032, y: 5.993, w: 2.308, textX: 10.391 },
++    { caption: 'CONSULTATION', x: 0.661, y: 3.138, w: 1.783, textX: 0.774 },
++  ];
++  plates.forEach((p) => {
++    plateShape(s, p.x, p.y, p.w);
++    plateText(s, p.textX, p.y, p.caption);
++  });
++
++  s.addShape('rect', { x: 3.204, y: 1.091, w: 4.046, h: 2.698, fill: { color: C.brown } });
++  text(s, 'FAMILY LAW', { x: 3.374, y: 1.666, w: 3.316, h: 0.505, size: 24, bold: true, color: C.white });
++  paragraph(s, LOREM_3, { x: 3.4, y: 2.183, w: 3.716, h: 1.086, color: C.white });
++}
++
++// 8 — Four-up photo grid with a brown copy block filling the lower-right cell.
++function slideCorporate(pptx) {
++  const s = pptx.addSlide();
++
++  s.addShape('rect', { x: 7.43, y: 3.919, w: 4.711, h: 2.413, fill: { color: C.brown } });
++  label(s, CHROME.signup, C.ink);
++  label(s, CHROME.brand, C.ink);
++  label(s, CHROME.footer, C.ink);
++  pageBadge(s, C.brown, C.white);
++
++  text(s, 'Corporate Law', { x: 7.824, y: 4.15, w: 3.316, h: 0.505, size: 24, bold: true, color: C.white });
++  paragraph(s, LOREM_4, { x: 7.849, y: 4.667, w: 3.766, h: 1.338, color: C.white });
++}
++
++// 9 — Dark contact slide: four white diagonal stripes behind a brown detail bar.
++function slideContact(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.night };
++
++  [[10.593, 3.461], [1.566, 1.837], [5.095, 3.764], [8.02, 1.458]].forEach(([x, y]) => {
++    s.addShape('diagStripe', {
++      x, y, w: 2.09, h: 2.837,
++      rectRadius: 0.63673 * 2.09,
++      fill: { color: C.white },
++    });
++  });
++
++  label(s, CHROME.signup, C.white);
++  label(s, CHROME.brand, C.white);
++  label(s, CHROME.footer, C.white);
++  pageBadge(s, C.brown, C.white);
++
++  s.addShape('rect', { x: 0.705, y: 2.352, w: 12.628, h: 2.786, fill: { color: C.brown } });
++
++  // Each contact detail = 16pt bold heading, short underscore rule, 10pt value.
++  const detail = (d) => {
++    text(s, d.head, { x: d.x, y: d.y, w: d.w, h: 0.37, size: 16, bold: true, color: C.white });
++    rule(s, d.ruleX, d.y + 0.373, d.ruleW, C.white);
++    text(s, d.value, { x: d.vx, y: d.vy, w: d.vw, h: 0.269, size: 10, color: C.white });
++  };
++
++  [
++    { head: 'PHONE NUMBER', value: '+ 123 456 7890', x: 5.551, y: 2.885, w: 2.78, ruleX: 5.651, ruleW: 0.85, vx: 5.564, vy: 3.315, vw: 1.895 },
++    { head: 'WEBSITE', value: 'WWW.YOURWEB.COM', x: 8.345, y: 2.885, w: 1.76, ruleX: 8.445, ruleW: 0.85, vx: 8.358, vy: 3.307, vw: 2.09 },
++    { head: 'EMAIL', value: 'YOURMAIL.COM', x: 10.942, y: 2.887, w: 1.733, ruleX: 11.066, ruleW: 0.622, vx: 10.979, vy: 3.309, vw: 1.733 },
++    { head: 'ADDRESS', value: 'STREET BORCELLE 39.A', x: 5.565, y: 3.997, w: 2.78, ruleX: 5.665, ruleW: 0.85, vx: 5.578, vy: 4.419, vw: 2.445 },
++  ].forEach(detail);
++
++  text(s, 'Contact us', { x: 1.124, y: 2.878, w: 2.993, h: 0.64, size: 32, bold: true, color: C.white });
++  paragraph(s, LOREM_2, { x: 1.124, y: 3.607, w: 3.555, h: 0.833, color: C.white });
++
++  [
++    { head: 'COOPERATION', value: 'THYNK UNLIMITED', x: 8.331, y: 3.997, w: 2.78, ruleX: 8.431, ruleW: 0.85, vx: 8.344, vy: 4.419, vw: 2.445 },
++    { head: 'FAX', value: 'YOURFAXHERE', x: 10.979, y: 4.026, w: 1.733, ruleX: 11.104, ruleW: 0.622, vx: 11.017, vy: 4.448, vw: 1.733 },
++  ].forEach(detail);
++}
++
++// 10 — Closing slide: giant "THANKS" with a pale circle bleeding off the right.
++function slideThanks(pptx) {
++  const s = pptx.addSlide();
++
++  s.addShape('ellipse', { x: 7.245, y: -1.296, w: 7.282, h: 7.282, fill: { color: C.paper } });
++  label(s, CHROME.brand, C.ink);
++  label(s, CHROME.footer, C.ink);
++
++  text(s, 'THANKS', { x: 0.609, y: 2.695, w: 6.058, h: 1.717, size: 96, bold: true, color: C.ink });
++  text(s, TAGLINE, { x: 0.673, y: 2.638, w: 3.929, h: 0.269, size: 10, color: C.ink });
++  paragraph(s, LOREM_1, { x: 0.673, y: 4.348, w: 4.775, h: 0.581, color: C.ink });
++  pageBadge(s, C.brown, C.white);
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'HUMES_16x9', width: 13.333, height: 7.5 });
++  pptx.layout = 'HUMES_16x9';
++  pptx.title = 'HUMES — Lawyer & Attorney Presentation Template';
++
++  [
++    slideCover, slideIntro, slideAttorneys, slideLeadership, slideServices,
++    slideTeamwork, slidePractice, slideCorporate, slideContact, slideThanks,
++  ].forEach((make) => make(pptx));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '0dff1a86-bd76-4810-9f5a-2e50222ff6fd_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

@@ -1,0 +1,1118 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/plumbing_services_company_overview.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/plumbing_services_company_overview.js
+@@ -0,0 +1,1115 @@
++/*
++ * "Plumbing Services Presentation" - 30 slides, 10 x 5.625 in (16:9).
++ *
++ * Standalone re-creation of the reference deck with pptxgenjs only.
++ * Photographs in the original are stand-ins (a flat colour block), so every
++ * picture here is drawn as a PHOTO-coloured placeholder in the same frame.
++ *
++ *   node 078b8314-6cef-4022-8cf8-aac01fc4648e_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// --------------------------------------------------------------------------
++// Theme
++// --------------------------------------------------------------------------
++const HEAD = 'Roboto Black';     // theme major font
++const BODY = 'Open Sans';        // theme minor font
++
++const BLUE   = '2E96C0';         // accent 1
++const GOLD   = 'D4B648';         // accent 2
++const WHITE  = 'FFFFFF';
++const BLACK  = '000000';
++const INK    = '3F3F3F';         // text 2 - headings / strong body
++const GREY    = '7F7F7F';        // accent 6 - body copy
++const SLATE  = '5F5F5F';         // accent 6 shaded - wordmark
++const MIST   = 'E5E5E5';         // light track fill
++const SNOW   = 'F2F2F2';         // panel wash
++const RULE   = 'B2B2B2';         // hairline rules
++const RULE2  = 'CCCCCC';
++const PHOTO  = 'FF002A';         // stand-in colour of every photo frame
++const PLANT  = '3F3D56';         // illustration stems (break slide)
++const SKY    = 'D3EBF4';         // illustration clouds (break slide)
++
++// --------------------------------------------------------------------------
++// Drawing helpers
++//
++// Every helper takes the frame as a positional `[x, y, w, h]` array in inches,
++// followed by an options object for anything that is not the default.
++// --------------------------------------------------------------------------
++
++/** Expand [x, y, w, h] and merge in extra pptxgenjs options. */
++function at(box, o) {
++  const opt = Object.assign({ x: box[0], y: box[1], w: box[2], h: box[3] }, o);
++  // pptxgenjs rewrites shadow values in place, so shared presets must be copied
++  if (opt.shadow) opt.shadow = Object.assign({}, opt.shadow);
++  return opt;
++}
++
++/** Plain auto-shape (rect / roundRect / triangle / ...). */
++function shape(s, kind, box, o) {
++  s.addShape(kind, at(box, o));
++}
++
++function ellipse(s, box, o) {
++  s.addShape('ellipse', at(box, o));
++}
++
++/** Straight connector; w or h may be zero for a pure horizontal/vertical rule. */
++function line(s, x, y, w, h, color, width) {
++  s.addShape('line', { x: x, y: y, w: w, h: h, line: { color: color, width: width } });
++}
++
++/** Text block. Defaults match the deck body style: Open Sans 8.25pt, 1.5 line spacing. */
++function text(s, box, runs, o) {
++  s.addText(runs, at(box, Object.assign({
++    fontFace: BODY, color: BLACK, fontSize: 8.25, valign: 'top',
++    lineSpacingMultiple: 1.5, margin: [7.2, 7.2, 3.6, 3.6], wrap: true
++  }, o)));
++}
++
++/**
++ * Custom-geometry shape. `pts` is a flat outline in a normalised 0..1 box:
++ * 'M' x y | 'L' x y | 'C' x1 y1 x2 y2 x y | 'Z', scaled onto the shape frame.
++ */
++function freeform(s, box, pts, o, runs) {
++  const w = box[2], h = box[3];               // points are relative to the frame
++  const points = [];
++  for (let i = 0; i < pts.length;) {
++    const op = pts[i++];
++    if (op === 'M') points.push({ x: pts[i++] * w, y: pts[i++] * h, moveTo: true });
++    else if (op === 'L') points.push({ x: pts[i++] * w, y: pts[i++] * h });
++    else if (op === 'C') points.push({
++      curve: { type: 'cubic', x1: pts[i++] * w, y1: pts[i++] * h, x2: pts[i++] * w, y2: pts[i++] * h },
++      x: pts[i++] * w, y: pts[i++] * h
++    });
++    else points.push({ close: true });
++  }
++  if (runs) text(s, box, runs, Object.assign({ shape: 'custGeom', points: points }, o));
++  else s.addShape('custGeom', at(box, Object.assign({ points: points }, o)));
++}
++
++/** Rectangular photo placeholder. */
++function photo(s, box, o) {
++  s.addShape('rect', at(box, Object.assign({ fill: PHOTO }, o)));
++}
++
++/** Circular photo placeholder. */
++function photoOval(s, box, o) {
++  s.addShape('ellipse', at(box, Object.assign({ fill: PHOTO }, o)));
++}
++
++/** Photo placeholder cut to a freeform frame. */
++function photoShape(s, box, pts, o) {
++  freeform(s, box, pts, Object.assign({ fill: PHOTO }, o));
++}
++
++/** Small pictogram: a single glyph centred in its frame. */
++function icon(s, box, glyph, color) {
++  s.addText([{ text: glyph }], at(box, {
++    color: color, fontFace: BODY, fontSize: Math.max(6, Math.round(box[3] * 62)),
++    align: 'center', valign: 'middle', margin: 0, wrap: false
++  }));
++}
++
++/** The four social buttons under the profile card on slide 9. */
++function socialRow(s, box) {
++  const d = box[3];
++  const gap = (box[2] - 4 * d) / 3;
++  for (let i = 0; i < 4; i++) {
++    const cell = [box[0] + i * (d + gap), box[1], d, d];
++    ellipse(s, cell, { fill: WHITE });
++    icon(s, cell, '\u2726', BLUE);
++  }
++}
++
++/** Wordmark, logo dot and divider that repeat in the top-left of every slide. */
++function brand(s) {
++  const dot = [0.3175, 0.3037, 0.1694, 0.1694];
++  ellipse(s, dot, { fill: BLUE });
++  icon(s, dot, '\u2726', WHITE);
++  line(s, 0.5326, 0.2829, 0, 0.2109, GOLD, 1.5);
++  text(s, [0.5814, 0.2622, 1.2, 0.2777], [
++    { text: 'Plumbing', options: { color: SLATE, fontFace: HEAD } },
++    { text: '.', options: { color: GOLD, fontFace: HEAD } }
++  ], { fontSize: 10.5, valign: 'middle' });
++}
++
++/** Mix `fg` over `bg`; `cover` is the opacity of fg (0..1). */
++function blend(fg, bg, cover) {
++  let out = '';
++  for (let i = 0; i < 6; i += 2) {
++    const a = parseInt(fg.substr(i, 2), 16), b = parseInt(bg.substr(i, 2), 16);
++    out += ('0' + Math.round(a * cover + b * (1 - cover)).toString(16)).slice(-2);
++  }
++  return out.toUpperCase();
++}
++
++/**
++ * A gradient wash. PowerPoint fades a colour over the photo behind it; pptxgenjs
++ * has no gradient API, so the ramp is painted as a run of opaque slices whose
++ * colour is the wash pre-mixed with the photo colour underneath.
++ *
++ *   o = { color, over, dir: 'h'|'v', from, to, r, cap }
++ *   `from`/`to` are transparency percentages at the two ends of the ramp,
++ *   `r` rounds the band and `cap` keeps the slices clear of the rounded ends.
++ */
++function gradientBand(s, box, o) {
++  const steps = 26;
++  const horiz = o.dir === 'h';
++  const cap = o.cap || 0;
++  const len = (horiz ? box[2] : box[3]) - 2 * cap;
++  const at = function (i) {
++    return blend(o.color, o.over || PHOTO, 1 - (o.from + (o.to - o.from) * i / (steps - 1)) / 100);
++  };
++  shape(s, o.r ? 'roundRect' : 'rect', box, { fill: at(0), rectRadius: o.r });
++  for (let i = 0; i < steps; i++) {
++    const off = cap + (len / steps) * i;
++    const cell = horiz
++      ? [box[0] + off, box[1], (len / steps) * 1.05, box[3]]
++      : [box[0], box[1] + off, box[2], (len / steps) * 1.05];
++    shape(s, 'rect', cell, { fill: at(i) });
++  }
++  if (cap) {   // far end: a rounded cap whose inner half hides under the last slice
++    const cell = horiz
++      ? [box[0] + box[2] - 2 * cap, box[1], 2 * cap, box[3]]
++      : [box[0], box[1] + box[3] - 2 * cap, box[2], 2 * cap];
++    shape(s, 'roundRect', cell, { fill: at(steps - 1), rectRadius: o.r });
++  }
++}
++
++
++// ---------------------------------------------------------------------------
++// Filler copy. The reference deck repeats these stems in nearly every
++// paragraph, so body text below is written as STEM + 'the rest'.
++// ---------------------------------------------------------------------------
++const LI = 'PLACEHOLDER';
++const LI_STD = 'u s try. Lorem Ipsum has been the industry\'PLACEHOLDER';
++const LI_SHORT = 'Lorem Ipsum is simply dummy text of the printing an';
++const LI_EVE = 'us try. Lorem Ipsum has been the industry\'PLACEHOLDER';
++const LI_IND = 'u s try. the industry\'s standard dummy';
++const LI_SIMP = 'u s try. Lorem Ipsum has been the industry\'PLACEHOLDER';
++const LD = 'Lorem ipsum dolor sit amet, ';
++
++// Drop shadows used by the cards, pills and photo rings.
++const SH0 = { type: 'outer', blur: 21, offset: 3, angle: 45, color: BLACK, opacity: .33 };
++const SH1 = { type: 'outer', blur: 10, offset: 0, color: BLACK, opacity: .15 };
++const SH2 = { type: 'outer', blur: 25, offset: 0, color: BLACK, opacity: .2 };
++const SH3 = { type: 'outer', blur: 9, offset: 0, color: BLACK, opacity: .26 };
++const SH4 = { type: 'outer', blur: 5, offset: 0, color: BLACK, opacity: .24 };
++const SH5 = { type: 'outer', blur: 11, offset: 0, color: BLACK, opacity: .26 };
++const SH6 = { type: 'outer', blur: 31, offset: 0, color: BLACK, opacity: .14 };
++const SH7 = { type: 'outer', blur: 7, offset: 0, color: BLACK, opacity: .32 };
++const SH8 = { type: 'outer', blur: 7, offset: 0, color: BLACK, opacity: .2 };
++
++// ---------------------------------------------------------------------------
++// Freeform outlines, normalised to the 0..1 box of the shape that uses them.
++// ---------------------------------------------------------------------------
++
++const PATH0 = ['M',.081,0,'L',1,0,'L',1,1,'L',.081,1,'C',.036,1,0,.944,0,.874,'L',0,.126,'C',0,.056,.036,0,.081,0,'Z']; // Freeform: Shape 16
++const PATH1 = ['M',1,0,'L',1,1,'L',.222,1,'L',.219,.998,'C',-.009,.805,-.134,.567,.226,.499,'C',.529,.442,.74,.126,.973,.012,'Z']; // Freeform: Shape 5
++const PATH2 = [
++  'M',.783,0,'L',1,.15,'C',.92,.335,.878,.508,.875,.669,'L',.875,1,'L',.515,1,'L',.515,.691,
++  'C',.516,.577,.542,.455,.594,.325,'C',.646,.195,.709,.086,.783,0,'Z','M',.268,0,'L',.485,.15,
++  'C',.405,.335,.364,.508,.361,.669,'L',.361,1,'L',0,1,'L',0,.691,'C',.001,.577,.027,.455,.079,.325,
++  'C',.131,.195,.194,.086,.268,0,'Z']; // Freeform: Shape 65
++const PATH3 = [
++  'M',.593,0,'C',.736,0,.867,.043,.97,.114,'L',1,.137,'L',1,.863,'L',.97,.886,'C',.867,.957,.736,1,.593,1,
++  'C',.265,1,0,.776,0,.5,'C',0,.224,.265,0,.593,0,'Z']; // Freeform: Shape 13
++const PATH4 = [
++  'M',.838,.059,'C',.876,.059,.914,.085,.936,.133,'L',1,.266,'L',1,.863,'L',.995,.855,'L',.736,.314,
++  'C',.7,.238,.715,.136,.77,.086,'C',.791,.067,.815,.058,.838,.059,'Z','M',.139,.004,
++  'C',.183,.005,.226,.034,.252,.089,'L',.548,.708,'C',.59,.795,.572,.912,.509,.969,
++  'C',.446,1.026,.36,1.002,.319,.915,'L',.023,.296,'C',-.019,.209,-.002,.092,.062,.035,
++  'C',.086,.013,.112,.003,.139,.004,'Z','M',.494,0,'C',.538,.001,.581,.03,.608,.085,'L',.904,.704,
++  'C',.945,.791,.928,.908,.864,.965,'C',.801,1.022,.716,.998,.674,.911,'L',.378,.292,
++  'C',.337,.205,.354,.088,.417,.031,'C',.441,.01,.468,0,.494,0,'Z']; // photo Picture Placeholder 15
++const PATH5 = ['M',0,0,'L',.95,0,'C',.978,0,1,.021,1,.047,'L',1,.953,'C',1,.979,.978,1,.95,1,'L',0,1,'Z']; // photo Picture Placeholder 11
++const PATH6 = ['M',.162,0,'L',1,0,'L',1,1,'L',.162,1,'C',.072,1,0,.98,0,.956,'L',0,.044,'C',0,.02,.072,0,.162,0,'Z']; // photo Picture Placeholder 14
++const PATH7 = [
++  'M',.442,.676,'L',1,.676,'L',1,1,'L',.442,1,'C',.349,1,.273,.928,.273,.838,'C',.273,.749,.349,.676,.442,.676,
++  'Z','M',.169,.338,'L',1,.338,'L',1,.662,'L',.169,.662,'C',.075,.662,0,.589,0,.5,'C',0,.411,.075,.338,.169,.338,
++  'Z','M',.317,0,'L',1,0,'L',1,.324,'L',.317,.324,'C',.224,.324,.149,.251,.149,.162,'C',.149,.072,.224,0,.317,0,
++  'Z']; // photo Picture Placeholder 7
++const PATH8 = ['M',.047,0,'L',.953,0,'C',.979,0,1,.013,1,.029,'L',1,1,'L',0,1,'L',0,.029,'C',0,.013,.021,0,.047,0,'Z']; // Freeform: Shape 8
++const PATH9 = ['M',0,0,'L',.958,0,'C',.981,0,1,.046,1,.103,'L',1,1,'L',0,1,'Z']; // photo Picture Placeholder 7
++const PATH10 = [
++  'M',.087,0,'L',.912,0,'C',.961,0,1,.031,1,.068,'L',1,.932,'C',1,.969,.961,1,.912,1,'L',.087,1,
++  'C',.039,1,0,.969,0,.932,'L',0,.068,'C',0,.031,.039,0,.087,0,'Z']; // photo Picture Placeholder 7
++const PATH11 = [
++  'M',.087,0,'L',.912,0,'C',.961,0,1,.021,1,.048,'L',1,.952,'C',1,.979,.961,1,.912,1,'L',.087,1,
++  'C',.039,1,0,.979,0,.952,'L',0,.048,'C',0,.021,.039,0,.087,0,'Z']; // photo Picture Placeholder 10
++const PATH12 = ['M',0,0,'L',1,0,'L',1,1,'L',.109,1,'C',.049,1,0,.964,0,.919,'Z']; // photo Picture Placeholder 16
++const PATH13 = [
++  'M',.146,.035,'C',.237,.013,.362,0,.5,0,'C',.776,0,1,.054,1,.12,'L',1,.746,'L',.011,1,'L',.01,.999,
++  'C',.004,.991,0,.983,0,.975,'L',0,.12,'C',0,.087,.056,.057,.146,.035,'Z']; // Freeform: Shape 22
++const PATH14 = ['M',.146,.032,'C',.056,.052,0,.079,0,.11,'L',0,.877,'L',.597,1,'L',1,.906,'L',1,.11,'C',1,.049,.776,0,.5,0,'C',.362,0,.237,.012,.146,.032,'Z']; // Freeform: Shape 12
++const PATH15 = ['M',0,0,'L',.742,0,'C',.885,0,1,.224,1,.5,'L',1,.5,'C',1,.776,.885,1,.742,1,'L',0,1,'Z']; // Freeform: Shape 32
++const PATH16 = ['M',.146,.051,'C',.056,.082,0,.125,0,.173,'L',0,1,'L',1,.63,'L',1,.173,'C',1,.077,.776,0,.5,0,'C',.362,0,.237,.019,.146,.051,'Z']; // Freeform: Shape 25
++const PATH17 = ['M',.146,.025,'C',.237,.01,.362,0,.5,0,'C',.776,0,1,.038,1,.086,'L',1,.921,'L',.567,1,'L',0,.909,'L',0,.086,'C',0,.062,.056,.041,.146,.025,'Z']; // Freeform: Shape 9
++const PATH18 = ['M',.051,0,'L',1,0,'L',1,.942,'L',.998,.943,'C',.912,.98,.818,1,.718,1,'C',.322,1,0,.673,0,.27,'C',0,.194,.011,.121,.032,.052,'Z']; // Freeform: Shape 8
++const PATH19 = [
++  'M',.031,0,'L',.969,0,'C',.986,0,1,.031,1,.069,'L',1,.931,'C',1,.969,.986,1,.969,1,'L',.031,1,
++  'C',.014,1,0,.969,0,.931,'L',0,.069,'C',0,.031,.014,0,.031,0,'Z']; // photo Picture Placeholder 6
++const PATH20 = ['M',.146,.043,'C',.237,.017,.362,0,.5,0,'C',.776,0,1,.066,1,.147,'L',1,.685,'L',0,1,'L',0,.147,'C',0,.107,.056,.07,.146,.043,'Z']; // Freeform: Shape 30
++const PATH21 = [
++  'M',.075,0,'L',.924,0,'C',.966,0,1,.031,1,.069,'L',1,.931,'C',1,.969,.966,1,.924,1,'L',.075,1,
++  'C',.034,1,0,.969,0,.931,'L',0,.069,'C',0,.031,.034,0,.075,0,'Z']; // photo Picture Placeholder 5
++const PATH22 = ['M',.146,.043,'C',.056,.07,0,.107,0,.147,'L',0,1,'L',1,.685,'L',1,.147,'C',1,.066,.776,0,.5,0,'C',.362,0,.237,.017,.146,.043,'Z']; // Freeform: Shape 16
++const PATH23 = ['M',1,0,'L',1,1,'L',.921,.99,'C',.38,.909,0,.72,0,.5,'C',0,.28,.38,.091,.921,.01,'Z']; // Freeform: Shape 20
++const PATH24 = [
++  'M',.801,.117,'L',1,.117,'L',1,.891,'L',.801,.891,'C',.787,.891,.776,.88,.776,.867,'L',.776,.141,
++  'C',.776,.128,.787,.117,.801,.117,'Z','M',.442,.056,'L',.72,.056,'C',.734,.056,.745,.067,.745,.081,
++  'L',.745,.932,'C',.745,.946,.734,.957,.72,.957,'L',.442,.957,'C',.429,.957,.418,.946,.418,.932,'L',.418,.081,
++  'C',.418,.067,.429,.056,.442,.056,'Z','M',.029,0,'L',.357,0,'C',.373,0,.386,.013,.386,.029,'L',.386,.971,
++  'C',.386,.987,.373,1,.357,1,'L',.029,1,'C',.013,1,0,.987,0,.971,'L',0,.029,'C',0,.013,.013,0,.029,0,'Z']; // photo Picture Placeholder 10
++const PATH25 = ['M',0,0,'L',.97,0,'C',.987,0,1,.042,1,.095,'L',1,1,'L',0,1,'Z']; // Freeform: Shape 22
++const PATH26 = [
++  'M',.022,.025,'C',.036,.01,.055,0,.075,0,'L',.924,0,'C',.966,0,1,.039,1,.087,'L',1,.518,'L',.58,1,'L',0,.334,
++  'L',0,.087,'C',0,.063,.008,.041,.022,.025,'Z']; // Freeform: Shape 12
++const PATH27 = [
++  'M',0,0,'L',1,0,'L',.999,.018,'C',.997,.039,.992,.059,.984,.076,'L',.538,.967,
++  'C',.516,1.011,.481,1.011,.459,.967,'L',.016,.082,'C',.005,.06,0,.032,0,.003,'Z']; // photo Picture Placeholder 14
++const PATH28 = [
++  'M',.501,0,'C',.516,0,.53,.005,.541,.016,'L',.984,.459,'C',1.006,.481,1.006,.516,.984,.538,'L',.538,.984,
++  'C',.516,1.006,.481,1.006,.459,.984,'L',.016,.541,'C',-.005,.519,-.005,.484,.016,.462,'L',.462,.016,
++  'C',.473,.005,.487,0,.501,0,'Z']; // photo Picture Placeholder 9
++const PATH29 = ['M',.619,0,'C',.748,0,.867,.041,.966,.111,'L',1,.138,'L',1,1,'L',.098,1,'L',.075,.96,'C',.027,.868,0,.762,0,.65,'C',0,.291,.277,0,.619,0,'Z']; // Freeform: Shape 194
++const PATH30 = [
++  'M',.309,1,'C',.179,1,.067,.921,.045,.815,'L',.045,.814,'L',.046,.814,'C',.062,.796,.076,.778,.086,.757,
++  'C',.074,.77,.06,.781,.044,.789,'L',.042,.791,'L',.041,.789,'C',.041,.785,.041,.782,.041,.778,
++  'C',.041,.701,.089,.63,.168,.59,'C',0,.445,.038,.208,.246,.104,'C',.455,0,.725,.083,.802,.274,'L',.803,.275,
++  'L',.802,.275,'C',.778,.284,.754,.288,.729,.288,'C',.755,.294,.782,.296,.809,.295,'L',.809,.295,'L',.81,.296,
++  'C',.818,.321,.821,.347,.821,.373,'C',.821,.373,.821,.374,.821,.376,'C',.821,.416,.842,.454,.878,.481,
++  'C',1,.573,.994,.733,.866,.819,'L',.865,.819,'L',.864,.819,'C',.825,.803,.797,.787,.778,.766,
++  'C',.791,.792,.809,.816,.833,.836,'L',.834,.837,'L',.833,.837,'C',.751,.877,.65,.877,.567,.84,
++  'C',.535,.934,.429,1,.309,1,'Z']; // Freeform 5
++const PATH31 = [
++  'M',.072,1,'C',.062,1,.056,.998,.053,.996,'C',.003,.882,0,.768,.046,.654,'C',.112,.475,.322,.217,.954,.005,
++  'C',.968,0,1,.006,.984,.011,'C',.359,.221,.148,.478,.082,.655,'C',.039,.768,.043,.882,.092,.995,
++  'C',.092,.997,.086,1,.072,1,'Z']; // Freeform 6
++const PATH32 = [
++  'M',.419,0,'L',.525,0,'L',.554,.043,'L',.662,.043,'C',.668,.043,.672,.049,.672,.056,'L',.672,.111,
++  'C',.672,.118,.668,.124,.662,.124,'L',.556,.124,'L',.556,.146,'L',.509,.146,'L',.509,.286,'L',.543,.286,
++  'L',.584,.347,'L',.584,.476,'L',.661,.479,'C',.714,.481,.76,.483,.792,.487,'C',.924,.499,.983,.645,.99,.742,
++  'C',.997,.839,.995,.918,1,.969,'C',1.005,1.02,.87,.997,.836,.98,'C',.822,.924,.847,.849,.808,.81,
++  'C',.769,.771,.708,.758,.602,.748,'C',.523,.74,.361,.736,.255,.74,'L',.213,.743,'L',.213,.752,'L',.135,.869,
++  'L',0,.869,'L',0,.327,'L',.135,.327,'L',.213,.444,'L',.213,.449,'L',.256,.456,'C',.277,.458,.3,.461,.325,.463,
++  'L',.363,.465,'L',.363,.347,'L',.404,.286,'L',.438,.286,'L',.438,.146,'L',.389,.146,'L',.389,.124,'L',.3,.124,
++  'C',.295,.124,.291,.118,.291,.111,'L',.291,.056,'C',.291,.049,.295,.043,.3,.043,'L',.391,.043,'L',.419,0,'Z']; // Freeform: Shape 37
++const PATH33 = [
++  'M',.5,0,'C',.603,.125,.721,.239,.854,.341,'C',1.049,.492,1.049,.736,.854,.887,
++  'C',.658,1.038,.342,1.038,.146,.887,'L',.146,.887,'C',-.049,.736,-.049,.492,.146,.341,
++  'C',.279,.239,.397,.125,.5,0,'Z']; // Freeform: Shape 36
++const PATH34 = ['M',0,.833,'L',0,.167,'C',0,.075,.008,0,.019,0,'L',1,0,'L',1,1,'L',.019,1,'C',.008,1,0,.925,0,.833,'Z']; // Freeform: Shape 196
++const PATH35 = [
++  'M',.072,1,'C',.062,1,.056,.998,.053,.996,'C',.003,.882,0,.768,.046,.654,'C',.112,.475,.323,.217,.954,.005,
++  'C',.967,0,1,.006,.983,.011,'C',.359,.221,.148,.478,.082,.655,'C',.039,.768,.043,.882,.092,.995,
++  'C',.092,.998,.085,1,.072,1,'Z']; // Freeform 6
++const PATH36 = [
++  'M',.77,.202,'C',.734,.101,.695,0,.65,.005,'C',.542,.017,.484,.617,.377,.596,'C',.308,.58,.263,.314,.199,.218,
++  'C',.115,.095,.01,.34,0,.68,'L',.011,.643,'C',.334,.942,.67,1,1,.819,'C',.923,.611,.847,.404,.77,.202,'Z']; // Freeform 72
++const PATH37 = [
++  'M',.771,.202,'C',.735,.106,.695,0,.65,.005,'C',.542,.015,.484,.614,.377,.598,
++  'C',.308,.582,.262,.317,.198,.223,'C',.114,.095,.008,.339,0,.677,'L',.011,.64,'C',.335,.942,.671,1,1,.815,
++  'C',.923,.609,.848,.408,.771,.202,'Z']; // Freeform 73
++const PATH38 = [
++  'M',.855,0,'C',.885,-.003,.913,.025,.939,.066,'L',1,.185,'L',1,.983,'L',.99,.986,
++  'C',.663,1.038,.334,.941,.015,.694,'L',0,.734,'C',.011,.364,.15,.099,.261,.237,
++  'C',.345,.341,.406,.63,.496,.648,'C',.637,.665,.714,.011,.855,0,'Z']; // Freeform: Shape 198
++const PATH39 = [
++  'M',.022,.026,'C',.008,.042,0,.065,0,.089,'L',0,.283,'L',.606,1,'L',1,.534,'L',1,.089,'C',1,.04,.966,0,.924,0,
++  'L',.075,0,'C',.055,0,.036,.01,.022,.026,'Z']; // Freeform: Shape 14
++const PATH40 = [
++  'M',.498,0,'C',.513,0,.527,.005,.538,.016,'L',.984,.462,'C',1.005,.484,1.005,.519,.984,.541,'L',.541,.984,
++  'C',.519,1.005,.484,1.005,.462,.984,'L',.016,.538,'C',-.005,.516,-.005,.481,.016,.459,'L',.459,.016,
++  'C',.47,.005,.484,0,.498,0,'Z']; // photo Picture Placeholder 11
++const PATH41 = ['M',0,0,'L',.96,0,'C',.982,0,1,.034,1,.075,'L',1,.924,'C',1,.966,.982,1,.96,1,'L',0,1,'Z']; // photo Picture Placeholder 6
++const PATH42 = [
++  'M',.058,0,'L',.942,0,'C',.974,0,1,.034,1,.075,'L',1,.924,'C',1,.966,.974,1,.942,1,'L',.058,1,
++  'C',.026,1,0,.966,0,.924,'L',0,.075,'C',0,.034,.026,0,.058,0,'Z']; // photo Picture Placeholder 9
++const PATH43 = ['M',0,0,'L',.801,1,'L',1,.862,'L',1,.274,'C',1,.123,.868,0,.706,0,'Z']; // Freeform: Shape 37
++const PATH44 = ['M',.146,.948,'C',.237,.98,.362,1,.5,1,'L',.5,1,'C',.776,1,1,.921,1,.824,'L',1,.33,'L',0,0,'L',0,.824,'C',0,.873,.056,.916,.146,.948,'Z']; // Freeform: Shape 22
++const PATH45 = ['M',.084,1,'L',1,.489,'L',0,0,'L',0,.832,'C',0,.881,.019,.928,.054,.971,'Z']; // Freeform: Shape 24
++const PATH46 = [
++  'M',.055,0,'L',.945,0,'C',.975,0,1,.034,1,.075,'L',1,.924,'C',1,.966,.975,1,.945,1,'L',.055,1,
++  'C',.025,1,0,.966,0,.924,'L',0,.075,'C',0,.034,.025,0,.055,0,'Z']; // photo Picture Placeholder 9
++const PATH47 = [
++  'M',.752,0,'C',.83,0,.905,.008,.976,.022,'L',1,.028,'L',1,.972,'L',.976,.978,'C',.905,.992,.83,1,.752,1,
++  'C',.337,1,0,.776,0,.5,'C',0,.224,.337,0,.752,0,'Z']; // Freeform: Shape 1
++const PATH48 = ['M',.619,0,'C',.747,0,.866,.04,.965,.107,'L',1,.134,'L',1,1,'L',.121,1,'L',.106,.979,'C',.039,.879,0,.758,0,.628,'C',0,.281,.277,0,.619,0,'Z']; // Freeform: Shape 32
++const PATH49 = ['M',0,0,'L',1,0,'L',.997,.043,'C',.95,.589,.745,1,.5,1,'C',.255,1,.05,.589,.003,.043,'Z']; // photo Picture Placeholder 6
++const PATH50 = ['M',.6,0,'C',.745,0,.878,.052,.982,.139,'L',1,.156,'L',1,1,'L',.139,1,'L',.137,.997,'C',.051,.892,0,.757,0,.61,'C',0,.273,.269,0,.6,0,'Z']; // photo Picture Placeholder 9
++const PATH51 = ['M',0,0,'L',1,0,'L',1,.909,'C',1,.959,.989,1,.974,1,'L',.026,1,'C',.011,1,0,.959,0,.909,'Z']; // photo Picture Placeholder 4
++const PATH52 = ['M',1,.316,'L',1,1,'L',0,1,'L',0,.316,'C',0,.141,.224,0,.5,0,'C',.776,0,1,.141,1,.316,'Z']; // Freeform: Shape 11
++const PATH53 = [
++  'M',0,.5,'L',0,.5,'L',0,.5,'Z','M',.269,0,'L',1,0,'L',1,1,'L',.269,1,'C',.139,1,.031,.829,.005,.601,'L',0,.5,
++  'L',.005,.399,'C',.031,.171,.139,0,.269,0,'Z']; // Freeform: Shape 9
++const PATH54 = [
++  'M',0,.5,'L',0,.5,'L',0,.5,'Z','M',.211,0,'L',.789,0,'C',.906,0,1,.224,1,.5,'L',1,.5,'C',1,.776,.906,1,.789,1,
++  'L',.211,1,'C',.109,1,.024,.829,.004,.601,'L',0,.5,'L',.004,.399,'C',.024,.171,.109,0,.211,0,'Z']; // photo Picture Placeholder 6
++const PATH55 = [
++  'M',.799,0,'C',.851,.001,.909,.01,.977,.029,'L',1,.036,'L',1,1,'L',0,1,'L',0,.262,'L',.036,.262,
++  'C',.414,.247,.497,.009,.774,0,'C',.782,0,.79,0,.799,0,'Z']; // Freeform: Shape 1
++const PATH56 = [
++  'M',.053,0,'L',.947,0,'C',.976,0,1,.026,1,.057,'L',1,.943,'C',1,.974,.976,1,.947,1,'L',.053,1,
++  'C',.024,1,0,.974,0,.943,'L',0,.057,'C',0,.026,.024,0,.053,0,'Z']; // photo Picture Placeholder 5
++const PATH57 = ['M',.162,0,'L',1,0,'L',1,.938,'L',.967,.952,'C',.883,.983,.792,1,.696,1,'C',.312,1,0,.727,0,.391,'C',0,.243,.06,.108,.159,.003,'Z']; // photo Picture Placeholder 12
++const PATH58 = ['M',0,0,'L',.833,0,'C',.925,0,1,.306,1,.684,'L',1,.684,'C',1,.778,.995,.868,.987,.95,'L',.981,1,'L',0,1,'Z']; // Freeform: Shape 21
++const PATH59 = ['M',.09,0,'L',1,0,'L',1,1,'L',.09,1,'C',.04,1,0,.966,0,.924,'L',0,.075,'C',0,.034,.04,0,.09,0,'Z']; // Freeform: Shape 19
++const PATH60 = ['M',.004,.047,'L',.798,0,'L',.917,0,'L',1,1,'L',.081,1,'C',.036,1,0,.969,0,.932,'L',0,.068,'C',0,.064,.001,.059,.002,.055,'Z']; // Freeform: Shape 3
++const PATH61 = ['M',1,0,'L',.697,1,'L',.686,1,'L',0,.837,'L',0,.068,'C',0,.031,.035,0,.077,0,'Z']; // Freeform: Shape 4
++const PATH62 = ['M',1,0,'L',1,1,'L',.124,1,'L',.001,.159,'C',-.005,.121,.03,.087,.078,.083,'Z']; // photo Picture Placeholder 8
++
++// ---------------------------------------------------------------------------
++// Slides
++// ---------------------------------------------------------------------------
++
++// 1. Solve Your  Plumbing  &  Drain  Cleaning
++function slide01(pres) {
++  const s = pres.addSlide();
++  photo(s, [0, 0, 10, 5.625]);
++  gradientBand(s, [0, 0, 10, 5.625], { color: WHITE, dir: 'h', from: 0, to: 43 });
++  brand(s);
++  text(s, [8.158, 3.902, 2.944, .24], '©2021 Plumbing Presentation', { rotate: 270, lineSpacingMultiple: 1, color: SLATE });
++  text(s, [.828, 1.693, 4.396, 1.111], [
++    { text: 'Solve Your ', options: { fontFace: HEAD } },
++    { text: 'Plumbing ', options: { color: BLUE, fontFace: HEAD } },
++    { text: '& ', options: { fontFace: HEAD } },
++    { text: 'Drain', options: { color: GOLD, fontFace: HEAD } },
++    { text: ' Cleaning', options: { fontFace: HEAD } }
++  ], { lineSpacingMultiple: 1, fontSize: 30 });
++  text(s, [.828, 2.913, 4.135, .704], LI + LI_EVE, { color: GREY });
++  text(s, [.828, 1.431, 3.85, .287], 'Plumbing Services Presentation', { color: GREY });
++  text(s, [.869, 3.85, 1.49, .344], 'Start Present ', { align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 10.5, color: WHITE, fill: BLUE, rectRadius: .036, shape: 'roundRect' });
++  freeform(s, [0, .9, 5.953, 3.825], PATH0, { flipH: true, line: { color: BLUE, width: 1.5 } });
++}
++
++// 2. Welcome Messages
++function slide02(pres) {
++  const s = pres.addSlide();
++  freeform(s, [5.865, 1.508, 4.135, 4.117], PATH1, { fill: BLUE });
++  ellipse(s, [6.144, 1.01, 3.062, 3.062], { fill: WHITE, shadow: SH0 });
++  freeform(s, [1.25, 1.932, .607, .476], PATH2, { fill: { color: GOLD, transparency: 85 } });
++  brand(s);
++  ellipse(s, [9.01, .828, .396, .396], { fill: GOLD });
++  text(s, [1.149, 1.196, 3.875, .555], 'Welcome Messages', { lineSpacingMultiple: 1, fontSize: 27, fontFace: HEAD });
++  text(s, [1.415, 2.088, 3.465, .495], LI_SHORT + 'd typesetting industry. Lorem Ipsum ndus Lorem Ipsum is simply. ', { align: 'justify', italic: true, color: INK });
++  text(s, [1.165, 2.716, 4.135, .912], LI + LI_EVE + ' typesetting industry. Lorem Ipsum has been types setting fg.', { color: GREY });
++  text(s, [1.25, 4.025, 2.397, .271], [
++    { text: 'Xafier ', options: { bold: true, color: BLUE } },
++    { text: 'Monroe' }
++  ], { lineSpacingMultiple: 1, fontSize: 10.13 });
++  text(s, [1.25, 4.302, 1.938, .252], 'CEO & Founder', { lineSpacingMultiple: 1, fontSize: 9, italic: true, color: GREY });
++  line(s, 1.25, 3.828, 3.845, 0, RULE, .75);
++  photoOval(s, [6.259, 1.125, 2.833, 2.833]);
++}
++
++// 3. About Our History.
++function slide03(pres) {
++  const s = pres.addSlide();
++  shape(s, 'roundRect', [1.393, 2.529, 7.213, .323], { fill: BLUE, rectRadius: .162 });
++  shape(s, 'roundRect', [3.87, 2.529, 2.26, .323], { fill: GOLD, rectRadius: .162 });
++  brand(s);
++  text(s, [3.062, .768, 3.875, .555], 'About Our History.', { align: 'center', lineSpacingMultiple: 1, fontSize: 27, fontFace: HEAD });
++  line(s, 4.94, 3.377, 0, .361, RULE2, .75);
++  ellipse(s, [4.879, 3.738, .121, .121], { fill: GOLD });
++  text(s, [1.095, 4.179, 7.81, .704], LI + LI_EVE + ' printing and types etting indus types etting indus try. Lorem Ipsum printing and types etting indus try. Lorem Ipsum has been the industry\'s standard dummy text eve simply dummy text of the', { align: 'center', color: GREY });
++  text(s, [3.572, 3.854, 2.857, .338], [
++    { text: '1', options: { bold: true, color: INK } },
++    { text: 'st', options: { bold: true, baseline: 600, color: INK } },
++    { text: ' Plumbing Company ', options: { bold: true, color: INK } }
++  ], { align: 'center', fontSize: 10.5 });
++  ellipse(s, [2.149, 2.073, 1.144, 1.144], { fill: WHITE, shadow: SH0 });
++  ellipse(s, [4.161, 1.845, 1.599, 1.599], { fill: WHITE, shadow: SH0 });
++  ellipse(s, [6.706, 2.073, 1.144, 1.144], { fill: WHITE, shadow: SH0 });
++  text(s, [2.314, 1.776, .815, .278], '2018', { align: 'center', lineSpacingMultiple: 1, fontSize: 10.5, bold: true, color: MIST });
++  text(s, [4.553, 1.581, .815, .278], '2020', { align: 'center', lineSpacingMultiple: 1, fontSize: 10.5, bold: true, color: GOLD });
++  text(s, [6.871, 1.726, .815, .278], '2021', { align: 'center', lineSpacingMultiple: 1, fontSize: 10.5, bold: true, color: MIST });
++  photoOval(s, [2.192, 2.116, 1.059, 1.059]);
++  photoOval(s, [4.221, 1.905, 1.48, 1.48]);
++  photoOval(s, [6.749, 2.116, 1.059, 1.059]);
++}
++
++// 4. About Our Vision.
++function slide04(pres) {
++  const s = pres.addSlide();
++  freeform(s, [7.345, .27, 2.655, 3.148], PATH3, { fill: BLUE });
++  shape(s, 'roundRect', [1.049, 3.398, 3.974, .95], { fill: WHITE, shadow: SH1, rectRadius: .475 });
++  brand(s);
++  ellipse(s, [7.952, 4.368, .538, .538], { fill: GOLD });
++  text(s, [1.149, 1.175, 3.875, .505], 'About Our Vision. ', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  ellipse(s, [1.232, 3.605, .536, .536], { fill: BLUE });
++  text(s, [1.874, 3.754, 2.847, .495], LI + 'us try. Lorem Ipsum', { color: GREY });
++  text(s, [1.864, 3.472, 2.857, .338], 'Plumbing Company ', { fontSize: 10.5, bold: true, color: INK });
++  text(s, [1.149, 1.771, 4.02, 1.12], LI + LI_SIMP + ' printing and types etting industry. Lorem Ipsum has been types setting fg. standard dummy text eve simply dummy', { color: GREY });
++  icon(s, [1.354, 3.729, .308, .308], '✦', WHITE);
++  shape(s, 'roundRect', [1.915, 4.297, 1.066, .07], { fill: GOLD, rectRadius: .035 });
++  line(s, 0, 3.103, 5, 0, RULE, .75);
++  photoShape(s, [5.411, 1.274, 4.589, 3.336], PATH4);
++}
++
++// 5. Our Missions.
++function slide05(pres) {
++  const s = pres.addSlide();
++  shape(s, 'roundRect', [3.463, 2.373, 4.85, 1.051], { fill: WHITE, shadow: SH1, rectRadius: .071 });
++  photoShape(s, [0, .73, 3.994, 4.264], PATH5);
++  photoShape(s, [8.801, .613, 1.199, 4.381], PATH6);
++  brand(s);
++  text(s, [4.438, .875, 3.875, .505], 'Our Missions. ', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  shape(s, 'roundRect', [3.116, 3.607, 4.159, 1.051], { fill: BLUE, shadow: SH1, rectRadius: .071 });
++  text(s, [3.679, 3.789, 2.857, .338], 'First Mission Here', { fontSize: 10.5, bold: true, color: WHITE });
++  text(s, [3.679, 4.005, 3.457, .495], LI + 'us try. Lorem Ipsum has been the', { color: WHITE });
++  text(s, [3.274, 3.711, .518, .439], '02.', { fontSize: 15, bold: true, color: WHITE });
++  text(s, [4.842, 2.524, 2.857, .338], 'Second Mission Here', { fontSize: 10.5, bold: true, color: GOLD });
++  text(s, [4.842, 2.74, 3.073, .495], LI + 'us try. Lorem Ipsum has been the', { color: GREY });
++  text(s, [4.438, 2.445, .518, .439], '01.', { fontSize: 15, bold: true, color: GOLD });
++  text(s, [4.438, 1.435, 3.851, .704], LI + LI_SIMP, { color: GREY });
++}
++
++// 6. We Are The Best Plumbing Industry.
++function slide06(pres) {
++  const s = pres.addSlide();
++  photoShape(s, [5.644, .515, 4.356, 4.542], PATH7);
++  gradientBand(s, [5.644, 2.066, 4.556, 1.438], { color: BLUE, dir: 'h', from: 0, to: 66, r: .719, cap: .719 });
++  brand(s);
++  ellipse(s, [5.713, 3.843, .802, .802], { fill: GOLD });
++  text(s, [1.149, 1.183, 3.875, .909], 'We Are The Best Plumbing Industry.', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  text(s, [1.149, 2.244, 4.025, .495], [
++    { text: LD, options: { color: GREY } },
++    { text: 'consectetur adipiscing elit. Vivamus vel euismod leo. Donec commodo et urna ac semper. Mauris', options: { color: GREY } }
++  ]);
++  text(s, [1.149, 3.763, 1.774, .704], LD + 'con secte tur adipiscing elit. Viva mus vel euismo.', { color: GREY });
++  text(s, [1.149, 3.412, 1.805, .338], 'Description Here', { align: 'justify', fontSize: 10.5, color: INK });
++  text(s, [3.194, 3.753, 1.774, .704], LD + 'con secte tur adipiscing elit. Viva mus vel euismo.', { color: GREY });
++  text(s, [3.194, 3.402, 1.805, .338], 'Description Here', { align: 'justify', fontSize: 10.5, color: INK });
++  shape(s, 'triangle', [1.243, 3.263, .058, .12], { flipH: true, fill: BLUE });
++  text(s, [1.291, 3.148, .929, .353], '1.124%', { lineSpacingMultiple: 1, fontSize: 15, bold: true, color: BLUE });
++  shape(s, 'triangle', [3.288, 3.263, .058, .12], { flipH: true, fill: GOLD });
++  text(s, [3.335, 3.148, .929, .353], '250 K', { lineSpacingMultiple: 1, fontSize: 15, bold: true, color: INK });
++  line(s, 1.056, 2.935, 3.968, 0, RULE, .75);
++  icon(s, [5.953, 4.082, .323, .323], '➤', WHITE);
++  text(s, [6.115, 2.7, 3.226, .495], LD + 'consectetur adipiscing elit. Vivamus vel euismod leo. Donec commodo et', { color: WHITE });
++  text(s, [6.116, 2.46, 1.805, .338], 'Detail.', { align: 'justify', fontSize: 10.5, bold: true, color: WHITE });
++}
++
++// 7. Why  Chooce  Our Plumbing Service?
++function slide07(pres) {
++  const s = pres.addSlide();
++  photo(s, [0, 2.404, 10, 1.951]);
++  gradientBand(s, [0, 2.404, 10, 1.951], { color: BLUE, dir: 'v', from: 0, to: 66 });
++  brand(s);
++  text(s, [1.172, .884, 3.875, .909], 'Why Chooce Our Plumbing Service? ', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  text(s, [5.034, .933, 3.851, .912], LI + LI_SIMP + ' printing and typesetting industry. Lorem Ipsum has been', { color: GREY });
++  shape(s, 'roundRect', [1.043, 3.545, 2.484, 1.262], { fill: WHITE, shadow: SH1, rectRadius: .086 });
++  shape(s, 'roundRect', [3.758, 3.545, 2.484, 1.262], { fill: GOLD, shadow: SH1, rectRadius: .086 });
++  shape(s, 'roundRect', [6.472, 3.545, 2.484, 1.262], { fill: WHITE, shadow: SH1, rectRadius: .086 });
++  text(s, [1.278, 4.173, 2.209, .495], LI + '.', { color: GREY });
++  text(s, [3.98, 4.173, 2.209, .495], LI + '. ', { color: WHITE });
++  text(s, [6.748, 4.173, 2.209, .495], LI + '.', { color: GREY });
++  text(s, [1.686, 3.779, 1.327, .454], 'First Serivce Options', { lineSpacingMultiple: 1, fontSize: 10.5, bold: true });
++  text(s, [4.37, 3.744, 1.327, .454], 'Second Service Options', { lineSpacingMultiple: 1, fontSize: 10.5, bold: true, color: WHITE });
++  text(s, [7.118, 3.744, 1.327, .454], 'Third Service Options', { lineSpacingMultiple: 1, fontSize: 10.5, bold: true });
++  icon(s, [1.333, 3.825, .264, .293], '✦', BLUE);
++  icon(s, [4.085, 3.854, .251, .251], '✦', WHITE);
++  icon(s, [6.8, 3.825, .275, .275], '✆', BLUE);
++}
++
++// 8. Meet Our Team.
++function slide08(pres) {
++  const s = pres.addSlide();
++  shape(s, 'roundRect', [1.317, 2.52, 2.168, 2.072], { fill: WHITE, shadow: SH2, rectRadius: .097 });
++  shape(s, 'roundRect', [3.74, 2.436, 2.385, 2.532], { fill: BLUE, shadow: SH2, rectRadius: .111 });
++  shape(s, 'roundRect', [6.343, 2.52, 2.168, 2.072], { fill: WHITE, shadow: SH2, rectRadius: .097 });
++  ellipse(s, [6.852, 2.127, 1.15, 1.15], { fill: WHITE, shadow: SH0 });
++  brand(s);
++  text(s, [2.997, .631, 3.875, .505], 'Meet Our Team. ', { align: 'center', lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  ellipse(s, [1.827, 2.127, 1.15, 1.15], { fill: WHITE, shadow: SH0 });
++  ellipse(s, [4.3, 2.004, 1.264, 1.264], { fill: WHITE, shadow: SH0 });
++  text(s, [1.469, 3.853, 1.865, .495], LI_SHORT + '.', { align: 'center', color: GREY });
++  text(s, [3.907, 3.876, 2.052, .704], LD + 'con secte tur adipiscing elit. Viva mus vel euismo. ipsum dolor', { align: 'center', color: WHITE });
++  text(s, [1.575, 3.384, 1.654, .338], 'Title Name Here', { align: 'center', fontSize: 10.5, bold: true, color: INK });
++  text(s, [4.106, 3.354, 1.654, .338], 'Description Here', { align: 'center', fontSize: 10.5, bold: true, color: WHITE });
++  text(s, [1.775, 3.599, 1.253, .287], 'General Manager', { align: 'center', italic: true, color: GREY });
++  text(s, [4.306, 3.581, 1.253, .287], 'Marketing Manager', { align: 'center', italic: true, color: WHITE });
++  text(s, [6.495, 3.853, 1.865, .495], LI_SHORT + '.', { align: 'center', color: GREY });
++  text(s, [1.864, 4.428, 1.075, .278], 'More Detail ', { align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 9, color: WHITE, fill: BLUE, rectRadius: .139, shape: 'roundRect' });
++  text(s, [4.307, 4.797, 1.252, .283], 'More Detail ', { align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 9, color: WHITE, fill: GOLD, rectRadius: .141, shape: 'roundRect' });
++  text(s, [6.89, 4.453, 1.075, .278], 'More Detail ', { align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 9, color: WHITE, fill: BLUE, rectRadius: .139, shape: 'roundRect' });
++  text(s, [1.138, 1.161, 7.356, .495], LI + LI_EVE + ' typesetting industry. Lorem', { align: 'center', color: GREY });
++  line(s, 1.083, 1.84, 7.834, 0, RULE, .75);
++  photoOval(s, [4.348, 2.051, 1.17, 1.17]);
++  photoOval(s, [6.895, 2.17, 1.063, 1.063]);
++  text(s, [6.6, 3.384, 1.654, .338], 'Title Name Here', { align: 'center', fontSize: 10.5, bold: true, color: INK });
++  text(s, [6.801, 3.599, 1.253, .287], 'Head Crew', { align: 'center', italic: true, color: GREY });
++  photoOval(s, [1.87, 2.17, 1.063, 1.063]);
++}
++
++// 9. About Our Plumber Supervisor Profile
++function slide09(pres) {
++  const s = pres.addSlide();
++  freeform(s, [5.893, .933, 2.958, 4.692], PATH8, { fill: BLUE, shadow: SH2 });
++  brand(s);
++  ellipse(s, [6.515, 1.451, 1.714, 1.714], { fill: WHITE, shadow: SH0 });
++  socialRow(s, [6.958, 4.535, .828, .158]);
++  text(s, [6.359, 3.42, 2.026, .303], 'Harrys Franco', { align: 'center', lineSpacingMultiple: 1, fontSize: 12, bold: true, color: WHITE });
++  text(s, [6.081, 3.881, 2.582, .495], LI + 'u s try', { align: 'center', color: WHITE });
++  line(s, 6.332, 3.827, 2.079, 0, GOLD, .75);
++  text(s, [6.608, .811, 1.529, .283], 'Marketing Manager', { align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 9, color: WHITE, italic: true, fill: GOLD, rectRadius: .141, shape: 'roundRect' });
++  text(s, [1.161, 1.103, 4.076, 1.01], 'About Our Plumber Supervisor Profile ', { lineSpacingMultiple: 1, fontSize: 27, fontFace: HEAD });
++  text(s, [1.165, 2.151, 4.076, .912], LI + LI_STD + 'u s try. Lorem Ipsum has been the', { color: GREY });
++  shape(s, 'roundRect', [1.22, 3.565, 3.478, .245], { fill: MIST, rectRadius: .122 });
++  shape(s, 'roundRect', [1.22, 4.012, 3.478, .245], { fill: MIST, rectRadius: .122 });
++  shape(s, 'roundRect', [1.22, 3.573, 2.623, .245], { fill: BLUE, rectRadius: .122 });
++  shape(s, 'roundRect', [1.22, 4.019, 2.803, .245], { fill: GOLD, rectRadius: .122 });
++  text(s, [1.279, 3.54, 2.074, .287], 'About Working Skills', { color: WHITE });
++  text(s, [4.116, 3.532, .543, .287], '90%', { align: 'right', bold: true, color: BLUE });
++  text(s, [4.116, 3.981, .543, .287], '95%', { align: 'right', bold: true, color: GOLD });
++  text(s, [1.279, 3.986, 2.074, .287], 'About Working Experience', { color: WHITE });
++  text(s, [1.149, 3.165, 4.076, .287], 'Detail Here :', { bold: true, color: INK });
++  photoOval(s, [6.579, 1.515, 1.586, 1.586]);
++}
++
++// 10. 01
++function slide10(pres) {
++  const s = pres.addSlide();
++  photoShape(s, [0, 2.812, 6.845, 2.812], PATH9);
++  freeform(s, [0, 2.808, 6.845, 2.812], PATH9, { fill: { color: WHITE, transparency: 20 } });
++  icon(s, [5.573, 2.747, .23, .23], '✦', WHITE);
++  brand(s);
++  shape(s, 'roundRect', [5.183, 2.476, 3.635, 1.834], { fill: BLUE, shadow: SH2, rectRadius: .086 });
++  text(s, [1.161, .951, 3.875, .909], 'We Serve Professional Plumber For You ', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  text(s, [5.449, 1.485, 3.201, .704], LI + 'u s try. Lorem Ipsum has been the indu stry\'s standard dummy text eve simp ly dummy', { color: GREY });
++  text(s, [5.449, 1.13, 3.57, .338], 'Subtitle Here', { fontSize: 10.5, bold: true, color: INK });
++  text(s, [6.913, .518, 1.591, 1.014], '01', { align: 'right', fontSize: 40.5, bold: true, color: GREY });
++  text(s, [5.449, 3.373, 3.201, .704], LI + 'u s try. Lorem Ipsum has been the indu stry\'s standard dummy text eve simp ly dummy', { color: WHITE });
++  text(s, [5.449, 3.018, 3.57, .338], 'Subtitle Here', { fontSize: 10.5, bold: true, color: WHITE });
++  text(s, [6.913, 2.315, 1.591, 1.014], '02', { align: 'right', fontSize: 40.5, bold: true, color: WHITE });
++  text(s, [7.229, 4.214, 1.339, .294], 'More Info ', { align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 10.5, color: WHITE, fill: GOLD, shadow: SH1, rectRadius: .147, shape: 'roundRect' });
++  icon(s, [5.513, .914, .23, .221], '✦', GOLD);
++  text(s, [1.149, 1.972, 3.675, .495], [
++    { text: LD, options: { italic: true, color: GREY } },
++    { text: 'consectetur adipiscing elit. Vivamus vel euismod leo. Donec commodo et urna ac', options: { italic: true, color: GREY } }
++  ]);
++}
++
++// 11. About Plumbing Currant Projects
++function slide11(pres) {
++  const s = pres.addSlide();
++  shape(s, 'roundRect', [1.418, 1.481, .742, 3.785], { rotate: 47, fill: MIST, rectRadius: .371 });
++  photoShape(s, [.545, 1.127, 1.996, 2.557], PATH10);
++  photoShape(s, [2.664, 1.127, 1.996, 3.638], PATH11);
++  photoShape(s, [8.564, 0, 1.436, 1.938], PATH12);
++  brand(s);
++  text(s, [5.085, 1.211, 3.186, .909], 'About Plumbing Currant Projects ', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  ellipse(s, [5.085, 2.585, .461, .461], { fill: BLUE, shadow: SH3 });
++  text(s, [5.689, 2.695, 3.041, .704], LI_SHORT + ' d types etting indu s try. Lorem Ipsum has been the industry\'s standard dummy text eve', { color: GREY });
++  text(s, [5.689, 2.442, 3.041, .338], 'Simple Text Here ', { fontSize: 10.5, bold: true, color: INK });
++  ellipse(s, [5.085, 3.769, .461, .461], { fill: WHITE, shadow: SH3 });
++  text(s, [5.689, 3.879, 3.041, .704], LI_SHORT + ' d types etting indu s try. Lorem Ipsum has been the industry\'s standard dummy text eve', { color: GREY });
++  text(s, [5.689, 3.626, 3.041, .338], 'Simple Text Here ', { fontSize: 10.5, bold: true, color: INK });
++  freeform(s, [1.367, 2.594, .966, 4.01], PATH13, { rotate: 47, fill: BLUE, shadow: SH4 });
++  shape(s, 'roundRect', [1.538, 3.423, .345, 1.128], { rotate: 47, fill: GOLD, rectRadius: .172 });
++}
++
++// 12. Recommanded  Plumbing Services
++function slide12(pres) {
++  const s = pres.addSlide();
++  freeform(s, [8.442, 2.721, .742, 3.387], PATH14, { rotate: 313, flipH: true, fill: MIST });
++  photoOval(s, [4.263, 2.37, 2.28, 2.28]);
++  photoOval(s, [6.805, 2.37, 2.28, 2.28]);
++  freeform(s, [0, 2.506, 4.043, 2.084], PATH15, { fill: BLUE, shadow: SH2 });
++  brand(s);
++  text(s, [1.149, .85, 7.685, .555], 'Recommanded Plumbing Services', { lineSpacingMultiple: 1, fontSize: 27, fontFace: HEAD });
++  text(s, [1.165, 1.427, 7.793, .495], LI + LI_STD + 'u s try. Lorem Ipsum has been the', { color: GREY });
++  freeform(s, [7.671, 3.631, .966, 2.788], PATH16, { rotate: 313, flipH: true, fill: BLUE, shadow: SH4 });
++  shape(s, 'roundRect', [8.567, 4.267, .345, 1.128], { rotate: 313, flipH: true, fill: GOLD, rectRadius: .172 });
++  text(s, [1.192, 3.406, 2.693, .704], LD + 'consectetur adipiscing elit. Vivamus vel euismod leo. Donec commodo et urna ac semper. ', { color: WHITE });
++  text(s, [1.183, 2.767, 1.209, .287], 'Aspects Ratio', { italic: true, color: WHITE });
++  text(s, [1.193, 3.005, 1.649, .454], '89,12 %', { lineSpacingMultiple: 1, fontSize: 21, bold: true, color: WHITE });
++  line(s, 1.149, 2.146, 7.685, 0, RULE, .75);
++  text(s, [1.248, 4.388, 1.325, .312], 'See More', { flipH: true, align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 10.5, color: WHITE, fill: GOLD, rectRadius: .156, shape: 'roundRect' });
++}
++
++// 13. About Outline  Plumbing Installation
++function slide13(pres) {
++  const s = pres.addSlide();
++  freeform(s, [.593, 3.768, .375, 2.185], PATH17, { rotate: 47, fill: GOLD });
++  shape(s, 'roundRect', [3.331, 2.767, .626, 2.903], { rotate: 47, fill: MIST, rectRadius: .313 });
++  freeform(s, [6.65, 0, 3.35, 3.295], PATH18, { fill: BLUE });
++  photoShape(s, [.97, 2.627, 4.395, 1.994], PATH19);
++  brand(s);
++  text(s, [1.161, 1.027, 3.875, .909], [
++    { text: 'About Outline ', options: { fontFace: HEAD, breakLine: true } },
++    { text: 'Plumbing Installation', options: { fontFace: HEAD } }
++  ], { lineSpacingMultiple: 1, fontSize: 24 });
++  freeform(s, [1.091, 3.22, .966, 3.276], PATH20, { rotate: 47, fill: BLUE, shadow: SH4 });
++  shape(s, 'roundRect', [5.687, 1.027, 3.094, 1.066], { fill: WHITE, shadow: SH1, rectRadius: .072 });
++  shape(s, 'roundRect', [5.687, 2.281, 3.094, 1.066], { fill: WHITE, shadow: SH1, rectRadius: .072 });
++  shape(s, 'roundRect', [5.687, 3.555, 3.094, 1.066], { fill: WHITE, shadow: SH1, rectRadius: .072 });
++  text(s, [1.161, 1.961, 4.203, .495], LI + 'u s try. Lorem Ipsum has been the industry\'s standard dummy text eve', { color: GREY });
++  ellipse(s, [5.866, 1.309, .461, .461], { fill: GOLD, shadow: SH3 });
++  text(s, [6.405, 1.418, 2.196, .495], LI_SHORT + ' d types etting indu ', { color: GREY });
++  text(s, [6.405, 1.165, 3.041, .338], 'Simple Text Here ', { fontSize: 10.5, bold: true, color: INK });
++  ellipse(s, [5.866, 2.567, .461, .461], { fill: BLUE, shadow: SH3 });
++  text(s, [6.405, 2.676, 2.196, .495], LI_SHORT + ' d types etting indu ', { color: GREY });
++  text(s, [6.405, 2.424, 3.041, .338], 'Simple Text Here ', { fontSize: 10.5, bold: true, color: INK });
++  ellipse(s, [5.866, 3.863, .461, .461], { fill: BLUE, shadow: SH3 });
++  text(s, [6.405, 3.973, 2.196, .495], LI_SHORT + ' d types etting indu ', { color: GREY });
++  text(s, [6.405, 3.72, 3.041, .338], 'Simple Text Here ', { fontSize: 10.5, bold: true, color: INK });
++}
++
++// 14. About Our Plumbing  Home Services
++function slide14(pres) {
++  const s = pres.addSlide();
++  shape(s, 'roundRect', [3.793, 3.437, .375, 2.241], { rotate: 313, flipH: true, fill: GOLD, rectRadius: .187 });
++  photoShape(s, [.487, .913, 3.494, 3.798], PATH21);
++  brand(s);
++  freeform(s, [2.951, 3.22, .966, 3.276], PATH22, { rotate: 313, flipH: true, fill: BLUE, shadow: SH4 });
++  text(s, [4.633, 1.087, 3.875, .909], [
++    { text: 'About Our Plumbing ', options: { fontFace: HEAD, breakLine: true } },
++    { text: 'Home Services', options: { fontFace: HEAD } }
++  ], { lineSpacingMultiple: 1, fontSize: 24 });
++  text(s, [4.633, 2.021, 4.048, .704], LI + 'u s try. Lorem Ipsum has been the industry\'s standard dummy text eve simply dummy text of the printing and types etting indu s try. ', { color: GREY });
++  text(s, [4.634, 2.832, 2.694, .278], 'More Detail :', { lineSpacingMultiple: 1, fontSize: 10.5, bold: true, color: INK });
++  text(s, [4.633, 3.149, 3.875, .495], LI + 'u s try. Lorem Ipsum has been the simply dummy te', { bullet: { characterCode: '2022', indent: 11 }, color: GREY });
++  text(s, [4.633, 3.728, 3.875, .495], LI + 'u s try. Lorem Ipsum has been the', { bullet: { characterCode: '2022', indent: 11 }, color: GREY });
++  freeform(s, [9.267, 1.773, .733, 2.079], PATH23, { fill: BLUE });
++  icon(s, [9.442, 2.629, .367, .367], '➤', WHITE);
++}
++
++// 15. Fixing Pipe Leaking And  Drine  Cleaning
++function slide15(pres) {
++  const s = pres.addSlide();
++  photoShape(s, [5.615, .595, 4.385, 4.379], PATH24);
++  freeform(s, [0, 3.907, 5.463, 1.718], PATH25, { fill: BLUE });
++  brand(s);
++  text(s, [1.18, 1.061, 3.315, .909], 'Fixing Pipe Leaking And Drine Cleaning', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  shape(s, 'roundRect', [1.239, 3.343, 3.094, 1.066], { fill: GOLD, shadow: SH1, rectRadius: .072 });
++  shape(s, 'roundRect', [4.495, 3.343, 3.094, 1.066], { fill: WHITE, shadow: SH1, rectRadius: .072 });
++  text(s, [1.357, 3.625, .521, .495], '01', { align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 10.5, color: WHITE, bold: true, color: BLUE, fill: WHITE, shadow: SH3, shape: 'ellipse' });
++  text(s, [1.957, 3.734, 2.196, .495], LI_SHORT + ' d types etting indu ', { color: WHITE });
++  text(s, [4.613, 3.629, .521, .495], '02', { align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 10.5, color: WHITE, bold: true, fill: BLUE, shadow: SH3, shape: 'ellipse' });
++  text(s, [5.213, 3.738, 2.196, .495], LI_SHORT + ' d types etting indu ', { color: GREY });
++  text(s, [1.972, 3.469, 2.099, .338], 'Simple Text Here ', { fontSize: 10.5, bold: true, color: WHITE });
++  text(s, [5.209, 3.469, 2.099, .338], 'Simple Text Here ', { fontSize: 10.5, bold: true, color: INK });
++  text(s, [1.163, 2.134, 4.046, .912], LI + LI_STD + 'u s try. Lorem Ipsum has been the', { color: GREY });
++}
++
++// 16. Residential And  Commerial  Plumber
++function slide16(pres) {
++  const s = pres.addSlide();
++  freeform(s, [-1.129, 1.997, 4.535, 3.949], PATH26, { rotate: 45, fill: BLUE });
++  shape(s, 'roundRect', [5.16, 3.923, 3.168, .588], { fill: WHITE, shadow: SH1, rectRadius: .04 });
++  ellipse(s, [8.239, 4.134, .164, .164], { fill: GOLD });
++  icon(s, [8.239, 4.133, .166, .166], '➤', WHITE);
++  brand(s);
++  text(s, [5.131, 1.393, 3.875, .909], 'Residential And Commerial Plumber', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  shape(s, 'roundRect', [3.917, 3.087, .646, .649], { rotate: 45, fill: GOLD, rectRadius: .049 });
++  text(s, [5.131, 2.826, 3.744, .912], LI + LI_STD + 'u s try. Lorem Ipsum', { color: GREY });
++  text(s, [5.131, 2.497, 3.744, .372], 'Description Here ', { fontSize: 12, bold: true, color: INK });
++  text(s, [5.286, 4.011, 1.373, .338], [
++    { text: '+142 ', options: { bold: true, color: INK } },
++    { text: 'Service Center ', options: { color: GREY } }
++  ]);
++  text(s, [6.712, 4.011, 1.669, .338], [
++    { text: '99% ', options: { bold: true, color: BLUE } },
++    { text: 'Trusted Plumbers', options: { color: GREY } }
++  ]);
++  line(s, 5.131, 2.417, 3.744, 0, RULE, .75);
++  icon(s, [4.109, 3.269, .263, .263], '✦', WHITE);
++  photoShape(s, [2.164, 0, 4.033, 2.017], PATH27);
++  photoShape(s, [.776, .9, 3.409, 3.409], PATH28);
++}
++
++// 17. BREAK SLIDE
++function slide17(pres) {
++  const s = pres.addSlide();
++  ellipse(s, [7.402, 2.584, .242, .242], { fill: 'F6F0DA' });
++  freeform(s, [4.364, 3.857, 5.636, 1.768], PATH29, { fill: SNOW });
++  freeform(s, [7.855, 2.866, .737, .894], PATH30, { fill: SNOW });
++  freeform(s, [7.999, 3.335, .188, .739], PATH31, { fill: PLANT });
++  shape(s, 'roundRect', [7.753, 1.849, 1.443, .417], { fill: BLUE, rectRadius: .174 });
++  brand(s);
++  text(s, [1.125, 1.189, 3.875, .656], 'BREAK SLIDE', { lineSpacingMultiple: 1, fontSize: 33, fontFace: HEAD });
++  text(s, [1.125, 1.752, 3.875, .656], 'PRESENTATION', { lineSpacingMultiple: 1, fontSize: 33, color: BLUE, fontFace: HEAD });
++  line(s, 1.125, 2.613, 4.073, 0, RULE, .75);
++  freeform(s, [6.225, 1.271, 1.978, 1.328], PATH32, { flipH: true, fill: GOLD });
++  freeform(s, [6.237, 2.745, .246, .319], PATH33, { flipH: true, fill: BLUE });
++  freeform(s, [7.132, 3.562, 3.71, .417], PATH34, { rotate: 90, fill: BLUE });
++  freeform(s, [8.085, 3.322, .161, .632], PATH35, { rotate: 18, fill: PLANT });
++  freeform(s, [7.174, 2.667, .281, .072], PATH36, { fill: SKY });
++  freeform(s, [8.162, 2.625, .466, .123], PATH37, { fill: SKY });
++  icon(s, [7.49, 3.056, .153, .04], '✦', SKY);
++  freeform(s, [9.425, 2.746, .576, .182], PATH38, { fill: SKY });
++  freeform(s, [7.527, 2.748, .281, .072], PATH36, { fill: SKY });
++  text(s, [1.183, 4.039, 1.356, .346], 'Next Slides ', { align: 'center', valign: 'middle', lineSpacingMultiple: 1, fontSize: 10.5, color: WHITE, fill: BLUE, shadow: SH1, rectRadius: .023, shape: 'roundRect' });
++  text(s, [1.125, 3.113, 4.174, .704], LI + LI_IND + 'PLACEHOLDER', { color: GREY });
++  text(s, [1.125, 2.784, 3.744, .372], 'Description Here ', { fontSize: 12, bold: true, color: INK });
++}
++
++// 18. Explore Our Plumbing Services Now
++function slide18(pres) {
++  const s = pres.addSlide();
++  freeform(s, [6.717, 2.014, 4.535, 3.833], PATH39, { rotate: 315, flipH: true, fill: BLUE });
++  brand(s);
++  shape(s, 'roundRect', [5.508, 3.279, .646, .649], { rotate: 315, flipH: true, fill: GOLD, rectRadius: .049 });
++  text(s, [1.125, 1.158, 3.875, .909], 'Explore Our Plumbing Services Now ', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  text(s, [1.144, 2.576, 3.968, .704], LI + LI_IND + 'PLACEHOLDER', { color: GREY });
++  text(s, [1.144, 2.247, 3.744, .338], 'Drain Cleaning ', { fontSize: 10.5, bold: true, color: INK });
++  text(s, [1.144, 3.789, 3.968, .704], LI + LI_IND + 'PLACEHOLDER', { color: GREY });
++  text(s, [1.144, 3.46, 3.744, .338], 'Kitchen Plumbing', { fontSize: 10.5, bold: true, color: BLUE });
++  icon(s, [5.66, 3.43, .342, .342], '✦', WHITE);
++  photoShape(s, [5.726, .648, 3.912, 3.912], PATH40);
++}
++
++// 19. Trusted & Professional Plumbing Company
++function slide19(pres) {
++  const s = pres.addSlide();
++  photoShape(s, [0, 1.022, 4.604, 2.42], PATH41);
++  gradientBand(s, [-.2, 1.022, 4.804, 2.42], { color: BLUE, dir: 'v', from: 66, to: 0, r: .18, cap: .18 });
++  shape(s, 'roundRect', [1.151, 2.91, 2.44, 1.968], { fill: WHITE, shadow: SH1, rectRadius: .134 });
++  shape(s, 'roundRect', [3.789, 2.91, 2.44, 1.968], { fill: WHITE, shadow: SH1, rectRadius: .134 });
++  photoShape(s, [1.249, 3.021, 2.243, 1.732], PATH42);
++  photoShape(s, [3.887, 3.021, 2.243, 1.732], PATH42);
++  shape(s, 'roundRect', [6.367, 2.91, 2.44, 1.968], { fill: WHITE, shadow: SH1, rectRadius: .134 });
++  brand(s);
++  text(s, [5, 1.043, 3.875, .909], 'Trusted & Professional Plumbing Company ', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  text(s, [4.989, 1.938, 3.968, .704], LI + LI_IND + 'PLACEHOLDER', { color: GREY });
++  freeform(s, [9.326, 4.29, 1.162, 1.25], PATH43, { rotate: 323, flipH: true, fill: BLUE });
++  text(s, [6.709, 3.804, 2.018, .704], LI + 'u s try. the', { color: GREY });
++  text(s, [6.709, 3.532, 3.239, .338], 'Description Here ', { fontSize: 10.5, bold: true, color: INK });
++  icon(s, [6.787, 3.151, .255, .307], '✦', GOLD);
++  shape(s, 'roundRect', [6.787, 4.712, 1.118, .326], { fill: GOLD, shadow: SH1, rectRadius: .022 });
++}
++
++// 20. Loyal Customers Report
++function slide20(pres) {
++  const s = pres.addSlide();
++  brand(s);
++  text(s, [2.125, .853, 5.75, .505], 'Loyal Customers Report', { align: 'center', lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  text(s, [1.322, 4.123, 7.356, .704], LI + LI_EVE + ' typesetting industry. Lorem printing and types etting indus try. Lorem Ipsum has been the industry\'s standard dummy text eve simply dummy text of the printing ', { align: 'center', color: GREY });
++  freeform(s, [8.938, 4.832, .375, 1.065], PATH44, { rotate: 223, flipH: true, fill: GOLD });
++  freeform(s, [9.4, 4.697, .706, 1.351], PATH45, { rotate: 223, flipH: true, fill: BLUE, shadow: SH4 });
++  shape(s, 'roundRect', [3.708, 1.704, 2.584, 1.968], { fill: BLUE, shadow: SH1, rectRadius: .134 });
++  ellipse(s, [4.715, 3.388, .569, .569], { fill: GOLD, shadow: SH5 });
++  text(s, [3.859, 2.752, 2.282, .495], LI_SHORT + 'd types', { align: 'center', color: WHITE });
++  text(s, [3.128, 2.424, 3.744, .372], 'Description Here ', { align: 'center', fontSize: 12, color: WHITE });
++  icon(s, [4.816, 3.504, .367, .367], '➤', WHITE);
++  text(s, [3.128, 1.788, 3.744, .575], '+1.1 K', { align: 'center', fontSize: 21, bold: true, color: WHITE });
++  line(s, 4.715, 2.396, .569, 0, WHITE, .75);
++  photoShape(s, [1.138, 1.815, 2.376, 1.732], PATH46);
++  photoShape(s, [6.486, 1.822, 2.376, 1.732], PATH46);
++}
++
++// 21. Most Requested Plumbing Service
++function slide21(pres) {
++  const s = pres.addSlide();
++  freeform(s, [7.405, .76, 2.595, 3.904], PATH47, { fill: BLUE, shadow: SH3 });
++  brand(s);
++  freeform(s, [6.578, 2.253, 3.422, 3.372], PATH48, { fill: WHITE, shadow: SH0 });
++  text(s, [1.125, .991, 3.875, .909], 'Most Requested Plumbing Service ', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  ellipse(s, [6.68, 1.975, .458, .458], { fill: GOLD, shadow: SH3 });
++  text(s, [1.144, 2.739, 2.387, .704], LI + LI_IND + ' text eve', { color: GREY });
++  text(s, [1.144, 2.41, 2.387, .338], 'Outline Plumbing', { bullet: { characterCode: '2713', indent: 18 }, fontSize: 10.5, bold: true, color: BLUE });
++  text(s, [3.694, 2.739, 2.387, .704], LI + LI_IND + ' text eve', { color: GREY });
++  text(s, [3.694, 2.41, 2.387, .338], 'Residential Plumbing', { bullet: { characterCode: '2713', indent: 18 }, fontSize: 10.5, bold: true, color: INK });
++  text(s, [1.144, 3.967, 2.387, .704], LI + LI_IND + ' text eve', { color: GREY });
++  text(s, [1.144, 3.638, 2.387, .338], 'Bathroom Plumbing', { bullet: { characterCode: '2713', indent: 18 }, fontSize: 10.5, bold: true, color: INK });
++  text(s, [3.694, 3.967, 2.387, .704], LI + LI_IND + ' text eve', { color: GREY });
++  text(s, [3.694, 3.638, 2.387, .338], 'Kitchen Plumbing', { bullet: { characterCode: '2713', indent: 18 }, fontSize: 10.5, bold: true, color: INK });
++  line(s, 1.125, 2.156, 4.812, 0, SLATE, .75);
++  photoShape(s, [4.548, 0, 3.594, 1.522], PATH49);
++  photoShape(s, [6.736, 2.412, 3.264, 3.213], PATH50);
++}
++
++// 22. Keep Improving  To Provide Excellent Service
++function slide22(pres) {
++  const s = pres.addSlide();
++  shape(s, 'roundRect', [.257, 2.685, 4.475, .255], { rotate: 270, flipH: true, fill: GOLD, rectRadius: .125 });
++  shape(s, 'rect', [3.625, -.75, 5.625, 7.125], { rotate: 270, flipH: true, fill: BLUE });
++  ellipse(s, [1.238, 1.138, 3.224, 3.224], { fill: WHITE, shadow: SH0 });
++  text(s, [5.127, .988, 3.242, 1.313], [
++    { text: 'Keep Improving ', options: { color: WHITE, fontFace: HEAD, breakLine: true } },
++    { text: 'To Provide Excellent Service', options: { color: WHITE, fontFace: HEAD } }
++  ], { lineSpacingMultiple: 1, fontSize: 24 });
++  text(s, [5.127, 2.276, 3.736, .495], LI + LI_IND + ' text eve simp', { color: WHITE });
++  shape(s, 'roundRect', [5.187, 3.014, .117, .117], { fill: WHITE, rectRadius: .02 });
++  text(s, [5.352, 2.932, 2.623, .303], 'Sink Overflow Solving ', { lineSpacingMultiple: 1, fontSize: 12, bold: true, color: WHITE });
++  shape(s, 'roundRect', [5.187, 4.004, .117, .117], { fill: GOLD, rectRadius: .02 });
++  text(s, [5.352, 3.911, 3.016, .303], 'Home Services', { lineSpacingMultiple: 1, fontSize: 12, bold: true, color: WHITE });
++  text(s, [5.351, 3.165, 3.296, .495], LI_SHORT + 'd type Ipsum is simply dummy text Ipsum is simply', { align: 'justify', color: WHITE });
++  text(s, [5.351, 4.167, 3.27, .495], LI_SHORT + 'd type Ipsum is simply dummy text Ipsum is simply', { align: 'justify', color: WHITE });
++  brand(s);
++  photoOval(s, [1.359, 1.258, 2.983, 2.983]);
++}
++
++// 23. Do The Best To Solve Your Plumbing Problem
++function slide23(pres) {
++  const s = pres.addSlide();
++  photoShape(s, [.312, 0, 9.38, 2.646], PATH51);
++  gradientBand(s, [.312, -.3, 9.38, 2.946], { color: BLUE, dir: 'v', from: 66, to: 0, r: .24, cap: .24 });
++  shape(s, 'roundRect', [.646, 2.716, 8.708, 2.163], { fill: WHITE, shadow: SH1, rectRadius: .147 });
++  shape(s, 'roundRect', [2.763, 2.532, 4.475, .352], { flipH: true, fill: GOLD, rectRadius: .173 });
++  text(s, [1.195, 3.917, 2.273, .704], LI + LI_IND, { align: 'center', color: GREY });
++  text(s, [1.256, 3.605, 2.151, .338], 'Description Here ', { align: 'center', fontSize: 10.5, bold: true, color: INK });
++  icon(s, [2.208, 3.293, .247, .247], '✦', BLUE);
++  text(s, [6.532, 3.876, 2.273, .704], LI + LI_IND, { align: 'center', color: GREY });
++  text(s, [6.593, 3.563, 2.151, .338], 'Description Here ', { align: 'center', fontSize: 10.5, bold: true, color: INK });
++  icon(s, [7.554, 3.304, .229, .213], '✦', BLUE);
++  text(s, [3.863, 3.899, 2.273, .704], LI + LI_IND, { align: 'center', color: GREY });
++  text(s, [3.924, 3.586, 2.151, .338], 'Description Here ', { align: 'center', fontSize: 10.5, bold: true, color: INK });
++  icon(s, [4.882, 3.28, .237, .252], '✦', BLUE);
++  text(s, [2.763, 1.03, 4.475, .909], 'Do The Best To Solve Your Plumbing Problem', { align: 'center', lineSpacingMultiple: 1, fontSize: 24, color: WHITE, fontFace: HEAD });
++}
++
++// 24. Our Key Values
++function slide24(pres) {
++  const s = pres.addSlide();
++  freeform(s, [9.516, 2.365, .375, .594], PATH52, { rotate: 270, fill: GOLD });
++  freeform(s, [6.583, .446, 3.417, 1.841], PATH53, { fill: BLUE });
++  brand(s);
++  line(s, 1.125, 3.378, 7.729, 0, RULE, .75);
++  text(s, [1.125, 1.255, 3.344, .505], 'Our Key Values ', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  shape(s, 'roundRect', [4.888, 1.06, 4.518, 2.031], { fill: WHITE, shadow: SH6, rectRadius: 1.016 });
++  text(s, [1.144, 1.852, 3.537, .912], LI + LI_IND + ' text eve simp ly dummy text of the printing and types dummy text of the printing and types etting indu s try. the industry\'s', { color: GREY });
++  shape(s, 'roundRect', [1.851, 3.038, 1.022, 2.172], { rotate: 90, fill: WHITE, shadow: SH2, rectRadius: .069 });
++  shape(s, 'roundRect', [4.267, 3.026, 1.022, 2.172], { rotate: 90, fill: BLUE, shadow: SH2, rectRadius: .069 });
++  ellipse(s, [1.125, 3.918, .301, .301], { fill: GOLD, shadow: SH7 });
++  ellipse(s, [3.588, 3.902, .301, .301], { fill: BLUE, shadow: SH7 });
++  text(s, [1.777, 3.699, 1.92, .372], 'Aspets 01', { align: 'justify', fontSize: 12, bold: true, color: GOLD });
++  text(s, [1.777, 3.986, 1.563, .495], 'Lorem Ipsum is simply dummy  text of the', { color: GREY });
++  text(s, [1.158, 3.819, .926, .338], '+28.192', { rotate: 270, align: 'justify', fontSize: 10.5, bold: true, color: INK });
++  icon(s, [1.243, 4.009, .081, .119], '➤', WHITE);
++  icon(s, [3.711, 3.993, .081, .119], '➤', WHITE);
++  text(s, [4.27, 3.993, 1.563, .495], 'Lorem Ipsum is simply dummy  text of the', { color: WHITE });
++  text(s, [3.651, 3.826, .926, .338], '30.21%', { rotate: 270, align: 'justify', fontSize: 10.5, bold: true, color: WHITE });
++  text(s, [5.979, 3.881, 2.959, .704], LI + LI_IND + ' text eve simply dummy text of', { color: GREY });
++  text(s, [5.968, 3.588, 3.239, .338], 'Description Here ', { fontSize: 10.5, bold: true, color: INK });
++  text(s, [4.27, 3.713, 1.92, .372], 'Aspects 02', { align: 'justify', fontSize: 12, bold: true, color: WHITE });
++  photoShape(s, [4.963, 1.155, 4.367, 1.841], PATH54);
++}
++
++// 25. 100% Satisfaction And  Guanranteed  Service
++function slide25(pres) {
++  const s = pres.addSlide();
++  freeform(s, [0, 3.146, 10, 2.479], PATH55, { fill: BLUE });
++  brand(s);
++  text(s, [5.391, 1.059, 3.875, .909], '100% Satisfaction And Guanranteed Service', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  text(s, [5.391, 2.043, 3.875, .704], LI + LI_IND + 'PLACEHOLDER', { color: GREY });
++  shape(s, 'roundRect', [.914, 1.016, 3.936, 3.688], { fill: WHITE, shadow: SH6, rectRadius: .278 });
++  ellipse(s, [5.478, 3.007, .569, .569], { fill: GOLD, shadow: SH5 });
++  text(s, [5.391, 3.959, 3.617, .495], LI + LI_IND, { color: WHITE });
++  text(s, [5.391, 3.647, 2.151, .338], 'Description Here ', { fontSize: 10.5, bold: true, color: WHITE });
++  icon(s, [5.617, 3.146, .292, .291], '✦', WHITE);
++  photoShape(s, [.993, 1.112, 3.777, 3.497], PATH56);
++}
++
++// 26. Aim To Be The Best Plumbing Company
++function slide26(pres) {
++  const s = pres.addSlide();
++  freeform(s, [-.154, 1.354, 4.425, 4.117], PATH1, { rotate: 270, flipH: true, flipV: true, fill: BLUE });
++  brand(s);
++  ellipse(s, [1.12, 1.467, 3.062, 3.062], { rotate: 270, flipH: true, flipV: true, fill: WHITE, shadow: SH0 });
++  shape(s, 'roundRect', [4.612, 2.295, 2.521, .519], { fill: SNOW, rectRadius: .037 });
++  text(s, [4.538, 1.189, 3.875, .909], 'Aim To Be The Best Plumbing Company', { lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  text(s, [4.808, 3.798, 1.513, .304], [
++    { text: '1', options: { bold: true, color: INK } },
++    { text: 'st', options: { bold: true, baseline: 600, color: INK } },
++    { text: ' Description Here', options: { bold: true, color: INK } }
++  ], { align: 'justify', fontSize: 9 });
++  text(s, [6.862, 3.798, 1.513, .304], [
++    { text: '2', options: { bold: true, color: INK } },
++    { text: 'nd', options: { bold: true, baseline: 600, color: INK } },
++    { text: ' Desription Here', options: { bold: true, color: INK } }
++  ], { align: 'justify', fontSize: 9 });
++  text(s, [4.808, 4.158, 1.513, .304], [
++    { text: '3', options: { bold: true, color: INK } },
++    { text: 'rd', options: { bold: true, baseline: 600, color: INK } },
++    { text: ' Description Here ', options: { bold: true, color: INK } }
++  ], { align: 'justify', fontSize: 9 });
++  text(s, [6.862, 4.158, 1.635, .304], [
++    { text: '4', options: { bold: true, color: INK } },
++    { text: 'th', options: { bold: true, baseline: 600, color: INK } },
++    { text: ' Description Here ', options: { bold: true, color: INK } }
++  ], { align: 'justify', fontSize: 9 });
++  text(s, [4.775, 2.378, 2.429, .379], 'We Are Professional And Provide The Best Plumbing Services', { lineSpacingMultiple: 1, bold: true, color: '404040' });
++  text(s, [4.538, 2.922, 4.227, .704], LD + 'consectetur adipis cing elit, sed do eius mod temp or incididunt ut labore et dolore magna aliqua. Ut enim ad consectetur dolor sit amet, dolor sit amet, consectetur adipis cing elit, sed', { align: 'justify', color: GREY });
++  ellipse(s, [4.612, 3.875, .163, .163], { fill: GOLD });
++  icon(s, [4.612, 3.875, .163, .163], '✓', WHITE);
++  ellipse(s, [4.612, 4.228, .163, .163], { fill: GOLD });
++  icon(s, [4.612, 4.228, .163, .163], '✓', WHITE);
++  ellipse(s, [6.616, 3.875, .163, .163], { fill: GOLD });
++  icon(s, [6.616, 3.875, .163, .163], '✓', WHITE);
++  ellipse(s, [6.616, 4.245, .163, .163], { fill: GOLD });
++  icon(s, [6.616, 4.245, .163, .163], '✓', WHITE);
++  shape(s, 'roundRect', [4.591, 2.354, .081, .401], { fill: BLUE, rectRadius: .041 });
++  photoOval(s, [1.234, 1.582, 2.833, 2.833]);
++  photoShape(s, [8.249, 0, 1.751, 2], PATH57);
++}
++
++// 27. Client Says About Us.
++function slide27(pres) {
++  const s = pres.addSlide();
++  freeform(s, [0, 3.87, 7.172, 1.755], PATH58, { fill: SNOW });
++  shape(s, 'roundRect', [.628, 2.2, 3.497, 2.399], { fill: BLUE, shadow: SH6, rectRadius: .181 });
++  shape(s, 'roundRect', [4.318, 2.196, 3.497, 2.399], { fill: WHITE, shadow: SH6, rectRadius: .181 });
++  freeform(s, [7.993, 2.196, 2.007, 2.399], PATH59, { fill: WHITE, shadow: SH6 });
++  brand(s);
++  ellipse(s, [.628, 1.793, 1.355, 1.355], { fill: WHITE, shadow: SH0 });
++  ellipse(s, [7.993, 1.79, 1.355, 1.355], { fill: WHITE, shadow: SH0 });
++  shape(s, 'rect', [9.5, 2.402, .5, .1], { fill: MIST });
++  shape(s, 'rect', [9.509, 2.553, .34, .051], { fill: MIST });
++  shape(s, 'rect', [8.474, 3.368, .899, .107], { fill: MIST });
++  shape(s, 'rect', [8.474, 3.632, 1.526, .067], { flipV: true, fill: MIST });
++  shape(s, 'rect', [8.474, 3.775, 1.526, .067], { flipV: true, fill: MIST });
++  shape(s, 'rect', [8.474, 3.918, 1.462, .067], { flipV: true, fill: MIST });
++  line(s, 1.577, 3.072, 2.145, 0, WHITE, .75);
++  text(s, [2.135, 2.632, 1.587, .287], 'Nov, 20 2021', { italic: true, color: WHITE });
++  text(s, [2.135, 2.378, 2.151, .372], [
++    { text: 'Title Name ', options: { bold: true, color: WHITE } },
++    { text: 'Here', options: { color: WHITE } }
++  ], { fontSize: 12 });
++  text(s, [.921, 3.352, 2.959, .704], '“Lorem Ipsum is simply dummy text of the printing and types etting indu s try. the industry\'s standard dummy text eve simply dummy text of …….. “', { italic: true, color: WHITE });
++  text(s, [2.418, 4.183, 1.464, .287], 'Read More ', { align: 'right', underline: { style: 'sng' }, color: WHITE });
++  line(s, 5.276, 3.049, 2.144, 0, RULE, .75);
++  text(s, [5.834, 2.609, 1.587, .287], 'Nov, 20 2021', { italic: true, color: GREY });
++  text(s, [5.834, 2.355, 2.151, .372], [
++    { text: 'Title Name', options: { bold: true, color: GOLD } },
++    { text: ' ', options: { bold: true, color: GREY } },
++    { text: 'Here', options: { color: GREY } }
++  ], { fontSize: 12 });
++  text(s, [4.649, 3.329, 2.959, .704], '“Lorem Ipsum is simply dummy text of the printing and types etting indu s try. the industry\'s standard dummy text eve simply dummy text of …….. “', { italic: true, color: GREY });
++  text(s, [6.117, 4.16, 1.464, .287], 'Read More ', { align: 'right', underline: { style: 'sng' }, color: GOLD });
++  ellipse(s, [4.318, 1.79, 1.355, 1.355], { fill: WHITE, shadow: SH0 });
++  text(s, [2.418, .768, 5.163, .555], 'Client Says About Us.', { align: 'center', lineSpacingMultiple: 1, fontSize: 27, fontFace: HEAD });
++  photoOval(s, [.678, 1.844, 1.254, 1.254]);
++  photoOval(s, [4.369, 1.841, 1.254, 1.254]);
++  photoOval(s, [8.043, 1.841, 1.254, 1.254]);
++}
++
++// 28. Frequently Asked Question
++function slide28(pres) {
++  const s = pres.addSlide();
++  photo(s, [0, 0, 10, 2.656]);
++  gradientBand(s, [0, 0, 10, 2.667], { color: BLUE, dir: 'v', from: 42, to: 0 });
++  brand(s);
++  text(s, [2.55, 1.126, 4.899, .505], 'Frequently Asked Question', { align: 'center', lineSpacingMultiple: 1, fontSize: 24, color: WHITE, fontFace: HEAD });
++  shape(s, 'roundRect', [.888, 2.022, 8.224, 2.758], { fill: WHITE, shadow: SH6, rectRadius: .208 });
++  shape(s, 'roundRect', [4.675, 2.48, .158, .161], { fill: RULE2, rectRadius: .03 });
++  icon(s, [4.675, 2.48, .158, .161], '+', WHITE);
++  shape(s, 'roundRect', [4.675, 2.934, .157, .161], { fill: GOLD, rectRadius: .03 });
++  icon(s, [4.675, 2.934, .157, .161], '–', WHITE);
++  text(s, [1.243, 2.861, 3.432, .304], 'What are the most common plumbing problems?', { fontSize: 9, bold: true, color: INK });
++  text(s, [1.243, 3.151, 3.452, .495], LI + LI_IND + ' text', { color: GREY });
++  text(s, [1.243, 3.64, 3.452, .287], 'Dripping Faucets. Dripping faucets are annoying,', { bullet: { characterCode: '2022', indent: 11 }, color: GREY });
++  text(s, [1.243, 3.92, 2.937, .495], 'Leaky Pipes. Leaky pipes can be caused by all sorts of problems,', { bullet: { characterCode: '2022', indent: 11 }, color: GREY });
++  text(s, [1.243, 2.42, 3.245, .304], 'What every plumber should know?', { fontSize: 9, bold: true, color: INK });
++  line(s, 1.243, 2.775, 3.608, 0, RULE2, .75);
++  line(s, 1.243, 4.477, 3.608, 0, RULE2, .75);
++  line(s, 1.243, 2.326, 3.608, 0, RULE2, .75);
++  shape(s, 'roundRect', [8.562, 2.501, .158, .161], { fill: RULE2, rectRadius: .03 });
++  icon(s, [8.562, 2.501, .158, .161], '+', WHITE);
++  text(s, [5.149, 2.441, 3.245, .304], 'What are the 4 types of plumbing?', { fontSize: 9, bold: true, color: INK });
++  line(s, 5.149, 2.376, 3.608, 0, RULE2, .75);
++  line(s, 5.149, 2.815, 3.608, 0, RULE2, .75);
++  shape(s, 'roundRect', [8.562, 3.029, .158, .161], { fill: RULE2, rectRadius: .03 });
++  icon(s, [8.562, 3.029, .158, .161], '+', WHITE);
++  text(s, [5.149, 2.969, 3.245, .304], 'How do you check for plumbing problems?', { fontSize: 9, bold: true, color: INK });
++  line(s, 5.149, 3.342, 3.608, 0, RULE2, .75);
++  shape(s, 'roundRect', [8.562, 3.556, .158, .161], { fill: RULE2, rectRadius: .03 });
++  icon(s, [8.562, 3.556, .158, .161], '+', WHITE);
++  text(s, [5.149, 3.496, 3.245, .304], 'How do I check the plumbing in my house?', { fontSize: 9, bold: true, color: INK });
++  line(s, 5.149, 3.87, 3.608, 0, RULE2, .75);
++  shape(s, 'roundRect', [8.562, 4.084, .158, .161], { fill: RULE2, rectRadius: .03 });
++  icon(s, [8.562, 4.084, .158, .161], '+', WHITE);
++  text(s, [5.149, 4.024, 3.245, .304], 'Why are my drains backing up?', { fontSize: 9, bold: true, color: INK });
++  line(s, 5.149, 4.397, 3.608, 0, RULE2, .75);
++}
++
++// 29. Get More Plumbing  Infomration
++function slide29(pres) {
++  const s = pres.addSlide();
++  shape(s, 'rect', [0, 1.198, 10, 3.29], { fill: WHITE, shadow: SH8 });
++  brand(s);
++  text(s, [2.364, 1.858, 5.272, .505], 'Get More Plumbing Infomration', { align: 'center', lineSpacingMultiple: 1, fontSize: 24, fontFace: HEAD });
++  text(s, [1.797, 2.37, 6.405, .495], LI + LI_IND + 'PLACEHOLDER', { align: 'center', color: GREY });
++  shape(s, 'roundRect', [1.557, 4.366, 6.886, .215], { flipH: true, fill: BLUE, rectRadius: .105 });
++  ellipse(s, [4.604, .825, .792, .792], { fill: GOLD, shadow: SH7 });
++  icon(s, [4.829, 1.067, .342, .229], '✦', WHITE);
++  ellipse(s, [4.681, .902, .638, .638], { line: { color: WHITE } });
++  text(s, [6.318, 3.587, 1.823, .404], 'Music.event@company.com', { lineSpacingMultiple: 1, fontSize: 9, color: WHITE });
++  text(s, [1.993, 3.5, 1.648, .495], '13 WestStree  Adventure The East, California', { color: GREY });
++  text(s, [1.993, 3.243, 1.53, .303], 'Office Address', { lineSpacingMultiple: 1, fontSize: 12, bold: true, color: BLUE });
++  text(s, [4.184, 3.243, 2.143, .303], 'Contact Person', { lineSpacingMultiple: 1, fontSize: 12, bold: true, color: GOLD });
++  text(s, [6.429, 3.243, 1.823, .303], 'E-mail & Website  ', { lineSpacingMultiple: 1, fontSize: 12, bold: true, color: BLUE });
++  text(s, [6.383, 3.487, 1.988, .287], 'plumbing.ind@domain.com', { align: 'justify', color: GREY });
++  text(s, [4.184, 3.487, 1.988, .287], '+12 3011-1131-10  (Admin)', { align: 'justify', color: GREY });
++  text(s, [4.188, 3.708, 1.988, .287], '(0001) 1221 111 1 (Fax)', { align: 'justify', color: GREY });
++  text(s, [6.379, 3.708, 1.988, .287], 'www.plumbingindustry.com', { align: 'justify', color: GREY });
++}
++
++// 30. THANK YOU  FOR WATCHING US
++function slide30(pres) {
++  const s = pres.addSlide();
++  freeform(s, [5.757, -.099, 4.433, 5.258], PATH60, { rotate: 4, fill: SNOW });
++  freeform(s, [6.106, .669, 4.653, 5.258], PATH61, { rotate: 345, fill: BLUE });
++  brand(s);
++  text(s, [1.167, 1.485, 4.214, 1.111], [
++    { text: 'THANK YOU ', options: { color: BLUE, fontFace: HEAD } },
++    { text: 'FOR WATCHING US', options: { fontFace: HEAD } }
++  ], { lineSpacingMultiple: 1, fontSize: 30 });
++  text(s, [1.167, 3.059, 3.85, .704], LD + 'consectetur adipis cing elit, sed do eius mod tem p or incididunt ut labore et dolore magna aliqua. Ut enim ad cons ect etur dolor sit sit amet, consecteturc ipsum', { color: GREY });
++  text(s, [1.167, 2.768, 3.85, .304], 'Plumbing Services Presentation', { fontSize: 9, bold: true, color: INK });
++  shape(s, 'roundRect', [1.229, 4.004, .617, .136], { flipH: true, fill: GOLD, rectRadius: .067 });
++  photoShape(s, [5.907, .385, 4.093, 5.228], PATH62);
++}
++
++const BUILDERS = [
++  slide01,
++  slide02,
++  slide03,
++  slide04,
++  slide05,
++  slide06,
++  slide07,
++  slide08,
++  slide09,
++  slide10,
++  slide11,
++  slide12,
++  slide13,
++  slide14,
++  slide15,
++  slide16,
++  slide17,
++  slide18,
++  slide19,
++  slide20,
++  slide21,
++  slide22,
++  slide23,
++  slide24,
++  slide25,
++  slide26,
++  slide27,
++  slide28,
++  slide29,
++  slide30
++];
++
++// ---------------------------------------------------------------------------
++// Build
++// ---------------------------------------------------------------------------
++const pres = new PptxGenJS();
++pres.defineLayout({ name: 'WIDE', width: 10, height: 5.625 });
++pres.layout = 'WIDE';
++pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++pres.title = 'Plumbing Services Presentation';
++
++BUILDERS.forEach(function (fn) { fn(pres); });
++
++pres.writeFile({ fileName: path.join(__dirname, '078b8314-6cef-4022-8cf8-aac01fc4648e_grok_final.pptx') })
++  .then(function (f) { console.log('wrote ' + f); });
++

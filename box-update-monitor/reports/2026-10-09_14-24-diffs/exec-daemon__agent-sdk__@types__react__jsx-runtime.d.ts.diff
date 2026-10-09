@@ -1,0 +1,27 @@
+--- 2026-10-09_14-11:/exec-daemon/agent-sdk/@types/react/jsx-runtime.d.ts
++++ 2026-10-09_14-24:/exec-daemon/agent-sdk/@types/react/jsx-runtime.d.ts
+@@ -5,11 +5,13 @@
+  * lets `"jsx": "react-jsx"` resolve without a full `@types/react`.
+  */
+ 
++import type { JSXElementConstructor, ReactElement, Key } from "./index.js";
++
+ /* eslint-disable @typescript-eslint/no-explicit-any */
+ 
+ export namespace JSX {
+-  type ElementType = string | import("./index.js").JSXElementConstructor<any>;
+-  type Element = import("./index.js").ReactElement;
++  type ElementType = string | JSXElementConstructor<any>;
++  type Element = ReactElement;
+   interface IntrinsicElements {
+     [tag: string]: any;
+   }
+@@ -21,7 +23,7 @@
+    * here and tsc still rejected `<Pill key={...} />`.
+    */
+   interface IntrinsicAttributes {
+-    key?: import("./index.js").Key | null;
++    key?: Key | null;
+   }
+ }
+ 

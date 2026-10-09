@@ -1,0 +1,926 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/skincare_glow_routine_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/skincare_glow_routine_presentation.js
+@@ -0,0 +1,923 @@
++/**
++ * "Glowys — Skincare Presentation Template": 30-slide deck rebuilt with pptxgenjs.
++ *
++ * Photos in the source deck are grey "Insert Your Image Here" stand-ins; they are
++ * redrawn here as native rectangles plus their caption (see `imgBox`). The small
++ * pictogram assets are approximated with native shapes (see `icon`).
++ *
++ *   node 0e14b245-a595-478c-acf3-04e1eb89dab4_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++const HEAD = 'Fredoka Medium'; // theme major latin font
++const BODY = 'Lato'; // theme minor latin font
++
++const C = {
++  text: '3F3F3F', // theme dk1 / tx1
++  white: 'FFFFFF',
++  accent: 'A7BFCB', // theme accent1
++  pale: 'FBFCFC', // accent1 lumMod 5%  + lumOff 95%
++  light: 'DCE5EA', // accent1 lumMod 40% + lumOff 60%
++  mid: '6D95A9', // accent1 lumMod 75%
++  dark: '456474', // accent1 lumMod 50%
++  ink: '191D1E',
++  red: 'C00000',
++  photo: 'D9D9D9', // grey of the "Insert Your Image Here" artwork
++  photoAlt: 'DDDDDD',
++};
++
++/* the template's recurring lorem strings */
++const L = {
++  a: 'Lorem ipsum dolor sit amet, consectetuer',
++  b: 'Lorem ipsum dolor sit amet, consectetuer adipiscing',
++  c: 'Lorem ipsum dolor sit amet, sed consectetuer adipiscing elit. ',
++  d: 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas',
++  e: 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit ameta consectetuer',
++  f: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere',
++  g: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus',
++  h: 'Lorem ipsum dolor sit amet, consectetuer sit adipiscing elit. Maecenas porttitor congue',
++  i: 'Lorem ipsum dolor sit sed amet, adipiscing elit. ',
++  j: 'Lorem ipsum dolor sit amet, adipiscing elit. ',
++  k: 'Lorem ipsum dolor sit amet, consectetuer massa. adipiscing elit. Maecenas porttitor congue',
++  m: 'Lorem ipsum dolor sit amet, consectetuer adipiscing  Maecenas porttitor',
++  n: 'pulvinar ultricies, purus lectus malesuada libero, sit ameta consectetuer posuere porttitor',
++  p: 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa. Fusce posuere',
++  q: 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit consectetuer',
++};
++
++/* ---------------------------------------------------------------- helpers */
++
++/** 40pt Fredoka headline — the deck's standard title treatment. */
++function title(s, text, x, y, w, h, o = {}) {
++  s.addText(text, { x, y, w, h, fontFace: HEAD, fontSize: 40, color: C.text, valign: 'top', ...o });
++}
++
++/** 14pt Lato paragraph at 150% leading — the deck's standard body treatment. */
++function body(s, text, x, y, w, h, o = {}) {
++  s.addText(text, {
++    x, y, w, h, fontFace: BODY, fontSize: 14, color: C.text,
++    valign: 'top', lineSpacingMultiple: 1.5, ...o,
++  });
++}
++
++/** The oversized percentage / price numerals used throughout the deck. */
++function figure(s, text, x, y, w, h, o = {}) {
++  s.addText(text, { x, y, w, h, fontFace: HEAD, fontSize: 40, color: C.dark, valign: 'top', ...o });
++}
++
++/** Bold 16pt Lato mini-heading: "Title Here", "Step 1", "Insert Text", ... */
++function label(s, text, x, y, w, h, o = {}) {
++  s.addText(text, {
++    x, y, w, h, fontFace: BODY, fontSize: 16, bold: true, color: C.text,
++    valign: 'top', lineSpacingMultiple: 1.5, ...o,
++  });
++}
++
++function rect(s, x, y, w, h, o = {}) {
++  s.addShape('rect', { x, y, w, h, ...o });
++}
++
++function line(s, x, y, w, h, color, width) {
++  s.addShape('line', { x, y, w, h, line: { color, width } });
++}
++
++/** Multi-segment (bent) connector, drawn as a chain of straight segments. */
++function polyline(s, pts, color, width) {
++  for (let i = 1; i < pts.length; i++) {
++    const [x0, y0] = pts[i - 1];
++    const [x1, y1] = pts[i];
++    line(s, Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0), color, width);
++  }
++}
++
++/**
++ * Down arrow with the deck's proportions (a 67%-wide shaft and a head taking the
++ * bottom 40%); pptxgenjs cannot set preset adjust values, so use custom geometry.
++ */
++function downArrow(s, x, y, w, h, o = {}) {
++  const sx = (w - w * 0.672) / 2; // shaft inset from each side
++  const hy = h * 0.6; // where the head starts
++  s.addShape('custGeom', {
++    x, y, w, h, ...o,
++    points: [
++      { x: 0, y: hy }, { x: sx, y: hy }, { x: sx, y: 0 }, { x: w - sx, y: 0 },
++      { x: w - sx, y: hy }, { x: w, y: hy }, { x: w / 2, y: h }, { close: true },
++    ],
++  });
++}
++
++/** Small filled circle used as a connector end cap. */
++function dot(s, x, y, color, d = 0.09) {
++  s.addShape('ellipse', { x: x - d / 2, y: y - d / 2, w: d, h: d, fill: { color }, line: { type: 'none' } });
++}
++
++function mix(a, b, t) {
++  const p = (h, i) => parseInt(h.substr(i * 2, 2), 16);
++  const v = (i) => Math.round(p(a, i) + (p(b, i) - p(a, i)) * t).toString(16).padStart(2, '0');
++  return (v(0) + v(1) + v(2)).toUpperCase();
++}
++
++/** Colour of a `[[position, hex], ...]` stop list at position `t`. */
++function stopColor(stops, t) {
++  for (let i = 1; i < stops.length; i++) {
++    if (t <= stops[i][0]) {
++      const [p0, c0] = stops[i - 1];
++      const [p1, c1] = stops[i];
++      return mix(c0, c1, p1 === p0 ? 0 : (t - p0) / (p1 - p0));
++    }
++  }
++  return stops[stops.length - 1][1];
++}
++
++/** Linear gradient, painted as a stack of solid bands (pptxgenjs fills are solid only). */
++function gradient(s, x, y, w, h, stops, dir = 'v', steps = 40) {
++  for (let i = 0; i < steps; i++) {
++    const color = stopColor(stops, (i + 0.5) / steps);
++    const o = { fill: { color }, line: { type: 'none' } };
++    if (dir === 'v') rect(s, x, y + (h * i) / steps, w, h / steps + 0.02, o);
++    else rect(s, x + (w * i) / steps, y, w / steps + 0.02, h, o);
++  }
++}
++
++/**
++ * Radial gradient, painted as nested ellipses over a base rectangle. `spread` is
++ * how far past the slide edge the outermost ring reaches, `ease` bends the ramp.
++ */
++function radial(s, x, y, w, h, inner, outer, spread = 1.35, ease = 0.8, steps = 44) {
++  rect(s, x, y, w, h, { fill: { color: outer }, line: { type: 'none' } });
++  for (let i = steps; i >= 1; i--) {
++    const t = i / steps;
++    const ew = w * spread * t;
++    const eh = h * spread * t;
++    s.addShape('ellipse', {
++      x: x + (w - ew) / 2, y: y + (h - eh) / 2, w: ew, h: eh,
++      fill: { color: mix(inner, outer, Math.pow(t, ease)) }, line: { type: 'none' },
++    });
++  }
++}
++
++/** Deck background: the master's accent1 5% -> 40% vertical wash. */
++function background(s) {
++  gradient(s, 0, 0, SLIDE_W, SLIDE_H, [[0, C.pale], [1, C.light]], 'v', 36);
++}
++
++/** Master furniture: page number, rotated running head, hairline rule, logo. */
++function chrome(s, num, color = C.mid) {
++  s.addText(String(num), {
++    x: 0.116, y: 6.641, w: 0.596, h: 0.399,
++    fontFace: BODY, fontSize: 14, color, align: 'center', valign: 'middle',
++  });
++  icon(s, 'drops', 0.296, 0.601, 0.236, color);
++  s.addText('Skincare Presentation template', {
++    x: 0.221, y: 2.095, w: 0.37, h: 3.288,
++    fontFace: BODY, fontSize: 10, color, align: 'center', charSpacing: 3, vert: 'vert270', wrap: false,
++  });
++  line(s, 0.817, 0, 0, SLIDE_H, color === C.white ? C.white : C.accent, 0.5);
++}
++
++/**
++ * The three grey stand-in plates used by the template, described by where the
++ * baked-in "Insert Your Image Here" caption sits inside the artwork and how
++ * tall that caption is as a fraction of the full plate.
++ */
++const ART = {
++  wide: { fill: C.photo, cx: 0.500, cy: 0.500, ch: 0.049 }, // 2000x1125 plate
++  tall: { fill: C.photoAlt, cx: 0.532, cy: 0.541, ch: 0.082 }, // 187x402 plate
++  slim: { fill: C.photoAlt, cx: 0.512, cy: 0.536, ch: 0.107 }, // 129x280 plate
++  ghost: { fill: null, cx: 0.500, cy: 0.500, ch: 0.049, ink: '98A9B2' }, // caption only, over a gradient
++  faded: { fill: C.photo, cx: 0.500, cy: 0.500, ch: 0.049, ink: '9AABB4' }, // plate seen through a tinted overlay
++};
++
++/**
++ * Stand-in for a photo. `crop` is the source deck's srcRect [left, top, right,
++ * bottom] as fractions, which decides how much of the plate — and therefore how
++ * much of its caption — is visible. `tilt` is [degrees, w, h] for the plates the
++ * deck clips to a rotated parallelogram; the caption itself stays upright. An
++ * `art.fill` of null draws the caption only, over a gradient painted beneath.
++ */
++function imgBox(s, x, y, w, h, o = {}) {
++  const art = o.art || ART.wide;
++  const [l, t, r, b] = o.crop || [0, 0, 0, 0];
++
++  if (o.tilt) {
++    const [deg, tw, th] = o.tilt;
++    rect(s, x + (w - tw) / 2, y + (h - th) / 2, tw, th,
++      { fill: { color: art.fill }, line: { type: 'none' }, rotate: deg });
++  } else if (art.fill) {
++    rect(s, x, y, w, h, { fill: { color: art.fill }, line: { type: 'none' } });
++  }
++
++  const plateH = h / (1 - t - b); // height the uncropped plate would occupy
++  const capX = x + (w * (art.cx - l)) / (1 - l - r);
++  const capY = y + (h * (art.cy - t)) / (1 - t - b);
++  s.addText([{ text: 'Insert Your Image', options: { breakLine: true } }, { text: 'Here' }], {
++    x: capX - w / 2, y: capY - 0.3, w, h: 0.6,
++    fontFace: BODY, fontSize: 38.4 * art.ch * plateH,
++    color: art.ink || C.text, align: 'center', valign: 'middle', wrap: false,
++  });
++}
++
++/**
++ * Pictograms (jar / dropper / absorption / face / droplets / social) drawn from
++ * native shapes rather than embedding the original icon bitmaps.
++ */
++function icon(s, kind, x, y, d, color, bg) {
++  const ln = { color, width: Math.max(0.75, d * 4.5) };
++  const at = (cx, cy, w, h) => ({ x: x + (cx - w / 2) * d, y: y + (cy - h / 2) * d, w: w * d, h: h * d });
++  const ell = (cx, cy, r, filled) => s.addShape('ellipse', {
++    ...at(cx, cy, 2 * r, 2 * r),
++    fill: filled ? { color } : { type: 'none' }, line: filled ? { type: 'none' } : ln,
++  });
++  const rr = (cx, cy, w, h, o = {}) => s.addShape('roundRect', {
++    ...at(cx, cy, w, h), rectRadius: Math.min(w, h) * d * 0.4, fill: { type: 'none' }, line: ln, ...o,
++  });
++  const seg = (x0, y0, x1, y1) => line(s, x + Math.min(x0, x1) * d, y + Math.min(y0, y1) * d,
++    Math.abs(x1 - x0) * d, Math.abs(y1 - y0) * d, color, ln.width);
++  const drop = (cx, cy, r) => s.addShape('teardrop', {
++    ...at(cx, cy, 2 * r, 2 * r), rotate: 315, fill: { type: 'none' }, line: ln,
++  });
++
++  switch (kind) {
++    case 'jar': // cream pot: rounded tub topped with a swirl of product
++      rr(0.5, 0.75, 0.84, 0.42);
++      s.addShape('custGeom', {
++        x, y, w: d, h: d, fill: { type: 'none' }, line: ln,
++        points: [
++          { x: 0.13 * d, y: 0.54 * d }, { x: 0.13 * d, y: 0.40 * d },
++          { curve: { type: 'cubic', x1: 0.24 * d, y1: 0.16 * d, x2: 0.44 * d, y2: 0.12 * d }, x: 0.56 * d, y: 0.06 * d },
++          { curve: { type: 'cubic', x1: 0.52 * d, y1: 0.22 * d, x2: 0.74 * d, y2: 0.26 * d }, x: 0.87 * d, y: 0.40 * d },
++          { x: 0.87 * d, y: 0.54 * d }, { close: true },
++        ],
++      });
++      break;
++    case 'dropper': // slanted pipette: barrel, bulb and a drip at the tip
++      s.addShape('roundRect', {
++        ...at(0.54, 0.47, 0.2, 0.66), rectRadius: 0.09 * d, rotate: 45, fill: { type: 'none' }, line: ln,
++      });
++      s.addShape('roundRect', {
++        ...at(0.8, 0.2, 0.28, 0.28), rectRadius: 0.12 * d, rotate: 45, fill: { color }, line: { type: 'none' },
++      });
++      s.addShape('custGeom', {
++        x, y, w: d, h: d, fill: { color }, line: { type: 'none' },
++        points: [{ x: 0.03 * d, y: 0.97 * d }, { x: 0.1 * d, y: 0.7 * d }, { x: 0.3 * d, y: 0.9 * d }, { close: true }],
++      });
++      seg(0.53, 0.26, 0.67, 0.4);
++      break;
++    case 'absorb': // arrows sinking through two wavy skin layers
++      [0.3, 0.7].forEach((cx) => downArrow(s, x + (cx - 0.1) * d, y + 0.04 * d, 0.2 * d, 0.36 * d,
++        { fill: { color }, line: { type: 'none' } }));
++      seg(0.02, 0.5, 0.98, 0.5);
++      s.addShape('wave', { ...at(0.5, 0.68, 0.96, 0.16), fill: { type: 'none' }, line: ln });
++      [0.16, 0.39, 0.61, 0.84].forEach((cx) => ell(cx, 0.86, 0.06, true));
++      break;
++    case 'face': // solid face disc, notched at the compass points, features knocked out
++      s.addShape('ellipse', { ...at(0.5, 0.5, 1, 1), fill: { color }, line: { type: 'none' } });
++      [[0.5, 0.0], [0.0, 0.5], [1.0, 0.5], [0.5, 1.0]].forEach(([cx, cy]) => s.addShape('rect', {
++        ...at(cx, cy, 0.22, 0.22), fill: { color: bg }, line: { type: 'none' },
++      }));
++      [[0.32, 0.44], [0.68, 0.44], [0.5, 0.3]].forEach(([cx, cy]) => s.addShape('ellipse', {
++        ...at(cx, cy, 0.15, 0.15), fill: { color: bg }, line: { type: 'none' },
++      }));
++      s.addShape('blockArc', {
++        ...at(0.5, 0.52, 0.5, 0.5), angleRange: [35, 145], fill: { color: bg }, line: { type: 'none' },
++      });
++      break;
++    case 'drops': // two droplets above a scatter of dots (the deck's logo mark)
++      drop(0.27, 0.28, 0.24);
++      drop(0.73, 0.28, 0.24);
++      [0.14, 0.38, 0.62, 0.86].forEach((cx) => ell(cx, 0.84, 0.07, true));
++      break;
++    case 'phone':
++      s.addShape('moon', { ...at(0.5, 0.5, 0.62, 0.86), rotate: 225, fill: { type: 'none' }, line: ln });
++      break;
++    case 'whatsapp':
++      ell(0.5, 0.5, 0.47);
++      s.addShape('moon', { ...at(0.5, 0.52, 0.34, 0.46), rotate: 225, fill: { type: 'none' }, line: ln });
++      break;
++    case 'instagram':
++      rr(0.5, 0.5, 0.94, 0.94);
++      ell(0.5, 0.52, 0.24);
++      ell(0.76, 0.24, 0.06, true);
++      break;
++  }
++}
++
++/* ---------------------------------------------------------------- slide 1 */
++
++function slide01(s) {
++  radial(s, 0.08, 0, SLIDE_W, SLIDE_H, 'ACC0CB', 'D6DADC', 1.15, 0.7);
++  imgBox(s, 0, 0, SLIDE_W, SLIDE_H, { art: ART.ghost });
++  s.addText('Glowys', {
++    x: 3.055, y: 2.309, w: 7.224, h: 2.423,
++    fontFace: HEAD, fontSize: 138, color: C.white, align: 'center', valign: 'top',
++  });
++  s.addText('Skincare Presentation Template', {
++    x: 3.719, y: 4.594, w: 5.896, h: 0.496,
++    fontFace: BODY, fontSize: 18, color: C.white, align: 'center',
++    charSpacing: 3, lineSpacingMultiple: 1.5, valign: 'top',
++  });
++}
++
++/* ---------------------------------------------------------------- slide 2 */
++
++function slide02(s) {
++  imgBox(s, 7.193, 0.476, 5.494, 6.547, { crop: [0.286, 0.064, 0.302, 0.064] });
++  title(s, 'Understanding the Science of Skincare for Healthier, Glowing Skin', 1.273, 1.044, 6.095, 2.121);
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet',
++    1.297, 3.436, 5.896, 1.115);
++  rect(s, 1.391, 5.09, 3.975, 1.342, { fill: { color: C.white }, line: { type: 'none' } });
++  icon(s, 'jar', 1.72, 5.565, 0.394, C.dark);
++  body(s, L.b, 2.482, 5.381, 2.554, 0.761);
++}
++
++/* ---------------------------------------------------------------- slide 3 */
++
++function slide03(s) {
++  imgBox(s, 1.351, 0.601, 4.382, 6.299, { crop: [0.326, 0.080, 0.345, 0.080] });
++  title(s, 'Daily Habits for Long-Lasting Skin Health and Beauty', 6.506, 0.914, 6.095, 2.121);
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar',
++    6.531, 3.306, 5.896, 0.761);
++
++  rect(s, 6.667, 4.62, 2.649, 1.967, { fill: { color: C.white }, line: { type: 'none' } });
++  figure(s, '45%', 6.948, 4.835, 1.586, 0.774);
++  body(s, L.a, 6.984, 5.61, 2.05, 0.761);
++
++  rect(s, 9.777, 4.626, 2.649, 1.967, { fill: { type: 'none' }, line: { color: C.mid, width: 1.5 } });
++  figure(s, '86%', 10.009, 4.835, 1.586, 0.774, { color: C.text });
++  body(s, L.a, 10.045, 5.61, 2.05, 0.761);
++}
++
++/* ---------------------------------------------------------------- slide 4 */
++
++function slide04(s) {
++  imgBox(s, 1.351, 4.468, 11.026, 2.331, { crop: [0.101, 0.343, 0.072, 0.347] });
++  title(s, 'Skincare Tips for a Healthy Glow and Naturally Radiant', 1.219, 0.7, 5.313, 2.121);
++  body(s, L.f, 1.243, 3.093, 5.423, 0.761);
++
++  [['01', 1.085, 0.792, 1.144, 1.241], ['02', 2.845, 2.552, 2.905, 3.001]].forEach(([n, yBadge, yTitle, yNum, yBody]) => {
++    rect(s, 7.588, yBadge, 0.624, 0.624, { fill: { color: C.accent }, line: { type: 'none' } });
++    s.addText(n, { x: 7.427, y: yNum, w: 0.947, h: 0.505, fontFace: HEAD, fontSize: 24, color: C.white, align: 'center', valign: 'top' });
++    body(s, 'Title Here', 8.535, yTitle, 2.687, 0.408, { bold: true });
++    body(s, L.h, 8.535, yBody, 4.097, 0.761);
++  });
++}
++
++/* ---------------------------------------------------------------- slide 5 */
++
++function slide05(s) {
++  const cols = [1.351, 4.196, 7.041, 9.886];
++  cols.forEach((x) => imgBox(s, x, 3.278, 2.491, 3.621, { crop: [0.407, 0.259, 0.407, 0.259] }));
++  title(s, 'Skincare Tips for a Healthy Glow and Naturally Radiant', 2.351, 0.601, 9.025, 1.447, { align: 'center' });
++  cols.forEach((x, i) => {
++    rect(s, x, 2.557, 2.491, 0.722, { fill: { color: C.white }, line: { color: C.mid, width: 1.5 } });
++    s.addText('0' + (i + 1), {
++      x: x + 0.772, y: 2.665, w: 0.947, h: 0.505,
++      fontFace: HEAD, fontSize: 24, color: C.dark, align: 'center', valign: 'top',
++    });
++  });
++}
++
++/* ---------------------------------------------------------------- slide 6 */
++
++function slide06(s) {
++  imgBox(s, 9.5, 0, 3.833, 7.5, { crop: [0.356, 0, 0.356, 0], caption: false });
++  rect(s, 9.5, 0, 3.833, 7.5, { fill: { color: C.accent, transparency: 50 }, line: { type: 'none' } });
++  imgBox(s, 9.5, 0, 3.833, 7.5, { crop: [0.356, 0, 0.356, 0], art: ART.ghost });
++  title(s, 'PLACEHOLDER', 1.219, 1.613, 5.598, 2.794);
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit ameta',
++    1.243, 4.772, 5.423, 1.115);
++  imgBox(s, 7.983, 1.2, 3.833, 5.1, { crop: [0.348, 0.160, 0.364, 0.160] });
++}
++
++/* ---------------------------------------------------------------- slide 7 */
++
++function slide07(s) {
++  rect(s, 8.783, 0, 4.55, 7.5, { fill: { color: C.accent }, line: { type: 'none' } });
++  rect(s, 6.934, 5.541, 4.899, 1.342, { fill: { color: C.white }, line: { type: 'none' } });
++  figure(s, '45%', 7.241, 5.825, 1.586, 0.774);
++  body(s, L.c, 8.623, 5.831, 2.961, 0.761);
++  title(s, 'PLACEHOLDER', 1.219, 1.325, 4.533, 3.467);
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies',
++    1.239, 5.06, 4.408, 1.115);
++  imgBox(s, 6.933, 0.601, 4.883, 4.339, { crop: [0.316, 0.201, 0.318, 0.220] });
++}
++
++/* ---------------------------------------------------------------- slide 8 */
++
++function slide08(s) {
++  imgBox(s, 8.643, 0, 4.69, 7.5, { crop: [0.323, 0, 0.326, 0] });
++  title(s, 'Anti-Aging Skincare Essentials to Keep Your Skin Looking Young', 1.239, 0.503, 6.433, 2.121);
++  [['dropper', 3.139], ['drops', 4.444], ['absorb', 5.748]].forEach(([kind, y]) => {
++    line(s, 1.762, y + 0.551, 2.1, 0, C.accent, 1);
++    rect(s, 1.361, y, 1.103, 1.103, { fill: { color: C.mid }, line: { type: 'none' } });
++    rect(s, 3.862, y, 3.384, 1.103, { fill: { type: 'none' }, line: { color: C.mid, width: 1.5 } });
++    icon(s, kind, 1.716, y + 0.354, 0.394, C.white);
++    body(s, L.c, 4.099, y + 0.171, 2.908, 0.761);
++  });
++}
++
++/* ---------------------------------------------------------------- slide 9 */
++
++function slide09(s) {
++  imgBox(s, 1.351, 4.002, 4.804, 2.531, { crop: [0.319, 0.332, 0.321, 0.330] });
++  title(s, 'PLACEHOLDER', 1.214, 0.967, 6.44, 2.121);
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies',
++    8.117, 1.47, 4.391, 1.115);
++
++  rect(s, 6.617, 3.996, 2.649, 2.531, { fill: { color: C.white }, line: { type: 'none' } });
++  figure(s, '45%', 6.898, 4.775, 1.586, 0.774);
++  body(s, L.a, 6.934, 5.55, 2.05, 0.761);
++
++  rect(s, 9.727, 4.002, 2.649, 2.531, { fill: { type: 'none' }, line: { color: C.mid, width: 1.5 } });
++  figure(s, '86%', 9.959, 4.775, 1.586, 0.774, { color: C.text });
++  body(s, L.a, 9.995, 5.55, 2.05, 0.761);
++
++  icon(s, 'jar', 7.035, 4.3, 0.354, C.dark);
++  icon(s, 'dropper', 10.079, 4.3, 0.354, C.dark);
++}
++
++/* --------------------------------------------------------------- slide 10 */
++
++function slide10(s) {
++  imgBox(s, 1.351, 0.601, 5.316, 6.899, { crop: [0.296, 0.014, 0.305, 0.066] });
++  title(s, 'PLACEHOLDER', 7.496, 1.453, 5.1, 2.794);
++  body(s, L.e, 7.576, 4.579, 4.657, 1.468);
++}
++
++/* --------------------------------------------------------------- slide 11 */
++
++function slide11(s) {
++  imgBox(s, 7.4, 0.601, 4.977, 2.333, { crop: [0.317, 0.343, 0.309, 0.346] });
++  title(s, 'Daily Habits for Long-Lasting Skin Health and Beauty', 1.233, 0.707, 5.1, 2.121);
++
++  rect(s, 5.248, 3.708, 3.26, 3.779, { fill: { color: C.white }, line: { type: 'none' } });
++  rect(s, 1.477, 3.721, 3.26, 3.779, { fill: { type: 'none' }, line: { color: C.mid, width: 1.5 } });
++  rect(s, 9.019, 3.708, 3.26, 3.779, { fill: { color: C.white }, line: { type: 'none' } });
++
++  [['45%', 1.789, 1.826], ['52%', 5.56, 5.596], ['76%', 9.331, 9.367]].forEach(([pct, xNum, xTxt]) => {
++    figure(s, pct, xNum, 4.22, 1.586, 0.774);
++    label(s, 'Title Here', xTxt, 5.04, 2.1, 0.452);
++    body(s, L.m, xTxt, 5.493, 2.6, 1.115);
++  });
++}
++
++/* --------------------------------------------------------------- slide 12 */
++
++function slide12(s) {
++  rect(s, 3.911, 0.601, 8.465, 6.899, { fill: { color: C.accent }, line: { type: 'none' } });
++  title(s, 'Hydration The Key to Radiant and Plump Skin', 5.494, 1.298, 6.303, 1.447, { color: C.white });
++  body(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus',
++    5.498, 2.892, 6.155, 0.761, { color: C.white });
++
++  rect(s, 5.615, 4.369, 2.972, 2.531, { fill: { color: C.white }, line: { type: 'none' } });
++  icon(s, 'jar', 6.048, 4.628, 0.354, C.dark);
++  figure(s, '45%', 5.91, 5.104, 1.586, 0.774);
++  body(s, L.i, 5.947, 5.878, 2.368, 0.761);
++
++  rect(s, 8.955, 4.369, 2.972, 2.531, { fill: { type: 'none' }, line: { color: C.white, width: 1.5 } });
++  icon(s, 'dropper', 9.387, 4.628, 0.354, C.white);
++  figure(s, '82%', 9.25, 5.104, 1.586, 0.774, { color: C.white });
++  body(s, L.i, 9.286, 5.878, 2.368, 0.761, { color: C.white });
++
++  rect(s, 4.342, 0.601, 0.772, 1.956, { fill: { color: C.white }, line: { type: 'none' } });
++  icon(s, 'absorb', 4.551, 1.89, 0.354, C.dark);
++  imgBox(s, 0.787, 0.785, 5.654, 6.714, { crop: [0.276, 0.022, 0.300, 0.083] });
++}
++
++/* --------------------------------------------------------------- slide 13 */
++
++function slide13(s) {
++  imgBox(s, 9.197, 0, 4.136, 7.5, { crop: [0.363, 0, 0.327, 0] });
++  [['jar', 0.578], ['dropper', 2.238], ['absorb', 3.898], ['face', 5.558]].forEach(([kind, y]) => {
++    rect(s, 7.374, y, 3.975, 1.342, { fill: { color: C.white }, line: { type: 'none' } });
++    icon(s, kind, 7.704, y + 0.474, 0.394, C.dark, C.white);
++    body(s, L.b, 8.466, y + 0.29, 2.554, 0.761);
++  });
++  title(s, 'Skincare for Men Simple and Effective Tips for Healthy Skin', 1.238, 1.453, 4.902, 2.794);
++  body(s, L.e, 1.317, 4.579, 4.657, 1.468);
++}
++
++/* --------------------------------------------------------------- slide 14 */
++
++function slide14(s) {
++  imgBox(s, 8.631, 0.974, 3.745, 2.776, { crop: [0.363, 0.315, 0.356, 0.315] });
++  rect(s, 1.391, 0.974, 3.62, 2.776, { fill: { type: 'none' }, line: { color: C.mid, width: 1.5 } });
++  title(s, 'Skincare for Men Simple and Effective Tips for Healthy Skin', 1.238, 4.496, 5.636, 2.121);
++  body(s, L.e, 7.874, 4.823, 4.657, 1.468);
++  body(s, 'Lorem ipsum dolor sit amet, sit adipiscing elit. Maecenas sed porttitor congue massa. ', 1.8, 2.245, 2.801, 1.115);
++  figure(s, '98%', 1.8, 1.374, 1.586, 0.774);
++
++  [['jar', 0.974], ['absorb', 2.362]].forEach(([kind, y]) => {
++    rect(s, 5.011, y, 3.62, 1.388, { fill: { type: 'none' }, line: { color: C.mid, width: 1.5 } });
++    icon(s, kind, 5.415, y + 0.497, 0.394, C.dark);
++    body(s, L.a, 6.178, y + 0.313, 2.049, 0.761);
++  });
++}
++
++/* --------------------------------------------------------------- slide 15 */
++
++function slide15(s) {
++  imgBox(s, 0, 0, SLIDE_W, SLIDE_H, { caption: false, art: ART.faded });
++  rect(s, 0, 0, SLIDE_W, SLIDE_H, { fill: { color: C.accent, transparency: 15 }, line: { type: 'none' } });
++  imgBox(s, 0, 0, SLIDE_W, SLIDE_H, { art: ART.ghost });
++  chrome(s, 15, C.white);
++  title(s, 'How to Choose the Right Sunscreen for Daily Sun Protection', 1.238, 1.086, 5.611, 2.121, { color: C.white });
++  body(s, L.e, 7.874, 1.412, 4.657, 1.468, { color: C.white });
++
++  [['83%', 8.089, 7.843], ['54%', 10.858, 10.612]].forEach(([pct, xNum, xTxt]) => {
++    figure(s, pct, xNum, 4.612, 1.453, 0.774, { color: C.white, align: 'center' });
++    label(s, 'Insert Text Here', xTxt, 5.387, 1.945, 0.452, { color: C.white, align: 'center' });
++  });
++  line(s, 10.2, 4.428, 0, 1.595, C.white, 1.5);
++}
++
++/* --------------------------------------------------------------- slide 16 */
++
++function slide16(s) {
++  imgBox(s, 1.155, 0.397, 6.054, 7.103, { crop: [0.263, 0.053, 0.283, 0] });
++  title(s, 'Skincare Trends to Watch for Cutting-Edge Innovations and Products', 7.544, 0.807, 5.228, 2.794);
++  body(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna', 7.544, 3.718, 4.746, 0.761);
++
++  [7.651, 9.593, 11.534].forEach((x, i) => {
++    line(s, x + 0.843, 5.617, i === 2 ? 0.957 : 1.099, 0, C.mid, 1.5);
++    rect(s, x, 5.196, 0.843, 0.843, { fill: { type: 'none' }, line: { color: C.mid, width: 1.5 } });
++    s.addText('0' + (i + 1), {
++      x: x + 0.122, y: 5.399, w: 0.599, h: 0.438,
++      fontFace: HEAD, fontSize: 20, color: C.dark, align: 'center', valign: 'top',
++    });
++    label(s, 'Insert Text', x - 0.227, 6.241, 1.298, 0.452, { align: 'center' });
++  });
++}
++
++/* --------------------------------------------------------------- slide 17 */
++
++function slide17(s) {
++  title(s, 'The Best Ingredients', 3.877, 0.759, 5.973, 0.774, { align: 'center' });
++
++  const box = { fill: { type: 'none' }, line: { color: C.mid, width: 1.75 } };
++  rect(s, 6.265, 2.545, 1.267, 1.267, box); // top
++  rect(s, 6.265, 4.895, 1.267, 1.267, box); // bottom
++  rect(s, 7.44, 3.72, 1.267, 1.267, { ...box, rotate: 90 }); // right
++  rect(s, 5.09, 3.72, 1.267, 1.267, { ...box, rotate: 90 }); // left
++
++  [[1.42, 2.363], [1.42, 5.13], [9.503, 2.363], [9.503, 5.13]].forEach(([x, y]) => {
++    label(s, 'Title Here', x, y, 2.874, 0.452, { align: 'center' });
++    body(s, L.d, x, y + 0.452, 2.874, 0.761, { align: 'center' });
++  });
++
++  icon(s, 'jar', 6.701, 2.981, 0.394, C.dark);
++  icon(s, 'absorb', 5.526, 4.156, 0.394, C.dark);
++  icon(s, 'face', 6.701, 5.331, 0.394, C.dark, 'E9EDF0');
++  icon(s, 'dropper', 7.876, 4.156, 0.394, C.dark);
++
++  // bent leader lines from each quadrant of copy to the tile cluster
++  [
++    [[6.264, 3.178], [4.949, 3.178], [4.949, 2.589], [3.633, 2.589]],
++    [[5.724, 4.986], [5.724, 5.412], [3.634, 5.412]],
++    [[8.073, 3.719], [8.073, 2.664], [10.136, 2.664]],
++    [[6.898, 6.162], [6.898, 6.412], [8.891, 6.412], [8.891, 5.455], [10.207, 5.455]],
++  ].forEach((pts) => {
++    polyline(s, pts, C.accent, 0.75);
++    const [ex, ey] = pts[pts.length - 1];
++    dot(s, ex, ey, C.accent);
++  });
++}
++
++/* --------------------------------------------------------------- slide 18 */
++
++function slide18(s) {
++  title(s, 'Skincare Tips for Healthy Glow and Naturally Skin', 7.865, 1.766, 4.907, 2.121);
++  body(s, L.q, 7.836, 4.266, 4.455, 1.468);
++
++  [1.084, 2.259, 3.434, 4.609, 5.784].forEach((y) => line(s, 1.351, y, 5.599, 0, C.accent, 0.5));
++
++  const bars = [
++    { x: 1.651, y: 3.434, h: 2.35, fill: { color: C.white }, line: { color: C.mid, width: 1.5 }, num: C.text },
++    { x: 3.467, y: 1.084, h: 4.7, fill: { color: C.accent }, line: { type: 'none' }, num: C.white },
++    { x: 5.284, y: 2.259, h: 3.525, fill: { color: C.mid }, line: { type: 'none' }, num: C.white },
++  ];
++  bars.forEach((b, i) => {
++    rect(s, b.x, b.y, 1.366, b.h, { fill: b.fill, line: b.line });
++    s.addText('50%', {
++      x: b.x + 0.25, y: b.y + 0.18, w: 0.866, h: 0.438,
++      fontFace: HEAD, fontSize: 20, color: b.num, align: 'center', valign: 'top',
++    });
++    label(s, 'Option ' + (i + 1), b.x + 0.094, 5.964, 1.177, 0.452, { align: 'center' });
++  });
++}
++
++/* --------------------------------------------------------------- slide 19 */
++
++function slide19(s) {
++  title(s, 'Do and Don\u2019t', 4.213, 0.733, 4.907, 0.774, { align: 'center' });
++
++  [2.775, 3.806, 4.837, 5.868].forEach((y) => line(s, 1.351, y, 11.026, 0, C.mid, 1.5));
++  [5.317, 6.517, 7.717].forEach((x) => line(s, x, 2.775, 0, 4.125, C.mid, 1.5));
++
++  const head = { fontFace: HEAD, fontSize: 20, color: C.mid, align: 'center', valign: 'top' };
++  s.addText('Title here', { x: 2.385, y: 2.245, w: 1.898, h: 0.438, ...head });
++  s.addText('Do', { x: 5.591, y: 2.245, w: 0.652, h: 0.438, ...head });
++  s.addText('Don\u2019t', { x: 6.582, y: 2.245, w: 1.069, h: 0.438, ...head });
++  s.addText('Title Here', { x: 9.145, y: 2.245, w: 1.804, h: 0.438, ...head });
++
++  // [row label y, copy y, is the filled dot in the "Do" column?, right hand copy]
++  const rows = [[3.088, 2.901, true, L.p], [4.119, 3.932, false, L.n], [5.151, 4.971, false, L.p], [6.182, 5.994, true, L.n]];
++  rows.forEach(([y, copyY, doIt, copy]) => {
++    s.addText('Insert Text Here', {
++      x: 2.175, y, w: 2.317, h: 0.404,
++      fontFace: BODY, fontSize: 18, bold: true, color: C.text, align: 'center', valign: 'top',
++    });
++    [[5.754, doIt], [6.954, !doIt]].forEach(([x, filled]) => s.addShape('ellipse', {
++      x, y: y + 0.039, w: 0.326, h: 0.326,
++      fill: filled ? { color: C.dark } : { type: 'none' }, line: { color: C.mid, width: 1.5 },
++    }));
++    body(s, copy, 7.795, copyY, 4.503, 0.761, { align: 'center' });
++  });
++}
++
++/* --------------------------------------------------------------- slide 20 */
++
++function slide20(s) {
++  gradient(s, 0, 0, SLIDE_W, SLIDE_H,
++    [[0, 'ECEDEC'], [0.3, 'D1DBDF'], [0.5, 'BBCBD4'], [0.72, '9BB4C1'], [1, '6B94A8']], 'h', 48);
++  imgBox(s, 0, 0, SLIDE_W, SLIDE_H, { art: ART.ghost });
++
++  s.addText('Why', {
++    x: 7.437, y: 1.778, w: 4.308, h: 0.774,
++    fontFace: HEAD, fontSize: 40, color: C.white, align: 'center', charSpacing: 3, valign: 'top',
++  });
++  s.addText('Your Brand', {
++    x: 6.977, y: 2.408, w: 5.228, h: 1.212,
++    fontFace: HEAD, fontSize: 66, color: C.white, align: 'center', valign: 'top',
++  });
++  body(s, L.p, 7.339, 4.126, 4.503, 0.761, { color: C.white, align: 'center' });
++
++  icon(s, 'whatsapp', 8.723, 5.393, 0.329, C.white);
++  icon(s, 'instagram', 9.426, 5.393, 0.329, C.white);
++  icon(s, 'phone', 10.13, 5.393, 0.329, C.white);
++
++  chrome(s, 20, C.white);
++  imgBox(s, 2.252, 0.601, 3.394, 6.394, { crop: [0.363, 0.058, 0.382, 0.090] });
++}
++
++/* --------------------------------------------------------------- slide 21 */
++
++function slide21(s) {
++  title(s, 'Winter Skincare Essentials to Keep Skin Hydrated and Protected', 1.95, 0.565, 9.433, 1.447, { align: 'center' });
++  body(s, L.q, 2.385, 2.218, 8.564, 0.761, { align: 'center' });
++
++  const cards = [
++    { card: 1.351, img: 1.722, text: 3.312, price: '$1.29', art: ART.wide, crop: [0.418, 0.180, 0.427, 0.227] },
++    { card: 7.061, img: 7.408, text: 9.022, price: '$2.06', art: ART.tall, crop: [0, 0, 0, 0] },
++  ];
++  cards.forEach((c) => imgBox(s, c.img, 3.89, 1.247, 2.681, { art: c.art, crop: c.crop }));
++  cards.forEach((c) => {
++    rect(s, c.card, 3.562, 5.316, 3.338, { fill: { type: 'none' }, line: { color: C.mid, width: 1.5 } });
++    s.addText('Insert Text Here', { x: c.text, y: 4.011, w: 2.744, h: 0.505, fontFace: HEAD, fontSize: 24, color: C.text, valign: 'top' });
++    line(s, c.text, 4.749, 2.983, 0, C.accent, 1.5);
++    s.addText(c.price, { x: c.text, y: 4.982, w: 2.744, h: 0.707, fontFace: HEAD, fontSize: 36, color: C.dark, valign: 'top' });
++    body(s, L.d, c.text, 5.689, 2.744, 0.761);
++  });
++}
++
++/* --------------------------------------------------------------- slide 22 */
++
++function slide22(s) {
++  title(s, 'Winter Skincare Essentials to Keep Skin Hydrated and Protected', 1.95, 0.565, 9.433, 1.447, { align: 'center' });
++
++  const cols = [
++    { x: 1.631, w: 2.367, side: 0.411, icon: 2.657, text: 1.523, kind: 'dropper' },
++    { x: 5.794, w: 2.139, side: 0.420, icon: 6.706, text: 5.572, kind: 'jar' },
++    { x: 9.932, w: 1.962, side: 0.426, icon: 10.756, text: 9.622, kind: 'face' },
++  ];
++  cols.forEach((c) => imgBox(s, c.x, 2.524, c.w, 2.346, { crop: [c.side, 0.337, c.side, 0.351] }));
++  cols.forEach((c) => {
++    icon(s, c.kind, c.icon, 5.254, 0.315, C.dark, 'E9EDF0');
++    label(s, 'Insert Text', c.text, 5.686, 2.583, 0.452, { align: 'center' });
++    body(s, L.d, c.text, 6.174, 2.583, 0.761, { align: 'center' });
++  });
++
++  line(s, 1.351, 4.87, 11.026, 0, C.accent, 1.5);
++  line(s, 4.919, 4.87, 0, 2.029, C.accent, 1.5);
++  line(s, 8.808, 4.87, 0, 2.029, C.accent, 1.5);
++}
++
++/* --------------------------------------------------------------- slide 23 */
++
++function slide23(s) {
++  const steps = [
++    { card: 1.741, img: [2.16, 3.147, 0.86, 1.869], dot: 2.491, text: 1.299, copy: 1.342, filled: true, art: ART.wide, crop: [0.440, 0.259, 0.443, 0.290] },
++    { card: 4.566, img: [5.045, 2.774, 0.745, 2.241], dot: 5.318, text: 4.126, copy: 4.169, filled: true, art: ART.slim, crop: [0.139, 0, 0.139, 0] },
++    { card: 7.651, img: [8.019, 2.462, 0.967, 2.547], dot: 8.396, text: 7.195, copy: 7.238, filled: true, art: ART.slim, crop: [0.088, 0, 0.088, 0] },
++    { card: 10.532, img: [11.042, 3.017, 0.668, 1.998], dot: 11.276, text: 10.085, copy: 10.127, filled: false, art: ART.slim, crop: [0.137, 0, 0.137, 0] },
++  ];
++  steps.forEach((st) => rect(s, st.card, 2.304, 1.703, 2.864, { fill: { color: C.white }, line: { color: C.mid, width: 1.5 } }));
++
++  s.addText([
++    { text: 'Step by Step ', options: { breakLine: true } },
++    { text: 'to Get Korean Glassy Skin' },
++  ], { x: 1.95, y: 0.49, w: 9.433, h: 1.447, fontFace: HEAD, fontSize: 40, color: C.text, align: 'center', valign: 'top' });
++
++  line(s, 1.351, 5.415, 11.026, 0, C.accent, 1.5);
++
++  steps.forEach((st, i) => {
++    s.addShape('ellipse', {
++      x: st.dot, y: 5.315, w: 0.2, h: 0.2,
++      fill: { color: st.filled ? C.mid : C.white }, line: st.filled ? { type: 'none' } : { color: C.mid, width: 1.5 },
++    });
++    label(s, 'Step ' + (i + 1), st.text, 5.727, 2.583, 0.452, { align: 'center' });
++    body(s, L.j, st.copy, 6.214, 2.498, 0.761, { align: 'center' });
++  });
++  steps.forEach((st) => imgBox(s, st.img[0], st.img[1], st.img[2], st.img[3], { art: st.art, crop: st.crop }));
++}
++
++/* --------------------------------------------------------------- slide 24 */
++
++function slide24(s) {
++  gradient(s, 5.956, 0, 7.377, 7.5, [[0, C.light], [0.3, 'E3E5E6'], [0.48, C.photoAlt], [1, C.photoAlt]], 'h', 30);
++  imgBox(s, 5.956, 0, 7.377, 7.5, { crop: [0.203, 0, 0.243, 0], art: ART.ghost });
++  rect(s, 0, 0, 5.956, 7.5, { fill: { color: C.light }, line: { type: 'none' } });
++  chrome(s, 24, C.mid);
++  title(s, 'Skincare Tips for Healthy Glow and Naturally Skin', 1.27, 0.826, 4.907, 2.121);
++
++  rect(s, 1.351, 3.549, 4.899, 1.342, { fill: { color: C.white }, line: { type: 'none' } });
++  figure(s, '45%', 1.658, 3.833, 1.586, 0.774);
++  body(s, L.c, 3.039, 3.84, 2.961, 0.761);
++
++  rect(s, 1.351, 5.332, 4.899, 1.342, { fill: { type: 'none' }, line: { color: C.ink, width: 1.5 } });
++  figure(s, '45%', 1.658, 5.616, 1.586, 0.774);
++  body(s, L.c, 3.039, 5.622, 2.961, 0.761);
++}
++
++/* --------------------------------------------------------------- slide 25 */
++
++function slide25(s) {
++  // three tilted product shots, each a rotated crop of the source artwork
++  imgBox(s, 9.109, 5.105, 1.361, 1.918, { crop: [0.392, 0.239, 0.392, 0.219], tilt: [69.7, 1.748, 0.805] });
++  imgBox(s, 9.022, 2.265, 1.535, 2.532, { crop: [0.409, 0.211, 0.409, 0.253], tilt: [16.4, 0.901, 2.374] });
++  imgBox(s, 9.343, 0.683, 0.703, 1.373, { crop: [0.406, 0.186, 0.428, 0.236], tilt: [77.9, 1.311, 0.439] });
++
++  const arrows = [
++    { x: 10.903, y: 0.601, w: 1.128, h: 1.412, fill: { color: C.white }, line: { color: C.mid, width: 1.5 }, label: '5%', color: C.text, tx: 11.166, ty: 1.31, tw: 0.602 },
++    { x: 10.714, y: 2.374, w: 1.506, h: 1.886, fill: { color: C.accent }, line: { type: 'none' }, label: '+5%', color: C.white, tx: 11.082, ty: 3.531, tw: 0.769 },
++    { x: 10.557, y: 4.62, w: 1.82, h: 2.279, fill: { color: C.mid }, line: { type: 'none' }, label: '+10%', color: C.white, tx: 10.988, ty: 6.064, tw: 0.958 },
++  ];
++  arrows.forEach((a) => downArrow(s, a.x, a.y, a.w, a.h, { fill: a.fill, line: a.line }));
++
++  title(s, 'Sensitive Skin Solutions A Comprehensive Guide to Skincare', 1.219, 1.613, 4.667, 2.794);
++  body(s, L.g, 1.241, 4.772, 4.853, 1.115);
++
++  arrows.forEach((a) => s.addText(a.label, {
++    x: a.tx, y: a.ty, w: a.tw, h: 0.438,
++    fontFace: HEAD, fontSize: 20, color: a.color, align: 'center', valign: 'top',
++  }));
++
++  [['$1.29', 0.906, 1.056], ['$1.00', 3.257, 3.407], ['$2.47', 5.608, 5.758]].forEach(([price, yBox, yTxt]) => {
++    rect(s, 7.041, yBox, 1.68, 0.912, { fill: { color: C.white }, line: { color: C.mid, width: 1.5 } });
++    s.addText(price, { x: 7.2, y: yTxt, w: 1.363, h: 0.572, fontFace: HEAD, fontSize: 28, color: C.dark, align: 'center', valign: 'top' });
++  });
++}
++
++/* --------------------------------------------------------------- slide 26 */
++
++function slide26(s) {
++  rect(s, 6.3, 0.833, 3.205, 5.833, { fill: { color: C.accent }, line: { type: 'none' } });
++  rect(s, 9.505, 1.575, 2.872, 4.35, { fill: { color: C.white }, line: { color: C.mid, width: 1.75 } });
++  s.addShape('star24', { x: 5.909, y: 1.265, w: 0.977, h: 0.977, fill: { color: C.red }, line: { type: 'none' } });
++
++  title(s, 'Sensitive Skin Solutions A Comprehensive Guide to Skincare', 1.13, 1.613, 4.667, 2.794);
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ',
++    1.152, 4.772, 4.451, 1.115);
++
++  s.addText([
++    { text: '50%', options: { fontSize: 20, breakLine: true } },
++    { text: 'OFF', options: { fontSize: 11 } },
++  ], { x: 5.886, y: 1.434, w: 1.024, h: 0.64, fontFace: HEAD, color: C.white, align: 'center', valign: 'top' });
++
++  [3.97, 4.621, 5.271].forEach((y, i) => {
++    s.addText('Lorem ipsum dolor sit', { x: 9.713, y, w: 2.455, h: 0.337, fontFace: BODY, fontSize: 14, color: C.text, align: 'center', valign: 'top' });
++    if (i < 2) line(s, 9.762, y + 0.494, 2.357, 0, C.accent, 1.5);
++  });
++  [4.239, 5.07, 5.901].forEach((y, i) => {
++    body(s, 'Lorem ipsum dolor sit amet', 6.519, y, 2.768, 0.408, { color: C.white, align: 'center' });
++    if (i < 2) line(s, 6.519, y + 0.619, 2.768, 0, C.white, 1.5);
++  });
++
++  imgBox(s, 7.407, 1.191, 0.99, 2.596, { crop: [0.442, 0.205, 0.438, 0.236] });
++  imgBox(s, 10.628, 1.893, 0.616, 1.84, { crop: [0.433, 0.140, 0.436, 0.164] });
++}
++
++/* --------------------------------------------------------------- slide 27 */
++
++function slide27(s) {
++  imgBox(s, 0.957, 1.802, 4.899, 5.698, { crop: [0.318, 0.092, 0.314, 0.149] });
++  title(s, 'The Benefits of Moisturizing', 2.359, 0.601, 8.615, 0.774, { align: 'center' });
++
++  const rows = [
++    { y: 2.408, kind: 'jar', tile: 2.52, ico: 2.922, path: [[2.481, 3.0], [4.305, 3.0], [4.305, 3.079], [6.129, 3.079]] },
++    { y: 3.983, kind: 'face', tile: 4.095, ico: 4.496, path: [[3.38, 3.861], [4.755, 3.861], [4.755, 4.654], [6.13, 4.654]] },
++    { y: 5.558, kind: 'dropper', tile: 5.669, ico: 6.071, path: [[2.785, 5.213], [4.458, 5.213], [4.458, 6.229], [6.13, 6.229]] },
++  ];
++  rows.forEach((r) => {
++    rect(s, 7.477, r.y, 4.899, 1.342, { fill: { color: C.white }, line: { type: 'none' } });
++    body(s, L.k, 7.724, r.y + 0.29, 4.406, 0.761);
++    rect(s, 6.129, r.tile, 1.081, 1.118, { fill: { color: C.mid }, line: { type: 'none' } });
++  });
++  rows.forEach((r) => {
++    polyline(s, r.path, C.accent, 0.75);
++    dot(s, r.path[0][0], r.path[0][1], C.accent);
++    icon(s, r.kind, 6.512, r.ico, 0.315, C.white, C.mid);
++  });
++}
++
++/* --------------------------------------------------------------- slide 28 */
++
++function slide28(s) {
++  imgBox(s, 6.983, 2.286, 5.393, 2.063, { crop: [0.302, 0.359, 0.294, 0.366] });
++  rect(s, 6.983, 4.836, 2.463, 2.063, { fill: { color: C.white }, line: { color: C.mid, width: 1.5 } });
++  rect(s, 9.914, 4.836, 2.463, 2.063, { fill: { color: C.white }, line: { color: C.mid, width: 1.5 } });
++  title(s, 'The Benefits of Moisturizing', 2.359, 0.601, 8.615, 0.774, { align: 'center' });
++
++  const arc = { fill: { type: 'none' }, line: { color: C.accent, width: 1.75, dashType: 'dash' } };
++  s.addShape('arc', { x: 1.743, y: 2.559, w: 3.406, h: 3.407, rotate: 356.3, ...arc });
++  s.addShape('arc', { x: 1.713, y: 3.04, w: 3.406, h: 3.407, rotate: 11.2, flipV: true, ...arc });
++  icon(s, 'jar', 5.009, 4.417, 0.327, C.dark);
++
++  [['45%', 7.278], ['82%', 10.208]].forEach(([pct, x]) => {
++    figure(s, pct, x, 5.142, 1.586, 0.774);
++    body(s, 'Lorem ipsum dolor sit amet, sed elit', x, 5.832, 1.874, 0.761);
++  });
++  imgBox(s, 1.178, 1.540, 3.297, 5.440, { crop: [0.380, 0.125, 0.373, 0.149], tilt: [16.4, 1.935, 5.101] });
++}
++
++/* --------------------------------------------------------------- slide 29 */
++
++function slide29(s) {
++  [3.335, 5.3].forEach((y) => imgBox(s, 1.351, y, 1.778, 1.53, { crop: [0.433, 0.401, 0.433, 0.395] }));
++  imgBox(s, 7.848, 0, 5.485, 7.5, { crop: [0.281, 0, 0.307, 0] });
++  title(s, 'Choosing the Right Skincare Products for Your Unique Skin Type', 1.23, 0.634, 6.187, 2.121);
++
++  [3.361, 5.326].forEach((y) => {
++    s.addText('50%', { x: 8.014, y, w: 0.881, h: 0.337, fontFace: HEAD, fontSize: 14, color: C.dark, align: 'right', valign: 'top' });
++    s.addText('Insert Text', { x: 3.581, y, w: 2.583, h: 0.337, fontFace: BODY, fontSize: 14, bold: true, color: C.text, valign: 'top' });
++    line(s, 3.681, y + 0.482, 5.118, 0, C.white, 3.25);
++    line(s, 3.681, y + 0.482, 2.656, 0, C.mid, 3.25);
++    body(s, L.f, 3.581, y + 0.716, 5.218, 0.761);
++  });
++}
++
++/* --------------------------------------------------------------- slide 30 */
++
++function slide30(s) {
++  imgBox(s, 0, 0, SLIDE_W, SLIDE_H, { caption: false, art: ART.faded });
++  rect(s, 0, 0, SLIDE_W, SLIDE_H, { fill: { color: C.accent, transparency: 15 }, line: { type: 'none' } });
++  imgBox(s, 0, 0, SLIDE_W, SLIDE_H, { art: ART.ghost });
++  s.addText('Thank', { x: 1.222, y: 2.013, w: 4.158, h: 1.717, fontFace: HEAD, fontSize: 96, color: C.white, valign: 'top' });
++  s.addText('You', { x: 1.222, y: 3.423, w: 4.158, h: 1.717, fontFace: HEAD, fontSize: 96, color: C.white, valign: 'top' });
++  s.addText('Presentation Template', {
++    x: 1.222, y: 4.991, w: 3.624, h: 0.496,
++    fontFace: BODY, fontSize: 18, color: C.white, charSpacing: 3, lineSpacingMultiple: 1.5, valign: 'top',
++  });
++  imgBox(s, 4.658, 0, 8.373, 7.5, { crop: [0.188, 0, 0.184, 0] });
++}
++
++/* ------------------------------------------------------------------- deck */
++
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++];
++
++/* slides whose full-bleed artwork replaces the master background and furniture */
++const OWN_BACKGROUND = new Set([1, 15, 20, 24, 30]);
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'GLOWYS', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'GLOWYS';
++  pptx.author = 'Glowys';
++  pptx.title = 'Glowys - Skincare Presentation Template';
++
++  BUILDERS.forEach((builder, i) => {
++    const n = i + 1;
++    const slide = pptx.addSlide();
++    if (!OWN_BACKGROUND.has(n)) {
++      background(slide);
++      chrome(slide, n);
++    }
++    builder(slide);
++  });
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '0e14b245-a595-478c-acf3-04e1eb89dab4_grok_final.pptx') });
++}
++
++build().then((f) => console.log('wrote ' + f)).catch((e) => { console.error(e); process.exit(1); });

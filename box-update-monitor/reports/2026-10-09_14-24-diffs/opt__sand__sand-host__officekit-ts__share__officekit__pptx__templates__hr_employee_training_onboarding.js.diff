@@ -1,0 +1,744 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/hr_employee_training_onboarding.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/hr_employee_training_onboarding.js
+@@ -0,0 +1,741 @@
++/**
++ * "Employee Training" deck — rebuilt with pptxgenjs.
++ *
++ * Slide size 13.333 x 7.5 in (16:9).  Every slide sits on the cream theme
++ * background; the coral accent is used for the little rounded "tick" bars that
++ * sit left of every heading, for cards, pills and chart series.
++ *
++ * The only raster in the source is the tablet photo on slide 17; it is replaced
++ * by a labelled placeholder rectangle (see `imagePlaceholder`).  Every other
++ * picture frame in the source is an *empty* placeholder that renders as bare
++ * background, so those areas are intentionally left blank here too.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const C = {
++  cream: 'FBFAE5', // accent1 – slide background
++  coral: 'ED6A5A', // accent2 – brand colour
++  white: 'FFFFFF',
++  ink: '0D0D0D', // tx1 lightened 5%  – headings
++  body: '404040', // tx1 lightened 25% – body copy
++  black: '000000',
++  coralPale: 'F4A69C', // accent2 lightened 40% – donut arcs
++  greyPale: 'F2F2F2', // bg1 darkened 5%     – donut remainder
++  gridPink: 'FBE1DE', // accent2 20%         – chart gridlines
++  axisGrey: 'D9D9D9',
++  ph: 'E4E1D2', // image placeholder fill
++  phText: '9A9683',
++};
++
++const F = {
++  head: 'DM Sans 18pt SemiBold', // theme major font
++  body: 'DM Sans 18pt', // theme minor font
++};
++
++const SLIDE_W = 13 + 1 / 3;
++const SLIDE_H = 7.5;
++
++const NO_LINE = { type: 'none' };
++
++/* ---------------------------------------------------------------- helpers */
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
++pptx.layout = 'DECK';
++
++/** New cream slide; `page` renders the master's bottom-right slide number. */
++function newSlide({ page = true, pageColor = C.body } = {}) {
++  const s = pptx.addSlide();
++  s.background = { color: C.cream };
++  if (page) {
++    s.slideNumber = {
++      x: 12.19, y: 6.899, w: 0.766, h: 0.337,
++      align: 'right', fontFace: F.body, fontSize: 14, color: pageColor,
++    };
++  }
++  return s;
++}
++
++/** Heading text box (theme major font, 90% line spacing). */
++function heading(s, text, o) {
++  s.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: F.head, fontSize: o.size, color: o.color || C.black,
++    bold: o.bold, align: o.align || 'left', valign: o.valign || 'middle',
++    lineSpacingMultiple: o.line || 0.9,
++  });
++}
++
++/** Body copy text box (theme minor font, 150% line spacing by default). */
++function body(s, text, o) {
++  s.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: o.face || F.body, fontSize: o.size || 14, color: o.color || C.body,
++    bold: o.bold, italic: o.italic,
++    align: o.align || 'left', valign: o.valign || 'top',
++    lineSpacingMultiple: o.line === undefined ? 1.5 : o.line,
++  });
++}
++
++/** The thin coral rounded bar that flags every heading. */
++function accentBar(s, x, y, h) {
++  s.addShape('roundRect', {
++    x, y, w: 0.079, h, rectRadius: 0.0395,
++    fill: { color: C.coral }, line: NO_LINE,
++  });
++}
++
++/** Coral rounded card. `r` is the corner radius in inches. */
++function card(s, x, y, w, h, r, color = C.coral) {
++  s.addShape('roundRect', {
++    x, y, w, h, rectRadius: r,
++    fill: { color }, line: NO_LINE,
++  });
++}
++
++/** Stand-in for a photograph that lived in the original deck. */
++function imagePlaceholder(s, x, y, w, h) {
++  s.addShape('rect', { x, y, w, h, fill: { color: C.ph }, line: NO_LINE });
++  s.addText('[image]', {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontFace: F.body, fontSize: 14, color: C.phText,
++  });
++}
++
++/** Header bar shared by the opening and closing slides. */
++function navBar(s) {
++  heading(s, 'Employee Training', { x: 0.653, y: 0.292, w: 1.685, h: 0.308, size: 12, color: C.ink, valign: 'top' });
++  heading(s, 'Home', { x: 9.019, y: 0.293, w: 0.99, h: 0.28, size: 12, color: C.ink, align: 'center', valign: 'top' });
++  heading(s, 'About Us', { x: 10.204, y: 0.295, w: 0.99, h: 0.308, size: 12, color: C.ink, align: 'center', valign: 'top' });
++  card(s, 11.583, 0.271, 0.99, 0.309, 0.1545);
++  heading(s, 'Contact', { x: 11.609, y: 0.292, w: 0.939, h: 0.281, size: 12, color: C.white, align: 'center', valign: 'top' });
++}
++
++/* ------------------------------------------------------------ boilerplate */
++
++const LOREM =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
++  'exercitation ullamco laboris';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor';
++const LOREM_MED =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut labore et dolore';
++const QUOTE = '"It\u2019s not what you achieve, it\u2019s what you overcome. That\u2019s what defines your career."';
++
++/* ------------------------------------------------------------ slide 1 ---- */
++
++function slideTitle() {
++  const s = newSlide({ page: false });
++  navBar(s);
++  heading(s, 'Employee Training', { x: 1.945, y: 0.734, w: 9.444, h: 1.626, size: 72, color: C.ink, align: 'center' });
++  body(s, LOREM, { x: 1.945, y: 2.359, w: 9.444, h: 0.808, align: 'center' });
++}
++
++/* ------------------------------------------------------------ slide 2 ---- */
++
++function slideWelcome() {
++  const s = newSlide();
++  accentBar(s, 0.721, 1.866, 1.535);
++  heading(s, 'Welcome To Employee Training', { x: 1.202, y: 2.088, w: 6.659, h: 1.314, size: 48 });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco ' +
++    'laboris nisi ut aliquip ex ea commodo consequat.\u00a0Lorem ipsum dolor sit amet, consectetur ' +
++    'adipiscing elit, sed do eiusmod tempor',
++    { x: 1.202, y: 3.75, w: 6.061, h: 1.809, valign: 'bottom' });
++}
++
++/* ------------------------------------------------------------ slide 3 ---- */
++
++function slideObjectives() {
++  const s = newSlide();
++  const stats = [
++    { x: 7.311, w: 1.349, value: '523+', label: 'Testimonial' },
++    { x: 9.184, w: 1.406, value: '89%', label: 'Success' },
++    { x: 10.956, w: 1.406, value: '2020', label: 'Built In' },
++  ];
++
++  card(s, 1.046, 0.808, 5.742, 1.579, 0.309);
++  heading(s, 'Skill Development', { x: 1.302, y: 0.946, w: 5.327, h: 0.555, size: 18, color: C.white, valign: 'top', line: 1.5 });
++  body(s, LOREM_MED, { x: 1.302, y: 1.451, w: 5.364, h: 0.808, color: C.white });
++
++  accentBar(s, 7.518, 1.553, 2.323);
++  heading(s, 'Training Program Objectives', { x: 7.958, y: 1.224, w: 5.262, h: 2.981, size: 60 });
++
++  stats.forEach((st, i) => {
++    if (i > 0) accentBar(s, st.x - 0.445, 4.623, 0.748);
++    heading(s, st.value, { x: st.x, y: 4.521, w: st.w, h: 0.639, size: 32, valign: 'top' });
++    body(s, st.label, { x: st.x, y: 5.035, w: st.w, h: 0.454 });
++  });
++  body(s, LOREM_MED, { x: 7.311, y: 5.675, w: 5.262, h: 0.808 });
++}
++
++/* ------------------------------------------------------------ slide 4 ---- */
++
++function slideMission() {
++  const s = newSlide({ pageColor: C.white });
++  s.addShape('rect', { x: 9.015, y: 0, w: 4.318, h: 7.5, fill: { color: C.coral }, line: NO_LINE });
++  accentBar(s, 0.727, 1.259, 2.323);
++  heading(s, 'Company Mission and Values', { x: 0.999, y: 1.084, w: 5.622, h: 2.672, size: 66 });
++  heading(s, 'To Innovate Sustainable Solutions That Improve Everyday Life',
++    { x: 0.999, y: 4.179, w: 4.755, h: 0.755, size: 18, valign: 'bottom', line: 1.0 });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation',
++    { x: 0.999, y: 4.934, w: 4.986, h: 1.481, valign: 'bottom' });
++}
++
++/* ------------------------------------------------------------ slide 5 ---- */
++
++function slideTeam() {
++  const s = newSlide();
++  const team = [
++    { name: 'Jennifer Sehan', nameX: 1.471, nameY: 6.075, subX: 1.62, subY: 6.423, subW: 1.429, lineX: 1.62, lineY: 6.462 },
++    { name: 'Anton Rodrigo', nameX: 4.747, nameY: 6.075, subX: 4.895, subY: 6.423, subW: 1.429, lineX: 4.895, lineY: 6.462 },
++    { name: 'Anne Grace ', nameX: 7.45, nameY: 6.069, subX: 7.598, subY: 6.417, subW: 1.429, lineX: 7.549, lineY: 6.455 },
++    { name: 'Alex Paula', nameX: 10.153, nameY: 6.062, subX: 10.264, subY: 6.417, subW: 1.59, lineX: 10.251, lineY: 6.448 },
++  ];
++
++  accentBar(s, 1.013, 1.105, 1.102);
++  heading(s, 'Meet the Training Team', { x: 1.013, y: 0.917, w: 11.307, h: 1.479, size: 66, align: 'center' });
++
++  team.forEach(m => {
++    heading(s, m.name, { x: m.nameX, y: m.nameY, w: 1.797, h: 0.37, size: 16, bold: true, align: 'center', valign: 'top' });
++    s.addShape('line', {
++      x: m.lineX, y: m.lineY, w: 1.54, h: 0,
++      line: { color: C.black, width: 0.5 },
++    });
++    body(s, 'Training', { x: m.subX, y: m.subY, w: m.subW, h: 0.404, size: 12, align: 'center' });
++  });
++}
++
++/* ------------------------------------------------------------ slide 6 ---- */
++
++function slideRespectful() {
++  const s = newSlide();
++  const items = [
++    { n: '01', title: 'Encouraging Communication', y: 3.206 },
++    { n: '02', title: 'Respecting Differences', y: 5.185 },
++  ];
++
++  accentBar(s, 0.721, 0.882, 1.693);
++  heading(s, 'Building a Respectful Workplace Training', { x: 1.019, y: 1.006, w: 6.964, h: 1.506, size: 44 });
++
++  items.forEach((it, i) => {
++    card(s, 2.383, it.y, 5.19, 1.714, 0.349);
++    heading(s, it.n, { x: 2.561, y: it.y + (i === 0 ? 0.564 : 0.638), w: 0.862, h: 0.575, size: 36, color: C.white, valign: 'bottom', line: 1.0 });
++    heading(s, it.title, { x: 3.423, y: it.y + 0.297, w: 3.948, h: 0.41, size: 18, color: C.white, valign: 'bottom', line: 1.0 });
++    body(s, LOREM_SHORT, { x: 3.423, y: it.y + 0.638, w: 3.948, h: 0.741, color: C.white, valign: 'bottom' });
++  });
++
++}
++
++/* ------------------------------------------------------------ slide 7 ---- */
++
++function slideOverview() {
++  const s = newSlide();
++  accentBar(s, 0.721, 1.021, 2.165);
++  heading(s, 'Overview Key Responsibilities', { x: 1.078, y: 1.118, w: 7.262, h: 1.971, size: 66 });
++  heading(s, 'Your Text Description Here', { x: 1.078, y: 3.45, w: 7.262, h: 0.481, size: 18, valign: 'bottom', line: 1.0 });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ipsum ' +
++    'dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et ' +
++    'dolore magna aliqua. Ut enim',
++    { x: 1.078, y: 4.021, w: 7.262, h: 1.356, valign: 'bottom' });
++  heading(s, '115k', { x: 1.078, y: 5.659, w: 2.715, h: 0.707, size: 36, valign: 'top' });
++  heading(s, 'Creative Project Value', { x: 1.078, y: 6.161, w: 2.715, h: 0.505, size: 16, bold: true, valign: 'top', line: 1.5 });
++
++  card(s, 8.822, 1.118, 3.747, 5.294, 0.449);
++  heading(s, 'Your Text Here', { x: 9.135, y: 3.822, w: 2.979, h: 0.555, size: 18, color: C.white, valign: 'top', line: 1.5 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt',
++    { x: 9.135, y: 4.283, w: 3.12, h: 1.161, color: C.white });
++  card(s, 9.135, 5.619, 1.523, 0.36, 0.18, C.cream);
++  heading(s, 'Learn More', { x: 9.263, y: 5.659, w: 1.267, h: 0.281, size: 14, color: C.coral, align: 'center', valign: 'top' });
++}
++
++/* ------------------------------------------------------------ slide 8 ---- */
++
++function slideSafety() {
++  const s = newSlide();
++  accentBar(s, 0.737, 4.254, 2.323);
++  heading(s, 'Workplace Safety Guidelines', { x: 1.191, y: 3.848, w: 4.46, h: 3.014, size: 54 });
++  heading(s, 'Prioritizing Your Health and Safety', { x: 6.252, y: 4.254, w: 6.137, h: 0.555, size: 18, bold: true, valign: 'top', line: 1.5 });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ipsum ' +
++    'dolor sit amet, consectetur adipiscing',
++    { x: 6.252, y: 4.77, w: 6.137, h: 1.515 });
++}
++
++/* ------------------------------------------------------------ slide 9 ---- */
++
++function slideDiversity() {
++  const s = newSlide();
++  const cards = [
++    { x: 8.048, y: 1.051, tx: 8.348, title: 'Definition of Inclusivity' },
++    { x: 8.024, y: 3.118, tx: 8.325, title: 'Company Commitment' },
++    { x: 8.048, y: 5.185, tx: 8.348, title: 'Benefits Inclusive Workplace' },
++  ];
++
++  accentBar(s, 0.737, 4.254, 2.323);
++  heading(s, 'Our Commitment to Diversity', { x: 1.24, y: 4.119, w: 5.603, h: 2.592, size: 54 });
++
++  card(s, 4.563, 1.36, 3.127, 1.952, 0.325);
++  heading(s, '95%', { x: 4.738, y: 1.598, w: 1.349, h: 0.639, size: 32, color: C.white, valign: 'top' });
++  heading(s, 'Our Commitment', { x: 5.913, y: 1.598, w: 1.683, h: 0.639, size: 16, bold: true, color: C.white, valign: 'top' });
++  body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ', { x: 4.738, y: 2.212, w: 2.722, h: 0.808, color: C.white });
++
++  cards.forEach(c => {
++    card(s, c.x, c.y, 4.549, 1.714, 0.349);
++    heading(s, c.title, { x: c.tx, y: c.y + 0.298, w: 3.948, h: 0.41, size: 18, color: C.white, valign: 'bottom', line: 1.0 });
++    body(s, LOREM_SHORT, { x: c.tx, y: c.y + 0.638, w: 3.948, h: 0.741, color: C.white, valign: 'bottom' });
++  });
++}
++
++/* ----------------------------------------------------------- slide 10 ---- */
++
++function slideFocusAreas() {
++  const s = newSlide();
++  // six coral cards, three staggered up / three staggered down
++  const cards = [
++    { x: 0.768, y: 2.68, tx: 0.985, ty: 2.783, tw: 2.157, by: 3.229, title: 'Communication' },
++    { x: 4.305, y: 2.68, tx: 4.52, ty: 2.837, tw: 2.152, by: 3.282, title: 'Your Text Here' },
++    { x: 7.842, y: 2.68, tx: 8.058, ty: 2.794, tw: 2.152, by: 3.24, title: 'Your Text Here' },
++    { x: 2.899, y: 5.003, tx: 3.116, ty: 5.106, tw: 2.034, by: 5.551, title: 'Your Text Here' },
++    { x: 6.435, y: 5.003, tx: 6.651, ty: 5.16, tw: 2.152, by: 5.605, title: 'Your Text Here' },
++    { x: 9.972, y: 5.003, tx: 10.189, ty: 5.117, tw: 2.152, by: 5.562, title: 'Your Text Here' },
++  ];
++  // connector segments (already flattened to plain horizontal / vertical runs)
++  const connectors = [
++    { x: 3.872, y: 3.661, w: 0.54, h: 0 },
++    { x: 1.863, y: 4.591, w: 0, h: 1.456 },
++    { x: 1.8625, y: 5.9915, w: 1.107, h: 0 },
++    { x: 3.821, y: 3.801, w: 0, h: 1.2 },
++    { x: 5.944, y: 5.992, w: 0.553, h: 0 },
++    { x: 5.944, y: 4.603, w: 0, h: 1.41 },
++    { x: 7.404, y: 3.661, w: 0.54, h: 0 },
++    { x: 7.353, y: 3.801, w: 0, h: 1.2 },
++    { x: 10.3865, y: 3.6695, w: 1.107, h: 0 },
++    { x: 11.494, y: 3.667, w: 0, h: 1.456 },
++  ];
++  const bullets = [
++    { x: 3.699, y: 3.531 }, { x: 1.739, y: 5.823 }, { x: 5.805, y: 5.82 },
++    { x: 7.231, y: 3.531 }, { x: 11.353, y: 3.531 },
++  ];
++
++  accentBar(s, 0.729, 0.83, 1.26);
++  heading(s, 'Skills Development Focus Areas', { x: 1.093, y: 0.77, w: 6.415, h: 1.608, size: 48 });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad',
++    { x: 7.868, y: 0.929, w: 4.684, h: 1.161 });
++  s.addShape('roundRect', { x: 10.737, y: 2.039, w: 0.535, h: 0.521, rectRadius: 0.1, fill: { color: C.cream }, line: NO_LINE });
++
++  connectors.forEach(c => s.addShape('line', { ...c, line: { color: C.black, width: 1 } }));
++
++  cards.forEach(c => {
++    card(s, c.x, c.y, 2.601, 1.91, 0.26);
++    heading(s, c.title, { x: c.tx, y: c.ty, w: c.tw, h: 0.555, size: 18, color: C.white, valign: 'top', line: 1.5 });
++    body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do',
++      { x: c.tx, y: c.by, w: 2.157, h: 1.161, color: C.white });
++  });
++
++  bullets.forEach(b => {
++    s.addShape('ellipse', { x: b.x, y: b.y, w: 0.277, h: 0.277, fill: { color: C.coral }, line: NO_LINE });
++    s.addText('>', {
++      x: b.x, y: b.y, w: 0.277, h: 0.277, align: 'center', valign: 'middle',
++      fontFace: F.body, fontSize: 10, bold: true, color: C.white, margin: 0,
++    });
++  });
++}
++
++/* ----------------------------------------------------------- slide 11 ---- */
++
++function slideBreak() {
++  const s = newSlide();
++
++  card(s, 3.115, 1.447, 4.145, 1.864, 0.331);
++  heading(s, 'Maria Jolly', { x: 4.188, y: 1.572, w: 1.654, h: 0.555, size: 18, color: C.white, valign: 'top', line: 1.5 });
++  heading(s, 'CEO Founder', { x: 4.188, y: 1.978, w: 1.654, h: 0.454, size: 14, color: C.white, valign: 'top', line: 1.5 });
++  body(s, QUOTE, { x: 3.429, y: 2.387, w: 3.647, h: 0.707, size: 12, color: C.white, italic: true });
++
++  accentBar(s, 7.755, 1.482, 1.811);
++  heading(s, 'It\u2019s Time To Break', { x: 8.019, y: 1.527, w: 4.461, h: 1.811, size: 72 });
++  card(s, 7.575, 4.225, 2.099, 0.484, 0.242);
++  heading(s, '30+ Minutes', { x: 7.629, y: 4.313, w: 1.991, h: 0.441, size: 16, color: C.white, align: 'center', valign: 'top' });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad',
++    { x: 7.575, y: 5.107, w: 4.684, h: 1.161 });
++}
++
++/* ----------------------------------------------------------- slide 12 ---- */
++
++function slideSuccessStories() {
++  const s = newSlide();
++  accentBar(s, 0.873, 0.671, 1.26);
++  heading(s, 'Success Stories', { x: 1.138, y: 0.886, w: 7.409, h: 1.045, size: 66 });
++  body(s, LOREM_SHORT, { x: 8.547, y: 0.912, w: 4.026, h: 0.808 });
++}
++
++/* ----------------------------------------------------------- slide 13 ---- */
++
++function slideQuiz() {
++  const s = newSlide();
++  const days = [['Mon', '17'], ['Tue', '18'], ['Wed', '19'], ['Thu', '20'], ['Fri', '21'], ['Sat', '22']];
++  const agenda = [
++    [['09:00', 'Knowledge Check', 'Introduction, Company Values'],
++     ['22:00', 'Mid-Training', 'Communication Skills, Safety Protocols'],
++     ['10:00', 'Expert call', 'Weekly review\nof mobile'],
++     ['09:00', 'Initial Call', 'Weekly review\nof mobile'],
++     ['09:00', 'Knowledge Check', 'Introduction, Company Values'],
++     ['09:00', 'Final Assessment', 'All training modules']],
++    [['14:00', 'Knowledge Check', 'Teamwork, Inclusivity'],
++     null,
++     ['09:00', 'Knowledge Check', 'Introduction, Company Values'],
++     null,
++     ['12:00', 'Mid-Training', 'Communication Skills, Safety Protocols'],
++     null],
++  ];
++  const CELL_PAD = [14.3, 0, 3.6, 17.8]; // marT / marR / marB / marL from the source table
++  const coral = { pt: 1, color: C.coral };
++  const cream = { pt: 1, color: C.cream }; // header column separators disappear into the coral band
++  const cellBorder = [coral, coral, coral, coral];
++
++  // border order is [top, right, bottom, left]
++  const headRow = days.map(([day, num], i) => ({
++    text: [
++      { text: day, options: { fontSize: 11, bold: true, breakLine: true } },
++      { text: num, options: { fontSize: 36, bold: true } },
++    ],
++    options: {
++      fill: { color: C.coral }, color: C.white, fontFace: F.head, valign: 'middle',
++      margin: CELL_PAD,
++      border: [coral, i === days.length - 1 ? coral : cream, coral, i === 0 ? coral : cream],
++    },
++  }));
++
++  const bodyRows = agenda.map(row => row.map(cell => {
++    if (!cell) return { text: '', options: { border: cellBorder } };
++    const [time, what, detail] = cell;
++    return {
++      text: [
++        { text: time, options: { fontFace: F.head, bold: true, color: C.black, breakLine: true, paraSpaceBefore: 6 } },
++        { text: what, options: { fontFace: F.head, bold: true, color: C.black, breakLine: true } },
++        ...detail.split('\n').map((line, i, all) => ({
++          text: line,
++          options: { fontFace: F.body, color: C.body, breakLine: i < all.length - 1, paraSpaceBefore: i === 0 ? 6 : 0 },
++        })),
++      ],
++      options: {
++        fontSize: 11, valign: 'top', lineSpacingMultiple: 1.3,
++        margin: CELL_PAD, border: cellBorder,
++      },
++    };
++  }));
++
++  accentBar(s, 0.725, 0.82, 1.299);
++  heading(s, 'Quiz and Assessment', { x: 1.023, y: 0.954, w: 8.893, h: 1.03, size: 60, color: C.ink });
++  s.addTable([headRow, ...bodyRows], {
++    x: 1.038, y: 2.4, w: 11.535,
++    colW: [1.921, 1.923, 1.923, 1.923, 1.923, 1.923],
++    rowH: [1.041, 1.629, 1.63],
++    fontSize: 11,
++  });
++}
++
++/* ----------------------------------------------------------- slide 14 ---- */
++
++function slidePerformance() {
++  const s = newSlide();
++  const stats = [
++    { y: 2.82, value: '90%', vy: 2.833, qy: 3.76 },
++    { y: 5.035, value: '7,198k', vy: 5.067, qy: 5.976 },
++  ];
++
++  accentBar(s, 0.714, 0.832, 1.693);
++  heading(s, 'Performance Metrics', { x: 1.155, y: 0.743, w: 6.181, h: 2.023, size: 66, color: C.ink });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis',
++    { x: 7.699, y: 1.091, w: 4.874, h: 1.161 });
++
++  s.addChart(pptx.ChartType.bar, [{
++    name: 'Series 1',
++    labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4 ', 'Category 5'],
++    values: [4.3, 2.5, 3.5, 4.5, 3.5],
++  }], {
++    x: 0.76, y: 3.009, w: 8.149, h: 3.891,
++    barDir: 'bar', barGapWidthPct: 153,
++    chartColors: [C.coral], showLegend: false, showTitle: false,
++    catAxisHidden: true,
++    valAxisMajorUnit: 0.5, valAxisLineShow: false,
++    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 12, valAxisLabelColor: C.body,
++    valGridLine: { style: 'solid', size: 0.75, color: C.gridPink },
++    catGridLine: { style: 'none' },
++  });
++
++  stats.forEach(st => {
++    card(s, 9.268, st.y, 3.305, 1.864, 0.331);
++    heading(s, st.value, { x: 9.568, y: st.vy, w: 1.654, h: 0.909, size: 32, color: C.white, valign: 'top', line: 1.5 });
++    body(s, '\u201cLorem ipsum dolor sit amet, consectetur adipiscing elit, sed\u201d',
++      { x: 9.568, y: st.qy, w: 2.859, h: 0.707, size: 12, color: C.white });
++  });
++}
++
++/* ----------------------------------------------------------- slide 15 ---- */
++
++function slideKpi() {
++  const s = newSlide();
++  const stats = [
++    { x: 6.044, tx: 6.228, w: 1.349, value: '523+', label: 'Testimonial', ly: 6.002 },
++    { x: 8.259, tx: 8.401, w: 1.406, value: '89%', label: 'Success', ly: 6.009 },
++    { x: 10.474, tx: 10.615, w: 1.406, value: '2020', label: 'Built In', ly: 6.002 },
++  ];
++
++  s.addChart(pptx.ChartType.bar, [{
++    name: 'Series 1',
++    labels: ['Data  1', 'Data 2', 'Data 3', 'Data 4', 'Data 5'],
++    values: [5.5, 4, 4.5, 3.6, 5],
++  }], {
++    x: 0.705, y: 0.839, w: 4.657, h: 6.045,
++    barDir: 'col', barGapWidthPct: 125, barOverlapPct: -76,
++    chartColors: [C.coral], showLegend: false, showTitle: false,
++    valAxisMaxVal: 6, valAxisLineShow: false,
++    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 12, valAxisLabelColor: C.body,
++    catAxisLineShow: true, catAxisLineColor: C.axisGrey,
++    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 12, catAxisLabelColor: C.body,
++    valGridLine: { style: 'solid', size: 0.75, color: C.gridPink },
++    catGridLine: { style: 'none' },
++  });
++
++  accentBar(s, 5.517, 0.89, 1.693);
++  heading(s, 'Key Performance Indicators (KPIs)', { x: 5.936, y: 0.839, w: 6.637, h: 1.877, size: 54 });
++  heading(s, 'Your Description Text Here', { x: 5.936, y: 2.974, w: 6.637, h: 0.555, size: 18, bold: true, valign: 'top', line: 1.5 });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ipsum ' +
++    'dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut',
++    { x: 5.936, y: 3.49, w: 6.637, h: 1.515 });
++
++  stats.forEach(st => {
++    card(s, st.x, 5.422, 1.689, 1.092, 0.25);
++    heading(s, st.value, { x: st.tx, y: 5.52, w: st.w, h: 0.639, size: 32, color: C.white, valign: 'top' });
++    body(s, st.label, { x: st.tx, y: st.ly, w: st.w, h: 0.454, color: C.white });
++  });
++}
++
++/* ----------------------------------------------------------- slide 16 ---- */
++
++/** One percentage doughnut: `pct` is the coral arc, the rest stays grey. */
++function donut(s, x, y, values) {
++  s.addChart(pptx.ChartType.doughnut, [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values }], {
++    x, y, w: values.w || 2.379, h: 1.603,
++    holeSize: 80, firstSliceAng: 0,
++    chartColors: [C.coralPale, C.greyPale],
++    showLegend: false, showTitle: false, dataBorder: { pt: 0, color: C.coral },
++    layout: { x: 0.2376, y: 0.0414, w: 0.5926, h: 0.8889 },
++  });
++}
++
++function slideTrainingFocus() {
++  const s = newSlide();
++  // Each panel holds three doughnuts with a caption above and a % in the hole.
++  const panels = [
++    {
++      cardX: 6.756, cardY: 1.28, labelY: 1.449, pctY: 2.578,
++      gauges: [
++        { chartX: 6.637, chartW: 2.365, values: [30, 70], labelX: 7.317, pct: '30%', pctX: 7.489, pctW: 0.839, caption: 'Chart 1' },
++        { chartX: 8.398, chartW: 2.379, values: [53, 72], labelX: 9.093, pct: '28%', pctX: 9.261, pctW: 0.863, caption: 'Chart 2' },
++        { chartX: 10.194, chartW: 2.379, values: [53, 47], labelX: 10.959, pct: '53%', pctX: 11.072, pctW: 0.847, caption: 'Chart 2' },
++      ],
++    },
++    {
++      cardX: 0.781, cardY: 4.107, labelY: 4.275, pctY: 5.405,
++      gauges: [
++        { chartX: 0.661, chartW: 2.365, values: [79, 21], labelX: 1.341, pct: '79%', pctX: 1.552, pctW: 0.774, caption: 'Chart 1' },
++        { chartX: 2.422, chartW: 2.379, values: [57, 28], labelX: 3.117, pct: '57%', pctX: 3.324, pctW: 0.771, caption: 'Chart 2' },
++        { chartX: 4.218, chartW: 2.379, values: [72, 28], labelX: 4.983, pct: '72%', pctX: 5.099, pctW: 0.847, caption: 'Chart 2' },
++      ],
++    },
++  ];
++
++  accentBar(s, 0.741, 0.976, 2.323);
++  heading(s, 'Employee Training Focus Areas', { x: 1.137, y: 1.131, w: 4.682, h: 2.26, size: 54 });
++
++  panels.forEach(p => {
++    card(s, p.cardX, p.cardY, 5.817, 2.596, 0.341);
++    p.gauges.forEach(g => {
++      donut(s, g.chartX, p.cardY + 0.716, Object.assign(g.values, { w: g.chartW }));
++      heading(s, g.caption, { x: g.labelX, y: p.labelY, w: 1.143, h: 0.505, size: 16, color: C.white, align: 'center', valign: 'top', line: 1.5 });
++      heading(s, g.pct, { x: g.pctX, y: p.pctY, w: g.pctW, h: 0.438, size: 20, color: C.white, align: 'center', valign: 'top' });
++    });
++  });
++
++  heading(s, 'Skill Development', { x: 7.048, y: 4.594, w: 5.485, h: 0.555, size: 18, valign: 'top', line: 1.5 });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud',
++    { x: 7.048, y: 5.055, w: 5.505, h: 1.161 });
++}
++
++/* ----------------------------------------------------------- slide 17 ---- */
++
++function slideAccomplishments() {
++  const s = newSlide();
++  imagePlaceholder(s, 7.613, 1.345, 5.72, 5.167); // the tablet photo (drawn first so the title stays legible)
++  accentBar(s, 0.746, 1.579, 1.929);
++  heading(s, 'Recognizing Your Accomplishments', { x: 1.176, y: 1.666, w: 6.825, h: 1.776, size: 54 });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation',
++    { x: 1.25, y: 3.631, w: 5.646, h: 1.161 });
++
++  card(s, 1.176, 5.24, 5.72, 1.272, 0.259);
++  heading(s, '351+', { x: 1.333, y: 5.495, w: 1.372, h: 0.587, size: 32, color: C.white, valign: 'bottom', line: 1.0 });
++  body(s, 'Testimonials', { x: 1.333, y: 5.972, w: 1.372, h: 0.315, color: C.white, valign: 'bottom' });
++  body(s, LOREM_SHORT, { x: 2.733, y: 5.506, w: 3.948, h: 0.741, color: C.white, valign: 'bottom' });
++}
++
++/* ----------------------------------------------------------- slide 18 ---- */
++
++function slidePackages() {
++  const s = newSlide();
++  const plans = [
++    { x: 0.779, y: 2.278, title: 'Technical Skills', titleX: 1.008, titleW: 3.078, price: '$27/Year ', priceX: 1.236,
++      icon: 'gear', iconX: 2.176, iconY: 2.548, iconW: 0.74, iconH: 0.74,
++      bulletX: 1.344, bulletY: 4.654, textX: 1.572, textY: 4.56, btnX: 1.521, btnY: 6.227, btnTextX: 1.745, btnTextY: 6.249 },
++    { x: 4.899, y: 2.27, title: 'Leadership Skills', titleX: 5.055, titleW: 3.223, price: '$37/Year ', priceX: 5.357,
++      icon: 'crown', iconX: 6.321, iconY: 2.546, iconW: 0.69, iconH: 0.656,
++      bulletX: 5.464, bulletY: 4.65, textX: 5.692, textY: 4.556, btnX: 5.641, btnY: 6.219, btnTextX: 5.865, btnTextY: 6.241 },
++    { x: 9.037, y: 2.268, title: 'Soft Skills', titleX: 9.495, titleW: 2.62, price: '$47/Year ', priceX: 9.495,
++      icon: 'quad', iconX: 10.483, iconY: 2.575, iconW: 0.644, iconH: 0.644,
++      bulletX: 9.602, bulletY: 4.647, textX: 9.83, textY: 4.554, btnX: 9.779, btnY: 6.217, btnTextX: 10.004, btnTextY: 6.238 },
++  ];
++
++  accentBar(s, 0.721, 0.577, 1.299);
++  heading(s, 'Training Packages Slide', { x: 1.174, y: 0.701, w: 10.986, h: 1.115, size: 66 });
++
++  plans.forEach(p => {
++    card(s, p.x, p.y, 3.536, 4.629, 0.405);
++    planIcon(s, p);
++    heading(s, p.title, { x: p.titleX, y: p.titleY || p.y + 1.131, w: p.titleW, h: 0.53, size: 24, color: C.white, align: 'center', valign: 'bottom', line: 1.0 });
++    heading(s, p.price, { x: p.priceX, y: p.y + 1.5, w: 2.62, h: 0.741, size: 32, color: C.white, align: 'center', valign: 'bottom', line: 1.0 });
++
++    for (let i = 0; i < 4; i++) {
++      const y = p.bulletY + i * 0.362;
++      s.addShape('ellipse', { x: p.bulletX, y, w: 0.228, h: 0.228, fill: { type: 'none' }, line: { color: C.white, width: 1 } });
++      s.addText('\u2713', { x: p.bulletX, y, w: 0.228, h: 0.228, align: 'center', valign: 'middle', margin: 0, fontFace: F.body, fontSize: 8, color: C.white });
++      body(s, 'Lorem ipsum dolor sit', { x: p.textX, y: p.textY + i * 0.362, w: 2.177, h: 0.384, color: C.white, valign: 'bottom' });
++    }
++
++    card(s, p.btnX, p.btnY, 2.052, 0.442, 0.221, C.cream);
++    heading(s, 'Select Plan', { x: p.btnTextX, y: p.btnTextY, w: 1.603, h: 0.399, size: 16, color: C.coral, align: 'center', valign: 'bottom', line: 1.0 });
++  });
++}
++
++/** Cream pictogram at the top of each pricing card, drawn from primitives. */
++function planIcon(s, { icon, iconX: x, iconY: y, iconW: w, iconH: h }) {
++  const fill = { color: C.cream };
++
++  if (icon === 'gear') {
++    s.addShape('gear6', { x, y, w, h, fill, line: NO_LINE });
++    s.addShape('ellipse', { x: x + w * 0.36, y: y + h * 0.36, w: w * 0.28, h: h * 0.28, fill: { color: C.coral }, line: NO_LINE });
++  } else if (icon === 'crown') {
++    // three peaks over a solid band, plus the separate base bar
++    s.addShape('rect', { x, y: y + h * 0.35, w, h: h * 0.33, fill, line: NO_LINE });
++    s.addShape('triangle', { x, y: y + h * 0.2, w: w * 0.28, h: h * 0.15, fill, line: NO_LINE });
++    s.addShape('triangle', { x: x + w * 0.28, y, w: w * 0.44, h: h * 0.35, fill, line: NO_LINE });
++    s.addShape('triangle', { x: x + w * 0.72, y: y + h * 0.2, w: w * 0.28, h: h * 0.15, fill, line: NO_LINE });
++    s.addShape('rect', { x, y: y + h * 0.78, w, h: h * 0.12, fill, line: NO_LINE });
++  } else {
++    const g = w / 2 - 0.03;
++    [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([cx, cy]) => s.addShape('roundRect', {
++      x: x + cx * (g + 0.06), y: y + cy * (g + 0.06), w: g, h: g,
++      rectRadius: g / 3, fill, line: NO_LINE,
++    }));
++  }
++}
++
++/* ----------------------------------------------------------- slide 19 ---- */
++
++/** Cream line-art pictogram inside a contact tile. */
++function contactIcon(s, kind, x, y, w, h) {
++  const stroke = { color: C.cream, width: 1.25 };
++  const outline = { fill: { type: 'none' }, line: stroke };
++
++  if (kind === 'pin') {
++    s.addShape('teardrop', { x, y, w, h: w, rotate: 135, ...outline });
++    s.addShape('ellipse', { x: x + w * 0.28, y: y + w * 0.22, w: w * 0.44, h: w * 0.44, ...outline });
++  } else if (kind === 'envelope') {
++    s.addShape('rect', { x, y, w, h, ...outline });
++    s.addShape('line', { x, y, w: w / 2, h: h * 0.62, line: stroke });
++    s.addShape('line', { x: x + w / 2, y, w: w / 2, h: h * 0.62, line: stroke, flipH: true });
++  } else if (kind === 'handset') {
++    s.addShape('blockArc', { x: x - w * 0.1, y: y - h * 0.1, w: w * 1.2, h: h * 1.2, rotate: 315, ...outline });
++  } else {
++    s.addShape('ellipse', { x, y, w, h, ...outline });
++    s.addShape('ellipse', { x: x + w * 0.32, y, w: w * 0.36, h, ...outline });
++    [0.28, 0.5, 0.72].forEach(f => s.addShape('line', {
++      x: x + (f === 0.5 ? 0 : w * 0.14), y: y + h * f,
++      w: f === 0.5 ? w : w * 0.72, h: 0, line: stroke,
++    }));
++  }
++}
++
++function slideContact() {
++  const s = newSlide();
++  const rows = [
++    { icon: 'pin', tileY: 2.867, glyphX: 1.36, glyphY: 2.975, glyphW: 0.274, glyphH: 0.402,
++      label: 'Address', labelY: 2.735, labelW: 3.092, value: '23 Avenue, San Fransisco, CA 10078', valueY: 3.105, valueW: 3.644 },
++    { icon: 'envelope', tileY: 3.908, glyphX: 1.303, glyphY: 4.061, glyphW: 0.387, glyphH: 0.312,
++      label: 'Email', labelY: 3.782, labelW: 3.804, value: 'employeetraining@gmail.com', valueY: 4.153, valueW: 3.804 },
++    { icon: 'handset', tileY: 4.937, glyphX: 1.297, glyphY: 5.062, glyphW: 0.399, glyphH: 0.368,
++      label: 'Telephone', labelY: 4.834, labelW: 3.644, value: '+123-456-7890', valueY: 5.204, valueW: 3.644 },
++    { icon: 'globe', tileY: 5.962, glyphX: 1.295, glyphY: 6.07, glyphW: 0.402, glyphH: 0.402,
++      label: 'Website', labelY: 5.859, labelW: 3.644, value: 'www.employeetraining.com', valueY: 6.229, valueW: 3.644 },
++  ];
++
++  accentBar(s, 0.721, 0.89, 1.654);
++  heading(s, 'Get In Touch', { x: 1.084, y: 0.816, w: 6.024, h: 1.87, size: 66 });
++
++  rows.forEach(r => {
++    card(s, 1.187, r.tileY, 0.618, 0.618, 0.15);
++    contactIcon(s, r.icon, r.glyphX, r.glyphY, r.glyphW, r.glyphH);
++    heading(s, r.label, { x: 2.037, y: r.labelY, w: r.labelW, h: 0.505, size: 16, valign: 'top', line: 1.5 });
++    body(s, r.value, { x: 2.037, y: r.valueY, w: r.valueW, h: 0.454 });
++  });
++
++  body(s, QUOTE, { x: 7.797, y: 5.366, w: 4.189, h: 0.808, italic: true, align: 'center' });
++  heading(s, 'Maria Jolly - CEO Founder', { x: 7.797, y: 6.198, w: 4.189, h: 0.555, size: 18, align: 'center', valign: 'top', line: 1.5 });
++}
++
++/* ----------------------------------------------------------- slide 20 ---- */
++
++function slideThankYou() {
++  const s = newSlide({ page: false });
++  navBar(s);
++  heading(s, 'Thank You!', { x: 5.832, y: 2.549, w: 6.837, h: 1.411, size: 88, align: 'center' });
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation',
++    { x: 6.062, y: 4.022, w: 6.353, h: 1.129 });
++}
++
++/* -------------------------------------------------------------- assemble - */
++
++[
++  slideTitle, slideWelcome, slideObjectives, slideMission, slideTeam,
++  slideRespectful, slideOverview, slideSafety, slideDiversity, slideFocusAreas,
++  slideBreak, slideSuccessStories, slideQuiz, slidePerformance, slideKpi,
++  slideTrainingFocus, slideAccomplishments, slidePackages, slideContact, slideThankYou,
++].forEach(build => build());
++
++pptx.writeFile({ fileName: path.join(__dirname, '004e136f-e00f-4de1-8dfa-216a9c85e14d_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

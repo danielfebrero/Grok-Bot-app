@@ -1,0 +1,62 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2022-08-main.xsd
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2022-08-main.xsd
+@@ -0,0 +1,59 @@
++<xsd:schema elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/office/powerpoint/2022/08/main" xmlns="http://schemas.microsoft.com/office/powerpoint/2022/08/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p188="http://schemas.microsoft.com/office/powerpoint/2018/8/main" xmlns:s="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
++  <xsd:complexType name="CT_TaskScheduleEventInfo" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:attribute name="stDt" type="xsd:dateTime" use="optional"/>
++    <xsd:attribute name="endDt" type="xsd:dateTime" use="optional"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_TaskProgressEventInfo" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:attribute name="val" type="s:ST_PositiveFixedPercentage" use="required"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_TaskTitleEventInfo" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:attribute name="val" type="xsd:string" use="required"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_TaskAssignUnassignUser" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:attribute name="authorId" type="p188:ST_AuthorId" use="required"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_TaskUnknownRecord" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd"/>
++  <xsd:complexType name="CT_CommentAnchor" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:attribute name="id" type="s:ST_Guid" use="required"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_TaskAnchor" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:sequence>
++      <xsd:element name="comment" type="CT_CommentAnchor" minOccurs="1" maxOccurs="1"/>
++      <xsd:element name="extLst" type="p:CT_ExtensionList" minOccurs="0" maxOccurs="1"/>
++    </xsd:sequence>
++  </xsd:complexType>
++  <xsd:complexType name="CT_TaskUndo" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:attribute name="id" type="s:ST_Guid" use="required"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_TaskHistoryEvent" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:sequence>
++      <xsd:element name="atrbtn" type="CT_TaskAssignUnassignUser" minOccurs="1" maxOccurs="1"/>
++      <xsd:element name="anchr" type="CT_TaskAnchor" minOccurs="0" maxOccurs="1"/>
++      <xsd:choice minOccurs="0" maxOccurs="1">
++        <xsd:element name="asgn" type="CT_TaskAssignUnassignUser" minOccurs="1" maxOccurs="1"/>
++        <xsd:element name="add" type="p:CT_Empty" minOccurs="0" maxOccurs="1"/>
++        <xsd:element name="title" type="CT_TaskTitleEventInfo" minOccurs="1" maxOccurs="1"/>
++        <xsd:element name="date" type="CT_TaskScheduleEventInfo" minOccurs="1" maxOccurs="1"/>
++        <xsd:element name="pcntCmplt" type="CT_TaskProgressEventInfo" minOccurs="1" maxOccurs="1"/>
++        <xsd:element name="unasgnAll" type="p:CT_Empty" minOccurs="0" maxOccurs="1"/>
++        <xsd:element name="undo" type="CT_TaskUndo" minOccurs="1" maxOccurs="1"/>
++        <xsd:element name="unknown" type="CT_TaskUnknownRecord" minOccurs="1" maxOccurs="1"/>
++      </xsd:choice>
++      <xsd:element name="extLst" type="p:CT_ExtensionList" minOccurs="0" maxOccurs="1"/>
++    </xsd:sequence>
++    <xsd:attribute name="time" type="xsd:dateTime" use="required"/>
++    <xsd:attribute name="id" type="s:ST_Guid" use="required"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_TaskHistory" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:sequence>
++      <xsd:element name="event" type="CT_TaskHistoryEvent" minOccurs="0" maxOccurs="unbounded"/>
++    </xsd:sequence>
++  </xsd:complexType>
++  <xsd:complexType name="CT_TaskDetails" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd">
++    <xsd:sequence>
++      <xsd:element name="history" type="CT_TaskHistory" minOccurs="1" maxOccurs="1"/>
++      <xsd:element name="extLst" type="p:CT_ExtensionList" minOccurs="0" maxOccurs="1"/>
++    </xsd:sequence>
++  </xsd:complexType>
++  <xsd:element name="taskDetails" type="CT_TaskDetails" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:odoc="http://schemas.microsoft.com/internal/obd"/>
++</xsd:schema>

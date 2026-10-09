@@ -1,0 +1,23 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2016-slidezoom.xsd
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/pptx/pml-2016-slidezoom.xsd
+@@ -0,0 +1,20 @@
++<xsd:schema elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/office/powerpoint/2016/slidezoom" xmlns="http://schemas.microsoft.com/office/powerpoint/2016/slidezoom" xmlns:pslz="http://schemas.microsoft.com/office/powerpoint/2016/slidezoom" xmlns:p166="http://schemas.microsoft.com/office/powerpoint/2016/6/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:s="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
++  <xsd:import namespace="http://schemas.microsoft.com/office/powerpoint/2016/6/main" schemaLocation="ms-pptx166.xsd"/>
++  <xsd:import namespace="http://schemas.openxmlformats.org/officeDocument/2006/sharedTypes" schemaLocation="shared-commonSimpleTypes.xsd"/>
++  <xsd:import namespace="http://schemas.openxmlformats.org/presentationml/2006/main" schemaLocation="pml.xsd"/>
++  <xsd:complexType name="CT_SlideZoomObject">
++    <xsd:sequence>
++      <xsd:element name="zmPr" type="p166:CT_ZoomObjectProperties" minOccurs="1" maxOccurs="1"/>
++      <xsd:element name="extLst" type="p:CT_ExtensionList" minOccurs="0" maxOccurs="1"/>
++    </xsd:sequence>
++    <xsd:attribute name="sldId" type="p:ST_SlideId" use="required"/>
++    <xsd:attribute name="cId" type="xsd:unsignedInt" use="optional"/>
++  </xsd:complexType>
++  <xsd:complexType name="CT_SlideZoom">
++    <xsd:sequence>
++      <xsd:element name="sldZmObj" type="CT_SlideZoomObject" minOccurs="1" maxOccurs="1"/>
++      <xsd:element name="extLst" type="p:CT_ExtensionList" minOccurs="0" maxOccurs="1"/>
++    </xsd:sequence>
++  </xsd:complexType>
++  <xsd:element name="sldZm" type="CT_SlideZoom"/>
++</xsd:schema>

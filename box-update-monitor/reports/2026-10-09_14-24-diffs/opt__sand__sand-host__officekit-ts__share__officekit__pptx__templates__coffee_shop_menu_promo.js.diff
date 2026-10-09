@@ -1,0 +1,505 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/coffee_shop_menu_promo.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/coffee_shop_menu_promo.js
+@@ -0,0 +1,502 @@
++/**
++ * "Moonbucks Coffee" — square (11.25" x 11.25") marketing deck, 9 slides.
++ *
++ * Rebuilt with pptxgenjs only. Photographs in the source deck are flat grey
++ * plates, so each one is recreated as a grey placeholder shape of the same
++ * geometry (see `photo()`).
++ *
++ * Run: node 32960a38-c20e-448b-b190-32661e6ad61c_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++const SIDE = 11.2517; // slide is a square
++
++const C = {
++  green: '388268',
++  greenAlt: '3A8268',
++  greenDeep: '2D7F60',
++  greenMid: '399868',
++  greenRule: '49AD8D',
++  greenLogo: '35906C',
++  cream: 'F4E6D9',
++  sand: 'E7CE9C',
++  sandBadge: 'E7CF9D',
++  sandBadgeAlt: 'E8CE9D',
++  ink: '000000',
++  inkSoft: '0C0C0C',
++  body: '3F3F3F',
++  white: 'FFFFFF',
++  hairline: 'D4C8C3',
++  photo: 'C2C2C2',
++  photoDark: '7F7F7F',
++};
++
++const FONT = 'PT Serif';
++const NO_LINE = { type: 'none' };
++
++// Very wide, very faint drop shadows sit under the "floating" panels and photos.
++// pptxgenjs rewrites the options object in place, so hand it a fresh one each time.
++const softShadow = (blur, opacity) => ({ type: 'outer', blur, offset: 0.0001, angle: 0, color: C.ink, opacity });
++const PANEL_SHADOW = () => softShadow(140, 0.26);
++const DISC_SHADOW = () => softShadow(120, 0.22);
++
++/* ------------------------------------------------------------------ *
++ * Geometry paths, normalised to 0..1 inside their own bounding box.
++ * ['M',x,y] moveTo · ['L',x,y] lineTo · ['C',x1,y1,x2,y2,x,y] cubic · ['Z'] close
++ * ------------------------------------------------------------------ */
++
++// Welcome slide: green field sheared off along a shallow diagonal.
++const DIAGONAL_FIELD = [
++  ['M', 0, 0], ['L', 1, 0], ['L', 1, 1], ['L', 0, 0.6807], ['Z'],
++];
++
++// "About" / "Product 2": quarter-round green corner blob.
++const CORNER_BLOB = [
++  ['M', 0, 0], ['L', 1, 0], ['L', 0.9986, 0.0491],
++  ['C', 0.9707, 0.5473, 0.5431, 0.9501, 0.0002, 1],
++  ['L', 0, 1], ['Z'],
++];
++
++// Promo slide: small concave corner leaf.
++const CORNER_LEAF = [
++  ['M', 0, 0], ['L', 0.9984, 0], ['L', 1, 0.0204],
++  ['C', 1, 0.4315, 0.6328, 0.7891, 0.0918, 0.9724],
++  ['L', 0, 1], ['Z'],
++];
++
++// "About": photo plate whose bottom-left corner is a big circular sweep.
++const SWEPT_PLATE = [
++  ['M', 0.048, 0], ['L', 1, 0], ['L', 1, 0.8508], ['L', 0.9701, 0.8767],
++  ['C', 0.8708, 0.9546, 0.7511, 1, 0.6222, 1],
++  ['C', 0.2786, 1, 0, 0.6768, 0, 0.2781],
++  ['C', 0, 0.2034, 0.0098, 0.1313, 0.028, 0.0635],
++  ['Z'],
++];
++
++// Line-art coffee cup logo: parts are placed as fractions of the logo box.
++const CUP_PARTS = [
++  {
++    frame: { x: 0.15, y: 0.2778, w: 0.65, h: 0.6111 }, // cup
++    path: [
++      ['M', 0, 0], ['L', 1, 0], ['L', 1, 0.66],
++      ['C', 1, 0.8478, 0.8712, 1, 0.7123, 1],
++      ['L', 0.2892, 1],
++      ['C', 0.1303, 1.001, 0.0009, 0.8496, 0, 0.6618],
++      ['C', 0, 0.6612, 0, 0.6606, 0, 0.66],
++      ['L', 0, 0], ['Z'],
++    ],
++  },
++  {
++    frame: { x: 0, y: 0.8889, w: 0.95, h: 0.1111 }, // saucer
++    path: [
++      ['M', 0, 0], ['L', 1, 0],
++      ['C', 1, 0.5523, 0.9529, 1, 0.8947, 1],
++      ['L', 0.1053, 1],
++      ['C', 0.0471, 1, 0, 0.5523, 0, 0],
++      ['Z'],
++    ],
++  },
++  {
++    frame: { x: 0.8, y: 0.3333, w: 0.2, h: 0.3333 }, // handle
++    path: [
++      ['M', 0, 0], ['L', 0.4638, 0],
++      ['C', 0.7599, 0, 1, 0.1601, 1, 0.3575],
++      ['L', 1, 0.6433],
++      ['C', 0.9993, 0.8405, 0.7594, 1, 0.4638, 1],
++      ['L', 0, 1], ['L', 0, 0], ['Z'],
++    ],
++  },
++  { frame: { x: 0.575, y: 0, w: 0.05, h: 0.1944 }, path: null }, // steam, right
++  { frame: { x: 0.375, y: 0, w: 0.05, h: 0.1944 }, path: null }, // steam, left
++];
++
++const STEAM_CURL = [
++  ['M', 0, 0],
++  ['C', 0.5709, 0.0837, 0.9493, 0.2458, 1, 0.4286],
++  ['C', 1, 0.7143, 0, 0.68, 0, 1],
++];
++
++const CUP_LABEL = { x: 0.2543, y: 0.401, w: 0.4586, h: 0.3446 };
++const CUP_LABEL_WIDE = { x: 0.2384, y: 0.4009, w: 0.4907, h: 0.3697 };
++
++// Contact slide: outlined map pin (teardrop + hole + shadow wedge).
++const PIN_PARTS = [
++  {
++    frame: { x: 0, y: 0, w: 1, h: 0.8571 },
++    path: [
++      ['M', 1, 0.375],
++      ['C', 1, 0.4975, 0.825, 0.6938, 0.6822, 0.8333],
++      ['C', 0.5833, 0.93, 0.5, 1, 0.5, 1],
++      ['C', 0.5, 1, 0.4167, 0.93, 0.3178, 0.8333],
++      ['C', 0.175, 0.6938, 0, 0.4975, 0, 0.375],
++      ['C', 0, 0.1679, 0.2239, 0, 0.5, 0],
++      ['C', 0.7761, 0, 1, 0.1679, 1, 0.375],
++      ['Z'],
++    ],
++  },
++  {
++    frame: { x: 0.3333, y: 0.1786, w: 0.3333, h: 0.2143 },
++    path: [
++      ['M', 1, 0.5],
++      ['C', 1, 0.7761, 0.7761, 1, 0.5, 1],
++      ['C', 0.2239, 1, 0, 0.7761, 0, 0.5],
++      ['C', 0, 0.2239, 0.2239, 0, 0.5, 0],
++      ['C', 0.7761, 0, 1, 0.2239, 1, 0.5],
++      ['Z'],
++    ],
++  },
++  {
++    frame: { x: 0, y: 0.7143, w: 1, h: 0.2857 },
++    path: [
++      ['M', 1, 1], ['L', 0, 1], ['L', 0.1111, 0], ['L', 0.3178, 0],
++      ['C', 0.4167, 0.29, 0.5, 0.5, 0.5, 0.5],
++      ['C', 0.5, 0.5, 0.5833, 0.29, 0.6822, 0],
++      ['L', 0.8889, 0], ['Z'],
++    ],
++  },
++];
++
++/* ------------------------------------------------------------------ *
++ * Drawing helpers
++ * ------------------------------------------------------------------ */
++
++/** Places a normalised child frame inside a parent box. */
++function place(parent, frac) {
++  return {
++    x: parent.x + frac.x * parent.w,
++    y: parent.y + frac.y * parent.h,
++    w: frac.w * parent.w,
++    h: frac.h * parent.h,
++  };
++}
++
++/** Draws a normalised path as a custom-geometry shape inside `box`. */
++function drawPath(slide, box, segments, style) {
++  const points = segments.map((seg) => {
++    const [cmd, ...v] = seg;
++    if (cmd === 'M') return { x: v[0] * box.w, y: v[1] * box.h, moveTo: true };
++    if (cmd === 'L') return { x: v[0] * box.w, y: v[1] * box.h };
++    if (cmd === 'Z') return { close: true };
++    return {
++      x: v[4] * box.w,
++      y: v[5] * box.h,
++      curve: { type: 'cubic', x1: v[0] * box.w, y1: v[1] * box.h, x2: v[2] * box.w, y2: v[3] * box.h },
++    };
++  });
++  slide.addShape('custGeom', Object.assign({}, box, { points }, style));
++}
++
++/** Flat grey stand-in for a photograph. */
++function photo(slide, box, opts = {}) {
++  slide.addShape(opts.shape || 'rect', Object.assign({}, box, {
++    fill: { color: opts.tone || C.photo },
++    line: NO_LINE,
++  }, opts.rectRadius ? { rectRadius: opts.rectRadius } : null,
++    opts.shadow ? { shadow: opts.shadow } : null));
++}
++
++function block(slide, box, color, opts = {}) {
++  slide.addShape(opts.shape || 'rect', Object.assign({}, box, {
++    fill: { color },
++    line: NO_LINE,
++  }, opts));
++}
++
++/** Horizontal rule / divider. */
++function rule(slide, box, color, width) {
++  slide.addShape('line', Object.assign({}, box, { line: { color, width } }));
++}
++
++/** Splits "Moonbucks |Coffee|" into upright / italic runs. */
++function italicRuns(spec) {
++  return spec
++    .split('|')
++    .map((text, i) => ({ text, options: { italic: i % 2 === 1 } }))
++    .filter((run) => run.text.length > 0);
++}
++
++function heading(slide, box, spec, size, opts = {}) {
++  slide.addText(italicRuns(spec), Object.assign({}, box, {
++    fontFace: FONT,
++    fontSize: size,
++    bold: true,
++    color: opts.color || C.ink,
++    align: opts.align || 'left',
++    valign: 'top',
++  }));
++}
++
++function paragraph(slide, box, text, size, opts = {}) {
++  const runs = (Array.isArray(text) ? text : [text]).map((line, i, all) => ({
++    text: line,
++    options: { breakLine: i < all.length - 1 },
++  }));
++  slide.addText(runs, Object.assign({}, box, {
++    fontFace: FONT,
++    fontSize: size,
++    color: opts.color || C.body,
++    align: opts.align || 'left',
++    valign: 'top',
++    bold: opts.bold || false,
++    lineSpacingMultiple: opts.tight ? undefined : 1.5,
++  }));
++}
++
++/** Round price/label pill, one or two stacked lines. */
++function badge(slide, box, lines, opts) {
++  const runs = lines.map((line, i) => ({
++    text: line,
++    options: { breakLine: i < lines.length - 1 },
++  }));
++  slide.addText(runs, Object.assign({}, box, {
++    shape: 'ellipse',
++    fill: { color: opts.fill },
++    line: NO_LINE,
++    fontFace: FONT,
++    fontSize: opts.size,
++    bold: true,
++    color: opts.color,
++    align: 'center',
++    valign: 'middle',
++  }));
++}
++
++function cupLogo(slide, box, opts) {
++  const stroke = { color: opts.stroke, width: 3 };
++  CUP_PARTS.forEach((part) => {
++    drawPath(slide, place(box, part.frame), part.path || STEAM_CURL, { line: stroke });
++  });
++  slide.addText('MB', Object.assign({}, place(box, opts.labelFrame || CUP_LABEL), {
++    fontFace: FONT,
++    fontSize: 20,
++    bold: true,
++    color: opts.label,
++    align: 'center',
++    valign: 'top',
++  }));
++}
++
++function mapPin(slide, box, color) {
++  PIN_PARTS.forEach((part) => {
++    drawPath(slide, place(box, part.frame), part.path, { line: { color, width: 4 } });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++function welcomeSlide(pres) {
++  const slide = pres.addSlide();
++  slide.background = { color: C.cream };
++  drawPath(slide, { x: 0, y: 0, w: SIDE, h: 7.0735 }, DIAGONAL_FIELD, { fill: { color: C.green }, line: NO_LINE });
++
++  heading(slide, { x: 2.7708, y: 8.7702, w: 5.7101, h: 0.8751 }, 'Moonbucks |Coffee|', 46, { align: 'center' });
++  paragraph(slide, { x: 3.8148, y: 8.0973, w: 3.6222, h: 0.4712 }, 'Western Millenial Coffee', 22,
++    { align: 'center', color: C.ink, tight: true });
++  rule(slide, { x: 4.8601, y: 10.0341, w: 1.5315, h: 0 }, C.greenRule, 4);
++  photo(slide, { x: 2.0263, y: 1.2176, w: 7.1991, h: 6.1454 });
++}
++
++function aboutSlide(pres) {
++  const slide = pres.addSlide();
++  slide.background = { color: C.cream };
++  drawPath(slide, { x: -0.0176, y: -0.014, w: 3.567, h: 3.9413 }, CORNER_BLOB,
++    { fill: { color: C.greenAlt }, line: NO_LINE });
++
++  paragraph(slide, { x: 5.2535, y: 8.9315, w: 4.7881, h: 1.416 },
++    'PLACEHOLDER', 18);
++  heading(slide, { x: 5.2535, y: 8.2177, w: 4.788, h: 0.5217 }, 'Think Outside The Box', 25);
++  paragraph(slide, { x: 5.2535, y: 6.352, w: 4.7881, h: 1.416 },
++    'PLACEHOLDER', 18);
++  heading(slide, { x: 5.2535, y: 5.6381, w: 4.788, h: 0.5217 }, 'Moonbucks |Coffee|', 25);
++  badge(slide, { x: 1.7813, y: 1.5132, w: 1.9187, h: 1.9187 }, ['OPEN', '24H'],
++    { fill: C.sandBadge, color: C.ink, size: 22 });
++
++  drawPath(slide, { x: 5.4744, y: 0, w: 5.7773, h: 4.9451 }, SWEPT_PLATE,
++    { fill: { color: C.photo }, line: NO_LINE });
++  photo(slide, { x: 0, y: 5.6567, w: 3.7, h: 5.5951 });
++}
++
++function productOneSlide(pres) {
++  const slide = pres.addSlide();
++  slide.background = { color: C.cream };
++  block(slide, { x: 0, y: 0, w: 3.3125, h: SIDE }, C.green);
++
++  badge(slide, { x: 0.816, y: 0.6254, w: 1.6806, h: 1.6806 }, ['25K IDR'],
++    { fill: C.sandBadge, color: C.ink, size: 24 });
++  heading(slide, { x: 5.6629, y: 5.6814, w: 4.4392, h: 0.5385 }, 'Coffee Latte Benefits', 26);
++  paragraph(slide, { x: 5.6629, y: 6.451, w: 4.5738, h: 1.772 },
++    'The caffeine in this coffee can help boost your metabolism and has been shown to increase fat burning by 10-29%. If that isn\u2019t a perk, I don\u2019t know what is!', 17);
++  paragraph(slide, { x: 5.6629, y: 8.5004, w: 4.7405, h: 1.772 }, [
++    'Each cup of coffee you drink a day reduces your risk of type II diabetes by 7%. Drink coffee reduces your risk of Alzheimer\u2019s ',
++    'by 65% & Parkinson\u2019s by 32-60%. ',
++  ], 17);
++
++  photo(slide, { x: 3.3125, y: 0, w: 7.9392, h: 4.8215 }, { tone: C.photoDark });
++  photo(slide, { x: 1.0151, y: 3.7804, w: 3.7037, h: 6.3609 });
++}
++
++function productTwoSlide(pres) {
++  const slide = pres.addSlide();
++  slide.background = { color: C.cream };
++  drawPath(slide, { x: -0.0176, y: -0.014, w: 4.1021, h: 4.5325 }, CORNER_BLOB,
++    { fill: { color: C.greenAlt }, line: NO_LINE });
++
++  photo(slide, { x: 7.0185, y: 3.7407, w: 4.2332, h: 7.511 });
++  heading(slide, { x: 6.2593, y: 0.9537, w: 4.0569, h: 0.69 }, 'Favourite |Coffee|', 35);
++  paragraph(slide, { x: 6.2749, y: 1.7646, w: 4.0413, h: 0.4711 }, 'Western Millenial Taste', 21, { tight: true });
++  paragraph(slide, { x: 1.2591, y: 7.183, w: 4.9446, h: 3.0594 },
++    'PLACEHOLDER', 17);
++  heading(slide, { x: 1.2591, y: 6.4227, w: 4.9446, h: 0.5554 }, 'Kopi Luwak Indonesia', 27);
++  badge(slide, { x: 8.3582, y: 2.9638, w: 1.5539, h: 1.5539 }, ['29K', 'IDR'],
++    { fill: C.greenMid, color: C.white, size: 22 });
++  photo(slide, { x: 1.1851, y: 1.0926, w: 4.3889, h: 4.3889 }, { shape: 'ellipse', shadow: DISC_SHADOW() });
++}
++
++function menuSlide(pres) {
++  const slide = pres.addSlide();
++  slide.background = { color: C.cream };
++  block(slide, { x: 0, y: 0, w: 2.7534, h: SIDE }, C.greenAlt);
++
++  photo(slide, { x: 1.2031, y: 6.5132, w: 2.8594, h: 3.6428 });
++  photo(slide, { x: 1.2031, y: 1.8842, w: 2.8594, h: 3.8141 });
++
++  const rows = [
++    { title: 'Ice |Coffee| Latte', y: 2.601, bodyY: 3.337, tail: 'ice coffee', badgeY: 3.4204, price: '29K' },
++    { title: 'Hot |Coffee| Latte', y: 6.825, bodyY: 7.561, tail: 'hot coffee', badgeY: 7.9416, price: '25K' },
++  ];
++  rows.forEach((row) => {
++    heading(slide, { x: 4.9373, y: row.y, w: 4.9447, h: 0.5722 }, row.title, 28);
++    paragraph(slide, { x: 4.9373, y: row.bodyY, w: 4.9449, h: 2.3248 },
++      'PLACEHOLDER' + row.tail, 18);
++  });
++  // Price pills sit between the photo column and the copy; drawn in source z-order.
++  badge(slide, { x: 3.074, y: 7.9416, w: 1.4259, h: 1.4259 }, ['25K', 'IDR'],
++    { fill: C.greenMid, color: C.white, size: 20 });
++  badge(slide, { x: 3.074, y: 3.4204, w: 1.4259, h: 1.4259 }, ['29K', 'IDR'],
++    { fill: C.greenMid, color: C.white, size: 20 });
++
++  cupLogo(slide, { x: 9.1288, y: 0.7143, w: 1.315, h: 1.1835 }, { stroke: C.greenLogo, label: C.greenDeep });
++}
++
++function packSlide(pres) {
++  const slide = pres.addSlide();
++  slide.background = { color: C.cream };
++  block(slide, { x: 0, y: 0, w: 7.8, h: 5.7778 }, C.greenAlt);
++
++  paragraph(slide, { x: 1.2167, y: 8.2331, w: 5.3904, h: 2.2011 },
++    'PLACEHOLDER', 17, { align: 'center' });
++  heading(slide, { x: 1.1929, y: 7.518, w: 5.4144, h: 0.5722 }, 'Snacks & Coffee Pack', 28, { align: 'center' });
++  badge(slide, { x: 0.655, y: 0.6177, w: 1.5539, h: 1.5539 }, ['29K', 'IDR'],
++    { fill: C.sandBadgeAlt, color: C.inkSoft, size: 22 });
++  photo(slide, { x: 1.9067, y: 2.625, w: 3.9866, h: 4.3405 });
++  photo(slide, { x: 7.8, y: 0, w: 3.4517, h: SIDE });
++}
++
++function promoOneSlide(pres) {
++  const slide = pres.addSlide();
++  slide.background = { color: C.cream };
++  drawPath(slide, { x: 0, y: 0, w: 1.5079, h: 2.0669 }, CORNER_LEAF,
++    { fill: { color: C.greenDeep }, line: NO_LINE });
++  drawPath(slide, { x: 9.9531, y: 9.4318, w: 1.3277, h: 1.8199 }, CORNER_LEAF,
++    { fill: { color: C.greenDeep }, line: NO_LINE, rotate: 180 });
++
++  const CUT = 0.1816; // roundRect corner radius of the two product photos
++  photo(slide, { x: 7.0474, y: 4.3875, w: 2.2347, h: 2.2892 }, { shape: 'roundRect', rectRadius: CUT });
++  photo(slide, { x: 1.9696, y: 7.5403, w: 2.2347, h: 2.2892 }, { shape: 'roundRect', rectRadius: CUT });
++
++  const COPY = 'PLACEHOLDER';
++  heading(slide, { x: 1.9021, y: 4.304, w: 4.5305, h: 0.5217 }, 'Cappuccino |Coffee|', 25, { align: 'right' });
++  paragraph(slide, { x: 1.9021, y: 4.9622, w: 4.5305, h: 1.772 }, COPY, 17, { align: 'right' });
++  heading(slide, { x: 3.0951, y: 2.3843, w: 5.0615, h: 0.6732 }, 'Weekend |Café| Promo', 34, { align: 'center' });
++  rule(slide, { x: 5.068, y: 3.4175, w: 1.1158, h: 0 }, C.greenRule, 3.5);
++  cupLogo(slide, { x: 4.9683, y: 0.8169, w: 1.315, h: 1.1835 }, { stroke: C.greenLogo, label: C.greenDeep });
++
++  heading(slide, { x: 4.8171, y: 7.4568, w: 4.5305, h: 0.5217 }, 'Americano |Coffee|', 25);
++  paragraph(slide, { x: 4.8171, y: 8.115, w: 4.5305, h: 1.772 }, COPY, 17);
++  badge(slide, { x: 8.8217, y: 4.1253, w: 0.9209, h: 0.9209 }, ['$4'], { fill: C.greenMid, color: C.white, size: 18 });
++  badge(slide, { x: 1.5092, y: 7.278, w: 0.9209, h: 0.9209 }, ['$5'], { fill: C.greenMid, color: C.white, size: 18 });
++}
++
++function promoTwoSlide(pres) {
++  const slide = pres.addSlide();
++  slide.background = { color: C.sand };
++  block(slide, { x: 0, y: 0, w: SIDE, h: 6.3221 }, C.green);
++  block(slide, { x: 1.7067, y: 5.3761, w: 7.8384, h: 5.8756 }, C.cream, { shadow: PANEL_SHADOW() });
++
++  paragraph(slide, { x: 2.82, y: 9.1151, w: 5.6119, h: 1.416 },
++    'PLACEHOLDER', 18, { align: 'center' });
++  heading(slide, { x: 3.2586, y: 7.6261, w: 4.7598, h: 0.6394 }, 'Chocolate |Coffee| Plus', 32, { align: 'center' });
++  paragraph(slide, { x: 4.0349, y: 6.9949, w: 3.2073, h: 0.4711 }, 'Weekdays Promo', 22,
++    { align: 'center', color: C.ink, tight: true });
++  rule(slide, { x: 4.844, y: 8.6264, w: 1.5371, h: 0 }, C.greenRule, 3.5);
++  badge(slide, { x: 0.7871, y: 0.6395, w: 1.5539, h: 1.5539 }, ['29K', 'IDR'],
++    { fill: C.sandBadgeAlt, color: C.inkSoft, size: 22 });
++  cupLogo(slide, { x: 9.1505, y: 0.7899, w: 1.315, h: 1.1835 },
++    { stroke: C.white, label: C.white, labelFrame: CUP_LABEL_WIDE });
++  photo(slide, { x: 3.2458, y: 1.6134, w: 4.76, h: 4.7823 });
++}
++
++const CONTACT_ROWS = [
++  { label: 'Phone Cell', y: 5.4232, value: '+62 819 8765 4321', valueX: 7.0829, valueW: 2.2531, valueY: 5.44 },
++  { label: 'Our Email', y: 6.2008, value: 'hello@moonbucks.coffee', valueX: 6.2324, valueW: 3.0445, valueY: 6.2176 },
++  { label: 'Instagram', y: 6.9795, value: 'Moonbuckscoffee.id', valueX: 6.8434, valueW: 2.4336, valueY: 6.9963 },
++  { label: 'Facebook', y: 7.7767, value: 'Moonbucks Authentic Coffee', valueX: 5.8489, valueW: 3.428, valueY: 7.7767 },
++  { label: 'Website', y: 8.5584, value: 'www.moonbucks.coffee', valueX: 6.4425, valueW: 2.8345, valueY: 8.5752 },
++];
++
++function contactSlide(pres) {
++  const slide = pres.addSlide();
++  slide.background = { color: C.cream };
++  block(slide, { x: 0, y: 0, w: 5.497, h: 11.2744 }, C.greenAlt);
++
++  photo(slide, { x: 5.497, y: 0, w: 5.7547, h: SIDE });
++  block(slide, { x: 1.4669, y: 1.487, w: 8.5756, h: 8.3148 }, C.cream, {
++    shape: 'roundRect',
++    rectRadius: 0.2109,
++    shadow: PANEL_SHADOW(),
++  });
++
++  heading(slide, { x: 2.4149, y: 2.1516, w: 4.8953, h: 0.6395 }, 'Moonbucks |Coffee|', 32);
++  mapPin(slide, { x: 8.7049, y: 2.2452, w: 0.5036, h: 0.7913 }, C.green);
++  paragraph(slide, { x: 2.4149, y: 2.9577, w: 5.7943, h: 1.0571 },
++    '5409 Marlen Wells, Mission Township, Corsair County, South Dakota, USA', 20);
++  rule(slide, { x: 1.4669, y: 4.6764, w: 8.5756, h: 0 }, C.hairline, 0.75);
++
++  CONTACT_ROWS.forEach((row) => {
++    paragraph(slide, { x: 2.4332, y: row.y, w: 3.6169, h: 0.4376 }, row.label, 20,
++      { bold: true, color: C.ink, tight: true });
++    paragraph(slide, { x: row.valueX, y: row.valueY, w: row.valueW, h: 0.4039 }, row.value, 18,
++      { align: 'right', tight: true });
++  });
++}
++
++/* ------------------------------------------------------------------ */
++
++function build() {
++  const pres = new PptxGenJS();
++  pres.defineLayout({ name: 'SQUARE', width: SIDE, height: SIDE });
++  pres.layout = 'SQUARE';
++  pres.author = 'Moonbucks Coffee';
++  pres.title = 'Moonbucks Coffee';
++
++  [
++    welcomeSlide, aboutSlide, productOneSlide, productTwoSlide, menuSlide,
++    packSlide, promoOneSlide, promoTwoSlide, contactSlide,
++  ].forEach((buildSlide) => buildSlide(pres));
++
++  return pres;
++}
++
++const outFile = path.join(__dirname, '32960a38-c20e-448b-b190-32661e6ad61c_grok_final.pptx');
++build()
++  .writeFile({ fileName: outFile })
++  .then(() => console.log('wrote', outFile))
++  .catch((err) => {
++    console.error(err);
++    process.exit(1);
++  });

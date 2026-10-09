@@ -1,0 +1,982 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/banking_finance_professional_template.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/banking_finance_professional_template.js
+@@ -0,0 +1,979 @@
++/**
++ * "Banking — Professional Template": 30-slide 16:9 deck rebuilt with PptxGenJS.
++ *
++ *   node 17ba019f-e7d5-4ec7-89dc-69f761c29506_grok_final.js
++ *
++ * writes 17ba019f-e7d5-4ec7-89dc-69f761c29506_grok_final.pptx next to this file.
++ * Photographs in the original are stock "REPLACE YOUR IMAGE HERE" plates; they are
++ * redrawn here as native grey placeholder rectangles carrying the same caption.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const WHITE = 'FFFFFF';       // theme lt1
++const GREY = 'A09F9E';        // theme accent1
++const GREY_MID = '898889';    // theme accent2
++const GREY_DARK = '606161';   // theme accent3
++const CHARCOAL = '464646';    // theme accent4
++const BODY = '595959';        // body copy
++const PALE = 'F2F2F2';
++const MINT = 'E5EEEA';
++const INK = '262626';
++
++const PHOTO = { fill: 'D0D0D0', text: '545456' };        // stock plate, dark variant
++const PHOTO_LIGHT = { fill: 'F3F3F3', text: '828284' };  // stock plate, light variant
++const PHOTO_CAPTION = 'REPLACE\nYOUR IMAGE\nHERE';
++
++const FONT = 'Roboto';
++const NL = '\n';
++
++/* ------------------------------------------------- copy used on many slides */
++const C = {
++  create:     'Create your text here.',
++  createUC:   'Create Your Text Here',
++  yourText:   'Your Text Here',
++  yourTitle:  'Your title here',
++  yourTittle: 'Your Tittle Here',
++  intro:      'Donec gravida leo porttitor maximus sagittis. Praesent non erat ligula. Curabitur nec '
++               + 'turpis porttitor maximus porttitor maximus ',
++  lead:       'PLACEHOLDER'
++               + 'amet Lorem.',
++  lorem:      'Lorem ipsum dolor sit amet, consectetur adipiscingLorem ipsum dolor sit amet,',
++  sed:        'PLACEHOLDER',
++  donec:      'PLACEHOLDER'
++               + 'maximus sagittis us sagittis abitur maximus sagittis us',
++  tail:       ' gravida leo porttitor maximus sagittis abitur maximus sagittis us  Donec gravida erat '
++               + 'PLACEHOLDER'
++               + 'us sagittis maxim erDonec',
++};
++
++/* ------------------------------------------------------------------ helpers */
++
++// Flat colour rectangle. `fade` is percent transparency (0 = opaque).
++function band(s, x, y, w, h, color, fade) {
++  s.addShape('rect', { x, y, w, h, fill: { color, transparency: fade || 0 }, line: { type: 'none' } });
++}
++
++function circle(s, x, y, d, color) {
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color }, line: { type: 'none' } });
++}
++
++// Hollow circle (1 pt outline), used by the icon timeline on slide 4.
++function ring(s, x, y, d, color) {
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color, width: 1 } });
++}
++
++// Straight 1.5 pt connector; w or h is 0 for vertical / horizontal rules.
++function rule(s, x, y, w, h, color) {
++  s.addShape('line', { x, y, w, h, line: { color, width: 1.5 } });
++}
++
++/**
++ * Text box. Geometry in inches, `size` in points, `line` is the line-spacing
++ * multiple, `pad` the internal inset in points ([left, right, bottom, top]).
++ */
++function txt(s, text, o) {
++  s.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: o.font || FONT, fontSize: o.size, color: o.color,
++    bold: !!o.bold, italic: !!o.italic,
++    align: o.align || 'left', valign: o.valign || 'top',
++    lineSpacingMultiple: o.line, rotate: o.rotate,
++    margin: o.pad === undefined ? [7.2, 7.2, 3.6, 3.6] : o.pad,
++    wrap: true, isTextBox: true,
++  });
++}
++
++/**
++ * Placeholder standing in for a photograph. The stock plates are 1422 x 843 px
++ * and all carry the same "REPLACE / YOUR IMAGE / HERE" caption, whose block sits
++ * a little up and to the left of the plate centre. Everything scales with the
++ * frame, so the caption is sized in source pixels and converted with the frame's
++ * own scale factor (`cropY` = fraction trimmed off the top and bottom).
++ */
++const PLATE_H = 843;
++const CAPTION = { size: 69.2, lead: 78.2, dx: -8.7, dy: -4.9 }; // source pixels
++
++function photo(s, x, y, w, h, o) {
++  const opt = o || {};
++  const skin = opt.light ? PHOTO_LIGHT : PHOTO;
++  const px = h / (PLATE_H * (1 - (opt.cropY || 0))); // inches per source pixel
++  band(s, x, y, w, h, skin.fill);
++  s.addText(PHOTO_CAPTION, {
++    x: x + CAPTION.dx * px, y: y + CAPTION.dy * px, w, h,
++    fontFace: FONT, fontSize: CAPTION.size * px * 72, bold: true, color: skin.text,
++    align: 'center', valign: 'middle', lineSpacing: CAPTION.lead * px * 72,
++    margin: 0, wrap: false, isTextBox: true,
++  });
++}
++
++/**
++ * Pictogram outlines traced from the original freeform shapes. Each entry is a
++ * list of closed sub-paths; every sub-path is a flat run of x, y pairs given as
++ * fractions of the icon's bounding box.
++ */
++const ICONS = {
++  search: [
++    [0.121, 0.392, 0.142, 0.286, 0.2, 0.2, 0.286, 0.142, 0.392, 0.12, 0.499, 0.144,
++     0.589, 0.206, 0.652, 0.296, 0.675, 0.404, 0.653, 0.509, 0.595, 0.595, 0.509,
++     0.653, 0.404, 0.675, 0.296, 0.652, 0.206, 0.589, 0.144, 0.499, 0.121, 0.392],
++    [0.978, 0.846, 0.738, 0.607, 0.791, 0.458, 0.787, 0.324, 0.725, 0.181, 0.614,
++     0.071, 0.471, 0.008, 0.313, 0.008, 0.173, 0.067, 0.067, 0.173, 0.008, 0.313,
++     0.008, 0.471, 0.071, 0.614, 0.181, 0.725, 0.324, 0.787, 0.404, 0.795, 0.507,
++     0.781, 0.601, 0.742, 0.872, 0.999, 0.917, 0.99, 0.993, 0.914, 0.999, 0.884, 0.978,
++     0.846],
++  ],
++  brush: [
++    [0.729, 0, 0.551, 0.304, 0.672, 0.372, 0.768, 0.487, 1, 0.237, 0.959, 0.164, 0.888,
++     0.089, 0.805, 0.029, 0.729, 0],
++    [0.612, 0.459, 0.559, 0.431, 0.5, 0.427, 0.379, 0.482, 0.275, 0.604, 0.161, 0.877,
++     0.09, 0.933, 0, 0.974, 0.133, 0.999, 0.304, 0.993, 0.472, 0.949, 0.535, 0.908,
++     0.624, 0.803, 0.679, 0.683, 0.681, 0.563, 0.612, 0.459],
++  ],
++  globeFacets: [
++    [0.69, 0.721, 0.515, 0.833, 0.379, 0.985, 0.556, 0.997, 0.711, 0.953, 0.724, 0.74,
++     0.69, 0.721],
++    [0.836, 0.129, 0.608, 0.187, 0.597, 0.245, 0.692, 0.38, 0.759, 0.532, 0.817, 0.551,
++     0.855, 0.597, 0.995, 0.57, 0.997, 0.446, 0.975, 0.342, 0.932, 0.248, 0.836, 0.129],
++    [0.636, 0.664, 0.458, 0.614, 0.299, 0.529, 0.221, 0.543, 0.163, 0.686, 0.134,
++     0.841, 0.213, 0.91, 0.305, 0.961, 0.45, 0.792, 0.636, 0.664],
++    [0.799, 0.736, 0.795, 0.904, 0.905, 0.793, 0.976, 0.652, 0.858, 0.672, 0.799,
++     0.736],
++    [0.661, 0.593, 0.689, 0.557, 0.676, 0.521, 0.628, 0.419, 0.543, 0.296, 0.493,
++     0.304, 0.44, 0.285, 0.333, 0.383, 0.345, 0.471, 0.494, 0.549, 0.661, 0.593],
++    [0.502, 0.092, 0.575, 0.121, 0.749, 0.067, 0.599, 0.01, 0.454, 0.002, 0.324, 0.032,
++     0.448, 0.107, 0.502, 0.092],
++    [0.137, 0.439, 0.145, 0.397, 0.053, 0.276, 0.008, 0.411, 0.01, 0.602, 0.07, 0.756,
++     0.105, 0.625, 0.158, 0.503, 0.137, 0.439],
++    [0.243, 0.332, 0.274, 0.337, 0.399, 0.223, 0.401, 0.164, 0.237, 0.074, 0.097,
++     0.204, 0.197, 0.343, 0.243, 0.332],
++  ],
++  wrench: [
++    [0.986, 0.362, 0.946, 0.436, 0.85, 0.516, 0.728, 0.545, 0.622, 0.524, 0.535, 0.465,
++     0.477, 0.379, 0.455, 0.273, 0.477, 0.167, 0.535, 0.08, 0.622, 0.021, 0.728, 0,
++     0.837, 0.022, 0.874, 0.044, 0.872, 0.069, 0.689, 0.175, 0.689, 0.312, 0.807,
++     0.377, 0.985, 0.277, 1, 0.298, 0.986, 0.362],
++    [0.182, 0.779, 0.155, 0.791, 0.143, 0.818, 0.155, 0.845, 0.182, 0.857, 0.21, 0.845,
++     0.221, 0.818, 0.21, 0.791, 0.182, 0.779],
++    [0.198, 0.978, 0.143, 1, 0.093, 0.982, 0.009, 0.894, 0.006, 0.827, 0.438, 0.387,
++     0.508, 0.493, 0.614, 0.562, 0.198, 0.978],
++  ],
++  rocket: [
++    [0.804, 0.137, 0.846, 0.155, 0.863, 0.196, 0.846, 0.238, 0.804, 0.255, 0.762,
++     0.238, 0.745, 0.196, 0.762, 0.155, 0.804, 0.137],
++    [0.406, 0.767, 0.353, 0.941, 0.405, 0.999, 0.662, 0.855, 0.679, 0.612, 0.849,
++     0.45, 0.926, 0.34, 0.989, 0.161, 0.994, 0.006, 0.835, 0.01, 0.66, 0.071, 0.552,
++     0.149, 0.388, 0.321, 0.141, 0.341, 0.003, 0.578, 0.004, 0.6, 0.06, 0.647, 0.233,
++     0.594, 0.406, 0.767],
++  ],
++  plane: [
++    [0.639, 0.201, 0.159, 0.087, 0.048, 0.191, 0.058, 0.221, 0.42, 0.42, 0.236, 0.605,
++     0.087, 0.567, 0, 0.655, 0.007, 0.675, 0.189, 0.811, 0.334, 0.998, 0.357, 0.995,
++     0.433, 0.915, 0.395, 0.765, 0.58, 0.58, 0.783, 0.948, 0.811, 0.951, 0.912, 0.871,
++     0.798, 0.362, 0.959, 0.188, 0.998, 0.093, 0.995, 0.038, 0.936, 0, 0.844, 0.023,
++     0.781, 0.062, 0.639, 0.201],
++  ],
++  send: [
++    [0.984, 0.006, 0.946, 0.005, 0.004, 0.555, 0.018, 0.602, 0.243, 0.695, 0.839,
++     0.179, 0.357, 0.77, 0.358, 0.97, 0.376, 0.996, 0.418, 0.99, 0.555, 0.823, 0.811,
++     0.927, 0.853, 0.91, 1, 0.042, 0.984, 0.006],
++  ],
++  diamond: [
++    [0.737, 0.308, 0.638, 0.077, 0.766, 0.077, 0.906, 0.308, 0.737, 0.308],
++    [0.592, 0.784, 0.739, 0.385, 0.896, 0.385, 0.592, 0.784],
++    [0.5, 0.849, 0.33, 0.385, 0.67, 0.385, 0.5, 0.849],
++    [0.104, 0.385, 0.261, 0.385, 0.408, 0.784, 0.104, 0.385],
++    [0.234, 0.077, 0.362, 0.077, 0.263, 0.308, 0.094, 0.308, 0.234, 0.077],
++    [0.567, 0.077, 0.666, 0.308, 0.334, 0.308, 0.433, 0.077, 0.567, 0.077],
++    [0.806, 0.016, 0.781, 0, 0.208, 0.002, 0.001, 0.335, 0.008, 0.373, 0.49, 0.998,
++     0.523, 0.988, 0.998, 0.361, 0.994, 0.323, 0.806, 0.016],
++  ],
++  globe: [
++    [0.366, 0.905, 0.409, 0.874, 0.611, 0.82, 0.697, 0.828, 0.735, 0.856, 0.654, 0.898,
++     0.564, 0.922, 0.465, 0.925, 0.366, 0.905],
++    [0.441, 0.078, 0.332, 0.162, 0.236, 0.277, 0.269, 0.319, 0.344, 0.32, 0.469, 0.355,
++     0.516, 0.404, 0.512, 0.494, 0.418, 0.568, 0.393, 0.613, 0.372, 0.812, 0.292,
++     0.734, 0.261, 0.58, 0.188, 0.508, 0.187, 0.468, 0.218, 0.378, 0.186, 0.357, 0.102,
++     0.347, 0.156, 0.248, 0.234, 0.167, 0.33, 0.109, 0.441, 0.078],
++    [0.926, 0.5, 0.89, 0.671, 0.838, 0.759, 0.827, 0.747, 0.815, 0.705, 0.838, 0.586,
++     0.828, 0.488, 0.802, 0.441, 0.718, 0.415, 0.675, 0.362, 0.667, 0.296, 0.733,
++     0.195, 0.714, 0.172, 0.669, 0.188, 0.637, 0.182, 0.618, 0.129, 0.635, 0.096,
++     0.752, 0.157, 0.844, 0.249, 0.905, 0.366, 0.926, 0.5],
++    [0.5, 0, 0.306, 0.039, 0.147, 0.147, 0.039, 0.306, 0, 0.5, 0.039, 0.694, 0.147,
++     0.853, 0.306, 0.961, 0.5, 1, 0.694, 0.961, 0.853, 0.853, 0.961, 0.694, 1, 0.5,
++     0.961, 0.306, 0.853, 0.147, 0.694, 0.039, 0.5, 0],
++  ],
++  planeFlat: [
++    [0.268, 1, 0.367, 1, 0.592, 0.574, 0.897, 0.571, 0.977, 0.543, 1, 0.5, 0.977,
++     0.457, 0.897, 0.429, 0.592, 0.426, 0.367, 0, 0.268, 0, 0.392, 0.426, 0.213, 0.426,
++     0.1, 0.319, 0, 0.319, 0.08, 0.5, 0, 0.681, 0.1, 0.681, 0.213, 0.574, 0.392, 0.574,
++     0.268, 1],
++  ],
++  link: [
++    [0.931, 0.076, 0.852, 0.021, 0.725, 0.003, 0.645, 0.034, 0.546, 0.126, 0.529,
++     0.158, 0.533, 0.193, 0.556, 0.221, 0.59, 0.232, 0.624, 0.222, 0.734, 0.128, 0.81,
++     0.139, 0.868, 0.199, 0.871, 0.274, 0.843, 0.32, 0.585, 0.562, 0.542, 0.573, 0.461,
++     0.53, 0.415, 0.539, 0.388, 0.579, 0.406, 0.635, 0.508, 0.693, 0.568, 0.695, 0.638,
++     0.674, 0.709, 0.626, 0.931, 0.408, 0.982, 0.332, 1, 0.242, 0.982, 0.152, 0.931,
++     0.076],
++    [0.366, 0.793, 0.298, 0.858, 0.215, 0.874, 0.143, 0.827, 0.124, 0.776, 0.129,
++     0.733, 0.157, 0.687, 0.398, 0.458, 0.464, 0.439, 0.539, 0.477, 0.595, 0.46, 0.611,
++     0.428, 0.602, 0.382, 0.52, 0.325, 0.39, 0.327, 0.3, 0.376, 0.054, 0.617, 0.01,
++     0.697, 0.001, 0.789, 0.028, 0.876, 0.087, 0.948, 0.169, 0.99, 0.259, 0.999, 0.325,
++     0.983, 0.454, 0.881, 0.472, 0.838, 0.454, 0.794, 0.41, 0.775, 0.366, 0.793],
++  ],
++};
++
++function icon(s, name, x, y, w, h, color, rotate) {
++  const pts = [];
++  ICONS[name].forEach(function (sub) {
++    for (let i = 0; i < sub.length; i += 2) {
++      pts.push(i === 0 ? { x: sub[i] * w, y: sub[i + 1] * h, moveTo: true }
++                       : { x: sub[i] * w, y: sub[i + 1] * h });
++    }
++    pts.push({ close: true });
++  });
++  s.addShape('custGeom', {
++    x, y, w, h, points: pts, rotate: rotate || 0,
++    fill: { color }, line: { type: 'none' },
++  });
++}
++
++/* ------------------------------------------------------------------- slides */
++
++/* 1 — BANKING — cover */
++function slide01(pres) {
++  const s = pres.addSlide();
++  photo(s, 0, 0, 13.333, 7.5, { cropY: 0.051 });
++  band(s, 0.433, 5.196, 12.9, 2.333, GREY_MID, 33);
++  circle(s, 1.103, 6.439, 0.556, WHITE);
++  txt(s, 'BANKING', { x: 0.965, y: 5.439, w: 4.227, h: 1.111, size: 60, bold: true, color: WHITE });
++  txt(s, 'FESSIONAL TEMPLATE', { x: 1.609, y: 6.497, w: 3.352, h: 0.438, size: 20, color: WHITE });
++  band(s, 0, 0, 0.433, 7.529, GREY_DARK);
++  txt(s, 'w  w  w  .  o  u  r  p  r  e  s  e  n  t  a  t  i  o  n  .  c  o  m  ',
++      { x: -2.128, y: 3.775, w: 4.74, h: 0.303, size: 12, bold: true, color: WHITE, align: 'center',
++        rotate: 90 });
++  rule(s, 5.712, 5.649, 0, 1.358, WHITE);
++  txt(s, 'PLACEHOLDER'
++          + 'maximus sagittis us sagittis abitur maximus sagittis us  Donec sagittis us Donec Donec '
++          + 'PLACEHOLDER'
++          + 'maximus sagittis us sagittis abitur maximus sagittis us',
++      { x: 6.449, y: 5.646, w: 6.01, h: 1.181, size: 11, color: WHITE, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, 'PRO', { x: 1.038, y: 6.492, w: 0.875, h: 0.438, size: 20, bold: true, color: GREY_MID });
++}
++
++/* 2 — HELLO WORLD — welcome */
++function slide02(pres) {
++  const s = pres.addSlide();
++  photo(s, 0, 0, 13.333, 7.5, { cropY: 0.051 });
++  band(s, 0, 0, 5.968, 7.5, GREY, 8);
++  txt(s, [C.donec
++          + '  Donec sa gravida erat ur erDonec gravida leo porttitor maxim erDonecporttitor maximus '
++          + 'sagittis us sagittis abitur maximus sagittis us',
++         '',
++         'PLACEHOLDER'
++          + 'maximus sagittis us sagittis abitur maximus sagittis us  Donec sa gravida erat ur '
++          + 'erDonec gravida leo porttitor ',
++         'PLACEHOLDER'
++          + 'sagittis us  Donec sa gravida erat ur erDonec gravida leo porttitor maxim '
++          + 'erDonecporttitor'].join(NL),
++      { x: 0.58, y: 3.13, w: 4.439, h: 3.711, size: 11, color: WHITE, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, 'Donec gravida leo porttitor leo porttitor maximus sagittis. Praesent non erat ligula. '
++          + 'Curabitur nec turpis porttitor maximus',
++      { x: 0.535, y: 1.975, w: 5.134, h: 0.625, size: 11, italic: true, color: WHITE, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, 'WELCOME',
++      { x: 8.542, y: 2.721, w: 8.403, h: 2.036, size: 115, bold: true, color: WHITE, align: 'center',
++        rotate: 270 });
++  txt(s, 'WORLD', { x: 0.316, y: 0.907, w: 4.535, h: 1.111, size: 60, bold: true, color: CHARCOAL });
++  txt(s, 'HELLO', { x: 0.339, y: 0.334, w: 2.456, h: 0.841, size: 44, bold: true, color: WHITE });
++}
++
++/* 3 — GREAT PEOPLE WITH INCREDIBLE IDEAS */
++function slide03(pres) {
++  const s = pres.addSlide();
++  photo(s, 0, 0, 5.157, 4.75);
++  photo(s, 0, 4.75, 2.662, 2.75, { light: true });
++  band(s, 5.157, 0, 8.176, 3.75, CHARCOAL);
++  txt(s, 'GREAT PEOPLE WITH INCREDIBLE IDEAS',
++      { x: 5.576, y: 0.814, w: 5.629, h: 1.313, size: 36, bold: true, color: WHITE });
++  txt(s, C.intro,
++      { x: 5.755, y: 2.243, w: 5.134, h: 0.656, size: 11, italic: true, color: WHITE, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, [C.donec
++          + '  Donec sagittis us Donec Donec gravida erat ur erDonec gravida leo porttitor maxim '
++          + 'PLACEHOLDER',
++         '',
++         C.donec
++          + '  Donec sagittis us Donec Donec gravida erat ur erDonec gravida leo porttitor maxim '
++          + 'PLACEHOLDER'].join(NL),
++      { x: 3.168, y: 5.103, w: 9.641, h: 2.045, size: 11, color: BODY, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.createUC, { x: 5.635, y: 4.426, w: 4.74, h: 0.438, size: 20, bold: true, color: CHARCOAL });
++}
++
++/* 4 — COMPANY HISTORY — icon timeline */
++function slide04(pres) {
++  const s = pres.addSlide();
++  photo(s, 5.968, 0, 7.365, 7.5);
++  band(s, 0, 0, 5.968, 7.5, GREY);
++  band(s, 8.81, 0, 4.524, 7.5, PALE, 30);
++  txt(s, C.lead,
++      { x: 0.801, y: 2.492, w: 4.977, h: 0.612, size: 12, italic: true, color: WHITE, line: 1.66666,
++        pad: 2 });
++  txt(s, 'SEO SERVICE',
++      { x: 10.335, y: 5.554, w: 2.048, h: 0.236, size: 14, bold: true, color: CHARCOAL, valign: 'middle',
++        pad: 0 });
++  txt(s, C.lorem,
++      { x: 10.335, y: 5.82, w: 2.48, h: 0.889, size: 11, color: BODY, valign: 'middle', line: 1.5, pad: 2 });
++  txt(s, 'FINANSIAL SERVICES',
++      { x: 10.335, y: 4.018, w: 2.048, h: 0.236, size: 14, bold: true, color: CHARCOAL, valign: 'middle',
++        pad: 0 });
++  txt(s, C.lorem,
++      { x: 10.335, y: 4.283, w: 2.48, h: 0.889, size: 11, color: BODY, valign: 'middle', line: 1.5, pad: 2 });
++  ring(s, 9.431, 5.524, 0.603, GREY);
++  circle(s, 9.431, 3.987, 0.603, GREY);
++  icon(s, 'search', 9.619, 5.712, 0.227, 0.227, GREY);
++  txt(s, 'BUSINESS WEB',
++      { x: 10.255, y: 0.963, w: 2.347, h: 0.447, size: 13, bold: true, color: CHARCOAL, valign: 'middle',
++        line: 1.5 });
++  txt(s, C.lorem, { x: 10.215, y: 1.314, w: 2.386, h: 0.919, size: 11, color: BODY, line: 1.5 });
++  txt(s, 'INVESTMENT',
++      { x: 10.337, y: 2.484, w: 2.048, h: 0.292, size: 13, bold: true, color: CHARCOAL, valign: 'middle',
++        line: 1.5, pad: 0 });
++  txt(s, C.lorem,
++      { x: 10.337, y: 2.767, w: 2.48, h: 0.889, size: 11, color: BODY, valign: 'middle', line: 1.5, pad: 2 });
++  ring(s, 9.432, 1.009, 0.603, GREY);
++  ring(s, 9.432, 2.471, 0.603, GREY);
++  icon(s, 'brush', 9.623, 2.674, 0.221, 0.198, GREY);
++  icon(s, 'globeFacets', 9.623, 1.2, 0.221, 0.221, GREY);
++  txt(s, [C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida leo '
++          + 'porttitor maximus sagittis us sagittis maxim erDonec',
++         '',
++         ' gravida leo porttitor maximus sagittis abitur maximus sagittis us  Donec gravida erat '
++          + 'ur erDonec gravida leo porttitor maxim erDonec gravida leo'].join(NL),
++      { x: 0.812, y: 4.06, w: 4.048, h: 2.6, size: 11, color: WHITE, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, 'Create your text here', { x: 0.712, y: 3.444, w: 4.809, h: 0.505, size: 24, bold: true, color: WHITE });
++  rule(s, 9.73, 1.612, 0, 0.853, GREY);
++  rule(s, 9.73, 3.074, 0, 0.913, GREY);
++  rule(s, 9.73, 4.599, 0, 0.913, GREY);
++  icon(s, 'wrench', 9.565, 4.131, 0.331, 0.331, WHITE, 31.32);
++  txt(s, 'HISTORY', { x: 0.67, y: 1.31, w: 4.566, h: 1.111, size: 60, bold: true, color: CHARCOAL });
++  txt(s, 'COMPANY', { x: 0.67, y: 0.501, w: 4.331, h: 1.111, size: 60, bold: true, color: WHITE });
++}
++
++/* 5 — WHO WHE ARE */
++function slide05(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 0, 13.333, 4.376, GREY_DARK);
++  photo(s, 4.381, 2.147, 8.952, 4.004, { cropY: 0.246 });
++  txt(s, C.yourTittle,
++      { x: 4.381, y: 0.698, w: 2.365, h: 0.325, size: 16, bold: true, color: WHITE, valign: 'middle',
++        pad: 2 });
++  txt(s, C.donec + '  Donec gravida erat ur erDonec',
++      { x: 4.406, y: 1.156, w: 8.519, h: 0.656, size: 11, color: WHITE, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.yourTittle,
++      { x: 0.604, y: 4.908, w: 2.175, h: 0.325, size: 16, bold: true, color: CHARCOAL, valign: 'middle',
++        pad: 2 });
++  txt(s, 'WHO', { x: 0.49, y: 0.503, w: 3.256, h: 1.111, size: 60, bold: true, color: WHITE });
++  txt(s, C.lead,
++      { x: 0.604, y: 2.61, w: 3.341, h: 0.888, size: 12, italic: true, color: WHITE, line: 1.66666, pad: 2 });
++  txt(s, 'WHE ARE', { x: 0.534, y: 1.429, w: 3.866, h: 0.909, size: 48, bold: true, color: WHITE });
++  band(s, 9.381, 4.365, 3.952, 1.786, PALE, 30);
++  txt(s, C.yourTittle,
++      { x: 9.711, y: 4.587, w: 2.175, h: 0.325, size: 16, bold: true, color: CHARCOAL, valign: 'middle',
++        pad: 2 });
++  txt(s, 'PLACEHOLDER'
++          + 'maximus sagittis us sagittis abitur',
++      { x: 9.72, y: 5.02, w: 3.337, h: 0.934, size: 11, color: BODY, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, ['Donec gravida erat ur erDonec gravida swaefetu',
++         ' leo porttitormaxim erDonec gravida leo porttitor ',
++         'maximus sagittisagittis abitur maximus sagittis',
++         '',
++         'Donec gravidarat ur erDonec gravida leo porttitor maxim erDonec  Donec gravida erat ur '
++          + 'PLACEHOLDER',
++         'PLACEHOLDER'
++          + 'PLACEHOLDER'].join(NL),
++      { x: 0.614, y: 5.372, w: 12.68, h: 1.767, size: 11, color: BODY, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++}
++
++/* 6 — OPPORTUNITIES — four icon columns */
++function slide06(pres) {
++  const s = pres.addSlide();
++  photo(s, 0, 0, 5.889, 4.095);
++  photo(s, 5.889, 0, 7.444, 4.095, { light: true, cropY: 0.072 });
++  band(s, 0, 0, 7.906, 4.095, GREY, 30);
++  icon(s, 'rocket', 7.993, 4.784, 0.453, 0.452, GREY_DARK);
++  icon(s, 'plane', 11.138, 4.749, 0.462, 0.46, CHARCOAL);
++  icon(s, 'send', 4.789, 4.761, 0.475, 0.475, GREY_MID);
++  icon(s, 'diamond', 1.579, 4.845, 0.469, 0.381, GREY);
++  txt(s, C.yourTitle,
++      { x: 0.8, y: 5.602, w: 2.048, h: 0.236, size: 14, bold: true, color: CHARCOAL, align: 'center',
++        valign: 'middle', pad: 0 });
++  txt(s, C.lorem,
++      { x: 0.585, y: 5.925, w: 2.48, h: 0.889, size: 11, color: BODY, align: 'center', valign: 'middle',
++        line: 1.5, pad: 2 });
++  txt(s, C.yourTitle,
++      { x: 3.948, y: 5.602, w: 2.048, h: 0.236, size: 14, bold: true, color: CHARCOAL, align: 'center',
++        valign: 'middle', pad: 0 });
++  txt(s, C.lorem,
++      { x: 3.733, y: 5.925, w: 2.48, h: 0.889, size: 11, color: BODY, align: 'center', valign: 'middle',
++        line: 1.5, pad: 2 });
++  txt(s, 'OPPORTUNITIES', { x: 0.465, y: 1.504, w: 6.732, h: 1.111, size: 60, bold: true, color: WHITE });
++  txt(s, C.intro,
++      { x: 0.632, y: 2.654, w: 4.804, h: 0.656, size: 11, italic: true, color: WHITE, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.yourTitle,
++      { x: 7.197, y: 5.602, w: 2.048, h: 0.236, size: 14, bold: true, color: CHARCOAL, align: 'center',
++        valign: 'middle', pad: 0 });
++  txt(s, C.lorem,
++      { x: 6.981, y: 5.925, w: 2.48, h: 0.889, size: 11, color: BODY, align: 'center', valign: 'middle',
++        line: 1.5, pad: 2 });
++  txt(s, C.yourTitle,
++      { x: 10.345, y: 5.602, w: 2.048, h: 0.236, size: 14, bold: true, color: CHARCOAL, align: 'center',
++        valign: 'middle', pad: 0 });
++  txt(s, C.lorem,
++      { x: 10.129, y: 5.925, w: 2.48, h: 0.889, size: 11, color: BODY, align: 'center', valign: 'middle',
++        line: 1.5, pad: 2 });
++  rule(s, 2.413, 5.007, 2.085, 0, GREY);
++  rule(s, 5.605, 5.007, 2.085, 0, GREY);
++  rule(s, 8.748, 5.007, 2.085, 0, GREY);
++}
++
++/* 7 — TESTIMONIAL */
++function slide07(pres) {
++  const s = pres.addSlide();
++  photo(s, 6.104, 0, 7.229, 7.5);
++  band(s, 0, 0, 6.104, 7.5, GREY_MID);
++  band(s, 0, 2.603, 11.853, 4.897, PALE, 30);
++  txt(s, ['“In the last two years, my life has completely changed. I always think',
++         'I am very lucky to have joined this great company. Thanks”.'].join(NL),
++      { x: 0.449, y: 3.52, w: 10.956, h: 3.063, size: 44, bold: true, color: CHARCOAL });
++  txt(s, 'TESTIMONIAL', { x: 0.449, y: 1.812, w: 10.263, h: 1.582, size: 88, bold: true, color: WHITE });
++}
++
++/* 8 — THE PROBLEM — three icon badges */
++function slide08(pres) {
++  const s = pres.addSlide();
++  photo(s, 5.888, 0, 7.445, 3.679, { cropY: 0.166 });
++  photo(s, 0, 3.679, 4.351, 3.821);
++  band(s, 0, -0.023, 5.894, 3.705, CHARCOAL);
++  band(s, 4.351, 3.679, 8.982, 3.821, GREY_MID);
++  txt(s, C.yourText,
++      { x: 5.234, y: 5.501, w: 1.973, h: 0.311, size: 14, bold: true, color: WHITE, align: 'center',
++        line: 1.07142 });
++  txt(s, C.sed, { x: 5.102, y: 5.792, w: 2.206, h: 0.858, size: 10, color: WHITE, align: 'center', line: 1.5 });
++  circle(s, 11.23, 4.569, 0.613, WHITE);
++  circle(s, 8.529, 4.571, 0.608, WHITE);
++  circle(s, 5.894, 4.569, 0.628, WHITE);
++  icon(s, 'globe', 6.063, 4.733, 0.283, 0.284, GREY_MID);
++  icon(s, 'planeFlat', 8.689, 4.711, 0.33, 0.31, GREY_MID);
++  icon(s, 'link', 11.407, 4.728, 0.269, 0.269, GREY_MID);
++  txt(s, C.yourText,
++      { x: 7.893, y: 5.501, w: 1.973, h: 0.311, size: 14, bold: true, color: WHITE, align: 'center',
++        line: 1.07142 });
++  txt(s, C.sed, { x: 7.76, y: 5.792, w: 2.206, h: 0.858, size: 10, color: WHITE, align: 'center', line: 1.5 });
++  txt(s, C.yourText,
++      { x: 10.583, y: 5.501, w: 1.973, h: 0.311, size: 14, bold: true, color: WHITE, align: 'center',
++        line: 1.07142 });
++  txt(s, C.sed, { x: 10.451, y: 5.792, w: 2.206, h: 0.858, size: 10, color: WHITE, align: 'center', line: 1.5 });
++  txt(s, C.intro,
++      { x: 0.456, y: 2.312, w: 3.895, h: 0.934, size: 11, italic: true, color: WHITE, font: 'Open Sans',
++        line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, 'PROBLEM', { x: 0.316, y: 0.892, w: 5.667, h: 1.447, size: 80, bold: true, color: WHITE });
++  txt(s, 'THE', { x: 0.339, y: 0.334, w: 2.456, h: 0.841, size: 44, bold: true, color: WHITE });
++}
++
++/* 9 — OUR SOLUTION — photo collage */
++function slide09(pres) {
++  const s = pres.addSlide();
++  band(s, 9.354, 3.917, 3.979, 0.458, CHARCOAL);
++  band(s, 4.281, 4.626, 2.509, 2.021, GREY_MID);
++  band(s, 1.036, 0.359, 2.198, 1.938, GREY);
++  photo(s, 0.458, 0, 2.396, 1.938);
++  photo(s, 7.938, 0, 5.396, 3.917);
++  photo(s, 0.458, 5.021, 5.896, 2.479, { cropY: 0.291 });
++  txt(s, C.donec + '  Donec gravida erat ur erDonec gravida leo porttitor',
++      { x: 0.547, y: 3.531, w: 3.859, h: 1.212, size: 11, color: BODY, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.create, { x: 0.458, y: 3.127, w: 4.176, h: 0.404, size: 18, bold: true, color: BODY });
++  icon(s, 'diamond', 5.296, 1.215, 0.666, 0.541, GREY_MID);
++  txt(s, C.yourTitle,
++      { x: 4.616, y: 2.109, w: 2.048, h: 0.236, size: 14, bold: true, color: BODY, align: 'center',
++        valign: 'middle', pad: 0 });
++  txt(s, C.lorem,
++      { x: 4.4, y: 2.375, w: 2.48, h: 0.889, size: 11, color: BODY, align: 'center', valign: 'middle',
++        line: 1.5, pad: 2 });
++  txt(s, 'OUR SOLUTION', { x: 7.775, y: 4.641, w: 4.48, h: 1.582, size: 44, bold: true, color: GREY });
++  txt(s, C.lead,
++      { x: 7.865, y: 6.294, w: 4.659, h: 0.612, size: 12, italic: true, color: BODY, line: 1.66666, pad: 2 });
++}
++
++/* 10 — OUR CONCEPT IN THE COMPANY */
++function slide10(pres) {
++  const s = pres.addSlide();
++  photo(s, 9.659, 0, 3.683, 7.5);
++  band(s, 0, 0, 4.603, 7.5, GREY_DARK);
++  band(s, 4.603, 0, 5.063, 7.5, GREY);
++  band(s, 4.603, 0, 5.063, 7.5, PALE, 30);
++  txt(s, C.yourText,
++      { x: 1.23, y: 1.294, w: 1.973, h: 0.311, size: 14, bold: true, color: WHITE, align: 'center',
++        line: 1.07142 });
++  txt(s, C.sed, { x: 1.098, y: 1.585, w: 2.206, h: 0.858, size: 10, color: WHITE, align: 'center', line: 1.5 });
++  circle(s, 1.877, 5.037, 0.613, CHARCOAL);
++  circle(s, 1.867, 2.743, 0.608, GREY_MID);
++  circle(s, 1.89, 0.501, 0.628, GREY);
++  icon(s, 'globe', 2.059, 0.666, 0.283, 0.284, WHITE);
++  icon(s, 'planeFlat', 2.041, 2.925, 0.245, 0.23, WHITE);
++  icon(s, 'link', 2.04, 5.196, 0.269, 0.269, WHITE);
++  txt(s, C.yourText,
++      { x: 1.23, y: 3.534, w: 1.973, h: 0.311, size: 14, bold: true, color: WHITE, align: 'center',
++        line: 1.07142 });
++  txt(s, C.sed, { x: 1.098, y: 3.825, w: 2.206, h: 0.858, size: 10, color: WHITE, align: 'center', line: 1.5 });
++  txt(s, C.yourText,
++      { x: 1.23, y: 5.83, w: 1.973, h: 0.311, size: 14, bold: true, color: WHITE, align: 'center',
++        line: 1.07142 });
++  txt(s, C.sed, { x: 1.098, y: 6.121, w: 2.206, h: 0.858, size: 10, color: WHITE, align: 'center', line: 1.5 });
++  txt(s, ['OUR CONCEPT',
++         'IN THE COMPANY'].join(NL),
++      { x: 4.932, y: 0.98, w: 4.519, h: 2.322, size: 44, bold: true, color: WHITE });
++  txt(s, C.yourText, { x: 5.024, y: 3.731, w: 2.328, h: 0.311, size: 14, bold: true, color: BODY, line: 1.07142 });
++  txt(s, ['PLACEHOLDER'
++          + 'voluptatem accusantium nyanSed ut perspiciatis unde omnis is er',
++         '',
++         'PLACEHOLDER'
++          + 'error sit voluptatem accusantium nyanpage',
++         'page natus error sit voluptatem accusantium nyanpage'].join(NL),
++      { x: 5, y: 4.12, w: 4.019, h: 2.121, size: 10, color: BODY, line: 1.5 });
++}
++
++/* 11 — CASE STUDY */
++function slide11(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 7.015, 6.132, 0.5, GREY);
++  band(s, 6.132, 0, 7.201, 0.5, GREY_MID);
++  photo(s, 0, 0.5, 13.333, 6.515, { cropY: 0.176 });
++  band(s, 1.518, 0, 4.614, 7.015, PALE, 30);
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida leo '
++          + 'PLACEHOLDER',
++      { x: 2.029, y: 3.924, w: 3.593, h: 2.045, size: 11, color: BODY, align: 'center', line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, 'STUDY', { x: 0.67, y: 2.11, w: 6.311, h: 1.717, size: 96, bold: true, color: WHITE, align: 'center' });
++  txt(s, 'CASE',
++      { x: 1.477, y: 1.405, w: 4.614, h: 1.111, size: 60, bold: true, color: CHARCOAL, align: 'center' });
++}
++
++/* 12 — FINANCIAL CHART */
++function slide12(pres) {
++  const s = pres.addSlide();
++  band(s, 5.51, 0, 7.823, 3.762, CHARCOAL);
++  photo(s, 0, 0, 5.51, 7.5);
++  photo(s, 6.794, 2.603, 2.51, 2.317);
++  photo(s, 9.54, 2.603, 2.51, 2.317);
++  txt(s, 'FINANCIAL CHART', { x: 6.698, y: 5.312, w: 4.507, h: 0.673, size: 34, bold: true, color: BODY });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida leo '
++          + 'PLACEHOLDER'
++          + 'porttitor maxim erDonec gravida leo porttitor maximus',
++      { x: 6.698, y: 0.754, w: 6.048, h: 1.458, size: 11, color: WHITE, line: 1.5 });
++  txt(s, C.intro,
++      { x: 6.831, y: 5.985, w: 4.991, h: 0.625, size: 11, italic: true, color: BODY, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++}
++
++/* 13 — FINANCIAL REPORT */
++function slide13(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 0, 13.333, 7.5, CHARCOAL);
++  band(s, 0, 5.095, 6.587, 2.405, GREY, 30);
++  photo(s, 0, 0, 6.587, 5.095);
++  photo(s, 7.45, 4, 2.51, 3.5);
++  photo(s, 10.305, 4, 2.51, 3.5);
++  txt(s, 'FINANCIAL REPORT', { x: 7.292, y: 0.464, w: 3.652, h: 1.313, size: 36, bold: true, color: WHITE });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 7.303, y: 2.377, w: 4.81, h: 1.212, size: 11, color: WHITE, line: 1.5 });
++  txt(s, C.create, { x: 7.303, y: 1.941, w: 4.176, h: 0.404, size: 18, bold: true, color: WHITE });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida leo '
++          + 'porttitor maximus sagittis us sagittis Donec gravida',
++      { x: 0.596, y: 5.848, w: 5.267, h: 1.181, size: 11, color: WHITE, line: 1.5 });
++  txt(s, C.create, { x: 0.596, y: 5.444, w: 4.176, h: 0.404, size: 18, bold: true, color: WHITE });
++}
++
++/* 14 — CREATIVE IMAGE LAYOUT */
++function slide14(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 0, 13.333, 7.5, CHARCOAL);
++  photo(s, 4.095, 2.984, 3.556, 4.516);
++  photo(s, 8.19, 2.984, 5.143, 4.516);
++  photo(s, 0, 0, 3.556, 2.984);
++  txt(s, C.donec + '  Donec gravida erat ur erDonec gravida leo porttitor',
++      { x: 9.159, y: 0.984, w: 3.206, h: 1.489, size: 11, color: WHITE, align: 'center', line: 1.5 });
++  txt(s, C.create, { x: 9.117, y: 0.461, w: 3.29, h: 0.404, size: 18, bold: true, color: WHITE, align: 'center' });
++  txt(s, C.donec + '  Donec gravida erat ur erDonec gravida leo porttitor',
++      { x: 4.27, y: 0.984, w: 3.206, h: 1.489, size: 11, color: WHITE, align: 'center', line: 1.5 });
++  txt(s, C.create, { x: 4.228, y: 0.461, w: 3.29, h: 0.404, size: 18, bold: true, color: WHITE, align: 'center' });
++  txt(s, ['CREATIVE',
++         'IMAGE LAYOUT'].join(NL),
++      { x: 0.079, y: 3.707, w: 3.901, h: 1.178, size: 32, bold: true, color: MINT, align: 'center' });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim',
++      { x: 0.374, y: 5.025, w: 3.311, h: 1.489, size: 11, color: WHITE, align: 'center', line: 1.5 });
++}
++
++/* 15 — BANK ACCOUNT ESSENTIALS */
++function slide15(pres) {
++  const s = pres.addSlide();
++  band(s, 6.718, 0, 5.155, 7.5, GREY);
++  photo(s, 1.21, 1.984, 5.508, 2.619, { cropY: 0.198 });
++  photo(s, 7.562, 2.731, 4.311, 2.683);
++  photo(s, 11.873, 0, 1.46, 7.5, { light: true });
++  txt(s, C.donec,
++      { x: 1.292, y: 1.066, w: 5.315, h: 0.625, size: 11, color: BODY, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.create, { x: 1.21, y: 0.539, w: 3.657, h: 0.438, size: 20, bold: true, color: BODY });
++  txt(s, C.create, { x: 1.877, y: 5.089, w: 3.657, h: 0.438, size: 20, bold: true, color: BODY });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida maximus '
++          + 'sagittis us  Donec gravida erat ur erDonec gravida leo porttitor maxim',
++      { x: 1.925, y: 5.563, w: 4.794, h: 1.489, size: 11, color: BODY, line: 1.5 });
++  txt(s, C.donec + '  Donec', { x: 7.476, y: 1.468, w: 3.937, h: 0.934, size: 11, color: WHITE, line: 1.5 });
++  txt(s, ['BANK ACCOUNT',
++         'ESSENTIALS'].join(NL),
++      { x: 7.438, y: 5.874, w: 4.492, h: 1.178, size: 32, bold: true, color: WHITE });
++  txt(s, C.create, { x: 7.466, y: 0.988, w: 3.657, h: 0.438, size: 20, bold: true, color: WHITE });
++  band(s, 0, 6.756, 0.867, 0.767, GREY);
++}
++
++/* 16 — CREDIT CARD IN THE COMPANY */
++function slide16(pres) {
++  const s = pres.addSlide();
++  band(s, 7.302, 0, 6.032, 4.429, CHARCOAL);
++  photo(s, 3.62, 0.985, 3.683, 3.452);
++  photo(s, 9.272, 3, 3.683, 4.5);
++  photo(s, 0.413, 4.778, 2.81, 2.722);
++  txt(s, ['CREDIT CARD',
++         'IN THE COMPANY'].join(NL),
++      { x: 7.864, y: 0.576, w: 4.18, h: 1.245, size: 34, bold: true, color: WHITE });
++  txt(s, C.intro,
++      { x: 7.961, y: 1.876, w: 4.991, h: 0.656, size: 11, italic: true, color: WHITE, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.create, { x: 3.476, y: 5.005, w: 3.657, h: 0.438, size: 20, bold: true, color: CHARCOAL });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida maximus '
++          + 'sagittis us  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 3.524, y: 5.48, w: 5.492, h: 1.489, size: 11, color: BODY, line: 1.5 });
++  txt(s, C.create, { x: 0.317, y: 0.861, w: 3.19, h: 0.438, size: 20, bold: true, color: CHARCOAL });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida maximus '
++          + 'sagittis us  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 0.365, y: 1.335, w: 2.841, h: 2.6, size: 11, color: BODY, line: 1.5 });
++}
++
++/* 17 — OUTLINING AND ENUMERATING */
++function slide17(pres) {
++  const s = pres.addSlide();
++  photo(s, 5.571, 0, 7.762, 3.81, { light: true, cropY: 0.172 });
++  photo(s, 0, 0, 5.571, 7.5);
++  band(s, 0, 0, 5.571, 7.5, PALE, 30);
++  band(s, 5.571, 3.81, 7.762, 3.69, CHARCOAL);
++  txt(s, [C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida leo '
++          + 'porttitor maximus sagittis us sagittis maxim erDonec',
++         '',
++         C.tail + ' gravida '].join(NL),
++      { x: 0.53, y: 4.092, w: 4.048, h: 2.878, size: 11, color: BODY, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.createUC, { x: 0.424, y: 2.436, w: 4.74, h: 0.505, size: 24, bold: true, color: CHARCOAL });
++  txt(s, 'OUTLINING AND ENUMERATING ',
++      { x: 0.376, y: 0.852, w: 5.603, h: 1.447, size: 40, bold: true, color: CHARCOAL });
++  txt(s, C.yourTittle,
++      { x: 6.564, y: 4.717, w: 4.261, h: 0.595, size: 32, bold: true, color: WHITE, valign: 'middle',
++        pad: 2 });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida leo '
++          + 'porttitor maximus sagittis us sagittis maxim erDonec',
++      { x: 6.574, y: 5.381, w: 5.887, h: 1.212, size: 11, color: WHITE, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, 'Donec gravida leo porttitor maximus sagittis. Praesent non erat ligula. Curabitr '
++          + 'maximus porttitor maximus ',
++      { x: 0.53, y: 3.044, w: 3.895, h: 0.656, size: 11, italic: true, color: BODY, font: 'Open Sans',
++        line: 1.5, pad: [0, 0, 3.6, 3.6] });
++}
++
++/* 18 — Quote — "You Can Have Anything You Want..." */
++function slide18(pres) {
++  const s = pres.addSlide();
++  photo(s, 0, 0, 13.333, 7.5, { cropY: 0.051 });
++  band(s, 0, 1.294, 11.853, 4.897, PALE, 30);
++  txt(s, '"You Can Have',
++      { x: 1.534, y: 1.794, w: 8.681, h: 1.199, size: 66, bold: true, color: CHARCOAL, align: 'center',
++        line: 1 });
++  band(s, 10.986, 5.431, 0.867, 0.767, GREY);
++  txt(s, 'Anything You Want',
++      { x: 1.534, y: 2.733, w: 8.681, h: 1.115, size: 66, bold: true, color: CHARCOAL, align: 'center',
++        line: 1 });
++  txt(s, 'In Life If You Dress',
++      { x: 1.534, y: 3.711, w: 8.681, h: 1.115, size: 66, bold: true, color: CHARCOAL, align: 'center',
++        line: 1 });
++  txt(s, 'For It." ',
++      { x: 1.534, y: 4.598, w: 8.681, h: 1.115, size: 66, bold: true, color: CHARCOAL, align: 'center',
++        line: 1 });
++}
++
++/* 19 — BANKING AND FINANCIAL */
++function slide19(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 0, 13.333, 7.5, GREY_DARK);
++  photo(s, 0, 2.96, 4.825, 4.54);
++  photo(s, 5.214, 2.96, 2.905, 4.54);
++  photo(s, 9.832, -0.007, 3.508, 4.54);
++  txt(s, ['BANKING AND',
++         'FINANCIAL'].join(NL),
++      { x: 0.294, y: 0.44, w: 4.18, h: 1.245, size: 34, bold: true, color: WHITE });
++  txt(s, C.intro,
++      { x: 0.391, y: 1.74, w: 3.862, h: 0.934, size: 11, italic: true, color: WHITE, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 8.508, y: 5.649, w: 4.619, h: 1.212, size: 11, color: WHITE, line: 1.5 });
++  txt(s, C.create, { x: 8.508, y: 5.112, w: 3.657, h: 0.438, size: 20, bold: true, color: WHITE });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 5.214, y: 1.167, w: 3.657, h: 1.489, size: 11, color: WHITE, line: 1.5 });
++  txt(s, C.create, { x: 5.214, y: 0.631, w: 3.657, h: 0.438, size: 20, bold: true, color: WHITE });
++}
++
++/* 20 — TITLE ONE / TWO / THREE */
++function slide20(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 4.544, 13.333, 2.956, GREY_DARK);
++  photo(s, 1.464, 2.529, 3.227, 4.54);
++  photo(s, 5.075, 2.529, 3.227, 4.54);
++  photo(s, 8.685, 2.529, 3.227, 4.54);
++  txt(s, C.donec, { x: 1.511, y: 1.03, w: 3.1, h: 1.212, size: 11, color: BODY, align: 'center', line: 1.5 });
++  txt(s, 'TITLE ONE',
++      { x: 1.416, y: 0.508, w: 3.29, h: 0.404, size: 18, bold: true, color: CHARCOAL, align: 'center' });
++  txt(s, C.donec, { x: 5.128, y: 1.03, w: 3.1, h: 1.212, size: 11, color: BODY, align: 'center', line: 1.5 });
++  txt(s, 'TITLE TWO',
++      { x: 5.033, y: 0.508, w: 3.29, h: 0.404, size: 18, bold: true, color: CHARCOAL, align: 'center' });
++  txt(s, C.donec, { x: 8.717, y: 1.03, w: 3.1, h: 1.212, size: 11, color: BODY, align: 'center', line: 1.5 });
++  txt(s, 'TITLE THREE',
++      { x: 8.622, y: 0.508, w: 3.29, h: 0.404, size: 18, bold: true, color: CHARCOAL, align: 'center' });
++}
++
++/* 21 — PROVIDE UPDATES ABOUT INDUSTRY */
++function slide21(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 0, 13.333, 7.5, GREY);
++  photo(s, 1.052, 0, 5.536, 4.316);
++  photo(s, 7.393, 2.95, 4.868, 2.132, { cropY: 0.261 });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 7.322, y: 5.582, w: 4.619, h: 1.212, size: 11, color: WHITE, line: 1.5 });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 0.972, y: 5.349, w: 4.619, h: 1.212, size: 11, color: WHITE, line: 1.5 });
++  txt(s, C.create, { x: 0.972, y: 4.754, w: 3.29, h: 0.404, size: 18, bold: true, color: WHITE });
++  txt(s, 'PROVIDE UPDATES ABOUT INDUSTRY',
++      { x: 7.314, y: 0.532, w: 5.372, h: 1.313, size: 36, bold: true, color: WHITE });
++  txt(s, C.lead,
++      { x: 7.404, y: 1.904, w: 4.659, h: 0.612, size: 12, italic: true, color: WHITE, line: 1.66666,
++        pad: 2 });
++  band(s, 7.393, 5.082, 4.868, 0.284, GREY_DARK);
++}
++
++/* 22 — TESTIMONIAL — quote over photo */
++function slide22(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 0, 13.333, 7.5, GREY_MID);
++  photo(s, 0, 0.562, 12.729, 6.938, { cropY: 0.081 });
++  band(s, 0, 2.603, 11.853, 4.897, PALE, 30);
++  txt(s, ['“In the last two years, my life has completely changed. I always think',
++         'I am very lucky to have joined this great company. Thanks”.'].join(NL),
++      { x: 0.449, y: 3.52, w: 10.956, h: 3.063, size: 44, bold: true, color: CHARCOAL });
++}
++
++/* 23 — DISCUSS BUSINESS */
++function slide23(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 0, 13.333, 7.5, GREY);
++  photo(s, 1.092, 2.694, 7.235, 3.712, { cropY: 0.135 });
++  photo(s, 9.209, 0, 3.425, 2.136);
++  txt(s, 'DISCUSS BUSINESS', { x: 1.002, y: 0.487, w: 4.48, h: 1.313, size: 36, bold: true, color: WHITE });
++  txt(s, C.lead,
++      { x: 1.092, y: 1.859, w: 4.659, h: 0.612, size: 12, italic: true, color: WHITE, line: 1.66666,
++        pad: 2 });
++  band(s, 5.249, 3.848, 5.271, 3.712, INK, 50);
++  txt(s, [C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida leo '
++          + 'porttitor maximus sagittis us sagittis maxim erDonec',
++         '',
++         C.tail + ' gravida leo porttitor maximus'].join(NL),
++      { x: 9.207, y: 2.995, w: 3.425, h: 3.433, size: 11, color: WHITE, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.createUC, { x: 9.1, y: 2.558, w: 3.841, h: 0.438, size: 20, bold: true, color: WHITE });
++}
++
++/* 24 — WE ARE HERE TO HELP */
++function slide24(pres) {
++  const s = pres.addSlide();
++  photo(s, 1.104, 0.544, 5.278, 4.853);
++  photo(s, 1.999, 2.213, 5.278, 4.853, { light: true });
++  txt(s, ['WE ARE HERE ',
++         'TO HELP'].join(NL),
++      { x: 8.083, y: 0.716, w: 4.48, h: 1.313, size: 36, bold: true, color: GREY });
++  txt(s, C.lead,
++      { x: 8.173, y: 2.088, w: 4.659, h: 0.612, size: 12, italic: true, color: BODY, line: 1.66666, pad: 2 });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 8.11, y: 3.643, w: 4.619, h: 1.212, size: 11, color: BODY, line: 1.5 });
++  txt(s, C.create, { x: 8.11, y: 3.194, w: 3.29, h: 0.404, size: 18, bold: true, color: CHARCOAL });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 8.11, y: 5.643, w: 4.619, h: 1.212, size: 11, color: BODY, line: 1.5 });
++  txt(s, C.create, { x: 8.11, y: 5.194, w: 3.29, h: 0.404, size: 18, bold: true, color: CHARCOAL });
++}
++
++/* 25 — OUR CONCEPT IN THE COMPANY */
++function slide25(pres) {
++  const s = pres.addSlide();
++  photo(s, 0, 0, 3.397, 3.868);
++  photo(s, 6.882, 2.913, 3.397, 3.868, { light: true });
++  txt(s, C.create, { x: 3.664, y: 0.393, w: 3.29, h: 0.404, size: 18, bold: true, color: CHARCOAL });
++  txt(s, [C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida leo '
++          + 'porttitor maximu sagittis us sagittis abitur maximus sagittis us  Donec gravida erat ur '
++          + 'PLACEHOLDER',
++         'maximus sagittis us sagittis maxim ',
++         'erDonec gravida leo porttitor maximus sag',
++         'ittis s sagittis us sagittis maxim erDo',
++         'nec gravida leo porttitor maximus sagi',
++         'ttis abitur maximus sagittis us  Donec'].join(NL),
++      { x: 3.743, y: 0.85, w: 4.701, h: 3.156, size: 11, color: BODY, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, ['OUR CONCEPT',
++         'IN THE COMPANY'].join(NL),
++      { x: 1.103, y: 4.543, w: 4.18, h: 1.245, size: 34, bold: true, color: GREY });
++  txt(s, C.intro,
++      { x: 1.201, y: 5.927, w: 4.926, h: 0.656, size: 11, italic: true, color: BODY, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  band(s, 2.335, 0, 1.058, 3.868, GREY, 50);
++  photo(s, 8.79, 0.683, 3.397, 3.868);
++}
++
++/* 26 — GROWING DEMAND */
++function slide26(pres) {
++  const s = pres.addSlide();
++  photo(s, 1.206, 0.508, 4.27, 4.302);
++  photo(s, 4.202, 3.365, 3.814, 3.556, { light: true });
++  photo(s, 9.944, 0.825, 3.397, 3.127);
++  txt(s, 'GROWING DEMAND', { x: 8.375, y: 4.499, w: 4.18, h: 1.245, size: 34, bold: true, color: GREY });
++  txt(s, C.intro,
++      { x: 8.472, y: 5.904, w: 4.082, h: 0.934, size: 11, italic: true, color: BODY, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.donec + '  Donec gravida erat ur erDonec gravida leo',
++      { x: 0.384, y: 5.431, w: 3.563, h: 1.489, size: 11, color: BODY, align: 'right', line: 1.5 });
++  txt(s, C.create,
++      { x: 0.657, y: 4.983, w: 3.29, h: 0.404, size: 18, bold: true, color: CHARCOAL, align: 'right' });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim',
++      { x: 5.754, y: 1.498, w: 3.976, h: 1.212, size: 11, color: BODY, line: 1.5 });
++  txt(s, C.create, { x: 5.754, y: 1.05, w: 3.29, h: 0.404, size: 18, bold: true, color: CHARCOAL });
++}
++
++/* 27 — OUR CONCEPT IN THE COMPANY */
++function slide27(pres) {
++  const s = pres.addSlide();
++  band(s, 5.492, 2.746, 7.841, 4.754, CHARCOAL);
++  photo(s, 7, 0, 5.619, 3.778);
++  photo(s, 0, 2.746, 5.492, 4.754);
++  txt(s, ['OUR CONCEPT',
++         'IN THE COMPANY'].join(NL),
++      { x: 0.468, y: 0.401, w: 4.18, h: 1.245, size: 34, bold: true, color: GREY });
++  txt(s, C.intro,
++      { x: 0.566, y: 1.702, w: 4.926, h: 0.656, size: 11, italic: true, color: BODY, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, [C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida leo '
++          + 'porttitor maximus sagittis us sagittis maxim erDonec',
++         '',
++         C.tail + ' gravida leo porttitor maximus'].join(NL),
++      { x: 6.08, y: 4.792, w: 6.698, h: 2.045, size: 11, color: WHITE, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.createUC, { x: 5.973, y: 4.306, w: 3.841, h: 0.438, size: 20, bold: true, color: WHITE });
++}
++
++/* 28 — HALF PAGE PHOTO SLIDE */
++function slide28(pres) {
++  const s = pres.addSlide();
++  photo(s, -0.019, 3.545, 7.794, 3.455, { cropY: 0.252 });
++  photo(s, 8.984, 0, 4.349, 5.229);
++  band(s, 0.458, 0.789, 7.335, 2.756, PALE);
++  txt(s, 'HALF PAGE PHOTO SLIDE',
++      { x: 1.044, y: 1.065, w: 3.492, h: 1.313, size: 36, bold: true, color: GREY_MID });
++  txt(s, C.intro,
++      { x: 1.153, y: 2.35, w: 5.931, h: 0.656, size: 11, italic: true, color: BODY, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.donec
++          + '  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida',
++      { x: 8.998, y: 5.92, w: 3.998, h: 1.212, size: 11, color: BODY, line: 1.5, pad: [0, 0, 3.6, 3.6] });
++  txt(s, C.createUC, { x: 8.881, y: 5.515, w: 3.841, h: 0.37, size: 16, bold: true, color: CHARCOAL });
++}
++
++/* 29 — POTENTIAL CLIENTS */
++function slide29(pres) {
++  const s = pres.addSlide();
++  band(s, 6.25, -0.006, 7.083, 3.845, GREY);
++  photo(s, 0.82, -0.006, 5.43, 7.5);
++  photo(s, 7.269, 0.707, 5.101, 3.845);
++  txt(s, 'POTENTIAL CLIENTS', { x: 7.103, y: 4.958, w: 3.492, h: 1.313, size: 36, bold: true, color: GREY_MID });
++  txt(s, C.intro,
++      { x: 7.212, y: 6.35, w: 4.753, h: 0.656, size: 11, italic: true, color: BODY, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  band(s, 0, 3.838, 6.248, 3.662, CHARCOAL, 10);
++  txt(s, ['PLACEHOLDER'
++          + 'porttitor maximus sagittis us sagittis abitur maximus sagittis us  Donec gravida erat '
++          + 'ur erDonec gravida leo portti',
++         '',
++         'PLACEHOLDER'
++          + 'sagittis us  Donec gravida erat ur erDonec gravida leo porttitor maxim erDonec gravida'].join(NL),
++      { x: 0.707, y: 4.612, w: 3.801, h: 2.6, size: 11, color: WHITE, line: 1.5 });
++  txt(s, C.create, { x: 0.707, y: 4.164, w: 3.29, h: 0.404, size: 18, bold: true, color: WHITE });
++}
++
++/* 30 — THANK — closing */
++function slide30(pres) {
++  const s = pres.addSlide();
++  band(s, 0, 0, 13.333, 7.5, GREY_MID);
++  photo(s, 7.092, 0.313, 4.972, 3.068);
++  photo(s, 1.214, 0, 4.718, 7.5, { light: true });
++  txt(s, 'THANK', { x: 6.817, y: 3.575, w: 6.078, h: 1.582, size: 88, bold: true, color: WHITE });
++  txt(s, C.intro,
++      { x: 7.142, y: 4.993, w: 4.632, h: 0.656, size: 11, italic: true, color: WHITE, line: 1.5,
++        pad: [0, 0, 3.6, 3.6] });
++  txt(s, 'PLACEHOLDER'
++          + 'maximus sagittis us',
++      { x: 7.04, y: 6.355, w: 4.619, h: 0.625, size: 11, color: WHITE, line: 1.5 });
++  txt(s, C.create, { x: 7.04, y: 5.906, w: 3.29, h: 0.404, size: 18, bold: true, color: WHITE });
++  band(s, 0.007, 3.75, 5.924, 3.75, GREY_DARK, 30);
++  photo(s, 0, 3.75, 4.972, 3.068);
++}
++
++const SLIDES = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++];
++
++function build() {
++  const pres = new PptxGenJS();
++  pres.defineLayout({ name: 'WIDE', width: 40 / 3, height: 7.5 }); // 13.333 x 7.5 in, 16:9
++  pres.layout = 'WIDE';
++  pres.author = 'ourpresentation.com';
++  pres.title = 'Banking Professional Template';
++  SLIDES.forEach(function (fn) { fn(pres); });
++  return pres;
++}
++
++const outFile = path.join(__dirname, '17ba019f-e7d5-4ec7-89dc-69f761c29506_grok_final.pptx');
++build().writeFile({ fileName: outFile }).then(function () {
++  console.log('wrote ' + outFile);
++});

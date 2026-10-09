@@ -1,0 +1,3057 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/business_plan_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/business_plan_pitch_deck.js
+@@ -0,0 +1,3054 @@
++/*
++ * Recreation of "Awesome Presentation Template" (27 slides, 13.333 x 7.5 in)
++ * with pptxgenjs only.  The deck's picture frames are empty placeholders, and its
++ * one bitmap (a monitor mock-up on slide 26) is redrawn from native shapes.
++ */
++const path = require('path');
++
++const PptxGenJS = require('pptxgenjs');
++
++
++/* ------------------------------------------------------------------ palette */
++const BG    = 'F2F2F2';
++   // slide background
++const BLUE  = '0144C1';
++   // accent 1  (dark blue)
++const CYAN  = '1EACFF';
++   // accent 2  (light blue)
++const INK   = '000000';
++
++const WHITE = 'FFFFFF';
++
++const GREY  = '7F7F7F';
++   // body copy
++const LGREY = 'D0CECE';
++   // hairlines
++const SILVER= 'E7E6E6';
++
++const NAVY  = '001C51';
++
++const LAV   = 'BFD4FF';
++   // lavender panels
++const ICE   = 'D2EDFF';
++
++
++const F_TITLE = 'Poppins SemiBold';
++
++const F_HEAD  = 'Poppins SemiBold';
++
++const F_LIGHT = 'Poppins Light';
++
++const F_BODY  = 'DM Sans';
++
++const F_UI    = 'Inter';
++
++const F_UISB  = 'Inter SemiBold';
++
++
++/* drop-shadow presets found in the deck */
++const SH_CARD = {
++ type:'outer', blur: 5, offset: 2, angle:45, color:INK, opacity:0.15 }
++;
++
++const SH_SOFT = {
++ type:'outer', blur: 4, offset: 2, angle:45, color:INK, opacity:0.15 }
++;
++
++const SH_TINY = {
++ type:'outer', blur: 3, offset: 1, angle:90, color:INK, opacity:0.15 }
++;
++
++const SH_BLUE = {
++ type:'outer', blur:26, offset:18, angle:70, color:INK, opacity:0.20 }
++;
++
++const SH_GLOW = {
++ type:'outer', blur:43, offset:26, angle:70, color:INK, opacity:0.21 }
++;
++
++const SH_WIDE = {
++ type:'outer', blur:41, offset:21, angle:70, color:INK, opacity:0.20 }
++;
++
++const SH_LIFT = {
++ type:'outer', blur: 7, offset: 3, angle:45, color:INK, opacity:0.20 }
++;
++
++
++/* ------------------------------------------------------------------ colour math */
++const hex = (c,i) => parseInt(c.substr(i*2,2),16);
++
++const rgb2hex = a => a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('').toUpperCase();
++
++const mix = (a,b,t) => rgb2hex([0,1,2].map(i=>hex(a,i)+(hex(b,i)-hex(a,i))*t));
++
++/** flatten `color` at `alpha`% on top of opaque `over` */
++const over = (color, alpha, bg) => mix(bg, color, alpha/100);
++
++
++/* ------------------------------------------------------------------ geometry */
++const rectPoly = (x,y,w,h) => [[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
++
++
++function rrPoly(x,y,w,h,r,seg){
++                       // rounded rectangle outline
++  seg = seg || 5;
++ r = Math.min(r, w/2, h/2);
++
++  const c = [[x+w-r,y+h-r,0],[x+r,y+h-r,90],[x+r,y+r,180],[x+w-r,y+r,270]], p = [];
++
++  c.forEach(([cx,cy,a0])=>{
++ for(let i=0;
++i<=seg;
++i++){
++ const a=(a0+90*i/seg)*Math.PI/180;
++
++    p.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]);
++ }
++ }
++);
++
++  return p;
++
++}
++
++function ellPoly(cx,cy,rx,ry,seg){
++
++  seg = seg || 56;
++ const p=[];
++
++  for(let i=0;
++i<seg;
++i++){
++ const a=2*Math.PI*i/seg;
++ p.push([cx+rx*Math.cos(a), cy+ry*Math.sin(a)]);
++ }
++
++  return p;
++
++}
++
++/** Freeform outline: [x,y] = lineTo, [x1,y1,x2,y2,x,y] = cubic. First entry is the start point. */
++function flatten(pathArr, ox, oy, steps){
++
++  steps = steps || 8;
++ const out=[];
++ let cur=[pathArr[0][0], pathArr[0][1]];
++
++  out.push(cur);
++
++  for(let i=1;
++i<pathArr.length;
++i++){
++ const s=pathArr[i];
++
++    if(s.length===2){
++ cur=[s[0],s[1]];
++ out.push(cur);
++ }
++
++    else {
++ const [x1,y1,x2,y2,x,y]=s, p0=cur;
++
++      for(let k=1;
++k<=steps;
++k++){
++ const t=k/steps, u=1-t;
++
++        out.push([u*u*u*p0[0]+3*u*u*t*x1+3*u*t*t*x2+t*t*t*x,
++                  u*u*u*p0[1]+3*u*u*t*y1+3*u*t*t*y2+t*t*t*y]);
++ }
++
++      cur=[x,y];
++ }
++
++  }
++
++  return out.map(p=>[p[0]+(ox||0), p[1]+(oy||0)]);
++
++}
++
++/** keep the half-plane  nx*x + ny*y >= c  (Sutherland-Hodgman) */
++function clipHalf(poly,nx,ny,c){
++
++  const out=[], n=poly.length;
++
++  for(let i=0;
++i<n;
++i++){
++ const a=poly[i], b=poly[(i+1)%n];
++
++    const da=nx*a[0]+ny*a[1]-c, db=nx*b[0]+ny*b[1]-c;
++
++    if(da>=0) out.push(a);
++
++    if((da>=0)!==(db>=0)){
++ const t=da/(da-db);
++ out.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]);
++ }
++
++  }
++
++  return out;
++
++}
++
++
++/* ------------------------------------------------------------------ drawing */
++function addPoly(sl, poly, opts){
++
++  const xs=poly.map(p=>p[0]), ys=poly.map(p=>p[1]);
++
++  const x=Math.min(...xs), y=Math.min(...ys);
++
++  const w=Math.max(1e-4, Math.max(...xs)-x), h=Math.max(1e-4, Math.max(...ys)-y);
++
++  sl.addShape('custGeom', Object.assign({
++ x, y, w, h, line:{
++type:'none'}
++,
++    points: poly.map(p=>({
++x:+(p[0]-x).toFixed(4), y:+(p[1]-y).toFixed(4)}
++)).concat([{
++close:true}
++])
++  }
++, opts));
++
++}
++
++/** straight stroked segment between two points */
++function seg(sl, p0, p1, col, wpt){
++
++  const x=Math.min(p0[0],p1[0]), y=Math.min(p0[1],p1[1]);
++
++  sl.addShape('custGeom',{
++x, y, w:Math.max(0.001,Math.abs(p1[0]-p0[0])), h:Math.max(0.001,Math.abs(p1[1]-p0[1])),
++    fill:{
++type:'none'}
++, line:{
++color:col, width:wpt}
++,
++    points:[{
++x:p0[0]-x,y:p0[1]-y}
++,{
++x:p1[0]-x,y:p1[1]-y}
++]}
++);
++
++}
++
++const ramp = (c1,c2) => [[0,c1,100],[100,c2,100]];
++
++/** sample a stop list [[pos%, color, alpha%], ...] at t in 0..1, flattened onto `bg` */
++function stopAt(stops, t, bg){
++
++  const p = t*100;
++ let i=0;
++
++  while(i<stops.length-2 && stops[i+1][0]<p) i++;
++
++  const a=stops[i], b=stops[i+1], u = b[0]===a[0] ? 0 : (p-a[0])/(b[0]-a[0]);
++
++  const col = mix(a[1], b[1], Math.max(0,Math.min(1,u)));
++
++  const al  = (a[2]===undefined?100:a[2]) + ((b[2]===undefined?100:b[2])-(a[2]===undefined?100:a[2]))*u;
++
++  return over(col, al, bg);
++
++}
++
++/** Linear gradient inside an arbitrary polygon, painted as nested colour steps.
++ *  pptxgenjs only emits solid fills, so a gradient is approximated by slicing the
++ *  polygon perpendicular to `ang` — one band roughly every 0.11 in. */
++function gradPoly(sl, poly, stops, ang, o){
++
++  o = o || {
++}
++;
++
++  const bg = o.over || BG;
++
++  const a = ang*Math.PI/180, dx=Math.cos(a), dy=Math.sin(a);
++
++  const pr = poly.map(p=>p[0]*dx+p[1]*dy);
++
++  const lo=Math.min(...pr), hi=Math.max(...pr);
++
++  const n = o.n || Math.max(8, Math.min(52, Math.ceil((hi-lo)/0.11)));
++
++  addPoly(sl, poly, Object.assign({
++ fill:{
++color: stopAt(stops,0,bg)}
++ }
++, o.base));
++
++  for(let k=1;
++k<n;
++k++){
++
++    const sub = clipHalf(poly, dx, dy, lo+(hi-lo)*k/n);
++
++    if(sub.length>2) addPoly(sl, sub, {
++ fill:{
++color: stopAt(stops, k/n, bg)}
++ }
++);
++
++  }
++
++}
++
++const gradRect = (sl,x,y,w,h,stops,ang,o)      => gradPoly(sl, rectPoly(x,y,w,h), stops, ang, o);
++
++const gradRR   = (sl,x,y,w,h,r,stops,ang,o)    => gradPoly(sl, rrPoly(x,y,w,h,r), stops, ang, o);
++
++const gradEll  = (sl,x,y,w,h,stops,ang,o)      => gradPoly(sl, ellPoly(x+w/2,y+h/2,w/2,h/2), stops, ang, o);
++
++
++/* ------------------------------------------------------------------ copy
++ * The template ships with placeholder prose;
++ the same few strings recur
++ * across most slides, so they live here once. */
++const L = {
++
++  amazing : 'Thanks to the growth of social media, brands and consumers have unprecedented access to each other, While intimate connection amazing',
++  unprec  : 'Thanks to the growth of social media, brands and consumers have unprecedented',
++  brands  : 'Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the growth of social media, brands and',
++  brands3 : 'Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the growth of social media, brands and Thanks to the growth of social media, brands and',
++  thanksTo: 'Thanks to the growth of social media, brands and consumers have Thanks to the',
++  access  : 'Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the',
++  media   : 'Thanks to the growth media, brands and consumers have access Thanks to',
++  dummy   : 'Dummy text ever since the 1500s, when an unknown printer took a galley of type and passages, and more',
++  mistaken: 'But I must explain you All this mistaken.'
++}
++;
++
++
++/* ------------------------------------------------------------------ text */
++function T(sl, text, o){
++
++  sl.addText(text, Object.assign({
++ valign:'top', fontFace:F_BODY, color:INK, isTextBox:true }
++, o));
++
++}
++
++const title = (sl,t,x,y,o)   => T(sl, t, Object.assign({
++x:x, y:y===undefined?0.774:y, w:5.6, h:0.707,
++                                  fontFace:F_TITLE, fontSize:36}
++, o));
++
++const subtitle = (sl,x,y,t)  => T(sl, t||'Title goes here', {
++x, y, w:2.286, h:0.33, fontSize:10,
++                                  color:GREY, lineSpacingMultiple:1.8}
++);
++
++const body = (sl,t,x,y,w,h,o)=> T(sl, t, Object.assign({
++x,y,w,h,fontSize:10,color:GREY,
++                                  lineSpacingMultiple:1.5}
++, o));
++
++/** one paragraph per string, each carrying its own bullet glyph */
++const bullets = (lines, code, extra) => lines.map(t => ({
++ text:t,
++  options: Object.assign({
++ breakLine:true, bullet:{
++ characterCode:code, indent:13.5 }
++ }
++, extra) }
++));
++
++/** "Summary Executive / Templates." rotated label used on several slides */
++function vLabel(sl, x, y, size){
++
++  T(sl, [{
++text:'Summary Executive', options:{
++breakLine:true}
++}
++, {
++text:'Templates.'}
++],
++    {
++ x, y, w:size===18?4.258:3.563, h:size===18?0.707:0.774, rotate:270, fontFace:'Poppins',
++      fontSize:size||20, underline:{
++style:'sng'}
++, color:INK }
++);
++
++}
++
++
++/* ------------------------------------------------------------------ icons */
++/** Small line-art pictograms, drawn from primitives so no bitmaps are needed.
++ *  All coordinates are fractions of `s`, measured from the icon centre.
++ *  F = filled shape, K = stroked shape, D = filled disc. */
++function icon(sl, kind, cx, cy, s, col){
++
++  const box = (x,y,w,h,rot)=>({
++x:cx+x*s, y:cy+y*s, w:w*s, h:h*s, rotate:rot||0}
++);
++
++  const lw  = Math.max(0.6, s*4);
++
++  const F = (shape,x,y,w,h,rot,c)=> sl.addShape(shape, Object.assign(box(x,y,w,h,rot),
++              {
++fill:{
++color:c||col}
++, line:{
++type:'none'}
++}
++));
++
++  const K = (shape,x,y,w,h,r2)=> sl.addShape(shape, Object.assign(box(x,y,w,h),
++              {
++fill:{
++type:'none'}
++, line:{
++color:col, width:lw}
++}
++, r2?{
++rectRadius:r2*s}
++:{
++}
++));
++
++  const D = (x,y,d)=> F('ellipse',x,y,d,d);
++
++  switch(kind){
++
++    case 'cart':                                            // shopping trolley
++      sl.addShape('trapezoid', Object.assign(box(-0.34,-0.30,0.72,0.42,180),
++        {
++fill:{
++type:'none'}
++, line:{
++color:col,width:lw}
++}
++));
++
++      [-0.14,0.02].forEach(dx=> F('rect',dx,-0.28,0.035,0.38));
++
++      F('rect',-0.30,-0.16,0.62,0.035);
++
++      F('rect',-0.50,-0.46,0.16,0.07);
++ F('rect',-0.36,-0.44,0.07,0.22);
++
++      D(-0.26,0.16,0.16);
++ D(0.12,0.16,0.16);
++ break;
++
++    case 'edit':                                            // pencil over a square
++      K('rect',-0.42,-0.36,0.78,0.78);
++
++      F('rect',0,-0.44,0.13,0.52,45);
++ F('triangle',-0.24,0.06,0.16,0.16,200);
++ break;
++
++    case 'bulb':                                            // light bulb with rays
++      D(-0.24,-0.32,0.48);
++ F('rect',-0.11,0.10,0.22,0.10);
++
++      F('rect',-0.08,0.24,0.16,0.08);
++ F('rect',-0.03,0.34,0.06,0.06);
++
++      [[-0.02,-0.56,0.04,0.14,0],[0.24,-0.50,0.04,0.14,35],[-0.28,-0.50,0.04,0.14,-35],
++       [0.34,-0.20,0.14,0.04,0],[-0.48,-0.20,0.14,0.04,0]].forEach(a=> F('rect',...a));
++
++      break;
++
++    case 'cloud':                                           // cloud with down-arrow
++      K('cloud',-0.50,-0.42,1.0,0.66);
++ F('rect',-0.05,-0.10,0.10,0.34);
++
++      F('triangle',-0.16,0.20,0.32,0.20,180);
++ break;
++
++    case 'gem':                                             // faceted diamond
++      K('diamond',-0.46,-0.28,0.92,0.74);
++
++      F('rect',-0.46,-0.12,0.92,0.05);
++
++      F('rect',-0.17,-0.28,0.045,0.30);
++ F('rect',0.13,-0.28,0.045,0.30);
++ break;
++
++    case 'layers':                                          // stacked sheets
++      [0.20,0.02,-0.16].forEach((dy,i)=> sl.addShape('diamond',
++        Object.assign(box(-0.46,dy-0.16,0.92,0.40),
++          {
++fill:{
++color:i===2?col:WHITE}
++, line:{
++color:col,width:lw}
++}
++)));
++
++      break;
++
++    case 'globe':
++      K('ellipse',-0.46,-0.46,0.92,0.92);
++ K('ellipse',-0.18,-0.46,0.36,0.92);
++
++      F('rect',-0.46,-0.03,0.92,0.05);
++ break;
++
++    case 'chat':                                            // speech bubble
++      sl.addShape('roundRect', Object.assign(box(-0.48,-0.44,0.96,0.72),
++        {
++fill:{
++color:col}
++, line:{
++type:'none'}
++, rectRadius:0.12*s}
++));
++
++      F('triangle',-0.34,0.24,0.24,0.22,180);
++ break;
++
++    case 'warn':
++      K('triangle',-0.48,-0.42,0.96,0.84);
++
++      F('rect',-0.04,-0.12,0.08,0.30);
++ D(-0.05,0.24,0.10);
++ break;
++
++    case 'link':                                            // two interlocking links
++      [[-0.44,-0.02],[0.02,-0.40]].forEach(([x,y])=> sl.addShape('roundRect',
++        Object.assign(box(x,y,0.42,0.26,-35), {
++fill:{
++type:'none'}
++,
++          line:{
++color:col,width:lw}
++, rectRadius:0.12*s}
++)));
++
++      break;
++
++    case 'muscle':                                          // flexed arm
++      K('roundRect',-0.48,0.02,0.66,0.34,0.10);
++ K('roundRect',-0.02,-0.44,0.44,0.80,0.20);
++ break;
++
++    case 'crosshair':
++      K('ellipse',-0.30,-0.30,0.60,0.60);
++ D(-0.09,-0.09,0.18);
++
++      F('rect',-0.03,-0.48,0.06,0.16);
++ F('rect',-0.03,0.32,0.06,0.16);
++
++      F('rect',-0.48,-0.03,0.16,0.06);
++ F('rect',0.32,-0.03,0.16,0.06);
++ break;
++
++    case 'person':
++      D(-0.18,-0.48,0.36);
++
++      sl.addShape('roundRect', Object.assign(box(-0.30,-0.06,0.60,0.56),
++        {
++fill:{
++color:col}
++, line:{
++type:'none'}
++, rectRadius:0.12*s}
++));
++ break;
++
++    case 'hand':                                            // open palm holding a coin
++      K('ellipse',0.02,-0.52,0.34,0.34);
++ D(0.14,-0.42,0.10);
++
++      F('rect',-0.46,0.04,0.62,0.05,-12);
++ F('rect',-0.46,0.04,0.05,0.30);
++
++      F('rect',0.14,-0.12,0.05,0.22);
++ break;
++
++    case 'mail':
++      F('rect',-0.48,-0.34,0.96,0.68);
++ F('triangle',-0.48,-0.34,0.96,0.42,180,WHITE);
++ break;
++
++    case 'phone':                                           // handset over signal arcs
++      F('rect',-0.34,-0.36,0.26,0.30,-30);
++ F('rect',0.06,0.06,0.26,0.30,-30);
++
++      F('rect',-0.20,-0.14,0.14,0.34,-30);
++
++      sl.addShape('ellipse', Object.assign(box(0.06,-0.40,0.46,0.46),
++        {
++fill:{
++type:'none'}
++, line:{
++color:col,width:lw*0.8}
++}
++));
++
++      sl.addShape('ellipse', Object.assign(box(0.18,-0.28,0.24,0.24),
++        {
++fill:{
++type:'none'}
++, line:{
++color:col,width:lw*0.8}
++}
++));
++ break;
++
++    case 'pin':                                             // map marker
++      F('teardrop',-0.34,-0.42,0.68,0.68,225);
++ F('ellipse',-0.12,-0.24,0.24,0.24,0,WHITE);
++ break;
++
++  }
++
++}
++
++/** white / blue / dark / outlined icon badge used all over the deck */
++function badge(sl, cx, cy, d, style, kind, o){
++
++  o = o || {
++}
++;
++
++  const x=cx-d/2, y=cy-d/2;
++
++  if(style==='blue')       gradEll(sl,x,y,d,d, ramp(BLUE,CYAN), o.ang||230, {
++n:12, base:{
++shadow:o.shadow||SH_BLUE}
++}
++);
++
++  else if(style==='white') sl.addShape('ellipse',{
++x,y,w:d,h:d,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,shadow:o.shadow||SH_SOFT}
++);
++
++  else if(style==='dark')  sl.addShape('ellipse',{
++x,y,w:d,h:d,fill:{
++color:'3F3F3F'}
++,line:{
++type:'none'}
++}
++);
++
++  else if(style==='ring')  sl.addShape('ellipse',{
++x,y,w:d,h:d,fill:{
++type:'none'}
++,line:{
++color:over(NAVY,77.6,o.over||BG),width:1}
++}
++);
++
++  else if(style==='plain') sl.addShape('ellipse',{
++x,y,w:d,h:d,fill:{
++color:o.fill||SILVER}
++,line:{
++type:'none'}
++}
++);
++
++  if(kind) icon(sl, kind, cx, cy, d*(o.k||0.40), o.ic || (style==='blue'||style==='dark' ? WHITE : INK));
++
++}
++
++/** facebook / instagram / twitter / linkedin marks, drawn small enough to read as chips */
++function socialGlyph(sl, kind, cx, cy, s, col){
++
++  const R=(x,y,w,h,o)=> sl.addShape('rect',Object.assign({
++x:cx+x*s,y:cy+y*s,w:w*s,h:h*s,
++    fill:{
++color:col}
++,line:{
++type:'none'}
++}
++,o));
++
++  if(kind==='f'){
++ R(-0.06,-0.30,0.18,0.60);
++ R(-0.20,-0.10,0.32,0.14);
++ }
++
++  else if(kind==='ig'){
++ sl.addShape('roundRect',{
++x:cx-0.30*s,y:cy-0.30*s,w:0.60*s,h:0.60*s,
++      fill:{
++type:'none'}
++,line:{
++color:col,width:Math.max(0.5,s*10)}
++,rectRadius:0.18*s}
++);
++
++    sl.addShape('ellipse',{
++x:cx-0.15*s,y:cy-0.15*s,w:0.30*s,h:0.30*s,fill:{
++type:'none'}
++,
++      line:{
++color:col,width:Math.max(0.5,s*10)}
++}
++);
++ }
++
++  else if(kind==='tw'){
++ sl.addShape('triangle',{
++x:cx-0.32*s,y:cy-0.24*s,w:0.64*s,h:0.44*s,
++      fill:{
++color:col}
++,line:{
++type:'none'}
++,rotate:118}
++);
++ R(-0.30,-0.16,0.34,0.16,{
++rotate:-20}
++);
++ }
++
++  else {
++ R(-0.30,-0.10,0.14,0.40);
++ sl.addShape('ellipse',{
++x:cx-0.31*s,y:cy-0.34*s,w:0.16*s,h:0.16*s,
++      fill:{
++color:col}
++,line:{
++type:'none'}
++}
++);
++
++    R(-0.04,-0.10,0.13,0.40);
++ R(0.14,-0.04,0.14,0.34);
++ R(-0.04,-0.10,0.30,0.13);
++ }
++
++}
++
++/** row of four filled social chips */
++function socialRow(sl, x, y, d, gap, col, glyphCol){
++
++  ['f','ig','tw','in'].forEach((g,i)=>{
++
++    sl.addShape('ellipse',{
++x:x+i*gap, y, w:d, h:d, fill:{
++color:col}
++, line:{
++type:'none'}
++}
++);
++
++    socialGlyph(sl, g, x+i*gap+d/2, y+d/2, d*0.72, glyphCol);
++
++  }
++);
++
++}
++
++/** three outlined social chips */
++function socialOutline(sl, x, y, d, gap, col){
++
++  ['tw','f','ig'].forEach((g,i)=>{
++
++    sl.addShape('ellipse',{
++x:x+i*gap, y, w:d, h:d, fill:{
++type:'none'}
++, line:{
++color:col,width:0.75}
++}
++);
++
++    socialGlyph(sl, g, x+i*gap+d/2, y+d/2, d*0.60, col);
++
++  }
++);
++
++}
++
++
++/* ------------------------------------------------------------------ artwork paths
++ * Freeform outlines lifted from the source deck (inches, shape-local).
++ * [x,y] = line-to, [x1,y1,x2,y2,x,y] = cubic bezier;
++ entry 0 is the start point. */
++const P_SWASH  = [[10.835,7.04],[0,7.04],[0,4.665],[4.481,5.356,5.459,2.085,5.673,0.648],[5.721,0.321,5.73,0.09,5.732,0],[5.792,0.749,6.075,1.508,6.492,2.252],[6.679,2.585,6.892,2.914,7.125,3.237],[8.098,4.588,9.399,5.823,10.438,6.708],[10.575,6.825,10.708,6.935,10.835,7.04]];
++
++const P_WAVE   = [[6.516,5.227],[0,5.227],[0.171,5.148,0.332,5.062,0.483,4.97],[2.003,4.05,2.517,2.551,2.679,1.44],[2.8,0.613,2.726,0,2.726,0],[2.855,0.587,3.1,1.163,3.416,1.713],[3.554,1.955,3.708,2.193,3.87,2.424],[4.575,3.426,5.463,4.309,6.216,4.97],[6.319,5.06,6.419,5.146,6.516,5.227]];
++
++const P_LOBE   = [[5.472,0],[5.472,8.185],[3.863,8.185],[3.708,8.101,3.557,8.015,3.413,7.928],[1.711,6.899,0.81,5.635,0.37,4.398],[0.042,3.48,-0.031,2.577,0.011,1.793],[0.022,1.572,0.042,1.364,0.069,1.166],[0.116,0.813,0.179,0.508,0.244,0.25],[0.267,0.161,0.289,0.077,0.311,0],[5.472,0]];
++
++const P_SLIVER = [[1.986,0.25],[1.711,0.673,0.657,2.421,0.656,4.382],[0.656,4.711,0.686,5.046,0.754,5.381],[0.77,5.462,0.788,5.543,0.809,5.623],[0.53,5.303,0.3,4.671,0.3,4.671],[0.177,4.335,0.068,3.909,0.023,3.396],[-0.051,2.572,0.04,1.521,0.502,0.25],[0.533,0.167,0.564,0.085,0.597,0],[1.488,0],[2.051,0.152]];
++
++/* single closing-quote glyph, 0.246 x 0.393 */
++const P_QUOTE  = [[0.191,0],[0.228,0.057],[0.191,0.079,0.161,0.102,0.139,0.125],[0.117,0.148,0.106,0.171,0.105,0.192],[0.105,0.203,0.107,0.212,0.111,0.22],[0.115,0.227,0.121,0.233,0.129,0.235],[0.173,0.19],[0.191,0.196,0.208,0.208,0.223,0.224],[0.238,0.24,0.246,0.261,0.246,0.285],[0.245,0.322,0.234,0.349,0.211,0.367],[0.188,0.385,0.16,0.393,0.127,0.393],[0.084,0.392,0.053,0.377,0.031,0.35],[0.01,0.323,0,0.292,0,0.256],[0,0.204,0.016,0.157,0.047,0.115],[0.079,0.073,0.127,0.034,0.191,0]];
++
++/* speech-bubble banner used on the timeline slides, 3.807 x 1.367 */
++const P_BANNER = [[0.113,0],[3.807,0],[3.807,1.367],[0.113,1.367],[0.113,0.773],[0,0.683],[0.113,0.594]];
++
++/* light-bulb outline: outer silhouette then inner cut-out, normalised 0..1 */
++const P_BULB_OUT = [[0.5,1],[0.606,1,0.66,0.993,0.701,0.976],[0.76,0.952,0.773,0.911,0.783,0.88],[0.792,0.856,0.798,0.839,0.801,0.83],[0.813,0.798,0.826,0.762,0.857,0.726],[0.903,0.672,0.936,0.624,0.959,0.575],[0.987,0.516,1,0.458,1,0.395],[1,0.289,0.948,0.19,0.853,0.115],[0.759,0.041,0.634,0,0.5,0],[0.367,0,0.242,0.041,0.147,0.115],[0.053,0.19,0,0.289,0,0.395],[0,0.458,0.014,0.516,0.042,0.575],[0.065,0.624,0.097,0.672,0.144,0.726],[0.174,0.762,0.188,0.798,0.199,0.83],[0.209,0.856,0.215,0.872,0.217,0.88],[0.228,0.911,0.241,0.952,0.3,0.976],[0.34,0.993,0.395,1,0.5,1]];
++
++const P_BULB_IN  = [[0.272,0.839],[0.263,0.816,0.251,0.781,0.199,0.697],[0.156,0.646,0.125,0.601,0.104,0.556],[0.079,0.504,0.067,0.451,0.067,0.395],[0.067,0.303,0.113,0.217,0.194,0.152],[0.276,0.088,0.385,0.053,0.5,0.053],[0.616,0.053,0.725,0.088,0.806,0.152],[0.888,0.217,0.933,0.303,0.933,0.395],[0.933,0.451,0.922,0.504,0.897,0.556],[0.876,0.601,0.845,0.646,0.801,0.697],[0.75,0.781,0.738,0.816,0.728,0.839],[0.721,0.859,0.71,0.893,0.669,0.93],[0.64,0.942,0.592,0.947,0.5,0.947],[0.408,0.947,0.361,0.942,0.332,0.93],[0.291,0.893,0.279,0.859,0.272,0.839]];
++
++/* highlighted "01" arrow of the SMART wheel, normalised 0..1 */
++const P_STEP = [[0.15,0.305],[0,0.353],[0,0.141],[0.446,0],[0.891,0.141],[0.89,0.353],[0.736,0.304],[0.725,0.468,0.818,0.623,1,0.739],[0.586,1],[0.3,0.817,0.139,0.563,0.15,0.305]];
++
++/* arrow head + shaft of the bullseye artwork, normalised 0..1 */
++const P_FLETCH = [[0.517,1],[0.49,1,0.434,0.968,0.393,0.926],[0.086,0.616],[0.048,0.577,0.014,0.503,0.01,0.455],[0.003,0.068],[0,0.019,0.045,0.006,0.1,0.042],[0.403,0.226],[0.455,0.258,0.545,0.258,0.597,0.226],[0.89,0.032],[0.941,0,0.986,0.01,0.99,0.058],[0.997,0.445],[1,0.494,0.969,0.568,0.931,0.61],[0.638,0.926],[0.6,0.968,0.545,1,0.517,1]];
++
++/** scale a normalised outline into a box */
++const fit = (pathArr,x,y,w,h) => pathArr.map(seg=>{
++ const o=[];
++
++  for(let i=0;
++i<seg.length;
++i+=2){
++ o.push(x+seg[i]*w, y+seg[i+1]*h);
++ }
++ return o;
++ }
++);
++
++/* Australia — outline + Tasmania, normalised 0..1 */
++const MAP_MAIN = [1,0.562,0.982,0.464,0.931,0.413,0.927,0.379,0.912,0.373,0.912,0.387,0.903,0.383,0.881,0.317,0.821,0.28,0.797,0.163,0.775,0.14,0.758,0.147,0.728,0.038,0.704,0.093,0.715,0.098,0.704,0.106,0.7,0.195,0.678,0.241,0.647,0.233,0.554,0.163,0.565,0.114,0.579,0.113,0.591,0.087,0.581,0.073,0.568,0.09,0.565,0.07,0.548,0.085,0.468,0.051,0.487,0.081,0.434,0.088,0.404,0.145,0.42,0.156,0.413,0.17,0.384,0.157,0.371,0.179,0.376,0.156,0.356,0.133,0.343,0.128,0.329,0.142,0.322,0.133,0.322,0.15,0.313,0.154,0.312,0.142,0.3,0.157,0.308,0.168,0.293,0.168,0.302,0.179,0.282,0.18,0.282,0.203,0.295,0.205,0.262,0.199,0.271,0.218,0.262,0.24,0.246,0.206,0.228,0.23,0.232,0.255,0.202,0.296,0.119,0.329,0.096,0.326,0.043,0.364,0.035,0.383,0.028,0.364,0.018,0.385,0.012,0.439,0.033,0.485,0.029,0.499,0.014,0.471,0.022,0.503,0.006,0.49,0.048,0.576,0.07,0.658,0.069,0.697,0.051,0.705,0.051,0.721,0.092,0.749,0.125,0.751,0.175,0.716,0.261,0.717,0.277,0.691,0.321,0.668,0.449,0.645,0.522,0.674,0.555,0.737,0.545,0.736,0.566,0.748,0.611,0.676,0.614,0.708,0.589,0.756,0.61,0.752,0.618,0.722,0.63,0.741,0.619,0.766,0.65,0.759,0.642,0.765,0.657,0.784,0.639,0.765,0.675,0.833,0.752,0.86,0.786,0.832,0.78,0.845,0.799,0.842,0.823,0.869,0.818,0.856,0.856,0.835,0.911,0.821,0.916,0.769,0.941,0.705,0.973,0.673];
++
++const MAP_TAS  = [0.869,0.957,0.863,0.916,0.827,0.928,0.781,0.913,0.813,0.997,0.835,0.999,0.844,0.975,0.862,0.988];
++
++const pairs = (a,x,y,w,h) => {
++ const o=[];
++ for(let i=0;
++i<a.length;
++i+=2) o.push([x+a[i]*w, y+a[i+1]*h]);
++ return o;
++ }
++;
++
++
++/* ------------------------------------------------------------------ deck */
++const pptx = new PptxGenJS();
++
++pptx.defineLayout({
++ name:'W169', width:13.333, height:7.5 }
++);
++
++pptx.layout = 'W169';
++
++pptx.author = 'pptxgenjs';
++
++pptx.title  = 'Awesome Presentation Template';
++
++const newSlide = () => {
++ const s = pptx.addSlide();
++ s.background = {
++ color: BG }
++;
++ return s;
++ }
++;
++
++
++/* =================================================================== 1 cover */
++function slide01(){
++
++  const s = newSlide();
++
++  /* faint dotted texture (behind the artwork, invisible where it is covered) */
++  for(let r=0;
++r<12;
++r++) for(let c=0;
++c<25;
++c++){
++
++    const x = -0.87 + c*0.585, y = -0.849 + r*0.549;
++
++    if(x > 8.2) continue;
++
++    s.addShape('ellipse',{
++x, y, w:0.149, h:0.149, fill:{
++color:'E1EBF2'}
++, line:{
++type:'none'}
++}
++);
++
++  }
++
++  gradPoly(s, flatten(P_SWASH, 2.32, 0.804), [[0,BLUE,0],[13,BLUE,0],[100,CYAN,84.7]], 331, {
++n:16}
++);
++
++  gradPoly(s, flatten(P_WAVE, 5.672, 2.616), ramp(BLUE,CYAN), 0, {
++n:14}
++);
++
++  addPoly(s, flatten(P_LOBE, 7.982, -0.341), {
++ fill:{
++color:GREY}
++ }
++);
++
++  gradPoly(s, flatten(P_SLIVER, 8.708, -0.341), [[0,BLUE,83.9],[100,CYAN,85.9]], 170, {
++n:10, over:GREY}
++);
++
++
++  T(s, [{
++text:'AWESOME',       options:{
++color:LGREY}
++}
++,
++        {
++text:' PRESENTATION ',options:{
++color:INK}
++}
++,
++        {
++text:'TEMPLATE',      options:{
++color:'006BC7'}
++}
++],
++    {
++ x:0.798, y:2.682, w:5.9, h:2.473, fontFace:'Poppins', bold:true, fontSize:54, lineSpacingMultiple:1.037 }
++);
++
++
++  s.addShape('ellipse',{
++x:1.0, y:1.004, w:0.634, h:0.634, fill:{
++type:'none'}
++, line:{
++color:CYAN, width:1.75}
++}
++);
++
++  gradEll(s, 1.056, 1.063, 0.523, 0.523, [[0,'15A8FF'],[2,'15A8FF'],[100,'0052E9']], 0,
++          {
++n:10, base:{
++shadow:SH_GLOW}
++}
++);
++
++  T(s,'MR',{
++x:1.056,y:1.10,w:0.523,h:0.45,align:'center',valign:'middle',fontSize:14,bold:true,fontFace:'Poppins',color:WHITE}
++);
++
++  T(s,'Logo Here',{
++x:1.773,y:1.136,w:1.327,h:0.37,fontFace:F_HEAD,fontSize:16}
++);
++
++  T(s,'www.website.com',{
++x:1.204,y:6.307,w:2.248,h:0.303,fontSize:12}
++);
++
++  icon(s,'globe',1.058,6.459,0.30,'80ACFE');
++
++  socialRow(s, 11.236, 6.319, 0.234, 0.309, BG, GREY);
++
++  T(s,'\u276F\u276F\u276F',{
++x:12.24,y:3.58,w:0.95,h:0.32,fontSize:13,color:WHITE,fontFace:F_HEAD,wrap:false}
++);
++
++  T(s,'01',{
++x:12.086,y:0.867,w:0.454,h:0.303,fontSize:12}
++);
++
++}
++
++
++/* =================================================================== 2 welcome */
++function slide02(){
++
++  const s = newSlide();
++
++  title(s,'Welcome Message',0.841,0.795,{
++w:6.219}
++);
++
++  s.addShape('rect',{
++x:0, y:3.323, w:6.667, h:4.177, fill:{
++color:over(LAV,49.8,BG)}
++, line:{
++type:'none'}
++}
++);
++
++
++  s.addShape('ellipse',{
++x:1.164,y:5.228,w:0.441,h:0.441,fill:{
++color:ICE}
++,line:{
++type:'none'}
++}
++);
++
++  s.addShape('ellipse',{
++x:1.207,y:5.271,w:0.356,h:0.356,fill:{
++color:'A5DDFF'}
++,line:{
++type:'none'}
++}
++);
++
++  gradEll(s,1.257,5.321,0.255,0.255, ramp(CYAN,BLUE), 0, {
++n:8}
++);
++
++
++  gradRect(s,1.82,5.835,4.846,0.731, ramp(BLUE,CYAN), 260, {
++n:16}
++);
++
++  s.addShape('rect',{
++x:0.945,y:5.835,w:0.878,h:0.731,fill:{
++color:'3F3F3F'}
++,line:{
++type:'none'}
++}
++);
++
++  icon(s,'chat',1.385,6.20,0.42,WHITE);
++
++  T(s,[{
++text:'James ',options:{
++bold:true}
++}
++,{
++text:'Williams'}
++],
++    {
++x:1.995,y:5.948,w:2.926,h:0.505,fontFace:F_HEAD,fontSize:24,color:WHITE}
++);
++
++  T(s,'/ Web Designer',{
++x:4.823,y:6.106,w:1.122,h:0.252,fontFace:F_UI,fontSize:9,color:WHITE}
++);
++
++  T(s,'www.website.com',{
++x:0.382,y:4.455,w:2.006,h:0.269,rotate:270,align:'right',fontSize:10}
++);
++
++
++  socialOutline(s, 7.724, 6.087, 0.307, 0.497, GREY);
++
++  gradEll(s,7.728,1.889,0.776,0.776, ramp(BLUE,CYAN), 250, {
++n:10}
++);
++
++  icon(s,'chat',8.116,2.277,0.40,WHITE);
++
++  T(s,[{
++text:'Your',options:{
++color:GREY}
++}
++,{
++text:' Best Massage ',options:{
++fontFace:F_UISB}
++}
++,{
++text:'Here',options:{
++color:GREY}
++}
++],
++    {
++x:8.69,y:1.957,w:2.184,h:0.64,fontFace:F_UI,fontSize:16,color:INK}
++);
++
++  s.addShape('line',{
++x:7.726,y:2.957,w:4.117,h:0,line:{
++color:LGREY,width:0.75}
++}
++);
++
++  s.addShape('line',{
++x:7.726,y:2.957,w:1.679,h:0,line:{
++color:CYAN,width:4.25}
++}
++);
++
++  T(s,"Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting industry lorem Ipsum has been the industry's standard.",
++    {
++x:7.621,y:3.185,w:4.425,h:0.909,fontSize:12,lineSpacingMultiple:1.5}
++);
++
++  T(s, bullets(['dummy text ever since the 1500s, when an unknown',
++                ' printer took a galley of type and passages, and more',
++                ' recently with desktop publishing software like Aldus',
++                ' PageMaker including versions of Lorem Ipsum.'], '2022'),
++    {
++x:7.621,y:4.175,w:4.425,h:1.38,fontSize:10,color:GREY,lineSpacingMultiple:2.2}
++);
++
++}
++
++
++/* =================================================================== 3 contents */
++function slide03(){
++
++  const s = newSlide();
++
++  s.addShape('rect',{
++x:0,y:4.437,w:8.073,h:3.063,fill:{
++color:over(LAV,49.8,BG)}
++,line:{
++type:'none'}
++}
++);
++
++  s.addShape('rect',{
++x:8.908,y:4.437,w:3.403,h:0.432,fill:{
++color:LAV}
++,line:{
++type:'none'}
++}
++);
++
++  title(s,'Table Of Content',0.841,1.603,{
++w:4.703}
++);
++
++  T(s,[{
++text:'Business Objective',options:{
++breakLine:true}
++}
++,{
++text:'Image Style'}
++],
++    {
++x:0.873,y:3.499,w:3.061,h:0.774,fontFace:'Poppins',fontSize:20,underline:{
++style:'sng'}
++}
++);
++
++  T(s,'Suscepts laborites nil almiqui commode consecutively illum dolorous feudist nullafacilisis. Exercise taction clamorer suscept laborites nil tailcup',
++    {
++x:0.873,y:4.766,w:2.815,h:1.035,fontSize:10,lineSpacingMultiple:1.7}
++);
++
++  gradRR(s,0.99,6.229,1.09,0.327,0.1635, [[0,BLUE],[2,BLUE],[100,CYAN]], 270, {
++n:8, base:{
++shadow:SH_GLOW}
++}
++);
++
++  T(s,'See More',{
++x:0.969,y:6.249,w:1.09,h:0.286,align:'center',fontSize:10.5,color:WHITE}
++);
++
++
++  gradRect(s,7.06,1.569,1.565,0.707, [[0,BLUE],[2,BLUE],[100,CYAN]], 270, {
++n:10, base:{
++shadow:SH_GLOW}
++}
++);
++
++  T(s,'\u2192',{
++x:7.06,y:1.569,w:1.565,h:0.707,align:'center',valign:'middle',fontSize:26,color:WHITE}
++);
++
++  T(s,'Topic list',{
++x:8.908,y:1.535,w:2.726,h:0.774,fontFace:F_HEAD,fontSize:40,color:'D8D8D8'}
++);
++
++
++  const topics = ['Executive Summary','Product /Services','Founders /Team','Market Overview',
++                  'Marketing & Sales','Corporate /organization','Opportunity & Risk','Financial Plan','Enclosures'];
++
++  T(s, bullets(topics,'2023').map((r,i)=>{
++ r.options.fontFace = i===4?F_UISB:F_UI;
++ return r;
++ }
++),
++    {
++x:8.965,y:2.615,w:2.22,h:3.388,fontSize:10.5,color:INK,lineSpacingMultiple:2.2}
++);
++
++  T(s, topics.map((t,i)=>({
++text:'0'+(i+1), options:{
++breakLine:true, fontFace:i===4?F_UISB:F_UI}
++}
++)),
++    {
++x:11.772,y:2.615,w:0.623,h:3.388,fontSize:10.5,color:INK,lineSpacingMultiple:2.2}
++);
++
++}
++
++
++/* =================================================================== 4 exec summary */
++function slide04(){
++
++  const s = newSlide();
++
++  title(s,'Executive Summary',0.81,0.795,{
++w:6.219}
++);
++
++  gradRect(s,0,4.401,13.333,3.099, ramp(BLUE,CYAN), 230, {
++n:20}
++);
++
++  vLabel(s, 10.309, 1.637);
++
++  T(s,'OUR VALUES',{
++x:0.845,y:2.107,w:3.254,h:0.438,fontFace:'Poppins',bold:true,fontSize:20,color:BLUE}
++);
++
++  [['Thanks to the growth of social media, brands and consumers have unprecedented access to each other, While intimate connection amazing experiences',2.688,0.774],
++   ['it also puts additional responsibility on everyone involved. Consumers\u2019 cards are on the table they want',3.556,0.522]].forEach(([t,y,h],i)=>{
++
++    gradEll(s,0.974,y+0.153,0.08,0.08, ramp(BLUE,CYAN),250,{
++n:4}
++);
++
++    T(s,t,{
++x:1.153,y,w:4.696,h,fontSize:10,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++  T(s, bullets(['To avoid striking out it\u2019s important','to know what they\u2019re aiming for What doe',
++                ' transparency Design','know what they\u2019re aiming for.'], '2023'),
++    {
++x:0.864,y:5.002,w:3.338,h:1.351,fontSize:10,color:WHITE,lineSpacingMultiple:2.3}
++);
++
++  /* two outlined quote marks, rotated 180 deg */
++  [[4.552,5.069],[5.575,5.069]].forEach(([qx,qy])=>{
++
++    s.addShape('custGeom',{
++x:qx,y:qy,w:1.023,h:1.489,rotate:180,fill:{
++type:'none'}
++,
++      line:{
++color:over(WHITE,53.7,'0C7BDE'),width:1}
++,
++      points: flatten(P_QUOTE,0,0,6).map(p=>({
++x:+(p[0]/0.246*1.023).toFixed(3), y:+(p[1]/0.393*1.489).toFixed(3)}
++)).concat([{
++close:true}
++])}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 5 exec summary cards */
++function slide05(){
++
++  const s = newSlide();
++
++  title(s,'Executive Summary',0.81,0.795,{
++w:6.219}
++);
++
++  gradRect(s,0,2.118,6.487,2.632, ramp(BLUE,CYAN), 200, {
++n:16}
++);
++
++  s.addShape('rect',{
++x:11.722,y:1.755,w:0.82,h:0.751,fill:{
++type:'none'}
++,line:{
++color:CYAN,width:1.75}
++}
++);
++
++  const rows = [
++    {
++y:2.869, tx:2.043, badge:[1.3785,3.3745,'white','person'], col:WHITE, over:'0C7BDE'}
++,
++    {
++y:5.408, tx:2.043, badge:[1.3785,5.9135,'blue','cart'],    col:GREY,  hd:INK}
++,
++    {
++y:5.408, tx:7.872, badge:[7.2065,5.9135,'dark','edit'],    col:GREY,  hd:INK}
++
++  ];
++
++  rows.forEach(r=>{
++
++    badge(s, r.badge[0], r.badge[1], 0.875, r.badge[2], r.badge[3], {
++over:r.over}
++);
++
++    T(s,'Company Mission',{
++x:r.tx,y:r.y,w:4.137,h:0.337,fontFace:F_UISB,fontSize:14,color:r.hd||WHITE}
++);
++
++    T(s,L.amazing,
++      {
++x:r.tx,y:r.y+0.397,w:4.08,h:0.774,fontSize:10,color:r.col,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 6 who we are */
++function slide06(){
++
++  const s = newSlide();
++
++  title(s,'Who We Are?',3.557,0.774,{
++w:6.219,align:'center'}
++);
++
++  s.addShape('rect',{
++x:0,y:4.54,w:13.333,h:2.96,fill:{
++color:ICE}
++,line:{
++type:'none'}
++}
++);
++
++  T(s,L.amazing,
++    {
++x:3.612,y:1.475,w:6.109,h:0.558,align:'center',fontSize:10,color:GREY,lineSpacingMultiple:1.7}
++);
++
++  gradRect(s,1.283,2.948,10.767,3.538, ramp(BLUE,CYAN), 200, {
++n:20}
++);
++
++  /* solid + outlined quote pairs */
++  const quote = (qx,qy,w,h,fill,ln) => s.addShape('custGeom',{
++x:qx,y:qy,w,h,rotate:180,
++    fill: fill?{
++color:fill}
++:{
++type:'none'}
++, line: ln?{
++color:ln,width:1}
++:{
++type:'none'}
++,
++    points: flatten(P_QUOTE,0,0,6).map(p=>({
++x:+(p[0]/0.246*w).toFixed(3), y:+(p[1]/0.393*h).toFixed(3)}
++)).concat([{
++close:true}
++])}
++);
++
++  quote(6.087,3.6,0.58,0.844,WHITE);
++ quote(6.667,3.6,0.58,0.844,WHITE);
++
++  quote(9.709,2.401,0.965,1.405,null,over(WHITE,53.7,'1391F0'));
++
++  quote(10.674,2.401,0.965,1.405,null,over(WHITE,53.7,'0F7CE0'));
++
++  T(s,'Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the growth of social media, brands and Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the growth of social media, brands and consumers have unprecedented access to each other, While intimate connection amazing experiences to each other, While intimate connection amazing experiences consumers have unprecedented access to each other, While intimate connection amazing experiences to each other, While intimate connection amazing experiences',
++    {
++x:2.154,y:4.762,w:9.025,h:1.279,align:'center',fontSize:10,color:WHITE,lineSpacingMultiple:1.5}
++);
++
++}
++
++
++/* =================================================================== 7 about us */
++function slide07(){
++
++  const s = newSlide();
++
++  gradPoly(s, [[0,0],[6.474,0],[0,7.489]], ramp(BLUE,CYAN), 200, {
++n:26}
++);
++
++  title(s,'About Us?',7.561,0.774,{
++w:3.63}
++);
++
++  body(s,L.amazing,
++    7.587,1.39,4.08,0.774);
++
++  [[2.603,'white','cart',INK],[4.063,'blue','edit',WHITE],[5.615,'white','bulb',INK]].forEach(([y,st,ic])=>{
++
++    badge(s, 8.1175, y+0.4375, 0.875, st, ic, {
++shadow: st==='blue'?SH_WIDE:SH_SOFT}
++);
++
++    T(s,'Example Here',{
++x:8.85,y:y-0.03,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,'Ever since the 1500s, when an printer took a galley of type and more recently',
++      {
++x:8.863,y:y+0.307,w:3.415,h:0.522,fontSize:10,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++  /* decorative bubbles */
++  gradEll(s,0.774,6.464,2.184,2.184, [[0,BLUE,0],[100,CYAN,20.8]], 270, {
++n:6}
++);
++
++  gradEll(s,2.144,2.532,2.425,2.425, [[0,BLUE,93.7],[100,CYAN,91.8]], 270, {
++n:8, over:'1B93F1'}
++);
++
++  icon(s,'hand',3.357,3.69,1.15,WHITE);
++
++  gradEll(s,5.4,5.427,0.488,0.488, [[0,BLUE,86.7],[100,CYAN,85.9]], 270, {
++n:4}
++);
++
++  gradEll(s,5.624,5.269,0.488,0.488, [[0,BLUE,77.6],[100,CYAN,74.9]], 270, {
++n:4}
++);
++
++  s.addShape('ellipse',{
++x:3.733,y:6.436,w:0.242,h:0.242,fill:{
++color:over(CYAN,31,BG)}
++,line:{
++type:'none'}
++}
++);
++
++  s.addShape('ellipse',{
++x:4.846,y:5.719,w:0.127,h:0.127,fill:{
++color:over(CYAN,31,BG)}
++,line:{
++type:'none'}
++}
++);
++
++  s.addShape('ellipse',{
++x:5.362,y:6.673,w:0.242,h:0.242,fill:{
++color:BG}
++,line:{
++color:INK,width:1}
++}
++);
++
++}
++
++
++/* =================================================================== 8 about company (stats) */
++function slide08(){
++
++  const s = newSlide();
++
++  s.addShape('rect',{
++x:0,y:0,w:6.116,h:7.5,fill:{
++color:over(LAV,60,BG)}
++,line:{
++type:'none'}
++}
++);
++
++  title(s,'About Company',0.832,0.774,{
++w:5.284}
++);
++
++  subtitle(s,0.819,1.297);
++
++  vLabel(s,-0.611,4.425);
++
++  /* nested square emblem */
++  s.addShape('rect',{
++x:1.709,y:2.736,w:0.937,h:0.937,fill:{
++type:'none'}
++,line:{
++color:BLUE,width:1.25}
++}
++);
++
++  s.addShape('rect',{
++x:1.901,y:2.931,w:0.548,h:0.548,fill:{
++type:'none'}
++,line:{
++color:BLUE,width:1.25}
++}
++);
++
++  gradRect(s,2.028,3.06,0.295,0.295, ramp(BLUE,CYAN), 220, {
++n:5, over:over(LAV,60,BG)}
++);
++
++  body(s,'Thanks to the growth of social media, brands and consumers have unprecedented access to each other, While',
++    7.901,0.805,5.266,0.583,{
++lineSpacingMultiple:1.8}
++);
++
++  [[6.894,'ring','edit','4.597M'],[10.233,'blue','bulb','5.857K']].forEach(([x,st,ic,val])=>{
++
++    badge(s, x+0.552, 3.5185, 0.795, st, ic, {
++k:0.42}
++);
++
++    T(s,'Company Mission Here',{
++x,y:4.067,w:1.726,h:0.572,fontFace:F_UISB,fontSize:14}
++);
++
++    T(s,L.unprec,
++      {
++x,y:4.637,w:2.417,h:0.74,fontSize:10,color:GREY,lineSpacingMultiple:1.4}
++);
++
++    s.addShape('line',{
++x:x+0.105,y:5.553,w:1.906,h:0,line:{
++color:LGREY,width:0.75}
++}
++);
++
++    T(s,'Product',{
++x,y:5.706,w:1.485,h:0.303,fontFace:'Poppins Medium',fontSize:12}
++);
++
++    T(s,val,{
++x:x-0.057,y:5.984,w:2.013,h:0.64,fontFace:F_LIGHT,fontSize:32}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 9 about company (circle) */
++function slide09(){
++
++  const s = newSlide();
++
++  title(s,'About Company',0.832,0.774,{
++w:5.284}
++);
++
++  subtitle(s,0.819,1.297);
++
++  [[2.5,'white','cart'],[4.025,'blue','edit'],[5.476,'white','bulb']].forEach(([y,st,ic],i)=>{
++
++    const bx = i===2 ? 1.342 : 1.329;
++
++    badge(s, bx, y+0.526, 0.894, st, ic, {
++shadow: st==='blue'?SH_WIDE:SH_SOFT}
++);
++
++    T(s,'Example Here',{
++x:i===2?2.038:2.025,y,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,L.brands3,
++      {
++x:i===2?2.05:2.038,y:y+0.296,w:4.676,h:0.707,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++  s.addShape('ellipse',{
++x:8.514,y:4.193,w:6.819,h:6.819,fill:{
++type:'none'}
++,
++    line:{
++color:CYAN,width:1.25,dashType:'dash'}
++}
++);
++
++  gradEll(s,7.637,1.896,4.59,4.59, ramp(BLUE,CYAN), 200, {
++n:16}
++);
++
++  s.addShape('ellipse',{
++x:9.155,y:1.38,w:0.242,h:0.242,fill:{
++color:over(CYAN,31,BG)}
++,line:{
++type:'none'}
++}
++);
++
++  s.addShape('ellipse',{
++x:11.605,y:2.132,w:0.122,h:0.122,fill:{
++color:over(CYAN,31,BG)}
++,line:{
++type:'none'}
++}
++);
++
++  s.addShape('ellipse',{
++x:11.058,y:0.626,w:0.242,h:0.242,fill:{
++color:BG}
++,line:{
++color:INK,width:1}
++}
++);
++
++}
++
++
++/* =================================================================== 10 about company (card) */
++function slide10(){
++
++  const s = newSlide();
++
++  title(s,'About Company',6.436,0.774,{
++w:5.284}
++);
++
++  subtitle(s,6.432,1.297);
++
++  [[2.05,'white','cart'],[3.372,'blue','edit']].forEach(([y,st,ic])=>{
++
++    badge(s, 6.8695, y+0.375, 0.687, st, ic, {
++shadow: st==='blue'?SH_WIDE:SH_SOFT}
++);
++
++    T(s,'Example Here',{
++x:7.384,y,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,L.brands,
++      {
++x:7.397,y:y+0.296,w:4.984,h:0.51,fontSize:9,color:GREY,lineSpacingMultiple:1.7}
++);
++
++  }
++);
++
++  s.addShape('rect',{
++x:3.24,y:4.569,w:9.014,h:1.967,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,shadow:SH_CARD}
++);
++
++  gradEll(s,3.624,4.82,1.5,1.5, ramp(BLUE,CYAN), 240, {
++n:12, over:WHITE}
++);
++
++  T(s,'Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the growth of social media, brands and Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the growth of social media, brands and consumers have',
++    {
++x:5.956,y:5.056,w:5.935,h:1.027,fontSize:10,lineSpacingMultiple:1.5}
++);
++
++}
++
++
++/* =================================================================== 11/12 service cards */
++function serviceCard(s, o){
++
++  const blue = o.style === 'blue';
++
++  if(blue) gradRR(s, o.x, o.y, o.w, o.h, o.r, ramp(BLUE,CYAN), 230, {
++n:16, base:{
++shadow:SH_BLUE}
++}
++);
++
++  else s.addShape('roundRect',{
++x:o.x,y:o.y,w:o.w,h:o.h,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,
++                               rectRadius:o.r, shadow:SH_CARD}
++);
++
++  const fg   = blue ? WHITE : INK;
++
++  const bgc  = blue ? '0E7BE0' : WHITE;
++
++  badge(s, o.ix, o.iy, o.d, blue?'plain':'ring', o.icon, {
++fill:WHITE, over:bgc, ic:INK, k:0.42}
++);
++
++  T(s,'Company Mission Here',{
++x:o.tx,y:o.ty,w:o.tw,h:o.th,fontFace:F_UISB,fontSize:o.ts,color:fg,align:o.align}
++);
++
++  T(s,L.unprec,
++    {
++x:o.bx,y:o.by,w:o.bw,h:o.bh,fontSize:o.bs,color:blue?WHITE:GREY,lineSpacingMultiple:1.4,align:o.align}
++);
++
++  s.addShape('line',{
++x:o.lx,y:o.ly,w:o.lw,h:0,line:{
++color:blue?over(BG,95.7,bgc):LGREY,width:0.75}
++}
++);
++
++  if(o.label) T(s,o.label,{
++x:o.px,y:o.py,w:1.485,h:0.303,fontFace:'Poppins Medium',fontSize:12,color:fg}
++);
++
++  T(s,o.value,{
++x:o.vx,y:o.vy,w:2.013,h:o.vh,fontFace:F_LIGHT,fontSize:o.vs,color:fg,align:o.align}
++);
++
++}
++
++function slide11(){
++
++  const s = newSlide();
++
++  title(s,'Our Service',0.795,0.774,{
++w:5.284}
++);
++
++  subtitle(s,0.791,1.297);
++
++  const cards = [
++    {
++x:0.882, style:'white', icon:'edit',  ix:2.0255, iy:3.1055, dy:0}
++,
++    {
++x:5.032, style:'blue',  icon:'bulb',  ix:6.1005, iy:3.1565, dy:0.0515}
++,
++    {
++x:8.965, style:'white', icon:'cloud', ix:10.1085,iy:3.1055, dy:0}
++
++  ];
++
++  cards.forEach((c,i)=>{
++
++    const dy = c.dy;
++
++    serviceCard(s, {
++x:c.x, y:2.241, w:3.272, h:4.245, r:0.33, style:c.style, icon:c.icon,
++      ix:c.ix, iy:c.iy, d:0.795,
++      tx:c.x+0.592, ty:3.655+dy, tw:1.726, th:0.572, ts:14,
++      bx:c.x+0.592, by:4.247+dy, bw:2.417, bh:0.74, bs:10,
++      lx:c.x+0.696, ly:5.141+dy, lw:1.906,
++      label:'Product', px:c.x+0.592, py:5.293+dy,
++      value:i===1?'5.857K':'4.597M', vx:c.x+0.535, vy:5.551+dy, vh:0.64, vs:32}
++);
++
++  }
++);
++
++}
++
++function slide12(){
++
++  const s = newSlide();
++
++  title(s,'Company Service',4.093,0.774,{
++w:5.284,align:'center'}
++);
++
++  subtitle(s,5.592,1.297);
++
++  [['white','cloud'],['white','gem'],['blue','bulb'],['white','edit']].forEach(([st,ic],i)=>{
++
++    const x = 0.882 + i*2.9125;
++
++    serviceCard(s, {
++x, y:2.241, w:2.61, h:3.962, r:0.55, style:st, icon:ic,
++      ix:x+1.305, iy:3.123, d:0.818, align:'center',
++      tx:x+0.503, ty:3.781, tw:1.603, th:0.505, ts:12,
++      bx:x+0.183, by:4.286, bw:2.243, bh:0.677, bs:9,
++      lx:x+0.241, ly:5.189, lw:2.128,
++      value:'4.597M', vx:x+0.298, vy:5.347, vh:0.572, vs:28}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 13 our objective */
++function slide13(){
++
++  const s = newSlide();
++
++  title(s,'Our Objective',7.521,0.774,{
++w:5.284}
++);
++
++  subtitle(s,7.517,1.297);
++
++  gradRect(s,5.702,0.931,0.645,2.357, ramp(BLUE,CYAN), 280, {
++n:14}
++);
++
++  s.addShape('line',{
++x:6.01,y:1.304,w:0,h:1.61,line:{
++color:WHITE,width:0.75,endArrowType:'triangle'}
++}
++);
++
++  [[2.528,'white','bulb'],[4.747,'blue','edit']].forEach(([y,st,ic],i)=>{
++
++    badge(s, 7.983, y+0.38, 0.76, st, ic, {
++shadow: st==='blue'?SH_WIDE:SH_SOFT}
++);
++
++    T(s,'Example Here',{
++x:i?7.534:7.521,y:y+0.96,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,L.access,
++      {
++x:i?7.546:7.534,y:y+1.296,w:4.115,h:0.48,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 14 smart objective */
++function slide14(){
++
++  const s = newSlide();
++
++  title(s,'Smart Objective',0.791,0.774,{
++w:5.284}
++);
++
++  subtitle(s,0.787,1.297);
++
++  vLabel(s,-0.608,4.401);
++
++  /* SMART wheel: five grey 45-degree slices, the sixth replaced by the blue step arrow */
++  const cx=4.50, cy=4.486, ro=1.986;
++
++  for(let i=0;
++i<5;
++i++){
++
++    s.addShape('blockArc',{
++x:cx-ro,y:cy-ro,w:2*ro,h:2*ro,fill:{
++color:LGREY}
++,line:{
++type:'none'}
++,
++      angleRange:[-96+i*45+1.5, -51+i*45-1.5], arcThicknessRatio:0.364}
++);
++
++  }
++
++  gradPoly(s, flatten(fit(P_STEP, 2.223, 3.862, 1.259, 1.983)), ramp(BLUE,CYAN), 260,
++    {
++n:12, base:{
++shadow:{
++type:'outer',blur:12,offset:17,angle:70,color:INK,opacity:0.2}
++}
++}
++);
++
++  s.addShape('ellipse',{
++x:2.666,y:4.674,w:0.359,h:0.359,fill:{
++color:BG}
++,line:{
++type:'none'}
++}
++);
++
++  T(s,'01',{
++x:2.666,y:4.674,w:0.359,h:0.359,align:'center',valign:'middle',fontFace:F_LIGHT,bold:true,fontSize:8}
++);
++
++  [['T',4.821,2.775],['R',5.749,3.685],['A',5.749,4.962],['M',4.882,5.810],['S',3.600,5.810]].forEach(([g,x,y])=>{
++
++    s.addShape('ellipse',{
++x,y,w:0.359,h:0.359,fill:{
++color:'AEABAB'}
++,line:{
++type:'none'}
++}
++);
++
++    T(s,g,{
++x,y,w:0.359,h:0.359,align:'center',valign:'middle',fontFace:F_LIGHT,fontSize:10,color:WHITE}
++);
++
++  }
++);
++
++  s.addShape('ellipse',{
++x:2.774,y:2.367,w:1.466,h:1.463,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,shadow:SH_TINY}
++);
++
++  gradEll(s,2.927,2.520,1.208,1.157, [[0,CYAN,55.7],[100,BLUE,100]], 120, {
++n:10, over:WHITE}
++);
++
++  icon(s,'person',3.531,3.099,0.62,WHITE);
++
++  T(s,'Title Here',{
++x:3.630,y:4.413,w:1.710,h:0.362,align:'center',fontFace:F_UISB,fontSize:14}
++);
++
++  /* right-hand list, middle row on a white card */
++  s.addShape('rect',{
++x:7.296,y:3.535,w:4.932,h:1.653,fill:{
++color:WHITE}
++,
++    line:{
++color:over(NAVY,36.9,BG),width:1}
++}
++);
++
++  [[2.334,'white','cart'],[4.012,'blue','edit'],[5.674,'white','bulb']].forEach(([y,st,ic])=>{
++
++    badge(s, 8.023, y+0.386, 0.772, st, ic, {
++shadow: st==='blue'?SH_WIDE:SH_SOFT}
++);
++
++    T(s,'Example Here',{
++x:8.621,y:y-0.173,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,L.brands,
++      {
++x:8.634,y:y+0.164,w:3.283,h:0.707,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 15/16 timeline */
++function timeline(s, o){
++
++  s.addShape('line',{
++x:6.697,y:o.axis,w:0,h:4.101,line:{
++color:over(INK,20,BG),width:0.75}
++}
++);
++
++  /* blue banner (points right) */
++  gradPoly(s, flatten(P_BANNER,0,0).map(p=>[2.336+3.807-p[0], o.b+1.367-p[1]]), ramp(BLUE,CYAN), 50,
++    {
++n:14, base:{
++shadow:{
++type:'outer',blur:41,offset:21,angle:70,color:INK,opacity:0.2}
++}
++}
++);
++
++  s.addShape('ellipse',{
++x:4.975,y:o.b+0.358,w:0.652,h:0.652,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,shadow:SH_TINY}
++);
++
++  icon(s,'layers',5.301,o.b+0.684,0.36,'0C0C0C');
++
++  T(s,L.media,
++    {
++x:o.tx,y:o.b+0.326,w:2.188,h:0.707,align:'right',fontSize:9,color:WHITE,lineSpacingMultiple:1.5}
++);
++
++  /* white banner (points left) */
++  addPoly(s, flatten(P_BANNER, 7.251, o.w), {
++fill:{
++color:WHITE}
++, base:0, shadow:SH_TINY}
++);
++
++  s.addShape('ellipse',{
++x:7.768,y:o.w+0.358,w:0.652,h:0.652,fill:{
++color:BG}
++,line:{
++type:'none'}
++}
++);
++
++  icon(s,'gem',8.094,o.w+0.684,0.40,'262626');
++
++  T(s,L.media,
++    {
++x:o.wx,y:o.w+0.357,w:2.188,h:0.707,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  /* year pills */
++  s.addShape('roundRect',{
++x:3.834,y:o.y1,w:2.31,h:0.799,fill:{
++type:'none'}
++,line:{
++color:NAVY,width:1}
++,rectRadius:0.3995}
++);
++
++  T(s,o.years[0],{
++x:4.088,y:o.y1+0.093,w:1.815,h:0.64,align:'center',fontFace:F_HEAD,fontSize:32}
++);
++
++  s.addShape('roundRect',{
++x:7.252,y:o.y2,w:2.31,h:0.799,fill:{
++type:'none'}
++,line:{
++color:NAVY,width:1}
++,rectRadius:0.3995}
++);
++
++  T(s,o.years[1],{
++x:6.874,y:o.y2+0.122,w:3.065,h:0.64,align:'center',fontFace:F_HEAD,fontSize:32}
++);
++
++  /* spiky burst markers on the axis */
++  [o.s1,o.s2].forEach(y=> s.addShape('irregularSeal1',{
++x:6.583,y,w:0.229,h:0.229,
++    fill:{
++color:mix(BLUE,CYAN,0.45)}
++,line:{
++type:'none'}
++}
++));
++
++}
++
++function slide15(){
++
++  const s = newSlide();
++
++  title(s,'Project Timeline',4.025,0.774,{
++w:5.284,align:'center'}
++);
++
++  subtitle(s,5.555,1.297);
++
++  timeline(s, {
++axis:3.399, b:5.111, tx:2.466, w:2.768, wx:8.784,
++               y1:3.126, y2:5.322, years:['2027','2028'], s1:3.337, s2:5.649}
++);
++
++}
++
++function slide16(){
++
++  const s = newSlide();
++
++  timeline(s, {
++axis:0, b:3.292, tx:2.445, w:0.949, wx:8.763,
++               y1:1.306, y2:3.502, years:['2029','2030'], s1:1.518, s2:3.829}
++);
++
++  title(s,'End',4.025,5.703,{
++w:5.284,align:'center'}
++);
++
++  T(s,'Company Title goes here',{
++x:5.234,y:6.236,w:2.865,h:0.33,align:'center',fontSize:10,
++    color:GREY,lineSpacingMultiple:1.8}
++);
++
++}
++
++
++/* =================================================================== 17 goal & objective */
++function slide17(){
++
++  const s = newSlide();
++
++  T(s,'A',{
++x:0.277,y:1.398,w:3.703,h:4.124,align:'center',fontFace:F_LIGHT,fontSize:239,color:SILVER}
++);
++
++  title(s,'Our Goal & Objective',0.882,0.774,{
++w:5.979}
++);
++
++  subtitle(s,0.878,1.297);
++
++  /* outlined light bulb: the ring is the area between the two bezier outlines */
++  const bulbOut = flatten(fit(P_BULB_OUT, 1.069, 2.11, 1.975, 2.499));
++
++  const bulbIn  = flatten(fit(P_BULB_IN,  1.069, 2.11, 1.975, 2.499));
++
++  gradPoly(s, bulbOut, [[0,BLUE,77.6],[100,CYAN,100]], 10, {
++n:10}
++);
++
++  addPoly(s, bulbIn, {
++fill:{
++color:BG}
++}
++);
++
++  /* screw base */
++  [4.66,4.79,4.92].forEach(y =>
++    s.addShape('roundRect',{
++x:1.58,y,w:0.90,h:0.10,fill:{
++color:mix(CYAN,BLUE,0.12)}
++,line:{
++type:'none'}
++,rectRadius:0.05}
++));
++
++  s.addShape('trapezoid',{
++x:1.66,y:5.03,w:0.74,h:0.26,fill:{
++color:mix(CYAN,BLUE,0.18)}
++,line:{
++type:'none'}
++,rotate:180}
++);
++
++  /* concentric target inside the bulb */
++  [[1.446,2.481,1.222,BLUE],[1.568,2.604,0.978,SILVER],[1.69,2.726,0.734,BLUE],
++   [1.812,2.848,0.49,SILVER],[1.935,2.97,0.246,BLUE]].forEach(([x,y,d,c])=>{
++
++    if(c===BLUE) gradEll(s,x,y,d,d, ramp(BLUE,CYAN), 230, {
++n:6, over:SILVER}
++);
++
++    else s.addShape('ellipse',{
++x,y,w:d,h:d,fill:{
++color:c}
++,line:{
++type:'none'}
++}
++);
++
++  }
++);
++
++  /* arrow shaft + flights */
++  s.addShape('rect',{
++x:2.162,y:2.054,w:0.941,h:0.045,fill:{
++color:'E5E5E5'}
++,line:{
++type:'none'}
++,rotate:-45}
++);
++
++  s.addShape('triangle',{
++x:2.057,y:2.841,w:0.258,h:0.258,fill:{
++color:BLUE}
++,line:{
++type:'none'}
++,rotate:225}
++);
++
++  gradPoly(s, [[2.916,1.95],[3.077,2.05],[3.03,2.223],[2.916,2.10]], ramp(BLUE,CYAN), 230, {
++n:4}
++);
++
++  gradPoly(s, [[3.206,2.078],[3.106,2.241],[2.935,2.19],[3.06,2.078]], ramp(BLUE,CYAN), 230, {
++n:4}
++);
++
++  /* SUCCESS arrow ribbon */
++  gradPoly(s, [[1.94,5.29],[2.09,5.29],[2.09,6.02],[5.90,6.02],[5.90,5.83],[6.20,6.10],[5.90,6.37],[5.90,6.17],[1.94,6.17]],
++    ramp(BLUE,CYAN), 190, {
++n:14}
++);
++
++  gradRect(s, 6.139, 5.499, 0.198, 0.986, ramp(BLUE,CYAN), 20, {
++n:5}
++);
++
++  T(s,'SUCCESS',{
++x:2.86,y:5.274,w:2.665,h:0.64,fontFace:'Poppins',bold:true,fontSize:32}
++);
++
++  /* right list */
++  s.addShape('rect',{
++x:6.59,y:5.499,w:5.54,h:0.986,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,shadow:SH_CARD}
++);
++
++  s.addShape('line',{
++x:7.475,y:5.499,w:0,h:0.986,line:{
++color:over(LGREY,77.6,WHITE),width:0.75}
++}
++);
++
++  icon(s,'globe',7.068,5.992,0.34,'80ACFE');
++
++  [[2.277,'white','cart'],[4.035,'blue','edit']].forEach(([y,st,ic])=>{
++
++    badge(s, 6.96, y+0.386, 0.772, st, ic, {
++shadow: st==='blue'?SH_WIDE:SH_SOFT}
++);
++
++    T(s,'Example Here',{
++x:7.641,y:y-0.173,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,'Thanks to the growth of social media, brands and consumers have Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the growth of social media, ',
++      {
++x:7.654,y:y+0.184,w:4.66,h:0.707,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++  T(s,'Thanks to the growth of social media, brands and consumers have Thanks to the social media, brands and consumers have',
++    {
++x:7.641,y:5.775,w:4.267,h:0.48,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++}
++
++
++/* =================================================================== 18 team leader (single) */
++function slide18(){
++
++  const s = newSlide();
++
++  s.addShape('rect',{
++x:12.698,y:0,w:0.635,h:7.5,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++}
++);
++
++  title(s,'Team Leader',0.768,0.774,{
++w:4.609}
++);
++
++  T(s,[{
++text:'Meet',options:{
++fontFace:F_LIGHT}
++}
++,{
++text:' Our ',options:{
++fontFace:F_LIGHT}
++}
++,
++       {
++text:'Professional',options:{
++breakLine:true}
++}
++,{
++text:'SEO & Founder'}
++],
++    {
++x:0.786,y:2.364,w:4.087,h:0.774,fontFace:F_HEAD,fontSize:20}
++);
++
++  s.addShape('line',{
++x:0.882,y:3.34,w:0.449,h:0,line:{
++color:BLUE,width:3.5}
++}
++);
++
++  T(s,L.dummy + ' recently with desktop publishing software like',
++    {
++x:0.788,y:3.461,w:4.609,h:0.774,fontSize:10,lineSpacingMultiple:1.5}
++);
++
++  T(s,L.dummy,
++    {
++x:0.788,y:4.352,w:4.609,h:0.522,fontSize:10,lineSpacingMultiple:1.5}
++);
++
++  /* concentric arcs + portrait */
++  [[6.309,1.692,4.516],[5.839,1.209,5.484],[5.314,0.684,6.533]].forEach(([x,y,d],i)=>{
++
++    const range = [[223,108],[257,130],[294,87]][i];
++
++    s.addShape('arc',{
++x,y,w:d,h:d,fill:{
++type:'none'}
++,line:{
++color:over(BLUE,72.9,BG),width:6.5}
++,angleRange:range}
++);
++
++  }
++);
++
++  gradEll(s,6.834,2.231,3.438,3.438, [[0,CYAN,0],[15,CYAN,0],[100,BLUE,72.9]], 280, {
++n:20}
++);
++
++  s.addShape('line',{
++x:4.83,y:6.058,w:2.60,h:0,line:{
++color:INK,width:1.25}
++}
++);
++
++  s.addShape('line',{
++x:7.43,y:5.20,w:0,h:0.858,line:{
++color:INK,width:1.25}
++}
++);
++
++  s.addShape('rect',{
++x:2.666,y:5.627,w:2.876,h:0.862,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++}
++);
++
++  gradRect(s,0.886,5.627,1.78,0.862, ramp(BLUE,CYAN), 240, {
++n:10}
++);
++
++  socialRow(s, 1.178, 5.941, 0.234, 0.309, BG, BLUE);
++
++  T(s,[{
++text:'Hello I\u2019m ',options:{
++breakLine:true}
++}
++,{
++text:'Robert Antony'}
++],
++    {
++x:2.91,y:5.738,w:2.184,h:0.64,fontFace:F_HEAD,fontSize:16}
++);
++
++  T(s,'www.website.com',{
++x:11.697,y:3.615,w:2.637,h:0.269,rotate:270,align:'right',fontSize:10}
++);
++
++}
++
++
++/* =================================================================== 19 team leader (three) */
++function slide19(){
++
++  const s = newSlide();
++
++  s.addShape('rect',{
++x:0,y:4.063,w:8.633,h:3.437,fill:{
++color:over(LAV,49.8,BG)}
++,line:{
++type:'none'}
++}
++);
++
++  title(s,'Team Leader',0.768,0.774,{
++w:4.609}
++);
++
++  vLabel(s,-0.996,4.123,18);
++
++  [[2.376,2.404,2.507,'01',2.906],[6.053,6.082,6.186,'02',2.862],[9.652,9.681,9.786,'03',2.906]].forEach(([nx,tx,px,num,ny])=>{
++
++    T(s,num,{
++x:nx,y:2.158,w:0.86,h:0.774,fontFace:'Poppins Thin',fontSize:40}
++);
++
++    T(s,'Amanda Chris',{
++x:tx,y:ny,w:2.014,h:0.37,fontFace:F_HEAD,fontSize:16}
++);
++
++    T(s,'CEO / Founder \u2013 Company Name Here',{
++x:tx,y:ny+0.291,w:2.488,h:0.252,fontSize:9}
++);
++
++    socialRow(s, px, 3.512, 0.194, 0.255, 'AEABAB', BG);
++
++    gradRect(s, px, 6.218, 2.447, 0.267, [[0,BLUE,72.9],[100,CYAN,80]], 250, {
++n:8, over:over(LAV,49.8,BG)}
++);
++
++    T(s,'@amanda  45',{
++x:px,y:6.218,w:2.447,h:0.267,align:'center',valign:'middle',
++      fontFace:'Poppins',fontSize:9,color:WHITE}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 20 our product */
++function slide20(){
++
++  const s = newSlide();
++
++  s.addShape('rect',{
++x:3.751,y:4.342,w:9.583,h:3.158,fill:{
++color:over(LAV,60,BG)}
++,line:{
++type:'none'}
++}
++);
++
++  title(s,'Our Product',0.768,0.774,{
++w:4.609}
++);
++
++  ['01','02','03'].forEach((num,i)=>{
++
++    const x = 0.768 + i*2.866;
++
++    T(s,num,{
++x,y:2.243,w:0.86,h:0.774,fontFace:'Poppins Thin',fontSize:40}
++);
++
++    T(s,'Example Here',{
++x:x+0.008,y:2.958,w:2.014,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,L.thanksTo,
++      {
++x:x+0.008,y:3.295,w:2.014,h:0.707,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++  badge(s, 10.2205, 2.8615, 0.615, 'blue', 'edit', {
++shadow:SH_WIDE}
++);
++
++  T(s,[{
++text:'Summary ',options:{
++breakLine:true}
++}
++,{
++text:'Executive Templates.'}
++],
++    {
++x:9.774,y:3.31,w:3.268,h:0.64,fontFace:'Poppins',fontSize:16}
++);
++
++  T(s,'89%',{
++x:9.779,y:4.621,w:2.928,h:0.774,fontFace:F_HEAD,fontSize:40}
++);
++
++  T(s,'Constituter Adipescent Elastoses Daimio Nonarmy Nib Eui mod',
++    {
++x:9.779,y:5.272,w:2.55,h:0.92,fontSize:12,bold:true,lineSpacingMultiple:1.667}
++);
++
++  s.addShape('rect',{
++x:9.885,y:6.299,w:2.344,h:0.187,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++}
++);
++
++  gradRect(s,9.885,6.299,1.824,0.187, [[0,BLUE,72.9],[100,CYAN,80]], 250, {
++n:8, over:over(LAV,60,BG)}
++);
++
++}
++
++
++/* =================================================================== 21 S.W.O.T */
++function slide21(){
++
++  const s = newSlide();
++
++  title(s,'S.W.O.T Analysis',4.362,0.774,{
++w:4.609,align:'center'}
++);
++
++  T(s,L.dummy + ' recently with desktop publishing software like',
++    {
++x:3.211,y:1.49,w:7.024,h:0.583,align:'center',fontSize:10,color:GREY,lineSpacingMultiple:1.8}
++);
++
++  [['S','muscle','white'],['W','link','white'],['O','warn','blue'],['T','crosshair','white']]
++   .forEach(([letter,ic,style],i)=>{
++
++    const x = 0.882 + i*2.9125, blue = style==='blue';
++
++    if(blue) gradRR(s,x,2.666,2.61,3.962,0.48, ramp(BLUE,CYAN),230,{
++n:16, base:{
++shadow:SH_BLUE}
++}
++);
++
++    else s.addShape('roundRect',{
++x,y:2.666,w:2.61,h:3.962,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,
++                                 rectRadius:0.40, shadow:SH_CARD}
++);
++
++    badge(s, x+1.305, 3.55, 0.822, blue?'plain':'ring', ic, {
++fill:WHITE, over:blue?'0E7BE0':WHITE, ic:INK, k:0.44}
++);
++
++    T(s,'Example Here',{
++x:x+0.298,y:4.176,w:2.014,h:0.337,align:'center',fontFace:F_HEAD,fontSize:14,
++      color:blue?WHITE:INK}
++);
++
++    T(s,L.thanksTo,
++      {
++x:x+0.298,y:4.506,w:2.014,h:0.707,align:'center',fontSize:9,lineSpacingMultiple:1.5,
++       color:blue?WHITE:(i===3?INK:GREY)}
++);
++
++    s.addShape('line',{
++x,y:5.408,w:2.61,h:0,line:{
++color:blue?over(BG,95.7,'0B69D6'):LGREY,width:0.75}
++}
++);
++
++    T(s,letter,{
++x:x+0.298,y:5.568,w:2.014,h:0.841,align:'center',fontFace:F_HEAD,fontSize:44,
++      color:blue?WHITE:INK}
++);
++
++    [x+0.583, x+1.716].forEach(lx=> s.addShape('line',{
++x:lx,y:5.956,w:0.31,h:0,
++      line:{
++color:blue?WHITE:BLUE,width:0.75}
++}
++));
++
++  }
++);
++
++}
++
++
++/* =================================================================== 22 market analysis */
++function slide22(){
++
++  const s = newSlide();
++
++  title(s,'Market Analysis',6.372,0.808,{
++w:4.609}
++);
++
++  subtitle(s,6.39,1.341);
++
++  gradRect(s,0.882,4.92,2.944,1.566, ramp(BLUE,CYAN), 230, {
++n:14, base:{
++shadow:SH_BLUE}
++}
++);
++
++  T(s,'$28.23M',{
++x:1.092,y:5.324,w:2.524,h:0.64,align:'center',fontFace:F_UISB,fontSize:32,color:WHITE}
++);
++
++  T(s,'Marketing Process',{
++x:1.553,y:5.833,w:1.602,h:0.269,align:'center',fontFace:'Inter Light',
++    fontSize:10,color:WHITE}
++);
++
++  s.addShape('rect',{
++x:7.819,y:2.298,w:4.41,h:4.188,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,shadow:SH_CARD}
++);
++
++  gradRect(s,6.469,2.298,1.346,4.188, [[0,BLUE,82.7],[100,CYAN,87.8]], 230, {
++n:14, base:{
++shadow:SH_BLUE}
++}
++);
++
++  icon(s,'cart',7.142,3.335,0.53,WHITE);
++
++  icon(s,'edit',7.142,5.452,0.46,WHITE);
++
++  s.addShape('line',{
++x:7.815,y:4.392,w:4.415,h:0,line:{
++color:LGREY,width:0.75}
++}
++);
++
++  [[2.71,'Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the growth of  media, brands and Thanks to the growth of social media, brands and'],
++   [4.766,'Thanks to the growth of social media, brands and consumers have unprecedented access Thanks to the growth social media, brands and Thanks to the growth of social media, brands and']]
++   .forEach(([y,txt])=>{
++
++    T(s,'Example Here',{
++x:8.301,y,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,txt,{
++x:8.301,y:y+0.337,w:3.393,h:0.934,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 23 business goal (target) */
++function slide23(){
++
++  const s = newSlide();
++
++  title(s,'Business Goal',0.858,0.808,{
++w:4.609}
++);
++
++  subtitle(s,0.877,1.341);
++
++  /* three arrows crossing a bullseye: shafts first, then the rings, then the flights */
++  const bx=3.688, by=4.491;
++
++  const spokes = [[-90,2.05],[90,2.05],[-42.5,2.15],[137.5,2.15],[35.5,2.15],[215.5,2.15]];
++
++  spokes.forEach(([a,len])=>{
++ const r=a*Math.PI/180;
++
++    seg(s, [bx,by], [bx+len*Math.cos(r), by+len*Math.sin(r)], LGREY, 7);
++ }
++);
++
++  [[2.234,3.036,2.908,'g'],[2.567,3.369,2.242,SILVER],[2.828,3.629,1.724,'g'],
++   [3.163,3.964,1.054,SILVER],[3.415,4.216,0.550,'g']].forEach(([x,y,d,c])=>{
++
++    if(c==='g') gradEll(s,x,y,d,d, ramp(BLUE,CYAN),230,{
++n:8, over:SILVER}
++);
++
++    else s.addShape('ellipse',{
++x,y,w:d,h:d,fill:{
++color:c}
++,line:{
++type:'none'}
++}
++);
++
++  }
++);
++
++  [[3.437,2.433,0.507,0.542,0],[1.703,5.005,0.591,0.551,-42.5],[3.442,6.106,0.572,0.585,35.5],
++   [5.092,5.003,0.591,0.551,42.5],[1.874,3.051,0.565,0.594,90],[4.971,3.059,0.565,0.594,-90]]
++   .forEach(([x,y,w,h,rot])=> gradPoly(s, flatten(fit(P_FLETCH, x, y, w, h)), ramp(BLUE,CYAN), 230,
++     {
++n:5, base:{
++rotate:rot}
++}
++));
++
++  /* right list */
++  s.addShape('rect',{
++x:6.775,y:3.535,w:5.412,h:1.653,fill:{
++color:WHITE}
++,line:{
++color:over(NAVY,36.9,BG),width:1}
++}
++);
++
++  [[2.334,'white','cart'],[4.012,'blue','edit'],[5.674,'white','cart']].forEach(([y,st,ic])=>{
++
++    const blue = st==='blue';
++
++    if(blue) gradRR(s,7.293,y,0.772,0.772,0.13, ramp(BLUE,CYAN),230,{
++n:8, base:{
++shadow:SH_BLUE}
++}
++);
++
++    else s.addShape('roundRect',{
++x:7.293,y,w:0.772,h:0.772,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,
++                                 rectRadius:0.13,shadow:SH_SOFT}
++);
++
++    icon(s, ic, 7.679, y+0.386, 0.32, blue?WHITE:INK);
++
++    T(s,'Example Here',{
++x:8.579,y:y-0.173,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,L.brands,
++      {
++x:8.592,y:y+0.124,w:3.283,h:0.707,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 24 business goal (arcs) */
++function slide24(){
++
++  const s = newSlide();
++
++  title(s,'Business Goal',0.858,0.808,{
++w:4.609}
++);
++
++  subtitle(s,0.877,1.341);
++
++  [[1.274,2.938,3.289,[223,108]],[0.931,2.585,3.994,[257,130]],[0.549,2.204,4.757,[294,87]]]
++   .forEach(([x,y,d,range])=> s.addShape('arc',{
++x,y,w:d,h:d,fill:{
++type:'none'}
++,
++     line:{
++color:over(BLUE,72.9,BG),width:5}
++,angleRange:range}
++));
++
++  s.addShape('rect',{
++x:6.556,y:3.394,w:5.674,h:1.719,fill:{
++type:'none'}
++,line:{
++color:BLUE,width:1}
++}
++);
++
++  [[1.963,'plain'],[3.741,'blue'],[5.553,'plain']].forEach(([y,st])=>{
++
++    if(st==='blue') gradEll(s,7.161,y,1.037,1.037, ramp(BLUE,CYAN),230,{
++n:8}
++);
++
++    else s.addShape('ellipse',{
++x:7.161,y,w:1.037,h:1.037,fill:{
++color:SILVER}
++,line:{
++type:'none'}
++}
++);
++
++  }
++);
++
++  [[2.101,'cart',SH_LIFT],[3.873,'bulb',SH_WIDE],[5.674,'edit',SH_LIFT]].forEach(([y,ic,sh],i)=>{
++
++    s.addShape('ellipse',{
++x:7.293,y,w:0.772,h:0.772,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,shadow:sh}
++);
++
++    icon(s, ic, 7.679, y+0.386, 0.32, INK);
++
++    const ty = [1.928,3.72,5.501][i];
++
++    T(s,'Example Here',{
++x:8.579,y:ty,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,L.brands,
++      {
++x:8.592,y:ty+0.337,w:3.283,h:0.707,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 25 our map */
++function slide25(){
++
++  const s = newSlide();
++
++  title(s,'Our Map',0.753,0.788,{
++w:4.609}
++);
++
++  subtitle(s,0.771,1.32);
++
++  addPoly(s, pairs(MAP_MAIN, 0.967, 2.275, 5.024, 4.228),
++    {
++fill:{
++color:over('44546A',14.9,BG)}
++, line:{
++color:over(BLUE,35.7,BG), width:0.75}
++}
++);
++
++  addPoly(s, pairs(MAP_TAS, 0.967, 2.275, 5.024, 4.228),
++    {
++fill:{
++color:over('44546A',14.9,BG)}
++, line:{
++color:over(BLUE,35.7,BG), width:0.75}
++}
++);
++
++  T(s,[{
++text:'Company',options:{
++breakLine:true}
++}
++,{
++text:'Example Title Here'}
++],
++    {
++x:6.853,y:1.703,w:2.6,h:0.64,fontFace:F_HEAD,fontSize:16}
++);
++
++  T(s,[{
++text:'But I must explain to you how "But I must explain to you how all this mistaken idea of denouncing pleasure & praising pain was of born and I will give you a complete',options:{
++breakLine:true}
++}
++,
++       {
++text:'all this mistaken idea of denouncing pleasure &'}
++],
++    {
++x:6.856,y:2.395,w:4.908,h:0.677,fontSize:9,color:GREY,lineSpacingMultiple:1.4}
++);
++
++  [[6.938,3.543,'33%',BLUE,false],[9.681,3.543,'67%',CYAN,false],
++   [6.938,5.101,'75%',mix(BLUE,CYAN,0.4),false],[9.681,5.101,'25%',WHITE,true]].forEach(([x,y,pct,fig,blue])=>{
++
++    if(blue) gradRR(s,x,y,2.548,1.385,0.23, ramp(BLUE,CYAN),230,
++      {
++n:12, base:{
++shadow:{
++type:'outer',blur:46,offset:27,angle:70,color:INK,opacity:0.27}
++}
++}
++);
++
++    else s.addShape('roundRect',{
++x,y,w:2.548,h:1.385,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,
++      rectRadius:0.23, shadow:{
++type:'outer',blur:4,offset:2,angle:45,color:INK,opacity:0.07}
++}
++);
++
++    const ix = x+0.287+(x>9?0.03:0);
++
++    icon(s,'person', ix+0.17, y+0.72, 0.85, fig);
++
++    T(s,pct,{
++x:x+0.813,y:y+0.278,w:1.27,h:0.505,fontFace:F_HEAD,fontSize:24,color:blue?WHITE:INK}
++);
++
++    T(s,L.mistaken,
++      {
++x:x+0.802,y:y+0.693,w:1.568,h:0.465,fontSize:9,color:blue?WHITE:INK,lineSpacingMultiple:1.4}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 26 device mockup */
++function slide26(){
++
++  const s = newSlide();
++
++  s.addShape('rect',{
++x:0,y:0,w:6.937,h:7.5,fill:{
++color:SILVER}
++,line:{
++type:'none'}
++}
++);
++
++  title(s,'Device Mockup',0.775,0.781,{
++w:4.609}
++);
++
++  subtitle(s,0.793,1.313);
++
++  /* monitor mock-up, redrawn from shapes in place of the source bitmap */
++  s.addShape('rect',{
++x:0.886,y:2.551,w:5.096,h:2.925,fill:{
++color:SILVER}
++,line:{
++color:'262626',width:2.25}
++}
++);
++
++  s.addShape('rect',{
++x:3.028,y:5.476,w:0.812,h:0.90,fill:{
++color:'A6A6A6'}
++,line:{
++type:'none'}
++}
++);
++
++  s.addShape('rect',{
++x:2.74,y:6.34,w:1.39,h:0.10,fill:{
++color:'D9D9D9'}
++,line:{
++color:'A6A6A6',width:0.75}
++}
++);
++
++  ['0144C1','2E7FE8','9FC4EE','D9D9D9'].forEach((c,i)=>
++    s.addShape('ellipse',{
++x:1.407+i*0.138,y:3.295,w:0.092,h:0.092,fill:{
++color:c}
++,line:{
++type:'none'}
++}
++));
++
++  T(s,'AWESOME PRESENTATION TEMPLATE',{
++x:1.262,y:3.455,w:2.855,h:1.111,fontFace:'Poppins',
++    bold:true,fontSize:20}
++);
++
++  T(s, bullets(['But I must explain to you how "But I must explain to you how all this mistaken idea of denouncing pleasure & praising pain was of born'],'2714'),
++    {
++x:7.299,y:0.781,w:5.565,h:0.48,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  [[2.551,'cart',false],[3.908,'bulb',true],[5.264,'edit',false]].forEach(([y,ic,blue])=>{
++
++    s.addShape('rect',{
++x:6.937,y,w:5.292,h:1.217,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,
++      shadow:{
++type:'outer',blur:4,offset:2,angle:45,color:INK,opacity:0.07}
++}
++);
++
++    s.addShape('line',{
++x:8.531,y,w:0,h:1.217,line:{
++color:SILVER,width:0.75}
++}
++);
++
++    s.addShape('roundRect',{
++x:7.356,y:y+0.24,w:0.755,h:0.755,fill:{
++color:blue?BLUE:SILVER}
++,
++      line:{
++type:'none'}
++,rectRadius:0.126}
++);
++
++    s.addShape('roundRect',{
++x:7.452,y:y+0.342,w:0.562,h:0.562,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,
++      shadow:SH_LIFT,rectRadius:0.094}
++);
++
++    icon(s, ic, 7.733, y+0.623, 0.24, INK);
++
++    T(s,'Example Here',{
++x:8.848,y:y+0.183,w:1.796,h:0.337,fontFace:F_HEAD,fontSize:14}
++);
++
++    T(s,'Thanks to the growth of social media, brands consumers have unprecedented',
++      {
++x:8.848,y:y+0.48,w:2.978,h:0.48,fontSize:9,color:GREY,lineSpacingMultiple:1.5}
++);
++
++  }
++);
++
++}
++
++
++/* =================================================================== 27 contact us */
++function slide27(){
++
++  const s = newSlide();
++
++  title(s,'Contact Us',0.858,0.808,{
++w:4.609}
++);
++
++  subtitle(s,0.877,1.341);
++
++  s.addShape('rect',{
++x:8.198,y:3.904,w:4.031,h:1.356,fill:{
++color:WHITE}
++,line:{
++type:'none'}
++,
++    shadow:{
++type:'outer',blur:8,offset:3,angle:70,color:INK,opacity:0.19}
++}
++);
++
++  const rows = [
++    {
++y:2.818, fill:WHITE, ic:'phone', icCol:INK, hy:2.676, hx:9.818, h:'Phone',
++     lines:['(+123) 456 7890','(+01) 092 029 029 029'], lx:9.818, ly:3.053}
++,
++    {
++y:4.224, fill:'3F3F3F', ic:'mail', icCol:WHITE, hy:4.168, hx:9.737, h:'Email',
++     lines:['lorem@example.com','example.com'], lx:9.748, ly:4.521}
++,
++    {
++y:5.774, fill:'3F82FF', ic:'pin', icCol:WHITE, hy:5.688, hx:9.746, h:'Address',
++     lines:['Example Street Address,','City 038404, State'], lx:9.746, ly:6.063}
++
++  ];
++
++  rows.forEach(r=>{
++
++    s.addShape('ellipse',{
++x:8.786,y:r.y,w:0.611,h:0.611,fill:{
++color:r.fill}
++,line:{
++type:'none'}
++}
++);
++
++    icon(s, r.ic, 9.0915, r.y+0.3055, 0.34, r.icCol);
++
++    T(s, r.h, {
++x:r.hx,y:r.hy,w:1.693,h:0.365,fontFace:F_UISB,fontSize:16,lineSpacingMultiple:1.25}
++);
++
++    T(s, r.lines.map(t=>({
++text:t, options:{
++breakLine:true}
++}
++)),
++      {
++x:r.lx,y:r.ly,w:2.2,h:0.522,fontFace:F_UI,fontSize:11,color:GREY,lineSpacingMultiple:1.364}
++);
++
++  }
++);
++
++  s.addShape('rect',{
++x:0.882,y:5.774,w:3.487,h:0.712,fill:{
++color:BLUE}
++,line:{
++type:'none'}
++,
++    shadow:{
++type:'outer',blur:36,offset:34,angle:50,color:INK,opacity:0.2}
++}
++);
++
++  T(s,'Thanks For Watching',{
++x:0.882,y:5.979,w:3.488,h:0.303,align:'center',fontFace:F_UISB,
++    fontSize:12,color:WHITE,lineSpacingMultiple:1.667}
++);
++
++}
++
++
++/* ------------------------------------------------------------------ run */
++[slide01,slide02,slide03,slide04,slide05,slide06,slide07,slide08,slide09,slide10,
++ slide11,slide12,slide13,slide14,slide15,slide16,slide17,slide18,slide19,slide20,
++ slide21,slide22,slide23,slide24,slide25,slide26,slide27].forEach(fn => fn());
++
++
++pptx.writeFile({
++ fileName: path.join(__dirname, '0a8399c0-4169-400a-bdc5-bebcfdf6b5a1_grok_final.pptx') }
++)
++    .then(f => console.log('wrote', f));
++

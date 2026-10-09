@@ -1,0 +1,735 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/digital_business_trends_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/digital_business_trends_company_profile.js
+@@ -0,0 +1,732 @@
++/**
++ * "FELLA Business" deck — rebuilt with pptxgenjs.
++ * Run: node 04c6f4e5-3255-4b6e-af23-c3b8dae8d544_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- design tokens
++const INK = '111111'; // accent2 — headline / logo black
++const ACCENT = 'EA4A26'; // accent1 — brand orange
++const GHOST = 'BFBFBF'; // bg1 lumMod 75% — the muted second title line
++const BODY = '595959'; // tx1 lumMod 65% — body copy
++const RULE = '808080'; // bg1 lumMod 50% — hairline separators
++const PANEL = 'F2F2F2'; // bg1 lumMod 95% — cards / map fill
++const WHITE = 'FFFFFF';
++
++const HEAD = 'Lora'; // theme major font
++const SANS = 'Lato'; // theme minor font
++const SANS_L = 'Lato Light';
++
++// pptxgenjs rewrites shadow numbers in place, so hand each shape its own copy.
++const shadow = () => ({ type: 'outer', color: '000000', opacity: 0.17, blur: 23, offset: 0, angle: 90 });
++
++// Shared text recipes -------------------------------------------------------
++const t = (o) => Object.assign({ margin: 0, valign: 'top', fontFace: SANS }, o);
++
++/** 44/54/60/80pt serif headline (first line ink, second line ghost grey). */
++const titleText = (o) =>
++    t(Object.assign(
++        { fontFace: HEAD, bold: true, fontSize: 44, color: INK, lineSpacingMultiple: 0.9 }, o
++    ));
++
++/** 16pt bold sub-heading (from the "Subtitle" placeholder style). */
++const subHead = (o) =>
++    t(Object.assign({ fontSize: 16, bold: true, color: INK, lineSpacingMultiple: 1.0 }, o));
++
++/** Label/number lifted from a "Title" placeholder: 90% leading, no bullet. */
++const titleLabel = (o) => t(Object.assign({ lineSpacingMultiple: 0.9, color: INK }, o));
++
++/** 10pt italic light body paragraph. */
++const bodyCopy = (o) =>
++    t(Object.assign(
++        { fontFace: SANS_L, fontSize: 10, italic: true, color: BODY, lineSpacingMultiple: 1.5 },
++        o
++    ));
++
++// Repeated lorem strings ----------------------------------------------------
++const LOREM_A =
++    'Vestibulum sapien quam, posuere a tempor ut, feugiat fringilla sem. Maecenas et faucibus ' +
++    'felis. Aliquam erat volutpat. Duis ut enim quis odio aliquet consectetur. Proin eros felis, ' +
++    'lobortis et sapien at, scelerisque laoreet massa. Aenean in felis semper, aliquam felis quis, ' +
++    'venenatis lacus.';
++const LOREM_SHORT =
++    'Vestibulum sapien quam, posuere a tempor ut, feugiat fringilla sem. Maecenas et faucibus ' +
++    'felis. Aliquam erat volutpat. Duis ut enim quis odio aliquet consectetur.';
++const LOREM_VIVAMUS =
++    'Vivamus laoreet tincidunt nulla, vitae mollis nulla fermentum a. Praesent nec leo nec augue ' +
++    'accumsan ultrices. Nunc malesuada sagittis massa.';
++const LOREM_RHONCUS =
++    'Nam rhoncus leo non turpis commodo vulputate. Nam quam arcu, vehicula nec ligula sit amet, ' +
++    'ullamcorper hendrerit mi.';
++const TESTIMONIAL =
++    '\u201C Integer sed dolor consectetur, ultricies velit venenatis, dictum erat. Donec ' +
++    'condimentum dictum orci sit amet fringilla. Aenean dapibus quam id risus dapibus, quis ' +
++    'facilisis ipsum facilisis. \u201C';
++
++// ---------------------------------------------------------------- primitives
++
++/** Pill outline used by the PRESENTATION / BUSINESS tags. */
++function pill(slide, x, y, label) {
++    slide.addShape('roundRect', {
++        x, y, w: 1.5717, h: 0.4468, fill: { type: 'none' },
++        line: { color: ACCENT, width: 1 }, rectRadius: 0.2234,
++    });
++    slide.addText(label, titleLabel({
++        x, y: y + 0.1525, w: 1.5717, h: 0.1418, fontSize: 11, align: 'center',
++    }));
++}
++
++/** The 2x2 black square mark (0.523 x 0.528 overall). */
++function squareMark(slide, x, y, color = INK) {
++    for (const dx of [0, 0.2729]) {
++        for (const dy of [0, 0.2776]) {
++            slide.addShape('rect', { x: x + dx, y: y + dy, w: 0.25, h: 0.25, fill: { color } });
++        }
++    }
++}
++
++/** Header + footer furniture shared by every slide. */
++function chrome(slide, { pageLabel } = {}) {
++    const wordmark = (y, text) => slide.addText(text, titleLabel({
++        x: 0.3614, y, w: 1.0831, h: 0.2719, fontFace: HEAD, fontSize: 20, bold: true,
++    }));
++    slide.addShape('line', { x: 0.375, y: 0.3195, w: 0.4089, h: 0, line: { color: INK, width: 2 } });
++    wordmark(0.3404, 'FELLA.');
++    pill(slide, 11.5273, 0.2425, 'PRESENTATION');
++    if (!pageLabel) return; // the cover slide has no footer band
++    pill(slide, 11.5273, 6.8107, 'BUSINESS');
++    slide.addShape('line', {
++        x: 1.1875, y: 7.0341, w: 10.3398, h: 0, line: { color: ACCENT, width: 0.5 },
++    });
++    wordmark(6.8981, pageLabel);
++}
++
++/** Two stacked serif words: dark line above, grey line below (separate boxes). */
++function stackedTitle(slide, x, y, dark, ghost, { size = 44, w = 3.5865, gap = 0.5064 } = {}) {
++    slide.addText(dark, titleText({ x, y, w, h: 0.5275, fontSize: size }));
++    slide.addText(ghost, titleText({ x, y: y + gap, w, h: 0.5275, fontSize: size, color: GHOST }));
++}
++
++/** Same two-tone headline, but as one wrapped two-paragraph block. */
++function stackedTitleBlock(slide, x, y, w, h, dark, ghost) {
++    slide.addText([
++        { text: dark, options: { color: INK, breakLine: true } },
++        { text: ghost, options: { color: GHOST } },
++    ], titleText({ x, y, w, h }));
++}
++
++/**
++ * Empty picture placeholder inherited from the layout: a small picture glyph
++ * (frame + sun + mountain) centred in the slot, captioned "Image Here".
++ */
++function imageSlot(slide, x, y, w, h, captionSize = 18) {
++    const cx = x + w / 2;
++    const cy = y + h / 2;
++    slide.addShape('rect', {
++        x: cx - 0.437, y: cy - 0.34, w: 0.874, h: 0.68,
++        fill: { color: WHITE }, line: { color: '7F7F7F', width: 1 },
++    });
++    slide.addShape('rect', {
++        x: cx - 0.377, y: cy - 0.283, w: 0.754, h: 0.566,
++        fill: { type: 'none' }, line: { color: 'BFBFBF', width: 0.75 },
++    });
++    slide.addShape('ellipse', {
++        x: cx - 0.29, y: cy - 0.222, w: 0.153, h: 0.153, fill: { color: 'F0A93B' },
++    });
++    slide.addShape('triangle', {
++        x: cx - 0.34, y: cy + 0.05, w: 0.36, h: 0.22, fill: { color: '5B9BD5' },
++    });
++    slide.addShape('triangle', {
++        x: cx - 0.17, y: cy - 0.06, w: 0.51, h: 0.33, fill: { color: '5B9BD5' },
++    });
++    slide.addText('Image Here', t({
++        x, y: cy - 0.16, w, h: 0.32, fontSize: captionSize, color: INK, align: 'center', wrap: false,
++    }));
++}
++
++/** Stand-in for a bitmap photo: flat grey block at the picture's own bounds. */
++function photoSlot(slide, x, y, w, h, color = '808080') {
++    slide.addShape('rect', { x, y, w, h, fill: { color } });
++    slide.addText('[image]', t({
++        x, y: y + h / 2 - 0.15, w, h: 0.3, fontSize: 11, color: WHITE, align: 'center',
++    }));
++}
++
++/** Grey picture-frame card (outer panel with a white window punched out). */
++function frameCard(slide, x, y, w, h) {
++    slide.addShape('rect', { x, y, w, h, fill: { color: PANEL } });
++    slide.addShape('rect', {
++        x: x + 0.14065 * w, y: y + 0.12534 * h,
++        w: 0.71872 * w, h: 0.64055 * h, fill: { color: WHITE },
++    });
++}
++
++/** Thin circled down-arrow used on the services / testimonial rows. */
++function downloadIcon(slide, x, y, size = 0.256) {
++    slide.addShape('ellipse', {
++        x, y, w: size, h: size, fill: { type: 'none' }, line: { color: INK, width: 0.75 },
++    });
++    slide.addShape('line', {
++        x: x + size / 2, y: y + 0.055, w: 0, h: size - 0.13,
++        line: { color: INK, width: 0.75, endArrowType: 'triangle' },
++    });
++}
++
++/** Five-star rating strip (filled count in orange, remainder black). */
++function stars(slide, x, y, filled = 4, total = 5) {
++    for (let i = 0; i < total; i++) {
++        slide.addShape('star5', {
++            x: x + i * 0.2508, y, w: 0.2003, h: 0.2003,
++            fill: { color: i < filled ? ACCENT : INK },
++        });
++    }
++}
++
++// ---------------------------------------------------------------- slide builders
++
++function slideCover(pptx) {
++    const s = pptx.addSlide();
++    chrome(s);
++    s.addText('FELLA', titleText({ x: 1.6667, y: 1.5599, w: 10, h: 1.0127, fontSize: 80, align: 'center' }));
++    s.addText('BUSINESS', titleText({
++        x: 1.6667, y: 2.4464, w: 10, h: 1.0127, fontSize: 80, color: GHOST, align: 'center',
++    }));
++    s.addText(
++        'Exploring Business Potential in the Digital Era: Analysis of Latest Trends, ' +
++        'Market Opportunities, and Success Strategies',
++        bodyCopy({ x: 4.5485, y: 3.8253, w: 4.2363, h: 1.0127, fontSize: 14, align: 'center' })
++    );
++
++    // "Let's See" call-to-action button
++    s.addShape('roundRect', {
++        x: 5.3614, y: 5.3776, w: 2.6106, h: 0.5625, fill: { color: ACCENT }, rectRadius: 0.28125,
++    });
++    s.addText("Let's See", titleLabel({
++        x: 5.6927, y: 5.5299, w: 1.5938, h: 0.2578, fontFace: HEAD, fontSize: 20, color: WHITE,
++    }));
++    s.addShape('line', {
++        x: 7.349, y: 5.6562, w: 0.2917, h: 0, line: { color: WHITE, width: 1, endArrowType: 'arrow' },
++    });
++
++    // black corner wedges, bottom-left and bottom-right
++    s.addShape('rtTriangle', { x: 0, y: 6.4797, w: 1.0203, h: 1.0203, fill: { color: INK } });
++    s.addShape('rtTriangle', {
++        x: 12.313, y: 6.4797, w: 1.0203, h: 1.0203, fill: { color: INK }, rotate: 270,
++    });
++    squareMark(s, 6.4053, 6.4797);
++}
++
++function slideWelcome(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '2024' });
++    stackedTitle(s, 1.6667, 1.5599, 'Welcome', 'Message');
++    s.addText('Business', subHead({ x: 1.6667, y: 3.5693, w: 1.0917, h: 0.256 }));
++    s.addText(
++        'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam enim metus, dictum ac ' +
++        'varius sodales, scelerisque eget libero. Sed rutrum odio faucibus, porta urna quis, ' +
++        'pharetra ipsum. Vivamus tristique hendrerit quam, nec volutpat nisi ullamcorper ac. ' +
++        'Suspendisse tempus vitae sem et elementum. ',
++        bodyCopy({ x: 1.6667, y: 3.8936, w: 3.6944, h: 1.2453 })
++    );
++    s.addText(LOREM_A, bodyCopy({ x: 6.0417, y: 3.8936, w: 3.6944, h: 1.2453 }));
++    squareMark(s, 11.5273, 4.6114);
++    imageSlot(s, 1.6667, 6.0694, 3.6944, 1.4306);
++    imageSlot(s, 6.0417, 6.0694, 3.6944, 1.4306);
++}
++
++function slideAgenda(pptx) {
++    const rows = [
++        { y: 1.5599, title: 'About Our Fella', num: '01' },
++        { y: 2.5938, title: 'Vision & Mission', num: '02' },
++        { y: 3.622, title: 'Fella Timeline', num: '03' },
++        { y: 4.6502, title: 'Fella Services', num: '04' },
++        { y: 5.6785, title: 'Meet The Team', num: '05' },
++    ];
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '2024' });
++    stackedTitle(s, 1.6667, 1.5599, 'Table Of', 'Content');
++    rows.forEach((row, i) => {
++        s.addText(row.title, subHead({ x: 7.5972, y: row.y, w: 1.9028, h: 0.256 }));
++        s.addText(row.num, subHead({ x: 9.7639, y: row.y, w: 1.9028, h: 0.256, align: 'right' }));
++        s.addText('Lorem ipsum dolor sit amet.',
++            bodyCopy({ x: 7.5972, y: row.y + 0.3243, w: 1.7292, h: 0.256 }));
++        if (i < rows.length - 1) {
++            s.addShape('line', {
++                x: 7.5972, y: row.y + 0.7363, w: 4.0694, h: 0, line: { color: RULE, width: 0.5 },
++            });
++        }
++    });
++    squareMark(s, 1.6667, 4.3306);
++    imageSlot(s, 3.169, 4.3306, 2.0841, 2.0841);
++}
++
++function slideAbout(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '01' });
++    stackedTitle(s, 1.6667, 1.5599, 'About Our', 'Fella');
++    s.addText('is Target Audience through Digital Marketing',
++        subHead({ x: 6.0417, y: 3.3645, w: 2.2083, h: 0.771 }));
++    s.addText(LOREM_A, bodyCopy({ x: 6.0417, y: 4.2791, w: 3.6944, h: 1.2453 }));
++    squareMark(s, 11.5273, 4.9969);
++    imageSlot(s, 1.6667, 3.3645, 3.1667, 4.1355);
++}
++
++function slideMission(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '02' });
++    stackedTitle(s, 1.6667, 1.5599, 'Our', 'Mission');
++    [['Mission 1', 1.6667], ['Mission 2', 6.0417]].forEach(([label, x]) => {
++        s.addText(label, subHead({ x, y: 4.098, w: 2.2083, h: 0.2438 }));
++        s.addText(LOREM_A, bodyCopy({ x, y: 4.4854, w: 3.6944, h: 1.2453 }));
++    });
++    squareMark(s, 11.5273, 5.2032);
++    [6.0417, 7.8353, 9.629].forEach((x) => imageSlot(s, x, 1.5599, 1.6287, 1.6287));
++}
++
++function slideVision(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '02' });
++    stackedTitle(s, 3.5679, 1.1408, 'Our', 'Vision', { size: 60, gap: 0.7445 });
++    [['Vision 1', 3.5679], ['Vision 2', 7.026]].forEach(([label, x]) => {
++        s.addText(label, subHead({ x, y: 4.3114, w: 2.2083, h: 0.2438 }));
++        s.addText(LOREM_A, bodyCopy({ x, y: 4.6988, w: 2.8663, h: 1.6317 }));
++    });
++    squareMark(s, 11.5273, 5.2032);
++    imageSlot(s, -1.334, 1.166, 4.0215, 5.1562);
++    imageSlot(s, 9.5112, 1.166, 2.0161, 2.0161);
++}
++
++/** Shared body of the two timeline slides; `nodes` drive the callouts. */
++function timelineSlide(pptx, { pageLabel, railX, railW, hub, hubMark, nodes }) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel });
++    stackedTitle(s, 1.6667, 1.5599, 'Fella', 'Timeline');
++    s.addShape('ellipse', {
++        x: hub, y: 3.3078, w: 1.873, h: 1.873, fill: { type: 'none' }, line: { color: INK, width: 1 },
++    });
++    squareMark(s, hubMark, 3.9806);
++    s.addShape('line', { x: railX, y: 4.2443, w: railW, h: 0, line: { color: INK, width: 1 } });
++    nodes.forEach((n) => {
++        const below = n.side === 'below';
++        s.addShape('ellipse', {
++            x: n.x, y: 4.0117, w: 0.4652, h: 0.4652,
++            fill: { color: WHITE }, line: { color: INK, width: 1 },
++        });
++        s.addShape('line', {
++            x: n.x + 0.2326, y: below ? 4.4769 : 3.1419, w: 0, h: 0.8698,
++            line: { color: INK, width: 1 },
++        });
++        const ty = below ? 4.6873 : 2.2443;
++        s.addText(n.label, subHead({ x: n.textX, y: ty, w: 2.2083, h: 0.2438 }));
++        s.addText(LOREM_A, bodyCopy({ x: n.textX, y: ty + 0.3874, w: 3.6944, h: 1.2453 }));
++    });
++}
++
++function slideTimelineOne(pptx) {
++    timelineSlide(pptx, {
++        pageLabel: '03', railX: 3.5397, railW: 9.7937, hub: 1.6667, hubMark: 2.3418,
++        nodes: [
++            { x: 4.498, textX: 5.1583, label: 'First Time', side: 'below' },
++            { x: 7.9424, textX: 8.6027, label: 'Second Time', side: 'above' },
++        ],
++    });
++}
++
++function slideTimelineTwo(pptx) {
++    timelineSlide(pptx, {
++        pageLabel: '04', railX: 0, railW: 9.7937, hub: 9.7937, hubMark: 10.4688,
++        nodes: [
++            { x: 1.6667, textX: 2.327, label: 'Third Time', side: 'below' },
++            { x: 5.1111, textX: 5.7714, label: 'Fourth Time', side: 'above' },
++        ],
++    });
++}
++
++function slideServices(pptx) {
++    const rows = [
++        { y: 3.2393, title: 'Digital Strategy Consulting', num: '01', iconY: 3.5748,
++          note: 'Preparing a digital strategy tailored to your business needs.' },
++        { y: 4.2281, title: 'User Experience Design', num: '02', iconY: 4.5636,
++          note: 'Intuitive and attractive interface design to enhance user experience.' },
++        { y: 5.2169, title: 'Data Analytics Solutions', num: '03', iconY: 5.5546,
++          note: 'In-depth data analysis to support informed decision making.' },
++    ];
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '05' });
++    stackedTitle(s, 4.8734, 1.5599, 'Fella', 'Services');
++    rows.forEach((row) => {
++        s.addText(row.title, subHead({ x: 4.8734, y: row.y, w: 3.2153, h: 0.256 }));
++        s.addText(row.num, subHead({ x: 9.7639, y: row.y, w: 1.9028, h: 0.256, align: 'right' }));
++        s.addText(row.note, bodyCopy({ x: 4.8734, y: row.y + 0.3243, w: 4.6875, h: 0.256 }));
++        s.addShape('line', {
++            x: 4.8734, y: row.y + 0.7362, w: 6.7932, h: 0, line: { color: RULE, width: 0.5 },
++        });
++        downloadIcon(s, 11.4106, row.iconY);
++    });
++    squareMark(s, 11.144, 1.599);
++    imageSlot(s, 0, 1.5599, 3.8101, 4.3932);
++}
++
++function slideTeam(pptx) {
++    const people = [
++        { cardX: 5.8217, photoX: 6.0764, photoW: 2.5051, name: 'Kyrie Petrakis', nameX: 6.4748, roleX: 6.7847 },
++        { cardX: 8.8636, photoX: 9.0131, photoW: 2.7525, name: 'Lars Peeters', nameX: 9.5167, roleX: 9.8266 },
++    ];
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '06' });
++    stackedTitle(s, 1.6667, 1.5599, 'Meet The', 'Team');
++    people.forEach((p) => frameCard(s, p.cardX, 2.4371, 2.8031, 3.1452));
++    people.forEach((p) => {
++        photoSlot(s, p.photoX, 1.8494, p.photoW, 3.0084);
++        s.addText(p.name, subHead({ x: p.nameX, y: 4.9703, w: 1.4969, h: 0.256, align: 'center' }));
++        s.addText('Marketing', bodyCopy({ x: p.roleX, y: 5.1937, w: 0.8771, h: 0.256, align: 'center' }));
++    });
++    s.addText('Talent & conservation', subHead({ x: 1.6667, y: 3.7144, w: 2.5694, h: 0.2438 }));
++    s.addText(LOREM_SHORT, bodyCopy({ x: 1.6667, y: 4.0811, w: 3.0, h: 0.7767 }));
++    squareMark(s, 1.6667, 5.6822);
++}
++
++function slideLeader(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '06' });
++    stackedTitle(s, 1.6667, 1.5672, 'Meet The', 'Leader', { size: 54, gap: 0.6838 });
++    frameCard(s, 8.2431, 1.5678, 3.8979, 4.3736);
++    photoSlot(s, 8.8652, 1.3171, 2.9947, 3.5964);
++    s.addText('Kyrie Petrakis', subHead({
++        x: 9.2248, y: 5.1544, w: 1.9858, h: 0.3587, fontSize: 20, align: 'center',
++    }));
++    s.addText('Marketing', bodyCopy({
++        x: 9.6106, y: 5.4445, w: 1.214, h: 0.2499, fontSize: 12, align: 'center',
++    }));
++    s.addText('Talent & conservation', subHead({ x: 4.3447, y: 4.1141, w: 1.9185, h: 0.5275 }));
++    s.addText(LOREM_SHORT, bodyCopy({ x: 4.3447, y: 5.1561, w: 3.0, h: 0.7767 }));
++    squareMark(s, 1.6667, 5.6822);
++}
++
++function slideBreak(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '2024' });
++    s.addText('Break', titleText({ x: 7.1688, y: 1.5599, w: 3.7257, h: 1.0127, fontSize: 80 }));
++    s.addText('Slide', titleText({
++        x: 7.1688, y: 2.4464, w: 3.7257, h: 1.0127, fontSize: 80, color: GHOST,
++    }));
++    s.addText([
++        { text: '"In the midst of chaos, there is also opportunity."', options: { breakLine: true } },
++        { text: '\u2014 Sun Tzu', options: { paraSpaceBefore: 10 } },
++    ], bodyCopy({ x: 7.1688, y: 3.8958, w: 4.0211, h: 0.6226, fontSize: 14, lineSpacingMultiple: 1.0 }));
++    squareMark(s, 7.1688, 5.4472);
++    imageSlot(s, 1.6667, 0, 4.4979, 5.9747);
++}
++
++function slideSwot(pptx) {
++    const cards = [
++        { x: 0.5485, badgeX: 1.7164, letter: 'S', title: 'Strengths' },
++        { x: 3.6557, badgeX: 4.8236, letter: 'W', title: 'Weaknesses' },
++        { x: 6.7629, badgeX: 7.9248, letter: 'O', title: 'Opportunities' },
++        { x: 9.8701, badgeX: 11.038, letter: 'T', title: 'Threats' },
++    ];
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '08' });
++    s.addText([
++        { text: 'SWOT ', options: { color: INK } },
++        { text: 'Analysis', options: { color: GHOST } },
++    ], titleText({ x: 3.8734, y: 1.2273, w: 5.5865, h: 0.5275, align: 'center' }));
++    cards.forEach((c) => {
++        s.addShape('roundRect', {
++            x: c.x, y: 2.3028, w: 2.9147, h: 3.8055, fill: { color: PANEL }, rectRadius: 0.4858,
++        });
++        s.addText(c.title, subHead({ x: c.x + 0.3473, y: 2.8901, w: 2.2201, h: 0.2438, align: 'center' }));
++        s.addText(LOREM_SHORT,
++            bodyCopy({ x: c.x + 0.3473, y: 3.3178, w: 2.2201, h: 1.212, align: 'center' }));
++        s.addShape('roundRect', {
++            x: c.badgeX, y: 5.0296, w: 0.5789, h: 0.5789, fill: { color: INK }, rectRadius: 0.0965,
++        });
++        s.addText(c.letter, t({
++            x: c.badgeX, y: 5.0296, w: 0.5789, h: 0.5789,
++            fontFace: HEAD, fontSize: 18, bold: true, color: WHITE, align: 'center', valign: 'middle',
++        }));
++    });
++}
++
++function slideGallery(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '09' });
++    stackedTitle(s, 1.6667, 1.5599, 'Gallery', 'Fella', { w: 2.5 });
++    s.addText('- In our journey, we are proud to work with diverse clients from various industries.',
++        subHead({ x: 1.6667, y: 3.3793, w: 2.0278, h: 1.3211 }));
++    s.addText(
++        'Vestibulum sapien quam, posuere a tempor ut, feugiat fringilla sem. Maecenas et faucibus ' +
++        'felis. Aliquam erat volutpat. Duis ut enim quis odio.',
++        bodyCopy({ x: 1.6667, y: 4.9238, w: 2.6389, h: 0.7767 })
++    );
++    [5.5139, 8.7778].forEach((x) => {
++        imageSlot(s, x, 1.5599, 2.8889, 2.8889);
++        s.addText(LOREM_VIVAMUS, bodyCopy({ x, y: 4.9238, w: 2.8889, h: 0.7767 }));
++    });
++}
++
++function slidePricing(pptx) {
++    const tiers = [
++        { x: 1.9473, name: 'Basic', price: '$99.99' },
++        { x: 5.2093, name: 'Advanced', price: '$199.99' },
++        { x: 8.4713, name: 'Premium', price: '$299.99' },
++    ];
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '10' });
++    imageSlot(s, 0, 0, 13.3333, 2.9911); // layout placeholder sits under the heading
++    s.addText([
++        { text: 'Pricing ', options: { color: INK } },
++        { text: 'List', options: { color: WHITE } },
++    ], titleText({ x: 3.8734, y: 1.0395, w: 5.5865, h: 0.5275, align: 'center' }));
++    tiers.forEach((tier) => {
++        s.addShape('roundRect', {
++            x: tier.x, y: 2.1914, w: 2.9147, h: 3.8055,
++            fill: { color: WHITE }, rectRadius: 0.4858, shadow: shadow(),
++        });
++        s.addText(tier.name,
++            subHead({ x: tier.x + 0.3473, y: 2.7788, w: 2.2201, h: 0.2438, align: 'center' }));
++        s.addText(LOREM_SHORT,
++            bodyCopy({ x: tier.x + 0.3473, y: 3.2064, w: 2.2201, h: 1.212, align: 'center' }));
++        s.addText(tier.price, subHead({
++            x: tier.x + 0.3473, y: 4.6567, w: 2.2201, h: 0.5789, fontSize: 36, align: 'center',
++        }));
++        s.addShape('roundRect', {
++            x: tier.x + 0.6002, y: 5.7075, w: 1.7143, h: 0.5789,
++            fill: { color: INK }, rectRadius: 0.28945,
++        });
++        s.addText('Book Now', titleLabel({
++            x: tier.x + 0.6002, y: 5.7075, w: 1.7143, h: 0.5789,
++            fontFace: HEAD, fontSize: 18, bold: true, color: WHITE, align: 'center', valign: 'middle',
++        }));
++    });
++}
++
++/** Flat stand-in for the laptop mockup bitmap (lid, screen and tapered base). */
++function laptopMockup(slide) {
++    slide.addShape('roundRect', {
++        x: 3.926, y: 2.206, w: 5.481, h: 3.68, fill: { color: '1E1E1E' }, rectRadius: 0.11,
++    });
++    slide.addShape('rect', { x: 4.079, y: 2.428, w: 5.175, h: 3.233, fill: { color: WHITE } });
++    slide.addShape('ellipse', { x: 6.646, y: 2.29, w: 0.04, h: 0.04, fill: { color: '4C4C4C' } });
++    slide.addShape('roundRect', {
++        x: 3.274, y: 5.897, w: 6.785, h: 0.222, fill: { color: 'CFD0D2' }, rectRadius: 0.06,
++    });
++    slide.addShape('roundRect', {
++        x: 6.09, y: 6.083, w: 1.15, h: 0.05, fill: { color: '9FA1A3' }, rectRadius: 0.025,
++    });
++}
++
++/** Flat stand-in for the smartphone mockup bitmap. */
++function phoneMockup(slide) {
++    slide.addShape('roundRect', {
++        x: 1.512, y: 1.027, w: 2.831, h: 5.341, fill: { color: '141414' }, rectRadius: 0.36,
++    });
++    slide.addShape('rect', { x: 2.87, y: 1.06, w: 1.44, h: 0.744, fill: { color: '6B6B6B' } });
++    slide.addShape('rect', { x: 1.748, y: 1.804, w: 2.387, h: 3.787, fill: { color: WHITE } });
++    // earpiece slot, front camera and the home button below the screen
++    slide.addShape('roundRect', {
++        x: 2.72, y: 1.43, w: 0.5, h: 0.06, fill: { color: '2E2E2E' }, rectRadius: 0.03,
++    });
++    slide.addShape('ellipse', { x: 2.86, y: 1.24, w: 0.09, h: 0.09, fill: { color: '2A3550' } });
++    slide.addShape('roundRect', {
++        x: 2.708, y: 5.72, w: 0.44, h: 0.44,
++        fill: { type: 'none' }, line: { color: '3A3A3A', width: 1 }, rectRadius: 0.12,
++    });
++    // side buttons on the left edge
++    [1.95, 2.4, 2.75].forEach((y) => slide.addShape('roundRect', {
++        x: 1.47, y, w: 0.06, h: y === 1.95 ? 0.2 : 0.32, fill: { color: '2E2E2E' }, rectRadius: 0.03,
++    }));
++}
++
++/** Two mockup slides share the same numbered feature card. */
++function featureCard(slide, card) {
++    slide.addShape('roundRect', {
++        x: card.x, y: card.y, w: card.w, h: card.h,
++        fill: { color: WHITE }, rectRadius: 0.17358 * Math.min(card.w, card.h), shadow: shadow(),
++    });
++    slide.addText(card.num, titleLabel({
++        x: card.numX, y: card.numY, w: card.numW, h: 0.3996,
++        fontFace: HEAD, fontSize: card.numSize, color: ACCENT, align: 'center',
++    }));
++    slide.addText(card.title, titleLabel({
++        x: card.titleX, y: card.titleY, w: 2.087, h: 0.2202,
++        fontSize: 16, bold: true, color: '000000', align: 'center',
++    }));
++    slide.addText(card.body, bodyCopy({
++        x: card.bodyX, y: card.bodyY, w: card.bodyW, h: card.bodyH, align: 'center',
++    }));
++}
++
++function slideMockupWeb(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '11' });
++    laptopMockup(s);
++    imageSlot(s, 4.0957, 2.4306, 5.1595, 3.225);
++    s.addText([
++        { text: 'Unique ', options: { color: INK } },
++        { text: 'Mockup', options: { color: GHOST } },
++    ], titleText({ x: 3.8734, y: 1.0395, w: 5.5865, h: 0.5275, align: 'center' }));
++    [
++        { x: 1.1875, num: '01', numX: 2.4578, title: 'Website', titleX: 1.6678, bodyX: 1.6678 },
++        { x: 9.0982, num: '02', numX: 10.3686, title: 'Information', titleX: 9.5785, bodyX: 9.5785 },
++    ].forEach((c) => featureCard(s, {
++        x: c.x, y: 2.7302, w: 3.0476, h: 2.6259,
++        num: c.num, numX: c.numX, numY: 3.1028, numW: 0.5069, numSize: 28,
++        title: c.title, titleX: c.titleX, titleY: 3.6522,
++        body: LOREM_RHONCUS, bodyX: c.bodyX, bodyY: 3.9456, bodyW: 2.087, bodyH: 0.9632,
++    }));
++}
++
++function slideMockupMobile(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '11' });
++    phoneMockup(s);
++    imageSlot(s, 1.7431, 1.7804, 2.4051, 3.8053);
++    stackedTitleBlock(s, 8.734, 3.145, 3.3449, 2.2131, 'Unique ', 'Mockup');
++    s.addText(LOREM_VIVAMUS, bodyCopy({ x: 5.8414, y: 1.6924, w: 2.8889, h: 0.7767 }));
++    [
++        { x: 3.071, num: '01', numX: 3.7266, title: 'Mobile', titleX: 3.2251, bodyX: 3.3407 },
++        { x: 5.6873, num: '02', numX: 6.3429, title: 'Info', titleX: 5.8414, bodyX: 5.957 },
++    ].forEach((c) => featureCard(s, {
++        x: c.x, y: 3.1621, w: 2.3466, h: 2.2131,
++        num: c.num, numX: c.numX, numY: 3.4727, numW: 1.0725, numSize: 36,
++        title: c.title, titleX: c.titleX, titleY: 4.0555,
++        body: 'Nam rhoncus leo non turpis commodo vulputate. Nam quam arcu, vehicula nec ligula',
++        bodyX: c.bodyX, bodyY: 4.3643, bodyW: 1.8559, bodyH: 0.9632,
++    }));
++}
++
++/**
++ * The "unique maps" artwork is 24 freeform regions in the source deck; each is
++ * approximated here by a soft rectangle at the same slide coordinates.
++ */
++const MAP_REGIONS = [
++    [4.335, 1.367, 1.120, 1.218], [5.248, 1.373, 1.035, 1.350],
++    [1.737, 1.624, 0.940, 0.990], [2.289, 1.637, 0.993, 1.142],
++    [3.089, 1.804, 0.956, 1.225], [3.870, 1.900, 1.078, 1.365],
++    [1.379, 2.407, 1.049, 1.114], [2.697, 2.441, 0.654, 1.234],
++    [4.922, 2.466, 1.279, 1.042, WHITE], [5.964, 2.532, 1.218, 1.100],
++    [2.155, 2.631, 0.629, 1.011], [3.991, 2.639, 1.226, 1.035, ACCENT],
++    [7.093, 2.749, 0.869, 1.285], [3.156, 2.854, 1.017, 1.075],
++    [1.714, 3.062, 0.793, 1.029], [4.046, 3.213, 1.571, 0.857, ACCENT],
++    [6.599, 3.230, 0.948, 1.322], [5.266, 3.259, 1.482, 0.964],
++    [1.188, 3.314, 0.942, 0.673], [2.238, 3.546, 0.968, 0.543],
++    [3.468, 3.805, 1.168, 1.646], [4.222, 3.805, 1.101, 0.992],
++    [5.724, 3.856, 1.135, 1.035], [4.710, 4.162, 1.419, 1.002],
++];
++
++function slideMaps(pptx) {
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '11' });
++    MAP_REGIONS.forEach(([x, y, w, h, color]) => {
++        s.addShape('roundRect', {
++            x, y, w, h, fill: { color: color || PANEL },
++            line: { color: WHITE, width: 1.5 }, rectRadius: 0.12,
++        });
++    });
++    stackedTitleBlock(s, 9.1351, 2.2072, 3.3449, 2.2131, 'Unique ', 'Maps');
++    s.addShape('roundRect', {
++        x: 1.2164, y: 3.9365, w: 2.8501, h: 2.2131,
++        fill: { color: WHITE }, rectRadius: 0.3841, shadow: shadow(),
++    });
++    s.addText('5000+', titleLabel({
++        x: 1.4335, y: 4.3307, w: 2.4471, h: 0.3996,
++        fontFace: HEAD, fontSize: 48, color: ACCENT, align: 'center',
++    }));
++    s.addText('Our Users', titleLabel({
++        x: 1.6092, y: 5.0286, w: 2.087, h: 0.2202,
++        fontSize: 16, bold: true, color: '000000', align: 'center',
++    }));
++    s.addText('Nam rhoncus leo non turpis commodo vulputate. Nam quam arcu,',
++        bodyCopy({ x: 1.5527, y: 5.2716, w: 2.2076, h: 0.6762, align: 'center' }));
++    s.addText(LOREM_VIVAMUS, bodyCopy({ x: 9.1401, y: 4.1833, w: 2.3568, h: 1.1096 }));
++}
++
++function slideTestimonial(pptx) {
++    const rows = [
++        { y: 3.0035, name: 'Richard Sanchez', rule: 4.3906, icon: 3.799 },
++        { y: 4.7088, name: 'Jonathan Patterson', rule: 6.0958, icon: 5.5043 },
++    ];
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '12' });
++    stackedTitle(s, 1.6667, 1.3242, 'Client', 'Testimonial');
++    rows.forEach((row) => {
++        s.addText(row.name, subHead({ x: 3.4068, y: row.y, w: 3.2153, h: 0.256 }));
++        s.addText(TESTIMONIAL, bodyCopy({ x: 3.4068, y: row.y + 0.3243, w: 4.6875, h: 0.7272 }));
++        stars(s, 10.4633, row.y);
++        s.addShape('line', {
++            x: 1.6667, y: row.rule, w: 10, h: 0, line: { color: RULE, width: 0.5 },
++        });
++        downloadIcon(s, 11.4106, row.icon);
++    });
++    rows.forEach((row) => imageSlot(s, 1.6667, row.y, 1.1667, 1.1667, 20));
++}
++
++function slideThanks(pptx) {
++    const contacts = [
++        { label: 'Phone:', x: 7.4828, lw: 0.7669, value: '+123-456-7890', vx: 7.4788, vw: 1.4219, y: 3.4196 },
++        { label: 'Website:', x: 9.2553, lw: 0.7229, value: 'www.yourwebsite.com', vx: 9.2513, vw: 1.3354, y: 3.4196 },
++        { label: 'Address', x: 7.4828, lw: 0.7669, y: 3.9714,
++          value: '+ABC Solutions Inc. 123 Main Street Suite 456 Cityville, State 78901 United States',
++          vx: 7.4788, vw: 3.1013, vh: 0.5884 },
++    ];
++    const s = pptx.addSlide();
++    chrome(s, { pageLabel: '2024' });
++    s.addText('Thank', titleText({ x: 1.7764, y: 1.5599, w: 3.7257, h: 1.0127, fontSize: 80 }));
++    s.addText('You', titleText({
++        x: 1.7764, y: 2.4464, w: 3.7257, h: 1.0127, fontSize: 80, color: GHOST,
++    }));
++    s.addText(
++        'Aenean a pharetra urna. Ut a elit non nulla viverra tincidunt. Nam sit amet consequat ' +
++        'nibh. Fusce non lacinia ligula. Nunc eget libero id justo eleifend congue. Quisque ' +
++        'sollicitudin orci vel nibh eleifend condimentum. Ut cursus maximus tempor.',
++        bodyCopy({ x: 1.7764, y: 3.8958, w: 4.0211, h: 1.0316 })
++    );
++    squareMark(s, 1.7764, 5.4472);
++    imageSlot(s, 8.2497, 1.1724, 5.0837, 5.1553);
++
++    s.addShape('roundRect', {
++        x: 6.9288, y: 2.4342, w: 4.208, h: 2.6316, fill: { color: ACCENT }, rectRadius: 0.4386,
++    });
++    s.addText('Get In Touch', t({
++        x: 7.4788, y: 2.7943, w: 2.6825, h: 0.4468,
++        fontSize: 18, bold: true, color: WHITE, lineSpacingMultiple: 1.5,
++    }));
++    contacts.forEach((c) => {
++        s.addText(c.label, t({
++            x: c.x, y: c.y, w: c.lw, h: 0.1994, fontSize: 10, bold: true, color: WHITE,
++        }));
++        s.addText(c.value, bodyCopy({
++            x: c.vx, y: c.y + 0.146, w: c.vw, h: c.vh || 0.2585, color: PANEL,
++        }));
++    });
++}
++
++// ---------------------------------------------------------------- assembly
++
++function build() {
++    const pptx = new PptxGenJS();
++    pptx.defineLayout({ name: 'FELLA_16x9', width: 13.3333, height: 7.5 });
++    pptx.layout = 'FELLA_16x9';
++    pptx.theme = { headFontFace: HEAD, bodyFontFace: SANS };
++    pptx.author = 'FELLA';
++    pptx.title = 'FELLA Business';
++
++    [
++        slideCover, slideWelcome, slideAgenda, slideAbout, slideMission, slideVision,
++        slideTimelineOne, slideTimelineTwo, slideServices, slideTeam, slideLeader, slideBreak,
++        slideSwot, slideGallery, slidePricing, slideMockupWeb, slideMockupMobile, slideMaps,
++        slideTestimonial, slideThanks,
++    ].forEach((fn) => fn(pptx));
++
++    return pptx;
++}
++
++build()
++    .writeFile({
++        fileName: path.join(__dirname, '04c6f4e5-3255-4b6e-af23-c3b8dae8d544_grok_final.pptx'),
++    })
++    .then((f) => console.log('wrote', f));

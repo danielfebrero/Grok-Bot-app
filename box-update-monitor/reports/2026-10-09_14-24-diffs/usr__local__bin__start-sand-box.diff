@@ -1,0 +1,10 @@
+--- 2026-10-09_14-11:/usr/local/bin/start-sand-box
++++ 2026-10-09_14-24:/usr/local/bin/start-sand-box
+@@ -1194,6 +1194,7 @@
+ }
+ 
+ if ensure_real_dir /home/box/chrome-profile/Default; then
++	chown_tree_to_box --shallow /home/box/chrome-profile
+ 	chown_tree_to_box --shallow --mode 700 /home/box/chrome-profile/Default
+ fi
+ 

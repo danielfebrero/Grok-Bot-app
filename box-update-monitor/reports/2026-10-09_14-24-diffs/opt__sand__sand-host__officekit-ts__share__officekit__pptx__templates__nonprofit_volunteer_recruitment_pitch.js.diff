@@ -1,0 +1,970 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/nonprofit_volunteer_recruitment_pitch.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/nonprofit_volunteer_recruitment_pitch.js
+@@ -0,0 +1,967 @@
++#!/usr/bin/env node
++/**
++ * "Volutta - Volunteer Presentation Template" rebuilt with pptxgenjs.
++ * 40 slides, 13.333in x 7.5in (16:9).
++ *
++ * Raster artwork in the source deck (small line-art icons and one laptop photo)
++ * is redrawn here as native pptxgenjs placeholder shapes.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens
++ * ------------------------------------------------------------------ */
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++const C = {
++  orangeLt: 'FFB666', // start of every orange gradient
++  orange: 'F98E19', // end of every orange gradient
++  orangeMid: 'FCA240', // flat stand-in for the orange gradient
++  purpleLt: 'A87FCC',
++  purple: '5F52C1',
++  purpleMid: '8469C7', // flat stand-in for the purple gradient
++  ink: '282F3D',
++  slate: '546177',
++  gray: '8895AA',
++  pale: 'AEBFDD',
++  white: 'FFFFFF',
++  blue: '4472C4', // theme accent1, visible through the closing slide
++  shOrange: 'A05C11', // shadow tint under orange / white-on-orange elements
++  shSlate: '546177', // shadow tint under neutral elements
++  shPurple: '7651A0',
++};
++
++const F = {
++  display: 'Poppins',
++  displaySemi: 'Poppins SemiBold',
++  displayXBold: 'Poppins ExtraBold',
++  body: 'Nunito Sans',
++  bodySemi: 'Nunito Sans SemiBold',
++  bodyBlack: 'Nunito Sans Black',
++};
++
++/** Reusable run styles. `wrap` mirrors the source text boxes' autofit setting. */
++const ST = {
++  eyebrow: { fontFace: F.bodySemi, fontSize: 13, bold: true, color: C.gray, wrap: false },
++  h1: { fontFace: F.display, fontSize: 36, bold: true, color: C.ink, wrap: false },
++  h2: { fontFace: F.display, fontSize: 44, bold: true, color: C.ink, wrap: false },
++  body: { fontFace: F.body, fontSize: 13, color: C.slate, lineSpacingMultiple: 1.5, wrap: true },
++  bold13: { fontFace: F.body, fontSize: 13, bold: true, color: C.slate, wrap: false },
++  plain13: { fontFace: F.body, fontSize: 13, color: C.gray, wrap: false },
++  stat: { fontFace: F.bodyBlack, fontSize: 32, bold: true, color: C.white, wrap: false },
++  button: { fontFace: F.displaySemi, fontSize: 13, bold: true, color: C.white, wrap: false },
++};
++
++/* ------------------------------------------------------------------ *
++ * Colour helpers
++ * ------------------------------------------------------------------ */
++
++const hex2rgb = (h) => [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16));
++const rgb2hex = (c) => c.map((v) => Math.round(v).toString(16).padStart(2, '0').toUpperCase()).join('');
++
++/** Blend two hex colours; t=0 -> a, t=1 -> b. */
++function mix(a, b, t) {
++  const x = hex2rgb(a);
++  const y = hex2rgb(b);
++  return rgb2hex(x.map((v, i) => v + (y[i] - v) * t));
++}
++
++/** Flatten a translucent colour onto an opaque backdrop (white unless given). */
++function over(hex, alphaPct, base) {
++  return mix(base || C.white, hex, alphaPct / 100);
++}
++
++/**
++ * Fresh drop-shadow options. pptxgenjs rewrites the object it is handed,
++ * so every shape needs its own copy.
++ */
++function shadow(color, blurPt, offsetPt, opacity) {
++  return { type: 'outer', color, blur: blurPt, offset: offsetPt, angle: 90, opacity };
++}
++
++const shSoft = () => shadow(C.shOrange, 30, 10, 0.4); // white shapes over orange
++const shDeep = () => shadow(C.shOrange, 30, 20, 0.4); // hero discs
++const shNeutral = () => shadow(C.shSlate, 30, 10, 0.4); // white shapes over white
++const shBadge = () => shadow(C.shSlate, 40, 10, 0.4); // small icon badges
++
++/* ------------------------------------------------------------------ *
++ * Geometry helpers
++ * ------------------------------------------------------------------ */
++
++let S; // pptx.ShapeType, bound once the deck exists
++const NO_LINE = { type: 'none' };
++
++/** Unit-square outlines. pptxgenjs wants absolute inches, so they get scaled. */
++const PATH_SQUARE = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }, { close: true }];
++
++const PATH_CIRCLE = (() => {
++  const k = 0.27615; // cubic control offset for a quarter circle
++  const c = (x1, y1, x2, y2, x, y) => ({ x, y, curve: { type: 'cubic', x1, y1, x2, y2 } });
++  return [
++    { x: 0.5, y: 0 },
++    c(0.5 + k, 0, 1, 0.5 - k, 1, 0.5),
++    c(1, 0.5 + k, 0.5 + k, 1, 0.5, 1),
++    c(0.5 - k, 1, 0, 0.5 + k, 0, 0.5),
++    c(0, 0.5 - k, 0.5 - k, 0, 0.5, 0),
++    { close: true },
++  ];
++})();
++
++const PATH_LEFT_BULGE = [
++  { x: 0, y: 0 }, { x: 0.8282, y: 0 }, { x: 0.8413, y: 0.0165 },
++  { x: 1, y: 0.4782, curve: { type: 'cubic', x1: 0.9415, y1: 0.1483, x2: 1, y2: 0.3071 } },
++  { x: 0.8019, y: 0.988, curve: { type: 'cubic', x1: 1, y1: 0.6705, x2: 0.926, y2: 0.8476 } },
++  { x: 0.7906, y: 1 }, { x: 0, y: 1 }, { close: true },
++];
++const PATH_TOP_DOME = [
++  { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0.6703 }, { x: 0.9752, y: 0.7053 },
++  { x: 0.5, y: 1, curve: { type: 'cubic', x1: 0.8339, y1: 0.8932, x2: 0.672, y2: 1 } },
++  { x: 0.0248, y: 0.7053, curve: { type: 'cubic', x1: 0.328, y1: 1, x2: 0.1661, y2: 0.8932 } },
++  { x: 0, y: 0.6703 }, { close: true },
++];
++const PATH_RIGHT_BULGE = [
++  { x: 0.2345, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0.2914, y: 1 }, { x: 0.267, y: 0.983 },
++  { x: 0, y: 0.4787, curve: { type: 'cubic', x1: 0.1039, y1: 0.8631, x2: 0, y2: 0.6817 } },
++  { x: 0.2149, y: 0.0166, curve: { type: 'cubic', x1: 0, y1: 0.2982, x2: 0.0821, y2: 0.1348 } },
++  { close: true },
++];
++const PATH_BARREL = [
++  { x: 0.1344, y: 0 }, { x: 0.8656, y: 0 }, { x: 0.8701, y: 0.0069 },
++  { x: 1, y: 0.5, curve: { type: 'cubic', x1: 0.9508, y1: 0.1372, x2: 1, y2: 0.3102 } },
++  { x: 0.8701, y: 0.9931, curve: { type: 'cubic', x1: 1, y1: 0.6898, x2: 0.9508, y2: 0.8628 } },
++  { x: 0.8656, y: 1 }, { x: 0.1344, y: 1 }, { x: 0.1299, y: 0.9931 },
++  { x: 0, y: 0.5, curve: { type: 'cubic', x1: 0.0492, y1: 0.8628, x2: 0, y2: 0.6898 } },
++  { x: 0.1299, y: 0.0069, curve: { type: 'cubic', x1: 0, y1: 0.3102, x2: 0.0492, y2: 0.1372 } },
++  { close: true },
++];
++const PATH_CARD_SWOOSH_BOTTOM = [
++  { x: 0, y: 0 }, { x: 0.0356, y: 0.0022 },
++  { x: 0.9905, y: 0.9548, curve: { type: 'cubic', x1: 0.4873, y1: 0.0581, x2: 0.8596, y2: 0.4416 } },
++  { x: 1, y: 1 }, { x: 0.1062, y: 1 },
++  { x: 0, y: 0.8705, curve: { type: 'cubic', x1: 0.0475, y1: 1, x2: 0, y2: 0.942 } },
++  { close: true },
++];
++const PATH_CARD_SWOOSH_TOP = [
++  { x: 0.0092, y: 0 }, { x: 0.9137, y: 0 },
++  { x: 1, y: 0.0878, curve: { type: 'cubic', x1: 0.9614, y1: 0, x2: 1, y2: 0.0393 } },
++  { x: 1, y: 0.988 }, { x: 0.9516, y: 0.9955 },
++  { x: 0.8634, y: 1, curve: { type: 'cubic', x1: 0.9226, y1: 0.9985, x2: 0.8932, y2: 1 } },
++  { x: 0, y: 0.1215, curve: { type: 'cubic', x1: 0.3865, y1: 1, x2: 0, y2: 0.6067 } },
++  { x: 0.0045, y: 0.0316, curve: { type: 'cubic', x1: 0, y1: 0.0911, x2: 0.0015, y2: 0.0612 } },
++  { close: true },
++];
++
++/** Scale a unit-square path to inches. */
++function scalePath(points, w, h) {
++  return points.map((p) => {
++    if (p.close) return p;
++    const q = { x: p.x * w, y: p.y * h };
++    if (p.curve) {
++      q.curve = { type: 'cubic', x1: p.curve.x1 * w, y1: p.curve.y1 * h, x2: p.curve.x2 * w, y2: p.curve.y2 * h };
++    }
++    if (p.moveTo) q.moveTo = true;
++    return q;
++  });
++}
++
++/** Turn cubic segments into a polyline over the unit square. */
++function flattenPath(points, perCurve) {
++  const out = [];
++  let cur = { x: 0, y: 0 };
++  points.forEach((p) => {
++    if (p.close) return;
++    if (p.curve) {
++      const { x1, y1, x2, y2 } = p.curve;
++      for (let i = 1; i <= perCurve; i++) {
++        const t = i / perCurve;
++        const u = 1 - t;
++        out.push({
++          x: u * u * u * cur.x + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * p.x,
++          y: u * u * u * cur.y + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * p.y,
++        });
++      }
++    } else {
++      out.push({ x: p.x, y: p.y });
++    }
++    cur = { x: p.x, y: p.y };
++  });
++  return out;
++}
++
++/**
++ * Clip a closed polygon to one half-plane (Sutherland-Hodgman), keeping the
++ * side where `inside` holds and inserting the exact crossing points.
++ */
++function clipHalfPlane(poly, inside, cross) {
++  const out = [];
++  poly.forEach((cur, i) => {
++    const prev = poly[(i + poly.length - 1) % poly.length];
++    const curIn = inside(cur);
++    const prevIn = inside(prev);
++    if (curIn !== prevIn) out.push(cross(prev, cur));
++    if (curIn) out.push(cur);
++  });
++  return out;
++}
++
++/**
++ * Gradient direction as a 0..1 parameter over the unit square. 'vertical' is
++ * the deck's `a:lin ang="5400000"`, 'diagonal' its `ang="2700000"`.
++ */
++const AXIS = {
++  vertical: (p) => p.y,
++  diagonal: (p) => (p.x + p.y) / 2,
++};
++
++/** Clip a unit polygon to the slice of `axis` between t0 and t1. */
++function pathSlice(poly, axis, t0, t1) {
++  const at = (a, b, t) => {
++    const f = (t - axis(a)) / (axis(b) - axis(a));
++    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
++  };
++  const lo = clipHalfPlane(poly, (p) => axis(p) >= t0, (a, b) => at(a, b, t0));
++  return clipHalfPlane(lo, (p) => axis(p) <= t1, (a, b) => at(a, b, t1));
++}
++
++/* ------------------------------------------------------------------ *
++ * Drawing helpers
++ * ------------------------------------------------------------------ */
++
++/**
++ * Paint a gradient by slicing a silhouette into flat colour bands.
++ * Neighbouring bands overlap slightly so no seam shows through.
++ */
++function gradShape(slide, x, y, w, h, unitPath, c1, c2, steps = 24, axisName = 'vertical') {
++  const axis = AXIS[axisName];
++  const poly = flattenPath(unitPath, 40);
++  const overlap = 0.6 / steps;
++  for (let i = 0; i < steps; i++) {
++    const t0 = i / steps;
++    const t1 = Math.min(1, (i + 1) / steps + overlap);
++    const pts = pathSlice(poly, axis, t0, t1);
++    if (pts.length < 3) continue;
++    // Re-frame the slice into its own bounding box so it can be placed absolutely.
++    const xs = pts.map((p) => p.x);
++    const ys = pts.map((p) => p.y);
++    const bx = Math.min.apply(null, xs);
++    const by = Math.min.apply(null, ys);
++    const bw = Math.max(1e-4, Math.max.apply(null, xs) - bx);
++    const bh = Math.max(1e-4, Math.max.apply(null, ys) - by);
++    const local = pts.map((p) => ({ x: (p.x - bx) / bw, y: (p.y - by) / bh }));
++    local.push({ close: true });
++    slide.addShape(S.custGeom, {
++      x: x + bx * w, y: y + by * h, w: bw * w, h: bh * h,
++      points: scalePath(local, bw * w, bh * h),
++      fill: { color: mix(c1, c2, i / (steps - 1)) }, line: NO_LINE,
++    });
++  }
++}
++
++/** Gradient-filled rectangle. */
++const gradBox = (slide, x, y, w, h, c1, c2, steps, axis) =>
++  gradShape(slide, x, y, w, h, PATH_SQUARE, c1, c2, steps || 30, axis);
++
++/** Gradient-filled disc. */
++const gradCircle = (slide, x, y, d, c1, c2, steps, axis) =>
++  gradShape(slide, x, y, d, d, PATH_CIRCLE, c1, c2, steps || 22, axis);
++
++/** Flat-filled silhouette. */
++function freeform(slide, x, y, w, h, unitPath, color, transparency) {
++  slide.addShape(S.custGeom, {
++    x, y, w, h,
++    points: scalePath(unitPath, w, h),
++    fill: transparency === undefined ? { color } : { color, transparency },
++    line: NO_LINE,
++  });
++}
++
++/** Filled circle. */
++function circle(slide, x, y, d, fill, opts) {
++  slide.addShape(S.ellipse, Object.assign({ x, y, w: d, h: d, fill, line: NO_LINE }, opts || {}));
++}
++
++/** Outlined (unfilled) circle — the deck's decorative rings. */
++function ring(slide, x, y, d, color, widthPt, transparency) {
++  slide.addShape(S.ellipse, {
++    x, y, w: d, h: d,
++    fill: { type: 'none' },
++    line: { color, width: widthPt, transparency },
++  });
++}
++
++/** Pale grey halo ring repeated on nearly every content slide. */
++const haloRing = (slide, x, y, d) => ring(slide, x, y, d || 5.994, C.pale, 100, 80);
++/** Thick orange arc peeking in from a slide edge. */
++const orangeRing = (slide, x, y, d) => ring(slide, x, y, d || 2.416, C.orangeMid, 40);
++
++/** Placeholder standing in for a small line-art icon graphic. */
++function icon(slide, x, y, w, h, color) {
++  const s = Math.min(w, h);
++  slide.addShape(S.roundRect, {
++    x: x + w * 0.1, y: y + h * 0.1, w: w * 0.8, h: h * 0.8,
++    rectRadius: s * 0.2,
++    fill: { type: 'none' },
++    line: { color, width: Math.max(0.75, s * 2) },
++  });
++}
++
++/** Circular icon badge: coloured disc with an icon placeholder centred on it. */
++function badge(slide, x, y, d, discColor, iconColor, sh) {
++  circle(slide, x, y, d, { color: discColor }, sh ? { shadow: sh } : {});
++  const s = d * 0.5;
++  icon(slide, x + (d - s) / 2, y + (d - s) / 2, s, s, iconColor);
++}
++
++/** Rectangle standing in for a photograph. */
++function imagePlaceholder(slide, x, y, w, h, caption) {
++  slide.addShape(S.rect, { x, y, w, h, fill: { color: 'EDEFF4' }, line: { color: C.pale, width: 1 } });
++  slide.addText(caption || '[image]', {
++    x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle',
++    fontFace: F.body, fontSize: 12, color: C.gray,
++  });
++}
++
++/** Text box. `text` may be a string or an array of paragraphs. */
++function T(slide, text, x, y, w, h, opts) {
++  const runs = Array.isArray(text)
++    ? text.map((t, i) => ({ text: t, options: { breakLine: i < text.length - 1 } }))
++    : text;
++  slide.addText(runs, Object.assign({ x, y, w, h, valign: 'top' }, opts || {}));
++}
++
++/** Style shorthand: merge a base style with per-call overrides. */
++const st = (base, extra) => Object.assign({}, base, extra || {});
++
++/** Pill button with its caption (the "volutta.com" call-to-action). */
++function pillButton(slide, x, y, w, label, labelX, labelW) {
++  slide.addShape(S.roundRect, {
++    x, y, w, h: 0.551, rectRadius: 0.2755,
++    fill: { color: C.orangeMid }, line: NO_LINE, shadow: shSoft(),
++  });
++  T(slide, label, labelX, y + 0.115, labelW, 0.32, st(ST.button, { align: 'center' }));
++}
++
++/** Bottom-right credit line plus the hairline rule along the slide foot. */
++function footer(slide) {
++  T(slide, 'Volutta Presentation Template', 9.185, 6.875, 3.08, 0.32,
++    st(ST.button, { align: 'right', color: C.orangeLt }));
++  slide.addShape(S.line, { x: 0, y: 7.049, w: 9.092, h: 0, line: { color: C.orangeLt, width: 2 } });
++}
++
++/** Funding progress bar used by the three "Our Project" slides. */
++function progressBar(slide, x, y, filledW, pct, pctX, pctW) {
++  slide.addShape(S.rect, { x, y, w: 4.787, h: 0.197, fill: { color: C.pale, transparency: 60 }, line: NO_LINE });
++  gradBox(slide, x, y, filledW, 0.197, C.orangeLt, C.orange, 12, 'diagonal');
++  slide.addShape(S.roundRect, {
++    x: pctX - 0.06, y: y + 0.289, w: 0.707, h: 0.575, rectRadius: 0.14,
++    fill: { color: C.purpleMid }, line: NO_LINE,
++  });
++  T(slide, pct, pctX, y + 0.476, pctW, 0.32, st(ST.bold13, { align: 'center', color: C.white }));
++}
++
++/** Section-divider slide: big white disc holding a title and subtitle. */
++function sectionDisc(slide, discX, discY, discD, title, titleBox, subtitle, subBox, sh) {
++  circle(slide, discX, discY, discD, { color: C.white }, { shadow: sh || shDeep() });
++  T(slide, title, titleBox[0], titleBox[1], titleBox[2], titleBox[3], st(ST.h2, { align: 'center' }));
++  T(slide, subtitle, subBox[0], subBox[1], subBox[2], subBox[3], st(ST.bold13, { align: 'center' }));
++}
++
++/** "eyebrow + big heading" pair used on most content slides. */
++function heading(slide, eyebrow, ex, ey, ew, title, tx, ty, tw, th, color) {
++  const tint = color ? { color } : {};
++  T(slide, eyebrow, ex, ey, ew, 0.32, st(ST.eyebrow, tint));
++  T(slide, title, tx, ty, tw, th, st(ST.h1, tint));
++}
++
++/* ------------------------------------------------------------------ *
++ * Per-slide builders
++ * ------------------------------------------------------------------ */
++
++const slides = [];
++
++// 1 — Cover
++slides.push((s) => {
++  gradBox(s, 0, 0, SLIDE_W, SLIDE_H, C.orangeLt, C.orange, 34);
++  [[-0.275, -3.192, 13.884], [1.208, -1.709, 10.918], [2.55, -0.366, 8.233]]
++    .forEach(([x, y, d]) => circle(s, x, y, d, { color: C.white, transparency: 93 }));
++  T(s, 'Volutta', 4.339, 2.742, 4.655, 1.447,
++    { align: 'center', wrap: false, fontFace: F.displayXBold, fontSize: 80, bold: true, color: C.white });
++  T(s, 'Volunteer Presentation Template', 5.179, 4.007, 2.975, 0.32, st(ST.bold13, { color: C.white }));
++  badge(s, 1.129, 4.96, 0.65, C.white, C.orange, shSoft());
++  badge(s, 11.78, 2.932, 0.65, C.white, C.orange, shSoft());
++  badge(s, 9.482, 6.055, 0.65, C.purpleMid, C.white, shNeutral());
++  badge(s, 2.542, 1.892, 0.65, C.purpleMid, C.white, shNeutral());
++});
++
++// 2 — "About" divider
++slides.push((s) => {
++  gradBox(s, 0, 0, SLIDE_W, SLIDE_H, over(C.orangeLt, 80), over(C.orange, 90), 34);
++  sectionDisc(s, 4.331, 1.414, 4.671, 'About', [5.566, 3.169, 2.202, 0.841], 'About Us', [6.174, 4.011, 0.986, 0.32]);
++  badge(s, 4.048, 3.425, 0.65, C.purpleMid, C.white);
++  ring(s, -1.312, -1.519, 3.738, C.white, 60, 80);
++  ring(s, 11.589, 4.331, 3.738, C.white, 60, 80);
++});
++
++// 3 — More People, More Impact
++slides.push((s) => {
++  haloRing(s, 4.611, 4.312);
++  heading(s, 'The Volutta', 1.417, 0.75, 1.168, ['More People,', 'More Impact'], 1.417, 1.07, 3.501, 1.313);
++  T(s, [
++    'Volutta is the most effective way to recruit highly qualified volunteers for your nonprofit.',
++    '',
++    'We match you with people who are passionate about and committed to your cause, and who can help when and where you need them.',
++  ], 1.417, 2.702, 3.385, 2.699, ST.body);
++  pillButton(s, 1.516, 5.808, 1.912, 'volutta.com', 1.81, 1.324);
++  footer(s);
++  orangeRing(s, 12.527, 2.702);
++  orangeRing(s, -1.61, 1.175);
++});
++
++// 4 — Testimonial
++slides.push((s) => {
++  haloRing(s, -3.044, 3.34);
++  orangeRing(s, 11.551, 3.178);
++  orangeRing(s, -1.208, -0.948);
++  T(s, '143.2K', 1.417, 1.793, 1.781, 0.707, ST.h1);
++  T(s, 'Nonprofits Rely On Volutta', 1.417, 2.5, 2.437, 0.32, ST.eyebrow);
++  T(s, '"It\'s a portal for volunteers to connect with the nonprofits, and in a way, it\'s its own search engine specifically for volunteer opportunities."',
++    1.417, 3.14, 3.302, 1.386, st(ST.body, { italic: true }));
++  T(s, 'DANIEL MARLAY, MAKE-A-WISH GREATER BAY AREA', 1.417, 4.84, 3.302, 0.73, st(ST.body, { bold: true }));
++  badge(s, 5.56, 1.468, 0.65, C.purpleMid, C.white);
++  footer(s);
++});
++
++// 5 — Recruiting solutions
++slides.push((s) => {
++  haloRing(s, 8.681, 2.379);
++  gradBox(s, 1.167, 0, 11, 5.38, over(C.orangeLt, 40), over(C.orange, 90), 26);
++  s.addShape(S.rect, {
++    x: 2.143, y: 2.857, w: 9.047, h: 3.643,
++    fill: { color: C.white }, line: NO_LINE, shadow: shadow(C.ink, 45, 15, 0.25),
++  });
++  T(s, ['Volutta Recruiting', 'Solutions For Nonprofits'], 3.476, 3.286, 6.382, 1.313, st(ST.h1, { align: 'center' }));
++  T(s, 'Get Connected To Qualified Volunteers When & Where You Need Them', 3.602, 4.599, 6.129, 0.32,
++    st(ST.eyebrow, { align: 'center' }));
++  T(s, 'With more volunteers and more volunteer opportunities than any other service, Volutta is how good people and good causes get connected',
++    3.602, 5.239, 6.129, 0.73, st(ST.body, { align: 'center' }));
++  badge(s, 1.818, 5.055, 0.65, C.purpleMid, C.white);
++  footer(s);
++});
++
++// 6 — Bringing People Together
++slides.push((s) => {
++  haloRing(s, 2.196, -2.354);
++  orangeRing(s, 11.809, -0.69);
++  orangeRing(s, -1.771, 3.809);
++  T(s, ['Bringing People', 'Together'], 1.376, 1.358, 4.257, 1.313, ST.h1);
++  T(s, [
++    'We believe everyone should have the chance to make a difference. That\'s why we make it easy for good people and good causes to connect.',
++    '',
++    'We\'ve connected millions of people with a great place to volunteer and helped tens of thousands of organizations better leverage volunteers to create real impact.',
++  ], 1.376, 2.99, 4.075, 2.699, ST.body);
++  gradCircle(s, 6.536, 0.871, 2.367, C.orangeLt, C.orange);
++  gradCircle(s, 10.754, 4.871, 0.973, C.orangeLt, C.orange, 12);
++  badge(s, 10.827, 4.943, 0.828, C.purpleMid, C.white);
++  footer(s);
++});
++
++// 7 — Who Can Volunteer?
++slides.push((s) => {
++  haloRing(s, -1.675, 3.97);
++  orangeRing(s, -1.249, -0.641);
++  orangeRing(s, 12.861, 2.463);
++  heading(s, 'The Volutta', 5.249, 1.02, 1.168, ['Who Can', 'Volunteer?'], 5.249, 1.34, 3.11, 1.313);
++  T(s, 'Online Volunteering allows the government tap into a wide range of skills and expertise, opening a door to:',
++    5.249, 2.972, 2.754, 1.386, ST.body);
++  [
++    ['1', 'Students', 0.958, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed', 1.012, 1.058],
++    ['2', 'Diaspora', 0.954, 'Volunteer from anywhere incididunt ut labore et dolore', 2.396, 0.73],
++    ['3', 'Retirees', 0.887, 'quis nostrud exercitation ullamco laboris nisi ut aliquip', 3.779, 0.73],
++    ['4', 'Adult', 0.665, 'People who are actively engaged in the labor market', 5.156, 0.73],
++  ].forEach(([n, title, titleW, desc, y, descH]) => {
++    circle(s, 9.021, y, 0.431, { color: C.orangeMid });
++    T(s, n, 9.081, y + 0.057, 0.311, 0.32, st(ST.bold13, { align: 'center', color: C.white }));
++    T(s, title, 9.608, y + 0.056, titleW, 0.32, ST.bold13);
++    T(s, desc, 9.608, y + 0.376, 2.559, descH, ST.body);
++  });
++  footer(s);
++});
++
++// 8 — Our Vision
++slides.push((s) => {
++  gradBox(s, 1.167, 2.934, 4.228, 3.566, C.orangeLt, C.orange, 22, 'diagonal');
++  heading(s, 'The Volutta', 1.825, 3.566, 1.168, 'Our Vision', 1.825, 3.886, 2.863, 0.707, C.white);
++  T(s, 'Volutta vision relies on the power of community, relationships and partnerships.',
++    1.825, 4.912, 2.994, 1.058, st(ST.body, { color: C.white }));
++  badge(s, 5.07, 4.536, 0.65, C.purpleMid, C.white);
++  footer(s);
++  orangeRing(s, 12.376, 3.29);
++});
++
++// 9 — "Team" divider
++slides.push((s) => {
++  gradBox(s, 0, 0, SLIDE_W, SLIDE_H, over(C.orangeLt, 75), over(C.orange, 90), 34);
++  freeform(s, 0, 0, 6.667, 7.5, PATH_LEFT_BULGE, C.white);
++  ring(s, 11.686, 4.782, 3.738, C.white, 60, 80);
++  T(s, 'Team', 1.886, 3.169, 2.013, 0.841, ST.h2);
++  T(s, 'Our Amazing Team', 1.886, 4.011, 1.832, 0.32, ST.bold13);
++  badge(s, 6.342, 3.425, 0.65, C.purpleMid, C.white);
++});
++
++// 10 — Our Team (bubble collage)
++slides.push((s) => {
++  haloRing(s, 0.371, 3.97);
++  haloRing(s, 6.83, -3.105);
++  orangeRing(s, 12.588, 3.477);
++  orangeRing(s, -1.658, 1.061);
++  T(s, 'Our Team', 1.417, 0.708, 2.742, 0.707, ST.h1);
++  T(s, ['See The Great Team Of People', 'Who Make Up The Volutta'], 1.417, 1.415, 2.749, 0.73,
++    st(ST.eyebrow, { lineSpacingMultiple: 1.5 }));
++  [[2.022, 2.516, 3.849], [6.03, 0.533, 2.878], [7.076, 3.933, 2.42], [9.604, 1.954, 1.961]]
++    .forEach(([x, y, d]) => circle(s, x, y, d, { color: C.white }, { shadow: shNeutral() }));
++  badge(s, 0.891, 4.579, 0.65, C.orangeMid, C.white, shBadge());
++  badge(s, 10.627, 5.33, 0.65, C.orangeMid, C.white, shBadge());
++  badge(s, 5.96, 6.028, 0.65, C.purpleMid, C.white, shBadge());
++  badge(s, 4.714, 1.151, 0.65, C.purpleMid, C.white, shBadge());
++  badge(s, 11.065, 1.038, 0.65, C.purpleMid, C.white, shBadge());
++  footer(s);
++});
++
++// 11 — Three leaders
++slides.push((s) => {
++  haloRing(s, 10.525, 0.051);
++  haloRing(s, -1.6, -2.708);
++  orangeRing(s, 12.009, -1.246);
++  [
++    [1.167, 'Jacob Jones', 2.269, 1.18, 'Founder', 2.409, 0.9],
++    [4.974, 'Kristin Watson', 5.936, 1.461, 'CEO', 6.382, 0.57],
++    [8.782, 'Guy Hawkins', 9.815, 1.319, 'Co-Founder', 9.884, 1.18],
++  ].forEach(([cx, name, nx, nw, role, rx, rw]) => {
++    gradCircle(s, cx, 1.39, 3.385, C.orangeLt, C.orange, 22, 'diagonal');
++    T(s, name, nx, 5.151, nw, 0.32, st(ST.bold13, { align: 'center' }));
++    T(s, role, rx, 5.471, rw, 0.32, st(ST.plain13, { align: 'center' }));
++  });
++  footer(s);
++});
++
++// 12 — Our Volunteer (contact grid)
++slides.push((s) => {
++  haloRing(s, -1.747, 4.183);
++  orangeRing(s, -0.975, -1.598);
++  heading(s, 'Lorem Ipsum Dolor Sit Amet', 1.35, 2.091, 2.597, 'Our Volunteer', 1.35, 1.384, 3.829, 0.707);
++  [
++    [2.235, 2.803, 'Jenny Wilson', 1.315, 'jennywilson', 1.171],
++    [2.235, 3.924, 'Robert Fox', 1.131, 'robertfox', 0.954],
++    [2.235, 5.088, 'Jane Cooper', 1.229, 'janecoo', 0.831],
++    [5.347, 2.803, 'Wade Warren', 1.401, 'wadewar', 0.972],
++    [5.347, 3.924, 'Esther Howard', 1.466, 'ehoward', 0.926],
++    [5.347, 5.088, 'John Watt', 1.068, 'johnw', 0.707],
++  ].forEach(([x, y, name, nw, handle, hw]) => {
++    T(s, name, x, y, nw, 0.32, ST.bold13);
++    icon(s, x + 0.066, y + 0.388, 0.212, 0.212, C.purple);
++    T(s, handle, x + 0.279, y + 0.352, hw, 0.32, ST.plain13);
++  });
++  footer(s);
++});
++
++// 13 — "Project" divider
++slides.push((s) => {
++  haloRing(s, 10.79, 2.606);
++  gradShape(s, 0, 0, SLIDE_W, 5.443, PATH_TOP_DOME, over(C.orangeLt, 75), over(C.orange, 90));
++  sectionDisc(s, 4.849, 3.365, 3.635, 'Project', [5.446, 4.602, 2.441, 0.841], 'Our Project', [6.085, 5.443, 1.163, 0.32]);
++  badge(s, 4.527, 4.857, 0.65, C.purpleMid, C.white);
++  orangeRing(s, -0.684, 6.589);
++});
++
++// 14 — Education For Children
++slides.push((s) => {
++  haloRing(s, 3.867, -2.261);
++  orangeRing(s, 11.811, -1.365);
++  gradShape(s, 0, 0, 6.667, 7.5, PATH_LEFT_BULGE, over(C.orangeLt, 75), over(C.orange, 90));
++  heading(s, 'Our Project', 1.417, 2.267, 1.142, ['Education For', 'Children'], 1.417, 2.587, 3.747, 1.313, C.white);
++  T(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    7.302, 2.185, 4.407, 1.714, ST.body);
++  T(s, 'Raised $1,500 from $4,500', 7.302, 4.432, 3.174, 0.402, st(ST.body, { bold: true }));
++  progressBar(s, 7.38, 4.926, 2.872, '60%', 9.956, 0.591);
++  footer(s);
++});
++
++// 15 — Food For Homeless
++slides.push((s) => {
++  circle(s, 1.167, 1.213, 3.635, { color: C.orangeMid }, { shadow: shadow(C.shOrange, 40, 20, 0.2) });
++  gradCircle(s, 1.167, 1.213, 3.635, C.orangeLt, C.orange);
++  T(s, 'Our Project', 2.414, 2.163, 1.142, 0.32, st(ST.eyebrow, { align: 'center', color: C.white }));
++  T(s, ['Food For', 'Homeless'], 1.605, 2.483, 2.758, 1.313, st(ST.h1, { align: 'center', color: C.white }));
++  T(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis ea commodo consequat.',
++    1.167, 5.119, 4.576, 1.386, ST.body);
++  T(s, 'Raised $200 from $2,500', 7.302, 5.121, 3.174, 0.402, st(ST.body, { bold: true }));
++  progressBar(s, 7.38, 5.615, 0.712, '9%', 7.849, 0.482);
++  orangeRing(s, 12.285, 1.655);
++  footer(s);
++});
++
++// 16 — Coronavirus
++slides.push((s) => {
++  haloRing(s, -1.674, -1.714);
++  orangeRing(s, 11.634, -1.511);
++  gradCircle(s, 0.948, 0.75, 6.0, over(C.orangeLt, 75), over(C.orange, 90));
++  circle(s, 2.13, 1.932, 3.635, { color: C.white }, { shadow: shDeep() });
++  T(s, 'Our Project', 3.377, 3.165, 1.142, 0.32, st(ST.eyebrow, { align: 'center' }));
++  T(s, 'Coronavirus', 2.229, 3.485, 3.436, 0.707, st(ST.h1, { align: 'center' }));
++  T(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    7.428, 2.466, 4.864, 1.714, ST.body);
++  T(s, 'Raised $1,500 from $6,000', 7.428, 4.392, 3.174, 0.402, st(ST.body, { bold: true }));
++  progressBar(s, 7.506, 4.886, 1.19, '25%', 8.397, 0.593);
++  footer(s);
++});
++
++// 17 — "Services" divider
++slides.push((s) => {
++  freeform(s, 6.427, 0, 6.907, 7.5, PATH_RIGHT_BULGE, C.pale, 80);
++  gradCircle(s, 2.235, 0.59, 6.0, over(C.orangeLt, 75), over(C.orange, 90));
++  sectionDisc(s, 6.427, 1.414, 4.671, 'Services', [7.315, 3.169, 2.895, 0.841], 'Our Services', [8.129, 4.011, 1.266, 0.32]);
++  badge(s, 6.143, 3.425, 0.65, C.purpleMid, C.white);
++  orangeRing(s, -1.449, 4.331);
++});
++
++// 18 — How To Donate?
++slides.push((s) => {
++  haloRing(s, -1.905, -2.71, 7.185);
++  orangeRing(s, -1.222, 3.662);
++  orangeRing(s, 12.125, -1.208);
++  T(s, 'How To Donate?', 4.508, 0.77, 4.316, 0.707, st(ST.h1, { align: 'center' }));
++  T(s, 'Lorem Ipsum Dolor Sit Amet', 5.368, 1.477, 2.597, 0.32, st(ST.eyebrow, { align: 'center' }));
++  [
++    [2.684, [C.orangeLt, C.orange], C.shOrange, C.orange, 'Drop Donation', 3.615, 1.445, 'Drop donation at drop off center', 2.921, 2.833, 4.125, 3.662, 0.426, 0.457],
++    [7.342, [C.purpleLt, C.purple], C.shPurple, C.purple, 'Pickup', 8.61, 0.772, 'Pickup Donation', 8.225, 1.541, 8.766, 3.704, 0.458, 0.393],
++  ].forEach(([cx, grad, shc, iconColor, title, tx, tw, sub, sx, sw, ix, iy, iw, ih]) => {
++    gradCircle(s, cx, 2.231, 3.307, over(grad[0], 80), over(grad[1], 80));
++    circle(s, cx + 1.146, 3.377, 1.015, { color: C.white }, { shadow: shadow(shc, 50, 20, 0.4) });
++    icon(s, ix, iy, iw, ih, iconColor);
++    T(s, title, tx, 5.864, tw, 0.32, st(ST.bold13, { align: 'center' }));
++    T(s, sub, sx, 6.18, sw, 0.32, st(ST.plain13, { align: 'center' }));
++  });
++  footer(s);
++});
++
++// 19 — Drop Donation
++slides.push((s) => {
++  haloRing(s, -3.099, -2.676);
++  orangeRing(s, 12.125, -1.208);
++  heading(s, 'How To Donate?', 1.417, 1.658, 1.594, 'Drop Donation', 1.417, 1.976, 3.952, 0.707);
++  T(s, 'Please drop the items in:', 1.417, 2.979, 2.227, 0.402, st(ST.body, { fontFace: F.bodySemi, wrap: false }));
++  [
++    ['4140 Parker Rd. Allentown, New Mexico 31134', 3.521, 2.58, 3.655],
++    ['2464 Royal Ln. Mesa, New Jersey 45463', 4.582, 2.167, 4.717],
++  ].forEach(([line, ty, tw, by]) => {
++    badge(s, 1.491, by, 0.461, C.purpleMid, C.white);
++    T(s, line, 2.133, ty, tw, 0.73, st(ST.body, { bold: true }));
++  });
++  footer(s);
++});
++
++// 20 — Pickup Donation
++slides.push((s) => {
++  haloRing(s, -1.31, -3.18);
++  orangeRing(s, 12.349, 0.747);
++  orangeRing(s, -1.557, 4.005);
++  heading(s, 'How To Donate?', 1.167, 2.194, 1.594, ['Pickup', 'Donation'], 1.167, 2.514, 2.597, 1.313);
++  T(s, 'PLACEHOLDER', 1.167, 4.147, 3.174, 0.73, ST.body);
++  s.addShape(S.roundRect, {
++    x: 4.885, y: 5.252, w: 3.578, h: 0.909, rectRadius: 0.1515,
++    fill: { color: C.white }, line: NO_LINE, shadow: shadow(C.shOrange, 50, 20, 0.4),
++  });
++  T(s, 'Contact us for further information', 5.087, 5.482, 3.174, 0.402, st(ST.body, { bold: true, align: 'center' }));
++  footer(s);
++});
++
++// 21 — "Gallery" divider
++slides.push((s) => {
++  gradShape(s, 1.167, 0, 11, 7.5, PATH_BARREL, over(C.orangeLt, 80), over(C.orange, 80), 26);
++  sectionDisc(s, 4.507, 1.591, 4.319, 'Gallery', [5.422, 3.169, 2.49, 0.841], 'Our Activity', [6.061, 4.011, 1.21, 0.32]);
++  badge(s, 4.182, 3.425, 0.65, C.purpleMid, C.white);
++});
++
++// 22 — Photo grid (two tinted discs)
++slides.push((s) => {
++  haloRing(s, 10.336, 2.354);
++  haloRing(s, 1.971, -2.702);
++  orangeRing(s, -1.2, 3.958);
++  gradCircle(s, 3.764, 3.292, 3.208, over(C.orangeLt, 80), over(C.orange, 80));
++  gradCircle(s, 8.958, 3.292, 3.208, over(C.orangeLt, 80), over(C.orange, 80));
++  footer(s);
++});
++
++// 23 — Full-bleed photo mosaic (every frame is empty in the source deck)
++slides.push(() => {});
++
++// 24 — Bubble mosaic
++slides.push((s) => {
++  orangeRing(s, 11.317, 2.714);
++  orangeRing(s, 0.109, 0.614);
++  [[0.714, 0.803, 3.685], [5.416, 2.985, 3.685], [5.029, 0.209, 2.398],
++    [10.118, 3.16, 2.398], [3.148, 4.677, 1.761], [8.511, 1.145, 1.761]]
++    .forEach(([x, y, d]) => circle(s, x, y, d, { color: C.white }, { shadow: shNeutral() }));
++  [[1.639, 5.099], [10.992, 1.408], [4.766, 2.835], [9.535, 5.487]]
++    .forEach(([x, y]) => badge(s, x, y, 0.65, C.purpleMid, C.white, shBadge()));
++  footer(s);
++});
++
++// 25 — Gallery captions
++slides.push((s) => {
++  haloRing(s, 9.853, -0.9);
++  orangeRing(s, -0.927, -0.757);
++  T(s, 'Gallery', 5.631, 0.787, 2.071, 0.707, st(ST.h1, { align: 'center' }));
++  T(s, 'Our Activity', 6.073, 1.487, 1.187, 0.32, st(ST.eyebrow, { align: 'center' }));
++  [[2.258, 1.298, 1.696], [5.974, 1.298, 5.413], [9.803, 1.319, 9.252]].forEach(([tx, tw, dx]) => {
++    T(s, 'Lorem Ipsum', tx, 5.897, tw, 0.32, st(ST.bold13, { align: 'center' }));
++    T(s, 'Lorem ipsum dolor sit amet', dx, 6.216, 2.421, 0.32, st(ST.plain13, { align: 'center' }));
++  });
++  footer(s);
++});
++
++// 26 — Three round photos with captions
++slides.push((s) => {
++  haloRing(s, -1.673, -2.469);
++  orangeRing(s, 12.47, 3.949);
++  [[1.167, 2.21, 1.298, 1.649, 1.438], [4.974, 6.018, 1.298, 5.456, 5.238], [8.782, 9.815, 1.319, 9.263, 9.039]]
++    .forEach(([cx, tx, tw, dx, bx]) => {
++      gradCircle(s, cx, 1.298, 3.385, C.orangeLt, C.orange, 22, 'diagonal');
++      badge(s, bx, 3.79, 0.65, C.purpleMid, C.white, shBadge());
++      T(s, 'Lorem Ipsum', tx, 5.226, tw, 0.32, st(ST.bold13, { align: 'center' }));
++      T(s, 'Lorem ipsum dolor sit amet', dx, 5.546, 2.421, 0.32, st(ST.plain13, { align: 'center' }));
++    });
++  footer(s);
++});
++
++// 27 — "Statistics" divider
++slides.push((s) => {
++  gradBox(s, 0, 0, SLIDE_W, SLIDE_H, C.orangeLt, over(C.orange, 60), 34, 'diagonal');
++  T(s, 'Statistics', 1.133, 2.931, 3.175, 0.841, st(ST.h2, { color: C.white }));
++  T(s, 'Overview & Statistics', 1.133, 3.773, 1.994, 0.32, st(ST.bold13, { color: C.white }));
++});
++
++// 28 — Overview KPIs
++slides.push((s) => {
++  haloRing(s, 3.67, -1.924);
++  orangeRing(s, -1.954, 4.315);
++  orangeRing(s, 12.725, 0.569);
++  T(s, 'Overview', 5.332, 0.75, 2.67, 0.707, st(ST.h1, { align: 'center' }));
++  T(s, 'Last 3 Years', 6.058, 1.457, 1.217, 0.32, st(ST.eyebrow, { align: 'center' }));
++  [
++    [1.401, '14.8M', 2.133, 1.513, 'Volunteers Connected', 1.858, 2.064],
++    [5.176, '129.1K', 5.805, 1.718, 'Non-Profits', 6.069, 1.191],
++    [8.951, '3.9M', 9.818, 1.243, 'Volunteers Needed', 9.535, 1.808],
++  ].forEach(([cx, value, vx, vw, caption, capX, capW]) => {
++    gradBox(s, cx, 2.262, 2.977, 2.977, over(C.orangeLt, 75), over(C.orange, 90), 18);
++    T(s, value, vx, 3.43, vw, 0.64, st(ST.stat, { align: 'center' }));
++    T(s, caption, capX, 5.565, capW, 0.32, st(ST.bold13, { align: 'center' }));
++  });
++  footer(s);
++});
++
++// 29 — Volunteers Connected (bar chart)
++slides.push((s) => {
++  haloRing(s, -2.068, -2.595);
++  orangeRing(s, 12.265, -0.806);
++  heading(s, 'Last 5 Years', 1.167, 1.023, 1.217, ['Volunteers', 'Vonnected'], 1.167, 1.343, 3.051, 1.313);
++  T(s, 'Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.',
++    1.167, 2.975, 3.051, 1.714, ST.body);
++  T(s, '14.8M', 1.167, 5.235, 1.822, 0.774,
++    { align: 'center', wrap: false, fontFace: F.bodyBlack, fontSize: 40, bold: true, color: C.orangeMid });
++  T(s, 'Volunteers Connected', 1.167, 6.009, 2.011, 0.32, st(ST.plain13, { align: 'center' }));
++  const bars = [2105, 4002, 7400, 10200, 14882].map((v, i) => ({
++    name: `Series ${i + 1}`, labels: ['Category 1'], values: [v],
++  }));
++  s.addChart('bar', bars, {
++    x: 5.724, y: 1.859, w: 6.542, h: 4.517,
++    barDir: 'col', barGapWidthPct: 219, barOverlapPct: -55,
++    chartColors: [C.orangeMid, C.purpleMid, C.orangeMid, C.purpleMid, C.orangeMid],
++    showLegend: false, showTitle: false, showValue: false,
++    catAxisHidden: true, catAxisLineShow: false,
++    valAxisLineShow: false, valAxisLabelColor: C.pale,
++    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 12,
++    valGridLine: { color: 'E6E6E6', style: 'solid', size: 0.75 },
++  });
++  footer(s);
++});
++
++// 30 — "Break Slides"
++slides.push((s) => {
++  gradBox(s, 0, 0, SLIDE_W, SLIDE_H, C.orangeLt, C.orange, 34);
++  T(s, ['Break', 'Slides'], 1.162, 2.799, 2.074, 1.582, st(ST.h2, { color: C.white }));
++  T(s, 'Take A Short Break', 1.162, 4.381, 1.841, 0.32, st(ST.bold13, { color: C.white }));
++  badge(s, 4.187, 3.425, 0.65, C.purpleMid, C.white);
++});
++
++// 31 — "Mockup" divider
++slides.push((s) => {
++  gradCircle(s, 0.417, 0, 7.5, over(C.orangeLt, 75), over(C.orange, 90), 24);
++  sectionDisc(s, 2.349, 1.932, 3.635, 'Mockup', [2.794, 3.169, 2.746, 0.841], 'Device Mockup', [3.43, 4.011, 1.473, 0.32]);
++});
++
++// 32 — Online Donation (laptop mockup)
++slides.push((s) => {
++  haloRing(s, -2.608, -0.075);
++  orangeRing(s, 10.829, -1.298, 3.647);
++  heading(s, 'Device Mockup', 1.167, 1.261, 1.454, ['Online', 'Donation'], 1.167, 1.581, 2.597, 1.313);
++  T(s, 'Lorem ipsum dolor sit amet, con sectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
++    1.167, 3.214, 2.946, 1.386, ST.body);
++  pillButton(s, 1.256, 5.219, 1.912, 'volutta.com', 1.55, 1.324);
++  imagePlaceholder(s, 4.797, 1.162, 8.269, 4.878, '[image] laptop mockup');
++  footer(s);
++});
++
++// 33 — Donate From Your Phone
++slides.push((s) => {
++  orangeRing(s, 5.24, -1.248, 3.009);
++  haloRing(s, 7.918, 4.038);
++  heading(s, 'Device Mockup', 1.167, 1.44, 1.454, ['Donate From', 'Your Phone'], 1.167, 1.76, 3.554, 1.313);
++  T(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
++    1.167, 3.393, 3.385, 1.386, ST.body);
++  pillButton(s, 1.269, 5.232, 2.157, 'volutta.com/app', 1.467, 1.762);
++  [[6.046, 0.769, 2.87, 5.731], [9.263, 1.084, 2.555, 5.102]].forEach(([x, y, w, h]) => {
++    s.addShape(S.roundRect, { x, y, w, h, rectRadius: 0.34, fill: { color: C.ink }, line: NO_LINE });
++  });
++  footer(s);
++});
++
++// 34 — "Package" divider (dark)
++slides.push((s) => {
++  gradBox(s, 0, 0, SLIDE_W, SLIDE_H, over(C.slate, 80), over(C.ink, 80), 34);
++  haloRing(s, 3.223, -1.775);
++  gradCircle(s, 3.667, 0.75, 6.0,
++    over(C.orangeLt, 75, over(C.slate, 80)), over(C.orange, 90, over(C.ink, 80)), 24);
++  sectionDisc(s, 4.849, 1.932, 3.635, 'Package', [5.179, 3.219, 2.975, 0.841], 'Donation Package', [5.8, 4.06, 1.734, 0.32]);
++  badge(s, 6.342, 5.243, 0.65, C.purpleMid, C.white);
++  orangeRing(s, -1.402, 3.319);
++  orangeRing(s, 12.44, 0.295);
++});
++
++// 35 — Donation Package (icon row)
++slides.push((s) => {
++  haloRing(s, -3.856, -3.476);
++  orangeRing(s, 10.274, -1.474);
++  T(s, 'Donation Package', 4.184, 0.75, 4.965, 0.707, ST.h1);
++  T(s, 'Lorem Ipsum Dolor Sit Amet Consectetur Adispicing', 4.411, 1.457, 4.511, 0.32, ST.eyebrow);
++  [
++    [2.715, 2.723, 2.352, 2.96, 1.111, 0.953, 'Clothes', 2.49, 0.835, 1.597],
++    [5.947, 3.194, 6.189, 2.883, 0.989, 1.109, 'Food', 6.31, 0.626, 5.313],
++    [9.783, 2.751, 9.907, 3.08, 1.111, 0.714, 'Cash', 10.153, 0.619, 9.155],
++  ].forEach(([dx, dy, ix, iy, iw, ih, title, tx, tw, cx]) => {
++    circle(s, dx, dy, 0.989, { color: C.pale, transparency: 80 });
++    icon(s, ix, iy, iw, ih, C.orangeMid);
++    T(s, title, tx, 4.995, tw, 0.32, st(ST.bold13, { align: 'center' }));
++    T(s, 'Lorem ipsum dolor sit amet consectetur adipising', cx, 5.314, 2.621, 0.73,
++      st(ST.body, { align: 'center', color: C.gray }));
++  });
++  footer(s);
++});
++
++// 36 — Donation Package (split layout)
++slides.push((s) => {
++  haloRing(s, 2.171, -1.767);
++  orangeRing(s, 12.515, -1.048);
++  gradShape(s, 0, 0, 6.667, 7.5, PATH_LEFT_BULGE, over(C.orangeLt, 75), over(C.orange, 90));
++  T(s, ['Donation', 'Package'], 1.167, 2.817, 2.597, 1.313, st(ST.h1, { color: C.white }));
++  T(s, 'Lorem Ipsum Dolor Sit Amet', 1.167, 4.13, 2.549, 0.32, st(ST.eyebrow, { color: C.white }));
++  [['Clothes', 0.988, 0.835, 1.119], ['Food', 3.325, 0.626, 3.397], ['Cash', 5.283, 0.619, 5.456]]
++    .forEach(([title, ty, tw, by]) => {
++      badge(s, 8.513, by, 0.579, C.orangeMid, C.white);
++      T(s, title, 9.185, ty, tw, 0.32, ST.bold13);
++      T(s, 'Lorem ipsum dolor sit amet consectetur adipising', 9.185, ty + 0.32, 2.621, 0.73,
++        st(ST.body, { color: C.gray }));
++    });
++  footer(s);
++});
++
++// 37 — Donation Package (three cards)
++slides.push((s) => {
++  haloRing(s, -3.233, -1.603);
++  haloRing(s, 10.951, -0.268);
++  T(s, 'Donation Package', 4.184, 0.75, 4.965, 0.707, st(ST.h1, { align: 'center' }));
++  T(s, 'Lorem Ipsum Dolor Sit Amet Consectetur Adispicing', 4.411, 1.457, 4.511, 0.32, st(ST.eyebrow, { align: 'center' }));
++  [
++    [1.522, C.orangeMid, 'Clothes', 2.485, 0.835, 2.495, 1.897, 2.38],
++    [5.286, C.purpleMid, 'Food', 6.354, 0.626, 6.26, 5.662, 6.145],
++    [9.051, C.orangeMid, 'Cash', 10.122, 0.619, 10.024, 9.426, 9.909],
++  ].forEach(([cardX, cardColor, title, tx, tw, iconX, textX, swooshX]) => {
++    s.addShape(S.roundRect, {
++      x: cardX, y: 2.543, w: 2.761, h: 3.957, rectRadius: 0.1558,
++      fill: { color: cardColor }, line: NO_LINE,
++    });
++    freeform(s, swooshX, 2.543, 1.902, 1.87, PATH_CARD_SWOOSH_TOP, C.white, 90);
++    freeform(s, cardX, 5.297, 1.467, 1.203, PATH_CARD_SWOOSH_BOTTOM, C.white, 90);
++    icon(s, iconX, 3.51, 0.814, 0.814, C.white);
++    T(s, title, tx, 4.868, tw, 0.32, st(ST.bold13, { align: 'center', color: C.white }));
++    T(s, 'Lorem ipsum dolor', textX, 5.457, 2.01, 0.32, st(ST.plain13, { align: 'center', color: C.white }));
++    T(s, 'Sit amet consect', textX, 5.726, 2.01, 0.32, st(ST.plain13, { align: 'center', color: C.white }));
++  });
++  orangeRing(s, 12.741, 1.521);
++  footer(s);
++});
++
++// 38 — "Contact" divider
++slides.push((s) => {
++  gradBox(s, 0, 0, SLIDE_W, SLIDE_H, C.orangeLt, C.orange, 34);
++  sectionDisc(s, 6.058, 1.932, 3.635, 'Contact', [6.482, 3.169, 2.786, 0.841], 'Get In Touch', [7.239, 4.011, 1.273, 0.32]);
++  badge(s, 9.368, 3.425, 0.65, C.purpleMid, C.white);
++  ring(s, 11.144, -2.825, 5.994, C.white, 100, 80);
++});
++
++// 39 — Contact Us
++slides.push((s) => {
++  haloRing(s, -2.19, -1.762);
++  orangeRing(s, 9.906, 0.989);
++  heading(s, 'Get In Touch', 1.167, 1.307, 1.256, 'Contact Us', 1.167, 1.627, 3.052, 0.707);
++  [
++    ['Esther Howard', 2.756, 2.893, 1.466, 0.32, false],
++    ['1901 Thornridge Cir. Shiloh, Hawaii 81063', 3.679, 3.809, 2.509, 0.539, true],
++    ['(406) 555-0120', 4.691, 4.821, 1.548, 0.32, false],
++    ['esther@volutta.com', 5.614, 5.743, 1.88, 0.32, false],
++  ].forEach(([line, by, ty, tw, th, wraps]) => {
++    badge(s, 1.277, by, 0.579, C.orangeMid, C.white);
++    T(s, line, 2.333, ty, tw, th, st(ST.bold13, { wrap: wraps }));
++  });
++  footer(s);
++});
++
++// 40 — Thank You (orange wash over the blue theme accent)
++slides.push((s) => {
++  s.background = { color: C.blue };
++  gradBox(s, 0, 0, SLIDE_W, SLIDE_H, over(C.orangeLt, 80, C.blue), over(C.orange, 80, C.blue), 34);
++  circle(s, 0.381, -2.536, 12.571, { color: C.white, transparency: 85 });
++  circle(s, 1.964, -0.952, 9.405, { color: C.white, transparency: 85 });
++  circle(s, 3.68, 0.763, 5.974, { color: C.white });
++  T(s, 'Thank You', 4.249, 3.195, 4.835, 1.111,
++    { align: 'center', wrap: false, fontFace: F.displayXBold, fontSize: 60, bold: true, color: C.ink });
++});
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++function build() {
++  const pptx = new PptxGenJS();
++  S = pptx.ShapeType;
++  pptx.defineLayout({ name: 'VOLUTTA_16x9', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'VOLUTTA_16x9';
++  pptx.author = 'Volutta';
++  pptx.title = 'Volutta - Volunteer Presentation Template';
++
++  slides.forEach((draw) => draw(pptx.addSlide()));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '0f6e4b9e-8628-48f3-9f80-23c632f80f0d_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => {
++  console.error(e);
++  process.exit(1);
++});

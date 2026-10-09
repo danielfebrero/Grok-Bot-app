@@ -1,0 +1,760 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/marketing_proposal_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/marketing_proposal_presentation.js
+@@ -0,0 +1,757 @@
++/*
++ * Rebuild of "MARKETING PROPOSAL PRESENTATION" (20 slides, 13.333 x 7.5 in)
++ * using only pptxgenjs + the Node standard library.
++ *
++ * Run:  node 156f147a-178a-473b-b17b-226a3e881b94_grok_final.js
++ * Out:  156f147a-178a-473b-b17b-226a3e881b94_grok_final.pptx (next to this file)
++ *
++ * The source deck holds only empty picture placeholders (it ships with no
++ * raster media at all), so no image-placeholder rectangles are needed.
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Theme
++ * ------------------------------------------------------------------ */
++
++const DARK = '343E3D'; // theme accent1 - charcoal green
++const CYAN = '47FFF8'; // theme accent2
++const BLUE = '0092D7'; // theme accent3
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++
++const HEAD = 'Manrope ExtraBold'; // theme major font
++const BODY = 'Montserrat'; // theme minor font
++
++// pptxgenjs cannot fill *text* with a gradient; the deck's blue->cyan gradient
++// headlines are drawn in the gradient's first stop, which is how they read.
++const GRAD_TXT = BLUE;
++
++const SLIDE_W = 13.333333; // 12192000 EMU
++const SLIDE_H = 7.5;
++
++const DEF_SIZE = 18; // presentation-level default text size
++const GRAD_ANGLE = 315; // every gradient in the deck runs lower-left -> upper-right
++
++/* ------------------------------------------------------------------ *
++ * Colour + geometry helpers
++ * ------------------------------------------------------------------ */
++
++function mix(from, to, t) {
++  const ch = i => {
++    const a = parseInt(from.substr(i, 2), 16);
++    const b = parseInt(to.substr(i, 2), 16);
++    return Math.round(a + (b - a) * t).toString(16).padStart(2, '0').toUpperCase();
++  };
++  return ch(0) + ch(2) + ch(4);
++}
++
++/** Clip a convex polygon against the half-plane  nx*x + ny*y <= d. */
++function clipHalfPlane(poly, nx, ny, d) {
++  const out = [];
++  for (let i = 0; i < poly.length; i++) {
++    const A = poly[i];
++    const B = poly[(i + 1) % poly.length];
++    const da = nx * A[0] + ny * A[1] - d;
++    const db = nx * B[0] + ny * B[1] - d;
++    if (da <= 0) out.push(A);
++    if ((da < 0 && db > 0) || (da > 0 && db < 0)) {
++      const t = da / (da - db);
++      out.push([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]);
++    }
++  }
++  return out;
++}
++
++/**
++ * Linear gradient fill, painted as a fan of slightly overlapping custGeom
++ * bands (pptxgenjs has no gradient fill API).  Fills the rectangle x/y/w/h,
++ * or - when `polys` is given - that list of convex polygons instead.
++ */
++function gradient(slide, o) {
++  const from = o.from || BLUE;
++  const to = o.to || CYAN;
++  const steps = o.steps || Math.max(12, Math.round(Math.max(o.w, o.h) * 9));
++  const rad = ((o.angle === undefined ? GRAD_ANGLE : o.angle) * Math.PI) / 180;
++  const nx = Math.cos(rad);
++  const ny = Math.sin(rad);
++  const shapes = o.polys || [[[o.x, o.y], [o.x + o.w, o.y], [o.x + o.w, o.y + o.h], [o.x, o.y + o.h]]];
++
++  let lo = Infinity;
++  let hi = -Infinity;
++  shapes.forEach(s => s.forEach(p => {
++    const d = nx * p[0] + ny * p[1];
++    if (d < lo) lo = d;
++    if (d > hi) hi = d;
++  }));
++
++  const band = (hi - lo) / steps;
++  const bleed = band * 0.4; // hides hairline seams between adjacent bands
++
++  for (let i = 0; i < steps; i++) {
++    const color = mix(from, to, (i + 0.5) / steps);
++    shapes.forEach(base => {
++      let poly = clipHalfPlane(base, nx, ny, lo + band * (i + 1) + bleed);
++      poly = clipHalfPlane(poly, -nx, -ny, -(lo + band * i - bleed));
++      if (poly.length < 3) return;
++      const xs = poly.map(p => p[0]);
++      const ys = poly.map(p => p[1]);
++      const bx = Math.min.apply(null, xs);
++      const by = Math.min.apply(null, ys);
++      const w = Math.max.apply(null, xs) - bx;
++      const h = Math.max.apply(null, ys) - by;
++      if (w < 0.002 || h < 0.002) return;
++      slide.addShape('custGeom', {
++        x: bx, y: by, w: w, h: h,
++        points: poly
++          .map(p => ({ x: +(p[0] - bx).toFixed(4), y: +(p[1] - by).toFixed(4) }))
++          .concat([{ close: true }]),
++        fill: { color: color },
++      });
++    });
++  }
++}
++
++/** Whole-slide gradient background. */
++function gradientBg(slide) {
++  gradient(slide, { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, steps: 90 });
++}
++
++/* The deck's 5-spoke asterisk logo as a normalised outline, plus a split into
++ * convex pieces (5 blades + the pentagonal core) so it can be gradient-filled. */
++const ASTERISK = [
++  [1, 0.5056], [0.9086, 0.2023], [0.5914, 0.3652], [0.6505, 0], [0.3441, 0],
++  [0.4032, 0.3483], [0.1129, 0.1629], [0, 0.4607], [0.3495, 0.5393],
++  [0.0806, 0.7865], [0.3172, 0.9832], [0.4946, 0.6629], [0.6398, 1],
++  [0.8925, 0.8202], [0.6452, 0.5562],
++];
++const ASTERISK_PARTS = [
++  [14, 0, 1, 2], [2, 3, 4, 5], [5, 6, 7, 8], [8, 9, 10, 11], [11, 12, 13, 14],
++  [2, 5, 8, 11, 14],
++];
++
++function asterisk(slide, x, y, w, h, color) {
++  if (color === 'GRAD') {
++    gradient(slide, {
++      x: x, y: y, w: w, h: h, steps: 12,
++      polys: ASTERISK_PARTS.map(part => part.map(i => [x + ASTERISK[i][0] * w, y + ASTERISK[i][1] * h])),
++    });
++    return;
++  }
++  slide.addShape('custGeom', {
++    x: x, y: y, w: w, h: h,
++    points: ASTERISK
++      .map(p => ({ x: +(p[0] * w).toFixed(4), y: +(p[1] * h).toFixed(4) }))
++      .concat([{ close: true }]),
++    fill: { color: color },
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Content helpers
++ * ------------------------------------------------------------------ */
++
++/** Text box; mirrors the deck's default "top aligned, auto-fit" text frames. */
++function text(slide, body, o) {
++  slide.addText(body, Object.assign({ valign: 'top', fontFace: BODY, fontSize: DEF_SIZE }, o));
++}
++
++/** Run helper: run('text', {runProps}) -> pptxgenjs text object. */
++function run(t, opts) {
++  return { text: t, options: opts || {} };
++}
++
++/** "Marketing Proposal" footer + page number, present on every slide. */
++function footer(slide, color) {
++  text(slide, [run('Marketing', {}), run(' Proposal', {})], {
++    x: 0.565, y: 7.028, w: 2.801, h: 0.337, fontFace: HEAD, fontSize: 14, color: color,
++  });
++  slide.slideNumber = {
++    x: 12.204, y: 7.011, w: 0.567, h: 0.337,
++    align: 'right', fontFace: HEAD, fontSize: 14, color: color,
++  };
++}
++
++/** Thin rule used under headings and beside stat blocks. */
++function rule(slide, x, y, w, color) {
++  slide.addShape('line', { x: x, y: y, w: w, h: 0, line: { color: color, width: 1.75 } });
++}
++
++// The soft shadow the deck puts under its cards and number tiles.
++const CARD_SHADOW = { type: 'outer', color: BLACK, opacity: 0.15, blur: 39, offset: 29, angle: 45 };
++
++/** One of the deck's decorative swooshes (a stroked, rotated `arc`). */
++function swoosh(slide, o) {
++  slide.addShape('arc', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    rotate: o.rot,
++    angleRange: o.range,
++    line: { color: o.color, width: 1.75 },
++  });
++}
++
++/** Big number followed by a superscript percent sign, e.g. 60%. */
++function percent(value, opts) {
++  return [run(value, opts), run('%', Object.assign({ superscript: true }, opts))];
++}
++
++/** Auto-numbered list where every paragraph carries its own bullet spec. */
++function numberedList(items) {
++  return items.map((t, i) => run(t, {
++    bullet: { type: 'number', style: 'arabicPeriod', indent: 18 },
++    lineSpacingMultiple: 1.2,
++    breakLine: i < items.length - 1,
++  }));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++const build = [];
++
++// 1 -- Title
++build.push(slide => {
++  slide.background = { color: DARK };
++  text(slide, [
++    run('MARKETING PROPOSAL', { color: GRAD_TXT, breakLine: true }),
++    run('PRESENTATION', { color: WHITE }),
++  ], { x: 0.533, y: 0.707, w: 9.45, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  text(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui conse quatur repudiandae Lorem ipsum dolor sit amet. ',
++    { x: 1.738, y: 4.56, w: 4.017, h: 1.492, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
++
++  text(slide, 'Lorem ipsum dolor sit amet, consectetur',
++    { x: 10.709, y: 0.89, w: 2.091, h: 0.601, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.3 });
++
++  asterisk(slide, 0.617, 4.664, 0.825, 0.79, WHITE);
++  swoosh(slide, { x: 8.422, y: 5.452, w: 4.574, h: 1.473, rot: 346.8, range: [346.0, 175.4], color: BLUE });
++  footer(slide, WHITE);
++});
++
++// 2 -- Agenda: four numbered columns on a dark band
++build.push(slide => {
++  slide.background = { color: WHITE };
++  slide.addShape('rect', { x: 0, y: 3.317, w: SLIDE_W, h: 4.183, fill: { color: DARK } });
++
++  text(slide, [
++    run('BUILDING THE BRAND ', {}),
++    run('STORY', { color: GRAD_TXT }),
++  ], { x: 1.979, y: 0.851, w: 9.376, h: 2.121, fontFace: HEAD, fontSize: 60, align: 'center' });
++
++  const cols = [
++    { n: '01', x: 0.573, nx: 0.59, lx: 0.675 },
++    { n: '02', x: 3.663, nx: 3.766, lx: 3.766 },
++    { n: '03', x: 6.874, nx: 6.892, lx: 6.976 },
++    { n: '04', x: 9.965, nx: 10.067, lx: 10.067 },
++  ];
++  cols.forEach(c => {
++    text(slide, c.n, { x: c.nx, y: 3.717, w: 1.689, h: 1.111, fontFace: HEAD, fontSize: 60, color: WHITE });
++    rule(slide, c.lx, 4.905, 2.6, WHITE);
++    text(slide, 'YOUR DESCRIPTION', { x: c.x, y: 5.182, w: 2.696, h: 0.37, fontFace: HEAD, fontSize: 16, color: WHITE });
++    text(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.',
++      { x: c.x, y: 5.552, w: 2.696, h: 0.57, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 });
++  });
++  footer(slide, WHITE);
++});
++
++// 3 -- The power of marketing
++build.push(slide => {
++  slide.background = { color: WHITE };
++  slide.addShape('rect', { x: 0, y: 0, w: 5.35, h: 5.417, fill: { color: DARK } });
++
++  text(slide, [
++    run('THE POWER OF ', {}),
++    run('MARKETING', { color: GRAD_TXT }),
++  ], { x: 6.641, y: 0.812, w: 6.238, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  text(slide, 'IMPORTANCE', { x: 6.604, y: 4.337, w: 3.296, h: 0.572, fontFace: HEAD, fontSize: 28 });
++  rule(slide, 6.715, 5.044, 5.874, DARK);
++  text(slide, 'Your Description Here', { x: 6.633, y: 5.156, w: 4.885, h: 0.572, fontFace: HEAD, fontSize: 28 });
++  text(slide, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, Lorem ipsum dolor.',
++    { x: 6.654, y: 5.77, w: 5.992, h: 0.927, fontSize: 14, lineSpacingMultiple: 1.2 });
++
++  text(slide, percent('90', { fontFace: HEAD, fontSize: 60 }).concat([run(' USER', { fontFace: HEAD, fontSize: 60 })]),
++    { x: 0.667, y: 5.729, w: 4.422, h: 1.111 });
++  text(slide, 'Your Description Here', { x: 0.684, y: 1.099, w: 2.589, h: 0.337, fontFace: HEAD, fontSize: 14, color: WHITE });
++
++  asterisk(slide, 4.658, 1.121, 1.36, 1.301, 'GRAD');
++  footer(slide, DARK);
++});
++
++// 4 -- Elevate your brand (full-bleed gradient)
++build.push(slide => {
++  gradientBg(slide);
++  text(slide, [
++    run('ELEVATE', { breakLine: true }),
++    run('YOUR BRAND', { color: WHITE }),
++  ], { x: 0.565, y: 1.111, w: 8.283, h: 2.121, fontFace: HEAD, fontSize: 60 });
++
++  asterisk(slide, 0.764, 4.565, 1.062, 1.016, WHITE);
++  text(slide, 'Your Description', { x: 2.308, y: 4.317, w: 3.35, h: 0.505, fontFace: HEAD, fontSize: 24, color: WHITE });
++  text(slide, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed eiusmod tempor inci.',
++    { x: 2.33, y: 4.889, w: 3.35, h: 0.925, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
++
++  swoosh(slide, { x: 7.843, y: 4.584, w: 4.574, h: 1.473, rot: 353.4, range: [350.5, 190.9], color: WHITE });
++  footer(slide, WHITE);
++});
++
++// 5 -- Crafting connections (staggered timeline)
++build.push(slide => {
++  slide.background = { color: DARK };
++
++  [2.444, 5.258, 8.074, 10.889].forEach(x => {
++    slide.addShape('line', { x: x, y: 2.344, w: 0, h: 4.531, line: { color: WHITE, width: 2, transparency: 90 } });
++  });
++
++  text(slide, [
++    run('CRAFTING', { color: GRAD_TXT }),
++    run(' CONNECTIONS', { color: WHITE }),
++  ], { x: 0.543, y: 0.836, w: 12.247, h: 1.01, fontFace: HEAD, fontSize: 54, align: 'center' });
++
++  ['Key 1', 'Key 2', 'Key 3', 'Key 4'].forEach((label, i) => {
++    text(slide, label, { x: [2.467, 5.271, 8.074, 10.899][i], y: 2.313, w: 0.996, h: 0.337, fontFace: HEAD, fontSize: 14, color: WHITE });
++  });
++
++  const cards = [
++    { bar: [0.667, 3.369, 4.624], barTxt: [1.089, 3.489, 3.658], conn: [0.928, 3.72, 1.163],
++      head: [1.046, 4.281, 2.718, 20], body: [1.068, 4.647, 2.697, 0.808],
++      label: 'Your Description Here', title: 'Your Description',
++      copy: 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor.' },
++    { bar: [4.354, 4.581, 4.084], barTxt: [4.78, 4.711, 3.658], conn: [4.643, 4.933, 1.194],
++      head: [4.791, 5.477, 2.718, 20], body: [4.812, 5.843, 2.697, 0.565],
++      label: 'Your Description Here', title: 'Your Description',
++      copy: 'Lorem ipsum dolor sit amet, consectetur adiiscing.' },
++    { bar: [9.752, 5.495, 2.915], barTxt: [10.175, 5.632, 2.198], conn: [10.031, 4.953, 0.891],
++      head: [10.147, 4.443, 2.453, DEF_SIZE], body: [10.169, 4.809, 2.72, 0.565],
++      label: 'Your Text Here', title: 'Your Description',
++      copy: 'Lorem ipsum dolor sit amet, consectetur adiiscing.' },
++  ];
++  cards.forEach(c => {
++    gradient(slide, { x: c.bar[0], y: c.bar[1], w: c.bar[2], h: 0.684, steps: 24 });
++    text(slide, c.label, { x: c.barTxt[0], y: c.barTxt[1], w: c.barTxt[2], h: 0.404, fontFace: HEAD, color: WHITE });
++    slide.addShape('line', {
++      x: c.conn[0], y: c.conn[1], w: 0, h: c.conn[2],
++      line: { color: 'F2F2F2', width: 1.75, beginArrowType: 'oval', endArrowType: 'oval' },
++    });
++    text(slide, c.title, { x: c.head[0], y: c.head[1], w: c.head[2], h: 0.438, fontFace: HEAD, fontSize: c.head[3], color: WHITE });
++    text(slide, c.copy, { x: c.body[0], y: c.body[1], w: c.body[2], h: c.body[3], fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 });
++  });
++
++  rule(slide, 0.675, 6.875, 11.992, DARK);
++  footer(slide, WHITE);
++});
++
++// 6 -- Marketing strategy framework
++build.push(slide => {
++  slide.background = { color: DARK };
++  text(slide, [
++    run('MARKETING', { color: WHITE, breakLine: true }),
++    run('STRATEGY', { color: WHITE, breakLine: true }),
++    run('FRAMEWORK', { color: GRAD_TXT }),
++  ], { x: 0.529, y: 3.171, w: 5.676, h: 3.13, fontFace: HEAD, fontSize: 60 });
++
++  asterisk(slide, 0.661, 1.625, 1.08, 1.033, 'GRAD');
++
++  [{ n: '01', y: 1.245 }, { n: '02', y: 4.205 }].forEach(item => {
++    slide.addShape('rect', { x: 7.022, y: item.y, w: 0.639, h: 0.639, fill: { color: BLUE }, shadow: CARD_SHADOW });
++    gradient(slide, { x: 7.022, y: item.y, w: 0.639, h: 0.639, steps: 12 });
++    text(slide, item.n, { x: 7.022, y: item.y + 0.116, w: 0.639, h: 0.404, fontFace: HEAD, bold: true, color: WHITE, align: 'center' });
++    text(slide, 'Insert Your Title Text here', { x: 6.926, y: item.y + 0.772, w: 5.157, h: 0.505, fontFace: HEAD, fontSize: 24, color: WHITE });
++    text(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur repudiandae.',
++      { x: 6.926, y: item.y + 1.277, w: 4.837, h: 0.925, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2, paraSpaceBefore: 12 });
++  });
++  footer(slide, WHITE);
++});
++
++// 7 -- Consumer trends
++build.push(slide => {
++  slide.background = { color: WHITE };
++  gradient(slide, { x: 9.45, y: 0, w: 3.883, h: SLIDE_H, steps: 60 });
++
++  text(slide, [
++    run('CONSUMER', { breakLine: true }),
++    run('TRENDS', { color: GRAD_TXT }),
++  ], { x: 0.56, y: 1.132, w: 5.293, h: 2.121, fontFace: HEAD, fontSize: 60 });
++
++  text(slide, 'Your Description Here', { x: 0.541, y: 4.73, w: 4.983, h: 0.572, fontFace: HEAD, fontSize: 28 });
++  text(slide, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, Lorem ipsum.',
++    { x: 0.562, y: 5.343, w: 6.104, h: 0.927, fontSize: 14, lineSpacingMultiple: 1.2 });
++  text(slide, 'Lorem ipsum dolor sit amet consectetur',
++    { x: 9.27, y: 5.626, w: 3.35, h: 0.643, fontSize: 14, color: WHITE, align: 'right', lineSpacingMultiple: 1.2 });
++
++  swoosh(slide, { x: 6.398, y: 3.319, w: 6.537, h: 1.919, rot: 348.9, range: [352.9, 189.3], color: BLUE });
++  asterisk(slide, 6.129, 1.73, 1.307, 1.301, 'GRAD');
++  footer(slide, DARK);
++});
++
++// 8 -- Campaign blueprint
++build.push(slide => {
++  slide.background = { color: WHITE };
++  gradient(slide, { x: 7.289, y: 0, w: 6.042, h: SLIDE_H, steps: 70 });
++
++  swoosh(slide, { x: 0.226, y: 4.321, w: 6.8, h: 1.919, rot: 348.9, range: [265.0, 300.3], color: DARK });
++  swoosh(slide, { x: 0.226, y: 4.321, w: 6.8, h: 1.919, rot: 348.9, range: [353.6, 189.4], color: BLUE });
++
++  text(slide, [
++    run('CAMPAIGN ', { breakLine: true }),
++    run('BLUEPRINT', { color: GRAD_TXT }),
++  ], { x: 0.553, y: 1.159, w: 6.498, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  asterisk(slide, 7.932, 1.583, 1.36, 1.301, WHITE);
++  text(slide, 'IMPORTANCE', { x: 7.932, y: 3.774, w: 3.943, h: 0.572, fontFace: HEAD, fontSize: 28, color: WHITE });
++  rule(slide, 8.037, 4.421, 4.419, WHITE);
++  text(slide, 'Your Description Here', { x: 7.955, y: 4.593, w: 4.712, h: 0.572, fontFace: HEAD, fontSize: 28, color: WHITE });
++  text(slide, 'Lorem ipsum dolor sit amet, consectetur adiiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna.',
++    { x: 7.972, y: 5.207, w: 4.808, h: 0.925, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
++  footer(slide, DARK);
++});
++
++// 9 -- Innovation in marketing (clustered bar chart)
++build.push(slide => {
++  gradientBg(slide);
++  text(slide, [
++    run('INNOVATION ', { color: WHITE, breakLine: true }),
++    run('IN MARKETING', { color: DARK }),
++  ], { x: 0.518, y: 1.158, w: 6.1, h: 2.121, fontFace: HEAD, fontSize: 60 });
++
++  const cats = ['Item 01', 'Item 02', 'Item 03', 'Item 04'];
++  slide.addChart('bar', [
++    { name: 'Series 1', labels: cats, values: [0.8, 2, 2.4, 7] },
++    { name: 'Series 2', labels: cats, values: [0.6, 1, 1.5, 5] },
++  ], {
++    x: 7.342, y: 1.192, w: 5.026, h: 5.328,
++    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 150,
++    chartColors: [DARK, WHITE],
++    showLegend: false, showTitle: false,
++    layout: { x: 0.0485, y: 0.0617, w: 0.9344, h: 0.8918 },
++    chartArea: { fill: { color: WHITE, transparency: 100 } },
++    plotArea: { fill: { color: WHITE, transparency: 100 } },
++    catAxisLineColor: DARK, catAxisLabelColor: BLACK, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 11,
++    valAxisLineColor: CYAN, valAxisLabelColor: BLACK, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 11,
++    catGridLine: { style: 'none' },
++    valGridLine: { color: '8FE4F3', size: 0.75 },
++  });
++
++  asterisk(slide, 0.652, 5.132, 0.825, 0.79, WHITE);
++  text(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui conse quatur repudiandae.',
++    { x: 1.772, y: 5.029, w: 3.906, h: 1.21, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
++  footer(slide, WHITE);
++});
++
++// 10 -- Market opportunity analysis (hand-built bar diagram)
++build.push(slide => {
++  gradientBg(slide);
++  text(slide, [
++    run('MARKET OPPORTUNITY', { color: WHITE, breakLine: true }),
++    run('ANALYSIS', {}),
++  ], { x: 0.567, y: 1.089, w: 8.988, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  // bars, tallest at the right: geometry / bar fill / label position + colour
++  const bars = [
++    { x: 11.335, y: 2.881, h: 3.486, fill: WHITE, label: '60', lx: 11.42, ly: 3.016, lc: DARK },
++    { x: 9.779, y: 3.974, h: 2.394, fill: DARK, label: '40', lx: 9.864, ly: 4.08, lc: WHITE },
++    { x: 8.223, y: 4.948, h: 1.419, fill: WHITE, label: '15', lx: 8.307, ly: 5.021, lc: DARK },
++    { x: 6.667, y: 4.72, h: 1.647, fill: DARK, label: '20', lx: 6.752, ly: 4.795, lc: WHITE },
++  ];
++  bars.forEach(b => {
++    slide.addShape('rect', { x: b.x, y: b.y, w: 1.331, h: b.h, fill: { color: b.fill } });
++    text(slide, percent(b.label, { fontFace: HEAD, fontSize: 28, color: b.lc }),
++      { x: b.lx, y: b.ly, w: 1.181, h: 0.572, align: 'center', valign: 'bottom' });
++  });
++
++  const stats = [
++    { x: 0.603, rx: 0.667, rw: 1.922, value: '$31M' },
++    { x: 3.447, rx: 3.6, rw: 1.892, value: '$22M' },
++  ];
++  stats.forEach(s => {
++    rule(slide, s.rx, 4.606, s.rw, WHITE);
++    text(slide, s.value, { x: s.x, y: 4.948, w: 2.481, h: 0.572, fontFace: HEAD, fontSize: 28, color: WHITE, valign: 'bottom' });
++    text(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo num.',
++      { x: s.x, y: 5.52, w: 2.383, h: 0.809, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 });
++  });
++  footer(slide, WHITE);
++});
++
++// 11 -- Brand positioning strategy
++build.push(slide => {
++  slide.background = { color: WHITE };
++  gradient(slide, { x: 6.667, y: 0, w: 6.667, h: SLIDE_H, steps: 75 });
++
++  text(slide, [
++    run('BRAND ', { color: GRAD_TXT }),
++    run('POSITIONING', { breakLine: true }),
++    run('STRATEGY', {}),
++  ], { x: 0.547, y: 1.07, w: 5.29, h: 2.827, fontFace: HEAD, fontSize: 54 });
++
++  asterisk(slide, 0.667, 4.765, 0.825, 0.79, 'GRAD');
++  text(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur repudiandae Lorem.',
++    { x: 1.787, y: 4.662, w: 3.857, h: 1.21, fontSize: 14, lineSpacingMultiple: 1.2 });
++
++  swoosh(slide, { x: 7.275, y: 3.579, w: 5.451, h: 1.473, rot: 350.1, range: [349.4, 191.3], color: WHITE });
++  footer(slide, DARK);
++});
++
++// 12 -- Competitive advantage (68% progress ring)
++build.push(slide => {
++  slide.background = { color: WHITE };
++  gradient(slide, { x: 0, y: 3.75, w: SLIDE_W, h: 3.75, steps: 60 });
++
++  // ring: gradient-shaded arc segments, then the dark "remaining" arc over them
++  const RING = { x: 0.945, y: 0.901, w: 2.202, h: 2.202 };
++  const SEGMENTS = 40;
++  for (let i = 0; i < SEGMENTS; i++) {
++    const a1 = (360 / SEGMENTS) * i - 0.4;
++    const a2 = (360 / SEGMENTS) * (i + 1) + 0.4;
++    const mid = (((a1 + a2) / 2) * Math.PI) / 180;
++    slide.addShape('blockArc', Object.assign({}, RING, {
++      angleRange: [(a1 + 360) % 360, a2 % 360],
++      arcThicknessRatio: 0.2076,
++      fill: { color: mix(BLUE, CYAN, (1 + Math.cos(mid - (GRAD_ANGLE * Math.PI) / 180)) / 2) },
++    }));
++  }
++  slide.addShape('blockArc', Object.assign({}, RING, {
++    angleRange: [219.877, 97.05], arcThicknessRatio: 0.10044, fill: { color: DARK },
++  }));
++  text(slide, percent('68', { fontFace: HEAD, fontSize: 36, bold: true }),
++    { x: 1.258, y: 1.524, w: 1.576, h: 0.707, align: 'center' });
++  text(slide, 'Text Goes Here', { x: 1.417, y: 2.116, w: 1.257, h: 0.454, fontSize: 10.5, align: 'center' });
++
++  text(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exerci tationem reiciendis qui consequatur repudiandae Lorem ipsum dolor sit.',
++    { x: 3.601, y: 1.152, w: 3.133, h: 1.775, fontSize: 14, lineSpacingMultiple: 1.2 });
++  asterisk(slide, 7.485, 0.971, 0.788, 0.754, 'GRAD');
++
++  text(slide, [
++    run('COMPETITIVE ', { color: WHITE }),
++    run('ADVANTAGE', {}),
++  ], { x: 0.535, y: 4.419, w: 6.132, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  swoosh(slide, { x: 7.415, y: 4.011, w: 5.083, h: 1.761, rot: 348.9, range: [349.1, 195.4], color: WHITE });
++  footer(slide, WHITE);
++});
++
++// 13 -- From insight to execution (numbered rows)
++build.push(slide => {
++  slide.background = { color: DARK };
++  text(slide, [
++    run('FROM INSIGHT TO ', { color: WHITE, breakLine: true }),
++    run('EXECUTION', { color: GRAD_TXT }),
++  ], { x: 0.56, y: 0.944, w: 8.579, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  [3.433, 4.223, 5.013, 5.803].forEach((y, i) => {
++    const highlight = i === 1;
++    slide.addShape('rect', { x: 0.667, y: y, w: 5.387, h: 0.554, fill: { color: WHITE }, shadow: CARD_SHADOW });
++    if (highlight) gradient(slide, { x: 0.667, y: y, w: 5.387, h: 0.554, steps: 22 });
++
++    const ink = highlight ? WHITE : DARK;
++    text(slide, (i + 1) + '.\t Think not, when the wailing winds of.', {
++      x: 1.167, y: y, w: 4.4, h: 0.554, margin: 0, valign: 'middle', wrap: false,
++      tabStops: [{ position: 1.069, alignment: 'l' }],
++      fontFace: HEAD, fontSize: 14, color: ink,
++    });
++    asterisk(slide, 5.598, y + 0.12, 0.322, 0.308, ink);
++  });
++
++  text(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam',
++    { x: 10.395, y: 1.134, w: 2.376, h: 0.805, fontSize: 12, color: WHITE, align: 'right', lineSpacingMultiple: 1.2 });
++  footer(slide, WHITE);
++});
++
++// 14 -- The power of storytelling (numbered dots on a gradient panel)
++build.push(slide => {
++  slide.background = { color: WHITE };
++  gradient(slide, { x: 6.667, y: 3.75, w: 6.667, h: 3.75, steps: 55 });
++
++  text(slide, [
++    run('THE POWER OF', { breakLine: true }),
++    run('STORYTELLING', { color: GRAD_TXT }),
++  ], { x: 6.516, y: 1.158, w: 5.972, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  const items = [
++    { n: '1', dy: 4.734, ty: 4.708, w: 3.642, label: 'Lorem Ipsum Dolor Sit Consectetur' },
++    { n: '2', dy: 5.221, ty: 5.209, w: 3.354, label: 'Consectetur Adipiscing Elit sed' },
++    { n: '3', dy: 5.708, ty: 5.692, w: 3.702, label: 'Sed Do Eiusmod Tempor Incididunt ' },
++    { n: '4', dy: 6.237, ty: 6.206, w: 3.642, label: 'Incididunt Ut Labore Et Dolore' },
++  ];
++  items.forEach(it => {
++    slide.addShape('ellipse', { x: 7.644, y: it.dy, w: 0.307, h: 0.307, fill: { color: WHITE } });
++    text(slide, it.n, { x: 7.644, y: it.dy, w: 0.307, h: 0.307, margin: 0, fontSize: 14, color: BLACK, align: 'center', valign: 'middle' });
++    text(slide, it.label, { x: 8.2, y: it.ty, w: it.w, h: 0.337, fontSize: 14, color: WHITE });
++  });
++
++  swoosh(slide, { x: 0.447, y: 4.337, w: 5.47, h: 1.557, rot: 353.5, range: [349.4, 187.3], color: BLUE });
++  asterisk(slide, 3.159, 1.043, 0.788, 0.754, 'GRAD');
++  footer(slide, DARK);
++});
++
++// 15 -- Execution strategy (hub with three dashed arrows)
++build.push(slide => {
++  slide.background = { color: DARK };
++  text(slide, [
++    run('EXECUTION ', { color: GRAD_TXT }),
++    run('STRATEGY', { color: WHITE }),
++  ], { x: 0.565, y: 0.725, w: 5.519, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  [1.701, 3.489, 5.278].forEach(y => {
++    text(slide, 'Your amazing title here', { x: 8.832, y: y, w: 3.334, h: 0.404, fontFace: HEAD, color: WHITE });
++    text(slide, numberedList(['Lorem ipsum dolor', 'Sit amet.', 'Qui sint neque']),
++      { x: 8.832, y: y + 0.404, w: 2.302, h: 0.923, fontSize: 14, color: WHITE });
++  });
++
++  const arrow = { color: 'A6A6A6', width: 1, dashType: 'dash', endArrowType: 'triangle' };
++  slide.addShape('line', { x: 6.958, y: 4.153, w: 1.41, h: 0, line: arrow });
++  slide.addShape('line', { x: 6.862, y: 4.46, w: 1.41, h: 1.545, line: arrow });
++  slide.addShape('line', { x: 6.862, y: 2.301, w: 1.41, h: 1.545, flipV: true, line: arrow });
++
++  slide.addShape('rect', { x: 5.932, y: 3.767, w: 0.771, h: 0.771, fill: { color: BLUE }, shadow: CARD_SHADOW });
++  gradient(slide, { x: 5.932, y: 3.767, w: 0.771, h: 0.771, angle: 90, steps: 14 });
++  asterisk(slide, 6.054, 3.912, 0.519, 0.497, WHITE);
++
++  swoosh(slide, { x: 1.96, y: 4.5, w: 4.766, h: 1.557, rot: 21.6, range: [347.4, 190.5], color: DARK });
++  footer(slide, WHITE);
++});
++
++// 16 -- Campaign implementation plan (four columns)
++build.push(slide => {
++  gradientBg(slide);
++  text(slide, [
++    run('CAMPAIGN ', { breakLine: true }),
++    run('IMPLEMENTATION PLAN', { color: WHITE }),
++  ], { x: 0.578, y: 0.849, w: 9.517, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  [{ ax: 0.475, tx: 0.56 }, { ax: 3.602, tx: 3.724 }, { ax: 6.968, tx: 7.077 }, { ax: 10.095, tx: 10.199 }].forEach(col => {
++    asterisk(slide, col.ax, 2.954, 0.451, 0.431, WHITE);
++    text(slide, 'Your Text Here', { x: col.tx, y: 4.97, w: 2.467, h: 0.438, fontFace: HEAD, fontSize: 20, color: WHITE });
++    text(slide, 'Lorem ipsum dolor sit amet, consectetur sed do adipiscing elit, sed do',
++      { x: col.tx, y: 5.481, w: 2.467, h: 0.808, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 });
++  });
++  footer(slide, WHITE);
++});
++
++// 17 -- Measuring success
++build.push(slide => {
++  slide.background = { color: DARK };
++  text(slide, [
++    run('MEASURING ', { color: WHITE }),
++    run('SUCCESS', { color: GRAD_TXT }),
++  ], { x: 7.514, y: 0.878, w: 5.257, h: 2.121, fontFace: HEAD, fontSize: 60, align: 'right' });
++
++  text(slide, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur ',
++    { x: 6.02, y: 4.323, w: 4.063, h: 2.089, fontSize: 20, color: WHITE, lineSpacingMultiple: 1.2 });
++  text(slide, 'Lorem ipsum dolor sit amet, consectetur',
++    { x: 10.56, y: 5.485, w: 2.211, h: 0.927, fontSize: 14, color: WHITE, align: 'right', lineSpacingMultiple: 1.2 });
++  footer(slide, WHITE);
++});
++
++// 18 -- Market opportunity analysis (pie chart)
++build.push(slide => {
++  slide.background = { color: DARK };
++  text(slide, [
++    run('MARKET OPPORTUNITY', { color: WHITE, breakLine: true }),
++    run('ANALYSIS', { color: GRAD_TXT }),
++  ], { x: 0.578, y: 1.028, w: 5.539, h: 2.827, fontFace: HEAD, fontSize: 54 });
++
++  slide.addChart('pie', [
++    { name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [8.2, 4] },
++  ], {
++    x: 6.935, y: 1.202, w: 5.539, h: 5.096,
++    chartColors: [CYAN, WHITE],
++    showLegend: false, showTitle: false, showValue: false,
++    dataBorder: { pt: 0, color: DARK },
++    firstSliceAng: 0,
++    chartArea: { fill: { color: WHITE, transparency: 100 } },
++    plotArea: { fill: { color: WHITE, transparency: 100 } },
++  });
++  text(slide, percent('60', { fontFace: HEAD, fontSize: 44, color: WHITE }),
++    { x: 9.876, y: 3.823, w: 1.803, h: 0.841, align: 'center' });
++  text(slide, percent('20', { fontFace: HEAD, fontSize: 40, color: DARK }),
++    { x: 7.867, y: 2.821, w: 1.593, h: 0.774, align: 'center' });
++
++  const legend = [
++    { y: 4.501, ty: 4.384, th: 0.643, color: WHITE, copy: 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo' },
++    { y: 5.379, ty: 5.261, th: 0.925, color: CYAN, copy: 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui' },
++  ];
++  legend.forEach(l => {
++    slide.addShape('rect', { x: 0.675, y: l.y, w: 0.353, h: 0.353, fill: { color: l.color } });
++    text(slide, l.copy, { x: 1.335, y: l.ty, w: 4.05, h: l.th, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
++  });
++  footer(slide, WHITE);
++});
++
++// 19 -- Optimizing every dollar
++build.push(slide => {
++  slide.background = { color: WHITE };
++  gradient(slide, { x: 0, y: 0, w: 6.406, h: SLIDE_H, steps: 72 });
++
++  const blocks = [
++    { ay: 1.223, hy: 0.993, by: 1.607, bw: 3.691, bh: 0.925,
++      copy: [run('Lorem ipsum dolor sit amet, conse', { breakLine: true }),
++        run('tetur adiiscing elit, sed do eiusmod tempor incididunt ut labore', {})] },
++    { ay: 3.251, hy: 3.021, by: 3.635, bw: 3.608, bh: 0.927,
++      copy: 'Lorem ipsum dolor sit amet, consec tetur adiiscing elit, sed do eiusmod tempor incididunt.' },
++    { ay: 5.198, hy: 4.968, by: 5.582, bw: 3.608, bh: 0.927,
++      copy: 'Lorem ipsum dolor sit amet, consec tetur adiiscing elit, sed do eiusmod tempor incididunt.' },
++  ];
++  blocks.forEach(b => {
++    asterisk(slide, 0.758, b.ay, 0.788, 0.754, WHITE);
++    text(slide, 'Your Description', { x: 1.889, y: b.hy, w: 4.305, h: 0.572, fontFace: HEAD, fontSize: 28, color: WHITE });
++    text(slide, b.copy, { x: 1.911, y: b.by, w: b.bw, h: b.bh, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
++  });
++
++  text(slide, [
++    run('OPTIMIZING ', { color: CYAN, breakLine: true }),
++    run('EVERY DOLLAR', {}),
++  ], { x: 6.964, y: 4.657, w: 5.611, h: 1.919, fontFace: HEAD, fontSize: 54 });
++
++  swoosh(slide, { x: 7.441, y: 2.473, w: 5.47, h: 1.557, rot: 353.5, range: [348.5, 173.0], color: BLUE });
++  footer(slide, DARK);
++});
++
++// 20 -- Thank you
++build.push(slide => {
++  gradientBg(slide);
++
++  text(slide, 'THANK YOU', { x: 1.924, y: 2.833, w: 9.485, h: 1.717, fontFace: HEAD, fontSize: 96, color: WHITE, align: 'center' });
++  swoosh(slide, { x: 3.443, y: 2.803, w: 6.692, h: 2.096, rot: 346.3, range: [216.0, 2.8], color: 'F2F2F2' });
++  swoosh(slide, { x: 3.443, y: 2.803, w: 6.692, h: 2.096, rot: 346.3, range: [23.8, 187.3], color: WHITE });
++  asterisk(slide, 1.695, 3.375, 0.662, 0.634, WHITE);
++  asterisk(slide, 10.977, 3.375, 0.662, 0.634, WHITE);
++  text(slide, 'THANK YOU', { x: 1.935, y: 2.804, w: 9.485, h: 1.717, fontFace: HEAD, fontSize: 96, color: WHITE, align: 'center' });
++
++  text(slide, 'LOREM IPSUM DOLOR SIT AMET. QUI SINT',
++    { x: 0.561, y: 0.598, w: 2.729, h: 0.643, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
++  text(slide, [run('MARKETING', { breakLine: true }), run('PROPOSAL', {})],
++    { x: 11.082, y: 0.625, w: 1.69, h: 0.572, fontSize: 14, color: WHITE, align: 'right' });
++
++  text(slide, 'Phone:', { x: 0.59, y: 6.084, w: 1.104, h: 0.463, color: WHITE, lineSpacingMultiple: 1.3 });
++  text(slide, '+22 1234 5678 9000', { x: 0.59, y: 6.525, w: 1.881, h: 0.342, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.3 });
++  text(slide, 'Office Address:', { x: 9.999, y: 5.745, w: 2.294, h: 0.496, fontSize: 20, color: WHITE, lineSpacingMultiple: 1.3 });
++  text(slide, 'Orlando City, Downtown Main Street 233, Florida, US',
++    { x: 9.999, y: 6.208, w: 2.839, h: 0.685, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.3 });
++});
++
++/* ------------------------------------------------------------------ *
++ * Assemble & write
++ * ------------------------------------------------------------------ */
++
++function main() {
++  const pres = new PptxGenJS();
++  pres.defineLayout({ name: 'WIDE_16x9', width: SLIDE_W, height: SLIDE_H });
++  pres.layout = 'WIDE_16x9';
++  pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++  pres.title = 'Marketing Proposal Presentation';
++
++  build.forEach(fn => fn(pres.addSlide()));
++
++  const out = path.join(__dirname, '156f147a-178a-473b-b17b-226a3e881b94_grok_final.pptx');
++  return pres.writeFile({ fileName: out }).then(() => console.log('wrote ' + out));
++}
++
++main().catch(err => {
++  console.error(err);
++  process.exit(1);
++});

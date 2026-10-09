@@ -1,0 +1,725 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/motivational_quotes_inspiration.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/motivational_quotes_inspiration.js
+@@ -0,0 +1,722 @@
++#!/usr/bin/env node
++/**
++ * "Make It Write" motivational quote deck — recreated with pptxgenjs.
++ *
++ * 17 slides on a tall 15 x 26.667 in canvas (9:16 story format):
++ *   1–12  quote posters
++ *  13–17  pictogram reference sheets
++ *
++ * The reference deck's background photographs / paper textures are replaced
++ * here by flat colour rectangles (`photoBackdrop`) matching each image's
++ * average tone; its hand-drawn vector pictograms are rebuilt from native
++ * pptxgenjs shapes and custom geometry.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ================================================================== *
++ * Design tokens
++ * ================================================================== */
++
++const SLIDE_W = 15.0;
++const SLIDE_H = 80 / 3;
++
++const C = {
++  ink: '050000', // near-black: headlines, brand dot, dark backgrounds
++  cocoa: '411004', // deep brown headline / logo (slides 2, 6)
++  plum: '643E46', // muted plum on the light-paper slides
++  rust: 'B05F43', // accent bar (slides 1, 4, 5)
++  peach: 'E29A72', // accent bar (slide 12)
++  white: 'FFFFFF',
++  black: '000000',
++  smoke: 'D5D5D5', // light grey panels + body copy on dark slides
++  wash: '171616', // 95%-transparent watermark
++};
++
++// Average tone of each replaced photograph / paper texture.
++const PHOTO = {
++  paperWhite: 'F2F2F2', // "nordwood-themes" paper (slide 1)
++  paperCream: 'F3F3F3', // "sincerely-media" paper (slides 2, 3)
++  textureRose: 'BDB4B2', // "Texture 1" (slides 4, 5)
++  textureClay: 'BEB5B3', // "Texture 2" (slide 6)
++};
++
++const F = {
++  bold: 'Montserrat Bold',
++  light: 'Montserrat Light',
++  regular: 'Montserrat Regular',
++  display: 'Playfair Display Bold',
++};
++
++// The deck only ever uses two display sizes for its quotes.
++const HEAD_XL = { fontFace: F.display, fontSize: 136, charSpacing: -6.8 };
++const HEAD_LG = { fontFace: F.display, fontSize: 84, charSpacing: -2.52 };
++
++const BOX = { isTextBox: true, valign: 'middle', margin: 2.5 };
++
++/* ================================================================== *
++ * Text helpers
++ * ================================================================== */
++
++/** Full-bleed stand-in for a background photograph / paper texture. */
++function photoBackdrop(slide, color) {
++  slide.addShape('rect', { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: { color } });
++}
++
++/**
++ * Multi-paragraph text box. `paras` is an array of paragraphs; each
++ * paragraph is an array of runs `{ t: 'text', ...runOptions }`.
++ */
++function richText(slide, paras, opts) {
++  const runs = [];
++  paras.forEach((para, pi) => {
++    const last = pi === paras.length - 1;
++    para.forEach((run, ri) => {
++      const { t, ...rest } = run;
++      runs.push({
++        text: t,
++        options: Object.assign({}, rest, { breakLine: !last && ri === para.length - 1 }),
++      });
++    });
++  });
++  slide.addText(runs, Object.assign({}, BOX, opts));
++}
++
++/** Single-paragraph text box. */
++function text(slide, str, opts) {
++  slide.addText(str, Object.assign({}, BOX, opts));
++}
++
++/** A quote headline (80% line spacing is used deck-wide). */
++function headline(slide, str, opts) {
++  text(slide, str, Object.assign({ lineSpacingMultiple: 0.8, color: C.ink }, opts));
++}
++
++/* ================================================================== *
++ * Branding furniture
++ * ================================================================== */
++
++/** The circular "MW™" brand dot. */
++function brandDot(slide, x, y, dotColor, markColor) {
++  slide.addShape('ellipse', { x, y, w: 0.787, h: 0.787, fill: { color: dotColor } });
++  richText(
++    slide,
++    [[{ t: 'MW' }, { t: '™', fontFace: F.light, superscript: true }]],
++    {
++      x: x + 0.139, y: y + 0.262, w: 0.51, h: 0.264,
++      fontFace: F.bold, fontSize: 11, color: markColor,
++      lineSpacingMultiple: 0.8, wrap: false,
++    }
++  );
++}
++
++/** "Make It Write™ / since 2015" lock-up. */
++function wordmarkStacked(slide, x, y, color, align) {
++  richText(
++    slide,
++    [
++      [{ t: 'Make It Write', fontFace: F.bold }, { t: '™', fontFace: F.light, superscript: true }],
++      [{ t: 'since 2015', fontFace: F.light }],
++    ],
++    { x, y, w: 2.021, h: 0.681, fontSize: 18, color, align, lineSpacingMultiple: 1.0, wrap: false }
++  );
++}
++
++/** Two-line "Make It / Write™" lock-up. */
++function makeItWrite(slide, opts) {
++  richText(
++    slide,
++    [
++      [{ t: 'Make It' }],
++      [{ t: 'Write' }, { t: '™', fontFace: F.light, superscript: true }],
++    ],
++    Object.assign({ fontFace: F.bold, lineSpacingMultiple: 0.8, wrap: false }, opts)
++  );
++}
++
++/** The same lock-up preceded by its coloured accent bar. */
++function wordmarkBar(slide, bar, mark) {
++  slide.addShape('rect', { x: bar.x, y: mark.y, w: 0.116, h: mark.h, fill: { color: bar.color } });
++  makeItWrite(slide, mark);
++}
++
++/** Four-line address block used on slides 7 and 8. */
++function footerBlock(slide, x, y, color) {
++  richText(
++    slide,
++    [
++      [{ t: 'Make it Write', fontFace: F.bold }],
++      [{ t: 'Influence More People', fontFace: F.regular, italic: true }],
++      [{ t: '© Since 2015', fontFace: F.light }],
++      [{ t: ' ' }],
++      [{ t: 'www.makeitwrite.com', fontFace: F.light }],
++    ],
++    { x, y, w: 2.874, h: 1.658, fontSize: 18, color, lineSpacingMultiple: 1.0, wrap: false }
++  );
++}
++
++/** Strap-line rotated 270° down the right edge (slides 11, 12). */
++function verticalStrapline(slide, x, y, color) {
++  richText(
++    slide,
++    [
++      [{ t: 'We brings motivation. ', fontFace: F.bold, align: 'right' }],
++      [{ t: 'Because you deserve better.', fontFace: F.light }],
++    ],
++    {
++      x, y, w: 3.555, h: 0.681, fontSize: 18, color,
++      lineSpacingMultiple: 1.0, wrap: false, rotate: 270,
++    }
++  );
++}
++
++/* ================================================================== *
++ * Vector artwork
++ * ================================================================== */
++
++/**
++ * Converts a compact path description into pptxgenjs `custGeom` points.
++ * Coordinates are fractions of the shape box; entries are
++ * `[x, y]` (line/move), `[x, y, cx1, cy1, cx2, cy2]` (cubic) or `'Z'`.
++ */
++function geom(cmds, w, h) {
++  return cmds.map((c, i) => {
++    if (c === 'Z') return { close: true };
++    const pt = { x: c[0] * w, y: c[1] * h };
++    if (i === 0) pt.moveTo = true;
++    if (c.length === 6) {
++      pt.curve = { type: 'cubic', x1: c[2] * w, y1: c[3] * h, x2: c[4] * w, y2: c[5] * h };
++    }
++    return pt;
++  });
++}
++
++// Outline pencil: body, sharpened tip and eraser cap.
++const PENCIL_PATH = [
++  [0.017, 0.983], [0.049, 0.789], [0.789, 0.049],
++  [0.951, 0.049, 0.834, 0.005, 0.916, 0.014],
++  [0.951, 0.211, 0.986, 0.084, 0.995, 0.166],
++  [0.211, 0.951], [0.017, 0.983], 'Z',
++];
++
++function pencilIcon(slide, x, y, size, color, transparency) {
++  const line = { color, width: size * 2.2, transparency };
++  slide.addShape('custGeom', {
++    x, y, w: size, h: size, points: geom(PENCIL_PATH, size, size),
++    fill: { type: 'none' }, line,
++  });
++  // The two creases that separate tip / body / eraser.
++  slide.addShape('line', { x: x + 0.049 * size, y: y + 0.789 * size, w: 0.162 * size, h: 0.162 * size, line });
++  slide.addShape('line', { x: x + 0.677 * size, y: y + 0.161 * size, w: 0.162 * size, h: 0.162 * size, line });
++}
++
++// Sydney Opera House: five overlapping shell "sails" leaning to the right.
++const sail = (x0, x1, apex, top) => [
++  [x0, 0.70],
++  [apex, top, x0 - 0.01, 0.36, apex - 0.07, top + 0.06],
++  [x1, 0.70, apex + 0.09, top + 0.10, x1, 0.44],
++  'Z',
++];
++const SAILS = [
++  sail(0.02, 0.19, 0.160, 0.34),
++  sail(0.13, 0.40, 0.350, 0.12),
++  sail(0.32, 0.63, 0.585, 0.02),
++  sail(0.57, 0.87, 0.810, 0.24),
++  sail(0.79, 0.98, 0.960, 0.42),
++];
++
++/** Four-hump wavy line for the harbour water. */
++function waterPath(y0) {
++  const humps = 4;
++  const step = 1 / humps;
++  const cmds = [[0, y0]];
++  for (let i = 0; i < humps; i += 1) {
++    const a = i * step;
++    cmds.push([a + step, y0, a + step * 0.25, y0 - 0.055, a + step * 0.75, y0 + 0.055]);
++  }
++  return cmds;
++}
++
++function operaHouseIcon(slide, x, y, w, h, color) {
++  const line = { color, width: 2.5 };
++  const stroke = (cmds) => slide.addShape('custGeom', {
++    x, y, w, h, points: geom(cmds, w, h), fill: { type: 'none' }, line,
++  });
++  SAILS.forEach(stroke);
++  stroke([[0, 0.72], [1, 0.72]]); // podium
++  stroke(waterPath(0.90));
++}
++
++/* ================================================================== *
++ * Pictogram library (slides 13–17)
++ *
++ * Every icon is a list of parts: [presetShape, x, y, w, h, rotate?]
++ * with coordinates as fractions of the icon cell. A leading '!' marks a
++ * knock-out part, drawn in the paper colour to carve detail out of a
++ * solid glyph.
++ * ================================================================== */
++
++const ICONS = {
++  house: [['triangle', 0.00, 0.02, 1.00, 0.44], ['rect', 0.14, 0.44, 0.72, 0.54], ['rect', 0.40, 0.66, 0.20, 0.32]],
++  clock: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['line', 0.50, 0.22, 0.00, 0.28], ['line', 0.50, 0.50, 0.26, 0.00]],
++  lock: [['blockArc', 0.24, 0.02, 0.52, 0.56], ['roundRect', 0.08, 0.42, 0.84, 0.56]],
++  book: [['rect', 0.14, 0.02, 0.72, 0.96], ['line', 0.30, 0.02, 0.00, 0.96]],
++  doc: [['rect', 0.18, 0.02, 0.64, 0.96], ['line', 0.30, 0.30, 0.40, 0.00], ['line', 0.30, 0.50, 0.40, 0.00], ['line', 0.30, 0.70, 0.24, 0.00]],
++  note: [['rect', 0.10, 0.10, 0.80, 0.88], ['line', 0.26, 0.00, 0.00, 0.16], ['line', 0.50, 0.00, 0.00, 0.16], ['line', 0.74, 0.00, 0.00, 0.16]],
++  check: [['line', 0.10, 0.50, 0.26, 0.34], ['line', 0.36, 0.84, 0.54, -0.66]],
++  checkRing: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['line', 0.26, 0.50, 0.16, 0.22], ['line', 0.42, 0.72, 0.34, -0.42]],
++  cross: [['line', 0.10, 0.10, 0.80, 0.80], ['line', 0.10, 0.90, 0.80, -0.80]],
++  film: [['rect', 0.06, 0.10, 0.88, 0.80], ['line', 0.24, 0.10, 0.00, 0.80], ['line', 0.76, 0.10, 0.00, 0.80]],
++  pie: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['line', 0.50, 0.50, 0.00, -0.48], ['line', 0.50, 0.50, 0.46, 0.14]],
++  bars: [['rect', 0.08, 0.52, 0.22, 0.46], ['rect', 0.39, 0.28, 0.22, 0.70], ['rect', 0.70, 0.06, 0.22, 0.92]],
++  target: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['ellipse', 0.32, 0.32, 0.36, 0.36]],
++  dots: [['ellipse', 0.06, 0.42, 0.16, 0.16], ['ellipse', 0.42, 0.42, 0.16, 0.16], ['ellipse', 0.78, 0.42, 0.16, 0.16]],
++  chat: [['roundRect', 0.02, 0.06, 0.96, 0.66], ['triangle', 0.20, 0.68, 0.24, 0.26, 180]],
++  edit: [['rect', 0.06, 0.20, 0.62, 0.74], ['line', 0.52, 0.44, 0.40, -0.40], ['line', 0.92, 0.04, 0.06, 0.06]],
++  ban: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['line', 0.18, 0.82, 0.64, -0.64]],
++  info: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['line', 0.50, 0.36, 0.00, 0.34]],
++  help: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['blockArc', 0.30, 0.18, 0.40, 0.34], ['line', 0.50, 0.60, 0.00, 0.16]],
++  copy: [['rect', 0.06, 0.06, 0.66, 0.66], ['rect', 0.28, 0.28, 0.66, 0.66]],
++  image: [['rect', 0.04, 0.14, 0.92, 0.72], ['ellipse', 0.16, 0.26, 0.18, 0.18], ['triangle', 0.32, 0.40, 0.50, 0.46]],
++  grid: [['rect', 0.06, 0.06, 0.88, 0.88], ['line', 0.50, 0.06, 0.00, 0.88], ['line', 0.06, 0.50, 0.88, 0.00]],
++  box: [['rect', 0.04, 0.20, 0.92, 0.24], ['rect', 0.12, 0.44, 0.76, 0.52]],
++  inbox: [['rect', 0.06, 0.10, 0.88, 0.80], ['line', 0.20, 0.58, 0.60, 0.00], ['triangle', 0.36, 0.20, 0.28, 0.28, 180]],
++  search: [['ellipse', 0.04, 0.04, 0.64, 0.64], ['line', 0.60, 0.60, 0.34, 0.34]],
++  funnel: [['triangle', 0.04, 0.06, 0.92, 0.56, 180], ['line', 0.50, 0.62, 0.00, 0.34]],
++  music: [['ellipse', 0.06, 0.66, 0.32, 0.30], ['line', 0.38, 0.82, 0.00, -0.78], ['line', 0.38, 0.04, 0.54, 0.14]],
++  star: [['star5', 0.00, 0.02, 1.00, 0.96]],
++  star4: [['star4', 0.00, 0.02, 1.00, 0.96]],
++  list: [['line', 0.06, 0.18, 0.00, 0.02], ['line', 0.28, 0.18, 0.66, 0.00], ['line', 0.06, 0.50, 0.00, 0.02], ['line', 0.28, 0.50, 0.66, 0.00], ['line', 0.06, 0.82, 0.00, 0.02], ['line', 0.28, 0.82, 0.66, 0.00]],
++  tag: [['homePlate', 0.02, 0.20, 0.96, 0.60], ['ellipse', 0.14, 0.42, 0.16, 0.16]],
++  phoneUp: [['roundRect', 0.24, 0.02, 0.52, 0.96], ['line', 0.24, 0.80, 0.52, 0.00]],
++  send: [['triangle', 0.02, 0.06, 0.96, 0.88, 135]],
++  sliders: [['line', 0.04, 0.30, 0.92, 0.00], ['line', 0.04, 0.70, 0.92, 0.00], ['ellipse', 0.24, 0.18, 0.24, 0.24], ['ellipse', 0.56, 0.58, 0.24, 0.24]],
++  gear: [['gear6', 0.00, 0.00, 1.00, 1.00], ['ellipse', 0.36, 0.36, 0.28, 0.28]],
++  card: [['rect', 0.02, 0.20, 0.96, 0.60], ['line', 0.02, 0.38, 0.96, 0.00]],
++  plus: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['line', 0.50, 0.26, 0.00, 0.48], ['line', 0.26, 0.50, 0.48, 0.00]],
++  minus: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['line', 0.26, 0.50, 0.48, 0.00]],
++  bag: [['rect', 0.04, 0.28, 0.92, 0.66], ['blockArc', 0.32, 0.06, 0.36, 0.36]],
++  folder: [['rect', 0.02, 0.24, 0.96, 0.62], ['rect', 0.02, 0.12, 0.38, 0.14]],
++  user: [['ellipse', 0.30, 0.06, 0.40, 0.40], ['blockArc', 0.08, 0.44, 0.84, 0.90]],
++  users: [['ellipse', 0.12, 0.10, 0.34, 0.34], ['ellipse', 0.54, 0.10, 0.34, 0.34], ['blockArc', 0.00, 0.44, 0.58, 0.70], ['blockArc', 0.42, 0.44, 0.58, 0.70]],
++  shield: [['pentagon', 0.06, 0.04, 0.88, 0.92, 180], ['star5', 0.30, 0.24, 0.40, 0.40]],
++  gift: [['rect', 0.04, 0.30, 0.92, 0.66], ['line', 0.50, 0.30, 0.00, 0.66], ['rect', 0.16, 0.10, 0.68, 0.20]],
++  eye: [['ellipse', 0.00, 0.22, 1.00, 0.56], ['ellipse', 0.36, 0.36, 0.28, 0.28]],
++  calendar: [['rect', 0.04, 0.14, 0.92, 0.82], ['line', 0.04, 0.36, 0.92, 0.00], ['line', 0.26, 0.02, 0.00, 0.18], ['line', 0.74, 0.02, 0.00, 0.18]],
++  bank: [['triangle', 0.02, 0.04, 0.96, 0.24], ['line', 0.20, 0.32, 0.00, 0.50], ['line', 0.50, 0.32, 0.00, 0.50], ['line', 0.80, 0.32, 0.00, 0.50], ['rect', 0.02, 0.84, 0.96, 0.14]],
++  warn: [['triangle', 0.02, 0.06, 0.96, 0.88], ['line', 0.50, 0.42, 0.00, 0.26]],
++  trash: [['rect', 0.16, 0.22, 0.68, 0.76], ['line', 0.06, 0.18, 0.88, 0.00], ['rect', 0.36, 0.02, 0.28, 0.14]],
++  phone: [['blockArc', 0.06, 0.06, 0.88, 0.88, 315]],
++  bolt: [['lightningBolt', 0.14, 0.02, 0.72, 0.96]],
++  bell: [['blockArc', 0.08, 0.10, 0.84, 0.84], ['line', 0.08, 0.76, 0.84, 0.00], ['ellipse', 0.42, 0.86, 0.16, 0.12]],
++  gem: [['diamond', 0.02, 0.08, 0.96, 0.84], ['line', 0.02, 0.36, 0.96, 0.00]],
++  heart: [['heart', 0.02, 0.06, 0.96, 0.88]],
++  cloud: [['cloud', 0.00, 0.16, 1.00, 0.68]],
++  play: [['rect', 0.02, 0.16, 0.96, 0.68], ['triangle', 0.36, 0.32, 0.32, 0.36, 90]],
++  camera: [['roundRect', 0.02, 0.22, 0.96, 0.66], ['ellipse', 0.30, 0.36, 0.40, 0.40], ['rect', 0.28, 0.08, 0.30, 0.14]],
++  rss: [['blockArc', 0.10, 0.10, 0.90, 0.90, 270], ['blockArc', 0.10, 0.42, 0.58, 0.58, 270], ['ellipse', 0.08, 0.76, 0.20, 0.20]],
++  apple: [['ellipse', 0.08, 0.20, 0.84, 0.78], ['line', 0.50, 0.20, 0.10, -0.18]],
++  win: [['rect', 0.06, 0.08, 0.40, 0.38], ['rect', 0.54, 0.06, 0.40, 0.38], ['rect', 0.06, 0.54, 0.40, 0.38], ['rect', 0.54, 0.54, 0.40, 0.38]],
++  droid: [['blockArc', 0.06, 0.10, 0.88, 0.88], ['line', 0.06, 0.54, 0.88, 0.00], ['ellipse', 0.30, 0.28, 0.10, 0.10], ['ellipse', 0.60, 0.28, 0.10, 0.10]],
++  share: [['ellipse', 0.60, 0.02, 0.30, 0.30], ['ellipse', 0.60, 0.66, 0.30, 0.30], ['ellipse', 0.06, 0.34, 0.30, 0.30], ['line', 0.32, 0.42, 0.32, -0.22], ['line', 0.32, 0.58, 0.32, 0.22]],
++  ghost: [['blockArc', 0.06, 0.06, 0.88, 0.76], ['line', 0.06, 0.66, 0.88, 0.00]],
++  paper: [['triangle', 0.02, 0.10, 0.96, 0.80, 105]],
++  // Filled mail family: knock-out lines carve the envelope flap.
++  env: [['rect', 0.04, 0.24, 0.92, 0.50], ['!line', 0.04, 0.24, 0.46, 0.30], ['!line', 0.50, 0.54, 0.46, -0.30]],
++  envDot: [['rect', 0.02, 0.20, 0.86, 0.46], ['!line', 0.02, 0.20, 0.43, 0.28], ['!line', 0.45, 0.48, 0.43, -0.28], ['ellipse', 0.58, 0.50, 0.42, 0.42]],
++  envTop: [['rect', 0.04, 0.30, 0.92, 0.46], ['!line', 0.04, 0.30, 0.46, 0.28], ['!line', 0.50, 0.58, 0.46, -0.28], ['rect', 0.30, 0.06, 0.40, 0.18]],
++  envPin: [['rect', 0.02, 0.22, 0.84, 0.46], ['!line', 0.02, 0.22, 0.42, 0.28], ['!line', 0.44, 0.50, 0.42, -0.28], ['teardrop', 0.58, 0.44, 0.42, 0.42, 225]],
++  envStar: [['rect', 0.02, 0.22, 0.84, 0.46], ['!line', 0.02, 0.22, 0.42, 0.28], ['!line', 0.44, 0.50, 0.42, -0.28], ['star5', 0.56, 0.46, 0.44, 0.44]],
++  envOpen: [['triangle', 0.02, 0.10, 0.96, 0.44], ['rect', 0.02, 0.50, 0.96, 0.40]],
++  envStamp: [['rect', 0.04, 0.26, 0.92, 0.48], ['!line', 0.04, 0.26, 0.46, 0.28], ['!line', 0.50, 0.54, 0.46, -0.28], ['rect', 0.62, 0.08, 0.30, 0.24], ['!rect', 0.68, 0.14, 0.18, 0.12]],
++  envPlus: [['rect', 0.02, 0.22, 0.84, 0.46], ['!line', 0.02, 0.22, 0.42, 0.28], ['!line', 0.44, 0.50, 0.42, -0.28], ['ellipse', 0.58, 0.50, 0.42, 0.42], ['!line', 0.79, 0.60, 0.00, 0.22], ['!line', 0.68, 0.71, 0.22, 0.00]],
++  envCheck: [['rect', 0.02, 0.22, 0.84, 0.46], ['!line', 0.02, 0.22, 0.42, 0.28], ['!line', 0.44, 0.50, 0.42, -0.28], ['ellipse', 0.58, 0.50, 0.42, 0.42], ['!line', 0.68, 0.72, 0.08, 0.08], ['!line', 0.76, 0.80, 0.14, -0.16]],
++  clip: [['roundRect', 0.28, 0.02, 0.44, 0.96], ['!roundRect', 0.38, 0.12, 0.24, 0.72], ['!rect', 0.38, 0.84, 0.24, 0.16]],
++  // Filled finance family.
++  key: [['ellipse', 0.02, 0.16, 0.50, 0.50], ['rect', 0.44, 0.36, 0.54, 0.14], ['rect', 0.80, 0.44, 0.10, 0.22]],
++  hourglass: [['triangle', 0.14, 0.06, 0.72, 0.42, 180], ['triangle', 0.14, 0.52, 0.72, 0.42], ['rect', 0.06, 0.02, 0.88, 0.08], ['rect', 0.06, 0.90, 0.88, 0.08]],
++  bulb: [['ellipse', 0.16, 0.04, 0.68, 0.68], ['rect', 0.36, 0.66, 0.28, 0.30]],
++  moneybag: [['blockArc', 0.06, 0.24, 0.88, 0.74], ['rect', 0.30, 0.04, 0.40, 0.16]],
++  globe: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['!ellipse', 0.32, 0.02, 0.36, 0.96], ['!line', 0.02, 0.50, 0.96, 0.00]],
++  calculator: [['rect', 0.10, 0.02, 0.80, 0.96], ['!rect', 0.20, 0.12, 0.60, 0.22], ['!line', 0.20, 0.56, 0.60, 0.00], ['!line', 0.20, 0.76, 0.60, 0.00], ['!line', 0.40, 0.44, 0.00, 0.50], ['!line', 0.62, 0.44, 0.00, 0.50]],
++  coins: [['ellipse', 0.06, 0.56, 0.60, 0.34], ['ellipse', 0.20, 0.30, 0.60, 0.34], ['ellipse', 0.34, 0.06, 0.60, 0.34]],
++  briefcase: [['rect', 0.02, 0.28, 0.96, 0.62], ['rect', 0.32, 0.10, 0.36, 0.16], ['!line', 0.02, 0.54, 0.96, 0.00]],
++  umbrella: [['blockArc', 0.02, 0.14, 0.96, 0.96], ['rect', 0.46, 0.50, 0.08, 0.44]],
++  piggy: [['ellipse', 0.06, 0.24, 0.80, 0.56], ['triangle', 0.20, 0.10, 0.22, 0.20], ['rect', 0.18, 0.72, 0.10, 0.20], ['rect', 0.62, 0.72, 0.10, 0.20]],
++  monitor: [['rect', 0.04, 0.10, 0.92, 0.60], ['rect', 0.40, 0.70, 0.20, 0.16], ['rect', 0.24, 0.86, 0.52, 0.10]],
++  scales: [['line', 0.50, 0.04, 0.00, 0.92], ['line', 0.10, 0.20, 0.80, 0.00], ['triangle', 0.02, 0.24, 0.32, 0.34, 180], ['triangle', 0.66, 0.24, 0.32, 0.34, 180]],
++  percent: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['!ellipse', 0.18, 0.18, 0.24, 0.24], ['!ellipse', 0.58, 0.58, 0.24, 0.24], ['!line', 0.22, 0.78, 0.56, -0.56]],
++  dollar: [['ellipse', 0.02, 0.02, 0.96, 0.96], ['!line', 0.50, 0.10, 0.00, 0.80], ['!blockArc', 0.24, 0.20, 0.52, 0.34], ['!blockArc', 0.24, 0.48, 0.52, 0.34, 180]],
++};
++
++/**
++ * Draws one pictogram inside the cell (x, y, w, h).
++ * `filled` picks the solid-glyph style, otherwise a hairline outline.
++ */
++const KNOCKOUT_W = 2.4; // pt — thick enough to read at icon scale
++
++function drawIcon(slide, name, x, y, w, h, { color, filled, stroke, paper }) {
++  ICONS[name].forEach(([part, dx, dy, dw, dh, rot]) => {
++    const cut = part.charAt(0) === '!';
++    const shape = cut ? part.slice(1) : part;
++    const tone = cut ? paper : color;
++    slide.addShape(shape, {
++      x: x + dx * w, y: y + dy * h, w: dw * w, h: dh * h, rotate: rot || 0,
++      fill: shape === 'line' ? null : { color: filled ? tone : 'FFFFFF', transparency: filled ? 0 : 100 },
++      line: { color: tone, width: cut ? KNOCKOUT_W : stroke },
++    });
++  });
++}
++
++/** Evenly spaced coordinates — the pictogram sheets are strict grids. */
++function series(start, step, count) {
++  return Array.from({ length: count }, (_, i) => start + i * step);
++}
++
++/* ================================================================== *
++ * Quote posters (slides 1–12)
++ * ================================================================== */
++
++// 1 — Cover on light paper.
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  photoBackdrop(s, PHOTO.paperWhite);
++  richText(
++    s,
++    [
++      [{ t: 'We brings motivation. ', fontFace: F.bold }],
++      [{ t: 'Because you deserve better.', fontFace: F.light }],
++    ],
++    { x: 1.575, y: 1.574, w: 3.555, h: 0.681, fontSize: 18, color: C.plum, lineSpacingMultiple: 1.0, wrap: false }
++  );
++  headline(s, 'a good laugh is sunshine in the house', {
++    x: 1.575, y: 10.031, w: 11.85, h: 6.606, ...HEAD_XL,
++  });
++  text(s, 'www.influencer.com', {
++    x: 1.575, y: 24.709, w: 2.659, h: 0.375,
++    fontFace: F.regular, fontSize: 18, color: C.plum, wrap: false,
++  });
++  wordmarkBar(s,
++    { x: 11.269, color: C.rust },
++    { x: 11.609, y: 24.039, w: 1.81, h: 1.044, fontSize: 32, color: C.plum });
++}
++
++// 2 — Quote with a pencil mark and a giant pencil watermark.
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  photoBackdrop(s, PHOTO.paperCream);
++  pencilIcon(s, 9.495, 14.697, 10.387, C.wash, 95);
++  headline(s, 'Keep your face always toward the sunshine - and shadows will fall behind you.', {
++    x: 1.575, y: 10.973, w: 11.85, h: 5.358, ...HEAD_LG,
++  });
++  pencilIcon(s, 1.575, 7.362, 1.698, C.cocoa, 0);
++  brandDot(s, 12.632, 1.572, C.ink, C.white);
++  wordmarkStacked(s, 11.398, 2.638, C.cocoa, 'right');
++}
++
++// 3 — Quote anchored low, attribution at the foot.
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  photoBackdrop(s, PHOTO.paperCream);
++  headline(s, 'The power of imagination makes us infinite.', {
++    x: 1.575, y: 14.874, w: 10.951, h: 4.114, ...HEAD_LG, color: C.black,
++  });
++  text(s, 'Eleanor Roosevelt', {
++    x: 1.575, y: 24.473, w: 4.063, h: 0.611,
++    fontFace: F.regular, fontSize: 32, color: C.black, wrap: false,
++  });
++  wordmarkStacked(s, 1.585, 2.638, C.black, 'left');
++  brandDot(s, 1.575, 1.572, C.ink, C.white);
++}
++
++// 4 — Quote on the rose paper texture, white attribution.
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  photoBackdrop(s, PHOTO.textureRose);
++  headline(s, 'Our chief want is someone who will inspire us to be what we know we could be.', {
++    x: 1.575, y: 11.097, w: 11.957, h: 5.358, ...HEAD_LG,
++  });
++  text(s, 'Ralph Waldo Emerson', {
++    x: 1.633, y: 22.023, w: 5.062, h: 0.611,
++    fontFace: F.regular, fontSize: 32, color: C.white, wrap: false,
++  });
++  text(s, 'www.influencer.com', {
++    x: 10.873, y: 22.259, w: 2.659, h: 0.375,
++    fontFace: F.regular, fontSize: 18, italic: true, color: C.white, wrap: false,
++  });
++  wordmarkBar(s,
++    { x: 1.575, color: C.rust },
++    { x: 1.969, y: 1.574, w: 1.163, h: 0.669, fontSize: 20, color: C.white });
++}
++
++// 5 — Centred quote, minimal furniture.
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  photoBackdrop(s, PHOTO.textureRose);
++  headline(s, 'Pessimism leads to weakness, optimism to power.', {
++    x: 2.13, y: 11.276, w: 10.741, h: 4.114, ...HEAD_LG, align: 'center',
++  });
++  text(s, 'www.influencer.com', {
++    x: 10.76, y: 24.709, w: 2.659, h: 0.375,
++    fontFace: F.regular, fontSize: 18, italic: true, color: C.plum, wrap: false,
++  });
++  wordmarkBar(s,
++    { x: 1.575, color: C.rust },
++    { x: 1.969, y: 1.574, w: 1.163, h: 0.669, fontSize: 20, color: C.plum });
++}
++
++// 6 — Long brown quote with a sub-caption.
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  photoBackdrop(s, PHOTO.textureClay);
++  headline(s, "Start by doing what's necessary; then do what's possible; and suddenly you are doing the impossible.", {
++    x: 1.575, y: 10.032, w: 10.951, h: 6.603, ...HEAD_LG, color: C.cocoa,
++  });
++  text(s, 'Eleanor Roosevelt', {
++    x: 1.575, y: 21.095, w: 4.286, h: 0.611,
++    fontFace: F.bold, fontSize: 32, color: C.ink, wrap: false,
++  });
++  text(s, 'She was a girl that love motivation herself by quote', {
++    x: 1.575, y: 21.824, w: 6.461, h: 0.375,
++    fontFace: F.light, fontSize: 18, italic: true, color: C.ink, wrap: false,
++  });
++  brandDot(s, 1.575, 1.574, C.ink, C.white);
++  wordmarkStacked(s, 1.585, 2.64, C.ink, 'left');
++}
++
++// 7 — Editorial layout: three translucent grey panels on white.
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  const panel = { color: C.smoke, transparency: 30 };
++  s.addShape('rect', { x: 1.11, y: 3.382, w: 5.583, h: 2.931, fill: panel });
++  s.addShape('rect', { x: 3.399, y: 10.533, w: 11.601, h: 6.64, fill: panel });
++  s.addShape('rect', { x: 1.11, y: 22.789, w: 4.493, h: 2.931, fill: panel });
++  richText(
++    s,
++    [
++      [{ t: 'A Motivational from', fontFace: F.light, fontSize: 18 }],
++      [{ t: 'ELLEN ROOSEVELT', fontFace: F.bold, fontSize: 32 }],
++    ],
++    { x: 1.575, y: 4.359, w: 4.493, h: 0.978, color: C.ink, lineSpacingMultiple: 1.2, wrap: false }
++  );
++  headline(s, 'Pessimism leads to weakness, optimism to power.', {
++    x: 5.146, y: 11.174, w: 8.757, h: 5.358, ...HEAD_LG,
++  });
++  footerBlock(s, 1.575, 23.425, C.ink);
++}
++
++// 8 — White quote in a grey panel that bleeds off the right edge.
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  s.addShape('rect', { x: 4.903, y: 8.082, w: 10.097, h: 6.64, fill: { color: C.smoke, transparency: 30 } });
++  headline(s, 'With the new day comes new strength and new thoughts.', {
++    x: 5.649, y: 8.517, w: 7.771, h: 5.358, ...HEAD_LG, color: C.white,
++  });
++  footerBlock(s, 1.568, 23.425, C.white);
++}
++
++// 9 — First of the black slides.
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.ink };
++  headline(s, 'Positive thinking will let you do everything better than negative thinking will.', {
++    x: 1.565, y: 11.718, w: 11.957, h: 5.358, ...HEAD_LG, color: C.white,
++  });
++  makeItWrite(s, { x: 1.565, y: 1.574, w: 1.81, h: 1.044, fontSize: 32, color: C.white });
++  text(s, 'Zig Ziglar', {
++    x: 1.565, y: 18.081, w: 2.16, h: 0.611,
++    fontFace: F.light, fontSize: 32, color: C.white, wrap: false,
++  });
++}
++
++// 10 — Black slide with publication meta and a biography paragraph.
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.ink };
++  richText(
++    s,
++    [
++      [
++        { t: 'Brought to you by', fontFace: F.light },
++        { t: ' Make It Write', fontFace: F.bold },
++        { t: '™', fontFace: F.light, superscript: true },
++      ],
++      [
++        { t: 'Published on ', fontFace: F.light },
++        { t: '20 March 2020', fontFace: F.bold },
++      ],
++    ],
++    { x: 9.801, y: 1.574, w: 3.618, h: 0.597, fontSize: 15, color: C.smoke, lineSpacingMultiple: 1.0, wrap: false }
++  );
++  headline(s, "I hated every minute of training, but I said, 'Don't quit. Suffer now and live the rest of your life as a champion.'", {
++    x: 1.575, y: 9.098, w: 10.958, h: 6.856, ...HEAD_LG, color: C.white,
++  });
++  text(
++    s,
++    'Muhammad Ali was a boxer, philanthropist and social activist who is universally regarded as one of the greatest athletes of the 20th century. Ali became an Olympic gold medalist in 1960 and the world heavyweight boxing champion in 1964.\u00a0',
++    { x: 1.575, y: 17.298, w: 8.601, h: 1.475, fontFace: F.regular, fontSize: 18, color: C.smoke, lineSpacingMultiple: 1.2 }
++  );
++  brandDot(s, 1.575, 1.574, C.white, C.ink);
++}
++
++// 11 — Extra-large white quote on black.
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.ink };
++  headline(s, 'You must do the things you think you cannot do.', {
++    x: 1.575, y: 11.096, w: 11.85, h: 8.617, ...HEAD_XL, color: C.white,
++  });
++  text(s, 'Eleanor Roosevelt', {
++    x: 1.575, y: 21.01, w: 4.063, h: 0.611,
++    fontFace: F.regular, fontSize: 32, color: C.white, wrap: false,
++  });
++  wordmarkStacked(s, 2.707, 1.628, C.white, 'left');
++  verticalStrapline(s, 11.302, 3.065, C.white);
++  brandDot(s, 1.575, 1.574, C.white, C.ink);
++}
++
++// 12 — Black slide with the Sydney Opera House pictogram.
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.ink };
++  operaHouseIcon(s, 1.575, 9.851, 3.227, 1.62, C.white);
++  headline(s, "I'd love to come to Australia. I'd love to walk about the Sydney Opera House.", {
++    x: 1.575, y: 12.905, w: 11.301, h: 5.358, ...HEAD_LG, color: C.white,
++  });
++  wordmarkBar(s,
++    { x: 1.575, color: C.peach },
++    { x: 1.969, y: 1.574, w: 1.163, h: 0.669, fontSize: 20, color: C.white });
++  richText(
++    s,
++    [
++      [{ t: 'Read More', fontFace: F.bold }, { t: ' on', fontFace: F.light }],
++      [{ t: 'www.influencer.com', fontFace: F.light }],
++    ],
++    { x: 10.799, y: 24.403, w: 2.621, h: 0.681, fontSize: 18, color: C.white, align: 'right', lineSpacingMultiple: 1.0, wrap: false }
++  );
++  verticalStrapline(s, 11.302, 3.012, C.white);
++}
++
++/* ================================================================== *
++ * Pictogram sheets (slides 13–17)
++ * ================================================================== */
++
++const SHEETS = [
++  { // 13 — 10 x 11 interface icons, hairline outline
++    colX: series(3.197, 0.9562, 10), rowY: series(8.555, 0.9560, 11),
++    w: 0.50, h: 0.48, stroke: 2.2,
++    names: ['house', 'clock', 'target', 'lock', 'lock', 'book', 'book', 'doc', 'copy', 'doc',
++      'copy', 'note', 'note', 'note', 'check', 'checkRing', 'cross', 'film', 'film', 'play',
++      'pie', 'bars', 'target', 'dots', 'dots', 'edit', 'edit', 'chat', 'chat', 'chat',
++      'ban', 'info', 'help', 'warn', 'copy', 'copy', 'box', 'image', 'image', 'calculator',
++      'box', 'box', 'inbox', 'inbox', 'bag', 'trash', 'search', 'search', 'search', 'funnel',
++      'funnel', 'funnel', 'music', 'music', 'star', 'star4', 'star', 'list', 'tag', 'tag',
++      'phoneUp', 'phoneUp', 'send', 'sliders', 'card', 'sliders', 'gear', 'gear', 'image', 'note',
++      'chat', 'card', 'card', 'card', 'calculator', 'plus', 'minus', 'bag', 'copy', 'box',
++      'edit', 'edit', 'list', 'list', 'list', 'folder', 'folder', 'folder', 'search', 'user',
++      'user', 'user', 'users', 'gear', 'shield', 'gift', 'eye', 'calendar', 'calendar', 'bank',
++      'warn', 'trash', 'trash', 'phone', 'phone', 'bolt', 'calculator', 'bell', 'gem', 'heart'],
++  },
++  { // 14 — 10 x 5 brand / social marks, hairline outline
++    colX: series(2.82, 1.0474, 10), rowY: series(11.243, 1.0441, 5),
++    w: 0.74, h: 0.75, stroke: 4.2,
++    names: ['play', 'camera', 'cross', 'chat', 'send', 'ghost', 'rss', 'droid', 'grid', 'bolt',
++      'win', 'target', 'chat', 'help', 'cloud', 'send', 'box', 'paper', 'apple', 'send',
++      'bolt', 'win', 'dots', 'target', 'ghost', 'chat', 'plus', 'users', 'gem', 'grid',
++      'play', 'grid', 'chat', 'apple', 'plus', 'win', 'play', 'note', 'ghost', 'droid',
++      'share', 'music', 'target', 'droid', 'note', 'camera', 'note', 'tag', 'star4', 'paper'],
++  },
++  { // 15 — 41 solid mail icons (last row holds a single glyph)
++    colX: series(1.941, 1.2244, 10), rowY: [10.832, 12.29, 14.05, 15.637, 16.786],
++    w: 0.86, h: 0.86, stroke: 0.5, filled: true, limit: 41,
++    names: ['clip', 'doc', 'paper', 'envPin', 'envStamp', 'envCheck', 'envDot', 'envTop', 'envCheck', 'envPlus',
++      'envPlus', 'envOpen', 'trash', 'envStamp', 'envTop', 'inbox', 'envDot', 'env', 'envCheck', 'envPlus',
++      'envPlus', 'envCheck', 'envTop', 'clip', 'envStar', 'envTop', 'envCheck', 'card', 'envPin', 'envPlus',
++      'envCheck', 'edit', 'envTop', 'clip', 'envOpen', 'envOpen', 'env', 'lock', 'envCheck', 'envPlus',
++      'phone'],
++  },
++  { // 16 — 10 x 5 solid finance icons
++    colX: series(1.972, 1.2284, 10), rowY: series(10.738, 1.2155, 5),
++    w: 0.87, h: 0.88, stroke: 0.5, filled: true,
++    names: ['key', 'hourglass', 'users', 'monitor', 'bulb', 'moneybag', 'phoneUp', 'globe', 'calculator', 'calculator',
++      'doc', 'bars', 'clock', 'share', 'moneybag', 'users', 'box', 'card', 'coins', 'card',
++      'calculator', 'gem', 'briefcase', 'calculator', 'doc', 'umbrella', 'coins', 'target', 'coins', 'briefcase',
++      'moneybag', 'calculator', 'bars', 'pie', 'globe', 'bank', 'piggy', 'monitor', 'coins', 'gem',
++      'tag', 'search', 'phoneUp', 'bank', 'bank', 'card', 'eye', 'percent', 'dollar', 'scales'],
++  },
++];
++
++function pictogramSheet(pptx, sheet) {
++  const s = pptx.addSlide();
++  const style = { color: C.black, filled: !!sheet.filled, stroke: sheet.stroke, paper: C.white };
++  const cells = [];
++  sheet.rowY.forEach((cy, r) => sheet.colX.forEach((cx, c) => cells.push([cx, cy, r * sheet.colX.length + c])));
++  cells.slice(0, sheet.limit || cells.length).forEach(([cx, cy, i]) => {
++    const name = ICONS[sheet.names[i]] ? sheet.names[i] : 'star';
++    drawIcon(s, name, cx - sheet.w / 2, cy - sheet.h / 2, sheet.w, sheet.h, style);
++  });
++}
++
++/**
++ * Slide 17 — 10 x 5 outline "city / landscape" vignettes: each cell is a
++ * horizon line, a sun or moon and a couple of silhouette landmarks.
++ */
++const SCENES = [
++  [['rect', 0.06, 0.42, 0.20, 0.44], ['trapezoid', 0.32, 0.30, 0.28, 0.56], ['ellipse', 0.70, 0.10, 0.16, 0.16], ['rect', 0.66, 0.58, 0.24, 0.28]],
++  [['ellipse', 0.30, 0.08, 0.16, 0.16], ['blockArc', 0.10, 0.28, 0.34, 0.58], ['blockArc', 0.48, 0.20, 0.36, 0.66], ['rect', 0.84, 0.50, 0.12, 0.36]],
++  [['ellipse', 0.62, 0.08, 0.16, 0.16], ['triangle', 0.06, 0.34, 0.34, 0.52], ['triangle', 0.32, 0.22, 0.38, 0.64], ['rect', 0.76, 0.56, 0.18, 0.30]],
++  [['rect', 0.10, 0.16, 0.14, 0.70], ['ellipse', 0.60, 0.10, 0.16, 0.16], ['rect', 0.34, 0.44, 0.18, 0.42], ['rect', 0.58, 0.52, 0.16, 0.34], ['rect', 0.80, 0.34, 0.14, 0.52]],
++  [['cloud', 0.04, 0.20, 0.28, 0.24], ['ellipse', 0.44, 0.10, 0.16, 0.16], ['blockArc', 0.24, 0.44, 0.44, 0.42], ['triangle', 0.66, 0.36, 0.30, 0.50]],
++  [['ellipse', 0.16, 0.10, 0.16, 0.16], ['triangle', 0.04, 0.40, 0.40, 0.46], ['pentagon', 0.40, 0.28, 0.30, 0.58], ['rect', 0.74, 0.48, 0.20, 0.38]],
++  [['ellipse', 0.72, 0.12, 0.16, 0.16], ['blockArc', 0.06, 0.34, 0.40, 0.52], ['rect', 0.50, 0.42, 0.16, 0.44], ['rect', 0.70, 0.56, 0.24, 0.30]],
++  [['ellipse', 0.10, 0.12, 0.16, 0.16], ['triangle', 0.20, 0.22, 0.34, 0.64], ['triangle', 0.48, 0.34, 0.30, 0.52], ['cloud', 0.74, 0.24, 0.24, 0.20]],
++  [['rect', 0.06, 0.32, 0.18, 0.54], ['rect', 0.28, 0.20, 0.16, 0.66], ['ellipse', 0.56, 0.10, 0.16, 0.16], ['rect', 0.50, 0.46, 0.20, 0.40], ['rect', 0.76, 0.38, 0.18, 0.48]],
++  [['ellipse', 0.66, 0.10, 0.16, 0.16], ['trapezoid', 0.08, 0.36, 0.34, 0.50], ['blockArc', 0.44, 0.30, 0.34, 0.56], ['rect', 0.82, 0.54, 0.14, 0.32]],
++];
++
++function landscapeSheet(pptx) {
++  const s = pptx.addSlide();
++  const colX = series(1.611, 1.2994, 10);
++  const rowY = series(10.073, 1.5209, 5);
++  const w = 0.99;
++  const h = 0.85;
++  const line = { color: C.black, width: 3.4 };
++  rowY.forEach((cy, r) => colX.forEach((cx, c) => {
++    const x = cx - w / 2;
++    const y = cy - h / 2;
++    SCENES[(r * 3 + c) % SCENES.length].forEach(([shape, dx, dy, dw, dh]) => {
++      s.addShape(shape, {
++        x: x + dx * w, y: y + dy * h, w: dw * w, h: dh * h,
++        fill: { color: 'FFFFFF', transparency: 100 }, line,
++      });
++    });
++    s.addShape('line', { x, y: y + 0.88 * h, w, h: 0, line });
++  }));
++}
++
++/* ================================================================== *
++ * Build
++ * ================================================================== */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'STORY', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'STORY';
++  pptx.author = 'Make It Write';
++  pptx.title = 'Make It Write — Motivational Quotes';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06,
++    slide07, slide08, slide09, slide10, slide11, slide12].forEach((fn) => fn(pptx));
++  SHEETS.forEach((sheet) => pictogramSheet(pptx, sheet));
++  landscapeSheet(pptx);
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '131c64d4-f681-452a-8530-6db2c5f917c6_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => {
++  console.error(e);
++  process.exit(1);
++});

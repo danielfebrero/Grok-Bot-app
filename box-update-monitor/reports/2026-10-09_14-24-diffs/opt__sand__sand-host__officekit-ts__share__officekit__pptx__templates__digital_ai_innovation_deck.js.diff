@@ -1,0 +1,830 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/digital_ai_innovation_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/digital_ai_innovation_deck.js
+@@ -0,0 +1,827 @@
++/*
++ * "Digital AI Innovation" — 25-slide deck rebuilt with pptxgenjs.
++ *
++ * Everything (positions in inches, colours, fonts, sizes) is written out as
++ * plain literals / data tables so the design can be read straight from the code.
++ *
++ * Note on pictures: the source deck's picture placeholders are all EMPTY (they
++ * hold no image data and render as nothing).  The only real raster assets are
++ * three tiny glyph icons; those are drawn as `imageBox()` placeholders.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const BG = '0D0D0D'; // slide background (theme tx1 @ lumMod 95%)
++const WHITE = 'FFFFFF';
++const BLUE = '1A80D9'; // accent1
++const PURPLE = '9172E0'; // accent2
++const ORANGE = 'F27457'; // accent3
++const BLUE2 = '5288F2'; // accent4
++const INK = '262626'; // black lumMod 85% — "almost black" body text on white
++const GREY = '595959'; // black lumMod 65% — secondary text on white
++const GREY2 = '808080'; // black lumMod 50%
++const SILVER = 'BFBFBF'; // white lumMod 75%
++const PALE = 'EDF1F3'; // light track / arc colour
++const MAP_GREY = '2D2D2D'; // world-map land colour
++
++const MAJOR = 'Space Grotesk'; // theme major (headings) font
++const MINOR = 'Inter Light'; // theme minor (body) font
++
++/* ---------------------------------------------------------------- shorthands */
++/* pptxgenjs mutates the shadow object it is handed, so hand it a fresh one each time. */
++const shadow = (opacity, blur, offset, angle, color) => ({ type: 'outer', color: color || '000000', opacity, blur, offset, angle });
++const softShadow = () => shadow(0.12, 19, 15, 135);
++const cardShadow = () => shadow(0.15, 12, 15, 135);
++const deepShadow = () => shadow(0.2, 52, 36, 135);
++const glow = (c) => shadow(0.35, 30, 12, 90, c);
++
++/* Add a shape. `opts` is passed straight through to pptxgenjs. */
++function sh(slide, shape, x, y, w, h, opts) {
++  slide.addShape(shape, Object.assign({ x, y, w, h }, opts));
++}
++
++/* Add a text box. Defaults mirror PowerPoint text boxes: top anchored, no fill. */
++function txt(slide, text, x, y, w, h, opts) {
++  const o = Object.assign(
++    { x, y, w, h, valign: 'top', align: 'left', fontFace: MINOR, fontSize: 18, color: WHITE },
++    opts
++  );
++  slide.addText(text, o);
++}
++
++/* Straight connector. */
++function ln(slide, x, y, w, h, color, width, opts) {
++  sh(slide, 'line', x, y, w, h, Object.assign({ line: Object.assign({ color, width: width || 0.75 }, opts || {}) }));
++}
++
++/* Rounded-rect radius: the source stores it as a % of the shorter side. */
++const radius = (pct, w, h) => (pct / 100) * Math.min(w, h);
++
++/* Placeholder standing in for a bitmap icon from the original deck. */
++function imageBox(slide, x, y, w, h, color) {
++  sh(slide, 'rect', x, y, w, h, { fill: { color: color || INK }, line: { color: color || INK, width: 0.5 } });
++}
++
++/* ------------------------------------------------------- reusable decorations */
++
++/* Offset squares motif (2 or 3 tiles) used in the deck corners. */
++function tiles(slide, x, y, size, color, cells) {
++  cells.forEach(([cx, cy]) => sh(slide, 'rect', x + cx * size, y + cy * size, size, size, { fill: { color } }));
++}
++const TILES_2 = [[0, 0], [1, 1]]; // top-left + bottom-right
++const TILES_3 = [[0, 0], [1, 0], [1, 1]]; // top-left + top-right + bottom-right
++
++/* The purple corner motif that repeats on the "content" slides. */
++function purpleCorner(slide) {
++  tiles(slide, 11.336, -0.01, 1.017, PURPLE, TILES_2);
++}
++
++/* Three faint vertical rules used on the title / closing slides. */
++function vRules(slide, left) {
++  [0, 2.132, 4.263].forEach((dx) =>
++    ln(slide, left + dx, 0, 0, 7.5, WHITE, 0.75, { transparency: 85, dashType: 'solid' })
++  );
++}
++
++/* White "How AI Is Redefining" call-to-action button with circled arrow. */
++function ctaButton(slide, x, y) {
++  sh(slide, 'rect', x, y, 3.449, 0.795, { fill: { color: WHITE }, line: { color: '000000', width: 0.75 }, shadow: deepShadow() });
++  txt(slide, 'How AI Is Redefining', x + 0.193, y + 0.196, 2.748, 0.404, { bold: true, fontFace: MAJOR, color: '000000' });
++  sh(slide, 'ellipse', x + 2.951, y + 0.234, 0.329, 0.329, { fill: { type: 'none' }, line: { color: INK, width: 0.75 } });
++  ln(slide, x + 2.951, y + 0.398, 0.233, 0, INK, 0.75, { endArrowType: 'arrow' });
++}
++
++/* Blue "+82M / Main target" bubble (slides 2 and 24). */
++function targetBubble(slide, x, y) {
++  sh(slide, 'ellipse', x, y, 1.95, 1.95, { fill: { color: BLUE }, shadow: glow(BLUE) });
++  txt(slide, '+82M', x - 0.008, y + 0.502, 1.967, 0.774, { fontSize: 40, fontFace: MAJOR, align: 'center' });
++  txt(slide, 'Main target', x - 0.008, y + 1.183, 1.967, 0.303, { fontSize: 12, align: 'center' });
++}
++
++/* Blue→purple gradient approximated with N vertical slices. */
++function gradientBar(slide, x, y, w, h, c1, c2, steps) {
++  const mix = (a, b, t) =>
++    [0, 2, 4]
++      .map((i) => Math.round(parseInt(a.substr(i, 2), 16) * (1 - t) + parseInt(b.substr(i, 2), 16) * t))
++      .map((v) => v.toString(16).padStart(2, '0').toUpperCase())
++      .join('');
++  const sw = w / steps;
++  for (let i = 0; i < steps; i++) {
++    sh(slide, 'rect', x + i * sw, y, sw + 0.004, h, { fill: { color: mix(c1, c2, (i + 0.5) / steps) } });
++  }
++}
++
++/* Small gradient tag with a downward pointer ("Our Founder", "Comparison"). */
++function tagBadge(slide, x, y, label) {
++  gradientBar(slide, x, y, 1.643, 0.346, BLUE, PURPLE, 8);
++  txt(slide, label, x, y + 0.03, 1.643, 0.28, { fontSize: 14, align: 'center', valign: 'middle' });
++  sh(slide, 'triangle', x + 0.149, y + 0.336, 0.159, 0.124, { fill: { color: '4172DE' }, rotate: 180 });
++}
++
++/* Two-arrow circular ring (slide 17 price dials): a pair of block arcs, each
++ * continued by an arrow head that points along the clockwise tangent. */
++function ringArrows(slide, cx, cy, d) {
++  const rMid = (d / 2) * 0.92;
++  const hw = 0.66;
++  const hh = 0.52;
++  [{ from: 298, to: 62 }, { from: 118, to: 242 }].forEach((a) => {
++    sh(slide, 'blockArc', cx - d / 2, cy - d / 2, d, d, {
++      fill: { color: PALE, transparency: 25 }, angleRange: [a.from, a.to], arcThicknessRatio: 0.16,
++    });
++    const head = a.to + 20; // the head carries on past the end of the arc
++    const rad = (head * Math.PI) / 180;
++    sh(slide, 'triangle', cx + rMid * Math.cos(rad) - hw / 2, cy + rMid * Math.sin(rad) - hh / 2, hw, hh, {
++      fill: { color: PALE, transparency: 25 }, rotate: head + 180,
++    });
++  });
++}
++
++/* A single "person" pictogram (head, shoulders, two legs) for slide 20. */
++function personIcon(slide, x, y, w, h, color, transparency) {
++  const fill = { color, transparency: transparency || 0 };
++  sh(slide, 'ellipse', x + w * 0.315, y, w * 0.37, w * 0.37, { fill });
++  sh(slide, 'round2SameRect', x, y + h * 0.16, w, h * 0.46, { fill, rectRadius: w * 0.3 });
++  sh(slide, 'rect', x + w * 0.09, y + h * 0.55, w * 0.34, h * 0.45, { fill });
++  sh(slide, 'rect', x + w * 0.57, y + h * 0.55, w * 0.34, h * 0.45, { fill });
++}
++
++/* ============================================================ slide builders */
++
++/* 1 — Title: "Digital AI / Innovation". */
++function slide01(s) {
++  tiles(s, 0, 5.749, 0.875, PURPLE, TILES_2);
++  txt(s, 'Digital AI', 1.518, 1.646, 7.127, 1.582, { fontSize: 88, fontFace: MAJOR, charSpacing: -1.5 });
++  vRules(s, 7.156);
++  sh(s, 'rect', 1.914, 3.327, 6.869, 1.608, { fill: { color: BLUE } });
++  txt(s, 'Innovation', 1.899, 3.341, 6.869, 1.582, { fontSize: 88, fontFace: MAJOR, charSpacing: -1.5, align: 'center' });
++  txt(s, 'Presentation Template', 2.362, 5.43, 7.127, 0.64, { fontSize: 32, charSpacing: 3 });
++  tiles(s, 11.9, 0, 0.722, ORANGE, TILES_3);
++}
++
++/* 2 — Agenda list + stat bubble + "208K" card. */
++function slide02(s) {
++  txt(s, 'Reinventing the World with Artificial Intelligence', 1.015, 0.896, 8.349, 1.717, {
++    fontSize: 48, fontFace: MAJOR, charSpacing: -1.5,
++  });
++  const bullets = [
++    '01. Lorem dolor sit amet, consectetur adipiscing elit, eiusmod.',
++    '02. Sed do eiusmod tempor incididunt ut labore et dolore aliqua.',
++    '03. Ut enim ad minim veniam, quis nostrud.',
++  ];
++  bullets.forEach((t, i) => txt(s, t, 1.015, 2.808 + i * 0.599, 7.816, 0.37, { fontSize: 16 }));
++  [3.235, 3.833].forEach((y) => ln(s, 1.015, y, 8.11, 0, WHITE, 0.75, { transparency: 60 }));
++
++  // white stat card
++  sh(s, 'roundRect', 6.965, 4.484, 5.354, 1.098, { fill: { color: WHITE }, rectRadius: radius(19.5, 5.354, 1.098), shadow: softShadow() });
++  ln(s, 7.982, 4.484, 0, 1.098, '000000', 0.75, { transparency: 70 });
++  [[7.473, 4.832], [7.473, 5.033], [7.272, 5.033]].forEach(([x, y]) => sh(s, 'rect', x, y, 0.201, 0.201, { fill: { color: INK } }));
++  txt(s, '208K', 8.163, 4.613, 1.933, 0.841, { fontSize: 44, bold: true, fontFace: MAJOR, color: INK });
++  txt(s, 'Think not, when the wailing winds of autumn.', 9.927, 4.731, 2.281, 0.604, { fontSize: 12, color: GREY, lineSpacingMultiple: 1.3 });
++
++  sh(s, 'ellipse', 9.846, 0.816, 2.363, 2.363, { fill: { type: 'none' }, line: { color: 'F2F2F2', width: 0.5, transparency: 88 } });
++  targetBubble(s, 10.06, 1.022);
++}
++
++/* 3 — "The Age of Intelligent" hero with colour blocks. */
++function slide03(s) {
++  tiles(s, 7.558, 0, 1.751, PURPLE, TILES_2);
++  tiles(s, -0.01, 3.75, 1.875, BLUE, TILES_3);
++  sh(s, 'rect', 9.3, 1.042, 1.933, 0.795, { fill: { color: WHITE }, line: { color: '000000', width: 0.75 }, shadow: deepShadow() });
++  txt(s, '40K+', 9.363, 1.086, 1.806, 0.707, { fontSize: 36, bold: true, fontFace: MAJOR, charSpacing: -1.5, color: BLUE, align: 'center' });
++  txt(s, [
++    { text: 'The Age of ', options: { fontFace: MAJOR } },
++    { text: 'Intelligent', options: { fontFace: MINOR } },
++  ], 0.806, 0.455, 7.127, 3.063, { fontSize: 88, charSpacing: -1.5 });
++  txt(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur.',
++    9.881, 4.712, 2.705, 1.603, { fontSize: 14, lineSpacingMultiple: 1.3 });
++  ctaButton(s, 2.562, 4.728);
++}
++
++/* 4 — Section opener "01" with two option cards. */
++function slide04(s) {
++  vRules(s, 7.875);
++  // blue option card
++  sh(s, 'roundRect', 7.04, 1.162, 4.003, 3.761, {
++    fill: { color: BLUE }, rectRadius: radius(16.67, 4.003, 3.761), line: { color: GREY, width: 0.25, transparency: 50 },
++  });
++  ln(s, 7.04, 3.777, 4.003, 0, WHITE, 0.75, { transparency: 50 });
++  txt(s, [
++    { text: 'Think not, when the wailing winds of autumn. ' },
++    { text: 'Drive the shivering leaflets from the tree.', options: { bold: true, underline: { style: 'sng' } } },
++  ], 7.392, 1.678, 3.299, 1.648, { fontSize: 16, align: 'center', lineSpacingMultiple: 1.3 });
++  txt(s, 'Options One', 7.382, 4.16, 1.185, 0.303, { fontSize: 12, wrap: false });
++
++  txt(s, '01', 0.847, 0.449, 4.224, 3.128, { fontSize: 199, fontFace: MAJOR, charSpacing: -1.5, color: PALE, transparency: 70, lineSpacingMultiple: 0.9 });
++  txt(s, 'From Insight to Impact with AI', 0.847, 3.175, 5.694, 1.919, { fontSize: 54, fontFace: MAJOR, charSpacing: -1.5 });
++  txt(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur.',
++    0.847, 5.357, 7.475, 0.767, { fontSize: 16, lineSpacingMultiple: 1.3 });
++
++  // white option card
++  sh(s, 'roundRect', 9.298, 3.487, 3.055, 2.87, {
++    fill: { color: WHITE }, rectRadius: radius(16.67, 3.055, 2.87), line: { color: GREY, width: 0.25, transparency: 50 },
++  });
++  ln(s, 9.298, 5.524, 3.055, 0, '000000', 0.75, { transparency: 50 });
++  txt(s, [
++    { text: 'Think not, when the wailing winds of autumn. ', options: { color: GREY } },
++    { text: 'Drive the shivering leaflets from the tree.', options: { bold: true, underline: { style: 'sng' }, color: INK } },
++  ], 9.56, 3.988, 2.531, 1.192, { fontSize: 14, align: 'center', lineSpacingMultiple: 1.3, color: GREY });
++  txt(s, 'Options Two', 9.56, 5.794, 1.203, 0.303, { fontSize: 12, color: GREY, wrap: false });
++  imageBox(s, 11.653, 5.713, 0.438, 0.438); // "people" glyph in the original
++}
++
++/* 5 — Six outlined feature boxes. */
++function slide05(s) {
++  const BODY = 'Lorem ipsum dolor sit amet. Qui sint neque';
++  const boxes = [
++    { x: 0.957, y: 3.13, label: 'One', active: false },
++    { x: 3.847, y: 3.13, label: 'Two', active: true },
++    { x: 6.737, y: 3.13, label: 'Three', active: false },
++    { x: 9.628, y: 3.13, label: 'Four', active: false },
++    { x: 0.957, y: 4.878, label: 'Five', active: false },
++    { x: 3.847, y: 4.878, label: 'Six', active: false },
++  ];
++  boxes.forEach((b) => {
++    sh(s, 'rect', b.x, b.y, 2.749, 1.615, b.active
++      ? { fill: { color: BLUE } }
++      : { fill: { color: WHITE, transparency: 100 }, line: { color: PURPLE, width: 0.75 } });
++    txt(s, b.label, b.x + 0.107, b.y + 0.178, 2.535, 0.64, {
++      fontSize: 32, fontFace: MAJOR, charSpacing: -1.5, align: 'center', color: b.active ? WHITE : BLUE,
++    });
++    txt(s, BODY, b.x + 0.107, b.y + 0.787, 2.535, 0.643, { fontSize: 14, align: 'center', lineSpacingMultiple: 1.2 });
++  });
++  txt(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur.',
++    7.112, 5.166, 5.032, 0.997, { lineSpacingMultiple: 1.3 });
++  txt(s, 'Reinventing the World with Artificial Intelligence', 1.86, 0.907, 9.612, 1.919, {
++    fontSize: 54, fontFace: MAJOR, charSpacing: -1.5, align: 'center',
++  });
++}
++
++/* 6 — Big headline over a blue stats band. */
++function slide06(s) {
++  sh(s, 'rect', 0, 3.75, 7.896, 3.75, { fill: { color: BLUE } });
++  const BODY = 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. ';
++  txt(s, '+208K', 0.523, 4.409, 2.541, 1.01, { fontSize: 54, bold: true, fontFace: MAJOR });
++  txt(s, BODY, 0.523, 5.621, 3.332, 1.117, { fontSize: 16, lineSpacingMultiple: 1.3 });
++  ln(s, 3.948, 3.75, 0, 3.75, '000000', 0.75, { transparency: 72 });
++  txt(s, '847M', 4.201, 4.409, 2.583, 1.01, { fontSize: 54, bold: true, fontFace: MAJOR });
++  txt(s, BODY, 4.201, 5.621, 2.934, 1.117, { fontSize: 16, lineSpacingMultiple: 1.3 });
++  txt(s, 'Reinventing the World with Artificial Intelligence', 1.097, 0.762, 11.041, 2.322, {
++    fontSize: 66, fontFace: MAJOR, charSpacing: -1.5,
++  });
++  txt(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur.',
++    8.858, 4.14, 3.597, 1.467, { fontSize: 16, lineSpacingMultiple: 1.3 });
++  ctaButton(s, 8.858, 6.095);
++  purpleCorner(s);
++}
++
++/* 7 — Hero headline with paragraph and CTA. */
++function slide07(s) {
++  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis,',
++    0.906, 4.303, 5.749, 1.297, { fontSize: 14, lineSpacingMultiple: 1.3, paraSpaceBefore: 12 });
++  txt(s, [
++    { text: 'The Age of ', options: { fontFace: MAJOR } },
++    { text: 'Intelligent', options: { fontFace: MINOR } },
++  ], 0.906, 0.947, 7.127, 3.063, { fontSize: 88, charSpacing: -1.5 });
++  ctaButton(s, 5.493, 5.718);
++}
++
++/* 8 — "#1" outline numeral with region / start-from labels. */
++function slide08(s) {
++  txt(s, '#1', 7.353, 0.83, 6.41, 5.89, { fontSize: 344, bold: true, fontFace: MAJOR, color: BLUE, outline: { color: BLUE, size: 3.25 } });
++  txt(s, 'The Power of Predictive Thinking', 0.679, 3.575, 6.992, 1.919, { fontSize: 54, fontFace: MAJOR, charSpacing: -1.5 });
++  txt(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur.',
++    0.679, 5.757, 7.475, 0.767, { fontSize: 16, lineSpacingMultiple: 1.3 });
++  txt(s, '404-', 0.679, 0.805, 4.118, 1.212, { fontSize: 66, bold: true, fontFace: MAJOR });
++  txt(s, 'Region', 11.601, 0.533, 0.598, 0.252, { fontSize: 9, bold: true, fontFace: MAJOR, wrap: false });
++  txt(s, 'Asia', 11.601, 0.829, 0.695, 0.404, { wrap: false });
++  txt(s, 'Start From', 11.601, 5.9, 0.852, 0.252, { fontSize: 9, bold: true, fontFace: MAJOR, wrap: false });
++  txt(s, '2025', 11.601, 6.196, 0.816, 0.404, { wrap: false });
++}
++
++/* 9 — Feature tiles (three white, one blue). */
++function slide09(s) {
++  const LOREM = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ';
++  const white = [
++    { x: 0.985, y: 1.0, tx: 1.156, ty: 1.209, title: 'Feature One' },
++    { x: 0.987, y: 2.905, tx: 1.157, ty: 3.114, title: 'Feature Two' },
++    { x: 3.732, y: 2.905, tx: 3.902, ty: 3.114, title: 'Feature Three' },
++  ];
++  white.forEach((c) => {
++    sh(s, 'rect', c.x, c.y, 2.745, 1.905, { fill: { color: WHITE }, line: { color: '000000', width: 0.75 } });
++    txt(s, c.title, c.tx, c.ty, 2.403, 0.37, { bold: true, fontFace: MAJOR, color: INK, lineSpacingMultiple: 1.3 });
++    txt(s, LOREM, c.tx, c.ty + 0.466, 2.403, 0.932, { fontSize: 14, color: INK, lineSpacingMultiple: 1.2, paraSpaceAfter: 6 });
++  });
++  sh(s, 'rect', 6.471, 2.905, 3.083, 4.056, { fill: { color: BLUE } });
++  txt(s, 'Feature Four', 6.728, 3.114, 2.742, 0.466, { bold: true, fontFace: MAJOR, lineSpacingMultiple: 1.3 });
++  txt(s, 'Lorem dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore aliqua.',
++    6.728, 3.58, 2.742, 1.498, { fontSize: 14, lineSpacingMultiple: 1.2, paraSpaceAfter: 6 });
++  txt(s, [
++    { text: '1.05 ETH ', options: { bold: true } },
++    { text: '($2,500)', options: { fontSize: 12 } },
++  ], 6.728, 6.089, 2.371, 0.404, { fontFace: MAJOR });
++  ctaButton(s, 8.677, 5.224);
++  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus',
++    0.98, 5.32, 4.957, 0.99, { fontSize: 14, lineSpacingMultiple: 1.3, paraSpaceBefore: 12 });
++  txt(s, 'Reinventing the World with Artificial Intelligence', 4.091, 0.952, 7.245, 1.582, {
++    fontSize: 44, fontFace: MAJOR, charSpacing: -1.5,
++  });
++  purpleCorner(s);
++}
++
++/* 10 — Four client columns over darkened photo panels. */
++function slide10(s) {
++  const cols = [0.03, 3.328, 6.66, 10.002];
++  // photo panels are empty in the source; only their left→right darkening scrim shows
++  const CELLS = 6;
++  cols.forEach((x) => {
++    for (let c = 0; c < CELLS; c++) {
++      for (let r = 0; r < CELLS; r++) {
++        const opacity = 0.08 + 0.3 * ((c + 0.5) / CELLS) + 0.61 * ((r + 0.5) / CELLS);
++        sh(s, 'rect', x + c * 0.557, r * 1.25, 0.561, 1.254, {
++          fill: { color: '000000', transparency: Math.round(100 - opacity * 100) },
++        });
++      }
++    }
++  });
++  const clients = [
++    { x: 0.476, tx: 0.476, name: 'CLIENT #1', rule: 3.0 },
++    { x: 3.784, tx: 3.784, name: 'CLIENT #2', rule: 1.5 },
++    { x: 7.092, tx: 7.092, name: 'CLIENT #3', rule: 1.5 },
++    { x: 10.4, tx: 10.462, name: 'CLIENT #4', rule: 1.5 },
++  ];
++  clients.forEach((c) => {
++    ln(s, c.x, 0.641, 1.666, 0, SILVER, c.rule);
++    txt(s, c.name, c.tx, 0.86, 1.548, 0.438, { fontSize: 20, bold: true, fontFace: MAJOR, wrap: false });
++    txt(s, 'Solve this problem', c.tx, 1.526, 1.657, 0.303, { fontSize: 12, wrap: false });
++    txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo.', c.x, 5.76, 2.555, 0.861, {
++      fontSize: 12, lineSpacingMultiple: 1.3, paraSpaceBefore: 12,
++    });
++  });
++}
++
++/* 11 — Two "event feed" notification cards. */
++function slide11(s) {
++  const cards = [
++    { x: 1.982, label: 2.069, who: 'Meeting', when: 'Sep. 12, 12:30' },
++    { x: 7.162, label: 7.249, who: 'Growth Team', when: 'Dec. 12, 12:30' },
++  ];
++  cards.forEach((c) => {
++    txt(s, 'Event feed in the letter', c.label, 3.75, 2.285, 0.337, { fontSize: 14, wrap: false });
++    sh(s, 'roundRect', c.x, 4.186, 3.977, 0.879, { fill: { color: WHITE }, rectRadius: radius(15.5, 3.977, 0.879), shadow: cardShadow() });
++    ln(s, c.x + 0.821, 4.185, 0, 0.88, SILVER, 1.0, { transparency: 50 });
++    sh(s, 'roundRect', c.x + 0.199, 4.403, 0.45, 0.446, { fill: { color: BLUE }, rectRadius: radius(22, 0.45, 0.446), shadow: cardShadow() });
++    txt(s, '@', c.x + 0.199, 4.403, 0.45, 0.446, { fontSize: 12, align: 'center', valign: 'middle' });
++    sh(s, 'teardrop', c.x + 1.09, 4.53, 0.14, 0.14, { fill: { color: ORANGE }, rotate: 225 });
++    txt(s, c.who, c.x + 1.35, 4.357, 1.4, 0.303, { fontSize: 12, color: GREY, wrap: false });
++    txt(s, c.when, c.x + 1.35, 4.612, 1.4, 0.286, { fontSize: 11, color: GREY, wrap: false });
++    imageBox(s, c.x + 2.68, 4.5, 0.14, 0.16, GREY); // tiny wallet/drop glyph
++    txt(s, 'Notify of receipt', c.x + 2.919, 4.357, 0.943, 0.471, { fontSize: 11, color: GREY });
++  });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis,',
++    2.498, 5.526, 8.336, 0.99, { fontSize: 14, align: 'center', lineSpacingMultiple: 1.3, paraSpaceBefore: 12 });
++}
++
++/* 12 — Founder profile with skill bars and tag pills. */
++function slide12(s) {
++  tagBadge(s, 1.196, 1.55, 'Our Founder');
++  txt(s, 'Faundra Rimose', 1.196, 2.099, 6.772, 0.922, {
++    fontSize: 54, bold: true, fontFace: MAJOR, charSpacing: -1.5, lineSpacingMultiple: 0.9,
++  });
++  const skills = [
++    { y: 3.287, value: 2.608, pct: '80%', label: 'Skill one goes here', color: PURPLE },
++    { y: 3.923, value: 1.89, pct: '52%', label: 'Skill two goes here', color: ORANGE },
++  ];
++  skills.forEach((k) => {
++    sh(s, 'roundRect', 1.196, k.y, 3.346, 0.132, { fill: { color: PALE }, rectRadius: 0.066 });
++    sh(s, 'roundRect', 1.196, k.y, k.value, 0.132, { fill: { color: k.color }, rectRadius: 0.066 });
++    txt(s, k.pct, 4.633, k.y - 0.082, 0.706, 0.303, { fontSize: 12 });
++    txt(s, k.label, 1.196, k.y + 0.185, 3.346, 0.303, { fontSize: 12 });
++  });
++  const pills = [
++    { x: 1.208, y: 4.788, w: 1.57, t: 'Dark design' },
++    { x: 2.934, y: 4.788, w: 1.524, t: 'Solutions' },
++    { x: 4.591, y: 4.788, w: 0.991, t: 'Ideas' },
++    { x: 1.208, y: 5.455, w: 2.0, t: 'One more thing' },
++  ];
++  pills.forEach((p) => {
++    sh(s, 'roundRect', p.x, p.y, p.w, 0.496, { fill: { type: 'none' }, line: { color: WHITE, width: 1.5, transparency: 50 }, rectRadius: radius(26.3, p.w, 0.496) });
++    txt(s, p.t, p.x, p.y, p.w, 0.496, { fontSize: 14, align: 'center', valign: 'middle' });
++  });
++  sh(s, 'roundRect', 3.364, 5.455, 1.524, 0.496, { fill: { color: BLUE2 }, rectRadius: radius(26.3, 1.524, 0.496), shadow: glow(BLUE2) });
++  txt(s, 'Perfomance', 3.364, 5.455, 1.524, 0.496, { fontSize: 14, align: 'center', valign: 'middle' });
++  txt(s, 'Office Head', 5.583, 5.205, 2.986, 0.337, { fontFace: MAJOR, align: 'right' });
++  txt(s, 'Bima Shurhan', 5.583, 5.435, 2.986, 0.493, { fontSize: 20, align: 'right' });
++}
++
++/* 13 — Four "case" circles on a rule. */
++function slide13(s) {
++  const cases = [
++    { x: 2.694, y: 2.649, d: 1.666, t: 'Case One', active: false },
++    { x: 4.787, y: 2.649, d: 1.666, t: 'Case Two', active: false },
++    { x: 6.718, y: 2.487, d: 1.989, t: 'Case Three', active: true },
++    { x: 8.972, y: 2.649, d: 1.666, t: 'Case Four', active: false },
++  ];
++  cases.forEach((c) => {
++    sh(s, 'ellipse', c.x, c.y, c.d, c.d, c.active
++      ? { fill: { color: BLUE2 }, shadow: glow(BLUE2) }
++      : { fill: { type: 'none' }, line: { color: WHITE, width: 0.75 } });
++    txt(s, c.t, c.x, c.y, c.d, c.d, { fontSize: 14, fontFace: MAJOR, bold: c.active, align: 'center', valign: 'middle' });
++  });
++  ln(s, 3.201, 5.118, 6.931, 0, WHITE, 0.75, { transparency: 56 });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis,',
++    2.498, 5.598, 8.336, 0.99, { fontSize: 14, align: 'center', lineSpacingMultiple: 1.3, paraSpaceBefore: 12 });
++  txt(s, 'Reinventing the World with Artificial Intelligence', 2.336, 0.606, 8.662, 1.582, {
++    fontSize: 44, fontFace: MAJOR, charSpacing: -1.5, align: 'center',
++  });
++  purpleCorner(s);
++}
++
++/* 14 — Vertical year timeline. */
++function slide14(s) {
++  sh(s, 'round2SameRect', 2.226, 3.75, 1.109, 3.75, { fill: { color: WHITE }, shadow: cardShadow() });
++  sh(s, 'roundRect', 2.144, 4.707, 1.658, 0.617, { fill: { color: BLUE }, rectRadius: radius(16.67, 1.658, 0.617), shadow: softShadow() });
++  txt(s, '       2025', 2.144, 4.707, 1.658, 0.617, { fontSize: 16, bold: true, fontFace: MAJOR, align: 'center', valign: 'middle' });
++  tiles(s, 2.456, 4.88, 0.136, WHITE, TILES_3);
++  txt(s, [
++    { text: 'SUBTITLE', options: { fontFace: MAJOR, bold: true, breakLine: true } },
++    { text: 'A peep at some distant orb has power to raise and purify', options: { fontSize: 14, bold: true, underline: { style: 'sng' } } },
++    { text: ' our thoughts like a strain of sacred music, or a noble picture, or a passage from the grander poets. It always does one good. ', options: { fontSize: 14 } },
++  ], 4.168, 4.495, 4.809, 1.757, { lineSpacingMultiple: 1.3, paraSpaceBefore: 6, margin: [2.8, 17, 2.8, 0] });
++  ['2024', '2026', '2027', '2028'].forEach((year, i) =>
++    txt(s, year, 2.522, [4.152, 5.533, 6.092, 6.643][i], 0.552, 0.316, {
++      fontSize: 16, color: '8B8B8B', lineSpacingMultiple: 1.3, wrap: false, margin: 0,
++    })
++  );
++  sh(s, 'roundRect', 9.265, 3.234, 3.224, 2.14, { fill: { color: WHITE }, rectRadius: radius(1.9, 3.224, 2.14), shadow: deepShadow() });
++  txt(s, '+289,029,123', 9.437, 3.544, 2.88, 0.438, { fontSize: 20, bold: true, fontFace: MAJOR, color: PURPLE, align: 'center' });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo.', 9.437, 4.065, 2.88, 0.998, {
++    fontSize: 14, color: INK, align: 'center', lineSpacingMultiple: 1.3, paraSpaceBefore: 12,
++  });
++}
++
++/* 15 — Split layout: three percentage panels on the right. */
++function slide15(s) {
++  const rows = [
++    { y: 0.0, ty: 0.83, pct: '63%', dark: false },
++    { y: 2.515, ty: 0.675, pct: '66%', dark: true },
++    { y: 5.0, ty: 0.675, pct: '61%', dark: false },
++  ];
++  rows.forEach((r) => {
++    sh(s, 'rect', 6.958, r.y, 6.375, 2.5, { fill: { color: r.dark ? BLUE : WHITE }, shadow: softShadow() });
++    txt(s, r.pct, 7.559, r.y + r.ty, 1.631, 1.01, { fontSize: 54, bold: true, fontFace: MAJOR, color: r.dark ? WHITE : INK, wrap: false });
++    txt(s, [
++      { text: 'Think not, when the wailing winds of autumn. ', options: { color: r.dark ? WHITE : GREY } },
++      { text: 'Drive the shivering leaflets from the tree.', options: { bold: true, underline: { style: 'sng' }, color: r.dark ? WHITE : INK } },
++    ], 9.417, r.y + r.ty + 0.008, 3.291, 0.994, { fontSize: 14, lineSpacingMultiple: 1.3 });
++  });
++  txt(s, 'Artificial Intelligence, Real Innovation', 0.917, 2.267, 5.522, 2.827, { fontSize: 54, fontFace: MAJOR, charSpacing: -1.5 });
++  txt(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur.',
++    0.917, 5.289, 4.95, 1.117, { fontSize: 16, lineSpacingMultiple: 1.3 });
++  txt(s, '404-', 0.917, 0.805, 4.118, 1.212, { fontSize: 66, bold: true, fontFace: MAJOR, transparency: 80 });
++}
++
++/* 16 — Agenda cards (one highlighted). */
++function slide16(s) {
++  txt(s, 'Artificial Intelligence Agenda 2025', 3.437, 0.676, 8.193, 1.919, { fontSize: 54, fontFace: MAJOR, charSpacing: -1.5 });
++  const cards = [
++    { x: 1.802, date: '16 August' },
++    { x: 4.403, date: '20 August' },
++    { x: 9.538, date: '26 August' },
++  ];
++  cards.forEach((c) => {
++    sh(s, 'roundRect', c.x, 3.534, 2.25, 2.865, { fill: { color: WHITE }, rectRadius: radius(6.9, 2.25, 2.865), shadow: cardShadow() });
++    txt(s, '2025', c.x + 1.635, 3.724, 0.532, 0.54, { fontSize: 16, color: 'C0C0C0', lineSpacingMultiple: 0.8 });
++    txt(s, c.date, c.x + 0.177, 4.755, 1.896, 0.423, { fontSize: 16, bold: true, fontFace: MAJOR, color: INK, lineSpacingMultiple: 1.3 });
++    txt(s, 'Agenda List', c.x + 0.177, 5.146, 1.896, 0.342, { fontSize: 12, color: BLUE, lineSpacingMultiple: 1.3 });
++    txt(s, 'Sed ut perspiciatis unde omnis iste', c.x + 0.177, 5.58, 1.896, 0.607, { fontSize: 12, color: GREY2, lineSpacingMultiple: 1.3 });
++  });
++  ln(s, 9.245, 1.881, 0, 0.912, 'D9D9D9', 1.0, { dashType: 'dash', beginArrowType: 'oval' });
++  txt(s, [
++    { text: '2025', options: { fontSize: 14, bold: true, color: BLUE, breakLine: true } },
++    { text: 'Important Do', options: { fontSize: 12, bold: true } },
++  ], 9.424, 1.698, 2.073, 0.61, { fontFace: MAJOR, lineSpacingMultiple: 1.2 });
++  sh(s, 'roundRect', 7.003, 2.844, 2.25, 3.555, { fill: { color: BLUE }, rectRadius: radius(6.9, 2.25, 3.555), shadow: cardShadow() });
++  txt(s, '22 August', 7.181, 4.093, 1.896, 0.463, { bold: true, fontFace: MAJOR, lineSpacingMultiple: 1.3 });
++  txt(s, 'Agenda List', 7.181, 4.511, 1.896, 0.382, { fontSize: 14, lineSpacingMultiple: 1.3 });
++  ['- Name Consultant', '- Idea Evaluation', '- Analysis Team'].forEach((t, i) =>
++    txt(s, t, 7.181, 5.041 + i * 0.387, 2.073, 0.303, { fontSize: 12 })
++  );
++  purpleCorner(s);
++}
++
++/* 17 — Two circular-arrow price dials. */
++function slide17(s) {
++  const dials = [
++    { x: 1.597, y: 3.092, dark: '2A50B1', light: '5D78DD', price: '1.59 ETH' },
++    { x: 5.721, y: 0.499, dark: '5B2ED0', light: PURPLE, price: '1.10 ETH' },
++  ];
++  dials.forEach((d) => {
++    ringArrows(s, d.x + 1.8735, d.y + 1.8735, 3.552);
++    sh(s, 'ellipse', d.x + 0.584, d.y + 0.584, 2.58, 2.58, { fill: { color: d.dark } });
++    sh(s, 'chord', d.x + 0.584, d.y + 0.584, 2.58, 2.58, { fill: { color: d.light }, angleRange: [339, 201] });
++    txt(s, 'Current price', d.x + 0.961, d.y + 0.883, 1.826, 0.337, { fontSize: 14, align: 'center' });
++    txt(s, d.price, d.x + 0.781, d.y + 1.781, 2.185, 0.64, { fontSize: 32, fontFace: MAJOR, charSpacing: -1.5, align: 'center' });
++  });
++  const stats = [
++    { x: 9.775, y: 0.918, big: '+210%', small: 'Growth of solar', color: PURPLE },
++    { x: 5.465, y: 4.768, big: '+80%', small: 'Management State', color: BLUE },
++  ];
++  stats.forEach((st) => {
++    txt(s, st.big, st.x, st.y, 2.722, 0.64, { fontSize: 32, bold: true, fontFace: MAJOR, color: st.color });
++    txt(s, st.small, st.x, st.y + 0.611, 2.722, 0.37, { fontSize: 16, bold: true, fontFace: MAJOR, color: st.color });
++    txt(s, 'PLACEHOLDER', st.x, st.y + 1.125, 3.028, 0.866, {
++      fontSize: 12, lineSpacingMultiple: 1.3,
++    });
++  });
++  txt(s, 'Next-Level Innovation', 1.018, 1.213, 6.772, 1.74, { fontSize: 54, fontFace: MAJOR, charSpacing: -1.5, lineSpacingMultiple: 0.9 });
++  tagBadge(s, 1.018, 0.664, 'Comparison');
++  txt(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur.',
++    8.662, 4.504, 3.597, 1.467, { fontSize: 16, lineSpacingMultiple: 1.3 });
++}
++
++/* 18 — Org-chart style key point / sub-key points. */
++function slide18(s) {
++  ln(s, 4.523, 3.068, 4.259, 0, WHITE, 0.75);
++  [4.523, 5.952, 7.367, 8.782].forEach((x) => ln(s, x, 3.068, 0, 1.096, WHITE, 0.75));
++  sh(s, 'rect', 4.853, 2.534, 3.627, 0.537, { fill: { color: BLUE }, line: { color: '000000', width: 0.75 } });
++  txt(s, 'Key point #1', 4.853, 2.534, 3.627, 0.537, { fontSize: 28, bold: true, fontFace: MAJOR, align: 'center', valign: 'middle' });
++  const cards = [
++    { x: 1.118, tx: 1.254, eth: '1.38 ETH' },
++    { x: 3.957, tx: 4.092, eth: '1.59 ETH' },
++    { x: 6.795, tx: 6.931, eth: '1.92 ETH' },
++    { x: 9.634, tx: 9.77, eth: '1.00 ETH' },
++  ];
++  cards.forEach((c, i) => {
++    sh(s, 'rect', c.x, 4.172, 2.581, 2.783, { fill: { type: 'none' }, line: { color: WHITE, width: 0.75 } });
++    sh(s, 'rect', c.x + 0.003, 4.172, 2.574, 0.396, { fill: { color: PURPLE } });
++    txt(s, 'Sub-Key point #' + (i + 1), c.x + 0.003, 4.172, 2.574, 0.396, { fontSize: 12, align: 'center', valign: 'middle' });
++    txt(s, c.eth, c.tx, 4.844, 2.31, 0.64, { fontSize: 32, fontFace: MAJOR, charSpacing: -1.5, color: BLUE, align: 'center' });
++    txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ', c.tx, 5.515, 2.31, 0.99, {
++      fontSize: 14, align: 'center', lineSpacingMultiple: 1.3, paraSpaceBefore: 12,
++    });
++  });
++  txt(s, 'Reinventing the World with Artificial Intelligence', 2.222, 0.545, 8.889, 1.582, {
++    fontSize: 44, fontFace: MAJOR, charSpacing: -1.5, align: 'center',
++  });
++  purpleCorner(s);
++}
++
++/* 19 — Photo grid slide: numbered list plus CTA. */
++function slide19(s) {
++  const items = [
++    '01. Lorem dolor sit amet, consectetur adipiscing elit, eiusmod.',
++    '02. Sed do eiusmod tempor incididunt ut labore et dolore aliqua.',
++    '03. Ut enim ad minim veniam, quis nostrud.',
++  ];
++  items.forEach((t, i) => txt(s, t, 4.937, 3.88 + i * 0.598, 7.044, 0.37, { fontSize: 16 }));
++  [4.306, 4.904].forEach((y) => ln(s, 4.937, y, 7.309, 0, WHITE, 0.75, { transparency: 60 }));
++  ctaButton(s, 8.819, 5.801);
++}
++
++/* 20 — Pictogram infographic: four rows of people. */
++function slide20(s) {
++  const rows = [
++    { y: 3.347, x0: 3.912, w: 0.189, color: BLUE, filled: 18, faded: 15 },
++    { y: 4.185, x0: 3.934, w: 0.189, color: ORANGE, filled: 19, faded: 10 },
++    { y: 5.023, x0: 3.912, w: 0.232, color: BLUE, filled: 21, faded: 10 },
++    { y: 5.861, x0: 3.912, w: 0.232, color: ORANGE, filled: 22, faded: 10 },
++  ];
++  rows.forEach((r) => {
++    for (let i = 0; i < 24; i++) {
++      const faded = i >= r.filled;
++      personIcon(s, r.x0 + i * 0.2921, r.y, r.w, 0.467, r.color, faded ? 100 - r.faded : 0);
++    }
++  });
++  const labels = [
++    { y: 3.273, w: 3.06, value: '25.000 Million', color: BLUE },
++    { y: 4.147, w: 2.978, value: '54.200 Million', color: ORANGE },
++    { y: 5.013, w: 2.978, value: '16.800 Million', color: BLUE },
++    { y: 5.822, w: 2.75, value: '43.600 Million', color: ORANGE },
++  ];
++  labels.forEach((l) => {
++    txt(s, l.value, 0.852, l.y, 2.686, 0.36, { fontSize: 14, bold: true, fontFace: MAJOR, color: l.color, lineSpacingMultiple: 1.3 });
++    txt(s, 'Most population city in America', 0.852, l.y + 0.294, l.w, 0.32, { fontSize: 12, lineSpacingMultiple: 1.3 });
++  });
++  txt(s, 'Artificial Intelligence Real Users Around The World', 0.852, 0.828, 9.847, 1.919, {
++    fontSize: 54, fontFace: MAJOR, charSpacing: -1.5,
++  });
++  purpleCorner(s);
++}
++
++/* 21 — Data table on a white card. */
++function slide21(s) {
++  sh(s, 'roundRect', 1.223, 1.967, 10.887, 4.807, { fill: { color: WHITE }, rectRadius: radius(5.14, 10.887, 4.807), shadow: deepShadow() });
++  const body = [
++    ['First Row', '1201011', '583101', '2348958', '132771'],
++    ['Second Row', '128378289', '838459', '4099', '737910'],
++    ['Third Row', '48849', '848900', '71617', '63681'],
++    ['Rowmance', '8973897', '32455467', '6547', '789679'],
++    ['Berow', '1201011', '583101', '2348958', '132771'],
++    ['Rowanow', '128378289', '838459', '4099', '737910'],
++    ['Last Row', '128378289', '838459', '4099', '737910'],
++  ];
++  const totals = ['1.000,000$', '2.300,000$', '3.400,000$', '92.400,000$'];
++  const headFills = [WHITE, BLUE, PURPLE, ORANGE, BLUE2];
++  const cell = { margin: [0, 0, 0, 0.2], valign: 'middle', fill: { color: WHITE } };
++
++  const rows = [];
++  rows.push(headFills.map((f, i) => ({
++    text: i === 0 ? '' : 'Column Title',
++    options: Object.assign({}, cell, { fill: { color: f }, color: WHITE, fontFace: MAJOR, fontSize: 14 }),
++  })));
++  body.forEach((r) => rows.push(r.map((v, i) => ({
++    text: v,
++    options: Object.assign({}, cell, i === 0
++      ? { fontFace: MAJOR, fontSize: 14, color: '000000' }
++      : { fontFace: MINOR, fontSize: 10.5, color: '000000' }),
++  }))));
++  rows.push([{ text: 'Total', options: Object.assign({}, cell, { fontFace: MAJOR, fontSize: 16, bold: true, color: '000000' }) }]
++    .concat(totals.map((v, i) => ({
++      text: v,
++      options: Object.assign({}, cell, { fontFace: MAJOR, fontSize: 12, color: [BLUE, PURPLE, ORANGE, BLUE2][i] }),
++    }))));
++
++  s.addTable(rows, { x: 1.666, y: 1.963, w: 10.002, h: 4.629, colW: [2, 2, 2, 2, 2], rowH: 0.514, border: { type: 'none' } });
++  txt(s, 'Artificial Intelligence Table ', 1.743, 0.726, 9.847, 0.909, {
++    fontSize: 48, fontFace: MAJOR, charSpacing: -1.5, align: 'center',
++  });
++}
++
++/* 22 — Clustered column chart with two KPI chips. */
++function slide22(s, pptx) {
++  const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
++  const data = [
++    { name: 'Series One', labels, values: [40, 80, 60, 70, 190, 150, 145, 195, 185, 320, 405, 574] },
++    { name: 'Series Two', labels, values: [20, 40, 20, 10, 20, 80, 60, 60, 90, 70, 180, 229] },
++  ];
++  s.addChart(pptx.ChartType.bar, data, {
++    x: 1.241, y: 2.979, w: 10.852, h: 3.835,
++    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 100,
++    layout: { x: 0.0174, y: 0, w: 0.9826, h: 0.8955 }, // plot area, as in the source chart
++    chartColors: [BLUE, PURPLE],
++    showLegend: false, showTitle: false,
++    catAxisLabelColor: WHITE, catAxisLabelFontFace: MINOR, catAxisLabelFontSize: 14, catAxisLineColor: WHITE,
++    valAxisLabelColor: WHITE, valAxisLabelFontFace: MINOR, valAxisLabelFontSize: 14, valAxisLineColor: WHITE,
++    valAxisMaxVal: 600, valAxisMinVal: 0, valAxisMajorUnit: 150, valAxisLabelFormatCode: '0"%"',
++    valGridLine: { style: 'none' },
++  });
++  const chips = [
++    { x: 5.585, w: 2.468, tw: 1.992, color: BLUE, title: 'Total Ether Supply', shadow: glow(BLUE), align: 'center', tx: 5.7 },
++    { x: 8.342, w: 2.647, tw: 2.137, color: PURPLE, title: 'Market Capitalization', shadow: null, align: 'left', tx: 8.563 },
++  ];
++  chips.forEach((c) => {
++    const o = { fill: { color: c.color }, rectRadius: radius(6, c.w, 1.185) };
++    if (c.shadow) o.shadow = c.shadow;
++    sh(s, 'roundRect', c.x, 2.387, c.w, 1.185, o);
++    txt(s, c.title, c.x + 0.221, 2.541, c.tw, 0.337, { fontSize: 14 });
++    txt(s, [{ text: '$299' }, { text: ',50', options: { superscript: true } }], c.tx, 2.948, 1.598, 0.439, {
++      fontSize: 24, fontFace: MAJOR, align: c.align, valign: 'middle', lineSpacingMultiple: 0.8,
++    });
++  });
++  txt(s, 'Artificial Intelligence Data Chart', 0.98, 0.733, 7.582, 1.919, { fontSize: 54, fontFace: MAJOR, charSpacing: -1.5 });
++}
++
++/* 23 — Split slide: orbit diagram left, numbered list right. */
++function slide23(s) {
++  sh(s, 'rect', 6.667, 0, 6.667, 7.5, { fill: { color: WHITE } });
++  sh(s, 'ellipse', 1.58, 0.345, 3.635, 3.635, { fill: { type: 'none' }, line: { color: WHITE, width: 0.75, transparency: 72 } });
++  sh(s, 'ellipse', 2.175, 0.94, 2.444, 2.444, { fill: { color: BLUE } });
++  txt(s, 'MARKET GROWTH FACTOR', 2.175, 0.94, 2.444, 2.444, { bold: true, fontFace: MAJOR, align: 'center', valign: 'middle' });
++  [1.159, 4.793].forEach((x) => {
++    sh(s, 'ellipse', x, 1.722, 0.842, 0.842, { fill: { color: WHITE }, shadow: softShadow() });
++    imageBox(s, x + 0.271, 1.822, 0.3, 0.32); // camera / magnifier glyphs
++  });
++  const items = [
++    { y: 1.127, color: PURPLE, num: '01', title: 'The Vision' },
++    { y: 3.084, color: BLUE, num: '02', title: 'The Mission' },
++    { y: 5.041, color: ORANGE, num: '03', title: 'The Goals' },
++  ];
++  items.forEach((it) => {
++    sh(s, 'roundRect', 7.547, it.y, 0.75, 0.75, { fill: { color: it.color }, rectRadius: radius(15.5, 0.75, 0.75), shadow: softShadow() });
++    txt(s, it.num, 7.505, it.y + 0.156, 0.833, 0.438, { fontSize: 20, align: 'center' });
++    txt(s, it.title, 8.508, it.y + 0.123, 3.292, 0.505, { fontSize: 24, bold: true, fontFace: MAJOR, color: INK });
++    txt(s, 'Informing blue-sky thinking to in turn target the low hanging fruit. Utilizing awareness to in turn gain traction.',
++      8.508, it.y + 0.647, 3.667, 0.863, { fontSize: 12, color: INK, lineSpacingMultiple: 1.3 });
++  });
++  txt(s, 'From Insight to Impact with AI', 0.847, 4.138, 5.694, 1.717, { fontSize: 48, fontFace: MAJOR, charSpacing: -1.5 });
++  txt(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. ', 0.847, 5.854, 4.988, 0.767, {
++    fontSize: 16, lineSpacingMultiple: 1.3,
++  });
++}
++
++/* 24 — World map backdrop with two profile cards. */
++
++/* The map is a low-res stencil of the original vector land masses: each '#'
++ * becomes one small rectangle, so the continents read without any bitmap. */
++const WORLD_MAP = [
++  '                ##### #######',
++  '              #################                     #',
++  '                ## ###########      ##                #',
++  '          ## # ###   #########               ##    #####     #',
++  '        ##########    #######               #     #########',
++  ' ##### ###### ######   ######        ####      ###################  #',
++  '#################  ##  ####         ###################################',
++  '################# ###  ###   ##    ###################################',
++  '###############   ##    #          ## ##############################',
++  ' ##   ##########  ####          ## ## ########################   #',
++  '       ###############          ## ###########################   #',
++  '        ###############          ##############################',
++  '        #############            ############################',
++  '        ###########             ##  ########################',
++  '         #########              ####   ###################   #',
++  '          ########              ##### ####################',
++  '          #####  #             ###########################',
++  '            ##                ################ ##########',
++  '             ###              ###############   ### ###',
++  '               ##             #############     ##   ##',
++  '                  ####         #############     #   #    #',
++  '                  ######           ########          # ##',
++  '                  ########          ######           #####  ##',
++  '                 ##########         ######                   ##',
++  '                  ########          ######                 ##',
++  '                   #######          ##### ##              #####',
++  '                   ######           ##### #             ########',
++  '                   #####             ###                ########',
++  '                   ####              ##                 ########',
++  '                   ###                                       ###',
++  '                   ##                                               #',
++  '                   ##                                              #',
++  '                  ##',
++  '                   #',
++];
++
++function worldMap(slide, x, y, w, h) {
++  const cw = w / 72;
++  const ch = h / WORLD_MAP.length;
++  WORLD_MAP.forEach((row, r) => {
++    for (let c = 0; c < row.length; c++) {
++      if (row[c] !== '#') continue;
++      let run = 1;
++      while (row[c + run] === '#') run++; // merge runs so we emit far fewer shapes
++      sh(slide, 'rect', x + c * cw, y + r * ch, cw * run + 0.004, ch + 0.004, { fill: { color: MAP_GREY } });
++      c += run - 1;
++    }
++  });
++}
++
++function slide24(s) {
++  worldMap(s, 2.054, 0.473, 9.24, 4.545);
++
++  const cards = [
++    { x: 6.345, y: 3.131, role: 'DEVELOPPER' },
++    { x: 9.903, y: 1.949, role: 'FULL-STACK' },
++  ];
++  cards.forEach((c) => {
++    sh(s, 'roundRect', c.x, c.y, 2.847, 3.803, { fill: { color: WHITE }, rectRadius: radius(7.4, 2.847, 3.803), shadow: cardShadow() });
++    ln(s, c.x, c.y + 2.923, 2.847, 0, '000000', 0.75, { transparency: 65 });
++    sh(s, 'ellipse', c.x + 0.956, c.y - 0.467, 0.936, 0.936, { fill: { color: WHITE }, shadow: cardShadow() });
++    imageBox(s, c.x + 1.22, c.y - 0.203, 0.408, 0.408); // frame / cart glyphs
++    txt(s, c.role, c.x + 0.438, c.y + 0.693, 1.972, 0.404, { bold: true, fontFace: MAJOR, color: INK, align: 'center' });
++    txt(s, 'Featured Design', c.x + 0.438, c.y + 1.016, 1.972, 0.303, { fontSize: 12, color: GREY, align: 'center' });
++    txt(s, [
++      { text: 'Think not, when the wailing winds of autumn. ', options: { color: GREY } },
++      { text: 'Drive the shivering leaflets from the tree.', options: { bold: true, underline: { style: 'sng' }, color: INK } },
++    ], c.x + 0.278, c.y + 1.518, 2.292, 1.129, { fontSize: 12, align: 'center', lineSpacingMultiple: 1.3 });
++    txt(s, 'Drive the shivering leaflets from the tree.', c.x + 0.174, c.y + 3.126, 2.5, 0.505, {
++      fontSize: 12, color: GREY, align: 'center',
++    });
++  });
++  txt(s, 'Artificial Intelligence World Map', 0.826, 4.234, 4.678, 2.524, { fontSize: 48, fontFace: MAJOR, charSpacing: -1.5 });
++  targetBubble(s, 2.061, 1.617);
++}
++
++/* 25 — Closing slide. */
++function slide25(s) {
++  txt(s, 'Thanks for Watching', 0.942, 0.842, 7.439, 2.772, {
++    fontSize: 88, fontFace: MAJOR, charSpacing: -1.5, lineSpacingMultiple: 0.9,
++  });
++  vRules(s, 7.941);
++  tiles(s, 10.139, 2.733, 1.017, PURPLE, TILES_2);
++}
++
++/* ==================================================================== build */
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25,
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.layout = 'LAYOUT_WIDE'; // 13.333in x 7.5in
++  pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
++  pptx.title = 'Digital AI Innovation';
++
++  pptx.defineSlideMaster({ title: 'DARK', background: { color: BG } });
++
++  BUILDERS.forEach((fn) => {
++    const slide = pptx.addSlide({ masterName: 'DARK' });
++    fn(slide, pptx);
++  });
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '01aecbcd-dead-436f-841d-5b87d4944d71_grok_final.pptx') });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

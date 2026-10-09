@@ -1,0 +1,864 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/lunar_fashion_beauty_brand_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/lunar_fashion_beauty_brand_presentation.js
+@@ -0,0 +1,861 @@
++#!/usr/bin/env node
++/**
++ * "Lunar" fashion & beauty deck - 30 slides, 13.333 x 7.5 in.
++ * Rebuilt with pptxgenjs only. Raster photos in the source deck are replaced
++ * by flat [image] placeholder blocks of the same footprint.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const C = {
++  gold: 'AA9968', // accent1
++  brown: '5D3A33', // accent2
++  olive: '4E4533', // accent3
++  white: 'FFFFFF',
++  ink: '1F1F1F', // tx1
++  slate: '595959', // tx2
++  gray: '7F7F7F', // accent6 - body copy
++  grayMid: '5F5F5F', // accent6 @75%
++  grayDark: '404040', // accent6 @50%
++  grayLt: 'B2B2B2', // accent6 @60/40 - captions
++  grayXlt: 'CCCCCC', // accent6 @40/60 - corner label
++  silver: 'D9D9D9', // white @85%
++  snow: 'F2F2F2', // white @95%
++  pale: 'C7C7C7', // tx1 @25/75
++  mist: 'E7E6E6', // bg2 - progress track
++  goldDeep: '584E31', // accent1 @50% - cover wash
++  phFill: 'E8E8E8', // image placeholder body
++  phLine: 'BFBFBF',
++};
++
++const F_BODY = 'Roboto'; // minor latin
++const F_HEAD = 'Raleway Black'; // major latin
++
++/* ------------------------------------------------------- recurring lorem copy */
++const P1 = 'Aliquaet nibh praesent tristique magna sit amet. Risus pretium quam vulputate dignissim. Enimagi cinec dui nunc';
++const P2 = 'Aliquaet nibh praesent tristique magna sit amet. Risus pretium quam vulputate dignissim. Enima gi cinec dui nunc';
++const MID = ' mattis enim ut tellus maelem entum';
++const AGAIN = ' nibh praesent tristique magna sit amet. Risus pretium quam vulputate dignissim. Enimagi cinec dui nunc';
++
++const T = {
++  short: P1,
++  full: P1 + MID + ' iena nec dui ultrices tristique magna sit amet. Risus pretium quam.',
++  dot: P1 + MID + ' iena nec dui ultrices. magna sit amet. ',
++  service: P1 + MID + ' iena nec dui ultrices tristique magna sit praesent tristique magna sit amet. Risus pretium quam vulputate dignissim',
++  items: 'Aliquaet nibh praesent tristique magna sit amet. Risus pretium quam vulputate et nibh praesent tristique magna sit a dignissim. Enimagi cinec dui nunc',
++  creative: P1 + MID + ' iena nec dui ultrices. magna sit amet. magna sit amet. Risus pretium quam vulputate dignissim. Enimagi cinec dui nunc' + MID + ' iena',
++  seller: P1 + MID + AGAIN + MID + ' vulputate dignissim. Enimagi cinec dui nunc',
++  stylish: P1 + MID + ' iena nec dui ultrices. magna sit amet. dignissim. Enimagi cinec dui',
++  detail: P1 + ' mattis enim ut tellus ma',
++  discount: P1 + MID + AGAIN.replace(' Enimagi cinec dui nunc', ' Enimagi ci'),
++  relax: P1 + MID + ' nibh praesent tristique magna sit amet. Risus pretium quam',
++  tablet: P2 + MID + ' nibh praesent tristique magna sit amet. Risus pretium quam vulputate',
++  phone: P1 + MID + AGAIN + MID + ' vulputate',
++  swatch: 'Aliquaet nibh praesent tristique magna sit amet. Risus pretium quam vulputate dign issim. nibh praesent tristique',
++  team: 'Aliquaet nibh praesent tristique magna sit amet. Risus pretium ',
++  card: 'Aliquaet nibh praesent tristique magna sit amet. Risus pretium quam vulputate dignissim. ',
++  tiny: 'Aliquaet nibh praesent tristique magna sit amet. Risus',
++  contactA: P2 + ' mattis enim ut tellus maelem tristique magna sit amet. Risus pretium quam vulputate',
++  contactB: 'Aliquaet nibh praesent tristique magna sit amet. Risus pretium quam vulputate dignissim. Enima gi ci',
++  price: 'Aliquet nibh praesent reno',
++};
++
++const EYEBROW = 'Fashion Is All About Your Inside';
++const BADGE_TEXT = 'WE ARE LUNAR FASHION AND BEAUTY ';
++const QUOTE = 'Anyone can get dressed up and glamorous, but it is how people dress in their days off that are the most intriguing';
++
++/* ------------------------------------------------------------ small helpers */
++const box = (x, y, w, h) => ({ x, y, w, h });
++
++function rect(slide, x, y, w, h, fill, more) {
++  slide.addShape('rect', Object.assign({ x, y, w, h, fill }, more));
++}
++
++function oval(slide, x, y, w, h, more) {
++  slide.addShape('ellipse', Object.assign({ x, y, w, h }, more));
++}
++
++/** Rounded-top "arch" outline used all over the deck (cards + photo frames). */
++function archPoints(w, h) {
++  const r = 0.3009 * h; // straight side starts here
++  return [
++    { x: 0.5 * w, y: 0 },
++    { x: 0.5511 * w, y: 0.0016 * h },
++    { curve: { type: 'cubic', x1: 0.8033 * w, y1: 0.017 * h, x2: w, y2: 0.1451 * h }, x: w, y: r },
++    { x: w, y: h },
++    { x: 0, y: h },
++    { x: 0, y: r },
++    { curve: { type: 'cubic', x1: 0, y1: 0.1451 * h, x2: 0.1968 * w, y2: 0.017 * h }, x: 0.4489 * w, y: 0.0016 * h },
++    { x: 0.5 * w, y: 0 },
++    { close: true },
++  ];
++}
++
++function arch(slide, x, y, w, h, fill, more) {
++  slide.addShape('custGeom', Object.assign({ x, y, w, h, fill, points: archPoints(w, h) }, more));
++}
++
++/** Photographs from the source deck become labelled grey blocks. */
++function imageBlock(slide, x, y, w, h) {
++  rect(slide, x, y, w, h, { color: C.phFill }, {
++    line: { color: C.phLine, width: 1 },
++    rectRadius: 0.08,
++  });
++  slide.addText('[image]', {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontFace: F_BODY, fontSize: 12, color: C.phLine,
++  });
++}
++
++/** Linear gradient faked with a handful of solid slices (skill bars). */
++function gradientBar(slide, x, y, w, h, from, to, steps) {
++  const mix = (a, b, t) => [0, 2, 4].map(i => {
++    const v = Math.round(parseInt(a.substr(i, 2), 16) * (1 - t) + parseInt(b.substr(i, 2), 16) * t);
++    return v.toString(16).padStart(2, '0').toUpperCase();
++  }).join('');
++  for (let i = 0; i < steps; i++) {
++    rect(slide, x + (w / steps) * i, y, w / steps + 0.01, h, { color: mix(from, to, i / (steps - 1)) });
++  }
++}
++
++/* --------------------------------------------------- repeated page furniture */
++
++/** Top-left three line stamp. */
++function cornerLabel(slide, color) {
++  slide.addText(
++    [{ text: 'Fashionable And ', options: { breakLine: true } },
++      { text: 'Beauty With', options: { breakLine: true } },
++      { text: 'Lunar' }],
++    { x: 0.827, y: 0.83, w: 1.17, h: 0.555, fontFace: F_BODY, fontSize: 9, color, wrap: false }
++  );
++}
++
++/** Vertical caption hugging the right edge. */
++function sideLabel(slide, color) {
++  slide.addText('Fashionable And Beauty Is You', {
++    x: 11.395, y: 3.624, w: 1.936, h: 0.252, rotate: 270, align: 'right',
++    fontFace: F_BODY, fontSize: 9, color, wrap: false,
++  });
++}
++
++/** Bottom-left underlined tagline. */
++function footNote(slide, color, lineColor) {
++  slide.addText('Make Your Day Be Fashionable', {
++    x: 0.827, y: 6.388, w: 1.932, h: 0.252, fontFace: F_BODY, fontSize: 9, color, wrap: false,
++  });
++  slide.addShape('line', {
++    x: 0.931, y: 6.641, w: 1.91, h: 0,
++    line: { color: lineColor || C.gold, width: lineColor ? 1.5 : 1.75 },
++  });
++}
++
++/** Bottom-right "Page nn" with its accent tick. */
++function pageNum(slide, n, opts) {
++  const o = opts || {};
++  const x = o.x !== undefined ? o.x : 11.769;
++  const w = o.w !== undefined ? o.w : 0.658;
++  const label = 'Page ' + (o.pad ? '0' + n : String(n));
++  slide.addText(
++    [{ text: 'Page', options: { bold: true } }, { text: label.slice(4) }],
++    { x, y: 6.461, w, h: 0.252, align: 'right', fontFace: F_BODY, fontSize: 9, color: o.color || C.grayLt, wrap: false }
++  );
++  rect(slide, 12.377, 6.281, 0.05, 0.347, { color: o.bar || C.gold });
++}
++
++/** Three hollow rings stacked at the top-right corner. */
++function dots(slide, color) {
++  [0.872, 1.177, 1.482].forEach((y, i) => {
++    slide.addShape('donut', { x: i === 2 ? 12.294 : 12.297, y, w: 0.153, h: 0.153, fill: { color } });
++  });
++}
++
++/** Round stamp: caption set on a circle around a solid five point star. */
++function badge(slide, x, y, textColor, starColor, textAlpha) {
++  const cx = x + 0.486;
++  const cy = y + 0.486;
++  const r = 0.415; // baseline circle for the caption glyphs
++  const chars = BADGE_TEXT.split('');
++  const step = 360 / chars.length;
++  chars.forEach((ch, i) => {
++    if (ch === ' ') return;
++    const deg = -82 + i * step;
++    const rad = (deg * Math.PI) / 180;
++    slide.addText(ch, {
++      x: cx + r * Math.sin(rad) - 0.12, y: cy - r * Math.cos(rad) - 0.095, w: 0.24, h: 0.19,
++      rotate: (deg + 360) % 360, align: 'center', valign: 'middle', margin: 0,
++      fontFace: F_BODY, fontSize: 13, color: textColor, transparency: textAlpha || 0,
++    });
++  });
++  slide.addShape('star5', { x: x + 0.206, y: y + 0.185, w: 0.578, h: 0.578, fill: { color: starColor } });
++}
++
++/* ------------------------------------------------------------- text builders */
++
++/** Section title: thin ring + small eyebrow + big italic display line. */
++function titleGroup(slide, x, y, w, runs, opts) {
++  const o = opts || {};
++  oval(slide, x - 0.161, y - 0.203, 0.918, 0.918, {
++    fill: { type: 'none' },
++    line: { color: o.ring || C.olive, width: 2.25, transparency: 75 },
++  });
++  slide.addText(EYEBROW, {
++    x: o.eyebrowX !== undefined ? o.eyebrowX : x + 0.756, y: y - 0.173, w: 2.376, h: 0.286,
++    align: o.align || 'left', fontFace: F_BODY, fontSize: o.eyebrowSize || 11,
++    color: o.eyebrow || C.grayLt, wrap: false,
++  });
++  slide.addText(runs.map(r => ({ text: r[0], options: { color: r[1] } })), {
++    x, y, w, h: o.h || 1.178, align: o.align || 'left',
++    fontFace: F_HEAD, fontSize: o.size || 32, italic: true, color: C.ink,
++  });
++}
++
++/** Justified 11pt body copy on 150% leading. */
++function body(slide, text, x, y, w, h, color, more) {
++  slide.addText(text, Object.assign({
++    x, y, w, h, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 11, color: color || C.gray,
++  }, more));
++}
++
++/** Small bold lead-in above a body paragraph. */
++function lead(slide, text, x, y, w, h, color, size) {
++  slide.addText(text, {
++    x, y, w, h, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: size || 14, bold: true, color,
++  });
++}
++
++/** Outlined pill button. */
++function button(slide, text, x, y, w, h, color, size) {
++  rect(slide, x, y, w, h, { type: 'none' }, { line: { color, width: 0.75 } });
++  slide.addText(text, {
++    x, y, w, h, align: 'center', valign: 'middle', fontFace: F_BODY, fontSize: size || 12, color,
++  });
++}
++
++/** Skill meter: grey track + gradient fill + caption + percentage. */
++function skillBar(slide, x, y, w, filled, caption, pct, labelX) {
++  slide.addText(caption, {
++    x: x + 0.006, y: y - 0.384, w: 2.102, h: 0.248, margin: 0, lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 11, italic: true, color: C.gray,
++  });
++  rect(slide, x, y, w, 0.05, { color: C.mist });
++  gradientBar(slide, x, y, filled, 0.05, C.gold, C.brown, 8);
++  slide.addText(pct, {
++    x: labelX, y: y - 0.121, w: 0.579, h: 0.269, margin: 0, align: 'justify',
++    lineSpacingMultiple: 1.5, fontFace: F_BODY, fontSize: 12, color: C.gray,
++  });
++}
++
++/* ================================================================== slides == */
++
++function slide01(s) {
++  rect(s, 0, 0, 13.333, 7.5, { color: C.goldDeep, transparency: 28 });
++  footNote(s, C.grayLt);
++  pageNum(s, 1, { pad: true });
++  cornerLabel(s, C.grayXlt);
++  dots(s, C.gold);
++  sideLabel(s, C.grayLt);
++  oval(s, 2.82, 1.679, 2.906, 2.906, { fill: { color: C.gold, transparency: 44 } });
++  s.addText('Lunar.', {
++    x: 3.785, y: 1.783, w: 6.853, h: 2.423, fontFace: F_HEAD, fontSize: 138, italic: true, color: C.white,
++  });
++  s.addText(EYEBROW, {
++    x: 5.664, y: 3.854, w: 4.157, h: 0.438, fontFace: F_BODY, fontSize: 20, color: C.white, wrap: false,
++  });
++  body(s, T.full, 2.146, 5.321, 9.042, 0.625, C.grayXlt, { align: 'center', transparency: 48 });
++}
++
++function slide02(s) {
++  rect(s, 0, 0.896, 4.771, 5.729, { color: C.gold });
++  badge(s, 0.176, 4.149, C.white, C.white, 45);
++  titleGroup(s, 5.432, 1.716, 4.521, [['Welcome To Lunar ', C.ink], ['Fashion And Beauty', C.brown]]);
++  lead(s, 'Newest Style.', 5.432, 3.555, 2.666, 0.415, C.brown);
++  body(s, T.short, 5.432, 4.024, 4.521, 0.625);
++  lead(s, 'Branded Fashion.', 5.432, 5.028, 2.666, 0.415, C.gold);
++  body(s, T.short, 5.432, 5.496, 4.521, 0.625);
++}
++
++function slide03(s) {
++  rect(s, 0, 3.75, 13.333, 3.75, { color: C.gold });
++  cornerLabel(s, C.grayXlt);
++  badge(s, 11.901, 5.139, C.white, C.white, 45);
++  titleGroup(s, 2.025, 1.813, 4.521, [['We Are The Best ', C.ink], ['Fashion And Beauty', C.brown]]);
++  body(s, T.full, 1.864, 4.146, 5.652, 0.903, C.white);
++  const tags = [['Basic Branding', 1.864, 5.324], ['Fashion Style Branding', 4.326, 5.32],
++    ['Basic Branding', 1.88, 5.835], ['Fashion Style Branding', 4.341, 5.831]];
++  tags.forEach(([txt, x, y]) => {
++    s.addText(txt, {
++      x, y, w: 3.021, h: 0.37, align: 'justify', lineSpacingMultiple: 1.5,
++      fontFace: F_BODY, fontSize: 12, bold: true, color: C.white,
++      bullet: { characterCode: '25AA', indent: 13.5 },
++    });
++  });
++}
++
++function slide04(s) {
++  rect(s, 0, 0, 4.771, 7.5, { color: C.gold });
++  dots(s, C.gold);
++  footNote(s, C.white, C.white);
++  pageNum(s, 4, { pad: true });
++  badge(s, 3.328, 5.202, C.white, C.white, 45);
++  sideLabel(s, C.grayLt);
++  titleGroup(s, 6.603, 1.838, 4.521, [['About Lunar Vision ', C.ink], ['Fashion And Beauty', C.brown]]);
++  lead(s, 'Vision Detail :', 8.216, 4.107, 2.666, 0.415, C.brown);
++  body(s, T.full, 8.216, 4.652, 2.942, 1.736);
++}
++
++function slide05(s) {
++  footNote(s, C.grayLt);
++  cornerLabel(s, C.grayXlt);
++  badge(s, 10.455, 4.295, C.white, C.white, 45);
++  titleGroup(s, 1.721, 1.762, 4.755, [['About Lunar Mission ', C.ink], ['Fashion And Beauty', C.brown]]);
++  [['01', 'First Thing Here.', 2.905, 3.548, 3.953], ['02', 'Second Thing Here.', 4.338, 4.98, 5.435]]
++    .forEach(([num, title, yNum, yTitle, yBody]) => {
++      s.addText(num, {
++        x: 1.501, y: yNum, w: 1.187, h: 1.296, align: 'justify', lineSpacingMultiple: 1.5,
++        fontFace: F_BODY, fontSize: 54, bold: true, color: C.snow,
++      });
++      lead(s, title, 1.838, yTitle, 2.666, 0.411, C.grayDark);
++      body(s, T.short, 1.838, yBody, 4.638, 0.625);
++    });
++}
++
++function slide06(s) {
++  rect(s, 4.75, 0, 8.583, 7.5, { color: C.gold });
++  pageNum(s, 6, { pad: true, x: 11.694, w: 0.733, color: C.grayXlt, bar: C.silver });
++  badge(s, 11.91, 0.879, C.white, C.white, 45);
++  titleGroup(s, 5.89, 3.513, 4.521, [['Get Fashionable And Beauty Items', C.white]],
++    { ring: C.brown, eyebrow: C.white });
++  body(s, T.items, 5.89, 5.1, 2.632, 1.459, C.white);
++  body(s, T.items, 9.061, 5.1, 2.632, 1.459, C.white);
++}
++
++function slide07(s) {
++  rect(s, 0, 0, 5.458, 7.5, { color: C.gold });
++  dots(s, C.gold);
++  pageNum(s, 7, { pad: true });
++  badge(s, 0.452, 3.264, C.white, C.white, 45);
++  sideLabel(s, C.grayLt);
++  titleGroup(s, 7.498, 1.777, 4.099, [['The Greatest  ', C.ink], ['Lunar Fashion & Beauty Service', C.brown]],
++    { h: 1.717 });
++  body(s, T.service, 7.498, 3.847, 3.924, 1.459);
++  rect(s, 7.629, 5.718, 1.566, 0.453, { color: C.gold });
++  s.addText('Show More', {
++    x: 7.629, y: 5.718, w: 1.566, h: 0.453, align: 'center', valign: 'middle',
++    fontFace: F_BODY, fontSize: 14, color: C.white,
++  });
++}
++
++function slide08(s) {
++  rect(s, 0, 0, 7.688, 7.5, { color: C.gold });
++  cornerLabel(s, C.grayXlt);
++  footNote(s, C.white, C.white);
++  badge(s, 11.927, 3.264, C.grayLt, C.pale, 45);
++  titleGroup(s, 1.299, 2.271, 4.847, [['About Lunar Fashion And Beauty Price', C.white]],
++    { ring: C.brown, eyebrow: C.white });
++  s.addText('$ 27,00', {
++    x: 1.169, y: 4.183, w: 1.772, h: 0.64, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 24, bold: true, color: C.white,
++  });
++  s.addShape('line', { x: 1.299, y: 4.94, w: 0.383, h: 0, line: { color: C.white, width: 4.5 } });
++  body(s, 'New Item', 1.696, 4.73, 1.356, 0.348, C.white);
++  body(s, T.service, 2.73, 4.237, 3.924, 1.459, C.white);
++}
++
++function slide09(s) {
++  badge(s, 1.389, 5.181, C.grayLt, C.pale, 45);
++  dots(s, C.gold);
++  pageNum(s, 9, { pad: true });
++  sideLabel(s, C.grayLt);
++  titleGroup(s, 6.429, 1.838, 4.521, [['Get More Beauty ', C.ink], ['Style And Service', C.brown]]);
++  lead(s, 'Breaktrough Description.', 6.545, 3.491, 2.666, 0.411, C.grayMid);
++  body(s, T.dot, 6.545, 3.94, 5.121, 0.9);
++  body(s, 'Color Options', 6.518, 5.121, 2.298, 0.348, C.gray, { italic: true });
++  [C.silver, C.gold, C.brown, C.olive].forEach((col, i) => {
++    rect(s, 6.635 + i * 0.344, 5.556, 0.207, 0.212, { color: col });
++  });
++  body(s, T.swatch, 8.234, 5.21, 2.96, 0.903, C.gray, { italic: true });
++}
++
++function slide10(s) {
++  rect(s, 0, 0, 13.333, 7.5, { color: C.gold });
++  cornerLabel(s, C.grayXlt);
++  badge(s, 11.972, 4.16, C.white, C.white, 45);
++  titleGroup(s, 1.731, 1.721, 4.521, [['Creative Lunar Fashion And Beauty', C.white]],
++    { ring: C.brown, eyebrow: C.white });
++  body(s, T.creative, 1.731, 3.089, 6.116, 1.181, C.white);
++}
++
++function slide11(s) {
++  cornerLabel(s, C.grayXlt);
++  badge(s, 1.787, 3.401, C.grayLt, C.pale, 45);
++  dots(s, C.gold);
++  pageNum(s, 11);
++  sideLabel(s, C.grayLt);
++  oval(s, 6.208, -0.226, 0.918, 0.918, { fill: { type: 'none' }, line: { color: C.olive, width: 2.25, transparency: 75 } });
++  s.addText([{ text: 'Meet Lunar ', options: { color: C.ink } }, { text: 'Best Team', options: { color: C.brown } }], {
++    x: 3.866, y: 0.995, w: 5.602, h: 0.64, align: 'center', fontFace: F_HEAD, fontSize: 32, italic: true,
++  });
++  s.addText(EYEBROW, {
++    x: 5.479, y: 0.822, w: 2.376, h: 0.286, align: 'center', fontFace: F_BODY, fontSize: 11, color: C.grayLt, wrap: false,
++  });
++  [['LARISSA MARIAH', C.gold, 2.179, 2.097, 5.595, 5.965],
++    ['CHRISTINA GLAIMORE', C.brown, 5.297, 5.215, 5.598, 5.969],
++    ['JEREMIAH FORZA', C.olive, 8.414, 8.333, 5.602, 5.972]].forEach(([name, col, xn, xb, yn, yb]) => {
++    s.addText(name, {
++      x: xn, y: yn, w: 2.666, h: 0.37, align: 'center', lineSpacingMultiple: 1.5,
++      fontFace: F_BODY, fontSize: 12, bold: true, color: col,
++    });
++    body(s, T.team, xb, yb, 2.829, 0.625, C.gray, { align: 'center' });
++  });
++}
++
++function slide12(s) {
++  rect(s, 7.604, 0, 5.729, 7.5, { color: C.gold });
++  cornerLabel(s, C.grayXlt);
++  footNote(s, C.grayLt);
++  badge(s, 11.927, 4.635, C.white, C.white, 45);
++  titleGroup(s, 1.245, 1.92, 4.521, [['About Lunar ', C.ink], ['Creative Planner', C.brown]]);
++  s.addText('Larissa Mariah', {
++    x: 1.245, y: 3.249, w: 2.666, h: 0.415, lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 14, bold: true, color: C.gold,
++  });
++  body(s, T.dot, 1.245, 3.749, 5.121, 0.9);
++  skillBar(s, 1.335, 5.309, 3.8, 3.239, 'Type Your Skill Here', '90%', 5.375);
++  skillBar(s, 1.335, 5.86, 3.8, 2.989, 'Type Your Experience Here', '87%', 5.375);
++}
++
++function slide13(s) {
++  rect(s, 0, 0, 5.729, 7.5, { color: C.gold });
++  dots(s, C.gold);
++  pageNum(s, 13);
++  badge(s, 0.452, 3.273, C.white, C.white, 45);
++  sideLabel(s, C.grayLt);
++  titleGroup(s, 6.422, 1.814, 4.521, [['Welcome To Lunar ', C.ink], ['Fashion And Beauty', C.brown]]);
++  s.addText('Christina Glaimore', {
++    x: 6.451, y: 3.527, w: 2.666, h: 0.415, lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 14, bold: true, color: C.brown,
++  });
++  body(s, T.dot, 6.451, 4.037, 5.121, 0.9);
++  skillBar(s, 6.541, 5.591, 3.8, 3.239, 'Type Your Skill Here', '90%', 10.581);
++  skillBar(s, 6.541, 6.142, 3.8, 2.989, 'Type Your Experience Here', '87%', 10.581);
++}
++
++function slide14(s) {
++  rect(s, 0, 0, 13.333, 7.5, { color: C.gold });
++  dots(s, 'BFBFBF');
++  badge(s, 0.452, 3.264, C.white, C.white, 45);
++  titleGroup(s, 5.63, 1.471, 4.521, [['Welcome To Lunar Fashion And Beauty', C.white]],
++    { ring: C.brown, eyebrow: C.white });
++  [5.573, 8.977].forEach(x => {
++    s.addText(T.short, {
++      x, y: 3.126, w: 3.173, h: 0.903, align: 'justify', lineSpacingMultiple: 1.5,
++      fontFace: F_BODY, fontSize: 11, color: C.white,
++      bullet: { characterCode: '25AA', indent: 13.5 },
++    });
++  });
++}
++
++function slide15(s) {
++  dots(s, C.gold);
++  pageNum(s, 15);
++  footNote(s, C.grayLt);
++  cornerLabel(s, C.grayXlt);
++  sideLabel(s, C.grayLt);
++
++  const cards = [
++    { x: 1.793, fill: C.white, head: C.gold, price: C.slate, note: C.grayMid, btn: C.grayXlt, btnTx: C.grayLt, shadow: true, title: 'Services One', amount: '$ 39.00', tw: 1.853, tx: 2.284 },
++    { x: 5.249, fill: C.gold, head: C.white, price: C.white, note: C.white, btn: C.white, btnTx: C.white, shadow: false, title: 'Services Two', amount: '$ 65.00', tw: 1.935, tx: 5.699 },
++    { x: 8.705, fill: C.white, head: C.gold, price: C.slate, note: C.grayMid, btn: C.grayXlt, btnTx: C.grayLt, shadow: true, title: 'Services Three', amount: '$ 59.00', tw: 2.086, tx: 9.079 },
++  ];
++  cards.forEach(c => {
++    arch(s, c.x, 2.294, 2.835, 3.728, { color: c.fill }, c.shadow
++      ? { shadow: { type: 'outer', blur: 19, offset: 4, angle: 90, color: '000000', opacity: 0.3 } } : {});
++  });
++  cards.forEach(c => {
++    const mid = c.x + 1.4175;
++    s.addText(c.title, {
++      x: c.tx, y: 2.852, w: c.tw, h: 0.438, align: 'center',
++      fontFace: F_BODY, fontSize: 20, bold: true, color: c.head,
++    });
++    s.addText(c.amount, {
++      x: mid - 0.9675, y: 3.37, w: 1.935, h: 0.645, align: 'center', lineSpacingMultiple: 1.07,
++      fontFace: F_BODY, fontSize: 32, bold: true, color: c.price,
++    });
++    s.addText('Detail Services', {
++      x: mid - 0.855, y: 3.958, w: 1.71, h: 0.46, align: 'center', lineSpacingMultiple: 1.5,
++      fontFace: F_BODY, fontSize: 16, bold: true, color: c.note,
++    });
++    [4.501, 4.892].forEach(y => {
++      s.addText(T.price, {
++        x: mid - 1.237, y, w: 2.474, h: 0.411, align: 'center', lineSpacingMultiple: 1.5,
++        fontFace: F_BODY, fontSize: 12, color: c.note,
++      });
++    });
++    rect(s, mid - 0.9675, 5.447, 1.935, 0.337, { type: 'none' }, { line: { color: c.btn, width: 0.75 } });
++    s.addText('See More', {
++      x: mid - 0.3955, y: 5.496, w: 0.791, h: 0.269, align: 'center',
++      fontFace: F_BODY, fontSize: 10, color: c.btnTx,
++    });
++  });
++
++  oval(s, 6.208, -0.226, 0.918, 0.918, { fill: { type: 'none' }, line: { color: C.olive, width: 2.25, transparency: 75 } });
++  s.addText([{ text: 'Lunar ', options: { color: C.ink } }, { text: 'Pricing Tables', options: { color: C.brown } }], {
++    x: 3.753, y: 0.995, w: 5.828, h: 0.64, align: 'center', fontFace: F_HEAD, fontSize: 32, italic: true,
++  });
++  s.addText(EYEBROW, {
++    x: 5.479, y: 0.822, w: 2.376, h: 0.286, align: 'center', fontFace: F_BODY, fontSize: 11, color: C.grayLt, wrap: false,
++  });
++}
++
++function slide16(s) {
++  rect(s, 0, 3.75, 13.333, 3.75, { color: C.gold });
++  dots(s, C.gold);
++  cornerLabel(s, C.grayXlt);
++  badge(s, 0.44, 5.143, C.white, C.white, 45);
++  titleGroup(s, 8.163, 5.143, 4.521, [['About Lunar Best Seller Products', C.white]], { eyebrow: C.white });
++  lead(s, 'Best Seller Product Here : Patterned Shirt', 2.699, 1.032, 4.769, 0.415, C.gold);
++  body(s, T.seller, 2.699, 1.454, 8.446, 0.903);
++}
++
++function slide17(s) {
++  rect(s, 0.979, 0.896, 3.771, 5.729, { color: C.gold });
++  rect(s, 5.729, 0, 7.604, 7.5, { color: C.gold });
++  dots(s, C.white);
++  pageNum(s, 17, { x: 11.764, w: 0.663, color: C.white, bar: C.white });
++  sideLabel(s, C.white);
++  badge(s, 0.979, 3.593, C.white, C.white, 45);
++  titleGroup(s, 6.642, 2.014, 4.521, [['Keep In Glame And Fashionables.', C.white]], { eyebrow: C.white });
++  lead(s, 'Creative Item Presentation.', 7.583, 4.618, 2.666, 0.37, C.white, 12);
++  body(s, T.dot, 7.583, 5.039, 3.853, 1.181, C.white);
++}
++
++function slide18(s) {
++  rect(s, 0, 0, 13.333, 7.5, { color: C.gold });
++  cornerLabel(s, C.white);
++  footNote(s, C.white);
++  pageNum(s, 18, { x: 11.764, w: 0.663, color: C.white, bar: C.white });
++  badge(s, 0.443, 3.264, C.white, C.white, 45);
++  oval(s, 5.981, 1.6, 0.918, 0.918, {
++    rotate: 90, fill: { type: 'none' }, line: { color: C.olive, width: 2.25, transparency: 75 },
++  });
++  s.addText('More Beauty And Stylish Products', {
++    x: 3.846, y: 3.432, w: 4.521, h: 1.178, rotate: 90, fontFace: F_HEAD, fontSize: 32, italic: true, color: C.white,
++  });
++  s.addText(EYEBROW, {
++    x: 5.538, y: 3.561, w: 2.376, h: 0.286, rotate: 90, fontFace: F_BODY, fontSize: 11, color: C.white, wrap: false,
++  });
++  lead(s, 'Products Description Here :', 7.541, 3.744, 2.666, 0.37, C.white, 12);
++  body(s, T.stylish, 7.541, 4.165, 4.223, 1.181, C.white);
++}
++
++function slide19(s) {
++  rect(s, 0, 0, 13.333, 3.75, { color: C.gold });
++  dots(s, C.white);
++  badge(s, 0.452, 1.33, C.white, C.white, 45);
++  titleGroup(s, 5.688, 1.482, 4.521, [['Black And White Fashion And Beauty', C.white]], { eyebrow: C.white });
++  lead(s, 'Detail Items.', 0.845, 5.232, 2.666, 0.415, C.gold);
++  s.addText('+5173', {
++    x: 5.654, y: 4.203, w: 2.666, h: 0.999, align: 'right', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 40, bold: true, color: C.silver,
++  });
++  body(s, T.detail, 0.845, 5.654, 3.737, 0.903);
++  body(s, T.detail, 5.014, 5.625, 3.737, 0.903);
++}
++
++function slide20(s) {
++  s.addShape('roundRect', {
++    x: 1.562, y: 0.783, w: 3.917, h: 5.953, fill: { color: C.gold }, rectRadius: 1.9585,
++  });
++  badge(s, 1.077, 3.273, C.grayLt, C.pale, 45);
++  dots(s, C.gold);
++  pageNum(s, 20);
++  sideLabel(s, C.grayLt);
++  titleGroup(s, 6.284, 1.887, 4.233, [['Discount Products ', C.ink], ['For Beauty Item', C.brown]]);
++  body(s, T.discount, 6.252, 3.592, 4.79, 1.181);
++  body(s, 'Discount', 6.263, 5.103, 1.553, 0.348);
++  s.addText('50%', {
++    x: 6.284, y: 5.162, w: 1.152, h: 0.729, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 28, bold: true, color: C.brown,
++  });
++  body(s, 'For New Member', 6.263, 5.717, 1.553, 0.348);
++  body(s, T.short, 7.766, 5.133, 3.038, 0.903);
++}
++
++function slide21(s) {
++  rect(s, 5.185, 0.833, 7.211, 5.854, { type: 'none' }, { line: { color: C.gold, width: 4.5 } });
++  badge(s, 0.523, 3.274, C.grayLt, C.pale, 45);
++  titleGroup(s, 6.339, 2.18, 4.508, [['Relax And ', C.ink], ['Take A Break', C.brown]],
++    { size: 44, h: 1.582, eyebrowSize: 12, eyebrowX: 7.095 });
++  body(s, T.relax, 7.652, 4.038, 4.044, 1.181);
++  s.addText('Take A Breal For 15 Minutes', {
++    x: 6.073, y: 4.362, w: 1.419, h: 0.625, rotate: 90, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 11, bold: true, color: C.gold,
++  });
++}
++
++function slide22(s) {
++  footNote(s, C.grayLt);
++  cornerLabel(s, C.grayXlt);
++  pageNum(s, 22);
++  badge(s, 10.008, 5.632, C.grayLt, C.pale, 45);
++  titleGroup(s, 3.7, 1.725, 5.509, [['About Lunar Fashion ', C.ink], ['And Beauty Gallery', C.brown]]);
++  s.addText([
++    { text: 'Up To  ', options: { fontSize: 14 } },
++    { text: '70%', options: { fontSize: 32 } },
++  ], {
++    x: 3.7, y: 3.059, w: 1.702, h: 0.819, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, bold: true, color: C.gold,
++  });
++  body(s, 'Discount', 3.663, 3.209, 0.939, 0.348);
++  body(s, 'For New Member', 3.7, 3.709, 1.553, 0.348);
++  body(s, T.discount, 5.423, 3.159, 4.79, 1.181);
++}
++
++function slide23(s) {
++  rect(s, 7.604, 0, 5.729, 7.5, { color: C.gold });
++  imageBlock(s, 4.773, 0.874, 3.816, 5.814); // tablet mock-up
++  cornerLabel(s, C.grayXlt);
++  footNote(s, C.grayLt);
++  dots(s, C.white);
++  pageNum(s, 23, { x: 11.764, w: 0.663, color: C.white, bar: C.white });
++  sideLabel(s, C.white);
++  titleGroup(s, 0.903, 2.246, 3.587, [['Welcome To Lunar Tablet ', C.ink], ['Device Here.', C.brown]], { h: 1.717 });
++  body(s, T.tablet, 0.903, 4.2, 3.521, 1.459);
++  [['Service #1', 1.475, 1.886], ['Service #2', 3.131, 3.542], ['Service #3', 4.787, 5.198]]
++    .forEach(([label, yl, yb]) => {
++      lead(s, label, 8.908, yl, 2.666, 0.415, C.white);
++      body(s, T.card, 8.908, yb, 2.42, 0.9, C.white);
++    });
++}
++
++function slide24(s) {
++  imageBlock(s, 0.856, 2.54, 5.054, 4.208); // desktop computer mock-up
++  rect(s, 6.667, 0, 6.667, 7.5, { color: C.gold });
++  dots(s, C.white);
++  pageNum(s, 24, { x: 11.764, w: 0.663, color: C.white, bar: C.white });
++  sideLabel(s, C.white);
++  titleGroup(s, 1.187, 0.968, 4.521, [['About Lunar ', C.ink], ['Computer Device', C.brown]]);
++  s.addText('2020', {
++    x: 7.373, y: 1.808, w: 2.666, h: 0.819, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 32, bold: true, color: C.white,
++  });
++  lead(s, 'About Description Here', 7.373, 2.634, 2.666, 0.415, C.white);
++  body(s, T.seller, 7.373, 3.149, 4.391, 1.736, C.white);
++  button(s, 'More Detail', 7.486, 5.355, 1.595, 0.421, C.white);
++}
++
++function slide25(s) {
++  rect(s, 1.875, 0, 9.604, 7.5, { color: C.gold });
++  imageBlock(s, 0.942, 1.946, 3.035, 4.739); // phone mock-ups (left pair)
++  imageBlock(s, 9.372, 1.946, 3.07, 4.739); // phone mock-ups (right pair)
++  oval(s, 6.281, 1.36, 0.918, 0.918, { fill: { type: 'none' }, line: { color: C.olive, width: 2.25, transparency: 75 } });
++  s.addText('Welcome To Lunar Phone Devices Here', {
++    x: 4.479, y: 1.706, w: 4.521, h: 1.178, align: 'center',
++    fontFace: F_HEAD, fontSize: 32, italic: true, color: C.white,
++  });
++  s.addText(EYEBROW, {
++    x: 5.552, y: 1.533, w: 2.376, h: 0.286, align: 'center', fontFace: F_BODY, fontSize: 11, color: C.white, wrap: false,
++  });
++  s.addText('Mockup Device Here', {
++    x: 5.196, y: 3.46, w: 2.666, h: 0.415, align: 'center', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 14, bold: true, color: C.white,
++  });
++  body(s, T.phone, 4.182, 3.975, 4.693, 1.459, C.white, { align: 'center' });
++  button(s, 'First Mockup', 5.237, 5.756, 1.315, 0.28, C.white);
++  button(s, 'Second Mockup', 6.662, 5.756, 1.434, 0.28, C.white);
++}
++
++/* six interlocking rings, alternating labels above / below */
++const RING_X = [3.055, 4.491, 5.927, 7.362, 8.798, 10.234];
++const RING_COLORS = [C.gold, C.brown, C.olive, C.gold, C.brown, C.brown];
++
++function slide26(s) {
++  cornerLabel(s, C.grayXlt);
++  dots(s, C.gold);
++  pageNum(s, 26);
++  sideLabel(s, C.grayLt);
++  infographicTitle(s);
++
++  RING_X.forEach((cx, i) => {
++    const up = i % 2 === 1; // odd rings point their caption upward
++    s.addShape('line', {
++      x: cx, y: up ? 3.077 : 4.851, w: 0, h: 0.695,
++      line: { color: C.ink, width: 2.25, [up ? 'beginArrowType' : 'endArrowType']: 'triangle' },
++    });
++  });
++  // painted right-to-left so each ring laps over the one after it
++  RING_X.slice().reverse().forEach((cx, k) => {
++    const i = RING_X.length - 1 - k;
++    s.addShape('donut', {
++      x: cx - 0.955, y: 3.391, w: 1.91, h: 1.91, fill: { color: RING_COLORS[i] },
++      shadow: { type: 'outer', blur: 6, offset: 4, angle: 45, color: '000000', opacity: 0.28 },
++    });
++  });
++  RING_X.forEach(cx => {
++    oval(s, cx - 0.48, 3.867, 0.96, 0.96, {
++      fill: { color: C.white },
++      shadow: { type: 'outer', blur: 7, offset: 5, angle: 225, color: '000000', opacity: 0.25 },
++    });
++  });
++  RING_X.forEach((cx, i) => {
++    s.addText('0' + (i + 1), {
++      x: cx - 0.48, y: 3.867, w: 0.96, h: 0.96, align: 'center', valign: 'middle',
++      fontFace: F_HEAD, fontSize: 24, color: C.grayDark,
++    });
++    const up = i % 2 === 1;
++    s.addText('Service #1', {
++      x: cx - 1.333, y: up ? 1.86 : 5.708, w: 2.666, h: 0.37, align: 'center', lineSpacingMultiple: 1.5,
++      fontFace: F_BODY, fontSize: 12, bold: true, color: C.gray,
++    });
++    s.addText(T.tiny, {
++      x: cx - 1.21, y: up ? 2.207 : 6.055, w: 2.42, h: 0.625, align: 'center', lineSpacingMultiple: 1.5,
++      fontFace: F_BODY, fontSize: 11, color: C.gray,
++    });
++  });
++}
++
++function infographicTitle(s) {
++  oval(s, 6.208, -0.57, 0.918, 0.918, { fill: { type: 'none' }, line: { color: C.olive, width: 2.25, transparency: 75 } });
++  s.addText([{ text: 'Lunar ', options: { color: C.ink } }, { text: 'Infographic', options: { color: C.brown } }], {
++    x: 3.753, y: 0.651, w: 5.828, h: 0.64, align: 'center', fontFace: F_HEAD, fontSize: 32, italic: true,
++  });
++  s.addText(EYEBROW, {
++    x: 5.479, y: 0.478, w: 2.376, h: 0.286, align: 'center', fontFace: F_BODY, fontSize: 11, color: C.grayLt, wrap: false,
++  });
++}
++
++function slide27(s, pptx) {
++  cornerLabel(s, C.grayXlt);
++  footNote(s, C.grayLt);
++  dots(s, C.gold);
++  pageNum(s, 27);
++  sideLabel(s, C.grayLt);
++  infographicTitle(s);
++
++  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++  s.addChart(pptx.ChartType.bar, [
++    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Series 3', labels: cats, values: [2, 2, 3, 5] },
++  ], {
++    x: 1.563, y: 2.781, w: 4.414, h: 2.71,
++    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 219, barOverlapPct: -27,
++    chartColors: [C.gold, C.brown, C.olive],
++    showLegend: true, legendPos: 'b', legendFontFace: F_BODY, legendFontSize: 12, legendColor: '6D6D6D',
++    catAxisLabelFontFace: F_BODY, catAxisLabelFontSize: 12, catAxisLabelColor: '6D6D6D',
++    catAxisLineColor: 'DDDDDD', catAxisMajorTickMark: 'none',
++    valAxisLabelFontFace: F_BODY, valAxisLabelFontSize: 12, valAxisLabelColor: '6D6D6D',
++    valAxisLineShow: false, valAxisMajorTickMark: 'none',
++    valGridLine: { color: 'DDDDDD', size: 0.75 }, catGridLine: { style: 'none' },
++    border: { pt: 0, color: 'FFFFFF' }, fill: 'FFFFFF',
++  });
++
++  [['01', 'First Thing Here.', 2.188, 2.83, 3.235], ['02', 'Second Thing Here.', 3.621, 4.263, 4.718]]
++    .forEach(([num, title, yNum, yTitle, yBody]) => {
++      s.addText(num, {
++        x: 6.565, y: yNum, w: 1.187, h: 1.296, align: 'justify', lineSpacingMultiple: 1.5,
++        fontFace: F_BODY, fontSize: 54, bold: true, color: C.snow,
++      });
++      lead(s, title, 6.903, yTitle, 2.666, 0.411, C.grayDark);
++      body(s, T.short, 6.903, yBody, 4.415, 0.625);
++    });
++}
++
++function slide28(s) {
++  arch(s, 1.688, 0.76, 3.875, 5.979, { color: C.gold });
++  badge(s, 1.202, 3.264, C.grayLt, C.pale, 45);
++  dots(s, C.gold);
++  pageNum(s, 28);
++  sideLabel(s, C.grayLt);
++  s.addText('\u201C', {
++    x: 6.048, y: 1.635, w: 0.948, h: 2.423, align: 'justify',
++    fontFace: F_BODY, fontSize: 138, italic: true, color: C.brown,
++  });
++  s.addText(QUOTE, {
++    x: 6.212, y: 2.877, w: 4.896, h: 1.717, align: 'justify',
++    fontFace: F_BODY, fontSize: 24, italic: true, color: C.grayMid,
++  });
++  s.addText('- Alexander Wang', {
++    x: 8.718, y: 4.971, w: 2.39, h: 0.404, align: 'right',
++    fontFace: F_BODY, fontSize: 18, bold: true, color: C.brown,
++  });
++}
++
++function slide29(s) {
++  badge(s, 0.954, 1.368, C.grayLt, C.pale, 45);
++  oval(s, 4.288, 1.854, 0.918, 0.918, { fill: { type: 'none' }, line: { color: C.olive, width: 2.25, transparency: 75 } });
++  s.addText([
++    { text: 'About Lunar ', options: { color: C.ink, breakLine: true } },
++    { text: 'Contact Information', options: { color: C.brown } },
++  ], { x: 4.448, y: 2.058, w: 4.847, h: 1.178, fontFace: F_HEAD, fontSize: 32, italic: true });
++  s.addText(EYEBROW, {
++    x: 5.204, y: 1.884, w: 2.376, h: 0.286, fontFace: F_BODY, fontSize: 11, color: C.grayLt, wrap: false,
++  });
++  body(s, T.contactA, 4.448, 3.96, 4.031, 1.181);
++  body(s, T.contactB, 4.448, 5.351, 4.031, 0.625);
++  s.addText('Follow Us', {
++    x: 9.081, y: 3.75, w: 1.667, h: 0.46, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 16, bold: true, color: C.gray,
++  });
++  s.addText('@Lunar_Fasjon', {
++    x: 9.088, y: 4.134, w: 2.476, h: 0.415, lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 14, bold: true, color: C.gold,
++  });
++  s.addText('Get In Touch', {
++    x: 9.076, y: 4.83, w: 1.667, h: 0.46, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 16, bold: true, color: C.gray,
++  });
++  s.addText([
++    { text: '(+76) 632 2320 340', options: { breakLine: true } },
++    { text: '(0435) 10000' },
++  ], {
++    x: 9.081, y: 5.214, w: 2.476, h: 0.797, align: 'justify', lineSpacingMultiple: 1.5,
++    fontFace: F_BODY, fontSize: 14, bold: true, color: C.brown,
++  });
++}
++
++function slide30(s) {
++  rect(s, 0, 0, 13.333, 7.5, { color: C.goldDeep, transparency: 14 });
++  footNote(s, C.grayLt);
++  pageNum(s, 30, { pad: true });
++  cornerLabel(s, C.grayXlt);
++  dots(s, C.gold);
++  sideLabel(s, C.grayLt);
++  oval(s, 2.716, 1.762, 2.906, 2.906, { fill: { color: C.gold, transparency: 44 } });
++  s.addText('Thanks.', {
++    x: 3.348, y: 1.949, w: 7.465, h: 2.423, fontFace: F_HEAD, fontSize: 138, italic: true, color: C.white,
++  });
++  s.addText('And See You Next Time', {
++    x: 5.476, y: 4.0, w: 3.131, h: 0.438, fontFace: F_BODY, fontSize: 20, color: C.white, wrap: false,
++  });
++  body(s, T.full, 2.146, 5.321, 9.042, 0.625, C.grayXlt, { align: 'center', transparency: 48 });
++}
++
++/* ==================================================================== build == */
++const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'LUNAR', width: 13.333, height: 7.5 });
++  pptx.layout = 'LUNAR';
++  pptx.author = 'Lunar';
++  pptx.title = 'Lunar Fashion And Beauty';
++  pptx.theme = { headFontFace: F_HEAD, bodyFontFace: F_BODY };
++
++  BUILDERS.forEach(fn => {
++    const slide = pptx.addSlide();
++    slide.background = { color: C.white };
++    fn(slide, pptx);
++  });
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '0f53a7fb-ad8f-464f-8d27-888f46513576_grok_final.pptx') });
++}
++
++build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });

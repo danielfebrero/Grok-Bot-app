@@ -1,0 +1,591 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/skincare_ingredients_guide.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/skincare_ingredients_guide.js
+@@ -0,0 +1,588 @@
++/**
++ * "Beyond the Surface: The Power of Skincare Ingredients"
++ * Standalone pptxgenjs re-creation of the reference deck (20 slides, 13.333 x 7.5 in).
++ *
++ * Raster images in the source deck are replaced with programmatic placeholders;
++ * everything else is rebuilt from native pptxgenjs shapes / text / charts.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++const C = {
++  bg:     'FEF7F0', // lt1  - page background (warm off-white)
++  cream:  'F2E6CB', // accent1 - big cream panels
++  taupe:  'A5A08A', // accent2 - cards / icon chips
++  stone:  'DCD8CE', // accent3 lumMod 90% - light grey chart series
++  sand:   'F8F1D8', // accent6 - pale chart series
++  white:  'FEFFFF', // accent5 - text on taupe
++  ink:    '000000', // dk1/dk2 - body + headings
++  black:  '000000',
++};
++const SERIF = 'DM Serif Display'; // major font
++const SANS  = 'Open Sans';        // minor font
++
++const LOREM_SHORT = 'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis.';
++const LOREM_MED   = 'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque.';
++const TEMPORIBUS  = 'Temporibus autem quibusdam et aut officiis debitis aut rerum. ';
++const SUBHEADING  = 'Subheading Text ';
++
++/* ---------------------------------------------------------------- helpers */
++// Every slide sits on the warm off-white master background.
++function newSlide(pres) {
++  return pres.addSlide({ masterName: 'BASE' });
++}
++
++// Plain text box: PowerPoint text boxes are top-anchored, pptxgenjs defaults to middle.
++function txt(slide, text, o) {
++  slide.addText(text, Object.assign({
++    fontFace: SANS, fontSize: 18, color: C.ink, valign: 'top',
++  }, o));
++}
++
++// Filled rectangle (no outline) - the deck's basic building block.
++function rect(slide, x, y, w, h, color, opts) {
++  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, opts));
++}
++
++function oval(slide, x, y, d, color) {
++  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color }, line: { type: 'none' } });
++}
++
++// Horizontal / vertical rule
++function rule(slide, x, y, w, h, color, width) {
++  slide.addShape('line', { x, y, w, h, line: { color: color || C.ink, width: width || 1 } });
++}
++
++// Small caption above every section title, e.g. "Subheading Text"
++function eyebrow(slide, x, y, w, text, o) {
++  txt(slide, text, Object.assign({
++    x, y, w, h: 0.466, fontFace: SERIF, fontSize: 16, italic: true,
++    color: C.ink, lineSpacingMultiple: 1.5,
++  }, o));
++}
++
++// Big serif italic section title (36pt unless overridden)
++function title(slide, x, y, w, h, text, o) {
++  txt(slide, text, Object.assign({
++    x, y, w, h, fontFace: SERIF, fontSize: 36, italic: true, color: C.ink,
++  }, o));
++}
++
++// 12pt Open Sans paragraph with the deck's 1.5 line spacing
++function body(slide, x, y, w, h, text, o) {
++  txt(slide, text, Object.assign({
++    x, y, w, h, fontSize: 12, color: C.ink, lineSpacingMultiple: 1.5,
++  }, o));
++}
++
++// "Your Text" style mini-heading (16pt serif italic)
++function miniHead(slide, x, y, w, text, o) {
++  txt(slide, text || 'Your Text', Object.assign({
++    x, y, w, h: 0.466, fontFace: SERIF, fontSize: 16, italic: true,
++    color: C.ink, lineSpacingMultiple: 1.5,
++  }, o));
++}
++
++// Line-art icon stand-in for the original SVG/PNG glyphs: an outlined frame
++// with a small inner mark, drawn in the icon colour of the surrounding chip.
++function icon(slide, x, y, w, h, bg, stroke) {
++  const s = h === undefined ? w : h;
++  slide.addShape('roundRect', { x, y, w, h: s, rectRadius: w * 0.18, fill: { color: bg }, line: { color: stroke, width: 1 } });
++  slide.addShape('line', { x: x + w * 0.25, y: y + s * 0.62, w: w * 0.5, h: 0, line: { color: stroke, width: 1 } });
++  slide.addShape('ellipse', { x: x + w * 0.38, y: y + s * 0.26, w: w * 0.24, h: s * 0.24, fill: { color: bg }, line: { color: stroke, width: 1 } });
++}
++
++/* ------------------------------------------------------------ slide 1 / 20 */
++function slideTitleCard(pres) {
++  const s = newSlide(pres);
++  rect(s, 0, 4.894, 13.333, 2.606, C.cream);
++  txt(s, [
++    { text: 'Beyond the Surface:', options: { breakLine: true } },
++    { text: 'The Power of Skincare Ingredients' },
++  ], { x: 1.666, y: 0.835, w: 10.002, h: 1.447, fontFace: SERIF, fontSize: 40, italic: true, align: 'center' });
++  return s;
++}
++
++function slideThankYou(pres) {
++  const s = newSlide(pres);
++  rect(s, 0, 4.894, 13.333, 2.606, C.cream);
++  txt(s, 'Thank You!', { x: 4.856, y: 1.128, w: 3.622, h: 0.774, fontFace: SERIF, fontSize: 40, italic: true, align: 'center' });
++  txt(s, 'Discover the Secrets of a Beauty', {
++    x: 4.738, y: 1.921, w: 3.857, h: 0.466, fontFace: SERIF, fontSize: 16, italic: true,
++    align: 'center', lineSpacingMultiple: 1.5,
++  });
++  rule(s, 3.839, 1.903, 5.656, 0, C.ink, 1);
++}
++
++/* ---------------------------------------------------------------- slide 2 */
++function slideTableOfContent(pres) {
++  const s = newSlide(pres);
++  title(s, 7.412, 1.949, 5.314, 0.707, 'Table Of Content');
++  eyebrow(s, 7.396, 1.454, 3.857, SUBHEADING);
++  rect(s, 0, 3.773, 13.333, 3.726, C.cream);
++
++  // three numbered entries across the cream band
++  [
++    { x: 0.744, num: '01', ruleX: 0.839, ruleW: 0.464 },
++    { x: 5.112, num: '02', ruleX: 5.207, ruleW: 0.634 },
++    { x: 9.480, num: '03', ruleX: 9.575, ruleW: 0.464 },
++  ].forEach(col => {
++    txt(s, col.num, { x: col.x, y: 4.337, w: 0.984, h: 0.922, fontFace: SERIF, fontSize: 36, italic: true, lineSpacingMultiple: 1.5 });
++    miniHead(s, col.x, 5.24, 2.323);
++    body(s, col.x, 5.735, 3.418, 0.675, LOREM_SHORT);
++    rule(s, col.ruleX, 6.641, col.ruleW, 0, C.ink, 2);
++  });
++  rule(s, 7.493, 2.826, 0.984, 0, C.ink, 2);
++}
++
++/* ---------------------------------------------------------------- slide 3 */
++function slideAboutUs(pres) {
++  const s = newSlide(pres);
++  rect(s, 0.839, 1.535, 5.002, 4.43, C.cream);
++  title(s, 1.737, 3.24, 2.725, 0.707, 'About Us');
++  eyebrow(s, 1.721, 2.812, 2.11, SUBHEADING);
++  body(s, 1.721, 4.222, 3.607, 0.978,
++    'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque.');
++  rule(s, 1.823, 2.674, 0.586, 0, C.ink, 3);
++}
++
++/* ---------------------------------------------------------------- slide 4 */
++function slideSkincareIntro(pres) {
++  const s = newSlide(pres);
++  rect(s, 0.839, 3.75, 5.002, 3.232, C.cream);
++  body(s, 1.322, 4.727, 4.165, 1.886,
++    "Skincare is the practice of caring for your skin. It involves using a variety of products and techniques " +
++    "to cleanse, protect, and enhance your skin's appearance. In this presentation, we'll explore the basics " +
++    'of skincare, from understanding your skin type to building an effective routine.');
++  txt(s, 'Skincare', { x: 1.322, y: 4.261, w: 1.729, h: 0.47, fontFace: SERIF, fontSize: 16, lineSpacingMultiple: 1.5 });
++  title(s, 0.778, 1.826, 5.062, 1.313, 'Our Guide to Healthy, Glowing Skin');
++  eyebrow(s, 0.762, 1.36, 3.857, 'Discover the Secrets of a Beauty');
++}
++
++/* ---------------------------------------------------------------- slide 5 */
++function slideVisionMission(pres) {
++  const s = newSlide(pres);
++  rect(s, 0, 0, 13.326, 5.493, C.cream);
++  rect(s, 7.493, 4.962, 5.002, 1.868, C.taupe);
++  body(s, 8.081, 5.792, 4.011, 0.675,
++    'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium.', { color: C.white });
++  miniHead(s, 8.081, 5.326, 1.421, 'Your Text', { color: C.white });
++
++  // three key figures along the bottom strip
++  [
++    { x: 0.852, w: 0.975, value: '75%' },
++    { x: 2.760, w: 1.238, value: '1076+' },
++    { x: 4.930, w: 0.937, value: '30+' },
++  ].forEach(stat => {
++    txt(s, stat.value, { x: stat.x, y: 5.818, w: stat.w, h: 0.649, fontFace: SERIF, fontSize: 24, lineSpacingMultiple: 1.5 });
++    txt(s, 'Your Text', { x: stat.x - 0.002, y: 6.385, w: 0.975, h: 0.356, fontFace: SERIF, fontSize: 11, lineSpacingMultiple: 1.5 });
++  });
++  rule(s, 2.293, 5.743, 0, 1.072, C.bg, 0.25);
++  rule(s, 4.463, 5.743, 0, 1.072, C.bg, 0.25);
++
++  title(s, 7.419, 1.67, 4.852, 0.707, 'Our Vision & Mission');
++  eyebrow(s, 7.403, 1.242, 2.11, SUBHEADING);
++  body(s, 7.419, 2.859, 5.002, 1.28,
++    'PLACEHOLDER' +
++    'atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa.');
++}
++
++/* ---------------------------------------------------------------- slide 6 */
++function slideServices(pres) {
++  const s = newSlide(pres);
++  rect(s, 0, 0, 3.832, 7.5, C.cream);
++
++  [
++    { text: 4.374, chip: 4.461, icon: 4.608 },
++    { text: 7.217, chip: 7.304, icon: 7.451 },
++    { text: 10.061, chip: 10.148, icon: 10.294 },
++  ].forEach(col => {
++    body(s, col.text, 6.044, 2.43, 0.978, LOREM_SHORT);
++    miniHead(s, col.text, 5.578, 1.421);
++    rect(s, col.chip, 4.872, 0.588, 0.555, C.taupe);
++    icon(s, col.icon, 5.003, 0.295, 0.295, C.taupe, C.white);
++  });
++
++  rect(s, 7.493, 1.261, 5.002, 2.397, C.taupe);
++  title(s, 8.399, 2.392, 3.156, 0.707, 'Our Services', { color: C.white });
++  eyebrow(s, 8.421, 1.93, 2.791, SUBHEADING, { color: C.white });
++  body(s, 0.757, 6.335, 2.72, 0.675, 'At vero eos et accusamus et iusto odio dignissimos ducimus');
++  txt(s, '1075+', { x: 0.757, y: 5.413, w: 1.84, h: 0.922, fontFace: SERIF, fontSize: 36, lineSpacingMultiple: 1.5 });
++}
++
++/* ---------------------------------------------------------------- slide 7 */
++function slideTeam(pres) {
++  const s = newSlide(pres);
++  // staggered taupe cards; every card holds name / role / blurb / rule
++  [
++    { x: 4.863, y: 3.920, name: 'Amy Andrea', nameX: 5.019, nameW: 2.169, colX: 5.263, blurbX: 5.059, ruleX: 5.704 },
++    { x: 7.483, y: 1.266, name: 'Ava Bella', nameX: 7.882, nameW: 1.681, colX: 7.882, blurbX: 7.678, ruleX: 8.323 },
++    { x: 10.109, y: 3.920, name: 'Ella Emily', nameX: 10.509, nameW: 1.681, colX: 10.509, blurbX: 10.304, ruleX: 10.950 },
++  ].forEach(card => {
++    rect(s, card.x, card.y, 2.48, 2.48, C.taupe);
++    txt(s, card.name, { x: card.nameX, y: card.y + 0.303, w: card.nameW, h: 0.516, fontFace: SERIF, fontSize: 18, italic: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
++    txt(s, 'Your Position', { x: card.colX, y: card.y + 0.721, w: 1.681, h: 0.375, fontFace: SERIF, fontSize: 12, italic: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
++    body(s, card.blurbX, card.y + 1.366, 2.09, 0.675, 'At vero eos et accusamus et iusto.', { color: C.white, align: 'center' });
++    rule(s, card.ruleX, card.y + 1.286, 0.8, 0, C.white, 1);
++  });
++
++  title(s, 0.747, 2.423, 3.085, 1.313, 'Meet Our Best Team');
++  eyebrow(s, 0.768, 1.988, 2.11, SUBHEADING);
++  body(s, 0.761, 4.874, 3.661, 0.678, 'PLACEHOLDER');
++  miniHead(s, 0.761, 4.408, 1.421);
++  rule(s, 0.839, 5.801, 0.67, 0, C.ink, 2);
++}
++
++/* ---------------------------------------------------------------- slide 8 */
++function slideGuideSplit(pres) {
++  const s = newSlide(pres);
++  rect(s, 5.84, 0, 7.493, 7.5, C.cream);
++  body(s, 9.103, 5.783, 3.254, 0.675, 'PLACEHOLDER');
++  miniHead(s, 9.103, 5.317, 1.825);
++  rule(s, 9.209, 6.7, 0.585, 0, C.ink, 2);
++  title(s, 0.745, 1.793, 5.062, 1.313, 'Our Guide to Healthy, Glowing Skin');
++  eyebrow(s, 0.762, 1.327, 3.857, 'Discover the Secrets of a Beauty');
++  body(s, 0.778, 3.413, 4.055, 0.675, 'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium.');
++}
++
++/* ---------------------------------------------------------------- slide 9 */
++function slideGuideGallery(pres) {
++  const s = newSlide(pres);
++  title(s, 2.211, 1.175, 8.91, 0.707, 'Our Guide to Healthy, Glowing Skin', { align: 'center' });
++  eyebrow(s, 4.738, 0.709, 3.857, 'Discover the Secrets of a Beauty', { align: 'center' });
++  rect(s, 7.493, 3.79, 4.332, 1.641, C.taupe);
++  body(s, 8.152, 4.478, 3.358, 0.675, LOREM_SHORT, { color: C.white });
++  miniHead(s, 8.152, 4.012, 1.421, 'Your Text', { color: C.white });
++}
++
++/* --------------------------------------------------------------- slide 10 */
++function slideWhySkincare(pres) {
++  const s = newSlide(pres);
++  [
++    { y: 0.969, head: 'Improved skin health: ', headW: 2.445, text: 'Helps prevent and treat skin conditions.' },
++    { y: 3.145, head: 'Enhanced appearance', headW: 2.884, text: 'Promotes a youthful and radiant complexion.' },
++    { y: 5.322, head: 'Boosted confidence: ', headW: 2.532, text: 'Feeling good about your skin can improve your self-esteem.' },
++  ].forEach(row => {
++    txt(s, row.head, { x: 9.38, y: row.y, w: row.headW, h: 0.47, fontFace: SERIF, fontSize: 16, italic: true, lineSpacingMultiple: 1.5 });
++    body(s, 9.38, row.y + 0.466, 3.158, 0.675, row.text);
++    rect(s, 8.477, row.y + 0.144, 0.681, 0.643, C.taupe);
++    icon(s, 8.620, row.y + 0.268, 0.396, 0.396, C.taupe, C.white);
++  });
++  rule(s, 8.477, 2.781, 4.017, 0, C.ink, 1);
++  rule(s, 8.477, 4.957, 4.017, 0, C.ink, 1);
++  title(s, 0.745, 2.11, 4.111, 1.313, 'Why is Skincare Important?');
++  eyebrow(s, 0.762, 1.644, 3.857, 'Benefits of a Good Skincare Routine');
++}
++
++/* --------------------------------------------------------------- slide 11 */
++function slideBarChart(pres) {
++  const s = newSlide(pres);
++  rect(s, 5.408, 0.521, 7.087, 4.838, C.bg, {
++    shadow: { type: 'outer', blur: 20, offset: 3, angle: 90, color: '000000', opacity: 0.1 },
++  });
++
++  const YEARS = ['2021', '2022', '2023', '2024'];
++  s.addChart('bar', [
++    { name: 'Series 1', labels: YEARS, values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: YEARS, values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Series 3', labels: YEARS, values: [2, 2, 3, 5] },
++  ], {
++    x: 5.713, y: 0.86, w: 6.511, h: 4.199,
++    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 150,
++    chartColors: [C.cream, C.stone, C.taupe],
++    showLegend: false, showTitle: false, showValue: false,
++    valAxisMaxVal: 6, valAxisMajorUnit: 1,
++    valAxisLineShow: false, valGridLine: { color: C.ink, size: 1 },
++    catAxisLineColor: 'D9D9D9', catGridLine: { style: 'none' },
++    catAxisLabelFontFace: SANS, catAxisLabelFontSize: 12, catAxisLabelColor: C.ink,
++    valAxisLabelFontFace: SANS, valAxisLabelFontSize: 12, valAxisLabelColor: C.ink,
++  });
++
++  rect(s, 5.408, 5.359, 7.087, 1.446, C.black);
++  rect(s, 6.213, 5.751, 0.662, 0.662, C.white);
++  icon(s, 6.332, 5.882, 0.4, 0.4, C.white, '55524B');
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore.\u00a0',
++    { x: 7.05, y: 5.744, w: 4.585, h: 0.675, fontSize: 12, color: C.white, lineSpacingMultiple: 1.5 });
++
++  txt(s, [
++    { text: 'Chart Infographic', options: { breakLine: true } },
++    { text: 'Information' },
++  ], { x: 0.735, y: 1.727, w: 4.187, h: 1.313, fontFace: SERIF, fontSize: 36, italic: true });
++  eyebrow(s, 0.735, 1.276, 2.49, SUBHEADING);
++
++  [{ hx: 0.784, bx: 2.133, y: 3.917 }, { hx: 0.784, bx: 2.133, y: 5.021 }, { hx: 0.795, bx: 2.144, y: 6.091 }]
++    .forEach(row => {
++      miniHead(s, row.hx, row.y, 1.421);
++      body(s, row.bx, row.y, 2.946, 0.675, 'At vero eos et accusamus et iusto odio dignissimos ducimus qui.');
++    });
++}
++
++/* --------------------------------------------------------------- slide 12 */
++function slideStackedChart(pres) {
++  const s = newSlide(pres);
++  const softShadow = { shadow: { type: 'outer', blur: 20, offset: 2, angle: 90, color: '000000', opacity: 0.1 } };
++
++  rect(s, 1.011, 0.917, 3.988, 5.667, C.bg, softShadow);
++  s.addChart('bar', [
++    { name: 'A', labels: ['Q1'], values: [17] },
++    { name: 'B', labels: ['Q1'], values: [30] },
++    { name: 'C', labels: ['Q1'], values: [53] },
++  ], {
++    x: 1.454, y: 1.794, w: 3.014, h: 4.251,
++    barDir: 'col', barGrouping: 'percentStacked', barGapWidthPct: 106, barOverlapPct: 100,
++    chartColors: [C.sand, C.stone, C.taupe],
++    layout: { x: 0.1006, y: 0.0237, w: 0.789, h: 0.9002 },
++    showLegend: false, showTitle: false,
++    showValue: true, dataLabelPosition: 'ctr', dataLabelColor: C.ink,
++    dataLabelFontFace: SANS, dataLabelFontSize: 12, dataLabelFormatCode: '0',
++    valAxisLabelFormatCode: '0%', valAxisMajorUnit: 0.1,
++    valAxisLineShow: false, valGridLine: { color: C.ink, size: 1 },
++    catAxisLineColor: 'D9D9D9', catGridLine: { style: 'none' },
++    catAxisLabelFontFace: SANS, catAxisLabelFontSize: 12, catAxisLabelColor: C.ink,
++    valAxisLabelFontFace: SANS, valAxisLabelFontSize: 10, valAxisLabelColor: C.ink,
++  });
++
++  // legend row under the chart card
++  [
++    { dot: 1.334, label: 1.534, color: C.black },
++    { dot: 2.612, label: 2.812, color: C.stone },
++    { dot: 3.834, label: 4.034, color: C.cream },
++  ].forEach(item => {
++    oval(s, item.dot, 6.173, 0.12, item.color);
++    txt(s, 'Your Text', { x: item.label, y: 6.106, w: 0.798, h: 0.252, fontFace: SERIF, fontSize: 9, italic: true, valign: 'middle' });
++  });
++
++  txt(s, [
++    { text: '15M', options: { fontSize: 33 } },
++    { text: '/month', options: { fontSize: 14 } },
++  ], { x: 1.755, y: 1.22, w: 2.776, h: 0.573, fontFace: SERIF, italic: true, align: 'center', lineSpacingMultiple: 0.8 });
++
++  // three explanation tiles on the right
++  [
++    { x: 5.663, headColor: C.taupe, textColor: C.white, titleX: 5.786, titleW: 1.88, bodyX: 5.927 },
++    { x: 7.953, headColor: C.stone, textColor: C.ink, titleX: 8.046, titleW: 1.942, bodyX: 8.217 },
++    { x: 10.209, headColor: C.cream, textColor: C.ink, titleX: 10.301, titleW: 1.942, bodyX: 10.472 },
++  ].forEach(tile => {
++    rect(s, tile.x, 4.432, 2.113, 2.151, C.white, softShadow);
++    rect(s, tile.x, 4.25, 2.126, 0.777, tile.headColor);
++    txt(s, 'Write Tittle Here', { x: tile.titleX, y: 4.432, w: tile.titleW, h: 0.379, fontFace: SERIF, fontSize: 12, italic: true, color: tile.textColor, align: 'center', lineSpacingMultiple: 1.5 });
++    txt(s, 'Lorem ipsum dolor sit, consectetur elit, sed do eiusmod ut labore et dolore', {
++      x: tile.bodyX, y: 5.181, w: 1.599, h: 1.133, fontSize: 10.5, align: 'center', lineSpacingMultiple: 1.5,
++    });
++  });
++
++  body(s, 5.745, 2.685, 6.211, 0.978,
++    'PLACEHOLDER' +
++    'atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident. ');
++  txt(s, 'HEALTH RUN', { x: 11.792, y: 0.577, w: 0.821, h: 0.286, fontFace: SERIF, fontSize: 10.5, color: C.bg });
++  title(s, 5.754, 1.314, 5.549, 1.313, 'Chart Infographic Information');
++  eyebrow(s, 5.754, 0.863, 2.49, SUBHEADING);
++}
++
++/* --------------------------------------------------------------- slide 13 */
++function slideProductCards(pres) {
++  const s = newSlide(pres);
++  rect(s, 3.832, 5.089, 9.502, 2.411, C.cream);
++
++  // five taupe product cards, each with a two-line caption
++  [
++    { x: 4.502, y: 3.330, tx: 4.697, ty: 3.639, tw: 3.213, th: 0.505, head: 'Cleanser:', text: 'Removes dirt, oil, and makeup.' },
++    { x: 4.502, y: 4.532, tx: 4.697, ty: 4.841, tw: 3.492, th: 0.505, head: 'Toner:', text: "Refreshes and balances the skin's pH." },
++    { x: 4.502, y: 5.722, tx: 4.697, ty: 6.031, tw: 3.213, th: 0.505, head: 'Moisturizer:', text: 'Hydrates and protects the skin.' },
++    { x: 8.579, y: 4.532, tx: 8.774, ty: 4.841, tw: 3.139, th: 0.505, head: 'Sunscreen:', text: 'Shields the skin from harmful UV rays.' },
++    { x: 8.579, y: 5.730, tx: 8.774, ty: 5.945, tw: 3.297, th: 0.707, head: 'Serums:', text: 'Target specific skin concerns (e.g., wrinkles, hyperpigmentation).' },
++  ].forEach(card => {
++    rect(s, card.x, card.y, 3.882, 1.123, C.taupe);
++    txt(s, [
++      { text: card.head, options: { breakLine: true } },
++      { text: card.text },
++    ], { x: card.tx, y: card.ty, w: card.tw, h: card.th, fontFace: SERIF, fontSize: 12, italic: true, color: C.white });
++  });
++
++  title(s, 0.742, 1.515, 6.672, 0.707, 'Essential Skincare Products');
++  eyebrow(s, 0.759, 1.048, 3.857, 'Building Your Skincare Arsenal');
++  body(s, 7.735, 1.52, 4.777, 0.675,
++    'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti. ');
++  miniHead(s, 7.735, 1.048, 1.421);
++}
++
++/* --------------------------------------------------------------- slide 14 */
++function slideReadingLabels(pres) {
++  const s = newSlide(pres);
++  rect(s, 4.502, 4.575, 8.832, 2.925, C.cream);
++  body(s, 7.395, 5.154, 4.115, 0.981,
++    '- There\u2019s an active ingredients that hold the key components that provide benefits such as hyaluronic acid, retinol, niacinamide, etc.');
++  rule(s, 7.493, 6.349, 0.856, 0, C.ink, 3);
++  title(s, 7.727, 2.345, 4.114, 1.313, 'Reading Skincare Labels');
++  eyebrow(s, 7.744, 1.879, 3.857, 'Deciphering Ingredients');
++}
++
++/* --------------------------------------------------------------- slide 15 */
++function slideMyths(pres) {
++  const s = newSlide(pres);
++  rect(s, 5.486, 0, 7.847, 4.341, C.cream);
++
++  [
++    { y: 1.880, w: 3.174, h: 0.370, chipY: 1.715, iconY: 1.835, text: 'Skincare Myths Debunked' },
++    { y: 3.750, w: 2.631, h: 0.909, chipY: 3.698, iconY: 3.790, text: 'Popping pimples will make them go far away faster.' },
++    { y: 5.846, w: 2.913, h: 0.640, chipY: 5.680, iconY: 5.766, text: 'Sunscreen is only necessary on sunny days.' },
++  ].forEach(row => {
++    txt(s, row.text, { x: 1.682, y: row.y, w: row.w, h: row.h, fontFace: SERIF, fontSize: 16 });
++    rect(s, 0.828, row.chipY, 0.681, 0.643, C.taupe);
++    icon(s, 0.961, row.iconY, 0.415, 0.415, C.taupe, C.white);
++  });
++  rule(s, 0.828, 5.181, 3.674, 0, C.ink, 1);
++  rule(s, 0.828, 3.198, 3.674, 0, C.ink, 1);
++
++  body(s, 6.746, 2.857, 5.424, 0.682, LOREM_MED);
++  title(s, 6.746, 2.005, 5.76, 0.707, 'Skincare Myths Debunked');
++  eyebrow(s, 6.730, 1.576, 3.756, 'Separating Fact from Fiction', { h: 0.47 });
++}
++
++/* --------------------------------------------------------------- slide 16 */
++// Vector phone mock-up rebuilt from native shapes (dark body, light screen, notch).
++function phoneMockup(slide, x, y, w, h, screenX, screenY, screenW, screenH) {
++  const notchW = w * 0.497;
++  slide.addShape('roundRect', { x, y, w, h, rectRadius: 0.3, fill: { color: '111111' }, line: { type: 'none' } });
++  slide.addShape('roundRect', { x: screenX, y: screenY, w: screenW, h: screenH, rectRadius: 0.22, fill: { color: C.bg }, line: { type: 'none' } });
++  slide.addShape('roundRect', { x: x + (w - notchW) / 2, y, w: notchW, h: 0.31, rectRadius: 0.09, fill: { color: '111111' }, line: { type: 'none' } });
++}
++
++function slideEssentialProducts(pres) {
++  const s = newSlide(pres);
++  rect(s, 0, 5.727, 13.333, 1.773, C.cream);
++
++  [
++    { dotY: 2.939, dotX: 0.836, x: 1.335, headY: 2.872, bodyY: 3.210 },
++    { dotY: 4.292, dotX: 0.823, x: 1.321, headY: 4.225, bodyY: 4.563 },
++  ].forEach(row => {
++    oval(s, row.dotX, row.dotY, 0.271, C.taupe);
++    txt(s, 'Text Here ', { x: row.x, y: row.headY, w: 1.483, h: 0.404, fontFace: SERIF, fontSize: 18, italic: true });
++    body(s, row.x, row.bodyY, 4.151, 0.675,
++      'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis voluptatum deleniti atque.');
++  });
++  body(s, 0.783, 6.102, 4.447, 0.678,
++    'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis voluptatum deleniti atque.');
++  title(s, 0.742, 1.263, 6.672, 0.707, 'Essential Skincare Products');
++  eyebrow(s, 0.759, 0.797, 3.857, 'Building Your Skincare Arsenal');
++
++  phoneMockup(s, 6.843, 2.069, 2.323, 4.909, 6.964, 2.213, 2.079, 4.667);
++  phoneMockup(s, 9.368, 0.620, 2.323, 4.909, 9.490, 0.763, 2.079, 4.667);
++
++  rect(s, 7.985, 4.719, 4.538, 1.784, C.taupe);
++  txt(s, '75%', { x: 8.444, y: 4.848, w: 1.419, h: 0.922, fontFace: SERIF, fontSize: 36, italic: true, color: C.white, lineSpacingMultiple: 1.5 });
++  miniHead(s, 8.442, 5.689, 1.421, 'Your Text', { color: C.white });
++  body(s, 9.698, 5.245, 2.65, 0.675, TEMPORIBUS, { color: C.white });
++}
++
++/* --------------------------------------------------------------- slide 17 */
++// Vector laptop mock-up: dark lid + bright screen on a silver keyboard base.
++// (On a trapezoid, `rectRadius` drives the "adj" guide, i.e. the top-edge inset.)
++function laptopMockup(slide, x, y, w, h) {
++  const lidW = w * 0.787, lidH = h * 0.796, lidX = x + (w - lidW) / 2;
++  const deckY = y + lidH, deckH = h * 0.185, slope = (w - lidW) / 2;
++  const kbH = deckH * 0.45, kbSlope = slope * (kbH / deckH), kbInset = 0.13;
++  slide.addShape('roundRect', { x: lidX, y, w: lidW, h: lidH, rectRadius: 0.07, fill: { color: '141414' }, line: { type: 'none' } });
++  slide.addShape('rect', { x: lidX + 0.19, y: y + 0.17, w: lidW - 0.38, h: lidH - 0.34, fill: { color: C.bg }, line: { type: 'none' } });
++  slide.addShape('ellipse', { x: lidX + lidW / 2 - 0.02, y: y + 0.07, w: 0.04, h: 0.04, fill: { color: '4A4A4A' }, line: { type: 'none' } });
++  slide.addShape('trapezoid', { x, y: deckY, w, h: deckH, rectRadius: slope, fill: { color: 'B4B4B7' }, line: { type: 'none' } });
++  slide.addShape('trapezoid', {
++    x: lidX - kbSlope + kbInset, y: deckY, w: lidW + 2 * kbSlope - 2 * kbInset, h: kbH,
++    rectRadius: kbSlope, fill: { color: '1F1F1F' }, line: { type: 'none' },
++  });
++  slide.addShape('rect', { x: x + w * 0.335, y: deckY + deckH * 0.58, w: w * 0.33, h: deckH * 0.28, fill: { color: 'A8A8AB' }, line: { type: 'none' } });
++  slide.addShape('roundRect', { x, y: deckY + deckH, w, h: h * 0.035, rectRadius: 0.04, fill: { color: 'E2DDD8' }, line: { type: 'none' } });
++}
++
++function slideLaptopMockup(pres) {
++  const s = newSlide(pres);
++  laptopMockup(s, 0.839, 0.96, 5.737, 3.734);
++  rect(s, 0, 5.086, 13.333, 2.414, C.cream);
++
++  [
++    { dot: 0.836, x: 1.427, y: 5.615 },
++    { dot: 5.183, x: 5.773, y: 5.615 },
++    { dot: 9.529, x: 10.119, y: 5.595 },
++  ].forEach(col => {
++    body(s, col.x, col.y + 0.536, 2.672, 0.675, TEMPORIBUS);
++    miniHead(s, col.x, col.y, 1.421);
++    oval(s, col.dot, col.y + 0.147, 0.271, C.taupe);
++  });
++  rule(s, 8.913, 5.446, 0, 1.383, C.ink, 1);
++  rule(s, 4.566, 5.595, 0, 1.383, C.ink, 1);
++
++  title(s, 7.379, 2.192, 5.125, 1.313, 'Our Guide to Healthy, Glowing Skin');
++  eyebrow(s, 7.379, 1.726, 3.857, 'Discover the Secrets of a Beauty');
++}
++
++/* --------------------------------------------------------------- slide 18 */
++function slideContact(pres) {
++  const s = newSlide(pres);
++  rect(s, 8.477, 3.181, 4.856, 4.319, C.cream);
++  txt(s, [
++    { text: 'Contact Us For', options: { breakLine: true } },
++    { text: 'More Information' },
++  ], { x: 0.768, y: 1.341, w: 5.436, h: 1.313, fontFace: SERIF, fontSize: 36, italic: true });
++  eyebrow(s, 0.768, 0.891, 2.11, SUBHEADING);
++  body(s, 8.395, 1.545, 4.247, 0.678,
++    'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum.');
++  miniHead(s, 8.395, 1.079, 1.421);
++  rule(s, 8.477, 2.411, 1.024, 0, C.ink, 1);
++
++  body(s, 9.673, 3.972, 2.97, 0.77, '1234, Name Street, Building, Your City, Your Country.', { fontSize: 14 });
++  icon(s, 9.299, 4.155, 0.25, 0.229, C.cream, '55524B');
++  txt(s, [
++    { text: 'yourinfo@email.com ', options: { breakLine: true } },
++    { text: 'your.email@mail.com' },
++  ], { x: 9.703, y: 5.953, w: 2.581, h: 0.768, fontSize: 14, lineSpacingMultiple: 1.5 });
++  icon(s, 9.314, 6.186, 0.24, 0.146, C.cream, '55524B');
++  body(s, 9.667, 5.171, 2.301, 0.42, '+00 123 4567 890', { fontSize: 14 });
++  icon(s, 9.314, 5.341, 0.25, 0.25, C.cream, '55524B');
++  rule(s, 9.314, 4.888, 2.97, 0, C.ink, 1);
++  rule(s, 9.301, 5.804, 2.97, 0, C.ink, 1);
++}
++
++/* --------------------------------------------------------------- slide 19 */
++function slideTips(pres) {
++  const s = newSlide(pres);
++  [
++    { x: 0.819, y: 1.511, tx: 1.762, head: 'Hydrate: ', headW: 1.421, text: 'Drink plenty of water.', textW: 2.132, textH: 0.303, iconX: 1.158, iconY: 1.854, iconS: 0.405 },
++    { x: 0.819, y: 2.815, tx: 1.762, head: 'Get enough sleep: ', headW: 2.174, text: 'Rest is essential for skin repair.', textW: 1.966, textH: 0.505, iconX: 1.158, iconY: 3.126, iconS: 0.405 },
++    { x: 0.821, y: 4.179, tx: 1.763, head: 'Manage stress: ', headW: 1.927, text: 'Practice relaxation techniques.', textW: 2.132, textH: 0.505, iconX: 1.158, iconY: 4.504, iconS: 0.405 },
++    { x: 0.821, y: 5.483, tx: 1.763, head: 'Eat a balanced diet: ', headW: 2.174, text: 'Nourish your skin from within.', textW: 1.966, textH: 0.505, iconX: 1.176, iconY: 5.836, iconS: 0.368 },
++  ].forEach(tip => {
++    rect(s, tip.x, tip.y, 3.347, 1.091, C.taupe);
++    txt(s, tip.head, { x: tip.tx, y: tip.y + 0.118, w: tip.headW, h: 0.47, fontFace: SERIF, fontSize: 16, italic: true, color: C.white, lineSpacingMultiple: 1.5 });
++    txt(s, tip.text, { x: tip.tx, y: tip.y + 0.495, w: tip.textW, h: tip.textH, fontSize: 12, color: C.white });
++    icon(s, tip.iconX, tip.iconY, tip.iconS, tip.iconS, C.taupe, C.white);
++  });
++
++  title(s, 7.795, 2.006, 5.125, 0.707, 'Tips for Healthy Skin');
++  eyebrow(s, 7.795, 1.54, 3.857, 'Beyond Skincare Products');
++  body(s, 9.724, 5.351, 2.98, 0.978,
++    'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum.');
++  miniHead(s, 9.724, 4.885, 1.421);
++}
++
++/* -------------------------------------------------------------------- run */
++function build() {
++  const pres = new PptxGenJS();
++  pres.defineLayout({ name: 'DECK', width: 13.333, height: 7.5 });
++  pres.layout = 'DECK';
++  pres.author = 'pptxgenjs';
++  pres.title = 'Beyond the Surface: The Power of Skincare Ingredients';
++  pres.defineSlideMaster({ title: 'BASE', background: { color: C.bg } });
++
++  const builders = [
++    slideTitleCard, slideTableOfContent, slideAboutUs, slideSkincareIntro, slideVisionMission,
++    slideServices, slideTeam, slideGuideSplit, slideGuideGallery, slideWhySkincare,
++    slideBarChart, slideStackedChart, slideProductCards, slideReadingLabels, slideMyths,
++    slideEssentialProducts, slideLaptopMockup, slideContact, slideTips, slideThankYou,
++  ];
++  builders.forEach(fn => fn(pres));
++  return pres;
++}
++
++build().writeFile({ fileName: path.join(__dirname, '0e3bb8d1-60ea-46c4-8715-b4f698056846_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

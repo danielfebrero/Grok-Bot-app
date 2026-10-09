@@ -1,0 +1,867 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/greenai_sustainability_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/greenai_sustainability_pitch_deck.js
+@@ -0,0 +1,864 @@
++#!/usr/bin/env node
++/**
++ * GreenAI Solutions -- pptxgenjs reconstruction of
++ * "062804aa-3432-4147-80c8-ff087078b88b.pptx" (20 slides, 13.333in x 7.5in).
++ *
++ * Every slide is built from plain pptxgenjs calls; the few repeating motifs
++ * (page furniture, gradient washes, icon glyphs) are factored into helpers.
++ * Raster/SVG artwork from the source deck is replaced by native shapes.
++ *
++ * Run:  node 062804aa-3432-4147-80c8-ff087078b88b_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Theme palette (from the source theme "Custom 23") + derived tints   *
++ * ------------------------------------------------------------------ */
++const TEAL = '117865';   // accent1
++const ORANGE = 'F38734'; // accent2
++const INK = '0A1622';    // accent3 - near black navy
++const NAVY = '112437';   // accent4
++const MINT = 'EFFFFC';   // accent5
++const WHITE = 'FFFFFF';
++const MINT_DK = 'BEFFF3'; // accent5 @ lumMod 90%
++const MINT_LT = 'BEF6EB'; // accent1 @ lumOff 80%
++const PEACH = 'FACFAE';   // accent2 @ lumOff 60%
++const ICE = 'DBE8F4';     // accent3 @ lumOff 90%
++const STEEL = 'ABC8E5';   // accent4 @ lumOff 75%
++const BLUE = '24507C';    // accent3 @ lumOff 25%
++const BOWTIE = 'D6DCE5';  // dk2 @ lumOff 80%
++const GREY10 = 'D0CECE';  // lt2 @ lumMod 90%
++const GREY25 = 'AFABAB';  // lt2 @ lumMod 75%
++const GREY50 = '767171';  // lt2 @ lumMod 50%  (default body copy)
++const GREY75 = '3B3838';  // lt2 @ lumMod 25%  (dark body copy)
++const SOFT = '262626';    // black @ lumOff 15%
++const SILVER = 'D9D9D9';  // white @ lumMod 85%
++
++const HEAD = 'DM Sans';   // major latin font
++const BODY = 'Open Sans'; // minor latin font
++
++const NO_FILL = { color: WHITE, transparency: 100 };
++// pptxgenjs rewrites the shadow object in place, so hand every shape its own copy.
++const cardShadow = () => ({ type: 'outer', color: '000000', blur: 40, offset: 3, angle: 45, opacity: 0.25 });
++const softShadow = () => ({ type: 'outer', color: '000000', blur: 30, offset: 0, angle: 45, opacity: 0.3 });
++
++/* ------------------------------------------------------------------ *
++ * Small utilities                                                     *
++ * ------------------------------------------------------------------ */
++
++/** Linear blend of two hex colours, f = 0 -> a, f = 1 -> b. */
++function mix(a, b, f) {
++  const ch = (s, i) => parseInt(s.substr(i * 2, 2), 16);
++  return [0, 1, 2]
++    .map(i => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * f).toString(16).padStart(2, '0'))
++    .join('')
++    .toUpperCase();
++}
++
++/** Colour at position t (0..1) along a list of [stop, colour] pairs. */
++function sample(stops, t) {
++  for (let i = 0; i < stops.length - 1; i++) {
++    const [p0, c0] = stops[i];
++    const [p1, c1] = stops[i + 1];
++    if (t <= p1) return mix(c0, c1, p1 === p0 ? 0 : (t - p0) / (p1 - p0));
++  }
++  return stops[stops.length - 1][1];
++}
++
++/**
++ * pptxgenjs cannot emit gradient fills, so linear washes are painted as a
++ * strip of thin bands interpolated between the source colour stops.
++ */
++function wash(s, box, stops, opts) {
++  const [x, y, w, h] = box;
++  const o = opts || {};
++  const n = o.bands || 64;
++  const horiz = o.dir === 'h';
++  for (let i = 0; i < n; i++) {
++    const color = sample(stops, (i + 0.5) / n);
++    if (horiz) s.addShape('rect', { x: x + (w * i) / n, y, w: w / n + 0.02, h, fill: { color } });
++    else s.addShape('rect', { x, y: y + (h * i) / n, w, h: h / n + 0.02, fill: { color } });
++  }
++}
++
++/** Radial glow: concentric discs from `edge` colour inwards to `core`. */
++function glow(s, cx, cy, d, edge, core, rings) {
++  const n = rings || 10;
++  for (let i = 0; i < n; i++) {
++    const dd = (d * (n - i)) / n;
++    s.addShape('ellipse', {
++      x: cx - dd / 2, y: cy - dd / 2, w: dd, h: dd,
++      fill: { color: mix(edge, core, i / (n - 1)) },
++    });
++  }
++}
++
++/* Text runs: 'plain string' | ['text', {opts}] | BR (hard line break) --- */
++const B = t => [t, { bold: true }];
++const BR = { br: true };
++function toRuns(spec) {
++  const out = [];
++  (typeof spec === 'string' ? [spec] : spec).forEach(part => {
++    if (part === BR) {
++      if (out.length) out[out.length - 1].options.breakLine = true;
++    } else if (typeof part === 'string') {
++      out.push({ text: part, options: {} });
++    } else {
++      out.push({ text: part[0], options: Object.assign({}, part[1]) });
++    }
++  });
++  return out;
++}
++
++/** Text box. box = [x, y, w, h]; source insets (0.1/0.05in) are the default. */
++function text(s, box, runs, o) {
++  s.addText(toRuns(runs), Object.assign({
++    x: box[0], y: box[1], w: box[2], h: box[3],
++    fontFace: BODY, fontSize: 12, color: GREY50, align: 'left', valign: 'top',
++  }, o || {}));
++}
++
++/** Display heading set in the major font. */
++function heading(s, box, runs, size, color, o) {
++  const opts = Object.assign({
++    fontFace: HEAD, fontSize: size, color, lineSpacing: Math.round(size * 1.05),
++  }, o || {});
++  if (opts.lineSpacing === null) delete opts.lineSpacing;
++  text(s, box, runs, opts);
++}
++
++/* ------------------------------------------------------------------ *
++ * Recurring furniture                                                 *
++ * ------------------------------------------------------------------ */
++
++/** "GreenAI Solutions" caption, top right of every content slide. */
++function brandTag(s, color) {
++  text(s, [10.792, 0.386, 2.273, 0.372], 'GreenAI Solutions',
++    { align: 'right', color, lineSpacingMultiple: 1.5 });
++}
++
++/** "Pg.    NN" caption, bottom left. */
++function pageTag(s, label, color) {
++  text(s, [0.253, 6.713, 2.273, 0.372], 'Pg.    ' + label,
++    { color: color || GREY75, lineSpacingMultiple: 1.5 });
++}
++
++/**
++ * The GreenAI house mark (traced from the deck's freeform): an orange
++ * house silhouette carrying a white magnifier pictogram.
++ */
++function houseMark(s, x, y, w, h) {
++  const P = (px, py) => ({ x: w * px, y: h * py });
++  const C = (x1, y1, x2, y2, px, py) => ({
++    x: w * px, y: h * py,
++    curve: { type: 'cubic', x1: w * x1, y1: h * y1, x2: w * x2, y2: h * y2 },
++  });
++  s.addShape('custGeom', {
++    x, y, w, h, fill: { color: ORANGE },
++    points: [
++      P(0.503, 0.000),
++      C(0.533, 0.000, 0.563, 0.008, 0.586, 0.025),
++      P(0.917, 0.265),
++      C(0.963, 0.298, 0.963, 0.352, 0.917, 0.385),
++      P(0.905, 0.394),
++      P(0.958, 0.411),
++      C(0.984, 0.429, 1.000, 0.455, 1.000, 0.484),
++      P(1.000, 0.897),
++      C(1.000, 0.954, 0.936, 1.000, 0.858, 1.000),
++      P(0.142, 1.000),
++      C(0.064, 1.000, 0.000, 0.954, 0.000, 0.897),
++      P(0.000, 0.484),
++      C(0.000, 0.455, 0.016, 0.429, 0.042, 0.411),
++      P(0.091, 0.396),
++      P(0.083, 0.390),
++      C(0.037, 0.357, 0.037, 0.303, 0.083, 0.270),
++      P(0.421, 0.025),
++      C(0.443, 0.008, 0.473, 0.000, 0.503, 0.000),
++      { close: true },
++    ],
++  });
++  glyph(s, x + w * 0.5, y + h * 0.63, Math.min(w, h) * 0.62, WHITE);
++}
++
++/** Small logo lock-up used in the corner of most slides. */
++function cornerLogo(s) {
++  houseMark(s, 0.366, 0.401, 0.317, 0.372);
++}
++
++/**
++ * Line-art pictogram placeholder (a ring with a stem) standing in for the
++ * SVG icons of the source deck.
++ */
++function glyph(s, cx, cy, size, color) {
++  const r = size * 0.62;
++  const wt = Math.max(0.75, size * 4.5);
++  s.addShape('ellipse', {
++    x: cx - r / 2, y: cy - r / 2 - size * 0.06, w: r, h: r,
++    fill: NO_FILL, line: { color, width: wt },
++  });
++  s.addShape('line', {
++    x: cx + r * 0.26, y: cy + r * 0.2, w: size * 0.28, h: size * 0.28,
++    line: { color, width: wt },
++  });
++}
++
++/** Orange bullet disc with a white pictogram, the deck's signature accent. */
++function iconDisc(s, x, y, d, iconSize) {
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: ORANGE } });
++  glyph(s, x + d / 2, y + d / 2, iconSize || d * 0.6, WHITE);
++}
++
++/** Placeholder standing in for a photograph in the source deck. */
++function photo(s, box, color, o) {
++  s.addShape((o && o.shape) || 'rect', Object.assign({
++    x: box[0], y: box[1], w: box[2], h: box[3], fill: { color },
++  }, o || {}));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides                                                              *
++ * ------------------------------------------------------------------ */
++
++/* 1 - Title */
++function slide01(s) {
++  s.addShape('ellipse', { x: 0.583, y: -2.333, w: 12.167, h: 12.167, fill: { color: 'E9FEFA' } });
++  s.addShape('ellipse', { x: 2.319, y: -0.635, w: 8.695, h: 8.695, fill: { color: 'FAFEFD' } });
++  s.addShape('ellipse', { x: 2.827, y: -0.111, w: 7.679, h: 7.679, fill: { color: 'F4FDFB' } });
++  heading(s, [3.274, 2.889, 6.786, 2.417],
++    [B('GreenAI'), B(' '), ['Solutions', { fontSize: 88 }], ' '],
++    72, '000000', { align: 'center', lineSpacing: 80 });
++  text(s, [3.505, 5.075, 6.323, 0.552], 'Revolutionizing Sustainability through AI',
++    { fontSize: 20, align: 'center', lineSpacingMultiple: 1.5 });
++  houseMark(s, 6.184, 1.391, 0.979, 1.15);
++}
++
++/* 2 - About */
++function slide02(s) {
++  s.addShape('roundRect', {
++    x: 1.018, y: 0.833, w: 5.792, h: 8.103, rectRadius: 0.886, fill: { color: 'E7FFFA' },
++  });
++  wash(s, [0, 2.968, 13.333, 4.532], [[0, MINT], [1, MINT_DK]]);
++  heading(s, [7.803, 1.779, 4.77, 2.631], ['About ', B('GreenAI'), ' Solutions '], 54, INK,
++    { lineSpacing: 60 });
++  text(s, [7.861, 4.754, 3.951, 1.28],
++    'We are a leading provider of AI-powered solutions, dedicated to addressing environmental ' +
++    'challenges and promoting sustainable practices.', { lineSpacingMultiple: 1.5 });
++  s.addShape('roundRect', {
++    x: 4.519, y: 4.526, w: 2.548, h: 2.141, rectRadius: 0.357,
++    fill: { color: WHITE }, shadow: cardShadow(),
++  });
++  text(s, [4.656, 5.561, 2.273, 0.77], ['Driving ', B('Sustainable Innovation'), ' with AI'],
++    { fontSize: 14, color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++  iconDisc(s, 5.436, 4.827, 0.657, 0.381);
++  brandTag(s, GREY75);
++  pageTag(s, '01');
++  cornerLogo(s);
++}
++
++/* 3 - Vision & Mission */
++function slide03(s) {
++  s.addShape('rect', { x: 4.698, y: 0, w: 8.635, h: 6.333, fill: { color: WHITE } });
++  wash(s, [0, 2.968, 13.333, 4.532], [[0, 'FDFEFE'], [1, 'F1FEFB']]);
++  heading(s, [1.279, 2.254, 3.658, 2.631], ['Our ', B('Vision'), ' & Mission'], 54, INK,
++    { lineSpacing: 60 });
++
++  const cards = [
++    { y: 1.464, fill: TEAL, color: WHITE, tw: 3.055,
++      body: 'We envision a world where AI-driven technologies empower sustainable development, ' +
++            'preserving our planet for future generations.' },
++    { y: 3.972, fill: WHITE, color: GREY50, tw: 3.268,
++      body: 'PLACEHOLDER' +
++            'positive environmental impact and foster sustainable practices.' },
++  ];
++  cards.forEach(c => {
++    s.addShape('roundRect', {
++      x: 7.469, y: c.y, w: 4.586, h: 2.141, rectRadius: 0.357,
++      fill: { color: c.fill }, shadow: cardShadow(),
++    });
++    text(s, [8.551, c.y + 0.43, c.tw, 1.28], c.body, { color: c.color, lineSpacingMultiple: 1.5 });
++    iconDisc(s, 7.88, c.y + 0.566, 0.539, 0.27);
++  });
++
++  text(s, [1.993, 5.119, 2.793, 0.866], ['Building a ', B('Greener Future'), ' with AI'],
++    { fontSize: 16, color: GREY75, lineSpacingMultiple: 1.5 });
++  glyph(s, 1.66, 5.553, 0.535, ORANGE);
++  brandTag(s, GREY75);
++  pageTag(s, '02');
++}
++
++/* 4 - Services (dark slide) */
++function slide04(s) {
++  s.background = { color: INK };
++  heading(s, [1.389, 1.438, 3.593, 1.79], ['Our ', B('Services')], 54, WHITE, { lineSpacing: 60 });
++  text(s, [7.336, 1.812, 3.876, 0.462], ['Building a ', B('Greener Future'), ' with AI'],
++    { fontSize: 16, color: WHITE, lineSpacingMultiple: 1.5 });
++  text(s, [7.363, 2.275, 3.534, 0.77],
++    'Lorem ipsum dolor sit amet,dolor adipiscing elit, sed do.',
++    { fontSize: 14, color: GREY10, lineSpacingMultiple: 1.5 });
++
++  s.addShape('roundRect', {
++    x: 1.155, y: 4.026, w: 5.906, h: 2.875, rectRadius: 0.333,
++    fill: { color: NAVY }, shadow: cardShadow(),
++  });
++  text(s, [2.857, 4.558, 3.537, 1.83],
++    'We offer a wide range of services, including energy optimization, waste management, ' +
++    'water conservation, and environmental monitoring, all driven by AI technology.',
++    { fontSize: 14, color: GREY10, lineSpacingMultiple: 1.5 });
++  iconDisc(s, 1.969, 4.694, 0.613, 0.42);
++
++  s.addShape('roundRect', {
++    x: 7.464, y: 4.026, w: 4.715, h: 2.866, rectRadius: 0.311,
++    fill: { color: MINT }, shadow: cardShadow(),
++  });
++  text(s, [8.904, 4.484, 2.693, 1.83],
++    'Lorem ipsum dolor sit amet,dolor adipiscing elit, sed do incididunt ut labore et dolore ' +
++    'magna aliqua. Lorem ipsum', { fontSize: 14, lineSpacingMultiple: 1.5 });
++  iconDisc(s, 7.987, 4.627, 0.613, 0.42);
++
++  brandTag(s, GREY25);
++  pageTag(s, '03', GREY25);
++}
++
++/* 5 - Team */
++function slide05(s) {
++  wash(s, [0, 0, 13.333, 7.5], [[0, MINT_DK], [1, MINT]], { dir: 'h' });
++  glow(s, 3.141, 2.43, 8.695, 'F0FFFC', 'FDFFFE', 5);
++  heading(s, [8.109, 1.925, 3.593, 1.79], ['Our ', B('Team')], 54, INK, { lineSpacing: 60 });
++  text(s, [8.14, 4.056, 3.361, 1.583],
++    'Our team consists of experienced professionals, AI specialists, and environmental ' +
++    'enthusiasts, committed to making a difference through sustainable technology.',
++    { lineSpacingMultiple: 1.5 });
++  s.addShape('ellipse', {
++    x: 3.949, y: 4.056, w: 2.718, h: 2.722, fill: { color: TEAL }, shadow: cardShadow(),
++  });
++  text(s, [4.279, 5.142, 2.057, 1.27], ['Experts ', B('in Sustainable AI '), 'Innovation'],
++    { fontSize: 16, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++  iconDisc(s, 4.974, 4.466, 0.668, 0.4);
++  brandTag(s, SOFT);
++  pageTag(s, '04');
++}
++
++/* 6 - Portfolio divider */
++function slide06(s) {
++  s.addShape('rect', { x: 0, y: 2.972, w: 13.333, h: 4.528, fill: { color: INK } });
++  heading(s, [1.804, 5.023, 4.075, 1.79],
++    ['Portfolio', BR, B('& Projects')], 54, WHITE,
++    { lineSpacing: 60 });
++  text(s, [7.454, 5.736, 4.761, 0.978],
++    'PLACEHOLDER' +
++    'energy efficiency, waste reduction, and environmental sustainability.',
++    { color: GREY10, lineSpacingMultiple: 1.5 });
++  glyph(s, 7.807, 5.412, 0.552, ORANGE);
++  pageTag(s, '05', GREY25);
++}
++
++/* 7 - Testimonials */
++function slide07(s) {
++  wash(s, [0.921, 0, 12.413, 7.5], [[0, 'F0FFFC'], [0.54, MINT_DK], [1, MINT_DK]], { dir: 'h' });
++  heading(s, [4.223, 0.962, 4.888, 0.948], 'Testimonials', 54, INK,
++    { align: 'center', lineSpacing: 60 });
++  text(s, [3.916, 1.77, 5.502, 0.552],
++    ["Clients' ", B('Feedback on '), B('GreenAI'), ' Solutions'],
++    { fontSize: 20, color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++
++  const quote = 'Lorem ipsum dolor sit amet,dolor adipiscing elit, sed do incididunt ut labore ' +
++    'et dolore magna aliqua. Lorem ipsum';
++  const cards = [
++    { x: 1.226, fill: TEAL, name: 'Adela Brown', nameColor: WHITE, role: 'CEO of Agriculture Company',
++      roleColor: GREY10, quoteColor: GREY10, tx: 1.725, nx: 2.919, sx: 4.342 },
++    { x: 6.916, fill: WHITE, name: 'Jennifer Hawkins', nameColor: GREY75, role: 'CEO of Sustainable Company',
++      roleColor: GREY50, quoteColor: GREY50, tx: 7.497, nx: 8.628, sx: 10.516 },
++  ];
++  cards.forEach(c => {
++    s.addShape('roundRect', {
++      x: c.x, y: 2.861, w: 5.191, h: 3.347, rectRadius: 0.377,
++      fill: { color: c.fill }, shadow: cardShadow(),
++    });
++    heading(s, [c.nx, 3.247, 2.793, 0.56], c.name, 20, c.nameColor,
++      { lineSpacing: null, lineSpacingMultiple: 1.5 });
++    text(s, [c.nx, 3.713, 2.682, 0.372], c.role,
++      { italic: true, color: c.roleColor, lineSpacingMultiple: 1.5 });
++    text(s, [c.tx, 4.297, 4.192, 1.124], quote,
++      { fontSize: 14, color: c.quoteColor, lineSpacingMultiple: 1.5 });
++    for (let i = 0; i < 5; i++) {
++      s.addShape('star5', {
++        x: c.sx + i * 0.2503, y: 5.607, w: 0.258, h: 0.258, fill: { color: ORANGE },
++      });
++    }
++  });
++
++  brandTag(s, SOFT);
++  pageTag(s, '01');
++}
++
++/* 8 - Power of AI */
++function slide08(s) {
++  wash(s, [0, 0, 13.333, 4.958], [[0, MINT_DK], [1, MINT]]);
++  heading(s, [7.316, 1.779, 4.906, 2.222],
++    ['The ', B('Power'), BR, B('of AI'), ' in', BR, 'Sustainability'],
++    48, INK, { lineSpacing: 50 });
++  s.addShape('roundRect', {
++    x: 2.439, y: 3.502, w: 3.096, h: 2.233, rectRadius: 0.252,
++    fill: { color: WHITE }, shadow: cardShadow(),
++  });
++  text(s, [2.59, 4.528, 2.793, 0.866],
++    ['Harnessing ', B('Technology for a Greener'), ' Future'],
++    { fontSize: 16, color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++  iconDisc(s, 3.658, 3.797, 0.657, 0.386);
++  text(s, [7.316, 4.307, 3.951, 1.886],
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
++    'ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ' +
++    'ullamco laboris nisi ut aliquip ex ea commodo consequat. ', { lineSpacingMultiple: 1.5 });
++  brandTag(s, SOFT);
++  pageTag(s, '07');
++  cornerLogo(s);
++}
++
++/* 9 - Energy optimization */
++function slide09(s) {
++  photo(s, [-0.071, 0.124, 2.375, 7.5], 'F3F3F2', { rotate: 352 }); // windmill photograph
++  s.addShape('rect', { x: 7.456, y: 0, w: 5.877, h: 7.5, fill: { color: INK } });
++  s.addShape('roundRect', {
++    x: 4.556, y: 4.683, w: 5.236, h: 1.95, rectRadius: 0.262,
++    fill: { color: TEAL }, shadow: cardShadow(),
++  });
++  heading(s, [1.303, 1.68, 4.906, 1.52], [B('Energy'), ' Optimization'], 48, INK,
++    { lineSpacing: 50 });
++  text(s, [5.756, 5.029, 3.642, 1.28],
++    'Our AI-driven energy management solutions have achieved an average energy consumption ' +
++    'reduction of 20%, resulting in significant cost savings.',
++    { color: GREY10, lineSpacingMultiple: 1.5 });
++  iconDisc(s, 4.905, 5.144, 0.657, 0.361);
++  text(s, [1.337, 3.631, 2.793, 1.83],
++    'Through our energy optimization system, we have helped clients save over $1 million in ' +
++    'annual energy expenses.', { fontSize: 14, color: GREY75, lineSpacingMultiple: 1.5 });
++  brandTag(s, GREY25);
++  pageTag(s, '08');
++  cornerLogo(s);
++}
++
++/* 10 - Waste sorting */
++function slide10(s) {
++  wash(s, [0, 0, 12.289, 7.5], [[0, MINT_DK], [1, MINT]], { dir: 'h' });
++  glow(s, 2.97, 5.607, 8.029, 'F2FEFB', 'FCFFFE', 5);
++  heading(s, [7.332, 1.335, 4.191, 2.222], ['Waste ', B('Sorting'), ' Revolution'], 48, INK,
++    { lineSpacing: 50 });
++  text(s, [8.316, 3.965, 2.793, 2.184],
++    'Our AI-powered waste sorting technology has improved recycling rates by accurately ' +
++    'identifying and sorting different types of waste materials.',
++    { fontSize: 14, color: GREY75, lineSpacingMultiple: 1.5 });
++  iconDisc(s, 7.448, 4.145, 0.613, 0.42);
++  s.addShape('ellipse', {
++    x: 1.431, y: 3.475, w: 3.435, h: 3.44, fill: { color: 'F4F5F5' }, shadow: cardShadow(),
++  });
++  iconDisc(s, 2.759, 3.965, 0.777, 0.442);
++  text(s, [1.865, 4.791, 2.565, 1.674],
++    ['Recycling facilities have achieved a ', B('50% reduction in sorting '), 'time period.'],
++    { fontSize: 16, color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++  brandTag(s, SOFT);
++  cornerLogo(s);
++}
++
++/* 11 - Precision agriculture */
++function slide11(s) {
++  wash(s, [0, 0, 13.333, 4.958], [[0, MINT_DK], [1, MINT]]);
++  // Smartphone mock-up (a vector illustration in the source deck).
++  s.addShape('roundRect', {
++    x: 1.769, y: 2.366, w: 3.455, h: 5.6, rectRadius: 0.44,
++    fill: NO_FILL, line: { color: '111111', width: 15 },
++  });
++  s.addShape('roundRect', {
++    x: 2.594, y: 2.262, w: 1.804, h: 0.38, rectRadius: 0.19, fill: { color: '111111' },
++  });
++  heading(s, [6.949, 1.7, 4.191, 1.545], [B('Precision'), ' Agriculture'], 54, INK,
++    { lineSpacing: 50 });
++  s.addShape('roundRect', {
++    x: 4.518, y: 4.102, w: 4.755, h: 2.529, rectRadius: 0.384,
++    fill: { color: NAVY }, shadow: cardShadow(),
++  });
++  text(s, [5.903, 4.589, 2.93, 1.583],
++    'Our AI-based agriculture solutions optimize irrigation, fertilizer usage, and crop ' +
++    'monitoring, resulting in higher yields and reduced water and chemical waste.',
++    { color: GREY10, lineSpacingMultiple: 1.5 });
++  iconDisc(s, 5.066, 4.698, 0.657, 0.374);
++  s.addShape('roundRect', {
++    x: 0.754, y: 1.35, w: 2.745, h: 2.069, rectRadius: 0.314,
++    fill: { color: WHITE }, shadow: softShadow(),
++  });
++  text(s, [0.947, 2.002, 2.367, 1.133],
++    'By implementing our precision agriculture system, farmers have experienced a 25% increase ' +
++    'in crop productivity.',
++    { fontSize: 10.5, color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++  iconDisc(s, 1.795, 1.138, 0.657, 0.374);
++  text(s, [9.743, 5.153, 1.954, 1.477],
++    ['Maximizing Crop Yield, ', B('Minimizing Environmental '), 'Impact'],
++    { fontSize: 14, color: GREY75, lineSpacingMultiple: 1.5 });
++  glyph(s, 10.084, 4.798, 0.528, ORANGE);
++  brandTag(s, SOFT);
++  pageTag(s, '10');
++}
++
++/* 12 - Air quality monitoring */
++function slide12(s) {
++  wash(s, [0, 3.351, 13.333, 4.149], [[0, 'FEFEFE'], [1, 'F1FEFB']]);
++  heading(s, [1.278, 1.783, 4.172, 2.246],
++    ['Air', BR, B('Quality'), BR, 'Monitoring'], 48, INK, { lineSpacing: 50 });
++  text(s, [1.328, 4.383, 4.122, 1.477],
++    'Our AI-enabled air quality monitoring systems provide real-time data and alerts, helping ' +
++    'organizations maintain safe and healthy indoor environments.',
++    { fontSize: 14, color: GREY75, lineSpacingMultiple: 1.5 });
++  s.addShape('ellipse', {
++    x: 7.258, y: 1.05, w: 3.535, h: 3.541, fill: { color: 'F4F4F4' }, shadow: cardShadow(),
++  });
++  iconDisc(s, 8.621, 1.623, 0.777, 0.486);
++  text(s, [7.551, 2.552, 2.917, 1.477],
++    [' Studies have shown that implementing ', B('our air quality monitoring solutions'),
++      ' has led to a ', B('30%'), ' reduction.'],
++    { fontSize: 14, color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++  brandTag(s, SOFT);
++  pageTag(s, '11');
++  cornerLogo(s);
++}
++
++/* 13 - Smart transportation */
++function slide13(s) {
++  s.addShape('rect', { x: 8.979, y: 0, w: 4.354, h: 7.5, fill: { color: INK } });
++  heading(s, [1.296, 1.407, 4.976, 1.52], [B('Smart'), ' Transportation'], 48, INK,
++    { lineSpacing: 50 });
++  text(s, [2.303, 3.324, 2.934, 2.537],
++    'Cities implementing our smart transportation systems have witnessed a 25% decrease in ' +
++    'average commute times and a 15% reduction in carbon emissions from transportation.',
++    { fontSize: 14, color: GREY75, lineSpacingMultiple: 1.5 });
++  iconDisc(s, 1.431, 3.494, 0.613, 0.365);
++  s.addShape('roundRect', {
++    x: 9.192, y: 2, w: 2.711, h: 2.318, rectRadius: 0.261,
++    fill: { color: WHITE }, shadow: cardShadow(),
++  });
++  text(s, [9.405, 2.589, 2.284, 1.46],
++    'Our AI-driven transportation solutions improve traffic flow, optimize route planning, and ' +
++    'promote the use of electric vehicles.',
++    { fontSize: 11, color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++  iconDisc(s, 10.191, 1.717, 0.713, 0.401);
++  s.addShape('roundRect', {
++    x: 5.547, y: 4.968, w: 2.203, h: 1.656, rectRadius: 0.187,
++    fill: { color: TEAL }, shadow: cardShadow(),
++  });
++  text(s, [5.672, 5.234, 1.954, 1.124], ['Optimizing Mobility, ', B('Reducing Emissions')],
++    { fontSize: 14, color: 'E7E6E6', align: 'center', lineSpacingMultiple: 1.5 });
++  brandTag(s, GREY25);
++  pageTag(s, '12');
++  cornerLogo(s);
++}
++
++/* 14 - Water resource management */
++function slide14(s) {
++  s.addShape('roundRect', {
++    x: 3.903, y: 0, w: 11.493, h: 7.5, rectRadius: 1.417, fill: { color: INK },
++  });
++  heading(s, [7.392, 1.783, 4.511, 2.222], ['Water ', B('Resource'), ' Management'], 48, WHITE,
++    { lineSpacing: 50 });
++  text(s, [8.53, 4.228, 2.838, 1.886],
++    'Our AI-powered water management solutions enable precise monitoring, leakage detection, ' +
++    'and optimal water distribution, ensuring efficient usage and conservation.',
++    { color: GREY10, lineSpacingMultiple: 1.5 });
++  iconDisc(s, 7.532, 4.367, 0.713, 0.402);
++  s.addShape('roundRect', {
++    x: 3.542, y: 3.608, w: 2.969, h: 2.506, rectRadius: 0.282,
++    fill: { color: WHITE }, shadow: cardShadow(),
++  });
++  text(s, [4.078, 3.898, 1.914, 0.417], 'Did You Know?',
++    { fontSize: 14, bold: true, color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++  text(s, [3.772, 4.356, 2.525, 1.46],
++    ' By implementing our water resource management system, municipalities have achieved a 20% ' +
++    'reduction in water losses due to leakages.',
++    { fontSize: 11, color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++  brandTag(s, GREY10);
++  pageTag(s, '13');
++}
++
++/* 15 - Energy consumption comparison (two hand-built bar charts) */
++function slide15(s) {
++  const WEEKS = ['week 1', 'week 2', 'week 3', 'week 4'];
++  const SERIES = [                      // one triplet of columns per week
++    { color: TEAL, values: [43, 25, 35, 20] },
++    { color: ORANGE, values: [24, 35, 25, 28] },
++    { color: NAVY, values: [27, 20, 39, 30] },
++  ];
++  const AXIS = 4.167;                   // baseline, in inches
++  const UNIT = 0.050676;                // inches per chart unit (5 units = 0.2534in)
++
++  function barChart(ox) {
++    for (let v = 50; v >= 0; v -= 5) {  // horizontal rules + value labels
++      const y = AXIS - v * UNIT;
++      s.addShape('line', {
++        x: ox + 1.75, y, w: 4.917, h: 0, line: { color: GREY10, width: 0.75 },
++      });
++      text(s, [ox + (v % 10 === 0 && v !== 0 || v === 50 ? 1.323 : v >= 10 ? 1.323 : 1.407),
++        y - 0.19, 0.491, 0.349], String(v),
++        { fontSize: 10.5, lineSpacingMultiple: 1.5 });
++    }
++    WEEKS.forEach((w, i) => {
++      text(s, [ox + 2.015 + i * 1.2232, 4.189, 0.777, 0.338], w,
++        { fontSize: 10.5, lineSpacingMultiple: 1.5 });
++      SERIES.forEach((ser, j) => {
++        const h = ser.values[i] * UNIT;
++        s.addShape('rect', {
++          x: ox + 1.972 + i * 1.2193 + j * 0.2727, y: AXIS - h, w: 0.219, h,
++          fill: { color: ser.color },
++        });
++      });
++    });
++  }
++  barChart(0);
++  barChart(5.738);
++
++  heading(s, [2.329, 0.495, 8.675, 0.739], 'Energy Consumption Comparison', 28, INK,
++    { align: 'center', lineSpacing: 50 });
++
++  const notes = [
++    { x: 1.431, tx: 1.868, fill: TEAL, head: WHITE, tw: 3.671, body: GREY10,
++      copy: ['PLACEHOLDER',
++        'GreenAI', ' Solutions’ energy.'] },
++    { x: 6.034, tx: 6.471, fill: WHITE, head: INK, tw: 3.567, body: GREY75,
++      copy: ['Implementing ', 'GreenAI',
++        " Solutions' energy management system, showcasing the significant reduction in energy usage."] },
++  ];
++  notes.forEach(n => {
++    s.addShape('roundRect', {
++      x: n.x, y: 4.917, w: 4.319, h: 1.825, rectRadius: 0.26,
++      fill: { color: n.fill }, shadow: cardShadow(),
++    });
++    heading(s, [n.tx, 5.148, 2.493, 0.404], 'The Data', 18, n.head,
++      { lineSpacing: null, valign: 'bottom' });
++    text(s, [n.tx, 5.552, n.tw, 0.978], n.copy, { color: n.body, lineSpacingMultiple: 1.5 });
++  });
++
++  text(s, [10.637, 5.618, 2.294, 1.124],
++    ['Harnessing ', B('Technology for a Greener'), ' Future'],
++    { fontSize: 14, color: GREY75, lineSpacingMultiple: 1.5 });
++  glyph(s, 11.005, 5.351, 0.501, ORANGE);
++  brandTag(s, SOFT);
++  pageTag(s, '14');
++}
++
++/* 16 - Waste recycling rates (mirrored column diagram) */
++function slide16(s) {
++  wash(s, [1.202, 0, 12.131, 7.5], [[0, MINT], [1, MINT_DK]], { dir: 'h' });
++  s.addShape('roundRect', {
++    x: 7.061, y: 0.984, w: 7.391, h: 5.463, rectRadius: 0.616,
++    fill: { color: WHITE }, shadow: cardShadow(),
++  });
++
++  // month, up-bar height, down-bar height, label width
++  const MONTHS = [
++    ['Jan', 1.085, 0.557, 0.534, 1.144],
++    ['Feb', 1.919, 0.951, 0.505, 2.130],
++    ['March', 0.825, 1.728, 0.834, 2.936],
++    ['April', 1.406, 1.085, 0.633, 3.994],
++    ['May', 1.779, 1.344, 0.834, 4.850],
++  ];
++  const BASE = 3.679;
++  MONTHS.forEach(([name, up, down, lw, lx], i) => {
++    const x = 1.202 + i * 0.9567;
++    s.addShape('rect', { x, y: BASE - up, w: 0.476, h: up, fill: { color: TEAL } });
++    s.addShape('rect', { x, y: 3.783, w: 0.476, h: down, fill: { color: SILVER } });
++    heading(s, [lx, 5.931, lw, 0.384], name, 12, '000000', { align: 'center' });
++  });
++  s.addShape('line', { x: 0.76, y: 3.733, w: 5.906, h: 0, line: { color: '000000', width: 1.25 } });
++
++  s.addShape('rect', { x: 6.165, y: 2.854, w: 0.359, h: 0.436, fill: { color: TEAL } });
++  s.addShape('rect', { x: 6.165, y: 4.175, w: 0.359, h: 0.436, fill: { color: SILVER } });
++  heading(s, [5.688, 3.349, 0.953, 0.384], 'Tittle 01', 12, '000000', { align: 'right' });
++  heading(s, [5.684, 3.733, 0.953, 0.384], 'Tittle 02', 12, '000000', { align: 'right' });
++
++  heading(s, [7.969, 1.701, 4.976, 2.222], ['Waste ', B('Recycling'), ' Rates'], 48, INK,
++    { lineSpacing: 50 });
++  text(s, [8.921, 3.988, 3.878, 1.83],
++    'PLACEHOLDER' +
++    "successfully recycled using GreenAI Solutions' waste management system.",
++    { fontSize: 14, color: GREY75, lineSpacingMultiple: 1.5 });
++  iconDisc(s, 8.101, 4.15, 0.641, 0.324);
++  brandTag(s, SOFT);
++  pageTag(s, '15');
++  cornerLogo(s);
++}
++
++/* 17 - Monthly sustainability plan (table) */
++function slide17(s) {
++  const HEAD_FILL = TEAL;
++  const BAND_A = 'CCD6D3'; // accent1 tint 40%
++  const BAND_B = 'E7EBEA'; // accent1 tint 20%
++  const HEADERS = ['The Data', 'Month 1', 'Month 2', 'Month 3', 'Month 4'];
++  const CELLS = [
++    ['Lorem ipsum dolor sit', 'Lorem ipsum sit', 'Lorem ipsum dolor', 'Lorem ipsum sit', 'Lorem ipsum'],
++    ['Lorem ipsum sit', 'Lorem ipsum dolor sit', 'Lorem ipsum sit', 'Lorem ipsum dolor', 'Lorem ipsum dolor sit'],
++    ['Lorem ipsum dolor', 'Lorem ipsum', 'Lorem ipsum dolor sit', 'Lorem ipsum', 'Lorem ipsum sit'],
++    ['Lorem ipsum dolor sit', 'Lorem ipsum dolor', 'Lorem ipsum', 'Lorem ipsum dolor sit', 'Lorem ipsum'],
++    ['Lorem ipsum sit', 'Lorem ipsum sit', 'Lorem ipsum sit', 'Lorem ipsum', 'Lorem ipsum dolor sit'],
++    ['Lorem ipsum', 'Lorem ipsum', 'Lorem ipsum dolor sit', 'Lorem ipsum sit', 'Lorem ipsum dolor'],
++    ['Lorem ipsum dolor', 'Lorem ipsum sit', 'Lorem ipsum dolor', 'Lorem ipsum dolor', 'Lorem ipsum sit'],
++  ];
++  const HAIRLINE = { type: 'solid', color: WHITE, pt: 1 };
++  const BORDER = [HAIRLINE, HAIRLINE, HAIRLINE, HAIRLINE]; // top, right, bottom, left
++  const rows = [HEADERS.map(() => ({ text: '', options: { fill: { color: HEAD_FILL } } }))];
++  CELLS.forEach((row, r) => {
++    rows.push(row.map(() => ({ text: '', options: { fill: { color: r % 2 ? BAND_B : BAND_A } } })));
++  });
++  s.addTable(rows, {
++    x: 1.175, y: 1.777, w: 11.016, colW: [2.203, 2.203, 2.203, 2.203, 2.203],
++    rowH: [0.714, 0.462, 0.462, 0.462, 0.462, 0.462, 0.462, 0.462],
++    border: BORDER, margin: 0,
++  });
++
++  // The source deck floats the copy over the table as free text boxes.
++  HEADERS.forEach((h, c) => {
++    heading(s, [1.431 + c * 2.181, 1.963, 1.747, 0.404], h, 18, WHITE,
++      { align: 'center', valign: 'bottom' });
++  });
++  const ROW_Y = [
++    [2.518, 2.981, 3.440, 3.918, 4.387, 4.840, 5.289],
++    [2.516, 2.981, 3.449, 3.910, 4.364, 4.816, 5.282],
++    [2.519, 2.981, 3.445, 3.927, 4.371, 4.879, 5.275],
++    [2.486, 2.989, 3.434, 3.910, 4.365, 4.839, 5.313],
++    [2.529, 2.989, 3.449, 3.909, 4.369, 4.829, 5.289],
++  ];
++  const COL_X = [1.151, 3.358, 5.552, 7.757, 9.957];
++  COL_X.forEach((x, c) => {
++    ROW_Y[c].forEach((y, r) => {
++      text(s, [x, y, 2.255, 0.372], CELLS[r][c], { align: 'center', lineSpacingMultiple: 1.5 });
++    });
++  });
++
++  heading(s, [2.878, 0.807, 7.608, 0.787], ['Monthly ', B('Sustainability'), ' Plan'], 40, INK,
++    { align: 'center', lineSpacing: 50 });
++  text(s, [2.921, 5.906, 8.635, 0.77],
++    'A monthly planner table highlighting sustainable actions and initiatives, allowing ' +
++    'individuals or organizations to track their progress in adopting eco-friendly practices.',
++    { fontSize: 14, color: GREY75, lineSpacingMultiple: 1.5 });
++  iconDisc(s, 2.177, 5.999, 0.583, 0.346);
++  brandTag(s, SOFT);
++  pageTag(s, '16');
++  cornerLogo(s);
++}
++
++/* 18 - Sustainable process (three linked discs) */
++function slide18(s) {
++  heading(s, [1.782, 1.134, 9.802, 0.803], ['Our ', B('Sustainable'), ' Process'], 40, INK,
++    { align: 'center', lineSpacing: 50 });
++
++  // Pinched ribbon linking consecutive discs (traced from the source freeform).
++  [3.309, 7.319].forEach(x => {
++    const w = 2.7, h = 1.299;
++    const C = (x1, y1, x2, y2, px, py) => ({
++      x: w * px, y: h * py,
++      curve: { type: 'cubic', x1: w * x1, y1: h * y1, x2: w * x2, y2: h * y2 },
++    });
++    s.addShape('custGeom', {
++      x, y: 2.664, w, h, fill: { color: BOWTIE },
++      points: [
++        { x: w, y: h },
++        C(0.76, 0.5, 0.24, 0.5, 0, 1),
++        { x: 0, y: 0 },
++        C(0.24, 0.5, 0.76, 0.5, 1, 0),
++        { x: w, y: h },
++        { close: true },
++      ],
++    });
++  });
++
++  const STEPS = [
++    { x: 1.855, fill: TEAL, tx: 1.663, cx: 1.365 },
++    { x: 5.755, fill: ORANGE, tx: 5.558, cx: 5.260 },
++    { x: 9.655, fill: NAVY, tx: 9.471, cx: 9.173 },
++  ];
++  STEPS.forEach(st => {
++    s.addShape('ellipse', { x: st.x, y: 2.395, w: 1.833, h: 1.835, fill: { color: st.fill } });
++    glyph(s, st.x + 0.917, st.y || 3.313, 0.874, WHITE);
++    heading(s, [st.tx, 4.5, 2.217, 0.438], 'The Data', 20, INK,
++      { align: 'center', valign: 'bottom' });
++    text(s, [st.cx, 5.051, 2.813, 1.28],
++      ["A series of interconnected circles or steps illustrating GreenAI Solutions' " +
++        'sustainable process, encompassing and research.'],
++      { color: GREY75, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++
++  brandTag(s, SOFT);
++  pageTag(s, '17');
++  cornerLogo(s);
++}
++
++/* 19 - Sustainable process (four arch cards) */
++function slide19(s) {
++  const ARCHES = [
++    { x: 2.430, w: 1.620, fill: MINT_LT, disc: TEAL, title: 'Title A', tx: 2.872, tw: 0.735,
++      cx: 2.638, bx: 2.534, lx: 2.752 },
++    { x: 4.716, w: 1.620, fill: PEACH, disc: ORANGE, title: 'Title B', tx: 5.166, tw: 0.719,
++      cx: 4.923, bx: 4.819, lx: 5.038 },
++    { x: 7.003, w: 1.615, fill: ICE, disc: BLUE, title: 'Title C', tx: 7.436, tw: 0.749,
++      cx: 7.209, bx: 7.104, lx: 7.322 },
++    { x: 9.284, w: 1.620, fill: STEEL, disc: NAVY, title: 'Title D', tx: 9.719, tw: 0.742,
++      cx: 9.490, bx: 9.388, lx: 9.606 },
++  ];
++  ARCHES.forEach(a => {
++    s.addShape('round2SameRect', {
++      x: a.x, y: 2.268, w: a.w, h: 3.266, rectRadius: a.w / 2, fill: { color: a.fill },
++    });
++    heading(s, [a.tx, 2.72, a.tw, 0.303], a.title, 18, '424242',
++      { align: 'center', margin: 0, wrap: false });
++    s.addShape('line', { x: a.lx, y: 3.176, w: 0.976, h: 0, line: { color: GREY50, width: 0.75 } });
++    text(s, [a.bx, 3.41, 1.411, 1.133], 'Lorem ipsum dolor sit amet consetur adipin nscing elit.',
++      { fontSize: 10.5, color: '000000', align: 'center', lineSpacingMultiple: 1.5 });
++    s.addShape('ellipse', {
++      x: a.cx, y: 4.931, w: 1.205, h: 1.207,
++      fill: { color: a.disc }, line: { color: WHITE, width: 6 },
++    });
++    glyph(s, a.cx + 0.6, 5.535, 0.55, WHITE);
++  });
++
++  heading(s, [1.782, 0.889, 9.802, 0.803], ['Our ', B('Sustainable'), ' Process'], 40, INK,
++    { align: 'center', lineSpacing: 50 });
++  brandTag(s, SOFT);
++  cornerLogo(s);
++}
++
++/* 20 - Closing */
++function slide20(s) {
++  s.addShape('ellipse', { x: 0.366, y: -2.333, w: 12.167, h: 12.167, fill: { color: 'F0FEFB' } });
++  glow(s, 5.838, 3.713, 10.156, 'F8FEFD', 'FEFEFE', 4);
++  heading(s, [2.587, 1.541, 4.08, 2.524], ['End of ', B('Slide.')], 72, INK,
++    { lineSpacing: null });
++  houseMark(s, 7.474, 1.788, 1.059, 1.244);
++  heading(s, [5.775, 4.128, 3.08, 0.438], 'How To Reach Us', 20, GREY50);
++  const LINES = [
++    [4.724, 3.04, 0.671, '1234, Name Street, Building, Your City, Your Country.', 4.848],
++    [5.488, 2.474, 0.368, 'yourinfo@email.com', 5.609],
++    [6.016, 2.474, 0.368, '+123 4567 890 // +123 4567', 6.069],
++  ];
++  LINES.forEach(([y, w, h, copy, iy]) => {
++    text(s, [6.553, y, w, h], copy, { lineSpacingMultiple: 1.5 });
++    glyph(s, 6.282, iy + 0.115, 0.25, TEAL);
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build                                                               *
++ * ------------------------------------------------------------------ */
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++];
++
++const pptx = new PptxGenJS();
++pptx.title = 'GreenAI Solutions';
++pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
++pptx.layout = 'WIDE_16x9';
++BUILDERS.forEach(build => build(pptx.addSlide()));
++
++pptx.writeFile({
++  fileName: path.join(__dirname, '062804aa-3432-4147-80c8-ff087078b88b_grok_final.pptx'),
++}).then(f => console.log('wrote', f));

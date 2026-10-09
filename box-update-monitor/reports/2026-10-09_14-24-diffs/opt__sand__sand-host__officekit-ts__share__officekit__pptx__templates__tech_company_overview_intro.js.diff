@@ -1,0 +1,399 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tech_company_overview_intro.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tech_company_overview_intro.js
+@@ -0,0 +1,396 @@
++#!/usr/bin/env node
++/**
++ * "Technology Business" — 15-slide presentation template, rebuilt with pptxgenjs.
++ * Slide size 13.333 x 7.5 in (16:9). Run with no arguments to write the .pptx
++ * next to this file.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ── palette ───────────────────────────────────────────────────────────── */
++const GREEN = '45A98F'; // brand accent used for every filled panel/hexagon
++const BLACK = '000000';
++const WHITE = 'FFFFFF';
++const GOLD = 'FFC000'; // rating stars
++
++/* ── typography ────────────────────────────────────────────────────────── */
++const BLK = 'Montserrat Black';
++const LIGHT = 'Montserrat Light';
++const SEMI = 'Montserrat SemiBold';
++
++/* ── boilerplate copy, reused verbatim across the deck ─────────────────── */
++const LOREM =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla bibendum tortor augue. ' +
++  'Nam ut nunc quis neque molestie mollis et quis massa. Donec convallis id augue et auctor. ' +
++  'Phasellus tempor vel sapien laoreet porttitor. Cras sed tempor dolor. Praesent pulvinar ' +
++  'turpis molestie ante cursus, quis elementum eros molestie. Cras imperdiet ligula lorem, ' +
++  'id cursus purus tincidunt nec. Ut eget libero in neque ornare condimentum id ac nibh. ' +
++  'Ut tellus nulla, venenatis a euismod sit amet, rutrum a mauris. Donec ullamcorper posuere ' +
++  'massa, id egestas sapien tempor eget.';
++
++const LOREM_SHORT =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla bibendum tortor augue. ' +
++  'Nam ut nunc quis neque molestie mollis et quis massa. Donec convallis id augue et auctor. ';
++
++/* ── shape helpers ─────────────────────────────────────────────────────── */
++
++const rect = (s, x, y, w, h, color, transparency) =>
++  s.addShape('rect', { x, y, w, h, fill: { color, transparency } });
++
++/** Small decorative hexagon; in the source every one of them is rotated 90°. */
++const hexDeco = (s, x, y, w, h, color) =>
++  s.addShape('hexagon', { x, y, w, h, rotate: 90, fill: { color } });
++
++/** Outlined hexagon used as the "Learn More" / percentage badge frame. */
++const hexBadge = (s, x, y, w, h) =>
++  s.addShape('hexagon', { x, y, w, h, line: { color: BLACK, width: 5 } });
++
++const star = (s, x, y, size) =>
++  s.addShape('star5', { x, y, w: size, h: size, fill: { color: GOLD } });
++
++/** Free-form polygon: `pts` are [x, y] pairs in inches, relative to x/y. */
++const poly = (s, x, y, w, h, pts, color, rotate) =>
++  s.addShape('custGeom', {
++    x, y, w, h, rotate,
++    fill: { color },
++    points: pts.map(([px, py]) => ({ x: px, y: py })).concat([{ close: true }]),
++  });
++
++/**
++ * Wide hexagon whose points are set by an "adj" ratio. pptxgenjs cannot emit
++ * preset adjust values, so the six corners are written out as an explicit path.
++ */
++const wideHexagon = (s, x, y, w, h, adj, color) => {
++  const x1 = Math.min(w, h) * adj;
++  poly(s, x, y, w, h, [[0, h / 2], [x1, 0], [w - x1, 0], [w, h / 2], [w - x1, h], [x1, h]], color);
++};
++
++/** Rectangle with both corners on one long side snipped off (snip2SameRect). */
++const snippedBanner = (s, x, y, w, h, color, rotate) => {
++  const c = Math.min(w, h) * 0.5;
++  poly(s, x, y, w, h, [[0, c], [c, 0], [w - c, 0], [w, c], [w, h], [0, h]], color, rotate);
++};
++
++/**
++ * Picture frame. The source deck ships empty picture placeholders — it stores
++ * no media at all — so each one is recreated as an unfilled frame that reserves
++ * exactly the same area.
++ */
++const imageFrame = (s, x, y, w, h) => s.addShape('rect', { x, y, w, h });
++
++/* ── text helpers ──────────────────────────────────────────────────────── */
++/* Every text box in the deck is top-anchored and auto-grows to fit (spAutoFit). */
++const BASE_TEXT = { valign: 'top', fit: 'resize' };
++
++/**
++ * Heading in Montserrat Black. `parts` is a list of [text, color] runs so the
++ * two-tone titles ("Welcome To Our " + green "Company") stay readable.
++ */
++const heading = (s, o, parts) =>
++  s.addText(parts.map(([text, color]) => ({ text, options: { color: color || BLACK } })), {
++    ...BASE_TEXT, x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: BLK, fontSize: o.size, align: o.align || 'left',
++  });
++
++/** 10 pt Montserrat Light paragraph — the body copy used all over the deck. */
++const body = (s, o) =>
++  s.addText(o.text || LOREM, {
++    ...BASE_TEXT, x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: LIGHT, fontSize: 10, color: o.color || BLACK, align: o.align || 'justify',
++  });
++
++/** Short Montserrat Black caption (numbers, months, names, labels). */
++const label = (s, o) =>
++  s.addText(o.text, {
++    ...BASE_TEXT, x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: BLK, fontSize: o.size, color: o.color || BLACK,
++    charSpacing: o.spc, align: o.align || 'center',
++  });
++
++/* ── slides ────────────────────────────────────────────────────────────── */
++
++/** 1 — Title slide: green wedge top-right, headline bottom-right. */
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: WHITE };
++  imageFrame(s, 0.451, 1.341, 5.476, 4.818);
++  heading(s, { x: 6.667, y: 3.75, w: 5.646, h: 1.717, size: 48 },
++    [['Technology ', BLACK], ['Business', GREEN]]);
++  body(s, { x: 6.667, y: 5.674, w: 6.038, h: 1.279 });
++  poly(s, 8.79, 0, 4.544, 3.426,
++    [[0.537, 0], [4.544, 0], [4.544, 3.39], [4.526, 3.426], [1.176, 3.426], [0, 1.074]], GREEN);
++  hexDeco(s, 0.979, 0.76, 1.556, 1.341, GREEN);
++  hexDeco(s, 4.2, 5.528, 1.377, 1.187, BLACK);
++  imageFrame(s, 5.283, 0.542, 2.767, 2.434);
++}
++
++/** 2 — Welcome: tilted green quad on the left, copy + green panel on the right. */
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  poly(s, -0.64, -0.197, 6.17, 4.861,
++    [[0, 3.635], [1.793, 0], [6.17, 0], [6.17, 4.861], [2.382, 4.861]], GREEN, 63.74);
++  imageFrame(s, 0.615, 1.656, 5.437, 4.703);
++  rect(s, 6.381, 4.906, 6.952, 2.037, GREEN);
++  heading(s, { x: 6.51, y: 1.656, w: 5.646, h: 1.447, size: 40 },
++    [['Welcome To Our ', BLACK], ['Company', GREEN]]);
++  body(s, { x: 6.51, y: 3.229, w: 6.038, h: 1.279 });
++  body(s, { x: 8.415, y: 5.032, w: 4.344, h: 1.784, color: WHITE });
++  hexDeco(s, 1.179, 5.613, 1.293, 1.114, GREEN);
++  hexDeco(s, 4.877, 2.282, 1.071, 0.923, BLACK);
++  imageFrame(s, 5.492, 4.911, 2.349, 2.032);
++}
++
++/** 3 — Section header: green block bottom-left, tall headline right. */
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  rect(s, 1.07, 4.145, 3.621, 3.355, GREEN);
++  imageFrame(s, 3.488, 0.364, 2.788, 3.104);
++  imageFrame(s, 1.07, 3.036, 3.621, 4.031);
++  heading(s, { x: 7.312, y: 0.785, w: 5.646, h: 2.794, size: 40 },
++    [['Technology Is Important For Your Business Development', BLACK]]);
++  body(s, { x: 7.312, y: 3.96, w: 4.344, h: 1.784 });
++  hexBadge(s, 7.312, 6.009, 2.666, 0.63);
++  label(s, { text: 'Learn More', x: 7.58, y: 6.105, w: 2.131, h: 0.438, size: 20, color: GREEN });
++  hexDeco(s, 5.498, 0.467, 1.556, 1.341, GREEN);
++  hexDeco(s, 0.466, 4.24, 1.377, 1.187, BLACK);
++  imageFrame(s, 0.827, 0.985, 1.843, 2.052);
++}
++
++/** 4 — About: centred intro over a full-width green band. */
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  rect(s, 2.102, 3.97, 9.152, 3.53, GREEN, 1);
++  heading(s, { x: 3.659, y: 0.559, w: 6.015, h: 0.841, size: 44, align: 'center' },
++    [['Abour Company', BLACK]]);
++  body(s, { x: 3.659, y: 1.621, w: 6.038, h: 1.279 });
++  hexBadge(s, 5.333, 3.12, 2.666, 0.63);
++  label(s, { text: 'Learn More', x: 5.601, y: 3.216, w: 2.131, h: 0.438, size: 20, color: GREEN });
++  imageFrame(s, 0.647, 4.236, 12.04, 2.922);
++  hexDeco(s, 0.275, 3.761, 1.556, 1.341, GREEN);
++  hexDeco(s, 11.783, 5.877, 1.377, 1.187, BLACK);
++}
++
++/** 5 — Vision / Mission: two green columns flanking a centred title. */
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  const columns = [
++    { panelX: 0.41, headX: 1.005, headAlign: 'center', head: '01. Vision', textX: 0.605 },
++    { panelX: 8.678, headX: 9.298, headAlign: 'left', head: '02. Mission', textX: 8.898 },
++  ];
++  columns.forEach((c) => rect(s, c.panelX, 0, 4.171, 5.6, GREEN));
++  heading(s, { x: 4.875, y: 2.353, w: 3.583, h: 2.121, size: 40, align: 'center' },
++    [['Company ', BLACK], ['Vision And Mission', GREEN]]);
++  columns.forEach((c) => {
++    label(s, { text: c.head, x: c.headX, y: 0.9, w: 2.93, h: 0.64, size: 32, color: WHITE, align: c.headAlign });
++    body(s, { x: c.textX, y: 1.539, w: 3.732, h: 2.121, color: WHITE, align: 'center' });
++    imageFrame(s, c.panelX, 3.927, 4.171, 3.232);
++  });
++}
++
++/** 6 — About meeting: intro on white, numbered list on a green band. */
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  rect(s, 0, 3.564, 13.333, 3.936, GREEN);
++  heading(s, { x: 6.358, y: 0.907, w: 5.646, h: 0.774, size: 40 },
++    [['About ', BLACK], ['Meeting', GREEN]]);
++  body(s, { x: 6.358, y: 1.792, w: 6.038, h: 1.279 });
++  // Numbered rows (a single group in the source deck).
++  [{ num: '01', numY: 4.592, textY: 4.171 }, { num: '02', numY: 6.041, textY: 5.613 }].forEach((r) => {
++    label(s, { text: r.num, x: 5.656, y: r.numY, w: 1.238, h: 0.438, size: 20, color: WHITE });
++    body(s, { x: 6.682, y: r.textY, w: 6.023, h: 1.279, color: WHITE });
++  });
++  imageFrame(s, 0.61, 0.371, 4.917, 6.759);
++  hexDeco(s, 0.892, 0.733, 1.302, 1.122, GREEN);
++  hexDeco(s, 4.68, 2.435, 1.046, 0.901, BLACK);
++}
++
++/** 7 — Company service: 2 x 2 grid of numbered services on a green band. */
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  rect(s, 0, 1.709, 13.333, 5.791, GREEN);
++  heading(s, { x: 3.659, y: 0.485, w: 6.015, h: 0.774, size: 40, align: 'center' },
++    [['Company ', BLACK], ['Service', GREEN]]);
++  const columns = [0.953, 8.036];
++  const rows = [{ headY: 2.12, textY: 2.692 }, { headY: 4.804, textY: 5.377 }];
++  [['01', 0, 0], ['02', 0, 1], ['03', 1, 0], ['04', 1, 1]].forEach(([num, col, row]) => {
++    const x = columns[col];
++    label(s, {
++      text: num + '. Our Service', x, y: rows[row].headY, w: 3.57, h: 0.572,
++      size: 28, color: WHITE, align: 'left',
++    });
++    body(s, { x, y: rows[row].textY, w: 4.344, h: 1.784, color: WHITE });
++  });
++}
++
++/** 8 — Target future: four month columns, hexagons above / captions below. */
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  rect(s, 0, 3.75, 13.333, 3.75, GREEN);
++  heading(s, { x: 2.615, y: 0.604, w: 8.03, h: 0.774, size: 40, align: 'center' },
++    [['Our Target ', BLACK], ['Future', GREEN]]);
++  const months = [
++    { name: 'April', labelX: 1.266, textX: 0.739, hexX: 1.532, picX: 0.815, textY: 6.144 },
++    { name: 'May', labelX: 4.356, textX: 3.83, hexX: 4.623, picX: 3.906, textY: 6.149 },
++    { name: 'June', labelX: 7.447, textX: 6.921, hexX: 7.714, picX: 6.997, textY: 6.149 },
++    { name: 'July', labelX: 10.538, textX: 10.011, hexX: 10.805, picX: 10.088, textY: 6.144 },
++  ];
++  months.forEach((m) => {
++    label(s, { text: m.name, x: m.labelX, y: 5.315, w: 1.593, h: 0.572, size: 28, color: WHITE });
++    body(s, {
++      text: LOREM_SHORT, x: m.textX, y: m.textY, w: 2.647, h: 1.111,
++      color: WHITE, align: 'center',
++    });
++    hexDeco(s, m.hexX, 1.905, 1.06, 0.914, GREEN);
++    imageFrame(s, m.picX, 2.362, 2.494, 2.776);
++  });
++}
++
++/** 9 — Picture with caption: green band across the top. */
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  rect(s, 0, 0, 13.333, 2.146, GREEN);
++  heading(s, { x: 0.646, y: 4.373, w: 6.021, h: 2.121, size: 40 },
++    [['Creating Ideas And Innovations In Technology', BLACK]]);
++  body(s, { x: 8.492, y: 4.541, w: 4.344, h: 1.784 });
++  imageFrame(s, 0.497, 0.453, 12.339, 3.297);
++  hexDeco(s, 6.023, 3.004, 1.288, 1.11, GREEN);
++}
++
++/** 10 — Statistics: hexagon badges with percentages beside a picture mosaic. */
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  heading(s, { x: 6.667, y: 1.231, w: 6.021, h: 2.322, size: 44 },
++    [['Creating Ideas And Innovations In Technology', BLACK]]);
++  const stats = [
++    { pct: '63%', month: 'June', badgeX: 6.667, valueX: 7.46, textX: 6.709 },
++    { pct: '57%', month: 'July', badgeX: 9.565, valueX: 10.43, textX: 9.675 },
++  ];
++  stats.forEach((st) => {
++    hexBadge(s, st.badgeX, 4.089, 2.666, 1.036);
++    label(s, { text: st.pct, x: st.valueX, y: 4.196, w: 1.138, h: 0.572, size: 28, color: GREEN });
++    label(s, { text: st.month, x: st.valueX, y: 4.737, w: 1.138, h: 0.303, size: 12, spc: 6 });
++    body(s, { text: LOREM_SHORT, x: st.textX, y: 5.336, w: 2.647, h: 1.111, align: 'center' });
++  });
++  // Staggered picture mosaic on the left.
++  [[0.517, 0.508], [3.233, 0.508], [1.875, 2.599], [3.233, 4.69], [0.517, 4.69]]
++    .forEach(([x, y]) => imageFrame(s, x, y, 2.101, 2.339));
++}
++
++/** 11 — Meet our team: three portrait cards with name, role and 5 stars. */
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  heading(s, { x: 3.604, y: 0.717, w: 6.125, h: 0.841, size: 44, align: 'center' },
++    [['Meet Our ', BLACK], ['Team', GREEN]]);
++  const team = [
++    { name: 'Zainal Arivin', nameX: 1.001, nameW: 3.049, nameY: 5.632, roleX: 0.508, starX: 1.63, hexX: 1.959, picX: 0.924 },
++    { name: 'Syafira Ashya', nameX: 4.778, nameW: 3.778, nameY: 5.632, roleX: 4.726, starX: 5.771, hexX: 6.1, picX: 5.065 },
++    { name: 'Jeromi Fergoi', nameX: 8.79, nameW: 4.035, nameY: 5.629, roleX: 8.79, starX: 9.912, hexX: 10.241, picX: 9.206 },
++  ];
++  team.forEach((m) => {
++    label(s, { text: m.name, x: m.nameX, y: m.nameY, w: m.nameW, h: 0.572, size: 28 });
++    label(s, {
++      text: 'Marketing Online', x: m.roleX, y: 6.272, w: 4.035, h: 0.37,
++      size: 16, spc: 3, color: GREEN,
++    });
++    for (let i = 0; i < 5; i++) star(s, m.starX + i * 0.375, 6.665, 0.292);
++    hexDeco(s, m.hexX, 2.093, 1.134, 0.977, GREEN);
++    imageFrame(s, m.picX, 2.581, 3.203, 2.771);
++  });
++}
++
++/** 12 — Quote: full-bleed green hexagon with a black banner on top. */
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  wideHexagon(s, 0.418, 0.418, 12.497, 6.664, 0.1736, GREEN);
++  snippedBanner(s, 2.808, 0.418, 7.684, 1.466, BLACK, 180);
++  heading(s, { x: 2.268, y: 2.804, w: 8.798, h: 3.063, size: 44, align: 'center' },
++    [['\u201cBusiness Must Develop And Grow With A Good And Modern Marketing Strategy\u201d', WHITE]]);
++  label(s, { text: 'Quotes Today', x: 4.881, y: 0.832, w: 3.571, h: 0.64, size: 32, color: WHITE });
++}
++
++/** 13 — Sales infographic: four stacked bars (white track + black value). */
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: GREEN };
++  const bars = [
++    { pct: '87%', year: '2023', trackX: 8.531, trackY: 1.007, trackH: 5.364, valX: 8.528, valY: 2.206, valW: 0.808, valH: 4.164, labelX: 8.441, pctY: 0.497 },
++    { pct: '73%', year: '2022', trackX: 9.511, trackY: 2.206, trackH: 4.164, valX: 9.508, valY: 3.336, valW: 0.805, valH: 3.035, labelX: 9.419, pctY: 1.67 },
++    { pct: '66%', year: '2021', trackX: 10.491, trackY: 3.406, trackH: 2.965, valX: 10.485, valY: 4.406, valW: 0.805, valH: 1.965, labelX: 10.397, pctY: 2.901 },
++    { pct: '57%', year: '2020', trackX: 11.471, trackY: 4.406, trackH: 1.965, valX: 11.468, valY: 5.086, valW: 0.799, valH: 1.309, labelX: 11.382, pctY: 3.899 },
++  ];
++  bars.forEach((b) => rect(s, b.trackX, b.trackY, 0.799, b.trackH, WHITE));
++  bars.forEach((b) => {
++    label(s, { text: b.pct, x: b.labelX, y: b.pctY, w: 0.978, h: 0.37, size: 16, color: WHITE });
++    label(s, { text: b.year, x: b.labelX, y: 6.418, w: 0.978, h: 0.303, size: 12, color: WHITE });
++  });
++  bars.forEach((b) => rect(s, b.valX, b.valY, b.valW, b.valH, BLACK));
++  heading(s, { x: 0.789, y: 1.502, w: 4.482, h: 1.582, size: 44 },
++    [['Infographic About Sales', WHITE]]);
++  body(s, { x: 0.789, y: 3.262, w: 6.038, h: 1.279, color: WHITE });
++  body(s, { x: 0.789, y: 4.719, w: 6.038, h: 1.279, color: WHITE });
++}
++
++/** 14 — Contact us: details on a green band under a white intro. */
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  rect(s, 0, 2.763, 13.333, 4.219, GREEN);
++  heading(s, { x: 0.974, y: 0.853, w: 4.482, h: 0.841, size: 44 }, [['Contact Us', BLACK]]);
++  const contacts = [
++    { head: 'WEBSITE :', value: 'www.fashionstyle.com', x: 6.496, y: 3.522, w: 5.658 },
++    { head: 'EMAIL :', value: 'fashionstyle@gmail.com', x: 6.479, y: 4.405, w: 5.451 },
++    { head: 'PHONE :', value: '+123-456-7890', x: 6.496, y: 5.289, w: 4.386 },
++  ];
++  contacts.forEach((c) => {
++    s.addText([
++      { text: c.head, options: { breakLine: true } },
++      { text: c.value, options: { charSpacing: 6 } },
++    ], {
++      ...BASE_TEXT, x: c.x, y: c.y, w: c.w, h: 0.707,
++      fontFace: SEMI, fontSize: 18, color: WHITE,
++    });
++  });
++  body(s, { x: 6.789, y: 0.634, w: 6.038, h: 1.279 });
++  imageFrame(s, 0.579, 2.763, 4.877, 4.219);
++}
++
++/** 15 — Thank you: green hexagon with black/green corner triangles. */
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  wideHexagon(s, 0.418, 0.418, 12.497, 6.664, 0.46123, GREEN);
++  const triangles = [
++    { x: 0.418, y: 0.418, size: 2.792, rotate: 90, color: BLACK },
++    { x: 10.123, y: 4.29, size: 2.792, rotate: 270, color: BLACK },
++    { x: 11.479, y: 0.418, size: 1.436, rotate: 180, color: GREEN },
++    { x: 0.418, y: 5.646, size: 1.436, rotate: 0, color: GREEN },
++  ];
++  triangles.forEach((t) => s.addShape('rtTriangle', {
++    x: t.x, y: t.y, w: t.size, h: t.size, rotate: t.rotate, fill: { color: t.color },
++  }));
++  label(s, { text: 'Technology Business', x: 4.714, y: 2.914, w: 3.906, h: 0.37, size: 16, spc: 3, color: WHITE });
++  heading(s, { x: 3.516, y: 3.21, w: 6.3, h: 1.01, size: 54, align: 'center' },
++    [['THANK YOU', WHITE]]);
++  label(s, { text: 'Presentation Template', x: 4.714, y: 4.212, w: 3.906, h: 0.303, size: 12, spc: 3, color: WHITE });
++}
++
++/* ── build ─────────────────────────────────────────────────────────────── */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE_16x9', width: 12192000 / 914400, height: 6858000 / 914400 });
++  pptx.layout = 'WIDE_16x9';
++  pptx.title = 'Technology Business';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++    slide09, slide10, slide11, slide12, slide13, slide14, slide15]
++    .forEach((fn) => fn(pptx));
++
++  const outFile = path.join(__dirname, '14f6f1d2-f878-49ed-9f5d-708fb6b0c62b_grok_final.pptx');
++  return pptx.writeFile({ fileName: outFile }).then(() => console.log('wrote', outFile));
++}
++
++build().catch((err) => {
++  console.error(err);
++  process.exit(1);
++});

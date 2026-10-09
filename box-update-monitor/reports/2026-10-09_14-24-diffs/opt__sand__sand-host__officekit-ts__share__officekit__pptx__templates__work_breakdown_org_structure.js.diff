@@ -1,0 +1,703 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/work_breakdown_org_structure.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/work_breakdown_org_structure.js
+@@ -0,0 +1,700 @@
++/**
++ * "Work Breakdown" presentation template, rebuilt with pptxgenjs.
++ *
++ * 16 slides at 10 x 5.625 in (16:9). Dark "app window" cards on a near-black
++ * background with a lime accent. Raster photos from the source deck are drawn
++ * here as light grey placeholder shapes.
++ *
++ *   node 1109f5a6-e266-4df8-b2b8-4baee8c17314_grok_final.js
++ */
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ palette */
++const LIME = 'CFF008'; // theme accent1
++const DARK = '131313'; // theme accent2 == slide background
++const CARD = '262626'; // window card body
++const EDGE = 'FCFEF1'; // hairline card border
++const DOT = '6B6B6B'; // window dots on dark cards
++const DOT2 = '8F8F8F'; // window dots, theme accent3
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const INK = '0C0C0C';
++const GREY = '3A3838';
++const DIM = '9BB405'; // muted lime: calendar days outside the month
++const PHOTO = 'F2F2F2'; // stands in for the photographs
++
++const TITLE_FONT = 'Poppins Medium';
++const BODY_FONT = 'Inter';
++
++/* Source deck insets: lIns/rIns 68575 EMU, tIns/bIns 34275 EMU. */
++const INSET = [5.4, 5.4, 2.7, 2.7]; // points, [left, right, bottom, top]
++const HAIRLINE = { color: EDGE, width: 0.75, transparency: 80 };
++const WIRE = { color: LIME, width: 1.5 }; // org-chart connectors
++const PAGE_NUM = { x: 9.033, y: 5.203, w: 0.467, h: 0.252, align: 'right', valign: 'middle', margin: INSET, fontFace: TITLE_FONT, fontSize: 11, bold: true, color: 'E7E6E6' };
++
++const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur';
++const DESC_HERE = 'Insert Description Text Here';
++const NEXT_PLAN = 'Our Next Project Plan';
++const ORG_TEAM = 'Organizational Team';
++
++/* ------------------------------------------------------------------ helpers */
++/** rounded-rect radius: the source stores it as a fraction of the shorter side */
++const rad = (frac, w, h) => frac * Math.min(w, h);
++
++/** dark "window" card with a hairline border */
++function card(s, x, y, w, h, frac) {
++	s.addShape('roundRect', { x, y, w, h, fill: { color: CARD }, line: HAIRLINE, rectRadius: rad(frac, w, h) });
++}
++
++/** lime panel nested inside a window card */
++function panel(s, x, y, w, h, frac = 0.04159) {
++	s.addShape('roundRect', { x, y, w, h, fill: { color: LIME }, rectRadius: rad(frac, w, h) });
++}
++
++/** the three "traffic light" dots in a window card's title bar */
++function dots(s, x, y, d, gap, color) {
++	for (let i = 0; i < 3; i++) s.addShape('ellipse', { x: x + i * gap, y, w: d, h: d, fill: { color } });
++}
++
++/** stand-in for a photograph in the source deck */
++function photo(s, x, y, w, h, shape) {
++	s.addShape(shape === 'round' ? 'ellipse' : 'roundRect', {
++		x, y, w, h, fill: { color: PHOTO }, rectRadius: 0.07, objectName: '[image]',
++	});
++}
++
++function line(s, x, y, w, h, opts) {
++	s.addShape('line', { x, y, w, h, line: Object.assign({}, WIRE, opts) });
++}
++
++/** draw a list of [x, y, w, h] connector segments */
++function wires(s, segs) {
++	segs.forEach(seg => line(s, seg[0], seg[1], seg[2], seg[3]));
++}
++
++function text(s, runs, o) {
++	s.addText(runs, Object.assign({
++		fontFace: BODY_FONT, fontSize: 9, color: LIME, align: 'left', valign: 'top', margin: INSET, wrap: true,
++	}, o));
++}
++
++/** slide heading in the deck's display face */
++function title(s, str, x, y, w, h, o) {
++	text(s, str, Object.assign({ x, y, w, h, fontFace: TITLE_FONT, fontSize: 33, color: WHITE, lineSpacingMultiple: 0.9 }, o));
++}
++
++/**
++ * Vertical gradient wash, painted as a stack of bands. pptxgenjs backgrounds
++ * take a single colour, so the source deck's 131313 -> 0C0C0C fade is stepped.
++ */
++function gradientBands(s, top, bottom, bands) {
++	const to = n => parseInt(top.substr(n, 2), 16);
++	const bo = n => parseInt(bottom.substr(n, 2), 16);
++	const hex = v => Math.round(v).toString(16).padStart(2, '0');
++	for (let i = 0; i < bands; i++) {
++		const t = i / (bands - 1);
++		const color = [0, 2, 4].map(n => hex(to(n) + (bo(n) - to(n)) * t)).join('');
++		s.addShape('rect', { x: 0, y: (5.625 / bands) * i, w: 10, h: 5.625 / bands + 0.01, fill: { color }, line: null });
++	}
++}
++
++/** small chevron pointing down (slide 9 card footers) */
++function chevron(s, x, y, w, h, color) {
++	s.addShape('custGeom', {
++		x, y, w, h, fill: { color },
++		points: [
++			{ x: 0, y: 0 }, { x: w / 2, y: h * 0.7 }, { x: w, y: 0 }, { x: w, y: h * 0.3 },
++			{ x: w / 2, y: h }, { x: 0, y: h * 0.3 }, { close: true },
++		],
++	});
++}
++
++/** lime disc holding a small dark calendar glyph */
++function calendarBullet(s, x, y) {
++	const d = 0.531;
++	s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: LIME } });
++	const ix = x + 0.159, iy = y + 0.159, g = 0.214;
++	s.addShape('roundRect', { x: ix, y: iy + g * 0.12, w: g, h: g * 0.88, fill: { color: CARD }, rectRadius: 0.025 });
++	s.addShape('rect', { x: ix + g * 0.16, y: iy, w: g * 0.1, h: g * 0.26, fill: { color: CARD } });
++	s.addShape('rect', { x: ix + g * 0.74, y: iy, w: g * 0.1, h: g * 0.26, fill: { color: CARD } });
++	s.addShape('rect', { x: ix + g * 0.14, y: iy + g * 0.42, w: g * 0.72, h: g * 0.08, fill: { color: LIME } });
++}
++
++/** "name over role" caption used on most people cards */
++function caption(s, name, role, o) {
++	text(s, name, {
++		x: o.nx, y: o.ny, w: o.nw, h: o.nh || 0.28, align: o.align || 'center',
++		fontFace: o.nameFont || TITLE_FONT, fontSize: o.nameSize || 12, bold: true, color: o.nameColor || BLACK, lineSpacingMultiple: 0.9,
++	});
++	text(s, role, {
++		x: o.rx, y: o.ry, w: o.rw, h: o.rh || 0.227, align: o.align || 'center',
++		fontSize: o.roleSize || 9, color: o.roleColor || DARK,
++	});
++}
++
++/* ============================================================ slide builders */
++
++/* 1 - title ---------------------------------------------------------------- */
++function slide01(s) {
++	s.background = { color: LIME };
++	text(s, 'Work Breakdown', {
++		x: 1.019, y: 2.126, w: 7.961, h: 1.159, align: 'center',
++		fontFace: TITLE_FONT, fontSize: 50, bold: true, color: CARD, lineSpacingMultiple: 1.3,
++	});
++	text(s, [
++		{ text: 'Presentation', options: { fontSize: 21 } },
++		{ text: ' Template', options: { fontSize: 18 } },
++	], { x: 3.004, y: 3.07, w: 3.992, h: 0.429, align: 'center', color: CARD });
++}
++
++/* 2 - CEO over two managers ------------------------------------------------ */
++function slide02(s) {
++	wires(s, [[5.007, 2.447, 0, 0.361], [2.568, 2.811, 0, 0.361], [7.439, 2.811, 0, 0.361], [2.571, 2.811, 4.872, 0]]);
++
++	card(s, 3.199, 0.649, 3.603, 2.005, 0.07268);
++	s.addShape('ellipse', { x: 3.478, y: 0.738, w: 0.25, h: 0.24, fill: { color: LIME } });
++	dots(s, 3.463, 2.478, 0.095, 0.146, DOT);
++	dots(s, 6.378, 0.84, 0.063, 0.104, DOT2);
++	panel(s, 3.361, 1.063, 3.287, 1.332);
++	photo(s, 5.335, 1.171, 1.117, 1.117, 'round');
++	text(s, 'CEO', { x: 3.803, y: 0.712, w: 1.094, h: 0.278, fontFace: TITLE_FONT, fontSize: 12, bold: true });
++	text(s, 'Johan Smith', { x: 3.424, y: 1.118, w: 1.536, h: 0.303, fontFace: TITLE_FONT, fontSize: 15, bold: true, color: DARK, lineSpacingMultiple: 0.9 });
++	text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.', { x: 3.425, y: 1.406, w: 1.892, h: 0.682, color: INK });
++	text(s, [
++		{ text: 'Johan_smith', options: { color: DARK } },
++		{ text: '@mail.com', options: { color: CARD } },
++	], { x: 3.424, y: 2.104, w: 1.386, h: 0.224, fontSize: 8, bold: true, lineSpacingMultiple: 1.3 });
++
++	[
++		{ x: 1.611, y: 2.992, role: 'Marketing Manager', rx: 1.985, rw: 1.207, name: 'Ilham Jer', bx: 1.762, bw: 0.747, mx: 1.758, mail: 'Ilham_J@mail.com', px: 2.509, py: 3.734 },
++		{ x: 6.492, y: 2.989, role: 'Finance Manager', rx: 6.879, rw: 0.906, name: 'Samual Per', bx: 6.639, bw: 0.692, mx: 6.617, mail: 'sam_R@mail.com', px: 7.391, py: 3.709 },
++	].forEach(c => {
++		card(s, c.x, c.y, 1.906, 2.005, 0.07268);
++		dots(s, c.x + 0.14, c.y + 1.829, 0.093, 0.1485, DOT);
++		s.addShape('ellipse', { x: c.x + 0.147, y: c.y + 0.088, w: 0.24, h: 0.24, fill: { color: LIME } });
++		panel(s, c.x + 0.12, c.y + 0.414, 1.672, 1.332);
++		dots(s, c.x + 1.57, c.y + 0.202, 0.04, 0.0655, DOT2);
++		photo(s, c.px, c.py, 0.788, 0.788, 'round');
++		text(s, c.role, { x: c.rx, y: c.y + 0.046, w: c.rw, h: 0.341, fontFace: TITLE_FONT, fontSize: 8, bold: true });
++		text(s, c.name, { x: c.x + 0.14, y: c.y + 0.448, w: 1.536, h: 0.303, fontFace: TITLE_FONT, fontSize: 15, bold: true, color: DARK, lineSpacingMultiple: 0.9 });
++		text(s, 'Lorem ipsum dolor sit', { x: c.bx, y: 3.695, w: c.bw, h: 0.666, color: INK, lineSpacingMultiple: 1.3 });
++		text(s, c.mail, { x: c.mx, y: c.y + 1.507, w: 1.318, h: 0.209, fontSize: 7, bold: true, color: CARD, lineSpacingMultiple: 1.3 });
++	});
++}
++
++/* 3 - CEO, two managers, six staff pills ----------------------------------- */
++function slide03(s) {
++	wires(s, [
++		[3.777, 1.444, 0, 0.177], [3.777, 4.004, 0, 0.177], [3.6, 2.814, 0, 0.177], [3.689, 1.533, 0, 2.56],
++		[7.053, 0.663, 0, 0.177], [7.053, 1.444, 0, 0.177], [7.053, 2.225, 0, 0.177], [6.875, 1.444, 0, 0.177], [6.964, 0.748, 0, 1.565],
++		[7.053, 3.224, 0, 0.177], [7.053, 4.005, 0, 0.177], [7.053, 4.786, 0, 0.177], [6.875, 4.005, 0, 0.177], [6.964, 3.31, 0, 1.565],
++	]);
++
++	card(s, 0.638, 1.9, 2.885, 2.005, 0.05086);
++	dots(s, 0.849, 3.729, 0.1, 0.163, DOT);
++	panel(s, 0.819, 2.314, 2.53, 1.332);
++	dots(s, 3.013, 2.081, 0.062, 0.099, DOT2);
++	photo(s, 0.941, 2.537, 0.885, 0.885, 'round');
++	text(s, 'Johan Smith', { x: 1.855, y: 2.549, w: 1.726, h: 0.303, fontFace: TITLE_FONT, fontSize: 15, bold: true, color: DARK, lineSpacingMultiple: 0.9 });
++	text(s, 'CEO', { x: 1.926, y: 2.91, w: 1.263, h: 0.278, fontSize: 12, bold: true, color: DARK });
++	text(s, [
++		{ text: 'Johan_smith', options: { color: DARK } },
++		{ text: '@mail.com', options: { color: CARD } },
++	], { x: 1.892, y: 3.2, w: 1.432, h: 0.239, fontSize: 8, lineSpacingMultiple: 1.3 });
++
++	[
++		{ y: 0.786, py: 1.207, name: 'Michel Judith', ny: 1.225, nw: 1.68, role: 'Marketing Manager', mail: 'Michel_Jud@mail.com' },
++		{ y: 3.367, py: 3.811, name: 'Ananta Rika', ny: 3.822, nw: 1.629, role: 'Design Manager', mail: 'Ananta_Rik@mail.com' },
++	].forEach(m => {
++		card(s, 3.795, m.y, 3.011, 1.384, 0.07602);
++		dots(s, 3.91, m.y + 1.274, 0.058, 0.116, DOT);
++		panel(s, 3.906, m.y + 0.333, 2.796, 0.899);
++		dots(s, 6.519, m.y + 0.145, 0.045, 0.07, DOT2);
++		photo(s, 4.082, m.py, 0.674, 0.674, 'round');
++		text(s, m.name, { x: 5.021, y: m.ny, w: m.nw, h: 0.304, fontFace: TITLE_FONT, fontSize: 15, bold: true, color: DARK, lineSpacingMultiple: 0.9 });
++		text(s, m.role, { x: 5.021, y: m.y + 0.724, w: 1.629, h: 0.227, color: DARK });
++		text(s, m.mail, { x: 5.021, y: m.y + 0.956, w: 1.629, h: 0.254, color: CARD, lineSpacingMultiple: 1.3 });
++	});
++
++	/* [name, role, pill y, caption y] - the source nudges some captions slightly */
++	[
++		['Juan Carlo', 'Marketing Staff', 0.432, 0.529], ['Alex Arnold', 'Marketing Staff', 1.225, 1.31],
++		['Frank Miller', 'Marketing Staff', 2.017, 2.091], ['Maria Lucy', 'Designer', 2.995, 3.088],
++		['Anton John', 'Designer', 3.788, 3.869], ['Juan Alexis', 'Designer', 4.581, 4.65],
++	].forEach(row => {
++		const [name, role, y, ty] = row;
++		card(s, 7.116, y, 2.313, 0.63, 0.07602);
++		panel(s, 7.183, y + 0.056, 2.179, 0.52);
++		caption(s, name, role, { nx: 7.469, ny: ty, nw: 1.629, nh: 0.257, rx: 7.469, ry: ty + 0.218, rw: 1.629, nameColor: DARK });
++	});
++}
++
++/* 4 - manager over four reports -------------------------------------------- */
++function slide04(s) {
++	gradientBands(s, DARK, INK, 24);
++	wires(s, [
++		[3.911, 2.771, 0, 0.257], [5.008, 2.511, 0, 0.257], [1.732, 2.768, 0, 0.257],
++		[8.268, 2.768, 0, 0.257], [1.732, 2.768, 6.541, 0], [6.089, 2.768, 0, 0.257],
++	]);
++
++	card(s, 3.767, 0.573, 2.467, 1.939, 0.05086);
++	dots(s, 3.948, 2.342, 0.091, 0.14, DOT);
++	panel(s, 3.922, 0.973, 2.163, 1.289);
++	dots(s, 5.791, 0.748, 0.059, 0.085, DOT2);
++	photo(s, 4.594, 1.016, 0.815, 0.815, 'round');
++	caption(s, 'Jaxon Reed', 'Manager', { nx: 4.011, ny: 1.801, nw: 1.979, nh: 0.304, rx: 4.011, ry: 2.031, rw: 1.979, rh: 0.22, nameSize: 15 });
++
++	[
++		{ x: 0.693, name: 'Ethan Carter', nx: 0.809, nw: 1.612, role: 'Marketing', rx: 0.875, px: 1.217, py: 3.478 },
++		{ x: 2.936, name: 'Joana Luis', nx: 3.118, nw: 1.479, role: 'Finance', rx: 3.118, px: 3.479, py: 3.484 },
++		{ x: 5.204, name: 'Mason Lee', nx: 5.386, nw: 1.479, role: 'Designer', rx: 5.386, px: 5.741, py: 3.489 },
++		{ x: 7.44, name: 'Lucas Rivera', nx: 7.556, nw: 1.612, role: 'Administration', rx: 7.622, px: 8.003, py: 3.495 },
++	].forEach(c => {
++		card(s, c.x, 3.034, 1.844, 1.939, 0.07268);
++		dots(s, c.x + 0.135, 4.803, 0.09, 0.144, DOT);
++		panel(s, c.x + 0.116, 3.434, 1.617, 1.289);
++		dots(s, c.x + 1.519, 3.229, 0.038, 0.0635, DOT2);
++		photo(s, c.px, c.py, 0.79, 0.79, 'round');
++		caption(s, c.name, c.role, { nx: c.nx, ny: 4.262, nw: c.nw, nh: 0.304, rx: c.rx, ry: 4.492, rw: 1.479, rh: 0.22, nameSize: 15 });
++	});
++}
++
++/* 5 - "Organizational Team" with a leader badge ---------------------------- */
++function slide05(s) {
++	wires(s, [
++		[2.827, 2.026, 1.182, 0], [6.01, 2.026, 1.182, 0],
++		[3.961, 3.115, 0, 0.204], [5.009, 2.273, 0, 0.839], [1.87, 3.112, 0, 0.204],
++		[8.143, 3.112, 0, 0.204], [1.87, 3.112, 6.278, 0], [6.052, 3.112, 0, 0.204],
++	]);
++	title(s, ORG_TEAM, 2.273, 0.457, 5.455, 0.631, { align: 'center', bold: true, lineSpacingMultiple: null });
++
++	[
++		{ x: 1.125, y: 1.12, name: 'Henry Sullivan', nx: 1.2, nw: 1.589, rx: 1.3, px: 1.616, py: 1.559 },
++		{ x: 7.09, y: 1.131, name: 'Aria Morgan', nx: 7.212, nw: 1.493, rx: 7.265, px: 7.555, py: 1.569 },
++	].forEach(c => {
++		card(s, c.x, c.y, 1.77, 1.861, 0.07268);
++		panel(s, c.x + 0.112, c.y + 0.385, 1.552, 1.381);
++		dots(s, c.x + 1.458, c.y + 0.188, 0.037, 0.061, DOT2);
++		photo(s, c.px, c.py, 0.829, 0.829, 'round');
++		caption(s, c.name, 'Manager', { nx: c.nx, ny: c.y + 1.312, nw: c.nw, nh: 0.281, rx: c.rx, ry: c.y + 1.533, rw: 1.42, nameSize: 14 });
++	});
++
++	[
++		{ x: 1.047, y: 3.308, name: 'Daniel Foster', nx: 1.045, nw: 1.621, role: 'Marketing', rx: 1.21, px: 1.503, py: 3.713 },
++		{ x: 3.117, y: 3.317, name: 'Logan Turner', nx: 3.176, nw: 1.498, role: 'Finance', rx: 3.28, px: 3.554, py: 3.733 },
++		{ x: 5.22, y: 3.327, name: 'Wyatt Price', nx: 5.334, nw: 1.388, role: 'Designer', rx: 5.383, px: 5.667, py: 3.733 },
++		{ x: 7.317, y: 3.308, name: 'Ellie Walters', nx: 7.431, nw: 1.388, role: 'Administration', rx: 7.479, px: 7.78, py: 3.704 },
++	].forEach(c => {
++		card(s, c.x, c.y, 1.645, 1.73, 0.07268);
++		panel(s, c.x + 0.104, c.y + 0.357, 1.443, 1.284);
++		dots(s, c.x + 1.356, c.y + 0.174, 0.034, 0.0565, DOT2);
++		photo(s, c.px, c.py, 0.77, 0.769, 'round');
++		caption(s, c.name, c.role, { nx: c.nx, ny: c.y + 1.219, nw: c.nw, nh: 0.281, rx: c.rx, ry: c.y + 1.424, rw: 1.32, nameSize: 14 });
++	});
++
++	card(s, 3.966, 1.719, 2.081, 0.607, 0.16667);
++	text(s, 'Our Team Leader', { x: 4.018, y: 1.886, w: 1.982, h: 0.303, align: 'center', fontSize: 15, bold: true, lineSpacingMultiple: 0.9 });
++}
++
++/* 6 - agenda: February calendar plus three note cards ---------------------- */
++const CAL_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
++/* [x, y, width, label, colour] - lime-on-lime cells are blank squares in the source */
++const CAL_CELLS = [
++	[1.033, 2.941, 0.434, '29', DIM], [1.533, 2.941, 0.434, '30', DIM], [2.033, 2.941, 0.434, '31', DIM],
++	[2.533, 2.941, 0.434, '1', LIME], [3.033, 2.941, 0.434, '2', LIME], [3.589, 2.941, 0.32, '3', LIME], [4.087, 2.941, 0.32, '4', LIME],
++	[1.09, 3.319, 0.32, '5', LIME], [1.59, 3.319, 0.32, '6', LIME], [2.09, 3.319, 0.32, '7', LIME], [2.59, 3.319, 0.32, '8', LIME],
++	[3.089, 3.319, 0.32, '9', LIME], [3.589, 3.319, 0.32, '10', LIME], [4.087, 3.319, 0.32, '11', LIME],
++	[1.09, 3.697, 0.32, '12', LIME], [1.59, 3.697, 0.32, '13', LIME], [3.589, 3.697, 0.32, '17', LIME], [4.087, 3.697, 0.32, '18', LIME],
++	[1.09, 4.084, 0.32, '19', LIME], [1.59, 4.084, 0.32, '20', LIME], [2.09, 4.084, 0.32, '21', LIME], [2.554, 4.084, 0.392, '22', LIME],
++	[3.089, 4.084, 0.32, '23', LIME], [3.554, 4.084, 0.392, '24', LIME], [4.051, 4.084, 0.392, '25', LIME],
++	[1.054, 4.442, 0.392, '26', LIME], [1.554, 4.442, 0.392, '27', LIME], [2.054, 4.442, 0.392, '28', LIME], [2.59, 4.442, 0.32, '29', LIME],
++	[3.054, 4.442, 0.392, '30', LIME], [3.554, 4.442, 0.392, '1', DIM], [4.051, 4.442, 0.392, '2', DIM],
++];
++
++function slide06(s) {
++	title(s, 'Our Agenda', 0.818, 0.674, 3.45, 0.624, { fontSize: 36, bold: true });
++
++	card(s, 0.824, 1.486, 3.849, 3.42, 0.03748);
++	s.addShape('ellipse', { x: 0.97, y: 1.593, w: 0.309, h: 0.309, fill: { color: LIME } });
++	dots(s, 4.191, 1.701, 0.077, 0.1275, DOT2);
++	s.addShape('round2SameRect', { x: 0.97, y: 2.002, w: 3.545, h: 0.523, fill: { color: LIME } });
++	text(s, 'February 2024', { x: 1.378, y: 2.074, w: 2.74, h: 0.379, align: 'center', fontFace: TITLE_FONT, fontSize: 18, bold: true, color: CARD });
++
++	CAL_DAYS.forEach((d, i) => {
++		text(s, d, { x: 1.025 + i * 0.4995, y: 2.693, w: 0.449, h: 0.193, align: 'center', valign: 'middle', shape: 'rect', fill: { color: LIME } });
++	});
++	CAL_CELLS.forEach(cell => {
++		const [x, y, w, label, color] = cell;
++		text(s, label, { x, y, w, h: 0.324, align: 'center', valign: 'middle', color, shape: 'rect', fill: { color: LIME } });
++	});
++	// three highlighted days: a lime disc covers the plain grid cell beneath it
++	[[2.107, 3.78, 2.083, 3.699, '12', '14'], [2.614, 3.776, 2.586, 3.701, '13', '15'], [3.112, 3.776, 3.088, 3.705, '14', '16']].forEach(day => {
++		const [gx, gy, x, y, under, label] = day;
++		text(s, under, { x: gx, y: gy, w: 0.272, h: 0.158, align: 'center', valign: 'middle', fontSize: 7, color: '595959', shape: 'rect', fill: { color: LIME } });
++		s.addShape('ellipse', { x, y, w: 0.324, h: 0.324, fill: { color: LIME } });
++		text(s, label, { x: x - 0.01, y, w: 0.32, h: 0.324, align: 'center', valign: 'middle', color: CARD });
++	});
++
++	[{ x: 5.2, y: 1.486, n: '14' }, { x: 7.435, y: 1.486, n: '15' }, { x: 5.2, y: 3.371, n: '14' }].forEach(c => {
++		card(s, c.x, c.y, 1.907, 1.534, 0.07268);
++		s.addShape('ellipse', { x: c.x + 1.373, y: c.y + 0.126, w: 0.375, h: 0.375, fill: { color: LIME } });
++		text(s, c.n, { x: c.x + 0.203, y: c.y + 0.043, w: 0.929, h: 0.53, fontFace: TITLE_FONT, fontSize: 27 });
++		line(s, c.x + 0.212, c.y + 0.765, 1.344, 0, { width: 0.75 });
++		s.addShape('roundRect', { x: c.x + 0.203, y: c.y + 0.715, w: 0.216, h: 0.1, fill: { color: LIME }, rectRadius: 0.05 });
++		text(s, 'Lorem ipsum dolor sit ame consectetur adipiscing elit', { x: c.x + 0.079, y: c.y + 0.905, w: 1.822, h: 0.456, lineSpacingMultiple: 1.3 });
++	});
++}
++
++/* 7 - weekly schedule ------------------------------------------------------ */
++function slide07(s) {
++	title(s, 'Schedule', 0.918, 0.627, 3.535, 0.589, { bold: true });
++	[
++		{ x: 0.949, num: '24', day: 'Monday', nx: 1.078, dx: 1.178, dw: 0.941, dy: 2.904, tx: 0.876, ty: 4.349 },
++		{ x: 2.637, num: '25', day: 'Tuesday', nx: 2.766, dx: 2.816, dw: 1.042, dy: 2.904, tx: 2.62, ty: 4.352 },
++		{ x: 4.324, num: '26', day: 'Wednesday', nx: 4.453, dx: 4.374, dw: 1.281, dy: 2.904, tx: 4.313, ty: 4.352, on: true },
++		{ x: 6.064, num: '27', day: 'Thursday', nx: 6.193, dx: 6.243, dw: 1.042, dy: 2.893, tx: 6.09, ty: 4.352 },
++		{ x: 7.803, num: '28', day: 'Friday', nx: 7.932, dx: 8.033, dw: 0.941, dy: 2.893, tx: 7.834, ty: 4.352 },
++	].forEach(d => {
++		const fg = d.on ? CARD : LIME;
++		if (d.on) s.addShape('roundRect', { x: d.x, y: 1.438, w: 1.4, h: 2.118, fill: { color: LIME }, rectRadius: rad(0.16667, 1.4, 2.118) });
++		else card(s, d.x, 1.438, 1.4, 2.118, 0.16667);
++		text(s, d.num, { x: d.nx, y: 1.81, w: 1.142, h: 0.901, align: 'center', fontSize: 54, color: fg, lineSpacingMultiple: 0.9 });
++		text(s, d.day, { x: d.dx, y: d.dy, w: d.dw, h: 0.282, align: 'center', fontSize: 14, color: fg, lineSpacingMultiple: 0.9 });
++		text(s, d.on ? '09:00 AM' : '09:00 PM', {
++			x: d.tx, y: d.ty, w: 1.374, h: 0.488, align: 'center', valign: 'middle', fontSize: 15, color: fg,
++			shape: 'roundRect', rectRadius: rad(0.5, 1.374, 0.488),
++			fill: { color: d.on ? LIME : CARD }, line: d.on ? null : HAIRLINE,
++		});
++	});
++	line(s, 0.949, 4.05, 3.072, 0, { width: 1.25 });
++	line(s, 6.137, 4.05, 3.072, 0, { width: 1.25 });
++	text(s, 'Visiting hours', { x: 3.959, y: 3.898, w: 2.082, h: 0.303, align: 'center', fontSize: 15, lineSpacingMultiple: 0.9 });
++}
++
++/* 8 - monthly agenda ------------------------------------------------------- */
++function slide08(s) {
++	title(s, 'Our Agenda This Month', 1.14, 0.775, 4.475, 1.075, { bold: true });
++	[
++		{ x: 1.295, date: '16 August', label: 'Agenda One' },
++		{ x: 3.245, date: '20 August', label: 'Agenda Two' },
++		{ x: 7.097, date: '26 August', label: 'Agenda Three' },
++	].forEach(c => {
++		card(s, c.x, 2.565, 1.688, 2.148, 0.16667);
++		text(s, c.date, { x: c.x + 0.132, y: 3.481, w: 1.422, h: 0.354, fontSize: 14, lineSpacingMultiple: 1.3 });
++		text(s, c.label, { x: c.x + 0.132, y: 3.774, w: 1.422, h: 0.257, lineSpacingMultiple: 1.3 });
++		text(s, 'Lorem ipsum dolor sit amet, adipiscing', { x: c.x + 0.132, y: 4.099, w: 1.422, h: 0.456, lineSpacingMultiple: 1.3 });
++		text(s, '2025', { x: c.x + 1.226, y: 2.707, w: 0.399, h: 0.451, align: 'center', fontSize: 14, color: WHITE, lineSpacingMultiple: 0.8 });
++	});
++
++	s.addShape('roundRect', { x: 5.196, y: 2.214, w: 1.688, h: 2.5, fill: { color: LIME }, rectRadius: rad(0.16667, 1.688, 2.5) });
++	text(s, '22 August', { x: 5.328, y: 2.984, w: 1.422, h: 0.347, fontSize: 14, color: CARD, lineSpacingMultiple: 1.3 });
++	text(s, 'Agenda List', { x: 5.328, y: 3.298, w: 1.422, h: 0.287, fontSize: 11, color: CARD, lineSpacingMultiple: 1.3 });
++	['- Name Consultant', '- Idea Evaluation', '- Analysis Team'].forEach((t, i) => {
++		text(s, t, { x: 5.328, y: 3.695 + i * 0.2905, w: 1.422, h: 0.227, color: CARD });
++	});
++
++	line(s, 6.877, 1.486, 0, 0.974, { width: 1, dashType: 'dash' });
++	text(s, [
++		{ text: '2025', options: { fontSize: 15, breakLine: true } },
++		{ text: 'Important Date', options: { fontSize: 9 } },
++	], { x: 7.011, y: 1.383, w: 1.555, h: 0.553, color: WHITE, lineSpacingMultiple: 1.2 });
++}
++
++/* 9 - work schedule: four dated cards -------------------------------------- */
++function slide09(s) {
++	wires(s, [
++		[4.002, 2.1, 0, 0.339], [5.005, 1.266, 0, 0.829], [1.938, 2.096, 0, 0.339],
++		[8.131, 2.096, 0, 0.339], [1.938, 2.096, 6.198, 0], [6.066, 2.096, 0, 0.339],
++	]);
++	card(s, 3.433, 0.858, 3.148, 0.816, 0.16667);
++	text(s, 'Work Schedule', { x: 3.346, y: 0.989, w: 3.329, h: 0.53, align: 'center', fontSize: 27, bold: true, color: WHITE });
++
++	[
++		{ x: 0.973, day: '20', month: 'February' }, { x: 3.001, day: '21', month: 'February' },
++		{ x: 5.065, day: '4', month: 'March' }, { x: 7.114, day: '12', month: 'March' },
++	].forEach(c => {
++		card(s, c.x, 2.923, 1.932, 1.844, 0.07268);
++		panel(s, c.x + 0.122, 3.304, 1.694, 1.368);
++		dots(s, c.x + 1.592, 3.108, 0.039, 0.0665, DOT2);
++		text(s, c.month, { x: c.x + 0.157, y: 3.31, w: 1.608, h: 0.328, align: 'center', fontFace: TITLE_FONT, fontSize: 15, color: CARD });
++		text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do', { x: c.x + 0.157, y: 3.663, w: 1.608, h: 0.647, align: 'center', color: CARD, lineSpacingMultiple: 1.3 });
++		chevron(s, c.x + 0.871, 4.44, 0.151, 0.102, CARD);
++		text(s, c.day, {
++			x: c.x + 0.583, y: 2.372, w: 0.807, h: 0.807, align: 'center', valign: 'middle',
++			fontFace: TITLE_FONT, fontSize: 33, color: CARD,
++			shape: 'roundRect', fill: { color: LIME }, rectRadius: rad(0.1617, 0.807, 0.807),
++		});
++	});
++}
++
++/* 10 - two teams flanking a project card ----------------------------------- */
++function slide10(s) {
++	// two mirrored brackets: [tick x, spine x, horizontal stub x]
++	[[3.134, 3.362, 3.362], [6.888, 6.66, 6.082]].forEach(b => {
++		wires(s, [
++			[b[0], 1.67, 0, 0.427], [b[0], 3.158, 0, 0.427], [b[0], 4.084, 0, 0.427],
++			[b[2], 2.7, 0.579, 0], [b[1], 1.875, 0, 2.421],
++		]);
++	});
++
++	[
++		{ x: 0.973, y: 0.962, name: 'Henry Sullivan', px: 1.507 },
++		{ x: 7.084, y: 0.969, name: 'Zoey Greene', px: 7.664 },
++	].forEach(c => {
++		card(s, c.x, c.y, 1.932, 1.844, 0.07268);
++		panel(s, c.x + 0.122, c.y + 0.381, 1.694, 1.368);
++		dots(s, c.x + 1.592, c.y + 0.185, 0.039, 0.0665, DOT2);
++		photo(s, c.px, c.y + 0.443, 0.829, 0.829, 'round');
++		caption(s, c.name, 'Manager', { nx: c.x + 0.134, ny: c.y + 1.3, nw: 1.629, rx: c.x + 0.191, ry: c.y + 1.518, rw: 1.55, nameSize: 14 });
++	});
++
++	card(s, 3.878, 2.181, 2.257, 1.015, 0.08787);
++	text(s, 'Team Project', { x: 4.04, y: 2.267, w: 1.919, h: 0.257, align: 'center', fontFace: TITLE_FONT, fontSize: 12, bold: true, lineSpacingMultiple: 0.9 });
++	text(s, LOREM_LONG, { x: 4.04, y: 2.505, w: 1.919, h: 0.666, align: 'center', lineSpacingMultiple: 1.3 });
++
++	[
++		{ x: 0.97, y: 3.052, name: 'Luna Harper' }, { x: 0.977, y: 3.974, name: 'Isaac Perkins' },
++		{ x: 7.079, y: 3.056, name: 'Maria Lucy' }, { x: 7.087, y: 3.978, name: 'Layla Ortiz' },
++	].forEach(c => {
++		card(s, c.x, c.y, 1.932, 0.63, 0.07602);
++		panel(s, c.x + 0.056, c.y + 0.056, 1.82, 0.52);
++		caption(s, c.name, 'Designer', { nx: c.x + 0.304, ny: c.y + 0.093, nw: 1.361, nh: 0.257, rx: c.x + 0.304, ry: c.y + 0.312, rw: 1.361 });
++	});
++}
++
++/* 11 - manager, three leads, six designers --------------------------------- */
++function slide11(s) {
++	wires(s, [[5.007, 1.557, 0, 0.767], [2.058, 1.865, 0, 0.308], [7.942, 1.865, 0, 0.308], [2.058, 1.865, 5.889, 0]]);
++
++	card(s, 3.725, 0.438, 2.55, 1.22, 0.05086);
++	panel(s, 3.819, 0.689, 2.369, 0.866);
++	dots(s, 5.947, 0.531, 0.06, 0.0905, DOT);
++	photo(s, 5.251, 0.741, 0.883, 0.74);
++	text(s, 'Gabriel Russell', { x: 3.829, y: 0.775, w: 1.475, h: 0.259, fontFace: TITLE_FONT, fontSize: 12, bold: true, color: BLACK, lineSpacingMultiple: 0.9 });
++	text(s, 'Manager', { x: 3.829, y: 1.018, w: 1.295, h: 0.215, fontSize: 8, color: DARK });
++	text(s, [
++		{ text: 'Gabriel_R', options: { color: BLACK } },
++		{ text: '@mail.com', options: { color: CARD } },
++	], { x: 3.829, y: 1.241, w: 1.342, h: 0.239, fontSize: 8, lineSpacingMultiple: 1.3 });
++
++	[
++		{ x: 0.761, y: 2.173, name: 'Ellie Walters', user: 'Ellie_W', font: TITLE_FONT, px: 2.34, py: 2.477, pw: 0.927 },
++		{ x: 3.674, y: 2.161, name: 'Scarlett Myers', user: 'Scarlett_M', font: TITLE_FONT, px: 5.252, py: 2.464, pw: 0.926 },
++		{ x: 6.586, y: 2.148, name: 'Elijah Boyd', user: 'Elijah_B', font: BODY_FONT, px: 8.165, py: 2.451, pw: 0.925 },
++	].forEach(c => {
++		card(s, c.x, c.y, 2.652, 1.22, 0.05086);
++		panel(s, c.x + 0.098, c.y + 0.252, 2.464, 0.866);
++		dots(s, c.x + 2.321, c.y + 0.094, 0.053, 0.094, DOT);
++		photo(s, c.px, c.py, c.pw, 0.755);
++		text(s, c.name, { x: c.x + 0.135, y: c.y + 0.335, w: 1.443, h: 0.259, fontFace: c.font, fontSize: 12, bold: true, color: BLACK, lineSpacingMultiple: 0.9 });
++		text(s, 'Manager', { x: c.x + 0.135, y: c.y + 0.578, w: 1.347, h: 0.215, fontSize: 8, color: DARK });
++		text(s, [
++			{ text: c.user, options: { color: BLACK } },
++			{ text: '@mail.com', options: { color: CARD } },
++		], { x: c.x + 0.135, y: c.y + 0.801, w: 1.577, h: 0.224, fontSize: 8, lineSpacingMultiple: 1.3 });
++	});
++
++	[
++		{ x: 1.092, y: 3.576, name: 'Jack Sanders' }, { x: 1.092, y: 4.361, name: 'Caleb Fisher' },
++		{ x: 4.045, y: 3.576, name: 'Nora Jenkins' }, { x: 4.045, y: 4.361, name: 'Hazel Quinn' },
++		{ x: 6.998, y: 3.576, name: 'Wyatt Price' }, { x: 6.998, y: 4.361, name: 'Luna Harper' },
++	].forEach(c => {
++		card(s, c.x, c.y, 1.932, 0.63, 0.07602);
++		panel(s, c.x + 0.056, c.y + 0.056, 1.82, 0.52);
++		caption(s, c.name, 'Designer', { nx: c.x + 0.304, ny: c.y + 0.093, nw: 1.361, nh: 0.257, rx: c.x + 0.304, ry: c.y + 0.312, rw: 1.361 });
++	});
++}
++
++/* 12 - founder flanked by six people --------------------------------------- */
++function slide12(s) {
++	// mirrored brackets: [tick x, spine x, horizontal stub x]
++	[[3.801, 3.95, 3.95], [6.213, 6.065, 5.687]].forEach(b => {
++		wires(s, [
++			[b[0], 1.699, 0, 0.305], [b[0], 3.044, 0, 0.305], [b[0], 4.388, 0, 0.305],
++			[b[2], 3.196, 0.378, 0], [b[1], 1.846, 0, 2.695],
++		]);
++	});
++	title(s, ORG_TEAM, 2.273, 0.457, 5.455, 0.631, { align: 'center', lineSpacingMultiple: null });
++
++	/* left column carries its caption inside the card group, right column beside it */
++	[
++		{ x: 1.335, y: 1.292, name: 'Julian West', font: TITLE_FONT, tx: 1.431, ty: 1.715, tw: 1.461, role: 'Designer', px: 2.805, py: 1.598 },
++		{ x: 1.316, y: 2.602, name: 'Isaac Perkins', font: TITLE_FONT, tx: 1.411, ty: 3.005, tw: 1.411, role: 'Designer', px: 2.799, py: 2.883 },
++		{ x: 1.308, y: 3.952, name: 'Zoey Greene', font: BODY_FONT, tx: 1.403, ty: 4.329, tw: 1.481, role: 'Designer', px: 2.805, py: 4.25 },
++		{ x: 6.337, y: 1.292, name: 'Levi Armstrong', font: TITLE_FONT, tx: 6.416, ty: 1.692, tw: 1.461, role: 'Finance', px: 7.803, py: 1.597 },
++		{ x: 6.318, y: 2.602, name: 'Gabriel Russell', font: TITLE_FONT, tx: 6.404, ty: 2.99, tw: 1.461, role: 'Administration', px: 7.797, py: 2.883 },
++		{ x: 6.299, y: 3.952, name: 'Harper Webb', font: TITLE_FONT, tx: 6.4, ty: 4.347, tw: 1.461, role: 'Marketing', px: 7.803, py: 4.249 },
++	].forEach(c => {
++		card(s, c.x, c.y, 2.34, 1.119, 0.05086);
++		panel(s, c.x + 0.086, c.y + 0.231, 2.174, 0.795);
++		dots(s, c.x + 2.04, c.y + 0.086, 0.055, 0.082, DOT);
++		photo(s, c.px, c.py, 0.721, 0.668);
++		text(s, c.name, { x: c.tx, y: c.ty, w: c.tw, h: 0.259, fontFace: c.font, fontSize: 12, bold: true, color: BLACK, lineSpacingMultiple: 0.9 });
++		text(s, c.role, { x: c.tx, y: c.ty + 0.217, w: 1.188, h: 0.252, fontSize: 11, color: DARK });
++	});
++
++	card(s, 4.168, 2.355, 1.674, 1.597, 0.07268);
++	panel(s, 4.274, 2.685, 1.468, 1.185);
++	dots(s, 5.547, 2.515, 0.035, 0.0575, DOT2);
++	photo(s, 4.344, 2.731, 1.324, 0.672);
++	caption(s, 'Henry Sullivan', 'CEO / Founder', { nx: 4.129, ny: 3.411, nw: 1.722, nh: 0.282, rx: 4.334, ry: 3.62, rw: 1.343, rh: 0.209, nameSize: 14, roleColor: CARD });
++}
++
++/* 13 - team leader with projects and people -------------------------------- */
++function slide13(s) {
++	wires(s, [
++		[8.287, 2.538, 0.005, 0.945], [1.712, 2.538, 0.005, 0.945], [5.0, 2.314, 0.005, 1.152],
++		[6.466, 4.311, 1.172, 0], [2.459, 4.306, 1.076, 0],
++		[2.851, 2.043, 0.679, 0], [6.46, 2.043, 0.679, 0],
++	]);
++	title(s, ORG_TEAM, 2.273, 0.627, 5.455, 0.631, { align: 'center', lineSpacingMultiple: null });
++
++	card(s, 3.495, 1.723, 3.069, 0.63, 0.07602);
++	panel(s, 3.554, 1.779, 2.95, 0.52);
++	text(s, 'Team Leader', { x: 3.847, y: 1.851, w: 2.306, h: 0.397, align: 'center', fontFace: TITLE_FONT, fontSize: 21, bold: true, color: DARK, lineSpacingMultiple: 0.9 });
++
++	[
++		{ x: 0.663, y: 1.608, tx: 0.883, label: 'Project One', dots: 2.702 },
++		{ x: 7.117, y: 1.607, tx: 7.337, label: 'Project Two', dots: 9.156 },
++	].forEach(c => {
++		card(s, c.x, c.y, 2.34, 1.119, 0.05086);
++		panel(s, c.x + 0.086, c.y + 0.231, 2.174, 0.795);
++		dots(s, c.dots, c.y + 0.086, 0.055, 0.083, DOT);
++		text(s, c.label, { x: c.tx, y: c.y + 0.26, w: 1.919, h: 0.257, align: 'center', fontFace: TITLE_FONT, fontSize: 12, bold: true, color: DARK, lineSpacingMultiple: 0.9 });
++		text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', { x: c.tx, y: c.y + 0.528, w: 1.919, h: 0.47, align: 'center', color: INK, lineSpacingMultiple: 1.3 });
++	});
++
++	card(s, 3.508, 3.446, 2.991, 1.778, 0.05086);
++	panel(s, 3.596, 3.698, 2.837, 1.429);
++	dots(s, 6.204, 3.539, 0.056, 0.084, DOT);
++	text(s, 'Team Project', { x: 3.87, y: 3.865, w: 2.26, h: 0.257, align: 'center', fontFace: TITLE_FONT, fontSize: 12, bold: true, color: DARK, lineSpacingMultiple: 0.9 });
++	text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ', { x: 3.87, y: 4.133, w: 2.26, h: 0.863, align: 'center', color: INK, lineSpacingMultiple: 1.3 });
++
++	[
++		{ x: 0.757, y: 3.409, name: 'winda Coleman', nx: 0.924, rx: 1.075, px: 0.903, dots: 2.436 },
++		{ x: 7.319, y: 3.417, name: 'abraham', nx: 7.487, rx: 7.637, px: 7.492, dots: 8.999 },
++	].forEach(c => {
++		card(s, c.x, c.y, 1.927, 1.778, 0.05086);
++		panel(s, c.x + 0.071, c.y + 0.252, 1.791, 1.429);
++		dots(s, c.dots, c.y + 0.094, 0.045, 0.0685, DOT);
++		photo(s, c.px, c.y + 0.37, 1.605, 0.909);
++		caption(s, c.name, 'Position ', { nx: c.nx, ny: c.y + 1.284, nw: 1.625, nh: 0.257, rx: c.rx, ry: c.y + 1.459, rw: 1.324, nameColor: DARK, roleColor: CARD });
++	});
++}
++
++/* 14 - agenda list for next month ------------------------------------------ */
++function slide14(s) {
++	card(s, 4.817, 0.904, 4.467, 3.926, 0.06055);
++	s.addShape('rect', { x: 4.668, y: 2.078, w: 4.406, h: 0.75, fill: { color: LIME } });
++	wires(s, [
++		[4.668, 1.318, 0, 0.305], [4.668, 2.295, 0, 0.305], [4.668, 3.011, 0, 0.305], [4.668, 3.899, 0, 0.305],
++		[3.419, 1.891, 1.101, 0], [4.52, 1.465, 0, 2.587],
++	]);
++
++	/* row two sits on the lime band, so it flips to dark text and a dark pill */
++	[
++		{ y: 1.245, label: 'Agenda 01', pill: '1 Feb', lw: 3.114 },
++		{ y: 2.127, label: 'Agenda 02', pill: '2 Feb', lw: 3.169, onBand: true },
++		{ y: 3.008, label: 'Agenda 03', pill: '3 Feb', lw: 3.177 },
++		{ y: 3.889, label: 'Agenda 04', pill: '4 Feb', lw: 3.138 },
++	].forEach(r => {
++		const fg = r.onBand ? GREY : LIME;
++		text(s, r.label, { x: 5.913, y: r.y, w: 3.002, h: r.onBand ? 0.298 : 0.326, fontFace: TITLE_FONT, fontSize: r.onBand ? 12 : 14, color: fg, lineSpacingMultiple: 1.1 });
++		text(s, LOREM_SHORT, { x: 5.913, y: r.y + 0.313, w: r.lw, h: 0.255, color: fg, lineSpacingMultiple: 1.3 });
++		text(s, r.pill, {
++			x: 5.147, y: r.y + 0.062, w: 0.595, h: 0.19, align: 'center', valign: 'middle',
++			color: r.onBand ? LIME : CARD, shape: 'roundRect', rectRadius: rad(0.16667, 0.595, 0.19),
++			fill: { color: r.onBand ? CARD : LIME }, line: r.onBand ? HAIRLINE : null,
++		});
++	});
++
++	card(s, 2.634, 0.904, 1.4, 2.118, 0.16667);
++	text(s, '2025', { x: 2.763, y: 1.125, w: 1.142, h: 1.712, align: 'center', fontSize: 54, lineSpacingMultiple: 0.9 });
++
++	calendarBullet(s, 0.804, 3.3);
++	text(s, 'Agenda', { x: 1.412, y: 3.3, w: 1.124, h: 0.303, fontFace: TITLE_FONT, fontSize: 14 });
++	text(s, LOREM_LONG, { x: 1.416, y: 3.617, w: 2.947, h: 0.453, lineSpacingMultiple: 1.3 });
++	title(s, 'Our Agenda Next Month', 0.548, 0.591, 2.015, 2.08);
++}
++
++/* 15 - next project plan, three rows --------------------------------------- */
++function slide15(s) {
++	wires(s, [
++		[4.09, 1.804, 0, 0.362], [3.742, 1.978, 0, 2.377],
++		[2.841, 1.985, 1.101, 0], [3.742, 3.194, 0.496, 0], [3.742, 4.355, 0.496, 0],
++	]);
++	title(s, NEXT_PLAN, 2.487, 0.585, 5.026, 0.58);
++
++	card(s, 0.755, 1.415, 2.367, 1.056, 0.07602);
++	panel(s, 0.853, 1.727, 2.195, 0.652);
++	dots(s, 2.82, 1.539, 0.053, 0.0875, DOT2);
++	text(s, 'Next Project', { x: 0.997, y: 1.868, w: 1.895, h: 0.397, fontFace: TITLE_FONT, fontSize: 21, bold: true, color: CARD, lineSpacingMultiple: 0.9 });
++
++	text(s, DESC_HERE, { x: 0.755, y: 3.231, w: 1.878, h: 0.53, fontFace: TITLE_FONT, fontSize: 14 });
++	text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt', { x: 0.755, y: 3.787, w: 1.878, h: 0.844, lineSpacingMultiple: 1.3 });
++
++	[
++		{ y: 1.547, ty: 1.734, py: 2.256, label: 'Project 01' },
++		{ y: 2.732, ty: 2.914, py: 3.441, label: 'Project 02' },
++		{ y: 3.904, ty: 4.094, py: 4.633, label: 'Project 03' },
++	].forEach(r => {
++		card(s, 4.212, r.y, 4.869, 0.874, 0.12994);
++		text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna', { x: 4.412, y: r.ty, w: 4.256, h: 0.451, lineSpacingMultiple: 1.3 });
++		text(s, r.label, {
++			x: 7.523, y: r.py, w: 1.691, h: 0.32, align: 'center', valign: 'middle', fontSize: 14, color: CARD,
++			shape: 'roundRect', rectRadius: rad(0.20831, 1.691, 0.32), fill: { color: LIME },
++		});
++	});
++}
++
++/* 16 - next project plan, numbered cards ----------------------------------- */
++function slide16(s) {
++	s.background = { color: DARK };
++	[
++		{ x: 1.06, y: 1.091, tx: 1.195, lx: 1.181, dots: 3.697, badge: [2.267, 0.669, '1'] },
++		{ x: 2.933, y: 2.35, tx: 3.069, lx: 3.055, dots: 5.571, badge: [4.188, 1.994, '2'] },
++		{ x: 1.113, y: 3.608, tx: 1.249, lx: 1.235, dots: 3.751, badge: [2.321, 3.188, '3'] },
++	].forEach(c => {
++		card(s, c.x, c.y, 3.007, 1.119, 0.09553);
++		panel(s, c.x + 0.111, c.y + 0.231, 2.793, 0.795, 0.07698);
++		dots(s, c.dots, c.y + 0.086, 0.053, 0.107, DOT);
++		text(s, DESC_HERE, { x: c.tx, y: c.y + 0.259, w: 2.75, h: 0.303, fontFace: TITLE_FONT, fontSize: 14, bold: true, color: CARD });
++		text(s, LOREM_LONG, { x: c.lx, y: c.y + 0.507, w: 2.764, h: 0.419, fontSize: 8, color: CARD, lineSpacingMultiple: 1.3 });
++		const [bx, by, n] = c.badge;
++		text(s, n, {
++			x: bx, y: by, w: 0.512, h: 0.492, align: 'center', valign: 'middle', fontFace: TITLE_FONT, fontSize: 27, color: CARD,
++			shape: 'roundRect', rectRadius: rad(0.1617, 0.512, 0.492), fill: { color: LIME },
++		});
++	});
++	// elbows joining card 1 to 2 and card 2 to 3
++	s.addShape('bentConnector2', { x: 4.066, y: 1.65, w: 0.378, h: 0.344, line: WIRE });
++	s.addShape('bentConnector2', { x: 2.577, y: 2.909, w: 0.356, h: 0.279, line: WIRE, flipH: true });
++
++	title(s, NEXT_PLAN, 5.274, 0.683, 3.834, 1.08);
++	text(s, DESC_HERE, { x: 6.703, y: 2.621, w: 2.28, h: 0.53, align: 'right', fontFace: TITLE_FONT, fontSize: 14 });
++	text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt', { x: 6.703, y: 3.122, w: 2.28, h: 0.647, align: 'right', lineSpacingMultiple: 1.3 });
++	calendarBullet(s, 8.323, 2.016);
++}
++
++/* ==================================================================== main */
++const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++	slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16];
++
++function main() {
++	const pres = new PptxGenJS();
++	pres.defineLayout({ name: 'DECK', width: 10, height: 5.625 });
++	pres.layout = 'DECK';
++
++	BUILDERS.forEach((build, i) => {
++		const s = pres.addSlide();
++		s.background = { color: DARK };
++		if (i > 0) s.slideNumber = Object.assign({}, PAGE_NUM);
++		build(s);
++	});
++
++	return pres.writeFile({ fileName: path.join(__dirname, '1109f5a6-e266-4df8-b2b8-4baee8c17314_grok_final.pptx') });
++}
++
++main().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });

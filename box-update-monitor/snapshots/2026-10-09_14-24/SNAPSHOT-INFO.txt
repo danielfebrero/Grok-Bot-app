@@ -1,0 +1,9 @@
+snapshot	2026-10-09_14-24
+created	2026-10-09 14:24:32 CEST
+label	auto: changement détecté (sha:/etc/sand-box-image-sha, sha:/exec-daemon/agent-sdk/canvas-sdk-version, sha:/exec-daemon/index.js, sha:/exec-daemon/package.json, sha:/opt/sand/sand-host/host-main.cjs)
+files	13596
+text_copies	3265
+big_text_gz	4
+unreadable	0
+bytes_hashed	1694316518
+duration_s	5.3

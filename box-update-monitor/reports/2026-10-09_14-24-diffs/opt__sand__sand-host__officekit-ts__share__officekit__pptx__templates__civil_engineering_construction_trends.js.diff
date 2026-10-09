@@ -1,0 +1,540 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/civil_engineering_construction_trends.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/civil_engineering_construction_trends.js
+@@ -0,0 +1,537 @@
++/**
++ * "The Future Of Engineering Construction" — 20 slide deck, 13.333in x 7.5in.
++ *
++ * Every shape below is a plain pptxgenjs call. Raster photos / device mockups /
++ * icons from the original deck are re-drawn as programmatic placeholders.
++ *
++ *   node 0066cbee-fb96-473a-ae58-feaaff1f5d71_grok_final.js
++ */
++
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ theme */
++
++const NAVY = '292A3C';        // accent1
++const ORANGE = 'FC9F1F';      // accent2
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const SLATE = '535579';       // navy @ lum 75%
++const NAVY_DEEP = '1F202D';   // navy @ lum 75% (darker variant)
++const NAVY_SOFT = '3A3B54';   // navy @ lum 90%
++const SAND = 'FDC579';        // orange @ lum 60% / off 40%
++const SILVER = 'E8E8E8';      // lt2
++const GREY75 = '404040';      // black @ lum 75%
++const GREY65 = '595959';      // black @ lum 65%
++const PHOTO_BG = 'CECECE';    // stand-in colour for the deck's photo placeholders
++const PHOTO_LABEL = 'EFEFEF';
++
++const HEAD = 'Roboto';        // major latin font
++const BODY = 'Open Sans';     // minor latin font
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++let SH; // pptx.ShapeType, assigned in build()
++
++/* ---------------------------------------------------------------- helpers */
++
++/** Flat colour rectangle. `transparency` is 0-100 (%). */
++function tile(s, x, y, w, h, color, transparency) {
++  const fill = { color: color };
++  if (transparency) fill.transparency = transparency;
++  s.addShape(SH.rect, { x: x, y: y, w: w, h: h, fill: fill, line: { type: 'none' } });
++}
++
++/** Generic text box. o = { size, font, color, bold, align, line, valign } */
++function txt(s, text, x, y, w, h, o) {
++  o = o || {};
++  s.addText(text, {
++    x: x, y: y, w: w, h: h,
++    fontSize: o.size || 18,
++    fontFace: o.font || BODY,
++    color: o.color || BLACK,
++    bold: !!o.bold,
++    align: o.align || 'left',
++    valign: o.valign || 'top',
++    lineSpacingMultiple: o.line,
++    wrap: o.wrap !== false,
++    isTextBox: true
++  });
++}
++
++/** 40pt bold Roboto headline. */
++function title(s, text, x, y, w, h) {
++  txt(s, text, x, y, w, h, { size: 40, font: HEAD, bold: true });
++}
++
++/** 18pt bold orange sub-headline. */
++function kicker(s, text, x, y, w, h) {
++  txt(s, text, x, y, w, h, { size: 18, font: HEAD, color: ORANGE, bold: true });
++}
++
++/** 10.5pt Open Sans body copy at 1.5 line spacing. */
++function para(s, text, x, y, w, h, o) {
++  o = o || {};
++  txt(s, text, x, y, w, h, {
++    size: o.size || 10.5, font: BODY, color: o.color || BLACK,
++    align: o.align, line: 1.5
++  });
++}
++
++/** Placeholder standing in for a photograph in the original deck. */
++function photo(s, x, y, w, h) {
++  tile(s, x, y, w, h, PHOTO_BG);
++  s.addText('[image]', {
++    x: x, y: y + h / 2 - 0.22, w: w, h: 0.44,
++    fontSize: Math.max(9, Math.min(16, w * 2.6)),
++    fontFace: BODY, color: PHOTO_LABEL, align: 'center', valign: 'middle'
++  });
++}
++
++/** Placeholder standing in for a small pictogram / icon graphic. */
++function iconMark(s, x, y, size, color) {
++  s.addShape(SH.roundRect, {
++    x: x + size * 0.1, y: y + size * 0.1, w: size * 0.8, h: size * 0.8,
++    rectRadius: size * 0.12,
++    fill: { type: 'none' }, line: { color: color || WHITE, width: Math.max(1, size * 2.4) }
++  });
++}
++
++/**
++ * Custom geometry from the original freeform shapes.
++ * `segs` entries: ['M',x,y] moveTo | [x,y] lineTo | [x1,y1,x2,y2,x,y] cubic | 'Z' close.
++ * Coordinates live in the path view box (vw x vh) and are mapped to the shape box.
++ */
++function freeform(s, x, y, w, h, vw, vh, segs, color) {
++  const fx = (v) => (v / vw) * w;
++  const fy = (v) => (v / vh) * h;
++  const pts = segs.map((g) => {
++    if (g === 'Z') return { close: true };
++    if (g[0] === 'M') return { x: fx(g[1]), y: fy(g[2]), moveTo: true };
++    if (g.length === 6) {
++      return { x: fx(g[4]), y: fy(g[5]),
++        curve: { type: 'cubic', x1: fx(g[0]), y1: fy(g[1]), x2: fx(g[2]), y2: fy(g[3]) } };
++    }
++    return { x: fx(g[0]), y: fy(g[1]) };
++  });
++  s.addShape(SH.custGeom, { x: x, y: y, w: w, h: h, points: pts,
++    fill: { color: color }, line: { type: 'none' } });
++}
++
++/** Four bars forming a device bezel around a (transparent) screen opening. */
++function bezel(s, ox, oy, ow, oh, ix, iy, iw, ih, color, radius) {
++  s.addShape(SH.roundRect, { x: ox, y: oy, w: ow, h: oh, rectRadius: radius || 0,
++    fill: { color: color }, line: { type: 'none' } });
++  photo(s, ix, iy, iw, ih);
++}
++
++/** Slide 12: two stacked smartphones, front one showing the image placeholder. */
++function phoneMock(s) {
++  tile(s, 3.61, 0.90, 1.35, 6.60, '15161C');           // phone behind
++  bezel(s, 4.29, 0.35, 3.97, 7.15, 4.46, 0.62, 3.56, 6.88, '111318', 0.45);
++  tile(s, 5.60, 0.42, 1.35, 0.22, '111318');           // front camera notch
++}
++
++/** Slide 13: desktop monitor on a stand. */
++function monitorMock(s) {
++  bezel(s, 6.79, 1.15, 6.54, 4.76, 7.07, 1.43, 6.26, 3.60, '222429', 0.05);
++  tile(s, 9.60, 5.85, 1.38, 0.80, '2C2E33');           // neck
++  tile(s, 9.30, 6.58, 2.00, 0.30, '35373D');           // foot
++}
++
++/** Slide 14: tablet held portrait. */
++function tabletMock(s) {
++  bezel(s, 2.28, 0.72, 4.58, 6.36, 2.53, 1.14, 4.13, 5.53, '111318', 0.18);
++  s.addShape(SH.ellipse, { x: 4.44, y: 6.72, w: 0.26, h: 0.26,
++    fill: { type: 'none' }, line: { color: '3A3C42', width: 1 } });
++}
++
++/** Slide 15: open laptop drawn in perspective from flat polygons. */
++function laptopMock(s) {
++  const poly = (pts, color) => {
++    const x0 = Math.min.apply(null, pts.map((p) => p[0]));
++    const y0 = Math.min.apply(null, pts.map((p) => p[1]));
++    s.addShape(SH.custGeom, {
++      x: x0, y: y0,
++      w: Math.max.apply(null, pts.map((p) => p[0])) - x0,
++      h: Math.max.apply(null, pts.map((p) => p[1])) - y0,
++      points: pts.map((p, i) => ({ x: p[0] - x0, y: p[1] - y0, moveTo: i === 0 }))
++        .concat([{ close: true }]),
++      fill: { color: color }, line: { type: 'none' }
++    });
++  };
++  // base, keyboard and trackpad are rhombi in the same perspective as the lid
++  quad([[5.73, 4.60], [7.93, 3.44], [11.25, 5.08], [9.17, 6.82]], 'E4E5E7');   // base
++  quad([[6.99, 4.26], [8.10, 3.68], [10.99, 5.54], [9.89, 6.12]], '7D7F84');   // keyboard
++  quad([[6.98, 5.15], [7.69, 4.78], [9.13, 5.71], [8.43, 6.08]], 'D9DADC');    // trackpad
++  quad([[8.94, 0.97], [12.53, 2.10], [11.20, 5.22], [7.61, 4.09]], '17181C');  // lid
++  quad([[9.05, 1.20], [12.31, 2.22], [11.09, 5.02], [7.83, 3.99]], PHOTO_BG);  // screen
++  s.addText('[image]', { x: 8.95, y: 2.90, w: 2.20, h: 0.4, fontSize: 12,
++    fontFace: BODY, color: PHOTO_LABEL, align: 'center', valign: 'middle' });
++}
++
++/* ----------------------------------------------------------- slide builders */
++
++function slide01(s) {
++  tile(s, 0, 0, 4.329, 2.565, ORANGE);
++  photo(s, 0.839, 0.784, 5.827, 5.932);
++  title(s, 'The Future Of Engineering Construction', 8.041, 1.207, 3.861, 2.121);
++  kicker(s, 'The Trends Civil Engineering', 8.041, 3.452, 3.716, 0.404);
++  para(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicaboquia voluptas sit aspernatur aut odit aut fugit', 8.076, 4.035, 4.505, 1.398);
++  tile(s, 8.147, 5.749, 2.211, 0.543, ORANGE);
++  txt(s, 'Start presentation', 8.324, 5.85, 1.858, 0.342, { size: 14, font: HEAD, color: WHITE, bold: true, align: 'center' });
++  tile(s, 12.494, 1.759, 0.839, 0.876, NAVY);
++  iconMark(s, 12.694, 1.966, 0.462);
++  txt(s, 'reallygreatsite.com', 11.648, 7.055, 1.508, 0.278, { size: 10.5, font: HEAD, align: 'right' });
++}
++
++function slide02(s) {
++  photo(s, 5.807, 0, 7.527, 4.75);
++  tile(s, 6.417, 3.75, 1.822, 2.386, ORANGE, 20);
++  tile(s, 12.295, 5.92, 1.049, 1.08, NAVY);
++  para(s, 'eveniet ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente', 8.732, 5.92, 3.184, 0.868);
++  title(s, 'Drones For Surveying Inspection', 1.176, 1.22, 3.153, 2.121);
++  kicker(s, 'Construction Sites', 1.176, 3.485, 2.687, 0.404);
++  para(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo', 1.176, 3.98, 3.153, 1.663);
++  tile(s, 1.264, 5.968, 1.244, 0.312, ORANGE);
++  txt(s, 'Learn Detail', 1.41, 6.016, 0.953, 0.216, { size: 8, font: HEAD, color: WHITE, align: 'center' });
++  txt(s, '39+', 6.607, 4.253, 1.277, 0.774, { size: 40, font: HEAD, color: WHITE, bold: true });
++  para(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem', 6.584, 4.948, 1.487, 0.685, { size: 8, color: WHITE });
++}
++
++function slide03(s) {
++  photo(s, 3.066, 0.818, 4.456, 5.864);
++  tile(s, 6.667, 1.489, 1.492, 1.239, ORANGE, 20);
++  tile(s, -0.011, 4.17, 2.441, 1.705, NAVY);
++  txt(s, '+372', 0.716, 3.16, 1.587, 0.774, { size: 40, font: HEAD, color: ORANGE, bold: true, align: 'right' });
++  para(s, 'velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad', 9.213, 1.674, 3.446, 0.868);
++  iconMark(s, 7.08, 1.775, 0.667);
++  title(s, 'Project Planning Scheduling', 8.445, 4.118, 4.456, 1.447);
++  kicker(s, 'The Role of Geotechnical ', 8.445, 5.741, 3.562, 0.404);
++  para(s, 'PLACEHOLDER', 0.295, 4.644, 2.008, 0.758, { size: 9, color: WHITE, align: 'right' });
++}
++
++function slide04(s) {
++  photo(s, 5.955, 1.08, 5.261, 6.42);
++  tile(s, 10.155, 5.045, 2.402, 1.455, ORANGE, 5);
++  title(s, 'Health And Construction Sites', 1.094, 1.176, 3.611, 2.121);
++  para(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, ', 1.094, 3.41, 3.611, 0.868);
++  [[4.654, ORANGE], [5.7, NAVY]].forEach(function (row, i) {
++    tile(s, 1.162, row[0], 0.624, 0.625, row[1]);
++    iconMark(s, 1.162 + 0.1, row[0] + 0.11, 0.4);
++    para(s, 'PLACEHOLDER', 2.254, row[0] + 0.011, 2.621, 0.603);
++  });
++  para(s, 'PLACEHOLDER', 10.33, 5.357, 2.051, 0.831, { size: 10, color: WHITE });
++}
++
++function slide05(s) {
++  photo(s, 7.197, 4.273, 6.136, 3.227);
++  photo(s, 0, 1.023, 7.197, 3.227);
++  tile(s, 4.904, 4.974, 3.925, 1.825, ORANGE, 8);
++  para(s, 'laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicaboquia voluptas', 0.939, 5.32, 3.232, 1.133);
++  tile(s, 2.545, -0.059, 1.625, 1.672, NAVY);
++  iconMark(s, 2.977, 0.397, 0.761);
++  title(s, 'Use of Blockchain in Construction Contracts', 8.085, 1.311, 4.779, 2.121);
++  txt(s, 'Construction Projects', 5.29, 5.267, 2.474, 0.37, { size: 16, font: HEAD, color: WHITE, bold: true });
++  para(s, 'PLACEHOLDER', 5.29, 5.638, 3.153, 0.868, { color: WHITE });
++}
++
++function slide06(s) {
++  photo(s, 6.667, 1.097, 6.667, 5.58);
++  tile(s, 10.233, -0.013, 1.625, 1.672, ORANGE, 8);
++  iconMark(s, 10.572, 0.35, 0.946);
++  tile(s, -0.013, 5.862, 0.968, 0.997, NAVY);
++  title(s, 'Modular Construction The Future', 1.728, 1.613, 3.782, 2.121);
++  para(s, 'take a trivial example, which of us ever undertakes laborious physical exercise, except to obtain some advantage from it? But who has any right to find fault with a man who chooses to enjoy a pleasure that has produces no resultant pleasure "', 1.728, 3.84, 3.992, 1.398);
++  tile(s, 1.779, 5.575, 1.244, 0.312, ORANGE);
++  txt(s, 'Learn Detail', 1.925, 5.624, 0.953, 0.216, { size: 8, font: HEAD, color: WHITE, align: 'center' });
++}
++
++function slide07(s) {
++  photo(s, 2.384, 0, 4.932, 7.5);
++  title(s, 'Green Building Certifications Explained', 8.483, 1.316, 4.002, 2.121);
++  para(s, 'how to pursue pleasure rationally encounter consequences extremely painful. Nor again is there anyone who loves or pursues or desires to obtain pain of itself, because it is pain, but because occasionally circumstances', 8.483, 3.639, 4.264, 1.133);
++  // three icon chips
++  [[8.559, ORANGE, 8], [9.686, NAVY, 0], [10.825, ORANGE, 8]].forEach(function (chip) {
++    tile(s, chip[0], 5.237, 0.92, 0.947, chip[1], chip[2]);
++    iconMark(s, chip[0] + 0.2, 5.45, 0.521);
++  });
++  // two stacked cards
++  [[2.138, ORANGE, 'Green Building', 2.388, 2.707],
++   [3.941, NAVY, 'Construction', 4.19, 4.51]].forEach(function (card) {
++    tile(s, 0.962, card[0], 3.013, 1.421, card[1], 8);
++    txt(s, card[2], 1.251, card[3], 1.992, 0.37, { size: 16, font: HEAD, color: WHITE, bold: true });
++    para(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem, ', 1.251, card[4], 2.435, 0.603, { color: WHITE });
++  });
++}
++
++function slide08(s) {
++  photo(s, 6.641, 0.897, 4.131, 5.707);
++  tile(s, 10.177, 1.61, 1.19, 1.189, ORANGE, 8);
++  iconMark(s, 10.424, 1.856, 0.696);
++  para(s, 'laudantium, totam rem aperiam que ipsa illo inventore ', 11.278, 4.83, 1.797, 0.868);
++  tile(s, 0, 5.215, 5.759, 2.288, NAVY);
++  title(s, 'Highway Design Traffic Engineering', 0.922, 1.144, 3.997, 2.121);
++  para(s, 'that produces no resultant pleasure "At vero eos et et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores', 0.922, 3.479, 4.291, 0.868);
++  txt(s, 'The Retrofitting Buildings', 0.881, 5.711, 3.022, 0.37, { size: 16, font: HEAD, color: WHITE, bold: true });
++  para(s, 'laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit', 0.922, 6.177, 3.956, 0.831, { size: 10, color: WHITE });
++}
++
++function slide09(s) {
++  photo(s, 0, 0, 7.481, 5.329);
++  tile(s, 1.152, 4.405, 1.958, 2.406, ORANGE, 20);
++  txt(s, '860+', 1.364, 5.221, 1.534, 0.774, { size: 40, font: HEAD, color: WHITE, bold: true });
++  para(s, 'take a trivial example, which of us ever physical exercise, except to obtain some advantage from it? But who has any right to find fault', 3.873, 5.741, 3.481, 0.868);
++  title(s, "The Big Dig Boston's Overhaul", 8.798, 1.393, 3.351, 2.121);
++  kicker(s, 'Infrastructure Overhaul', 8.798, 3.561, 3.199, 0.404);
++  para(s, 'the master-builder of human happiness one rejects, dislikes, or avoids pleasure itself, because  is pleasure, but because those who do not know how to pursue pleasure rationally encounter consequences', 8.798, 4.088, 3.949, 1.133);
++  txt(s, '+7650', 8.84, 5.788, 1.958, 0.774, { size: 40, font: HEAD, bold: true });
++  tile(s, 12.378, 5.677, 0.968, 0.997, NAVY);
++}
++
++function slide10(s) {
++  photo(s, 3.177, 0, 10.156, 3.75);
++  tile(s, 1.051, 2.366, 3.975, 4.073, ORANGE);
++  txt(s, 'Chuo Shinkansen', 1.561, 3.019, 2.738, 0.438, { size: 20, font: HEAD, color: WHITE, bold: true });
++  para(s, 'take a trivial example, which of us ever undertakes laborious physical exercise, except to obtain some advantage from it? But who has any right to find fault with a man who chooses to enjoy a pleasure that has no annoying consequences, or one who avoids a pain that produces no', 1.561, 3.591, 2.953, 2.193, { color: WHITE });
++  title(s, 'Construction In Extreme Environments Arctic Desert Space', 6.282, 4.402, 6.313, 2.121);
++  tile(s, 11.759, 6.451, 1.089, 1.062, NAVY);
++  iconMark(s, 12.019, 6.684, 0.57);
++}
++
++function slide11(s) {
++  txt(s, 'Meet Our Best Team', 1.896, 0.544, 9.542, 0.841, { size: 44, font: HEAD, bold: true, align: 'center' });
++  const team = [
++    { x: 0.656, name: 'Samira Hadid', nx: 1.394, nw: 2.296, cx: 1.613 },
++    { x: 4.78, name: 'Chiaki Sato', nx: 5.592, nw: 2.149, cx: 5.738 },
++    { x: 8.905, name: 'Lars Peeters', nx: 9.439, nw: 2.703, cx: 9.862 }
++  ];
++  team.forEach(function (m) {
++    photo(s, m.x, 2.05, 3.772, 3.798);
++    txt(s, m.name, m.nx, 6.151, m.nw, 0.438, { size: 20, font: HEAD, bold: true, align: 'center' });
++    para(s, 'voluptate velit esse', m.cx, 6.551, 1.858, 0.37, { size: 12, align: 'center' });
++  });
++  tile(s, 12.143, -0.013, 1.203, 0.557, NAVY);
++  tile(s, 0, 6.969, 1.203, 0.557, ORANGE);
++}
++
++function slide12(s) {
++  phoneMock(s);
++  s.addShape(SH.line, { x: 0.102, y: 2.928, w: 2.392, h: 0, line: { color: NAVY, width: 1.5, transparency: 66 } });
++  s.addShape(SH.line, { x: 0, y: 4.565, w: 2.392, h: 0, line: { color: NAVY, width: 1.5, transparency: 66 } });
++  [['+6600', 1.46, 2.188], ['+4250', 3.036, 3.81], ['+3760', 4.738, 5.509]].forEach(function (st) {
++    txt(s, st[0], 0.536, st[1], 1.958, 0.774, { size: 40, font: HEAD });
++    para(s, 'vero eos et et iusto odio dignissimos ducimus qui blanditiis', 0.545, st[2], 2.78, 0.531, { size: 9 });
++  });
++  title(s, 'Challenges Engineering Projects', 9.259, 1.3, 3.522, 2.121);
++  kicker(s, 'Construction Industry', 9.259, 3.607, 2.832, 0.404);
++  para(s, 'how to pursue pleasure rationally encounter consequences extremely painful. Nor again is there anyone who loves or pursues or desires to obtain pain of itself, because it is pain, but because occasionally', 9.259, 4.143, 3.362, 1.398);
++  tile(s, 9.347, 5.888, 1.244, 0.312, ORANGE);
++  txt(s, 'Learn Detail', 9.493, 5.937, 0.953, 0.216, { size: 8, font: HEAD, color: WHITE, align: 'center' });
++}
++
++function slide13(s) {
++  monitorMock(s);
++  tile(s, 7.805, 0, 1.797, 2.051, ORANGE, 16);
++  iconMark(s, 8.204, 0.525, 1.0);
++  title(s, 'The Future Engineer Skills For 2030', 1.184, 1.535, 4.095, 2.121);
++  para(s, 'take a trivial example, which of us ever undertakes laborious physical exercise, except to obtain some advantage from it? But who has any right to find fault with a man who chooses to enjoy a pleasure that has produces no resultant', 1.184, 3.771, 4.348, 1.133);
++  tile(s, 1.247, 5.34, 0.624, 0.625, NAVY);
++  iconMark(s, 1.347, 5.45, 0.4);
++  para(s, 'PLACEHOLDER', 2.339, 5.351, 3.193, 0.603);
++}
++
++function slide14(s) {
++  tile(s, 0, 0, 4.582, 2.975, NAVY);
++  tabletMock(s);
++  para(s, 'PLACEHOLDER', 0.369, 1.292, 1.624, 1.133, { color: WHITE });
++  title(s, 'The Impact of AI Engineering Jobs', 8.236, 1.216, 3.93, 2.121);
++  kicker(s, 'The Construction Industry', 8.236, 3.502, 3.347, 0.404);
++  para(s, 'fault with a man who chooses to enjoy a pleasure that has no annoying consequences, or one who avoids a pain that produces no resultant pleasure "At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque', 8.236, 4.071, 4.296, 1.398);
++  tile(s, 8.299, 5.972, 1.244, 0.312, ORANGE);
++  txt(s, 'Learn Detail', 8.445, 6.021, 0.953, 0.216, { size: 8, font: HEAD, color: WHITE, align: 'center' });
++}
++
++function slide15(s) {
++  laptopMock(s);
++  tile(s, 6.144, -0.013, 1.523, 1.489, NAVY);
++  iconMark(s, 6.52, 0.346, 0.771);
++  title(s, 'The Impact of AI on Engineering Jobs', 0.901, 1.35, 4.801, 2.121);
++  kicker(s, 'Professional Responsibility', 0.966, 3.643, 3.859, 0.404);
++  para(s, 'voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita', 0.966, 4.263, 3.998, 1.398);
++  tile(s, 1.042, 6.091, 1.244, 0.312, ORANGE);
++  txt(s, 'Learn Detail', 1.188, 6.14, 0.953, 0.216, { size: 8, font: HEAD, color: WHITE, align: 'center' });
++  para(s, 'who loves pursues  desires to obtain pain of itself, because it is pain', 10.858, 6.091, 2.066, 0.868);
++}
++
++/* Infographic slides ------------------------------------------------------ */
++
++function infographicTitle(s, text, x, y, w, align) {
++  txt(s, text, x, y, w, 0.653, { size: 40, font: BODY, align: align, line: 0.9 });
++}
++
++/** "Title Here" + paragraph block used on slides 16 and 17. */
++function titleBlock(s, tx, ty, px, py, align) {
++  txt(s, 'Title Here', tx, ty, 2.307, 0.552, { size: 20, font: HEAD, align: align, line: 1.5 });
++  txt(s, 'In voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident',
++    px, py, 3.725, 0.978, { size: 12, color: GREY75, align: align, line: 1.5 });
++}
++
++function slide16(s) {
++  // house body + left arrow + right arrow, straight from the original freeforms
++  freeform(s, 5.652, 5.493, 2.026, 1.012, 21600, 21600, [
++    ['M', 14688, 21600], [6880, 21600], [3072, 21600, 0, 15447, 0, 7820], [0, 0],
++    [21600, 0], [21600, 7820], [21600, 15447, 18496, 21600, 14688, 21600], 'Z'], SLATE);
++  freeform(s, 3.521, 1.681, 4.498, 2.626, 21464, 21575, [
++    ['M', 21356, 7200], [15154, 74], [15068, -25, 14968, -25, 14882, 74], [8680, 7200],
++    [8480, 7422, 8580, 7989, 8823, 7989], [9955, 7989], [10098, 7989, 10198, 8186, 10198, 8408],
++    [10198, 12156], [3753, 12156], [3753, 10923], [3753, 10652, 3681, 10380, 3538, 10257],
++    [3366, 10085, 3151, 10134, 3008, 10380], [129, 15337], [-43, 15633, -43, 16101, 129, 16397],
++    [3008, 21353], [3094, 21501, 3194, 21575, 3309, 21575], [3380, 21575, 3452, 21550, 3524, 21476],
++    [3667, 21353, 3738, 21082, 3738, 20811], [3738, 19578], [9826, 19578], [9826, 18616],
++    [3610, 18616], [3366, 18616, 3180, 18961, 3180, 19356], [3180, 20293], [616, 15879],
++    [3180, 11465], [3180, 12402], [3180, 12822, 3380, 13142, 3610, 13142], [18019, 13142],
++    [19036, 13142, 19852, 11737, 19852, 9986], [19852, 8408], [19852, 8161, 19967, 7989, 20096, 7989],
++    [21228, 7989], [21457, 7989, 21557, 7446, 21356, 7200], 'Z'], NAVY);
++  freeform(s, 5.652, 3.933, 4.161, 1.936, 21555, 21505, [
++    ['M', 21413, 13100], [18288, 6400], [18194, 6200, 18086, 6100, 17961, 6100],
++    [17883, 6100, 17806, 6133, 17728, 6233], [17572, 6400, 17495, 6767, 17495, 7133],
++    [17495, 8800], [10497, 8800], [10497, 0], [0, 0], [0, 5833],
++    [0, 8200, 886, 10100, 1991, 10100], [17635, 10100], [17899, 10100, 18101, 9633, 18101, 9100],
++    [18101, 7833], [20885, 13800], [18101, 19767], [18101, 18500],
++    [18101, 17933, 17883, 17500, 17635, 17500], [10886, 17500], [10886, 18800], [17495, 18800],
++    [17495, 20467], [17495, 20833, 17572, 21200, 17728, 21367],
++    [17914, 21600, 18148, 21533, 18303, 21200], [21429, 14500],
++    [21600, 14133, 21600, 13500, 21413, 13100], 'Z'], ORANGE);
++  titleBlock(s, 8.651, 2.661, 8.651, 3.145, 'left');
++  titleBlock(s, 2.375, 4.434, 0.957, 4.917, 'right');
++  infographicTitle(s, 'Infographic Slide Design', 0.84, 0.512, 11.653, 'center');
++}
++
++function slide17(s) {
++  // four quadrant petals + four inner petals of the circle diagram
++  const petals = [
++    [6.761, 2.097, 2.119, 2.156, 164, 167, ORANGE, [['M', 164, 167], [163, 122, 145, 82, 115, 52], [86, 22, 45, 2, 0, 0], [0, 167, 0, 167, 0, 167], [164, 167], 'Z']],
++    [4.424, 2.097, 2.195, 2.156, 170, 167, NAVY_DEEP, [['M', 170, 0], [124, 1, 82, 20, 52, 50], [21, 80, 2, 121, 0, 167], [170, 167, 170, 167, 170, 167], [170, 0], 'Z']],
++    [4.424, 4.409, 2.195, 2.156, 170, 167, ORANGE, [['M', 0, 0], [2, 46, 21, 87, 52, 117], [82, 147, 124, 166, 170, 167], [170, 0, 170, 0, 170, 0], [0, 0], 'Z']],
++    [6.761, 4.409, 2.119, 2.156, 164, 167, NAVY, [['M', 0, 167], [45, 164, 86, 145, 115, 115], [145, 85, 163, 44, 164, 0], [0, 0, 0, 0, 0, 0], [0, 167], 'Z']],
++    [6.761, 3.156, 1.097, 1.097, 85, 85, SAND, [['M', 85, 85], [83, 39, 46, 3, 0, 0], [0, 85, 0, 85, 0, 85], [85, 85], 'Z']],
++    [5.508, 3.156, 1.111, 1.097, 86, 85, NAVY, [['M', 86, 0], [40, 3, 3, 39, 0, 85], [86, 85, 86, 85, 86, 85], [86, 0], 'Z']],
++    [5.508, 4.409, 1.111, 1.097, 86, 85, SAND, [['M', 0, 0], [3, 45, 40, 82, 86, 85], [86, 0, 86, 0, 86, 0], [0, 0], 'Z']],
++    [6.761, 4.409, 1.097, 1.097, 85, 85, NAVY_SOFT, [['M', 85, 0], [0, 0, 0, 0, 0, 0], [0, 85, 0, 85, 0, 85], [46, 82, 83, 46, 85, 0], 'Z']]
++  ];
++  petals.forEach(function (p) { freeform(s, p[0], p[1], p[2], p[3], p[4], p[5], p[7], p[6]); });
++  [[5.224, 3.045], [5.255, 5.362], [7.684, 3.045], [7.716, 5.316]].forEach(function (g) {
++    iconMark(s, g[0], g[1], 0.342, SILVER);
++  });
++  titleBlock(s, 1.833, 2.327, 0.415, 2.811, 'right');
++  titleBlock(s, 1.833, 4.978, 0.415, 5.461, 'right');
++  titleBlock(s, 9.193, 2.327, 9.193, 2.811, 'left');
++  titleBlock(s, 9.193, 4.978, 9.193, 5.461, 'left');
++  infographicTitle(s, 'Infographic Slide Design', 0.84, 0.752, 11.653, 'center');
++}
++
++function slide18(s) {
++  // three interlocking rings
++  freeform(s, 8.163, 1.605, 3.002, 3.0, 1219, 1218, [
++    ['M', 609, 0], [273, 0, 0, 273, 0, 609], [0, 916, 227, 1169, 522, 1212],
++    [550, 1216, 580, 1218, 609, 1218], [716, 1218, 816, 1191, 903, 1143],
++    [909, 1139, 916, 1136, 922, 1132], [1035, 1064, 1124, 961, 1174, 838],
++    [1203, 767, 1219, 690, 1219, 609], [1219, 273, 946, 0, 609, 0], 'Z',
++    ['M', 774, 918], [725, 944, 669, 959, 609, 959], [416, 959, 260, 802, 260, 609],
++    [260, 416, 416, 260, 609, 260], [802, 260, 959, 416, 959, 609],
++    [959, 735, 892, 845, 793, 907], [787, 911, 780, 914, 774, 918], 'Z'], NAVY);
++  freeform(s, 6.978, 3.647, 3.002, 3.002, 1219, 1218, [
++    ['M', 609, 0], [273, 0, 0, 273, 0, 609], [0, 946, 273, 1218, 609, 1218],
++    [946, 1218, 1219, 946, 1219, 609], [1219, 273, 946, 0, 609, 0], 'Z',
++    ['M', 609, 959], [416, 959, 260, 802, 260, 609], [260, 416, 416, 260, 609, 260],
++    [802, 260, 959, 416, 959, 609], [959, 802, 802, 959, 609, 959], 'Z'], SLATE);
++  freeform(s, 9.337, 3.668, 3.003, 2.987, 1219, 1212, [
++    ['M', 697, 0], [647, 123, 558, 226, 445, 294], [494, 268, 550, 253, 609, 253],
++    [803, 253, 959, 410, 959, 603], [959, 796, 803, 952, 609, 952],
++    [416, 952, 260, 796, 260, 603], [260, 602, 260, 601, 260, 600], [0, 600, 0, 600, 0, 600],
++    [0, 601, 0, 602, 0, 603], [0, 939, 273, 1212, 609, 1212],
++    [946, 1212, 1219, 939, 1219, 603], [1219, 296, 992, 42, 697, 0], 'Z'], ORANGE);
++  [['01', 2.333, 2.569], ['02', 3.833, 4.029], ['03', 5.305, 5.489]].forEach(function (row) {
++    txt(s, row[0], 0.664, row[1], 1.066, 0.82, { size: 32, font: HEAD, color: GREY75, bold: true, align: 'right', line: 1.5 });
++    txt(s, 'Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus',
++      1.945, row[2], 3.903, 0.972, { size: 12, color: GREY65, line: 1.5 });
++  });
++  iconMark(s, 9.437, 2.895, 0.463, NAVY);
++  iconMark(s, 8.232, 4.915, 0.465, SLATE);
++  iconMark(s, 10.62, 4.933, 0.471, ORANGE);
++  infographicTitle(s, 'Infographic Slide Design', 0.929, 1.192, 6.577, 'left');
++}
++
++function slide19(s) {
++  freeform(s, 4.296, 1.841, 3.365, 1.651, 3673146, 1802130, [
++    ['M', 2587296, 0], [2968683, 0, 3332018, 77294, 3662489, 217071], [3673146, 222205],
++    [3673146, 1662424], [3673146, 1739581, 3610597, 1802130, 3533440, 1802130], [0, 1802130],
++    [42117, 1687057], [461450, 695644, 1443134, 0, 2587296, 0], 'Z'], ORANGE);
++  freeform(s, 7.836, 2.128, 1.361, 3.081, 1485900, 3362675, [
++    ['M', 0, 0], [40303, 19415], [901366, 487172, 1485900, 1399461, 1485900, 2448276],
++    [1485900, 2734317, 1442422, 3010202, 1361715, 3269685], [1327680, 3362675], [139706, 3362675],
++    [62549, 3362675, 0, 3300126, 0, 3222969], [0, 0], 'Z'], SLATE);
++  freeform(s, 4.136, 3.659, 1.229, 2.879, 1341120, 3142631, [
++    ['M', 112237, 0], [1201414, 0], [1278571, 0, 1341120, 62549, 1341120, 139706],
++    [1341120, 3142631], [1217850, 3067742], [483086, 2571346, 0, 1730709, 0, 777241],
++    [0, 562711, 24457, 353893, 70733, 153422], [112237, 0], 'Z'], NAVY);
++  freeform(s, 5.539, 5.377, 3.45, 1.525, 3765499, 1664971, [
++    ['M', 139706, 0], [3765499, 0], [3690693, 160240],
++    [3233133, 1053565, 2303283, 1664971, 1230631, 1664971],
++    [813489, 1664971, 417943, 1572506, 63372, 1406952], [0, 1374981], [0, 139706],
++    [0, 62549, 62549, 0, 139706, 0], 'Z'], ORANGE);
++  [['01', 5.389, 2.428, 0.744], ['02', 4.356, 4.874, 0.844],
++   ['03', 7.18, 5.778, 0.844], ['04', 8.033, 3.272, 0.893]].forEach(function (n) {
++    txt(s, n[0], n[1], n[2], n[3], 0.707,
++      { size: 36, font: HEAD, color: SILVER, bold: true, align: 'center', wrap: false });
++  });
++  iconMark(s, 6.245, 3.729, 0.843, '9A9A9A');
++  txt(s, 'Lorem ipsum dolor sit consectetuer.', 5.703, 4.637, 1.927, 0.505, { size: 12, color: GREY65, align: 'center' });
++  [[1.041, 2.658, 2.984], [1.041, 5.061, 5.386],
++   [9.766, 2.658, 2.984], [9.766, 5.061, 5.386]].forEach(function (col) {
++    txt(s, 'Description', col[0], col[1], 1.357, 0.37, { size: 16, font: HEAD, bold: true });
++    txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit.', col[0], col[2], 2.881, 0.867, { size: 16, color: GREY65, line: 1.5 });
++  });
++  infographicTitle(s, 'Infographic Slide Design', 0.84, 0.613, 11.653, 'center');
++}
++
++function slide20(s) {
++  tile(s, 0, 0, 4.329, 2.565, ORANGE);
++  photo(s, 0.84, 0.785, 5.826, 5.931);
++  txt(s, 'Thank You', 7.776, 1.445, 4.06, 2.699, { size: 96, font: HEAD, bold: true, line: 0.8 });
++  para(s, 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis', 7.841, 4.183, 4.505, 0.868);
++  tile(s, 7.94, 5.511, 2.211, 0.543, ORANGE);
++  txt(s, 'End  presentation', 8.117, 5.612, 1.858, 0.342, { size: 14, font: HEAD, color: WHITE, bold: true, align: 'center' });
++  tile(s, 12.494, 1.759, 0.839, 0.876, NAVY);
++  iconMark(s, 12.694, 1.966, 0.462);
++  txt(s, 'reallygreatsite.com', 11.648, 7.055, 1.508, 0.278, { size: 10.5, font: HEAD, align: 'right' });
++}
++
++/* -------------------------------------------------------------------- main */
++
++const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07,
++  slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15,
++  slide16, slide17, slide18, slide19, slide20];
++
++function build() {
++  const pptx = new PptxGenJS();
++  SH = pptx.ShapeType;
++  pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'DECK';
++  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++  pptx.title = 'The Future Of Engineering Construction';
++
++  SLIDES.forEach(function (builder) {
++    const slide = pptx.addSlide();
++    slide.background = { color: WHITE };
++    builder(slide);
++  });
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '0066cbee-fb96-473a-ae58-feaaff1f5d71_grok_final.pptx')
++  });
++}
++
++build().then(function (f) { console.log('wrote', f); }, function (e) { console.error(e); process.exit(1); });

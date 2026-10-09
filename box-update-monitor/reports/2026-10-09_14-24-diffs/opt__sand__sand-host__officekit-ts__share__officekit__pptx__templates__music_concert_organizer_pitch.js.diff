@@ -1,0 +1,1095 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/music_concert_organizer_pitch.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/music_concert_organizer_pitch.js
+@@ -0,0 +1,1092 @@
++/**
++ * MUSIFEST - Professional Music Concert Organizer Presentation
++ * Standalone pptxgenjs rebuild of the 30-slide reference deck (13.333in x 7.5in).
++ *
++ * The original deck leans heavily on linear/radial gradient fills, which
++ * pptxgenjs does not expose. Every gradient below is therefore rebuilt from
++ * plain shapes: `gradPoly()` slices a polygon into colour bands and `glow()`
++ * stacks translucent ellipses. Photographs are replaced by dark placeholder
++ * shapes, as required.
++ */
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ palette */
++const C = {
++  magenta: 'E92EFB', pink: 'FF2079', purple: '440BD4', navy: '04005E',
++  white: 'FFFFFF', ice: 'F2F2F2', silver: 'E8E8E8',
++  charcoal: '262626', black: '000000',
++  ghost: '151515',      // the oversized "0n" watermark numbers
++  caption: '2E2E2E',    // "| Music Concert Presentation"
++  orb: '181818',        // small dark spheres
++  slot: '1C1C1C'        // image placeholders
++};
++/**
++ * Theme gradients. The deck's three-stop accent1/2/3 fill is declared with
++ * `scaled="1"`, which pushes the magenta stop outside the shape - what you
++ * actually see is a straight pink -> purple ramp, so that is what BRAND is.
++ * The four-stop accent1..4 fill (thin rules, dots, rings) is not scaled and
++ * does show its magenta and navy ends.
++ */
++const BRAND = [[0, C.pink], [1, C.purple]];
++const BRAND4 = [[0, C.magenta], [0.32, C.pink], [0.69, C.purple], [1, C.navy]];
++const DARK = [[0, C.charcoal], [1, C.black]];       // bg2 -> bg1
++const DARK47 = [[0.47, C.charcoal], [1, C.black]];
++const DARK36 = [[0.36, C.charcoal], [1, C.black]];
++const DARK38 = [[0.38, C.charcoal], [1, C.black]];
++const HEAD = 'Montserrat';   // +mj-lt
++const BODY = 'Poppins';      // +mn-lt
++const SW = 13.333, SH = 7.5;
++
++/* --------------------------------------------------------------- primitives */
++const hex = (c) => c.map((v) => ('0' + Math.max(0, Math.min(255, Math.round(v))).toString(16)).slice(-2)).join('').toUpperCase();
++const rgb = (h) => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
++const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
++
++/** colour of a stop list at position t (0..1) */
++function stopAt(stops, t) {
++  if (t <= stops[0][0]) return rgb(stops[0][1]);
++  for (let i = 0; i < stops.length - 1; i++) {
++    if (t <= stops[i + 1][0]) {
++      const [p0, c0] = stops[i], [p1, c1] = stops[i + 1];
++      return mix(rgb(c0), rgb(c1), (t - p0) / (p1 - p0));
++    }
++  }
++  return rgb(stops[stops.length - 1][1]);
++}
++
++/** Sutherland-Hodgman clip of a polygon against the half plane n.p <= d */
++function clipHalf(poly, nx, ny, d) {
++  const out = [];
++  for (let i = 0; i < poly.length; i++) {
++    const a = poly[i], b = poly[(i + 1) % poly.length];
++    const da = nx * a[0] + ny * a[1] - d, db = nx * b[0] + ny * b[1] - d;
++    if (da <= 0) out.push(a);
++    if ((da < 0 && db > 0) || (da > 0 && db < 0)) {
++      const t = da / (da - db);
++      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
++    }
++  }
++  return out;
++}
++
++/** Fill an arbitrary polygon with a linear gradient by slicing it into bands. */
++function gradPoly(s, poly, deg, stops, bands) {
++  bands = bands || 16;
++  const r = (deg * Math.PI) / 180, nx = Math.cos(r), ny = Math.sin(r);
++  let lo = Infinity, hi = -Infinity;
++  poly.forEach((p) => { const v = nx * p[0] + ny * p[1]; lo = Math.min(lo, v); hi = Math.max(hi, v); });
++  for (let k = 0; k < bands; k++) {
++    const t0 = k / bands, t1 = (k + 1) / bands;
++    let q = clipHalf(poly, nx, ny, lo + (hi - lo) * t1 + 0.004);
++    q = clipHalf(q, -nx, -ny, -(lo + (hi - lo) * t0) + 0.004);
++    if (q.length < 3) continue;
++    const xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
++    const x0 = Math.min(...xs), y0 = Math.min(...ys);
++    const w = Math.max(Math.max(...xs) - x0, 0.004), h = Math.max(Math.max(...ys) - y0, 0.004);
++    s.addShape('custGeom', {
++      x: x0, y: y0, w: w, h: h,
++      points: q.map((p) => ({ x: +(p[0] - x0).toFixed(3), y: +(p[1] - y0).toFixed(3) })).concat([{ close: true }]),
++      fill: { color: hex(stopAt(stops, (t0 + t1) / 2)) }, line: { type: 'none' }
++    });
++  }
++}
++
++/** clip a polygon against a convex polygon (used to trim radial bands) */
++function clipPoly(subject, clipper) {
++  let out = subject;
++  for (let i = 0; i < clipper.length && out.length; i++) {
++    const a = clipper[i], b = clipper[(i + 1) % clipper.length];
++    out = clipHalf(out, -(b[1] - a[1]), b[0] - a[0], -(b[1] - a[1]) * a[0] + (b[0] - a[0]) * a[1]);
++  }
++  return out;
++}
++
++/**
++ * Fill a polygon with a radial gradient focused on (fx, fy) - the focus may
++ * lie outside the shape, which is how the deck's "glow from a corner" panels
++ * are built. Drawn outer band first, then progressively smaller discs.
++ */
++function radPoly(s, poly, fx, fy, stops, bands) {
++  let rmax = 0;
++  poly.forEach((p) => { rmax = Math.max(rmax, Math.hypot(p[0] - fx, p[1] - fy)); });
++  bands = bands || Math.max(8, Math.round(rmax * 5));
++  for (let k = bands; k >= 1; k--) {
++    const t = k / bands;
++    const disc = [];
++    for (let i = 39; i >= 0; i--) { const a = (i / 40) * 2 * Math.PI; disc.push([fx + rmax * t * Math.cos(a), fy + rmax * t * Math.sin(a)]); }
++    const q = clipPoly(poly, disc);
++    if (q.length < 3) continue;
++    const xs = q.map((z) => z[0]), ys = q.map((z) => z[1]);
++    const x0 = Math.min(...xs), y0 = Math.min(...ys);
++    const w = Math.max(Math.max(...xs) - x0, 0.004), h = Math.max(Math.max(...ys) - y0, 0.004);
++    s.addShape('custGeom', {
++      x: x0, y: y0, w: w, h: h,
++      points: q.map((z) => ({ x: +(z[0] - x0).toFixed(3), y: +(z[1] - y0).toFixed(3) })).concat([{ close: true }]),
++      fill: { color: hex(stopAt(stops, t - 0.5 / bands)) }, line: { type: 'none' }
++    });
++  }
++}
++
++/* ----------------------------------------------------------- point builders */
++function rectPts(x, y, w, h) { return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]; }
++function ellPts(x, y, w, h, n) {
++  n = n || 44; const a = [];
++  for (let i = 0; i < n; i++) { const t = (i / n) * 2 * Math.PI; a.push([x + w / 2 + (w / 2) * Math.cos(t), y + h / 2 + (h / 2) * Math.sin(t)]); }
++  return a;
++}
++/** rounded rectangle; `corners` picks which of TL,TR,BR,BL are rounded */
++function roundPts(x, y, w, h, r, corners) {
++  corners = corners || [1, 1, 1, 1];
++  const c = [[x + r, y + r, 180, 270], [x + w - r, y + r, 270, 360], [x + w - r, y + h - r, 0, 90], [x + r, y + h - r, 90, 180]];
++  const sq = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
++  const out = [];
++  c.forEach((cc, i) => {
++    if (!corners[i]) { out.push(sq[i]); return; }
++    for (let k = 0; k <= 5; k++) { const t = ((cc[2] + (k / 5) * 90) * Math.PI) / 180; out.push([cc[0] + r * Math.cos(t), cc[1] + r * Math.sin(t)]); }
++  });
++  return out;
++}
++/** flatten a unit-space path ( M / L / C commands ) into a polygon */
++function pathPts(cmds, x, y, w, h, opt) {
++  opt = opt || {};
++  const pts = []; let cur = [0, 0];
++  const P = (u, v) => [x + (opt.flipH ? 1 - u : u) * w, y + (opt.flipV ? 1 - v : v) * h];
++  cmds.forEach((c) => {
++    if (c[0] === 'M' || c[0] === 'L') { cur = P(c[1], c[2]); pts.push(cur); }
++    else {
++      const p0 = cur, p1 = P(c[1], c[2]), p2 = P(c[3], c[4]), p3 = P(c[5], c[6]);
++      for (let i = 1; i <= 10; i++) {
++        const t = i / 10, u = 1 - t;
++        pts.push([u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
++                  u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]]);
++      }
++      cur = p3;
++    }
++  });
++  return opt.rot ? rotatePts(pts, x + w / 2, y + h / 2, opt.rot) : pts;
++}
++function rotatePts(pts, cx, cy, deg) {
++  const r = (deg * Math.PI) / 180, co = Math.cos(r), si = Math.sin(r);
++  return pts.map((p) => [cx + (p[0] - cx) * co - (p[1] - cy) * si, cy + (p[0] - cx) * si + (p[1] - cy) * co]);
++}
++
++/* ------------------------------------------------------- gradient shortcuts */
++const gRect = (s, x, y, w, h, deg, st, b) => gradPoly(s, rectPts(x, y, w, h), deg, st, b);
++const gEll = (s, x, y, w, h, deg, st, b) => gradPoly(s, ellPts(x, y, w, h), deg, st, b);
++const gRound = (s, x, y, w, h, r, deg, st, b, corners) => gradPoly(s, roundPts(x, y, w, h, r, corners), deg, st, b);
++const gPath = (s, cmds, x, y, w, h, deg, st, b, opt) => gradPoly(s, pathPts(cmds, x, y, w, h, opt), deg, st, b);
++
++/* Radial variants. `CORNER` puts the focus on the lower-left corner and `TOP`
++ * high above the shape - the two focus rectangles the deck actually uses. */
++const rRound = (s, x, y, w, h, r, stops, b, corners) => radPoly(s, roundPts(x, y, w, h, r, corners), x, y + h, stops, b);
++const rRoundC = (s, x, y, w, h, r, stops, b, corners) => radPoly(s, roundPts(x, y, w, h, r, corners), x + w / 2, y + h / 2, stops, b);
++const rEllTop = (s, x, y, w, h, stops, b) => radPoly(s, ellPts(x, y, w, h), x + 0.377 * w, y - 0.196 * h, stops, b);
++const rPathTop = (s, cmds, x, y, w, h, stops, b, opt) => radPoly(s, pathPts(cmds, x, y, w, h, opt), x + 0.377 * w, y - 0.196 * h, stops, b);
++const rPathC = (s, cmds, x, y, w, h, stops, b, opt) => radPoly(s, pathPts(cmds, x, y, w, h, opt), x + w / 2, y + h / 2, stops, b);
++
++/** soft radial halo: stacked translucent ellipses (pink core -> purple rim) */
++function glow(s, x, y, d, peak) {
++  const N = 20, a = 1 - Math.pow(1 - (peak || 0.4), 1 / N);
++  for (let k = 0; k < N; k++) {
++    const dd = d * Math.pow(1 - k / N, 0.85);
++    s.addShape('ellipse', {
++      x: x + (d - dd) / 2, y: y + (d - dd) / 2, w: dd, h: dd,
++      fill: { color: hex(mix(rgb(C.purple), rgb(C.pink), k / (N - 1))), transparency: Math.round((1 - a) * 100) },
++      line: { type: 'none' }
++    });
++  }
++}
++
++/* ------------------------------------------------------- shared components */
++/**
++ * Dark vignette shared by every slide (the master paints it with a photo of
++ * exactly this). It is a circular ramp: flat #262626 across the middle third,
++ * falling off to pure black past the slide corners.
++ */
++function backdrop(s) {
++  s.background = { color: C.black };
++  const R = 7.65, PLATEAU = 3.0, N = 38;
++  for (let v = 0; v <= N; v++) {
++    const d = 2 * (R - (v / N) * (R - PLATEAU));
++    s.addShape('ellipse', { x: SW / 2 - d / 2, y: SH / 2 - d / 2, w: d, h: d, fill: { color: hex([v, v, v]) }, line: { type: 'none' } });
++  }
++}
++
++/** page furniture: tiny caption + oversized ghost page number ("01".."030") */
++function header(s, n, side) {
++  const right = side === 'right';
++  s.addText('| Music Concert Presentation', {
++    x: right ? 11.316 : 0.587, y: 0.236, w: 1.802, h: 0.236,
++    fontFace: BODY, fontSize: 8, color: C.caption, valign: 'top', wrap: false
++  });
++  s.addText('0' + n, {
++    x: right ? 10.74 : 0.01, y: 0.094, w: 0.628, h: 0.505, align: right ? 'right' : 'left',
++    fontFace: HEAD, fontSize: 24, bold: true, color: C.ghost, valign: 'top', wrap: false
++  });
++}
++
++/** three overlapping brand dots (the Musifest mark) */
++function dots(s, x, y, d, gap) {
++  d = d || 0.182; gap = gap === undefined ? 0.1445 : gap;
++  for (let i = 0; i < 3; i++) gEll(s, x + i * gap, y, d, d, 45, BRAND4, 6);
++}
++
++/** dots + "Professional Music Concert Organizer" strap line */
++function strap(s, x, y, size) {
++  dots(s, x, y + 0.05);
++  s.addText('Professional Music Concert Organizer', {
++    x: x + 0.462, y: y, w: 3.963, h: 0.286, fontFace: BODY, fontSize: size || 11, color: C.ice, valign: 'top'
++  });
++}
++
++/** white line + brand-gradient line, the standard section title */
++function title(s, white, grad, o) {
++  s.addText([{ text: white, options: { color: C.white } }, { text: grad, options: { color: C.pink } }], {
++    x: o.x, y: o.y, w: o.w, h: o.h || 1.313, align: o.align || 'left',
++    fontFace: HEAD, fontSize: o.size || 36, bold: true, color: C.white, valign: 'top'
++  });
++}
++
++const txt = (s, t, o) => s.addText(t, Object.assign({ fontFace: BODY, fontSize: 11, color: C.silver, valign: 'top' }, o));
++/** grey paragraph copy, 1.5 line spacing like the original body boxes */
++const body = (s, t, o) => txt(s, t, Object.assign({ lineSpacingMultiple: 1.5, color: C.silver }, o));
++
++/**
++ * Thin accent rule. `dir` is the direction the gradient runs:
++ * 'r' right, 'l' left, 'd' down, 'u' up. Four-stop rules (the wide ones under
++ * headings) show magenta->navy; three-stop rules show pink->purple.
++ */
++function bar(s, x, y, w, h, dir, stops) {
++  const deg = { r: 0, l: 180, d: 90, u: 270 }[dir];   // y grows downwards
++  gRect(s, x, y, w, h, deg, stops || BRAND4, 10);
++}
++
++/** small matte sphere */
++const orb = (s, x, y, d, col) => s.addShape('ellipse', { x: x, y: y, w: d, h: d, fill: { color: col || C.orb }, line: { type: 'none' } });
++
++/** brand ring with a dark core - used for every icon bubble */
++function ring(s, x, y, d, glyph) {
++  gEll(s, x, y, d, d, 45, BRAND4, 12);
++  const i = d * 0.082, c = d - 2 * i;
++  gEll(s, x + i, y + i, c, c, 45, DARK47, 8);
++  if (glyph !== false) gRound(s, x + d * 0.37, y + d * 0.375, d * 0.26, d * 0.25, d * 0.05, 45, BRAND, 5);
++}
++
++/** dark disc carrying a pink check mark (bullet badges) */
++function check(s, x, y, d) {
++  orb(s, x, y, d, '141414');
++  const p = [[0.22, 0.52], [0.34, 0.4], [0.44, 0.5], [0.72, 0.22], [0.84, 0.34], [0.44, 0.74]];
++  s.addShape('custGeom', {
++    x: x, y: y, w: d, h: d, points: p.map((q) => ({ x: +(q[0] * d).toFixed(3), y: +(q[1] * d).toFixed(3) })).concat([{ close: true }]),
++    fill: { color: C.pink }, line: { type: 'none' }
++  });
++}
++
++/** dark disc with a small numeral (01 / 02 ...) */
++function numOrb(s, x, y, d, n) {
++  orb(s, x, y, d, '111111');
++  s.addText(n, { x: x, y: y, w: d, h: d, align: 'center', valign: 'middle', fontFace: BODY, fontSize: 12, bold: true, color: C.pink });
++}
++
++/**
++ * Stand-in for one of the deck's picture frames. The reference ships no
++ * photographs - every picture placeholder is empty - so the slot is drawn as a
++ * flat dark panel of the same geometry rather than an embedded raster.
++ */
++function slot(s, kind, x, y, w, h, o) {
++  o = o || {};
++  const opt = { x: x, y: y, w: w, h: h, fill: { color: o.color || C.slot, transparency: o.op === undefined ? 82 : o.op }, line: { type: 'none' } };
++  if (kind === 'roundRect') opt.rectRadius = o.r || 0.25;
++  if (kind === 'custGeom') opt.points = o.points;
++  s.addShape(kind, opt);
++}
++
++/** chevron arrow inside a dark disc (carousel controls) */
++function navDot(s, x, y, d, dir) {
++  orb(s, x, y, d, '121212');
++  s.addShape('chevron', { x: x + d * 0.36, y: y + d * 0.3, w: d * 0.24, h: d * 0.38, rotate: dir === 'left' ? 180 : 0, fill: { color: C.pink }, line: { type: 'none' } });
++}
++
++/** big opening quote glyph */
++function quoteMark(s, x, y, w, h, col) {
++  [0, w * 0.55].forEach((dx) => {
++    s.addShape('custGeom', {
++      x: x + dx, y: y, w: w * 0.45, h: h,
++      points: [{ x: 0, y: 0 }, { x: w * 0.45, y: 0 }, { x: w * 0.2, y: h }, { x: 0, y: h }, { close: true }],
++      fill: { color: col || C.white }, line: { type: 'none' }
++    });
++  });
++}
++
++/* --------------------------------------------------------- reusable outlines
++ * Unit-space paths lifted from the deck's freeform shapes. M/L take (x,y);
++ * C takes the two control points followed by the end point.               */
++/** the "petal": flat left edge, bulging semicircular right edge */
++const PETAL = [['M', 0, 0], ['L', 0.76, 0], ['L', 0.766, 0.005],
++  ['C', 0.911, 0.132, 1, 0.307, 1, 0.5], ['C', 1, 0.693, 0.911, 0.868, 0.766, 0.995],
++  ['L', 0.76, 1], ['L', 0, 1]];
++/** wide dome used on the pricing slide header band */
++const DOME = [['M', 0, 0], ['L', 1, 0], ['L', 1, 0.406], ['L', 0.995, 0.42],
++  ['C', 0.861, 0.782, 0.688, 1, 0.5, 1], ['C', 0.312, 1, 0.14, 0.782, 0.005, 0.42], ['L', 0, 0.406]];
++/** capsule with only the left end rounded (break-time caption plate) */
++const CAPSULE_L = [['M', 1, 0], ['L', 0.091, 0], ['C', 0.047, 0, 0.01, 0.171, 0.002, 0.399],
++  ['L', 0, 0.5], ['L', 0.002, 0.601], ['C', 0.01, 0.829, 0.047, 1, 0.091, 1], ['L', 1, 1]];
++/** vertical lens (two arcs) - the album-slide backdrop panels */
++const LENS = [['M', 0.111, 0], ['L', 0.889, 0], ['L', 0.893, 0.007],
++  ['C', 0.96, 0.133, 1, 0.293, 1, 0.466], ['C', 1, 0.668, 0.946, 0.851, 0.858, 0.985],
++  ['L', 0.847, 1], ['L', 0.153, 1], ['L', 0.142, 0.985],
++  ['C', 0.054, 0.851, 0, 0.668, 0, 0.466], ['C', 0, 0.293, 0.04, 0.133, 0.107, 0.007]];
++
++/* ============================================================ SLIDE BUILDERS */
++const slides = [];
++const slide = (fn) => slides.push(fn);
++
++/* 01 - cover */
++slide((s) => {
++  backdrop(s);
++  gPath(s, PETAL, 0, 0, 6.562, 7.5, 45, BRAND, 18);
++  rPathTop(s, PETAL, 0, 0, 6.417, 7.5, DARK38);
++  glow(s, 5.483, -2.588, 6.948, 0.25);
++  [[10.702, 5.893, 0.183], [5.4, 0.803, 0.322], [4.86, 6.09, 0.58], [6.024, 4.214, 0.252]].forEach((o) => orb(s, o[0], o[1], o[2]));
++  glow(s, -2.675, 0.084, 6.948, 0.55);
++  slot(s, 'custGeom', 0, 0, 5.967, 7.5, { color: '0A0A0A', points: pathPts(PETAL, 0, 0, 5.967, 7.5).map((q) => ({ x: +q[0].toFixed(3), y: +q[1].toFixed(3) })).concat([{ close: true }]) });
++  header(s, 1, 'right');
++  dots(s, 7.03, 2.061, 0.486, 0.386);
++  gEll(s, 8.134, 2.066, 0.486, 0.486, 45, DARK47, 6);
++  title(s, 'MUSI', 'FEST', { x: 6.904, y: 2.594, w: 6.346, h: 1.447, size: 80 });
++  s.addText('Professional Music Concert Organizer Presentation', { x: 6.955, y: 4.005, w: 5.477, h: 0.91, fontFace: BODY, fontSize: 24, color: C.ice, valign: 'top' });
++});
++
++/* 02 - table of contents */
++const TOC = [
++  ['03. ABOUT US', '17. PRICING TABLE'],
++  ['09. THE MUSIC EVENT IDEA', '18. PROFESSIONAL TEAM'],
++  ['11. AGENCY PHILOSOPHY', '23. BUSINESS PORTFOLIO'],
++  ['12. OUR MAIN SERVICES', '27. OUR MERCHANDISE'],
++  ['16. RECORDING SERVICES', '29. CONTACT INFORMATION']
++];
++slide((s) => {
++  backdrop(s);
++  slot(s, 'roundRect', 6.667, 0, 5.979, 4.75, { color: '0C0C0C', r: 0.25 });
++  glow(s, 9.96, 5.055, 5.069, 0.35);
++  rRound(s, 0.688, 2.958, 8.208, 4.542, 0.5, DARK, [1, 1, 0, 0]);
++  header(s, 2, 'left');
++  bar(s, 0.688, 1.369, 1.409, 0.1, 'r');
++  title(s, 'TABLE OF ', 'CONTENTS', { x: 2.323, y: 1.178, w: 4.187, h: 1.582, size: 44 });
++  ring(s, 10.174, 4.252, 0.997);
++  TOC.forEach((row, r) => row.forEach((label, c) => {
++    s.addText(label, {
++      x: c ? 4.97 : 1.335, y: 3.7 + r * 0.6512, w: 3.332, h: 0.337, fontFace: HEAD, fontSize: 14, bold: true,
++      color: label.startsWith('23.') ? C.pink : C.ice, valign: 'top'
++    });
++  }));
++});
++
++/* 03 - about us */
++slide((s) => {
++  backdrop(s);
++  glow(s, -2.413, 1.979, 5.855, 0.35);
++  slot(s, 'custGeom', 0.646, 0, 6.007, 6.753, { color: '0B0B0B' });
++  header(s, 3, 'right');
++  rRound(s, 4.707, 3.75, 7.979, 3.75, 0.42, DARK, [1, 1, 0, 0]);
++  bar(s, 4.707, 4.524, 0.101, 2.201, 'u', BRAND);
++  title(s, 'ABOUT MUSIFEST ', 'MUSIC ORGANIZER', { x: 7.097, y: 1.426, w: 5.465 });
++  strap(s, 7.238, 2.773);
++  quoteMark(s, 5.455, 4.139, 1.316, 1.161, '151515');
++  body(s, 'Through meticulous planning and a passion for music, Musifest orchestrates seamless concert experiences, fostering connections between artists, audiences, and sponsors to create unforgettable moments in the world of live entertainment.',
++    { x: 5.75, y: 4.524, w: 6.175, h: 1.285, fontSize: 12 });
++  s.addText([
++    { text: 'REDEFINING CONCERTS WITH', options: { color: C.ice } }, { text: ' PASSION ', options: { color: C.pink } },
++    { text: 'FOR ', options: { color: C.ice } }, { text: 'UNFORGETTABLE', options: { color: C.pink } },
++    { text: ' EXPERIENCES WORLDWIDE', options: { color: C.ice } }
++  ], { x: 5.749, y: 6.087, w: 5.397, h: 0.572, fontFace: HEAD, fontSize: 14, bold: true, valign: 'top' });
++});
++
++/* 04 - history timeline */
++const HISTORY = [
++  [4.582, '2022', 'Musifest founded, focusing on excellence.'],
++  [6.639, '2023', 'Recognized for innovation and quality.'],
++  [8.698, '2024', 'Expanded events, reaching new audiences.'],
++  [10.755, '2025', 'Globally acclaimed events.']
++];
++slide((s) => {
++  backdrop(s);
++  glow(s, 8.92, 0.148, 5.855, 0.3);
++  gRect(s, 0, 0, 3.667, 7.5, 45, BRAND, 18);
++  s.addText('GROUNDBREAKING CONCERT METHODS', { x: 0.302, y: 2.913, w: 3.062, h: 0.573, align: 'center', fontFace: BODY, fontSize: 14, bold: true, color: C.white, valign: 'top' });
++  s.addText('TOP-TIER CONCERT MANAGEMENT', { x: 0.302, y: 6.365, w: 3.062, h: 0.573, align: 'center', fontFace: BODY, fontSize: 14, bold: true, color: C.white, valign: 'top' });
++  slot(s, 'ellipse', 0.708, 0.542, 2.25, 2.25, { color: '1A0A22' });
++  slot(s, 'ellipse', 0.708, 3.993, 2.25, 2.25, { color: '1A0A22' });
++  header(s, 4, 'right');
++  title(s, 'THE HISTORY OF ', 'MUSIFEST ORGANIZER', { x: 4.555, y: 1.16, w: 6.382 });
++  strap(s, 4.696, 2.507);
++  ring(s, 4.576, 3.418, 0.997);
++  body(s, 'Musifest, a trailblazer in professional concert organization, emerged from a vision of revolutionizing the industry with excellence and innovation. Its journey, marked by significant milestones and unwavering dedication, has positioned it as a leader',
++    { x: 5.722, y: 3.45, w: 6.757, h: 0.908 });
++  HISTORY.forEach(([x, year, note], i) => {
++    orb(s, x + 0.049, 4.987, 0.58);
++    gRound(s, x + 0.21, 5.17, 0.23, 0.21, 0.05, 45, BRAND, 5);
++    s.addText(year, { x: x, y: 5.637, w: 0.877, h: 0.37, fontFace: HEAD, fontSize: 16, bold: true, color: C.ice, valign: 'top' });
++    txt(s, note, { x: x, y: 5.983, w: 1.837, h: 0.632, fontSize: 10.5, italic: true });
++    if (i < 3) s.addShape('line', { x: x + 0.628, y: 5.278, w: 1.477, h: 0, line: { color: C.silver, width: 0.5, endArrowType: 'triangle' } });
++  });
++});
++
++/* 05 - memorable events */
++slide((s) => {
++  backdrop(s);
++  glow(s, 10.166, -2.698, 5.855, 0.3);
++  gRound(s, 9.646, 3.75, 3.042, 3.0, 0.38, 45, BRAND, 16);
++  header(s, 5, 'left');
++  ring(s, 12.595, -0.269, 0.997, false);
++  title(s, 'HAVE MEMORABLE ', 'EVENTS WITH US', { x: 0.793, y: 1.305, w: 5.465 });
++  strap(s, 0.934, 2.651);
++  s.addText('TAILORED EXPERIENCES', { x: 7.257, y: 1.443, w: 3.424, h: 0.37, fontFace: BODY, fontSize: 16, bold: true, color: C.ice, valign: 'top' });
++  bar(s, 7.37, 1.903, 3.2, 0.05, 'r');
++  body(s, 'Bespoke events tailored to your audience, ensuring each moment is unforgettable and resonates with attendees. meticulously orchestrates every detail, guaranteeing seamless execution',
++    { x: 7.26, y: 2.045, w: 5.342, h: 0.908 });
++  slot(s, 'roundRect', 0.646, 3.75, 8.708, 3.0, { color: '101010', r: 0.4 });
++  orb(s, 10.813, 4.244, 0.708, '141414');
++  gRound(s, 11.075, 4.451, 0.184, 0.293, 0.04, 45, BRAND, 5);
++  s.addText('78% - 80%', { x: 10.094, y: 5.188, w: 2.146, h: 0.505, align: 'center', fontFace: HEAD, fontSize: 24, bold: true, color: C.white, valign: 'top' });
++  s.addText('Excellence in Event Personalization Award', { x: 9.889, y: 5.722, w: 2.556, h: 0.571, align: 'center', fontFace: BODY, fontSize: 14, color: C.white, valign: 'top' });
++});
++
++/* 06 - the story of Musifest */
++const STORY = [
++  ['INCEPTION', "Musifest's vision reshapes concert organization."],
++  ['PASSION', 'Driven by music, Musifest aims for excellence.'],
++  ['INNOVATION', 'Musifest pioneers industry standards.'],
++  ['LEGACY', 'Musifest leaves a premier mark in live entertainment.']
++];
++slide((s) => {
++  backdrop(s);
++  slot(s, 'rect', 5.604, 0, 4.021, 7.5, { color: '0B0B0B' });
++  glow(s, -2.079, 4.336, 5.855, 0.3);
++  header(s, 6, 'left');
++  bar(s, 0.667, 1.634, 1.409, 0.1, 'r');
++  title(s, 'THE STORY ', 'OF MUSIFEST', { x: 0.573, y: 1.922, w: 4.552, h: 1.582, size: 44 });
++  s.addText('TALE OF MUSICAL MASTERY', { x: 0.616, y: 4.062, w: 3.424, h: 0.372, fontFace: BODY, fontSize: 16, bold: true, color: C.ice, valign: 'top' });
++  bar(s, 0.71, 4.515, 3.4, 0.05, 'r');
++  body(s, 'Musifest began with a vision to revolutionize concert organization, driven by a deep passion for music. Through innovative approaches and a commitment to excellence, Musifest quickly rose to prominence, hosting diverse and acclaimed events.',
++    { x: 0.62, y: 4.634, w: 4.316, h: 1.464 });
++  rRound(s, 8.665, 0.74, 4.021, 6.021, 0.45, DARK);
++  bar(s, 8.665, 0.739, 2.201, 0.101, 'r', BRAND);
++  STORY.forEach(([head, note], i) => {
++    const y = 1.548 + i * 1.3055;
++    orb(s, 9.108, y, 0.58);
++    gRound(s, 9.27, y + 0.155, 0.26, 0.26, 0.05, 225, BRAND, 5);
++    s.addText(head, { x: 9.866, y: y - 0.062, w: 1.717, h: 0.337, fontFace: HEAD, fontSize: 14, bold: true, color: C.ice, valign: 'top' });
++    txt(s, note, { x: 9.866, y: y + 0.226, w: 2.467, h: 0.455, fontSize: 10.5, italic: true });
++    if (i < 3) s.addShape('line', { x: 9.398, y: y + 0.58, w: 0, h: 0.726, line: { color: C.silver, width: 0.5, endArrowType: 'triangle' } });
++  });
++});
++
++/* 07 - live tour (circles left) */
++slide((s) => {
++  backdrop(s);
++  glow(s, 0.563, 0.382, 6.736, 0.3);
++  rEllTop(s, 0.416, 0.677, 4.27, 4.27, DARK);
++  slot(s, 'ellipse', 0.79, 1.05, 3.524, 3.524, { color: '0D0D0D' });
++  rEllTop(s, 2.98, 2.553, 4.27, 4.27, DARK);
++  slot(s, 'ellipse', 3.352, 2.925, 3.524, 3.524, { color: '0D0D0D' });
++  glow(s, 10.191, 4.575, 5.855, 0.3);
++  header(s, 7, 'right');
++  ring(s, 1.484, 5.2, 0.997);
++  ring(s, 4.993, 1.312, 0.997);
++  title(s, 'LIVE TOUR WITH ', 'THE YOUR STARS', { x: 7.487, y: 1.28, w: 5.119 });
++  strap(s, 7.628, 2.627);
++  [['01', 3.694, 'UNFORGETTABLE PERFORMANCE', "Experience electrifying performances from your favorite artists, brought to life by Musifest's expert concert organization."],
++   ['02', 5.262, 'IMMERSIVE ENTERTAINMENT', 'Immerse yourself in an unforgettable journey through music as Musifest orchestrates seamless live tours with your beloved stars.']
++  ].forEach(([n, y, head, note]) => {
++    numOrb(s, 7.589, y + 0.021, 0.58, n);
++    s.addText(head, { x: 8.262, y: y, w: 3.771, h: 0.37, fontFace: BODY, fontSize: 16, bold: true, color: C.ice, valign: 'top' });
++    txt(s, note, { x: 8.267, y: y + 0.386, w: 4.552, h: 0.708, fontSize: 12 });
++  });
++});
++
++/* 08 - live tour (numbered cards) */
++const TOUR = [
++  ['01', "Exclusive artist lineup that means curate your dream concert experience with Musifest's stellar lineup of renowned artists and performers."],
++  ['02', "Immerse yourself in captivating performances enhanced by Musifest's state-of-the-art stage production and audiovisual effects."],
++  ['03', "Elevate your connection with your favorite stars through Musifest's personalized fan experiences, creating unforgettable memories for music enthusiasts."]
++];
++slide((s) => {
++  backdrop(s);
++  glow(s, 2.878, 1.424, 6.713, 0.28);
++  gRect(s, 9.708, 0, 3.625, 7.5, 270, BRAND, 14);
++  slot(s, 'roundRect', 7.688, 0.74, 5.0, 4.042, { color: '18082A', r: 0.3 });
++  header(s, 8, 'left');
++  title(s, 'LIVE TOUR WITH ', 'THE YOUR STARS', { x: 0.545, y: 1.181, w: 5.119 });
++  strap(s, 0.686, 2.528);
++  TOUR.forEach(([n, note], i) => {
++    const y = 3.149 + i * 1.22;
++    rRound(s, 0.687, y, 5.979, 1.074, 0.14, DARK);
++    bar(s, 0.688, y + 0.237, 0.05, 0.6, 'u', BRAND);
++    s.addText(n, { x: 0.951, y: y + 0.21, w: 0.7, h: 0.572, fontFace: HEAD, fontSize: 28, bold: true, color: C.pink, valign: 'top' });
++    txt(s, note, { x: 1.733, y: y + 0.209, w: 4.55, h: 0.656 });
++  });
++  orb(s, 10.158, 5.173, 0.708, '141414');
++  gRound(s, 10.349, 5.363, 0.325, 0.33, 0.06, 225, BRAND, 5);
++  s.addText('TOUR OF THE YEAR AWARDSTANDOUT ARTISTS IMMERSIVE PRODUCTIONS', { x: 10.083, y: 5.993, w: 2.587, h: 0.656, fontFace: HEAD, fontSize: 11, bold: true, color: C.white, valign: 'top' });
++});
++
++/* 09 - the idea for music concert */
++const IDEA = [
++  [0.675, 1.189, 'THE DYNAMIC FUSION OF DIVERSE GENRES', 'PLACEHOLDER'],
++  [4.517, 5.031, 'CREATING UNFORGETTABLE ATMOSPHERES', 'Pay attention to every detail of the concert environment, from the stage design and lighting effects']
++];
++slide((s) => {
++  backdrop(s);
++  glow(s, -2.389, -3.347, 9.187, 0.3);
++  glow(s, 9.435, 4.888, 4.111, 0.3);
++  header(s, 9, 'right');
++  IDEA.forEach(([cx, ox, head, note], i) => {
++    rRound(s, cx, 1.012, 3.596, 5.475, 0.46, DARK);
++    gEll(s, ox, 1.41, 2.568, 2.568, 225, BRAND, 14);
++    s.addText(head, { x: cx + 0.346, y: 4.245, w: 2.905, h: 0.573, align: 'center', fontFace: BODY, fontSize: 14, bold: true, color: C.ice, valign: 'top' });
++    s.addShape('line', { x: cx + 1.004, y: 4.938, w: 1.587, h: 0, line: { color: C.magenta, width: 1 } });
++    txt(s, note, { x: cx + 0.23, y: 5.13, w: 3.137, h: 0.656, align: 'center', italic: true });
++    bar(s, cx + 0.698, 6.388, 2.2, 0.101, 'r', BRAND);
++  });
++  title(s, 'THE IDEA FOR ', 'MUSIC CONCERT', { x: 8.364, y: 1.6, w: 4.803 });
++  strap(s, 8.505, 2.946);
++  ring(s, 8.469, 4.149, 0.772);
++  body(s, 'Foster active participation from the audience by incorporating interactive elements such as sing-alongs, crowd-sourced song requests, or interactive voting for encore performances. By involving the audience directly in the concert experience',
++    { x: 9.332, y: 4.059, w: 3.641, h: 1.741 });
++});
++
++/* 10 - jazz community */
++const JAZZ = ['VIBRANT JAZZ HUB: MUSIFEST HOSTS TOP JAZZ EVENTS IN NYC',
++  'RENOWNED ARTISTS: SHOWCASING CELEBRATED JAZZ PERFORMERS',
++  'INNOVATIVE COLLABORATIONS: PUSHING BOUNDARIES IN JAZZ MUSIC'];
++slide((s) => {
++  backdrop(s);
++  glow(s, 4.581, -1.999, 5.835, 0.3);
++  rPathTop(s, PETAL, 6.667, 0, 6.667, 7.5, DARK38, 0, { flipH: true });
++  slot(s, 'custGeom', 7.498, 0, 5.835, 7.5, { color: '0A0A0A' });
++  [[7.298, 2.527, 0.58], [7.163, 6.172, 0.409], [7.463, 0.576, 0.333]].forEach((o) => orb(s, o[0], o[1], o[2], '1E1E1E'));
++  header(s, 10, 'left');
++  title(s, 'TOP OF JAZZ MUSIC ', 'COMMUNITY IN NYC', { x: 0.543, y: 1.139, w: 5.835 });
++  strap(s, 0.684, 2.486);
++  txt(s, 'Musifest actively engages with the jazz community, offering opportunities for networking, education, and appreciation, solidifying its position as a cornerstone of the NYC jazz scene.',
++    { x: 0.582, y: 3.377, w: 5.439, h: 0.872, fontSize: 12, lineSpacingMultiple: 1.3 });
++  JAZZ.forEach((t, i) => {
++    const y = 4.451 + i * 0.7605;
++    check(s, 0.664, y + 0.078, 0.366);
++    s.addText(t, { x: 1.085, y: y, w: 4.332, h: 0.573, fontFace: HEAD, fontSize: 14, bold: true, color: C.ice, valign: 'top' });
++  });
++});
++
++/* 11 - philosophy */
++const PHILO = ['FOCUSES ON INCLUSIVE, ACCESSIBLE CONCERT EXPERIENCES',
++  'UPHOLDS AUTHENTIC, EXCEPTIONAL TALENT STANDARDS',
++  'ALWAYS ACTIVELY ENGAGES WITH ITS COMMUNITY'];
++slide((s) => {
++  backdrop(s);
++  glow(s, 2.346, 1.638, 7.475, 0.3);
++  glow(s, 10.903, -2.745, 5.835, 0.3);
++  rRound(s, 0, 0.792, 6.667, 5.917, 0.58, DARK, [0, 1, 1, 0]);
++  header(s, 11, 'left');
++  title(s, 'THE PHILOSOPHY ', 'OF MUSIFEST', { x: 0.545, y: 1.493, w: 5.119 });
++  strap(s, 0.686, 2.84);
++  s.addText('PASSION DRIVEN EXCELLENCE', { x: 0.616, y: 3.917, w: 3.964, h: 0.372, fontFace: BODY, fontSize: 16, bold: true, color: C.ice, valign: 'top' });
++  bar(s, 0.715, 4.383, 2.3, 0.05, 'r');
++  body(s, 'Musifest embodies a commitment to excellence fueled by a profound passion for music and live entertainment and we believes in creating inclusive and accessible concert experiences that resonate with diverse audiences.',
++    { x: 0.62, y: 4.488, w: 4.79, h: 1.186 });
++  PHILO.forEach((t, i) => {
++    const y = 1.309 + i * 0.7605;
++    check(s, 7.476, y + 0.077, 0.366);
++    s.addText(t, { x: 7.898, y: y, w: 4.269, h: 0.573, fontFace: HEAD, fontSize: 14, bold: true, color: C.ice, valign: 'top' });
++  });
++  slot(s, 'rect', 5.663, 3.804, 3.396, 2.156, { color: '140A1C' });
++  slot(s, 'rect', 9.312, 3.804, 3.396, 2.156, { color: '140A1C' });
++});
++
++/* 12 - main services */
++const SERVICES = [
++  ['CONCERT CURATION:', 'TAILORED SELECTION OF TOP-TIER MUSICAL PERFORMANCES'],
++  ['EVENT PRODUCTION:', 'SEAMLESS EXECUTION OF IMMERSIVE CONCERT EXP'],
++  ['ARTIST MANAGEMENT:', 'REPRESENTATION AND COLLABORATION FACILITATION']
++];
++slide((s) => {
++  backdrop(s);
++  glow(s, 7.021, -2.541, 9.079, 0.28);
++  glow(s, -1.539, 4.569, 5.247, 0.3);
++  header(s, 12, 'left');
++  bar(s, 0.667, 1.38, 1.409, 0.1, 'r');
++  title(s, 'OUR MAIN ', 'SERVICES HERE', { x: 0.573, y: 1.668, w: 5.49, h: 1.582, size: 44 });
++  body(s, 'We specialize in comprehensive concert organization services, ranging from meticulous curation of top-tier musical performances to seamless event production ensuring immersive experiences for attendees.',
++    { x: 0.585, y: 3.899, w: 5.394, h: 1.285, fontSize: 12 });
++  s.addText([
++    { text: 'TOP-TIER CONCERTS, ', options: { color: C.ice } }, { text: 'SEAMLESS PRODUCTION, ', options: { color: C.pink } },
++    { text: 'ARTIST MANAGEMENT, INTERACTIVE ENGAGEMENT.', options: { color: C.ice } }
++  ], { x: 0.583, y: 5.483, w: 5.115, h: 0.505, fontFace: HEAD, fontSize: 12, bold: true, valign: 'top' });
++  SERVICES.forEach(([lead, rest], i) => {
++    const y = 0.729 + i * 2.072;
++    rRound(s, 6.667, y, 5.979, 1.898, 0.2, DARK);
++    gEll(s, 7.352, y + 0.233, 1.432, 1.432, 45, BRAND4, 14);
++    orb(s, 6.312, y + 0.595, 0.708, '141414');
++    gRound(s, 6.53, y + 0.77, 0.28, 0.36, 0.06, 45, BRAND, 5);
++    s.addText([{ text: lead + '\n', options: { color: C.pink } }, { text: rest, options: { color: C.ice } }],
++      { x: 8.896, y: y + 0.545, w: 3.639, h: 0.808, fontFace: HEAD, fontSize: 14, bold: true, valign: 'top' });
++  });
++});
++
++/* 13 - fest organizer */
++const FEST = ['Craft your perfect festival lineup', 'Ensure flawless festival execution',
++  'Interactive Audience Engagement', 'Handle artist logistics and contracts expertly'];
++slide((s) => {
++  backdrop(s);
++  glow(s, -1.749, -3.27, 9.079, 0.3);
++  header(s, 13, 'right');
++  rRound(s, 3.531, 0.698, 3.927, 6.104, 0.47, DARK);
++  slot(s, 'roundRect', 3.812, 1.021, 3.396, 4.714, { color: '141414', r: 0.3 });
++  s.addText('MUSIC FEST LIST:', { x: 0.569, y: 2.484, w: 2.894, h: 0.405, fontFace: BODY, fontSize: 18, bold: true, color: C.ice, valign: 'top' });
++  bar(s, 0.689, 2.978, 1.4, 0.05, 'r');
++  FEST.forEach((t, i) => {
++    const y = 3.502 + i * 0.6072;
++    check(s, 0.661, y + 0.045, 0.366);
++    txt(s, t, { x: 1.115, y: y, w: 2.0, h: 0.47, color: C.ice });
++  });
++  gRound(s, 4.38, 5.934, 2.229, 0.564, 0.282, 45, BRAND, 12);
++  s.addText('COLLABORATE NOW', { x: 4.38, y: 5.934, w: 2.229, h: 0.564, align: 'center', valign: 'middle', fontFace: HEAD, fontSize: 10, bold: true, color: C.white });
++  navDot(s, 3.758, 6.022, 0.388, 'left');
++  navDot(s, 6.844, 6.022, 0.388, 'right');
++  title(s, 'GET YOUR MUSIC ', 'FEST ORGANIZER', { x: 7.833, y: 1.6, w: 5.056 });
++  strap(s, 7.974, 2.946);
++  ring(s, 7.938, 4.191, 0.772);
++  body(s, 'Musifest provides comprehensive services for planning, coordinating, and managing your music festival, ensuring a seamless and memorable experience for organizers and attendees alike.',
++    { x: 8.8, y: 4.101, w: 3.962, h: 1.587, fontSize: 12 });
++});
++
++/* 14 - band values */
++const BANDS = [
++  [1.493, 0.818, 'PROFESSIONAL BRANDING AND IMAGE CONSULTING'],
++  [5.628, 4.953, 'STRATEGIC MARKETING AND PROMOTION CAMPAIGNS'],
++  [9.764, 9.292, 'CONCERT BOOKING AND TOUR MANAGEMENT']
++];
++slide((s) => {
++  backdrop(s);
++  glow(s, 7.696, -2.921, 6.123, 0.3);
++  glow(s, 2.271, 4.508, 5.247, 0.3);
++  gRect(s, 0, 0.74, 9.627, 2.979, 45, DARK47, 12);
++  slot(s, 'rect', 9.627, 0.739, 3.706, 2.979, { color: '121212' });
++  title(s, 'IMPROVE YOUR ', 'BAND VALUES', { x: 0.56, y: 1.296, w: 4.566 });
++  strap(s, 0.701, 2.642);
++  bar(s, 5.719, 1.53, 1.4, 0.05, 'r');
++  txt(s, "We specialize in empowering bands to reach their full potential in the music industry. Our services are designed to enhance your band's value and increase your visibility in the competitive market.",
++    { x: 5.63, y: 1.677, w: 3.707, h: 1.026 });
++  BANDS.forEach(([cx, tx, label], i) => {
++    gEll(s, cx, 4.111, 2.076, 2.076, 45, BRAND4, 16);
++    gEll(s, cx + 0.121, 4.231, 1.833, 1.833, 45, DARK47, 10);
++    slot(s, 'ellipse', cx + 0.243, 4.352, 1.59, 1.59, { color: '141414' });
++    s.addText(label, { x: tx, y: 6.325, w: i === 2 ? 3.021 : 3.427, h: 0.573, align: 'center', fontFace: HEAD, fontSize: 14, bold: true, color: C.ice, valign: 'top' });
++    if (i < 2) {
++      orb(s, 4.245 + i * 4.135, 4.794, 0.708, '141414');
++      s.addShape('chevron', { x: 4.519 + i * 4.136, y: 5.014, w: 0.181, h: 0.267, fill: { color: C.pink }, line: { type: 'none' } });
++    }
++  });
++});
++
++/* 15 - musician project & talent management */
++const TALENT = [
++  [4.688, 'INTERACTIVE AUDIENCE ENGAGEMENT', 'we believe in fostering mean-ingful connections between artists and audiences. Throu-gh innovative engagement strategies such as interactive voting for song requests'],
++  [8.797, 'THE SEAMLESS EVENT COORDINATION', 'Our team at Musifest understands the importance of flawless event execution. From coordinating stage setups and sound checks to managing vendor logistics']
++];
++slide((s) => {
++  backdrop(s);
++  glow(s, -3.732, -1.652, 8.582, 0.35);
++  slot(s, 'roundRect', 0.708, 0.708, 4.958, 6.792, { color: '0C0C0C', r: 0.45 });
++  header(s, 15, 'right');
++  title(s, 'MUSICIAN PROJECT & ', 'TALENT MANAGEMENT', { x: 6.1, y: 1.327, w: 6.4 });
++  strap(s, 6.241, 2.674);
++  TALENT.forEach(([cx, head, note]) => {
++    rRound(s, cx, 3.444, 3.891, 3.316, 0.29, DARK);
++    gRound(s, cx + 0.256, 3.734, 3.377, 0.858, 0.2, 45, BRAND, 12);
++    s.addText(head, { x: cx + 0.406, y: 3.908, w: 3.078, h: 0.505, align: 'center', fontFace: HEAD, fontSize: 12, bold: true, color: C.ice, valign: 'top' });
++    ring(s, cx + 0.25, 5.102, 0.772);
++    txt(s, note, { x: cx + 1.112, y: 5.089, w: 2.528, h: 1.212 });
++  });
++});
++
++/* 16 - improve your music album */
++const ALBUM = [
++  ['01', 'Experience the difference in sound quality with our state-of-the-art audio production services. Our team of experienced engineers'],
++  ['02', 'Make a lasting impression with stunning album artwork that captures the essence of your music. Our talented designers will collaborate'],
++  ['03', 'PLACEHOLDER']
++];
++slide((s) => {
++  backdrop(s);
++  glow(s, 2.902, 3.334, 8.582, 0.3);
++  gEll(s, 6.562, 0.594, 6.312, 6.312, 45, BRAND, 20);
++  header(s, 16, 'left');
++  title(s, 'IMPROVE YOUR ', 'MUSIC ALBUM NOW', { x: 0.545, y: 1.097, w: 5.75 });
++  strap(s, 0.686, 2.444);
++  ALBUM.forEach(([n, note], i) => {
++    const y = 3.129 + i * 1.2195;
++    rRound(s, 0.687, y, 5.356, 1.074, 0.14, DARK);
++    bar(s, 0.688, y + 0.236, 0.05, 0.6, 'u', BRAND);
++    s.addText(n, { x: 0.951, y: y + 0.25, w: 0.7, h: 0.572, fontFace: HEAD, fontSize: 28, bold: true, color: C.pink, valign: 'top' });
++    txt(s, note, { x: 1.733, y: y + 0.208, w: 4.009, h: 0.656 });
++  });
++  ring(s, 11.113, 0.833, 1.254);
++});
++
++/* 17 - pricing plan */
++const PACKS = [
++  [1.196, 'STRANDARD PACK', '$26', ['Enim nec dui nunc priota', 'Magna sit amet risus protago', 'Risus pretium quam']],
++  [5.045, 'PREMIUM PACK', '$42', ['Enim nec dui nunc priota', 'Magna sit amet risus protago', 'Risus pretium quam', 'Magna sit amet risus pro']],
++  [8.896, 'PLATINUM PACK', '$68', ['Enim nec dui nunc priota', 'Magna sit amet risus protago', 'Risus pretium quam', 'Magna sit amet risus pro', 'Risus pretium quam vioreda']]
++];
++slide((s) => {
++  backdrop(s);
++  gPath(s, DOME, 0, 0, 13.333, 4.087, 45, DARK47, 14);
++  glow(s, -0.106, 1.75, 8.582, 0.3);
++  glow(s, 10.166, -2.698, 5.855, 0.3);
++  header(s, 17, 'left');
++  ring(s, 12.595, -0.269, 0.997, false);
++  title(s, 'OUR PRICING ', 'PLAN', { x: 3.466, y: 0.618, w: 6.4, h: 0.707, align: 'center' });
++  strap(s, 4.932, 1.325);
++  PACKS.forEach(([x, name, price, feats]) => {
++    gRound(s, x, 2.108, 3.242, 4.667, 0.34, 45, DARK47, 14);
++    bar(s, x + 0.77, 2.107, 1.7, 0.101, 'r', BRAND);
++    s.addText(name, { x: x + 0.26, y: 2.572, w: 2.72, h: 0.404, align: 'center', fontFace: HEAD, fontSize: 18, bold: true, color: C.pink, valign: 'top' });
++    s.addText('Updated At 2023', { x: x + 0.86, y: 2.901, w: 1.524, h: 0.306, align: 'center', fontFace: BODY, fontSize: 9, italic: true, color: C.ice, valign: 'top' });
++    s.addText([{ text: price, options: { fontSize: 36 } }, { text: '/ month', options: { fontSize: 10 } }],
++      { x: x + 0.52, y: 3.341, w: 2.201, h: 0.707, align: 'center', fontFace: HEAD, bold: true, color: C.pink, valign: 'top' });
++    feats.forEach((f, i) => {
++      s.addText(f, {
++        x: x + 0.16, y: 4.146 + i * 0.2975, w: 3.0, h: 0.35, fontFace: BODY, fontSize: 10, color: C.ice,
++        bullet: { characterCode: '2713' }, valign: 'top', wrap: false, inset: 0.04
++      });
++    });
++    gRound(s, x + 0.582, 5.979, 2.078, 0.481, 0.24, 45, BRAND, 12);
++    s.addText('PURCHASE NOW', { x: x + 0.582, y: 5.979, w: 2.078, h: 0.481, align: 'center', valign: 'middle', fontFace: HEAD, fontSize: 10, bold: true, color: C.white });
++  });
++});
++
++/* 18 - CEO and founder */
++const CEO = [
++  [0.967, 5.771, 'Pioneered groundbreaking concert formats.'],
++  [0.967, 6.413, 'Spearheaded successful global concert tours.'],
++  [4.597, 5.771, 'Received industry recognition for innovation.'],
++  [4.597, 6.413, "Expanded Musifest's reach to new markets."]
++];
++slide((s) => {
++  backdrop(s);
++  glow(s, 4.603, -1.349, 5.409, 0.3);
++  gRect(s, 0, 3.766, 13.333, 3.734, 35, BRAND, 20);
++  gRound(s, 7.688, 0.729, 5.0, 6.045, 0.42, 45, DARK47, 14);
++  slot(s, 'roundRect', 7.981, 1.033, 4.413, 4.717, { color: '1A1A1A', r: 0.3 });
++  header(s, 18, 'left');
++  title(s, 'MEET OUR CEO AND ', 'FOUNDER HERE', { x: 0.524, y: 1.338, w: 5.768 });
++  strap(s, 0.665, 2.684);
++  s.addText('ALFRED LOTHUS DUNE', { x: 0.542, y: 4.168, w: 3.37, h: 0.403, fontFace: HEAD, fontSize: 18, bold: true, color: C.white, valign: 'top' });
++  s.addText("Musifest's CEO and Founder", { x: 0.549, y: 4.505, w: 2.182, h: 0.306, fontFace: BODY, fontSize: 9, italic: true, color: C.white, valign: 'top' });
++  s.addText('EXPERIENCE:', { x: 0.578, y: 5.163, w: 2.262, h: 0.503, fontFace: HEAD, fontSize: 18, bold: true, color: C.white, valign: 'top' });
++  txt(s, 'Our CEO and Founder, the driving force behind Musifest, is a visionary leader with a passion',
++    { x: 4.203, y: 4.132, w: 3.017, h: 0.908, color: C.white, lineSpacingMultiple: 1.5 });
++  CEO.forEach(([x, y, t]) => {
++    check(s, x - 0.328, y + 0.063, 0.314);
++    txt(s, t, { x: x, y: y, w: x < 2 ? 3.0 : 2.851, h: 0.505, fontSize: 12, color: C.white });
++  });
++  gRound(s, 8.811, 5.925, 2.753, 0.564, 0.282, 45, BRAND, 12);
++  s.addText('450+ TOTAL ACHIEVEMENT', { x: 8.811, y: 5.925, w: 2.753, h: 0.564, align: 'center', valign: 'middle', fontFace: HEAD, fontSize: 10, bold: true, color: C.white });
++  navDot(s, 8.093, 6.013, 0.388, 'left');
++  navDot(s, 11.895, 6.013, 0.388, 'right');
++});
++
++/* 19 - marketing manager */
++slide((s) => {
++  backdrop(s);
++  glow(s, 7.024, 3.75, 8.582, 0.3);
++  gRound(s, 1.646, 2.705, 5.021, 4.069, 0.4, 45, DARK47, 14);
++  slot(s, 'rect', 0.71, 0.762, 2.979, 4.925, { color: '0F0F0F' });
++  header(s, 19, 'right');
++  title(s, 'OUR MARKETING ', 'MANAGER', { x: 4.068, y: 1.162, w: 8.582, h: 0.774, size: 40 });
++  strap(s, 4.208, 1.981);
++  [['2023', 'BAND OF THE YEARS', 'Start From October', 3.131],
++   ['175+', 'TOTAL ACHIEVEMENTS', 'Data From January 2023', 4.569]
++  ].forEach(([big, mid, small, y]) => {
++    s.addText(big, { x: 4.493, y: y, w: 1.244, h: 0.505, align: 'center', fontFace: HEAD, fontSize: 24, bold: true, color: C.pink, valign: 'top' });
++    s.addText(mid, { x: 4.017, y: y + 0.378, w: 2.196, h: 0.347, align: 'center', fontFace: HEAD, fontSize: 11, bold: true, color: C.white, valign: 'top' });
++    s.addText(small, { x: 4.088, y: y + 0.628, w: 2.054, h: 0.261, align: 'center', fontFace: BODY, fontSize: 7, italic: true, color: C.white, valign: 'top' });
++  });
++  bar(s, 2.856, 6.675, 2.601, 0.099, 'r', BRAND);
++  orb(s, 7.453, 3.029, 0.588, '141414');
++  gRound(s, 7.655, 3.224, 0.184, 0.196, 0.04, 45, BRAND, 4);
++  s.addText('THOMAS ALPHA DUNE', { x: 8.134, y: 3.017, w: 3.405, h: 0.403, fontFace: HEAD, fontSize: 18, bold: true, color: C.ice, valign: 'top' });
++  txt(s, 'Marketing Manager', { x: 8.148, y: 3.392, w: 2.724, h: 0.286 });
++  body(s, "Our Marketing Manager is a strategic visionary dedicated to elevating Musifest's brand presence and driving audience engagement. With a keen understanding of market trends",
++    { x: 7.368, y: 3.793, w: 5.106, h: 0.908 });
++  ['ORCHESTRATED SUCCESSFUL SOCIAL MEDIA CAMPAIGNS', "INCREASED MUSIFEST'S ONLINE PRESENCE AND FOLLOWERSHIP"].forEach((t, i) => {
++    const y = 4.979 + i * 0.7605;
++    check(s, 7.473, y + 0.045, 0.366);
++    s.addText(t, { x: 7.894, y: y, w: 3.967, h: 0.505, fontFace: HEAD, fontSize: 12, bold: true, color: C.ice, valign: 'top' });
++  });
++});
++
++/* 20 - professional music producer */
++slide((s) => {
++  backdrop(s);
++  gRect(s, 4.687, 2.75, 8.646, 4.75, 337, BRAND, 20);
++  glow(s, 1.384, -3.457, 8.582, 0.3);
++  gRound(s, 0.688, 0.74, 5.738, 6.031, 0.32, 45, DARK36, 14);
++  header(s, 20, 'left');
++  ring(s, 12.595, -0.269, 0.997, false);
++  title(s, 'PROFESSIONAL ', 'MUSIC PRODUCER', { x: 0.984, y: 1.526, w: 5.183 });
++  strap(s, 1.125, 2.872);
++  ring(s, 1.125, 4.087, 0.771);
++  body(s, 'A professional music producer is a creative visionary and technical expert responsible for shaping the sound and direction of music projects. They collaborate closely with artists to develop their musical vision,',
++    { x: 1.986, y: 3.995, w: 3.964, h: 1.464 });
++  slot(s, 'rect', 6.667, 0.75, 2.87, 4.0, { color: '20103A' });
++  slot(s, 'rect', 9.776, 0.75, 2.87, 4.0, { color: '20103A' });
++  [[7.753, 6.74, 6.936, 'JOHAN LAURA DUNE'], [10.863, 9.849, 10.047, 'SINIAR LAURA DUNE']].forEach(([ox, tx, sx, name]) => {
++    orb(s, ox, 5.066, 0.696, '141414');
++    gRound(s, ox + 0.238, 5.297, 0.219, 0.233, 0.04, 45, BRAND, 4);
++    s.addText(name, { x: tx, y: 5.894, w: 2.724, h: 0.337, align: 'center', fontFace: HEAD, fontSize: 14, bold: true, color: C.white, valign: 'top' });
++    s.addText('Senior Music Producer', { x: sx, y: 6.191, w: 2.33, h: 0.286, align: 'center', fontFace: BODY, fontSize: 11, italic: true, color: C.white, valign: 'top' });
++  });
++});
++
++/* 21 - senior creative director */
++slide((s) => {
++  backdrop(s);
++  glow(s, -2.625, -3.55, 9.559, 0.35);
++  gRound(s, 6.667, 0.762, 5.974, 5.976, 0.55, 135, DARK47, 14, [0, 1, 1, 0]);
++  bar(s, 6.642, 2.0, 0.05, 3.5, 'u');
++  slot(s, 'roundRect', 0.693, 0.762, 5.974, 5.976, { color: '111111', r: 0.45 });
++  header(s, 21, 'right');
++  title(s, 'MUSIFEST SENIOR ', 'CREATIVE DIRECTOR', { x: 7.114, y: 1.387, w: 5.183, h: 1.178, size: 32 });
++  strap(s, 7.255, 2.589);
++  orb(s, 7.204, 3.622, 0.588, '141414');
++  gRound(s, 7.406, 3.818, 0.184, 0.196, 0.04, 45, BRAND, 4);
++  s.addText('RUDDIES ALPHA DUNE', { x: 7.885, y: 3.611, w: 3.403, h: 0.403, fontFace: HEAD, fontSize: 18, bold: true, color: C.ice, valign: 'top' });
++  txt(s, 'Creative Director', { x: 7.899, y: 3.986, w: 2.722, h: 0.286 });
++  body(s, 'The Musifest Senior Creative Director is the visionary leader responsible for overseeing the artistic direction and creative execution of all Musifest events.',
++    { x: 7.141, y: 4.304, w: 5.106, h: 0.908 });
++  check(s, 7.262, 5.617, 0.366);
++  s.addText('INNOVATIVE CONCEPTUALIZATION CREATING MEMORABLE EXPERIENCES', { x: 7.703, y: 5.561, w: 3.967, h: 0.505, fontFace: HEAD, fontSize: 12, bold: true, color: C.ice, valign: 'top' });
++});
++
++/* 22 - break time */
++slide((s) => {
++  backdrop(s);
++  glow(s, 1.665, -1.877, 7.114, 0.3);
++  gPath(s, DOME, 7.365, 1.564, 7.5, 4.372, 135, BRAND, 18, { rot: 90 });
++  gPath(s, DOME, 7.54, 1.707, 7.5, 4.087, 135, DARK47, 14, { rot: 90 });
++  slot(s, 'ellipse', 5.957, 0.594, 6.312, 6.312, { color: '111111', label: false });
++  rRound(s, 0, 5.337, 5.904, 1.074, 0.53, DARK, [0, 0, 0, 1]);
++  header(s, 22, 'left');
++  bar(s, 0.667, 1.505, 2.4, 0.2, 'r');
++  title(s, 'BREAK ', 'TIME', { x: 0.482, y: 1.747, w: 5.479, h: 3.332, size: 96 });
++  s.addText('15 Minutes Break Estimations', { x: 0.566, y: 5.622, w: 4.981, h: 0.505, fontFace: BODY, fontSize: 24, color: C.white, valign: 'top' });
++  ring(s, 11.556, 3.123, 1.254);
++});
++
++/* 23 - new music albums */
++slide((s) => {
++  backdrop(s);
++  glow(s, 4.564, 0.727, 8.582, 0.28);
++  glow(s, 0.716, -0.723, 8.582, 0.28);
++  rPathC(s, LENS, 1.09, 0, 11.153, 7.5, DARK36);
++  glow(s, 10.166, -2.698, 5.855, 0.28);
++  rPathC(s, LENS, 2.104, 0, 9.125, 7.5, DARK36);
++  [0.639, 9.196].forEach((x) => {
++    gEll(s, x, 2.271, 3.498, 3.498, 45, BRAND4, 18);
++    s.addShape('ellipse', { x: x + 1.224, y: 2.271 + 1.224, w: 1.05, h: 1.05, fill: { color: '0B0B0B' }, line: { type: 'none' } });
++  });
++  header(s, 23, 'left');
++  ring(s, 12.595, -0.269, 0.997, false);
++  title(s, 'NEW MUSIC ', 'ALBUMS', { x: 3.466, y: 0.827, w: 6.4, h: 0.707, align: 'center' });
++  strap(s, 4.932, 1.533);
++  quoteMark(s, 6.009, 2.483, 1.316, 1.161, '141414');
++  bar(s, 5.317, 2.945, 2.7, 0.05, 'r');
++  txt(s, "New Music Albums refer to recently released collections of songs or compositions by artists or bands. These albums showcase fresh musical works, often representing the artist's latest creative endeavors and reflecting current trends and influences in the music industry.",
++    { x: 4.391, y: 3.21, w: 4.552, h: 2.542, fontSize: 14, align: 'center', lineSpacingMultiple: 1.5 });
++  [[0.785, 'SOULFUL REFLECTIONS ', 'BY HARMONY AVENUE'], [9.342, 'ELECTRIC DREAMS', ' BY NEON PULSE DUNE']].forEach(([x, a, b]) => {
++    s.addText([{ text: a, options: { color: C.pink } }, { text: b, options: { color: C.ice } }],
++      { x: x, y: 6.0, w: 3.206, h: 0.572, align: 'center', fontFace: HEAD, fontSize: 14, bold: true, valign: 'top' });
++  });
++});
++
++/* 24 - idealist type of music */
++slide((s) => {
++  backdrop(s);
++  glow(s, 7.812, 2.226, 5.75, 0.3);
++  gRound(s, 6.667, 1.741, 5.0, 4.05, 0.57, 45, DARK36, 14);
++  slot(s, 'rect', 8.646, 0.7, 4.021, 4.05, { color: '121212', label: false });
++  slot(s, 'rect', 5.667, 2.726, 4.021, 4.049, { color: '121212', label: false });
++  header(s, 24, 'left');
++  title(s, 'OUR IDEALIST ', 'TYPE OF MUSIC', { x: 0.53, y: 1.276, w: 5.183, h: 1.447, size: 40 });
++  strap(s, 0.672, 2.767);
++  [['01', 3.632, 'CONNECTING WITH AUDIENCES', 'Our idealist type of music embodies soulful melodies and heartfelt lyrics, transcending genres to evoke deep emotions and meaningful connections with listeners.'],
++   ['02', 5.2, 'EMBRACING INNOVATION', 'Our idealist type of music celebrates diversity and innovation, embracing experimental sounds and unconventional rhythms to push the boundaries of traditional genres.']
++  ].forEach(([n, y, head, note]) => {
++    numOrb(s, 0.637, y + 0.062, 0.58, n);
++    s.addText(head, { x: 1.316, y: y, w: 3.962, h: 0.37, fontFace: BODY, fontSize: 16, bold: true, color: C.ice, valign: 'top' });
++    txt(s, note, { x: 1.335, y: y + 0.365, w: 4.021, h: 0.842 });
++  });
++  bar(s, 6.103, 2.269, 1.9, 0.05, 'r');
++  bar(s, 10.331, 5.214, 1.9, 0.05, 'r');
++  gRound(s, 5.875, 5.542, 3.604, 0.951, 0.26, 45, BRAND, 12);
++  s.addText('CELEBRATING DIVERSITY EMBRACING INNOVATION', { x: 6.137, y: 5.766, w: 3.08, h: 0.503, align: 'center', fontFace: HEAD, fontSize: 12, bold: true, color: C.ice, valign: 'top' });
++});
++
++/* 25 - 2024 tour journey */
++const TOUR24 = ['GLOBAL SHOWCASE - CELEBRATING DIVERSITY', 'MUSICAL DISCOVERY - UNFORGETTABLE PERFORMANCES', 'ECLECTIC PERFORMANCES - DIVERSE ENTERTAINMENT'];
++slide((s) => {
++  backdrop(s);
++  glow(s, 0.875, 1.699, 7.625, 0.35);
++  gRound(s, 3.875, 0.767, 2.979, 1.87, 0.23, 45, BRAND, 14);
++  slot(s, 'roundRect', 3.875, 2.833, 2.979, 1.87, { color: '141414', r: 0.23, label: false });
++  slot(s, 'roundRect', 0.688, 0.767, 2.979, 3.936, { color: '141414', r: 0.23, label: false });
++  gRound(s, 0.688, 4.901, 2.979, 1.87, 0.23, 45, DARK36, 12);
++  header(s, 25, 'right');
++  s.addText('23 OCT', { x: 4.168, y: 1.122, w: 1.637, h: 0.571, fontFace: HEAD, fontSize: 28, bold: true, color: C.white, valign: 'top' });
++  s.addText('LATIN BEATS IN RIO - SAMBA UNDER THE STARS', { x: 4.163, y: 1.734, w: 2.488, h: 0.472, fontFace: BODY, fontSize: 11, bold: true, color: C.white, valign: 'top' });
++  s.addText('14 JAN', { x: 0.981, y: 5.256, w: 1.568, h: 0.572, fontFace: HEAD, fontSize: 28, bold: true, color: C.pink, valign: 'top' });
++  s.addText('JAZZ HALLS OF NEW ORLEANS - SOULFUL GROOVES', { x: 0.976, y: 5.87, w: 2.488, h: 0.47, fontFace: BODY, fontSize: 11, bold: true, color: C.white, valign: 'top' });
++  title(s, 'OUR 2024 MUSIC ', 'TOUR JOURNEY', { x: 7.54, y: 1.225, w: 4.897 });
++  strap(s, 7.681, 2.571);
++  txt(s, 'Our 2024 Music Tour Journey is an exhilarating exploration of musical diversity and cultural exchange, spanning various cities and venues around the globe.',
++    { x: 7.578, y: 3.342, w: 5.234, h: 0.87, fontSize: 12, lineSpacingMultiple: 1.3 });
++  TOUR24.forEach((t, i) => {
++    const y = 4.384 + i * 0.7605;
++    check(s, 7.662, y + 0.077, 0.366);
++    s.addText(t, { x: 8.083, y: y, w: 3.939, h: 0.573, fontFace: HEAD, fontSize: 14, bold: true, color: C.ice, valign: 'top' });
++  });
++});
++
++/* 26 - marketing analysis infographic */
++const ANALYSIS = [
++  [5.223, '01', 11.969, 'MARKET TRENDS ASSESSMENT:', 'THE ANALYZING INDUSTRY SHIFTS TIMING', 3.492],
++  [4.641, '02', 10.745, 'COMPETITIVE LANDSCAPE EVALUATION:', 'IDENTIFYING KEY PLAYERS', 3.129],
++  [4.188, '03', 10.427, 'STRATEGIC RECOMMENDATIONS:', 'ENHANCING MARKETING STRATEGIES', 2.769],
++  [4.641, '04', 10.745, 'CONSUMER BEHAVIOR ANALYSIS:', 'UNDERSTANDING AUDIENCE PREFERENCES', 3.261],
++  [5.223, '05', 11.969, 'CONSUMER BEHAVIOR ANALYSIS:', 'UNDERSTANDING AUDIENCE PREFERENCES', 3.492]
++];
++/** open C-shaped track the numbered chips sit on */
++const ARC = [['M', 0.93, 0], ['L', 1, 0.002], ['L', 1, 0.054], ['L', 0.93, 0.052],
++  ['C', 0.717, 0.052, 0.504, 0.096, 0.341, 0.183], ['C', 0.015, 0.358, 0.015, 0.642, 0.341, 0.817],
++  ['C', 0.504, 0.904, 0.717, 0.948, 0.93, 0.948], ['L', 1, 0.946], ['L', 1, 0.998], ['L', 0.93, 1],
++  ['C', 0.692, 1, 0.454, 0.951, 0.273, 0.854], ['C', -0.091, 0.658, -0.091, 0.342, 0.273, 0.146],
++  ['C', 0.454, 0.049, 0.692, 0, 0.93, 0]];
++slide((s) => {
++  backdrop(s);
++  glow(s, 2.212, -0.427, 4.111, 0.28);
++  glow(s, 7.696, 2.219, 7.625, 0.25);
++  gPath(s, ARC, 10.571, 0.958, 3.001, 5.584, 90, DARK36, 12);
++  header(s, 26, 'left');
++  title(s, 'MARKETING ', 'ANALYSIS 2024', { x: 0.53, y: 1.651, w: 5.183, h: 1.447, size: 40 });
++  strap(s, 0.672, 3.144);
++  ring(s, 0.63, 4.274, 0.772);
++  body(s, 'Marketing Analysis 2024 is a comprehensive assessment of market trends, consumer behavior, and competitive landscape in the music industry for the year 2024. It aims to provide insights and strategic recommendations',
++    { x: 1.493, y: 4.184, w: 3.67, h: 1.741 });
++  ANALYSIS.forEach(([w, num, chipX, lead, rest, tw], i) => {
++    const y = 0.806 + i * 1.2253;
++    rRoundC(s, 5.79, y, w, 0.987, 0.494, DARK36);
++    gRound(s, 5.675, y - 0.053, 1.069, 1.094, 0.53, 45, BRAND, 12);
++    rRoundC(s, 5.765, y + 0.038, 0.891, 0.911, 0.45, DARK36);
++    gRound(s, 6.03, y + 0.3, 0.36, 0.38, 0.07, 45, BRAND, 6);
++    gRound(s, chipX, y + 0.213, 0.549, 0.561, 0.28, 45, BRAND, 8);
++    s.addText(num, { x: chipX, y: y + 0.213, w: 0.549, h: 0.561, align: 'center', valign: 'middle', fontFace: HEAD, fontSize: 12, bold: true, color: C.white });
++    s.addText([{ text: lead + '\n', options: { color: C.pink } }, { text: rest, options: { color: C.ice } }],
++      { x: 6.949, y: y + 0.258, w: tw, h: 0.404, fontFace: HEAD, fontSize: 9, bold: true, valign: 'top' });
++  });
++});
++
++/* 27 - merchandise */
++const MERCH = [[0.656, '$140', 'T - SHIRT ALBUM X'], [3.719, '$78', 'HATS ALBUM X'],
++  [6.783, '$97', 'TOTE BAGS X'], [9.845, '$798', 'VINYL RECORDS X']];
++slide((s) => {
++  backdrop(s);
++  glow(s, 10.166, -2.698, 5.855, 0.3);
++  header(s, 27, 'left');
++  ring(s, 12.595, -0.269, 0.997, false);
++  title(s, 'NEWEST ', 'MERCHANDISE', { x: 2.922, y: 0.764, w: 7.489, h: 0.707, align: 'center' });
++  strap(s, 4.932, 1.47);
++  gRound(s, 0.656, 2.198, 12.021, 0.674, 0.337, 45, BRAND, 22);
++  navDot(s, 0.893, 2.341, 0.388, 'left');
++  navDot(s, 12.053, 2.341, 0.388, 'right');
++  s.addText('BACK', { x: 1.377, y: 2.408, w: 0.833, h: 0.252, fontFace: HEAD, fontSize: 9, italic: true, color: C.ice, valign: 'top' });
++  s.addText('NEXT', { x: 11.123, y: 2.408, w: 0.833, h: 0.252, align: 'right', fontFace: HEAD, fontSize: 9, italic: true, color: C.ice, valign: 'top' });
++  s.addText('MERCH BY ALFARO DUNE’S BAND', { x: 4.92, y: 2.384, w: 3.493, h: 0.302, align: 'center', fontFace: HEAD, fontSize: 12, bold: true, color: C.ice, valign: 'top' });
++  MERCH.forEach(([x, price, name]) => {
++    gRound(s, x, 3.163, 2.832, 3.483, 0.43, 45, DARK36, 12);
++    bar(s, x + 0.566, 3.164, 1.7, 0.05, 'r', BRAND);
++    slot(s, 'rect', x + 0.269, 3.455, 2.293, 2.13, { color: '141414', label: false });
++    s.addText(price, { x: x + 0.602, y: 5.671, w: 1.628, h: 0.503, fontFace: HEAD, fontSize: 18, color: C.pink, valign: 'top' });
++    s.addText(name, { x: x + 0.427, y: 6.13, w: 1.977, h: 0.286, fontFace: HEAD, fontSize: 11, color: C.white, valign: 'top' });
++  });
++});
++
++/* 28 - quote */
++slide((s) => {
++  backdrop(s);
++  glow(s, -2.01, -0.096, 7.693, 0.35);
++  gRound(s, 0, 0.761, 6.667, 5.979, 0.71, 45, DARK36, 14, [0, 1, 1, 0]);
++  slot(s, 'roundRect', 0.625, 1.396, 5.312, 4.708, { color: '151515', r: 0.4 });
++  bar(s, 6.566, 2.649, 0.101, 2.201, 'd', BRAND);
++  header(s, 28, 'right');
++  quoteMark(s, 7.375, 1.135, 1.314, 1.163, '242424');
++  s.addText([
++    { text: 'Nobody ', options: { color: C.white } }, { text: 'orchestrates ', options: { color: C.pink } },
++    { text: 'the melody of life like a music ', options: { color: C.white } }, { text: 'organizer, ', options: { color: C.pink } },
++    { text: 'they are the pillars transforming chaos into ', options: { color: C.white } }, { text: 'harmony.', options: { color: C.pink } }
++  ], { x: 7.493, y: 1.594, w: 5.236, h: 3.871, fontFace: HEAD, fontSize: 32, bold: true, valign: 'top' });
++  orb(s, 7.55, 5.802, 0.587, '141414');
++  gRound(s, 7.752, 5.998, 0.184, 0.194, 0.04, 45, BRAND, 4);
++  s.addText('PEROTTA DUNE – MUSIC EXPERT', { x: 8.286, y: 5.924, w: 3.424, h: 0.337, fontFace: BODY, fontSize: 14, bold: true, color: C.ice, valign: 'top' });
++});
++
++/* 29 - contact */
++const CONTACT = [
++  [1.351, 3.965, 'OFFICE HOURS', 'Monday – Saturday\n08.00 AM – 08.00 PM'],
++  [4.245, 3.965, 'ADDRESS', 'Merdeka Street No. 012\nNusantara City, Indonesia'],
++  [1.351, 5.66, 'GET IN TOUCH', '(+62) 000 0000 0000\n(0725) 00000'],
++  [4.245, 5.66, 'FOLLOW US', 'www.yoursitehere.com\noffice@yoursitehere.com']
++];
++slide((s) => {
++  backdrop(s);
++  glow(s, 2.506, -2.955, 7.625, 0.25);
++  slot(s, 'roundRect', 6.667, 0, 5.979, 6.729, { color: '0C0C0C', r: 0.35 });
++  rRound(s, 0.646, 3.375, 7.004, 4.125, 0.38, DARK, [1, 1, 0, 0]);
++  bar(s, 0.646, 4.238, 0.101, 2.399, 'u', BRAND);
++  header(s, 29, 'left');
++  title(s, 'CONTACT ', 'INFORMATION', { x: 1.292, y: 1.133, w: 5.183, h: 1.447, size: 40 });
++  strap(s, 1.434, 2.625);
++  CONTACT.forEach(([x, y, head, lines]) => {
++    s.addText(head, { x: x, y: y, w: 2.457, h: 0.46, fontFace: HEAD, fontSize: 16, bold: true, color: C.white, valign: 'top' });
++    s.addText(lines, { x: x, y: y + 0.464, w: 2.797, h: 0.573, fontFace: BODY, fontSize: 14, color: C.white, valign: 'top' });
++  });
++});
++
++/* 30 - thanks */
++slide((s) => {
++  backdrop(s);
++  glow(s, 1.363, -2.588, 6.948, 0.25);
++  gPath(s, PETAL, 6.771, 0, 6.562, 7.5, 135, BRAND, 18, { flipH: true });
++  rPathTop(s, PETAL, 6.917, 0, 6.417, 7.5, DARK38, 0, { flipH: true });
++  slot(s, 'custGeom', 7.366, 0, 5.967, 7.5, { color: '0A0A0A', points: pathPts(PETAL, 0, 0, 5.967, 7.5, { flipH: true }).map((q) => ({ x: +q[0].toFixed(3), y: +q[1].toFixed(3) })).concat([{ close: true }]) });
++  rPathC(s, CAPSULE_L, 0, 5.829, 2.571, 1.671, DARK47, 0, { flipH: true, flipV: true });
++  [[2.69, 5.893, 0.183], [7.674, 0.824, 0.322], [7.789, 5.944, 0.58]].forEach((o) => orb(s, o[0], o[1], o[2]));
++  header(s, 30, 'left');
++  dots(s, 0.696, 2.061, 0.486, 0.386);
++  gEll(s, 1.8, 2.066, 0.486, 0.486, 45, DARK47, 6);
++  title(s, 'THA', 'NKS', { x: 0.571, y: 2.594, w: 6.346, h: 1.582, size: 88 });
++  s.addText('And See You Next Time', { x: 0.622, y: 4.005, w: 4.503, h: 0.505, fontFace: BODY, fontSize: 24, color: C.ice, valign: 'top' });
++});
++
++/* ==================================================================== build */
++const pptx = new PptxGenJS();
++pptx.author = 'Musifest';
++pptx.title = 'Music Concert Presentation';
++pptx.defineLayout({ name: 'MUSIFEST', width: SW, height: SH });
++pptx.layout = 'MUSIFEST';
++pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++slides.forEach((build) => build(pptx.addSlide()));
++pptx.writeFile({ fileName: path.join(__dirname, '134f0974-52fb-47b9-8a42-67a08dbea64d_grok_final.pptx') })
++  .then((f) => console.log('wrote ' + f));

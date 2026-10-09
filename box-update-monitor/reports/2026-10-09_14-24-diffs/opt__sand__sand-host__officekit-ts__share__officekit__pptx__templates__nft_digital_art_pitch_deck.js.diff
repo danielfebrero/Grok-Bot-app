@@ -1,0 +1,803 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/nft_digital_art_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/nft_digital_art_pitch_deck.js
+@@ -0,0 +1,800 @@
++/**
++ * ARTSYC - "NFT Presentation" deck (30 slides, 13.333 x 7.5 in)
++ * Rebuilt with pptxgenjs only.  Run:  node <this file>
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette
++const BLUE = '1460F8';   // accent 1 - headline / primary
++const CYAN = '12CDF2';   // accent 3 - gradient end
++const ORANGE = 'F7820D'; // accent 2 - buttons
++const PEACH = 'FDE6CF';  // accent 2 @ 20% - skill-bar track
++const DARK = '262626';   // text 1 @ 85%
++const GRAY = '808080';   // text 1 @ 50%
++const WHITE = 'FFFFFF';
++
++const HEAD = 'Poppins';   // major (theme) font
++const BODY = 'Open Sans'; // minor (theme) font
++
++const SLIDE_W = 13.3333;
++const SLIDE_H = 7.5;
++
++// ------------------------------------------------------------- primitives
++// Every helper takes the box as [x, y, w, h] in inches.
++
++function rect(s, [x, y, w, h], color) {
++  s.addShape('rect', { x, y, w, h, fill: { color }, line: { type: 'none' } });
++}
++
++function oval(s, [x, y, w, h], color) {
++  s.addShape('ellipse', { x, y, w, h, fill: { color }, line: { type: 'none' } });
++}
++
++// Rounded rectangle. `r` is the corner radius in inches; `shadow` adds the
++// deck's standard soft drop shadow (20% black, 10pt blur, no offset).
++function rrect(s, [x, y, w, h], color, r, shadow) {
++  s.addShape('roundRect', {
++    x, y, w, h, rectRadius: r,
++    fill: { color }, line: { type: 'none' },
++    shadow: shadow ? SOFT_SHADOW : undefined,
++  });
++}
++
++const SOFT_SHADOW = { type: 'outer', color: '000000', opacity: 0.2, blur: 10, offset: 0, angle: 90 };
++
++// Free-form outline. `pts` are pptxgenjs custGeom points relative to the box.
++function poly(s, [x, y, w, h], color, pts) {
++  s.addShape('custGeom', { x, y, w, h, points: pts, fill: { color }, line: { type: 'none' } });
++}
++
++// ---------------------------------------------------------------- text
++// `body` is either a plain string or a list of {t, c, b, f} runs.
++function txt(s, [x, y, w, h], body, o) {
++  o = o || {};
++  const common = {
++    fontSize: o.size || 10,
++    fontFace: o.f || BODY,
++    color: o.c || DARK,
++    bold: !!o.b,
++    charSpacing: o.spc || 0,
++  };
++  const runs = typeof body === 'string'
++    ? [{ text: body, options: {} }]
++    : body.map(r => ({ text: r.t, options: { color: r.c, bold: !!r.b, fontFace: r.f || BODY } }));
++  s.addText(runs, Object.assign({}, common, {
++    x, y, w, h,
++    align: o.align || 'left',
++    valign: 'top',
++    wrap: !o.nowrap,
++    lineSpacingMultiple: o.line || 1,
++    isTextBox: true,
++  }));
++}
++
++// ------------------------------------------------------------- gradients
++// PowerPoint linear gradients have no pptxgenjs API, so the BLUE -> CYAN ramp
++// is painted as a run of solid bands and then clipped back to the intended
++// silhouette with a white cover that has the silhouette punched out of it.
++//
++//   dir  'v'  = top -> bottom
++//        'd'  = 45 deg, top-left -> bottom-right
++//        'dh' / 'dv' / 'dhv' = the 45 deg ramp mirrored horizontally, vertically
++//        or both, matching the flipH / flipV / rot180 freeforms in the deck
++//   clip 'rect' | 'ellipse' | <corner radius in inches> | <custGeom points>
++
++function mix(t) {
++  const a = [0x14, 0x60, 0xf8], b = [0x12, 0xcd, 0xf2];
++  return a.map((v, i) => Math.round(v + (b[i] - v) * t))
++    .map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
++}
++
++// Clip a convex polygon against the half-plane  ax + by <= c  (Sutherland-Hodgman).
++function clipHalf(poly, a, b, c) {
++  const out = [];
++  for (let i = 0; i < poly.length; i++) {
++    const p = poly[i], q = poly[(i + 1) % poly.length];
++    const dp = a * p[0] + b * p[1] - c, dq = a * q[0] + b * q[1] - c;
++    if (dp <= 0) out.push(p);
++    if ((dp < 0 && dq > 0) || (dp > 0 && dq < 0)) {
++      const t = dp / (dp - dq);
++      out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
++    }
++  }
++  return out;
++}
++
++function gradBands(s, x, y, w, h, dir) {
++  const n = Math.max(10, Math.min(44, Math.round((w + h) * 7)));
++  const fx = dir.indexOf('h') > 0, fy = dir.indexOf('v') > 0;
++  // Bands are stacked (each one reaches the far edge and is overpainted by the
++  // next), which keeps the ramp free of hairline seams.
++  for (let i = 0; i < n; i++) {
++    const color = mix((i + 0.5) / n);
++    if (dir === 'v') {
++      const y0 = (h * i) / n;
++      rect(s, [x, y + y0, w, h - y0], color);
++    } else {
++      // 45 deg: the ramp runs along u + v, so each band is the part of the box
++      // beyond the diagonal  u + v = s0.
++      const s0 = ((w + h) * i) / n;
++      const poly = clipHalf([[0, 0], [w, 0], [w, h], [0, h]], -1, -1, -s0);
++      if (poly.length < 3) continue;
++      s.addShape('custGeom', {
++        x, y, w, h, fill: { color }, line: { type: 'none' },
++        points: poly
++          .map((p, k) => ({ x: r4(fx ? w - p[0] : p[0]), y: r4(fy ? h - p[1] : p[1]),
++            moveTo: k === 0 }))
++          .concat([{ close: true }]),
++      });
++    }
++  }
++}
++
++const r4 = v => Math.round(v * 10000) / 10000;
++
++// Cover = a slightly oversized white frame with `clip` punched out of it, so
++// only the wanted silhouette of the band stack survives.
++const PAD = 0.06;
++
++function gradCover(s, x, y, w, h, clip) {
++  if (clip === 'rect') return;
++  const W = w + 2 * PAD, H = h + 2 * PAD;
++  const frame = [{ x: 0, y: 0, moveTo: true }, { x: W, y: 0 }, { x: W, y: H }, { x: 0, y: H },
++    { close: true }];
++  const off = p => {
++    if (p.close) return p;
++    const q = { x: r4(p.x + PAD), y: r4(p.y + PAD) };
++    if (p.moveTo) q.moveTo = true;
++    if (p.curve) q.curve = p.curve;
++    return q;
++  };
++  let hole;
++  if (clip === 'ellipse') {
++    hole = [{ x: w / 2, y: 0, moveTo: true },
++      { curve: { type: 'arc', wR: w / 2, hR: h / 2, stAng: 270, swAng: 360 }, x: w / 2, y: 0 },
++      { close: true }];
++  } else if (typeof clip === 'number') {
++    const r = clip;
++    hole = [{ x: r, y: 0, moveTo: true },
++      { curve: { type: 'arc', wR: r, hR: r, stAng: 270, swAng: -90 }, x: 0, y: r },
++      { x: 0, y: h - r },
++      { curve: { type: 'arc', wR: r, hR: r, stAng: 180, swAng: -90 }, x: r, y: h },
++      { x: w - r, y: h },
++      { curve: { type: 'arc', wR: r, hR: r, stAng: 90, swAng: -90 }, x: w, y: h - r },
++      { x: w, y: r },
++      { curve: { type: 'arc', wR: r, hR: r, stAng: 0, swAng: -90 }, x: w - r, y: 0 },
++      { close: true }];
++  } else {
++    hole = clip;
++  }
++  s.addShape('custGeom', {
++    x: x - PAD, y: y - PAD, w: W, h: H,
++    fill: { color: WHITE }, line: { type: 'none' },
++    points: frame.concat(hole.map(off)),
++  });
++}
++
++function grad(s, [x, y, w, h], dir, clip, shadow) {
++  if (shadow) rrect(s, [x, y, w, h], mix(0.5), clip, true);
++  gradBands(s, x, y, w, h, dir);
++  gradCover(s, x, y, w, h, clip);
++}
++
++// ------------------------------------------------------- repeated chrome
++// Top bar, page number and footer appear on every slide; only the ink colour
++// changes where the artwork behind them turns blue.
++const NAV = [['Contact', 9.0826, 0.7016], ['Service', 10.2318, 0.6665],
++  ['About', 11.3127, 0.6297], ['Home', 12.3865, 0.5981]];
++
++function chrome(s, o) {
++  const ink = o.nav || GRAY;
++  NAV.forEach(([label, x, w]) => {
++    const on = label === 'About';
++    const c = label === 'Contact' && o.navContact ? o.navContact : (on && !o.nav ? DARK : ink);
++    txt(s, [x, 0.3074, w, 0.2693], label, { c, b: on, align: 'right', nowrap: 1 });
++  });
++  const b = o.brand || DARK;
++  txt(s, [0.726, 0.3074, 2.0567, 0.2693],
++    [{ t: 'NFT', c: b, b: 1, f: HEAD }, { t: ' ', c: b, f: HEAD },
++      { t: 'Presentation', c: o.brand || GRAY, f: HEAD }], { spc: 3, nowrap: 1 });
++  rrect(s, [0.443, 0.3555, 0.1757, 0.1757], o.dot || ORANGE, 0.0293);
++  txt(s, [0.3487, 6.9233, o.numW, 0.2693], o.num,
++    { c: o.numColor || DARK, b: 1, f: HEAD, nowrap: 1 });
++  txt(s, [10.8193, 6.9233, 2.1654, 0.2693], 'Website Goes Here',
++    { c: o.site || GRAY, spc: 3, align: 'right', nowrap: 1 });
++}
++
++// ============================================================== slides
++
++function slide01(pres) {
++  const s = pres.addSlide();
++  poly(s, [0, 1.3595, 9.2314, 4.7811], WHITE, [
++    { x: 0, y: 0, moveTo: true }, { x: 9.2314, y: 0 }, { x: 9.0108, y: 0.0808 },
++    { curve: { type: 'cubic', x1: 8.1111, y1: 0.4613, x2: 7.4798, y2: 1.3522 }, x: 7.4798, y: 2.3906 },
++    { curve: { type: 'cubic', x1: 7.4798, y1: 3.4289, x2: 8.1111, y2: 4.3198 }, x: 9.0108, y: 4.7003 },
++    { x: 9.2314, y: 4.7811 }, { x: 0, y: 4.7811 }, { close: true },
++  ]);
++  grad(s, [7.4798, 1.2432, 5.0135, 5.0135], 'v', 'ellipse');
++  txt(s, [1.3333, 2.1107, 3.5503, 1.1107], [{ t: 'ART', c: BLUE, b: 1, f: HEAD }, { t: 'SYC', c: DARK, b: 1, f: HEAD }], { size: 60, nowrap: 1 });
++  txt(s, [1.3333, 3.0699, 2.2285, 0.3029], 'NFT Presentation', { c: GRAY, size: 12, spc: 3, nowrap: 1 });
++  txt(s, [1.3333, 3.591, 4.8889, 0.5789], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', { c: GRAY, line: 1.5 });
++  rrect(s, [1.4444, 4.5909, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [1.5269, 4.6785, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  chrome(s, { num: '01', numW: 0.3422 });
++}
++
++function slide02(pres) {
++  const s = pres.addSlide();
++  grad(s, [0, 0, 13.3333, 3.1015], 'v', [
++    { x: 0, y: 0, moveTo: true }, { x: 13.3333, y: 0 }, { x: 13.3333, y: 1.0356 }, { x: 13.2606, y: 1.0873 },
++    { curve: { type: 'cubic', x1: 11.3783, y1: 2.359, x2: 9.1092, y2: 3.1015 }, x: 6.6666, y: 3.1015 },
++    { curve: { type: 'cubic', x1: 4.2241, y1: 3.1015, x2: 1.955, y2: 2.359 }, x: 0.0727, y: 1.0873 },
++    { x: 0, y: 1.0356 }, { close: true },
++  ]);
++  txt(s, [1.4258, 5.106, 10.4762, 0.8314], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat sint occaecat cupidatat non proident, sunt in anim id est laborum.', { c: GRAY, align: 'center', line: 1.5 });
++  rrect(s, [5.8941, 6.2081, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [5.9766, 6.2957, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [4.6584, 4.3964, 4.0166, 0.5722], [{ t: 'Welcome', c: BLUE, b: 1, f: HEAD }, { t: ' ', c: DARK, b: 1, f: HEAD }, { t: 'Message', c: DARK, b: 1, f: HEAD }], { size: 28, align: 'center', nowrap: 1 });
++  chrome(s, { num: '02', numW: 0.372, nav: WHITE, brand: WHITE });
++}
++
++function slide03(pres) {
++  const s = pres.addSlide();
++  grad(s, [7.5799, 0, 5.7534, 4.2562], 'd', [
++    { x: 0.0061, y: 0, moveTo: true }, { x: 5.7534, y: 0 }, { x: 5.7534, y: 3.8895 }, { x: 5.6231, y: 3.9484 },
++    { curve: { type: 'cubic', x1: 5.2599, y1: 4.102, x2: 4.8697, y2: 4.2041 }, x: 4.4615, y: 4.2456 },
++    { x: 4.322, y: 4.2562 }, { x: 4.322, y: 2.797 },
++    { curve: { type: 'cubic', x1: 4.322, y1: 2.4438, x2: 4.0357, y2: 2.1574 }, x: 3.6825, y: 2.1574 },
++    { x: 0.4941, y: 2.1574 }, { x: 0.4885, y: 2.1482 },
++    { curve: { type: 'cubic', x1: 0.177, y1: 1.5747, x2: 0, y2: 0.9175 }, x: 0, y: 0.2189 },
++    { curve: { type: 'cubic', x1: 0, y1: 0.149, x2: 0.0018, y2: 0.0796 }, x: 0.0053, y: 0.0106 },
++    { close: true },
++  ]);
++  rrect(s, [1.4282, 1.1244, 4.8892, 2.066], WHITE, 0.3443);
++  txt(s, [1.8821, 1.6357, 3.9815, 1.0434], [{ t: 'Welcome To Our ', c: BLUE, b: 1, f: HEAD }, { t: 'Presentation', c: DARK, b: 1, f: HEAD }], { size: 28, align: 'center' });
++  txt(s, [1.3171, 3.7665, 2.86, 1.5887], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod incididunt ut laboret dolore magna aliqua. Ut enim ad minim venia quis nostrud exercitation ullamco laboris nisi ut aliquip commodo aute dolo reprehenderit in', { c: GRAY, line: 1.5 });
++  rrect(s, [1.4282, 5.9311, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [1.5107, 6.0187, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [9.3, 1.2959, 2.6426, 0.5789], 'Lorem ipsum dolor amet, consectetur adipiscing elit eiusmod', { c: WHITE, line: 1.5 });
++  txt(s, [8.4358, 1.3598, 0.6402, 0.4376], '10+', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  chrome(s, { num: '03', numW: 0.3773, nav: WHITE });
++}
++
++function slide04(pres) {
++  const s = pres.addSlide();
++  grad(s, [0, -0.005, 6.2944, 5.132], 'd', [
++    { x: 0, y: 0, moveTo: true }, { x: 6.2944, y: 0 }, { x: 6.2944, y: 1.1185 }, { x: 5.2362, y: 1.1185 },
++    { curve: { type: 'cubic', x1: 4.944, y1: 1.1185, x2: 4.7071, y2: 1.3554 }, x: 4.7071, y: 1.6476 },
++    { x: 4.7071, y: 5.132 }, { x: 0, y: 5.132 }, { close: true },
++  ]);
++  txt(s, [9.1936, 1.7134, 2.7211, 1.0434], [{ t: 'About Our ', c: BLUE, b: 1, f: HEAD }, { t: 'NFT Project', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [9.1936, 3.1775, 2.86, 1.5887], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod incididunt ut laboret dolore magna aliqua. Ut enim ad minim venia quis nostrud exercitation ullamco laboris nisi ut aliquip commodo aute dolo reprehenderit in', { c: GRAY, line: 1.5 });
++  rrect(s, [9.3047, 5.3421, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [9.3872, 5.4297, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  rrect(s, [1.4214, 4.4691, 3.9048, 1.3175], WHITE, 0.2196);
++  txt(s, [2.6669, 4.8384, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: GRAY, line: 1.5 });
++  txt(s, [1.8344, 4.9023, 0.6402, 0.4376], '10+', { c: ORANGE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [1.3266, 1.7406, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: WHITE, line: 1.5 });
++  txt(s, [1.3266, 1.303, 0.6402, 0.4376], '10+', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [1.3266, 3.1386, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: WHITE, line: 1.5 });
++  txt(s, [1.3266, 2.7011, 0.7226, 0.4376], '30k', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  chrome(s, { num: '04', numW: 0.3878, brand: WHITE });
++}
++
++function slide05(pres) {
++  const s = pres.addSlide();
++  txt(s, [1.4314, 1.2707, 3.3715, 1.0434], [{ t: 'History Of Our ', c: BLUE, b: 1, f: HEAD }, { t: 'NFT Project', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [5.6349, 1.2505, 6.267, 1.0838], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor reprehender voluptate velit esse cillum dolore eu fugiat nulla pariatur. ', { c: GRAY, line: 1.5 });
++  poly(s, [5.5499, 3.254, 7.7834, 3.3175], WHITE, [
++    { x: 0.5529, y: 0, moveTo: true }, { x: 7.7834, y: 0 }, { x: 7.7834, y: 3.3175 }, { x: 0.5529, y: 3.3175 },
++    { curve: { type: 'cubic', x1: 0.2475, y1: 3.3175, x2: 0, y2: 3.0699 }, x: 0, y: 2.7646 },
++    { x: 0, y: 0.5529 }, { curve: { type: 'cubic', x1: 0, y1: 0.2476, x2: 0.2475, y2: 0 }, x: 0.5529, y: 0 },
++    { close: true },
++  ]);
++  txt(s, [6.9659, 3.9387, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, line: 1.5 });
++  txt(s, [6.3103, 4.1356, 0.4824, 0.4376], '01', { c: ORANGE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [6.9659, 5.0553, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, line: 1.5 });
++  txt(s, [6.3103, 5.2522, 0.542, 0.4376], '02', { c: ORANGE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  chrome(s, { num: '05', numW: 0.3825 });
++}
++
++function slide06(pres) {
++  const s = pres.addSlide();
++  poly(s, [1.3103, 0.9764, 12.023, 5.5472], WHITE, [
++    { x: 0.5118, y: 0, moveTo: true }, { x: 12.023, y: 0 }, { x: 12.023, y: 5.5472 }, { x: 0.5118, y: 5.5472 },
++    { curve: { type: 'cubic', x1: 0.2292, y1: 5.5472, x2: 0, y2: 5.318 }, x: 0, y: 5.0354 },
++    { x: 0, y: 0.5118 }, { curve: { type: 'cubic', x1: 0, y1: 0.2292, x2: 0.2292, y2: 0 }, x: 0.5118, y: 0 },
++    { close: true },
++  ]);
++  txt(s, [6.9649, 1.8583, 3.8543, 1.0434], [{ t: 'About Our Digital ', c: BLUE, b: 1, f: HEAD }, { t: 'Art Project', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [6.9636, 3.1676, 5.4229, 1.0838], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris si aliquip ex ea commodo consequat. Duis aute irure dolor reprehender voluptate velit esse cillum', { c: GRAY, line: 1.5 });
++  rrect(s, [7.0677, 4.9112, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [7.1502, 4.9988, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [10.9283, 5.0628, 1.4582, 0.5789], 'Lorem ipsum dolor consectetur', { c: GRAY, line: 1.5 });
++  txt(s, [10.9283, 4.6252, 0.7226, 0.4376], '30k', { c: BLUE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [9.1405, 5.0628, 1.4582, 0.5789], 'Lorem ipsum dolor consectetur', { c: GRAY, line: 1.5 });
++  txt(s, [9.1405, 4.6252, 0.6402, 0.4376], '10+', { c: BLUE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  chrome(s, { num: '06', numW: 0.3808 });
++}
++
++function slide07(pres) {
++  const s = pres.addSlide();
++  txt(s, [4.4379, 1.7926, 2.6267, 1.0434], [{ t: 'Our Best ', c: BLUE, b: 1, f: HEAD }, { t: 'Digital Art', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [4.4379, 3.1676, 2.9282, 1.5887], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris si aliquip ex ea commodo consequat. ', { c: GRAY, line: 1.5 });
++  rrect(s, [4.5539, 5.263, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [4.6364, 5.3506, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  grad(s, [8.4818, 3.0913, 3.9048, 1.3175], 'd', 0.2196, true);
++  txt(s, [9.7273, 3.4606, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: WHITE, line: 1.5 });
++  txt(s, [8.8948, 3.5245, 0.6402, 0.4376], '10+', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  rrect(s, [8.4818, 1.5186, 3.9048, 1.3175], WHITE, 0.2196);
++  txt(s, [9.7273, 1.8879, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: GRAY, line: 1.5 });
++  txt(s, [8.8948, 1.9518, 0.7226, 0.4376], '30k', { c: BLUE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  rrect(s, [8.4818, 4.664, 3.9048, 1.3175], WHITE, 0.2196);
++  txt(s, [9.7273, 5.0333, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: GRAY, line: 1.5 });
++  txt(s, [8.8948, 5.0972, 0.7524, 0.4376], '78%', { c: BLUE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  chrome(s, { num: '07', numW: 0.365 });
++}
++
++function slide08(pres) {
++  const s = pres.addSlide();
++  grad(s, [9.9411, 0, 3.3923, 3.75], 'd', [
++    { x: 0, y: 0, moveTo: true }, { x: 3.3923, y: 0 }, { x: 3.3923, y: 3.75 }, { x: 2.1028, y: 3.75 },
++    { x: 2.1028, y: 1.1395 }, { x: 0, y: 1.1395 }, { close: true },
++  ]);
++  rrect(s, [-0.6377, 1.3221, 5.4817, 1.9748], WHITE, 0.3291);
++  txt(s, [1.2328, 1.7878, 2.9282, 1.0434], [{ t: 'Our Digital ', c: BLUE, b: 1, f: HEAD }, { t: 'Art Collection', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [5.6331, 1.3889, 2.4477, 1.8411], 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris si aliquip ex ea commodo consequat. ', { c: GRAY, line: 1.5 });
++  grad(s, [5.2992, 4.7069, 3.9048, 1.3175], 'd', 0.2196, true);
++  txt(s, [6.5446, 5.0762, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: WHITE, line: 1.5 });
++  txt(s, [5.7122, 5.14, 0.6402, 0.4376], '10+', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  chrome(s, { num: '08', numW: 0.3843, nav: WHITE, navContact: GRAY });
++}
++
++function slide09(pres) {
++  const s = pres.addSlide();
++  grad(s, [0, 0, 3.8264, 2.6565], 'd', [
++    { x: 0, y: 0, moveTo: true }, { x: 3.8264, y: 0 }, { x: 3.8028, y: 0.1545 },
++    { curve: { type: 'cubic', x1: 3.7298, y1: 0.5114, x2: 3.596, y2: 0.8463 }, x: 3.4128, y: 1.1478 },
++    { x: 3.3662, y: 1.2177 }, { x: 2.0811, y: 1.2177 },
++    { curve: { type: 'cubic', x1: 1.7836, y1: 1.2177, x2: 1.5425, y2: 1.4588 }, x: 1.5425, y: 1.7563 },
++    { x: 1.5425, y: 2.5504 }, { x: 1.2877, y: 2.6076 },
++    { curve: { type: 'cubic', x1: 1.1076, y1: 2.6397, x2: 0.9222, y2: 2.6565 }, x: 0.733, y: 2.6565 },
++    { curve: { type: 'cubic', x1: 0.5166, y1: 2.6565, x2: 0.3054, y2: 2.6346 }, x: 0.1015, y: 2.5928 },
++    { x: 0, y: 2.5668 }, { close: true },
++  ]);
++  rrect(s, [4.7859, 1.726, 7.005, 2.215], WHITE, 0.3692);
++  txt(s, [1.4314, 5.2865, 3.3545, 1.0434], [{ t: 'Our Vision And ', c: BLUE, b: 1, f: HEAD }, { t: 'Mission', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [5.6349, 5.2663, 6.267, 1.0838], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor reprehender voluptate velit esse cillum dolore eu fugiat nulla pariatur. ', { c: GRAY, line: 1.5 });
++  rrect(s, [11.0183, 2.6112, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [11.1008, 2.6988, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [5.4213, 2.586, 2.328, 0.8314], 'Lorem ipsum dolor consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ', { c: GRAY, line: 1.5 });
++  txt(s, [5.4213, 2.2495, 1.2345, 0.3366], 'Our Vision', { c: BLUE, b: 1, f: HEAD, size: 14, nowrap: 1 });
++  txt(s, [8.0927, 2.586, 2.328, 0.8314], 'Lorem ipsum dolor consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ', { c: GRAY, line: 1.5 });
++  txt(s, [8.0927, 2.2495, 1.38, 0.3366], 'Our Mission', { c: BLUE, b: 1, f: HEAD, size: 14, nowrap: 1 });
++  chrome(s, { num: '09', numW: 0.3773, brand: WHITE });
++}
++
++function slide10(pres) {
++  const s = pres.addSlide();
++  poly(s, [0, 0.9764, 12.023, 5.5472], WHITE, [
++    { x: 6.6637, y: 0, moveTo: true }, { x: 11.1478, y: 0 },
++    { curve: { type: 'cubic', x1: 11.6312, y1: 0, x2: 12.023, y2: 0.3918 }, x: 12.023, y: 0.8752 },
++    { x: 12.023, y: 4.672 },
++    { curve: { type: 'cubic', x1: 12.023, y1: 5.1554, x2: 11.6312, y2: 5.5472 }, x: 11.1478, y: 5.5472 },
++    { x: 9.628, y: 5.5472 }, { x: 9.628, y: 5.5472 }, { x: 0, y: 5.5472 }, { x: 0, y: 0 }, { x: 6.6636, y: 0 },
++    { close: true },
++  ]);
++  txt(s, [1.2627, 1.7945, 2.7115, 1.0434], [{ t: 'More About ', c: BLUE, b: 1, f: HEAD }, { t: 'NFT Project', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [1.2627, 3.1676, 2.9282, 1.5887], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris si aliquip ex ea commodo consequat. ', { c: GRAY, line: 1.5 });
++  rrect(s, [1.3786, 5.263, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [1.4611, 5.3506, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  chrome(s, { num: '10', numW: 0.3422 });
++}
++
++function slide11(pres) {
++  const s = pres.addSlide();
++  grad(s, [0, 0, 3.6667, 7.5], 'd', [
++    { x: 0, y: 0, moveTo: true }, { x: 3.6667, y: 0 }, { x: 3.6667, y: 1.1925 }, { x: 1.4762, y: 1.1925 },
++    { x: 1.4762, y: 6.3075 }, { x: 3.6667, y: 6.3075 }, { x: 3.6667, y: 7.5 }, { x: 0, y: 7.5 },
++    { close: true },
++  ]);
++  rrect(s, [8, 1.6567, 3.8571, 2.066], WHITE, 0.3443);
++  txt(s, [8.5728, 2.168, 2.7115, 1.0434], [{ t: 'Let\u2019s Take A ', c: BLUE, b: 1, f: HEAD }, { t: 'Break Slide', c: DARK, b: 1, f: HEAD }], { size: 28, align: 'center' });
++  txt(s, [9.147, 4.251, 2.86, 1.0838], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod incididunt ut laboret dolore magna aliqua. Ut enim ad minim venia quis nostrud', { c: GRAY, line: 1.5 });
++  rrect(s, [9.2581, 5.863, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [9.3406, 5.9506, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  chrome(s, { num: '11', numW: 0.3001, numColor: WHITE, brand: WHITE });
++}
++
++function slide12(pres) {
++  const s = pres.addSlide();
++  grad(s, [8.4835, 5.4992, 3.2235, 1.033], 'd', 0.1722, true);
++  grad(s, [1.6211, 5.4992, 3.2235, 1.033], 'd', 0.1722, true);
++  txt(s, [5.1198, 0.9678, 3.0938, 0.5722], [{ t: 'What ', c: BLUE, b: 1, f: HEAD }, { t: 'We Do?', c: DARK, b: 1, f: HEAD }], { size: 28, align: 'center' });
++  txt(s, [1.4258, 1.7368, 10.4762, 0.8314], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat sint occaecat cupidatat non proident, sunt in anim id est laborum.', { c: GRAY, align: 'center', line: 1.5 });
++  rrect(s, [5.0549, 5.4992, 3.2235, 1.033], WHITE, 0.1722);
++  txt(s, [5.2774, 5.7262, 2.7785, 0.5789], 'Lorem ipsum dolor amet consectetur adipiscing elit sed do', { c: GRAY, align: 'center', line: 1.5 });
++  txt(s, [8.7077, 5.7262, 2.7785, 0.5789], 'Lorem ipsum dolor amet consectetur adipiscing elit sed do', { c: WHITE, align: 'center', line: 1.5 });
++  txt(s, [1.8435, 5.7262, 2.7785, 0.5789], 'Lorem ipsum dolor amet consectetur adipiscing elit sed do', { c: WHITE, align: 'center', line: 1.5 });
++  rrect(s, [5.6758, 4.6368, 1.9817, 0.5826], ORANGE, 0.0971, true);
++  rrect(s, [2.2455, 4.6405, 1.9817, 0.5826], WHITE, 0.0971);
++  rrect(s, [9.1061, 4.6405, 1.9817, 0.5826], WHITE, 0.0971);
++  txt(s, [2.5376, 4.7635, 1.3975, 0.3366], 'Service One', { c: BLUE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [5.9633, 4.7635, 1.401, 0.3366], 'Service Two', { c: WHITE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [9.3132, 4.7635, 1.5641, 0.3366], 'Service Three', { c: BLUE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  chrome(s, { num: '12', numW: 0.3299 });
++}
++
++function slide13(pres) {
++  const s = pres.addSlide();
++  txt(s, [1.3391, 1.4286, 2.3378, 1.5146], [{ t: 'Our', c: DARK, b: 1, f: HEAD }, { t: ' Excellent ', c: BLUE, b: 1, f: HEAD }, { t: 'Services', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  grad(s, [8.2453, 3.0913, 3.6566, 1.3175], 'd', 0.2196, true);
++  rrect(s, [8.2453, 1.5186, 3.6566, 1.3175], WHITE, 0.2196);
++  rrect(s, [8.2453, 4.664, 3.6566, 1.3175], WHITE, 0.2196);
++  txt(s, [9.2109, 3.4605, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: WHITE, line: 1.5 });
++  txt(s, [8.6583, 3.5244, 0.542, 0.4376], '02', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [9.2109, 1.8878, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: GRAY, line: 1.5 });
++  txt(s, [8.6583, 1.9517, 0.4824, 0.4376], '01', { c: BLUE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [9.2109, 5.0332, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: GRAY, line: 1.5 });
++  txt(s, [8.6583, 5.0971, 0.5526, 0.4376], '03', { c: BLUE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [4.3672, 1.3915, 2.9282, 1.5887], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris si aliquip ex ea commodo consequat. ', { c: GRAY, line: 1.5 });
++  chrome(s, { num: '13', numW: 0.3352 });
++}
++
++function slide14(pres) {
++  const s = pres.addSlide();
++  rrect(s, [5.1734, 3.1846, 2.9921, 3.259], WHITE, 0.4987);
++  rrect(s, [1.9975, 3.1846, 2.9921, 3.259], WHITE, 0.4987);
++  rrect(s, [8.3437, 3.1846, 2.9921, 3.259], WHITE, 0.4987);
++  txt(s, [5.5276, 4.455, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, align: 'center', line: 1.5 });
++  rrect(s, [5.8941, 5.5492, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [5.9767, 5.6368, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [5.9749, 4.1184, 1.401, 0.3366], 'Service Two', { c: DARK, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [6.3253, 3.5462, 0.677, 0.5722], '02', { c: BLUE, b: 1, f: HEAD, size: 28, align: 'center', nowrap: 1 });
++  txt(s, [2.3546, 4.455, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, align: 'center', line: 1.5 });
++  rrect(s, [2.721, 5.5492, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [2.8036, 5.6368, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [2.8036, 4.1184, 1.3975, 0.3366], 'Service One', { c: DARK, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [3.1934, 3.5462, 0.5946, 0.5722], '01', { c: BLUE, b: 1, f: HEAD, size: 28, align: 'center', nowrap: 1 });
++  txt(s, [8.7007, 4.455, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, align: 'center', line: 1.5 });
++  rrect(s, [9.0672, 5.5492, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [9.1498, 5.6368, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [9.0665, 4.1184, 1.5641, 0.3366], 'Service Three', { c: DARK, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [9.4905, 3.5462, 0.6928, 0.5722], '03', { c: BLUE, b: 1, f: HEAD, size: 28, align: 'center', nowrap: 1 });
++  chrome(s, { num: '14', numW: 0.3457 });
++}
++
++function slide15(pres) {
++  const s = pres.addSlide();
++  grad(s, [9.0503, 5.257, 4.283, 2.243], 'd', [
++    { x: 3.0957, y: 0, moveTo: true },
++    { curve: { type: 'cubic', x1: 3.4332, y1: 0, x2: 3.7587, y2: 0.0513 }, x: 4.0649, y: 0.1465 },
++    { x: 4.283, y: 0.2264 }, { x: 4.283, y: 2.243 }, { x: 0, y: 2.243 }, { x: 0.0923, y: 1.9907 },
++    { curve: { type: 'cubic', x1: 0.5872, y1: 0.8209, x2: 1.7455, y2: 0 }, x: 3.0957, y: 0 }, { close: true },
++  ]);
++  rrect(s, [2.5181, 4.4322, 7.2595, 1.654], WHITE, 0.2757);
++  txt(s, [1.4314, 1.3615, 3.0549, 0.5722], [{ t: 'Our ', c: BLUE, b: 1, f: HEAD }, { t: 'Services', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [1.4314, 2.2077, 5.9813, 1.0838], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip commodo consequat. Duis aute irure dolor reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. ', { c: GRAY, line: 1.5 });
++  grad(s, [8.2453, 2.6395, 3.6566, 1.3175], 'd', 0.2196, true);
++  rrect(s, [8.2453, 1.1303, 3.6566, 1.3175], WHITE, 0.2196);
++  txt(s, [9.2109, 3.0088, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: WHITE, line: 1.5 });
++  txt(s, [8.6583, 3.0727, 0.542, 0.4376], '02', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [9.2109, 1.4996, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: GRAY, line: 1.5 });
++  txt(s, [8.6583, 1.5635, 0.4824, 0.4376], '01', { c: BLUE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [3.4811, 5.0336, 0.5526, 0.4376], '03', { c: BLUE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [4.1607, 4.8367, 3.5377, 0.8314], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ulabore dolore magna enim ad minim veniam', { c: GRAY, line: 1.5 });
++  chrome(s, { num: '15', numW: 0.3404, site: WHITE });
++}
++
++function slide16(pres) {
++  const s = pres.addSlide();
++  rrect(s, [1.4314, 3.1846, 2.9921, 3.259], WHITE, 0.4987);
++  rrect(s, [4.8133, 1.0575, 2.9921, 3.259], WHITE, 0.4987);
++  txt(s, [5.1676, 2.3278, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, align: 'center', line: 1.5 });
++  grad(s, [5.5341, 3.4221, 1.5451, 0.4444], 'd', 0.0741);
++  txt(s, [5.6167, 3.5097, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [5.6149, 1.9912, 1.401, 0.3366], 'Service Two', { c: DARK, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [5.9653, 1.419, 0.677, 0.5722], '02', { c: ORANGE, b: 1, f: HEAD, size: 28, align: 'center', nowrap: 1 });
++  txt(s, [1.7884, 4.455, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, align: 'center', line: 1.5 });
++  grad(s, [2.1549, 5.5492, 1.5451, 0.4444], 'd', 0.0741);
++  txt(s, [2.2375, 5.6368, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [2.2374, 4.1184, 1.3975, 0.3366], 'Service One', { c: DARK, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [2.6273, 3.5462, 0.5946, 0.5722], '01', { c: ORANGE, b: 1, f: HEAD, size: 28, align: 'center', nowrap: 1 });
++  txt(s, [9.2419, 1.7926, 2.775, 1.0434], [{ t: 'Service We ', c: BLUE, b: 1, f: HEAD }, { t: 'Provide', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [9.2419, 3.1676, 2.9282, 1.5887], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris si aliquip ex ea commodo consequat. ', { c: GRAY, line: 1.5 });
++  rrect(s, [9.3579, 5.263, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [9.4404, 5.3506, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  chrome(s, { num: '16', numW: 0.3387 });
++}
++
++function slide17(pres) {
++  const s = pres.addSlide();
++  rrect(s, [8.3718, 4.664, 3.6566, 1.3175], WHITE, 0.2196);
++  txt(s, [9.3374, 5.0332, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: GRAY, line: 1.5 });
++  txt(s, [8.7848, 5.0971, 0.5719, 0.4376], '04', { c: ORANGE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [4.3872, 1.2677, 2.9144, 1.0434], [{ t: 'Our Creative ', c: BLUE, b: 1, f: HEAD }, { t: 'Service', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [8.0591, 1.2475, 4.0415, 1.0838], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris si aliquip ex ea commodo consequat. ', { c: GRAY, line: 1.5 });
++  grad(s, [4.5015, 4.664, 3.6566, 1.3175], 'd', 0.2196, true);
++  txt(s, [5.4671, 5.0332, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: WHITE, line: 1.5 });
++  txt(s, [4.9145, 5.0971, 0.5526, 0.4376], '03', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  grad(s, [8.3718, 3.0913, 3.6566, 1.3175], 'd', 0.2196, true);
++  txt(s, [9.3374, 3.4605, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: WHITE, line: 1.5 });
++  txt(s, [8.7848, 3.5244, 0.542, 0.4376], '02', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  rrect(s, [4.5015, 3.0913, 3.6566, 1.3175], WHITE, 0.2196);
++  txt(s, [5.4671, 3.4605, 2.2781, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit eiusmod', { c: GRAY, line: 1.5 });
++  txt(s, [4.9145, 3.5244, 0.4824, 0.4376], '01', { c: ORANGE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  chrome(s, { num: '17', numW: 0.3229 });
++}
++
++function slide18(pres) {
++  const s = pres.addSlide();
++  rrect(s, [-0.8254, 0.9424, 5.2698, 2.066], WHITE, 0.3443);
++  txt(s, [1.2395, 1.4537, 2.7115, 1.0434], [{ t: 'Let\u2019s Take A ', c: BLUE, b: 1, f: HEAD }, { t: 'Break Slide', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [5.4272, 1.3073, 6.6667, 1.3363], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.', { c: GRAY, line: 1.5 });
++  txt(s, [1.2395, 5.6816, 1.4582, 0.5789], 'Lorem ipsum dolor consectetur', { c: GRAY, line: 1.5 });
++  txt(s, [1.2395, 5.244, 0.7226, 0.4376], '30k', { c: BLUE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [1.2395, 4.3398, 1.4582, 0.5789], 'Lorem ipsum dolor consectetur', { c: GRAY, line: 1.5 });
++  txt(s, [1.2395, 3.9022, 0.6402, 0.4376], '10+', { c: ORANGE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  rrect(s, [3.6719, 4.8591, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [3.7544, 4.9467, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  chrome(s, { num: '18', numW: 0.3422 });
++}
++
++function slide19(pres) {
++  const s = pres.addSlide();
++  txt(s, [4.3774, 0.9678, 4.573, 0.5722], [{ t: 'Our Creative ', c: BLUE, b: 1, f: HEAD }, { t: 'Team', c: DARK, b: 1, f: HEAD }], { size: 28, align: 'center' });
++  txt(s, [1.4258, 5.7008, 10.4762, 0.8314], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat sint occaecat cupidatat non proident, sunt in anim id est laborum.', { c: GRAY, align: 'center', line: 1.5 });
++  grad(s, [5.6758, 4.6368, 1.9817, 0.5826], 'd', 0.0971, true);
++  rrect(s, [2.2455, 4.6405, 1.9817, 0.5826], WHITE, 0.0971);
++  rrect(s, [9.1061, 4.6405, 1.9817, 0.5826], WHITE, 0.0971);
++  txt(s, [2.4201, 4.7635, 1.6325, 0.3366], 'Robert Sumler', { c: ORANGE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [5.9213, 4.7635, 1.4852, 0.3366], 'Lenora Mcoy', { c: WHITE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [9.4403, 4.7635, 1.3099, 0.3366], 'David Bass', { c: ORANGE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  chrome(s, { num: '19', numW: 0.3352 });
++}
++
++function slide20(pres) {
++  const s = pres.addSlide();
++  txt(s, [1.4815, 1.7926, 3.1018, 1.0434], [{ t: 'Meet Our ', c: BLUE, b: 1, f: HEAD }, { t: 'Great Team', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [1.4815, 3.1676, 2.9282, 1.5887], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris si aliquip ex ea commodo consequat. ', { c: GRAY, line: 1.5 });
++  rrect(s, [1.5975, 5.263, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [1.68, 5.3506, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  rrect(s, [5.6291, 4.6176, 3.4535, 1.5322], WHITE, 0.2554);
++  txt(s, [5.9666, 5.2602, 2.7785, 0.5789], 'Lorem ipsum dolor amet consectetur adipiscing elit sed do', { c: GRAY, align: 'center', line: 1.5 });
++  txt(s, [6.6886, 4.9281, 1.3344, 0.3366], 'Tina Hodge', { c: BLUE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  rrect(s, [9.4087, 1.3502, 3.4535, 1.5322], WHITE, 0.2554);
++  txt(s, [9.7462, 1.9929, 2.7785, 0.5789], 'Lorem ipsum dolor amet consectetur adipiscing elit sed do', { c: GRAY, align: 'center', line: 1.5 });
++  txt(s, [10.4884, 1.6608, 1.2941, 0.3366], 'Paul Heath', { c: BLUE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  chrome(s, { num: '20', numW: 0.372 });
++}
++
++function slide21(pres) {
++  const s = pres.addSlide();
++  txt(s, [1.677, 5.8661, 3.1614, 0.5789], 'Lorem ipsum dolor sit amet, consectetur adipiscing sed do eiusmod', { c: GRAY, align: 'center', line: 1.5 });
++  txt(s, [5.0832, 5.8661, 3.1614, 0.5789], 'Lorem ipsum dolor sit amet, consectetur adipiscing sed do eiusmod', { c: GRAY, align: 'center', line: 1.5 });
++  txt(s, [8.5146, 5.8661, 3.1614, 0.5789], 'Lorem ipsum dolor sit amet, consectetur adipiscing sed do eiusmod', { c: GRAY, align: 'center', line: 1.5 });
++  txt(s, [4.8332, 0.9678, 3.6613, 0.5722], [{ t: 'Our Best ', c: BLUE, b: 1, f: HEAD }, { t: 'Team', c: DARK, b: 1, f: HEAD }], { size: 28, align: 'center' });
++  txt(s, [1.4258, 1.7368, 10.4762, 0.5789], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ', { c: GRAY, align: 'center', line: 1.5 });
++  rrect(s, [9.1061, 5.1377, 1.9817, 0.5826], WHITE, 0.0971);
++  txt(s, [9.3553, 5.2607, 1.4799, 0.3366], 'Charles Cole', { c: BLUE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  rrect(s, [2.2669, 5.1377, 1.9817, 0.5826], WHITE, 0.0971);
++  txt(s, [2.4231, 5.2607, 1.6658, 0.3366], 'Rocco Strange', { c: BLUE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  grad(s, [5.6758, 5.1377, 1.9817, 0.5826], 'd', 0.0971, true);
++  txt(s, [5.8967, 5.2644, 1.5343, 0.3366], 'Lorene Fisher', { c: WHITE, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  chrome(s, { num: '21', numW: 0.3299 });
++}
++
++function slide22(pres) {
++  const s = pres.addSlide();
++  grad(s, [9.0503, 5.257, 4.283, 2.243], 'd', [
++    { x: 3.0957, y: 0, moveTo: true },
++    { curve: { type: 'cubic', x1: 3.4332, y1: 0, x2: 3.7587, y2: 0.0513 }, x: 4.0649, y: 0.1465 },
++    { x: 4.283, y: 0.2264 }, { x: 4.283, y: 2.243 }, { x: 0, y: 2.243 }, { x: 0.0923, y: 1.9907 },
++    { curve: { type: 'cubic', x1: 0.5872, y1: 0.8209, x2: 1.7455, y2: 0 }, x: 3.0957, y: 0 }, { close: true },
++  ]);
++  grad(s, [0, -0.0054, 3.9947, 1.1447], 'dhv', [
++    { x: 0, y: 0, moveTo: true }, { x: 3.9947, y: 0 }, { x: 3.9871, y: 0.0086 },
++    { curve: { type: 'cubic', x1: 3.3197, y1: 0.7085, x2: 2.3782, y2: 1.1447 }, x: 1.3347, y: 1.1447 },
++    { curve: { type: 'cubic', x1: 0.9553, y1: 1.1447, x2: 0.5893, y2: 1.087 }, x: 0.2451, y: 0.98 },
++    { x: 0, y: 0.8902 }, { close: true },
++  ]);
++  txt(s, [1.3964, 1.5989, 3.7584, 0.5722], [{ t: 'Robert ', c: BLUE, b: 1, f: HEAD }, { t: 'Sumler', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  poly(s, [1.4994, 4.7844, 3.6554, 0.3031], PEACH, [
++    { x: 0, y: 0, moveTo: true }, { x: 3.6554, y: 0 }, { x: 3.6554, y: 0.3031 }, { x: 0, y: 0.3031 },
++    { close: true },
++  ]);
++  rect(s, [1.4994, 4.7844, 3.074, 0.3031], ORANGE);
++  txt(s, [4.6758, 4.8013, 0.4789, 0.2693], '90%', { c: DARK, align: 'right', nowrap: 1 });
++  txt(s, [1.5623, 4.8013, 1.1767, 0.2693], 'Your Title Here', { c: WHITE, nowrap: 1 });
++  poly(s, [1.4994, 5.5979, 3.6554, 0.3031], PEACH, [
++    { x: 0, y: 0, moveTo: true }, { x: 3.6554, y: 0 }, { x: 3.6554, y: 0.3031 }, { x: 0, y: 0.3031 },
++    { close: true },
++  ]);
++  rect(s, [1.4994, 5.5979, 2.9272, 0.3031], ORANGE);
++  txt(s, [4.6758, 5.6148, 0.4789, 0.2693], '85%', { c: DARK, align: 'right', nowrap: 1 });
++  txt(s, [1.5623, 5.6148, 1.1767, 0.2693], 'Your Title Here', { c: WHITE, nowrap: 1 });
++  rrect(s, [1.4994, 2.4839, 5.6752, 1.8202], WHITE, 0.3034);
++  txt(s, [1.9932, 3.2673, 2.328, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit, sed do', { c: GRAY, line: 1.5 });
++  txt(s, [1.9932, 2.9308, 1.0557, 0.3366], 'Skill One', { c: BLUE, b: 1, f: HEAD, size: 14, nowrap: 1 });
++  txt(s, [4.4913, 3.2673, 2.328, 0.5789], 'Lorem ipsum dolor consectetur adipiscing elit, sed do', { c: GRAY, line: 1.5 });
++  txt(s, [4.4913, 2.9308, 1.0592, 0.3366], 'Skill Two', { c: BLUE, b: 1, f: HEAD, size: 14, nowrap: 1 });
++  chrome(s, { num: '22', numW: 0.3597, brand: WHITE, site: WHITE, dot: BLUE });
++}
++
++function slide23(pres) {
++  const s = pres.addSlide();
++  grad(s, [7.7937, 0, 5.5397, 2.9011], 'dv', [
++    { x: 4.004, y: 2.9011, moveTo: true },
++    { curve: { type: 'cubic', x1: 4.4405, y1: 2.9011, x2: 4.8616, y2: 2.8347 }, x: 5.2576, y: 2.7116 },
++    { x: 5.5397, y: 2.6083 }, { x: 5.5397, y: 0 }, { x: 0, y: 0 }, { x: 0.1194, y: 0.3263 },
++    { curve: { type: 'cubic', x1: 0.7594, y1: 1.8394, x2: 2.2577, y2: 2.9011 }, x: 4.004, y: 2.9011 },
++    { close: true },
++  ]);
++  rrect(s, [1.3093, 4.3362, 10.7147, 2.215], WHITE, 0.3692);
++  txt(s, [6.5104, 5.1963, 2.328, 0.8314], 'Lorem ipsum dolor consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ', { c: GRAY, line: 1.5 });
++  txt(s, [6.5104, 4.8598, 1.0557, 0.3366], 'Skill One', { c: BLUE, b: 1, f: HEAD, size: 14, nowrap: 1 });
++  txt(s, [9.1817, 5.1963, 2.328, 0.8314], 'Lorem ipsum dolor consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ', { c: GRAY, line: 1.5 });
++  txt(s, [9.1817, 4.8598, 1.0592, 0.3366], 'Skill Two', { c: BLUE, b: 1, f: HEAD, size: 14, nowrap: 1 });
++  poly(s, [2.1074, 4.9219, 3.6554, 0.3031], PEACH, [
++    { x: 0, y: 0, moveTo: true }, { x: 3.6554, y: 0 }, { x: 3.6554, y: 0.3031 }, { x: 0, y: 0.3031 },
++    { close: true },
++  ]);
++  rect(s, [2.1074, 4.9219, 3.074, 0.3031], ORANGE);
++  txt(s, [5.2838, 4.9388, 0.4789, 0.2693], '90%', { c: DARK, align: 'right', nowrap: 1 });
++  txt(s, [2.1703, 4.9388, 1.1767, 0.2693], 'Your Title Here', { c: WHITE, nowrap: 1 });
++  poly(s, [2.1074, 5.6624, 3.6554, 0.3031], PEACH, [
++    { x: 0, y: 0, moveTo: true }, { x: 3.6554, y: 0 }, { x: 3.6554, y: 0.3031 }, { x: 0, y: 0.3031 },
++    { close: true },
++  ]);
++  rect(s, [2.1074, 5.6624, 2.9272, 0.3031], ORANGE);
++  txt(s, [5.2838, 5.6793, 0.4789, 0.2693], '85%', { c: DARK, align: 'right', nowrap: 1 });
++  txt(s, [2.1703, 5.6793, 1.1767, 0.2693], 'Your Title Here', { c: WHITE, nowrap: 1 });
++  txt(s, [1.3093, 1.4184, 3.4685, 0.5722], [{ t: 'Lenora ', c: BLUE, b: 1, f: HEAD }, { t: 'Mcoy', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [1.3093, 2.1558, 4.7286, 1.0838], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ', { c: GRAY, line: 1.5 });
++  chrome(s, { num: '23', numW: 0.365, nav: WHITE });
++}
++
++function slide24(pres) {
++  const s = pres.addSlide();
++  grad(s, [5.282, 0, 8.0513, 3.6069], 'd', 'rect');
++  txt(s, [1.3964, 1.2021, 3.0322, 1.0434], [{ t: 'Our Creative ', c: BLUE, b: 1, f: HEAD }, { t: 'Portfolio', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [7.2125, 1.2959, 1.4619, 0.5789], 'Lorem ipsum dolor consectetur', { c: WHITE, line: 1.5 });
++  txt(s, [6.3483, 1.3598, 0.6402, 0.4376], '10+', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [10.2976, 1.2959, 1.4619, 0.5789], 'Lorem ipsum dolor consectetur', { c: WHITE, line: 1.5 });
++  txt(s, [9.4334, 1.3598, 0.7226, 0.4376], '30k', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [7.2913, 5.6448, 5.0952, 0.8314], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad veniam, quis nostrud exercitation ullamco laboris nisi ut', { c: GRAY, line: 1.5 });
++  rrect(s, [5.019, 5.8383, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [5.1015, 5.9259, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  chrome(s, { num: '24', numW: 0.3755, nav: WHITE });
++}
++
++function slide25(pres) {
++  const s = pres.addSlide();
++  rrect(s, [8.9893, 5.1265, 2.9531, 1.3175], WHITE, 0.2196);
++  rrect(s, [-0.8254, 0.9424, 5.381, 2.066], WHITE, 0.3443);
++  txt(s, [5.8095, 1.3073, 6.2843, 1.3363], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolo reprehenderit voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.', { c: GRAY, line: 1.5 });
++  txt(s, [1.2395, 1.4537, 3.0322, 1.0434], [{ t: 'Our Best NFT ', c: BLUE, b: 1, f: HEAD }, { t: 'Collection', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  grad(s, [8.9893, 3.6458, 2.9531, 1.3175], 'd', 0.2196, true);
++  txt(s, [10.1726, 3.882, 1.5211, 0.8314], 'Lorem ipsum dolor sit amet consectety adipiscing elit', { c: WHITE, line: 1.5 });
++  txt(s, [9.3401, 4.079, 0.6402, 0.4376], '10+', { c: WHITE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  txt(s, [10.1726, 5.3632, 1.5211, 0.8314], 'Lorem ipsum dolor sit amet consectety adipiscing elit', { c: GRAY, line: 1.5 });
++  txt(s, [9.3401, 5.5602, 0.7226, 0.4376], '30k', { c: ORANGE, b: 1, f: HEAD, size: 20, nowrap: 1 });
++  chrome(s, { num: '25', numW: 0.3702 });
++}
++
++function slide26(pres) {
++  const s = pres.addSlide();
++  grad(s, [0, 5.257, 4.283, 2.243], 'dh', [
++    { x: 1.1873, y: 0, moveTo: true },
++    { curve: { type: 'cubic', x1: 0.8498, y1: 0, x2: 0.5243, y2: 0.0513 }, x: 0.2181, y: 0.1465 },
++    { x: 0, y: 0.2264 }, { x: 0, y: 2.243 }, { x: 4.283, y: 2.243 }, { x: 4.1907, y: 1.9907 },
++    { curve: { type: 'cubic', x1: 3.6958, y1: 0.8209, x2: 2.5375, y2: 0 }, x: 1.1873, y: 0 }, { close: true },
++  ]);
++  rrect(s, [8.1288, 1.2805, 5.903, 2.066], WHITE, 0.3443);
++  txt(s, [8.8166, 1.7918, 3.4897, 1.0434], [{ t: 'Best Digital Art ', c: BLUE, b: 1, f: HEAD }, { t: 'Collection', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [8.8166, 4.5115, 3.1258, 1.5887], 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ommodo consequat. Duis aute irure dolor in reprehenderit.', { c: GRAY, line: 1.5 });
++  rrect(s, [6.309, 5.0836, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [6.3915, 5.1712, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  chrome(s, { num: '26', numW: 0.3685, numColor: WHITE });
++}
++
++function slide27(pres) {
++  const s = pres.addSlide();
++  grad(s, [7.7552, 0, 5.5781, 2.3236], 'dv', [
++    { x: 0, y: 0, moveTo: true }, { x: 5.5781, y: 0 }, { x: 5.5781, y: 2.0109 }, { x: 5.2768, y: 2.1212 },
++    { curve: { type: 'cubic', x1: 4.8539, y1: 2.2527, x2: 4.4041, y2: 2.3236 }, x: 3.9379, y: 2.3236 },
++    { curve: { type: 'cubic', x1: 2.3059, y1: 2.3236, x2: 0.8767, y2: 1.4554 }, x: 0.087, y: 0.1557 },
++    { close: true },
++  ]);
++  txt(s, [1.4763, 1.7918, 2.9282, 1.0434], [{ t: 'Our Excellent ', c: BLUE, b: 1, f: HEAD }, { t: 'Portfolio', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [1.4815, 3.1676, 2.9282, 1.5887], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris si aliquip ex ea commodo consequat. ', { c: GRAY, line: 1.5 });
++  rrect(s, [1.5975, 5.263, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [1.68, 5.3506, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  rrect(s, [8.9099, 3.1846, 2.9921, 3.259], WHITE, 0.2923);
++  txt(s, [9.2669, 4.455, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, align: 'center', line: 1.5 });
++  grad(s, [9.6334, 5.5492, 1.5451, 0.4444], 'd', 0.0741);
++  txt(s, [9.716, 5.6368, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [9.6835, 4.1184, 1.4624, 0.3366], 'Our Portfolio', { c: DARK, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [10.1058, 3.5462, 0.5946, 0.5722], '01', { c: ORANGE, b: 1, f: HEAD, size: 28, align: 'center', nowrap: 1 });
++  chrome(s, { num: '27', numW: 0.3527, nav: WHITE });
++}
++
++function slide28(pres) {
++  const s = pres.addSlide();
++  grad(s, [-0.8879, 1.0034, 5.2698, 1.4216], 'd', 0.2369, true);
++  txt(s, [5.4272, 1.1789, 6.6667, 1.0838], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. ', { c: GRAY, line: 1.5 });
++  txt(s, [1.2395, 1.4281, 2.9282, 0.5722], 'Pricing Plan', { c: WHITE, b: 1, f: HEAD, size: 28 });
++  rrect(s, [8.5136, 3.1846, 2.9921, 3.259], WHITE, 0.2923);
++  txt(s, [8.8707, 4.455, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, align: 'center', line: 1.5 });
++  txt(s, [9.1582, 4.1184, 1.6973, 0.3366], 'Package Three', { c: DARK, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [9.529, 3.5462, 0.9558, 0.5722], '$50', { c: BLUE, b: 1, f: HEAD, size: 28, align: 'center', nowrap: 1 });
++  rrect(s, [5.1706, 3.1846, 2.9921, 3.259], WHITE, 0.2923);
++  txt(s, [5.5276, 4.455, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, align: 'center', line: 1.5 });
++  txt(s, [5.905, 4.1184, 1.5343, 0.3366], 'Package Two', { c: DARK, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [6.1868, 3.5462, 0.954, 0.5722], '$34', { c: BLUE, b: 1, f: HEAD, size: 28, align: 'center', nowrap: 1 });
++  rrect(s, [1.8276, 3.1846, 2.9921, 3.259], WHITE, 0.2923);
++  txt(s, [2.1846, 4.455, 2.2781, 0.8314], 'PLACEHOLDER', { c: GRAY, align: 'center', line: 1.5 });
++  rrect(s, [9.2371, 5.5492, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [9.3197, 5.6368, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  rrect(s, [5.8941, 5.5492, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [5.9767, 5.6368, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  txt(s, [2.5522, 4.1184, 1.5308, 0.3366], 'Package One', { c: DARK, b: 1, f: HEAD, size: 14, align: 'center', nowrap: 1 });
++  txt(s, [2.9139, 3.5462, 0.8138, 0.5722], '$12', { c: BLUE, b: 1, f: HEAD, size: 28, align: 'center', nowrap: 1 });
++  rrect(s, [2.5511, 5.5492, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [2.6337, 5.6368, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  chrome(s, { num: '28', numW: 0.372 });
++}
++
++function slide29(pres) {
++  const s = pres.addSlide();
++  grad(s, [9.0503, 5.257, 4.283, 2.243], 'd', [
++    { x: 3.0957, y: 0, moveTo: true },
++    { curve: { type: 'cubic', x1: 3.4332, y1: 0, x2: 3.7587, y2: 0.0513 }, x: 4.0649, y: 0.1465 },
++    { x: 4.283, y: 0.2264 }, { x: 4.283, y: 2.243 }, { x: 0, y: 2.243 }, { x: 0.0923, y: 1.9907 },
++    { curve: { type: 'cubic', x1: 0.5872, y1: 0.8209, x2: 1.7455, y2: 0 }, x: 3.0957, y: 0 }, { close: true },
++  ]);
++  rrect(s, [1.4546, 4.0503, 7.1192, 2.215], WHITE, 0.3692);
++  txt(s, [1.3586, 1.6336, 2.9282, 1.0434], [{ t: 'Get In Touch ', c: BLUE, b: 1, f: HEAD }, { t: 'With us', c: DARK, b: 1, f: HEAD }], { size: 28 });
++  txt(s, [2.065, 4.9103, 2.9282, 0.8314], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod incididun ut labore dolore magna aliqua.', { c: GRAY, line: 1.5 });
++  txt(s, [2.065, 4.5738, 1.7008, 0.3366], 'Phone Number', { c: ORANGE, b: 1, f: HEAD, size: 14, nowrap: 1 });
++  txt(s, [5.1547, 4.9103, 2.9282, 0.8314], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod incididun ut labore dolore magna aliqua.', { c: GRAY, line: 1.5 });
++  txt(s, [5.1547, 4.5738, 1.4466, 0.3366], 'Our Address', { c: ORANGE, b: 1, f: HEAD, size: 14, nowrap: 1 });
++  txt(s, [4.8914, 1.2347, 2.9282, 1.8411], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate', { c: GRAY, line: 1.5 });
++  chrome(s, { num: '29', numW: 0.365, site: WHITE });
++}
++
++function slide30(pres) {
++  const s = pres.addSlide();
++  grad(s, [7.4798, 1.2432, 5.0135, 5.0135], 'd', 'ellipse');
++  poly(s, [0, 1.3595, 9.2314, 4.7811], WHITE, [
++    { x: 0, y: 0, moveTo: true }, { x: 9.2314, y: 0 }, { x: 9.0108, y: 0.0808 },
++    { curve: { type: 'cubic', x1: 8.1111, y1: 0.4613, x2: 7.4798, y2: 1.3522 }, x: 7.4798, y: 2.3906 },
++    { curve: { type: 'cubic', x1: 7.4798, y1: 3.4289, x2: 8.1111, y2: 4.3198 }, x: 9.0108, y: 4.7003 },
++    { x: 9.2314, y: 4.7811 }, { x: 0, y: 4.7811 }, { close: true },
++  ]);
++  txt(s, [1.3333, 3.309, 4.8889, 0.8314], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad veniam, quis nostrud exercitation ullamco laboris nisi', { c: GRAY, line: 1.5 });
++  txt(s, [1.3333, 2.2116, 4.6214, 1.0098], [{ t: 'THANK', c: BLUE, b: 1, f: HEAD }, { t: ' ', c: DARK, b: 1, f: HEAD }, { t: 'YOU', c: DARK, b: 1, f: HEAD }], { size: 54, nowrap: 1 });
++  rrect(s, [1.4444, 4.5909, 1.5451, 0.4444], ORANGE, 0.0741);
++  txt(s, [1.5269, 4.6785, 1.38, 0.2693], 'Learn More', { c: WHITE, align: 'center', spc: 3, nowrap: 1 });
++  chrome(s, { num: '30', numW: 0.3773 });
++}
++
++// ------------------------------------------------------------------ main
++const DECK = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19,
++  slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29,
++  slide30];
++
++const pres = new PptxGenJS();
++pres.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
++pres.layout = 'WIDE';
++pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++pres.title = 'NFT Presentation';
++
++DECK.forEach(build => build(pres));
++
++pres.writeFile({ fileName: path.join(__dirname, 'aab06bbe-ed22-44cf-b2a3-efc5a6cb1b9d_grok_final.pptx') })
++  .then(f => console.log('wrote ' + f));

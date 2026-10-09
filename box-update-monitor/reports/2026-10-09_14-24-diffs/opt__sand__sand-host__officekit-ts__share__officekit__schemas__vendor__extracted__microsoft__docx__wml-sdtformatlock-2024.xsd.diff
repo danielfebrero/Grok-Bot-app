@@ -1,0 +1,7 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/docx/wml-sdtformatlock-2024.xsd
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/schemas/vendor/extracted/microsoft/docx/wml-sdtformatlock-2024.xsd
+@@ -0,0 +1,4 @@
++<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:w12="http://schemas.openxmlformats.org/wordprocessingml/2006/main" elementFormDefault="qualified" attributeFormDefault="qualified" blockDefault="#all" xmlns="http://schemas.microsoft.com/office/word/2024/wordml/sdtformatlock" targetNamespace="http://schemas.microsoft.com/office/word/2024/wordml/sdtformatlock">
++   <xsd:import id="w12" namespace="http://schemas.openxmlformats.org/wordprocessingml/2006/main" schemaLocation="word12.xsd"/>
++   <xsd:attribute name="formattingAllowed" type="w12:ST_OnOff"/>
++ </xsd:schema>

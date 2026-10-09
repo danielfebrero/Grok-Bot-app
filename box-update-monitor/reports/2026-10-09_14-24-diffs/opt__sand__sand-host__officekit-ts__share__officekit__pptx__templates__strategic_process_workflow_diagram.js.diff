@@ -1,0 +1,827 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/strategic_process_workflow_diagram.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/strategic_process_workflow_diagram.js
+@@ -0,0 +1,824 @@
++/*
++ * "Process Diagram" — 20-slide deck rebuilt with pptxgenjs.
++ *
++ * Raster images from the source deck are replaced with flat grey placeholder
++ * rectangles (imageBox); vector icons become small outlined glyph marks.
++ *
++ * Run:  node 10bb8a7a-7934-4dc3-aa59-653f831cce6d_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const FONT = 'SUSE';
++
++const VIOLET = '4B38EF';
++const NAVY = '2C374B';
++const INK = '262626';
++const STEEL = '98BCD0';
++const SLATE = '5E97B6';
++const SILVER = 'BFBFBF';
++const GREY = '808080';   // body copy
++const SOFT = 'F2F2F2';   // decorative rails / rings
++const IMGBG = 'D9D9D9';  // image placeholder
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++
++// The four accent colours, in the order the deck cycles through them.
++const ACCENTS = [VIOLET, NAVY, INK, STEEL];
++
++// Body-text insets used by the source deck, expressed in points [l, r, b, t].
++const PAD_L = [7.2, 7.2, 7.2, 7.2];   // 0.100"
++const PAD_M = [5.4, 5.4, 2.7, 2.7];   // 0.073" / 0.037"
++const PAD_S = [5.0, 5.0, 2.5, 2.5];   // 0.069" / 0.035"
++
++// pptxgenjs rewrites the shadow object it is handed, so hand out a fresh one
++// each time rather than sharing a single constant.
++function softShadow() {
++  return { type: 'outer', blur: 21.2, offset: 2.1, angle: 45, color: INK, opacity: 0.1 };
++}
++
++// Some shapes in the deck carry a wide tinted glow instead of a grey drop shadow.
++function glow(color) {
++  return { type: 'outer', blur: 21.5, offset: 2.1, angle: 45, color, opacity: 0.247 };
++}
++
++const LOREM =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
++  'exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.';
++const LOREM_MED =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.';
++const LOREM_S = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit';
++const LOREM_XS = 'Lorem ipsum dolor sit amet, consectetur';
++
++/* ---------------------------------------------------------------- helpers */
++
++// Text box. `o` carries x/y/w/h plus any pptxgenjs text overrides.
++function T(slide, txt, o) {
++  slide.addText(txt, Object.assign({
++    fontFace: FONT, color: GREY, fontSize: 9,
++    align: 'left', valign: 'top', wrap: true, margin: PAD_M,
++  }, o));
++}
++
++// Section heading: 36pt bold, 80% line spacing, 0.1" insets.
++function title(slide, txt, x, y, w, h, opts) {
++  T(slide, txt, Object.assign({
++    x, y, w, h, fontSize: 36, bold: true, color: INK,
++    lineSpacingMultiple: 0.8, margin: PAD_L,
++  }, opts));
++}
++
++// Grey paragraph of body copy at 120% line spacing.
++function body(slide, txt, x, y, w, h, opts) {
++  T(slide, txt, Object.assign({ x, y, w, h, lineSpacingMultiple: 1.2 }, opts));
++}
++
++function rect(slide, x, y, w, h, color, opts) {
++  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, opts));
++}
++
++function pill(slide, x, y, w, h, color, opts) {
++  slide.addShape('roundRect', Object.assign({
++    x, y, w, h, fill: { color }, rectRadius: h / 2,
++  }, opts));
++}
++
++function circle(slide, cx, cy, d, color, opts) {
++  slide.addShape('ellipse', Object.assign({
++    x: cx - d / 2, y: cy - d / 2, w: d, h: d, fill: { color },
++  }, opts));
++}
++
++function vline(slide, x, y, h, color, width) {
++  slide.addShape('line', { x, y, w: 0, h, line: { color, width } });
++}
++
++function hline(slide, x, y, w, color, width) {
++  slide.addShape('line', { x, y, w, h: 0, line: { color, width } });
++}
++
++// Flat stand-in for a photo region of the source deck (its picture
++// placeholders carry exactly this grey fill).
++function imageBox(slide, x, y, w, h) {
++  slide.addShape('rect', { x, y, w, h, fill: { color: IMGBG } });
++}
++
++// Stand-in for one of the deck's small pictogram graphics: a framed square
++// with a baseline stroke, drawn in the given colour.
++function glyph(slide, cx, cy, size, color) {
++  slide.addShape('roundRect', {
++    x: cx - size / 2, y: cy - size / 2, w: size, h: size,
++    rectRadius: size * 0.18, line: { color, width: 1.5 },
++  });
++  slide.addShape('line', {
++    x: cx - size * 0.22, y: cy + size * 0.14, w: size * 0.44, h: 0,
++    line: { color, width: 1.5 },
++  });
++}
++
++// Open "C" ring: a thick partial annulus. Angles run clockwise from 3 o'clock.
++function ring(slide, cx, cy, r, thick, from, to, color, shadow) {
++  slide.addShape('blockArc', {
++    x: cx - r, y: cy - r, w: r * 2, h: r * 2,
++    fill: { color }, angleRange: [from, to], arcThicknessRatio: thick / r, shadow,
++  });
++}
++
++// Half-ellipse rail used to bend the ribbon paths ('left' or 'right' bulge).
++function bend(slide, xEdge, yTop, rx, h, side, color, width) {
++  slide.addShape('arc', {
++    x: side === 'right' ? xEdge - rx : xEdge, y: yTop, w: rx * 2, h,
++    angleRange: side === 'right' ? [270, 90] : [90, 270],
++    line: { color, width },
++  });
++}
++
++// Right-pointing arrow tag: rectangle body plus a triangular head.
++function arrowTag(slide, x, y, w, h, color) {
++  const head = w * 0.294;      // horizontal depth of the head
++  const inset = h * 0.134;     // body is slightly shorter than the head
++  slide.addShape('custGeom', {
++    x, y, w, h, fill: { color },
++    points: [
++      { x: w - head, y: 0 },
++      { x: w, y: h / 2 },
++      { x: w - head, y: h },
++      { x: w - head, y: h - inset },
++      { x: 0, y: h - inset },
++      { x: 0, y: inset },
++      { x: w - head, y: inset },
++      { close: true },
++    ],
++  });
++}
++
++// Chevron banner: arrow head on the right, matching notch cut into the left.
++function chevron(slide, x, y, w, h, color) {
++  const notch = w * 0.161;
++  slide.addShape('custGeom', {
++    x, y, w, h, fill: { color },
++    points: [
++      { x: 0, y: 0 },
++      { x: w - notch, y: 0 },
++      { x: w, y: h / 2 },
++      { x: w - notch, y: h },
++      { x: 0, y: h },
++      { x: notch, y: h / 2 },
++      { close: true },
++    ],
++  });
++}
++
++// Small solid triangle pointing right (used as an inline marker).
++function marker(slide, cx, cy, w, h, color) {
++  slide.addShape('triangle', {
++    x: cx - h / 2, y: cy - w / 2, w: h, h: w, rotate: 90, fill: { color },
++  });
++}
++
++// Arrow head terminating a ring, sitting `at` degrees round it and aimed `dir`
++// degrees (both measured clockwise from 3 o'clock).
++function arcArrow(slide, cx, cy, r, at, dir, color) {
++  const rad = at * Math.PI / 180;
++  const size = 0.44;
++  slide.addShape('triangle', {
++    x: cx + r * Math.cos(rad) - size / 2, y: cy + r * Math.sin(rad) - size / 2,
++    w: size, h: size, rotate: dir + 90, fill: { color },
++  });
++}
++
++/* ------------------------------------------------------------- slide 1/20 */
++
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 0, 0, 3.417, 5.625);
++  T(s, [{ text: 'Process', options: { breakLine: true } }, { text: 'Diagram' }], {
++    x: 4.054, y: 0.308, w: 4.757, h: 2.356,
++    fontSize: 80, bold: true, color: BLACK, lineSpacingMultiple: 0.8, margin: PAD_L,
++  });
++  T(s, 'Presentation Template', {
++    x: 4.117, y: 2.683, w: 4.394, h: 0.417,
++    fontSize: 16, bold: true, color: INK, lineSpacingMultiple: 0.8, margin: PAD_L,
++  });
++  T(s, 'A visual representation of key stages in our workflow, designed to ensure ' +
++       'clarity, alignment, and strategic execution across all phases.', {
++    x: 4.142, y: 3.427, w: 4.394, h: 0.732, fontSize: 10.5, bold: true, margin: PAD_L,
++  });
++  rect(s, 4.231, 4.278, 0.927, 0.422, VIOLET);
++  T(s, '2026', {
++    x: 4.348, y: 4.303, w: 0.8, h: 0.417,
++    fontSize: 16, bold: true, color: WHITE, lineSpacingMultiple: 0.8, margin: PAD_L,
++  });
++  T(s, 'www.yoursite.com', {
++    x: 4.124, y: 5.027, w: 2.069, h: 0.323,
++    fontSize: 9, color: INK, lineSpacingMultiple: 0.8, margin: PAD_L,
++  });
++}
++
++/* ------------------------------------------------------------- slide 2/20 */
++
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'A Strategic Framework for Sustainable Growth', 0.295, 0.939, 4.723, 1.656);
++  circle(s, 0.79, 3.282, 0.741, VIOLET);
++  glyph(s, 0.79, 3.282, 0.36, WHITE);
++  T(s, 'Goal-Oriented', {
++    x: 1.286, y: 3.06, w: 2.604, h: 0.444,
++    fontSize: 18, bold: true, color: INK, lineSpacingMultiple: 0.8, margin: PAD_L,
++  });
++  body(s, LOREM, 0.34, 4.067, 4.589, 0.619);
++  imageBox(s, 5.277, 0.417, 4.307, 2.25);
++  imageBox(s, 5.277, 2.959, 4.307, 2.25);
++}
++
++/* ------------------------------------------------------------- slide 3/20 */
++
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'Strategic Clarity Rooted in Purpose', 0.408, 1.498, 3.679, 1.528, { margin: PAD_M });
++  body(s, LOREM, 0.434, 3.325, 3.503, 0.801);
++
++  // Four interlocking open rings, each hugging one accent circle.
++  const nodes = [
++    { cx: 5.001, cy: 1.297, color: VIOLET, gap: 'right' },
++    { cx: 6.045, cy: 2.317, color: NAVY, gap: 'left' },
++    { cx: 5.012, cy: 3.322, color: INK, gap: 'right' },
++    { cx: 6.056, cy: 4.342, color: STEEL, gap: 'left' },
++  ];
++  nodes.forEach(function (n) {
++    const span = n.gap === 'right' ? [45, 315] : [225, 135];
++    ring(s, n.cx, n.cy, 0.783, 0.142, span[0], span[1], SOFT);
++  });
++
++  // White capsules carrying the numbered captions.
++  const steps = [
++    { x: 5.088, y: 0.963, w: 3.691, h: 0.677, n: '01', nx: 5.806, ny: 1.067,
++      tx: 6.292, ty: 1.164, tw: 2.348, label: 'Identify the Core Challenge', color: VIOLET },
++    { x: 5.806, y: 1.934, w: 3.706, h: 0.752, n: '02', nx: 6.946, ny: 2.075,
++      tx: 7.543, ty: 2.188, tw: 1.838, label: 'Clarify Desired Outcome', color: NAVY },
++    { x: 4.750, y: 2.942, w: 4.101, h: 0.752, n: '03', nx: 5.971, ny: 3.083,
++      tx: 6.539, ty: 3.180, tw: 2.214, label: 'Align with Stakeholders', color: INK },
++    { x: 5.806, y: 3.950, w: 3.706, h: 0.752, n: '04', nx: 6.946, ny: 4.091,
++      tx: 7.529, ty: 4.205, tw: 1.984, label: 'Set Key Metrics for Success', color: SLATE },
++  ];
++  steps.forEach(function (p) {
++    pill(s, p.x, p.y, p.w, p.h, WHITE, { shadow: softShadow() });
++    T(s, p.n, { x: p.nx, y: p.ny, w: 0.751, h: 0.469, fontSize: 23.48, bold: true, color: p.color });
++    T(s, p.label, { x: p.tx, y: p.ty, w: p.tw, h: 0.276, fontSize: 10, bold: true, lineSpacingMultiple: 1.2 });
++  });
++
++  nodes.forEach(function (n) { circle(s, n.cx, n.cy, 1.02, n.color); });
++  nodes.forEach(function (n) { glyph(s, n.cx, n.cy, 0.42, WHITE); });
++}
++
++/* ------------------------------------------------------------- slide 4/20 */
++
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 0.417, 0.417, 3.94, 4.792);
++  title(s, 'Activating Strategic Initiatives', 4.787, 0.522, 4.669, 1.414, { lineSpacingMultiple: null });
++  body(s, LOREM, 4.831, 2.016, 4.669, 0.619);
++  slide04Quote(s);
++}
++
++function slide04Quote(s) {
++  s.addShape('roundRect', {
++    x: 3.796, y: 3.079, w: 5.803, h: 1.889, fill: { color: INK }, rectRadius: 0.229,
++  });
++  circle(s, 5.457, 4.024, 1.122, IMGBG);
++  T(s, 'Strategy without resources is just a wish.', {
++    x: 6.404, y: 3.506, w: 2.961, h: 0.68, fontSize: 18, color: WHITE,
++  });
++  T(s, 'John Bennet', {
++    x: 6.404, y: 4.282, w: 3.136, h: 0.259, fontSize: 11, bold: true, color: WHITE,
++  });
++}
++
++/* ------------------------------------------------------------- slide 5/20 */
++
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'Strategic Planning', 2.769, 0.518, 4.461, 0.559, { align: 'center', margin: PAD_M });
++
++  // Five nodes on a wave: odd ones sit high, even ones sit low.
++  const nodes = [
++    { cx: 1.917, cy: 3.095, color: VIOLET, up: true },
++    { cx: 3.358, cy: 3.410, color: NAVY, up: false },
++    { cx: 4.800, cy: 3.095, color: INK, up: true },
++    { cx: 6.241, cy: 3.410, color: STEEL, up: false },
++    { cx: 7.683, cy: 3.095, color: SILVER, up: true },
++  ];
++  nodes.forEach(function (n) {
++    s.addShape('arc', {
++      x: n.cx - 0.7205, y: n.cy - 0.7205, w: 1.441, h: 1.441,
++      angleRange: n.up ? [180, 360] : [0, 180], line: { color: SOFT, width: 4.5 },
++    });
++  });
++  [1.196, 2.638, 4.079, 5.521, 6.962, 8.404].forEach(function (x) {
++    vline(s, x, 3.100, 0.305, SOFT, 4.5);
++  });
++  nodes.forEach(function (n) { circle(s, n.cx, n.cy, 1.158, n.color, { shadow: softShadow() }); });
++  nodes.forEach(function (n) { glyph(s, n.cx, n.cy, 0.45, WHITE); });
++
++  // Captions alternate above (high nodes) / below (low nodes).
++  const cards = [
++    { pct: '50%', pc: VIOLET, head: 'Review the Data', hx: 1.066, hw: 1.667, x: 1.066, y: 3.874, below: true },
++    { pct: '60%', pc: NAVY, head: 'Identify Key Focus Areas', hx: 2.282, hw: 2.211, x: 2.554, y: 1.420, below: false },
++    { pct: '70%', pc: INK, head: 'Set Clear Objectives', hx: 3.573, hw: 2.502, x: 3.990, y: 3.874, below: true },
++    { pct: '80%', pc: STEEL, head: ' Develop Strategic Initiatives', hx: 4.728, hw: 3.027, x: 5.408, y: 1.420, below: false },
++    { pct: '95%', pc: SILVER, head: 'Secure Alignment & Buy-In', hx: 6.432, hw: 2.502, x: 6.850, y: 3.874, below: true },
++  ];
++  cards.forEach(function (c) {
++    T(s, c.pct, { x: c.x, y: c.y, w: 1.667, h: 0.397, fontSize: 19.43, bold: true, color: c.pc, align: 'center', margin: PAD_S });
++    T(s, c.head, { x: c.hx, y: c.y + 0.376, w: c.hw, h: 0.294, fontSize: 11.1, bold: true, color: INK, align: 'center', margin: PAD_S });
++    T(s, LOREM_S, { x: c.x, y: c.y + 0.621, w: 1.667, h: 0.615, align: 'center', lineSpacingMultiple: 1.2, margin: PAD_S });
++  });
++}
++
++/* ------------------------------------------------------------- slide 6/20 */
++
++function slide06(pptx) {
++  const s = pptx.addSlide();
++
++  // Snaking rail: four horizontal runs joined by alternating half-round bends.
++  const RAIL = 20.95;
++  hline(s, 0.855, 0.600, 2.374, SOFT, RAIL);
++  bend(s, 3.226, 0.600, 0.629, 1.101, 'right', SOFT, RAIL);
++  hline(s, 1.484, 1.701, 1.761, SOFT, RAIL);
++  bend(s, 0.855, 1.701, 0.629, 1.101, 'left', SOFT, RAIL);
++  hline(s, 1.496, 2.802, 1.739, SOFT, RAIL);
++  bend(s, 3.238, 2.802, 0.629, 1.101, 'right', SOFT, RAIL);
++  hline(s, 1.448, 3.903, 1.803, SOFT, RAIL);
++  bend(s, 0.843, 3.903, 0.605, 1.101, 'left', SOFT, RAIL);
++  hline(s, 1.448, 5.004, 2.290, SOFT, RAIL);
++
++  // Icon badges sit on the rail; captions flip side with the rail.
++  const stops = [
++    { cx: 3.293, cy: 1.147, color: VIOLET, head: 'Launch Priority Actions',
++      hx: 0.311, hy: 0.869, hw: 2.407, bx: 0.135, bw: 2.584, align: 'right' },
++    { cx: 1.399, cy: 2.248, color: NAVY, head: 'Coordinate Across Teams',
++      hx: 1.944, hy: 1.971, hw: 2.406, bx: 1.944, bw: 2.568, align: 'left' },
++    { cx: 3.323, cy: 3.349, color: INK, head: 'Track Execution in Real-Time',
++      hx: -0.108, hy: 3.083, hw: 2.826, bx: 0.135, bw: 2.584, align: 'right' },
++    { cx: 1.399, cy: 4.450, color: STEEL, head: 'Iterate & Adapt',
++      hx: 1.944, hy: 4.172, hw: 2.406, bx: 1.944, bw: 2.568, align: 'left' },
++  ];
++  stops.forEach(function (p) {
++    circle(s, p.cx, p.cy, 0.882, WHITE, { shadow: softShadow() });
++    circle(s, p.cx, p.cy, 0.688, p.color);
++    glyph(s, p.cx, p.cy, 0.3, WHITE);
++    T(s, p.head, { x: p.hx, y: p.hy, w: p.hw, h: 0.277, fontSize: 11.97, bold: true, color: INK, align: p.align });
++    T(s, LOREM_XS, { x: p.bx, y: p.hy + 0.29, w: p.bw, h: 0.253, fontSize: 8.97, align: p.align, lineSpacingMultiple: 1.2 });
++  });
++
++  title(s, 'Innovation with Measurable Results', 4.872, 0.379, 4.703, 1.171);
++  body(s, LOREM, 4.925, 1.704, 4.649, 0.621);
++  imageBox(s, 5.0, 2.823, 5.0, 2.802);
++}
++
++/* ------------------------------------------------------------- slide 7/20 */
++
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'Insight-Driven Research & Data Acquisition', 0.55, 1.252, 3.557, 2.013, { margin: PAD_M });
++  body(s, LOREM, 0.55, 3.572, 3.512, 0.801);
++
++  // Three linked arrow-rings cascading down the middle; the first two close
++  // with an arrow head that feeds into the ring below.
++  ring(s, 5.961, 1.752, 0.798, 0.204, 181, 91, VIOLET, glow('BE6DB7'));
++  arcArrow(s, 5.961, 1.752, 0.79, 97, 140, VIOLET);
++  ring(s, 5.446, 2.818, 0.798, 0.204, 88, 314, NAVY, glow('FDD36A'));
++  arcArrow(s, 5.446, 2.818, 0.79, 86, 20, NAVY);
++  ring(s, 5.962, 3.882, 0.797, 0.203, 225, 180, INK, glow('DC8449'));
++  glyph(s, 5.445, 2.818, 0.36, NAVY);
++  glyph(s, 5.961, 1.752, 0.36, VIOLET);
++  glyph(s, 5.962, 3.882, 0.45, WHITE);
++
++  const stats = [
++    { pct: '75%', color: VIOLET, y: 0.878, head: 'Define Research Objectives', hw: 2.346, hh: 0.265 },
++    { pct: '85%', color: NAVY, y: 2.178, head: 'Collect Data Using Strategic Methods', hw: 2.298, hh: 0.458 },
++    { pct: '95%', color: INK, y: 3.683, head: 'Step Three', hw: 1.718, hh: 0.265 },
++  ];
++  stats.forEach(function (st) {
++    T(s, st.pct, { x: 7.254, y: st.y, w: 1.718, h: 0.409, fontSize: 20.03, bold: true, color: st.color });
++    T(s, st.head, { x: 7.254, y: st.y + 0.388, w: st.hw, h: st.hh, fontSize: 11.44, bold: true, color: INK });
++    T(s, LOREM_S, { x: 7.254, y: st.y + 0.388 + st.hh + 0.02, w: 1.718, h: 0.436, lineSpacingMultiple: 1.2 });
++  });
++}
++
++/* ------------------------------------------------------------- slide 8/20 */
++
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  // Oversized guide circle; only its lower arc falls on the slide.
++  s.addShape('ellipse', { x: 2.483, y: -1.408, w: 5.012, h: 5.012, line: { color: SOFT, width: 5.88 } });
++  title(s, 'Iterate. Optimize. Elevate.', 3.578, 0.506, 3.0, 1.528, { align: 'center', margin: PAD_M });
++
++  const nodes = [
++    { x: 1.780, y: 0.461, color: VIOLET, tx: 0.219, ty: 2.094, tw: 1.885,
++      head: 'Performance Insights', align: 'right', hs: 11.43 },
++    { x: 2.514, y: 2.109, color: NAVY, tx: 0.440, ty: 3.742, tw: 2.217,
++      head: 'Identify Areas of Friction', align: 'right' },
++    { x: 4.259, y: 2.884, color: INK, tx: 3.250, ty: 4.582, tw: 3.501,
++      head: 'Test Small Improvements', align: 'center', bx: 3.892, bw: 2.217 },
++    { x: 6.004, y: 2.109, color: STEEL, tx: 6.952, ty: 3.742, tw: 2.217,
++      head: 'Measure the Impact', align: 'left' },
++    { x: 6.739, y: 0.461, color: SILVER, tx: 7.956, ty: 2.094, tw: 1.806,
++      head: 'Apply What Works', align: 'left', bw: 2.217, hs: 11.43 },
++  ];
++  nodes.forEach(function (n) {
++    s.addShape('ellipse', { x: n.x, y: n.y, w: 1.466, h: 1.466, fill: { color: n.color }, shadow: softShadow() });
++    glyph(s, n.x + 0.733, n.y + 0.733, 0.56, WHITE);
++    T(s, n.head, { x: n.tx, y: n.ty, w: n.tw, h: 0.277, fontSize: n.hs || 11, bold: true, color: INK, align: n.align, margin: [6, 6, 3, 3] });
++    T(s, LOREM_S, { x: n.bx || n.tx, y: n.ty + 0.3, w: n.bw || n.tw, h: 0.434, color: INK, align: n.align, lineSpacingMultiple: 1.2, margin: PAD_S });
++  });
++}
++
++/* ------------------------------------------------------------- slide 9/20 */
++
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'Monitor. Analyze. Improve.', 0.289, 3.388, 4.418, 1.171);
++  body(s, LOREM, 0.341, 4.693, 4.670, 0.621);
++  imageBox(s, 0.430, 0.417, 4.581, 2.608);
++
++  vline(s, 7.521, 1.311, 3.379, SOFT, 1.41);
++  const rows = [
++    { n: '01', color: VIOLET, dot: VIOLET, y: 0.712, side: 'left', pct: '70%', pctY: 0.623,
++      head: 'Customer Retention Rate', headY: 1.023, hw: 1.514, hh: 0.451 },
++    { n: '02', color: NAVY, dot: NAVY, y: 1.845, side: 'right', pct: '+13.5%', pctY: 1.970,
++      head: 'User Growth Rate', headY: 2.396, hw: 1.694, hh: 0.261 },
++    { n: '03', color: INK, dot: INK, y: 2.978, side: 'left', pct: '35%', pctY: 2.890,
++      head: 'Highest traffic day (Monday)', headY: 3.272, hw: 1.694, hh: 0.451 },
++    { n: '04', color: STEEL, dot: 'B4CEDC', y: 4.111, side: 'right', pct: '+17.4%', pctY: 4.166,
++      head: 'Refine the Approach', headY: 4.549, hw: 1.694, hh: 0.261, pc: SLATE },
++  ];
++  rows.forEach(function (r, i) {
++    // Badge alternates left / right of the spine; the teardrop points at it.
++    const bx = r.side === 'left' ? 6.086 : 8.054;
++    s.addShape('teardrop', {
++      x: bx, y: r.y, w: 0.891, h: 0.891, fill: { color: WHITE },
++      rotate: r.side === 'left' ? 45 : 225, shadow: softShadow(),
++    });
++    circle(s, bx + 0.4455, r.y + 0.4455, 0.638, r.color);
++    T(s, r.n, {
++      x: bx + 0.13, y: r.y + 0.22, w: 0.631, h: 0.451, fontSize: 22.57, bold: true,
++      color: WHITE, align: 'center', valign: 'middle', margin: PAD_S,
++    });
++    circle(s, 7.521, 1.177 + i * 1.133, 0.267, WHITE);
++    circle(s, 7.521, 1.177 + i * 1.133, 0.151, r.dot);
++    const tx = r.side === 'left' ? 7.965 : 5.492;
++    const align = r.side === 'left' ? 'left' : 'right';
++    T(s, r.pct, { x: tx, y: r.pctY, w: 1.694, h: 0.404, fontSize: 19.75, bold: true, color: r.pc || r.color, align, margin: PAD_S });
++    T(s, r.head, { x: tx, y: r.headY, w: r.hw, h: r.hh, fontSize: 11.28, bold: true, align, margin: PAD_S });
++  });
++}
++
++/* ------------------------------------------------------------ slide 10/20 */
++
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  vline(s, 3.308, 0.0, 5.625, SOFT, 6.0);
++
++  const phases = [
++    { n: '01', color: VIOLET, y: 0.458, left: true, name: 'Phase 1', sub: 'Discovery & Alignment', sw: 2.215, sh: 0.318 },
++    { n: '02', color: NAVY, y: 1.383, left: false, name: 'Phase 2', sub: 'Research & Strategy Design', sw: 1.573, sh: 0.560 },
++    { n: '03', color: INK, y: 2.309, left: true, name: 'Phase 3', sub: 'Planning & Resource Mapping', sw: 1.729, sh: 0.560 },
++    { n: '04', color: STEEL, y: 3.235, left: false, name: 'Phase 4', sub: 'Execution & Tracking', sw: 2.214, sh: 0.318 },
++    { n: '05', color: SILVER, y: 4.161, left: true, name: 'Phase 5', sub: 'Review & Optimization', sw: 2.214, sh: 0.318 },
++  ];
++  phases.forEach(function (p) {
++    const x = p.left ? 0.454 : 3.703;
++    s.addShape('homePlate', {
++      x, y: p.y, w: 2.499, h: 1.014, fill: { color: p.color }, flipH: !p.left,
++    });
++    const align = p.left ? 'left' : 'right';
++    T(s, p.name, { x: p.left ? 0.662 : 3.865, y: p.y + 0.186, w: 2.13, h: 0.278, fontSize: 12, bold: true, color: WHITE, align });
++    T(s, p.sub, {
++      x: p.left ? 0.661 : (p.sw === 2.214 ? 3.780 : 4.422), y: p.y + 0.462,
++      w: p.sw, h: p.sh, fontSize: 12, color: WHITE, align, lineSpacingMultiple: 1.2,
++    });
++    s.addShape('ellipse', { x: 3.075, y: p.y + 0.267, w: 0.478, h: 0.478, fill: { color: p.color } });
++    T(s, p.n, {
++      x: 3.075, y: p.y + 0.267, w: 0.478, h: 0.478, fontSize: 11, bold: true,
++      color: WHITE, align: 'center', valign: 'middle', margin: PAD_M,
++    });
++  });
++
++  title(s, 'From Insight to Business Impact', 6.533, 1.543, 3.204, 1.656);
++  body(s, LOREM_MED, 6.607, 3.461, 2.956, 0.621);
++}
++
++/* ------------------------------------------------------------ slide 11/20 */
++
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 6.694, 0.0, 3.306, 5.625);
++  title(s, 'An Evolving Journey of Growth & Strategic Agility', 0.292, 1.275, 4.413, 1.656);
++  body(s, LOREM, 0.351, 3.547, 4.413, 0.803);
++
++  const cards = [
++    { y: 0.521, color: VIOLET, big: '+320% YoY', bw: 1.558, sub: 'Monthly Active Users' },
++    { y: 2.188, color: NAVY, big: 'From 5 to 21 core staff', bw: 2.811, sub: 'Team Expansion' },
++    { y: 3.854, color: INK, big: '3 countries in Q1', bw: 2.221, sub: 'New Markets Entered' },
++  ];
++  cards.forEach(function (c) {
++    s.addShape('roundRect', { x: 5.0, y: c.y, w: 4.028, h: 1.25, fill: { color: c.color }, rectRadius: 0.208 });
++    circle(s, 5.611, c.y + 0.625, 0.674, WHITE);
++    glyph(s, 5.611, c.y + 0.625, 0.28, c.color);
++    T(s, c.big, { x: 6.096, y: c.y + 0.213, w: c.bw, h: 0.505, fontSize: 18, bold: true, color: WHITE, margin: PAD_L });
++    T(s, c.sub, { x: 6.153, y: c.y + 0.665, w: 1.735, h: 0.316, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* ------------------------------------------------------------ slide 12/20 */
++
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'Navigating the Next Phase of Business Evolution', 1.508, 0.484, 6.985, 1.171, { align: 'center' });
++
++  const steps = [
++    { x: 0.399, color: VIOLET, label: 'Steps 01', pct: '+40%', note: 'Increase in operational efficiency', nw: 2.064, below: true },
++    { x: 2.451, color: NAVY, label: 'Steps 02', pct: '+60%', note: 'Audience growth in new regions', nw: 1.929, below: false },
++    { x: 4.502, color: INK, label: 'Steps 03', pct: '+50%', note: 'Faster release cycle turnaround', nw: 1.929, below: true },
++    { x: 6.554, color: STEEL, label: 'Steps 04', pct: '+400%', note: 'Increase in partner-driven conversions', nw: 2.519, below: false, pc: SLATE },
++  ];
++  const PAD_T = [5.8, 5.8, 2.9, 2.9];
++  steps.forEach(function (st) {
++    const x = st.x;
++    // Leader line from the pill up (odd steps) or down (even steps) to the caption.
++    vline(s, x + 0.516, st.below ? 4.064 : 1.965, st.below ? 1.107 : 0.949, st.color, 0.81);
++
++    // White disc sits behind the pill so it reads as a knob on the left end.
++    circle(s, x + 0.5155, 3.4965, 1.031, WHITE, { shadow: softShadow() });
++    s.addShape('roundRect', { x: x + 0.122, y: 3.138, w: 2.86, h: 0.731, fill: { color: st.color }, rectRadius: 0.3655 });
++    circle(s, x + 0.5155, 3.5040, 0.448, WHITE);
++    marker(s, x + 0.519, 3.504, 0.208, 0.092, st.color);
++    T(s, st.label, { x: x + 0.870, y: 3.364, w: 1.538, h: 0.298, fontSize: 12.85, bold: true, color: WHITE, margin: PAD_T });
++
++    const cx = x + 0.720;
++    const cy = st.below ? 4.115 : 2.013;
++    T(s, st.pct, { x: cx, y: cy, w: 1.929, h: 0.46, fontSize: 22.49, bold: true, color: st.pc || st.color, margin: PAD_T });
++    T(s, st.note, { x: cx, y: cy + 0.435, w: st.nw, h: 0.418, fontSize: 10, bold: true, margin: PAD_T });
++  });
++}
++
++/* ------------------------------------------------------------ slide 13/20 */
++
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'The Economic Impact of Strategic Infrastructure Development', 1.054, 0.596, 7.893, 1.171, { align: 'center' });
++
++  const cols = [
++    { ix: 0.629, cx: 1.771, cy: 2.380, color: VIOLET, tx: 0.879, cap: 'Enabling Connectivity & Trade' },
++    { ix: 2.452, cx: 3.594, cy: 2.391, color: NAVY, tx: 2.676, cap: 'Stimulating Job Creation & Local Economies' },
++    { ix: 4.275, cx: 5.417, cy: 2.378, color: INK, tx: 4.579, cap: 'Powering Long-Term Economic Growth' },
++  ];
++  cols.forEach(function (c) {
++    imageBox(s, c.ix, 2.37, 2.284, 1.969);
++    circle(s, c.cx, c.cy, 0.548, c.color, { shadow: softShadow() });
++    glyph(s, c.cx, c.cy, 0.24, WHITE);
++    T(s, c.cap, {
++      x: c.tx, y: 4.626, w: 1.675, h: 0.682, fontSize: 12, bold: true,
++      color: c.color, align: 'center', lineSpacingMultiple: 1.0, margin: [5.4, 5.4, 2.7, 2.7],
++    });
++  });
++
++  T(s, '2029', { x: 6.965, y: 3.020, w: 2.225, h: 0.431, fontSize: 21.09, bold: true, color: SLATE });
++  T(s, 'Step Process', { x: 6.965, y: 3.486, w: 2.400, h: 0.279, fontSize: 12.05, bold: true, color: INK });
++  T(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++       'incididunt ut labore et dolore magna',
++    { x: 6.965, y: 3.768, w: 2.606, h: 0.624, fontSize: 9.04, lineSpacingMultiple: 1.2 });
++}
++
++/* ------------------------------------------------------------ slide 14/20 */
++
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'Strategic Value of High-Impact Data Analysts', 1.213, 0.434, 7.574, 1.171, { align: 'center' });
++
++  const bars = [
++    { x: 0.550, y: 3.435, color: VIOLET, tag: 'Process 01', tw: 1.163, year: '2026',
++      note: 'Understand the Business Challenge', ny: 4.300, lx: 0.554, ly: 4.056, lh: 1.038, tx: 0.690, nw: 1.810 },
++    { x: 2.775, y: 3.215, color: NAVY, tag: 'Process 02', tw: 1.155, year: '2027',
++      note: 'Collect and Organize Data', ny: 1.963, lx: 2.787, ly: 2.296, lh: 0.890, tx: 2.955, nw: 1.500 },
++    { x: 5.000, y: 3.435, color: INK, tag: 'Process 03', tw: 1.112, year: '2028',
++      note: 'Discover patterns, gaps, and opportunities.', ny: 4.300, lx: 4.996, ly: 4.056, lh: 1.038, tx: 5.156, nw: 1.960 },
++    { x: 7.225, y: 3.215, color: STEEL, tag: 'Process 04', tw: 1.128, year: '2029',
++      note: 'Communicate Findings Effectively', ny: 1.963, lx: 7.230, ly: 2.296, lh: 0.890, tx: 7.398, nw: 1.810, yc: SLATE },
++  ];
++  bars.forEach(function (b) {
++    vline(s, b.lx, b.ly, b.lh, b.color, 0.75);
++    rect(s, b.x, b.y, 2.225, 0.572, b.color, { shadow: softShadow() });
++    marker(s, b.x + 1.994, b.y + 0.286, 0.194, 0.087, WHITE);
++    T(s, b.tag, { x: b.x + 0.065, y: b.y + 0.147, w: b.tw, h: 0.279, fontSize: 12.05, bold: true, color: WHITE, margin: [5.4, 5.4, 2.7, 2.7] });
++    T(s, b.year, { x: b.tx, y: b.ny, w: 1.810, h: 0.431, fontSize: 21.09, bold: true, color: b.yc || b.color, margin: [5.4, 5.4, 2.7, 2.7] });
++    T(s, b.note, { x: b.tx, y: b.ny + 0.409, w: b.nw, h: 0.482, fontSize: 12.05, bold: true, margin: [5.4, 5.4, 2.7, 2.7] });
++  });
++}
++
++/* ------------------------------------------------------------ slide 15/20 */
++
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 0, 0, 10.0, 3.259);
++
++  const cells = [
++    { x: 0.420, color: VIOLET, pct: '+55%', tx: 0.537, tw: 2.012, th: 0.476,
++      note: 'Cross-team task completion increased', px: 0.649 },
++    { x: 2.726, color: NAVY, pct: '+60%', tx: 2.955, tw: 1.788, th: 0.677,
++      note: 'User satisfaction rose by +48% post-UX refresh', px: 2.955 },
++    { x: 5.032, color: INK, pct: '-56%', tx: 5.261, tw: 1.788, th: 0.677,
++      note: 'Security issue resolution time reduced by', px: 5.261 },
++    { x: 7.337, color: STEEL, pct: '+70%', tx: 7.566, tw: 1.788, th: 0.476,
++      note: 'Data dashboard usage jumped', px: 7.566, pc: SLATE },
++  ];
++  cells.forEach(function (c) {
++    chevron(s, c.x, 2.567, 2.246, 1.399, c.color);
++    marker(s, c.x + 2.058, 3.272, 0.192, 0.085, WHITE);
++    circle(s, c.x + 1.221, 3.266, 0.870, WHITE);
++    glyph(s, c.x + 1.221, 3.266, 0.4, c.color);
++    T(s, c.pct, { x: c.px, y: 4.230, w: 1.788, h: 0.426, fontSize: 20.84, bold: true, color: c.pc || c.color, align: 'center', margin: [5.3, 5.3, 2.7, 2.7] });
++    T(s, c.note, { x: c.tx, y: 4.633, w: c.tw, h: c.th, fontSize: 11.91, bold: true, align: 'center', margin: [5.3, 5.3, 2.7, 2.7] });
++  });
++}
++
++/* ------------------------------------------------------------ slide 16/20 */
++
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'Advancing with Strategic Intent', 0.321, 0.451, 4.841, 1.171);
++
++  // Tube path weaving over/under the four numbered circles: each node carries a
++  // half-round cap plus two straight legs, and all but the last ends in an arrow.
++  const R = 0.8055, TUBE = 0.167, LEG = 0.81, AW = 0.467, AH = 0.327;
++  const nodes = [
++    { cx: 1.200, cy: 2.782, color: VIOLET, n: '01', up: true, tx: 0.632, ty: 3.823, th: 0.418, cap: 'Align Vision with Action' },
++    { cx: 2.641, cy: 4.346, color: NAVY, n: '02', up: false, tx: 2.111, ty: 2.987, th: 0.594, cap: 'Empower People and Teams' },
++    { cx: 4.086, cy: 2.782, color: INK, n: '03', up: true, tx: 3.552, ty: 3.823, th: 0.418, cap: 'Stay Agile in Execution' },
++    { cx: 5.527, cy: 4.346, color: STEEL, n: '04', up: false, tx: 5.030, ty: 2.987, th: 0.594, cap: 'Lead with Integrity and Intention', nc: SLATE, tail: false },
++  ];
++  nodes.forEach(function (nd) {
++    const dir = nd.up ? 1 : -1;      // legs run down from a top cap, up from a bottom one
++    s.addShape('blockArc', {
++      x: nd.cx - R, y: nd.cy - R, w: R * 2, h: R * 2, fill: { color: SOFT },
++      angleRange: nd.up ? [180, 360] : [0, 180], arcThicknessRatio: TUBE / R,
++    });
++    const legY = nd.up ? nd.cy : nd.cy - LEG;
++    rect(s, nd.cx - R, legY, TUBE, LEG, SOFT);
++    rect(s, nd.cx + R - TUBE, legY, TUBE, LEG, SOFT);
++    if (nd.tail !== false) {
++      s.addShape('triangle', {
++        x: nd.cx + R - TUBE / 2 - AW / 2, y: nd.cy + dir * LEG - (nd.up ? 0 : AH),
++        w: AW, h: AH, fill: { color: SOFT }, flipV: nd.up,
++      });
++    }
++  });
++  nodes.forEach(function (nd) {
++    circle(s, nd.cx, nd.cy, 1.136, nd.color, { shadow: softShadow() });
++    glyph(s, nd.cx, nd.cy, 0.5, WHITE);
++    T(s, nd.n, { x: nd.tx + 0.131, y: nd.ty - 0.354, w: 0.802, h: 0.374, fontSize: 18.29, bold: true, color: nd.nc || nd.color, align: 'center', margin: [4.7, 4.7, 2.4, 2.4] });
++    T(s, nd.cap, { x: nd.tx, y: nd.ty, w: 1.065, h: nd.th, fontSize: 10.45, bold: true, align: 'center', margin: [4.7, 4.7, 2.4, 2.4] });
++  });
++
++  imageBox(s, 6.741, 0.0, 3.259, 2.143);
++  imageBox(s, 6.741, 2.369, 3.259, 3.256);
++}
++
++/* ------------------------------------------------------------ slide 17/20 */
++
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  title(s, 'Sustaining Monthly Revenue Growth', 1.165, 0.308, 7.669, 1.171, { align: 'center' });
++  imageBox(s, 6.353, 2.138, 3.647, 3.071);
++
++  const months = [
++    { x: 0.417, y: 2.137, color: VIOLET, n: '01', name: 'January', sub: 'Foundation Set', sx: 1.014, sw: 1.450, ls: 1.3 },
++    { x: 3.302, y: 2.137, color: NAVY, n: '02', name: 'February', sub: 'Revenue Doubled', sx: 3.900, sw: 1.450, ls: 1.3 },
++    { x: 0.417, y: 3.891, color: INK, n: '03', name: 'March', sub: 'Strategic Partnerships Kick In', sx: 0.599, sw: 2.280, ls: 1.0 },
++    { x: 3.302, y: 3.891, color: STEEL, n: '04', name: 'April', sub: 'Organic Growth Momentum', sx: 3.527, sw: 2.195, ls: 1.0 },
++  ];
++  months.forEach(function (m) {
++    s.addShape('roundRect', { x: m.x, y: m.y, w: 2.644, h: 1.318, fill: { color: m.color }, rectRadius: 0.22 });
++    T(s, m.name, { x: m.x + 0.543, y: m.y + 0.433, w: 1.558, h: 0.505, fontSize: 18, bold: true, color: WHITE, align: 'center', margin: PAD_L });
++    T(s, m.sub, { x: m.sx, y: m.y + (m.ls === 1.3 ? 0.817 : 0.835), w: m.sw, h: 0.316, fontSize: 11, color: WHITE, align: 'center', lineSpacingMultiple: m.ls });
++    // Numbered badge straddling the top edge of the card.
++    const bx = m.x + 1.322;
++    s.addShape('ellipse', { x: bx - 0.396, y: m.y - 0.420, w: 0.792, h: 0.792, fill: { color: WHITE }, rotate: 45, shadow: softShadow() });
++    circle(s, bx, m.y - 0.024, 0.638, m.color);
++    T(s, m.n, { x: bx - 0.315, y: m.y - 0.249, w: 0.631, h: 0.451, fontSize: 22.57, bold: true, color: WHITE, align: 'center', valign: 'middle', margin: PAD_S });
++  });
++}
++
++/* ------------------------------------------------------------ slide 18/20 */
++
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 0.0, 0.0, 4.548, 2.141);
++  title(s, 'Catalyzing Industry Progress Through Strategic Milestones', 0.291, 2.438, 4.548, 2.141);
++  T(s, LOREM_MED, { x: 0.351, y: 4.624, w: 4.165, h: 0.682, fontSize: 10, lineSpacingMultiple: 1.2, margin: [5.4, 5.4, 2.7, 2.7] });
++
++  // Bracketed rail snaking down the right-hand side.
++  const RAIL = 15.28;
++  hline(s, 5.868, 0.566, 3.521, SOFT, RAIL);
++  bend(s, 9.389, 0.566, 0.639, 1.125, 'right', SOFT, RAIL);
++  hline(s, 7.606, 1.691, 1.784, SOFT, RAIL);
++  bend(s, 6.966, 1.691, 0.639, 1.125, 'left', SOFT, RAIL);
++  hline(s, 7.620, 2.816, 1.775, SOFT, RAIL);
++  bend(s, 9.395, 2.816, 0.639, 1.125, 'right', SOFT, RAIL);
++  hline(s, 7.568, 3.941, 1.827, SOFT, RAIL);
++  bend(s, 6.957, 3.941, 0.611, 1.125, 'left', SOFT, RAIL);
++  hline(s, 7.568, 5.067, 1.821, SOFT, RAIL);
++
++  const stops = [
++    { cx: 6.472, cy: 1.150, color: VIOLET, tx: 6.896, ty: 1.008, tw: 2.776, align: 'right', label: 'Innovating Through Practice' },
++    { cx: 8.352, cy: 2.254, color: NAVY, tx: 5.084, ty: 2.127, tw: 2.776, align: 'left', label: 'Collaborating Across Sectors' },
++    { cx: 6.472, cy: 3.389, color: INK, tx: 6.896, ty: 3.237, tw: 2.776, align: 'right', label: 'Elevating Quality Standards' },
++    { cx: 8.372, cy: 4.505, color: STEEL, tx: 5.983, ty: 4.249, tw: 1.877, align: 'left', label: 'Educating & Empowering Others', th: 0.510 },
++  ];
++  stops.forEach(function (p) {
++    s.addShape('ellipse', { x: p.cx - 0.285, y: p.cy - 0.292, w: 0.569, h: 0.583, fill: { color: p.color } });
++    glyph(s, p.cx, p.cy, 0.24, WHITE);
++    T(s, p.label, { x: p.tx, y: p.ty, w: p.tw, h: p.th || 0.283, fontSize: 12, bold: true, align: p.align, margin: [5.5, 5.5, 2.7, 2.7] });
++  });
++}
++
++/* ------------------------------------------------------------ slide 19/20 */
++
++function slide19(pptx) {
++  const s = pptx.addSlide();
++
++  const steps = [
++    { x: 0.417, y: 2.267, color: VIOLET, n: '01', tx: 0.456, ty: 3.721, pct: '55%', head: 'Foundation Phase', below: true },
++    { x: 1.963, y: 2.092, color: NAVY, n: '02', tx: 2.193, ty: 0.606, pct: '65%', head: 'Market Validation', below: false },
++    { x: 3.522, y: 2.257, color: INK, n: '03', tx: 3.782, ty: 3.721, pct: '75%', head: 'Acceleration', below: true },
++    { x: 5.074, y: 2.092, color: STEEL, n: '04', tx: 5.178, ty: 0.606, pct: '85%', head: 'Strategic Growth', below: false, pc: SLATE },
++  ];
++  // Draw right-to-left so each arrow tucks behind the one before it.
++  steps.slice().reverse().forEach(function (st) {
++    arrowTag(s, st.x, st.y, 2.191, 1.289, st.color);
++  });
++  steps.forEach(function (st) {
++    T(s, st.n, {
++      x: st.x + 0.874, y: st.y + 0.408, w: 0.701, h: 0.538, fontSize: 27.79,
++      bold: true, color: WHITE, align: 'center', valign: 'middle', margin: PAD_S,
++    });
++    T(s, st.pct, { x: st.tx, y: st.ty, w: 1.669, h: 0.398, fontSize: 19.45, bold: true, color: st.pc || st.color, align: 'center', margin: PAD_S });
++    T(s, st.head, { x: st.tx, y: st.ty + 0.376, w: 1.669, h: 0.257, fontSize: 11.11, bold: true, color: INK, align: 'center', margin: PAD_S });
++    T(s, LOREM_S, { x: st.tx, y: st.ty + 0.622, w: 1.669, h: 0.661, align: 'center', lineSpacingMultiple: 1.3, margin: PAD_S });
++  });
++
++  imageBox(s, 7.589, 0.000, 2.414, 1.758);
++  imageBox(s, 7.589, 1.934, 2.414, 1.758);
++  imageBox(s, 7.586, 3.870, 2.414, 1.758);
++}
++
++/* ------------------------------------------------------------ slide 20/20 */
++
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 0.0, 0.417, 5.562, 4.803);
++  title(s, 'The Path Is Clear. Let\u2019s Move Forward.', 5.971, 0.330, 3.917, 1.656);
++  T(s, 'We\u2019re ready to execute\u2014at scale.', {
++    x: 5.989, y: 2.121, w: 3.568, h: 0.471, fontSize: 16, bold: true, color: INK, margin: PAD_L,
++  });
++
++  const contacts = [
++    { y: 2.973, color: '1949EE', label: 'Email', value: 'hello@yourstudio.com' },
++    { y: 3.785, color: NAVY, label: 'Phone', value: '+1 234 567 8910' },
++    { y: 4.598, color: INK, label: 'Website', value: 'www.yoursite.com' },
++  ];
++  contacts.forEach(function (c) {
++    circle(s, 6.402, c.y + 0.311, 0.608, c.color);
++    glyph(s, 6.402, c.y + 0.311, 0.26, WHITE);
++    T(s, c.label, { x: 6.884, y: c.y, w: 0.907, h: 0.404, fontSize: 12, bold: true, color: INK, margin: PAD_L });
++    T(s, c.value, { x: 6.884, y: c.y + 0.271, w: 2.697, h: 0.353, fontSize: 9, margin: PAD_L });
++  });
++}
++
++/* -------------------------------------------------------------- assembly */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'DECK', width: 10, height: 5.625 });
++  pptx.layout = 'DECK';
++  pptx.title = 'Process Diagram';
++  pptx.theme = { headFontFace: FONT, bodyFontFace: FONT };
++
++  const builders = [
++    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  ];
++  builders.forEach(function (fn) { fn(pptx); });
++  return pptx;
++}
++
++const OUT = path.join(__dirname, '10bb8a7a-7934-4dc3-aa59-653f831cce6d_grok_final.pptx');
++build().writeFile({ fileName: OUT }).then(function () {
++  console.log('wrote ' + OUT);
++});

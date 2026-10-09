@@ -1,0 +1,491 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/interior_design_portfolio_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/interior_design_portfolio_presentation.js
+@@ -0,0 +1,488 @@
++#!/usr/bin/env node
++/*
++ * INTERIZA — "New Interior / Minimalist Design" deck (31 slides, 13.333 x 7.5 in).
++ * Rebuilt with pptxgenjs.
++ *
++ * The source deck fills its photo slots with empty picture placeholders (they
++ * carry no bitmap and render as bare background), so they are left blank here
++ * too. The one real photograph — the laptop on slide 29 — is replaced by a
++ * flat placeholder rectangle.
++ *
++ *   node 0a916c4c-b1d3-4a00-b386-f3cedad75b65_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const BROWN = '9E6E56'; // accent1 of the deck
++const SAND  = 'F0EBE3'; // pale panel fill
++const OLIVE = '7C7460';
++const INK   = '0D0D0D'; // near-black panels / headings
++const GREY  = '404040'; // body + chrome text
++const SNOW  = 'F2F2F2'; // text on dark panels
++const BLACK = '000000';
++const WHITE = 'FFFFFF';
++const SILVER = 'C9CCCE'; // stand-in for the one photograph in the deck
++const SCREEN = '808080';
++
++/* -------------------------------------------------------------------- fonts */
++const INTER    = 'Inter';
++const INTER_MD = 'Inter Medium';
++const INTER_LT = 'Inter Light';
++const SANS     = 'Open Sans';
++const POPPINS  = 'Poppins';
++
++/* ------------------------------------------------------- boiler-plate copy */
++const A = 'A company is an association or collection of individuals, whether natural persons.';
++const B = 'individuals, whether natural A company is an association or collection of individuals.';
++const C1 = A + ' ';
++const C2 = A + ' individuals, whether natural A company.';
++const C3 = A + ' individuals, whether natural A company is an association.';
++const C4 = A + ' ' + B + ' ';
++const C5 = A + ' ' + B + ' A company is an association.';
++const C6 = A + ' ' + B + ' ' + A + ' ';
++const C7 = A + ' ' + B + ' ' + A + ' individuals, whether natural A company is an association.';
++const C8 = A + ' ' + B + ' ' + A + ' ' + B + ' ';
++
++const LOREM = 'There are many variations of passages of lorem ipsum available, ' +
++              'but the majority have suffered alteration in some form, by injected humour';
++const LOREM_SHORT = 'There are many variations of passages of lorem ipsum available, ' +
++                    'but the majority have suffered alteration.';
++const KICKER = 'MINIMALIST INTERIOR DESIGN';
++
++/* ------------------------------------------------------------------ helpers */
++// Every text box in the source deck is top-anchored; pptxgenjs defaults to centre.
++function txt(slide, text, opts) {
++  slide.addText(text, Object.assign({ valign: 'top', fontFace: INTER, fontSize: 8, color: GREY }, opts));
++}
++
++function rect(slide, x, y, w, h, color) {
++  slide.addShape('rect', { x, y, w, h, fill: { color }, line: { type: 'none' } });
++}
++
++function rule(slide, x, y, w, color) {
++  slide.addShape('line', { x, y, w, h: 0, line: { color, width: 1 } });
++}
++
++/* Header / footer furniture that repeats on nearly every slide. */
++function chrome(slide, o) {
++  o = o || {};
++  const c = o.color || GREY;                 // brand + bottom tagline
++  const cornerC = o.cornerColor || GREY;     // SIGN IN + PAGE
++  const sz = o.brandSize || 10;
++  txt(slide, [{ text: 'INTERIOR', options: { fontSize: sz } },
++              { text: ' ',        options: { fontSize: sz - 2 } },
++              { text: 'PRESENTATION', options: { fontSize: sz } }],
++      { x: 0.432, y: 0.475, w: 1.594, h: sz === 10 ? 0.438 : 0.370, bold: true, color: c });
++  txt(slide, 'SIGN IN', { x: 11.229, y: 0.475, w: 1.585, h: 0.236,
++                          align: 'right', bold: true, color: cornerC });
++  if (o.footer === false) return;
++  txt(slide, [{ text: 'NEW INTERIOR', options: { breakLine: true } }, { text: 'MINIMALIST DESIGN' }],
++      { x: o.tagX || 0.520, y: 6.878, w: 1.945, h: 0.370, color: c });
++  txt(slide, 'PAGE 01/30', { x: 11.229, y: 6.878, w: 1.585, h: 0.236, align: 'right', color: cornerC });
++}
++
++/* Two-tone display heading plus its small Poppins kicker. */
++function hero(slide, o) {
++  txt(slide, KICKER, { x: o.x + 0.026, y: o.y - 0.291, w: 2.258, h: 0.236,
++                       fontFace: POPPINS, color: BLACK });
++  txt(slide, [{ text: o.head, options: { color: INK } }, { text: o.tail, options: { color: BROWN } }],
++      { x: o.x, y: o.y, w: o.w || 4.574, h: o.size === 36 ? 1.313 : 1.447,
++        fontSize: o.size || 40, bold: true });
++}
++
++/* Justified lorem paragraph followed by underlined Poppins index rows. */
++const ROW_DY  = [1.155, 1.669, 2.146];
++const RULE_DY = [1.426, 1.917, 2.407];
++function bodyBlock(slide, o) {
++  const w = o.w || 4.208, ruleW = o.ruleW || 4.090;
++  txt(slide, [{ text: LOREM }, { text: '. ' }, { text: LOREM }, { text: '.' }],
++      { x: o.x, y: o.y, w, h: 0.888, fontFace: SANS, color: BLACK,
++        align: 'justify', lineSpacingMultiple: 1.5 });
++  (o.rows || []).forEach((label, i) => {
++    txt(slide, label, { x: o.x + 0.028, y: o.y + ROW_DY[i], w: 2.258, h: 0.236,
++                        fontFace: POPPINS, color: INK });
++    rule(slide, o.x + 0.119, o.y + RULE_DY[i], ruleW, INK);
++  });
++}
++
++/* Column of "A company is..." paragraphs over thin Inter-Light index rows. */
++const LINK_W = { 'INTERIOR DESIGN': 1.156, 'FURNITURE': 0.830, 'DECORATION': 0.928, 'INTERIOR': 0.709 };
++function copyColumn(slide, o) {
++  const c = o.color;
++  (o.paras || []).forEach(([dy, body]) => {
++    txt(slide, body, { x: o.x, y: o.y + dy, w: o.w, h: 0.581, fontFace: SANS, fontSize: 10,
++                       color: c, align: 'justify', lineSpacingMultiple: 1 });
++  });
++  (o.links || []).forEach(([dy, label]) => {
++    txt(slide, label, { x: o.x + 0.037, y: o.y + dy, w: LINK_W[label], h: 0.236,
++                        wrap: false, fontFace: INTER_LT, color: c });
++    rule(slide, o.x + 0.135, o.y + dy + 0.272, o.ruleW, c);
++  });
++}
++
++/* Solid card: heading + lorem, optionally with a big number and divider. */
++function card(slide, o) {
++  rect(slide, o.x, o.y, o.w, o.h, o.fill);
++  const lx = o.x + o.px, ly = o.y + o.py;
++  const heading = Array.isArray(o.label)
++    ? [{ text: o.label[0], options: { breakLine: true } }, { text: o.label[1] }]
++    : o.label;
++  txt(slide, heading, { x: lx, y: ly, w: 1.347, h: Array.isArray(o.label) ? 0.505 : 0.303,
++                        fontFace: POPPINS, fontSize: 12, bold: true, color: SNOW });
++  txt(slide, [{ text: LOREM }, { text: '.' }],
++      { x: lx, y: ly + (Array.isArray(o.label) ? 0.564 : 0.329), w: 1.910, h: 0.774,
++        fontFace: SANS, color: SNOW });
++}
++
++const STAT_W = 3.567, STAT_H = 1.688;
++function statCard(slide, o) {
++  card(slide, { x: o.x, y: o.y, w: STAT_W, h: STAT_H, fill: o.fill, label: o.label, px: 0.174, py: 0.287 });
++  txt(slide, o.value, { x: o.x + 2.114, y: o.y + 0.548, w: 1.429, h: 0.774,
++                        fontSize: 40, bold: true, color: SNOW });
++  slide.addShape('line', { x: o.x + 2.039, y: o.y + 0.616, w: 0, h: 0.706,
++                           line: { color: SNOW, width: 1 } });
++}
++
++/* 18pt statement paragraph used on the two device slides. */
++function statement(slide, o) {
++  txt(slide, [{ text: 'A COMPANY IS AN ' },
++              { text: 'ASSOCIATION OR COLLECTION', options: { bold: true } },
++              { text: ' OF INDIVIDUALS, WHETHER NATURAL PERSONS. INDIVIDUALS, - ' },
++              { text: 'WHETHER NATURAL A COMPANY IS AN ASSOCIATION OR COLLECTION OF INDIVIDUALS. ',
++                options: { bold: true } }],
++      { x: o.x, y: o.y, w: 4.058, h: 1.977, fontSize: 18, color: o.color, lineSpacingMultiple: 1 });
++  copyColumn(slide, { x: o.x, y: o.y, w: 4.058, ruleW: 3.829, color: o.color,
++                      links: [[2.813, 'INTERIOR'], [3.357, 'FURNITURE']] });
++}
++
++/* ------------------------------------------------------------ slide builders */
++const slides = [];
++
++// 1 — cover
++slides.push(s => {
++  chrome(s, { brandSize: 8, tagX: 0.432 });
++  [['HOME', 5.182], ['ABOUT ', 6.104], ['PORTFOLIO ', 7.027]].forEach(([label, x]) => {
++    txt(s, label, { x, y: 0.475, w: 1.037, h: 0.236, align: 'center', fontFace: SANS });
++  });
++  txt(s, 'INTERIZA', { x: 0.370, y: 4.735, w: 6.605, h: 1.447,
++                       fontFace: INTER_MD, fontSize: 80, bold: true, color: BROWN });
++  txt(s, C4, { x: 8.415, y: 5.168, w: 4.399, h: 0.581, fontFace: SANS, fontSize: 10,
++               align: 'justify', lineSpacingMultiple: 1 });
++});
++
++// 2 — INTRODUCE INTERIZA.
++slides.push(s => {
++  chrome(s, { brandSize: 8 });
++  statCard(s, { x: 3.100, y: 3.062, fill: BROWN, label: 'FURNITURE', value: '15K' });
++  hero(s, { x: 7.388, y: 1.891, head: 'INTRODUCE ', tail: 'INTERIZA.' });
++  bodyBlock(s, { x: 7.460, y: 3.373, rows: ['INTERIOR', 'FURNITURE', 'MARKETING'] });
++});
++
++// 3 — WELCOME TO INTERIZA.
++slides.push(s => {
++  rect(s, 10.262, 0, 3.071, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 1.889, y: 1.857, head: 'WELCOME TO ', tail: 'INTERIZA.' });
++  bodyBlock(s, { x: 1.961, y: 3.339, rows: ['INTERIOR', 'FURNITURE', 'MARKETING'] });
++});
++
++// 4 — ABOUT OUR INTERIZA.
++slides.push(s => {
++  rect(s, 0, 0, 3.682, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 6.888, y: 1.891, head: 'ABOUT OUR ', tail: 'INTERIZA.' });
++  bodyBlock(s, { x: 6.960, y: 3.373, rows: ['INTERIOR', 'FURNITURE', 'DECORATION'] });
++  card(s, { x: 3.428, y: 3.962, w: 2.018, h: 1.611, fill: BROWN, label: 'FURNITURE', px: 0.125, py: 0.285 });
++});
++
++// 5 — OUR VISION INTERIZA.
++slides.push(s => {
++  chrome(s);
++  hero(s, { x: 1.455, y: 1.836, head: 'OUR VISION ', tail: 'INTERIZA.' });
++  bodyBlock(s, { x: 1.527, y: 3.319, rows: ['INTERIOR', 'FURNITURE', 'MARKETING'] });
++  statCard(s, { x: 6.667, y: 4.075, fill: BROWN, label: 'FURNITURE', value: '15K' });
++});
++
++// 6 — OUR MISSION INTERIZA.
++slides.push(s => {
++  chrome(s);
++  hero(s, { x: 7.651, y: 1.891, head: 'OUR MISSION ', tail: 'INTERIZA.' });
++  bodyBlock(s, { x: 7.723, y: 3.373, rows: ['INTERIOR', 'FURNITURE', 'DECORATION'] });
++  statCard(s, { x: 0.610, y: 3.111, fill: BROWN, label: 'INTERIOR', value: '85%' });
++  statCard(s, { x: 0.610, y: 4.797, fill: INK, label: 'FURNITURE', value: '15K' });
++});
++
++// 7 — OUR GOALS INTERIZA.
++slides.push(s => {
++  rect(s, 4.670, 0, 4.018, 7.5, SAND);
++  chrome(s, { footer: false });
++  copyColumn(s, { x: 4.854, y: 1.242, w: 3.658, ruleW: 3.451, color: INK,
++                  paras: [[0, C8], [4.311, C4]],
++                  links: [[1.531, 'INTERIOR DESIGN'], [2.163, 'FURNITURE'], [2.832, 'DECORATION']] });
++  hero(s, { x: 1.209, y: 5.187, head: 'OUR GOALS ', tail: 'INTERIZA.', size: 36, w: 3.447 });
++  rect(s, 8.825, 1.317, 3.196, 2.050, SAND);
++  txt(s, C4, { x: 9.078, y: 1.885, w: 2.690, h: 0.581, fontFace: SANS, fontSize: 10,
++               color: INK, align: 'justify', lineSpacingMultiple: 1 });
++});
++
++// 8 — OUR STRATEGY COMPANY.
++slides.push(s => {
++  rect(s, 6.667, 0, 6.667, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 7.436, y: 1.891, head: 'OUR STRATEGY ', tail: 'COMPANY.', w: 4.827 });
++  bodyBlock(s, { x: 7.508, y: 3.373, rows: ['INTERIOR', 'FURNITURE', 'DECORATION'] });
++  card(s, { x: 3.500, y: 3.857, w: 2.018, h: 1.611, fill: BROWN, label: 'FURNITURE', px: 0.125, py: 0.284 });
++});
++
++// 9 — OUR TARGET INTERIZA.
++slides.push(s => {
++  rect(s, 0, 0, 6.487, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 1.218, y: 1.818, head: 'OUR TARGET ', tail: 'INTERIZA.' });
++  bodyBlock(s, { x: 1.290, y: 3.300, rows: ['INTERIOR', 'FURNITURE', 'MARKETING'] });
++  card(s, { x: 10.588, y: 3.129, w: 2.018, h: 1.611, fill: BROWN, label: 'INTERIOR', px: 0.125, py: 0.284 });
++});
++
++// 10 — MESSAGING INTERIZA.
++slides.push(s => {
++  rect(s, 5.530, 0, 4.129, 7.5, SAND);
++  chrome(s);
++  copyColumn(s, { x: 5.751, y: 1.242, w: 3.658, ruleW: 3.451, color: INK,
++                  paras: [[0, C8], [3.599, C3], [4.499, C4]],
++                  links: [[1.531, 'INTERIOR DESIGN'], [2.163, 'FURNITURE'], [2.832, 'DECORATION']] });
++  hero(s, { x: 0.764, y: 1.571, head: 'MESSAGING ', tail: 'INTERIZA.', size: 36, w: 3.447 });
++  card(s, { x: 9.671, y: 3.482, w: 2.470, h: 1.611, fill: INK, label: 'INTERIOR', px: 0.307, py: 0.285 });
++});
++
++// 11 — MINIMALIST INTERIZA.
++slides.push(s => {
++  rect(s, 9.688, 0, 3.646, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 1.500, y: 2.369, head: 'MINIMALIST ', tail: 'INTERIZA.' });
++  bodyBlock(s, { x: 1.572, y: 3.852, ruleW: 3.984, rows: ['INTERIOR'] });
++});
++
++// 12 — OUR MARKETING INTERIZA. (chrome sits over a full-bleed photo)
++slides.push(s => {
++  chrome(s, { color: SNOW });
++  hero(s, { x: 7.233, y: 2.008, head: 'OUR MARKETING ', tail: 'INTERIZA.', w: 5.167 });
++  bodyBlock(s, { x: 7.306, y: 3.490, rows: ['INTERIOR', 'FURNITURE', 'DECORATION'] });
++  card(s, { x: 4.153, y: 4.261, w: 2.018, h: 1.611, fill: BROWN, label: 'INTERIOR', px: 0.125, py: 0.284 });
++  card(s, { x: 4.153, y: 5.883, w: 2.018, h: 1.611, fill: INK, label: 'FURNITURE', px: 0.125, py: 0.284 });
++});
++
++// 13 — MINIMALIST INTERIZA. (dark centre column)
++slides.push(s => {
++  rect(s, 9.093, 0, 4.240, 7.5, SAND);
++  chrome(s);
++  rect(s, 5.306, 0, 3.787, 7.5, INK);
++  copyColumn(s, { x: 5.458, y: 2.252, w: 3.479, ruleW: 3.244, color: SNOW,
++                  paras: [[0, C6], [1.445, C7]],
++                  links: [[2.976, 'INTERIOR DESIGN'], [3.608, 'FURNITURE'], [4.277, 'DECORATION']] });
++  hero(s, { x: 0.449, y: 2.135, head: 'MINIMALIST ', tail: 'INTERIZA.' });
++  card(s, { x: 0.625, y: 4.570, w: 2.470, h: 1.611, fill: INK, label: 'INTERIOR', px: 0.307, py: 0.284 });
++  rect(s, 9.090, 3.270, 2.906, 2.911, BROWN);
++  [[3.697, C5], [5.055, C2]].forEach(([y, body]) => {
++    txt(s, body, { x: 9.190, y, w: 2.668, h: 0.581, fontFace: SANS, fontSize: 10,
++                   color: SNOW, align: 'justify', lineSpacingMultiple: 1 });
++  });
++});
++
++// 14 — STATISTIC INTERIZA.
++slides.push(s => {
++  rect(s, 9.075, 0, 4.258, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 1.218, y: 1.818, head: 'STATISTIC ', tail: 'INTERIZA.' });
++  bodyBlock(s, { x: 1.290, y: 3.300, rows: ['INTERIOR', 'FURNITURE', 'MARKETING'] });
++  card(s, { x: 10.185, y: 3.116, w: 2.018, h: 1.611, fill: BROWN, label: 'INTERIOR', px: 0.125, py: 0.284 });
++});
++
++// 15 — OUR KITCHEN INTERIZA. (full-width banner photo)
++slides.push(s => {
++  chrome(s);
++  hero(s, { x: 0.520, y: 4.837, head: 'OUR KITCHEN ', tail: 'INTERIZA.' });
++  bodyBlock(s, { x: 8.431, y: 4.837, rows: ['INTERIOR'] });
++});
++
++// 16 — WORKSPACE INTERIZA.
++slides.push(s => {
++  rect(s, 0, 0, 3.513, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 6.626, y: 1.894, head: 'WORKSPACE ', tail: 'INTERIZA.', w: 5.167 });
++  bodyBlock(s, { x: 6.698, y: 3.377, rows: ['INTERIOR', 'FURNITURE', 'DECORATION'] });
++});
++
++// 17 — two mirrored image + card columns
++slides.push(s => {
++  chrome(s);
++  [[1.494, BROWN, 'INTERIOR', 1.394, 4.237], [7.627, OLIVE, 'FURNITURE', 7.543, 4.241]]
++    .forEach(([x, fill, label, bx, by]) => {
++      card(s, { x, y: 2.484, w: 2.018, h: 1.409, fill, label, px: 0.038, py: 0.170 });
++      bodyBlock(s, { x: bx, y: by, w: 4.406, ruleW: 4.193, rows: ['INTERIOR', 'FURNITURE'] });
++    });
++});
++
++// 18 — brown centre column
++slides.push(s => {
++  chrome(s);
++  rect(s, 2.858, 0, 5.177, 7.5, BROWN);
++  copyColumn(s, { x: 3.707, y: 1.927, w: 3.479, ruleW: 3.244, color: SNOW,
++                  paras: [[0, C6], [1.358, C7]],
++                  links: [[2.888, 'INTERIOR DESIGN'], [3.521, 'FURNITURE'], [4.189, 'DECORATION']] });
++  card(s, { x: 0.942, y: 2.660, w: 1.917, h: 1.611, fill: INK, label: 'INTERIOR', px: 0.069, py: 0.260 });
++});
++
++// 19 — four-up gallery
++slides.push(s => {
++  chrome(s);
++  [[1.093, 4.082, BROWN, 'FURNITURE'], [3.960, 4.078, INK, 'INTERIOR'],
++   [6.826, 4.074, BROWN, 'FURNITURE'], [9.692, 4.071, INK, 'INTERIOR']].forEach(([x, y, fill, label]) => {
++    rect(s, x, y, 2.507, 2.306, fill);
++    txt(s, label, { x: x + 0.143, y: y + 0.336, w: 1.347, h: 0.303,
++                    fontFace: POPPINS, fontSize: 12, bold: true, color: SNOW });
++    txt(s, [{ text: LOREM }, { text: '.' }], { x: x + 0.143, y: y + 0.664, w: 2.202, h: 0.640,
++                                               fontFace: SANS, color: SNOW, align: 'justify' });
++    txt(s, LOREM_SHORT, { x: x + 0.128, y: y + 1.397, w: 2.202, h: 0.505,
++                          fontFace: SANS, color: SNOW, align: 'justify' });
++  });
++});
++
++// 20 — SITTING ROOM INTERIZA.
++slides.push(s => {
++  rect(s, 0, 0, 3.513, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 6.839, y: 1.894, head: 'SITTING ROOM ', tail: 'INTERIZA.', w: 5.167 });
++  bodyBlock(s, { x: 6.911, y: 3.377, rows: ['INTERIOR', 'FURNITURE', 'DECORATION'] });
++});
++
++// 21 — brown column with left full-bleed photo
++slides.push(s => {
++  chrome(s);
++  rect(s, 5.576, 0, 4.694, 7.5, BROWN);
++  copyColumn(s, { x: 6.146, y: 1.890, w: 3.479, ruleW: 3.244, color: SNOW,
++                  paras: [[0, C6], [1.445, C7]],
++                  links: [[2.975, 'INTERIOR DESIGN'], [3.608, 'FURNITURE'], [4.276, 'DECORATION']] });
++  card(s, { x: 10.284, y: 3.423, w: 1.917, h: 1.611, fill: INK, label: 'INTERIOR', px: 0.069, py: 0.260 });
++});
++
++// 22 — DINNING ROOM INTERIZA.
++slides.push(s => {
++  rect(s, 9.750, 0, 3.583, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 1.785, y: 2.204, head: 'DINNING ROOM ', tail: 'INTERIZA.', w: 5.167 });
++  bodyBlock(s, { x: 1.820, y: 3.686, rows: ['INTERIOR', 'FURNITURE'] });
++  card(s, { x: 10.709, y: 2.989, w: 1.917, h: 1.611, fill: INK, label: 'INTERIOR', px: 0.069, py: 0.260 });
++});
++
++// 23 — two copy columns
++slides.push(s => {
++  rect(s, 0, 0, 4.506, 7.5, SAND);
++  chrome(s);
++  copyColumn(s, { x: 4.927, y: 1.302, w: 3.479, ruleW: 3.244, color: GREY,
++                  paras: [[0, C6], [1.445, C7]],
++                  links: [[3.532, 'INTERIOR DESIGN'], [4.164, 'FURNITURE'], [4.833, 'DECORATION']] });
++  copyColumn(s, { x: 1.107, y: 3.923, w: 3.118, ruleW: 2.912, color: GREY,
++                  paras: [[0, C4]], links: [[1.097, 'INTERIOR DESIGN']] });
++  card(s, { x: 10.834, y: 3.117, w: 1.917, h: 1.611, fill: BROWN, label: 'INTERIOR', px: 0.070, py: 0.260 });
++});
++
++// 24 — MINIMALIST INTERIZA.
++slides.push(s => {
++  rect(s, 0, 0, 4.213, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 7.260, y: 2.127, head: 'MINIMALIST ', tail: 'INTERIZA.', w: 5.167 });
++  bodyBlock(s, { x: 7.295, y: 3.609, rows: ['INTERIOR', 'FURNITURE'] });
++});
++
++// 25 — AVAILABLE PORTFOLIO.
++slides.push(s => {
++  rect(s, 8.450, 0, 4.883, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 1.288, y: 2.130, head: 'AVAILABLE ', tail: 'PORTFOLIO.', w: 5.167 });
++  bodyBlock(s, { x: 1.322, y: 3.612, rows: ['INTERIOR', 'FURNITURE'] });
++  card(s, { x: 9.416, y: 3.156, w: 1.917, h: 1.611, fill: BROWN, label: 'INTERIOR', px: 0.070, py: 0.259 });
++});
++
++// 26 — three-column colour study
++slides.push(s => {
++  rect(s, 8.885, 0, 4.448, 7.5, BROWN);
++  rect(s, 0, 0, 4.688, 7.5, SAND);
++  chrome(s, { cornerColor: SNOW });
++  [[0.520, GREY], [5.047, GREY], [9.301, SNOW]].forEach(([x, color]) => {
++    copyColumn(s, { x, y: 1.527, w: 3.479, ruleW: 3.244, color,
++                    paras: [[0, C6], [1.445, C7]],
++                    links: [[2.976, 'INTERIOR DESIGN'], [3.608, 'FURNITURE'], [4.277, 'DECORATION']] });
++  });
++});
++
++// 27 — type specimen
++slides.push(s => {
++  rect(s, 0, 0, 7.987, 7.5, SAND);
++  chrome(s);
++  copyColumn(s, { x: 8.672, y: 1.390, w: 3.479, ruleW: 3.244, color: GREY,
++                  paras: [[0, C6], [1.445, C7]],
++                  links: [[2.975, 'INTERIOR DESIGN'], [3.608, 'FURNITURE'], [4.276, 'DECORATION']] });
++  txt(s, 'USE FONT INTERIZA.', { x: 0.432, y: 1.680, w: 6.293, h: 0.774, fontSize: 40, bold: true });
++  txt(s, 'INTER',     { x: 0.432, y: 4.345, w: 3.625, h: 1.111, fontSize: 60, bold: true });
++  txt(s, 'OPEN SANS', { x: 0.407, y: 5.229, w: 5.205, h: 1.111, fontSize: 60, bold: true });
++});
++
++// 28 — OUR FRAME INTERIZA.
++slides.push(s => {
++  rect(s, 0, 0, 4.213, 7.5, SAND);
++  chrome(s);
++  hero(s, { x: 7.260, y: 2.127, head: 'OUR FRAME ', tail: 'INTERIZA.', w: 4.281 });
++  bodyBlock(s, { x: 7.295, y: 3.609, rows: ['INTERIOR', 'FURNITURE'] });
++});
++
++// 29 — laptop mock-up (the deck's only real photograph, shown as a placeholder)
++slides.push(s => {
++  rect(s, 0.925, 1.996, 6.205, 3.396, SILVER);    // laptop body [image]
++  rect(s, 1.786, 2.149, 4.489, 2.828, SCREEN);    // screen
++  rect(s, 4.638, 5.074, 0.551, 0.095, BLACK);     // trackpad lip
++  chrome(s);
++  statement(s, { x: 8.041, y: 1.735, color: GREY });
++  card(s, { x: 5.320, y: 1.284, w: 2.230, h: 1.800, fill: BROWN,
++            label: ['NEW', 'ARRIVALS'], px: 0.212, py: 0.250 });
++});
++
++// 30 — desktop monitor mock-up
++slides.push(s => {
++  rect(s, 7.652, 1.759, 4.959, 2.998, BLACK);     // bezel
++  rect(s, 7.652, 4.757, 4.959, 0.463, 'E9E9E9');  // chin
++  s.addShape('trapezoid', { x: 9.265, y: 5.220, w: 1.731, h: 0.525,
++                            fill: { color: 'BBBBBB' }, line: { type: 'none' } });
++  rect(s, 7.861, 1.994, 4.534, 2.547, WHITE);     // screen
++  chrome(s);
++  statement(s, { x: 0.939, y: 1.773, color: BLACK });
++  rect(s, 6.656, 2.633, 1.741, 1.522, BROWN);
++  txt(s, C1, { x: 6.773, y: 2.950, w: 1.588, h: 0.581, fontFace: SANS, fontSize: 10,
++               color: WHITE, lineSpacingMultiple: 1 });
++});
++
++// 31 — THANKYOU
++slides.push(s => {
++  chrome(s);
++  txt(s, 'THANKYOU', { x: 2.992, y: 3.281, w: 7.348, h: 1.447, align: 'center',
++                       fontFace: INTER_MD, fontSize: 80, bold: true, color: BROWN });
++  txt(s, C7, { x: 4.374, y: 5.328, w: 4.585, h: 0.581, fontFace: SANS, fontSize: 10,
++               align: 'center', lineSpacingMultiple: 1 });
++});
++
++/* ---------------------------------------------------------------------- run */
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++pptx.layout = 'WIDE';
++pptx.author = 'INTERIZA';
++pptx.title = 'Interior Presentation';
++
++slides.forEach(build => {
++  const slide = pptx.addSlide();
++  slide.background = { color: WHITE };
++  build(slide);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, '0a916c4c-b1d3-4a00-b386-f3cedad75b65_grok_final.pptx') })
++    .then(f => console.log('wrote ' + f));

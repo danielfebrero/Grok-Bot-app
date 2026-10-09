@@ -1,0 +1,635 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_urban_mental_health_crisis.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_urban_mental_health_crisis.js
+@@ -0,0 +1,632 @@
++/**
++ * "Understanding The Mental Health Crisis in Urban Areas" — 20 slide deck.
++ * Rebuilt with pptxgenjs only.  Run: `node <this file>`  ->  writes the .pptx next to itself.
++ *
++ * Slide size 13.333 x 7.5 in (16:9).  Everything below is plain data + pptxgenjs calls.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const C = {
++  brown: '764B2F', // primary brand brown
++  cream: 'FEFCF9', // theme lt1 / lt2 (page background)
++  ink: '131313', // theme dk1 / dk2 (body text)
++  lilac: 'D4BBD7', // large decorative card
++  sand: 'F1ECE7', // secondary decorative card
++  pink: 'FFD3F7', // accent badge / pill
++  ash: 'E7E7E7', // tx1 lum 10/90 — pale grey panels
++  bone: 'DBD5D5', // bar-chart neutral
++  grey: 'A6A6A6', // bar-chart neutral
++  hatch: 'ADAAA4', // diagonal rules of the hatched picture frames
++  hatchTx: '9A948C',
++};
++
++/* -------------------------------------------------------------------- fonts */
++const KARLA = 'Karla'; // body face used across the deck
++const KARLA_MED = 'Karla Medium'; // display face used for the big titles
++const MANROPE = 'Manrope'; // theme minor font (a few runs inherit it)
++const MANROPE_B = 'Manrope bold'; // theme major font
++
++/* ---------------------------------------------------------- generic helpers */
++let SH; // pptx.ShapeType, assigned in build()
++
++/** filled shape without an outline (every shape in this deck is outline-less) */
++function shape(s, kind, o) {
++  s.addShape(kind, Object.assign({ line: { type: 'none' } }, o));
++}
++const rect = (s, x, y, w, h, fill, extra) =>
++  shape(s, SH.rect, Object.assign({ x, y, w, h, fill: { color: fill } }, extra));
++const oval = (s, x, y, w, h, fill, extra) =>
++  shape(s, SH.ellipse, Object.assign({ x, y, w, h, fill: { color: fill } }, extra));
++/** roundRect; pass `rectRadius` (inches) in `extra` to override the 16.67% default */
++const round = (s, x, y, w, h, fill, extra) =>
++  shape(s, SH.roundRect, Object.assign({ x, y, w, h, fill: { color: fill } }, extra));
++
++/** text box: top-anchored, Karla 10pt, ink — matching the deck's defaults */
++function text(s, body, o) {
++  s.addText(body, Object.assign({ fontFace: KARLA, fontSize: 10, color: C.ink, valign: 'top', fit: 'resize' }, o));
++}
++/** 60pt display heading (Karla Medium) */
++function title(s, body, x, y, w, h, color, face, size, wrap) {
++  text(s, body, {
++    x, y, w, h, fontSize: size || 60, fontFace: face || KARLA_MED, color: color || C.ink,
++    wrap: wrap !== false,
++  });
++}
++/** 12pt kicker above a paragraph, 1.5 line spacing */
++function kicker(s, body, x, y, w, h, color, face) {
++  text(s, body, { x, y, w, h, fontSize: 12, fontFace: face || KARLA, color: color || C.ink, lineSpacingMultiple: 1.5 });
++}
++/** 10pt left-aligned caption, 1.5 line spacing */
++function caption(s, body, x, y, w, h, color, size) {
++  text(s, body, { x, y, w, h, fontSize: size || 10, color: color || C.ink, lineSpacingMultiple: 1.5 });
++}
++/** 10pt justified body copy, 1.5 line spacing */
++function para(s, body, x, y, w, h, color, face) {
++  text(s, body, {
++    x, y, w, h, fontSize: 10, fontFace: face || KARLA, color: color || C.ink,
++    align: 'justify', lineSpacingMultiple: 1.5,
++  });
++}
++/** bulleted 10pt list — bullet props must be set per paragraph, not on the shape */
++function bullets(s, items, x, y, w, h, color, indentPt) {
++  const bullet = { characterCode: '2022', indent: indentPt || 18 };
++  text(s, items.map((t, i) => ({ text: t, options: { bullet, breakLine: i < items.length - 1 } })), {
++    x, y, w, h, fontSize: 10, fontFace: KARLA, color: color || C.ink,
++    align: 'justify', lineSpacingMultiple: 1.5,
++  });
++}
++
++/** the two-dot company mark in the top-left corner (group is scaled to 0.291 x 0.146) */
++function logoDots(s, color) {
++  oval(s, 0.76, 0.729, 0.1455, 0.146, color);
++  oval(s, 0.9055, 0.729, 0.1455, 0.146, color);
++}
++
++/** running header: dot mark + "Company" + optional "Dates:" and "Urban Literal" blocks */
++function header(s, o) {
++  o = o || {};
++  logoDots(s, o.dot || C.brown);
++  text(s, 'Company', { x: 1.2, y: 0.652, w: 0.947, h: 0.303, fontSize: 12, color: o.company || C.ink, wrap: false });
++  if (o.meta) {
++    text(s, 'Dates:\n09/04/2045', { x: 8.606, y: 0.623, w: 0.994, h: 0.438, color: o.meta, wrap: false });
++    text(s, 'Urban Literal\nMental Health', { x: 11.268, y: 0.623, w: 1.734, h: 0.438, color: o.meta });
++  }
++}
++
++/** small circle holding an arrow (the "Grup 102" ornament); dir 'se' or 'e' */
++function arrowBadge(s, x, y, d, fill, dir, stroke) {
++  const ink = fill === C.ink ? C.cream : C.ink;
++  oval(s, x, y, d, d, fill, stroke ? { line: { color: stroke, width: 0.75 } } : undefined);
++  s.addShape(SH.line, {
++    x: x + d * 0.3, y: y + (dir === 'e' ? d * 0.5 : d * 0.3),
++    w: d * 0.4, h: dir === 'e' ? 0 : d * 0.4,
++    line: { color: ink, width: 0.75, endArrowType: 'triangle' },
++  });
++}
++
++/**
++ * Stand-in for an empty picture frame.  The reference fills these with a light
++ * diagonal hatch pattern, redrawn here as evenly spaced 45° rules.
++ */
++function imageFrame(s, x, y, w, h) {
++  rect(s, x, y, w, h, C.cream);
++  const STEP = 0.12;
++  for (let d = -h; d < w; d += STEP) {
++    const x0 = Math.max(x + d, x); // clip the rule to the frame
++    const y0 = y + Math.max(-d, 0);
++    const len = Math.min(w - (x0 - x), h - (y0 - y));
++    s.addShape(SH.line, { x: x0, y: y0, w: len, h: len, line: { color: C.hatch, width: 0.75 } });
++  }
++  text(s, '[image]', { x, y: y + h / 2 - 0.16, w, h: 0.32, align: 'center', color: C.hatchTx, fontSize: 11 });
++}
++
++/* ------------------------------------------------------------ shared strings */
++const LOREM_LONG =
++  'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. ' +
++  'Dolor sit eget ligula eget dolor sit amet consetectuer adispiscing lorem ipsum dolor sit amet.';
++const LOREM_MED =
++  'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. ' +
++  'Dolor sit eget ligula eget dolor sit amet consetectuer adispiscing.';
++const LOREM_SHORT = 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. Dolor sit eget';
++const LOREM_TINY = 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. Dolor sit eget.';
++const LOREM_CIRCLE = 'Lorem ipsum dolor sit dolora sit ametis asda ametsuliasq, consectetuer adipiscing.';
++const LOREM_CASE = 'Lorem ipsum dolor sitasdwea amet, consectetuer dolor sit.';
++
++/* =================================================================== slide 1 */
++/* Title slide: brown right panel, stacked lilac/sand cards, contact strip. */
++function slide01(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 7.8, 0, 5.533, 7.5, C.brown);
++  round(s, 7.644, 1.388, 3.48, 4.499, C.sand);
++  round(s, 7.166, 1.388, 3.48, 4.499, C.lilac);
++
++  header(s, { dot: C.brown, company: C.ink, meta: C.cream });
++  title(s, 'Understanding The Mental Health Crisis in Urban Areas', 0.604, 1.746, 6.063, 3.736, C.ink, null, 54);
++  text(s, 'Slide To Continue', { x: 11.268, y: 6.63, w: 1.359, h: 0.269, color: C.cream });
++
++  // contact strip: label row (12pt) + value row (10pt)
++  [['Website:', 'www.example.com', 0.76, 1.413], ['Contact:', '+11 222 3333 4444', 2.549, 1.413],
++   ['Email:', 'example@email.com', 4.337, 1.555]].forEach(([label, value, x, wv]) => {
++    text(s, label, { x, y: 6.194, w: 1.413, h: 0.373, fontSize: 12, align: 'justify', lineSpacingMultiple: 1.5 });
++    text(s, value, { x, y: 6.572, w: wv, h: 0.327, align: 'justify', lineSpacingMultiple: 1.5 });
++  });
++
++  // pink stat badge
++  round(s, 10.782, 5.368, 1.794, 1.199, C.pink, { rectRadius: 0.12 });
++  arrowBadge(s, 12.226, 5.481, 0.24, C.ink, 'se');
++  text(s, 'Effected People', { x: 10.95, y: 5.89, w: 1.392, h: 0.303, fontSize: 12 });
++  text(s, '12.357K ', { x: 10.931, y: 6.062, w: 1.734, h: 0.438, fontSize: 20 });
++}
++
++/* =================================================================== slide 2 */
++/* Section opener "Introduction": full-width brown band with rotated cards. */
++function slide02(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 0, 0, 13.333, 5.344, C.brown);
++  round(s, 2.739, 0.394, 3.255, 5.223, C.sand, { rotate: 270 });
++  round(s, 2.184, 0.394, 3.255, 5.223, C.lilac, { rotate: 270 });
++
++  header(s, { dot: C.cream, company: C.cream, meta: C.cream });
++  title(s, 'Introduction', 0.76, 5.996, 5.517, 1.111, C.ink);
++  text(s, 'Where ideas meet impact.', { x: 10.694, y: 6.63, w: 1.879, h: 0.269 });
++  kicker(s, 'Hello, We are From Company', 8.606, 1.67, 1.461, 0.675, C.cream);
++  para(s, LOREM_MED, 8.606, 2.836, 3.967, 0.832, C.cream);
++  para(s, 'Mental Health 2040', 8.606, 4.138, 2.277, 0.327, C.cream);
++}
++
++/* =================================================================== slide 3 */
++/* Agenda: 2x3 numbered grid on the brown half, intro + pill on the light half. */
++function slide03(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 5.278, 0, 8.056, 7.5, C.brown);
++  header(s, { dot: C.brown, company: C.ink, meta: C.cream });
++
++  const NUM_COLOR = [C.cream, C.lilac, C.sand]; // column-by-column numeral tint
++  const ITEMS = [
++    // [numeral, label, numeral x, label x, label w]
++    ['01', 'Case \nStudies', 5.838, 7.046, 1.002],
++    ['02', 'Public\nAwareness', 8.211, 9.436, 1.301],
++    ['03', 'Urban Habits', 10.737, 11.948, 1.008],
++    ['04', 'Risk Groups \nin City Care', 5.838, 7.047, 1.32],
++    ['05', 'Our Collaboration', 8.211, 9.436, 1.301],
++    ['06', 'Future Step', 10.739, 11.95, 0.847],
++  ];
++  ITEMS.forEach(([num, label, nx, lx, lw], i) => {
++    const row = i < 3 ? 0 : 1;
++    const ny = row ? 4.347 : 2.241;
++    const ly = row ? 4.747 : 2.648;
++    text(s, num, { x: nx, y: ny, w: 1.736, h: 1.212, fontSize: 66, color: NUM_COLOR[i % 3] });
++    text(s, label, { x: lx, y: ly, w: lw, h: 0.505, fontSize: 12, color: C.cream });
++  });
++
++  title(s, 'Content Index', 0.616, 2.241, 3.606, 2.121, C.ink);
++  kicker(s, 'Maximus lorem guis, blandit elit. Proin tellus euismod, a congue libero nisl sed do euismod.',
++    0.632, 4.577, 4.15, 0.675, C.ink);
++  round(s, 0.662, 5.708, 2.035, 0.427, C.pink, { rectRadius: 0.2135 });
++  text(s, 'Presentation', { x: 0.804, y: 5.77, w: 1.381, h: 0.303, fontSize: 12, align: 'center' });
++  arrowBadge(s, 2.326, 5.792, 0.26, C.cream, 'e', C.ink);
++}
++
++/* =================================================================== slide 4 */
++/* "Case Studies" divider: two rotated cards top-right + hatched photo band. */
++function slide04(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  round(s, 10.276, -0.12, 2.949, 3.155, C.brown, { rotate: 270 });
++  round(s, 7.134, -0.112, 2.932, 3.155, C.lilac, { rotate: 270 });
++
++  title(s, 'Case Studies', 0.561, 1.388, 5.358, 1.111, C.ink, null, 60, false);
++  kicker(s, 'What is Our Concern', 7.477, 0.655, 1.151, 0.675, C.ink, MANROPE_B);
++  para(s, LOREM_SHORT, 7.477, 1.636, 2.325, 0.832, C.ink, MANROPE);
++  kicker(s, 'How it Benefits', 10.632, 0.655, 1.151, 0.675, C.cream, MANROPE_B);
++  para(s, LOREM_SHORT, 10.632, 1.636, 2.325, 0.832, C.cream, MANROPE);
++
++  header(s, { dot: C.brown, company: C.ink });
++  imageFrame(s, 0, 2.932, 13.333, 4.568);
++}
++
++/* =================================================================== slide 5 */
++/* "Public Awareness": three stat cards stacked on a full brown background. */
++function slide05(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.brown };
++
++  // rotated cards, top to bottom: lilac / pink / sand
++  const CARDS = [
++    // [card y (pre-rotation), fill, percent, percent y, audience label, label y, target y]
++    [-1.866, C.lilac, '76%', 0.436, 'Public A \nCity A', 0.703, 1.817],
++    [0.518, C.pink, '34%', 2.824, 'Public B\nCity B', 3.092, 4.204],
++    [2.918, C.sand, '12%', 5.221, 'Public C\nCity C', 5.378, 6.628],
++  ];
++  CARDS.forEach(([cy, fill]) => round(s, 8.732, cy, 2.347, 6.478, fill, { rotate: 270 }));
++  CARDS.forEach(([, , pct, py, label, ly, ty], i) => {
++    text(s, pct, { x: 9.079, y: py, w: 3.599, h: 2.036, fontSize: 115 });
++    kicker(s, label, 7.077, ly, i === 0 ? 1.535 : 1.151, 0.675, C.ink);
++    text(s, 'Target Audiences', { x: 7.077, y: ty, w: 1.351, h: 0.269 });
++  });
++
++  kicker(s, 'Why it Matters?', 0.76, 1.67, 1.261, 0.675, C.cream);
++  para(s, LOREM_LONG, 0.76, 2.598, 4.53, 0.832, C.cream);
++  title(s, 'Public\nAwareness', 0.76, 4.994, 4.53, 2.121, C.cream);
++  header(s, { dot: C.cream, company: C.cream });
++}
++
++/* =================================================================== slide 6 */
++/* "People Urban Habits": brown right column with rotated cards, two text blocks. */
++function slide06(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 6.322, 0, 7.011, 7.5, C.brown);
++  round(s, 7.776, 2.199, 3.625, 5.776, C.sand, { rotate: 270 });
++  round(s, 8.204, 2.199, 3.625, 5.776, C.lilac, { rotate: 270 });
++
++  title(s, 'People Urban Habits', 7.078, 0.577, 5.495, 2.121, C.cream);
++  kicker(s, 'At-Risk Groups in City Care', 0.76, 1.77, 1.494, 0.675, C.ink);
++  para(s, LOREM_LONG, 0.76, 2.697, 4.53, 0.832, C.ink);
++  kicker(s, 'Urban Life and Mental ', 0.76, 4.714, 1.261, 0.675, C.ink);
++  para(s, LOREM_LONG, 0.76, 5.642, 4.53, 0.832, C.ink);
++  header(s, { dot: C.brown, company: C.ink });
++}
++
++/* =================================================================== slide 7 */
++/* "Risk Groups in City Care": brown band on top, problem / solution below. */
++function slide07(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 0, 0, 13.333, 4.214, C.brown);
++  round(s, 8.426, 0.113, 2.121, 4.672, C.sand, { rotate: 270 });
++  round(s, 8.687, 0.113, 2.121, 4.672, C.lilac, { rotate: 270 });
++  rect(s, 7.7, 4.214, 5.633, 3.286, C.ash);
++
++  title(s, 'Risk Groups \nin City Care', 0.76, 1.473, 4.873, 2.121, C.cream);
++  kicker(s, 'Our Problem', 0.76, 5.088, 0.906, 0.675, C.ink, KARLA_MED);
++  para(s, LOREM_LONG, 0.76, 6.016, 4.53, 0.832, C.ink);
++  kicker(s, 'Our Solution', 8.606, 5.088, 0.906, 0.675, C.ink, KARLA_MED);
++  bullets(s, [
++    'Solution one, lorem ipsum dolor sit amet consetecuter.',
++    'Solution two, lorem ipsum dolro sit amet consetectuer.',
++    'Soultion three, lorem ipsum dolor sit amet consetectu.',
++  ], 8.606, 6.016, 3.967, 0.832, C.ink, 18);
++  header(s, { dot: C.cream, company: C.cream, meta: C.cream });
++}
++
++/* =================================================================== slide 8 */
++/* "Our Collaboration": a row of four partner circles. */
++function slide08(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  title(s, 'Our Collaboration', 0.76, 1.388, 5.964, 2.121, C.ink);
++  kicker(s, 'Prioritize Efforts', 8.606, 1.445, 1.261, 0.675, C.ink);
++  para(s, LOREM_MED, 8.606, 2.448, 3.967, 0.832, C.ink);
++
++  const CIRCLES = [
++    // [circle x, fill, caption, caption x, caption w, text colour, body x]
++    [0.76, C.brown, 'Urban Institution', 1.547, 1.261, C.cream, 1.184],
++    [3.742, C.pink, 'Urban\nCommunities', 4.545, 1.261, C.ink, 4.146],
++    [6.724, C.lilac, 'Urban\nGovernment', 7.448, 1.418, C.ink, 7.128],
++    [9.706, C.sand, 'Urban\nSocial Activists', 10.43, 1.418, C.ink, 10.109],
++  ];
++  CIRCLES.forEach(([cx, fill]) => oval(s, cx, 4.032, 2.867, 2.867, fill));
++  CIRCLES.forEach(([, , caption, tx, tw, color, bx]) => {
++    text(s, caption, { x: tx, y: 4.659, w: tw, h: 0.675, fontSize: 12, color, align: 'center', lineSpacingMultiple: 1.5 });
++    text(s, LOREM_CIRCLE, { x: bx, y: 5.466, w: 2.06, h: 0.832, color, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++  header(s, { dot: C.brown, company: C.ink, meta: C.ink });
++}
++
++/* =================================================================== slide 9 */
++/* "Future Steps": 2x2 topic grid on brown, hatched photo block bottom-left. */
++function slide09(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  title(s, 'Future Steps', 0.633, 1.445, 4.306, 2.121, C.ink);
++  rect(s, 6.244, 0, 7.089, 7.5, C.brown);
++
++  const TOPICS = [
++    // [heading, heading x, heading y, heading w, heading h, wrap?, body x, body y]
++    ['Mental Health Emergency \nResponse', 7.021, 2.064, 2.23, 0.505, false, 7.016, 2.613],
++    ['Policy and System Gaps', 10.118, 2.064, 2.043, 0.303, false, 10.113, 2.613],
++    ['Program Impact and Evaluation', 7.016, 4.521, 1.967, 0.505, true, 7.016, 5.07],
++    ['Trauma-Informed Care', 10.156, 4.521, 1.967, 0.303, false, 10.113, 5.07],
++  ]; // only the "Program Impact" heading wraps to two lines
++  TOPICS.forEach(([head, hx, hy, hw, hh, wrap, bx, by]) => {
++    text(s, head, { x: hx, y: hy, w: hw, h: hh, fontSize: 12, color: C.cream, wrap });
++    para(s, LOREM_TINY, bx, by, 2.305, 0.832, C.cream);
++  });
++  header(s, { dot: C.brown, company: C.ink, meta: C.cream });
++  imageFrame(s, 0, 4.055, 6.244, 3.445);
++}
++
++/* ================================================================== slide 10 */
++/* "Strategic Steps": three caption/paragraph pairs scattered along the bottom. */
++function slide10(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  title(s, 'Strategic Steps', 0.76, 1.388, 9.817, 1.111, C.ink);
++
++  const NOTES = [
++    // [label x, label y, body x, body y, body w, body text]
++    [0.76, 5.989, 2.022, 6.072, 3.265, 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. Dolor sit.'],
++    [5.397, 5.195, 6.728, 5.243, 1.75, 'Lorem ipsum dolor sit dolor sit ametis asdaa.'],
++    [8.606, 6.275, 9.919, 6.32, 2.654, 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing.'],
++  ];
++  NOTES.forEach(([lx, ly, bx, by, bw, body]) => {
++    kicker(s, 'Strategic Subject:', lx, ly, 1.261, 0.675, C.ink, MANROPE_B);
++    para(s, body, bx, by, bw, 0.58, C.ink, MANROPE);
++  });
++  header(s, { dot: C.brown, company: C.ink, meta: C.ink });
++}
++
++/* ================================================================== slide 11 */
++/* "Grow In Rates": two case-study columns (brown left, lilac right). */
++function slide11(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 0, 0, 4.183, 7.5, C.brown);
++  rect(s, 7.967, 0, 5.367, 7.5, C.lilac);
++  title(s, 'Grow \nIn Rates', 4.388, 1.455, 3.373, 2.121, C.ink);
++
++  // left column (on brown, cream text)
++  text(s, 'Case Studies 1', { x: 0.924, y: 1.658, w: 1.78, h: 0.37, fontSize: 16, color: C.cream });
++  text(s, 'Client: Xyz Corporation', { x: 0.924, y: 2.331, w: 2.225, h: 0.303, fontSize: 12, color: C.cream });
++  para(s, LOREM_CASE, 0.924, 2.882, 2.325, 0.58, C.cream);
++  text(s, 'Main Objectives', { x: 0.924, y: 3.975, w: 1.577, h: 0.303, fontSize: 12, color: C.cream });
++  bullets(s, ['Increase brand awareness.', 'Improve websites.'], 0.924, 4.551, 2.325, 0.58, C.cream, 13.5);
++  text(s, '25%', { x: 0.924, y: 5.572, w: 1.169, h: 0.64, fontSize: 32, color: C.cream });
++  para(s, 'Increase in\nConverstion', 2.123, 5.484, 1.162, 0.58, C.cream);
++
++  // right column (on lilac, ink text)
++  text(s, 'Case Studies 2', { x: 8.606, y: 1.711, w: 1.911, h: 0.37, fontSize: 16 });
++  text(s, 'Client: Abc Enterprises', { x: 8.606, y: 2.384, w: 2.225, h: 0.303, fontSize: 12 });
++  para(s, LOREM_CASE, 8.656, 2.854, 2.557, 0.58, C.ink);
++  text(s, 'Main Objectives', { x: 8.694, y: 3.947, w: 1.734, h: 0.303, fontSize: 12 });
++  bullets(s, ['Monthly branding design.', 'Attract any customers'], 8.656, 4.523, 2.557, 0.58, C.ink, 13.5);
++  para(s, 'Reduction in\nManual Entry', 8.754, 6.124, 1.279, 0.58, C.ink);
++
++  round(s, 10.984, 5.572, 1.794, 1.199, C.pink, { rectRadius: 0.12 });
++  arrowBadge(s, 12.428, 5.685, 0.24, C.ink, 'se');
++  para(s, 'percentage', 11.065, 5.737, 1.279, 0.327, C.ink);
++  text(s, '30%', { x: 11.026, y: 6.064, w: 1.169, h: 0.64, fontSize: 32 });
++
++  header(s, { dot: C.cream, company: C.cream, meta: C.ink });
++  imageFrame(s, 4.183, 4.055, 3.784, 3.445);
++}
++
++/* ================================================================== slide 12 */
++/* "Access to Mental Health Services": two stacked colour blocks on the left. */
++function slide12(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  kicker(s, 'Why it Matters?', 6.667, 1.749, 1.261, 0.675, C.ink);
++  para(s, LOREM_LONG, 6.667, 2.677, 4.53, 0.832, C.ink);
++  title(s, 'Access to Mental Health Services', 6.667, 3.991, 6.006, 3.13, C.ink);
++  header(s, { dot: C.brown, company: C.ink, meta: C.ink });
++
++  const BLOCKS = [
++    // [block y, fill, heading, heading y, heading w, body y, text colour]
++    [1.376, C.lilac, 'Therapy', 2.127, 0.805, 2.677, C.ink],
++    [4.138, C.brown, 'Community Support', 4.944, 1.764, 5.493, C.cream],
++  ];
++  BLOCKS.forEach(([by, fill, head, hy, hw, py, color]) => {
++    rect(s, 0, by, 5.555, 2.761, fill);
++    text(s, head, { x: 0.699, y: hy, w: hw, h: 0.303, fontSize: 12, color, wrap: false });
++    para(s, 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. ' +
++      'Dolor sit eget amet consetectuer adispsicing ligula eget dolor sit amet ligula.', 0.695, py, 3.967, 0.832, color);
++  });
++}
++
++/* ================================================================== slide 13 */
++/* "Services Overview": brown band, rotated cards, grey footer block. */
++function slide13(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 0, 0, 13.333, 5.344, C.brown);
++  round(s, 6.209, 0.118, 3.256, 5.776, C.sand, { rotate: 270 });
++  round(s, 6.521, 0.118, 3.256, 5.776, C.lilac, { rotate: 270 });
++  rect(s, 0, 5.344, 4.667, 2.156, C.ash);
++
++  title(s, 'Services Overview', 5.41, 6.011, 7.386, 1.111, C.ink);
++  kicker(s, 'Excellent Services', 0.76, 1.67, 1.484, 0.675, C.cream);
++  para(s, LOREM_MED, 0.76, 2.836, 3.74, 0.832, C.cream);
++  caption(s, 'Bryant Davis – Head  Of Service', 0.76, 4.138, 2.406, 0.327, C.cream);
++
++  [[0.76, 0.76, 'Service 1'], [2.582, 2.61, 'Service 2']].forEach(([lx, bx, label]) => {
++    text(s, label, { x: lx, y: 5.811, w: 1.413, h: 0.373, fontSize: 12, align: 'justify', lineSpacingMultiple: 1.5 });
++    para(s, 'Lorem ipsum dolor sitasdwea amet, consectetuer', bx, 6.183, 1.413, 0.831, C.ink);
++  });
++  header(s, { dot: C.cream, company: C.cream, meta: C.cream });
++}
++
++/* ================================================================== slide 14 */
++/* "Service Pricing": three price columns + hatched photo block top-right. */
++function slide14(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++
++  const COLS = [
++    // [panel x, fill, label, label w, price, price w, text colour, text x, budget/uses y, uses x]
++    [0, C.brown, 'Content Marketing', 1.852, '$50.2k+', 2.191, C.cream, 0.788, 6.563, 2.136],
++    [4.444, C.lilac, 'Social Media Marketing', 2.169, '$25.4k+', 2.169, C.ink, 5.29, 6.563, 6.631],
++    [8.889, C.cream, 'Email Marketing', 2.469, '$35.8k+', 2.274, C.ink, 9.767, 6.507, 11.104],
++  ];
++  COLS.forEach(([px, fill]) => rect(s, px, 4.554, 4.444, 2.946, fill));
++  title(s, 'Service\nPricing', 0.594, 1.629, 3.703, 2.121, C.ink);
++  COLS.forEach(([, , label, lw, price, pw, color, tx, fy, ux]) => {
++    text(s, label, { x: tx, y: 5.418, w: lw, h: 0.303, fontSize: 12, color });
++    text(s, price, { x: tx, y: 5.822, w: pw, h: 0.707, fontSize: 36, color });
++    text(s, 'Allocated Budget', { x: tx, y: fy, w: 1.341, h: 0.269, color });
++    text(s, 'Uses of resources', { x: ux, y: fy, w: 1.469, h: 0.269, color });
++  });
++  header(s, { dot: C.brown, company: C.ink });
++  imageFrame(s, 5.496, 0, 7.837, 4.554);
++}
++
++/* ================================================================== slide 15 */
++/* "Company Activity Campaign": brown right panel, rotated cards bottom-left. */
++function slide15(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 7.595, 0, 5.751, 7.5, C.brown);
++  title(s, 'Company\nActivity\nCampaign', 8.211, 2.432, 4.362, 3.13, C.cream);
++  kicker(s, 'Why it Matters?', 0.76, 1.393, 1.261, 0.675, C.ink);
++  para(s, 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. ' +
++    'Dolor sit eget ligula eget dolor sit amet consetectuer adispiscing lorem ipsum.',
++    0.76, 2.321, 3.017, 1.085, C.ink);
++  round(s, 2.556, 2.94, 3.255, 5.223, C.sand, { rotate: 270 });
++  round(s, 2.15, 2.94, 3.255, 5.223, C.lilac, { rotate: 270 });
++
++  round(s, 10.575, 5.736, 1.794, 1.199, C.pink, { rectRadius: 0.12 });
++  arrowBadge(s, 12.02, 5.848, 0.24, C.ink, 'se');
++  para(s, 'percentage', 10.657, 5.9, 1.279, 0.327, C.ink);
++  text(s, '30%', { x: 10.618, y: 6.227, w: 1.169, h: 0.64, fontSize: 32 });
++  header(s, { dot: C.brown, company: C.ink, meta: C.cream });
++}
++
++/* ================================================================== slide 16 */
++/* "People and Resources": three staggered circles straddling the brown edge. */
++function slide16(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 7.711, 0, 5.622, 7.5, C.brown);
++  title(s, 'People and Resources', 0.76, 1.936, 4.256, 3.13, C.ink);
++
++  const NODES = [
++    // [circle x, circle y, fill, heading, heading x, heading y, heading h, body x, body y]
++    [6.28, 0.601, C.lilac, 'Community', 6.776, 1.206, 0.372, 6.597, 1.796],
++    [8.368, 2.498, C.pink, 'Urban People', 8.873, 3.099, 0.372, 8.694, 3.633],
++    [6.614, 4.629, C.sand, 'Networking Events', 7.153, 5.066, 0.675, 6.974, 5.859],
++  ];
++  NODES.forEach(([cx, cy, fill]) => oval(s, cx, cy, 2.271, 2.271, fill));
++  NODES.forEach(([, , , head, hx, hy, hh, bx, by]) => {
++    text(s, head, { x: hx, y: hy, w: 1.261, h: hh, fontSize: 12, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
++    text(s, 'Lorem ipsum dolor sit dolora sit ametis as.',
++      { x: bx, y: by, w: 1.619, h: 0.58, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++
++  para(s, 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. ' +
++    'Dolor sit eget ligula eget dolor sit amet consetectuer.', 0.76, 6.32, 4.862, 0.58, C.ink);
++  text(s, 'Data Strategies', { x: 11.268, y: 6.63, w: 1.359, h: 0.269, color: C.cream });
++  header(s, { dot: C.brown, company: C.ink, meta: C.cream });
++}
++
++/* ================================================================== slide 17 */
++/* "Data and Evidence-Based Care": pill bar chart built from rounded rectangles. */
++function slide17(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 0, 0, 8.111, 7.5, C.brown);
++  rect(s, 8.111, 5.379, 5.356, 2.121, C.ash);
++
++  // stat badge over the brown panel
++  round(s, 1.2, 1.576, 1.794, 1.199, C.pink, { rectRadius: 0.12 });
++  arrowBadge(s, 2.644, 1.688, 0.24, C.ink, 'se');
++  text(s, '4,76K', { x: 1.301, y: 1.774, w: 1.604, h: 0.64, fontSize: 32 });
++  text(s, 'Data Statistic', { x: 1.248, y: 2.344, w: 1.488, h: 0.303, fontSize: 12 });
++  para(s, 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. Dolor',
++    3.33, 1.471, 3.056, 0.58, C.cream);
++
++  // bar chart: a tall cream "track" pill with a shorter coloured pill in front
++  const BARS = [
++    // [track x, track y, track w, track h, fill x, fill y, fill w, fill h, fill colour, year, year x]
++    [1.55, 3.816, 0.816, 2.308, 1.543, 4.539, 0.827, 1.611, C.lilac, '2020', 1.709],
++    [2.833, 3.019, 0.816, 3.155, 2.82, 3.878, 0.843, 2.296, C.pink, '2025', 2.926],
++    [4.127, 3.816, 0.816, 2.308, 4.127, 4.53, 0.816, 1.611, C.bone, '2030', 4.288],
++    [5.431, 2.995, 0.816, 3.155, 5.424, 4.223, 0.837, 1.928, C.grey, '2035', 5.607],
++  ];
++  BARS.forEach(([tx, ty, tw, th]) => round(s, tx, ty, tw, th, C.cream, { rectRadius: tw / 2 }));
++  BARS.forEach(([, , , , fx, fy, fw, fh, fc]) => round(s, fx, fy, fw, fh, fc, { rectRadius: fw / 2 }));
++  BARS.forEach(([, , , , , , , , , year, yx]) =>
++    caption(s, year, yx, 6.576, 0.657, 0.327, C.cream));
++
++  title(s, 'Data and Evidence-Based Care', 8.562, 1.222, 4.207, 4.14, C.ink);
++  text(s, '$2.850.00', { x: 8.606, y: 6.104, w: 2.201, h: 0.572, fontSize: 28 });
++  caption(s, 'Conversion Rates', 8.606, 6.576, 1.475, 0.327, C.ink);
++  s.addShape(SH.line, { x: 11.017, y: 6.387, w: 0, h: 0.349, line: { color: C.ink, width: 1 } });
++  caption(s, '13%', 11.29, 5.942, 0.978, 0.735, C.ink, 28);
++  caption(s, 'Increase Rates', 11.29, 6.576, 1.283, 0.327, C.ink);
++  header(s, { dot: C.cream, company: C.cream, meta: C.ink });
++}
++
++/* ================================================================== slide 18 */
++/* "Achievement Program": two colour blocks + hatched photo band. */
++function slide18(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.sand };
++  rect(s, 3.825, 0, 3.819, 3.101, C.lilac);
++  rect(s, -0.006, 0, 3.832, 3.101, C.brown);
++
++  [['Future Urban Mental Health Strategies', 0.732, 2.015, C.cream],
++   ['Mental Day Urban Family', 4.551, 1.29, C.ink]].forEach(([head, x, w, color]) => {
++    kicker(s, head, x, 0.688, w, 0.675, color);
++    para(s, LOREM_SHORT, x, 1.669, 2.325, 0.832, color);
++  });
++  // trailing empty paragraph is present in the original
++  title(s, [{ text: 'Achievement', options: { breakLine: true } }, { text: 'Program', options: { breakLine: true } },
++    { text: '' }], 7.834, 0.519, 5.506, 3.13, C.ink);
++  imageFrame(s, 0, 3.101, 13.333, 4.399);
++}
++
++/* ================================================================== slide 19 */
++/* "Powered by Our Team": full brown background, three rotated cards. */
++function slide19(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.brown };
++  title(s, 'Powered by Our Team', 7.911, 4.631, 5.004, 2.121, C.cream, MANROPE);
++  para(s, 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. ' +
++    'Dolor sit eget ligula eget dolor sit amet consetectuer adispiscing lorem ipsum dolor.',
++    8.606, 2.598, 3.967, 0.832, C.cream, MANROPE);
++  kicker(s, 'We Seek Better Futures', 8.606, 1.67, 1.405, 0.675, C.cream, MANROPE_B);
++
++  round(s, 1.869, 1.407, 4.94, 5.467, C.sand, { rotate: 270 });
++  round(s, 1.463, 1.407, 4.94, 5.467, C.lilac, { rotate: 270 });
++  round(s, 0.938, 1.407, 4.94, 5.467, C.lilac, { rotate: 270 });
++  header(s, { dot: C.cream, company: C.cream, meta: C.cream });
++}
++
++/* ================================================================== slide 20 */
++/* Closing slide: contact details, big thank-you, stacked cards on the left. */
++function slide20(pres) {
++  const s = pres.addSlide();
++  s.background = { color: C.cream };
++  rect(s, 0, 0, 4.415, 7.5, C.brown);
++  title(s, 'Thank You for Your Kind Attention', 7.539, 2.366, 5.131, 3.13, C.ink, MANROPE);
++
++  [['Website:', 'www.example.com', 7.539, 1.413], ['Contact:', '+11 222 3333 4444', 9.327, 1.413],
++   ['Email:', 'example@email.com', 11.115, 1.555]].forEach(([label, value, x, wv]) => {
++    text(s, label, { x, y: 0.652, w: 1.413, h: 0.373, fontSize: 12, fontFace: MANROPE_B, align: 'justify', lineSpacingMultiple: 1.5 });
++    text(s, value, { x, y: 1.03, w: wv, h: 0.327, fontFace: MANROPE, align: 'justify', lineSpacingMultiple: 1.5 });
++  });
++  para(s, 'Lorem ipsum dolor sit dolor sit ametis asda amet, consectetuer adipiscing elitisu. ' +
++    'Dolor sit eget ligula eget dolor sit amet consetectuer dolor sit amet.',
++    7.539, 6.32, 4.99, 0.58, C.ink, MANROPE);
++  text(s, 'We’ll see you soon, have a great day.',
++    { x: 0.76, y: 6.572, w: 2.751, h: 0.327, fontFace: MANROPE_B, color: C.cream, lineSpacingMultiple: 1.5 });
++
++  round(s, 1.8, 1.357, 3.7, 5.081, C.sand);
++  round(s, 1.269, 1.357, 3.7, 5.081, C.lilac);
++  round(s, 0.71, 1.357, 3.7, 5.081, C.lilac);
++  header(s, { dot: C.cream, company: C.cream });
++}
++
++/* ==================================================================== build */
++function build() {
++  const pres = new PptxGenJS();
++  SH = pres.ShapeType;
++  pres.defineLayout({ name: 'DECK_16x9', width: 13.333333, height: 7.5 });
++  pres.layout = 'DECK_16x9';
++  pres.theme = { headFontFace: MANROPE_B, bodyFontFace: MANROPE };
++  pres.title = 'Understanding The Mental Health Crisis in Urban Areas';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++    .forEach(fn => fn(pres));
++
++  return pres.writeFile({ fileName: path.join(__dirname, '079d3440-0775-42d9-b93b-d9459618c1c8_grok_final.pptx') });
++}
++
++build().then(f => console.log('wrote', f));

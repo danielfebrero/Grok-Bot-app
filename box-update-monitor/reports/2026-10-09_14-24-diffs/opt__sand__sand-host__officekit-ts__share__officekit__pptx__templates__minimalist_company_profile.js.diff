@@ -1,0 +1,825 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/minimalist_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/minimalist_company_profile.js
+@@ -0,0 +1,822 @@
++/**
++ * Monochrome / Lineart presentation - rebuilt with pptxgenjs.
++ *
++ * Recreates a 24-slide 16:9 deck (13.333in x 7.5in) whose visual language is
++ * black hairline outlines, white cards and diagonal-hatch "drop shadows".
++ * Photographs in the original are replaced by labelled placeholder blocks.
++ *
++ * Run:  node 0d942ef0-136c-441e-a358-4bb4c4c2d900_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens
++ * ------------------------------------------------------------------ */
++
++const BLACK = '000000';
++const WHITE = 'FFFFFF';
++const GREY = 'BFBFBF';          // "lumMod 75%" grey used by the pricing table
++const RED = 'FF0000';           // colour of the "Graphikal Placeholder" caption
++const SHADOW_GREY = 'E4E4E4';   // stand-in for the hatch-filled text shadows
++const PLACEHOLDER_FILL = 'E9E9E9';
++const PLACEHOLDER_LINE = 'A6A6A6';
++
++const TITLE_FONT = 'Montserrat ExtraBold';
++const BODY_FONT = 'Lato';
++
++const CARD_LINE = { color: BLACK, width: 1.5 };
++const THIN_LINE = { color: BLACK, width: 1.5 };
++const RAIL_LINE = { color: BLACK, width: 2.25 };
++
++const HATCH_STEP = 0.055;      // spacing of the diagonal hatch lines (inches)
++const HATCH_WIDTH = 0.11;      // stroke weight of a hatch line (points)
++const HATCH_PHASE = 0.025;     // grid offset that keeps neighbouring hatches in step
++
++// Headlines on the dark slides carry a hard, un-blurred 45-degree drop shadow.
++// A fresh object is required per call because pptxgenjs rewrites these fields.
++function titleShadow() {
++    return { type: 'outer', angle: 45, offset: 8, blur: 0.001, color: BLACK, opacity: 1 };
++}
++
++/* ------------------------------------------------------------------ *
++ * Generic drawing helpers
++ * ------------------------------------------------------------------ */
++
++/** Diagonal (top-left to bottom-right) hatch fill, drawn as one custom path.
++ *  Lines are phase-locked to a slide-wide grid so adjacent hatched shapes align. */
++function hatch(slide, x, y, w, h, opts) {
++    const step = (opts && opts.step) || HATCH_STEP;
++    // Shift the first line so that (globalX - globalY) stays on the shared grid.
++    const phase = (((x - y - HATCH_PHASE) % step) + step) % step;
++    const points = [];
++    for (let d = -h - phase; d <= w; d += step) {
++        let x0 = d, y0 = 0, x1 = d + h, y1 = h;
++        if (x0 < 0) { y0 = -x0; x0 = 0; }
++        if (x1 > w) { y1 = h - (x1 - w); x1 = w; }
++        if (x1 - x0 < 0.01) continue;
++        points.push({ x: +x0.toFixed(3), y: +y0.toFixed(3), moveTo: true });
++        points.push({ x: +x1.toFixed(3), y: +y1.toFixed(3) });
++    }
++    slide.addShape('custGeom', {
++        x, y, w, h, points,
++        fill: { type: 'none' },
++        line: { color: BLACK, width: (opts && opts.width) || HATCH_WIDTH },
++    });
++    if (opts && opts.border) slide.addShape('rect', { x, y, w, h, fill: { type: 'none' }, line: THIN_LINE });
++}
++
++/** White card with a hairline black keyline. */
++function card(slide, x, y, w, h, fillColor) {
++    slide.addShape('rect', {
++        x, y, w, h,
++        fill: { color: fillColor || WHITE },
++        line: fillColor === BLACK ? { color: WHITE, width: 1.5 } : CARD_LINE,
++    });
++}
++
++/** Card plus its hatched shadow, offset down-right. */
++function shadowCard(slide, x, y, w, h, dx, dy) {
++    hatch(slide, x + (dx === undefined ? 0.186 : dx), y + (dy === undefined ? 0.170 : dy), w, h);
++    card(slide, x, y, w, h);
++}
++
++/** Photo stand-in: keyline card, red caption, grey "[image]" block. */
++function imagePlaceholder(slide, x, y, w, h) {
++    card(slide, x, y, w, h);
++    slide.addText('Graphikal Placeholder', {
++        x, y: y + 0.02, w, h: 0.28, wrap: false, margin: 0,
++        align: 'center', valign: 'top', fontFace: TITLE_FONT, fontSize: 11, color: RED,
++    });
++    // The original artwork uses a fixed-size picture glyph regardless of tile size.
++    const bw = Math.min(0.86, w * 0.7), bh = Math.min(0.68, h * 0.7);
++    slide.addShape('rect', {
++        x: x + (w - bw) / 2, y: y + (h - bh) / 2, w: bw, h: bh,
++        fill: { color: PLACEHOLDER_FILL }, line: { color: PLACEHOLDER_LINE, width: 0.75 },
++    });
++    slide.addText('[image]', {
++        x: x + (w - bw) / 2, y: y + (h - bh) / 2, w: bw, h: bh,
++        align: 'center', valign: 'middle', fontFace: BODY_FONT, fontSize: 8, color: '808080',
++    });
++}
++
++/** Headline set in the display face. */
++function title(slide, x, y, w, h, lines, opts) {
++    const o = opts || {};
++    slide.addText(lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })), {
++        x, y, w, h,
++        fontFace: TITLE_FONT, fontSize: o.fontSize || 40, color: o.color || BLACK,
++        align: o.align || 'left', valign: 'top', charSpacing: 3,
++        shadow: o.shadow ? titleShadow() : undefined,
++        lineSpacingMultiple: o.lineSpacingMultiple,
++    });
++}
++
++/** Sub-heading (20pt display face). */
++function subtitle(slide, x, y, w, text, opts) {
++    const o = opts || {};
++    slide.addText(text, {
++        x, y, w, h: 0.438,
++        fontFace: TITLE_FONT, fontSize: o.fontSize || 20, color: o.color || BLACK,
++        align: o.align || 'left', valign: 'top',
++    });
++}
++
++/** Body copy. `lines` may contain '' to produce a blank paragraph. */
++function body(slide, x, y, w, h, lines, opts) {
++    const o = opts || {};
++    slide.addText(lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })), {
++        x, y, w, h,
++        fontFace: BODY_FONT, fontSize: o.fontSize || 11, color: o.color || BLACK,
++        align: o.align || 'justify', valign: 'top',
++        lineSpacingMultiple: o.lineSpacingMultiple || 1.5,
++    });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide chrome: the punched-binder rail that runs down every page
++ * ------------------------------------------------------------------ */
++
++const RAIL_DOTS = [
++    [0.260, 0.496], [0.247, 0.859], [0.247, 1.220],
++    [0.260, 6.111], [0.247, 6.474], [0.247, 6.836],
++];
++
++function rail(slide, pageLabel) {
++    slide.addShape('line', { x: 0.662, y: 0, w: 0, h: 7.5, line: RAIL_LINE });
++    RAIL_DOTS.forEach(([x, y]) => {
++        slide.addShape('ellipse', { x, y, w: 0.169, h: 0.169, fill: { type: 'none' }, line: THIN_LINE });
++        slide.addShape('ellipse', {
++            x: x + 0.013, y: y + 0.024, w: 0.155, h: 0.152,
++            fill: { type: 'none' }, line: THIN_LINE,
++        });
++    });
++    if (pageLabel) {
++        slide.addText(pageLabel, {
++            x: -0.427, y: 3.559, w: 1.530, h: 0.352, rotate: 270,
++            align: 'center', valign: 'middle',
++            fontFace: TITLE_FONT, fontSize: 11, color: BLACK, charSpacing: 3,
++        });
++    }
++}
++
++/* ------------------------------------------------------------------ *
++ * Small vector icons (replace the SVG glyphs of the original)
++ * ------------------------------------------------------------------ */
++
++function iconBank(slide, x, y, s) {
++    const c = { fill: { color: BLACK }, line: { type: 'none' } };
++    slide.addShape('triangle', { x: x + 0.04 * s, y: y + 0.12 * s, w: 0.92 * s, h: 0.20 * s, ...c });
++    slide.addShape('rect', { x: x + 0.02 * s, y: y + 0.32 * s, w: 0.96 * s, h: 0.07 * s, ...c });
++    [0.12, 0.32, 0.52, 0.72].forEach((f) =>
++        slide.addShape('rect', { x: x + f * s, y: y + 0.41 * s, w: 0.14 * s, h: 0.32 * s, ...c }));
++    slide.addShape('rect', { x: x + 0.02 * s, y: y + 0.75 * s, w: 0.96 * s, h: 0.10 * s, ...c });
++}
++
++function iconBriefcase(slide, x, y, s) {
++    const c = { fill: { color: BLACK }, line: { type: 'none' } };
++    slide.addShape('rect', { x: x + 0.34 * s, y: y + 0.16 * s, w: 0.32 * s, h: 0.10 * s, ...c });
++    slide.addShape('rect', { x: x + 0.40 * s, y: y + 0.16 * s, w: 0.20 * s, h: 0.16 * s, fill: { color: WHITE }, line: { type: 'none' } });
++    slide.addShape('roundRect', { x: x + 0.03 * s, y: y + 0.28 * s, w: 0.94 * s, h: 0.52 * s, rectRadius: 0.03 * s, ...c });
++    slide.addShape('rect', { x: x + 0.44 * s, y: y + 0.46 * s, w: 0.12 * s, h: 0.12 * s, fill: { color: WHITE }, line: { type: 'none' } });
++}
++
++/* ------------------------------------------------------------------ *
++ * Shared body copy of the template
++ * ------------------------------------------------------------------ */
++
++const LOREM_1 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
++const LOREM_2 = 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in.';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore.';
++const LOREM_LINE = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et';
++const MOCKUP_COPY = [
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore',
++    '',
++    ' magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu.',
++];
++
++/** The white text panel shared by the mock-up / chart slides. */
++function textPanel(slide, cardX, textX, titleLines) {
++    hatch(slide, cardX + 0.247, 1.576, 4.557, 4.787);
++    card(slide, cardX, 1.306, 4.529, 4.811);
++    title(slide, textX, 1.741, 4.306, 1.447, titleLines);
++    subtitle(slide, textX + 0.014, 3.094, 4.291, 'YOUR SUBTITLE HERE');
++    body(slide, textX + 0.014, 3.608, 3.982, 2.008, MOCKUP_COPY);
++}
++
++/* ------------------------------------------------------------------ *
++ * Per-slide builders
++ * ------------------------------------------------------------------ */
++
++function slide01(s) {                                    // Cover
++    rail(s);
++    hatch(s, 1.570, 1.062, 10.670, 5.817);
++    card(s, 1.093, 0.621, 10.670, 5.817);
++    ['shadow', 'solid'].forEach((pass) => {
++        const d = pass === 'shadow' ? 0.152 : 0;
++        s.addText('WHITE', {
++            x: 2.210 + d, y: 2.715 + d, w: 6.100, h: 1.180, margin: 0, wrap: false,
++            fontFace: TITLE_FONT, fontSize: 122, align: 'left', valign: 'middle',
++            color: pass === 'shadow' ? SHADOW_GREY : BLACK,
++        });
++    });
++    s.addText(
++        ['MONOCHROME', 'LINEART', 'PRESENTATION'].map((t, i) => ({ text: t, options: { breakLine: i < 2 } })),
++        {
++            x: 8.812, y: 2.790, w: 2.811, h: 1.248,
++            fontFace: TITLE_FONT, fontSize: 12, bold: true, color: BLACK,
++            valign: 'top', lineSpacingMultiple: 2.0,
++        });
++}
++
++function slide02(s) {                                    // Welcome
++    rail(s, 'PAGE 02');
++    hatch(s, 1.277, 0.857, 3.680, 2.339);
++    hatch(s, 1.631, 3.883, 5.926, 2.760);
++    card(s, 1.277, 3.584, 5.926, 2.760);
++    imagePlaceholder(s, 8.367, 0.139, 4.823, 7.215);
++    title(s, 1.291, 2.346, 3.557, 0.707, ['WELCOME'], { fontSize: 36, color: WHITE, align: 'center', shadow: true });
++    subtitle(s, 1.757, 3.913, 4.610, 'PLACE YOUR SUBTITLE HERE');
++    body(s, 1.812, 4.508, 4.834, 1.453, [LOREM_1, '', LOREM_2]);
++    hatch(s, 9.309, 6.352, 3.324, 0.661);
++    card(s, 9.149, 6.204, 3.324, 0.661);
++    s.addText('Jane Claire V.', {
++        x: 9.149, y: 6.204, w: 3.324, h: 0.661,
++        align: 'center', valign: 'middle', fontFace: TITLE_FONT, fontSize: 16, color: BLACK,
++    });
++}
++
++function slide03(s) {                                    // We are W&B
++    rail(s, 'PAGE 03');
++    hatch(s, 7.625, 1.141, 4.388, 5.518);
++    card(s, 7.145, 0.842, 4.484, 5.518);
++    hatch(s, 1.701, 1.141, 4.970, 2.216);
++    hatch(s, 1.690, 4.442, 4.970, 2.216);
++    imagePlaceholder(s, 1.260, 0.842, 5.078, 2.216);
++    imagePlaceholder(s, 1.260, 4.143, 5.078, 2.216);
++    title(s, 7.574, 1.141, 3.569, 1.447, ['WE ARE', 'W&B']);
++    body(s, 7.574, 2.775, 3.569, 3.119, [
++        LOREM_1, '',
++        'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
++    ]);
++}
++
++function slide04(s) {                                    // About company
++    rail(s, 'PAGE 04');
++    hatch(s, 1.552, 2.794, 11.356, 4.008);
++    card(s, 1.095, 2.317, 3.672, 4.220);
++    card(s, 5.034, 2.329, 3.672, 4.220);
++    imagePlaceholder(s, 8.972, 2.329, 3.672, 4.208);
++    card(s, 1.094, 0.859, 11.549, 1.093);
++    title(s, 1.094, 1.010, 11.549, 0.774, ['ABOUT COMPANY'], { align: 'center' });
++    [[1.094, 1.362, 'SUBTITLE #1', 2.933, 3.508],
++     [5.033, 5.300, 'SUBTITLE #2', 2.945, 3.520]].forEach(([sx, bx, label, sy, by]) => {
++        subtitle(s, sx, sy, 3.672, label, { align: 'center' });
++        body(s, bx, by, 3.138, 2.286, [LOREM_1, '', LOREM_2]);
++    });
++}
++
++function slide05(s) {                                    // Company values / missions
++    rail(s, 'PAGE 05');
++    hatch(s, 7.615, 1.304, 5.313, 4.015);
++    card(s, 7.358, 1.035, 5.316, 4.052);
++    hatch(s, 1.460, 3.173, 5.316, 3.115);
++    card(s, 1.253, 2.996, 5.316, 3.115);
++    title(s, 1.094, 1.010, 3.672, 1.447, ['COMPANY', 'VALUES']);
++
++    subtitle(s, 1.558, 3.293, 3.672, 'COMPANY VISIONS');
++    [[4.024, iconBank, 4.054], [5.087, iconBriefcase, 5.050]].forEach(([iy, icon, ty]) => {
++        icon(s, 1.558, iy, 0.620);
++        body(s, 2.258, ty, 4.019, 0.620, [LOREM_SHORT]);
++    });
++
++    subtitle(s, 7.663, 1.332, 3.672, 'COMPANY MISSIONS');
++    [[2.062, iconBank, 2.093], [3.126, iconBriefcase, 3.089], [4.070, iconBriefcase, 4.033]].forEach(([iy, icon, ty]) => {
++        icon(s, 7.663, iy, 0.620);
++        body(s, 8.363, ty, 4.019, 0.620, [LOREM_SHORT]);
++    });
++}
++
++function slide06(s) {                                    // Our goals
++    rail(s, 'PAGE 06');
++    hatch(s, 9.007, 0.538, 3.624, 6.688);
++    imagePlaceholder(s, 8.754, 0.274, 3.624, 1.770);
++    imagePlaceholder(s, 8.754, 2.239, 3.624, 2.759);
++    imagePlaceholder(s, 8.754, 5.193, 3.624, 1.770);
++    s.addText('OUR GOALS', {
++        x: -0.507, y: 3.363, w: 4.502, h: 0.774, rotate: 270,
++        align: 'center', valign: 'top', fontFace: TITLE_FONT, fontSize: 40, color: BLACK, charSpacing: 3,
++    });
++    [['GOALS NUMBER ONE', 1.825, 2.130],
++     ['GOALS NUMBER TWO', 3.260, 3.565],
++     ['GOALS NUMBER THREE', 4.721, 5.025]].forEach(([label, sy, by]) => {
++        subtitle(s, 2.514, sy, 4.019, label);
++        body(s, 2.514, by, 4.019, 0.620, [LOREM_SHORT]);
++    });
++}
++
++function slide07(s) {                                    // Client testimonies
++    rail(s, 'PAGE 07');
++    const cards = [
++        { x: 1.266, y: 2.984, name: 'Jane Claire V.', nameX: 1.916, nameW: 2.023, textX: 1.559, textY: 3.128, textH: 2.008,
++          lines: ['Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,',
++                  'quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea common.'] },
++        { x: 5.201, y: 2.995, name: 'Madame Lufy', nameX: 5.853, nameW: 2.020, textX: 5.495, textY: 3.139, textH: 2.008,
++          lines: ['Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do', '',
++                  ' eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut.'] },
++        { x: 9.136, y: 3.018, name: 'Lucy Impster', nameX: 9.817, nameW: 1.962, textX: 9.430, textY: 3.162, textH: 1.731,
++          lines: ['Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut.'] },
++    ];
++    cards.forEach((c) => {
++        hatch(s, c.x + 0.211, c.y + 0.144, 3.324, 2.942);
++        card(s, c.x, c.y, 3.324, 2.328);
++        card(s, c.x, c.y + 2.438, 3.324, 0.454);
++        [[c.x - 0.010, c.y - 0.017], [c.x + 2.939, c.y + 1.902]].forEach(([qx, qy]) =>
++            s.addText('\u201C', {
++                x: qx, y: qy, w: 0.416, h: 0.572,
++                align: 'center', valign: 'top', fontFace: TITLE_FONT, fontSize: 28, color: BLACK,
++            }));
++        body(s, c.textX, c.textY, 2.727, c.textH, c.lines);
++        s.addText(c.name, {
++            x: c.nameX, y: c.y + 2.457, w: c.nameW, h: 0.404,
++            align: 'center', valign: 'top', fontFace: TITLE_FONT, fontSize: 18, color: BLACK,
++        });
++    });
++    title(s, 1.094, 1.010, 4.652, 1.447, ['CLIENT TESTIMONIES']);
++}
++
++function slide08(s) {                                    // Our team of experts
++    rail(s, 'PAGE 08');
++    hatch(s, 7.257, 1.385, 5.040, 2.184);
++    hatch(s, 2.059, 4.291, 10.238, 2.184);
++    imagePlaceholder(s, 7.109, 1.220, 5.010, 2.184);
++    [1.882, 4.496, 7.110, 9.723].forEach((x, i) =>
++        imagePlaceholder(s, x, i % 2 === 0 ? 4.091 : 4.104, 2.396, 2.184));
++    title(s, 1.215, 1.245, 4.652, 1.447, ['OUR TEAM', 'OF EXPERTS']);
++    body(s, 1.255, 2.692, 5.181, 0.897, [
++        'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea.',
++    ]);
++}
++
++function slide09(s) {                                    // Personal profile
++    rail(s, 'PAGE 09');
++    card(s, 5.796, 3.553, 5.723, 3.016);
++    hatch(s, 7.349, 0.706, 5.040, 2.184);
++    hatch(s, 1.633, 1.509, 3.556, 5.060);
++    card(s, 6.155, 5.430, 5.005, 0.190);
++    card(s, 6.155, 6.066, 5.005, 0.190);
++    imagePlaceholder(s, 1.427, 1.333, 3.556, 5.060);
++    title(s, 7.207, 1.042, 4.652, 1.447, ['PERSONAL', 'PROFILE'], { align: 'right', color: WHITE, shadow: true });
++    subtitle(s, 6.028, 3.847, 3.672, 'NICK GERALDYNE');
++    body(s, 6.028, 4.242, 5.005, 0.620, [
++        'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim.',
++    ]);
++    subtitle(s, 6.028, 5.093, 3.672, 'SKILL NUMBER ONE', { fontSize: 11 });
++    subtitle(s, 6.028, 5.729, 3.672, 'SKILL NUMBER TWO', { fontSize: 11 });
++    hatch(s, 6.169, 5.444, 4.065, 0.171);   // skill bar 1 (81%)
++    hatch(s, 6.169, 6.077, 4.765, 0.171);   // skill bar 2 (95%)
++}
++
++function slide10(s) {                                    // Pull quote
++    rail(s, 'PAGE 10');
++    hatch(s, 5.966, 1.445, 6.111, 5.125);
++    card(s, 5.780, 1.314, 6.111, 5.060);
++    hatch(s, 1.633, 1.509, 3.556, 5.060);
++    imagePlaceholder(s, 1.427, 1.333, 3.556, 5.060);
++    s.addText('\u201CIf you do not want it, do not do it because life is to short to last long.\u201D', {
++        x: 6.667, y: 2.088, w: 4.327, h: 2.849,
++        align: 'center', valign: 'top', fontFace: TITLE_FONT, fontSize: 28, italic: true,
++        color: BLACK, lineSpacingMultiple: 1.5,
++    });
++    s.addText('From: EMO BAND \u201816', {
++        x: 5.775, y: 5.408, w: 6.111, h: 0.286,
++        align: 'center', valign: 'top', fontFace: TITLE_FONT, fontSize: 11, bold: true, color: BLACK,
++    });
++}
++
++function slide11(s) {                                    // Coffee break
++    hatch(s, 0.675, 0, 12.658, 7.5);
++    rail(s, 'PAGE 11');
++    imagePlaceholder(s, 8.549, 0.210, 4.524, 7.056);
++    title(s, 1.907, 2.675, 5.349, 2.121, ['15 MINUTES', 'COFFEE', 'BREAK'], { color: WHITE, shadow: true });
++}
++
++function slide12(s) {                                    // Our best services
++    rail(s, 'PAGE 12');
++    hatch(s, 1.714, 2.546, 10.631, 1.407);
++    card(s, 1.528, 2.376, 10.631, 1.407);
++    hatch(s, 1.714, 5.262, 10.631, 1.407);
++    card(s, 1.528, 5.092, 10.631, 1.407);
++    const tiles = [[5.707, 1.762], [7.878, 1.762], [9.988, 1.762], [1.852, 4.474], [4.023, 4.474], [6.132, 4.474]];
++    tiles.forEach(([x, y]) => hatch(s, x + 0.114, y + 0.100, 1.745, 1.712));
++    tiles.forEach(([x, y]) => imagePlaceholder(s, x, y, 1.745, 1.712));
++    title(s, 3.152, 0.520, 7.030, 0.774, ['OUR BEST SERVICES'], { align: 'center' });
++    subtitle(s, 1.723, 2.556, 3.672, 'SERVICE #1');
++    body(s, 1.723, 2.951, 3.621, 0.620, [LOREM_LINE], { align: 'left' });
++    subtitle(s, 8.239, 5.271, 3.672, 'SERVICE #2', { align: 'right' });
++    body(s, 8.239, 5.667, 3.621, 0.620, [LOREM_LINE], { align: 'right' });
++}
++
++function slide13(s) {                                    // Service detail
++    rail(s, 'PAGE 13');
++    hatch(s, 6.922, 0.895, 5.233, 5.945);
++    [[6.726, 0.630, 2.455, 1.834], [9.439, 0.630, 2.455, 3.927],
++     [6.724, 2.678, 2.455, 3.927], [9.441, 4.775, 2.455, 1.834]]
++        .forEach(([x, y, w, h]) => imagePlaceholder(s, x, y, w, h));
++    title(s, 1.883, 0.943, 3.621, 1.447, ['SERVICE DETAIL #1'], { align: 'right' });
++    [['DETAIL #1', 2.752, 3.147], ['DETAIL #2', 4.086, 4.482], ['DETAIL #3', 5.414, 5.810]]
++        .forEach(([label, sy, by]) => {
++            subtitle(s, 1.883, sy, 3.524, label, { align: 'right' });
++            body(s, 1.883, by, 3.621, 0.620, [LOREM_LINE], { align: 'left' });
++        });
++}
++
++function slide14(s) {                                    // Portfolio
++    rail(s, 'PAGE 14');
++    hatch(s, 1.407, 1.291, 5.537, 2.401);
++    card(s, 1.222, 1.130, 5.537, 2.370);
++    hatch(s, 1.407, 4.125, 5.537, 2.401);
++    hatch(s, 7.375, 4.432, 5.295, 2.094);
++    hatch(s, 10.035, 1.259, 2.634, 2.484);
++    imagePlaceholder(s, 1.222, 3.960, 5.537, 2.370);
++    imagePlaceholder(s, 7.189, 1.126, 2.420, 5.204);
++    imagePlaceholder(s, 9.853, 1.133, 2.634, 2.481);
++    imagePlaceholder(s, 9.853, 3.846, 2.634, 2.481);
++    title(s, 1.650, 1.586, 4.972, 0.774, ['PORTFOLIO']);
++    body(s, 1.650, 2.360, 3.621, 0.620, [LOREM_LINE], { align: 'left' });
++}
++
++/** Ring gauge: an open arc with a white disc and a percentage label. */
++function gauge(s, x, y, startAngle, label) {
++    s.addShape('pie', {
++        x, y, w: 1.007, h: 1.007,
++        angleRange: [startAngle, 270], fill: { type: 'none' }, line: THIN_LINE,
++    });
++    s.addShape('ellipse', { x: x + 0.048, y: y + 0.048, w: 0.910, h: 0.910, fill: { color: WHITE }, line: THIN_LINE });
++    s.addText(label, {
++        x: x + 0.048, y: y + 0.048, w: 0.910, h: 0.910,
++        align: 'center', valign: 'middle', fontFace: TITLE_FONT, fontSize: 12, color: BLACK,
++    });
++}
++
++function slide15(s) {                                    // Portfolio details
++    hatch(s, 1.235, 0, 4.848, 7.5);
++    hatch(s, 6.788, 1.279, 5.926, 5.363);
++    rail(s, 'PAGE 15');
++    card(s, 1.620, 2.623, 4.058, 4.019);
++    card(s, 6.468, 5.078, 2.843, 1.300);
++    card(s, 9.596, 1.027, 2.843, 1.300);
++    imagePlaceholder(s, 6.468, 1.027, 2.852, 3.755);
++    imagePlaceholder(s, 9.581, 2.623, 2.852, 3.755);
++    title(s, 1.576, 0.883, 4.507, 1.447, ['PORTFOLIO DETAILS'], { color: WHITE, shadow: true });
++    gauge(s, 6.618, 5.233, 90.5, '50%');
++    body(s, 7.674, 5.233, 1.393, 0.897, ['Lorem ipsum dolor sit amet, consectetur.']);
++    gauge(s, 9.774, 1.191, 1.7, '75%');
++    body(s, 10.830, 1.191, 1.393, 0.897, ['Lorem ipsum dolor sit amet, consectetur.']);
++    [['SUBTITLE #1', 2.864, 3.260], ['SUBTITLE #2', 4.113, 4.509], ['SUBTITLE #3', 5.362, 5.758]]
++        .forEach(([label, sy, by]) => {
++            subtitle(s, 2.261, sy, 2.885, label);
++            body(s, 2.267, by, 2.964, 0.620,
++                ['Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor'], { align: 'left' });
++        });
++}
++
++/** Outline of a phone handset drawn from primitives. */
++function phoneMockup(s, x, y) {
++    const w = 2.366, h = 4.841;
++    s.addShape('roundRect', { x, y, w, h, rectRadius: 0.30, fill: { color: WHITE }, line: THIN_LINE });
++    s.addShape('roundRect', { x: x + 0.046, y: y + 0.043, w: w - 0.092, h: h - 0.087, rectRadius: 0.26, fill: { color: WHITE }, line: THIN_LINE });
++    s.addShape('round2SameRect', { x: x + 0.765, y: y + 0.204, w: 0.829, h: 0.160, fill: { color: WHITE }, line: THIN_LINE });
++    // side buttons
++    [[x + 2.068, y + 1.227, 0.571], [x - 0.090, y + 0.578, 0.213],
++     [x - 0.160, y + 1.015, 0.353], [x - 0.160, y + 1.439, 0.353]].forEach(([bx, by, bw]) =>
++        s.addShape('roundRect', { x: bx, y: by, w: bw, h: 0.082, rotate: 90, rectRadius: 0.04, fill: { color: WHITE }, line: THIN_LINE }));
++}
++
++function slide16(s) {                                    // Phone mockups
++    rail(s, 'PAGE 16');
++    hatch(s, 6.935, 1.490, 2.327, 4.798, {});
++    hatch(s, 9.787, 1.490, 2.327, 4.798, {});
++    textPanel(s, 1.315, 1.515, ['PHONE MOCKUPS']);
++    [6.768, 9.620].forEach((x) => phoneMockup(s, x, 1.333));
++    imagePlaceholder(s, 6.880, 1.413, 2.151, 4.674);
++    imagePlaceholder(s, 9.732, 1.437, 2.151, 4.674);
++}
++
++function slide17(s) {                                    // Tablet mockups
++    rail(s, 'PAGE 17');
++    hatch(s, 7.462, 1.079, 4.398, 5.780, {});
++    textPanel(s, 1.948, 2.148, ['TABLET MOCKUPS']);
++    s.addShape('roundRect', { x: 7.189, y: 0.884, w: 4.500, h: 5.872, rectRadius: 0.28, fill: { color: WHITE }, line: THIN_LINE });
++    s.addShape('roundRect', { x: 7.234, y: 0.930, w: 4.410, h: 5.780, rectRadius: 0.24, fill: { color: WHITE }, line: THIN_LINE });
++    [[11.175, 0.859, 0.271, 0], [11.558, 1.343, 0.226, 90], [11.558, 1.578, 0.226, 90]].forEach(([bx, by, bw, rot]) =>
++        s.addShape('roundRect', { x: bx, y: by, w: bw, h: 0.091, rotate: rot, rectRadius: 0.045, fill: { color: WHITE }, line: THIN_LINE }));
++    [[9.249, 0.067], [9.405, 0.067], [9.683, 0.067]].forEach(([cx, d]) =>
++        s.addShape('ellipse', { x: cx, y: 0.970, w: d, h: d, fill: { color: WHITE }, line: THIN_LINE }));
++    [[9.424, 0.989], [9.562, 0.990]].forEach(([cx, cy]) =>
++        s.addShape('ellipse', { x: cx, y: cy, w: 0.028, h: 0.028, fill: { color: BLACK }, line: THIN_LINE }));
++    imagePlaceholder(s, 7.371, 1.056, 4.129, 5.521);
++}
++
++function slide18(s) {                                    // Laptop mockups
++    rail(s, 'PAGE 18');
++    textPanel(s, 1.315, 1.515, ['LAPTOP MOCKUPS']);
++    s.addShape('roundRect', { x: 6.378, y: 0.957, w: 8.367, h: 5.713, rectRadius: 0.12, fill: { color: WHITE }, line: THIN_LINE });
++    s.addShape('rect', { x: 6.421, y: 0.999, w: 8.282, h: 5.585, fill: { color: WHITE }, line: THIN_LINE });
++    s.addShape('rect', { x: 6.421, y: 6.436, w: 8.282, h: 0.148, fill: { color: WHITE }, line: THIN_LINE });
++    s.addShape('roundRect', { x: 5.428, y: 6.585, w: 10.267, h: 0.205, rectRadius: 0.09, fill: { color: WHITE }, line: THIN_LINE });
++    s.addShape('roundRect', { x: 9.702, y: 6.585, w: 1.701, h: 0.134, rectRadius: 0.06, fill: { color: WHITE }, line: THIN_LINE });
++    s.addShape('ellipse', { x: 10.508, y: 1.146, w: 0.089, h: 0.089, fill: { color: WHITE }, line: THIN_LINE });
++    imagePlaceholder(s, 6.625, 1.397, 7.853, 4.883);
++}
++
++function slide19(s) {                                    // Bar chart
++    rail(s, 'PAGE 19');
++    textPanel(s, 7.721, 7.982, ['TABLE CHARTS']);
++    // baseline grid: value 0 at y = 6.196, one unit = 0.8485in
++    const zero = 6.196, unit = 0.8485;
++    for (let v = 0; v <= 6; v++) {
++        s.addShape('line', { x: 1.858, y: zero - v * unit, w: 4.758, h: 0, line: THIN_LINE });
++        s.addText(String(v), {
++            x: 1.204, y: zero - v * unit - 0.135, w: 0.620, h: 0.269,
++            align: 'right', valign: 'top', fontFace: TITLE_FONT, fontSize: 10, color: BLACK,
++        });
++    }
++    // three series per category: solid black, hatched, white
++    const series = [
++        { x: 2.028, label: 'Data 1', values: [2.32, 2.20, 1.98] },
++        { x: 3.212, label: 'Data 1', values: [1.54, 4.41, 1.98] },
++        { x: 4.421, label: 'Data 3', values: [5.49, 3.01, 4.60] },
++        { x: 5.620, label: 'Data 4', values: [4.00, 1.98, 3.01] },
++    ];
++    series.forEach((g) => {
++        g.values.forEach((v, i) => {
++            const x = g.x + i * 0.293, h = v * unit, y = zero - h;
++            if (i === 0) s.addShape('rect', { x, y, w: 0.293, h, fill: { color: BLACK }, line: THIN_LINE });
++            else if (i === 1) hatch(s, x, y, 0.293, h, { border: true });
++            else s.addShape('rect', { x, y, w: 0.293, h, fill: { color: WHITE }, line: THIN_LINE });
++        });
++        s.addText(g.label, {
++            x: g.x - 0.004, y: 6.263, w: 0.873, h: 0.269,
++            align: 'center', valign: 'top', fontFace: TITLE_FONT, fontSize: 10, color: BLACK,
++        });
++    });
++}
++
++function slide20(s) {                                    // Infographics display
++    hatch(s, 0.657, 0, 12.677, 1.245);
++    rail(s, 'PAGE 20');
++    [[4.184, 4.038], [9.804, 9.658]].forEach(([hx, cx]) => {
++        hatch(s, hx, 1.768, 2.678, 5.204);
++        card(s, cx, 1.632, 2.678, 5.204);
++    });
++    title(s, 0.662, 0.177, 12.672, 0.774, ['INFOGRAPHICS DISPLAY'], { align: 'center', color: WHITE, shadow: true });
++    const columns = [
++        { x: 1.217, arc: 90.5, icon: iconBriefcase, label: 'Infographic #1' },
++        { x: 4.034, arc: 38.8, icon: iconBank, label: 'Infographic #2' },
++        { x: 6.837, arc: 132.4, icon: iconBriefcase, label: 'Infographic #3' },
++        { x: 9.654, arc: 316.6, icon: iconBank, label: 'Infographic #4' },
++    ];
++    columns.forEach((c) => {
++        const ringX = c.x + 0.500;
++        s.addShape('pie', { x: ringX, y: 1.805, w: 1.774, h: 1.774, angleRange: [c.arc, 270], fill: { type: 'none' }, line: THIN_LINE });
++        s.addShape('ellipse', { x: ringX + 0.085, y: 1.891, w: 1.603, h: 1.603, fill: { color: WHITE }, line: THIN_LINE });
++        c.icon(s, ringX + 0.491, 2.287, 0.791);
++        subtitle(s, c.x, 3.855, 2.682, c.label, { align: 'center' });
++        body(s, c.x + 0.207, 4.269, 2.201, 2.008, [
++            'Lorem ipsum dolor sit amet, consectetur adipiscing elit,', '',
++            ' sed do eiusmod tempor incididunt ut labore et dolore',
++            ' magna aliqua. Ut enim ad minim veniam, quis nostrud',
++        ]);
++    });
++}
++
++/* --- Slide 21: outline map of the United States --------------------- *
++ * Each row is [hatched, x0,y0, x1,y1, ...] with coordinates normalised to
++ * the 0..1 box that the map occupies on the slide. */
++
++const US_MAP_PATHS = [
++    // [hatched, x0,y0, x1,y1, ...] - coordinates are 0..1 inside the map box
++    [0, 0.177,0.032,0.162,0.13,0.069,0.111,0.065,0.089,0.049,0.079,0.057,0.058,0.054,0.007,0.081,0.029,0.074,0.063,0.089,0.037,0.088,0.023,0.087,0.037,0.083,0.028,0.087,0,0.177,0.032],
++    [0, 0.261,0.458,0.375,0.476,0.365,0.64,0.294,0.631,0.294,0.638,0.259,0.634,0.258,0.646,0.241,0.643,0.261,0.458],
++    [1, 0.554,0.697,0.548,0.599,0.523,0.587,0.484,0.592,0.465,0.578,0.445,0.575,0.429,0.56,0.432,0.498,0.373,0.493,0.364,0.64,0.294,0.631,0.291,0.638,0.322,0.682,0.326,0.711,0.338,0.729,0.357,0.741,0.369,0.717,0.393,0.72,0.429,0.793,0.439,0.833,0.474,0.853,0.48,0.849,0.474,0.784,0.493,0.772,0.495,0.76,0.522,0.751,0.533,0.724,0.535,0.735,0.551,0.725,0.554,0.697],
++    [0, 0.168,0.435,0.162,0.464,0.149,0.464,0.152,0.523,0.143,0.532,0.131,0.576,0.201,0.634,0.241,0.643,0.261,0.458,0.168,0.435],
++    [0, 0.138,0.566,0.135,0.552,0.152,0.523,0.146,0.495,0.066,0.332,0.087,0.239,0.015,0.211,0,0.261,0.001,0.309,0.008,0.347,0.016,0.355,0.02,0.347,0.031,0.354,0.021,0.351,0.02,0.367,0.014,0.363,0.03,0.474,0.066,0.505,0.083,0.537,0.084,0.561,0.138,0.566],
++    [0, 0.373,0.493,0.432,0.498,0.429,0.56,0.445,0.575,0.465,0.578,0.484,0.592,0.523,0.586,0.538,0.598,0.535,0.484,0.375,0.476,0.373,0.493],
++    [0, 0.535,0.484,0.535,0.413,0.521,0.384,0.399,0.378,0.394,0.477,0.535,0.484],
++    [1, 0.521,0.384,0.502,0.303,0.488,0.289,0.37,0.276,0.365,0.341,0.401,0.346,0.399,0.378,0.521,0.384],
++    [0, 0.469,0.287,0.487,0.289,0.501,0.302,0.501,0.189,0.376,0.179,0.369,0.276,0.469,0.287],
++    [0, 0.375,0.21,0.256,0.188,0.239,0.319,0.365,0.341,0.375,0.21],
++    [0, 0.501,0.188,0.492,0.087,0.383,0.078,0.376,0.179,0.501,0.188],
++    [0, 0.394,0.478,0.401,0.346,0.276,0.327,0.261,0.458,0.394,0.478],
++    [1, 0.275,0.327,0.239,0.319,0.244,0.286,0.19,0.273,0.167,0.435,0.261,0.457,0.275,0.327],
++    [0, 0.069,0.329,0.146,0.496,0.148,0.464,0.16,0.466,0.165,0.452,0.19,0.272,0.087,0.239,0.069,0.329],
++    [0, 0.139,0.257,0.149,0.176,0.168,0.146,0.162,0.13,0.069,0.11,0.065,0.089,0.049,0.079,0.015,0.183,0.015,0.211,0.139,0.257],
++    [0, 0.163,0.122,0.168,0.146,0.149,0.176,0.139,0.257,0.243,0.287,0.254,0.207,0.249,0.196,0.221,0.202,0.21,0.154,0.199,0.154,0.208,0.121,0.188,0.074,0.193,0.037,0.177,0.032,0.163,0.122],
++    [0, 0.383,0.078,0.193,0.037,0.188,0.074,0.208,0.121,0.199,0.154,0.21,0.154,0.221,0.202,0.248,0.197,0.253,0.207,0.256,0.189,0.374,0.21,0.383,0.078],
++    [0, 0.95,0.209,0.956,0.183,0.97,0.172,0.972,0.152,0.982,0.156,1,0.13,0.99,0.107,0.982,0.107,0.973,0.067,0.964,0.058,0.958,0.067,0.947,0.064,0.931,0.141,0.95,0.209],
++    [1, 0.798,0.279,0.811,0.261,0.806,0.244,0.844,0.234,0.853,0.223,0.848,0.206,0.867,0.173,0.894,0.161,0.909,0.232,0.914,0.284,0.908,0.299,0.941,0.281,0.91,0.305,0.876,0.269,0.799,0.287,0.798,0.279],
++    [0, 0.894,0.17,0.909,0.233,0.922,0.231,0.924,0.152,0.894,0.161,0.894,0.17],
++    [0, 0.931,0.141,0.924,0.152,0.922,0.231,0.949,0.217,0.931,0.141],
++    [0, 0.912,0.273,0.912,0.291,0.942,0.273,0.939,0.25,0.909,0.257,0.912,0.273],
++    [0, 0.952,0.258,0.945,0.246,0.939,0.25,0.942,0.271,0.952,0.258],
++    [0, 0.972,0.245,0.967,0.237,0.969,0.245,0.962,0.249,0.95,0.235,0.955,0.224,0.949,0.217,0.909,0.233,0.909,0.257,0.945,0.246,0.955,0.262,0.972,0.245],
++    [0, 0.96,0.264,0.965,0.261,0.96,0.264],
++    [0, 0.906,0.299,0.89,0.289,0.885,0.3,0.896,0.327,0.884,0.347,0.899,0.365,0.909,0.328,0.906,0.299],
++    [0, 0.885,0.349,0.883,0.341,0.887,0.385,0.899,0.383,0.885,0.349],
++    [0, 0.883,0.341,0.896,0.326,0.886,0.313,0.891,0.285,0.876,0.269,0.799,0.287,0.798,0.279,0.785,0.291,0.795,0.367,0.883,0.341],
++    [1, 0.796,0.663,0.805,0.665,0.85,0.779,0.853,0.819,0.845,0.847,0.847,0.838,0.832,0.842,0.837,0.838,0.816,0.818,0.806,0.788,0.805,0.795,0.801,0.791,0.793,0.775,0.797,0.763,0.792,0.759,0.792,0.768,0.788,0.76,0.788,0.727,0.763,0.699,0.75,0.695,0.73,0.711,0.724,0.692,0.718,0.692,0.72,0.698,0.704,0.69,0.688,0.695,0.681,0.679,0.736,0.668,0.739,0.676,0.793,0.672,0.798,0.679,0.796,0.663],
++    [0, 0.655,0.735,0.636,0.721,0.647,0.717,0.643,0.71,0.633,0.713,0.636,0.679,0.597,0.681,0.608,0.642,0.605,0.616,0.548,0.617,0.548,0.653,0.558,0.687,0.551,0.725,0.594,0.729,0.593,0.721,0.616,0.742,0.623,0.735,0.63,0.74,0.632,0.729,0.645,0.737,0.645,0.745,0.655,0.735],
++    [0, 0.538,0.598,0.548,0.599,0.548,0.617,0.604,0.615,0.603,0.592,0.631,0.517,0.616,0.515,0.621,0.499,0.535,0.502,0.538,0.598],
++    [0, 0.717,0.484,0.634,0.496,0.621,0.547,0.737,0.535,0.744,0.518,0.779,0.49,0.784,0.475,0.717,0.484],
++    [0, 0.899,0.474,0.895,0.469,0.894,0.478,0.89,0.469,0.88,0.477,0.877,0.463,0.88,0.471,0.889,0.465,0.889,0.45,0.784,0.474,0.779,0.49,0.744,0.518,0.737,0.535,0.798,0.519,0.808,0.528,0.828,0.523,0.854,0.549,0.864,0.545,0.872,0.517,0.889,0.512,0.892,0.503,0.878,0.506,0.886,0.494,0.877,0.489,0.895,0.49,0.899,0.474],
++    [0, 0.812,0.618,0.801,0.593,0.759,0.541,0.765,0.531,0.713,0.538,0.739,0.677,0.793,0.672,0.797,0.679,0.796,0.663,0.804,0.665,0.812,0.618],
++    [0, 0.815,0.47,0.893,0.449,0.871,0.411,0.88,0.416,0.879,0.406,0.858,0.398,0.86,0.381,0.848,0.37,0.835,0.367,0.821,0.404,0.815,0.4,0.808,0.437,0.783,0.454,0.773,0.446,0.746,0.479,0.815,0.47],
++    [0, 0.808,0.528,0.803,0.52,0.775,0.522,0.759,0.541,0.813,0.619,0.854,0.549,0.828,0.523,0.808,0.528],
++    [0, 0.685,0.689,0.683,0.676,0.736,0.668,0.717,0.537,0.662,0.543,0.665,0.696,0.671,0.697,0.674,0.686,0.676,0.7,0.687,0.696,0.685,0.689],
++    [0, 0.662,0.663,0.662,0.543,0.621,0.547,0.603,0.592,0.608,0.636,0.597,0.681,0.636,0.679,0.639,0.707,0.645,0.699,0.665,0.696,0.662,0.663],
++    [0, 0.88,0.345,0.813,0.362,0.816,0.376,0.827,0.363,0.844,0.361,0.859,0.381,0.858,0.398,0.876,0.401,0.868,0.365,0.877,0.354,0.873,0.372,0.889,0.407,0.888,0.43,0.897,0.383,0.887,0.385,0.88,0.345],
++    [1, 0.773,0.445,0.783,0.453,0.805,0.439,0.815,0.4,0.821,0.404,0.835,0.367,0.848,0.37,0.838,0.358,0.816,0.376,0.813,0.362,0.795,0.367,0.791,0.336,0.787,0.371,0.761,0.417,0.773,0.445],
++    [0, 0.752,0.474,0.772,0.447,0.762,0.416,0.753,0.407,0.738,0.413,0.717,0.399,0.718,0.411,0.707,0.416,0.698,0.44,0.69,0.434,0.687,0.445,0.662,0.448,0.653,0.474,0.639,0.474,0.641,0.489,0.633,0.497,0.752,0.474],
++    [0, 0.633,0.496,0.641,0.489,0.64,0.474,0.636,0.477,0.632,0.456,0.615,0.44,0.619,0.421,0.607,0.416,0.587,0.364,0.514,0.365,0.535,0.413,0.535,0.501,0.622,0.498,0.617,0.515,0.631,0.514,0.633,0.496],
++    [0, 0.567,0.188,0.574,0.183,0.574,0.164,0.614,0.119,0.582,0.119,0.559,0.103,0.564,0.103,0.535,0.1,0.524,0.09,0.525,0.074,0.522,0.087,0.492,0.087,0.502,0.181,0.496,0.2,0.504,0.211,0.502,0.27,0.593,0.267,0.59,0.252,0.565,0.227,0.567,0.188],
++    [0, 0.604,0.166,0.644,0.132,0.635,0.154,0.645,0.151,0.668,0.164,0.692,0.149,0.714,0.171,0.719,0.169,0.701,0.175,0.727,0.201,0.721,0.247,0.735,0.232,0.744,0.242,0.748,0.277,0.734,0.309,0.675,0.316,0.683,0.292,0.675,0.257,0.678,0.221,0.688,0.203,0.69,0.214,0.698,0.176,0.689,0.173,0.669,0.19,0.67,0.182,0.663,0.183,0.654,0.208,0.645,0.184,0.604,0.166],
++    [1, 0.653,0.201,0.646,0.184,0.597,0.166,0.597,0.153,0.574,0.164,0.574,0.183,0.564,0.199,0.566,0.227,0.594,0.258,0.597,0.293,0.606,0.299,0.656,0.295,0.655,0.247,0.664,0.202,0.649,0.229,0.653,0.201],
++    [0, 0.782,0.295,0.754,0.318,0.734,0.309,0.711,0.314,0.717,0.399,0.738,0.413,0.753,0.407,0.761,0.417,0.787,0.371,0.791,0.336,0.785,0.291,0.782,0.295],
++    [0, 0.662,0.452,0.668,0.445,0.687,0.445,0.69,0.434,0.698,0.44,0.706,0.416,0.718,0.411,0.711,0.313,0.663,0.323,0.668,0.421,0.662,0.452],
++    [0, 0.643,0.471,0.653,0.474,0.668,0.421,0.664,0.323,0.655,0.295,0.605,0.298,0.614,0.316,0.608,0.333,0.599,0.336,0.592,0.386,0.607,0.416,0.619,0.421,0.615,0.44,0.632,0.457,0.636,0.478,0.643,0.471],
++    [0, 0.593,0.365,0.602,0.35,0.599,0.337,0.608,0.334,0.614,0.317,0.597,0.293,0.593,0.267,0.502,0.27,0.503,0.255,0.499,0.295,0.514,0.366,0.587,0.364,0.593,0.371,0.593,0.365],
++    [0, 0.21,0.947,0.212,0.964,0.194,0.981,0.195,0.966,0.199,0.961,0.202,0.968,0.21,0.947],
++    [0, 0.127,0.898,0.129,0.907,0.12,0.902,0.127,0.898],
++    [0, 0.11,0.829,0.123,0.846,0.109,0.837,0.11,0.829],
++    [0, 0.201,0.726,0.234,0.75,0.258,0.746,0.268,0.753,0.283,0.909,0.294,0.909,0.308,0.928,0.315,0.915,0.322,0.915,0.35,0.955,0.365,0.961,0.364,0.984,0.345,0.967,0.355,0.982,0.352,0.991,0.342,0.984,0.343,0.962,0.337,0.972,0.337,0.947,0.334,0.97,0.293,0.918,0.262,0.92,0.253,0.913,0.246,0.921,0.252,0.908,0.24,0.904,0.236,0.922,0.216,0.936,0.221,0.909,0.232,0.907,0.224,0.9,0.201,0.933,0.203,0.945,0.184,0.969,0.152,0.995,0.145,0.988,0.141,0.997,0.119,1,0.143,0.982,0.152,0.984,0.176,0.959,0.181,0.939,0.172,0.935,0.168,0.943,0.16,0.932,0.15,0.935,0.151,0.907,0.145,0.912,0.136,0.903,0.135,0.896,0.145,0.893,0.133,0.879,0.146,0.855,0.168,0.853,0.17,0.832,0.16,0.836,0.143,0.829,0.144,0.816,0.136,0.808,0.154,0.799,0.168,0.81,0.175,0.804,0.151,0.765,0.201,0.726],
++];
++const MAP_BOX = { x: 0.873, y: 1.295, w: 6.706, h: 4.910 };
++
++function mapPolygon(row, box) {
++    const pts = [];
++    for (let i = 1; i < row.length; i += 2) pts.push([row[i] * box.w, row[i + 1] * box.h]);
++    return pts;
++}
++
++/** Diagonal hatch clipped to an arbitrary polygon (used for the shaded states). */
++function hatchPolygon(slide, originX, originY, pts, step) {
++    const maxX = Math.max(...pts.map((p) => p[0]));
++    const minY = Math.min(...pts.map((p) => p[1]));
++    const maxY = Math.max(...pts.map((p) => p[1]));
++    const points = [];
++    // Lines run at 45 degrees: y = x - c. For each c, collect edge crossings.
++    for (let c = minY - maxX; c <= maxY; c += step) {
++        const hits = [];
++        for (let i = 0; i < pts.length; i++) {
++            const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
++            const fa = ay - ax - c, fb = by - bx - c;
++            if ((fa <= 0 && fb > 0) || (fb <= 0 && fa > 0)) {
++                const t = fa / (fa - fb);
++                hits.push(ax + t * (bx - ax));
++            }
++        }
++        hits.sort((a, b) => a - b);
++        for (let i = 0; i + 1 < hits.length; i += 2) {
++            if (hits[i + 1] - hits[i] < 0.01) continue;
++            points.push({ x: +hits[i].toFixed(3), y: +(hits[i] + c).toFixed(3), moveTo: true });
++            points.push({ x: +hits[i + 1].toFixed(3), y: +(hits[i + 1] + c).toFixed(3) });
++        }
++    }
++    if (!points.length) return;
++    slide.addShape('custGeom', {
++        x: originX, y: originY, w: MAP_BOX.w, h: MAP_BOX.h, points,
++        fill: { type: 'none' }, line: { color: BLACK, width: HATCH_WIDTH },
++    });
++}
++
++function mapPath(s, row) {
++    const pts = mapPolygon(row, MAP_BOX);
++    const points = pts.map(([x, y], i) => ({ x: +x.toFixed(3), y: +y.toFixed(3), moveTo: i === 0 }));
++    points.push({ close: true });
++    s.addShape('custGeom', {
++        x: MAP_BOX.x, y: MAP_BOX.y, w: MAP_BOX.w, h: MAP_BOX.h, points,
++        fill: { color: WHITE }, line: THIN_LINE,
++    });
++    if (row[0]) hatchPolygon(s, MAP_BOX.x, MAP_BOX.y, pts, HATCH_STEP);
++}
++
++function slide21(s) {                                    // Map charts
++    rail(s, 'PAGE 21');
++    textPanel(s, 7.721, 7.982, ['MAP CHARTS']);
++    US_MAP_PATHS.forEach((row) => mapPath(s, row));
++}
++
++function slide22(s) {                                    // Pricing plans
++    hatch(s, 0.657, 0, 12.677, 1.245);
++    rail(s, 'PAGE 22');
++    const plans = [
++        { x: 1.664, price: '$299', name: 'BASIC', dark: false, active: 1 },
++        { x: 5.642, price: '$499', name: 'REGULAR', dark: false, active: 2 },
++        { x: 9.424, price: '$799', name: 'ADVANCE', dark: true, active: 4 },
++    ];
++    const bullets = ['Lorem ipsum dolor sit amet.', 'eiusmod tempor incididunt.',
++        'nostrud exercitation laboris.', 'Lorem ipsum dolor sit amet.'];
++    plans.forEach((p) => {
++        hatch(s, p.x + 0.278, 1.912, 2.678, 4.965);
++        card(s, p.x, 1.713, 2.761, 4.965, p.dark ? BLACK : WHITE);
++        s.addShape('line', { x: p.x, y: 2.765, w: 2.761, h: 0, line: { color: p.dark ? WHITE : BLACK, width: 1.5 } });
++        const fg = p.dark ? WHITE : BLACK;
++        s.addText(p.price, {
++            x: p.x + 0.196, y: 1.870, w: 2.369, h: 0.774,
++            align: 'center', valign: 'top', fontFace: TITLE_FONT, fontSize: 40, color: fg, charSpacing: 3,
++        });
++        s.addText(p.name, {
++            x: p.x, y: 5.930, w: 2.761, h: 0.505,
++            align: 'center', valign: 'top', fontFace: TITLE_FONT, fontSize: 24, bold: true, color: fg,
++        });
++        body(s, p.x + 0.218, 2.911, 2.329, 0.620,
++            ['Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed.'], { align: 'center', color: fg });
++        s.addText(bullets.map((t, i) => ({
++            text: t,
++            options: {
++                breakLine: i < bullets.length - 1,
++                bullet: { characterCode: '2022' },
++                color: p.dark ? WHITE : (i < p.active ? BLACK : GREY),
++            },
++        })), {
++            x: p.x, y: 3.455, w: 2.761, h: 2.219,
++            align: 'center', valign: 'top', fontFace: BODY_FONT, fontSize: 11,
++            lineSpacingMultiple: 3.0,
++        });
++    });
++    title(s, 0.662, 0.177, 12.672, 0.774, ['OUR PRICING PLAN'], { align: 'center', color: WHITE, shadow: true });
++}
++
++function slide23(s) {                                    // Company contacts
++    hatch(s, 7.676, 0, 5.658, 7.500);
++    rail(s, 'PAGE 23');
++    s.addShape('rect', { x: 8.744, y: 1.245, w: 4.011, h: 5.734, fill: { color: BLACK }, line: { color: WHITE, width: 1.5 } });
++    card(s, 1.572, 2.518, 5.381, 3.936);
++    imagePlaceholder(s, 8.367, 0.859, 4.011, 5.758);
++    title(s, 1.352, 1.017, 4.306, 1.447, ['COMPANY CONTACTS']);
++    const blocks = [
++        { x: 1.913, y: 2.841, w: 2.236, head: 'Operational Hours', lines: ['Monday - Friday', '8AM-  7PM'] },
++        { x: 4.523, y: 2.841, w: 2.083, head: 'Office Location', lines: ['Ocean Floor N09', 'South Side, NZ - 45678'] },
++        { x: 1.902, y: 4.723, w: 2.236, head: 'Phone Numbers', lines: ['+01 (234) 567 890', '+10 (987) 654 321'] },
++        { x: 4.512, y: 4.723, w: 2.083, head: 'Email & Website', lines: ['graphikalcreative@gmail.com', 'www.yourdomain.com'] },
++    ];
++    blocks.forEach((b) => {
++        s.addText(b.head, {
++            x: b.x, y: b.y, w: b.w, h: 0.673, margin: 0,
++            align: 'left', valign: 'top', fontFace: TITLE_FONT, fontSize: 20, bold: true, color: BLACK,
++        });
++        s.addText(b.lines.map((t, i) => ({ text: t, options: { breakLine: i === 0 } })), {
++            x: b.x + 0.011, y: b.y + 0.835, w: b.w, h: 0.524, margin: 0,
++            align: 'left', valign: 'top', fontFace: BODY_FONT, fontSize: 11, color: BLACK, lineSpacingMultiple: 1.5,
++        });
++    });
++}
++
++function slide24(s) {                                    // Thank you
++    rail(s);
++    hatch(s, 1.570, 1.062, 10.670, 5.817);
++    card(s, 1.093, 0.621, 10.670, 5.817);
++    ['shadow', 'solid'].forEach((pass) => {
++        const dx = pass === 'shadow' ? 0.166 : 0;
++        s.addText([
++            { text: 'THANK', options: { breakLine: true } },
++            { text: 'YOU!' },
++        ], {
++            x: 3.055 + dx, y: 2.076 + dx, w: 6.377, h: 3.055, margin: 0, wrap: false,
++            align: 'center', valign: 'middle', fontFace: TITLE_FONT, fontSize: 121,
++            color: pass === 'shadow' ? SHADOW_GREY : BLACK, lineSpacing: 137,
++        });
++    });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++const BUILDERS = [
++    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++    slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
++    slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
++];
++
++function build() {
++    const pptx = new PptxGenJS();
++    pptx.defineLayout({ name: 'WIDE', width: 13.3333, height: 7.5 });
++    pptx.layout = 'WIDE';
++    pptx.author = 'Graphikal Creative';
++    pptx.title = 'Monochrome Lineart Presentation';
++
++    BUILDERS.forEach((builder) => {
++        const slide = pptx.addSlide();
++        slide.background = { color: WHITE };
++        builder(slide);
++    });
++
++    return pptx.writeFile({
++        fileName: path.join(__dirname, '0d942ef0-136c-441e-a358-4bb4c4c2d900_grok_final.pptx'),
++    });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

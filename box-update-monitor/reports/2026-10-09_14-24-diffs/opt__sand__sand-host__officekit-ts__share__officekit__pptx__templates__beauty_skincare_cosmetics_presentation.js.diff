@@ -1,0 +1,759 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/beauty_skincare_cosmetics_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/beauty_skincare_cosmetics_presentation.js
+@@ -0,0 +1,756 @@
++#!/usr/bin/env node
++/**
++ * "SkinCare - Beauty & Cosmetics Presentation" - 25 slide deck, 20 x 11.25 in.
++ *
++ * Recreated with pptxgenjs only. Raster photos / vector icon files from the
++ * original are not embedded; they are drawn as native shapes (tinted rectangles
++ * and glyph icons) in the same position and size.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const SLIDE_W = 20;
++const SLIDE_H = 11.25;
++
++const PURPLE = '7D3C92';
++const INK = '262626'; // body text dark
++const GRAY = '808080'; // muted paragraph text
++const GRAY2 = '595959'; // contact text
++const GOLD = 'F5BC4C'; // rating stars
++const BAR = 'F7FAFF'; // top bar / tinted cards
++const WHITE = 'FFFFFF';
++const SNOW = 'F2F2F2'; // text on purple cards
++
++// Text-box insets, in points, matching the deck's 0.1" / 0.05" body margins.
++// pptxgenjs order is [left, right, bottom, top].
++const INSET = [7.2, 7.2, 3.6, 3.6];
++
++const XB = 'Plus Jakarta Sans ExtraBold';
++const SB = 'Plus Jakarta Sans SemiBold';
++const MD = 'Plus Jakarta Sans Medium';
++const RG = 'Plus Jakarta Sans';
++
++// Soft card shadow used throughout the original deck (black, very low alpha).
++const shadow = (angle, blur = 33, offset = 27) => ({
++	type: 'outer', color: '000000', opacity: 0.11, blur, offset, angle, rotateWithShape: false,
++});
++
++// PowerPoint stores a roundRect corner radius as an adjust value; r = adj/100000 * min(w,h).
++const rr = (adj, w, h) => Number(((adj / 100000) * Math.min(w, h)).toFixed(3));
++
++/* --------------------------------------------------------- shared strings */
++
++const LOREM_A =
++	'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor cong massa. ' +
++	'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet ' +
++	'commodo magna eros quis urna.';
++const LOREM_B =
++	'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas port itor congu e massa. ' +
++	'Fusce posuere, magna sed pulvinar ultricies, purusasi lectus malesuadaws libero, sit amet ' +
++	'commodo magna eros quis urna. ';
++const LOREM_C =
++	'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas port itor congu e massa. ' +
++	'Fusce posuere, magna sed pulvinar ultricies, purusasi lectus malesuadaws libero';
++const LOREM_D =
++	'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitora cong massa. ' +
++	'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesu ada libero, sit amet ' +
++	'commodo magna eros quis urna.';
++const LOREM_E =
++	'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++	'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo ' +
++	'magna eri quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.';
++const LOREM_F =
++	'Lorem ipsum dolor sit amet, consectetuer adipiscing elita. Maecenas porttitor congue massa. ' +
++	'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit am et commodo ' +
++	'magna eri quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.';
++const CARD_TEXT = 'Lorem ipsum dolor sit amet, consec tetuer adipiscing elit. Maecenas';
++const ITEM_TEXT = 'Lorem ipsum dolor sit amet, conse ctetuer adipiscing elit. Maecenasr porttitor cong massa. ';
++const QUOTE = 'Beauty begins the moment you decide to be yourself.';
++const EYEBROW = 'Beauty & Cosmetics Presentation';
++const HEAD_SUB = 'Fusce posuere, magna sed pulvinar ultricies';
++
++/* --------------------------------------------------------- small builders */
++
++/* The deck's small SVG graphics, rebuilt from native shapes. Each takes the
++   bounding box of the original graphic so positions carry over unchanged. */
++
++/** Brand mark: an outlined lotus - two fanned side leaves and an upright bud. */
++function lotus(s, x, y, d, color = PURPLE) {
++	const o = { fill: { type: 'none' }, line: { color, width: Math.max(1, d * 3.6) } };
++	const lw = d * 0.60, lh = d * 0.50;
++	s.addShape('chord', Object.assign({ x, y: y + d - lh, w: lw, h: lh, rotate: 335 }, o));
++	s.addShape('chord', Object.assign({ x: x + d - lw, y: y + d - lh, w: lw, h: lh, rotate: 25, flipH: true }, o));
++	s.addShape('teardrop', Object.assign({ x: x + d * 0.31, y, w: d * 0.38, h: d * 0.64, rotate: 315 }, o));
++}
++
++/** Six-petal daisy used inside the purple badges. */
++function flower(s, x, y, d, color = WHITE, hole = PURPLE) {
++	const cx = x + d / 2, cy = y + d / 2, ring = d * 0.30, pr = d * 0.42;
++	for (let i = 0; i < 6; i++) {
++		const a = (i * 60 - 90) * Math.PI / 180;
++		s.addShape('ellipse', {
++			x: cx + ring * Math.cos(a) - pr / 2, y: cy + ring * Math.sin(a) - pr / 2,
++			w: pr, h: pr, fill: { color }, line: { type: 'none' },
++		});
++	}
++	s.addShape('ellipse', { x: cx - pr * 0.31, y: cy - pr * 0.31, w: pr * 0.62, h: pr * 0.62, fill: { color }, line: { type: 'none' } });
++	s.addShape('ellipse', { x: cx - pr * 0.17, y: cy - pr * 0.17, w: pr * 0.34, h: pr * 0.34, fill: { color: hole }, line: { type: 'none' } });
++}
++
++/** Head-and-shoulders glyph next to "Call For Consultant". */
++function person(s, x, y, d, color = PURPLE) {
++	s.addShape('ellipse', { x: x + d * 0.29, y: y + d * 0.12, w: d * 0.42, h: d * 0.42, fill: { color }, line: { type: 'none' } });
++	s.addShape('roundRect', { x: x + d * 0.11, y: y + d * 0.58, w: d * 0.78, h: d * 0.42, rectRadius: d * 0.2, fill: { color }, line: { type: 'none' } });
++}
++
++/** Purple tick used in the check-mark lists. */
++function tick(s, x, y, d, color = PURPLE) {
++	s.addText('\u2714', {
++		x, y, w: d, h: d, margin: 0, align: 'center', valign: 'middle',
++		fontFace: RG, fontSize: Math.round(d * 62), color,
++	});
++}
++
++/** Contact icons on the closing "Get In Touch" panel. */
++function mailIcon(s, x, y, d, color = WHITE) {
++	const w = d * 0.86, h = d * 0.66, lw = Math.max(1, d * 4);
++	s.addShape('roundRect', { x: x + (d - w) / 2, y: y + (d - h) / 2, w, h, rectRadius: d * 0.08, fill: { type: 'none' }, line: { color, width: lw } });
++	s.addShape('line', { x: x + (d - w) / 2, y: y + (d - h) / 2 + h * 0.07, w: w / 2, h: h * 0.48, line: { color, width: lw } });
++	s.addShape('line', { x: x + d / 2, y: y + (d - h) / 2 + h * 0.55, w: w / 2, h: -h * 0.48, line: { color, width: lw } });
++}
++
++function pinIcon(s, x, y, d, color = WHITE, hole = PURPLE) {
++	s.addShape('teardrop', { x: x + d * 0.22, y: y + d * 0.14, w: d * 0.56, h: d * 0.56, rotate: 135, fill: { color }, line: { type: 'none' } });
++	s.addShape('ellipse', { x: x + d * 0.38, y: y + d * 0.29, w: d * 0.24, h: d * 0.24, fill: { color: hole }, line: { type: 'none' } });
++}
++
++function phoneIcon(s, x, y, d, color = WHITE) {
++	s.addShape('roundRect', { x: x + d * 0.42, y: y + d * 0.25, w: d * 0.18, h: d * 0.52, rectRadius: d * 0.08, rotate: 315, fill: { color }, line: { type: 'none' } });
++	s.addShape('ellipse', { x: x + d * 0.13, y: y + d * 0.19, w: d * 0.23, h: d * 0.23, fill: { color }, line: { type: 'none' } });
++	s.addShape('ellipse', { x: x + d * 0.64, y: y + d * 0.7, w: d * 0.23, h: d * 0.23, fill: { color }, line: { type: 'none' } });
++}
++
++// Auto-sized label: original boxes use wrap="none" + spAutoFit.
++function label(s, text, x, y, w, h, opts) {
++	s.addText(text, Object.assign({ x, y, w, h, wrap: false, valign: 'top', margin: INSET }, opts));
++}
++
++function para(s, text, x, y, w, h, opts) {
++	s.addText(text, Object.assign(
++		{ x, y, w, h, valign: 'top', margin: INSET, fontFace: MD, fontSize: 16, color: GRAY, lineSpacingMultiple: 1.5 },
++		opts));
++}
++
++function title(s, text, x, y, w, h, fontSize) {
++	s.addText(text, { x, y, w, h, valign: 'top', margin: INSET, fontFace: XB, fontSize, color: INK });
++}
++
++function eyebrow(s, x, y, w = 4.826, text = EYEBROW, align = 'left') {
++	s.addText(text, { x, y, w, h: 0.438, valign: 'top', margin: INSET, align, fontFace: XB, fontSize: 20, color: PURPLE });
++}
++
++// Purple sub-heading used above secondary paragraphs.
++function subHead(s, text, x, y, w, h, fontSize = 24) {
++	s.addText(text, {
++		x, y, w, h, valign: 'top', margin: INSET, fontFace: XB, fontSize, color: PURPLE, lineSpacingMultiple: 1.5,
++	});
++}
++
++function pillButton(s, text, x, y, w, h, filled) {
++	s.addText(text, {
++		shape: 'roundRect', rectRadius: rr(filled ? 16267 : 13857, w, h),
++		x, y, w, h, align: 'center', valign: 'middle',
++		fill: filled ? { color: PURPLE } : { type: 'none' },
++		line: filled ? { type: 'none' } : { color: PURPLE, width: 2 },
++		fontFace: XB, fontSize: 18, color: filled ? WHITE : PURPLE,
++	});
++}
++
++// Five gold rating stars (a grouped row in the original, 0.206 in each).
++function stars(s, x, y) {
++	for (let i = 0; i < 5; i++) {
++		s.addShape('star5', { x: Number((x + i * 0.3113).toFixed(3)), y, w: 0.206, h: 0.206, fill: { color: GOLD } });
++	}
++}
++
++// Purple rounded badge holding a white flower icon.
++function badge(s, x, y, w = 0.703, h = 0.66, glyph = FLOWER, gs = 0.502) {
++	s.addShape('roundRect', { x, y, w, h, rectRadius: rr(20071, w, h), fill: { color: PURPLE } });
++	icon(s, glyph, x + (w - gs) / 2 + 0.05, y + (h - gs) / 2 + 0.05, gs, WHITE);
++}
++
++/**
++ * "Beauty & Cosmetics" feature card: 5.424 x 2.323 white panel, badge at the
++ * left, purple title and a small grey paragraph.
++ */
++function featureCard(s, x, y, fill = WHITE, adj = 13140) {
++	const w = 5.424, h = 2.323;
++	s.addShape('roundRect', { x, y, w, h, rectRadius: rr(adj, w, h), fill: { color: fill }, shadow: shadow(40) });
++	badge(s, x + 0.428, y + 0.573);
++	label(s, 'Beauty & Cosmetics ', x + 1.357, y + 0.489, 3.338, 0.471, { fontFace: XB, fontSize: 22, color: PURPLE });
++	para(s, CARD_TEXT, x + 1.357, y + 1.075, 3.512, 0.761, { fontSize: 14 });
++}
++
++/** "Beauty SPA" review card: stars, purple title, paragraph, badge top-right. */
++function reviewCard(s, x, y, adj = 8388) {
++	const w = 3.361, h = 2.715;
++	s.addShape('roundRect', { x, y, w, h, rectRadius: rr(adj, w, h), fill: { color: WHITE }, shadow: shadow(130) });
++	stars(s, x + 0.477, y + 0.462);
++	label(s, 'Beauty SPA', x + 0.406, y + 0.876, 1.966, 0.471, { fontFace: XB, fontSize: 22, color: PURPLE });
++	para(s, [{ text: 'Lorem ipsum dolor sit amet' }, { text: ', consec tetuer adipiscing' }],
++		x + 0.406, y + 1.462, 2.886, 0.761, { fontSize: 14 });
++	badge(s, x + 2.645, y + 0.033, 0.703, 0.66, FLOWER, 0.424);
++}
++
++/** Small product card: stars, purple title, one short grey line. */
++function miniCard(s, x, y, name) {
++	const w = 2.886, h = 1.834;
++	s.addShape('roundRect', { x, y, w, h, rectRadius: rr(8388, w, h), fill: { color: WHITE }, shadow: shadow(60) });
++	stars(s, x + 0.474, y + 0.314);
++	label(s, name, x + 0.39, y + 0.665, 2.15, 0.404, { fontFace: XB, fontSize: 18, color: PURPLE });
++	para(s, [{ text: 'Lorem ' }, { text: 'ipsum dolor' }], x + 0.403, y + 1.06, 2.43, 0.451);
++}
++
++/** Check-mark bullet row (purple tick + purple label). */
++function checkRow(s, text, x, y, w) {
++	icon(s, CHECK, x, y + 0.064, 0.282, PURPLE);
++	label(s, text, x + 0.422, y, w, 0.438, { fontFace: XB, fontSize: 20, color: PURPLE });
++}
++
++/**
++ * Stand-in for a device-mockup photograph: dark bezel with a blank white
++ * screen, drawn from shapes instead of embedding the original bitmap.
++ */
++function device(s, x, y, w, h, bezel, rotate = 0) {
++	s.addShape('roundRect', {
++		x, y, w, h, rectRadius: bezel * 1.4, rotate, fill: { color: '2C2C30' }, line: { type: 'none' },
++	});
++	s.addText('[image]', {
++		shape: 'rect', rotate, margin: INSET, align: 'center', valign: 'middle',
++		x: x + bezel, y: y + bezel, w: w - 2 * bezel, h: h - 2 * bezel,
++		fill: { color: WHITE }, line: { type: 'none' }, fontFace: MD, fontSize: 16, color: 'C8C8C8',
++	});
++}
++
++/* ------------------------------------------------------------- top header */
++
++// The same sticky navigation bar sits on every slide; only the active item changes.
++const NAV_ITEMS = ['Welcome', 'About', 'Services', 'Portfolio', 'Contact '];
++const NAV_GAPS = ['                        ', '                         ', '                      ', '                       '];
++
++function header(s, active) {
++	s.addShape('rect', { x: 0, y: 0, w: SLIDE_W, h: 1.198, fill: { color: BAR } });
++	icon(s, PERSON, 0.801, 0.405, 0.315, PURPLE);
++	label(s, 'Call For Consultant', 1.116, 0.39, 2.248, 0.37, { fontFace: SB, fontSize: 16, color: INK });
++	label(s, '+123 456 7890', 3.596, 0.39, 1.764, 0.37, { fontFace: SB, fontSize: 16, color: INK });
++
++	// Nav runs: contiguous inactive items are merged, the active one is purple.
++	const runs = [];
++	let pending = '';
++	NAV_ITEMS.forEach((item, i) => {
++		const gap = NAV_GAPS[i] || '';
++		if (item === active) {
++			if (pending) runs.push({ text: pending, options: { color: INK } });
++			pending = '';
++			runs.push({ text: item, options: { color: PURPLE } });
++			pending += gap;
++		} else {
++			pending += item + gap;
++		}
++	});
++	if (pending) runs.push({ text: pending, options: { color: INK } });
++	s.addText(runs, {
++		x: 6.481, y: 0.377, w: 9.496, h: 0.37, valign: 'top', margin: INSET,
++		align: 'center', fontFace: SB, fontSize: 16, color: INK,
++	});
++
++	icon(s, LOTUS, 17.322, 0.258, 0.503, PURPLE);
++	label(s, 'SkinCare', 17.824, 0.323, 1.452, 0.438, { fontFace: XB, fontSize: 20, color: PURPLE });
++}
++
++/** "HEALTH / BEAUTY" corner mark used on the title, break and closing slides. */
++function cornerMark(s, x, align) {
++	s.addText('HEALTH', { x, y: 9.556, w: 1.807, h: 0.37, valign: 'top', margin: INSET, align, fontFace: RG, fontSize: 16, color: INK, charSpacing: 3 });
++	s.addText('BEAUTY', { x, y: 9.963, w: 1.807, h: 0.505, valign: 'top', margin: INSET, align, fontFace: XB, fontSize: 24, color: PURPLE, charSpacing: 3 });
++}
++
++/* --------------------------------------------------------------- slide 01 */
++
++function slide01(s) {
++	// The original lays a white left-to-right gradient veil over a full-height
++	// hero photo; the veil is opaque up to ~43% so only the right half shows.
++	header(s, 'Welcome');
++	icon(s, LOTUS, 3.128, 3.16, 1.005, PURPLE);
++	label(s, 'SkinCare', 1.343, 3.816, 7.367, 2.036, { fontFace: XB, fontSize: 115, color: INK });
++	s.addText(EYEBROW, {
++		shape: 'roundRect', rectRadius: rr(18676, 4.728, 0.669), x: 1.495, y: 6.05, w: 4.728, h: 0.669,
++		align: 'center', valign: 'middle', fill: { color: PURPLE }, fontFace: XB, fontSize: 18, color: WHITE,
++	});
++	cornerMark(s, 0.801, 'left');
++	para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elitas. Maecenas porttitor', 5.01, 9.498, 4.728, 0.855);
++}
++
++/* --------------------------------------------------------------- slide 02 */
++
++function slide02(s) {
++	header(s, 'Welcome');
++	eyebrow(s, 10.0, 2.523);
++	s.addText([
++		{ text: 'Beauty is not ', options: { color: INK } },
++		{ text: 'in the face; beauty ', options: { color: PURPLE } },
++		{ text: 'is a light in the heart.', options: { color: INK } },
++	], { x: 10.0, y: 3.297, w: 9.6, h: 3.13, valign: 'top', margin: INSET, fontFace: XB, fontSize: 60 });
++	para(s, LOREM_A, 10.0, 6.894, 9.017, 1.259);
++	pillButton(s, 'Read More', 10.098, 8.703, 2.421, 0.669, true);
++	pillButton(s, 'Learn More', 13.002, 8.703, 2.421, 0.669, false);
++	reviewCard(s, 5.36, 2.396, 13140);
++	featureCard(s, 3.476, 7.049);
++}
++
++/* --------------------------------------------------------------- slide 03 */
++
++const TOC = [
++	['Our Content One', 11.246, 2.58, 2.555],
++	['Our Content Two', 15.427, 2.58, 2.562],
++	['Our Content Three', 11.246, 5.306, 2.744],
++	['Our Content Four', 15.427, 5.306, 2.593],
++	['Our Content Five', 11.246, 8.031, 2.542],
++	['Our Content Six', 15.427, 8.031, 2.388],
++];
++
++function slide03(s) {
++	header(s, null);
++	eyebrow(s, 1.116, 2.729);
++	title(s, 'Table Of Content', 1.116, 3.503, 9.6, 1.313, 72);
++	para(s, LOREM_A, 1.116, 5.339, 9.017, 1.259);
++	TOC.forEach(([name, x, y, w]) => {
++		label(s, name, x, y, w, 0.438, { fontFace: XB, fontSize: 20, color: PURPLE });
++		para(s, ITEM_TEXT, x, y + 0.587, 3.457, 1.114, { fontSize: 14 });
++	});
++	s.addText(QUOTE, {
++		x: 1.116, y: 7.445, w: 4.071, h: 1.838, valign: 'top', margin: INSET,
++		fontFace: XB, fontSize: 24, color: INK, lineSpacingMultiple: 1.5,
++	});
++	para(s, 'Lorem ipsum dolor sit amet, consectetu adipiscing elit. Maecenas porttitor cons massa. ' +
++		'Fusce posuere, magna sed pulvi ultricies, purus lectus malesuada', 5.568, 7.502, 4.432, 1.663);
++}
++
++/* --------------------------------------------------------------- slide 04 */
++
++function slide04(s) {
++	header(s, 'About');
++	featureCard(s, 1.746, 7.765);
++	eyebrow(s, 9.676, 2.625);
++	title(s, 'Our About SkinCare Beauty Cosmetics', 9.676, 3.399, 9.6, 1.717, 48);
++	para(s, LOREM_A, 9.676, 5.601, 9.165, 1.259);
++	eyebrow(s, 9.676, 7.686, 8.785, 'Fusce posuere, magna sed pulvinar ultricies, purus lectus');
++	para(s, LOREM_A, 9.676, 8.417, 9.165, 1.259);
++}
++
++/* --------------------------------------------------------------- slide 05 */
++
++function slide05(s) {
++	header(s, 'About');
++	eyebrow(s, 1.513, 2.498);
++	title(s, 'Our About SkinCare Beauty Cosmetics', 1.513, 3.272, 10.63, 1.919, 54);
++	para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++		'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo ' +
++		'magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.',
++		1.513, 5.535, 10.741, 1.259);
++	featureCard(s, 1.333, 7.4);
++	featureCard(s, 7.79, 7.4);
++}
++
++/* --------------------------------------------------------------- slide 06 */
++
++function slide06(s) {
++	header(s, 'About');
++	s.addShape('roundRect', {
++		x: 6.667, y: 2.543, w: 12.476, h: 3.886, rectRadius: rr(13140, 12.476, 3.886),
++		fill: { color: WHITE }, shadow: shadow(40, 43, 0),
++	});
++	eyebrow(s, 7.629, 3.045);
++	title(s, 'Invest in your skin. It is going to represent you for a very long time.', 7.629, 3.819, 10.63, 1.582, 44);
++	featureCard(s, 1.333, 7.578);
++	featureCard(s, 7.629, 7.578, BAR);
++	featureCard(s, 13.719, 7.578);
++}
++
++/* --------------------------------------------------------------- slide 07 */
++
++function slide07(s) {
++	header(s, 'About');
++	eyebrow(s, 1.238, 2.71);
++	title(s, QUOTE, 1.238, 3.484, 7.842, 2.827, 54);
++	para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas port itor congue massa. ' +
++		'Fusce posuere, magna sed pulvinar ultricies, purusasi lectus malesuada libero, sit amet commodo ' +
++		'magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.',
++		1.238, 7.119, 8.084, 1.663);
++}
++
++/* --------------------------------------------------------------- slide 08 */
++
++function slide08(s) {
++	header(s, 'About');
++	eyebrow(s, 9.74, 2.565);
++	title(s, 'Beauty is not in the face; beauty is a light in the heart.', 9.74, 3.338, 9.05, 1.447, 40);
++	para(s, LOREM_B, 9.74, 5.41, 9.05, 1.259);
++	[['Our Content One', 9.74, 3.825], ['Our Content Two', 14.907, 3.836]].forEach(([name, x, w]) => {
++		s.addText(name, { x, y: 7.485, w, h: 0.505, valign: 'top', margin: INSET, fontFace: XB, fontSize: 24, color: PURPLE });
++		para(s, ITEM_TEXT, x, 8.071, 4.369, 1.259);
++	});
++}
++
++/* --------------------------------------------------------------- slide 09 */
++
++function slide09(s) {
++	header(s, 'About');
++	eyebrow(s, 1.0, 2.565);
++	title(s, 'Beauty is how you feel inside, and it reflects in your eyes.', 1.0, 3.338, 9.0, 1.447, 40);
++	para(s, LOREM_B, 1.0, 5.41, 9.05, 1.259);
++	badge(s, 1.084, 7.562);
++	label(s, 'Beauty & Cosmetics ', 2.013, 7.478, 3.338, 0.471, { fontFace: XB, fontSize: 22, color: PURPLE });
++	para(s, 'Lorem ipsum dolor sit amet, consec tetuer adipiscing elit. Maecenas por itor congu e massa. ',
++		2.013, 8.064, 4.036, 1.259);
++	s.addText(QUOTE, {
++		x: 6.481, y: 7.353, w: 3.674, h: 1.838, valign: 'top', margin: INSET,
++		fontFace: XB, fontSize: 24, color: INK, lineSpacingMultiple: 1.5,
++	});
++	reviewCard(s, 11.6, 7.396);
++	reviewCard(s, 15.616, 7.396);
++}
++
++/* --------------------------------------------------------------- slide 10 */
++
++function slide10(s) {
++	// Layout art: a purple slab peeking out from behind the portrait.
++	s.addShape('roundRect', {
++		x: 1.21, y: 2.629, w: 3.452, h: 7.355, rectRadius: rr(10174, 3.452, 7.355), fill: { color: PURPLE },
++	});
++	header(s, 'About');
++	eyebrow(s, 8.271, 2.622);
++	title(s, 'The best color in the whole world is the one that looks good on you.', 8.271, 3.396, 10.051, 1.447, 40);
++	para(s, LOREM_B, 8.271, 5.467, 10.051, 1.259);
++	[8.32, 13.749].forEach(x => {
++		s.addShape('roundRect', {
++			x, y: 7.35, w: 4.457, h: 2.323, rectRadius: rr(7586, 4.457, 2.323), fill: { color: PURPLE },
++		});
++		label(s, 'Beauty & Cosmetics ', x + 0.534, 7.802, 3.338, 0.471, { fontFace: XB, fontSize: 22, color: WHITE });
++		para(s, CARD_TEXT, x + 0.534, 8.426, 3.512, 0.761, { fontSize: 14, color: SNOW });
++	});
++}
++
++/* --------------------------------------------------------------- slide 11 */
++
++function slide11(s) {
++	header(s, 'Services');
++	const w = 5.68, h = 2.727;
++	s.addShape('roundRect', {
++		x: 0.962, y: 2.404, w, h, rectRadius: rr(10774, w, h), fill: { color: WHITE }, shadow: shadow(180),
++	});
++	badge(s, 1.692, 3.187);
++	label(s, 'Beauty & Cosmetics ', 2.621, 3.103, 3.338, 0.471, { fontFace: XB, fontSize: 22, color: PURPLE });
++	para(s, CARD_TEXT, 2.621, 3.689, 3.512, 0.761, { fontSize: 14 });
++	eyebrow(s, 1.116, 5.969);
++	title(s, 'Beauty is not flawless; it shines even through your flaws.', 1.116, 6.742, 9.022, 1.447, 40);
++	para(s, LOREM_B, 1.116, 8.668, 9.022, 1.259);
++	subHead(s, HEAD_SUB, 11.234, 6.85, 4.347, 1.232);
++	title(s, '579M', 16.279, 6.687, 2.573, 1.01, 54);
++	subHead(s, 'Happy Clients', 16.311, 7.627, 2.573, 0.583, 22);
++	para(s, LOREM_C, 11.229, 8.668, 7.623, 1.259);
++	reviewCard(s, 15.699, 3.206);
++}
++
++/* ---------------------------------------------------- slides 12 & 25 (hero) */
++
++// Centered hero used by the "Break Slides" divider and the closing slide.
++function heroSlide(s, headline, x, w, backdrop) {
++	if (backdrop) {
++		s.addShape('rect', { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: { color: WHITE, transparency: 19 } });
++	}
++	header(s, backdrop ? 'Welcome' : null);
++	icon(s, LOTUS, 9.224, 2.433, 1.551, PURPLE);
++	s.addText(headline, {
++		x, y: 3.984, w, h: 2.423,
++		valign: 'top', margin: INSET, wrap: false, align: 'center', fontFace: XB, fontSize: 138, color: INK,
++	});
++	s.addText(EYEBROW, {
++		shape: 'roundRect', rectRadius: rr(18676, 4.728, 0.669), x: 7.636, y: 6.74, w: 4.728, h: 0.669,
++		align: 'center', valign: 'middle', fill: { color: PURPLE }, fontFace: XB, fontSize: 18, color: WHITE,
++	});
++	cornerMark(s, 0.801, 'left');
++	cornerMark(s, 17.393, 'right');
++	para(s, [
++		{ text: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas port itor congu e massa. ' +
++			'Fusce posuere, magna sed pulvinar ultricies, purusasi lectus malesuadaws ', options: { breakLine: true } },
++		{ text: 'libero, sit amet commodo magna eros quis urna. ' },
++	], 4.857, 8.926, 10.285, 1.259, { align: 'center' });
++}
++
++/* --------------------------------------------------------------- slide 13 */
++
++function slide13(s) {
++	header(s, 'Welcome');
++	eyebrow(s, 1.116, 2.415);
++	title(s, 'Our Services SkinCare Beauty Cosmetics', 1.116, 3.189, 9.6, 1.919, 54);
++	para(s, LOREM_D, 1.116, 5.625, 8.659, 1.259);
++	[[10.798, 2.853], [15.326, 2.853], [10.798, 6.627], [15.326, 6.627]].forEach(([x, y]) => {
++		const w = 3.816, h = 2.727;
++		s.addShape('roundRect', { x, y, w, h, rectRadius: rr(10774, w, h), fill: { color: BAR } });
++		badge(s, x + 1.557, y - 0.195, 0.703, 0.66, FLOWER, 0.424);
++		label(s, 'Services Beauty', x + 0.586, y + 0.699, 2.646, 0.471, { fontFace: XB, fontSize: 22, color: PURPLE });
++		para(s, 'Lorem ipsum dolor sit amet, consec tetuer adipis', x + 0.287, y + 1.285, 3.244, 0.855, { align: 'center' });
++	});
++	subHead(s, HEAD_SUB, 1.148, 7.401, 7.618, 0.627);
++	para(s, LOREM_C, 1.144, 8.34, 8.437, 1.259);
++}
++
++/* --------------------------------------------------------------- slide 14 */
++
++function slide14(s) {
++	header(s, 'Services');
++	// Two flat name-plates over the left photos, plus one tall review card.
++	[[1.339, 4.318, 'Cosmetics One', 2.321], [1.339, 9.125, 'Cosmetics Two', 2.328]].forEach(([x, y, name, w]) => {
++		s.addShape('roundRect', {
++			x, y, w: 3.211, h: 1.444, rectRadius: rr(15089, 3.211, 1.444), fill: { color: WHITE }, shadow: shadow(130),
++		});
++		stars(s, x + 0.361, y + 0.301);
++		label(s, name, x + 0.276, y + 0.634, w, 0.438, { fontFace: XB, fontSize: 20, color: PURPLE });
++		badge(s, x + 2.528, y - 0.015, 0.703, 0.66, FLOWER, 0.424);
++	});
++	s.addShape('roundRect', {
++		x: 5.747, y: 6.902, w: 3.361, h: 2.715, rectRadius: rr(8388, 3.361, 2.715),
++		fill: { color: WHITE }, shadow: shadow(130),
++	});
++	stars(s, 6.224, 7.364);
++	label(s, 'Cosmetics Three', 6.14, 7.798, 2.511, 0.438, { fontFace: XB, fontSize: 20, color: PURPLE });
++	badge(s, 8.392, 6.902, 0.703, 0.66, FLOWER, 0.424);
++	para(s, [{ text: 'Lorem ipsum dolor sit amet' }, { text: ', consec tetuer adipiscing' }],
++		6.153, 8.364, 2.886, 0.761, { fontSize: 14 });
++	eyebrow(s, 10.4, 2.415);
++	title(s, 'Our Services SkinCare Beauty Cosmetics', 10.4, 3.189, 8.659, 1.919, 54);
++	para(s, LOREM_D, 10.4, 5.625, 8.659, 1.259);
++	s.addText(QUOTE, {
++		x: 10.4, y: 7.562, w: 4.071, h: 1.838, valign: 'top', margin: INSET,
++		fontFace: XB, fontSize: 24, color: INK, lineSpacingMultiple: 1.5,
++	});
++	para(s, 'Lorem ipsum dolor sit amet, consec tetu adipiscing elit. Maecenas portt itor cons massa. ' +
++		'Fusce posuere, ma gna sed pulvi ultricies', 14.852, 7.701, 4.067, 1.663);
++}
++
++/* --------------------------------------------------------------- slide 15 */
++
++function slide15(s) {
++	header(s, 'Services');
++	[[1.207, 'Cosmetics One', 2.321], [7.352, 'Cosmetics Two', 2.328], [13.498, 'Cosmetics Three ', 2.562]]
++		.forEach(([x, name, w]) => {
++			const cw = 4.661, ch = 2.251;
++			s.addShape('roundRect', {
++				x, y: 7.958, w: cw, h: ch, rectRadius: rr(8388, cw, ch), fill: { color: WHITE }, shadow: shadow(130),
++			});
++			badge(s, x + 0.485, 8.531, 0.703, 0.66, FLOWER, 0.424);
++			stars(s, x + 1.397, 8.445);
++			label(s, name, x + 1.312, 8.796, w, 0.438, { fontFace: XB, fontSize: 20, color: PURPLE });
++			para(s, [{ text: 'Lorem ipsum dolor sit amet' }, { text: ', ' }], x + 1.325, 9.276, 2.886, 0.408, { fontSize: 14 });
++		});
++	eyebrow(s, 1.231, 1.913);
++	title(s, 'Our Services SkinCare Beauty Cosmetics', 1.231, 2.687, 8.659, 1.919, 54);
++	subHead(s, 'Fusce posuere, magna sed pulvinar ultricies, purusasi lectus malesuadaws libero',
++		11.234, 1.875, 7.618, 1.232);
++	para(s, LOREM_C, 11.229, 3.373, 7.623, 1.259);
++}
++
++/* --------------------------------------------------------------- slide 16 */
++
++const CHECK_LIST = ['Lorem ipsum dolor ', 'Aks adipiscing elitas. ', 'Amazing Beauty', 'Beauty & Cosmetics '];
++
++function slide16(s) {
++	header(s, 'Services');
++	[1.333, 7.442, 13.544].forEach(x => featureCard(s, x, 3.933, WHITE, 8974));
++	eyebrow(s, 1.231, 7.139);
++	title(s, 'Our Services SkinCare Beauty Cosmetics', 1.231, 7.913, 8.659, 1.919, 54);
++	CHECK_LIST.forEach((text, i) => checkRow(s, text, 10.957, 7.557 + i * 0.612, 3.2));
++	para(s, 'Lorem ipsum dolor sit amet, co nsectetuer adipiscing elit. Mari  ecenas port itor congu e massa. ' +
++		'Fusce posuere', 15.465, 7.44, 3.678, 1.663);
++	s.addText('Read More', {
++		shape: 'roundRect', rectRadius: rr(16267, 1.664, 0.5), x: 17.304, y: 9.362, w: 1.664, h: 0.5,
++		align: 'center', valign: 'middle', fill: { color: PURPLE }, fontFace: XB, fontSize: 16, color: WHITE,
++	});
++}
++
++/* --------------------------------------------------------------- slide 17 */
++
++function slide17(s) {
++	header(s, 'Services');
++	[[11.887, 3.839, 'Cosmetics One'], [16.044, 3.839, 'Cosmetics Two'],
++		[11.887, 8.214, 'Cosmetic Three'], [16.044, 8.214, 'Cosmetics Four']]
++		.forEach(([x, y, name]) => miniCard(s, x, y, name));
++	eyebrow(s, 1.116, 2.389);
++	title(s, 'Beauty is how you feel inside, and it reflects in your eyes.', 1.116, 3.163, 8.626, 1.447, 40);
++	para(s, LOREM_B, 1.116, 5.027, 8.419, 1.259);
++	subHead(s, 'Fusce posuere, magna sed pulvinar ultricies, purusasi lectus malesuadaws libero',
++		1.12, 6.825, 7.618, 1.232);
++	para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas port itor congu e massa. ' +
++		'Fusce posuere, magna sed pulvinar ultricies, purusasi lectus', 1.116, 8.463, 8.419, 0.855);
++}
++
++/* --------------------------------------------------------------- slide 18 */
++
++function slide18(s) {
++	header(s, 'Services');
++	miniCard(s, 3.145, 3.791, 'Cosmetics One');
++	miniCard(s, 3.145, 8.218, 'Cosmetics Two');
++	eyebrow(s, 7.683, 2.293);
++	title(s, 'To me, beauty and makeup and color is like the finishing touch on everything.',
++		7.683, 3.067, 10.993, 1.447, 40);
++	para(s, LOREM_E, 7.683, 5.22, 10.847, 1.259);
++	featureCard(s, 7.397, 7.245, WHITE, 8974);
++	featureCard(s, 13.506, 7.245, WHITE, 8974);
++}
++
++/* --------------------------------------------------------------- slide 19 */
++
++function slide19(s) {
++	header(s, 'Portfolio');
++	eyebrow(s, 1.116, 2.389);
++	title(s, 'Our Gallery Portfolio SkinCare Beauty Cosmetics', 1.116, 3.163, 9.336, 1.582, 44);
++	para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas port itor conguere massa. ' +
++		'Fusce posuere, magna sed pulvinar ultricies, purusasi lectus malesuadaws liber sit amet commodo ' +
++		'magna eros quis urna. ', 1.116, 5.365, 9.336, 1.259);
++	CHECK_LIST.slice(0, 3).forEach((text, i) => checkRow(s, text, 1.192, 7.637 + i * 0.612, 3.2));
++	featureCard(s, 5.027, 7.245, WHITE, 8974);
++}
++
++/* --------------------------------------------------------------- slide 20 */
++
++function slide20(s) {
++	header(s, 'Portfolio');
++	eyebrow(s, 12.316, 2.425);
++	s.addText([
++		{ text: 'Gallery ', options: { color: INK } },
++		{ text: 'Portfolio SkinCare ', options: { color: PURPLE } },
++		{ text: 'Beauty Cosmetics', options: { color: INK } },
++	], { x: 12.316, y: 3.199, w: 6.961, h: 2.827, valign: 'top', margin: INSET, fontFace: XB, fontSize: 54 });
++	para(s, LOREM_F, 12.316, 6.479, 6.476, 2.067);
++	pillButton(s, 'Read More', 12.38, 9.118, 2.421, 0.669, true);
++	pillButton(s, 'Learn More', 15.283, 9.118, 2.421, 0.669, false);
++}
++
++/* --------------------------------------------------------------- slide 21 */
++
++function slide21(s) {
++	header(s, 'Portfolio');
++	eyebrow(s, 0.999, 2.044);
++	title(s, 'Gallery Portfolio SkinCare Beauty Cosmetics', 0.999, 2.818, 9.336, 1.717, 48);
++	[[1.308, 'Gallery Portfolio One', 2.8], [7.298, 'Gallery Portfolio Two', 2.807],
++		[15.491, 'Gallery Portfolio Three', 2.97]].forEach(([x, name, w]) => {
++		const cw = 3.588, ch = 1.478;
++		s.addShape('roundRect', {
++			x, y: 8.79, w: cw, h: ch, rectRadius: rr(8388, cw, ch), fill: { color: WHITE }, shadow: shadow(60),
++		});
++		label(s, name, x + 0.276, 9.109, w, 0.404, { fontFace: XB, fontSize: 18, color: PURPLE });
++		para(s, [{ text: 'Lorem ipsum dolor ' }, { text: 'sit amet' }], x + 0.289, 9.505, 3.316, 0.451);
++	});
++	subHead(s, 'Fusce posuere, magna sed pulvinar ultricies, ', 10.932, 2.044, 7.618, 0.627);
++	para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas portti congue massa. ' +
++		'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo ' +
++		'magna eri quis urna', 10.932, 3.046, 8.344, 1.259);
++}
++
++/* --------------------------------------------------------------- slide 22 */
++
++function slide22(s) {
++	// Photo of a hand holding a phone, tilted and bleeding off the bottom-left.
++	device(s, 1.985, 2.465, 3.58, 7.37, 0.3, 23);
++	header(s, 'Portfolio');
++	eyebrow(s, 9.017, 2.711);
++	title(s, 'Easy Access call & message', 9.017, 3.485, 9.904, 2.322, 66);
++	para(s, LOREM_F, 9.017, 6.43, 9.214, 1.663);
++	pillButton(s, 'Download App', 9.096, 8.716, 2.792, 0.694, true);
++	pillButton(s, 'View Demo', 12.413, 8.716, 2.421, 0.694, false);
++}
++
++/* --------------------------------------------------------------- slide 23 */
++
++function slide23(s) {
++	header(s, 'Portfolio');
++	eyebrow(s, 1.486, 2.787);
++	title(s, 'Preview SkinCare Beauty Cosmetics With Desktop', 1.486, 3.561, 9.0, 1.717, 48);
++	para(s, LOREM_B, 1.486, 5.827, 9.05, 1.259);
++	badge(s, 1.57, 7.985);
++	label(s, 'Beauty & Cosmetics ', 2.499, 7.901, 3.338, 0.471, { fontFace: XB, fontSize: 22, color: PURPLE });
++	para(s, 'Lorem ipsum dolor sit amet, consec tetuer adipiscing elit. Maecenas por', 2.499, 8.487, 4.036, 0.855);
++	s.addText(QUOTE, {
++		x: 6.968, y: 7.453, w: 3.674, h: 1.838, valign: 'top', margin: INSET,
++		fontFace: XB, fontSize: 24, color: INK, lineSpacingMultiple: 1.5,
++	});
++	// Desktop monitor mockup: screen plus a light grey base and stand.
++	device(s, 11.94, 2.76, 6.45, 5.15, 0.16);
++	s.addShape('rect', { x: 11.94, y: 7.79, w: 6.45, h: 0.28, fill: { color: 'BFBFBF' }, line: { type: 'none' } });
++	s.addShape('trapezoid', {
++		x: 14.35, y: 8.07, w: 1.7, h: 0.87, rotate: 180, fill: { color: 'C9C9C9' }, line: { type: 'none' },
++	});
++}
++
++/* --------------------------------------------------------------- slide 24 */
++
++const CONTACTS = [
++	[2.473, MAIL, 0.453, ['SkinCarebeau@example.com', 4.252], ['Cosmetics@example.com', 3.808]],
++	[8.341, PIN, 0.528, ['Address Line One', 2.569], ['Address Line Two Lorem', 3.471]],
++	[14.075, PHONE, 0.512, ['+123 456 7890', 2.155], ['+098 765 4321', 2.155]],
++];
++
++function slide24(s) {
++	header(s, 'Portfolio');
++	s.addShape('roundRect', {
++		x: 1.127, y: 3.595, w: 17.746, h: 6.64, rectRadius: rr(3135, 17.746, 6.64),
++		fill: { color: WHITE }, shadow: shadow(135, 25, 30),
++	});
++	eyebrow(s, 6.328, 4.444, 7.344, 'Beauty & Cosmetics Presentation Template', 'center');
++	s.addText('Get In Touch SkinCare Beauty Cosmetics', {
++		x: 2.473, y: 5.107, w: 15.054, h: 0.909, valign: 'top', margin: INSET,
++		align: 'center', fontFace: XB, fontSize: 48, color: INK,
++	});
++	para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas por  titor congue massa. ' +
++		'Fusce posuere, magna sed pulvinar ultricies, purusa lectus malesuada libero, sit amet commodo ' +
++		'magna eros quis urna.', 2.473, 6.399, 15.054, 0.855, { align: 'center' });
++	CONTACTS.forEach(([x, glyph, gs, line1, line2]) => {
++		s.addShape('roundRect', { x, y: 8.016, w: 0.818, h: 0.819, rectRadius: rr(16667, 0.818, 0.819), fill: { color: PURPLE } });
++		icon(s, glyph, x + (0.818 - gs) / 2, 8.016 + (0.819 - gs) / 2, gs, WHITE);
++		[line1, line2].forEach(([text, w], i) => {
++			label(s, text, x + 1.054, 7.936 + i * 0.542, w, 0.438, { fontFace: SB, fontSize: 20, color: GRAY2 });
++		});
++	});
++}
++
++/* ------------------------------------------------------------------ build */
++
++const BUILDERS = [
++	slide01, slide02, slide03, slide04, slide05, slide06, slide07,
++	slide08, slide09, slide10, slide11,
++	s => heroSlide(s, 'Break Slides', 4.089, 11.821, false), // 12 - divider
++	slide13, slide14, slide15, slide16, slide17, slide18, slide19,
++	slide20, slide21, slide22, slide23, slide24,
++	s => heroSlide(s, 'Thank You All', 3.655, 12.691, true), // 25 - closing
++];
++
++function build() {
++	const pptx = new PptxGenJS();
++	pptx.defineLayout({ name: 'SKINCARE', width: SLIDE_W, height: SLIDE_H });
++	pptx.layout = 'SKINCARE';
++	pptx.theme = { headFontFace: XB, bodyFontFace: MD };
++	pptx.title = 'SkinCare - Beauty & Cosmetics Presentation';
++
++	BUILDERS.forEach(fn => {
++		const slide = pptx.addSlide();
++		slide.background = { color: WHITE };
++		fn(slide);
++	});
++
++	return pptx.writeFile({ fileName: path.join(__dirname, '03cf928f-2505-41ec-bac7-5c81762b3d62_grok_final.pptx') });
++}
++
++build().then(f => console.log('wrote', f)).catch(err => { console.error(err); process.exit(1); });

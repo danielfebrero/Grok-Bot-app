@@ -1,0 +1,22 @@
+--- 2026-10-09_14-11:/usr/local/bin/ensure-machine-id
++++ 2026-10-09_14-24:/usr/local/bin/ensure-machine-id
+@@ -42,10 +42,18 @@
+ 	exit 0
+ fi
+ 
++make_box_dir() {
++	if [ "$(id -u)" -eq 0 ]; then
++		runuser -u box -- mkdir -p "$1"
++	else
++		mkdir -p "$1"
++	fi
++}
++
+ replace_regular_file() {
+ 	local path="$1" content="$2"
+ 	local dir="${path%/*}" tmp
+-	mkdir -p "${dir}" 2>/dev/null || true
++	[ -d "${dir}" ] || make_box_dir "${dir}" 2>/dev/null || return 0
+ 	if tmp="$(mktemp "${dir}/.machine-id.XXXXXX" 2>/dev/null)"; then
+ 		if printf '%s\n' "${content}" >"${tmp}" 2>/dev/null; then
+ 			chmod 644 "${tmp}" 2>/dev/null || true

@@ -1,0 +1,677 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/mental_health_awareness_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/mental_health_awareness_presentation.js
+@@ -0,0 +1,674 @@
++/**
++ * "TakeCare." — Mental Health Presentation Template
++ * Standalone pptxgenjs recreation of 05f64663-6e41-45ac-8ca2-781012cb5c31.pptx
++ *
++ * 10 slides, 13.333in x 7.5in (16:9).
++ * Run: node 05f64663-6e41-45ac-8ca2-781012cb5c31_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------------------
++// Theme (colour scheme "Custom 607" + resolved tint/shade variants)
++// ---------------------------------------------------------------------------
++
++const C = {
++  page: 'F6F6F6', // lt2 - slide background
++  white: 'FFFFFF', // lt1
++  yellow: 'FECE2A', // accent1 - logo petals & highlight bars
++  green: '044844', // accent2 - deep teal, primary brand colour
++  olive: '4D7135', // accent3 - second half of every headline
++  sand: 'ECE0CD', // accent4 - large photo-frame cards
++  ink: '404040', // tx1 lighter 25% - headline / label text
++  body: '808080', // tx1 lighter 50% - paragraph text
++  faint: 'D9D9D9', // bg1 darker 15% - footer url
++};
++
++const FONT = {
++  head: 'Montserrat Medium', // headlines, labels, nav
++  semi: 'Montserrat SemiBold',
++  plain: 'Montserrat',
++  body: 'Open Sans', // paragraph copy
++};
++
++const SZ = { title: 40, head: 36, label: 12, copy: 11, small: 10, stat: 14 };
++
++// ---------------------------------------------------------------------------
++// Vector artwork. Each path is normalised into a 0..1 box and replayed through
++// `iconPoints()`; commands are M(move) L(line) C(cubic bezier) Z(close).
++// ---------------------------------------------------------------------------
++
++// lotus flower outline - the big translucent watermark on every slide
++const LOTUS = [
++  'M', 0.5, 1, 'C', 0.439, 0.993, 0.379, 0.976, 0.319, 0.951, 'C', 0.259, 0.925, 0.205, 0.889, 0.158,
++  0.841, 'C', 0.111, 0.794, 0.073, 0.734, 0.044, 0.661, 'C', 0.015, 0.589, 0, 0.502, 0, 0.4, 'L', 0, 0.35,
++  'L', 0.05, 0.35, 'C', 0.092, 0.35, 0.136, 0.355, 0.181, 0.366, 'C', 0.226, 0.377, 0.268, 0.393, 0.307,
++  0.415, 'C', 0.318, 0.343, 0.34, 0.27, 0.376, 0.194, 'C', 0.411, 0.119, 0.453, 0.054, 0.5, 0, 'C', 0.548,
++  0.054, 0.589, 0.119, 0.624, 0.194, 'C', 0.66, 0.27, 0.683, 0.343, 0.693, 0.415, 'C', 0.732, 0.393,
++  0.774, 0.377, 0.819, 0.366, 'C', 0.864, 0.355, 0.908, 0.35, 0.95, 0.35, 'L', 1, 0.35, 'L', 1, 0.4, 'C',
++  1, 0.502, 0.985, 0.589, 0.956, 0.661, 'C', 0.927, 0.734, 0.889, 0.794, 0.842, 0.841, 'C', 0.795, 0.889,
++  0.741, 0.925, 0.682, 0.951, 'C', 0.622, 0.976, 0.562, 0.993, 0.5, 1, 'Z', 'M', 0.498, 0.898, 'C', 0.488,
++  0.759, 0.447, 0.655, 0.374, 0.584, 'C', 0.301, 0.513, 0.211, 0.469, 0.103, 0.453, 'C', 0.112, 0.595,
++  0.154, 0.701, 0.229, 0.771, 'C', 0.305, 0.841, 0.394, 0.883, 0.498, 0.898, 'Z', 'M', 0.5, 0.58, 'C',
++  0.513, 0.562, 0.528, 0.543, 0.546, 0.523, 'C', 0.564, 0.504, 0.581, 0.487, 0.597, 0.472, 'C', 0.596,
++  0.425, 0.586, 0.375, 0.569, 0.324, 'C', 0.552, 0.272, 0.529, 0.222, 0.5, 0.173, 'C', 0.471, 0.222,
++  0.448, 0.272, 0.431, 0.324, 'C', 0.414, 0.375, 0.404, 0.425, 0.403, 0.472, 'C', 0.419, 0.487, 0.437,
++  0.504, 0.455, 0.523, 'C', 0.473, 0.543, 0.488, 0.562, 0.5, 0.58, 'Z', 'M', 0.597, 0.875, 'C', 0.628,
++  0.865, 0.66, 0.85, 0.694, 0.831, 'C', 0.727, 0.812, 0.758, 0.786, 0.787, 0.753, 'C', 0.816, 0.72, 0.84,
++  0.679, 0.861, 0.63, 'C', 0.881, 0.581, 0.893, 0.522, 0.898, 0.453, 'C', 0.819, 0.464, 0.75, 0.49, 0.691,
++  0.531, 'C', 0.632, 0.571, 0.587, 0.623, 0.555, 0.685, 'C', 0.565, 0.712, 0.574, 0.741, 0.581, 0.773,
++  'C', 0.588, 0.804, 0.593, 0.838, 0.597, 0.875, 'Z',
++];
++
++// one quadrant of the four-petal "TakeCare." logo mark (mirrored for the other 3)
++const PETAL = [
++  'M', 0.08, 0.239, 'L', 0.238, 0, 'L', 0.688, 0.225, 'L', 0.529, 0.464, 'C', 0.502, 0.506, 0.543, 0.557,
++  0.598, 0.548, 'L', 0.902, 0.497, 'L', 1, 0.939, 'L', 0.696, 0.99, 'C', 0.205, 1.073, -0.17, 0.615, 0.08,
++  0.239, 'Z',
++];
++
++// head-with-gear ("mindset") icon - slide 2 stat card
++const HEAD_GEAR = [
++  'M', 0.158, 1, 'L', 0.158, 0.785, 'C', 0.108, 0.742, 0.069, 0.691, 0.041, 0.633, 'C', 0.014, 0.575, 0,
++  0.514, 0, 0.45, 'C', 0, 0.325, 0.046, 0.219, 0.138, 0.131, 'C', 0.23, 0.044, 0.342, 0, 0.473, 0, 'C',
++  0.583, 0, 0.68, 0.031, 0.765, 0.092, 'C', 0.849, 0.153, 0.904, 0.233, 0.93, 0.331, 'L', 0.998, 0.588,
++  'C', 1.002, 0.603, 0.999, 0.618, 0.989, 0.631, 'C', 0.978, 0.644, 0.964, 0.65, 0.947, 0.65, 'L', 0.842,
++  0.65, 'L', 0.842, 0.8, 'C', 0.842, 0.828, 0.831, 0.851, 0.811, 0.871, 'C', 0.79, 0.89, 0.765, 0.9,
++  0.736, 0.9, 'L', 0.631, 0.9, 'L', 0.631, 1, 'L', 0.526, 1, 'L', 0.526, 0.8, 'L', 0.736, 0.8, 'L', 0.736,
++  0.55, 'L', 0.878, 0.55, 'L', 0.828, 0.356, 'C', 0.808, 0.28, 0.765, 0.219, 0.7, 0.171, 'C', 0.634,
++  0.124, 0.558, 0.1, 0.473, 0.1, 'C', 0.372, 0.1, 0.285, 0.134, 0.213, 0.201, 'C', 0.141, 0.269, 0.105,
++  0.351, 0.105, 0.448, 'C', 0.105, 0.498, 0.116, 0.545, 0.137, 0.59, 'C', 0.159, 0.635, 0.189, 0.675,
++  0.229, 0.71, 'L', 0.263, 0.74, 'L', 0.263, 1, 'L', 0.158, 1, 'Z', 'M', 0.421, 0.65, 'L', 0.526, 0.65,
++  'L', 0.534, 0.588, 'C', 0.541, 0.585, 0.547, 0.582, 0.553, 0.579, 'C', 0.559, 0.575, 0.564, 0.572,
++  0.568, 0.568, 'L', 0.629, 0.593, 'L', 0.681, 0.508, 'L', 0.629, 0.47, 'C', 0.63, 0.463, 0.631, 0.457,
++  0.631, 0.45, 'C', 0.631, 0.443, 0.63, 0.437, 0.629, 0.43, 'L', 0.681, 0.392, 'L', 0.629, 0.308, 'L',
++  0.568, 0.333, 'C', 0.564, 0.328, 0.559, 0.325, 0.553, 0.321, 'C', 0.547, 0.318, 0.541, 0.315, 0.534,
++  0.313, 'L', 0.526, 0.25, 'L', 0.421, 0.25, 'L', 0.413, 0.313, 'C', 0.406, 0.315, 0.4, 0.318, 0.394,
++  0.321, 'C', 0.388, 0.325, 0.383, 0.328, 0.379, 0.333, 'L', 0.318, 0.308, 'L', 0.266, 0.392, 'L', 0.318,
++  0.43, 'C', 0.316, 0.437, 0.316, 0.443, 0.316, 0.45, 'C', 0.316, 0.457, 0.316, 0.463, 0.318, 0.47, 'L',
++  0.266, 0.508, 'L', 0.318, 0.593, 'L', 0.379, 0.568, 'C', 0.383, 0.572, 0.388, 0.575, 0.394, 0.579, 'C',
++  0.4, 0.582, 0.406, 0.585, 0.413, 0.588, 'L', 0.421, 0.65, 'Z', 'M', 0.473, 0.525, 'C', 0.451, 0.525,
++  0.433, 0.518, 0.418, 0.503, 'C', 0.402, 0.489, 0.394, 0.471, 0.394, 0.45, 'C', 0.394, 0.429, 0.402,
++  0.411, 0.418, 0.397, 'C', 0.433, 0.382, 0.451, 0.375, 0.473, 0.375, 'C', 0.495, 0.375, 0.514, 0.382,
++  0.529, 0.397, 'C', 0.545, 0.411, 0.552, 0.429, 0.552, 0.45, 'C', 0.552, 0.471, 0.545, 0.489, 0.529,
++  0.503, 'C', 0.514, 0.518, 0.495, 0.525, 0.473, 0.525, 'Z',
++];
++
++// handshake icon - slide 5 "Challenging Misconceptions" badge
++const HANDSHAKE = [
++  'M', 0.495, 0.9, 'C', 0.498, 0.9, 0.501, 0.899, 0.504, 0.898, 'C', 0.507, 0.896, 0.509, 0.894, 0.51,
++  0.892, 'L', 0.883, 0.482, 'C', 0.892, 0.472, 0.899, 0.461, 0.903, 0.449, 'C', 0.907, 0.436, 0.909,
++  0.424, 0.909, 0.411, 'C', 0.909, 0.398, 0.907, 0.385, 0.903, 0.373, 'C', 0.899, 0.361, 0.892, 0.35,
++  0.883, 0.341, 'L', 0.69, 0.129, 'C', 0.682, 0.119, 0.672, 0.111, 0.661, 0.107, 'C', 0.65, 0.102, 0.638,
++  0.1, 0.626, 0.1, 'C', 0.615, 0.1, 0.604, 0.102, 0.592, 0.107, 'C', 0.581, 0.111, 0.571, 0.119, 0.562,
++  0.129, 'L', 0.549, 0.142, 'L', 0.633, 0.236, 'C', 0.644, 0.248, 0.653, 0.261, 0.658, 0.276, 'C', 0.663,
++  0.291, 0.666, 0.307, 0.666, 0.324, 'C', 0.666, 0.359, 0.655, 0.388, 0.634, 0.412, 'C', 0.612, 0.436,
++  0.585, 0.448, 0.554, 0.448, 'C', 0.538, 0.448, 0.524, 0.445, 0.51, 0.439, 'C', 0.496, 0.433, 0.484,
++  0.424, 0.473, 0.412, 'L', 0.388, 0.32, 'L', 0.189, 0.539, 'C', 0.187, 0.541, 0.185, 0.544, 0.184, 0.547,
++  'C', 0.183, 0.55, 0.182, 0.553, 0.182, 0.556, 'C', 0.182, 0.563, 0.184, 0.569, 0.189, 0.574, 'C', 0.194,
++  0.58, 0.199, 0.582, 0.205, 0.582, 'C', 0.208, 0.582, 0.211, 0.582, 0.214, 0.58, 'C', 0.217, 0.578,
++  0.219, 0.577, 0.221, 0.575, 'L', 0.375, 0.405, 'L', 0.439, 0.475, 'L', 0.286, 0.645, 'C', 0.283, 0.648,
++  0.282, 0.65, 0.28, 0.653, 'C', 0.279, 0.656, 0.279, 0.659, 0.279, 0.662, 'C', 0.279, 0.669, 0.281,
++  0.675, 0.286, 0.68, 'C', 0.29, 0.685, 0.295, 0.688, 0.301, 0.688, 'C', 0.304, 0.688, 0.308, 0.687,
++  0.311, 0.685, 'C', 0.314, 0.683, 0.316, 0.682, 0.317, 0.68, 'L', 0.472, 0.511, 'L', 0.535, 0.581, 'L',
++  0.382, 0.751, 'C', 0.38, 0.753, 0.378, 0.755, 0.377, 0.759, 'C', 0.376, 0.762, 0.375, 0.765, 0.375,
++  0.769, 'C', 0.375, 0.775, 0.378, 0.781, 0.382, 0.786, 'C', 0.387, 0.791, 0.392, 0.794, 0.398, 0.794,
++  'C', 0.401, 0.794, 0.404, 0.793, 0.407, 0.792, 'C', 0.409, 0.791, 0.412, 0.789, 0.414, 0.786, 'L',
++  0.568, 0.618, 'L', 0.632, 0.688, 'L', 0.478, 0.858, 'C', 0.475, 0.86, 0.474, 0.863, 0.472, 0.866, 'C',
++  0.471, 0.869, 0.471, 0.872, 0.471, 0.875, 'C', 0.471, 0.882, 0.473, 0.888, 0.478, 0.892, 'C', 0.483,
++  0.898, 0.488, 0.9, 0.495, 0.9, 'Z', 'M', 0.493, 1, 'C', 0.465, 1, 0.441, 0.99, 0.419, 0.969, 'C', 0.397,
++  0.949, 0.385, 0.923, 0.381, 0.892, 'C', 0.355, 0.888, 0.334, 0.877, 0.316, 0.858, 'C', 0.299, 0.838,
++  0.288, 0.815, 0.284, 0.786, 'C', 0.259, 0.782, 0.237, 0.77, 0.22, 0.751, 'C', 0.203, 0.731, 0.193,
++  0.708, 0.189, 0.68, 'C', 0.16, 0.676, 0.137, 0.662, 0.119, 0.639, 'C', 0.1, 0.615, 0.091, 0.588, 0.091,
++  0.556, 'C', 0.091, 0.54, 0.094, 0.524, 0.1, 0.508, 'C', 0.106, 0.493, 0.114, 0.479, 0.124, 0.468, 'L',
++  0.388, 0.179, 'L', 0.537, 0.342, 'C', 0.538, 0.345, 0.54, 0.347, 0.543, 0.348, 'C', 0.546, 0.349, 0.549,
++  0.35, 0.552, 0.35, 'C', 0.559, 0.35, 0.565, 0.348, 0.57, 0.343, 'C', 0.574, 0.339, 0.576, 0.332, 0.576,
++  0.325, 'C', 0.576, 0.322, 0.576, 0.318, 0.575, 0.315, 'C', 0.573, 0.312, 0.572, 0.309, 0.57, 0.308, 'L',
++  0.407, 0.129, 'C', 0.399, 0.119, 0.389, 0.111, 0.378, 0.107, 'C', 0.367, 0.102, 0.356, 0.1, 0.343, 0.1,
++  'C', 0.332, 0.1, 0.321, 0.102, 0.309, 0.107, 'C', 0.298, 0.111, 0.288, 0.119, 0.279, 0.129, 'L', 0.119,
++  0.306, 'C', 0.112, 0.314, 0.106, 0.322, 0.102, 0.332, 'C', 0.097, 0.342, 0.094, 0.352, 0.092, 0.362,
++  'C', 0.091, 0.372, 0.091, 0.383, 0.092, 0.393, 'C', 0.094, 0.404, 0.097, 0.413, 0.102, 0.422, 'L',
++  0.036, 0.495, 'C', 0.023, 0.476, 0.013, 0.455, 0.007, 0.432, 'C', 0.001, 0.409, -0.001, 0.386, 0, 0.362,
++  'C', 0.002, 0.339, 0.007, 0.316, 0.016, 0.294, 'C', 0.025, 0.272, 0.038, 0.252, 0.054, 0.235, 'L',
++  0.214, 0.059, 'C', 0.232, 0.04, 0.252, 0.025, 0.275, 0.015, 'C', 0.297, 0.005, 0.32, 0, 0.343, 0, 'C',
++  0.367, 0, 0.39, 0.005, 0.412, 0.015, 'C', 0.435, 0.025, 0.454, 0.04, 0.472, 0.059, 'L', 0.484, 0.072,
++  'L', 0.497, 0.059, 'C', 0.515, 0.04, 0.535, 0.025, 0.558, 0.015, 'C', 0.58, 0.005, 0.603, 0, 0.626, 0,
++  'C', 0.65, 0, 0.673, 0.005, 0.695, 0.015, 'C', 0.717, 0.025, 0.737, 0.04, 0.755, 0.059, 'L', 0.947,
++  0.27, 'C', 0.964, 0.289, 0.977, 0.311, 0.986, 0.336, 'C', 0.995, 0.361, 1, 0.387, 1, 0.412, 'C', 1,
++  0.438, 0.995, 0.464, 0.986, 0.488, 'C', 0.977, 0.513, 0.964, 0.535, 0.947, 0.554, 'L', 0.574, 0.962,
++  'C', 0.563, 0.974, 0.551, 0.983, 0.537, 0.99, 'C', 0.523, 0.997, 0.509, 1, 0.493, 1, 'Z',
++];
++
++// check-in-circle bullet - slide 6 tips list
++const CHECK_CIRCLE = [
++  'M', 0.43, 0.73, 'L', 0.782, 0.378, 'L', 0.712, 0.308, 'L', 0.43, 0.59, 'L', 0.288, 0.448, 'L', 0.218,
++  0.518, 'L', 0.43, 0.73, 'Z', 'M', 0.5, 1, 'C', 0.431, 1, 0.366, 0.987, 0.305, 0.961, 'C', 0.244, 0.934,
++  0.191, 0.899, 0.146, 0.854, 'C', 0.101, 0.809, 0.066, 0.756, 0.039, 0.695, 'C', 0.013, 0.634, 0, 0.569,
++  0, 0.5, 'C', 0, 0.431, 0.013, 0.366, 0.039, 0.305, 'C', 0.066, 0.244, 0.101, 0.191, 0.146, 0.146, 'C',
++  0.191, 0.101, 0.244, 0.066, 0.305, 0.039, 'C', 0.366, 0.013, 0.431, 0, 0.5, 0, 'C', 0.569, 0, 0.634,
++  0.013, 0.695, 0.039, 'C', 0.756, 0.066, 0.809, 0.101, 0.854, 0.146, 'C', 0.899, 0.191, 0.934, 0.244,
++  0.961, 0.305, 'C', 0.987, 0.366, 1, 0.431, 1, 0.5, 'C', 1, 0.569, 0.987, 0.634, 0.961, 0.695, 'C',
++  0.934, 0.756, 0.899, 0.809, 0.854, 0.854, 'C', 0.809, 0.899, 0.756, 0.934, 0.695, 0.961, 'C', 0.634,
++  0.987, 0.569, 1, 0.5, 1, 'Z', 'M', 0.5, 0.9, 'C', 0.612, 0.9, 0.706, 0.861, 0.784, 0.784, 'C', 0.861,
++  0.706, 0.9, 0.612, 0.9, 0.5, 'C', 0.9, 0.388, 0.861, 0.294, 0.784, 0.216, 'C', 0.706, 0.139, 0.612, 0.1,
++  0.5, 0.1, 'C', 0.388, 0.1, 0.294, 0.139, 0.216, 0.216, 'C', 0.139, 0.294, 0.1, 0.388, 0.1, 0.5, 'C',
++  0.1, 0.612, 0.139, 0.706, 0.216, 0.784, 'C', 0.294, 0.861, 0.388, 0.9, 0.5, 0.9, 'Z',
++];
++
++// heartbeat-in-frame icon - slide 7 "Navigating The Digital World" badge
++const PULSE = [
++  'M', 0, 0.312, 'L', 0, 0.125, 'C', 0, 0.091, 0.01, 0.061, 0.029, 0.037, 'C', 0.049, 0.012, 0.072, 0,
++  0.1, 0, 'L', 0.9, 0, 'C', 0.928, 0, 0.951, 0.012, 0.971, 0.037, 'C', 0.99, 0.061, 1, 0.091, 1, 0.125,
++  'L', 1, 0.312, 'L', 0.9, 0.312, 'L', 0.9, 0.125, 'L', 0.1, 0.125, 'L', 0.1, 0.312, 'L', 0, 0.312, 'Z',
++  'M', 0.1, 1, 'C', 0.072, 1, 0.049, 0.988, 0.029, 0.963, 'C', 0.01, 0.939, 0, 0.909, 0, 0.875, 'L', 0,
++  0.688, 'L', 0.1, 0.688, 'L', 0.1, 0.875, 'L', 0.9, 0.875, 'L', 0.9, 0.688, 'L', 1, 0.688, 'L', 1, 0.875,
++  'C', 1, 0.909, 0.99, 0.939, 0.971, 0.963, 'C', 0.951, 0.988, 0.928, 1, 0.9, 1, 'L', 0.1, 1, 'Z', 'M',
++  0.4, 0.812, 'C', 0.409, 0.812, 0.418, 0.81, 0.426, 0.804, 'C', 0.435, 0.798, 0.441, 0.79, 0.445, 0.778,
++  'L', 0.6, 0.391, 'L', 0.655, 0.528, 'C', 0.659, 0.54, 0.665, 0.548, 0.674, 0.554, 'C', 0.682, 0.56,
++  0.691, 0.562, 0.7, 0.562, 'L', 1, 0.562, 'L', 1, 0.438, 'L', 0.731, 0.438, 'L', 0.645, 0.222, 'C',
++  0.641, 0.21, 0.635, 0.202, 0.626, 0.198, 'C', 0.618, 0.193, 0.609, 0.191, 0.6, 0.191, 'C', 0.591, 0.191,
++  0.582, 0.193, 0.574, 0.198, 'C', 0.565, 0.202, 0.559, 0.21, 0.555, 0.222, 'L', 0.4, 0.609, 'L', 0.345,
++  0.472, 'C', 0.341, 0.46, 0.335, 0.452, 0.326, 0.446, 'C', 0.318, 0.44, 0.309, 0.438, 0.3, 0.438, 'L', 0,
++  0.438, 'L', 0, 0.562, 'L', 0.269, 0.562, 'L', 0.355, 0.778, 'C', 0.359, 0.79, 0.365, 0.798, 0.374,
++  0.804, 'C', 0.382, 0.81, 0.391, 0.812, 0.4, 0.812, 'Z',
++];
++
++// question mark glyph - slide 9 FAQ markers
++const QUESTION = [
++  'M', 0.372, 0.684, 'C', 0.372, 0.613, 0.383, 0.562, 0.405, 0.531, 'C', 0.427, 0.5, 0.474, 0.466, 0.546,
++  0.429, 'C', 0.609, 0.397, 0.656, 0.37, 0.689, 0.347, 'C', 0.722, 0.323, 0.739, 0.297, 0.739, 0.267, 'C',
++  0.739, 0.231, 0.718, 0.201, 0.675, 0.178, 'C', 0.633, 0.154, 0.575, 0.142, 0.5, 0.142, 'C', 0.422,
++  0.142, 0.363, 0.156, 0.322, 0.183, 'C', 0.282, 0.21, 0.253, 0.238, 0.236, 0.266, 'L', 0, 0.208, 'C',
++  0.032, 0.152, 0.091, 0.103, 0.177, 0.062, 'C', 0.262, 0.021, 0.37, 0, 0.5, 0, 'C', 0.661, 0, 0.784,
++  0.026, 0.87, 0.077, 'C', 0.957, 0.128, 1, 0.19, 1, 0.262, 'C', 1, 0.306, 0.984, 0.343, 0.951, 0.374,
++  'C', 0.918, 0.405, 0.866, 0.441, 0.796, 0.48, 'C', 0.721, 0.521, 0.675, 0.553, 0.659, 0.574, 'C', 0.643,
++  0.596, 0.635, 0.632, 0.635, 0.684, 'L', 0.372, 0.684, 'Z', 'M', 0.5, 1, 'C', 0.45, 1, 0.406, 0.99, 0.37,
++  0.969, 'C', 0.334, 0.948, 0.317, 0.924, 0.317, 0.895, 'C', 0.317, 0.866, 0.334, 0.841, 0.37, 0.82, 'C',
++  0.406, 0.8, 0.45, 0.789, 0.5, 0.789, 'C', 0.55, 0.789, 0.594, 0.8, 0.63, 0.82, 'C', 0.666, 0.841, 0.683,
++  0.866, 0.683, 0.895, 'C', 0.683, 0.924, 0.666, 0.948, 0.63, 0.969, 'C', 0.594, 0.99, 0.55, 1, 0.5, 1,
++  'Z',
++];
++
++// six-point asterisk - slide 10 contact column
++const ASTERISK = [
++  'M', 0.417, 0, 'L', 0.583, 0, 'L', 0.58, 0.363, 'L', 0.914, 0.172, 'L', 1, 0.322, 'L', 0.671, 0.5, 'L',
++  1, 0.678, 'L', 0.914, 0.826, 'L', 0.58, 0.637, 'L', 0.583, 1, 'L', 0.417, 1, 'L', 0.42, 0.637, 'L',
++  0.086, 0.826, 'L', 0, 0.678, 'L', 0.331, 0.5, 'L', 0, 0.322, 'L', 0.086, 0.172, 'L', 0.42, 0.363, 'Z',
++];
++
++// ---------------------------------------------------------------------------
++// Geometry helpers
++// ---------------------------------------------------------------------------
++
++/** OOXML roundRect `adj` (1/100000 of the short side) -> pptxgenjs rectRadius in inches. */
++function radius(adj, w, h) {
++  return (adj / 100000) * Math.min(w, h);
++}
++
++/** Expand a normalised path table into pptxgenjs custGeom points, scaled to w x h inches. */
++function iconPoints(pathData, w, h) {
++  const pts = [];
++  for (let i = 0; i < pathData.length; ) {
++    const cmd = pathData[i++];
++    if (cmd === 'Z') {
++      pts.push({ close: true });
++    } else if (cmd === 'M') {
++      pts.push({ x: pathData[i++] * w, y: pathData[i++] * h, moveTo: true });
++    } else if (cmd === 'L') {
++      pts.push({ x: pathData[i++] * w, y: pathData[i++] * h });
++    } else {
++      const x1 = pathData[i++] * w;
++      const y1 = pathData[i++] * h;
++      const x2 = pathData[i++] * w;
++      const y2 = pathData[i++] * h;
++      pts.push({ x: pathData[i++] * w, y: pathData[i++] * h, curve: { type: 'cubic', x1, y1, x2, y2 } });
++    }
++  }
++  return pts;
++}
++
++/**
++ * Rectangle with square top corners and radius `r` on the two bottom corners.
++ * pptxgenjs' `rectRadius` only writes a single `adj`, which is not enough for the
++ * two-value `round2SameRect` preset, so the outline is spelled out instead.
++ */
++function bottomRoundedRectPoints(w, h, r) {
++  const quarterTurn = (stAng) => ({ x: 0, y: 0, curve: { type: 'arc', hR: r, wR: r, stAng, swAng: 90 } });
++  return [
++    { x: 0, y: 0, moveTo: true },
++    { x: w, y: 0 },
++    { x: w, y: h - r },
++    quarterTurn(0), // sweeps right edge -> bottom edge
++    { x: r, y: h },
++    quarterTurn(90), // sweeps bottom edge -> left edge
++    { close: true },
++  ];
++}
++
++// ---------------------------------------------------------------------------
++// Shape / text helpers
++// ---------------------------------------------------------------------------
++
++/** Rounded rectangle. `adj` is the raw OOXML adjust value from the source deck. */
++function card(slide, pptx, { x, y, w, h, adj, fill, line }) {
++  slide.addShape(pptx.shapes.ROUNDED_RECTANGLE, {
++    x, y, w, h,
++    rectRadius: radius(adj, w, h),
++    fill: fill ? { color: fill } : { type: 'none' },
++    line: line ? { color: line, width: 1 } : { type: 'none' },
++  });
++}
++
++/** Solid-filled vector icon built from one of the path tables above. */
++function icon(slide, pptx, pathData, { x, y, w, h, color, flipH, flipV }) {
++  slide.addShape(pptx.shapes.CUSTOM_GEOMETRY, {
++    x, y, w, h,
++    points: iconPoints(pathData, w, h),
++    fill: { color },
++    line: { type: 'none' },
++    flipH: !!flipH,
++    flipV: !!flipV,
++  });
++}
++
++/** The short yellow "marker pen" bar that sits under the coloured half of a headline. */
++function marker(slide, pptx, x, y, w) {
++  card(slide, pptx, { x, y, w, h: 0.143, adj: 50000, fill: C.yellow });
++}
++
++/** White lotus watermark, always square. */
++function lotus(slide, pptx, x, y) {
++  icon(slide, pptx, LOTUS, { x, y, w: 1.17, h: 1.17, color: C.white });
++}
++
++/** "TakeCare." brand lock-up, identical on all 10 slides. */
++function logo(slide, pptx) {
++  const petals = [
++    { x: 0.56, y: 0.384 },
++    { x: 0.421, y: 0.526, flipH: true, flipV: true },
++    { x: 0.422, y: 0.384, flipH: true },
++    { x: 0.559, y: 0.526, flipV: true },
++  ];
++  petals.forEach((p) =>
++    icon(slide, pptx, PETAL, { x: p.x, y: p.y, w: 0.125, h: 0.13, color: C.yellow, flipH: p.flipH, flipV: p.flipV })
++  );
++  slide.addText('TakeCare.', {
++    x: 0.71, y: 0.383, w: 1.376, h: 0.286, valign: 'top',
++    fontFace: FONT.head, fontSize: SZ.copy, color: C.ink, charSpacing: 0.5,
++  });
++}
++
++/** Bottom-right website credit, identical on all 10 slides. */
++function footer(slide) {
++  slide.addText('www.yourgreatsite.com', {
++    x: 9.579, y: 6.92, w: 3.368, h: 0.269, valign: 'top', align: 'right',
++    fontFace: FONT.plain, fontSize: SZ.small, color: C.faint, charSpacing: 2,
++  });
++}
++
++/**
++ * Two-tone headline. `parts` is a list of [text, colour] (optionally followed by
++ * 'break' to end the paragraph after that run — only slide 1's 40pt title needs it).
++ */
++function headline(slide, { x, y, w, h, size = SZ.head, parts }) {
++  const runs = parts.map(([text, color, brk]) => ({
++    text,
++    options: { fontFace: FONT.head, fontSize: size, color, breakLine: brk === 'break' },
++  }));
++  slide.addText(runs, { x, y, w, h, valign: 'top' });
++}
++
++/** 12pt Montserrat Medium sub-heading / label. */
++function label(slide, { x, y, w, h, text, color = C.ink }) {
++  slide.addText(text, { x, y, w, h, valign: 'top', fontFace: FONT.head, fontSize: SZ.label, color });
++}
++
++/** 11pt Open Sans paragraph copy at 150% leading. */
++function copy(slide, { x, y, w, h, text, color = C.body }) {
++  slide.addText(text, {
++    x, y, w, h, valign: 'top',
++    fontFace: FONT.body, fontSize: SZ.copy, color, lineSpacingMultiple: 1.5,
++  });
++}
++
++/** Bold green kicker + grey description, as used by the slide 4 disorder list. */
++function kickerBlock(slide, { x, y, w, h, kicker, text }) {
++  slide.addText(
++    [
++      { text: kicker, options: { fontFace: FONT.body, fontSize: SZ.copy, color: C.green, bold: true, breakLine: true } },
++      { text, options: { fontFace: FONT.body, fontSize: SZ.copy, color: C.body } },
++    ],
++    { x, y, w, h, valign: 'top', lineSpacingMultiple: 1.5 }
++  );
++}
++
++// ---------------------------------------------------------------------------
++// Slides
++// ---------------------------------------------------------------------------
++
++function slide1(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  card(s, pptx, { x: 6.431, y: 4.595, w: 1.658, h: 1.547, adj: 24964, fill: C.green });
++  lotus(s, pptx, 0.993, 1.203);
++  card(s, pptx, { x: 7.715, y: 0.367, w: 0.958, h: 0.339, adj: 50000, line: C.green });
++  marker(s, pptx, 2.613, 3.609, 1.826);
++  headline(s, {
++    x: 1.578, y: 1.788, w: 4.489, h: 2.121, size: SZ.title,
++    parts: [['Mental Health Presentation', C.ink, 'break'], ['Template', C.olive]],
++  });
++  copy(s, {
++    x: 1.58, y: 4.717, w: 4.175, h: 1.182,
++    text: "Mental health refers to a person's emotional, psychological, and social well-being. It affects " +
++      'how individuals think, feel, and act, influencing their ability to handle stress, relate to others, ' +
++      'and make decisions. ',
++  });
++  logo(s, pptx);
++  footer(s);
++  const nav = [['Home', 7.844], ['Menu', 8.92], ['About', 9.996], ['Contact', 11.073]];
++  nav.forEach(([item, x]) => label(s, { x, y: 0.378, w: 1.052, h: 0.303, text: item, color: C.green }));
++  card(s, pptx, { x: 6.667, y: 1.771, w: 3.658, h: 4.146, adj: 8435, fill: C.sand });
++}
++
++function slide2(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  card(s, pptx, { x: 4.529, y: 4.954, w: 1.658, h: 1.547, adj: 38381, fill: C.green });
++  card(s, pptx, { x: 2.299, y: 1.482, w: 3.658, h: 4.791, adj: 8435, fill: C.sand });
++  lotus(s, pptx, 10.132, 0.938);
++  marker(s, pptx, 8.142, 2.511, 1.826);
++  headline(s, {
++    x: 7.06, y: 1.482, w: 4.978, h: 1.313,
++    parts: [['Mental Health ', C.ink], ['Awareness', C.olive]],
++  });
++  copy(s, {
++    x: 7.06, y: 4.395, w: 4.334, h: 1.183,
++    text: 'Welcome to our Mental Health Awareness presentation. Today, we will explore the significance of ' +
++      'mental health, its impact on overall well-being, and how we can promote positive mental health in our lives.',
++  });
++  label(s, { x: 7.06, y: 3.623, w: 3.658, h: 0.505, text: 'Understanding The Importance of Mental Well-being.' });
++  s.addText('learn more', {
++    shape: pptx.shapes.ROUNDED_RECTANGLE,
++    x: 7.16, y: 5.934, w: 1.51, h: 0.339,
++    rectRadius: radius(50000, 1.51, 0.339),
++    fill: { type: 'none' }, line: { color: C.green, width: 1 },
++    align: 'center', valign: 'middle', fontFace: FONT.head, fontSize: SZ.small, color: C.green,
++  });
++  // "200k+" stat card
++  card(s, pptx, { x: 1.771, y: 2.471, w: 1.167, h: 1.089, adj: 8297, fill: C.white, line: C.green });
++  icon(s, pptx, HEAD_GEAR, { x: 2.214, y: 2.658, w: 0.297, h: 0.313, color: C.green });
++  s.addText('200k+', {
++    x: 1.832, y: 3.037, w: 1.046, h: 0.337, valign: 'top', align: 'center',
++    fontFace: FONT.semi, fontSize: SZ.stat, bold: true, color: C.green,
++  });
++  logo(s, pptx);
++  footer(s);
++}
++
++function slide3(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  card(s, pptx, { x: 9.693, y: 1.189, w: 1.658, h: 1.547, adj: 17775, fill: C.green });
++  card(s, pptx, { x: 8.962, y: 1.481, w: 2.081, h: 4.56, adj: 11337, fill: C.sand });
++  lotus(s, pptx, 6.002, 0.772);
++  marker(s, pptx, 1.769, 2.241, 1.711);
++  logo(s, pptx);
++  footer(s);
++  headline(s, {
++    x: 1.689, y: 1.808, w: 4.978, h: 1.313,
++    parts: [['Defining', C.olive], [' Mental Health Issues', C.ink]],
++  });
++  label(s, { x: 1.689, y: 3.949, w: 3.658, h: 0.303, text: 'What Is Mental Health? ' });
++  copy(s, {
++    x: 1.689, y: 4.528, w: 4.334, h: 1.182,
++    text: 'It influences how we think, feel, and act, and also affects how we handle stress, relate to ' +
++      'others, and make life choices. It is an integral part of our overall health and deserves equal ' +
++      'attention and care.',
++  });
++  // quote card overlapping the sand panel
++  card(s, pptx, { x: 9.932, y: 3.949, w: 2.081, h: 1.83, adj: 8297, fill: C.white, line: C.green });
++  copy(s, {
++    x: 10.148, y: 4.273, w: 1.791, h: 1.182, color: C.green,
++    text: 'Mental health refers to our emotional, psychological, and social well-being. ',
++  });
++}
++
++function slide4(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  card(s, pptx, { x: 1.29, y: 5.036, w: 1.407, h: 1.313, adj: 20515, fill: C.green });
++  lotus(s, pptx, 5.382, 0.723);
++  logo(s, pptx);
++  footer(s);
++  marker(s, pptx, 4.141, 2.419, 1.826);
++  headline(s, {
++    x: 1.549, y: 1.386, w: 4.978, h: 1.313,
++    parts: [['Common Mental Health ', C.ink], ['Disorders', C.olive]],
++  });
++  label(s, { x: 1.549, y: 2.967, w: 3.658, h: 0.303, text: 'Recognizing The Signs and Symptoms' });
++
++  const disorders = [
++    {
++      y: 1.386,
++      kicker: '01. ANXIETY DISORDERS:',
++      text: 'Excessive worry or fear, restlessness or feeling on edge, rapid heart rate or palpitations, ' +
++        'difficulty concentrating, avoiding certain situations or places',
++    },
++    {
++      y: 3.159,
++      kicker: '02. DEPRESSION:',
++      text: 'Persistent sadness or emptiness, loss of interest in previously enjoyed activities, changes ' +
++        'in sleep patterns, thoughts of worthlessness or guilt',
++    },
++    {
++      y: 4.932,
++      kicker: '03. BIPOLAR DISORDER:',
++      text: 'Extreme mood swings, increased energy and impulsivity during manic episodes, feelings of ' +
++        'hopelessness or suicidal thoughts during depressive episodes',
++    },
++  ];
++  disorders.forEach((d) =>
++    kickerBlock(s, { x: 7.695, y: d.y, w: 4.334, h: 1.182, kicker: d.kicker, text: d.text })
++  );
++
++  card(s, pptx, { x: 4.932, y: 3.989, w: 2.036, h: 2.125, adj: 7270, fill: C.sand });
++}
++
++function slide5(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  // full-bleed sand banner, rounded only on the bottom-left corner
++  s.addShape(pptx.shapes.ROUND_1_RECTANGLE, {
++    x: 2.432, y: 0, w: 10.902, h: 3.55,
++    rectRadius: radius(11420, 10.902, 3.55),
++    flipH: true, flipV: true,
++    fill: { color: C.sand }, line: { type: 'none' },
++  });
++  lotus(s, pptx, 10.609, 4.259);
++  logo(s, pptx);
++  footer(s);
++  marker(s, pptx, 3.902, 5.816, 1.343);
++  headline(s, {
++    x: 1.505, y: 4.773, w: 4.334, h: 1.313,
++    parts: [['The Stigma of Mental ', C.ink], ['Health', C.olive]],
++  });
++  copy(s, {
++    x: 6.402, y: 4.838, w: 4.853, h: 1.182,
++    text: 'Unfortunately, mental health is still surrounded by stigma and misconceptions. In this slide, we ' +
++      'PLACEHOLDER' +
++      'misconceptions and create a more supportive environment.',
++  });
++  // "Challenging Misconceptions" badge
++  card(s, pptx, { x: 1.251, y: 2.377, w: 2.361, h: 0.878, adj: 8297, fill: C.white, line: C.green });
++  icon(s, pptx, HANDSHAKE, { x: 1.515, y: 2.672, w: 0.319, h: 0.29, color: C.green });
++  label(s, { x: 1.895, y: 2.564, w: 1.685, h: 0.505, text: 'Challenging Misconceptions', color: C.green });
++}
++
++function slide6(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  card(s, pptx, { x: 5.431, y: 4.495, w: 2.472, h: 2.113, adj: 4741, fill: C.sand });
++  card(s, pptx, { x: 6.736, y: 0.682, w: 1.407, h: 1.313, adj: 10425, fill: C.green });
++  lotus(s, pptx, 11.151, 4.559);
++  logo(s, pptx);
++  footer(s);
++  marker(s, pptx, 2.9, 2.998, 1.652);
++  headline(s, {
++    x: 1.549, y: 1.37, w: 3.231, h: 1.919,
++    parts: [['Promoting Mental ', C.ink], ['Well-Being', C.olive]],
++  });
++  label(s, { x: 1.549, y: 3.641, w: 3.494, h: 0.303, text: 'Tips for A Healthy Mind' });
++
++  const tips = [
++    { y: 1.37, iconY: 1.427, w: 2.284, title: 'Stay Physically Active', text: 'Aim for at least 30 minutes of physical activity most days of the week.' },
++    { y: 3.129, iconY: 3.186, w: 2.774, title: 'Get Adequate Sleep', text: 'Aim for 7-9 hours of quality sleep each night to support mental and physical restoration.' },
++    { y: 4.888, iconY: 4.935, w: 2.774, title: 'Connect with Others', text: 'Social connections provide support, reduce feelings of isolation, and enhance well-being.' },
++  ];
++  tips.forEach((t) => {
++    copy(s, { x: 8.845, y: t.y + 0.337, w: t.w, h: 0.904, text: t.text });
++    label(s, { x: 8.845, y: t.y, w: 2.534, h: 0.303, text: t.title, color: C.green });
++    icon(s, pptx, CHECK_CIRCLE, { x: 8.553, y: t.iconY, w: 0.208, h: 0.208, color: C.green });
++  });
++}
++
++function slide7(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  card(s, pptx, { x: 6.444, y: 3.963, w: 4.589, h: 2.113, adj: 4741, fill: C.sand });
++  lotus(s, pptx, 5.018, 0.86);
++  card(s, pptx, { x: 1.535, y: 4.973, w: 1.407, h: 1.313, adj: 9531, fill: C.green });
++  logo(s, pptx);
++  footer(s);
++  marker(s, pptx, 3.05, 2.547, 2.063);
++  headline(s, {
++    x: 1.764, y: 1.513, w: 4.236, h: 1.313,
++    parts: [['The Impact of ', C.ink], ['Social Media', C.olive]],
++  });
++  copy(s, {
++    x: 6.945, y: 1.583, w: 4.334, h: 1.182,
++    text: 'Social media has become an integral part of our lives, but it can also impact our mental health. ' +
++      'PLACEHOLDER' +
++      'tips for mindful online engagement.',
++  });
++  // "Navigating The Digital World Mindfully" badge, overlapping the sand card
++  card(s, pptx, { x: 9.953, y: 3.42, w: 1.845, h: 1.435, adj: 8297, fill: C.white, line: C.green });
++  label(s, { x: 10.131, y: 3.957, w: 1.673, h: 0.707, text: 'Navigating The Digital World Mindfully', color: C.green });
++  icon(s, pptx, PULSE, { x: 10.25, y: 3.619, w: 0.252, h: 0.201, color: C.green });
++}
++
++function slide8(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  card(s, pptx, { x: 8.534, y: 5.086, w: 1.754, h: 1.637, adj: 33242, fill: C.green });
++  lotus(s, pptx, 5.861, 1.139);
++  marker(s, pptx, 1.731, 2.238, 1.826);
++  logo(s, pptx);
++  footer(s);
++  headline(s, {
++    x: 1.527, y: 1.779, w: 5.338, h: 1.313,
++    parts: [['Supporting', C.olive], [' Others with Mental Issues', C.ink]],
++  });
++  label(s, { x: 1.527, y: 4.028, w: 4.978, h: 0.303, text: 'Being an Empathetic and Understanding Ally' });
++  copy(s, {
++    x: 1.527, y: 4.645, w: 4.978, h: 0.904,
++    text: 'Supporting someone with mental health challenges requires empathy and understanding. This slide ' +
++      'will provide guidance on how to be a supportive friend, family member, or colleague.',
++  });
++  card(s, pptx, { x: 7.534, y: 3.243, w: 2.494, h: 2.458, adj: 6950, fill: C.sand });
++}
++
++function slide9(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  card(s, pptx, { x: 1.448, y: 2.469, w: 1.407, h: 1.313, adj: 13588, fill: C.green });
++  card(s, pptx, { x: 1.689, y: 1.295, w: 5.263, h: 2.248, adj: 5949, fill: C.sand });
++  lotus(s, pptx, 10.103, 0.796);
++  logo(s, pptx);
++  footer(s);
++  marker(s, pptx, 8.712, 3.087, 1.826);
++  headline(s, {
++    x: 7.779, y: 1.46, w: 3.494, h: 1.919,
++    parts: [['Frequently Asked ', C.ink], ['Questions', C.olive]],
++  });
++
++  const faqs = [
++    {
++      x: 2.125, iconX: 1.698, qw: 4.254, aw: 4.334, ah: 1.182,
++      q: 'How do stigma and misconceptions impact mental health awareness and seeking help?',
++      a: 'Stigma hinders open discussions about mental health, causing shame and reluctance. Raising ' +
++        'awareness and challenging misconceptions can reduce stigma and encourage timely help-seeking.',
++    },
++    {
++      x: 7.779, iconX: 7.352, qw: 3.947, aw: 3.783, ah: 0.904,
++      q: 'What are common signs of mental health issues, and when should someone seek professional help?',
++      a: 'Signs include persistent changes in mood, sleep, appetite, and energy levels. Seek professional ' +
++        'help if symptoms interfere with daily life.',
++    },
++  ];
++  faqs.forEach((f) => {
++    copy(s, { x: f.x, y: 4.405, w: f.qw, h: 0.627, text: f.q, color: C.green });
++    copy(s, { x: f.x, y: 5.189, w: f.aw, h: f.ah, text: f.a });
++    icon(s, pptx, QUESTION, { x: f.iconX, y: 4.529, w: 0.217, h: 0.379, color: C.green });
++  });
++}
++
++function slide10(pptx) {
++  const s = pptx.addSlide({ masterName: 'BASE' });
++  card(s, pptx, { x: 6.188, y: 5.398, w: 1.407, h: 1.313, adj: 22657, fill: C.green });
++  // tall sand panel bleeding off the top edge, rounded at the bottom two corners
++  s.addShape(pptx.shapes.CUSTOM_GEOMETRY, {
++    x: 6.403, y: 0, w: 3.69, h: 6.503,
++    points: bottomRoundedRectPoints(3.69, 6.503, radius(7210, 3.69, 6.503)),
++    fill: { color: C.sand }, line: { type: 'none' },
++  });
++  lotus(s, pptx, 4.296, 1.179);
++  logo(s, pptx);
++  footer(s);
++  marker(s, pptx, 2.641, 2.749, 1.962);
++  headline(s, {
++    x: 1.489, y: 1.695, w: 3.658, h: 1.313,
++    parts: [['We Are Here to ', C.ink], ['Help You', C.olive]],
++  });
++  label(s, {
++    x: 1.489, y: 4.098, w: 3.658, h: 0.505,
++    text: 'Your Jouney to Mental Wellness Begins with a Simple Step',
++  });
++  copy(s, {
++    x: 1.489, y: 4.9, w: 4.073, h: 0.904,
++    text: "Your mental health is important to us, and we're here to support you. Don't hesitate to reach " +
++      'out and take the first step toward a healthier, happier you.',
++  });
++  copy(s, {
++    x: 10.466, y: 1.82, w: 1.281, h: 1.737,
++    text: "When you're ready to talk, we're here to listen. Your well-being is our priority.",
++  });
++  icon(s, pptx, ASTERISK, { x: 10.582, y: 1.313, w: 0.33, h: 0.34, color: C.green });
++
++  card(s, pptx, { x: 8.344, y: 4.269, w: 3.883, h: 1.536, adj: 8297, fill: C.white, line: C.green });
++  const contact = [
++    ['Phone: ', '(+555) 123 4567-89'],
++    ['Email: ', 'company@yourgreatsite.com'],
++    ['Website: ', 'www.yourgreatsite.com'],
++  ];
++  const runs = [];
++  contact.forEach(([key, value]) => {
++    runs.push({ text: key, options: { fontFace: FONT.plain, fontSize: SZ.label, color: C.green, bold: true } });
++    runs.push({ text: value, options: { fontFace: FONT.head, fontSize: SZ.label, color: C.green, breakLine: true } });
++  });
++  s.addText(runs, { x: 8.622, y: 4.536, w: 3.503, h: 0.976, valign: 'top', lineSpacingMultiple: 1.5 });
++}
++
++// ---------------------------------------------------------------------------
++// Build
++// ---------------------------------------------------------------------------
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE', width: 13.3333333, height: 7.5 }); // 12192000 x 6858000 EMU
++  pptx.layout = 'WIDE';
++  pptx.author = 'TakeCare.';
++  pptx.title = 'Mental Health Presentation Template';
++  pptx.defineSlideMaster({ title: 'BASE', background: { color: C.page } });
++
++  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10].forEach((fn) => fn(pptx));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '05f64663-6e41-45ac-8ca2-781012cb5c31_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f));

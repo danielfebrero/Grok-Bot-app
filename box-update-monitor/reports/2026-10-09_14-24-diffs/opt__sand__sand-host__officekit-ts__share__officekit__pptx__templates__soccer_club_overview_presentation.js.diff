@@ -1,0 +1,962 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/soccer_club_overview_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/soccer_club_overview_presentation.js
+@@ -0,0 +1,959 @@
++/*
++ * SOCCER — presentation template  (35 slides, 26.667in x 15in)
++ * Rebuilt with pptxgenjs.  Run: node <this file>   ->  writes the .pptx next to itself.
++ */
++'use strict';
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette / type
++const RED = 'DB0D0D';
++const DARK = '1A1A1A';
++const GREY = 'DADADA';
++const PALE = 'E7E6E6';
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++
++const HEAD = 'Staatliches';   // display face used for every heading / label
++const BODY = 'Roboto';        // body copy
++
++// The template ships with lorem-ipsum filler; these four strings cover every body block.
++const LOREM = "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, "
++  + 'when an unknown printer took a galley of type and scrambled it to make a type specimen book.';
++const LOREM_SHORT = "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, "
++  + 'when an unknown printer';
++const LOREM_TINY = "Lorem Ipsum has been the industry's standard dummy text ever since.";
++const SURVIVED = 'It has survived not only five centuries, but also the leap into electronic '
++  + 'typesetting, remaining essentially unchanged.';
++
++const SLIDE_W = 26.667;
++const SLIDE_H = 15;
++
++const NOLINE = { type: 'none' };
++const solid = (color) => ({ color });
++
++// ---------------------------------------------------------------- primitives
++function newSlide(pptx, bg) {
++  const s = pptx.addSlide();
++  s.background = { color: bg };
++  return s;
++}
++
++function rect(s, x, y, w, h, color) {
++  s.addShape('rect', { x, y, w, h, fill: solid(color), line: NOLINE });
++}
++
++function oval(s, x, y, w, h, color) {
++  s.addShape('ellipse', { x, y, w, h, fill: solid(color), line: NOLINE });
++}
++
++// plain text block; `text` may be a string or an array of lines
++function txt(s, x, y, w, h, text, size, color, o) {
++  o = o || {};
++  const lines = Array.isArray(text) ? text : [text];
++  s.addText(lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })), {
++    x, y, w, h,
++    fontFace: o.font || HEAD,
++    fontSize: size,
++    color,
++    bold: o.bold !== false,
++    align: o.align || 'left',
++    valign: o.valign || 'top',
++    margin: o.pad ? 3.6 : undefined,
++    rotate: o.rotate,
++    isTextBox: true,
++  });
++}
++
++// text block whose runs differ in size / colour / weight
++function rich(s, x, y, w, h, runs, o) {
++  o = o || {};
++  s.addText(runs.map((r) => ({
++    text: r.text,
++    options: {
++      fontFace: r.font || BODY, fontSize: r.sz, color: r.color,
++      bold: !!r.bold, breakLine: !!r.brk,
++    },
++  })), {
++    x, y, w, h,
++    align: o.align || 'left',
++    valign: o.valign || 'top',
++    margin: o.pad ? 3.6 : undefined,
++    rotate: o.rotate,
++    isTextBox: true,
++  });
++}
++
++// solid bar with a centred caption — the deck's standard section chip
++function banner(s, x, y, w, h, label, o) {
++  o = o || {};
++  rect(s, x, y, w, h, o.fill || RED);
++  s.addText(label, {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontFace: HEAD, fontSize: o.size || 40, color: o.color || WHITE,
++    bold: o.bold !== false, isTextBox: true,
++  });
++}
++
++// numbered disc used in the "skill" / "option" lists
++function badge(s, x, y, d, label, color) {
++  oval(s, x, y, d, d, color);
++  s.addText(label, {
++    x, y, w: d, h: d, align: 'center', valign: 'middle',
++    fontFace: BODY, fontSize: 32, color: WHITE, bold: true, isTextBox: true,
++  });
++}
++
++// stand-in for a photograph in the original deck
++function imageBox(s, x, y, w, h) {
++  s.addShape('rect', { x, y, w, h, fill: solid(GREY), line: { color: DARK, width: 3 } });
++  s.addText('[image]', {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontFace: BODY, fontSize: 24, color: DARK, isTextBox: true,
++  });
++}
++
++// ---------------------------------------------------------------- recurring decoration
++const DOT_COLS = [0, 0.325];
++const DOT_ROWS = [0, 0.304, 0.619, 0.922];
++const DOT_D = 0.197;
++
++// 2 x 4 grid of small discs (corner ornament, appears on every slide)
++function dots(s, x, y, color) {
++  DOT_COLS.forEach((dx) => DOT_ROWS.forEach((dy) => oval(s, x + dx, y + dy, DOT_D, DOT_D, color)));
++}
++
++// four-pointed star with narrow spikes (prstGeom star4, adj 9310)
++function star4(s, x, y, size, color) {
++  const r = size / 2;
++  const i = r * 0.1317;               // inner radius along the diagonals
++  s.addShape('custGeom', {
++    x, y, w: size, h: size, fill: solid(color), line: NOLINE,
++    points: [
++      { x: 0, y: r }, { x: r - i, y: r - i }, { x: r, y: 0 }, { x: r + i, y: r - i },
++      { x: size, y: r }, { x: r + i, y: r + i }, { x: r, y: size }, { x: r - i, y: r + i },
++      { close: true },
++    ],
++  });
++}
++
++// the twin sparkles that sit at the end of every fade bar
++function sparkle(s, x, y) {
++  star4(s, x, y, 1.465, RED);
++  star4(s, x + 1.561, y, 1.465, RED);
++}
++
++function mix(a, b, t) {
++  let out = '';
++  for (let i = 0; i < 6; i += 2) {
++    const av = parseInt(a.substr(i, 2), 16);
++    const bv = parseInt(b.substr(i, 2), 16);
++    out += Math.round(av + (bv - av) * t).toString(16).padStart(2, '0');
++  }
++  return out.toUpperCase();
++}
++
++// horizontal rule that fades from the slide colour into red (a gradient in the original).
++// `flip` mirrors it so the red end points left instead of right.
++function fadeBar(s, x, y, w, from, flip) {
++  const h = 0.394;
++  const N = 64;
++  for (let i = 0; i < N; i++) {
++    const t = Math.max(0, (i / (N - 1) - 0.15) / 0.85);
++    const k = flip ? N - 1 - i : i;
++    rect(s, x + (w * k) / N, y, w / N + 0.02, h, mix(from, RED, t));
++  }
++}
++
++// rotated "SOCCER +++" tag riding the right-hand edge
++function sideTag(s, color) {
++  rich(s, 23.519, 11.782, 4.539, 0.942, [
++    { text: 'SOCCER ', sz: 50, color, font: HEAD, bold: 1 },
++    { text: '+++', sz: 50, color: RED, font: HEAD, bold: 1 },
++  ], { align: 'right', rotate: 90 });
++}
++
++// ---------------------------------------------------------------- pictogram set
++// rounded card with independently sized corners: r = [topLeft, topRight, botRight, botLeft]
++function card(s, x, y, w, h, r, color) {
++  const arc = (rr, stAng) => ({ x: 0, y: 0, curve: { type: 'arc', hR: rr, wR: rr, stAng, swAng: 90 } });
++  const pts = [{ x: r[0], y: 0 }, { x: w - r[1], y: 0 }, arc(r[1], 270),
++               { x: w, y: h - r[2] }, arc(r[2], 0),
++               { x: r[3], y: h }, arc(r[3], 90),
++               { x: 0, y: r[0] }, arc(r[0], 180), { close: true }];
++  s.addShape('custGeom', { x, y, w, h, fill: solid(color), line: NOLINE, points: pts });
++}
++
++// classic panelled football: dark rim, centre pentagon, five patches around it
++function ballIcon(s, x, y, d, ink, gap) {
++  const cx = x + d / 2;
++  const cy = y + d / 2;
++  s.addShape('ellipse', {
++    x: x + d * 0.04, y: y + d * 0.04, w: d * 0.92, h: d * 0.92,
++    fill: solid(gap), line: { color: ink, width: d * 5 },
++  });
++  s.addShape('pentagon', { x: cx - d * 0.16, y: cy - d * 0.16, w: d * 0.32, h: d * 0.32, fill: solid(ink), line: NOLINE, flipV: true });
++  for (let k = 0; k < 5; k++) {
++    const a = (k * 72 - 90) * Math.PI / 180;
++    s.addShape('pentagon', {
++      x: cx + Math.cos(a) * d * 0.31 - d * 0.115,
++      y: cy + Math.sin(a) * d * 0.31 - d * 0.115,
++      w: d * 0.23, h: d * 0.23, fill: solid(ink), line: NOLINE, rotate: k * 72 + 36,
++    });
++  }
++}
++
++// winners' podium: three blocks, the middle athlete with both arms raised
++function podiumIcon(s, x, y, w, h, ink) {
++  const px = (f) => x + f * w;
++  const py = (f) => y + f * h;
++  [[0.00, 0.74, 0.31, 0.26], [0.34, 0.62, 0.32, 0.38], [0.69, 0.80, 0.31, 0.20]]
++    .forEach(([a, b, c, e]) => rect(s, px(a), py(b), c * w, e * h, ink));
++  // side runners-up
++  [[0.155, 0.40], [0.845, 0.47]].forEach(([cx, top]) => {
++    oval(s, px(cx - 0.075), py(top), 0.15 * w, 0.13 * h, ink);
++    rect(s, px(cx - 0.075), py(top + 0.16), 0.15 * w, 0.22 * h, ink);
++    [-0.13, 0.075].forEach((dx) => rect(s, px(cx + dx), py(top + 0.17), 0.055 * w, 0.20 * h, ink));
++  });
++  // winner
++  oval(s, px(0.425), py(0.14), 0.15 * w, 0.13 * h, ink);
++  rect(s, px(0.455), py(0.28), 0.09 * w, 0.30 * h, ink);
++  [[-25, 0.30], [25, 0.60]].forEach(([rot, ax]) =>
++    s.addShape('rect', { x: px(ax), y: py(0.10), w: 0.06 * w, h: 0.28 * h, fill: solid(ink), line: NOLINE, rotate: rot }));
++  [[0.395, -12], [0.545, 12]].forEach(([lx, rot]) =>
++    s.addShape('rect', { x: px(lx), y: py(0.42), w: 0.06 * w, h: 0.24 * h, fill: solid(ink), line: NOLINE, rotate: rot }));
++}
++
++// weightlifter holding a barbell overhead
++function lifterIcon(s, x, y, w, h, ink) {
++  rect(s, x + 0.06 * w, y + 0.10 * h, 0.88 * w, 0.06 * h, ink);         // bar
++  [0.02, 0.92].forEach((bx) => rect(s, x + bx * w, y + 0.02 * h, 0.06 * w, 0.22 * h, ink));
++  oval(s, x + 0.42 * w, y + 0.16 * h, 0.16 * w, 0.18 * h, ink);         // head
++  rect(s, x + 0.36 * w, y + 0.36 * h, 0.28 * w, 0.34 * h, ink);         // torso
++  [0.20, 0.62].forEach((ax) => rect(s, x + ax * w, y + 0.16 * h, 0.18 * w, 0.10 * h, ink)); // arms
++  [0.30, 0.56].forEach((lx) => rect(s, x + lx * w, y + 0.66 * h, 0.14 * w, 0.34 * h, ink)); // legs
++}
++
++// running figure: head, leaning torso, swinging arms and striding legs
++function runnerIcon(s, x, y, w, h, ink) {
++  const px = (f) => x + f * w;
++  const py = (f) => y + f * h;
++  const limb = (a, b, lw, lh, rot) =>
++    s.addShape('rect', { x: px(a), y: py(b), w: lw * w, h: lh * h, fill: solid(ink), line: NOLINE, rotate: rot });
++  oval(s, px(0.44), py(0.00), 0.30 * w, 0.19 * h, ink);
++  limb(0.36, 0.21, 0.26, 0.30, 12);                 // torso
++  limb(0.06, 0.26, 0.30, 0.11, 20);                 // forward arm
++  limb(0.60, 0.20, 0.26, 0.11, -35);                // trailing arm
++  limb(0.50, 0.48, 0.16, 0.30, -30);                // front thigh
++  limb(0.62, 0.68, 0.15, 0.30, 20);                 // front shin
++  limb(0.24, 0.48, 0.16, 0.28, 30);                 // rear thigh
++  limb(0.10, 0.66, 0.15, 0.26, -25);                // rear shin
++}
++
++// thick ring segment: arc of `sweep` degrees starting at `start` (0 deg = 3 o'clock, clockwise)
++function ringSegment(s, x, y, d, start, sweep, thickness, color) {
++  const R = d / 2;
++  const r = R * (1 - thickness);
++  const at = (rad, a) => ({ x: R + rad * Math.cos(a * Math.PI / 180), y: R + rad * Math.sin(a * Math.PI / 180) });
++  const p0 = at(R, start);
++  const p1 = at(r, start + sweep);
++  s.addShape('custGeom', {
++    x, y, w: d, h: d, fill: solid(color), line: NOLINE,
++    points: [
++      { x: p0.x, y: p0.y, moveTo: true },
++      { x: 0, y: 0, curve: { type: 'arc', hR: R, wR: R, stAng: start, swAng: sweep } },
++      { x: p1.x, y: p1.y },
++      { x: 0, y: 0, curve: { type: 'arc', hR: r, wR: r, stAng: start + sweep, swAng: -sweep } },
++      { close: true },
++    ],
++  });
++}
++
++// telephone handset: half ring curving down-left, with an ear pad and a mouth pad on its ends
++function phoneIcon(s, x, y, d, ink) {
++  const THICK = 0.40;
++  const START = 215;   // ear end, measured clockwise from 3 o'clock
++  const SWEEP = -190;  // sweep back through 9 o'clock and 6 o'clock to the mouth end
++  ringSegment(s, x, y, d, START, SWEEP, THICK, ink);
++  const rm = (d / 2) * (1 - THICK / 2);
++  const pad = d * 0.42;
++  [START, START + SWEEP].forEach((a) => {
++    const cx = x + d / 2 + rm * Math.cos(a * Math.PI / 180);
++    const cy = y + d / 2 + rm * Math.sin(a * Math.PI / 180);
++    s.addShape('roundRect', {
++      x: cx - pad / 2, y: cy - pad / 2, w: pad, h: pad * 0.86,
++      rectRadius: pad * 0.3, fill: solid(ink), line: NOLINE, rotate: a + 90,
++    });
++  });
++}
++
++// wire globe: outer ring, equator and one meridian ellipse
++function globeIcon(s, x, y, d, ink) {
++  const stroke = { color: ink, width: d * 8 };
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: stroke });
++  rect(s, x, y + d * 0.45, d, d * 0.10, ink);
++  s.addShape('ellipse', {
++    x: x + d * 0.26, y, w: d * 0.48, h: d,
++    fill: { type: 'none' }, line: stroke,
++  });
++}
++
++// envelope: filled body with the flap scored into it
++function mailIcon(s, x, y, w, h, ink, paper) {
++  rect(s, x, y, w, h, ink);
++  s.addShape('triangle', {
++    x: x + w * 0.04, y: y + h * 0.06, w: w * 0.92, h: h * 0.62,
++    fill: solid(paper || RED), line: NOLINE, flipV: true,
++  });
++}
++
++// red ring split into four quadrants by a cross of background-coloured gaps —
++// the hub of the slide-21 "best strategy" diagram
++function quadRing(s, x, y, d, gapX, gapY, gapW, gapH, ringColor, gapColor) {
++  oval(s, x, y, d, d, ringColor);
++  rect(s, gapX, y, gapW, d, gapColor);
++  rect(s, x, gapY, d, gapH, gapColor);
++}
++
++// red disc carrying a social-network glyph
++function socialIcon(s, x, y, d, glyph) {
++  oval(s, x, y, d, d, RED);
++  s.addText(glyph, {
++    x, y, w: d, h: d, align: 'center', valign: 'middle',
++    fontFace: BODY, fontSize: 20, color: WHITE, bold: true, isTextBox: true,
++  });
++}
++
++// ---------------------------------------------------------------- slides
++
++function slide1(p) {
++  const s = newSlide(p, DARK);
++  txt(s, 2.33, 2.233, 13.388, 5.15, 'SOCCER', 300, WHITE);
++  txt(s, 2.229, 6.915, 13.316, 1.447, 'come play together with us', 80, RED, { bold: false });
++  txt(s, 0.561, 0.477, 10.55, 0.942, 'Presentation template +++', 50, WHITE, { bold: false });
++  txt(s, 2.229, 9.822, 11.106, 1.262, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  rect(s, 22.147, 9.039, 4.52, 1.91, GREY);
++  txt(s, 22.79, 9.578, 3.355, 0.875, 'Lorem Ipsum has been the industry\'s standard', 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  fadeBar(s, 13.495, 12.304, 13.408, DARK);
++  sparkle(s, 13.761, 11.769);
++  dots(s, 0.561, 13.404, RED);
++}
++
++function slide2(p) {
++  const s = newSlide(p, GREY);
++  txt(s, 2.229, 2.44, 13.271, 3.13, ['Welcome to', 'Soccer presentation'], 90, DARK);
++  txt(s, 15.766, 4.407, 8.631, 2.423, [LOREM, '', SURVIVED], 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.229, 7.5, 6.463, 1.731, 'ALL ABOUT US');
++  rect(s, 2.296, 9.538, 6.463, 3.16, DARK);
++  txt(s, 3.175, 10.293, 4.707, 1.649, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley.', 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  fadeBar(s, 15.5, 3.179, 11.811, GREY);
++  sparkle(s, 15.766, 2.644);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide3(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 0, 0, 13.335, 15, DARK);
++  txt(s, 2.882, 8.802, 8.923, 3.13, ['KNOW MORE ', 'ABOUT SOCCER'], 90, WHITE);
++  txt(s, 15.154, 9.15, 9.244, 2.423, [LOREM, '', SURVIVED], 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 15.154, 5.85, 9.244, 1.731, 'ALL ABOUT US');
++  fadeBar(s, -6.643, 4.007, 11.811, DARK, true);
++  sparkle(s, 2.882, 3.452);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide4(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 0, 7.5, 26.667, 7.5, DARK);
++  txt(s, 15.075, 1.691, 8.923, 3.13, ['KNOW MORE ', 'ABOUT SOCCER'], 90, BLACK);
++  txt(s, 2.348, 3.758, 9.462, 2.423, [LOREM, '', SURVIVED], 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.229, 9.125, 10.54, 1.731, 'LOREM IPSUM');
++  banner(s, 2.229, 11.397, 10.54, 1.731, 'LOREM IPSUM');
++  fadeBar(s, -0.457, 1.897, 14.093, GREY, true);
++  sparkle(s, 10.346, 1.361);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide5(p) {
++  const s = newSlide(p, GREY);
++  txt(s, 2.267, 9.807, 8.923, 3.13, ['KNOW MORE ', 'ABOUT SOCCER'], 90, BLACK);
++  txt(s, 16.563, 3.539, 7.365, 1.649, LOREM, 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  rect(s, 15.271, 8.963, 9.167, 3.735, DARK);
++  txt(s, 16.563, 10.2, 7.365, 1.262, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type.', 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 15.271, 6.785, 9.167, 1.731, 'ALL ABOUT US');
++  fadeBar(s, -0.265, 8.57, 14.093, GREY, true);
++  sparkle(s, 10.538, 8.034);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide6(p) {
++  const s = newSlide(p, DARK);
++  txt(s, 15.373, 2.396, 9.1, 3.13, 'OUR VISION AND MISSION', 90, WHITE);
++  banner(s, 2.229, 7.776, 8.042, 1.731, 'VISION');
++  txt(s, 2.229, 10.547, 8.042, 1.649, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 12.529, 7.776, 11.909, 1.731, 'MISSION');
++  txt(s, 12.529, 10.227, 4.707, 0.707, 'Mission One', 36, WHITE, { bold: false });
++  txt(s, 12.529, 11.212, 5.689, 1.262, LOREM_SHORT, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 18.749, 10.227, 4.707, 0.707, 'Mission TWO', 36, WHITE, { bold: false });
++  txt(s, 18.749, 11.212, 5.689, 1.262, LOREM_SHORT, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  fadeBar(s, -0.452, 5.964, 11.811, DARK, true);
++  sparkle(s, 9.067, 5.372);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide7(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 13.333, 0, 13.333, 15, DARK);
++  txt(s, 2.269, 2.008, 9.1, 3.13, 'OUR VISION AND MISSION', 90, BLACK);
++  banner(s, 15.921, 2.379, 8.438, 1.731, 'VISION');
++  txt(s, 15.921, 4.754, 8.438, 1.649, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 15.921, 7.753, 8.438, 1.731, 'MISSION');
++  txt(s, 15.921, 10.06, 4.117, 0.707, 'Mission One', 36, WHITE, { bold: false });
++  txt(s, 15.921, 10.851, 4.117, 1.649, LOREM_SHORT, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 20.52, 10.06, 4.117, 0.707, 'Mission two', 36, WHITE, { bold: false });
++  txt(s, 20.52, 10.851, 4.117, 1.649, LOREM_SHORT, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  fadeBar(s, -0.393, 5.94, 12.746, GREY, true);
++  sparkle(s, 9.062, 5.405);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide8(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 0, 0, 12.661, 15, DARK);
++  txt(s, 2.229, 2.566, 8.54, 3.13, ['WHY CHOOSE ', 'OUR CLUB'], 90, WHITE);
++  rect(s, 12.661, 9.276, 5.783, 5.724, RED);
++  txt(s, 13.655, 11.082, 4.01, 2.036, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type.', 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.229, 10.885, 8.194, 1.731, 'OPTION');
++  banner(s, 2.234, 8.573, 8.194, 1.731, 'OPTION');
++  rect(s, 11.65, 3.493, 2.087, 2.087, RED);
++  ballIcon(s, 11.929, 3.766, 1.528, DARK, RED);
++  fadeBar(s, 16.023, 2.14, 11.811, GREY);
++  sparkle(s, 16.289, 1.604);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide9(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 16.525, 6.054, 7.819, 3.13, RED);
++  txt(s, 17.866, 7.637, 5.619, 0.9, 'Lorem Ipsum has been the industry\'s standard dummy text ever since', 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 17.573, 2.15, 7.744, 3.13, ['WHY CHOOSE ', 'OUR CLUB'], 90, BLACK);
++  txt(s, 17.87, 6.652, 5.615, 0.796, 'OPTION', 40, WHITE);
++  rect(s, 16.579, 9.605, 7.819, 3.13, DARK);
++  txt(s, 17.919, 11.189, 5.619, 0.9, 'Lorem Ipsum has been the industry\'s standard dummy text ever since', 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 17.924, 10.204, 5.615, 0.796, 'OPTION', 40, WHITE);
++  rect(s, 8.442, 10.611, 2.087, 2.087, RED);
++  ballIcon(s, 8.721, 10.884, 1.528, DARK, RED);
++  fadeBar(s, -3.328, 2.365, 12.746, GREY, true);
++  sparkle(s, 5.931, 1.782);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide10(p) {
++  const s = newSlide(p, DARK);
++  txt(s, 15.61, 9.508, 8.788, 1.262, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 2.269, 9.728, 8.358, 3.13, ['WHY CHOOSE ', 'OUR CLUB'], 90, WHITE);
++  badge(s, 14.051, 9.508, 1.107, '1', RED);
++  txt(s, 15.61, 11.179, 8.788, 1.262, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  badge(s, 14.051, 11.179, 1.107, '2', RED);
++  banner(s, 17.769, 5.502, 6.628, 1.731, 'BEST OPTION');
++  fadeBar(s, -0.452, 8.359, 11.811, DARK, true);
++  sparkle(s, 9.067, 7.767);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide11(p) {
++  const s = newSlide(p, GREY);
++  txt(s, 17.343, 2.961, 6.942, 3.13, 'OUR BEST SERVICE', 90, BLACK);
++  txt(s, 15.159, 8.048, 9.278, 2.423, [LOREM, '', SURVIVED], 23, BLACK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 15.159, 10.892, 4.379, 1.731, 'SERVICE');
++  banner(s, 20.012, 10.892, 4.379, 1.731, 'SERVICE');
++  rect(s, 2.229, 4.494, 4.886, 4.929, DARK);
++  txt(s, 3.063, 5.747, 3.219, 2.423, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley.', 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.229, 2.302, 4.886, 1.731, 'SERVICE');
++  fadeBar(s, 13.333, 6.995, 13.573, GREY);
++  sparkle(s, 13.599, 6.46);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide12(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 13.333, 0, 13.333, 15, DARK);
++  banner(s, 2.287, 2.302, 5.387, 1.731, 'SERVICE');
++  txt(s, 2.651, 4.338, 5.024, 2.423, LOREM, 23, BLACK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.287, 7.964, 5.387, 1.731, 'SERVICE');
++  txt(s, 2.651, 10, 5.024, 2.423, LOREM, 23, BLACK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 17.918, 4.263, 6.942, 3.13, 'OUR BEST SERVICE', 90, WHITE);
++  txt(s, 18.013, 8.382, 6.215, 3.585, [LOREM, '', SURVIVED], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  fadeBar(s, 16.187, 2.92, 13.408, DARK);
++  sparkle(s, 16.454, 2.385);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide13(p) {
++  const s = newSlide(p, DARK);
++  txt(s, 2.809, 4.062, 5.231, 4.645, ['OUR ', 'BEST ', 'SERVICE'], 90, WHITE);
++  txt(s, 20.106, 4.934, 4.083, 5.133, [LOREM, '', SURVIVED], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 13.747, 2.794, 5.231, 1.731, 'SERVICE');
++  fadeBar(s, -0.256, 11.74, 12.474, DARK, true);
++  sparkle(s, 9.926, 11.148);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide14(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 3.586, 9.802, 4.36, 1.107, RED);
++  rect(s, 0, 0, 26.667, 8.457, DARK);
++  txt(s, 2.342, 2.19, 9.588, 1.616, 'Our best team', 90, WHITE);
++  txt(s, 3.818, 9.959, 3.895, 0.774, 'Skill', 40, WHITE, { align: 'center', bold: false });
++  badge(s, 2.229, 9.802, 1.107, '1', DARK);
++  banner(s, 3.586, 11.593, 4.36, 1.107, 'Skill', { bold: false });
++  badge(s, 2.229, 11.593, 1.107, '3', DARK);
++  banner(s, 10.179, 9.802, 4.36, 1.107, 'Skill', { bold: false });
++  badge(s, 8.823, 9.802, 1.107, '2', DARK);
++  banner(s, 10.179, 11.593, 4.36, 1.107, 'Skill', { bold: false });
++  badge(s, 8.823, 11.593, 1.107, '4', DARK);
++  txt(s, 2.342, 4.037, 10.993, 1.262, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 16.342, 2.302, 8.073, 1.731, 'Name here');
++  fadeBar(s, -0.304, 6.325, 15.145, DARK, true);
++  sparkle(s, 12.549, 5.733);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide15(p) {
++  const s = newSlide(p, GREY);
++  txt(s, 17.711, 2.23, 4.898, 3.13, ['Our best', 'team'], 90, BLACK);
++  txt(s, 19.013, 8.813, 5.384, 3.972, [LOREM, '', SURVIVED], 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  rect(s, 2.229, 5.789, 7.555, 1.731, RED);
++  txt(s, 2.584, 6.287, 6.771, 0.774, 'Name here', 40, WHITE, { align: 'center' });
++  banner(s, 3.586, 8.395, 6.198, 1.107, 'Skill', { fill: DARK, bold: false });
++  badge(s, 2.229, 8.395, 1.107, '1', RED);
++  banner(s, 3.586, 9.865, 6.198, 1.107, 'Skill', { fill: DARK, bold: false });
++  badge(s, 2.229, 9.865, 1.107, '2', RED);
++  banner(s, 3.586, 11.393, 6.198, 1.107, 'Skill', { fill: DARK, bold: false });
++  badge(s, 2.229, 11.393, 1.107, '3', RED);
++  banner(s, 12.154, 13.269, 5.688, 1.731, 'Name here');
++  fadeBar(s, 14.076, 5.999, 13.015, GREY);
++  sparkle(s, 14.342, 5.463);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide16(p) {
++  const s = newSlide(p, DARK);
++  txt(s, 2.342, 2.19, 9.588, 1.616, 'Our best team', 90, WHITE);
++  txt(s, 14.736, 2.496, 9.588, 1.262, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 9.741, 11.233, 7.188, 1.731, 'Name here');
++  banner(s, 2.213, 11.233, 7.188, 1.731, 'Name here');
++  banner(s, 17.21, 11.233, 7.188, 1.731, 'Name here');
++  fadeBar(s, 11.38, 4.881, 15.474, DARK);
++  sparkle(s, 11.646, 4.346);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide17(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 0, 4.654, 26.667, 10.346, DARK);
++  txt(s, 2.229, 2.209, 12.113, 1.616, 'Achievement in years', 90, BLACK);
++  txt(s, 2.305, 9.983, 11.028, 2.423, [LOREM, '', SURVIVED], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  rect(s, 6.727, 6.457, 2.087, 2.087, RED);
++  podiumIcon(s, 7.184, 6.931, 1.213, 1.137, DARK);
++  banner(s, 14.232, 5.812, 10.166, 1.731, 'EVENT NAME');
++  rect(s, 14.232, 8.158, 10.166, 4.539, GREY);
++  txt(s, 15.222, 9.002, 8.364, 1.649, LOREM, 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 15.207, 11.242, 4.063, 1.107, 'AWARD', { bold: false });
++  banner(s, 19.523, 11.198, 4.063, 1.107, 'AWARD', { bold: false });
++  fadeBar(s, 14.076, 2.774, 13.015, GREY);
++  sparkle(s, 14.342, 2.239);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide18(p) {
++  const s = newSlide(p, GREY);
++  banner(s, 2.229, 2.302, 10.166, 1.731, 'EVENT NAME');
++  rect(s, 2.229, 4.649, 10.166, 4.539, DARK);
++  txt(s, 3.1, 5.283, 8.364, 1.649, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 3.085, 7.484, 4.063, 1.107, 'AWARD', { bold: false });
++  banner(s, 7.401, 7.48, 4.063, 1.107, 'AWARD', { bold: false });
++  txt(s, 17.046, 2.711, 8.447, 3.13, ['Achievement ', 'in years'], 90, BLACK);
++  rect(s, 2.229, 9.804, 10.166, 2.894, DARK);
++  banner(s, 3.085, 10.642, 4.063, 1.107, 'CATEGORY', { bold: false });
++  banner(s, 7.401, 10.642, 4.063, 1.107, 'CATEGORY', { bold: false });
++  txt(s, 17.549, 8.975, 6.805, 3.198, [LOREM, '', SURVIVED], 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  rect(s, 14.96, 8.975, 2.087, 2.087, RED);
++  podiumIcon(s, 15.416, 9.449, 1.213, 1.137, DARK);
++  fadeBar(s, 13.134, 6.933, 14.171, GREY);
++  sparkle(s, 13.4, 6.397);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide19(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 0, 0, 11.808, 15, DARK);
++  txt(s, 2.229, 2.209, 7.732, 3.13, ['Achievement ', 'in years'], 90, WHITE);
++  txt(s, 2.229, 6.554, 7.732, 3.198, [LOREM, '', SURVIVED], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.229, 10.967, 7.463, 1.731, 'EVENT NAME');
++  txt(s, 15.384, 2.638, 8.693, 1.262, LOREM, 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 14.232, 6.679, 10.166, 1.731, 'AWARD');
++  banner(s, 14.232, 8.795, 10.166, 1.731, 'AWARD', { fill: DARK });
++  banner(s, 14.232, 10.967, 10.166, 1.731, 'AWARD');
++  fadeBar(s, 12.094, 4.945, 14.831, GREY);
++  sparkle(s, 12.36, 4.41);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide20(p) {
++  const s = newSlide(p, GREY);
++  card(s, 4.309, 2.437, 8.438, 2.912, [0.31, 0.31, 1.88, 0.31], DARK);
++  txt(s, 6.184, 3.126, 4.293, 0.707, 'LOREM IPSUM', 36, WHITE);
++  oval(s, 2.229, 2.196, 3.395, 3.395, RED);
++  txt(s, 6.301, 3.895, 5.52, 0.707, LOREM_TINY, 21, WHITE, { font: 'Roboto', bold: false });
++  card(s, 4.309, 9.498, 8.438, 2.912, [0.31, 0.31, 1.88, 0.31], DARK);
++  oval(s, 2.229, 9.256, 3.395, 3.395, RED);
++  txt(s, 6.301, 10.955, 5.52, 0.707, LOREM_TINY, 21, WHITE, { font: 'Roboto', bold: false });
++  card(s, 2.229, 5.954, 8.438, 2.912, [0.31, 0.31, 0.31, 1.88], DARK);
++  oval(s, 9.353, 5.713, 3.395, 3.395, RED);
++  txt(s, 3.59, 6.612, 4.293, 0.707, 'LOREM IPSUM', 36, WHITE);
++  txt(s, 3.707, 7.38, 5.52, 0.707, LOREM_TINY, 21, WHITE, { font: 'Roboto', bold: false });
++  txt(s, 6.184, 10.187, 4.293, 0.707, 'LOREM IPSUM', 36, WHITE);
++  txt(s, 15.976, 2.135, 7.732, 3.13, ['BEST STRATEGY', 'TO WIN'], 90, BLACK);
++  txt(s, 15.965, 5.954, 8.842, 2.423, [LOREM, '', SURVIVED], 23, BLACK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  lifterIcon(s, 2.958, 2.987, 1.909, 1.816, DARK);
++  runnerIcon(s, 10.409, 6.33, 1.369, 2.101, DARK);
++  podiumIcon(s, 2.929, 10.017, 2.001, 1.876, DARK);
++  banner(s, 15.692, 10.949, 4.204, 1.731, 'LOREM IPSUM');
++  banner(s, 20.234, 10.949, 4.204, 1.731, 'LOREM IPSUM');
++  fadeBar(s, 12.675, 9.13, 14.791, GREY);
++  sparkle(s, 12.941, 8.595);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide21(p) {
++  const s = newSlide(p, DARK);
++  txt(s, 2.229, 2.209, 7.732, 3.13, ['BEST STRATEGY', 'TO WIN'], 90, WHITE);
++  rect(s, 19.555, 2.658, 4.842, 4.842, GREY);
++  rect(s, 19.555, 7.772, 4.842, 4.842, GREY);
++  rect(s, 14.504, 2.658, 4.842, 4.842, GREY);
++  rect(s, 14.504, 7.772, 4.842, 4.842, GREY);
++  quadRing(s, 16.495, 4.68, 5.912, 19.346, 7.5, 0.209, 0.272, RED, DARK);
++  oval(s, 17.692, 5.897, 3.49, 3.49, DARK);
++  oval(s, 17.81, 6.014, 3.255, 3.255, GREY);
++  txt(s, 22.401, 5.594, 1.703, 0.993, '02', 53, BLACK, { font: 'Roboto', align: 'center' });
++  txt(s, 14.803, 5.631, 1.703, 0.993, '01', 53, BLACK, { font: 'Roboto', align: 'center' });
++  txt(s, 22.396, 8.753, 1.703, 0.993, '04', 53, BLACK, { font: 'Roboto', align: 'center' });
++  txt(s, 14.797, 8.753, 1.703, 0.993, '03', 53, BLACK, { font: 'Roboto', align: 'center' });
++  txt(s, 15.024, 3.267, 3.286, 1.161, 'Lorem Ipsum has been the industry\'s standard dummy text', 23, BLACK, { font: 'Roboto', bold: false });
++  txt(s, 20.537, 3.225, 3.302, 1.161, 'Lorem Ipsum has been the industry\'s standard dummy text', 23, BLACK, { font: 'Roboto', align: 'right', bold: false });
++  txt(s, 20.537, 10.726, 3.302, 1.161, 'Lorem Ipsum has been the industry\'s standard dummy text', 23, BLACK, { font: 'Roboto', align: 'right', bold: false });
++  txt(s, 15.193, 10.74, 3.344, 1.161, 'Lorem Ipsum has been the industry\'s standard dummy text', 23, BLACK, { font: 'Roboto', bold: false });
++  ballIcon(s, 18.658, 6.855, 1.528, DARK, GREY);
++  txt(s, 2.309, 8.016, 9.278, 2.423, [LOREM, '', SURVIVED], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.309, 10.859, 4.379, 1.731, 'LOREM IPSUM');
++  banner(s, 7.162, 10.859, 4.379, 1.731, 'LOREM IPSUM');
++  fadeBar(s, -2.544, 5.954, 15.145, DARK, true);
++  sparkle(s, 10.31, 5.362);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide22(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 10.543, 0, 16.124, 15, DARK);
++  txt(s, 2.229, 4.898, 7.732, 3.13, 'NEXT MATCH SCHEDULE', 90, BLACK);
++  banner(s, 13, 2.302, 11.438, 1.731, 'EVENT NAME, 19 AUGUST 2030');
++  txt(s, 13.337, 4.544, 4.042, 0.707, 'LOREM IPSUM', 36, WHITE, { bold: false });
++  txt(s, 13.335, 5.335, 4.884, 1.649, LOREM_SHORT, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 19.198, 4.544, 4.042, 0.707, 'LOREM IPSUM', 36, WHITE, { bold: false });
++  txt(s, 19.196, 5.335, 4.884, 1.649, LOREM_SHORT, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 12.96, 8.016, 11.438, 1.731, 'EVENT NAME, 19 SEPTEMBER 2030');
++  txt(s, 13.297, 10.258, 4.042, 0.707, 'LOREM IPSUM', 36, WHITE, { bold: false });
++  txt(s, 13.295, 11.049, 4.884, 1.649, LOREM_SHORT, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 19.158, 10.258, 4.042, 0.707, 'LOREM IPSUM', 36, WHITE, { bold: false });
++  txt(s, 19.156, 11.049, 4.884, 1.649, LOREM_SHORT, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  fadeBar(s, -2.267, 9.634, 12.746, GREY, true);
++  sparkle(s, 6.991, 9.051);
++  dots(s, 25.69, 0.474, PALE);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide23(p) {
++  const s = newSlide(p, GREY);
++  txt(s, 2.269, 10.578, 11.385, 1.616, 'NEXT MATCH SCHEDULE', 90, BLACK);
++  banner(s, 14.308, 2.382, 4.885, 1.731, 'EVENT NAME');
++  rect(s, 14.308, 4.45, 4.885, 8.248, DARK);
++  txt(s, 14.991, 5.627, 3.519, 4.746, [LOREM, '', 'It has survived not only five centuries, but also the leap.'], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 14.991, 10.71, 3.519, 0.707, '17 MEI 2030', 36, WHITE);
++  banner(s, 19.44, 2.382, 4.885, 1.731, 'EVENT NAME');
++  rect(s, 19.44, 4.45, 4.885, 8.248, DARK);
++  txt(s, 20.123, 5.627, 3.519, 4.746, [LOREM, '', 'It has survived not only five centuries, but also the leap.'], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 20.123, 10.71, 3.519, 0.707, '29 MEI 2030', 36, WHITE);
++  fadeBar(s, -0.302, 2.941, 14.126, GREY, true);
++  sparkle(s, 10.534, 2.406);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide24(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 0, 0, 26.667, 7.5, DARK);
++  txt(s, 15.777, 2.542, 8.303, 3.13, ['NEXT MATCH ', 'SCHEDULE'], 90, WHITE);
++  banner(s, 13, 8.144, 11.438, 1.731, 'EVENT NAME, 19 AUGUST 2030');
++  txt(s, 13.337, 10.386, 4.042, 0.707, 'LOREM IPSUM', 36, BLACK, { bold: false });
++  txt(s, 13.335, 11.177, 4.884, 1.649, LOREM_SHORT, 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 19.198, 10.386, 4.042, 0.707, 'LOREM IPSUM', 36, BLACK, { bold: false });
++  txt(s, 19.196, 11.177, 4.884, 1.649, LOREM_SHORT, 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  fadeBar(s, -1.825, 3.714, 15.145, DARK, true);
++  sparkle(s, 11.029, 3.122);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide25(p) {
++  const s = newSlide(p, DARK);
++  txt(s, 2.229, 2.302, 12.541, 1.616, 'PRICES AND PACKAGES', 90, WHITE);
++  txt(s, 14.77, 6.555, 9.667, 2.423, [LOREM, '', SURVIVED], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  rect(s, 2.229, 7.769, 4.886, 4.929, GREY);
++  txt(s, 3.063, 10.223, 3.219, 1.649, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.', 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.229, 5.577, 4.886, 1.731, 'PACKAGE');
++  txt(s, 3.063, 8.536, 3.271, 1.447, '$79', 80, DARK, { font: 'Roboto', valign: 'middle', pad: true });
++  rect(s, 7.702, 7.766, 4.886, 4.929, GREY);
++  txt(s, 8.535, 10.22, 3.219, 1.649, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.', 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 7.702, 5.574, 4.886, 1.731, 'PACKAGE');
++  txt(s, 8.535, 8.533, 3.271, 1.447, '$99', 80, DARK, { font: 'Roboto', valign: 'middle', pad: true });
++  banner(s, 14.77, 10.052, 9.667, 1.731, 'REGRISTATION NOW');
++  fadeBar(s, 12.852, 4.353, 14.456, DARK);
++  sparkle(s, 13.118, 3.817);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide26(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 0, 0, 10, 15, DARK);
++  txt(s, 2.229, 2.302, 5.466, 4.645, ['PRICES', 'AND', 'PACKAGES'], 90, WHITE);
++  txt(s, 2.229, 8.096, 5.466, 2.036, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.229, 10.967, 5.466, 1.731, 'REGRISTATION NOW');
++  banner(s, 12.342, 5.132, 12.095, 1.731, 'PACKAGE');
++  txt(s, 12.817, 10.313, 5.06, 2.423, LOREM, 23, BLACK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 12.817, 8.746, 3.271, 1.447, '$79', 80, DARK, { font: 'Roboto', valign: 'middle', pad: true });
++  txt(s, 12.817, 7.919, 4.042, 0.707, 'LOREM IPSUM', 36, BLACK, { bold: false });
++  txt(s, 19.022, 10.313, 5.06, 2.423, LOREM, 23, BLACK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 19.022, 8.746, 3.271, 1.447, '$99', 80, DARK, { font: 'Roboto', valign: 'middle', pad: true });
++  txt(s, 19.022, 7.919, 4.042, 0.707, 'LOREM IPSUM', 36, BLACK, { bold: false });
++  fadeBar(s, 10.612, 2.837, 16.518, GREY);
++  sparkle(s, 10.878, 2.302);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide27(p) {
++  const s = newSlide(p, GREY);
++  txt(s, 12.768, 4.24, 12.846, 1.616, 'REGRISTATION VIA PHONE', 90, BLACK);
++  txt(s, 12.768, 6.948, 11.63, 2.423, [LOREM, '', SURVIVED], 23, BLACK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  rect(s, 12.849, 10.611, 2.087, 2.087, RED);
++  banner(s, 15.474, 10.611, 8.924, 2.087, '+123 456 789', { fill: DARK });
++  phoneIcon(s, 13.399, 11.161, 0.987, DARK);
++  imageBox(s, 1.851, 3.223, 9.904, 14.495);
++  fadeBar(s, -0.806, 2.342, 14.634, GREY, true);
++  sparkle(s, 10.341, 1.759);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide28(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 0, 7.5, 26.667, 7.5, DARK);
++  txt(s, 2.229, 2.461, 9.04, 3.13, ['REGRISTATION ', 'VIA WEBSITE'], 90, BLACK);
++  banner(s, 2.229, 10.919, 8.924, 2.087, 'WWW.YOURWEBSITE.COM');
++  txt(s, 2.229, 9.198, 9.097, 1.262, LOREM, 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  imageBox(s, 12.597, 3.944, 12.314, 7.415);
++  fadeBar(s, 10.612, 2.576, 16.518, GREY);
++  sparkle(s, 10.878, 2.041);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide29(p) {
++  const s = newSlide(p, DARK);
++  txt(s, 16.975, 3.871, 7.461, 1.616, 'GET IN TOUCH', 90, WHITE);
++  oval(s, 10.629, 8.931, 1.374, 1.374, RED);
++  oval(s, 6.617, 8.931, 1.374, 1.374, RED);
++  oval(s, 2.824, 8.931, 1.374, 1.374, RED);
++  txt(s, 9.396, 11.321, 3.839, 0.488, 'youremail@gmail.com', 23, WHITE, { font: 'Roboto', align: 'center', valign: 'middle', bold: false, pad: true });
++  txt(s, 9.68, 10.58, 3.271, 0.707, 'EMAIL', 36, WHITE, { align: 'center', valign: 'middle', pad: true });
++  mailIcon(s, 10.916, 9.324, 0.8, 0.6, DARK, RED);
++  txt(s, 5.402, 11.347, 3.839, 0.488, 'www.yourwebsite.com', 23, WHITE, { font: 'Roboto', align: 'center', valign: 'middle', bold: false, pad: true });
++  txt(s, 5.668, 10.606, 3.271, 0.707, 'WEBSITE', 36, WHITE, { align: 'center', valign: 'middle', pad: true });
++  txt(s, 1.875, 11.347, 3.271, 0.488, '+123 456 789', 23, WHITE, { font: 'Roboto', align: 'center', valign: 'middle', bold: false, pad: true });
++  txt(s, 1.875, 10.606, 3.271, 0.707, 'PHONE', 36, WHITE, { align: 'center', valign: 'middle', pad: true });
++  phoneIcon(s, 3.111, 9.246, 0.8, DARK);
++  globeIcon(s, 6.921, 9.218, 0.8, DARK);
++  txt(s, 15.59, 9.297, 8.846, 2.423, [LOREM, '', SURVIVED], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  fadeBar(s, 13.335, 7.393, 14.456, DARK);
++  sparkle(s, 13.601, 6.858);
++  dots(s, 25.69, 0.474, PALE);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide30(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 9.985, 0, 16.682, 15, DARK);
++  txt(s, 2.229, 2.541, 4.641, 3.13, 'GET IN TOUCH', 90, BLACK);
++  oval(s, 20.844, 10.269, 1.374, 1.374, RED);
++  oval(s, 20.826, 6.645, 1.374, 1.374, RED);
++  oval(s, 20.826, 3.084, 1.374, 1.374, RED);
++  txt(s, 20.862, 12.564, 3.839, 0.488, 'youremail@gmail.com', 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 20.862, 11.822, 3.271, 0.707, 'EMAIL', 36, WHITE, { valign: 'middle', pad: true });
++  mailIcon(s, 21.131, 10.663, 0.8, 0.6, DARK, RED);
++  txt(s, 20.844, 9.033, 3.839, 0.488, 'www.yourwebsite.com', 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 20.844, 8.292, 3.271, 0.707, 'WEBSITE', 36, WHITE, { valign: 'middle', pad: true });
++  txt(s, 20.844, 5.501, 3.271, 0.488, '+123 456 789', 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 20.844, 4.759, 3.271, 0.707, 'PHONE', 36, WHITE, { valign: 'middle', pad: true });
++  phoneIcon(s, 21.113, 3.399, 0.8, DARK);
++  globeIcon(s, 21.131, 6.932, 0.8, DARK);
++  txt(s, 2.229, 7.79, 5.466, 2.036, LOREM, 23, DARK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  banner(s, 2.229, 10.661, 5.466, 1.731, 'REGRISTATION NOW');
++  fadeBar(s, 16.994, 2.153, 10.834, DARK);
++  sparkle(s, 17.26, 1.618);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide31(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 15.89, 2.398, 8.436, 7.172, DARK);
++  txt(s, 17.421, 4.603, 5.781, 3.972, [LOREM, '', SURVIVED], 23, WHITE, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  txt(s, 17.433, 3.361, 6.204, 0.707, 'CONTACT INFORMATION', 36, WHITE, { valign: 'middle', pad: true });
++  socialIcon(s, 21.7, 10.301, 0.787, 'f');
++  socialIcon(s, 18.016, 10.301, 0.787, 'IG');
++  socialIcon(s, 19.244, 10.301, 0.787, 'in');
++  socialIcon(s, 20.472, 10.301, 0.787, 't');
++  txt(s, 2.229, 2.343, 9.295, 1.616, 'GET IN TOUCH', 90, BLACK);
++  oval(s, 13.789, 3.964, 1.374, 1.374, RED);
++  phoneIcon(s, 14.075, 4.28, 0.8, DARK);
++  fadeBar(s, -0.438, 12.245, 17.87, GREY, true);
++  sparkle(s, 14.143, 11.71);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide32(p) {
++  const s = newSlide(p, DARK);
++  txt(s, 2.229, 2.302, 9.849, 1.616, 'It’s time to break', 90, WHITE);
++  rect(s, 2.269, 7.52, 8.423, 5.473, PALE);
++  txt(s, 3.471, 8.679, 6.297, 3.231, '“This is a quote. Words full of wisdom that someone important said.”', 45, BLACK, { font: 'Roboto', valign: 'middle' });
++  rect(s, 2.269, 5.314, 8.423, 1.731, RED);
++  txt(s, 2.749, 5.811, 7.463, 0.774, '10 minutes', 40, WHITE, { align: 'center' });
++  fadeBar(s, 11.907, 2.864, 15.105, DARK);
++  sparkle(s, 12.173, 2.329);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, WHITE);
++}
++
++function slide33(p) {
++  const s = newSlide(p, GREY);
++  txt(s, 18.278, 2.468, 6.119, 3.13, ['It’s time', 'to break'], 90, BLACK);
++  rect(s, 15.088, 8.731, 9.309, 6.269, DARK);
++  txt(s, 16.934, 10.271, 6.297, 3.231, '“This is a quote. Words full of wisdom that someone important said.”', 45, WHITE, { font: 'Roboto', valign: 'middle' });
++  rect(s, 0, 10.231, 6.821, 1.731, RED);
++  txt(s, 0.48, 10.728, 6.043, 0.774, '10 minutes', 40, WHITE, { align: 'center' });
++  fadeBar(s, 14.822, 6.511, 12.545, GREY);
++  sparkle(s, 15.088, 5.976);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide34(p) {
++  const s = newSlide(p, GREY);
++  rect(s, 0.002, 0, 26.667, 7.5, DARK);
++  txt(s, 2.186, 2.156, 4.617, 3.13, ['It’s time', 'to break'], 90, WHITE);
++  rect(s, 15.126, 4.492, 9.309, 6.269, RED);
++  txt(s, 16.972, 6.032, 6.297, 3.231, '“This is a quote. Words full of wisdom that someone important said.”', 45, WHITE, { font: 'Roboto', valign: 'middle' });
++  banner(s, 2.229, 10.989, 4.963, 1.731, '10 minutes');
++  fadeBar(s, -0.522, 5.667, 9.664, DARK, true);
++  sparkle(s, 6.85, 5.075);
++  dots(s, 25.69, 0.474, GREY);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++function slide35(p) {
++  const s = newSlide(p, GREY);
++  txt(s, 12.824, 1.722, 13.388, 5.15, 'thanks', 300, BLACK);
++  txt(s, 12.723, 6.404, 13.316, 1.447, 'come play together with us', 80, RED, { bold: false });
++  txt(s, 12.824, 9.13, 11.529, 2.423, [LOREM, '', SURVIVED], 23, BLACK, { font: 'Roboto', valign: 'middle', bold: false, pad: true });
++  fadeBar(s, -0.638, 12.425, 12.496, GREY, true);
++  sparkle(s, 8.835, 11.856);
++  dots(s, 25.69, 0.474, DARK);
++  dots(s, 0.561, 13.404, RED);
++  sideTag(s, BLACK);
++}
++
++const BUILDERS = [
++  slide1, slide2, slide3, slide4, slide5, slide6, slide7,
++  slide8, slide9, slide10, slide11, slide12, slide13, slide14,
++  slide15, slide16, slide17, slide18, slide19, slide20, slide21,
++  slide22, slide23, slide24, slide25, slide26, slide27, slide28,
++  slide29, slide30, slide31, slide32, slide33, slide34, slide35,
++];
++
++// ---------------------------------------------------------------- build
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'SOCCER', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'SOCCER';
++  pptx.title = 'SOCCER — presentation template';
++  BUILDERS.forEach((fn) => fn(pptx));
++  return pptx.writeFile({ fileName: path.join(__dirname, '07031c4b-d8c8-4ee5-9f97-40dcdf29d4e3_grok_final.pptx') });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

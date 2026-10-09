@@ -1,0 +1,959 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/business_financial_planning_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/business_financial_planning_presentation.js
+@@ -0,0 +1,956 @@
++/*
++ * "Kandash." financial-planning deck - 20 slides, 13.333 x 7.5 in (16:9).
++ *
++ * Everything is plain pptxgenjs: a small set of drawing helpers, a table of
++ * normalised vector paths for the recurring decorative shapes, and one
++ * builder function per slide listing its shapes in z-order.
++ *
++ * Run:  node 1938537d-f905-4470-90ee-d5b171303f4f_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette --
++const C = {
++  bg: 'FCFCFC',        // slide background
++  black: '000000',
++  white: 'FFFFFF',
++  ink: '231F20',       // logo mark
++  purple: '9000FF',
++  magenta: 'CE40D2',
++  green: '2CC08A',
++  orange: 'FF5C01',
++  gray: 'A6A6A6',      // inactive nav labels
++  hair: 'BFBFBF',      // nav pill outlines
++  slate: '404040',     // tablet bezel highlight on slide 1
++  peach: 'FF9C65'      // hairlines on the orange card, slide 1
++};
++
++const FONT_REG = 'Raleway regular';
++const FONT_BOLD = 'Raleway bold';
++const FONT_PLAIN = 'Raleway';
++const NO_LINE = { type: 'none' };
++
++// -------------------------------------------------------- vector geometry --
++// Each path is a list of ops in a 0..1 unit box, scaled to the shape's w/h:
++//   ['M', x, y]                        move to
++//   ['L', x, y]                        line to
++//   ['C', x1, y1, x2, y2, x, y]        cubic bezier
++//   ['Z']                              close
++const P = {
++  // rounded card with a notch scooped out of the lower-left corner
++  card: [['M',1,0.1504],['L',1,0.8496],['C',1,0.9327,0.9641,1,0.9198,1],['L',0.3091,1],['C',0.292,1,0.2784,0.9731,0.2792,0.941],['C',0.2792,0.9397,0.2793,0.9385,0.2793,0.9372],['C',0.2848,0.6815,0.1755,0.4714,0.0391,0.4757],['C',0.0365,0.4758,0.0339,0.476,0.0313,0.4762],['C',0.0142,0.4778,0,0.4521,0,0.4201],['L',0,0.1504],['C',0,0.0673,0.0359,0,0.0802,0],['L',0.9198,0],['C',0.9641,0,1,0.0673,1,0.1504],['Z']],
++  // wide pill-shaped bar with a notch on the lower-left
++  bar: [['M',1,0.1862],['L',1,0.8138],['C',1,0.9166,0.9793,1,0.9539,1],['L',0.1662,1],['C',0.1431,1,0.1225,0.94,0.1154,0.8511],['C',0.1036,0.7007,0.0741,0.582,0.0369,0.534],['C',0.0149,0.5056,0,0.4224,0,0.3291],['L',0,0.1863],['C',0,0.0834,0.0207,0,0.0461,0],['L',0.9539,0],['C',0.9793,0,1,0.0834,1,0.1862],['Z']],
++  // large square tile with a notch scooped out of the lower-left
++  tile: [['M',0.8408,0],['C',0.9287,0,1,0.0713,1,0.1592],['L',1,0.8408],['C',1,0.9287,0.9287,1,0.8408,1],['L',0.4782,1],['C',0.4475,1,0.423,0.975,0.423,0.9443],['C',0.423,0.9441,0.423,0.9439,0.423,0.9437],['C',0.423,0.7412,0.2588,0.577,0.0563,0.577],['C',0.0561,0.577,0.0559,0.577,0.0557,0.577],['C',0.025,0.577,0,0.5525,0,0.5218],['L',0,0.1592],['C',0,0.0713,0.0713,0,0.1592,0]],
++  // speech-bubble tag used for the "75% Sales" callout
++  tagBubble: [['M',0.9104,0],['L',0.0896,0],['C',0.0401,0,0,0.0774,0,0.173],['L',0,0.5481],['C',0,0.6437,0.0401,0.7211,0.0896,0.7211],['L',0.2254,0.7211],['C',0.2428,0.7211,0.2598,0.7309,0.2744,0.7493],['L',0.3547,0.8505],['L',0.451,0.9719],['C',0.4808,1.0094,0.5192,1.0094,0.549,0.9719],['L',0.6453,0.8505],['L',0.7256,0.7493],['C',0.7402,0.7309,0.7572,0.7211,0.7746,0.7211],['L',0.9104,0.7211],['C',0.9599,0.7211,1,0.6437,1,0.5481],['L',1,0.173],['C',1,0.0774,0.9599,0,0.9104,0],['Z']],
++  // sparkline squiggle drawn on the Sales Insights card
++  spark: [['M',0,1],['C',0.0471,0.8097,0.0942,0.6194,0.1605,0.5917],['C',0.2267,0.5639,0.3229,0.8389,0.3977,0.8333],['C',0.4725,0.8278,0.5492,0.5792,0.6093,0.5583],['C',0.6694,0.5375,0.693,0.8014,0.7581,0.7083],['C',0.8233,0.6153,0.9116,0.3076,1,0]],
++  // Kandash logo - filled disc with a keyhole slot
++  logoDisc: [['M',1,0.5],['C',1,0.7762,0.7761,1,0.5,1],['C',0.2239,1,0,0.7762,0,0.5],['C',0,0.2238,0.2239,0,0.5,0],['C',0.5751,0,0.6463,0.0165,0.7102,0.0462],['L',0.4198,0.3365],['C',0.3865,0.3699,0.3698,0.4139,0.3698,0.4579],['C',0.3698,0.5019,0.3865,0.546,0.4198,0.5793],['C',0.4866,0.6461,0.5959,0.6461,0.6627,0.5793],['L',0.9533,0.2887],['C',0.9833,0.3529,1,0.4245,1,0.5],['Z']],
++  // Kandash logo - the angled pin inside the disc
++  logoPin: [['M',1,0.3428],['L',0.4135,0.9298],['L',0.4122,0.9311],['C',0.3204,1.023,0.1702,1.023,0.0785,0.9311],['L',0.0688,0.9215],['C',-0.0218,0.8308,-0.0229,0.6832,0.0654,0.5911],['C',0.0665,0.5899,0.0677,0.5887,0.0688,0.5875],['L',0.6559,0],['C',0.7973,0.0836,0.9158,0.2017,1,0.3428],['Z']],
++  // flame glyph
++  flame: [['M',0.9401,0.5151],['C',0.9706,0.6,0.8433,0.6837,0.7176,0.6488],['C',0.6123,0.6233,0.5715,0.5395,0.6445,0.4674],['C',0.8093,0.3174,0.6887,0.0814,0.4153,0],['C',0.5392,0.1605,0.349,0.3081,0.2403,0.3698],['C',0.1316,0.4314,0.0586,0.4953,0.0365,0.5326],['C',-0.0739,0.7163,0.0909,0.8919,0.2029,0.9337],['C',0.152,0.8547,0.1044,0.7035,0.3049,0.5616],['C',0.3049,0.5616,0.2471,0.7128,0.3728,0.8174],['C',0.4985,0.9221,0.4968,1,0.4968,1],['C',0.6921,1,0.8772,0.9198,0.9553,0.7884],['C',1.0148,0.7105,1.0199,0.5872,0.9401,0.5151]],
++  // rocket fuselage
++  rocket: [['M',0.6599,0],['C',0.5502,0.0447,0.4257,0.121,0.3048,0.2421],['C',0.0836,0.4637,0.0186,0.7318,0,0.8845],['L',0.1152,1],['C',0.2677,0.9814,0.5372,0.9181,0.7584,0.6965],['C',0.8792,0.5754,0.9554,0.4525,1,0.3426],['C',0.9758,0.2812,0.9275,0.2086,0.8587,0.1378],['C',0.7918,0.0726,0.7212,0.0242,0.6599,0],['Z'],['M',0.7546,0.4022],['C',0.7119,0.4451,0.6413,0.4451,0.5967,0.4022],['C',0.5539,0.3594,0.5539,0.2886,0.5967,0.2439],['C',0.6394,0.2011,0.71,0.2011,0.7546,0.2439],['C',0.7974,0.2886,0.7974,0.3594,0.7546,0.4022],['Z']],
++  // rocket exhaust trail
++  rocketTrail: [['M',0.9757,0.03],['C',0.8994,-0.0494,0.4088,0.0414,0,0.1548],['C',0.1472,0.2456,0.2998,0.3704,0.447,0.5235],['C',0.5996,0.6824,0.7195,0.8412,0.8067,1],['C',0.9157,0.5632,1.0574,0.1094,0.9757,0.03],['Z']],
++  // rocket left fin
++  rocketFinL: [['M',1,0.0659],['L',0.8606,0.0102],['C',0.8032,-0.0112,0.7417,0.0016,0.6966,0.0445],['L',0.0448,0.726],['C',-0.0618,0.8374,0.0366,1.0303,0.1842,0.996],['L',0.7294,0.8674],['C',0.7745,0.6531,0.8483,0.3659,1,0.0659],['Z']],
++  // rocket right fin
++  rocketFinR: [['M',0.9195,0],['C',0.6329,0.1392,0.3591,0.2148,0.1367,0.2546],['L',0.0041,0.8195],['C',-0.0301,0.9627,0.1581,1.0622,0.2736,0.9548],['L',0.9537,0.3222],['C',0.9965,0.2824,1.0136,0.2188,0.9879,0.1631],['L',0.9195,0],['Z']],
++  // rocket spark
++  rocketSpark: [['M',0.8199,0.1797],['C',0.7076,0.0676,0.7216,-0.1216,0.4899,0.1096],['C',0.2583,0.3408,-0.0858,0.8663,0.0195,0.9784],['C',0.1319,1.0906,0.6585,0.7402,0.8902,0.509],['C',1.1218,0.2708,0.9323,0.2848,0.8199,0.1797],['Z']],
++  // pie glyph - the large 3/4 wedge
++  pieMain: [['M',0.5678,0],['C',0.2524,0.0132,0,0.2342,0,0.5],['C',0,0.7763,0.2681,1,0.5994,1],['C',0.7492,1,0.8896,0.9553,1,0.8711],['L',0.5678,0.5105],['L',0.5678,0],['Z']],
++  // pie glyph - the quarter wedge
++  pieQtr: [['M',0,0],['L',0,1],['L',1,1],['C',0.9721,0.4583,0.5404,0.0278,0,0],['Z']],
++  // pie glyph - the small cut-out wedge
++  pieCut: [['M',0,0],['L',0.7069,1],['C',0.8852,0.7222,0.9879,0.3718,1,0],['L',0,0],['Z']],
++};
++
++function points (ops, w, h) {
++  return ops.map(function (o) {
++    if (o[0] === 'Z') return { close: true };
++    if (o[0] === 'M') return { x: o[1] * w, y: o[2] * h, moveTo: true };
++    if (o[0] === 'L') return { x: o[1] * w, y: o[2] * h };
++    return {
++      x: o[5] * w, y: o[6] * h,
++      curve: { type: 'cubic', x1: o[1] * w, y1: o[2] * h, x2: o[3] * w, y2: o[4] * h }
++    };
++  });
++}
++
++// ------------------------------------------------------------- primitives --
++// `rot` of 180 flips a path end-for-end, e.g. moving a card's corner notch
++// from the lower-left to the upper-right.
++function poly (s, ops, x, y, w, h, fill, rot) {
++  s.addShape('custGeom', {
++    x: x, y: y, w: w, h: h, rotate: rot || 0,
++    fill: fill ? { color: fill } : { type: 'none' },
++    line: NO_LINE,
++    points: points(ops, w, h)
++  });
++}
++
++// Open, unfilled path (the sales sparkline on slide 1).
++function stroke (s, ops, x, y, w, h, color) {
++  s.addShape('custGeom', {
++    x: x, y: y, w: w, h: h,
++    fill: { type: 'none' }, line: { color: color, width: 1 },
++    points: points(ops, w, h)
++  });
++}
++
++function rect (s, x, y, w, h, fill) {
++  s.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: fill }, line: NO_LINE });
++}
++
++function rrect (s, x, y, w, h, fill, radius) {
++  s.addShape('roundRect', {
++    x: x, y: y, w: w, h: h, rectRadius: radius,
++    fill: fill ? { color: fill } : { type: 'none' }, line: NO_LINE
++  });
++}
++
++// Fully rounded ends (the deck's roundRect adj value 50000).
++function pill (s, x, y, w, h, fill, outline) {
++  s.addShape('roundRect', {
++    x: x, y: y, w: w, h: h, rectRadius: Math.min(w, h) / 2,
++    fill: fill ? { color: fill } : { type: 'none' },
++    line: outline ? { color: outline, width: 0.75 } : NO_LINE
++  });
++}
++
++function circle (s, x, y, d, fill) {
++  s.addShape('ellipse', { x: x, y: y, w: d, h: d, fill: { color: fill }, line: NO_LINE });
++}
++
++function hline (s, x, y, w, color) {
++  s.addShape('line', { x: x, y: y, w: w, h: 0, line: { color: color, width: 1 } });
++}
++
++/*
++ * Text. Opts: s = pt size, b = Raleway bold, p = plain "Raleway" face,
++ * c = colour, m = centre aligned, l = line-spacing multiple.
++ * Boxes in the source deck are top-anchored and unpadded.
++ */
++function t (s, str, x, y, w, h, o) {
++  o = o || {};
++  s.addText(str, {
++    x: x, y: y, w: w, h: h,
++    fontSize: o.s, fontFace: o.b ? FONT_BOLD : (o.p ? FONT_PLAIN : FONT_REG),
++    color: o.c || C.black,
++    align: o.m ? 'center' : 'left', valign: 'top',
++    lineSpacingMultiple: o.l || null,
++    margin: [7.2, 7.2, 3.6, 3.6], wrap: true, isTextBox: true
++  });
++}
++
++// ------------------------------------------------------------- composites --
++/*
++ * Image placeholder. The source deck reserves these slots with empty picture
++ * placeholders - it embeds no bitmaps at all - so they are recreated as bare
++ * hairline frames that let the card behind them show through, exactly as the
++ * original renders.
++ */
++function photo (s, x, y, w, h) {
++  s.addShape('roundRect', {
++    x: x, y: y, w: w, h: h, rectRadius: 0.06,
++    fill: { type: 'none' }, line: { color: 'EFEDF2', width: 0.5 }
++  });
++}
++
++// Circular badge holding the flame glyph.
++function flame (s, x, y, d, fill) {
++  circle(s, x, y, d, fill);
++  poly(s, P.flame, x + 0.326 * d, y + 0.246 * d, 0.348 * d, 0.509 * d, C.white);
++}
++
++// Circular badge holding the rocket glyph.
++function rocket (s, x, y, d, fill) {
++  circle(s, x, y, d, fill);
++  poly(s, P.rocketTrail, x + 0.608 * d, y + 0.318 * d, 0.091 * d, 0.088 * d, C.white);
++  poly(s, P.rocketFinL, x + 0.302 * d, y + 0.454 * d, 0.120 * d, 0.115 * d, C.white);
++  poly(s, P.rocketFinR, x + 0.446 * d, y + 0.588 * d, 0.115 * d, 0.123 * d, C.white);
++  poly(s, P.rocket, x + 0.407 * d, y + 0.341 * d, 0.264 * d, 0.264 * d, C.white);
++  poly(s, P.rocketSpark, x + 0.348 * d, y + 0.592 * d, 0.070 * d, 0.070 * d, C.white);
++}
++
++// Circular badge holding the three-wedge pie glyph.
++function pieIcon (s, x, y, d, fill) {
++  circle(s, x, y, d, fill);
++  poly(s, P.pieMain, x + 0.231 * d, y + 0.234 * d, 0.451 * d, 0.541 * d, C.white);
++  poly(s, P.pieQtr, x + 0.515 * d, y + 0.234 * d, 0.255 * d, 0.256 * d, C.white);
++  poly(s, P.pieCut, x + 0.535 * d, y + 0.518 * d, 0.235 * d, 0.166 * d, C.white);
++}
++
++// "..." menu button: a disc with three small dots across its middle.
++function dots (s, x, y, d, fill, dotColor) {
++  circle(s, x, y, d, fill);
++  circle(s, x + 0.287 * d, y + 0.466 * d, 0.0845 * d, dotColor);
++  circle(s, x + 0.458 * d, y + 0.466 * d, 0.0845 * d, dotColor);
++  circle(s, x + 0.639 * d, y + 0.464 * d, 0.0845 * d, dotColor);
++}
++
++// ----------------------------------------------------------------- charts --
++// Every chart in the deck is the same two-slice 66/33 donut or pie.
++const SLICES = [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [66, 33] }];
++const CHART_BASE = { showLegend: false, showTitle: false, showValue: false,
++                     dataBorder: { pt: 0, color: C.white }, chartArea: { fill: { type: 'none' } } };
++
++function pie (s, x, y, w, h, a, b) {
++  s.addChart('pie', SLICES, Object.assign({ x: x, y: y, w: w, h: h,
++    chartColors: [a || C.white, b || C.white] }, CHART_BASE));
++}
++
++function donut (s, x, y, w, h, a, b) {
++  s.addChart('doughnut', SLICES, Object.assign({ x: x, y: y, w: w, h: h, holeSize: 39,
++    chartColors: [a || C.white, b || C.white] }, CHART_BASE));
++}
++
++// ----------------------------------------------------------- shared chrome --
++// The same top navigation bar sits on all 20 slides.
++const NAV_LINKS = [
++  { label: 'Home', x: 3.878, w: 0.891, pillX: 3.928, pillW: 0.79, active: true },
++  { label: 'Features', x: 5.072, w: 0.891, pillX: 5.122, pillW: 0.79 },
++  { label: 'Finances', x: 6.267, w: 0.891, pillX: 6.317, pillW: 0.79 },
++  { label: 'Community', x: 7.46, w: 1.116, pillX: 7.517, pillW: 0.999 }
++];
++
++function nav (s) {
++  // brand mark
++  poly(s, P.logoDisc, 1.511, 0.577, 0.253, 0.253, C.ink);
++  poly(s, P.logoPin, 1.616, 0.595, 0.129, 0.129, C.ink);
++  t(s, 'Kandash.', 1.763, 0.552, 0.954, 0.303, { s: 12, b: 1 });
++
++  NAV_LINKS.forEach(function (link) {
++    if (link.active) pill(s, link.pillX, 0.548, link.pillW, 0.268, C.green);
++    else pill(s, link.pillX, 0.552, link.pillW, 0.268, null, C.hair);
++    t(s, link.label, link.x, link.active ? 0.547 : 0.552, link.w, 0.252,
++      { s: 9, c: link.active ? C.white : C.gray, m: 1 });
++  });
++
++  // date chip
++  pill(s, 10.132, 0.517, 1.693, 0.338, C.orange);
++  s.addText([
++    { text: 'November 09 ', options: { fontFace: FONT_REG } },
++    { text: '- 2090', options: { fontFace: FONT_BOLD } }
++  ], { x: 10.16, y: 0.546, w: 1.654, h: 0.269, fontSize: 10, color: C.white,
++       align: 'center', valign: 'top', margin: [7.2, 7.2, 3.6, 3.6], isTextBox: true });
++}
++
++// ------------------------------------------------------------ slide bodies --
++function slide01 (s) {
++  rrect(s, 1.505,1.781,3.675,5.08, C.slate, 0.272);
++  rrect(s, 1.535,1.804,3.616,5.036, C.black, 0.274);
++  rrect(s, 1.732,2.002,3.224,4.662, C.white, 0.096);
++  photo(s, 1.733,1.993,3.224,2.974);
++  rrect(s, 5.408,4.454,2.376,2.407, C.black, 0.369);
++  poly(s, P.tile, 5.408,4.444,2.417,2.417, C.orange);
++  hline(s, 5.646,5.192,1.985, C.peach);
++  hline(s, 5.646,5.387,1.985, C.peach);
++  hline(s, 5.645,5.592,1.985, C.peach);
++  pieIcon(s, 5.535,6.12,0.6, C.magenta);
++  pill(s, 10.783,6.191,1.029,0.349, C.purple);
++  nav(s);
++  t(s, 'Build a Secure\nFurture for\nYour Business.', 8.411,2.266,3.816,1.616, {s:30, b:1});
++  t(s, 'Financing Planning Presentation.', 8.799,1.859,2.683,0.269, {s:10, b:1});
++  t(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.', 8.411,4.814,2.898,0.529, {s:9, l:1.5});
++  dots(s, 8.499,1.872,0.26, C.magenta, C.white);
++  rrect(s, 5.408,1.804,2.376,2.407, C.black, 0.369);
++  poly(s, P.tile, 5.408,1.794,2.417,2.417, C.purple);
++  t(s, 'The Details.', 9.024,6.029,1.23,0.286, {s:11, b:1});
++  t(s, 'Duis aute irure dolor in reprehenderit in vol.', 9.024,6.327,1.447,0.481, {s:8, l:1.5});
++  t(s, 'improve finances well!', 8.411,3.97,1.535,0.505, {s:12, b:1});
++  rocket(s, 8.72,6.03,0.284, C.green);
++  circle(s, 8.499,6.092,0.171, C.magenta);
++  t(s, 'Learn More', 10.81,6.191,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  flame(s, 5.542,3.45,0.6, C.green);
++  t(s, 'Hi, Rollans !', 6.594,2.123,1.074,0.286, {s:11, b:1, c:C.white});
++  t(s, 'Welcome Back', 6.612,2.392,1.018,0.219, {s:7, c:C.white});
++  dots(s, 6.638,2.984,0.26, C.black, C.white);
++  t(s, '1.9k+', 6.925,2.908,0.774,0.37, {s:16, b:1, c:C.white});
++  t(s, 'Sed ut perspiciatis un de omnis iste natusiu error sit volup.', 6.527,3.329,1.261,0.61, {s:7, c:C.white, l:1.5});
++  t(s, 'Sales Insights.', 5.581,4.681,1.268,0.286, {s:11, b:1, c:C.white});
++  stroke(s, P.spark, 5.695,5.151,1.638,0.5, C.black);
++  poly(s, P.tagBubble, 6.963,4.676,0.706,0.366, C.black);
++  t(s, '75% Sales', 6.923,4.684,0.793,0.236, {s:8, b:1, c:C.white, m:1});
++  t(s, '+45%', 6.515,5.783,1.004,0.438, {s:20, b:1, c:C.white});
++  t(s, 'Sed ut perspiciatis un de omnis iste natus.', 6.531,6.237,1.261,0.434, {s:7, c:C.white, l:1.5});
++  t(s, '$8681.98', 1.849,5.309,1.477,0.438, {s:20, b:1});
++  t(s, 'Sales Summary', 1.849,5.088,1.183,0.252, {s:9});
++  pill(s, 1.971,6.01,0.082,0.389, C.purple);
++  pill(s, 2.068,6.145,0.082,0.251, C.orange);
++  pill(s, 2.165,6.191,0.082,0.204, C.green);
++  pill(s, 2.262,5.987,0.082,0.405, C.magenta);
++  pill(s, 2.361,6.056,0.082,0.337, C.black);
++  t(s, '21', 2.477,5.962,0.415,0.269, {s:10, b:1});
++  t(s, 'Total Deals.', 2.46,6.205,0.774,0.219, {s:7});
++  t(s, '$291.90', 3.258,5.97,0.814,0.269, {s:10, b:1});
++  t(s, 'Won', 3.267,6.202,0.487,0.219, {s:7});
++  t(s, '$122.76', 4.039,5.978,0.814,0.269, {s:10, b:1});
++  t(s, 'Lost', 4.054,6.21,0.487,0.219, {s:7});
++  pill(s, 3.673,5.304,0.999,0.268, C.green);
++  t(s, 'This Week', 3.696,5.327,0.774,0.219, {s:7, c:C.white});
++  dots(s, 4.419,5.342,0.19, C.black, C.white);
++  rocket(s, 1.887,2.181,0.457, C.magenta);
++  photo(s, 5.624,2.025,0.898,0.898);
++}
++
++function slide02 (s) {
++  nav(s);
++  t(s, 'Agenda.', 4.984,1.842,3.455,0.909, {s:48, b:1, m:1});
++  pill(s, 2.168,3.251,2.772,0.51, C.purple);
++  t(s, 'Introduction to Financial Planning', 2.189,3.36,2.725,0.269, {s:10, b:1, c:C.white, m:1});
++  pill(s, 5.11,3.251,1.865,0.51, C.magenta);
++  t(s, 'Budgeting Basics', 5.171,3.36,1.739,0.269, {s:10, b:1, c:C.white, m:1});
++  pill(s, 7.169,3.251,1.962,0.51, C.green);
++  t(s, 'Retirement Planning', 7.236,3.36,1.823,0.269, {s:10, b:1, c:C.white, m:1});
++  pill(s, 9.325,3.251,1.841,0.51, C.orange);
++  t(s, 'Estate Planning', 9.516,3.36,1.454,0.269, {s:10, b:1, c:C.white, m:1});
++  pill(s, 2.098,4.086,2.772,0.51, C.black);
++  t(s, 'Setting Financial Goals', 2.119,4.194,2.725,0.269, {s:10, b:1, c:C.white, m:1});
++  pill(s, 5.061,4.086,1.995,0.51, C.purple);
++  t(s, 'Investment Strategies', 5.187,4.194,1.739,0.269, {s:10, b:1, c:C.white, m:1});
++  pill(s, 7.247,4.086,1.962,0.51, C.magenta);
++  t(s, 'Insurance Planning', 7.421,4.194,1.61,0.269, {s:10, b:1, c:C.white, m:1});
++  pill(s, 9.394,4.086,1.841,0.51, C.black);
++  t(s, 'Thank You', 9.586,4.194,1.454,0.269, {s:10, b:1, c:C.white, m:1});
++  t(s, 'AaAt vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas.', 3.952,5.05,5.429,0.576, {s:10, m:1, l:1.5});
++  pill(s, 6.802,6.166,1.242,0.349, C.purple);
++  t(s, 'Discover Now', 6.853,6.166,1.162,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 5.289,6.166,1.029,0.349, C.orange);
++  t(s, 'Get Started', 5.372,6.166,0.887,0.302, {s:9, c:C.white, m:1, l:1.5});
++}
++
++function slide03 (s) {
++  photo(s, 2.029,2.121,3.224,2.714);
++  nav(s);
++  t(s, 'Introduction.', 8.342,2.611,2.803,0.606, {s:30, b:1});
++  t(s, 'esse cillum dolore eu fugiat nulla pariatur  exc epteurirsint occaecat cupidatat non proidenisii\nt, sunt in culpaituqui officia deserunt.s', 8.342,3.622,2.897,0.756, {s:9, l:1.5});
++  t(s, 'sint occaecat cupidatat non proident, sunt in culpaituqui officia deserunt mollit anim.', 8.342,4.532,2.897,0.525, {s:9, l:1.5});
++  rrect(s, 2.029,5.072,3.224,1.493, C.orange, 0.38);
++  rrect(s, 5.485,4.158,2.376,2.407, C.black, 0.369);
++  poly(s, P.tile, 5.485,4.148,2.417,2.417, C.purple);
++  pie(s, 5.335,5.71,1.214,0.809, C.magenta, C.white);
++  t(s, 'Hellow, We Are Kandash.', 5.618,4.416,2.259,0.841, {s:22, b:1, c:C.white});
++  dots(s, 6.972,5.618,0.689, C.green, C.white);
++  rrect(s, 5.485,2.121,2.417,1.778, C.green, 0.394);
++  pill(s, 2.378,5.498,0.153,0.724, C.white);
++  pill(s, 2.558,5.755,0.153,0.467, C.purple);
++  pill(s, 2.739,5.841,0.153,0.38, C.white);
++  pill(s, 2.919,5.468,0.153,0.754, C.purple);
++  pill(s, 3.104,5.595,0.153,0.627, C.white);
++  t(s, '198.876', 3.423,5.44,1.715,0.572, {s:28, b:1, c:C.white});
++  t(s, 'Statistics Point.', 3.441,5.98,1.206,0.269, {s:10, c:C.white});
++  t(s, '9/10', 5.529,2.344,2.4,1.01, {s:54, b:1, c:C.white, m:1});
++  t(s, 'Rating Company.', 6.029,3.299,1.402,0.269, {s:10, c:C.white, m:1});
++  pill(s, 8.407,5.784,1.029,0.349, C.orange);
++  t(s, 'Get Started', 8.434,5.784,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 9.983,5.784,1.029,0.349, C.magenta);
++  t(s, 'Learn More', 10.01,5.784,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  flame(s, 2.255,2.344,0.481, C.black);
++}
++
++function slide04 (s) {
++  photo(s, 5.291,3.333,3.007,1.603);
++  photo(s, 8.501,2.017,2.799,4.78);
++  pill(s, 5.736,2.305,2.305,0.51, C.black);
++  rrect(s, 5.291,5.194,2.682,1.603, C.black, 0.267);
++  nav(s);
++  t(s, 'The Importance of Financial Planning.', 1.88,1.97,4.15,1.01, {s:27, b:1});
++  t(s, 'Financial Stability.', 5.894,2.383,2.133,0.353, {s:15, b:1, c:C.white});
++  t(s, 'income is greater than expenses.', 3.767,6.077,1.319,0.37, {s:8, p:1});
++  t(s, '80%', 3.722,5.586,1.393,0.505, {s:24, b:1});
++  pie(s, 1.708,5.694,1.069,0.713, C.green, C.black);
++  t(s, 'Data Statistics.', 2.56,6.051,0.745,0.37, {s:8, p:1});
++  t(s, '12.4', 2.56,5.561,1.069,0.505, {s:24, b:1});
++  poly(s, P.card, 5.291,5.194,3.007,1.603, C.orange);
++  t(s, 'Definition\n& Significance.', 5.462,5.32,1.433,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 6.303,6.01,1.986,0.525, {s:9, p:1, c:C.white, l:1.5});
++  pieIcon(s, 5.394,6.168,0.522, C.green);
++  rrect(s, 2.013,3.333,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 2.013,3.333,3.007,1.603, C.magenta);
++  t(s, 'How Financial Planning Contributies to Stability?', 2.184,3.458,2.216,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 3.028,4.144,1.829,0.525, {s:9, p:1, c:C.white, l:1.5});
++  flame(s, 2.116,4.307,0.522, C.purple);
++  rocket(s, 10.684,2.202,0.457, C.magenta);
++  flame(s, 5.452,3.524,0.421, C.black);
++}
++
++function slide05 (s) {
++  pill(s, 5.402,1.929,2.223,0.573, C.black);
++  circle(s, 8.007,3.243,1.906, C.green);
++  t(s, '02', 8.273,3.226,1.375,1.01, {s:54, b:1, c:C.white, m:1});
++  circle(s, 2.347,3.231,1.906, C.purple);
++  nav(s);
++  t(s, 'The Importance of Financial Planning.', 1.639,1.668,4.363,1.01, {s:27, b:1});
++  t(s, 'Goal Achievement', 5.486,2.036,2.061,0.353, {s:15, b:1, c:C.white, m:1});
++  poly(s, P.card, 1.951,4.197,4.283,2.283, C.magenta);
++  donut(s, 0.944,5.331,2.547,1.698, C.purple, C.green);
++  circle(s, 1.812,5.76,0.807, C.black);
++  t(s, '30%', 1.786,5.961,0.854,0.404, {s:18, b:1, c:C.white, m:1});
++  t(s, 'Short-Term & Long-Term Objectives through Planning.', 2.223,4.438,3.829,0.707, {s:18, b:1, c:C.white});
++  t(s, 'Nam libero tempore, cum soluta nobis\nest eligendi optio cumque nihil impedi quo minus id quod maxime place.', 3.465,5.4,2.516,0.756, {s:9, c:C.white, l:1.5});
++  poly(s, P.card, 7.531,4.203,4.283,2.283, C.orange);
++  donut(s, 6.524,5.336,2.547,1.698, C.magenta, C.purple);
++  circle(s, 7.392,5.765,0.807, C.black);
++  t(s, '42%', 7.366,5.967,0.854,0.404, {s:18, b:1, c:C.white, m:1});
++  t(s, 'The Role of Financial Planning in Goal Seting.', 7.803,4.444,3.397,0.707, {s:18, b:1, c:C.white});
++  t(s, 'Nam libero tempore, cum soluta nobis\nest eligendi optio cumque nihil impedi quo minus id quod maxime place.', 9.046,5.406,2.516,0.756, {s:9, c:C.white, l:1.5});
++  t(s, '01', 2.613,3.214,1.375,1.01, {s:54, b:1, c:C.white, m:1});
++  t(s, 'Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et.', 8.438,1.957,3.23,0.529, {s:9, l:1.5});
++}
++
++function slide06 (s) {
++  photo(s, 4.555,1.797,2.799,5.079);
++  pill(s, 8.609,4.975,2.755,0.277, C.black);
++  pill(s, 8.609,6.584,2.755,0.277, C.black);
++  pill(s, 8.609,6.048,2.755,0.277, C.black);
++  pill(s, 8.609,5.511,2.755,0.277, C.black);
++  nav(s);
++  t(s, 'The Importance of Financial Planning.', 7.609,1.624,4.15,1.043, {s:27, b:1});
++  t(s, 'Market Risks', 7.628,4.903,0.831,0.404, {s:9});
++  t(s, 'Credit Risks', 7.628,5.456,0.831,0.404, {s:9});
++  t(s, 'Operational Risks', 7.628,5.988,1.01,0.404, {s:9});
++  t(s, 'Other Risks', 7.628,6.519,0.831,0.404, {s:9});
++  t(s, '15%', 11.441,4.976,0.541,0.269, {s:10, b:1});
++  t(s, '30%', 11.441,6.038,0.541,0.269, {s:10, b:1});
++  t(s, '10%', 11.441,6.57,0.541,0.269, {s:10, b:1});
++  t(s, 'Identifying & Assesing Financial Risks.', 7.64,4.096,2.163,0.505, {s:12, b:1});
++  t(s, '45%', 11.441,5.507,0.541,0.269, {s:10, b:1});
++  pill(s, 8.609,4.974,1.091,0.277, C.orange);
++  pill(s, 8.609,6.583,0.887,0.277, C.green);
++  pill(s, 8.609,6.046,1.899,0.277, C.magenta);
++  pill(s, 8.609,5.51,2.243,0.277, C.purple);
++  pill(s, 10.511,4.171,1.311,0.351, C.black);
++  t(s, 'This Year', 10.629,4.211,0.774,0.252, {s:9, c:C.white});
++  dots(s, 11.509,4.216,0.261, C.white, C.black);
++  pill(s, 7.709,2.865,2.223,0.573, C.black);
++  t(s, 'Risk Mitigation', 7.793,2.972,2.061,0.353, {s:15, b:1, c:C.white, m:1});
++  poly(s, P.card, 1.509,1.781,2.545,1.356, C.magenta, 180);
++  pie(s, 3.152,1.515,1.464,0.976, C.green, C.black);
++  t(s, '70%', 1.707,1.61,1.738,1.082, {s:44, b:1, c:C.white, l:1.5});
++  t(s, 'Diversification.', 1.7,2.63,1.389,0.346, {s:11, c:C.white, l:1.5});
++  poly(s, P.card, 1.509,3.67,2.545,1.356, C.orange, 180);
++  pie(s, 3.152,3.404,1.464,0.976, C.magenta, C.black);
++  t(s, '20%', 1.707,3.499,1.738,1.082, {s:44, b:1, c:C.white, l:1.5});
++  t(s, 'Insurance Coverage.', 1.7,4.519,1.861,0.345, {s:11, p:1, c:C.white, l:1.5});
++  poly(s, P.card, 1.522,5.504,2.545,1.356, C.green, 180);
++  pie(s, 3.166,5.238,1.464,0.976, C.orange, C.black);
++  t(s, '10%', 1.721,5.333,1.738,1.082, {s:44, b:1, c:C.white, l:1.5});
++  t(s, 'Emergency Funds.', 1.714,6.353,1.692,0.346, {s:11, c:C.white, l:1.5});
++  flame(s, 6.608,1.999,0.55, C.purple);
++}
++
++function slide07 (s) {
++  rrect(s, 8.464,3.834,2.682,1.603, C.black, 0.267);
++  dots(s, 8.572,4.815,0.509, C.green, C.white);
++  rrect(s, 5.132,3.834,2.682,1.603, C.black, 0.267);
++  dots(s, 5.242,4.815,0.509, C.green, C.white);
++  rrect(s, 1.806,3.834,2.682,1.603, C.black, 0.267);
++  dots(s, 1.916,4.815,0.509, C.green, C.white);
++  nav(s);
++  poly(s, P.card, 1.806,3.833,3.007,1.603, C.magenta);
++  t(s, 'Short-Term Goals.', 1.977,3.959,1.328,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 2.75,4.474,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  poly(s, P.card, 5.132,3.834,3.007,1.603, C.purple);
++  t(s, 'Medium-Term Goals.', 5.303,3.96,1.399,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 6.076,4.474,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  poly(s, P.card, 8.464,3.834,3.007,1.603, C.orange);
++  t(s, 'Long-Term Goals.', 8.635,3.96,1.399,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 9.408,4.474,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  t(s, 'Type of Goal.', 4.222,1.704,4.89,0.841, {s:44, b:1, m:1});
++  t(s, 'PLACEHOLDER', 4.505,2.884,4.324,0.53, {s:9, m:1, l:1.5});
++  t(s, 'The Details.', 2.786,6.006,1.23,0.286, {s:11, b:1});
++  t(s, 'Duis aute irure dolor in reprehenderit in vol.', 2.786,6.304,1.447,0.481, {s:8, l:1.5});
++  rocket(s, 2.483,6.007,0.284, C.green);
++  circle(s, 2.262,6.069,0.171, C.magenta);
++  pie(s, 5.61,6.031,1.069,0.713, C.green, C.black);
++  t(s, 'Data Statistics.', 6.462,6.388,0.745,0.37, {s:8, p:1});
++  t(s, '12.4', 6.462,5.898,1.069,0.505, {s:24, b:1});
++  t(s, 'income is greater than expenses.', 9.501,6.373,1.319,0.37, {s:8, p:1});
++  t(s, '80%', 9.456,5.883,1.393,0.505, {s:24, b:1});
++}
++
++function slide08 (s) {
++  photo(s, 4.784,1.781,3.174,2.065);
++  photo(s, 8.236,1.781,3.174,2.065);
++  photo(s, 11.688,1.781,3.174,2.065);
++  nav(s);
++  pill(s, 1.519,4.337,4.745,0.533, C.orange);
++  t(s, 'Specific.', 1.648,4.448,1.328,0.303, {s:12, b:1, c:C.white});
++  t(s, 'Temporibus autem quibusdam et aut officiis.', 2.872,4.42,2.909,0.302, {s:9, c:C.white, l:1.5});
++  pill(s, 1.519,5.281,4.745,0.533, C.magenta);
++  t(s, 'Achivable.', 1.648,5.392,1.328,0.303, {s:12, b:1, c:C.white});
++  t(s, 'Temporibus autem quibusdam et aut officiis.', 2.872,5.363,2.909,0.302, {s:9, c:C.white, l:1.5});
++  flame(s, 5.758,4.257,0.705, C.black);
++  flame(s, 5.757,5.19,0.705, C.black);
++  pill(s, 6.864,4.337,4.745,0.533, C.green);
++  t(s, 'Measurable.', 6.993,4.448,1.406,0.303, {s:12, b:1, c:C.white});
++  t(s, 'Temporibus autem quibusdam et aut officiis.', 8.217,4.42,2.909,0.302, {s:9, c:C.white, l:1.5});
++  pill(s, 6.864,5.281,4.745,0.533, C.purple);
++  t(s, 'Relavant.', 6.993,5.392,1.328,0.303, {s:12, b:1, c:C.white});
++  t(s, 'Temporibus autem quibusdam et aut officiis.', 8.217,5.363,2.909,0.302, {s:9, c:C.white, l:1.5});
++  flame(s, 11.103,4.257,0.705, C.black);
++  flame(s, 11.101,5.19,0.705, C.black);
++  pill(s, 4.192,6.251,4.745,0.533, C.black);
++  t(s, 'Time-Bound.', 4.321,6.362,1.435,0.303, {s:12, b:1, c:C.white});
++  t(s, 'Temporibus autem quibusdam et aut officiis.', 5.545,6.333,2.909,0.302, {s:9, c:C.white, l:1.5});
++  flame(s, 8.43,6.16,0.705, C.orange);
++  t(s, 'SMART Criteria Example.', 1.387,1.907,3.153,1.01, {s:27, b:1});
++  t(s, 'Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe.', 1.407,3.203,2.835,0.529, {s:9, l:1.5});
++  rocket(s, 4.959,1.957,0.457, C.purple);
++  rocket(s, 8.438,1.957,0.457, C.orange);
++  rocket(s, 11.902,1.957,0.457, C.green);
++}
++
++function slide09 (s) {
++  nav(s);
++  t(s, 'SMART Criteria Example.', 1.404,2.208,3.241,1.01, {s:27, b:1});
++  rrect(s, 3.46,3.589,2.36,1.41, C.black, 0.235);
++  poly(s, P.card, 3.46,3.589,2.646,1.41, C.magenta);
++  t(s, 'Measurable.', 3.591,3.714,1.399,0.337, {s:14, b:1, c:C.white});
++  t(s, 'But I must explain to you my how All this mistaken ideao\nf denounceng pleasure.', 4.313,4.125,1.693,0.68, {s:8, p:1, c:C.white, l:1.5});
++  dots(s, 3.591,4.459,0.414, C.orange, C.white);
++  rrect(s, 6.314,3.589,2.36,1.41, C.black, 0.235);
++  poly(s, P.card, 6.314,3.589,2.646,1.41, C.orange);
++  t(s, 'Achievable.', 6.445,3.714,1.416,0.337, {s:14, b:1, c:C.white});
++  t(s, 'But I must explain to you my how All this mistaken ideao\nf denounceng pleasure.', 7.168,4.125,1.693,0.68, {s:8, p:1, c:C.white, l:1.5});
++  dots(s, 6.445,4.459,0.414, C.purple, C.white);
++  rrect(s, 4.99,1.985,2.36,1.41, C.black, 0.235);
++  poly(s, P.card, 4.99,1.985,2.646,1.41, C.purple);
++  t(s, 'Specific.', 5.121,2.11,1.328,0.337, {s:14, b:1, c:C.white});
++  t(s, 'But I must explain to you my how All this mistaken ideao\nf denounceng pleasure.', 5.843,2.521,1.693,0.68, {s:8, p:1, c:C.white, l:1.5});
++  dots(s, 5.121,2.855,0.414, C.green, C.white);
++  rrect(s, 7.831,5.19,2.36,1.41, C.magenta, 0.235);
++  poly(s, P.card, 7.831,5.19,2.646,1.41, C.black);
++  t(s, 'Time-Bound.', 7.962,5.316,1.602,0.337, {s:14, b:1, c:C.white});
++  t(s, 'But I must explain to you my how All this mistaken ideao\nf denounceng pleasure.', 8.684,5.727,1.693,0.68, {s:8, p:1, c:C.white, l:1.5});
++  dots(s, 7.947,6.053,0.414, C.white, C.black);
++  rrect(s, 9.169,3.589,2.36,1.41, C.black, 0.235);
++  poly(s, P.card, 9.169,3.589,2.646,1.41, C.green);
++  t(s, 'Relavant.', 9.299,3.714,1.328,0.337, {s:14, b:1, c:C.white});
++  t(s, 'But I must explain to you my how All this mistaken ideao\nf denounceng pleasure.', 10.022,4.125,1.693,0.68, {s:8, p:1, c:C.white, l:1.5});
++  dots(s, 9.299,4.459,0.414, C.magenta, C.white);
++  t(s, 'At vero eos et accusamus et iusto odio dignis simos ducimus qui blanditiis praesentium.', 1.423,5.731,2.884,0.529, {s:9, l:1.5});
++  pie(s, 1.154,3.992,1.226,0.817, C.green, C.black);
++  t(s, 'Data Statistics.', 2.111,4.401,0.745,0.37, {s:8, p:1});
++  t(s, '12.4', 2.111,3.91,1.069,0.505, {s:24, b:1});
++  pill(s, 4.717,5.848,1.029,0.349, C.purple);
++  t(s, 'Get Started', 4.744,5.848,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 6.119,5.848,1.029,0.349, C.green);
++  t(s, 'Learn More', 6.146,5.848,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  t(s, '90%', 8.1,2.191,1.117,0.572, {s:28, b:1});
++  t(s, 'This theory works smoothly.', 8.097,2.778,1.096,0.37, {s:8});
++  t(s, 'The Details.', 10.149,2.334,1.23,0.286, {s:11, b:1});
++  t(s, 'Duis aute irure dolor in reprehenderit in vol.', 10.149,2.632,1.447,0.481, {s:8, l:1.5});
++  rocket(s, 9.845,2.335,0.284, C.green);
++  circle(s, 9.624,2.397,0.171, C.magenta);
++}
++
++function slide10 (s) {
++  nav(s);
++  rrect(s, 1.43,2.369,2.76,1.73, C.black, 0.288);
++  poly(s, P.card, 1.43,2.369,3.245,1.73, C.magenta);
++  t(s, 'Investment Returns.', 1.609,2.504,1.468,0.572, {s:14, b:1, c:C.white});
++  t(s, 'quis nostrum exercitati on em ullam corporis suscipit labori osam needertiys.', 2.704,3.117,1.848,0.752, {s:9, p:1, c:C.white, l:1.5});
++  circle(s, 3.42,1.979,0.832, C.orange);
++  t(s, '01', 3.42,2.067,0.79,0.572, {s:28, b:1, c:C.white, m:1});
++  dots(s, 1.558,3.453,0.509, C.purple, C.white);
++  rrect(s, 4.978,2.324,2.76,1.73, C.black, 0.288);
++  poly(s, P.card, 4.978,2.324,3.245,1.73, C.purple);
++  t(s, 'Primary Emp\nloyment.', 5.157,2.459,1.468,0.572, {s:14, b:1, c:C.white});
++  t(s, 'quis nostrum exercitati on em ullam corporis suscipit labori osam needertiys.', 6.252,3.072,1.848,0.752, {s:9, p:1, c:C.white, l:1.5});
++  circle(s, 6.978,1.933,0.832, C.magenta);
++  t(s, '02', 6.968,2.022,0.79,0.572, {s:28, b:1, c:C.white, m:1});
++  dots(s, 5.106,3.407,0.509, C.green, C.white);
++  rrect(s, 1.402,4.823,2.76,1.73, C.black, 0.288);
++  poly(s, P.card, 1.402,4.823,3.245,1.73, C.orange);
++  t(s, 'Side Hustle Income.', 1.581,4.958,1.468,0.572, {s:14, b:1, c:C.white});
++  t(s, 'quis nostrum exercitati on em ullam corporis suscipit labori osam needertiys.', 2.676,5.571,1.848,0.752, {s:9, p:1, c:C.white, l:1.5});
++  circle(s, 3.392,4.432,0.832, C.green);
++  t(s, '03', 3.392,4.521,0.79,0.572, {s:28, b:1, c:C.white, m:1});
++  dots(s, 1.53,5.906,0.509, C.magenta, C.white);
++  rrect(s, 4.95,4.777,2.76,1.73, C.black, 0.288);
++  poly(s, P.card, 4.95,4.777,3.245,1.73, C.green);
++  t(s, 'Rental Income.', 5.129,4.912,1.468,0.572, {s:14, b:1, c:C.white});
++  t(s, 'quis nostrum exercitati on em ullam corporis suscipit labori osam needertiys.', 6.224,5.525,1.848,0.752, {s:9, p:1, c:C.white, l:1.5});
++  circle(s, 6.94,4.387,0.832, C.orange);
++  t(s, '04', 6.932,4.475,0.806,0.572, {s:28, b:1, c:C.white, m:1});
++  dots(s, 5.078,5.861,0.509, C.orange, C.white);
++  t(s, 'Creating a Per-sonal or Business Budget.', 8.615,1.929,3.713,1.464, {s:27, b:1});
++  t(s, 'esse cillum dolore eu fugiat nulla pariatur  exc epteurirsint occaecat cupidatat non proide.', 8.615,3.608,2.897,0.529, {s:9, l:1.5});
++  pill(s, 10.887,5.985,1.029,0.349, C.purple);
++  t(s, 'The Details.', 9.234,5.823,1.23,0.286, {s:11, b:1});
++  t(s, 'Duis aute irure dolor in reprehenderit in vol.', 9.234,6.121,1.447,0.481, {s:8, l:1.5});
++  rocket(s, 8.931,5.824,0.284, C.green);
++  circle(s, 8.71,5.886,0.171, C.magenta);
++  t(s, 'Learn More', 10.914,5.985,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 10.241,4.691,1.242,0.349, C.magenta);
++  t(s, 'Discover Now', 10.292,4.691,1.162,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 8.728,4.691,1.029,0.349, C.orange);
++  t(s, 'Get Started', 8.81,4.691,0.887,0.302, {s:9, c:C.white, m:1, l:1.5});
++}
++
++function slide11 (s) {
++  photo(s, 6.163,2.47,3.593,1.898);
++  rrect(s, 10.036,2.47,1.405,1.898, C.magenta, 0.309);
++  nav(s);
++  t(s, 'Importance of Tracking Income & Expenses.', 1.774,2.451,4.177,0.942, {s:25, b:1});
++  t(s, 'eveniet ut et voluptates repudiandae sint et molestiae non recusandae. Itaquesro tiquis nostrum exerci.', 1.799,3.665,3.499,0.525, {s:9, p:1, l:1.5});
++  rrect(s, 1.882,4.681,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 1.882,4.681,3.007,1.603, C.orange);
++  t(s, 'Identifying Spen-\nding Patterns.', 2.082,4.834,1.742,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 2.897,5.492,1.829,0.525, {s:9, p:1, c:C.white, l:1.5});
++  flame(s, 1.985,5.655,0.522, C.purple);
++  rrect(s, 5.159,4.681,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 5.159,4.681,3.007,1.603, C.green);
++  t(s, 'Ensuring Alignment\nwith Financial Goals.', 5.358,4.834,1.896,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 6.174,5.492,1.829,0.525, {s:9, p:1, c:C.white, l:1.5});
++  flame(s, 5.262,5.655,0.522, C.magenta);
++  rrect(s, 8.435,4.676,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 8.435,4.676,3.007,1.603, C.purple);
++  t(s, 'Making Informed\nFinancial Decisions. ', 8.635,4.829,1.896,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 9.45,5.487,1.829,0.525, {s:9, p:1, c:C.white, l:1.5});
++  flame(s, 8.538,5.65,0.522, C.green);
++  dots(s, 6.336,2.661,0.458, C.black, C.white);
++  pie(s, 10.062,2.572,1.348,0.898, C.purple, C.white);
++  t(s, 'Data Statistics.', 10.219,3.957,1.033,0.236, {s:8, p:1, c:C.white, m:1});
++  t(s, '12.4', 10.128,3.385,1.214,0.572, {s:28, b:1, c:C.white, m:1});
++}
++
++function slide12 (s) {
++  photo(s, 1.965,3.6,2.985,1.428);
++  nav(s);
++  rrect(s, 1.943,1.782,2.682,1.603, C.black, 0.267);
++  dots(s, 2.053,2.763,0.509, C.magenta, C.white);
++  poly(s, P.card, 1.943,1.781,3.007,1.603, C.orange);
++  t(s, 'Regular Review.', 2.114,1.907,1.328,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 2.887,2.421,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 1.943,5.259,2.682,1.603, C.black, 0.267);
++  dots(s, 2.053,6.24,0.509, C.green, C.white);
++  poly(s, P.card, 1.943,5.259,3.007,1.603, C.purple);
++  t(s, 'Emergency Fund.', 2.114,5.384,1.328,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 2.887,5.899,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 5.178,3.472,2.682,1.603, C.black, 0.267);
++  dots(s, 5.287,4.453,0.509, C.orange, C.white);
++  poly(s, P.card, 5.178,3.471,3.007,1.603, C.magenta);
++  t(s, 'Prioritized Spending.', 5.349,3.597,1.328,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 6.122,4.111,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 8.412,3.472,2.682,1.603, C.black, 0.267);
++  dots(s, 8.522,4.453,0.509, C.purple, C.white);
++  poly(s, P.card, 8.412,3.471,3.007,1.603, C.green);
++  t(s, 'Use Technology.', 8.583,3.597,1.328,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 9.356,4.111,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rocket(s, 4.366,3.777,0.403, C.black);
++  t(s, 'Tips for Effective Budgeting.', 5.192,2.069,3.519,1.01, {s:27, b:1});
++  t(s, 'eveniet ut et voluptates repudiandae sint et molestiae non recusandae Itaq ue earum.', 5.275,5.792,2.979,0.525, {s:9, p:1, l:1.5});
++  pill(s, 8.67,5.939,1.029,0.349, C.orange);
++  t(s, 'Get Started', 8.698,5.939,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 10.246,5.939,1.029,0.349, C.magenta);
++  t(s, 'Learn More', 10.273,5.939,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pie(s, 9.072,2.18,1.226,0.817, C.orange, C.black);
++  t(s, 'Data Statistics.', 10.029,2.588,0.745,0.37, {s:8, p:1});
++  t(s, '12.4', 10.029,2.098,1.069,0.505, {s:24, b:1});
++}
++
++function slide13 (s) {
++  poly(s, P.bar, 1.835,1.837,4.227,1.047, C.orange);
++  nav(s);
++  t(s, 'Bonds.', 1.977,1.919,1.227,0.337, {s:14, b:1, c:C.white});
++  t(s, 'culpa qui officia deserunt mollitia animi, id est laborum dolorum.', 2.493,2.256,2.215,0.481, {s:8, p:1, c:C.white, l:1.5});
++  t(s, '87%', 4.796,1.928,1.227,0.572, {s:28, b:1, c:C.white});
++  t(s, 'Rate Investment.', 4.801,2.444,1.13,0.279, {s:8, p:1, c:C.white, l:1.5});
++  pie(s, 1.33,2.36,1.214,0.809, C.green, C.black);
++  poly(s, P.bar, 2.682,3.109,4.227,1.047, C.purple);
++  t(s, 'Stocks.', 2.824,3.191,1.227,0.337, {s:14, b:1, c:C.white});
++  t(s, 'culpa qui officia deserunt mollitia animi, id est laborum dolorum.', 3.34,3.528,2.215,0.481, {s:8, p:1, c:C.white, l:1.5});
++  t(s, '87%', 5.643,3.2,1.227,0.572, {s:28, b:1, c:C.white});
++  t(s, 'Rate Investment.', 5.649,3.716,1.13,0.279, {s:8, p:1, c:C.white, l:1.5});
++  pie(s, 2.177,3.633,1.214,0.809, C.orange, C.black);
++  poly(s, P.bar, 3.718,4.409,4.227,1.047, C.magenta);
++  t(s, 'Mutual Funds.', 3.86,4.492,1.575,0.337, {s:14, b:1, c:C.white});
++  t(s, 'culpa qui officia deserunt mollitia animi, id est laborum dolorum.', 4.376,4.828,2.215,0.481, {s:8, p:1, c:C.white, l:1.5});
++  t(s, '87%', 6.679,4.5,1.227,0.572, {s:28, b:1, c:C.white});
++  t(s, 'Rate Investment.', 6.684,5.016,1.13,0.279, {s:8, p:1, c:C.white, l:1.5});
++  pie(s, 3.213,4.933,1.214,0.809, C.purple, C.black);
++  poly(s, P.bar, 4.565,5.682,4.227,1.047, C.green);
++  t(s, 'Real Estate.', 4.707,5.764,1.723,0.337, {s:14, b:1, c:C.white});
++  t(s, 'culpa qui officia deserunt mollitia animi, id est laborum dolorum.', 5.223,6.1,2.215,0.481, {s:8, p:1, c:C.white, l:1.5});
++  t(s, '87%', 7.526,5.773,1.227,0.572, {s:28, b:1, c:C.white});
++  t(s, 'Rate Investment.', 7.532,6.289,1.13,0.279, {s:8, p:1, c:C.white, l:1.5});
++  pie(s, 4.06,6.205,1.214,0.809, C.magenta, C.black);
++  t(s, 'Types of Investment.', 6.553,1.751,3.173,1.178, {s:32, b:1});
++  t(s, 'culpa qui officia deserunt mollitia animi, id est laborum dolorum fuga.', 7.353,3.303,2.26,0.525, {s:9, p:1, l:1.5});
++  pill(s, 8.428,4.749,1.029,0.349, C.orange);
++  t(s, 'Get Started', 8.455,4.749,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 9.83,4.749,1.029,0.349, C.purple);
++  t(s, 'Learn More', 9.858,4.749,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 9.386,5.933,0.153,0.504, C.black);
++  pill(s, 9.566,6.112,0.153,0.325, C.black);
++  pill(s, 9.747,6.172,0.153,0.265, C.black);
++  pill(s, 9.927,5.912,0.153,0.525, C.black);
++  pill(s, 10.112,6,0.153,0.437, C.black);
++  t(s, '198.876', 10.406,5.838,1.253,0.438, {s:20, b:1});
++  t(s, 'Statistics Point.', 10.421,6.244,1.206,0.236, {s:8});
++}
++
++function slide14 (s) {
++  nav(s);
++  donut(s, 6.83,1.746,2.057,1.371, C.purple, C.green);
++  circle(s, 7.582,2.143,0.578, C.black);
++  t(s, '15%', 7.449,2.268,0.854,0.303, {s:12, b:1, c:C.white, m:1});
++  t(s, 'Real Estate.', 5.314,1.915,1.575,0.458, {s:16, b:1, l:1.5});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 5.31,2.373,1.829,0.529, {s:9, p:1, l:1.5});
++  donut(s, 10.286,1.74,2.057,1.371, C.purple, C.green);
++  circle(s, 11.038,2.136,0.578, C.black);
++  t(s, '15%', 10.904,2.262,0.854,0.303, {s:12, b:1, c:C.white, m:1});
++  t(s, 'Stock.', 8.756,1.863,1.575,0.458, {s:16, b:1, l:1.5});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 8.77,2.394,1.829,0.525, {s:9, p:1, l:1.5});
++  donut(s, 6.832,3.379,2.057,1.371, C.purple, C.green);
++  circle(s, 7.584,3.776,0.578, C.black);
++  t(s, '15%', 7.451,3.901,0.854,0.303, {s:12, b:1, c:C.white, m:1});
++  t(s, 'Bound.', 5.287,3.421,1.575,0.458, {s:16, b:1, l:1.5});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 5.302,3.984,1.829,0.525, {s:9, p:1, l:1.5});
++  donut(s, 10.286,3.379,2.057,1.371, C.purple, C.green);
++  circle(s, 11.038,3.776,0.578, C.black);
++  t(s, '15%', 10.904,3.901,0.854,0.303, {s:12, b:1, c:C.white, m:1});
++  t(s, 'Mutual Funds.', 8.756,3.428,1.829,0.458, {s:16, b:1, l:1.5});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 8.771,3.991,1.829,0.525, {s:9, p:1, l:1.5});
++  rrect(s, 5.387,5.102,2.682,1.603, C.black, 0.267);
++  dots(s, 5.496,6.083,0.509, C.magenta, C.white);
++  poly(s, P.card, 5.387,5.101,3.007,1.603, C.orange);
++  t(s, 'Maximize Return.', 5.558,5.227,1.328,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 6.331,5.741,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 8.818,5.097,2.682,1.603, C.black, 0.267);
++  dots(s, 8.928,6.078,0.509, C.green, C.white);
++  poly(s, P.card, 8.818,5.096,3.007,1.603, C.magenta);
++  t(s, 'Spread Risk.', 8.989,5.222,0.926,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 9.762,5.736,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  t(s, 'Diversi-\nfication.', 1.408,1.895,2.149,1.178, {s:32, b:1});
++  t(s, 'exercitationem ullam corporis susc ipit laboriosam, nisi ut aliquid ex ea.', 1.41,3.386,2.348,0.529, {s:9, l:1.5});
++  pill(s, 3.032,4.554,1.242,0.349, C.purple);
++  t(s, 'Discover Now', 3.083,4.554,1.162,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 1.519,4.554,1.029,0.349, C.orange);
++  t(s, 'Get Started', 1.601,4.554,0.887,0.302, {s:9, c:C.white, m:1, l:1.5});
++  t(s, 'The Details.', 2.03,5.888,1.23,0.286, {s:11, b:1});
++  t(s, 'Duis aute irure dolor in reprehenderit in vol.', 2.03,6.186,1.447,0.481, {s:8, l:1.5});
++  rocket(s, 1.726,5.889,0.284, C.magenta);
++  circle(s, 1.505,5.951,0.171, C.purple);
++  pie(s, 3.524,5.516,0.957,0.638, C.green, C.black);
++  t(s, 'Data Statistics.', 3.753,6.447,1.018,0.236, {s:8, p:1});
++  t(s, '12.4', 3.74,6.009,0.729,0.438, {s:20, b:1});
++}
++
++function slide15 (s) {
++  photo(s, 2.523,1.781,4.008,1.654);
++  nav(s);
++  rrect(s, 8.122,3.435,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 7.798,3.435,3.007,1.603, C.magenta, 180);
++  dots(s, 10.191,3.555,0.509, C.purple, C.white);
++  t(s, 'Periodic Review.', 7.969,3.588,0.997,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 7.977,4.117,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 8.122,5.259,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 7.798,5.259,3.007,1.603, C.orange, 180);
++  dots(s, 10.191,5.379,0.509, C.green, C.white);
++  t(s, 'Risk Tolerance Assessment.', 7.969,5.411,1.456,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 7.977,5.941,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 4.883,5.259,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 4.558,5.259,3.007,1.603, C.green, 180);
++  dots(s, 6.951,5.379,0.509, C.magenta, C.white);
++  t(s, 'Strategic Planning.', 4.729,5.411,1.281,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 4.738,5.941,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  t(s, 'Risk Tolerance & Investment Planning.', 6.914,2.022,4.403,1.01, {s:27, b:1});
++  t(s, 'exercitationem ullam corporis sus cipit laboriosam, nisi ut aliquid exi ea cominfo bjirlah katagwth.', 4.771,3.894,2.594,0.901, {s:11, p:1, l:1.5});
++  dots(s, 2.673,1.97,0.378, C.black, C.white);
++  rrect(s, 2.524,3.689,1.801,1.898, C.purple, 0.304);
++  pie(s, 2.768,3.77,1.323,0.882, C.magenta, C.white);
++  t(s, 'Data Statistics.', 2.673,5.161,1.431,0.236, {s:8, p:1, c:C.white, m:1});
++  t(s, '12.4', 2.768,4.483,1.319,0.707, {s:36, b:1, c:C.white, m:1});
++  t(s, 'The Details.', 2.935,5.875,1.23,0.286, {s:11, b:1});
++  t(s, 'Duis aute irure dolor in reprehenderit in vol.', 2.935,6.173,1.447,0.481, {s:8, l:1.5});
++  rocket(s, 2.631,5.876,0.284, C.orange);
++}
++
++function slide16 (s) {
++  nav(s);
++  t(s, 'architecto beatae vitae dicta sunt explicabo. Nemo enimip sam voluptatem quia.', 5.389,3.698,2.462,0.752, {s:9, p:1, m:1, l:1.5});
++  t(s, 'Strategies for Building\na Retirement Fund.', 4.499,1.992,4.379,1.01, {s:27, b:1, m:1});
++  t(s, '90%', 2.08,1.992,1.307,0.606, {s:30, b:1});
++  t(s, 'finances are well managed.', 2.082,2.615,1.055,0.37, {s:8});
++  rrect(s, 2.177,3.321,2.682,1.603, C.black, 0.267);
++  dots(s, 2.286,4.301,0.509, C.green, C.white);
++  poly(s, P.card, 2.177,3.32,3.007,1.603, C.orange);
++  t(s, 'Diversifi-\nCation.', 2.348,3.445,1.328,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 3.12,3.96,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 5.153,4.923,2.682,1.593, C.black, 0.266);
++  dots(s, 5.263,5.904,0.509, C.magenta, C.white);
++  poly(s, P.card, 5.153,4.922,3.007,1.603, C.green);
++  t(s, 'Consistent Contributions.', 5.324,5.048,1.328,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 6.097,5.562,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 8.16,3.328,2.682,1.603, C.black, 0.267);
++  dots(s, 8.269,4.309,0.509, C.purple, C.white);
++  poly(s, P.card, 8.16,3.327,3.007,1.603, C.magenta);
++  t(s, 'Review &\nAdjust.', 8.331,3.453,1.328,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 9.103,3.967,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  pie(s, 8.778,5.468,1.226,0.817, C.orange, C.black);
++  t(s, 'Data Statistics.', 9.735,5.877,0.745,0.37, {s:8, p:1});
++  t(s, '12.4', 9.735,5.386,1.069,0.505, {s:24, b:1});
++  t(s, 'The Details.', 3.087,5.459,1.23,0.286, {s:11, b:1});
++  t(s, 'Duis aute irure dolor in reprehenderit in vol.', 3.087,5.757,1.447,0.481, {s:8, l:1.5});
++  rocket(s, 2.783,5.46,0.284, C.green);
++  circle(s, 2.562,5.522,0.171, C.magenta);
++  t(s, '90%', 10.17,2.011,1.117,0.572, {s:28, b:1});
++  t(s, 'This theory works smoothly.', 10.167,2.598,1.096,0.37, {s:8});
++}
++
++function slide17 (s) {
++  photo(s, 1.857,5.015,4.008,1.848);
++  nav(s);
++  rrect(s, 1.857,3.001,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 1.857,3.001,3.007,1.603, C.orange);
++  t(s, 'Risk Mitigation. ', 2.057,3.134,1.139,0.539, {s:13, b:1, c:C.white});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 2.872,3.812,1.829,0.525, {s:9, p:1, c:C.white, l:1.5});
++  flame(s, 1.96,3.975,0.522, C.purple);
++  dots(s, 4.251,3.21,0.369, C.black, C.white);
++  rrect(s, 5.161,3.001,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 5.161,3.001,3.007,1.603, C.green);
++  t(s, 'Financial Stability.', 5.361,3.134,1.139,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 6.176,3.812,1.829,0.525, {s:9, p:1, c:C.white, l:1.5});
++  flame(s, 5.264,3.975,0.522, C.magenta);
++  dots(s, 7.555,3.21,0.369, C.black, C.white);
++  rrect(s, 8.465,3.001,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 8.465,3.001,3.007,1.603, C.magenta);
++  t(s, 'Peace of Mind.', 8.665,3.134,1.139,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you ho\nAll this mistaken idea.', 9.48,3.812,1.829,0.525, {s:9, p:1, c:C.white, l:1.5});
++  flame(s, 8.568,3.975,0.522, C.orange);
++  dots(s, 10.859,3.21,0.369, C.black, C.white);
++  t(s, 'On the other hand, we den ounce with righteo us indi gnation and dislike.', 6.176,5.464,2.188,0.901, {s:11, l:1.5});
++  t(s, 'Importance of Insurance in Financial Planning.', 6.976,1.627,4.919,1.01, {s:27, b:1});
++  pill(s, 8.892,5.764,1.029,0.349, C.orange);
++  t(s, 'Get Started', 8.92,5.764,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 10.468,5.764,1.029,0.349, C.green);
++  t(s, 'Learn More', 10.495,5.764,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  t(s, 'income is greater than expenses.', 4.726,2.178,1.319,0.37, {s:8, p:1});
++  t(s, '80%', 4.68,1.687,1.393,0.505, {s:24, b:1});
++  pie(s, 1.857,1.817,1.069,0.713, C.magenta, C.black);
++  t(s, 'Data Statistics.', 2.709,2.175,0.745,0.37, {s:8, p:1});
++  t(s, '12.4', 2.709,1.684,1.069,0.505, {s:24, b:1});
++  pieIcon(s, 1.998,5.188,0.43, C.black);
++}
++
++function slide18 (s) {
++  nav(s);
++  t(s, ' Itaque earum rerum hic tenetur a sapi delectus, ut aut reiciendis volups. pain and trouble that are.', 1.907,3.51,3.255,0.529, {s:9, p:1, l:1.5});
++  t(s, 'Will, Trusts, and\nPower of Attorney.', 1.907,2.213,3.92,1.01, {s:27, b:1});
++  poly(s, P.bar, 7.054,2.314,4.227,1.047, C.orange);
++  t(s, 'Trusts.', 7.195,2.396,1.227,0.337, {s:14, b:1, c:C.white});
++  t(s, 'culpa qui officia deserunt mollitia animi, id est laborum dolorum.', 7.712,2.732,2.215,0.481, {s:8, p:1, c:C.white, l:1.5});
++  t(s, '87%', 10.014,2.405,1.227,0.572, {s:28, b:1, c:C.white});
++  t(s, 'Rate Strategy.', 10.02,2.921,1.13,0.279, {s:8, p:1, c:C.white, l:1.5});
++  poly(s, P.bar, 7.054,3.792,4.227,1.047, C.green);
++  t(s, 'Wills.', 7.195,3.875,1.227,0.337, {s:14, b:1, c:C.white});
++  t(s, 'culpa qui officia deserunt mollitia animi, id est laborum dolorum.', 7.712,4.211,2.215,0.481, {s:8, p:1, c:C.white, l:1.5});
++  t(s, '92%', 10.014,3.883,1.227,0.572, {s:28, b:1, c:C.white});
++  t(s, 'Rate Strategy.', 10.02,4.399,1.13,0.279, {s:8, p:1, c:C.white, l:1.5});
++  poly(s, P.bar, 7.054,5.265,4.227,1.047, C.purple);
++  t(s, 'Power of Attorney.', 7.195,5.347,2.03,0.337, {s:14, b:1, c:C.white});
++  t(s, 'culpa qui officia deserunt mollitia animi, id est laborum dolorum.', 7.712,5.683,2.215,0.481, {s:8, p:1, c:C.white, l:1.5});
++  t(s, '78%', 10.014,5.356,1.227,0.572, {s:28, b:1, c:C.white});
++  t(s, 'Rate Strategy.', 10.02,5.872,1.13,0.279, {s:8, p:1, c:C.white, l:1.5});
++  pill(s, 2.008,4.756,1.029,0.349, C.orange);
++  t(s, 'Get Started', 2.035,4.756,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 3.564,4.756,1.029,0.349, C.magenta);
++  t(s, 'Learn More', 3.591,4.756,0.997,0.302, {s:9, c:C.white, m:1, l:1.5});
++  pill(s, 2.008,5.788,0.153,0.504, C.black);
++  pill(s, 2.188,5.944,0.153,0.349, C.black);
++  pill(s, 2.369,5.693,0.153,0.6, C.black);
++  t(s, '198.876', 2.634,5.645,1.253,0.438, {s:20, b:1});
++  t(s, 'Statistics Point.', 2.649,6.051,1.206,0.236, {s:8});
++  t(s, 'The Details.', 4.814,5.627,1.23,0.286, {s:11, b:1});
++  t(s, 'Duis aute irure dolor in reprehenderit in vol.', 4.814,5.925,1.447,0.481, {s:8, l:1.5});
++  rocket(s, 4.511,5.628,0.284, C.green);
++  circle(s, 4.29,5.69,0.171, C.magenta);
++  pie(s, 6.694,2.88,1.002,0.668, C.magenta, C.black);
++  pie(s, 6.71,4.348,1.002,0.668, C.orange, C.black);
++  pie(s, 6.694,5.809,1.002,0.668, C.green, C.black);
++}
++
++function slide19 (s) {
++  photo(s, 1.844,4.999,3.993,1.848);
++  photo(s, 7.354,4.999,4.135,1.848);
++  nav(s);
++  rrect(s, 8.823,1.781,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 8.498,1.781,3.007,1.603, C.magenta, 180);
++  dots(s, 10.891,1.901,0.509, C.orange, C.white);
++  t(s, 'Professional Guidance.', 8.669,1.934,1.281,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 8.678,2.463,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 2.168,1.781,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 1.844,1.781,3.007,1.603, C.orange, 180);
++  dots(s, 4.237,1.901,0.509, C.green, C.white);
++  t(s, 'Clear Communication.', 2.015,1.934,1.777,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 2.023,2.463,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  rrect(s, 5.492,1.781,2.682,1.603, C.black, 0.267);
++  poly(s, P.card, 5.167,1.781,3.007,1.603, C.green, 180);
++  dots(s, 7.56,1.901,0.509, C.magenta, C.white);
++  t(s, 'Regular Updates.', 5.338,1.934,1.219,0.505, {s:12, b:1, c:C.white});
++  t(s, 'But I must explain to you how\nAll this mistaken idea of deno\nunceng pleasure.', 5.346,2.463,1.986,0.752, {s:9, p:1, c:C.white, l:1.5});
++  t(s, 'Lorem ipsum dolor sit amet, con secte tur adipiscing elit, sed doi eiusmod.', 6.082,3.944,2.502,0.525, {s:9, p:1, l:1.5});
++  t(s, 'Easuring a Smooth Transfer of Assets.', 1.83,3.698,3.92,1.01, {s:27, b:1});
++  t(s, 'The Details.', 9.791,3.778,1.23,0.286, {s:11, b:1});
++  t(s, 'Duis aute irure dolor in reprehenderit in vol.', 9.791,4.076,1.447,0.481, {s:8, l:1.5});
++  rocket(s, 9.487,3.779,0.284, C.purple);
++  circle(s, 9.266,3.841,0.171, C.magenta);
++  pie(s, 5.898,5.088,1.226,0.817, C.orange, C.black);
++  t(s, 'Data Statistics.', 6.156,6.365,1.069,0.236, {s:8, p:1});
++  t(s, '12.4', 6.156,5.86,1.069,0.505, {s:24, b:1});
++  flame(s, 2.015,5.183,0.411, C.purple);
++  flame(s, 7.571,5.183,0.411, C.purple);
++}
++
++function slide20 (s) {
++  pill(s, 1.549,5.929,1.641,0.51, C.purple);
++  nav(s);
++  t(s, 'Thank You.', 1.409,1.892,5.291,3.332, {s:96, b:1});
++  t(s, '@social_media', 1.593,6.032,1.561,0.303, {s:12, b:1, c:C.white, m:1});
++  rrect(s, 8.083,1.749,3.675,5.08, C.slate, 0.272);
++  rrect(s, 8.113,1.773,3.616,5.036, C.black, 0.274);
++  pill(s, 3.38,5.929,1.641,0.51, C.orange);
++  t(s, '+00 111 222 333', 3.424,6.032,1.561,0.303, {s:12, b:1, c:C.white, m:1});
++  pill(s, 5.212,5.929,2.338,0.51, C.green);
++  t(s, 'thegreatsite@mail.com', 5.385,6.032,2.103,0.303, {s:12, b:1, c:C.white, m:1});
++  photo(s, 8.31,1.97,3.224,4.662);
++  flame(s, 10.839,2.175,0.522, C.magenta);
++}
++
++const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07,
++                slide08, slide09, slide10, slide11, slide12, slide13, slide14,
++                slide15, slide16, slide17, slide18, slide19, slide20];
++
++// ------------------------------------------------------------------- main --
++function build () {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++  pptx.layout = 'WIDE';
++  pptx.author = 'Kandash.';
++  pptx.title = 'Financing Planning Presentation';
++
++  SLIDES.forEach(function (draw) {
++    const s = pptx.addSlide();
++    s.background = { color: C.bg };
++    draw(s);
++  });
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '1938537d-f905-4470-90ee-d5b171303f4f_grok_final.pptx')
++  });
++}
++
++build().then(function (f) { console.log('wrote ' + f); },
++             function (e) { console.error(e); process.exit(1); });

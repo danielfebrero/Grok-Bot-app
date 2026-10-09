@@ -1,0 +1,676 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/retail_merchandise_display_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/retail_merchandise_display_presentation.js
+@@ -0,0 +1,673 @@
++/*
++ * "Merchandise Display" — 25-slide deck rebuilt with pptxgenjs.
++ *
++ * Slide size 13.333 x 7.5 in.  Theme fonts: Poppins Medium (headings) /
++ * Inter Light (body).  Raster photos of the source deck are re-created here
++ * with native shapes (see the mockup / icon helpers below).
++ *
++ * Run:  node 0af5a0b5-5f53-44aa-b6c3-5c3e128289b0_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Palette + typography (deck theme)
++ * ------------------------------------------------------------------ */
++const C = {
++  orange: 'FF6D00', // accent5 — primary brand orange
++  amber: 'FF8500', // accent4
++  deepOrange: 'FF5400', // accent6
++  white: 'FFFFFF',
++  black: '000000',
++  ink: '404040', // tx1 @ 75% lum — headline grey
++  body: '666666', // paragraph grey
++  navInk: '262626', // tx1 @ 85% lum — nav bar (layouts 2-11)
++  bgGrey: 'F2F2F2', // bg1 @ 95% lum — page background
++  panel: 'E7E6E6', // bg2 — light card
++  track: 'D9D9D9', // bg1 @ 85% lum — gauge / bar track
++  rule: 'DEE2E6', // accent1 — hairline divider
++  darkFrame: '1D1D1D', // device mockup body
++  mapLand: 'E6E6E7' // inactive map regions
++};
++
++const HEAD = 'Poppins Medium'; // theme major font
++const BODY = 'Inter Light'; // theme minor font
++
++/* Text option builders. Every text box in the source deck carries
++ * spAutoFit, hence `fit: 'resize'` on the shared base. */
++const T = (o) => Object.assign({ fontFace: BODY, fontSize: 18, color: C.black, valign: 'top', fit: 'resize' }, o);
++const para = (o) => T(Object.assign({ fontSize: 12, color: C.body, lineSpacingMultiple: 1.5 }, o));
++const head = (o) => T(Object.assign({ fontFace: HEAD, fontSize: 40, color: C.ink }, o));
++const num = (o) => T(Object.assign({ fontFace: HEAD, fontSize: 24, color: C.orange, wrap: false }, o));
++const capt = (o) => T(Object.assign({ fontFace: HEAD, fontSize: 12, wrap: false }, o));
++
++/* Filler paragraphs reused across the deck ---------------------------- */
++const L = {
++  full: 'The European languages are members of the same family. Their separate existence is a myth. For science, music, sport, etc, Europe uses the same vocabulary. The languages only differ in their grammar, their pronunciation',
++  long: 'The European languages are members of the same family. Their separate existence is a myth. For science, music, sport, etc, Europe uses the same vocabulary. The languages only differ in their grammar, their pronunciation and their most common words.',
++  vocab: 'The European languages are members of the same family. Their separate existence is a myth. For science, music, sport, etc, Europe uses the same vocabulary. ',
++  europe: 'The European languages are members of the same family. Their separate existence is a myth. For science, music, sport, etc, Europe',
++  myth: 'The European languages are members of the same family. Their separate existence is a myth. ',
++  exist: 'The European languages are members of the same family. Their separate existence',
++  sep: 'The European languages are members of the same family. Their separate',
++  dot: 'The European languages are members of the same family.',
++  dotSp: 'The European languages are members of the same family. ',
++  plain: 'The European languages are members of the same family',
++  everyone: 'Everyone realizes why a new common language would be desirable: one could refuse to pay expensive translators. To achieve this, it would be necessary to have uniform grammar, pronunciation and more common words.',
++  desirable: 'Everyone realizes why a new common language would be desirable',
++  members: 'The European languages are members Family.',
++  membersDot: 'The European languages are members.'
++};
++
++/* ------------------------------------------------------------------ *
++ * Deck-wide furniture
++ * ------------------------------------------------------------------ */
++const NAV = [
++  { text: 'Merchandise Display', x: 0.602, w: 1.838 },
++  { text: 'Contact Us', x: 9.38, w: 1.071 },
++  { text: 'About Us', x: 10.73, w: 0.928 },
++  { text: '2039', x: 11.937, w: 0.612 }
++];
++
++/** Top navigation strip painted by the slide layouts on every page. */
++function addNav(slide, color) {
++  NAV.forEach((n) => {
++    slide.addText(n.text, T({ x: n.x, y: 0.601, w: n.w, h: 0.303, fontSize: 12, color: color, wrap: false }));
++  });
++}
++
++/** New slide with background colour and (optional) nav bar. */
++function page(pptx, opts) {
++  opts = opts || {};
++  const slide = pptx.addSlide();
++  slide.background = { color: opts.bg || C.bgGrey };
++  if (opts.nav !== false) addNav(slide, opts.navColor || C.navInk);
++  return slide;
++}
++
++/* ------------------------------------------------------------------ *
++ * Reusable graphics
++ * ------------------------------------------------------------------ */
++
++/** Rounded pill holding a big number plus a small caption beside it. */
++function pill(slide, o) {
++  slide.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: { color: o.fill || C.orange }, line: { type: 'none' },
++    rectRadius: o.radius === undefined ? 0.12 : o.radius
++  });
++  slide.addText(o.value, num({ x: o.vx, y: o.vy, w: o.vw, h: o.vh, fontSize: o.vSize || 24, color: C.white }));
++  slide.addText(o.caption, capt({ x: o.cx, y: o.cy, w: o.cw, h: 0.303, color: C.white }));
++}
++
++/** Ring gauge: grey track, orange 90% sweep, hole, centred percentage. */
++function ringGauge(slide, o) {
++  const hole = o.size * 0.8125;
++  const inset = (o.size - hole) / 2;
++  slide.addShape('ellipse', { x: o.x, y: o.y, w: o.size, h: o.size, fill: { color: C.track }, line: { type: 'none' } });
++  slide.addShape('pie', {
++    x: o.x, y: o.y, w: o.size, h: o.size,
++    fill: { color: o.color }, line: { type: 'none' },
++    angleRange: [319.4, 270]
++  });
++  slide.addShape('ellipse', { x: o.x + inset, y: o.y + inset, w: hole, h: hole, fill: { color: C.bgGrey }, line: { type: 'none' } });
++  slide.addText(o.text, num({ x: o.tx, y: o.ty, w: o.tw, h: o.th, fontSize: o.fontSize, color: C.amber, align: 'center' }));
++}
++
++/** Check mark built from two rotated rounded bars. */
++function tick(slide, x, y, color) {
++  slide.addShape('roundRect', { x: x - 0.005, y: y + 0.062, w: 0.085, h: 0.032, rotate: 45, fill: { color: color }, line: { type: 'none' }, rectRadius: 0.016 });
++  slide.addShape('roundRect', { x: x + 0.03, y: y + 0.052, w: 0.16, h: 0.032, rotate: -50, fill: { color: color }, line: { type: 'none' }, rectRadius: 0.016 });
++}
++
++/** Tick + one line of list copy. */
++function bulletRow(slide, o) {
++  tick(slide, o.x, o.y + 0.112, o.color);
++  slide.addText(o.text, para({ x: o.x + 0.247, y: o.y, w: o.w, h: 0.368, color: o.color }));
++}
++
++/* --- flat icon glyphs (freeform vectors in the source) -------------- */
++
++/** Briefcase. */
++function iconBriefcase(slide, x, y, w, h, color) {
++  slide.addShape('roundRect', { x: x + w * 0.34, y: y, w: w * 0.32, h: h * 0.30, fill: { type: 'none' }, line: { color: color, width: Math.max(1, h * 22) }, rectRadius: h * 0.09 });
++  slide.addShape('roundRect', { x: x, y: y + h * 0.20, w: w, h: h * 0.80, fill: { color: color }, line: { type: 'none' }, rectRadius: h * 0.12 });
++  slide.addShape('ellipse', { x: x + w * 0.37, y: y + h * 0.45, w: w * 0.26, h: h * 0.26, fill: { color: C.bgGrey }, line: { type: 'none' } });
++}
++
++/** Wallet. */
++function iconWallet(slide, x, y, w, h, color) {
++  slide.addShape('roundRect', { x: x, y: y, w: w, h: h, fill: { color: color }, line: { type: 'none' }, rectRadius: h * 0.18 });
++  slide.addShape('roundRect', { x: x + w * 0.70, y: y + h * 0.30, w: w * 0.30, h: h * 0.40, fill: { color: C.bgGrey }, line: { type: 'none' }, rectRadius: h * 0.12 });
++  slide.addShape('ellipse', { x: x + w * 0.78, y: y + h * 0.41, w: w * 0.10, h: h * 0.18, fill: { color: color }, line: { type: 'none' } });
++}
++
++/** Globe (disc + meridians knocked out in the bar colour). */
++function iconGlobe(slide, x, y, size, color, cut) {
++  slide.addShape('ellipse', { x: x, y: y, w: size, h: size, fill: { color: color }, line: { type: 'none' } });
++  slide.addShape('ellipse', { x: x + size * 0.30, y: y, w: size * 0.40, h: size, fill: { type: 'none' }, line: { color: cut, width: 1.25 } });
++  [0.30, 0.5, 0.70].forEach((f) => {
++    slide.addShape('line', { x: x + size * 0.04, y: y + size * f, w: size * 0.92, h: 0, line: { color: cut, width: 1.25 } });
++  });
++}
++
++/** Map pin with a dollar sign. */
++function iconPin(slide, x, y, w, h, color, cut) {
++  slide.addShape('triangle', { x: x + w * 0.12, y: y + w * 0.50, w: w * 0.76, h: h - w * 0.50, fill: { color: color }, line: { type: 'none' }, flipV: true });
++  slide.addShape('ellipse', { x: x, y: y, w: w, h: w, fill: { color: color }, line: { type: 'none' } });
++  slide.addShape('ellipse', { x: x + w * 0.13, y: y + w * 0.13, w: w * 0.74, h: w * 0.74, fill: { color: cut }, line: { type: 'none' } });
++  slide.addText('$', T({ x: x + w * 0.18, y: y + w * 0.10, w: w * 0.64, h: w * 0.62, fontFace: HEAD, fontSize: 19, bold: true, color: color, align: 'center', valign: 'middle', fit: 'none' }));
++}
++
++/** Cog. */
++function iconGear(slide, x, y, size, color, cut) {
++  slide.addShape('gear9', { x: x, y: y, w: size, h: size, fill: { color: color }, line: { type: 'none' }, rotate: 10 });
++  slide.addShape('ellipse', { x: x + size * 0.30, y: y + size * 0.30, w: size * 0.40, h: size * 0.40, fill: { color: cut }, line: { type: 'none' } });
++}
++
++/* --- photo stand-ins ------------------------------------------------ */
++
++/** Opening double quote (slide 22) — two comma-shaped teardrops. */
++function quoteGlyph(slide, x, y, color) {
++  [0, 0.30].forEach((dx) => {
++    slide.addShape('teardrop', { x: x + dx, y: y, w: 0.25, h: 0.32, fill: { color: color }, line: { type: 'none' } });
++  });
++}
++
++/** Phone mockup (slide 9): frame, bezel, screen, notch and side buttons. */
++function phoneMockup(slide, x, y, w, h) {
++  slide.addShape('roundRect', { x: x, y: y, w: w, h: h, fill: { color: '3A3A3C' }, line: { type: 'none' }, rectRadius: 0.55 });
++  slide.addShape('roundRect', { x: x + 0.08, y: y + 0.07, w: w - 0.16, h: h - 0.07, fill: { color: C.darkFrame }, line: { type: 'none' }, rectRadius: 0.50 });
++  slide.addShape('roundRect', { x: x + 0.30, y: y + 0.14, w: w - 0.60, h: h - 0.14, fill: { color: C.bgGrey }, line: { type: 'none' }, rectRadius: 0.40 });
++  slide.addShape('roundRect', { x: x + w / 2 - 1.15, y: y + 0.14, w: 2.30, h: 0.56, fill: { color: C.darkFrame }, line: { type: 'none' }, rectRadius: 0.26 });
++  // Side buttons.
++  [[y + 0.90, 0.32], [y + 1.45, 0.60], [y + 2.20, 0.60]].forEach((b) => {
++    slide.addShape('roundRect', { x: x - 0.015, y: b[0], w: 0.05, h: b[1], fill: { color: '3A3A3C' }, line: { type: 'none' }, rectRadius: 0.025 });
++  });
++  slide.addShape('roundRect', { x: x + w - 0.035, y: y + 1.60, w: 0.05, h: 0.95, fill: { color: '3A3A3C' }, line: { type: 'none' }, rectRadius: 0.025 });
++}
++
++/** Laptop mockup (slide 10). */
++function laptopMockup(slide, x, y, w, h) {
++  slide.addShape('roundRect', { x: x, y: y, w: w, h: h, fill: { color: C.darkFrame }, line: { type: 'none' }, rectRadius: 0.14 });
++  slide.addShape('rect', { x: x + 0.10, y: y + 0.31, w: w - 0.34, h: h - 0.65, fill: { color: C.bgGrey }, line: { type: 'none' } });
++  slide.addShape('roundRect', { x: x - 0.40, y: y + h + 0.05, w: w + 1.2, h: 0.11, fill: { color: '4A4A4F' }, line: { type: 'none' }, rectRadius: 0.055 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++// 1 — Title (full orange)
++function slide01(pptx) {
++  const s = page(pptx, { bg: C.orange, navColor: C.white });
++  s.addText('Merchandise Display', head({ x: 0.705, y: 2.472, w: 6.828, h: 1.915, fontSize: 66, color: C.white, lineSpacingMultiple: 0.8 }));
++  s.addText('Colection Merchandise Presentation Template', T({ x: 0.705, y: 4.686, w: 5.052, h: 0.37, fontSize: 16, color: C.white }));
++  s.addShape('roundRect', { x: 0.85, y: 5.355, w: 1.058, h: 0.37, fill: { color: C.white }, line: { type: 'none' }, rectRadius: 0.05 });
++  s.addText('Explore', T({ x: 0.986, y: 5.389, w: 0.787, h: 0.303, fontSize: 12, color: 'BF5200', wrap: false }));
++}
++
++// 2 — Introduction
++function slide02(pptx) {
++  const s = page(pptx);
++  s.addText('Introduction', T({ x: 6.811, y: 2.054, w: 1.683, h: 0.37, fontFace: HEAD, fontSize: 16, color: C.ink, wrap: false }));
++  s.addText([
++    { text: 'Where ' }, { text: 'Products ', options: { color: C.orange } }, { text: 'Meet Attention' }
++  ], head({ x: 6.811, y: 2.587, w: 5.3, h: 1.182, lineSpacingMultiple: 0.8 }));
++  s.addText(L.full, para({ x: 6.811, y: 3.932, w: 4.946, h: 1.277 }));
++}
++
++// 3 — Two-column intro copy
++function slide03(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'The Art Of ' }, { text: 'Visual Product', options: { color: C.orange } }, { text: ' Presentation' }
++  ], head({ x: 1.333, y: 2.096, w: 6.967, h: 1.2, lineSpacingMultiple: 0.8 }));
++  s.addText(L.long, para({ x: 1.333, y: 4.492, w: 5.333, h: 1.277, align: 'justify' }));
++  s.addText(L.everyone, para({ x: 7.217, y: 4.492, w: 4.783, h: 1.277, align: 'justify', color: C.ink }));
++}
++
++// 4 — Our story
++function slide04(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'Our Story in Retail ' }, { text: 'Innovation', options: { color: C.orange } }
++  ], head({ x: 1.677, y: 2.029, w: 5.068, h: 1.2, color: C.black, lineSpacingMultiple: 0.8 }));
++  s.addText(L.vocab, para({ x: 1.677, y: 3.476, w: 5.619, h: 0.974 }));
++  s.addText(L.desirable, para({ x: 3.39, y: 4.747, w: 3.277, h: 0.671, color: C.ink }));
++  s.addText('+390', num({ x: 1.732, y: 4.747, w: 1.508, h: 0.707, fontSize: 36 }));
++  s.addShape('roundRect', { x: 8.207, y: 2.472, w: 0.743, h: 0.754, fill: { color: C.orange }, line: { type: 'none' }, rectRadius: 0.12 });
++  iconGear(s, 8.368, 2.634, 0.41, C.white, C.orange);
++}
++
++// 5 — Vision & Mission
++function slide05(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'Vision & ' }, { text: 'Mission', options: { color: C.orange } }
++  ], head({ x: 1.478, y: 2.036, w: 4.737, h: 0.774, color: C.black, wrap: false }));
++  s.addText(L.plain, para({ x: 1.534, y: 2.8, w: 5.619, h: 0.368 }));
++  s.addText('Our Vision', T({ x: 1.534, y: 3.815, w: 0.967, h: 0.707, fontFace: HEAD }));
++  s.addText(L.myth, para({ x: 2.977, y: 3.815, w: 3.953, h: 0.671 }));
++  s.addText('Our Mission', T({ x: 1.534, y: 4.881, w: 1.167, h: 0.707, fontFace: HEAD, color: C.orange }));
++  s.addText(L.myth, para({ x: 2.977, y: 4.881, w: 4.176, h: 0.671 }));
++  s.addShape('roundRect', { x: 8.289, y: 4.663, w: 2.567, h: 0.921, fill: { color: C.orange }, line: { type: 'none' }, rectRadius: 0.087 });
++  s.addText('90%', num({ x: 8.468, y: 4.89, w: 0.898, h: 0.505, color: C.white }));
++  s.addText('The European languages', T({ x: 9.335, y: 4.858, w: 1.5, h: 0.505, fontSize: 12, color: C.white }));
++}
++
++// 6 — Services
++function slide06(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'Innovative Merchandise Display ' }, { text: 'Services', options: { color: C.orange } }
++  ], head({ x: 5.667, y: 1.958, w: 6.397, h: 1.313, fontSize: 36, color: C.black }));
++  s.addText(L.europe, para({ x: 5.667, y: 3.452, w: 5.619, h: 0.671 }));
++  s.addText(L.dot, para({ x: 5.667, y: 5.085, w: 2.492, h: 0.671 }));
++  s.addText(L.dot, para({ x: 8.794, y: 5.085, w: 2.492, h: 0.671 }));
++  iconBriefcase(s, 5.769, 4.637, 0.296, 0.305, C.orange);
++  iconWallet(s, 8.913, 4.723, 0.301, 0.219, C.ink);
++  pill(s, {
++    x: 3.076, y: 2.097, w: 2.042, h: 0.734, radius: 0.13,
++    value: '+3589', vx: 3.076, vy: 2.243, vw: 1.285, vh: 0.505,
++    caption: 'People', cx: 4.265, cy: 2.397, cw: 0.773
++  });
++}
++
++// 7 — Team
++function slide07(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'The ' }, { text: 'People', options: { color: C.orange } }, { text: ' Behind the Vision' }
++  ], head({ x: 0.528, y: 1.936, w: 5.111, h: 1.447, color: C.black }));
++  s.addText(L.dotSp, para({ x: 0.633, y: 3.424, w: 4.901, h: 0.368 }));
++  [
++    { name: 'Aaron Loeb', role: 'Manager', x: 4.796, y: 5.511, rw: 0.896 },
++    { name: 'Drew Feig', role: 'CEO', x: 10.472, y: 2.705, rw: 0.553 },
++    { name: 'Chidi Eze', role: 'Staff', x: 9.386, y: 5.524, rw: 0.563 }
++  ].forEach((p) => {
++    s.addText(p.name, T({ x: p.x, y: p.y, w: 1.638, h: 0.404, fontFace: HEAD, color: C.orange }));
++    s.addText(p.role, T({ x: p.x, y: p.y + 0.297, w: p.rw, h: 0.303, fontSize: 12, wrap: false }));
++  });
++}
++
++// 8 / 18 — "It's Break Time" interstitials (full orange, no nav)
++function breakSlide(pptx, o) {
++  const s = page(pptx, { bg: C.orange, nav: false });
++  s.addText('It\u2019s Break Time', head({ x: o.tx, y: o.ty, w: o.tw, h: 1.313, fontSize: 72, color: C.white, wrap: o.wrap }));
++  s.addShape('roundRect', { x: o.bx, y: o.by, w: 1.541, h: 0.45, fill: { color: C.white }, line: { type: 'none' }, rectRadius: 0.075 });
++  s.addText('10 Minute', T({ x: o.bx + 0.15, y: o.by + 0.043, w: 1.254, h: 0.37, fontFace: HEAD, fontSize: 16, color: C.orange, wrap: false }));
++  s.addText(o.note, para({ x: o.nx, y: o.ny, w: o.nw, h: 0.671, color: C.white, align: 'right' }));
++}
++
++function slide08(pptx) {
++  breakSlide(pptx, { tx: 1.655, ty: 5.141, tw: 7.551, wrap: false, bx: 9.512, by: 5.677, note: L.dotSp, nx: 1.655, ny: 3.511, nw: 2.751 });
++}
++
++// 9 — Phone mockup
++function slide09(pptx) {
++  const s = page(pptx);
++  phoneMockup(s, 7.42, 1.58, 4.66, 5.92);
++  s.addText([
++    { text: 'Display That Defines' }, { text: ' ', options: { color: C.black } }, { text: 'Identity', options: { color: C.orange } }
++  ], head({ x: 1.372, y: 1.864, w: 4.619, h: 1.447 }));
++  s.addText(L.plain, para({ x: 1.372, y: 3.382, w: 4.754, h: 0.368, color: C.ink }));
++  s.addText('+90.8K', num({ x: 1.496, y: 4.89, w: 1.578, h: 0.572, fontSize: 28 }));
++  s.addText(L.myth, para({ x: 1.496, y: 5.474, w: 4.058, h: 0.671 }));
++}
++
++// 10 — Laptop mockup
++function slide10(pptx) {
++  const s = page(pptx);
++  laptopMockup(s, -1.0, 1.82, 6.71, 4.57);
++  s.addText([
++    { text: 'Modern Merchandise Display ' }, { text: 'Showcase', options: { color: C.orange } }
++  ], head({ x: 6.898, y: 2.165, w: 5.833, h: 1.313, fontSize: 36 }));
++  s.addText('+1300', num({ x: 6.898, y: 4.454, w: 1.522, h: 0.64, fontSize: 32 }));
++  s.addText('Merchandise', capt({ x: 8.42, y: 4.622, w: 1.303, h: 0.303 }));
++  s.addText(L.europe, para({ x: 6.898, y: 5.093, w: 5.619, h: 0.671 }));
++}
++
++// 11 — Weekly trends card + gauge card
++function slide11(pptx) {
++  const s = page(pptx);
++  s.addShape('roundRect', { x: 1.159, y: 1.492, w: 6.333, h: 3.143, fill: { color: C.track, transparency: 65 }, line: { type: 'none' }, rectRadius: 0.317 });
++
++  // Grey track bar + orange value bar per weekday.
++  const DAYS = [
++    { day: 'Mon', x: 4.059, value: 1.318, labelX: 3.835 },
++    { day: 'Tue', x: 4.502, value: 1.035, labelX: 4.277 },
++    { day: 'Wed', x: 4.944, value: 0.408, labelX: 4.720 },
++    { day: 'Thu', x: 5.379, value: 1.035, labelX: 5.154 },
++    { day: 'Fri', x: 5.813, value: 0.800, labelX: 5.595 },
++    { day: 'Sat', x: 6.248, value: 1.173, labelX: 6.037 },
++    { day: 'Sun', x: 6.682, value: 1.651, labelX: 6.480 }
++  ];
++  const BAR_W = 0.209, TOP = 1.988, BASE = 3.892;
++  DAYS.forEach((d) => {
++    s.addShape('roundRect', { x: d.x, y: TOP, w: BAR_W, h: BASE - TOP, fill: { color: C.ink, transparency: 80 }, line: { type: 'none' }, rectRadius: BAR_W / 2 });
++    s.addShape('roundRect', { x: d.x, y: BASE - d.value, w: BAR_W, h: d.value, fill: { color: C.amber }, line: { type: 'none' }, rectRadius: BAR_W / 2 });
++    s.addText(d.day, T({ x: d.labelX, y: 3.986, w: 0.659, h: 0.298, fontSize: 8, align: 'center' }));
++  });
++
++  s.addText('+9534M', num({ x: 1.608, y: 3.05, w: 1.585, h: 0.505 }));
++  s.addText('European languages are members', T({ x: 1.687, y: 3.56, w: 1.799, h: 0.505, fontSize: 12, color: C.body }));
++
++  s.addText([
++    { text: 'Merchandise ' }, { text: 'Trends', options: { color: C.orange } }, { text: ' Chart' }
++  ], head({ x: 8.152, y: 1.767, w: 4.629, h: 1.447, color: C.black }));
++  s.addText(L.myth, para({ x: 8.056, y: 5.438, w: 4.118, h: 0.671 }));
++
++  s.addShape('roundRect', { x: 1.159, y: 4.838, w: 1.904, h: 1.74, fill: { color: C.track, transparency: 65 }, line: { type: 'none' }, rectRadius: 0.16 });
++  ringGauge(s, { x: 1.417, y: 5.046, size: 1.386, color: C.amber, text: '90%', tx: 1.719, ty: 5.555, tw: 0.784, th: 0.438, fontSize: 20 });
++  s.addText('+90%', num({ x: 3.486, y: 5.479, w: 1.462, h: 0.64, fontSize: 32 }));
++  s.addText('People Like', capt({ x: 4.838, y: 5.709, w: 1.292, h: 0.337, fontSize: 14, color: C.ink }));
++}
++
++// 12 — Line chart with markers
++function slide12(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'Store', options: { color: C.orange } }, { text: ' Display' }
++  ], head({ x: 1.538, y: 1.645, w: 3.684, h: 0.707, fontSize: 36, color: C.black }));
++  s.addText(L.dot, para({ x: 1.538, y: 2.307, w: 4.795, h: 0.368 }));
++  s.addText('+85.8%', num({ x: 7.909, y: 1.988, w: 2.053, h: 0.707, fontSize: 36 }));
++  s.addText('Product Sold', T({ x: 9.976, y: 2.28, w: 1.517, h: 0.337, fontFace: HEAD, fontSize: 14, color: C.ink }));
++
++  // Polyline through six ring markers, then an arrow flying up to the right.
++  const R = 0.3555;
++  const NODES = [[0.951, 5.242], [2.873, 5.813], [4.889, 4.949], [7.283, 5.294], [8.759, 6.806], [10.962, 5.813]];
++  NODES.slice(0, -1).forEach((p, i) => {
++    const q = NODES[i + 1];
++    s.addShape('line', {
++      x: Math.min(p[0], q[0]), y: Math.min(p[1], q[1]),
++      w: Math.abs(q[0] - p[0]), h: Math.abs(q[1] - p[1]),
++      flipH: q[0] < p[0], flipV: q[1] < p[1],
++      line: { color: C.orange, width: 3 }
++    });
++  });
++  s.addShape('line', { x: 11.087, y: 3.527, w: 1.517, h: 2.159, flipV: true, line: { color: C.orange, width: 2.5, endArrowType: 'triangle' } });
++  NODES.forEach((p) => {
++    s.addShape('ellipse', { x: p[0] - R / 2, y: p[1] - R / 2, w: R, h: R, fill: { color: C.bgGrey }, line: { color: C.orange, width: 3 } });
++  });
++
++  s.addShape('wedgeRoundRectCallout', { x: 7.23, y: 3.904, w: 1.35, h: 0.867, fill: { color: C.orange }, line: { type: 'none' } });
++  s.addText('80%', num({ x: 7.457, y: 4.102, w: 0.898, h: 0.505, color: C.white, align: 'center' }));
++}
++
++// 13 — Ascending columns with icons
++function slide13(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'Optimizing Visual ' }, { text: 'Merchandising', options: { color: C.amber } },
++    { text: ' ', options: { color: C.black } }, { text: 'Strategies' }
++  ], head({ x: 1.283, y: 1.629, w: 6.667, h: 2.121 }));
++  s.addText('$87.8', num({ x: 1.283, y: 4.335, w: 1.731, h: 0.774, fontSize: 40, color: C.amber }));
++  s.addText(L.sep, para({ x: 1.283, y: 5.199, w: 3.809, h: 0.671 }));
++
++  const COLUMNS = [
++    { x: 6.667, y: 5.454, h: 3.3, fill: C.amber, pct: '35%', pctX: 6.927, pctY: 4.891, pctW: 0.798, pctColor: C.amber },
++    { x: 8.625, y: 4.221, h: 4.533, fill: C.orange, pct: '65%', pctX: 9.041, pctY: 3.531, pctW: 0.784, pctColor: C.orange },
++    { x: 10.583, y: 2.987, h: 5.767, fill: C.deepOrange, pct: '90%', pctX: 11.006, pctY: 2.304, pctW: 0.784, pctColor: C.orange }
++  ];
++  COLUMNS.forEach((c) => {
++    s.addShape('roundRect', { x: c.x, y: c.y, w: 1.629, h: c.h, fill: { color: c.fill }, line: { type: 'none' }, rectRadius: 0.25 });
++    s.addText(c.pct, num({ x: c.pctX, y: c.pctY, w: c.pctW, h: 0.438, fontSize: 20, color: c.pctColor }));
++  });
++  iconGlobe(s, 7.135, 5.871, 0.666, C.white, C.amber);
++  iconPin(s, 9.123, 4.574, 0.702, 0.889, C.white, C.orange);
++  iconGear(s, 11.027, 3.369, 0.763, C.white, C.deepOrange);
++}
++
++// 14 — Map
++function slide14(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'Global ', options: { color: C.orange } }, { text: 'Merchandise Display Map' }
++  ], head({ x: 1.535, y: 2.291, w: 5.068, h: 2.121 }));
++  s.addText(L.exist, para({ x: 1.535, y: 4.616, w: 3.809, h: 0.671 }));
++  countryMap(s, 6.61, 1.29, 4.12, 5.705);
++  s.addShape('roundRect', { x: 9.479, y: 2.317, w: 2.524, h: 0.626, fill: { color: C.white, transparency: 19 }, line: { type: 'none' }, rectRadius: 0.104 });
++  s.addText('+3579M', num({ x: 9.517, y: 2.444, w: 1.219, h: 0.404, fontSize: 18 }));
++  s.addText('Product Sold', T({ x: 10.619, y: 2.536, w: 1.202, h: 0.286, fontFace: HEAD, fontSize: 11, color: C.ink }));
++}
++
++// 15 — Large ring gauge
++function slide15(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'Merchandising ' }, { text: 'Presence', options: { color: C.orange } }, { text: ' in All Regions' }
++  ], head({ x: 6.979, y: 2.099, w: 4.5, h: 2.121, color: C.black }));
++  s.addText(L.exist, para({ x: 7.0, y: 4.333, w: 3.809, h: 0.671 }));
++  s.addText('+3579M', num({ x: 6.979, y: 5.299, w: 1.781, h: 0.572, fontSize: 28 }));
++  ringGauge(s, { x: 1.854, y: 2.203, size: 3.556, color: C.orange, text: '90%', tx: 2.962, ty: 3.614, tw: 1.362, th: 0.774, fontSize: 40 });
++}
++
++// 16 — Two pricing cards
++function slide16(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'Smart Merchandise Display ' }, { text: 'Planning', options: { color: C.orange } }
++  ], head({ x: 1.083, y: 1.631, w: 5.425, h: 1.313, fontSize: 36 }));
++  s.addText(L.dotSp, para({ x: 1.125, y: 3.019, w: 5.146, h: 0.368 }));
++
++  const CARDS = [
++    { x: 1.083, y: 4.113, radius: 0.278, fill: C.orange, price: '$90.8K', px: 1.471, pw: 1.554, fg: C.white, bx: 1.619 },
++    { x: 7.063, y: 4.109, radius: 0.23, fill: C.panel, price: '$100.8K', px: 7.45, pw: 1.694, fg: C.ink, bx: 7.598 }
++  ];
++  CARDS.forEach((c) => {
++    s.addShape('roundRect', { x: c.x, y: c.y, w: 5.188, h: 2.524, fill: { color: c.fill }, line: { type: 'none' }, rectRadius: c.radius });
++    s.addText(c.price, num({ x: c.px, y: c.y + 0.311, w: c.pw, h: 0.572, fontSize: 28, color: c.fg }));
++    [5.112, 5.48, 5.869].forEach((rowY) => bulletRow(s, { x: c.bx, y: rowY, w: 3.88, text: L.members, color: c.fg }));
++  });
++}
++
++// 17 — Feature list + KPI card
++function slide17(pptx) {
++  const s = page(pptx);
++  s.addText([
++    { text: 'Enhancing ' }, { text: 'Product', options: { color: C.orange } },
++    { text: ' ', options: { color: C.black } }, { text: 'Visibility', options: { color: C.orange } },
++    { text: ' to Drive Stronger Sales Performance' }
++  ], head({ x: 1.133, y: 1.911, w: 5.533, h: 2.794, color: C.black }));
++  s.addText(L.exist, para({ x: 1.133, y: 4.877, w: 3.809, h: 0.671 }));
++
++  s.addShape('roundRect', { x: 7.617, y: 1.5, w: 4.583, h: 2.433, fill: { color: C.panel, transparency: 46 }, line: { type: 'none' }, rectRadius: 0.215 });
++  [1.981, 2.35, 2.718, 3.086].forEach((rowY) => bulletRow(s, { x: 8.126, y: rowY, w: 3.396, text: L.membersDot, color: C.ink }));
++
++  s.addShape('roundRect', { x: 6.667, y: 4.205, w: 4.583, h: 2.433, fill: { color: C.orange }, line: { type: 'none' }, rectRadius: 0.215 });
++  s.addText('340+', num({ x: 7.176, y: 4.68, w: 1.075, h: 0.505, color: C.white }));
++  s.addText('1.980+', num({ x: 9.444, y: 4.68, w: 1.284, h: 0.505, color: C.white }));
++  s.addShape('line', { x: 8.922, y: 4.68, w: 0, h: 0.741, line: { color: C.rule, width: 0.5 } });
++  s.addText('The European', para({ x: 7.141, y: 5.028, w: 1.349, h: 0.368, color: C.white }));
++  s.addText('The European', para({ x: 9.448, y: 5.028, w: 1.349, h: 0.368, color: C.white }));
++  s.addText('The European languages are members of the same family. Their separate is a myth.',
++    para({ x: 7.176, y: 5.533, w: 3.749, h: 0.671, color: C.white }));
++}
++
++function slide18(pptx) {
++  breakSlide(pptx, { tx: 1.47, ty: 1.641, tw: 7.831, wrap: true, bx: 9.3, by: 2.168, note: L.dot, nx: 3.508, ny: 5.782, nw: 2.469 });
++}
++
++// 19 — Gallery captions
++function slide19(pptx) {
++  const s = page(pptx, { navColor: C.ink });
++  s.addText(L.exist, para({ x: 3.375, y: 2.076, w: 2.701, h: 0.974, align: 'right' }));
++  s.addText([
++    { text: 'Curated Merchandise Visual' }, { text: ' ', options: { color: C.black } },
++    { text: 'Inspiration', options: { color: C.orange } }
++  ], head({ x: 0.869, y: 4.633, w: 5.263, h: 2.121 }));
++}
++
++// 20 — Gallery + orange info card
++function slide20(pptx) {
++  const s = page(pptx, { bg: C.white, navColor: C.ink });
++  s.addText([
++    { text: 'Merchandise', options: { color: C.orange } }, { text: ' Display Gallery for Brands' }
++  ], head({ x: 0.933, y: 1.548, w: 6.95, h: 1.447, color: C.black }));
++  s.addText(L.dotSp, para({ x: 8.117, y: 2.217, w: 3.417, h: 0.671 }));
++  s.addText(L.dotSp, para({ x: 0.933, y: 6.364, w: 4.812, h: 0.368 }));
++  s.addShape('roundRect', { x: 9.967, y: 3.449, w: 2.433, h: 2.667, fill: { color: C.orange }, line: { type: 'none' }, rectRadius: 0.299 });
++  s.addText('+1920', num({ x: 10.561, y: 4.028, w: 1.184, h: 0.505, color: C.white, align: 'center' }));
++  s.addText('The European languages are members', para({ x: 10.22, y: 4.57, w: 1.926, h: 0.974, color: C.white, align: 'center' }));
++}
++
++// 21 — Product grid
++function slide21(pptx) {
++  const s = page(pptx, { navColor: C.ink });
++  s.addText([
++    { text: 'Merchandise to ' }, { text: 'Explore', options: { color: C.orange } }
++  ], head({ x: 7.706, y: 2.178, w: 3.987, h: 1.447, color: C.black }));
++  s.addText(L.exist, para({ x: 7.706, y: 3.744, w: 3.636, h: 0.671 }));
++  pill(s, {
++    x: 6.475, y: 5.654, w: 1.908, h: 0.637, radius: 0.11,
++    value: '+3589', vx: 6.475, vy: 5.766, vw: 1.105, vh: 0.438, vSize: 20,
++    caption: 'Product', cx: 7.471, cy: 5.858, cw: 0.861
++  });
++}
++
++// 22 — Testimonial
++function slide22(pptx) {
++  const s = page(pptx, { bg: C.white, navColor: C.ink });
++  quoteGlyph(s, 5.86, 1.83, C.ink);
++  s.addText([
++    { text: 'Beautiful, functional, and ' },
++    { text: 'perfectly aligned ', options: { color: C.orange } },
++    { text: 'with our brand.' }
++  ], head({ x: 6.462, y: 2.188, w: 5.046, h: 2.794 }));
++  s.addText('Claudia Alves', T({ x: 3.319, y: 5.364, w: 2.03, h: 0.404, fontFace: HEAD, color: C.orange }));
++  s.addText('Client', T({ x: 3.319, y: 5.661, w: 0.649, h: 0.303, fontSize: 12, wrap: false }));
++}
++
++// 23 — Contact
++function slide23(pptx) {
++  const s = page(pptx, { bg: C.white, navColor: C.ink });
++  s.addText([
++    { text: 'Reach Out for' }, { text: ' More ' }, { text: 'Information', options: { color: C.orange } }
++  ], head({ x: 1.083, y: 5.108, w: 5.354, h: 1.447, color: C.black }));
++  [
++    { key: 'Phone ', kw: 0.724, ky: 5.360, val: '123-456-7890', vx: 10.070, vy: 5.382, vw: 1.354 },
++    { key: 'Web ', kw: 0.581, ky: 5.676, val: 'www.reallygreatsite.com', vx: 10.078, vy: 5.705, vw: 2.169 },
++    { key: 'Email ', kw: 0.674, ky: 5.998, val: 'hello@reallygreatsite.com', vx: 10.070, vy: 5.999, vw: 2.262 }
++  ].forEach((r) => {
++    s.addText(r.key, capt({ x: 8.984, y: r.ky, w: r.kw, h: 0.303 }));
++    s.addText(r.val, T({ x: r.vx, y: r.vy, w: r.vw, h: 0.303, fontSize: 12, wrap: false }));
++  });
++}
++
++// 24 — Closing statement
++function slide24(pptx) {
++  const s = page(pptx, { bg: C.white, navColor: C.ink });
++  s.addText([
++    { text: 'Let Your ' }, { text: 'Products', options: { color: C.orange } }, { text: ' Speak Through Display' }
++  ], head({ x: 1.54, y: 2.036, w: 6.746, h: 1.447, color: C.black }));
++  iconBriefcase(s, 8.211, 4.117, 0.314, 0.314, C.orange);
++  s.addText(L.europe, para({ x: 8.095, y: 4.67, w: 3.895, h: 0.974 }));
++  s.addShape('roundRect', { x: 1.0, y: 5.644, w: 1.745, h: 0.826, fill: { color: C.orange }, line: { type: 'none' }, rectRadius: 0.14 });
++  s.addText('135K', num({ x: 1.337, y: 5.771, w: 1.071, h: 0.572, fontSize: 28, color: C.white }));
++}
++
++// 25 — Thank you (full orange)
++function slide25(pptx) {
++  const s = page(pptx, { bg: C.orange, navColor: C.white });
++  s.addText('Thank You', head({ x: 1.254, y: 3.549, w: 5.06, h: 1.212, fontSize: 66, color: C.white, wrap: false }));
++  s.addText('For Your Attention', T({ x: 1.43, y: 4.636, w: 3.061, h: 0.404, color: C.white, charSpacing: 3, wrap: false }));
++  s.addText(L.exist, para({ x: 1.254, y: 5.841, w: 4.635, h: 0.671, color: C.white }));
++}
++
++/* ------------------------------------------------------------------ *
++ * Map artwork for slide 14 — outline plus highlighted cluster,
++ * stored as unit-square polygons and scaled into place.
++ * ------------------------------------------------------------------ */
++const MAP_OUTLINE = [
++  [0.604, 0.000], [0.555, 0.037], [0.472, 0.072], [0.398, 0.070], [0.382, 0.104], [0.373, 0.103],
++  [0.369, 0.089], [0.345, 0.084], [0.297, 0.109], [0.273, 0.140], [0.283, 0.141], [0.282, 0.181],
++  [0.242, 0.189], [0.221, 0.215], [0.174, 0.233], [0.185, 0.262], [0.169, 0.262], [0.131, 0.232],
++  [0.126, 0.241], [0.149, 0.274], [0.121, 0.296], [0.103, 0.288], [0.092, 0.316], [0.136, 0.355],
++  [0.126, 0.380], [0.144, 0.408], [0.120, 0.420], [0.135, 0.428], [0.141, 0.477], [0.120, 0.497],
++  [0.153, 0.525], [0.098, 0.587], [0.053, 0.592], [0.026, 0.617], [0.036, 0.641], [0.015, 0.640],
++  [0.000, 0.651], [0.052, 0.685], [0.109, 0.699], [0.132, 0.725], [0.203, 0.734], [0.214, 0.723],
++  [0.235, 0.723], [0.266, 0.743], [0.348, 0.760], [0.379, 0.780], [0.392, 0.806], [0.444, 0.824],
++  [0.453, 0.849], [0.481, 0.855], [0.479, 0.880], [0.501, 0.892], [0.563, 0.891], [0.591, 0.877],
++  [0.625, 0.889], [0.665, 0.879], [0.735, 0.906], [0.685, 0.974], [0.718, 0.976], [0.745, 0.999],
++  [0.790, 0.818], [0.772, 0.778], [0.735, 0.758], [0.737, 0.714], [0.782, 0.705], [0.812, 0.710],
++  [0.801, 0.687], [0.754, 0.684], [0.755, 0.647], [0.890, 0.645], [0.890, 0.630], [0.915, 0.644],
++  [0.945, 0.622], [0.960, 0.621], [0.984, 0.651], [0.983, 0.677], [0.998, 0.676], [0.973, 0.606],
++  [0.922, 0.579], [0.964, 0.546], [0.936, 0.522], [0.919, 0.480], [0.920, 0.429], [0.938, 0.417],
++  [0.950, 0.380], [0.920, 0.373], [0.788, 0.383], [0.732, 0.333], [0.694, 0.326], [0.647, 0.333],
++  [0.574, 0.330], [0.562, 0.309], [0.538, 0.302], [0.549, 0.263], [0.519, 0.231], [0.511, 0.203],
++  [0.498, 0.203], [0.494, 0.193], [0.466, 0.200], [0.495, 0.161], [0.501, 0.122], [0.534, 0.082],
++  [0.556, 0.078], [0.578, 0.049], [0.625, 0.039], [0.649, 0.025], [0.640, 0.009]
++];
++
++const MAP_HIGHLIGHT = [
++  [0.138, 0.007], [0.130, 0.178], [0.067, 0.235], [0.034, 0.363], [0.077, 0.359], [0.087, 0.404],
++  [0.112, 0.420], [0.132, 0.404], [0.166, 0.409], [0.187, 0.456], [0.182, 0.494], [0.243, 0.531],
++  [0.235, 0.594], [0.178, 0.591], [0.164, 0.562], [0.148, 0.569], [0.148, 0.605], [0.087, 0.641],
++  [0.000, 0.797], [0.038, 0.828], [0.032, 0.885], [0.047, 0.964], [0.160, 0.998], [0.168, 0.885],
++  [0.241, 0.880], [0.361, 0.815], [0.588, 0.819], [0.615, 0.797], [0.645, 0.709], [0.700, 0.704],
++  [0.706, 0.682], [0.779, 0.691], [0.874, 0.639], [0.943, 0.646], [0.959, 0.628], [0.941, 0.560],
++  [0.943, 0.427], [0.970, 0.402], [0.968, 0.363], [0.998, 0.330], [0.980, 0.289], [0.726, 0.307],
++  [0.637, 0.181], [0.576, 0.163], [0.521, 0.178], [0.361, 0.172], [0.339, 0.192], [0.272, 0.167],
++  [0.270, 0.117], [0.249, 0.081], [0.183, 0.084], [0.152, 0.059], [0.160, 0.029]
++];
++
++/* Borders between the highlighted regions, as unit-square polylines. */
++const MAP_SEAMS = [
++  [[0.150, 0.055], [0.245, 0.300], [0.170, 0.420], [0.235, 0.560]],
++  [[0.245, 0.300], [0.470, 0.230], [0.560, 0.330], [0.560, 0.560]],
++  [[0.560, 0.330], [0.760, 0.310], [0.790, 0.470]],
++  [[0.230, 0.560], [0.560, 0.560], [0.620, 0.790]]
++];
++
++/** Draws a unit-square polygon as a custGeom shape scaled to x/y/w/h. */
++function polygon(slide, pts, x, y, w, h, fill) {
++  slide.addShape('custGeom', {
++    x: x, y: y, w: w, h: h,
++    fill: { color: fill }, line: { type: 'none' },
++    points: pts.map((p) => ({ x: +(p[0] * w).toFixed(4), y: +(p[1] * h).toFixed(4) })).concat([{ close: true }])
++  });
++}
++
++function countryMap(slide, x, y, w, h) {
++  polygon(slide, MAP_OUTLINE, x, y, w, h, C.mapLand);
++  // The highlighted cluster sits inside the outline's bounding box.
++  const hx = x + 1.40, hy = y + 1.50, hw = 2.535, hh = 2.215;
++  polygon(slide, MAP_HIGHLIGHT, hx, hy, hw, hh, C.orange);
++  MAP_SEAMS.forEach((seam) => {
++    seam.slice(0, -1).forEach((p, i) => {
++      const q = seam[i + 1];
++      slide.addShape('line', {
++        x: hx + Math.min(p[0], q[0]) * hw, y: hy + Math.min(p[1], q[1]) * hh,
++        w: Math.abs(q[0] - p[0]) * hw, h: Math.abs(q[1] - p[1]) * hh,
++        flipH: q[0] < p[0], flipV: q[1] < p[1],
++        line: { color: C.bgGrey, width: 0.75 }
++      });
++    });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'DECK', width: 13.333333, height: 7.5 });
++  pptx.layout = 'DECK';
++  pptx.title = 'Merchandise Display';
++  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++  BUILDERS.forEach((fn) => fn(pptx));
++  return pptx;
++}
++
++build().writeFile({ fileName: path.join(__dirname, '0af5a0b5-5f53-44aa-b6c3-5c3e128289b0_grok_final.pptx') })
++  .then((f) => console.log('wrote ' + f))
++  .catch((e) => { console.error(e); process.exit(1); });

@@ -1,0 +1,814 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fresh_food_nutrition_benefits.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fresh_food_nutrition_benefits.js
+@@ -0,0 +1,811 @@
++/**
++ * "Fresh Food" deck rebuilt with pptxgenjs.
++ * 24 slides, 13.333" x 7.5" (16:9). Photographs in the original are replaced by
++ * flat colour placeholder shapes that keep the original crop geometry.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ---------------------------------------------------------------- palette */
++const DARK = '345017'; // deep olive green
++const LIME = '97B33F'; // leaf green
++const ORANGE = 'FE8D47';
++const WHITE = 'FFFFFF';
++const GREY = '808080'; // body copy
++const GREY_D = '595959'; // sub-heads
++const GREY_XD = '404040';
++const GREY_L = 'D9D9D9'; // body copy on dark
++const GREY_XL = 'F2F2F2'; // decorative panels
++const PHOTO = 'AEE0E1'; // stand-in for the pale teal photographs
++const PHOTO2 = 'B8B5A2'; // stand-in for the second photo asset
++const PHOTO3 = 'AAA9A7'; // stand-in for the portrait photo
++
++/* ------------------------------------------------------------------ fonts */
++const HEAD = 'Raleway'; // display / headlines
++const SUB = 'Montserrat'; // sub-heads, labels, big numbers
++const BODY = 'Lato'; // body copy
++
++/* --------------------------------------------------------------- defaults */
++// Every text frame in the source keeps PowerPoint's default insets (points).
++const INSET = [7.2, 7.2, 3.6, 3.6]; // [left, right, bottom, top]
++// The deck's one shadow style: 40% black, 45deg, wide soft blur.
++// Returned fresh each time because pptxgenjs rewrites the object in place.
++const shadow = (blur) => ({
++  type: 'outer', color: '000000', opacity: 0.4, angle: 45, offset: 3, blur: blur || 40,
++});
++
++/* ------------------------------------------------------------------ helpers */
++
++// Text box matching the source's spAutoFit boxes: top anchored, grows with text.
++function txt(slide, text, o) {
++  slide.addText(text, Object.assign(
++    { valign: 'top', margin: INSET, fontFace: BODY, color: GREY, isTextBox: true, fit: 'resize' },
++    o
++  ));
++}
++// Headline (Raleway bold).
++const head = (s, t, o) => txt(s, t, Object.assign({ fontFace: HEAD, bold: true }, o));
++// Sub-head / label (Montserrat bold).
++const sub = (s, t, o) => txt(s, t, Object.assign({ fontFace: SUB, bold: true }, o));
++// Body paragraph: justified, 150% leading — the deck's standard copy block.
++const body = (s, t, o) => txt(s, t, Object.assign(
++  { fontSize: 11, align: 'justify', lineSpacingMultiple: 1.5 }, o
++));
++
++function shape(slide, type, o) {
++  slide.addShape(type, o);
++}
++const rect = (s, o) => shape(s, 'rect', o);
++const oval = (s, o) => shape(s, 'ellipse', o);
++// Rounded rectangle; `radius` is the OOXML adjust value (fraction of the short side).
++function roundRect(slide, o) {
++  const r = o.radius === undefined ? 0.5 : o.radius;
++  const opts = Object.assign({}, o);
++  delete opts.radius;
++  opts.rectRadius = r * Math.min(o.w, o.h);
++  shape(slide, 'roundRect', opts);
++}
++
++// Photo stand-in: flat colour block in place of a raster image.
++function photo(slide, o) {
++  const opts = Object.assign({ fill: { color: PHOTO } }, o);
++  const kind = opts.kind || 'rect';
++  delete opts.kind;
++  if (kind === 'circle') oval(slide, opts);
++  else if (kind === 'rect') rect(slide, opts);
++  else roundRect(slide, Object.assign(opts, { radius: kind }));
++}
++
++// The pill badge that sits in the top-left corner of nearly every slide.
++function cornerBadge(slide, fill) {
++  roundRect(slide, { x: 0.2954, y: 0.266, w: 2.0189, h: 0.3673, fill: { color: fill || LIME } });
++  sub(slide, 'Your Text Here',
++    { x: 0.3344, y: 0.2959, w: 1.5703, h: 0.3029, fontSize: 12, color: WHITE });
++}
++
++// The orange "Your Text Here" pill used as a call-out throughout the deck.
++function pill(slide, x, y, o) {
++  o = o || {};
++  const w = o.w || 3.0;
++  roundRect(slide, {
++    x: x, y: y, w: w, h: 0.5113,
++    fill: o.outline ? { type: 'none' } : { color: o.fill || ORANGE },
++    line: o.outline ? { color: o.outline, width: 3 } : undefined,
++    shadow: o.shadow ? shadow(20) : undefined,
++  });
++  sub(slide, o.text || 'Your Text Here', {
++    x: x + 0.156, y: y + 0.0705, w: w - 0.312, h: 0.3702,
++    fontSize: 16, color: o.color || WHITE,
++  });
++}
++
++/**
++ * 4x5 staggered dot grid used as a decorative motif.
++ * Rows hold 2,3,4,4,4 dots and are left aligned; `rot180` mirrors the pattern.
++ */
++const DOT_ROWS = [2, 3, 4, 4, 4];
++const DOT_DX = 0.33955;
++const DOT_DY = 0.3287;
++const DOT_D = 0.1264;
++function dotGrid(slide, x, y, color, rot180) {
++  DOT_ROWS.forEach((count, row) => {
++    for (let col = 0; col < count; col++) {
++      const cx = rot180 ? x + (3 - col) * DOT_DX : x + col * DOT_DX;
++      const cy = rot180 ? y + (4 - row) * DOT_DY : y + row * DOT_DY;
++      oval(slide, { x: cx, y: cy, w: DOT_D, h: DOT_D, fill: { color: color } });
++    }
++  });
++}
++
++/**
++ * Line-art glyph stand-in: a white (or coloured) rounded outline square.
++ * The source uses freeform vector food icons; these keep their footprint.
++ */
++function icon(slide, x, y, w, h, color) {
++  roundRect(slide, {
++    x: x, y: y, w: w, h: h, radius: 0.18,
++    fill: { type: 'none' }, line: { color: color || WHITE, width: 1.75 },
++  });
++}
++
++/* Circular icon badge: orange disc, white ring, drop shadow, glyph inside. */
++function iconBadge(slide, x, y, d, glyphColor) {
++  oval(slide, {
++    x: x, y: y, w: d, h: d,
++    fill: { color: ORANGE }, line: { color: WHITE, width: 5 }, shadow: shadow(),
++  });
++  const g = d * 0.42;
++  icon(slide, x + (d - g) / 2, y + (d - g) / 2, g, g, glyphColor || WHITE);
++}
++
++/**
++ * Custom-geometry shape. `points` are fractions of the shape's own box:
++ *   [x, y]                        -> lineTo (or moveTo when first / flagged 'm')
++ *   [x, y, x1, y1, x2, y2]        -> cubic bezier with two control points
++ *   { close: true }               -> close the sub-path
++ * pptxgenjs writes the path in the shape's local EMU space, so keep them relative.
++ */
++function freeform(slide, o) {
++  const pts = o.points.map(p => {
++    if (p.close) return { close: true };
++    const q = { x: p[0] * o.w, y: p[1] * o.h };
++    if (p.length === 6) {
++      q.curve = {
++        type: 'cubic',
++        x1: p[2] * o.w, y1: p[3] * o.h, x2: p[4] * o.w, y2: p[5] * o.h,
++      };
++    } else if (p[2] === 'm') q.moveTo = true;
++    return q;
++  });
++  shape(slide, 'custGeom', { x: o.x, y: o.y, w: o.w, h: o.h, fill: o.fill, points: pts });
++}
++
++/**
++ * Panel with only two of its corners rounded (OOXML round2SameRect).
++ * `side` picks which edge carries the radius; `r` is in inches.
++ */
++function twoCornerPanel(slide, o) {
++  const rx = o.r / o.w, ry = o.r / o.h, k = 0.45; // bezier handle for a quarter round
++  const P = {
++    right: [
++      [0, 0, 'm'], [1 - rx, 0],
++      [1, ry, 1 - rx * k, 0, 1, ry * k],
++      [1, 1 - ry],
++      [1 - rx, 1, 1, 1 - ry * k, 1 - rx * k, 1],
++      [0, 1], { close: true },
++    ],
++    left: [
++      [rx, 0, 'm'], [1, 0], [1, 1], [rx, 1],
++      [0, 1 - ry, rx * k, 1, 0, 1 - ry * k],
++      [0, ry],
++      [rx, 0, 0, ry * k, rx * k, 0],
++      { close: true },
++    ],
++  }[o.side];
++  freeform(slide, { x: o.x, y: o.y, w: o.w, h: o.h, fill: o.fill, points: P });
++}
++
++/* The repeated "Lorem" filler strings, kept short so the code stays readable. */
++const L1 = 'Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmod.';
++const L2 = 'Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmod tempor incididunt ut. Laksa sadips um dolor sit amet, consectetur.';
++const L3 = 'Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmod tempor incididunt ut. Laksa sadips um dolor sit amet.';
++const L4 = 'Lorem laksa sadipsum dolor sita met, con se ctetur adipis cing elit, sed do eiusmod tempor incidi dunt ut. Laksa sadips um.';
++const L5 = 'Lorem laksa sadipsum dolor sitamet, con se um dolor ctetur adipis cing elit, sed do eius mod tem por incid idunt ut. Laksa sa dips dolor sit amet, cons ectetur.';
++const L6 = 'Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, .';
++const L7 = 'Lorem laksa sadipsum dolor sitamet.';
++const L8 = 'Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing.';
++const TITLE_LONG = 'Better Flavour And Texture Because They Have Not Been Subjected';
++
++/* ================================================================ slides */
++
++/* 1 — title: green panel left, stacked photo blocks right. */
++function slide01(s) {
++  twoCornerPanel(s, { x: 0, y: 0, w: 9.2222, h: 7.5, r: 0.377, side: 'right', fill: { color: DARK } });
++  photo(s, { x: 7.9841, y: 0.4425, w: 4.9048, h: 3.7302, kind: 0.0986 });
++  photo(s, { x: 7.9841, y: 4.3155, w: 2.3746, h: 2.7421, kind: 0.1529 });
++  photo(s, { x: 10.5143, y: 4.3155, w: 2.3746, h: 2.7421, kind: 0.1529 });
++  dotGrid(s, 11.4932, 5.3224, WHITE);
++  iconBadge(s, 1.1345, 1.8705, 1.0);
++  head(s, 'Fresh Food',
++    { x: 1.0001, y: 2.8705, w: 5.6665, h: 1.1107, fontSize: 60, color: WHITE });
++  sub(s, 'Your Text Here',
++    { x: 1.0607, y: 5.5691, w: 2.0922, h: 0.3702, fontSize: 16, color: WHITE });
++  body(s, L1, { x: 3.0636, y: 5.5388, w: 3.5576, h: 0.6238, color: GREY_L });
++  dotGrid(s, 2.6965, 0.8125, '4C6821'); // 24% lime over the dark panel
++  cornerBadge(s);
++}
++
++/* 2 — big photo left, headline + two copy columns right. */
++function slide02(s) {
++  shape(s, 'flowChartManualInput', {
++    x: -1.1894, y: 1.1894, w: 7.5, h: 5.1212, rotate: 90, fill: { color: DARK },
++  });
++  photo(s, { x: 0.7222, y: 1.1667, w: 5.7929, h: 5.625, kind: 0.0483 });
++  sub(s, 'Your Text Here',
++    { x: 7.2374, y: 1.1403, w: 2.0922, h: 0.3702, fontSize: 16, color: GREY_D });
++  head(s, 'Generally Refers To Food That Is Recently Harvested',
++    { x: 7.2374, y: 1.4565, w: 5.3737, h: 1.7166, fontSize: 32, color: '000000' });
++  iconBadge(s, 7.3283, 4.1331, 1.0);
++  pill(s, 8.4242, 4.3775, { fill: LIME });
++  const L2COL = 'Lorem laksa sadipsum dolor sitamet, con se um dolor ctetur adipis cing elit, sed do eius mod tem por incid idunt ut. Laksa sa dips asapumde dolor sit amet, cons ectetur.';
++  body(s, L2COL, { x: 7.2374, y: 5.3365, w: 2.6869, h: 1.4529 });
++  body(s, L2COL, { x: 9.9242, y: 5.3365, w: 2.6869, h: 1.4529 });
++  cornerBadge(s);
++}
++
++/* 3 — teal photo column left, numbered headline right. */
++function slide03(s) {
++  photo(s, { x: 0, y: 0, w: 5.4762, h: 7.5 });
++  head(s, 'PLACEHOLDER',
++    { x: 6.4437, y: 1.2738, w: 6.2229, h: 1.9186, fontSize: 36, color: DARK });
++  oval(s, {
++    x: 4.7579, y: 1.0556, w: 1.4365, h: 1.4365,
++    fill: { color: ORANGE }, line: { color: WHITE, width: 5 }, shadow: shadow(),
++  });
++  txt(s, '01', {
++    x: 4.7579, y: 1.4204, w: 1.4134, h: 0.7068,
++    fontSize: 36, bold: true, italic: true, align: 'center', color: WHITE,
++  });
++  shape(s, 'line', {
++    x: 6.6, y: 4.3889, w: 0, h: 2.3168, line: { color: 'BFBFBF', width: 3 },
++  });
++  sub(s, 'Your Text Here',
++    { x: 6.7334, y: 4.5058, w: 2.0922, h: 0.3702, fontSize: 16 });
++  body(s, L2 + ' ' + L2, { x: 6.7334, y: 4.9538, w: 5.3619, h: 1.1752 });
++  body(s, L1, {
++    x: 6.7334, y: 6.3918, w: 5.3619, h: 0.2861, italic: true, lineSpacingMultiple: 1,
++  });
++  body(s, L1, {
++    x: 9.5552, y: 0.2702, w: 3.4702, h: 0.6238, align: 'right', italic: true, color: 'A6A6A6',
++  });
++  roundRect(s, { x: 0.7109, y: 5.1584, w: 2.3, h: 1.5417, radius: 0.19241, fill: { color: WHITE } });
++  sub(s, 'Your Text Here', {
++    x: 0.9123, y: 5.4631, w: 1.8973, h: 0.3366, fontSize: 14, align: 'center',
++  });
++  body(s, 'Lorem laksa sadipsum dolor sitamet.',
++    { x: 0.9581, y: 5.768, w: 1.8056, h: 0.6238, align: 'center' });
++  cornerBadge(s);
++}
++
++/* 4 — headline left, two photo cards over a lime panel right. */
++function slide04(s) {
++  twoCornerPanel(s, {
++    x: 9.1190, y: 0.0, w: 4.2143, h: 7.5, r: 0.3373, side: 'left', fill: { color: LIME },
++  });
++  photo(s, { x: 5.2381, y: 3.8445, w: 7.3333, h: 2.8182, kind: 0.1042 });
++  photo(s, { x: 7.5714, y: 0.8373, w: 5.0, h: 2.8182, kind: 0.1042 });
++  head(s, 'Retain Their Natural Vitamins, Minerals, And Other Nutrients',
++    { x: 0.7619, y: 1.2183, w: 5.9048, h: 1.9186, fontSize: 36, color: '000000' });
++  pill(s, 0.8142, 3.7467);
++  body(s, L5, { x: 0.7619, y: 4.5927, w: 3.7778, h: 0.8975 });
++  body(s, L5, { x: 0.7619, y: 5.6403, w: 3.7778, h: 0.8975 });
++  cornerBadge(s);
++}
++
++/* 5 — full-width photo band on top, three copy columns below. */
++function slide05(s) {
++  photo(s, { x: 0, y: 0, w: 13.3333, h: 2.5079 });
++  head(s, TITLE_LONG.replace('Subjected', 'Subjected'),
++    { x: 0.9477, y: 3.0827, w: 4.2428, h: 2.2551, fontSize: 32, color: DARK });
++  body(s, L1, { x: 2.4784, y: 5.8967, w: 2.8857, h: 0.6198, italic: true });
++  pill(s, 6.1544, 3.8258, { outline: ORANGE, color: GREY_D });
++  body(s, L2 + ' ' + L2, { x: 6.1544, y: 4.4803, w: 3.0, h: 2.2859 });
++  body(s, L2 + ' ' + L2, { x: 9.254, y: 4.4803, w: 3.0, h: 2.2859 });
++  roundRect(s, { x: 9.375, y: 2.0156, w: 4.7202, h: 1.4764, radius: 0.19241, fill: { color: LIME } });
++  txt(s, '01.', {
++    x: 9.5723, y: 2.3331, w: 1.0191, h: 0.8415,
++    fontFace: SUB, fontSize: 44, italic: true, align: 'right', color: WHITE,
++  });
++  body(s, 'Lorem laksa sadipsum dolor sita met, con se um dolor ctetur ad ipis eius mod tem por.',
++    { x: 10.6607, y: 2.2694, w: 2.2604, h: 0.8975, italic: true, color: WHITE });
++  photo(s, { x: 0, y: 5.5868, w: 1.1736, h: 1.1753, fill: { color: PHOTO3 } });
++  cornerBadge(s, DARK);
++}
++
++/* 6 — dark slide, teal circle photo, stat card. */
++function slide06(s) {
++  s.background = { color: DARK };
++  photo(s, { x: 5.6667, y: 1.2292, w: 5.0417, h: 5.0417, kind: 'circle' });
++  head(s, 'One of the challenges with fresh food is its limited shelf life.',
++    { x: 0.7726, y: 1.3147, w: 5.8941, h: 1.7166, fontSize: 32, color: WHITE });
++  roundRect(s, { x: 9.5833, y: 4.2427, w: 2.9375, h: 2.5079, radius: 0.09705, fill: { color: LIME } });
++  sub(s, '137.5', { x: 9.9296, y: 4.5499, w: 1.9359, h: 0.7068, fontSize: 36, color: WHITE });
++  body(s, L1, { x: 9.9296, y: 5.4966, w: 2.2449, h: 0.8975, italic: true, color: WHITE });
++  oval(s, { x: 9.4115, y: 5.3248, w: 0.3438, h: 0.3438, fill: { color: WHITE } });
++  oval(s, { x: 12.349, y: 5.3248, w: 0.3438, h: 0.3438, fill: { color: WHITE } });
++  roundRect(s, { x: 0.893, y: 3.5135, w: 4.0653, h: 1.5417, radius: 0.12034, fill: { color: WHITE } });
++  sub(s, 'Your Text Here', { x: 1.2352, y: 3.8043, w: 1.8973, h: 0.3366, fontSize: 14 });
++  body(s, L1, { x: 1.2352, y: 4.1502, w: 3.3784, h: 0.6198, italic: true, align: 'left' });
++  body(s, L2 + ' Lorem laksa sadipsum dolor sitamet, con se ctetur.',
++    { x: 0.8984, y: 5.6685, w: 4.8724, h: 0.8975, color: GREY_L });
++  dotGrid(s, 10.9988, 0.8676, '4C6821', true);
++  cornerBadge(s);
++}
++
++/* 7 — full-bleed teal photo, big headline, white stat card. */
++function slide07(s) {
++  photo(s, { x: 0, y: 0, w: 13.3333, h: 7.5 });
++  head(s, 'Consuming A Diet Rich In Fresh Fruits',
++    { x: 1.1196, y: 1.2325, w: 4.7785, h: 3.7361, fontSize: 54, color: WHITE });
++  shape(s, 'line', { x: 1.3103, y: 5.4306, w: 0, h: 1.1667, line: { color: LIME, width: 3 } });
++  body(s, 'Lorem laksa sadipsum dolor sitamet, con se cte tur adipis cing elit, sed do eiusmod tempor inci didunt utdolor sit amet, consectetur. ',
++    { x: 1.4338, y: 5.4444, w: 3.8896, h: 1.1147, fontSize: 14, italic: true, color: GREY_XL });
++  roundRect(s, {
++    x: 6.6667, y: 1.3788, w: 5.5471, h: 5.2184, radius: 0.05178,
++    fill: { color: WHITE }, shadow: shadow(38),
++  });
++  [6.3056, 11.8527].forEach(x => oval(s, {
++    x: x, y: 3.6471, w: 0.6818, h: 0.6818, fill: { color: LIME }, shadow: shadow(30),
++  }));
++  sub(s, '87%', { x: 7.2414, y: 2.076, w: 2.0293, h: 0.9088, fontSize: 48, color: '000000' });
++  body(s, 'Lorem laksa sadi dolor.',
++    { x: 7.2414, y: 2.9107, w: 1.9233, h: 0.2861, lineSpacingMultiple: 1 });
++  [['85%', 1.7899], ['2014', 2.5992]].forEach(([label, y]) => {
++    sub(s, label, {
++      x: 9.3802, y: y, w: 2.0293, h: 0.5722, fontSize: 28, color: LIME,
++      bullet: { characterCode: '2022', indent: 36 },
++    });
++  });
++  pill(s, 7.3949, 3.8876);
++  body(s, L2 + ' Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmod tempor incididunt ut. ',
++    { x: 7.3949, y: 4.5421, w: 4.137, h: 1.4529 });
++  cornerBadge(s);
++}
++
++/* 8 — centred headline over a row of photo tiles, dark band below. */
++function slide08(s) {
++  rect(s, { x: 0, y: 3.9242, w: 13.3333, h: 3.5758, fill: { color: DARK } });
++  photo(s, { x: 1.7765, y: 2.8574, w: 2.1667, h: 2.1667 });
++  photo(s, { x: 3.9432, y: 2.8574, w: 2.1667, h: 2.1667, fill: { color: PHOTO2 } });
++  photo(s, { x: 9.3902, y: 2.8574, w: 2.1667, h: 2.1667, fill: { color: PHOTO2 } });
++  photo(s, { x: 6.1099, y: 2.3006, w: 3.2803, h: 3.2803, kind: 0.125 });
++  head(s, 'One Of The Challenges With Fresh Food Is Its Limited Shelf Life.',
++    { x: 2.6693, y: 0.7778, w: 7.9948, h: 1.1781, fontSize: 32, align: 'center', color: DARK });
++  [1.5506, 11.3309].forEach(x => oval(s, {
++    x: x, y: 3.7148, w: 0.4518, h: 0.4518,
++    fill: { color: ORANGE }, line: { color: WHITE, width: 5 }, shadow: shadow(),
++  }));
++  body(s, L2 + ' ', { x: 1.5506, y: 5.7903, w: 4.3164, h: 0.8975, align: 'left', color: GREY_L });
++  body(s, 'Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmod tempor incididunt ut. ',
++    { x: 7.7937, y: 6.0257, w: 4.3164, h: 0.6198, align: 'left', color: GREY_L });
++  cornerBadge(s);
++}
++
++/* 9 — editorial grid of photo blocks around a centre headline. */
++function slide09(s) {
++  rect(s, { x: 0, y: 0, w: 1.5703, h: 7.5, fill: { color: GREY_XL } });
++  rect(s, { x: 10.3333, y: 0, w: 3.0, h: 0.9394, fill: { color: LIME } });
++  photo(s, { x: 0.6551, y: 0.9394, w: 3.6024, h: 3.1515 });
++  photo(s, { x: 0.6551, y: 4.7286, w: 1.9335, h: 1.9335, kind: 'circle' });
++  photo(s, { x: 6.6403, y: 4.3958, w: 3.2536, h: 2.4981 });
++  photo(s, { x: 10.0797, y: 4.3958, w: 3.2536, h: 2.4981 });
++  head(s, TITLE_LONG,
++    { x: 4.5911, y: 0.9394, w: 3.8256, h: 2.7937, fontSize: 32, color: DARK });
++  pill(s, 8.6668, 1.6932);
++  body(s, L2 + ' Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmo.',
++    { x: 8.6668, y: 2.2802, w: 3.6024, h: 1.4529 });
++  body(s, L2 + ' Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmod tempor incididunt ut.',
++    { x: 2.8809, y: 4.83, w: 3.2536, h: 1.7306 });
++  cornerBadge(s);
++}
++
++/* 10 — mosaic of teal circles left, headline + two pills right. */
++function slide10(s) {
++  // Original: one photo cropped into a honeycomb of circles (d = 1.742").
++  // Even columns start above the top edge, odd columns are offset half a step.
++  const COL_ROWS = [
++    [-0.351, [-0.192, 1.616, 3.424, 5.233, 7.041]],
++    [1.228, [0.703, 2.511, 4.320, 6.128]],
++    [2.807, [-0.192, 1.616, 3.424, 5.233]],
++    [4.387, [0.703, 2.511, 4.320]],
++  ];
++  COL_ROWS.forEach(([x, rows]) => rows.forEach(y =>
++    oval(s, { x: x, y: y, w: 1.742, h: 1.742, fill: { color: PHOTO } })));
++  // Three grey tabs peeking in from the top-right corner.
++  [9.2598, 11.0143, 12.7688].forEach(x =>
++    roundRect(s, { x: x, y: -1.0833, w: 1.615, h: 2.0506, radius: 0.1666, fill: { color: GREY_XL } }));
++  sub(s, 'Your Text Here', { x: 6.8558, y: 0.9673, w: 2.0922, h: 0.3702, fontSize: 16 });
++  head(s, 'Many People Prefer To Buy Fresh, Locally Sourced Produce',
++    { x: 6.8125, y: 1.2494, w: 5.7708, h: 2.7937, fontSize: 40, color: DARK });
++  body(s, L2 + ' Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmod tempor incididunt ut. ',
++    { x: 6.8125, y: 4.8538, w: 5.5057, h: 1.1752 });
++  pill(s, 6.8125, 6.2229, { w: 2.1354, text: 'Your Text', shadow: true });
++  pill(s, 9.1039, 6.2229, { w: 2.1354, text: 'Your Text', fill: LIME, shadow: true });
++}
++
++/* 11 — four tall photo cards on an orange band. */
++function slide11(s) {
++  rect(s, { x: 0, y: 4.2222, w: 8.4286, h: 3.2778, fill: { color: ORANGE } });
++  // Grey quarter-disc tucked into the top-right corner.
++  freeform(s, {
++    x: 10.4913, y: 0, w: 2.8421, h: 2.1988, fill: { color: GREY_XL },
++    points: [
++      [0, 0, 'm'], [1, 0], [1, 0.9563], [0.9296, 0.9797],
++      [0.7737, 1, 0.8792, 0.993, 0.8271, 1],
++      [0, 0, 0.3464, 1, 0, 0.5523],
++      { close: true },
++    ],
++  });
++  head(s, TITLE_LONG,
++    { x: 0.7729, y: 1.0412, w: 9.9414, h: 1.3127, fontSize: 36, color: DARK });
++  [0.9048, 3.0434, 5.1819, 7.3205].forEach(x =>
++    photo(s, { x: x, y: 2.7619, w: 2.0128, h: 4.0952, kind: 0.1299 }));
++  [[2.8716, 3.2912], [5.078, 5.4975]].forEach(([yh, yb]) => {
++    sub(s, 'Your Text Here', { x: 9.7309, y: yh, w: 2.0922, h: 0.3702, fontSize: 16, color: ORANGE });
++    body(s, L3, { x: 9.7309, y: yb, w: 2.6977, h: 1.1752 });
++  });
++  cornerBadge(s);
++}
++
++/* 12 — three icon badges with copy, teal photo panel right. */
++function slide12(s) {
++  photo(s, { x: 7.9206, y: 0, w: 5.4127, h: 7.5 });
++  [1.6306, 3.2893, 4.948].forEach((y, i) => {
++    iconBadge(s, 1.1526, y, 1.421);
++    sub(s, 'Your Text Here',
++      { x: 2.8124, y: y + 0.0317, w: 3.0893, h: 0.3702, fontSize: 16, color: GREY_D });
++    body(s, L3, { x: 2.8124, y: y + 0.4195, w: 3.9834, h: 0.8975 });
++  });
++  cornerBadge(s);
++}
++
++/* 13 — dark banner, three circular photos, captions below. */
++function slide13(s) {
++  rect(s, { x: 0, y: 0, w: 13.3333, h: 3.6349, fill: { color: DARK } });
++  dotGrid(s, 0.8126, 5.2981, GREY_XL);
++  dotGrid(s, 11.3672, 0.6333, '4A6631'); // 20% F2F2F2 over the dark band
++  head(s, TITLE_LONG,
++    { x: 2.7852, y: 0.7973, w: 7.763, h: 1.0434, fontSize: 28, align: 'center', color: WHITE });
++  [1.6423, 5.2751, 8.9079].forEach((x, i) => {
++    oval(s, {
++      x: x, y: 2.2733, w: 2.7831, h: 2.7831,
++      fill: { color: PHOTO }, line: { color: WHITE, width: 5 }, shadow: shadow(34),
++    });
++    sub(s, 'Your Text Here', {
++      x: x + 0.1622, y: 5.5204, w: 2.4588, h: 0.3702,
++      fontSize: 16, align: 'center', color: GREY_D,
++    });
++    body(s, 'Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmod tempor incididunt ut. Laksa sadips.',
++      { x: x - 0.2571, y: 5.9082, w: 3.2974, h: 0.8975, align: 'center' });
++  });
++  cornerBadge(s);
++}
++
++/* 14 — dark slide, 2x2 icon grid, teal block bottom-left. */
++function slide14(s) {
++  s.background = { color: DARK };
++  [0, 1.1508, 2.3016].forEach(y =>
++    rect(s, { x: 12.5238, y: y, w: 0.8095, h: 0.8095, fill: { color: ORANGE } }));
++  photo(s, { x: 0, y: 3.3802, w: 4.8438, h: 4.1198 });
++  head(s, TITLE_LONG,
++    { x: 0.4518, y: 0.9674, w: 4.3924, h: 1.9859, fontSize: 28, color: WHITE });
++  const CELLS = [
++    [6.5945, 1.3945, 0.6815, 0.7706, 5.5267, 2.3625],
++    [10.1059, 1.3945, 0.7118, 0.7666, 9.0823, 2.3625],
++    [7.1191, 4.3235, 0.6535, 0.7313, 6.0664, 5.3335],
++    [10.6455, 4.3807, 0.7717, 0.6079, 9.622, 5.3335],
++  ];
++  CELLS.forEach(([ix, iy, iw, ih, tx, ty]) => {
++    icon(s, ix, iy, iw, ih);
++    sub(s, 'Your Text Here',
++      { x: tx, y: ty, w: 2.759, h: 0.3702, fontSize: 16, align: 'center', color: WHITE });
++    body(s, 'Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do eiusmod tempor incididunt ut. ',
++      { x: tx, y: ty + 0.3878, w: 2.759, h: 0.8975, align: 'center', color: GREY_L });
++  });
++  cornerBadge(s);
++}
++
++/* 15 — two stacked photo cards left, headline and copy centre. */
++function slide15(s) {
++  rect(s, { x: 11.1587, y: 4.4603, w: 2.1746, h: 3.0397, fill: { color: LIME } });
++  photo(s, { x: 0.5873, y: 1.0476, w: 3.8095, h: 3.4127, kind: 0.055 });
++  photo(s, { x: 0.5873, y: 4.6825, w: 3.8095, h: 2.8175, kind: 0.0667 });
++  photo(s, { x: 9.5714, y: 2.9134, w: 3.1746, h: 3.9596, kind: 0.055 });
++  head(s, 'PLACEHOLDER',
++    { x: 4.9391, y: 0.8745, w: 7.8069, h: 1.5146, fontSize: 28, color: DARK });
++  sub(s, 'Your Text Here', { x: 4.9531, y: 2.9134, w: 3.0893, h: 0.3702, fontSize: 16, color: GREY_D });
++  body(s, L3, { x: 4.9531, y: 3.3013, w: 3.9834, h: 0.8975 });
++  pill(s, 4.9531, 4.8331);
++  body(s, 'Lorem laksa sadipsum dolor sitamet, con se ctetur adipis cing elit, sed do se ctetur adipis cing eiusmod tempor incididunt ut. Laksa sadips um dolor sit amet, cons ectetur. Lorem laksa sadipsum dolor sitamet, con se cte tur adipis cing elit, sed do eiusmo.',
++    { x: 4.9531, y: 5.4201, w: 3.9834, h: 1.4529 });
++  cornerBadge(s);
++}
++
++/* 16 — team page: lime arc behind a teal panel, three round portraits. */
++function slide16(s) {
++  freeform(s, {
++    x: 0, y: 0, w: 8.3226, h: 7.5, fill: { color: LIME },
++    points: [
++      [0, 0, 'm'], [0.8985, 0], [0.9165, 0.0443],
++      [1, 0.5033, 0.9703, 0.1853, 1, 0.3405],
++      [0.9165, 0.9623, 1, 0.6661, 0.9703, 0.8212],
++      [0.9011, 1], [0, 1],
++      { close: true },
++    ],
++  });
++  // Teal photo panel with a bulging right edge.
++  freeform(s, {
++    x: 0, y: 0, w: 6.6667, h: 7.5, fill: { color: PHOTO },
++    points: [
++      [0, 0, 'm'], [0.838, 0], [0.844, 0.009],
++      [1, 0.506, 0.943, 0.154, 1, 0.324],
++      [0.87, 0.963, 1, 0.671, 0.953, 0.827],
++      [0.846, 1], [0, 1],
++      { close: true },
++    ],
++  });
++  head(s, 'Team Member',
++    { x: 0.5683, y: 2.191, w: 4.5281, h: 0.7742, fontSize: 40, color: WHITE });
++  head(s, TITLE_LONG,
++    { x: 0.5683, y: 4.5349, w: 3.7932, h: 1.1107, fontSize: 20, color: WHITE });
++  iconBadge(s, 5.9946, 3.1142, 1.0);
++  [1.1797, 3.0331, 4.8865].forEach((y, i) => {
++    photo(s, { x: 7.4301, y: y, w: 1.4337, h: 1.4337, kind: 'circle' });
++    sub(s, 'Your Name Here',
++      { x: 9.1423, y: y + 0.3713, w: 3.0893, h: 0.3702, fontSize: 16, color: GREY_D });
++    body(s, L7, { x: 9.1423, y: y + 0.7591, w: 3.2253, h: 0.2861, lineSpacingMultiple: 1 });
++  });
++  dotGrid(s, 11.8442, 2.0819, GREY_XL);
++  cornerBadge(s);
++}
++
++/* 17 — 2x2 team cards left, dark panel with "Team Member" right. */
++function slide17(s) {
++  freeform(s, {
++    x: 7.8828, y: 0, w: 5.4505, h: 7.5, fill: { color: DARK },
++    points: [
++      [0.1537, 0, 'm'], [1, 0], [1, 1], [0.1537, 1],
++      [0, 0.8883, 0.0688, 1, 0, 0.95],
++      [0, 0.1117],
++      [0.1537, 0, 0, 0.05, 0.0688, 0],
++      { close: true },
++    ],
++  });
++  photo(s, { x: 7.8828, y: 4.2664, w: 5.4505, h: 2.2425 });
++  head(s, 'Team Member',
++    { x: 8.5531, y: 1.2209, w: 3.6801, h: 1.582, fontSize: 44, color: WHITE });
++  icon(s, 10.2813, 4.9668, 0.6535, 0.7313, DARK);
++  body(s, L6, { x: 11.1545, y: 4.8837, w: 1.9591, h: 0.8975, align: 'left' });
++  const CARDS = [[1.3238, 1.2209], [4.6575, 1.2209], [1.3238, 4.2664], [4.6575, 4.2664]];
++  CARDS.forEach(([x, y]) => {
++    // Orange card offset behind the photo tile.
++    roundRect(s, { x: x + 0.1084, y: y + 0.1053, w: 1.5941, h: 1.5941, radius: 0.167, fill: { color: ORANGE } });
++    photo(s, { x: x, y: y, w: 1.5941, h: 1.5941, kind: 0.167 });
++    sub(s, 'Your Name Here', {
++      x: x - 0.6718, y: y + 1.8547, w: 3.0893, h: 0.3702,
++      fontSize: 16, align: 'center', color: GREY_D,
++    });
++    body(s, L7, {
++      x: x - 0.7398, y: y + 2.2425, w: 3.2253, h: 0.2861,
++      align: 'center', lineSpacingMultiple: 1,
++    });
++  });
++  cornerBadge(s);
++}
++
++/* 18 — three overlapping stat circles with side copy. */
++function slide18(s) {
++  head(s, 'Data Slides', { x: 0.8981, y: 1.4597, w: 2.5146, h: 1.582, fontSize: 44, color: DARK });
++  shape(s, 'flowChartConnector', {
++    x: 4.4385, y: 1.2222, w: 4.3611, h: 4.3611, fill: { color: DARK }, shadow: shadow(35),
++  });
++  head(s, '864', {
++    x: 5.1111, y: 1.6449, w: 3.0159, h: 0.8415, fontSize: 44, align: 'center', color: WHITE,
++  });
++  body(s, L6, {
++    x: 5.2504, y: 2.4863, w: 2.8413, h: 0.6198, align: 'center', color: GREY_XL,
++  });
++  [['78%', 4.0913, LIME, 4.5663, 4.2803], ['82%', 6.7579, ORANGE, 7.2345, 6.9486]]
++    .forEach(([label, x, fill, tx, bx]) => {
++      shape(s, 'flowChartConnector', {
++        x: x, y: 3.7728, w: 2.3889, h: 2.3889, fill: { color: fill }, shadow: shadow(35),
++      });
++      head(s, label, {
++        x: tx, y: 4.2906, w: 1.4722, h: 0.7742, fontSize: 40, align: 'center', color: WHITE,
++      });
++      body(s, L7, {
++        x: bx, y: 5.2495, w: 2.0441, h: 0.4712,
++        align: 'center', color: WHITE, lineSpacingMultiple: 1,
++      });
++    });
++  [[0.8981, 4.7822], [9.9206, 4.7822], [9.3333, 1.4597]].forEach(([x, y], i) => {
++    const w = i === 2 ? 3.1019 : 2.5146;
++    sub(s, 'Your Text Here', { x: x, y: y, w: w, h: 0.3702, fontSize: 16, color: GREY_D });
++    body(s, L4, { x: x, y: y + 0.3878, w: w, h: i === 2 ? 0.8975 : 1.1752 });
++  });
++  cornerBadge(s);
++}
++
++/* 19 — three graduated stat bubbles with captions. */
++function slide19(s) {
++  rect(s, { x: 7.2698, y: 0, w: 6.0635, h: 2.7769, fill: { color: GREY_XL } });
++  photo(s, { x: 0, y: 3.374, w: 2.746, h: 4.126 });
++  head(s, 'Data Slides', { x: 0.6951, y: 1.1949, w: 2.5146, h: 1.582, fontSize: 44, color: DARK });
++  const BUBBLES = [
++    { x: 3.4636, y: 1.7028, d: 2.3157, fill: LIME, num: '864', ny: 2.2052, ly: 2.9783 },
++    { x: 6.038, y: 1.3963, d: 2.9289, fill: LIME, num: '896', ny: 2.2052, ly: 3.0374 },
++    { x: 9.2255, y: 1.1949, d: 3.3316, fill: ORANGE, num: '934', ny: 1.8646, ly: 2.6967 },
++  ];
++  BUBBLES.forEach(b => {
++    oval(s, { x: b.x, y: b.y, w: b.d, h: b.d, fill: { color: b.fill } });
++    const cx = b.x + b.d / 2 - 1.00665;
++    head(s, b.num, { x: cx, y: b.ny, w: 2.0133, h: 0.8415, fontSize: 44, align: 'center', color: WHITE });
++    sub(s, 'Your Text Here', { x: cx, y: b.ly, w: 2.0133, h: 0.3366, fontSize: 14, align: 'center', color: WHITE });
++  });
++  body(s, L6, { x: 9.4707, y: 3.0641, w: 2.8413, h: 0.6198, align: 'center', color: WHITE });
++  [3.6741, 6.6628, 9.6514].forEach(x => {
++    sub(s, 'Your Text Here', { x: x, y: 4.9159, w: 2.5146, h: 0.3702, fontSize: 16, color: GREY_D });
++    body(s, L4, { x: x, y: 5.3037, w: 2.5146, h: 1.1752 });
++  });
++  cornerBadge(s);
++}
++
++/* 20 — lime break slide. */
++function slide20(s) {
++  s.background = { color: LIME };
++  rect(s, { x: 0, y: 3.8958, w: 1.4167, h: 2.5, fill: { color: ORANGE } });
++  dotGrid(s, 1.1557, 1.7, WHITE);
++  [7.1627, 9.4802, 11.7976].forEach(x =>
++    photo(s, { x: x, y: 1.3581, w: 2.125, h: 2.125, kind: 'circle' }));
++  head(s, 'Break Slide',
++    { x: 1.6876, y: 3.75, w: 7.1874, h: 1.3127, fontSize: 72, color: WHITE });
++  body(s, L1, {
++    x: 8.875, y: 6.1419, w: 3.4702, h: 0.6238, italic: true, color: WHITE,
++    bullet: { characterCode: '2022', indent: 13.5 },
++  });
++  cornerBadge(s, DARK);
++}
++
++/* 21 — pricing: three cards with round photo, copy and price. */
++function slide21(s) {
++  photo(s, { x: 10.3492, y: 0, w: 2.9841, h: 7.5 });
++  head(s, 'Business Models',
++    { x: 0.7903, y: 1.0031, w: 8.508, h: 0.7068, fontSize: 36, align: 'center', color: '000000' });
++  const PLANS = [
++    { x: 0.7903, name: 'Basic', dark: true },
++    { x: 3.6901, name: 'Standard', dark: false },
++    { x: 6.5899, name: 'Premium', dark: true },
++  ];
++  PLANS.forEach(p => {
++    roundRect(s, {
++      x: p.x, y: 2.0955, w: 2.7083, h: 4.6277, radius: 0.11864,
++      fill: { color: p.dark ? DARK : WHITE },
++      line: p.dark ? undefined : { color: LIME, width: 5 },
++    });
++    head(s, p.name, {
++      x: p.x + 0.3081, y: 2.3143, w: 2.0922, h: 0.5049,
++      fontSize: 24, align: 'center', color: p.dark ? WHITE : DARK,
++    });
++    photo(s, { x: p.x + 0.4995, y: 2.9906, w: 1.7092, h: 1.7092, kind: 'circle' });
++    body(s, L8, {
++      x: p.x + 0.4677, y: 4.8117, w: 1.7728, h: 0.9015,
++      align: 'center', color: p.dark ? GREY_XL : GREY,
++    });
++    const money = p.dark ? WHITE : ORANGE;
++    txt(s, [
++      { text: '$', options: { fontSize: 20 } },
++      { text: '35,', options: { fontSize: 32 } },
++      { text: '00', options: { fontSize: 20 } },
++    ], {
++      x: p.x + 0.605, y: 5.825, w: 1.4982, h: 0.6395,
++      bold: true, align: 'center', color: money,
++    });
++  });
++  iconBadge(s, 9.8613, 3.4094, 1.0);
++  cornerBadge(s);
++}
++
++/* 22 — pricing variant on a grey band. */
++function slide22(s) {
++  rect(s, { x: 0, y: 4.0, w: 13.3333, h: 3.5, fill: { color: GREY_XL } });
++  head(s, 'Business Models',
++    { x: 1.8373, y: 0.916, w: 9.6587, h: 0.7068, fontSize: 36, align: 'center', color: ORANGE });
++  body(s, L1, {
++    x: 3.0458, y: 1.6632, w: 7.2416, h: 0.2861,
++    align: 'center', color: GREY_XD, lineSpacingMultiple: 1,
++  });
++  const PLANS = [
++    { x: 2.3011, name: 'Basic', card: DARK, tag: ORANGE, price: '35,' },
++    { x: 5.3075, name: 'Standard', card: LIME, tag: DARK, price: '55,' },
++    { x: 8.3239, name: 'Premium', card: DARK, tag: ORANGE, price: '125,' },
++  ];
++  PLANS.forEach(p => {
++    roundRect(s, { x: p.x, y: 2.5666, w: 2.7083, h: 4.2, radius: 0.10838, fill: { color: p.card } });
++    head(s, p.name, {
++      x: p.x + 0.3081, y: 2.9583, w: 2.0922, h: 0.4376,
++      fontSize: 20, align: 'center', color: WHITE,
++    });
++    body(s, L1, {
++      x: p.x + 0.6051, y: 3.5972, w: 1.4982, h: 1.7346, align: 'center', color: WHITE,
++    });
++    roundRect(s, { x: p.x + 0.3081, y: 5.8381, w: 2.0922, h: 0.6395, fill: { color: p.tag } });
++    txt(s, [
++      { text: '$', options: { fontSize: 20 } },
++      { text: p.price, options: { fontSize: 32 } },
++      { text: '00', options: { fontSize: 20 } },
++    ], {
++      x: p.x + (p.price.length > 3 ? 0.4698 : 0.6051), y: 5.8381,
++      w: p.price.length > 3 ? 1.7689 : 1.4982, h: 0.6395,
++      bold: true, align: 'center', color: WHITE,
++    });
++  });
++  cornerBadge(s);
++}
++
++/* 23 — contact: photo panel left, four info cards right. */
++function slide23(s) {
++  rect(s, { x: 11.1212, y: 0, w: 2.2121, h: 7.5, fill: { color: LIME } });
++  freeform(s, {
++    x: 0, y: 0.8686, w: 7.0645, h: 6.6314, fill: { color: PHOTO },
++    points: [
++      [0, 0, 'm'], [0.9067, 0],
++      [1, 0.0994, 0.9582, 0, 1, 0.0445],
++      [1, 1], [0, 1],
++      { close: true },
++    ],
++  });
++  head(s, 'Contact Slide',
++    { x: 7.4241, y: 0.7426, w: 4.7062, h: 0.7068, fontSize: 36, color: DARK });
++  const CARDS = [
++    { x: 7.5649, y: 1.9524, fill: ORANGE, title: 'Address 1', tw: 1.3134, bw: 1.9157,
++      lines: ['4326  Hastings Street', 'Los Angeles', 'Los Angeles, US', 'V6C 1B4'] },
++    { x: 9.9487, y: 1.9524, fill: WHITE, title: 'Address 2', tw: 1.359, bw: 1.7573,
++      lines: ['4521  Long Street', 'Vancouver', 'British Columbia', 'V6C 1B4'] },
++    { x: 7.5649, y: 4.4364, fill: WHITE, title: 'Email', tw: 1.0101, bw: 2.4061, dx: -0.0793,
++      lines: ['business@mail.com', 'business@supermail.com', 'www.constructe.ca'] },
++    { x: 9.9487, y: 4.4364, fill: WHITE, title: 'Phone', tw: 1.103, bw: 1.4814,
++      lines: ['604-048-0756', '604-728-6623'] },
++  ];
++  CARDS.forEach(c => {
++    const onOrange = c.fill === ORANGE;
++    roundRect(s, {
++      x: c.x, y: c.y, w: 2.2121, h: 2.2651, radius: 0.16667,
++      fill: { color: c.fill }, shadow: shadow(30),
++    });
++    sub(s, c.title, {
++      x: c.x + 0.251, y: c.y + 0.2991, w: c.tw, h: 0.4597,
++      fontSize: 16, color: onOrange ? WHITE : DARK,
++    });
++    body(s, c.lines.map((t, i) => ({ text: t, options: { breakLine: i < c.lines.length - 1 } })), {
++      x: c.x + 0.251 + (c.dx || 0), y: c.y + 0.6921, w: c.bw, h: 1.1792,
++      align: 'left', color: onOrange ? WHITE : GREY,
++    });
++  });
++  cornerBadge(s);
++}
++
++/* 24 — thank-you closer on dark green. */
++function slide24(s) {
++  s.background = { color: DARK };
++  photo(s, { x: 2.1746, y: 1.8849, w: 3.7302, h: 3.7302, kind: 'circle' });
++  [5.1112, 6.6667, 8.2103].forEach(x => oval(s, {
++    x: x, y: 3.1393, w: 1.4128, h: 1.4128,
++    fill: { color: PHOTO }, line: { color: WHITE, width: 5 },
++  }));
++  head(s, 'Thank You',
++    { x: 5.9048, y: 1.8089, w: 5.6665, h: 1.1107, fontSize: 60, color: WHITE });
++  body(s, L1, {
++    x: 5.9048, y: 4.9913, w: 4.2698, h: 0.6238, italic: true, color: GREY_L,
++    bullet: { characterCode: '2022', indent: 13.5 },
++  });
++  dotGrid(s, 1.0296, 4.9913, '4C6821');
++  dotGrid(s, 10.9988, 0.8676, '4C6821');
++  cornerBadge(s);
++}
++
++/* ------------------------------------------------------------------ build */
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
++  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE', width: 13.3333, height: 7.5 });
++  pptx.layout = 'WIDE';
++  BUILDERS.forEach(fn => fn(pptx.addSlide()));
++  return pptx.writeFile({ fileName: path.join(__dirname, '0c19352e-3055-40db-8f0f-31ce165041cd_grok_final.pptx') });
++}
++
++build().then(f => console.log('wrote', f));

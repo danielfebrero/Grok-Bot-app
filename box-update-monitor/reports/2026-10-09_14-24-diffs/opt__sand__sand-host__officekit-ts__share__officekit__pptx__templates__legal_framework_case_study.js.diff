@@ -1,0 +1,674 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/legal_framework_case_study.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/legal_framework_case_study.js
+@@ -0,0 +1,671 @@
++/**
++ * "Law Presentation" — 20-slide deck rebuilt with pptxgenjs.
++ *
++ * Slide size 10 x 5.625in (16:9). Photographs in the source deck are replaced
++ * by light-grey "[image]" placeholders at the same position and size.
++ *
++ *   node 0aac181b-0b28-485f-b4d6-b265c6e06630_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const C = {
++  green: '10CE81',
++  purple: '9E79B5',
++  yellow: 'FFC000',
++  red: 'EF233C',
++  black: '000000',
++  white: 'FFFFFF',
++  grey: '7F7F7F',
++  slate: '595959',
++  track: 'F2F2F2',
++  photo: 'F2F2F2',
++  photoTx: 'A8A8A8',
++  rule: 'D8D8D8',
++  ring: 'B2B1B1',
++  device: '0A0A0A',
++  deviceBase: '555452',
++};
++
++const F = {
++  xb: 'Plus Jakarta Sans ExtraBold',
++  rg: 'Plus Jakarta Sans',
++  pop: 'Poppins SemiBold',
++};
++
++// Google-Slides text insets, in points. pptxgenjs order: [left, right, bottom, top]
++const INS = [5.4, 5.4, 2.7, 2.7];
++const INS_WIDE = [7.2, 7.2, 3.6, 3.6];
++
++// Soft drop shadow on every floating card. Built fresh per shape because
++// pptxgenjs merges defaults into the object it is handed.
++function cardShadow() {
++  return { type: 'outer', color: C.black, opacity: 0.09, blur: 27, offset: 14, angle: 110 };
++}
++
++/* ---------------------------------------------------------------- helpers */
++
++/** Plain text box; `o` carries x/y/w/h plus any override. */
++function text(slide, body, o) {
++  slide.addText(body, Object.assign({
++    fontFace: F.rg, fontSize: 11, color: C.black,
++    align: 'left', valign: 'top', margin: INS, wrap: true,
++  }, o));
++}
++
++/** Slide title. */
++function title(slide, body, o) {
++  text(slide, body, Object.assign({ fontFace: F.xb, fontSize: 36, color: C.black }, o));
++}
++
++/** Centred 41pt title used by the full-bleed layouts. */
++function bigTitle(slide, body, o) {
++  text(slide, body, Object.assign({
++    fontFace: F.xb, fontSize: 41, bold: true, align: 'center',
++    x: 1.069, y: 0.573, w: 7.862, h: 0.757,
++  }, o));
++}
++
++/** 12pt extra-bold sub-heading. */
++function head(slide, body, o) {
++  text(slide, body, Object.assign({ fontFace: F.xb, fontSize: 12, lineSpacingMultiple: 1.5 }, o));
++}
++
++/** 11pt grey body copy. */
++function copy(slide, body, o) {
++  text(slide, body, Object.assign({ color: C.grey, lineSpacingMultiple: 1.5 }, o));
++}
++
++/** 15pt extra-bold lead-in above body copy. */
++function lead(slide, body, o) {
++  text(slide, body, Object.assign({ fontFace: F.xb, fontSize: 15, lineSpacingMultiple: 1.2 }, o));
++}
++
++/** 18pt extra-bold money figure. */
++function figure(slide, body, o) {
++  text(slide, body, Object.assign({ fontFace: F.xb, fontSize: 18, lineSpacingMultiple: 1.2 }, o));
++}
++
++function rect(slide, x, y, w, h, color, o) {
++  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, o));
++}
++
++function ellipse(slide, x, y, w, h, color, o) {
++  slide.addShape('ellipse', Object.assign({ x, y, w, h, fill: { color } }, o));
++}
++
++/** Rounded rectangle; `adj` is the OOXML corner ratio (0.5 = pill). */
++function pill(slide, x, y, w, h, color, adj, o) {
++  slide.addShape('roundRect', Object.assign({
++    x, y, w, h, fill: { color },
++    rectRadius: (adj === undefined ? 0.5 : adj) * Math.min(w, h),
++  }, o));
++}
++
++/** Numbered bullet: 0.572in disc with a centred white ordinal on top. */
++function badge(slide, x, y, color, label) {
++  ellipse(slide, x, y, 0.572, 0.572, color);
++  text(slide, label, {
++    x: x - 0.094, y: y + 0.097, w: 0.761, h: 0.379,
++    align: 'center', fontFace: F.xb, fontSize: 18, color: C.white,
++  });
++}
++
++/** Small ordinal disc + white ordinal, positions given independently. */
++function badgeAt(slide, cx, cy, tx, ty, color, label) {
++  ellipse(slide, cx, cy, 0.572, 0.572, color);
++  text(slide, label, {
++    x: tx, y: ty, w: 0.761, h: 0.379,
++    align: 'center', fontFace: F.xb, fontSize: 18, color: C.white,
++  });
++}
++
++/** Photo stand-in: flat grey block with an "[image]" caption. */
++function photo(slide, x, y, w, h, shape, o) {
++  slide.addShape(shape || 'rect', Object.assign({ x, y, w, h, fill: { color: C.photo } }, o));
++  text(slide, '[image]', {
++    x, y: y + h / 2 - 0.16, w, h: 0.32,
++    align: 'center', fontSize: 10, color: C.photoTx, margin: 0,
++  });
++}
++
++/**
++ * Free-form shape. `pts` are path commands in 0..1 shape-relative units and
++ * are emitted relative to the shape box (pptxgenjs offsets them itself):
++ *   ['M', x, y] | ['L', x, y] | ['C', x1, y1, x2, y2, x, y] | ['Z']
++ */
++function blob(slide, x, y, w, h, color, pts, o) {
++  const points = pts.map(function (p) {
++    if (p[0] === 'Z') return { close: true };
++    if (p[0] === 'C') {
++      return {
++        x: p[5] * w, y: p[6] * h,
++        curve: { type: 'cubic', x1: p[1] * w, y1: p[2] * h, x2: p[3] * w, y2: p[4] * h },
++      };
++    }
++    return { x: p[1] * w, y: p[2] * h, moveTo: p[0] === 'M' };
++  });
++  slide.addShape('custGeom', Object.assign({ x, y, w, h, fill: { color }, points }, o));
++}
++
++/** Bottom-right page number inherited from the slide master. */
++function pageNum(slide, n, color) {
++  text(slide, String(n), {
++    x: 9.226, y: 5.21, w: 0.574, h: 0.252,
++    align: 'right', fontSize: 11, color: color || C.grey,
++  });
++}
++
++/** Instagram / Facebook / X chips under each team member. */
++function socialRow(slide, x, y) {
++  [[C.green, '\u25CE'], [C.purple, 'f'], [C.yellow, '\u2715']].forEach(function (chip, i) {
++    const cx = x + i * 0.4145;
++    ellipse(slide, cx, y, 0.224, 0.224, chip[0]);
++    text(slide, chip[1], {
++      x: cx, y: y, w: 0.224, h: 0.224,
++      align: 'center', valign: 'middle', fontSize: 8, color: C.white, margin: 0,
++    });
++  });
++}
++
++/* ------------------------------------------------------- shared text bits */
++
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur';
++const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut';
++const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';
++const LOREM_FULL = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim';
++const LOREM_LEAD = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et';
++const LOREM_STEP = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit';
++const PERSPIC = 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem';
++const DESC_HERE = 'Your Text Description Here';
++const HERE = 'Your text here';
++const OVERVIEW = 'PLACEHOLDER';
++
++/** Three "• Lorem ipsum dolor" rows used on slides 11, 18 and 19. */
++function loremBullets(align) {
++  return ['Lorem ipsum dolor', 'Lorem ipsum dolor ', 'Lorem ipsum dolor'].map(function (t, i) {
++    return {
++      text: t,
++      options: {
++        align: align, bullet: { characterCode: '2022', indent: 17 },
++        breakLine: i < 2, color: C.grey, fontSize: 11, fontFace: F.rg, lineSpacingMultiple: 1.5,
++      },
++    };
++  });
++}
++
++/* ------------------------------------------------------------- the slides */
++
++// 1 — title slide
++function slide01(s) {
++  pill(s, 3.423, 0.451, 0.895, 0.25, C.green);
++  title(s, 'Law Presentation', { x: 0.566, y: 1.358, w: 5.459, h: 2.095, fontSize: 60 });
++  [['Home', 0.566, 0.651], ['About Us', 1.429, 0.895], ['Service', 2.412, 0.895]].forEach(function (n) {
++    text(s, n[0], { x: n[1], y: 0.434, w: n[2], h: 0.252, fontSize: 9, margin: INS_WIDE });
++  });
++  text(s, 'Contact', {
++    x: 3.423, y: 0.441, w: 0.895, h: 0.252,
++    fontSize: 9, color: C.white, align: 'center', margin: INS_WIDE,
++  });
++  blob(s, 6.956, 0, 3.044, 2.812, C.green, [
++    ['M', 0.0743, 0], ['L', 1, 0], ['L', 1, 0.8666], ['L', 0.9786, 0.884],
++    ['C', 0.8784, 0.9572, 0.7576, 1, 0.6276, 1],
++    ['C', 0.281, 1, 0, 0.6958, 0, 0.3206],
++    ['C', 0, 0.2268, 0.0176, 0.1374, 0.0493, 0.0561], ['Z'],
++  ]);
++  pill(s, 0.566, 3.558, 2.279, 0.275, C.yellow);
++  text(s, 'Presentation Template', {
++    x: 0.686, y: 3.556, w: 2.038, h: 0.278, fontFace: F.xb, fontSize: 12, color: C.white,
++  });
++  photo(s, 6.179, 0, 3.821, 5.625);
++}
++
++// 2 — agenda
++function slide02(s) {
++  rect(s, 3.687, 1.791, 2.779, 3.834, C.yellow);
++  title(s, 'Agenda for the Legal Discussion', { x: 0.57, y: 0.504, w: 5.37, h: 1.287 });
++  [['01', 'Introduction', 2.108, 2.11], ['02', 'Case Study', 3.193, 3.197], ['03', 'Legal Precedents', 4.279, 4.282]]
++    .forEach(function (row) {
++      text(s, row[0], {
++        x: 3.766, y: row[3], w: 0.761, h: 0.379,
++        align: 'center', fontFace: F.xb, fontSize: 18, color: C.white,
++      });
++      head(s, row[1], { x: 4.526, y: row[2], w: 1.729, h: 0.379, color: C.white });
++      copy(s, LOREM_SHORT, { x: 4.526, y: row[2] + 0.321, w: 1.633, h: 0.606, color: C.white });
++    });
++  head(s, DESC_HERE, { x: 0.57, y: 2.268, w: 2.625, h: 0.475 });
++  copy(s, LOREM_MED, { x: 0.57, y: 2.598, w: 2.625, h: 0.871 });
++  copy(s, OVERVIEW, { x: 0.57, y: 3.718, w: 2.591, h: 0.871, fontFace: F.xb, color: C.black });
++  pageNum(s, 2, C.white);
++  photo(s, 6.139, 0, 3.861, 5.625);
++}
++
++// 3 — introduction
++function slide03(s) {
++  pageNum(s, 3);
++  title(s, 'Introduction To The Legal Framework', { x: 3.988, y: 0.628, w: 4.988, h: 1.287 });
++  [2.318, 3.793].forEach(function (y) {
++    head(s, DESC_HERE, { x: 5.59, y: y, w: 3.238, h: 0.379 });
++    copy(s, LOREM_LONG, { x: 5.59, y: y + 0.341, w: 3.238, h: 0.871 });
++  });
++  badgeAt(s, 4.415, 3.84, 4.321, 3.937, C.yellow, '02');
++  badgeAt(s, 4.416, 2.373, 4.322, 2.47, C.green, '01');
++  copy(s, '2024', { x: 0.706, y: 3.502, w: 2.139, h: 0.682, fontFace: F.xb, fontSize: 24, color: C.black });
++  head(s, HERE, { x: 0.706, y: 4.013, w: 2.139, h: 0.379 });
++  copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', { x: 0.706, y: 4.293, w: 2.139, h: 0.606 });
++  blob(s, 0, 0, 2.711, 2.812, C.purple, [
++    ['M', 0, 0], ['L', 0.2012, 0], ['L', 0.8191, 0.3569],
++    ['C', 0.9954, 0.4587, 1.0527, 0.6789, 0.947, 0.8488],
++    ['C', 0.9074, 0.9126, 0.8505, 0.9601, 0.7856, 0.9894],
++    ['L', 0.7587, 1], ['L', 0.4971, 1], ['L', 0.4702, 0.9894],
++    ['C', 0.4588, 0.9843, 0.4476, 0.9785, 0.4366, 0.9721],
++    ['L', 0, 0.72], ['Z'],
++  ]);
++  photo(s, 0.706, 0.726, 2.38, 2.38, 'ellipse');
++}
++
++// 4 — core framework
++function slide04(s) {
++  pageNum(s, 4);
++  title(s, 'Understanding Core Legal Framework', { x: 0.57, y: 0.504, w: 5.37, h: 1.287 });
++  rect(s, 6.56, 0, 3.44, 3.571, C.green);
++  head(s, DESC_HERE, { x: 0.57, y: 2.481, w: 2.625, h: 0.475 });
++  copy(s, LOREM_MED, { x: 0.57, y: 2.811, w: 2.625, h: 0.871 });
++  copy(s, OVERVIEW, { x: 0.57, y: 3.932, w: 2.591, h: 0.871, fontFace: F.xb, color: C.black });
++  // three numbered call-outs: [discX, textX, textW, rowY, colour, ordinal]
++  [[3.583, 4.448, 1.729, 2.514, C.purple, '01'],
++   [3.583, 4.448, 1.729, 4.081, C.yellow, '02'],
++   [6.829, 7.661, 1.468, 4.081, C.red, '03']].forEach(function (r) {
++    badge(s, r[0], r[3], r[4], r[5]);
++    head(s, HERE, { x: r[1], y: r[3] - (r[5] === '03' ? 0.053 : 0.031), w: r[2], h: 0.379 });
++    copy(s, LOREM_SHORT, { x: r[1], y: r[3] + 0.29, w: 1.633, h: 0.606 });
++  });
++  photo(s, 7.512, 0.002, 2.488, 2.86);
++}
++
++// 5 — case study
++function slide05(s) {
++  title(s, 'Case Study', { x: 0.57, y: 0.412, w: 3.552, h: 0.757, fontSize: 41 });
++  blob(s, 8.225, 2.769, 2.017, 2.808, C.purple, [
++    ['M', 0.9397, 0.188],
++    ['C', 0.9781, 0.2389, 1, 0.2972, 1, 0.3592],
++    ['L', 1, 0.6029], ['L', 0.0777, 1], ['L', 0, 0.9069], ['L', 0, 0.3592],
++    ['C', 0, 0.1608, 0.2239, 0, 0.5, 0],
++    ['C', 0.6898, 0, 0.855, 0.076, 0.9397, 0.188], ['Z'],
++  ], { rotate: -59.07 });
++  [[1.637, 1.771, C.green], [2.871, 3.005, C.yellow], [4.109, 4.243, C.red]].forEach(function (d) {
++    ellipse(s, 3.321, d[1], 0.302, 0.302, d[2]);
++    copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor. ',
++      { x: 3.953, y: d[0], w: 2.636, h: 0.871 });
++  });
++  copy(s, 'Case Total', { x: 0.57, y: 2.131, w: 2.029, h: 0.454, fontFace: F.xb, fontSize: 15, color: C.black });
++  copy(s, '7.09K', { x: 0.57, y: 2.41, w: 2.029, h: 0.682, fontFace: F.xb, fontSize: 24, color: C.black });
++  copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', { x: 0.57, y: 3.005, w: 2.029, h: 0.606 });
++  pageNum(s, 5, C.white);
++  photo(s, 7.05, 2.421, 2.38, 2.38, 'ellipse');
++}
++
++// 6 — influential precedents
++function slide06(s) {
++  pageNum(s, 6);
++  rect(s, 0, 2.024, 4.512, 3.679, C.yellow);
++  title(s, 'Point of Influential Legal Precedents', { x: 0.57, y: 0.412, w: 7.53, h: 1.439, fontSize: 41 });
++  lead(s, 'Highlight Important Legal Cases', { x: 5.087, y: 2.024, w: 2.38, h: 0.682 });
++  copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt',
++    { x: 5.087, y: 2.705, w: 2.38, h: 0.871 });
++  // [x, card fill, label, label colour, body colour]
++  [[1.489, C.white, 'Constitutional Law', C.black, C.slate],
++   [4.257, C.red, 'Corporate  Law', C.white, C.white],
++   [7.025, C.purple, 'Criminal Law', C.white, C.white]].forEach(function (card) {
++    pill(s, card[0], 4.014, 2.138, 1.134, card[1], 0.16667, { shadow: cardShadow() });
++    head(s, card[2], { x: card[0] + 0.226, y: 4.112, w: 1.729, h: 0.379, color: card[3] });
++    copy(s, LOREM_SHORT, { x: card[0] + 0.226, y: 4.38, w: 1.793, h: 0.606, color: card[4] });
++  });
++  photo(s, 1.119, 2.024, 3.393, 2.667);   // overlaps the first card, as in the original
++}
++
++// 7 — key legislation
++function slide07(s) {
++  pageNum(s, 7);
++  s.addShape('teardrop', { x: 6.529, y: 0, w: 3.471, h: 3.553, fill: { color: C.green } });
++  photo(s, 6.801, 0.336, 2.926, 2.88, 'ellipse');
++  title(s, 'Key Legislation Impacting the Legal Framework', { x: 0.57, y: 0.412, w: 5.825, h: 1.893 });
++  lead(s, 'A Summary Of The Most Critical Legal Provisions', { x: 0.57, y: 2.629, w: 5.311, h: 0.379 });
++  copy(s, LOREM_FULL, { x: 0.57, y: 2.972, w: 5.028, h: 0.606 });
++  // [discX, textX, textW, headY, colour, ordinal]
++  [[0.568, 1.432, 1.729, 4.098, C.purple, '01'],
++   [3.719, 4.584, 1.729, 4.098, C.yellow, '02'],
++   [6.965, 7.797, 1.468, 4.076, C.red, '03']].forEach(function (col) {
++    badgeAt(s, col[0], 4.129, col[0] - 0.094, 4.225, col[4], col[5]);
++    head(s, HERE, { x: col[1], y: col[3], w: col[2], h: 0.379 });
++    copy(s, LOREM_SHORT, { x: col[1], y: 4.419, w: 1.633, h: 0.606 });
++  });
++}
++
++// 8 — head of legal
++function slide08(s) {
++  pageNum(s, 8);
++  rect(s, 0, 0, 5, 5.625, C.yellow);
++  title(s, 'Head Of Legal', { x: 5.344, y: 0.68, w: 3.815, h: 0.682 });
++  lead(s, 'William Robert', { x: 5.344, y: 1.769, w: 3.609, h: 0.32, bold: true });
++  copy(s, LOREM_FULL, { x: 5.344, y: 2.089, w: 3.609, h: 0.961 });
++  // [label, %, trackY, fillY, fillW, colour, labelY]
++  [['Experience', '87%', 3.754, 3.754, 2.302, C.green, 3.29],
++   ['Skill', '75%', 4.427, 4.428, 1.86, C.purple, 3.964]].forEach(function (bar) {
++    pill(s, 5.657, bar[2], 2.637, 0.089, C.track);
++    pill(s, 5.371, bar[3], bar[4], 0.089, bar[5]);
++    copy(s, bar[0], { x: 5.344, y: bar[6], w: 1.279, h: 0.416, fontFace: F.xb, fontSize: 14, color: C.black });
++    copy(s, bar[1], {
++      x: 7.554, y: bar[6], w: 0.74, h: 0.416,
++      fontFace: F.xb, fontSize: 14, bold: true, color: C.black, align: 'right',
++    });
++  });
++  photo(s, 0.841, 1.056, 4.159, 3.184);
++  lead(s, [
++    { text: 'Hallo, ', options: { breakLine: true } },
++    { text: 'I\u2019m William Robert' },
++  ], { x: 0.753, y: 4.345, w: 2.209, h: 0.682, bold: true });
++}
++
++// 9 — team grid
++function slide09(s) {
++  pageNum(s, 9);
++  title(s, 'Meet The Legal Team', { x: 2.148, y: 0.554, w: 5.704, h: 0.682 });
++  [[1.987, 1.859], [3.496, 3.245], [6.514, 3.301], [5.006, 1.896]].forEach(function (p) {
++    photo(s, p[0], p[1], 1.509, 1.414);
++  });
++  [{ name: 'William Robert', x: 0.071, y: 1.934, align: 'right', social: [0.731, 2.918] },
++   { name: 'Mariana Luis', x: 1.56, y: 3.385, align: 'right', social: [2.265, 4.382] },
++   { name: 'Alex Paula', x: 6.587, y: 1.934, align: 'left', social: [6.68, 2.918] },
++   { name: 'Karina Rose', x: 8.1, y: 3.315, align: 'left', social: [8.205, 4.374] }].forEach(function (p) {
++    lead(s, p.name, { x: p.x, y: p.y, w: 1.829, h: 0.379, align: p.align, bold: true });
++    copy(s, 'Lorem ipsum dolor sit amet, consectetur, ', { x: p.x, y: p.y + 0.32, w: 1.829, h: 0.606, align: p.align });
++    socialRow(s, p.social[0], p.social[1]);
++  });
++}
++
++// 10 — pie statistic
++function slide10(s) {
++  pageNum(s, 10);
++  // three `pie` wedges sharing one bounding box: [colour, startAngle, endAngle]
++  [[C.green, 269.7, 30.15], [C.purple, 29.83, 147.52], [C.yellow, 146.87, 269.43]].forEach(function (seg, i) {
++    s.addShape('pie', {
++      x: 3.559, y: i === 2 ? 2.415 : 2.408, w: 2.477, h: 2.516,
++      fill: { color: seg[0] }, angleRange: [seg[1], seg[2]],
++    });
++  });
++  title(s, 'Key Legal Concepts Statistic', { x: 0.57, y: 0.479, w: 5.837, h: 1.439, fontSize: 41 });
++  [['30%', 3.812, 3.124], ['35%', 4.595, 4.063], ['35%', 5.053, 2.965]].forEach(function (lb) {
++    copy(s, lb[0], { x: lb[1], y: lb[2], w: 0.893, h: 0.606, fontFace: F.xb, fontSize: 21, color: C.white });
++  });
++  // [colour, ordinal, amount, discY, ordY, figY, copyY, figH, figLn, textX, discX, ordX]
++  [[C.green, '01', '$10.57M', 1.899, 1.996, 1.868, 2.189, 0.439, 1.2, 7.564, 6.7, 6.605],
++   [C.purple, '02', '$187', 3.073, 3.17, 3.042, 3.363, 0.439, 1.2, 7.546, 6.682, 6.587],
++   [C.yellow, '03', '$37.01', 4.278, 4.375, 4.19, 4.569, 0.53, 1.5, 7.564, 6.7, 6.605]].forEach(function (r) {
++    badgeAt(s, r[10], r[3], r[11], r[4], r[0], r[1]);
++    figure(s, r[2], { x: r[9], y: r[5], w: 1.729, h: r[7], lineSpacingMultiple: r[8] });
++    copy(s, LOREM_SHORT, { x: r[9], y: r[6], w: 1.633, h: 0.606 });
++  });
++  head(s, DESC_HERE, { x: 0.57, y: 3.666, w: 2.644, h: 0.475 });
++  copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut.\u00a0',
++    { x: 0.57, y: 3.996, w: 2.644, h: 1.136 });
++}
++
++// 11 — four-step wheel
++function slide11(s) {
++  pageNum(s, 11);
++  s.addShape('ellipse', {
++    x: 2.349, y: 1.508, w: 3.185, h: 3.186,
++    fill: { type: 'none' }, line: { color: C.ring, width: 0.75 },
++  });
++  // Left half-disc split into four wedges. The source deck mirrors the whole
++  // group horizontally, so each wedge is drawn flipped.
++  blob(s, 0.003, 0.557, 2.262, 2.219, C.green, [
++    ['M', 0, 1], ['C', 0.0116, 0.4436, 0.4542, 0, 1, 0], ['L', 1, 1], ['Z'],
++  ], { flipH: true });
++  blob(s, 0, 1.217, 2.266, 1.56, C.purple, [
++    ['M', 1, 1], ['L', 0, 1], ['C', 0.0058, 0.6092, 0.1179, 0.2557, 0.2957, 0], ['Z'],
++  ], { flipH: true });
++  blob(s, 0.003, 2.777, 2.266, 2.311, C.red, [
++    ['M', 0, 0.013], ['L', 0.0017, 0], ['L', 1, 0], ['L', 1, 1], ['L', 0.9934, 1],
++    ['C', 0.4477, 0.9967, 0.0066, 0.5635, 0, 0.0285], ['Z'],
++  ], { flipH: true });
++  blob(s, 0, 2.777, 2.269, 1.645, C.yellow, [
++    ['M', 1, 0], ['L', 0.2902, 1],
++    ['C', 0.1128, 0.7529, 0.0033, 0.4142, 0, 0.04], ['L', 0.0017, 0], ['Z'],
++  ], { flipH: true });
++  [['Step 01', 2.299, 0.675, LOREM_STEP], ['Step 02', 2.925, 1.868, LOREM_STEP],
++   ['Step 03', 2.82, 3.06, LOREM_STEP + '.'], ['Step 04', 2.299, 4.253, LOREM_STEP]]
++    .forEach(function (st) {
++      text(s, st[0], { x: st[1], y: st[2], w: 2.188, h: 0.303, fontFace: F.xb, fontSize: 14, bold: true });
++      text(s, st[3], { x: st[1], y: st[2] + 0.256, w: 2.188, h: 0.509, color: C.slate, lineSpacingMultiple: 1.3 });
++    });
++  text(s, 'Legal Solutions Shape Client',
++    { x: 5.333, y: 0.487, w: 3.991, h: 2.12, align: 'right', fontFace: F.xb, fontSize: 41, bold: true });
++  text(s, [
++    { text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++  ].concat(loremBullets('right')),
++    { x: 6.14, y: 3.114, w: 3.185, h: 1.666, align: 'right', color: C.grey, lineSpacingMultiple: 1.5 });
++  [['01', 0.18, 1.132], ['02', 0.936, 1.982], ['03', 0.936, 3.073], ['04', 0.175, 3.874]].forEach(function (n) {
++    text(s, n[0], { x: n[1], y: n[2], w: 0.761, h: 0.53, align: 'center', fontFace: F.xb, fontSize: 27, color: C.white });
++  });
++}
++
++/**
++ * Timeline row shared by slides 12 and 13: a shadowed white card on one side
++ * of the centre rule, a money figure on the other. `side` says which side the
++ * card sits on; the two mirror variants use slightly different insets.
++ */
++const TIMELINE = {
++  left: {
++    cardW: 2.593, titleDx: 0.181, titleW: 2.25, bodyDx: 0.177, bodyW: 2.339,
++    badgeDy: 0.221, figDy: 0.102, figBodyDy: 0.464, figBodyDx: -0.006, align: 'left',
++  },
++  right: {
++    cardW: 2.615, titleDx: 0.088, titleW: 2.33, bodyDx: 0.004, bodyW: 2.422,
++    badgeDy: 0.218, figDy: 0.004, figBodyDy: 0.327, figBodyDx: -0.614, align: 'right',
++  },
++};
++
++function timelineRow(s, o) {
++  const g = TIMELINE[o.side];
++  pill(s, o.cardX, o.y, g.cardW, 1.014, C.white, 0.16667, { shadow: cardShadow(), flipH: true });
++  text(s, 'Brainstorming', {
++    x: o.cardX + g.titleDx, y: o.y + 0.103, w: g.titleW, h: 0.303,
++    fontFace: F.xb, fontSize: 14, align: g.align,
++  });
++  text(s, PERSPIC, {
++    x: o.cardX + g.bodyDx, y: o.y + 0.362, w: g.bodyW, h: 0.509,
++    color: C.slate, lineSpacingMultiple: 1.3, align: g.align,
++  });
++  badge(s, 4.689, o.y + g.badgeDy, o.color, o.num);
++  figure(s, o.amount, { x: o.figX, y: o.y + g.figDy, w: 1.729, h: 0.439, align: g.align });
++  text(s, PERSPIC, {
++    x: o.figX + g.figBodyDx, y: o.y + g.figBodyDy, w: 2.339, h: 0.509,
++    color: C.slate, lineSpacingMultiple: 1.3, align: g.align,
++  });
++}
++
++// 12 — challenges / solutions (timeline start)
++function slide12(s) {
++  pageNum(s, 12);
++  text(s, 'Legal Challenges and Strategic Solutions',
++    { x: 1.892, y: 0.451, w: 6.215, h: 1.439, align: 'center', fontFace: F.xb, fontSize: 41, bold: true });
++  s.addShape('line', { x: 5, y: 2.579, w: 0, h: 3.046, line: { color: C.rule, width: 2.75 } });
++  timelineRow(s, { y: 2.354, side: 'left', cardX: 1.814, color: C.green, num: '01', amount: '$10.57M', figX: 5.456 });
++  timelineRow(s, { y: 3.849, side: 'right', cardX: 5.432, color: C.purple, num: '02', amount: '$13.75M', figX: 2.673 });
++}
++
++// 13 — challenges / solutions (timeline continued)
++function slide13(s) {
++  pageNum(s, 13);
++  s.addShape('line', { x: 5, y: 0, w: 0, h: 4.473, line: { color: C.rule, width: 2.75 } });
++  timelineRow(s, { y: 0.839, side: 'left', cardX: 1.814, color: C.yellow, num: '03', amount: '$18.20M', figX: 5.455 });
++  timelineRow(s, { y: 2.334, side: 'right', cardX: 5.431, color: C.red, num: '04', amount: '$37.80M', figX: 2.673 });
++  timelineRow(s, { y: 3.931, side: 'left', cardX: 1.82, color: C.green, num: '05', amount: '$11.90M', figX: 5.461 });
++}
++
++// 14 — four teardrop steps
++function slide14(s) {
++  pageNum(s, 14);
++  bigTitle(s, 'Step-by-Step Breakdown of Legal Procedures', { h: 1.439 });
++  s.addShape('teardrop', { x: 3.81, y: 2.582, w: 1.119, h: 1.119, fill: { color: C.green }, rotate: 180, flipH: true });
++  s.addShape('teardrop', { x: 5.071, y: 2.582, w: 1.119, h: 1.119, fill: { color: C.purple }, rotate: 180 });
++  s.addShape('teardrop', { x: 3.81, y: 3.797, w: 1.119, h: 1.119, fill: { color: C.yellow } });
++  s.addShape('teardrop', { x: 5.071, y: 3.797, w: 1.119, h: 1.119, fill: { color: C.red }, flipH: true });
++  [['01', 3.99, 2.876], ['02', 5.25, 2.876], ['03', 3.99, 4.091], ['04', 5.25, 4.091]].forEach(function (n) {
++    text(s, n[0], { x: n[1], y: n[2], w: 0.761, h: 0.53, align: 'center', fontFace: F.xb, fontSize: 27, color: C.white });
++  });
++  [['Step 01', 1.37, 2.642, 'right', LOREM_STEP], ['Step 02', 6.441, 2.642, 'left', LOREM_STEP],
++   ['Step 03', 1.37, 3.974, 'right', LOREM_STEP + '.'], ['Step 04', 6.441, 3.974, 'left', LOREM_STEP]]
++    .forEach(function (st) {
++      text(s, st[0], { x: st[1], y: st[2], w: 2.188, h: 0.303, align: st[3], fontFace: F.xb, fontSize: 14, bold: true });
++      text(s, st[4], { x: st[1], y: st[2] + 0.256, w: 2.188, h: 0.509, align: st[3], color: C.slate, lineSpacingMultiple: 1.3 });
++    });
++}
++
++// 15 — gallery
++function slide15(s) {
++  pageNum(s, 15);
++  bigTitle(s, 'Our Gallery Project');
++  photo(s, 1.783, 1.583, 1.848, 1.525);
++  photo(s, 3.814, 1.586, 2.373, 3.588);
++  photo(s, 6.369, 1.586, 1.848, 1.525);
++  photo(s, 1.783, 3.36, 1.848, 0.992);
++  lead(s, 'Highlight Gallery', { x: 6.369, y: 3.318, w: 2.25, h: 0.379 });
++  copy(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor', { x: 6.369, y: 3.664, w: 2.25, h: 0.871 });
++  figure(s, '219K', { x: 6.369, y: 4.611, w: 2.25, h: 0.439 });
++  lead(s, 'Law Gallery', { x: 1.783, y: 4.535, w: 1.729, h: 0.379 });
++  copy(s, 'Lorem ipsum dolor sit', { x: 1.783, y: 4.806, w: 1.849, h: 0.341 });
++}
++
++// 16 — portfolio
++function slide16(s) {
++  pageNum(s, 16);
++  bigTitle(s, 'Our Portfolio Project');
++  photo(s, 0.57, 1.598, 3.186, 1.869);
++  photo(s, 4.086, 1.598, 1.961, 1.214);
++  photo(s, 4.086, 3.055, 1.977, 2.119);
++  photo(s, 6.393, 3.055, 2.537, 2.119);
++  copy(s, 'Successfully Defending Housing Rights For Over 200 Families', { x: 6.393, y: 1.598, w: 2.25, h: 0.871 });
++  lead(s, 'Case: Community Legal Aid (2023)', { x: 0.57, y: 3.774, w: 2.25, h: 0.682 });
++}
++
++// 17 — phone mock-up
++function slide17(s) {
++  pageNum(s, 17);
++  blob(s, 3.561, 3.735, 2.878, 1.89, C.yellow, [
++    ['M', 0.5, 0],
++    ['C', 0.7761, 0, 1, 0.341, 1, 0.7616],
++    ['C', 1, 0.8404, 0.9921, 0.9165, 0.9775, 0.988],
++    ['L', 0.9746, 1], ['L', 0.0254, 1], ['L', 0.0225, 0.988],
++    ['C', 0.0079, 0.9165, 0, 0.8404, 0, 0.7616],
++    ['C', 0, 0.341, 0.2239, 0, 0.5, 0], ['Z'],
++  ]);
++  bigTitle(s, 'Applying Legal Knowledge');
++  // [colour, ordinal, discY, ordY, figY, copyY, textX, discX, ordX, amount, figH, figLn]
++  [[C.green, '01', 1.87, 1.967, 1.84, 2.161, 1.689, 0.825, 0.73, '$10.57M', 0.439, 1.2],
++   [C.purple, '02', 3.045, 3.141, 3.014, 3.335, 1.671, 0.807, 0.712, '$187M', 0.439, 1.2],
++   [C.yellow, '03', 4.25, 4.347, 4.162, 4.54, 1.689, 0.825, 0.73, '$37.01M', 0.53, 1.5]].forEach(function (r) {
++    badgeAt(s, r[7], r[2], r[8], r[3], r[0], r[1]);
++    figure(s, r[9], { x: r[6], y: r[4], w: 1.729, h: r[10], lineSpacingMultiple: r[11] });
++    copy(s, LOREM_SHORT, { x: r[6], y: r[5], w: 1.633, h: 0.606 });
++  });
++  pill(s, 4.082, 1.560, 1.845, 3.628, C.device, 0.09);           // phone chassis
++  photo(s, 4.188, 1.613, 1.644, 3.513, 'roundRect', { rectRadius: 0.235 });
++  pill(s, 6.318, 2.425, 1.629, 0.275, C.yellow);
++  text(s, 'Device Mockup', { x: 6.439, y: 2.422, w: 1.509, h: 0.278, fontFace: F.xb, fontSize: 12, color: C.white });
++}
++
++// 18 — laptop mock-up
++function slide18(s) {
++  pageNum(s, 18);
++  ellipse(s, 7.451, 3.292, 2.114, 2.114, C.purple);
++  bigTitle(s, 'Applying Legal Knowledge');
++  pill(s, 4.465, 1.780, 4.271, 2.875, C.device, 0.05);           // laptop lid
++  photo(s, 4.573, 1.943, 4.063, 2.567);                          // screen
++  pill(s, 3.990, 4.655, 5.221, 0.123, C.deviceBase, 0.5);        // laptop base
++  head(s, DESC_HERE, { x: 0.57, y: 1.984, w: 2.829, h: 0.475 });
++  text(s, [
++    { text: LOREM_LEAD, options: { breakLine: true } },
++    { text: ' ', options: { breakLine: true } },
++  ].concat(loremBullets('left')),
++    { x: 0.57, y: 2.314, w: 2.829, h: 1.931, color: C.grey, lineSpacingMultiple: 1.5 });
++  pill(s, 0.57, 4.437, 1.629, 0.275, C.yellow);
++  text(s, 'View More', {
++    x: 0.57, y: 4.437, w: 1.629, h: 0.275,
++    align: 'center', valign: 'middle', fontFace: F.xb, fontSize: 12, bold: true, color: C.white, margin: 0,
++  });
++}
++
++// 19 — navigating challenges
++function slide19(s) {
++  text(s, 'Navigating Legal Challenges and Future Opportunities',
++    { x: 0.57, y: 0.562, w: 8.255, h: 1.439, fontFace: F.xb, fontSize: 41, bold: true });
++  rect(s, 6.6, 2.281, 3.4, 3.344, C.green);
++  photo(s, 7.036, 2.736, 2.964, 2.883);
++  head(s, DESC_HERE, { x: 0.57, y: 2.412, w: 2.829, h: 0.475 });
++  text(s, [
++    { text: LOREM_LEAD, options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: ' ', options: { fontFace: F.xb, fontSize: 15 } },
++    { text: '2024', options: { fontFace: F.xb, fontSize: 15, color: C.black, breakLine: true } },
++  ].concat(loremBullets('left')),
++    { x: 0.57, y: 2.742, w: 2.829, h: 2.31, color: C.grey, lineSpacingMultiple: 1.5 });
++  [[3.83, 2.443, 3.736, 2.54, C.yellow, '01', 4.695, 2.412, 1.729, 2.733],
++   [3.833, 3.814, 3.738, 3.911, C.red, '02', 4.664, 3.761, 1.468, 4.104]].forEach(function (r) {
++    badgeAt(s, r[0], r[1], r[2], r[3], r[4], r[5]);
++    head(s, HERE, { x: r[6], y: r[7], w: r[8], h: 0.379 });
++    copy(s, LOREM_SHORT, { x: r[6], y: r[9], w: 1.633, h: 0.606 });
++  });
++  pageNum(s, 19, C.white);
++}
++
++// 20 — closing / contact
++function slide20(s) {
++  // Yellow band whose right edge is a half-round cap (a rotated round2SameRect).
++  s.addShape('round2SameRect', {
++    x: 1.565, y: 0.506, w: 2.155, h: 5.286, fill: { color: C.yellow },
++    rotate: 90, flipH: true, rectRadius: 0.5 * 2.155,
++  });
++  text(s, 'Connect With Us', { x: 0.57, y: 0.562, w: 5.382, h: 0.757, fontFace: F.xb, fontSize: 41, bold: true });
++  text(s, 'Thank You for Attending',
++    { x: 0.207, y: 2.758, w: 2.436, h: 0.783, fontFace: F.xb, fontSize: 21, bold: true, color: C.white });
++  photo(s, 3.202, 2.031, 2.202, 2.202, 'ellipse');
++  // [label, labelY, labelW, value, valueY, valueW]
++  [['Website:', 1.872, 0.908, 'www.yourwebsite.com', 2.157, 1.765],
++   ['Phone:', 2.929, 0.794, '+123-456-7890', 3.214, 1.345],
++   ['Email:', 3.983, 0.794, 'hello@youremail.com', 4.27, 1.697]].forEach(function (row) {
++    text(s, row[0], {
++      x: 6.211, y: row[1], w: row[2], h: 0.249,
++      valign: 'bottom', fontFace: F.pop, fontSize: 12, bold: true,
++    });
++    text(s, row[3], { x: 6.211, y: row[4], w: row[5], h: 0.249, valign: 'bottom', fontSize: 11, color: C.slate });
++  });
++}
++
++/* --------------------------------------------------------------- assembly */
++
++const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07,
++  slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15,
++  slide16, slide17, slide18, slide19, slide20];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'DECK_16x9', width: 10, height: 5.625 });
++pptx.layout = 'DECK_16x9';
++pptx.title = 'Law Presentation';
++
++BUILDERS.forEach(function (build) {
++  const slide = pptx.addSlide();
++  slide.background = { color: C.white };
++  build(slide);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, '0aac181b-0b28-485f-b4d6-b265c6e06630_grok_final.pptx') })
++  .then(function (f) { console.log('wrote ' + f); });

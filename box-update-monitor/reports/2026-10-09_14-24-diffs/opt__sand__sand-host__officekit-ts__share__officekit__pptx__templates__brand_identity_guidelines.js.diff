@@ -1,0 +1,658 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/brand_identity_guidelines.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/brand_identity_guidelines.js
+@@ -0,0 +1,655 @@
++/**
++ * "GENESIS BRAND GUIDELINES" — 20 slide brand-guideline deck, rebuilt with pptxgenjs.
++ * Raster artwork in the source deck is replaced by light `[image]` placeholder boxes.
++ */
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ palette */
++
++const C = {
++  accent: '6C6C64', // theme accent1 - warm grey, the primary brand colour
++  tan: 'ACA494', // theme accent2 - section-divider background
++  olive: '646C64', // theme accent3
++  black: '000000',
++  white: 'FFFFFF',
++  ink: '262626', // swatch captions
++  brown: '5A5346', // cover address block
++  grey: '808080', // palette percentage labels
++  ghost: 'E7E6E6', // "X2" labels sitting on accent corner squares
++  screen: '231F20', // tablet body
++  ph: 'F7F7F6', // image-placeholder fill (5% accent over white)
++  phText: 'BFBFBB',
++};
++
++const F = {
++  major: 'Inter Black', // theme major latin - titles / display
++  body: 'Poppins', // theme minor latin - everything else
++  medium: 'Inter Medium',
++  sans: 'Open Sans',
++  mark: 'Mulish ExtraBold', // face whose lowercase "g" is the brand mark
++};
++
++// Ink metrics of the mark glyph, measured relative to its text box: it renders
++// `hPerPt` inches tall per point, is `aspect` as wide as it is tall, and its ink
++// centre sits `drop` x (ink height) below the box centre because of the descender.
++const MARK = { hPerPt: 0.01026, aspect: 0.73, drop: 0.34 };
++
++/* ------------------------------------------------------- reusable copy blocks */
++
++const LOREM =
++  'THERE ARE MANY VARIATIONS OF PASSAGES OF LOREM IPSUM AVAILABLE, BUT THE MAJORITY HAVE ' +
++  'SUFFERED ALTERATION IN SOME FORM, BY INJECTED HUMOUR, OR RANDOMISED WORDS WHICH DON\'T ' +
++  'LOOK EVEN SLIGHTLY BELIEVABLE. IF YOU ARE GOING TO USE A PASSAGE OF LOREM IPSUM, YOU NEED ' +
++  'TO BE SURE THERE ISN\'T ANYTHING EMBARRASSING HIDDEN IN THE MIDDLE OF TEXT. ALL THE LOREM ' +
++  'IPSUM GENERATORS ON THE INTERNET TEND TO REPEAT PREDEFINED';
++
++const SEDI = 'SEDI SAESEQUO MOLUPTUR AUDI SIT AUT ET DOLENIM VELITATI DELLABO';
++const ADDRESS = '123 STREET CITY NAME, STREET, COUNTY 12345';
++
++/* --------------------------------------------------------------- primitives */
++
++function text(slide, content, opts) {
++  slide.addText(content, Object.assign({ fontFace: F.body, fontSize: 18, color: C.black, valign: 'top' }, opts));
++}
++
++function box(slide, opts) {
++  const o = Object.assign({}, opts);
++  o.fill = o.fill ? (typeof o.fill === 'string' ? { color: o.fill } : o.fill) : { type: 'none' };
++  if (!o.line) o.line = { type: 'none' };
++  slide.addShape('rect', o);
++}
++
++function rule(slide, opts) {
++  slide.addShape('line', {
++    x: opts.x, y: opts.y, w: opts.w || 0, h: opts.h || 0,
++    line: { color: opts.color || C.accent, width: opts.width || 0.75, transparency: opts.transparency || 0 },
++  });
++}
++
++/* --------------------------------------------------------------- brand marks */
++
++// The brand mark is the lowercase "g" of the display face. Drawn as a glyph
++// (rather than a traced outline) so the geometry stays legible in source.
++// (x, y, w, h) is the box the *inked* glyph should fill; the text box around it
++// is deliberately oversized and the glyph is centred, so nothing ever clips.
++function logoG(slide, x, y, w, h, color) {
++  const pad = h;
++  slide.addText('g', {
++    x: x + w / 2 - pad, y: y + h / 2 - MARK.drop * h - pad, w: 2 * pad, h: 2 * pad,
++    fontFace: F.mark, fontSize: h / MARK.hPerPt, color,
++    align: 'center', valign: 'middle', margin: 0,
++  });
++}
++
++// "g GENESIS" lock-up. `h` is the height of the g; the word sits to its right.
++function wordmark(slide, x, y, h, color) {
++  logoG(slide, x, y, h * MARK.aspect, h, color);
++  text(slide, 'GENESIS', {
++    x: x + h * 0.713, y: y + h * 0.365, w: h * 2.587, h: h * 0.67,
++    fontFace: F.major, fontSize: h * 32.8, bold: true, charSpacing: h * 3.5, color,
++    wrap: false, margin: 0,
++  });
++}
++
++// Stacked variant: mark centred above the word (slides 7 and 19).
++function stackedMark(slide, x, y, w, gh, fontSize, markColor, wordColor) {
++  logoG(slide, x + w / 2 - gh * 0.355, y, gh * MARK.aspect, gh, markColor);
++  text(slide, 'GENESIS', {
++    x, y: y + gh * 1.06, w, h: fontSize * 0.0219, fontFace: F.major, fontSize, bold: true,
++    color: wordColor, align: 'center', wrap: false, margin: 0,
++  });
++}
++
++// The EAN-style strip under the cover address block. Alternating gap/bar run
++// lengths, in thousandths of the strip width (they add up to 1000).
++const BARCODE_RUNS = [
++  0, 13, 8, 8, 12, 9, 27, 5, 16, 17, 10, 12, 14, 7, 13, 22, 16, 11, 12, 6, 37, 5, 24, 12, 15,
++  6, 9, 20, 13, 14, 15, 6, 14, 20, 8, 12, 7, 21, 15, 5, 14, 15, 13, 23, 7, 5, 14, 20, 11, 6,
++  40, 20, 7, 6, 16, 11, 16, 18, 15, 11, 3, 14, 14, 14, 27, 7, 28, 13, 20, 23, 6, 6, 8, 13,
++];
++
++function barcode(slide, x, y, w, h, color) {
++  let cx = x;
++  BARCODE_RUNS.forEach((run, i) => {
++    if (i % 2 === 1 && run > 0) box(slide, { x: cx, y, w: (run * w) / 1000, h, fill: color });
++    cx += (run * w) / 1000;
++  });
++}
++
++function imagePlaceholder(slide, x, y, w, h, opts) {
++  const o = opts || {};
++  box(slide, { x, y, w, h, fill: o.fill || C.ph, rectRadius: o.radius });
++  if (o.radius) {
++    slide.addShape('roundRect', {
++      x, y, w, h, rectRadius: o.radius, fill: { color: o.fill || C.ph }, line: { type: 'none' },
++    });
++  }
++  text(slide, '[image]', {
++    x, y: y + h / 2 - 0.16, w, h: 0.32, fontSize: 9, color: C.phText, align: 'center', valign: 'middle',
++  });
++}
++
++/* ------------------------------------------------------------ recurring furniture */
++
++// Border, side rail, rotated rail captions, header pill, date and page number.
++// `dark` = the tan section-divider treatment (black rail + black hairlines).
++function frame(slide, page, dark) {
++  const stroke = dark ? C.black : C.accent;
++  if (dark) box(slide, { x: 0, y: 0, w: 13.333, h: 7.5, fill: C.tan });
++  rule(slide, { x: 0.382, y: 0.728, w: 12.549, color: stroke });
++  rule(slide, { x: 12.937, y: 0, h: 7.5, color: stroke });
++  box(slide, { x: 0, y: 0, w: 0.483, h: 7.5, fill: stroke });
++
++  const rail = { fontSize: 8, charSpacing: 1, color: C.white, rotate: 90, valign: 'middle' };
++  text(slide, 'PRESENTED FOR YOUR BRAND', Object.assign({ x: -0.936, y: 1.736, w: 2.355, h: 0.236 }, rail));
++  text(slide, 'WWW.EXAMPLE.COM', Object.assign({ x: -0.536, y: 4.259, w: 1.556, h: 0.236, align: 'center' }, rail));
++  text(slide, 'BRAND GUIDEINE', Object.assign({ x: -0.502, y: 6.348, w: 1.488, h: 0.236, align: 'right' }, rail));
++
++  slide.addShape('roundRect', {
++    x: 1.129, y: 0.242, w: 2.201, h: 0.295, rectRadius: 0.1475,
++    fill: { type: 'none' }, line: { color: stroke, width: 0.75 },
++  });
++  text(slide, 'GENESIS BRAND', {
++    x: 1.327, y: 0.225, w: 1.806, h: 0.337, fontFace: F.major, fontSize: 14,
++    color: dark ? C.black : C.accent, align: 'center', valign: 'middle',
++  });
++  text(slide, '{ DATE : 10/ 12/ 2030 }', { x: 5.411, y: 0.277, w: 2.512, h: 0.252, fontSize: 9, align: 'center' });
++  text(slide, [
++    { text: 'PAGE OF   ', options: { fontSize: 8, bold: true } },
++    { text: page, options: { fontSize: 32, bold: true, color: dark ? C.black : C.accent } },
++  ], { x: 11.463, y: -0.107, w: 1.468, h: 0.847, align: 'right', lineSpacing: 59 });
++}
++
++// Page headline plus the short accent bar that sits above it.
++function headline(slide, title, w) {
++  box(slide, { x: 1.261, y: 1.202, w: 1.323, h: 0.093, fill: C.accent });
++  text(slide, title, {
++    x: 1.129, y: 1.426, w: w || 7.968, h: 0.883,
++    fontFace: F.major, fontSize: 48, bold: true, lineSpacing: 59,
++  });
++}
++
++// "DETAILS BRAND" heading + the long lorem paragraph underneath it.
++function detailsBrand(slide, x, y) {
++  text(slide, 'DETAILS BRAND', { x, y, w: 2.153, h: 0.404, bold: true, color: C.accent });
++  text(slide, LOREM, { x, y: y + 0.479, w: 4.827, h: 1.294, fontSize: 8, lineSpacingMultiple: 1.5 });
++}
++
++// The four-line pull quote used across the content pages.
++function quoteBlock(slide, x, y) {
++  text(slide, [
++    { text: 'GOOD VISUAL COME', options: { breakLine: true } },
++    { text: 'FROM ' },
++    { text: 'EXPERIENCE.', options: { bold: true, breakLine: true } },
++    { text: 'EXPERIENCE ', options: { bold: true } },
++    { text: 'COMES FROM MAKING BAD DESIGN.' },
++  ], { x, y, w: 4.484, h: 1.447, fontSize: 20 });
++}
++
++// Cover / divider footer: three tracked lines each sitting on a rule.
++function clientBlock(slide, x, y, color, stroke) {
++  const row = { fontSize: 10, charSpacing: 1.5, color, breakLine: true };
++  text(slide, [
++    { text: 'CLIENT NAME', options: row },
++    { text: 'PROJECT NAME', options: row },
++    { text: 'AUGUST 20TH, 2025', options: Object.assign({}, row, { breakLine: false }) },
++  ], { x, y, w: 2.19, h: 0.982, lineSpacingMultiple: 2, margin: 0 });
++  [0.361, 0.722, 1.056].forEach((dy) => rule(slide, { x: x - 0.028, y: y + dy, w: 2.292, color: stroke, width: 0.82 }));
++}
++
++// "01 / DOLENIM VELITATI / rule / body" cluster (slides 10, 16 and 18).
++function numberedItem(slide, x, y, num) {
++  text(slide, num, { x, y, w: 0.485, h: 0.337, fontSize: 14, bold: true, align: 'center' });
++  text(slide, 'DOLENIM VELITATI', { x, y: y + 0.374, w: 1.516, h: 0.252, fontSize: 9 });
++  rule(slide, { x: x + 0.108, y: y + 0.589, w: 1.913, color: C.accent, width: 0.75 });
++  text(slide, SEDI, { x: x - 0.003, y: y + 0.677, w: 2.418, h: 0.424, fontSize: 8, lineSpacingMultiple: 1.2 });
++}
++
++/* ------------------------------------------------------------------- slide 1 */
++
++function slideCover(pres) {
++  const s = pres.addSlide();
++  frame(s, '01', false);
++  text(s, 'GUIDELINES.', {
++    x: 1.129, y: 2.342, w: 11.286, h: 2.034, fontFace: F.major, fontSize: 120, bold: true,
++    charSpacing: 3, lineSpacingMultiple: 1, margin: [0, 0, 0, 0.015],
++  });
++  text(s, [
++    { text: '© COPY ALL RIGHT. GENESIS ', options: { bold: true } },
++    { text: 'BRAND GUIDELINE 2023' },
++  ], { x: 1.124, y: 5.155, w: 2.38, h: 0.471, fontSize: 11 });
++  rule(s, { x: 1.235, y: 5.931, w: 1.276, color: C.accent, width: 3 });
++  text(s, 'THE BEST THING ABOUT OPTIMISM IS YOU CAN LEARN IT, EVEN IF YOUR OUTLOOK TENDS TO BE MORE PESSIMISTIC.',
++    { x: 1.124, y: 6.07, w: 4.524, h: 0.531, fontSize: 9, bold: true, lineSpacingMultiple: 1.5 });
++
++  text(s, 'B. G. D', { x: 6.924, y: 5.416, w: 0.83, h: 0.303, fontSize: 12, bold: true, color: C.brown });
++  text(s, ADDRESS, { x: 6.924, y: 5.769, w: 2.221, h: 0.455, fontSize: 9, color: C.brown, lineSpacing: 13 });
++  barcode(s, 7.029, 6.29, 1.484, 0.249, C.accent);
++  clientBlock(s, 9.82, 5.486, C.black, C.accent);
++}
++
++/* ------------------------------------------------------------------- slide 2 */
++
++function slideWelcome(pres) {
++  const s = pres.addSlide();
++  frame(s, '02', false);
++  headline(s, 'WELCOME MESSAGES');
++
++  text(s, '\u201C', { x: 1.044, y: 2.754, w: 3.674, h: 2.069, fontFace: F.major, fontSize: 116, color: C.accent });
++  text(s, [
++    { text: 'CONTRARY TO POPULAR BELIEF, LOREM IPSUM IS ALOREM', options: { breakLine: true } },
++    { text: 'IPSUM PASSAGE, ', options: { underline: { style: 'sng' } } },
++  ], { x: 1.137, y: 3.978, w: 3.58, h: 0.965, fontFace: F.major, fontSize: 14, color: C.accent, lineSpacingMultiple: 1.2 });
++  text(s, 'contrary to popular belief, lorem ipsum is not simply obscure latin connecter, alarm ipsum passage, ' +
++    'and going through the cites of the popular belief, lorem ipsum is not simply',
++  { x: 1.137, y: 5.566, w: 4.055, h: 0.924, fontSize: 10, lineSpacingMultiple: 1.2 });
++
++  imagePlaceholder(s, 5.597, 3.031, 3.208, 4.469);
++
++  text(s, 'ALISHIA EVANS', { x: 9.323, y: 4.436, w: 2.075, h: 0.37, fontSize: 16, bold: true });
++  text(s, 'CEO/MANAGER BUSINESS STRATEGY CO', { x: 9.323, y: 4.668, w: 2.712, h: 0.309, fontSize: 9, lineSpacing: 16 });
++  rule(s, { x: 9.392, y: 5.279, w: 2.643, color: C.accent });
++  text(s, 'BRAND', { x: 9.312, y: 5.518, w: 1.648, h: 0.37, fontSize: 16, bold: true, color: C.accent });
++  text(s, 'THERE ARE MANY VARIATIONS OF PASSAGES OF LOREM IPSUM AVAILABLE, BUT THE MAJORITY HAVE SUFFERED ALTERATION',
++    { x: 9.323, y: 5.848, w: 3.33, h: 0.642, fontSize: 9, lineSpacing: 13 });
++}
++
++/* ------------------------------------------------------------------- slide 3 */
++
++const CONTENTS_TOP = [
++  ['LOREM IPSUM', '01'], ['LOREM IPSUM', '03'], ['DOLOR SITEMAT', '04'],
++  ['CONSECTEUTR', '05'], ['ADIPISCING ELIT', '07'], ['PHASELLUS', '08'],
++];
++const CONTENTS_BOTTOM = [['INTRODUCTION', '01'], ['LOREM IPSUM', '03'], ['DOLOR SITEMAT', '04']];
++
++function slideContents(pres) {
++  const s = pres.addSlide();
++  frame(s, '03', false);
++  headline(s, 'CONTENT LIST');
++
++  // Labels and rules march down on slightly different pitches, as in the source.
++  const group = (rowsList, labelY0, ruleY0) => rowsList.forEach(([label, num], i) => {
++    const y = labelY0 + i * 0.3946;
++    text(s, label, { x: 1.261, y, w: 1.7, h: 0.179, fontSize: 10, charSpacing: 1, wrap: false, margin: 0 });
++    text(s, num, { x: 6.398, y: y + 0.023, w: 0.254, h: 0.196, fontSize: 11, charSpacing: 1, margin: 0 });
++    rule(s, { x: 1.261, y: ruleY0 + i * 0.4007, w: 5.406, color: C.accent, width: 0.82 });
++  });
++  group(CONTENTS_TOP, 2.924, 3.208);
++  group(CONTENTS_BOTTOM, 5.745, 6.048);
++
++  detailsBrand(s, 7.754, 2.812);
++  imagePlaceholder(s, 7.754, 4.92, 4.662, 1.93);
++}
++
++/* ------------------- slides 4, 8, 11, 13, 15, 17 - section dividers ---------- */
++
++function sectionSlide(pres, page, title, num, titleW) {
++  const s = pres.addSlide();
++  frame(s, page, true);
++  text(s, title, {
++    x: 1.047, y: 2.209, w: titleW, h: 1.111, fontFace: F.major, fontSize: 60,
++    color: C.white, lineSpacingMultiple: 1, margin: 0.05,
++  });
++  text(s, 'PROPOSAL PRESENTATION TEMPLATE', {
++    x: 1.012, y: 3.369, w: 3.483, h: 0.303, fontSize: 12, bold: true,
++    underline: { style: 'sng' }, color: C.white,
++  });
++  text(s, num, {
++    x: 0.847, y: 3.954, w: 4.281, h: 3.467, fontSize: 200, color: C.white, transparency: 60,
++  });
++  text(s, 'B. G. D', { x: 6.924, y: 5.416, w: 0.83, h: 0.303, fontSize: 12, bold: true, color: C.white });
++  text(s, ADDRESS, { x: 6.924, y: 5.769, w: 2.221, h: 0.455, fontSize: 9, color: C.white, lineSpacing: 13 });
++  barcode(s, 7.029, 6.29, 1.484, 0.249, C.black);
++  clientBlock(s, 9.82, 5.486, C.white, C.black);
++}
++
++/* ------------------------------------------------------------------- slide 5 */
++
++// One logo clear-space diagram: hairline grid, four "X2" gutters, corner squares.
++function clearSpaceDiagram(s, top, opts) {
++  const x0 = 7.638, right = 11.846, inner = 8.054, innerRight = 11.429, hair = { color: C.black, transparency: 60 };
++  const rows = [top, top + 0.347, top + 1.34, top + 1.688];
++  rows.forEach((y) => rule(s, Object.assign({ x: x0, y, w: 4.208 }, hair)));
++  [x0, inner, innerRight, right].forEach((x) => rule(s, Object.assign({ x, y: top, h: 1.688 }, hair)));
++
++  const label = { fontSize: 10, fontFace: F.body, valign: 'middle' };
++  const cornerColor = opts.corners ? C.ghost : C.black;
++  if (opts.corners) {
++    box(s, { x: 7.635, y: top + 0.002, w: 0.422, h: 0.343, fill: C.accent });
++    box(s, { x: 11.429, y: top + 0.002, w: 0.414, h: 0.342, fill: C.accent });
++    box(s, { x: 7.635, y: top + 1.343, w: 0.422, h: 0.346, fill: C.accent });
++    box(s, { x: 11.429, y: top + 1.338, w: 0.414, h: 0.346, fill: C.accent });
++  }
++  text(s, 'X2', Object.assign({ x: 7.643, y: top + 0.039, w: 0.4, h: 0.269, color: cornerColor }, label));
++  text(s, 'X2', Object.assign({ x: 11.443, y: top + 0.039, w: 0.405, h: 0.269, color: cornerColor }, label));
++  text(s, 'X2', Object.assign({ x: 7.643, y: top + 1.379, w: 0.4, h: 0.269, color: cornerColor }, label));
++  text(s, 'X2', Object.assign({ x: 11.443, y: top + 1.379, w: 0.405, h: 0.269, color: cornerColor }, label));
++  text(s, 'X2', Object.assign({ x: 9.539, y: top + 0.039, w: 0.405, h: 0.269, color: C.black }, label));
++  text(s, 'EXAMPLE TEXT', Object.assign({ x: 9.11, y: top + 1.379, w: 1.263, h: 0.269, color: C.black }, label));
++}
++
++function slidePrimaryLogo(pres) {
++  const s = pres.addSlide();
++  frame(s, '05', false);
++  headline(s, 'PRIMARY LOGO');
++  detailsBrand(s, 1.129, 2.812);
++  quoteBlock(s, 1.129, 5.188);
++
++  box(s, { x: 8.057, y: 2.844, w: 3.372, h: 0.991, fill: { color: C.accent, transparency: 10 } });
++  clearSpaceDiagram(s, 2.497, { corners: false });
++  wordmark(s, 8.374, 2.914, 0.853, C.white);
++
++  clearSpaceDiagram(s, 4.884, { corners: true });
++  wordmark(s, 8.374, 5.302, 0.853, C.black);
++}
++
++/* ------------------------------------------------------------------- slide 6 */
++
++function slideLogoMarks(pres) {
++  const s = pres.addSlide();
++  frame(s, '06', false);
++  headline(s, 'LOGO MARKS');
++
++  // Left: a 3x3 construction grid holding the mark.
++  [2.874, 4.282].forEach((x) => rule(s, { x, y: 3.276, h: 3.157, color: C.olive }));
++  [4.12, 5.572].forEach((y) => rule(s, { x: 1.261, y, w: 4.531, color: C.olive, width: 0.5 }));
++  const cell = { fontSize: 10, fontFace: F.medium, valign: 'middle', h: 0.269 };
++  text(s, 'BRAND ', Object.assign({ x: 3.213, y: 3.426, w: 0.77 }, cell));
++  text(s, 'CREATIVE', Object.assign({ x: 1.516, y: 4.696, w: 1.498 }, cell));
++  text(s, 'DESIGN', Object.assign({ x: 4.803, y: 4.696, w: 1.498 }, cell));
++  text(s, 'GUIDELINES', Object.assign({ x: 2.721, y: 6.044, w: 1.61, align: 'center' }, cell));
++  logoG(s, 3.058, 4.204, 0.936, 1.3, C.accent);
++
++  // Right: 9x9 hairline grid with the oversized mark on top.
++  const gridY = [2.847, 3.264, 3.694, 4.111, 4.542, 4.958, 5.389, 5.806, 6.222];
++  gridY.forEach((y) => rule(s, { x: 7.097, y, w: 5.008, color: C.accent, width: 0.75 }));
++  for (let i = 0; i < 9; i++) {
++    rule(s, { x: 7.353 + i * 0.5689, y: 2.651, h: 3.782, color: C.accent, width: 0.75 });
++  }
++  logoG(s, 8.71, 3.239, 1.875, 2.604, C.black);
++}
++
++/* ------------------------------------------------------------------- slide 7 */
++
++function slideLogoVariation(pres) {
++  const s = pres.addSlide();
++  frame(s, '07', false);
++  headline(s, 'LOGO VARIATION');
++  detailsBrand(s, 7.754, 4.806);
++
++  box(s, { x: 1.261, y: 3.132, w: 3.834, h: 1.587, fill: C.accent });
++  wordmark(s, 1.87, 3.495, 0.853, C.white);
++
++  box(s, { x: 5.322, y: 3.132, w: 1.803, h: 1.587, fill: C.white, line: { color: C.accent, width: 1 } });
++  stackedMark(s, 5.508, 3.426, 1.431, 0.705, 20, C.accent, C.black);
++
++  [[1.261, C.black, C.white], [3.291, C.tan, C.black], [5.322, C.olive, C.white]].forEach(([x, bg, fg]) => {
++    box(s, { x, y: 4.912, w: 1.803, h: 1.638, fill: bg });
++    logoG(s, x + 0.497, 5.169, 0.81, 1.124, fg);
++  });
++}
++
++/* ------------------------------------------------------------------- slide 9 */
++
++const HERO_COLORS = [
++  { x: 6.167, fill: C.accent, name: 'COLOR ONE', code: 'COLOR _01', hex: 'EDE1D0', nameX: 6.057, bodyX: 6.059, ottX: 6.062, codeX: 6.067 },
++  { x: 7.743, fill: C.tan, name: 'COLOR TWO', code: 'COLOR_02', hex: 'E6E2D8', nameX: 7.64, bodyX: 7.64, ottX: 7.649, codeX: 7.659 },
++  { x: 9.319, fill: C.olive, name: 'COLOR THREE', code: 'COLOR_03', hex: 'E9E0D0', nameX: 9.216, bodyX: 9.236, ottX: 9.223, codeX: 9.216 },
++  { x: 10.895, fill: C.black, name: 'COLOR FOUR', code: 'COLOR_04', hex: 'CCAF85', nameX: 10.796, bodyX: 10.8, ottX: 10.81, codeX: 10.813 },
++];
++
++function slideHeroColors(pres) {
++  const s = pres.addSlide();
++  frame(s, '09', false);
++  headline(s, 'HERO COLORS');
++  quoteBlock(s, 1.129, 5.188);
++
++  HERO_COLORS.forEach((sw) => {
++    box(s, { x: sw.x, y: 3.099, w: 1.185, h: 1.29, fill: sw.fill });
++    rule(s, { x: sw.x, y: 4.691, w: 1.185, color: C.white, width: 2.25 });
++    [5.141, 5.59, 6.04].forEach((y) => rule(s, { x: sw.x, y, w: 1.185, color: C.white, width: 0.75 }));
++    rule(s, { x: sw.x, y: 6.49, w: 1.185, color: C.black, width: 0.75 });
++
++    text(s, sw.name, { x: sw.nameX, y: 4.758, w: 1.6, h: 0.303, fontSize: 12, bold: true, color: C.ink });
++    text(s, [
++      { text: 'AND TYPESETTING INDUSTRY. ', options: { breakLine: true } },
++      { text: 'LOREM IPSUM HAS BEEN' },
++    ], { x: sw.bodyX, y: 5.198, w: 1.671, h: 0.353, fontSize: 7, color: C.ink, lineSpacing: 9 });
++    text(s, [
++      { text: 'OTT DENT, ASTEROIDEA  ', options: { breakLine: true } },
++      { text: 'SINAIA QUALM.' },
++    ], { x: sw.ottX, y: 5.633, w: 1.389, h: 0.353, fontSize: 7, color: C.ink, lineSpacing: 9 });
++    text(s, [
++      { text: sw.code, options: { breakLine: true } },
++      { text: sw.hex },
++    ], { x: sw.codeX, y: 6.09, w: 0.9, h: 0.349, fontSize: 7, color: C.ink, lineSpacing: 9 });
++  });
++}
++
++/* ------------------------------------------------------------------ slide 10 */
++
++const TINT_STEPS = [
++  { x: 3.163, labelX: 3.576, transparency: 0, label: '100%' },
++  { x: 4.477, labelX: 4.851, transparency: 15, label: '75%' },
++  { x: 5.791, labelX: 6.165, transparency: 50, label: '50%' },
++  { x: 7.105, labelX: 7.479, transparency: 75, label: '25%' },
++  { x: 8.419, labelX: 8.838, transparency: 95, label: '5%' },
++];
++
++function paletteSpecs(s, x, y, name, hex, rgb, third) {
++  text(s, name, { x: x + 0.036, y, w: 1.338, h: 0.191, fontSize: 10, bold: true, color: C.tan, margin: 0 });
++  [hex, rgb, third].forEach((row, i) => {
++    text(s, row, {
++      x, y: y + 0.431 + i * 0.217, w: 1.934, h: 0.23, fontSize: 9, color: C.black, valign: 'middle', margin: 0.04,
++    });
++  });
++}
++
++function slideColorPalettes(pres) {
++  const s = pres.addSlide();
++  frame(s, '10', false);
++  headline(s, 'COLOR PALLETES');
++
++  paletteSpecs(s, 1.261, 3.152, 'PALETTE 01', 'HEX     : #0A1744', 'RGB     : 10, 23, 68', 'HSB     : 225, 85%, 26%');
++  paletteSpecs(s, 1.261, 5.103, 'PALETTE 02', 'HEX     : #361E84', 'RGB     : 54, 30, 132', 'HSL      : 254, 77%, 51%');
++
++  [[3.028, C.accent, 4.567], [4.979, C.tan, 6.518]].forEach(([y, color, labelY]) => {
++    TINT_STEPS.forEach((step) => {
++      box(s, { x: step.x, y, w: 1.314, h: 1.343, fill: { color, transparency: step.transparency } });
++      text(s, step.label, {
++        x: step.labelX, y: labelY, w: 0.565, h: 0.254, fontSize: 11, fontFace: F.sans,
++        color: C.grey, align: 'center', valign: 'middle', wrap: false,
++      });
++    });
++  });
++
++  numberedItem(s, 10.214, 3.124, '01');
++  numberedItem(s, 10.214, 5.097, '02');
++}
++
++/* ------------------------------------------------------------------ slide 12 */
++
++function slideFonts(pres) {
++  const s = pres.addSlide();
++  frame(s, '12', false);
++  headline(s, 'FONT FOR BRAND USED', 9.583);
++
++  const specimen = (y, face, bold, name, role, alphaY) => {
++    text(s, name, { x: 1.129, y, w: 1.733, h: 0.412, fontFace: face, fontSize: 20, bold, lineSpacingMultiple: 0.9 });
++    text(s, role, { x: 1.129, y: y + 0.431, w: 1.613, h: 0.286, fontFace: face, fontSize: 11 });
++    text(s, 'Aa', {
++      x: 3.33, y: y - 0.369, w: 2.628, h: 1.658, fontFace: face, fontSize: 100, bold,
++      color: C.accent, lineSpacingMultiple: 0.9,
++    });
++    text(s, [
++      { text: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', options: { breakLine: true } },
++      { text: 'Abcdefghijklmnopqrstuvwxyz', options: { breakLine: true } },
++      { text: '0123456789' },
++    ], { x: 5.958, y: alphaY, w: 6.64, h: 1.192, fontFace: face, fontSize: 24, bold, lineSpacingMultiple: 0.9 });
++  };
++  specimen(3.4, F.major, true, 'INTER', 'TITLE / HEADLINE', 3.216);
++  specimen(5.31, F.body, false, 'POPPINS', 'STANDART / BODY', 5.153);
++}
++
++/* ------------------------------------------------------------------ slide 14 */
++
++function slideDevices(pres) {
++  const s = pres.addSlide();
++  frame(s, '14', false);
++  headline(s, 'DEVICE APPLICATION', 9.583);
++  detailsBrand(s, 1.129, 2.812);
++  quoteBlock(s, 1.129, 5.188);
++
++  // Phone
++  s.addShape('roundRect', { x: 6.207, y: 2.857, w: 1.559, h: 3.306, rectRadius: 0.19, fill: { color: C.black }, line: { type: 'none' } });
++  imagePlaceholder(s, 6.243, 2.897, 1.486, 3.231, { fill: C.white, radius: 0.16 });
++  box(s, { x: 6.8, y: 2.907, w: 0.372, h: 0.04, fill: '484747' });
++  text(s, 'MOBILE', { x: 6.385, y: 6.451, w: 1.202, h: 0.404, color: C.accent, align: 'center' });
++
++  // Tablet
++  s.addShape('roundRect', { x: 8.215, y: 2.857, w: 4.318, h: 3.306, rectRadius: 0.2, fill: { color: C.screen }, line: { type: 'none' } });
++  imagePlaceholder(s, 8.286, 2.923, 4.203, 3.205, { fill: C.white, radius: 0.17 });
++  text(s, 'OUR TAB DEVICE', { x: 9.287, y: 6.451, w: 2.421, h: 0.404, color: C.accent, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ slide 16 */
++
++function slideGallery(pres) {
++  const s = pres.addSlide();
++  frame(s, '16', false);
++  headline(s, 'GALLERY DIRECTION', 9.583);
++  quoteBlock(s, 1.129, 5.188);
++
++  imagePlaceholder(s, 1.261, 2.639, 2.837, 2.167);
++  imagePlaceholder(s, 4.375, 2.639, 1.509, 1.278);
++  imagePlaceholder(s, 8.77, 2.639, 1.9, 1.608);
++  imagePlaceholder(s, 10.822, 2.645, 1.9, 1.608);
++  imagePlaceholder(s, 8.77, 4.417, 2.938, 3.083);
++
++  ['01', '02', '03'].forEach((n, i) => numberedItem(s, 6.164, 2.664 + i * 1.411, n));
++}
++
++/* ------------------------------------------------------------------ slide 18 */
++
++function slideBusinessCard(pres) {
++  const s = pres.addSlide();
++  frame(s, '18', false);
++  headline(s, 'BUSINESS CARD', 9.583);
++  quoteBlock(s, 1.129, 5.188);
++  numberedItem(s, 1.132, 3.144, '01');
++  numberedItem(s, 4.014, 3.144, '02');
++
++  // Card front
++  box(s, { x: 8.574, y: 2.449, w: 3.18, h: 1.905, fill: C.accent, line: { color: C.black, width: 1.18 } });
++  logoG(s, 9.77, 2.854, 0.788, 1.095, C.white);
++
++  // Card back
++  box(s, { x: 6.282, y: 4.776, w: 3.18, h: 1.905, fill: C.black });
++  const detail = { fontSize: 6, color: C.white, valign: 'middle', h: 0.202 };
++  [[6.483, 5.048, 0.089], [6.483, 5.226, 0.094], [7.942, 5.01, 0.089], [7.942, 5.17, 0.078]]
++    .forEach(([x, y, d]) => s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: C.white }, line: { type: 'none' } }));
++  text(s, '+', Object.assign({ x: 6.564, y: 4.997, w: 0.26 }, detail));
++  text(s, '44 012 3456 789', Object.assign({ x: 6.652, y: 4.993, w: 0.861 }, detail));
++  text(s, 'YOURDOMAIN.COM', Object.assign({ x: 6.609, y: 5.168, w: 0.98 }, detail));
++  text(s, 'INFO.AD@DOMAIN.COM', Object.assign({ x: 8.067, y: 4.934, w: 1.166 }, detail));
++  text(s, '17 STATE ROAD 19 SINGAPORE, ', Object.assign({ x: 8.067, y: 5.119, w: 1.326, h: 0.303 }, detail));
++  text(s, 'ASHLYN MARK', {
++    x: 6.394, y: 5.687, w: 2.38, h: 0.421, fontFace: F.major, fontSize: 14, color: C.white, lineSpacing: 26,
++  });
++  text(s, [
++    { text: '© COPY ALL RIGHT. GENESIS ', options: { bold: true } },
++    { text: 'BRAND GUIDELINE 2023' },
++  ], { x: 6.394, y: 6.08, w: 1.221, h: 0.269, fontSize: 5, color: C.white });
++  wordmark(s, 8.302, 6.221, 0.329, C.accent);
++}
++
++/* ------------------------------------------------------------------ slide 19 */
++
++function slideMapFolder(pres) {
++  const s = pres.addSlide();
++  frame(s, '19', false);
++  headline(s, 'MAP FOLDER', 9.583);
++  detailsBrand(s, 1.129, 2.812);
++  quoteBlock(s, 1.129, 5.188);
++
++  // Large folder
++  box(s, { x: 7.582, y: 1.809, w: 4.051, h: 4.955, fill: C.accent });
++  s.addShape('flowChartManualOperation', {
++    x: 7.745, y: 1.809, w: 3.726, h: 0.593, fill: { color: C.black, transparency: 1 }, line: { type: 'none' },
++  });
++  s.addShape('ellipse', { x: 9.372, y: 2.167, w: 0.47, h: 0.47, fill: { color: C.accent }, line: { color: C.white, width: 2 } });
++  text(s, [
++    { text: 'Latest', options: { fontSize: 13, bold: true, breakLine: true } },
++    { text: 'Lorem Ipsum\u00a0is simply', options: { fontSize: 11 } },
++  ], { x: 8.558, y: 3.266, w: 2.1, h: 0.55, color: C.white, align: 'center', lineSpacing: 16 });
++  stackedMark(s, 8.898, 5.124, 1.431, 0.705, 20, C.white, C.white);
++
++  // Small folder
++  box(s, { x: 5.836, y: 5.084, w: 1.37, h: 1.676, fill: C.tan });
++  s.addShape('flowChartManualOperation', {
++    x: 5.891, y: 5.084, w: 1.26, h: 0.201, fill: { color: C.accent, transparency: 1 }, line: { type: 'none' },
++  });
++  s.addShape('ellipse', { x: 6.442, y: 5.205, w: 0.159, h: 0.159, fill: { color: C.accent }, line: { color: C.white, width: 2 } });
++  logoG(s, 6.324, 5.785, 0.395, 0.548, C.black);
++}
++
++/* ------------------------------------------------------------------ slide 20 */
++
++const CONTACT_COLUMNS = [
++  { x: 5.59, title: 'CONTACT', lines: ['PHONE : + 459 789 540', 'FREE TOLL : + 1286 4789 456', '_', 'FAX : + 145 3657 4596'] },
++  { x: 8.209, title: 'ADDRESS', lines: ['GENESIS', '374 WILLIAM S CANNING BLVD,', 'FALL RIVER MA 2721', 'UNITED STATES'] },
++  { x: 10.829, title: 'SOCIAL', lines: ['EXAMPLE TEXT', 'WWW.DOMAIN@GMAIL.COM', '_', 'WWW.SOCIALMEDIA.COM'] },
++];
++
++function slideThankYou(pres) {
++  const s = pres.addSlide();
++  frame(s, '20', false);
++  imagePlaceholder(s, 1.129, 4.556, 3.936, 2.944);
++  text(s, 'THANK YOU.', {
++    x: 1.129, y: 2.342, w: 11.286, h: 2.034, fontFace: F.major, fontSize: 120, bold: true,
++    charSpacing: 3, lineSpacingMultiple: 1, margin: [0, 0, 0, 0.015],
++  });
++
++  CONTACT_COLUMNS.forEach((col) => {
++    text(s, col.title, { x: col.x, y: 5.482, w: 1.563, h: 0.303, fontFace: F.major, fontSize: 12, color: C.accent });
++    text(s, col.lines.map((t, i) => ({ text: t, options: { breakLine: i < col.lines.length - 1 } })),
++      { x: col.x, y: 5.827, w: 1.972, h: 0.774, fontSize: 8, lineSpacing: 12 });
++  });
++  [7.534, 10.297].forEach((x) => rule(s, { x, y: 5.562, h: 0.974, color: C.accent, width: 1 }));
++}
++
++/* --------------------------------------------------------------------- build */
++
++function build() {
++  const pres = new pptxgen();
++  pres.defineLayout({ name: 'WIDE', width: 13.3333333, height: 7.5 }); // 12192000 x 6858000 EMU
++  pres.layout = 'WIDE';
++  pres.author = 'Genesis Brand';
++  pres.title = 'Genesis Brand Guidelines';
++
++  slideCover(pres);
++  slideWelcome(pres);
++  slideContents(pres);
++  sectionSlide(pres, '04', 'BRAND LOGOS.', '01.', 8.162);
++  slidePrimaryLogo(pres);
++  slideLogoMarks(pres);
++  slideLogoVariation(pres);
++  sectionSlide(pres, '08', 'BRAND COLORS.', '02.', 8.162);
++  slideHeroColors(pres);
++  slideColorPalettes(pres);
++  sectionSlide(pres, '11', 'BRAND TYPOGRAPHY.', '03.', 10.008);
++  slideFonts(pres);
++  sectionSlide(pres, '13', 'BRAND APPLICATION.', '04.', 10.008);
++  slideDevices(pres);
++  sectionSlide(pres, '15', 'BRAND IMAGERY.', '05.', 10.008);
++  slideGallery(pres);
++  sectionSlide(pres, '17', 'BRAND STATIONARY.', '06.', 10.008);
++  slideBusinessCard(pres);
++  slideMapFolder(pres);
++  slideThankYou(pres);
++
++  return pres.writeFile({ fileName: path.join(__dirname, '16657be1-7330-4dcf-846c-acc541c3e798_grok_final.pptx') });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

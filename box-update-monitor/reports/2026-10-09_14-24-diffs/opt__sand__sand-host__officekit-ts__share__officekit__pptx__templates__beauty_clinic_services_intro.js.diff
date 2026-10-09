@@ -1,0 +1,797 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/beauty_clinic_services_intro.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/beauty_clinic_services_intro.js
+@@ -0,0 +1,794 @@
++/**
++ * Beauty Clinic — presentation template (30 slides, 13.333in x 7.5in).
++ *
++ * Standalone recreation of the reference deck with pptxgenjs.
++ * Run:  node 0da2289d-f60e-4a38-8dd2-816d09787aae_grok_final.js
++ * Writes the .pptx next to this file.
++ *
++ * Raster images in the original (four social icons on slide 26) are replaced
++ * with programmatic placeholders, per the conversion brief.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ===========================================================================
++// Design tokens
++// ===========================================================================
++
++const PLUM = 'B0578D';   // primary brand plum
++const ROSE = 'D988B9';   // secondary rose
++const WHITE = 'FFFFFF';
++const GREY = '7F7F7F';   // default body copy
++const DARK = '3F3F3F';   // darker body copy variant
++const MID = '595959';    // mid body copy variant
++const GREEN = '385623';  // single green check on the table slide
++
++const F = {
++  light: 'Poppins Light',
++  body: 'Poppins',
++  med: 'Poppins Medium',
++  semi: 'Poppins SemiBold',
++  xbold: 'Poppins ExtraBold',
++  mLight: 'Montserrat Light',
++  mSemi: 'Montserrat SemiBold',
++};
++
++// Google-Slides text boxes use 0.1in side / 0.05in top+bottom insets.
++// pptxgenjs expects margins in points, ordered [left, right, bottom, top].
++const INSET = [7.2, 7.2, 3.6, 3.6];
++
++// ===========================================================================
++// Primitive helpers
++// ===========================================================================
++
++/** Text box. `opts`: font, size, color, align, bold, italic, lineSpacing, grow. */
++function text(s, x, y, w, h, str, opts) {
++  const o = opts || {};
++  s.addText(str, {
++    x, y, w, h,
++    fontFace: o.font || F.body,
++    fontSize: o.size || 10,
++    color: o.color || GREY,
++    bold: o.bold || false,
++    italic: o.italic || false,
++    align: o.align || 'left',
++    valign: 'top',
++    margin: INSET,
++    lineSpacingMultiple: o.lineSpacing || undefined,
++    autoFit: o.grow !== false,
++    wrap: true,
++  });
++}
++
++/** Text box built from styled runs: [{ t, font, sup }, ...]. */
++function rich(s, x, y, w, h, runs, opts) {
++  const o = opts || {};
++  s.addText(runs.map(r => ({
++    text: r.t,
++    options: {
++      fontFace: r.font || F.body,
++      superscript: r.sup || false,
++      breakLine: !!r.br,
++    },
++  })), {
++    x, y, w, h,
++    fontSize: o.size || 10,
++    color: o.color || GREY,
++    align: o.align || 'left',
++    valign: 'top',
++    margin: INSET,
++    lineSpacingMultiple: o.lineSpacing || undefined,
++    autoFit: true,
++    wrap: true,
++  });
++}
++
++/** Filled rectangle. */
++function box(s, x, y, w, h, fill) {
++  s.addShape('rect', { x, y, w, h, fill: { color: fill }, line: { type: 'none' } });
++}
++
++/** Circle of diameter `d`. */
++function circle(s, x, y, d, fill) {
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: fill }, line: { type: 'none' } });
++}
++
++/** Ellipse with independent width/height. */
++function oval(s, x, y, w, h, fill) {
++  s.addShape('ellipse', { x, y, w, h, fill: { color: fill }, line: { type: 'none' } });
++}
++
++/** Circle with a single centred glyph (the table's check / cross markers). */
++function badge(s, x, y, d, fill, glyph, glyphColor) {
++  s.addText(glyph, {
++    shape: 'ellipse',
++    x, y, w: d, h: d,
++    fill: { color: fill }, line: { type: 'none' },
++    fontFace: F.med, fontSize: 14, color: glyphColor,
++    bold: glyph === '\u2713',
++    align: 'center', valign: 'middle', margin: INSET,
++  });
++}
++
++/** Triangle marker. `opts`: fill | outline, rotate, flipH. */
++function tri(s, x, y, w, h, opts) {
++  const o = opts || {};
++  s.addShape('triangle', {
++    x, y, w, h,
++    fill: o.fill ? { color: o.fill } : { type: 'none' },
++    line: o.outline ? { color: o.outline, width: 1 } : { type: 'none' },
++    rotate: o.rotate || 0,
++    flipH: o.flipH || false,
++  });
++}
++
++/** Horizontal rule of any colour/weight. */
++function hrule(s, x, y, w, color, width) {
++  s.addShape('line', { x, y, w, h: 0, line: { color, width } });
++}
++
++/** Vertical rule. */
++function vrule(s, x, y, h, color, width) {
++  s.addShape('line', { x, y, w: 0, h, line: { color, width } });
++}
++
++/** The signature 2.25pt rose accent rule used beside every heading. */
++function rule(s, x, y, w) {
++  hrule(s, x, y, w, ROSE, 2.25);
++}
++
++// ===========================================================================
++// Typographic helpers
++// ===========================================================================
++
++/** 40pt heading: light first half + extra-bold second half. */
++function title(s, x, y, w, h, lightPart, boldPart) {
++  s.addText([
++    { text: lightPart, options: { fontFace: F.light } },
++    { text: boldPart, options: { fontFace: F.xbold } },
++  ], { x, y, w, h, fontSize: 40, color: PLUM, align: 'left', valign: 'top', margin: INSET, autoFit: true });
++}
++
++/** 80pt cover heading, centred. */
++function hero(s, x, y, w, h, lightPart, boldPart) {
++  s.addText([
++    { text: lightPart, options: { fontFace: F.light } },
++    { text: boldPart, options: { fontFace: F.xbold } },
++  ], { x, y, w, h, fontSize: 80, color: PLUM, align: 'center', valign: 'top', margin: INSET, autoFit: true });
++}
++
++/** 20pt Poppins Medium sub-heading. Pass an array for multiple lines. */
++function label(s, x, y, w, h, str, opts) {
++  const o = opts || {};
++  paragraphs(s, x, y, w, h, str, {
++    font: F.med, size: 20, color: o.color || ROSE, align: o.align,
++    italic: o.italic, lineSpacing: o.lineSpacing,
++  });
++}
++
++/** 10pt Poppins body copy at 1.5 line spacing. Pass an array for multiple paragraphs. */
++function body(s, x, y, w, h, str, opts) {
++  const o = opts || {};
++  paragraphs(s, x, y, w, h, str, {
++    font: F.body, size: 10, color: o.color || GREY, align: o.align,
++    lineSpacing: o.lineSpacing === null ? undefined : (o.lineSpacing || 1.5),
++  });
++}
++
++/** Bulleted 10pt list, 1.5 line spacing, hanging indent of 0.1875in. */
++function bullets(s, x, y, w, h, items) {
++  s.addText(items.map(t => ({
++    text: t,
++    options: { bullet: { characterCode: '2022', indent: 13.5 }, breakLine: true },
++  })), {
++    x, y, w, h, fontFace: F.body, fontSize: 10, color: GREY,
++    align: 'left', valign: 'top', margin: INSET, lineSpacingMultiple: 1.5, autoFit: true,
++  });
++}
++
++/** One text box holding one or more same-styled paragraphs. */
++function paragraphs(s, x, y, w, h, str, o) {
++  const lines = Array.isArray(str) ? str : [str];
++  s.addText(lines.map(t => ({ text: t, options: { breakLine: true } })), {
++    x, y, w, h,
++    fontFace: o.font, fontSize: o.size, color: o.color,
++    italic: o.italic || false,
++    align: o.align || 'left', valign: 'top', margin: INSET,
++    lineSpacingMultiple: o.lineSpacing || undefined,
++    autoFit: true,
++    wrap: true,
++  });
++}
++
++// ===========================================================================
++// Recurring furniture
++// ===========================================================================
++
++/** Small three-circle logo mark, top-left of every slide, plus page/footers. */
++function chrome(s, page) {
++  logoMark(s, 0.129, 0.137, 0.436);
++  footNote(s, 11.836, 0.137, 'Page ' + page, 'right');
++  footNote(s, 0.129, 7.075, 'Presentation', 'left');
++  footNote(s, 11.836, 7.075, 'Beauty Clinic', 'right');
++}
++
++/**
++ * The logo: a plum disc, a white disc punched out low-right, and a rose dot.
++ * Ratios are relative to the plum disc so the same artwork serves the 0.436in
++ * corner mark and the 2.085in cover mark.
++ */
++function logoMark(s, x, y, d) {
++  circle(s, x, y, d, PLUM);
++  circle(s, x + 0.140218 * d, y + 0.283929 * d, 0.719564 * d, WHITE);
++  circle(s, x + 0.369286 * d, y + 0.717458 * d, 0.261190 * d, ROSE);
++}
++
++/** 8pt plum running head / foot (fixed box, unlike the auto-fitting body text). */
++function footNote(s, x, y, str, align) {
++  text(s, x, y, 1.368, 0.284, str, {
++    font: F.semi, size: 8, color: PLUM, align, lineSpacing: 1.5, grow: false,
++  });
++}
++
++/**
++ * Stand-in for a raster image from the original deck. The only bitmaps in the
++ * reference are four white social glyphs sitting on plum discs (slide 26), so a
++ * plain white block at the same box is the closest native equivalent.
++ */
++function imagePlaceholder(s, x, y, w, h) {
++  s.addShape('rect', { x, y, w, h, fill: { color: WHITE }, line: { type: 'none' } });
++}
++
++// ===========================================================================
++// Slides
++// ===========================================================================
++
++// --- 1. Cover ---
++function slide01(s) {
++  chrome(s, '01');
++  rich(s, 2.51302, 3.637, 8.3073, 1.44733, [{ t: 'Beauty ', font: F.light }, { t: 'Clinic', font: F.xbold }, { t: ' ', font: F.mSemi }], { size: 80, color: PLUM, align: 'center' });
++  rule(s, 2.96227, 5.25418, 7.52302);
++  label(s, 4.81447, 5.40165, 3.70439, 0.43757, 'Presentation Template', { align: 'center' });
++  logoMark(s, 5.62431, 1.56642, 2.08471);
++}
++
++// --- 2. Table Of Content ---
++function slide02(s) {
++  chrome(s, '02');
++  label(s, 1.67635, 4.52459, 3.46857, 0.43757, '02. Service & Product');
++  title(s, 1.67635, 0.88825, 6.51412, 0.77415, 'Table Of ', 'Content');
++  rule(s, 0, 1.31458, 1.36232);
++  label(s, 1.67635, 2.79828, 2.68597, 0.43757, '01. Introduction');
++  body(s, 2.14221, 3.17886, 3.65217, 0.58279, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. ');
++  label(s, 7.25847, 2.79828, 3.814, 0.43757, '03. Clinic Infographic');
++  body(s, 2.14221, 4.96215, 3.65217, 0.58279, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. ');
++  body(s, 7.72433, 3.17886, 3.65217, 0.58279, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. ');
++  label(s, 7.25847, 4.54234, 3.26327, 0.43757, '04. Our Team');
++  body(s, 7.72433, 4.96215, 3.65217, 0.58279, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. ');
++}
++
++// --- 3. Section — 01. Introduction We Are ---
++function slide03(s) {
++  chrome(s, '03');
++  body(s, 6.88728, 4.292, 4.53746, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl');
++  title(s, 1.67635, 1.3955, 7.21595, 0.77415, '01. Introduction ', 'We Are');
++  rule(s, 0, 1.77834, 1.47826);
++}
++
++// --- 4. Welcome to Beauty Clinic ---
++function slide04(s) {
++  chrome(s, '04');
++  circle(s, 0.0837, 0.41753, 4.15408, PLUM);
++  title(s, 6.13467, 0.88825, 5.03793, 1.44733, 'Welcome to ', 'Beauty Clinic');
++  body(s, 6.13467, 3.0443, 6.03379, 1.08767, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl vel fermentum. Aenean eget neque sagittis mattis. ');
++  label(s, 6.13467, 4.84068, 1.89855, 0.43757, 'Hallo');
++  label(s, 9.4728, 4.84068, 1.89855, 0.43757, 'Greeting');
++  body(s, 6.13467, 5.37805, 2.71015, 0.82983, 'Donec auctor blandit leo, convallis mollis mi dictum hendrerit ornare. Class aptent taciti sociosqu');
++  body(s, 9.45831, 5.37805, 2.71015, 0.82983, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class');
++  rule(s, 1.33252, 1.31458, 4.19129);
++  circle(s, 2.66989, 0.13689, 1.02229, ROSE);
++}
++
++// --- 5. Let's Get Acquainted ---
++function slide05(s) {
++  chrome(s, '05');
++  circle(s, 8.8699, 0.68613, 4.15408, PLUM);
++  rule(s, 7.64515, 1.31458, 4.19129);
++  title(s, 1.44447, 0.88825, 6.55767, 0.77415, 'Let’s Get ', 'Acquainted');
++  body(s, 1.4271, 2.59761, 6.24928, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per  himenaeos. Duis id rutrum. Pellentesque dictum a nisl vel fermentum. Aenean eget neque sagittis mattis. ');
++  label(s, 1.4398, 4.62142, 1.89855, 0.43757, 'About us');
++  body(s, 1.4398, 5.15879, 2.85256, 0.82983, 'Donec auctor blandit leo, condimentum in. In dictum hendrerit ornare blandit leo, ');
++  label(s, 4.82382, 4.62313, 1.89855, 0.43757, 'Story');
++  body(s, 4.82382, 5.1605, 2.85256, 0.83446, 'Donec auctor mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu');
++  circle(s, 12.1823, 3.44337, 1.02229, ROSE);
++}
++
++// --- 6. Business Fields ---
++function slide06(s) {
++  chrome(s, '06');
++  circle(s, 1.0261, 1.7233, 5.16842, PLUM);
++  rule(s, 2.49644, 6.28785, 4.19129);
++  label(s, 6.55078, 1.95835, 2.4, 0.43757, '01. Beautician');
++  label(s, 6.55078, 4.61152, 2.25715, 0.43757, '02. Cosmetics');
++  title(s, 1.43966, 0.88825, 4.93513, 0.77415, 'Business ', 'Fields');
++  body(s, 7.02697, 2.51552, 4.80788, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl vel');
++  body(s, 7.0858, 5.23692, 4.80788, 0.83446, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. ');
++  body(s, 1.93704, 4.79247, 3.34655, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu himenaeos. Duis id rutrum. Pellentesque dictum', { color: WHITE, align: 'center' });
++  circle(s, 1.17611, 5.7767, 1.02229, ROSE);
++}
++
++// --- 7. Licensing & Legality ---
++function slide07(s) {
++  chrome(s, '07');
++  label(s, 2.11544, 5.14263, 4.16491, 0.43757, 'business permit');
++  label(s, 2.09995, 3.85517, 4.16492, 0.43757, 'Clinical Legality');
++  label(s, 8.07937, 3.85056, 4.16491, 0.43757, 'Expert Certificate');
++  body(s, 2.12643, 4.31792, 4.28007, 0.32958, 'Donec auctor, convallis mollis mi condimentum in. In');
++  label(s, 8.07936, 5.19092, 4.16491, 0.43757, 'Product License');
++  rule(s, 0, 1.31458, 1.19048);
++  title(s, 1.43966, 0.88825, 6.6397, 0.77415, 'Licensing & ', 'Legality');
++  body(s, 2.14192, 5.63628, 4.28007, 0.32958, 'Donec auctor, convallis mollis mi condimentum in. In');
++  body(s, 8.10585, 4.30916, 4.28007, 0.32958, 'Donec auctor, convallis mollis mi condimentum in. In');
++  body(s, 8.10585, 5.6405, 4.28007, 0.32958, 'Donec auctor, convallis mollis mi condimentum in. In');
++  circle(s, 1.59201, 3.95239, 0.25397, PLUM);
++  circle(s, 1.6075, 5.23803, 0.25397, PLUM);
++  circle(s, 7.57143, 3.94417, 0.25397, PLUM);
++  circle(s, 7.57143, 5.28272, 0.25397, PLUM);
++  body(s, 1.4271, 2.02765, 10.5412, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl vel fermentum. Aenean eget neque sagittis mattis. Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl vel fermentum. Aenean eget neque sagittis mattis. ');
++}
++
++// --- 8. Section — 01. Service & Product ---
++function slide08(s) {
++  chrome(s, '08');
++  body(s, 6.88728, 4.292, 4.53746, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl');
++  title(s, 1.67635, 1.3955, 6.80057, 0.77415, '01. Service ', '& Product');
++  rule(s, 0, 1.77834, 1.47826);
++}
++
++// --- 9. Our Services ---
++function slide09(s) {
++  chrome(s, '09');
++  circle(s, 6.29563, 0.47386, 4.15408, PLUM);
++  rule(s, 5.88085, 1.31458, 4.19129);
++  circle(s, 6.194, 3.30875, 1.02229, ROSE);
++  body(s, 1.49689, 2.66773, 3.70076, 1.08227, 'Donec auctor blandit leo, convallis condimentum in. In dictum hendrerit ornare. sociosqu ad litora torquent per conubia nostra, himenaeos.  Duis id rutrum. Pellentesque dictum a nisl');
++  label(s, 1.44447, 4.70313, 2.91302, 0.77415, ['01. ', 'Face Treatment']);
++  title(s, 1.44447, 0.88825, 4.15408, 0.77415, 'Our ', 'Services');
++  label(s, 5.19765, 4.70313, 3.11512, 0.77415, ['02. ', 'Body Care']);
++  label(s, 8.95082, 4.70313, 2.93804, 0.77415, ['03. ', 'Injection Serum']);
++  body(s, 8.95082, 5.50773, 2.93804, 0.82983, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. ');
++  body(s, 1.44447, 5.50773, 2.80254, 0.82983, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. ');
++  body(s, 5.19765, 5.50773, 2.80254, 0.82983, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. ');
++}
++
++// --- 10. Face Treatment ---
++function slide10(s) {
++  chrome(s, '10');
++  circle(s, 7.2, 1.91313, 5.3205, PLUM);
++  circle(s, 10.857, 6.21134, 1.02229, ROSE);
++  body(s, 1.45541, 2.11093, 5.42151, 1.08227, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit inceptos himenaeos. i rutrum. Pellentesque dictum a nisl vel fermentum. ornare. Class aptent taciti sociosqu ad litora torquent per ornare. Class aptent taciti sociosqu ad litora torquent per ');
++  label(s, 1.46165, 4.09017, 1.89855, 0.77415, '01. Treatment');
++  body(s, 1.46165, 4.86428, 2.27241, 1.08227, 'Donec auctor blandit leo, convallis condimentum in. In dictum hendrerit ornare. Class clear boya');
++  title(s, 1.4271, 0.88825, 5.05115, 0.77415, 'Face ', 'Treatment');
++  label(s, 9.14981, 4.09017, 1.89855, 0.77415, '02. Treatment');
++  body(s, 9.14981, 4.86428, 2.27241, 1.08227, 'Donec auctor blandit leo, convallis condimentum in. In dictum hendrerit ornare. Class clear boya', { color: WHITE });
++  rule(s, 6.63476, 6.7658, 4.22222);
++}
++
++// --- 11. Body Care ---
++function slide11(s) {
++  chrome(s, '11');
++  circle(s, 8.33396, 3.58464, 3.66871, PLUM);
++  label(s, 4.73556, 2.01191, 2.27241, 0.43757, '01. Method');
++  body(s, 4.73556, 2.44948, 3.08051, 0.82983, 'Donec auctor blandit leo, convallis condimentum in. In dictum hendrerit ornare. Class clear boya', { color: MID });
++  title(s, 1.4271, 0.88825, 5.05115, 0.77415, 'Body ', 'Care');
++  body(s, 8.7581, 4.87345, 2.82044, 1.0869, 'mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per', { color: WHITE, align: 'center' });
++  label(s, 8.7357, 2.01191, 2.27241, 0.43757, '02. Method');
++  body(s, 8.7357, 2.44948, 3.08051, 0.82983, 'Donec auctor blandit leo, convallis condimentum in. In dictum hendrerit ornare. Class clear boya', { color: MID });
++  circle(s, 11.0081, 6.19498, 1.02229, ROSE);
++  rule(s, 6.78588, 6.6735, 4.22222);
++}
++
++// --- 12. Injection Serum ---
++function slide12(s) {
++  chrome(s, '12');
++  circle(s, 9.13609, 1.80772, 3.66871, PLUM);
++  circle(s, 11.8364, 4.45414, 1.02229, ROSE);
++  rule(s, 8.00693, 4.77668, 4.22222);
++  body(s, 1.4271, 2.12667, 3.24314, 2.09204, ['Donec auctor blandit leo, condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos', '', ' himenaeos. Pellentesque condimentum in. In dictum hendrerit ornare. Donec auctor blandit leo, condimentum in. '], { color: MID });
++  label(s, 1.4271, 5.11897, 2.2866, 0.43757, 'Serum name');
++  body(s, 1.4271, 5.59769, 4.58828, 0.82983, 'Donec auctor blandit leo\\condimentum blandit leo, convallis condimentum  himenaeos. Pellentesque condimentum in. In dictum hendrerit ornare. Donec auctor blandit leo, ', { color: MID });
++  rich(s, 1.4271, 0.88825, 5.05115, 0.77415, [{ t: 'I', font: F.mLight }, { t: 'njection ', font: F.light }, { t: 'Serum', font: F.xbold }], { size: 40, color: PLUM });
++  label(s, 6.63177, 5.11897, 2.2866, 0.43757, 'Serum name');
++  body(s, 6.66667, 5.59769, 4.58828, 0.82983, 'Donec auctor blandit leo\\condimentum blandit leo, convallis condimentum  himenaeos. Pellentesque condimentum in. In dictum hendrerit ornare. Donec auctor blandit leo, ', { color: MID });
++}
++
++// --- 13. Our Product (numbered) ---
++function slide13(s) {
++  chrome(s, '13');
++  circle(s, 0.90257, 1.81086, 4.98974, PLUM);
++  body(s, 1.60145, 3.29145, 3.7524, 2.09204, ['Donec auctor blandit leo, convallis condimentum in. In dictum hendrerit ornare. sociosqu ad litora torquent per conubia nostra, himenaeos.  Duis id rutrum. Pellentesque dictum a nisl ', '', 'Donec auctor blandit leo, convallis condimentum in. In dictum hendrerit ornare. sociosqu ad litora torquent per conubia nostra, himenaeos.  Duis id'], { color: WHITE });
++  label(s, 7.96994, 1.96244, 3.51788, 0.43757, 'Face Treatment');
++  title(s, 1.44447, 0.88825, 4.09399, 0.77415, 'Our ', 'Product');
++  label(s, 7.96994, 3.56332, 3.76194, 0.43757, 'Body Care');
++  body(s, 7.96994, 4.00089, 3.52494, 0.83523, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu', { color: MID });
++  label(s, 7.96994, 5.22073, 3.5481, 0.43757, 'Injection Serum');
++  body(s, 7.96994, 5.65829, 3.5481, 0.83523, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu', { color: MID });
++  body(s, 7.96994, 2.40001, 3.51788, 0.83523, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu', { color: MID });
++  text(s, 6.78216, 1.73287, 0.90336, 0.77415, '01.', { font: F.light, size: 40, color: ROSE, align: 'center' });
++  text(s, 6.7021, 3.32222, 1.06347, 0.77415, '02.', { font: F.light, size: 40, color: ROSE, align: 'center' });
++  text(s, 6.72479, 5.00416, 1.0181, 0.77415, '03.', { font: F.light, size: 40, color: ROSE, align: 'center' });
++  circle(s, 4.51617, 5.77831, 1.02229, ROSE);
++  rule(s, 0, 1.2724, 1.21538);
++}
++
++// --- 14. Our Product (four cards) ---
++function slide14(s) {
++  chrome(s, '14');
++  circle(s, 8.10163, 0.50676, 4.59545, PLUM);
++  circle(s, 11.4982, 0.80738, 1.02229, ROSE);
++  rule(s, 5.5635, 1.31853, 4.22222);
++  body(s, 1.34302, 2.22562, 6.03024, 0.82983, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, inceptos himenaeos. Duis id auctor blandit leo, convallis mollis mi condimentum in. In', { color: DARK });
++  label(s, 1.34125, 3.64071, 2.09176, 0.43757, 'Skin Care');
++  body(s, 1.34125, 4.07827, 2.89707, 0.57739, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum', { color: DARK });
++  label(s, 5.08562, 3.6493, 2.09176, 0.43757, 'Body Scrub');
++  body(s, 1.34125, 5.34246, 2.89707, 0.57739, 'Donec auctor blandit leomollis mi in. In dictum hendrerit ornare. ', { color: DARK });
++  label(s, 1.34125, 4.90489, 2.09176, 0.43757, 'Beauty Mask');
++  body(s, 5.08562, 4.07827, 2.89707, 0.57739, 'Donec auctor blandit leo, convallis mollis mi condimentum', { color: DARK });
++  label(s, 5.08562, 4.90489, 2.67804, 0.43757, 'Toner & Serum');
++  body(s, 5.08562, 5.34246, 2.89707, 0.57739, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum', { color: DARK });
++  title(s, 1.34302, 0.92143, 5.03793, 0.77415, 'Our ', 'Product');
++}
++
++// --- 15. Skin Care ---
++function slide15(s) {
++  chrome(s, '15');
++  circle(s, 8.22702, 0.16132, 4.33611, PLUM);
++  rule(s, 0, 1.33825, 1.08696);
++  title(s, 1.34302, 0.9275, 3.1339, 0.77415, 'Skin ', 'Care');
++  body(s, 1.34302, 2.262, 4.83158, 1.08227, 'Donec auctor blandit leo, convallis mollis mi dictum hendrerit ornare. Class aptent taciti sociosqu dictum a nisl vel fermentum. Aenean eget neque sagittis mattis. Donec auctor blandit leo, convallis mollis mi condimentum', { color: DARK });
++  circle(s, 11.8473, 0.82711, 1.02229, ROSE);
++  label(s, 6.7368, 4.58405, 2.09176, 0.43757, '70% Contain', { align: 'center' });
++  body(s, 6.53547, 5.10824, 2.49441, 0.82983, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum', { color: DARK, align: 'center' });
++}
++
++// --- 16. Beauty Mask ---
++function slide16(s) {
++  chrome(s, '16');
++  circle(s, 0.29003, 2.45723, 4.7041, PLUM);
++  rule(s, 0.404, 6.20546, 3.64111);
++  circle(s, 3.43478, 6.19498, 1.02229, ROSE);
++  title(s, 1.34302, 0.92715, 4.83158, 0.77415, 'Beauty ', 'Mask');
++  body(s, 5.19803, 2.36597, 3.56455, 1.8396, ['Donec auctor blandit leo, convallis mollis mi dictum hendrerit ornare. Class aptent taciti sociosqu dictum a nisl vel fermentum. Aenean', '', ' eget neque sagittis mattis. Donec auctor blandit leo, convallis mollis mi condimentum dictum hendrerit ornare. '], { color: DARK });
++  label(s, 1.34302, 4.59171, 2.09176, 0.43757, '80% Contain');
++  body(s, 1.34302, 5.03542, 2.86333, 0.82983, ' eget neque sagittis mattis. blandit leo, convallis mollis mi condimentum dictum hendrerit ornare. ', { color: WHITE });
++}
++
++// --- 17. Body Scrub ---
++function slide17(s) {
++  chrome(s, '17');
++  circle(s, 4.95833, 2.73835, 3.9618, PLUM);
++  circle(s, 7.63086, 5.72243, 1.02229, ROSE);
++  label(s, 5.96365, 4.88522, 2.09176, 0.43757, '80% Contain');
++  body(s, 9.11788, 4.86478, 2.87153, 1.08227, 'Donec auctor condimentum in. dictum convallis . Aenean eget neque Donec auctor blandit leo, convallis hendrerit fermentum. ', { color: DARK });
++  title(s, 1.34302, 0.92715, 3.8792, 0.77415, 'Body ', 'Scrub');
++  rule(s, 6.00521, 4.63592, 5.9842);
++  body(s, 1.31186, 2.36597, 4.25957, 1.08227, 'Donec auctor blandit leo, convallis hendrerit fermentum. Aenean eget neque sagittis mattis. Donec auctor blandit aptent taciti sociosqu fermentum. Aenean eget neque sagittis mattis. Donec auctor blandit', { color: DARK });
++}
++
++// --- 18. Toner & Serum ---
++function slide18(s) {
++  chrome(s, '18');
++  oval(s, 7.49468, 2.04289, 5.09284, 5.1757, PLUM);
++  circle(s, 11.5652, 5.84415, 1.02229, ROSE);
++  body(s, 1.3368, 2.50347, 3.86285, 1.08227, 'Donec auctor blandit leo, condimentum in. dictum hendrerit ornare. Class aptent taciti sociosqu ad himenaeos. Duis id rutrum., dictum himenaeos. rutrum. Pellentesque dictum a ', { color: MID });
++  label(s, 9.03319, 4.29534, 2.27241, 0.43757, 'Method');
++  title(s, 1.34302, 0.92715, 4.83158, 0.77415, 'Toner & ', 'Serum');
++  rule(s, 9.15873, 6.09719, 2.83712);
++  body(s, 9.03319, 4.90987, 2.80326, 0.82983, 'condimentum in. dictum hendrerit ornare. Class aptent taciti sociosqu ad himenaeos. Duis id rutrum., ', { color: WHITE });
++}
++
++// --- 19. Section — 03. Clinic Infographic ---
++function slide19(s) {
++  chrome(s, '19');
++  body(s, 6.88728, 4.292, 4.53746, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl');
++  title(s, 1.67635, 1.3955, 6.80057, 0.77415, '03. Clinic ', 'Infographic');
++  rule(s, 0, 1.77834, 1.47826);
++}
++
++// --- 20. Basic Table ---
++function slide20(s) {
++  chrome(s, '20');
++  box(s, 5.78204, 1.9468, 2.00009, 4.60875, PLUM);
++  badge(s, 6.58131, 5.4879, 0.43756, ROSE, 'X', WHITE);
++  box(s, 7.9376, 1.9468, 2.00009, 4.60875, PLUM);
++  box(s, 10.0931, 1.9468, 2.00009, 4.60875, ROSE);
++  hrule(s, 1.32567, 4.50855, 10.7713, GREY, 0.75);
++  hrule(s, 1.32567, 5.26828, 10.7713, GREY, 0.75);
++  hrule(s, 1.32567, 3.74881, 10.7713, GREY, 0.75);
++  badge(s, 6.58131, 3.23696, 0.43756, WHITE, '✓', PLUM);
++  badge(s, 6.58131, 3.98727, 0.43756, WHITE, '✓', PLUM);
++  badge(s, 6.58131, 4.73758, 0.43756, WHITE, '✓', PLUM);
++  label(s, 1.34302, 3.23577, 3.87605, 0.43757, 'Customer Visit Chart');
++  label(s, 1.34302, 3.98657, 3.87605, 0.43757, 'Product Sold');
++  label(s, 1.34302, 4.73737, 4.25528, 0.43757, 'Customer Satisfaction');
++  label(s, 1.34302, 5.48817, 3.87605, 0.43757, 'Average Prediction');
++  body(s, 6.06365, 2.48697, 1.41916, 0.26927, 'Table data', { color: WHITE, align: 'center', lineSpacing: null });
++  label(s, 5.89018, 2.08037, 1.78411, 0.43757, 'Data 01', { color: WHITE, align: 'center' });
++  body(s, 8.22571, 2.48697, 1.41916, 0.26927, 'Table data', { color: WHITE, align: 'center', lineSpacing: null });
++  label(s, 8.05224, 2.08037, 1.78411, 0.43757, 'Data 02', { color: WHITE, align: 'center' });
++  body(s, 10.3633, 2.48697, 1.41916, 0.26927, 'Table data', { color: WHITE, align: 'center', lineSpacing: null });
++  label(s, 10.1898, 2.08037, 1.78411, 0.43757, 'Data 03', { color: WHITE, align: 'center' });
++  title(s, 1.34302, 0.92715, 4.83158, 0.77415, 'Basic ', 'Table');
++  rule(s, 0, 1.31458, 1.19048);
++  hrule(s, 1.32567, 6.02802, 10.7713, GREY, 0.75);
++  badge(s, 8.71652, 3.23578, 0.43756, WHITE, '✓', PLUM);
++  badge(s, 10.8744, 3.98727, 0.43756, WHITE, '✓', PLUM);
++  badge(s, 8.71652, 4.73758, 0.43756, WHITE, '✓', PLUM);
++  badge(s, 8.72552, 3.97785, 0.43756, ROSE, 'X', WHITE);
++  badge(s, 8.71652, 5.50207, 0.43756, WHITE, '✓', GREEN);
++  badge(s, 10.8744, 3.22373, 0.43756, PLUM, 'X', WHITE);
++  badge(s, 10.8744, 4.73758, 0.43756, WHITE, '✓', PLUM);
++  badge(s, 10.8744, 5.50207, 0.43756, WHITE, '✓', PLUM);
++}
++
++// --- 21. Customer Visit Chart ---
++function slide21(s) {
++  chrome(s, '21');
++  title(s, 1.34302, 0.9169, 4.94683, 1.44733, 'Customer Visit ', 'Chart');
++  body(s, 1.34302, 3.40282, 5.03177, 1.08227, 'Donec auctor blandit leo, convallis mollis mi condimentum indictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Donec auctor blandit leo, convallis mollis mi condimentum indictum hendrerit');
++  rule(s, 0, 1.31458, 1.19048);
++  hrule(s, 7.16493, 1.86878, 4.89478, GREY, 1);
++  hrule(s, 7.16493, 2.66236, 4.89478, GREY, 1);
++  hrule(s, 7.16493, 3.46987, 4.89478, GREY, 1);
++  hrule(s, 7.16493, 4.26345, 4.89478, GREY, 1);
++  hrule(s, 7.16493, 5.07011, 4.89478, GREY, 1);
++  hrule(s, 7.16493, 5.8637, 4.89478, GREY, 1);
++  box(s, 7.82583, 5.1408, 0.70793, 0.73553, PLUM);
++  box(s, 9.24462, 3.86656, 0.70793, 1.99714, PLUM);
++  box(s, 10.6943, 2.29651, 0.70793, 3.56718, PLUM);
++  box(s, 8.97465, 4.3615, 0.70793, 1.5022, ROSE);
++  box(s, 7.5339, 4.86011, 0.70793, 1.01623, ROSE);
++  box(s, 10.4154, 2.52957, 0.70793, 3.33413, ROSE);
++  text(s, 7.4798, 6.00086, 1.0042, 0.32958, 'January', { font: F.semi, size: 10, color: GREY, align: 'center', lineSpacing: 1.5 });
++  text(s, 8.97465, 6.00086, 0.9779, 0.32958, 'February', { font: F.semi, size: 10, color: GREY, align: 'center', lineSpacing: 1.5 });
++  text(s, 10.4154, 6.00086, 0.98678, 0.32958, 'March', { font: F.semi, size: 10, color: GREY, align: 'center', lineSpacing: 1.5 });
++  label(s, 1.34302, 5.03387, 2.27241, 0.43757, 'Per Month');
++  body(s, 3.76389, 5.03387, 2.40451, 0.82983, 'hendrerit ornare. Class aptent taciti sociosqu torquent per conubia nostra, per inceptos');
++}
++
++// --- 22. Product Sale ---
++function slide22(s) {
++  chrome(s, '22');
++  title(s, 1.34302, 0.93066, 4.94683, 0.77415, 'Product ', 'Sale');
++  rule(s, 0, 1.31458, 1.19048);
++  label(s, 1.34302, 3.82259, 2.27241, 0.43757, 'Product 01');
++  label(s, 1.33701, 5.09538, 2.27241, 0.43757, 'Product 02');
++  label(s, 7.21981, 3.83383, 2.27241, 0.43757, 'Product 03');
++  box(s, 1.33701, 4.3365, 3.70466, 0.41916, ROSE);
++  box(s, 1.33701, 4.3365, 2.69197, 0.41916, PLUM);
++  label(s, 5.24547, 4.3365, 0.86531, 0.43757, '78%');
++  label(s, 7.22255, 5.09538, 2.27241, 0.43757, 'Product 04');
++  box(s, 1.33701, 5.59384, 3.70466, 0.41916, ROSE);
++  box(s, 1.33701, 5.59384, 3.08328, 0.41916, PLUM);
++  label(s, 5.24547, 5.59384, 0.86531, 0.43757, '89%');
++  box(s, 7.22255, 4.3365, 3.70466, 0.41916, ROSE);
++  box(s, 7.22255, 4.33229, 2.0818, 0.41916, PLUM);
++  label(s, 11.131, 4.3365, 0.86531, 0.43757, '62%');
++  box(s, 7.22255, 5.59384, 3.70466, 0.41916, ROSE);
++  box(s, 7.22255, 5.58962, 3.30349, 0.41916, PLUM);
++  label(s, 11.131, 5.59384, 0.86531, 0.43757, '95%');
++  body(s, 1.34302, 2.19644, 10.6533, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum indictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Donec auctor blandit leo, convallis mollis mi condimentum indictum hendrerit Donec auctor blandit leo, convallis mollis mi condimentum indictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Donec auctor blandit leo, convallis mollis mi condimentum indictum hendrerit');
++}
++
++// --- 23. Customer Satisfaction ---
++function slide23(s) {
++  chrome(s, '23');
++  hrule(s, 2.31403, 2.40244, 3.67314, GREY, 0.75);
++  hrule(s, 2.31403, 2.9923, 3.67314, GREY, 0.75);
++  hrule(s, 2.31403, 3.58216, 3.67314, GREY, 0.75);
++  hrule(s, 2.31403, 4.17202, 3.67314, GREY, 0.75);
++  hrule(s, 2.31403, 4.76188, 3.67314, GREY, 0.75);
++  hrule(s, 2.31403, 5.35174, 3.67314, GREY, 0.75);
++  hrule(s, 2.31403, 5.9416, 3.67314, GREY, 0.75);
++  vrule(s, 3.02284, 2.61548, 3.0224, ROSE, 0.75);
++  vrule(s, 4.18303, 2.38174, 3.0224, ROSE, 0.75);
++  vrule(s, 5.34322, 2.88901, 3.0224, ROSE, 0.75);
++  box(s, 5.04918, 4.7302, 0.59184, 0.90097, ROSE);
++  box(s, 3.88711, 2.89031, 0.59184, 0.90097, PLUM);
++  box(s, 2.72504, 3.549, 0.59184, 0.90097, PLUM);
++  text(s, 1.53671, 5.80697, 0.40978, 0.26927, '0', { font: F.semi, size: 10, color: PLUM, align: 'center' });
++  text(s, 1.4802, 5.2171, 0.46629, 0.26927, '10', { font: F.semi, size: 10, color: PLUM, align: 'center' });
++  text(s, 1.34302, 4.62723, 0.60347, 0.26927, '20', { font: F.semi, size: 10, color: PLUM, align: 'center' });
++  text(s, 1.34302, 4.03736, 0.60347, 0.26927, '30', { font: F.semi, size: 10, color: PLUM, align: 'center' });
++  text(s, 1.34302, 3.44749, 0.60347, 0.26927, '40', { font: F.semi, size: 10, color: PLUM, align: 'center' });
++  text(s, 1.34302, 2.85762, 0.60347, 0.26927, '50', { font: F.semi, size: 10, color: PLUM, align: 'center' });
++  text(s, 1.35876, 2.26775, 0.60347, 0.26927, '60', { font: F.semi, size: 10, color: PLUM, align: 'center' });
++  text(s, 2.71462, 3.79753, 0.60347, 0.4039, '01', { font: F.med, size: 18, color: WHITE, align: 'center' });
++  text(s, 3.88246, 3.13884, 0.60347, 0.4039, '02', { font: F.med, size: 18, color: WHITE, align: 'center' });
++  text(s, 5.04398, 4.97873, 0.60347, 0.4039, '03', { font: F.med, size: 18, color: WHITE, align: 'center' });
++  title(s, 1.34302, 0.93586, 6.97444, 0.77415, 'Customer ', 'Satisfaction');
++  label(s, 7.5937, 4.9554, 2.86993, 0.43757, '03. Not Satisfied');
++  body(s, 8.14937, 5.36421, 3.64725, 0.57739, 'Donec auctor blandit leo, convallis condimentum in. In dictum', { color: DARK });
++  label(s, 7.60278, 2.2708, 2.86993, 0.43757, '01. Very Satisfied');
++  body(s, 8.14937, 2.70075, 3.64725, 0.57739, 'Donec auctor blandit leo, convallis mollis mi condimentum in. ', { color: DARK });
++  label(s, 7.60278, 3.6131, 2.09176, 0.43757, '02. Satisfied');
++  body(s, 8.14937, 4.00266, 3.64725, 0.57739, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum', { color: DARK });
++  rule(s, 0, 1.31458, 1.19048);
++}
++
++// --- 24. Average Prediction ---
++function slide24(s) {
++  chrome(s, '24');
++  rule(s, 0, 1.31458, 1.19048);
++  title(s, 1.34302, 0.93066, 5.85698, 0.77415, 'Average ', 'Prediction');
++  box(s, 2.95636, 4.21777, 1.41097, 1.84724, PLUM);
++  box(s, 4.52056, 4.21777, 1.41097, 1.84724, ROSE);
++  label(s, 1.35998, 4.33628, 0.92029, 0.43752, 'May');
++  label(s, 1.35998, 4.97817, 0.92029, 0.43752, 'June');
++  label(s, 1.35998, 5.62005, 0.92029, 0.43752, 'July');
++  hrule(s, 1.34302, 4.78723, 4.56088, GREY, 0.75);
++  hrule(s, 1.34302, 5.42612, 4.56088, GREY, 0.75);
++  hrule(s, 1.34302, 6.06501, 4.56088, GREY, 0.75);
++  tri(s, 3.55063, 5.03398, 0.29352, 0.25304, { fill: WHITE });
++  tri(s, 3.55063, 4.35807, 0.29352, 0.25304, { outline: WHITE, rotate: 180, flipH: true });
++  tri(s, 3.55063, 5.69628, 0.29352, 0.25304, { fill: WHITE });
++  tri(s, 5.03475, 4.36878, 0.29352, 0.22452, { fill: WHITE });
++  tri(s, 5.03475, 5.04465, 0.29352, 0.22452, { outline: WHITE, rotate: 180, flipH: true });
++  tri(s, 5.03475, 5.69628, 0.29352, 0.22452, { fill: WHITE });
++  box(s, 8.99818, 4.21777, 1.41097, 1.84724, PLUM);
++  box(s, 10.5624, 4.21777, 1.41097, 1.84724, ROSE);
++  label(s, 7.4018, 4.33628, 0.92029, 0.43752, '2020');
++  label(s, 7.4018, 4.97817, 0.92029, 0.43752, '2021');
++  label(s, 7.4018, 5.62005, 0.92029, 0.43752, '2022');
++  hrule(s, 7.38484, 4.78723, 4.56088, GREY, 0.75);
++  hrule(s, 7.38484, 5.42612, 4.56088, GREY, 0.75);
++  hrule(s, 7.38484, 6.06501, 4.56088, GREY, 0.75);
++  tri(s, 9.59245, 5.03398, 0.29352, 0.25304, { fill: WHITE });
++  tri(s, 9.59245, 4.35807, 0.29352, 0.25304, { outline: WHITE, rotate: 180, flipH: true });
++  tri(s, 9.59245, 5.69628, 0.29352, 0.25304, { fill: WHITE });
++  tri(s, 11.0766, 4.36878, 0.29352, 0.22452, { fill: WHITE });
++  tri(s, 11.0766, 5.04465, 0.29352, 0.22452, { outline: WHITE, rotate: 180, flipH: true });
++  tri(s, 11.0766, 5.69628, 0.29352, 0.22452, { fill: WHITE });
++  body(s, 7.32372, 2.69867, 4.51273, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl');
++  body(s, 1.34302, 2.69389, 4.60547, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl');
++  label(s, 1.35909, 2.19913, 2.12352, 0.43752, 'Per Month');
++  label(s, 7.32372, 2.19913, 2.12352, 0.43752, 'Per Years');
++}
++
++// --- 25. Section — 04. Our Team ---
++function slide25(s) {
++  chrome(s, '25');
++  body(s, 6.88728, 4.292, 4.53746, 1.0869, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl');
++  title(s, 1.67635, 1.3955, 5.21092, 0.77415, '04. Our ', 'Team');
++  rule(s, 0, 1.77834, 1.47826);
++}
++
++// --- 26. CEO Founder ---
++function slide26(s) {
++  chrome(s, '26');
++  body(s, 1.34302, 2.35843, 5.46857, 0.82983, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl');
++  label(s, 1.80226, 3.86696, 3.57734, 0.43757, 'dr. Veronica angel');
++  bullets(s, 1.80226, 4.30453, 4.34023, 0.82983, ['Donec auctor blandit leo, convallis mollis mi condime', 'dictum nostra, per inceptos himenaeos. Duis id rutrum', 'Pellentesque dictum a nisl vel']);
++  title(s, 1.34302, 0.9328, 5.03793, 0.77415, 'CEO ', 'Founder');
++  circle(s, 4.1026, 5.55268, 0.77415, PLUM);
++  circle(s, 5.20773, 5.55268, 0.77415, PLUM);
++  oval(s, 1.8979, 5.54837, 0.76858, 0.77415, PLUM);
++  circle(s, 2.99747, 5.55268, 0.77415, PLUM);
++  imagePlaceholder(s, 2.19875, 5.75865, 0.16688, 0.33376);
++  imagePlaceholder(s, 3.23157, 5.77255, 0.30594, 0.30594);
++  imagePlaceholder(s, 4.3367, 5.80037, 0.30594, 0.25032);
++  imagePlaceholder(s, 5.4601, 5.79082, 0.26941, 0.26941);
++  rule(s, 0, 1.31458, 1.19048);
++}
++
++// --- 27. Our Team ---
++function slide27(s) {
++  chrome(s, '27');
++  title(s, 1.34302, 0.9275, 5.03793, 0.77415, 'Our ', 'Team');
++  label(s, 3.37174, 2.45336, 2.93034, 0.43757, 'Denise Nathanael');
++  label(s, 3.37174, 4.51514, 3.00921, 0.43757, 'Vanessa Louis');
++  label(s, 9.07311, 2.45336, 2.82685, 0.43757, 'Whitney Dunn');
++  label(s, 9.07311, 4.51514, 3.44605, 0.43757, 'Clarissa Mathew');
++  rule(s, 0, 1.31458, 1.19048);
++  bullets(s, 3.37174, 3.10335, 3.08094, 0.82983, ['Donec auctor blandit leo, convallis', 'dictum nostra, inceptos himenaeos. ', 'Pellentesque dictum a nisl vel']);
++  bullets(s, 9.07311, 3.10335, 3.08094, 0.82983, ['Donec auctor blandit leo, convallis', 'dictum nostra, inceptos himenaeos. ', 'Pellentesque dictum a nisl vel']);
++  bullets(s, 3.37174, 5.18074, 3.08094, 0.82983, ['Donec auctor blandit leo, convallis', 'dictum nostra, inceptos himenaeos. ', 'Pellentesque dictum a nisl vel']);
++  bullets(s, 9.07311, 5.18074, 3.08094, 0.82983, ['Donec auctor blandit leo, convallis', 'dictum nostra, inceptos himenaeos. ', 'Pellentesque dictum a nisl vel']);
++}
++
++// --- 28. Contact Us ---
++function slide28(s) {
++  chrome(s, '28');
++  label(s, 1.95601, 4.58182, 2.47835, 0.43757, 'Address');
++  label(s, 9.50036, 4.58182, 1.69539, 0.43757, 'Email');
++  label(s, 6.18513, 4.58706, 1.3329, 0.43757, 'Phone');
++  rich(s, 2.14568, 5.11672, 2.77669, 0.26927, [{ t: '21', font: F.body }, { t: 'st', font: F.body, sup: true }, { t: ' Street, Philadelphia Us 23112', font: F.body }], { size: 10, color: GREY });
++  circle(s, 2.07124, 5.22388, 0.06806, PLUM);
++  rich(s, 2.14568, 5.40085, 2.77669, 0.26927, [{ t: '18', font: F.body }, { t: 'th', font: F.body, sup: true }, { t: ' Street, Los Angels Us 43776', font: F.body }], { size: 10, color: GREY });
++  circle(s, 2.07124, 5.50801, 0.06806, PLUM);
++  body(s, 6.3748, 5.08519, 1.49335, 0.26927, '+123 4567 8900', { lineSpacing: null });
++  body(s, 6.3748, 5.40085, 1.49335, 0.26927, '+123 9876 54321', { lineSpacing: null });
++  oval(s, 6.30036, 5.18292, 0.05, 0.06806, PLUM);
++  oval(s, 6.30036, 5.50017, 0.05, 0.06806, PLUM);
++  body(s, 9.69003, 5.11341, 1.69539, 0.26927, 'example@mail.com', { lineSpacing: null });
++  body(s, 9.69003, 5.40085, 1.69539, 0.26927, 'yourmail@mail.com', { lineSpacing: null });
++  oval(s, 9.61559, 5.21114, 0.05, 0.06806, PLUM);
++  oval(s, 9.61559, 5.50017, 0.05, 0.06806, PLUM);
++  title(s, 1.34302, 0.9275, 5.03793, 0.77415, 'Contact ', 'Us');
++  rule(s, 0, 1.31458, 1.19048);
++  body(s, 1.34302, 2.66773, 4.63615, 1.08227, 'Donec auctor blandit leo, convallis mollis mi condimentum in. In dictum hendrerit ornare. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis id rutrum. Pellentesque dictum a nisl');
++}
++
++// --- 29. Closing Quote ---
++function slide29(s) {
++  chrome(s, '29');
++  oval(s, 6.72068, 1.74975, 5.11577, 5.199, PLUM);
++  circle(s, 10.4488, 5.9195, 1.02229, ROSE);
++  rule(s, 7.80217, 6.03568, 2.83712);
++  title(s, 1.34302, 0.9275, 5.03793, 0.77415, 'Closing ', 'Quote');
++  label(s, 2.14862, 2.87367, 9.03609, 1.55869, '“ Beauty is a choice. The sincerity and happiness that you always strive to be present in your heart for yourself and others, will always radiate to your face. That\'s true beauty “', { lineSpacing: 1.5, italic: true });
++  text(s, 7.1937, 5.13108, 4.24819, 0.43757, '- Helvy Tiana Rosa -', { font: F.semi, size: 20, color: WHITE, align: 'center' });
++  body(s, 7.88282, 5.54821, 2.86993, 0.26927, 'Indonesian writer 1970', { color: WHITE, align: 'center', lineSpacing: null });
++  rule(s, 0, 1.31458, 1.19048);
++}
++
++// --- 30. Thank You ---
++function slide30(s) {
++  chrome(s, '30');
++  hero(s, 2.51302, 2.60801, 8.3073, 1.44733, 'Thank ', 'You');
++  rule(s, 3.89855, 4.2252, 5.73913);
++}
++
++// ===========================================================================
++// Build
++// ===========================================================================
++
++const SLIDES = [
++  slide01,
++  slide02,
++  slide03,
++  slide04,
++  slide05,
++  slide06,
++  slide07,
++  slide08,
++  slide09,
++  slide10,
++  slide11,
++  slide12,
++  slide13,
++  slide14,
++  slide15,
++  slide16,
++  slide17,
++  slide18,
++  slide19,
++  slide20,
++  slide21,
++  slide22,
++  slide23,
++  slide24,
++  slide25,
++  slide26,
++  slide27,
++  slide28,
++  slide29,
++  slide30,
++];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'BEAUTY', width: 13.333, height: 7.5 });
++pptx.layout = 'BEAUTY';
++pptx.author = 'Beauty Clinic';
++pptx.title = 'Beauty Clinic Presentation Template';
++
++SLIDES.forEach(build => {
++  const s = pptx.addSlide();
++  s.background = { color: WHITE };
++  build(s);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, '0da2289d-f60e-4a38-8dd2-816d09787aae_grok_final.pptx') })
++  .then(f => console.log('wrote ' + f));

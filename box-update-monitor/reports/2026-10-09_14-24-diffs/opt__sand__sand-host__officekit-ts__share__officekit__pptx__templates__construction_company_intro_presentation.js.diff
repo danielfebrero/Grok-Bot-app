@@ -1,0 +1,561 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/construction_company_intro_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/construction_company_intro_presentation.js
+@@ -0,0 +1,558 @@
++/**
++ * "Allana Construction" presentation - rebuilt with pptxgenjs.
++ *
++ * Photographs in the source deck are replaced with flat gray placeholder
++ * shapes that keep the original position, size and outline geometry.
++ *
++ * Run: node 0733bfaf-344a-4156-a17f-9732ee4f4790_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Theme
++ * ------------------------------------------------------------------ */
++
++const C = {
++  dark: '3D3D38',      // accent1 - the deck's charcoal
++  gray: '777770',      // accent2
++  panel: 'F2F2F2',     // white, lumMod 95%
++  border: 'D9D9D9',    // white, lumMod 85%
++  white: 'FFFFFF',
++  black: '000000',
++  body: '262626',      // black, lumMod 85% / lumOff 15%
++  photo: '7F7F7F'      // stand-in for the stock photography
++};
++
++const F = { head: 'Poppins', body: 'Poppins', slab: 'Roboto Slab', lato: 'Lato' };
++
++const SLIDE_W = 13.333333;
++const SLIDE_H = 7.5;
++
++// Shadows are handed out as fresh objects: pptxgenjs rewrites the properties
++// of whatever object it is given, so a shared constant would be corrupted the
++// second time it is used.
++const shadows = {
++  // Soft diffused drop behind every big Poppins headline.
++  title: () => ({ type: 'outer', color: C.black, opacity: 0.05, blur: 20, offset: 11, angle: 45 }),
++  // Wide halo under the two cover-slide headlines.
++  cover: () => ({ type: 'outer', color: C.black, opacity: 0.58, blur: 19, offset: 0, angle: 45 }),
++  // Glow under the filled "MORE" button.
++  button: () => ({ type: 'outer', color: C.gray, opacity: 0.24, blur: 45, offset: 3, angle: 90 }),
++  // Deep drop under the white icon tile on the profile slide.
++  tile: () => ({ type: 'outer', color: C.black, opacity: 0.2, blur: 50, offset: 50, angle: 135 })
++};
++
++const LOREM_A =
++  'PLACEHOLDER' +
++  'PLACEHOLDER';
++const LOREM_B = 'siasani laro esse cillum dolorei europes sasianti derioanii';
++const EYEBROW = 'CONSTRUCTION PRESENTATION TEMPLATE';
++const HEADLINE = 'ABOUT ALLANA CONSTRUCTION ';
++
++/* ------------------------------------------------------------------ *
++ * Building blocks
++ * ------------------------------------------------------------------ */
++
++// Thin charcoal rule that closes every content slide.
++function footerBar(s) {
++  s.addShape('rect', { x: 0, y: 7.385, w: SLIDE_W, h: 0.12, fill: { color: C.dark } });
++}
++
++// pptxgenjs cannot emit gradient fills, so the deck's one gradient - the white
++// sheen washing left-to-right across the cover band - is stepped out of a row
++// of translucent white slices. Opacity follows t^1.6, matching the source's
++// gradient stops (transparent at the left, 25% white at the right).
++function sheen(s, o) {
++  const steps = 18;
++  const step = o.w / steps;
++  for (let i = 0; i < steps; i++) {
++    const t = (i + 0.5) / steps;
++    s.addShape('rect', {
++      x: o.x + i * step, y: o.y, w: step, h: o.h,
++      fill: { color: C.white, transparency: 100 - 25 * Math.pow(t, 1.6) }
++    });
++  }
++}
++
++// Flat panel: solid fill, optional border, optional rounded corners.
++function panel(s, o) {
++  s.addShape(o.shape || 'rect', Object.assign({ fill: { color: o.color || C.panel } }, o));
++}
++
++// White card with the pale gray hairline outline used across the deck.
++function card(s, o) {
++  s.addShape(o.shape || 'roundRect', Object.assign(
++    { fill: { color: C.white }, line: { color: C.border, width: 1 } }, o));
++}
++
++// Gray block standing in for a photograph.
++function photo(s, o) {
++  s.addShape(o.points ? 'custGeom' : (o.shape || 'rect'), Object.assign({ fill: { color: C.photo } }, o));
++}
++
++// Big Poppins headline (32pt by default, 95% leading, soft shadow).
++function headline(s, text, o) {
++  s.addText(text, Object.assign({
++    fontFace: F.head, fontSize: 32, bold: true, color: C.black, valign: 'top',
++    lineSpacingMultiple: 0.95, paraSpaceAfter: 3, shadow: shadows.title()
++  }, o));
++}
++
++// Small letter-spaced label above a paragraph.
++function eyebrow(s, text, o) {
++  s.addText(text, Object.assign({
++    fontFace: F.body, fontSize: 12, charSpacing: 1, color: C.black, valign: 'top'
++  }, o));
++}
++
++// Justified 11pt paragraphs at 150% leading.
++function bodyText(s, paras, o) {
++  const runs = paras.map((t, i) => ({ text: t, options: { breakLine: i < paras.length - 1 } }));
++  s.addText(runs, Object.assign({
++    fontFace: F.body, fontSize: 11, color: C.black, align: 'justify',
++    lineSpacingMultiple: 1.5, valign: 'top'
++  }, o));
++}
++
++// Short accent rule drawn next to / above a headline.
++function rule(s, o) {
++  s.addShape('line', Object.assign({ h: 0, line: { color: C.dark, width: 2.5 } }, o));
++}
++
++// The paired "MORE" buttons: filled charcoal + outlined.
++function moreButtons(s, x, y) {
++  const size = { w: 1.996, h: 0.528 };
++  const label = { fontFace: F.body, fontSize: 12, align: 'center', valign: 'middle' };
++  s.addShape('rect', Object.assign({ x: x, y: y, fill: { color: C.dark }, shadow: shadows.button() }, size));
++  s.addText('MORE', Object.assign({ x: x + 2.335, y: y, shape: 'rect', line: { color: C.dark, width: 0.5 }, color: C.dark }, size, label));
++  s.addText('MORE', Object.assign({ x: x, y: y, shape: 'rect', line: { color: C.dark, width: 0.5 }, color: C.white }, size, label));
++}
++
++// Eyebrow + two-paragraph copy block, the deck's standard text unit.
++// `gap` is the baseline distance from the label down to the paragraph.
++function copyBlock(s, o) {
++  eyebrow(s, o.label || EYEBROW, { x: o.x + 0.011, y: o.y, w: 4.38, h: 0.303, color: o.labelColor || C.black });
++  bodyText(s, o.paras || [LOREM_A + 'velite', LOREM_B], {
++    x: o.x, y: o.y + (o.gap || 0.407), w: o.w || 4.569, h: 1.185, color: o.color || C.black
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Icon glyphs (traced from the source deck's line art)
++ * ------------------------------------------------------------------ */
++
++// Positions a glyph part inside a 100x100 box anchored at x/y.
++function glyphBox(x, y, size) {
++  const u = size / 100;
++  return function (l, t, w, h, opts) {
++    return Object.assign({ x: x + l * u, y: y + t * u, w: w * u, h: h * u }, opts);
++  };
++}
++
++// Hard-hat worker badge (white on charcoal) used on slides 7, 8 and 10.
++// Drawn as outlines so the charcoal shows through as the face and shirt.
++function workerIcon(s, x, y, size) {
++  const at = glyphBox(x, y, size);
++  const W = { fill: { color: C.white } };
++  const D = { fill: { color: C.dark } };
++  const stroke = { color: C.white, width: size * 3.4 };
++  s.addShape('ellipse', at(32, 20, 36, 36, { line: stroke, fill: { color: C.dark } }));
++  s.addShape('chord', at(36, 6, 28, 20, Object.assign({ angleRange: [180, 0] }, W)));
++  s.addShape('roundRect', at(28, 20, 44, 7, Object.assign({ rectRadius: 0.5 }, W)));
++  s.addShape('rect', at(43, 52, 14, 8, { line: stroke, fill: { color: C.dark } }));  // neck
++  s.addShape('trapezoid', at(15, 56, 70, 36, W));                                    // hi-vis vest
++  s.addShape('trapezoid', at(26, 57, 22, 36, Object.assign({ rotate: 180 }, D)));    // shirt, left
++  s.addShape('trapezoid', at(52, 57, 22, 36, Object.assign({ rotate: 180 }, D)));    // shirt, right
++  s.addShape('rect', at(15, 80, 70, 5, W));                                          // belt
++}
++
++// Concrete mixer truck (charcoal on a white tile) used on slide 13.
++function truckIcon(s, x, y, size) {
++  const at = glyphBox(x, y, size);
++  const D = { fill: { color: C.dark } };
++  s.addShape('parallelogram', at(5, 16, 30, 40, Object.assign({ rotate: 8 }, D)));  // hopper
++  s.addShape('chord', at(38, 16, 30, 46, Object.assign({ angleRange: [250, 110] }, D)));
++  s.addShape('rect', at(3, 62, 58, 12, D));                                        // bed
++  s.addShape('rect', at(64, 40, 32, 34, D));                                       // cab
++  s.addShape('rect', at(70, 45, 16, 12, { fill: { color: C.white } }));            // window
++  s.addShape('ellipse', at(15, 66, 22, 22, D));                                    // wheels
++  s.addShape('ellipse', at(72, 66, 22, 22, D));
++}
++
++// Outlined white contact glyphs on the closing slide, drawn from primitives.
++const HAIRLINE = { color: C.white, width: 1 };
++const CONTACT_ICONS = {
++  pin: function (s, x, y, w, h) {
++    s.addShape('teardrop', { x: x, y: y, w: w, h: h * 0.86, rotate: 135, line: HAIRLINE, fill: { color: C.dark } });
++    s.addShape('ellipse', { x: x + w * 0.3, y: y + h * 0.2, w: w * 0.4, h: h * 0.34, line: HAIRLINE, fill: { color: C.dark } });
++  },
++  phone: function (s, x, y, w, h) {
++    // Handset = thick three-quarter ring; two thin arcs are the signal waves.
++    s.addShape('blockArc', {
++      x: x - w * 0.04, y: y + h * 0.04, w: w * 0.84, h: h * 0.84,
++      angleRange: [100, 350], arcThicknessRatio: 0.34, rotate: 45, fill: { color: C.white }
++    });
++    s.addShape('arc', { x: x + w * 0.44, y: y - h * 0.02, w: w * 0.56, h: h * 0.56, angleRange: [290, 20], line: HAIRLINE });
++    s.addShape('arc', { x: x + w * 0.54, y: y + h * 0.08, w: w * 0.36, h: h * 0.36, angleRange: [290, 20], line: HAIRLINE });
++  },
++  mail: function (s, x, y, w, h) {
++    s.addShape('rect', { x: x, y: y, w: w, h: h, line: HAIRLINE, fill: { color: C.dark } });
++    s.addShape('custGeom', {
++      x: x, y: y, w: w, h: h, line: HAIRLINE,
++      points: [{ x: 0, y: 0 }, { x: w / 2, y: h * 0.6 }, { x: w, y: 0 }]
++    });
++  },
++  globe: function (s, x, y, w, h) {
++    s.addShape('ellipse', { x: x, y: y, w: w, h: h, line: HAIRLINE });
++    s.addShape('ellipse', { x: x + w * 0.31, y: y, w: w * 0.38, h: h, line: HAIRLINE });
++    s.addShape('ellipse', { x: x + w * 0.03, y: y + h * 0.16, w: w * 0.94, h: h * 0.68, line: HAIRLINE });
++    s.addShape('line', { x: x, y: y + h / 2, w: w, h: 0, line: HAIRLINE });
++  },
++  instagram: function (s, x, y, w, h) {
++    s.addShape('ellipse', { x: x, y: y, w: w, h: h, line: HAIRLINE });
++    s.addShape('roundRect', { x: x + w * 0.24, y: y + h * 0.24, w: w * 0.52, h: h * 0.52, rectRadius: 0.05, line: HAIRLINE });
++    s.addShape('ellipse', { x: x + w * 0.37, y: y + h * 0.37, w: w * 0.26, h: h * 0.26, line: HAIRLINE });
++  }
++};
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++// Slides 1 and 15 share the cover artwork: photo cut with a rounded
++// bottom-left corner, charcoal band and two translucent swooshes.
++function coverSlide(pres, o) {
++  const s = pres.addSlide();
++
++  photo(s, {
++    x: 6.519, y: 0, w: 6.314, h: 6.75,
++    points: [
++      { x: 0, y: 0 }, { x: 6.314, y: 0 }, { x: 6.314, y: 4.447 },
++      { x: 4.011, y: 6.75, curve: { type: 'cubic', x1: 6.314, y1: 5.719, x2: 5.283, y2: 6.75 } },
++      { x: 0, y: 6.75 }, { close: true }
++    ]
++  });
++
++  panel(s, { x: 0, y: 4.329, w: 8.511, h: 3.171, color: C.dark });
++
++  // Two mirrored swooshes lighten the band: a broad L-shaped sweep (its foot
++  // is the full-width strip along the bottom, its head the right-hand column
++  // joined by a concave quarter-round) plus a narrow crescent echoing it.
++  sheen(s, { x: 0, y: 6.765, w: 8.511, h: 0.735 });                       // sweep foot
++  s.addShape('custGeom', {                                                 // sweep head
++    x: 6.021, y: 4.329, w: 2.49, h: 2.436,
++    fill: { color: C.white, transparency: 81 },
++    points: [
++      { x: 1.585, y: 0 }, { x: 2.49, y: 0 }, { x: 2.49, y: 2.436 }, { x: 0, y: 2.436 },
++      { x: 1.585, y: 0.851, curve: { type: 'cubic', x1: 0.875, y1: 2.436, x2: 1.585, y2: 1.726 } },
++      { x: 1.585, y: 0 }, { close: true }
++    ]
++  });
++  s.addShape('custGeom', {                                                 // crescent
++    x: 5.111, y: 4.329, w: 2.49, h: 2.436, flipH: true,
++    fill: { color: C.white, transparency: 90 },
++    points: [
++      { x: 0, y: 0 }, { x: 0.905, y: 0 }, { x: 0.905, y: 0.851 },
++      { x: 2.49, y: 2.436, curve: { type: 'cubic', x1: 0.905, y1: 1.726, x2: 1.614, y2: 2.436 } },
++      { x: 1.581, y: 2.436 },
++      { x: 0.027, y: 1.17, curve: { type: 'cubic', x1: 0.814, y1: 2.436, x2: 0.175, y2: 1.893 } },
++      { x: 0, y: 0.899 }, { close: true }
++    ]
++  });
++
++  s.addText(o.title, {
++    x: 0.885, y: o.titleY, w: o.titleW, h: o.titleH,
++    fontFace: F.head, fontSize: o.titleSize, bold: true, color: C.black,
++    valign: 'top', shadow: shadows.cover()
++  });
++
++  s.addText('INTRODUCING CONSTRUCTION PRESENTATION TEMPLATE', {
++    x: 0.885, y: 5.371, w: 5.031, h: 0.64,
++    fontFace: F.body, fontSize: 16, charSpacing: 3, color: C.white, valign: 'bottom'
++  });
++  s.addShape('roundRect', {
++    x: 0.987, y: 6.298, w: 0.685, h: 0.161, rectRadius: 0.08,
++    line: { color: C.white, width: 0.75 }
++  });
++}
++
++// 2 - photo left, copy right, inside a wide white card.
++function slideAbout(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 5.443, y: 3.167, w: 7.89, h: 4.333, shape: 'round1Rect', rectRadius: 0.722, flipH: true });
++  card(s, { x: 0.696, y: 1.926, w: 11.783, h: 4.52, rectRadius: 0.169 });
++  panel(s, { x: 0.696, y: 3.421, w: 6.658, h: 3.025, shape: 'round1Rect', rectRadius: 0.325, color: C.dark });
++  copyBlock(s, { x: 7.632, y: 3.421, gap: 0.345, paras: [LOREM_A + 'velitei', LOREM_B] });
++  headline(s, HEADLINE, { x: 0.682, y: 0.708, w: 7.432, h: 0.613 });
++  footerBar(s);
++  photo(s, { x: 1.152, y: 2.29, w: 5.681, h: 3.791 });
++}
++
++// 3 - charcoal copy card floating above a photo card on the right.
++function slideCardStack(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 0, y: 1.917, w: SLIDE_W, h: 3.831 });
++  card(s, { x: 5.174, y: 2.134, w: 6.679, h: 4.52, rectRadius: 0.169 });
++  panel(s, { x: 5.174, y: 0.656, w: 6.679, h: 1.92, shape: 'roundRect', rectRadius: 0.068, color: C.dark });
++  eyebrow(s, EYEBROW, { x: 6.324, y: 1.129, w: 4.38, h: 0.303, color: C.white, align: 'center' });
++  bodyText(s, ['PLACEHOLDER'],
++    { x: 5.611, y: 1.474, w: 5.806, h: 0.63, color: C.white });
++  headline(s, 'ALLANA CONSTRUCTION ', { x: 0.673, y: 3.41, w: 3.806, h: 1.124 });
++  rule(s, { x: 0.83, y: 3.13, w: 0.472 });
++  footerBar(s);
++  photo(s, { x: 5.559, y: 3.021, w: 5.91, h: 3.281, shape: 'roundRect', rectRadius: 0.158 });
++}
++
++// 4 - charcoal banner across the top, framed photo on the right.
++function slideBanner(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 0.506, y: 0.819, w: 12.821, h: 6.681 });
++  panel(s, { x: -0.016, y: 0, w: SLIDE_W + 0.016, h: 3.097, color: C.dark });
++  footerBar(s);
++  copyBlock(s, { x: 0.873, y: 3.642 });
++  moreButtons(s, 0.981, 5.579);
++  headline(s, HEADLINE, { x: 0.887, y: 0.891, w: 4.012, h: 1.124, color: C.white });
++  rule(s, { x: 0.995, y: 2.345, w: 0.472, line: { color: C.white, width: 2.5 } });
++  card(s, { x: 6.227, y: 0, w: 6.328, h: 6.429, shape: 'rect' });
++  photo(s, { x: 6.51, y: 0, w: 5.753, h: 6.108 });
++}
++
++// 5 - charcoal column on the left holding two stacked photos.
++function slideTwoPhotos(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 0, y: 0, w: 3.561, h: 6.935, color: C.dark });
++  panel(s, { x: 3.561, y: 2.855, w: 8.87, h: 4.08 });
++  footerBar(s);
++  copyBlock(s, { x: 6.819, y: 3.498 });
++  moreButtons(s, 6.927, 5.435);
++  headline(s, 'ALLANA CONSTRUCTION ', { x: 6.83, y: 1.386, w: 3.806, h: 1.124 });
++  rule(s, { x: 6.987, y: 1.106, w: 0.472 });
++  photo(s, { x: 0.826, y: 0.882, w: 4.95, h: 2.542 });
++  photo(s, { x: 0.826, y: 4.076, w: 4.95, h: 2.542 });
++}
++
++// 6 - rounded charcoal header bar, two copy blocks, tall photo right.
++function slideHeaderBar(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 0, y: 2.037, w: SLIDE_W, h: 5.409 });
++  photo(s, {
++    x: 6.807, y: 0, w: 6.027, h: 6.557,
++    points: [
++      { x: 0, y: 0 }, { x: 6.027, y: 0 }, { x: 6.027, y: 5.757 },
++      { x: 5.227, y: 6.557, curve: { type: 'cubic', x1: 6.027, y1: 6.199, x2: 5.669, y2: 6.557 } },
++      { x: 0.8, y: 6.557 },
++      { x: 0, y: 5.757, curve: { type: 'cubic', x1: 0.358, y1: 6.557, x2: 0, y2: 6.199 } },
++      { close: true }
++    ]
++  });
++  footerBar(s);
++  [2.799, 4.477].forEach(function (y) {
++    copyBlock(s, { x: 1.264, y: y, gap: 0.368, label: 'MAXIET MOVIE PRESENTATION TEMPLATE' });
++  });
++  panel(s, { x: 0.923, y: -0.014, w: 11.487, h: 1.532, shape: 'round2SameRect', flipV: true, color: C.dark });
++  headline(s, HEADLINE, { x: 1.556, y: 0.478, w: 7.432, h: 0.549, fontSize: 28, color: C.white });
++  rule(s, { x: 8.221, y: 0.752, w: 3.556, line: { color: C.white, width: 1 } });
++}
++
++// 7 - charcoal side panel, white card, photo and an icon tab on the right.
++function slideSidePanel(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 0.506, y: 0.819, w: 12.821, h: 6.681 });
++  panel(s, { x: 0, y: 0.375, w: 5.494, h: 6.681, shape: 'round1Rect', rectRadius: 0.547, color: C.dark });
++  card(s, { x: 0.969, y: 2.173, w: 11.396, h: 4.364, rectRadius: 0.236 });
++  footerBar(s);
++  eyebrow(s, EYEBROW, { x: 1.454, y: 3.451, w: 4.38, h: 0.303 });
++  bodyText(s, [LOREM_A + 'velitei derioanii erine', 'siasani laro esse cillum dolorei europes sasiantier'],
++    { x: 1.443, y: 3.796, w: 3.987, h: 1.463 });
++  headline(s, 'ABOUT ALLANA', { x: 0.969, y: 1.046, w: 3.684, h: 0.549, fontSize: 28, color: C.white });
++  photo(s, { x: 6.193, y: 2.585, w: 5.842, h: 3.54, shape: 'roundRect', rectRadius: 0.13 });
++  panel(s, { x: 11.256, y: 3.73, w: 2.078, h: 1.25, shape: 'round1Rect', rectRadius: 0.461, flipH: true, color: C.dark });
++  workerIcon(s, 11.961, 4.021, 0.668);
++}
++
++// 8 - headline block over a charcoal strip with three photos.
++function slideGallery(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 0, y: 3.695, w: SLIDE_W, h: 3.75 });
++  panel(s, { x: 7.708, y: 3.695, w: 5.625, h: 3.805, color: C.dark });
++  footerBar(s);
++  eyebrow(s, EYEBROW, { x: 0.846, y: 1.685, w: 4.38, h: 0.303, color: C.dark });
++  headline(s, HEADLINE, { x: 0.835, y: 0.914, w: 6.596, h: 0.549, fontSize: 28 });
++  bodyText(s, [LOREM_A + 'velitei'], { x: 2.555, y: 2.212, w: 4.569, h: 0.908, valign: 'middle' });
++  panel(s, { x: 0.94, y: 2.352, w: 1.404, h: 0.727, color: C.dark });
++  workerIcon(s, 1.365, 2.439, 0.552);
++  photo(s, { x: 8.543, y: 0, w: 4.198, h: 6.729 });
++  photo(s, { x: 4.568, y: 4.328, w: 3.651, h: 2.401 });
++  photo(s, { x: 0.592, y: 4.328, w: 3.651, h: 2.401 });
++}
++
++// 9 - photo overlapping a charcoal block, stacked labels on the right.
++function slideOverlap(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 7.121, y: 3.639, w: 6.213, h: 2.514 });
++  panel(s, { x: 0.592, y: 0, w: 4.784, h: 6.78, color: C.dark });
++  panel(s, { x: 7.121, y: 2.79, w: 6.213, h: 0.848, color: C.dark });
++  footerBar(s);
++  headline(s, HEADLINE, { x: 7.634, y: 1.557, w: 3.969, h: 0.996, fontSize: 28 });
++  eyebrow(s, EYEBROW, { x: 7.634, y: 3.063, w: 4.38, h: 0.303, color: C.white });
++  bodyText(s, [LOREM_A + 'velite', LOREM_B], { x: 7.634, y: 4.224, w: 4.569, h: 1.185, color: C.body });
++  photo(s, { x: 1.319, y: 1.347, w: 5.802, h: 4.805 });
++}
++
++// 10 - two numbered copy blocks beside a photo, charcoal edge tab right.
++function slideNumbered(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 0, y: 0.927, w: 7.167, h: 1.755 });
++  headline(s, 'ABOUT ALLANA CONSTRUCTION', { x: 0.875, y: 1.306, w: 4.569, h: 0.996, fontSize: 28, valign: 'middle' });
++  panel(s, { x: 11.295, y: 0, w: 2.039, h: 7.5, color: C.dark });
++  [['01', 3.051], ['02', 4.804]].forEach(function (row) {
++    copyBlock(s, { x: 0.875, y: row[1], gap: 0.368, label: EYEBROW + ' ' + row[0], labelColor: C.dark, color: C.body });
++  });
++  footerBar(s);
++  photo(s, { x: 6.208, y: 0.92, w: 6.25, h: 5.66 });
++  panel(s, { x: 11.295, y: 5.37, w: 2.039, h: 1.25, shape: 'round1Rect', rectRadius: 0.461, flipH: true, color: C.dark });
++  workerIcon(s, 11.81, 5.878, 1.008);
++}
++
++// 11 - big rounded white plane with copy on the left, photo right.
++function slideRoundedPlane(pres) {
++  const s = pres.addSlide();
++  panel(s, { x: 0, y: 4.786, w: 10.625, h: 2.714, shape: 'round1Rect', rectRadius: 0.399, flipV: true });
++  card(s, { x: 0, y: 0, w: SLIDE_W, h: 6.458, shape: 'round1Rect', rectRadius: 1.26, flipH: true, flipV: true });
++  footerBar(s);
++  copyBlock(s, { x: 0.811, y: 3.118 });
++  moreButtons(s, 0.919, 5.055);
++  headline(s, 'ALLANA CONSTRUCTION ', { x: 0.858, y: 1.675, w: 3.806, h: 1.124 });
++  photo(s, { x: 6.191, y: 0.8, w: 7.142, h: 5.658 });
++}
++
++// 12 - "Our team": three portraits over a charcoal footer plane.
++function slideTeam(pres) {
++  const s = pres.addSlide();
++  card(s, { x: 0, y: 0.5, w: 12.821, h: 3.657, shape: 'round1Rect', rectRadius: 0.374 });
++  panel(s, { x: 0, y: 4.157, w: SLIDE_W, h: 2.843, shape: 'round1Rect', rectRadius: 0.307, flipV: true, color: C.dark });
++  footerBar(s);
++
++  const members = [
++    { photoX: 1.398, nameX: 1.398, descX: 1.082, descW: 2.978, font: F.head },
++    { photoX: 5.495, nameX: 5.494, descX: 5.064, descW: 3.207, font: F.slab },
++    { photoX: 9.589, nameX: 9.589, descX: 9.274, descW: 2.976, font: F.slab }
++  ];
++  members.forEach(function (m) {
++    s.addText('YOUR NAME HERE', {
++      x: m.nameX, y: 5.15, w: 2.346, h: 0.426, fontFace: m.font, fontSize: 16, bold: true,
++      color: C.white, align: 'center', valign: 'bottom'
++    });
++    s.addText('voluptate velela eria siasani esse cillum voluptate velela ', {
++      x: m.descX, y: 5.764, w: m.descW, h: 0.608, fontFace: F.body, fontSize: 12,
++      color: C.white, align: 'center', valign: 'top', lineSpacingMultiple: 1.3, paraSpaceAfter: 6
++    });
++    photo(s, { x: m.photoX, y: 2.285, w: 2.347, h: 2.347, shape: 'round2SameRect' });
++  });
++
++  headline(s, 'OUR TEAM ALLANA CONSTRUCTION', { x: 1.604, y: 1.003, w: 10.125, h: 0.613, align: 'center' });
++}
++
++// 13 - profile: name and bio on the left, quote bar with truck icon below.
++function slideProfile(pres) {
++  const s = pres.addSlide();
++  card(s, { x: 3.618, y: -2.466, w: 5.598, h: 12.833, shape: 'round1Rect', rectRadius: 1.495, rotate: 270, flipV: true });
++  panel(s, { x: 0.5, y: 4.353, w: 12.833, h: 2.397, shape: 'round1Rect', rectRadius: 0.456, flipH: true, color: C.dark });
++
++  headline(s, 'YOVANDDA LATUS INDERA', { x: 1.049, y: 1.836, w: 4.951, h: 0.996, fontSize: 28, valign: 'middle' });
++  bodyText(s, ['HEAD OF ALLANA CONSTRUCTION'], { x: 1.049, y: 2.917, w: 5.872, h: 0.352, color: C.body });
++  bodyText(s, ['PLACEHOLDER'],
++    { x: 1.049, y: 3.352, w: 5.872, h: 0.63, color: C.body });
++
++  s.addShape('roundRect', {
++    x: 1.168, y: 5.063, w: 1.253, h: 0.978, rectRadius: 0.142, fill: { color: C.white },
++    shadow: shadows.tile()
++  });
++  truckIcon(s, 1.544, 5.302, 0.5);
++  bodyText(s, ['PLACEHOLDER'],
++    { x: 2.715, y: 5.098, w: 3.575, h: 0.908, color: C.white });
++
++  photo(s, { x: 6.667, y: 0.833, w: 6.167, h: 5.917 });
++}
++
++// 14 - contact card sitting on a full-bleed photo.
++function slideContact(pres) {
++  const s = pres.addSlide();
++  photo(s, { x: 0, y: 0, w: 9.188, h: 7.5 });
++
++  // Two nested plates, both with only their left corners rounded.
++  const plate = function (x, y, w, h, r) {
++    return [
++      { x: r, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: r, y: h },
++      { x: 0, y: h - r, curve: { type: 'cubic', x1: r / 2.04, y1: h, x2: 0, y2: h - r / 2.04 } },
++      { x: 0, y: r },
++      { x: r, y: 0, curve: { type: 'cubic', x1: 0, y1: r / 2.04, x2: r / 2.04, y2: 0 } },
++      { close: true }
++    ];
++  };
++  s.addShape('custGeom', {
++    x: 6.488, y: 0.659, w: 6.845, h: 6.183, fill: { color: C.white },
++    line: { color: C.border, width: 1 }, points: plate(6.488, 0.659, 6.845, 6.183, 0.222)
++  });
++  s.addShape('custGeom', {
++    x: 6.75, y: 0.917, w: 6.583, h: 5.667, fill: { color: C.dark },
++    points: plate(6.75, 0.917, 6.583, 5.667, 0.178)
++  });
++
++  s.addText('ALLANA CONTACT', {
++    x: 7.803, y: 1.304, w: 5.102, h: 0.572, fontFace: F.head, fontSize: 28, bold: true,
++    color: C.white, valign: 'top', shadow: shadows.title()
++  });
++  rule(s, { x: 7.93, y: 2.174, w: 1.364, line: { color: C.white, width: 2.25 } });
++
++  const note = { fontFace: F.lato, fontSize: 12, color: C.white, valign: 'top' };
++  s.addText('Please feel free to call me on (phone cell) or contact by (email), if you require any further information.',
++    Object.assign({ x: 7.803, y: 2.345, w: 4.337, h: 0.667, lineSpacingMultiple: 1.5 }, note));
++  s.addText([
++    { text: '1234 Amphitheatre Parkway', options: { breakLine: true } },
++    { text: 'Mountain View, CA 12345', options: { breakLine: true } },
++    { text: 'United States' }
++  ], Object.assign({ x: 8.332, y: 3.212, w: 2.98, h: 0.97, lineSpacingMultiple: 1.5 }, note));
++
++  const lines = [
++    ['phone', '+62 812 3456 7890', 8.338, 4.336, 7.93, 4.311, 0.304, 0.303],
++    ['mail', 'example@yourdomain.com', 8.367, 4.821, 7.949, 4.865, 0.304, 0.221],
++    ['globe', 'www.ensure.com', 8.367, 5.33, 7.936, 5.334, 0.318, 0.299],
++    ['instagram', 'allanaconstruction', 8.367, 5.847, 7.946, 5.855, 0.342, 0.342]
++  ];
++  lines.forEach(function (l) {
++    s.addText(l[1], Object.assign({ x: l[2], y: l[3], w: 2.976, h: 0.303 }, note));
++    CONTACT_ICONS[l[0]](s, l[4], l[5], l[6], l[7]);
++  });
++  CONTACT_ICONS.pin(s, 7.964, 3.338, 0.237, 0.326);
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++const pres = new PptxGenJS();
++pres.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
++pres.layout = 'WIDE';
++pres.theme = { headFontFace: F.head, bodyFontFace: F.body };
++
++coverSlide(pres, { title: 'ALLANA CONSTRUCTION PRESENTATION', titleY: 1.308, titleW: 5.292, titleH: 1.919, titleSize: 36 });
++slideAbout(pres);
++slideCardStack(pres);
++slideBanner(pres);
++slideTwoPhotos(pres);
++slideHeaderBar(pres);
++slideSidePanel(pres);
++slideGallery(pres);
++slideOverlap(pres);
++slideNumbered(pres);
++slideRoundedPlane(pres);
++slideTeam(pres);
++slideProfile(pres);
++slideContact(pres);
++coverSlide(pres, { title: 'THANK YOU.', titleY: 1.448, titleW: 3.199, titleH: 1.717, titleSize: 48 });
++
++pres.writeFile({ fileName: path.join(__dirname, '0733bfaf-344a-4156-a17f-9732ee4f4790_grok_final.pptx') })
++  .then(function (f) { console.log('wrote ' + f); });

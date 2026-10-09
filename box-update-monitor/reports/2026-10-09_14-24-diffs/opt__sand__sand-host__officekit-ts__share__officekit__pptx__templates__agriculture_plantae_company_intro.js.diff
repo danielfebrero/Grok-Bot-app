@@ -1,0 +1,893 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/agriculture_plantae_company_intro.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/agriculture_plantae_company_intro.js
+@@ -0,0 +1,890 @@
++/**
++ * "Plantae." — Agriculture Presentation (40 slides, 20" x 11.25").
++ * Rebuilt from scratch with pptxgenjs. Photographs in the original deck are
++ * replaced by flat gray placeholder shapes of the same size / rounding.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++const C = {
++  orange: 'F46833',
++  green: '215550',
++  dark: '262626',
++  gray: 'BFBFBF',
++  white: 'FFFFFF',
++  photo: '999999', // stand-in for every raster image
++  wash: 'F2F2F2',
++  card: 'F9F8FD',
++  band: 'E8E8E9',
++};
++const F = { head: 'Poppins SemiBold', med: 'Poppins Medium', reg: 'Poppins', body: 'Lato' };
++
++const SLIDE_W = 20;
++const SLIDE_H = 11.25;
++
++/* Lorem fragments reused across the deck */
++const L = {
++  a: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt',
++  b: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi',
++  c: 'Lorem ipsum dolor sit amet consectetur adipisci',
++  d: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat',
++  e: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore',
++  f: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis',
++  g: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et',
++  h: 'PLACEHOLDER',
++  i: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim',
++  j: 'Lorem ipsum dolor sit ame consectetur adipiscing',
++  k: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut',
++  m: 'PLACEHOLDER',
++  n: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ',
++  o: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis',
++  p: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eusmod temporaly incididunt ut labore et',
++  q: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do',
++  r: 'Lorem ipsum dolor sit amet, consec adipiscing elit sed do eusmod',
++  s: 'PLACEHOLDER',
++  t: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea',
++  u: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo',
++  v: 'Lorem ipsum dolor sit amet, consectetur adipisc elit, sed do',
++  w: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod',
++  x: 'Lorem ipsum dolor sit amet, consectetur adipi elit, sed do eiusmod tempor incididunt utlimat labore  et dolore magna aliqua..',
++};
++
++/* ------------------------------------------------------------- primitives */
++const eyebrow = (s, x, y, w, text, o = {}) =>
++  s.addText(text, { x, y, w, h: 0.404, fontFace: F.med, fontSize: 18, color: C.orange, charSpacing: 1, valign: 'top', ...o });
++
++const title = (s, x, y, w, h, text, o = {}) =>
++  s.addText(text, { x, y, w, h, fontFace: F.head, fontSize: 48, color: C.dark, charSpacing: 1, valign: 'top', ...o });
++
++const subhead = (s, x, y, w, text, o = {}) =>
++  s.addText(text, { x, y, w, h: 0.404, fontFace: F.head, fontSize: 18, color: C.orange, charSpacing: 1, valign: 'top', ...o });
++
++const body = (s, x, y, w, h, text, o = {}) =>
++  s.addText(text, { x, y, w, h, fontFace: F.body, fontSize: 16, color: C.gray, lineSpacingMultiple: 1.5, valign: 'top', ...o });
++
++/** Gray stand-in for a photograph. */
++const photo = (s, x, y, w, h, o = {}) => {
++  if (o.ellipse) return s.addShape('ellipse', { x, y, w, h, fill: { color: C.photo } });
++  if (o.r) return s.addShape('roundRect', { x, y, w, h, fill: { color: C.photo }, rectRadius: o.r });
++  return s.addShape('rect', { x, y, w, h, fill: { color: C.photo } });
++};
++
++/** Rectangle whose bottom two corners are fully rounded. */
++function bottomRounded(s, x, y, w, h, color) {
++  const r = w / 2;
++  s.addShape('roundRect', { x, y, w, h, fill: { color }, rectRadius: r });
++  s.addShape('rect', { x, y, w, h: h - r, fill: { color } });
++}
++
++/** Small ">" chevron built from an L-bracket rotated 45 degrees. */
++function chevron(s, x, y, size, color) {
++  const k = size / 457200;
++  const pt = (px, py) => ({ x: px * k, y: py * k });
++  s.addShape('custGeom', {
++    x, y, w: size, h: size, rotate: 315, fill: { color },
++    points: [pt(0, 457200), pt(0, 393192), pt(393192, 393192), pt(393192, 0), pt(457200, 0),
++      pt(457200, 393192), pt(457200, 457200), pt(393192, 457200), { close: true }],
++  });
++}
++
++/** Pill button: capsule + caption + round arrow badge. */
++function button(s, x, y, label, o = {}) {
++  const w = o.w || 2.471;
++  const pill = o.pill || C.green;
++  const badge = o.badge || C.orange;
++  const ink = o.ink || C.white;
++  s.addShape('roundRect', {
++    x, y, w, h: 0.6, fill: { color: pill }, rectRadius: 0.3,
++    shadow: { type: 'outer', color: pill, opacity: 0.4, blur: 40, offset: 15, angle: 90 },
++  });
++  s.addText(label, { x, y: y + 0.098, w: w - 0.524, h: 0.404, align: 'center', valign: 'top', fontFace: F.med, fontSize: 18, color: ink, charSpacing: 1 });
++  s.addShape('ellipse', { x: x + w - 0.524, y: y - 0.023, w: 0.449, h: 0.449, fill: { color: badge } });
++  chevron(s, x + w - 0.402, y + 0.126, 0.164, o.arrow || C.white);
++}
++
++/** Progress meter: track + filled portion + two percentage captions. */
++function meter(s, x, y, done, opts = {}) {
++  const track = opts.track || { color: C.wash, transparency: 50 };
++  const fill = opts.fill || C.green;
++  const ink = opts.ink || C.orange;
++  s.addShape('roundRect', { x, y, w: 4, h: 0.191, fill: track, rectRadius: 0.0955 });
++  s.addShape('roundRect', { x, y, w: 4 * (done / 100), h: 0.191, fill: { color: fill }, rectRadius: 0.0955 });
++  s.addText(done + '%', { x: x - 0.997, y: y - 0.106, w: 1, h: 0.404, valign: 'top', fontFace: F.head, fontSize: 18, color: ink, charSpacing: 1 });
++  s.addText('100%', { x: x + 3.998, y: y - 0.106, w: 1, h: 0.404, align: 'right', valign: 'top', fontFace: F.head, fontSize: 18, color: ink, charSpacing: 1 });
++}
++
++/**
++ * Left-to-right ramp over the gray hero photo (the original used a white
++ * gradient with varying alpha). `from`/`to` are opacities, 0 = photo shows
++ * through, 1 = solid white; the ramp finishes at `endFrac` of the width.
++ */
++function whiteWash(s, from, to, endFrac = 1) {
++  const bands = 48;
++  for (let i = 0; i < bands; i++) {
++    const t = Math.min(1, (i / (bands - 1)) / endFrac);
++    const a = from + (to - from) * t;
++    const v = Math.round(153 + (255 - 153) * a);
++    const hex = v.toString(16).padStart(2, '0').toUpperCase().repeat(3);
++    s.addShape('rect', { x: (SLIDE_W / bands) * i, y: 0, w: SLIDE_W / bands + 0.02, h: SLIDE_H, fill: { color: hex } });
++  }
++}
++
++/** Four-pointed star with concave sides (the SWOT backdrop on slide 30). */
++function concaveStar(s, x, y, w, h, color) {
++  const mid = { x: w / 2, y: h / 2 };
++  const tips = [{ x: w / 2, y: 0 }, { x: w, y: h / 2 }, { x: w / 2, y: h }, { x: 0, y: h / 2 }];
++  const points = [tips[0]];
++  for (let i = 1; i <= 4; i++) {
++    const t = tips[i % 4];
++    points.push({ x: t.x, y: t.y, curve: { type: 'quadratic', x1: mid.x, y1: mid.y } });
++  }
++  points.push({ close: true });
++  s.addShape('custGeom', { x, y, w, h, fill: { color }, points });
++}
++
++/** Seedling roundel used as the brand mark. */
++function logoMark(s, x, y, d) {
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: C.white } });
++  s.addShape('rect', { x: x + d * 0.47, y: y + d * 0.3, w: d * 0.06, h: d * 0.45, fill: { color: C.orange } });
++  s.addShape('teardrop', { x: x + d * 0.5, y: y + d * 0.2, w: d * 0.26, h: d * 0.22, fill: { color: C.orange }, rotate: 90 });
++  s.addShape('teardrop', { x: x + d * 0.5, y: y + d * 0.45, w: d * 0.26, h: d * 0.22, fill: { color: C.orange }, rotate: 90 });
++  s.addShape('teardrop', { x: x + d * 0.22, y: y + d * 0.4, w: d * 0.26, h: d * 0.22, fill: { color: C.orange }, rotate: 180 });
++}
++
++/** Orange rail down the left edge, present on every slide. */
++function sidebar(s, n) {
++  s.addShape('roundRect', { x: 0.25, y: 0.25, w: 1, h: 10.75, fill: { color: C.orange }, rectRadius: 0.5 });
++  s.addText('Plantae.', { x: -0.469, y: 2.183, w: 2.438, h: 0.572, rotate: 90, valign: 'top', fontFace: F.head, fontSize: 28, color: C.white, charSpacing: 1 });
++  logoMark(s, 0.521, 0.521, 0.458);
++  s.addText(String(n).padStart(2, '0') + '.', { x: 0.361, y: 10.297, w: 0.781, h: 0.404, align: 'center', valign: 'top', fontFace: F.med, fontSize: 18, color: C.white });
++  s.addShape('line', { x: 0.75, y: 4.038, w: 0, h: 5.678, line: { color: C.white, width: 3 } });
++}
++
++/* --------------------------------------------------------- small pictograms */
++/** Seed sachet with a leaf; `cut` is the colour showing through the leaf. */
++function iconSeed(s, x, y, w, h, color, cut) {
++  s.addShape('roundRect', { x, y: y + h * 0.16, w, h: h * 0.84, fill: { color }, rectRadius: w * 0.14 });
++  s.addShape('rect', { x, y, w, h: h * 0.1, fill: { color } });
++  s.addShape('teardrop', { x: x + w * 0.2, y: y + h * 0.38, w: w * 0.6, h: h * 0.4, fill: { color: cut }, rotate: 135 });
++}
++/** Flower pot. */
++function iconPot(s, x, y, w, h, color) {
++  s.addShape('trapezoid', { x, y: y + h * 0.3, w, h: h * 0.7, fill: { color }, rotate: 180 });
++  s.addShape('roundRect', { x, y, w, h: h * 0.26, fill: { color }, rectRadius: h * 0.07 });
++}
++/** Watering can. */
++function iconCan(s, x, y, w, h, color) {
++  s.addShape('roundRect', { x, y: y + h * 0.35, w: w * 0.58, h: h * 0.65, fill: { color }, rectRadius: w * 0.16 });
++  s.addShape('triangle', { x: x + w * 0.52, y: y + h * 0.34, w: w * 0.48, h: h * 0.34, fill: { color }, rotate: 35 });
++  s.addShape('arc', { x: x + w * 0.06, y: y + h * 0.02, w: w * 0.52, h: h * 0.62, line: { color, width: 3.5 }, angleRange: [180, 350] });
++}
++/** Twitter bird / Facebook / Instagram marks (orange on white). */
++const socialIcon = {
++  t: (s, x, y, d) => {
++    s.addShape('moon', { x: x - d * 0.05, y, w: d * 1.05, h: d * 1.05, fill: { color: C.orange }, rotate: 250 });
++    s.addShape('triangle', { x: x + d * 0.5, y: y + d * 0.05, w: d * 0.55, h: d * 0.42, fill: { color: C.orange }, rotate: 150 });
++  },
++  f: (s, x, y, d) => {
++    s.addShape('roundRect', { x, y, w: d, h: d, fill: { color: C.orange }, rectRadius: d * 0.16 });
++    s.addText('f', { x, y: y - d * 0.06, w: d, h: d, align: 'center', valign: 'middle', fontFace: F.head, fontSize: Math.round(d * 62), color: C.white });
++  },
++  o: (s, x, y, d) => {
++    s.addShape('roundRect', { x, y, w: d, h: d, fill: { color: C.orange }, rectRadius: d * 0.22 });
++    s.addShape('roundRect', { x: x + d * 0.16, y: y + d * 0.16, w: d * 0.68, h: d * 0.68, fill: { type: 'none' }, line: { color: C.white, width: d * 4 }, rectRadius: d * 0.16 });
++    s.addShape('ellipse', { x: x + d * 0.36, y: y + d * 0.36, w: d * 0.28, h: d * 0.28, fill: { type: 'none' }, line: { color: C.white, width: d * 4 } });
++  },
++};
++const socialRow = (s, x, y, d, gap) => ['t', 'f', 'o'].forEach((k, i) => socialIcon[k](s, x + i * gap, y, d));
++
++/* ================================================================= slides */
++const build = {};
++
++build[1] = (s) => {
++  whiteWash(s, 1, 0);
++  title(s, 3.25, 3.154, 5.806, 1.717, [
++    { text: 'Plantae', options: { color: C.green } },
++    { text: '.', options: { color: C.orange, fontFace: F.reg } },
++  ], { fontSize: 96, charSpacing: 0 });
++  subhead(s, 3.25, 5.358, 5.806, 'Agriculture Presentation');
++  body(s, 3.25, 5.755, 5.806, 0.856, L.a);
++  button(s, 3.25, 7.496, 'Let\u2019s Start');
++  sidebar(s, 1);
++};
++
++build[2] = (s) => {
++  bottomRounded(s, 11.292, 0, 8.059, 10.589, C.orange);
++  bottomRounded(s, 11.63, 0, 7.37, 10.25, C.photo);
++  eyebrow(s, 3.25, 2.82, 5.542, 'About Us');
++  title(s, 3.25, 3.224, 5.542, 1.717, 'Plantae Is Best Agriculture');
++  body(s, 3.25, 5.391, 5.542, 1.663, L.b, { align: 'justify' });
++  button(s, 3.25, 7.83, 'Learn More');
++  sidebar(s, 2);
++};
++
++build[3] = (s) => {
++  photo(s, 11.542, 1, 7.458, 9.25, { r: 0.264 });
++  eyebrow(s, 3.25, 2.711, 7.167, 'About Us');
++  title(s, 3.25, 3.115, 7.167, 1.717, 'What Do You Know About Plantae ?');
++  s.addShape('roundRect', { x: 3.812, y: 6.355, w: 9.23, h: 3.207, fill: { color: C.orange, transparency: 12 }, rectRadius: 0.189 });
++  subhead(s, 4.542, 7.127, 7.771, 'Agriculture System', { color: C.white });
++  body(s, 4.542, 7.531, 7.771, 1.26, L.b, { color: C.white, align: 'justify' });
++  sidebar(s, 3);
++};
++
++build[4] = (s) => {
++  eyebrow(s, 5.193, 1.389, 9.614, 'About Us', { align: 'center' });
++  title(s, 5.193, 1.793, 9.614, 0.909, 'Excellent Plant Type', { align: 'center' });
++  [['Type 01A', 3.25, 3.262, 0.145], ['Type 05A', 8.69, 8.702, 0.187], ['Type 07A', 14.129, 14.129, 0.249]]
++    .forEach(([name, tx, px, r]) => {
++      photo(s, px, 4.025, 3.871, 3.873, { r });
++      subhead(s, tx, 8.602, 3.871, name, { align: 'center' });
++      body(s, tx, 9.005, 3.871, 0.856, L.c, { align: 'center' });
++    });
++  sidebar(s, 4);
++};
++
++build[5] = (s) => {
++  s.addShape('rect', { x: 2.25, y: 0.998, w: 5.291, h: 5.291, fill: { color: C.green } });
++  s.addShape('rect', { x: 7.541, y: 0.998, w: 0.2, h: 5.291, fill: { color: C.orange } });
++  photo(s, 7.741, 0.998, 11.259, 5.291);
++  eyebrow(s, 2.875, 2.587, 4.041, 'About Us', { color: C.white });
++  title(s, 2.875, 2.991, 4.041, 1.717, 'Gardening Procedure', { color: C.white });
++  iconSeed(s, 2.406, 7.876, 0.383, 0.519, C.orange, C.white);
++  iconPot(s, 8.224, 7.874, 0.703, 0.521, C.orange);
++  iconCan(s, 14.042, 7.876, 0.703, 0.519, C.orange);
++  [['1. Seed Quality', 2.25], ['2. Soil Mixing', 8.068], ['3. Watering Plants', 13.886]].forEach(([t, x]) => {
++    subhead(s, x, 8.891, 5.115, t);
++    body(s, x, 9.315, 5.115, 0.856, L.a);
++  });
++  sidebar(s, 5);
++};
++
++build[6] = (s) => {
++  eyebrow(s, 2.25, 1.103, 5.488, 'About Us');
++  title(s, 2.25, 1.507, 5.488, 1.717, 'Planting Ideas By Plantae.');
++  body(s, 10.548, 1.964, 8.452, 1.26, L.b, { align: 'justify' });
++  [2.25, 7.881, 13.512].forEach((x) => photo(s, x, 4.659, 5.488, 5.488));
++  sidebar(s, 6);
++};
++
++build[7] = (s) => {
++  photo(s, 2.25, 1, 6.331, 9.25, { r: 0.237 });
++  eyebrow(s, 10.581, 2.165, 7.419, 'About Us');
++  title(s, 10.581, 2.569, 7.419, 0.909, 'Choose Your Plants');
++  subhead(s, 10.581, 4.144, 7.419, 'High Seed Quality');
++  body(s, 10.581, 4.567, 7.419, 0.856, L.a);
++  [['Type 01A', 10.581], ['Type 05A', 13.419], ['Type 07A', 16.258]].forEach(([t, x]) => {
++    photo(s, x, 6.63, 1.742, 1.742, { ellipse: true });
++    subhead(s, x, 8.681, 1.742, t, { align: 'center' });
++  });
++  sidebar(s, 7);
++};
++
++build[8] = (s) => {
++  photo(s, 2.25, 1, 4.452, 9.25);
++  photo(s, 7.038, 1, 4.452, 9.25);
++  eyebrow(s, 13.2, 2.367, 5.8, 'About Us');
++  title(s, 13.2, 2.771, 5.8, 0.909, 'Plantae Vision');
++  body(s, 13.2, 4.083, 5.8, 0.856, L.a);
++  [['1. Seed Quality', 5.848], ['2. Planting Plants', 7.624]].forEach(([t, y]) => {
++    subhead(s, 13.2, y, 5.8, t);
++    body(s, 13.2, y + 0.404, 5.8, 0.856, L.a);
++  });
++  sidebar(s, 8);
++};
++
++build[9] = (s) => {
++  photo(s, 2.254, 1, 6.725, 9.25, { r: 0.135 });
++  eyebrow(s, 10.721, 2.045, 8.279, 'About Us');
++  title(s, 10.721, 2.449, 8.279, 0.909, 'Plantae Mission');
++  body(s, 10.721, 3.762, 8.279, 1.26, L.d, { align: 'justify' });
++  [['1. Best Agriculture', 7.261, { color: C.orange, transparency: 12 }],
++    ['2. Make Excellent Seed', 13.326, { color: C.green }]].forEach(([t, x, fill]) => {
++    s.addShape('roundRect', { x, y: 5.998, w: 5.675, h: 3.207, fill, rectRadius: 0.189 });
++    subhead(s, x + 0.748, 6.77, 4.179, t, { color: C.white });
++    body(s, x + 0.748, 7.174, 4.179, 1.26, L.e, { color: C.white, align: 'justify' });
++  });
++  sidebar(s, 9);
++};
++
++build[10] = (s) => {
++  // Slanted photo cards with an orange leading edge.
++  const H = 4.598;      // card height
++  const LEAN = 1.631;   // horizontal run of the slanted edge
++  const EDGE = 0.181;   // how far the orange edge peeks out to the left
++  const slant = (w) => [{ x: LEAN, y: 0 }, { x: w, y: 0 }, { x: w - LEAN, y: H }, { x: 0, y: H }, { close: true }];
++  const people = [['Ashley Amanda', 'Senior Gardener', 1.931], ['Stephen Nicholas', 'Gardener', 6.028],
++    ['Jessica Sarah', 'Gardener', 10.125], ['Stephanie Rebecca', 'Gardener', 14.222]];
++  people.forEach(([, , x]) => {
++    s.addShape('custGeom', { x: x - EDGE, y: 3.966, w: 1.952, h: H, fill: { color: C.orange }, points: slant(1.952) });
++    s.addShape('custGeom', { x, y: 3.966, w: 5.097, h: H, fill: { color: C.photo }, points: slant(5.097) });
++  });
++  eyebrow(s, 6.485, 1.5, 8.279, 'Team', { align: 'center' });
++  title(s, 6.485, 1.904, 8.279, 0.909, 'Meet Our Gardener', { align: 'center' });
++  people.forEach(([name, role, x]) => {
++    subhead(s, x, 9.059, 3.409, name, { align: 'center' });
++    s.addText(role, { x, y: 9.38, w: 3.409, h: 0.37, align: 'center', valign: 'top', fontFace: F.body, fontSize: 16, color: C.green });
++  });
++  sidebar(s, 10);
++};
++
++build[11] = (s) => {
++  eyebrow(s, 5.895, 1.079, 8.971, 'Team', { align: 'center' });
++  title(s, 5.895, 1.483, 8.971, 0.909, 'Meet Our Farmer', { align: 'center' });
++  body(s, 3.25, 2.796, 14.75, 0.856, L.d, { align: 'center' });
++  [['Brian Kevin', 'Junior Farmer ', 3.25], ['Nicholas Ryan', 'Senior Farmer ', 8.75], ['Justin Brandon', 'Senior Farmer', 14.25]]
++    .forEach(([name, role, x]) => {
++      s.addShape('ellipse', { x, y: 5.079, w: 3.75, h: 3.75, fill: { color: C.orange } });
++      photo(s, x + 0.112, 5.192, 3.526, 3.526, { ellipse: true });
++      subhead(s, x, 9.48, 3.75, name, { align: 'center' });
++      s.addText(role, { x, y: 9.8, w: 3.75, h: 0.37, align: 'center', valign: 'top', fontFace: F.body, fontSize: 16, italic: true, color: C.green });
++    });
++  sidebar(s, 11);
++};
++
++build[12] = (s) => {
++  eyebrow(s, 3.25, 3.231, 5.964, 'Team');
++  title(s, 3.25, 3.635, 5.964, 0.909, 'Meet Our Senior');
++  subhead(s, 3.25, 4.948, 5.964, 'Plantae Senior');
++  body(s, 3.25, 5.351, 5.964, 1.26, L.f);
++  button(s, 3.25, 7.433, 'Learn More');
++  [['Diana Christina', 10.403], ['Jeremy Christian', 14.474]].forEach(([name, x]) => {
++    photo(s, x, 3.142, 3.526, 3.775);
++    s.addShape('rect', { x, y: 6.917, w: 3.526, h: 1.116, fill: { color: C.green } });
++    subhead(s, x, 7.129, 3.526, name, { align: 'center', color: C.white });
++    s.addText('Senior Farmer ', { x, y: 7.45, w: 3.526, h: 0.37, align: 'center', valign: 'top', fontFace: F.body, fontSize: 16, italic: true, color: C.white });
++  });
++  sidebar(s, 12);
++};
++
++build[13] = (s) => {
++  s.addShape('ellipse', { x: 10.452, y: 2.188, w: 8.226, h: 8.226, fill: { color: C.orange } });
++  s.addShape('ellipse', { x: 10.839, y: 2.575, w: 7.452, h: 7.452, fill: { color: C.green } });
++  photo(s, 10.839, 0, 7.452, 10.027, { r: 3.726 });
++  eyebrow(s, 3.252, 3.364, 5.964, 'Team');
++  title(s, 3.252, 3.768, 5.964, 0.909, 'George Kevin');
++  subhead(s, 3.252, 5.081, 5.964, 'Plantae Owner');
++  body(s, 3.252, 5.485, 5.964, 1.26, L.f, { align: 'justify' });
++  socialRow(s, 3.366, 7.552, 0.331, 0.82);
++  sidebar(s, 13);
++};
++
++build[14] = (s) => {
++  photo(s, 12.5, 1, 6.5, 9.25, { r: 0.282 });
++  eyebrow(s, 2.25, 3.48, 5.964, 'Service');
++  title(s, 2.25, 3.884, 5.964, 0.909, 'Best Service');
++  body(s, 2.25, 5.197, 5.964, 1.26, L.f, { align: 'justify' });
++  button(s, 2.251, 7.17, 'Learn More');
++  s.addShape('roundRect', { x: 9.011, y: 6.075, w: 5.194, h: 3.39, fill: { color: C.orange, transparency: 12 }, rectRadius: 0.194 });
++  iconSeed(s, 9.674, 6.547, 0.383, 0.519, C.white, C.orange);
++  subhead(s, 9.536, 7.36, 4.144, '01. Seed Selection', { color: C.white });
++  body(s, 9.536, 7.764, 4.144, 1.26, L.g, { color: C.white, align: 'justify' });
++  sidebar(s, 14);
++};
++
++/** Tall service card used on slides 15 and 16. */
++function serviceCard(s, x, label, color) {
++  s.addShape('roundRect', { x, y: 2.688, w: 3.164, h: 5.875, fill: { color }, rectRadius: 0.436 });
++  iconSeed(s, x + 1.251, 4.037, 0.662, 0.899, C.white, color);
++  subhead(s, x + 0.071, 5.697, 3.001, label, { align: 'center', color: C.white });
++  body(s, x + 0.071, 6.101, 3.001, 1.26, L.h, { align: 'center', color: C.white });
++}
++
++build[15] = (s) => {
++  serviceCard(s, 11.046, '01. Seed Selection', C.orange);
++  serviceCard(s, 14.836, '02. Fertilizer Use', C.green);
++  eyebrow(s, 3.25, 3.306, 5.896, 'Service', { align: 'justify' });
++  title(s, 3.25, 3.71, 5.896, 0.909, 'Plantae Service', { align: 'justify' });
++  subhead(s, 3.252, 5.023, 5.896, 'Best Service From Plantae', { align: 'justify' });
++  body(s, 3.25, 5.426, 5.896, 1.26, L.i, { align: 'justify' });
++  body(s, 3.25, 7.088, 5.896, 0.856, L.g, { align: 'justify' });
++  sidebar(s, 15);
++};
++
++build[16] = (s) => {
++  serviceCard(s, 2.253, '01. Seed Selection', C.orange);
++  serviceCard(s, 5.834, '02. Fertilizer Use', C.green);
++  serviceCard(s, 9.414, '03. Pesticide ', C.orange);
++  eyebrow(s, 13.853, 3.306, 5.147, 'Service');
++  title(s, 13.853, 3.71, 5.147, 0.909, 'Our Service');
++  subhead(s, 13.855, 5.023, 5.147, 'Service From Plantae');
++  body(s, 13.853, 5.426, 5.147, 1.26, L.i);
++  button(s, 13.853, 7.492, 'Learn More');
++  sidebar(s, 16);
++};
++
++build[17] = (s) => {
++  const cards = [['01. Seed Selection', 2.25, 2.176, C.orange], ['02. Fertilizer Use', 7.771, 2.176, C.green],
++    ['03. Pesticide ', 2.25, 5.803, C.orange], ['04. Sprinkling ', 7.771, 5.803, C.green]];
++  cards.forEach(([label, x, y, color]) => {
++    s.addShape('roundRect', { x, y, w: 5.176, h: 3.271, fill: { color }, rectRadius: 0.292 });
++    iconSeed(s, x + 0.64, y + 1.186, 0.662, 0.899, C.white, color);
++    subhead(s, x + 1.828, y + 1.006, 3.001, label, { color: C.white });
++    body(s, x + 1.828, y + 1.41, 3.001, 0.856, L.j, { color: C.white });
++  });
++  eyebrow(s, 13.853, 3.933, 5.147, 'Service');
++  title(s, 13.853, 4.336, 5.147, 0.909, 'Our Service');
++  subhead(s, 13.855, 5.649, 5.147, 'Service From Plantae');
++  body(s, 13.853, 6.052, 5.147, 1.26, L.i);
++  sidebar(s, 17);
++};
++
++build[18] = (s) => {
++  whiteWash(s, 0.14, 1, 0.62);
++  title(s, 10.797, 4.565, 8.127, 1.717, [
++    { text: 'Break ', options: { color: C.green } },
++    { text: 'Time', options: { color: C.green, fontFace: F.reg } },
++    { text: '.', options: { color: C.orange } },
++  ], { fontSize: 96, charSpacing: 0 });
++  subhead(s, 10.797, 6.281, 8.127, 'LET\u2019S START AGAIN IN 15 MINUTES', { charSpacing: 1.5 });
++  button(s, 16.464, 9.65, 'Start Again', { w: 2.536 });
++  sidebar(s, 18);
++};
++
++/** "+1K Farm / +2K Greenhouse / +5K Garden" statistics row. */
++function statsRow(s, y) {
++  [['1K', 'Farm', 3.25, 1.25], ['2K', 'Greenhouse', 5.014, 1.993], ['5K', 'Garden', 7.521, 1.625]]
++    .forEach(([num, label, x, w]) => {
++      s.addText([{ text: '+', options: { color: C.green } }, { text: num, options: { color: C.dark } }],
++        { x, y, w, h: 0.64, align: 'center', valign: 'top', fontFace: F.head, fontSize: 32, charSpacing: 1 });
++      subhead(s, x, y + 0.64, w, label, { align: 'center' });
++    });
++}
++
++build[19] = (s) => {
++  eyebrow(s, 3.25, 2.916, 5.896, 'Portfolio ', { align: 'justify' });
++  title(s, 3.25, 3.32, 5.896, 1.717, 'Great Facilities In Plantae');
++  body(s, 3.25, 5.441, 5.896, 1.26, L.i, { align: 'justify' });
++  statsRow(s, 7.29);
++  photo(s, 10.75, 1, 4, 4.5);
++  photo(s, 10.75, 5.75, 4, 4.5);
++  photo(s, 15, 1, 4, 9.25);
++  sidebar(s, 19);
++};
++
++build[20] = (s) => {
++  eyebrow(s, 3.25, 2.8, 5.896, 'Portfolio ', { align: 'justify' });
++  title(s, 3.25, 3.204, 5.896, 1.717, 'Best & Beautiful Garden Design');
++  subhead(s, 3.25, 5.325, 5.896, 'Plantae Portfolio');
++  body(s, 3.25, 5.729, 5.896, 1.26, L.i, { align: 'justify' });
++  button(s, 3.257, 7.849, 'Next Slide', { w: 2.506 });
++  photo(s, 11.146, 1, 7.854, 9.25);
++  sidebar(s, 20);
++};
++
++build[21] = (s) => {
++  eyebrow(s, 3.25, 2.254, 5.896, 'Portfolio ', { align: 'justify' });
++  title(s, 3.25, 2.658, 5.896, 2.524, 'Plantae Is The Best Agriculture In The UK');
++  body(s, 3.25, 5.586, 5.896, 1.26, L.i, { align: 'justify' });
++  statsRow(s, 7.953);
++  photo(s, 11.5, 1, 3.625, 9.25);
++  photo(s, 15.375, 1, 3.625, 9.25);
++  sidebar(s, 21);
++};
++
++build[22] = (s) => {
++  photo(s, 2.25, 1, 8.758, 4.5);
++  photo(s, 2.25, 5.75, 8.758, 4.5);
++  eyebrow(s, 12.186, 2.321, 6.6, 'Portfolio ');
++  title(s, 12.186, 2.725, 6.6, 0.909, 'Plantae Project');
++  body(s, 12.186, 4.037, 6.6, 0.856, L.e);
++  subhead(s, 12.186, 5.977, 6.6, 'Hydroponic progress');
++  body(s, 12.186, 6.381, 6.6, 1.26, L.i);
++  meter(s, 13.183, 8.632, 90);
++  sidebar(s, 22);
++};
++
++build[23] = (s) => {
++  photo(s, 2.255, 2.906, 3.995, 7.516);
++  photo(s, 6.457, 0.828, 3.995, 7.516);
++  eyebrow(s, 12.067, 1.498, 6.6, 'Portfolio ');
++  title(s, 12.067, 1.902, 6.6, 0.909, 'Plantae Progress');
++  [[3.214, 87], [7.291, 75]].forEach(([y, pct]) => {
++    subhead(s, 12.067, y, 6.6, 'In progress');
++    body(s, 12.067, y + 0.404, 6.6, 1.26, L.i);
++    meter(s, 13.065, y + 2.174, pct);
++  });
++  sidebar(s, 23);
++};
++
++build[24] = (s) => {
++  photo(s, 2.25, 0.979, 4.928, 9.292);
++  photo(s, 7.405, 0.979, 4.928, 9.292);
++  eyebrow(s, 13.861, 2.063, 4.139, 'Portfolio ');
++  title(s, 13.861, 2.467, 4.139, 0.909, 'Our Project');
++  body(s, 13.861, 3.571, 4.139, 0.856, L.w);
++  button(s, 13.861, 4.934, 'Next Slide', { w: 2.506 });
++  s.addShape('roundRect', { x: 11.82, y: 6.877, w: 6.18, h: 2.787, fill: { color: C.green }, rectRadius: 0.258 });
++  subhead(s, 12.218, 7.259, 4.928, 'Hybrida Progress', { color: C.white });
++  body(s, 12.218, 7.663, 4.928, 0.856, L.v, { color: C.white });
++  meter(s, 13.182, 9.083, 75, { track: { color: C.white }, fill: C.orange, ink: C.white });
++  sidebar(s, 24);
++};
++
++build[25] = (s) => {
++  s.addShape('rect', { x: 15.45, y: 0, w: 4.55, h: 11.25, fill: { color: C.orange } });
++  // Desktop monitor mock-up.
++  s.addShape('roundRect', { x: 12.14, y: 3.137, w: 6.56, h: 3.8, fill: { color: '222222' }, rectRadius: 0.1 });
++  photo(s, 12.283, 3.285, 6.31, 3.5);
++  s.addShape('rect', { x: 15.19, y: 6.937, w: 0.46, h: 0.98, fill: { color: '222222' } });
++  s.addShape('roundRect', { x: 14.18, y: 7.86, w: 2.46, h: 0.26, fill: { color: '222222' }, rectRadius: 0.09 });
++  eyebrow(s, 3.155, 3.204, 6.6, 'Mockup');
++  title(s, 3.155, 3.608, 6.6, 1.717, 'Visit Our Online Marketplace');
++  body(s, 3.155, 5.729, 6.6, 0.856, L.e);
++  button(s, 3.155, 7.445, 'Visit Now', { w: 2.414 });
++  sidebar(s, 25);
++};
++
++build[26] = (s) => {
++  // Laptop mock-up.
++  s.addShape('roundRect', { x: 7.42, y: 3.777, w: 6.36, h: 4.02, fill: { color: '222222' }, rectRadius: 0.12 });
++  photo(s, 7.604, 3.934, 6.042, 3.7);
++  s.addShape('trapezoid', { x: 6.837, y: 7.796, w: 7.576, h: 0.34, fill: { color: 'B7B7B7' } });
++  s.addShape('roundRect', { x: 6.837, y: 8.05, w: 7.576, h: 0.13, fill: { color: '9A9A9A' }, rectRadius: 0.06 });
++  eyebrow(s, 3.25, 1.078, 14.75, 'Mockup', { align: 'center' });
++  title(s, 3.25, 1.482, 14.75, 0.909, 'Plantae Websites Is Available Now', { align: 'center' });
++  subhead(s, 3.25, 5.075, 3.587, 'Marketplace ');
++  body(s, 3.25, 5.479, 3.587, 0.856, L.m);
++  subhead(s, 14.413, 5.075, 3.587, 'Agriculture', { align: 'right' });
++  body(s, 14.413, 5.479, 3.587, 0.856, L.m, { align: 'right' });
++  button(s, 12.662, 7.656, 'Visit Now', { w: 2.414 });
++  body(s, 3.25, 9.316, 14.75, 0.856, L.u, { align: 'center' });
++  sidebar(s, 26);
++};
++
++build[27] = (s) => {
++  // Phone mock-up (runs off the bottom of the slide, as in the original).
++  s.addShape('roundRect', { x: 3.4, y: 2.178, w: 6.78, h: 9.072, fill: { color: '222222' }, rectRadius: 0.8 });
++  photo(s, 3.772, 2.485, 6.063, 8.765, { r: 0.55 });
++  s.addShape('roundRect', { x: 5.62, y: 2.178, w: 2.34, h: 0.78, fill: { color: '222222' }, rectRadius: 0.34 });
++  [2.75, 4.15, 4.95].forEach((y) => s.addShape('roundRect', { x: 3.32, y, w: 0.1, h: y === 2.75 ? 0.5 : 0.85, fill: { color: '222222' }, rectRadius: 0.05 }));
++  s.addShape('roundRect', { x: 10.16, y: 4.5, w: 0.1, h: 1.3, fill: { color: '222222' }, rectRadius: 0.05 });
++  eyebrow(s, 12.29, 2.858, 5.71, 'Mockup');
++  title(s, 12.29, 3.261, 5.71, 1.717, 'Plantae Social Media');
++  subhead(s, 12.29, 5.382, 5.71, 'Share Activity In Here');
++  body(s, 12.29, 5.786, 5.71, 1.26, L.n);
++  socialRow(s, 12.355, 7.905, 0.486, 1.089);
++  sidebar(s, 27);
++};
++
++build[28] = (s) => {
++  // Four-petal SWOT flower.
++  const petals = [['S', 11.134, 2.532, C.green], ['W', 14.636, 2.532, C.orange],
++    ['O', 11.134, 5.711, C.orange], ['T', 14.636, 5.711, C.green]];
++  petals.forEach(([, x, y, color], i) => s.addShape('roundRect', { x, y, w: 3.36, h: 3.007, fill: { color }, rectRadius: 0.8 }));
++  [[12.156, 3.581], [15.509, 3.567], [12.156, 6.697], [15.509, 6.697]].forEach(([ix, iy], i) =>
++    SWOT_ICON[i](s, ix, iy, 0.957, petals[i][3]));
++  s.addShape('ellipse', { x: 13.019, y: 4.079, w: 3.092, h: 3.092, fill: { color: C.white, transparency: 90 } });
++  s.addShape('ellipse', { x: 13.254, y: 4.314, w: 2.621, h: 2.621, fill: { color: C.card } });
++  s.addText('SWOT', { x: 13.254, y: 5.171, w: 2.621, h: 0.909, align: 'center', valign: 'top', fontFace: F.head, fontSize: 48, color: C.orange, charSpacing: 1 });
++  [['S', 12.329, 2.047, C.green], ['W', 15.831, 2.047, C.orange],
++    ['O', 12.329, 8.232, C.orange], ['T', 15.831, 8.232, C.green]].forEach(([g, x, y, color]) => {
++    s.addShape('ellipse', { x: x - 0.11, y: y - 0.11, w: 1.19, h: 1.19, fill: { color: C.white } });
++    s.addShape('ellipse', { x, y, w: 0.97, h: 0.97, fill: { color } });
++    s.addText(g, { x, y, w: 0.97, h: 0.97, align: 'center', valign: 'middle', fontFace: F.med, fontSize: 36, color: C.white });
++  });
++  eyebrow(s, 3.254, 2.627, 5.995, 'SWOT');
++  title(s, 3.254, 3.031, 5.995, 1.717, 'SWOT Analyst Infographic');
++  body(s, 3.254, 5.151, 5.995, 1.26, L.o, { align: 'justify' });
++  body(s, 3.254, 6.815, 5.995, 0.856, L.k);
++  meter(s, 4.252, 8.325, 90);
++  sidebar(s, 28);
++};
++
++/** Heading + paragraph pair, used by the SWOT / infographic layouts. */
++function captionBlock(s, x, y, w, heading, text, o = {}) {
++  subhead(s, x, y, w, heading, { align: o.align, color: o.color || C.orange });
++  body(s, x, y + 0.404, w, o.h || 1.26, text, { align: o.align, color: o.textColor || C.gray });
++}
++
++/** Chart / medal / fingerprint / rocket marks used on the SWOT wheels. */
++const SWOT_ICON = [
++  (s, x, y, d) => { // bar chart
++    [0, 1, 2].forEach((i) => s.addShape('rect', { x: x + i * d * 0.34, y: y + d * (0.62 - i * 0.25), w: d * 0.22, h: d * (0.38 + i * 0.25), fill: { color: C.white } }));
++  },
++  (s, x, y, d, bg) => { // rosette
++    s.addShape('ellipse', { x: x + d * 0.16, y, w: d * 0.68, h: d * 0.68, fill: { color: C.white } });
++    s.addShape('ellipse', { x: x + d * 0.34, y: y + d * 0.18, w: d * 0.32, h: d * 0.32, fill: { color: bg } });
++    s.addShape('triangle', { x: x + d * 0.1, y: y + d * 0.6, w: d * 0.34, h: d * 0.42, fill: { color: C.white }, rotate: 180 });
++    s.addShape('triangle', { x: x + d * 0.56, y: y + d * 0.6, w: d * 0.34, h: d * 0.42, fill: { color: C.white }, rotate: 180 });
++  },
++  (s, x, y, d) => { // fingerprint
++    [1, 0.72, 0.44].forEach((k) => s.addShape('arc', { x: x + d * (1 - k) / 2, y: y + d * (1 - k) / 2, w: d * k, h: d * k, line: { color: C.white, width: 1.5 }, angleRange: [200, 340] }));
++  },
++  (s, x, y, d) => { // rocket
++    s.addShape('teardrop', { x: x + d * 0.2, y: y + d * 0.06, w: d * 0.6, h: d * 0.72, fill: { color: C.white }, rotate: 315 });
++    s.addShape('triangle', { x: x + d * 0.02, y: y + d * 0.62, w: d * 0.34, h: d * 0.34, fill: { color: C.white }, rotate: 225 });
++  },
++];
++
++build[29] = (s) => {
++  // Quartered ring with a small gap between quadrants and a white hub.
++  const cx = 10.623, cy = 7.128, R = 2.556, hub = 1.011;
++  [[182, 268, C.green], [272, 358, C.orange], [92, 178, C.orange], [2, 88, C.green]]
++    .forEach(([a0, a1, color]) => s.addShape('pie', { x: cx - R, y: cy - R, w: R * 2, h: R * 2, fill: { color }, angleRange: [a0, a1] }));
++  s.addShape('ellipse', { x: cx - hub, y: cy - hub, w: hub * 2, h: hub * 2, fill: { color: C.white } });
++  [['S', -1.213, -1.278], ['W', 1.213, -1.278], ['O', -1.213, 1.278], ['T', 1.213, 1.278]].forEach(([g, dx, dy]) =>
++    s.addText(g, { x: cx + dx - 0.5, y: cy + dy - 0.5, w: 1, h: 1, align: 'center', valign: 'middle', fontFace: F.med, fontSize: 54, color: C.white }));
++  // Circular icon badges pinned to the outer corners of each quadrant.
++  [[7.813, 5.102, C.green, 0], [12.493, 5.102, C.orange, 1], [7.813, 8.224, C.orange, 2], [12.493, 8.224, C.green, 3]]
++    .forEach(([x, y, color, i]) => {
++      s.addShape('ellipse', { x: x - 0.09, y: y - 0.09, w: 1.127, h: 1.127, fill: { color: C.white } });
++      s.addShape('ellipse', { x, y, w: 0.947, h: 0.947, fill: { color } });
++      SWOT_ICON[i](s, x + 0.24, y + 0.24, 0.47, color);
++    });
++  eyebrow(s, 2.253, 1.01, 16.747, 'SWOT', { align: 'center' });
++  title(s, 2.253, 1.414, 16.747, 0.909, 'SWOT Analyst Infographic', { align: 'center' });
++  [[2.253, 4.032], [2.253, 7.554], [13.605, 4.032], [13.605, 7.554]].forEach(([x, y]) =>
++    s.addShape('roundRect', { x, y, w: 5.395, h: 2.686, fill: { color: C.wash, transparency: 50 }, rectRadius: 0.225 }));
++  captionBlock(s, 2.875, 4.543, 4.151, 'Strengths', L.p, { align: 'right' });
++  captionBlock(s, 2.875, 8.065, 4.151, 'Opportunities', L.p, { align: 'right' });
++  captionBlock(s, 14.227, 4.543, 4.151, 'Weaknesses', L.p);
++  captionBlock(s, 14.227, 8.065, 4.151, 'Threats', L.p);
++  sidebar(s, 29);
++};
++
++build[30] = (s) => {
++  concaveStar(s, 7.789, 4.556, 5.674, 5.685, C.orange);
++  [['W', 9.686, 4.605], ['T', 11.527, 6.446], ['O', 9.686, 8.305], ['S', 7.838, 6.446]].forEach(([g, x, y]) => {
++    s.addShape('ellipse', { x, y, w: 1.886, h: 1.886, fill: { color: C.white }, line: { color: C.orange, width: 2 } });
++    s.addShape('ellipse', { x: x + 0.402, y: y + 0.402, w: 1.083, h: 1.083, fill: { color: C.green } });
++    s.addText(g, { x: x + 0.402, y: y + 0.402, w: 1.083, h: 1.083, align: 'center', valign: 'middle', fontFace: F.med, fontSize: 50, color: C.white });
++  });
++  s.addShape('ellipse', { x: 9.686, y: 6.446, w: 1.886, h: 1.886, fill: { color: C.white }, line: { color: C.orange, width: 2 } });
++  // Elbow leaders: [dotted end x,y] -> corner -> [diagram end x,y].
++  [[6.843, 4.766, 7.789, 4.766, 7.789, 7.360],
++    [13.827, 4.764, 11.493, 4.764, 11.493, 5.559],
++    [6.843, 9.499, 9.767, 9.499, 9.767, 8.239],
++    [13.827, 8.287, 13.462, 8.287, 13.462, 7.347]].forEach(([ax, ay, bx, by, cx2, cy2]) => {
++    s.addShape('line', { x: Math.min(ax, bx), y: ay, w: Math.abs(bx - ax), h: 0, flipH: ax > bx, line: { color: C.green, width: 0.75, beginArrowType: 'oval' } });
++    s.addShape('line', { x: bx, y: Math.min(by, cy2), w: 0, h: Math.abs(cy2 - by), line: { color: C.green, width: 0.75 } });
++  });
++  eyebrow(s, 2.253, 1.01, 16.747, 'SWOT', { align: 'center' });
++  title(s, 2.253, 1.414, 16.747, 0.909, 'SWOT Analyst Infographic', { align: 'center' });
++  captionBlock(s, 2.875, 4.543, 4.151, 'Strengths', L.p, { align: 'right' });
++  captionBlock(s, 2.875, 8.065, 4.151, 'Opportunities', L.p, { align: 'right' });
++  captionBlock(s, 14.227, 4.543, 4.151, 'Weaknesses', L.p);
++  captionBlock(s, 14.227, 8.065, 4.151, 'Threats', L.p);
++  sidebar(s, 30);
++};
++
++build[31] = (s) => {
++  [[3.699, 4.145], [3.699, 7.507], [10.72, 4.145], [10.72, 7.507]].forEach(([x, y]) =>
++    s.addShape('roundRect', { x, y, w: 6.423, h: 2.734, fill: { color: C.wash, transparency: 50 }, rectRadius: 0.15 }));
++  // Chunky arrows flanking each card.
++  [[2.555, 4.405, false], [2.555, 7.793, false], [15.827, 4.405, true], [15.827, 7.793, true]]
++    .forEach(([x, y, flip]) => {
++      s.addShape('round1Rect', { x: flip ? x + 1.633 : x, y: y + 1.291, w: 0.987, h: 0.904, fill: { color: C.orange }, rectRadius: 0.452, flipH: flip });
++      s.addShape(flip ? 'leftArrow' : 'rightArrow', { x, y, w: 2.62, h: 1.91, fill: { color: C.green }, adjusting: 0.42 });
++    });
++  eyebrow(s, 2.253, 1.01, 16.747, 'SWOT', { align: 'center' });
++  title(s, 2.253, 1.414, 16.747, 0.909, 'SWOT Analyst Infographic', { align: 'center' });
++  captionBlock(s, 5.567, 4.543, 4.151, 'Strengths', L.p);
++  captionBlock(s, 5.567, 8.065, 4.151, 'Opportunities', L.p);
++  captionBlock(s, 11.617, 4.543, 4.151, 'Weaknesses', L.p, { align: 'right' });
++  captionBlock(s, 11.617, 8.065, 4.151, 'Threats', L.p, { align: 'right' });
++  sidebar(s, 31);
++};
++
++build[32] = (s) => {
++  // Hexagon-tipped banner rows, alternating sides.
++  const rows = [['S', 'Strengths', 3.169, C.orange, false], ['W', 'Weaknesses', 4.91, C.green, true],
++    ['O', 'Opportunities', 6.651, C.orange, false], ['T', 'Threats', 8.392, C.green, true]];
++  rows.forEach(([glyph, label, y, color, right]) => {
++    const barX = right ? 7.879 : 4.639;
++    s.addShape('rect', { x: barX, y, w: 8.735, h: 1.633, fill: { color } });
++    const hx = right ? 15.607 : 3.76;
++    s.addShape('hexagon', { x: hx - 0.247, y: y - 0.215, w: 1.791, h: 2.063, fill: { color } });
++    s.addShape('hexagon', { x: hx, y, w: 1.886, h: 1.633, fill: { color: C.card } });
++    s.addText(glyph, { x: hx, y, w: 1.886, h: 1.633, align: 'center', valign: 'middle', fontFace: F.reg, fontSize: 60, bold: true, color });
++    captionBlock(s, right ? 8.357 : 6.43, y + 0.388, 6.466, label, L.q,
++      { align: right ? 'right' : 'left', color: C.white, textColor: C.white, h: 0.452 });
++  });
++  eyebrow(s, 2.253, 1.01, 16.747, 'SWOT', { align: 'center' });
++  title(s, 2.253, 1.414, 16.747, 0.909, 'SWOT Analyst Infographic', { align: 'center' });
++  sidebar(s, 32);
++};
++
++build[33] = (s) => {
++  // Exploded doughnut assembled from pie wedges of differing radii.
++  s.addShape('ellipse', { x: 8.233, y: 4.15, w: 4.778, h: 4.778, fill: { color: C.wash, transparency: 50 } });
++  [[7.493, 3.439, 6.259, 202.46, 238.08, C.orange],
++    [7.493, 3.439, 6.259, 103.32, 170.88, C.orange],
++    [7.493, 3.439, 6.259, 305.28, 351.32, C.orange],
++    [6.920, 2.837, 7.403, 160.50, 204.16, C.green],
++    [7.055, 2.972, 7.134, 339.66, 33.40, C.green],
++    [7.865, 3.812, 5.513, 27.54, 69.03, C.orange]]
++    .forEach(([x, y, d, a0, a1, color]) =>
++      s.addShape('pie', { x, y, w: d, h: d, fill: { color }, angleRange: [a0, a1], flipH: true }));
++  s.addShape('ellipse', { x: 9.347, y: 5.264, w: 2.55, h: 2.55, fill: { color: C.white } });
++  eyebrow(s, 3.233, 1.01, 14.788, 'Infographic', { align: 'center' });
++  title(s, 3.233, 1.414, 14.788, 0.909, 'Plantae Infographic', { align: 'center' });
++  captionBlock(s, 3.233, 4.178, 3.636, 'January', L.r, { h: 0.856 });
++  captionBlock(s, 3.233, 7.700, 3.636, 'February', L.r, { h: 0.865 });
++  captionBlock(s, 14.350, 4.178, 3.644, 'March', L.r, { align: 'right', h: 0.856 });
++  captionBlock(s, 14.350, 7.700, 3.644, 'April', L.r, { align: 'right', h: 0.856 });
++  sidebar(s, 33);
++};
++
++/** The six pictograms inside the slide-34 wheel, in clockwise order. */
++const WHEEL_ICON = [
++  (s, x, y, d) => { // lightbulb
++    s.addShape('ellipse', { x, y, w: d * 0.72, h: d * 0.72, fill: { color: C.white } });
++    s.addShape('rect', { x: x + d * 0.28, y: y + d * 0.65, w: d * 0.18, h: d * 0.3, fill: { color: C.white } });
++  },
++  (s, x, y, d) => { // target
++    s.addShape('donut', { x, y, w: d, h: d, fill: { color: C.white } });
++    s.addShape('ellipse', { x: x + d * 0.36, y: y + d * 0.36, w: d * 0.28, h: d * 0.28, fill: { color: C.white } });
++  },
++  (s, x, y, d) => s.addShape('gear6', { x, y, w: d, h: d, fill: { color: C.white } }),
++  (s, x, y, d, bg) => { // eye
++    s.addShape('ellipse', { x, y: y + d * 0.26, w: d, h: d * 0.5, fill: { color: C.white } });
++    s.addShape('ellipse', { x: x + d * 0.34, y: y + d * 0.34, w: d * 0.32, h: d * 0.32, fill: { color: bg } });
++  },
++  (s, x, y, d) => s.addShape('can', { x: x + d * 0.14, y, w: d * 0.72, h: d, fill: { color: C.white } }),
++  (s, x, y, d) => { // presentation board
++    s.addShape('rect', { x, y, w: d, h: d * 0.78, fill: { color: C.white } });
++    s.addShape('rect', { x: x + d * 0.45, y: y + d * 0.78, w: d * 0.1, h: d * 0.3, fill: { color: C.white } });
++  },
++];
++
++build[34] = (s) => {
++  // Six-segment doughnut with leader lines out to the month captions.
++  const cx = 10.61, cy = 7.034, RX = 2.97, RY = 2.478;
++  const hy = 6.544, r = 1.189;  // the hub sits a little above the wheel centre
++  // Six wedges: only 240 degrees of the wheel are drawn (the ref leaves the sides open).
++  // [startAngle, endAngle, colour] clockwise from 3 o'clock: Mar, Feb, Jan, Jun, May, Apr
++  const seg = [[93, 147, C.green], [153, 207, C.orange], [213, 267, C.green],
++    [273, 327, C.orange], [333, 27, '3D6660'], [33, 87, 'F0805A']];
++  seg.forEach(([a0, a1, color], i) => {
++    s.addShape('pie', { x: cx - RX, y: cy - RY, w: RX * 2, h: RY * 2, fill: { color }, angleRange: [a0, a1] });
++    const mid = ((a0 + (a0 > a1 ? a1 + 360 : a1)) / 2 - 90) * Math.PI / 180;
++    const ix = cx + Math.cos(mid) * RX * 0.72;
++    const iy = cy + Math.sin(mid) * RY * 0.72;
++    WHEEL_ICON[i](s, ix - 0.3, iy - 0.3, 0.6, color);
++  });
++  s.addShape('ellipse', { x: cx - 1.37, y: hy - 1.37, w: 2.74, h: 2.74, fill: { color: C.white } });
++  s.addShape('ellipse', { x: cx - r, y: hy - r, w: r * 2, h: r * 2, fill: { color: C.green } });
++  s.addShape('ellipse', { x: cx - r + 0.18, y: hy - r + 0.18, w: (r - 0.18) * 2, h: (r - 0.18) * 2, fill: { color: C.white } });
++  [[6.843, 4.873, 1.700, C.green], [6.843, 7.031, 1.509, C.orange], [6.843, 9.187, 2.604, C.green],
++    [12.812, 4.873, 1.587, C.orange], [12.956, 7.031, 1.444, C.green], [11.775, 9.187, 2.625, C.orange]]
++    .forEach(([x, y, w, color]) => s.addShape('line', { x, y, w, h: 0, line: { color, width: 1.5, beginArrowType: 'oval' } }));
++  eyebrow(s, 2.25, 1.01, 16.75, 'Infographic', { align: 'center' });
++  title(s, 2.25, 1.414, 16.75, 0.909, 'Plantae Infographic', { align: 'center' });
++  [['January', 4.244], ['February', 6.394], ['March ', 8.553]].forEach(([m, y]) =>
++    captionBlock(s, 2.25, y, 3.636, m, L.r, { align: 'right', h: 0.865 }));
++  [['June', 4.244], ['May', 6.394], ['April', 8.553]].forEach(([m, y]) =>
++    captionBlock(s, 15.364, y, 3.636, m, L.r, { h: 0.865 }));
++  sidebar(s, 34);
++};
++
++build[35] = (s) => {
++  eyebrow(s, 2.747, 1.01, 13.712, 'Infographic', { align: 'center' });
++  title(s, 2.747, 1.414, 13.712, 0.909, 'Plantae Infographic', { align: 'center' });
++  const cols = [3.004, 11.485];
++  const ys = [3.85, 6.078, 8.305];
++  cols.forEach((cxx, ci) => ys.forEach((y, ri) => {
++    const num = String(ci * 3 + ri + 1).padStart(2, '0');
++    s.addShape('rect', { x: cxx + 0.643, y: y + 0.259, w: 5.872, h: 1.676, fill: { color: C.wash, transparency: 50 } });
++    s.addShape('rect', { x: cxx, y, w: 1.292, h: 1.292, fill: { color: C.green } });
++    s.addText(num, { x: cxx, y, w: 1.292, h: 1.292, align: 'center', valign: 'middle', fontFace: F.med, fontSize: 24, color: C.white });
++    s.addShape('rtTriangle', { x: cxx, y: y + 1.292, w: 0.643, h: 0.643, fill: { color: C.orange }, rotate: 180 });
++    body(s, cxx + 2.087, y + 0.669, 3.636, 0.856, L.r);
++  }));
++  sidebar(s, 35);
++};
++
++build[36] = (s) => {
++  eyebrow(s, 3.004, 1.01, 14.996, 'Pricing', { align: 'center' });
++  title(s, 3.004, 1.414, 14.996, 0.909, 'Plantae Pricing Package', { align: 'center' });
++  s.addShape('roundRect', { x: 8.653, y: 3.246, w: 3.693, h: 5.215, fill: { color: C.green }, rectRadius: 0.359 });
++  [7.503, 13.501].forEach((x) => s.addShape('line', { x, y: 3.979, w: 0, h: 3.75, line: { color: C.wash, width: 3 } }));
++  const plans = [
++    { x: 3.451, name: 'Lite Package', price: '$250', nameColor: C.orange, priceColor: C.green, textColor: C.gray, pill: C.green, badge: C.orange, arrow: C.white },
++    { x: 9.002, name: 'Medium Package', price: '$325', nameColor: C.white, priceColor: C.white, textColor: C.white, pill: C.orange, badge: C.white, arrow: C.green },
++    { x: 14.549, name: 'Mega Package', price: '$500', nameColor: C.orange, priceColor: C.green, textColor: C.gray, pill: C.green, badge: C.orange, arrow: C.white },
++  ];
++  plans.forEach((p) => {
++    eyebrow(s, p.x, 3.725, 3, p.name, { color: p.nameColor });
++    s.addText(p.price, { x: p.x, y: 4.339, w: 3, h: 0.774, valign: 'top', fontFace: F.head, fontSize: 40, color: p.priceColor, charSpacing: 1 });
++    body(s, p.x, 5.256, 3, 1.26, L.s, { color: p.textColor, align: 'justify' });
++    button(s, p.x, 7.382, 'Choose', { w: 2.343, pill: p.pill, badge: p.badge, arrow: p.arrow });
++  });
++  body(s, 3.913, 9.385, 12.809, 0.856, L.t, { align: 'center' });
++  sidebar(s, 36);
++};
++
++build[37] = (s) => {
++  photo(s, 8.189, 1.167, 4.61, 9.25, { r: 0.326 });
++  eyebrow(s, 2.25, 3.631, 4.727, 'Contact');
++  title(s, 2.25, 4.035, 4.727, 0.909, 'Get In Touch');
++  body(s, 2.296, 5.071, 4.681, 1.26, L.x);
++  button(s, 2.296, 7.019, 'Learn more', { w: 2.593 });
++  [['Address', 1.98, ['Agriculture Plantae street 123', 'Any City']],
++    ['Websites', 4.995, ['www.greenhouse.plantae.com', 'www.plantae.agriculture.com']],
++    ['Mail', 8.01, ['Greenhouse@Plantae.com', 'Agriculture@Plantae.com']]].forEach(([head, y, lines]) => {
++    subhead(s, 14.423, y, 3.441, head);
++    body(s, 14.423, y + 0.404, 3.441, 0.856, lines.map((t, i) => ({ text: t, options: { breakLine: i < lines.length - 1 } })));
++  });
++  sidebar(s, 37);
++};
++
++build[38] = (s) => {
++  whiteWash(s, 1, 0.35);
++  title(s, 2.75, 4.565, 10.182, 1.717, [
++    { text: 'Thank ', options: { color: C.green } },
++    { text: 'You', options: { color: C.orange, fontFace: F.reg } },
++    { text: '.', options: { color: C.orange } },
++  ], { fontSize: 96, charSpacing: 0 });
++  subhead(s, 2.75, 6.281, 10.182, 'THANKS FOR WATCHING MY PRESENTATION', { charSpacing: 1.5 });
++  sidebar(s, 38);
++};
++
++/** Sheet of 72 outline pictograms (slides 39 and 40 of the original). */
++const GLYPHS = [
++  'leftArrow', 'upArrow', 'downArrow', 'rightArrow', 'leftRightArrow', 'upDownArrow', 'bentArrow', 'bentUpArrow',
++  'curvedRightArrow', 'curvedLeftArrow', 'curvedUpArrow', 'curvedDownArrow',
++  'notchedRightArrow', 'stripedRightArrow', 'quadArrow', 'leftRightUpArrow', 'chevron', 'homePlate',
++  'triangle', 'rtTriangle', 'diamond', 'pentagon', 'hexagon', 'heptagon',
++  'octagon', 'decagon', 'dodecagon', 'star4', 'star5', 'star6',
++  'star7', 'star8', 'heart', 'sun', 'moon', 'cloud',
++  'teardrop', 'donut', 'can', 'cube', 'wave', 'doubleWave',
++  'bevel', 'frame', 'halfFrame', 'corner', 'diagStripe', 'chord',
++  'pie', 'blockArc', 'arc', 'plaque', 'plus', 'mathMultiply',
++  'mathDivide', 'mathEqual', 'mathNotEqual', 'flowChartDocument', 'flowChartMultidocument', 'flowChartTerminator',
++  'flowChartPreparation', 'flowChartManualInput', 'flowChartManualOperation', 'flowChartConnector', 'flowChartPunchedCard', 'flowChartPunchedTape',
++  'flowChartSummingJunction', 'flowChartOr', 'flowChartCollate', 'flowChartSort', 'flowChartExtract', 'flowChartMerge',
++];
++function iconSheet(s, x0, y0, w, h, size) {
++  const cols = 12, rows = 6;
++  const dx = (w - size) / (cols - 1);
++  const dy = (h - size) / (rows - 1);
++  for (let r = 0; r < rows; r++) {
++    for (let c = 0; c < cols; c++) {
++      const x = x0 + c * dx;
++      const y = y0 + r * dy;
++      const g = GLYPHS[(r * cols + c) % GLYPHS.length];
++      s.addShape(g, { x, y, w: size, h: size, fill: { type: 'none' }, line: { color: C.orange, width: 3.5 } });
++    }
++  }
++}
++
++build[39] = (s) => { iconSheet(s, 4.12, 2.478, 12.98, 6.294, 0.72); sidebar(s, 39); };
++build[40] = (s) => { iconSheet(s, 4.22, 2.518, 12.78, 6.194, 0.70); sidebar(s, 40); };
++
++/* ------------------------------------------------------------------- main */
++const pptx = new PptxGenJS();
++pptx.author = 'Plantae';
++pptx.title = 'Agriculture Presentation';
++pptx.defineLayout({ name: 'PLANTAE', width: SLIDE_W, height: SLIDE_H });
++pptx.layout = 'PLANTAE';
++
++for (let n = 1; n <= 40; n++) {
++  const slide = pptx.addSlide();
++  slide.background = { color: C.white };
++  build[n](slide);
++}
++
++pptx.writeFile({ fileName: path.join(__dirname, '0fb5716d-427c-46db-a7a7-2e9cdc1f5dd4_grok_final.pptx') })
++  .then((f) => console.log('wrote', f));

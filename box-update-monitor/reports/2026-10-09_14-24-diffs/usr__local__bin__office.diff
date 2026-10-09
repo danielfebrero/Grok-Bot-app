@@ -1,0 +1,10 @@
+--- 2026-10-09_14-11:/usr/local/bin/office
++++ 2026-10-09_14-24:/usr/local/bin/office
+@@ -1,6 +1,2 @@
+ #!/usr/bin/env bash
+-shopt -s execfail
+-if [ -x /opt/sand/sand-host/officekit/bin/office ]; then
+-	exec /opt/sand/sand-host/officekit/bin/office "$@"
+-fi
+-exec /usr/local/libexec/sand/officekit/bin/office "$@"
++exec /opt/sand/sand-host/officekit-ts/bin/office "$@"

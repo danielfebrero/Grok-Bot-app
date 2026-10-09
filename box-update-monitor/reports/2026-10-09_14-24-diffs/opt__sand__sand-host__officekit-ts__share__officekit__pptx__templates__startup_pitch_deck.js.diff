@@ -1,0 +1,602 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/startup_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/startup_pitch_deck.js
+@@ -0,0 +1,599 @@
++#!/usr/bin/env node
++/**
++ * "Moon Startup - Start Up Pitch Deck" - 15 slides, 13.333 x 7.5 in (16:9).
++ * Rebuilt with pptxgenjs only. Raster photos in the original are replaced by
++ * flat "[image]" placeholder blocks of the same geometry.
++ */
++'use strict';
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const NAVY = '04162F'; // accent1 - the deck's dark brand colour
++const WHITE = 'FFFFFF';
++const OFFWHITE = 'F2F2F2'; // page background + light text on navy
++const CARD = 'D9D9D9'; // light card fill
++const SILVER = 'BFBFBF'; // secondary infographic fill / rules
++const INK = '000000';
++const INK_85 = '262626';
++const INK_92 = '0D0D0D';
++const BODY_GREY = '404040';
++const BODY_GREY2 = '595959';
++const BODY_GREY3 = '3F3F3F';
++const HINT_GREY = '808080';
++const BLUE = '2C7CED'; // CTA pill on the cover / closing slide
++const BLUE_PALE = 'AACBF8';
++const PLACEHOLDER = 'CECECE'; // stand-in for photographs
++const PLACEHOLDER_TX = 'A8A8A8';
++
++/* -------------------------------------------------------------------- fonts */
++const HEAD = 'Poppins Medium'; // theme major font
++const BODY = 'Poppins Light'; // theme minor font
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++/* ----------------------------------------------------------------- helpers  */
++// roundRect "adj" values in the source file are a fraction of the shorter side
++const rr = (frac, minSide) => frac * minSide;
++
++function rect (slide, o) { slide.addShape('rect', o); }
++
++function box (slide, text, o) {
++  slide.addText(text, Object.assign({ fontFace: BODY, fontSize: 18, color: INK, valign: 'top' }, o));
++}
++
++/** Body copy: 12pt grey on 150% leading - the deck's default paragraph style. */
++function body (slide, text, o) {
++  box(slide, text, Object.assign({ fontSize: 12, color: BODY_GREY, lineSpacingMultiple: 1.5 }, o));
++}
++
++function hr (slide, x, y, w, color, width, dash, transparency) {
++  slide.addShape('line', { x, y, w, h: 0, line: { color, width, dashType: dash || 'solid', transparency: transparency || 0 } });
++}
++
++/** Flat block standing in for a photograph. */
++function photo (slide, x, y, w, h, radius) {
++  slide.addShape(radius ? 'roundRect' : 'rect',
++    { x, y, w, h, fill: { color: PLACEHOLDER }, rectRadius: radius || 0 });
++  box(slide, '[image]', { x, y, w, h, align: 'center', valign: 'middle', fontSize: 11, color: PLACEHOLDER_TX });
++}
++
++/** Stand-in for the deck's small vector icons: rounded square + centre dot. */
++function icon (slide, x, y, s, color) {
++  slide.addShape('roundRect', { x, y, w: s, h: s, fill: { type: 'none' }, line: { color, width: 1 }, rectRadius: s * 0.28 });
++  slide.addShape('ellipse', { x: x + s * 0.36, y: y + s * 0.36, w: s * 0.28, h: s * 0.28, fill: { color } });
++}
++
++/** Solid disc badge holding a glyph - the social buttons on the cover slide. */
++function glyphBadge (slide, x, y, s, disc, glyph, ink, size) {
++  slide.addShape('ellipse', { x, y, w: s, h: s, fill: { color: disc } });
++  box(slide, glyph, { x: x - 0.2, y, w: s + 0.4, h: s, align: 'center', valign: 'middle', fontFace: HEAD, fontSize: size, color: ink, bold: true, wrap: false });
++}
++
++/** Paper-plane style CTA glyph (a rotated triangle). */
++function plane (slide, x, y, s, color) {
++  slide.addShape('triangle', { x, y, w: s, h: s, fill: { color }, rotate: 90 });
++}
++
++const lerp = (a, b, t) => Math.round(a + (b - a) * t);
++function mix (c1, c2, t) {
++  const p = (c, i) => parseInt(c.substr(i * 2, 2), 16);
++  const h = n => n.toString(16).toUpperCase().padStart(2, '0');
++  return h(lerp(p(c1, 0), p(c2, 0), t)) + h(lerp(p(c1, 1), p(c2, 1), t)) + h(lerp(p(c1, 2), p(c2, 2), t));
++}
++
++/**
++ * The cover and closing slides use a corner-focused radial gradient.
++ * pptxgenjs backgrounds are a flat colour only, so paint the ramp as a stack of
++ * nested ellipses centred on the bright corner (fx, fy) - largest (darkest)
++ * first, each one slightly smaller and brighter.
++ */
++const GLOW_REACH = 1.2; // outermost ring, as a fraction of the slide diagonal
++const GLOW_SQUASH = 0.8; // <1 stretches the rings vertically
++const GLOW_GAMMA = 0.8; // ramp shaping: <1 keeps the bright core tight
++
++function cornerGlow (slide, fx, fy, dark, bright, steps) {
++  for (let i = 0; i < steps; i++) {
++    const f = GLOW_REACH * (1 - i / (steps - 1));
++    const rx = SLIDE_W * f;
++    const ry = SLIDE_H * f / GLOW_SQUASH;
++    slide.addShape('ellipse', {
++      x: fx - rx, y: fy - ry, w: rx * 2, h: ry * 2,
++      fill: { color: mix(dark, bright, Math.pow(1 - f / GLOW_REACH, GLOW_GAMMA)) }
++    });
++  }
++}
++
++/** Header bar: logo mark, wordmark, back arrow and the "Search Here" pill. */
++function chrome (slide, dark) {
++  const ink = dark ? WHITE : INK;
++  const sub = dark ? WHITE : HINT_GREY;
++  slide.addShape('ellipse', { x: 0.531, y: 0.508, w: 0.143, h: 0.164, fill: { color: ink } });
++  slide.addShape('ellipse', { x: 0.484, y: 0.472, w: 0.236, h: 0.236, fill: { type: 'none' }, line: { color: ink, width: 0.5 } });
++  box(slide, 'Moon Startup', { x: 0.72, y: 0.438, w: 1.326, h: 0.303, fontSize: 12, color: ink, wrap: false });
++
++  slide.addShape('ellipse', { x: 10.795, y: 0.438, w: 0.3, h: 0.303, fill: { color: WHITE, transparency: 66 }, line: { color: sub, width: 1 } });
++  slide.addShape('line', { x: 10.876, y: 0.547, w: 0.138, h: 0.085, flipH: true, line: { color: sub, width: 0.75, endArrowType: 'arrow' } });
++
++  slide.addShape('roundRect', { x: 11.146, y: 0.438, w: 1.67, h: 0.303, rectRadius: rr(0.5, 0.303), fill: { color: WHITE, transparency: 66 }, line: { color: sub, width: 1 } });
++  box(slide, 'Search Here', { x: 11.219, y: 0.438, w: 1.326, h: 0.303, fontSize: 12, color: sub });
++  slide.addShape('ellipse', { x: 12.545, y: 0.511, w: 0.122, h: 0.122, fill: { type: 'none' }, line: { color: sub, width: 0.9 } });
++  slide.addShape('line', { x: 12.653, y: 0.619, w: 0.048, h: 0.049, line: { color: sub, width: 0.9 } });
++}
++
++/** Page title + intro paragraph used on nearly every content slide. */
++function heading (slide, txt, x, y, w, h) {
++  box(slide, txt, { x, y, w, h, fontFace: HEAD, fontSize: 36, bold: true, color: INK });
++}
++function intro (slide, txt, x, y, w, h) {
++  body(slide, txt, { x, y, w, h });
++}
++
++const LOREM = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++  'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ';
++const LOREM_G = 'PLACEHOLDER';
++
++/* ============================================================== slide 1 ==== */
++function slide01 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: '031226' };
++  cornerGlow(s, SLIDE_W, SLIDE_H, '031226', '1263D4', 70);
++
++  // scattered 1" tiles in the top-right corner
++  [[12.333, 0], [11.333, 1.0], [12.333, 2.0], [10.333, 1.984], [9.333, 0.984]].forEach(([x, y]) =>
++    rect(s, { x, y, w: 1, h: 1, fill: { color: NAVY, transparency: 71 } }));
++
++  chrome(s, true);
++
++  [['G+', 0.804, 1.527, 0.374], ['\u25A1', 1.41, 1.517, 0.392], ['f', 2.033, 1.528, 0.374]]
++    .forEach(([g, x, y, sz]) => glyphBadge(s, x, y, sz, WHITE, g, NAVY, 11));
++  s.addShape('line', { x: 2.913, y: 1.291, w: 0, h: 0.803, line: { color: WHITE, width: 0.25, transparency: 10 } });
++  box(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue',
++    { x: 3.183, y: 1.354, w: 3.807, h: 0.678, fontSize: 12, color: OFFWHITE, lineSpacingMultiple: 1.5 });
++
++  box(s, 'Start Up', { x: 0.742, y: 3.169, w: 8.145, h: 2.457, fontFace: HEAD, fontSize: 136, color: WHITE, wrap: false });
++  box(s, 'Pitch Deck', { x: 0.604, y: 4.826, w: 10.251, h: 2.457, fontFace: HEAD, fontSize: 136, color: WHITE });
++
++  s.addShape('roundRect', { x: 9.008, y: 4.115, w: 2.651, h: 0.566, rectRadius: rr(0.5, 0.566), fill: { color: BLUE } });
++  s.addShape('ellipse', { x: 11.032, y: 4.182, w: 0.499, h: 0.499, fill: { color: WHITE } });
++  plane(s, 11.138, 4.279, 0.29, BLUE);
++  box(s, 'Start Presentation', { x: 9.13, y: 4.234, w: 1.936, h: 0.337, fontSize: 14, bold: true, color: WHITE, wrap: false });
++}
++
++/* ============================================================== slide 2 ==== */
++function slide02 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  photo(s, 1.354, 3.526, 5.059, 3.41, 0);
++  chrome(s, false);
++
++  heading(s, 'Table Of Content', 0.72, 1.372, 4.504, 0.707);
++  intro(s, LOREM, 0.72, 2.222, 9.345, 0.675);
++
++  // navy tab bleeding off the left edge (a 90deg rotated "top corners rounded")
++  s.addShape('round2SameRect', { x: -1.179, y: 4.705, w: 3.41, h: 1.052, rotate: 90, fill: { color: NAVY } });
++
++  const rows = [
++    ['Introductions', '3', 3.45, 3.609, false],
++    ['Problem Statement', '4', 4.016, 3.609, false],
++    ['Innovative Solutions', '5', 4.555, 3.609, false],
++    ['Market Size & Potential', '6', 5.128, 3.482, false],
++    ['How We Make Money', '7', 5.838, 3.482, true],
++    ['Progress & Traction', '9', 6.592, 2.511, false]
++  ];
++  // highlighted row sits on a navy pill with a circular arrow badge
++  s.addShape('roundRect', { x: 7.439, y: 5.723, w: 4.954, h: 0.634, rectRadius: rr(0.20173, 0.634), fill: { color: NAVY } });
++  s.addShape('ellipse', { x: 7.587, y: 5.874, w: 0.331, h: 0.331, fill: { color: WHITE, transparency: 76 } });
++  s.addShape('rightArrow', { x: 7.676, y: 5.98, w: 0.153, h: 0.12, fill: { color: WHITE } });
++
++  rows.forEach(([label, num, y, w, hot]) => {
++    const c = hot ? WHITE : INK;
++    box(s, label, { x: hot ? 8.175 : 7.554, y, w, h: 0.404, color: c, wrap: false });
++    box(s, num, { x: 11.936, y: y + 0.017, w: 0.346, h: 0.404, color: c, align: 'right' });
++  });
++}
++
++/* ============================================================== slide 3 ==== */
++function slide03 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  chrome(s, false);
++  heading(s, 'Introduce The Business Model', 0.825, 1.454, 8.107, 0.707);
++  intro(s, LOREM + ' Nunc', 0.825, 2.302, 10.375, 0.675);
++
++  photo(s, 7.757, 3.582, 4.788, 2.997, rr(0.08356, 2.997));
++  s.addShape('roundRect', { x: 0.803, y: 3.582, w: 6.665, h: 2.997, rectRadius: rr(0.08356, 2.997), fill: { color: NAVY } });
++
++  const rows = [
++    ['How We Generate Scale', 'Lorem ipsum dolor sit amet, consectetuer adipiscing', 4.032, 4.329, 12, 4.905, 1.127],
++    ['Abou Business Models', 'Lorem ipsum dolor sit amet, consectetuer adipiscing', 5.256, 5.553, 10, 6.129, 1.174]
++  ];
++  rows.forEach(([title, sub, yT, yS, szS, yLine, xLine]) => {
++    icon(s, 1.236, yT + 0.128, 0.32, WHITE);
++    box(s, title, { x: 1.885, y: yT, w: 2.514, h: 0.337, fontFace: HEAD, fontSize: 14, color: WHITE, wrap: false });
++    body(s, sub, { x: 1.885, y: yS, w: 4.616, h: 0.375, fontSize: szS, color: OFFWHITE });
++    hr(s, xLine, yLine, 5.97, WHITE, 0.75);
++    s.addShape('ellipse', { x: 6.82, y: yT + 0.36, w: 0.24, h: 0.24, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
++    s.addShape('rightArrow', { x: 6.875, y: yT + 0.425, w: 0.13, h: 0.11, fill: { color: WHITE } });
++  });
++}
++
++/* ============================================================== slide 4 ==== */
++function slide04 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  chrome(s, false);
++  heading(s, 'At The Core Of Our Values Is A Commitment', 0.784, 1.374, 4.525, 1.919);
++  intro(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++    'Fusce posuere, magna sed pulvinar ultricies, purus lectus', 0.784, 3.629, 4.81, 0.981);
++
++  const cards = [
++    [1.374, CARD, INK, BODY_GREY, LOREM_SHORT, 12],
++    [3.233, NAVY, WHITE, OFFWHITE, LOREM_SHORT, 12],
++    [5.091, CARD, INK, BODY_GREY, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ', 10]
++  ];
++  cards.forEach(([y, fill, titleCol, bodyCol, text, sz]) => {
++    s.addShape('roundRect', { x: 7.417, y, w: 5.399, h: 1.669, rectRadius: rr(0.08356, 1.669), fill: { color: fill } });
++    s.addShape('ellipse', { x: 6.917, y: y + 0.335, w: 1.0, h: 1.0, fill: { color: fill }, line: { color: OFFWHITE, width: 4 } });
++    icon(s, 7.222, y + 0.64, 0.39, fill === NAVY ? OFFWHITE : NAVY);
++    box(s, 'How We Generate Scale', { x: 8.223, y: y + 0.347, w: 2.565, h: 0.337, fontFace: HEAD, fontSize: 14, color: titleCol, wrap: false });
++    body(s, text, { x: 8.223, y: y + 0.644, w: 4.396, h: 0.678, fontSize: sz, color: bodyCol });
++  });
++}
++
++/* ============================================================== slide 5 ==== */
++function slide05 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  photo(s, -1.2, 0, 5.547, 7.5, 0.71); // full-bleed left photo, rounded right edge
++  chrome(s, false);
++
++  heading(s, 'Leveraging Data To Provide Actionable Insight', 5.261, 1.771, 6.945, 1.313);
++  intro(s, LOREM, 5.261, 3.238, 7.295, 0.981);
++
++  const items = [
++    ['Internal Data (CRM, ERP, Website Analytics)', 4.676, 4.347],
++    ['External Data (Market Trends, Social Media, Third-party Providers)', 5.302, 5.728],
++    ['Structured Vs Unstructured Data', 5.944, 4.102]
++  ];
++  items.forEach(([txt, y, w], i) => {
++    s.addShape('ellipse', { x: 5.412, y: y + 0.052, w: 0.216, h: 0.216, fill: { color: NAVY } });
++    box(s, '\u2713', { x: 5.412, y: y + 0.052, w: 0.216, h: 0.216, fontFace: 'DejaVu Sans', fontSize: 9, color: WHITE, align: 'center', valign: 'middle' });
++    body(s, txt, { x: 6.163, y, w, h: 0.375 });
++    if (i < 2) hr(s, 5.412, y + 0.482, i === 0 ? 7.096 : 7.144, SILVER, 0.75, 'dash');
++  });
++}
++
++/* ============================================================== slide 6 ==== */
++function slide06 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  chrome(s, false);
++  heading(s, 'Transformative Solutions For Modern Business', 0.807, 1.224, 8.28, 1.313);
++  intro(s, LOREM, 0.807, 2.579, 10.294, 0.678);
++  hr(s, 0.721, 3.646, 11.892, SILVER, 0.5);
++  box(s, 'Fundamental change in how businesses operate',
++    { x: 0.807, y: 4.034, w: 2.09, h: 0.808, fontSize: 14, bold: true, color: INK });
++
++  const cards = [
++    ['Sustainable Operations', 4.825, 4.034, CARD],
++    ['Data & AI Integration', 8.817, 4.034, NAVY],
++    ['Digital Transformation', 4.825, 5.579, CARD],
++    ['Workforce Enablement', 8.817, 5.579, CARD]
++  ];
++  cards.forEach(([title, x, y, fill]) => {
++    s.addShape('roundRect', { x, y, w: 3.812, h: 1.374, rectRadius: rr(0.08356, 1.374), fill: { color: fill } });
++    box(s, title, { x: x + 0.18, y: y + 0.189, w: 2.847, h: 0.337, fontSize: 14, bold: true, color: fill === NAVY ? WHITE : INK });
++    box(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas',
++      { x: x + 0.18, y: y + 0.508, w: 3.451, h: 0.678, fontSize: 12, color: fill === NAVY ? OFFWHITE : BODY_GREY, lineSpacingMultiple: 1.5 });
++  });
++}
++
++/* ============================================================== slide 7 ==== */
++function slide07 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  chrome(s, false);
++  heading(s, 'Help Clients To Navigate Challenges And Optimized', 0.751, 1.557, 5.696, 1.919);
++  box(s, 'Future Technology', { x: 0.751, y: 3.921, w: 3.062, h: 0.37, fontSize: 16, bold: true, color: INK });
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++    'Fusce posuere, magna sed pulvinar ultricies', { x: 0.751, y: 4.435, w: 6.77, h: 0.678 });
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
++    { x: 0.751, y: 5.276, w: 5.376, h: 0.678, bullet: { indent: 13.5 } });
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
++    { x: 0.751, y: 6.05, w: 5.376, h: 0.375, bullet: { indent: 13.5 } });
++
++  // three stat bubbles
++  s.addShape('ellipse', { x: 7.554, y: 1.496, w: 2.625, h: 2.625, fill: { color: BLUE_PALE } });
++  s.addShape('ellipse', { x: 10.673, y: 2.311, w: 1.81, h: 1.81, fill: { color: BLUE_PALE } });
++  s.addShape('ellipse', { x: 9.429, y: 4.315, w: 2.181, h: 2.181, fill: { color: NAVY } });
++
++  // growth-chart glyph inside the large bubble
++  rect(s, { x: 8.196, y: 2.607, w: 0.202, h: 0.435, fill: { color: INK } });
++  rect(s, { x: 8.482, y: 2.438, w: 0.202, h: 0.604, fill: { color: INK } });
++  s.addShape('upArrow', { x: 8.646, y: 1.913, w: 0.443, h: 1.129, fill: { color: INK } });
++  s.addShape('ellipse', { x: 8.958, y: 2.482, w: 0.578, h: 0.578, fill: { color: INK } });
++  box(s, '$', { x: 8.958, y: 2.482, w: 0.578, h: 0.578, fontFace: HEAD, fontSize: 20, bold: true, color: BLUE_PALE, align: 'center', valign: 'middle' });
++
++  box(s, 'Innovation Of Start Up', { x: 7.994, y: 3.162, w: 1.744, h: 0.572, fontFace: HEAD, fontSize: 14, color: INK, align: 'center' });
++  box(s, 'Data & AI Integration', { x: 11.027, y: 2.575, w: 1.101, h: 0.471, fontSize: 11, color: BODY_GREY, align: 'center' });
++  box(s, '$1200K', { x: 10.788, y: 3.032, w: 1.581, h: 0.572, fontFace: HEAD, fontSize: 28, bold: true, color: INK, align: 'center' });
++  box(s, 'Income', { x: 11.134, y: 3.554, w: 0.888, h: 0.286, fontSize: 11, color: BODY_GREY, align: 'center' });
++  box(s, 'Digital Transformation', { x: 9.748, y: 4.691, w: 1.543, h: 0.471, fontSize: 11, bold: true, color: OFFWHITE, align: 'center' });
++  box(s, '90%', { x: 9.729, y: 5.162, w: 1.581, h: 0.841, fontFace: HEAD, fontSize: 44, bold: true, color: WHITE, align: 'center' });
++  box(s, 'Process', { x: 10.075, y: 5.908, w: 0.888, h: 0.286, fontSize: 11, color: OFFWHITE, align: 'center' });
++}
++
++/* ============================================================== slide 8 ==== */
++function slide08 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  photo(s, 6.667, 1.426, 2.823, 4.193, 0.25);
++  photo(s, 9.721, 1.426, 2.823, 4.193, 0.25);
++  chrome(s, false);
++  heading(s, 'Meet Our Startup Expert Team', 0.674, 1.516, 4.923, 1.313);
++  intro(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++    'Fusce posuere, magna sed pulvinar ultricies, purus', 0.674, 3.259, 4.494, 0.981);
++
++  [['Isabella Adams', 6.882, 7.131, 1.967], ['Emma Walker', 9.936, 10.186, 1.781]].forEach(([name, xLine, xText, w]) => {
++    s.addShape('line', { x: xLine, y: 6.068, w: 0, h: 0.698, line: { color: NAVY, width: 1 } });
++    box(s, name, { x: xText, y: 5.942, w, h: 0.37, fontFace: HEAD, fontSize: 16, bold: true, color: INK, wrap: false });
++    box(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
++      { x: xText, y: 6.313, w: 2.143, h: 0.579, fontSize: 10, color: BODY_GREY, lineSpacingMultiple: 1.5 });
++  });
++}
++
++/* ============================================================== slide 9 ==== */
++function slide09 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  // laptop: screen slab over a wider base bar; phone: tall rounded slab in front
++  photo(s, 7.28, 3.18, 4.65, 3.05, 0.08);
++  rect(s, { x: 6.5, y: 6.23, w: 6.04, h: 0.22, fill: { color: PLACEHOLDER } });
++  photo(s, 6.44, 3.93, 1.9, 3.4, 0.3);
++  chrome(s, false);
++
++  heading(s, 'Startup Pitch Deck Mockup Design', 0.859, 1.315, 5.681, 1.313);
++  intro(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++    'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo', 6.49, 1.481, 5.984, 0.981);
++  box(s, 'Startup Pitch Deck Presentation: Showcasing Innovation, Vision, And Market Potential To Attract Investors',
++    { x: 0.859, y: 2.955, w: 3.687, h: 0.808, fontSize: 14, bold: true, color: INK });
++  box(s, 'Data & AI Integration', { x: 0.859, y: 4.309, w: 1.79, h: 0.286, fontSize: 11, color: BODY_GREY });
++  box(s, '$1200K', { x: 0.859, y: 4.675, w: 2.832, h: 0.841, fontFace: HEAD, fontSize: 44, bold: true, color: NAVY });
++  intro(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna',
++    0.859, 5.494, 3.92, 0.981);
++}
++
++/* ============================================================= slide 10 ==== */
++function slide10 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  chrome(s, false);
++  box(s, 'Infographic Section', { x: 3.912, y: 1.12, w: 5.509, h: 0.707, fontFace: HEAD, fontSize: 36, bold: true, color: INK, align: 'center' });
++
++  // two "count" stats
++  [['120+', 'Product', 1.105, 2.952, 2.403, 2.96, 2.458, 3.33, 2.527],
++    ['80+', 'Market', 5.015, 2.975, 6.313, 2.983, 2.541, 3.353, 2.541]]
++    .forEach(([big, label, bx, by, tx, ty, tw, sy, sw]) => {
++      box(s, big, { x: bx, y: by, w: 1.416, h: 0.707, fontSize: 36, color: NAVY });
++      box(s, 'Rewards', { x: bx, y: by + 0.578, w: 1.416, h: 0.37, fontSize: 16, color: INK_92 });
++      box(s, label, { x: tx, y: ty, w: tw, h: 0.37, fontSize: 16, color: INK_92 });
++      body(s, 'Lorem dolor sit amet consectetur adipiscing elit', { x: tx, y: sy, w: sw, h: 0.572, color: BODY_GREY2 });
++    });
++
++  // two money cards
++  [['$31m', 'Management', 1.218, 4.396, 1.456, 4.663, 5.163, 3.226, 4.936],
++    ['$22m', 'Investor Relations', 4.937, 4.391, 5.175, 4.658, 5.158, 6.969, 4.669]]
++    .forEach(([amt, label, rx, ry, tx, ty, ly, ix, iy]) => {
++      rect(s, { x: rx, y: ry, w: 3.153, h: 1.337, fill: { color: CARD } });
++      box(s, amt, { x: tx, y: ty, w: 1.646, h: 0.572, fontSize: 28, color: INK_92 });
++      box(s, label, { x: tx, y: ly, w: 1.996, h: 0.33, fontSize: 12, color: BODY_GREY2, lineSpacingMultiple: 1.2 });
++      icon(s, ix, iy, 0.62, NAVY);
++    });
++
++  body(s, 'PLACEHOLDER',
++    { x: 1.139, y: 6.205, w: 6.951, h: 0.572, color: BODY_GREY2 });
++
++  // dark problem / solutions panel
++  rect(s, { x: 8.902, y: 2.498, w: 3.265, h: 4.342, fill: { color: NAVY } });
++  [3.301, 4.703, 5.421].forEach(y => hr(s, 9.171, y, 2.726, WHITE, 0.5, 'solid', 61));
++  box(s, 'Problem', { x: 9.062, y: 2.75, w: 2.944, h: 0.404, fontSize: 18, bold: true, color: WHITE, align: 'center' });
++  box(s, LOREM_G, { x: 9.1, y: 3.468, w: 2.869, h: 1.057, fontSize: 12, color: WHITE, align: 'center', lineSpacingMultiple: 1.2 });
++  box(s, 'Solutions', { x: 9.413, y: 4.861, w: 2.243, h: 0.404, fontSize: 18, bold: true, color: WHITE, align: 'center' });
++  box(s, LOREM_G, { x: 9.1, y: 5.564, w: 2.869, h: 1.057, fontSize: 12, color: WHITE, align: 'center', lineSpacingMultiple: 1.2 });
++}
++
++/* ============================================================= slide 11 ==== */
++function slide11 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  chrome(s, false);
++  box(s, 'Infographic Section', { x: 0.921, y: 1.59, w: 6.23, h: 0.774, fontFace: HEAD, fontSize: 40, bold: true, color: INK });
++  box(s, 'PLACEHOLDER',
++    { x: 0.972, y: 2.603, w: 5.678, h: 0.598, fontSize: 12, color: BODY_GREY3, lineSpacingMultiple: 1.3 });
++
++  // Four-piece "brain" puzzle. Each quadrant is a slab squared off against the
++  // seams plus a few circular lobes bulging out along its outer edge.
++  const SX = 9.92; const SY = 3.52; // seam crossing point
++  const quads = [
++    { fill: NAVY, slab: [7.55, 2.95, SX, SY], lobes: [[7.56, 2.99, 0.52], [8.30, 2.68, 0.63], [8.90, 2.66, 0.62], [9.45, 2.62, 0.60]] },
++    { fill: SILVER, slab: [SX, 2.95, 11.90, SY], lobes: [[10.40, 2.50, 0.62], [11.15, 2.60, 0.63], [11.75, 2.95, 0.52]] },
++    { fill: SILVER, slab: [7.56, SY, SX, 4.05], lobes: [[7.56, 3.95, 0.45], [8.40, 4.25, 0.63], [9.20, 4.45, 0.62], [9.65, 4.20, 0.55]] },
++    { fill: NAVY, slab: [SX, SY, 11.70, 4.55], lobes: [[10.55, 4.75, 0.62], [11.25, 4.95, 0.72], [11.80, 4.30, 0.58]] }
++  ];
++  quads.forEach(({ fill, slab: [x0, y0, x1, y1], lobes }) => {
++    lobes.forEach(([cx, cy, r]) => s.addShape('ellipse', { x: cx - r, y: cy - r, w: r * 2, h: r * 2, fill: { color: fill } }));
++    rect(s, { x: x0, y: y0, w: x1 - x0, h: y1 - y0, fill: { color: fill } });
++  });
++  s.addShape('rtTriangle', { x: 10.35, y: 5.10, w: 1.25, h: 0.80, flipV: true, fill: { color: NAVY } }); // brain stem
++  // seams, then the interlocking tabs that straddle them
++  rect(s, { x: SX - 0.03, y: 1.85, w: 0.06, h: 4.1, fill: { color: OFFWHITE } });
++  rect(s, { x: 7.0, y: SY - 0.03, w: 5.45, h: 0.06, fill: { color: OFFWHITE } });
++  [[9.70, 2.73, SILVER], [8.47, 3.69, NAVY], [11.12, 3.30, NAVY], [10.17, 4.34, SILVER]]
++    .forEach(([x, y, c]) => s.addShape('ellipse',
++      { x: x - 0.235, y: y - 0.235, w: 0.47, h: 0.47, fill: { color: c }, line: { color: OFFWHITE, width: 1.5 } }));
++  [['45', 7.653, 2.507, WHITE], ['25', 9.78, 2.208, INK], ['65', 8.335, 3.917, INK], ['35', 10.251, 4.079, WHITE]]
++    .forEach(([n, x, y, c]) => s.addText(
++      [{ text: n, options: { fontSize: 28 } }, { text: '%', options: { fontSize: 20 } }],
++      { x, y, w: 1.916, h: 0.572, fontFace: BODY, bold: true, color: c, align: 'center', valign: 'top' }));
++
++  // 2 x 2 bullet grid
++  [[1.111, 1.437, 1.458, 3.962, NAVY], [3.971, 4.297, 4.318, 3.962, SILVER],
++    [1.111, 1.437, 1.458, 5.408, SILVER], [3.971, 4.297, 4.318, 5.408, NAVY]]
++    .forEach(([dx, bx, tx, ty, c]) => {
++      s.addShape('ellipse', { x: dx, y: ty + 0.071, w: 0.262, h: 0.262, fill: { color: c } });
++      s.addShape('triangle', { x: dx + 0.096, y: ty + 0.17, w: 0.07, h: 0.06, rotate: 90, fill: { color: WHITE } });
++      box(s, 'Your Text Here', { x: tx, y: ty, w: 2.192, h: 0.37, fontSize: 16, bold: true, color: INK_85 });
++      box(s, 'Lorem dolor sit amet consectetur adipiscing elit sed do',
++        { x: bx, y: ty + 0.321, w: 2.282, h: 0.889, fontSize: 12, color: BODY_GREY3, lineSpacingMultiple: 1.3 });
++    });
++}
++
++/* ============================================================= slide 12 ==== */
++function slide12 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  chrome(s, false);
++  heading(s, 'Infographic Section', 0.674, 1.482, 5.509, 0.707);
++
++  // three tilted rounded squares climbing to the right
++  const tiles = [[4.626, 3.318], [6.464, 2.71], [8.253, 2.055]];
++  tiles.forEach(([x, y]) => s.addShape('roundRect', { x, y, w: 2.127, h: 2.127, rotate: 315, rectRadius: 0.28, fill: { color: NAVY, transparency: 15 } }));
++  [[4.917, 4.158, 4.852, 4.397, 5.619, 3.971], [6.833, 3.442, 6.768, 3.682, 7.426, 3.318], [8.685, 2.737, 8.62, 2.976, null, null]]
++    .forEach(([px, py, sx, sy, yx, yy]) => {
++      box(s, '70%', { x: px, y: py, w: 1.23, h: 0.505, rotate: 315, fontFace: HEAD, fontSize: 24, color: WHITE, align: 'center', valign: 'middle' });
++      box(s, 'Progression', { x: sx, y: sy, w: 1.707, h: 0.373, rotate: 315, fontSize: 12, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++      if (yx !== null) box(s, '2024', { x: yx, y: yy, w: 2.021, h: 0.303, rotate: 45, flipH: true, fontSize: 12, color: WHITE, align: 'center', valign: 'middle' });
++    });
++
++  // white "256K" badges
++  [[9.887, 2.103], [7.449, 4.801], [3.252, 3.62]].forEach(([x, y]) => {
++    s.addShape('roundRect', { x, y, w: 1.576, h: 0.59, rectRadius: rr(0.29845, 0.59), fill: { color: WHITE } });
++    s.addShape('roundRect', { x: x + 0.107, y: y + 0.088, w: 0.428, h: 0.414, rectRadius: rr(0.29845, 0.414), fill: { color: NAVY } });
++    s.addShape('ellipse', { x: x + 0.245, y: y + 0.21, w: 0.155, h: 0.155, fill: { color: WHITE } });
++    box(s, '256K', { x: x + 0.608, y: y + 0.126, w: 1.261, h: 0.337, fontFace: HEAD, fontSize: 14, bold: true, color: BODY_GREY, valign: 'middle' });
++  });
++
++  box(s, 'Option Here', { x: 9.125, y: 5.559, w: 2.285, h: 0.337, fontFace: HEAD, fontSize: 14, color: INK });
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor', { x: 9.125, y: 5.889, w: 3.665, h: 0.679 });
++
++  // white caption pill bottom-left
++  s.addShape('roundRect', { x: 0.852, y: 5.552, w: 3.665, h: 0.946, rectRadius: rr(0.5, 0.946), fill: { color: WHITE } });
++  s.addShape('ellipse', { x: 1.019, y: 5.691, w: 0.669, h: 0.669, fill: { color: NAVY } });
++  s.addShape('ellipse', { x: 1.252, y: 5.924, w: 0.203, h: 0.203, fill: { color: WHITE } });
++  box(s, 'Your Text Here', { x: 1.855, y: 5.709, w: 1.702, h: 0.337, fontFace: HEAD, fontSize: 14, bold: true, color: INK });
++  body(s, 'Maecenas porttitor congue', { x: 1.863, y: 5.97, w: 2.733, h: 0.376 });
++}
++
++/* ============================================================= slide 13 ==== */
++function slide13 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  chrome(s, false);
++  box(s, 'Infographic Section', { x: 3.912, y: 1.12, w: 5.509, h: 0.707, fontFace: HEAD, fontSize: 36, bold: true, color: INK, align: 'center' });
++
++  // --- left: a GOAL hub inside a ring of eight alternating 45 degree segments.
++  // The hub is wider than the ring, so only the top, bottom and a right sliver show.
++  s.addShape('ellipse', { x: 0.62, y: 3.3, w: 2.0, h: 2.3, fill: { color: 'E9F3EE' } }); // soft mint glow
++  const RING = { x: 1.49, y: 3.04, w: 1.845, h: 2.765 };
++  for (let i = 0; i < 8; i++) {
++    s.addShape('pie', Object.assign({ angleRange: [340 + i * 45, 25 + i * 45] },
++      RING, { fill: { color: i % 2 ? SILVER : NAVY } }));
++  }
++  s.addShape('ellipse', { x: 1.139, y: 3.397, w: 2.054, h: 2.054, fill: { color: WHITE } });
++  box(s, 'GOAL', { x: 1.608, y: 3.989, w: 1.118, h: 0.505, fontSize: 24, bold: true, color: INK, align: 'center' });
++  box(s, 'Lorem dolor sit amet consectetur', { x: 1.306, y: 4.507, w: 1.721, h: 0.53, fontSize: 11, color: BODY_GREY2, align: 'center', lineSpacingMultiple: 1.2 });
++
++  // dashed guide arc with an end cap dot at each tip
++  s.addShape('arc', { x: 0.428, y: 2.655, w: 3.5, h: 3.538, angleRange: [270, 90], fill: { type: 'none' }, line: { color: 'A5A5A5', width: 0.75, dashType: 'lgDash', transparency: 50 } });
++  [[2.082, 6.113], [2.09, 2.583]].forEach(([x, y]) =>
++    s.addShape('ellipse', { x, y, w: 0.129, h: 0.13, fill: { color: OFFWHITE }, line: { color: 'D8D8D8', width: 0.75 } }));
++
++  // --- centre: four numbered pills, each with a marker dot on the guide arc
++  const pills = [
++    ['01', 3.964, 2.329, NAVY, 3.422, 3.198],
++    ['02', 4.473, 3.419, SILVER, 3.734, 3.974],
++    ['03', 4.488, 4.609, NAVY, 3.749, 4.581],
++    ['04', 4.021, 5.688, SILVER, 3.479, 5.345]
++  ];
++  pills.forEach(([num, x, y, fill, mx, my]) => {
++    const dark = fill === NAVY;
++    const fg = dark ? WHITE : INK;
++    s.addShape('roundRect', { x, y, w: 3.048, h: 0.828, rectRadius: rr(0.5, 0.828), fill: { color: fill } });
++    s.addShape('ellipse', { x: x - 0.46, y: y + 0.075, w: 0.672, h: 0.679, fill: { color: fill } });
++    box(s, num, { x: x - 0.41, y: y + 0.18, w: 0.575, h: 0.438, rotate: -18, fontSize: 20, bold: true, color: fg, align: 'center', valign: 'middle' });
++    box(s, 'Lorem dolor sit amet consectetur adipisci', { x: x + 0.45, y: y + 0.133, w: 1.721, h: 0.53, fontSize: 10.5, color: dark ? WHITE : BODY_GREY, lineSpacingMultiple: 1.2 });
++    s.addShape('line', { x: x + 2.173, y: y + 0.154, w: 0, h: 0.513, line: { color: dark ? WHITE : OFFWHITE, width: 1.14 } });
++    icon(s, x + 2.39, y + 0.24, 0.34, fg);
++    s.addShape('ellipse', { x: mx, y: my, w: 0.241, h: 0.243, fill: { color: WHITE } });
++    s.addShape('ellipse', { x: mx + 0.05, y: my + 0.05, w: 0.14, h: 0.142, fill: { color: fill } });
++  });
++
++  // --- right: copy, icon row and the 68% stat
++  body(s, LOREM_G + 'PLACEHOLDER',
++    { x: 8.022, y: 2.676, w: 4.328, h: 1.284 });
++  [8.124, 9.352, 10.526, 11.562].forEach(x => icon(s, x, 4.53, 0.53, NAVY));
++  box(s, '68%', { x: 7.902, y: 5.396, w: 1.45, h: 0.774, fontSize: 40, color: INK });
++  body(s, 'Lorem dolor sit amet consectetur adipiscing elit sed do eiusmod', { x: 9.433, y: 5.516, w: 3.265, h: 0.678 });
++}
++
++/* ============================================================= slide 14 ==== */
++function slide14 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: OFFWHITE };
++  photo(s, 8.999, 1.416, 4.334, 2.394, 0.25);
++  chrome(s, false);
++  heading(s, 'Our Contact Information\u2019s', 0.674, 1.696, 7.514, 0.707);
++  intro(s, LOREM, 0.674, 2.548, 7.514, 0.981);
++
++  const cards = [
++    ['Get In Touch', '(+62) 000 0000 0000\n(0725) 00000', 0.757, CARD, 2.456],
++    ['Address', '123 Street Name, City Name, Name Country', 3.755, NAVY, 2.088],
++    ['Follow Us', 'www.yoursitehere.com\noffice@ yoursitehere.com', 6.753, CARD, 2.456],
++    ['Email', 'name@mailaddress.com\nHellomail@address.com', 9.751, CARD, 2.4]
++  ];
++  cards.forEach(([title, lines, x, fill, tw]) => {
++    const fg = fill === NAVY ? WHITE : INK;
++    s.addShape('roundRect', { x, y: 4.43, w: 2.825, h: 1.984, rectRadius: rr(0.10608, 1.984), fill: { color: fill } });
++    s.addShape('ellipse', { x: x + 0.18, y: 4.771, w: 0.281, h: 0.281, fill: { color: fg } });
++    box(s, title, { x: x + 0.514, y: 4.723, w: 1.476, h: 0.375, fontFace: HEAD, fontSize: 12, color: fg, lineSpacingMultiple: 1.5 });
++    body(s, lines, { x: x + 0.4, y: 5.106, w: tw, h: 0.678, color: fg });
++    box(s, 'Lorem dolor sit amet', { x: x + 0.4, y: 5.769, w: 1.856, h: 0.352, fontSize: 11, italic: true, color: fg });
++  });
++}
++
++/* ============================================================= slide 15 ==== */
++function slide15 (pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: '031227' };
++  cornerGlow(s, 0, SLIDE_H, '031227', '1263D4', 70);
++
++  [[0, 0], [1.0, 1.0], [0, 2.0], [2.0, 1.984], [3.0, 0.984], [4.0, 0]].forEach(([x, y]) =>
++    rect(s, { x, y, w: 1, h: 1, fill: { color: INK, transparency: 76 } }));
++
++  chrome(s, true);
++  box(s, 'Thank You', { x: 0.556, y: 3.75, w: 10.375, h: 2.423, fontFace: HEAD, fontSize: 138, bold: true, color: WHITE, wrap: false });
++  box(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ' +
++    'Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo',
++  { x: 0.93, y: 5.907, w: 9.742, h: 0.678, fontSize: 12, color: OFFWHITE, lineSpacingMultiple: 1.5 });
++
++  s.addShape('roundRect', { x: 10.048, y: 3.184, w: 2.651, h: 0.566, rectRadius: rr(0.5, 0.566), fill: { color: BLUE } });
++  s.addShape('ellipse', { x: 12.175, y: 3.24, w: 0.455, h: 0.455, fill: { color: WHITE } });
++  plane(s, 12.272, 3.328, 0.27, BLUE);
++  box(s, 'End Presentation', { x: 10.17, y: 3.304, w: 1.834, h: 0.337, fontSize: 14, bold: true, color: WHITE, wrap: false });
++}
++
++/* ------------------------------------------------------------------- build  */
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'DECK_16x9', width: SLIDE_W, height: SLIDE_H });
++pptx.layout = 'DECK_16x9';
++pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++pptx.title = 'Start Up Pitch Deck';
++
++[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15].forEach(fn => fn(pptx));
++
++pptx.writeFile({ fileName: path.join(__dirname, '0394ecc6-35eb-4d89-a510-7d98b7c685b6_grok_final.pptx') })
++  .then(f => console.log('wrote', f));

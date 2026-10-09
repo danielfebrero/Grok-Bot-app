@@ -1,0 +1,899 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/jewelry_store_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/jewelry_store_company_profile.js
+@@ -0,0 +1,896 @@
++/**
++ * "Diamend" jewelry presentation - 30 slides, 13.333 x 7.5 in (16:9).
++ *
++ * Rebuilt from scratch with pptxgenjs.  The source deck ships no raster
++ * artwork at all - its picture placeholders were never filled - so nothing
++ * needs to stand in for photographs; every mark below is a native shape.
++ *
++ * Run it with no arguments; the .pptx lands next to this file:
++ *   node 0e840600-8235-476d-a80e-97b604788ee1_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const BG = '333F50';      // slide background (theme tx2, 75% luminance)
++const DARK = '333F50';    // dark chips / buttons
++const ACCENT = 'D89971';  // warm copper
++const WHITE = 'FFFFFF';
++
++const SERIF = 'Playfair Display Medium';   // display face (always italic here)
++const SANS = 'Open Sans';                  // body face
++
++const SLIDE_W = 12192000 / 914400;   // 13.3333in - exactly 16:9 at 7.5in tall
++const SLIDE_H = 7.5;
++
++/* --------------------------------------------------------------- plumbing */
++
++function newSlide(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: BG };
++  return s;
++}
++
++/** Text-run shorthand: S('hello', { bold: true }) */
++function S(text, opts) {
++  return { text: text, options: opts || {} };
++}
++
++/** Normalises `'str'` | `S(..)` | `[['str', color], ...]` | `[S(..), ..]` into runs. */
++function runs(content, base) {
++  if (typeof content === 'string') return [S(content, base)];
++  if (!Array.isArray(content)) content = [content];
++  return content.map(function (r) {
++    if (Array.isArray(r)) return S(r[0], Object.assign({}, base, { color: r[1] }));
++    return S(r.text, Object.assign({}, base, r.options));
++  });
++}
++
++/** Generic text box. Boxes are top-anchored and auto-height, like the source. */
++function txt(s, x, y, w, h, content, opts) {
++  opts = opts || {};
++  const base = {
++    fontFace: opts.fontFace || SANS,
++    fontSize: opts.fontSize || 10,
++    color: opts.color || WHITE,
++    italic: opts.italic || false,
++    charSpacing: opts.charSpacing,
++  };
++  s.addText(runs(content, base), {
++    x: x, y: y, w: w, h: h,
++    align: opts.align || 'left',
++    valign: 'top',
++    wrap: opts.wrap !== false,
++    fit: 'resize',
++    lineSpacingMultiple: opts.lineSpacingMultiple,
++  });
++}
++
++/** 28pt italic serif section heading. */
++function title(s, x, y, w, h, content, opts) {
++  txt(s, x, y, w, h, content, Object.assign({ fontFace: SERIF, fontSize: 28, italic: true }, opts));
++}
++
++/** 14pt italic serif card heading. */
++function sub(s, x, y, w, h, content, opts) {
++  txt(s, x, y, w, h, content, Object.assign({ fontFace: SERIF, fontSize: 14, italic: true }, opts));
++}
++
++/** 24pt italic serif figure ("01", "12+", "$30", ...). */
++function num(s, x, y, w, h, content, opts) {
++  txt(s, x, y, w, h, content, Object.assign({ fontFace: SERIF, fontSize: 24, italic: true }, opts));
++}
++
++/** 12pt italic serif label (table-of-contents page numbers). */
++function tag(s, x, y, w, h, content, opts) {
++  txt(s, x, y, w, h, content, Object.assign({ fontFace: SERIF, fontSize: 12, italic: true }, opts));
++}
++
++/** 10pt Open Sans paragraph, 150% leading - the deck's body copy style. */
++function body(s, x, y, w, h, content, opts) {
++  txt(s, x, y, w, h, content, Object.assign({ lineSpacingMultiple: 1.5 }, opts));
++}
++
++/* ----------------------------------------------------------------- shapes */
++
++function rect(s, x, y, w, h, color) {
++  s.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: color } });
++}
++
++function roundRect(s, x, y, w, h, color, radiusFrac) {
++  const frac = radiusFrac === undefined ? 0.16667 : radiusFrac;
++  s.addShape('roundRect', {
++    x: x, y: y, w: w, h: h,
++    fill: { color: color },
++    rectRadius: frac * Math.min(w, h),
++  });
++}
++
++function circle(s, x, y, d, color) {
++  s.addShape('ellipse', { x: x, y: y, w: d, h: d, fill: { color: color } });
++}
++
++/** Outlined circle used as background decoration. */
++function ring(s, x, y, d) {
++  s.addShape('ellipse', { x: x, y: y, w: d, h: d, line: { color: WHITE, width: 1 } });
++}
++
++/** Quarter-circle white hairline (the recurring corner swoosh). */
++function arc(s, x, y, d, rotate) {
++  s.addShape('arc', { x: x, y: y, w: d, h: d, rotate: rotate, line: { color: WHITE, width: 1 } });
++}
++
++/** Thin horizontal divider. */
++function rule(s, x, y, w) {
++  s.addShape('line', { x: x, y: y, w: w, h: 0, line: { color: WHITE, width: 0.5 } });
++}
++
++/** Free-form blob from a table of points (see the CG_* constants below). */
++function freeform(s, x, y, w, h, points, flipH) {
++  s.addShape('custGeom', {
++    x: x, y: y, w: w, h: h, points: points,
++    fill: { color: ACCENT }, flipH: flipH || false,
++  });
++}
++
++/** Four-pointed sparkle. */
++function star(s, x, y, d, color) {
++  s.addShape('star4', { x: x, y: y, w: d, h: d, fill: { color: color } });
++}
++
++/* -------------------------------------------------------------- composites */
++
++const BTN_W = 1.597;
++const BTN_H = 0.479;
++
++/** The "Read More" pill that appears on most slides. */
++function readMore(s, x, y, fill, color) {
++  roundRect(s, x, y, BTN_W, BTN_H, fill || DARK);
++  txt(s, x + 0.152, y + 0.105, 1.292, 0.269, 'Read More',
++      { wrap: false, charSpacing: 3, color: color || WHITE });
++}
++
++/**
++ * Furniture repeated on every slide: corner swoosh, three sparkles, the
++ * "Jewelry Presentation" wordmark, the footer note and the "nn/30" counter.
++ */
++function chrome(s, pageNo, opts) {
++  opts = opts || {};
++  arc(s, 11.092, -2.241, 4.482, 180);
++  star(s, 0.413, 0.288, 0.22, opts.whiteStar ? WHITE : ACCENT);
++  star(s, 12.699, 0.288, 0.22, ACCENT);
++  star(s, 12.336, 0.446, 0.42, ACCENT);
++
++  txt(s, 0.706, 0.258, 1.547, 0.269,
++      opts.mono ? 'Jewelry Presentation' : [['Jewelry ', WHITE], ['Presentation', ACCENT]],
++      { fontFace: SERIF, italic: true, wrap: false });
++
++  const foot = opts.footer === 'presenter'
++    ? [S('Present By : ', { bold: true }), S('Tamara Valente')]
++    : [S('Back To ', { bold: true, color: opts.footer === 'plain' ? WHITE : ACCENT }),
++       S('Table Of Content')];
++  txt(s, 0.321, 6.966, 2.067, 0.269, foot);
++
++  const nn = String(pageNo).padStart(2, '0');
++  txt(s, 11.512, 6.899, 1.5, 0.337,
++      [S(nn, { fontSize: 14, color: ACCENT }), S('/30', { fontSize: 10 })],
++      { fontFace: SERIF, italic: true, align: 'right', wrap: false });
++}
++
++/* ---------------------------------------------------- free-form point sets */
++/* Coordinates are inches relative to each shape's own top-left corner.       */
++
++// slide 4 - stat card, notched top-left
++const CG_S4_19 = [
++  { x: 0, y: 0, moveTo: true }, { x: 2.775, y: 0 }, { x: 3.802, y: 0 }, { x: 4.505, y: 0 },
++  { x: 4.938, y: 0.432, curve: { type: 'cubic', x1: 4.744, y1: 0, x2: 4.938, y2: 0.194 } },
++  { x: 4.938, y: 2.162 },
++  { x: 4.505, y: 2.595, curve: { type: 'cubic', x1: 4.938, y1: 2.401, x2: 4.744, y2: 2.595 } },
++  { x: 3.802, y: 2.595 }, { x: 2.775, y: 2.595 }, { x: 0.092, y: 2.595 }, { x: 0.092, y: 0.348 },
++  { x: 0.034, y: 0.064, curve: { type: 'cubic', x1: 0.092, y1: 0.247, x2: 0.071, y2: 0.151 } },
++  { close: true }
++];
++
++// slide 5 - stat card, concave upper-left
++const CG_S5_20 = [
++  { x: 0, y: 0, moveTo: true }, { x: 4.569, y: 0 },
++  { x: 4.824, y: 0.255, curve: { type: 'cubic', x1: 4.71, y1: 0, x2: 4.824, y2: 0.114 } },
++  { x: 4.824, y: 1.275 },
++  { x: 4.569, y: 1.529, curve: { type: 'cubic', x1: 4.824, y1: 1.415, x2: 4.71, y2: 1.529 } },
++  { x: 0.365, y: 1.529 }, { x: 0.351, y: 1.25 },
++  { x: 0.066, y: 0.137, curve: { type: 'cubic', x1: 0.311, y1: 0.859, x2: 0.213, y2: 0.485 } },
++  { close: true }
++];
++
++// slide 5 - stat card, sweeping concave left edge
++const CG_S5_18 = [
++  { x: 0.047, y: 0, moveTo: true }, { x: 6.162, y: 0 },
++  { x: 6.417, y: 0.255, curve: { type: 'cubic', x1: 6.303, y1: 0, x2: 6.417, y2: 0.114 } },
++  { x: 6.417, y: 1.275 },
++  { x: 6.162, y: 1.529, curve: { type: 'cubic', x1: 6.417, y1: 1.415, x2: 6.303, y2: 1.529 } },
++  { x: 1.497, y: 1.529 }, { x: 1.495, y: 1.526 },
++  { x: 0.253, y: 0.158, curve: { type: 'cubic', x1: 1.196, y1: 0.976, x2: 0.769, y2: 0.507 } },
++  { x: 0, y: 0.005 }, { close: true }
++];
++
++// slide 11 - banner with a bite taken out of the right edge
++const CG_S11_18 = [
++  { x: 0.425, y: 0, moveTo: true }, { x: 8.386, y: 0 }, { x: 8.293, y: 0.085 },
++  { x: 7.8, y: 1.274, curve: { type: 'cubic', x1: 7.988, y1: 0.389, x2: 7.8, y2: 0.809 } },
++  { x: 8.293, y: 2.463, curve: { type: 'cubic', x1: 7.8, y1: 1.738, x2: 7.988, y2: 2.158 } },
++  { x: 8.386, y: 2.547 }, { x: 0.425, y: 2.547 },
++  { x: 0, y: 2.123, curve: { type: 'cubic', x1: 0.19, y1: 2.547, x2: 0, y2: 2.357 } }, { x: 0, y: 0.425 },
++  { x: 0.425, y: 0, curve: { type: 'cubic', x1: 0, y1: 0.19, x2: 0.19, y2: 0 } }, { close: true }
++];
++
++// slide 18 - thick open ring (bottom-left decoration)
++const CG_S18_27 = [
++  { x: 5.429, y: 0, moveTo: true }, { x: 5.578, y: 0 }, { x: 5.707, y: 0.142 },
++  { x: 6.609, y: 2.656, curve: { type: 'cubic', x1: 6.271, y1: 0.825, x2: 6.609, y2: 1.701 } },
++  { x: 2.656, y: 6.609, curve: { type: 'cubic', x1: 6.609, y1: 4.84, x2: 4.84, y2: 6.609 } },
++  { x: 0.142, y: 5.707, curve: { type: 'cubic', x1: 1.701, y1: 6.609, x2: 0.825, y2: 6.271 } },
++  { x: 0, y: 5.578 }, { x: 0, y: 5.429 }, { x: 0.167, y: 5.575 },
++  { x: 2.553, y: 6.403, curve: { type: 'cubic', x1: 0.823, y1: 6.093, x2: 1.652, y2: 6.403 } },
++  { x: 6.403, y: 2.553, curve: { type: 'cubic', x1: 4.679, y1: 6.403, x2: 6.403, y2: 4.679 } },
++  { x: 5.575, y: 0.167, curve: { type: 'cubic', x1: 6.403, y1: 1.652, x2: 6.093, y2: 0.823 } },
++  { close: true }
++];
++
++// slide 19 - team strip: three scalloped cut-outs along the top
++const CG_S19_27 = [
++  { x: 0.413, y: 0, moveTo: true }, { x: 0.708, y: 0 }, { x: 0.708, y: 0 },
++  { x: 2.283, y: 1.575, curve: { type: 'cubic', x1: 0.708, y1: 0.87, x2: 1.413, y2: 1.575 } },
++  { x: 3.857, y: 0, curve: { type: 'cubic', x1: 3.152, y1: 1.575, x2: 3.857, y2: 0.87 } },
++  { x: 3.857, y: 0 }, { x: 4.011, y: 0 }, { x: 4.011, y: 0 },
++  { x: 5.586, y: 1.575, curve: { type: 'cubic', x1: 4.011, y1: 0.87, x2: 4.716, y2: 1.575 } },
++  { x: 7.161, y: 0, curve: { type: 'cubic', x1: 6.456, y1: 1.575, x2: 7.161, y2: 0.87 } },
++  { x: 7.161, y: 0 }, { x: 7.314, y: 0 }, { x: 7.314, y: 0 },
++  { x: 8.889, y: 1.575, curve: { type: 'cubic', x1: 7.314, y1: 0.87, x2: 8.02, y2: 1.575 } },
++  { x: 10.464, y: 0, curve: { type: 'cubic', x1: 9.759, y1: 1.575, x2: 10.464, y2: 0.87 } },
++  { x: 10.464, y: 0 }, { x: 10.759, y: 0 },
++  { x: 11.172, y: 0.413, curve: { type: 'cubic', x1: 10.987, y1: 0, x2: 11.172, y2: 0.185 } },
++  { x: 11.172, y: 2.063 },
++  { x: 10.759, y: 2.475, curve: { type: 'cubic', x1: 11.172, y1: 2.291, x2: 10.987, y2: 2.475 } },
++  { x: 0.413, y: 2.475 },
++  { x: 0, y: 2.063, curve: { type: 'cubic', x1: 0.185, y1: 2.475, x2: 0, y2: 2.291 } }, { x: 0, y: 0.413 },
++  { x: 0.413, y: 0, curve: { type: 'cubic', x1: 0, y1: 0.185, x2: 0.185, y2: 0 } }, { close: true }
++];
++
++// slide 21 - name card, wavy left edge
++const CG_S21_30 = [
++  { x: 0, y: 0, moveTo: true }, { x: 3.704, y: 0 },
++  { x: 3.973, y: 0.269, curve: { type: 'cubic', x1: 3.852, y1: 0, x2: 3.973, y2: 0.121 } },
++  { x: 3.973, y: 1.347 },
++  { x: 3.704, y: 1.617, curve: { type: 'cubic', x1: 3.973, y1: 1.496, x2: 3.852, y2: 1.617 } },
++  { x: 0, y: 1.617 }, { x: 0.123, y: 1.39 },
++  { x: 0.241, y: 0.808, curve: { type: 'cubic', x1: 0.199, y1: 1.211, x2: 0.241, y2: 1.015 } },
++  { x: 0.123, y: 0.227, curve: { type: 'cubic', x1: 0.241, y1: 0.602, x2: 0.199, y2: 0.406 } },
++  { close: true }
++];
++
++// slide 21 - name card, wavy left edge (mirrored)
++const CG_S21_29 = [
++  { x: 3.704, y: 0, moveTo: true }, { x: 0, y: 0 }, { x: 0.123, y: 0.227 },
++  { x: 0.241, y: 0.808, curve: { type: 'cubic', x1: 0.199, y1: 0.406, x2: 0.241, y2: 0.602 } },
++  { x: 0.123, y: 1.39, curve: { type: 'cubic', x1: 0.241, y1: 1.015, x2: 0.199, y2: 1.211 } },
++  { x: 0, y: 1.617 }, { x: 3.704, y: 1.617 },
++  { x: 3.973, y: 1.347, curve: { type: 'cubic', x1: 3.852, y1: 1.617, x2: 3.973, y2: 1.496 } },
++  { x: 3.973, y: 0.269 },
++  { x: 3.704, y: 0, curve: { type: 'cubic', x1: 3.973, y1: 0.121, x2: 3.852, y2: 0 } }, { close: true }
++];
++
++// slide 29 - contact panel with a long concave tail
++const CG_S29_25 = [
++  { x: 3.74, y: 0, moveTo: true }, { x: 7.531, y: 0 },
++  { x: 7.867, y: 0.336, curve: { type: 'cubic', x1: 7.717, y1: 0, x2: 7.867, y2: 0.15 } },
++  { x: 7.867, y: 2.84 },
++  { x: 7.531, y: 3.176, curve: { type: 'cubic', x1: 7.867, y1: 3.026, x2: 7.717, y2: 3.176 } },
++  { x: 0.082, y: 3.176 },
++  { x: 0.014, y: 3.169, curve: { type: 'cubic', x1: 0.058, y1: 3.176, x2: 0.036, y2: 3.174 } },
++  { x: 0, y: 3.165 }, { x: 0.135, y: 3.155 },
++  { x: 3.673, y: 0.261, curve: { type: 'cubic', x1: 1.808, y1: 2.985, x2: 3.188, y2: 1.82 } },
++  { close: true }
++];
++
++// slide 26 - wide card rounded on the left side only
++const CG_S26_19 = [
++  { x: 0.442, y: 0, moveTo: true }, { x: 7.915, y: 0 }, { x: 7.915, y: 3.586 }, { x: 0.442, y: 3.586 },
++  { x: 0, y: 3.144, curve: { type: 'cubic', x1: 0.198, y1: 3.586, x2: 0, y2: 3.388 } }, { x: 0, y: 0.442 },
++  { x: 0.442, y: 0, curve: { type: 'cubic', x1: 0, y1: 0.198, x2: 0.198, y2: 0 } }, { close: true }
++];
++
++/* ------------------------------------------------- shared body copy */
++
++const L1 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut';
++
++const L2 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elites eiusmod tempor';
++
++const L3 =
++  'Lorem ipsum dolor consectetur adipiscing elit, sed do';
++
++const L4 =
++  'Lorem ipsum dolor sit, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++  'labore etdolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco ' +
++  'laboris nisi ut aliquip ex ea commodo';
++
++const L5 =
++  'Lorem ipsum dolor sit, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++  'laboris nisi ut aliquip ex ea commodo';
++
++const L6 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
++  'exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ';
++
++const L7 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
++  'exercitation ullamco laboris nisi ut aliquip ex commodo consequat. Duis aute irure dolor ' +
++  'in reprehenderit in voluptate velit';
++
++const L8 =
++  'Lorem ipsum dolor sit consectetur adipiscing elit, do eiusmod tempor incididunt ut ' +
++  'labore et';
++
++const L9 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt labore dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ' +
++  'ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in ' +
++  'reprehenderit in voluptate velit esse';
++
++const L10 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do nisi ut aliquip ex ea ' +
++  'commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse';
++
++const L11 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod incididunt ' +
++  'labore et dolore magna aliqua.';
++
++const L12 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, eiusmod tempor incididunt ut ' +
++  'labore dolore magna';
++
++const L13 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit seddo eiusmod tempor incididunt ' +
++  'ut labore et dolore magna aliqua. ';
++
++const L14 =
++  'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed do tempor';
++
++const L15 =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod';
++
++/* ----------------------------------------------------------- the slides */
++
++function slide01(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 1, { footer: 'presenter' });
++  roundRect(s, 1.869, 4.053, 9.595, 2.485, ACCENT);
++  body(s, 6.549, 4.757, 2.047, 1.084, L12);
++  txt(s, 2.654, 5.566, 2.649, 0.303, S('Jewelry Presentation'), { wrap: false, fontSize: 12, charSpacing: 3 });
++  txt(s, 2.654, 4.607, 3.561, 1.111, S('Diamend'), { wrap: false, fontFace: SERIF, fontSize: 60, italic: true });
++  arc(s, 10.029, 5.104, 2.869, 270);
++  readMore(s, 9.082, 5.056);
++}
++
++function slide02(pptx) {
++  const s = newSlide(pptx);
++  roundRect(s, -0.861, 1.042, 10.459, 2.324, ACCENT);
++  chrome(s, 2, { footer: 'presenter' });
++  txt(s, 9.659, 4.06, 0.805, 0.269, 'Welcome', { wrap: false });
++  tag(s, 11.803, 4.032, 0.384, 0.303, '03', { align: 'right', wrap: false, color: ACCENT });
++  txt(s, 9.659, 4.479, 0.598, 0.269, 'About', { wrap: false });
++  tag(s, 11.81, 4.451, 0.377, 0.303, '05', { align: 'right', wrap: false, color: ACCENT });
++  txt(s, 9.659, 4.898, 0.667, 0.269, 'Service', { wrap: false });
++  tag(s, 11.84, 4.87, 0.347, 0.303, '12', { align: 'right', wrap: false, color: ACCENT });
++  txt(s, 9.659, 5.317, 0.565, 0.269, 'Team', { wrap: false });
++  tag(s, 11.837, 5.289, 0.351, 0.303, '19', { align: 'right', wrap: false, color: ACCENT });
++  txt(s, 9.659, 5.736, 0.765, 0.269, 'Portfolio', { wrap: false });
++  tag(s, 11.812, 5.708, 0.376, 0.303, '24', { align: 'right', wrap: false, color: ACCENT });
++  txt(s, 9.659, 6.155, 0.705, 0.269, 'Contact', { wrap: false });
++  tag(s, 11.81, 6.127, 0.377, 0.303, '29', { align: 'right', wrap: false, color: ACCENT });
++  rule(s, 9.758, 4.363, 2.331);
++  rule(s, 9.758, 4.782, 2.331);
++  rule(s, 9.758, 5.201, 2.331);
++  rule(s, 9.758, 5.62, 2.331);
++  rule(s, 9.758, 6.039, 2.331);
++  rule(s, 9.758, 6.458, 2.331);
++  title(s, 0.583, 1.447, 3.258, 0.572, 'Table Of Content', { wrap: false });
++  body(s, 0.583, 2.16, 5.961, 0.832,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco ' +
++      'laboris nisi ut aliquip ex commodo aute irure dolor in');
++  arc(s, 8.012, 1.786, 3.162, 270);
++  readMore(s, 6.974, 1.971);
++}
++
++function slide03(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 3);
++  title(s, 5.066, 0.861, 3.212, 0.572, [['Welcome ', WHITE], ['Message', ACCENT]], { align: 'center', wrap: false });
++  body(s, 1.568, 1.588, 10.209, 0.832,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco ' +
++      'laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in ' +
++      'PLACEHOLDER' +
++      'id est laborum.', { align: 'center' });
++  roundRect(s, 2.846, 5.342, 7.641, 1.14, ACCENT);
++  num(s, 3.37, 5.66, 0.691, 0.505, '12+', { wrap: false });
++  sub(s, 4.28, 5.744, 1.734, 0.337, 'Year Of Existence', { wrap: false });
++  body(s, 6.426, 5.618, 3.537, 0.58,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt');
++}
++
++function slide04(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 4, { footer: 'plain' });
++  title(s, 1.211, 1.037, 2.082, 1.043, [['Welcome ', WHITE], ['Message', ACCENT]]);
++  body(s, 3.579, 1.016, 6.881, 1.084,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco ' +
++      'laboris nisi aliquip commodo consequat. Duis aute irure dolor in reprehenderit in voluptate ' +
++      'velit esse cillum dolore fugiat cupidatat non proident, sunt in culpa qui officia deserunt ' +
++      'anim id est laborum.');
++  freeform(s, 5.408, 3.5, 4.938, 2.595, CG_S4_19);
++  readMore(s, 9.547, 4.558);
++  num(s, 5.893, 4.073, 0.691, 0.505, '12+', { wrap: false });
++  sub(s, 6.644, 3.993, 1.734, 0.337, 'Year Of Existence', { wrap: false });
++  body(s, 6.644, 4.33, 2.494, 0.327, 'Lorem ipsum dolor sit consectetur');
++  num(s, 5.893, 5.017, 0.619, 0.505, '1M', { wrap: false });
++  sub(s, 6.644, 4.937, 2.16, 0.337, 'Social Media Followers', { wrap: false });
++  body(s, 6.644, 5.274, 2.494, 0.327, 'Lorem ipsum dolor sit consectetur');
++}
++
++function slide05(pptx) {
++  const s = newSlide(pptx);
++  freeform(s, 7.183, 4.714, 4.824, 1.529, CG_S5_20);
++  freeform(s, 5.59, 2.985, 6.417, 1.529, CG_S5_18);
++  chrome(s, 5, { footer: 'plain' });
++  title(s, 1.211, 1.209, 4.764, 0.572, [['About Our Jewelry ', WHITE], ['Store', ACCENT]]);
++  body(s, 6.52, 0.953, 3.813, 1.084,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++      'labore dolore magna aliqua. Ut enim minim veniam, quis exercitation ullamco laboris nisi ut ' +
++      'aliquip ex commodo');
++  num(s, 7.972, 5.226, 0.619, 0.505, '1M', { wrap: false });
++  sub(s, 8.723, 5.147, 2.16, 0.337, 'Social Media Followers', { wrap: false });
++  body(s, 8.723, 5.483, 2.903, 0.327, 'Lorem ipsum dolor sit amet, consectetur');
++  num(s, 7.304, 3.499, 0.691, 0.505, '12+', { wrap: false });
++  sub(s, 8.055, 3.42, 1.734, 0.337, 'Year Of Existence', { wrap: false });
++  body(s, 8.055, 3.757, 3.572, 0.327, 'Lorem ipsum dolor sit amet, consectetur adipiscing');
++}
++
++function slide06(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 6);
++  title(s, 1.211, 1.619, 2.869, 1.043, [['Histoy Of Our ', WHITE], ['Jewelry Store', ACCENT]]);
++  roundRect(s, 3.239, 4.276, 6.261, 1.642, ACCENT);
++  body(s, 4.72, 1.056, 3.173, 1.337, L4);
++  body(s, 4.72, 2.393, 3.173, 0.832, L5);
++  ring(s, -0.599, 5.581, 3.839);
++  circle(s, 1.221, 3.761, 2.671, DARK);
++  sub(s, 4.295, 4.639, 1.233, 0.337, 'Our History', { wrap: false });
++  body(s, 4.295, 4.975, 2.314, 0.58, L3);
++  sub(s, 6.835, 4.639, 1.233, 0.337, 'Our History', { wrap: false });
++  body(s, 6.835, 4.975, 2.314, 0.58, L3);
++}
++
++function slide07(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 7, { mono: true, whiteStar: true });
++  roundRect(s, 5.453, 1.101, 6.587, 1.753, ACCENT);
++  title(s, 6.24, 1.459, 5.242, 1.043, 'From Ancient Adornments to Modern Masterpieces');
++  body(s, 7.787, 4.092, 4.253, 1.337, L9);
++  body(s, 7.787, 5.429, 4.253, 0.832, L10);
++  roundRect(s, 0.893, 4.84, 2.967, 1.594, ACCENT);
++  sub(s, 1.732, 5.179, 1.291, 0.337, 'Best Product', { align: 'center', wrap: false });
++  body(s, 1.22, 5.516, 2.314, 0.58, L3, { align: 'center' });
++}
++
++function slide08(pptx) {
++  const s = newSlide(pptx);
++  circle(s, -1.054, 5.013, 4.973, ACCENT);
++  chrome(s, 8, { footer: 'plain' });
++  title(s, 7.949, 1.382, 3.497, 1.043, [['Best Jewelry Store ', WHITE], ['In Town', ACCENT]]);
++  readMore(s, 8.06, 5.638, ACCENT);
++  body(s, 7.949, 2.832, 4.253, 1.337, L9);
++  body(s, 7.949, 4.169, 4.253, 0.832, L10);
++}
++
++function slide09(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 9);
++  title(s, 1.211, 4.46, 5.221, 1.043, [['Explore Different Styles and ', WHITE], ['Types of Jewelry', ACCENT]]);
++  body(s, 1.211, 5.74, 10.911, 0.832,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco ' +
++      'laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in ' +
++      'voluptate velit esse cillum dolore fugiat nulla pariatur. Excepteur sint occaecat cupidatat ' +
++      'non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.');
++  roundRect(s, 3.889, 1.366, 5.005, 1.801, ACCENT);
++  sub(s, 4.348, 1.806, 1.594, 0.337, 'Modern Jewelry', { wrap: false });
++  body(s, 6.216, 1.684, 2.314, 0.58, L3);
++  sub(s, 4.348, 2.391, 1.522, 0.337, 'Classic Jewelry', { wrap: false });
++  body(s, 6.216, 2.269, 2.314, 0.58, L3);
++}
++
++function slide10(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 10);
++  title(s, 5.818, 1.157, 4.804, 0.572, [['The Art of ', WHITE], ['Jewelry Design', ACCENT]]);
++  body(s, 5.818, 2.034, 6.228, 1.084,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco ' +
++      'laboris nisi ut aliquip ecommodo consequat. Duis aute irure dolor in reprehenderit voluptate ' +
++      'velit esse cillum dolore fugiat nulla pariatur. ');
++  roundRect(s, 4.099, 4.275, 5.729, 1.801, ACCENT);
++  num(s, 4.627, 4.923, 0.796, 0.505, '95%', { wrap: false });
++  sub(s, 5.623, 4.718, 1.824, 0.337, 'Best Seller Product', { wrap: false });
++  body(s, 5.623, 5.054, 3.83, 0.58, L1);
++}
++
++function slide11(pptx) {
++  const s = newSlide(pptx);
++  ring(s, -0.611, 5.581, 3.839);
++  freeform(s, 1.309, 1.139, 8.386, 2.547, CG_S11_18);
++  chrome(s, 11);
++  title(s, 1.902, 1.638, 5.933, 0.572, 'Trends in Contemporary Jewelry');
++  body(s, 1.902, 2.355, 6.794, 0.832,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco ' +
++      'laborisu aliquip ex ea commodo consequat. ');
++  body(s, 6.028, 4.684, 6.308, 0.832, L6);
++  sub(s, 6.028, 5.818, 1.594, 0.337, 'Modern Jewelry', { wrap: false, color: ACCENT });
++  body(s, 6.028, 6.155, 2.915, 0.327, 'Lorem ipsum dolor sit amet, consectetur');
++  sub(s, 9.422, 5.812, 1.522, 0.337, 'Classic Jewelry', { wrap: false, color: ACCENT });
++  body(s, 9.422, 6.155, 2.915, 0.327, 'Lorem ipsum dolor sit amet, consectetur');
++}
++
++function slide12(pptx) {
++  const s = newSlide(pptx);
++  ring(s, -0.626, 5.581, 3.839);
++  chrome(s, 12);
++  roundRect(s, 5.312, 2.56, 2.71, 1.831, ACCENT, 0.12279);
++  roundRect(s, 8.192, 2.56, 2.71, 1.831, ACCENT, 0.12279);
++  roundRect(s, 2.431, 2.56, 2.71, 1.831, ACCENT, 0.12279);
++  readMore(s, 8.749, 4.153);
++  readMore(s, 5.868, 4.153);
++  readMore(s, 2.981, 4.153);
++  sub(s, 6.048, 2.772, 1.238, 0.337, 'Service Two', { align: 'center', wrap: false });
++  body(s, 5.599, 3.109, 2.135, 0.832, L2, { align: 'center' });
++  sub(s, 3.167, 2.772, 1.224, 0.337, 'Service One', { align: 'center', wrap: false });
++  body(s, 2.712, 3.109, 2.135, 0.832, L2, { align: 'center' });
++  sub(s, 8.858, 2.772, 1.375, 0.337, 'Service Three', { align: 'center', wrap: false });
++  body(s, 8.477, 3.109, 2.135, 0.832, L2, { align: 'center' });
++  title(s, 4.85, 0.861, 3.644, 0.572, [['Our Shop ', WHITE], ['Service', ACCENT]], { align: 'center' });
++  body(s, 1.568, 1.588, 10.209, 0.58, L6, { align: 'center' });
++}
++
++function slide13(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 13);
++  roundRect(s, 5.312, 2.582, 2.71, 2.432, ACCENT, 0.12279);
++  roundRect(s, 8.192, 2.582, 2.71, 2.432, ACCENT, 0.12279);
++  roundRect(s, 2.431, 2.582, 2.71, 2.432, ACCENT, 0.12279);
++  readMore(s, 8.749, 4.776, WHITE, DARK);
++  readMore(s, 5.868, 4.776, WHITE, DARK);
++  readMore(s, 2.981, 4.776, WHITE, DARK);
++  sub(s, 6.048, 3.35, 1.238, 0.337, 'Service Two', { align: 'center', wrap: false });
++  body(s, 5.599, 3.686, 2.135, 0.832, L2, { align: 'center' });
++  sub(s, 3.167, 3.35, 1.224, 0.337, 'Service One', { align: 'center', wrap: false });
++  body(s, 2.712, 3.686, 2.135, 0.832, L2, { align: 'center' });
++  sub(s, 8.858, 3.35, 1.375, 0.337, 'Service Three', { align: 'center', wrap: false });
++  body(s, 8.477, 3.686, 2.135, 0.832, L2, { align: 'center' });
++  num(s, 3.521, 2.84, 0.518, 0.505, '01', { align: 'center', wrap: false });
++  num(s, 6.386, 2.84, 0.572, 0.505, '02', { align: 'center', wrap: false });
++  num(s, 9.27, 2.84, 0.565, 0.505, '03', { align: 'center', wrap: false });
++  body(s, 1.205, 5.726, 11.132, 0.832,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud esi exercitation ' +
++      'ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in ' +
++      'reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint ' +
++      'occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est ' +
++      'laborum.', { align: 'center' });
++}
++
++function slide14(pptx) {
++  const s = newSlide(pptx);
++  ring(s, -1.479, 2.972, 3.372);
++  chrome(s, 14);
++  body(s, 5.548, 1.123, 5.395, 0.58, L13);
++  body(s, 2.433, 5.791, 5.395, 0.58, L13);
++  roundRect(s, 2.529, 3.844, 5.517, 1.617, ACCENT);
++  num(s, 3.047, 4.4, 0.572, 0.505, '02', { wrap: false });
++  sub(s, 3.841, 4.194, 1.238, 0.337, 'Service Two', { wrap: false });
++  body(s, 3.841, 4.53, 3.83, 0.58, L1);
++  roundRect(s, 5.287, 2.04, 5.517, 1.617, ACCENT);
++  num(s, 5.806, 2.596, 0.518, 0.505, '01', { wrap: false });
++  sub(s, 6.6, 2.39, 1.224, 0.337, 'Service One', { wrap: false });
++  body(s, 6.6, 2.727, 3.83, 0.58, L1);
++}
++
++function slide15(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 15);
++  title(s, 5.551, 4.727, 3.31, 0.572, [['Our Best ', WHITE], ['Service', ACCENT]]);
++  body(s, 5.551, 5.427, 6.74, 1.084,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco ' +
++      'laboris nisi aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit ' +
++      'voluptate velit esse cillum dolore eu fugiat nulla pariatur. ');
++  roundRect(s, 4.627, 1.335, 5.095, 2.058, ACCENT);
++  sub(s, 5.045, 1.815, 1.224, 0.337, 'Service One', { wrap: false });
++  body(s, 6.465, 1.693, 2.852, 0.58, L14);
++  sub(s, 5.045, 2.576, 1.238, 0.337, 'Service Two', { wrap: false });
++  body(s, 6.465, 2.454, 2.852, 0.58, L14);
++}
++
++function slide16(pptx) {
++  const s = newSlide(pptx);
++  ring(s, -0.409, 5.814, 3.372);
++  chrome(s, 16);
++  title(s, 1.345, 1.209, 3.31, 0.572, [['Shop ', WHITE], ['Services', ACCENT]]);
++  body(s, 4.542, 0.953, 5.792, 1.084,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco ' +
++      'laboris nisi taliquip commodo consequat. Duis aute irure dolor reprehenderit in voluptate ' +
++      'velit esse cillum dolore eu fugiat nulla pariatur. ');
++  roundRect(s, 6.539, 2.994, 5.517, 1.617, ACCENT);
++  num(s, 7.058, 3.55, 0.518, 0.505, '01', { wrap: false });
++  sub(s, 7.852, 3.344, 1.224, 0.337, 'Service One', { wrap: false });
++  body(s, 7.852, 3.681, 3.83, 0.58, L1);
++  roundRect(s, 6.539, 4.813, 5.517, 1.617, ACCENT);
++  num(s, 7.058, 5.369, 0.572, 0.505, '02', { wrap: false });
++  sub(s, 7.852, 5.164, 1.238, 0.337, 'Service Two', { wrap: false });
++  body(s, 7.852, 5.5, 3.83, 0.58, L1);
++}
++
++function slide17(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 17);
++  title(s, 1.22, 1.382, 2.516, 1.043, [['Services We ', WHITE], ['Provide', ACCENT]]);
++  body(s, 1.22, 2.832, 3.173, 1.337, L4);
++  body(s, 1.22, 4.169, 3.173, 0.832, L5);
++  readMore(s, 1.331, 5.638, ACCENT);
++  roundRect(s, 8.126, 3.347, 0.806, 0.806, ACCENT);
++  sub(s, 9.293, 3.166, 1.238, 0.337, 'Service Two', { wrap: false });
++  body(s, 9.293, 3.502, 2.946, 0.832, L11);
++  roundRect(s, 8.126, 1.799, 0.806, 0.806, ACCENT);
++  sub(s, 9.293, 1.618, 1.224, 0.337, 'Service One', { wrap: false });
++  body(s, 9.293, 1.954, 2.946, 0.832, L11);
++  roundRect(s, 8.126, 4.895, 0.806, 0.806, ACCENT);
++  sub(s, 9.293, 4.714, 1.375, 0.337, 'Service Three', { wrap: false });
++  body(s, 9.293, 5.05, 2.946, 0.832, L11);
++  num(s, 8.243, 3.5, 0.572, 0.505, '02', { align: 'center', wrap: false });
++  num(s, 8.246, 5.046, 0.565, 0.505, '03', { align: 'center', wrap: false });
++  num(s, 8.27, 1.956, 0.518, 0.505, '01', { align: 'center', wrap: false });
++}
++
++function slide18(pptx) {
++  const s = newSlide(pptx);
++  freeform(s, 0, 0, 6.609, 6.609, CG_S18_27);
++  chrome(s, 18, { mono: true, whiteStar: true });
++  title(s, 7.918, 1.382, 3.31, 1.043, [['Take A Break ', WHITE], ['Slides', ACCENT]]);
++  readMore(s, 8.029, 5.638, ACCENT);
++  body(s, 7.918, 2.832, 4.253, 1.337, L9);
++  body(s, 7.918, 4.169, 4.253, 0.832, L10);
++}
++
++function slide19(pptx) {
++  const s = newSlide(pptx);
++  freeform(s, 1.081, 4.181, 11.172, 2.475, CG_S19_27);
++  chrome(s, 19);
++  title(s, 4.85, 0.861, 3.644, 0.572, [['Our Best ', WHITE], ['Team', ACCENT]], { align: 'center' });
++  body(s, 1.568, 1.588, 10.209, 0.58, L6, { align: 'center' });
++  sub(s, 2.699, 5.944, 1.329, 0.337, 'Josie Wilmot', { align: 'center', wrap: false });
++  sub(s, 5.942, 5.944, 1.448, 0.337, 'Barbara Reyes', { align: 'center', wrap: false });
++  sub(s, 9.215, 5.944, 1.51, 0.337, 'Shelly Fairman', { align: 'center', wrap: false });
++}
++
++function slide20(pptx) {
++  const s = newSlide(pptx);
++  ring(s, -0.448, 5.814, 3.372);
++  chrome(s, 20);
++  title(s, 1.206, 0.964, 2.864, 1.043, [['Meet Our Best ', WHITE], ['Team', ACCENT]]);
++  readMore(s, 10.417, 1.246, ACCENT);
++  body(s, 4.412, 0.943, 5.406, 1.084, L7);
++  roundRect(s, 4.439, 3.314, 3.653, 1.316, ACCENT);
++  sub(s, 4.851, 3.64, 1.289, 0.337, 'Joanne Bate', { wrap: false });
++  body(s, 4.851, 3.977, 2.855, 0.327, 'Lorem ipsum dolor sit amet, consectetur');
++  roundRect(s, 5.241, 4.825, 3.653, 1.316, ACCENT);
++  sub(s, 6.947, 5.151, 1.562, 0.337, 'Sandra Thomas', { align: 'right', wrap: false });
++  body(s, 5.654, 5.487, 2.855, 0.327, 'Lorem ipsum dolor sit amet, consectetur', { align: 'right' });
++}
++
++function slide21(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 21);
++  freeform(s, 8.029, 1.516, 3.973, 1.617, CG_S21_30);
++  title(s, 1.22, 1.382, 2.864, 1.043, [['Meet Our Best ', WHITE], ['Team', ACCENT]]);
++  body(s, 1.22, 2.832, 3.173, 1.337, L4);
++  body(s, 1.22, 4.169, 3.173, 0.832, L5);
++  readMore(s, 1.331, 5.638, ACCENT);
++  sub(s, 8.73, 1.867, 1.301, 0.337, 'Megan Stone', { wrap: false });
++  body(s, 8.73, 2.203, 2.851, 0.58, L15);
++  freeform(s, 5.459, 4.367, 3.973, 1.617, CG_S21_29, true);
++  sub(s, 6.978, 4.717, 1.753, 0.337, 'Stephanie Roberts', { align: 'right', wrap: false });
++  body(s, 5.881, 5.054, 2.851, 0.58, L15, { align: 'right' });
++}
++
++function slide22(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 22);
++  title(s, 1.223, 1.651, 2.823, 0.572, [['Shelly ', WHITE], ['Fairman', ACCENT]], { align: 'center', wrap: false });
++  rect(s, 1.325, 4.689, 3.064, 0.213, WHITE);
++  tag(s, 1.223, 4.332, 0.873, 0.303, 'Skill One', { wrap: false });
++  tag(s, 3.975, 4.332, 0.519, 0.303, '90%', { align: 'right', wrap: false });
++  rect(s, 1.325, 4.689, 2.75, 0.213, ACCENT);
++  rect(s, 1.325, 5.636, 3.064, 0.213, WHITE);
++  tag(s, 1.223, 5.283, 0.887, 0.303, 'Skill Two', { wrap: false });
++  tag(s, 3.971, 5.283, 0.523, 0.303, '80%', { align: 'right', wrap: false });
++  rect(s, 1.325, 5.636, 2.436, 0.213, ACCENT);
++  body(s, 1.223, 2.552, 3.339, 1.337,
++      'PLACEHOLDER' +
++      'dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ' +
++      'aliquip ex commodo consequat. ');
++  roundRect(s, 9.029, 1.41, 2.98, 4.681, ACCENT);
++  readMore(s, 9.72, 5.273);
++  sub(s, 9.764, 4.053, 1.51, 0.337, 'Shelly Fairman', { align: 'center', wrap: false });
++  body(s, 9.262, 4.39, 2.514, 0.58, 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do', { align: 'center' });
++}
++
++function slide23(pptx) {
++  const s = newSlide(pptx);
++  roundRect(s, 4.089, 4.746, 7.94, 1.509, ACCENT);
++  chrome(s, 23, { footer: 'plain' });
++  rect(s, 4.706, 5.543, 3.064, 0.213, WHITE);
++  tag(s, 4.604, 5.187, 0.873, 0.303, 'Skill One', { wrap: false });
++  tag(s, 7.357, 5.187, 0.519, 0.303, '90%', { align: 'right', wrap: false });
++  rect(s, 4.706, 5.543, 2.75, 0.213, DARK);
++  rect(s, 8.344, 5.54, 3.064, 0.213, WHITE);
++  tag(s, 8.242, 5.187, 0.887, 0.303, 'Skill Two', { wrap: false });
++  tag(s, 10.991, 5.187, 0.523, 0.303, '80%', { align: 'right', wrap: false });
++  rect(s, 8.344, 5.54, 2.436, 0.213, DARK);
++  title(s, 6.311, 1.19, 3.308, 0.572, [['Stephanie ', WHITE], ['Roberts', ACCENT]], { wrap: false });
++  body(s, 6.313, 2.013, 5.817, 1.084,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod tempor incididunt ut ' +
++      'labore et dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco ' +
++      'laboris nisi ut aliquip ex commodo consequat. Duis irure dolor reprehenderit in voluptate ' +
++      'velit esse cillum dolore eu fugiat nulla pariatur. ');
++  body(s, 6.313, 3.17, 5.817, 0.58,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod tempor incididunt in ' +
++      'voluptate velit esse cillum dolore eu fugiat nulla pariatur. ');
++}
++
++function slide24(pptx) {
++  const s = newSlide(pptx);
++  ring(s, -0.835, 5.443, 4.113);
++  chrome(s, 24);
++  title(s, 1.235, 1.209, 3.939, 0.572, [['Our Jewelry ', WHITE], ['Gallery', ACCENT]]);
++  body(s, 5.851, 0.953, 4.482, 1.084,
++      'Lorem ipsum dolor sit amet, consectetur adipiscing elito eiusmod tempor incididunt ut labore ' +
++      'et dolore magna aliqua. Ut enim minim veniam, quis nostrud exercitation ullamco laboris ut ' +
++      'aliquip ex ea commodo consequat. ');
++  roundRect(s, 1.221, 3.508, 4.344, 2.428, ACCENT);
++  sub(s, 1.64, 3.958, 1.461, 0.337, 'Collection One', { wrap: false });
++  body(s, 1.64, 4.295, 3.603, 0.327, 'Lorem ipsum dolor sit amet, consectetur adipiscing');
++  sub(s, 1.64, 4.822, 1.475, 0.337, 'Collection Two', { wrap: false });
++  body(s, 1.64, 5.158, 3.603, 0.327, 'Lorem ipsum dolor sit amet, consectetur adipiscing');
++}
++
++function slide25(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 25);
++  title(s, 1.235, 4.734, 3.302, 0.572, [['Our Best ', WHITE], ['Product', ACCENT]]);
++  body(s, 1.235, 5.445, 5.406, 1.084, L7);
++  roundRect(s, 1.637, 0.987, 5.968, 2.667, ACCENT, 0.10575);
++  num(s, 2.413, 2.066, 0.572, 0.505, '02', { wrap: false });
++  body(s, 3.088, 2.028, 4.05, 0.58, L1);
++  num(s, 2.413, 1.413, 0.518, 0.505, '01', { wrap: false });
++  body(s, 3.088, 1.376, 4.05, 0.58, L1);
++  num(s, 2.413, 2.718, 0.565, 0.505, '03', { wrap: false });
++  body(s, 3.088, 2.68, 4.05, 0.58, L1);
++}
++
++function slide26(pptx) {
++  const s = newSlide(pptx);
++  ring(s, -0.738, 5.443, 4.113);
++  freeform(s, 5.418, 2.971, 7.915, 3.586, CG_S26_19);
++  chrome(s, 26);
++  title(s, 1.206, 0.964, 2.527, 1.043, [['Our Jewelry ', WHITE], ['Collection', ACCENT]]);
++  readMore(s, 10.417, 1.246, ACCENT);
++  body(s, 4.272, 0.943, 5.406, 1.084, L7);
++  sub(s, 10.637, 3.58, 1.461, 0.337, 'Collection One', { wrap: false });
++  body(s, 10.637, 3.917, 2.063, 0.327, 'Lorem ipsum dolor sit amet, ');
++  sub(s, 10.637, 4.432, 1.475, 0.337, 'Collection Two', { wrap: false });
++  body(s, 10.637, 4.769, 2.063, 0.327, 'Lorem ipsum dolor sit amet, ');
++  sub(s, 10.637, 5.289, 1.611, 0.337, 'Collection Three', { wrap: false });
++  body(s, 10.637, 5.625, 2.063, 0.327, 'Lorem ipsum dolor sit amet, ');
++}
++
++function slide27(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 27);
++  title(s, 9.124, 1.382, 2.527, 1.043, [['Our Gallery ', WHITE], ['Product', ACCENT]]);
++  body(s, 9.124, 2.832, 3.173, 1.337, L4);
++  body(s, 9.124, 4.169, 3.173, 0.832, L5);
++  readMore(s, 9.235, 5.638, ACCENT);
++}
++
++function slide28(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 28);
++  title(s, 4.85, 0.861, 3.644, 0.572, [['Pricing ', WHITE], ['Table', ACCENT]], { align: 'center' });
++  body(s, 1.568, 1.588, 10.209, 0.58, L6, { align: 'center' });
++  roundRect(s, 5.09, 2.779, 3.145, 3.779, ACCENT, 0.13871);
++  readMore(s, 5.868, 5.694);
++  body(s, 5.41, 4.58, 2.514, 0.832, L8, { align: 'center' });
++  sub(s, 6.013, 4.244, 1.312, 0.337, 'Package Two', { align: 'center', wrap: false });
++  roundRect(s, 6.192, 3.164, 0.941, 0.798, DARK);
++  num(s, 6.28, 3.31, 0.765, 0.505, '$20', { align: 'center', wrap: false });
++  roundRect(s, 1.774, 2.779, 3.145, 3.779, ACCENT, 0.13871);
++  readMore(s, 2.551, 5.694);
++  body(s, 2.093, 4.58, 2.514, 0.832, L8, { align: 'center' });
++  sub(s, 2.704, 4.244, 1.298, 0.337, 'Package One', { align: 'center', wrap: false });
++  roundRect(s, 2.876, 3.164, 0.941, 0.798, DARK);
++  num(s, 2.991, 3.31, 0.71, 0.505, '$10', { align: 'center', wrap: false });
++  roundRect(s, 8.407, 2.779, 3.145, 3.779, ACCENT, 0.13871);
++  readMore(s, 9.185, 5.694);
++  body(s, 8.726, 4.58, 2.514, 0.832, L8, { align: 'center' });
++  sub(s, 9.262, 4.244, 1.448, 0.337, 'Package Three', { align: 'center', wrap: false });
++  roundRect(s, 9.509, 3.164, 0.941, 0.798, DARK);
++  num(s, 9.601, 3.31, 0.758, 0.505, '$30', { align: 'center', wrap: false });
++}
++
++function slide29(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 29, { mono: true, whiteStar: true });
++  freeform(s, 4.148, 1.23, 7.867, 3.176, CG_S29_25);
++  title(s, 1.208, 5.508, 2.804, 1.043, [['Contact ', WHITE], ['Information', ACCENT]]);
++  readMore(s, 10.417, 5.79, ACCENT);
++  body(s, 4.26, 5.488, 5.406, 1.084, L7);
++  body(s, 8.134, 2.065, 3.451, 0.58, L8);
++  sub(s, 8.134, 1.729, 1.483, 0.337, 'Phone Number', { wrap: false });
++  body(s, 7.514, 3.329, 4.071, 0.58,
++      'Lorem ipsum dolor sit consectetur adipiscing elit, eiusmod tempor incididunt ut labore et');
++  sub(s, 7.514, 2.992, 1.426, 0.337, 'Email Address', { wrap: false });
++}
++
++function slide30(pptx) {
++  const s = newSlide(pptx);
++  chrome(s, 30, { footer: 'presenter' });
++  roundRect(s, 1.869, 4.053, 9.595, 2.485, ACCENT);
++  body(s, 6.549, 4.757, 2.047, 1.084, L12);
++  txt(s, 2.654, 5.515, 1.738, 0.303, S('For Watching'), { wrap: false, fontSize: 12, charSpacing: 3 });
++  txt(s, 2.654, 4.757, 3.492, 0.909, S('Thank You'), { wrap: false, fontFace: SERIF, fontSize: 48, italic: true });
++  arc(s, 10.029, 5.104, 2.869, 270);
++  readMore(s, 9.082, 5.056);
++}
++
++/* --------------------------------------------------------------- assembly */
++
++const SLIDES = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
++  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
++  slide25, slide26, slide27, slide28, slide29, slide30,
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'WIDE';
++  pptx.title = 'Diamend - Jewelry Presentation';
++  pptx.author = 'Tamara Valente';
++  SLIDES.forEach(function (fn) { fn(pptx); });
++  return pptx.writeFile({ fileName: path.join(__dirname, '0e840600-8235-476d-a80e-97b604788ee1_grok_final.pptx') });
++}
++
++build().then(function (f) { console.log('wrote ' + f); },
++             function (e) { console.error(e); process.exit(1); });

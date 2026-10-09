@@ -1,0 +1,631 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/consulting_business_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/consulting_business_pitch_deck.js
+@@ -0,0 +1,628 @@
++/**
++ * Consulting Business — 20-slide deck rebuilt with PptxGenJS.
++ * Run: node 10eb52be-eedd-4017-95eb-84c8e33974de_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Theme
++ * ------------------------------------------------------------------ */
++
++const BG = '0A0A0A';        // slide background
++const WHITE = 'FFFFFF';
++const GREY = '595959';      // tx1 lumMod 65% -> body copy
++const GREY95 = 'F2F2F2';
++const A1 = '04BF68';        // accent1 - signature green
++const A2 = '468C5F';        // accent2 - divider rules
++const A3 = '194023';        // accent3 - deep green (header outline)
++const A4 = '8C655D';        // accent4 - clay
++const A5 = 'D6F589';        // accent5 - lime
++const A6 = '2E4159';        // accent6 - slate blue
++const PAGENO = '06884C';    // accent1 @70% over the dark background
++const PLACEHOLDER = '13171D'; // accent6 @25% over the dark background
++
++const FONT = 'Roboto';
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++/* ------------------------------------------------------------------ *
++ * Small helpers
++ * ------------------------------------------------------------------ */
++
++const rgb = (h) => [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16));
++const hex = (c) => c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('').toUpperCase();
++const mix = (a, b, t) => hex(rgb(a).map((v, i) => v + (rgb(b)[i] - v) * Math.max(0, Math.min(1, t))));
++const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
++const deg = (r) => (r * 180) / Math.PI;
++const rad = (d) => (d * Math.PI) / 180;
++
++/** Colour at position `t` of a multi-stop ramp [[pos, hex], ...]. */
++function rampAt(stops, t) {
++  t = clamp(t, 0, 1);
++  let i = 0;
++  while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
++  const [p0, c0] = stops[i];
++  const [p1, c1] = stops[i + 1];
++  return mix(c0, c1, p1 === p0 ? 0 : (t - p0) / (p1 - p0));
++}
++
++/** Text box. Mirrors the deck's defaults: Roboto, top aligned, no auto-fit. */
++function tx(slide, text, o) {
++  slide.addText(text, Object.assign({
++    fontFace: FONT,
++    color: WHITE,
++    valign: 'top',
++    align: 'left',
++    isTextBox: true,
++  }, o));
++}
++
++/** Solid shape shorthand. */
++function box(slide, shape, o) {
++  slide.addShape(shape, Object.assign({ line: { type: 'none' } }, o));
++}
++
++/* ------------------------------------------------------------------ *
++ * Gradient emulation
++ *
++ * PptxGenJS only emits solid fills, so every gradient in the source deck
++ * is rebuilt from thin solid slices: horizontal bands for rectangles and
++ * circular segments ("chord" shapes) for the round glow blobs.
++ * ------------------------------------------------------------------ */
++
++/**
++ * Linear gradient inside a rectangle whose corners may be rounded.
++ * dir is the screen angle (deg, 0 = right, 90 = down) of increasing t.
++ */
++function gradBox(slide, o) {
++  const rows = o.rows || 48;
++  const cols = o.cols || 1;
++  const r = { tl: 0, tr: 0, bl: 0, br: 0, ...(o.corners || {}) };
++  const ux = Math.cos(rad(o.dir)), uy = Math.sin(rad(o.dir));
++  const lo = Math.min(0, o.w * ux) + Math.min(0, o.h * uy);
++  const hi = Math.max(0, o.w * ux) + Math.max(0, o.h * uy);
++  const bleed = 0.008;
++
++  for (let j = 0; j < rows; j++) {
++    const y0 = (j * o.h) / rows;
++    const y1 = ((j + 1) * o.h) / rows;
++    // horizontal inset required by the rounded corners for this band
++    let left = 0, right = 0;
++    for (const [rad_, top] of [[r.tl, true], [r.bl, false]]) {
++      if (!rad_) continue;
++      const d = top ? rad_ - Math.min(y0, y1) : rad_ - (o.h - Math.max(y0, y1));
++      if (d > 0) left = Math.max(left, rad_ - Math.sqrt(Math.max(0, rad_ * rad_ - d * d)));
++    }
++    for (const [rad_, top] of [[r.tr, true], [r.br, false]]) {
++      if (!rad_) continue;
++      const d = top ? rad_ - Math.min(y0, y1) : rad_ - (o.h - Math.max(y0, y1));
++      if (d > 0) right = Math.max(right, rad_ - Math.sqrt(Math.max(0, rad_ * rad_ - d * d)));
++    }
++    const bw = o.w - left - right;
++    if (bw <= 0) continue;
++    for (let i = 0; i < cols; i++) {
++      const cx = left + ((i + 0.5) * bw) / cols;
++      const cy = (y0 + y1) / 2;
++      const t = ((cx * ux + cy * uy) - lo) / (hi - lo);
++      box(slide, 'rect', {
++        x: o.x + left + (i * bw) / cols,
++        y: o.y + y0,
++        w: bw / cols + (i < cols - 1 ? bleed : 0),
++        h: (y1 - y0) + (j < rows - 1 ? bleed : 0),
++        fill: { color: rampAt(o.stops, o.ease ? o.ease(t) : t) },
++      });
++    }
++  }
++}
++
++/**
++ * Soft circular glow: a disc that fades from `peak` on one side to the
++ * background on the other. Built from stacked circular segments so the
++ * outline stays perfectly round.
++ */
++function glowDisc(slide, o) {
++  const steps = o.steps || 18;
++  const tail = o.tail === undefined ? 0.3 : o.tail; // where the fade hits the background
++  for (let i = 0; i < steps; i++) {
++    const p = -tail + ((1 + tail) * i) / steps;      // chord cut position, -1..1
++    const shade = (p + tail) / (1 + tail) + 0.5 / steps;
++    const phi = deg(Math.acos(clamp(p, -1, 1)));
++    box(slide, 'chord', {
++      x: o.cx - o.r, y: o.cy - o.r, w: o.r * 2, h: o.r * 2,
++      angleRange: [(o.dir - phi + 360) % 360, (o.dir + phi) % 360],
++      fill: { color: mix(BG, o.peak, shade) },
++    });
++  }
++}
++
++/** Concentric disc with a hole — the radial ring used on slide 10. */
++function radialRing(slide, o) {
++  const steps = o.steps || 10;
++  for (let i = 0; i < steps; i++) {
++    const f = 1 - i / steps;                       // outer -> inner
++    const rr = o.rHole + (o.r - o.rHole) * f;
++    box(slide, 'ellipse', {
++      x: o.cx - rr, y: o.cy - rr, w: rr * 2, h: rr * 2,
++      fill: { color: mix(o.inner, o.outer, f) },
++    });
++  }
++  box(slide, 'ellipse', {
++    x: o.cx - o.rHole, y: o.cy - o.rHole, w: o.rHole * 2, h: o.rHole * 2,
++    fill: { color: BG },
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Master furniture (from the slide master: pill outline, rails, page no)
++ * ------------------------------------------------------------------ */
++
++function chrome(slide, pageNo) {
++  slide.background = { color: BG };
++  slide.addShape('roundRect', {
++    x: 0.194, y: 0.189, w: 12.943, h: 0.323, rectRadius: 0.161,
++    fill: { type: 'none' }, line: { color: A3, width: 1 },
++  });
++  tx(slide, 'Consulting Business', { x: 0.294, y: 0.213, w: 2.853, h: 0.286, fontSize: 11, color: A1 });
++  tx(slide, 'Presentation ©️2025', { x: 10.198, y: 0.213, w: 2.853, h: 0.286, fontSize: 11, color: A1, align: 'right' });
++  tx(slide, String(pageNo), { x: 12.531, y: 6.874, w: 0.621, h: 0.404, fontSize: 18, color: PAGENO, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Recurring composites
++ * ------------------------------------------------------------------ */
++
++const BODY_SM = { fontSize: 12, color: GREY, lineSpacingMultiple: 1.2 };
++const BODY_MD = { fontSize: 14, color: GREY, lineSpacingMultiple: 1.2 };
++const KICKER = { fontSize: 14, color: A1 };
++
++const LOREM_SHORT = 'Lorem Ipsum is simply dummy text of the printing.';
++const LOREM_LINE = 'Lorem Ipsum is simply dummy text of the printing and typesetting industry.';
++const LOREM_STD = "Lorem Ipsum is simply dummy text of the printing and typesetting industry.  Lorem Ipsum has been the industry's standard dummy.";
++const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.';
++const INFO_SUB = 'Lorem Ipsum is simply dummy text of the printing and typesetting industry.  Lorem Ipsum.';
++
++/** kicker line + paragraph, the deck's most repeated text pairing */
++function captionPair(slide, o) {
++  tx(slide, o.title || 'Your Text Subtitle Here', {
++    x: o.tx_, y: o.ty, w: o.tw || 2.381, h: 0.337, align: o.align || 'left', ...KICKER,
++  });
++  tx(slide, o.body || LOREM_SHORT, {
++    x: o.bx, y: o.by, w: o.bw || 2.306, h: o.bh || 0.567, align: o.align || 'left', ...BODY_SM,
++  });
++}
++
++/** numbered green disc (renders as the bare numeral in this deck's palette) */
++function numberDisc(slide, x, y, size, label, fontSize) {
++  tx(slide, label, {
++    x, y, w: size, h: size, fontSize: fontSize || 14, color: WHITE,
++    align: 'center', valign: 'middle',
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * The three overlapping glow blobs used on slides 1, 2, 15 and 17
++ * ------------------------------------------------------------------ */
++
++const BLOB_R = 1.529;
++
++function blobTrio(slide, dx, dirs) {
++  const spots = [
++    { x: 4.693 + dx, y: 2.303, dir: dirs[0] },
++    { x: 3.019 + dx, y: 2.343, dir: dirs[1] },
++    { x: 6.725 + dx, y: 2.462, dir: dirs[2] },
++  ];
++  spots.forEach((s) => glowDisc(slide, { cx: s.x + BLOB_R, cy: s.y + BLOB_R, r: BLOB_R, dir: s.dir, peak: '0C8047' }));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++function slide01(pptx) {
++  const s = pptx.addSlide(); chrome(s, 1);
++  blobTrio(s, 0.266, [183, 10, 286]);
++  tx(s, '©️2025', { x: 6.183, y: 1.405, w: 0.968, h: 0.404, fontSize: 18 });
++  tx(s, 'Consulting Business', {
++    x: 0.004, y: 3.377, w: 13.326, h: 1.189,
++    fontSize: 80, align: 'center', lineSpacingMultiple: 0.8,
++  });
++  tx(s, 'Modern Business Presentation Template', {
++    x: 3.543, y: 6.127, w: 6.248, h: 0.404, fontSize: 18, align: 'center',
++  });
++}
++
++function slide02(pptx) {
++  const s = pptx.addSlide(); chrome(s, 2);
++  glowDisc(s, { cx: 0.240 + BLOB_R, cy: 1.085 + BLOB_R, r: BLOB_R, dir: 281, peak: '0B7E45' });
++  glowDisc(s, { cx: 2.609 + BLOB_R, cy: 4.961 + BLOB_R, r: BLOB_R, dir: 112, peak: '0B7E45' });
++  tx(s, 'Hi, Welcome', { x: 5.861, y: 1.488, w: 3.114, h: 0.427, fontSize: 24, color: A1, lineSpacingMultiple: 0.8 });
++  tx(s, 'Introduction', { x: 5.861, y: 2.108, w: 6.380, h: 1.080, fontSize: 72, lineSpacingMultiple: 0.8 });
++  [3.433, 5.092].forEach((y) => {
++    tx(s, LOREM_LONG, { x: 5.911, y, w: 5.316, h: 1.210, ...BODY_MD });
++  });
++}
++
++function slide03(pptx) {
++  const s = pptx.addSlide(); chrome(s, 3);
++  captionPair(s, { tx_: 8.157, ty: 0.959, tw: 2.207, bx: 8.170, by: 1.307, bw: 2.586 });
++  captionPair(s, { tx_: 8.150, ty: 2.185, tw: 2.193, bx: 8.162, by: 2.532, bw: 2.586 });
++  tx(s, 'Consulting for the Future of Business', {
++    x: 0.902, y: 4.539, w: 6.883, h: 1.737, fontSize: 54, lineSpacingMultiple: 0.9,
++  });
++}
++
++function slide04(pptx) {
++  const s = pptx.addSlide(); chrome(s, 4);
++  // full-bleed panel, top corners rounded, lit from the bottom-right
++  gradBox(s, {
++    x: 0, y: 0.867, w: 5.717, h: 6.633, dir: 54, rows: 80, cols: 14,
++    corners: { tl: 0.95, tr: 0.95 }, ease: (t) => Math.pow(t, 1.35),
++    stops: [[0, BG], [1, A1]],
++  });
++  tx(s, 'Smarter Decisions. Stronger Businesses.', {
++    x: 6.716, y: 0.942, w: 5.111, h: 1.070, fontSize: 32, lineSpacingMultiple: 0.9,
++  });
++  tx(s, LOREM_STD, { x: 6.716, y: 2.079, w: 5.187, h: 0.928, ...BODY_MD });
++  tx(s, '“', { x: 6.463, y: 3.489, w: 0.546, h: 0.774, fontSize: 40, color: A1 });
++  tx(s, LOREM_STD, { x: 6.767, y: 3.649, w: 5.187, h: 0.567, fontSize: 12, color: WHITE, italic: true, lineSpacingMultiple: 1.2 });
++  captionPair(s, { tx_: 6.808, ty: 5.451, bx: 6.821, by: 5.798 });
++  captionPair(s, { tx_: 10.024, ty: 5.451, bx: 10.036, by: 5.798 });
++}
++
++function slide05(pptx) {
++  const s = pptx.addSlide(); chrome(s, 5);
++  gradBox(s, {
++    x: 0, y: 0.867, w: 3.823, h: 6.633, dir: 54, rows: 80, cols: 10,
++    corners: { tl: 0.637, tr: 0.637 }, ease: (t) => Math.pow(t, 1.35),
++    stops: [[0, BG], [1, A1]],
++  });
++  tx(s, 'Core consulting areas', { x: 0.841, y: 1.538, w: 2.957, h: 1.555, fontSize: 32, lineSpacingMultiple: 0.9 });
++  tx(s, "Lorem Ipsum is simply dummy text of the printing and typesetting industry.  Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,  when an unknown printer took a galley of type and scrambled it to make a type specimen book.",
++    { x: 0.841, y: 3.423, w: 2.500, h: 3.189, fontSize: 14, color: WHITE, align: 'justify', lineSpacingMultiple: 1.2 });
++  numberDisc(s, 5.248, 4.408, 0.845, '01');
++  captionPair(s, { tx_: 5.308, ty: 5.657, bx: 5.321, by: 6.005 });
++  numberDisc(s, 9.172, 1.105, 0.845, '02');
++  captionPair(s, { tx_: 9.232, ty: 2.354, bx: 9.245, by: 2.701 });
++}
++
++function slide06(pptx) {
++  const s = pptx.addSlide(); chrome(s, 6);
++  gradBox(s, {
++    x: 8.280, y: 1.899, w: 5.054, h: 5.601, dir: 90, rows: 70,
++    stops: [[0, BG], [0.55, '0C4327'], [0.75, '0E4928'], [1, '174225']],
++  });
++  [['01', 1.211, 1.339, 1.810], ['02', 3.123, 3.373, 3.845], ['03', 5.160, 5.424, 5.896]].forEach(([n, oy, ty_, by]) => {
++    numberDisc(s, 2.316, oy, 0.845, n);
++    tx(s, 'Your Text Subtitle Here', { x: 3.608, y: ty_, w: 2.193, h: 0.337, ...KICKER });
++    tx(s, LOREM_LINE, { x: 3.608, y: by, w: 3.151, h: 0.567, ...BODY_SM });
++  });
++  tx(s, 'The Best Ideas', { x: 9.387, y: 5.498, w: 2.912, h: 0.438, fontSize: 20, align: 'center' });
++  tx(s, LOREM_LINE, { x: 9.244, y: 5.972, w: 3.197, h: 0.567, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 });
++}
++
++function slide07(pptx) {
++  const s = pptx.addSlide(); chrome(s, 7);
++  tx(s, 'Our Professional Team', { x: 3.134, y: 0.935, w: 7.064, h: 0.645, fontSize: 40, align: 'center', lineSpacingMultiple: 0.8 });
++  tx(s, LOREM_LINE, { x: 2.772, y: 1.576, w: 7.789, h: 0.362, ...BODY_MD, align: 'center' });
++
++  // video-style play arrows over the (empty) portrait placeholders
++  [[4.295, 3.874], [8.633, 3.895]].forEach(([x, y]) => {
++    box(s, 'triangle', { x, y, w: 0.449, h: 0.348, rotate: 90, fill: { color: 'D9D9D9' } });
++  });
++
++  const team = [
++    { plus: [1.506, 5.659, 0.344], name: 'Nikita Loring', nx: 2.201, ny: 5.566, nSize: 11, role: 'Law Staff', rx: 2.198, ry: 5.789, rSize: 10 },
++    { plus: [5.298, 5.786, 0.428], name: 'Bruce Champbell', nx: 6.123, ny: 5.676, nSize: 14, role: 'Lead Engineer', rx: 6.120, ry: 5.954, rSize: 11 },
++    { plus: [9.534, 5.652, 0.344], name: 'Marie Nathalia', nx: 10.212, ny: 5.564, nSize: 11, role: 'UI/UX Designer', rx: 10.209, ry: 5.787, rSize: 10 },
++  ];
++  team.forEach((m) => {
++    const [px, py, pr] = m.plus;
++    s.addText('+', {
++      shape: 'ellipse', x: px, y: py, w: pr, h: pr + 0.008,
++      fill: { color: A6 }, line: { color: WHITE, width: 2.25 },
++      fontFace: 'Poppins Medium', fontSize: 16, color: WHITE, align: 'center', valign: 'middle',
++    });
++    tx(s, m.name, { x: m.nx, y: m.ny, w: 1.870, h: 0.286, fontSize: m.nSize });
++    tx(s, m.role, { x: m.rx, y: m.ry, w: 1.423, h: 0.330, fontSize: m.rSize, color: A1, lineSpacingMultiple: 1.5 });
++  });
++}
++
++function slide08(pptx) {
++  const s = pptx.addSlide(); chrome(s, 8);
++  tx(s, '+50%', { x: 1.127, y: 1.273, w: 3.607, h: 0.999, fontSize: 66, lineSpacingMultiple: 0.8 });
++  tx(s, '$61M', { x: 4.481, y: 1.273, w: 3.607, h: 0.999, fontSize: 66, lineSpacingMultiple: 0.8 });
++  box(s, 'line', { x: 4.025, y: 0.924, w: 0, h: 1.772, line: { color: A2, width: 1 } });
++  tx(s, 'Business Complete', { x: 1.163, y: 2.274, w: 2.381, h: 0.404, fontSize: 18, color: A1 });
++  tx(s, 'Business Profit', { x: 4.479, y: 2.274, w: 2.381, h: 0.404, fontSize: 18, color: A1 });
++  const para = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus.';
++  captionPair(s, { tx_: 1.125, ty: 3.425, bx: 1.137, by: 3.773, bw: 5.053, bh: 0.809, body: para });
++  captionPair(s, { tx_: 1.125, ty: 5.096, bx: 1.137, by: 5.444, bw: 4.926, bh: 0.809, body: para });
++}
++
++function slide09(pptx) {
++  const s = pptx.addSlide(); chrome(s, 9);
++  gradBox(s, {
++    x: 1.240, y: 3.604, w: 2.864, h: 2.861, dir: 47, rows: 60, cols: 12,
++    corners: { tl: 0.321, tr: 0.321, bl: 0.321, br: 0.321 },
++    stops: [[0, '101E14'], [1, '098049']],
++  });
++  tx(s, 'Showcase the consulting services offered', {
++    x: 7.080, y: 1.362, w: 5.231, h: 0.859, fontSize: 28, lineSpacingMultiple: 0.8,
++  });
++  tx(s, "Lorem Ipsum is simply dummy text of the printing and typesetting industry.  Lorem Ipsum has been the industry's standard.",
++    { x: 7.080, y: 2.429, w: 4.039, h: 0.809, ...BODY_SM });
++  tx(s, 'Consulting & Professional Services', { x: 1.561, y: 4.104, w: 2.178, h: 1.111, fontSize: 20, color: GREY95 });
++  tx(s, LOREM_SHORT, { x: 1.561, y: 5.345, w: 2.223, h: 0.627, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 });
++  numberDisc(s, 4.671, 5.097, 0.845, '01');
++  captionPair(s, { tx_: 5.675, ty: 5.057, bx: 5.687, by: 5.405 });
++  numberDisc(s, 8.537, 5.097, 0.845, '02');
++  captionPair(s, { tx_: 9.542, ty: 5.057, bx: 9.554, by: 5.405 });
++}
++
++function slide10(pptx) {
++  const s = pptx.addSlide(); chrome(s, 10);
++  tx(s, 'Metrics or achievements from previous work.', {
++    x: 1.836, y: 1.007, w: 9.662, h: 1.184, fontSize: 40, align: 'center', lineSpacingMultiple: 0.8,
++  });
++  // three progress donuts: filled ring + white arc + centred percentage
++  const dials = [
++    { x: 2.000, pct: '70%', sweep: 228.4, tx_: 2.780, cx: 2.121, sx: 2.108 },
++    { x: 4.724, pct: '40%', sweep: 133.1, tx_: 5.947, cx: 5.288, sx: 5.275 },
++    { x: 7.671, pct: '80%', sweep: 262.1, tx_: 9.169, cx: 8.510, sx: 8.497 },
++  ];
++  dials.forEach((d) => {
++    const cx = d.x + 1.3835, cy = 2.589 + 1.3835;
++    radialRing(s, { cx, cy, r: 1.3835, rHole: 0.486, inner: '067340', outer: '049E56' });
++    box(s, 'arc', {
++      x: cx - 0.972, y: 4.005 - 0.972, w: 1.944, h: 1.944,
++      angleRange: [95.1, (95.1 + d.sweep) % 360],
++      line: { color: WHITE, width: 11.75, endArrowType: 'oval' },
++    });
++    tx(s, d.pct, { x: d.tx_, y: 3.796, w: 1.206, h: 0.373, fontSize: 20, align: 'center', lineSpacingMultiple: 0.8 });
++    tx(s, 'Your Subtitle', { x: d.sx, y: 5.735, w: 2.550, h: 0.337, ...KICKER, align: 'center' });
++    tx(s, LOREM_SHORT, { x: d.cx, y: 6.083, w: 2.525, h: 0.567, ...BODY_SM, align: 'center' });
++  });
++}
++
++function slide11(pptx) {
++  const s = pptx.addSlide(); chrome(s, 11);
++  tx(s, '“', { x: 0.496, y: 0.911, w: 0.546, h: 0.774, fontSize: 40, color: A1 });
++  tx(s, 'Lorem Ipsum is simply dummy text of the printing and typesetting industry.  Lorem Ipsum has.',
++    { x: 0.800, y: 1.071, w: 4.388, h: 0.567, fontSize: 12, color: WHITE, italic: true, lineSpacingMultiple: 1.2 });
++  tx(s, 'Highlight industry trends', { x: 6.784, y: 0.861, w: 4.649, h: 1.434, fontSize: 44, lineSpacingMultiple: 0.9 });
++  const trendBody = "Lorem Ipsum is simply dummy text of the printing and typesetting industry.  Lorem Ipsum has been the industry's.";
++  [[2.915, 3.336], [4.885, 5.306]].forEach(([ty_, by]) => {
++    tx(s, 'Your Subtitle', { x: 8.582, y: ty_, w: 1.898, h: 0.337, ...KICKER });
++    tx(s, trendBody, { x: 8.582, y: by, w: 3.549, h: 0.897, ...BODY_SM });
++  });
++}
++
++/** shared header for the two "Our Infographic Design" slides */
++function infographicHeader(s) {
++  tx(s, 'Our Infographic Design', { x: 2.206, y: 1.082, w: 8.921, h: 0.645, fontSize: 40, align: 'center', lineSpacingMultiple: 0.8 });
++  tx(s, INFO_SUB, { x: 2.199, y: 1.822, w: 8.936, h: 0.362, ...BODY_MD, align: 'center' });
++}
++
++function slide12(pptx) {
++  const s = pptx.addSlide(); chrome(s, 12);
++  infographicHeader(s);
++  const cols = [
++    { disc: 2.937, dy: 3.278, n: '01', sx: 2.508, bx: 2.519 },
++    { disc: 5.115, dy: 3.267, n: '02', sx: 4.941, bx: 4.953 },
++    { disc: 7.304, dy: 3.267, n: '03', sx: 7.219, bx: 7.231 },
++    { disc: 9.482, dy: 3.267, n: '04', sx: 9.441, bx: 9.453 },
++  ];
++  cols.forEach((c) => {
++    numberDisc(s, c.disc, c.dy, 1.009, c.n);
++    tx(s, 'Your Subtitle', { x: c.sx, y: 5.491, w: 2.381, h: 0.337, ...KICKER, align: 'center' });
++    tx(s, LOREM_SHORT, { x: c.bx, y: 5.838, w: 2.358, h: 0.567, ...BODY_SM, align: 'center' });
++  });
++}
++
++function slide13(pptx) {
++  const s = pptx.addSlide(); chrome(s, 13);
++  infographicHeader(s);
++
++  // chain of four rings; the whole ribbon fades from green (left) to dark (right)
++  const nodes = [
++    { x: 3.555, fill: A1, ring: '0A7A44', badge: '079652', n: '01', tx_: 4.034, sx: 3.063, bx: 3.075, cap: 'below' },
++    { x: 5.303, fill: A6, ring: '0A6A3B', badge: '08843F', n: '02', tx_: 5.794, sx: 4.730, bx: 4.742, cap: 'above' },
++    { x: 7.052, fill: A4, ring: '0A5732', badge: '0B6C3C', n: '03', tx_: 7.535, sx: 6.563, bx: 6.575, cap: 'below' },
++    { x: 8.801, fill: A5, ring: '0B4629', badge: '0C5833', n: '04', tx_: 9.267, sx: 8.263, bx: 8.275, cap: 'above' },
++  ];
++  // connector tails
++  box(s, 'rect', { x: 2.259, y: 4.674, w: 1.30, h: 0.148, fill: { color: '0A6B3B' } });
++  box(s, 'rect', { x: 9.90, y: 4.674, w: 1.17, h: 0.148, fill: { color: '18261E' } });
++  nodes.forEach((nd) => {
++    const cx = nd.x + 0.638, cy = 4.748;
++    box(s, 'blockArc', {
++      x: cx - 0.93, y: cy - 0.93, w: 1.86, h: 1.86,
++      angleRange: [344, 290], arcThicknessRatio: 0.161,
++      fill: { color: nd.ring },
++    });
++    box(s, 'ellipse', { x: nd.tx_ - 0.03, y: 3.62, w: 0.585, h: 0.445, fill: { color: nd.badge } });
++    box(s, 'ellipse', { x: nd.x, y: 4.110, w: 1.276, h: 1.276, fill: { color: nd.fill } });
++    tx(s, nd.n, { x: nd.tx_, y: 3.690, w: 0.527, h: 0.303, fontSize: 12, align: 'center' });
++    const ty_ = nd.cap === 'above' ? 2.435 : 5.969;
++    const by = nd.cap === 'above' ? 2.783 : 6.316;
++    tx(s, 'Your Subtitle', { x: nd.sx, y: ty_, w: 2.381, h: 0.337, ...KICKER, align: 'center' });
++    tx(s, LOREM_SHORT, { x: nd.bx, y: by, w: 2.358, h: 0.567, ...BODY_SM, align: 'center' });
++  });
++  [3.375, 5.134, 6.875, 8.642].forEach((x) => {
++    tx(s, '85,5%', { x, y: 4.517, w: 1.658, h: 0.404, fontSize: 18, align: 'center' });
++  });
++}
++
++function slide14(pptx) {
++  const s = pptx.addSlide(); chrome(s, 14);
++  tx(s, 'Analysis', { x: 1.078, y: 1.087, w: 4.822, h: 1.189, fontSize: 80, lineSpacingMultiple: 0.8 });
++  tx(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo.',
++    { x: 6.887, y: 1.156, w: 5.005, h: 1.052, ...BODY_SM });
++
++  const panels = [
++    { n: '01', discX: 1.032, value: '10000+', vx: 2.324, vw: 1.733, label: 'Global Partners', lx: 2.312, lw: 1.911, ly: 3.655, chartX: 1.034 },
++    { n: '02', discX: 4.887, value: '464K', vx: 6.117, vw: 1.177, label: 'Analytics Report', lx: 6.105, lw: 1.848, ly: 3.630, chartX: 4.857 },
++    { n: '03', discX: 8.929, value: '920K', vx: 10.388, vw: 1.177, label: 'Problem Solving', lx: 10.375, lw: 1.998, ly: 3.630, chartX: 8.868 },
++  ];
++  panels.forEach((p) => {
++    numberDisc(s, p.discX, 3.172, 0.863, p.n);
++    tx(s, p.value, { x: p.vx, y: p.value === '10000+' ? 3.107 : 3.082, w: p.vw, h: 0.640, fontSize: 24, lineSpacingMultiple: 1.5 });
++    tx(s, p.label, { x: p.lx, y: p.ly, w: p.lw, h: 0.370, fontSize: 12, color: A1, lineSpacingMultiple: 1.5 });
++    s.addChart(pptx.ChartType.bar, [
++      { name: 'Series 1', labels: ['Data 1', 'Data 2', 'Data 3'], values: [7.2, 8, 6.9] },
++      { name: 'Series 2', labels: ['Data 1', 'Data 2', 'Data 3'], values: [5.6, 5.5, 5.3] },
++    ], {
++      x: p.chartX, y: 4.288, w: 3.295, h: 2.331,
++      barDir: 'col', barGapWidthPct: 219, barOverlapPct: -27,
++      chartColors: ['077344', '86A25B'],
++      showLegend: false, showTitle: false,
++      catAxisLabelColor: WHITE, catAxisLabelFontFace: FONT, catAxisLabelFontSize: 10, catAxisLineColor: '4A4A4A',
++      valAxisLabelColor: WHITE, valAxisLabelFontFace: FONT, valAxisLabelFontSize: 10,
++      valAxisMinVal: 0, valAxisMaxVal: 9, valAxisMajorUnit: 1, valAxisLineShow: false,
++      valGridLine: { style: 'solid', size: 0.75, color: '2A2A2A' },
++      catGridLine: { style: 'none' },
++    });
++  });
++}
++
++function slide15(pptx) {
++  const s = pptx.addSlide(); chrome(s, 15);
++  glowDisc(s, { cx: 6.771 + BLOB_R, cy: 2.769 + BLOB_R, r: BLOB_R, dir: 281, peak: '0B7E45' });
++  glowDisc(s, { cx: 6.811 + BLOB_R, cy: 4.442 + BLOB_R, r: BLOB_R, dir: 111, peak: '0B7E45' });
++  glowDisc(s, { cx: 9.323 + BLOB_R, cy: 0.976 + BLOB_R, r: BLOB_R, dir: 11, peak: '0B7E45' });
++  tx(s, 'Driven by Data, Guided by Experience', { x: 0.984, y: 1.761, w: 4.649, h: 2.100, fontSize: 44, lineSpacingMultiple: 0.9 });
++  tx(s, LOREM_LONG, { x: 0.984, y: 4.610, w: 5.484, h: 1.210, ...BODY_MD });
++}
++
++function slide16(pptx) {
++  const s = pptx.addSlide(); chrome(s, 16);
++  tx(s, 'Transforming Challenges Into Opportunities', { x: 0.788, y: 1.020, w: 11.870, h: 1.737, fontSize: 54, lineSpacingMultiple: 0.9 });
++  tx(s, '*) Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus eros quis urna.Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.',
++    { x: 0.839, y: 3.073, w: 10.995, h: 0.567, fontSize: 12, color: A1, italic: true, align: 'justify', lineSpacingMultiple: 1.2 });
++  box(s, 'line', { x: 1.339, y: 5.036, w: 8.905, h: 0, line: { color: A5, width: 1, dashType: 'dash' } });
++  const milestone = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. massa. Fusce posuere, magna sed pulvinar ultricies';
++  [[0.948, 0.860], [4.047, 3.860], [7.145, 6.986], [10.244, 9.986]].forEach(([dotX, textX]) => {
++    box(s, 'ellipse', { x: dotX, y: 4.841, w: 0.391, h: 0.391, fill: { color: WHITE } });
++    tx(s, milestone, { x: textX, y: 5.545, w: 2.697, h: 1.210, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
++  });
++}
++
++function slide17(pptx) {
++  const s = pptx.addSlide(); chrome(s, 17);
++  blobTrio(s, -4.228, [183, 10, 286]);
++  box(s, 'roundRect', { x: 1.194, y: 3.714, w: 5.394, h: 2.793, rectRadius: 0.16, fill: { color: PLACEHOLDER } });
++  tx(s, 'Picture Here', { x: 1.194, y: 3.760, w: 5.394, h: 0.45, fontSize: 20, align: 'center' });
++  tx(s, 'Consulting Business', { x: 1.100, y: 1.081, w: 6.536, h: 1.737, fontSize: 54, lineSpacingMultiple: 0.9 });
++  tx(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo.',
++    { x: 7.209, y: 1.379, w: 5.005, h: 1.210, ...BODY_MD });
++
++  // card A sits on the slate panel, card B on the (transparent) glow panel
++  box(s, 'roundRect', { x: 5.258, y: 4.456, w: 3.333, h: 1.726, rectRadius: 0.0917, fill: { color: A6 } });
++  [
++    { letter: 'A', discX: 7.612, titleX: 5.258, bodyX: 5.547, letterX: 7.695, titleColor: WHITE },
++    { letter: 'B', discX: 11.212, titleX: 8.883, bodyX: 9.171, letterX: 11.290, titleColor: GREY95 },
++  ].forEach((c, i) => {
++    box(s, 'ellipse', { x: c.discX, y: i === 0 ? 4.124 : 4.133, w: 0.675, h: 0.675, fill: { color: '6B6B6B' } });
++    tx(s, c.letter, { x: c.letterX, y: i === 0 ? 4.070 : 4.075, w: 0.508, h: 0.648, fontSize: 24, align: 'center', lineSpacingMultiple: 1.5 });
++    tx(s, 'Description Here', { x: c.titleX, y: 4.822, w: 3.333, h: 0.425, fontSize: 14, bold: true, color: c.titleColor, align: 'center', lineSpacingMultiple: 1.5 });
++    tx(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. ',
++      { x: c.bodyX, y: 5.264, w: 2.757, h: 0.721, fontSize: 10.5, color: WHITE, align: 'center', lineSpacingMultiple: 1.2 });
++  });
++}
++
++function slide18(pptx) {
++  const s = pptx.addSlide(); chrome(s, 18);
++  // two tall bars whose lime / clay gradients fade out towards the middle
++  const fade = (color) => [[0, color], [0.5, BG], [1, color]];
++  gradBox(s, { x: 5.305, y: 1.967, w: 2.067, h: 5.533, dir: 90, rows: 64, stops: fade('BEDD7B') });
++  gradBox(s, { x: 7.371, y: 0.944, w: 2.067, h: 6.556, dir: 90, rows: 64, stops: fade('7E5B53') });
++
++  tx(s, 'Traffic', { x: 0.584, y: 1.017, w: 4.311, h: 1.298, fontSize: 88, lineSpacingMultiple: 0.8 });
++  tx(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor.',
++    { x: 1.250, y: 3.123, w: 2.722, h: 1.369, fontSize: 16, lineSpacingMultiple: 1.2 });
++  tx(s, '3.5K +', { x: 1.139, y: 5.053, w: 3.617, h: 1.447, fontSize: 80, color: A1 });
++  const blurb = 'Maximus lorem guis, blandit. Proin utter tellus euismod,.';
++  tx(s, blurb, { x: 5.489, y: 2.152, w: 1.574, h: 1.210, fontSize: 14, lineSpacingMultiple: 1.2 });
++  tx(s, '95%', { x: 5.489, y: 3.716, w: 2.349, h: 0.774, fontSize: 40, color: A5 });
++  tx(s, blurb, { x: 7.555, y: 1.161, w: 1.574, h: 1.210, fontSize: 14, lineSpacingMultiple: 1.2 });
++  tx(s, '102%', { x: 7.555, y: 2.542, w: 2.349, h: 0.774, fontSize: 40, color: A4 });
++  tx(s, '80.9%', { x: 10.049, y: 4.467, w: 1.809, h: 0.726, fontSize: 24, color: A1, align: 'center', valign: 'middle' });
++  tx(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Aenean commodo ligula',
++    { x: 10.049, y: 5.476, w: 2.590, h: 0.928, fontSize: 14, lineSpacingMultiple: 1.2 });
++}
++
++function slide19(pptx) {
++  const s = pptx.addSlide(); chrome(s, 19);
++  tx(s, 'Chart', { x: 0.501, y: 1.096, w: 5.236, h: 1.683, fontSize: 115, lineSpacingMultiple: 0.8 });
++  tx(s, '2.4K +', { x: 7.183, y: 1.079, w: 2.872, h: 1.111, fontSize: 60 });
++  tx(s, '56%', { x: 10.406, y: 1.079, w: 2.536, h: 1.111, fontSize: 60 });
++  const legend = 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et';
++  [
++    { title: 'Data One', ty: 3.308, by: 3.848, pct: '70.9%', px: 4.528, py: 3.217, pc: A1 },
++    { title: 'Data Two', ty: 5.219, by: 5.760, pct: '30.9%', px: 4.540, py: 5.090, pc: A5 },
++  ].forEach((row) => {
++    tx(s, row.title, { x: 0.745, y: row.ty, w: 2.903, h: 0.510, fontSize: 20, lineSpacingMultiple: 1.3 });
++    tx(s, legend, { x: 0.745, y: row.by, w: 5.236, h: 0.645, ...BODY_MD });
++    tx(s, row.pct, { x: row.px, y: row.py, w: 1.307, h: 0.544, fontSize: 16, color: row.pc, align: 'center', valign: 'middle' });
++  });
++  s.addChart(pptx.ChartType.bar, [
++    { name: 'Series 1', labels: ['1', '2', '3', '4'], values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: ['1', '2', '3', '4'], values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Series 3', labels: ['1', '2', '3', '4'], values: [2, 2, 3, 5] },
++  ], {
++    x: 7.161, y: 2.590, w: 5.183, h: 4.051,
++    barDir: 'bar', barGrouping: 'percentStacked', barGapWidthPct: 150, barOverlapPct: 100,
++    chartColors: [A1, A6, A5],
++    showLegend: false, showTitle: false,
++    catAxisLabelColor: WHITE, catAxisLabelFontFace: FONT, catAxisLabelFontSize: 10, catAxisLineColor: '4A4A4A',
++    valAxisLabelColor: WHITE, valAxisLabelFontFace: FONT, valAxisLabelFontSize: 10,
++    valAxisLabelFormatCode: '0%', valAxisLineShow: false,
++    valGridLine: { style: 'solid', size: 0.75, color: '2A2A2A' },
++    catGridLine: { style: 'none' },
++  });
++}
++
++function slide20(pptx) {
++  const s = pptx.addSlide(); chrome(s, 20);
++  tx(s, 'Thank You', { x: 0.760, y: 1.248, w: 8.287, h: 1.665, fontSize: 115, lineSpacingMultiple: 0.8 });
++  tx(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus.',
++    { x: 0.760, y: 3.117, w: 4.217, h: 1.210, ...BODY_MD });
++  tx(s, 'Get in touch with us', { x: 8.003, y: 4.310, w: 3.048, h: 0.319, fontSize: 16, align: 'center', lineSpacingMultiple: 0.8 });
++  box(s, 'ellipse', { x: 11.542, y: 4.117, w: 0.705, h: 0.705, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
++  box(s, 'line', { x: 11.789, y: 4.574, w: 0.210, h: -0.210, line: { color: A1, width: 1.5, endArrowType: 'triangle' } });
++  box(s, 'line', { x: 0, y: 5.516, w: 13.333, h: 0, line: { color: A2, width: 1 } });
++  [
++    { label: 'Your Email', value: 'youremail@here.com', lx: 0.826, vx: 0.843, lw: 1.806 },
++    { label: 'Contact', value: '(+0) 000 0000 0000', lx: 5.801, vx: 5.818, lw: 1.806 },
++    { label: 'Your Address', value: '123 Main Street Here', lx: 10.527, vx: 10.527, lw: 2.387 },
++  ].forEach((c) => {
++    tx(s, c.label, { x: c.lx, y: 5.988, w: c.lw, h: 0.337, fontSize: 14 });
++    tx(s, c.value, { x: c.vx, y: 6.341, w: 1.789, h: 0.269, fontSize: 10, color: A5 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'CUSTOM', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'CUSTOM';
++  pptx.theme = { headFontFace: FONT, bodyFontFace: FONT };
++  pptx.title = 'Consulting Business';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++    .forEach((fn) => fn(pptx));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '10eb52be-eedd-4017-95eb-84c8e33974de_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

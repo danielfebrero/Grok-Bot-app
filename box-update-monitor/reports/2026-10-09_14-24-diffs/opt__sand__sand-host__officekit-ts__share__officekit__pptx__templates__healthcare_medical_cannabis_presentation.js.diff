@@ -1,0 +1,837 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_medical_cannabis_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_medical_cannabis_presentation.js
+@@ -0,0 +1,834 @@
++/**
++ * Cannayu - Medical Marijuana & Cannabis Presentation Template
++ * Standalone pptxgenjs rebuild of the 30-slide reference deck (20" x 11.25").
++ *
++ * The reference deck's flat vector icons are redrawn here from native
++ * pptxgenjs shapes, and its raster mock-up photographs are replaced by
++ * labelled grey placeholder rectangles.
++ */
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ tokens */
++const SLIDE_W = 20, SLIDE_H = 11.25;
++
++const GREEN = '23B526',   // brand green
++      DEEP  = '1D9720',   // darker green accent
++      MINT  = 'C8F9E4',   // pale mint wave
++      INK   = '040F24',   // headline navy
++      INK2  = '041E3B',
++      BODY  = '595959',   // grey body copy
++      SOFT  = 'F2F2F2',   // body copy on green
++      WHITE = 'FFFFFF',
++      RULE  = 'D9D9D9',
++      GOLD  = 'FFC000',
++      PHOTO = 'E8E8E8';   // image placeholder fill
++
++const F_XB   = 'Plus Jakarta Sans ExtraBold',
++      F_SB   = 'Plus Jakarta Sans SemiBold',
++      F_PJ   = 'Plus Jakarta Sans',
++      F_BODY = 'Nunito';
++
++// pptxgenjs rewrites the shadow object it is handed, so hand out a fresh copy.
++const shadow = {
++  soft: () => ({ type: 'outer', color: '000000', opacity: 0.20, blur: 45, offset: 30, angle: 45 }),
++  card: () => ({ type: 'outer', color: 'BFBFBF', opacity: 0.40, blur: 35, offset: 20, angle: 45 }),
++  deep: () => ({ type: 'outer', color: 'A6A6A6', opacity: 0.40, blur: 50, offset: 80, angle: 45 }),
++  navy: () => ({ type: 'outer', color: INK, opacity: 0.20, blur: 50, offset: 80, angle: 45 })
++};
++
++/* ------------------------------------------------- freeform outlines (0..1) */
++// Path commands: ['M',x,y] ['L',x,y] ['C',x1,y1,x2,y2,x,y] ['Z']
++const P = {
++  waveTitle: [['M',0,0],['L',1,0],['L',1,0.85364],
++              ['C',0.4178,0.61375,0.60379,1.28046,0,0.85364],['Z']],
++  waveBack:  [['M',0.00114,0],['L',1,0],['C',1,0.33333,1,0.66667,1,1],
++              ['C',0.51835,0.51438,0.60197,1.22364,0,0.76038],
++              ['C',0.00038,0.50692,0.00076,0.25346,0.00114,0],['Z']],
++  sideCurve: [['M',0.48157,0],['L',1,0],['L',1,1],['L',0.02134,1],
++              ['C',-0.12351,0.45445,0.5176,0.60384,0.48356,0.02605],['Z']],
++  hillLeft:  [['M',1,0],['L',1,1],['L',0,1],['L',0,0.18471],['L',0.00865,0.21127],
++              ['C',0.1913,0.75621,0.4448,0.49846,1,0],['Z']],
++  petal:     [['M',0,0],['L',0.38472,0],['L',0.38446,0.00328],
++              ['C',0.38396,0.01294,0.3837,0.02266,0.3837,0.03243],
++              ['C',0.3837,0.34527,0.64475,0.59887,0.96676,0.59887],
++              ['C',0.97682,0.59887,0.98683,0.59862,0.99676,0.59813],
++              ['L',1,0.5979],['L',1,1],['L',0.95711,0.99683],
++              ['C',0.43695,0.94551,0.02723,0.53125,0.00049,0.01883],['Z']],
++  notched:   [['M',0,0],['L',1,0],['L',1,1],['L',0.71725,1],['L',0.71608,0.99859],
++              ['C',0.67981,0.95132,0.65332,0.87994,0.64773,0.77778],
++              ['C',0.62199,0.30756,0.41336,0.47725,0.26591,0.50909],
++              ['C',0.14206,0.53584,0.05712,0.45508,0.00887,0.34992],
++              ['L',0,0.32916],['Z']],
++  blob:      [['M',0.57858,0],['L',1,0.00202],['L',1,1],['L',0.02608,1],
++              ['C',-0.16158,0.55175,0.73034,0.55309,0.57858,0],['Z']],
++  slope:     [['M',0.77789,0],['C',0.78203,0,0.78617,0.00006,0.79031,0.00032],
++              ['C',0.8565,0.00448,0.9217,0.0489,0.97021,0.13259],
++              ['L',1,0.18397],['L',1,1],['L',0,1],['L',0.60443,0.10959],
++              ['C',0.65364,0.03709,0.71577,0.00083,0.77789,0],['Z']]
++};
++
++/* ----------------------------------------------------------- path plumbing */
++function cubic(p0, c1, c2, p3, t) {
++  const u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
++  return [a * p0[0] + b * c1[0] + c * c2[0] + d * p3[0],
++          a * p0[1] + b * c1[1] + c * c2[1] + d * p3[1]];
++}
++
++/** Convert a fractional path into pptxgenjs custGeom points (inches). */
++function toPoints(cmds, w, h) {
++  return cmds.map((c, i) => {
++    if (c[0] === 'Z') return { close: true };
++    if (c[0] === 'C') return { x: c[5] * w, y: c[6] * h,
++      curve: { type: 'cubic', x1: c[1] * w, y1: c[2] * h, x2: c[3] * w, y2: c[4] * h } };
++    return i === 0 ? { x: c[1] * w, y: c[2] * h, moveTo: true } : { x: c[1] * w, y: c[2] * h };
++  });
++}
++
++/** Flatten a fractional path into a polygon of [x,y] samples. */
++function flatten(cmds, steps) {
++  const poly = []; let cur = [0, 0];
++  cmds.forEach(c => {
++    if (c[0] === 'Z') return;
++    if (c[0] === 'C') {
++      const p3 = [c[5], c[6]];
++      for (let i = 1; i <= steps; i++) poly.push(cubic(cur, [c[1], c[2]], [c[3], c[4]], p3, i / steps));
++      cur = p3;
++    } else { cur = [c[1], c[2]]; poly.push(cur); }
++  });
++  return poly;
++}
++
++/** Extent of a polygon across position u along `axis` ('x' or 'y'). */
++function spanAt(poly, u, axis) {
++  const ax = axis === 'x' ? 0 : 1, other = 1 - ax;
++  let lo = Infinity, hi = -Infinity;
++  for (let i = 0; i < poly.length; i++) {
++    const p = poly[i], q = poly[(i + 1) % poly.length];
++    if ((p[ax] <= u && q[ax] >= u) || (q[ax] <= u && p[ax] >= u)) {
++      const t = q[ax] === p[ax] ? 0 : (u - p[ax]) / (q[ax] - p[ax]);
++      const v = p[other] + (q[other] - p[other]) * t;
++      if (v < lo) lo = v;
++      if (v > hi) hi = v;
++    }
++  }
++  return lo <= hi ? [lo, hi] : null;
++}
++
++const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
++
++/** Blend two hex colours; t=0 gives `a`, t=1 gives `b`. */
++function blend(a, b, t) {
++  const ch = (h, i) => parseInt(h.substr(i * 2, 2), 16);
++  return [0, 1, 2].map(i => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * clamp01(t))
++    .toString(16).padStart(2, '0').toUpperCase()).join('');
++}
++
++function addPath(slide, o) {
++  slide.addShape('custGeom', { x: o.x, y: o.y, w: o.w, h: o.h,
++    points: toPoints(o.path, o.w, o.h), fill: { color: o.fill }, line: { type: 'none' } });
++}
++
++/**
++ * Freeform painted with a linear colour ramp (pptxgenjs cannot emit gradient
++ * fills), drawn as a fan of slices cut across the outline and shaded from the
++ * backdrop colour to the fill colour. `from`/`to` mark where the ramp leaves
++ * the backdrop and reaches full colour, measured from the faded end.
++ */
++function addFadePath(slide, o) {
++  const axis = o.axis || 'x', steps = o.steps || 110, pad = 0.6 / steps;
++  const from = o.from || 0, to = o.to === undefined ? 1 : o.to;
++  const back = o.back || WHITE;
++  const poly = flatten(o.path, 30);
++  for (let i = 0; i < steps; i++) {
++    const ua = clamp01(i / steps - pad) + 1e-5, ub = clamp01((i + 1) / steps + pad) - 1e-5;
++    const sa = spanAt(poly, ua, axis), sb = spanAt(poly, ub, axis);
++    if (!sa || !sb) continue;
++    const mid = (i + 0.5) / steps;                   // 0..1 along the axis
++    const g = o.reverse ? 1 - mid : mid;             // 0 at the faded edge
++    const quad = axis === 'x'
++      ? [[ua, sa[0]], [ub, sb[0]], [ub, sb[1]], [ua, sa[1]]]
++      : [[sa[0], ua], [sb[0], ub], [sb[1], ub], [sa[1], ua]];
++    slide.addShape('custGeom', { x: o.x, y: o.y, w: o.w, h: o.h,
++      points: quad.map((p, k) => ({ x: p[0] * o.w, y: p[1] * o.h, moveTo: k === 0 }))
++                  .concat([{ close: true }]),
++      fill: { color: blend(back, o.fill, (g - from) / (to - from)) }, line: { type: 'none' } });
++  }
++}
++
++/** Box shaded from the white page at its top edge down to solid colour. */
++function addFadeBox(slide, o) {
++  const steps = 90, to = o.to || 0.95, band = o.h / steps;
++  for (let i = 0; i < steps; i++) {
++    slide.addShape(o.shape || 'rect', Object.assign(
++      { x: o.x, y: o.y + i * band, w: o.w, h: band * 1.6,
++        fill: { color: blend(WHITE, o.fill || GREEN, ((i + 0.5) / steps) / to) }, line: { type: 'none' } },
++      o.radius ? { rectRadius: o.radius } : {}));
++  }
++  if (o.radius) {  // restore the rounded silhouette lost by the slicing
++    slide.addShape(o.shape, { x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.radius,
++      fill: { type: 'none' }, line: { color: WHITE, width: 2.5 } });
++  }
++}
++
++/* -------------------------------------------------------------- text atoms */
++const txt = (s, text, o) => s.addText(text, Object.assign(
++  { fontFace: F_BODY, fontSize: 18, color: BODY, valign: 'top' }, o));
++
++const eyebrow = (s, x, y, text, o) => txt(s, text, Object.assign(
++  { x, y, w: 2.6, h: 0.3702, fontFace: F_XB, fontSize: 16, color: GREEN, charSpacing: 1 }, o));
++
++const headline = (s, x, y, w, h, text, o) => txt(s, text, Object.assign(
++  { x, y, w, h, fontFace: F_XB, fontSize: 48, color: INK }, o));
++
++const subhead = (s, x, y, w, text, o) => txt(s, text, Object.assign(
++  { x, y, w, h: 0.4376, fontFace: F_PJ, fontSize: 20, bold: true, color: INK }, o));
++
++const copy = (s, x, y, w, h, text, o) => txt(s, text, Object.assign(
++  { x, y, w, h, lineSpacingMultiple: 1.5 }, o));
++
++/* --------------------------------------------------------------- icon set */
++// Outlines traced from the reference artwork, as fractions of the icon box.
++const SHAPES = {
++  maple:   [[.50,.03],[.55,.20],[.66,.15],[.62,.31],[.77,.25],[.73,.38],[.90,.40],[.80,.51],[.97,.60],
++            [.68,.65],[.71,.73],[.53,.69],[.55,.97],[.45,.97],[.47,.69],[.29,.73],[.32,.65],[.03,.60],
++            [.20,.51],[.10,.40],[.27,.38],[.23,.25],[.38,.31],[.34,.15],[.45,.20]],
++  shield:  [[.50,.02],[.95,.18],[.95,.52],[.50,.98],[.05,.52],[.05,.18]],
++  handset: [[.18,.06],[.34,.06],[.42,.28],[.32,.38],[.44,.58],[.62,.68],[.72,.58],[.94,.66],[.94,.82],
++            [.80,.94],[.55,.90],[.30,.72],[.14,.44],[.08,.20]],
++  tick:    [[.06,.52],[.18,.40],[.40,.62],[.82,.16],[.94,.28],[.40,.88]]
++};
++
++function fig(s, shape, color, x, y, w, h, extra) {
++  s.addShape(shape, Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, extra));
++}
++
++function poly(s, name, color, x, y, z) {
++  s.addShape('custGeom', { x, y, w: z, h: z, fill: { color }, line: { type: 'none' },
++    points: SHAPES[name].map((p, i) => ({ x: p[0] * z, y: p[1] * z, moveTo: i === 0 }))
++                        .concat([{ close: true }]) });
++}
++
++/** Each icon paints inside the square box (x, y, z, z) in colour c. */
++const ICON = {
++  leaf:   (s, x, y, z, c) => poly(s, 'maple', c, x, y, z),
++  check:  (s, x, y, z, c) => poly(s, 'tick', c, x, y, z),
++  phone:  (s, x, y, z, c) => poly(s, 'handset', c, x, y, z),
++  // pipette: slanted barrel above a squeeze bulb
++  drop: (s, x, y, z, c) => {
++    fig(s, 'roundRect', c, x + .44 * z, y + .04 * z, .17 * z, .60 * z, { rotate: 45, rectRadius: .08 * z });
++    fig(s, 'ellipse', c, x + .12 * z, y + .60 * z, .27 * z, .32 * z);
++  },
++  // mortar & pestle
++  mortar: (s, x, y, z, c) => {
++    fig(s, 'blockArc', c, x + .02 * z, y + .16 * z, .96 * z, .96 * z,
++        { angleRange: [0, 180], arcThicknessRatio: 1 });
++    fig(s, 'roundRect', c, x + .60 * z, y - .02 * z, .10 * z, .46 * z, { rotate: 28, rectRadius: .05 * z });
++    fig(s, 'rect', c, x + .40 * z, y + .78 * z, .20 * z, .16 * z);
++  },
++  // capped medicine bottle with a label window and a spilled capsule
++  bottle: (s, x, y, z, c, bg) => {
++    fig(s, 'rect', c, x + .34 * z, y + .02 * z, .26 * z, .12 * z);
++    fig(s, 'roundRect', c, x + .16 * z, y + .18 * z, .62 * z, .78 * z, { rectRadius: .09 * z });
++    fig(s, 'rect', bg || WHITE, x + .26 * z, y + .40 * z, .42 * z, .16 * z);
++    fig(s, 'roundRect', c, x + .72 * z, y + .66 * z, .28 * z, .16 * z, { rotate: -30, rectRadius: .08 * z });
++  },
++  cross: (s, x, y, z, c) => fig(s, 'mathPlus', c, x + .06 * z, y + .06 * z, .88 * z, .88 * z),
++  // medical cross inside a ring
++  crossRing: (s, x, y, z, c) => {
++    s.addShape('ellipse', { x: x + .05 * z, y: y + .05 * z, w: .9 * z, h: .9 * z,
++      fill: { type: 'none' }, line: { color: c, width: z * 6 } });
++    fig(s, 'mathPlus', c, x + .27 * z, y + .27 * z, .46 * z, .46 * z);
++  },
++  // shield guarding against a virus
++  shield: (s, x, y, z, c, bg) => {
++    poly(s, 'shield', c, x, y, z);
++    fig(s, 'sun', bg || WHITE, x + .28 * z, y + .22 * z, .44 * z, .44 * z);
++  },
++  // heart carrying an ECG trace
++  heart: (s, x, y, z, c, bg) => {
++    fig(s, 'heart', c, x + .04 * z, y + .08 * z, .92 * z, .84 * z);
++    const zig = [[.16,.46],[.32,.46],[.40,.32],[.50,.60],[.58,.46],[.84,.46]];
++    for (let i = 0; i < zig.length - 1; i++) s.addShape('line',
++      { x: x + zig[i][0] * z, y: y + zig[i][1] * z,
++        w: (zig[i + 1][0] - zig[i][0]) * z, h: (zig[i + 1][1] - zig[i][1]) * z,
++        line: { color: bg || WHITE, width: z * 3.5 } });
++  },
++  virus: (s, x, y, z, c) => fig(s, 'sun', c, x, y, z, z),
++  // open palm cradling a heart
++  hand: (s, x, y, z, c) => {
++    fig(s, 'heart', c, x + .26 * z, y + .04 * z, .48 * z, .42 * z);
++    fig(s, 'blockArc', c, x, y + .10 * z, z, z, { angleRange: [15, 165], arcThicknessRatio: 0.18 });
++  },
++  // city skyline
++  building: (s, x, y, z, c) => [[.05,.34,.26],[.36,.10,.28],[.69,.44,.26]]
++    .forEach(b => fig(s, 'rect', c, x + b[0] * z, y + b[1] * z, b[2] * z, (.92 - b[1]) * z)),
++  // post box on a short post with its flag raised
++  mailbox: (s, x, y, z, c) => {
++    fig(s, 'round2SameRect', c, x + .02 * z, y + .26 * z, .70 * z, .52 * z, { rectRadius: .26 * z });
++    fig(s, 'rect', c, x + .30 * z, y + .76 * z, .08 * z, .22 * z);
++    fig(s, 'rect', c, x + .76 * z, y + .16 * z, .06 * z, .46 * z);
++    fig(s, 'rect', c, x + .82 * z, y + .16 * z, .16 * z, .14 * z);
++  },
++  // rotary desk telephone
++  deskPhone: (s, x, y, z, c, bg) => {
++    fig(s, 'blockArc', c, x + .03 * z, y + .10 * z, .94 * z, .94 * z,
++        { angleRange: [190, 350], arcThicknessRatio: 0.34 });
++    fig(s, 'roundRect', c, x + .10 * z, y + .55 * z, .80 * z, .34 * z, { rectRadius: .07 * z });
++    fig(s, 'ellipse', bg || WHITE, x + .38 * z, y + .62 * z, .24 * z, .20 * z);
++  }
++};
++
++const icon = (s, name, x, y, z, color, bg) => ICON[name](s, x, y, z, color, bg);
++
++/* ------------------------------------------------------- composite widgets */
++/** "Cannayu" wordmark used in the top-left corner of nearly every slide. */
++function header(s, textColor, leafColor) {
++  txt(s, 'Cannayu', { x: 0.7176, y: 0.6364, w: 2.0379, h: 0.4376,
++    fontFace: F_XB, fontSize: 20, color: textColor || INK });
++  icon(s, 'leaf', 1.7986, 0.5796, 0.2756, leafColor || GREEN);
++}
++
++/** Pill-shaped call-to-action button. */
++function button(s, x, y, w, h, text, fill, o) {
++  s.addShape('roundRect', { x, y, w, h, rectRadius: Math.min(w, h) / 2,
++    fill: { color: fill || GREEN }, line: { type: 'none' } });
++  txt(s, text, Object.assign({ x, y: y + (h - 0.4039) / 2, w, h: 0.4039,
++    fontFace: F_SB, fontSize: 20, color: WHITE, align: 'center' }, o));
++}
++
++const card = (s, x, y, w, h, radius, fill, shadowFn) => s.addShape('roundRect',
++  { x, y, w, h, rectRadius: radius, fill: { color: fill }, line: { type: 'none' },
++    shadow: shadowFn ? shadowFn() : undefined });
++
++/** Rounded tile carrying a white icon. */
++function tile(s, x, y, size, name, fill) {
++  const plate = fill || GREEN;
++  s.addShape('roundRect', { x, y, w: size, h: size, rectRadius: size * 0.198,
++    fill: { color: plate }, line: { type: 'none' } });
++  if (name) icon(s, name, x + size * 0.245, y + size * 0.245, size * 0.51, WHITE, plate);
++}
++
++/** Green disc + white tick used by the benefit lists. */
++function bullet(s, x, y, size, fill) {
++  s.addShape('ellipse', { x, y, w: size, h: size, fill: { color: fill || GREEN }, line: { type: 'none' } });
++  icon(s, 'check', x + size * 0.27, y + size * 0.27, size * 0.46, WHITE);
++}
++
++/** Stand-in for a photograph / device mock-up in the source deck. */
++function photo(s, x, y, w, h) {
++  s.addShape('rect', { x, y, w, h, fill: { color: PHOTO }, line: { color: 'CCCCCC', width: 1 } });
++  txt(s, '[image]', { x, y: y + h / 2 - 0.25, w, h: 0.5, fontSize: 18, color: '9A9A9A', align: 'center' });
++}
++
++const rule = (s, x, y, w, h, color, width) => s.addShape('line', { x, y, w, h, line: { color, width } });
++
++/* ------------------------------------------------------------ copy strings */
++const LOREM = {
++  s2:  'Facilisis mauris sit amet massa. Gravida neque convallisan cras semper auctor neque. Tortor vitae purus faucibus ornare suspendisse sed nisi. Id velit ut tortor pretium viverra hera suspendisse potenti nullam. Aliquam id diam maece nasuan ultricies mi eget. Facilisi cras fermentum odio eu feugiat pretium nibh ipsum consequat cannabis. ',
++  s3:  'Facilisis mauris sit amet massa. Gravida neque convasan crasa semper auctor neque. Tortor vitae purus faucibus ornare green suspendisse sed nisi. Id velit ut tortor pretium viverra hera inte suspendisse potenti nullam. Aliquam diam maece nasuan mun ultricies mi eget. Facilisi crasfer mentum odio eu feugiat pretiu nibh ipsum consequat medical marijuana.',
++  s4:  'Facilisis mauris sit amet massa. Gravida neque convasan cras semper auctor neque. Tortor vitae purus faucibus ornare suspendisse sed nisi. Id velit ut tortor pretium viverra hera suspendisse potenti nullam. Aliquam  diam maece nasuan ultricies mi eget. Facilisi crasfer mentum odio eu feugiat pretium ipsum consequat.',
++  s5:  'Facilisis mauris sit amet massa. Gravida neque convasan cras semper auctor neque. Tortor vita purus faucibus ornare suspendisse sed.',
++  s6:  'Facilisis mauris sit amet massa. Gravida neque convasan crasui semper auctor neque. Tortor vitae purus faucibus ornare monta suspendisse sed nisi. Id velit ut tortor pretium viverra hera nulu suspendisse potenti nullam aliquam  diam maece.',
++  s7:  'Facilisis mauris sit amet massa. Gravida neque convasan cras semper auctor neque. Tortor vitae purus faucibus ornare suspendisse sed nisi velit ut tortor.',
++  s8:  'Facilisis mauris sit amet massa. Gravida neque convasan crasui semper auctor neque. Tortor vitae purus faucibus ornare monta.',
++  s9:  'Facilisis mauris sit amet massa. Gravida neque convasan cras semper auctor neque. Tortor vitae purus faucibus ornare suspendisse sed nisi velit ut tortor pretium viverra hera suspendisse poten nullam liquam diam maece nasuan.',
++  tiny: 'Facilisis mauris amet massal Gravida neque convasan.',
++  tiny2:'Facilisis mauris amet massal gravida neque convasan.',
++  s10: 'Facilisis mauris sit amet massa. Gravida neque conva cras semper auctor neque. Tortor vitae purus faucibu ornare suspendisse sed nisi velit ut tortor pretium viverra hera suspendisse poten nullam. Aliquam diam maece nasuan ultricies eget facilisi crasfer.',
++  s12: 'Facilisis mauris sit amet massa. Gravida neque conva semper auctor neque. Tortor vitae purus faucibu ornare suspendisse nisi velit utama.',
++  s12b:'Facilisis mauris sit amet massa. Gravida neque convasan cras semper auctor neque. Tortor vitae purus faucibus ornare suspendisse sed nisi velit ut tortor.',
++  s14: 'Facilisis mauris sit amet massa. Gravida neque convasan crasa semper auctor neque. Tortor vitae purus faucibus ornare green suspendisse sed nisi. Id velit ut tortor pretium viverra hera inte suspendisse potenti nullam. ',
++  s14c:'Facilisis mauris amet massal gravida neque convas',
++  s15: 'Facilisis mauris sit amet massa. Gravida neque convas crasa semper auctor neque. Tortor vitae purus faucibu ornare green suspendisse sed nisi velit tortor.',
++  s15c:'PLACEHOLDER',
++  s16: 'Facilisis mauris sit amet massa. Gravida neque convasan cras semper auctor neque.',
++  s18: 'Facilisis mauris sit amet massa. Gravida neque convasan crasa semper auctor neque. Tortor vitae purus faucibus ornare green suspendisse sed nisi. Id velit ut tortor pretium viverra hera inte suspendisse potenti nullam. Aliquam diam maece nasuan mun ultricies.',
++  s18c:'Facilisis mauris sit amet massa. Gravida neque conva cras semper auctor neque. Tortor vitae purus faucibu ornare',
++  s19: 'Facilisis mauris sit amet massa ravida neque conva sempe',
++  s20: 'Facilisis mauris sit amet massa. Gravida neque convasan crasanu semper auctor neque. Tortor vitae purus faucibus ornare greenal suspendisse sed nisi ut tortor pretium viverra.',
++  s21: 'Facilisis mauris sit amet massa. Gravida neque convasan crasa semper auctor neque. Tortor vitae purus faucibus ornare green suspendisse sed nisi. Id velit ut tortor pretiu viverra hera inte suspendi potenti nullam aliquam diam maece.',
++  s23: 'Facilisis mauris sit amet massa. Gravida neque convas crasa semper auctor neque. Tortor vitae purus faucibu ornare green supendis.',
++  s25a:'Facilisis mauris sit amet massa. Gravida neque convallisan cras semper auctor neque. Tortor vitae purus faucibus ornare suspendisse sed nisi. Id velit ut tortor pretium viverra hera suspendisse potenti nullam aliquam id diam. ',
++  s25b:'Maece nasuan ultricies mi eget. Facilisi cras fermentum odio eu feugiat pretium nibh ipsum consequat cannabis. ',
++  s28: 'Facilisis mauris sit amet massa. Gravida neque convallisan cras semper auctor neque. Tortor vitae purus faucibus ornare suspendisse sed nisi velit ut tortor pretium.'
++};
++
++const TAGLINE = 'Medical Marijuana & Cannabis Presentation Template';
++const BENEFITS = [['Prevent Glaucoma', 3.4652], ['Overcoming Mental Problems', 4.978],
++                  ['Treating Anxiety Disorders', 4.7071], ['Fight Cancer', 3.4652]];
++
++/* ============================================================ slide 1 – 30 */
++const slides = [];
++const S = fn => slides.push(fn);
++
++/* 1. Title */
++S(s => {
++  addFadePath(s, { x: 0, y: 0.006, w: 20, h: 7.295, path: P.waveTitle, fill: GREEN, reverse: true });
++  addPath(s, { x: 0, y: 0.6308, w: 20, h: 7.1136, path: P.waveBack, fill: GREEN });
++  header(s, WHITE, WHITE);
++  txt(s, 'Cannayu', { x: 10.1481, y: 7.7063, w: 8.25, h: 2.0364, fontFace: F_XB, fontSize: 115, color: INK });
++  txt(s, TAGLINE, { x: 10.306, y: 9.7427, w: 8.5467, h: 0.4376, fontFace: F_SB, fontSize: 20, color: INK });
++  icon(s, 'leaf', 16.0924, 7.4654, 1.1811, GREEN);
++});
++
++/* 2. About us – oversized statement */
++S(s => {
++  addPath(s, { x: 10.7558, y: 0, w: 8.546, h: 11.25, path: P.sideCurve, fill: GREEN });
++  header(s);
++  eyebrow(s, 1.5572, 2.2409, 'ABOUT US', { w: 1.7913 });
++  txt(s, [{ text: 'Cannayu, ', options: { breakLine: true } }, { text: 'Medical Marijuana for Treatment' }],
++    { x: 1.5572, y: 2.6448, w: 9.5943, h: 3.7361, fontFace: F_XB, fontSize: 72, color: INK });
++  copy(s, 1.6683, 6.9813, 7.0589, 2.7678, LOREM.s2);
++});
++
++/* 3. Welcome + CTA */
++S(s => {
++  header(s);
++  eyebrow(s, 10.989, 1.617, 'ABOUT US');
++  headline(s, 10.989, 2.1181, 7.3519, 2.5244, 'Hello, Welcome to Cannayu Medical Marijuana Laboratory');
++  copy(s, 10.989, 5.1665, 7.3519, 2.7895, LOREM.s3);
++  button(s, 11.064, 8.6164, 3.3564, 1.0167, 'Explore Now');
++});
++
++/* 4. Marijuana for health */
++S(s => {
++  header(s);
++  eyebrow(s, 1.5259, 2.4302, 'ABOUT US');
++  headline(s, 1.5259, 2.9314, 6.6701, 1.7166, 'Medical Marijuana For Health');
++  subhead(s, 1.5259, 5.4649, 3.4652, 'Subtitle Your Text');
++  copy(s, 1.5259, 6.0303, 6.6701, 2.7895, LOREM.s4);
++});
++
++/* 5. Benefits panel over a mint wave */
++S(s => {
++  addPath(s, { x: -0.0101, y: 3.7739, w: 20, h: 7.1364, path: P.hillLeft, fill: MINT });
++  addFadePath(s, { x: 0, y: 4.1136, w: 20, h: 7.1364, path: P.hillLeft, fill: GREEN,
++                   reverse: true, from: 0.38, back: MINT });
++  header(s);
++  eyebrow(s, 1.9334, 2.1197, 'ABOUT US');
++  headline(s, 1.9334, 2.6209, 6.7468, 2.5244, 'Get to Know Medical Marijuana and its Benefits');
++  card(s, 10.6136, 1.5455, 7.6332, 6.5, 0.3636, GREEN);
++  [[2.4683, 3.0958, 2.3918, 'drop'], [5.1453, 5.7728, 5.0688, 'mortar']].forEach(r => {
++    subhead(s, 12.4994, r[0], 3.6209, 'Subtitle Your Text', { color: WHITE });
++    copy(s, 11.7286, r[1], 5.8813, 1.4263, LOREM.s5, { color: SOFT });
++    icon(s, r[3], 11.7286, r[2], 0.5906, WHITE);
++  });
++});
++
++/* 6. Do you know what medical marijuana is? */
++S(s => {
++  header(s);
++  eyebrow(s, 10.946, 1.6948, 'ABOUT US');
++  headline(s, 10.946, 2.196, 7.5928, 1.7166, 'Do You Know What Medical Marijuana Is?');
++  copy(s, 10.946, 4.347, 7.5928, 1.8807, LOREM.s6);
++  BENEFITS.forEach((b, i) => {
++    bullet(s, 10.9877, 6.7207 + i * 0.7625, 0.5469);
++    subhead(s, 11.844, 6.7754 + i * 0.7625, b[1], b[0]);
++  });
++});
++
++/* 7. Treatment products */
++S(s => {
++  s.addShape('round1Rect', { x: 15.2955, y: 4.5909, w: 4.7045, h: 6.6591, flipH: true,
++    fill: { color: GREEN }, line: { type: 'none' } });
++  header(s);
++  eyebrow(s, 1.4577, 2.0171, 'ABOUT US');
++  headline(s, 1.4577, 2.5182, 6.6701, 1.7166, 'Medical Marijuana For Treatment');
++  [[5.0517, 'Marinol and Cesamet', 3.8395, 5.6171], [7.5594, 'Cannabis Sativex', 3.6193, 8.1248]].forEach(r => {
++    subhead(s, 1.4577, r[0], r[2], r[1]);
++    copy(s, 1.4577, r[3], 6.6701, 1.4263, LOREM.s7);
++  });
++});
++
++/* 8. Made and tested in the lab */
++S(s => {
++  header(s, WHITE);
++  eyebrow(s, 11.2791, 1.8169, 'ABOUT US');
++  headline(s, 11.2791, 2.318, 7.1982, 1.7166, 'Cannabis is Made and Tested in the Lab');
++  [[4.9075, 4.8395, 5.3781, 'leaf', 5.1918], [7.5362, 7.4682, 8.0068, 'mortar', 7.8205]].forEach(r => {
++    tile(s, 11.3802, r[0], 1.1591);
++    icon(s, r[3], 11.6645, r[4], 0.5906, WHITE);
++    subhead(s, 13.0678, r[1], 3.6209, 'Subtitle Your Text');
++    copy(s, 13.0678, r[2], 5.5781, 1.4263, LOREM.s8);
++  });
++});
++
++/* 9. Three floating feature cards */
++S(s => {
++  header(s);
++  [[1.4448, 'drop'], [4.3911, 'mortar'], [7.3375, 'bottle']].forEach(r => {
++    const y = r[0];
++    card(s, 12.9773, y, 6.0909, 2.4677, 0.2035, WHITE, shadow.deep);
++    tile(s, 13.4937, y + 0.6543, 1.1591, r[1]);
++    subhead(s, 15.103, y + 0.4786, 3.1872, 'Subtitle Your Text');
++    copy(s, 15.103, y + 1.0172, 3.4487, 0.9719, LOREM.tiny);
++  });
++  eyebrow(s, 1.1751, 2.7622, 'ABOUT US');
++  headline(s, 1.1751, 3.2633, 6.6701, 1.7166, 'Medical Marijuana For Treatment');
++  subhead(s, 1.1751, 5.5873, 3.4652, 'Subtitle Your Text');
++  copy(s, 1.1751, 6.1527, 5.7497, 2.3351, LOREM.s9);
++});
++
++/* 10. Professional doctors – 2x2 portrait cards */
++S(s => {
++  s.addShape('round1Rect', { x: 14.6313, y: 6.7727, w: 5.3687, h: 4.4773, flipH: true,
++    fill: { color: GREEN }, line: { type: 'none' } });
++  header(s);
++  eyebrow(s, 1.5161, 3.1767, 'OUR TEAM');
++  headline(s, 1.5161, 3.6779, 6.1203, 1.7166, 'Our Professional Doctor');
++  copy(s, 1.5161, 5.7382, 6.4214, 2.3351, LOREM.s10);
++  [1.2034, 5.7427].forEach(cy => [9.3864, 13.8974].forEach(cx => {
++    card(s, cx, cy, 4.3039, 4.3039, 0.2647, WHITE, shadow.card);
++    subhead(s, cx, cy + 2.9285, 4.3039, 'Your Name Here', { align: 'center' });
++    txt(s, 'Job Position', { x: cx + 0.954, y: cy + 3.3427, w: 2.3958, h: 0.5175,
++      color: GREEN, align: 'center', lineSpacingMultiple: 1.5 });
++  }));
++});
++
++/* 11. Meet our doctor – four green cards */
++S(s => {
++  eyebrow(s, 8.9353, 0.8813, 'OUR TEAM', { w: 2.1293, align: 'center' });
++  headline(s, 5.3148, 1.3824, 9.3703, 0.9088, 'Meet Our Doctor', { align: 'center' });
++  [[1.542, 6.3636], [5.8459, 6.3688], [10.1498, 6.3739], [14.4538, 6.379]].forEach(c => {
++    const [x, y] = c;
++    card(s, x, y, 4.0042, 2.9905, 0.4567, GREEN, shadow.card);
++    bullet(s, x + 2.9266, y + 2.6368, 0.5469, DEEP);
++    subhead(s, x - 0.1499, y + 1.541, 4.3039, 'Your Name Here', { color: SOFT, align: 'center' });
++    txt(s, 'Job Position', { x: x + 0.8042, y: y + 1.9553, w: 2.3958, h: 0.5175,
++      color: SOFT, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++  txt(s, 'Cannayu', { x: 9.2921, y: 10.1954, w: 1.4159, h: 0.4376, fontFace: F_XB, fontSize: 20, color: INK });
++  icon(s, 'leaf', 10.3731, 10.1386, 0.2756, GREEN);
++  rule(s, 0, 10.4142, 8.6818, 0, RULE, 1);
++  rule(s, 11.3182, 10.4142, 8.6818, 0, RULE, 1);
++});
++
++/* 12. Team member profile on a green field */
++S(s => {
++  s.addShape('rect', { x: 0, y: 0, w: 20, h: 8.9545, fill: { color: GREEN }, line: { type: 'none' } });
++  addPath(s, { x: 12.7369, y: 0, w: 7.2631, h: 7.4762, path: P.petal, fill: DEEP });
++  s.addShape('custGeom', { x: 0, y: 6.8409, w: 2.0534, h: 2.1136, rotate: 180,
++    points: toPoints(P.petal, 2.0534, 2.1136), fill: { color: DEEP }, line: { type: 'none' } });
++  card(s, 1.3621, 8.104, 17.2757, 2.6088, 0.1574, WHITE, shadow.card);
++  eyebrow(s, 1.5584, 1.2488, 'OUR TEAM', { color: WHITE });
++  headline(s, 1.5584, 1.75, 8.4696, 0.9088, 'Brianna Amber, S. Farm', { color: WHITE });
++  txt(s, 'Job Position', { x: 1.5584, y: 2.6285, w: 2.3958, h: 0.5175, color: WHITE, lineSpacingMultiple: 1.5 });
++  copy(s, 1.5584, 3.4883, 9.2878, 0.9719, LOREM.s12, { color: SOFT });
++  [['Cannabis Researcher', '90%', 4.9091, 5.6909, 7.902, 8.2396],
++   ['Processing Medicine', '80%', 6.1144, 6.8961, 7.1272, 7.5188]].forEach(r => {
++    subhead(s, 1.5584, r[2], 4.827, r[0], { color: SOFT });
++    subhead(s, r[5], r[2], 1.4415, r[1], { color: SOFT, align: 'right' });
++    rule(s, 1.7061, r[3], r[4], 0, WHITE, 6);
++  });
++  [[16.4533, 'drop'], [14.8874, 'mortar'], [13.3214, 'bottle']].forEach(t =>
++    tile(s, t[0], 8.8288, 1.1591, t[1], INK));
++  subhead(s, 2.3876, 8.6397, 5.7653, 'Medical Marijuana for Treatment');
++  copy(s, 2.3876, 9.2051, 9.9143, 0.9719, LOREM.s12b);
++});
++
++/* 13. Six feature cards */
++S(s => {
++  header(s);
++  const icons = [['drop', 'mortar', 'bottle'], ['crossRing', 'heart', 'shield']];
++  [1.0227, 7.6301].forEach((x, c) => [1.9585, 4.6432, 7.3237].forEach((y, r) => {
++    card(s, x, y, 6.0909, 2.4677, 0.2035, WHITE, shadow.deep);
++    tile(s, x + 0.5165, y + 0.6543, 1.1591, icons[c][r]);
++    subhead(s, x + 2.1258, y + 0.4786, 3.1872, 'Subtitle Your Text');
++    copy(s, x + 2.1258, y + 1.0172, 3.4487, 0.9719, LOREM.tiny2);
++  }));
++});
++
++/* 14. Why choose treatment – gradient photo grid */
++S(s => {
++  [[7.801, 0, 4.0682], [11.8595, 0, 4.0682], [15.9276, 0, 4.0682],
++   [7.7899, 5.625, 4.1002], [11.8595, 5.625, 4.0682], [15.9123, 5.625, 4.1002]].forEach(g =>
++    addFadeBox(s, { x: g[0], y: g[1], w: g[2], h: 5.625 }));
++  header(s);
++  eyebrow(s, 1.3349, 2.358, 'OUR SERVICE');
++  headline(s, 1.3349, 2.8591, 5.2014, 3.3322, 'Why Choose Treatment Using Medical Marijuana?');
++  copy(s, 1.3349, 6.6329, 5.6559, 2.3351, LOREM.s14);
++  [[7.8163, 3.508, 4.0393], [11.8748, 3.508, 4.0393], [15.943, 3.508, 4.0393],
++   [7.801, 9.133, 9.6643], [11.8748, 9.133, 9.6643], [15.9276, 9.133, 9.6643]].forEach(t => {
++    subhead(s, t[0], t[1], 4.0375, 'Subtitle Your Text', { color: WHITE, align: 'center' });
++    txt(s, LOREM.s14c, { x: t[0], y: t[2], w: 4.0375, h: 0.9719, color: SOFT,
++      align: 'center', lineSpacingMultiple: 1.5 });
++  });
++});
++
++/* 15. Treatment methods – four white cards on a green band */
++S(s => {
++  s.addShape('rect', { x: 0, y: 6.6894, w: 20, h: 4.5606, fill: { color: GREEN }, line: { type: 'none' } });
++  header(s);
++  eyebrow(s, 1.6092, 1.8807, 'OUR SERVICE');
++  headline(s, 1.6092, 2.3819, 9.3545, 1.7166, 'Treatment Methods With Our Medical Marijuana');
++  icon(s, 'mortar', 12.1275, 1.6001, 0.7874, GREEN);
++  copy(s, 12.1275, 2.4381, 6.7177, 1.4263, LOREM.s15);
++  [[1.6092, 'drop'], [5.8642, 'hand'], [10.1191, 'crossRing'], [14.3741, 'virus']].forEach(c => {
++    const x = c[0];
++    card(s, x, 5.0946, 4.0167, 4.6193, 0.3058, WHITE, shadow.soft);
++    tile(s, x + 1.554, 5.6586, 0.9087, c[1]);
++    subhead(s, x, 7.185, 4.0167, 'Subtitle Your Text', { align: 'center' });
++    txt(s, LOREM.s15c, { x, y: 7.7236, w: 4.0167, h: 1.4263, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++});
++
++/* 16. Our best service */
++S(s => {
++  s.addShape('round1Rect', { x: 0, y: 6.0417, w: 6.1042, h: 5.2083,
++    fill: { color: GREEN }, line: { type: 'none' } });
++  [[1.8181, 'crossRing', 2.6329], [4.7348, 'heart', 5.5495], [7.6515, 'shield', 8.4662]].forEach(r => {
++    const y = r[0];
++    card(s, 1.7365, y, 8.2635, 2.6137, 0.199, WHITE, shadow.soft);
++    icon(s, r[1], 2.4001, r[2], 0.9843, GREEN);
++    subhead(s, 3.9336, y + 0.5383, 4.8195, 'Service Your Here');
++    copy(s, 3.9336, y + 1.1036, 5.4028, 0.9719, LOREM.s16);
++  });
++  header(s);
++  eyebrow(s, 11.8005, 3.1128, 'OUR SERVICE');
++  headline(s, 11.8005, 3.614, 6.463, 0.9088, 'Our Best Service');
++  copy(s, 11.8005, 4.965, 6.4214, 2.3351, LOREM.s10);
++  s.addShape('roundRect', { x: 11.9, y: 7.9579, w: 3.8333, h: 1.0167, rectRadius: 0.5083,
++    fill: { color: GREEN }, line: { type: 'none' } });
++  icon(s, 'phone', 12.3277, 8.2694, 0.3937, WHITE);
++  txt(s, '24 Hours Support', { x: 12.9215, y: 8.2643, w: 2.6119, h: 0.4039,
++    fontFace: F_SB, fontSize: 18, color: WHITE });
++});
++
++/* 17. Section break */
++S(s => {
++  addFadePath(s, { x: 0, y: 0, w: 20, h: 11.25, path: P.notched, fill: GREEN, reverse: true });
++  txt(s, 'Breakslides', { x: 1.5787, y: 6.9656, w: 9.8291, h: 2.0364, fontFace: F_XB, fontSize: 115, color: INK });
++  txt(s, TAGLINE, { x: 1.7365, y: 9.002, w: 8.5467, h: 0.4376, fontFace: F_SB, fontSize: 20, color: INK });
++  icon(s, 'leaf', 9.3184, 6.7247, 1.1811, GREEN);
++  header(s, WHITE, WHITE);
++});
++
++/* 18. Portfolio – three checked notes */
++S(s => {
++  header(s);
++  eyebrow(s, 1.5986, 2.7224, 'PORTFOLIO');
++  headline(s, 1.5986, 3.2236, 7.0969, 2.5244, 'Why Choose Treatment Using Medical Marijuana?');
++  copy(s, 1.5986, 6.1925, 6.6423, 2.3351, LOREM.s18);
++  [[2.9174, 1.4261, 1.9915], [6.074, 4.6292, 5.1945], [9.3833, 7.8322, 8.3976]].forEach(r => {
++    bullet(s, 10.3961, r[0], 0.5469);
++    subhead(s, 13.5819, r[1], 4.0808, 'Subtitle Your Here');
++    copy(s, 13.5819, r[2], 5.0999, 1.4263, LOREM.s18c);
++  });
++});
++
++/* 19. Product grid with prices */
++S(s => {
++  eyebrow(s, 8.73, 1.0057, 'PORTFOLIO', { align: 'center' });
++  headline(s, 3.9622, 1.5069, 12.0757, 0.9088, 'Medical Marijuana Products', { align: 'center' });
++  ['$ 57.00', '$ 62.00', '$ 79.00', '$ 95.00'].forEach((price, i) => {
++    const dx = i * 4.3333;
++    subhead(s, 1.7033 + dx, 7.6738, 3.5934, i ? 'Marijuana Product' : 'Marijuana Product ', { align: 'center' });
++    txt(s, LOREM.s19, { x: 1.4688 + dx, y: 8.1864, w: 4.0625, h: 0.9719, align: 'center', lineSpacingMultiple: 1.5 });
++    s.addShape('roundRect', { x: 2.5657 + dx, y: 9.4315, w: 1.8686, h: 0.7074, rectRadius: 0.3537,
++      fill: { color: GREEN }, line: { type: 'none' } });
++    txt(s, price, { x: 2.7394 + dx, y: 9.6001, w: 1.5212, h: 0.3702,
++      fontFace: F_XB, fontSize: 16, color: WHITE, align: 'center' });
++  });
++});
++
++/* 20. Medical marijuana – three gradient tiles */
++S(s => {
++  [7.3977, 10.9508, 14.5038].forEach(x =>
++    addFadeBox(s, { x, y: 6.2442, w: 3.25, h: 3.8921, shape: 'roundRect', radius: 0.2689 }));
++  header(s);
++  eyebrow(s, 10.214, 1.8805, 'PORTFOLIO');
++  headline(s, 10.214, 2.3816, 7.2727, 0.9088, 'Medical Marijuana');
++  copy(s, 10.214, 3.5795, 7.5189, 1.4263, LOREM.s20);
++  icon(s, 'mortar', 8.6347, 8.2232, 0.776, WHITE);
++  icon(s, 'drop', 12.2214, 8.2906, 0.7087, WHITE);
++  icon(s, 'shield', 15.7745, 8.2906, 0.7087, WHITE);
++  [7.4855, 11.0385, 14.5915].forEach((x, i) => txt(s, 'Subtitle Here',
++    { x, y: i === 2 ? 9.1253 : 9.1271, w: 3.0745, h: 0.4039,
++      fontFace: F_PJ, fontSize: 18, bold: true, color: WHITE, align: 'center' }));
++});
++
++/* 21. Facts – white panel on a full green background */
++S(s => {
++  s.addShape('rect', { x: 0, y: 0, w: 20, h: 11.25, fill: { color: GREEN }, line: { type: 'none' } });
++  s.addShape('roundRect', { x: 6.401, y: -1.0374, w: 7.1979, h: 15.5909, rotate: 270, flipH: true,
++    rectRadius: 0.4399, fill: { color: WHITE }, line: { type: 'none' } });
++  eyebrow(s, 3.668, 4.3015, 'PORTFOLIO');
++  headline(s, 3.668, 4.8026, 5.5007, 1.7166, 'Fact Medical Marijuana');
++  copy(s, 3.668, 6.8796, 5.8765, 2.3351, LOREM.s21);
++  BENEFITS.concat([['Reduce Chronic Pain', 4.2952]]).forEach((b, i) => {
++    bullet(s, 11.3276, 5.2168 + i * 0.7625, 0.5469);
++    subhead(s, 12.184, 5.2714 + i * 0.7627, b[1], b[0]);
++  });
++  header(s, WHITE);
++});
++
++/* 22. Two product cards */
++S(s => {
++  s.addShape('round2SameRect', { x: 12.5142, y: 3.0341, w: 9.7898, h: 5.1818, rotate: 270,
++    fill: { color: GREEN }, line: { type: 'none' } });
++  header(s);
++  [[8.5377, 9.0819, 9.9443, '$ 57.00'], [13.7252, 14.2694, 15.1318, '$ 85.00']].forEach(c => {
++    card(s, c[0], 2.358, 4.6818, 6.5341, 0.394, WHITE, shadow.soft);
++    subhead(s, c[1], 7.2224, 3.5934, 'Marijuana Product ', { align: 'center' });
++    s.addShape('roundRect', { x: c[2], y: 7.8556, w: 1.8686, h: 0.7074, rectRadius: 0.3537,
++      fill: { color: GREEN }, line: { type: 'none' } });
++    txt(s, c[3], { x: c[2] + 0.1737, y: 8.0242, w: 1.5212, h: 0.3702,
++      fontFace: F_XB, fontSize: 16, color: WHITE, align: 'center' });
++  });
++  eyebrow(s, 1.5455, 3.1707, 'PORTFOLIO');
++  headline(s, 1.5455, 3.6719, 6.2955, 1.7166, 'Products Medical Marijuana');
++  copy(s, 1.5455, 5.7442, 5.8765, 2.3351, LOREM.s21);
++});
++
++/* 23. Benefits + progress ring */
++S(s => {
++  header(s, WHITE);
++  eyebrow(s, 11.1342, 1.5553, 'ABOUT US');
++  headline(s, 11.1342, 2.0564, 7.1613, 1.7166, 'Benefits of Medical Marijuana?');
++  [[4.2683, 4.5877, 'mortar'], [6.2683, 6.5878, 'crossRing'], [8.2684, 8.5879, 'bottle']].forEach(r => {
++    copy(s, 12.4261, r[0], 5.8693, 1.4263, LOREM.s23);
++    icon(s, r[2], 11.1342, r[1], 0.7874, GREEN);
++  });
++  s.addShape('rect', { x: 5.523, y: 1.6667, w: 3.7693, h: 4.0279,
++    fill: { color: GREEN }, line: { type: 'none' }, shadow: shadow.navy() });
++  s.addShape('arc', { x: 6.4231, y: 2.2709, w: 1.9691, h: 1.9691, angleRange: [325.79, 270.61],
++    fill: { type: 'none' }, line: { color: WHITE, width: 15 } });
++  txt(s, '100%', { x: 6.6977, y: 2.9694, w: 1.5212, h: 0.5722,
++    fontFace: F_XB, fontSize: 28, color: WHITE, align: 'center' });
++  txt(s, 'Medical Marijuana', { x: 5.6751, y: 4.5514, w: 3.4652, h: 0.539,
++    fontFace: F_SB, fontSize: 20, color: WHITE, align: 'center', lineSpacingMultiple: 1.5 });
++});
++
++/* 24. Desktop mock-up */
++S(s => {
++  s.addShape('round1Rect', { x: 0.9432, y: 2.7614, w: 5.6591, h: 7.5455, rotate: 90,
++    rectRadius: 1.2244, fill: { color: GREEN }, line: { type: 'none' } });
++  photo(s, 1.7986, 2.6894, 7.0698, 5.8712);
++  eyebrow(s, 10.9937, 2.1814, 'OUR MOCKUP');
++  headline(s, 10.9937, 2.6825, 6.6701, 1.7166, 'Medical Marijuana For Treatment');
++  copy(s, 10.9937, 4.7624, 7.529, 2.7895, LOREM.s3);
++  button(s, 11.063, 8.1765, 3.7324, 0.8921, 'www.cannayu.com', INK, { fontSize: 18 });
++  header(s);
++});
++
++/* 25. Laptop mock-up + stat card */
++S(s => {
++  addPath(s, { x: 11.1371, y: -0.0227, w: 8.8629, h: 11.2727, path: P.blob, fill: GREEN });
++  photo(s, 9.7998, 2.7872, 8.6273, 4.9937);
++  header(s);
++  eyebrow(s, 1.5729, 2.5677, 'OUR MOCKUP');
++  headline(s, 1.5729, 3.0689, 6.6701, 1.7166, 'What is Medical Marijuana?');
++  txt(s, [{ text: LOREM.s25a, options: { breakLine: true } }, { text: ' ', options: { breakLine: true } },
++          { text: LOREM.s25b }],
++    { x: 1.5729, y: 5.2086, w: 7.0589, h: 3.2439, lineSpacingMultiple: 1.5 });
++  card(s, 12.831, 6.888, 6.0909, 2.4677, 0.2035, WHITE, shadow.navy);
++  subhead(s, 14.9568, 7.3666, 3.1872, 'Subtitle Your Text');
++  copy(s, 14.9568, 7.9052, 3.4487, 0.9719, LOREM.tiny2);
++  txt(s, '95%', { x: 13.3804, y: 7.7684, w: 1.9338, h: 0.7068,
++    fontFace: F_XB, fontSize: 36, color: GREEN });
++});
++
++/* 26. Phone mock-ups */
++S(s => {
++  photo(s, 6.6244, 4.0537, 4.5483, 7.1963);
++  photo(s, 1.7986, 1.5916, 4.5483, 8.0668);
++  header(s);
++  eyebrow(s, 11.9041, 1.5749, 'OUR MOCKUP');
++  headline(s, 11.9041, 2.076, 7.0212, 1.7166, 'Benefits of Medical Marijuana?');
++  [[4.6386, GREEN, WHITE, SOFT, 5.4533, 'bottle', 3.3799],
++   [7.5412, WHITE, INK, BODY, 8.3559, 'crossRing', 4.8195]].forEach(r => {
++    card(s, 10.2563, r[0], 8.2635, 2.6137, 0.199, r[1], shadow.soft);
++    subhead(s, 12.4534, r[0] + 0.5382, r[6], 'Medical Marijuana', { color: r[2] });
++    copy(s, 12.4534, r[0] + 1.1036, 5.4028, 0.9719, LOREM.s16, { color: r[3] });
++    icon(s, r[5], 10.9199, r[4], 0.9843, r[1] === GREEN ? WHITE : GREEN, r[1]);
++  });
++});
++
++/* 27. Pricing plans */
++S(s => {
++  eyebrow(s, 8.0206, 1.1875, 'PRICING PLAN', { w: 3.9588, align: 'center' });
++  headline(s, 4.095, 1.6886, 11.8101, 0.9088, 'Choose Your Product', { align: 'center' });
++  [{ x: 2.207, price: 'Starting $25.00', bg: WHITE, ink: INK, pill: GREEN, list: BODY, bar: GREEN, track: RULE },
++   { x: 7.5501, price: 'Starting $75.00', bg: GREEN, ink: WHITE, pill: INK, list: WHITE, bar: INK, track: WHITE },
++   { x: 12.8931, price: 'Starting $100.00', bg: WHITE, ink: INK, pill: GREEN, list: BODY, bar: GREEN, track: RULE }
++  ].forEach(p => {
++    card(s, p.x, 3.7246, 4.8998, 6.338, 0.3731, p.bg, shadow.soft);
++    icon(s, 'leaf', p.x + 2.0169, 4.2825, 0.8661, p.bg === GREEN ? WHITE : GREEN);
++    subhead(s, p.x + 0.8727, 5.3072, 3.1545, 'Medical Marijuana', { color: p.ink, align: 'center' });
++    s.addShape('roundRect', { x: p.x + 0.7091, y: 6.207, w: 3.4817, h: 0.8921, rectRadius: 0.446,
++      fill: { color: p.pill }, line: { type: 'none' } });
++    txt(s, p.price, { x: p.x + 0.8258, y: 6.4511, w: 3.1344, h: 0.4039,
++      fontFace: F_SB, fontSize: 18, color: WHITE, align: 'center' });
++    txt(s, [1, 2, 3, 4].map(n => ({ text: 'Your Service Here ' + n,
++      options: { breakLine: true, bullet: { characterCode: '2713', indent: 22 } } })),
++      { x: p.x + 1.2026, y: 7.4989, w: 3.2293, h: 1.8807, color: p.list, lineSpacingMultiple: 1.5 });
++    rule(s, p.x + 0.8619, 7.711, 0, 1.5938, p.track, 2.5);
++    rule(s, p.x + 0.8619, 7.711, 0, 0.4062, p.bar, 5);
++  });
++});
++
++/* 28. Testimonials */
++S(s => {
++  s.addShape('rect', { x: 12.8182, y: 0, w: 7.1818, h: 11.25, fill: { color: GREEN }, line: { type: 'none' } });
++  [3.2374, 6.94].forEach(y => {
++    card(s, 1.8068, y, 14.75, 3.2614, 0.2127, WHITE, shadow.soft);
++    for (let i = 0; i < 5; i++) s.addShape('star5', { x: 5.8047 + i * 0.3636, y: y + 0.5783,
++      w: 0.3636, h: 0.3636, fill: { color: GOLD }, line: { type: 'none' } });
++    copy(s, 5.7365, y + 1.0979, 9.8866, 0.9719, LOREM.s28);
++    subhead(s, 5.7365, y + 2.2454, 2.8449, 'Your Name Here');
++    txt(s, 'Job Position', { x: 8.6134, y: y + 2.1655, w: 2.3958, h: 0.5175,
++      color: GREEN, lineSpacingMultiple: 1.5 });
++    rule(s, 8.386, y + 2.3201, 0, 0.3333, GREEN, 3);
++  });
++  eyebrow(s, 1.8068, 1.0487, 'PRICING PLAN', { w: 3.9588 });
++  headline(s, 1.8068, 1.5498, 9.9205, 0.9088, 'What Our Customer Says');
++  [[6.364, 80], [6.6634, 0], [6.9627, 80]].forEach(d => s.addShape('ellipse',
++    { x: 19.2109, y: d[0], w: 0.1804, h: 0.1804, fill: { color: WHITE, transparency: d[1] }, line: { type: 'none' } }));
++});
++
++/* 29. Contact details */
++S(s => {
++  header(s);
++  eyebrow(s, 11.2305, 1.2775, 'OUR MOCKUP');
++  headline(s, 11.2305, 1.7786, 7.3699, 1.7166, 'Visit us at the Following Address');
++  [{ y: 4.1861, ty: 4.1463, by: 4.6694, bw: 3.8143, ic: 'building', t: 'Office Address',
++     b: '7 East 68th Street, New York, NY 10065 , United States' },
++   { y: 6.3119, ty: 6.3119, by: 6.835, bw: 3.0959, ic: 'deskPhone', t: 'Our Phone',
++     b: ['+08 8983 9843 9201', '+08 7685 3629 0045'] },
++   { y: 8.4775, ty: 8.4775, by: 9.0006, bw: 3.0959, ic: 'mailbox', t: 'Email & Website',
++     b: ['Info@ucleaner.com', 'www.ucleaner.com'] }
++  ].forEach(r => {
++    icon(s, r.ic, 11.2305, r.y, 0.5906, GREEN);
++    subhead(s, 12.2218, r.ty, 2.7937, r.t, { color: INK2 });
++    const lines = Array.isArray(r.b) ? r.b.map(t => ({ text: t, options: { breakLine: true } })) : r.b;
++    txt(s, lines, { x: 12.2197, y: r.by, w: r.bw, h: 0.9719, lineSpacingMultiple: 1.5 });
++  });
++});
++
++/* 30. Thank you */
++S(s => {
++  addFadePath(s, { x: 5.7936, y: 2.3383, w: 14.2064, h: 8.9117, path: P.slope,
++    fill: GREEN, reverse: true, to: 0.85 });
++  txt(s, 'Thank You', { x: 1.5044, y: 3.3765, w: 9.8291, h: 2.0364, fontFace: F_XB, fontSize: 115, color: INK });
++  txt(s, TAGLINE, { x: 1.6622, y: 5.4129, w: 8.5467, h: 0.4376, fontFace: F_SB, fontSize: 20, color: INK });
++  icon(s, 'leaf', 8.5623, 3.1356, 1.1811, GREEN);
++  header(s);
++  button(s, 1.6622, 6.5571, 3.7324, 0.8921, 'www.cannayu.com', GREEN, { fontSize: 18 });
++});
++
++/* -------------------------------------------------------------------- main */
++const pres = new pptxgen();
++pres.defineLayout({ name: 'CANNAYU', width: SLIDE_W, height: SLIDE_H });
++pres.layout = 'CANNAYU';
++pres.author = 'Cannayu';
++pres.title = 'Cannayu - Medical Marijuana & Cannabis Presentation Template';
++
++slides.forEach(build => {
++  const slide = pres.addSlide();
++  slide.background = { color: WHITE };
++  build(slide);
++});
++
++pres.writeFile({ fileName: path.join(__dirname, '02247313-5a88-43bb-b961-4dfa5d477062_grok_final.pptx') })
++    .then(f => console.log('wrote ' + f));

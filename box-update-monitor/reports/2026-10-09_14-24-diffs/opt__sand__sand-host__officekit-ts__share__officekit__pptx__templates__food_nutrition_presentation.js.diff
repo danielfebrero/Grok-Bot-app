@@ -1,0 +1,1073 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/food_nutrition_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/food_nutrition_presentation.js
+@@ -0,0 +1,1070 @@
++/**
++ * "Food & Nutrition" presentation template — 52 slides, 13.333in x 7.5in.
++ *
++ * Rebuilt from the reference deck with pptxgenjs only. Raster photography in the
++ * original (all of it sat in picture placeholders) is represented here by light
++ * grey `[image]` boxes drawn with `imageBox()`.
++ *
++ *   node <this file>   ->   writes the .pptx next to itself
++ */
++
++const path = require('path')
++const PptxGenJS = require('pptxgenjs')
++
++// ---------------------------------------------------------------- palette
++const ORANGE   = 'E76239'   // primary accent
++const ORANGE_L = 'EC8362'
++const SALMON   = 'EF9579'
++const SALMON_D = 'DB7C5E'
++const AMBER    = 'E97132'
++const DARK     = '404040'   // charcoal panels
++const INK      = '262626'
++const BLACK    = '0D0D0D'
++const GREY     = '595959'
++const GREY_M   = '808080'
++const GREY_L   = 'A6A6A6'
++const SILVER   = 'F2F2F2'
++const MIST     = 'E8E8E8'
++const WHITE    = 'FFFFFF'
++const SHADE    = '000000'
++
++// ---------------------------------------------------------------- typography
++const SERIF = 'Playfair Display'   // headings
++const SANS  = 'Work Sans'          // body copy
++const MONT  = 'Montserrat'         // statistics
++
++const NOLINE = { type: 'none' }
++const NOFILL = { type: 'none' }
++// [lIns, rIns, bIns, tIns] in points — the level-2 indent used inside the pill labels
++const PILL_INSET = [43.2, 7.2, 3.6, 3.6]
++
++// Text presets. Every call below spreads one of these and overrides what differs.
++const BODY    = { fontSize: 11, lineSpacing: 17 }
++const HEAD    = { fontFace: SERIF, fontSize: 32, bold: true }
++const LABEL   = { fontSize: 14, bold: true, lineSpacing: 17 }
++const ITEM    = { fontSize: 12, bold: true, lineSpacing: 17 }
++const NUM     = { fontSize: 16, bold: true, lineSpacing: 17 }
++const NUMXL   = { fontSize: 28, bold: true, lineSpacing: 17 }
++const CAPTION = { fontSize: 12, color: GREY, lineSpacingMultiple: 1.2 }
++const TAG     = { fontSize: 14, bold: true, charSpacing: 1.9, align: 'center', wrap: false }
++
++// ---------------------------------------------------------------- copy
++const TITLE = 'The secret of success in life is to eat what you like.'
++const QUOTE = 'A satisfied customer is the best business strategy of all.'
++const LOR   = 'lorem ipsum dolor sita amet consec tetu rasi'
++const LOR_A = LOR   + ' adipis'
++const LOR_B = LOR_A + ' cingesa nibuha eget justo sed gravida est sedi onsec'
++const LOR_C = LOR_B + ' teturasanit adipiscinge elitas sed cursus'
++const LOR_D = LOR_C + ' sita amet consec tetu rasi adipis'
++const LOR_E = LOR_D + ' cingesa nibuha '
++
++// ---------------------------------------------------------------- custom outlines
++// Each entry is a list of closed sub-paths in normalised 0..1 shape coordinates.
++const BANNER_SLASH = [
++  [[0.164, 0], [1, 0], [1, 1], [0, 1], [0, 0.5901]],
++  [[0.1066, 0], [0.148, 0], [0, 0.5325], [0, 0.3834]],
++  [[0, 0], [0.0906, 0], [0, 0.3258]]
++]
++const ARROW_MARK = [
++  [[0.3463, 0.3074], [0.6883, 1], [0, 1]],
++  [[0.5, 0], [1, 1], [0.7696, 1], [0.3872, 0.2256]]
++]
++const ANGLED_PANEL = [
++  [[0.4158, 0], [1, 0], [1, 1], [0.8039, 1], [0.7803, 1], [0, 1]]
++]
++const CORNER_CHEVRON = [
++  [[0, 0.2597], [0, 0], [1, 1], [0.7433, 1]],
++  [[0, 1], [0, 0.3297], [0.673, 1]]
++]
++const ANGLED_WALL = [
++  [[0.2211, 0], [0.675, 0], [0.6786, 0], [1, 0], [1, 1], [0.8909, 1], [0.8778, 1], [0.4575, 1], [0.4436, 1], [0, 1]]
++]
++const SLANT_BAND = [
++  [[1, 1], [0.8665, 1], [0.8505, 1], [0.3366, 1], [0.3196, 1], [0, 1], [0.0584, 0.0049], [0.046, 0.0049], [0.0474, 0], [0.6025, 0], [0.6069, 0], [1, 0]]
++]
++const BANNER_SLASH_2 = [
++  [[0.2639, 0], [1, 0], [1, 1], [0, 1], [0, 0.6084]],
++  [[0.1987, 0], [0.2557, 0], [0, 0.5894], [0, 0.4581]],
++  [[0, 0], [0.1904, 0], [0, 0.439]]
++]
++
++// ---------------------------------------------------------------- drawing helpers
++function rect (s, x, y, w, h, fill, opts) {
++  s.addShape('rect', Object.assign({ x, y, w, h, fill, line: NOLINE }, opts))
++}
++
++function shape (s, kind, x, y, w, h, fill, opts) {
++  s.addShape(kind, Object.assign({ x, y, w, h, fill, line: NOLINE }, opts))
++}
++
++function line (s, x, y, w, h, lineProps, opts) {
++  s.addShape('line', Object.assign({ x, y, w, h, line: lineProps }, opts))
++}
++
++// The deck's two recurring 1.5pt rule motifs: a plain hairline and an arrow.
++function rule (s, x, y, w, h, color, opts) {
++  line(s, x, y, w, h, { color, width: 1.5 }, opts)
++}
++
++function arrow (s, x, y, w, h, color, opts) {
++  line(s, x, y, w, h, { color, width: 1.5, endArrowType: 'triangle' }, opts)
++}
++
++// Draws a multi-contour outline (see the path tables above) scaled into x/y/w/h.
++function poly (s, x, y, w, h, contours, opts) {
++  const points = []
++  contours.forEach(contour => {
++    contour.forEach((pt, i) => points.push({ x: w * pt[0], y: h * pt[1], moveTo: i === 0 }))
++    points.push({ close: true })
++  })
++  s.addShape('custGeom', Object.assign({ x, y, w, h, points, line: NOLINE }, opts))
++}
++
++function text (s, body, x, y, w, h, opts) {
++  s.addText(body, Object.assign({ x, y, w, h, fontFace: SANS, color: SHADE, valign: 'top' }, opts))
++}
++
++// --- adjustable preset geometries -------------------------------------------
++// pptxgenjs cannot pass OOXML `adj` values, so these four are traced as outlines.
++
++// Diagonal band running corner to corner; `adj` is the band width / min(w, h).
++function diagStripe (s, x, y, w, h, fill, adj, opts) {
++  const t = Math.min(w, h) * adj
++  poly(s, x, y, w, h, [[[t / w, 0], [1, 0], [0, 1], [0, (t * h / w) / h]]],
++    Object.assign({ fill }, opts))
++}
++
++// Sheared rectangle leaning right; `adj` is the top offset / min(w, h).
++function parallelogram (s, x, y, w, h, fill, adj, opts) {
++  const d = Math.min(w, h) * adj / w
++  poly(s, x, y, w, h, [[[0, 1], [d, 0], [1, 0], [1 - d, 1]]], Object.assign({ fill }, opts))
++}
++
++// Rectangle with the top-right corner cut off; `adj` is the cut / min(w, h).
++function snipRect (s, x, y, w, h, fill, adj, opts) {
++  const d = Math.min(w, h) * adj
++  poly(s, x, y, w, h, [[[0, 0], [1 - d / w, 0], [1, d / h], [1, 1], [0, 1]]],
++    Object.assign({ fill }, opts))
++}
++
++// Triangle with a movable apex; `adj` is the apex position across the width.
++function triangle (s, x, y, w, h, fill, adj, opts) {
++  poly(s, x, y, w, h, [[[0, 1], [adj, 0], [1, 1]]], Object.assign({ fill }, opts))
++}
++
++// Stand-in for a photograph in the reference deck. Boxes too small for a
++// caption (the three icon glyphs on slide 48) get a plain swatch instead.
++function imageBox (s, x, y, w, h) {
++  s.addShape('rect', { x, y, w, h, fill: MIST, line: { color: GREY_L, width: 0.75 } })
++  if (w < 1 || h < 0.4) return
++  s.addText('[image]', {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontFace: SANS, fontSize: 11, color: GREY_M
++  })
++}
++
++// 1. Cover — dark banner with corner slashes over the title, orange base bar
++function slide01 (pres) {
++  const s = pres.addSlide()
++  poly(s, 0, 1.9, 13.33, 3.71, BANNER_SLASH, { fill: { color: SHADE, transparency: 20 } })
++  rect(s, 0, 6.32, 13.33, 1.18, ORANGE)
++  text(s, 'Food & Nutrition', 5.21, 2.83, 7.6, 1.21, { fontFace: SERIF, fontSize: 66, bold: true, color: WHITE, align: 'right', wrap: false })
++  text(s, 'Presentation Template', 10.29, 4.97, 2.52, 0.29, { fontSize: 11, color: WHITE, charSpacing: 1.9, align: 'center', wrap: false })
++  text(s, 'Template', 0.53, 4.93, 1.34, 0.34, { ...TAG, color: WHITE })
++  line(s, 0.61, 4.65, 1.06, 0, { color: WHITE, width: 2.25, endArrowType: 'triangle' }, { flipH: true })
++}
++
++// 2. Quote + intro copy, orange right-triangle bleeding off the bottom right
++function slide02 (pres) {
++  const s = pres.addSlide()
++  shape(s, 'rtTriangle', 8.18, 4.62, 5.15, 2.88, ORANGE, { flipH: true })
++  text(s, TITLE, 2.31, 1.45, 4.16, 1.72, HEAD)
++  text(s, LOR_C, 2.33, 5.26, 4.14, 0.79, BODY)
++  text(s, 'What we do ?', 2.31, 4.84, 4.14, 0.33, LABEL)
++  text(s, 'PLACEHOLDER', 2.33, 3.9, 4.14, 0.56, BODY)
++  rule(s, 0.59, 0, 0, 7.5, ORANGE)
++}
++
++// 3. Charcoal half-panel top-left, caption block on the right
++function slide03 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, -0.01, 6.76, 3.76, DARK)
++  text(s, 'Template', 11.43, 0.69, 1.34, 0.34, { ...TAG, color: DARK })
++  arrow(s, 11.55, 0.46, 1.06, 0, DARK)
++  text(s, TITLE, 1.02, 1.27, 4.99, 1.04, { fontFace: SERIF, fontSize: 28, bold: true, color: WHITE })
++  text(s, LOR_C, 7.99, 1.96, 4.12, 0.79, BODY)
++  text(s, 'What we do ?', 7.97, 1.38, 4.14, 0.33, LABEL)
++}
++
++// 4. Two facing triangles (grey / tinted orange) framing the title
++function slide04 (pres) {
++  const s = pres.addSlide()
++  shape(s, 'rtTriangle', 6.07, 0.36, 7.27, 7.14, { color: ORANGE, transparency: 80 }, { flipH: true })
++  shape(s, 'rtTriangle', 0, 1.76, 6.07, 5.74, MIST)
++  text(s, TITLE, 8.59, 1.89, 4.01, 1.72, HEAD)
++  text(s, LOR_B, 8.61, 4.81, 3.44, 0.79, BODY)
++  text(s, 'What we do ?', 8.59, 4.22, 3.44, 0.33, LABEL)
++  text(s, LOR_B, 0.59, 6.01, 3.44, 0.79, BODY)
++  text(s, 'What we do ?', 0.57, 5.42, 3.44, 0.33, { ...LABEL, color: INK, align: 'justify' })
++}
++
++// 5. Tinted orange column carrying the caption, title on the left
++function slide05 (pres) {
++  const s = pres.addSlide()
++  rect(s, 6.78, 0, 4.33, 7.5, { color: ORANGE, transparency: 20 })
++  text(s, 'Template', 11.6, 0.82, 1.34, 0.34, { ...TAG, color: DARK })
++  arrow(s, 11.72, 0.58, 1.06, 0, DARK)
++  text(s, TITLE, 0.76, 1.16, 5.52, 1.18, HEAD)
++  text(s, LOR_C, 7.49, 1.35, 2.91, 1.46, { fontSize: 11, color: WHITE, lineSpacingMultiple: 1.5 })
++  text(s, 'What we do ?', 7.49, 0.94, 2.91, 0.33, { ...LABEL, color: WHITE, align: 'justify' })
++}
++
++// 6. Orange diagonal band across the top-right corner
++function slide06 (pres) {
++  const s = pres.addSlide()
++  diagStripe(s, 7.44, -0.39, 5.5, 6.28, ORANGE, 0.887, { rotate: 90 })
++  text(s, TITLE, 1.28, 1.25, 4.16, 1.72, HEAD)
++  text(s, LOR_C, 1.3, 4.18, 4.14, 0.79, BODY)
++  text(s, 'What we do ?', 1.28, 3.59, 4.14, 0.33, { ...LABEL, color: INK, align: 'justify' })
++  text(s, LOR_A + ' cingesa nibuha eget justo ', 1.3, 5.31, 4.14, 0.56, BODY)
++  text(s, LOR, 9, 6.79, 3.96, 0.3, { fontSize: 12, color: GREY_M, wrap: false })
++  arrow(s, 11.51, 6.55, 1.31, 0, DARK)
++}
++
++// 7. Translucent white plate over the photo, orange edge strip on the right
++function slide07 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 1.73, 9.67, 4.04, { color: WHITE, transparency: 20 })
++  text(s, TITLE, 0.92, 2.31, 5.73, 1.18, HEAD)
++  text(s, 'Template', 7.72, 2.61, 1.34, 0.34, { ...TAG, color: DARK })
++  arrow(s, 7.83, 2.37, 1.06, 0, DARK)
++  text(s, 'Template', 7.72, 5.08, 1.34, 0.34, { ...TAG, color: DARK })
++  text(s, LOR_C, 0.92, 4.23, 4.12, 0.79, BODY)
++  rect(s, 11.75, 0, 1.58, 7.5, ORANGE)
++  rule(s, 12.53, 0, 0, 7.5, WHITE)
++}
++
++// 8. Full-height orange panel on the right holding title and copy
++function slide08 (pres) {
++  const s = pres.addSlide()
++  rect(s, 7.68, 0, 4.97, 7.5, ORANGE)
++  text(s, TITLE, 8.12, 2.19, 4.11, 1.51, { fontFace: SERIF, fontSize: 28, bold: true, color: WHITE })
++  text(s, LOR_C + ' adipis cingesa nibuha', 8.12, 4.03, 4.11, 1.28, { fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 })
++  text(s, LOR_C, 3.98, 5.06, 3.03, 1.27, BODY)
++  text(s, 'What we do ?', 3.96, 4.53, 3.05, 0.33, { ...LABEL, color: INK, align: 'justify' })
++}
++
++// 9. Orange arrow mark at the top, title and copy split below the rule
++function slide09 (pres) {
++  const s = pres.addSlide()
++  poly(s, 5.8, 0, 1.74, 1.27, ARROW_MARK, { fill: ORANGE, rotate: 180 })
++  text(s, TITLE, 1.48, 5.14, 4.06, 1.72, HEAD)
++  text(s, LOR_E, 6.59, 5.48, 5.27, 0.79, BODY)
++  rule(s, 3.85, 4.7, 5.63, 0, ORANGE, { flipH: true })
++}
++
++// 10. Coffee break — tinted plate centred on a full-bleed orange field
++function slide10 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 13.32, 7.5, ORANGE)
++  rect(s, 2.06, 1.73, 9.12, 4.04, { color: WHITE, transparency: 20 })
++  text(s, 'Coffee Break!', 4.58, 2.74, 4.06, 0.84, { fontFace: SERIF, fontSize: 44, bold: true, align: 'center' })
++  text(s, LOR_B, 4.18, 3.75, 4.87, 0.63, { fontSize: 11, align: 'center', lineSpacingMultiple: 1.5 })
++  text(s, '5 Minutes', 4.18, 5.1, 4.87, 0.35, { fontSize: 11, bold: true, align: 'center', lineSpacingMultiple: 1.5 })
++}
++
++// 11. Numbered list on the left, floating white quote card on the right
++function slide11 (pres) {
++  const s = pres.addSlide()
++  text(s, LOR_E, 1.08, 5.67, 4.66, 1.03, BODY)
++  text(s, LOR_B, 1.79, 1.18, 3.96, 0.79, BODY)
++  text(s, 'The Service One', 1.79, 0.71, 3.96, 0.33, { ...ITEM, color: INK, align: 'justify' })
++  text(s, '01.', 0.9, 0.82, 0.89, 0.39, { fontSize: 32, bold: true, color: INK, align: 'right', lineSpacing: 17 })
++  text(s, LOR_B, 1.79, 2.68, 3.96, 0.79, BODY)
++  text(s, 'The Service Two', 1.79, 2.21, 3.96, 0.33, { ...ITEM, color: INK, align: 'justify' })
++  text(s, '02.', 0.9, 2.32, 0.89, 0.39, { fontSize: 32, bold: true, color: INK, align: 'right', lineSpacing: 17 })
++  text(s, 'What we do ?', 1.08, 4.97, 2.19, 0.33, { ...LABEL, color: INK, align: 'justify' })
++  rule(s, 1.21, 4.66, 1.29, 0, ORANGE_L, { flipH: true })
++  rect(s, 8.37, 2.18, 3.14, 3.14, WHITE, { shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 13, offset: 0, angle: 0 } })
++  text(s, TITLE, 8.66, 2.52, 2.58, 2.46, { fontFace: SERIF, fontSize: 28, bold: true })
++}
++
++// 12. Orange sidebar with a numbered service list, title and copy alongside
++function slide12 (pres) {
++  const s = pres.addSlide()
++  rect(s, 1.04, 0, 4.02, 7.5, ORANGE)
++  text(s, TITLE, 5.86, 0.75, 3.09, 2.26, HEAD)
++  text(s, LOR_E, 9.64, 1.12, 2.89, 1.51, BODY)
++  text(s, LOR, 2.03, 1.79, 2.02, 0.56, { ...BODY, color: WHITE })
++  text(s, 'Service One', 2.03, 1.3, 2.02, 0.34, { fontSize: 18, bold: true, color: WHITE, lineSpacing: 17 })
++  text(s, '01.', 1.98, 0.76, 0.89, 0.36, { fontSize: 24, bold: true, color: WHITE, lineSpacing: 17 })
++  text(s, LOR, 2.03, 4.01, 2.02, 0.56, { ...BODY, color: WHITE })
++  text(s, 'Service Two', 2.03, 3.51, 2.02, 0.34, { fontSize: 18, bold: true, color: WHITE, lineSpacing: 17 })
++  text(s, '02.', 1.98, 2.97, 0.89, 0.36, { fontSize: 24, bold: true, color: WHITE, lineSpacing: 17 })
++  text(s, LOR, 2.03, 6.19, 2.02, 0.56, { ...BODY, color: WHITE })
++  text(s, 'Service Three', 2.03, 5.69, 2.02, 0.34, { fontSize: 18, bold: true, color: WHITE, lineSpacing: 17 })
++  text(s, '03.', 1.98, 5.15, 0.89, 0.36, { fontSize: 24, bold: true, color: WHITE, lineSpacing: 17 })
++}
++
++// 13. Two priced service tiles bottom-left, centred title block on the right
++function slide13 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0.93, 4.47, 2.82, 2.36, ORANGE)
++  text(s, 'Service One', 1.33, 5.43, 2.02, 0.34, { ...LABEL, color: WHITE, align: 'center' })
++  text(s, [
++    { text: '$', options: { align: 'center', lineSpacingMultiple: 1.07, paraSpaceAfter: 8, fontSize: 16, bold: true, color: WHITE, superscript: true } },
++    { text: '567', options: { fontSize: 16, bold: true, color: WHITE } }
++  ], 1.33, 4.94, 2.02, 0.37, {})
++  text(s, LOR, 1.33, 5.75, 2.02, 0.56, { ...BODY, color: WHITE, align: 'center' })
++  rect(s, 4.16, 4.47, 2.82, 2.36, DARK)
++  text(s, 'Service Two', 4.56, 5.43, 2.02, 0.34, { ...LABEL, color: WHITE, align: 'center' })
++  text(s, [
++    { text: '$', options: { align: 'center', lineSpacingMultiple: 1.07, paraSpaceAfter: 8, fontSize: 16, bold: true, color: WHITE, superscript: true } },
++    { text: '567', options: { fontSize: 16, bold: true, color: WHITE } }
++  ], 4.56, 4.94, 2.02, 0.37, {})
++  text(s, LOR, 4.56, 5.75, 2.02, 0.56, { ...BODY, color: WHITE, align: 'center' })
++  text(s, TITLE, 7.53, 1.22, 4.89, 1.72, { ...HEAD, align: 'center' })
++  text(s, LOR_C, 7.53, 5.48, 4.89, 0.79, { ...BODY, align: 'center' })
++  text(s, 'What we do ?', 8.88, 4.98, 2.19, 0.33, { ...LABEL, align: 'center' })
++  text(s, LOR_C, 7.53, 3.79, 4.89, 0.79, { ...BODY, align: 'center' })
++  rule(s, 8.32, 3.24, 3.3, 0, ORANGE_L, { flipH: true })
++}
++
++// 14. "what we do" pill, vertical title, tinted orange column with services
++function slide14 (pres) {
++  const s = pres.addSlide()
++  rect(s, 8.55, 0, 4.02, 7.5, { color: ORANGE, transparency: 20 })
++  text(s, 'what we do ?', 0.94, 0.76, 4.44, 0.54, { fontSize: 14, bold: true, color: WHITE, valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE, margin: PILL_INSET })
++  text(s, TITLE, 0.94, 3.57, 2.66, 2.79, HEAD)
++  text(s, LOR_E, 8.84, 1.48, 3.23, 1.51, { ...BODY, color: WHITE })
++  text(s, '“', 8.55, 3.62, 4.66, 1.19, { fontFace: SERIF, fontSize: 287, color: WHITE, transparency: 70, lineSpacing: 17 })
++  text(s, LOR_A + ' cingesa nibuha eget justo', 9.73, 4.22, 2.35, 0.79, { ...BODY, color: WHITE })
++  text(s, 'The Service One', 9.73, 3.75, 2.35, 0.33, { ...ITEM, color: WHITE })
++  text(s, '01.', 8.85, 3.86, 0.89, 0.39, { fontSize: 32, bold: true, color: WHITE, lineSpacing: 17 })
++  text(s, LOR_A + ' cingesa nibuha eget justo', 9.73, 6, 2.35, 0.79, { ...BODY, color: WHITE })
++  text(s, 'The Service Two', 9.73, 5.52, 2.35, 0.33, { ...ITEM, color: WHITE })
++  text(s, '02.', 8.84, 5.63, 0.89, 0.39, { fontSize: 32, bold: true, color: WHITE, lineSpacing: 17 })
++  rule(s, 1.06, 3.36, 2.13, 0, ORANGE_L, { flipH: true })
++}
++
++// 15. Orange title banner, right-hand service list, orange footer bar
++function slide15 (pres) {
++  const s = pres.addSlide()
++  rect(s, 9.49, 0, 3.84, 7.5, { color: WHITE, transparency: 5 })
++  text(s, LOR, 10.43, 1.79, 2.02, 0.56, BODY)
++  text(s, 'Service One', 10.43, 1.3, 2.02, 0.34, { fontSize: 18, bold: true, lineSpacing: 17 })
++  text(s, '01.', 10.38, 0.76, 0.89, 0.36, { fontSize: 24, bold: true, lineSpacing: 17 })
++  text(s, LOR, 10.43, 4.01, 2.02, 0.56, BODY)
++  text(s, 'Service Two', 10.43, 3.51, 2.02, 0.34, { fontSize: 18, bold: true, lineSpacing: 17 })
++  text(s, '02.', 10.38, 2.97, 0.89, 0.36, { fontSize: 24, bold: true, lineSpacing: 17 })
++  text(s, LOR, 10.43, 6.19, 2.02, 0.56, BODY)
++  text(s, 'Service Three', 10.43, 5.69, 2.02, 0.34, { fontSize: 18, bold: true, lineSpacing: 17 })
++  text(s, '03.', 10.38, 5.15, 0.89, 0.36, { fontSize: 24, bold: true, lineSpacing: 17 })
++  rect(s, 1.59, 0, 6.3, 1.64, ORANGE)
++  text(s, TITLE, 2.3, 0.36, 4.89, 0.91, { fontFace: SERIF, fontSize: 24, bold: true, color: WHITE, align: 'center' })
++  rect(s, 0, 6.74, 9.49, 0.75, ORANGE)
++}
++
++// 16. Tall stacked title on the left, three numbered services on the right
++function slide16 (pres) {
++  const s = pres.addSlide()
++  text(s, LOR_A, 9.63, 1.33, 2.18, 0.79, BODY)
++  text(s, 'The Service One', 9.63, 0.8, 1.93, 0.33, ITEM)
++  text(s, '01.', 8.84, 0.89, 0.77, 0.38, NUMXL)
++  text(s, LOR_A, 9.67, 3.62, 2.18, 0.79, BODY)
++  text(s, 'The Service Two', 9.67, 3.09, 1.93, 0.33, ITEM)
++  text(s, '02.', 8.8, 3.18, 0.86, 0.38, NUMXL)
++  text(s, LOR_A, 9.67, 5.91, 2.18, 0.79, BODY)
++  text(s, 'The Service Three', 9.67, 5.38, 1.93, 0.33, ITEM)
++  text(s, '03.', 8.8, 5.47, 0.86, 0.38, NUMXL)
++  text(s, TITLE, 1.1, 1.46, 2.96, 3.47, { fontFace: SERIF, fontSize: 40, bold: true })
++  rule(s, 1.21, 1.23, 1.19, 0, ORANGE, { flipH: true })
++}
++
++// 17. Charcoal snipped panel with a 2x2 service grid and an orange pill
++function slide17 (pres) {
++  const s = pres.addSlide()
++  snipRect(s, 6.43, 0.64, 5.97, 6.21, DARK, 0.247, { flipH: true })
++  text(s, LOR_A + ' ipsum dolo', 7.11, 3.36, 1.97, 0.79, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'The Service One', 7.11, 3.04, 1.89, 0.33, { ...ITEM, color: WHITE, align: 'justify' })
++  text(s, '01.', 6.9, 2.69, 0.77, 0.35, { fontSize: 20, bold: true, color: WHITE, align: 'right', lineSpacing: 17 })
++  text(s, LOR_A + ' ipsum dolo', 9.82, 3.35, 1.97, 0.79, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'The Service Two', 9.82, 3.04, 1.89, 0.33, { ...ITEM, color: WHITE, align: 'justify' })
++  text(s, '02.', 9.62, 2.68, 0.77, 0.35, { fontSize: 20, bold: true, color: WHITE, align: 'right', lineSpacing: 17 })
++  text(s, LOR_A + ' ipsum dolo', 7.11, 5.34, 1.97, 0.79, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'The Service Three', 7.11, 5.03, 1.97, 0.33, { ...ITEM, color: WHITE, align: 'justify' })
++  text(s, '03.', 6.9, 4.68, 0.77, 0.35, { fontSize: 20, bold: true, color: WHITE, align: 'right', lineSpacing: 17 })
++  text(s, LOR_A + ' ipsum dolo', 9.86, 5.33, 1.97, 0.79, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'The Service Four', 9.86, 5.02, 1.89, 0.33, { ...ITEM, color: WHITE, align: 'justify' })
++  text(s, '04.', 9.65, 4.67, 0.77, 0.35, { fontSize: 20, bold: true, color: WHITE, align: 'right', lineSpacing: 17 })
++  text(s, 'what we do ?', 8.16, 1.3, 5.17, 0.54, { fontSize: 14, bold: true, color: WHITE, valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE, margin: PILL_INSET })
++  text(s, TITLE, 0.93, 1.46, 4.17, 1.72, HEAD)
++  text(s, LOR_E, 0.94, 4.85, 4.7, 1.18, { fontSize: 11, lineSpacingMultiple: 1.5 })
++  rule(s, 1.73, 3.61, 0, 1.3, ORANGE, { rotate: 270 })
++}
++
++// 18. Wide photo band, centred orange pill, two services underneath
++function slide18 (pres) {
++  const s = pres.addSlide()
++  text(s, TITLE, 1.13, 4.61, 3.32, 2.26, HEAD)
++  text(s, LOR_A, 5.93, 5.73, 2.18, 0.79, BODY)
++  text(s, 'The Service One', 5.93, 5.2, 1.93, 0.33, ITEM)
++  text(s, '01.', 5.14, 5.3, 0.77, 0.38, NUMXL)
++  text(s, LOR_A, 10.02, 5.73, 2.18, 0.79, BODY)
++  text(s, 'The Service One', 10.02, 5.2, 1.93, 0.33, ITEM)
++  text(s, '02.', 9.15, 5.3, 0.86, 0.38, NUMXL)
++  text(s, 'what we do ?', 4.45, 3.43, 4.44, 0.54, { fontSize: 14, bold: true, color: WHITE, align: 'center', valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE })
++}
++
++// 19. Numbered list left, angled charcoal panel with the pull quote right
++function slide19 (pres) {
++  const s = pres.addSlide()
++  poly(s, 8.67, 0, 5.1, 7.5, ANGLED_PANEL, { fill: DARK })
++  text(s, QUOTE, 10.39, 3.18, 2.66, 2.96, { ...HEAD, color: WHITE, lineSpacing: 34 })
++  text(s, 'Template', 11.6, 6.88, 1.34, 0.34, { ...TAG, color: WHITE })
++  line(s, 11.72, 6.65, 1.06, 0, { type: 'none', width: 1.5, endArrowType: 'triangle' }, { flipH: true })
++  text(s, LOR_A, 2.51, 1.47, 2.18, 0.79, BODY)
++  text(s, 'The Service One', 2.51, 0.94, 1.93, 0.33, ITEM)
++  text(s, '01.', 1.72, 1.03, 0.77, 0.38, NUMXL)
++  text(s, LOR_A, 2.6, 3.63, 2.18, 0.79, BODY)
++  text(s, 'The Service Two', 2.6, 3.1, 1.93, 0.33, ITEM)
++  text(s, '02.', 1.72, 3.19, 0.86, 0.38, NUMXL)
++  text(s, LOR_A, 2.6, 5.77, 2.18, 0.79, BODY)
++  text(s, 'The Service Three', 2.6, 5.24, 1.93, 0.33, ITEM)
++  text(s, '03.', 1.73, 5.33, 0.86, 0.38, NUMXL)
++  arrow(s, 11.72, 6.64, 1.06, 0, WHITE, { flipH: true })
++  rule(s, 0.87, 0, 0, 7.5, ORANGE)
++  rect(s, 11.7, 0.81, 2.16, 0.54, ORANGE, { rotate: 90 })
++}
++
++// 20. Coffee break — orange parallelogram on a charcoal field
++function slide20 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 13.33, 7.5, DARK)
++  parallelogram(s, 5.12, 1.49, 7.42, 4.5, ORANGE, 0.305)
++  triangle(s, 11.45, 4.57, 1.87, 2.93, SILVER, 0.5)
++  text(s, 'Coffee Break!', 6.52, 2.56, 5.07, 1.01, { fontFace: SERIF, fontSize: 54, bold: true, color: WHITE, align: 'center' })
++  text(s, LOR, 6.64, 4.63, 2.18, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Add Title Here', 6.65, 4.3, 1.93, 0.33, { ...LABEL, color: WHITE, align: 'justify' })
++  text(s, '01.', 5.75, 4.29, 0.77, 0.34, { ...NUM, color: WHITE, align: 'right' })
++  text(s, '5 Minutes', 5.55, 5.45, 1.93, 0.33, { ...LABEL, color: WHITE, align: 'justify' })
++}
++
++// 21. Team bios over a full-bleed charcoal background
++function slide21 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 13.33, 7.5, DARK)
++  text(s, TITLE, 7.8, 1.88, 4.29, 1.67, { fontFace: SERIF, fontSize: 31, bold: true, color: WHITE, charSpacing: 0.5 })
++  text(s, LOR_D, 7.8, 4.17, 4.29, 1.03, { ...BODY, color: WHITE })
++  text(s, LOR_A, 4.15, 2.18, 2.18, 0.79, { ...BODY, color: WHITE })
++  text(s, 'Add Name', 4.15, 1.32, 1.93, 0.34, { fontFace: SERIF, fontSize: 20, bold: true, color: WHITE, lineSpacing: 17 })
++  text(s, 'Founder', 4.15, 1.66, 2.18, 0.33, { fontSize: 14, color: WHITE, lineSpacing: 17 })
++  text(s, 'about', 1.24, 6.94, 0.98, 0.33, { ...LABEL, color: WHITE, align: 'center' })
++  text(s, 'lorem ipsum dolor sita amet consec', 2.64, 6.91, 3.94, 0.32, { fontSize: 10, color: WHITE, align: 'justify', lineSpacing: 17 })
++  arrow(s, 11.03, 7.08, 1.07, 0, WHITE)
++  text(s, LOR_A, 4.15, 4.98, 2.18, 0.79, { ...BODY, color: WHITE })
++  text(s, 'Add Name', 4.15, 4.11, 1.93, 0.34, { fontFace: SERIF, fontSize: 20, bold: true, color: WHITE, lineSpacing: 17 })
++  text(s, 'Founder', 4.15, 4.45, 2.18, 0.33, { fontSize: 14, color: WHITE, lineSpacing: 17 })
++}
++
++// 22. Profile block over a snipped charcoal footer with two progress bars
++function slide22 (pres) {
++  const s = pres.addSlide()
++  rect(s, 1.27, 4.88, 4.03, 2.62, { color: DARK, transparency: 30 })
++  snipRect(s, 5.3, 4.88, 8.04, 2.62, DARK, 0.359)
++  text(s, 'What we do ?', 1.71, 5.5, 2.19, 0.33, { ...LABEL, color: WHITE, align: 'justify' })
++  rect(s, 1.81, 6.62, 3.04, 0.25, SILVER)
++  text(s, '66%', 1.81, 6.62, 2, 0.25, { fontSize: 8, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: ORANGE_L, line: NOLINE })
++  rect(s, 1.81, 5.98, 3.04, 0.25, SILVER)
++  text(s, '82%', 1.81, 5.98, 2.64, 0.25, { fontSize: 8, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: INK, line: NOLINE })
++  text(s, 'about', 11.4, 5.55, 0.98, 0.33, { ...LABEL, color: WHITE, align: 'center' })
++  arrow(s, 6.57, 5.71, 1.07, 0, WHITE)
++  text(s, LOR_C, 6.49, 6.15, 5.78, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Add Your Name', 6.29, 1.05, 3.64, 0.64, HEAD)
++  text(s, LOR_C + 'PLACEHOLDER', 6.29, 1.96, 5.78, 1.27, BODY)
++  rule(s, 6.37, 3.83, 5.63, 0, ORANGE_L, { flipH: true })
++}
++
++// 23. Three portrait slots with corner chevrons and name plates
++function slide23 (pres) {
++  const s = pres.addSlide()
++  text(s, TITLE, 2.87, 0.43, 7.6, 1.14, { fontFace: SERIF, fontSize: 31, bold: true, charSpacing: 0.5, align: 'center' })
++  text(s, 'Add Your Name', 1.92, 5.21, 2.51, 0.51, { fontSize: 12, bold: true, color: WHITE, align: 'center', valign: 'middle', shape: 'rect', fill: DARK, line: NOLINE })
++  text(s, 'Add Your Name', 6.01, 5.21, 2.51, 0.51, { fontSize: 12, bold: true, color: WHITE, align: 'center', valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE })
++  text(s, 'Add Your Name', 10.1, 5.21, 2.51, 0.51, { fontSize: 12, bold: true, color: WHITE, align: 'center', valign: 'middle', shape: 'rect', fill: DARK, line: NOLINE })
++  rule(s, 3.41, 6.92, 6.51, 0, ORANGE, { flipH: true })
++  poly(s, 0.72, 2.13, 1.42, 1.38, CORNER_CHEVRON, { fill: DARK, rotate: 180, flipH: true })
++  poly(s, 4.81, 2.13, 1.42, 1.38, CORNER_CHEVRON, { fill: ORANGE, rotate: 180, flipH: true })
++  poly(s, 8.9, 2.13, 1.42, 1.38, CORNER_CHEVRON, { fill: DARK, rotate: 180, flipH: true })
++}
++
++// 24. Orange card with a caption block, title to its right
++function slide24 (pres) {
++  const s = pres.addSlide()
++  text(s, TITLE, 9.81, 2.35, 2.66, 2.79, HEAD)
++  text(s, 'what we do ?', 10.42, 6.79, 1.21, 0.31, { fontSize: 10, bold: true, color: INK, align: 'center', lineSpacing: 17 })
++  arrow(s, 11.89, 6.96, 0.76, 0, DARK)
++  rect(s, 4.29, 1.23, 4.75, 5.04, ORANGE)
++  text(s, LOR_B + ' teturasanit ', 4.92, 2.79, 3.44, 0.79, { ...BODY, color: WHITE })
++  text(s, 'Add Your Name Here', 4.96, 2.2, 3.4, 0.44, { fontFace: SERIF, fontSize: 20, bold: true, color: WHITE })
++  arrow(s, 5.03, 4.33, 1.07, 0, WHITE)
++  text(s, 'about', 7.55, 4.16, 0.98, 0.33, { ...LABEL, color: WHITE, align: 'justify' })
++  text(s, LOR_A + ' cingesa nibuha eget justo sed', 4.92, 4.74, 3.44, 0.56, { ...BODY, color: WHITE })
++}
++
++// 25. Two stacked profile blocks with progress bars, charcoal edge strip
++function slide25 (pres) {
++  const s = pres.addSlide()
++  text(s, 'Add Your Name Here', 5.59, 0.41, 5.01, 0.64, { ...HEAD, charSpacing: 0.8, shape: 'rect', fill: WHITE, line: NOLINE })
++  text(s, 'what we do ?', 5.59, 2.79, 2.19, 0.33, { ...LABEL, color: INK, align: 'justify' })
++  rect(s, 7.39, 3.32, 2.78, 0.25, SILVER)
++  text(s, '66%', 7.39, 3.32, 1.82, 0.25, { fontSize: 7, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE })
++  rect(s, 7.39, 2.86, 2.78, 0.25, SILVER)
++  text(s, '82%', 7.39, 2.86, 2.41, 0.25, { fontSize: 7, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: INK, line: NOLINE })
++  text(s, LOR_E + 'eget', 5.61, 1.15, 4.65, 1.18, { fontSize: 11, lineSpacingMultiple: 1.5 })
++  text(s, 'Add Your Name Here', 5.59, 3.93, 5.31, 0.64, { ...HEAD, charSpacing: 0.8, shape: 'rect', fill: WHITE, line: NOLINE })
++  text(s, 'what we do ?', 5.59, 6.31, 2.19, 0.33, { ...LABEL, color: INK, align: 'justify' })
++  rect(s, 7.39, 6.84, 2.78, 0.25, SILVER)
++  text(s, '66%', 7.39, 6.84, 1.82, 0.25, { fontSize: 7, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE })
++  rect(s, 7.39, 6.37, 2.78, 0.25, SILVER)
++  text(s, '82%', 7.39, 6.37, 2.41, 0.25, { fontSize: 7, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: INK, line: NOLINE })
++  text(s, LOR_E + 'eget', 5.61, 4.67, 4.65, 1.18, { fontSize: 11, lineSpacingMultiple: 1.5 })
++  rect(s, 11.43, 0, 1.38, 7.5, DARK)
++}
++
++// 26. Minimal name block on the left, right-aligned title
++function slide26 (pres) {
++  const s = pres.addSlide()
++  text(s, TITLE, 7.83, 0.88, 4.92, 1.72, { ...HEAD, align: 'right' })
++  text(s, LOR_C + ' consec tetu rasi adipis', 0.78, 1.61, 3.7, 1.03, BODY)
++  text(s, 'what we do ?', 0.44, 6.61, 1.21, 0.31, { fontSize: 10, bold: true, color: INK, align: 'center', lineSpacing: 17 })
++  arrow(s, 11.99, 6.79, 0.76, 0, DARK)
++  text(s, 'Add Name Here', 0.78, 1.04, 2.19, 0.33, { ...LABEL, color: INK, align: 'justify' })
++}
++
++// 27. Vertical title with progress bars, three coloured edge strips
++function slide27 (pres) {
++  const s = pres.addSlide()
++  rect(s, 10.67, 0, 2.66, 7.5, ORANGE)
++  poly(s, 1.15, 4.89, 1.68, 1.64, CORNER_CHEVRON, { fill: DARK, rotate: 90, flipH: true })
++  text(s, TITLE, 5.54, 0.96, 2.87, 2.79, HEAD)
++  text(s, LOR_B + ' teturasanit adipiscinge elitas sed ', 5.59, 4.19, 4.14, 0.79, { ...BODY, align: 'justify' })
++  text(s, 'what we do ?', 5.61, 5.59, 2.19, 0.33, { ...LABEL, color: INK, align: 'justify' })
++  rect(s, 7.4, 6.29, 2.35, 0.25, SILVER)
++  text(s, '66%', 7.4, 6.29, 1.54, 0.25, { fontSize: 5, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE })
++  rect(s, 7.4, 5.66, 2.35, 0.25, SILVER)
++  text(s, '82%', 7.4, 5.66, 2.04, 0.25, { fontSize: 5, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: INK, line: NOLINE })
++  rect(s, 11.58, 0, 0.84, 7.5, DARK)
++  rule(s, 3.9, 0.63, 6.51, 0, ORANGE, { flipH: true })
++}
++
++// 28. Title and copy over four wide progress bars
++function slide28 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0.9, 6.42, 5.28, 0.54, SILVER)
++  text(s, '66%', 0.9, 6.42, 3.46, 0.54, { fontSize: 14, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE })
++  rect(s, 0.9, 5.59, 5.28, 0.54, SILVER)
++  text(s, '82%', 0.9, 5.59, 4.57, 0.54, { fontSize: 14, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: INK, line: NOLINE })
++  text(s, TITLE, 0.9, 0.54, 4.37, 1.72, HEAD)
++  text(s, LOR_B + 'PLACEHOLDER', 7.16, 1, 5.28, 0.79, { ...BODY, align: 'justify' })
++  rect(s, 7.16, 6.42, 5.28, 0.54, SILVER)
++  text(s, '66%', 7.16, 6.42, 3.46, 0.54, { fontSize: 14, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE })
++  rect(s, 7.16, 5.59, 5.28, 0.54, SILVER)
++  text(s, '82%', 7.16, 5.59, 4.57, 0.54, { fontSize: 14, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: INK, line: NOLINE })
++  rule(s, 5.98, 0.75, 0, 1.3, ORANGE_L)
++}
++
++// 29. Coffee break — charcoal band with a tinted orange plate
++function slide29 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 13.33, 3.75, DARK)
++  rect(s, 1.04, 0, 7.69, 5.94, { color: ORANGE, transparency: 20 })
++  text(s, 'Coffee Break!', 2.17, 2.42, 5.43, 1.11, { fontFace: SERIF, fontSize: 60, bold: true, color: WHITE, align: 'center', wrap: false })
++  text(s, '5 MInutes', 7.43, 0.36, 1.03, 0.3, { fontSize: 12, bold: true, color: WHITE, align: 'center', wrap: false })
++  arrow(s, 1.59, 0.53, 1.07, 0, WHITE)
++  rect(s, 1.04, 5.94, 7.69, 1.58, WHITE)
++}
++
++// 30. Full-height orange panel left, title with two figure call-outs right
++function slide30 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 6.67, 7.5, ORANGE)
++  text(s, LOR_C, 7.64, 3.93, 4.61, 0.79, BODY)
++  text(s, 'What we do ?', 7.64, 3.37, 2.19, 0.33, { ...LABEL, color: INK, align: 'justify' })
++  text(s, TITLE, 7.64, 1.31, 4.61, 1.72, HEAD)
++  text(s, 'lorem ipsum dolor sita amet', 7.65, 5.63, 1.51, 0.56, BODY)
++  text(s, [
++    { text: '42, ', options: { align: 'justify', lineSpacing: 17, fontSize: 18, bold: true, color: INK } },
++    { text: '45 M', options: { fontSize: 12, bold: true, color: INK } }
++  ], 7.64, 5.25, 1.51, 0.34, {})
++  text(s, 'lorem ipsum dolor sita amet', 9.96, 5.63, 1.51, 0.56, BODY)
++  text(s, [
++    { text: '42, ', options: { align: 'justify', lineSpacing: 17, fontSize: 18, bold: true, color: ORANGE_L } },
++    { text: '45 M', options: { fontSize: 12, bold: true, color: ORANGE_L } }
++  ], 9.95, 5.25, 1.51, 0.34, {})
++}
++
++// 31. Orange sidebar, title, two shadowed portfolio cards
++function slide31 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0.84, 0, 3.47, 7.5, ORANGE)
++  rect(s, 9.65, 2.11, 2.84, 2.18, WHITE, { shadow: { type: 'outer', color: SHADE, opacity: 0.31, blur: 7, offset: 3, angle: 135 } })
++  rect(s, 9.65, 4.6, 2.84, 2.18, WHITE, { shadow: { type: 'outer', color: SHADE, opacity: 0.31, blur: 7, offset: 3, angle: 135 } })
++  text(s, LOR, 10.12, 3.09, 1.92, 0.56, BODY)
++  text(s, 'Portfolio One', 10.11, 2.76, 1.93, 0.33, ITEM)
++  text(s, LOR, 10.12, 5.58, 1.92, 0.56, BODY)
++  text(s, 'Portfolio Two', 10.11, 5.25, 1.93, 0.33, ITEM)
++  text(s, TITLE, 5.92, 0.5, 6.57, 1.18, HEAD)
++}
++
++// 32. Orange panel with white title, portfolio captions, corner chevron
++function slide32 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0.84, 0, 3.47, 7.5, ORANGE)
++  text(s, LOR_B + 'PLACEHOLDER', 1.36, 4.34, 2.43, 1.99, { ...BODY, color: WHITE })
++  text(s, TITLE, 1.36, 1.18, 2.43, 2.79, { ...HEAD, color: WHITE })
++  text(s, LOR, 7.58, 2.64, 1.92, 0.56, BODY)
++  text(s, 'Portfolio One', 7.57, 2.31, 1.93, 0.33, ITEM)
++  text(s, LOR, 7.59, 6.04, 1.92, 0.56, BODY)
++  text(s, 'Portfolio Two', 7.58, 5.72, 1.93, 0.33, ITEM)
++  rule(s, 12.67, 0, 0, 7.5, ORANGE_L)
++  poly(s, 10.7, 0.22, 1.5, 1.64, CORNER_CHEVRON, { fill: DARK, flipH: true, flipV: true })
++}
++
++// 33. Rotated charcoal strip, figure call-outs, orange footer pill
++function slide33 (pres) {
++  const s = pres.addSlide()
++  rect(s, 8.43, 2.6, 7.5, 2.3, DARK, { rotate: 90 })
++  text(s, 'Text here?', 0, 6.98, 5.56, 0.52, { fontSize: 14, bold: true, color: WHITE, align: 'right', valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE, margin: PILL_INSET })
++  arrow(s, 11.99, 7.01, 0.76, 0, DARK)
++  text(s, TITLE, 5.09, 1.18, 4.04, 1.72, HEAD)
++  text(s, LOR_C + ' consec tetu rasi adipis', 5.1, 3.59, 4.13, 1.03, BODY)
++  text(s, 'lorem ipsum dolor sita amet', 5.09, 5.88, 1.51, 0.56, BODY)
++  text(s, [
++    { text: '42, ', options: { align: 'justify', lineSpacing: 17, fontSize: 18, bold: true, color: INK } },
++    { text: '45 M', options: { fontSize: 12, bold: true, color: INK } }
++  ], 5.08, 5.5, 1.51, 0.34, {})
++  text(s, 'lorem ipsum dolor sita amet', 7.4, 5.88, 1.51, 0.56, BODY)
++  text(s, [
++    { text: '42, ', options: { align: 'justify', lineSpacing: 17, fontSize: 18, bold: true, color: ORANGE } },
++    { text: '45 M', options: { fontSize: 12, bold: true, color: ORANGE } }
++  ], 7.39, 5.5, 1.51, 0.34, {})
++  rule(s, 3.9, 0.63, 6.51, 0, ORANGE, { flipH: true })
++}
++
++// 34. Orange header band, centred title block, footer arrow
++function slide34 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 13.33, 1.89, ORANGE)
++  text(s, LOR_C + ' tetu rasi adipis cingesa nibuha eget justo sed gravida ', 4.2, 5.1, 4.93, 1.03, BODY)
++  text(s, 'what we do ?', 4.2, 4.44, 2.19, 0.33, { fontSize: 10.5, bold: true, color: INK, align: 'justify', lineSpacing: 17 })
++  text(s, TITLE, 4.2, 2.4, 4.93, 1.72, HEAD)
++  arrow(s, 4.34, 6.98, 1.08, 0, DARK)
++  text(s, 'about', 7.85, 6.82, 0.98, 0.33, { ...LABEL, color: INK, align: 'center' })
++}
++
++// 35. Charcoal and orange quadrants with tinted inner plates
++function slide35 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 6.67, 3.75, DARK)
++  text(s, LOR, 0.62, 6.37, 1.92, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Portfolio One', 0.6, 6.04, 1.93, 0.34, { ...LABEL, color: WHITE, align: 'justify' })
++  text(s, LOR, 4.14, 6.4, 1.92, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Portfolio Two', 4.13, 6.07, 1.93, 0.33, { ...LABEL, color: WHITE, align: 'justify' })
++  rect(s, 6.67, 3.75, 6.67, 3.75, ORANGE)
++  text(s, TITLE, 1.28, 1.02, 4.1, 1.72, { ...HEAD, color: WHITE, align: 'center' })
++  arrow(s, 7.54, 0.62, 1.06, 0, DARK)
++  text(s, 'about', 11.72, 0.45, 0.98, 0.33, { ...LABEL, color: INK, align: 'center' })
++  rect(s, 7.24, 4.11, 5.52, 3.02, { color: WHITE, transparency: 5 })
++  text(s, LOR_D, 7.96, 5.11, 4.07, 1.03, { ...BODY, align: 'center' })
++  text(s, 'about', 11.6, 6.67, 1, 0.33, { ...LABEL, color: INK, align: 'right' })
++  text(s, LOR_C + ' tetu rasi adipis cingesa nibuha eget justo sed gravida ', 7.54, 1.23, 4.93, 1.03, BODY)
++}
++
++// 36. Rotated charcoal panel, right-aligned title on a tinted plate
++function slide36 (pres) {
++  const s = pres.addSlide()
++  rect(s, -1.57, 1.57, 7.5, 4.36, DARK, { rotate: 90 })
++  rect(s, 5.6, 1.74, 6.48, 4.03, { color: WHITE, transparency: 5 })
++  text(s, TITLE, 6.34, 2.28, 5.32, 1.04, { fontFace: SERIF, fontSize: 28, bold: true, align: 'right' })
++  text(s, LOR_D, 6.34, 3.91, 5.32, 0.79, { ...BODY, align: 'right' })
++  text(s, 'about', 10.76, 5.29, 0.98, 0.33, { ...LABEL, color: INK, align: 'right' })
++  rule(s, 0.59, 0, 0, 7.5, ORANGE)
++}
++
++// 37. Angled charcoal wall over orange, two-tone headline card
++function slide37 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 13.33, 7.5, ORANGE)
++  poly(s, 0, 0, 13.33, 3.75, ANGLED_WALL, { fill: DARK, flipH: true })
++  rect(s, 2.53, 2.02, 8.27, 3.45, { color: WHITE, transparency: 5 })
++  text(s, [
++    { text: 'A satisfied customer is the ', options: { fontFace: SERIF, fontSize: 28, bold: true, color: ORANGE } },
++    { text: 'best business strategy of all', options: { fontFace: SERIF, fontSize: 28, bold: true } }
++  ], 3.02, 2.42, 5.85, 1.04, {})
++  text(s, LOR_C + ' sita', 3.02, 3.93, 3.6, 1.03, BODY)
++  arrow(s, 7.72, 4.99, 1.06, 0, DARK, { flipH: true })
++  text(s, 'Details', 9.35, 4.8, 0.98, 0.31, { fontSize: 9, bold: true, color: INK, charSpacing: 1.5, align: 'center', lineSpacing: 17 })
++}
++
++// 38. Title, "Our Service" banner and two numbered services
++function slide38 (pres) {
++  const s = pres.addSlide()
++  text(s, TITLE, 0.8, 0.87, 4.11, 1.72, HEAD)
++  text(s, LOR_A + 'PLACEHOLDER', 0.8, 2.58, 4.11, 0.79, BODY)
++  text(s, LOR, 2.38, 5.97, 2.18, 0.56, BODY)
++  text(s, 'Service One', 2.38, 5.57, 1.93, 0.34, { ...NUM, color: INK, align: 'justify' })
++  text(s, '01.', 1.47, 5.56, 0.77, 0.34, { ...NUM, color: INK, align: 'right' })
++  text(s, LOR, 5.99, 5.97, 2.18, 0.56, BODY)
++  text(s, 'Service Two', 5.99, 5.57, 1.93, 0.34, { ...NUM, color: INK, align: 'justify' })
++  text(s, '02.', 5.09, 5.56, 0.77, 0.34, { ...NUM, color: INK, align: 'right' })
++  text(s, 'Our Service', 0.94, 4.58, 7.44, 0.5, { fontFace: SERIF, fontSize: 24, bold: true, color: WHITE, shape: 'rect', fill: ORANGE, line: NOLINE })
++}
++
++// 39. Full-bleed orange with a slanted charcoal band along the bottom
++function slide39 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 13.33, 7.5, ORANGE)
++  text(s, LOR_C + ' amet consec tetu rasi adipis cingesa nibuha eget justo ', 1.16, 3.58, 5.12, 1.03, { ...BODY, color: WHITE })
++  text(s, 'what we do ?', 1.16, 3.06, 1.96, 0.33, { fontSize: 10.5, bold: true, color: WHITE, align: 'justify', lineSpacing: 17 })
++  text(s, TITLE, 1.16, 1.04, 5.12, 1.72, { ...HEAD, color: WHITE })
++  poly(s, 0, 5.67, 7.55, 1.85, SLANT_BAND, { fill: DARK, flipH: true, flipV: true })
++}
++
++// 40. Title and one service, orange footer with a rotated "Template" tab
++function slide40 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 6.28, 13.33, 1.22, ORANGE)
++  text(s, LOR_B + ' teturasanit', 1.96, 4.83, 3.65, 0.79, BODY)
++  text(s, 'Service One', 1.96, 4.43, 1.93, 0.34, { ...NUM, color: INK, align: 'justify' })
++  text(s, '01.', 1.05, 4.42, 0.77, 0.34, { ...NUM, color: INK, align: 'right' })
++  text(s, LOR_B + ' teturasanit', 1.32, 3.22, 4.28, 0.79, BODY)
++  text(s, 'what we do ?', 1.32, 2.69, 1.96, 0.33, { fontSize: 10.5, bold: true, color: INK, align: 'justify', lineSpacing: 17 })
++  text(s, TITLE, 1.32, 0.66, 4.28, 1.72, HEAD)
++  arrow(s, 1.02, 6.06, 0, 1.08, WHITE, { rotate: 270, flipV: true })
++  text(s, 'Template', 0.39, 6.85, 1.36, 0.33, { ...ITEM, color: WHITE, charSpacing: 3, align: 'center' })
++}
++
++// 41. Vertical title beside two shadowed service cards
++function slide41 (pres) {
++  const s = pres.addSlide()
++  rect(s, 3.62, 0.6, 3.66, 2.5, WHITE, { shadow: { type: 'outer', color: SHADE, opacity: 0.24, blur: 51, offset: 0, angle: 65 } })
++  text(s, LOR + ' ipsum dolor sita amet', 4.64, 1.66, 2.18, 0.79, BODY)
++  text(s, 'Service One', 4.64, 1.26, 1.93, 0.34, { ...NUM, color: INK, align: 'justify' })
++  text(s, '01.', 3.73, 1.25, 0.77, 0.34, { ...NUM, color: INK, align: 'right' })
++  rect(s, 3.62, 4.4, 3.66, 2.5, WHITE, { shadow: { type: 'outer', color: SHADE, opacity: 0.24, blur: 51, offset: 0, angle: 65 } })
++  text(s, LOR + ' ipsum dolor sita amet', 4.64, 5.45, 2.18, 0.79, BODY)
++  text(s, 'Service Two', 4.64, 5.06, 1.93, 0.34, { ...NUM, color: INK, align: 'justify' })
++  text(s, '02.', 3.73, 5.05, 0.77, 0.34, { ...NUM, color: INK, align: 'right' })
++  text(s, TITLE, 1.11, 1.26, 2.02, 3.87, HEAD)
++  rule(s, 0.59, 0, 0, 7.5, DARK)
++}
++
++// 42. Orange header band, title, three numbered services
++function slide42 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 13.33, 2.97, ORANGE)
++  text(s, LOR + ' ipsum dolor sita amet', 1.73, 5.97, 2.04, 0.79, BODY)
++  text(s, 'Service One', 1.73, 5.58, 1.81, 0.34, { ...NUM, color: INK, align: 'justify' })
++  text(s, '01.', 0.82, 5.57, 0.72, 0.34, { ...NUM, color: INK, align: 'right' })
++  text(s, LOR + ' ipsum dolor sita amet', 5.16, 5.97, 2.04, 0.79, BODY)
++  text(s, 'Service Two', 5.16, 5.58, 1.81, 0.34, { ...NUM, color: INK, align: 'justify' })
++  text(s, '02.', 4.26, 5.57, 0.72, 0.34, { ...NUM, color: INK, align: 'right' })
++  text(s, LOR + ' ipsum dolor sita amet', 8.6, 5.98, 2.04, 0.79, BODY)
++  text(s, 'Service Three', 8.6, 5.59, 1.81, 0.34, { ...NUM, color: INK, align: 'justify' })
++  text(s, '03.', 7.69, 5.58, 0.72, 0.34, { ...NUM, color: INK, align: 'right' })
++  text(s, TITLE, 1.05, 3.33, 4.28, 1.72, HEAD)
++}
++
++// 43. Coffee break — tinted plate over a translucent orange band
++function slide43 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 11.35, 3.75, { color: ORANGE, transparency: 30 })
++  rect(s, 2.71, 1.73, 7.9, 4.03, { color: WHITE, transparency: 5 })
++  text(s, LOR, 3.67, 4.78, 2.18, 0.56, BODY)
++  text(s, 'Add Title Here', 3.67, 4.42, 1.93, 0.33, { ...LABEL, align: 'justify' })
++  text(s, '01.', 2.76, 4.41, 0.77, 0.34, { ...NUM, align: 'right' })
++  text(s, 'Coffee Break!', 3.95, 2.38, 5.43, 1.11, { fontFace: SERIF, fontSize: 60, bold: true, color: DARK, align: 'center', wrap: false })
++  text(s, '5 MInutes', 9.15, 5.1, 1.03, 0.3, { fontSize: 12, bold: true, color: DARK, align: 'center', wrap: false })
++  arrow(s, 7.77, 5.27, 1.07, 0, DARK)
++}
++
++// 44. Timeline 20XX x3 — dotted arrow, orange caption tiles, rotated title
++function slide44 (pres) {
++  const s = pres.addSlide()
++  text(s, '20XX', 2.52, 1.11, 1.3, 0.38, { ...NUMXL, transparency: 20, align: 'center' })
++  rect(s, 2.7, 5.56, 2.5, 1.94, ORANGE)
++  arrow(s, 0.51, 0.45, 0, 1.08, DARK, { rotate: 180, flipV: true })
++  text(s, 'Template', 0.24, 0.83, 1.36, 0.33, { ...ITEM, color: DARK, charSpacing: 3, align: 'center', rotate: 270 })
++  text(s, TITLE, -1.34, 4.46, 4.31, 0.77, { fontFace: SERIF, fontSize: 20, bold: true, rotate: 270 })
++  text(s, 'lorem ipsum dolor sita amet consec tetu', 2.99, 6.62, 2.04, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Portfolio One', 2.99, 6.32, 1.81, 0.34, { ...NUM, color: WHITE, align: 'justify' })
++  text(s, '01.', 2.74, 5.88, 0.72, 0.34, { ...NUM, color: WHITE, align: 'right' })
++  line(s, 2.26, 0.55, 11.07, 0, { color: ORANGE, width: 4, transparency: 30, dashType: 'sysDot', endArrowType: 'triangle' }, { flipH: true })
++  text(s, '20XX', 6.16, 1.11, 1.3, 0.38, { ...NUMXL, transparency: 20, align: 'center' })
++  rect(s, 6.35, 5.56, 2.5, 1.94, ORANGE)
++  text(s, 'lorem ipsum dolor sita amet consec tetu', 6.64, 6.62, 2.04, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Portfolio Two', 6.64, 6.32, 1.81, 0.34, { ...NUM, color: WHITE, align: 'justify' })
++  text(s, '02.', 6.39, 5.88, 0.72, 0.34, { ...NUM, color: WHITE, align: 'right' })
++  text(s, '20XX', 9.81, 1.11, 1.3, 0.38, { ...NUMXL, transparency: 20, align: 'center' })
++  rect(s, 9.99, 5.56, 2.5, 1.94, ORANGE)
++  text(s, 'lorem ipsum dolor sita amet consec tetu', 10.28, 6.62, 2.04, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Portfolio Three', 10.28, 6.32, 1.92, 0.34, { ...NUM, color: WHITE, align: 'justify' })
++  text(s, '03.', 10.03, 5.88, 0.72, 0.34, { ...NUM, color: WHITE, align: 'right' })
++}
++
++// 45. Timeline 20XX x3 (continued), rotated title on the right
++function slide45 (pres) {
++  const s = pres.addSlide()
++  arrow(s, 12.12, 0.45, 0, 1.08, DARK, { rotate: 180, flipV: true })
++  text(s, 'Template', 11.85, 0.83, 1.36, 0.33, { ...ITEM, color: DARK, charSpacing: 3, align: 'center', rotate: 270 })
++  text(s, TITLE, 10.27, 4.46, 4.31, 0.77, { fontFace: SERIF, fontSize: 20, bold: true, rotate: 270 })
++  text(s, '20XX', 0.92, 1.11, 1.3, 0.38, { ...NUMXL, transparency: 20, align: 'center' })
++  rect(s, 1.1, 5.56, 2.5, 1.94, ORANGE)
++  text(s, 'lorem ipsum dolor sita amet consec tetu', 1.39, 6.62, 2.04, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Portfolio Four', 1.39, 6.32, 1.81, 0.34, { ...NUM, color: WHITE, align: 'justify' })
++  text(s, '04.', 1.14, 5.88, 0.72, 0.34, { ...NUM, color: WHITE, align: 'right' })
++  line(s, 0.04, 0.55, 11.07, 0, { color: ORANGE, width: 4, transparency: 30, dashType: 'sysDot', endArrowType: 'triangle' })
++  text(s, '20XX', 4.56, 1.11, 1.3, 0.38, { ...NUMXL, transparency: 20, align: 'center' })
++  rect(s, 4.75, 5.56, 2.5, 1.94, ORANGE)
++  text(s, 'lorem ipsum dolor sita amet consec tetu', 5.04, 6.62, 2.04, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Portfolio Five', 5.04, 6.32, 1.81, 0.34, { ...NUM, color: WHITE, align: 'justify' })
++  text(s, '05.', 4.79, 5.88, 0.72, 0.34, { ...NUM, color: WHITE, align: 'right' })
++  text(s, '20XX', 8.21, 1.11, 1.3, 0.38, { ...NUMXL, transparency: 20, align: 'center' })
++  rect(s, 8.39, 5.56, 2.5, 1.94, ORANGE)
++  text(s, 'lorem ipsum dolor sita amet consec tetu', 8.68, 6.62, 2.04, 0.56, { ...BODY, color: WHITE, align: 'justify' })
++  text(s, 'Portfolio Six', 8.68, 6.32, 1.92, 0.34, { ...NUM, color: WHITE, align: 'justify' })
++  text(s, '06.', 8.43, 5.88, 0.72, 0.34, { ...NUM, color: WHITE, align: 'right' })
++}
++
++// 46. Coffee break — orange banner with corner slashes
++function slide46 (pres) {
++  const s = pres.addSlide()
++  poly(s, 0, 1.9, 10.57, 3.7, BANNER_SLASH_2, { fill: { color: ORANGE, transparency: 5 } })
++  text(s, 'Coffee Break!', 2.57, 3.19, 5.43, 1.11, { fontFace: SERIF, fontSize: 60, bold: true, color: WHITE, align: 'center', wrap: false })
++  text(s, '5 MInutes', 9.15, 5, 1.03, 0.3, { fontSize: 12, bold: true, color: WHITE, align: 'center', wrap: false })
++  arrow(s, 7.78, 5.17, 1.07, 0, WHITE)
++}
++
++// 47. Pie chart with call-out labels and a headline figure
++function slide47 (pres) {
++  const s = pres.addSlide()
++  text(s, TITLE, 1.27, 1.39, 4.05, 1.72, HEAD)
++  // 3-D exploded pie in the reference; recreated with a native pie chart
++  s.addChart(pres.ChartType.pie, [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'],
++    values: [8.2, 3.2, 1.4, 1.2] }],
++    { x: 6.75, y: 2.36, w: 3.9, h: 3.9, chartColors: [ORANGE, GREY_M, 'BFBFBF', 'D9D9D9'],
++      dataBorder: { pt: 2, color: WHITE }, showLegend: false, showValue: false, firstSliceAng: 200 })
++  line(s, 11.24, 2.39, 0.5, 1.64, { color: GREY_L, width: 1, dashType: 'dash' }, { flipV: true })
++  line(s, 10.04, 2.39, 1.7, 0, { color: GREY_L, width: 1, dashType: 'dash' }, { flipH: true, flipV: true })
++  line(s, 8.52, 1.93, 1.03, 1.04, { color: GREY_L, width: 1, dashType: 'dash' }, { flipH: true, flipV: true })
++  line(s, 7.93, 1.95, 0.59, 0, { color: GREY_L, width: 1, dashType: 'dash' }, { flipH: true })
++  text(s, '$69M', 6.92, 0.85, 1.74, 0.57, { fontFace: MONT, fontSize: 28, bold: true, align: 'center' })
++  text(s, '58% Income', 6.87, 1.38, 1.85, 0.37, { fontSize: 16, align: 'center' })
++  line(s, 9.28, 5.2, 0.51, 0.52, { color: GREY_L, width: 1, dashType: 'dash' }, { flipH: true })
++  line(s, 8.52, 5.7, 0.76, 0, { color: GREY_L, width: 1, dashType: 'dash' }, { flipH: true, flipV: true })
++  text(s, '$25M', 7.82, 5.78, 1.74, 0.57, { fontFace: MONT, fontSize: 28, bold: true, align: 'center' })
++  text(s, '26% Income', 7.77, 6.28, 1.84, 0.37, { fontSize: 16, align: 'center' })
++  text(s, '$32M', 9.91, 1.2, 1.74, 0.57, { fontFace: MONT, fontSize: 28, bold: true, align: 'center' })
++  text(s, '28% Income', 9.88, 1.75, 1.8, 0.37, { fontSize: 16, align: 'center' })
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur.', 1.26, 5.06, 3.29, 1.05, CAPTION)
++  text(s, [
++    { text: '$87M ', options: { breakLine: true, fontFace: MONT, fontSize: 28, bold: true, color: ORANGE } },
++    { text: '70%Income', options: { fontSize: 16, color: BLACK } }
++  ], 1.26, 4.2, 3.18, 0.84, {})
++  line(s, 1.39, 3.62, 1.99, 0, { color: ORANGE, width: 4 })
++}
++
++// 48. Column chart with icon markers and three figure rows
++function slide48 (pres) {
++  const s = pres.addSlide()
++  text(s, TITLE, 6.77, 1.06, 5.54, 1.18, HEAD)
++  s.addChart(pres.ChartType.bar, [{ name: 'Series 1',
++    labels: ['Best Data One', 'Best Data Two', 'Best Data Three'], values: [32, 28, 25] }],
++    { x: 1.02, y: 0.919, w: 4.957, h: 6.488, chartColors: [GREY, ORANGE, GREY],
++      barDir: 'col', barGapWidthPct: 80, showLegend: false, showValue: false,
++      catAxisHidden: true, valAxisMaxVal: 35, valAxisLineShow: false,
++      valAxisLabelColor: GREY, valAxisLabelFontFace: SANS, valAxisLabelFontSize: 12,
++      valGridLine: { color: 'D9D9D9', style: 'solid', size: 1 } })
++  shape(s, 'roundRect', 1.88, 1.18, 0.64, 0.64, WHITE, { rectRadius: 0.257, shadow: { type: 'outer', color: SHADE, opacity: 0.15, blur: 39, offset: 29, angle: 45 } })
++  shape(s, 'roundRect', 4.79, 2.39, 0.64, 0.64, WHITE, { rectRadius: 0.257, shadow: { type: 'outer', color: SHADE, opacity: 0.15, blur: 39, offset: 29, angle: 45 } })
++  shape(s, 'roundRect', 3.33, 1.88, 0.64, 0.64, WHITE, { rectRadius: 0.257, shadow: { type: 'outer', color: SHADE, opacity: 0.15, blur: 39, offset: 29, angle: 45 } })
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', 8.3, 3.21, 3.45, 0.56, CAPTION)
++  text(s, '11/04/2022 Type', 8.3, 2.84, 3.45, 0.37, { fontSize: 16, bold: true, color: BLACK })
++  text(s, [
++    { text: '32', options: { fontFace: MONT, fontSize: 36, color: DARK } },
++    { text: 'M', options: { fontFace: MONT, fontSize: 24, color: DARK } }
++  ], 6.77, 2.83, 1.42, 0.71, {})
++  text(s, 'Sales !', 6.77, 3.41, 1.42, 0.37, { fontSize: 16, color: BLACK })
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', 8.3, 4.54, 3.45, 0.56, CAPTION)
++  text(s, '11/04/2022 Type', 8.3, 4.17, 3.45, 0.37, { fontSize: 16, bold: true, color: ORANGE })
++  text(s, [
++    { text: '28', options: { fontFace: MONT, fontSize: 36, color: ORANGE } },
++    { text: 'M', options: { fontFace: MONT, fontSize: 24, color: ORANGE } }
++  ], 6.77, 4.16, 1.42, 0.71, {})
++  text(s, 'Rewards', 6.77, 4.74, 1.42, 0.37, { fontSize: 16, color: BLACK })
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.', 8.3, 5.88, 3.45, 0.56, CAPTION)
++  text(s, '11/04/2022 Type', 8.3, 5.51, 3.45, 0.37, { fontSize: 16, bold: true, color: BLACK })
++  text(s, [
++    { text: '25', options: { fontFace: MONT, fontSize: 36, color: DARK } },
++    { text: 'M', options: { fontFace: MONT, fontSize: 24, color: DARK } }
++  ], 6.77, 5.5, 1.42, 0.71, {})
++  text(s, 'Sales !', 6.77, 6.08, 1.42, 0.37, { fontSize: 16, color: BLACK })
++  imageBox(s, 2, 1.3, 0.4, 0.4)
++  imageBox(s, 3.44, 1.99, 0.41, 0.41)
++  imageBox(s, 4.89, 2.49, 0.45, 0.45)
++}
++
++// 49. Triangle bar chart with a legend and a list panel
++function slide49 (pres) {
++  const s = pres.addSlide()
++  rect(s, 9.07, 5.34, 4.26, 2.16, ORANGE)
++  text(s, 'lorem ipsum dolor sita amet consec tetu', 9.43, 6.42, 3.54, 0.32, { ...BODY, color: WHITE, align: 'center' })
++  text(s, 'what we do?', 10.3, 6.06, 1.81, 0.32, { fontSize: 10.5, bold: true, color: WHITE, align: 'center', lineSpacing: 17 })
++  text(s, TITLE, 0.61, 0.45, 5.73, 1.18, HEAD)
++  shape(s, 'rtTriangle', 6.96, 4.27, 0.88, 2.16, '606060', { line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  shape(s, 'rtTriangle', 6.08, 4.27, 0.88, 2.16, '606060', { flipH: true, line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  triangle(s, 5.25, 5.98, 1.71, 0.45, DARK, 0.557)
++  shape(s, 'rtTriangle', 5.47, 3.51, 0.88, 2.92, 'E5886B', { line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  shape(s, 'rtTriangle', 4.59, 3.51, 0.88, 2.92, 'E5886B', { flipH: true, line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  triangle(s, 3.76, 5.98, 1.71, 0.45, SALMON, 0.557)
++  shape(s, 'rtTriangle', 3.98, 4.27, 0.88, 2.16, '606060', { line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  shape(s, 'rtTriangle', 3.11, 4.27, 0.88, 2.16, '606060', { flipH: true, line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  triangle(s, 2.27, 5.98, 1.71, 0.45, DARK, 0.594)
++  shape(s, 'rtTriangle', 2.49, 4.85, 0.88, 1.58, 'E5886B', { line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  shape(s, 'rtTriangle', 1.62, 4.85, 0.88, 1.58, 'E5886B', { flipH: true, line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  triangle(s, 0.78, 5.98, 1.71, 0.45, SALMON_D, 0.632)
++  rect(s, 0.88, 6.55, 0.2, 0.2, AMBER, { line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  text(s, 'Lorem ipsum', 1.08, 6.49, 1.31, 0.32, CAPTION)
++  rect(s, 2.64, 6.55, 0.2, 0.2, DARK, { line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  text(s, 'Lorem ipsum', 2.85, 6.49, 1.31, 0.32, CAPTION)
++  rect(s, 4.57, 6.55, 0.2, 0.2, AMBER, { line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  text(s, 'Lorem ipsum', 4.78, 6.49, 1.31, 0.32, CAPTION)
++  rect(s, 6.41, 6.55, 0.2, 0.2, DARK, { line: { color: WHITE, width: 3 }, shadow: { type: 'outer', color: SHADE, opacity: 0.1, blur: 63, offset: 43, angle: 45 } })
++  text(s, 'Lorem ipsum', 6.61, 6.49, 1.31, 0.32, CAPTION)
++  text(s, '80', 2.38, 3.48, 1.27, 0.71, { fontFace: MONT, fontSize: 36, color: SALMON_D })
++  text(s, 'Sales !', 2.38, 4, 1.27, 0.37, { fontSize: 16, color: BLACK })
++  text(s, '95', 3.87, 2.9, 1.27, 0.71, { fontFace: MONT, fontSize: 36, color: DARK })
++  text(s, 'Sales !', 3.87, 3.42, 1.27, 0.37, { fontSize: 16, color: BLACK })
++  text(s, '120', 5.38, 2.11, 1.27, 0.71, { fontFace: MONT, fontSize: 36, color: SALMON_D })
++  text(s, 'Sales !', 5.38, 2.63, 1.27, 0.37, { fontSize: 16, color: BLACK })
++  text(s, '95', 6.87, 2.91, 1.27, 0.71, { fontFace: MONT, fontSize: 36, color: DARK })
++  text(s, 'Sales !', 6.87, 3.43, 1.27, 0.37, { fontSize: 16, color: BLACK })
++  line(s, 2.49, 4.47, 0, 0.45, { color: GREY_L, width: 1, dashType: 'dash', endArrowType: 'oval' }, { flipV: true })
++  line(s, 3.98, 3.9, 0, 0.44, { color: GREY_L, width: 1, dashType: 'dash', endArrowType: 'oval' }, { flipV: true })
++  line(s, 5.48, 3.11, 0, 0.44, { color: GREY_L, width: 1, dashType: 'dash', endArrowType: 'oval' }, { flipV: true })
++  line(s, 6.97, 3.89, 0, 0.46, { color: GREY_L, width: 1, dashType: 'dash', endArrowType: 'oval' }, { flipV: true })
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. ', 9.07, 1.56, 3.42, 0.93, { fontSize: 14, lineSpacingMultiple: 1.2 })
++  text(s, [
++    { text: 'Lorem ipsum dolor', options: { lineSpacingMultiple: 1.2, bullet: { type: 'number', style: 'arabicPeriod', indent: 18 }, breakLine: true, fontSize: 12 } },
++    { text: 'Sit amet.', options: { lineSpacingMultiple: 1.2, bullet: { type: 'number', style: 'arabicPeriod', indent: 18 }, breakLine: true, fontSize: 12 } },
++    { text: 'Qui sint neque', options: { lineSpacingMultiple: 1.2, bullet: { type: 'number', style: 'arabicPeriod', indent: 18 }, breakLine: true, fontSize: 12 } },
++    { text: 'Quo numquam', options: { lineSpacingMultiple: 1.2, bullet: { type: 'number', style: 'arabicPeriod', indent: 18 }, fontSize: 12 } }
++  ], 9.07, 3.49, 2.3, 1.05, {})
++  text(s, 'List title here', 9.07, 3.12, 2.3, 0.37, { fontSize: 16, bold: true })
++  poly(s, 11.83, -0.01, 1.5, 1.64, CORNER_CHEVRON, { fill: DARK, flipH: true, flipV: true })
++}
++
++// 50. Tablet mockup, title, and a four-item value list on a grey panel
++function slide50 (pres) {
++  const s = pres.addSlide()
++  imageBox(s, -1.02, 0.71, 4.38, 6.19)
++  rect(s, 9.06, 0, 4.27, 7.5, SILVER)
++  text(s, TITLE, 4.6, 1.41, 3.21, 2.26, HEAD)
++  text(s, LOR_B + ' teturasanit sed gravida ', 4.6, 5.06, 3.01, 1.03, BODY)
++  text(s, 'what we do ?', 4.6, 4.53, 1.96, 0.33, { fontSize: 10.5, bold: true, color: INK, align: 'justify', lineSpacing: 17 })
++  shape(s, 'ellipse', 9.83, 1.64, 0.17, 0.17, DARK)
++  text(s, 'lorem ipsum dolor sita', 10.49, 1.88, 1.93, 0.32, BODY)
++  text(s, [
++    { text: '54, 66 ', options: LABEL },
++    { text: 'Value', options: { fontSize: 11, bold: true } }
++  ], 10.49, 1.48, 1.93, 0.33, {})
++  shape(s, 'ellipse', 9.83, 2.93, 0.17, 0.17, ORANGE_L)
++  text(s, 'lorem ipsum dolor sita', 10.49, 3.16, 1.93, 0.32, BODY)
++  text(s, [
++    { text: '54, 66 ', options: LABEL },
++    { text: 'Value', options: { fontSize: 11, bold: true } }
++  ], 10.49, 2.77, 1.93, 0.33, {})
++  shape(s, 'ellipse', 9.83, 4.18, 0.17, 0.17, GREY_M)
++  text(s, 'lorem ipsum dolor sita', 10.49, 4.42, 1.93, 0.32, BODY)
++  text(s, [
++    { text: '54, 66 ', options: LABEL },
++    { text: 'Value', options: { fontSize: 11, bold: true } }
++  ], 10.49, 4.02, 1.93, 0.33, {})
++  shape(s, 'ellipse', 9.83, 5.44, 0.17, 0.17, GREY_L)
++  text(s, 'lorem ipsum dolor sita', 10.49, 5.68, 1.93, 0.32, BODY)
++  text(s, [
++    { text: '54, 66 ', options: LABEL },
++    { text: 'Value', options: { fontSize: 11, bold: true } }
++  ], 10.49, 5.28, 1.93, 0.33, {})
++}
++
++// 51. Laptop mockup, title, orange pill and a 2x2 value list
++function slide51 (pres) {
++  const s = pres.addSlide()
++  imageBox(s, -1.15, 2.47, 6.77, 4.15)
++  shape(s, 'ellipse', 6.09, 4.27, 0.17, 0.17, DARK)
++  text(s, 'lorem ipsum dolor sita', 6.75, 4.51, 1.93, 0.32, BODY)
++  text(s, [
++    { text: '54, 66 ', options: { ...LABEL, align: 'justify', color: DARK } },
++    { text: 'Value', options: { fontSize: 11, bold: true, color: DARK } }
++  ], 6.75, 4.11, 1.93, 0.33, {})
++  shape(s, 'ellipse', 6.09, 5.56, 0.17, 0.17, ORANGE)
++  text(s, 'lorem ipsum dolor sita', 6.75, 5.79, 1.93, 0.32, BODY)
++  text(s, [
++    { text: '54, 66 ', options: { ...LABEL, align: 'justify', color: DARK } },
++    { text: 'Value', options: { fontSize: 11, bold: true, color: DARK } }
++  ], 6.75, 5.4, 1.93, 0.33, {})
++  shape(s, 'ellipse', 9.52, 4.27, 0.17, 0.17, DARK)
++  text(s, 'lorem ipsum dolor sita', 10.18, 4.51, 1.93, 0.32, BODY)
++  text(s, [
++    { text: '54, 66 ', options: LABEL },
++    { text: 'Value', options: { fontSize: 11, bold: true } }
++  ], 10.18, 4.11, 1.93, 0.33, {})
++  shape(s, 'ellipse', 9.52, 5.56, 0.17, 0.17, ORANGE)
++  text(s, 'lorem ipsum dolor sita', 10.18, 5.79, 1.93, 0.32, BODY)
++  text(s, [
++    { text: '54, 66 ', options: LABEL },
++    { text: 'Value', options: { fontSize: 11, bold: true } }
++  ], 10.18, 5.4, 1.93, 0.33, {})
++  text(s, LOR_B + ' teturasanit sed gravida ', 6.09, 2.98, 6.02, 0.56, BODY)
++  text(s, 'what we do ?', 6.09, 2.54, 1.93, 0.33, { fontSize: 10.5, bold: true, color: INK, align: 'justify', lineSpacing: 17 })
++  text(s, TITLE, 0.94, 0.88, 6.77, 1.18, HEAD)
++  text(s, 'Text here?', 8.47, 1.21, 5.58, 0.52, { fontSize: 14, bold: true, color: WHITE, valign: 'middle', shape: 'rect', fill: ORANGE, line: NOLINE, margin: PILL_INSET })
++}
++
++// 52. Closing "Thanks" — layered orange plates on charcoal
++function slide52 (pres) {
++  const s = pres.addSlide()
++  rect(s, 0, 0, 6.26, 7.5, DARK)
++  poly(s, 0.68, 0.43, 11.98, 6.64, BANNER_SLASH_2, { fill: { color: ORANGE, transparency: 30 } })
++  text(s, 'Thanks', 3.78, 2.73, 5.77, 2.04, { fontFace: SERIF, fontSize: 115, bold: true, color: WHITE, align: 'center', wrap: false })
++  text(s, 'Presentation Template', 9.86, 6.49, 2.52, 0.29, { fontSize: 11, color: WHITE, charSpacing: 1.9, align: 'center', wrap: false })
++  text(s, 'Template', 0.95, 6.49, 1.34, 0.34, { ...TAG, color: WHITE })
++  line(s, 1.04, 6.22, 1.06, 0, { color: WHITE, width: 2.25, endArrowType: 'triangle' }, { flipH: true })
++}
++
++// ---------------------------------------------------------------- assembly
++const SLIDES = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++  slide31, slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
++  slide41, slide42, slide43, slide44, slide45, slide46, slide47, slide48, slide49, slide50,
++  slide51, slide52
++]
++
++function build () {
++  const pres = new PptxGenJS()
++  pres.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 })
++  pres.layout = 'WIDE'
++  pres.theme = { headFontFace: SERIF, bodyFontFace: SANS }
++  pres.title = 'Food & Nutrition'
++
++  SLIDES.forEach(fn => fn(pres))
++  return pres
++}
++
++build().writeFile({ fileName: path.join(__dirname, '0f33cc07-3561-4eac-b0ef-caa424ec2db2_grok_final.pptx') })
++  .then(f => console.log('wrote ' + f))
++  .catch(err => { console.error(err); process.exit(1) })

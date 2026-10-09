@@ -1,0 +1,1318 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/industrial_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/industrial_company_profile.js
+@@ -0,0 +1,1315 @@
++/**
++ * Rebuild of the "INDUSTRIAL" 51-slide presentation template with pptxgenjs.
++ * Photographs from the original deck are replaced by flat placeholder blocks;
++ * every other element (text, vector icon, chart, colour band) is drawn natively.
++ *
++ *   node <this file>   ->  writes the .pptx next to this script
++ */
++'use strict';
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const NAVY = '193D5A', GOLD = 'FFAD00', WHITE = 'FFFFFF', GREY = '808080',
++      LGREY = 'D9D9D9', PGREY = 'F2F2F2', DGREY = '595959', MAROON = '760000',
++      INK = '002060', AMBER = 'FFC000', SILVER = 'BFBFBF';
++const MONT = 'Montserrat', LATO = 'Lato', LATOB = 'Lato Black', MERRI = 'Merriweather';
++
++/* -------------------------------------------------- primitive shape helpers */
++// Every helper takes (slide, x, y, w, h, ...) in inches.
++// Option keys: rot (deg), fh/fv (flip), lc/lw (line colour / width in pt).
++function xf(o) {
++  const r = {};
++  if (o.rot) r.rotate = o.rot;
++  if (o.fh) r.flipH = true;
++  if (o.fv) r.flipV = true;
++  return r;
++}
++function box(x, y, w, h, o) { return Object.assign({ x, y, w, h }, xf(o || {})); }
++function paint(c, o) {
++  const r = {};
++  r.fill = c ? { color: c } : { type: 'none' };
++  if (c && o && o.a) r.fill.transparency = o.a;
++  r.line = (o && o.lc) ? { color: o.lc, width: o.lw || 1 } : { type: 'none' };
++  return r;
++}
++function shape(s, kind, x, y, w, h, c, o) {
++  o = o || {};
++  s.addShape(kind, Object.assign(box(x, y, w, h, o), paint(c, o)));
++}
++const R   = (s, x, y, w, h, c, o) => shape(s, 'rect', x, y, w, h, c, o);
++const O   = (s, x, y, w, h, c, o) => shape(s, 'ellipse', x, y, w, h, c, o);
++const TRI = (s, x, y, w, h, c, o) => shape(s, 'triangle', x, y, w, h, c, o);
++const RT  = (s, x, y, w, h, c, o) => shape(s, 'rtTriangle', x, y, w, h, c, o);
++const BRK = (s, x, y, w, h, c, o) => shape(s, 'leftBracket', x, y, w, h, c, o);
++
++// straight connector; h===0 -> horizontal rule, w===0 -> vertical rule
++function L(s, x, y, w, h, c, pt, o) {
++  s.addShape('line', Object.assign(box(x, y, w, h, o || {}),
++    { line: { color: c, width: pt } }));
++}
++
++// free-form polygon; pts are integer percentages of the bounding box
++function poly(s, pts, x, y, w, h, c, o) {
++  const p = [];
++  pts.forEach((q, i) => {
++    p.push({ x: (q[0] / 100) * w, y: (q[1] / 100) * h, moveTo: i === 0 });
++  });
++  p.push({ close: true });
++  s.addShape('custGeom', Object.assign(box(x, y, w, h, o || {}),
++    paint(c, o), { points: p }));
++}
++
++/* --------------------------------------------------------------- icon library
++ * Each icon is a list of closed sub-paths in a 0..100 square; the first
++ * sub-path is the outline, the rest are holes (even-odd fill). */
++const ICONS = {
++  tw: [[[84,8],[61,2],[45,31],[7,7],[12,38],[3,37],[5,44],[19,60],[12,62],[15,69],[28,77],[0,90],[36,100],[64,89],[84,59],[88,25],[100,13],[89,15],[98,3]]],
++  fb: [[[60,0],[27,10],[23,31],[0,31],[0,51],[23,51],[23,100],[63,100],[63,51],[99,51],[99,31],[63,31],[63,19],[100,16],[100,0]]],
++  ig: [[[24,0],[7,7],[0,24],[1,82],[24,100],[79,100],[97,88],[99,18],[76,0]],[[24,10],[87,15],[90,76],[85,87],[24,90],[13,85],[10,22],[24,10]],[[50,24],[32,32],[24,50],[32,68],[50,76],[68,68],[76,50],[68,32],[50,24]],[[50,32],[63,37],[68,50],[63,63],[50,68],[37,63],[32,50],[37,37],[50,32]],[[77,17],[70,24],[77,31],[83,24],[77,17]]],
++  crane: [[[32,0],[27,9],[0,26],[2,29],[22,29],[22,86],[9,86],[8,98],[11,100],[62,100],[64,97],[63,86],[42,86],[42,29],[66,29],[66,48],[52,50],[53,72],[83,72],[86,70],[86,50],[71,48],[71,29],[98,29],[100,26],[36,9],[32,0]],[[57,53],[81,53],[81,67],[57,67]],[[13,91],[59,91],[59,95],[13,95]],[[38,15],[77,24],[41,24]],[[27,55],[36,68],[27,81]],[[37,34],[37,60],[27,47]]],
++  mixer: [[[15,0],[3,23],[8,29],[8,62],[0,64],[1,89],[8,89],[12,97],[17,100],[23,98],[28,89],[65,88],[74,88],[81,99],[89,98],[94,88],[99,88],[100,86],[100,53],[91,34],[91,26],[62,26],[61,62],[28,62],[12,42],[12,28],[22,7],[15,0]],[[31,9],[23,11],[15,30],[16,38],[21,48],[30,56],[38,60],[48,59],[54,54],[58,47],[57,31],[47,15],[31,9]],[[66,30],[87,30],[87,36],[96,55],[96,83],[89,75],[84,73],[78,76],[75,83],[66,83],[65,64]],[[4,67],[61,67],[61,84],[28,84],[24,76],[18,73],[11,77],[8,84],[4,84]],[[31,14],[40,17],[48,24],[33,52],[23,43],[19,31],[26,16],[31,14]],[[70,34],[68,36],[68,59],[91,59],[92,56],[82,34]]],
++  hammer: [[[24,0],[0,23],[2,44],[16,35],[82,100],[91,88],[27,23],[37,13],[24,0]],[[76,0],[63,13],[73,23],[52,44],[62,56],[84,35],[98,44],[100,23],[76,0]],[[24,26],[87,89],[81,95],[19,32]],[[37,60],[8,88],[18,100],[48,71],[37,60]],[[76,5],[96,25],[94,39],[69,13]],[[24,5],[31,13],[6,39],[4,25]]],
++  saw: [[[81,0],[0,63],[32,100],[57,82],[57,72],[65,69],[63,62],[71,61],[70,53],[78,51],[77,43],[85,42],[84,34],[92,32],[91,24],[100,22],[81,0]],[[81,5],[93,20],[87,21],[88,29],[80,31],[81,38],[73,40],[74,48],[66,50],[67,57],[59,59],[60,67],[52,69],[54,75],[28,47]],[[25,49],[52,80],[33,95],[5,64]],[[23,57],[15,61],[14,70],[29,86],[39,86],[43,74],[23,57]],[[24,61],[39,76],[36,82],[31,82],[19,69],[24,61]]],
++  tools: [[[81,0],[67,6],[62,14],[62,23],[23,62],[12,62],[3,69],[0,79],[2,87],[5,87],[16,76],[24,84],[13,95],[13,99],[23,100],[32,95],[38,88],[38,77],[77,38],[88,38],[97,31],[100,21],[98,13],[95,13],[84,24],[76,16],[88,4],[86,1],[81,0]],[[78,6],[70,17],[84,30],[94,21],[92,28],[85,33],[74,34],[34,74],[32,87],[21,94],[30,83],[16,70],[6,79],[8,72],[15,67],[26,66],[66,26],[68,13],[78,6]],[[69,54],[54,70],[62,77],[62,86],[67,94],[75,99],[86,99],[87,95],[76,84],[84,76],[98,87],[99,74],[92,65],[77,62],[69,54]],[[19,0],[14,1],[12,4],[24,16],[16,24],[2,13],[1,25],[8,35],[23,38],[32,46],[46,31],[38,23],[34,7],[19,0]],[[69,61],[75,67],[89,69],[94,79],[82,70],[70,83],[79,94],[76,94],[68,87],[67,75],[61,69]],[[22,6],[31,11],[33,25],[39,31],[31,39],[25,33],[16,33],[10,30],[6,21],[17,30],[30,18],[30,14]]],
++  worker: [[[50,0],[32,5],[22,14],[18,23],[10,25],[11,28],[18,28],[23,42],[37,51],[0,72],[2,100],[47,99],[48,73],[39,52],[61,52],[52,73],[53,99],[100,98],[100,72],[63,51],[76,42],[82,28],[89,28],[90,25],[82,23],[78,14],[68,5],[50,0]],[[24,28],[76,28],[68,43],[50,48],[32,43],[24,28]],[[50,5],[67,10],[76,23],[24,23],[33,10],[50,5]],[[65,58],[81,67],[78,78],[59,78],[59,74]],[[35,58],[41,78],[22,78],[19,67]],[[86,70],[94,75],[94,95],[83,95],[86,70]]],
++  gear: [[[43,0],[41,15],[31,19],[19,10],[9,21],[19,31],[15,41],[0,43],[0,58],[15,59],[19,69],[10,80],[21,91],[31,81],[41,85],[43,100],[58,100],[59,85],[69,81],[80,90],[91,79],[81,69],[85,59],[100,57],[100,42],[85,41],[81,31],[90,20],[79,9],[69,19],[59,15],[57,0]],[[45,4],[55,4],[55,18],[69,23],[79,14],[86,21],[77,31],[82,44],[96,45],[96,55],[82,55],[77,69],[86,79],[79,86],[69,77],[56,82],[55,96],[45,96],[45,82],[31,77],[21,86],[14,79],[23,69],[18,56],[4,55],[4,45],[18,44],[23,30],[14,21],[21,14],[31,23],[45,16]],[[50,30],[36,36],[30,50],[36,64],[50,70],[64,64],[70,50],[64,36],[50,30]],[[50,35],[61,39],[65,50],[61,61],[50,65],[39,61],[35,50],[39,39],[50,35]]],
++  flame: [[[51,0],[39,21],[6,49],[0,67],[5,81],[14,90],[32,97],[54,100],[72,97],[88,91],[97,82],[99,71],[92,56],[69,46],[65,49],[73,61],[71,70],[60,73],[48,68],[48,59],[64,39],[67,28],[62,12],[51,0]],[[53,9],[59,19],[61,30],[57,40],[42,58],[43,70],[55,77],[72,75],[79,66],[74,53],[88,60],[93,71],[91,80],[82,89],[68,94],[51,96],[34,93],[18,87],[8,77],[6,65],[13,49],[43,24],[53,9]],[[78,7],[75,9],[79,21],[78,30],[69,41],[80,46],[91,46],[99,40],[99,31],[91,18],[78,7]],[[83,18],[94,34],[93,39],[87,42],[77,40],[83,32],[83,18]]],
++  truck: [[[3,0],[0,3],[1,88],[8,89],[12,97],[18,100],[25,97],[28,89],[74,88],[78,97],[85,100],[91,96],[94,88],[100,85],[100,49],[91,29],[91,20],[66,19],[66,3],[63,0]],[[5,7],[61,7],[61,22],[61,58],[5,58]],[[66,26],[86,26],[95,51],[95,81],[89,73],[84,70],[78,74],[74,81],[66,81],[66,62]],[[5,65],[61,65],[61,82],[28,82],[24,73],[18,70],[11,74],[8,82],[5,82]],[[70,29],[67,32],[68,56],[90,57],[92,52],[82,29]],[[72,36],[81,36],[86,50],[72,50]]],
++  cog: [[[29,4],[32,15],[21,24],[11,18],[3,33],[13,38],[11,52],[0,55],[4,71],[15,68],[24,79],[18,89],[33,97],[38,87],[52,89],[55,100],[71,96],[68,85],[79,76],[89,82],[97,67],[87,62],[89,48],[100,45],[96,29],[85,32],[76,21],[82,11],[67,3],[62,13],[48,11],[45,0]]],
++  phone: [[[21,0],[33,29],[27,45],[62,74],[73,63],[100,76],[89,95],[57,96],[10,54],[1,19],[21,0]]],
++  pin: [[[50,0],[15,10],[0,35],[5,50],[50,100],[94,52],[100,35],[85,10],[50,0]],[[50,22],[65,27],[68,37],[59,46],[45,48],[32,33],[50,22]]],
++  mail: [[[1,8],[0,88],[10,100],[96,97],[99,8],[47,66]],[[10,0],[50,55],[90,0]]],
++  web: [[[47,0],[32,16],[26,46],[47,47]],[[53,53],[53,100],[68,84],[74,54]],[[67,3],[80,47],[100,47],[90,20],[67,3]],[[0,53],[10,80],[33,97],[20,53]],[[26,53],[32,84],[46,100],[47,53]],[[54,0],[53,47],[74,47],[68,16],[54,0]]],
++  notch: [[[0,0],[79,0],[81,39],[85,71],[91,92],[97,99],[100,100],[21,100],[14,96],[9,86],[3,61],[0,0]]],
++  tri: [[[100,100],[50,0],[0,100]]],
++  qtrA: [[[13,0],[13,17],[4,20],[1,25],[0,30],[1,35],[4,40],[13,42],[13,59],[26,63],[37,72],[45,85],[48,100],[59,100],[64,90],[74,85],[84,90],[89,100],[100,100],[99,87],[93,61],[88,50],[74,30],[56,14],[46,8],[25,1],[13,0]]],
++  qtrB: [[[100,0],[87,1],[61,7],[50,12],[30,26],[14,44],[8,54],[1,75],[0,87],[17,87],[20,96],[25,99],[30,100],[35,99],[40,96],[42,87],[59,87],[63,74],[72,63],[85,55],[100,52],[100,41],[90,36],[85,26],[90,16],[100,11]]],
++  qtrC: [[[70,0],[65,1],[60,4],[58,13],[41,13],[37,26],[32,34],[24,40],[11,47],[0,48],[0,59],[10,64],[15,74],[10,84],[0,89],[0,100],[26,97],[50,88],[70,74],[86,56],[96,36],[100,13],[83,13],[80,4],[75,1],[70,0]]],
++  qtrD: [[[0,0],[1,13],[7,39],[12,50],[26,70],[44,86],[54,92],[75,99],[87,100],[87,83],[96,80],[99,75],[100,70],[99,65],[96,60],[87,58],[87,41],[74,37],[63,28],[55,15],[52,0],[41,0],[36,10],[26,15],[16,10],[11,0]]],
++  factory: [[[39,0],[56,0],[56,44],[72,42],[72,0],[88,0],[88,39],[100,37],[100,100],[0,100],[0,52]],[[12,66],[23,66],[23,75],[12,75]],[[33,66],[45,66],[45,75],[33,75]],[[55,66],[67,66],[67,75],[55,75]],[[77,66],[88,66],[88,75],[77,75]]],
++  chartUp: [[[0,0],[7,0],[7,93],[100,93],[100,100],[0,100]],[[88,13],[96,20],[57,58],[38,42],[15,84],[7,79],[36,28],[56,45]]]
++};
++function I(s, name, x, y, w, h, c, o) {
++  o = o || {};
++  const pts = [];
++  ICONS[name].forEach(sub => {
++    sub.forEach((q, i) => pts.push({ x: (q[0] / 100) * w, y: (q[1] / 100) * h, moveTo: i === 0 }));
++    pts.push({ close: true });
++  });
++  s.addShape('custGeom', Object.assign(box(x, y, w, h, o), paint(c, o), { points: pts }));
++}
++
++/* ------------------------------------------------------------ text placement
++ * T(slide, text, x, y, w, h, opts) where text is a string or an array of runs.
++ * Run/opt keys: f font, sz size(pt), b bold, i italic, c colour, sp charSpacing,
++ * al align (l|c|r|j), ls line-spacing multiple, br break after, v valign, nw nowrap. */
++const ALIGN = { l: 'left', c: 'center', r: 'right', j: 'justify' };
++const VALIGN = { m: 'middle', b: 'bottom' };
++function runOpts(o) {
++  const r = {};
++  if (o.f) r.fontFace = o.f;
++  if (o.sz) r.fontSize = o.sz;
++  if (o.b) r.bold = true;
++  if (o.i) r.italic = true;
++  if (o.c) r.color = o.c;
++  if (o.sp) r.charSpacing = o.sp;
++  if (o.al) r.align = ALIGN[o.al];
++  if (o.ls) r.lineSpacingMultiple = o.ls;
++  if (o.br) r.breakLine = true;
++  return r;
++}
++function T(s, txt, x, y, w, h, o) {
++  o = o || {};
++  const base = Object.assign(runOpts(o), box(x, y, w, h, o), {
++    valign: VALIGN[o.v] || 'top', wrap: !o.nw,
++    fontFace: o.f || LATO, fontSize: o.sz || 18, color: o.c || GREY,
++  });
++  if (!o.al) base.align = 'left';
++  const body = Array.isArray(txt)
++    ? txt.map(r => ({ text: r.t, options: runOpts(r) }))
++    : txt;
++  s.addText(body, base);
++}
++
++/* ------------------------------------------------------------ shared styles */
++const BODY    = { f: LATO, sz: 11, c: GREY, al: 'j', ls: 1.5 };  // justified body copy
++const BODYC   = { f: LATO, sz: 11, c: GREY, al: 'c', ls: 1.5 };
++const BODYL   = { f: LATO, sz: 11, c: GREY, ls: 1.5 };
++const NOTE    = { f: LATO, sz: 11, c: GREY };
++const FOOT    = { f: LATO, sz: 11, c: GREY, al: 'r' };
++const KICKER  = { f: MONT, sz: 14, b: 1, c: NAVY, sp: 6, al: 'c', nw: 1 };
++const SUBHEAD = { f: MONT, sz: 16, b: 1, c: NAVY };
++const H1      = { f: MONT, sz: 36, b: 1, c: NAVY };
++const H2      = { f: MONT, sz: 32, b: 1, c: NAVY };
++// TS = T with a named style preset, plus per-call overrides
++function TS(s, txt, x, y, w, h, style, over) {
++  T(s, txt, x, y, w, h, Object.assign({}, style, over || {}));
++}
++
++/* ------------------------------------------------------- recurring furniture */
++// three stacked bars ("hamburger") in the top-right corner
++function menu(s, c) {
++  [[0.625, 0], [0.498, 0.117], [0.625, 0.238]].forEach(([w, dy]) =>
++    L(s, 12.676, 0.355 + dy, w * 0.568, 0, c, 3.75));
++}
++// twitter / facebook / instagram in a horizontal row of width w
++function socialRow(s, x, cy, w, c) {
++  const k = w / 1.335;
++  I(s, 'tw', x,                 cy - 0.092 * k, 0.229 * k, 0.184 * k, c);
++  I(s, 'fb', x + 0.677 * k,     cy - 0.119 * k, 0.114 * k, 0.239 * k, c);
++  I(s, 'ig', x + 1.145 * k,     cy - 0.094 * k, 0.190 * k, 0.187 * k, c);
++}
++// same three icons stacked vertically over height h
++function socialCol(s, cx, y, h, c) {
++  const k = h / 1.312;
++  I(s, 'ig', cx - 0.095 * k, y,               0.190 * k, 0.187 * k, c);
++  I(s, 'fb', cx - 0.057 * k, y + 0.538 * k,   0.114 * k, 0.239 * k, c);
++  I(s, 'tw', cx - 0.115 * k, y + 1.127 * k,   0.229 * k, 0.184 * k, c);
++}
++// three small gold dots used as a rule under headings
++function dots(s, x, y, span) {
++  for (let i = 0; i < 3; i++) O(s, x + (i * span) / 2, y, 0.117, 0.117, GOLD);
++}
++// gold pill with left/right navigation triangles
++function navPill(s, x, y) {
++  R(s, x, y, 1.264, 0.528, GOLD);
++  TRI(s, x + 0.213, y + 0.21, 0.094, 0.109, NAVY, { rot: 270 });
++  TRI(s, x + 0.943, y + 0.21, 0.094, 0.109, NAVY, { rot: 90 });
++}
++// bare up/down carets (no pill)
++function caretPair(s, x, y, c) {
++  TRI(s, x, y, 0.109, 0.094, c);
++  TRI(s, x, y + 0.536, 0.109, 0.094, c, { rot: 180 });
++}
++// "COMPANY ———— 2022" strap line
++function tagline(s, x, y, w, c, pt) {
++  T(s, 'COMPANY', x, y, 1.345, 0.286, { f: MONT, sz: 11, b: 1, sp: 3, c: c, nw: 1 });
++  T(s, '2022', x + w - 0.77, y, 0.77, 0.286, { f: MONT, sz: 11, b: 1, sp: 3, c: c, al: 'r', nw: 1 });
++  L(s, x + 1.43, y + 0.145, w - 2.29, 0, AMBER, pt);
++}
++// right-aligned "COMPANY NAME" credit above the page number
++function footer(s, x, y, w, c) {
++  TS(s, 'COMPANY NAME', x, y, w, 0.286, FOOT, { c: c });
++}
++// bottom-right page number
++function pageNum(s, n, x, w, al) {
++  T(s, String(n), x === undefined ? 9.971 : x, 6.807, w === undefined ? 3 : w, 0.399,
++    { f: LATO, sz: 18, c: GREY, al: al || 'r', v: 'm' });
++}
++// elbow connector: up the middle, then out to both sides
++function elbow(s, x, y, w, h, c, pt) {
++  const bx = x + w * 0.4995;
++  L(s, x, y + h, bx - x, 0, c, pt);
++  L(s, bx, y, 0, h, c, pt);
++  L(s, bx, y, x + w - bx, 0, c, pt);
++}
++// device mock-ups traced from the original photographs
++function rr(s, x, y, w, h, c, rad, o) {
++  s.addShape('roundRect', Object.assign(box(x, y, w, h, o || {}),
++    paint(c, o), { rectRadius: rad }));
++}
++function device(s, kind, x, y, w, h, o) {
++  o = o || {};
++  if (kind === 'monitor') {
++    rr(s, x, y, w, h * 0.649, '000000', 0.06, o);                        // bezel
++    R(s, x + w * 0.048, y + h * 0.055, w * 0.904, h * 0.575, WHITE, o);  // screen
++    R(s, x, y + h * 0.649, w, h * 0.192, 'CBCBCB', o);                   // chin
++    poly(s, [[39, 0], [60, 0], [67, 100], [31, 100]],
++      x, y + h * 0.841, w, h * 0.159, 'A1A1A1', o);                      // stand
++  } else {
++    const b = kind === 'phone' ? 0.036 : 0.064;   // side bezel fraction
++    const t = kind === 'phone' ? 0.044 : 0.091;   // top bezel fraction
++    rr(s, x, y, w, h, '131313', kind === 'phone' ? 0.14 : 0.07, o);
++    rr(s, x + w * b, y + h * t, w * (1 - 2 * b), h * (1 - 2 * t), WHITE, 0.04, o);
++  }
++}
++
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: MAROON };
++  R(s, 0,2.094,13.333,3.312, INK, {a:21});
++  R(s, 0,2.094,5.021,3.312, GOLD);
++  T(s, "INDUSTRIAL", 3.877,2.801,6.655,1.313, {f:MONT,sz:72,b:1,c:WHITE,nw:1});
++  T(s, "PRESENTATION TEMPLATE", 4.238,4.24,4.857,0.438, {f:MONT,sz:20,c:WHITE,al:"c"});
++  tagline(s, 8.681, 6.883, 4.378, WHITE, 1);
++  socialCol(s, 12.763, 3.094, 1.312, WHITE);
++  T(s, "PRESENTATION", 0.425,0.449,1.817,0.337, {f:MONT,sz:14,b:1,c:WHITE,nw:1});
++  pageNum(s, 1, 12.289, 0.962, "l");
++  I(s, 'factory', 2.937,3.094,0.746,0.694, WHITE);
++}
++
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 2);
++  T(s, "ABOUT US", -0.469,3.582,1.953,0.337, {f:MONT,sz:14,b:1,c:NAVY,sp:6,al:"c",rot:270});
++  TS(s, "About Our Company", 7.968,1.264,4.206,1.313, H1);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat", 7.968,4.975,4.206,1.175, BODY);
++  footer(s, 9.971,6.863,2.497, GREY);
++  menu(s, GOLD);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  R(s, 9.27,3.75,4.064,3.75, NAVY);
++  pageNum(s, 3);
++  R(s, 0,0,1.015,0.97, GOLD);
++  TS(s, "Enterprise Of Mass Production", 0.738,1.831,3.561,1.919, H1, {al:"c"});
++  TS(s, "ABOUT US", 1.881,0.313,1.953,0.337, KICKER);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.", 0.986,4.91,3.064,1.175, BODY);
++  dots(s, 2.227, 4.291, 0.501);
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.", 10.087,4.926,2.429,1.453, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  T(s, "Lorem ipsum", 10.011,4.358,2.58,0.404, {f:MONT,b:1,c:WHITE,al:"c"});
++  footer(s, 8.262,6.863,4.206, PGREY);
++  socialRow(s, 1.851, 6.983, 1.335, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 4);
++  T(s, "ABOUT US", -0.469,3.582,1.953,0.337, {f:MONT,sz:14,b:1,c:NAVY,sp:6,al:"r",nw:1,rot:270});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.", 10.087,4.479,2.429,1.453, BODY);
++  T(s, "Your Text Here", 10.011,3.911,2.58,0.404, {f:MONT,b:1,c:NAVY,al:"c"});
++  footer(s, 9.864,6.863,2.605, GREY);
++  menu(s, GOLD);
++  T(s, "Supply On Demand Will Determined The Industrial Work.", 1.995,1.086,5.509,3.063, {f:MONT,sz:44,b:1,c:WHITE});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam consectetur adipiscing.", 2.025,5.517,5.217,0.897, {f:LATO,sz:11,c:WHITE,al:"j",ls:1.5});
++  dots(s, 2.227, 4.802, 0.501);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  R(s, 5.727,0,7.606,6.53, NAVY);
++  pageNum(s, 5);
++  R(s, 0,0,1.015,0.97, GOLD);
++  TS(s, "ABOUT US", 1.881,0.313,1.953,0.337, KICKER);
++  T(s, "Classification Of Many Industrial Sectors", 0.79,1.586,3.391,1.986, {f:MONT,sz:28,b:1,c:NAVY});
++  footer(s, 9.971,6.863,2.497, GREY);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.", 0.821,5.355,3.013,1.175, BODY);
++  T(s, "INDUSTRY CLASSIFICATION", 0.821,4.921,3.391,0.37, {f:LATOB,sz:16,c:DGREY});
++  dots(s, 0.939, 4.163, 0.501);
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor et.", 9.726,1.629,3.013,0.62, {f:LATO,sz:11,c:PGREY,al:"j",ls:1.5});
++  T(s, "FIRST INDUSTRY", 9.726,1.292,2.794,0.337, {f:LATOB,sz:14,c:WHITE});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor et.", 9.749,3.055,3.013,0.62, {f:LATO,sz:11,c:PGREY,al:"j",ls:1.5});
++  T(s, "SECOND INDUSTRY", 9.749,2.718,2.794,0.337, {f:LATOB,sz:14,c:WHITE});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor et.", 9.773,4.481,3.013,0.62, {f:LATO,sz:11,c:PGREY,al:"j",ls:1.5});
++  T(s, "THIRD INDUSTRY", 9.773,4.144,2.794,0.337, {f:LATOB,sz:14,c:WHITE});
++  menu(s, GOLD);
++  socialRow(s, 10.58, 5.869, 1.335, WHITE);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,3.708,7.5, GOLD);
++  pageNum(s, 6);
++  TS(s, "ABOUT US", 6.968,0.329,1.953,0.337, KICKER);
++  TS(s, "Hundred People Will Working On A Huge Industrial Factory", 1.03,4.787,5.446,1.717, H2);
++  T(s, "01", 0.027,1.769,2.444,1.717, {f:MERRI,sz:96,c:WHITE,al:"r"});
++  socialRow(s, 1.187, 0.546, 1.335, WHITE);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eius sapsmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.", 7.701,4.78,2.138,1.731, BODY);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eius sapsmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam magna.", 10.165,4.78,2.138,1.731, BODY);
++  dots(s, 6.938, 5.353, 0);
++  footer(s, 9.971,6.863,2.497, GREY);
++  I(s, 'factory', 12.594,0.302,0.414,0.385, NAVY);
++}
++
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: NAVY };
++  R(s, 6,0,1.015,7.5, GOLD);
++  pageNum(s, 7);
++  TS(s, "ABOUT US", 5.531,3.582,1.953,0.337, KICKER, {rot:270});
++  T(s, "Industry Will Need A Huge Amount of Power Plan And Resources To Start The Production.", 7.854,1.667,4.764,2.794, {f:MONT,sz:32,b:1,c:WHITE});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eius sapsmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam magna.", 7.882,5.31,4.576,0.897, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  footer(s, 9.971,6.863,2.497, LGREY);
++  tagline(s, 7.882, 0.726, 4.605, LGREY, 1.75);
++  I(s, 'factory', 6.306,0.287,0.414,0.385, NAVY);
++}
++
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  pageNum(s, 8);
++  R(s, 0,0,1.015,0.97, GOLD);
++  TS(s, "Building With Specific Purpose Of One Specific Production.", 1.015,1.59,4.675,2.255, H2);
++  TS(s, "ABOUT US", 2.721,0.313,1.953,0.337, KICKER);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore .", 7.075,5.493,5.465,1.175, BODY);
++  T(s, "LOREM IPSUM DOLOR SIT", 7.075,5.059,3.391,0.37, {f:LATOB,sz:16,c:GREY});
++  R(s, 11.125,4.182,2.208,0.697, GOLD);
++  socialRow(s, 11.562, 4.53, 1.335, NAVY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  menu(s, WHITE);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,3.227,7.5, GOLD);
++  pageNum(s, 9);
++  TS(s, "ABOUT US", -0.469,3.582,1.953,0.337, KICKER, {rot:270});
++  TS(s, "The Official Partner Of A Factory Will Require Professional Person.", 6.559,1.236,5.727,1.717, H2);
++  T(s, "YOUR NAME", 8.393,3.454,1.89,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  TS(s, "Lorem ipsum dolor transport.", 8.393,3.766,2.161,0.286, NOTE, {i:1});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 8.393,4.162,3.137,0.471, NOTE, {al:"j"});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore .", 6.635,5.14,5.652,1.175, BODY);
++  tagline(s, 6.591, 0.386, 4.362, GREY, 1);
++  menu(s, NAVY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  R(s, 6.104,0,0.961,7.5, GOLD);
++  R(s, 0,0,6.104,7.5, NAVY);
++  pageNum(s, 10);
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eius sapsmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam magna.", 1,4.585,2.199,1.731, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  T(s, "YOUR NAME", 1.155,3.515,1.89,0.37, {f:MONT,sz:16,b:1,c:WHITE,al:"c"});
++  T(s, "Ad minim veniam magna.", 1,3.859,2.199,0.286, {f:LATO,sz:11,i:1,c:LGREY,al:"c"});
++  TS(s, "Your Text Here", 9.435,2.34,3,1.313, H1);
++  footer(s, 9.971,6.863,2.497, GREY);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore .", 9.435,4.121,3,2.008, BODY);
++  tagline(s, 9.418, 1.394, 3.034, NAVY, 1.75);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, WHITE);
++}
++
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  poly(s, [[0,0],[48,0],[100,100],[0,100]], 0,0,8.313,7.5, GOLD);
++  poly(s, [[0,0],[100,0],[100,100]], 11.149,0,2.193,3.781, PGREY);
++  pageNum(s, 11);
++  T(s, "OUR VISION", 7.194,1.905,4.246,0.774, {f:MONT,sz:40,b:1,c:NAVY});
++  T(s, "YOUR TEXT  HERE", 7.248,1.534,3.852,0.37, {f:LATO,sz:16,b:1,c:GREY});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore .", 8.091,3.809,4.025,1.453, BODY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  dots(s, 8.212, 3.202, 0.501);
++  I(s, 'factory', 12.481,0.287,0.414,0.385, NAVY);
++}
++
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  R(s, 10.476,0,2.857,7.5, GOLD);
++  poly(s, [[0,40],[100,40],[100,100],[0,100]], 0,0,0.617,6.427, NAVY);
++  poly(s, [[0,0],[100,0],[100,38],[0,38]], 0,0,0.617,6.427, NAVY);
++  pageNum(s, 12, 6.828, 3, "r");
++  T(s, "OUR MISSIONS", 1.651,2.639,5.139,0.774, {f:MONT,sz:40,b:1,c:NAVY});
++  tagline(s, 1.651, 1.268, 4.605, NAVY, 1.75);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam. ", 1.651,4.823,3.149,1.175, BODY);
++  T(s, "YOUR TEXT  HERE", 1.651,4.344,2.573,0.37, {f:LATO,sz:16,b:1,c:DGREY});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam. ", 5.102,4.823,3.149,1.175, BODY);
++  T(s, "YOUR TEXT  HERE", 5.102,4.344,2.573,0.37, {f:LATO,sz:16,b:1,c:DGREY});
++  footer(s, 6.569,6.863,2.605, GREY);
++}
++
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,2.444,13.333,2.301, PGREY);
++  pageNum(s, 13);
++  TS(s, "At vero deos et accusamus ekat.", 1.122,5.923,2.369,0.286, NOTE, {i:1,al:"c"});
++  T(s, "Your Name", 1.315,5.533,1.984,0.404, {f:LATO,b:1,c:NAVY,al:"c"});
++  socialRow(s, 1.943, 6.465, 0.727, NAVY);
++  TS(s, "At vero deos et accusamus ekat.", 4.029,5.923,2.369,0.286, NOTE, {i:1,al:"c"});
++  T(s, "Your Name", 4.221,5.533,1.984,0.404, {f:LATO,b:1,c:NAVY,al:"c"});
++  socialRow(s, 4.85, 6.465, 0.727, NAVY);
++  TS(s, "At vero deos et accusamus ekat.", 6.936,5.923,2.369,0.286, NOTE, {i:1,al:"c"});
++  T(s, "Your Name", 7.128,5.533,1.984,0.404, {f:LATO,b:1,c:NAVY,al:"c"});
++  socialRow(s, 7.756, 6.465, 0.727, NAVY);
++  TS(s, "At vero deos et accusamus ekat.", 9.842,5.923,2.369,0.286, NOTE, {i:1,al:"c"});
++  T(s, "Your Name", 10.035,5.533,1.984,0.404, {f:LATO,b:1,c:NAVY,al:"c"});
++  socialRow(s, 10.663, 6.465, 0.727, NAVY);
++  TS(s, "Our Team", 4.097,0.475,5.139,0.639, H2, {al:"c"});
++  R(s, 0,0,1.015,0.97, GOLD);
++  footer(s, 9.864,6.863,2.605, GREY);
++  menu(s, GOLD);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  poly(s, [[14,0],[100,100],[14,100]], 0,0,5.048,7.5, NAVY);
++  poly(s, [[0,0],[14,0],[14,100],[0,100]], 0,0,5.048,7.5, NAVY);
++  poly(s, [[0,0],[100,0],[100,100]], 11.149,0,2.193,3.781, GOLD);
++  pageNum(s, 14);
++  TS(s, [{t:"At vero deos et accusamus ekat",i:1},{t:" sed do eiusmod tempor"},{t:".",i:1}], 5.222,1.299,4.315,0.286, NOTE);
++  T(s, "Your Name", 5.222,0.909,1.984,0.404, {f:LATO,b:1,c:NAVY});
++  socialRow(s, 5.328, 1.927, 0.727, NAVY);
++  TS(s, [{t:"At vero deos et accusamus ekat",i:1},{t:" sed do eiusmod tempor"},{t:".",i:1}], 6.703,3.46,4.315,0.286, NOTE);
++  T(s, "Your Name", 6.703,3.07,1.984,0.404, {f:LATO,b:1,c:NAVY});
++  socialRow(s, 6.809, 4.088, 0.727, NAVY);
++  TS(s, [{t:"At vero deos et accusamus ekat",i:1},{t:" sed do eiusmod tempor"},{t:".",i:1}], 8.184,5.621,4.315,0.286, NOTE);
++  T(s, "Your Name", 8.184,5.231,1.984,0.404, {f:LATO,b:1,c:NAVY});
++  socialRow(s, 8.29, 6.249, 0.727, NAVY);
++  T(s, "Our Technical Team", 0.604,4.776,3.242,1.717, {f:MONT,sz:32,b:1,c:WHITE});
++  footer(s, 9.864,6.863,2.605, GREY);
++  menu(s, NAVY);
++}
++
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,5.444,7.5, NAVY);
++  pageNum(s, 15);
++  TS(s, "At vero deos et accusamus ekat.", 7.111,1.97,2.369,0.286, NOTE, {i:1});
++  T(s, "Your Name", 7.111,1.527,1.984,0.438, {f:LATO,sz:20,b:1,c:NAVY});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", 7.111,2.429,4.599,0.62, BODY);
++  TS(s, "At vero deos et accusamus ekat.", 7.111,4.895,2.369,0.286, NOTE, {i:1});
++  T(s, "Your Name", 7.111,4.452,1.984,0.438, {f:LATO,sz:20,b:1,c:NAVY});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", 7.111,5.353,4.599,0.62, BODY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam. ", 0.996,4.355,2.397,1.453, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  T(s, "YOUR TEXT  HERE", 0.996,3.75,2.573,0.37, {f:LATO,sz:16,b:1,c:PGREY});
++  T(s, "Our Investors", 0.996,1.608,3.242,1.178, {f:MONT,sz:32,b:1,c:WHITE});
++  tagline(s, 8.609, 0.386, 4.362, GREY, 1);
++  R(s, 12.806,3.167,0.528,1.264, GOLD);
++  caretPair(s, 13.015, 3.483, NAVY);
++  socialRow(s, 1.527, 6.983, 1.335, WHITE);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, WHITE);
++}
++
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  R(s, 1.015,0,12.318,3.952, PGREY);
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 16);
++  TS(s, "TEAM", -0.057,3.582,1.129,0.337, KICKER, {rot:270});
++  TS(s, "At vero deos et accusamus ekat.", 2.516,5.732,2.369,0.286, NOTE, {i:1,al:"c"});
++  T(s, "Your Name", 2.709,5.342,1.984,0.404, {f:LATO,b:1,c:NAVY,al:"c"});
++  socialRow(s, 3.337, 2.289, 0.727, NAVY);
++  TS(s, "At vero deos et accusamus ekat.", 5.916,5.732,2.369,0.286, NOTE, {i:1,al:"c"});
++  T(s, "Your Name", 6.109,5.342,1.984,0.404, {f:LATO,b:1,c:NAVY,al:"c"});
++  socialRow(s, 6.737, 2.289, 0.727, NAVY);
++  TS(s, "At vero deos et accusamus ekat.", 9.316,5.732,2.369,0.286, NOTE, {i:1,al:"c"});
++  T(s, "Your Name", 9.509,5.342,1.984,0.404, {f:LATO,b:1,c:NAVY,al:"c"});
++  socialRow(s, 10.137, 2.289, 0.727, NAVY);
++  TS(s, "Our Engineering Team", 3.668,0.754,6.8,0.639, H2, {al:"c"});
++  footer(s, 9.864,6.863,2.605, GREY);
++  menu(s, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  R(s, 7.569,4.153,4.611,3.347, NAVY);
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 17);
++  TS(s, "SERVICES", -0.436,3.582,1.887,0.337, KICKER, {rot:270});
++  T(s, "See Our Professional Main Service ", 8.47,1.037,3.848,1.515, {f:MONT,sz:28,b:1,c:'333F50'});
++  TS(s, "Lorem ipsum dolor transport assit amet, cinonsectetur adipiscing elit, sed do its eiusmod tempor incididun ut laborest etera dolore magna aliqua. ", 8.47,2.611,3.848,0.897, BODY);
++  T(s, "YOUR TEXT HERE", 9.031,4.765,1.879,0.286, {f:LATO,sz:11,b:1,c:WHITE});
++  T(s, "Lorem ipsum dolor transport.", 9.031,4.977,2.178,0.286, {f:LATO,sz:11,c:LGREY});
++  T(s, "YOUR TEXT HERE", 9.031,5.585,1.879,0.286, {f:LATO,sz:11,b:1,c:WHITE});
++  T(s, "Lorem ipsum dolor transport.", 9.031,5.798,2.178,0.286, {f:LATO,sz:11,c:LGREY});
++  T(s, "YOUR TEXT HERE", 9.031,6.41,1.879,0.286, {f:LATO,sz:11,b:1,c:WHITE});
++  T(s, "Lorem ipsum dolor transport.", 9.031,6.622,2.178,0.286, {f:LATO,sz:11,c:LGREY});
++  R(s, 3.921,4.153,3.649,3.347, NAVY, {a:32});
++  T(s, [{t:"Lorem ipsum dolor transport assit amet, cinonse ctetur ",c:LGREY},{t:"adipiscing",c:WHITE},{t:" elit, sed do its eiusmod tempor incididun ut laborest etera dolore magna aliqua. ",c:LGREY}], 4.521,5.428,2.449,1.453, {f:LATO,sz:11,al:"j",ls:1.5});
++  T(s, "OUR CURRENT WORK", 4.521,4.765,2.259,0.337, {f:LATO,sz:14,b:1,c:WHITE});
++  menu(s, GOLD);
++  L(s, 4.643,5.281,0.531,0, GOLD, 1.25);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++  I(s, 'crane', 8.239,4.789,0.458,0.451, WHITE);
++  I(s, 'mixer', 8.241,6.5,0.454,0.351, WHITE);
++  I(s, 'hammer', 8.241,5.615,0.455,0.45, WHITE);
++}
++
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  BRK(s, 0.385,4.712,3.046,2.53, null, {rot:90,lc:NAVY,lw:1.5});
++  pageNum(s, 18);
++  TS(s, "Our Work & Services", 0.659,1.379,2.498,1.919, H1);
++  footer(s, 9.864,6.863,2.605, GREY);
++  TS(s, "YOUR TEXT HERE", 9.152,1.302,3.136,0.37, SUBHEAD);
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 9.152,1.611,3.456,0.62, BODY);
++  TS(s, "YOUR TEXT HERE", 9.152,2.632,3.136,0.37, SUBHEAD);
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 9.152,2.941,3.456,0.62, BODY);
++  TS(s, "YOUR TEXT HERE", 9.152,3.961,3.136,0.37, SUBHEAD);
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 9.152,4.27,3.456,0.62, BODY);
++  TS(s, "YOUR TEXT HERE", 9.152,5.291,3.136,0.37, SUBHEAD);
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 9.152,5.6,3.456,0.62, BODY);
++  R(s, 0,0,1.015,0.97, GOLD);
++  menu(s, GOLD);
++  TS(s, "Technical Engineer", 0.724,5.834,2.369,0.286, NOTE, {i:1,al:"c"});
++  T(s, "Your Name", 0.916,5.391,1.984,0.438, {f:LATO,sz:20,b:1,c:NAVY,al:"c"});
++  socialRow(s, 1.545, 6.365, 0.727, NAVY);
++  navPill(s, 7.339, 6.63);
++  TS(s, "SERVICES", 1.395,0.342,1.887,0.337, KICKER);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++  I(s, 'tools', 8.322,1.425,0.494,0.494, NAVY);
++  I(s, 'worker', 8.353,5.395,0.432,0.522, NAVY);
++  I(s, 'gear', 8.306,2.757,0.525,0.525, NAVY);
++  I(s, 'flame', 8.385,4.057,0.367,0.522, NAVY);
++}
++
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: NAVY };
++  pageNum(s, 19);
++  T(s, "YOUR SERVICE HERE", 5.258,4.453,2.818,0.404, {f:LATO,b:1,c:WHITE,al:"c"});
++  T(s, "At vero eos et accu samus et iusto kli asaodio dignissimos ducimus qui bikala nditiis praesenti volu, dignissimos ducimus qui kliajam. Dsamus et iusto kiln asapodio dignissimos ducimus qui bikala ", 5.142,5.339,3.05,1.453, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  dots(s, 6.375, 5.067, 0.501);
++  T(s, "YOUR SERVICE HERE", 9.702,0.677,2.818,0.404, {f:LATO,b:1,c:WHITE,al:"c"});
++  T(s, "At vero eos et accu samus et iusto kli asaodio dignissimos ducimus qui bikala nditiis praesenti volu, dignissimos ducimus qui kliajam. Dsamus et iusto kiln asapodio dignissimos ducimus qui bikala ", 9.586,1.563,3.05,1.453, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  dots(s, 10.819, 1.291, 0.501);
++  R(s, 0,0,1.015,0.97, GOLD);
++  T(s, "SERVICES", 1.395,0.342,1.887,0.337, {f:MONT,sz:14,b:1,c:WHITE,sp:6,nw:1});
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0.97,5.286,2.97, NAVY);
++  pageNum(s, 20);
++  R(s, 0,0,1.015,0.97, GOLD);
++  T(s, "Company Services", 0.904,1.406,3.118,1.313, {f:MONT,sz:36,b:1,c:WHITE});
++  T(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 0.904,2.816,3.456,0.62, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  TS(s, "SERVICES", 5.723,0.342,1.887,0.337, KICKER);
++  TS(s, "YOUR TEXT HERE", 1.663,5.168,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 1.483,5.477,3.009,0.897, BODYC);
++  TS(s, "YOUR TEXT HERE", 5.343,5.185,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 5.162,5.494,3.009,0.897, BODYC);
++  TS(s, "YOUR TEXT HERE", 9.022,5.202,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 8.841,5.511,3.009,0.897, BODYC);
++  footer(s, 9.864,6.863,2.605, GREY);
++  tagline(s, 0.508, 6.858, 4.362, GREY, 1);
++  menu(s, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++  I(s, 'truck', 6.298,4.363,0.737,0.53, NAVY);
++  I(s, 'crane', 9.977,4.265,0.737,0.726, NAVY);
++  I(s, 'gear', 2.622,4.263,0.731,0.731, NAVY);
++}
++
++function slide21(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,4.41,7.5, NAVY);
++  pageNum(s, 21);
++  L(s, 6.54,2.069,6.793,0, GOLD, 4);
++  O(s, 6.54,1.942,0.254,0.254, GOLD);
++  TS(s, "YOUR SERVICE HERE", 5.343,4.684,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 5.162,5.097,3.009,0.897, BODYC);
++  footer(s, 9.864,6.863,2.605, GREY);
++  O(s, 10.301,1.942,0.254,0.254, GOLD);
++  TS(s, "YOUR SERVICE HERE", 9.104,4.684,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 8.923,5.097,3.009,0.897, BODYC);
++  R(s, 0,0,1.015,0.97, GOLD);
++  T(s, "SERVICES", 1.395,0.342,1.887,0.337, {f:MONT,sz:14,b:1,c:WHITE,sp:6,nw:1});
++  menu(s, NAVY);
++  T(s, "Our Work & Services", 0.956,2.195,2.498,1.919, {f:MONT,sz:36,b:1,c:WHITE});
++  T(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 0.956,4.869,2.498,0.897, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  socialRow(s, 1.527, 6.983, 1.335, WHITE);
++  navPill(s, 8.342, 6.614);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide22(pptx) {
++  const s = pptx.addSlide();
++  pageNum(s, 22);
++  L(s, 0,2.069,13.333,0, GOLD, 4);
++  O(s, 6.54,1.942,0.254,0.254, GOLD);
++  TS(s, "YOUR SERVICE HERE", 5.343,4.684,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 5.162,5.097,3.009,0.897, BODYC);
++  footer(s, 9.864,6.863,2.605, GREY);
++  O(s, 10.301,1.942,0.254,0.254, GOLD);
++  TS(s, "YOUR SERVICE HERE", 9.104,4.684,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 8.923,5.097,3.009,0.897, BODYC);
++  R(s, 0,0,1.015,0.97, GOLD);
++  T(s, "SERVICES", 5.723,0.342,1.887,0.337, {f:MONT,sz:14,b:1,c:GREY,sp:6,al:"c",nw:1});
++  menu(s, NAVY);
++  O(s, 2.762,1.942,0.254,0.254, GOLD);
++  TS(s, "YOUR SERVICE HERE", 1.565,4.684,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 1.384,5.097,3.009,0.897, BODYC);
++  navPill(s, 6.403, 6.614);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide23(pptx) {
++  const s = pptx.addSlide();
++  R(s, 8.801,0,4.53,7.5, NAVY);
++  pageNum(s, 23);
++  L(s, 0,2.069,6.474,0, GOLD, 4);
++  O(s, 6.22,1.942,0.254,0.254, GOLD);
++  TS(s, "YOUR SERVICE HERE", 5.023,4.684,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 4.843,5.097,3.009,0.897, BODYC);
++  footer(s, 9.864,6.863,2.605, LGREY);
++  R(s, 0,0,1.015,0.97, GOLD);
++  T(s, "SERVICES", 10.123,0.342,1.887,0.337, {f:MONT,sz:14,b:1,c:PGREY,sp:6,al:"c",nw:1});
++  menu(s, GOLD);
++  O(s, 2.442,1.942,0.254,0.254, GOLD);
++  TS(s, "YOUR SERVICE HERE", 1.245,4.684,2.648,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 1.065,5.097,3.009,0.897, BODYC);
++  T(s, "Lorem ipsum dolor transport assit amet, cinonse ctetur adipiscing elit, sed do its eiusmod tempor incididun ut laborest etera dolore magna aliqua. ", 9.636,4.819,2.859,1.175, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  T(s, "OUR CURRENT WORK", 9.636,3.882,2.859,0.37, {f:MONT,sz:16,b:1,c:WHITE,al:"c"});
++  L(s, 10.8,4.586,0.531,0, GOLD, 1.25);
++  navPill(s, 4.127, 6.614);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide24(pptx) {
++  const s = pptx.addSlide();
++  R(s, 4.396,0,2.271,7.5, GOLD);
++  pageNum(s, 24);
++  TS(s, "Portfolio Slides", 0.762,0.848,3.118,1.313, H1);
++  TS(s, "At vero eos et accu samus et iusto kli asaodio dignissimos ducimus qui bikala nditiis praesenti volu, dignissimos ducimus qui kliajam. Dsamus et iusto kiln asapodio dignissimos ducimus qui bikala ", 7.583,5.301,4.701,0.897, BODY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  tagline(s, 8.609, 0.386, 4.362, GREY, 1);
++  socialRow(s, 1.364, 6.926, 1.335, NAVY);
++}
++
++function slide25(pptx) {
++  const s = pptx.addSlide();
++  R(s, 10.685,0,2.648,7.5, GOLD);
++  pageNum(s, 25);
++  TS(s, "YOUR TEXT HERE", 0.74,5.767,2.648,0.37, SUBHEAD);
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 0.74,6.155,3.744,0.62, BODYL);
++  TS(s, "YOUR TEXT HERE", 6.56,5.767,2.648,0.37, SUBHEAD);
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus qui bikalanditiis praesenti volu.", 6.56,6.155,3.744,0.62, BODYL);
++  footer(s, 9.864,6.863,2.605, null);
++  socialCol(s, 12.763, 0.573, 1.312, NAVY);
++}
++
++function slide26(pptx) {
++  const s = pptx.addSlide();
++  pageNum(s, 26);
++  T(s, "Image Gallery Slides", 0.842,1.754,2.432,2.12, {f:MONT,sz:40,b:1,c:NAVY,al:"c"});
++  R(s, 0,0,1.015,0.97, GOLD);
++  TS(s, "PORTFOLIO", 1.476,0.342,2.178,0.337, KICKER);
++  TS(s, "At vero eos et accu samus et iusto kli asaodio dignissimos ducimus qui bikala nditiis praesenti volu.", 1.008,4.92,2.098,1.175, BODY);
++  dots(s, 1.765, 4.335, 0.501);
++  socialRow(s, 1.39, 6.983, 1.335, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide27(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: NAVY };
++  R(s, 0.001,0,2.521,7.5, GOLD);
++  pageNum(s, 27);
++  TS(s, "PORTFOLIO", -0.581,3.582,2.178,0.337, KICKER, {rot:270});
++  T(s, "At vero eos et accu samus et iusto kli asaodio dig nissimos ducimus qui bikala nditiis praesenti volu.", 7.786,5.865,3.957,0.62, {f:LATO,sz:11,c:WHITE,al:"j",ls:1.5});
++  T(s, "Your Title Here", 3.063,5.865,4.14,0.639, {f:MONT,sz:32,b:1,c:WHITE});
++  tagline(s, 8.609, 0.325, 4.362, PGREY, 1);
++  footer(s, 9.864,6.863,2.605, LGREY);
++  socialRow(s, 0.593, 7.076, 1.335, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide28(pptx) {
++  const s = pptx.addSlide();
++  pageNum(s, 28);
++  R(s, 0,3.319,3.73,4.181, NAVY);
++  T(s, "Your Text Here", 0.609,5.189,2.432,0.37, {f:MONT,sz:16,b:1,c:WHITE,al:"c"});
++  T(s, "At vero eos et accu samus et iusto kli asaodio dignissimos ducimus qui bikala nditiis praesenti volu.", 0.741,5.598,2.168,1.175, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  O(s, 1.375,3.876,0.9,0.9, null, {lc:GOLD,lw:3.25});
++  R(s, 0.609,4.006,2.432,0.639, NAVY);
++  T(s, "57%", 0.609,4.006,2.432,0.639, {f:MONT,sz:32,c:WHITE,al:"c"});
++  T(s, "Use Safety Tools", 9.406,1.994,2.349,2.322, {f:MONT,sz:44,b:1,c:NAVY});
++  footer(s, 9.864,6.863,2.605, GREY);
++  TS(s, "YOUR TEXT HERE", 9.406,4.784,2.648,0.37, SUBHEAD);
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus dignis simos ducimus qui bikala nditiis qui bikalan ditiis prae senti volu.", 9.406,5.159,3.062,1.175, BODY);
++  tagline(s, 9.434, 1.082, 3.034, NAVY, 1.75);
++  menu(s, NAVY);
++  navPill(s, 8.127, 6.613);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide29(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: NAVY };
++  pageNum(s, 29, 2.742, 3, "r");
++  R(s, 2.286,0.656,5.556,5.886, WHITE);
++  T(s, "01", -0.159,4.013,2.444,1.717, {f:MERRI,sz:96,c:WHITE,al:"r"});
++  L(s, 1.471,5.79,0,1.02, AMBER, 4.5);
++  L(s, 1.471,3.5,0,0.513, AMBER, 4.5);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua..", 3.028,4.35,4.072,1.453, BODY);
++  T(s, "Your Text Here", 3.138,1.413,3.851,1.582, {f:MONT,sz:44,b:1,c:NAVY,al:"c"});
++  T(s, "LOREM IPSUM DOLOR", 3.191,3.91,3.746,0.37, {f:MONT,sz:16,b:1,c:GREY,sp:3,al:"c"});
++  dots(s, 4.771, 3.358, 0.501);
++  footer(s, 2.417,6.863,2.605, LGREY);
++  menu(s, WHITE);
++  I(s, 'factory', 0.463,0.466,0.414,0.385, WHITE);
++}
++
++function slide30(pptx) {
++  const s = pptx.addSlide();
++  R(s, 8.968,0,4.365,7.5, PGREY);
++  pageNum(s, 30);
++  R(s, 0,0,1.931,7.5, GOLD);
++  TS(s, "PORTFOLIO", 5.578,0.342,2.178,0.337, KICKER);
++  L(s, 8.574,5.592,2.309,0, NAVY, 2);
++  T(s, "01", 7.885,5.34,0.561,0.505, {f:MONT,sz:24,c:NAVY,al:"r",nw:1});
++  T(s, "04", 11.009,5.34,0.647,0.505, {f:MONT,sz:24,c:NAVY,nw:1});
++  L(s, 8.574,5.592,0.76,0, NAVY, 5);
++  footer(s, 9.864,6.863,2.605, GREY);
++  menu(s, NAVY);
++  R(s, 3.479,5.163,3.562,1.424, NAVY, {a:18});
++  T(s, "Your Text Here", 3.837,5.38,2.648,0.37, {f:MONT,sz:16,b:1,c:WHITE});
++  T(s, "At vero eos sat accusa asmus etiuto odio java lorem java kroonidi.", 3.837,5.719,2.885,0.62, {f:LATO,sz:11,c:LGREY,al:"j",ls:1.5});
++  I(s, 'factory', 0.706,0.287,0.414,0.385, NAVY);
++}
++
++function slide31(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 31);
++  TS(s, "PORTFOLIO", -0.581,3.582,2.178,0.337, KICKER, {rot:270});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus dignis simos ducimus qui bikala nditiis qui bikalan ditiis prae senti volu.", 1.47,5.536,3.403,0.897, BODY);
++  TS(s, "Your Text Here", 4.132,0.528,6.079,0.639, H2, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus dignis simos ducimus qui bikala nditiis qui bikalan ditiis prae senti volu.", 5.47,5.536,3.403,0.897, BODY);
++  TS(s, "At vero eos et accusamus et iusto odio dignis simos ducimus dignis simos ducimus qui bikala nditiis qui bikalan ditiis prae senti volu.", 9.413,5.536,3.403,0.897, BODY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  menu(s, NAVY);
++  socialRow(s, 6.504, 7.015, 1.335, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide32(pptx) {
++  const s = pptx.addSlide();
++  R(s, 11.471,0,1.862,7.5, GOLD);
++  device(s, 'monitor', -1.064,0.903,7.159,6.04);
++  pageNum(s, 32);
++  TS(s, "Monitoring Project", 6.897,1.49,5.462,0.707, H1);
++  menu(s, NAVY);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan ditiis.", 6.965,4.715,1.974,1.453, BODY);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan.", 9.18,4.715,1.974,1.453, BODY);
++  T(s, "LOREM IPSUM DOLOR", 6.897,1.112,3.746,0.37, {f:MONT,sz:16,b:1,c:GREY,sp:3});
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide33(pptx) {
++  const s = pptx.addSlide();
++  poly(s, [[100,0],[100,100],[0,100],[35,0]], 7.635,0,5.698,7.5, PGREY);
++  R(s, 0,0,1.015,7.5, GOLD);
++  device(s, 'phone', 9.729,3.835,2.202,4.661, {rot:15});
++  device(s, 'phone', 11.103,-1.29,2.202,4.661, {rot:15});
++  device(s, 'phone', 7.609,0.794,2.202,4.661, {rot:15});
++  pageNum(s, 33);
++  TS(s, "Accessing Device Tool", 2.202,2.437,3.596,1.313, H1);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan. At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan.", 2.202,4.541,3.596,1.453, BODY);
++  TS(s, "COMPANY", -0.43,3.582,1.874,0.337, KICKER, {rot:270});
++  tagline(s, 2.235, 1.584, 3.583, NAVY, 2.75);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide34(pptx) {
++  const s = pptx.addSlide();
++  R(s, 6.873,0,0.975,7.5, GOLD);
++  R(s, 0,0,6.873,7.5, NAVY);
++  device(s, 'tablet', 5.131,0.862,3.98,5.777);
++  pageNum(s, 34);
++  T(s, "Application Usage", 1.034,1.577,3.596,1.313, {f:MONT,sz:36,b:1,c:WHITE});
++  T(s, "At vero eos et accusa asapmus et iusto odio digshay nis simos du cimus dignis sim  duc imus qui bikala nditiis qui bikalan. At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan.", 1.034,4.377,3.235,1.731, {f:LATO,sz:11,c:PGREY,al:"j",ls:1.5});
++  T(s, "YOUR TEXT HERE", 1.034,3.968,3.187,0.37, {f:MONT,sz:16,b:1,c:PGREY});
++  dots(s, 1.226, 3.372, 0.501);
++  socialRow(s, 1.984, 6.983, 1.335, PGREY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan ditiis.", 9.892,4.099,2.568,1.175, BODY);
++  T(s, "YOUR TEXT HERE", 9.98,3.729,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY,al:"c"});
++  T(s, "76,5%", 10.658,2.006,2.024,0.774, {f:LATO,sz:40,b:1,c:NAVY});
++  menu(s, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, GOLD);
++  I(s, 'chartUp', 10.139,2.14,0.519,0.519, NAVY);
++}
++
++function slide35(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 35);
++  TS(s, "COMPANY", -0.43,3.582,1.874,0.337, KICKER, {rot:270});
++  T(s, "Company Strength", 7.676,1.636,3.596,1.447, {f:MONT,sz:40,b:1,c:NAVY});
++  menu(s, NAVY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  tagline(s, 7.676, 1.091, 4.178, NAVY, 2.75);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui ditiis.", 7.694,4.225,4.16,0.62, BODYL);
++  T(s, "YOUR TEXT HERE", 7.694,3.855,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui ditiis.", 7.694,5.472,4.16,0.62, BODYL);
++  T(s, "YOUR TEXT HERE", 7.694,5.102,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  socialRow(s, 3.636, 6.962, 1.335, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide36(pptx) {
++  const s = pptx.addSlide();
++  poly(s, [[65,0],[100,0],[100,100],[0,100]], 7.879,0,5.454,7.5, PGREY);
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 36);
++  TS(s, "COMPANY", -0.43,3.582,1.874,0.337, KICKER, {rot:270});
++  T(s, "Weakness", 8.403,2.392,3.826,0.842, {f:MONT,sz:44,b:1,c:NAVY,al:"r"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui ditiis.", 7.86,4.508,2.136,1.175, BODY);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui ditiis.", 10.093,4.508,2.136,1.175, BODY);
++  T(s, "YOUR TEXT HERE", 9.83,2.016,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY,al:"r"});
++  dots(s, 11.351, 3.807, 0.501);
++  footer(s, 9.864,6.863,2.605, GREY);
++  menu(s, NAVY);
++  socialRow(s, 3.446, 6.962, 1.335, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide37(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,1.015,7.5, GOLD);
++  elbow(s, 1,2.682,12.333,4.125, GOLD, 2.75);
++  pageNum(s, 37);
++  TS(s, "COMPANY", -0.43,3.582,1.874,0.337, KICKER, {rot:270});
++  TS(s, "Company Opportunities", 7.462,0.958,4.574,1.313, H1);
++  TS(s, "At vero eos et accusamus et iusto odio digala.", 8.896,3.577,3.423,0.286, NOTE);
++  T(s, "Your Text Here", 8.896,3.248,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  T(s, "01.", 7.985,3.226,0.958,0.572, {f:MONT,sz:28,c:NAVY,al:"r"});
++  TS(s, "At vero eos et accusamus et iusto odio digala.", 8.896,4.357,3.423,0.286, NOTE);
++  T(s, "Your Text Here", 8.896,4.028,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  T(s, "02.", 7.985,4.006,0.958,0.572, {f:MONT,sz:28,c:NAVY,al:"r"});
++  TS(s, "At vero eos et accusamus et iusto odio digala.", 8.896,5.137,3.423,0.286, NOTE);
++  T(s, "Your Text Here", 8.896,4.809,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  T(s, "03.", 7.985,4.787,0.958,0.572, {f:MONT,sz:28,c:NAVY,al:"r"});
++  TS(s, "At vero eos et accusamus et iusto odio digala.", 8.896,5.918,3.423,0.286, NOTE);
++  T(s, "Your Text Here", 8.896,5.589,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  T(s, "04.", 7.866,5.567,1.078,0.572, {f:MONT,sz:28,c:NAVY,al:"r"});
++  menu(s, NAVY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide38(pptx) {
++  const s = pptx.addSlide();
++  R(s, 11.052,0,2.281,7.5, PGREY);
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 38);
++  TS(s, "COMPANY", -0.43,3.582,1.874,0.337, KICKER, {rot:270});
++  TS(s, "The Threats", 7.485,1.443,4.574,0.707, H1);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 6.097,3.729,2.964,0.62, BODYC);
++  T(s, "YOUR TEXT HERE", 6.382,3.442,2.393,0.337, {f:MONT,sz:14,b:1,c:GREY,al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 9.381,3.729,2.964,0.62, BODYC);
++  T(s, "YOUR TEXT HERE", 9.667,3.442,2.393,0.337, {f:MONT,sz:14,b:1,c:GREY,al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 6.097,5.422,2.964,0.62, BODYC);
++  T(s, "YOUR TEXT HERE", 6.382,5.136,2.393,0.337, {f:MONT,sz:14,b:1,c:GREY,al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 9.381,5.422,2.964,0.62, BODYC);
++  T(s, "YOUR TEXT HERE", 9.667,5.136,2.393,0.337, {f:MONT,sz:14,b:1,c:GREY,al:"c"});
++  menu(s, NAVY);
++  socialRow(s, 5.999, 6.962, 1.335, NAVY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++  I(s, 'tools', 7.384,2.862,0.389,0.389, GOLD, {fh:1});
++  I(s, 'worker', 10.693,2.854,0.34,0.41, GOLD, {fh:1});
++  I(s, 'gear', 7.372,4.614,0.413,0.413, GOLD, {fh:1});
++  I(s, 'flame', 10.719,4.615,0.288,0.41, GOLD, {fh:1});
++}
++
++function slide39(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: MAROON };
++  R(s, 0,2.094,13.333,3.312, INK, {a:21});
++  R(s, 12.159,2.094,1.175,3.312, GOLD, {fh:1});
++  T(s, "LET’S TAKE BREAK FOR 5 MINUTES", 4.082,4.141,5.168,0.438, {f:MONT,sz:20,c:WHITE,al:"c",nw:1});
++  tagline(s, 4.067, 0.386, 4.378, WHITE, 1);
++  socialCol(s, 12.763, 3.094, 1.312, INK);
++  T(s, "INDUSTRIAL", 1.047,6.803,1.466,0.337, {f:MONT,sz:14,b:1,c:WHITE,nw:1});
++  T(s, [{t:"BREAK ",c:WHITE},{t:"SLIDE",c:GOLD}], 3.019,2.766,7.295,1.313, {f:MONT,sz:72,b:1,al:"c",nw:1});
++  I(s, 'factory', 0.475,6.706,0.414,0.385, WHITE);
++}
++
++function slide40(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 40);
++  I(s, 'cog', 7.943,1.163,2.859,2.859, GOLD, {rot:15});
++  I(s, 'cog', 10.19,2.678,2.612,2.612, NAVY, {rot:15});
++  I(s, 'cog', 8.702,4.165,1.962,1.962, NAVY, {rot:15});
++  TS(s, "COMPANY", -0.43,3.582,1.874,0.337, KICKER, {rot:270});
++  T(s, "Company / Industrial Infographic", 2.209,0.993,4.819,1.043, {f:MONT,sz:28,b:1,c:NAVY});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 3.302,3.431,3.499,0.62, BODYL);
++  TS(s, "YOUR TEXT HERE", 3.302,3.102,2.393,0.37, SUBHEAD);
++  O(s, 2.287,3.102,0.799,0.799, NAVY);
++  T(s, "01", 2.287,3.102,0.799,0.799, {f:LATO,b:1,al:"c",v:"m"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 3.302,4.647,3.499,0.62, BODYL);
++  TS(s, "YOUR TEXT HERE", 3.302,4.318,2.393,0.37, SUBHEAD);
++  O(s, 2.287,4.318,0.799,0.799, NAVY);
++  T(s, "02", 2.287,4.318,0.799,0.799, {f:LATO,b:1,al:"c",v:"m"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 3.302,5.91,3.499,0.62, BODYL);
++  TS(s, "YOUR TEXT HERE", 3.302,5.581,2.393,0.37, SUBHEAD);
++  O(s, 2.287,5.581,0.799,0.799, NAVY);
++  T(s, "03", 2.287,5.581,0.799,0.799, {f:LATO,b:1,al:"c",v:"m"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 2.209,2.041,4.819,0.342, BODYL);
++  footer(s, 9.864,6.863,2.605, GREY);
++  menu(s, NAVY);
++  L(s, 2.287,2.677,0.799,0, GOLD, 2);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide41(pptx) {
++  const s = pptx.addSlide();
++  I(s, 'notch', 1.021,2.938,2.563,1.147, GOLD, {rot:120});
++  I(s, 'tri', 1.973,3.139,3.16,1.58, GOLD, {rot:120});
++  I(s, 'notch', 3.559,2.636,2.563,1.147, GOLD, {rot:255,fv:1});
++  I(s, 'tri', 4.577,2.341,3.16,1.58, GOLD, {rot:255,fv:1});
++  I(s, 'notch', 6.261,2.938,2.563,1.147, GOLD, {rot:120});
++  I(s, 'tri', 7.213,3.139,3.16,1.58, GOLD, {rot:120});
++  I(s, 'notch', 8.8,2.636,2.563,1.147, NAVY, {rot:255,fv:1});
++  I(s, 'tri', 9.817,2.341,3.16,1.58, NAVY, {rot:255,fv:1});
++  pageNum(s, 41);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 1.22,5.719,2.651,0.62, BODYC);
++  TS(s, "YOUR TEXT HERE", 1.349,5.39,2.393,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 3.871,5.723,2.651,0.62, BODYC);
++  TS(s, "YOUR TEXT HERE", 4,5.394,2.393,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 6.522,5.726,2.651,0.62, BODYC);
++  TS(s, "YOUR TEXT HERE", 6.651,5.398,2.393,0.37, SUBHEAD, {al:"c"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 9.172,5.73,2.651,0.62, BODYC);
++  TS(s, "YOUR TEXT HERE", 9.302,5.402,2.393,0.37, SUBHEAD, {al:"c"});
++  footer(s, 9.864,6.863,2.605, GREY);
++  T(s, "Company Flow Diagram", 4.257,0.629,4.819,0.505, {f:MONT,sz:24,b:1,c:NAVY,al:"c"});
++  R(s, 0,0,1.015,0.97, GOLD);
++  menu(s, NAVY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++  I(s, 'tools', 2.517,3.169,0.667,0.667, WHITE);
++  I(s, 'worker', 10.274,2.833,0.582,0.704, WHITE);
++  I(s, 'gear', 4.976,2.957,0.708,0.708, WHITE);
++  I(s, 'flame', 7.852,3.175,0.495,0.703, WHITE);
++}
++
++function slide42(pptx) {
++  const s = pptx.addSlide();
++  R(s, 10.092,0,3.241,7.5, PGREY);
++  R(s, 0,0,1.015,0.97, GOLD);
++  pageNum(s, 42);
++  TS(s, "COMPANY", -0.43,3.582,1.874,0.337, KICKER, {rot:270});
++  menu(s, NAVY);
++  I(s, 'qtrA', 3.747,1.408,2.631,2.293, GOLD);
++  I(s, 'qtrB', 1.695,1.409,2.293,2.631, NAVY);
++  I(s, 'qtrC', 4.086,3.461,2.293,2.631, NAVY);
++  I(s, 'qtrD', 1.696,3.799,2.631,2.293, GOLD);
++  T(s, "01", 2.436,2.318,0.658,0.572, {f:LATO,sz:28,b:1,c:WHITE,al:"c",nw:1});
++  T(s, "04", 4.904,2.318,0.658,0.572, {f:LATO,sz:28,b:1,c:NAVY,al:"c",nw:1});
++  T(s, "02", 2.436,4.584,0.658,0.572, {f:LATO,sz:28,b:1,c:NAVY,al:"c",nw:1});
++  T(s, "03", 4.904,4.584,0.658,0.572, {f:LATO,sz:28,b:1,c:WHITE,al:"c",nw:1});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 8.024,1.929,3.647,0.62, BODYL);
++  TS(s, "YOUR TEXT HERE", 8.024,1.647,2.393,0.37, SUBHEAD);
++  T(s, "01.", 7.462,1.533,0.666,0.505, {f:LATO,sz:24,b:1,c:NAVY,al:"r",nw:1});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 8.024,3.184,3.647,0.62, BODYL);
++  TS(s, "YOUR TEXT HERE", 8.024,2.901,2.393,0.37, SUBHEAD);
++  T(s, "02.", 7.462,2.788,0.666,0.505, {f:LATO,sz:24,b:1,c:NAVY,al:"r",nw:1});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 8.024,4.438,3.647,0.62, BODYL);
++  TS(s, "YOUR TEXT HERE", 8.024,4.156,2.393,0.37, SUBHEAD);
++  T(s, "03.", 7.462,4.042,0.666,0.505, {f:LATO,sz:24,b:1,c:NAVY,al:"r",nw:1});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus.", 8.024,5.693,3.647,0.62, BODYL);
++  TS(s, "YOUR TEXT HERE", 8.024,5.41,2.393,0.37, SUBHEAD);
++  T(s, "04.", 7.462,5.296,0.666,0.505, {f:LATO,sz:24,b:1,c:NAVY,al:"r",nw:1});
++  footer(s, 9.864,6.863,2.605, GREY);
++  navPill(s, 3.773, 6.632);
++  socialCol(s, 12.763, 3.094, 1.312, INK);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide43(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 43);
++  TS(s, "COMPANY", -0.43,3.582,1.874,0.337, KICKER, {rot:270});
++  poly(s, [[0,0],[100,0],[100,100],[0,100]], 11.474,1.031,1.861,1.236, GOLD);
++  poly(s, [[0,0],[100,0],[100,100],[0,100]], 11.474,2.444,1.444,1.236, GOLD);
++  poly(s, [[0,0],[100,0],[100,100],[0,100]], 7.229,1.691,3.298,0.923, GOLD);
++  poly(s, [[0,0],[100,0],[100,100],[0,100]], 6.688,2.756,3.84,0.923, GOLD);
++  poly(s, [[0,25],[100,0],[100,100],[0,100]], 10.528,2.444,0.947,1.236, NAVY);
++  poly(s, [[0,100],[100,78],[100,0],[0,42]], 10.528,1.031,0.947,1.583, NAVY);
++  poly(s, [[0,100],[100,100],[100,0],[0,0]], 11.474,5.233,1.423,1.236, GOLD, {fv:1});
++  poly(s, [[0,100],[100,100],[100,0],[0,0]], 11.474,3.82,1.133,1.236, GOLD, {fv:1});
++  poly(s, [[0,100],[100,100],[100,0],[0,0]], 6.854,4.886,3.673,0.923, GOLD, {fv:1});
++  poly(s, [[0,100],[100,100],[100,0],[0,0]], 6.312,3.82,4.215,0.923, GOLD, {fv:1});
++  poly(s, [[0,75],[100,100],[100,0],[0,0]], 10.528,3.82,0.947,1.236, NAVY);
++  poly(s, [[0,0],[100,22],[100,100],[0,58]], 10.528,4.886,0.947,1.583, NAVY);
++  poly(s, [[0,0],[100,0],[100,100],[0,100]], 12.919,2.444,0.417,1.236, 'D4D4D4');
++  poly(s, [[0,100],[100,100],[100,0],[0,0]], 12.608,3.82,0.728,1.236, 'D4D4D4', {fv:1});
++  poly(s, [[0,100],[100,100],[100,0],[0,0]], 12.898,5.233,0.438,1.236, 'D4D4D4', {fv:1});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan ditiis.", 1.859,3.942,3.673,0.897, BODY);
++  T(s, "YOUR TEXT HERE", 1.859,3.628,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan ditiis.", 1.859,5.463,3.673,0.897, BODY);
++  T(s, "YOUR TEXT HERE", 1.859,5.149,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  TS(s, "Company / Industrial Infographic", 1.859,1.124,4.245,1.717, H2);
++  dots(s, 2.022, 3.193, 0.501);
++  footer(s, 9.864,6.863,2.605, GREY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++  I(s, 'tools', 8.487,5.144,0.407,0.407, '333333');
++  I(s, 'crane', 8.66,1.938,0.436,0.43, '333333');
++  I(s, 'saw', 8.405,3.003,0.404,0.431, '333333');
++  I(s, 'hammer', 8.203,4.068,0.434,0.429, '000000');
++}
++
++function slide44(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,3.485,7.5, NAVY);
++  pageNum(s, 44);
++  R(s, 3.167,2.091,9.413,4.568, WHITE);
++  // three sunburst rings behind the DATA 1/2/3 bubbles
++  [[3.557, NAVY, [8.2, 3.2]], [6.481, GOLD, [7, 4]], [9.404, GOLD, [8.2, 4]]].forEach(([x, c, vals]) => {
++    s.addChart(pptx.ChartType.doughnut,
++      [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: vals }],
++      { x: x, y: 2.442, w: 2.785, h: 2.634, holeSize: 54, showLegend: false, showTitle: false,
++        chartColors: [c, LGREY], dataBorder: { pt: 0, color: WHITE } });
++  });
++  O(s, 7.085,2.971,1.576,1.576, WHITE);
++  T(s, "DATA 2", 7.085,2.971,1.576,1.576, {f:LATO,sz:20,b:1,c:GOLD,al:"c",v:"m"});
++  O(s, 10.008,2.971,1.576,1.576, WHITE);
++  T(s, "DATA 3", 10.008,2.971,1.576,1.576, {f:LATO,sz:20,b:1,c:GOLD,al:"c",v:"m"});
++  O(s, 4.162,2.971,1.576,1.576, WHITE);
++  T(s, "DATA 1", 4.162,2.971,1.576,1.576, {f:LATO,sz:20,b:1,c:'181717',al:"c",v:"m"});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 6.733,5.671,2.28,0.62, BODYC);
++  T(s, "Your Text Here", 6.8,5.304,2.146,0.37, {f:LATO,sz:16,b:1,c:DGREY,al:"c"});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 3.81,5.671,2.28,0.62, BODYC);
++  T(s, "Your Text Here", 3.877,5.304,2.146,0.37, {f:LATO,sz:16,b:1,c:DGREY,al:"c"});
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 9.656,5.671,2.28,0.62, BODYC);
++  T(s, "Your Text Here", 9.723,5.304,2.146,0.37, {f:LATO,sz:16,b:1,c:DGREY,al:"c"});
++  footer(s, 9.864,6.863,2.605, GREY);
++  T(s, "Data Chart", 0.626,2.013,2.52,1.447, {f:MONT,sz:40,b:1,c:WHITE});
++  T(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan ditiis.", 0.626,4.763,1.978,1.453, {f:LATO,sz:11,c:PGREY,al:"j",ls:1.5});
++  menu(s, WHITE);
++  T(s, "COMPANY", 5.729,0.312,1.874,0.337, {f:MONT,sz:14,b:1,c:PGREY,sp:6,nw:1});
++  I(s, 'factory', 0.303,0.287,0.414,0.385, WHITE);
++}
++
++function slide45(pptx) {
++  const s = pptx.addSlide();
++  pageNum(s, 45);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui.", 9.631,3.646,2.806,0.897, BODY);
++  T(s, "YOUR TEXT HERE", 9.631,3.331,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui.", 9.631,5.195,2.806,0.897, BODY);
++  T(s, "YOUR TEXT HERE", 9.631,4.88,2.393,0.37, {f:MONT,sz:16,b:1,c:DGREY});
++  footer(s, 9.864,6.863,2.605, GREY);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui.", 8.423,1.941,4.046,0.62, BODY);
++  T(s, "Data Chart", 8.423,1.254,3.846,0.774, {f:MONT,sz:40,b:1,c:NAVY});
++  R(s, 0,0,1.015,0.97, GOLD);
++  menu(s, NAVY);
++  dots(s, 8.55, 2.904, 0.501);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++  I(s, 'crane', 8.414,3.472,0.82,0.808, NAVY);
++  I(s, 'mixer', 8.417,5.026,0.814,0.628, NAVY);
++  s.addChart(pptx.ChartType.bar,
++    [{ name: 'Series 1', labels: CATS4, values: [3, 2.5, 3.5, 3] },
++     { name: 'Series 2', labels: CATS4, values: [2.4, 2, 1.8, 2.8] },
++     { name: 'Series 3', labels: CATS4, values: [2, 2, 3, 3] }],
++    Object.assign(barAxis(), { x: 0.896, y: 0.727, w: 6.808, h: 6.08,
++      barDir: 'bar', barGapWidthPct: 79, chartColors: [NAVY, GOLD, 'AFABAB'] }));
++}
++
++function slide46(pptx) {
++  const s = pptx.addSlide();
++  R(s, 0,0,1.015,7.5, GOLD);
++  pageNum(s, 46);
++  footer(s, 9.864,6.863,2.605, GREY);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan ditiis. Edigshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan ditiis.", 1.81,1.822,4.86,0.897, BODY);
++  T(s, "YOUR TEXT HERE", 1.81,1.063,3.36,0.404, {f:MONT,b:1,c:NAVY});
++  menu(s, NAVY);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan ditiis. Edigshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui bikalan ditiis.", 7.394,1.822,4.86,0.897, BODY);
++  T(s, "YOUR TEXT HERE", 7.394,1.063,3.36,0.404, {f:MONT,b:1,c:NAVY});
++  TS(s, "COMPANY", -0.43,3.582,1.874,0.337, KICKER, {rot:270});
++  L(s, 1.953,1.656,0.799,0, GOLD, 2);
++  L(s, 7.509,1.656,0.799,0, GOLD, 2);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++  s.addChart(pptx.ChartType.bar, [{ name: 'Sales', labels: QTRS, values: [2, 3.2, 4, 5] }],
++    Object.assign(barAxis(), { x: 1.809, y: 3.196, w: 4.998, h: 3.263,
++      barGapWidthPct: 54, chartColors: [GOLD], valGridLine: { style: 'solid', color: LGREY, size: 0.75 } }));
++  s.addChart(pptx.ChartType.bar, [{ name: 'Sales', labels: QTRS, values: [2, 4, 5, 3] }],
++    Object.assign(barAxis(), { x: 7.283, y: 3.196, w: 4.998, h: 3.263,
++      barGapWidthPct: 54, chartColors: [NAVY], valGridLine: { style: 'solid', color: LGREY, size: 0.75 } }));
++}
++
++function slide47(pptx) {
++  const s = pptx.addSlide();
++  pageNum(s, 47);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui.", 0.859,2.88,2.839,0.897, BODYL, {al:"r"});
++  T(s, "YOUR TEXT HERE", 0.859,2.535,2.839,0.404, {f:MONT,b:1,c:DGREY,al:"r"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui.", 0.859,5.335,2.839,0.897, BODYL, {al:"r"});
++  T(s, "YOUR TEXT HERE", 0.859,4.989,2.839,0.404, {f:MONT,b:1,c:DGREY,al:"r"});
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui.", 9.523,5.133,2.839,0.897, BODYL);
++  T(s, "YOUR TEXT HERE", 9.523,4.788,2.839,0.404, {f:MONT,b:1,c:DGREY});
++  R(s, 0,0,1.015,0.97, GOLD);
++  TS(s, "Data Chart", 4.744,0.764,3.846,0.707, H1, {al:"c"});
++  menu(s, NAVY);
++  footer(s, 9.864,6.863,2.605, GREY);
++  TS(s, "At vero eos et accusamus et iusto odio digshay nis simos du cimus dignis sim  ducimus qui bikala nditiis qui.", 9.009,2.155,3.339,0.897, BODY);
++  L(s, 9.35,3.592,0.799,0, GOLD, 3);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++  T(s, "01", 0.859,1.835,2.839,0.774, {f:MONT,sz:40,c:GOLD,al:"r"});
++  T(s, "02", 0.859,4.29,2.839,0.774, {f:MONT,sz:40,c:GOLD,al:"r"});
++  T(s, "03", 9.523,4.088,2.839,0.774, {f:MONT,sz:40,c:GOLD});
++  s.addChart(pptx.ChartType.pie,
++    [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr'], values: [6, 3.2, 1] }],
++    { x: 4.323, y: 1.974, w: 4.684, h: 4.448, chartColors: [NAVY, GOLD, 'BFBFBF'],
++      dataBorder: { pt: 1.5, color: WHITE }, showLegend: true, legendPos: 'b',
++      legendFontFace: LATO, legendFontSize: 12, legendColor: DGREY, showTitle: false });
++}
++
++function slide48(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: GOLD };
++  pageNum(s, 48);
++  R(s, 4.359,1.016,7.921,6.484, NAVY);
++  T(s, "The Industrial Will Support Our Life In The Modern Days. And Production Will Lead To Successful World.", 5.446,2.572,5.745,2.794, {f:MERRI,sz:32,c:WHITE});
++  T(s, "Quoter’s Name", 6.561,6.282,2.251,0.337, {f:MONT,sz:14,c:WHITE});
++  L(s, 5.625,6.484,0.872,0, GOLD, 1);
++  T(s, "QUOTES OF THE DAY", 5.446,1.695,4.38,0.337, {f:MONT,sz:14,c:WHITE,sp:6});
++  T(s, "INDUSTRIAL", 7.922,0.386,1.466,0.337, {f:MONT,sz:14,b:1,c:NAVY,nw:1});
++  I(s, 'factory', 7.429,0.287,0.414,0.385, NAVY);
++}
++
++function slide49(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: PGREY };
++  R(s, 0,0,2.906,7.5, GOLD);
++  pageNum(s, 49);
++  R(s, 1.574,1.968,3.175,4.556, NAVY);
++  T(s, [{t:"$",sz:28},{t:"399",sz:44},{t:",00",sz:28}], 2.042,2.909,2.239,0.842, {f:MONT,b:1,c:WHITE,al:"c",nw:1});
++  T(s, "Standard", 2.539,2.472,1.245,0.37, {f:MONT,sz:16,c:WHITE,al:"c",nw:1});
++  T(s, "There Are Many Variations Of Passages Of Lorem Ipsum Available", 2.706,4.382,1.396,1.453, {f:LATO,sz:11,c:WHITE,ls:1.5});
++  L(s, 2.906,4.037,0.511,0, GOLD, 2);
++  O(s, 2.457,4.544,0.069,0.069, GOLD);
++  O(s, 2.457,4.81,0.069,0.069, GOLD);
++  R(s, 5.079,1.968,3.175,4.556, NAVY);
++  T(s, [{t:"$",sz:28},{t:"499",sz:44},{t:",00",sz:28}], 5.516,2.909,2.3,0.842, {f:MONT,b:1,c:WHITE,al:"c",nw:1});
++  T(s, "Gold", 6.303,2.472,0.728,0.37, {f:MONT,sz:16,c:WHITE,al:"c",nw:1});
++  T(s, "There Are Many Variations Of Passages Of Lorem Ipsum Available", 6.212,4.382,1.396,1.453, {f:LATO,sz:11,c:WHITE,ls:1.5});
++  L(s, 6.411,4.037,0.511,0, GOLD, 2);
++  O(s, 5.962,4.544,0.069,0.069, GOLD);
++  O(s, 5.962,4.81,0.069,0.069, GOLD);
++  R(s, 8.585,1.968,3.175,4.556, NAVY);
++  T(s, [{t:"$",sz:28},{t:"899",sz:44},{t:",00",sz:28}], 9.031,2.909,2.281,0.842, {f:MONT,b:1,c:WHITE,al:"c",nw:1});
++  T(s, "Premium", 9.535,2.472,1.275,0.37, {f:MONT,sz:16,c:WHITE,al:"c",nw:1});
++  T(s, "There Are Many Variations Of Passages Of Lorem Ipsum Available", 9.717,4.382,1.396,1.453, {f:LATO,sz:11,c:WHITE,ls:1.5});
++  L(s, 9.917,4.037,0.511,0, GOLD, 2);
++  O(s, 9.468,4.544,0.069,0.069, GOLD);
++  O(s, 9.468,4.81,0.069,0.069, GOLD);
++  O(s, 5.962,5.102,0.069,0.069, GOLD);
++  O(s, 9.468,5.108,0.069,0.069, GOLD);
++  O(s, 9.468,5.373,0.069,0.069, GOLD);
++  O(s, 9.468,5.648,0.069,0.069, GOLD);
++  RT(s, 5.079,1.968,1.38,1.38, GOLD, {rot:90});
++  T(s, "RECOMMEDED", 4.958,2.371,1.31,0.269, {f:MONT,sz:10,b:1,c:NAVY,al:"c",nw:1,rot:315});
++  T(s, "Pricing Table", 4.427,0.637,4.158,0.707, {f:MONT,sz:36,b:1,c:'222A35',al:"c"});
++  T(s, "INDUSTRIAL", 0.904,0.386,1.466,0.337, {f:MONT,sz:14,b:1,c:NAVY,nw:1});
++  footer(s, 9.864,6.863,2.605, GREY);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, NAVY);
++}
++
++function slide50(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: NAVY };
++  R(s, 1.254,0.847,8.667,5.806, WHITE);
++  pageNum(s, 50, 0.352, 3, "l");
++  L(s, 6.904,3.234,0,2.823, SILVER, 1);
++  socialCol(s, 7.648, 4.288, 1.311, GOLD);
++  TS(s, "@theindustrial", 7.9,4.219,1.205,0.286, NOTE);
++  TS(s, "The Industrial", 7.9,4.787,1.205,0.286, NOTE);
++  TS(s, "@the_industrial", 7.9,5.356,1.433,0.286, NOTE);
++  T(s, "Follow Us", 7.452,3.606,1.465,0.404, {f:MONT,c:NAVY});
++  T(s, "Contact Us", 1.886,1.372,2.786,0.639, {f:MONT,sz:32,b:1,nw:1});
++  TS(s, [{t:"4521  Hastings Street",br:1},{t:"Vancouver",br:1},{t:"British Columbia",br:1},{t:"V6C 1B4"}], 1.941,3.471,1.662,1.175, BODYL, {nw:1});
++  T(s, "ADDRESS", 1.941,3.126,1.382,0.408, {f:LATO,sz:14,b:1,c:'0D0D0D',sp:3,ls:1.5,nw:1});
++  TS(s, "www.industrial.ca", 1.941,5.685,1.415,0.342, BODYL, {nw:1});
++  T(s, "WEBSITE", 1.941,5.34,1.338,0.408, {f:LATO,sz:14,b:1,c:'0D0D0D',sp:3,ls:1.5,nw:1});
++  TS(s, [{t:"industrial@mail.com",br:1},{t:"industrial@supermail.com",br:1},{t:"industrial@post.com"}], 4.427,3.471,2.114,0.897, BODYL);
++  T(s, "EMAIL", 4.427,3.126,1.01,0.408, {f:LATO,sz:14,b:1,c:'0D0D0D',sp:3,ls:1.5});
++  TS(s, [{t:"604-048-0756",br:1},{t:"604-728-6623"}], 4.427,5.405,1.205,0.62, BODYL);
++  T(s, "PHONE", 4.427,5.06,1.103,0.408, {f:LATO,sz:14,b:1,c:'0D0D0D',sp:3,ls:1.5});
++  I(s, 'phone', 4.567,4.75,0.245,0.235, GOLD);
++  I(s, 'pin', 2.095,2.795,0.199,0.283, GOLD);
++  I(s, 'mail', 4.551,2.795,0.276,0.199, GOLD);
++  I(s, 'web', 2.072,5.016,0.245,0.245, GOLD);
++  TS(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et.", 6.077,1.749,3.19,0.897, BODYL, {al:"r"});
++  footer(s, 1.172,6.905,2.605, WHITE);
++  I(s, 'factory', 12.574,0.287,0.414,0.385, NAVY);
++}
++
++function slide51(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: WHITE };
++  R(s, 2.242,2.094,8.839,3.312, INK, {a:21});
++  R(s, 0,2.094,2.242,3.312, GOLD);
++  T(s, [{t:"THANK",c:GOLD},{t:" YOU",c:WHITE}], 3.371,2.865,6.592,1.313, {f:MONT,sz:72,b:1,al:"c",nw:1});
++  T(s, "INDUSTRIAL", 0.904,0.386,1.466,0.337, {f:MONT,sz:14,b:1,c:WHITE,nw:1});
++  tagline(s, 4.464, 4.311, 4.378, WHITE, 1);
++  socialCol(s, 0.54, 3.094, 1.312, WHITE);
++  T(s, "PRESENTATION", 11.08,6.837,1.817,0.337, {f:MONT,sz:14,b:1,c:WHITE,al:"r",nw:1});
++  R(s, 11.086,2.094,2.242,3.312, GOLD);
++  pageNum(s, 51);
++  I(s, 'factory', 0.303,0.287,0.414,0.385, WHITE);
++}
++
++/* ------------------------------------------------------------------ assemble */
++const CATS4 = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++const QTRS = ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'];
++function barAxis() {
++  return {
++    showLegend: false, showTitle: false, showValue: false,
++    catAxisLineShow: true, catAxisLineColor: LGREY, valAxisLineShow: false,
++    valGridLine: { style: 'solid', color: LGREY, size: 0.75 },
++    catGridLine: { style: 'none' },
++    catAxisLabelFontFace: LATO, catAxisLabelFontSize: 12, catAxisLabelColor: DGREY,
++    valAxisLabelFontFace: LATO, valAxisLabelFontSize: 12, valAxisLabelColor: DGREY,
++    dataBorder: { pt: 0, color: WHITE },
++  };
++}
++
++const SLIDES = [
++  slide01,
++  slide02,
++  slide03,
++  slide04,
++  slide05,
++  slide06,
++  slide07,
++  slide08,
++  slide09,
++  slide10,
++  slide11,
++  slide12,
++  slide13,
++  slide14,
++  slide15,
++  slide16,
++  slide17,
++  slide18,
++  slide19,
++  slide20,
++  slide21,
++  slide22,
++  slide23,
++  slide24,
++  slide25,
++  slide26,
++  slide27,
++  slide28,
++  slide29,
++  slide30,
++  slide31,
++  slide32,
++  slide33,
++  slide34,
++  slide35,
++  slide36,
++  slide37,
++  slide38,
++  slide39,
++  slide40,
++  slide41,
++  slide42,
++  slide43,
++  slide44,
++  slide45,
++  slide46,
++  slide47,
++  slide48,
++  slide49,
++  slide50,
++  slide51
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'W16x9', width: 13.333, height: 7.5 });
++  pptx.layout = 'W16x9';
++  pptx.title = 'INDUSTRIAL Presentation Template';
++  SLIDES.forEach(fn => fn(pptx));
++  return pptx;
++}
++
++build().writeFile({ fileName: path.join(__dirname, '081b70a2-627d-4bac-a736-fe356e8901e4_grok_final.pptx') })
++  .then(f => console.log('wrote ' + f));

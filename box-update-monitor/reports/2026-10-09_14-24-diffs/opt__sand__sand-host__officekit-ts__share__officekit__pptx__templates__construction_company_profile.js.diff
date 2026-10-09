@@ -1,0 +1,624 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/construction_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/construction_company_profile.js
+@@ -0,0 +1,621 @@
++/**
++ * "Palema." construction-agency deck — rebuilt with pptxgenjs.
++ *
++ * Slide size 13.333 x 7.5 in (16:9), theme fonts Lato (headings) / DM Sans (body),
++ * accent #FF8000 on either a white or a #262626 page.
++ *
++ * The source deck carries no raster artwork: its picture frames are empty
++ * placeholders and the three team icons are vectors, redrawn here from
++ * primitives. Frame rectangles are noted per slide in comments.
++ *
++ * Run:  node 03cfd7ef-d17e-4f28-bc7f-3c8975071cd8_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens
++ * ------------------------------------------------------------------ */
++
++const C = {
++  orange: 'FF8000',
++  ink: '262626', // dark page background / darkest text
++  white: 'FFFFFF',
++  grey: '808080', // body copy
++  greyDark: '595959',
++  greyMid: 'BFBFBF',
++  greyLight: 'D9D9D9',
++};
++
++const FONT_MAJOR = 'Lato'; // theme major latin
++const FONT_MINOR = 'DM Sans'; // theme minor latin
++
++// Recurring type styles (sizes in pt).
++const T = {
++  title: { fontFace: FONT_MAJOR, fontSize: 36, bold: true },
++  hero: { fontFace: FONT_MAJOR, fontSize: 60, bold: true },
++  sub: { fontFace: FONT_MAJOR, fontSize: 14, bold: true },
++  body: { fontFace: FONT_MINOR, fontSize: 12, color: C.grey, lineSpacingMultiple: 1.5 },
++  nav: { fontFace: FONT_MINOR, fontSize: 12 },
++  brand: { fontFace: FONT_MAJOR, fontSize: 14, bold: true },
++  pageNo: { fontFace: FONT_MAJOR, fontSize: 36, bold: true, charSpacing: 0 },
++  url: { fontFace: FONT_MINOR, fontSize: 10, charSpacing: 2, lineSpacingMultiple: 1.0 },
++};
++
++// The deck re-uses a handful of filler paragraphs.
++const LOREM = {
++  long: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod ' +
++    'tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim ',
++  medium: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut',
++  short: 'Lorem ipsum dolor sit, adipisicing elit, sed do eiusmod',
++  tiny: 'Lorem ipsum dolor amet, elit, sed do eiusmod',
++  card: 'Lorem ipsum dolor amet, consectet adipi sicing elit, sed do',
++  team: 'Lorem ipsum dolor sit amet, elit, sed do eiusmod tempor incididunt',
++  panel: 'Lorem ipsum dolor amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut',
++};
++
++// pptxgenjs rescales the shadow object in place, so build a fresh one per shape.
++function cardShadow() {
++  return { type: 'outer', blur: 50, offset: 3, angle: 90, color: '000000', opacity: 0.1 };
++}
++
++/* ------------------------------------------------------------------ *
++ * Low-level helpers
++ * ------------------------------------------------------------------ */
++
++// Text box with PowerPoint's default insets and top anchoring.
++function txt(slide, content, o) {
++  slide.addText(content, Object.assign({ valign: 'top', align: 'left', isTextBox: true }, o));
++}
++
++function rect(slide, o) {
++  slide.addShape('rect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: o.fill ? { color: o.fill } : { type: 'none' },
++    line: o.line || { type: 'none' },
++    shadow: o.shadow,
++  });
++}
++
++function ellipse(slide, o) {
++  slide.addShape('ellipse', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: o.fill ? { color: o.fill } : { type: 'none' },
++    line: o.line || { type: 'none' },
++  });
++}
++
++function roundRect(slide, o) {
++  slide.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.r || 0.03,
++    fill: o.fill ? { color: o.fill } : { type: 'none' },
++    line: o.line || { type: 'none' },
++    rotate: o.rotate || 0,
++  });
++}
++
++function line(slide, o) {
++  slide.addShape('line', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    line: { color: o.color, width: o.width },
++    flipV: !!o.flipV,
++  });
++}
++
++// Free-form polygon; pts are absolute [x, y] pairs in inches.
++function poly(slide, pts, o) {
++  const xs = pts.map((p) => p[0]);
++  const ys = pts.map((p) => p[1]);
++  const x = Math.min.apply(null, xs);
++  const y = Math.min.apply(null, ys);
++  slide.addShape('custGeom', {
++    x: x, y: y, w: Math.max.apply(null, xs) - x, h: Math.max.apply(null, ys) - y,
++    points: pts.map((p) => ({ x: p[0] - x, y: p[1] - y })).concat([{ close: true }]),
++    fill: o.fill ? { color: o.fill } : { type: 'none' },
++    line: o.line || { type: 'none' },
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Recurring decorations
++ * ------------------------------------------------------------------ */
++
++/**
++ * Diagonal pinstripe texture used on nearly every slide: 40 evenly spaced
++ * bands running up to the right, clipped to the block's box.
++ * Values are fractions of the block, taken from the original freeform.
++ */
++const HATCH = { slope: 0.39965, gap: 0.034845, thick: 0.00615, first: 0.0169, count: 40 };
++
++// Sutherland–Hodgman clip of a convex polygon against `keep(pt) >= 0`.
++function clipHalfPlane(polygon, keep) {
++  const out = [];
++  for (let i = 0; i < polygon.length; i++) {
++    const a = polygon[i];
++    const b = polygon[(i + 1) % polygon.length];
++    const da = keep(a);
++    const db = keep(b);
++    if (da >= 0) out.push(a);
++    if ((da >= 0) !== (db >= 0)) {
++      const t = da / (da - db);
++      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
++    }
++  }
++  return out;
++}
++
++function hatchBlock(slide, o) {
++  const rot = o.rotate || 0;
++  for (let i = 0; i < HATCH.count; i++) {
++    const a = HATCH.first + i * HATCH.gap;
++    // Keep the unit square strip between v = a - slope*u and v = a + thick - slope*u.
++    let p = [[0, 0], [1, 0], [1, 1], [0, 1]];
++    p = clipHalfPlane(p, (q) => q[1] + HATCH.slope * q[0] - a);
++    p = clipHalfPlane(p, (q) => a + HATCH.thick - (q[1] + HATCH.slope * q[0]));
++    if (p.length < 3) continue;
++    poly(slide, p.map((q) => {
++      let u = q[0];
++      let v = q[1];
++      if (rot === 90) { const t = u; u = 1 - v; v = t; }
++      else if (rot === 270) { const t = u; u = v; v = 1 - t; }
++      return [o.x + u * o.w, o.y + v * o.h];
++    }), { fill: o.color || C.orange });
++  }
++}
++
++// "L"-in-a-square brand mark: notched frame plus two solid blocks.
++function brandMark(slide, x, y, w, h) {
++  const sx = w / 0.774;
++  const sy = h / 0.808;
++  poly(slide, [
++    [x, y], [x + 0.717 * sx, y], [x + 0.717 * sx, y + 0.0864 * sy],
++    [x + 0.0764 * sx, y + 0.0864 * sy], [x + 0.0764 * sx, y + 0.7215 * sy],
++    [x + 0.717 * sx, y + 0.7215 * sy], [x + 0.717 * sx, y + 0.808 * sy], [x, y + 0.808 * sy],
++  ], { fill: C.orange });
++  rect(slide, { x: x + 0.609 * sx, y: y, w: 0.166 * sx, h: 0.338 * sy, fill: C.orange });
++  rect(slide, { x: x + 0.204 * sx, y: y, w: 0.299 * sx, h: 0.615 * sy, fill: C.orange });
++}
++
++// Four stacked, right-aligned bars — the "hamburger" nav button.
++function hamburger(slide, x, y, w, h, color) {
++  [[0.000, 0.000, 1.000], [0.188, 0.296, 0.812], [0.000, 0.593, 1.000], [0.281, 0.889, 0.719]]
++    .forEach((b) => {
++      roundRect(slide, { x: x + b[0] * w, y: y + b[1] * h, w: b[2] * w, h: 0.111 * h, r: 0.014, fill: color });
++    });
++}
++
++// Small "v" chevron next to the Menu label.
++function chevron(slide, x, y, w, h, color) {
++  const t = h * 0.42;
++  poly(slide, [
++    [x, y], [x + t * 0.9, y], [x + w / 2, y + h - t], [x + w - t * 0.9, y], [x + w, y],
++    [x + w / 2, y + h],
++  ], { fill: color });
++}
++
++// Diagonal arrow drawn from three strokes.
++function arrowGlyph(slide, x, y, w, h, color, width) {
++  line(slide, { x: x, y: y + h * 0.086, w: w, h: 0, color: color, width: width });
++  line(slide, { x: x + w * 0.956, y: y, w: 0, h: h, color: color, width: width, flipV: true });
++  line(slide, { x: x + w * 0.098, y: y + h * 0.093, w: w * 0.825, h: h * 0.84, color: color, width: width, flipV: true });
++}
++
++/* ------------------------------------------------------------------ *
++ * Icon glyphs (flat, single colour, built from primitives)
++ * ------------------------------------------------------------------ */
++
++function iconBriefcase(slide, x, y, w, h, color, bg) {
++  roundRect(slide, { x: x + 0.33 * w, y: y, w: 0.34 * w, h: 0.30 * h, r: 0.03, fill: color });
++  roundRect(slide, { x: x + 0.40 * w, y: y + 0.09 * h, w: 0.20 * w, h: 0.30 * h, r: 0.02, fill: bg });
++  roundRect(slide, { x: x, y: y + 0.20 * h, w: w, h: 0.80 * h, r: 0.05, fill: color });
++  rect(slide, { x: x, y: y + 0.55 * h, w: w, h: 0.055 * h, fill: bg });
++  rect(slide, { x: x + 0.44 * w, y: y + 0.44 * h, w: 0.12 * w, h: 0.32 * h, fill: color });
++}
++
++function iconGradCap(slide, x, y, w, h, color) {
++  poly(slide, [[x + w / 2, y], [x + w, y + 0.42 * h], [x + w / 2, y + 0.68 * h], [x, y + 0.42 * h]],
++    { fill: color });
++  poly(slide, [
++    [x + 0.18 * w, y + 0.56 * h], [x + w / 2, y + 0.80 * h], [x + 0.82 * w, y + 0.56 * h],
++    [x + 0.82 * w, y + 0.80 * h], [x + w / 2, y + h], [x + 0.18 * w, y + 0.80 * h],
++  ], { fill: color });
++  line(slide, { x: x + 0.93 * w, y: y + 0.36 * h, w: 0, h: 0.44 * h, color: color, width: 1.5 });
++}
++
++function iconBinoculars(slide, x, y, w, h, color, bg) {
++  [0, 0.60].forEach((bx) => {
++    roundRect(slide, { x: x + (bx + 0.077) * w, y: y, w: 0.25 * w, h: 0.22 * h, r: 0.02, fill: color });
++    roundRect(slide, { x: x + bx * w, y: y + 0.12 * h, w: 0.40 * w, h: 0.88 * h, r: 0.05, fill: color });
++    ellipse(slide, { x: x + (bx + 0.03) * w, y: y + 0.55 * h, w: 0.34 * w, h: 0.36 * h, fill: bg });
++  });
++  rect(slide, { x: x + 0.36 * w, y: y + 0.30 * h, w: 0.28 * w, h: 0.34 * h, fill: color });
++  ellipse(slide, { x: x + 0.42 * w, y: y + 0.50 * h, w: 0.16 * w, h: 0.16 * h, fill: bg });
++}
++
++function iconTools(slide, x, y, w, h, color) {
++  roundRect(slide, { x: x + 0.08 * w, y: y + 0.42 * h, w: 0.84 * w, h: 0.19 * h, r: 0.02, fill: color, rotate: -45 });
++  roundRect(slide, { x: x + 0.08 * w, y: y + 0.42 * h, w: 0.84 * w, h: 0.19 * h, r: 0.02, fill: color, rotate: 45 });
++  poly(slide, [
++    [x + 0.55 * w, y + 0.06 * h], [x + 0.95 * w, y + 0.06 * h], [x + 0.72 * w, y + 0.30 * h],
++    [x + 0.95 * w, y + 0.52 * h], [x + 0.60 * w, y + 0.52 * h], [x + 0.45 * w, y + 0.30 * h],
++  ], { fill: color });
++  ellipse(slide, { x: x + 0.10 * w, y: y + 0.72 * h, w: 0.15 * w, h: 0.15 * h, fill: C.white });
++}
++
++function iconBulb(slide, x, y, w, h, color) {
++  ellipse(slide, { x: x, y: y, w: w, h: w * 1.05, fill: color });
++  poly(slide, [
++    [x + 0.24 * w, y + 0.80 * h], [x + 0.76 * w, y + 0.80 * h],
++    [x + 0.66 * w, y + h], [x + 0.34 * w, y + h],
++  ], { fill: color });
++  rect(slide, { x: x + 0.22 * w, y: y + 0.74 * h, w: 0.56 * w, h: 0.045 * h, fill: C.white });
++}
++
++function iconTruck(slide, x, y, w, h, color) {
++  roundRect(slide, { x: x + 0.03 * w, y: y + 0.12 * h, w: 0.55 * w, h: 0.62 * h, r: 0.03, fill: color });
++  poly(slide, [
++    [x + 0.55 * w, y + 0.28 * h], [x + 0.75 * w, y + 0.28 * h], [x + 0.93 * w, y + 0.50 * h],
++    [x + 0.93 * w, y + 0.74 * h], [x + 0.55 * w, y + 0.74 * h],
++  ], { fill: color });
++  rect(slide, { x: x + 0.03 * w, y: y + 0.66 * h, w: 0.94 * w, h: 0.13 * h, fill: color });
++  [0.24, 0.68].forEach((cx) => {
++    ellipse(slide, { x: x + cx * w, y: y + 0.60 * h, w: 0.24 * w, h: 0.30 * h, fill: color });
++    ellipse(slide, { x: x + (cx + 0.06) * w, y: y + 0.68 * h, w: 0.12 * w, h: 0.15 * h, fill: C.white });
++  });
++}
++
++function iconGlobe(slide, x, y, w, h, color) {
++  const ring = { color: color, width: 1.5 };
++  ellipse(slide, { x: x, y: y, w: w, h: h, line: ring });
++  ellipse(slide, { x: x + 0.32 * w, y: y, w: 0.36 * w, h: h, line: ring });
++  line(slide, { x: x, y: y + h / 2, w: w, h: 0, color: color, width: 1.5 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Page furniture shared by every slide
++ * ------------------------------------------------------------------ */
++
++// Thin vertical rule hanging off the right edge; sits under everything else.
++function rightRule(slide, color) {
++  line(slide, { x: 12.649, y: 1.981, w: 0, h: 3.538, color: color, width: 1.5 });
++}
++
++function wordmark(slide, theme) {
++  const fg = theme === 'dark' ? C.white : C.ink;
++  brandMark(slide, 0.542, 0.314, 0.278, 0.29);
++  txt(slide, [{ text: 'Palema' }, { text: '.' }],
++    Object.assign({ x: 0.888, y: 0.301, w: 1.359, h: 0.337, color: fg }, T.brand));
++}
++
++function header(slide, theme) {
++  const fg = theme === 'dark' ? C.white : C.ink;
++  wordmark(slide, theme);
++  txt(slide, 'Menu', Object.assign({ x: 11.558, y: 0.323, w: 0.729, h: 0.303, color: fg }, T.nav));
++  chevron(slide, 12.186, 0.451, 0.101, 0.058, theme === 'dark' ? C.white : C.greyMid);
++  hamburger(slide, 12.491, 0.34, 0.308, 0.261, C.orange);
++}
++
++// Sideways "0N" page number in the bottom-right corner.
++function pageNumber(slide, n, theme) {
++  txt(slide, '0' + n, Object.assign(
++    { x: 12.119, y: 6.699, w: 1.046, h: 0.707, rotate: 270, align: 'right', color: theme === 'dark' ? C.white : C.ink },
++    T.pageNo));
++}
++
++function siteUrl(slide, theme) {
++  txt(slide, 'WWW.YOURWEBSITE.COM', Object.assign(
++    { x: 0.347, y: 6.967, w: 3.17, h: 0.269, color: theme === 'dark' ? C.greyDark : C.greyLight }, T.url));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++// 01 — dark hero. Picture frames: 5.125/0/4.907/7.5 and 0/4.181/4.109/1.909.
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.ink };
++  rightRule(s, C.orange);
++
++  hatchBlock(s, { x: 4.781, y: 4.911, w: 2.159, h: 4.114 });
++  rect(s, { x: 6.832, y: 3.75, w: 3.843, h: 3.75, fill: C.orange });
++
++  header(s, 'dark');
++  txt(s, 'Home', Object.assign({ x: 4.922, y: 0.338, w: 0.776, h: 0.303, align: 'center', color: C.white, bold: true, fontFace: FONT_MAJOR }, T.nav));
++  txt(s, 'About Us', Object.assign({ x: 5.798, y: 0.338, w: 1.368, h: 0.303, align: 'center', color: C.greyMid }, T.nav));
++  txt(s, 'Contact', Object.assign({ x: 7.043, y: 0.338, w: 1.368, h: 0.303, align: 'center', color: C.greyMid }, T.nav));
++
++  txt(s, [{ text: 'Palema' }, { text: '.' }],
++    { x: 1.342, y: 1.505, w: 5.248, h: 1.717, color: C.white, fontFace: FONT_MAJOR, fontSize: 96, bold: true });
++  txt(s, 'Lorem ipsum dolor sit amet, elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim',
++    Object.assign({ x: 8.615, y: 1.933, w: 3.521, h: 0.982 }, T.body, { color: C.white }));
++
++  // Primary / secondary call-to-action buttons.
++  rect(s, { x: 1.549, y: 3.401, w: 1.154, h: 0.344, fill: C.orange });
++  txt(s, 'Read More', { x: 1.549, y: 3.418, w: 1.154, h: 0.303, align: 'center', color: C.white, fontFace: FONT_MAJOR, fontSize: 12, bold: true });
++  rect(s, { x: 2.956, y: 3.401, w: 1.154, h: 0.344, line: { color: C.orange, width: 1 } });
++  txt(s, 'Started', { x: 2.956, y: 3.418, w: 1.154, h: 0.303, align: 'center', color: C.white, fontFace: FONT_MAJOR, fontSize: 12, bold: true });
++
++  rect(s, { x: 3.525, y: 5.505, w: 0.585, h: 0.585, fill: C.orange });
++  arrowGlyph(s, 3.677, 5.663, 0.28, 0.267, C.white, 3);
++
++  siteUrl(s, 'dark');
++  pageNumber(s, 1, 'dark');
++}
++
++// 02 — vision. Picture frames: 7.001/1.571/2.409/4.357 and 9.549/2.619/2.409/3.31.
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  rightRule(s, C.greyLight);
++
++  rect(s, { x: 7.52, y: 0, w: 1.359, h: 1.571, fill: C.orange });
++  hatchBlock(s, { x: 6.862, y: 5.28, w: 0.956, h: 1.821 });
++
++  header(s, 'light');
++  txt(s, [
++    { text: 'Building The Future ', options: { color: C.ink } },
++    { text: 'Our Vision Unveiled', options: { color: C.orange } },
++  ], Object.assign({ x: 1.424, y: 1.705, w: 5.253, h: 1.313 }, T.title));
++
++  txt(s, 'Transforming Ambition into Reality ', Object.assign({ x: 1.424, y: 3.635, w: 3.697, h: 0.337, color: C.ink }, T.sub));
++  txt(s, LOREM.medium, Object.assign({ x: 1.424, y: 4.082, w: 4.35, h: 0.682 }, T.body));
++  txt(s, LOREM.long, Object.assign({ x: 1.424, y: 4.811, w: 4.35, h: 0.985 }, T.body));
++
++  rect(s, { x: 9.734, y: 1.848, w: 0.13, h: 0.13, fill: C.orange });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur', Object.assign({ x: 9.97, y: 1.705, w: 2.158, h: 0.679 }, T.body));
++
++  siteUrl(s, 'light');
++  pageNumber(s, 2, 'light');
++}
++
++// 03 — progress. Picture frames: 0/1.625/3.097/5.875 and 3.273/1.625/3.097/4.25.
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  rightRule(s, C.greyLight);
++
++  rect(s, { x: 4.142, y: 0, w: 1.359, h: 1.625, fill: C.orange });
++  hatchBlock(s, { x: 4.822, y: 5.397, w: 1.821, h: 0.956, rotate: 90 });
++
++  header(s, 'light');
++  txt(s, [
++    { text: 'Timely Our ', options: { color: C.ink } },
++    { text: 'Progress', options: { color: C.orange } },
++  ], Object.assign({ x: 7.131, y: 1.971, w: 5.055, h: 0.707 }, T.title));
++
++  txt(s, 'From Blueprint To Completion ', Object.assign({ x: 7.131, y: 3.339, w: 3.697, h: 0.337, color: C.ink }, T.sub));
++  txt(s, LOREM.long, Object.assign({ x: 7.131, y: 3.802, w: 4.654, h: 0.985 }, T.body));
++
++  rect(s, { x: 7.242, y: 5.093, w: 1.472, h: 0.436, fill: C.orange });
++  txt(s, 'Read More', Object.assign({ x: 7.242, y: 5.142, w: 1.472, h: 0.337, align: 'center', color: C.white }, T.sub));
++
++  pageNumber(s, 3, 'light');
++}
++
++// 04 — sustainability. Picture frame: 1.549/3.417/10.236/3.149.
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  rightRule(s, C.greyLight);
++
++  rect(s, { x: 5.987, y: 6.566, w: 1.359, h: 0.934, fill: C.orange });
++  hatchBlock(s, { x: 0.977, y: 3.75, w: 0.956, h: 1.821 });
++
++  header(s, 'light');
++  txt(s, [
++    { text: 'Green Building ', options: { color: C.ink } },
++    { text: 'Initiatives', options: { color: C.orange } },
++  ], Object.assign({ x: 2.628, y: 0.934, w: 8.077, h: 0.707, align: 'center' }, T.title));
++
++  txt(s, 'Building Responsibly for a Sustainable Future ',
++    Object.assign({ x: 4.516, y: 1.924, w: 4.301, h: 0.337, align: 'center', color: C.ink }, T.sub));
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim , consectetur adipisicing elit, sed do eiusmod tempor incididunt',
++    Object.assign({ x: 2.26, y: 2.344, w: 8.814, h: 0.682, align: 'center' }, T.body));
++
++  siteUrl(s, 'light');
++  pageNumber(s, 4, 'light');
++}
++
++// 05 — safety. Picture frame: 6.81/3.646/6.524/3.854.
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  rightRule(s, C.greyLight);
++
++  rect(s, { x: 12.602, y: 1.429, w: 0.731, h: 2.217, fill: C.orange });
++  hatchBlock(s, { x: 6.306, y: 5.679, w: 0.956, h: 1.821 });
++
++  header(s, 'light');
++  txt(s, [
++    { text: 'Ensuring a Secure ', options: { color: C.ink } },
++    { text: 'Work Environment', options: { color: C.orange } },
++  ], Object.assign({ x: 1.413, y: 1.674, w: 5.253, h: 1.313 }, T.title));
++
++  txt(s, 'Our Commitment to Safety ', Object.assign({ x: 1.413, y: 3.539, w: 3.652, h: 0.337, color: C.ink }, T.sub));
++  txt(s, LOREM.long, Object.assign({ x: 1.413, y: 4.042, w: 4.35, h: 0.985 }, T.body));
++
++  rect(s, { x: 1.545, y: 5.213, w: 0.613, h: 0.613, fill: C.orange });
++  iconBinoculars(s, 1.68, 5.373, 0.343, 0.292, C.white, C.orange);
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod',
++    Object.assign({ x: 2.35, y: 5.146, w: 3.897, h: 0.679 }, T.body));
++
++  // Two labelled bullet points along the top right.
++  [
++    { sq: 7.206, lx: 7.452, bx: 7.099, bw: 2.318, label: 'Point One' },
++    { sq: 9.84, lx: 10.085, bx: 9.759, bw: 2.28, label: 'Point Two' },
++  ].forEach((p) => {
++    rect(s, { x: p.sq, y: 1.931, w: 0.139, h: 0.139, fill: C.orange });
++    txt(s, p.label, Object.assign({ x: p.lx, y: 1.841, w: 2.242, h: 0.337, color: C.ink }, T.sub, { lineSpacingMultiple: 1.0 }));
++    txt(s, LOREM.tiny, Object.assign({ x: p.bx, y: 2.253, w: p.bw, h: 0.679 }, T.body));
++  });
++
++  siteUrl(s, 'light');
++}
++
++// 06 — timeline cards. Picture frames: 0/2.347/4.893/5.153 and 8.44/2.347/4.893/5.153.
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  rightRule(s, C.greyLight);
++
++  rect(s, { x: 12.583, y: 1.192, w: 0.75, h: 1.155, fill: C.orange });
++  hatchBlock(s, { x: -0.369, y: 1.869, w: 1.821, h: 0.956, rotate: 270 });
++
++  header(s, 'light');
++  txt(s, [
++    { text: 'Embracing Technological ', options: { color: C.ink } },
++    { text: 'Advancement', options: { color: C.orange } },
++  ], Object.assign({ x: 1.411, y: 1.119, w: 10.51, h: 0.707, align: 'center' }, T.title));
++
++  const cards = [
++    { x: 3.547, fill: C.white, tile: C.orange, glyph: C.white, ink: C.ink, body: C.grey, year: '2023 - 2024', shadow: cardShadow() },
++    { x: 7.121, fill: C.orange, tile: C.white, glyph: C.orange, ink: C.white, body: C.white, year: '2024 - 2025' },
++  ];
++  cards.forEach((c, i) => {
++    rect(s, { x: c.x, y: 3.227, w: 2.639, h: 3.393, fill: c.fill, shadow: c.shadow });
++    rect(s, { x: c.x + 0.944, y: 3.67, w: 0.803, h: 0.803, fill: c.tile });
++    if (i === 0) iconBriefcase(s, c.x + 1.127, 3.884, 0.44, 0.376, c.glyph, c.tile);
++    else iconGradCap(s, c.x + 1.127, 3.884, 0.44, 0.376, c.glyph);
++    txt(s, c.year, Object.assign({ x: c.x, y: 4.783, w: 2.639, h: 0.337, align: 'center', color: c.ink }, T.sub));
++    txt(s, LOREM.card, Object.assign({ x: c.x + 0.252, y: 5.195, w: 2.187, h: 0.982, align: 'center' }, T.body, { color: c.body }));
++  });
++}
++
++// 07 — team. Picture frames: 5.892/0/2.517/3.557 and 1.549/3.686/6.861/2.812.
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  rightRule(s, C.greyLight);
++
++  rect(s, { x: 6.468, y: 6.499, w: 1.359, h: 1.001, fill: C.orange });
++  hatchBlock(s, { x: 1.098, y: 4.337, w: 0.956, h: 1.821 });
++
++  header(s, 'light');
++  txt(s, [
++    { text: 'Dedicated Team ', options: { color: C.ink } },
++    { text: 'Diverse Roles', options: { color: C.orange } },
++  ], Object.assign({ x: 1.422, y: 1.105, w: 4.007, h: 1.313 }, T.title));
++  txt(s, 'Lorem ipsum dolor sit amet, adipisicing elit, sed do eiusmod tempor incididunt ut labore',
++    Object.assign({ x: 1.453, y: 2.547, w: 4.111, h: 0.679 }, T.body));
++
++  // Three icon + heading + copy rows down the right column.
++  [
++    { label: 'Technical Experts', ly: 1.219, by: 1.738, iy: 1.214, iw: 0.342, ih: 0.342, lw: 2.378, icon: iconTools },
++    { label: 'Experienced Leadership', ly: 3.173, by: 3.682, iy: 3.157, iw: 0.246, ih: 0.357, lw: 2.378, icon: iconBulb },
++    { label: 'Collaboration', ly: 5.092, by: 5.602, iy: 5.112, iw: 0.371, ih: 0.297, lw: 1.934, icon: iconTruck },
++  ].forEach((r) => {
++    r.icon(s, 8.965, r.iy, r.iw, r.ih, C.orange);
++    txt(s, r.label, Object.assign({ x: 9.4, y: r.ly, w: r.lw, h: 0.337, color: C.ink }, T.sub));
++    txt(s, LOREM.team, Object.assign({ x: 8.86, y: r.by, w: 3.137, h: 0.679 }, T.body));
++  });
++
++  siteUrl(s, 'light');
++  pageNumber(s, 7, 'light');
++}
++
++// 08 — challenges. Picture frames: 0/2.316/4.812/2.559, 4.958/2.316/3.417/2.559, 8.521/2.316/4.812/2.559.
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  rightRule(s, C.greyLight);
++
++  rect(s, { x: 12.576, y: 1.319, w: 0.757, h: 0.997, fill: C.orange });
++  hatchBlock(s, { x: 0, y: 1.439, w: 0.956, h: 1.821 });
++
++  header(s, 'light');
++  txt(s, [
++    { text: 'Overcoming ', options: { color: C.ink } },
++    { text: 'Obstacles', options: { color: C.orange } },
++  ], Object.assign({ x: 3.087, y: 1.254, w: 7.158, h: 0.707, align: 'center' }, T.title));
++  txt(s, 'Navigating Challenges with Strategic Solutions ',
++    Object.assign({ x: 4.211, y: 1.98, w: 4.912, h: 0.337, align: 'center', color: C.white }, T.sub));
++
++  // Three captions under the photo strip.
++  [
++    { label: 'Adaptable Strategies', lx: 1.654, lw: 2.378, bx: 1.392, by: 5.567 },
++    { label: 'Innovative Problem-Solving', lx: 5.285, lw: 2.764, bx: 5.217, by: 5.567 },
++    { label: 'Best Strategies', lx: 9.297, lw: 2.378, bx: 9.031, by: 5.559 },
++  ].forEach((c) => {
++    txt(s, c.label, Object.assign({ x: c.lx, y: 5.212, w: c.lw, h: 0.337, align: 'center', color: C.ink }, T.sub));
++    txt(s, LOREM.short, Object.assign({ x: c.bx, y: c.by, w: 2.9, h: 0.679, align: 'center' }, T.body));
++  });
++
++  siteUrl(s, 'light');
++  pageNumber(s, 8, 'light');
++}
++
++// 09 — outlook. Picture frames: 7.877/0/5.472/4.079 and 1.549/3.421/5.472/4.079.
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  rightRule(s, C.greyLight);
++
++  rect(s, { x: 12.59, y: 4.08, w: 0.758, h: 1.495, fill: C.orange });
++  hatchBlock(s, { x: 1.071, y: 4.535, w: 0.956, h: 1.821 });
++
++  wordmark(s, 'light');
++  txt(s, [
++    { text: 'Beyond The ', options: { color: C.ink } },
++    { text: 'Horizon', options: { color: C.orange } },
++  ], Object.assign({ x: 1.417, y: 1.35, w: 3.755, h: 1.313 }, T.title));
++
++  // Two stacked panels: orange over white.
++  [
++    { y: 1.047, fill: C.orange, ink: C.white, body: C.white, title: 'Community Engagement Initiatives', ty: 1.442, by: 1.891 },
++    { y: 4.535, fill: C.white, ink: C.ink, body: C.grey, title: 'Feedback and Iteration', ty: 4.93, by: 5.378, shadow: cardShadow() },
++  ].forEach((p) => {
++    rect(s, { x: 4.8, y: p.y, w: 4.749, h: 1.918, fill: p.fill, shadow: p.shadow });
++    txt(s, p.title, Object.assign({ x: 5.129, y: p.ty, w: 4.091, h: 0.337, align: 'center', color: p.ink }, T.sub));
++    txt(s, LOREM.panel, Object.assign({ x: 5.129, y: p.by, w: 4.091, h: 0.679, align: 'center' }, T.body, { color: p.body }));
++  });
++
++  arrowGlyph(s, 10.089, 4.839, 0.183, 0.174, C.orange, 2);
++  txt(s, 'Lorem ipsum dolor sit, adipisicing elit, sed do eiusmod tempor',
++    Object.assign({ x: 9.991, y: 5.167, w: 2.272, h: 0.982 }, T.body));
++
++  pageNumber(s, 9, 'light');
++}
++
++// 10 — closing. Picture frame: 0/3.975/13.333/3.525.
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.ink };
++  rightRule(s, C.orange);
++
++  rect(s, { x: 12.608, y: 1.65, w: 0.725, h: 2.325, fill: C.orange });
++  hatchBlock(s, { x: 0.004, y: 3.1, w: 0.756, h: 1.821 });
++
++  header(s, 'dark');
++  txt(s, [
++    { text: 'Thank You ', options: { color: C.white } },
++    { text: 'For Attention', options: { color: C.orange } },
++  ], Object.assign({ x: 1.465, y: 1.204, w: 5.472, h: 2.121 }, T.hero));
++
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim amet, ',
++    Object.assign({ x: 7.634, y: 1.421, w: 4.481, h: 0.982 }, T.body, { color: C.white }));
++
++  ellipse(s, { x: 7.729, y: 2.666, w: 0.441, h: 0.441, fill: C.orange });
++  iconGlobe(s, 7.819, 2.763, 0.263, 0.26, C.white);
++  txt(s, 'www.yourwebsite.com',
++    Object.assign({ x: 8.26, y: 2.718, w: 2.862, h: 0.337, color: C.white }, T.sub, { lineSpacingMultiple: 1.0 }));
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'PALEMA_16x9', width: 13.333, height: 7.5 });
++  pptx.layout = 'PALEMA_16x9';
++  pptx.theme = { headFontFace: FONT_MAJOR, bodyFontFace: FONT_MINOR };
++  pptx.author = 'Palema.';
++  pptx.title = 'Palema. — Company Profile';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10]
++    .forEach((fn) => fn(pptx));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '03cfd7ef-d17e-4f28-bc7f-3c8975071cd8_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote ' + f)).catch((e) => {
++  console.error(e);
++  process.exit(1);
++});

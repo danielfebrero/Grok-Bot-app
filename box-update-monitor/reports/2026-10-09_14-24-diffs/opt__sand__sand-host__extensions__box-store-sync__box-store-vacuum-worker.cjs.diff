@@ -1,0 +1,13 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/extensions/box-store-sync/box-store-vacuum-worker.cjs
++++ 2026-10-09_14-24:/opt/sand/sand-host/extensions/box-store-sync/box-store-vacuum-worker.cjs
+@@ -64,6 +64,10 @@
+     return admitted.has(value) ? value : fallback;
+   };
+ }
++var DNS_LABEL = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?";
++var HOST = new RegExp(`^(?=.{1,253}$)${DNS_LABEL}(?:\\.${DNS_LABEL})*$`);
++var CAPPED_TEXT_CAPS = [200, 3276];
++var CAPPED_TEXT_CEILING = Math.max(...CAPPED_TEXT_CAPS);
+ var CONNECT_CODE_TAGS = [
+   "Canceled",
+   "Unknown",

@@ -1,0 +1,631 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/data_protection_infographics.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/data_protection_infographics.js
+@@ -0,0 +1,628 @@
++/*
++ * Data Protection — infographic deck (17 slides, 26.67" x 15").
++ * Recreated with pptxgenjs. Raster/vector artwork from the original deck is
++ * represented by labelled placeholder panels (see `artwork()`).
++ */
++
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ palette */
++
++const C = {
++  head: '44546A', // tx2 — headings / default body text
++  body: '656D78', // secondary paragraph grey
++  a1: 'FF7043',
++  a2: 'FF5722',
++  a3: 'F4511E',
++  a4: 'E64A19',
++  a5: 'D84315',
++  a6: 'BF360C',
++  white: 'FFFFFF'
++};
++
++// Bold words in the original use a radial accent gradient; these are the
++// flattened (lumMod 89%) equivalents that the gradient reads as.
++const GRAD = { a1: 'FF5520', a2: 'FF3F02', a3: 'E8400B', a4: 'CD4216', a5: 'C03C13', a6: 'AA300B' };
++
++// Three–stop accent gradient used for the big statement headlines.
++const GRAD_TRI = 'F4511E';
++
++// Theme "subtle gradient" shape fill, flattened per accent.
++const FILL = { a1: 'FF7A53', a2: 'FF643C', a3: 'F95E33', a4: 'EB5730', a5: 'E14E2B', a6: 'CB4520' };
++
++const RING_GREY = 'D1D4D5';
++const DIAL_SHADOW = { type: 'outer', color: 'B5BAC0', opacity: 0.2, blur: 20, offset: 0, angle: 0 };
++const RING_LIGHT = 'EDEDED';
++
++/* -------------------------------------------------------------------- fonts */
++
++const F_LIGHT = 'Source Sans Pro Light';
++const F_XLIGHT = 'Source Sans Pro ExtraLight';
++const F_BLACK = 'Source Sans Pro Black';
++const F_REG = 'Source Sans Pro';
++const F_ROBOTO = 'Roboto';
++const F_ROBOTO_BK = 'Roboto Black';
++
++/* ------------------------------------------------------------ shared copy */
++
++const LOREM_LONG =
++  'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
++  'authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. Kitsch authentic ' +
++  'offal, narwhal tilde etsy four loko selvage normcore messenger bag put a bird ' +
++  'on it heirloom gastropub.';
++const LOREM_MED =
++  'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
++  'authentic brooklyn YOLO.';
++const LOREM_SHORT = 'Hashtag fashion axe fingerstache, everyday carry shoreditch brooklyn YOLO.';
++const LOREM_TINY = 'Hashtag fashion axe fingerstache brooklyn YOLO.';
++const SYNTH = 'Synth chartreuse XOXO, tacos brooklyn VHS plaid.';
++const BICYCLE = 'Bicycle rights +1 actually shoreditch, vinyl fixie small batch pop-up';
++
++/* ------------------------------------------------------------------ helpers */
++
++/** Radial stops of the cover background, from the centre outwards. */
++const SLIDE_W = 26.6701389, SLIDE_H = 15;
++const COVER_STOPS = [[0.00, 'E84512'], [0.30, 'DD4718'], [0.70, 'CA3709'], [1.00, 'BD3309']];
++const COVER_RINGS = 40;
++
++/** Piecewise-linear lookup into COVER_STOPS at radius fraction `f`. */
++function coverColor(f) {
++  let i = 1;
++  while (i < COVER_STOPS.length - 1 && COVER_STOPS[i][0] < f) i++;
++  const [p0, c0] = COVER_STOPS[i - 1], [p1, c1] = COVER_STOPS[i];
++  const t = p1 === p0 ? 0 : (f - p0) / (p1 - p0);
++  let out = '';
++  for (let ch = 0; ch < 3; ch++) {
++    const a = parseInt(c0.substr(ch * 2, 2), 16), b = parseInt(c1.substr(ch * 2, 2), 16);
++    out += Math.round(a + (b - a) * t).toString(16).padStart(2, '0');
++  }
++  return out.toUpperCase();
++}
++
++/** Placeholder panel standing in for the original isometric artwork. */
++function artwork(s, x, y, w, h) {
++  s.addShape('roundRect', {
++    x, y, w, h,
++    fill: { color: 'EEF1F6' }, line: { color: 'C9CEE2', width: 1, dashType: 'dash' },
++    rectRadius: 0.25
++  });
++  s.addText('[image]', {
++    x, y, w, h, align: 'center', valign: 'middle', margin: 0,
++    fontFace: F_LIGHT, fontSize: 28, color: 'A9B1C6'
++  });
++}
++
++/** "Data Protection Infographic Slide" heading + strap-line used on slides 2-16. */
++function header(s) {
++  s.addText([
++    { text: 'Data Protection ', options: { color: C.head } },
++    { text: 'Infographic', options: { color: C.a3 } },
++    { text: ' ', options: { color: C.a1 } },
++    { text: 'Slide', options: { color: C.head } }
++  ], { x: 5.074, y: 0.893, w: 16.522, h: 1.178, align: 'center', valign: 'top', fontFace: F_LIGHT, fontSize: 64 });
++
++  s.addText([
++    { text: 'Letterpress next level trust fund, ', options: { color: C.head } },
++    { text: 'before', options: { color: C.a3 } },
++    { text: ' they sold out +1 meh gluten-free locavore tacos PBR&B tofu. ', options: { color: C.head } }
++  ], { x: 6.445, y: 2.054, w: 13.779, h: 0.505, align: 'center', valign: 'top', wrap: false, fontFace: F_LIGHT, fontSize: 24 });
++}
++
++/** Body paragraph in the deck's standard grey. */
++function bodyText(s, txt, x, y, w, h, opt = {}) {
++  s.addText(txt, {
++    x, y, w, h, valign: 'top',
++    fontFace: F_LIGHT, fontSize: opt.size || 24, color: opt.color || C.head,
++    lineSpacingMultiple: opt.line || 1.5, margin: opt.margin === undefined ? [7.2, 7.2, 3.6, 3.6] : opt.margin
++  });
++}
++
++/** Statement headline built from [text, accentColorOrNull] pairs; '\n' breaks the line. */
++function headline(s, parts, x, y, w, h, size) {
++  const runs = [];
++  parts.forEach(([text, accent]) => {
++    if (text === '\n') { runs[runs.length - 1].options.breakLine = true; return; }
++    runs.push({ text, options: accent ? { bold: true, color: accent } : { color: C.head } });
++  });
++  s.addText(runs, { x, y, w, h, valign: 'top', fontFace: F_ROBOTO, fontSize: size });
++}
++
++/** Solid accent disc holding the white "ticked circle" pictogram. */
++function badge(s, x, y, d, color, glyph) {
++  const g = d * 0.474, go = (d - g) / 2;
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color }, line: { type: 'none' } });
++  if (!glyph) {
++    s.addShape('ellipse', {
++      x: x + go, y: y + go, w: g, h: g,
++      fill: { type: 'none' }, line: { color: C.white, width: d * 0.9 }
++    });
++  }
++  s.addText(glyph || '✓', {
++    x: x + go, y: y + go, w: g, h: g, align: 'center', valign: 'middle', margin: 0,
++    fontFace: F_REG, fontSize: g * (glyph ? 62 : 62), color: C.white
++  });
++}
++
++/** Accent ring enclosing a white disc and a line-art glyph. */
++function ringIcon(s, x, y, d, color, glyph) {
++  s.addShape('ellipse', {
++    x, y, w: d, h: d, fill: { color }, line: { type: 'none' },
++    shadow: { type: 'outer', color: '9AA0A6', opacity: 0.35, blur: 8, offset: 2, angle: 90 }
++  });
++  s.addShape('ellipse', {
++    x: x + d * 0.0815, y: y + d * 0.0815, w: d * 0.837, h: d * 0.837,
++    fill: { color: C.white }, line: { type: 'none' }
++  });
++  s.addText(glyph, {
++    x, y, w: d, h: d, align: 'center', valign: 'middle', margin: 0,
++    fontFace: F_REG, fontSize: d * 34, color
++  });
++}
++
++/** Compact progress ring (outer band + pie arc + white core). */
++function donutSmall(s, x, y, value) {
++  const D = 1.693;
++  s.addShape('donut', { x, y, w: D, h: D, fill: { color: RING_LIGHT }, line: { type: 'none' }, shadow: DIAL_SHADOW });
++  s.addShape('donut', { x: x + 0.062, y: y + 0.062, w: 1.533, h: 1.533, fill: { color: RING_GREY }, line: { type: 'none' } });
++  arcChart(s, x + 0.062, y + 0.062, 1.565, value, RING_GREY);
++  s.addShape('ellipse', { x: x + 0.384, y: y + 0.384, w: 0.926, h: 0.926, fill: { color: C.white }, line: { type: 'none' } });
++}
++
++/** Wide double-ring progress dial used on slides 5 and 14. */
++function donutLarge(s, x, y, value) {
++  const D = 2.244;
++  s.addShape('donut', { x, y, w: D, h: D, fill: { color: RING_GREY }, line: { type: 'none' }, shadow: DIAL_SHADOW });
++  s.addShape('ellipse', { x: x + 0.117, y: y + 0.117, w: 2.010, h: 2.010, fill: { color: RING_LIGHT }, line: { type: 'none' } });
++  arcChart(s, x + 0.160, y + 0.160, 1.925, value, RING_LIGHT);
++  s.addShape('ellipse', { x: x + 0.497, y: y + 0.497, w: 1.250, h: 1.250, fill: { color: 'F7F5F6' }, line: { type: 'none' } });
++  s.addShape('donut', { x: x + 0.471, y: y + 0.482, w: 1.302, h: 1.290, fill: { color: 'D1D4D4' }, line: { type: 'none' } });
++  s.addShape('ellipse', { x: x + 0.584, y: y + 0.584, w: 1.076, h: 1.076, fill: { color: C.white }, line: { type: 'none' } });
++  s.addShape('ellipse', { x: x + 0.983, y: y + 0.988, w: 0.278, h: 0.269, fill: { color: 'D1D4D4' }, line: { type: 'none' } });
++}
++
++/** Native pie chart supplying the coloured arc inside a progress ring. */
++function arcChart(s, x, y, d, value, blank) {
++  s.addChart('pie', [{ name: 'Region 1', labels: ['Quarter', 'Blank'], values: [value, 130] }], {
++    x, y, w: d, h: d,
++    chartColors: [C.a1, blank],
++    showLegend: false, showTitle: false, showValue: false,
++    firstSliceAng: 0,
++    chartArea: { roundedCorners: false },
++    layout: { x: 0.005, y: 0.005, w: 0.99, h: 0.9875 }
++  });
++}
++
++/** Percentage + type caption pair sitting beside a progress ring. */
++function statLabel(s, x, yPct, yType, pct, type, color) {
++  s.addText(pct, { x, y: yPct, w: 0.985, h: 0.573, margin: 0, valign: 'top', fontFace: F_ROBOTO, fontSize: 32, bold: true, color });
++  s.addText(type, { x, y: yType, w: 0.985, h: 0.452, margin: 0, valign: 'top', fontFace: F_ROBOTO, fontSize: 20, bold: true, color: C.head });
++}
++
++/** Orange strap-line + grey sentence pair (repeated feature block). */
++function featureText(s, x, yTop, wTop, yBody, wBody) {
++  s.addText(SYNTH, {
++    x, y: yTop, w: wTop, h: 0.467, margin: 0, valign: 'top',
++    fontFace: F_LIGHT, fontSize: 21, color: C.a1, lineSpacingMultiple: 1.3
++  });
++  s.addText(LOREM_SHORT, {
++    x: x + 0.021, y: yBody, w: wBody, h: 1.077, margin: 0, valign: 'top',
++    fontFace: F_LIGHT, fontSize: 24, color: C.body, lineSpacingMultiple: 1.5
++  });
++}
++
++/** Icon + two-paragraph caption used by the list slides (3 and 8). */
++function iconRow(s, x, y, ovalY, textX, textW, accent, glyph) {
++  ringIcon(s, x, ovalY, 1.024, FILL[accent], glyph);
++  s.addText([
++    { text: SYNTH, options: { fontFace: F_BLACK, fontSize: 16, bold: true, breakLine: true } },
++    { text: LOREM_TINY, options: { fontFace: F_LIGHT, fontSize: 16 } }
++  ], { x: textX, y, w: textW, h: 1.674, valign: 'top', color: C.head, lineSpacingMultiple: 1.5, margin: [7.2, 7.2, 3.6, 3.6] });
++}
++
++/* ------------------------------------------------------------ slide builders */
++
++/** Slides 1 and 17 — full-bleed orange cover with concentric light blooms. */
++function cover(p, opts) {
++  const s = p.addSlide();
++  s.background = { color: COVER_STOPS[COVER_STOPS.length - 1][1] };
++  // Concentric ellipses stand in for the original centred radial gradient.
++  for (let i = COVER_RINGS; i > 0; i--) {
++    const f = i / COVER_RINGS;
++    s.addShape('ellipse', {
++      x: SLIDE_W * (1 - f) / 2, y: SLIDE_H * (1 - f) / 2, w: SLIDE_W * f, h: SLIDE_H * f,
++      fill: { color: coverColor(f) }, line: { type: 'none' }
++    });
++  }
++  [[opts.blobs[0][0], opts.blobs[0][1], 3], [opts.blobs[1][0], opts.blobs[1][1], 6]].forEach(b => {
++    s.addShape('ellipse', {
++      x: b[0], y: b[1], w: 26.57, h: 23.44,
++      fill: { color: C.white, transparency: 100 - b[2] }, line: { type: 'none' }
++    });
++  });
++
++  s.addText(opts.kicker, {
++    x: 5.663, y: opts.kickerY, w: 15.344, h: opts.kickerH, align: 'center', valign: 'top',
++    fontFace: F_REG, fontSize: opts.kickerSize, bold: opts.kickerBold, color: C.white, lineSpacingMultiple: 0.9
++  });
++  s.addText('DATA PROTECTION', {
++    x: 5.098, y: 6.330, w: 16.474, h: 2.339, align: 'center', valign: 'top', wrap: false,
++    fontFace: F_BLACK, fontSize: 133, bold: true, color: C.white
++  });
++  s.addText(opts.footer, {
++    x: opts.footerX, y: 9.627, w: opts.footerW, h: 0.505, align: 'center', valign: 'top', wrap: false,
++    fontFace: F_LIGHT, fontSize: 24, color: C.white
++  });
++
++  if (opts.arrow) {
++    s.addShape('ellipse', {
++      x: 12.867, y: 11.393, w: 0.936, h: 0.936,
++      fill: { type: 'none' }, line: { color: C.white, width: 1 }
++    });
++    s.addText('↓', {
++      x: 12.867, y: 11.393, w: 0.936, h: 0.936, align: 'center', valign: 'middle', margin: 0,
++      fontFace: F_REG, fontSize: 32, color: C.white
++    });
++  }
++  return s;
++}
++
++function slide2(p) {
++  const s = p.addSlide(); header(s);
++  artwork(s, 0.612, 3.051, 10.497, 11.296);
++  headline(s, [
++    ['Security', GRAD_TRI], [' used to be an ', null], ['inconvenience', GRAD_TRI],
++    [' sometimes, ', null], ['but', GRAD_TRI], [' now it’s a ', null],
++    ['necessity', GRAD_TRI], [' all the time.', null]
++  ], 12.370, 4.121, 11.740, 2.524, 48);
++  bodyText(s, LOREM_LONG, 12.370, 6.539, 12.232, 1.709, { size: 22, color: C.body });
++
++  badge(s, 12.512, 8.699, 1.496, FILL.a5);
++  badge(s, 12.543, 11.135, 1.496, FILL.a3);
++  featureText(s, 14.413, 8.778, 6.227, 9.269, 8.685);
++  featureText(s, 14.406, 11.135, 6.227, 11.627, 8.685);
++}
++
++function slide3(p) {
++  const s = p.addSlide(); header(s);
++  artwork(s, 14.541, 3.232, 10.662, 10.892);
++  [
++    [3.720, 4.160, 3.892, 3.958, 'a1', '⌗'],
++    [5.771, 6.156, 3.974, 3.522, 'a2', '▤'],
++    [7.822, 8.198, 3.888, 3.888, 'a3', '✳'],
++    [9.873, 10.249, 3.974, 3.510, 'a4', '✚'],
++    [11.924, 12.300, 3.974, 3.787, 'a5', '▣']
++  ].forEach(r => iconRow(s, 2.757, r[0], r[1], r[2], r[3], r[4], r[5]));
++
++  s.addText('Data Security', {
++    x: 7.761, y: 4.121, w: 5.762, h: 0.871, margin: 0, valign: 'top',
++    fontFace: F_ROBOTO_BK, fontSize: 28, bold: true, color: C.head
++  });
++  s.addText([
++    { text: 'Data Security', options: { breakLine: true } },
++    { text: 'Information Analysis' }
++  ], {
++    x: 7.761, y: 4.799, w: 5.077, h: 1.453, margin: 0, valign: 'top',
++    fontFace: F_ROBOTO_BK, fontSize: 28, bold: true, color: GRAD.a1, lineSpacingMultiple: 1.2
++  });
++  s.addText([
++    { text: LOREM_LONG, options: { breakLine: true } },
++    { text: 'Kitsch authentic offal, narwhal tilde etsy four loko selvage normcore messenger.' }
++  ], {
++    x: 7.761, y: 6.060, w: 4.919, h: 7.913, valign: 'top',
++    fontFace: F_LIGHT, fontSize: 24, color: C.head, lineSpacingMultiple: 1.5, margin: [7.2, 7.2, 3.6, 3.6]
++  });
++}
++
++/** Slides 4 and 16 share the "Cyber-Security" layout, mirrored artwork aside. */
++function cyberSlide(p, art) {
++  const s = p.addSlide(); header(s);
++  artwork(s, art[0], art[1], art[2], art[3]);
++  headline(s, [
++    ['Cyber-Security', GRAD_TRI], [' is much ', null], ['more', GRAD_TRI], ['\n', null],
++    ['than a ', null], ['matter', GRAD_TRI], [' of ', null], ['IT', GRAD_TRI], ['.', null]
++  ], 13.285, 4.856, 10.912, 1.986, 56);
++  bodyText(s, LOREM_LONG, 13.285, 6.956, 10.640, 2.461);
++
++  [9.847, 10.839, 11.841].forEach(y => {
++    s.addShape('ellipse', { x: 13.474, y, w: 0.604, h: 0.604, fill: { color: C.white }, line: { color: C.a1, width: 1.38 } });
++    s.addText('✓', {
++      x: 13.474, y, w: 0.604, h: 0.604, align: 'center', valign: 'middle', margin: 0,
++      fontFace: F_REG, fontSize: 18, color: C.a1
++    });
++    s.addText(SYNTH, {
++      x: 14.224, y: y - 0.062, w: 6.944, h: 0.583, valign: 'top', wrap: false,
++      fontFace: F_LIGHT, fontSize: 24, color: C.head, lineSpacingMultiple: 1.3, margin: [7.2, 7.2, 3.6, 3.6]
++    });
++  });
++}
++
++/** Slides 5 and 14 share the "prepackaged firewall" layout with four dials. */
++function firewallSlide(p, art, colX, headY, bodyY, dials) {
++  const s = p.addSlide(); header(s);
++  artwork(s, art[0], art[1], art[2], art[3]);
++  headline(s, [
++    ['As we’ve come to ', null], ['realize', GRAD.a2], [', the idea that ', null],
++    ['security', GRAD.a3], [' starts and ends with the purchase of a prepackaged ', null],
++    ['firewall', GRAD.a4], [' is simply ', null], ['misguided', GRAD.a5], ['.', null]
++  ], colX, headY, 11.058, 3.332, 48);
++  bodyText(s, LOREM_LONG, colX, bodyY, 10.640, 2.461);
++  dials.forEach(d => donutLarge(s, d[0], d[1], d[2]));
++}
++
++function slide6(p) {
++  const s = p.addSlide(); header(s);
++  artwork(s, 1.634, 3.232, 10.241, 10.576);
++  headline(s, [
++    ['It takes ', null], ['20 years ', GRAD.a1], ['to ', null], ['build', GRAD.a2],
++    [' a reputation and ', null], ['few minutes ', GRAD.a3], ['of ', null],
++    ['cyber-incident', GRAD.a4], [' to ', null], ['ruin it.', GRAD.a5]
++  ], 13.769, 3.710, 11.517, 2.524, 48);
++  s.addText(BICYCLE, {
++    x: 13.792, y: 6.061, w: 9.436, h: 1.043, valign: 'top',
++    fontFace: F_XLIGHT, fontSize: 28, color: C.a1, margin: [7.2, 7.2, 3.6, 3.6]
++  });
++  bodyText(s, LOREM_LONG, 13.782, 6.936, 10.640, 2.461);
++
++  badge(s, 13.769, 9.838, 1.496, FILL.a5);
++  badge(s, 13.769, 12.235, 1.496, FILL.a3);
++  featureText(s, 15.690, 9.802, 6.227, 10.294, 8.685);
++  featureText(s, 15.690, 12.199, 6.227, 12.691, 8.685);
++}
++
++function slide7(p) {
++  const s = p.addSlide(); header(s);
++  artwork(s, 13.410, 3.386, 12.301, 10.307);
++  headline(s, [
++    ['Privacy', GRAD.a1], [' – ', null], ['like', GRAD.a2], [' eating and ', null],
++    ['breathing', GRAD.a3], [' – is ', null], ['one', GRAD.a4], [' of life’s ', null],
++    ['basic', GRAD.a5], [' requirements.', null]
++  ], 1.507, 4.667, 11.058, 1.447, 40);
++  s.addText(BICYCLE, {
++    x: 1.507, y: 6.118, w: 9.436, h: 1.043, valign: 'top',
++    fontFace: F_XLIGHT, fontSize: 28, color: C.a1, margin: [7.2, 7.2, 3.6, 3.6]
++  });
++  s.addText(SYNTH, {
++    x: 1.507, y: 7.111, w: 6.099, h: 0.522, valign: 'top', wrap: false,
++    fontFace: F_LIGHT, fontSize: 21, color: C.head, lineSpacingMultiple: 1.3, margin: [7.2, 7.2, 3.6, 3.6]
++  });
++  bodyText(s, LOREM_LONG, 1.507, 7.634, 10.640, 2.461);
++
++  [[1.507, 10.504, 30], [4.390, 10.517, 130], [7.694, 10.517, 365]].forEach(d => donutSmall(s, d[0], d[1], d[2]));
++  statLabel(s, 3.303, 10.853, 11.451, '19%', 'Type A', C.a1);
++  statLabel(s, 6.288, 10.860, 11.458, '50%', 'Type B', C.a2);
++  statLabel(s, 9.486, 10.858, 11.457, '74%', 'Type C', C.a3);
++}
++
++function slide8(p) {
++  const s = p.addSlide(); header(s);
++  artwork(s, 1.609, 3.232, 10.578, 10.586);
++  [
++    [13.325, 4.613, 5.053, 14.460, 3.958, 'a1', '⌗'],
++    [18.896, 4.613, 4.998, 20.113, 3.316, 'a2', '✳'],
++    [13.325, 7.128, 7.503, 14.456, 3.888, 'a3', '✚'],
++    [18.896, 7.128, 7.503, 20.113, 3.316, 'a4', '▣']
++  ].forEach(r => iconRow(s, r[0], r[1], r[2], r[3], r[4], r[5], r[6]));
++
++  s.addText('Data Security', {
++    x: 13.509, y: 9.833, w: 5.762, h: 0.670, margin: 0, valign: 'top',
++    fontFace: F_ROBOTO_BK, fontSize: 22, bold: true, color: C.head
++  });
++  s.addText('Process Data Security Analysis', {
++    x: 13.509, y: 10.503, w: 3.116, h: 2.150, margin: 0, valign: 'top',
++    fontFace: F_ROBOTO_BK, fontSize: 24, bold: true, color: GRAD.a5, lineSpacingMultiple: 1.2
++  });
++  bodyText(s,
++    'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
++    'authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. ',
++    17.020, 9.735, 6.706, 1.709, { size: 22 });
++}
++
++function slide9(p) {
++  const s = p.addSlide(); header(s);
++  artwork(s, 14.047, 3.503, 11.727, 10.164);
++  [
++    { x: 1.379, y: 4.334, accent: 'a2', title: 'Computer Viruses', tw: 4.581, tx: 1.954, bw: 4.522 },
++    { x: 7.960, y: 4.330, accent: 'a3', title: 'Worms', tw: 1.786, tx: 8.446, bw: 4.551 },
++    { x: 1.385, y: 9.061, accent: 'a4', title: 'Adware', tw: 1.920, tx: 1.954, bw: 4.687 },
++    { x: 7.911, y: 9.054, accent: 'a6', title: 'Spyware', tw: 2.179, tx: 8.446, bw: 4.551 }
++  ].forEach(card => {
++    const col = C[card.accent];
++    s.addShape('ellipse', { x: card.x, y: card.y, w: 1.181, h: 1.183, fill: { color: col, transparency: 71 }, line: { type: 'none' } });
++    s.addShape('ellipse', { x: card.x + 0.102, y: card.y + 0.112, w: 0.943, h: 0.945, fill: { color: col, transparency: 71 }, line: { type: 'none' } });
++    s.addShape('ellipse', { x: card.x + 0.238, y: card.y + 0.250, w: 0.668, h: 0.669, fill: { color: col }, line: { type: 'none' } });
++    s.addText(card.title, {
++      x: card.tx, y: card.y + 0.492, w: card.tw, h: 0.774, valign: 'top', wrap: false,
++      fontFace: F_ROBOTO_BK, fontSize: 40, bold: true, color: C.head, margin: [0, 0, 3.6, 3.6]
++    });
++    s.addText([
++      { text: 'Synth chartreuse XOXO, tacos VHS plaid.', options: { color: col, breakLine: true } },
++      { text: LOREM_MED, options: { color: C.body } }
++    ], {
++      x: card.tx, y: card.y + 1.638, w: card.bw, h: 2.067, valign: 'top',
++      fontFace: F_LIGHT, fontSize: 20, lineSpacingMultiple: 1.5, margin: [0, 0, 3.6, 3.6]
++    });
++  });
++}
++
++/** Slides 10 and 15 share the big "kicker word" layout. */
++function bigWordSlide(p, cfg) {
++  const s = p.addSlide(); header(s);
++  artwork(s, cfg.art[0], cfg.art[1], cfg.art[2], cfg.art[3]);
++  s.addText([
++    { text: cfg.kicker, options: { color: C.head, breakLine: true } },
++    { text: 'Info', options: { color: GRAD_TRI, breakLine: true } },
++    { text: ' ', options: { fontSize: 8, breakLine: true } },
++    { text: cfg.big[0], options: { fontSize: 85.34, color: cfg.big[1] } },
++    { text: cfg.big[2], options: { fontSize: 85.34, color: cfg.big[3] } }
++  ], { x: cfg.x, y: cfg.y, w: cfg.w, h: 2.614, valign: 'top', fontFace: F_ROBOTO_BK, fontSize: 28, bold: true });
++
++  s.addText('CONTENT TITLE', {
++    x: cfg.x, y: cfg.titleY, w: 4.098, h: 0.550, valign: 'top',
++    fontFace: F_ROBOTO_BK, fontSize: 26.66, bold: true, color: C.head, margin: [7.2, 7.2, 3.6, 3.6]
++  });
++  return s;
++}
++
++function slide10(p) {
++  const s = bigWordSlide(p, {
++    art: [2.130, 3.071, 9.396, 10.679], x: 13.272, y: 4.673, w: 12.232, titleY: 7.327,
++    kicker: 'Safe Password', big: ['SAFE', C.head, ' PASSWORD', GRAD_TRI]
++  });
++  bodyText(s, LOREM_LONG, 13.272, 7.917, 12.232, 1.709, { size: 22, color: C.body });
++
++  [[13.272, 9.981, 30], [16.155, 9.994, 130], [19.458, 9.994, 365], [22.498, 9.947, 280]]
++    .forEach(d => donutSmall(s, d[0], d[1], d[2]));
++  statLabel(s, 15.067, 10.329, 10.928, '19%', 'Type A', C.a1);
++  statLabel(s, 18.053, 10.336, 10.935, '50%', 'Type B', C.a2);
++  statLabel(s, 21.250, 10.335, 10.933, '74%', 'Type C', C.a3);
++  statLabel(s, 24.359, 10.286, 10.885, '68%', 'Type D', C.a4);
++}
++
++function slide11(p) {
++  const s = p.addSlide(); header(s);
++  artwork(s, 15.267, 3.479, 9.915, 9.478);
++  [
++    { bx: 1.372, by: 4.066, tx: 2.961, ty: 4.066, th: 1.783, byy: 5.776, bw: 6.175, lines: ['Hackers are', 'getting smarter'] },
++    { bx: 8.417, by: 3.984, tx: 10.057, ty: 4.057, th: 1.168, byy: 5.719, bw: 6.197, lines: ['The Internet of things', 'is expanding'] },
++    { bx: 1.372, by: 8.624, tx: 3.012, ty: 8.709, th: 1.168, byy: 10.370, bw: 6.175, lines: ['Hacking tools are increasing & evolving'] },
++    { bx: 8.417, by: 8.612, tx: 10.057, ty: 8.709, th: 1.168, byy: 10.370, bw: 6.197, lines: ['Personal Information is shared online'] }
++  ].forEach(card => {
++    badge(s, card.bx, card.by, 1.311, GRAD.a1);
++    s.addText(card.lines.map((t, i) => ({ text: t, options: { breakLine: i < card.lines.length - 1 } })), {
++      x: card.tx, y: card.ty, w: 3.868, h: card.th, valign: 'middle', margin: 0,
++      fontFace: F_ROBOTO_BK, fontSize: 28, bold: true, color: C.head, lineSpacingMultiple: 1.3
++    });
++    s.addText([
++      { text: SYNTH, options: { fontSize: 22, color: C.a1, breakLine: true } },
++      { text: LOREM_MED, options: { fontSize: 20, color: C.body } }
++    ], { x: card.bx, y: card.byy, w: card.bw, h: 1.732, valign: 'top', margin: 0, fontFace: F_LIGHT, lineSpacingMultiple: 1.5 });
++  });
++}
++
++function slide12(p) {
++  const s = p.addSlide(); header(s);
++  artwork(s, 1.389, 3.232, 10.697, 10.827);
++  headline(s, [
++    ['It ', null], ['would', GRAD.a1], [' be so much easier if there were a ', null],
++    ['secret password', GRAD.a2], [', or ', null], ['handshake', GRAD.a3],
++    ['. Netherworld, open sesame! Yeah, that ', null], ['didn\'t work', GRAD.a4], [', either.', null]
++  ], 14.085, 4.443, 10.591, 4.140, 48);
++  s.addText(BICYCLE, {
++    x: 14.085, y: 8.613, w: 9.436, h: 1.043, valign: 'top',
++    fontFace: F_XLIGHT, fontSize: 28, color: C.a1, margin: [7.2, 7.2, 3.6, 3.6]
++  });
++  s.addText(SYNTH, {
++    x: 14.085, y: 9.605, w: 6.099, h: 0.522, valign: 'top', wrap: false,
++    fontFace: F_LIGHT, fontSize: 21, color: C.head, lineSpacingMultiple: 1.3, margin: [7.2, 7.2, 3.6, 3.6]
++  });
++  bodyText(s, LOREM_LONG, 14.085, 10.129, 10.640, 2.461);
++}
++
++function slide13(p) {
++  const s = p.addSlide(); header(s);
++  artwork(s, 13.679, 3.232, 11.480, 11.441);
++  [[9.463, FILL.a1, 9.817], [11.793, FILL.a3, 12.160]].forEach(pill => {
++    s.addShape('roundRect', {
++      x: -0.75, y: pill[0], w: 3.766, h: 1.440,
++      fill: { color: pill[1] }, line: { type: 'none' }, rectRadius: 0.72
++    });
++    s.addShape('ellipse', {
++      x: 1.823, y: pill[2], w: 0.709, h: 0.709,
++      fill: { type: 'none' }, line: { color: C.white, width: 1.35 }
++    });
++    s.addText('✓', {
++      x: 1.823, y: pill[2], w: 0.709, h: 0.709, align: 'center', valign: 'middle', margin: 0,
++      fontFace: F_REG, fontSize: 28, color: C.white
++    });
++  });
++  headline(s, [
++    ['You are an ', null], ['essential', GRAD.a1], [' ingredient in our ', null],
++    ['ongoing', GRAD.a2], [' effort to reduce ', null], ['Security', GRAD.a3], [' Risk.', null]
++  ], 1.559, 4.190, 10.396, 2.524, 48);
++  bodyText(s, LOREM_LONG, 1.539, 6.640, 10.640, 2.461);
++  featureText(s, 3.472, 9.387, 6.227, 9.879, 6.227);
++  featureText(s, 3.462, 11.730, 6.227, 12.221, 6.205);
++}
++
++function slide15(p) {
++  const s = bigWordSlide(p, {
++    art: [13.835, 2.995, 11.691, 11.433], x: 1.246, y: 4.530, w: 12.443, titleY: 7.125,
++    kicker: 'Infected Message', big: ['INFECTED', GRAD_TRI, ' MESSAGES', C.head]
++  });
++  bodyText(s,
++    'Hashtag fashion axe fingerstache, everyday carry shoreditch pinterest umami ' +
++    'authentic brooklyn YOLO heirloom keytar waistcoat kickstarter. Kitsch authentic offal.',
++    1.246, 7.656, 10.640, 1.855);
++
++  s.addShape('roundRect', {
++    x: 1.246, y: 9.675, w: 8.513, h: 1.570,
++    fill: { color: 'D8DADD', transparency: 75 }, line: { type: 'none' }, rectRadius: 0.16
++  });
++  s.addText(LOREM_MED, {
++    x: 1.246, y: 9.675, w: 8.513, h: 1.570, valign: 'middle',
++    fontFace: F_LIGHT, fontSize: 20, color: C.head, lineSpacingMultiple: 1.3,
++    margin: [28.4, 28.4, 3.6, 3.6]
++  });
++
++  [
++    { x: 1.413, oy: 11.598, gx: 1.700, accent: FILL.a1, num: '2.888 K', nx: 2.886, cap: 'Male User', cx: 3.108, cw: 1.257, ny: 11.542, cy: 12.378 },
++    { x: 5.670, oy: 11.648, gx: 5.965, accent: FILL.a2, num: '1.074 K', nx: 7.143, cap: 'Female User', cx: 7.365, cw: 1.560, ny: 11.592, cy: 12.405 }
++  ].forEach(st => {
++    badge(s, st.x, st.oy, 1.200, st.accent, '☺');
++    s.addText(st.num, {
++      x: st.nx, y: st.ny, w: 2.151, h: 0.774, valign: 'top', wrap: false,
++      fontFace: F_ROBOTO, fontSize: 40, bold: true, color: C.head, margin: [7.2, 7.2, 3.6, 3.6]
++    });
++    s.addText(st.cap, {
++      x: st.cx, y: st.cy, w: st.cw, h: 0.337, valign: 'top', wrap: false, margin: 0,
++      fontFace: F_ROBOTO, fontSize: 20, color: C.head
++    });
++  });
++}
++
++/* ---------------------------------------------------------------- assemble */
++
++const pptx = new pptxgen();
++pptx.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
++pptx.layout = 'DECK';
++pptx.title = 'Data Protection';
++
++cover(pptx, {
++  blobs: [[1.942, 6.048], [5.482, 0.000]], arrow: true,
++  kicker: [
++    { text: 'We’ve been ' }, { text: 'crafting', options: { bold: true } },
++    { text: ' beautiful ' }, { text: 'presentation', options: { italic: true } },
++    { text: ' & making ' }, { text: 'clients', options: { bold: true, italic: true } },
++    { text: ' happy for years.' }
++  ],
++  kickerY: 4.663, kickerH: 0.586, kickerSize: 32, kickerBold: false,
++  footer: 'Letterpress next level trust fund, before. ', footerX: 10.517, footerW: 5.636
++});
++slide2(pptx);
++slide3(pptx);
++cyberSlide(pptx, [1.235, 3.220, 10.929, 10.875]);
++firewallSlide(pptx, [14.480, 3.107, 9.686, 11.000], 1.886, 4.289, 7.536,
++  [[1.886, 10.314, 25], [4.470, 10.310, 75], [7.190, 10.319, 19], [9.909, 10.319, 350]]);
++slide6(pptx);
++slide7(pptx);
++slide8(pptx);
++slide9(pptx);
++slide10(pptx);
++slide11(pptx);
++slide12(pptx);
++slide13(pptx);
++firewallSlide(pptx, [1.408, 3.232, 11.229, 11.162], 13.801, 4.341, 7.588,
++  [[13.801, 10.366, 25], [16.385, 10.361, 75], [19.104, 10.371, 19], [21.824, 10.371, 350]]);
++slide15(pptx);
++cyberSlide(pptx, [0.967, 3.464, 12.162, 10.643]);
++cover(pptx, {
++  blobs: [[0.216, 4.390], [3.756, -1.658]], arrow: false,
++  kicker: 'CLOSING SLIDE',
++  kickerY: 4.665, kickerH: 0.767, kickerSize: 44, kickerBold: true,
++  footer: 'Pulsecolor', footerX: 12.513, footerW: 1.645
++});
++
++pptx.writeFile({
++  fileName: path.join(__dirname, '086078bb-f2b2-4206-9b29-acbade1c739c_grok_final.pptx')
++}).then(f => console.log('wrote', f));

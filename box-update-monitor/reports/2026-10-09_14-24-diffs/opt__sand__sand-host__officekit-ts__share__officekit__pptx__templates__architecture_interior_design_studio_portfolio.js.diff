@@ -1,0 +1,629 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/architecture_interior_design_studio_portfolio.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/architecture_interior_design_studio_portfolio.js
+@@ -0,0 +1,626 @@
++#!/usr/bin/env node
++/**
++ * "Planga Plongo" — Architecture & Interior Design Presentation (25 slides, 13.333 x 7.5 in).
++ * Rebuilt with pptxgenjs only. Photographs in the original are picture placeholders that
++ * render as plain white boxes; they are recreated here as native rectangles (`imageBox`).
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const GREEN = '727E72'; // brand sage green used for every heading
++const INK = '262626'; // near-black used for rules and small caption text
++const BLACK = '000000';
++const WHITE = 'FFFFFF';
++const GRAY_LT = 'D8D8D8';
++const GRAY_MD = 'BFBFBF';
++const GRAY_DK = 'A5A5A5';
++const GRID = 'D0CECE';
++
++/* -------------------------------------------------------------- typography */
++const SANS = 'Montserrat';
++const SEMI = 'Montserrat SemiBold';
++const MEDIUM = 'Montserrat Medium';
++
++/* ------------------------------------------------------------- shared copy */
++const LOREM_LONG =
++  'Laoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. Arcu risus quis varius quam ' +
++  'quisque id diam vel. Volutpat consequat mauris nunc congue nisi vitae. Phasellus vestibulum lorem sed ' +
++  'risus Lorem ipsum dolor sit amet, consectetur.';
++const LOREM_SHORT =
++  'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id ' +
++  'faucibus nisl tincidunt. ';
++const LOREM_LEAD =
++  'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id ' +
++  'faucibus nisl tincidunt. Arcu risus quis varius quam quisque id diam veolutpat consequat.';
++const LOREM_INTRO =
++  'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id ' +
++  'faucibus nisl tincidunt. Arcu risus quis varius quam quisque id diam vel. Volutpat consequat mauris nunc.';
++const LOREM_TAIL =
++  'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id ' +
++  'faucibus nisl tincidunt consequat mauris nunc.';
++const TIMELINE_NOTE =
++  'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero.';
++
++/* ------------------------------------------------------------------ helpers */
++/** Plain text box: no fill, no inset, top-aligned — same as every text shape in the deck. */
++function T(slide, str, opts) {
++  slide.addText(str, Object.assign({ fontFace: SANS, fontSize: 11, color: BLACK, align: 'left', valign: 'top', margin: 0, fit: 'resize' }, opts));
++}
++
++/** Sage-green semibold headline. */
++function heading(slide, str, x, y, w, h, fontSize) {
++  T(slide, str, { x, y, w, h, fontSize, fontFace: SEMI, color: GREEN });
++}
++
++/** 11 pt body copy at 150% leading. */
++function paragraph(slide, str, x, y, w, h, opts) {
++  T(slide, str, Object.assign({ x, y, w, h, fontSize: 11, lineSpacingMultiple: 1.5 }, opts));
++}
++
++/** Horizontal hairline rule. */
++function rule(slide, x, y, w, color, width) {
++  slide.addShape('straightConnector1', { x, y, w, h: 0, line: { color: color || INK, width: width || 1 } });
++}
++
++/** Short line ending in a solid triangular arrow head. */
++function arrow(slide, x, y, w, width) {
++  slide.addShape('straightConnector1', { x, y, w, h: 0, line: { color: GREEN, width: width || 2.5, endArrowType: 'triangle' } });
++}
++
++/** Outlined stadium-shaped button (fully rounded rectangle). */
++function pill(slide, x, y, w, h, color) {
++  slide.addShape('roundRect', { x, y, w, h, rectRadius: Math.min(w, h) / 2, line: { color: color || GREEN, width: 1 } });
++}
++
++/** Placeholder standing in for a photograph (the source deck leaves these blank/white). */
++function imageBox(slide, x, y, w, h) {
++  slide.addShape('rect', { x, y, w, h, fill: { color: WHITE } });
++}
++
++/** Top-left word marks, present on all but a few full-bleed slides. */
++const NAV_ITEMS = [
++  { label: 'Modern', x: 0.68229, y: 0.38973, w: 0.53299 },
++  { label: 'Best Of 2025', x: 1.83854, y: 0.38973, w: 0.80729 },
++  { label: 'Creative Inside', x: 3.2691, y: 0.39441, w: 0.94965 },
++];
++
++/** Top-right hamburger icon: three 0.18229" strokes. */
++const MENU_ROWS = [0.45035, 0.50333, 0.55631];
++
++function chrome(slide, opts) {
++  const o = opts || {};
++  if (o.nav !== false) {
++    NAV_ITEMS.forEach(function (item) {
++      T(slide, item.label, { x: item.x, y: item.y, w: item.w, h: 0.2272, fontSize: 9, color: INK, lineSpacingMultiple: 1.5 });
++    });
++  }
++  if (o.menu !== false) {
++    MENU_ROWS.forEach(function (y) {
++      slide.addShape('straightConnector1', { x: 12.46875, y: y, w: 0.18229, h: 0, line: { color: BLACK, width: 1.25 } });
++    });
++  }
++}
++
++/* -------------------------------------------------------------- the slides */
++
++// 1 — Cover
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 5.41667, 2.67155, 7.23438, 3.02947);
++  chrome(s);
++  heading(s, 'PLANGA', 0.57118, 1.06061, 5.93062, 1.61563, 96);
++  heading(s, 'PLONGO', 0.57118, 2.67155, 6.18306, 1.61563, 96);
++  T(s, 'Architecture & Interior Design Presentation', { x: 0.68229, y: 4.28718, w: 3.78215, h: 0.30282, fontSize: 12, lineSpacingMultiple: 1.5 });
++
++  pill(s, 10.03514, 1.40648, 2.6159, 0.53964);
++  T(s, 'hello@reallygreatsite.com', { x: 10.24304, y: 1.57983, w: 2.2001, h: 0.20195, fontSize: 12, color: INK, align: 'center' });
++
++  rule(s, 0.68229, 6.97917, 11.96875);
++  pill(s, 0.68229, 6.04468, 1.7027, 0.6098);
++  arrow(s, 1.11003, 6.34957, 0.84722);
++  T(s, 'Check More', { x: 5.41667, y: 6.42186, w: 1.21137, h: 0.23561, fontSize: 14, fontFace: SEMI, color: INK });
++  [
++    { label: 'Archhitecture', x: 9.15278, w: 0.92535, h: 0.2272 },
++    { label: 'Interior', x: 10.89583, w: 0.4809, h: 0.22639 },
++    { label: 'Design', x: 12.19444, w: 0.4566, h: 0.2272 },
++  ].forEach(function (tag) {
++    T(s, tag.label, { x: tag.x, y: 6.42607, w: tag.w, h: tag.h, fontSize: 9, color: INK, align: 'right', lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 2 — Introduction
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Introduction', 0.68229, 1.50077, 5.46255, 1.00977, 60);
++  paragraph(s, LOREM_LEAD, 7.13514, 2.90991, 5.51591, 0.83306, { bold: true });
++  paragraph(s, LOREM_LONG, 7.13514, 4.01506, 5.51591, 1.11089);
++  pill(s, 7.13514, 6.4222, 1.55518, 0.55696);
++  arrow(s, 7.48911, 6.70068, 0.84722);
++  imageBox(s, 0.68229, 2.90991, 5.82221, 4.06926);
++}
++
++// 3 — Interior Design & Architecture
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Interior Design', 0.68229, 1.46372, 6.50913, 1.00977, 60);
++  heading(s, '& Architecture', 0.68229, 2.47348, 6.30052, 1.00977, 60);
++  rule(s, 0.68229, 3.85417, 11.96875);
++  paragraph(s, LOREM_LEAD, 7.13513, 4.38096, 5.51591, 0.83306, { bold: true });
++  paragraph(s, LOREM_LONG, 7.13513, 5.48612, 5.51591, 1.11074);
++  pill(s, 0.68229, 4.38096, 1.55518, 0.55696);
++  arrow(s, 1.03627, 4.65944, 0.84722);
++}
++
++// 4 — About Our Studio Planga
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 8.20833, 0, 5.125, 7.5);
++  chrome(s);
++  heading(s, 'About Our', 0.68229, 1.23892, 4.5492, 1.00977, 60);
++  heading(s, 'Studio Planga', 0.68229, 2.23149, 6.0919, 1.00977, 60);
++  paragraph(s, LOREM_LONG, 0.68229, 4.7859, 5.27604, 1.11074);
++  paragraph(s, LOREM_SHORT, 0.68229, 6.02566, 5.27604, 0.55537);
++  rule(s, 0.68229, 6.97917, 2.5868);
++}
++
++// 5 — History Of Planga Studio (four-entry timeline)
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'History Of', 0.68229, 1.62807, 4.34936, 1.00977, 60);
++  heading(s, 'Planga Studio', 0.68229, 2.53952, 6.0919, 1.00977, 60);
++
++  const COLUMNS = [0.68229, 7.22917]; // left / right timeline columns
++  const ROWS = [4.80208, 5.71354, 6.625]; // the three separator rules per column
++  COLUMNS.forEach(function (x) {
++    ROWS.forEach(function (y) {
++      rule(s, x, y, 5.42187);
++    });
++  });
++
++  [
++    { year: '2019', x: 0.68229, y: 5.01961, w: 0.88705 },
++    { year: '2021', x: 0.68229, y: 5.93106, w: 0.86952 },
++    { year: '2020', x: 7.22917, y: 5.01961, w: 0.98522 },
++    { year: '2022', x: 7.22917, y: 5.93106, w: 0.94841 },
++  ].forEach(function (e) {
++    T(s, e.year, { x: e.x, y: e.y, w: e.w, h: 0.47122, fontSize: 28, fontFace: SEMI, color: INK });
++    arrow(s, e.x + 1.18832, e.y + 0.25122, 0.33854, 0.75);
++    paragraph(s, TIMELINE_NOTE, e.x + 1.82813, e.y - 0.01042, 3.59375, 0.50488, { fontSize: 10 });
++  });
++
++  imageBox(s, 7.90625, 1.62807, 4.74479, 1.92122);
++}
++
++// 6 — Good Campaign / Good Impact
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 8.35417, 0, 4.97917, 7.5);
++  chrome(s);
++  heading(s, 'Good Campaign', 0.68508, 1.34826, 5.16804, 0.74049, 44);
++  paragraph(s, LOREM_LONG, 0.68229, 2.32455, 5.27604, 1.11074);
++  rule(s, 0.68229, 3.94749, 5.38021);
++  heading(s, 'Good Impact', 0.68508, 4.45968, 4.13198, 0.74049, 44);
++  paragraph(s, LOREM_LONG, 0.68229, 5.45176, 5.27604, 1.11074);
++}
++
++// 7 — New Campaign
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  heading(s, 'New', 0.68229, 1.29445, 1.97921, 1.00977, 60);
++  chrome(s);
++  heading(s, 'Campaign', 0.68229, 2.21274, 4.49837, 1.00977, 60);
++  paragraph(s, LOREM_LONG, 0.68229, 4.3473, 4.47207, 1.38843);
++
++  const NOTE =
++    'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet edisse interdum sectetur libero id  faucibus vestibulum.';
++  T(s, '01. Preserving Nature', { x: 10.12142, y: 2.8463, w: 2.15802, h: 0.23561, fontSize: 14, fontFace: SEMI, color: INK });
++  paragraph(s, NOTE, 10.12142, 3.27254, 2.52962, 1.11074);
++  rule(s, 10.12142, 4.91273, 2.52962);
++  T(s, '02. Weather Danger', { x: 10.12142, y: 5.44218, w: 2.04933, h: 0.23561, fontSize: 14, fontFace: SEMI, color: INK });
++  paragraph(s, NOTE, 10.12142, 5.86842, 2.52962, 1.11074);
++
++  pill(s, 0.68229, 6.4222, 1.55518, 0.55696);
++  arrow(s, 1.03627, 6.70068, 0.84722);
++  imageBox(s, 6.05208, 1.29445, 3.19792, 5.68472);
++}
++
++// 8 — We Shape Our Building Therefore They Shape Us
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  paragraph(s, LOREM_LONG, 5.37537, 1.32292, 5.51591, 1.11074);
++  rule(s, 5.37537, 2.72917, 3.83297);
++  heading(s, 'We Shape Our', 5.37537, 4.2528, 5.68192, 0.90879, 54);
++  heading(s, 'Building Therefore', 5.37537, 5.16159, 7.27567, 0.90879, 54);
++  heading(s, 'They Shape Us', 5.37537, 6.07038, 5.68192, 0.90879, 54);
++  imageBox(s, 0, 1.32292, 4.21875, 6.17708);
++}
++
++// 9 — Recoginizing The Need Is The Primary Condition For Design
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Recoginizing The', 0.68229, 1.29201, 5.50521, 0.74049, 44);
++  heading(s, 'Need Is The Primary', 0.68229, 2.01766, 7.01563, 0.74049, 44);
++  heading(s, 'Condition For Design', 0.68229, 2.74331, 6.74479, 0.74049, 44);
++  paragraph(s, LOREM_LONG, 0.68229, 4.7859, 5.27604, 1.11074);
++  paragraph(s, LOREM_SHORT, 0.68229, 6.02566, 5.27604, 0.55537);
++  rule(s, 0.68229, 6.97917, 2.5868);
++  imageBox(s, 9.77083, 1.29445, 3.5625, 5.68472);
++}
++
++// 10 — Planga Studio Best Work
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Planga Studio Best Work', 0.68229, 1.77341, 9.81366, 0.90879, 54);
++  paragraph(s, LOREM_LONG, 0.68229, 2.98612, 8.61979, 1.02042, { fontSize: 14 });
++  pill(s, 11.25211, 3.50554, 1.39893, 0.50101);
++  arrow(s, 11.52797, 3.75604, 0.80466);
++  imageBox(s, 0, 4.71875, 13.33333, 2.78125);
++}
++
++// 11 — Michael Alex testimonial
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Michael Alex', 0.68229, 1.49915, 5.50287, 1.00977, 60);
++  paragraph(s, 'Founder Of Stuido', 0.6875, 2.50892, 1.42187, 0.27769);
++  paragraph(
++    s,
++    '\u201CLaoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. Arcu risus quis varius quam ' +
++      'quisque id diam vel. Volutpat consequat mauris nunc congue nisi vitae. Phasellus vestibulum lorem sed risus ' +
++      'Lorem ipsum dolor sit amet.\u201D',
++    7.28125, 1.49915, 5.36979, 1.11074,
++    { bold: true, italic: true }
++  );
++  paragraph(s, LOREM_SHORT, 7.28125, 2.90991, 5.36979, 0.55537);
++
++  [
++    { label: 'Vel turpis nunc eget lorem dolor.', y: 5.16129, tx: 7.50781, tw: 2.81771 },
++    { label: 'libero id faucibus nisl tincidunt. ', y: 5.81367, tx: 7.59375, tw: 2.64584 },
++    { label: 'Laoreet suspendisse interdum.', y: 6.46606, tx: 7.57277, tw: 2.68778 },
++  ].forEach(function (chip) {
++    pill(s, 7.28125, chip.y, 3.27083, 0.51311, INK);
++    paragraph(s, chip.label, chip.tx, chip.y + 0.10729, chip.tw, 0.27769, { bold: true, align: 'center' });
++  });
++
++  imageBox(s, 0.68229, 3.38542, 5.50287, 3.59375);
++}
++
++// 12 — Our Expert Team
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 0.68229, 3.35417, 5.72396, 3.625);
++  chrome(s);
++  heading(s, 'Our Expert Team', 0.68229, 1.49915, 6.64237, 0.90879, 54);
++  paragraph(s, LOREM_SHORT, 8.72917, 1.57489, 3.92187, 0.83306);
++  T(s, 'James Ferran', { x: 1.03212, y: 3.74915, w: 2.35437, h: 0.40391, fontSize: 24, fontFace: SEMI, color: INK });
++  paragraph(s, 'Team Leader', 1.03212, 4.17435, 1.12066, 0.27769);
++  imageBox(s, 6.48438, 3.35417, 3.04427, 3.625);
++  imageBox(s, 9.61458, 3.35417, 3.04427, 3.625);
++}
++
++// 13 — Full-width statement
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'We Should Attempt To Bring', 0.68229, 1.32156, 9.2334, 0.74049, 44);
++  heading(s, 'Nature, House, And Human', 0.68229, 2.01603, 8.70923, 0.74049, 44);
++  heading(s, 'Beings Together In A Higher Unity', 0.68229, 2.71051, 10.91809, 0.74049, 44);
++  imageBox(s, 0.68229, 4.09946, 11.96875, 3.40054);
++}
++
++// 14 — Inspirational Interior
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Inspirational', 0.68229, 1.49002, 5.98146, 1.11074, 66);
++  heading(s, 'Interior', 0.68229, 2.60076, 3.54119, 1.11074, 66);
++  paragraph(s, LOREM_LONG, 6.1203, 4.61458, 6.53074, 0.83306);
++  paragraph(s, LOREM_TAIL, 6.1203, 5.62435, 6.53074, 0.55537);
++  rule(s, 6.1203, 6.55208, 3.26537);
++  imageBox(s, 8.15625, 1.49002, 4.49479, 2.22148);
++  imageBox(s, 0.68229, 4.61458, 4.49479, 2.88542);
++}
++
++// 15 — All Fine Architectural Values Are Human Values (no hamburger)
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, { menu: false });
++  heading(s, 'All Fine Architectural', 0.68229, 1.25, 6.20312, 0.67318, 40);
++  heading(s, 'Values Are Human', 0.68229, 1.85551, 5.44063, 0.67318, 40);
++  heading(s, 'Values, Else Not ', 0.68229, 2.46137, 4.56771, 0.67318, 40);
++  heading(s, 'Valuable', 0.68229, 3.06723, 2.62546, 0.67318, 40);
++  paragraph(
++    s,
++    'Laoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. Arcu risus quis varius quam ' +
++      'quisque id diam vel. Volutpat consequat mauris nunc congue nisi vitae. ',
++    7.61458, 5.04167, 5.03646, 0.83306
++  );
++  paragraph(
++    s,
++    'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id faucibus nisl.',
++    7.61458, 6.05143, 5.03646, 0.55537
++  );
++  rule(s, 7.61458, 6.97917, 3.26537);
++  imageBox(s, 7.61458, 0.52083, 5.03646, 2.69792);
++  imageBox(s, 0.68229, 4.27895, 6.20312, 2.70021);
++}
++
++// 16 — Welcome To Our World Of Architecture (no chrome)
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 0.68229, 0, 11.96875, 2.9054);
++  heading(s, 'Welcome To Our', 0.68229, 3.1554, 6.42319, 0.74049, 44);
++  heading(s, 'World Of Architecture', 0.68229, 3.8959, 7.09365, 0.74049, 44);
++  rule(s, 0.68229, 4.95833, 11.96875);
++  paragraph(s, LOREM_LONG, 0.6874, 5.40187, 6.53074, 0.83306);
++  paragraph(s, LOREM_TAIL, 0.6874, 6.41164, 6.53074, 0.55537);
++  pill(s, 11.09586, 6.41164, 1.55518, 0.55696);
++  arrow(s, 11.44984, 6.69027, 0.84722);
++}
++
++// 17 — Architecture And Interior Of The Future
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Architecture And', 0.68229, 1.28642, 5.99023, 0.80781, 48);
++  heading(s, 'Interior Of The Future', 0.68229, 2.11585, 7.56623, 0.80781, 48);
++  imageBox(s, 0.68229, 3.32292, 11.96875, 2.42393);
++  paragraph(s, LOREM_LONG, 0.6874, 6.14611, 6.53074, 0.83306);
++  pill(s, 11.09586, 6.41179, 1.55518, 0.55696);
++  arrow(s, 11.44984, 6.69027, 0.84722);
++}
++
++// 18 — The Creative Process Of Our Artist
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 8.4375, 0, 4.89583, 7.5);
++  chrome(s);
++  heading(s, 'The Creative', 0.68229, 1.33546, 3.99524, 0.74049, 44);
++  heading(s, 'Process Of Our Artist', 0.68229, 2.07596, 6.68093, 0.74049, 44);
++  paragraph(s, LOREM_LONG, 0.68229, 4.7859, 5.27604, 1.11074);
++  paragraph(s, LOREM_SHORT, 0.68229, 6.02566, 5.27604, 0.55537);
++  rule(s, 0.68229, 6.97917, 2.5868);
++}
++
++// 19 — Three-step process (no chrome)
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  imageBox(s, 0.68229, 0, 11.96875, 3.61458);
++  rule(s, 0.68229, 4.95938, 11.96875);
++  const STEP_COPY =
++    'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id ' +
++    'faucibus nisl tincidunt. Arcu risus quis varius quam quisque id diam vel. Volutpat consequat mauris.';
++  [
++    { title: '01. Project Plan', x: 0.68229, ty: 4.22428, tw: 2.64888, bw: 3.41201, copy: STEP_COPY },
++    { title: '02. Completion', x: 4.99424, ty: 4.22428, tw: 2.63836, bw: 3.41201, copy: STEP_COPY },
++    {
++      title: '03. Realization', x: 9.30619, ty: 4.2193, tw: 2.52091, bw: 3.34485,
++      copy:
++        'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id ' +
++        'faucibus nisl tincidunt. Arcu risus quis varius quam quisque id diam veolutpat consequat.',
++    },
++  ].forEach(function (step) {
++    T(s, step.title, { x: step.x, y: step.ty, w: step.tw, h: 0.40391, fontSize: 24, fontFace: SEMI, color: GREEN });
++    paragraph(s, step.copy, step.x, 5.17407, step.bw, 1.38843, { color: INK });
++  });
++}
++
++// 20 — Planga Studio Portfolio
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Planga Studio', 0.68229, 1.32505, 6.0919, 1.00977, 60);
++  heading(s, 'Portfolio', 0.68229, 2.33481, 3.74981, 1.00977, 60);
++  paragraph(s, LOREM_LONG, 7.375, 2.23384, 5.27604, 1.11074);
++  imageBox(s, 5.53125, 3.97917, 2.27083, 3.0);
++  imageBox(s, 0.68229, 3.97917, 4.75521, 3.0);
++  imageBox(s, 7.89583, 3.97917, 4.75521, 3.0);
++}
++
++// 21 — Gallery Slide
++function slide21(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Gallery Slide', 0.68229, 1.32505, 5.36263, 1.00977, 60);
++  paragraph(
++    s,
++    'Laoreet suspendisse interdum consectetur libero id faucibus nisl tincidunt. Arcu risus quis varius quam ' +
++      'quisque id diam vel. ',
++    7.41406, 1.55224, 5.23698, 0.55537
++  );
++  imageBox(s, 0.68229, 3.03825, 6.67188, 3.94092);
++  imageBox(s, 7.41406, 3.03133, 2.58854, 3.94092);
++  imageBox(s, 10.0625, 3.03133, 2.58854, 1.93742);
++  imageBox(s, 10.0625, 5.04866, 2.58854, 1.93742);
++}
++
++// 22 — Data Chart (column chart drawn as bars)
++function slide22(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Data Chart', 0.68229, 1.53836, 4.71399, 1.00977, 60);
++  paragraph(s, LOREM_INTRO, 0.68229, 2.82418, 5.72222, 0.83306);
++
++  T(s, 'Data Average', { x: 0.68229, y: 4.42856, w: 1.55322, h: 0.26927, fontSize: 16 });
++  heading(s, '88%', 0.68229, 4.85473, 1.82144, 1.00977, 60);
++  s.addText(
++    ['Vel turpis nunc eget lorem', 'Interdum consectetur libero ', 'Varius quam quisque.'].map(function (line) {
++      return { text: line, options: { breakLine: true, bullet: { characterCode: '2022', indent: 13.5 } } };
++    }),
++    { x: 2.90104, y: 4.85473, w: 2.43564, h: 0.83306, fontFace: SANS, fontSize: 11, color: BLACK, lineSpacingMultiple: 1.5, margin: 0, valign: 'top' }
++  );
++  rule(s, 0.68229, 6.18268, 4.65439, INK, 0.75);
++
++  // Plot: baseline at y = 6.99806, three groups of three columns.
++  rule(s, 7.66473, 6.99806, 5.0569, INK, 0.75);
++  [
++    { x: 7.99052, y: 1.71835, h: 5.28893, c: GREEN },
++    { x: 8.3644, y: 4.1027, h: 2.89536, c: GRAY_MD },
++    { x: 8.73828, y: 4.57957, h: 2.41849, c: GRAY_DK },
++    { x: 9.63865, y: 3.95096, h: 3.05631, c: GREEN },
++    { x: 10.01253, y: 1.71835, h: 5.27971, c: GRAY_MD },
++    { x: 10.38642, y: 4.57957, h: 2.41849, c: GRAY_DK },
++    { x: 11.28344, y: 2.73711, h: 4.27016, c: GREEN },
++    { x: 11.65732, y: 4.818, h: 2.18006, c: GRAY_MD },
++    { x: 12.0312, y: 3.34404, h: 3.65402, c: GRAY_DK },
++  ].forEach(function (bar) {
++    s.addShape('rect', { x: bar.x, y: bar.y, w: 0.29852, h: bar.h, fill: { color: bar.c } });
++  });
++  [
++    { label: '50', x: 7.30643, y: 1.53836, w: 0.22462 },
++    { label: '40', x: 7.23958, y: 2.6108, w: 0.35831 },
++    { label: '30', x: 7.30643, y: 3.68325, w: 0.22462 },
++    { label: '20', x: 7.30643, y: 4.75569, w: 0.22462 },
++    { label: '10', x: 7.30643, y: 5.79149, w: 0.22462 },
++    { label: '0', x: 7.30643, y: 6.82729, w: 0.22462 },
++  ].forEach(function (tick) {
++    T(s, tick.label, { x: tick.x, y: tick.y, w: tick.w, h: 0.34154, fontSize: 12, align: 'center', valign: 'middle', lineSpacingMultiple: 1.5 });
++  });
++}
++
++// 23 — Impacts (horizontal stacked bars)
++function slide23(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Impacts', 0.68229, 1.75975, 4.64359, 0.84147, 50);
++
++  // Two legend chips + their descriptions.
++  [
++    { value: '740.000', label: 'Our Impact', y: 3.11163, fill: GRAY_DK, lx: 2.10322 },
++    { value: '260.000', label: 'Competitor', y: 5.18822, fill: GREEN, lx: 2.07505 },
++  ].forEach(function (chip) {
++    s.addShape('rect', { x: 0.68229, y: chip.y, w: 2.45181, h: 0.45763, fill: { color: chip.fill } });
++    T(s, chip.value, { x: 0.81866, y: chip.y + 0.07735, w: 1.22692, h: 0.30293, fontSize: 18, fontFace: SEMI, color: WHITE });
++    T(s, chip.label, { x: chip.lx, y: chip.y + 0.12784, w: 0.91976, h: 0.18512, fontSize: 11, color: WHITE });
++  });
++  paragraph(
++    s,
++    'Cras vel fermentum metus. Integer luctus convallis massa, ut rutrum lectus dictum ac. Maecenas ligula orci, ' +
++      'Maecenas ligula orci, feugiat suscipit purus sed',
++    0.68229, 3.69761, 4.68248, 0.83306
++  );
++  s.addShape('straightConnector1', { x: 0.68229, y: 4.79427, w: 4.68248, h: 0, rotate: 180, line: { color: INK, width: 0.75 } });
++  paragraph(
++    s,
++    'feugiat suscipit purus sed, suscipit lacinia tortor. Suspendisse commodo nisl a augue pretium, gravida tincidunt',
++    0.68229, 5.82011, 4.68248, 0.52403
++  );
++
++  // Scale labels and vertical gridlines (lines rotated 90 degrees about their centre).
++  [
++    { label: '25', x: 7.70853 },
++    { label: '50', x: 9.19012 },
++    { label: '75', x: 10.65915 },
++    { label: '100', x: 12.14074 },
++  ].forEach(function (tick) {
++    T(s, tick.label, { x: tick.x, y: 2.43353, w: 0.37206, h: 0.16829, fontSize: 10, align: 'right' });
++  });
++  [6.4391, 7.91441, 9.38972, 10.86502].forEach(function (x) {
++    s.addShape('straightConnector1', { x: x, y: 4.18514, w: 3.57204, h: 0, rotate: 90, line: { color: GRID, width: 0.75 } });
++  });
++  s.addShape('straightConnector1', { x: 6.74981, y: 2.39911, w: 0, h: 3.57204, line: { color: BLACK, width: 0.75 } });
++
++  // Two stacked horizontal bars, each drawn as rotated rectangles.
++  [
++    { x: 9.42214, y: 0.49934, w: 0.55658, h: 5.90123, c: GREEN },
++    { x: 8.83672, y: 2.49197, w: 0.55658, h: 1.91598, c: GRAY_LT },
++    { x: 10.15365, y: 2.2828, w: 0.55658, h: 2.33431, c: GRAY_MD },
++    { x: 9.42214, y: 1.95931, w: 0.55658, h: 5.90123, c: GREEN },
++    { x: 9.6933, y: 3.75658, w: 0.55658, h: 2.3067, c: GRAY_LT },
++    { x: 10.8166, y: 3.74277, w: 0.55658, h: 2.33431, c: GRAY_MD },
++  ].forEach(function (seg) {
++    s.addShape('rect', { x: seg.x, y: seg.y, w: seg.w, h: seg.h, rotate: -90, fill: { color: seg.c } });
++  });
++}
++
++/** The divider under the first Impacts block is stored flipped in the source deck. */
++function slideRuleReversed(slide, x, y, w) {
++  slide.addShape('straightConnector1', { x, y, w, h: 0, rotate: 180, line: { color: INK, width: 0.75 } });
++}
++
++// 24 — Contact Us
++function slide24(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Contact Us', 6.92882, 1.52794, 4.77535, 1.00977, 60);
++  paragraph(s, LOREM_INTRO, 6.92882, 2.95978, 5.72222, 0.83306);
++  rule(s, 6.92882, 4.20131, 4.67188, GREEN);
++
++  [
++    {
++      title: 'Our Address :', x: 6.92882, tw: 1.94647,
++      lines: [
++        { text: '123456 Washington', y: 5.66143, w: 2.1683 },
++        { text: 'Growth\u00AE21', y: 5.97185, w: 1.2914 },
++        { text: 'Building 47 Office 202', y: 6.27594, w: 2.47321 },
++      ],
++      ty: 5.09544,
++    },
++    {
++      title: 'Our Contacts :', x: 10.34725, tw: 1.89725,
++      lines: [
++        { text: 'hello@name.com', y: 5.65946, w: 1.89725 },
++        { text: '+123 456 789', y: 5.97185, w: 1.89725 },
++      ],
++      ty: 5.094,
++    },
++  ].forEach(function (col) {
++    T(s, col.title, { x: col.x, y: col.ty, w: col.tw, h: 0.30293, fontSize: 18, fontFace: SEMI, valign: 'middle' });
++    col.lines.forEach(function (line) {
++      T(s, line.text, { x: col.x, y: line.y, w: line.w, h: 0.20195, fontSize: 12, valign: 'middle' });
++    });
++  });
++
++  imageBox(s, 0.68229, 1.52794, 5.07812, 5.45122);
++}
++
++// 25 — Thank You!
++function slide25(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  heading(s, 'Thank You!', 0.68229, 1.81636, 6.45654, 1.34635, 80);
++  T(s, 'Architecture & Interior Design Presentation', { x: 0.68229, y: 3.16271, w: 3.7066, h: 0.30293, fontSize: 12, lineSpacingMultiple: 1.5 });
++  T(s, 'Architecture & Interior Design', { x: 0.69271, y: 5.04304, w: 1.87216, h: 0.2272, fontSize: 9, color: INK, lineSpacingMultiple: 1.5 });
++  arrow(s, 2.77675, 5.17172, 0.80832, 0.75);
++  T(s, 'Since 2019', { x: 3.79695, y: 5.06255, w: 0.7493, h: 0.2272, fontSize: 9, color: INK, lineSpacingMultiple: 1.5 });
++  rule(s, 0.68229, 5.72727, 11.96875, GREEN);
++  paragraph(
++    s,
++    'Vel turpis nunc eget lorem dolor sed viverra ipsum. Laoreet suspendisse interdum consectetur libero id ' +
++      'faucibus nisl tincidunt arcu risus quis varius quam.',
++    0.68229, 6.1843, 3.98437, 0.83306
++  );
++  s.addShape('ellipse', { x: 10.78504, y: 6.34811, w: 1.866, h: 0.43929, line: { color: GREEN, width: 0.75 } });
++  T(s, 'Exit', { x: 11.53046, y: 6.44995, w: 0.37516, h: 0.23561, fontSize: 14, fontFace: MEDIUM, align: 'center' });
++  imageBox(s, 8.07071, 1.59414, 4.58033, 3.08263);
++}
++
++/* ------------------------------------------------------------------- build */
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'PLANGA', width: 12192000 / 914400, height: 6858000 / 914400 }); // 13.333 x 7.5 in
++  pptx.layout = 'PLANGA';
++  pptx.author = 'PptxGenJS';
++  pptx.title = 'Planga Plongo — Architecture & Interior Design Presentation';
++
++  [
++    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++    slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++    slide19, slide20, slide21, slide22, slide23, slide24, slide25,
++  ].forEach(function (fn) {
++    fn(pptx);
++  });
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '0728417e-9121-4eaf-a2d0-b9b008f2450e_grok_final.pptx') });
++}
++
++build().then(function (file) {
++  console.log('wrote ' + file);
++});

@@ -1,0 +1,591 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/academic_thesis_defense_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/academic_thesis_defense_presentation.js
+@@ -0,0 +1,588 @@
++/*
++ * "THESIS DEFENSE — Presentation Template" (20 slides, 10 x 5.625 in)
++ * Standalone pptxgenjs re-creation of the reference deck.
++ * Raster photos in the original are replaced by grey "[image]" placeholders.
++ *
++ * Run:  node 137fdd80-2749-41bb-91f1-7e0f21950fd7_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Palette / typography (from the deck theme "Custom 58")
++ * ------------------------------------------------------------------ */
++const NAVY = '075E93'; // accent2 – dark slide background
++const SKY = 'C5E7FC'; // slide-master background
++const WHITE = 'FFFFFF'; // lt1
++const BLACK = '000000'; // dk1
++const PANEL = 'E2F3FD'; // pale chart panel
++const GRID_SKY = 'AADCFA'; // gantt grid
++const GRID_GREY = 'D8D8D8'; // line-chart grid / axis
++const BAR_FILL = '74C6F8'; // accent1 – bar chart
++const BAR_LINE = '086EAD';
++const IMG_BG = 'F2F2F2'; // image placeholder
++const IMG_FG = '9AA0A6';
++
++const HEAD = 'Space Grotesk'; // headings / numbers
++const BODY = 'Space Grotesk Light'; // body copy
++
++const INSETS = [5.4, 5.4, 2.7, 2.7]; // [l, r, b, t] in points = Google Slides defaults
++
++/* ------------------------------------------------------------------ *
++ * Icon outlines — normalised 0..1 polygons, scaled by `poly()`
++ * ------------------------------------------------------------------ */
++// 8-pointed asterisk / sparkle used as the deck's logo mark
++const ASTERISK = [
++  [0.444, 1.0], [0.444, 0.633], [0.186, 0.893], [0.107, 0.814], [0.367, 0.556],
++  [0.0, 0.556], [0.0, 0.444], [0.367, 0.444], [0.107, 0.186], [0.186, 0.107],
++  [0.444, 0.367], [0.444, 0.0], [0.556, 0.0], [0.556, 0.367], [0.814, 0.107],
++  [0.893, 0.186], [0.633, 0.444], [1.0, 0.444], [1.0, 0.556], [0.633, 0.556],
++  [0.893, 0.814], [0.814, 0.893], [0.556, 0.633], [0.556, 1.0],
++];
++// left-pointing arrow (drawn with rotate:180 to point right)
++const ARROW_LEFT = [
++  [0.239, 0.563], [0.589, 0.913], [0.5, 1.0], [0.0, 0.5], [0.5, 0.0],
++  [0.589, 0.088], [0.239, 0.438], [1.0, 0.438], [1.0, 0.563],
++];
++// downward chevron (drawn with rotate:270 to point right)
++const CHEVRON_DOWN = [
++  [0.5, 1.0], [0.0, 0.189], [0.117, 0.0], [0.5, 0.622], [0.883, 0.0], [1.0, 0.189],
++];
++// tick mark that sits inside the circled check bullet
++const CHECK_MARK = [
++  [0.430, 0.730], [0.783, 0.378], [0.712, 0.307],
++  [0.430, 0.590], [0.288, 0.447], [0.218, 0.518],
++];
++// pictogram bodies for the population infographic
++const BODY_SKIRT = [
++  [0.5, 0.0], [0.717, 0.09], [1.0, 0.6], [0.667, 0.6],
++  [0.667, 1.0], [0.333, 1.0], [0.333, 0.6], [0.0, 0.6], [0.283, 0.09],
++];
++const BODY_TORSO = [
++  [0.286, 0.0], [0.714, 0.0], [1.0, 0.133], [1.0, 0.5], [0.786, 0.5],
++  [0.786, 1.0], [0.214, 1.0], [0.214, 0.5], [0.0, 0.5], [0.0, 0.133],
++];
++
++/* ------------------------------------------------------------------ *
++ * Low-level drawing helpers
++ * ------------------------------------------------------------------ */
++let pptx; // set in build()
++
++/** Text box matching the reference body-properties (top anchored, GS insets). */
++function txt(slide, text, o) {
++  slide.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: o.face || BODY,
++    fontSize: o.size,
++    color: o.color,
++    align: o.align || 'left',
++    valign: 'top',
++    margin: INSETS,
++    lineSpacingMultiple: o.lnSpc,
++    bold: o.bold,
++    wrap: true,
++  });
++}
++
++/** Straight connector between two points. */
++function line(slide, x1, y1, x2, y2, color, width) {
++  slide.addShape(pptx.ShapeType.line, {
++    x: Math.min(x1, x2), y: Math.min(y1, y2),
++    w: Math.abs(x2 - x1), h: Math.abs(y2 - y1),
++    line: { color: color, width: width },
++    flipV: (x2 - x1) * (y2 - y1) < 0,
++  });
++}
++
++function rect(slide, x, y, w, h, fill) {
++  slide.addShape(pptx.ShapeType.rect, { x: x, y: y, w: w, h: h, fill: { color: fill }, line: { type: 'none' } });
++}
++
++function ellipse(slide, cx, cy, d, fill, opts) {
++  slide.addShape(pptx.ShapeType.ellipse, Object.assign({
++    x: cx - d / 2, y: cy - d / 2, w: d, h: d, fill: { color: fill },
++  }, opts || {}));
++}
++
++/** Draw a normalised polygon scaled into the box (x, y, w, h). */
++function poly(slide, pts, x, y, w, h, fill, opts) {
++  slide.addShape(pptx.ShapeType.custGeom, Object.assign({
++    x: x, y: y, w: w, h: h,
++    fill: fill.transparency ? fill : { color: fill.color || fill },
++    line: { type: 'none' },
++    points: pts.map(function (p) { return { x: p[0] * w, y: p[1] * h }; }).concat([{ close: true }]),
++  }, opts || {}));
++}
++
++/* ------------------------------------------------------------------ *
++ * Composite icons
++ * ------------------------------------------------------------------ */
++function asterisk(slide, x, y, size, color) {
++  poly(slide, ASTERISK, x, y, size, size, color);
++}
++
++function arrowRight(slide, x, y, size, color) {
++  poly(slide, ARROW_LEFT, x, y, size, size, color, { rotate: 180 });
++}
++
++function chevronRight(slide, x, y, w, h, color) {
++  poly(slide, CHEVRON_DOWN, x, y, w, h, color, { rotate: 270 });
++}
++
++/** Circled tick used for the check-list bullets. */
++function checkBullet(slide, x, y, size, color) {
++  ellipse(slide, x + size / 2, y + size / 2, size * 0.9, null, {
++    fill: { type: 'none' }, line: { color: color, width: size * 0.1 * 72 },
++  });
++  poly(slide, CHECK_MARK, x, y, size, size, color);
++}
++
++/** Teardrop pin body: circular head plus the triangle tangent to it. */
++function pinBody(slide, x, y, w, h, color, headR, tipY) {
++  const cy = 0.41; // head centre as a fraction of the height
++  const d = (tipY - cy) * h, r = headR * w, t = Math.sqrt(d * d - r * r);
++  const dx = (t * r / d) / w, dy = (t * t / d) / h;
++  poly(slide, [[0.5, tipY], [0.5 - dx, tipY - dy], [0.5 + dx, tipY - dy]], x, y, w, h, color);
++  ellipse(slide, x + w / 2, y + cy * h, 2 * r, color, { line: { type: 'none' } });
++}
++
++/** Outlined map pin: solid teardrop, hollowed out, with a dot in the middle. */
++function mapPin(slide, x, y, w, h, color, holeColor) {
++  pinBody(slide, x, y, w, h, color, 0.5, 1.0);
++  pinBody(slide, x, y, w, h, holeColor, 0.375, 0.867);
++  ellipse(slide, x + w / 2, y + 0.4 * h, 0.25 * w, color, { line: { type: 'none' } });
++}
++
++/** Person pictogram (head + body) for the population chart. */
++function person(slide, x, y, w, h, fill, female) {
++  const head = 0.115;
++  ellipse(slide, x + w / 2, y + head / 2, head, null, { fill: fill, line: { type: 'none' } });
++  poly(slide, female ? BODY_SKIRT : BODY_TORSO, x, y + 0.144, w, h - 0.144, fill);
++}
++
++/** Grey stand-in for a photo from the original deck. */
++function imageBox(slide, x, y, w, h) {
++  rect(slide, x, y, w, h, IMG_BG);
++  slide.addText('[image]', {
++    x: x, y: y + h / 2 - 0.16, w: w, h: 0.32,
++    fontFace: BODY, fontSize: 10, color: IMG_FG, align: 'center', valign: 'middle', margin: 0,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Shared slide chrome: eyebrow label + bottom bar with page number
++ * ------------------------------------------------------------------ */
++function chrome(slide, page, ink) {
++  txt(slide, 'THESIS DEFENSE PRESENTATION TEMPLATE', { x: 0.57, y: 0.37, w: 3.615, h: 0.227, size: 9, color: ink });
++
++  line(slide, 0, 5.027, 10, 5.027, ink, 1.5);
++  line(slide, 0.57, 5.027, 0.57, 5.672, ink, 1.5);
++  line(slide, 9.438, 5.027, 9.438, 5.672, ink, 1.5);
++  asterisk(slide, 0.132, 5.177, 0.298, ink);
++  arrowRight(slide, 9.593, 5.2, 0.253, ink);
++
++  slide.addText([
++    { text: 'THESIS DEFENSE', options: { breakLine: true } },
++    { text: 'PRESENTATION TEMPLATE' },
++  ], { x: 0.71, y: 5.137, w: 1.806, h: 0.379, fontFace: BODY, fontSize: 9, color: ink, valign: 'top', margin: INSETS });
++
++  slide.addText([
++    { text: ' PAGE', options: { breakLine: true } },
++    { text: '  ' + page + ' / 20' },
++  ], { x: 8.135, y: 5.137, w: 1.154, h: 0.379, fontFace: BODY, fontSize: 9, color: ink, align: 'right', valign: 'top', margin: INSETS });
++}
++
++/** Create a slide with the right background + ink colour. */
++function newSlide(dark) {
++  const slide = pptx.addSlide();
++  slide.background = { color: dark ? NAVY : SKY };
++  return slide;
++}
++
++/* ------------------------------------------------------------------ *
++ * Reusable content blocks
++ * ------------------------------------------------------------------ */
++/** Small "→ LEARN MORE" call to action. */
++function learnMore(slide, x, y, ink, w) {
++  arrowRight(slide, x, y + 0.125, 0.139, ink);
++  txt(slide, 'LEARN MORE', { x: x + 0.139, y: y, w: w || 1.03, h: 0.341, size: 11, color: ink, lnSpc: 1.5 });
++}
++
++const LOREM_LONG =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++  'labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco ' +
++  'laboris nisi ut aliquip ex ea commodo consequat.\u00a0';
++const LOREM_MED = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit';
++
++/* ================================================================== *
++ * Slide builders
++ * ================================================================== */
++
++// 1 — Title
++function slide01() {
++  const s = newSlide(true);
++  txt(s, 'THESIS', { x: 0.57, y: 0.598, w: 4.908, h: 1.818, face: HEAD, size: 104, color: WHITE });
++  txt(s, 'DEFENSE', { x: 3.225, y: 2.062, w: 6.205, h: 1.818, face: HEAD, size: 104, color: WHITE, align: 'right' });
++  txt(s, 'PRESENTATION             TEMPLATE', { x: 0.562, y: 3.891, w: 8.867, h: 0.757, size: 41, color: WHITE, align: 'center' });
++  line(s, 4.871, 4.27, 6.418, 4.27, WHITE, 2.25);
++  chrome(s, 1, WHITE);
++}
++
++// 2 — Introduction
++function slide02() {
++  const s = newSlide(false);
++  txt(s, 'INTRODUCTION', { x: 0.791, y: 0.598, w: 5.625, h: 0.985, face: HEAD, size: 54, color: BLACK });
++  line(s, 0, 1.62, 10, 1.62, BLACK, 1.5);
++  txt(s, LOREM_LONG, { x: 3.604, y: 2.083, w: 6.26, h: 0.816, size: 11, color: BLACK, lnSpc: 1.5 });
++  asterisk(s, 8.839, 0.795, 0.591, BLACK);
++  imageBox(s, 0, 2.083, 3.177, 2.49);
++  txt(s, '32,4K', { x: 5.482, y: 3.328, w: 2.312, h: 0.682, face: HEAD, size: 36, color: BLACK });
++  txt(s, LOREM_SHORT, { x: 5.482, y: 3.967, w: 2.312, h: 0.606, size: 11, color: BLACK, lnSpc: 1.5 });
++  learnMore(s, 8.26, 4.232, BLACK);
++  chrome(s, 2, BLACK);
++}
++
++// 3 — Problem statement
++function slide03() {
++  const s = newSlide(false);
++  txt(s, 'PROBLEM STATEMENT', { x: 0.81, y: 0.737, w: 4.43, h: 1.893, face: HEAD, size: 54, color: BLACK });
++  txt(s, LOREM_LONG, { x: 0.81, y: 3.031, w: 3.846, h: 1.401, size: 11, color: BLACK, lnSpc: 1.5 });
++  line(s, 5.48, 0, 5.48, 5.027, BLACK, 1.5);
++  line(s, 5.48, 2.514, 10, 2.514, BLACK, 1.5);
++  [['PROBLEM 01', 0.592, 1.041, 3.529], ['PROBLEM 02', 3.111, 3.561, 3.594]].forEach(function (r) {
++    txt(s, r[0], { x: 6.087, y: r[1], w: 3.342, h: 0.53, face: HEAD, size: 27, color: BLACK });
++    txt(s, LOREM_MED, { x: 6.087, y: r[2], w: r[3], h: 0.816, size: 11, color: BLACK, lnSpc: 1.5 });
++  });
++  chrome(s, 3, BLACK);
++}
++
++// 4 — Research objectives
++function slide04() {
++  const s = newSlide(true);
++  txt(s, 'RESEARCH OBJECTIVES', { x: 0.57, y: 0.598, w: 8.859, h: 0.985, face: HEAD, size: 54, color: WHITE });
++  line(s, 0, 1.62, 10, 1.62, WHITE, 1.5);
++  arrowRight(s, 1.191, 2.553, 0.589, WHITE);
++  [['OBJECTIVES ONE', 2.863, 3.118], ['OBJECTIVES TWO', 6.491, 3.039]].forEach(function (c) {
++    imageBox(s, c[1], 2.032, 1.631, 1.631);
++    txt(s, c[0], { x: c[1], y: 3.79, w: 2.938, h: 0.429, face: HEAD, size: 21, color: WHITE });
++    txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor incididunt',
++      { x: c[1], y: 4.22, w: c[2], h: 0.539, size: 11, color: WHITE, lnSpc: 1.5 });
++  });
++  chrome(s, 4, WHITE);
++}
++
++// 5 — Hypotheses
++function slide05() {
++  const s = newSlide(false);
++  txt(s, 'HYPOTHESES', { x: 0.79, y: 0.679, w: 4.793, h: 0.985, face: HEAD, size: 54, color: BLACK });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.',
++    { x: 5.818, y: 0.869, w: 3.83, h: 0.539, size: 11, color: BLACK, lnSpc: 1.5 });
++  imageBox(s, 0, 1.769, 7.003, 1.597);
++  asterisk(s, 8.839, 2.272, 0.591, BLACK);
++  txt(s, '89%', { x: 3.695, y: 3.74, w: 1.669, h: 0.682, face: HEAD, size: 36, color: BLACK, align: 'right' });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim.',
++    { x: 5.712, y: 3.74, w: 4.076, h: 0.816, size: 11, color: BLACK, lnSpc: 1.5 });
++  chrome(s, 5, BLACK);
++}
++
++// 6 — Significance of the study
++function slide06() {
++  const s = newSlide(false);
++  txt(s, 'SIGNIFICANCE OF THE STUDY', { x: 0.807, y: 0.761, w: 6.215, h: 1.893, face: HEAD, size: 54, color: BLACK });
++  ['ACADEMIC', 'SOCIETAL', 'INDUSTRY'].forEach(function (label, i) {
++    const y = 2.919 + i * 0.6455;
++    chevronRight(s, 1.83, y + 0.16, 0.179, 0.11, BLACK);
++    txt(s, label, { x: 2.128, y: y, w: 1.835, h: 0.429, face: HEAD, size: 21, color: BLACK });
++  });
++  imageBox(s, 5.363, 1.816, 2.102, 1.457);
++  imageBox(s, 4.561, 3.609, 2.904, 1.03);
++  imageBox(s, 7.753, 0.598, 2.247, 4.042);
++  chrome(s, 6, BLACK);
++}
++
++// 7 — Scope and limitations
++function slide07() {
++  const s = newSlide(true);
++  txt(s, 'SCOPE AND LIMITATIONS', { x: 0.581, y: 0.718, w: 8.859, h: 0.909, face: HEAD, size: 50, color: WHITE, align: 'center' });
++  line(s, 0, 1.62, 10, 1.62, WHITE, 1.5);
++  line(s, 5.0, 1.62, 5.0, 5.027, WHITE, 1.5);
++  [['INCLUDED PACKAGED', 0.57, 1.442, 1.664, 2.625], ['EXCLUDED PACKAGED', 5.587, 6.459, 6.681, 2.609]].forEach(function (col) {
++    txt(s, col[0], { x: col[1], y: 1.973, w: 3.843, h: 0.429, face: HEAD, size: 21, color: WHITE, align: 'center' });
++    [2.615, 3.33, 4.044].forEach(function (y) {
++      checkBullet(s, col[2], y + 0.076, 0.202, WHITE);
++      txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed.',
++        { x: col[3], y: y, w: col[4], h: 0.539, size: 11, color: WHITE, lnSpc: 1.5 });
++    });
++  });
++  chrome(s, 7, WHITE);
++}
++
++// 8 — Literature review
++function slide08() {
++  const s = newSlide(false);
++  txt(s, 'LITERATURE REVIEW', { x: 0.742, y: 0.681, w: 4.43, h: 1.893, face: HEAD, size: 54, color: BLACK });
++  line(s, 5.742, 0, 5.742, 5.027, BLACK, 1.5);
++  imageBox(s, 0, 2.686, 5.742, 2.341);
++  ['2022', '2023', '2024', '2025'].forEach(function (year, i) {
++    const y = 0.681 + i * 1.0697;
++    txt(s, year, { x: 6.235, y: y, w: 1.265, h: 0.581, face: HEAD, size: 30, color: BLACK });
++    txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit sed.',
++      { x: 7.5, y: y, w: 2.095, h: 0.539, size: 11, color: BLACK, lnSpc: 1.5 });
++  });
++  chrome(s, 8, BLACK);
++}
++
++// 9 — Theoretical framework (hand-drawn line chart)
++function slide09() {
++  const s = newSlide(false);
++  txt(s, 'THEORETICAL FRAMEWORK', { x: 0.772, y: 0.857, w: 5.055, h: 1.893, face: HEAD, size: 54, color: BLACK });
++  txt(s, '2025', { x: 1.517, y: 2.991, w: 4.108, h: 0.682, face: HEAD, size: 36, color: BLACK });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.',
++    { x: 1.517, y: 3.673, w: 4.108, h: 0.816, size: 11, color: BLACK, lnSpc: 1.5 });
++
++  rect(s, 5.895, 0.598, 3.534, 3.946, PANEL);
++  txt(s, 'Income Quarter 1-2', { x: 6.196, y: 0.857, w: 2.857, h: 0.303, face: HEAD, size: 14, color: BLACK });
++  for (let i = 0; i < 6; i++) line(s, 6.272, 1.479 + i * 0.4918, 9.052, 1.479 + i * 0.4918, GRID_GREY, 0.75);
++
++  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
++  MONTHS.forEach(function (m, i) {
++    txt(s, m, { x: 6.136 + i * 0.518, y: 4.081, w: 0.503, h: 0.252, size: 11, color: BLACK, align: 'center' });
++  });
++
++  // data points, in inches on the panel
++  const PTS = [[6.336, 3.443], [6.906, 2.478], [7.424, 3.155], [7.941, 1.495], [8.460, 2.479], [8.922, 1.991]];
++  for (let i = 1; i < PTS.length; i++) line(s, PTS[i - 1][0], PTS[i - 1][1], PTS[i][0], PTS[i][1], NAVY, 2.25);
++  PTS.forEach(function (p) { ellipse(s, p[0], p[1], 0.127, NAVY, { line: { type: 'none' } }); });
++
++  chrome(s, 9, BLACK);
++}
++
++// 10 — Research methodology
++function slide10() {
++  const s = newSlide(true);
++  txt(s, 'RESEARCH METHODOLOGY', { x: 0.57, y: 0.687, w: 8.859, h: 0.909, face: HEAD, size: 50, color: WHITE, align: 'center' });
++  line(s, 0, 1.62, 10, 1.62, WHITE, 1.5);
++  line(s, 3.333, 1.62, 3.333, 5.027, WHITE, 1.5);
++  line(s, 6.667, 1.62, 6.667, 5.027, WHITE, 1.5);
++  [['FIRST', 'QUALITATIVE', 0.775, 1.367], ['SECOND', 'QUANTTATIVE', 3.851, 1.379], ['THIRD', 'MIXED', 6.996, 1.546]]
++    .forEach(function (c) {
++      txt(s, c[0], { x: c[2], y: 1.962, w: 2.299, h: 0.341, size: 11, color: WHITE, lnSpc: 1.5 });
++      txt(s, c[1], { x: c[2], y: 2.303, w: 2.299, h: 0.48, face: HEAD, size: 24, color: WHITE });
++      txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor',
++        { x: c[2], y: 2.837, w: 2.299, h: 0.871, size: 11, color: WHITE, lnSpc: 1.5 });
++      learnMore(s, c[2], 4.232, WHITE, c[3]);
++    });
++  chrome(s, 10, WHITE);
++}
++
++// 11 — Population & sample (pictogram infographic)
++function slide11() {
++  const s = newSlide(false);
++  txt(s, 'POPULATION & SAMPLE', { x: 0.816, y: 0.633, w: 4.662, h: 1.893, face: HEAD, size: 54, color: BLACK });
++  txt(s, LOREM_LONG, { x: 5.583, y: 0.955, w: 3.846, h: 1.401, size: 11, color: BLACK, lnSpc: 1.5 });
++  line(s, 0, 2.658, 10, 2.658, BLACK, 1.5);
++  line(s, 1.91, 2.658, 1.91, 5.027, BLACK, 1.5);
++  arrowRight(s, 0.749, 3.637, 0.411, BLACK);
++
++  const SOLID = { color: BLACK };
++  const FADED = { color: NAVY, transparency: 60 };
++  const GREY = { color: BLACK, transparency: 60 };
++
++  txt(s, '69%', { x: 2.486, y: 3.016, w: 1.403, h: 0.757, face: HEAD, size: 41, color: BLACK });
++  for (let i = 0; i < 15; i++) person(s, 4.011 + i * 0.367, 3.086, 0.259, 0.575, i < 10 ? SOLID : FADED, true);
++
++  txt(s, '31%', { x: 2.486, y: 3.939, w: 1.403, h: 0.757, face: HEAD, size: 41, color: BLACK });
++  for (let i = 0; i < 15; i++) person(s, 4.028 + i * 0.367, 4.024, 0.201, 0.575, i < 5 ? SOLID : (i === 5 ? GREY : FADED), false);
++
++  chrome(s, 11, BLACK);
++}
++
++// 12 — Data collection
++function slide12() {
++  const s = newSlide(false);
++  txt(s, 'DATA COLLECTION', { x: 0.758, y: 0.685, w: 7.087, h: 0.909, face: HEAD, size: 50, color: BLACK });
++  line(s, 0, 1.62, 7.657, 1.62, BLACK, 1.5);
++  line(s, 0, 3.324, 7.657, 3.324, BLACK, 1.5);
++  line(s, 7.657, 0, 7.657, 5.027, BLACK, 1.5);
++  line(s, 3.828, 1.62, 3.828, 5.027, BLACK, 1.5);
++  imageBox(s, 7.657, 0, 2.343, 5.027);
++  [['SURVEYS', 0.773, 1.966], ['INTERVIEWS', 4.399, 1.966], ['EXPERIMENTS', 0.773, 3.64], ['ETC', 4.399, 3.64]]
++    .forEach(function (c) {
++      txt(s, c[0], { x: c[1], y: c[2], w: 3.258, h: 0.48, face: HEAD, size: 24, color: BLACK });
++      txt(s, 'Lorem ipsum dolor sit amet, consetur adipiscing elit, sed do eiusmod tempor',
++        { x: c[1], y: c[2] + 0.48, w: 3.056, h: 0.539, size: 11, color: BLACK, lnSpc: 1.5 });
++    });
++  chrome(s, 12, BLACK);
++}
++
++// 13 — Data analysis techniques
++function slide13() {
++  const s = newSlide(true);
++  txt(s, 'DATA ANALYSIS TECHNIQUES', { x: 0.831, y: 0.731, w: 5.801, h: 1.742, face: HEAD, size: 50, color: WHITE });
++  asterisk(s, 8.839, 1.657, 0.591, WHITE);
++  line(s, 0, 2.658, 10, 2.658, WHITE, 1.5);
++  [['TOOLS/SOFTWARE', 3.225, ['01. SPSS', '02. NVivo', '03. EXCEL']],
++   ['ANALYTICAL METHODS', 4.031, ['01. CODING', '02. STATISTICS', '03. ETC']]].forEach(function (row) {
++    txt(s, row[0], { x: 0.831, y: row[1], w: 3.298, h: 0.429, face: HEAD, size: 21, color: WHITE });
++    row[2].forEach(function (item, i) {
++      txt(s, item, { x: 4.775 + i * 1.7025, y: row[1] + 0.02, w: 1.25, h: 0.341, size: 11, color: WHITE, lnSpc: 1.5 });
++    });
++  });
++  chrome(s, 13, WHITE);
++}
++
++// 14 — Research timeline (gantt)
++function slide14() {
++  const s = newSlide(false);
++  txt(s, 'RESEARCH TIMELINE', { x: 0.57, y: 0.7, w: 8.859, h: 0.909, face: HEAD, size: 50, color: BLACK, align: 'center' });
++  rect(s, 0.57, 1.737, 8.859, 2.905, PANEL);
++
++  ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Dec'].forEach(function (m, i) {
++    txt(s, m, { x: 2.4 + i * 0.6235, y: 1.908, w: 0.493, h: 0.278, size: 12, color: BLACK });
++  });
++  for (let i = 0; i < 11; i++) line(s, 2.305 + i * 0.6253, 1.908, 2.305 + i * 0.6253, 4.408, GRID_SKY, 0.75);
++  for (let i = 0; i < 4; i++) {
++    line(s, 0.87, 2.264 + i * 0.5623, 9.208, 2.264 + i * 0.5623, GRID_SKY, 0.75);
++    txt(s, 'Project A', { x: 0.87, y: 2.394 + i * 0.5603, w: 1.53, h: 0.278, size: 12, color: BLACK });
++  }
++
++  [['Phase One', 2.465, 2.436, 2.72], ['Phase Two', 3.229, 3.012, 3.752],
++   ['Phase Three', 5.092, 3.573, 3.167], ['Phase Four', 7.592, 4.126, 1.494]].forEach(function (b) {
++    rect(s, b[1], b[2], b[3], 0.211, NAVY);
++    asterisk(s, b[1] + 0.044, b[2] + 0.037, 0.138, PANEL);
++    txt(s, b[0], { x: b[1] + 0.18, y: b[2], w: 1.53, h: 0.215, size: 8, color: PANEL });
++  });
++  chrome(s, 14, BLACK);
++}
++
++// 15 — Results (hand-drawn bar chart)
++function slide15() {
++  const s = newSlide(false);
++  txt(s, 'RESULTS', { x: 0.762, y: 0.924, w: 3.712, h: 0.985, face: HEAD, size: 54, color: BLACK });
++  s.addText([
++    { text: LOREM_MED, options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco.' },
++  ], { x: 2.105, y: 2.732, w: 2.435, h: 2.205, fontFace: BODY, fontSize: 11, color: BLACK, valign: 'top', margin: INSETS, lineSpacingMultiple: 1.5 });
++  learnMore(s, 0.935, 4.301, BLACK, 1.169);
++
++  rect(s, 4.474, 0.598, 4.956, 4.044, PANEL);
++  txt(s, 'REPORT INCOME IN 2025', { x: 4.819, y: 0.874, w: 4.61, h: 0.328, size: 15, color: BLACK });
++  txt(s, 'FIRST QUARTER', { x: 4.819, y: 3.598, w: 1.54, h: 0.341, size: 11, color: BLACK, lnSpc: 1.5 });
++  txt(s, '67,88K', { x: 4.819, y: 3.917, w: 1.54, h: 0.48, face: HEAD, size: 24, color: BLACK });
++  txt(s, 'LAST QUARTER', { x: 7.512, y: 3.598, w: 1.54, h: 0.341, size: 11, color: BLACK, align: 'right', lnSpc: 1.5 });
++  txt(s, '123,65K', { x: 7.512, y: 3.917, w: 1.54, h: 0.48, face: HEAD, size: 24, color: BLACK, align: 'right' });
++
++  const BASE = 3.201;
++  for (let v = 0; v <= 10; v++) {
++    txt(s, String(v), { x: 4.507, y: BASE - 0.128 - v * 0.1657, w: 0.479, h: 0.274, size: 9, color: NAVY, align: 'right' });
++  }
++  line(s, 5.017, BASE, 9.004, BASE, GRID_GREY, 0.75);
++
++  const BARS = [0.054, 0.145, 0.568, 0.441, 0.553, 0.92, 0.659, 0.861, 1.086, 1.048, 1.103, 1.471];
++  const LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Des'];
++  BARS.forEach(function (h, i) {
++    const x = 5.017 + i * 0.3363;
++    s.addShape(pptx.ShapeType.rect, {
++      x: x, y: BASE - h, w: 0.336, h: h,
++      fill: { color: BAR_FILL }, line: { color: BAR_LINE, width: 0.75 },
++    });
++    line(s, x + 0.332, BASE, x + 0.332, BASE + 0.034, GRID_GREY, 0.75);
++    txt(s, LABELS[i], { x: x + 0.04, y: 3.239, w: 0.46, h: 0.227, size: 9, color: NAVY });
++  });
++  chrome(s, 15, BLACK);
++}
++
++// 16 — Discussion
++function slide16() {
++  const s = newSlide(true);
++  txt(s, 'DISCUSSION', { x: 0.79, y: 0.831, w: 4.43, h: 0.909, face: HEAD, size: 50, color: WHITE });
++  imageBox(s, 2.267, 1.875, 2.581, 2.581);
++  txt(s, LOREM_MED, { x: 5.151, y: 2.087, w: 4.279, h: 0.816, size: 11, color: WHITE, lnSpc: 1.5 });
++  mapPin(s, 6.716, 3.421, 0.273, 0.341, WHITE, NAVY);
++  txt(s, 'ADDRESS', { x: 7.16, y: 3.421, w: 2.927, h: 0.429, face: HEAD, size: 21, color: WHITE });
++  txt(s, 'Consectetur Road, Cambridge G1578K, United Kingdom',
++    { x: 7.16, y: 3.851, w: 2.418, h: 0.606, size: 11, color: WHITE, lnSpc: 1.5 });
++  chrome(s, 16, WHITE);
++}
++
++// 17 — Conclusion
++function slide17() {
++  const s = newSlide(false);
++  txt(s, 'CONCLUSION', { x: 0.57, y: 0.598, w: 8.859, h: 0.985, face: HEAD, size: 54, color: BLACK, align: 'center' });
++  line(s, 0, 1.62, 10, 1.62, BLACK, 1.5);
++  [['QUARTER 01', '32,4K', 1.151, 1.95], ['QUARTER 02', '120,8K', 3.845, 2.461], ['QUARTER 03', '548,1K', 6.538, 2.972]]
++    .forEach(function (c) {
++      txt(s, c[0], { x: c[2], y: c[3], w: 2.312, h: 0.341, size: 11, color: BLACK, align: 'center', lnSpc: 1.5 });
++      txt(s, c[1], { x: c[2], y: c[3] + 0.34, w: 2.312, h: 0.682, face: HEAD, size: 36, color: BLACK, align: 'center' });
++      txt(s, LOREM_SHORT, { x: c[2], y: c[3] + 0.979, w: 2.312, h: 0.606, size: 11, color: BLACK, align: 'center', lnSpc: 1.5 });
++    });
++  chrome(s, 17, BLACK);
++}
++
++// 18 — Recommendations
++function slide18() {
++  const s = newSlide(false);
++  txt(s, 'RECOMMENDATIONS', { x: 0.57, y: 0.659, w: 8.859, h: 0.909, face: HEAD, size: 50, color: BLACK, align: 'center' });
++  line(s, 0, 1.62, 10, 1.62, BLACK, 1.5);
++
++  txt(s, 'FOR PRACTICE', { x: 0.808, y: 1.974, w: 2.451, h: 0.429, face: HEAD, size: 21, color: BLACK });
++  s.addText([
++    { text: LOREM_MED, options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco.' },
++  ], { x: 0.808, y: 2.441, w: 2.753, h: 1.927, fontFace: BODY, fontSize: 11, color: BLACK, valign: 'top', margin: INSETS, lineSpacingMultiple: 1.5 });
++
++  txt(s, 'FURTHER RESEARCH', { x: 5.188, y: 1.974, w: 4.43, h: 0.429, face: HEAD, size: 21, color: BLACK });
++  [2.441, 3.236, 4.031].forEach(function (y, i) {
++    checkBullet(s, 5.279, y + 0.066, 0.202, BLACK);
++    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.',
++      { x: 5.55, y: y, w: i === 0 ? 4.142 : 4.067, h: 0.539, size: 11, color: BLACK, lnSpc: 1.5 });
++  });
++  chrome(s, 18, BLACK);
++}
++
++// 19 — References
++function slide19() {
++  const s = newSlide(true);
++  txt(s, 'REFERENCES', { x: 0.679, y: 0.718, w: 4.796, h: 0.909, face: HEAD, size: 50, color: WHITE });
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim',
++    { x: 0.679, y: 1.57, w: 4.671, h: 0.606, size: 11, color: WHITE, lnSpc: 1.5 });
++  imageBox(s, 5.675, 0, 4.325, 4.352);
++  [['TYPE ONE', 2.876, 2.823], ['TYPE TWO', 3.798, 3.746]].forEach(function (r) {
++    txt(s, r[0], { x: 1.369, y: r[1], w: 1.247, h: 0.328, face: HEAD, size: 15, color: WHITE });
++    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do.',
++      { x: 2.616, y: r[2], w: 2.384, h: 0.606, size: 11, color: WHITE, lnSpc: 1.5 });
++  });
++  chrome(s, 19, WHITE);
++}
++
++// 20 — Thank you
++function slide20() {
++  const s = newSlide(false);
++  txt(s, 'THANK', { x: 0.57, y: 0.598, w: 8.867, h: 1.818, face: HEAD, size: 104, color: BLACK });
++  txt(s, 'YOU', { x: 6.455, y: 2.062, w: 2.974, h: 1.818, face: HEAD, size: 104, color: BLACK, align: 'right' });
++  txt(s, 'FOR YOUR                     ATTENTION', { x: 0.562, y: 3.891, w: 8.867, h: 0.757, size: 41, color: BLACK, align: 'center' });
++  line(s, 3.607, 4.27, 5.966, 4.27, BLACK, 2.25);
++  chrome(s, 20, BLACK);
++}
++
++/* ================================================================== */
++function build() {
++  pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'GS_16x9', width: 10, height: 5.625 });
++  pptx.layout = 'GS_16x9';
++  pptx.title = 'Thesis Defense Presentation Template';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++    .forEach(function (fn) { fn(); });
++
++  const out = path.join(__dirname, '137fdd80-2749-41bb-91f1-7e0f21950fd7_grok_final.pptx');
++  return pptx.writeFile({ fileName: out }).then(function () { console.log('wrote ' + out); });
++}
++
++build().catch(function (err) { console.error(err); process.exit(1); });

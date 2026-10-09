@@ -1,0 +1,857 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/travel_wanderlust_destination_guide.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/travel_wanderlust_destination_guide.js
+@@ -0,0 +1,854 @@
++/*
++ * Wanderlust Wonders — 15-slide travel deck rebuilt with PptxGenJS.
++ *
++ * Slide size: 13.333 x 7.5 in (16:9).  Theme fonts: Red Hat Display (headings) /
++ * Open Sans (body).  Raster photos in the source deck are re-created here as
++ * flat grey "[image]" placeholders that keep the original frame shape.
++ *
++ * Run:  node 05a4748e-89e0-4f10-9c93-754db5bb12e4_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const C = {
++  blue: '285FEA',      // accent1
++  teal: '0FBBA5',      // accent2
++  pink: 'EC2A9C',      // accent3
++  yellow: 'FEE600',    // accent4
++  blueSoft: '7E9FF2',  // accent1 lightened 40%
++  black: '000000',
++  white: 'FFFFFF',
++  wave: 'F2F2F2',      // background ribbons
++  hair: 'D9D9D9',      // hair-lines / muted text
++  card: 'BFBFBF',      // card outlines
++  grey: 'E8E8E8',      // bg2
++  photo: 'CFCFCF',     // image placeholder fill
++  photoTx: 'A6A6A6',   // image placeholder caption
++};
++
++const FONT = { head: 'Red Hat Display', body: 'Open Sans' };
++
++/* Soft drop shadows copied from the source deck.  pptxgenjs rewrites the
++ * option object it is handed, so every shape needs its own copy. */
++function shadow(opacity, offset) {
++  return { type: 'outer', color: '000000', blur: 20, offset: offset, angle: 45, opacity: opacity };
++}
++const SHADOW = function () { return shadow(0.10, 15); };          // offset down-right
++const SHADOW_CTR = function () { return shadow(0.10, 0); };       // centred glow
++const SHADOW_SOFT = function () { return shadow(0.05, 0); };      // faint centred glow
++
++/* Filler copy — the template ships with lorem ipsum, reproduced verbatim. */
++const LOREM = {
++  full: 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, '
++    + 'a maximus leo ligula at dolor. Morbi et malesuada purus. ',
++  half: 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, '
++    + 'a maximus leo ligula at dolor. Morbi et malesuada',
++  card: 'Quisque non elit ma uris. Cr as euismod, metus ac finibu fin bus, felis dui',
++  intro: 'Quisque non elit mauris. Cras euismod, metus ac finibus fini bus, felis dui suscipit purus, '
++    + 'a maximus leo ligula euis mod, metus euismod, metus ac finibus finibus fini bus, felis',
++  tile: 'Quisque non elit mauris. Cras euismod, metus ac finibus',
++  tiny: 'Quisque non elit mauris. Cras',
++  long: 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, '
++    + 'a maximus leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit euismod, '
++    + 'metus ac Cras euismod, metus ac finibus finibus Cras euismod, metus ac metus ac',
++};
++
++/* ------------------------------------------------- hand-traced vector shapes
++ * Each entry is an SVG-style path in 0..1 shape-local units; `pathPoints()`
++ * scales it to the width/height the shape is placed at.                      */
++const PATHS = {
++  // hand-drawn loop doodle used as an accent on every slide
++  squiggle:
++    'M0.001 0.745 C0.004 0.745 0.011 0.778 0.057 0.829 C0.08 0.854 0.115 0.883 0.165 0.91 C0.19 0.923 0.218 0.936 0.251 0.947 C0.283 0.959 0.319 0.968 '
++    + '0.359 0.974 C0.437 0.987 0.53 0.985 0.62 0.965 C0.71 0.945 0.798 0.906 0.858 0.85 C0.919 0.794 0.943 0.721 0.958 0.647 C0.965 0.61 0.969 0.571 0.959 '
++    + '0.534 C0.95 0.497 0.926 0.461 0.885 0.433 C0.865 0.419 0.841 0.408 0.815 0.4 C0.789 0.393 0.76 0.389 0.733 0.391 C0.706 0.393 0.681 0.401 0.669 0.415 '
++    + 'C0.656 0.428 0.656 0.446 0.669 0.456 C0.683 0.467 0.709 0.47 0.734 0.466 C0.76 0.462 0.784 0.454 0.805 0.443 C0.849 0.421 0.884 0.394 0.911 0.365 '
++    + 'C0.924 0.35 0.935 0.335 0.944 0.32 C0.952 0.304 0.959 0.288 0.96 0.273 C0.961 0.258 0.957 0.244 0.944 0.233 C0.931 0.222 0.912 0.214 0.891 0.21 C0.87 '
++    + '0.206 0.848 0.205 0.828 0.209 C0.809 0.214 0.792 0.222 0.784 0.232 C0.776 0.243 0.781 0.253 0.796 0.257 C0.803 0.259 0.813 0.26 0.822 0.26 C0.831 0.26 '
++    + '0.841 0.258 0.85 0.257 C0.885 0.25 0.91 0.23 0.924 0.209 C0.938 0.189 0.942 0.167 0.937 0.147 C0.932 0.128 0.917 0.11 0.902 0.096 C0.887 0.081 0.87 '
++    + '0.069 0.853 0.059 C0.82 0.039 0.79 0.025 0.771 0.015 C0.751 0.006 0.741 0.001 0.742 0 C0.743 -0.001 0.754 0.003 0.775 0.012 C0.796 0.02 0.827 0.032 '
++    + '0.863 0.052 C0.881 0.062 0.9 0.074 0.916 0.089 C0.933 0.105 0.95 0.122 0.957 0.145 C0.963 0.167 0.96 0.191 0.946 0.215 C0.938 0.226 0.927 0.238 0.913 '
++    + '0.248 C0.899 0.258 0.88 0.267 0.858 0.272 C0.846 0.274 0.835 0.276 0.823 0.276 C0.811 0.276 0.798 0.275 0.785 0.272 C0.773 0.269 0.76 0.262 0.755 '
++    + '0.252 C0.751 0.243 0.754 0.233 0.759 0.225 C0.77 0.209 0.794 0.198 0.819 0.192 C0.845 0.187 0.873 0.187 0.899 0.192 C0.925 0.197 0.95 0.206 0.968 '
++    + '0.221 C0.986 0.237 0.992 0.256 0.991 0.274 C0.99 0.292 0.983 0.309 0.974 0.326 C0.965 0.343 0.953 0.359 0.94 0.375 C0.911 0.407 0.873 0.436 0.826 0.46 '
++    + 'C0.802 0.472 0.774 0.483 0.742 0.487 C0.725 0.49 0.708 0.491 0.69 0.488 C0.672 0.486 0.654 0.48 0.642 0.47 C0.63 0.461 0.624 0.448 0.624 0.436 C0.624 '
++    + '0.425 0.629 0.413 0.638 0.403 C0.657 0.382 0.694 0.371 0.728 0.369 C0.799 0.364 0.866 0.386 0.911 0.418 C0.958 0.449 0.984 0.49 0.994 0.531 C1.004 '
++    + '0.572 1 0.612 0.993 0.65 C0.985 0.688 0.975 0.726 0.958 0.762 C0.942 0.798 0.918 0.832 0.885 0.862 C0.82 0.922 0.725 0.963 0.63 0.983 C0.534 1.004 '
++    + '0.435 1.004 0.352 0.99 C0.31 0.983 0.272 0.973 0.239 0.96 C0.206 0.948 0.176 0.934 0.151 0.92 C0.101 0.891 0.067 0.86 0.045 0.834 C0.022 0.807 0.012 '
++    + '0.785 0.006 0.769 C0.001 0.754 -0.001 0.746 0 0.746 Z',
++
++  // large soft S-curve ribbon used as page background
++  waveBig:
++    'M0.948 1 C0.935 1 0.922 0.997 0.912 0.99 C0.818 0.924 0.841 0.821 0.857 0.753 C0.87 0.695 0.873 0.621 0.812 0.594 C0.781 0.581 0.736 0.58 0.689 0.579 '
++    + 'C0.62 0.577 0.542 0.575 0.487 0.532 C0.418 0.478 0.443 0.41 0.465 0.349 C0.481 0.305 0.497 0.263 0.473 0.234 C0.449 0.204 0.383 0.195 0.346 0.193 '
++    + 'C0.328 0.192 0.31 0.192 0.291 0.191 C0.241 0.19 0.19 0.189 0.139 0.176 C0.056 0.156 -0.018 0.095 0.004 0.029 C0.011 0.009 0.039 -0.004 0.067 0.001 '
++    + 'C0.095 0.006 0.112 0.026 0.105 0.046 C0.099 0.065 0.125 0.094 0.173 0.106 C0.209 0.115 0.251 0.116 0.294 0.117 C0.314 0.117 0.334 0.118 0.354 0.119 '
++    + 'C0.454 0.125 0.527 0.152 0.563 0.197 C0.608 0.252 0.585 0.314 0.565 0.368 C0.545 0.424 0.535 0.459 0.564 0.482 C0.589 0.502 0.637 0.503 0.692 0.504 '
++    + 'C0.748 0.505 0.812 0.507 0.867 0.531 C0.955 0.57 0.986 0.649 0.959 0.765 C0.943 0.835 0.933 0.9 0.984 0.936 C1.005 0.95 1.005 0.974 0.985 0.989 C0.975 '
++    + '0.996 0.962 1 0.948 1 Z',
++
++  // narrow S-curve ribbon used as page background
++  waveThin:
++    'M0.518 1 C0.466 1 0.415 0.993 0.379 0.981 C0.314 0.957 0.323 0.923 0.4 0.903 C0.618 0.847 0.697 0.744 0.585 0.665 C0.535 0.63 0.453 0.598 0.365 0.564 '
++    + 'C0.285 0.533 0.202 0.501 0.137 0.464 C-0.118 0.318 -0.008 0.125 0.392 0.014 C0.466 -0.006 0.581 -0.005 0.649 0.018 C0.717 0.04 0.712 0.075 0.638 0.096 '
++    + 'C0.361 0.173 0.282 0.311 0.458 0.412 C0.509 0.441 0.578 0.467 0.652 0.496 C0.75 0.534 0.851 0.573 0.919 0.621 C1.095 0.745 0.976 0.899 0.636 0.987 '
++    + 'C0.601 0.996 0.559 1 0.518 1 Z',
++
++  // title-slide photo frame: square top, dome-shaped bottom
++  hero:
++    'M0 0 L1 0 L1 0.635 L0.999 0.635 L0.997 0.658 C0.972 0.85 0.759 1 0.5 1 C0.241 1 0.028 0.85 0.003 0.658 L0.001 0.635 L0 0.635 L0 0.619 Z',
++
++  // slide 10 half-dome
++  dome:
++    'M0.5 0 C0.744 0 0.947 0.391 0.994 0.912 L1 1 L0 1 L0.006 0.912 C0.053 0.391 0.256 0 0.5 0 Z',
++
++  // slide 10 translucent ribbon over the dome
++  swoosh:
++    'M0.982 0.68 C0.993 0.707 0.999 0.736 1 0.769 L0.999 0.786 L0.991 0.804 C0.956 0.868 0.905 0.927 0.84 0.98 L0.814 1 L0.813 0.981 C0.815 0.938 0.826 '
++    + '0.896 0.834 0.862 C0.854 0.784 0.858 0.683 0.768 0.647 C0.722 0.628 0.656 0.627 0.585 0.625 C0.483 0.623 0.367 0.621 0.285 0.562 C0.183 0.489 0.22 '
++    + '0.396 0.253 0.314 C0.277 0.254 0.3 0.197 0.265 0.158 C0.228 0.116 0.131 0.105 0.076 0.102 L0.04 0.101 L0 0.004 L0.05 0 L0.089 0.001 C0.237 0.009 0.344 '
++    + '0.046 0.399 0.107 C0.465 0.182 0.432 0.266 0.402 0.34 C0.372 0.415 0.357 0.463 0.399 0.494 C0.437 0.521 0.508 0.522 0.59 0.524 C0.673 0.526 0.768 '
++    + '0.528 0.849 0.561 C0.914 0.587 0.959 0.627 0.982 0.68 Z',
++
++  // pill-shaped label with a small arrow notch
++  tag:
++    'M0.89 1 L0.11 1 C0.049 1 0 0.842 0 0.647 C0 0.452 0.049 0.293 0.11 0.293 L0.153 0.293 L0.205 0 L0.258 0.293 L0.89 0.293 C0.951 0.293 1 0.452 1 0.647 '
++    + 'C1 0.842 0.951 1 0.89 1 Z',
++
++  // photo frame rounded on the left, flat on the right
++  halfRound:
++    'M1 0 L1 1 L0.909 0.998 C0.398 0.972 0 0.759 0 0.5 C0 0.241 0.398 0.028 0.909 0.002 Z',
++
++  // tilted quadrilateral photo frame
++  quad:
++    'M0.456 0 L1 0.197 L0.507 1 L0 0.781 Z',
++
++  // tilted rounded-corner photo frame
++  slab:
++    'M0.231 0 L0.952 0.081 C0.983 0.084 1.004 0.105 0.999 0.128 L0.833 0.964 C0.828 0.987 0.8 1.003 0.769 1 L0.048 0.919 C0.017 0.916 -0.004 0.895 0.001 '
++    + '0.872 L0.167 0.036 C0.172 0.013 0.2 -0.003 0.231 0 Z',
++
++  // command (loop) glyph
++  command:
++    'M0.831 0.669 C0.7 0.669 0.7 0.669 0.7 0.669 C0.7 0.331 0.7 0.331 0.7 0.331 C0.831 0.331 0.831 0.331 0.831 0.331 C0.925 0.331 1 0.256 1 0.169 C1 0.075 '
++    + '0.925 0 0.831 0 C0.744 0 0.669 0.075 0.669 0.169 C0.669 0.3 0.669 0.3 0.669 0.3 C0.331 0.3 0.331 0.3 0.331 0.3 C0.331 0.169 0.331 0.169 0.331 0.169 '
++    + 'C0.331 0.075 0.256 0 0.169 0 C0.075 0 0 0.075 0 0.169 C0 0.256 0.075 0.331 0.169 0.331 C0.3 0.331 0.3 0.331 0.3 0.331 C0.3 0.669 0.3 0.669 0.3 0.669 '
++    + 'C0.169 0.669 0.169 0.669 0.169 0.669 C0.075 0.669 0 0.744 0 0.831 C0 0.925 0.075 1 0.169 1 C0.256 1 0.331 0.925 0.331 0.831 C0.331 0.7 0.331 0.7 0.331 '
++    + '0.7 C0.669 0.7 0.669 0.7 0.669 0.7 C0.669 0.831 0.669 0.831 0.669 0.831 C0.669 0.925 0.744 1 0.831 1 C0.925 1 1 0.925 1 0.831 C1 0.744 0.925 0.669 '
++    + '0.831 0.669 Z M0.7 0.169 C0.7 0.094 0.762 0.031 0.831 0.031 C0.906 0.031 0.969 0.094 0.969 0.169 C0.969 0.237 0.906 0.3 0.831 0.3 C0.7 0.3 0.7 0.3 0.7 '
++    + '0.3 L0.7 0.169 Z M0.169 0.3 C0.094 0.3 0.031 0.237 0.031 0.169 C0.031 0.094 0.094 0.031 0.169 0.031 C0.237 0.031 0.3 0.094 0.3 0.169 C0.3 0.3 0.3 0.3 '
++    + '0.3 0.3 L0.169 0.3 Z M0.3 0.831 C0.3 0.906 0.237 0.969 0.169 0.969 C0.094 0.969 0.031 0.906 0.031 0.831 C0.031 0.762 0.094 0.7 0.169 0.7 C0.3 0.7 0.3 '
++    + '0.7 0.3 0.7 L0.3 0.831 Z M0.331 0.669 C0.331 0.331 0.331 0.331 0.331 0.331 C0.669 0.331 0.669 0.331 0.669 0.331 C0.669 0.669 0.669 0.669 0.669 0.669 '
++    + 'L0.331 0.669 Z M0.831 0.969 C0.762 0.969 0.7 0.906 0.7 0.831 C0.7 0.7 0.7 0.7 0.7 0.7 C0.831 0.7 0.831 0.7 0.831 0.7 C0.906 0.7 0.969 0.762 0.969 '
++    + '0.831 C0.969 0.906 0.906 0.969 0.831 0.969 Z',
++
++  // paper-plane send glyph
++  plane:
++    'M0.775 0.764 L0.588 0.699 L0.586 0.699 L0.511 0.673 L0.862 0.209 L0.775 0.764 Z M0.541 0.728 L0.472 0.797 L0.491 0.711 L0.541 0.728 L0.541 0.728 Z '
++    + 'M0.457 0.675 C0.455 0.677 0.454 0.68 0.453 0.683 L0.45 0.697 L0.429 0.792 L0.379 0.646 L0.769 0.271 L0.47 0.659 L0.457 0.675 Z M0.156 0.552 L0.767 '
++    + '0.227 L0.349 0.618 L0.156 0.552 Z M0.908 0.119 C0.902 0.114 0.893 0.114 0.885 0.118 L0.095 0.537 C0.088 0.542 0.083 0.549 0.083 0.557 C0.083 0.566 '
++    + '0.09 0.573 0.097 0.575 L0.314 0.649 L0.341 0.658 L0.347 0.676 L0.411 0.87 L0.411 0.871 L0.411 0.872 C0.414 0.878 0.42 0.883 0.427 0.885 C0.434 0.888 '
++    + '0.442 0.885 0.447 0.88 L0.448 0.879 L0.454 0.873 L0.585 0.744 L0.785 0.812 C0.792 0.815 0.798 0.814 0.803 0.81 C0.808 0.807 0.812 0.802 0.814 0.796 '
++    + 'L0.918 0.14 C0.919 0.13 0.915 0.123 0.908 0.119 Z',
++
++  // map marker outline
++  pin:
++    'M0.087 0.135 C-0.006 0.22 -0.026 0.327 0.034 0.422 L0.261 0.731 L0.457 0.984 C0.469 0.998 0.498 1.004 0.522 0.997 C0.531 0.994 0.538 0.989 0.543 0.984 '
++    + 'L0.739 0.731 L0.966 0.422 C1.026 0.327 1.006 0.22 0.913 0.135 C0.759 -0.005 0.45 -0.042 0.221 0.052 C0.168 0.075 0.123 0.103 0.087 0.135 Z M0.849 '
++    + '0.163 C0.927 0.234 0.943 0.324 0.893 0.404 L0.668 0.71 L0.5 0.927 L0.332 0.711 L0.107 0.404 C0.057 0.323 0.073 0.233 0.152 0.162 C0.282 0.044 0.543 '
++    + '0.013 0.735 0.092 C0.78 0.111 0.818 0.135 0.849 0.163 Z',
++
++  // map marker, filled (contact chip)
++  pinSolid:
++    'M0.5 0.458 C0.448 0.458 0.406 0.417 0.406 0.365 C0.406 0.312 0.448 0.271 0.5 0.271 C0.552 0.271 0.594 0.312 0.594 0.365 C0.594 0.417 '
++    + '0.552 0.458 0.5 0.458 Z M0.5 0.146 C0.428 0.146 0.36 0.181 0.32 0.242 C0.279 0.301 0.271 0.377 0.297 0.445 L0.396 0.664 L0.481 0.843 '
++    + 'C0.484 0.85 0.492 0.854 0.5 0.854 C0.508 0.854 0.516 0.85 0.519 0.843 L0.604 0.664 L0.703 0.445 C0.729 0.377 0.721 0.301 0.68 0.242 '
++    + 'C0.64 0.181 0.572 0.146 0.5 0.146 Z',
++
++};
++
++/* ------------------------------------------------------------------ helpers */
++
++/** Convert one of the PATHS strings into pptxgenjs `points`, scaled to w x h. */
++function pathPoints(d, w, h) {
++  const t = d.match(/[MLCZ]|-?[\d.]+/g);
++  const pts = [];
++  let i = 0;
++  while (i < t.length) {
++    const op = t[i++];
++    const num = () => parseFloat(t[i++]);
++    if (op === 'M') pts.push({ x: num() * w, y: num() * h, moveTo: true });
++    else if (op === 'L') pts.push({ x: num() * w, y: num() * h });
++    else if (op === 'C') {
++      const x1 = num() * w, y1 = num() * h, x2 = num() * w, y2 = num() * h;
++      pts.push({ x: num() * w, y: num() * h, curve: { type: 'cubic', x1, y1, x2, y2 } });
++    } else if (op === 'Z') pts.push({ close: true });
++  }
++  return pts;
++}
++
++/** Freeform shape from a PATHS entry. */
++function freeform(slide, d, o) {
++  slide.addShape('custGeom', Object.assign({
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    points: pathPoints(d, o.w, o.h),
++    fill: { color: o.color, transparency: o.transparency || 0 },
++    line: { type: 'none' },
++    rotate: o.rotate || 0,
++  }, o.extra));
++}
++
++/* Text-box insets used throughout the deck: [left, right, bottom, top] in points. */
++const MARGIN = [7.2, 7.2, 3.6, 3.6];
++
++/** Text box matching the deck defaults: 0.1" side inset, top-anchored. */
++function text(slide, str, o) {
++  slide.addText(str, Object.assign({
++    fontFace: FONT.body, fontSize: 10, color: C.black,
++    align: 'left', valign: 'top', margin: MARGIN,
++  }, o));
++}
++
++/** Heading text (Red Hat Display). */
++function heading(slide, str, o) {
++  text(slide, str, Object.assign({ fontFace: FONT.head, bold: true, fontSize: 40 }, o));
++}
++
++/** Body paragraph: 10pt Open Sans at 1.5 line spacing. */
++function body(slide, str, o) {
++  text(slide, str, Object.assign({ fontSize: 10, lineSpacing: 18 }, o));
++}
++
++/** Rounded rectangle card. `r` is the corner radius in inches. */
++function card(slide, o) {
++  slide.addShape('roundRect', Object.assign({
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    rectRadius: o.r === undefined ? Math.min(o.w, o.h) * 0.1667 : o.r,
++    fill: o.fill ? { color: o.fill, transparency: o.transparency || 0 } : { type: 'none' },
++    line: o.line || { type: 'none' },
++    shadow: o.shadow,
++  }, o.extra));
++}
++
++/**
++ * Stand-in for a photograph: flat grey block in the original frame shape,
++ * captioned "[image]".  `shape` picks a PATHS frame, 'circle' or 'rect'.
++ */
++function imagePlaceholder(slide, o) {
++  const shape = o.shape || 'circle';
++  if (shape === 'circle') {
++    slide.addShape('ellipse', { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: C.photo }, line: { type: 'none' } });
++  } else if (shape === 'rect') {
++    slide.addShape('roundRect', {
++      x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.r || 0,
++      fill: { color: C.photo }, line: { type: 'none' },
++    });
++  } else {
++    freeform(slide, PATHS[shape], { x: o.x, y: o.y, w: o.w, h: o.h, color: C.photo, rotate: o.rotate });
++  }
++  if (o.label !== false) {
++    text(slide, '[image]', {
++      x: o.x, y: o.y + o.h / 2 - 0.2, w: o.w, h: 0.4,
++      align: 'center', valign: 'middle', fontSize: o.cap || 11, color: C.photoTx,
++    });
++  }
++}
++
++/** The doodle that decorates every slide. */
++function doodle(slide, x, y, color, rotate) {
++  freeform(slide, PATHS.squiggle, { x, y, w: 0.465, h: 0.734, color, rotate });
++}
++
++/** Thin arrow / rule used under card copy. */
++function arrow(slide, o) {
++  slide.addShape('line', {
++    x: o.x, y: o.y, w: o.w, h: 0,
++    line: { color: o.color, width: o.width || 0.75, endArrowType: o.plain ? 'none' : 'triangle' },
++  });
++}
++
++/** Top nav bar, footer URL and "Page | n" that repeat on every slide. */
++function chrome(slide, n, opts) {
++  const o = opts || {};
++  text(slide, 'Traveling', { x: 0.383, y: 0.453, w: 2.122, h: 0.303, fontFace: FONT.head, bold: true, fontSize: 12 });
++  [['Home', 8.575, true], ['About Us', 10.16, false], ['Experience', 11.745, false]].forEach(function (it) {
++    text(slide, it[0], {
++      x: it[1], y: 0.473, w: 1.277, h: 0.269, align: 'center', valign: 'bottom',
++      fontFace: FONT.head, fontSize: 10, bold: it[2], charSpacing: 1,
++    });
++  });
++  if (!o.noFooter) {
++    text(slide, 'www.reallygreatsite.com', {
++      x: 0.394, y: 6.791, w: 2.731, h: 0.269, valign: 'middle', fontFace: FONT.head, fontSize: 10, charSpacing: 1,
++    });
++  }
++  slide.addText([
++    { text: 'Page  |  ', options: { fontSize: 12, charSpacing: 1 } },
++    { text: String(n), options: { fontSize: 12, bold: true, charSpacing: 1 } },
++  ], {
++    x: 11.623, y: 6.717, w: 1.301, h: 0.399, align: 'right', valign: 'middle',
++    fontFace: FONT.body, color: C.black, margin: MARGIN,
++  });
++}
++
++/* ------------------------------------------------------------ slide bodies */
++
++/* Slides 1 and 15 share the same cover layout, only the wording differs. */
++function coverSlide(slide, n, opts) {
++  card(slide, { x: 1.185, y: 5.041, w: 5.604, h: 1.306, r: 0.653, fill: C.white, shadow: SHADOW_SOFT() });
++  slide.addShape('ellipse', { x: 7.051, y: 1.631, w: 5.222, h: 5.222, fill: { color: C.blue }, line: { type: 'none' } });
++
++  text(slide, 'Exploring the World One Trip at a Time', {
++    x: 1.061, y: 1.53, w: 4.251, h: 0.37, fontFace: FONT.head, fontSize: 16,
++  });
++  heading(slide, opts.title, { x: 1.061, y: 1.947, w: 5.222, h: 2.121, fontSize: 60 });
++
++  card(slide, { x: 1.185, y: 4.205, w: 2.227, h: 0.467, r: 0.234, fill: C.teal, shadow: SHADOW() });
++  text(slide, opts.button, { x: 1.259, y: 4.286, w: 1.73, h: 0.303, fontSize: 12, color: C.white });
++  slide.addShape('ellipse', { x: 2.981, y: 4.263, w: 0.349, h: 0.349, fill: { color: C.white }, line: { type: 'none' } });
++  freeform(slide, PATHS.plane, { x: 3.049, y: 4.339, w: 0.195, h: 0.195, color: C.black });
++
++  text(slide, 'Top Destinations for Every Traveler', { x: 3.726, y: 5.407, w: 1.963, h: 0.572, fontSize: 14 });
++  arrow(slide, { x: 5.689, y: 5.711, w: 0.756, color: C.hair });
++
++  // Confetti circles + pink label; the photo below covers most of them.
++  slide.addShape('ellipse', { x: 7.065, y: 1.433, w: 0.783, h: 0.783, fill: { color: C.teal }, line: { type: 'none' }, shadow: SHADOW() });
++  freeform(slide, PATHS.tag, { x: 10.688, y: 1.367, w: 2.128, h: 0.66, color: C.pink, rotate: 195 });
++  text(slide, 'Solo Travel Survival Guide', {
++    x: 10.701, y: 1.459, w: 2.154, h: 0.278, align: 'center', fontFace: FONT.head, fontSize: 10.5,
++    color: C.white, rotate: 15,
++  });
++
++  chrome(slide, n);
++  imagePlaceholder(slide, { shape: 'hero', x: 7.051, y: 0, w: 5.222, h: 6.854, cap: 16 });
++
++  // Yellow badge with a route pin, drawn over the photo.
++  slide.addShape('ellipse', { x: 11.36, y: 5.421, w: 0.783, h: 0.783, fill: { color: C.yellow }, line: { type: 'none' }, shadow: SHADOW() });
++  routePin(slide, 11.607, 5.652);
++
++  doodle(slide, 6.557, 2.822, C.yellow, 150);
++  doodle(slide, 11.993, 5.998, C.pink, 30);
++
++  imagePlaceholder(slide, { x: 1.332, y: 5.21, w: 0.967, h: 0.967, label: false });
++  imagePlaceholder(slide, { x: 2.497, y: 5.21, w: 0.967, h: 0.967, label: false });
++}
++
++/** "Dotted route + map pin" mark that sits on the yellow cover badge. */
++function routePin(slide, x, y) {
++  freeform(slide, PATHS.pin, { x: x + 0.208, y: y, w: 0.08, h: 0.13, color: C.black });
++  freeform(slide, PATHS.pin, { x: x, y: y + 0.142, w: 0.099, h: 0.161, color: C.black });
++  // the winding dotted trail linking the two markers
++  [[0.148, 0.288], [0.124, 0.288], [0.101, 0.287], [0.171, 0.287], [0.194, 0.282],
++   [0.153, 0.19], [0.132, 0.155], [0.145, 0.177], [0.167, 0.203], [0.19, 0.231],
++   [0.213, 0.123], [0.199, 0.246], [0.22, 0.276], [0.24, 0.264], [0.221, 0.211],
++   [0.24, 0.222], [0.197, 0.282], [0.198, 0.131]].forEach(function (d) {
++    slide.addShape('ellipse', {
++      x: x + d[0], y: y + d[1], w: 0.02, h: 0.02, fill: { color: C.black }, line: { type: 'none' },
++    });
++  });
++}
++
++function slide01(slide) {
++  coverSlide(slide, 1, { title: 'Wanderlust Wonders', button: 'Start Presentation' });
++}
++
++function slide15(slide) {
++  coverSlide(slide, 15, { title: 'Thanks for Attention', button: 'End Presentation' });
++}
++
++/* 2 — Table of contents */
++function slide02(slide) {
++  freeform(slide, PATHS.waveBig, { x: 2.962, y: -2.057, w: 8.33, h: 11.595, color: C.wave, rotate: 270 });
++  chrome(slide, 2);
++
++  const items = [
++    { n: '01', y: 1.546, active: true },
++    { n: '02', y: 2.714, active: false },
++    { n: '03', y: 3.879, active: false },
++    { n: '04', y: 5.047, active: false },
++  ];
++  items.forEach(function (it) {
++    card(slide, {
++      x: 8.142, y: it.y, w: 4.117, h: 0.907, r: 0.454,
++      fill: it.active ? C.blue : C.white,
++      line: it.active ? { type: 'none' } : { color: C.hair, width: 0.25 },
++      shadow: SHADOW(),
++    });
++    text(slide, it.n, {
++      x: 8.303, y: it.y + 0.066, w: 1.128, h: 0.774, fontFace: FONT.head, fontSize: 40, bold: true,
++      color: it.active ? C.white : C.black, transparency: it.active ? 0 : 95,
++    });
++    text(slide, 'Your Subtitle Goes Here', {
++      x: 9.312, y: it.y + 0.268, w: 3.147, h: 0.37, fontFace: FONT.head, fontSize: 16,
++      color: it.active ? C.white : C.hair,
++    });
++  });
++
++  text(slide, 'Table Of', { x: 1.074, y: 1.867, w: 2.491, h: 0.774, fontFace: FONT.head, fontSize: 40 });
++  text(slide, 'Content', { x: 1.074, y: 2.513, w: 4.773, h: 1.447, fontFace: FONT.head, fontSize: 80 });
++  body(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, '
++    + 'a maximus leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit euismod, '
++    + 'metus ac Cras euismod, metus ac finibus', { x: 1.074, y: 4.149, w: 5.412, h: 0.831 });
++  body(slide, LOREM.half, { x: 1.074, y: 5.054, w: 5.412, h: 0.579 });
++
++  doodle(slide, 5.735, 1.652, C.teal, 210);
++  doodle(slide, 10.004, 6.173, C.pink, 30);
++}
++
++/* 3 — Stories from Around the Globe */
++function slide03(slide) {
++  freeform(slide, PATHS.waveThin, { x: 2.187, y: -1.093, w: 2.896, h: 9.558, color: C.wave, rotate: 330 });
++  chrome(slide, 3);
++
++  heading(slide, 'Stories from Around the Globe', { x: 6.855, y: 1.717, w: 5.273, h: 1.447 });
++  body(slide, LOREM.full, { x: 6.855, y: 3.461, w: 5.691, h: 0.579 });
++  text(slide, '50%', { x: 6.855, y: 4.34, w: 1.847, h: 0.774, fontFace: FONT.head, fontSize: 40 });
++  body(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, a',
++    { x: 8.561, y: 4.34, w: 3.985, h: 0.579 });
++
++  card(slide, { x: 6.981, y: 5.355, w: 1.33, h: 0.37, r: 0.078, fill: C.blue, shadow: SHADOW_CTR() });
++  text(slide, 'Learn More', {
++    x: 7.06, y: 5.389, w: 1.17, h: 0.303, align: 'center', fontFace: FONT.head, fontSize: 12, color: C.white,
++  });
++
++  doodle(slide, 5.621, 1.082, C.teal, 300);
++  doodle(slide, 10.004, 6.173, C.pink, 30);
++  imagePlaceholder(slide, { x: 1.177, y: 1.32, w: 4.861, h: 4.861, cap: 14 });
++}
++
++/* 4 — How to Travel Light */
++function slide04(slide) {
++  freeform(slide, PATHS.waveBig, { x: 7.57, y: 0.171, w: 6.456, h: 8.987, color: C.wave, rotate: 255 });
++  chrome(slide, 4);
++
++  heading(slide, 'How to Travel Light Without Sacrificing Style', { x: 0.95, y: 1.717, w: 6.772, h: 1.447 });
++  text(slide, 'Staying Energized on the Go', { x: 0.95, y: 3.464, w: 3.938, h: 0.37, fontFace: FONT.head, fontSize: 16 });
++  body(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus fini bus, felis dui susci pit purus, '
++    + 'a maximus leo ligula euismod, metus euismod, metus ac finibus', { x: 0.95, y: 3.939, w: 6.025, h: 0.579 });
++  text(slide, '123,45K+', { x: 0.95, y: 4.755, w: 2.358, h: 0.64, fontFace: FONT.head, fontSize: 32 });
++  body(slide, 'Quisque non elit mauris. Cras euismod, met', { x: 0.95, y: 5.336, w: 3.075, h: 0.326 });
++
++  doodle(slide, 3.707, 0.719, C.teal, 210);
++  doodle(slide, 11.301, 5.655, C.pink, 30);
++
++  card(slide, { x: 4.336, y: 4.835, w: 3.929, h: 0.828, fill: C.white, shadow: SHADOW_CTR() });
++  card(slide, { x: 4.535, y: 5.017, w: 0.458, h: 0.458, fill: C.blue, shadow: SHADOW() });
++  freeform(slide, PATHS.command, { x: 4.651, y: 5.133, w: 0.225, h: 0.226, color: C.white });
++  text(slide, 'Tradition Meets Innovation', { x: 5.167, y: 5.061, w: 2.901, h: 0.37, fontFace: FONT.head, fontSize: 16 });
++
++  imagePlaceholder(slide, { x: 8.792, y: 1.243, w: 3.592, h: 3.592, cap: 13 });
++  imagePlaceholder(slide, { x: 7.282, y: 4.101, w: 2.156, h: 2.156, cap: 11 });
++}
++
++/* 5 — Hiking the World's Most Iconic Trails */
++function slide05(slide) {
++  freeform(slide, PATHS.waveThin, { x: 2.758, y: -1.561, w: 3.86, h: 12.739, color: C.wave, rotate: 300 });
++  chrome(slide, 5);
++
++  heading(slide, "Hiking the World's Most Iconic Trails", { x: 1.218, y: 1.456, w: 5.189, h: 1.447 });
++  body(slide, LOREM.intro, { x: 7.864, y: 1.764, w: 4.41, h: 0.831 });
++
++  [
++    { x: 4.2, color: C.blue, title: 'Nature\u2019s Escapes' },
++    { x: 6.889, color: C.teal, title: 'Chasing Sunsets' },
++    { x: 9.578, color: C.pink, title: 'Into the Wild' },
++  ].forEach(function (t) {
++    card(slide, { x: t.x, y: 3.617, w: 2.532, h: 2.575, fill: t.color, shadow: SHADOW() });
++    text(slide, t.title, {
++      x: t.x + 0.257, y: 4.041, w: 2.162, h: 0.337, fontFace: FONT.head, fontSize: 14, color: C.white,
++    });
++    body(slide, LOREM.card, { x: t.x + 0.257, y: 4.393, w: 2.162, h: 0.831, color: C.white });
++    arrow(slide, { x: t.x + 0.371, y: 5.61, w: 1.283, color: C.white, width: 0.5 });
++  });
++
++  doodle(slide, 3.84, 6.424, C.teal, 105);
++  doodle(slide, 12.161, 2.187, C.pink, 30);
++  imagePlaceholder(slide, { x: 1.218, y: 3.617, w: 2.575, h: 2.575, cap: 12 });
++}
++
++/* 6 — Historic Cities Worth Getting Lost In */
++function slide06(slide) {
++  freeform(slide, PATHS.waveBig, { x: 6.623, y: 1.91, w: 6.456, h: 8.987, color: C.wave, rotate: 270 });
++  chrome(slide, 6);
++
++  heading(slide, 'Historic Cities Worth Getting Lost In', { x: 1.136, y: 1.311, w: 5.774, h: 1.447 });
++  [
++    { x: 7.64, big: '123,45K+', wBig: 2.761, small: LOREM.tiny, wSmall: 2.29 },
++    { x: 10.845, big: '50%', wBig: 1.339, small: 'Quisque none', wSmall: 1.143 },
++  ].forEach(function (s) {
++    text(slide, s.big, { x: s.x, y: 1.482, w: s.wBig, h: 0.64, fontFace: FONT.head, fontSize: 32 });
++    body(slide, s.small, { x: s.x, y: 2.063, w: s.wSmall, h: 0.326 });
++  });
++  slide.addShape('line', { x: 10.343, y: 1.594, w: 0, h: 0.74, line: { color: C.hair, width: 1 } });
++  body(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, '
++    + 'a maximus leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit am urna tempor '
++    + 'sollicitudin. Cras pretium Quisque non elit mauris. Cras euismod, euismod, metus ac',
++    { x: 1.136, y: 2.885, w: 11.278, h: 0.579 });
++
++  [
++    { x: 1.136, color: C.blue, title: 'City Lights & Skyline Nights' },
++    { x: 6.82, color: C.teal, title: 'Cultural Immersion' },
++  ].forEach(function (t) {
++    card(slide, { x: t.x, y: 3.864, w: 5.377, h: 2.164, fill: C.white, shadow: SHADOW_CTR() });
++    imagePlaceholder(slide, { shape: 'rect', r: 0.26, x: t.x + 0.09, y: 3.958, w: 1.705, h: 1.975, cap: 10 });
++    text(slide, t.title, { x: t.x + 2.079, y: 4.244, w: 2.742, h: 0.337, fontFace: FONT.head, fontSize: 14 });
++    body(slide, 'Quisque non elit mauris. Cras euismod, ', { x: t.x + 2.079, y: 4.616, w: 2.931, h: 0.326 });
++    card(slide, { x: t.x + 2.192, y: 5.172, w: 1.342, h: 0.36, fill: t.color, shadow: SHADOW() });
++    text(slide, 'Interest', {
++      x: t.x + 2.412, y: 5.222, w: 0.901, h: 0.252, align: 'center', fontFace: FONT.head, fontSize: 9, color: C.grey,
++    });
++    card(slide, { x: t.x + 3.668, y: 5.172, w: 1.342, h: 0.36, fill: C.white, line: { color: t.color, width: 0.5 } });
++    text(slide, 'Learn More', {
++      x: t.x + 3.756, y: 5.24, w: 1.167, h: 0.252, align: 'center', fontFace: FONT.head, fontSize: 9, color: t.color,
++    });
++  });
++
++  doodle(slide, 3.965, 0.389, C.pink, 30);
++  doodle(slide, 10.881, 6.212, C.yellow, 30);
++}
++
++/* 7 — Healing Destinations for Body & Mind */
++function slide07(slide) {
++  freeform(slide, PATHS.waveThin, { x: 2.758, y: -1.561, w: 3.86, h: 12.739, color: C.wave, rotate: 300 });
++  chrome(slide, 7);
++
++  heading(slide, 'Healing Destinations for Body & Mind', { x: 1.136, y: 1.077, w: 5.774, h: 1.447 });
++  body(slide, LOREM.intro, { x: 7.864, y: 1.368, w: 4.41, h: 0.831 });
++
++  [
++    { x: 1.214, fill: C.blue, ink: C.white, icon: 'gear' },
++    { x: 4.507, fill: C.yellow, ink: C.black, icon: 'window' },
++  ].forEach(function (t) {
++    card(slide, { x: t.x, y: 2.845, w: 3.113, h: 3.41, r: 0.4, fill: t.fill, shadow: SHADOW() });
++    text(slide, '123,46K+', {
++      x: t.x + 0.295, y: 3.196, w: 2.285, h: 0.64, fontFace: FONT.head, fontSize: 32, color: t.ink,
++    });
++    body(slide, 'Quisque non elit mauris. Cras euism od, metus ac finibus finibus, felis dui suscipit purus, '
++      + 'a maximus leo ligula at dolor. Morbi et malesuada', { x: t.x + 0.295, y: 3.898, w: 2.618, h: 1.084, color: t.ink });
++    arrow(slide, { x: t.x + 0.417, y: 5.585, w: 0.885, color: t.ink, width: 1 });
++    card(slide, { x: t.x + 1.958, y: 5.16, w: 0.841, h: 0.841, fill: C.white, shadow: SHADOW() });
++    if (t.icon === 'gear') gearIcon(slide, t.x + 2.373, 5.584);
++    else windowIcon(slide, t.x + 2.199, 5.323);
++  });
++
++  doodle(slide, 5.577, 6.376, C.teal, 105);
++  doodle(slide, 12.254, 1.832, C.pink, 30);
++  imagePlaceholder(slide, { x: 7.915, y: 2.825, w: 3.43, h: 3.43, cap: 12 });
++  imagePlaceholder(slide, { shape: 'halfRound', x: 11.64, y: 2.826, w: 1.694, h: 3.427, label: false });
++}
++
++/** Outline cog wheel: a toothed ring with a hollow hub. */
++function gearIcon(slide, cx, cy) {
++  slide.addShape('gear9', {
++    x: cx - 0.235, y: cy - 0.235, w: 0.47, h: 0.47,
++    fill: { color: C.white }, line: { color: C.black, width: 1.25 },
++  });
++  slide.addShape('ellipse', {
++    x: cx - 0.068, y: cy - 0.068, w: 0.136, h: 0.136,
++    fill: { color: C.white }, line: { color: C.black, width: 1.25 },
++  });
++}
++
++/** Aeroplane window: rounded porthole with a sun and two clouds inside. */
++function windowIcon(slide, x, y) {
++  slide.addShape('roundRect', {
++    x: x, y: y, w: 0.353, h: 0.513, rectRadius: 0.166,
++    fill: { color: C.white }, line: { color: C.black, width: 1.25 },
++  });
++  slide.addShape('line', { x: x + 0.12, y: y + 0.085, w: 0.115, h: 0, line: { color: C.black, width: 1.25 } });
++  slide.addShape('sun', {
++    x: x + 0.145, y: y + 0.145, w: 0.105, h: 0.105, fill: { color: C.white }, line: { color: C.black, width: 0.75 },
++  });
++  slide.addShape('cloud', { x: x - 0.015, y: y + 0.215, w: 0.155, h: 0.1, fill: { color: C.white }, line: { color: C.black, width: 0.75 } });
++  slide.addShape('cloud', { x: x + 0.12, y: y + 0.305, w: 0.2, h: 0.125, fill: { color: C.white }, line: { color: C.black, width: 0.75 } });
++}
++
++/* 8 — Backpacking Across Continents on a Budget */
++function slide08(slide) {
++  freeform(slide, PATHS.waveBig, { x: 0.467, y: -0.755, w: 6.456, h: 8.987, color: C.wave, rotate: 255 });
++  chrome(slide, 8);
++
++  [
++    { x: 1.202, y: 1.431, fill: C.blue, ink: C.white, pct: '40%' },
++    { x: 3.118, y: 1.431, fill: C.yellow, ink: C.black, pct: '40%' },
++    { x: 1.202, y: 3.828, fill: C.pink, ink: C.white, pct: '20%' },
++    { x: 3.125, y: 3.828, fill: C.teal, ink: C.white, pct: '50%' },
++  ].forEach(function (t) {
++    card(slide, { x: t.x, y: t.y, w: 1.783, h: 2.236, fill: t.fill });
++    text(slide, t.pct, { x: t.x + 0.224, y: t.y + 0.251, w: 1.229, h: 0.64, fontSize: 32, color: t.ink });
++    body(slide, LOREM.tile, { x: t.x + 0.224, y: t.y + 0.846, w: 1.398, h: 1.084, color: t.ink });
++  });
++
++  heading(slide, 'Backpacking Across Continents on a Budget', { x: 5.849, y: 1.877, w: 6.484, h: 1.447 });
++  [5.849, 9.179].forEach(function (x) {
++    text(slide, '123,45K+', { x: x, y: 3.738, w: 2.358, h: 0.64, fontFace: FONT.head, fontSize: 32 });
++    body(slide, LOREM.tiny, { x: x, y: 4.319, w: 2.29, h: 0.326 });
++  });
++  body(slide, LOREM.long, { x: 5.851, y: 4.792, w: 6.665, h: 0.831 });
++
++  doodle(slide, 6.61, 6.306, C.teal, 105);
++  doodle(slide, 11.9, 1.409, C.pink, 30);
++}
++
++/* 9 — Meet Our Best Team Here */
++function slide09(slide) {
++  freeform(slide, PATHS.waveThin, { x: 5.454, y: -4.408, w: 2.488, h: 16.063, color: C.wave, rotate: 285 });
++  chrome(slide, 9);
++
++  heading(slide, 'Meet Our Best Team Here', { x: 2.589, y: 1.2, w: 8.155, h: 0.774, align: 'center' });
++  [
++    { x: 1.652, name: 'Benjamin Esteban' },
++    { x: 5.387, name: 'Bryan Govanchy' },
++    { x: 9.117, name: 'Benjamin Esteban' },
++  ].forEach(function (p) {
++    imagePlaceholder(slide, { x: p.x, y: 2.465, w: 2.56, h: 2.57, cap: 11 });
++    text(slide, p.name, {
++      x: p.x - 0.28, y: 5.58, w: 3.12, h: 0.37, align: 'center', fontFace: FONT.head, fontSize: 16,
++    });
++    body(slide, LOREM.tiny, { x: p.x - 0.22, y: 5.92, w: 3.004, h: 0.326, align: 'center' });
++  });
++
++  doodle(slide, 4.309, 6.424, C.teal, 105);
++  doodle(slide, 11.9, 1.409, C.pink, 30);
++}
++
++/* 10 — Break slide */
++function slide10(slide) {
++  freeform(slide, PATHS.waveBig, { x: 1.184, y: -0.755, w: 6.456, h: 8.987, color: C.wave, rotate: 255 });
++  chrome(slide, 10);
++
++  heading(slide, 'It\u2019s Time to Break', { x: 6.882, y: 2.063, w: 6.905, h: 3.332, fontSize: 96 });
++  imagePlaceholder(slide, { x: 1.143, y: 1.325, w: 4.807, h: 4.807, cap: 14 });
++
++  freeform(slide, PATHS.dome, { x: 4.426, y: 5.395, w: 4.766, h: 2.105, color: C.blue });
++  freeform(slide, PATHS.swoosh, { x: 5.366, y: 4.756, w: 2.617, h: 3.984, color: C.blueSoft, rotate: 285, transparency: 75 });
++  slide.addText([
++    { text: '30', options: { fontSize: 48 } },
++    { text: 'Minutes', options: { fontSize: 32 } },
++  ], {
++    x: 5.02, y: 6.102, w: 3.579, h: 0.909, align: 'center', valign: 'top',
++    fontFace: FONT.head, color: C.white, margin: MARGIN,
++  });
++
++  doodle(slide, 6.735, 1.048, C.pink, 30);
++  doodle(slide, 10.76, 5.745, C.teal, 105);
++}
++
++/* 11 — Two Ways to See the Same Place */
++function slide11(slide) {
++  freeform(slide, PATHS.waveThin, { x: 8.293, y: -2.19, w: 3.558, h: 11.742, color: C.wave, rotate: 315 });
++  chrome(slide, 11);
++
++  heading(slide, 'Two Ways to See the Same Place', { x: 1.054, y: 1.511, w: 5.088, h: 1.447 });
++
++  // Tablet-over-laptop product photo.  Rebuilt from shapes: a silver laptop
++  // wedge with two tilted device bodies and their grey screens on top.
++  slide.addShape('roundRect', {   // laptop lying flat behind the tablets
++    x: 7.7, y: 4.2, w: 4.6, h: 1.9, rectRadius: 0.16, rotate: 8,
++    fill: { color: 'A9A9B8' }, line: { type: 'none' }, shadow: SHADOW(),
++  });
++  freeform(slide, PATHS.quad, { x: 8.402, y: 2.451, w: 3.273, h: 3.383, color: '23232B' });
++  imagePlaceholder(slide, { shape: 'quad', x: 8.63, y: 2.68, w: 2.82, h: 2.92, label: false });
++  freeform(slide, PATHS.slab, { x: 7.405, y: 1.542, w: 3.007, h: 4.023, color: '23232B' });
++  imagePlaceholder(slide, { shape: 'slab', x: 7.63, y: 1.79, w: 2.56, h: 3.52, cap: 12 });
++  slide.addShape('roundRect', {   // stylus resting against the tablet
++    x: 6.92, y: 1.18, w: 0.075, h: 2.85, rectRadius: 0.038, rotate: 22,
++    fill: { color: 'E8E8EC' }, line: { type: 'none' },
++  });
++
++  // Mini bar chart tile.
++  card(slide, { x: 1.183, y: 3.512, w: 2.405, h: 2.354, r: 0.343, fill: C.blue, shadow: SHADOW() });
++  [
++    { x: 1.516, y: 4.722, h: 0.676, t: 0 },
++    { x: 1.879, y: 4.495, h: 0.903, t: 75 },
++    { x: 2.243, y: 4.271, h: 1.128, t: 0 },
++    { x: 2.606, y: 4.053, h: 1.346, t: 75, white: true },
++    { x: 2.969, y: 3.861, h: 1.538, t: 0 },
++  ].forEach(function (b) {
++    card(slide, {
++      x: b.x, y: b.y, w: 0.286, h: b.h, r: 0.143,
++      fill: b.white ? C.white : C.grey, transparency: b.t,
++    });
++  });
++  slide.addShape('line', { x: 1.516, y: 5.518, w: 1.739, h: 0, line: { color: C.grey, width: 1 } });
++
++  text(slide, 'Affordable Luxury', { x: 3.951, y: 3.512, w: 3.057, h: 0.337, fontFace: FONT.head, fontSize: 14 });
++  body(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus fini bus, felis dui susci pit purus, '
++    + 'a maximus leo ligula euismod, metus', { x: 3.951, y: 3.962, w: 2.659, h: 1.084 });
++  card(slide, { x: 4.024, y: 5.41, w: 1.206, h: 0.467, r: 0.081, fill: C.black, shadow: SHADOW() });
++  text(slide, 'Learn More', { x: 4.098, y: 5.492, w: 1.083, h: 0.303, fontFace: FONT.head, fontSize: 12, color: C.white });
++
++  doodle(slide, 5.963, 6.083, C.teal, 105);
++  doodle(slide, 11.556, 1.155, C.pink, 30);
++}
++
++/* 12 — Behind the Scenes of a Travel Creator */
++function slide12(slide) {
++  freeform(slide, PATHS.waveBig, { x: 1.184, y: -0.755, w: 6.456, h: 8.987, color: C.wave, rotate: 255 });
++  chrome(slide, 12, { noFooter: true });
++
++  // Open laptop seen from above: lid with the screen, hinge bar, then the
++  // silver base with a keyboard block and trackpad.
++  slide.addShape('roundRect', {
++    x: 1.486, y: 1.235, w: 4.306, h: 2.96, rectRadius: 0.1,
++    fill: { color: '1E1E1E' }, line: { type: 'none' },
++  });
++  imagePlaceholder(slide, { shape: 'rect', x: 1.571, y: 1.271, w: 4.143, h: 2.864, cap: 12 });
++  slide.addShape('roundRect', {
++    x: 1.25, y: 4.24, w: 4.79, h: 0.17, rectRadius: 0.06,
++    fill: { color: 'D0D0D0' }, line: { type: 'none' },
++  });
++  slide.addShape('roundRect', {
++    x: 1.33, y: 4.44, w: 4.49, h: 3.06, rectRadius: 0.1,
++    fill: { color: 'C4C4C4' }, line: { type: 'none' },
++  });
++  slide.addShape('roundRect', {   // keyboard well
++    x: 1.5, y: 4.6, w: 3.94, h: 1.72, rectRadius: 0.04,
++    fill: { color: '6E6E6E' }, line: { type: 'none' },
++  });
++  slide.addShape('roundRect', {   // trackpad
++    x: 2.92, y: 6.5, w: 1.46, h: 1.0, rectRadius: 0.04,
++    fill: { color: '7A7A7A' }, line: { type: 'none' },
++  });
++
++  heading(slide, 'Behind the Scenes of a Travel Creator', { x: 6.9, y: 1.736, w: 5.333, h: 1.447 });
++  text(slide, 'Giving Back While You Travel', { x: 6.9, y: 3.523, w: 3.938, h: 0.37, fontFace: FONT.head, fontSize: 16 });
++  body(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, '
++    + 'a maximus leo ligula at dolor. Morbi et malesuada purus. Phasellus a lacus sit amet urna tempor '
++    + 'sollicitudin. Cras pretium Quisque non elit mauris. Cras euismod, metus ac finibus finibus, '
++    + 'finibus, felis dui suscipit purus, ', { x: 6.9, y: 3.997, w: 5.483, h: 1.084 });
++  body(slide, LOREM.full, { x: 6.9, y: 5.185, w: 5.483, h: 0.579 });
++
++  doodle(slide, 7.778, 6.071, C.teal, 105);
++  doodle(slide, 12.237, 1.265, C.pink, 30);
++}
++
++/* 13 — Testimonials */
++function slide13(slide) {
++  freeform(slide, PATHS.waveThin, { x: 2.809, y: -1.646, w: 3.953, h: 13.045, color: C.wave, rotate: 300 });
++  chrome(slide, 13);
++
++  heading(slide, 'What They Say About Us?', { x: 0.941, y: 1.486, w: 11.451, h: 0.774, align: 'center' });
++
++  // Side cards first, then the taller highlighted centre card on top.
++  [
++    { x: 1.026, fill: C.yellow, ink: C.black, star: C.black, avatar: 2.912, name: 'Silvia Gina Marlenstone' },
++    { x: 9.149, fill: C.pink, ink: C.white, star: C.white, avatar: 11.089, name: 'Johannah Angel Christina' },
++  ].forEach(function (t) {
++    imagePlaceholder(slide, { x: t.avatar, y: 3.162, w: 0.694, h: 0.694, label: false });
++    card(slide, { x: t.x, y: 3.512, w: 3.159, h: 2.42, r: 0.372, fill: t.fill });
++    stars(slide, t.x + 0.393, 3.847, 0.163, 0.226, t.star);
++    text(slide, t.name, { x: t.x + 0.296, y: 4.255, w: 2.458, h: 0.303, fontFace: FONT.head, fontSize: 12, color: t.ink });
++    text(slide, LOREM.full, { x: t.x + 0.296, y: 4.612, w: 2.566, h: 0.986, fontSize: 9, lineSpacing: 16, color: t.ink });
++  });
++
++  imagePlaceholder(slide, { x: 7.139, y: 2.722, w: 0.95, h: 0.95, label: false });
++  card(slide, { x: 4.583, y: 3.126, w: 4.167, h: 3.193, r: 0.491, fill: C.blue, shadow: SHADOW_SOFT() });
++  stars(slide, 5.085, 3.495, 0.207, 0.288, C.white);
++  text(slide, 'Benjamin Michael Stroye', { x: 4.983, y: 3.942, w: 2.458, h: 0.337, fontFace: FONT.head, fontSize: 14, color: C.white });
++  body(slide, LOREM.long, { x: 4.983, y: 4.362, w: 3.378, h: 1.589, color: C.white });
++
++  doodle(slide, 4.028, 6.271, C.teal, 105);
++  doodle(slide, 11.632, 1.533, C.pink, 30);
++}
++
++/** Row of five solid rating stars. */
++function stars(slide, x, y, size, step, color) {
++  for (let i = 0; i < 5; i++) {
++    slide.addShape('star5', {
++      x: x + i * step, y: y, w: size, h: size,
++      fill: { color: color }, line: { type: 'none' },
++    });
++  }
++}
++
++/* 14 — Contact details */
++function slide14(slide) {
++  freeform(slide, PATHS.waveBig, { x: 1.184, y: -0.755, w: 6.456, h: 8.987, color: C.wave, rotate: 255 });
++  chrome(slide, 14);
++
++  heading(slide, 'Our Contact Information Here', { x: 6.9, y: 1.736, w: 5.333, h: 1.447 });
++  body(slide, 'Quisque non elit mauris. Cras euismod, metus ac finibus finibus, felis dui suscipit purus, '
++    + 'a maximus leo ligula at dolor. Morbi et', { x: 6.9, y: 3.461, w: 5.692, h: 0.579 });
++
++  [
++    { x: 6.994, y: 4.504, fill: C.blue, icon: 'marker', label: '123 Anywhere St., Any City' },
++    { x: 7.0, y: 5.226, fill: C.teal, icon: 'phone', label: '+123-456-7890' },
++    { x: 9.781, y: 4.504, fill: C.pink, icon: 'globe', label: 'www.reallygreatsite.com' },
++    { x: 9.781, y: 5.226, fill: C.yellow, icon: 'mail', label: 'hello@reallygreatsite.com' },
++  ].forEach(function (r) {
++    card(slide, { x: r.x, y: r.y, w: 0.438, h: 0.438, fill: r.fill, shadow: SHADOW_CTR() });
++    contactIcon(slide, r.icon, r.x + 0.219, r.y + 0.219);
++    text(slide, r.label, {
++      x: r.x + 0.56, y: r.y + 0.042, w: 1.977, h: 0.353, valign: 'middle', fontSize: 10, lineSpacing: 18,
++    });
++  });
++
++  doodle(slide, 6.347, 6.197, C.teal, 105);
++  doodle(slide, 11.632, 1.533, C.pink, 30);
++  imagePlaceholder(slide, { x: 1.143, y: 1.325, w: 4.807, h: 4.807, cap: 14 });
++}
++
++/** Small glyph centred on a contact chip. */
++function contactIcon(slide, kind, cx, cy) {
++  if (kind === 'marker') {
++    freeform(slide, PATHS.pinSolid, { x: cx - 0.115, y: cy - 0.115, w: 0.23, h: 0.23, color: C.white });
++  } else if (kind === 'phone') {
++    slide.addShape('roundRect', {   // handset body
++      x: cx - 0.038, y: cy - 0.088, w: 0.076, h: 0.176, rectRadius: 0.038,
++      fill: { color: C.white }, line: { type: 'none' }, rotate: 315,
++    });
++    [[-0.075, -0.055], [0.03, 0.05]].forEach(function (d) {   // ear- and mouth-piece
++      slide.addShape('roundRect', {
++        x: cx + d[0], y: cy + d[1], w: 0.085, h: 0.035, rectRadius: 0.017,
++        fill: { color: C.white }, line: { type: 'none' }, rotate: 315,
++      });
++    });
++  } else if (kind === 'globe') {
++    slide.addShape('ellipse', {
++      x: cx - 0.09, y: cy - 0.09, w: 0.18, h: 0.18, fill: { type: 'none' }, line: { color: C.white, width: 1.25 },
++    });
++    slide.addShape('ellipse', {
++      x: cx - 0.038, y: cy - 0.09, w: 0.076, h: 0.18, fill: { type: 'none' }, line: { color: C.white, width: 1 },
++    });
++    slide.addShape('line', { x: cx - 0.09, y: cy, w: 0.18, h: 0, line: { color: C.white, width: 1 } });
++    slide.addShape('line', { x: cx - 0.075, y: cy - 0.052, w: 0.15, h: 0, line: { color: C.white, width: 0.75 } });
++    slide.addShape('line', { x: cx - 0.075, y: cy + 0.052, w: 0.15, h: 0, line: { color: C.white, width: 0.75 } });
++  } else {   // open envelope with an "@" on the flap
++    slide.addShape('rect', {
++      x: cx - 0.093, y: cy - 0.04, w: 0.186, h: 0.13, fill: { color: C.yellow }, line: { color: C.black, width: 1.25 },
++    });
++    slide.addShape('roundRect', {
++      x: cx - 0.062, y: cy - 0.105, w: 0.124, h: 0.115, rectRadius: 0.02,
++      fill: { color: C.yellow }, line: { color: C.black, width: 1.25 },
++    });
++    text(slide, '@', {
++      x: cx - 0.09, y: cy - 0.115, w: 0.18, h: 0.13, align: 'center', valign: 'middle', fontSize: 7, bold: true,
++    });
++    slide.addShape('line', { x: cx - 0.093, y: cy - 0.04, w: 0.093, h: 0.13, line: { color: C.black, width: 1.25 } });
++    slide.addShape('line', { x: cx, y: cy + 0.09, w: 0.093, h: -0.13, line: { color: C.black, width: 1.25 } });
++  }
++}
++
++/* ------------------------------------------------------------------- build */
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
++pptx.layout = 'WIDE_16x9';
++pptx.author = 'Wanderlust Wonders';
++pptx.title = 'Wanderlust Wonders';
++
++const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15];
++
++BUILDERS.forEach(function (build) {
++  const slide = pptx.addSlide();
++  slide.background = { color: C.white };
++  build(slide);
++});
++
++pptx.writeFile({ fileName: path.join(__dirname, '05a4748e-89e0-4f10-9c93-754db5bb12e4_grok_final.pptx') })
++  .then(function (f) { console.log('wrote', f); })
++  .catch(function (e) { console.error(e); process.exit(1); });

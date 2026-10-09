@@ -1,0 +1,751 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/modern_business_company_overview.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/modern_business_company_overview.js
+@@ -0,0 +1,748 @@
++/**
++ * OXIRIS - Modern Business deck (30 slides, 13.333 x 7.5 in)
++ * Standalone pptxgenjs recreation of the reference presentation.
++ *
++ * The original carries no photographs of its own: every photo slot is an empty
++ * picture placeholder that renders as nothing, so those slots are left empty
++ * here too (their pink/white framing rectangles are real shapes and are kept).
++ * The raster pictograms and the device mockups are redrawn from native
++ * pptxgenjs shapes rather than embedded as images.
++ */
++const path = require("path");
++const PptxGenJS = require("pptxgenjs");
++
++// ---------------------------------------------------------------- palette
++const BLUE  = "043280"; // deck background
++const WHITE = "FFFFFF";
++const PINK  = "E54782"; // accent
++const CORAL = "F86963"; // small dots on the cover
++const GREY  = "F2F2F2"; // ghosted "MANUAL ANALYSIS" headline
++const BLACK = "000000";
++
++const FONT = "DM Sans";
++
++// pptxgenjs shape aliases used throughout
++const R  = "rect";
++const RR = "roundRect";
++const E  = "ellipse";
++const DI = "diamond";
++const LN = "line";
++
++// ------------------------------------------------------------- primitives
++
++/** Text box. `body` is a string, or an array of [text, color?, size?] runs. */
++function T(s, body, x, y, w, h, o) {
++  o = o || {};
++  const base = {
++    fontFace: FONT, fontSize: o.sz || 12, bold: !!o.b,
++    color: o.c || WHITE,
++    align: o.al === "c" ? "center" : o.al === "r" ? "right" : "left",
++    valign: o.va === "m" ? "middle" : "top",
++    x: x, y: y, w: w, h: h,
++    margin: 0, isTextBox: true, wrap: true,
++  };
++  if (o.lh) base.lineSpacingMultiple = o.lh;
++  if (typeof body === "string") { s.addText(body, base); return; }
++  const runs = body.map(function (r) {
++    return { text: r[0], options: { color: r[1] || base.color, fontSize: r[2] || base.fontSize } };
++  });
++  s.addText(runs, base);
++}
++
++/** Generic geometric shape. */
++function S(s, shape, x, y, w, h, o) {
++  o = o || {};
++  const opt = { x: x, y: y, w: w, h: h };
++  if (o.fill) opt.fill = o.alpha ? { color: o.fill, transparency: o.alpha } : { color: o.fill };
++  if (o.line) opt.line = { color: o.line, width: o.lw === undefined ? 1.5 : o.lw };
++  if (!o.fill && shape !== LN) opt.fill = { type: "none" };
++  if (o.r !== undefined) opt.rectRadius = o.r;
++  if (o.arc) { opt.angleRange = o.arc; opt.arcThicknessRatio = o.arcT; }
++  if (o.rot) opt.rotate = o.rot;
++  return s.addShape(shape, opt);
++}
++
++/** Filled circle. */
++function dot(s, x, y, d, color) {
++  s.addShape(E, { x: x, y: y, w: d, h: d, fill: { color: color } });
++}
++
++/**
++ * Donut ring of outer diameter `d` whose wall is `a * d` thick, drawn as a
++ * stroked ellipse: the stroke straddles the path, so the path diameter is
++ * d * (1 - a) and the stroke is a * d wide.
++ */
++function ring(s, x, y, d, a, color) {
++  const dia = d * (1 - a), off = (d - dia) / 2;
++  s.addShape(E, { x: x + off, y: y + off, w: dia, h: dia, fill: { type: "none" },
++                  line: { color: color, width: a * d * 72 } });
++}
++const ringBold = function (s, x, y, d, c) { ring(s, x, y, d, 0.18378, c); }; // small accents
++const ringThin = function (s, x, y, d, c) { ring(s, x, y, d, 0.12072, c); }; // big open circles
++
++// -------------------------------------------------------------- pictograms
++// The reference deck uses small raster line-art icons; each is redrawn here
++// from native pptxgenjs shapes at the same position and size.
++
++function ln(s, x, y, w, h, color, width, flipV) {
++  s.addShape(LN, { x: x, y: y, w: w, h: h, flipV: !!flipV,
++                   line: { color: color, width: width } });
++}
++function ring2(s, x, y, d, color, width) {
++  s.addShape(E, { x: x, y: y, w: d, h: d, fill: { type: "none" },
++                  line: { color: color, width: width } });
++}
++
++function bulb(s, x, y, d, c) {
++  ring2(s, x + d * 0.2, y + d * 0.06, d * 0.6, c, d * 2.2);      // glass
++  S(s, R, x + d * 0.36, y + d * 0.62, d * 0.28, d * 0.1, { fill: c }); // neck
++  S(s, R, x + d * 0.36, y + d * 0.76, d * 0.28, d * 0.07, { fill: c });
++  S(s, R, x + d * 0.4, y + d * 0.88, d * 0.2, d * 0.07, { fill: c });
++}
++function gear(s, x, y, d, c) {
++  s.addShape("gear6", { x: x, y: y, w: d, h: d, fill: { color: c } });
++  s.addShape(E, { x: x + d * 0.38, y: y + d * 0.38, w: d * 0.24, h: d * 0.24,
++                  fill: { color: BLUE } });
++}
++function target(s, x, y, d, c) {
++  ring2(s, x + d * 0.06, y + d * 0.12, d * 0.82, c, d * 2.6);
++  ring2(s, x + d * 0.26, y + d * 0.32, d * 0.42, c, d * 2.6);
++  ln(s, x + d * 0.47, y + d * 0.53, d * 0.5, -d * 0.5, c, d * 2.6);   // arrow shaft
++  s.addShape("triangle", { x: x + d * 0.78, y: y - d * 0.04, w: d * 0.26, h: d * 0.26,
++                           rotate: 45, fill: { color: c } });
++}
++function plane(s, x, y, d, c) {
++  // paper dart: outlined right triangle swept up-right, plus a centre crease
++  s.addShape("rtTriangle", { x: x + d * 0.04, y: y + d * 0.06, w: d * 0.92, h: d * 0.88,
++                             rotate: 250, fill: { type: "none" },
++                             line: { color: c, width: d * 2 } });
++  ln(s, x + d * 0.14, y + d * 0.8, d * 0.72, -d * 0.62, c, d * 1.4, true);
++}
++function trophy(s, x, y, d, c) {
++  // cup = downward trapezoid, plus two side handles, stem and base
++  s.addShape("trapezoid", { x: x + d * 0.24, y: y + d * 0.08, w: d * 0.52, h: d * 0.46,
++                            rotate: 180, fill: { color: c } });
++  s.addShape("blockArc", { x: x + d * 0.02, y: y + d * 0.06, w: d * 0.34, h: d * 0.38,
++                           angleRange: [90, 270], arcThicknessRatio: 0.4, fill: { color: c } });
++  s.addShape("blockArc", { x: x + d * 0.64, y: y + d * 0.06, w: d * 0.34, h: d * 0.38,
++                           angleRange: [270, 90], arcThicknessRatio: 0.4, fill: { color: c } });
++  S(s, R, x + d * 0.44, y + d * 0.54, d * 0.12, d * 0.26, { fill: c });  // stem
++  S(s, R, x + d * 0.24, y + d * 0.8, d * 0.52, d * 0.1, { fill: c });    // base
++}
++function mail(s, x, y, d, c) {
++  S(s, R, x, y + d * 0.18, d, d * 0.64, { line: c, lw: d * 2.2 });
++  ln(s, x + d * 0.03, y + d * 0.21, d * 0.47, d * 0.3, c, d * 2.2);        // flap \
++  ln(s, x + d * 0.5, y + d * 0.21, d * 0.47, d * 0.3, c, d * 2.2, true);   // flap /
++}
++function phone(s, x, y, d, c) {
++  // handset = thick three-quarter arc tilted earpiece-up-left / mouthpiece-down-right
++  s.addShape("blockArc", { x: x, y: y, w: d, h: d, rotate: 210,
++                           angleRange: [190, 350], arcThicknessRatio: 0.55,
++                           fill: { color: c } });
++}
++function map(s, x, y, d, c) {
++  S(s, R, x, y + d * 0.2, d * 0.34, d * 0.66, { line: c, lw: d * 2 });
++  S(s, R, x + d * 0.34, y + d * 0.12, d * 0.34, d * 0.66, { line: c, lw: d * 2 });
++  S(s, R, x + d * 0.68, y + d * 0.2, d * 0.32, d * 0.66, { line: c, lw: d * 2 });
++  s.addShape("teardrop", { x: x + d * 0.56, y: y, w: d * 0.36, h: d * 0.36, rotate: 135,
++                           fill: { color: c } });                        // pin
++}
++function clock(s, x, y, d, c) {
++  ring2(s, x + d * 0.04, y + d * 0.04, d * 0.92, c, d * 2.2);
++  ln(s, x + d * 0.5, y + d * 0.28, 0, d * 0.24, c, d * 2.2);   // hour hand
++  ln(s, x + d * 0.5, y + d * 0.5, d * 0.2, 0, c, d * 2.2);     // minute hand
++}
++function venn(s, x, y, d, c) {
++  s.addShape(E, { x: x + d * 0.26, y: y + d * 0.04, w: d * 0.48, h: d * 0.48, fill: { color: c } });
++  s.addShape(E, { x: x + d * 0.02, y: y + d * 0.46, w: d * 0.48, h: d * 0.48, fill: { color: c } });
++  s.addShape(E, { x: x + d * 0.5, y: y + d * 0.46, w: d * 0.48, h: d * 0.48, fill: { color: c } });
++}
++
++// --------------------------------------------------------- shared furniture
++
++/** "OXIRIS —" top-left and "— PRESENTATION 2024" top-right. */
++function hdr(s) {
++  T(s, "OXIRIS", 0.446, 0.403, 0.554, 0.202);
++  S(s, LN, 1.046, 0.504, 0.438, 0, { line: WHITE, lw: 0.75 });
++  S(s, LN, 10.722, 0.504, 0.438, 0, { line: WHITE, lw: 0.75 });
++  T(s, "PRESENTATION 2024", 11.125, 0.403, 1.762, 0.202, { al: "r" });
++}
++
++/** Twitter / Facebook / Instagram glyph row on the cover + closing slides. */
++function socialIcons(s) {
++  S(s, "triangle", 0.428, 6.847, 0.188, 0.158, { fill: WHITE, rot: 135 }); // bird
++  S(s, R, 0.829, 6.82, 0.091, 0.185, { fill: WHITE });                     // f stem
++  S(s, R, 0.783, 6.878, 0.183, 0.042, { fill: WHITE });                    // f bar
++  S(s, RR, 1.098, 6.842, 0.168, 0.168, { line: WHITE, lw: 1, r: 0.045 });  // camera
++  dot(s, 1.157, 6.901, 0.05, WHITE);
++  S(s, LN, 1.437, 6.918, 0.438, 0, { line: WHITE, lw: 0.75 });
++}
++
++/** Flat smartphone mockup: grey chassis, black bezel, black screen, buttons. */
++function phoneMockup(s, x, y, w, h) {
++  S(s, RR, x + 0.034, y, w - 0.068, h, { fill: "808080", r: 0.3 });        // chassis
++  S(s, RR, x + 0.063, y + 0.027, w - 0.126, h - 0.053, { fill: BLACK, r: 0.28 }); // bezel
++  S(s, RR, x + 0.169, y + 0.125, w - 0.338, h - 0.25, { fill: BLACK, r: 0.21 });  // screen
++  S(s, R, x + w - 0.04, y + 1.68, 0.026, 0.387, { fill: "808080" });  // power
++  S(s, R, x + 0.014, y + 1.393, 0.026, 0.31, { fill: "808080" });     // volume up
++  S(s, R, x + 0.014, y + 1.75, 0.026, 0.31, { fill: "808080" });      // volume down
++}
++
++/** Flat desktop-monitor mockup: bezel, blue screen, silver chin, neck, foot. */
++function desktopMockup(s, x, y, w) {
++  const cx = x + w / 2;
++  S(s, R, x + 0.10, y + 0.79, w - 0.20, 2.98, { fill: "121212" });          // bezel
++  S(s, R, x + 0.21, y + 0.90, w - 0.42, 2.76, { fill: BLUE });              // screen
++  S(s, R, x + 0.10, y + 3.77, w - 0.20, 0.47, { fill: "BFC3C8" });          // chin
++  S(s, R, cx - 0.40, y + 4.24, 0.80, 0.62, { fill: "D8DADD" });             // neck
++  S(s, RR, cx - 1.05, y + 4.86, 2.10, 0.16, { fill: "E6E8EA", r: 0.08 });   // foot
++}
++
++/** Flat laptop mockup bleeding off the left edge of slide 26. */
++function laptopMockup(s) {
++  S(s, R, -1.401, 1.613, 7.367, 4.530, { fill: BLACK });   // lid + screen
++  S(s, R, -2.103, 6.143, 8.769, 0.231, { fill: "595959" });// deck
++  S(s, R, 0.966, 6.143, 2.631, 0.046, { fill: "808080" }); // trackpad notch
++}
++
++// ------------------------------------------------------------------ deck
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: "WIDE", width: 13.333, height: 7.5 });
++pptx.layout = "WIDE";
++pptx.theme = { headFontFace: FONT, bodyFontFace: FONT };
++
++function newSlide() {
++  const s = pptx.addSlide();
++  s.background = { color: BLUE };
++  return s;
++}
++
++// --------------------------------------------- slide 01 — cover
++function slide01(s) {
++  T(s, [["O"], ["XIRIS", null, 138]], 6.342, 4.985, 7.875, 4.022, {sz:239, b:1});
++  hdr(s);
++  dot(s, 0.473, 1.264, 0.5, WHITE);
++  ringBold(s, 0.769, 2.361, 2.776, PINK);
++  T(s, "XIRIS", 3.662, 2.781, 4.431, 1.936, {sz:115, b:1});
++  dot(s, 4.731, 2.6, 0.362, CORAL);
++  dot(s, 6.161, 2.6, 0.362, CORAL);
++  ringThin(s, 9.163, 1.205, 1.581, WHITE);
++  ringBold(s, 4.351, 5.304, 0.586, PINK);
++  ringBold(s, 8.448, 4.071, 0.586, PINK);
++  T(s, "Modern Business", 8.448, 4.994, 2.541, 0.337, {sz:20, b:1});
++  T(s, "Ipsum consequat nisl vel pretium lectus quam id. Lectus nulla at volutpat diam ut. Ultricies mi eget mauris pharetra et ultrices.", 8.448, 5.414, 3.989, 0.881, {lh:1.5});
++  socialIcons(s);
++  S(s, LN, 1.437, 6.918, 0.438, 0, {line:WHITE, lw:0.75});
++  dot(s, 12.41, 3.249, 0.5, WHITE);
++  S(s, LN, 0, 3.535, 0.314, 0.002, {line:WHITE, lw:6});
++  S(s, LN, 0, 3.749, 0.446, 0, {line:WHITE, lw:6});
++  S(s, LN, 0, 3.962, 0.314, 0.002, {line:WHITE, lw:6});
++}
++
++// --------------------------------------------- slide 02 — welcome to our company
++function slide02(s) {
++  hdr(s);
++  T(s, "Sit amet consectetur adipiscing elit duis. Cursus eget nunc scelerisque viverra mauris in aliquam sem fringilla. Lorem donec massa sapien faucibus et. Vel orci porta non pulvinar neque laoreet suspendisse interdum. Praesent tristique magna sit amet purus gravida.", 0.446, 3.496, 6.1, 1.184, {lh:1.5});
++  T(s, [["WELCOME"], [" TO OUR", WHITE]], 0.446, 1.733, 6.293, 0.774, {sz:46, b:1, c:PINK});
++  T(s, "COMPANY", 0.446, 2.462, 3.758, 0.774, {sz:46, b:1});
++  T(s, "Your Title Here", 0.446, 5.25, 1.747, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 0.446, 5.605, 2.399, 0.578, {lh:1.5});
++  T(s, "Your Title Here", 4.073, 5.25, 1.747, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 4.073, 5.605, 2.399, 0.578, {lh:1.5});
++  S(s, R, 8.231, 0.995, 4.049, 5.934, {line:PINK});
++  ringBold(s, 7.287, 4.647, 0.586, PINK);
++  dot(s, 3.911, 0.515, 0.438, WHITE);
++  ringThin(s, 1.046, 6.733, 1.548, WHITE);
++}
++
++// --------------------------------------------- slide 03 — about company
++function slide03(s) {
++  hdr(s);
++  T(s, "Sit amet consectetur adipiscing elit duis. Cursus eget nunc scelerisque viverra mauris in aliquam sem fringilla. Lorem donec massa sapien faucibus et. Vel orci porta non pulvinar neque laoreet suspendisse interdum. Praesent tristique magna sit amet purus gravida.", 6.787, 2.689, 6.1, 1.184, {lh:1.5});
++  T(s, [["ABOUT"], [" COMPANY", WHITE]], 6.787, 1.589, 6.026, 0.774, {sz:46, b:1, c:PINK});
++  T(s, "Your Title Here", 6.787, 5.402, 1.747, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 6.787, 5.757, 2.399, 0.578, {lh:1.5});
++  T(s, "Your Title Here", 10.414, 5.402, 1.747, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 10.414, 5.757, 2.399, 0.578, {lh:1.5});
++  T(s, "Sit amet consectetur adipiscing elit duis. Cursus eget nunc scelerisque viverra mauris in aliquam sem fringilla.", 6.787, 4.112, 6.1, 0.578, {lh:1.5});
++  ringThin(s, 5.059, 0.32, 1.581, WHITE);
++  ringBold(s, 12.301, 4.69, 0.586, PINK);
++  dot(s, 8.636, 7.184, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 04 — company history
++function slide04(s) {
++  hdr(s);
++  T(s, [["COMPANY "], ["HISTORY", PINK]], 0.446, 1.371, 6.529, 0.774, {sz:46, b:1});
++  T(s, "Sit amet consectetur adipiscing elit duis. Cursus eget nunc scelerisque viverra mauris in aliquam sem fringilla. Lorem donec massa sapien faucibus et. Vel orci porta non pulvinar neque.", 8.667, 1.166, 3.951, 1.184, {lh:1.5});
++  dot(s, 12.682, 2.793, 0.438, WHITE);
++  ringBold(s, 2.596, 0.96, 0.411, PINK);
++  ringThin(s, -0.371, 6.296, 1.581, WHITE);
++}
++
++// --------------------------------------------- slide 05 — company profile
++function slide05(s) {
++  S(s, R, 7.268, 1.685, 5.012, 4.891, {line:PINK});
++  S(s, R, 8.167, 2.751, 5.167, 4.749, {fill:PINK});
++  hdr(s);
++  T(s, [["COMPANY "], ["PROFILE", PINK]], 0.446, 1.685, 6.319, 0.774, {sz:46, b:1});
++  T(s, "Sit amet consectetur adipiscing elit duis. Cursus eget nunc scelerisque viverra mauris in aliquam sem fringilla. Lorem donec massa sapien faucibus et. Vel orci porta non pulvinar neque laoreet suspendisse interdum. Praesent tristique magna sit amet purus gravida.", 0.446, 4.781, 6.1, 1.184, {lh:1.5});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent elementum elit vel erat tempus malesuada. Pellentesque vehicula eget ex ac.", 0.446, 3.014, 6.1, 1.486, {lh:1.5});
++  ringBold(s, 0.459, 6.478, 0.586, PINK);
++  ringThin(s, 3.489, -0.696, 1.581, WHITE);
++  dot(s, 6.47, 4.267, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 06 — timeline 2019
++function slide06(s) {
++  hdr(s);
++  T(s, "OUR BEST", 0.446, 2.334, 3.338, 0.774, {sz:46, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat.", 0.446, 4.285, 4.975, 0.881, {lh:1.5});
++  T(s, "TIMELINE EVER", 0.446, 3.079, 4.72, 0.774, {sz:46, b:1, c:PINK});
++  S(s, LN, 6.667, 2.511, 0.005, 4.989, {line:WHITE, lw:3});
++  S(s, E, 6.044, 1.266, 1.245, 1.245, {line:WHITE, lw:8});
++  T(s, "Your Title Here", 7.679, 2.395, 1.747, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. ", 7.679, 2.75, 5.198, 0.881, {lh:1.5});
++  T(s, "2019", 7.679, 1.535, 1.669, 0.774, {sz:46, b:1});
++  ringThin(s, -0.317, 6.575, 1.581, WHITE);
++  ringBold(s, 11.595, 1.944, 0.586, PINK);
++  dot(s, 2.806, 1.251, 0.438, WHITE);
++  bulb(s, 6.376, 1.595, 0.581, PINK);
++}
++
++// --------------------------------------------- slide 07 — timeline 2025 + progress bars
++function slide07(s) {
++  hdr(s);
++  S(s, LN, 6.667, 0, 0.005, 4.989, {line:WHITE, lw:3});
++  S(s, E, 6.044, 4.989, 1.245, 1.245, {line:WHITE, lw:8});
++  T(s, "OUR BEST", 0.446, 4.462, 3.338, 0.774, {sz:46, b:1});
++  T(s, "TIMELINE EVER", 0.446, 5.207, 4.72, 0.774, {sz:46, b:1, c:PINK});
++  T(s, "Your Title Here", 7.679, 2.395, 1.747, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. ", 7.679, 2.75, 5.198, 0.881, {lh:1.5});
++  T(s, "2025", 7.679, 1.535, 1.865, 0.774, {sz:46, b:1});
++  S(s, LN, 7.774, 4.804, 3.5, 0, {line:WHITE, lw:7});
++  S(s, LN, 7.774, 4.804, 3.062, 0, {line:PINK, lw:7});
++  S(s, LN, 7.774, 5.716, 3.5, 0, {line:WHITE, lw:7});
++  S(s, LN, 7.774, 5.716, 2.881, 0, {line:PINK, lw:7});
++  T(s, "Leadership On Corporate", 7.774, 4.445, 2.119, 0.202);
++  T(s, "Decision Maker", 7.774, 5.357, 1.318, 0.202);
++  T(s, "87%", 10.723, 5.273, 0.536, 0.303, {sz:18, al:'r'});
++  T(s, "92%", 10.722, 4.354, 0.552, 0.303, {sz:18, al:'r'});
++  ringThin(s, 8.553, -0.745, 1.581, WHITE);
++  ringBold(s, 12.301, 6.511, 0.586, PINK);
++  dot(s, 2.831, 6.288, 0.438, WHITE);
++  plane(s, 6.342, 5.321, 0.581, PINK);
++}
++
++// --------------------------------------------- slide 08 — our services (image left)
++function slide08(s) {
++  hdr(s);
++  T(s, [["OUR "], ["SERVICES", PINK]], 7.235, 1.771, 4.775, 0.774, {sz:46, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 7.235, 2.683, 5.431, 1.184, {lh:1.5});
++  T(s, "Service One", 7.235, 4.963, 1.465, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod.", 7.235, 5.289, 2.129, 0.808, {sz:11, lh:1.5});
++  T(s, "Service Two", 10.339, 4.968, 1.465, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod.", 10.339, 5.294, 2.129, 0.808, {sz:11, lh:1.5});
++  gear(s, 7.174, 4.363, 0.534, PINK);
++  target(s, 10.339, 4.363, 0.534, PINK);
++  ringThin(s, 5.949, 0.092, 1.581, WHITE);
++  ringBold(s, 8.782, 6.511, 0.586, PINK);
++  dot(s, 13.115, 3.649, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 09 — our services (pink panel left)
++function slide09(s) {
++  S(s, R, 0, 0, 2.307, 7.5, {fill:PINK});
++  hdr(s);
++  T(s, [["OUR "], ["SERVICES", PINK]], 7.235, 1.536, 4.775, 0.774, {sz:46, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 7.235, 2.448, 5.431, 1.184, {lh:1.5});
++  dot(s, 7.235, 4.248, 0.438, WHITE);
++  T(s, "01", 7.272, 4.28, 0.353, 0.321, {sz:14, b:1, al:'c', lh:1.5, va:'m', c:PINK});
++  T(s, "Your Awesome Title Here", 7.875, 4.248, 2.847, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae.", 7.875, 4.596, 5.012, 0.53, {sz:11, lh:1.5});
++  dot(s, 7.235, 5.565, 0.438, WHITE);
++  T(s, "02", 7.247, 5.592, 0.405, 0.321, {sz:14, b:1, al:'c', lh:1.5, va:'m', c:PINK});
++  T(s, "Your Awesome Title Here", 7.875, 5.565, 2.847, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae.", 7.875, 5.914, 5.012, 0.53, {sz:11, lh:1.5});
++  ringThin(s, 5.76, 6.551, 1.581, WHITE);
++  dot(s, 1.243, 1.538, 0.438, WHITE);
++  ringBold(s, 8.408, 0.312, 0.586, PINK);
++}
++
++// --------------------------------------------- slide 10 — our services (pink panel right)
++function slide10(s) {
++  S(s, R, 10.312, 0, 3.01, 7.5, {fill:PINK});
++  hdr(s);
++  T(s, [["OUR "], ["SERVICES", PINK]], 0.446, 1.771, 4.775, 0.774, {sz:46, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 0.446, 2.683, 5.431, 1.184, {lh:1.5});
++  T(s, "Service One", 0.446, 4.963, 1.465, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod.", 0.446, 5.289, 2.129, 0.808, {sz:11, lh:1.5});
++  T(s, "Service Two", 3.55, 4.968, 1.465, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod.", 3.55, 5.294, 2.129, 0.808, {sz:11, lh:1.5});
++  gear(s, 0.384, 4.363, 0.534, PINK);
++  target(s, 3.55, 4.363, 0.534, PINK);
++  ringBold(s, 2.576, 6.511, 0.586, PINK);
++  ringThin(s, 7.449, -0.658, 1.581, WHITE);
++  dot(s, 9.478, 5.978, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 11 — SWOT - strength
++function slide11(s) {
++  hdr(s);
++  T(s, "S", 1.436, 1.123, 2.722, 5.789, {sz:344, b:1});
++  S(s, R, 0.806, 1.495, 3.984, 4.672, {line:PINK});
++  T(s, "STRENGHT BRAND", 6.349, 1.69, 5.188, 0.673, {sz:40, b:1, c:PINK});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Dignissim diam quis enim lobortis. Tincidunt tortor aliquam nulla facilisi cras fermentum odio. In vitae turpis massa sed elementum tempus egestas. Sed lectus vestibulum mattis ullamcorper velit sed. Elit duis tristique sollicitudin.", 6.349, 3.342, 6.179, 1.538, {lh:1.5});
++  T(s, "9.97K", 6.349, 5.406, 0.984, 0.404, {sz:24, b:1});
++  T(s, "97.550", 8.41, 5.402, 1.232, 0.404, {sz:24, b:1});
++  T(s, "95%", 10.331, 5.402, 0.78, 0.404, {sz:24, b:1});
++  T(s, "Completed Projects", 6.349, 5.802, 1.704, 0.202);
++  T(s, "Happy Customers", 8.41, 5.802, 1.539, 0.202);
++  T(s, "Mission Completed", 10.331, 5.802, 1.644, 0.202);
++  T(s, "MANUAL ANALYSIS", 6.349, 2.348, 5.355, 0.673, {sz:40, b:1, c:GREY});
++}
++
++// --------------------------------------------- slide 12 — SWOT - weakness
++function slide12(s) {
++  hdr(s);
++  T(s, "W", 7.997, 1.983, 4.89, 4.022, {sz:239, b:1, al:'c'});
++  S(s, R, 8.45, 1.495, 3.984, 4.672, {line:PINK});
++  T(s, "WEAKNESS BRAND", 0.446, 1.47, 5.188, 0.673, {sz:40, b:1, c:PINK});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Dignissim diam quis enim lobortis. Tincidunt tortor aliquam nulla facilisi cras fermentum odio.", 0.446, 3.122, 6.179, 0.881, {lh:1.5});
++  T(s, "MANUAL ANALYSIS", 0.446, 2.127, 5.355, 0.673, {sz:40, b:1, c:GREY});
++  dot(s, 0.446, 4.473, 0.438, WHITE);
++  T(s, "01", 0.483, 4.505, 0.353, 0.321, {sz:14, b:1, al:'c', lh:1.5, va:'m', c:PINK});
++  T(s, "Your Awesome Title Here", 1.086, 4.473, 2.847, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 1.086, 4.822, 4.088, 0.252, {sz:11, lh:1.5});
++  dot(s, 0.446, 5.429, 0.438, WHITE);
++  T(s, "02", 0.457, 5.456, 0.405, 0.321, {sz:14, b:1, al:'c', lh:1.5, va:'m', c:PINK});
++  T(s, "Your Awesome Title Here", 1.086, 5.429, 2.847, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 1.086, 5.778, 4.088, 0.252, {sz:11, lh:1.5});
++}
++
++// --------------------------------------------- slide 13 — SWOT - opportunity
++function slide13(s) {
++  hdr(s);
++  T(s, "O", 1.193, 1.521, 3.209, 4.83, {sz:287, b:1, al:'c'});
++  S(s, R, 0.806, 1.495, 3.984, 4.672, {line:PINK});
++  T(s, "OPPORTUNITY BRAND", 6.349, 1.521, 6.016, 0.673, {sz:40, b:1, c:PINK});
++  T(s, "MANUAL ANALYSIS", 6.349, 2.178, 5.355, 0.673, {sz:40, b:1, c:GREY});
++  dot(s, 6.349, 3.388, 0.438, WHITE);
++  T(s, "01", 6.386, 3.42, 0.353, 0.321, {sz:14, b:1, al:'c', lh:1.5, va:'m', c:PINK});
++  T(s, "Personal Branding", 6.989, 3.388, 2.089, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Dignissim diam quis enim lobortis. Tincidunt tortor aliquam nulla facilisi cras fermentum odio.", 6.989, 3.737, 5.539, 0.808, {sz:11, lh:1.5});
++  dot(s, 6.349, 5.081, 0.438, WHITE);
++  T(s, "02", 6.36, 5.108, 0.405, 0.321, {sz:14, b:1, al:'c', lh:1.5, va:'m', c:PINK});
++  T(s, "Digital Marketing", 6.989, 5.081, 1.985, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Dignissim diam quis enim lobortis. Tincidunt tortor aliquam nulla facilisi cras fermentum odio.", 6.989, 5.43, 5.539, 0.808, {sz:11, lh:1.5});
++}
++
++// --------------------------------------------- slide 14 — SWOT - threats
++function slide14(s) {
++  hdr(s);
++  T(s, "T", 7.997, 1.596, 4.89, 4.83, {sz:287, b:1, al:'c'});
++  S(s, R, 8.45, 1.495, 3.984, 4.672, {line:PINK});
++  T(s, "THREATS BRAND", 0.446, 1.389, 5.188, 0.673, {sz:40, b:1, c:PINK});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Dignissim diam quis enim lobortis. Tincidunt tortor aliquam nulla facilisi cras fermentum odio. In vitae turpis massa sed elementum tempus egestas. Sed lectus vestibulum mattis ullamcorper velit sed. Elit duis tristique sollicitudin.", 0.446, 3.227, 6.48, 1.487, {lh:1.5});
++  T(s, "MANUAL ANALYSIS", 0.446, 2.046, 5.355, 0.673, {sz:40, b:1, c:GREY});
++  T(s, "Your Title Here", 0.446, 5.234, 1.747, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 0.446, 5.589, 2.399, 0.578, {lh:1.5});
++  T(s, "Your Title Here", 4.073, 5.234, 1.747, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 4.073, 5.589, 2.399, 0.578, {lh:1.5});
++}
++
++// --------------------------------------------- slide 15 — Alexa Felicia profile
++function slide15(s) {
++  S(s, DI, 1, 1.073, 5.354, 5.354, {line:PINK});
++  hdr(s);
++  S(s, DI, 0.446, 1.073, 5.354, 5.354, {fill:PINK});
++  T(s, [["ALEXA "], ["FELICIA", PINK]], 7.231, 1.585, 4.775, 0.774, {sz:46, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 7.231, 3.207, 5.431, 1.184, {lh:1.5});
++  T(s, [["FOUNDER OF "], ["OXIRIS", PINK]], 7.231, 2.421, 2.665, 0.303, {sz:18, b:1});
++  T(s, "Designer", 7.231, 5.054, 1.097, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, do.", 7.231, 5.38, 2.377, 0.53, {sz:11, lh:1.5});
++  T(s, "Marketing", 10.441, 5.059, 1.24, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, do.", 10.441, 5.385, 2.377, 0.53, {sz:11, lh:1.5});
++  dot(s, 1.046, 5.645, 0.438, WHITE);
++  ringBold(s, 5.359, 0.605, 0.586, PINK);
++  ringThin(s, 9.156, 6.483, 1.581, WHITE);
++}
++
++// --------------------------------------------- slide 16 — our amazing team
++function slide16(s) {
++  S(s, R, 4.874, 3.376, 3.585, 2.235, {line:PINK});
++  S(s, R, 0.806, 3.36, 3.032, 2.734, {line:PINK});
++  S(s, R, 9.495, 2.889, 3.032, 2.734, {line:PINK});
++  hdr(s);
++  T(s, [["OUR "], ["AMAZING TEAM", PINK]], 3.244, 1.132, 6.846, 0.774, {sz:46, b:1, al:'c'});
++  T(s, "Sit amet consectetur adipiscing elit duis. Cursus eget nunc scelerisque viverra mauris in aliquam sem fringilla. Lorem donec massa sapien faucibus et. Vel orci porta non pulvinar neque.", 2.371, 1.906, 8.592, 0.578, {al:'c', lh:1.5});
++  T(s, "FELIX DASMOND", 1.307, 6.273, 2.52, 0.337, {sz:20, b:1, al:'c'});
++  T(s, "DIRECTOR COMPANY", 1.59, 6.688, 1.954, 0.202, {b:1, al:'c', c:PINK});
++  T(s, "CATNESS CLARE", 5.407, 6.273, 2.52, 0.337, {sz:20, b:1, al:'c'});
++  T(s, "FINANCE LEAD", 5.917, 6.688, 1.5, 0.202, {b:1, al:'c', c:PINK});
++  T(s, "CHARLIE MONK", 9.506, 6.273, 2.52, 0.337, {sz:20, b:1, al:'c'});
++  T(s, "MARKETING MANAGER", 9.683, 6.688, 2.166, 0.202, {b:1, al:'c', c:PINK});
++  ringBold(s, 0.897, 1.226, 0.586, PINK);
++  ringThin(s, 12.437, 1.069, 1.581, WHITE);
++  dot(s, 4.154, 7.281, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 17 — your style
++function slide17(s) {
++  hdr(s);
++  S(s, R, 7.268, 1.754, 5.012, 4.788, {line:PINK});
++  T(s, [["YOUR "], ["STYLE", PINK]], 0.446, 2.229, 4.179, 0.774, {sz:46, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 0.446, 3.141, 6.22, 1.184, {lh:1.5});
++  T(s, "READ MORE", 0.567, 4.93, 1.441, 0.236, {sz:14, b:1, al:'c'});
++  S(s, R, 0.446, 4.825, 1.682, 0.446, {line:PINK});
++  ringThin(s, 4.829, -0.478, 1.581, WHITE);
++  ringBold(s, 5.479, 5.048, 0.586, PINK);
++  dot(s, 0.446, 6.66, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 18 — new concept
++function slide18(s) {
++  hdr(s);
++  T(s, [["NEW "], ["CONCEPT", PINK]], 0.446, 1.729, 4.946, 0.774, {sz:46, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet.", 0.446, 2.641, 6.75, 0.881, {lh:1.5});
++  S(s, R, 0.446, 4.127, 7.338, 2.755, {fill:PINK});
++  T(s, "Design", 1.102, 5.247, 0.909, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc.", 1.102, 5.573, 2.517, 0.808, {sz:11, lh:1.5});
++  T(s, "Concept", 4.713, 5.252, 1.085, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc.", 4.713, 5.578, 2.477, 0.808, {sz:11, lh:1.5});
++  bulb(s, 4.628, 4.634, 0.569, WHITE);
++  venn(s, 1.046, 4.624, 0.6, WHITE);
++  dot(s, 7.566, 1.095, 0.438, WHITE);
++  ringBold(s, 2.943, 0.344, 0.586, PINK);
++}
++
++// --------------------------------------------- slide 19 — our portfolio (3 up)
++function slide19(s) {
++  hdr(s);
++  T(s, [["OUR "], ["PORTFOLIO", PINK]], 6.941, 1.645, 5.322, 0.774, {sz:46, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 6.941, 2.755, 5.946, 1.184, {lh:1.5});
++  dot(s, 6.941, 4.515, 0.438, WHITE);
++  T(s, "01", 6.978, 4.547, 0.353, 0.321, {sz:14, b:1, al:'c', lh:1.5, va:'m', c:PINK});
++  T(s, "Your Awesome Title Here", 7.581, 4.515, 2.847, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 7.581, 4.864, 4.088, 0.252, {sz:11, lh:1.5});
++  dot(s, 6.941, 5.471, 0.438, WHITE);
++  T(s, "02", 6.952, 5.498, 0.405, 0.321, {sz:14, b:1, al:'c', lh:1.5, va:'m', c:PINK});
++  T(s, "Your Awesome Title Here", 7.581, 5.471, 2.847, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 7.581, 5.82, 4.088, 0.252, {sz:11, lh:1.5});
++  S(s, R, 4.607, 1.233, 1.496, 5.653, {line:PINK});
++  ringThin(s, 6.566, -0.987, 1.581, WHITE);
++  ringBold(s, 12.12, 4.293, 0.586, PINK);
++  dot(s, 9.165, 7.281, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 20 — our portfolio (grid)
++function slide20(s) {
++  S(s, R, 10.5, 2.427, 2.833, 5.073, {fill:PINK});
++  hdr(s);
++  T(s, [["OUR "], ["PORTFOLIO", PINK]], 0.446, 1.799, 5.322, 0.774, {sz:46, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent elementum elit vel erat tempus malesuada.", 0.446, 2.909, 5.618, 1.487, {lh:1.5});
++  T(s, "Your Awesome Title Here", 0.446, 4.823, 2.847, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae.", 0.446, 5.171, 5.012, 0.53, {sz:11, lh:1.5});
++  S(s, R, 5.768, 6.352, 2.016, 0.53, {fill:PINK});
++  T(s, "Best Of 2025", 5.951, 6.483, 1.652, 0.269, {sz:16, b:1, al:'c'});
++  dot(s, -0.143, 7.199, 0.438, WHITE);
++  ringThin(s, 2.701, -0.987, 1.581, WHITE);
++  ringBold(s, 5.701, 4.293, 0.586, PINK);
++}
++
++// --------------------------------------------- slide 21 — portfolio gallery
++function slide21(s) {
++  S(s, R, 3.634, 0, 2.876, 7.5, {fill:PINK, alpha:40});
++  hdr(s);
++  ringThin(s, 7.47, -0.987, 1.581, WHITE);
++  ringBold(s, 11.159, 7.14, 0.586, PINK);
++}
++
++// --------------------------------------------- slide 22 — best style product
++function slide22(s) {
++  S(s, R, 6.847, 3.302, 5.913, 3.584, {line:PINK});
++  hdr(s);
++  T(s, "BEST STYLE", 0.446, 1.209, 3.998, 0.808, {sz:48, b:1});
++  T(s, "PRODUCT", 0.446, 2.013, 3.559, 0.808, {sz:48, b:1, c:PINK});
++  T(s, "Quality Service", 7.95, 4.547, 2.25, 0.337, {sz:20, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent elementum elit vel erat tempus.", 7.95, 5.022, 4.582, 1.363, {sz:11, lh:1.5});
++  ringBold(s, 4.748, 2.336, 0.586, PINK);
++  ringThin(s, 2.522, -1.163, 1.581, WHITE);
++}
++
++// --------------------------------------------- slide 23 — branding concept
++function slide23(s) {
++  S(s, R, 4.986, 1.217, 7.901, 5.547, {line:PINK});
++  hdr(s);
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 6.496, 3.76, 5.946, 1.184, {lh:1.5});
++  T(s, "BRANDING", 6.496, 1.811, 3.872, 0.808, {sz:48, b:1});
++  T(s, "CONCEPT", 6.496, 2.615, 3.559, 0.808, {sz:48, b:1, c:PINK});
++  T(s, "85%", 6.496, 5.572, 0.984, 0.404, {sz:24, b:1});
++  T(s, "3.6K", 8.557, 5.569, 0.894, 0.404, {sz:24, b:1});
++  T(s, "987", 10.478, 5.569, 0.78, 0.404, {sz:24, b:1});
++  T(s, "Lorem ipsum dolor", 6.496, 5.968, 1.629, 0.202);
++  T(s, "Lorem ipsum dolor", 8.557, 5.968, 1.539, 0.202);
++  T(s, "Lorem ipsum dolor", 10.478, 5.968, 1.595, 0.202);
++  ringThin(s, 0.356, 6.709, 1.581, WHITE);
++  ringBold(s, 3.904, 0.517, 0.586, PINK);
++  dot(s, 12.224, 1.592, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 24 — smartphone mockup
++function slide24(s) {
++  hdr(s);
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet.", 0.446, 4.403, 4.804, 1.184, {lh:1.5});
++  T(s, "SMARTPHONE", 0.446, 2.454, 4.915, 0.808, {sz:48, b:1});
++  T(s, "MOCKUP", 0.446, 3.258, 3.415, 0.808, {sz:48, b:1, c:PINK});
++  phoneMockup(s, 5.6, 1.342, 2.856, 5.358);
++  S(s, E, 8.956, 1.614, 0.683, 0.683, {line:WHITE, lw:5});
++  plane(s, 9.119, 1.796, 0.319, PINK);
++  T(s, "Keyword", 9.948, 1.556, 1.104, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae.", 9.948, 1.905, 2.912, 0.808, {sz:11, lh:1.5});
++  S(s, E, 8.956, 3.5, 0.683, 0.683, {line:WHITE, lw:5});
++  T(s, "Keyword", 9.948, 3.443, 1.104, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae.", 9.948, 3.791, 2.912, 0.808, {sz:11, lh:1.5});
++  S(s, E, 8.956, 5.387, 0.683, 0.683, {line:WHITE, lw:5});
++  T(s, "Keyword", 9.948, 5.329, 1.104, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae.", 9.948, 5.678, 2.912, 0.808, {sz:11, lh:1.5});
++  bulb(s, 9.109, 5.54, 0.377, PINK);
++  target(s, 9.109, 3.653, 0.377, PINK);
++  dot(s, 0.969, 1.248, 0.438, WHITE);
++  ringThin(s, 3.335, 6.709, 1.581, WHITE);
++  ringBold(s, 8.692, -0.293, 0.586, PINK);
++}
++
++// --------------------------------------------- slide 25 — desktop mockup
++function slide25(s) {
++  desktopMockup(s, 7.042, 1.021, 5.458);
++  S(s, R, 2.564, 4.798, 2.016, 1.025, {fill:PINK});
++  hdr(s);
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent elementum elit vel erat tempus.", 0.446, 2.961, 5.661, 1.487, {lh:1.5});
++  T(s, [["DESKTOP "], ["MOCKUP", PINK]], 0.446, 1.871, 5.845, 0.74, {sz:44, b:1});
++  T(s, "85%", 0.446, 5.032, 0.984, 0.404, {sz:24, b:1});
++  T(s, "Lorem ipsum dolor", 0.446, 5.428, 1.629, 0.202);
++  T(s, "3.6K", 2.84, 5.028, 0.894, 0.404, {sz:24, b:1});
++  T(s, "Lorem ipsum dolor", 2.84, 5.428, 1.465, 0.202);
++  ringBold(s, 6.124, 4.644, 0.586, PINK);
++  ringThin(s, 2.999, -0.701, 1.581, WHITE);
++  dot(s, 0.286, 6.772, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 26 — laptop mockup
++function slide26(s) {
++  laptopMockup(s);
++  hdr(s);
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent elementum elit vel erat tempus.", 7.192, 2.948, 5.661, 1.487, {lh:1.5});
++  T(s, [["LAPTOP "], ["MOCKUP", PINK]], 7.192, 1.857, 5.49, 0.74, {sz:44, b:1});
++  T(s, "Your Awesome Title Here", 7.192, 4.785, 2.847, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae.", 7.192, 5.133, 5.695, 0.53, {sz:11, lh:1.5});
++  ringThin(s, 10.722, 6.545, 1.581, WHITE);
++  ringBold(s, 8.707, 0.628, 0.586, PINK);
++  dot(s, 2.181, 0.957, 0.438, WHITE);
++}
++
++// --------------------------------------------- slide 27 — column chart
++// The reference draws this chart as flat shapes (there is no embedded chart
++// part), so it is rebuilt the same way from the series data below.
++const CHART_MONTHS = ["January", "February", "March", "April", "May", "June",
++                      "July", "August", "September", "Oktober", "November", "December"];
++const CHART_VALUES = [43, 25, 35, 45, 24, 44, 18, 28, 20, 20, 30, 50];
++const CHART_HILITE = 3;   // April is called out in white
++const AXIS_Y = 6.486;     // baseline
++const UNIT   = 0.06009;   // inches per chart unit
++
++function slide27(s) {
++  hdr(s);
++  T(s, [["COLLUMN "], ["CHART", PINK]], 3.244, 1.132, 6.846, 0.774, {sz:46, b:1, al:'c'});
++  T(s, "Sit amet consectetur adipiscing elit duis. Cursus eget nunc scelerisque viverra mauris in aliquam sem fringilla. Lorem donec massa sapien faucibus et. Vel orci porta non pulvinar neque.", 2.371, 1.906, 8.592, 0.578, {al:'c', lh:1.5});
++
++  CHART_VALUES.forEach(function (v, i) {
++    const cx = 1.681 + i * 0.9301, h = v * UNIT;       // bar centre + height
++    S(s, R, cx - 0.1455, AXIS_Y - h, 0.291, h, { fill: i === CHART_HILITE ? WHITE : PINK });
++    T(s, String(v), cx - 0.1455, AXIS_Y - h - 0.294, 0.291, 0.202, { al: 'c' });
++    T(s, CHART_MONTHS[i], cx - 0.45, AXIS_Y + 0.101, 0.9, 0.185, { sz: 11, al: 'c' });
++  });
++
++  S(s, LN, 1.177, AXIS_Y, 11.208, 0, {line:WHITE, lw:0.75});
++  for (let v = 0; v <= 60; v += 10) {                   // y-axis scale
++    T(s, String(v), 0.588, AXIS_Y - v * UNIT - 0.101, 0.5, 0.202, { al: 'r' });
++  }
++}
++
++// --------------------------------------------- slide 28 — our infographic
++function slide28(s) {
++  hdr(s);
++  S(s, DI, 5.097, 3.229, 1.569, 1.569, {fill:PINK});
++  S(s, DI, 6.667, 3.229, 1.569, 1.569, {fill:PINK});
++  S(s, DI, 5.097, 4.798, 1.569, 1.569, {fill:PINK});
++  S(s, DI, 6.667, 4.798, 1.569, 1.569, {fill:PINK});
++  T(s, [["OUR "], ["INFOGRAPHIC", PINK]], 3.244, 1.132, 6.846, 0.774, {sz:46, b:1, al:'c'});
++  T(s, "Sit amet consectetur adipiscing elit duis. Cursus eget nunc scelerisque viverra mauris in aliquam sem fringilla. Lorem donec massa sapien faucibus et. Vel orci porta non pulvinar neque.", 2.371, 1.906, 8.592, 0.578, {al:'c', lh:1.5});
++  T(s, "About One", 8.739, 3.574, 1.35, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus.", 8.739, 3.923, 3.727, 0.53, {sz:11, lh:1.5});
++  T(s, "About Two", 8.739, 5.144, 1.35, 0.269, {sz:16, b:1});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus.", 8.739, 5.492, 3.727, 0.53, {sz:11, lh:1.5});
++  T(s, "About Three", 3.025, 3.574, 1.569, 0.269, {sz:16, b:1, al:'r'});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus.", 0.867, 3.923, 3.727, 0.53, {sz:11, al:'r', lh:1.5});
++  T(s, "About Four", 3.244, 5.144, 1.35, 0.269, {sz:16, b:1, al:'r'});
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus.", 0.867, 5.492, 3.727, 0.53, {sz:11, al:'r', lh:1.5});
++  gear(s, 7.196, 3.758, 0.511, WHITE);
++  target(s, 7.196, 5.327, 0.511, WHITE);
++  trophy(s, 5.626, 3.758, 0.511, WHITE);
++  plane(s, 5.626, 5.327, 0.511, WHITE);
++  bulb(s, 6.297, 4.428, 0.74, WHITE);
++}
++
++// --------------------------------------------- slide 29 — contact us
++function slide29(s) {
++  S(s, R, 1, 1.347, 4.968, 6.399, {line:PINK});
++  hdr(s);
++  T(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed molestie dignissim nunc, quis tempus lacus ultrices vitae. Proin porttitor ante at ante hendrerit consequat. Donec molestie tellus ut imperdiet aliquet. Lorem ipsum dolor sit amet, consectetur adipiscing elit.", 6.778, 3.014, 5.946, 1.184, {lh:1.5});
++  T(s, [["CONTACT"], [" US", PINK]], 6.778, 1.869, 4.629, 0.808, {sz:48, b:1});
++  mail(s, 6.778, 4.757, 0.456, WHITE);
++  phone(s, 10.081, 4.757, 0.456, WHITE);
++  map(s, 6.778, 5.709, 0.456, WHITE);
++  clock(s, 10.081, 5.709, 0.456, WHITE);
++  T(s, "oxirisinfo@support.com", 7.372, 4.85, 2.331, 0.236, {sz:14});
++  T(s, "+6764-050-011", 10.669, 4.85, 1.619, 0.236, {sz:14});
++  T(s, "325 East 38th Street, New York, NY, 10019, USA", 7.372, 5.781, 2.331, 0.677, {sz:14, lh:1.5});
++  T(s, "09:00 – 18:00", 10.669, 5.819, 1.414, 0.236, {sz:14});
++  dot(s, 12.083, 1.65, 0.438, WHITE);
++  ringThin(s, 4.387, -0.701, 1.581, WHITE);
++  ringBold(s, 10.376, 7.073, 0.586, PINK);
++}
++
++// --------------------------------------------- slide 30 — thanks
++function slide30(s) {
++  hdr(s);
++  S(s, LN, 0, 3.535, 0.314, 0.002, {line:WHITE, lw:6});
++  S(s, LN, 0, 3.749, 0.446, 0, {line:WHITE, lw:6});
++  S(s, LN, 0, 3.962, 0.314, 0.002, {line:WHITE, lw:6});
++  T(s, "HANKS", 2.767, 2.781, 5.681, 1.935, {sz:115, b:1});
++  T(s, "T", 0.349, 1.334, 2.807, 4.83, {sz:287, b:1, al:'c', c:PINK});
++  T(s, [["O"], ["XIRIS", null, 138]], 6.342, 4.985, 7.875, 4.022, {sz:239, b:1});
++  T(s, "Modern Business", 8.448, 4.994, 2.541, 0.337, {sz:20, b:1});
++  T(s, "Ipsum consequat nisl vel pretium lectus quam id. Lectus nulla at volutpat diam ut. Ultricies mi eget mauris pharetra et ultrices.", 8.448, 5.414, 3.989, 0.881, {lh:1.5});
++  dot(s, 0.473, 1.264, 0.5, WHITE);
++  ringThin(s, 6.867, 0.555, 1.581, WHITE);
++  ringBold(s, 4.351, 5.304, 0.586, PINK);
++  ringBold(s, 8.448, 4.071, 0.586, PINK);
++  dot(s, 11.938, 2.702, 0.5, WHITE);
++  socialIcons(s);
++  S(s, LN, 1.437, 6.918, 0.438, 0, {line:WHITE, lw:0.75});
++}
++
++
++// ------------------------------------------------------------------ build
++const builders = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
++  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
++  slide25, slide26, slide27, slide28, slide29, slide30,
++];
++builders.forEach(function (build) { build(newSlide()); });
++
++pptx.writeFile({
++  fileName: path.join(__dirname, "188f4e5f-cd1f-47c1-9c6b-fe2e2bc285b3_grok_final.pptx"),
++}).then(function (f) { console.log("wrote " + f); });

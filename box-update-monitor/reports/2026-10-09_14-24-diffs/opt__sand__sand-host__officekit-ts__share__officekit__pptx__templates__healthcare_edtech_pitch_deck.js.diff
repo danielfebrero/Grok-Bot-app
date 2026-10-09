@@ -1,0 +1,690 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_edtech_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_edtech_pitch_deck.js
+@@ -0,0 +1,687 @@
++#!/usr/bin/env node
++/**
++ * "Healthcare" pitch deck - rebuilt from scratch with pptxgenjs.
++ *
++ * 10 slides, 13.333in x 7.5in (16:9 widescreen), white background.
++ * The reference deck's raster/vector assets are not embedded: every icon and
++ * decorative graphic below is drawn with native pptxgenjs shapes.
++ *
++ * Run: node 0d2ac28e-6c08-4517-a67e-7731d85f1cb2_grok_final.js
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const C = {
++  purple: '5937EE', // primary brand purple
++  purpleAlt: '5F3DEF', // icon tiles
++  lilac: '7F64F2', // secondary purple
++  lilacPale: 'AD9BF7',
++  ice: 'F0F4FF', // pale blue chip / card background
++  yellow: 'FBDA3B',
++  amber: 'FFC000',
++  coral: 'EF6E70',
++  black: '000000',
++  ink: '0F0F0F',
++  white: 'FFFFFF',
++  white85: 'D9D9D9', // white @ 85% luminance
++  white65: 'A6A6A6', // white @ 65% luminance
++  white50: '7F7F7F', // white @ 50% luminance
++  silver: 'E8E8E8',
++  smoke: 'F2F2F2',
++};
++
++const SANS = 'DM Sans';
++const INTER = 'Inter';
++
++const LOREM_FULL =
++  'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. ' +
++  "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, " +
++  'when an unknown printer.';
++const LOREM_TAIL =
++  '\u00a0is simply dummy text of the printing and typesetting industry. ' +
++  "Lorem Ipsum has been the industry's standard";
++
++/** "**Lorem Ipsum** is simply dummy text ..." run pair used all over the deck. */
++function loremRuns() {
++  return [{ text: 'Lorem Ipsum', options: { bold: true } }, { text: LOREM_TAIL }];
++}
++
++/* --------------------------------------------------------------- helpers */
++
++const NO_LINE = { type: 'none' };
++
++// PowerPoint's default text-box insets, in points, ordered [left, right, bottom, top].
++const INSETS = [7.2, 7.2, 3.6, 3.6];
++
++/** Text box. Defaults match PowerPoint text boxes: top aligned, DM Sans. */
++function txt(slide, content, o) {
++  slide.addText(content, Object.assign(
++    { fontFace: SANS, fontSize: 12, color: C.black, valign: 'top', margin: INSETS },
++    o
++  ));
++}
++
++/** Rounded rectangle; `adj` is the OOXML corner adjustment (fraction of the short side). */
++function rrect(slide, x, y, w, h, fill, adj, more) {
++  slide.addShape('roundRect', Object.assign(
++    { x, y, w, h, fill: { color: fill }, line: NO_LINE, rectRadius: (adj === undefined ? 0.16667 : adj) * Math.min(w, h) },
++    more
++  ));
++}
++
++function oval(slide, x, y, w, h, fill, more) {
++  slide.addShape('ellipse', Object.assign({ x, y, w, h, fill: { color: fill }, line: NO_LINE }, more));
++}
++
++function hline(slide, x, y, w, color, pt) {
++  slide.addShape('line', { x, y, w, h: 0, line: { color, width: pt } });
++}
++
++/* ------------------------------------------------------------------ icons
++ * Line-art glyphs, described inside a 0..1 unit square. Every geometry is
++ * given as a bounding box so it can simply be scaled onto the slide:
++ *   ['l', x1,y1, x2,y2]            stroked line
++ *   ['e', x,y,w,h]                 ellipse outline
++ *   ['E'|'W', x,y,w,h]             ellipse filled with the icon | backdrop color
++ *   ['r', x,y,w,h, rad, rot]       rounded rect outline
++ *   ['R', x,y,w,h, rad, rot]       rounded rect filled
++ *   ['A', x,y,w,h, fromDeg,toDeg]  arc (0deg = 3 o'clock, sweeping clockwise)
++ *   ['P', x,y,w,h, fromDeg,toDeg]  filled pie wedge
++ *   ['V', x,y,w,h]                 backdrop-colored triangle, apex down (knockout)
++ *   ['S'|'s', x,y,w,h]             5-point star filled with icon | backdrop color
++ */
++const ICONS = {
++  stethoscope: [
++    ['l', 0.229, 0.125, 0.229, 0.25], ['l', 0.458, 0.125, 0.458, 0.25], // ear tips
++    ['l', 0.125, 0.23, 0.125, 0.44], ['l', 0.583, 0.23, 0.583, 0.44], // ear tubes
++    ['A', 0.125, 0.208, 0.458, 0.458, 90, 180], // left tube curving into the chest piece
++    ['A', 0.125, 0.208, 0.458, 0.458, 0, 90], // right tube
++    ['A', 0.354, 0.458, 0.438, 0.417, 0, 180], // loop down to the bell
++    ['e', 0.708, 0.500, 0.167, 0.167], // bell
++  ],
++  lungs: [
++    ['l', 0.50, 0.05, 0.50, 0.32],
++    ['l', 0.50, 0.32, 0.27, 0.42], ['l', 0.50, 0.32, 0.73, 0.42],
++    ['A', 0.03, 0.26, 0.48, 0.70, 0, 270], // left lobe, open toward the trachea
++    ['A', 0.49, 0.26, 0.48, 0.70, 270, 180], // right lobe
++  ],
++  syringe: [
++    ['r', 0.28, 0.32, 0.46, 0.24, 0.06, -45], // barrel, angled bottom-left to top-right
++    ['l', 0.05, 0.95, 0.28, 0.72], ['l', 0.70, 0.30, 0.95, 0.05],
++    ['l', 0.64, 0.06, 0.94, 0.36],
++    ['l', 0.41, 0.45, 0.53, 0.57], ['l', 0.31, 0.55, 0.43, 0.67],
++  ],
++  capsule: [
++    ['r', 0.16, 0.34, 0.68, 0.32, 0.16, -45],
++    ['l', 0.38, 0.62, 0.62, 0.38],
++  ],
++  brain: [ // two lobes meeting on the midline, each with a fold
++    ['e', 0.03, 0.10, 0.47, 0.80], ['e', 0.50, 0.10, 0.47, 0.80],
++    ['l', 0.50, 0.10, 0.50, 0.90],
++    ['A', 0.14, 0.26, 0.22, 0.24, 270, 90], ['A', 0.14, 0.52, 0.22, 0.24, 270, 90],
++    ['A', 0.64, 0.26, 0.22, 0.24, 90, 270], ['A', 0.64, 0.52, 0.22, 0.24, 90, 270],
++  ],
++  monitor: [
++    ['r', 0.125, 0.125, 0.750, 0.583, 0.083],
++    ['l', 0.417, 0.708, 0.417, 0.875], ['l', 0.583, 0.708, 0.583, 0.875],
++    ['l', 0.333, 0.875, 0.667, 0.875],
++    ['l', 0.708, 0.396, 0.625, 0.396], ['l', 0.625, 0.396, 0.563, 0.500], // ECG trace
++    ['l', 0.563, 0.500, 0.438, 0.333], ['l', 0.438, 0.333, 0.375, 0.438],
++    ['l', 0.375, 0.438, 0.292, 0.438],
++  ],
++  network: [ // four nodes wired in an open loop (top-left and bottom-right are unlinked)
++    ['e', 0.02, 0.10, 0.26, 0.26], ['e', 0.72, 0.16, 0.26, 0.26],
++    ['e', 0.02, 0.62, 0.26, 0.26], ['e', 0.68, 0.66, 0.26, 0.26],
++    ['l', 0.28, 0.14, 0.72, 0.14], ['l', 0.15, 0.36, 0.15, 0.62],
++    ['l', 0.85, 0.42, 0.85, 0.66], ['l', 0.28, 0.86, 0.68, 0.82],
++  ],
++  chevronRight: [
++    ['l', 0.30, 0.08, 0.76, 0.50], ['l', 0.76, 0.50, 0.30, 0.92],
++  ],
++  cardList: [
++    ['r', 0.06, 0.06, 0.88, 0.88, 0.20],
++    ['r', 0.22, 0.22, 0.28, 0.24, 0.05],
++    ['l', 0.22, 0.62, 0.78, 0.62], ['l', 0.22, 0.78, 0.60, 0.78],
++  ],
++  chartUp: [
++    ['l', 0.10, 0.08, 0.10, 0.90], ['l', 0.10, 0.90, 0.92, 0.90],
++    ['l', 0.24, 0.66, 0.44, 0.46], ['l', 0.44, 0.46, 0.58, 0.60],
++    ['l', 0.58, 0.60, 0.86, 0.26],
++    ['l', 0.86, 0.26, 0.64, 0.26], ['l', 0.86, 0.26, 0.86, 0.46],
++  ],
++  cardList2: [
++    ['r', 0.12, 0.14, 0.76, 0.80, 0.18], ['R', 0.34, 0.04, 0.32, 0.18, 0.05],
++    ['E', 0.23, 0.37, 0.10, 0.10], ['l', 0.42, 0.42, 0.74, 0.42],
++    ['E', 0.23, 0.53, 0.10, 0.10], ['l', 0.42, 0.58, 0.74, 0.58],
++    ['E', 0.23, 0.69, 0.10, 0.10], ['l', 0.42, 0.74, 0.74, 0.74],
++  ],
++  clipboardPlus: [
++    ['r', 0.12, 0.14, 0.76, 0.80, 0.18], ['R', 0.34, 0.04, 0.32, 0.18, 0.05],
++    ['l', 0.50, 0.36, 0.50, 0.62], ['l', 0.37, 0.49, 0.63, 0.49],
++    ['l', 0.34, 0.76, 0.66, 0.76],
++  ],
++  person: [ // outlined head over a solid torso with a V-neck cut out of it
++    ['e', 0.28, 0.02, 0.44, 0.44],
++    ['P', 0.10, 0.52, 0.80, 0.96, 180, 360],
++    ['V', 0.36, 0.52, 0.28, 0.24],
++  ],
++  arrowRight: [
++    ['l', 0.04, 0.50, 0.94, 0.50],
++    ['l', 0.66, 0.22, 0.94, 0.50], ['l', 0.66, 0.78, 0.94, 0.50],
++  ],
++  arrowUp: [
++    ['l', 0.50, 0.92, 0.50, 0.10],
++    ['l', 0.22, 0.38, 0.50, 0.10], ['l', 0.78, 0.38, 0.50, 0.10],
++  ],
++  arrowUpRight: [
++    ['l', 0.18, 0.82, 0.80, 0.20],
++    ['l', 0.40, 0.20, 0.80, 0.20], ['l', 0.80, 0.20, 0.80, 0.60],
++  ],
++  circleArrow: [
++    ['e', 0.04, 0.04, 0.92, 0.92],
++    ['l', 0.33, 0.67, 0.67, 0.33],
++    ['l', 0.44, 0.33, 0.67, 0.33], ['l', 0.67, 0.33, 0.67, 0.56],
++  ],
++  award: [
++    ['R', 0.26, 0.50, 0.15, 0.48, 0.02, 16], ['R', 0.59, 0.50, 0.15, 0.48, 0.02, -16],
++    ['E', 0.16, 0.04, 0.68, 0.68], ['W', 0.22, 0.10, 0.56, 0.56],
++    ['E', 0.26, 0.14, 0.48, 0.48], ['s', 0.34, 0.22, 0.32, 0.32],
++  ],
++};
++
++/**
++ * Draw icon `name` inside the square (x, y, s).
++ * `color` strokes/fills the glyph; `bg` fills its knocked-out parts.
++ */
++function icon(slide, name, x, y, s, color, weight, bg) {
++  const stroke = { color, width: Math.max(0.6, +(s * (weight || 1.5) / 24 * 72).toFixed(2)) };
++  const solid = { color };
++  const knockout = { color: bg || C.white };
++  const U = (v) => v * s;
++  const box = (d) => ({ x: x + U(d[1]), y: y + U(d[2]), w: U(d[3]), h: U(d[4]) });
++
++  ICONS[name].forEach((d) => {
++    const k = d[0];
++    if (k === 'l') {
++      const dx = U(d[3] - d[1]), dy = U(d[4] - d[2]);
++      slide.addShape('line', {
++        x: x + U(Math.min(d[1], d[3])), y: y + U(Math.min(d[2], d[4])),
++        w: Math.abs(dx), h: Math.abs(dy), flipH: dx < 0, flipV: dy < 0, line: stroke,
++      });
++    } else if (k === 'e' || k === 'E' || k === 'W') {
++      slide.addShape('ellipse', Object.assign(box(d),
++        k === 'e' ? { line: stroke } : { fill: k === 'E' ? solid : knockout, line: NO_LINE }));
++    } else if (k === 'r' || k === 'R') {
++      slide.addShape('roundRect', Object.assign(box(d),
++        { rectRadius: U(d[5]), rotate: d[6] || 0 },
++        k === 'r' ? { line: stroke } : { fill: solid, line: NO_LINE }));
++    } else if (k === 'A') {
++      slide.addShape('arc', Object.assign(box(d), { angleRange: [d[5], d[6]], line: stroke }));
++    } else if (k === 'P') {
++      slide.addShape('pie', Object.assign(box(d), { angleRange: [d[5], d[6]], fill: solid, line: NO_LINE }));
++    } else if (k === 'V') {
++      slide.addShape('triangle', Object.assign(box(d), { flipV: true, fill: knockout, line: NO_LINE }));
++    } else if (k === 'S' || k === 's') {
++      slide.addShape('star5', Object.assign(box(d),
++        { fill: k === 'S' ? solid : knockout, line: NO_LINE }));
++    }
++  });
++}
++
++/* ------------------------------------------------------- composite pieces */
++
++/** Rounded card with a rectangular notch bitten out of one corner. */
++function notchCard(slide, x, y, w, h, fill, opt) {
++  const r = opt.r, nw = opt.nw, nh = opt.nh;
++  const arc = (st, sw) => ({ x: 0, y: 0, curve: { type: 'arc', wR: r, hR: r, stAng: st, swAng: sw } });
++  slide.addShape('custGeom', {
++    x, y, w, h, fill: { color: fill }, line: NO_LINE,
++    flipH: !!opt.flipH, flipV: !!opt.flipV,
++    points: [ // traced clockwise from the top edge; notch sits top-right
++      { x: r, y: 0, moveTo: true },
++      { x: w - nw - r, y: 0 }, arc(270, 90),
++      { x: w - nw, y: nh - r }, arc(180, -90),
++      { x: w - r, y: nh }, arc(270, 90),
++      { x: w, y: h - r }, arc(0, 90),
++      { x: r, y: h }, arc(90, 90),
++      { x: 0, y: r }, arc(180, 90),
++      { close: true },
++    ],
++  });
++}
++
++/** Rounded card with a circular bite out of the bottom-right (drawn on white). */
++function circleNotchCard(slide, x, y, w, h, fill, r, cut) {
++  rrect(slide, x, y, w, h, fill, r / Math.min(w, h));
++  oval(slide, x + cut.cx - cut.r, y + cut.cy - cut.r, 2 * cut.r, 2 * cut.r, C.white);
++}
++
++/** Top-left "Healthcare" wordmark. */
++function logo(slide) {
++  txt(slide, 'Healthcare', {
++    x: 0.761, y: 0.302, w: 1.228, h: 0.376, fontSize: 12, bold: true,
++    valign: 'middle', lineSpacingMultiple: 1.5,
++  });
++  icon(slide, 'stethoscope', 0.475, 0.347, 0.286, C.purple);
++}
++
++/** Pale pill button: "Learn More" + purple arrow capsule. */
++function learnMore(slide, x, y) {
++  rrect(slide, x, y, 1.665, 0.408, C.ice, 0.5);
++  rrect(slide, x + 0.911, y + 0.054, 0.692, 0.301, C.purple, 0.5);
++  icon(slide, 'arrowRight', x + 1.174, y + 0.105, 0.215, C.ice);
++  txt(slide, 'Learn More', {
++    x: x + 0.091, y: y + 0.047, w: 0.83, h: 0.284, fontSize: 8,
++    valign: 'middle', lineSpacingMultiple: 1.5,
++  });
++}
++
++/** Pale pill card: icon tile on the left, two lines of caption on the right. */
++function iconPill(slide, x, y, iconName, iconColor, tile) {
++  rrect(slide, x, y, 3.048, 0.663, C.ice, 0.28181);
++  rrect(slide, x + 0.126, y + 0.086, 0.479, 0.479, tile || C.purpleAlt, 0.2428);
++  icon(slide, iconName, x + 0.198, y + 0.159, 0.333, iconColor);
++  txt(slide, 'Lorem Ipsum\u00a0is simply dummy text of the printing', {
++    x: x + 0.793, y: y + 0.078, w: 2.087, h: 0.486, fontSize: 8, lineSpacingMultiple: 1.5,
++  });
++}
++
++/** Pale "78%" statistic card. */
++function statCard(slide, x, y) {
++  rrect(slide, x, y, 2.124, 1.295, C.ice);
++  oval(slide, x + 1.645, y + 0.837, 0.348, 0.348, C.purpleAlt);
++  txt(slide, '78%', {
++    x: x + 0.151, y: y + 0.159, w: 1.541, h: 0.707, fontFace: INTER, fontSize: 36,
++    bold: true, align: 'center',
++  });
++  txt(slide, 'Lorem Ipsum\u00a0is simply dummy text of', {
++    x: x + 0.338, y: y + 0.767, w: 1.051, h: 0.303, fontFace: INTER, fontSize: 6,
++  });
++  icon(slide, 'lungs', x + 1.705, y + 0.901, 0.226, C.white);
++}
++
++/** Big number + two-line caption, repeated in a row. */
++function statTrio(slide, x, y, items, color) {
++  items.forEach((label, i) => {
++    const cx = x + i * 1.391;
++    txt(slide, label, {
++      x: cx, y, w: 1.391, h: 0.927, fontSize: 36, bold: true, color,
++      valign: 'middle', lineSpacingMultiple: 1.5,
++    });
++    txt(slide, 'Insert Text here please', {
++      x: cx, y: y + 0.832, w: 0.899, h: 0.370, fontSize: 8, color,
++    });
++  });
++}
++
++/** Icon tile + bold heading + body paragraph (feature list item). */
++function featureBlock(slide, o) {
++  rrect(slide, o.tileX, o.tileY, 0.346, 0.346, o.tile, 0.16667);
++  icon(slide, o.icon, o.iconX, o.iconY, o.iconSize, o.iconColor, 1.5, o.tile);
++  txt(slide, o.title, {
++    x: o.x, y: o.y, w: o.titleW, h: 0.376, fontSize: 12, bold: true,
++    color: o.color, lineSpacingMultiple: 1.5,
++  });
++  txt(slide, loremRuns(), {
++    x: o.x, y: o.y + 0.319, w: 2.087, h: 0.890, fontSize: 8,
++    color: o.color, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* ------------------------------------------------------------- the slides */
++
++// 1 - Title: "Revolutionizing Health Education"
++function slide1(pres) {
++  const s = pres.addSlide();
++  txt(s, [
++    { text: 'Revolutionizing', options: { breakLine: true } },
++    { text: 'Health', options: { bold: true, color: C.purple } },
++    { text: ' ' }, { text: 'Education' },
++  ], { x: 0.761, y: 1.489, w: 5.280, h: 1.447, fontSize: 40 });
++  txt(s, 'Headline Here', {
++    x: 6.963, y: 0.758, w: 1.391, h: 0.376, fontSize: 12, bold: true,
++    color: C.white, lineSpacingMultiple: 1.5,
++  });
++  oval(s, 6.834, 1.134, 7.605, 7.605, C.purple);
++  oval(s, 7.709, 2.043, 6.727, 6.727, C.lilac);
++  logo(s);
++  txt(s, LOREM_FULL, { x: 0.707, y: 3.353, w: 3.873, h: 0.989, fontSize: 9, lineSpacingMultiple: 1.5 });
++  statTrio(s, 0.761, 5.622, ['20+', '93%', '3M+'], C.black);
++  learnMore(s, 0.761, 4.797);
++  oval(s, 7.794, 0.912, 0.561, 0.561, C.purple);
++  oval(s, 11.913, 0.157, 0.946, 0.946, C.purple);
++  statCard(s, 6.309, 2.455);
++  iconPill(s, 7.045, 4.628, 'syringe', C.silver);
++  iconPill(s, 9.548, 6.085, 'capsule', C.white);
++}
++
++// 2 - Problem and Pain Points: four notched cards
++function slide2(pres) {
++  const s = pres.addSlide();
++  txt(s, [{ text: 'Problem and', options: { breakLine: true } }, { text: 'Pain Points' }],
++    { x: 0.761, y: 1.302, w: 3.666, h: 1.447, fontSize: 40 });
++  logo(s);
++
++  const SIDE = 3.059;
++  const NOTCH = { r: 0.0887 * SIDE, nw: 0.2241 * SIDE, nh: 0.2020 * SIDE };
++  const cards = [
++    { x: 6.379, y: 3.832, fill: C.lilac, n: '03' },
++    { x: 9.578, y: 3.832, fill: C.purple, n: '04' },
++    { x: 6.379, y: 0.609, fill: C.purple, n: '01' },
++    { x: 9.578, y: 0.609, fill: C.lilac, n: '02' },
++  ];
++  cards.forEach((c) => {
++    notchCard(s, c.x, c.y, SIDE, SIDE, c.fill, NOTCH);
++    oval(s, c.x + 2.423, c.y + 0.004, 0.538, 0.538, C.yellow);
++    txt(s, c.n, {
++      x: c.x + 2.423, y: c.y + 0.004, w: 0.538, h: 0.538, fontSize: 9,
++      align: 'center', valign: 'middle', wrap: false,
++    });
++  });
++
++  const copy = [
++    { x: 6.800, y: 1.419, w: 1.950, title: 'Outdated Curriculum' },
++    { x: 10.059, y: 1.419, w: 2.117, title: 'Accessibility Barriers' },
++    { x: 6.800, y: 4.538, w: 1.791, title: 'Faculty Shortages' },
++    { x: 10.059, y: 4.538, w: 1.992, title: 'Health Education' },
++  ];
++  copy.forEach((c) => {
++    txt(s, c.title, {
++      x: c.x, y: c.y, w: c.w, h: 0.376, fontSize: 12, bold: true,
++      color: C.white, lineSpacingMultiple: 1.5,
++    });
++    txt(s, loremRuns(), {
++      x: c.x, y: c.y + 0.501, w: 1.592, h: 1.092, fontSize: 8,
++      color: C.white, lineSpacingMultiple: 1.5,
++    });
++  });
++
++  txt(s, LOREM_FULL, { x: 0.859, y: 3.385, w: 3.474, h: 0.989, fontSize: 9, lineSpacingMultiple: 1.5 });
++}
++
++// 3 - Emerging Opportunities
++function slide3(pres) {
++  const s = pres.addSlide();
++  rrect(s, 0.467, 0.858, 5.367, 2.892, C.purple, 0.09589);
++  txt(s, 'Emerging Opportunities', {
++    x: 0.761, y: 1.106, w: 3.939, h: 1.447, fontSize: 40, color: C.white,
++  });
++  txt(s, " Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer.", {
++    x: 0.761, y: 2.699, w: 3.697, h: 0.535, fontSize: 9, color: C.white, lineSpacingMultiple: 1.5,
++  });
++  icon(s, 'circleArrow', 5.137, 3.116, 0.421, C.white, 2);
++
++  const feats = [
++    { x: 1.906, title: 'Learning Platform', titleW: 1.755, icon: 'brain', ic: C.smoke, is: 0.223, ix: 0.062, iy: 0.208 },
++    { x: 5.348, title: 'Simulation Training', titleW: 1.958, icon: 'monitor', ic: C.smoke, is: 0.224, ix: 0.061, iy: 0.214 },
++    { x: 8.577, title: 'Global Partnership', titleW: 1.864, icon: 'network', ic: C.white, is: 0.208, ix: 0.069, iy: 0.216 },
++  ];
++  feats.forEach((f) => {
++    featureBlock(s, {
++      tileX: f.x, tileY: 5.033, tile: C.purple,
++      icon: f.icon, iconColor: f.ic, iconSize: f.is, iconX: f.x + f.ix, iconY: 4.886 + f.iy,
++      x: f.x + 0.429, y: 4.886, titleW: f.titleW, title: f.title, color: C.black,
++    });
++  });
++
++  rrect(s, 10.032, 3.116, 2.540, 0.408, C.ice, 0.5);
++  rrect(s, 10.095, 3.170, 0.692, 0.301, C.purple, 0.5);
++  icon(s, 'arrowRight', 10.359, 3.221, 0.215, C.ice);
++  txt(s, 'Lorem ipsum is simply', {
++    x: 10.811, y: 3.163, w: 1.415, h: 0.284, fontSize: 8, valign: 'middle', lineSpacingMultiple: 1.5,
++  });
++  logo(s);
++}
++
++// 4 - Value Proposition
++function slide4(pres) {
++  const s = pres.addSlide();
++  rrect(s, 0.163, 4.014, 13.007, 3.340, C.purple, 0.11047);
++  txt(s, 'Value Proposition', { x: 6.838, y: 0.590, w: 3.666, h: 1.447, fontSize: 40 });
++  txt(s, LOREM_FULL, { x: 6.838, y: 2.363, w: 3.433, h: 0.989, fontSize: 9, lineSpacingMultiple: 1.5 });
++
++  rrect(s, 11.753, 4.222, 1.177, 2.924, C.yellow, 0.16947);
++  icon(s, 'chevronRight', 12.073, 5.356, 0.656, C.ink, 2.5);
++
++  featureBlock(s, {
++    tileX: 8.598, tileY: 4.726, tile: C.amber,
++    icon: 'person', iconColor: C.black, iconSize: 0.238, iconX: 8.652, iconY: 4.773,
++    x: 9.027, y: 4.580, titleW: 1.864, title: 'Decision making', color: C.white,
++  });
++  featureBlock(s, {
++    tileX: 5.890, tileY: 4.726, tile: C.amber,
++    icon: 'brain', iconColor: C.black, iconSize: 0.224, iconX: 5.951, iconY: 4.787,
++    x: 6.318, y: 4.580, titleW: 2.087, title: 'Increased Knowladge', color: C.white,
++  });
++
++  // price tag card
++  rrect(s, 4.277, 2.070, 1.397, 1.171, C.ice, 0.09657);
++  icon(s, 'cardList', 5.306, 2.160, 0.271, C.coral);
++  txt(s, 'Lorem Ipsum\u00a0is simply design', {
++    x: 4.459, y: 2.352, w: 0.814, h: 0.303, fontSize: 6, color: C.white50,
++  });
++  txt(s, '$12,000', { x: 4.459, y: 2.736, w: 1.190, h: 0.468, fontSize: 16, lineSpacingMultiple: 1.5 });
++
++  rrect(s, 1.160, 0.959, 0.825, 0.825, C.purple);
++  icon(s, 'chartUp', 1.300, 1.098, 0.546, C.white);
++
++  // two price rows, each ruled above and below
++  [5.976, 6.310].forEach((y) => {
++    txt(s, 'Insert text table here', {
++      x: 6.308, y, w: 1.312, h: 0.284, fontSize: 8, color: C.white, lineSpacingMultiple: 1.5,
++    });
++    hline(s, 6.403, y, 4.832, C.white, 0.75);
++    hline(s, 6.403, y + 0.334, 4.832, C.white, 0.75);
++    txt(s, '$980/per month', {
++      x: 10.268, y, w: 1.312, h: 0.284, fontSize: 8, color: C.white, lineSpacingMultiple: 1.5,
++    });
++  });
++
++  rrect(s, 0.175, 3.154, 3.048, 0.663, C.ice, 0.28181);
++  rrect(s, 0.300, 3.241, 0.479, 0.479, C.coral, 0.2428);
++  icon(s, 'cardList2', 0.402, 3.338, 0.276, C.white);
++  txt(s, 'AI-Powered personalized Learning Paths', {
++    x: 0.968, y: 3.233, w: 1.796, h: 0.486, fontSize: 8, lineSpacingMultiple: 1.5,
++  });
++  logo(s);
++}
++
++// 5 - Financial Projection (hand-built bar chart, as in the reference)
++function slide5(pres) {
++  const s = pres.addSlide();
++  txt(s, 'Financial Projection', { x: 0.761, y: 1.318, w: 3.737, h: 1.447, fontSize: 40 });
++  txt(s, loremRuns(), { x: 5.352, y: 1.672, w: 2.087, h: 0.890, fontSize: 8, lineSpacingMultiple: 1.5 });
++  logo(s);
++
++  rrect(s, 8.495, 2.182, 3.687, 2.523, C.purple, 0.06218);
++  txt(s, 'Key Metrics', { x: 8.893, y: 2.628, w: 1.482, h: 0.370, fontFace: INTER, fontSize: 16, color: C.white });
++  rrect(s, 8.521, 4.832, 3.687, 1.358, C.lilacPale, 0.13485);
++  icon(s, 'person', 4.705, 1.829, 0.576, C.purple);
++  txt(s, 'Future Initiatives', { x: 8.893, y: 4.965, w: 1.982, h: 0.370, fontFace: INTER, fontSize: 16, color: C.white });
++
++  // plot: 7 gridlines, four bars, value labels and category labels
++  for (let i = 0; i < 7; i++) hline(s, 1.211, 4.026 + i * 0.40578, 4.760, C.white50, 0.75);
++  const axis = [['$100', 0.761, 3.885, 0.512], ['150', 0.832, 4.286, 0.442], ['60', 0.786, 4.695, 0.442],
++    ['40', 0.832, 5.104, 0.396], ['20', 0.832, 5.513, 0.379], ['10', 0.861, 5.922, 0.350], ['0', 0.878, 6.331, 0.281]];
++  axis.forEach((a) => txt(s, a[0], {
++    x: a[1], y: a[2], w: a[3], h: 0.281, fontSize: 10, color: C.white65,
++    align: 'center', valign: 'middle', wrap: false,
++  }));
++  const bars = [
++    { x: 1.382, y: 5.591, h: 0.880, fill: C.lilac, label: '$5M', lx: 1.559, ly: 5.305, lw: 0.512, cx: 1.534 },
++    { x: 2.590, y: 5.182, h: 1.290, fill: C.lilac, label: '$5M', lx: 2.805, ly: 4.900, lw: 0.512, cx: 2.732 },
++    { x: 3.798, y: 4.397, h: 2.079, fill: C.lilac, label: '$10M', lx: 3.989, ly: 4.088, lw: 0.583, cx: 3.950 },
++    { x: 5.007, y: 3.885, h: 2.568, fill: C.purple, label: '$115M', lx: 5.164, ly: 3.604, lw: 0.650, cx: 5.164 },
++  ];
++  bars.forEach((b, i) => {
++    s.addShape('rect', { x: b.x, y: b.y, w: 0.964, h: b.h, fill: { color: b.fill }, line: NO_LINE });
++    txt(s, b.label, {
++      x: b.lx, y: b.ly, w: b.lw, h: 0.281, fontSize: 10, bold: true,
++      align: 'center', valign: 'middle', wrap: false,
++    });
++    txt(s, 'Year ' + (i === 3 ? 5 : i + 1), {
++      x: b.cx, y: 6.508, w: 0.660, h: 0.281, fontSize: 10, color: C.white65,
++      align: 'center', valign: 'middle', wrap: false,
++    });
++  });
++
++  rrect(s, 1.135, 3.141, 1.998, 0.469, C.lilacPale, 0.24334);
++  txt(s, 'Revenue Growth ', {
++    x: 1.135, y: 3.141, w: 1.998, h: 0.469, fontSize: 12, align: 'right', valign: 'middle', wrap: false,
++  });
++  icon(s, 'arrowUp', 1.190, 3.204, 0.344, C.white, 2);
++
++  txt(s, loremRuns(), { x: 8.893, y: 3.163, w: 2.378, h: 0.688, fontSize: 8, color: C.white, lineSpacingMultiple: 1.5 });
++  txt(s, loremRuns(), { x: 8.893, y: 5.290, w: 2.378, h: 0.688, fontSize: 8, color: C.white, lineSpacingMultiple: 1.5 });
++}
++
++// 6 - The Team and Expertise
++function slide6(pres) {
++  const s = pres.addSlide();
++  txt(s, 'The Team and Expertise', { x: 0.761, y: 1.152, w: 3.940, h: 1.447, fontSize: 40 });
++  logo(s);
++  txt(s, LOREM_FULL, { x: 0.761, y: 2.761, w: 3.433, h: 0.989, fontSize: 9, lineSpacingMultiple: 1.5 });
++
++  const team = [
++    { y: 1.577, fill: C.purple, name: 'Dr. Kyra Silvani ', nx: 8.653, ny: 1.908 },
++    { y: 2.887, fill: C.lilac, name: 'Dr. Rocky Gerong', nx: 8.747, ny: 3.195 },
++    { y: 4.197, fill: C.purple, name: 'Dr. Jamal Kore', nx: 8.818, ny: 4.505 },
++    { y: 5.567, fill: C.lilac, name: 'Dr. Ayana Hyra', nx: 8.747, ny: 5.943 },
++  ];
++  team.forEach((t) => rrect(s, 7.182, t.y, 5.468, 1.128, t.fill, 0.10988));
++  learnMore(s, 0.618, 6.745);
++  team.forEach((t) => {
++    txt(s, t.name, {
++      x: t.nx, y: t.ny, w: 1.719, h: 0.281, fontSize: 12, bold: true,
++      color: C.white, valign: 'middle', wrap: false,
++    });
++    txt(s, 'Lead Cardiologist', {
++      x: t.nx, y: t.ny + 0.232, w: 1.113, h: 0.281, fontSize: 8,
++      color: C.white85, valign: 'middle', wrap: false,
++    });
++  });
++
++  rrect(s, 5.756, 3.910, 0.669, 0.669, C.purple);
++  icon(s, 'clipboardPlus', 5.860, 4.013, 0.461, C.white);
++}
++
++// 7 - Marketing and Growth Strategy: three cards with a badge bitten out
++function slide7(pres) {
++  const s = pres.addSlide();
++  txt(s, 'Marketing and Growth Strategy', { x: 0.761, y: 0.913, w: 4.843, h: 1.447, fontSize: 40 });
++
++  const cards = [
++    { x: 1.251, title: [{ text: 'Hospital & Clinics' }] },
++    { x: 4.781, title: [{ text: 'Community Health' }] },
++    { x: 8.312, title: [{ text: 'Digital ' }, { text: 'Campigns' }] },
++  ];
++  cards.forEach((c) => {
++    circleNotchCard(s, c.x, 2.919, 2.933, 3.575, C.purple, 0.191, { cx: 2.852, cy: 2.938, r: 0.732 });
++    oval(s, c.x + 2.349, 5.370, 0.984, 0.984, C.yellow);
++    icon(s, 'arrowUpRight', c.x + 2.546, 5.567, 0.591, C.black, 2);
++  });
++  cards.forEach((c) => {
++    txt(s, c.title, {
++      x: c.x + 0.261, y: 3.430, w: 1.982, h: 0.640, fontFace: INTER, fontSize: 16,
++      bold: true, color: C.white,
++    });
++    txt(s, loremRuns(), {
++      x: c.x + 0.261, y: 4.166, w: 1.696, h: 1.932, fontSize: 10.5,
++      color: C.white, lineSpacingMultiple: 1.5,
++    });
++  });
++
++  txt(s, loremRuns(), { x: 9.158, y: 1.173, w: 2.087, h: 0.890, fontSize: 8, lineSpacingMultiple: 1.5 });
++  rrect(s, 8.306, 1.323, 0.591, 0.591, C.purple);
++  icon(s, 'chartUp', 8.405, 1.423, 0.391, C.white);
++  logo(s);
++}
++
++// 8 - Key Features and Benefits
++function slide8(pres) {
++  const s = pres.addSlide();
++  txt(s, 'Key Features and Benefits', { x: 0.574, y: 0.865, w: 3.940, h: 1.447, fontSize: 40 });
++  txt(s, LOREM_FULL, { x: 9.280, y: 1.241, w: 3.433, h: 0.989, fontSize: 9, lineSpacingMultiple: 1.5 });
++  iconPill(s, 9.472, 6.314, 'syringe', C.silver);
++  statCard(s, 4.899, 1.038);
++  logo(s);
++  rrect(s, 0.469, 4.843, 4.726, 2.311, C.purple, 0.06762);
++  statTrio(s, 0.795, 5.301, ['60+', '43%', '5M+'], C.white85);
++  icon(s, 'award', 8.497, 1.487, 0.524, C.purple);
++  icon(s, 'circleArrow', 4.628, 5.012, 0.344, C.white, 2);
++  rrect(s, 0.343, 4.994, 0.236, 1.901, C.yellow, 0.5);
++}
++
++// 9 - Business Model and Revenue: four notched cards with big numbers
++function slide9(pres) {
++  const s = pres.addSlide();
++  txt(s, 'Business Model and Revenue', {
++    x: 4.263, y: 0.634, w: 4.807, h: 1.447, fontSize: 40, align: 'center',
++  });
++
++  const CW = 3.310, CH = 2.174;
++  const NOTCH = { r: 0.304, nw: 1.499, nh: 1.021 };
++  const cards = [
++    { x: 1.081, y: 2.081, flipH: false, badge: 2.966 },
++    { x: 1.081, y: 4.388, flipH: false, badge: 2.966 },
++    { x: 8.615, y: 2.081, flipH: true, badge: 8.643 },
++    { x: 8.615, y: 4.388, flipH: true, badge: 8.643 },
++  ];
++  cards.forEach((c) => {
++    notchCard(s, c.x, c.y, CW, CH, C.ice, Object.assign({ flipV: true, flipH: c.flipH }, NOTCH));
++    rrect(s, c.badge, c.y + 1.220, 1.398, 0.955, C.purple, 0.2623);
++  });
++
++  const copy = [
++    { x: 1.328, y: 2.483, align: 'left' }, { x: 9.481, y: 2.410, align: 'right' },
++    { x: 1.408, y: 4.722, align: 'left' }, { x: 9.561, y: 4.722, align: 'right' },
++  ];
++  copy.forEach((c) => txt(s, loremRuns(), {
++    x: c.x, y: c.y, w: 2.087, h: 0.890, fontSize: 8, align: c.align, lineSpacingMultiple: 1.5,
++  }));
++
++  const nums = [
++    { n: '01', x: 3.180, y: 3.284, w: 0.964 }, { n: '02', x: 3.076, y: 5.588, w: 1.130 },
++    { n: '03', x: 8.774, y: 3.301, w: 1.130 }, { n: '04', x: 8.774, y: 5.646, w: 1.130 },
++  ];
++  nums.forEach((v) => txt(s, v.n, {
++    x: v.x, y: v.y, w: v.w, h: 0.998, fontSize: 44, bold: true, color: C.white85,
++    align: 'center', valign: 'middle', wrap: false,
++  }));
++  logo(s);
++}
++
++// 10 - Thank You
++function slide10(pres) {
++  const s = pres.addSlide();
++  txt(s, [{ text: 'Thank You for', options: { breakLine: true } }, { text: 'Attention' }],
++    { x: 1.155, y: 2.420, w: 5.720, h: 2.121, fontSize: 60 });
++  learnMore(s, 1.155, 4.947);
++  circleNotchCard(s, 7.887, 1.576, 4.710, 5.740, C.purple, 0.307, { cx: 4.580, cy: 4.719, r: 1.176 });
++  oval(s, 11.659, 5.511, 1.580, 1.580, C.yellow);
++  icon(s, 'arrowUpRight', 11.975, 5.827, 0.948, C.black, 2);
++  logo(s);
++}
++
++/* ------------------------------------------------------------------- main */
++
++function build() {
++  const pres = new PptxGenJS();
++  pres.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
++  pres.layout = 'WIDE_16x9';
++  pres.author = 'pptxgenjs';
++  pres.title = 'Revolutionizing Health Education';
++
++  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10]
++    .forEach((fn) => fn(pres));
++
++  return pres.writeFile({
++    fileName: path.join(__dirname, '0d2ac28e-6c08-4517-a67e-7731d85f1cb2_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote ' + f)).catch((e) => { console.error(e); process.exit(1); });

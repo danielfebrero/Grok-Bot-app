@@ -1,0 +1,713 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/creative_brief_product_brand.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/creative_brief_product_brand.js
+@@ -0,0 +1,710 @@
++/**
++ * "Creative Brief" — 25-slide deck rebuilt with pptxgenjs.
++ * Photographs in the original are replaced by light "Image placeholder" panels;
++ * icons are drawn from native shapes.
++ */
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ theme */
++const C = {
++  dark: '2D3621',    // accent1 – deep olive
++  darkMid: '222819', // accent1 @ 75% luminance
++  sage: 'B9C9A5',    // accent2
++  sageDeep: '8DA76C',// accent2 @ 75% luminance
++  sagePale: 'D5DFC9',// accent2 @ 60/40
++  olive: '647849',   // accent1 @ 75/25
++  page: 'F9FAF8',    // slide background
++  panel: 'F2F2F2',   // image-placeholder panel
++  panelTxt: 'BFBFBF',
++  white: 'FFFFFF',
++  ink: '000000',
++  ink85: '262626',
++  ink75: '404040',
++  grid: 'D9D9D9',
++};
++const MAJOR = 'Marcellus';  // theme major font
++const MINOR = 'Lato';       // theme minor font
++const CHEVRON = '\u276E';   // ❮  – the deck's small "back" arrow
++const ARROW = '\u2192';     // →  – arrow inside the sage tiles
++
++const SHADOW_CARD = { type: 'outer', color: '000000', opacity: 0.1, blur: 40, offset: 15, angle: 35 };
++const SHADOW_SOFT = { type: 'outer', color: '000000', opacity: 0.05, blur: 17, offset: 0, angle: 90 };
++const SHADOW_TILE = { type: 'outer', color: '000000', opacity: 0.14, blur: 22, offset: 6.5, angle: 45 };
++
++/* ---------------------------------------------------------------- helpers */
++function rect(s, x, y, w, h, color, more) {
++  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, more || {}));
++}
++
++function txt(s, text, o) {
++  // no `margin` override: PowerPoint's default text insets match the source deck
++  s.addText(text, Object.assign({ fontFace: MINOR, fontSize: 18, color: C.ink, valign: 'top' }, o));
++}
++
++/** 60pt Marcellus headline used on nearly every content slide. */
++function title(s, text, x, y, w, h, color, more) {
++  txt(s, text, Object.assign({ x, y, w, h, fontFace: MAJOR, fontSize: 60, bold: true, color: color || C.dark }, more || {}));
++}
++
++/** 12pt Lato paragraph with the deck's 1.3 line spacing. */
++function para(s, text, x, y, w, h, more) {
++  txt(s, text, Object.assign({ x, y, w, h, fontSize: 12, lineSpacingMultiple: 1.3 }, more || {}));
++}
++
++/** Grey panel standing in for a photograph. */
++function imagePanel(s, x, y, w, h, label) {
++  s.addText(label || 'Image placeholder', {
++    shape: 'rect', x, y, w, h, fill: { color: C.panel },
++    align: 'center', valign: 'middle', fontFace: MINOR, fontSize: 18, color: C.panelTxt,
++  });
++}
++
++function hLine(s, x, y, w, color, size) {
++  s.addShape('line', { x, y, w, h: 0, line: { color, width: size || 1 } });
++}
++
++/** Sage square holding a small white glyph. */
++function glyphTile(s, x, y, size, glyph, glyphSize, more) {
++  s.addShape('rect', Object.assign({ x, y, w: size, h: size, fill: { color: C.sage } }, more || {}));
++  txt(s, glyph, { x, y, w: size, h: size, align: 'center', valign: 'middle', fontSize: glyphSize, color: C.white, margin: 0 });
++}
++
++/** Outlined check-box + caption, used in the two-column list of slide 4. */
++function checkItem(s, x, y, w, text) {
++  s.addShape('rect', { x: x + 0.021, y: y + 0.088, w: 0.134, h: 0.134, fill: { type: 'none' }, line: { color: C.dark, width: 1.25 } });
++  txt(s, '\u2713', { x: x - 0.02, y: y + 0.01, w: 0.28, h: 0.28, align: 'center', valign: 'middle', fontSize: 15, bold: true, color: C.dark, margin: 0 });
++  para(s, text, x + 0.223, y, w - 0.223, 0.324, { lineSpacingMultiple: 1.2, color: C.ink75 });
++}
++
++/**
++ * Small bar-chart icon built from rectangles; `variant` picks the silhouette
++ * so neighbouring icons in a list do not look identical.
++ */
++function barIcon(s, x, y, size, color, variant) {
++  const heights = { flat: [0.45, 0.65, 0.30], up: [0.28, 0.46, 0.68], down: [0.68, 0.46, 0.28] }[variant || 'flat'];
++  heights.forEach((hh, i) => rect(s, x + size * (0.11 + i * 0.26), y + size * (0.9 - hh), size * 0.16, size * hh, color));
++  rect(s, x + size * 0.05, y + size * 0.9, size * 0.9, size * 0.07, color);
++}
++
++/** Three stacked coins. */
++function coinIcon(s, x, y, size, color) {
++  for (let i = 2; i >= 0; i--) {
++    s.addShape('ellipse', { x: x + i * size * 0.14, y: y + size * (0.58 - i * 0.16), w: size * 0.72, h: size * 0.3,
++      fill: { color }, line: { color: C.dark, width: 0.75 } });
++  }
++}
++
++/** Small pyramid of blocks. */
++function blockIcon(s, x, y, size, color) {
++  const u = size * 0.24;
++  [[0.38, 0.10], [0.14, 0.42], [0.62, 0.42], [0.02, 0.72], [0.38, 0.72], [0.74, 0.72]]
++    .forEach(b => rect(s, x + size * b[0], y + size * b[1], u, u * 0.85, color));
++}
++
++/** Master slide-number badge (bottom-right; slide art may cover it). */
++function pageNumber(s, n) {
++  txt(s, String(n), { x: 12.749, y: 6.899, w: 0.462, h: 0.286, align: 'center', fontFace: MAJOR, fontSize: 11, bold: true, color: C.ink75 });
++}
++
++/** Every slide starts with the page background and the master page number. */
++function newSlide(p, n, bg) {
++  const s = p.addSlide();
++  s.background = { color: bg || C.page };
++  if (n) pageNumber(s, n);
++  return s;
++}
++
++/* =========================================================== slide builders */
++
++/** 1 — cover: dark page, oversized serif wordmark behind the photo panel. */
++function slide01(p) {
++  const s = newSlide(p, 1, C.dark);
++  txt(s, 'CREATIVE BRIEF', { x: 0.663, y: 0.911, w: 7.073, h: 2.7, fontFace: MAJOR, fontSize: 96, color: C.sage, lineSpacingMultiple: 0.8 });
++  txt(s, 'Creative Brief Presentation Template', { x: 0.719, y: 3.85, w: 5.267, h: 0.438, fontSize: 20, color: C.white });
++  hLine(s, 0.783, 3.65, 5.028, C.sage);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. ',
++    4.2, 5.993, 4.425, 0.596, { align: 'right', color: C.white });
++  imagePanel(s, 0.667, 0, 6.347, 7.5);
++}
++
++/** 2 — title slide: dark bar on the left, "Company / Companion Brief". */
++function slide02(p) {
++  const s = newSlide(p, 2);
++  rect(s, 0, 0, 3.19, 7.5, C.dark);
++  txt(s, 'Company ', { x: 6.187, y: 1.259, w: 6.061, h: 1.582, fontFace: MAJOR, fontSize: 88, bold: true, color: C.dark });
++  txt(s, 'Companion Brief ', { x: 7.251, y: 2.841, w: 5.293, h: 0.909, fontFace: MAJOR, fontSize: 48, color: C.olive, align: 'right' });
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In vehicula sem sit amet hendrerit dictum. sit amet venenatis tristique. ',
++    7.863, 5.419, 4.745, 0.985, { fontSize: 14, align: 'right', color: C.dark });
++  imagePanel(s, 1.02, 0.797, 4.633, 6.753);
++}
++
++/** 3 — "Creative Product": dark block plus three arrow-tile features. */
++function slide03(p) {
++  const s = newSlide(p, 3);
++  rect(s, 0, 2.491, 3.903, 2.829, C.dark);
++  title(s, 'Creative Product ', 0.667, 1.03, 7.296, 1.111, C.ink75);
++  ['Creative Product 01 ', 'Creative Product 02 ', 'Creative Product 03 '].forEach((head, i) => {
++    const y = 2.573 + i * 1.484;
++    txt(s, head, { x: 9.577, y, w: 2.523, h: 0.37, fontFace: MAJOR, fontSize: 16, bold: true, color: C.dark });
++    para(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit Proin.', 9.577, y + 0.412, 2.857, 0.561,
++      { lineSpacingMultiple: 1.2, color: C.ink75 });
++    glyphTile(s, 8.819, y + 0.115, 0.577, ARROW, 16, { shadow: SHADOW_TILE });
++  });
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In vehicula sem sit amet hendrerit dictum. sit amet venenatis tristique. ',
++    0.781, 5.638, 7.552, 0.761, { fontSize: 16, color: C.dark });
++}
++
++/** 4 — two columns of check-list items under a wide intro paragraph. */
++function slide04(p) {
++  const s = newSlide(p, 4);
++  title(s, 'Product Creative Scheme ', 0.957, 1.39, 10.477, 1.111);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla feugiat erat ante, at posuere mauris scelerisque ac. Vivamus ultrices vitae erat id malesuada. Sed non turpis posuere mauris scelerisque ac Vivamus.',
++    0.957, 2.59, 9.615, 0.602);
++  [
++    { x: 1.053, head: 'Creative Roadmap Scheme', tw: 4.528 },
++    { x: 7.201, head: 'Product Brief Insight ', tw: 4.699 },
++  ].forEach(col => {
++    glyphTile(s, col.x, 3.686, 0.404, CHEVRON, 15);
++    txt(s, col.head, { x: col.x + 0.516, y: 3.685, w: 3.813, h: 0.404, fontFace: MAJOR, fontSize: 18, bold: true, color: C.dark });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In vehicula sem sit amet hendrerit dictum. ',
++      col.x + 0.516, 4.116, col.tw, 0.602, { color: C.ink85 });
++    for (let i = 0; i < 3; i++) {
++      checkItem(s, col.x + 0.611, 4.963 + i * 0.349, 4.045, 'Lorem ipsum dolor sit amet, consectetur.');
++    }
++  });
++  s.addShape('line', { x: 6.667, y: 3.75, w: 0, h: 1.917, line: { color: C.ink75, width: 1 } });
++}
++
++/** 5 — "Analysis Competitor": photo panel left, three icon rows right. */
++function slide05(p) {
++  const s = newSlide(p, 5);
++  rect(s, 0, 3.151, 5.935, 4.349, C.dark);
++  title(s, 'Analysis Competitor ', 0.869, 0.91, 8.318, 1.111);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla feugiat erat ante, at posuere mauris scele risque ac. Vivamus ultrices vitae erat id malesuada. Sed non turpisc',
++    0.81, 2.104, 7.695, 0.602);
++  [
++    ['Market Creative Analysis ', 'flat'], ['Approach Literature Project ', 'up'], ['Clearly Brief Explanation ', 'down'],
++  ].forEach(([head, variant], i) => {
++    const y = 3.278 + i * 1.239;
++    txt(s, head, { x: 7.992, y, w: 3.51, h: 0.37, fontFace: MAJOR, fontSize: 16, bold: true, color: C.dark });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla feugiat erat ante, at posuere', 7.992, y + 0.342, 4.536, 0.602);
++    rect(s, 7.263, y + 0.088, 0.573, 0.573, C.sage);
++    barIcon(s, 7.333, y + 0.158, 0.433, C.white, variant);
++  });
++  imagePanel(s, 0, 3.522, 6.689, 3.978);
++}
++
++/** 6 — "Aligning With Our Brand": two overlapping photo panels + two cards. */
++function slide06(p) {
++  const s = newSlide(p, 6);
++  rect(s, 0, 0, 4.639, 5.452, C.dark);
++  title(s, 'Aligning With Our Brand ', 6.964, 1.382, 5.656, 2.121, C.ink75);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. Morbi tortor justo, porta eget consequat ac.',
++    6.964, 3.538, 5.837, 0.596);
++  [
++    { x: 9.444, bg: C.dark, head: 'Company Brief 02', headCol: C.white, bodyCol: C.white, tw: 2.498, hw: 2.0 },
++    { x: 6.203, bg: C.white, head: 'Company Brief 01', headCol: C.dark, bodyCol: C.ink75, tw: 2.526, hw: 2.035 },
++  ].forEach(card => {
++    s.addShape('roundRect', { x: card.x, y: 4.683, w: 2.963, h: 1.335, rectRadius: 0.02, fill: { color: card.bg }, shadow: SHADOW_CARD });
++    txt(s, card.head, { x: card.x + 0.216, y: 4.885, w: card.hw, h: 0.366, fontFace: MAJOR, fontSize: 14, bold: true, color: card.headCol, lineSpacingMultiple: 1.2 });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ', card.x + 0.216, 5.249, card.tw, 0.567, { lineSpacingMultiple: 1.2, color: card.bodyCol });
++  });
++  imagePanel(s, 0.468, 0.797, 2.824, 5.167);
++  imagePanel(s, 3.618, 1.251, 2.824, 5.452);
++}
++
++/** 7 — "Understanding Our Audience": two stat chips over a tall photo panel. */
++function slide07(p) {
++  const s = newSlide(p, 7);
++  title(s, 'Understanding Our Audience', 6.838, 1.338, 5.828, 2.121);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla feugiat erat ante, at posuere ectetu mauris ipiscin scelerisque ac amet venenatis tristique. Morbi tortor justo, porta eget consequat ac. ',
++    6.838, 3.608, 5.587, 0.859);
++  glyphTile(s, 7.015, 5.058, 0.404, CHEVRON, 15);
++  txt(s, 'Quick Response For Audience Satisfaction  ', { x: 7.53, y: 5.058, w: 5.066, h: 0.404, fontFace: MAJOR, fontSize: 18, bold: true, color: C.dark });
++  para(s, [
++    { text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In vehicula sem sit', options: { color: C.ink85 } },
++    { text: ' at posuere ectetu mauris ipiscin.', options: { color: C.ink } },
++  ], 7.53, 5.547, 5.066, 0.596);
++  [['227+ ', 'Project', 3.75], ['117+ ', 'Customer', 5.295]].forEach(([big, small, y]) => {
++    s.addShape('roundRect', { x: 0.646, y, w: 1.827, h: 1.371, rectRadius: 0.02, fill: { color: C.dark }, shadow: SHADOW_SOFT });
++    txt(s, big, { x: 0.902, y: y + 0.178, w: 1.301, h: 0.707, fontFace: MAJOR, fontSize: 36, bold: true, color: C.white, wrap: false });
++    txt(s, small, { x: 0.902, y: y + 0.885, w: 1.168, h: 0.337, fontFace: MAJOR, fontSize: 14, color: C.white, wrap: false });
++  });
++  imagePanel(s, 1.709, 0, 4.609, 7.5);
++}
++
++/** 8 — "Creative Engagement": dark 01/02/03 strip beneath the copy. */
++function slide08(p) {
++  const s = newSlide(p, 8);
++  rect(s, 0, 0.797, 5.778, 5.906, C.dark);
++  title(s, 'Creative Engagement ', 6.942, 1.151, 5.536, 2.121);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla feugiat erat ante, at posuere mauris scelerisque ac. Vivamus Nulla.',
++    6.946, 3.4, 5.202, 0.596);
++  rect(s, 4.806, 4.325, 7.546, 1.501, C.dark, { shadow: SHADOW_TILE });
++  [
++    ['01', 'Manage Your Business With Pith-Deck', 5.324, 2.11],
++    ['02', 'Set the Goals with Our Planning ', 7.669, 1.964],
++    ['03', 'Set the Goals with Our Planning ', 9.869, 1.964],
++  ].forEach(([num, body, x, w]) => {
++    txt(s, num, { x, y: 4.569, w: 0.664, h: 0.424, fontFace: MAJOR, fontSize: 16, bold: true, color: C.white, lineSpacingMultiple: 1.3 });
++    para(s, body, x, 4.98, w, 0.602, { color: C.white });
++  });
++  imagePanel(s, 0.667, 1.402, 5.111, 4.696);
++}
++
++/** 9 — "Creative Brief Portfolio": five-panel photo mosaic on a dark band. */
++function slide09(p) {
++  const s = newSlide(p, 9);
++  rect(s, 0, 3.356, 13.333, 4.144, C.dark);
++  title(s, 'Creative Brief Portfolio', 0.878, 1.041, 8.923, 1.111);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla feugiat erat ante, at posuere mauris scelerisque ac. Vivamus Nulla feugiat erat ante Vivamus consectetur adipiscing elit. Nulla feugiat .',
++    0.878, 2.316, 8.628, 0.602);
++  [
++    [0, 3.356, 4.43, 3.348], [4.701, 3.356, 2.393, 3.348], [7.365, 3.356, 2.393, 3.348],
++    [9.984, 0.797, 3.349, 2.953], [9.984, 4.117, 3.349, 2.586],
++  ].forEach(b => imagePanel(s, b[0], b[1], b[2], b[3]));
++}
++
++/** 10 — "Creative Dynamic Strategies": four captions on a dark band. */
++function slide10(p) {
++  const s = newSlide(p, 10);
++  title(s, 'Creative Dynamic Strategies', 1.002, 1.127, 10.981, 1.111);
++  para(s, [
++    { text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. Morbi' },
++    { text: ' consectetur adipiscing elit. In vehicula sem sit amet hendrerit', options: { color: C.ink85 } },
++    { text: ' tortor justo, porta eget consequat ac, semper sit amet sem. ' },
++  ], 0.946, 2.374, 10.981, 0.596);
++  s.addShape('rect', { x: 0, y: 3.458, w: 13.333, h: 4.042, fill: { color: C.dark, transparency: 20 } });
++  ['Creative Mindset ', 'Strategic Vision ', 'Leadership Skill', 'Business Brief '].forEach((head, i) => {
++    const x = 1.002 + i * 2.9;
++    s.addShape('ellipse', { x: x + 0.113, y: 4.41, w: 0.622, h: 0.622, fill: { color: C.sage } });
++    barIcon(s, x + 0.241, 4.537, 0.368, C.white, ['flat', 'up', 'down', 'flat'][i]);
++    txt(s, head, { x, y: 5.253, w: 2.367, h: 0.404, fontFace: MAJOR, fontSize: 18, bold: true, color: C.sage });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', x, 5.664, 2.423, 0.605, { color: C.white });
++  });
++  // the picture placeholder sits on top of the band in the source deck
++  imagePanel(s, 0, 3.458, 13.333, 4.042);
++}
++
++/** 11 — "Sustainable Plan Development": stat rail + numbered list. */
++function slide11(p) {
++  const s = newSlide(p, 11);
++  title(s, 'Sustainable Plan Development ', 6.641, 1.164, 6.376, 2.121);
++  s.addShape('roundRect', { x: 0.317, y: 1.25, w: 1.611, h: 5, rectRadius: 0.02, fill: { color: C.dark } });
++  [['1500+', 'Strategy'], ['100+', 'Plan'], ['120+', 'Product'], ['93%', 'Testimonials']].forEach(([big, small], i) => {
++    const y = 1.675 + i * 1.1553;
++    txt(s, big, { x: 0.66, y, w: 1.104, h: 0.404, fontFace: MAJOR, fontSize: 18, bold: true, color: C.white });
++    txt(s, small, { x: 0.622, y: y + 0.407, w: 1.181, h: 0.286, fontFace: MAJOR, fontSize: 10.5, color: C.white });
++    if (i < 3) hLine(s, 0.667, 2.603 + i * 1.147, 0.804, C.white, 1);
++  });
++  [['01.', 'Integrated Planning'], ['02.', 'Creative Build Experience'], ['03.', 'Brief Outsorce Build']].forEach(([num, head], i) => {
++    const x = 6.667 - i * 0.026, y = 3.523 + i * 1.008;
++    txt(s, num, { x, y, w: 1.044, h: 0.746, fontFace: MAJOR, fontSize: 32, bold: true, color: C.dark, valign: 'middle', lineSpacingMultiple: 1.3 });
++    txt(s, head, { x: x + 0.964, y: y + 0.024, w: 3.617, h: 0.418, fontFace: MAJOR, fontSize: 18, bold: true, color: C.sage, lineSpacingMultiple: 1.1 });
++    para(s, 'Lorem ipsum dolor sit amet consectetur adispicing elit.', x + 0.964, y + 0.458, 4.827, 0.334, { color: C.ink85 });
++    hLine(s, x + 0.118, y + 0.894, 4.882, C.ink85, 1);
++  });
++  imagePanel(s, 1.928, 0.723, 4.155, 6.054);
++}
++
++/** 12 — founder profile with a skill progress bar. */
++function slide12(p) {
++  const s = newSlide(p, 12);
++  rect(s, 1.149, 0, 5.175, 1.259, C.dark);
++  rect(s, 0.519, 4.728, 1.973, 1.383, C.dark, { shadow: SHADOW_SOFT });
++  txt(s, [{ text: '15+', options: { fontSize: 36 } }, { text: '/Yrs ', options: { fontSize: 20 } }],
++    { x: 0.915, y: 4.835, w: 1.308, h: 0.707, fontFace: MAJOR, bold: true, color: C.white, wrap: false });
++  txt(s, 'Experience', { x: 0.915, y: 5.559, w: 1.182, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true, color: C.white, wrap: false });
++  txt(s, 'Profile Founder', { x: 6.852, y: 1.527, w: 4.587, h: 0.774, fontFace: MAJOR, fontSize: 40, bold: true, color: C.sage });
++  title(s, 'Harold Thomas ', 6.852, 2.494, 6.0, 1.111);
++  para(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas portti tor congue massa. Fusce posuere, magna sed.',
++    6.852, 3.829, 5.699, 0.604, { color: C.ink85 });
++  txt(s, 'Skill Description Profil', { x: 6.922, y: 4.853, w: 2.505, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true, color: C.ink });
++  txt(s, '85%', { x: 11.73, y: 5.258, w: 0.805, h: 0.358, fontFace: MAJOR, fontSize: 14, bold: true, color: C.ink75, lineSpacingMultiple: 1.2 });
++  rect(s, 7.013, 5.401, 4.5, 0.07, C.panel);
++  rect(s, 7.013, 5.401, 3.264, 0.07, C.sage);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin convallis. ', 6.939, 5.655, 5.465, 0.319,
++    { lineSpacingMultiple: 1.2, color: C.ink75 });
++  imagePanel(s, 1.149, 0.797, 5.175, 6.703);
++}
++
++/** 13 — "Creative Team": three member cards with photo panels. */
++function slide13(p) {
++  const s = newSlide(p, 13);
++  rect(s, 0, 3.818, 2.578, 3.682, C.dark);
++  title(s, 'Creative Team ', 1.043, 0.869, 6.159, 1.111);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. Morbi tortor justo, porta eget.',
++    1.043, 2.017, 5.527, 0.596);
++  // lead member — larger type plus a descriptive line
++  txt(s, 'Jhon Peter', { x: 4.061, y: 3.167, w: 2.034, h: 0.572, fontFace: MAJOR, fontSize: 28, bold: true, color: C.dark, wrap: false });
++  txt(s, 'Staff', { x: 4.061, y: 3.739, w: 0.78, h: 0.404, color: C.ink, wrap: false });
++  para(s, 'Lorem ipsum dolor sit amet, consecte tuer adipiscing elit Maecenas.', 4.051, 4.274, 2.93, 0.596, { color: C.ink85 });
++  txt(s, [{ text: '10+', options: { fontSize: 36 } }, { text: '/Yrs ', options: { fontSize: 20 } }],
++    { x: 4.061, y: 5.141, w: 1.48, h: 0.707, fontFace: MAJOR, bold: true, color: C.sage, wrap: false });
++  txt(s, 'Experience', { x: 4.061, y: 5.951, w: 1.182, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true, color: C.sage, wrap: false });
++  [['Wilmart', 10.136, 1.84], ['Rebecca', 10.2, 4.451]].forEach(([name, x, y]) => {
++    txt(s, name, { x, y, w: 1.69, h: 0.572, fontFace: MAJOR, fontSize: 28, bold: true, color: C.dark, wrap: false });
++    txt(s, 'Staff', { x, y: y + 0.572, w: 0.78, h: 0.404, color: C.ink, wrap: false });
++    txt(s, [{ text: '05+', options: { fontSize: 28 } }, { text: '/Yrs ', options: { fontSize: 16 } }],
++      { x, y: y + 1.199, w: 1.313, h: 0.572, fontFace: MAJOR, bold: true, color: C.sage, wrap: false });
++    txt(s, 'Experience', { x, y: y + 1.786, w: 1.182, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true, color: C.sage, wrap: false });
++  });
++  imagePanel(s, 1.043, 3.021, 2.685, 3.682);
++  imagePanel(s, 7.394, 1.594, 2.362, 2.362);
++  imagePanel(s, 7.394, 4.341, 2.362, 2.362);
++}
++
++/** 14 — "Creative Spot In Digital Era": quote bar with a 75% donut. */
++function slide14(p) {
++  const s = newSlide(p, 14);
++  rect(s, 9.617, 0, 3.716, 7.5, C.dark);
++  // stack of tilted device cards (a photograph in the source deck)
++  s.addShape('roundRect', { x: 9.75, y: 1.95, w: 2.95, h: 4.15, rectRadius: 0.07, rotate: 17, fill: { color: '2B2B2B' }, shadow: SHADOW_CARD });
++  s.addShape('roundRect', { x: 7.55, y: 1.35, w: 3.5, h: 4.6, rectRadius: 0.07, rotate: -5, fill: { color: '1F1F1F' }, shadow: SHADOW_CARD });
++  title(s, 'Creative Spot In Digital Era ', 0.888, 1.032, 5.618, 2.121);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. Morbi tortor justo, porta eget.',
++    0.888, 3.278, 5.527, 0.596);
++  rect(s, 2.247, 4.293, 5.405, 1.264, C.white, { shadow: SHADOW_TILE });
++  rect(s, 0.996, 4.293, 1.264, 1.264, C.dark);
++  s.addShape('pie', { x: 1.265, y: 4.526, w: 0.799, h: 0.798, fill: { color: C.white }, angleRange: [0, 270] });
++  s.addShape('ellipse', { x: 1.371, y: 4.63, w: 0.592, h: 0.591, fill: { color: C.darkMid } });
++  txt(s, '75%', { x: 1.369, y: 4.773, w: 0.592, h: 0.303, align: 'center', fontFace: MAJOR, fontSize: 12, color: C.white });
++  barIcon(s, 2.666, 4.582, 0.685, C.dark, 'up');
++  s.addShape('line', { x: 3.65, y: 4.63, w: 0, h: 0.591, line: { color: C.ink, width: 1 } });
++  txt(s, '\u201CLorem ipsum dolor sit amet, consect etur adipiscing elit.\u201D',
++    { x: 3.875, y: 4.611, w: 3.56, h: 0.64, fontSize: 16, italic: true, color: C.ink });
++  imagePanel(s, 7.435, 1.216, 3.716, 4.42, 'Image Placeholder');
++}
++
++/** 15 — desktop-monitor mockup beside two "vision / goals" cards. */
++function slide15(p) {
++  const s = newSlide(p, 15);
++  rect(s, 0, 0, 3.716, 7.5, C.dark);
++  // monitor mockup drawn from primitives (a photograph in the source deck)
++  rect(s, -3.11, 5.35, 8.25, 0.55, 'C9CBCD');           // base shelf
++  rect(s, 1.19, 5.9, 1.36, 0.72, 'D5D7D9');             // stand neck
++  s.addShape('ellipse', { x: 0.89, y: 6.5, w: 1.97, h: 0.35, fill: { color: 'E1E3E5' } });
++  rect(s, -3.11, 1.39, 8.25, 3.96, '111111');           // bezel
++  rect(s, -3.0, 1.5, 7.92, 3.6, C.panel);              // screen
++  txt(s, 'Image Placeholder', { x: -1.171, y: 1.611, w: 6.087, h: 3.424, align: 'center', valign: 'middle', color: C.panelTxt });
++  title(s, 'Inspiring Task Delivering Results', 5.72, 1.226, 6.802, 2.121);
++  [
++    { x: 5.872, bg: C.dark, head: 'Compelling Vision', headCol: C.white, bodyCol: C.white, shadow: null },
++    { x: 9.332, bg: C.white, head: 'Set Clear Goals', headCol: C.sage, bodyCol: C.ink85, shadow: SHADOW_TILE },
++  ].forEach(card => {
++    s.addShape('rect', { x: card.x, y: 3.52, w: 3.039, h: 2.02, fill: { color: card.bg }, shadow: card.shadow || undefined });
++    txt(s, card.head, { x: card.x + 0.421, y: 3.79, w: 1.939, h: 0.818, fontFace: MAJOR, fontSize: 20, bold: true, color: card.headCol, lineSpacingMultiple: 1.1 });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur elit. ', card.x + 0.421, 4.608, 2.28, 0.602, { color: card.bodyCol });
++  });
++  rect(s, 5.872, 5.852, 1.679, 0.422, C.dark);
++  txt(s, 'See More ', { x: 6.055, y: 5.895, w: 1.312, h: 0.337, align: 'center', fontFace: MAJOR, fontSize: 14, color: C.sage });
++}
++
++/** 16 — "Measurement and Evaluation": phone mockups + 60% doughnut chart. */
++function slide16(p) {
++  const s = newSlide(p, 16);
++  rect(s, 0, 0, 4.212, 7.5, C.dark);
++  [[1.313, 1.165, 2.564, 5.171], [3.371, 1.903, 2.219, 4.475]].forEach(b => {
++    s.addShape('roundRect', { x: b[0], y: b[1], w: b[2], h: b[3], rectRadius: 0.12, fill: { color: '5E465D' } });
++    s.addShape('roundRect', { x: b[0] + 0.03, y: b[1] + 0.03, w: b[2] - 0.06, h: b[3] - 0.06, rectRadius: 0.12, fill: { color: '706F6F' } });
++    s.addShape('roundRect', { x: b[0] + 0.065, y: b[1] + 0.04, w: b[2] - 0.13, h: b[3] - 0.08, rectRadius: 0.11, fill: { color: '1D1D1B' } });
++    rect(s, b[0] + b[2] * 0.38, b[1] + 0.045, b[2] * 0.24, 0.065, '111111');   // notch
++  });
++  title(s, 'Measurement and Evaluation ', 6.345, 1.183, 6.113, 2.121, C.ink85);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla feugiat erat ante, at posuere mauris scelerisque ac. Vivamus ultrices vitae erat id malesuada. ',
++    6.369, 3.449, 6.077, 0.602);
++  s.addChart('doughnut', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [30, 60] }], {
++    x: 6.345, y: 4.48, w: 1.444, h: 1.485, holeSize: 75, firstSliceAng: 0,
++    chartColors: [C.panel, C.dark], dataBorder: { pt: 0, color: C.page },
++    showLegend: false, showValue: false, showTitle: false, chartArea: { fill: { color: C.page } },
++  });
++  txt(s, '60%', { x: 6.558, y: 5.004, w: 1.019, h: 0.438, align: 'center', valign: 'middle', fontFace: MAJOR, fontSize: 20, bold: true, color: C.dark });
++  txt(s, '38,53-45,89K', { x: 8.242, y: 4.748, w: 2.588, h: 0.438, fontFace: MAJOR, fontSize: 20, bold: true, color: C.ink75 });
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin convallis, . Vivamus ultrices vitae erat id.',
++    8.242, 5.301, 4.425, 0.567, { lineSpacingMultiple: 1.2, color: C.ink85 });
++}
++
++/** 17 — "Creative Pricing Package": two dark price cards. */
++function slide17(p) {
++  const s = newSlide(p, 17);
++  title(s, 'Creative Pricing Package', 0.97, 1.006, 10.28, 1.111);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. Morbi tortor justo, porta eget consequat ac, semper sit am consectetur adipiscing elit. Proin bibendum risus sit et sem. ',
++    0.97, 2.207, 9.655, 0.596);
++  [['$250', 'Creative Brief 01', 3.557], ['$350', 'Creative Brief 02', 9.528]].forEach(([price, label, x]) => {
++    rect(s, x, 3.75, 2.377, 2.953, C.dark);
++    txt(s, price, { x: x + 0.228, y: 4.095, w: 1.845, h: 0.774, fontFace: MAJOR, fontSize: 40, bold: true, color: C.white });
++    txt(s, label, { x: x + 0.228, y: 5.047, w: 1.957, h: 0.37, fontFace: MAJOR, fontSize: 16, bold: true, color: C.white });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ', x + 0.228, 5.519, 1.934, 0.859, { color: C.white });
++  });
++}
++
++/** 18 — "Brief Data Report": pie chart flanked by three figures. */
++function slide18(p) {
++  const s = newSlide(p, 18);
++  txt(s, 'Brief Data Report ', { x: 2.323, y: 1.006, w: 8.688, h: 1.111, align: 'center', fontFace: MAJOR, fontSize: 60, bold: true, color: C.dark });
++  s.addChart('pie', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr'], values: [35, 25, 40] }], {
++    x: 3.575, y: 2.403, w: 6.184, h: 4.123, chartColors: [C.sageDeep, C.sagePale, C.sage],
++    dataBorder: { pt: 1.5, color: C.white }, showLegend: false, showValue: false, showTitle: false,
++    chartArea: { fill: { color: C.page } },
++  });
++  [[5.352, 3.699, 'up'], [6.438, 5.163, 'down'], [7.128, 3.699, 'flat']]
++    .forEach(b => barIcon(s, b[0], b[1], 0.698, C.white, b[2]));
++  // left figure block
++  txt(s, 'Project Brief One ', { x: 1.216, y: 3.033, w: 2.434, h: 0.438, align: 'center', fontFace: MAJOR, fontSize: 20, bold: true, color: C.sage });
++  txt(s, 'Production Cost Total', { x: 1.216, y: 3.647, w: 2.434, h: 0.337, align: 'center', fontFace: MAJOR, fontSize: 14, bold: true, color: C.ink85 });
++  txt(s, '$29,910', { x: 1.502, y: 4.062, w: 1.862, h: 0.572, align: 'center', fontFace: MAJOR, fontSize: 28, bold: true, color: C.sage });
++  para(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit Proin.', 0.999, 4.679, 2.866, 0.596, { align: 'center' });
++  s.addShape('roundRect', { x: 1.972, y: 5.453, w: 0.92, h: 0.332, rectRadius: 0.15, fill: { color: C.sage } });
++  txt(s, 'Check ', { x: 2.026, y: 5.467, w: 0.812, h: 0.303, align: 'center', fontFace: MAJOR, fontSize: 12, bold: true, color: C.white });
++  // right figure blocks
++  [['Project Brief Two ', '$18,349', C.sageDeep, 2.5], ['Project Brief Three ', '$12,320', C.sagePale, 4.659]].forEach(([label, value, col, y]) => {
++    txt(s, label, { x: 9.621, y, w: 2.434, h: 0.404, align: 'center', fontFace: MAJOR, fontSize: 18, bold: true, color: col });
++    txt(s, value, { x: 9.907, y: y + 0.404, w: 1.862, h: 0.505, align: 'center', fontFace: MAJOR, fontSize: 24, bold: true, color: col });
++    para(s, 'Lorem ipsum dolor sit amet, consec tetur adipiscing elit Proin.', 9.404, y + 0.966, 2.866, 0.596, { align: 'center' });
++  });
++  hLine(s, 9.468, 4.309, 2.65, C.ink85, 1);
++}
++
++/** 19 — "Market Chart": 100 % stacked column chart on a dark panel. */
++function slide19(p) {
++  const s = newSlide(p, 19);
++  rect(s, 0, 1.003, 6.352, 5.495, C.dark);
++  s.addChart('bar', [
++    { name: 'Series 1', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Series 2', labels: ['Category 1', 'Category 2', 'Category 3', 'Category 4'], values: [2.4, 4.4, 1.8, 2.8] },
++  ], {
++    x: 0.456, y: 1.331, w: 5.345, h: 4.839, barDir: 'col', barGrouping: 'percentStacked',
++    barGapWidthPct: 150, barOverlapPct: 100, chartColors: [C.sageDeep, C.sage],
++    showLegend: false, showValue: false, showTitle: false,
++    catAxisHidden: true, valAxisLabelFormatCode: '0%',
++    valAxisLabelColor: C.white, valAxisLabelFontFace: MINOR, valAxisLabelFontSize: 12,
++    valAxisLineShow: false, valGridLine: { color: C.grid, size: 0.75, style: 'solid' },
++    chartArea: { fill: { color: C.dark } }, plotArea: { fill: { color: C.dark } },
++  });
++  title(s, 'Market Chart ', 6.786, 1.51, 5.462, 1.111);
++  txt(s, 'Market Data Monthly Chart ', { x: 6.728, y: 2.727, w: 5.462, h: 0.404, fontFace: MAJOR, fontSize: 18, bold: true, color: C.sage });
++  [['4500+', 'Data One ', C.sage, 6.896, 'flat'], ['4300+', 'Data Two ', C.sageDeep, 9.864, 'up']].forEach(([big, small, col, x, variant]) => {
++    s.addShape('ellipse', { x, y: 3.576, w: 0.719, h: 0.719, fill: { color: col } });
++    barIcon(s, x + 0.133, 3.71, 0.452, C.white, variant);
++    txt(s, big, { x: x + 0.888, y: 3.448, w: 1.811, h: 0.64, fontFace: MAJOR, fontSize: 32, bold: true, color: col });
++    txt(s, small, { x: x + 0.888, y: 4.087, w: 1.329, h: 0.37, fontFace: MAJOR, fontSize: 16, bold: true, color: C.ink85 });
++  });
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. Morbi tortor justo.',
++    6.786, 4.706, 5.673, 0.596);
++  rect(s, 6.856, 5.569, 1.679, 0.422, C.dark);
++  txt(s, 'See More ', { x: 7.04, y: 5.611, w: 1.312, h: 0.337, align: 'center', fontFace: MAJOR, fontSize: 14, color: C.sage });
++}
++
++/**
++ * Filled sparkline used twice on slide 20. Drawn in three layers because
++ * pptxgenjs cannot put a gradient inside a chart series:
++ *   1. grid + solid area   2. page-coloured fade strips   3. line + markers.
++ */
++function areaSpark(p, s, x, y, w, h, color, values) {
++  const labels = values.map((_, i) => String(i + 1));
++  const axes = {
++    showLegend: false, showValue: false, showTitle: false,
++    catAxisHidden: true, valAxisHidden: true, valAxisMinVal: 0, valAxisMaxVal: 100, valAxisMajorUnit: 33.34,
++  };
++  s.addChart('area', [{ name: 'fill', labels, values }], Object.assign({
++    x, y, w, h, chartColors: [color],
++    catGridLine: { color: C.panelTxt, size: 0.25, style: 'solid' },
++    valGridLine: { color: C.panelTxt, size: 0.25, style: 'solid' },
++    chartArea: { fill: { color: C.page } }, plotArea: { fill: { color: C.page } },
++  }, axes));
++  const STRIPS = 40;
++  for (let i = 0; i < STRIPS; i++) {
++    rect(s, x, y + (h * i) / STRIPS, w, h / STRIPS + 0.02, C.page,
++      { line: { type: 'none' }, fill: { color: C.page, transparency: Math.round(100 - (i * 74) / (STRIPS - 1)) } });
++  }
++  s.addChart('line', [{ name: 'line', labels, values }], Object.assign({
++    x, y, w, h, chartColors: [color], lineSize: 0.75,
++    lineDataSymbol: 'circle', lineDataSymbolSize: 4, lineDataSymbolLineColor: color,
++    catGridLine: { style: 'none' }, valGridLine: { style: 'none' },
++    chartArea: { fill: { color: C.page, transparency: 100 } }, plotArea: { fill: { color: C.page, transparency: 100 } },
++  }, axes));
++}
++
++/** 20 — "Target Market Data Chart": two sparkline blocks with figures. */
++function slide20(p) {
++  const s = newSlide(p, 20);
++  title(s, 'Target Market Data Chart ', 0.88, 1.145, 4.382, 3.13);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. Morbi tortor justo.',
++    0.899, 4.345, 4.223, 0.859);
++  const SERIES = [26, 60, 26, 50, 45, 16, 26, 100, 45, 46];
++  [
++    { y: 1.556, color: C.dark, big: '23,000+', bigCol: '8CA07A', label: 'Market Two' },
++    { y: 4.105, color: C.sage, big: '53,000+', bigCol: C.sage, label: 'Market One' },
++  ].forEach(b => {
++    areaSpark(p, s, 5.786, b.y, 4.128, 1.838, b.color, SERIES);
++    txt(s, b.big, { x: 10.243, y: b.y + 0.382, w: 2.067, h: 0.555, fontFace: MAJOR, fontSize: 28, bold: true, color: b.bigCol });
++    txt(s, b.label, { x: 10.243, y: b.y + 0.867, w: 2.169, h: 0.325, fontFace: MAJOR, fontSize: 14, bold: true, color: C.ink85 });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adispicing elit. ', 10.243, b.y + 1.236, 2.423, 0.602, { color: C.ink75 });
++  });
++  rect(s, 1.006, 5.515, 1.679, 0.422, C.dark);
++  txt(s, 'See More ', { x: 1.19, y: 5.558, w: 1.312, h: 0.337, align: 'center', fontFace: MAJOR, fontSize: 14, color: C.sage });
++}
++
++/** 21 — "Profit Data Infographic": three interlocking gears + a bullet list. */
++function slide21(p) {
++  const s = newSlide(p, 21);
++  [
++    { x: 0.321, y: 2.164, d: 3.414, fill: C.sagePale, hole: 1.893, icon: 0.908, variant: 'flat' },
++    { x: 3.601, y: 0.989, d: 2.771, fill: C.sageDeep, hole: 1.537, icon: 0.619, variant: 'up' },
++    { x: 3.921, y: 3.896, d: 2.236, fill: C.sage, hole: 1.24, icon: 0.619, variant: 'down' },
++  ].forEach(g => {
++    s.addShape('gear9', { x: g.x, y: g.y, w: g.d, h: g.d, fill: { color: g.fill }, line: { color: C.white, width: 3, transparency: 60 }, shadow: SHADOW_TILE });
++    const cx = g.x + g.d / 2, cy = g.y + g.d / 2;
++    s.addShape('ellipse', { x: cx - g.hole / 2, y: cy - g.hole / 2, w: g.hole, h: g.hole, fill: { color: C.white } });
++    barIcon(s, cx - g.icon / 2, cy - g.icon / 2, g.icon, C.sage, g.variant);
++  });
++  title(s, 'Profit Data Infographic ', 7.0, 0.885, 5.175, 2.121);
++  [
++    ['Series One ', '2347+', C.sagePale], ['Series Two ', '3215+', C.sageDeep], ['Series Three ', '2345+', C.sage],
++  ].forEach(([label, value, col], i) => {
++    const y = 3.161 + i * 1.174;
++    s.addShape('ellipse', { x: 7.147, y: y + 0.604, w: 0.103, h: 0.103, fill: { color: col } });
++    txt(s, label, { x: 7.349, y, w: 2.9, h: 0.37, fontFace: MAJOR, fontSize: 16, bold: true, color: col });
++    txt(s, value, { x: 7.349, y: y + 0.37, w: 1.389, h: 0.572, fontFace: MAJOR, fontSize: 28, bold: true, color: col });
++    para(s, 'Lorem ipsum dolor sit amet adipiscing elit. Proin sit tristique. ', 8.738, y + 0.338, 3.266, 0.604);
++  });
++}
++
++/** Linear blend between two hex colours. */
++function mix(from, to, t) {
++  return [0, 2, 4]
++    .map(i => Math.round(parseInt(from.substr(i, 2), 16) * (1 - t) + parseInt(to.substr(i, 2), 16) * t))
++    .map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
++}
++
++/** Dark→sage bridge between the two discs, stepped as overlapping circles. */
++function gradientBridge(s, cx0, cx1, cy, d, from, to, steps) {
++  for (let i = 0; i < steps; i++) {
++    const t = i / (steps - 1);
++    s.addShape('ellipse', { x: cx0 + (cx1 - cx0) * t - d / 2, y: cy - d / 2, w: d, h: d, fill: { color: mix(from, to, t) } });
++  }
++}
++
++/** 22 — "Circle Data Infographic": two circles bridged by a gradient band. */
++function slide22(p) {
++  const s = newSlide(p, 22);
++  txt(s, 'Circle Data Infographic', { x: 1.458, y: 0.976, w: 10.417, h: 1.143, align: 'center', fontFace: MAJOR, fontSize: 60, bold: true, color: C.dark });
++  gradientBridge(s, 3.349, 9.986, 4.571, 4.207, C.darkMid, C.sageDeep, 34);
++  s.addShape('ellipse', { x: 1.245, y: 2.467, w: 4.207, h: 4.207, fill: { color: C.dark } });
++  s.addShape('ellipse', { x: 7.882, y: 2.467, w: 4.207, h: 4.207, fill: { color: C.sage } });
++  [
++    { x: 1.64, label: 'Project Layer 01', value: '$126,238', icon: coinIcon },
++    { x: 8.277, label: 'Project Layer 02', value: '$238,349', icon: blockIcon },
++  ].forEach(b => {
++    b.icon(s, b.x + 1.404, 3.289, 0.609, C.white);
++    txt(s, b.label, { x: b.x + 0.202, y: 4.052, w: 3.012, h: 0.438, align: 'center', fontFace: MAJOR, fontSize: 20, bold: true, color: C.white });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit', b.x, 4.616, 3.417, 0.605, { align: 'center', color: C.white });
++    txt(s, b.value, { x: b.x + 0.601, y: 5.346, w: 2.215, h: 0.505, align: 'center', fontFace: MAJOR, fontSize: 24, bold: true, color: C.white });
++  });
++  txt(s, 'Project Swap ', { x: 5.452, y: 3.614, w: 2.43, h: 0.505, align: 'center', fontFace: MAJOR, fontSize: 24, bold: true, color: C.white });
++  s.addShape('rightArrow', { x: 6.04, y: 4.405, w: 1.253, h: 0.505, fill: { color: C.white } });
++  s.addShape('rightArrow', { x: 6.04, y: 4.954, w: 1.253, h: 0.505, fill: { color: C.white }, flipH: true });
++}
++
++/* Bounding boxes of the archipelago outlines on slide 23 (x, y, w, h in inches).
++   The source uses freeform island paths; rounded blobs stand in for them. */
++const MAP_ISLANDS = [
++  [0.955, 2.377, 0.811, 1.045], [1.469, 2.808, 0.838, 1.316], [1.843, 3.728, 0.811, 1.171],
++  [2.214, 3.276, 0.925, 0.979], [2.451, 4.561, 0.677, 0.882], [2.472, 4.164, 0.851, 0.545],
++  [2.709, 4.419, 0.993, 0.874], [3.012, 2.683, 1.446, 1.459], [3.091, 4.970, 0.572, 0.654],
++  [3.466, 5.521, 0.408, 0.331], [3.471, 4.364, 0.785, 0.474], [3.779, 5.552, 0.624, 0.514],
++  [4.322, 5.503, 0.772, 0.677], [4.348, 3.402, 1.375, 1.388], [4.867, 3.765, 1.259, 1.156],
++  [4.912, 5.503, 1.325, 0.822], [5.618, 3.271, 1.301, 1.328], [5.750, 4.327, 0.564, 1.139],
++  [5.784, 6.132, 0.314, 0.217], [5.810, 2.780, 0.856, 0.916], [6.127, 6.137, 0.848, 0.277],
++  [6.577, 4.459, 1.043, 1.499], [6.854, 4.190, 0.277, 0.731], [6.899, 6.132, 1.552, 0.799],
++  [7.036, 3.602, 1.133, 1.236], [7.378, 4.735, 0.867, 0.845], [7.449, 3.685, 0.588, 0.200],
++  [7.937, 2.468, 1.004, 1.422], [8.234, 3.139, 1.865, 1.488], [8.587, 4.710, 2.279, 1.502],
++  [9.475, 3.673, 1.481, 1.445], [10.700, 4.130, 1.678, 2.284],
++];
++
++/** 23 — "Heat Map Infographic": stylised archipelago with two callout cards. */
++function slide23(p) {
++  const s = newSlide(p, 23);
++  MAP_ISLANDS.forEach((b, i) => s.addShape('ellipse', { x: b[0], y: b[1], w: b[2], h: b[3], rotate: (i % 5) * 9 - 18, fill: { color: C.grid } }));
++  txt(s, 'Heat Map Infographic', { x: 1.225, y: 0.839, w: 10.884, h: 1.111, align: 'center', fontFace: MAJOR, fontSize: 60, bold: true, color: C.dark });
++  [
++    { card: [0.774, 5.389], bg: C.dark, pin: [2.37, 3.729], num: '01',
++      label: 'Business Progress One', value: '$658 - $906', elbow: [[1.019, 4.223], [2.37, 3.976]] },
++    { card: [9.948, 2.254], bg: C.sage, pin: [7.031, 4.245], num: '02',
++      label: 'Business Progress Two', value: '$620 - $890', elbow: [[9.722, 2.839], [7.278, 4.107]] },
++  ].forEach(b => {
++    // dashed elbow connector: horizontal leg from the pin, then a vertical leg to the card
++    const [c, pin] = b.elbow;
++    s.addShape('line', { x: Math.min(c[0], pin[0]), y: pin[1], w: Math.abs(pin[0] - c[0]), h: 0, line: { color: C.panelTxt, width: 1, dashType: 'lgDash' } });
++    s.addShape('line', { x: c[0], y: Math.min(c[1], pin[1]), w: 0, h: Math.abs(c[1] - pin[1]), line: { color: C.panelTxt, width: 1, dashType: 'lgDash' } });
++    rect(s, b.card[0], b.card[1], 2.718, 1.171, b.bg);
++    txt(s, b.label, { x: b.card[0] + 0.271, y: b.card[1] + 0.209, w: 2.176, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true, color: C.white });
++    txt(s, b.value, { x: b.card[0] + 0.271, y: b.card[1] + 0.525, w: 1.988, h: 0.438, fontFace: MAJOR, fontSize: 20, color: C.white });
++    s.addShape('ellipse', { x: b.pin[0], y: b.pin[1], w: 0.494, h: 0.494, fill: { color: b.bg } });
++    txt(s, b.num, { x: b.pin[0], y: b.pin[1] + 0.078, w: 0.494, h: 0.337, align: 'center', fontFace: MAJOR, fontSize: 14, color: C.white });
++  });
++}
++
++/** House / receiver / envelope icons for the contact row of slide 24. */
++function contactIcon(s, kind, x, y, size, color) {
++  if (kind === 'home') {
++    s.addShape('triangle', { x, y: y + size * 0.08, w: size, h: size * 0.42, fill: { color } });
++    rect(s, x + size * 0.16, y + size * 0.48, size * 0.68, size * 0.44, color);
++  } else if (kind === 'phone') {
++    s.addShape('roundRect', { x: x + size * 0.37, y: y + size * 0.06, w: size * 0.26, h: size * 0.88, rectRadius: 0.5, fill: { color }, rotate: 35 });
++    s.addShape('ellipse', { x: x + size * 0.02, y: y + size * 0.06, w: size * 0.34, h: size * 0.34, fill: { color } });
++    s.addShape('ellipse', { x: x + size * 0.64, y: y + size * 0.6, w: size * 0.34, h: size * 0.34, fill: { color } });
++  } else {
++    rect(s, x, y + size * 0.18, size, size * 0.64, color);
++    s.addShape('line', { x, y: y + size * 0.18, w: size * 0.5, h: size * 0.42, line: { color: C.page, width: 1.25 } });
++    s.addShape('line', { x: x + size * 0.5, y: y + size * 0.6, w: size * 0.5, h: -size * 0.42, line: { color: C.page, width: 1.25 } });
++  }
++}
++
++/** 24 — "Get in Touch With Us": contact details and a call-to-action button. */
++function slide24(p) {
++  const s = newSlide(p, 24);
++  rect(s, -0.055, 0.797, 4.807, 5.906, C.dark);
++  title(s, 'Get in Touch  With Us ', 7.125, 1.296, 5.385, 2.121, C.ink85);
++  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin bibendum risus sit amet venenatis tristique. Morbi tortor justo.',
++    7.125, 3.595, 5.385, 0.596);
++  [
++    { x: 7.22, kind: 'home', w: 1.957, lines: 'Head Office :\nRoosevolt Street, L5 USA' },
++    { x: 9.317, kind: 'phone', w: 1.574, lines: 'Phone :\n6489-298-28900' },
++    { x: 11.031, kind: 'mail', w: 1.792, lines: 'Email :\nCreative@briefcommu' },
++  ].forEach(b => {
++    contactIcon(s, b.kind, b.x + 0.05, 4.454, 0.368, C.dark);
++    txt(s, b.lines, { x: b.x, y: 4.864, w: b.w, h: 0.555, fontSize: 11, color: C.ink85, lineSpacingMultiple: 1.2 });
++  });
++  rect(s, 7.22, 5.77, 1.679, 0.422, C.dark);
++  txt(s, 'Get Contact  ', { x: 7.403, y: 5.813, w: 1.312, h: 0.337, align: 'center', fontFace: MAJOR, fontSize: 14, color: C.sage });
++  imagePanel(s, 0.957, 1.636, 5.252, 4.289);
++}
++
++/** 25 — closing slide, mirrors the cover. */
++function slide25(p) {
++  const s = newSlide(p, 0, C.dark);
++  txt(s, 'Thank You ', { x: 7.639, y: 3.326, w: 5.028, h: 2.723, align: 'right', fontFace: MAJOR, fontSize: 96, color: C.sage, lineSpacingMultiple: 0.8 });
++  txt(s, 'Creative Brief Presentation Template', { x: 7.4, y: 6.266, w: 5.267, h: 0.438, align: 'right', fontSize: 20, color: C.white });
++  hLine(s, 8.204, 6.066, 4.288, C.sage);
++  imagePanel(s, 0.667, 0, 6.347, 7.5);
++}
++
++/* -------------------------------------------------------------------- main */
++function main() {
++  const pptx = new pptxgen();
++  pptx.defineLayout({ name: 'W16x9', width: 13.333, height: 7.5 });
++  pptx.layout = 'W16x9';
++  pptx.author = 'Creative Brief';
++  pptx.title = 'Creative Brief Presentation Template';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++    slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++    slide19, slide20, slide21, slide22, slide23, slide24, slide25]
++    .forEach(build => build(pptx));
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '0bb81db0-a823-47e5-b3e8-68f85f9de39b_grok_final.pptx') });
++}
++
++main().then(f => console.log('wrote', f));

@@ -1,0 +1,665 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/agriculture_farming_company_overview.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/agriculture_farming_company_overview.js
+@@ -0,0 +1,662 @@
++#!/usr/bin/env node
++/**
++ * "Agriculture / Agriculture and Farming Presentation" - 20 slides, 20 x 11.25 in.
++ * Rebuilt from scratch with pptxgenjs; run with no arguments to emit the .pptx
++ * next to this file.
++ *
++ * The source deck's photo frames are empty picture placeholders (no bitmap is
++ * embedded anywhere), so they are intentionally left blank here too; the small
++ * pictogram graphics are redrawn as programmatic glyph marks by `icon()`.
++ */
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ tokens */
++const GREEN = '148126';
++const ORANGE = 'FF8C27';
++const INK = '0A1722';
++const WHITE = 'FFFFFF';
++const BODY_GREY = '262626'; // tx1 lumMod 85% / lumOff 15%
++const TRACK_GREY = 'F2F2F2'; // bg1 lumMod 95%
++const HAIRLINE = 'D9D9D9'; // bg1 lumMod 85%
++
++const SERIF = 'DM Serif Display';
++const SANS = 'Inter';
++const SANS_SB = 'Inter SemiBold';
++const SANS_LT = 'Inter Light';
++
++const SLIDE_W = 20;
++const SLIDE_H = 11.25;
++
++/* Soft shadows used by the template's cards and tiles. Built by factory
++   functions because pptxgenjs rewrites the object it is handed. */
++const cardShadow = () => ({ type: 'outer', blur: 80, offset: 0, angle: 0, color: 'BFBFBF', opacity: 0.4 });
++const tileShadow = () => ({ type: 'outer', blur: 45, offset: 0, angle: 0, color: '808080', opacity: 0.4 });
++const dropShadow = (color = '595959') => ({ type: 'outer', blur: 90, offset: 40, angle: 45, color, opacity: 0.4 });
++
++/* ----------------------------------------------------------------- helpers */
++
++/** pptxgenjs only exposes preset-shape adjust handles through `angleRange`,
++ *  which writes <a:gd name="adjN" fmla="val round(v*60000)"/>. Feed it raw
++ *  OOXML adjust values (0..100000) scaled back down. */
++const adjust = (adj1, adj2 = 0) => ({ angleRange: [adj1 / 60000, adj2 / 60000] });
++
++/** roundRect adjust value -> pptxgenjs `rectRadius` (inches). */
++const radius = (adj, w, h) => (adj / 100000) * Math.min(w, h);
++
++const text = (slide, str, o) =>
++    slide.addText(str, Object.assign({ fontFace: SANS_LT, fontSize: 18, color: BODY_GREY, valign: 'top' }, o));
++
++/** Small orange/white all-caps kicker above every headline. */
++const eyebrow = (slide, str, x, y, w, color = ORANGE) =>
++    text(slide, str, { x, y, w, h: 0.404, fontFace: SANS_SB, fontSize: 18, color, charSpacing: 1, wrap: false });
++
++/** DM Serif Display headline. */
++const heading = (slide, str, x, y, w, h, o = {}) =>
++    text(slide, str, Object.assign({ x, y, w, h, fontFace: SERIF, fontSize: 54, color: INK }, o));
++
++/** Inter Light paragraph, 150% leading. */
++const paragraph = (slide, str, x, y, w, h, o = {}) =>
++    text(slide, str, Object.assign({ x, y, w, h, lineSpacingMultiple: 1.5 }, o));
++
++/** 20pt "Write Anything Here" style card title. */
++const cardTitle = (slide, str, x, y, w, o = {}) =>
++    text(slide, str, Object.assign({ x, y, w, h: 0.438, fontFace: SANS_SB, fontSize: 20, color: INK }, o));
++
++/* Line-art farm pictograms, described in unit coordinates (0..1 inside the
++   icon box) so `icon()` can stamp them at any size. Primitives:
++     ln x1 y1 x2 y2 | el x y w h (outline) | dot x y d | rc x y w h | rr x y w h r */
++const GLYPHS = {
++    wheat: [
++        ...[0.11, 0.34, 0.57, 0.8].flatMap(x => [
++            ['ln', x + 0.06, 0.16, x + 0.06, 0.84],
++            ['el', x, 0.1, 0.12, 0.24],
++            ['el', x, 0.28, 0.12, 0.24],
++            ['el', x, 0.46, 0.12, 0.24],
++        ]),
++        ['ln', 0.04, 0.9, 0.96, 0.9],
++    ],
++    farmer: [
++        ['el', 0.34, 0.04, 0.34, 0.14], ['ln', 0.26, 0.14, 0.76, 0.14], // hat
++        ['el', 0.4, 0.12, 0.22, 0.24], // head
++        ['ln', 0.3, 0.44, 0.72, 0.44], // shoulders
++        ['ln', 0.3, 0.44, 0.3, 0.94], ['ln', 0.72, 0.44, 0.72, 0.94],
++        ['ln', 0.3, 0.94, 0.72, 0.94],
++        ['ln', 0.44, 0.36, 0.44, 0.64], ['ln', 0.58, 0.36, 0.58, 0.64], // overall straps
++        ['ln', 0.44, 0.64, 0.58, 0.64],
++        ['ln', 0.14, 0.2, 0.14, 0.94], // pitchfork
++        ['ln', 0.04, 0.2, 0.24, 0.2], ['ln', 0.06, 0.06, 0.06, 0.2], ['ln', 0.22, 0.06, 0.22, 0.2],
++    ],
++    seedbag: [
++        ['rr', 0.24, 0.08, 0.52, 0.84, 0.06],
++        ['ln', 0.24, 0.2, 0.76, 0.2], // folded top
++        ['el', 0.36, 0.36, 0.28, 0.34], // leaf badge
++        ['ln', 0.4, 0.66, 0.6, 0.4],
++    ],
++    scarecrow: [
++        ['rc', 0.36, 0.04, 0.28, 0.08], ['ln', 0.28, 0.12, 0.72, 0.12],
++        ['el', 0.38, 0.12, 0.24, 0.24],
++        ['ln', 0.5, 0.36, 0.5, 0.96],
++        ['ln', 0.12, 0.46, 0.88, 0.46],
++        ['ln', 0.3, 0.4, 0.3, 0.74], ['ln', 0.7, 0.4, 0.7, 0.74],
++        ['ln', 0.3, 0.74, 0.7, 0.74],
++    ],
++    corn: [
++        ['el', 0.34, 0.06, 0.32, 0.62],
++        ['ln', 0.5, 0.1, 0.5, 0.64],
++        ['el', 0.06, 0.4, 0.38, 0.56], ['el', 0.56, 0.4, 0.38, 0.56],
++    ],
++    tractor: [
++        ['rc', 0.46, 0.16, 0.26, 0.22],
++        ['rr', 0.2, 0.38, 0.56, 0.22, 0.05],
++        ['el', 0.5, 0.56, 0.38, 0.38], ['dot', 0.65, 0.71, 0.08],
++        ['el', 0.1, 0.68, 0.26, 0.26], ['dot', 0.2, 0.775, 0.06],
++    ],
++};
++
++/** Stamp one of the GLYPHS at (x, y) in a `size` inch square. */
++function icon(slide, kind, x, y, size, color = ORANGE) {
++    const w = size * 1.9; // stroke weight in points, proportional to icon size
++    const line = { color, width: w };
++    GLYPHS[kind].forEach(g => {
++        const [t, a, b, c, d, e] = g;
++        const X = v => x + v * size;
++        const Y = v => y + v * size;
++        if (t === 'ln') slide.addShape('line', { x: X(a), y: Y(b), w: (c - a) * size, h: (d - b) * size, line });
++        else if (t === 'el') slide.addShape('ellipse', { x: X(a), y: Y(b), w: c * size, h: d * size, fill: { type: 'none' }, line });
++        else if (t === 'dot') slide.addShape('ellipse', { x: X(a), y: Y(b), w: c * size, h: c * size, fill: { color }, line: { type: 'none' } });
++        else if (t === 'rc') slide.addShape('rect', { x: X(a), y: Y(b), w: c * size, h: d * size, fill: { type: 'none' }, line });
++        else slide.addShape('roundRect', { x: X(a), y: Y(b), w: c * size, h: d * size, rectRadius: e * size, fill: { type: 'none' }, line });
++    });
++}
++
++/** Instagram / facebook / twitter marks, stepped by (gap, gapY) each.
++ *  `knockout` is the surface colour showing through the facebook "f". */
++function socialRow(slide, x, y, size, gap, color = ORANGE, gapY = 0, knockout = WHITE) {
++    // instagram: outlined rounded square with a ring and a corner dot
++    slide.addShape('roundRect', {
++        x, y, w: size, h: size, rectRadius: size * 0.22,
++        fill: { type: 'none' }, line: { color, width: size * 4.5 },
++    });
++    slide.addShape('ellipse', {
++        x: x + size * 0.28, y: y + size * 0.28, w: size * 0.44, h: size * 0.44,
++        fill: { type: 'none' }, line: { color, width: size * 4.5 },
++    });
++    slide.addShape('ellipse', {
++        x: x + size * 0.7, y: y + size * 0.14, w: size * 0.14, h: size * 0.14,
++        fill: { color }, line: { type: 'none' },
++    });
++
++    // facebook: solid rounded square knocked out with an "f"
++    slide.addShape('roundRect', {
++        x: x + gap, y: y + gapY, w: size, h: size, rectRadius: size * 0.12,
++        fill: { color }, line: { type: 'none' },
++    });
++    slide.addShape('rect', {
++        x: x + gap + size * 0.44, y: y + gapY + size * 0.22, w: size * 0.16, h: size * 0.78,
++        fill: { color: knockout }, line: { type: 'none' },
++    });
++    slide.addShape('rect', {
++        x: x + gap + size * 0.3, y: y + gapY + size * 0.42, w: size * 0.36, h: size * 0.14,
++        fill: { color: knockout }, line: { type: 'none' },
++    });
++    slide.addShape('rect', {
++        x: x + gap + size * 0.44, y: y + gapY + size * 0.22, w: size * 0.24, h: size * 0.14,
++        fill: { color: knockout }, line: { type: 'none' },
++    });
++
++    // twitter: swept bird silhouette
++    slide.addShape('custGeom', {
++        x: x + 2 * gap, y: y + 2 * gapY + size * 0.2, w: size, h: size * 0.6,
++        fill: { color }, line: { type: 'none' },
++        points: [
++            { x: size, y: 0 },
++            { x: 0.72 * size, y: 0.12 * size },
++            { x: 0.36 * size, y: 0.16 * size, curve: { type: 'cubic', x1: 0.6 * size, y1: 0, x2: 0.42 * size, y2: 0.02 * size } },
++            { x: 0.3 * size, y: 0.44 * size, curve: { type: 'cubic', x1: 0.28 * size, y1: 0.3 * size, x2: 0.26 * size, y2: 0.4 * size } },
++            { x: 0.03 * size, y: 0.2 * size },
++            { x: 0.2 * size, y: 0.56 * size, curve: { type: 'cubic', x1: 0, y1: 0.4 * size, x2: 0.06 * size, y2: 0.52 * size } },
++            { x: 0, y: 0.6 * size },
++            { x: 0.62 * size, y: 0.5 * size, curve: { type: 'cubic', x1: 0.34 * size, y1: 0.66 * size, x2: 0.52 * size, y2: 0.6 * size } },
++            { x: 0.8 * size, y: 0.1 * size, curve: { type: 'cubic', x1: 0.8 * size, y1: 0.38 * size, x2: 0.84 * size, y2: 0.2 * size } },
++            { x: size, y: 0 },
++            { close: true },
++        ],
++    });
++}
++
++/** Blend `hex` toward white; t=0 keeps the colour, t=1 is pure white. */
++function tint(hex, t) {
++    const ch = i => {
++        const v = parseInt(hex.substr(i * 2, 2), 16);
++        return Math.round(v + (255 - v) * t).toString(16).padStart(2, '0');
++    };
++    return (ch(0) + ch(1) + ch(2)).toUpperCase();
++}
++
++/** Vertical colour->white wash. pptxgenjs exposes no gradient fill, so the
++ *  ramp is painted as a stack of pre-blended opaque bands. */
++function verticalFade(slide, { x, y, w, h, color, fromT, toT, bands = 64 }) {
++    const band = h / bands;
++    for (let i = 0; i < bands; i++) {
++        slide.addShape('rect', {
++            x, y: y + i * band, w, h: band * 2, // bands overlap so no seams show
++            fill: { color: tint(color, (fromT + ((toT - fromT) * i) / (bands - 1)) / 100) },
++            line: { type: 'none' },
++        });
++    }
++}
++
++/** Rectangle with an arbitrary subset of corners rounded ([tl, tr, br, bl]). */
++function corneredRect(slide, { x, y, w, h, r, corners }, style) {
++    const k = 0.4477 * r; // circular-arc bezier handle
++    const [tl, tr, br, bl] = corners;
++    const pts = [];
++    pts.push({ x: tl ? r : 0, y: 0 });
++    pts.push({ x: tr ? w - r : w, y: 0 });
++    if (tr) pts.push({ x: w, y: r, curve: { type: 'cubic', x1: w - r + k, y1: 0, x2: w, y2: r - k } });
++    pts.push({ x: w, y: br ? h - r : h });
++    if (br) pts.push({ x: w - r, y: h, curve: { type: 'cubic', x1: w, y1: h - r + k, x2: w - r + k, y2: h } });
++    pts.push({ x: bl ? r : 0, y: h });
++    if (bl) pts.push({ x: 0, y: h - r, curve: { type: 'cubic', x1: r - k, y1: h, x2: 0, y2: h - r + k } });
++    pts.push({ x: 0, y: tl ? r : 0 });
++    if (tl) pts.push({ x: r, y: 0, curve: { type: 'cubic', x1: 0, y1: r - k, x2: r - k, y2: 0 } });
++    pts.push({ close: true });
++    slide.addShape('custGeom', Object.assign({ x, y, w, h, points: pts }, style));
++}
++
++/* ------------------------------------------------------------ slide bodies */
++
++/* Cover + closer share the green wash, the leaf wordmark and the caption bar. */
++function coverSlide(slide, { title, titleY, leafX, barX, barY, captionX, captionY, footer }) {
++    slide.addShape('rect', { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H * 0.43, fill: { color: GREEN }, line: { type: 'none' } });
++    verticalFade(slide, { x: 0, y: SLIDE_H * 0.43, w: SLIDE_W, h: SLIDE_H * 0.57, color: GREEN, fromT: 0, toT: 100 });
++
++    text(slide, title, { x: 2.227, y: titleY, w: 15.546, h: 3.13, fontFace: SERIF, fontSize: 180, color: WHITE, align: 'center' });
++    leafMark(slide, leafX, titleY + 0.261);
++
++    slide.addShape('round2DiagRect', Object.assign({
++        x: barX, y: barY, w: 9.127, h: 1.23, fill: { color: ORANGE }, line: { type: 'none' },
++    }, adjust(50000)));
++    text(slide, 'Agriculture and Farming Presentation', {
++        x: captionX, y: captionY, w: 7.102, h: 0.572,
++        fontFace: SANS, fontSize: 28, color: WHITE, align: 'center', wrap: false,
++    });
++    if (footer) {
++        text(slide, footer, { x: 8.16, y: 10.167, w: 3.68, h: 0.438, fontFace: SANS, fontSize: 20, color: WHITE, align: 'center', wrap: false });
++    }
++}
++
++/** Orange leaf sitting on the wordmark: a tilted quarter-round blade plus a
++ *  two-diagonal-corner square. */
++function leafMark(slide, x, y) {
++    slide.addShape('custGeom', {
++        x, y, w: 0.583, h: 0.583, rotate: 332.8, fill: { color: ORANGE }, line: { type: 'none' },
++        points: [
++            { x: 0.583, y: 0 },
++            { x: 0.583, y: 0.227 },
++            { x: 0.53, y: 0.2 },
++            { x: 0.137, y: 0.326, curve: { type: 'cubic', x1: 0.387, y1: 0.126, x2: 0.211, y2: 0.183 } },
++            { x: 0.005, y: 0.583 },
++            { x: 0, y: 0.583 },
++            { x: 0, y: 0.292 },
++            { x: 0.292, y: 0, curve: { type: 'cubic', x1: 0, y1: 0.131, x2: 0.131, y2: 0 } },
++            { close: true },
++        ],
++    });
++    slide.addShape('round2DiagRect', Object.assign({
++        x: x + 0.196, y: y + 0.119, w: 0.583, h: 0.583, fill: { color: ORANGE }, line: { type: 'none' },
++    }, adjust(50000)));
++}
++
++const slide01 = s => coverSlide(s, {
++    title: 'Agriculture', titleY: 2.0, leafX: 7.554,
++    barX: 7.248, barY: 4.838, captionX: 8.261, captionY: 5.167,
++});
++
++function slide02(s) {
++    eyebrow(s, 'WELCOME SLIDE', 1.748, 2.304, 2.476);
++    heading(s, 'We\u2019re Good Partner for Agriculture', 1.748, 2.95, 7.46, 1.919);
++    paragraph(s, [
++        { text: 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu non odio euismod lacinia. Tellus elementum sagittis vitae et leo duis. Sit amet mauris commodo quis imperdiet massa tincidunt nunc. Congue mauris rhoncus aenean vel elit scelerisque mauris pellentesque.', options: { breakLine: true } },
++        { text: '', options: { breakLine: true } },
++        { text: 'Facilisis leo vel fringilla est. Scelerisque viverra mauris aliquam sem fringilla magna amet purus gravida.' },
++    ], 1.748, 5.263, 7.231, 3.683);
++}
++
++function slide03(s) {
++    s.addShape('round2DiagRect', Object.assign({
++        x: 9.725, y: 1.411, w: 5.553, h: 8.427, fill: { color: GREEN }, line: { type: 'none' }, shadow: dropShadow(INK),
++    }, adjust(14416)));
++
++    [{ kind: 'wheat', iy: 2.239, ty: 3.208 }, { kind: 'farmer', iy: 6.145, ty: 7.12 }].forEach(({ kind, iy, ty }) => {
++        icon(s, kind, 10.55, iy, 0.787);
++        cardTitle(s, 'Write Anything Here', 10.55, ty, 3.903, { color: WHITE });
++        paragraph(s, 'PLACEHOLDER', 10.55, ty + 0.486, 3.903, 1.411, { color: WHITE });
++    });
++    s.addShape('line', { x: 10.55, y: 5.625, w: 4.172, h: 0, line: { color: WHITE, width: 2 } });
++
++    eyebrow(s, 'ABOUT US', 1.74, 2.371, 1.624);
++    heading(s, 'Exploring the Journey of Food Production', 1.74, 3.017, 6.01, 2.827);
++    paragraph(s, 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu odio euismod lacinia. Tellus elementu sagittis vitae et leo duis. Sit amet mauris commodo quis imperdiet massa tinidunt nunc. Congue mauris rhoncus aenean vel elit scelerisque mauris pellente Facilisis leo vel fringilla estanau vivera here.', 1.74, 6.105, 6.466, 2.774);
++}
++
++function slide04(s) {
++    corneredRect(s, { x: 1.396, y: 1.244, w: 7.688, h: 8.761, r: 0.887, corners: [1, 0, 0, 1] },
++        { fill: { color: GREEN, transparency: 12 }, line: { type: 'none' } });
++
++    [['wheat', 1.771], ['seedbag', 4.625], ['farmer', 7.479]].forEach(([kind, y]) => {
++        cardTitle(s, 'Write Anything Here', 10.571, y, 3.903);
++        paragraph(s, 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu odio euismod lacinia. Tellus elementu sagittis vitae etan leo duis situn amet mauris commodo quis imperdiet massa. ', 10.571, y + 0.589, 8.093, 1.411);
++        s.addShape('round2DiagRect', Object.assign({
++            x: 8.49, y, w: 1.188, h: 1.188, fill: { color: ORANGE }, line: { type: 'none' }, shadow: tileShadow(),
++        }, adjust(37368)));
++        icon(s, kind, 8.808, y + 0.318, 0.551, WHITE);
++    });
++
++    eyebrow(s, 'ABOUT US', 2.645, 5.958, 1.624, WHITE);
++    heading(s, 'Sustainable Farming', 2.645, 6.52, 5.398, 2.121, { fontSize: 60, color: WHITE });
++}
++
++function slide05(s) {
++    verticalFade(s, { x: 0, y: 8.563, w: SLIDE_W, h: 2.687, color: GREEN, fromT: 100, toT: 0 });
++
++    eyebrow(s, 'ABOUT US', 1.709, 1.584, 1.624);
++    heading(s, 'Lessons for Modern Agriculture', 1.709, 2.23, 7.46, 1.919);
++    icon(s, 'wheat', 10.491, 1.503, 0.669);
++    paragraph(s, 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu non odio euismod lacinia. Tellus elementum sagittis vitae et leo duis. Sit amet mauris commodo quis imperdiet massa tincidunt nunc. Congue mauris rhoncus aenean elit scelerisque.', 10.423, 2.283, 7.792, 1.865);
++
++    [1.785, 7.347, 12.91].forEach((x, i) => {
++        const y = [5.039, 5.033, 5.026][i];
++        s.addShape('roundRect', {
++            x, y, w: 5.306, h: 2.794, rectRadius: radius(10517, 5.306, 2.794),
++            fill: { color: WHITE }, line: { type: 'none' }, shadow: cardShadow(),
++        });
++        icon(s, ['scarecrow', 'corn', 'tractor'][i], x + 0.559, y + [0.562, 0.567, 0.563][i], 0.591);
++        paragraph(s, 'Risus commodo viverra maecenas accumsan lacus sed arcu odio.', x + 0.559, y + 1.276, 4.187, 0.957);
++    });
++}
++
++function slide06(s) {
++    s.addShape('round2DiagRect', Object.assign({
++        x: 1.959, y: 6.77, w: 11.27, h: 2.922, fill: { color: GREEN }, line: { type: 'none' }, shadow: dropShadow(),
++    }, adjust(23685)));
++
++    eyebrow(s, 'ABOUT US', 1.959, 1.916, 1.624);
++    heading(s, 'Rice and Wheat, our main Agriculture', 1.959, 2.562, 7.46, 1.919);
++    paragraph(s, 'Risus commodo vivera maecenas accumsan lacus vel. Sed arcu non odio euismod lacinia. Tellus elemen tuma sagittis vitae et leo duis. Sit amet mauris commodo quis.', 1.959, 4.722, 7.187, 1.411);
++
++    s.addShape('round2DiagRect', Object.assign({
++        x: 2.946, y: 7.578, w: 1.188, h: 1.188, fill: { color: ORANGE }, line: { type: 'none' },
++    }, adjust(37368)));
++    icon(s, 'wheat', 3.264, 7.896, 0.551, WHITE);
++    paragraph(s, 'Risus commodo vivera maecenas accumsan lacus vel. Sed arcu non odio euismod lacinia. Tellus elemen tuma sagittis vitae et leo duis. Sit amet mauris commodo quis.', 4.805, 7.466, 7.549, 1.411, { color: WHITE });
++}
++
++function slide07(s) {
++    eyebrow(s, 'ABOUT US', 1.74, 2.371, 1.624);
++    heading(s, 'How Innovation is Reshaping the Agriculture', 1.74, 3.017, 6.01, 2.827);
++    paragraph(s, 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu odio euismod lacinia. Tellus elementu sagittis vitae et leo duis. Sit amet mauris commodo quis imperdiet massa tinidunt nunc. Congue mauris rhoncus aenean vel elit scelerisque mauris pellente Facilisis leo.', 1.74, 6.105, 6.01, 2.774);
++
++    [8.842, 13.738].forEach((x, i) => {
++        s.addShape('roundRect', {
++            x, y: 6.388, w: 4.583, h: 2.774, rectRadius: radius(16667, 4.583, 2.774),
++            fill: { color: GREEN }, line: { type: 'none' },
++        });
++        cardTitle(s, 'Write Anything Here', x, 7.029, 4.583, { color: WHITE, align: 'center' });
++        paragraph(s, 'Risus commodo viver rantau maecenas accumsan', x, 7.565, 4.583, 0.957, { color: WHITE, align: 'center' });
++        const tabX = [11.794, 16.69][i];
++        s.addShape('round2DiagRect', Object.assign({
++            x: tabX, y: 6.025, w: 1.053, h: 0.727, fill: { color: ORANGE }, line: { type: 'none' }, shadow: tileShadow(),
++        }, adjust(37368)));
++        icon(s, ['wheat', 'farmer'][i], tabX + 0.369, 6.231, 0.315, WHITE);
++    });
++}
++
++function slide08(s) {
++    s.background = { color: GREEN };
++    // giant outlined wordmark running up the left edge, tucked behind the card
++    text(s, 'Agriculture', {
++        x: -5.762, y: 4.178, w: 14.419, h: 2.895, rotate: 270, align: 'center',
++        fontFace: SERIF, fontSize: 166, color: WHITE, outline: { color: WHITE, size: 0.75 },
++    });
++    s.addShape('round2DiagRect', {
++        x: 1.438, y: 1.208, w: 10.5, h: 8.833, flipH: true,
++        fill: { color: WHITE }, line: { type: 'none' }, shadow: cardShadow(),
++    });
++
++    eyebrow(s, 'ABOUT US', 3.203, 2.427, 1.624);
++    heading(s, 'Our Agriculture Innovation', 3.203, 3.072, 6.749, 1.919);
++    [5.44, 7.412].forEach((y, i) => {
++        icon(s, ['farmer', 'tractor'][i], 3.203, [5.53, 7.525][i], 0.669);
++        paragraph(s, 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu non odio euismod lacinia. Tellus elemen sagittis vitae leo duis. ', 4.345, y, 5.827, 1.411);
++    });
++
++    s.addShape('round2DiagRect', Object.assign({
++        x: 11.938, y: 6.896, w: 3.146, h: 3.146, fill: { color: ORANGE }, line: { type: 'none' },
++    }, adjust(23290)));
++    text(s, '20+', { x: 12.451, y: 7.651, w: 1.77, h: 0.774, fontFace: SANS_SB, fontSize: 40, color: WHITE });
++    paragraph(s, 'Risus comon vera cenas acumsa', 12.451, 8.425, 2.394, 0.862, { fontSize: 16, color: WHITE });
++}
++
++function slide09(s) {
++    s.addShape('rect', { x: 0, y: 0, w: 5.357, h: SLIDE_H, fill: { color: GREEN }, line: { type: 'none' } });
++
++    eyebrow(s, 'ABOUT US', 10.724, 1.968, 1.624);
++    heading(s, 'Agriculture Benefits the Environment', 10.724, 2.614, 7.514, 1.919);
++    paragraph(s, 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu non odio euismod lacinia. Tellus elementum sagittis vitae et leo duis. Sit amet mauris commodo quis imperdiet massa tincidunt nunc congue mauris agirculture.', 10.724, 4.894, 7.514, 1.865);
++
++    s.addShape('roundRect', {
++        x: 10.765, y: 7.282, w: 1.542, h: 1.542, rectRadius: radius(16667, 1.542, 1.542),
++        fill: { color: ORANGE }, line: { type: 'none' },
++    });
++    icon(s, 'wheat', 11.201, 7.718, 0.669, WHITE);
++    cardTitle(s, 'Write Anything Here', 12.743, 7.282, 3.903);
++    paragraph(s, 'Risus commodo viverra maecenas acumsan lacus vel. Seduna arcu odio euismod lacinia Tellus elementu sagittis vitae etanas.', 12.743, 7.871, 5.64, 1.411);
++}
++
++/** Rounded blob (1.13 x 0.974) carrying the step numbers on slide 10. */
++function numberBlob(slide, x, y, color) {
++    slide.addShape('custGeom', {
++        x, y, w: 1.13, h: 0.974, fill: { color }, line: { type: 'none' },
++        points: [
++            { x: 0.657, y: 0 },
++            { x: 1.121, y: 0.192, curve: { type: 'cubic', x1: 0.838, y1: 0, x2: 1.002, y2: 0.074 } },
++            { x: 1.13, y: 0.203 },
++            { x: 1.13, y: 0.559 },
++            { x: 0.715, y: 0.974, curve: { type: 'cubic', x1: 1.13, y1: 0.788, x2: 0.944, y2: 0.974 } },
++            { x: 0.085, y: 0.974 },
++            { x: 0.052, y: 0.913 },
++            { x: 0, y: 0.657, curve: { type: 'cubic', x1: 0.018, y1: 0.834, x2: 0, y2: 0.748 } },
++            { x: 0.657, y: 0, curve: { type: 'cubic', x1: 0, y1: 0.294, x2: 0.294, y2: 0 } },
++            { close: true },
++        ],
++    });
++}
++
++function slide10(s) {
++    eyebrow(s, 'ABOUT US', 1.974, 1.538, 1.624);
++    heading(s, 'Agricultural Nutrition', 1.974, 2.184, 11.547, 1.01);
++    s.addShape('round2DiagRect', Object.assign({
++        x: 2.007, y: 3.54, w: 15.986, h: 2.217, fill: { color: GREEN }, line: { type: 'none' },
++    }, adjust(23685)));
++    paragraph(s, 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu non odio euismod lacinia. Tellus elementum sagittis vitae et leo duis. Sit amet mauris commodo quis imperdiet massa tincidunt nunc congue mauris agriculture here.', 2.786, 4.17, 14.526, 0.957, { color: WHITE });
++
++    ['01', '02', '03', '04'].forEach((n, i) => {
++        const x = [4.778, 8.805, 12.835, 16.863][i];
++        numberBlob(s, x, 8.738, ORANGE);
++        text(s, n, { x: x + 0.031, y: 9.006, w: 1.13, h: 0.438, fontFace: SANS_SB, fontSize: 20, color: WHITE, align: 'center' });
++    });
++}
++
++function slide11(s) {
++    // four photo cards live on the layout
++    [[8.407, 0.993], [13.264, 0.993], [8.407, 5.821], [13.264, 5.821]].forEach(([x, y]) => {
++        s.addShape('roundRect', {
++            x, y, w: 4.583, h: 4.437, rectRadius: radius(5392, 4.583, 4.437),
++            fill: { color: GREEN }, line: { type: 'none' }, shadow: cardShadow(),
++        });
++        cardTitle(s, 'Write Anything Here', x, y + 3.61, 4.583, { color: WHITE, align: 'center' });
++    });
++
++    eyebrow(s, 'PORTFOLIO', 1.792, 2.342, 1.773);
++    heading(s, 'Agricultural Innovation', 1.792, 2.987, 5.125, 1.919);
++    paragraph(s, 'Risus commodo viverra maecenas accu lacus vel. Sed arcu odio euismod lacinia tellus huata elementum sagittis vitae et leo duis. Sit amet mauris commodo quis imperdiet here massa tincidunt congue mauris honcus aenean vel elit celerisque mauris pellentesque. Facilisis leonas vel fringilla est celerisque viverra.', 1.792, 5.225, 5.125, 3.683);
++}
++
++function slide12(s) {
++    eyebrow(s, 'PORTFOLIO', 1.62, 1.347, 1.773);
++    heading(s, 'Agricultural Projects', 1.62, 1.993, 8.479, 1.01);
++
++    s.addShape('roundRect', {
++        x: 3.565, y: 4.914, w: 5.306, h: 2.794, rectRadius: radius(10517, 5.306, 2.794),
++        fill: { color: WHITE }, line: { type: 'none' }, shadow: cardShadow(),
++    });
++    icon(s, 'tractor', 4.124, 5.481, 0.591);
++    paragraph(s, 'Risus commodo viverra maecenas accumsan lacus sed arcu odio.', 4.124, 6.189, 4.187, 0.957);
++
++    s.addShape('round2DiagRect', Object.assign({
++        x: 8.839, y: 7.791, w: 7.515, h: 2.922, fill: { color: GREEN }, line: { type: 'none' }, shadow: dropShadow(),
++    }, adjust(23685)));
++    s.addShape('roundRect', {
++        x: 9.58, y: 8.599, w: 1.188, h: 1.188, rectRadius: radius(22515, 1.188, 1.188),
++        fill: { color: ORANGE }, line: { type: 'none' },
++    });
++    icon(s, 'wheat', 9.898, 8.918, 0.551, WHITE);
++    paragraph(s, 'Risus commodo vive macena accus lacus sed arcu odio euismod lacinia tellus elemen tuma sagittis vitae.', 11.243, 8.439, 4.37, 1.411, { color: WHITE });
++}
++
++function slide13(s) {
++    eyebrow(s, 'OUR TEAM', 9.172, 1.249, 1.655, ORANGE);
++    heading(s, 'Our Great Farmers', 4.365, 1.895, 11.271, 1.01, { align: 'center' });
++
++    [0, 5.607, 11.214].forEach(dx => {
++        cardTitle(s, 'Write Name Here', 2.441 + dx, 7.241, 3.903, { align: 'center' });
++        paragraph(s, 'Risus commodo viver ratesa maecenas accum lacus', 2.569 + dx, 7.776, 3.648, 0.957, { align: 'center' });
++        socialRow(s, 3.582 + dx, 9.224, 0.315, 0.654);
++    });
++}
++
++function slide14(s) {
++    eyebrow(s, 'OUR TEAM', 1.792, 2.772, 1.655);
++    heading(s, 'Meet Our Team', 1.792, 3.418, 6.479, 1.01);
++    paragraph(s, 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu nonia odio euismod lacinia. Tellus elementum sagittis vitae et leo duis. Situmea amet mauris commodo quis imperdiet massa tincidunt nunc congue mauris.', 1.792, 4.67, 5.958, 2.32);
++
++    s.addShape('round2DiagRect', Object.assign({
++        x: 1.792, y: 7.518, w: 3.146, h: 0.96, fill: { color: GREEN }, line: { type: 'none' },
++    }, adjust(50000)));
++    text(s, 'READMORE', { x: 2.495, y: 7.796, w: 1.739, h: 0.404, fontFace: SANS_SB, fontSize: 18, color: WHITE, charSpacing: 1, wrap: false });
++
++    [[8.836, 7.638], [13.934, 6.453]].forEach(([x, y]) => {
++        s.addShape('roundRect', {
++            x, y, w: 3.998, h: 2.298, rectRadius: radius(10517, 3.998, 2.298),
++            fill: { color: WHITE }, line: { type: 'none' }, shadow: cardShadow(),
++        });
++        cardTitle(s, 'Write Name Here', x, y + 0.398, 3.998, { align: 'center' });
++        paragraph(s, 'Job Position', x, y + 0.785, 3.998, 0.502, { align: 'center' });
++        socialRow(s, x + 1.356, y + 1.65, 0.25, 0.518);
++    });
++}
++
++function slide15(s) {
++    heading(s, 'Devian Edison', 1.858, 2.036, 7.952, 1.212, { fontSize: 66 });
++    eyebrow(s, 'JOB POSITION', 1.858, 3.401, 2.151);
++    paragraph(s, 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu odio euismod lacinia tellus.', 1.858, 4.164, 6.371, 0.957);
++
++    // skill bars: grey track + orange progress + label + percentage
++    [
++        { pct: '90%', y: 6.325, fillW: 6.201, labelY: 5.651, dx: 0 },
++        { pct: '70%', y: 7.681, fillW: 5.521, labelY: 7.007, dx: 0.006 },
++        { pct: '85%', y: 9.036, fillW: 5.976, labelY: 8.362, dx: 0.012 },
++    ].forEach(({ pct, y, fillW, labelY, dx }) => {
++        s.addShape('rect', { x: 1.938 + dx, y, w: 6.833, h: 0.178, fill: { color: TRACK_GREY }, line: { type: 'none' } });
++        s.addShape('rect', { x: 1.966 + dx, y: y + 0.027, w: fillW, h: 0.124, fill: { color: ORANGE }, line: { type: 'none' } });
++        cardTitle(s, 'Write Anything Here', 1.858 + dx, labelY, 4.631);
++        cardTitle(s, pct, 7.42 + dx, labelY - 0.007, 1.465, { align: 'right' });
++    });
++
++    // green hook (from the layout) and the tilted orange social pill
++    s.addShape('custGeom', {
++        x: 13.256, y: 6.672, w: 5.975, h: 2.031, rotate: 315, fill: { color: GREEN }, line: { type: 'none' },
++        points: [
++            { x: 5.975, y: 0 },
++            { x: 5.975, y: 0.207 },
++            { x: 4.151, y: 2.031, curve: { type: 'cubic', x1: 5.975, y1: 1.214, x2: 5.158, y2: 2.031 } },
++            { x: 0, y: 2.031 },
++            { x: 0, y: 1.051 },
++            { x: 4.266, y: 1.051 },
++            { x: 5.952, y: 0.048, curve: { type: 'cubic', x1: 4.994, y1: 1.051, x2: 5.627, y2: 0.645 } },
++            { close: true },
++        ],
++    });
++    s.addShape('roundRect', {
++        x: 10.99, y: 7.706, w: 3.202, h: 1.015, rotate: 45, rectRadius: 0.5075,
++        fill: { color: ORANGE }, line: { type: 'none' },
++    });
++    socialRow(s, 11.971, 7.594, 0.315, 0.463, WHITE, 0.463, ORANGE); // steps down the tilted pill
++}
++
++function slide16(s) {
++    s.addShape('rect', { x: 9.458, y: 0, w: 5.271, h: 5.625, fill: { color: GREEN }, line: { type: 'none' } });
++    s.addShape('rect', { x: 14.729, y: 0, w: 5.271, h: 5.625, fill: { color: WHITE }, line: { color: TRACK_GREY, width: 1 } });
++    s.addShape('rect', { x: 14.729, y: 5.625, w: 5.271, h: 5.625, fill: { color: WHITE }, line: { color: TRACK_GREY, width: 1 } });
++
++    const cell = (kind, x, ix, iy, ty, onGreen) => {
++        icon(s, kind, ix, iy, 0.787);
++        cardTitle(s, 'Write Anything Here', x, ty, 3.903, { color: onGreen ? WHITE : INK });
++        paragraph(s, 'PLACEHOLDER', x, ty + 0.485, 3.903, 1.411, { color: onGreen ? WHITE : BODY_GREY });
++    };
++    cell('wheat', 10.339, 10.339, 1.38, 2.349, true);
++    cell('farmer', 15.594, 15.610, 1.376, 2.349, false);
++    cell('seedbag', 15.594, 15.612, 7.001, 7.974, false);
++
++    eyebrow(s, 'OUR SERVICES', 1.781, 2.38, 2.216);
++    heading(s, 'Agriculture Service', 1.781, 3.026, 6.448, 1.919);
++    paragraph(s, [
++        { text: 'Risus commodo viverra maecenas accumsan lacus vel. Sed arcu non odio euismod lacinia tellus elementum sagittis vitae et leo duis. Sit amet mauris commodo quis imperdiet massa tincidunt nunc congue mauris rhoncus.', options: { breakLine: true } },
++        { text: '', options: { breakLine: true } },
++        { text: 'Facilisis leo vel fringilla est. Scelerisque viverra mauris aliquam sem fringilla magna amet.' },
++    ], 1.781, 5.187, 5.885, 3.683);
++}
++
++function slide17(s) {
++    s.addShape('rect', { x: 0, y: 0, w: 7.323, h: SLIDE_H, fill: { color: GREEN }, line: { type: 'none' } });
++    s.addShape('rect', { x: 1.043, y: 1.656, w: 7.479, h: 7.938, fill: { color: WHITE }, line: { type: 'none' } });
++
++    eyebrow(s, 'OUR SERVICES', 2.392, 2.835, 2.216);
++    heading(s, 'Our Great Service', 2.392, 3.481, 4.781, 1.919);
++    paragraph(s, 'Risus commodo viver ranu maecen asun accumsan lacus vel. Sed arcu non odio euismod lacinia tellus elemen tumania sagittis vitae etuna leo duis amet mauris commo dona quis imperdiet massa here ticidunt congue mauris rhoncus.', 2.392, 5.641, 5.212, 2.774);
++
++    [['wheat', 1.854], ['seedbag', 4.708], ['farmer', 7.562]].forEach(([kind, y]) => {
++        s.addShape('round2DiagRect', Object.assign({
++            x: 12.115, y, w: 1.188, h: 1.188, fill: { color: ORANGE }, line: { type: 'none' }, shadow: tileShadow(),
++        }, adjust(37368)));
++        icon(s, kind, 12.433, y + 0.318, 0.551, WHITE);
++        cardTitle(s, 'Write Anything Here', 13.894, y - 0.083, 3.903);
++        paragraph(s, 'Risus commodo viverra maecen aumsan lacusu. Sedun arcu odio euismod lacinia tellus elementu sagittis vitae duis.', 13.894, y + 0.506, 5.147, 1.411);
++    });
++}
++
++function slide18(s) {
++    s.background = { color: GREEN };
++    s.addShape('roundRect', {
++        x: 1.313, y: 3.146, w: 17.374, h: 6.885, rectRadius: radius(5213, 17.374, 6.885),
++        fill: { color: WHITE }, line: { type: 'none' },
++    });
++
++    eyebrow(s, 'OUR SERVICES', 2.567, 4.276, 2.216);
++    heading(s, 'Agriculture Service', 2.567, 4.921, 9.789, 1.01);
++    paragraph(s, 'Risus commodo vive maecenas acumsan lacus vel Sed arcu non odio euismod lacinia tellus elementum sagittis vitae et leo duis. Sit amet mauris commodo.', 10.759, 4.52, 6.674, 1.411);
++
++    [['wheat', 2.567], ['scarecrow', 6.327], ['tractor', 10.088], ['corn', 13.849]].forEach(([kind, x], i) => {
++        const active = i === 0;
++        s.addShape('roundRect', {
++            x, y: 6.682, w: 3.585, h: 2.395, rectRadius: radius(9330, 3.585, 2.395),
++            fill: active ? { color: ORANGE } : { type: 'none' },
++            line: active ? { type: 'none' } : { color: HAIRLINE, width: 1.5 },
++        });
++        icon(s, kind, x + 0.7375, 7.115, 0.551, active ? WHITE : ORANGE);
++        text(s, 'Write Anything Here', {
++            x: x + 0.671, y: 7.818, w: 2.667, h: 0.774,
++            fontFace: SANS_SB, fontSize: 20, color: active ? WHITE : INK, valign: 'top',
++        });
++    });
++}
++
++function slide19(s) {
++    ['01', '02', '03'].forEach((n, i) => {
++        const y = [2.835, 5.9, 8.965][i];
++        s.addShape('round2DiagRect', Object.assign({
++            x: 7.512, y, w: 1.081, h: 1.081, flipH: true, fill: { color: GREEN }, line: { type: 'none' },
++        }, adjust(33292)));
++        text(s, n, { x: 7.512, y: y + 0.321, w: 1.081, h: 0.438, fontFace: SANS_SB, fontSize: 20, color: WHITE, align: 'center' });
++        cardTitle(s, 'Write Anything Here', 13.05, y - 1.343, 3.903);
++        paragraph(s, 'Risus commodo viverra maecen aumsan lacusu. Sedun arcu odio euismod lacinia tellus elementu sagittis vitae duis.', 13.05, y - 0.754, 5.147, 1.411);
++    });
++
++    eyebrow(s, 'OUR SERVICES', 1.802, 2.835, 2.216);
++    heading(s, 'Agriculture Service', 1.802, 3.481, 5.365, 1.919);
++    paragraph(s, 'Risus commodo viveran maecen asun accumsan lacus. Sed arcu non odiona euismod lacinia tellus elemen tumania sagittis vitae etuna duis amet mauris commo dona quis perdiet massa here ticidunt congue mauris rhoncus.', 1.802, 5.641, 5.073, 2.774);
++}
++
++const slide20 = s => coverSlide(s, {
++    title: 'Thank You', titleY: 2.779, leafX: 7.554,
++    barX: 5.437, barY: 5.7, captionX: 6.449, captionY: 6.029,
++    footer: 'Made with Love Slidehous',
++});
++
++/* -------------------------------------------------------------------- main */
++const BUILDERS = [
++    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'DECK_20x11_25', width: SLIDE_W, height: SLIDE_H });
++pptx.layout = 'DECK_20x11_25';
++pptx.title = 'Agriculture and Farming Presentation';
++
++BUILDERS.forEach(build => build(pptx.addSlide()));
++
++pptx.writeFile({ fileName: path.join(__dirname, '171a0d2f-4147-4f9e-a8ca-42a63473c358_grok_final.pptx') })
++    .then(f => console.log('wrote', f));

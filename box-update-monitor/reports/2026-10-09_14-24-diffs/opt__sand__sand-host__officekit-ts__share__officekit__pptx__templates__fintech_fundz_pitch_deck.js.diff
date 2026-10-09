@@ -1,0 +1,2564 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fintech_fundz_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fintech_fundz_pitch_deck.js
+@@ -0,0 +1,2561 @@
++/**
++ * Fundz Financial Technology — fintech presentation template (30 slides, 13.333" x 7.5").
++ * Standalone pptxgenjs recreation of the reference deck.
++ * Raster images in the original are replaced with flat "[image]" placeholder rectangles.
++ */
++'use strict';
++
++
++const path = require('path');
++
++const PptxGenJS = require('pptxgenjs');
++
++
++// ---------------------------------------------------------------------------
++// Theme
++// ---------------------------------------------------------------------------
++
++const TEAL = '017871';
++ // accent1 / accent3 / accent5
++const TEAL_DK = '005A54';
++ // accent1 shaded 25%
++const PEACH = 'FFC4BA';
++ // accent2 / accent4 / accent6
++const PEACH_DK = 'BF938B';
++ // accent4 shaded 25%
++const WHITE = 'FFFFFF';
++
++const NAVY = '333F4F';
++ // tx2 lumMod 75%
++const INK = '231A28';
++ // literal ink used by a few headings
++const GREY05 = '0C0C0C';
++ // tx1 +5%
++const GREY15 = '262626';
++ // tx1 +15%
++const GREY25 = '3F3F3F';
++ // tx1 +25%
++const GREY35 = '595959';
++ // tx1 +35%
++const GREY50 = '7F7F7F';
++ // tx1 +50%
++const GREY_LN = 'BFBFBF';
++ // bg1 -25%
++const GREY_BAR = 'F2F2F2';
++ // bg1 -5%
++const PHOTO_TINT = 'FBFBFB';
++ // stand-in tint for removed photographs
++const PHOTO_LABEL = "C9C9C9";
++
++
++const MAJOR = 'Space Grotesk';
++ // +mj-lt
++const MINOR = 'Rubik';
++ // +mn-lt
++
++// Diffuse drop shadows used by the template's "floating card" shapes
++// (the source deck uses ~50-75pt blur at 14-15% black, offset down-right).
++const CARD_SHADOW = {
++ type: 'outer', color: '000000', opacity: 0.14, blur: 70, offset: 26, angle: 45 }
++;
++
++const SOFT_SHADOW = {
++ type: 'outer', color: '000000', opacity: 0.13, blur: 46, offset: 20, angle: 45 }
++;
++
++
++// ---------------------------------------------------------------------------
++// Helpers
++// ---------------------------------------------------------------------------
++
++/** Text box matching the template default: 0.1" side / 0.05" top-bottom insets. */
++function tbox(slide, text, o) {
++
++  slide.addText(text, Object.assign({
++ fontFace: MINOR, margin: [7.2, 7.2, 3.6, 3.6], valign: 'top' }
++, o));
++
++}
++
++
++/** Heading in the major (display) typeface. */
++function heading(slide, text, o) {
++
++  tbox(slide, text, Object.assign({
++ fontFace: MAJOR, color: GREY25 }
++, o));
++
++}
++
++
++/** Body copy in the minor typeface, 12pt grey, 130% leading. */
++function body(slide, text, o) {
++
++  tbox(slide, text, Object.assign({
++ fontSize: 12, color: GREY50, lineSpacingMultiple: 1.3 }
++, o));
++
++}
++
++
++function rect(slide, o) {
++
++  slide.addShape('rect', o);
++
++}
++
++
++function roundRect(slide, o) {
++
++  slide.addShape('roundRect', o);
++
++}
++
++
++function ellipse(slide, o) {
++
++  slide.addShape('ellipse', o);
++
++}
++
++
++/** Straight connector (pptxgenjs draws a `line` shape between x,y and x+w,y+h). */
++function connector(slide, o) {
++
++  slide.addShape('line', o);
++
++}
++
++
++/**
++ * Stand-in for a raster image. The template ships with its picture placeholders empty
++ * (they render as nothing), so this is used only where the reference actually shows
++ * artwork: the tilted phone on slide 27 and the grey photo bed on slide 30.
++ */
++function photoFrame(slide, x, y, w, h, opts) {
++
++  const o = opts || {
++}
++;
++
++  slide.addShape(o.shape || 'rect', {
++
++    x: x, y: y, w: w, h: h,
++    fill: {
++ color: o.tint || PHOTO_TINT }
++,
++    line: o.line || {
++ type: 'none' }
++,
++    rectRadius: o.rectRadius, rotate: o.rotate,
++  }
++);
++
++  if (o.label) {
++
++    tbox(slide, '[image]', {
++
++      x: x, y: y + h / 2 - 0.18, w: w, h: 0.36, align: 'center', valign: 'middle',
++      fontSize: 11, color: o.labelColor || PHOTO_LABEL, rotate: o.rotate,
++    }
++);
++
++  }
++
++}
++
++
++/** Circular "icon chip": filled disc plus a glyph drawn as text. */
++function iconChip(slide, x, y, d, fill, glyph, glyphColor, glyphSize) {
++
++  ellipse(slide, {
++ x: x, y: y, w: d, h: d, fill: {
++ color: fill }
++, line: {
++ type: 'none' }
++ }
++);
++
++  if (glyph) {
++
++    tbox(slide, glyph, {
++
++      x: x, y: y, w: d, h: d, align: 'center', valign: 'middle', fontFace: MAJOR,
++      fontSize: glyphSize || Math.round(d * 26), color: glyphColor || WHITE,
++    }
++);
++
++  }
++
++}
++
++
++/** Small square glyph-stand-in for the deck's line icons (frame + inner bar). */
++function iconGlyph(slide, x, y, d, color) {
++
++  slide.addShape('roundRect', {
++
++    x: x + d * 0.22, y: y + d * 0.22, w: d * 0.56, h: d * 0.56, rectRadius: d * 0.06,
++    fill: {
++ type: 'none' }
++, line: {
++ color: color, width: 1.25 }
++,
++  }
++);
++
++  connector(slide, {
++ x: x + d * 0.32, y: y + d * 0.5, w: d * 0.36, h: 0, line: {
++ color: color, width: 1.25 }
++ }
++);
++
++}
++
++
++/** Arrow-in-circle button used on the "Hello & Welcome" / two-paragraph slides. */
++function arrowButton(slide, x, y, d, glyph) {
++
++  ellipse(slide, {
++ x: x, y: y, w: d, h: d, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++  tbox(slide, glyph || '\u2192', {
++
++    x: x, y: y, w: d, h: d, align: 'center', valign: 'middle', fontSize: 14, fontFace: MAJOR, color: TEAL,
++  }
++);
++
++}
++
++
++// World map: simplified continent outlines, flat [x0,y0,x1,y1,...] inch pairs.
++const WORLD_MAP = [
++  [14.81,2.22,14.64,2.14,14.59,2.20,14.52,2.08,14.19,1.93,13.92,1.91,13.94,1.99,13.87,2.01,13.80,1.93,13.52,1.94,13.51,2.01,13.37,1.84,13.10,1.85,12.78,1.70,12.56,1.68,12.42,1.82,12.18,1.76,12.12,1.85,12.00,1.76,11.99,1.62,11.82,1.59,11.77,1.68,11.19,1.58,10.95,1.68,11.33,1.41,11.22,1.32,11.01,1.35,11.03,1.30,10.88,1.23,10.66,1.35,10.69,1.39,10.39,1.38,10.11,1.50,10.11,1.59,9.82,1.61,9.91,1.76,9.68,1.70,9.70,1.76,9.62,1.77,9.72,1.84,9.58,1.81,9.56,1.68,9.47,1.81,9.51,1.98,9.67,2.00,9.74,2.11,9.56,2.01,9.43,2.21,9.29,2.17,9.42,2.16,9.50,2.04,9.42,1.79,9.47,1.71,9.38,1.67,9.17,1.84,9.26,2.05,8.84,1.88,8.91,2.00,8.86,2.05,8.82,2.00,8.58,2.05,8.59,2.00,8.24,2.16,8.25,2.05,8.12,2.03,8.15,2.22,8.07,2.19,7.97,2.33,7.84,2.29,7.84,2.38,7.62,2.14,7.91,2.22,8.02,2.16,8.01,2.10,7.51,1.93,7.56,1.86,7.44,1.88,7.44,1.82,7.29,1.89,7.29,1.84,6.87,1.99,6.83,2.05,6.90,2.07,6.68,2.32,6.39,2.51,6.39,2.71,6.49,2.79,6.63,2.67,6.75,2.96,6.90,2.91,7.02,2.67,6.94,2.61,6.95,2.49,7.19,2.24,7.31,2.31,7.12,2.45,7.13,2.61,7.52,2.65,7.25,2.69,7.26,2.83,7.14,2.83,7.04,3.02,6.65,3.04,6.59,2.96,6.63,2.80,6.53,2.86,6.54,3.07,6.39,3.10,6.17,3.33,6.06,3.31,6.08,3.37,5.94,3.38,6.10,3.52,6.09,3.65,5.74,3.68,5.72,3.91,5.75,4.01,6.04,4.03,6.31,3.68,6.56,3.62,6.86,3.86,6.88,3.96,6.92,3.83,6.99,3.85,6.72,3.62,6.76,3.54,7.01,3.74,7.20,4.04,7.19,3.96,7.25,3.94,7.19,3.82,7.49,3.80,7.41,3.71,7.57,3.49,7.68,3.52,7.69,3.62,7.82,3.57,7.73,3.52,7.92,3.46,7.83,3.58,8.04,3.77,7.68,3.75,7.35,3.86,7.37,3.98,7.49,4.06,7.79,4.02,7.74,4.41,7.71,4.31,7.48,4.34,7.15,4.23,7.01,4.37,6.62,4.19,6.61,4.01,6.06,4.13,5.89,4.08,5.55,4.51,5.76,4.51,5.55,4.51,5.38,4.78,5.39,5.22,5.80,5.59,6.28,5.49,6.57,5.60,6.56,5.84,6.70,6.02,6.78,6.32,6.68,6.63,6.98,7.41,7.31,7.41,7.52,7.26,7.63,7.00,7.76,6.93,7.73,6.70,7.99,6.50,7.92,6.04,8.48,5.31,8.47,5.24,8.20,5.31,8.10,5.26,7.85,4.91,7.63,4.40,7.70,4.49,7.73,4.43,7.92,4.71,8.14,5.20,8.65,5.00,8.88,4.74,8.71,4.55,8.50,4.66,8.34,4.41,8.37,4.36,8.62,4.54,9.17,4.59,9.34,4.81,9.45,4.75,9.48,5.03,9.67,5.41,9.77,5.35,9.82,5.05,10.12,4.79,10.32,4.74,10.45,5.04,10.59,5.03,10.62,5.40,10.88,5.73,10.86,5.56,10.66,5.34,10.70,5.16,10.92,5.38,11.00,5.35,11.13,5.18,10.96,4.91,11.00,4.82,11.09,4.77,11.18,4.84,11.59,4.60,11.71,4.37,11.58,4.12,11.73,4.00,11.57,4.01,11.51,3.91,11.70,3.81,11.66,3.92,11.80,3.86,11.90,3.97,11.88,4.15,12.06,4.11,11.97,3.85,12.15,3.67,12.26,3.69,12.54,3.35,12.58,3.09,12.32,2.98,12.63,2.72,13.21,2.71,13.18,2.66,13.32,2.54,13.44,2.53,13.45,2.61,13.63,2.47,13.60,2.59,13.25,2.89,13.28,3.24,13.58,2.90,13.52,2.78,13.60,2.67,13.86,2.61,13.90,2.67,14.22,2.46,14.29,2.49,14.28,2.37,14.17,2.32,14.29,2.33,14.38,2.20,14.65,2.36,14.81,2.22],
++  [2.44,5.42,2.63,5.40,2.38,5.35,2.28,5.04,2.09,5.05,2.17,4.77,2.03,4.79,1.97,4.91,1.77,4.90,1.68,4.75,1.70,4.48,1.88,4.37,2.07,4.41,2.03,4.35,2.21,4.35,2.35,4.40,2.46,4.61,2.43,4.30,2.69,4.08,2.67,3.88,2.70,3.97,2.76,3.80,2.88,3.78,3.09,3.56,3.23,3.56,3.14,3.65,3.36,3.55,3.20,3.49,3.14,3.40,3.18,3.33,2.92,3.43,3.13,3.27,3.57,3.18,3.59,3.07,3.38,3.07,3.52,3.01,3.31,2.88,3.19,2.62,3.13,2.75,3.03,2.77,2.95,2.72,2.97,2.58,2.80,2.49,2.57,2.50,2.61,2.68,2.55,2.75,2.65,2.90,2.51,2.99,2.56,3.15,2.51,3.23,2.39,3.10,2.38,2.97,1.91,2.84,1.82,2.61,2.01,2.43,1.90,2.37,2.10,2.37,2.20,2.18,2.36,2.21,2.43,2.10,2.36,1.93,2.23,1.92,2.28,1.99,2.15,2.14,2.12,1.99,2.01,2.04,2.01,1.95,1.92,1.92,1.97,1.88,1.82,1.74,2.01,1.57,1.78,1.59,1.74,1.89,1.87,1.99,1.78,2.15,1.69,2.02,1.49,2.09,1.32,1.99,1.20,2.02,1.31,2.03,1.22,2.08,1.24,2.18,1.13,2.06,0.94,2.09,0.88,1.99,0.49,1.95,0.47,1.89,0.41,1.96,0.30,1.85,0.07,2.01,0.24,1.89,-0.03,2.00,-1.01,1.79,-1.44,2.01,-1.17,2.18,-1.51,2.24,-1.42,2.33,-1.19,2.31,-1.20,2.40,-1.40,2.49,-1.42,2.56,-1.31,2.60,-1.40,2.61,-1.30,2.66,-1.24,2.61,-1.24,2.74,-1.00,2.70,-1.04,2.82,-1.29,2.98,-0.89,2.78,-0.88,2.69,-0.67,2.55,-0.78,2.70,-0.59,2.57,-0.22,2.66,-0.10,2.76,-0.02,2.72,0.35,3.15,0.33,3.22,0.55,3.36,0.46,3.39,0.47,3.83,0.60,3.95,0.64,4.13,0.78,4.19,0.94,4.44,0.90,4.48,1.15,4.70,0.92,4.36,0.95,4.29,1.31,4.72,1.37,4.89,2.15,5.17,2.24,5.32,2.44,5.42],
++  [4.55,6.10,4.34,5.93,4.12,5.92,3.99,5.82,3.86,5.89,3.93,5.82,3.81,5.83,3.87,5.74,3.81,5.61,3.55,5.53,3.30,5.31,3.05,5.32,2.94,5.24,2.88,5.38,2.88,5.22,2.61,5.44,2.62,5.63,2.48,5.77,2.50,5.93,2.44,6.01,2.69,6.48,2.94,6.66,2.88,7.35,2.79,7.61,2.82,8.03,2.69,8.10,2.80,8.17,2.74,8.35,2.84,8.39,2.87,8.52,2.97,8.45,2.97,8.55,2.90,8.57,3.16,8.59,2.97,8.43,3.14,8.18,3.07,8.08,3.24,7.88,3.18,7.77,3.28,7.79,3.30,7.68,3.53,7.62,3.49,7.32,3.50,7.43,3.67,7.46,3.93,7.11,3.93,6.97,4.28,6.80,4.37,6.38,4.55,6.10],
++  [5.07,1.92,4.86,1.89,4.99,1.82,4.85,1.86,4.99,1.80,4.93,1.77,5.16,1.85,4.93,1.62,5.21,1.61,5.14,1.55,5.30,1.51,5.22,1.46,5.27,1.37,5.13,1.31,5.33,1.29,5.16,1.20,5.36,0.98,5.22,0.99,5.39,0.95,5.32,0.92,5.49,0.89,5.57,0.79,5.22,0.81,5.06,0.91,5.15,0.76,4.91,0.84,4.99,0.77,4.66,0.79,5.16,0.72,4.85,0.65,4.97,0.62,4.04,0.65,4.16,0.73,3.98,0.70,4.12,0.79,3.87,0.71,3.88,0.78,3.74,0.73,3.71,0.82,3.66,0.72,3.46,0.77,3.57,0.84,3.37,0.79,3.37,0.87,3.09,0.95,3.23,0.97,3.16,1.06,2.84,1.17,3.14,1.23,2.91,1.27,3.05,1.32,3.00,1.34,3.04,1.37,3.49,1.40,3.66,1.65,3.62,1.78,3.70,1.70,3.81,1.78,3.84,1.87,3.67,1.84,3.87,1.90,3.87,2.09,3.73,2.09,3.86,2.13,3.72,2.12,3.77,2.14,3.72,2.19,3.85,2.14,3.73,2.22,3.83,2.23,3.78,2.33,3.88,2.31,3.81,2.39,3.97,2.60,4.09,2.56,4.17,2.64,4.28,2.29,4.57,2.19,4.68,2.03,5.07,1.92],
++  [13.18,7.13,13.16,6.95,12.86,6.68,12.67,6.29,12.58,6.61,12.35,6.48,12.39,6.34,12.20,6.30,12.09,6.49,11.95,6.44,11.69,6.70,11.37,6.82,11.38,7.02,11.32,7.00,11.48,7.46,12.17,7.29,12.37,7.46,12.45,7.35,12.42,7.47,12.49,7.45,12.58,7.62,12.85,7.68,13.00,7.60,13.18,7.13],
++  [2.89,1.81,2.61,1.67,2.46,1.74,2.42,1.59,2.24,1.65,2.28,1.79,2.19,1.69,2.26,1.59,2.12,1.60,2.03,1.72,2.12,1.88,2.54,1.92,2.55,1.87,2.69,1.97,2.65,2.01,2.77,2.02,2.84,2.13,2.78,2.25,2.58,2.34,2.73,2.30,2.92,2.47,3.11,2.52,3.00,2.39,3.18,2.48,3.19,2.39,3.02,2.21,3.09,2.18,3.24,2.30,3.35,2.16,3.05,2.05,3.00,2.00,3.10,1.97,3.02,1.94,3.07,1.90,2.89,1.81],
++  [1.96,0.82,2.26,0.94,2.62,0.85,2.54,0.90,2.62,0.90,2.36,0.96,2.50,1.03,2.19,0.96,2.42,1.10,2.15,1.17,2.38,1.20,2.27,1.26,2.14,1.21,2.17,1.28,2.06,1.31,2.46,1.37,2.59,1.33,2.52,1.29,2.57,1.20,2.75,1.12,2.65,1.05,2.89,1.02,3.20,0.83,3.08,0.84,3.35,0.74,2.63,0.66,2.67,0.72,2.51,0.67,2.37,0.73,2.52,0.80,2.24,0.72,2.18,0.76,2.27,0.79,1.96,0.82],
++  [8.49,1.77,8.75,1.87,8.68,1.71,8.81,1.53,9.29,1.32,8.69,1.47,8.49,1.77],
++  [12.81,6.02,12.46,5.86,12.34,5.94,12.29,5.83,12.12,5.83,12.28,5.90,12.20,5.91,12.24,5.98,12.28,5.94,12.46,6.04,12.51,6.12,12.45,6.17,12.60,6.22,12.77,6.15,13.04,6.29,12.81,6.02],
++  [1.47,1.93,1.54,1.90,1.38,1.81,1.34,1.58,1.21,1.63,1.22,1.77,1.13,1.65,0.92,1.69,0.92,1.62,0.71,1.77,0.87,1.78,0.75,1.82,0.79,1.86,1.02,1.87,0.79,1.90,0.99,2.03,1.28,1.96,1.46,2.00,1.47,1.93],
++  [1.97,3.46,2.14,3.35,2.30,3.51,2.46,3.53,2.50,3.59,2.42,3.57,2.35,3.74,2.71,3.59,2.39,3.78,2.27,3.54,2.17,3.76,2.16,3.54,2.31,3.52,2.14,3.44,1.97,3.46],
++];
++
++
++// ---------------------------------------------------------------------------
++// Slide builders
++// ---------------------------------------------------------------------------
++
++// 1 — Title / cover
++function slide01(pptx) {
++
++  const s = pptx.addSlide();
++
++  s.background = {
++ color: TEAL }
++;
++
++  // Big rounded blob rotated behind the title (accent2 at ~73% transparency).
++  s.addShape('custGeom', {
++
++    x: -3.979, y: -2.514, w: 6.583, h: 7.286, rotate: 284.5,
++    fill: {
++ color: PEACH, transparency: 73 }
++, line: {
++ type: 'none' }
++,
++    points: [
++      {
++ x: 1.549, y: 0.143, moveTo: true }
++,
++      {
++ x: 6.071, y: 2.745 }
++,
++      {
++ x: 6.071, y: 4.542, curve: {
++ type: 'cubic', x1: 6.753, y1: 3.148, x2: 6.753, y2: 4.139 }
++ }
++,
++      {
++ x: 1.549, y: 7.144 }
++,
++      {
++ x: 0.0, y: 6.245, curve: {
++ type: 'cubic', x1: 0.867, y1: 7.546, x2: 0.0, y2: 7.051 }
++ }
++,
++      {
++ x: 0.0, y: 1.041 }
++,
++      {
++ x: 1.549, y: 0.143, curve: {
++ type: 'cubic', x1: 0.0, y1: 0.236, x2: 0.867, y2: -0.26 }
++ }
++,
++      {
++ close: true }
++,
++    ],
++  }
++);
++
++  heading(s, 'Fundz Financial\nTechnology', {
++ x: 7.508, y: 0.529, w: 5.242, h: 1.717, fontSize: 48, bold: true, color: WHITE }
++);
++
++  heading(s, 'Fintech Presentation Template', {
++ x: 7.508, y: 2.431, w: 5.205, h: 0.404, fontSize: 18, color: WHITE, charSpacing: 3 }
++);
++
++
++  // Contact block, bottom right: pin / phone / mail markers plus their labels.
++  tbox(s, 'Central office', {
++ x: 9.751, y: 4.855, w: 2.953, h: 0.505, fontSize: 24, bold: true, color: WHITE }
++);
++
++  const contacts = [
++    {
++ y: 5.456, text: 'Your Address Here', marker: 'pin' }
++,
++    {
++ y: 5.898, text: '+647 9937 98 XXXX', marker: 'phone' }
++,
++    {
++ y: 6.330, text: '@youremail@domain.net', marker: 'mail' }
++,
++  ];
++
++  contacts.forEach(function (c) {
++
++    if (c.marker === 'pin') {
++
++      s.addShape('teardrop', {
++ x: 9.94, y: c.y + 0.10, w: 0.12, h: 0.12, rotate: 225, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++    }
++ else if (c.marker === 'phone') {
++
++      roundRect(s, {
++ x: 9.96, y: c.y + 0.09, w: 0.08, h: 0.16, rectRadius: 0.02, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++    }
++ else {
++
++      rect(s, {
++ x: 9.92, y: c.y + 0.13, w: 0.16, h: 0.10, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++    }
++
++    tbox(s, c.text, {
++ x: 10.13, y: c.y, w: 2.55, h: 0.38, fontSize: 14, color: WHITE }
++);
++
++  }
++);
++
++}
++
++
++// 2 — Hello & Welcome
++function slide02(pptx) {
++
++  const s = pptx.addSlide();
++
++  // Quarter-circle teal shape anchored at the bottom-left corner.
++  s.addShape('custGeom', {
++
++    x: 0, y: 3.188, w: 5.504, h: 4.312, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++,
++    points: [
++      {
++ x: 0.933, y: 0.0, moveTo: true }
++,
++      {
++ x: 5.489, y: 4.111, curve: {
++ type: 'cubic', x1: 3.304, y1: 0.0, x2: 5.254, y2: 1.802 }
++ }
++,
++      {
++ x: 5.504, y: 4.312 }
++,
++      {
++ x: 0.0, y: 4.312 }
++,
++      {
++ x: 0.0, y: 0.095 }
++,
++      {
++ x: 0.933, y: 0.0, curve: {
++ type: 'cubic', x1: 0.308, y1: 0.032, x2: 0.617, y2: 0.0 }
++ }
++,
++      {
++ close: true }
++,
++    ],
++  }
++);
++
++  heading(s, [
++    {
++ text: 'Hello ', options: {
++ color: GREY25 }
++ }
++,
++    {
++ text: '&', options: {
++ color: TEAL }
++ }
++,
++    {
++ text: ' Welcome', options: {
++ color: GREY25 }
++ }
++,
++  ], {
++ x: 8.187, y: 2.69, w: 4.701, h: 2.121, fontSize: 60, charSpacing: -1.5 }
++);
++
++  arrowButton(s, 6.667, 5.351, 0.577);
++
++  body(s, 'Donec aliquet risus eget libero malesuada, quis pharetra magna efficitur nulla dapibus.',
++    {
++ x: 8.187, y: 5.324, w: 3.92, h: 0.604 }
++);
++
++}
++
++
++// 3 — Currency Fundz: 2x3 tile grid
++function slide03(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, 'Currency\nFundz', {
++ x: 0.75, y: 3.718, w: 5.703, h: 2.794, fontSize: 80, color: INK }
++);
++
++
++  const tiles = [
++    {
++ col: 0, row: 0, title: 'Imaging', dark: false }
++,
++    {
++ col: 1, row: 0, title: 'Final/Result', dark: false }
++,
++    {
++ col: 0, row: 1, title: 'Smudge Art', dark: false }
++,
++    {
++ col: 1, row: 1, title: 'The Conceptual', dark: true }
++,
++    {
++ col: 0, row: 2, title: 'Imaging', dark: false }
++,
++    {
++ col: 1, row: 2, title: 'Final/Result', dark: false }
++,
++  ];
++
++  tiles.forEach(function (t) {
++
++    const x = 7.589 + t.col * 2.873;
++
++    const y = 2.989 + t.row * 1.5045;
++
++    rect(s, {
++
++      x: x, y: y, w: 2.872, h: 1.502,
++      fill: t.dark ? {
++ color: TEAL }
++ : {
++ color: 'FAFAFA' }
++,
++      line: {
++ color: WHITE, width: 0.75 }
++,
++      shadow: t.dark ? undefined : SOFT_SHADOW,
++    }
++);
++
++    heading(s, t.title, {
++ x: x + 0.318, y: y + 0.229, w: 2.226, h: 0.426, fontSize: 16, color: t.dark ? WHITE : TEAL, lineSpacingMultiple: 1.3 }
++);
++
++    body(s, 'Lorem ipsum dolor sit amet, consectetuer',
++      {
++ x: x + 0.328, y: y + 0.593, w: 2.226, h: 0.682, fontSize: 14, color: t.dark ? WHITE : GREY35 }
++);
++
++  }
++);
++
++}
++
++
++// 4 — Motivation quote (peach background)
++function slide04(pptx) {
++
++  const s = pptx.addSlide();
++
++  s.background = {
++ color: PEACH }
++;
++
++  heading(s, 'Motivation.', {
++ x: 2.283, y: 1.609, w: 8.767, h: 1.111, fontSize: 60, align: 'center' }
++);
++
++  tbox(s, '\u201CFusce sit amet erat mattis, condimentum odio ut, commodo quam. Duis nulla nisi, volutpat in ligula a, suscipit bibendum mi\u201D',
++    {
++ x: 2.283, y: 3.617, w: 8.767, h: 0.939, fontSize: 20, italic: true, color: GREY25, align: 'center', lineSpacingMultiple: 1.3 }
++);
++
++  heading(s, 'Your Name', {
++ x: 3.55, y: 5.454, w: 6.233, h: 0.438, fontSize: 20, bold: true, align: 'center' }
++);
++
++  tbox(s, 'Donec aliquet risus eget libero malesuada.',
++    {
++ x: 4.097, y: 5.908, w: 5.139, h: 0.341, fontSize: 12, color: GREY15, align: 'center', lineSpacingMultiple: 1.3 }
++);
++
++}
++
++
++// 5 — Two.Paragraph
++function slide05(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, [
++    {
++ text: 'Two', options: {
++ color: GREY25 }
++ }
++,
++    {
++ text: '.', options: {
++ color: TEAL }
++ }
++,
++    {
++ text: ' Paragraph', options: {
++ color: GREY25 }
++ }
++,
++  ], {
++ x: 1.177, y: 1.629, w: 5.237, h: 2.121, fontSize: 60 }
++);
++
++  tbox(s, '\u201CLorem ipsum dolor sit amet, consectetur adipiscing elit. In a commodo purus. Phasellus pulvinar felis ac ipsum consectetur, vitae finibus tellus efficitur. Phasellus ac rutrum justo, eget egestas nunc.',
++    {
++ x: 7.156, y: 2.04, w: 5.01, h: 1.3, fontSize: 14, italic: true, color: GREY50, align: 'justify', lineSpacingMultiple: 1.3 }
++);
++
++  arrowButton(s, 6.016, 2.401, 0.577, '\u2261');
++
++
++  const para = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuad.';
++
++  body(s, para, {
++ x: 1.167, y: 4.534, w: 5.015, h: 1.913, align: 'justify' }
++);
++
++  body(s, para, {
++ x: 6.731, y: 4.534, w: 5.436, h: 1.913, align: 'justify' }
++);
++
++}
++
++
++// 6 — Agenda cards
++function slide06(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, [
++    {
++ text: 'Agenda', options: {
++ color: GREY25 }
++ }
++,
++    {
++ text: '.', options: {
++ color: TEAL }
++ }
++,
++  ], {
++ x: 1.167, y: 0.915, w: 4.153, h: 1.111, fontSize: 60 }
++);
++
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere.',
++    {
++ x: 1.167, y: 2.549, w: 4.621, h: 0.604 }
++);
++
++
++  const cards = [
++    {
++ x: 1.167, fill: TEAL, date: '02 July 2024', title: 'Agenda A, \n2024', titleColor: WHITE, textColor: WHITE }
++,
++    {
++ x: 5.093, fill: PEACH, date: '26 August 2024', title: 'Agenda B, \n2024', titleColor: TEAL, textColor: GREY15 }
++,
++  ];
++
++  cards.forEach(function (c) {
++
++    roundRect(s, {
++ x: c.x, y: 3.75, w: 3.689, h: 2.835, rectRadius: 0.39, fill: {
++ color: c.fill }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++    tbox(s, c.date, {
++ x: c.x + 0.372, y: 4.082, w: 2.663, h: 0.303, fontSize: 12, fontFace: MAJOR, color: c.textColor }
++);
++
++    heading(s, c.title, {
++ x: c.x + 0.372, y: 4.409, w: 2.663, h: 1.043, fontSize: 28, color: c.titleColor }
++);
++
++    tbox(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit.',
++      {
++ x: c.x + 0.372, y: 5.608, w: 3.181, h: 0.604, fontSize: 12, color: c.textColor, lineSpacingMultiple: 1.3 }
++);
++
++  }
++);
++
++  tbox(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit.',
++    {
++ x: 9.155, y: 5.689, w: 3.012, h: 0.604, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.3 }
++);
++
++}
++
++
++// 7 — Image gallery, five staggered photos
++function slide07(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, [
++    {
++ text: 'Image Gallery', options: {
++ color: GREY25 }
++ }
++,
++    {
++ text: '.', options: {
++ color: TEAL }
++ }
++,
++  ], {
++ x: 1.351, y: 0.89, w: 8.493, h: 0.909, fontSize: 48 }
++);
++
++
++  for (let i = 0;
++ i < 5;
++ i++) {
++
++    const x = 1.351 + i * 2.1846;
++
++    const y = i % 2 === 0 ? 2.285 : 2.798;
++ // alternating baseline
++    ellipse(s, {
++ x: x, y: y + 3.335, w: 0.237, h: 0.237, fill: {
++ type: 'none' }
++, line: {
++ color: TEAL, width: 1.25 }
++ }
++);
++
++    tbox(s, 'View More', {
++ x: x + 0.313, y: y + 3.302, w: 1.58, h: 0.337, fontSize: 14, color: GREY50 }
++);
++
++  }
++
++
++  // Speech balloon "Hello People!" — rounded body with a tail at the lower left.
++  s.addShape('custGeom', {
++
++    x: 8.87, y: 2.80, w: 0.60, h: 0.50, fill: {
++ color: PEACH }
++, line: {
++ type: 'none' }
++,
++    points: [{
++ x: 0.30, y: 0, moveTo: true }
++, {
++ x: 0.60, y: 0 }
++, {
++ x: 0, y: 0.50 }
++, {
++ close: true }
++],
++  }
++);
++
++  roundRect(s, {
++ x: 8.839, y: 1.628, w: 2.208, h: 1.238, rectRadius: 0.21, fill: {
++ color: PEACH }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++  heading(s, 'Hello \nPeople!', {
++ x: 9.073, y: 1.700, w: 1.80, h: 1.10, fontSize: 28, color: WHITE, valign: 'middle', lineSpacingMultiple: 0.9 }
++);
++
++}
++
++
++// 8 — Cryptocurrency fund, teal side panel
++function slide08(pptx) {
++
++  const s = pptx.addSlide();
++
++  rect(s, {
++ x: 9.658, y: 0, w: 3.675, h: 7.5, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++ }
++);
++
++  heading(s, 'Cryptocurrency Fund for \nBusy Person', {
++ x: 2.035, y: 1.071, w: 6.093, h: 1.178, fontSize: 32, color: NAVY }
++);
++
++  rect(s, {
++ x: 1.667, y: 2.503, w: 6.598, h: 2.057, fill: {
++ color: 'FAFAFA' }
++, line: {
++ color: WHITE, width: 0.75 }
++, shadow: SOFT_SHADOW }
++);
++
++  heading(s, 'General Project #1', {
++ x: 2.038, y: 2.717, w: 4.177, h: 0.426, fontSize: 16, color: TEAL, lineSpacingMultiple: 1.3 }
++);
++
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
++    {
++ x: 2.035, y: 3.161, w: 5.079, h: 1.126, color: GREY35, lineSpacingMultiple: 1.3 }
++);
++
++}
++
++
++// 9 — Crypto wallet, three numbered pills
++function slide09(pptx) {
++
++  const s = pptx.addSlide();
++
++  s.background = {
++ color: PEACH }
++;
++
++  heading(s, 'Start using your own Crypto \nWallet!', {
++ x: 1.052, y: 2.366, w: 4.311, h: 2.794, fontSize: 40, color: NAVY }
++);
++
++
++  const rows = [
++    {
++ x: 6.196, y: 1.830, num: '01.', title: 'Manage Marketing Point', dark: false }
++,
++    {
++ x: 6.196, y: 3.230, num: '02.', title: 'Project\nCreative Stuff', dark: true }
++,
++    {
++ x: 6.249, y: 4.629, num: '03.', title: 'Businesses\nReviews', dark: false }
++,
++  ];
++
++  rows.forEach(function (r, i) {
++
++    roundRect(s, {
++
++      x: r.x, y: r.y, w: 6.201, h: 1.041, rectRadius: 0.52,
++      fill: r.dark ? {
++ color: TEAL }
++ : {
++ color: 'FDE8E4' }
++,
++      line: {
++ color: WHITE, width: 0.75 }
++,
++      shadow: r.dark ? undefined : SOFT_SHADOW,
++    }
++);
++
++    const fg = r.dark ? WHITE : NAVY;
++
++    heading(s, r.num, {
++ x: 6.612, y: 2.064 + i * 1.3997, w: 0.869, h: 0.572, fontSize: 28, color: fg }
++);
++
++    heading(s, r.title, {
++ x: 7.411, y: 2.064 + i * 1.3997, w: 1.908, h: 0.572, fontSize: 14, color: fg }
++);
++
++    connector(s, {
++ x: 9.254, y: 2.029 + i * 1.3997, w: 0, h: 0.643, line: {
++ color: r.dark ? WHITE : GREY35, width: 1 }
++ }
++);
++
++    tbox(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit',
++      {
++ x: 9.643, y: 2.048 + i * 1.3997, w: 2.91, h: 0.604, fontSize: 12, color: r.dark ? WHITE : GREY35 }
++);
++
++  }
++);
++
++}
++
++
++// 10 — Wallet in a minute, three stacked photos
++function slide10(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, 'Start using your Crypto Wallet in a Minute', {
++ x: 1.33, y: 2.096, w: 4.317, h: 1.717, fontSize: 32, color: NAVY }
++);
++
++  heading(s, 'Subtitle Here', {
++ x: 1.33, y: 4.172, w: 3.119, h: 0.386, fontSize: 14, color: NAVY, lineSpacingMultiple: 1.3 }
++);
++
++  body(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. porttitor congue massa. Fusce posuere, magna sed pulvinar',
++    {
++ x: 1.33, y: 4.546, w: 3.715, h: 0.863, color: GREY35 }
++);
++
++}
++
++
++// 11 — Re-Investing, 65/35 progress bar
++function slide11(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, 'Re-Investing To Maximise Gains', {
++ x: 3.63, y: 1.377, w: 3.615, h: 2.794, fontSize: 40, color: GREY15, charSpacing: -1.5 }
++);
++
++  body(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of',
++    {
++ x: 3.671, y: 4.997, w: 2.359, h: 1.126, color: GREY35 }
++);
++
++
++  rect(s, {
++ x: 7.5, y: 3.917, w: 4.917, h: 2.958, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++ }
++);
++
++  heading(s, 'Your text in here', {
++ x: 7.894, y: 4.387, w: 2.161, h: 0.386, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.3 }
++);
++
++  body(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of',
++    {
++ x: 7.894, y: 4.912, w: 4.129, h: 0.602, color: WHITE }
++);
++
++  rect(s, {
++ x: 7.98, y: 5.815, w: 2.417, h: 0.208, fill: {
++ color: WHITE, transparency: 40 }
++, line: {
++ type: 'none' }
++ }
++);
++
++  rect(s, {
++ x: 10.396, y: 5.815, w: 1.541, h: 0.208, fill: {
++ color: WHITE, transparency: 80 }
++, line: {
++ type: 'none' }
++ }
++);
++
++  connector(s, {
++ x: 7.98, y: 5.815, w: 0, h: 0.59, line: {
++ color: WHITE, width: 1 }
++ }
++);
++
++  connector(s, {
++ x: 10.396, y: 5.815, w: 0, h: 0.59, line: {
++ color: WHITE, width: 1 }
++ }
++);
++
++  heading(s, '65%', {
++ x: 7.98, y: 6.065, w: 0.675, h: 0.345, fontSize: 12, color: WHITE }
++);
++
++  heading(s, '35%', {
++ x: 10.396, y: 6.065, w: 0.675, h: 0.345, fontSize: 12, color: WHITE }
++);
++
++}
++
++
++// 12 — Growth market, two edge photos
++function slide12(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, 'Growth Market with Digital Business',
++    {
++ x: 4.062, y: 1.612, w: 3.378, h: 3.032, fontSize: 40, color: GREY15, lineSpacingMultiple: 1.1 }
++);
++
++  connector(s, {
++ x: 5.606, y: 5.297, w: 1.061, h: 0, line: {
++ color: NAVY, width: 1 }
++ }
++);
++
++  tbox(s, 'Digital Art Expert\nin Works',
++    {
++ x: 6.81, y: 5.073, w: 1.76, h: 1.192, fontSize: 24, color: INK, charSpacing: -0.7, lineSpacingMultiple: 0.9 }
++);
++
++}
++
++
++// 13 — Famous work: rotated capsule
++function slide13(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, [
++    {
++ text: 'Famous Work of', options: {
++ fontSize: 32 }
++ }
++,
++    {
++ text: '\n2024', options: {
++ fontSize: 48 }
++ }
++,
++  ], {
++ x: 0.916, y: 0.817, w: 6.093, h: 1.447, color: NAVY }
++);
++
++
++  roundRect(s, {
++ x: 5.409, y: 3.663, w: 4.757, h: 2.413, rectRadius: 0.5, rotate: 45, fill: {
++ color: TEAL, transparency: 25 }
++, line: {
++ type: 'none' }
++ }
++);
++
++  tbox(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut efficitur ipsum vitae tortor accumsan, a pulvinar',
++    {
++ x: 6.203, y: 4.282, w: 3.385, h: 1.38, rotate: 45, fontSize: 16, bold: true, color: WHITE, lineSpacingMultiple: 1.2 }
++);
++
++  // Two small white bubbles poking out of the capsule's shoulder
++  ellipse(s, {
++ x: 7.635, y: 3.015, w: 0.52, h: 0.52, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++  ellipse(s, {
++ x: 8.02, y: 3.30, w: 0.42, h: 0.42, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++}
++
++
++// 14 — Re-Investing flow with icon discs (teal background)
++function slide14(pptx) {
++
++  const s = pptx.addSlide();
++
++  s.background = {
++ color: TEAL }
++;
++
++  heading(s, 'Re-Investing To Maximise Gains', {
++ x: 1.529, y: 0.752, w: 6.093, h: 1.447, fontSize: 40, color: WHITE, charSpacing: -1.5 }
++);
++
++
++  const steps = [{
++ x: 1.529, y: 4.121 }
++, {
++ x: 4.207, y: 2.856 }
++];
++
++  steps.forEach(function (p) {
++
++    ellipse(s, {
++ x: p.x, y: p.y, w: 1.115, h: 1.06, fill: {
++ color: PEACH }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++    iconGlyph(s, p.x, p.y - 0.03, 1.09, WHITE);
++
++    heading(s, 'Features', {
++ x: p.x, y: p.y + 1.352, w: 1.907, h: 0.438, fontSize: 20, color: WHITE }
++);
++
++    tbox(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing',
++      {
++ x: p.x, y: p.y + 1.820, w: 1.907, h: 0.805, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 }
++);
++
++  }
++);
++
++
++  const dash = {
++ color: GREY_LN, dashType: 'dash', endArrowType: 'triangle', width: 1 }
++;
++
++  connector(s, {
++ x: 0.0, y: 4.6, w: 1.125, h: 0, line: dash }
++);
++
++  connector(s, {
++ x: 2.89, y: 4.454, w: 1.038, h: -0.889, line: dash }
++);
++
++  connector(s, {
++ x: 5.572, y: 3.371, w: 1.125, h: 0, line: dash }
++);
++
++}
++
++
++// 15 — Agendas in 2024: date chips + copy
++function slide15(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, [
++    {
++ text: 'Agendas in ', options: {
++ fontSize: 32 }
++ }
++,
++    {
++ text: '\n2024', options: {
++ fontSize: 44 }
++ }
++,
++  ], {
++ x: 0.781, y: 0.478, w: 6.093, h: 1.38, color: NAVY }
++);
++
++  connector(s, {
++ x: -2.313, y: 6.043, w: 9.897, h: 0, line: {
++ color: 'A5A5A5', width: 1 }
++ }
++);
++
++
++  const items = [
++    {
++ y: 2.653, chipY: 2.665, chip: '24/2', fill: PEACH }
++,
++    {
++ y: 4.098, chipY: 4.110, chip: '13/3', fill: TEAL }
++,
++    {
++ y: 5.543, chipY: 5.587, chip: '15/4', fill: PEACH }
++,
++  ];
++
++  items.forEach(function (it) {
++
++    roundRect(s, {
++ x: 7.584, y: it.chipY, w: 1.249, h: 0.563, rectRadius: 0.094, fill: {
++ color: it.fill }
++, line: {
++ type: 'none' }
++ }
++);
++
++    heading(s, it.chip, {
++ x: 7.68, y: it.chipY + 0.029, w: 1.058, h: 0.505, fontSize: 24, color: WHITE, align: 'center', valign: 'middle' }
++);
++
++    heading(s, 'Agenda', {
++ x: 9.143, y: it.y, w: 3.203, h: 0.438, fontSize: 20, color: GREY15 }
++);
++
++    tbox(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod',
++      {
++ x: 9.143, y: it.y + 0.437, w: 3.203, h: 0.81, fontSize: 12, color: GREY15, lineSpacingMultiple: 1.2 }
++);
++
++  }
++);
++
++}
++
++
++// 16 — Big savings figure over a full-bleed photo
++function slide16(pptx) {
++
++  const s = pptx.addSlide();
++
++  tbox(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur repudiandae vel reiciendis provident quo autem voluptas!',
++    {
++ x: 1.155, y: 1.227, w: 9.912, h: 0.643, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 }
++);
++
++  // Bitcoin coin: concentric discs with a "B" face
++  const coin = [
++    [1.194, 2.416, 0.851, 'FBEC27'],
++    [1.210, 2.430, 0.824, 'FBBA2D'],
++    [1.286, 2.505, 0.671, 'FBEE3D'],
++    [1.320, 2.539, 0.604, 'FBBA2D'],
++    [1.352, 2.571, 0.540, 'FBCE37'],
++  ];
++
++  coin.forEach(function (c) {
++ ellipse(s, {
++ x: c[0], y: c[1], w: c[2], h: c[2], fill: {
++ color: c[3] }
++, line: {
++ type: 'none' }
++ }
++);
++ }
++);
++
++  tbox(s, 'B', {
++ x: 1.194, y: 2.416, w: 0.851, h: 0.852, align: 'center', valign: 'middle', fontSize: 22, bold: true, fontFace: MAJOR, color: 'DC9D3B' }
++);
++
++  heading(s, '$16,443.30', {
++ x: 2.237, y: 2.419, w: 8.086, h: 0.909, fontSize: 48, bold: true, color: PEACH, valign: 'middle' }
++);
++
++  heading(s, 'Start using your own \nCrypto Wallet!', {
++ x: 1.155, y: 3.515, w: 10.984, h: 1.717, fontSize: 48, color: WHITE }
++);
++
++  heading(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur repudiandae.',
++    {
++ x: 1.155, y: 5.545, w: 10.659, h: 0.728, fontSize: 16, color: WHITE, lineSpacingMultiple: 1.2 }
++);
++
++}
++
++
++// 17 — Cryptonary benefits, three columns
++function slide17(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, 'Cryptonary Benefits', {
++ x: 1.088, y: 1.155, w: 9.301, h: 0.841, fontSize: 44, color: GREY05, charSpacing: -1.5 }
++);
++
++  const cols = [
++    {
++ num: '01', numX: 1.398, x: 1.203, imgX: 1.203, title: 'Benefits One', y1: 5.423, y2: 5.854 }
++,
++    {
++ num: '02', numX: 5.241, x: 5.057, imgX: 5.057, title: 'Benefits Two', y1: 5.437, y2: 5.868 }
++,
++    {
++ num: '03', numX: 9.189, x: 8.881, imgX: 8.953, title: 'Benefits Three', y1: 5.423, y2: 5.854 }
++,
++  ];
++
++  cols.forEach(function (c) {
++
++    heading(s, c.num, {
++ x: c.numX, y: 2.43, w: 1.2, h: 0.841, fontSize: 44, bold: true, color: TEAL }
++);
++
++    heading(s, c.title, {
++ x: c.x, y: c.y1, w: 3.016, h: 0.425, fontSize: 16, color: GREY05, lineSpacingMultiple: 1.3 }
++);
++
++    tbox(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit',
++      {
++ x: c.x, y: c.y2, w: 2.559, h: 0.601, fontSize: 12, color: GREY05, lineSpacingMultiple: 1.3 }
++);
++
++  }
++);
++
++}
++
++
++// 18 — Savings account (peach background, photo strips right)
++function slide18(pptx) {
++
++  const s = pptx.addSlide();
++
++  s.background = {
++ color: PEACH }
++;
++
++  heading(s, 'Re-Investing To Maximise Gains', {
++ x: 1.082, y: 2.199, w: 6.417, h: 1.447, fontSize: 40, color: GREY15, charSpacing: -1.5 }
++);
++
++  tbox(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam. Non exercitationem reiciendis qui consequatur.',
++    {
++ x: 1.082, y: 3.787, w: 4.746, h: 0.808, fontSize: 12, color: GREY15, lineSpacingMultiple: 1.2 }
++);
++
++  tbox(s, '\u2192', {
++ x: 1.15, y: 5.13, w: 0.42, h: 0.36, fontSize: 16, bold: true, fontFace: MAJOR, color: TEAL }
++);
++
++  tbox(s, 'Savings Account Number :', {
++ x: 1.689, y: 5.154, w: 2.981, h: 0.303, fontSize: 12, color: GREY15 }
++);
++
++  heading(s, '$16,443.30', {
++ x: 1.689, y: 5.5, w: 4.547, h: 0.707, fontSize: 36, color: TEAL }
++);
++
++}
++
++
++// 19 — Easy money: peach card between photos
++function slide19(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, 'Make cryptocurrency easy money.',
++    {
++ x: 1.273, y: 1.053, w: 10.788, h: 0.609, fontSize: 40, color: GREY15, align: 'center', margin: 0, lineSpacingMultiple: 0.9 }
++);
++
++  roundRect(s, {
++ x: 5.003, y: 2.542, w: 2.944, h: 2.729, rectRadius: 0.086, fill: {
++ color: PEACH }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++  tbox(s, [
++    {
++ text: '70% ', options: {
++ fontSize: 24 }
++ }
++,
++    {
++ text: '\nProfit project', options: {
++ fontSize: 14 }
++ }
++,
++  ], {
++ x: 5.368, y: 3.137, w: 1.885, h: 0.74, color: GREY15, align: 'right' }
++);
++
++  tbox(s, 'Lorem ipsum dolor sit amet, consectetuer',
++    {
++ x: 5.553, y: 4.006, w: 1.706, h: 0.869, fontSize: 12, color: GREY15, align: 'right' }
++);
++
++  tbox(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa.',
++    {
++ x: 3.691, y: 5.845, w: 5.952, h: 0.602, fontSize: 14, color: GREY15, align: 'center' }
++);
++
++}
++
++
++// 20 — Data Analytic: two interlocking arrow loops
++function slide20(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, 'Make Company Get Bigger \nProfit Than Ever',
++    {
++ x: 1.163, y: 0.761, w: 11.008, h: 1.554, fontSize: 40, color: GREY25, align: 'center', lineSpacingMultiple: 1.1 }
++);
++
++
++  // Teal loop sweeps left/down, peach loop sweeps right/up.
++  s.addShape('custGeom', {
++
++    x: 2.407, y: 2.821, w: 5.19, h: 3.415, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++,
++    points: [
++      {
++ x: 5.185, y: 3.139, moveTo: true }
++, {
++ x: 4.877, y: 2.831 }
++, {
++ x: 4.899, y: 2.716 }
++,
++      {
++ x: 4.26, y: 2.902, curve: {
++ type: 'cubic', x1: 4.715, y1: 2.832, x2: 4.495, y2: 2.902 }
++ }
++,
++      {
++ x: 3.065, y: 1.704, curve: {
++ type: 'cubic', x1: 3.6, y1: 2.902, x2: 3.065, y2: 2.365 }
++ }
++,
++      {
++ x: 4.089, y: 0.518, curve: {
++ type: 'cubic', x1: 3.065, y1: 1.101, x2: 3.509, y2: 0.602 }
++ }
++,
++      {
++ x: 3.957, y: 0.267 }
++, {
++ x: 4.11, y: 0.0 }
++,
++      {
++ x: 2.551, y: 1.704, curve: {
++ type: 'cubic', x1: 3.237, y1: 0.077, x2: 2.551, y2: 0.809 }
++ }
++,
++      {
++ x: 2.85, y: 2.67, curve: {
++ type: 'cubic', x1: 2.551, y1: 2.063, x2: 2.662, y2: 2.395 }
++ }
++,
++      {
++ x: 0.523, y: 2.67 }
++, {
++ x: 0.523, y: 2.393 }
++, {
++ x: 0.0, y: 2.864 }
++, {
++ x: 0.523, y: 3.333 }
++,
++      {
++ x: 0.523, y: 3.026 }
++, {
++ x: 3.174, y: 3.026 }
++,
++      {
++ x: 4.26, y: 3.415, curve: {
++ type: 'cubic', x1: 3.471, y1: 3.269, x2: 3.849, y2: 3.415 }
++ }
++,
++      {
++ x: 5.19, y: 3.139, curve: {
++ type: 'cubic', x1: 4.603, y1: 3.415, x2: 4.922, y2: 3.314 }
++ }
++,
++      {
++ close: true }
++,
++    ],
++  }
++);
++
++  s.addShape('custGeom', {
++
++    x: 6.831, y: 2.823, w: 4.096, h: 2.891, fill: {
++ color: PEACH }
++, line: {
++ type: 'none' }
++,
++    points: [
++      {
++ x: 4.096, y: 0.549, moveTo: true }
++, {
++ x: 3.573, y: 0.08 }
++, {
++ x: 3.573, y: 0.382 }
++, {
++ x: 0.922, y: 0.382 }
++,
++      {
++ x: 0.0, y: 0.0, curve: {
++ type: 'cubic', x1: 0.667, y1: 0.171, x2: 0.348, y2: 0.033 }
++ }
++,
++      {
++ x: 0.15, y: 0.265 }
++, {
++ x: 0.017, y: 0.518 }
++,
++      {
++ x: 1.031, y: 1.702, curve: {
++ type: 'cubic', x1: 0.592, y1: 0.605, x2: 1.031, y2: 1.102 }
++ }
++,
++      {
++ x: 0.704, y: 2.525, curve: {
++ type: 'cubic', x1: 1.031, y1: 2.021, x2: 0.908, y2: 2.31 }
++ }
++,
++      {
++ x: 0.761, y: 2.52 }
++, {
++ x: 1.07, y: 2.828 }
++, {
++ x: 1.064, y: 2.891 }
++,
++      {
++ x: 1.545, y: 1.702, curve: {
++ type: 'cubic', x1: 1.361, y1: 2.584, x2: 1.545, y2: 2.164 }
++ }
++,
++      {
++ x: 1.247, y: 0.738, curve: {
++ type: 'cubic', x1: 1.545, y1: 1.344, x2: 1.434, y2: 1.011 }
++ }
++,
++      {
++ x: 3.573, y: 0.738 }
++, {
++ x: 3.573, y: 1.018 }
++, {
++ x: 4.096, y: 0.549 }
++,
++      {
++ close: true }
++,
++    ],
++  }
++);
++
++  iconChip(s, 6.206, 2.630, 0.923, WHITE, 'B', TEAL, 24);
++
++  iconChip(s, 7.128, 5.173, 0.923, WHITE, 'A', PEACH, 24);
++
++  heading(s, 'Data \nAnalytic\n2024',
++    {
++ x: 5.348, y: 3.675, w: 2.639, h: 1.702, fontSize: 24, bold: true, align: 'center', margin: [0, 0, 3.6, 3.6], lineSpacingMultiple: 1.2 }
++);
++
++
++  s.addShape('upArrow', {
++ x: 1.568, y: 3.817, w: 0.541, h: 0.768, rotate: 180, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++ }
++);
++
++  tbox(s, [{
++ text: '1.500+ ', options: {
++ fontSize: 20, bold: true, fontFace: MAJOR }
++ }
++, {
++ text: 'Income', options: {
++ fontSize: 14 }
++ }
++],
++    {
++ x: 2.385, y: 3.75, w: 2.462, h: 0.438, color: TEAL }
++);
++
++  tbox(s, 'The European languages are members',
++    {
++ x: 2.397, y: 4.133, w: 2.089, h: 0.596, fontSize: 12, color: GREY50, lineSpacingMultiple: 1.3 }
++);
++
++
++  s.addShape('upArrow', {
++ x: 8.864, y: 5.031, w: 0.541, h: 0.768, fill: {
++ color: PEACH }
++, line: {
++ type: 'none' }
++ }
++);
++
++  tbox(s, [{
++ text: '3.000+ ', options: {
++ fontSize: 20, bold: true, fontFace: MAJOR }
++ }
++, {
++ text: 'Income', options: {
++ fontSize: 14 }
++ }
++],
++    {
++ x: 9.681, y: 4.967, w: 2.462, h: 0.438, color: PEACH }
++);
++
++  tbox(s, 'The European languages are members',
++    {
++ x: 9.681, y: 5.321, w: 2.089, h: 0.596, fontSize: 12, color: GREY50, lineSpacingMultiple: 1.3 }
++);
++
++}
++
++
++// 21 — Revenue columns 01/02/03
++function slide21(pptx) {
++
++  const s = pptx.addSlide();
++
++  rect(s, {
++ x: 4.892, y: 0, w: 2.441, h: 7.5, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++ }
++);
++
++  rect(s, {
++ x: 0.010, y: 0, w: 2.440, h: 7.5, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++  rect(s, {
++ x: 2.451, y: 0, w: 2.440, h: 7.5, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++  s.addShape('rtTriangle', {
++ x: 4.701, y: 6.166, w: 0.36, h: 0.327, rotate: 225, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++  s.addShape('rtTriangle', {
++ x: 2.260, y: 6.166, w: 0.36, h: 0.327, rotate: 225, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++
++  const cols = [
++    {
++ num: '01', numX: 0.349, numW: 2.219, numColor: TEAL, textX: 0.341, textColor: GREY25, chipX: 0.490, iconColor: TEAL }
++,
++    {
++ num: '02', numX: 2.562, numW: 2.441, numColor: PEACH, textX: 2.769, textColor: GREY25, chipX: 2.801, iconColor: PEACH }
++,
++    {
++ num: '03', numX: 5.003, numW: 2.219, numColor: WHITE, textX: 5.284, textColor: WHITE, chipX: 5.239, iconColor: PEACH }
++,
++  ];
++
++  cols.forEach(function (c, i) {
++
++    heading(s, c.num, {
++ x: c.numX, y: 2.72, w: c.numW, h: 2.06, fontSize: 110, bold: true, color: c.numColor, lineSpacingMultiple: 1.1 }
++);
++
++    heading(s, 'Revenue #' + (i + 1), {
++ x: c.textX, y: 5.42, w: 1.868, h: 0.386, fontSize: 16, color: c.textColor, lineSpacingMultiple: 1.1 }
++);
++
++    tbox(s, 'The European languages are members',
++      {
++ x: c.textX, y: 5.833, w: 1.871, h: 0.859, fontSize: 12, color: c.textColor, lineSpacingMultiple: 1.3 }
++);
++
++    ellipse(s, {
++ x: c.chipX, y: 0.447, w: 0.579, h: 0.579, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++    iconGlyph(s, c.chipX, 0.447, 0.579, c.iconColor);
++
++  }
++);
++
++
++  heading(s, 'Re-Investing \nTo Maximise Gains', {
++ x: 7.976, y: 2.106, w: 4.405, h: 2.121, fontSize: 40, color: GREY15, charSpacing: -1.5 }
++);
++
++  tbox(s, 'The European languages are members of the same family. Their separate existence is a myth. For science, music, sport, etc.',
++    {
++ x: 7.976, y: 4.979, w: 3.879, h: 0.803, fontSize: 12, italic: true, color: GREY50, lineSpacingMultiple: 1.2 }
++);
++
++}
++
++
++// 22 — Slider chart with four data tracks
++function slide22(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, 'Growth Market with Digital Business',
++    {
++ x: 1.208, y: 0.696, w: 10.917, h: 0.813, fontSize: 40, color: GREY15, align: 'center', lineSpacingMultiple: 1.1 }
++);
++
++
++  const cards = [
++    {
++ x: 1.438, y: 2.332, valueX: 1.330, labelX: 1.693, value: '23,120', color: PEACH, align: 'right', chipX: 3.606, chipY: 2.519, chipFill: PEACH }
++,
++    {
++ x: 1.438, y: 4.754, valueX: 1.330, labelX: 1.693, value: '40,685', color: TEAL, align: 'right', chipX: 3.606, chipY: 4.956, chipFill: TEAL }
++,
++    {
++ x: 9.417, y: 2.332, valueX: 9.889, labelX: 9.889, value: '23,120', color: TEAL, align: 'left', chipX: 9.139, chipY: 2.519, chipFill: TEAL }
++,
++    {
++ x: 9.417, y: 4.754, valueX: 9.896, labelX: 9.896, value: '40,685', color: PEACH, align: 'left', chipX: 9.139, chipY: 4.962, chipFill: PEACH }
++,
++  ];
++
++  cards.forEach(function (c) {
++
++    roundRect(s, {
++ x: c.x, y: c.y, w: 2.461, h: 1.233, rectRadius: 0.1, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++    heading(s, c.value, {
++ x: c.valueX, y: c.y + 0.163, w: 2.133, h: 0.572, fontSize: 28, bold: true, color: c.color, align: c.align }
++);
++
++    tbox(s, 'High value', {
++ x: c.labelX, y: c.y + 0.673, w: 1.77, h: 0.381, fontSize: 14, color: GREY50, align: c.align, lineSpacingMultiple: 1.3 }
++);
++
++    ellipse(s, {
++ x: c.chipX, y: c.chipY, w: 0.579, h: 0.579, fill: {
++ color: c.chipFill }
++, line: {
++ type: 'none' }
++ }
++);
++
++    iconGlyph(s, c.chipX, c.chipY, 0.579, WHITE);
++
++  }
++);
++
++
++  // Four vertical sliders: grey track + coloured fill + white handle
++  const tracks = [
++    {
++ x: 4.947, fillY: 3.853, fillH: 1.955, color: TEAL, handleY: 3.741, label: 'Data 01', labelX: 4.414 }
++,
++    {
++ x: 6.002, fillY: 3.200, fillH: 2.567, color: PEACH, handleY: 3.069, label: 'Data 02', labelX: 5.469 }
++,
++    {
++ x: 7.057, fillY: 4.037, fillH: 1.771, color: TEAL, handleY: 4.037, label: 'Data 03', labelX: 6.525 }
++,
++    {
++ x: 8.115, fillY: 2.714, fillH: 3.093, color: PEACH, handleY: 2.627, label: 'Data 04', labelX: 7.594 }
++,
++  ];
++
++  tracks.forEach(function (t) {
++
++    rect(s, {
++ x: t.x, y: 2.058, w: 0.159, h: 3.75, fill: {
++ color: GREY_BAR }
++, line: {
++ type: 'none' }
++ }
++);
++
++    rect(s, {
++ x: t.x, y: t.fillY, w: 0.159, h: t.fillH, fill: {
++ color: t.color }
++, line: {
++ type: 'none' }
++ }
++);
++
++    roundRect(s, {
++ x: t.x - 0.211, y: t.handleY, w: 0.581, h: 0.296, rectRadius: 0.05, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++    connector(s, {
++ x: t.x - 0.095, y: t.handleY + 0.148, w: 0.348, h: 0, line: {
++ color: GREY15, width: 2 }
++ }
++);
++
++    tbox(s, t.label, {
++ x: t.labelX, y: 6.115, w: 1.224, h: 0.337, fontSize: 14, color: GREY50, align: 'center' }
++);
++
++  }
++);
++
++}
++
++
++// 23 — Data 2023 Digital Finance line chart
++function slide23(pptx) {
++
++  const s = pptx.addSlide();
++
++  rect(s, {
++ x: 0, y: 0, w: 4.438, h: 7.5, fill: {
++ color: PEACH }
++, line: {
++ type: 'none' }
++ }
++);
++
++  s.addShape('triangle', {
++ x: 4.305, y: 1.068, w: 0.601, h: 0.34, rotate: 90, fill: {
++ color: PEACH }
++, line: {
++ type: 'none' }
++ }
++);
++
++  heading(s, 'Data 2023 Digital FInance', {
++ x: 0.895, y: 0.781, w: 3.619, h: 2.075, fontSize: 36, color: GREY15, lineSpacingMultiple: 1.1 }
++);
++
++
++  // The trend curve
++  s.addShape('custGeom', {
++
++    x: 1.079, y: 2.621, w: 11.217, h: 2.08, fill: {
++ type: 'none' }
++, line: {
++ color: WHITE, width: 1.5 }
++,
++    points: [
++      {
++ x: 0.0, y: 2.08, moveTo: true }
++,
++      {
++ x: 2.451, y: 0.764, curve: {
++ type: 'cubic', x1: 0.758, y1: 1.448, x2: 1.488, y2: 0.819 }
++ }
++,
++      {
++ x: 5.773, y: 1.751, curve: {
++ type: 'cubic', x1: 3.413, y1: 0.71, x2: 4.435, y2: 1.757 }
++ }
++,
++      {
++ x: 9.391, y: 0.041, curve: {
++ type: 'cubic', x1: 7.111, y1: 1.746, x2: 8.484, y2: 0.235 }
++ }
++,
++      {
++ x: 11.217, y: 0.583, curve: {
++ type: 'cubic', x1: 10.299, y1: -0.154, x2: 11.002, y2: 0.403 }
++ }
++,
++    ],
++  }
++);
++
++
++  // Callout markers: dot + dashed drop line + label
++  const marks = [
++    {
++ x: 1.506, y: 4.267, drop: 1.350, dot: WHITE, line: WHITE, label: '2.18%', lx: 1.427, ly: 5.765, lw: 1.26, color: TEAL }
++,
++    {
++ x: 2.894, y: 3.454, drop: 1.312, dot: WHITE, line: WHITE, label: '7.16%', lx: 2.819, ly: 4.914, lw: 1.26, color: TEAL }
++,
++    {
++ x: 5.070, y: 3.851, drop: 1.561, dot: TEAL, line: GREY_LN, label: '6.28%', lx: 4.995, ly: 5.560, lw: 1.26, color: GREY25 }
++,
++    {
++ x: 6.957, y: 4.328, drop: 0.724, dot: TEAL, line: GREY_LN, label: 'Best moment', lx: 6.882, ly: 5.200, lw: 2.004, color: GREY25 }
++,
++    {
++ x: 9.264, y: 3.224, drop: 1.505, dot: TEAL, line: GREY_LN, label: '12.33%', lx: 9.189, ly: 4.877, lw: 1.26, color: GREY25 }
++,
++    {
++ x: 10.656, y: 2.585, drop: 1.293, dot: TEAL, line: GREY_LN, label: 'Highest data', lx: 10.580, ly: 4.026, lw: 2.004, color: GREY25 }
++,
++  ];
++
++  marks.forEach(function (m) {
++
++    connector(s, {
++ x: m.x + 0.042, y: m.y + 0.26, w: 0, h: m.drop - 0.26, line: {
++ color: m.line, width: 1, dashType: 'dash', endArrowType: 'triangle' }
++ }
++);
++
++    ellipse(s, {
++ x: m.x, y: m.y, w: 0.085, h: 0.084, fill: {
++ color: m.dot }
++, line: {
++ type: 'none' }
++ }
++);
++
++    heading(s, m.label, {
++ x: m.lx, y: m.ly, w: m.lw, h: 0.422, fontSize: 18, color: m.color, lineSpacingMultiple: 1.1 }
++);
++
++  }
++);
++
++
++  ellipse(s, {
++ x: 4.371, y: 3.516, w: 0.143, h: 0.143, fill: {
++ color: TEAL }
++, line: {
++ color: WHITE, width: 5 }
++ }
++);
++
++  roundRect(s, {
++ x: 4.878, y: 2.27, w: 3.372, h: 1.238, rectRadius: 0.1, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: CARD_SHADOW }
++);
++
++  s.addShape('triangle', {
++ x: 4.60, y: 3.20, w: 0.34, h: 0.42, rotate: 270, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++  tbox(s, [
++    {
++ text: '$3,000,000 ', options: {
++ fontSize: 24, bold: true, fontFace: MAJOR }
++ }
++,
++    {
++ text: '/Month', options: {
++ fontSize: 16 }
++ }
++,
++  ], {
++ x: 5.082, y: 2.424, w: 3.675, h: 0.589, color: TEAL, lineSpacingMultiple: 1.3 }
++);
++
++  tbox(s, 'A wonderful serenity has taken',
++    {
++ x: 5.082, y: 2.929, w: 3.675, h: 0.334, fontSize: 12, color: GREY50, lineSpacingMultiple: 1.3 }
++);
++
++}
++
++
++// 24 — Personal finance card + CTA
++function slide24(pptx) {
++
++  const s = pptx.addSlide();
++
++  heading(s, 'Make Company \nGet Bigger \nProfit Than Ever', {
++ x: 1.458, y: 1.139, w: 5.292, h: 1.919, fontSize: 36, color: GREY25 }
++);
++
++  tbox(s, 'Leverage agile frameworks to provide a robust synopsis for high level overviews. ',
++    {
++ x: 1.458, y: 3.164, w: 4.288, h: 0.693, fontSize: 14, color: GREY15, lineSpacingMultiple: 1.3 }
++);
++
++  roundRect(s, {
++ x: 1.458, y: 4.308, w: 5.292, h: 2.052, rectRadius: 0.34, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: CARD_SHADOW }
++);
++
++  heading(s, 'Personal Finance', {
++ x: 1.952, y: 4.727, w: 2.681, h: 0.462, fontSize: 18, bold: true, color: GREY15, lineSpacingMultiple: 1.3 }
++);
++
++  tbox(s, 'survival strategies to ensure proactive',
++    {
++ x: 1.952, y: 5.253, w: 2.681, h: 0.687, fontSize: 14, color: GREY15, lineSpacingMultiple: 1.3 }
++);
++
++  roundRect(s, {
++ x: 9.317, y: 5.43, w: 2.11, h: 0.49, rectRadius: 0.107, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++ }
++);
++
++  tbox(s, 'Try it now', {
++ x: 9.417, y: 5.43, w: 1.6, h: 0.49, fontSize: 14, color: WHITE, valign: 'middle' }
++);
++
++  tbox(s, '\u2192', {
++ x: 10.82, y: 5.43, w: 0.45, h: 0.49, fontSize: 14, fontFace: MAJOR, color: WHITE, valign: 'middle', align: 'center' }
++);
++
++}
++
++
++// 25 — Shop where you want (peach background, icon row)
++function slide25(pptx) {
++
++  const s = pptx.addSlide();
++
++  s.background = {
++ color: PEACH }
++;
++
++  // Faded background glyph stand-ins at the far left/right
++  iconGlyph(s, 1.488, 2.578, 0.804, 'F7B3A7');
++
++  iconGlyph(s, 11.171, 2.632, 0.696, 'F7B3A7');
++
++  iconGlyph(s, 4.747, 2.051, 0.563, GREY25);
++
++  iconGlyph(s, 7.812, 2.051, 0.563, GREY25);
++
++  roundRect(s, {
++ x: 6.059, y: 1.534, w: 1.216, h: 1.215, rectRadius: 0.28, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++ }
++);
++
++  iconGlyph(s, 6.059, 1.534, 1.216, WHITE);
++
++  heading(s, 'Shop Where You Want, How You Want.',
++    {
++ x: 3.017, y: 3.525, w: 7.299, h: 1.582, fontSize: 44, color: GREY15, align: 'center' }
++);
++
++  tbox(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. ',
++    {
++ x: 2.742, y: 5.242, w: 7.85, h: 0.689, fontSize: 14, color: GREY15, align: 'center', lineSpacingMultiple: 1.3 }
++);
++
++}
++
++
++// 26 — Table Economic
++function slide26(pptx) {
++
++  const s = pptx.addSlide();
++
++  roundRect(s, {
++ x: 0.757, y: 2.629, w: 11.819, h: 3.779, rectRadius: 0.25, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: CARD_SHADOW }
++);
++
++  heading(s, 'Table Economic', {
++ x: 1.036, y: 0.794, w: 7.162, h: 0.841, fontSize: 44, color: GREY15 }
++);
++
++  tbox(s, [
++    {
++ text: 'Lorem Ipsum', options: {
++ bold: true }
++ }
++,
++    {
++ text: "\u00A0is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard" }
++,
++  ], {
++ x: 1.035, y: 1.786, w: 8.201, h: 0.64, fontSize: 16, color: '000000' }
++);
++
++
++  const headers = ['Name', 'Change (%)', 'Ico date', 'Ico price', 'Curr. Price'];
++
++  const coins = ['Bitcoin', 'Ethereum', 'Ripple', 'Zcash', 'Monero-XMR', 'Dash'];
++
++  const rows = [headers.map(function (h) {
++
++    return {
++ text: h, options: {
++ bold: true, color: WHITE, fill: {
++ color: TEAL }
++, fontFace: 'Open Sans', fontSize: 12 }
++ }
++;
++
++  }
++)];
++
++  coins.forEach(function (name, i) {
++
++    const shade = i === 1 ? GREY_BAR : WHITE;
++ // second data row is banded
++    rows.push([name, '+3244.77%', '2024', '$0.005', '$0.004'].map(function (v) {
++
++      return {
++ text: v, options: {
++ color: GREY15, fill: {
++ color: shade }
++, fontSize: 11 }
++ }
++;
++
++    }
++));
++
++  }
++);
++
++  s.addTable(rows, {
++
++    x: 1.169, y: 3.009, w: 8.255, colW: [1.651, 1.651, 1.651, 1.651, 1.651],
++    rowH: [0.373, 0.427, 0.427, 0.427, 0.427, 0.427, 0.427],
++    align: 'center', valign: 'middle', fontFace: MINOR,
++    border: {
++ type: 'solid', color: 'D9D9D9', pt: 0.5 }
++,
++  }
++);
++
++
++  heading(s, 'Change (%)', {
++ x: 9.721, y: 4.416, w: 2.258, h: 0.404, fontSize: 18, bold: true, color: GREY15 }
++);
++
++  tbox(s, 'The European languages are. Their separate existence is a myth. ',
++    {
++ x: 9.721, y: 4.951, w: 2.682, h: 0.995, fontSize: 14, color: GREY15, lineSpacingMultiple: 1.3 }
++);
++
++}
++
++
++// 27 — Phone hero on teal
++function slide27(pptx) {
++
++  const s = pptx.addSlide();
++
++  s.background = {
++ color: TEAL }
++;
++
++  ellipse(s, {
++ x: 3.361, y: 1.769, w: 9.271, h: 6.806, rotate: 348.3, fill: {
++ color: PEACH, transparency: 85 }
++, line: {
++ type: 'none' }
++ }
++);
++
++  ellipse(s, {
++ x: 6.881, y: 0.191, w: 9.271, h: 6.806, rotate: 348.3, fill: {
++ color: TEAL, transparency: 91 }
++, line: {
++ type: 'none' }
++ }
++);
++
++  heading(s, 'Start using your Crypto Wallet in a Minute',
++    {
++ x: 1.024, y: 2.438, w: 5.047, h: 3.013, fontSize: 48, color: WHITE, lineSpacingMultiple: 0.9 }
++);
++
++  roundRect(s, {
++ x: 4.922, y: 5.644, w: 1.946, h: 0.653, rectRadius: 0.33, fill: {
++ color: WHITE, transparency: 78 }
++, line: {
++ color: WHITE, transparency: 50, width: 0.75 }
++ }
++);
++
++  tbox(s, 'New! Progress', {
++ x: 5.146, y: 5.802, w: 1.519, h: 0.337, fontSize: 14, color: WHITE }
++);
++
++  // Photograph of a tilted phone, replaced by a rotated rounded slab with a bezel
++  photoFrame(s, 8.30, 0.70, 4.1, 7.9, {
++
++    shape: 'roundRect', rectRadius: 0.10, rotate: 322.4, tint: '05716B',
++    line: {
++ color: '2B2B33', width: 5 }
++,
++  }
++);
++
++}
++
++
++// 28 — Projecting Business, tilted phone outlines
++function slide28(pptx) {
++
++  const s = pptx.addSlide();
++
++  s.background = {
++ color: PEACH }
++;
++
++  heading(s, 'Projecting\nBusiness', {
++ x: 1.419, y: 2.673, w: 4.465, h: 2.121, fontSize: 60, color: GREY15 }
++);
++
++
++  // Four outlined phones rotated 30 degrees, each with a small camera dot
++  const phones = [
++    {
++ x: 8.515, y: 0.924, dotX: 11.166, dotY: 1.720 }
++,
++    {
++ x: 11.376, y: 1.419, dotX: 14.027, dotY: 2.215 }
++,
++    {
++ x: 6.017, y: 5.253, dotX: 8.668, dotY: 6.047 }
++,
++    {
++ x: 8.878, y: 5.748, dotX: 11.529, dotY: 6.542 }
++,
++  ];
++
++  phones.forEach(function (p) {
++
++    roundRect(s, {
++
++      x: p.x, y: p.y, w: 2.039, h: 4.281, rectRadius: 0.18, rotate: 30,
++      fill: {
++ color: PEACH }
++, line: {
++ color: '373737', width: 3 }
++,
++    }
++);
++
++    ellipse(s, {
++ x: p.dotX, y: p.dotY, w: 0.14, h: 0.14, fill: {
++ color: '373737' }
++, line: {
++ type: 'none' }
++ }
++);
++
++  }
++);
++
++
++  ellipse(s, {
++ x: 8.901, y: 2.150, w: 2.603, h: 2.603, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++ }
++);
++
++  tbox(s, [{
++ text: '+13.2', options: {
++ fontSize: 44 }
++ }
++, {
++ text: '%', options: {
++ fontSize: 24 }
++ }
++],
++    {
++ x: 8.925, y: 2.900, w: 2.706, h: 0.841, fontFace: MAJOR, color: WHITE, align: 'center' }
++);
++
++  tbox(s, 'Profit technologies', {
++ x: 8.977, y: 3.658, w: 2.603, h: 0.303, fontSize: 12, color: WHITE, align: 'center' }
++);
++
++
++  ellipse(s, {
++ x: 7.453, y: 4.491, w: 2.122, h: 2.122, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++  tbox(s, [{
++ text: '177', options: {
++ fontSize: 44 }
++ }
++, {
++ text: 'k', options: {
++ fontSize: 24 }
++ }
++],
++    {
++ x: 7.531, y: 5.000, w: 1.967, h: 0.841, fontFace: MAJOR, color: TEAL, align: 'center' }
++);
++
++  tbox(s, 'Total users', {
++ x: 7.531, y: 5.758, w: 1.967, h: 0.303, fontSize: 12, color: TEAL, align: 'center' }
++);
++
++}
++
++
++// 29 — World map with four location callouts
++function slide29(pptx) {
++
++  const s = pptx.addSlide();
++
++  s.background = {
++ color: TEAL }
++;
++
++  // Simplified continent outlines (flat [x,y,...] inch pairs) drawn as filled polygons.
++  WORLD_MAP.forEach(function (flat) {
++
++    const pts = [];
++
++    for (let i = 0;
++ i < flat.length;
++ i += 2) pts.push({
++ x: flat[i], y: flat[i + 1], moveTo: i === 0 }
++);
++
++    pts.push({
++ close: true }
++);
++
++    s.addShape('custGeom', {
++ x: 0, y: 0, w: 13.333, h: 7.5, fill: {
++ color: PEACH, transparency: 10 }
++, line: {
++ type: 'none' }
++, points: pts }
++);
++
++  }
++);
++
++
++  heading(s, 'Start using your Crypto Wallet in a Minute',
++    {
++ x: 1.476, y: 1.297, w: 10.381, h: 0.64, fontSize: 32, color: WHITE, align: 'center' }
++);
++
++  [7.136, 7.296, 7.456].forEach(function (x) {
++
++    ellipse(s, {
++ x: x, y: 1.019, w: 0.107, h: 0.107, fill: {
++ type: 'none' }
++, line: {
++ color: TEAL, width: 1 }
++ }
++);
++
++  }
++);
++
++
++  const places = [
++    {
++ card: [3.812, 2.261, 2.457], tick: 6.000, pin: [5.520, 2.960], shadow: [5.902, 3.547], title: 'Place 4', sub: 'Established 12/2018' }
++,
++    {
++ card: [9.533, 3.291, 2.302], tick: 11.567, pin: [8.463, 3.845], shadow: [9.121, 4.500], title: 'Place 3', sub: 'Established 05/2020' }
++,
++    {
++ card: [1.735, 4.269, 2.302], tick: 3.769, pin: [2.009, 3.398], shadow: [2.063, 4.006], title: 'Place 1', sub: 'Established 05/2019' }
++,
++    {
++ card: [5.085, 5.217, 3.052], tick: 7.869, pin: [4.926, 4.275], shadow: [5.252, 4.972], title: 'Place 2', sub: 'Established 12/2019' }
++,
++  ];
++
++  places.forEach(function (p) {
++
++    ellipse(s, {
++ x: p.shadow[0], y: p.shadow[1], w: 0.616, h: 0.191, fill: {
++ color: '000000', transparency: 90 }
++, line: {
++ type: 'none' }
++ }
++);
++
++    s.addShape('teardrop', {
++ x: p.pin[0], y: p.pin[1], w: 0.34, h: 0.34, rotate: 225, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++    rect(s, {
++ x: p.card[0], y: p.card[1], w: p.card[2], h: 0.775, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++    rect(s, {
++ x: p.tick, y: p.card[1] + 0.359, w: 0.48, h: 0.057, rotate: 270, fill: {
++ color: TEAL }
++, line: {
++ type: 'none' }
++ }
++);
++
++    tbox(s, [
++      {
++ text: p.title, options: {
++ bold: true, breakLine: true }
++ }
++,
++      {
++ text: p.sub }
++,
++    ], {
++ x: p.card[0] + 0.13, y: p.card[1] + 0.107, w: p.card[2] - 0.2, h: 0.568, fontSize: 12, color: GREY25, lineSpacingMultiple: 1.2 }
++);
++
++  }
++);
++
++}
++
++
++// 30 — Closing / contact
++function slide30(pptx) {
++
++  const s = pptx.addSlide();
++
++  photoFrame(s, 0, 0, 13.333, 7.5, {
++ tint: 'F3F3F3' }
++);
++
++  tbox(s, 'Click icon to add picture', {
++ x: 0, y: 3.32, w: 13.333, h: 0.36, fontSize: 16, color: GREY25, align: 'center' }
++);
++
++  rect(s, {
++ x: -0.008, y: 4.023, w: 13.342, h: 3.837, fill: {
++ color: TEAL, transparency: 5 }
++, line: {
++ type: 'none' }
++ }
++);
++
++
++  // Centre "add picture" pin sitting over the teal band
++  ellipse(s, {
++ x: 5.949, y: 3.035, w: 1.435, h: 1.435, fill: {
++ color: PEACH }
++, line: {
++ color: 'FFDBD5', width: 1 }
++ }
++);
++
++  iconGlyph(s, 5.949, 3.035, 1.435, WHITE);
++
++
++  heading(s, 'Bring a good stuff', {
++ x: 1.467, y: 4.982, w: 3.169, h: 0.438, fontSize: 20, color: WHITE }
++);
++
++  tbox(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ',
++    {
++ x: 1.467, y: 5.419, w: 4.945, h: 1.048, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 }
++);
++
++  tbox(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod',
++    {
++ x: 8.161, y: 4.952, w: 3.706, h: 0.568, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2 }
++);
++
++
++  // Contact lines: envelope / globe markers plus the text
++  rect(s, {
++ x: 8.254, y: 5.778, w: 0.199, h: 0.14, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++ }
++);
++
++  tbox(s, 'mail@company.com', {
++ x: 8.538, y: 5.715, w: 1.781, h: 0.286, fontSize: 11, color: WHITE }
++);
++
++  ellipse(s, {
++ x: 8.254, y: 6.118, w: 0.178, h: 0.178, fill: {
++ type: 'none' }
++, line: {
++ color: WHITE, width: 1 }
++ }
++);
++
++  tbox(s, 'www.companywebsite.com', {
++ x: 8.521, y: 6.063, w: 2.441, h: 0.286, fontSize: 11, color: WHITE }
++);
++
++
++  // Address balloon, top right, with its tail pointing down-right
++  roundRect(s, {
++ x: 7.681, y: 0.876, w: 3.191, h: 1.31, rectRadius: 0.22, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++, shadow: SOFT_SHADOW }
++);
++
++  s.addShape('custGeom', {
++
++    x: 10.20, y: 2.10, w: 0.55, h: 0.45, fill: {
++ color: WHITE }
++, line: {
++ type: 'none' }
++,
++    points: [{
++ x: 0, y: 0, moveTo: true }
++, {
++ x: 0.34, y: 0 }
++, {
++ x: 0.55, y: 0.45 }
++, {
++ close: true }
++],
++  }
++);
++
++  heading(s, 'Address', {
++ x: 7.961, y: 1.028, w: 1.597, h: 0.37, fontSize: 16, color: GREY35 }
++);
++
++  tbox(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit',
++    {
++ x: 7.961, y: 1.35, w: 2.638, h: 0.568, fontSize: 12, color: GREY35, lineSpacingMultiple: 1.2 }
++);
++
++  // Map-pin marker beneath the balloon
++  s.addShape('teardrop', {
++ x: 10.496, y: 2.266, w: 0.643, h: 0.643, rotate: 225, fill: {
++ color: PEACH }
++, line: {
++ color: 'FFDBD5', width: 1 }
++ }
++);
++
++  iconGlyph(s, 10.496, 2.226, 0.60, WHITE);
++
++}
++
++
++// ---------------------------------------------------------------------------
++// Build
++// ---------------------------------------------------------------------------
++
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++];
++
++
++function build() {
++
++  const pptx = new PptxGenJS();
++
++  pptx.defineLayout({
++ name: 'FUNDZ', width: 13.333, height: 7.5 }
++);
++
++  pptx.layout = 'FUNDZ';
++
++  pptx.theme = {
++ headFontFace: MAJOR, bodyFontFace: MINOR }
++;
++
++  pptx.title = 'Fundz Financial Technology';
++
++  BUILDERS.forEach(function (fn) {
++ fn(pptx);
++ }
++);
++
++  return pptx.writeFile({
++ fileName: path.join(__dirname, '08efd17a-5d92-4052-a40c-3db10546f02a_grok_final.pptx') }
++);
++
++}
++
++
++build().then(function (f) {
++ console.log('wrote', f);
++ }
++, function (e) {
++ console.error(e);
++ process.exit(1);
++ }
++);
++

@@ -1,0 +1,561 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/barbershop_business_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/barbershop_business_presentation.js
+@@ -0,0 +1,558 @@
++/**
++ * "Barbershop" presentation - recreated with pptxgenjs.
++ *
++ * 10 slides, 13.333 x 7.5 in (16:9). Dark charcoal background, lime accent,
++ * Bebas Neue display type + Work Sans body type.
++ * Photographs in the source deck are rendered here as flat gray placeholders.
++ *
++ * Run: node 1874af87-57ab-40b4-af54-b31d1cdc4abd_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Palette / typography
++ * ------------------------------------------------------------------ */
++
++const INK = '151517'; // slide background + "black" ink
++const SNOW = 'F9F9F9'; // headline white
++const LIME = 'C5F853'; // accent
++const BODY_LIGHT = 'D9D9D9'; // body copy on dark
++const BODY_DARK = '262626'; // body copy on lime
++const PHOTO = 'CCCCCC'; // image placeholder fill
++const PHOTO_LABEL = '9A9A9A';
++
++const DISPLAY = 'Bebas Neue';
++const SANS = 'Work Sans';
++
++const SZ_HERO = 203; // full-bleed word marks ("BARBERSHOP", "THANK YOU")
++const SZ_TITLE = 37; // section headlines
++const SZ_LEAD = 18; // sub-heads / card titles (deck default size)
++const SZ_BODY = 10.5; // paragraph + nav copy
++
++const HAIRLINE = { color: LIME, width: 1 }; // 1pt lime keyline used on every card
++const NO_FILL = { type: 'none' };
++const NO_LINE = { type: 'none' };
++
++/* ------------------------------------------------------------------ *
++ * Low-level helpers
++ * ------------------------------------------------------------------ */
++
++// Body copy: 10.5pt Work Sans, justified, 1.5 line spacing.
++// `single: true` drops the extra leading (used by the one-line contact fields).
++function para(slide, text, box, opts = {}) {
++  slide.addText(text, {
++    ...box,
++    fontFace: SANS,
++    fontSize: SZ_BODY,
++    color: opts.color || BODY_LIGHT,
++    align: 'justify',
++    lineSpacingMultiple: opts.single ? undefined : 1.5,
++    valign: 'top',
++  });
++}
++
++// Two-tone word mark, e.g. "Best our " (white) + "product" (lime).
++function duoTitle(slide, light, accent, box, opts = {}) {
++  slide.addText(
++    [
++      { text: light, options: { color: SNOW } },
++      { text: accent, options: { color: LIME } },
++    ],
++    {
++      ...box,
++      fontFace: opts.fontFace || DISPLAY,
++      fontSize: opts.fontSize || SZ_TITLE,
++      bold: opts.bold || false,
++      align: opts.align || 'left',
++      valign: opts.valign || 'top',
++      wrap: opts.wrap !== undefined ? opts.wrap : false,
++    }
++  );
++}
++
++// Outlined "card": dark (or empty) fill with a 1pt lime keyline.
++function card(slide, box, opts = {}) {
++  slide.addShape('rect', {
++    ...box,
++    fill: opts.transparent ? NO_FILL : { color: INK },
++    line: HAIRLINE,
++  });
++}
++
++// Solid lime bar / rule. The mosaic veils on slide 1 use 15% transparency.
++function limeBar(slide, box, transparency) {
++  slide.addShape('rect', {
++    ...box,
++    fill: transparency ? { color: LIME, transparency } : { color: LIME },
++    line: NO_LINE,
++  });
++}
++
++// Bold label centred inside a rectangle. Defaults to lime fill + dark text;
++// `fill`/`color`/`noLine` cover the outlined and dark-plate variants.
++function labelBox(slide, text, box, opts = {}) {
++  slide.addText(text, {
++    ...box,
++    shape: 'rect',
++    fill: opts.fill === 'none' ? NO_FILL : { color: opts.fill || LIME },
++    line: opts.noLine ? NO_LINE : HAIRLINE,
++    fontFace: SANS,
++    fontSize: opts.fontSize || SZ_LEAD,
++    bold: true,
++    color: opts.color || INK,
++    align: 'center',
++    valign: 'middle',
++  });
++}
++
++// Stand-in for a photograph: flat gray rectangle with a discreet caption.
++function photo(slide, x, y, w, h) {
++  slide.addShape('rect', { x, y, w, h, fill: { color: PHOTO }, line: NO_LINE });
++  slide.addText('[image]', {
++    x, y: y + h / 2 - 0.16, w, h: 0.32,
++    fontFace: SANS, fontSize: 8, color: PHOTO_LABEL, align: 'center', valign: 'middle',
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Pictogram helpers (the source deck uses vector freeforms here)
++ * ------------------------------------------------------------------ */
++
++// Open scissors, drawn as line art: two tilted oval finger rings on the left and
++// two tapered blades crossing at a pivot dot on the right.
++function scissors(slide, x, y, w, h) {
++  const outline = { fill: NO_FILL, line: { color: LIME, width: 1.5 } };
++  slide.addShape('ellipse', { x, y: y + h * 0.03, w: w * 0.4, h: h * 0.42, rotate: -20, ...outline });
++  slide.addShape('ellipse', { x, y: y + h * 0.55, w: w * 0.4, h: h * 0.42, rotate: 20, ...outline });
++  [false, true].forEach((flipV) => {
++    slide.addShape('custGeom', {
++      x: x + w * 0.22, y, w: w * 0.78, h, flipV, ...outline,
++      points: [
++        { x: 0, y: h * 0.78 }, { x: w * 0.76, y: 0.0 }, { x: w * 0.78, y: h * 0.14 },
++        { x: w * 0.1, y: h * 0.9 }, { close: true },
++      ],
++    });
++  });
++  slide.addShape('ellipse', {
++    x: x + w * 0.5, y: y + h * 0.42, w: w * 0.1, h: h * 0.13,
++    fill: { color: LIME }, line: NO_LINE,
++  });
++}
++
++// Account glyph: round head above a rounded torso.
++function userGlyph(slide, x, y, w, h) {
++  const head = w * 0.52;
++  slide.addShape('ellipse', { x: x + (w - head) / 2, y, w: head, h: head, fill: { color: LIME }, line: NO_LINE });
++  slide.addShape('roundRect', {
++    x, y: y + head * 1.05, w, h: h - head * 1.05,
++    rectRadius: w * 0.28, fill: { color: LIME }, line: NO_LINE,
++  });
++}
++
++// One large cog with a hollow hub plus two smaller cogs to its upper/lower right.
++function gearsGlyph(slide, x, y, w, h) {
++  const solid = { fill: { color: LIME }, line: NO_LINE };
++  slide.addShape('gear6', { x, y: y + h * 0.22, w: w * 0.6, h: h * 0.78, ...solid });
++  slide.addShape('ellipse', {
++    x: x + w * 0.2, y: y + h * 0.45, w: w * 0.18, h: h * 0.24,
++    fill: { color: INK }, line: NO_LINE,
++  });
++  slide.addShape('gear6', { x: x + w * 0.55, y: y - h * 0.02, w: w * 0.42, h: h * 0.5, ...solid });
++  slide.addShape('gear6', { x: x + w * 0.6, y: y + h * 0.5, w: w * 0.38, h: h * 0.46, ...solid });
++}
++
++// Magic wand pointing up-right, sparkles scattered around its tip.
++function wandGlyph(slide, x, y, w, h) {
++  const solid = { fill: { color: LIME }, line: NO_LINE };
++  slide.addShape('roundRect', {
++    x: x - w * 0.06, y: y + h * 0.42, w: w * 1.05, h: h * 0.2,
++    rectRadius: h * 0.08, rotate: -42, ...solid,
++  });
++  slide.addShape('star4', { x: x + w * 0.26, y: y + h * 0.02, w: w * 0.22, h: h * 0.24, ...solid });
++  slide.addShape('star4', { x: x + w * 0.06, y: y + h * 0.16, w: w * 0.15, h: h * 0.17, ...solid });
++  slide.addShape('star4', { x: x + w * 0.68, y: y + h * 0.3, w: w * 0.13, h: h * 0.15, ...solid });
++}
++
++// Pie chart: three-quarter disc with the remaining quarter pulled out to the lower right.
++function pieGlyph(slide, x, y, w, h) {
++  const solid = { fill: { color: LIME }, line: NO_LINE };
++  slide.addShape('pie', { x, y, w: w * 0.8, h: h * 0.8, angleRange: [0, 270], ...solid });
++  slide.addShape('pie', {
++    x: x + w * 0.2, y: y + h * 0.2, w: w * 0.8, h: h * 0.8, angleRange: [0, 90], ...solid,
++  });
++}
++
++// Handset inside a rounded square (contact tile 1).
++function phoneGlyph(slide, x, y, w, h) {
++  slide.addShape('roundRect', { x, y, w, h, rectRadius: w * 0.22, fill: { color: INK }, line: NO_LINE });
++  slide.addShape('roundRect', {
++    x: x + w * 0.3, y: y + h * 0.22, w: w * 0.22, h: h * 0.56,
++    rectRadius: w * 0.09, rotate: -35, fill: { color: LIME }, line: NO_LINE,
++  });
++  slide.addShape('ellipse', { x: x + w * 0.22, y: y + h * 0.24, w: w * 0.2, h: h * 0.2, fill: { color: LIME }, line: NO_LINE });
++  slide.addShape('ellipse', { x: x + w * 0.58, y: y + h * 0.56, w: w * 0.2, h: h * 0.2, fill: { color: LIME }, line: NO_LINE });
++}
++
++// Paper plane (contact tile 2) drawn as two custom polygons.
++function planeGlyph(slide, x, y, w, h) {
++  const dark = { fill: { color: INK }, line: NO_LINE };
++  slide.addShape('custGeom', {
++    x, y, w, h, ...dark,
++    points: [
++      { x: 0, y: h * 0.42 }, { x: w, y: 0 }, { x: w * 0.42, y: h * 0.62 }, { close: true },
++    ],
++  });
++  slide.addShape('custGeom', {
++    x, y, w, h, ...dark,
++    points: [
++      { x: w * 0.36, y: h * 0.7 }, { x: w, y: 0 }, { x: w * 0.6, y: h }, { close: true },
++    ],
++  });
++}
++
++// Globe (contact tile 3): a dark rim with three land masses floating inside it.
++function globeGlyph(slide, x, y, w, h) {
++  const dark = { fill: { color: INK }, line: NO_LINE };
++  slide.addShape('donut', { x, y, w, h, rectRadius: h * 0.1, ...dark });
++  slide.addShape('teardrop', { x: x + w * 0.16, y: y + h * 0.28, w: w * 0.34, h: h * 0.44, rotate: 205, ...dark });
++  slide.addShape('teardrop', { x: x + w * 0.56, y: y + h * 0.14, w: w * 0.22, h: h * 0.5, rotate: 145, ...dark });
++  slide.addShape('ellipse', { x: x + w * 0.4, y: y + h * 0.72, w: w * 0.28, h: h * 0.11, ...dark });
++}
++
++// House (contact tile 4): overhanging roof, chimney, body block with a doorway.
++function homeGlyph(slide, x, y, w, h) {
++  const dark = { fill: { color: INK }, line: NO_LINE };
++  slide.addShape('rect', { x: x + w * 0.66, y: y + h * 0.08, w: w * 0.14, h: h * 0.4, ...dark });
++  slide.addShape('triangle', { x, y, w, h: h * 0.55, ...dark });
++  slide.addShape('rect', { x: x + w * 0.17, y: y + h * 0.45, w: w * 0.66, h: h * 0.55, ...dark });
++  slide.addShape('rect', {
++    x: x + w * 0.42, y: y + h * 0.68, w: w * 0.16, h: h * 0.32,
++    fill: { color: LIME }, line: NO_LINE,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Shared page chrome: logo lock-up on the left, nav links on the right.
++ * Repeated verbatim on all ten slides.
++ * ------------------------------------------------------------------ */
++
++const NAV_LINKS = [
++  { text: 'Profile', x: 6.303, y: 0.463, w: 0.665 },
++  { text: 'Gallery', x: 7.665, y: 0.458, w: 0.703 },
++  { text: 'Categories', x: 9.066, y: 0.465, w: 0.959 },
++  { text: 'Contact', x: 10.723, y: 0.466, w: 0.772 },
++];
++
++function chrome(slide) {
++  scissors(slide, 1.137, 0.449, 0.399, 0.305);
++  duoTitle(slide, 'barber', 'shop', { x: 1.707, y: 0.477, w: 0.784, h: 0.278 }, {
++    fontSize: SZ_BODY, align: 'center',
++  });
++  NAV_LINKS.forEach((link) => {
++    slide.addText(link.text, {
++      x: link.x, y: link.y, w: link.w, h: 0.278,
++      fontFace: SANS, fontSize: SZ_BODY, color: SNOW, valign: 'top', wrap: false,
++    });
++  });
++  userGlyph(slide, 11.938, 0.466, 0.231, 0.256);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide builders
++ * ------------------------------------------------------------------ */
++
++const MASTER = 'BARBERSHOP';
++
++// Every slide sits on the shared dark master.
++function newSlide(pptx) {
++  return pptx.addSlide({ masterName: MASTER });
++}
++
++// 1 - Cover: giant BARBERSHOP word mark over a mosaic of photos.
++function slide1(pptx) {
++  const s = newSlide(pptx);
++  const mosaic = [
++    [1.137, 4.700, 1.443, 2.389],
++    [2.580, 4.095, 2.308, 1.271],
++    [3.077, 5.366, 2.194, 2.134],
++    [5.271, 5.366, 1.382, 1.561],
++    [6.653, 4.668, 1.382, 1.561],
++    [8.417, 6.229, 2.308, 1.271],
++    [8.034, 4.095, 2.194, 2.134],
++    [10.725, 4.505, 1.443, 2.389],
++  ];
++  mosaic.forEach((b) => photo(s, ...b));
++
++  // Two mosaic tiles are veiled with 85% lime and carry copy.
++  limeBar(s, { x: 8.034, y: 4.095, w: 2.194, h: 2.134 }, 15);
++  limeBar(s, { x: 3.077, y: 5.366, w: 2.194, h: 2.134 }, 15);
++
++  duoTitle(s, 'barber', 'shop', { x: 0.968, y: 0.853, w: 11.355, h: 3.484 }, {
++    fontSize: SZ_HERO, align: 'center',
++  });
++
++  chrome(s);
++
++  s.addText('Started Presentation', {
++    x: 5.267, y: 4.111, w: 1.701, h: 0.278,
++    fontFace: SANS, fontSize: SZ_BODY, color: SNOW, valign: 'top', wrap: false,
++  });
++  s.addShape('line', {
++    x: 7.074, y: 4.250, w: 0.449, h: 0,
++    line: { color: LIME, width: 1, endArrowType: 'triangle' },
++  });
++  s.addText('Barber Presentation Template', {
++    x: 8.288, y: 4.657, w: 1.879, h: 1.01,
++    fontFace: SANS, fontSize: SZ_LEAD, color: INK, valign: 'top',
++  });
++  para(s, 'Lorem ipsum dolor sit amet, conse ctetur adipiscing elit, sed do', {
++    x: 3.347, y: 5.867, w: 1.655, h: 1.132,
++  }, { color: BODY_DARK });
++}
++
++// 2 - Welcome / about.
++function slide2(pptx) {
++  const s = newSlide(pptx);
++  limeBar(s, { x: 1.147, y: 1.389, w: 0.784, h: 1.579 }, 15);
++  chrome(s);
++
++  duoTitle(s, 'Welcome to ', 'barbershop', { x: 1.168, y: 1.842, w: 4.341, h: 0.724 });
++
++  s.addText('About Our Planning', {
++    x: 6.614, y: 1.527, w: 2.604, h: 0.404,
++    fontFace: SANS, fontSize: SZ_LEAD, bold: true, color: SNOW, valign: 'top', wrap: false,
++  });
++  limeBar(s, { x: 6.680, y: 2.114, w: 3.113, h: 0.05 });
++  para(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++    'PLACEHOLDER' +
++    'eu fugiat nulla pariatur. Excepteur sint',
++    { x: 6.571, y: 2.685, w: 5.702, h: 0.867 });
++
++  photo(s, 1.137, 3.750, 4.747, 3.750);
++  photo(s, 6.667, 4.526, 5.502, 2.974);
++}
++
++// 3 - Vision and mission, numbered 01 / 02.
++function slide3(pptx) {
++  const s = newSlide(pptx);
++  chrome(s);
++
++  duoTitle(s, 'Vision and ', 'Mission', { x: 7.375, y: 1.297, w: 3.317, h: 0.724 });
++
++  const items = [
++    { n: '01', label: 'Vision ', numY: 1.394, headY: 1.297, headW: 1.611, bodyY: 1.751 },
++    { n: '02', label: 'Mission ', numY: 3.139, headY: 3.042, headW: 1.804, bodyY: 3.497 },
++  ];
++  items.forEach((it) => {
++    labelBox(s, it.n, { x: 1.137, y: it.numY, w: 0.711, h: 0.901 }, { fontSize: 24, noLine: true });
++    duoTitle(s, it.label, 'Title', { x: 2.170, y: it.headY, w: it.headW, h: 0.404 }, {
++      fontFace: SANS, fontSize: SZ_LEAD, bold: true,
++    });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do Excepteur sint', {
++      x: 2.170, y: it.bodyY, w: 3.736, h: 0.601,
++    });
++  });
++
++  s.addShape('rightArrow', {
++    x: 11.624, y: 1.481, w: 0.545, h: 0.270, fill: { color: LIME }, line: NO_LINE,
++  });
++  photo(s, 1.137, 4.528, 4.768, 1.586);
++  photo(s, 7.453, 2.516, 4.744, 3.598);
++}
++
++// 4 - Facilities: a tall photo column with three staggered outlined cards.
++function slide4(pptx) {
++  const s = newSlide(pptx);
++  photo(s, 3.547, 0, 3.884, 7.5);
++  chrome(s);
++
++  duoTitle(s, 'Best our ', 'facilities', { x: 1.084, y: 3.129, w: 2.168, h: 1.346 }, { wrap: true });
++  limeBar(s, { x: 1.137, y: 2.176, w: 1.6, h: 0.05 });
++  limeBar(s, { x: 1.137, y: 5.287, w: 1.6, h: 0.05 });
++
++  const cards = [
++    { title: '1. Facilities', x: 8.242, y: 1.403 },
++    { title: '2. Facilities', x: 6.673, y: 3.013 },
++    { title: '3. Facilities', x: 8.242, y: 4.624 },
++  ];
++  cards.forEach((c) => {
++    card(s, { x: c.x, y: c.y, w: 3.926, h: 1.473 });
++    s.addText(c.title, {
++      x: c.x + 0.45, y: c.y + 0.291, w: 1.918, h: 0.404,
++      fontFace: SANS, fontSize: SZ_LEAD, bold: true, color: LIME, valign: 'top',
++    });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing sit', {
++      x: c.x + 0.45, y: c.y + 0.659, w: 3.096, h: 0.505,
++    });
++  });
++
++  s.addShape('rightArrow', {
++    x: 11.597, y: 3.564, w: 0.571, h: 0.372, fill: { color: LIME }, line: NO_LINE,
++  });
++}
++
++// 5 - Products: three outlined titles on the left, a lime call-out over a photo.
++function slide5(pptx) {
++  const s = newSlide(pptx);
++  photo(s, 7.442, 0, 5.891, 5.147);
++  chrome(s);
++
++  duoTitle(s, 'Best our ', 'product', { x: 7.354, y: 5.592, w: 3.193, h: 0.724 });
++  s.addShape('rightArrow', {
++    x: 10.824, y: 5.776, w: 0.545, h: 0.270, fill: { color: LIME }, line: NO_LINE,
++  });
++
++  [
++    { title: '1. Project Title', y: 1.400 },
++    { title: '2. Project Title', y: 3.183 },
++    { title: '3. Project Title', y: 4.967 },
++  ].forEach((p) => {
++    labelBox(s, p.title, { x: 1.163, y: p.y, w: 2.099, h: 0.402 }, { fill: 'none', color: LIME });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod cillum dolore eu', {
++      x: 1.085, y: p.y + 0.570, w: 4.072, h: 0.601,
++    });
++  });
++
++  limeBar(s, { x: 6.175, y: 2.779, w: 3.625, h: 1.751 });
++  para(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++    'incididunt ut labore et dolore reprehenderit',
++    { x: 6.521, y: 3.089, w: 2.933, h: 1.132 }, { color: BODY_DARK });
++}
++
++// 6 - Team: three framed portraits with name plates.
++function slide6(pptx) {
++  const s = newSlide(pptx);
++  chrome(s);
++  duoTitle(s, 'Meet our ', 'team', { x: 5.318, y: 1.276, w: 2.698, h: 0.724 }, { align: 'center' });
++
++  const people = [
++    { name: 'Benjamin Shah', x: 1.137, y: 1.368, h: 4.337, px: 1.304, py: 1.531, ph: 4.012, plateX: 1.137, plateY: 5.969 },
++    { name: 'Alfredo Torres', x: 5.082, y: 2.534, h: 3.171, px: 5.250, py: 2.701, ph: 2.842, plateX: 5.082, plateY: 5.971 },
++    { name: 'Bailey Dupont', x: 9.000, y: 1.368, h: 4.337, px: 9.168, py: 1.531, ph: 4.012, plateX: 9.028, plateY: 5.973 },
++  ];
++  people.forEach((p) => card(s, { x: p.x, y: p.y, w: 3.168, h: p.h }));
++  people.forEach((p) => photo(s, p.px, p.py, 2.833, p.ph));
++  people.forEach((p) => labelBox(s, p.name, { x: p.plateX, y: p.plateY, w: 3.168, h: 0.62 }, {
++    fill: INK, color: LIME,
++  }));
++}
++
++// 7 - Services: photo panel on the left, icon + label rows on the right.
++function slide7(pptx) {
++  const s = newSlide(pptx);
++  photo(s, 0, 0, 5.544, 7.5);
++  s.addShape('rect', { x: 0, y: 3.074, w: 4.695, h: 1.326, fill: { color: INK }, line: NO_LINE });
++  chrome(s);
++
++  duoTitle(s, 'Best our ', 'service', { x: 1.074, y: 3.414, w: 3.621, h: 0.724 }, { wrap: true });
++
++  const rows = [
++    { title: '1. Service ', y: 1.396, glyph: gearsGlyph, gx: 6.887, gy: 1.623, gw: 0.270, gh: 0.246, bodyY: 1.966, tx: 8.208, bx: 8.088 },
++    { title: '2. Service ', y: 3.202, glyph: wandGlyph, gx: 6.909, gy: 3.438, gw: 0.225, gh: 0.229, bodyY: 3.772, tx: 8.208, bx: 8.088 },
++    { title: '3. Service ', y: 5.008, glyph: pieGlyph, gx: 6.903, gy: 5.242, gw: 0.238, gh: 0.232, bodyY: 5.578, tx: 8.213, bx: 8.093 },
++  ];
++  rows.forEach((r) => {
++    labelBox(s, r.title, { x: r.tx, y: r.y, w: 1.834, h: 0.454 }, { noLine: true });
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt.', {
++      x: r.bx, y: r.bodyY, w: 4.167, h: 0.601,
++    });
++    card(s, { x: 6.590, y: r.y, w: 0.864, h: 0.700 });
++    r.glyph(s, r.gx, r.gy, r.gw, r.gh);
++  });
++}
++
++// 8 - Portfolio grid: four square frames over two wide frames, title plate on top.
++function slide8(pptx) {
++  const s = newSlide(pptx);
++  chrome(s);
++
++  const squares = [1.137, 4.032, 6.926, 9.821];
++  squares.forEach((x) => card(s, { x, y: 1.396, w: 2.354, h: 2.354 }));
++  card(s, { x: 1.134, y: 4.232, w: 5.252, h: 2.354 });
++  card(s, { x: 6.926, y: 4.232, w: 5.252, h: 2.354 });
++
++  photo(s, 1.294, 4.392, 4.932, 2.034);
++  photo(s, 7.086, 4.392, 4.932, 2.034);
++  [1.297, 4.191, 7.086, 9.981].forEach((x) => photo(s, x, 1.556, 2.034, 2.034));
++
++  card(s, { x: 4.670, y: 3.380, w: 3.992, h: 1.139 });
++  duoTitle(s, 'Best ', 'portfolio', { x: 5.188, y: 3.650, w: 2.958, h: 0.724 }, {
++    align: 'center', wrap: true,
++  });
++}
++
++// 9 - Contact details with icon tiles beside a large photo.
++function slide9(pptx) {
++  const s = newSlide(pptx);
++  chrome(s);
++
++  card(s, { x: 1.137, y: 1.401, w: 3.475, h: 1.139 });
++  duoTitle(s, 'Contact ', 'us', { x: 1.395, y: 1.608, w: 2.958, h: 0.724 }, { align: 'center', wrap: true });
++
++  const contacts = [
++    { y: 3.088, value: '+12345678910', vw: 1.633, vy: 3.199, glyph: phoneGlyph, gx: 1.246, gy: 3.198, gw: 0.267, gh: 0.265 },
++    { y: 3.931, value: 'yourmail@gmail.com', vw: 1.953, vy: 4.035, glyph: planeGlyph, gx: 1.256, gy: 4.050, gw: 0.248, gh: 0.248 },
++    { y: 4.774, value: 'www.yourwebsite.com', vw: 1.953, vy: 4.871, glyph: globeGlyph, gx: 1.233, gy: 4.869, gw: 0.294, gh: 0.296 },
++    { y: 5.617, value: '123 Anywhere ST,, Any City', vw: 2.259, vy: 5.706, glyph: homeGlyph, gx: 1.248, gy: 5.754, gw: 0.264, gh: 0.213 },
++  ];
++  contacts.forEach((c) => {
++    limeBar(s, { x: 1.137, y: c.y, w: 0.486, h: 0.486 });
++    card(s, { x: 2.006, y: c.y, w: 2.606, h: 0.486 }, { transparent: true });
++    para(s, c.value, { x: 2.248, y: c.vy, w: c.vw, h: 0.278 }, { single: true });
++    c.glyph(s, c.gx, c.gy, c.gw, c.gh);
++  });
++
++  card(s, { x: 5.882, y: 1.401, w: 6.286, h: 3.926 });
++  photo(s, 6.065, 1.565, 5.929, 3.598);
++  para(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++    'incididunt. adipiscing elit, sed do eiusmod tempor incididunt',
++    { x: 5.792, y: 5.578, w: 6.468, h: 0.601 });
++}
++
++// 10 - Closing THANK YOU.
++function slide10(pptx) {
++  const s = newSlide(pptx);
++  [
++    [1.178, 2.114], [3.545, 3.032], [6.829, 2.114], [9.177, 3.032],
++  ].forEach(([x, w]) => photo(s, x, 1.389, w, 2.114));
++  chrome(s);
++
++  labelBox(s, 'SEE YOU NEXT TIME', { x: 1.926, y: 2.168, w: 3.2, h: 0.558 }, {
++    fill: INK, color: LIME, fontSize: 16,
++  });
++  duoTitle(s, 'Thank ', 'you', { x: 1.731, y: 3.579, w: 9.830, h: 3.517 }, {
++    fontSize: SZ_HERO, align: 'center',
++  });
++
++  const arrow = { w: 0.285, h: 0.365, fill: { color: LIME }, line: NO_LINE };
++  s.addShape('rightArrow', { ...arrow, x: 11.883, y: 4.870 });
++  s.addShape('rightArrow', { ...arrow, x: 1.178, y: 4.870, flipH: true });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'W16x9', width: 13.3333333, height: 7.5 });
++  pptx.layout = 'W16x9';
++  pptx.title = 'PowerPoint Presentation';
++  pptx.author = 'HP';
++
++  pptx.defineSlideMaster({ title: MASTER, background: { color: INK } });
++
++  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10]
++    .forEach((fn) => fn(pptx));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '1874af87-57ab-40b4-af54-b31d1cdc4abd_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f));

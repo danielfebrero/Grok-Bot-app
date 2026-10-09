@@ -1,0 +1,1033 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/corporate_profile_about_services_portfolio.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/corporate_profile_about_services_portfolio.js
+@@ -0,0 +1,1030 @@
++#!/usr/bin/env node
++'use strict';
++/*
++ * "Kareem - Ramadan Presentation Template" (40 slides, 26.66 x 15 in)
++ * Rebuilt with pptxgenjs only.  Raster photos / icon PNGs of the original deck
++ * are replaced by native shape placeholders (flat grey blocks for the photos,
++ * simple vector glyphs for the icons).
++ */
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++const SLIDE_W = 26.659722;
++const SLIDE_H = 15;
++
++/* ---------------------------------------------------------------- palette */
++const C = {
++  navy:   '0C182C',   // page furniture / dark backgrounds
++  deep:   '1E3C4E',   // secondary dark (cards, icons)
++  gold:   'E3B873',   // headings
++  sand:   'F9D083',   // buttons, stars, highlight fills
++  rule:   'DFB66E',   // thick underline on the cover slides
++  body:   '595959',   // body copy on light backgrounds
++  light:  'F2F2F2',   // body copy on dark backgrounds
++  white:  'FFFFFF',
++  grey:   '7F7F7F',   // master furniture + Merriweather captions
++  photo:  '7F7F7F',   // image placeholder fill
++  photo2: 'C3C3C3'    // lighter image placeholder fill
++};
++
++/* ------------------------------------------------------------------ fonts */
++const F = {
++  title: 'Playfair Display ExtraBold',
++  head:  'Playfair Display SemiBold',
++  med:   'Playfair Display Medium',
++  disp:  'Playfair Display',
++  body:  'Lato',
++  serif: 'Merriweather'
++};
++
++/* soft drop shadow used by nearly every filled shape in the deck
++   (a fresh object per call - pptxgenjs rewrites the object it is given) */
++function sh() { return { type: 'outer', blur: 40, offset: 16, angle: 45, color: '000000', opacity: 0.11 }; }
++/* text insets of the original text boxes: 0.1in left/right, 0.05in top/bottom */
++const INSET = [7.2, 7.2, 3.6, 3.6];
++
++/* --------------------------------------------------- re-used lorem blocks */
++const T = {
++  long1: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.',
++  long2: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas sed porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ae purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
++  long3: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas sed porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ae purus lectus malesuada libero, sit amet commodo magna eros quis.',
++  pell:  'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra nonummy pede. Mauris et orci.',
++  pell2: 'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra',
++  pell3: 'PLACEHOLDER',
++  pell4: 'Pellentesque habitant morbi tristique senectus et netus et orci et malesuada fames ac turpis egestas. Proin pharetra nonummy.',
++  elite: 'Lorem ipsum dolor sit amet, consectetuer adipiscinged elit. Maecenas porttitor congue massa magna sed elite.',
++  card:  'Lorem ipsum dolor sit amet, consectetuer adipiscing elit est sed. Maecenas porttitor congue massa. ',
++  vivera:'Lorem ipsum dolor sit amet, consectetuer adipiscing elit  ae vivera. Maecenas porttitor congue massa. Fusce posuere, magna sedeted pulvinar ultricies, purus lectus malesuada libero, sit amet',
++  short: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
++  ut:    'Ut enim ad minim veniam, quis nostrud exercitation',
++  mae:   'Maecenas porttitor congue massa. Fusce posuere, magna sed',
++  maeL:  'Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada',
++  chevron:'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue ultricies, purus lectus malesuada libero.'
++};
++
++/* ------------------------------------------------------------- primitives */
++function box(s, x, y, w, h, fill, opt) {          // plain filled rectangle
++  s.addShape('rect', Object.assign({ x: x, y: y, w: w, h: h, fill: { color: fill } }, opt));
++}
++function photo(s, x, y, w, h, shape, opt) {       // [image] placeholder
++  s.addShape(shape || 'rect',
++    Object.assign({ x: x, y: y, w: w, h: h, fill: { color: C.photo } }, opt));
++}
++function rule(s, x, y, w, color, width) {         // horizontal hair-line
++  s.addShape('line', { x: x, y: y, w: w, h: 0, line: { color: color || C.gold, width: width || 1 } });
++}
++function vrule(s, x, y, h, color, width) {        // vertical hair-line
++  s.addShape('line', { x: x, y: y, w: 0, h: h, line: { color: color || C.gold, width: width || 3 } });
++}
++function star4(s, x, y, d) {                      // 4 point sparkle
++  s.addShape('star4', { x: x, y: y, w: d, h: d, fill: { color: C.sand }, shadow: sh() });
++}
++function star7(s, x, y, w, h, fill, opt) {        // 7 point "islamic" star
++  s.addShape('star7', Object.assign({ x: x, y: y, w: w, h: h, fill: { color: fill } }, opt));
++}
++
++/* -------------------------------------------------------------- text kits */
++function text(s, str, o) { s.addText(str, Object.assign({ valign: 'top', margin: INSET }, o)); }
++
++// 72pt gold section heading; second half is italic
++function head(s, x, y, w, a, b, o) {
++  const runs = [{ text: a, options: {} }];
++  if (b) runs.push({ text: b, options: { italic: true } });
++  s.addText(runs, Object.assign({
++    x: x, y: y, w: w, h: 1.312, fontFace: F.title, fontSize: 71.98,
++    color: C.gold, align: 'left', valign: 'top', margin: INSET
++  }, o));
++}
++// 28pt gold sub heading
++function sub(s, x, y, w, t, o) {
++  text(s, t, Object.assign({ x: x, y: y, w: w, h: 0.572, fontFace: F.head, fontSize: 27.99, color: C.gold }, o));
++}
++// 22pt Lato body copy, 150% leading
++function body(s, x, y, w, h, t, o) {
++  text(s, t, Object.assign({
++    x: x, y: y, w: w, h: h, fontFace: F.body, fontSize: 21.99,
++    color: C.body, lineSpacingMultiple: 1.5
++  }, o));
++}
++// 20pt Merriweather grey caption used by the infographic slides
++function cap(s, x, y, w, t, o) {
++  text(s, t, Object.assign({
++    x: x, y: y, w: w, h: 1.562, fontFace: F.serif, fontSize: 20, color: C.grey,
++    align: 'center', lineSpacingMultiple: 1.5
++  }, o));
++}
++// 28pt bold Playfair title used by the infographic slides
++function capTitle(s, x, y, w, t, color, o) {
++  text(s, t, Object.assign({
++    x: x, y: y, w: w, h: 0.572, fontFace: F.head, fontSize: 28, bold: true,
++    color: color || C.gold, align: 'center'
++  }, o));
++}
++// small gold "YOUR TITTLE" / "TITTLE" kicker
++function kicker(s, x, y, w, t, size) {
++  text(s, t, { x: x, y: y, w: w, h: size === 21 ? 0.454 : 0.404, fontFace: F.med,
++    fontSize: size || 18, color: C.gold });
++}
++
++/* ------------------------------------------------------------- composites */
++// gold pill button with a white circle + navy star badge on its left
++function viewMore(s, x, y) {
++  s.addShape('roundRect', { x: x + 0.454, y: y + 0.074, w: 3.751, h: 0.902,
++    fill: { color: C.sand }, rectRadius: 0.451, shadow: sh() });
++  text(s, 'VIEW MORE', { x: x + 1.12, y: y + 0.296, w: 2.741, h: 0.438,
++    fontFace: F.head, fontSize: 20, bold: true, color: C.deep, align: 'center' });
++  s.addShape('ellipse', { x: x, y: y, w: 1.051, h: 1.051, fill: { color: C.white }, shadow: sh() });
++  star7(s, x + 0.222, y + 0.222, 0.606, 0.606, C.deep);
++}
++
++// vector stand-ins for the icon bitmaps of the original deck.
++// `bg` is the colour behind the glyph and is used to carve details out of it.
++function glyph(s, kind, x, y, d, color, bg) {
++  const stroke = { color: color, width: d * 7 };
++  if (kind === 'search') {                     // magnifier over a pulse line
++    s.addShape('donut', { x: x, y: y, w: d * 0.78, h: d * 0.78, fill: { color: color }, rectRadius: d * 0.055 });
++    s.addShape('roundRect', { x: x + d * 0.6, y: y + d * 0.66, w: d * 0.36, h: d * 0.13,
++      fill: { color: color }, rotate: 45, rectRadius: d * 0.06 });
++    s.addShape('custGeom', { x: x + d * 0.15, y: y + d * 0.25, w: d * 0.48, h: d * 0.28,
++      line: { color: color, width: d * 4 },
++      points: [{ x: 0, y: d * 0.14 }, { x: d * 0.11, y: d * 0.14 }, { x: d * 0.19, y: 0 },
++               { x: d * 0.29, y: d * 0.28 }, { x: d * 0.37, y: d * 0.14 }, { x: d * 0.48, y: d * 0.14 }] });
++  } else if (kind === 'pie') {                 // pie chart with a detached slice
++    s.addShape('pie', { x: x, y: y + d * 0.04, w: d * 0.92, h: d * 0.92,
++      fill: { color: color }, angleRange: [0, 265] });
++    s.addShape('pie', { x: x + d * 0.08, y: y, w: d * 0.92, h: d * 0.92,
++      fill: { color: color }, angleRange: [272, 358] });
++  } else if (kind === 'target') {              // bullseye pierced by an arrow
++    s.addShape('donut', { x: x, y: y, w: d, h: d, fill: { color: color }, rectRadius: d * 0.1 });
++    s.addShape('donut', { x: x + d * 0.2, y: y + d * 0.2, w: d * 0.6, h: d * 0.6,
++      fill: { color: color }, rectRadius: d * 0.1 });
++    s.addShape('ellipse', { x: x + d * 0.38, y: y + d * 0.38, w: d * 0.24, h: d * 0.24, fill: { color: color } });
++    s.addShape('custGeom', { x: x + d * 0.5, y: y + d * 0.02, w: d * 0.62, h: d * 0.48, fill: { color: color },
++      points: [{ x: 0, y: d * 0.48 }, { x: d * 0.44, y: d * 0.04 }, { x: d * 0.48, y: d * 0.08 },
++               { x: d * 0.04, y: d * 0.52 }, { close: true }] });
++    s.addShape('custGeom', { x: x + d * 0.82, y: y - d * 0.02, w: d * 0.3, h: d * 0.3, fill: { color: color },
++      points: [{ x: d * 0.3, y: 0 }, { x: d * 0.28, y: d * 0.26 }, { x: d * 0.18, y: d * 0.16 },
++               { x: d * 0.04, y: d * 0.28 }, { x: 0, y: d * 0.24 }, { x: d * 0.14, y: d * 0.1 },
++               { x: d * 0.04, y: d * 0.02 }, { close: true }] });
++  } else if (kind === 'board') {               // presentation screen + bars
++    s.addShape('rect', { x: x + d * 0.05, y: y + d * 0.08, w: d * 0.9, h: d * 0.6, line: stroke });
++    [[0.26, 0.2], [0.44, 0.34], [0.62, 0.27]].forEach(function (b) {
++      s.addShape('rect', { x: x + b[0] * d, y: y + (0.63 - b[1]) * d, w: d * 0.1, h: b[1] * d,
++        fill: { color: color } });
++    });
++    s.addShape('line', { x: x + d * 0.5, y: y + d * 0.68, w: 0, h: d * 0.16, line: stroke });
++    s.addShape('line', { x: x + d * 0.32, y: y + d * 0.84, w: d * 0.36, h: 0, line: stroke });
++  } else if (kind === 'mail') {                // envelope
++    s.addShape('rect', { x: x, y: y + d * 0.15, w: d, h: d * 0.7, line: { color: color, width: d * 8 } });
++    s.addShape('line', { x: x + d * 0.04, y: y + d * 0.19, w: d * 0.46, h: d * 0.3, line: { color: color, width: d * 8 } });
++    s.addShape('line', { x: x + d * 0.5, y: y + d * 0.49, w: d * 0.46, h: -d * 0.3, line: { color: color, width: d * 8 } });
++  } else if (kind === 'phone') {               // handset
++    s.addShape('roundRect', { x: x + d * 0.05, y: y + d * 0.3, w: d * 0.9, h: d * 0.4,
++      fill: { color: color }, rotate: 315, rectRadius: d * 0.18 });
++    s.addShape('ellipse', { x: x + d * 0.22, y: y + d * 0.22, w: d * 0.56, h: d * 0.56, fill: { color: bg || C.white } });
++  } else {                                     // 'map' – folded map
++    [[0, 0.15], [0.35, 0.05], [0.7, 0.15]].forEach(function (m) {
++      s.addShape('rect', { x: x + m[0] * d, y: y + m[1] * d, w: d * 0.3, h: d * 0.7, fill: { color: color } });
++    });
++  }
++}
++// icon glyph centred in a filled circle
++function iconCircle(s, x, y, d, circle, kind, ink) {
++  s.addShape('ellipse', { x: x, y: y, w: d, h: d, fill: { color: circle }, shadow: sh() });
++  glyph(s, kind, x + d * 0.154, y + d * 0.154, d * 0.692, ink || C.white, circle);
++}
++
++// tablet mock-up (body + bezel + grey screen)
++function tablet(s, x, y, w, h) {
++  s.addShape('roundRect', { x: x, y: y, w: w, h: h, fill: { color: 'C7C1CB' }, rectRadius: 0.34 });
++  s.addShape('roundRect', { x: x + 0.046, y: y + 0.049, w: w - 0.093, h: h - 0.097,
++    fill: { color: '0E0E0E' }, rectRadius: 0.3 });
++  photo(s, x + 0.285, y + 0.325, w - 0.638, h - 0.647, 'roundRect', { rectRadius: 0.12 });
++  [[3.824, 0.142, '040404'], [4.079, 0.129, '040404'], [4.409, 0.163, '0A5574'],
++   [4.679, 0.178, '040404'], [4.926, 0.129, '040404']].forEach(function (c) {
++    s.addShape('ellipse', { x: x + c[0], y: y + c[1], w: 0.168, h: 0.168, fill: { color: c[2] } });
++  });
++}
++
++// phone mock-up: metal frame, silver band, black body, notch, side buttons
++function phone(s, x, y) {
++  [[0, 0, 4.978, 9.977, 'A6A299', 0.62], [0.04, 0.031, 4.899, 9.922, '454442', 0.6],
++   [0.063, 0.062, 4.853, 9.86, 'EFF0EB', 0.58], [0.086, 0.09, 4.806, 9.804, '010300', 0.56]]
++    .forEach(function (r) {
++      s.addShape('roundRect', { x: x + r[0], y: y + r[1], w: r[2], h: r[3],
++        fill: { color: r[4] }, rectRadius: r[5] });
++    });
++  photo(s, x + 0.212, y + 0.194, 4.557, 9.589, 'roundRect', { rectRadius: 0.534 });
++  s.addShape('roundRect', { x: x + 1.853, y: y + 0.376, w: 1.271, h: 0.39,
++    fill: { color: '100E11' }, rectRadius: 0.195 });
++  s.addShape('ellipse', { x: x + 1.931, y: y + 0.456, w: 0.238, h: 0.238, fill: { color: '000100' } });
++  s.addShape('ellipse', { x: x + 2.812, y: y + 0.467, w: 0.216, h: 0.216, fill: { color: '060A0A' } });
++  s.addShape('ellipse', { x: x + 2.85, y: y + 0.506, w: 0.138, h: 0.138, fill: { color: '0A1519' } });
++  [[-0.019, 0.917, 0.357], [-0.019, 2.934, 0.768], [-0.019, 3.864, 0.768], [4.9, 3.494, 1.145]]
++    .forEach(function (b) {
++      s.addShape('roundRect', { x: x + b[0], y: y + b[1], w: 0.097, h: b[2],
++        fill: { color: 'A6A299' }, rectRadius: 0.04 });
++    });
++}
++
++// laptop mock-up (lid + screen + base bar)
++function laptop(s, x, y) {
++  s.addShape('roundRect', { x: x + 1.2, y: y, w: 12.727, h: 8.727, fill: { color: '707A82' }, rectRadius: 0.22 });
++  s.addShape('roundRect', { x: x + 1.243, y: y + 0.029, w: 12.64, h: 8.662, fill: { color: '262A2D' }, rectRadius: 0.2 });
++  s.addShape('roundRect', { x: x + 1.275, y: y + 0.06, w: 12.576, h: 8.608, fill: { color: '000201' }, rectRadius: 0.18 });
++  photo(s, x + 1.362, y + 0.173, 12.388, 8.179);
++  s.addShape('roundRect', { x: x + 6.68, y: y + 0.06, w: 1.766, h: 0.19, fill: { color: '000201' }, rectRadius: 0.07 });
++  s.addShape('rect', { x: x + 0.824, y: y + 9.019, w: 1.682, h: 0.085, fill: { color: '030603' } });
++  s.addShape('rect', { x: x + 12.621, y: y + 9.019, w: 1.682, h: 0.085, fill: { color: '030603' } });
++  s.addShape('roundRect', { x: x, y: y + 8.655, w: 15.127, h: 0.376, fill: { color: '4E5560' }, rectRadius: 0.12 });
++  s.addShape('roundRect', { x: x + 6.193, y: y + 8.704, w: 2.74, h: 0.139, fill: { color: '9EA4B4' }, rectRadius: 0.06 });
++}
++
++// full-height arrow "step" used by the process infographics; the left edge is
++// notched by the same amount as the head so the arrows interlock
++function arrowStep(s, x, y, w, h, head, fill, flip) {
++  const P = [[0, 0], [w - head, 0], [w, h / 2], [w - head, h], [0, h], [head, h / 2]];
++  s.addShape('custGeom', {
++    x: x, y: y, w: w, h: h, fill: { color: fill }, shadow: sh(),
++    points: P.map(function (p) { return { x: flip ? w - p[0] : p[0], y: p[1] }; }).concat([{ close: true }])
++  });
++}
++
++/* ------------------------------------------- master furniture and layouts */
++const NAV = [['About', 1.33], ['Services', 3.173], ['Teams', 5.016], ['Portfolio', 6.749]];
++const CHROME = {
++  nav: function (s, c) {
++    NAV.forEach(function (i) {
++      text(s, i[0], { x: i[1], y: 0.333, w: 1.5, h: 0.404, fontFace: F.med, fontSize: 18, color: c });
++    });
++  },
++  website: function (s, c) {
++    text(s, 'yourwebsite.com', { x: 1.328, y: 14.167, w: 2.989, h: 0.404, fontFace: F.med, fontSize: 18, color: c });
++  },
++  kareem: function (s, c) {
++    text(s, 'Kareem', { x: 23.082, y: 0.333, w: 2.252, h: 0.404, align: 'right', fontFace: F.med, fontSize: 18, color: c });
++  },
++  page: function (s, c, n) {
++    text(s, 'Page  ' + n, { x: -0.844, y: 12.726, w: 2.25, h: 0.798, rotate: 270, valign: 'middle',
++      fontFace: F.body, fontSize: 16, color: c, margin: [14.4, 14.4, 7.2, 7.2] });
++  }
++};
++
++// every slide layout of the original deck = a few navy blocks (+ the odd sparkle)
++const LAYOUTS = {
++  L1:  {},
++  L2:  { rects: [[11.08, 4.5, 14.25, 10.5]] },
++  L3:  { rects: [[0, 0, 9.743, 6.75]], stars: [[22.332, 11.236, 4.498]], light: ['nav'] },
++  L4:  { rects: [[13.33, 10.25, 11.25, 4.75]] },
++  L5:  { rects: [[15.579, 11.833, 9.751, 2.417]] },
++  L6:  { rects: [[11.413, 0, 1.167, 6]] },
++  L7:  { rects: [[1.33, 8.667, 12.019, 4.833]] },
++  L8:  { rects: [[0.562, 0, 26.097, 15.005]], light: ['website', 'nav', 'kareem'] },
++  L9:  { rects: [[19.328, 10.538, 5.998, 4.5]] },
++  L10: { rects: [[1.332, 11.583, 8.997, 1.917]] },
++  L11: { rects: [[14.137, 7.31, 5.964, 2.606]] },
++  L12: { rects: [[0.562, 12.75, 26.097, 2.25]] },
++  L13: { rects: [[16.326, 0.737, 3.774, 1.763], [0.497, 0, 9.082, 15]], light: ['website', 'nav'] },
++  L14: { rects: [[13.33, 0, 12.75, 15]] },
++  L15: { rects: [[0.025, 0, 26.634, 15]], light: ['page', 'website', 'nav', 'kareem'],
++         star7: [11.998, 0.167, 14.667, 14.667] },
++  L16: { rects: [[0.5, 0, 26.16, 15]], light: ['kareem', 'website', 'nav'] },
++  L17: { rects: [[0.413, 0, 26.247, 15]] },
++  L18: { rects: [[8.054, 11, 5.276, 3.25], [14.118, 1.5, 5.969, 1.833]] },
++  L19: { rects: [[1.33, 8.288, 4, 5.212]] },
++  L20: { rects: [[17.842, 11.75, 8.248, 2.5], [6.582, 12, 4.509, 2.25]] },
++  L21: { rects: [[0.562, 0, 8.269, 15]], light: ['website', 'nav'] },
++  L22: { rects: [[0.497, 0, 17.335, 15]], light: ['nav', 'website'] },
++  L23: { rects: [[17.082, 0, 9.578, 15]], light: ['kareem'], frame: [20.08, 2.083, 4.944, 9.977] },
++  L24: { rects: [[0, 0, 26.653, 15]], light: ['page', 'website', 'nav', 'kareem'],
++         frame: [1.802, 3.417, 4.944, 9.977] },
++  L25: { stars: [[24.461, 0.309, 3.202], [24.121, 3.055, 2.028]] }
++};
++
++function newSlide(pres, page, layoutKey) {
++  const s = pres.addSlide();
++  s.background = { color: C.white };
++  // ---- master: navy spine, rotated page number, nav bar, footer
++  box(s, 0, 0, 0.562, 15, C.navy);
++  CHROME.page(s, C.light, page);
++  CHROME.nav(s, C.grey);
++  CHROME.website(s, C.grey);
++  CHROME.kareem(s, C.grey);
++  // ---- layout
++  const L = LAYOUTS[layoutKey];
++  (L.rects || []).forEach(function (r) { box(s, r[0], r[1], r[2], r[3], C.navy); });
++  (L.stars || []).forEach(function (r) { star4(s, r[0], r[1], r[2]); });
++  if (L.star7) {
++    star7(s, L.star7[0], L.star7[1], L.star7[2], L.star7[3], null,
++      { fill: { type: 'none' }, line: { color: C.sand, width: 2.25 } });
++  }
++  if (L.frame) {
++    s.addShape('roundRect', { x: L.frame[0], y: L.frame[1], w: L.frame[2], h: L.frame[3],
++      fill: { type: 'none' }, line: { color: C.sand, width: 2.25 }, rectRadius: 0.82 });
++  }
++  (L.light || []).forEach(function (k) { CHROME[k](s, C.light, page); });
++  return s;
++}
++
++/* ============================================================== SLIDES 1-10 */
++function slide01(p) {                                   // cover – "Kareem"
++  const s = newSlide(p, 1, 'L2');
++  photo(s, 11.08, 1.5, 13.499, 12, 'round1Rect');
++  box(s, 2.829, 5.029, 5.225, 2.29, C.deep, { shadow: sh() });
++  s.addText([
++    { text: 'Kareem', options: { fontSize: 229.94, bold: true, italic: true, color: C.gold, breakLine: true } },
++    { text: 'Ramadan Presentation Template', options: { fontSize: 36, color: C.deep } }
++  ], { x: 2.866, y: 5.029, w: 20.964, h: 4.578, fontFace: F.disp, align: 'left', valign: 'top', margin: INSET });
++  star4(s, 9.92, -0.858, 3.202); star4(s, 9.58, 1.888, 2.028); star4(s, 21.599, 10.541, 4.498);
++  rule(s, 2.911, 8.52, 11.229, C.rule, 6);
++}
++
++function slide02(p) {                                   // welcome
++  const s = newSlide(p, 2, 'L3');
++  head(s, 14.865, 3.587, 9.751, 'Welcome ', 'Slides');
++  body(s, 14.865, 5.734, 9.751, 3.914, T.long1 + '\n\n' + T.pell);
++  viewMore(s, 14.58, 10.433);
++  photo(s, 1.33, 1.5, 12.788, 12, 'star7');
++}
++
++function slide03(p) {                                   // about us – rounded photo
++  const s = newSlide(p, 3, 'L4');
++  head(s, 2.097, 3.333, 9.733, 'About ', 'Us');
++  body(s, 2.097, 5.524, 9.733, 3.914,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas sed porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ae purus lectus malesuada libero, sit amet commodo magna eros quis urna.\n\nNunc viverra imperdiet enim. Fusce est. Vivamus a tellus. ' + T.pell);
++  viewMore(s, 1.997, 10.365);
++  rule(s, 17.165, 13.917, 6.665);
++  kicker(s, 14.176, 13.679, 3.003, 'YOUR TITTLE');
++  photo(s, 13.33, 1.5, 11.25, 11.25, 'round2DiagRect');
++}
++
++function slide04(p) {                                   // about us – two photos
++  const s = newSlide(p, 4, 'L5');
++  head(s, 3.579, 1.917, 9.751, 'About ', 'Us');
++  body(s, 3.581, 4.107, 9.749, 1.138,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas elite porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies.');
++  rule(s, 19.319, 13.154, 5.249);
++  kicker(s, 16.33, 12.952, 3.003, 'YOUR TITTLE');
++  viewMore(s, 3.459, 6.194);
++  body(s, 10.33, 8.557, 3.788, 2.804,
++    'Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Proin pharetra nonummy');
++  rule(s, 10.457, 8.288, 2.123);
++  photo(s, 1.33, 8.288, 8.252, 5.212);
++  photo(s, 15.579, 1.5, 9.751, 10.5, 'round1Rect');
++}
++
++function slide05(p) {                                   // about us – icon list
++  const s = newSlide(p, 5, 'L6');
++  head(s, 14.844, 2, 9.757, 'About ', 'Us');
++  body(s, 14.826, 4.167, 9.757, 1.693, T.long3);
++  [[7.223, 6.583, C.gold, 'search'], [9.778, 9.055, C.deep, 'pie'], [12.306, 11.583, C.gold, 'target']]
++    .forEach(function (r, i) {
++      body(s, 16.844, r[0], 7.74, 1.138, T.elite);
++      sub(s, 16.845, r[1], 7.746, 'Your Tittle Here');
++      iconCircle(s, 14.663, [6.734, 9.203, 11.699][i], 1.693, r[2], r[3]);
++    });
++  body(s, 6.573, 11.994, 6.007, 1.138,
++    'Lorem ipsum dolor sit amet, consectetuers adipiscing elit. Maecenas porttitor sed.');
++  sub(s, 6.575, 11.271, 6.011, 'Your Tittle Here');
++  photo(s, 6.575, 6.75, 6.005, 3.75);
++  photo(s, 1.326, 0, 10.503, 6);
++  photo(s, 1.33, 6.75, 4.526, 6.75);
++}
++
++function slide06(p) {                                   // wanna know our company
++  const s = newSlide(p, 6, 'L1');
++  head(s, 2.079, 2.362, 9.749, 'Wanna Know Our ', 'Kareem Company?', { h: 2.524 });
++  body(s, 2.079, 5.778, 9.749, 1.693,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do dolor sed eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut');
++  [8.36, 10.917].forEach(function (y) {
++    sub(s, 2.078, y, 9.75, 'Tittle Here');
++    body(s, 2.078, y + 0.668, 9.75, 1.138, T.pell);
++  });
++  sub(s, 13.33, 11.25, 11.247, 'Your Great Tittle Place Here');
++  body(s, 13.33, 11.955, 11.247, 1.693,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor dolor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim.');
++  photo(s, 13.33, 2.25, 12.75, 8.25);
++}
++
++function slide07(p) {                                   // more about our company
++  const s = newSlide(p, 7, 'L7');
++  photo(s, 1.332, 1.5, 12.017, 7.5);
++  photo(s, 6.582, 9.75, 6.767, 4.5);
++  head(s, 14.83, 2.277, 9.745, 'More About Our ', 'Company Here', { h: 2.524 });
++  body(s, 14.83, 5.693, 9.745, 1.693, T.long3);
++  sub(s, 2.08, 9.778, 3.752, 'Your Tittle Here');
++  body(s, 2.08, 10.445, 3.752, 2.249,
++    'Pellentesque habitant sed morbi tristique senectus et netus et malesuada ae fames ac turpis egestas. ', { color: C.light });
++  star4(s, 11.08, -0.75, 4.498);
++  [8.11, 10.667].forEach(function (y) {
++    sub(s, 14.833, y, 9.75, 'Tittle Here');
++    body(s, 14.833, y + 0.668, 9.75, 1.138, T.pell);
++  });
++}
++
++function slide08(p) {                                   // dark about page
++  const s = newSlide(p, 8, 'L8');
++  photo(s, 14.83, 1.5, 10.497, 13.5);
++  head(s, 2.081, 2.449, 11.249, 'About Our Kareem ', 'Company Here', { h: 2.524 });
++  body(s, 2.081, 5.864, 11.249, 5.024,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor dolor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus. Pellentesque habitant morbi tristique senectus et netus et ae malesuada fames ac turpis egestas. Proin pharetra nonummy pede. Mauris et orci.\n\nLorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor tellus congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. ',
++    { color: C.light });
++  kicker(s, 14.83, 0.894, 3.003, 'YOUR TITTLE');
++  rule(s, 17.331, 1.061, 6.499, C.white);
++  viewMore(s, 1.997, 11.532);
++  star4(s, 24.461, 0.309, 3.202); star4(s, 24.121, 3.055, 2.028);
++}
++
++const TEAM3 = [['Sarah Emillia', 3.399], ['Petter Brown', 10.716], ['Sam Herman', 18.034]];
++
++function slide09(p) {                                   // team – star portraits
++  const s = newSlide(p, 9, 'L1');
++  rule(s, 19.331, 13.85, 7.329, C.white);
++  head(s, 1.348, 1.667, 23.982, 'See Our ', 'Amazing Team', { align: 'center' });
++  TEAM3.forEach(function (m, i) {
++    body(s, m[1], 12.495, 5.227, 1.138, T.pell3);
++    sub(s, m[1] + 0.008, 11.25, 5.219, m[0]);
++    rule(s, m[1] + 0.167, 12.248, 4.054);
++    photo(s, 2.83 + i * 7.318, 4.167, 6.366, 6.333, 'star7');
++  });
++}
++
++function slide10(p) {                                   // team – arch portraits
++  const s = newSlide(p, 10, 'L1');
++  head(s, 1.348, 1.667, 23.982, 'See Our ', 'Amazing Team', { align: 'center' });
++  [['Sarah Emillia', 3.969], ['Petter Brown', 10.717], ['Sam Herman', 17.465]].forEach(function (m, i) {
++    body(s, m[1], 12.495, 5.227, 1.138, T.pell3);
++    sub(s, m[1] + 0.007, 11.25, 5.219, m[0]);
++    rule(s, m[1] + 0.166, 12.248, 4.054);
++    photo(s, 3.968 + i * 6.748, 4.167, 5.227, 6.333, 'round2SameRect');
++  });
++  star4(s, 24.461, 0.309, 3.202); star4(s, 24.121, 3.055, 2.028);
++}
++
++/* ============================================================= SLIDES 11-20 */
++function slide11(p) {                                   // team – four cards
++  const s = newSlide(p, 11, 'L9');
++  head(s, 1.348, 1.667, 23.982, 'See Our ', 'Amazing Team', { align: 'center' });
++  [['Veronica', 'Sales Marketing', 1.348, 5.208, 1.325, 5.252, 12.002],
++   ['Sam Herman', 'Graphic Designer', 7.32, 5.26, 7.332, 5.248, 12.0],
++   ['Joerge Carl', 'Website Developer', 13.326, 5.26, 13.33, 5.252, 12.002],
++   ['George Peter', 'Copywriting Expert', 19.332, 5.995, 19.328, 5.998, 12.785]
++  ].forEach(function (m, i) {
++    const dark = i === 3;
++    sub(s, m[2], m[6], m[3], m[0], { align: 'center' });
++    body(s, m[2], m[6] + 0.715, m[3], 0.583, m[1],
++      { align: 'center', color: dark ? C.light : C.body });
++    photo(s, m[4], dark ? 4.538 : 4.497, m[5], dark ? 7.5 : 6.75,
++      dark ? 'round1Rect' : 'roundRect', { rectRadius: 0.875 });
++  });
++}
++
++function slide12(p) {                                   // personal portfolios
++  const s = newSlide(p, 12, 'L10');
++  head(s, 11.852, 2.521, 10.5, 'Our Personal ', 'Portfolios Here', { h: 2.524 });
++  body(s, 11.827, 5.565, 10.5, 1.693,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do dolor eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut');
++  photo(s, 1.331, 1.5, 9.001, 10.5, 'round1Rect');
++  s.addShape('round1Rect', { x: 17.082, y: 7.778, w: 9.578, h: 2.417, flipH: true,
++    fill: { color: C.sand }, rectRadius: 0.403 });
++  const SHORT = 'Lorem ipsum dolor sit amet, nisi consectetur adipiscing elit';
++  sub(s, 11.852, 8.148, 4.476, 'Your Tittle Here');
++  body(s, 11.852, 8.778, 4.476, 1.138, SHORT);
++  sub(s, 17.436, 8.115, 4.916, 'Your Tittle Here', { color: C.deep });
++  body(s, 17.439, 8.746, 4.864, 1.138, 'Lorem ipsum dolor sit amet, nisi ae amet consectetur adipiscing sed');
++  sub(s, 11.852, 10.695, 4.476, 'Your Tittle Here');
++  body(s, 11.852, 11.362, 4.476, 1.138, SHORT);
++  sub(s, 17.082, 10.695, 5.221, 'Your Tittle Here');
++  body(s, 17.082, 11.362, 5.221, 1.138, 'Lorem ipsum dolor sit amet, nisi amet consectetur adipiscing elit, sed do');
++  kicker(s, 2.08, 12.5, 1.783, 'TITTLE', 20.99);
++  rule(s, 4.029, 12.75, 5.552, C.white);
++  star4(s, 8.711, 0.309, 3.202); star4(s, 8.371, 3.055, 2.028);
++}
++
++function slide13(p) {                                   // our services – collage
++  const s = newSlide(p, 13, 'L11');
++  photo(s, 1.33, 1.491, 11.25, 6.797);
++  photo(s, 20.868, 1.52, 5.791, 9.73);
++  photo(s, 14.137, 3.015, 5.964, 4.538, 'round1Rect');
++  photo(s, 14.118, 9.791, 5.982, 5.209);
++  head(s, 2.08, 9.03, 10.5, 'Our ', 'Services');
++  body(s, 2.08, 11.196, 10.5, 1.693,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus amet imperdiet enim. Fusce est. Vivamus a tellus. Pellentesque habitant morbi.');
++  sub(s, 20.853, 12.028, 4.492, 'Tittle Here');
++  body(s, 20.853, 12.695, 4.492, 1.138, 'Lorem ipsum dolor sit amet, nisi consectetur adipiscing elit sed');
++  star4(s, 10.332, -0.75, 4.498);
++  body(s, 16.348, 8.243, 2.998, 0.856, T.short, { fontSize: 16, color: C.light });
++  rule(s, 14.83, 8.682, 1.1);
++}
++
++function slide14(p) {                                   // services – icons row
++  const s = newSlide(p, 14, 'L1');
++  photo(s, 12.58, 0, 12.748, 6.75);
++  head(s, 2.086, 2.971, 8.994, 'Our ', 'Services');
++  [5.137, 7.694, 10.25].forEach(function (y) {
++    sub(s, 2.078, y, 8.994, 'Tittle Here');
++    body(s, 2.078, y + 0.668, 8.994, 1.138, T.pell4);
++  });
++  [[12.578, 2.911, C.gold, 'search'], [17.101, 2.911, C.deep, 'pie'], [21.606, 2.886, C.gold, 'target']]
++    .forEach(function (c) {
++      body(s, c[0], 12.195, 3.753, 1.138, T.ut);
++      sub(s, c[0] + 0.008, 10.95, 3.747, 'Your Tittle Here');
++      rule(s, c[0] + 0.167, 11.949, c[1]);
++      iconCircle(s, c[0] - 0.004, 7.877, 2.307, c[2], c[3]);
++    });
++  star4(s, 24.461, 0.309, 3.202); star4(s, 24.121, 3.055, 2.028);
++}
++
++function slide15(p) {                                   // best services
++  const s = newSlide(p, 15, 'L12');
++  head(s, 2.081, 1.5, 9.749, 'Best Services in ', 'Kareem Company', { h: 2.524 });
++  body(s, 2.081, 4.916, 9.749, 3.914, T.long1 + '\n\n' + T.pell);
++  [2.08, 7.33].forEach(function (x, i) {
++    sub(s, x, 9.58, i ? 4.5 : 4.538, 'Your Tittle Here');
++    body(s, x, 10.302, i ? 4.5 : 4.538, 1.138, 'Lorem ipsum dolor sit amet, sed consectetuer adipiscing elited. ');
++  });
++  kicker(s, 2.08, 13.679, 2.657, 'YOUR TITTLE');
++  rule(s, 5.082, 13.846, 8.24);
++  body(s, 13.65, 13.417, 3.431, 0.856,
++    'Pellentesque habitant morbi sed  tristique senectus et netus ae.', { fontSize: 16, color: C.light });
++  photo(s, 18.582, 1.538, 7.516, 12.712);
++  s.addShape('rect', { x: 13.33, y: 0, w: 6.002, h: 9, fill: { color: C.photo2 } });
++}
++
++function slide16(p) {                                   // testimonial + services
++  const s = newSlide(p, 16, 'L13');
++  text(s, 'Pellentesque habitant morbi dolor tristique senectus et netus et.',
++    { x: 2.665, y: 1.675, w: 6.167, h: 1.279, fontFace: F.med, fontSize: 27.99, italic: true,
++      color: C.gold, lineSpacingMultiple: 1.5 });
++  text(s, '\u201C', { x: 1.08, y: 1.083, w: 1.5, h: 3.013, fontFace: F.med, fontSize: 173,
++    italic: true, color: C.gold });
++  sub(s, 20.843, 4.034, 3.737, 'Your Tittle Here');
++  body(s, 20.835, 5.278, 3.743, 2.249,
++    'Pellentesque habitant orci morbi tristique senectuse et netus et malesuada sed fames ac turpis egestas. ');
++  rule(s, 21.002, 5.032, 2.903);
++  head(s, 11.096, 8.5, 8.985, 'Our Amazing ', 'Services Here', { h: 2.524 });
++  body(s, 11.096, 11.864, 8.985, 1.693,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit congues. Maecenas porttitor congue massa. Fusce posuere, magna sed urna pulvinar ultricies, purus lectus malesuada libero, sit amet libero');
++  glyph(s, 'target', 20.643, 1.953, 1.618, C.gold);
++  kicker(s, 16.747, 1.25, 1.783, 'TITTLE', 20.99);
++  rule(s, 18.696, 1.5, 1.404);
++  photo(s, 1.33, 3.75, 7.502, 9.75);
++  photo(s, 11.08, 0.737, 4.495, 6.763);
++  photo(s, 16.326, 2.25, 3.774, 5.25);
++  photo(s, 20.83, 8.288, 3.75, 5.212);
++}
++
++function slide17(p) {                                   // amazing services (dark right)
++  const s = newSlide(p, 17, 'L14');
++  head(s, 14.118, 1.583, 10.462, 'See Our Amazing ', 'Services Here', { h: 2.524 });
++  body(s, 14.118, 5.044, 10.462, 1.693,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus sed malesuada libero, sit amet commodo magna eros quis urna viverra enim. ',
++    { color: C.light });
++  [[2.835, 11.778, 10.534, 11.532, 2.903], [7.335, 5.612, 4.367, 5.365, 2.935]].forEach(function (c) {
++    body(s, c[0], c[1], 3.743, 1.138, T.ut);
++    sub(s, c[0] + 0.008, c[2], 3.737, 'Your Tittle Here');
++    rule(s, c[0] + 0.167, c[3], c[4]);
++  });
++  star4(s, 23.082, -1.498, 4.498);
++  glyph(s, 'search', 7.141, 2.181, 1.691, C.gold);
++  glyph(s, 'pie', 2.747, 8.333, 1.691, C.deep);
++  photo(s, 14.118, 7.534, 11.193, 6.716);
++  photo(s, 1.33, 1.538, 5.252, 5.962);
++  photo(s, 7.328, 7.5, 5.252, 7.5);
++}
++
++function slide18(p) {                                   // dark services with star photo
++  const s = newSlide(p, 18, 'L15');
++  photo(s, 12.584, 0.737, 13.496, 13.513, 'star7');
++  head(s, 1.927, 2.956, 9.736, 'Our ', 'Services Here');
++  body(s, 1.927, 5.233, 9.736, 1.693, T.long3, { color: C.light });
++  [[7.73, 7.706, 8.362, C.sand, 'search', C.deep], [10.206, 10.206, 10.945, C.deep, 'pie', C.sand]]
++    .forEach(function (r) {
++      iconCircle(s, 1.747, r[0], 1.693, r[3], r[4], r[5]);
++      sub(s, 3.929, r[1], 7.742, 'Your Tittle Here');
++      body(s, 3.927, r[2], 7.736, 1.138, T.elite, { color: C.light });
++    });
++  star4(s, 13.257, 0.508, 3.202); star4(s, 23.497, 10.918, 4.498); star4(s, 12.917, 3.255, 2.028);
++}
++
++function slide19(p) {                                   // break slides
++  const s = newSlide(p, 19, 'L2');
++  photo(s, 11.08, 1.5, 13.499, 12, 'round1Rect');
++  box(s, 2.829, 5.029, 4.915, 2.29, C.deep, { shadow: sh() });
++  s.addText([
++    { text: 'Break ', options: {} }, { text: 'Slides', options: { italic: true } }
++  ], { x: 2.866, y: 5.029, w: 20.964, h: 3.971, fontFace: F.disp, fontSize: 229.94,
++       bold: true, color: C.gold, valign: 'top', margin: INSET });
++  body(s, 2.866, 11.612, 5.965, 1.138,
++    'PLACEHOLDER');
++  rule(s, 2.994, 11.333, 2.838);
++  star4(s, 9.92, -0.858, 3.202); star4(s, 9.58, 1.888, 2.028); star4(s, 21.599, 10.541, 4.498);
++  rule(s, 2.911, 8.52, 17.932, C.rule, 6);
++}
++
++function slide20(p) {                                   // dark photo grid
++  const s = newSlide(p, 20, 'L16');
++  sub(s, 11.074, 8.868, 4.506, 'Your Tittle Here');
++  body(s, 11.097, 10.113, 4.483, 2.804,
++    'Pellentesque habitant morbi ae tristique senectus et netus etos malesuada fames ac turpis urna egestas. Proin pharetra pedete. Mauris et orci congue dolor.',
++    { color: C.light });
++  rule(s, 11.224, 9.867, 3.139);
++  star4(s, 24.461, 0.309, 3.202); star4(s, 24.121, 3.055, 2.028);
++  [[1.33, 1.538, 12, 5.962], [14.118, 1.5, 11.943, 6], [1.33, 8.288, 9, 5.212],
++   [16.35, 8.288, 4.463, 6.712], [21.598, 8.288, 4.481, 6.712]]
++    .forEach(function (r) { photo(s, r[0], r[1], r[2], r[3]); });
++}
++
++/* ============================================================= SLIDES 21-30 */
++function slide21(p) {                                   // portfolio – four white cards
++  const s = newSlide(p, 21, 'L1');
++  head(s, 14.881, 1.558, 10.449, 'See Our Amazing ', 'Portfolios Here', { h: 2.524 });
++  body(s, 14.881, 4.973, 10.449, 1.138,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus');
++  [[2.854, 6.75, 1.997, 7.441, C.sand, 'search'], [2.854, 10.5, 2.002, 11.158, C.deep, 'pie'],
++   [15.604, 6.75, 14.747, 7.441, C.sand, 'target'], [15.604, 10.5, 14.752, 11.158, C.deep, 'board']]
++    .forEach(function (c) {
++      box(s, c[0], c[1], 9.726, 3, C.white, { shadow: sh() });
++      sub(s, c[0] + 1.758, c[1] + 0.645, 7.206, 'Your Tittle Here');
++      body(s, c[0] + 1.758, c[1] + 1.278, 7.218, 1.138, T.card);
++      iconCircle(s, c[2], c[3], 1.693, c[4], c[5]);
++    });
++  photo(s, 2.83, 1.538, 9.75, 4.462);
++}
++
++function slide22(p) {                                   // portfolio + counters
++  const s = newSlide(p, 22, 'L10');
++  head(s, 12.605, 2.25, 11.288, 'See Our Kareem Best ', 'Portfolios Here', { h: 2.524 });
++  kicker(s, 2.08, 12.5, 1.783, 'TITTLE', 20.99);
++  rule(s, 4.029, 12.75, 5.552);
++  body(s, 12.609, 5.658, 11.288, 3.359,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor dolore congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. \n\nPellentesque habitant morbi tristique senectus et netus et malesuada fames ac urna turpis egestas. Proin pharetra nonummy pede. Mauris et orci posuere magna.');
++  [['12', 'Members', 12.612, 14.133], ['360', 'Product Sold', 15.614, 17.383],
++   ['99', 'Networks', 18.616, 20.136], ['125', 'Project Done', 21.617, 23.386]]
++    .forEach(function (m) {
++      text(s, m[0], { x: m[2], y: 9.771, w: 2.248, h: 1.312, fontFace: F.title, fontSize: 71.98,
++        color: C.gold, align: 'center' });
++      text(s, '+', { x: m[3], y: 9.354, w: 1.396, h: 1.312, fontFace: F.title, fontSize: 71.98,
++        bold: true, color: C.gold });
++      body(s, m[2], 11.25, 2.248, 0.583, m[1], { align: 'center' });
++    });
++  star4(s, 23.112, 11.25, 4.498);
++  photo(s, 1.331, 1.5, 9.001, 10.5, 'round1Rect');
++}
++
++function slide23(p) {                                   // dark page, four wide cards
++  const s = newSlide(p, 23, 'L17');
++  // each card = rounded panel (reads as a soft shadow) + a square panel on top
++  [[0.75, C.white, C.gold, C.gold, 'search', 11.21, C.white],
++   [4.167, C.sand, C.deep, C.deep, 'pie', 12.54, 'E3B873'],
++   [7.583, C.white, C.gold, C.gold, 'target', 11.21, C.white],
++   [11.0, C.white, C.gold, C.deep, 'board', 11.21, C.white]]
++    .forEach(function (c) {
++      s.addShape('roundRect', { x: 14.12, y: c[0], w: 11.21, h: 3.208, fill: { color: c[6] },
++        rectRadius: 0.535, shadow: sh() });
++      box(s, 14.12, c[0], c[5], 3.208, c[1], { shadow: sh() });
++      sub(s, 15.58, c[0] + 0.441, 8.985, 'Your Tittle Here', { color: c[2] });
++      body(s, 15.58, c[0] + 1.074, 9, 1.693, T.vivera);
++      iconCircle(s, 13.273, c[0] + 0.757, 1.693, c[3], c[4]);
++    });
++  [[1.33, 0.729, 5.252, 6.021], [7.328, 0, 5.252, 7.526],
++   [1.33, 7.502, 5.252, 6.748], [7.328, 8.278, 5.252, 6.722]]
++    .forEach(function (r) { photo(s, r[0], r[1], r[2], r[3]); });
++}
++
++function slide24(p) {                                   // portfolios – three columns
++  const s = newSlide(p, 24, 'L18');
++  photo(s, 14.118, 3, 5.969, 11.25);
++  photo(s, 8.054, 1.5, 5.276, 9.75);
++  photo(s, 20.827, 1.5, 5.253, 9.75);
++  body(s, 8.851, 12.233, 2.978, 1.26,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue',
++    { fontSize: 16, color: C.light });
++  rule(s, 8.957, 12, 1.742);
++  kicker(s, 14.83, 2, 1.783, 'TITTLE', 20.99);
++  rule(s, 16.779, 2.24, 2.586);
++  body(s, 20.832, 12, 3.748, 1.693, 'Pellentesque habitant sed morbi tristique senectus et netus et malesuada.');
++  rule(s, 20.913, 14.177, 2.071);
++  [[6.53, 7.203, 1.138, 'Pellentesque habitant morbi tristique senectus et netus et malesuada sed.'],
++   [9.301, 9.974, 1.138, 'Pellentesque habitant morbi tristique senectus et netus et malesuada sed.'],
++   [11.968, 12.641, 0.583, 'Pellentesque habitant morbi tristique']].forEach(function (r) {
++    sub(s, 1.997, r[0], 5.252, 'Your Tittle Here');
++    body(s, 1.997, r[1], 5.252, r[2], r[3]);
++  });
++  head(s, 2.036, 1.833, 5.189, '', 'Portfolios');
++  body(s, 2.036, 4.03, 5.189, 1.693,
++    'PLACEHOLDER');
++  star4(s, 10.645, -0.75, 4.498);
++}
++
++function slide25(p) {                                   // our portfolios
++  const s = newSlide(p, 25, 'L19');
++  body(s, 2.08, 10.195, 2.252, 2.471,
++    'Pellentesque  dolor habitant morbi ae tristique senectus et netus et malesuada fames ac turpis telus pharetra nonummy',
++    { fontSize: 16, color: C.light });
++  text(s, 'Your Tittle', { x: 2.08, y: 9.05, w: 2.252, h: 0.539, fontFace: F.body, fontSize: 20,
++    bold: true, color: C.gold, lineSpacingMultiple: 1.5 });
++  rule(s, 2.185, 9.963, 1.317);
++  head(s, 14.119, 1.527, 10.461, 'Our ', 'Portfolios');
++  body(s, 14.119, 3.724, 10.461, 3.359,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus amet malesuada libero, sit amet commodo magna eros quis urna.\n\n' + T.pell);
++  [[19.332, 8.288, 5.252, 6.712], [13.33, 8.288, 5.252, 6.712],
++   [5.082, 8.288, 7.498, 5.212], [1.33, 1.529, 11.25, 5.971]]
++    .forEach(function (r) { photo(s, r[0], r[1], r[2], r[3]); });
++}
++
++function slide26(p) {                                   // latest gallery
++  const s = newSlide(p, 26, 'L20');
++  s.addText([
++    { text: 'See Our Latest ', options: {} }, { text: 'Amazing', options: { italic: true } },
++    { text: ' ', options: {} }, { text: 'Gallery', options: { italic: true } }
++  ], { x: 2.08, y: 2, w: 9, h: 2.524, fontFace: F.title, fontSize: 71.98, color: C.gold,
++       valign: 'top', margin: INSET });
++  sub(s, 11.83, 11.312, 5.256, 'Your Tittle Here');
++  body(s, 11.853, 12.557, 5.229, 1.693, T.pell2);
++  rule(s, 11.98, 12.31, 3.661);
++  body(s, 7.33, 12.816, 2.978, 0.856, T.short, { fontSize: 16, color: C.light });
++  rule(s, 7.435, 12.583, 1.742);
++  kicker(s, 18.58, 12.917, 1.783, 'TITTLE', 20.99);
++  rule(s, 20.529, 13.167, 4.8);
++  [[11.84, 1.5, 5.241, 9], [6.582, 5.25, 4.498, 6.75],
++   [1.33, 5.25, 4.502, 8.25], [17.832, 1.5, 8.248, 10.5]]
++    .forEach(function (r) { photo(s, r[0], r[1], r[2], r[3]); });
++}
++
++function slide27(p) {                                   // tablet mock-up
++  const s = newSlide(p, 27, 'L21');
++  tablet(s, 2.835, 1.678, 8.931, 11.644);
++  head(s, 14.119, 3, 9.711, 'Our ', 'Mockup Here');
++  body(s, 14.119, 5.197, 9.711, 1.693,
++    T.pell + '\nNunc viverra imperdiet enim. Fusce est. Vivamus a tellus.');
++  [[7.667, 8.306, C.sand, 'search'], [10.139, 10.862, C.deep, 'pie']].forEach(function (r, i) {
++    sub(s, 16.095, r[0], 7.746, 'Your Tittle Here');
++    body(s, 16.094, r[1], 7.74, 1.138, T.elite);
++    iconCircle(s, 13.909, [7.734, 10.25][i], 1.693, r[2], r[3]);
++  });
++}
++
++function slide28(p) {                                   // two tablets on dark
++  const s = newSlide(p, 28, 'L22');
++  head(s, 2.087, 3, 7.491, 'Our ', 'Mockup');
++  body(s, 2.087, 5.197, 7.491, 1.693,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing sit elit sit. Maecenas porttitor congue massa. Fusce libero posuere, magna aesed pulvinar ultricies, purus lectus.',
++    { color: C.light });
++  [7.667, 10.139].forEach(function (y) {
++    sub(s, 2.08, y, 7.508, 'Your Tittle Here');
++    body(s, 2.08, y + 0.639, 7.502, 1.138, T.elite, { color: C.light });
++  });
++  tablet(s, 11.103, 1.678, 8.931, 11.644);
++  tablet(s, 20.565, 1.678, 8.931, 11.644);
++  kicker(s, 11.08, 14, 1.783, 'TITTLE', 20.99);
++  rule(s, 13.029, 14.24, 4.802);
++}
++
++function slide29(p) {                                   // phone mock-ups
++  const s = newSlide(p, 29, 'L23');
++  phone(s, 14.052, 2.521);
++  phone(s, 19.511, 2.564);
++  head(s, 2.831, 3.587, 9.751, 'Phone ', 'Mockups');
++  body(s, 2.831, 5.734, 9.751, 3.914, T.long1 + '\n\n' + T.pell);
++  viewMore(s, 2.545, 10.433);
++  star4(s, 12.503, 0.346, 3.202); star4(s, 12.163, 3.092, 2.028);
++  body(s, 17.83, 13.394, 2.978, 0.856, T.short, { fontSize: 16, color: C.light });
++  rule(s, 21.028, 13.833, 3.364);
++}
++
++function slide30(p) {                                   // phone mock-ups on dark
++  const s = newSlide(p, 30, 'L24');
++  phone(s, 2.3, 3.857);
++  phone(s, 13.615, 3.843);
++  s.addShape('round1Rect', { x: 7.067, y: 6, w: 5.513, h: 3.787, fill: { color: C.sand },
++    rectRadius: 0.815 });
++  head(s, 1.348, 1.667, 23.982, 'See Our Amazing ', 'Phone Mockups', { align: 'center' });
++  sub(s, 8.011, 6.666, 3.822, 'Your Tittle Here', { color: C.deep });
++  body(s, 8.011, 7.305, 3.819, 1.693,
++    'Fusce posuere, magna sed pulvinar ultricies, purus sit lectus malesuada libero.');
++  [5.312, 9.062].forEach(function (y) {
++    sub(s, 19.33, y, 5.256, 'Your Tittle Here');
++    body(s, 19.353, y + 1.245, 5.229, 1.693, T.pell2, { color: C.light });
++    rule(s, 19.48, y + 0.998, 3.661);
++  });
++  star4(s, 24.461, 0.309, 3.202); star4(s, 24.121, 3.055, 2.028);
++}
++
++/* ============================================================= SLIDES 31-40 */
++function slide31(p) {                                   // laptop mock-up
++  const s = newSlide(p, 31, 'L1');
++  head(s, 2.115, 3.969, 8.214, 'Laptop ', 'Mockup');
++  body(s, 2.115, 6.116, 8.214, 2.249,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit sed. Maecenas porttitor congue massa. Fusce posuere, magna ae sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.');
++  viewMore(s, 1.83, 9.199);
++  laptop(s, 12.08, 2.897);
++  star4(s, 11.247, 0.75, 4.498); star4(s, 23.383, 8.917, 3.202); star4(s, 23.043, 11.663, 2.028);
++}
++
++// gold+navy 72pt heading shared by every infographic slide
++function infoTitle(s, x) {
++  head(s, x || 1.33, 1.545, 24.001, 'Our Best ', 'Infographics Here', { align: 'center' });
++}
++
++function slide32(p) {                                   // six chevron steps
++  const s = newSlide(p, 32, 'L25');
++  infoTitle(s, 1.326);
++  [['Step One', 2.803, C.sand], ['Step Two', 6.526, C.deep], ['Step Three', 10.227, C.sand]]
++    .forEach(function (a) {
++      arrowStep(s, a[1], 4.583, 4.61, 3.709, 1.14, a[2], false);
++      text(s, a[0], { x: a[1] + 1.027, y: 6.083, w: 3.43, h: 0.631, fontFace: F.disp, fontSize: 24,
++        bold: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
++    });
++  [['Step Four', 11.865, C.deep], ['Step Five', 15.589, C.sand], ['Step Six', 19.289, C.deep]]
++    .forEach(function (a) {
++      arrowStep(s, a[1], 9.791, 4.61, 3.709, 1.14, a[2], true);
++      text(s, a[0], { x: a[1] + 1.027, y: 11.285, w: 3.43, h: 0.631, fontFace: F.disp, fontSize: 24,
++        bold: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
++    });
++  sub(s, 15.585, 4.969, 6.005, 'Your Tittle Here');
++  body(s, 15.607, 6.213, 5.982, 1.693, T.chevron);
++  rule(s, 15.728, 5.967, 4.142);
++  sub(s, 4.317, 10.177, 6.005, 'Your Tittle Here', { align: 'right' });
++  body(s, 4.339, 11.421, 5.982, 1.693, T.chevron, { align: 'right' });
++  rule(s, 6.082, 11.175, 4.142);
++}
++
++function slide33(p) {                                   // four numbered stars
++  const s = newSlide(p, 33, 'L25');
++  infoTitle(s);
++  [['01', 2.207, 3.619, C.sand, 4.752, 8.996, 2.865, 10.319, C.gold],
++   ['02', 7.853, 4.369, C.deep, 10.407, 9.733, 8.533, 11.415, C.deep],
++   ['03', 13.661, 3.619, C.sand, 16.203, 8.996, 14.31, 10.319, C.gold],
++   ['04', 19.363, 4.369, C.deep, 21.878, 9.733, 19.937, 11.415, C.deep]]
++    .forEach(function (a) {
++      star7(s, a[1], a[2], 5.09, 4.844, a[3], { shadow: sh() });
++      text(s, a[0], { x: a[1] + 0.671, y: a[2] + 1.522, w: 3.748, h: 1.692, fontFace: F.disp,
++        fontSize: 72, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
++      vrule(s, a[4], a[5], 0.833, a[8] === C.gold ? C.gold : C.deep);
++      capTitle(s, a[6], a[7], 3.773, 'Your Tittle', a[8]);
++      cap(s, a[6] + 0.004, a[7] + 0.605, 3.791, T.mae);
++    });
++}
++
++function slide34(p) {                                   // honeycomb of six
++  const s = newSlide(p, 34, 'L25');
++  [['02', 11.481, 3.947, C.sand, 12.568, 5.007], ['01', 8.464, 5.661, C.deep, 9.485, 6.721],
++   ['03', 14.559, 5.661, C.deep, 15.568, 6.721], ['06', 8.464, 9.132, C.sand, 9.485, 10.192],
++   ['04', 14.559, 9.132, C.sand, 15.568, 10.192], ['05', 11.445, 10.852, C.deep, 12.568, 11.912]]
++    .forEach(function (h) {
++      s.addShape('hexagon', { x: h[1], y: h[2], w: 3.634, h: 3.229, fill: { color: h[3] }, shadow: sh() });
++      text(s, h[0], { x: h[4], y: h[5], w: 1.416, h: 1.111, rotate: 338.4, fontFace: F.disp,
++        fontSize: 59.99, bold: true, color: C.white, align: 'center' });
++    });
++  s.addShape('hexagon', { x: 11.481, y: 7.429, w: 3.634, h: 3.229, fill: { color: C.white }, shadow: sh() });
++  glyph(s, 'target', 12.728, 8.508, 1.141, C.sand);
++  [4.759, 7.939, 11.103].forEach(function (y) {
++    sub(s, 19.354, y, 5.243, 'Your Tittle Here', { fontSize: 28, bold: true });
++    cap(s, 19.354, y + 0.605, 5.243, T.maeL, { align: 'left' });
++    sub(s, 2.088, y, 5.243, 'Your Tittle Here', { fontSize: 28, bold: true, align: 'right' });
++    cap(s, 2.062, y + 0.605, 5.266, T.maeL, { align: 'right' });
++  });
++  infoTitle(s);
++}
++
++function slide35(p) {                                   // five chevrons
++  const s = newSlide(p, 35, 'L25');
++  [['01', 1.996, 4.5, C.sand, 3.303, 3.622, 4.599, 8.766, 0.833, 2.7, 10.192, C.gold],
++   ['02', 6.303, 4.5, C.deep, 7.618, 3.581, 8.905, 8.766, 1.583, 7.007, 10.861, C.deep],
++   ['03', 10.72, 4.5, C.sand, 12.139, 3.477, 13.321, 8.766, 0.833, 11.435, 10.192, C.gold],
++   ['04', 14.97, 4.5, C.deep, 16.372, 3.494, 17.571, 8.766, 1.583, 15.685, 10.861, C.deep],
++   ['05', 19.387, 4.333, C.sand, 20.808, 3.474, 21.988, 8.766, 0.833, 20.101, 10.192, C.gold]]
++    .forEach(function (a) {
++      s.addShape('chevron', { x: a[1], y: a[2], w: 5.203, h: 3.788, fill: { color: a[3] }, shadow: sh() });
++      text(s, a[0], { x: a[4], y: a[2] + 0.998, w: a[5], h: 1.335, fontFace: F.disp, fontSize: 54,
++        bold: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
++      vrule(s, a[6], a[7], a[8], a[11]);
++      capTitle(s, a[9], a[10], 3.773, 'Your Tittle', a[11]);
++      cap(s, a[9] + 0.003, a[10] + 0.606, 3.791, T.mae);
++    });
++  infoTitle(s);
++}
++
++function slide36(p) {                                   // four icon stars
++  const s = newSlide(p, 36, 'L25');
++  infoTitle(s);
++  [['01', 2.905, 4.583, C.sand, C.gold, 'search', 3.402, 9.62, 4.698, 12.332],
++   ['02', 8.212, 5.711, C.deep, C.deep, 'pie', 8.709, 10.783, 10.006, 13.498],
++   ['03', 13.655, 4.583, C.sand, C.gold, 'target', 14.152, 9.62, 15.448, 12.332],
++   ['05', 18.988, 5.711, C.deep, C.deep, 'board', 19.485, 10.783, 20.781, 13.498]]
++    .forEach(function (a) {
++      star7(s, a[1], a[2], 4.658, 4.295, a[3], { shadow: sh() });
++      star7(s, a[1] + 0.523, a[2] + 0.51, 3.68, 3.393, null,
++        { fill: { type: 'none' }, line: { color: C.white, width: 1 } });
++      glyph(s, a[5], a[1] + 1.614, a[2] + 1.551, 1.428, C.white, a[3]);
++      star7(s, a[1] + 3.105, a[2] + 2.697, 1.661, 1.531, C.white, { shadow: sh() });
++      text(s, a[0], { x: a[1] + 3.105, y: a[2] + 2.697, w: 1.661, h: 1.531, fontFace: F.disp,
++        fontSize: 44, bold: true, color: a[4], align: 'center', valign: 'middle' });
++      capTitle(s, a[6], a[7], 3.773, 'Your Tittle', a[4]);
++      cap(s, a[6] - 0.009, a[7] + 0.606, 3.791, T.mae);
++      rule(s, a[8], a[9], 1.181, a[4], 4.5);
++    });
++}
++
++function slide37(p) {                                   // hex numbers
++  const s = newSlide(p, 37, 'L25');
++  [[8.349, 4.606, C.white], [13.087, 4.606, C.white], [5.981, 8.918, C.white],
++   [10.718, 8.918, C.sand], [15.457, 8.918, C.white]].forEach(function (h) {
++    s.addShape('hexagon', { x: h[0], y: h[1], w: 5.147, h: 4.437, rotate: 90,
++      fill: { color: h[2] }, shadow: sh() });
++  });
++  glyph(s, 'target', 16.856, 9.962, 2.35, C.deep);
++  [['567', 9.1, 5.87, C.gold, F.disp, 28], ['180', 13.765, 5.87, C.gold, F.disp, 28],
++   ['456', 6.659, 10.182, C.gold, F.disp, 28], ['456', 11.396, 10.137, C.deep, F.serif, 23.99]]
++    .forEach(function (n) {
++      text(s, n[0], { x: n[1] + 0.491, y: n[2], w: 2.662, h: 1.211, fontFace: F.disp, fontSize: 65.98,
++        bold: true, color: n[3], align: 'center' });
++      text(s, 'Your Tittle Here', { x: n[1], y: n[2] + 1.356, w: 3.791, h: 0.72, fontFace: n[4],
++        fontSize: n[5], color: n[3], align: 'center', lineSpacingMultiple: 1.5 });
++    });
++  sub(s, 2.507, 5.741, 5.243, 'Your Tittle Here', { fontSize: 28, bold: true, align: 'right' });
++  cap(s, 2.507, 6.346, 5.243, T.maeL, { align: 'right' });
++  sub(s, 1.752, 10.053, 3.744, 'Your Tittle', { fontSize: 28, bold: true, align: 'right' });
++  cap(s, 1.752, 10.658, 3.744, T.pell3, { align: 'right' });
++  sub(s, 18.914, 5.741, 5.243, 'Your Tittle Here', { fontSize: 28, bold: true });
++  cap(s, 18.914, 6.346, 5.243, T.maeL, { align: 'left' });
++  sub(s, 21.164, 10.053, 3.744, 'Your Tittle', { fontSize: 28, bold: true });
++  cap(s, 21.164, 10.658, 3.744, T.pell3, { align: 'left' });
++  infoTitle(s);
++}
++
++function slide38(p) {                                   // four teardrops
++  const s = newSlide(p, 38, 'L25');
++  [[18.58, 5.665, 18.57, 6.271, 'left'], [18.58, 9.416, 18.57, 10.021, 'left'],
++   [2.847, 5.665, 2.847, 6.271, 'right'], [2.847, 9.416, 2.847, 10.021, 'right']]
++    .forEach(function (t) {
++      sub(s, t[0], t[1], 5.208, 'Your Tittle Here', { fontSize: 28, bold: true, align: t[4] });
++      cap(s, t[2], t[3], 5.243, T.maeL, { align: t[4] });
++    });
++  infoTitle(s);
++  // four teardrops arranged as a pinwheel, every tail meeting the centre
++  [[9.432, 4.924, 3.688, 90, C.sand], [13.636, 4.652, 3.96, 180, C.deep],
++   [9.16, 9.118, 3.96, 0, C.deep], [13.54, 9.118, 4.211, 270, C.sand]]
++    .forEach(function (t) {
++      s.addShape('teardrop', { x: t[0], y: t[1], w: t[2], h: t[2], rotate: t[3],
++        fill: { color: t[4] }, shadow: sh() });
++    });
++  glyph(s, 'target', 10.426, 10.383, 1.428, C.white, C.deep);
++  glyph(s, 'search', 10.562, 6.054, 1.428, C.white, C.sand);
++  glyph(s, 'pie', 14.902, 5.918, 1.428, C.white, C.deep);
++  glyph(s, 'board', 15.027, 10.509, 1.428, C.white, C.sand);
++}
++
++// contact row: white pill + coloured icon circle + gold label
++function contactRow(s, y, circle, kind, label) {
++  s.addShape('roundRect', { x: 15.998, y: y, w: 6.333, h: 1.366, fill: { color: C.white },
++    rectRadius: 0.228, shadow: sh() });
++  s.addShape('ellipse', { x: 15.466, y: y + 0.104, w: 1.159, h: 1.159, fill: { color: circle }, shadow: sh() });
++  glyph(s, kind, 15.752, y + 0.39, 0.586, C.white);
++  text(s, label, { x: 17.098, y: y + 0.431, w: 4.483, h: 0.505, fontFace: F.head, fontSize: 23.99, color: C.gold });
++}
++
++function slide39(p) {                                   // get in touch
++  const s = newSlide(p, 39, 'L3');
++  head(s, 15.584, 3.029, 9.745, 'Get In ', 'Touch!');
++  body(s, 15.584, 5.213, 9.745, 2.249,
++    T.long3.replace('quis.', 'quis urna.') + '\nNunc viverra imperdiet enim. Fusce est. Vivamus a tellus.');
++  contactRow(s, 8.174, C.sand, 'mail', 'Info@Kareem.com');
++  contactRow(s, 9.693, C.deep, 'phone', '+00 1234 5678 90');
++  contactRow(s, 11.218, C.sand, 'map', '08 Highway St. New York');
++  photo(s, 1.33, 1.5, 12.788, 12, 'star7');
++}
++
++function slide40(p) {                                   // thank you
++  const s = newSlide(p, 40, 'L2');
++  photo(s, 11.08, 1.5, 13.499, 12, 'round1Rect');
++  star4(s, 21.599, 10.541, 4.498);
++  box(s, 2.829, 5.029, 4.915, 2.29, C.deep, { shadow: sh() });
++  s.addText([
++    { text: 'Thank ', options: { fontSize: 229.94, bold: true } },
++    { text: 'You', options: { fontSize: 229.94, bold: true, italic: true, breakLine: true } },
++    { text: 'Kareem Presentation Template', options: { fontSize: 36, color: C.deep } }
++  ], { x: 2.866, y: 5.029, w: 20.964, h: 4.578, fontFace: F.disp, color: C.gold, valign: 'top', margin: INSET });
++  star4(s, 9.92, -0.858, 3.202); star4(s, 9.58, 1.888, 2.028);
++  rule(s, 2.911, 8.52, 15.642, C.rule, 6);
++}
++
++/* ------------------------------------------------------------------- build */
++function build() {
++  const pres = new pptxgen();
++  pres.defineLayout({ name: 'KAREEM', width: SLIDE_W, height: SLIDE_H });
++  pres.layout = 'KAREEM';
++  pres.author = 'Kareem';
++  pres.title = 'Kareem Ramadan Presentation Template';
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++   slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++   slide31, slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40
++  ].forEach(function (fn) { fn(pres); });
++  return pres.writeFile({
++    fileName: path.join(__dirname, '02e8084d-1b97-4a85-a6c3-14b4ad941564_grok_final.pptx')
++  });
++}
++
++build().then(function (f) { console.log('wrote ' + f); }, function (e) { console.error(e); process.exit(1); });

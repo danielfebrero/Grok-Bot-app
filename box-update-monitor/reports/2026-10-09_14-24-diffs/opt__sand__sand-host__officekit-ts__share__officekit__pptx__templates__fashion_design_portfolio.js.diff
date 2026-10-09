@@ -1,0 +1,956 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_design_portfolio.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/fashion_design_portfolio.js
+@@ -0,0 +1,953 @@
++/**
++ * VALENTA — Fashion Design Style deck (35 slides, 13.333" x 7.5")
++ * Rebuilt with pptxgenjs. Raster artwork in the source deck (photo placeholders,
++ * device mock-ups, the chart bitmap and the barcode strip) is redrawn here with
++ * native shapes / charts instead of embedded images.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ tokens */
++
++const C = {
++  bg: '323232',        // slide background
++  orange: 'FE6501',    // brand accent
++  white: 'FFFFFF',
++  black: '000000',
++  dark: '3F3F3F',      // "knocked out" text on white chips
++  gray: 'D8D8D8',      // map land
++  silver: 'BFBFBF',    // hairlines
++  barcode: '979797',
++};
++// The palette slides show the accent at 89 / 78 / 67 % opacity over the dark
++// background; pptxgenjs has no shape alpha, so the blends are pre-computed.
++const BLEND = (hex, a) => hex.match(/../g)
++  .map((h, i) => Math.round(parseInt(h, 16) * a + parseInt(C.bg.substr(i * 2, 2), 16) * (1 - a)))
++  .map(v => v.toString(16).padStart(2, '0').toUpperCase()).join('');
++const ORANGE_A = [0.89, 0.7765, 0.6706].map(a => BLEND(C.orange, a));
++const WHITE_A = [0.89, 0.7765, 0.6706].map(a => BLEND(C.white, a));
++
++const F = { head: 'DM Sans', body: 'Open Sans', alt: 'Montserrat' };
++
++// Google-Slides text-box insets (0.1" sides, 0.05" top/bottom) expressed in pt.
++const INSET = [7.2, 7.2, 3.6, 3.6];
++
++const TXT = {
++  long: 'A company is an association or collection of individuals, whether natural persons. individuals, whether natural A company. A company is an association or collection of individuals, whether natural persons. individuals, whether natural A company. A company is an association.',
++  mid: 'A company is an association or collection of individuals, whether natural persons. individuals, whether natural A company. A company is an association or collection.',
++  mid2: 'A company is an association or collection of individuals, whether natural persons. individuals, whether natural A company. A company is an association or collection',
++  half: 'A company is an association or collection of individuals, whether natural persons. individuals, whether natural A company. ',
++  half2: 'A company is an association or collection of individuals, whether natural persons. individuals, whether natural A company. A company is an association or collection of individuals, whether natural persons. ',
++  short: 'A company is an association or collection of individuals, whether natural persons. ',
++  lorem: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. In et quam est eget mi. Pellentesque nunc orci eu enim, eget in fringilla vitae, et eros present.',
++  loremA: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet,. Sapien nam suspendisse, tincidunt',
++  loremB: 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus',
++  swot: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam viverra euismod odio, gravida pellentesque urna varius vitae. ',
++  fluffer: "There comes a nice little fluffer. This piece of canvas is your world. Let's give him a friend too.",
++};
++
++/* ----------------------------------------------------------------- helpers */
++
++/** Body / caption text — Open Sans, white, top-anchored like the original. */
++function text(s, str, o) {
++  s.addText(str, Object.assign({
++    fontFace: F.body, fontSize: 10, color: C.white,
++    align: 'left', valign: 'top', margin: INSET, isTextBox: true,
++  }, o));
++}
++
++/** Display type — DM Sans. */
++function head(s, str, o) {
++  s.addText(str, Object.assign({
++    fontFace: F.head, fontSize: 60, bold: true, color: C.orange,
++    align: 'left', valign: 'top', margin: INSET, isTextBox: true,
++  }, o));
++}
++
++const rect = (s, x, y, w, h, color) => s.addShape('rect', { x, y, w, h, fill: { color } });
++const oval = (s, x, y, w, h, color) => s.addShape('ellipse', { x, y, w, h, fill: { color } });
++const hline = (s, x, y, w, color = C.white, width = 0.75) =>
++  s.addShape('line', { x, y, w, h: 0, line: { color, width } });
++const vline = (s, x, y, h, color = C.white, width = 0.75) =>
++  s.addShape('line', { x, y, w: 0, h, line: { color, width } });
++
++/* --------------------------------------------------- recurring furniture */
++
++/** Top menu: CONTACT / MEDIA / LAYOUT. */
++function navMenu(s, x, y, align = 'center', rotate) {
++  const items = [['CONTACT', 0, 1.177, 0.317], ['MEDIA', 1.568, 0.842, 0.304], ['LAYOUT', 2.802, 1.069, 0.332]];
++  items.forEach(([label, dx, w, h]) => {
++    text(s, label, { x: x + dx, y: dx ? y - 0.004 : y, w, h, align, rotate });
++  });
++}
++/** Same menu rotated onto the left edge (slide 4). */
++function navMenuVertical(s) {
++  [['CONTACT', -0.044, 4.948, 1.177, 0.317], ['MEDIA', 0.113, 3.554, 0.842, 0.304],
++   ['LAYOUT', 0.013, 2.193, 1.069, 0.332]].forEach(([l, x, y, w, h]) =>
++    text(s, l, { x, y, w, h, align: 'center', rotate: 270 }));
++}
++
++/** Bottom-left globe badge + site + page counter. */
++function footerBadge(s) {
++  globe(s, 0.382, 6.939, 0.334, C.orange);
++  text(s, 'WWW.VALENTA.COM', { x: 0.771, y: 7.011, w: 1.5, h: 0.324, fontSize: 8 });
++  text(s, [{ text: 'PAGE 04-35', options: { breakLine: true } }, { text: 'TOTAL SLIDE' }],
++    { x: 0.771, y: 6.61, w: 0.95, h: 0.324, fontSize: 8, bold: true });
++}
++
++/** Bottom-right "01 ———>" pager. */
++function pager(s) {
++  text(s, '01', { x: 11.027, y: 7.011, w: 0.492, h: 0.262, bold: true });
++  hline(s, 11.366, 7.142, 1.472);
++  s.addShape('ellipse', { x: 12.938, y: 7.053, w: 0.178, h: 0.178, line: { color: C.white, width: 0.75 } });
++  s.addShape('line', {
++    x: 12.982, y: 7.142, w: 0.078, h: 0,
++    line: { color: C.white, width: 0.5, endArrowType: 'triangle' },
++  });
++}
++
++/** Wire-globe glyph used in the badge and inside the orange tiles. */
++function globe(s, x, y, d, color) {
++  const lw = Math.max(0.75, d * 4);
++  const o = { line: { color, width: lw }, fill: { type: 'none' } };
++  s.addShape('ellipse', Object.assign({ x, y, w: d, h: d }, o));
++  s.addShape('ellipse', Object.assign({ x: x + d * 0.31, y, w: d * 0.38, h: d }, o));
++  hline(s, x + d * 0.03, y + d * 0.29, d * 0.94, color, lw);
++  hline(s, x, y + d * 0.5, d, color, lw);
++  hline(s, x + d * 0.03, y + d * 0.71, d * 0.94, color, lw);
++  vline(s, x + d * 0.5, y, d, color, lw);
++}
++
++/** Orange square (or circle) with the white globe centred on it. */
++function globeTile(s, x, y, w, h, gx, gy, gd, shape = 'rect') {
++  s.addShape(shape, { x, y, w, h, fill: { color: C.orange } });
++  globe(s, gx, gy, gd, C.white);
++}
++
++/** "WRITE MESSAGE HERE" caption + rule + barcode block. */
++function messageBlock(s, x, y, ruleW, barX, barY) {
++  text(s, 'WRITE MESSAGE HERE', { x, y, w: 1.667, h: 0.268 });
++  hline(s, x + 0.097, y + 0.282, ruleW);
++  if (barX !== undefined) barcode(s, barX, barY);
++}
++
++// Bar widths of the decorative EAN strip, alternating bar / gap, in source px.
++const BAR_RUNS = 'PLACEHOLDER';
++
++/** Barcode strip (1.473" x 0.846" in the original artwork). */
++function barcode(s, x, y) {
++  const u = 1.473 / 324;      // source bitmap was 324 px wide
++  let px = 23;
++  BAR_RUNS.split('').forEach((d, i) => {
++    const w = Number(d);
++    if (i % 2 === 0) rect(s, x + px * u, y + 23 * u, w * u, 112 * u, C.barcode);
++    px += w;
++  });
++  text(s, 'A1234567890A', {
++    x: x + 0.02, y: y + 0.615, w: 1.43, h: 0.22, fontSize: 10, color: C.barcode,
++    align: 'center', charSpacing: 1.4, margin: 0,
++  });
++}
++
++/** Giant rotated "PORTFOLIO" / "EXCLUSIVE" watermark word. */
++function sideWord(s, str, x, color = C.orange, size = 60) {
++  head(s, str, { x, y: 3.195, w: 5.192, h: 1.111, rotate: 270, align: 'center', color, fontSize: size });
++}
++
++/** Empty picture frames in the source render as nothing — mirrored here. */
++function photoFrame() { /* intentionally blank */ }
++
++/** A single line of text stretched across a square block — reads as stripes. */
++function stretchedWordmark(s, x, y, w, h, phrase) {
++  const cell = w / phrase.length;
++  phrase.split('').forEach((ch, i) => {
++    if (ch !== ' ') rect(s, x + i * cell, y, cell * 0.58, h, C.white);
++  });
++}
++
++/* --------------------------------------------------- mock-up placeholders */
++// The source deck uses photo-realistic device renders; they are rebuilt from
++// plain shapes at the same on-slide geometry.
++
++/** Handset: rounded body, dark screen, speaker slot, home button or notch. */
++function phoneMockup(s, o) {
++  s.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.w * 0.13,
++    fill: { color: o.body }, line: { color: o.rim, width: o.rimW || 1 },
++  });
++  rect(s, o.sx, o.sy, o.sw, o.sh, o.screen || C.dark);
++  if (o.notch) {
++    s.addShape('roundRect', {
++      x: o.x + o.w * 0.3, y: o.sy - 0.01, w: o.w * 0.4, h: 0.26,
++      rectRadius: 0.1, fill: { color: '050505' },
++    });
++  } else {
++    s.addShape('roundRect', {
++      x: o.x + o.w * 0.39, y: o.y + o.h * 0.045, w: o.w * 0.22, h: 0.05,
++      rectRadius: 0.025, fill: { color: o.rim },
++    });
++    s.addShape('ellipse', {
++      x: o.x + o.w * 0.5 - o.hd / 2, y: o.y + o.h - o.hd - o.h * 0.035, w: o.hd, h: o.hd,
++      fill: { type: 'none' }, line: { color: o.rim, width: 1.25 },
++    });
++  }
++  text(s, '[image]', { x: o.sx, y: o.sy + o.sh * 0.45, w: o.sw, h: 0.3, align: 'center', color: '787878' });
++}
++
++/** All-in-one desktop: black bezel, glass, brushed foot and stand.
++ *  The glass is transparent in the original, so the orange band shows through. */
++function monitorMockup(s) {
++  rect(s, -1.84, 1.373, 7.767, 4.634, '030303');        // bezel
++  rect(s, -1.84, 1.713, 7.447, 4.014, C.bg);            // glass
++  rect(s, 0, 1.713, 2.043, 4.014, C.orange);            // orange band seen through glass
++  text(s, '[image]', { x: 3.2, y: 3.55, w: 1.2, h: 0.3, align: 'center', color: '787878' });
++  rect(s, -1.84, 6.013, 7.767, 0.707, 'D2D3D5');        // aluminium foot
++  rect(s, 1.24, 6.72, 1.613, 0.78, 'D4D4D6');           // stand
++}
++
++/* ---------------------------------------------------------- outline icons */
++
++/** Small line-art glyphs used on the two icon-sheet slides. */
++const stroke = (col = C.orange) => ({ fill: { type: 'none' }, line: { color: col, width: 1 } });
++
++const GLYPH = {
++  ring: (s, x, y, d, col) => s.addShape('ellipse', Object.assign({ x, y, w: d, h: d }, stroke(col))),
++  box: (s, x, y, d, col) => s.addShape('rect', Object.assign({ x, y, w: d, h: d }, stroke(col))),
++  roundBox: (s, x, y, d, col) => s.addShape('roundRect', Object.assign({ x, y, w: d, h: d, rectRadius: d * 0.22 }, stroke(col))),
++  pin: (s, x, y, d, col = C.orange) => {
++    s.addShape('ellipse', Object.assign({ x, y, w: d, h: d * 0.8 }, stroke(col)));
++    s.addShape('triangle', { x: x + d * 0.3, y: y + d * 0.6, w: d * 0.4, h: d * 0.4, rotate: 180, fill: { color: col } });
++  },
++  play: (s, x, y, d, col) => s.addShape('triangle', Object.assign({ x, y, w: d, h: d, rotate: 90 }, stroke(col))),
++  bars: (s, x, y, d, col = C.orange) => [0, 1, 2].forEach(i =>
++    rect(s, x + i * d * 0.38, y + d * (0.55 - i * 0.22), d * 0.2, d * (0.45 + i * 0.22), col)),
++  arrow: (s, x, y, d, col = C.orange) => {
++    s.addShape('ellipse', Object.assign({ x, y, w: d, h: d }, stroke(col)));
++    s.addShape('line', { x: x + d * 0.25, y: y + d * 0.5, w: d * 0.5, h: 0, line: { color: col, width: 1, endArrowType: 'triangle' } });
++  },
++  cloud: (s, x, y, d, col) => s.addShape('cloud', Object.assign({ x, y, w: d, h: d * 0.72 }, stroke(col))),
++  heart: (s, x, y, d, col) => s.addShape('heart', Object.assign({ x, y, w: d, h: d }, stroke(col))),
++  diamond: (s, x, y, d, col) => s.addShape('diamond', Object.assign({ x, y, w: d, h: d }, stroke(col))),
++  lines: (s, x, y, d, col = C.orange) => [0, 1, 2].forEach(i =>
++    hline(s, x, y + d * (0.2 + i * 0.3), d * (i === 1 ? 0.7 : 1), col, 1)),
++  plusBox: (s, x, y, d, col = C.orange) => {
++    s.addShape('rect', Object.assign({ x, y, w: d, h: d }, stroke(col)));
++    hline(s, x + d * 0.25, y + d * 0.5, d * 0.5, col, 1);
++    vline(s, x + d * 0.5, y + d * 0.25, d * 0.5, col, 1);
++  },
++};
++const GLYPH_CYCLE = Object.keys(GLYPH);
++
++/** Rows of evenly spaced glyphs — the two "icon pack" slides. */
++function iconSheet(s, cols, rows, size, seed) {
++  rows.forEach((cy, r) => cols.forEach((cx, c) => {
++    const name = GLYPH_CYCLE[(r * cols.length + c + seed) % GLYPH_CYCLE.length];
++    GLYPH[name](s, cx - size / 2, cy - size / 2, size);
++  }));
++}
++
++/* -------------------------------------------------------------- world maps */
++// Each string is one raster row of the map; '#' = land, 'o' = highlighted
++// country, '.' = shadowed country, ' ' = sea. Runs are merged into rectangles.
++
++const MAP_PALETTE = { '#': C.gray, o: C.orange, '.': C.dark };
++
++function drawMap(s, grid, x0, y0, x1, y1) {
++  const cw = (x1 - x0) / grid[0].length, ch = (y1 - y0) / grid.length;
++  grid.forEach((row, r) => {
++    for (let c = 0; c < row.length;) {
++      const ch0 = row[c];
++      let n = 1;
++      while (c + n < row.length && row[c + n] === ch0) n++;
++      if (MAP_PALETTE[ch0]) rect(s, x0 + c * cw, y0 + r * ch, n * cw + cw * 0.12, ch * 1.12, MAP_PALETTE[ch0]);
++      c += n;
++    }
++  });
++}
++
++const WORLD_MAP = [
++  '                                   #####        #########                                                                                   ',
++  '                              ############################ ##                                                                               ',
++  '                            ################################                                          ##                                    ',
++  '                         #  ##########  ###################                                           ####                                  ',
++  '                      #  #################################                                              ###                                 ',
++  '                   ##  #  # #######   #####################                                 #            oo                                 ',
++  '                    ###############        ################                             ####         ooooooooo         ### #                ',
++  '                 ####      # ######         ###############                            ##           ooooooooo#          #                   ',
++  '                 ######## #### ######       ##############                            ##     o    oooooooooooooooooo                        ',
++  '    ##            # ######  ## ########     ##############                 ###        ##    oo ooooooooooooooooooooo oooooooo               ',
++  '  ########## ################## ########     ############               ######o          #o ooooooooooooooooooooooooooooooooooooooo#ooo     ',
++  ' #################################  #####    #########                 ######ooooo o oooooooooooooooooooooooooooooooooooooooooooooooooooo   ',
++  ' #################################   #####   ########    ###           ######oo o ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo ',
++  ' ################################# ######     #####      ####         #### ###oooooooooooooooooooooooooooooooooooooooooooooooooooooooooo  o ',
++  ' #############################     ## ###     ####                  ##### ####ooooooooooooooooooooooooooooooooooooooooooooooooooooooooo     ',
++  ' ############################      ####        ###                  ##### ###oooooooooooooooooooooooooooooooooooooooooooooooooo  oooo       ',
++  '  #####    ##################      #######                      #   #####  ##oooooooooooooooooooooooooooooooooooooooooooo       o           ',
++  '    #        ###################    ######                     ##    #### ###ooooooooooooooooooooooooooooooooooooooooooo       oo           ',
++  '              #################### ########                   ####   #########oooooooooooooo##ooooooooooooooooooooooooo       ooo           ',
++  '              #################### #########                  ##### ###########ooooooooooo#######oooooooooooooooo.ooooooo#    oo            ',
++  '                ############################                    ################ooooo##############ooooo##oooooo...ooooo #                  ',
++  '                 ##oooooooooo############  ##                   #################ooo###########################.....oooo #                  ',
++  '                 ooooooooooooooo##########                       ################oooo#############...###########......o                     ',
++  '                 oooooooooooooooo ##ooo #                      ##############    ooo  ###########.....#######........oo ##                  ',
++  '                 ooooooooooooooooooooo                        #####  # ############## ###########.........#........#    #                   ',
++  '                  oooooooooooooooooo#                         ####   #  # # ######### #########.................  ##    #                   ',
++  '                  oooooooooooooooooo                           ####### #  # ####################................  ##   ##                   ',
++  '                   ooooooooooooooooo                           ########        ##################...............   #####                    ',
++  '                    ##oooooooooooo                            ###################################................   #                       ',
++  '                     ######oo    o                            #####################################...#..........                           ',
++  '                     #######      o                         ############################################........                            ',
++  '                      # ####                                #############################   ############....... #                           ',
++  '                         ###   #   ##                      ##############################    ############## .                               ',
++  '                         #######     ##                    ###################### ######      #####   ##### #                               ',
++  '                           ######                          ###########################        ####    ######    #                           ',
++  '                               ##                          #########################           ##       ####    ##                          ',
++  '                                ##  ######                  ##########################         ##         ##     ##                         ',
++  '                                   #########                 ########################            #      #        ##                         ',
++  '                                   ###########                ##    #################                  ###    ##                            ',
++  '                                   ######oo#oo                        ##############                   ###  ####   #                        ',
++  '                                  #####ooooooo#o                     #############                      ### ### #   ##                      ',
++  '                                  ####ooooooooooooo                   ###########                        ##  ## #    #####                  ',
++  '                                  ###ooooooooooooooo                   ##########                         ####         ####                 ',
++  '                                   ###oooooooooooooo                   ###########                             ##       #  #                ',
++  '                                    #####oooooooooo                    ###########                                  ### ##                  ',
++  '                                    #######oooooooo                    ########### ##                             ##### ##                  ',
++  '                                      #####oooooooo                    #########   ##                            ##########                 ',
++  '                                      #####ooooooo                     #########   ##                         ##############                ',
++  '                                      #######oooo                      #########  ##                         ################               ',
++  '                                      #######oo                         #######                              ################               ',
++  '                                      ######ooo                         ######                                ################              ',
++  '                                      #######o                           ####                                 ###############               ',
++  '                                      #######                            ###                                  ####    #######               ',
++  '                                     #######                                                                           #####         #      ',
++  '                                     ######                                                                              ##          ##     ',
++  '                                     ####                                                                                 #         ##      ',
++  '                                     ####                                                                                 #        ##       ',
++  '                                    ####                                                                                          ##        ',
++  '                                    ####                                                                                                    ',
++  '                                    ###                                                                                                     ',
++  '                                     ##                                                                                                     ',
++  '                                      ##                                                                                                    ',
++];
++
++const EUROPE_MAP = [
++  '                                                            oooooooooooooooooooooooooooooooooooo',
++  '                                                            oooooooooooooooooooooooooooooooooooo',
++  '                                                           ooooooooooooooooooooooooooooooooooooo',
++  '                                                          oooooooooooooooooooooooooooooooooooooo',
++  '                                         ####          oo oooooooooooooooooooooooooooooooooooooo',
++  '                                       ######          o  oooooooooooooooooooooooooooooooooooooo',
++  '                                      #######ooooooo   ooooooooooooooooooooooooooooooooooooooooo',
++  '                                     #######oooooooooo  oooooooooooooooooooooooooooooooooooooooo',
++  '                                    ########oooooooooo ooooooooooooooooooooooooooooooooooooooooo',
++  '                                  ###########ooooooooo ooooooooooooooooooooooooooooooooooooooooo',
++  '                                  ############ooooooo oooooooooooooooooooooooooooooooooooooooooo',
++  '                                   ###########oooo     ooooooooooooooooooooooooooooooooooooooooo',
++  '                                  #############oooo oooooooooooooooooooooooooooooooooooooooooooo',
++  '                                  #############oooo   oooooooooooooooooooooooooooooooooooooooooo',
++  '                                 ######### ####ooooooooooooooooooooooooooooooooooooooooooooooooo',
++  '                                 ########  #####oooooooooooooooooooooooooooooooooooooooooooooooo',
++  ' ##                             #########  #####oooooooooooooooooooooooooooooooooooooooooooooooo',
++  '###                             ######### ########oooooooooooooooooooooooooooooooooooooooooooooo',
++  '########                       ######### #########oooooooooooooooooooooooooooooooooooooooooooooo',
++  ' #######                      #########  ########ooooooooooooooooooooooooooooooooooooooooooooooo',
++  '########                    ##########   ########ooooooooooooooooooooooooooooooooooooooooooooooo',
++  ' #######                   ###########   #######oooooooooooooooooooooooooooooooooooooooooooooooo',
++  '  ####                     ###########   ########ooooooooooooooooooooooooooooooooooooooooooooooo',
++  '                          ############    ####   ooooooooooooooooooooooooooooooooooooooooooooooo',
++  '                    #     ############# # ### ###oooooooooooooooooooooooooooooooooooooooooooooo#',
++  '                          ##############     ###ooooooooooooooooooooooooooooooooooooooooooooooo#',
++  '                  #       ##############   ######oooooooooooooooooooooooooooooooooooooooooooooo#',
++  '              # ###        ############    # ####oooooooooooooooooooooooooooooooooooooooooooooo#',
++  '             #####         ###  ######     #  ####oooooooooooooooooooooooooooooooooooooooooooooo',
++  '              #####              ##### ##  #######oooooooooooooooooooooooooooooooooooooooooooooo',
++  '              #####           ## ######    ###########oooooooooooooooooooooooooooo#####ooo######',
++  '              ####           ###  #####    ###########ooooooooooooooooooooooooooo###############',
++  '           ########          ### ####      ############ooooooooooooooooooooooooo################',
++  '         ##########          #######       ##############ooooooooooooooooooooo##################',
++  '         #####  ####          ####     ## ##############oooooooooooooooooooooo##################',
++  '         #####   ###          ### ##  ##################o..ooooooooooooooooooo##################',
++  '        #####  ######         ##########################.....oooooooooooooooooo#################',
++  '        #####  ######     #############################.............oooooooooooooo##############',
++  '              ########   #######################....................oooooooooooooo##     #######',
++  '               #######  ########################....................ooooooooooooooo      ###### ',
++  '              #######  ##########################..................oooooooooooooooo    #######  ',
++  '             ##  # # oo#########################...................oooooooooooooooo   ######### ',
++  '                     ooo#######################...................oooooooooooooooo     ######## ',
++  '                 o oooooo######################......##..........  ooooooooooooooo      ########',
++  '             oo  oooooooooo####################.....####........  ooooooooooooooooo       ######',
++  '             oooooooooooooooo############################.. .... .  oooooooooooooooo           #',
++  '               ooooooooooooo#############################.    ...   oooooooooooooooo            ',
++  '                oooooooooooo############################..     .       oo####oo##oooo #         ',
++  '                ooooooooooo###############################                ##########oo##        ',
++  '                #oooooooooo###############################                 ###############      ',
++  '                 oooooooooo##############################                  ##############       ',
++  '                oooooooooooo####### ######################                 ##############       ',
++  '     #####      ooooooooooo########  ####################         ##    ############## ##       ',
++  '     ########   oooooooooooo#######   ###################      ######################  ##       ',
++  '     ###########oooooooooooo#   #####  ###################    ######################            ',
++  '    ##############oooo   oo     #####    ##########################################             ',
++  '    #################o        o  #####      ############## ########################             ',
++  '    ##################        o   #######    ###################################                ',
++  '   ##################         o    #######   ########   ######################                  ',
++  '  ################            #      ####### ######     ####################                    ',
++  '  ###############            ###       ### ## ######    #################                       ',
++  '   ##############   ##       ###        ##     ######   ############## #                        ',
++  '  ############### #          ###         ##     #######   ###########                           ',
++  '   #############                         #      #####  #  ######  #                             ',
++  '      #########                     #####         ##   #    #      ###                          ',
++  '      #######                       ####          ###                                           ',
++  '                                      ##                                                        ',
++  '                                                      ####                                      ',
++];
++
++/* ---------------------------------------------------------- slide builders */
++
++const SLIDES = [];
++const slide = fn => SLIDES.push(fn);
++
++// 1 — cover
++slide(s => {
++  navMenu(s, 4.745, 0.111);
++  footerBadge(s); pager(s);
++  text(s, 'FASHION DESIGN STYLE', { x: 5.122, y: 6.345, w: 3.118, h: 0.307, fontSize: 12, align: 'center' });
++  const stack = { w: 10.356, h: 1.717, fontSize: 96, bold: false, align: 'center' };
++  head(s, 'VALENTA', Object.assign({ x: 1.507, y: 3.574, color: C.black }, stack));
++  head(s, 'VALENTA', Object.assign({ x: 1.511, y: 2.132, color: C.black }, stack));
++  head(s, 'VALENTA', Object.assign({ x: 1.503, y: 2.85, color: C.orange }, stack));
++  photoFrame(s, 4.715, 1.389, 3.903, 4.722);
++});
++
++// 2 — INTRODUCE.
++slide(s => {
++  navMenu(s, 0.982, 0.111);
++  footerBadge(s); pager(s);
++  head(s, 'INTRODUCE.', { x: 7.211, y: 1.184, w: 5.192, h: 1.111 });
++  text(s, TXT.long, { x: 7.28, y: 2.879, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 7.294, 4.976, 3.75, 7.308, 5.357);
++  globeTile(s, 4.853, 2.976, 1.814, 1.566, 5.338, 3.347, 0.834);
++  photoFrame(s, 1.153, 1.389, 4.722, 4.722);
++});
++
++// 3 — PORTFOLIO column
++slide(s => {
++  rect(s, 2.736, 0, 3.931, 7.5, C.orange);
++  navMenu(s, 8.911, 0.111, 'left');
++  footerBadge(s); pager(s);
++  ['VALENTA', 'VALENTA', 'VALENTA'].forEach((w, i) =>
++    head(s, w, { x: 6.904, y: 2.211 + i * 0.639, w: 4.124, h: 1.111, color: i === 1 ? C.black : C.orange }));
++  [2.476, 4.045, 5.613].forEach(y =>
++    text(s, TXT.mid, { x: 3.126, y, w: 3.152, h: 0.581, lineSpacingMultiple: 1.5 }));
++  sideWord(s, 'PORTFOLIO', -2.436);
++  barcode(s, 7.438, 5.362);
++  photoFrame(s, 9.042, 1.403, 4.292, 4.708);
++});
++
++// 4 — PORTFOLIO. with circle badge
++slide(s => {
++  footerBadge(s); pager(s); navMenuVertical(s);
++  head(s, 'PORTFOLIO.', { x: 7.346, y: 1.184, w: 5.404, h: 1.111 });
++  text(s, TXT.long, { x: 7.415, y: 2.879, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 7.429, 4.976, 3.75, 7.443, 5.357);
++  stretchedWordmark(s, 4.394, 2.671, 2.184, 2.181, 'VALENTA VALENTA VALENTA VALENTA VALENTA');
++  globeTile(s, 4.571, 2.858, 1.785, 1.785, 5.069, 3.344, 0.834, 'ellipse');
++  photoFrame(s, 1.569, 0.882, 3.917, 5.736);
++});
++
++// 5 — MESSAGE.
++slide(s => {
++  footerBadge(s); navMenu(s, 0.335, 0.111);
++  rect(s, 1.167, 1.389, 7.889, 2.879, C.orange);
++  pager(s);
++  head(s, 'MESSAGE.', { x: 1.589, y: 1.544, w: 5.404, h: 1.111, color: C.white });
++  text(s, TXT.long, { x: 1.674, y: 2.733, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 1.687, 4.629, 3.75, 1.701, 5.01);
++  sideWord(s, 'PORTFOLIO', 10.696);
++  text(s, TXT.short, { x: 6.198, y: 6.561, w: 1.933, h: 0.581, align: 'right' });
++  photoFrame(s, 8.236, 0, 5.097, 7.5);
++});
++
++// 6 — IMPORTANT.
++slide(s => {
++  footerBadge(s); navMenu(s, 0.335, 0.111); pager(s);
++  sideWord(s, 'PORTFOLIO', -2.436);
++  sideWord(s, 'PORTFOLIO', -1.791);
++  head(s, 'IMPORTANT.', { x: 7.346, y: 1.184, w: 5.404, h: 1.111 });
++  text(s, TXT.long, { x: 7.415, y: 2.879, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 7.429, 4.976, 3.75, 7.443, 5.357);
++  globeTile(s, 4.853, 4.545, 1.814, 1.566, 5.338, 4.916, 0.834);
++  photoFrame(s, 1.958, 1.403, 4.694, 4.708);
++});
++
++// 7 — orange panel + VALENTA stack
++slide(s => {
++  footerBadge(s); pager(s); navMenu(s, 6.551, 0.111);
++  rect(s, 0.569, 1.85, 6.889, 2.361, C.orange);
++  text(s, TXT.long, { x: 0.771, y: 2.45, w: 5.896, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 0.812, 4.518, 5.368, 0.826, 4.899);
++  ['VALENTA', 'VALENTA', 'VALENTA'].forEach((w, i) =>
++    head(s, w, { x: 8.993, y: 3.843 + i * 0.639, w: 4.124, h: 1.111, color: i === 1 ? C.black : C.orange }));
++  rect(s, 4.366, 5.449, 3.067, 0.639, C.orange);
++  text(s, 'FASHION DESIGN STYLE', { x: 4.341, y: 5.633, w: 3.118, h: 0.307, fontSize: 12, align: 'center' });
++  photoFrame(s, 6.681, 1.403, 6.653, 3.903);
++});
++
++// 8 — OUR- GALLERY.
++slide(s => {
++  footerBadge(s); navMenu(s, 0.335, 0.111); pager(s);
++  sideWord(s, 'PORTFOLIO', -2.436);
++  sideWord(s, 'PORTFOLIO', -1.791);
++  rect(s, 4.514, 4.514, 2.639, 1.569, C.orange);
++  text(s, TXT.short, { x: 4.867, y: 4.718, w: 1.933, h: 0.581, lineSpacingMultiple: 1.5 });
++  text(s, TXT.long, { x: 7.646, y: 3.309, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 7.66, 4.976, 4.965, 7.674, 5.357);
++  head(s, 'OUR- GALLERY.', { x: 7.576, y: 1.184, w: 5.146, h: 1.919, fontSize: 54 });
++  photoFrame(s, 1.167, 1.403, 3.139, 4.681);
++});
++
++// 9 — PORTFOLIO. + vertical PLACEHOLDER
++slide(s => {
++  footerBadge(s); navMenu(s, 4.944, 0.111); pager(s);
++  text(s, TXT.long, { x: 0.234, y: 2.741, w: 4.349, h: 0.581, lineSpacingMultiple: 1.5 });
++  head(s, 'PORTFOLIO.', { x: 0.165, y: 1.364, w: 4.932, h: 0.909, fontSize: 48 });
++  messageBlock(s, 0.234, 4.78, 3.75, 0.248, 5.161);
++  sideWord(s, 'PLACEHOLDER', 7.656, C.black, 48);
++  text(s, TXT.short, { x: 7.989, y: 6.284, w: 1.933, h: 0.581, align: 'right' });
++  photoFrame(s, 10.611, 1.403, 2.722, 4.708);
++});
++
++// 10 — VALENTA stack, centred caption
++slide(s => {
++  navMenu(s, 4.736, 0.111); footerBadge(s); pager(s);
++  const stack = { w: 10.356, h: 1.717, fontSize: 96, bold: false, align: 'center' };
++  head(s, 'VALENTA', Object.assign({ x: 1.507, y: 3.912, color: C.black }, stack));
++  head(s, 'VALENTA', Object.assign({ x: 1.511, y: 2.47, color: C.black }, stack));
++  head(s, 'VALENTA', Object.assign({ x: 1.503, y: 3.188, color: C.orange }, stack));
++  text(s, TXT.long, { x: 2.764, y: 5.641, w: 7.833, h: 0.581, align: 'center', lineSpacingMultiple: 1.5 });
++  photoFrame(s, 2.75, 1.403, 7.833, 3.139);
++});
++
++// 11 — PLACEHOLDER. on orange
++slide(s => {
++  footerBadge(s); navMenu(s, 0.335, 0.111); pager(s);
++  sideWord(s, 'EXCLUSIVE', 10.696);
++  rect(s, 3.505, 2.181, 7.889, 3.167, C.orange);
++  head(s, 'PLACEHOLDER.', { x: 4.206, y: 2.544, w: 6.46, h: 1.111, color: C.white });
++  text(s, TXT.long, { x: 4.291, y: 3.733, w: 5.459, h: 0.581, lineSpacingMultiple: 1.5 });
++  text(s, TXT.short, { x: 9.557, y: 5.613, w: 1.933, h: 0.581, align: 'right' });
++  photoFrame(s, 0, 1.396, 4.292, 4.701);
++});
++
++// 12 — OUR- FASHION.
++slide(s => {
++  footerBadge(s); pager(s);
++  text(s, TXT.long, { x: 7.862, y: 3.267, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 7.876, 4.935, 4.965, 7.89, 5.315);
++  head(s, 'OUR- FASHION.', { x: 7.793, y: 1.142, w: 5.146, h: 1.919, fontSize: 54 });
++  sideWord(s, 'PORTFOLIO', -2.436);
++  sideWord(s, 'PORTFOLIO', -1.791);
++  globeTile(s, 1.764, 4.477, 1.814, 1.566, 2.249, 4.848, 0.834);
++  photoFrame(s, 2.75, 0, 4.708, 7.5);
++});
++
++// 13 — OUR STYLE PORTFOLIO.
++slide(s => {
++  footerBadge(s); pager(s); navMenu(s, 7.292, 0.111);
++  text(s, TXT.half2, { x: 1.118, y: 3.351, w: 4.812, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 1.132, 4.732, 4.701, 1.146, 5.113);
++  head(s, 'OUR STYLE PORTFOLIO.', { x: 1.049, y: 1.361, w: 5.146, h: 1.919, fontSize: 54 });
++  globeTile(s, 6.667, 2.967, 1.814, 1.566, 7.151, 3.338, 0.834);
++  photoFrame(s, 7.458, 1.396, 5.875, 4.708);
++});
++
++// 14 — OUR- VALENTA. on split orange
++slide(s => {
++  rect(s, 0, 0, 6.667, 7.5, C.orange);
++  sideWord(s, 'PORTFOLIO', -2.436, C.black);
++  sideWord(s, 'PORTFOLIO', -1.791, C.black);
++  text(s, TXT.long, { x: 7.417, y: 3.267, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 7.431, 4.935, 4.965, 7.445, 5.315);
++  head(s, 'OUR- VALENTA.', { x: 7.348, y: 1.142, w: 5.146, h: 1.919, fontSize: 54 });
++  pager(s);
++  photoFrame(s, 1.958, 1.403, 3.903, 4.701);
++});
++
++// 15 — UNDERSHADE.
++slide(s => {
++  footerBadge(s); navMenu(s, 1.028, 0.196); pager(s);
++  sideWord(s, 'EXCLUSIVE', 10.696);
++  sideWord(s, 'EXCLUSIVE', 10.033);
++  rect(s, 1.167, 1.389, 6.292, 2.879, C.orange);
++  text(s, TXT.long, { x: 1.674, y: 2.733, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 1.687, 4.629, 3.75, 1.701, 5.01);
++  head(s, 'UNDERSHADE.', { x: 1.589, y: 1.614, w: 5.404, h: 1.01, fontSize: 54, color: C.white });
++  text(s, TXT.short, { x: 6.18, y: 5.687, w: 1.933, h: 0.581, align: 'right' });
++  photoFrame(s, 6.25, 2, 5.764, 3.5);
++});
++
++// 16 — orange tile, right
++slide(s => {
++  footerBadge(s); navMenu(s, 0.382, 0.196); pager(s);
++  rect(s, 8.264, 1.993, 3.931, 2.75, C.orange);
++  text(s, TXT.mid2, { x: 2.653, y: 4.856, w: 6.097, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 2.653, 5.628, 5.264, 2.667, 5.967);
++  text(s, TXT.short, { x: 0.382, y: 3.062, w: 1.933, h: 0.581, align: 'right' });
++  globe(s, 10.59, 2.951, 0.834, C.white);
++  photoFrame(s, 2.75, 2.194, 7.069, 2.347);
++});
++
++// 17 — TAG YOUR STYLE NOW.
++slide(s => {
++  navMenu(s, 9.246, 0.196); pager(s);
++  globeTile(s, 4.853, 2.967, 1.814, 1.566, 5.338, 3.338, 0.834);
++  text(s, TXT.long, { x: 7.32, y: 3.404, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 7.334, 5.072, 4.965, 7.348, 5.452);
++  head(s, 'TAG YOUR STYLE NOW.', { x: 7.25, y: 1.279, w: 5.146, h: 1.919, fontSize: 54 });
++  sideWord(s, 'PORTFOLIO', -2.436, C.black);
++  sideWord(s, 'PORTFOLIO', -1.791, C.black);
++  photoFrame(s, 0, 0, 5.083, 7.5);
++});
++
++// 18 — AWESOME PORTFOLIO.
++slide(s => {
++  footerBadge(s); navMenu(s, 6.537, 0.196, 'left'); pager(s);
++  rect(s, 6.681, 1.236, 5.334, 5.028, C.orange);
++  text(s, TXT.half2, { x: 0.743, y: 3.385, w: 4.812, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 0.757, 4.767, 4.701, 0.771, 5.147);
++  head(s, 'AWESOME PORTFOLIO.', { x: 0.674, y: 1.396, w: 5.146, h: 1.919, fontSize: 54 });
++  text(s, TXT.short, { x: 9.968, y: 4.767, w: 1.883, h: 0.581, align: 'right' });
++  sideWord(s, 'PORTFOLIO', 10.237, C.black);
++  globe(s, 10.93, 3.602, 0.834, C.white);
++  photoFrame(s, 6.681, 1.396, 3.125, 4.708);
++});
++
++// 19 & 20 — colour palette chips
++const CHIP_LABELS = ['11% TRANSPARANCY', '22% TRANSPARANCY', '33% TRANSPARANCY'];
++
++slide(s => {                                          // 19
++  footerBadge(s); navMenu(s, 4.745, 0.196, 'left'); pager(s);
++  [C.orange, ...ORANGE_A].forEach((col, i) => rect(s, 1.158 + i * 1.5975, 3.549, 1.597, 0.847, col));
++  [C.white, ...WHITE_A].forEach((col, i) => rect(s, 1.158 + i * 1.5975, 4.709, 1.597, 0.847, col));
++  s.addText([{ text: 'COLOR ', options: { color: C.white } }, { text: 'PALETTE ', options: { color: C.orange } },
++    { text: 'VALENTA.', options: { color: C.white } }],
++    { x: 1.061, y: 1.774, w: 5.146, h: 1.447, fontFace: F.head, fontSize: 40, bold: true, valign: 'top', margin: INSET, isTextBox: true });
++  text(s, TXT.mid2, { x: 8.114, y: 3.475, w: 4.15, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 8.128, 4.578, 4.039, 8.142, 4.931);
++  text(s, 'ORANGE', { x: 1.387, y: 3.849, w: 1.069, h: 0.332 });
++  text(s, 'WHITE', { x: 1.387, y: 5.001, w: 1.069, h: 0.332, color: C.dark });
++  CHIP_LABELS.forEach((l, i) => {
++    text(s, l, { x: 2.936 + i * 1.5485, y: 3.776 - i * 0.002, w: 1.368, h: 0.336 });
++    text(s, l, { x: 2.936 + i * 1.5485, y: 4.929 - i * 0.0015, w: 1.368, h: 0.336, color: C.dark });
++  });
++});
++
++slide(s => {                                          // 20
++  footerBadge(s); navMenu(s, 4.745, 0.196, 'left'); pager(s);
++  [C.orange, ...ORANGE_A].forEach((col, i) => rect(s, 5.922 + i * 1.597, 2.154, 1.597, 1.438, col));
++  [C.white, ...WHITE_A].forEach((col, i) => rect(s, 5.922 + i * 1.597, 3.904, 1.597, 1.416, col));
++  text(s, [{ text: 'ORANGE', options: { breakLine: true } }, { text: 'COLOR :', options: { breakLine: true } },
++    { text: '254 101 1' }], { x: 6.151, y: 2.662, w: 1.222, h: 0.456 });
++  text(s, [{ text: 'WHITE', options: { breakLine: true } }, { text: 'COLOR :', options: { breakLine: true } },
++    { text: '255 255 255' }], { x: 6.151, y: 4.389, w: 1.069, h: 0.332, color: C.dark });
++  CHIP_LABELS.forEach((l, i) => {
++    text(s, l, { x: 7.699 + i * 1.549, y: 2.665 - i * 0.0015, w: 1.368, h: 0.336 });
++    text(s, l, { x: 7.699 + i * 1.549, y: 4.388 - i * 0.0015, w: 1.368, h: 0.336, color: C.dark });
++  });
++  s.addText([{ text: 'COLOR SETTINGS ', options: { color: C.white } }, { text: 'VALENTA', options: { color: C.orange } },
++    { text: ' HERE.', options: { color: C.white } }],
++    { x: 0.477, y: 2.036, w: 5.146, h: 1.447, fontFace: F.head, fontSize: 40, bold: true, valign: 'top', margin: INSET, isTextBox: true });
++  text(s, TXT.half, { x: 0.475, y: 3.541, w: 4.636, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 0.489, 4.45, 4.525, 0.503, 4.803);
++});
++
++// 21 — PORTFOLIO EXCLUSIVE.
++slide(s => {
++  footerBadge(s); pager(s);
++  sideWord(s, 'PORTFOLIO', -2.436);
++  sideWord(s, 'PORTFOLIO', -1.791);
++  globeTile(s, 4.853, 2.967, 1.814, 1.566, 5.338, 3.338, 0.834);
++  text(s, TXT.long, { x: 7.32, y: 3.404, w: 5.234, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 7.334, 5.072, 4.965, 7.348, 5.452);
++  head(s, 'PORTFOLIO EXCLUSIVE.', { x: 7.25, y: 1.182, w: 5.146, h: 1.919, fontSize: 54 });
++  photoFrame(s, 1.958, 0.764, 3.903, 5.972);
++});
++
++// 22 — VALENTA HERE
++slide(s => {
++  footerBadge(s); navMenu(s, 4.745, 0.196, 'left'); pager(s);
++  head(s, 'VALENTA HERE', { x: 4.283, y: 5.098, w: 4.775, h: 0.707, fontSize: 36, color: C.white, align: 'center' });
++  text(s, TXT.mid2, { x: 3.416, y: 5.933, w: 6.53, h: 0.581, align: 'center', lineSpacingMultiple: 1.5 });
++  globeTile(s, 1.958, 1.403, 1.396, 1.205, 2.294, 1.643, 0.724);
++  photoFrame(s, 1.958, 1.403, 9.424, 3.139);
++});
++
++// 23 — three team cards
++slide(s => {
++  footerBadge(s); navMenu(s, 4.745, 0.196, 'left'); pager(s);
++  const team = [['MANUEL', 1.049], ['ANGELICA', 5.382], ['RICHARD', 9.715]];
++  team.forEach(([, x]) => s.addShape('roundRect', {
++    x, y: 1.303, w: 2.569, h: 3.002, rectRadius: 2.569 * 0.409, fill: { color: C.orange },
++  }));
++  team.forEach(([name, x]) => {
++    head(s, name, { x: x + 0.225, y: 4.509, w: 2.118, h: 0.505, fontSize: 24, color: C.white, align: 'center' });
++    text(s, TXT.half, { x: x - 0.087, y: 5.04, w: 2.743, h: 0.581, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++});
++
++// 24 — *BREAK TIME*
++slide(s => {
++  footerBadge(s); navMenu(s, 4.745, 0.196, 'left'); pager(s);
++  const stack = { w: 10.356, h: 1.717, fontSize: 96, align: 'center' };
++  head(s, 'VALENTA', Object.assign({ x: 1.507, y: 3.574, color: C.black, bold: false }, stack));
++  head(s, '*BREAK TIME*', Object.assign({ x: 1.503, y: 2.677, color: C.orange }, stack));
++  head(s, 'VALENTA', Object.assign({ x: 1.511, y: 2.132, color: C.black, bold: false }, stack));
++});
++
++// 25 & 27 — phone mock-up feature slides
++const FEATURES = [
++  ['LAYERED FILES', TXT.loremA, 1.221, 1.431, 1.232, 1.5, C.dark, 'download'],
++  ['UNLIMITED OPTIONS', TXT.loremB, 3.17, 3.376, 3.223, 3.419, C.orange, 'link'],
++  ['FULL CUSTOMIZED', TXT.loremB, 5.094, 5.34, 5.264, 5.455, C.dark, 'flag'],
++];
++
++/** Glyphs inside the round feature bullets. */
++const FEATURE_ICON = {
++  download: (s, x, y) => {
++    s.addShape('line', { x: x + 0.155, y, w: 0, h: 0.17, line: { color: C.white, width: 1, endArrowType: 'triangle' } });
++    hline(s, x + 0.03, y + 0.26, 0.25, C.white, 1);
++  },
++  link: (s, x, y) => [0, 1].forEach(i => s.addShape('roundRect', {
++    x: x + 0.03 + i * 0.13, y: y + 0.05 + i * 0.12, w: 0.17, h: 0.13,
++    rectRadius: 0.06, fill: { type: 'none' }, line: { color: C.white, width: 1 },
++  })),
++  flag: (s, x, y) => {
++    vline(s, x + 0.05, y, 0.32, C.white, 1);
++    s.addShape('rect', { x: x + 0.05, y, w: 0.22, h: 0.16, fill: { color: C.white } });
++  },
++};
++
++function featureColumn(s, textW, connColor) {
++  FEATURES.forEach(([title, body, ty, by, cy, iy, dotColor, icon]) => {
++    text(s, title, { x: 9.18, y: ty, w: textW, h: 0.303, fontSize: 12 });
++    text(s, body, { x: 9.173, y: by, w: textW, h: 0.858, lineSpacingMultiple: 1.5 });
++    oval(s, 8.222, cy, 0.728, 0.728, dotColor);
++    FEATURE_ICON[icon](s, 8.43, iy);
++  });
++  [2.063, 4.08].forEach(y => s.addShape('line', {
++    x: 8.586, y, w: 0, h: 1.056, line: { color: connColor, width: 0.75, dashType: 'dash' },
++  }));
++}
++
++function phoneSlide(s, opts) {
++  rect(s, 0, 0, 6.5, 7.5, opts.panel || C.orange);
++  phoneMockup(s, opts.phone);
++  hline(s, opts.rx, opts.ry, 2.438);
++  text(s, TXT.lorem, { x: opts.tx, y: opts.ty, w: opts.tw, h: 2.794, align: 'justify', lineSpacingMultiple: 2 });
++  head(s, 'PHONE DEVICE MOCKUP SLIDE',
++    { x: opts.hx, y: opts.hy, w: opts.hw, h: 1.007, fontSize: 28, bold: false, color: C.white, lineSpacingMultiple: 0.9 });
++  featureColumn(s, opts.featW, opts.conn);
++}
++
++slide(s => phoneSlide(s, {                            // 25
++  panel: ORANGE_A[0],
++  phone: { x: 4.994, y: 1.139, w: 2.556, h: 5.25, body: 'F5F0F0', rim: 'CFCFE0', hd: 0.4,
++    sx: 5.133, sy: 1.733, sw: 2.287, sh: 4.0 },
++  rx: 1.022, ry: 3.071, tx: 0.947, ty: 3.118, tw: 2.957,
++  hx: 0.905, hy: 2.008, hw: 3.289, featW: 2.723, conn: C.white,
++}));
++
++// 26 — desktop / download call-to-action
++slide(s => {
++  rect(s, 0, 0, 2.043, 7.5, C.orange);
++  monitorMockup(s);
++  rect(s, 6.667, 0, 6.667, 2.667, C.orange);
++  head(s, 'OUR DESKTOP ACTIVITIES',
++    { x: 6.632, y: 4.03, w: 6.229, h: 0.579, fontSize: 32, bold: false, color: C.white, lineSpacingMultiple: 1 });
++  text(s, "You have freedom here. The only guide is your heart. Trees grow in all kinds of ways. They're not all perfectly straight. ",
++    { x: 6.709, y: 4.761, w: 4.541, h: 0.614, align: 'justify', lineSpacingMultiple: 2 });
++  s.addShape('roundRect', { x: 6.709, y: 5.724, w: 3.152, h: 0.651, rectRadius: 0.029, fill: { color: C.orange } });
++  text(s, 'Download Now', { x: 6.992, y: 5.849, w: 2.176, h: 0.402, fontSize: 18, bold: true, valign: 'middle' });
++  s.addShape('line', {
++    x: 9.352, y: 6.08, w: 0.227, h: 0,
++    line: { color: C.white, width: 3, endArrowType: 'triangle' },
++  });
++  rect(s, 6.667, 6.899, 6.667, 0.601, C.orange);
++});
++
++slide(s => phoneSlide(s, {                            // 27
++  phone: { x: 5.0, y: 1.1, w: 2.567, h: 5.267, body: '0B0B0B', rim: '6E6E76', hd: 0.375,
++    sx: 5.133, sy: 1.7, sw: 2.3, sh: 4.1 },
++  rx: 0.802, ry: 2.966, tx: 0.741, ty: 3.046, tw: 3.003,
++  hx: 0.741, hy: 1.861, hw: 3.716, featW: 2.71, conn: C.silver,
++}));
++
++// 28 — diamond steps
++slide(s => {
++  // spade / sprinkler / basket glyphs, drawn inside the diamonds
++  const STEP_ICON = {
++    spade: (x, y) => {
++      s.addShape('line', { x, y: y + 0.28, w: 0.26, h: -0.26, line: { color: C.white, width: 1.5 } });
++      s.addShape('diamond', Object.assign({ x: x - 0.08, y: y + 0.24, w: 0.2, h: 0.22 }, stroke(C.white)));
++    },
++    sprinkler: (x, y) => {
++      s.addShape('line', { x, y: y + 0.1, w: 0.24, h: -0.06, line: { color: C.white, width: 1.5 } });
++      [0, 1, 2].forEach(i => s.addShape('ellipse', {
++        x: x + 0.03 + i * 0.09, y: y + 0.2 + (i % 2) * 0.06, w: 0.05, h: 0.05, fill: { color: C.white },
++      }));
++    },
++    basket: (x, y) => {
++      s.addShape('trapezoid', Object.assign({ x, y: y + 0.1, w: 0.3, h: 0.22, rotate: 180 }, stroke(C.white)));
++      hline(s, x - 0.02, y + 0.1, 0.34, C.white, 1.5);
++    },
++  };
++  const steps = [['FIND THE BEST SOILS', 1.049, 1.49, 0.936, C.orange, 4.039, 'spade'],
++    ['INVEST ON PEOPLE FARMS', 3.183, 3.624, 3.07, C.dark, 4.563, 'sprinkler'],
++    ['HARVEST YOUR BONUSES', 5.317, 5.758, 5.204, C.orange, 4.563, 'basket']];
++  steps.forEach(([title, ty, by, dy, fill, tw, icon]) => {
++    text(s, TXT.fluffer, { x: 8.433, y: by, w: 3.748, h: 0.679, align: 'justify', lineSpacingMultiple: 2 });
++    head(s, title, { x: 8.433, y: ty, w: tw, h: 0.427, fontSize: 20, bold: false, color: C.white, valign: 'middle' });
++    s.addShape('diamond', { x: 6.901, y: dy, w: 1.34, h: 1.359, fill: { type: 'none' }, line: { color: C.silver, width: 1 } });
++    s.addShape('diamond', { x: 6.991, y: dy + 0.093, w: 1.16, h: 1.177, fill: { color: fill } });
++    STEP_ICON[icon](7.44, dy + 0.42);
++  });
++  phoneMockup(s, {
++    x: 1.447, y: 0.927, w: 4.593, h: 8.2, body: '060606', rim: 'B4B4B4', rimW: 2.5, notch: true,
++    sx: 1.75, sy: 1.107, sw: 3.99, sh: 7.8, screen: C.bg,
++  });
++});
++
++// 29 — SWOT
++slide(s => {
++  // four lobes on a 1"-radius rosette centred at (6.685, 4.49)
++  const petals = [[6.242, 3.599, C.orange], [7.578, 4.047, C.white],
++    [7.127, 5.368, C.orange], [5.793, 4.946, C.white]];
++  petals.forEach(([cx, cy, color]) => s.addShape('ellipse', {
++    x: cx - 0.875, y: cy - 0.875, w: 1.75, h: 1.75,
++    fill: { color }, line: { color: C.bg, width: 2 },
++  }));
++  [['S', 5.609, 2.897, C.white], ['O', 6.516, 4.906, C.white], ['W', 7.07, 3.595, C.dark], ['T', 5.114, 4.448, C.dark]]
++    .forEach(([ch, x, y, color]) =>
++      head(s, ch, { x, y, w: 1.196, h: 1.111, fontSize: 60, bold: false, color, align: 'center' }));
++  // elbow leaders from each petal out to its caption
++  hline(s, 7.773, 2.998, 1.309); s.addShape('line', { x: 7.405, y: 2.998, w: 0.368, h: 0.368, rotate: 180, line: { color: C.white, width: 0.75 } });
++  hline(s, 4.557, 3.027, 1.309); s.addShape('line', { x: 4.189, y: 3.027, w: 0.368, h: 0.368, rotate: 180, line: { color: C.white, width: 0.75 } });
++  s.addShape('line', { x: 8.818, y: 5.277, w: 0.368, h: 0.368, line: { color: C.white, width: 0.75 } });
++  s.addShape('line', { x: 7.509, y: 5.645, w: 1.309, h: 0, rotate: 180, line: { color: C.white, width: 0.75 } });
++  s.addShape('line', { x: 5.441, y: 5.435, w: 0.368, h: 0.368, line: { color: C.white, width: 0.75 } });
++  s.addShape('line', { x: 4.118, y: 5.803, w: 1.309, h: 0, rotate: 180, line: { color: C.white, width: 0.75 } });
++
++  const SWOT_ICON = {
++    rocket: (x, y, col) => {                                   // STRENGHT
++      s.addShape('triangle', Object.assign({ x: x + 0.09, y, w: 0.36, h: 0.42, rotate: 45 }, stroke(col)));
++      s.addShape('line', { x, y: y + 0.35, w: 0.16, h: 0.14, line: { color: col, width: 1.5 } });
++    },
++    board: (x, y, col) => {                                    // WEAKNESS
++      s.addShape('rect', Object.assign({ x, y, w: 0.542, h: 0.4 }, stroke(col)));
++      s.addShape('line', { x: x + 0.271, y: y + 0.4, w: 0, h: 0.1, line: { color: col, width: 1.5 } });
++    },
++    layers: (x, y, col) => [0, 1, 2].forEach(i =>              // OPPORTUNITIES
++      s.addShape('diamond', Object.assign({ x, y: y + i * 0.17, w: 0.542, h: 0.19 }, stroke(col)))),
++    flask: (x, y, col) => {                                    // THREAD
++      s.addShape('trapezoid', Object.assign({ x, y: y + 0.13, w: 0.444, h: 0.37 }, stroke(col)));
++      s.addShape('line', { x: x + 0.17, y, w: 0.11, h: 0, line: { color: col, width: 1.5 } });
++    },
++  };
++  const quads = [
++    ['WEAKNESS', 9.333, 2.402, 2.584, 'left', 9.333, 2.808, 3.056, 9.406, 1.863, C.white, 'board'],
++    ['OPPORTUNITIES', 9.406, 4.878, 3.594, 'left', 9.406, 5.342, 2.983, 9.536, 4.379, C.orange, 'layers'],
++    ['STRENGHT', 1.514, 2.482, 2.32, 'right', 0.833, 2.954, 3.103, 3.233, 1.863, C.orange, 'rocket'],
++    ['THREAD', 2.089, 4.943, 1.774, 'right', 0.833, 5.384, 3.046, 3.199, 4.395, C.white, 'flask'],
++  ];
++  quads.forEach(([title, tx, ty, tw, align, bx, by, bw, ix, iy, color, icon]) => {
++    head(s, title, { x: tx, y: ty, w: tw, h: 0.438, fontSize: 20, bold: false, color: C.white, align });
++    text(s, TXT.swot, { x: bx, y: by, w: bw, h: 0.858, align: align === 'right' ? 'right' : 'justify', lineSpacingMultiple: 1.5 });
++    SWOT_ICON[icon](ix, iy, color);
++  });
++  head(s, 'SWOT ANALYS', { x: 3.207, y: 0.49, w: 6.92, h: 0.556, fontSize: 40, bold: false, color: C.white, align: 'center', lineSpacingMultiple: 0.9 });
++  hline(s, 5.932, 1.306, 1.468, C.white, 3);
++});
++
++// 30 — stacked area chart
++slide(s => {
++  rect(s, 7.431, 0, 5.903, 7.5, C.orange);
++  head(s, 'OUR CHART', { x: 8.118, y: 1.781, w: 3.924, h: 0.64, fontSize: 32, bold: false, color: C.white });
++  head(s, 'STATISTIC NOW.', { x: 8.118, y: 2.268, w: 4.466, h: 0.64, fontSize: 32, bold: false, color: C.white });
++  text(s, 'Presentation Template Design', { x: 8.115, y: 1.442, w: 3.815, h: 0.337, fontFace: F.alt, fontSize: 14 });
++  rect(s, -0.002, 0, 0.366, 7.5, C.orange);
++  const cats = ['5/1/2002', '6/1/2002', '7/1/2002', '8/1/2002', '9/1/2002'];
++  // the multi-series form makes the area meet both axes (crossBetween=midCat)
++  s.addChart([{ type: 'area', data: [
++    { name: 'Series 1', labels: cats, values: [32, 32, 28, 12, 15] },
++    { name: 'Series 2', labels: cats, values: [12, 12, 12, 21, 28] },
++  ] }], {
++    x: 0.903, y: 1.759, w: 5.972, h: 3.981,
++    barGrouping: 'stacked', chartColors: [C.orange, C.white],
++    showLegend: true, legendPos: 'b', legendColor: C.white, legendFontSize: 9,
++    valAxisMaxVal: 50, valAxisMinVal: 0, valAxisMajorUnit: 5,
++    catAxisLabelColor: C.white, valAxisLabelColor: C.white,
++    catAxisLabelFontSize: 9, valAxisLabelFontSize: 9,
++    catAxisLineColor: C.silver, valAxisLineColor: C.silver,
++    valGridLine: { color: '5A5A5A', style: 'solid', size: 0.5 },
++    catGridLine: { style: 'none' },
++    border: { pt: 0, color: C.bg },
++  });
++  text(s, TXT.long + ' individuals, whether natural A company. A company is an association or collection of individuals.',
++    { x: 8.157, y: 3.359, w: 4.111, h: 0.581, lineSpacingMultiple: 1.5 });
++  messageBlock(s, 8.185, 5.747, 3.75);
++});
++
++// 31 — GLOBAL MAP
++slide(s => {
++  drawMap(s, WORLD_MAP, 1.603, 1.947, 11.73, 6.957);
++  head(s, 'GLOBAL MAP', { x: 3.221, y: 0.49, w: 6.92, h: 0.556, fontSize: 40, bold: false, color: C.white, align: 'center', lineSpacingMultiple: 0.9 });
++});
++
++// 32 — EUROPE MAP
++slide(s => {
++  drawMap(s, EUROPE_MAP, 0.125, 2.445, 7.036, 7.5);
++  head(s, 'EUROPE MAP', { x: 3.221, y: 0.628, w: 6.92, h: 0.556, fontSize: 40, bold: false, color: C.white, align: 'center', lineSpacingMultiple: 0.9 });
++  head(s, '$543BN', { x: 7.869, y: 2.304, w: 3.429, h: 0.837, fontSize: 32, bold: false, color: C.white, lineSpacingMultiple: 0.9 });
++  text(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla.',
++    { x: 7.869, y: 2.963, w: 4.859, h: 0.858, lineSpacingMultiple: 1.5 });
++  head(s, '$423BN', { x: 7.853, y: 4.814, w: 3.208, h: 0.837, fontSize: 32, bold: false, color: C.white, lineSpacingMultiple: 0.9 });
++  text(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. In et quam est eget mi. Pellentesque nunc.',
++    { x: 7.869, y: 5.464, w: 4.859, h: 1.111, lineSpacingMultiple: 1.5 });
++});
++
++// 33 — THANKYOU
++slide(s => {
++  oval(s, 3.319, 2.054, 6.695, 3.392, C.orange);
++  footerBadge(s); pager(s); navMenu(s, 4.745, 0.196, 'left');
++  head(s, 'THANKYOU', { x: 1.503, y: 1.237, w: 10.356, h: 1.717, fontSize: 96, bold: false, color: C.white, align: 'center' });
++  head(s, 'THANKYOU', { x: 1.521, y: 2.256, w: 10.356, h: 1.717, fontSize: 96, bold: false, color: C.black, align: 'center' });
++  text(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse.',
++    { x: 3.542, y: 5.838, w: 6.25, h: 0.606, align: 'center', lineSpacingMultiple: 1.5 });
++});
++
++// 34 & 35 — icon sheets
++slide(s => iconSheet(s,
++  [1.813, 2.884, 3.959, 5.03, 6.101, 7.235, 8.311, 9.386, 10.458, 11.531],
++  [1.433, 1.977, 2.514, 3.502, 4.038, 5.119, 5.65, 6.192], 0.28, 0));
++slide(s => iconSheet(s,
++  [1.826, 2.935, 4.043, 5.148, 6.257, 7.364, 8.43, 9.538, 10.646, 11.752],
++  [1.563, 2.113, 3.126, 3.68, 4.238, 5.434, 5.978], 0.28, 5));
++
++/* -------------------------------------------------------------------- main */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'VALENTA_169', width: 13.333, height: 7.5 });
++  pptx.layout = 'VALENTA_169';
++  pptx.author = 'VALENTA';
++  pptx.title = 'VALENTA — Fashion Design Style';
++  SLIDES.forEach(fn => {
++    const s = pptx.addSlide();
++    s.background = { color: C.bg };
++    fn(s);
++  });
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '0265e768-7421-4865-8fe6-abc306b76a34_grok_final.pptx'),
++  });
++}
++
++build().then(f => console.log('wrote', f)).catch(e => { console.error(e); process.exit(1); });

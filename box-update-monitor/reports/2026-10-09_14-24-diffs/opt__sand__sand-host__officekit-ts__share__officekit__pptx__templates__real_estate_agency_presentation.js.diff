@@ -1,0 +1,694 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/real_estate_agency_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/real_estate_agency_presentation.js
+@@ -0,0 +1,691 @@
++/**
++ * "HOUSTATE" real-estate template - 15 slides, 13.333 x 7.5 in.
++ * Rebuilt with pptxgenjs only.  Raster photos in the original deck are
++ * flat grey placeholder images; they are re-created here as grey rectangles.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const NAVY = '152330';
++const GOLD = 'D4AE58';
++const CREAM = 'F2F2F2'; // page background (bg1 lumMod 95%)
++const WHITE = 'FFFFFF';
++const INK = '262626'; // headings on light backgrounds
++const INK_SOFT = '404040';
++const GREY = '808080'; // body copy on light backgrounds
++const GREY_LT = 'D9D9D9'; // body copy on navy backgrounds
++const HAIRLINE = 'BFBFBF';
++const FOOT_INK = '14222E';
++const PHOTO = '7F7F7F'; // placeholder for ppt/media/image1.jpg
++const SCREEN = 'C3C3C3'; // placeholder for ppt/media/image2.jpg
++
++const REG = 'Montserrat';
++const SEMI = 'Montserrat SemiBold';
++const MED = 'Montserrat Medium';
++const POP = 'Poppins';
++const POP_SEMI = 'Poppins SemiBold';
++const WORK_SEMI = 'Work Sans SemiBold';
++
++/**
++ * Soft drop shadows. pptxgenjs rewrites the object it is handed, so every
++ * shape needs its own copy - hence factories rather than shared constants.
++ * The originals also shrink the shadow (sx/sy 90-95 %), which pptxgenjs
++ * cannot express; the offsets below reproduce the resulting look.
++ */
++function shadow(opacity, blur, offset, angle) {
++	return { type: 'outer', color: '000000', opacity, blur, offset, angle };
++}
++const CARD_SHADOW = function () { return shadow(0.13, 29, 5, 90); };
++const DEEP_SHADOW = function () { return shadow(0.09, 39, 9, 30); };
++const TEAM_SHADOW = function () { return shadow(0.10, 35, 7, 90); };
++const PILL_SHADOW = function () { return shadow(0.13, 29, 15, 90); };
++
++/* ------------------------------------------------------- drawing helpers */
++
++/** Solid rectangle. */
++function rect(s, x, y, w, h, color, opts) {
++	s.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, opts));
++}
++
++/** Rounded rectangle; `r` is the corner radius in inches. */
++function round(s, x, y, w, h, r, opts) {
++	s.addShape('roundRect', Object.assign({ x, y, w, h, rectRadius: r, line: { type: 'none' } }, opts));
++}
++
++/** Circle. */
++function circle(s, x, y, d, color, opts) {
++	s.addShape('ellipse', Object.assign({ x, y, w: d, h: d, fill: { color }, line: { type: 'none' } }, opts));
++}
++
++/** Placeholder standing in for a photograph in the source deck. */
++function photo(s, x, y, w, h, color) {
++	rect(s, x, y, w, h, color || PHOTO);
++}
++
++/** Mix two hex colours, `t` = 0 gives `a`, 1 gives `b`. */
++function mix(a, b, t) {
++	let out = '';
++	for (let i = 0; i < 6; i += 2) {
++		const va = parseInt(a.substr(i, 2), 16);
++		const vb = parseInt(b.substr(i, 2), 16);
++		out += ('0' + Math.round(va + (vb - va) * t).toString(16)).slice(-2);
++	}
++	return out.toUpperCase();
++}
++
++/**
++ * Vertical strips fading from `left` to `right`. pptxgenjs has no gradient
++ * fills, so the brushed-metal panels of the mock-ups are banded instead.
++ */
++function hGradient(s, x, y, w, h, left, right, bands) {
++	const n = bands || 10;
++	for (let i = 0; i < n; i++) {
++		rect(s, x + (w / n) * i, y, w / n + 0.004, h, mix(left, right, (i + 0.5) / n));
++	}
++}
++
++/** Free-form polygon, points given as normalised [0..1] pairs. */
++function poly(s, x, y, w, h, pts, color, opts) {
++	s.addShape('custGeom', Object.assign({
++		x, y, w, h,
++		fill: { color },
++		line: { type: 'none' },
++		points: pts.map(function (p) { return { x: p[0] * w, y: p[1] * h }; }).concat([{ close: true }])
++	}, opts));
++}
++
++/** Text box. Defaults mirror PowerPoint text boxes: top anchored, no fill. */
++function text(s, runs, o) {
++	s.addText(runs, Object.assign({
++		valign: 'top',
++		fontFace: REG,
++		fontSize: 18,
++		color: INK,
++		isTextBox: true
++	}, o));
++}
++
++/** Body copy: 11 pt, justified, 150 % leading. */
++function body(s, str, x, y, w, h, color, o) {
++	text(s, str, Object.assign({
++		x, y, w, h, fontSize: 11, color: color || GREY, align: 'justify', lineSpacingMultiple: 1.5
++	}, o));
++}
++
++/** Small gold "About Us" / "Mockup Device" kicker. */
++function kicker(s, str, x, y, w) {
++	text(s, str, { x, y, w: w || 1.205, h: 0.353, fontSize: 15, fontFace: SEMI, color: GOLD, wrap: false });
++}
++
++/** Filled tag/button with centred caption. */
++function tag(s, x, y, w, h, fillColor, caption, capOpts) {
++	rect(s, x, y, w, h, fillColor, capOpts && capOpts.radius ? null : null);
++	if (caption) {
++		text(s, caption, Object.assign({
++			x, y, w, h, h: h, valign: 'middle', align: 'center',
++			fontSize: 12, fontFace: POP, bold: true, charSpacing: 1.2, color: WHITE
++		}, capOpts));
++	}
++}
++
++/* ------------------------------------------------------------ icon shapes */
++
++/* Normalised outlines lifted from the original custom geometries. */
++const ROOF = [[0, 1], [0.344, 0], [1, 0.973], [0.351, 0.207]];
++const CHECK = [[0.339, 0.981], [0, 0.391], [0.191, 0.374], [0.382, 0.742],
++	[0.820, 0.017], [0.896, 0], [1, 0.017], [0.414, 0.985]];
++/* Origami bird, five facets. */
++const BIRD = [
++	[[0.935, 0.527], [0.371, 1.000], [0.495, 0.546]],
++	[[0.871, 0.140], [1.000, 0.193], [0.925, 0.217], [0.925, 0.469], [0.871, 0.444]],
++	[[0.000, 0.058], [0.941, 0.507], [0.495, 0.522]],
++	[[0.242, 0.039], [0.586, 0.198], [0.565, 0.304], [0.360, 0.208]],
++	[[0.774, 0.000], [0.871, 0.039], [0.952, 0.140], [0.839, 0.101], [0.844, 0.435], [0.591, 0.314], [0.640, 0.101]]
++];
++
++/** The Houstate roof mark. */
++function roof(s, x, y, w, h, color) {
++	poly(s, x, y, w, h, ROOF, color || WHITE);
++}
++
++/** White tick used in the bullet circles. */
++function check(s, cx, cy, w, h, color) {
++	poly(s, cx, cy, w, h, CHECK, color || WHITE);
++}
++
++/*
++ * Tiny pictograms, drawn from primitives inside a normalised 1 x 1 box.
++ * `bg` is the colour behind the glyph, used to punch out negative space.
++ */
++function briefcaseIcon(s, x, y, w, h, color, bg) {
++	round(s, x + 0.14 * w, y, 0.72 * w, 0.52 * h, 0.13 * h, { fill: { color } }); // handle
++	round(s, x + 0.25 * w, y + 0.10 * h, 0.50 * w, 0.52 * h, 0.09 * h, { fill: { color: bg } });
++	round(s, x, y + 0.22 * h, w, 0.78 * h, 0.11 * h, { fill: { color } }); // case
++	rect(s, x, y + 0.54 * h, w, 0.08 * h, bg); // divider with two clasps
++	rect(s, x + 0.22 * w, y + 0.49 * h, 0.14 * w, 0.18 * h, color);
++	rect(s, x + 0.64 * w, y + 0.49 * h, 0.14 * w, 0.18 * h, color);
++}
++function thumbIcon(s, x, y, w, h, color, bg) {
++	round(s, x + 0.76 * w, y + 0.42 * h, 0.24 * w, 0.58 * h, 0.05 * h, { fill: { color } }); // cuff
++	round(s, x, y + 0.40 * h, 0.72 * w, 0.60 * h, 0.11 * h, { fill: { color } }); // fist
++	round(s, x + 0.26 * w, y, 0.38 * w, 0.62 * h, 0.15 * h, { fill: { color } }); // thumb
++	[0.56, 0.70, 0.84].forEach(function (fy) {
++		rect(s, x + 0.03 * w, y + fy * h, 0.24 * w, 0.025 * h, bg); // finger creases
++	});
++}
++function birdIcon(s, x, y, w, h, color) {
++	BIRD.forEach(function (facet) { poly(s, x, y, w, h, facet, color); });
++}
++function chatIcon(s, x, y, w, h, color, bg) {
++	round(s, x, y, 0.68 * w, 0.80 * h, 0.15 * h, { fill: { color } }); // back bubble
++	round(s, x + 0.28 * w, y + 0.14 * h, 0.72 * w, 0.86 * h, 0.15 * h, { fill: { color } });
++	[0.47, 0.61, 0.75].forEach(function (dx) {
++		s.addShape('ellipse', {
++			x: x + (dx - 0.045) * w, y: y + 0.50 * h, w: 0.09 * w, h: 0.15 * h,
++			fill: { color: bg }, line: { type: 'none' }
++		});
++	});
++}
++const ICONS = { briefcase: briefcaseIcon, thumb: thumbIcon, bird: birdIcon, chat: chatIcon };
++
++/** Coloured disc + pictogram, as used for the statistic / skill bullets. */
++function iconDisc(s, x, y, d, name, discColor, glyphColor) {
++	const disc = discColor || GOLD;
++	circle(s, x, y, d, disc);
++	ICONS[name](s, x + 0.29 * d, y + 0.30 * d, 0.42 * d, 0.40 * d, glyphColor || WHITE, disc);
++}
++
++/* ------------------------------------------------- repeated page furniture */
++
++/** Small wordmark in the top-left corner of the cover / closing slides. */
++function wordmark(s) {
++	roof(s, 0.891, 0.501, 0.836, 0.158, WHITE);
++	text(s, 'HOUSTATE', { x: 0.195, y: 0.61, w: 1.788, h: 0.37, fontSize: 16, bold: true, color: WHITE, align: 'center' });
++}
++
++/** Decorative three-bar "menu" mark, right aligned at the top corner. */
++function menuMark(s) {
++	[[12.652, 0.324, 0.300], [12.752, 0.414, 0.200], [12.852, 0.501, 0.100]]
++		.forEach(function (b) { rect(s, b[0], b[1], b[2], 0.040, WHITE); });
++}
++
++/** Footer captions of the cover / closing slides. */
++function coverFooter(s, color) {
++	text(s, 'Real Estate Presentation', { x: 0.382, y: 6.991, w: 2.279, h: 0.303, fontSize: 12, color, wrap: false });
++	text(s, 'www.houstate.com', { x: 11.209, y: 6.991, w: 1.846, h: 0.303, fontSize: 12, color, align: 'right', wrap: false });
++}
++
++/* ---------------------------------------------------------------- slides */
++
++function slide01Cover(s) {
++	rect(s, 0, 6.769, 13.333, 0.731, GOLD); // gold strip from the layout
++	photo(s, 0, 0, 13.333, 6.769);
++	rect(s, 0, 0, 13.333, 6.769, NAVY, { fill: { color: NAVY, transparency: 20 } });
++	roof(s, 5.144, 2.186, 4.7, 0.819, WHITE);
++	text(s, 'HOUSTATE', {
++		x: 1.983, y: 2.853, w: 9.367, h: 1.447,
++		fontSize: 80, bold: true, color: WHITE, align: 'center', charSpacing: 2
++	});
++	text(s, 'REAL ESTATE PRESENTATION TEMPLATE', {
++		x: 2.921, y: 4.032, w: 7.523, h: 0.404,
++		fontSize: 18, fontFace: SEMI, color: WHITE, align: 'center', charSpacing: 2.6
++	});
++	wordmark(s);
++	menuMark(s);
++	coverFooter(s, FOOT_INK);
++	rect(s, 5.701, 4.708, 1.932, 0.517, GOLD);
++	text(s, 'LET’S STARTED', {
++		x: 5.701, y: 4.708, w: 1.932, h: 0.517, valign: 'middle', align: 'center',
++		fontSize: 12, fontFace: SEMI, color: WHITE, charSpacing: 1
++	});
++}
++
++function slide02About(s) {
++	s.background = { color: CREAM };
++	photo(s, 4.381, -0.021, 8.952, 5.481);
++	rect(s, 0.873, 2.04, 7.048, 5.46, WHITE, { shadow: CARD_SHADOW() });
++	kicker(s, 'About Us', 1.536, 2.682);
++	text(s, 'Find your best house with us', { x: 1.508, y: 2.988, w: 5.176, h: 1.447, fontSize: 40, bold: true });
++	rect(s, 1.614, 4.615, 1.0, 0.05, GOLD);
++	body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++		'incididunt ut labore et dolore magna aliqua. Suspendisse potenti nullam ac tortor vitae ' +
++		'purus faucibus ornare. Tellus elementum sagittis vitae condimentum id venenatis mattis ' +
++		'ullamcorper velit sed', 1.518, 4.854, 5.784, 1.18);
++	rect(s, 1.614, 6.29, 1.709, 0.47, GOLD);
++	text(s, 'Find Out More', {
++		x: 1.614, y: 6.29, w: 1.709, h: 0.47, valign: 'middle', align: 'center',
++		fontSize: 12, fontFace: MED, color: WHITE
++	});
++}
++
++const STATS = [
++	{ x: 0.898, y: 4.453, icon: 'briefcase', value: '1000+', caption: 'Replace this' },
++	{ x: 3.420, y: 4.453, icon: 'thumb', value: '350+', caption: 'Replace this' },
++	{ x: 0.898, y: 5.348, icon: 'bird', value: '>35M', caption: 'Replace this' },
++	{ x: 3.420, y: 5.348, icon: 'chat', caption: 'Replace with your description' }
++];
++
++function slide03Integrated(s) {
++	rect(s, 7.444, 0, 5.889, 4.0, NAVY); // navy block from the layout
++	photo(s, 9.437, 1.512, 3.079, 4.673);
++	photo(s, 6.111, 1.512, 3.079, 4.673);
++	kicker(s, 'About Us', 0.843, 1.501);
++	text(s, 'We integrated with developer', { x: 0.817, y: 1.779, w: 4.786, h: 1.313, fontSize: 36, bold: true });
++	body(s, 'PLACEHOLDER' +
++		'misl venenatis voluptate velit esse cillum magna aliqua minimasa veniam consectetur.',
++		0.859, 3.299, 4.751, 0.903);
++	STATS.forEach(function (st) {
++		iconDisc(s, st.x, st.y, 0.576, st.icon);
++		const tx = st.x + 0.764;
++		if (st.value) {
++			text(s, st.value, {
++				x: tx, y: st.y - 0.207, w: 1.331, h: 0.639,
++				fontSize: 24, bold: true, color: INK_SOFT, lineSpacingMultiple: 1.5
++			});
++			text(s, st.caption, {
++				x: tx - 0.009, y: st.y + 0.285, w: 1.331, h: 0.347,
++				fontSize: 11, color: GREY, lineSpacingMultiple: 1.5
++			});
++		} else {
++			text(s, st.caption, {
++				x: tx, y: st.y - 0.008, w: 1.577, h: 0.625,
++				fontSize: 11, fontFace: SEMI, color: INK_SOFT, lineSpacingMultiple: 1.5
++			});
++		}
++	});
++	rect(s, 6.734, 6.061, 1.834, 0.14, GOLD);
++	rect(s, 10.059, 6.061, 1.834, 0.14, GOLD);
++}
++
++const PROPERTY_TYPES = [
++	['Residential Property', 7.317, 4.846, 1.923], ['Argiculture Property', 10.537, 4.855, 1.929],
++	['Commercial Property', 7.318, 5.307, 2.044], ['Special Use Property', 10.537, 5.316, 1.953],
++	['Industrial Property', 7.317, 5.776, 1.787], ['Mixed – Use Property', 10.537, 5.785, 1.988]
++];
++
++function slide04Help(s) {
++	s.background = { color: NAVY };
++	rect(s, 0, 1.238, 5.381, 1.032, GOLD); // gold block from the layout
++	photo(s, 2.571, 1.508, 3.603, 4.587);
++	photo(s, 0, 1.508, 2.206, 3.206);
++	kicker(s, 'About Us', 6.777, 1.351);
++	text(s, 'We help you to find the best property', {
++		x: 6.762, y: 1.668, w: 5.861, h: 1.313, fontSize: 36, bold: true, color: WHITE
++	});
++	body(s, 'PLACEHOLDER' +
++		'PLACEHOLDER' +
++		'aliqua minimasa ipsum voluptate.', 6.777, 3.251, 5.846, 0.903, GREY_LT);
++	text(s, 'WE SALE ALL IN ONE PLACE :', {
++		x: 6.767, y: 4.353, w: 2.904, h: 0.303,
++		fontSize: 12, fontFace: POP, bold: true, charSpacing: 1.2, color: WHITE, wrap: false
++	});
++	PROPERTY_TYPES.forEach(function (it) {
++		const cx = it[1] - 0.438;
++		circle(s, cx, it[2] + 0.018, 0.24, GOLD);
++		check(s, cx + 0.058, it[2] + 0.092, 0.127, 0.089, WHITE);
++		text(s, it[0], { x: it[1], y: it[2], w: it[3], h: 0.303, fontSize: 12, fontFace: POP_SEMI, color: WHITE, wrap: false });
++	});
++	text(s, 'Houstate', {
++		x: 11.809, y: 6.938, w: 0.998, h: 0.303,
++		fontSize: 12, fontFace: SEMI, color: WHITE, align: 'right', wrap: false
++	});
++	s.addShape('line', { x: 0.527, y: 7.089, w: 11.092, h: 0, line: { color: WHITE, width: 1.5 } });
++}
++
++const LISTINGS = [
++	{ card: 1.254, photo: 1.429, price: 1.782, desc: 1.618, value: '$800,000' },
++	{ card: 5.016, photo: 5.191, price: 5.594, desc: 5.431, value: '$950,000' },
++	{ card: 8.778, photo: 8.953, price: 9.376, desc: 9.212, value: '$730,000' }
++];
++const LISTING_DESC = 'PLACEHOLDER';
++
++function slide05Featured(s) {
++	s.background = { color: CREAM };
++	rect(s, 0, 0, 7.683, 4.397, NAVY); // navy block from the layout
++	LISTINGS.forEach(function (c) {
++		rect(s, c.card, 2.651, 3.301, 3.949, WHITE, { shadow: DEEP_SHADOW() });
++		photo(s, c.photo, 2.819, 2.952, 2.35);
++		text(s, c.value, {
++			x: c.price, y: 5.342, w: 2.145, h: 0.505,
++			fontSize: 24, bold: true, color: INK_SOFT, align: 'center', charSpacing: 0.5
++		});
++		text(s, LISTING_DESC, {
++			x: c.desc, y: 5.847, w: 2.472, h: 0.577,
++			fontSize: 10, color: GREY, align: 'center', lineSpacingMultiple: 1.5
++		});
++	});
++	round(s, 10.403, 1.993, 1.676, 0.411, 0.2055, { fill: { color: GOLD } });
++	text(s, 'Explore More', {
++		x: 10.403, y: 1.993, w: 1.676, h: 0.411, valign: 'middle', align: 'center',
++		fontSize: 12, fontFace: SEMI, color: WHITE
++	});
++	text(s, 'Featured House', { x: 1.278, y: 0.751, w: 5.176, h: 0.774, fontSize: 40, bold: true, color: WHITE });
++	body(s, 'PLACEHOLDER' +
++		'mattis velit', 1.31, 1.604, 5.176, 0.625, GREY_LT);
++}
++
++function slide06EasyToFind(s) {
++	s.background = { color: CREAM };
++	photo(s, 4.81, 0, 8.524, 5.381);
++	photo(s, 1.095, 0, 3.429, 5.381);
++	rect(s, 1.746, 3.718, 7.365, 2.929, WHITE, { shadow: CARD_SHADOW() });
++	kicker(s, 'About Us', 2.183, 4.021);
++	text(s, 'Easy to find a Property', { x: 2.152, y: 4.282, w: 6.602, h: 0.707, fontSize: 36, bold: true });
++	rect(s, 2.245, 5.206, 1.143, 0.05, GOLD);
++	body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++		'incididunt ut labore et dolore magna aliqua. Suspendisse potenti nullam ac tortor vitae ' +
++		'purus faucibus ornare. Tellus id venenatis mattis ullamcorper velit sed',
++		2.152, 5.458, 6.602, 0.903);
++	text(s, 'BUY OR RENT A PROPERTY', {
++		x: 9.619, y: 5.618, w: 3.0, h: 0.303,
++		fontSize: 12, fontFace: POP, bold: true, charSpacing: 1, color: INK_SOFT
++	});
++	body(s, 'PLACEHOLDER', 9.619, 5.912, 2.778, 0.625);
++}
++
++const SERVICE_CARDS = [
++	{ y: 1.666, fill: NAVY, tag: GOLD, label: 'BUY A HOUSE', copy: WHITE, tagX: 7.617, tagY: 1.939, txtY: 1.965, bodyX: 7.539, bodyY: 2.338 },
++	{ y: 3.459, fill: CREAM, tag: GREY, label: 'SELL A HOUSE', copy: GREY, tagX: 7.617, tagY: 3.735, txtY: 3.761, bodyX: 7.534, bodyY: 4.136 },
++	{ y: 5.255, fill: CREAM, tag: GREY, label: 'RENT A HOUSE', copy: GREY, tagX: 7.623, tagY: 5.538, txtY: 5.563, bodyX: 7.528, bodyY: 5.932 }
++];
++const SERVICE_COPY = 'PLACEHOLDER' +
++	'potenti dolore magna aliqua';
++
++function slide07Services(s) {
++	s.background = { color: CREAM };
++	round(s, 0.952, 1.666, 5.714, 5.064, 0.2007, { fill: { color: WHITE }, shadow: CARD_SHADOW() });
++	photo(s, 1.254, 1.985, 5.111, 3.206);
++	body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++		'incididunt ut labore et dolore magna aliqua. Suspendisse potenti nullam ac tortor vitae ' +
++		'purus ornare.', 1.254, 5.479, 5.09, 0.903);
++	text(s, 'Houstate’s Services', { x: 3.113, y: 0.627, w: 7.107, h: 0.774, fontSize: 40, bold: true, align: 'center' });
++	SERVICE_CARDS.forEach(function (c) {
++		round(s, 7.286, c.y, 5.095, 1.475, 0.1752, {
++			fill: { color: c.fill },
++			line: c.fill === CREAM ? { color: HAIRLINE, width: 1.25 } : { type: 'none' },
++			shadow: c.fill === NAVY ? PILL_SHADOW() : undefined
++		});
++		round(s, c.tagX, c.tagY, 2.133, 0.338, 0.169, { fill: { color: c.tag } });
++		text(s, c.label, {
++			x: c.tagX + 0.064, y: c.txtY, w: 2.005, h: 0.303, align: 'center',
++			fontSize: 12, fontFace: POP, bold: true, charSpacing: 1.2, color: WHITE
++		});
++		body(s, SERVICE_COPY, c.bodyX, c.bodyY, 4.624, 0.625, c.copy);
++	});
++}
++
++const BEST_SERVICES = [
++	{ card: 1.254, photo: 1.443, tag: 1.771, label: 1.903, desc: 1.618, title: 'BUY PROPERTIES' },
++	{ card: 5.016, photo: 5.205, tag: 5.532, label: 5.671, desc: 5.431, title: 'SELL PROPERTIES' },
++	{ card: 8.778, photo: 8.967, tag: 9.294, label: 9.426, desc: 9.212, title: 'RENT PROPERTIES' }
++];
++
++function slide08BestServices(s) {
++	s.background = { color: CREAM };
++	rect(s, 0, 0, 13.333, 4.937, NAVY); // navy block from the layout
++	BEST_SERVICES.forEach(function (c) {
++		rect(s, c.card, 2.651, 3.301, 3.778, WHITE, { shadow: DEEP_SHADOW() });
++		photo(s, c.photo, 2.846, 2.923, 2.09);
++		rect(s, c.tag, 4.639, 2.269, 0.595, GOLD);
++		text(s, c.title, {
++			x: c.label, y: 4.783, w: 2.005, h: 0.303, align: 'center',
++			fontSize: 12, fontFace: POP, bold: true, charSpacing: 1.2, color: WHITE
++		});
++		text(s, LISTING_DESC + ' faucibus', {
++			x: c.desc, y: 5.373, w: 2.472, h: 0.903,
++			fontSize: 11, color: GREY, align: 'center', lineSpacingMultiple: 1.5
++		});
++	});
++	text(s, 'Our Services', {
++		x: 5.885, y: 0.541, w: 1.564, h: 0.353,
++		fontSize: 15, fontFace: SEMI, color: GOLD, align: 'center', wrap: false
++	});
++	text(s, 'Our Best Services', {
++		x: 3.601, y: 0.817, w: 6.132, h: 0.774, fontSize: 40, bold: true, color: WHITE, align: 'center'
++	});
++	text(s, 'PLACEHOLDER' +
++		'PLACEHOLDER', {
++		x: 3.523, y: 1.691, w: 6.288, h: 0.625,
++		fontSize: 11, color: GREY_LT, align: 'center', lineSpacingMultiple: 1.5
++	});
++}
++
++function slide09Profile(s) {
++	s.background = { color: NAVY };
++	rect(s, 1.048, 0.815, 2.238, 4.01, GOLD); // layout blocks
++	rect(s, 4.286, 0, 9.048, 5.73, WHITE);
++	photo(s, 1.238, 1.028, 4.317, 5.444);
++	text(s, 'Aubrey Madison', { x: 6.44, y: 1.17, w: 5.429, h: 0.841, fontSize: 44, fontFace: WORK_SEMI, color: INK_SOFT });
++	text(s, 'CEO / Founder', { x: 6.434, y: 1.951, w: 3.151, h: 0.404, fontSize: 18, fontFace: POP_SEMI, color: '595959' });
++	rect(s, 6.544, 2.607, 1.143, 0.05, GOLD);
++	body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++		'incididunt ut labore et dolore magna aliqua. Suspendisse potenti nullam ac tortor vitae ' +
++		'purus faucibus ornare. Tellus elementum sagittis vitae condimentum id venenatis mattis',
++		6.448, 2.862, 5.683, 1.18);
++	iconDisc(s, 6.509, 4.26, 0.576, 'briefcase');
++	text(s, 'ABOUT SKILL HERE', {
++		x: 7.245, y: 4.252, w: 4.425, h: 0.304,
++		fontSize: 12, fontFace: POP_SEMI, bold: true, charSpacing: 1, color: INK
++	});
++	body(s, 'PLACEHOLDER' +
++		'ac tortor. ', 7.245, 4.518, 4.885, 0.625);
++}
++
++const TEAM = [
++	{ card: 1.020, cardY: 2.521, photo: 1.241, photoY: 2.702, tx: 2.630, ty: 2.728, name: 'Alfred Ride', role: 'HEAD OFFICE' },
++	{ card: 6.646, cardY: 2.521, photo: 6.840, photoY: 2.707, tx: 8.272, ty: 2.728, name: 'Aubrey Grace', role: 'FOUNDER' },
++	{ card: 2.127, cardY: 4.811, photo: 2.319, photoY: 4.990, tx: 3.753, ty: 5.018, name: 'Liza Febrian', role: 'CO FOUNDER' },
++	{ card: 7.753, cardY: 4.811, photo: 7.938, photoY: 4.992, tx: 9.379, ty: 5.018, name: 'Julian Morp', role: 'DESIGNER' }
++];
++
++function slide10Team(s) {
++	s.background = { color: CREAM };
++	text(s, [
++		{ text: 'Introduce to you our ', options: { color: INK } },
++		{ text: 'best team', options: { color: GOLD } }
++	], { x: 0.889, y: 0.828, w: 5.086, h: 1.313, fontSize: 36, bold: true });
++	body(s, 'PLACEHOLDER' +
++		'veniam nostrud consectetur adipiscinc elita vederico cillum magna aliqua minimasa voluptate.',
++		7.358, 1.117, 5.073, 0.903);
++	TEAM.forEach(function (m) {
++		rect(s, m.card, m.cardY, 4.678, 1.723, WHITE, { shadow: TEAM_SHADOW() });
++		photo(s, m.photo, m.photoY, 1.2, 1.362);
++		text(s, m.name, { x: m.tx, y: m.ty, w: 2.1, h: 0.404, fontSize: 18, bold: true, color: INK_SOFT });
++		text(s, m.role, {
++			x: m.tx, y: m.ty + 0.367, w: 1.911, h: 0.286,
++			fontSize: 11, fontFace: POP_SEMI, charSpacing: 1, color: GOLD
++		});
++		body(s, 'Lectus proin nibh nisl id venenatis  condimentum liquam ultricies. ',
++			m.tx, m.ty + 0.681, 2.883, 0.625);
++	});
++}
++
++/** Smart-phone mock-up (slide 11). */
++function phoneMockup(s, x, y, w, h) {
++	round(s, x, y, w, h, 0.24, { fill: { color: INK_SOFT } });
++	round(s, x + 0.042, y + 0.039, w - 0.083, h - 0.078, 0.22, { fill: { color: '0D0D0D' } });
++	photo(s, x + 0.095, y + 0.090, w - 0.185, h - 0.182, SCREEN);
++	round(s, x + 0.534, y + 0.086, 1.070, 0.174, 0.087, { fill: { color: '0D0D0D' } });
++	circle(s, x + 0.691, y + 0.136, 0.057, '171717');
++	round(s, x + 0.943, y + 0.146, 0.299, 0.050, 0.025, { fill: { color: INK } });
++	[[y + 0.523, 0.193], [y + 0.919, 0.320], [y + 1.303, 0.320]].forEach(function (b) {
++		round(s, x - 0.021, b[0], 0.073, b[1], 0.036, { fill: { color: GREY } });
++	});
++	round(s, x + w - 0.037, y + 0.889, 0.074, 0.517, 0.036, { fill: { color: GREY } });
++}
++
++const PHONE_FEATURES = [
++	{ icon: 7.027, iconY: 4.399, tx: 7.477, ty: 4.335, bx: 7.477, by: 4.662, w: 4.425 },
++	{ icon: 7.027, iconY: 5.482, tx: 7.506, ty: 5.419, bx: 7.506, by: 5.745, w: 4.395 }
++];
++
++function slide11Phone(s) {
++	photo(s, 1.431, 1.167, 4.286, 4.768);
++	phoneMockup(s, 2.501, 2.043, 2.142, 4.382);
++	kicker(s, 'Mockup Device', 6.917, 1.225, 1.881);
++	text(s, 'Preview app on Phone device ', { x: 6.885, y: 1.493, w: 5.017, h: 1.447, fontSize: 40, bold: true });
++	body(s, 'Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore ' +
++		'magna aliqua. Suspendisse potenti nullam tortor vitae purus faucibus ornare.',
++		6.923, 3.154, 4.979, 0.903);
++	PHONE_FEATURES.forEach(function (f) {
++		rect(s, f.icon, f.iconY, 0.24, 0.24, GOLD);
++		check(s, f.icon + 0.060, f.iconY + 0.070, 0.122, 0.101, WHITE);
++		text(s, 'TEXT TITLE HERE', {
++			x: f.tx, y: f.ty, w: f.w, h: 0.304, fontSize: 12, bold: true, charSpacing: 1, color: INK
++		});
++		body(s, 'PLACEHOLDER' +
++			'ac tortor. ', f.bx, f.by, f.w, 0.625);
++	});
++}
++
++/** Desktop monitor mock-up (slide 12). */
++function desktopMockup(s) {
++	round(s, 1.25, 1.694, 4.94, 3.395, 0.13, { fill: { color: '0D0D0D' } });
++	photo(s, 1.427, 1.886, 4.591, 2.6);
++	round(s, 1.25, 4.641, 4.94, 0.449, 0.118, { fill: { color: 'C6C6C6' } }); // chin
++	hGradient(s, 1.30, 4.641, 4.84, 0.400, 'BABABA', 'D3D3D3');
++	// neck: flared trapezoid, shaded top-dark to bottom-light
++	for (let i = 0; i < 6; i++) {
++		const t0 = i / 6, t1 = (i + 1) / 6;
++		const l0 = 0.19 - 0.19 * t0, l1 = 0.19 - 0.19 * t1;
++		const r0 = 0.85 + 0.15 * t0, r1 = 0.85 + 0.15 * t1;
++		poly(s, 2.984, 5.059 + 0.740 * t0, 1.473, 0.740 / 6 + 0.004,
++			[[l0, 0], [r0, 0], [r1, 1], [l1, 1]], mix('818181', 'B7B7B7', (i + 0.5) / 6));
++	}
++	round(s, 2.901, 5.631, 1.638, 0.168, 0.084, { fill: { color: 'CCCCCC' } }); // foot
++	rect(s, 2.901, 5.715, 1.638, 0.084, 'CCCCCC');
++	[3.506, 3.591, 3.697, 3.888].forEach(function (cx) { circle(s, cx, 1.763, 0.046, '171717'); });
++}
++
++const DESKTOP_POINTS = ['A powerful application', 'Help you find your best home', 'We always make the best for you'];
++
++function slide12Desktop(s) {
++	poly(s, 0, 0, 6.071, 5.144, [[0, 0], [1, 0], [0.635, 0.846], [0, 1]], NAVY); // layout wedge
++	desktopMockup(s);
++	kicker(s, 'Mockup Device', 6.917, 1.418, 1.881);
++	text(s, 'Preview app on Desktop device ', { x: 6.885, y: 1.686, w: 5.017, h: 1.447, fontSize: 40, bold: true });
++	body(s, 'Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore ' +
++		'magna aliqua. Suspendisse potenti nullam tortor vitae purus faucibus ornare.',
++		6.923, 3.347, 4.979, 0.903);
++	DESKTOP_POINTS.forEach(function (label, i) {
++		const y = 4.542 + i * 0.42;
++		circle(s, 7.036, y, 0.2, GOLD);
++		check(s, 7.084, y + 0.062, 0.106, 0.074, WHITE);
++		text(s, label, {
++			x: 7.469, y: y - 0.12, w: 2.845, h: 0.347,
++			fontSize: 11, fontFace: SEMI, color: INK_SOFT, lineSpacingMultiple: 1.5
++		});
++	});
++	text(s, 'Houstate', {
++		x: 10.904, y: 5.779, w: 0.998, h: 0.303,
++		fontSize: 12, fontFace: SEMI, color: GOLD, align: 'right', wrap: false
++	});
++	s.addShape('line', { x: 7.084, y: 5.93, w: 3.82, h: 0, line: { color: GOLD, width: 1.5 } });
++}
++
++/** Laptop mock-up, cropped by the right slide edge (slide 13). */
++function laptopMockup(s) {
++	round(s, 7.958, 1.348, 6.667, 4.464, 0.16, { fill: { color: '0D0D0D' } });
++	photo(s, 8.111, 1.651, 6.3, 3.943);
++	circle(s, 11.249, 1.466, 0.072, GREY);
++	rect(s, 7.958, 5.694, 6.667, 0.118, INK_SOFT); // hinge
++	poly(s, 7.159, 5.805, 8.265, 0.164, [[0.005, 0], [1, 0], [1, 1], [0.0, 1]], 'BDBDBD'); // base
++	hGradient(s, 7.20, 5.805, 8.22, 0.164, 'BABABA', 'C4C4C4', 6);
++	poly(s, 7.192, 5.969, 8.199, 0.096, [[0, 0], [1, 0], [0.96, 1], [0.04, 1]], '888888'); // front lip
++	hGradient(s, 7.24, 5.969, 8.10, 0.092, '808080', '9B9B9B', 6);
++	round(s, 10.600, 5.805, 1.369, 0.107, 0.05, { fill: { color: GREY } }); // trackpad notch
++}
++
++const APP_FEATURES = [
++	{ disc: 1.345, icon: 'briefcase', tx: 2.110 },
++	{ disc: 4.035, icon: 'bird', tx: 4.735 }
++];
++
++function slide13App(s) {
++	s.background = { color: NAVY };
++	laptopMockup(s);
++	kicker(s, 'Mockup Device', 1.234, 1.536, 1.881);
++	text(s, [
++		{ text: 'Our app is more ', options: { color: WHITE } },
++		{ text: 'powerful', options: { color: GOLD } },
++		{ text: ' now', options: { color: WHITE } }
++	], { x: 1.219, y: 1.803, w: 5.017, h: 1.447, fontSize: 40, bold: true });
++	APP_FEATURES.forEach(function (f) {
++		// 30 %-opaque white disc reads as a slate grey over the navy background
++		circle(s, f.disc, 3.738, 0.576, WHITE, { fill: { color: WHITE, transparency: 70 } });
++		ICONS[f.icon](s, f.disc + 0.167, 3.911, 0.242, 0.230, GOLD, '5D6672');
++		text(s, 'Replace with your description', {
++			x: f.tx, y: 3.706, w: 1.577, h: 0.625,
++			fontSize: 11, fontFace: SEMI, color: WHITE, lineSpacingMultiple: 1.5
++		});
++	});
++	body(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++		'incididunt ut labore et dolore magna aliqua. Suspendisse potenti nullam ac tortor vitae ' +
++		'PLACEHOLDER' +
++		'mattis ullamcorper velit sed. ', 1.253, 4.506, 5.031, 1.458, GREY_LT);
++}
++
++const CONTACT = [
++	{ label: 'OUR ADDRESS', lx: 6.573, ly: 4.370, lw: 1.725, vx: 6.579, vy: 4.652, vw: 2.340, vh: 0.625, value: 'Street Name, 45, Building 445566, State, Country' },
++	{ label: 'OFFICE HOURS', lx: 9.429, ly: 4.370, lw: 1.780, vx: 9.429, vy: 4.652, vw: 1.936, vh: 0.620, value: 'Monday – Friday\n08:00 – 17:00' },
++	{ label: 'EMAIL', lx: 6.568, ly: 5.565, lw: 0.856, vx: 6.583, vy: 5.848, vw: 2.340, vh: 0.347, value: 'email@yourcompany.com' },
++	{ label: 'PHONE', lx: 9.429, ly: 5.554, lw: 0.947, vx: 9.429, vy: 5.836, vw: 1.936, vh: 0.347, value: '(800) 123 4567' }
++];
++
++function slide14Contact(s) {
++	s.background = { color: CREAM };
++	rect(s, 2.064, 1.229, 10.054, 5.502, NAVY); // navy panel from the layout
++	photo(s, 1.215, 0.769, 4.462, 5.502);
++	text(s, 'Contact Us', { x: 6.528, y: 1.813, w: 3.755, h: 0.841, fontSize: 44, bold: true, color: WHITE, wrap: false });
++	rect(s, 6.675, 2.866, 1.143, 0.05, GOLD);
++	body(s, 'Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore ' +
++		'magna aliqua. Suspendisse potenti nullam tortor vitae purus faucibus ornare. ',
++		6.58, 3.141, 4.785, 0.903, GREY_LT);
++	CONTACT.forEach(function (c) {
++		text(s, c.label, {
++			x: c.lx, y: c.ly, w: c.lw, h: 0.337,
++			fontSize: 14, fontFace: POP, bold: true, charSpacing: 1, color: WHITE, wrap: false
++		});
++		text(s, c.value, {
++			x: c.vx, y: c.vy, w: c.vw, h: c.vh,
++			fontSize: 11, color: GREY_LT, lineSpacingMultiple: 1.5
++		});
++	});
++}
++
++function slide15ThankYou(s) {
++	photo(s, 0, 0, 13.333, 7.5);
++	rect(s, 0, 0, 13.333, 7.5, NAVY, { fill: { color: NAVY, transparency: 30 } });
++	text(s, 'THANKYOU', {
++		x: 1.983, y: 2.912, w: 9.367, h: 1.447,
++		fontSize: 80, bold: true, color: WHITE, align: 'center', charSpacing: 2
++	});
++	text(s, 'REAL ESTATE PRESENTATION TEMPLATE', {
++		x: 2.921, y: 4.184, w: 7.523, h: 0.404,
++		fontSize: 18, fontFace: SEMI, color: WHITE, align: 'center', charSpacing: 2.6
++	});
++	wordmark(s);
++	menuMark(s);
++	coverFooter(s, WHITE);
++}
++
++/* ------------------------------------------------------------------ build */
++
++const SLIDES = [
++	slide01Cover, slide02About, slide03Integrated, slide04Help, slide05Featured,
++	slide06EasyToFind, slide07Services, slide08BestServices, slide09Profile, slide10Team,
++	slide11Phone, slide12Desktop, slide13App, slide14Contact, slide15ThankYou
++];
++
++function build() {
++	const pptx = new PptxGenJS();
++	pptx.defineLayout({ name: 'HOUSTATE', width: 13.333, height: 7.5 });
++	pptx.layout = 'HOUSTATE';
++	pptx.title = 'Houstate — Real Estate Presentation Template';
++	SLIDES.forEach(function (draw) { draw(pptx.addSlide()); });
++	return pptx.writeFile({ fileName: path.join(__dirname, '126e7d29-19e8-4605-89b6-f093a1ae8f11_grok_final.pptx') });
++}
++
++build().then(function (f) { console.log('wrote ' + f); }, function (e) { console.error(e); process.exit(1); });

@@ -1,0 +1,952 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/international_yoga_day_wellness.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/international_yoga_day_wellness.js
+@@ -0,0 +1,949 @@
++/**
++ * "International Day of Yoga" - 18 slide deck, rebuilt with pptxgenjs.
++ *
++ * Photographic content in the source deck (device mockups, background photos)
++ * is replaced with native-shape placeholders; every other element is a real
++ * pptxgenjs shape / text box.
++ *
++ *   node 049713e3-65ff-48b5-a4d3-12f5e7d971c3_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* =================================================================== *
++ * Theme
++ * =================================================================== */
++
++const C = {
++  purple: '6F6AD8', // accent1
++  lilac:  'B67DD9', // accent2
++  pink:   'E894D6', // accent3
++  olive:  '627E23', // accent5 @ lum 50%
++  ink:    '404040', // tx1 @ lum 75/25 - the standard body/heading colour
++  black:  '000000',
++  white:  'FFFFFF',
++  grey:   'A6A6A6', // footer url
++  mist:   'E2E1F7', // accent1 @ lum 20/80 - timeline rails
++  haze:   'D3B1E8', // accent2 @ lum 60/40 - title wave outline
++  map:    'EEEEEE',
++  device: '1D1D1F'
++};
++
++const HEAD = 'Onest';      // theme major font
++const BODY = 'Open Sans';  // theme minor font
++const ALT  = 'Plus Jakarta Sans';
++
++// Outer shadows lifted from the source deck (blur / offset in points).
++// pptxgenjs rewrites the object it is handed, so hand it a fresh one each time.
++const shadow = (blur, offset, angle) =>
++  ({ type: 'outer', blur: blur, offset: offset, angle: angle, color: '000000', opacity: 0.1 });
++const SH_TOP = () => shadow(20, 10, 90);  // cast straight down (cards, tiles)
++const SH_SM  = () => shadow(20, 10, 45);  // icon bubbles
++const SH_MD  = () => shadow(30, 15, 45);
++const SH_LG  = () => shadow(40, 20, 45);  // wide pills
++
++const NOLINE = { type: 'none' };
++const NOFILL = { type: 'none' };
++
++const LOREM_SHORT = 'A global celebration of wellness, balance, and mindfulness through.';
++const LOREM_MED   = 'A global celebration of wellness, balance, and mindfulness through the ancient.';
++const LOREM_LONG  = 'A global celebration of wellness, balance, and mindfulness through the ancient ' +
++                    'practice of yoga\u2014bringing peace and unity to individuals and communities.';
++const IDY_LONG    = 'International Day of Yoga, celebrated every June 21st, honors the timeless ' +
++                    'PLACEHOLDER' +
++                    'peace, health, and holistic well-being. ';
++const IDY_SHORT   = 'International Day of Yoga, celebrated every June 21st, honors the timeless ' +
++                    'tradition of yoga that has transcended borders to become a .';
++
++/* =================================================================== *
++ * Freeform paths, normalised into a 0..1 box.
++ * m = moveTo, l = lineTo, c = cubic bezier (x1 y1 x2 y2 x y), z = close
++ * =================================================================== */
++
++const WAVE = [ // the deep "S" wave used as the title-slide banner
++  ['m', 0.41395, 0.00071],
++  ['c', 0.41867, -0.00028, 0.42338, -0.00025, 0.42807, 0.00091],
++  ['c', 0.44058, 0.00401, 0.45299, 0.01518, 0.46514, 0.03652],
++  ['c', 0.50439, 0.10534, 0.53598, 0.27078, 0.56901, 0.41224],
++  ['c', 0.60203, 0.55370, 0.64116, 0.67943, 0.68181, 0.64842],
++  ['c', 0.72246, 0.61741, 0.76278, 0.43063, 0.80113, 0.51888],
++  ['c', 0.82923, 0.58306, 0.84297, 0.77234, 0.86853, 0.86635],
++  ['c', 0.89319, 0.95672, 0.92453, 0.94590, 0.95341, 0.92606],
++  ['c', 0.96785, 0.91614, 0.98272, 0.90511, 0.99730, 0.90526],
++  ['l', 1, 0.90585], ['l', 1, 1], ['l', 0, 1], ['l', 0, 0.07450], ['l', 0.00364, 0.09429],
++  ['c', 0.04957, 0.32463, 0.11132, 0.45027, 0.17169, 0.40921],
++  ['c', 0.22218, 0.37487, 0.26879, 0.23969, 0.31633, 0.13412],
++  ['c', 0.34754, 0.06484, 0.38094, 0.00769, 0.41395, 0.00071],
++  ['z']
++];
++
++const WAVE_FLAT = [ // shallower wave, "Call to Action" slide
++  ['m', 0.36396, 0.00097],
++  ['c', 0.37093, -0.00038, 0.37789, -0.00034, 0.38483, 0.00123],
++  ['c', 0.40333, 0.00543, 0.42166, 0.02057, 0.43962, 0.04951],
++  ['c', 0.49763, 0.14279, 0.54432, 0.36703, 0.59314, 0.55879],
++  ['c', 0.64195, 0.75054, 0.69978, 0.92097, 0.75986, 0.87893],
++  ['c', 0.81994, 0.83689, 0.87953, 0.58372, 0.93622, 0.70334],
++  ['c', 0.96218, 0.75771, 0.97984, 0.87832, 0.99867, 0.99225],
++  ['l', 1, 1], ['l', 0, 1], ['l', 0, 0.55743], ['l', 0.00590, 0.55468],
++  ['c', 0.08052, 0.50814, 0.14941, 0.32490, 0.21968, 0.18180],
++  ['c', 0.26580, 0.08789, 0.31517, 0.01042, 0.36396, 0.00097],
++  ['z']
++];
++
++// hair-thin decorative "ribbon" outlines scattered behind the content
++const RIBBON_A = [
++  ['m', 0.85932, 0.01434],
++  ['c', 0.84979, 0.01778, 0.84035, 0.02188, 0.83103, 0.02672],
++  ['c', 0.80617, 0.03961, 0.78216, 0.05770, 0.75943, 0.08225],
++  ['c', 0.68602, 0.16146, 0.63536, 0.29741, 0.58000, 0.41889],
++  ['c', 0.52463, 0.54036, 0.45582, 0.65680, 0.37193, 0.67173],
++  ['c', 0.28805, 0.68665, 0.19289, 0.59910, 0.12276, 0.69027],
++  ['c', 0.07134, 0.75677, 0.05832, 0.89288, 0.01427, 0.97674],
++  ['l', 0, 1], ['l', 1, 0.56721], ['l', 0.93368, 0], ['l', 0.91011, 0.00204],
++  ['c', 0.89297, 0.00434, 0.87600, 0.00832, 0.85932, 0.01434],
++  ['z']
++];
++
++const RIBBON_B = [
++  ['m', 0.56248, 0.01652],
++  ['c', 0.60863, -0.01037, 0.65797, -0.00086, 0.70491, 0.01966],
++  ['c', 0.77644, 0.05094, 0.84823, 0.10483, 0.92005, 0.08106],
++  ['c', 0.93615, 0.07573, 0.95201, 0.06606, 0.96749, 0.05246],
++  ['l', 0.97794, 0.04232], ['l', 1, 0.38401], ['l', 0, 1], ['l', 0.00586, 0.96863],
++  ['c', 0.01906, 0.89470, 0.03091, 0.81791, 0.05314, 0.77149],
++  ['c', 0.10163, 0.66965, 0.16744, 0.76745, 0.22545, 0.75077],
++  ['c', 0.28345, 0.73410, 0.33104, 0.60404, 0.36933, 0.46837],
++  ['c', 0.40761, 0.33269, 0.44264, 0.18084, 0.49341, 0.09237],
++  ['c', 0.50912, 0.06495, 0.52573, 0.04474, 0.54292, 0.03034],
++  ['c', 0.54936, 0.02494, 0.55589, 0.02036, 0.56248, 0.01652],
++  ['z']
++];
++
++const RIBBON_C = [
++  ['m', 0.51236, 0.11386],
++  ['c', 0.50630, 0.11742, 0.50029, 0.12168, 0.49436, 0.12670],
++  ['c', 0.47855, 0.14009, 0.46327, 0.15887, 0.44881, 0.18435],
++  ['c', 0.40211, 0.26656, 0.36988, 0.40767, 0.33465, 0.53376],
++  ['c', 0.29943, 0.65984, 0.25565, 0.78070, 0.20228, 0.79620],
++  ['c', 0.14891, 0.81169, 0.08836, 0.72081, 0.04375, 0.81545],
++  ['c', 0.02330, 0.85859, 0.01239, 0.92995, 0.00025, 0.99865],
++  ['l', 0, 1], ['l', 1, 0.29394], ['l', 0.97893, 0], ['l', 0.97740, 0.00392],
++  ['c', 0.93762, 0.09599, 0.89072, 0.15733, 0.84134, 0.17384],
++  ['c', 0.77526, 0.19593, 0.70921, 0.14585, 0.64340, 0.11678],
++  ['c', 0.60022, 0.09771, 0.55482, 0.08887, 0.51236, 0.11386],
++  ['z']
++];
++
++const RIBBON_D = [
++  ['m', 0.47697, 0.26286],
++  ['c', 0.51644, 0.24215, 0.55865, 0.24948, 0.59881, 0.26528],
++  ['c', 0.65999, 0.28937, 0.72141, 0.33087, 0.78284, 0.31257],
++  ['c', 0.85631, 0.29068, 0.92385, 0.17369, 0.96787, 0.00942],
++  ['l', 0.97019, 0], ['l', 1, 0.37070], ['l', 0, 1], ['l', 0.00081, 0.99610],
++  ['c', 0.01210, 0.93916, 0.02224, 0.88003, 0.04125, 0.84428],
++  ['c', 0.08274, 0.76585, 0.13903, 0.84116, 0.18865, 0.82832],
++  ['c', 0.23827, 0.81548, 0.27898, 0.71532, 0.31173, 0.61084],
++  ['c', 0.34449, 0.50635, 0.37445, 0.38941, 0.41788, 0.32128],
++  ['c', 0.43132, 0.30016, 0.44553, 0.28460, 0.46023, 0.27351],
++  ['c', 0.46574, 0.26935, 0.47133, 0.26582, 0.47697, 0.26286],
++  ['z']
++];
++
++/** Convert a normalised path into pptxgenjs custGeom points (inches). */
++function pathPoints(spec, w, h) {
++  return spec.map(function (seg) {
++    if (seg[0] === 'z') return { close: true };
++    if (seg[0] === 'm') return { x: seg[1] * w, y: seg[2] * h, moveTo: true };
++    if (seg[0] === 'l') return { x: seg[1] * w, y: seg[2] * h };
++    return {
++      x: seg[5] * w, y: seg[6] * h,
++      curve: { type: 'cubic', x1: seg[1] * w, y1: seg[2] * h, x2: seg[3] * w, y2: seg[4] * h }
++    };
++  });
++}
++
++/** Add a freeform built from one of the normalised paths above. */
++function freeform(slide, spec, o) {
++  slide.addShape('custGeom', Object.assign({ fill: NOFILL, line: NOLINE }, o,
++    { points: pathPoints(spec, o.w, o.h) }));
++}
++
++/** Thin pink decorative ribbon (the deck's recurring background flourish). */
++function ribbon(slide, spec, o) {
++  freeform(slide, spec, Object.assign({ fill: NOFILL, line: { color: C.pink, width: 0.25 } }, o));
++}
++
++/* =================================================================== *
++ * Shared building blocks
++ * =================================================================== */
++
++/** Body / label text. Source text boxes are top-anchored unless stated. */
++function txt(slide, text, o) {
++  slide.addText(text, Object.assign({
++    fontFace: BODY, fontSize: 12, color: C.ink, align: 'left', valign: 'top'
++  }, o));
++}
++
++/** 40pt section heading in the theme heading font. */
++function heading(slide, text, o) {
++  txt(slide, text, Object.assign({ fontFace: HEAD, fontSize: 40 }, o));
++}
++
++/** Paragraph copy at 1.5 line spacing. */
++function body(slide, text, o) {
++  txt(slide, text, Object.assign({ lineSpacingMultiple: 1.5 }, o));
++}
++
++/** Big accent number above a small caption (the "+357 / Global Awareness" pairs). */
++function statPair(slide, o) {
++  txt(slide, o.value, {
++    x: o.x, y: o.y, w: 2.032, h: 0.707, fontFace: HEAD, fontSize: 36, bold: true,
++    color: o.color, align: 'center', valign: 'middle'
++  });
++  txt(slide, o.label, {
++    x: o.x + 0.064, y: o.y + 0.81, w: 2.032, h: 0.303, align: 'center', valign: 'middle'
++  });
++}
++
++/** White pill + coloured icon bubble + centred label. */
++function iconPill(slide, o) {
++  slide.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: 0.672, rectRadius: 0.336,
++    fill: { color: C.white }, line: NOLINE, shadow: SH_LG()
++  });
++  slide.addShape('ellipse', {
++    x: o.x + 0.125, y: o.y + 0.08, w: 0.512, h: 0.512,
++    fill: { color: o.bubble }, line: NOLINE, shadow: SH_SM()
++  });
++  icon(slide, o.icon, o.x + 0.381, o.y + 0.336, 0.24, C.white);
++  txt(slide, o.label, {
++    x: o.x + 0.992, y: o.y + 0.1845, w: 2.31, h: 0.303,
++    fontFace: HEAD, align: 'center', valign: 'middle'
++  });
++}
++
++/**
++ * Dark bezel + white screen: stands in for a device photograph.
++ * `body` is the outer chassis, `screen` the lit area (both in inches).
++ * `extras` optionally adds a home button / camera dot or a top notch.
++ */
++function deviceMock(slide, body, screen, radius, extras) {
++  slide.addShape('roundRect', Object.assign({ rectRadius: radius,
++    fill: { color: C.device }, line: NOLINE }, body));
++  slide.addShape('roundRect', Object.assign({ rectRadius: 0.03,
++    fill: { color: C.white }, line: NOLINE }, screen));
++  const cx = body.x + body.w / 2;
++  if (extras && extras.home) {                    // front camera dot + home ring
++    slide.addShape('ellipse', { x: cx - 0.02, y: body.y + 0.11, w: 0.04, h: 0.04,
++      fill: { color: '3A3A3C' }, line: NOLINE });
++    slide.addShape('ellipse', { x: cx - 0.11, y: body.y + body.h - 0.30, w: 0.22, h: 0.22,
++      fill: NOFILL, line: { color: '3A3A3C', width: 1 } });
++  }
++  if (extras && extras.notch) {
++    slide.addShape('roundRect', { x: cx - 0.55, y: screen.y - 0.02, w: 1.10, h: 0.28,
++      rectRadius: 0.13, fill: { color: C.device }, line: NOLINE });
++  }
++}
++
++
++/* =================================================================== *
++ * Icon library: small glyphs assembled from native shapes, each drawn
++ * centred on (cx, cy) inside an s x s box. `bg` is the colour behind the
++ * glyph, used to punch negative space out of a few of them.
++ * =================================================================== */
++
++function icon(slide, kind, cx, cy, s, color, bg) {
++  const fill = { color: color };
++  const bgFill = { color: bg || C.white };
++  const box = (x, y, w, h, rot) =>
++    slide.addShape('rect', { x: cx + x * s, y: cy + y * s, w: w * s, h: h * s, rotate: rot || 0, fill: fill, line: NOLINE });
++  const dot = (x, y, d) =>
++    slide.addShape('ellipse', { x: cx + x * s, y: cy + y * s, w: d * s, h: d * s, fill: fill, line: NOLINE });
++  const oval = (x, y, w, h, rot) =>
++    slide.addShape('ellipse', { x: cx + x * s, y: cy + y * s, w: w * s, h: h * s, rotate: rot || 0, fill: fill, line: NOLINE });
++  const rnd = (x, y, w, h, r, rot) =>
++    slide.addShape('roundRect', { x: cx + x * s, y: cy + y * s, w: w * s, h: h * s, rectRadius: r * s, rotate: rot || 0, fill: fill, line: NOLINE });
++  const ring = (x, y, d, lw) =>
++    slide.addShape('ellipse', { x: cx + x * s, y: cy + y * s, w: d * s, h: d * s, fill: NOFILL, line: { color: color, width: lw } });
++  const tri = (x, y, w, h, rot, f) =>
++    slide.addShape('triangle', { x: cx + x * s, y: cy + y * s, w: w * s, h: h * s, rotate: rot || 0, fill: f || fill, line: NOLINE });
++
++  switch (kind) {
++    case 'meditate':                          // lotus-pose figure
++      dot(-0.15, -0.54, 0.30);
++      rnd(-0.19, -0.24, 0.38, 0.36, 0.16);    // torso
++      box(-0.44, -0.16, 0.30, 0.10, 25);      // arms resting on the knees
++      box(0.14, -0.16, 0.30, 0.10, -25);
++      oval(-0.50, 0.04, 1.00, 0.30);          // crossed legs
++      break;
++    case 'warrior':                           // standing warrior pose
++      dot(-0.02, -0.50, 0.22);
++      box(-0.10, -0.26, 0.16, 0.34, 20);
++      box(-0.42, -0.30, 0.44, 0.09, 20);      // outstretched arms
++      box(-0.34, 0.06, 0.42, 0.09, 25);       // rear leg
++      box(0.02, 0.06, 0.10, 0.40, 0);         // front leg
++      break;
++    case 'people':                            // two figures
++      dot(-0.46, -0.44, 0.32); dot(0.14, -0.44, 0.32);
++      rnd(-0.52, -0.06, 0.44, 0.36, 0.14); rnd(0.08, -0.06, 0.44, 0.36, 0.14);
++      break;
++    case 'crowd':                             // row of four figures
++      [-0.50, -0.24, 0.02, 0.28].forEach(function (x) {
++        dot(x, -0.46, 0.20);
++        rnd(x - 0.01, -0.22, 0.22, 0.52, 0.06);
++      });
++      break;
++    case 'bars':                              // bar chart
++      box(-0.44, -0.04, 0.20, 0.44); box(-0.12, -0.28, 0.20, 0.68); box(0.20, -0.44, 0.20, 0.84);
++      break;
++    case 'star':
++      slide.addShape('star5', { x: cx - 0.55 * s, y: cy - 0.55 * s, w: 1.1 * s, h: 1.1 * s, fill: fill, line: NOLINE });
++      break;
++    case 'pinwheel':                          // four curved blades around a hub
++      [0, 90, 180, 270].forEach(function (a) {
++        const rad = a * Math.PI / 180;
++        oval(-0.17 + 0.26 * Math.sin(rad), -0.17 - 0.26 * Math.cos(rad), 0.34, 0.34, a);
++        tri(-0.14 + 0.40 * Math.sin(rad), -0.14 - 0.40 * Math.cos(rad), 0.28, 0.28, a + 45);
++      });
++      dot(-0.14, -0.14, 0.28);
++      break;
++    case 'lotus':                             // fanned petals over a base
++      [-52, -26, 0, 26, 52].forEach(function (a, i) {
++        const tall = i === 2 ? 0.78 : (i % 4 === 0 ? 0.54 : 0.66);
++        oval(-0.11 + 0.30 * Math.sin(a * Math.PI / 180), 0.16 - tall, 0.22, tall, a);
++      });
++      oval(-0.44, 0.06, 0.88, 0.20);
++      break;
++    case 'target':
++      ring(-0.50, -0.50, 1.00, 1.5); ring(-0.26, -0.26, 0.52, 1.5); dot(-0.10, -0.10, 0.20);
++      box(0.04, -0.10, 0.52, 0.08, 315);      // arrow shaft
++      tri(0.34, -0.52, 0.24, 0.24, 45);       // arrow head
++      break;
++    case 'leaf':
++      slide.addShape('teardrop', { x: cx - 0.46 * s, y: cy - 0.46 * s, w: 0.92 * s, h: 0.92 * s,
++        rotate: 225, fill: fill, line: NOLINE });
++      break;
++    case 'dumbbell':
++      box(-0.30, -0.08, 0.60, 0.16); rnd(-0.50, -0.28, 0.20, 0.56, 0.06); rnd(0.30, -0.28, 0.20, 0.56, 0.06);
++      break;
++    case 'recycle':                           // three chasing arrows
++      [0, 120, 240].forEach(function (a) {
++        const r = 0.30, rad = a * Math.PI / 180;
++        tri(-0.19 + r * Math.sin(rad), -0.19 - r * Math.cos(rad), 0.38, 0.34, a);
++      });
++      break;
++    case 'globe':
++      dot(-0.50, -0.50, 1.00);
++      slide.addShape('ellipse', { x: cx - 0.20 * s, y: cy - 0.5 * s, w: 0.40 * s, h: 1.0 * s,
++        fill: NOFILL, line: { color: bg || C.white, width: 1 } });
++      slide.addShape('rect', { x: cx - 0.5 * s, y: cy - 0.05 * s, w: 1.0 * s, h: 0.09 * s,
++        fill: bgFill, line: NOLINE });
++      break;
++    case 'mail':                              // envelope with an open flap
++      box(-0.46, -0.30, 0.92, 0.60);
++      tri(-0.42, -0.26, 0.84, 0.40, 180, bgFill);
++      break;
++    case 'telephone':                         // desk phone: handset above the body
++      slide.addShape('trapezoid', { x: cx - 0.48 * s, y: cy - 0.10 * s, w: 0.96 * s, h: 0.40 * s,
++        fill: fill, line: NOLINE });
++      rnd(-0.44, -0.44, 0.88, 0.20, 0.10);    // handset
++      dot(-0.44, -0.40, 0.24); dot(0.20, -0.40, 0.24);
++      box(-0.09, -0.36, 0.18, 0.22);          // cord
++      break;
++    case 'lock':
++      ring(-0.26, -0.52, 0.52, 2); rnd(-0.38, -0.18, 0.76, 0.60, 0.12);
++      break;
++    case 'marker':                            // map pin
++      dot(-0.42, -0.60, 0.84); tri(-0.26, 0.10, 0.52, 0.50, 180);
++      break;
++    case 'quote':
++      slide.addText('\u201C', {
++        x: cx - 0.7 * s, y: cy - s, w: 1.4 * s, h: 1.4 * s, fontFace: BODY,
++        fontSize: Math.round(s * 120), bold: true, color: color, align: 'center', valign: 'middle'
++      });
++      break;
++    default:
++      dot(-0.40, -0.40, 0.80);
++  }
++}
++
++/* =================================================================== *
++ * Page chrome: footer url on the left, pink page-number bubble right.
++ * The four full-bleed slides (1, 5, 17, 18) hide it.
++ * =================================================================== */
++
++function newSlide(pptx, pageNo) {
++  const s = pptx.addSlide();
++  s.background = { color: C.white };
++  if (pageNo) {
++    txt(s, 'www.yourwebsitedomain.com',
++      { x: 0.591, y: 6.872, w: 2.667, h: 0.286, fontSize: 10.5, color: C.grey });
++    s.addShape('ellipse',
++      { x: 12.575, y: 6.836, w: 0.391, h: 0.391, fill: { color: C.pink }, line: NOLINE });
++    txt(s, String(pageNo),
++      { x: 12.368, y: 6.832, w: 0.816, h: 0.399, fontSize: 10.5, color: C.white,
++        align: 'center', valign: 'middle' });
++  }
++  return s;
++}
++
++/* =================================================================== *
++ * Slides
++ * =================================================================== */
++
++/** 1 - Title: full-bleed purple with wave banners top and bottom. */
++function slideTitle(pptx) {
++  const s = newSlide(pptx, 0);
++  s.background = { color: C.lilac };
++  s.addShape('rect', { x: 0, y: -0.01, w: 13.333, h: 7.526, fill: { color: C.purple, transparency: 20 }, line: NOLINE });
++
++  txt(s, 'YOGA', {
++    x: 2.968, y: 2.303, w: 7.397, h: 2.895,
++    fontFace: HEAD, fontSize: 166, bold: true, color: C.white, align: 'center'
++  });
++
++  const wave = { fill: { color: C.purple, transparency: 80 }, line: { color: C.haze, width: 0.5 } };
++  freeform(s, WAVE, Object.assign({ x: -0.017, y: 5.909, w: 13.368, h: 1.783 }, wave));
++  freeform(s, WAVE, Object.assign({ x: 0, y: -0.267, w: 13.368, h: 1.783, flipH: true, flipV: true }, wave));
++
++  txt(s, 'International Day of', {
++    x: 2.098, y: 2.273, w: 7.397, h: 0.37,
++    fontFace: HEAD, fontSize: 16, italic: true, color: C.white, align: 'right'
++  });
++  txt(s, ' Uniting Body, Mind, and Spirit Through Global Harmony', {
++    x: 3.413, y: 4.787, w: 5.778, h: 0.337, fontSize: 14, italic: true, color: C.white
++  });
++}
++
++/** 2 - What Is Yoga? : photo panel left, copy + two CTA pills right. */
++function slideWhatIsYoga(pptx) {
++  const s = newSlide(pptx, 2);
++
++  heading(s, 'What Is Yoga?', { x: 7.952, y: 1.385, w: 5.238, h: 0.774 });
++  body(s, LOREM_LONG, { x: 7.952, y: 2.518, w: 4.414, h: 1.277, align: 'justify' });
++
++  [
++    { y: 4.506, fill: C.purple, icon: 'lotus',    label: 'Wellness Program' },
++    { y: 5.514, fill: C.lilac,  icon: 'meditate', label: 'Corporate Yoga'   }
++  ].forEach(function (b) {
++    s.addShape('roundRect', {
++      x: 7.948, y: b.y, w: 4.064, h: 0.698, rectRadius: 0.349,
++      fill: { color: b.fill }, line: NOLINE, shadow: SH_MD()
++    });
++    icon(s, b.icon, 8.331, b.y + 0.349, 0.26, C.white, b.fill);
++    txt(s, b.label, {
++      x: 8.823, y: b.y + 0.198, w: 2.598, h: 0.303,
++      fontFace: HEAD, color: C.white, align: 'center', valign: 'middle'
++    });
++  });
++
++  statPair(s, { x: 0.346, y: 5.079, value: '+357', label: 'Global Awareness',    color: C.purple });
++  statPair(s, { x: 2.667, y: 5.079, value: '+255', label: 'Awareness Campaign', color: C.lilac  });
++}
++
++/** 3 - Origins of Yoga: copy left, two stat tiles bottom-right. */
++function slideOrigins(pptx) {
++  const s = newSlide(pptx, 3);
++  ribbon(s, RIBBON_A, { x: 7.099, y: 4.874, w: 6.505, h: 3.381, rotate: 12.68 });
++
++  heading(s, 'Origins of Yoga', { x: 0.777, y: 1.332, w: 4.537, h: 0.774 });
++  body(s, LOREM_LONG, { x: 0.777, y: 2.401, w: 4.803, h: 0.978 });
++
++  [
++    { x: 7.157, fill: C.purple, radius: 0.144, icon: 'people', label: 'Global Awareness', value: '+150.000' },
++    { x: 9.886, fill: C.lilac,  radius: 0.154, icon: 'bars',   label: 'Social Impact',    value: '+255.000' }
++  ].forEach(function (t) {
++    s.addShape('roundRect', {
++      x: t.x, y: 4.604, w: 2.517, h: 1.665, rectRadius: t.radius,
++      fill: { color: t.fill }, line: NOLINE, shadow: SH_TOP()
++    });
++    icon(s, t.icon, t.x + 0.535, 5.253, 0.28, C.white, t.fill);
++    txt(s, t.value, {
++      x: t.x + 0.816, y: 5.06, w: 1.517, h: 0.389,
++      fontFace: HEAD, fontSize: 20, bold: true, color: C.white, align: 'center', valign: 'middle'
++    });
++    txt(s, t.label, {
++      x: t.x + 0.242, y: 5.522, w: 2.032, h: 0.303,
++      color: C.white, align: 'center', valign: 'middle'
++    });
++  });
++}
++
++/** 4 - Summer Solstice: heading + three icon pills over a lilac wave. */
++function slideSolstice(pptx) {
++  const s = newSlide(pptx, 4);
++  ribbon(s, WAVE, { x: 3.298, y: -0.167, w: 10.07, h: 1.343, flipH: true, flipV: true });
++  freeform(s, WAVE, { x: 1.511, y: 5.918, w: 13.209, h: 1.762, flipH: true, fill: { color: C.lilac }, line: NOLINE });
++
++  heading(s, 'The Summer Solstice In Yogic Tradition', { x: 1.511, y: 1.257, w: 5.818, h: 1.447 });
++
++  [
++    { y: 3.334, bubble: C.purple, icon: 'crowd',  label: 'Global Community'   },
++    { y: 4.408, bubble: C.lilac,  icon: 'target', label: 'Purpose Marketing'  },
++    { y: 5.482, bubble: C.pink,   icon: 'pinwheel', label: 'Awareness Campaign' }
++  ].forEach(function (p) {
++    iconPill(s, { x: 1.511, y: p.y, w: 3.771, bubble: p.bubble, icon: p.icon, label: p.label });
++  });
++}
++
++/** 5 - Benefits of Yoga: three tall cards, the last one filled purple. */
++function slideBenefits(pptx) {
++  const s = newSlide(pptx, 0);
++  ribbon(s, RIBBON_A, { x: -0.129, y: 4.874, w: 6.505, h: 3.381, rotate: 347.32, flipH: true });
++
++  heading(s, 'Benefits of Yoga', { x: 1.009, y: 1.124, w: 8.333, h: 0.774 });
++
++  [
++    { x: 0.983, fill: C.white,  text: C.ink,   label: 'flexibility' },
++    { x: 4.154, fill: C.white,  text: C.ink,   label: 'strength'    },
++    { x: 7.325, fill: C.purple, text: C.white, label: 'inner peace' }
++  ].forEach(function (card) {
++    s.addShape('roundRect', {
++      x: card.x, y: 2.762, w: 2.818, h: 2.944, rectRadius: 0.216,
++      fill: { color: card.fill }, line: NOLINE, shadow: SH_TOP()
++    });
++    txt(s, card.label, {
++      x: card.x + 0.379, y: 5.091, w: 2.111, h: 0.303,
++      fontFace: HEAD, color: card.text, align: 'center'
++    });
++  });
++}
++
++/** 6 - Yoga for Mental Health: snaking timeline rail with three stops. */
++function slideMentalHealth(pptx) {
++  const s = newSlide(pptx, 6);
++  const rail = { color: C.mist, width: 6 };
++
++  // straight segments and 180-degree elbows of the rail (rotated 90 degrees,
++  // exactly as authored in the source deck)
++  [-0.009, 1.938, 3.868, 5.823].forEach(function (y) {
++    s.addShape('line', { x: 9.654, y: y, w: 0, h: 1.686, rotate: 90, line: rail });
++  });
++  const ELBOW = [183.2, 356.8];          // sweep of each half-turn
++  [0.837, 4.719].forEach(function (y) {
++    s.addShape('arc', { x: 9.529, y: y, w: 1.946, h: 1.946, rotate: 90,
++      angleRange: ELBOW, line: rail, fill: NOFILL });
++  });
++  s.addShape('arc', { x: 7.853, y: 2.776, w: 1.946, h: 1.946, rotate: 90, flipV: true,
++    angleRange: ELBOW, line: rail, fill: NOFILL });
++
++  [
++    { bx: 11.219, by: 1.484, bubble: C.purple, ic: 'meditate', align: 'right',
++      tx: 8.415, ty: 1.317, cx: 7.592, cy: 1.611, title: 'Awareness Campaign' },
++    { bx: 7.626,  by: 3.495, bubble: C.lilac,  ic: 'people',   align: 'left',
++      tx: 8.597, ty: 3.261, cx: 8.597, cy: 3.555, title: 'Global Solidarity' },
++    { bx: 11.219, by: 5.368, bubble: C.pink,   ic: 'crowd',    align: 'right',
++      tx: 8.415, ty: 5.2,   cx: 7.592, cy: 5.494, title: 'Human Rights' }
++  ].forEach(function (stop) {
++    s.addShape('ellipse', { x: stop.bx, y: stop.by, w: 0.512, h: 0.512,
++      fill: { color: stop.bubble }, line: NOLINE, shadow: SH_SM() });
++    icon(s, stop.ic, stop.bx + 0.256, stop.by + 0.256, 0.24, C.white, stop.bubble);
++    txt(s, stop.title, { x: stop.tx, y: stop.ty, w: 2.31, h: 0.303, fontFace: HEAD, align: stop.align });
++    body(s, LOREM_SHORT, { x: stop.cx, y: stop.cy, w: 3.133, h: 0.675, align: stop.align });
++  });
++
++  heading(s, 'Yoga for Mental Health', { x: 1.087, y: 5.09, w: 5.43, h: 1.447 });
++}
++
++/** 7 - Physical Health & Healing: 2x2 numbered pills + tablet mockup. */
++function slidePhysical(pptx) {
++  const s = newSlide(pptx, 7);
++
++  // tablet photo stand-in (rotated landscape device, bleeding off the right edge)
++  deviceMock(s, { x: 8.077, y: 1.069, w: 5.400, h: 4.167 },
++                { x: 8.480, y: 1.306, w: 4.997, h: 3.708 }, 0.26);
++  ribbon(s, RIBBON_B, { x: 3.734, y: 5.356, w: 9.622, h: 3.115, rotate: 11.28 });
++
++  heading(s, [
++    { text: 'Physical Health', options: { breakLine: true } },
++    { text: '& Healing' }
++  ], { x: 1.149, y: 1.226, w: 5.362, h: 1.447 });
++
++  [
++    { x: 1.046, y: 3.736, n: '01', bubble: C.purple, title: 'Global Community'     },
++    { x: 6.783, y: 3.741, n: '02', bubble: C.lilac,  title: 'Awareness Campaign'   },
++    { x: 1.046, y: 5.246, n: '03', bubble: C.lilac,  title: 'Global Solidarity'    },
++    { x: 6.783, y: 5.250, n: '04', bubble: C.lilac,  title: 'Celebration Initiative' }
++  ].forEach(function (card) {
++    s.addShape('roundRect', { x: card.x, y: card.y, w: 5.465, h: 1.111, rectRadius: 0.556,
++      fill: { color: C.white }, line: NOLINE, shadow: SH_LG() });
++    s.addShape('ellipse', { x: card.x + 0.088, y: card.y + 0.129, w: 0.853, h: 0.853,
++      fill: { color: card.bubble }, line: NOLINE, shadow: SH_SM() });
++    txt(s, card.n, { x: card.x + 0.103, y: card.y + 0.354, w: 0.822, h: 0.404,
++      fontFace: HEAD, fontSize: 18, color: C.white, align: 'center', valign: 'middle' });
++    txt(s, card.title, { x: card.x + 1.174, y: card.y + 0.254, w: 3.317, h: 0.303,
++      fontFace: HEAD, align: 'center' });
++    txt(s, 'A global celebration of wellness, balance.', {
++      x: card.x + 1.022, y: card.y + 0.528, w: 3.622, h: 0.303, align: 'center' });
++  });
++}
++
++/** 8 - Breathing Practices: three square icon cards + copy. */
++function slideBreathing(pptx) {
++  const s = newSlide(pptx, 8);
++  ribbon(s, RIBBON_C, { x: 5.481, y: 5.404, w: 10.224, h: 3.257, rotate: 12.68 });
++
++  heading(s, [
++    { text: 'Breathing Practices ', options: { color: C.ink } },
++    { text: '(Pranayama)', options: { color: C.lilac } }
++  ], { x: 7.649, y: 1.225, w: 5.117, h: 2.121 });
++
++  [
++    { x: 0.926, fill: C.purple, ic: 'warrior',  icColor: C.white, text: C.white, label: 'Social Impact'  },
++    { x: 3.112, fill: C.white,  ic: 'lotus',    icColor: C.lilac, text: C.ink,   label: 'Cultural Unity' },
++    { x: 5.363, fill: C.white,  ic: 'recycle',  icColor: C.lilac, text: C.ink,   label: 'Sustainability' }
++  ].forEach(function (card) {
++    s.addShape('roundRect', { x: card.x, y: 4.199, w: 1.81, h: 1.81, rectRadius: 0.19,
++      fill: { color: card.fill }, line: NOLINE, shadow: SH_TOP() });
++    icon(s, card.ic, card.x + 0.905, 4.905, 0.42, card.icColor, card.fill);
++    txt(s, card.label, { x: card.x - 0.151, y: 5.303, w: 2.111, h: 0.303,
++      color: card.text, align: 'center' });
++  });
++
++  body(s, LOREM_LONG, { x: 7.65, y: 4.466, w: 4.414, h: 1.277, align: 'justify' });
++}
++
++/** 9 - Meditation and Stillness: long copy, one pill, two circular photos. */
++function slideMeditation(pptx) {
++  const s = newSlide(pptx, 9);
++  ribbon(s, RIBBON_D, { x: 3.163, y: 4.913, w: 10.183, h: 3.931, rotate: 12.68 });
++
++  heading(s, 'Meditation and Stillness', { x: 1.006, y: 1.275, w: 3.667, h: 1.447 });
++  body(s, 'International Day of Yoga, celebrated every June 21st, honors the timeless tradition ' +
++          'of yoga that has transcended borders to become a universal symbol of peace, health, ' +
++          'and holistic well-being. This presentation explores the origins of yoga, its impact ' +
++          'on physical and mental wellness, and how it has evolved into a movement that unites ' +
++          'people across cultures.',
++       { x: 1.006, y: 2.946, w: 5.205, h: 1.886 });
++
++  iconPill(s, { x: 1.006, y: 5.6, w: 3.771, bubble: C.purple, icon: 'leaf', label: 'Fresh Ingredients' });
++
++  txt(s, 'Humanity',   { x: 6.899, y: 4.529, w: 2.31, h: 0.303, fontFace: HEAD, align: 'center' });
++  txt(s, 'Connection', { x: 10.129, y: 4.529, w: 2.31, h: 0.303, fontFace: HEAD, align: 'center' });
++}
++
++/** 10 - Virtual Yoga Sessions: phone mockup, quote card, two reviews. */
++function slideVirtual(pptx) {
++  const s = newSlide(pptx, 10);
++
++  deviceMock(s, { x: 3.304, y: 0.889, w: 2.874, h: 5.778 },
++                { x: 3.446, y: 1.028, w: 2.590, h: 5.500 }, 0.40, { notch: true });
++
++  heading(s, 'Virtual Yoga Sessions', { x: 7.147, y: 1.028, w: 4.85, h: 1.447 });
++
++  [
++    { y: 3.012, title: 'Recognition Day'  },
++    { y: 4.923, title: 'Ethical Branding' }
++  ].forEach(function (rev) {
++    txt(s, rev.title, { x: 8.618, y: rev.y, w: 2.31, h: 0.303, fontFace: HEAD });
++    body(s, LOREM_MED, { x: 8.621, y: rev.y + 0.381, w: 3.631, h: 0.675 });
++    for (let i = 0; i < 5; i++) {
++      icon(s, 'star', 11.085 + i * 0.201, rev.y + 0.151, 0.14, C.lilac);
++    }
++  });
++
++  // testimonial card
++  s.addShape('roundRect', { x: 0.748, y: 2.967, w: 3.542, h: 2.381, rectRadius: 0.167,
++    fill: { color: C.purple }, line: NOLINE, shadow: SH_TOP() });
++  body(s, 'A global celebration of wellness, balance, and mindfulness.',
++    { x: 0.985, y: 3.492, w: 3.069, h: 0.675, color: C.white, align: 'center' });
++  txt(s, 'Unknown Writer', { x: 1.364, y: 4.536, w: 2.31, h: 0.303,
++    fontFace: HEAD, color: C.white, align: 'center' });
++  s.addShape('ellipse', { x: 3.528, y: 2.727, w: 0.512, h: 0.512,
++    fill: { color: C.white }, line: NOLINE, shadow: SH_SM() });
++  icon(s, 'quote', 3.784, 3.02, 0.3, C.purple);
++}
++
++/** 11 - Yoga for All Ages: text column + purple callout card. */
++function slideAllAges(pptx) {
++  const s = newSlide(pptx, 11);
++
++  heading(s, 'Yoga for All Ages', { x: 1.014, y: 1.13, w: 4.151, h: 1.447 });
++
++  txt(s, 'Cultural Representation Day', { x: 1.04, y: 4.003, w: 3.17, h: 0.303, fontFace: HEAD });
++  body(s, IDY_LONG, { x: 1.04, y: 4.575, w: 3.625, h: 1.583 });
++
++  s.addShape('roundRect', { x: 5.614, y: 3.78, w: 4.641, h: 2.378, rectRadius: 0.175,
++    fill: { color: C.purple }, line: NOLINE, shadow: SH_LG() });
++  s.addShape('roundRect', { x: 5.387, y: 4.135, w: 2.983, h: 0.481, rectRadius: 0.24,
++    fill: { color: C.lilac }, line: NOLINE, shadow: SH_LG() });
++  txt(s, 'Awareness Campaign', { x: 5.887, y: 4.224, w: 2.373, h: 0.303,
++    fontFace: ALT, bold: true, color: C.white });
++  body(s, IDY_SHORT, { x: 5.893, y: 4.797, w: 4.127, h: 0.978, color: C.white });
++}
++
++/** 12 - Global Celebrations: grey world map, pins, arcs and three pills. */
++function slideGlobal(pptx) {
++  const s = newSlide(pptx, 12);
++
++  worldMap(s, { x: 0.99, y: 1.380, w: 6.951, h: 3.931 });
++
++  heading(s, [
++    { text: 'Global', options: { breakLine: true } },
++    { text: 'Celebrations' }
++  ], { x: 8.573, y: 1.321, w: 6.27, h: 1.447 });
++
++  [
++    { y: 3.375, bubble: C.purple, ic: 'pinwheel', label: 'Global Solidarity'  },
++    { y: 4.449, bubble: C.lilac,  ic: 'lotus', label: 'Awareness Campaign'    },
++    { y: 5.523, bubble: C.pink,   ic: 'meditate', label: 'Celebration Initiative' }
++  ].forEach(function (p, i) {
++    iconPill(s, { x: i === 2 ? 8.52 : 8.572, y: p.y, w: 3.771, bubble: p.bubble, icon: p.ic, label: p.label });
++  });
++
++  // lilac banner + caption under the map
++  s.addShape('roundRect', { x: 1.039, y: 4.87, w: 2.819, h: 0.481, rectRadius: 0.24,
++    fill: { color: C.lilac }, line: NOLINE, shadow: SH_LG() });
++  txt(s, 'Awareness Campaign', { x: 1.363, y: 4.96, w: 2.201, h: 0.303,
++    fontFace: ALT, bold: true, color: C.white, align: 'center' });
++  body(s, IDY_SHORT, { x: 1.088, y: 5.557, w: 5.928, h: 0.675 });
++}
++
++/**
++ * Light-grey world map: four filled polygons (Americas, Eurasia+Africa,
++ * Oceania, Antarctica) traced from the source artwork, normalised to 0..1.
++ */
++const CONTINENTS = [
++  [ // Eurasia + Africa
++    0.980,0.107, 0.691,0.014, 0.643,0.082, 0.623,0.043, 0.603,0.089, 0.519,0.082, 0.487,0.128,
++    0.491,0.192, 0.443,0.181, 0.457,0.260, 0.403,0.491, 0.435,0.559, 0.497,0.566, 0.531,0.851,
++    0.571,0.822, 0.609,0.708, 0.603,0.609, 0.675,0.399, 0.719,0.434, 0.749,0.541, 0.752,0.470,
++    0.788,0.431, 0.832,0.626, 0.882,0.655, 0.888,0.537, 0.860,0.577, 0.832,0.552, 0.844,0.452,
++    0.888,0.416, 0.906,0.256, 0.926,0.278, 0.908,0.349, 0.938,0.327, 0.938,0.263, 0.882,0.153,
++    0.930,0.146, 0.952,0.206
++  ],
++  [ // North + South America
++    0.445,0.011, 0.385,-0.018, 0.160,0.075, 0.066,0.071, 0.010,0.135, 0.004,0.171, 0.062,0.146,
++    0.076,0.174, 0.056,0.299, 0.074,0.406, 0.184,0.537, 0.174,0.633, 0.218,0.740, 0.222,0.890,
++    0.259,0.890, 0.287,0.836, 0.337,0.633, 0.244,0.516, 0.170,0.520, 0.156,0.431, 0.124,0.441,
++    0.126,0.388, 0.174,0.367, 0.184,0.423, 0.184,0.356, 0.220,0.285, 0.299,0.231, 0.299,0.039,
++    0.335,0.050, 0.349,0.146, 0.389,0.093, 0.425,0.117, 0.417,0.064
++  ],
++  [ // Oceania
++    0.936,0.598, 0.940,0.626, 0.962,0.641, 0.968,0.690, 0.950,0.694, 0.948,0.680, 0.932,0.676,
++    0.930,0.641, 0.916,0.637, 0.916,0.662, 0.900,0.665, 0.902,0.712, 0.886,0.744, 0.862,0.765,
++    0.858,0.854, 0.900,0.829, 0.920,0.829, 0.940,0.879, 0.940,0.907, 0.950,0.911, 0.950,0.883,
++    0.984,0.840, 0.998,0.797, 0.996,0.769, 0.974,0.701, 0.974,0.669, 0.996,0.658, 0.976,0.612
++  ],
++  [ // Antarctica
++    0.423,0.993, 0.413,0.968, 0.397,1.011, 0.381,1.021, 0.050,1.021, 0.050,1.032, 0.072,1.068,
++    0.397,1.068, 0.419,1.036
++  ]
++];
++
++// map pins, and the lilac arcs that link them (angles in degrees)
++const MAP_PINS = [
++  [1.588, 2.273], [3.563, 1.268], [4.625, 2.047],
++  [3.026, 3.650], [4.858, 3.896], [6.508, 2.937]
++];
++const MAP_ARCS = [
++  { x: 6.061, y: 3.103, w: 1.202, h: 1.223, a: [280.2, 359.2] },
++  { x: 5.084, y: 3.393, w: 2.061, h: 1.084, a: [5.6, 168.3]   },
++  { x: 1.696, y: 1.361, w: 3.192, h: 1.678, a: [179.7, 287.9] },
++  { x: 3.165, y: 3.518, w: 1.728, h: 1.084, a: [5.6, 182.5]   },
++  { x: 3.201, y: 1.329, w: 1.544, h: 1.424, a: [258.5, 359.2] },
++  { x: 4.344, y: 2.265, w: 2.338, h: 1.424, a: [238.3, 359.2] }
++];
++
++function worldMap(slide, box) {
++  CONTINENTS.forEach(function (flat) {
++    const pts = [];
++    for (let i = 0; i < flat.length; i += 2) {
++      pts.push({ x: flat[i] * box.w, y: flat[i + 1] * box.h, moveTo: i === 0 });
++    }
++    pts.push({ close: true });
++    slide.addShape('custGeom', { x: box.x, y: box.y, w: box.w, h: box.h,
++      points: pts, fill: { color: C.map }, line: NOLINE });
++  });
++
++  MAP_ARCS.forEach(function (a) {
++    slide.addShape('arc', { x: a.x, y: a.y, w: a.w, h: a.h, angleRange: a.a,
++      line: { color: C.lilac, width: 0.75 }, fill: NOFILL });
++  });
++
++  MAP_PINS.forEach(function (p) {
++    icon(slide, 'marker', p[0] + 0.147, p[1] + 0.147, 0.28, C.purple);
++  });
++
++  // the highlighted destination: white star inside a lilac bubble
++  slide.addShape('ellipse', { x: 7.126, y: 3.841, w: 0.219, h: 0.219,
++    fill: { color: C.lilac }, line: NOLINE, shadow: SH_SM() });
++  icon(slide, 'star', 7.236, 3.951, 0.12, C.white);
++}
++
++/** 13 - Yoga in Education: three white cards left, stat block right. */
++function slideEducation(pptx) {
++  const s = newSlide(pptx, 13);
++  ribbon(s, RIBBON_D, { x: -0.403, y: 4.824, w: 10.996, h: 3.931, rotate: 347.32, flipH: true });
++
++  heading(s, [
++    { text: 'Yoga in', options: { breakLine: true } },
++    { text: 'Education' }
++  ], { x: 7.682, y: 0.971, w: 5.332, h: 1.447, color: C.black });
++
++  [
++    { y: 0.663, ty: 1.057, cy: 1.418, color: C.lilac,  title: 'Global Solidarity'    },
++    { y: 2.840, ty: 3.234, cy: 3.595, color: C.purple, title: 'Awareness Campaign'   },
++    { y: 5.016, ty: 5.410, cy: 5.771, color: C.pink,   title: 'International Message' }
++  ].forEach(function (card) {
++    s.addShape('roundRect', { x: 1.105, y: card.y, w: 5.562, h: 1.82, rectRadius: 0.148,
++      fill: { color: C.white }, line: NOLINE, shadow: SH_TOP() });
++    txt(s, card.title, { x: 3.122, y: card.ty, w: 2.227, h: 0.303, fontFace: HEAD, color: card.color });
++    body(s, LOREM_MED, { x: 3.122, y: card.cy, w: 3.656, h: 0.671 });
++  });
++
++  // purple highlight block
++  s.addShape('roundRect', { x: 7.682, y: 2.98, w: 4.049, h: 1.81, rectRadius: 0.19,
++    fill: { color: C.purple }, line: NOLINE, shadow: SH_TOP() });
++  icon(s, 'meditate', 8.408, 3.85, 0.44, C.white, C.purple);
++  txt(s, '+85%', { x: 9.024, y: 3.153, w: 2.445, h: 0.924,
++    fontFace: HEAD, fontSize: 36, bold: true, color: C.white, lineSpacingMultiple: 1.5 });
++  txt(s, 'International Recognition', { x: 9.063, y: 4.032, w: 3.069, h: 0.369,
++    color: C.white, lineSpacingMultiple: 1.5 });
++  s.addShape('rightArrow', { x: 11.028, y: 3.552, w: 0.302, h: 0.288, rotate: 270,
++    fill: { color: C.white }, line: NOLINE });
++
++  statPair(s, { x: 7.379, y: 5.416, value: '+357', label: 'Awareness Campaign',   color: C.purple });
++  statPair(s, { x: 9.699, y: 5.416, value: '+255', label: 'Diversity Celebration', color: C.lilac });
++}
++
++/** 14 - Workplace Wellness: three photo tiles, the middle one purple. */
++function slideWorkplace(pptx) {
++  const s = newSlide(pptx, 14);
++
++  heading(s, 'Workplace Wellness with Yoga', { x: 2.224, y: 0.724, w: 8.886, h: 0.774, align: 'center' });
++
++  s.addShape('roundRect', { x: 4.803, y: 2.076, w: 3.728, h: 4.4, rectRadius: 0.425,
++    fill: { color: C.purple }, line: NOLINE, shadow: SH_TOP() });
++
++  [
++    { x: 1.675, label: 'Diversity Celebration', color: C.ink   },
++    { x: 5.611, label: 'Shared Values',         color: C.white },
++    { x: 9.548, label: 'Global Solidarity',     color: C.ink   }
++  ].forEach(function (t) {
++    txt(s, t.label, { x: t.x, y: 5.869, w: 2.111, h: 0.303, fontFace: HEAD, color: t.color, align: 'center' });
++  });
++
++  s.addShape('ellipse', { x: 12.144, y: 0.951, w: 0.204, h: 0.204, fill: NOFILL, line: { color: C.pink, width: 0.5 } });
++  s.addShape('ellipse', { x: 12.473, y: 0.744, w: 0.088, h: 0.088, fill: NOFILL, line: { color: C.pink, width: 0.5 } });
++}
++
++/** 15 - Eco-Yoga Movement: heading, copy and three circular icons. */
++function slideEco(pptx) {
++  const s = newSlide(pptx, 15);
++
++  heading(s, 'Eco-Yoga Movement', { x: 6.064, y: 1.657, w: 6.539, h: 0.774 });
++  body(s, IDY_LONG, { x: 6.064, y: 3.022, w: 5.936, h: 0.974, align: 'justify' });
++
++  [
++    { x: 6.411, fill: C.purple, ic: 'dumbbell', icColor: C.white, label: 'Solidarity'    },
++    { x: 8.811, fill: C.white,  ic: 'lotus',    icColor: C.lilac, label: 'Celebration'   },
++    { x: 11.211, fill: C.white, ic: 'leaf',     icColor: C.pink,  label: 'Collaboration' }
++  ].forEach(function (b) {
++    s.addShape('ellipse', { x: b.x, y: 4.763, w: 0.512, h: 0.512,
++      fill: { color: b.fill }, line: NOLINE, shadow: SH_TOP() });
++    icon(s, b.ic, b.x + 0.256, 5.019, 0.24, b.icColor, b.fill);
++    txt(s, b.label, { x: b.x - 0.769, y: 5.54, w: 2.05, h: 0.303, fontFace: HEAD, align: 'center' });
++  });
++}
++
++/** 16 - Inspiring Yoga Stories: two tab pills over two copy columns. */
++function slideStories(pptx) {
++  const s = newSlide(pptx, 16);
++
++  ribbon(s, RIBBON_B, { x: 6.532, y: 5.747, w: 6.825, h: 2.533, rotate: 12.68,
++    line: { color: C.white, width: 0.25 } });
++  deviceMock(s, { x: 8.158, y: 1.333, w: 3.499, h: 4.834 },
++                { x: 8.352, y: 1.681, w: 3.111, h: 4.138 }, 0.18, { home: true });
++
++  heading(s, 'Inspiring Yoga Stories', { x: 1.447, y: 1.321, w: 6.474, h: 0.774 });
++
++  [
++    { x: 1.589, fill: C.purple, icColor: C.white,  ic: 'lock',  text: C.white, label: 'Awareness'  },
++    { x: 4.459, fill: C.white,  icColor: C.purple, ic: 'lotus', text: C.ink,   label: 'Connection' }
++  ].forEach(function (tab) {
++    s.addShape('roundRect', { x: tab.x, y: 3.035, w: 2.382, h: 0.698, rectRadius: 0.349,
++      fill: { color: tab.fill }, line: NOLINE, shadow: SH_TOP() });
++    icon(s, tab.ic, tab.x + 0.383, 3.384, 0.26, tab.icColor, tab.fill);
++    txt(s, tab.label, { x: tab.x + 0.322, y: 3.23, w: 2.227, h: 0.303,
++      fontFace: HEAD, color: tab.text, align: 'center' });
++    body(s, 'International Day of Yoga, celebrated every June 21st, honors the timeless tradition ' +
++            'of yoga that has transcended borders to become a universal symbol of peace, health.',
++      { x: tab.x, y: 4.019, w: 2.382, h: 2.189, align: 'justify' });
++  });
++}
++
++/** 17 - Call to Action: three contact rows over a lilac wave. */
++function slideContact(pptx) {
++  const s = newSlide(pptx, 0);
++  freeform(s, WAVE_FLAT, { x: 0, y: 5.602, w: 12.568, h: 1.898, fill: { color: C.lilac }, line: NOLINE });
++
++  heading(s, 'Call to Action', { x: 7.588, y: 1.026, w: 6.539, h: 0.774 });
++
++  // only the first row sits on a white pill in the source deck
++  s.addShape('roundRect', { x: 7.006, y: 2.341, w: 5.562, h: 1.203, rectRadius: 0.6,
++    fill: { color: C.white }, line: NOLINE, shadow: SH_TOP() });
++
++  [
++    { y: 2.626, bubble: C.purple, ic: 'telephone', label: 'Phone',   value: '+01-234-567-890'       },
++    { y: 3.945, bubble: C.lilac,  ic: 'mail',      label: 'E-Mail',  value: 'loremipsum@yourmail.com' },
++    { y: 5.287, bubble: C.olive,  ic: 'globe',     label: 'Website', value: 'www.yourwebsitedomain.com' }
++  ].forEach(function (row) {
++    s.addShape('ellipse', { x: 7.636, y: row.y, w: 0.539, h: 0.539,
++      fill: { color: row.bubble }, line: NOLINE, shadow: SH_TOP() });
++    icon(s, row.ic, 7.906, row.y + 0.27, 0.24, C.white, row.bubble);
++    txt(s, row.label, { x: 8.567, y: row.y - 0.04, w: 2.898, h: 0.303, fontFace: HEAD });
++    txt(s, row.value, { x: 8.567, y: row.y + 0.294, w: 2.898, h: 0.303 });
++  });
++}
++
++/** 18 - Thank You: mirror of the title slide. */
++function slideThanks(pptx) {
++  const s = newSlide(pptx, 0);
++  s.background = { color: C.lilac };
++  s.addShape('rect', { x: 0, y: -0.01, w: 13.333, h: 7.526,
++    fill: { color: C.purple, transparency: 10 }, line: NOLINE });
++
++  const wave = { fill: NOFILL, line: { color: C.white, width: 0.75 } };
++  freeform(s, WAVE, Object.assign({ x: 0, y: 5.909, w: 13.368, h: 1.783 }, wave));
++  freeform(s, WAVE, Object.assign({ x: 0, y: -0.167, w: 13.368, h: 1.783, flipH: true, flipV: true }, wave));
++
++  txt(s, 'Share Your Energy', { x: 5.719, y: 2.356, w: 7.397, h: 0.438,
++    fontFace: HEAD, fontSize: 20, color: C.white, align: 'center' });
++  txt(s, 'Thank You!', { x: 1.484, y: 2.732, w: 10.365, h: 2.036,
++    fontFace: HEAD, fontSize: 115, color: C.white, align: 'center' });
++  txt(s, '\u201CThank you for breathing, stretching, and celebrating the unity of yoga.\u201D',
++    { x: 2.363, y: 4.732, w: 5.778, h: 0.572, fontSize: 14, color: C.white });
++}
++
++/* =================================================================== *
++ * Build
++ * =================================================================== */
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++  pptx.layout = 'WIDE';                  // 12192000 x 6858000 EMU
++  pptx.author = 'pptxgenjs';
++  pptx.title = 'International Day of Yoga';
++
++  [
++    slideTitle, slideWhatIsYoga, slideOrigins, slideSolstice, slideBenefits,
++    slideMentalHealth, slidePhysical, slideBreathing, slideMeditation, slideVirtual,
++    slideAllAges, slideGlobal, slideEducation, slideWorkplace, slideEco,
++    slideStories, slideContact, slideThanks
++  ].forEach(function (fn) { fn(pptx); });
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '049713e3-65ff-48b5-a4d3-12f5e7d971c3_grok_final.pptx')
++  });
++}
++
++build().then(function (f) { console.log('wrote', f); }).catch(function (e) {
++  console.error(e);
++  process.exit(1);
++});

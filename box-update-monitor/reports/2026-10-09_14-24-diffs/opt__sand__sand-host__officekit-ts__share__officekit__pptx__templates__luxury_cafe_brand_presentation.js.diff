@@ -1,0 +1,998 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/luxury_cafe_brand_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/luxury_cafe_brand_presentation.js
+@@ -0,0 +1,995 @@
++/**
++ * "Sananta - Luxury Cafe Presentation" — 25 slide deck rebuilt with pptxgenjs.
++ *
++ * Photographs in the source deck are represented here by tinted rectangles
++ * tagged "[image]" (the original template ships with empty picture
++ * placeholders, so these read the same way the reference does).
++ *
++ * Run:  node 01ddd6a0-1b12-4db6-9382-b0e4e6c40adf_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Design tokens (theme "~~SANANTA")
++ * ------------------------------------------------------------------ */
++
++const C = {
++  gold: 'D79D57', // accent1
++  brown: '8E5C1A', // accent2
++  rust: '8E3321', // accent3
++  orange: 'C05924', // accent4
++  plum: '572A3E', // accent5
++  purple: '634672', // accent6
++  dark: '3B2F2F', // tx2 - deep espresso panels
++  white: 'FFFFFF',
++  ink: '262626', // headline grey (tx1 lum 85%)
++  body: '404040', // body copy (tx1 lum 75%)
++  muted: '595959',
++  hairline: 'D9D9D9',
++  grey: '808080',
++  axis: '9397A2',
++  numberChip: '2C2323',
++  band: 'F2F2F2',
++  tableAlt: 'F7F7F7',
++};
++
++const HEAD = 'Marcellus'; // theme major latin
++const BODY = 'Roboto'; // theme minor latin
++
++const SLIDE_W = 13.3333333;
++const SLIDE_H = 7.5;
++
++/** Soft drop shadow used by every "card" in the deck. */
++const CARD_SHADOW = { type: 'outer', blur: 45, offset: 15, angle: 90, color: '000000', opacity: 0.07 };
++
++/** Cubic-bezier constant for approximating a quarter circle. */
++const K = 0.5523;
++
++let pptx; // set in build()
++let S; // pptx.shapes shorthand
++
++/* ------------------------------------------------------------------ *
++ * Small text helpers — each mirrors one recurring style in the deck
++ * ------------------------------------------------------------------ */
++
++/** Gold, letter-spaced kicker above every title ("IMAGE SLIDE", ...). */
++function eyebrow(slide, text, x, y, w, opts = {}) {
++  slide.addText(text, {
++    x, y, w, h: 0.313,
++    fontFace: BODY, fontSize: 14, charSpacing: 3, color: opts.color || C.gold,
++    align: opts.align || 'left', valign: 'bottom', lineSpacingMultiple: 0.9,
++  });
++}
++
++/** 48pt Marcellus headline (60pt on the section divider). */
++function title(slide, text, x, y, w, h, opts = {}) {
++  slide.addText(text, {
++    x, y, w, h,
++    fontFace: HEAD, fontSize: opts.fontSize || 48, color: opts.color || C.ink,
++    align: opts.align || 'left', valign: 'top', lineSpacingMultiple: 0.8,
++  });
++}
++
++/** 16pt Marcellus coloured sub-heading. */
++function subhead(slide, text, x, y, w, opts = {}) {
++  slide.addText(text, {
++    x, y, w, h: 0.343,
++    fontFace: HEAD, fontSize: 16, color: opts.color || C.gold,
++    align: opts.align || 'left', valign: 'bottom',
++  });
++}
++
++/** 12pt Roboto paragraph copy; `text` may be a string or array of strings.
++ *  The deck's body list style is 130% leading with 8pt after each paragraph. */
++function copy(slide, text, x, y, w, h, opts = {}) {
++  const paras = Array.isArray(text) ? text : [text];
++  const runOpts = { breakLine: true };
++  if (opts.bullet) runOpts.bullet = opts.bullet;
++  slide.addText(paras.map((t) => ({ text: t, options: runOpts })), {
++    x, y, w, h,
++    fontFace: BODY, fontSize: 12, color: opts.color || C.body,
++    align: opts.align || 'left', valign: opts.valign || 'top',
++    lineSpacingMultiple: 1.3, paraSpaceAfter: 8,
++  });
++}
++
++/** Big statistic ("200+", "74%", "$55"). */
++function stat(slide, text, x, y, w, opts = {}) {
++  slide.addText(text, {
++    x, y, w, h: opts.h || 0.586,
++    fontFace: HEAD, fontSize: opts.fontSize || 32, color: opts.color || C.gold,
++    align: opts.align || 'left', valign: opts.valign || 'bottom',
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Shape helpers
++ * ------------------------------------------------------------------ */
++
++/** Empty photo frame: faint grey wash + "[image]" tag, exactly where the
++ *  reference deck keeps its picture placeholder. */
++function imageFrame(slide, x, y, w, h, opts = {}) {
++  slide.addShape(opts.shape || S.RECTANGLE, {
++    x, y, w, h,
++    fill: { color: 'A6A6A6', transparency: 95 },
++    rectRadius: opts.rectRadius,
++    points: opts.points,
++  });
++  slide.addText('[image]', {
++    x, y: y + h / 2 - 0.16, w, h: 0.32,
++    fontFace: BODY, fontSize: 10, color: 'A0A0A0', align: 'center', valign: 'middle',
++  });
++}
++
++/** The two-layer white card (outer plate + hairline inner plate). */
++function card(slide, o) {
++  slide.addShape(S.ROUNDED_RECTANGLE, {
++    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: 0.03,
++    fill: { color: o.fill || C.white }, shadow: CARD_SHADOW,
++  });
++  slide.addShape(S.ROUNDED_RECTANGLE, {
++    x: o.ix, y: o.iy, w: o.iw, h: o.ih, rectRadius: 0.03,
++    fill: o.innerFill === 'none' ? undefined : { color: o.innerFill || C.white },
++    line: { color: o.innerLine || C.hairline, width: 0.75 },
++  });
++}
++
++/** Standard 2.794 x 2.498 square card (used on slides 5-8, 18). */
++function squareCard(slide, x, y, opts = {}) {
++  card(slide, {
++    x, y, w: 2.794, h: 2.498,
++    ix: x + 0.137, iy: y + 0.127, iw: 2.52, ih: 2.244,
++    ...opts,
++  });
++}
++
++/** Tall 2.794 x 4.109 card (slides 13 & 17). */
++function tallCard(slide, x, opts = {}) {
++  card(slide, {
++    x, y: 2.353, w: 2.794, h: 4.109,
++    ix: x + 0.137, iy: 2.48, iw: 2.52, ih: 3.842,
++    ...opts,
++  });
++}
++
++/** Full-width panel behind the chart / table (slides 15 & 16). */
++function panelCard(slide) {
++  card(slide, {
++    x: 0.749, y: 2.353, w: 11.902, h: 4.173,
++    ix: 0.903, iy: 2.519, iw: 11.594, ih: 3.842,
++  });
++}
++
++/** Arch (rectangle capped by a semicircle) — the deck's signature outline. */
++function archPoints(w, h) {
++  const r = w / 2;
++  return [
++    { x: 0, y: h },
++    { x: 0, y: r },
++    { x: r, y: 0, curve: { type: 'cubic', x1: 0, y1: r * (1 - K), x2: r * (1 - K), y2: 0 } },
++    { x: w, y: r, curve: { type: 'cubic', x1: r * (1 + K), y1: 0, x2: w, y2: r * (1 - K) } },
++    { x: w, y: h },
++    { close: true },
++  ];
++}
++
++function archOutline(slide, x, y, w, h, opts = {}) {
++  slide.addShape(S.CUSTOM_GEOMETRY, {
++    x, y, w, h,
++    points: archPoints(w, h),
++    rotate: opts.rotate || 0,
++    line: { color: opts.color || C.gold, width: opts.width || 1.5, transparency: opts.transparency || 0 },
++  });
++}
++
++/** Rounded "squircle" used for the team portraits on slide 11. */
++function blobPoints(s) {
++  const f = (v) => v * s;
++  return [
++    { x: f(0.5), y: 0 },
++    { x: f(0.759), y: f(0.107), curve: { type: 'cubic', x1: f(0.594), y1: 0, x2: f(0.687), y2: f(0.036) } },
++    { x: f(0.893), y: f(0.241) },
++    { x: f(0.893), y: f(0.759), curve: { type: 'cubic', x1: f(1.036), y1: f(0.384), x2: f(1.036), y2: f(0.616) } },
++    { x: f(0.759), y: f(0.893) },
++    { x: f(0.241), y: f(0.893), curve: { type: 'cubic', x1: f(0.616), y1: f(1.036), x2: f(0.384), y2: f(1.036) } },
++    { x: f(0.107), y: f(0.759) },
++    { x: f(0.107), y: f(0.241), curve: { type: 'cubic', x1: f(-0.036), y1: f(0.616), x2: f(-0.036), y2: f(0.384) } },
++    { x: f(0.241), y: f(0.107) },
++    { x: f(0.5), y: 0, curve: { type: 'cubic', x1: f(0.313), y1: f(0.036), x2: f(0.406), y2: 0 } },
++    { close: true },
++  ];
++}
++
++/** Quarter disc; `cx`/`cy` (0 or 1) pick which corner the straight edges meet. */
++function quarterDiscPoints(s, cx, cy) {
++  const kx = cx * s;
++  const ky = cy * s;
++  const ox = s - kx;
++  const oy = s - ky;
++  return [
++    { x: kx, y: ky },
++    { x: ox, y: ky },
++    { x: kx, y: oy, curve: { type: 'cubic', x1: ox, y1: ky + K * (oy - ky), x2: kx + K * (ox - kx), y2: oy } },
++    { close: true },
++  ];
++}
++
++/** S-curve ribbon of the "wave" infographic (slide 22), normalised 0..1. */
++function wavePoints(w, h) {
++  const p = (fx, fy) => ({ x: fx * w, y: fy * h });
++  const cub = (fx, fy, x1, y1, x2, y2) => ({
++    x: fx * w, y: fy * h,
++    curve: { type: 'cubic', x1: x1 * w, y1: y1 * h, x2: x2 * w, y2: y2 * h },
++  });
++  return [
++    p(1.0, 0.0),
++    cub(0.875, 0.188, 1.0, 0.0, 0.94, 0.007),
++    cub(0.614, 0.861, 0.813, 0.355, 0.646, 0.788),
++    cub(0.44, 1.0, 0.577, 0.945, 0.53, 1.0),
++    cub(0.0, 1.0, 0.0, 1.0, 0.0, 1.0),
++    cub(0.174, 0.861, 0.09, 1.0, 0.137, 0.945),
++    cub(0.435, 0.188, 0.206, 0.788, 0.373, 0.355),
++    cub(0.56, 0.0, 0.5, 0.007, 0.56, 0.0),
++    p(1.0, 0.0),
++    { close: true },
++  ];
++}
++
++/** Simple outlined drink glyph used inside the coloured icon circles. */
++function drinkIcon(slide, cx, cy, size, color) {
++  const w = size * 0.62;
++  slide.addShape(S.ROUNDED_RECTANGLE, {
++    x: cx - w / 2, y: cy - size * 0.42, w, h: size * 0.14,
++    rectRadius: 0.02, line: { color, width: 1 },
++  });
++  slide.addShape(S.TRAPEZOID, {
++    x: cx - w / 2 + size * 0.05, y: cy - size * 0.22, w: w - size * 0.1, h: size * 0.6,
++    flipV: true, line: { color, width: 1 },
++  });
++}
++
++/** Coloured circle + white drink glyph (the deck's icon badge). */
++function iconBadge(slide, x, y, d, color) {
++  slide.addShape(S.OVAL, { x, y, w: d, h: d, fill: { color } });
++  drinkIcon(slide, x + d / 2, y + d / 2, d * 0.62, C.white);
++}
++
++/** Master furniture: brand mark, footer and page chip. Drawn first so that
++ *  full-bleed slide panels can cover it, exactly as in the reference. */
++function chrome(slide, pageNo) {
++  slide.addText('Sananta', {
++    x: 11.378, y: 0.209, w: 1.666, h: 0.41,
++    fontFace: HEAD, fontSize: 20, color: C.gold, align: 'right', valign: 'top', lineSpacingMultiple: 0.9,
++  });
++  footer(slide, { color: C.grey, transparency: 60 });
++  pageChip(slide, pageNo);
++}
++
++function footer(slide, opts = {}) {
++  slide.addText('Luxury Cafe Presentation © 2024', {
++    x: 0.289, y: 6.986, w: 2.445, h: 0.269,
++    fontFace: BODY, fontSize: 10, color: opts.color || C.white,
++    transparency: opts.transparency === undefined ? 60 : opts.transparency,
++    align: 'left', valign: 'bottom',
++  });
++}
++
++function pageChip(slide, pageNo) {
++  slide.addShape(S.ROUNDED_RECTANGLE, {
++    x: 12.546, y: 6.884, w: 0.252, h: 0.472, rotate: 270, rectRadius: 0.126,
++    line: { color: C.brown, width: 0.75 },
++  });
++  slide.addText(String(pageNo), {
++    x: 12.436, y: 6.994, w: 0.472, h: 0.252,
++    fontFace: HEAD, fontSize: 9, bold: true, color: C.gold, align: 'center', valign: 'middle',
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Repeated copy
++ * ------------------------------------------------------------------ */
++
++const LOREM_LONG =
++  'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. ';
++const LOREM_MED = 'A wonderful serenity has taken possession of my entire soul, like these sweet of spring.';
++const LOREM_SHORT = 'A wonderful serenity has taken possession of my entire soul.';
++const LOREM_MORNINGS = 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings';
++const LOREM_TAKEN = 'A wonderful serenity has taken possession.';
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++// 1 — Cover, full-bleed photo dimmed to 55% black
++function slide01(s) {
++  s.addShape(S.RECTANGLE, { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: { color: '000000', transparency: 45 } });
++  imageFrame(s, 0, 0, SLIDE_W, SLIDE_H);
++  s.addShape(S.ROUNDED_RECTANGLE, {
++    x: 1.848, y: 1.167, w: 2.971, h: 5.167, rectRadius: 1.4855, line: { color: C.gold, width: 1.5 },
++  });
++  s.addText('Sananta', {
++    x: 2.303, y: 2.704, w: 5.002, h: 1.463,
++    fontFace: HEAD, fontSize: 88, color: C.white, valign: 'top', lineSpacingMultiple: 0.9,
++  });
++  s.addText('LUXURY CAFÉ PRESENTATION', {
++    x: 2.303, y: 4.073, w: 2.32, h: 0.645,
++    fontFace: BODY, fontSize: 14, charSpacing: 3, color: C.white, valign: 'top', lineSpacingMultiple: 1.2,
++  });
++}
++
++// 2 — Split cover: photo left, espresso panel right
++function slide02(s) {
++  imageFrame(s, 0, 0, 6.667, SLIDE_H);
++  s.addShape(S.ROUNDED_RECTANGLE, {
++    x: 1.848, y: 1.167, w: 2.971, h: 5.167, rectRadius: 1.4855, line: { color: C.gold, width: 1.5 },
++  });
++  s.addShape(S.RECTANGLE, { x: 6.667, y: 0, w: 6.667, h: SLIDE_H, fill: { color: C.dark } });
++  s.addText('Sananta', {
++    x: 7.649, y: 2.743, w: 5.002, h: 1.463,
++    fontFace: HEAD, fontSize: 88, color: C.white, valign: 'top', lineSpacingMultiple: 0.9,
++  });
++  s.addText('LUXURY CAFÉ PRESENTATION', {
++    x: 7.649, y: 4.112, w: 2.32, h: 0.645,
++    fontFace: BODY, fontSize: 14, charSpacing: 3, color: C.white, valign: 'top', lineSpacingMultiple: 1.2,
++  });
++  s.addShape(S.LINE, { x: 9.698, y: 4.289, w: 3.635, h: 0, line: { color: C.gold, width: 1.5 } });
++}
++
++// 3 — Section divider on a full espresso background
++function slide03(s) {
++  s.addShape(S.RECTANGLE, { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: { color: C.dark } });
++  archOutline(s, 0.714, 0.32, 5.264, 6.859, { rotate: 90 });
++  imageFrame(s, 0, 1.378, 6.458, 4.744);
++  eyebrow(s, 'SECTION SLIDE', 7.649, 1.81, 4.653);
++  title(s, 'The title for Section Slide', 7.649, 2.189, 4.653, 2.548, { fontSize: 60, color: C.white });
++  copy(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring.',
++    7.649, 5.088, 4.653, 0.602, { color: C.white });
++}
++
++// 4 — Introduction: espresso pill + circular photo
++function slide04(s) {
++  s.addShape(S.ROUNDED_RECTANGLE, {
++    x: 0.978, y: 1.583, w: 11.673, h: 4.333, rectRadius: 2.1665, fill: { color: C.dark },
++  });
++  eyebrow(s, 'INTRODUCTION SLIDE', 7.496, 2.323, 4.859);
++  title(s, 'Introducing Sananta Cafe', 7.496, 2.702, 4.859, 1.412, { color: C.white });
++  copy(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings.',
++    7.496, 4.575, 4.05, 0.602, { color: C.white });
++  s.addShape(S.OVAL, { x: 0.682, y: 0.757, w: 5.986, h: 5.986, line: { color: C.gold, width: 1.5 } });
++  imageFrame(s, 0.978, 1.053, 5.395, 5.395, { shape: S.OVAL });
++}
++
++// 5 — Description: two paragraphs + stat card + arched photo
++function slide05(s) {
++  archOutline(s, 6.667, 0.726, 5.264, 6.859);
++  imageFrame(s, 6.927, 1.042, 4.744, 6.458);
++  eyebrow(s, 'DESCRIPTION SLIDE', 0.919, 1.348, 4.859);
++  title(s, 'Glimpse of Sananta Cafe', 0.919, 1.727, 4.859, 1.412);
++  copy(s, [
++    'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for the bliss of souls like mine.',
++    'I am so happy, my dear friend, so absorbed in the exquisite sense of mere tranquil existence, that I neglect my talents. Then, I should be incapable of drawing a stroke.',
++  ], 0.919, 3.6, 4.05, 2.552);
++  squareCard(s, 5.27, 3.655);
++  stat(s, '200+', 5.626, 4.085, 2.131, { align: 'center' });
++  copy(s, LOREM_MED, 5.626, 4.665, 2.131, 1.128, { align: 'center' });
++}
++
++// 6 — Photo left, two feature cards, two subtitle blocks right
++function slide06(s) {
++  imageFrame(s, 0, 0, 7.0, SLIDE_H);
++  squareCard(s, 2.131, 1.252);
++  iconBadge(s, 3.143, 1.62, 0.77, C.gold);
++  copy(s, LOREM_SHORT, 2.462, 2.517, 2.131, 0.865, { align: 'center', valign: 'bottom' });
++  squareCard(s, 4.925, 3.75);
++  iconBadge(s, 5.937, 4.118, 0.77, C.brown);
++  copy(s, LOREM_SHORT, 5.256, 5.015, 2.131, 0.865, { align: 'center', valign: 'bottom' });
++  eyebrow(s, 'IMAGE SLIDE', 7.781, 1.356, 4.521);
++  title(s, 'Luxuriate in Every Cup', 7.781, 1.735, 4.521, 1.412);
++  [[3.839, C.gold], [5.219, C.brown]].forEach(([y, color]) => {
++    subhead(s, 'Subtitle Text Here', 8.483, y, 3.818, { color });
++    copy(s, LOREM_MED, 8.483, y + 0.338, 3.818, 0.602);
++  });
++}
++
++// 7 — Two offset photos with a dark stat card
++function slide07(s) {
++  imageFrame(s, 5.73, 0, 3.7, 5.801);
++  imageFrame(s, 9.634, 1.699, 3.7, 5.801);
++  eyebrow(s, 'IMAGE SLIDE', 0.919, 1.699, 3.986);
++  title(s, 'A Haven for Discerning Tastes', 0.919, 2.079, 3.986, 2.058);
++  subhead(s, 'Subtitle Text Here', 0.919, 4.598, 3.986);
++  copy(s, LOREM_LONG, 0.919, 4.936, 3.986, 0.865);
++  squareCard(s, 8.135, 3.655, { fill: C.dark, innerFill: 'none', innerLine: C.gold });
++  stat(s, '200+', 8.491, 4.085, 2.131, { align: 'center' });
++  copy(s, LOREM_MED, 8.491, 4.665, 2.131, 1.128, { align: 'center', color: C.white });
++}
++
++// 8 — Three staggered photos, each with a floating card
++function slide08(s) {
++  [[0.682, 2.508], [4.971, 1.478], [9.26, 2.21]].forEach(([x, y]) => imageFrame(s, x, y, 4.074, 4.242));
++  const cards = [
++    { x: 4.971, y: 0.75, color: C.brown },
++    { x: 0.682, y: 1.78, color: C.gold },
++    { x: 9.26, y: 1.482, color: C.rust },
++  ];
++  cards.forEach((c, i) => {
++    squareCard(s, c.x, c.y);
++    iconBadge(s, c.x + 1.012, c.y + 0.368, 0.77, c.color);
++    copy(s, LOREM_SHORT, c.x + 0.332, c.y + 1.265, 2.131, 0.865, { align: 'center', valign: 'bottom' });
++    if (i === 1) eyebrow(s, 'IMAGE SLIDE', 0.919, 1.103, 3.986);
++  });
++}
++
++// 9 — Arched photo left, headline + two statistics right
++function slide09(s) {
++  archOutline(s, 0.682, -0.089, 5.0, 6.516, { rotate: 180 });
++  imageFrame(s, 0.929, 0, 4.506, 6.135);
++  eyebrow(s, 'IMAGE SLIDE', 6.619, 1.499, 5.785);
++  title(s, 'Coffee Culture meets Grandeur', 6.619, 1.879, 5.785, 1.412);
++  subhead(s, 'Subtitle Text Here', 6.619, 3.752, 5.785);
++  copy(s, LOREM_LONG, 6.619, 4.089, 5.785, 0.602);
++  [['74%', 6.619, C.brown], ['+246', 9.515, C.rust]].forEach(([text, x, color]) => {
++    stat(s, text, x, 5.081, 2.889, { color });
++    copy(s, 'A wonderful serenity has taken', x, 5.661, 2.889, 0.34);
++  });
++}
++
++// 10 — Espresso half + 2x3 photo grid
++function slide10(s) {
++  s.addShape(S.RECTANGLE, { x: 0, y: 0, w: 6.889, h: SLIDE_H, fill: { color: C.dark } });
++  archOutline(s, 1.201, 0.942, 5.264, 6.629, { transparency: 80 });
++  eyebrow(s, 'IMAGE SLIDE', 0.919, 1.699, 3.986);
++  title(s, 'A Haven for Discerning Tastes', 0.919, 2.079, 3.986, 2.058, { color: C.white });
++  subhead(s, 'Subtitle Text Here', 0.919, 4.598, 3.986);
++  copy(s, LOREM_LONG, 0.919, 4.936, 3.986, 0.865, { color: C.white });
++  footer(s);
++  [5.635, 8.237, 10.838].forEach((x) => {
++    [1.206, 3.799].forEach((y) => imageFrame(s, x, y, 2.495, 2.495));
++  });
++}
++
++// 11 — Team grid with squircle portraits
++function slide11(s) {
++  eyebrow(s, 'PROFILE/TEAM SLIDE', 2.716, 0.896, 7.902, { align: 'center' });
++  title(s, 'Meet Our Best Team', 2.716, 1.275, 7.902, 0.766, { align: 'center' });
++  const people = ['Andrew Marshall', 'Angela Swan', 'Timothy Boston', 'Rosemary White'];
++  people.forEach((name, i) => {
++    const col = i * 2.99;
++    s.addShape(S.CUSTOM_GEOMETRY, {
++      x: 1.298 + col, y: 2.609, w: 1.99, h: 1.99,
++      points: blobPoints(1.99), line: { color: C.gold, width: 1.5 },
++    });
++    imageFrame(s, 1.131 + col, 2.553, 1.99, 1.99, { shape: S.CUSTOM_GEOMETRY, points: blobPoints(1.99) });
++    subhead(s, name, 0.921 + col, 4.877, 2.522, { align: 'center' });
++    s.addText('Occupation', {
++      x: 0.921 + col, y: 5.151, w: 2.522, h: 0.34,
++      fontFace: BODY, fontSize: 12, italic: true, color: C.muted, align: 'center', valign: 'top',
++    });
++    copy(s, 'A wonderful serenity has taken possession of my entire soul, like these mornings.',
++      0.921 + col, 5.628, 2.522, 0.865, { align: 'center' });
++  });
++}
++
++// 12 — Two-column paragraph slide inside a giant rounded outline
++function slide12(s) {
++  s.addShape(S.ROUNDED_RECTANGLE, {
++    x: 6.52, y: -3.114, w: 4.116, h: 15.319, rotate: 270, rectRadius: 2.058,
++    line: { color: C.gold, width: 1.5 },
++  });
++  eyebrow(s, 'PARAGRAPH SLIDE', 0.919, 0.896, 11.496);
++  title(s, 'Exquisite Coffee Atmosphere', 0.919, 1.275, 11.496, 0.766);
++  copy(s, [
++    'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my whole heart. I am alone, and feel the charm of existence in this spot, which was created for the bliss.',
++    'I am so happy, my dear friend, so absorbed in the exquisite sense of mere tranquil existence, that I neglect my talents. I should be incapable of drawing a single stroke at the present moment; and yet I feel that I never was a greater artist than now.',
++    'When, while the lovely valley teems with vapour around me, and the meridian sun strikes the upper surface of the impenetrable foliage of my trees, and but a few stray gleams steal into the inner sanctuary',
++  ], 2.046, 3.083, 5.923, 2.927, { valign: 'middle' });
++  copy(s, [
++    'A wonderful serenity has taken possession.',
++    'Like these sweet mornings of spring which I enjoy with my whole heart.',
++    'I am alone, and feel the charm of existence in this spot, which was created for the bliss.',
++    'I am so happy, my dear friend, so absorbed in the exquisite sense of mere tranquil existence.',
++    'I should be incapable of drawing a single stroke at the present moment.',
++  ], 8.453, 3.102, 3.961, 2.889, {
++    valign: 'middle',
++    bullet: { characterCode: '2756', indent: 21 },
++  });
++}
++
++// 13 — Four feature cards over an espresso band
++function slide13(s) {
++  s.addShape(S.RECTANGLE, { x: 0, y: 5.308, w: SLIDE_W, h: 2.192, fill: { color: C.dark } });
++  eyebrow(s, 'FEATURE SLIDE', 2.716, 0.896, 7.902, { align: 'center' });
++  title(s, 'Featured Items', 2.716, 1.275, 7.902, 0.766, { align: 'center' });
++  [C.gold, C.brown, C.rust, C.orange].forEach((color, i) => {
++    const x = 0.749 + i * 3.014;
++    tallCard(s, x);
++    iconBadge(s, x + 0.415, 2.721, 0.77, color);
++    subhead(s, 'Subtitle Here', x + 0.331, 3.815, 2.131, { color });
++    copy(s, LOREM_LONG, x + 0.331, 4.153, 2.131, 1.653);
++  });
++  footer(s);
++  pageChip(s, 13);
++}
++
++// 14 — Numbered list beside a headline
++function slide14(s) {
++  eyebrow(s, 'FEATURE SLIDE', 0.919, 1.699, 3.986);
++  title(s, 'Luxury is Always on the Menu', 0.919, 2.079, 3.986, 2.058);
++  subhead(s, 'Subtitle Text Here', 0.919, 4.598, 3.986);
++  copy(s, LOREM_LONG, 0.919, 4.936, 3.986, 0.865);
++  ['01', '02', '03', '04'].forEach((num, i) => {
++    const y = 1.05 + i * 1.4575;
++    s.addShape(S.OVAL, { x: 5.821, y, w: 0.72, h: 0.72, line: { color: C.gold, width: 1 } });
++    s.addShape(S.OVAL, { x: 5.889, y: y + 0.069, w: 0.583, h: 0.583, fill: { color: C.band } });
++    s.addText(num, {
++      x: 5.889, y: y + 0.069, w: 0.583, h: 0.583,
++      fontFace: HEAD, fontSize: 14, color: C.gold, align: 'center', valign: 'middle', margin: 0,
++    });
++    subhead(s, 'Subtitle Text Here', 6.765, y, 5.649);
++    copy(s, LOREM_LONG, 6.765, y + 0.337, 5.649, 0.602);
++  });
++}
++
++// 15 — Smoothed line chart with two callout statistics
++function slide15(s) {
++  eyebrow(s, 'TABLE/CHART SLIDE', 0.919, 0.896, 11.496, { align: 'center' });
++  title(s, 'Simple Line Chart', 0.919, 1.275, 11.496, 0.766, { align: 'center' });
++  panelCard(s);
++  const labels = ['3/1/2024', '3/2/2024', '3/3/2024', '3/4/2024', '3/5/2024',
++    '3/6/2024', '3/7/2024', '3/8/2024', '3/9/2024'];
++  s.addChart(pptx.charts.LINE, [
++    { name: 'Data 1', labels, values: [3, 12, 17, 12, 23, 26, 19, 24, 20] },
++    { name: 'Data 2', labels, values: [12, 21, 22, 17, 28, 19, 27, 26, 32] },
++  ], {
++    x: 1.181, y: 2.763, w: 7.47, h: 3.305,
++    chartColors: [C.gold, C.brown],
++    lineSize: 2.25, lineSmooth: true, lineDataSymbol: 'circle', lineDataSymbolSize: 5,
++    showLegend: false,
++    catAxisLabelFontFace: BODY, catAxisLabelFontSize: 10.5, catAxisLabelColor: C.grey,
++    catAxisLineColor: 'E6E6E6',
++    valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12, valAxisLabelColor: C.grey,
++    valAxisLineShow: false, valAxisMajorUnit: 5,
++    valGridLine: { color: C.band, size: 0.75 }, catGridLine: { style: 'none' },
++  });
++  [['74%', 2.787, C.gold], ['82%', 4.648, C.brown]].forEach(([text, y, color]) => {
++    stat(s, text, 8.948, y, 3.205, { color });
++    copy(s, 'A wonderful serenity has taken these possession of my entire soul, like these sweet mornings of spring.',
++      8.948, y + 0.58, 3.205, 0.865);
++  });
++}
++
++// 16 — Six column data table with sentiment badges
++function slide16(s) {
++  panelCard(s);
++  eyebrow(s, 'TABLE/CHART SLIDE', 0.919, 0.896, 11.496, { align: 'center' });
++  title(s, 'Simple Table', 0.919, 1.275, 11.496, 0.766, { align: 'center' });
++
++  const head = ['Request A Quote', 'Type #1', 'Type #2', 'Type #3', 'Type #4', 'Testimoni'];
++  const stages = [
++    ['Awareness', 'Satisfied'],
++    ['Consideration', 'Happy'],
++    ['Purchase', 'Normal'],
++    ['Advocacy', 'Satisfied'],
++    ['Venture', 'Sad'],
++  ];
++  const vRule = { pt: 0.5, color: C.hairline };
++  const none = { type: 'none' };
++  const cellBorder = [none, vRule, none, vRule]; // top, right, bottom, left
++
++  const rows = [head.map((t) => ({
++    text: t,
++    options: { fill: { color: C.gold }, color: C.white, fontFace: HEAD, fontSize: 16, border: [none, none, none, none] },
++  }))];
++  stages.forEach(([stage, mood], r) => {
++    const bg = r % 2 === 1 ? C.tableAlt : C.white;
++    const base = { fill: { color: bg }, color: C.body, fontFace: BODY, fontSize: 12, border: cellBorder };
++    rows.push([
++      { text: stage, options: base },
++      ...[1, 2, 3, 4].map(() => ({ text: 'Type Here', options: base })),
++      { text: mood, options: { ...base, border: [none, none, none, vRule], margin: [0, 0.1, 0, 0.55] } },
++    ]);
++  });
++
++  s.addTable(rows, {
++    x: 1.013, y: 2.645, w: 11.402,
++    colW: [2.146, 1.782, 1.782, 1.782, 1.782, 2.129],
++    rowH: Array(6).fill(0.597),
++    valign: 'middle', margin: [0, 0.1, 0, 0.1], autoPage: false,
++  });
++
++  [C.brown, C.gold, C.orange, C.brown, C.purple].forEach((color, i) => {
++    s.addShape(S.OVAL, { x: 10.418, y: 3.373 + i * 0.5963, w: 0.342, h: 0.342, fill: { color } });
++  });
++}
++
++// 17 — Price cards, the third one inverted
++function slide17(s) {
++  eyebrow(s, 'TABLE/CHART SLIDE', 0.919, 0.896, 11.496, { align: 'center' });
++  title(s, 'Price Table', 0.919, 1.275, 11.496, 0.766, { align: 'center' });
++  const tiers = [
++    { price: '$55', color: C.gold, dark: false },
++    { price: '$65', color: C.brown, dark: false },
++    { price: '$75', color: C.gold, dark: true },
++    { price: '$85', color: C.orange, dark: false },
++  ];
++  tiers.forEach((t, i) => {
++    const x = 0.749 + i * 3.014;
++    tallCard(s, x, t.dark ? { fill: C.dark, innerFill: 'none', innerLine: C.gold } : {});
++    subhead(s, 'Subtitle Here', x + 0.331, 2.665, 2.131, { color: t.color });
++    stat(s, t.price, x + 0.331, 3.114, 2.131, { fontSize: 40, color: t.color, valign: 'top', h: 0.707 });
++    copy(s, LOREM_LONG, x + 0.331, 4.153, 2.131, 1.653, t.dark ? { color: C.white } : {});
++  });
++}
++
++// 18 — Timeline with alternating drop pins
++function slide18(s) {
++  s.addShape(S.LINE, { x: 0, y: 2.418, w: SLIDE_W, h: 0, line: { color: C.hairline, width: 0.75 } });
++  const pins = [
++    { x: 1.096, color: C.gold, stem: 3.493, year: '2020' },
++    { x: 4.182, color: C.brown, stem: 2.333, year: '2021' },
++    { x: 6.644, color: C.rust, stem: 4.128, year: '2021' },
++    { x: 8.599, color: C.plum, stem: 3.203, year: '2022' },
++    { x: 11.492, color: C.purple, stem: 2.335, year: '2023' },
++  ];
++  pins.forEach((p) => {
++    s.addShape(S.OVAL, { x: p.x, y: 2.347, w: 0.143, h: 0.143, fill: { color: p.color } });
++    s.addShape(S.LINE, { x: p.x + 0.072, y: 2.418, w: 0, h: p.stem, line: { color: p.color, width: 1 } });
++    const cy = 2.418 + p.stem - 0.356;
++    s.addShape(S.OVAL, { x: p.x - 0.364, y: cy, w: 0.871, h: 0.871, fill: { color: p.color } });
++    s.addText(p.year, {
++      x: p.x - 0.333, y: cy, w: 0.81, h: 0.871,
++      fontFace: HEAD, fontSize: 18, color: C.white, charSpacing: -1.5, align: 'center', valign: 'middle',
++    });
++  });
++  subhead(s, 'Subtitle Here', 1.445, 2.76, 2.131);
++  copy(s, LOREM_LONG, 1.445, 3.098, 2.131, 1.653);
++  subhead(s, 'Subtitle Here', 8.948, 2.76, 1.928, { color: C.plum });
++  copy(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my heart. ',
++    8.948, 3.098, 1.928, 1.653);
++  card(s, { x: 5.326, y: 2.748, w: 2.794, h: 2.498, ix: 5.463, iy: 2.875, iw: 2.52, ih: 2.244 });
++  iconBadge(s, 6.338, 3.116, 0.77, C.rust);
++  copy(s, LOREM_SHORT, 5.658, 4.013, 2.131, 0.865, { align: 'center', valign: 'bottom' });
++  [[3.055, C.brown], [10.366, C.purple]].forEach(([x, color]) => {
++    subhead(s, 'Subtitle Here', x, 5.692, 2.394, { color, align: 'center' });
++    copy(s, LOREM_TAKEN, x, 6.03, 2.394, 0.602, { align: 'center' });
++  });
++  eyebrow(s, 'INFOGRAPHIC SLIDE', 1.365, 0.896, 10.603, { align: 'center' });
++  title(s, 'Timeline Infographic', 1.365, 1.275, 10.603, 0.766, { align: 'center' });
++}
++
++// 19 — Hexagonal ring split into six coloured wedges
++function slide19(s) {
++  eyebrow(s, 'INFOGRAPHIC SLIDE', 1.236, 0.896, 10.861, { align: 'center' });
++  title(s, 'Hexagonal Infographic', 1.236, 1.275, 10.861, 0.766, { align: 'center' });
++
++  // Pointy-top hexagonal ring: six trapezoid wedges between an outer and an
++  // inner hexagon, capped by a white hexagon carrying the "87%" figure.
++  const cx = 6.667;
++  const cy = 4.469;
++  const RX = 1.6915;
++  const RY = 1.901;
++  const IX = 0.962;
++  const IY = 1.081;
++  const vertex = (rx, ry, i) => {
++    const a = (Math.PI / 180) * (90 - 60 * i);
++    return { x: cx + rx * Math.cos(a), y: cy - ry * Math.sin(a) };
++  };
++  const hexagon = (rx, ry, dy = 0) => [...Array(6)].map((_, i) => {
++    const p = vertex(rx, ry, i);
++    return { x: p.x - (cx - rx), y: p.y - (cy - ry) + dy };
++  }).concat([{ close: true }]);
++
++  s.addShape(S.CUSTOM_GEOMETRY, { // soft drop shadow behind the ring
++    x: cx - RX, y: cy - RY, w: 2 * RX, h: 2 * RY,
++    points: hexagon(RX, RY, 0.09), fill: { color: C.body, transparency: 96 },
++  });
++
++  const wedgeColors = [C.brown, C.orange, C.plum, C.purple, C.rust, C.gold];
++  wedgeColors.forEach((color, k) => {
++    const quad = [vertex(RX, RY, k), vertex(RX, RY, k + 1), vertex(IX, IY, k + 1), vertex(IX, IY, k)];
++    const minX = Math.min(...quad.map((p) => p.x));
++    const minY = Math.min(...quad.map((p) => p.y));
++    const maxX = Math.max(...quad.map((p) => p.x));
++    const maxY = Math.max(...quad.map((p) => p.y));
++    s.addShape(S.CUSTOM_GEOMETRY, {
++      x: minX, y: minY, w: maxX - minX, h: maxY - minY,
++      points: quad.map((p) => ({ x: p.x - minX, y: p.y - minY })).concat([{ close: true }]),
++      fill: { color }, line: { color: C.white, width: 1.5 },
++    });
++    const mid = quad.reduce((acc, p) => ({ x: acc.x + p.x / 4, y: acc.y + p.y / 4 }), { x: 0, y: 0 });
++    drinkIcon(s, mid.x, mid.y, 0.42, C.white);
++  });
++  s.addShape(S.CUSTOM_GEOMETRY, {
++    x: cx - IX, y: cy - IY, w: 2 * IX, h: 2 * IY,
++    points: hexagon(IX, IY), fill: { color: C.white },
++  });
++  s.addShape(S.CUSTOM_GEOMETRY, {
++    x: 5.823, y: 3.521, w: 1.688, h: 1.897,
++    points: hexagon(0.844, 0.9485).map((p) => (p.close ? p : { x: p.x, y: p.y })),
++    fill: { color: C.white }, line: { color: C.hairline, width: 0.75 },
++  });
++  s.addText('87%', {
++    x: 5.907, y: 4.164, w: 1.52, h: 0.707,
++    fontFace: HEAD, fontSize: 40, color: C.gold, align: 'center', valign: 'top',
++  });
++
++  const labels = [
++    { x: 1.083, y: 2.464, color: C.gold, align: 'right' },
++    { x: 0.851, y: 3.999, color: C.purple, align: 'right' },
++    { x: 1.083, y: 5.535, color: C.plum, align: 'right' },
++    { x: 8.547, y: 2.464, color: C.brown, align: 'left' },
++    { x: 8.778, y: 3.999, color: C.rust, align: 'left' },
++    { x: 8.547, y: 5.535, color: C.orange, align: 'left' },
++  ];
++  labels.forEach((l) => {
++    subhead(s, 'Subtitle Here', l.x, l.y, 3.704, { color: l.color, align: l.align });
++    copy(s, LOREM_MORNINGS, l.x, l.y + 0.337, 3.704, 0.602, { align: l.align });
++  });
++}
++
++// 20 — 3x3 matrix with labelled axes
++function slide20(s) {
++  eyebrow(s, 'FEATURE SLIDE', 0.919, 2.023, 3.986);
++  title(s, 'Matrix Infographic', 0.919, 2.402, 3.986, 1.412);
++  subhead(s, 'Subtitle Text Here', 0.919, 4.275, 3.669);
++  copy(s, 'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy with my heart. ',
++    0.919, 4.612, 3.669, 0.865);
++
++  s.addShape(S.LINE, {
++    x: 5.796, y: 5.818, w: 6.35, h: 0,
++    line: { color: C.axis, width: 1, endArrowType: 'triangle' },
++  });
++  s.addShape(S.LINE, {
++    x: 5.801, y: 1.4, w: 0, h: 4.418,
++    line: { color: C.axis, width: 1, beginArrowType: 'triangle' },
++  });
++
++  const grid = [
++    [C.orange, C.rust, C.gold],
++    [C.purple, C.plum, C.rust],
++    [C.brown, C.purple, C.purple],
++  ];
++  grid.forEach((row, r) => {
++    row.forEach((color, c) => {
++      const x = 6.046 + c * 1.9475;
++      const y = 1.72 + r * 1.318;
++      s.addShape(S.ROUNDED_RECTANGLE, { x, y, w: 1.848, h: 1.233, rectRadius: 0.063, fill: { color } });
++      s.addText('YOUR VALUE', {
++        x: x + 0.115, y: y + 0.442, w: 1.618, h: 0.35,
++        fontFace: HEAD, fontSize: 14, color: C.white, align: 'center', valign: 'middle',
++      });
++    });
++  });
++
++  ['LOW', 'MEDIUM', 'HIGH'].forEach((t, i) => {
++    s.addText(t, {
++      x: 6.204 + i * 1.948, y: 1.303, w: 1.531, h: 0.292,
++      fontFace: BODY, fontSize: 11, color: C.grey, align: 'center', valign: 'top', lineSpacingMultiple: 1.1,
++    });
++  });
++  ['HIGH', 'MEDIUM', 'LOW'].forEach((t, i) => {
++    s.addText(t, {
++      x: 11.566, y: 2.191 + i * 1.318, w: 1.052, h: 0.292, rotate: 270,
++      fontFace: BODY, fontSize: 11, color: C.grey, align: 'center', valign: 'top', lineSpacingMultiple: 1.1,
++    });
++  });
++  s.addText('YOUR VALUE SUBTITLE', {
++    x: 7.681, y: 5.874, w: 2.473, h: 0.323,
++    fontFace: HEAD, fontSize: 12, color: C.body, align: 'center', valign: 'top', lineSpacingMultiple: 1.1,
++  });
++  s.addText('YOUR VALUE SUBTITLE', {
++    x: 4.369, y: 3.493, w: 2.473, h: 0.323, rotate: 90,
++    fontFace: HEAD, fontSize: 12, color: C.body, align: 'center', valign: 'top', lineSpacingMultiple: 1.1,
++  });
++}
++
++// 21 — Pinwheel of quarter discs under a rising arrow
++function slide21(s) {
++  s.addShape(S.UP_ARROW, {
++    x: 7.109, y: 1.114, w: 2.289, h: 2.019, flipH: true, fill: { color: C.gold },
++  });
++  drinkIcon(s, 8.253, 2.35, 0.78, C.white);
++
++  const leaves = [
++    { x: 7.459, y: 3.286, color: C.brown, cx: 0, cy: 0 },
++    { x: 5.697, y: 3.286, color: C.rust, cx: 1, cy: 1 },
++    { x: 5.697, y: 5.021, color: C.orange, cx: 0, cy: 0 },
++    { x: 3.935, y: 5.021, color: C.purple, cx: 1, cy: 1 },
++  ];
++  leaves.forEach((l) => {
++    s.addShape(S.CUSTOM_GEOMETRY, {
++      x: l.x, y: l.y, w: 1.583, h: 1.583,
++      points: quarterDiscPoints(1.583, l.cx, l.cy), fill: { color: l.color },
++    });
++    drinkIcon(s, l.x + 0.792 + (l.cx ? -0.12 : 0.12), l.y + 0.792 + (l.cy ? -0.12 : 0.12), 0.62, C.white);
++  });
++
++  eyebrow(s, 'PARAGRAPH SLIDE', 0.919, 0.896, 6.04);
++  title(s, 'Arrow Infographic', 0.919, 1.275, 6.04, 0.766);
++  const notes = [
++    { x: 0.919, y: 4.869, w: 2.838, color: C.purple, align: 'right' },
++    { x: 2.763, y: 3.133, w: 2.838, color: C.rust, align: 'right' },
++    { x: 7.541, y: 5.402, w: 3.029, color: C.orange, align: 'left' },
++    { x: 9.385, y: 3.666, w: 3.029, color: C.brown, align: 'left' },
++  ];
++  notes.forEach((n) => {
++    subhead(s, 'Subtitle Here', n.x, n.y, n.w, { color: n.color, align: n.align });
++    copy(s, LOREM_MORNINGS, n.x, n.y + 0.337, n.w, 0.865, { align: n.align });
++  });
++  stat(s, '94%', 9.892, 1.662, 2.523);
++  copy(s, 'A wonderful serenity has taken these possession.', 9.892, 2.242, 2.523, 0.602);
++}
++
++// 22 — Ribbon / wave process chain
++function slide22(s) {
++  eyebrow(s, 'PARAGRAPH SLIDE', 3.647, 0.896, 6.04, { align: 'center' });
++  title(s, 'Arrow Infographic', 3.647, 1.275, 6.04, 0.766, { align: 'center' });
++
++  // Ribbons are drawn back-to-front: pale under-layers first, then the four
++  // saturated bands that carry the drink glyphs.
++  const ribbons = [
++    { x: 1.063, color: 'F7EBDD' },
++    { x: 3.430, color: 'F4E0C5' },
++    { x: 5.802, color: 'F2D0C9' },
++    { x: 8.169, color: 'F6DDD0' },
++    { x: 9.353, color: C.orange },
++    { x: 4.614, color: C.brown },
++    { x: 6.985, color: C.rust },
++    { x: 2.247, color: C.gold },
++  ];
++  ribbons.forEach((wv) => {
++    s.addShape(S.CUSTOM_GEOMETRY, {
++      x: wv.x, y: 4.008, w: 2.118, h: 1.259,
++      points: wavePoints(2.118, 1.259), fill: { color: wv.color },
++    });
++  });
++  [2.982, 5.353, 7.723, 10.093].forEach((cx) => drinkIcon(s, cx, 4.63, 0.44, C.white));
++
++  [[2.645, 3.668], [7.532, 3.668], [5.802, 5.416], [10.688, 5.416]].forEach(([x, y]) => {
++    s.addShape(S.LINE, { x, y, w: 0, h: 0.19, line: { color: C.hairline, width: 1 } });
++    s.addShape(S.OVAL, { x: x - 0.04, y: y - 0.04, w: 0.08, h: 0.08, fill: { color: C.hairline } });
++  });
++
++  const notes = [
++    { x: 0.793, y: 2.579, color: C.gold },
++    { x: 5.68, y: 2.579, color: C.rust },
++    { x: 3.95, y: 5.755, color: C.brown },
++    { x: 8.836, y: 5.755, color: C.orange },
++  ];
++  notes.forEach((n) => {
++    subhead(s, 'Subtitle Here', n.x, n.y, 3.704, { color: n.color, align: 'center' });
++    copy(s, LOREM_MORNINGS, n.x, n.y + 0.338, 3.704, 0.602, { align: 'center' });
++  });
++}
++
++// 23 — Phone mockup on an espresso field
++function slide23(s) {
++  s.addShape(S.RECTANGLE, { x: 3.317, y: 0, w: 10.016, h: SLIDE_H, fill: { color: C.dark } });
++  // Phone mockup: plum chassis + black bezel; the screen is a cut-out, so the
++  // page background (white, then the espresso panel) shows through it.
++  s.addShape(S.ROUNDED_RECTANGLE, {
++    x: 1.238, y: 1.206, w: 4.032, h: 8.129, rectRadius: 0.42, fill: { color: '5F4A5E' },
++  });
++  s.addShape(S.ROUNDED_RECTANGLE, {
++    x: 1.31, y: 1.28, w: 3.888, h: 7.985, rectRadius: 0.38, fill: { color: '1D1C1A' },
++  });
++  [[2.42, 0.35], [2.9, 0.62], [3.62, 0.62]].forEach(([y, h]) => {
++    s.addShape(S.ROUNDED_RECTANGLE, { x: 1.185, y, w: 0.09, h, rectRadius: 0.03, fill: { color: '5F4A5E' } });
++  });
++  s.addShape(S.ROUNDED_RECTANGLE, { x: 5.19, y: 3.1, w: 0.09, h: 0.9, rectRadius: 0.03, fill: { color: '5F4A5E' } });
++  s.addShape(S.ROUND_2_SAME_RECTANGLE, {
++    x: 1.463, y: 1.386, w: 3.581, h: 6.114, rectRadius: 0.3, fill: { color: 'F5F5F5' },
++  });
++  s.addShape(S.ROUND_1_RECTANGLE, {
++    x: 3.317, y: 1.386, w: 1.727, h: 6.114, rectRadius: 0.3, fill: { color: C.dark },
++  });
++  s.addText('[image]', {
++    x: 1.463, y: 5.11, w: 3.581, h: 0.32,
++    fontFace: BODY, fontSize: 10, color: 'A0A0A0', align: 'center', valign: 'middle',
++  });
++  archOutline(s, 8.325, 0.942, 5.264, 6.629, { transparency: 80 });
++  eyebrow(s, 'PARAGRAPH SLIDE', 5.972, 1.375, 6.299);
++  title(s, 'Simple Smartphone Mockup', 5.972, 1.755, 6.299, 1.412, { color: C.white });
++  subhead(s, 'Subtitle Text Here', 5.972, 3.724, 2.96);
++  copy(s, [
++    'A wonderful serenity has taken possession of my entire soul.',
++    'Like these sweet mornings of spring which I enjoy.',
++    'This entire soul, like these sweet of spring.',
++  ], 5.972, 4.061, 2.96, 1.877, { color: C.white, bullet: { characterCode: '2756', indent: 21 } });
++  card(s, {
++    x: 9.477, y: 3.627, w: 2.794, h: 2.498, fill: C.gold,
++    ix: 9.614, iy: 3.754, iw: 2.52, ih: 2.244, innerFill: C.gold, innerLine: C.white,
++  });
++  stat(s, '200+', 9.834, 4.058, 2.131, { align: 'center', color: C.white });
++  copy(s, LOREM_MED, 9.834, 4.637, 2.131, 1.128, { align: 'center', color: C.white });
++  pageChip(s, 23);
++}
++
++// 24 — Laptop mockup with a numbered sidebar
++function slide24(s) {
++  s.addShape(S.RECTANGLE, { x: 0, y: 0, w: 4.331, h: SLIDE_H, fill: { color: C.dark } });
++  footer(s);
++  ['01', '02', '03', '04'].forEach((num, i) => {
++    const y = 1.05 + i * 1.342;
++    s.addShape(S.OVAL, { x: 0.682, y, w: 0.72, h: 0.72, line: { color: C.gold, width: 1 } });
++    s.addShape(S.OVAL, { x: 0.751, y: y + 0.069, w: 0.583, h: 0.583, fill: { color: C.numberChip } });
++    s.addText(num, {
++      x: 0.751, y: y + 0.069, w: 0.583, h: 0.583,
++      fontFace: HEAD, fontSize: 14, color: C.gold, align: 'center', valign: 'middle', margin: 0,
++    });
++    copy(s, 'A wonderful serenity has taken of my entire soul.', 1.627, y + 0.059, 2.262, 0.602, { color: C.white });
++  });
++  // Laptop mockup: silver shell, black bezel, screen, then the base bar.
++  s.addShape(S.ROUNDED_RECTANGLE, { x: 5.897, y: 1.043, w: 5.744, h: 4.02, rectRadius: 0.09, fill: { color: 'BDBDBD' } });
++  s.addShape(S.ROUNDED_RECTANGLE, { x: 5.958, y: 1.098, w: 5.622, h: 3.71, rectRadius: 0.06, fill: { color: '010101' } });
++  s.addShape(S.RECTANGLE, { x: 6.117, y: 1.226, w: 5.306, h: 3.361, fill: { color: C.brown } });
++  imageFrame(s, 6.117, 1.226, 5.306, 3.361);
++  s.addShape(S.ROUNDED_RECTANGLE, { x: 5.13, y: 4.85, w: 7.29, h: 0.235, rectRadius: 0.11, fill: { color: 'D1D2D7' } });
++  s.addShape(S.ROUNDED_RECTANGLE, { x: 7.72, y: 4.87, w: 2.25, h: 0.075, rectRadius: 0.03, fill: { color: '9C9C9C' } });
++  subhead(s, 'Subtitle Text Here', 5.013, 5.566, 7.527, { align: 'center' });
++  copy(s, LOREM_LONG, 5.013, 5.904, 7.527, 0.602, { align: 'center' });
++}
++
++// 25 — Thank-you closer with contact chips
++function slide25(s) {
++  imageFrame(s, 0, 0, 4.302, SLIDE_H);
++  s.addShape(S.RECTANGLE, { x: 4.302, y: 0, w: 9.032, h: SLIDE_H, fill: { color: C.dark } });
++  s.addShape(S.ROUNDED_RECTANGLE, {
++    x: 5.356, y: 1.167, w: 2.971, h: 5.167, rectRadius: 1.4855, line: { color: C.gold, width: 1.5 },
++  });
++  s.addText('Thank You', {
++    x: 5.811, y: 2.704, w: 6.682, h: 1.434,
++    fontFace: HEAD, fontSize: 88, color: C.white, valign: 'top', lineSpacingMultiple: 0.9,
++  });
++  s.addText('FOR YOUR ATTENTION', {
++    x: 5.811, y: 4.073, w: 2.32, h: 0.645,
++    fontFace: BODY, fontSize: 14, charSpacing: 3, color: C.white, valign: 'top', lineSpacingMultiple: 1.2,
++  });
++  [['+1234567890', 4.328], ['your_email@email.com', 4.95]].forEach(([text, y]) => {
++    s.addShape(S.OVAL, { x: 8.889, y, w: 0.413, h: 0.413, fill: { color: C.gold } });
++    s.addText(text, {
++      x: 9.427, y: y + 0.037, w: 3.113, h: 0.338,
++      fontFace: BODY, fontSize: 12, color: C.white, valign: 'top', lineSpacingMultiple: 1.3,
++    });
++  });
++  footer(s, { color: C.grey, transparency: 60 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Assembly
++ * ------------------------------------------------------------------ */
++
++const BUILDERS = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25,
++];
++
++// The first three layouts hide master furniture in the source deck.
++const NO_CHROME = new Set([1, 2, 3]);
++
++function build() {
++  pptx = new PptxGenJS();
++  S = pptx.shapes;
++  pptx.defineLayout({ name: 'SANANTA', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'SANANTA';
++  pptx.title = 'Sananta — Luxury Cafe Presentation';
++  pptx.author = 'Sananta';
++
++  BUILDERS.forEach((builder, i) => {
++    const slide = pptx.addSlide();
++    slide.background = { color: C.white };
++    if (!NO_CHROME.has(i + 1)) chrome(slide, i + 1);
++    builder(slide);
++  });
++
++  const out = path.join(__dirname, '01ddd6a0-1b12-4db6-9382-b0e4e6c40adf_grok_final.pptx');
++  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote', out));
++}
++
++build().catch((err) => {
++  console.error(err);
++  process.exit(1);
++});

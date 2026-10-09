@@ -1,0 +1,88 @@
+--- 2026-10-09_14-11:/exec-daemon/agent-sdk/@types/react/index.d.ts
++++ 2026-10-09_14-24:/exec-daemon/agent-sdk/@types/react/index.d.ts
+@@ -55,82 +55,30 @@
+ export type Dispatch<A> = (value: A) => void;
+ export type SetStateAction<S> = S | ((prevState: S) => S);
+ 
+-/**
+- * Event shapes follow `@types/react`: `T` is the element the handler is
+- * attached to, `E` the DOM event behind `nativeEvent`. The `globalThis.*`
+- * references are the `lib.dom` interfaces, which the module-level names
+- * below would otherwise shadow.
+- */
+-export interface SyntheticEvent<T = Element, E = Event> {
+-  nativeEvent: E;
++export interface SyntheticEvent<T = Element> {
+   target: EventTarget & T;
+   currentTarget: EventTarget & T;
+-  type: string;
+-  timeStamp: number;
+-  bubbles: boolean;
+-  cancelable: boolean;
+-  defaultPrevented: boolean;
+-  isTrusted: boolean;
+   preventDefault(): void;
+-  isDefaultPrevented(): boolean;
+   stopPropagation(): void;
+-  isPropagationStopped(): boolean;
+-  persist(): void;
+ }
+ 
+-export interface UIEvent<T = Element, E = globalThis.UIEvent> extends SyntheticEvent<T, E> {
+-  detail: number;
+-}
+-
+-export interface MouseEvent<T = Element, E = globalThis.MouseEvent> extends UIEvent<T, E> {
++export interface MouseEvent<T = Element> extends SyntheticEvent<T> {
+   button: number;
+-  buttons: number;
+   clientX: number;
+   clientY: number;
+-  pageX: number;
+-  pageY: number;
+-  screenX: number;
+-  screenY: number;
+-  movementX: number;
+-  movementY: number;
+-  relatedTarget: EventTarget | null;
+   altKey: boolean;
+   ctrlKey: boolean;
+   metaKey: boolean;
+   shiftKey: boolean;
+-  getModifierState(key: string): boolean;
+-}
+-
+-export interface PointerEvent<T = Element> extends MouseEvent<T, globalThis.PointerEvent> {
+-  pointerId: number;
+-  pointerType: "mouse" | "pen" | "touch";
+-  isPrimary: boolean;
+-  pressure: number;
+-  tangentialPressure: number;
+-  tiltX: number;
+-  tiltY: number;
+-  twist: number;
+-  width: number;
+-  height: number;
+ }
+ 
+-export interface KeyboardEvent<T = Element> extends UIEvent<T, globalThis.KeyboardEvent> {
++export interface KeyboardEvent<T = Element> extends SyntheticEvent<T> {
+   key: string;
+   code: string;
+-  location: number;
+-  repeat: boolean;
+   altKey: boolean;
+   ctrlKey: boolean;
+   metaKey: boolean;
+   shiftKey: boolean;
+-  getModifierState(key: string): boolean;
+-}
+-
+-export interface FocusEvent<Target = Element, RelatedTarget = Element> extends SyntheticEvent<
+-  Target,
+-  globalThis.FocusEvent
+-> {
+-  relatedTarget: (EventTarget & RelatedTarget) | null;
+ }
+ 
+ export interface ChangeEvent<T = Element> extends SyntheticEvent<T> {}

@@ -1,0 +1,615 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/esports_gaming_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/esports_gaming_presentation.js
+@@ -0,0 +1,612 @@
++#!/usr/bin/env node
++/**
++ * "TURN WAY - Esport Presentation 2025" rebuilt with pptxgenjs.
++ * 20 slides, 13.333 x 7.5 in (16:9 wide).
++ *
++ * The original deck's photographs sit in empty picture placeholders (they render
++ * as nothing) except on slides 16 and 17, where the device mock-ups are drawn
++ * here as labelled placeholder rectangles instead of embedded bitmaps.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ---------------------------------------------------------------- palette */
++const BLUE = '0078FF'; // theme accent2
++const GOLD = 'FFC000';
++const WHITE = 'FFFFFF';
++const GREY = 'BFBFBF'; // white @ 75% luminance - body copy
++const SILVER = 'D9D9D9'; // white @ 85% luminance
++const HEAD = 'Teko'; // theme major font
++const BODY = 'Open Sans'; // theme minor font
++const ALT = 'Lato'; // used by a few runs in the original
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++/* ------------------------------------------------------------ boilerplate */
++const LOREM = {
++  sedDo: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do',
++  tempor: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor',
++  labore: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore',
++  emeteui: 'Lorem ipsum emeteui dolor sit  consectetur adipiscing.',
++  ameteu: 'Lorem ipsum dolor sit ameteu',
++  numquam: 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.',
++};
++LOREM.magna = LOREM.labore + ' et dolore magna';
++LOREM.tellus = LOREM.magna + ' aliqua. Adipiscing at in tellus';
++LOREM.varius = LOREM.tellus + ' integer feugiat scelerisque varius. Dui vivamus arcu felis bibendum ut tristique';
++
++/* ------------------------------------------------------------- primitives */
++
++/**
++ * Master background: vertical gradient from 000000 (top) to 0A0A0A (bottom).
++ * pptxgenjs only does flat backgrounds, so it is painted as the same 11 steps
++ * a renderer quantizes that gradient into.
++ */
++function backdrop(slide, pageNo) {
++  for (let v = 0; v <= 10; v++) {
++    const y0 = Math.max(0, ((v - 0.5) / 10) * SLIDE_H);
++    const y1 = Math.min(SLIDE_H, ((v + 0.5) / 10) * SLIDE_H);
++    const hex = v.toString(16).toUpperCase().padStart(2, '0');
++    slide.addShape('rect', { x: 0, y: y0, w: SLIDE_W, h: y1 - y0, fill: { color: hex + hex + hex } });
++  }
++  if (pageNo) {
++    // Master's blue page-number tab, top right corner.
++    slide.addText(String(pageNo), {
++      x: 12.187, y: 0, w: 1.145, h: 0.54, shape: 'rect', fill: { color: BLUE },
++      align: 'center', valign: 'middle', fontFace: BODY, fontSize: 18, bold: true, color: WHITE,
++    });
++  }
++}
++
++/** Teko display headline; `parts` is a list of [text, color] pairs. */
++function headline(slide, o) {
++  slide.addText(o.parts.map(function (p) { return { text: p[0], options: { color: p[1] } }; }), {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: HEAD, fontSize: o.size || 44, bold: true,
++    align: o.align || 'left', valign: 'top', charSpacing: o.spc,
++  });
++}
++
++/** Small bold all-caps line (section eyebrow, stat caption, list heading). */
++function label(slide, o) {
++  slide.addText(o.text, {
++    x: o.x, y: o.y, w: o.w, h: o.h || 0.303,
++    fontFace: BODY, fontSize: o.size || 12, bold: o.bold !== false,
++    italic: !!o.italic, color: o.color || GOLD, align: o.align || 'left',
++    charSpacing: o.spc, valign: 'top',
++  });
++}
++
++/** 13pt justified body copy at 130% leading. */
++function para(slide, o) {
++  slide.addText(o.text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: BODY, fontSize: o.size || 13, color: o.color || GREY,
++    align: o.align || 'justify', lineSpacingMultiple: o.line || 1.3, valign: 'top',
++  });
++}
++
++function rule(slide, o) {
++  slide.addShape('line', {
++    x: o.x, y: o.y, w: o.w, h: o.h || 0,
++    line: { color: o.color || BLUE, width: o.width || 4.5, dashType: o.dash },
++  });
++}
++
++/** snip2DiagRect(adj1=0, adj2=50%): top-right and bottom-left corners cut off. */
++function snipButton(slide, o) {
++  const c = Math.min(o.w, o.h) / 2;
++  slide.addShape('custGeom', {
++    x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: BLUE },
++    points: [
++      { x: 0, y: 0 }, { x: o.w - c, y: 0 }, { x: o.w, y: c },
++      { x: o.w, y: o.h }, { x: c, y: o.h }, { x: 0, y: o.h - c }, { close: true },
++    ],
++  });
++  slide.addText(o.text, {
++    x: o.x, y: o.y, w: o.w, h: o.h, align: 'center', valign: 'middle',
++    fontFace: BODY, fontSize: 14, bold: true, color: WHITE,
++  });
++}
++
++/** Plain rectangular button. */
++function flatButton(slide, o) {
++  slide.addText(o.text, {
++    x: o.x, y: o.y, w: o.w, h: o.h, shape: 'rect', fill: { color: BLUE },
++    align: 'center', valign: 'middle', fontFace: BODY, fontSize: 16, bold: true, color: WHITE,
++  });
++}
++
++/** snip2DiagRect(adj1=50%, adj2=50%): all four corners cut - a flat hexagon. */
++function hexBadge(slide, o) {
++  const c = o.h / 2;
++  slide.addShape('custGeom', {
++    x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: BLUE },
++    points: [
++      { x: c, y: 0 }, { x: o.w - c, y: 0 }, { x: o.w, y: c },
++      { x: o.w - c, y: o.h }, { x: c, y: o.h }, { x: 0, y: c }, { close: true },
++    ],
++  });
++  slide.addText(o.text, {
++    x: o.x, y: o.y, w: o.w, h: o.h, align: 'center', valign: 'middle',
++    fontFace: BODY, fontSize: 18, bold: true, color: WHITE,
++  });
++}
++
++/** Slanted progress bar (parallelogram, adj 73614). */
++function slantBar(slide, o) {
++  const s = 0.73614 * Math.min(o.w, o.h);
++  slide.addShape('custGeom', {
++    x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.color },
++    points: [{ x: s, y: 0 }, { x: o.w, y: 0 }, { x: o.w - s, y: o.h }, { x: 0, y: o.h }, { close: true }],
++  });
++}
++
++/**
++ * Stand-in for a bitmap that is not embedded in this rebuild. The originals are
++ * silver-framed devices showing a black screen, so a dark panel with a light
++ * outline keeps the slide reading the same way.
++ */
++function imagePlaceholder(slide, o) {
++  slide.addShape('rect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: { color: '0A0A0A' }, line: { color: 'A8A8A8', width: 1.5 },
++  });
++  slide.addText(o.label, {
++    x: o.x, y: o.y, w: o.w, h: o.h, align: 'center', valign: 'middle',
++    fontFace: BODY, fontSize: 12, color: '6E6E6E',
++  });
++}
++
++/** White tick mark, drawn instead of the original check icon graphic. */
++function checkMark(slide, o) {
++  const P = [[0.897, 0.165], [0.364, 0.669], [0.107, 0.406], [0.019, 0.491],
++    [0.359, 0.841], [0.449, 0.757], [0.981, 0.252]];
++  slide.addShape('custGeom', {
++    x: o.x, y: o.y, w: o.s, h: o.s, fill: { color: WHITE },
++    points: P.map(function (p) { return { x: p[0] * o.s, y: p[1] * o.s }; }).concat([{ close: true }]),
++  });
++}
++
++const OUTLINE = { color: WHITE, width: 1.8 };
++
++/** Game controller icon (slide 5); (x, y) is the top-left of the 0.62 x 0.31 body. */
++function iconGamepad(slide, x, y) {
++  const w = 0.62; const h = 0.31; const r = h / 2; const k = 0.5523 * r;
++  slide.addShape('custGeom', {
++    x: x, y: y, w: w, h: h, line: OUTLINE,
++    points: [
++      { x: r, y: 0 }, { x: w - r, y: 0 },
++      { x: w, y: r, curve: { type: 'cubic', x1: w - r + k, y1: 0, x2: w, y2: r - k } },
++      { x: w - r, y: h, curve: { type: 'cubic', x1: w, y1: r + k, x2: w - r + k, y2: h } },
++      { x: 0.629 * w, y: h },
++      { x: 0.379 * w, y: h, curve: { type: 'quadratic', x1: 0.504 * w, y1: 0.50 * h } },
++      { x: r, y: h },
++      { x: 0, y: r, curve: { type: 'cubic', x1: r - k, y1: h, x2: 0, y2: r + k } },
++      { x: r, y: 0, curve: { type: 'cubic', x1: 0, y1: r - k, x2: r - k, y2: 0 } },
++    ],
++  });
++  [[0.128, 0.435], [0.298, 0.629]].forEach(function (d) { // d-pad dots
++    slide.addShape('ellipse', { x: x + d[0] * w - 0.018, y: y + d[1] * h - 0.018, w: 0.036, h: 0.036, fill: { color: WHITE } });
++  });
++  slide.addShape('rect', { x: x + 0.42, y: y + 0.157, w: 0.09, h: 0.016, fill: { color: WHITE } }); // "+"
++  slide.addShape('rect', { x: x + 0.457, y: y + 0.12, w: 0.016, h: 0.09, fill: { color: WHITE } });
++  slide.addShape('custGeom', { // cable curling out of the top
++    x: x + 0.245, y: y - 0.265, w: 0.11, h: 0.27, line: OUTLINE,
++    points: [
++      { x: 0.06, y: 0.27 },
++      { x: 0.02, y: 0.10, curve: { type: 'cubic', x1: 0.06, y1: 0.20, x2: -0.02, y2: 0.16 } },
++      { x: 0.11, y: 0, curve: { type: 'cubic', x1: 0.05, y1: 0.05, x2: 0.08, y2: 0.02 } },
++    ],
++  });
++}
++
++/** Desktop monitor icon (slide 5); (x, y) is the top-left of the 0.545 x 0.465 screen. */
++function iconMonitor(slide, x, y) {
++  const w = 0.545; const h = 0.465;
++  slide.addShape('roundRect', { x: x, y: y, w: w, h: h, rectRadius: 0.04, line: OUTLINE });
++  slide.addShape('rect', { x: x, y: y + 0.405, w: w, h: 0.02, fill: { color: WHITE } });
++  slide.addShape('rect', { x: x + 0.225, y: y + h, w: 0.095, h: 0.07, line: OUTLINE }); // neck
++  slide.addShape('rect', { x: x + 0.170, y: y + h + 0.070, w: 0.195, h: 0.025, fill: { color: WHITE } }); // base
++}
++
++/** Computer mouse icon (slide 5); (x, y) is the top-left of the 0.335 x 0.535 body. */
++function iconMouse(slide, x, y) {
++  const w = 0.335; const h = 0.535;
++  slide.addShape('roundRect', { x: x, y: y, w: w, h: h, rectRadius: w / 2, line: OUTLINE });
++  slide.addShape('rect', { x: x, y: y + 0.19, w: w, h: 0.02, fill: { color: WHITE } });
++  slide.addShape('rect', { x: x + w / 2 - 0.01, y: y + 0.02, w: 0.02, h: 0.19, fill: { color: WHITE } });
++  slide.addShape('custGeom', { // cable curling out of the top
++    x: x + w / 2, y: y - 0.12, w: 0.30, h: 0.13, line: OUTLINE,
++    points: [
++      { x: 0, y: 0.12 },
++      { x: 0.16, y: 0.045, curve: { type: 'cubic', x1: 0.02, y1: 0.02, x2: 0.08, y2: 0.08 } },
++      { x: 0.30, y: 0.02, curve: { type: 'cubic', x1: 0.24, y1: 0.01, x2: 0.27, y2: 0 } },
++    ],
++  });
++}
++
++/* ------------------------------------------------------------ slide 1 & 20 */
++/** Cover / closing layout: blue panel, blue disc, centred display type. */
++function coverSlide(slide, o) {
++  slide.addShape('rect', { x: 3.2, y: 0, w: 10.133, h: 7.5, fill: { color: '000000', transparency: 30 } });
++  slide.addShape('rect', { x: 0, y: 0, w: 3.2, h: 7.5, fill: { color: BLUE } });
++  slide.addShape('ellipse', { x: 2.316, y: 2.367, w: 1.795, h: 1.795, fill: { color: BLUE } });
++  label(slide, {
++    x: 6.031, y: 2.365, w: 4.471, h: 0.37, text: 'ESPORT PRESENTATION 2025',
++    size: 16, align: 'center', spc: 1,
++  });
++  headline(slide, { x: 3.2, y: 2.763, w: 10.133, h: 1.717, size: 96, align: 'center', spc: 6, parts: o.parts });
++  para(slide, { x: 4.743, y: 4.217, w: 7.048, h: 0.646, text: LOREM.tellus, align: 'center' });
++}
++
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 1);
++  coverSlide(s, { parts: [['TURN WAY', WHITE]] });
++}
++
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 20);
++  coverSlide(s, { parts: [['THANK ', WHITE], ['YOU', GOLD]] });
++}
++
++/* ------------------------------------------------------------------ slide 2 */
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 2);
++  label(s, { x: 7.38, y: 1.464, w: 1.812, text: 'ESPORT GAMING', spc: 0.4 });
++  headline(s, { x: 7.38, y: 1.767, w: 3.199, h: 1.582, parts: [['TURN WAY ', WHITE], ['ESPORT', GOLD]] });
++  label(s, { x: 7.38, y: 3.391, w: 3.199, h: 0.337, text: 'YOUR TEXT HERE', size: 14, color: WHITE, spc: 0.9 });
++  para(s, { x: 7.38, y: 3.75, w: 4.735, h: 1.499, text: LOREM.varius + ' et. ' });
++  snipButton(s, { x: 7.513, y: 5.505, w: 2.115, h: 0.559, text: 'CLICK HERE' });
++}
++
++/* ------------------------------------------------------------------ slide 3 */
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 3);
++  // Two gold diamond outlines on the right.
++  [[5.883, 0.492], [8.625, 3.307]].forEach(function (p) {
++    s.addShape('diamond', { x: p[0], y: p[1], w: 2.301, h: 2.301, line: { color: GOLD, width: 3 } });
++  });
++  // Three text blocks bracketed by blue rules that run off the left edge.
++  const blocks = [
++    { yShort: 1.175, yLong: 2.731, yLabel: 1.462, color: GOLD },
++    { yShort: 4.573, yLong: 3.017, yLabel: 3.313, color: WHITE },
++    { yShort: 4.835, yLong: 6.391, yLabel: 5.122, color: GOLD },
++  ];
++  blocks.forEach(function (b) {
++    rule(s, { x: -2.354, y: b.yShort, w: 5.516, width: 2.25 });
++    rule(s, { x: -1.607, y: b.yLong, w: 5.558, width: 2.25 });
++    label(s, { x: 1.167, y: b.yLabel, w: 2.291, h: 0.337, text: 'WRITE YOUR TEXT', size: 14, color: b.color, spc: 0.9 });
++    para(s, { x: 1.167, y: b.yLabel + 0.336, w: 4.579, h: 0.646, text: LOREM.labore + '.' });
++  });
++}
++
++/* ------------------------------------------------------------------ slide 4 */
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 4);
++  // snip2DiagRect(adj1=0, adj2=32666) outline
++  const w = 4.671; const c = 0.32666 * w;
++  s.addShape('custGeom', {
++    x: 2.309, y: 0.663, w: w, h: w, line: { color: BLUE, width: 3 },
++    points: [
++      { x: 0, y: 0 }, { x: w - c, y: 0 }, { x: w, y: c },
++      { x: w, y: w }, { x: c, y: w }, { x: 0, y: w - c }, { close: true },
++    ],
++  });
++  label(s, { x: 7.576, y: 1.248, w: 1.812, text: 'ESPORT GAMING', spc: 0.4 });
++  headline(s, { x: 7.576, y: 1.552, w: 3.979, h: 1.582, parts: [['BEST ESPORT OUR ', WHITE], ['TALENT ', GOLD]] });
++  rule(s, { x: 7.701, y: 3.207, w: 2.725 });
++  para(s, { x: 7.576, y: 3.534, w: 4.735, h: 0.646, text: LOREM.labore });
++  const stats = [
++    { x: 7.58, y: 4.304, value: '3,24K', color: WHITE, cx: 7.569, cw: 2.015, caption: 'Completed Mission' },
++    { x: 9.724, y: 4.304, value: '95%', color: GOLD, cx: 9.724, cw: 1.545, caption: 'Good Reviews' },
++    { x: 7.58, y: 5.335, value: '1,50K', color: GOLD, cx: 7.569, cw: 2.015, caption: 'Completed Mission' },
++    { x: 9.724, y: 5.335, value: '87%', color: WHITE, cx: 9.724, cw: 1.545, caption: 'Good Reviews' },
++  ];
++  stats.forEach(function (t) {
++    label(s, { x: t.x, y: t.y, w: 1.831, h: 0.639, text: t.value, size: 32, color: t.color, spc: 0.9 });
++    label(s, { x: t.cx, y: t.y + 0.583, w: t.cw, text: t.caption, color: WHITE, spc: undefined });
++  });
++}
++
++/* ------------------------------------------------------------------ slide 5 */
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 5);
++  s.addShape('rect', { x: 8.412, y: 0, w: 0.924, h: 7.5, fill: { color: BLUE } });
++  const rows = [
++    { block: 8.024, by: 1.023, tx: 9.49, ty: 1.046, tw: 2.026, title: 'THE ABOUT ONE', icon: iconGamepad, ix: 8.364, iy: 1.520 },
++    { block: 8.570, by: 3.203, tx: 10.255, ty: 3.273, tw: 2.026, title: 'THE ABOUT TWO', icon: iconMonitor, ix: 8.949, iy: 3.445 },
++    { block: 8.024, by: 5.486, tx: 9.49, ty: 5.508, tw: 1.940, title: 'THE ABOUT THREE', icon: iconMouse, ix: 8.429, iy: 5.800 },
++  ];
++  rows.forEach(function (r) {
++    s.addShape('rect', { x: r.block, y: r.by, w: 1.309, h: 1.045, fill: { color: BLUE } });
++    r.icon(s, r.ix, r.iy);
++    label(s, { x: r.tx, y: r.ty, w: r.tw, text: r.title, color: WHITE, spc: 0.9 });
++    para(s, { x: r.tx, y: r.ty + 0.300, w: 2.767, h: 0.646, text: LOREM.emeteui, color: WHITE, align: 'left' });
++  });
++  label(s, { x: 1.06, y: 1.612, w: 1.812, text: 'ESPORT GAMING', spc: 0.4 });
++  headline(s, { x: 1.06, y: 1.883, w: 3.308, h: 1.582, parts: [['ABOUT OUR ', WHITE], ['GAMING', GOLD]] });
++  rule(s, { x: 1.185, y: 3.539, w: 1.794 });
++  para(s, { x: 1.06, y: 3.866, w: 2.693, h: 1.215, text: LOREM.labore + ' et', color: WHITE });
++  snipButton(s, { x: 1.148, y: 5.286, w: 1.884, h: 0.559, text: 'CLICK HERE' });
++}
++
++/* ------------------------------------------------------------------ slide 6 */
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 6);
++  rule(s, { x: 3.164, y: 1.143, w: 6.592, h: 0.006, color: GOLD, width: 3, dash: 'sysDash' });
++  const steps = [
++    { year: '2023', bx: 1.619, bw: 1.545, by: 0.864, tx: 1.247, tw: 2.291, ty: 1.777, px: 0.820, py: 2.144, color: WHITE, hex: false },
++    { year: '2024', bx: 5.521, bw: 2.291, by: 0.867, tx: 5.521, tw: 2.291, ty: 1.767, px: 5.095, py: 2.155, color: GOLD, hex: true },
++    { year: '2025', bx: 9.756, bw: 1.545, by: 0.870, tx: 9.186, tw: 2.686, ty: 1.788, px: 8.957, py: 2.155, color: WHITE, hex: false },
++  ];
++  steps.forEach(function (t, i) {
++    if (t.hex) {
++      hexBadge(s, { x: t.bx, y: t.by, w: t.bw, h: 0.559, text: t.year });
++    } else {
++      s.addText(t.year, {
++        x: t.bx, y: t.by, w: t.bw, h: 0.559, shape: 'flowChartPreparation', fill: { color: BLUE },
++        align: 'center', valign: 'middle', fontFace: BODY, fontSize: 18, bold: true, color: WHITE,
++      });
++    }
++    label(s, {
++      x: t.tx, y: t.ty, w: t.tw, h: 0.37, size: 16, align: 'center', color: t.color, spc: 0.9,
++      text: ['THE ABOUT ONE', 'THE ABOUT TWO', 'THE ABOUT THREE'][i],
++    });
++    para(s, {
++      x: t.px, y: t.py, w: 3.143, h: 0.646, align: 'center', color: WHITE,
++      text: 'Lorem ipsum dolor sit ameteu' + (i === 0 ? ' ' : '  ') + 'adipiscing elit, sed do',
++    });
++  });
++}
++
++/* ------------------------------------------------------------------ slide 7 */
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 7);
++  label(s, { x: 7.362, y: 1.077, w: 1.812, h: 0.32, text: 'BEST OUR TEAM', size: 13, spc: 0.4 });
++  headline(s, { x: 7.324, y: 1.488, w: 4.261, h: 0.841, spc: 0.9, parts: [['ANDREAS ', WHITE], ['PICCO', GOLD]] });
++  rule(s, { x: 7.449, y: 2.411, w: 3.768 });
++  para(s, { x: 7.357, y: 2.699, w: 4.228, h: 0.646, text: LOREM.tempor });
++  const skills = [
++    { name: 'Leadership', pct: '90%', y: 3.633, barY: 4.004, fillW: 3.13 },
++    { name: 'Teamwork', pct: '80%', y: 4.479, barY: 4.851, fillW: 2.731 },
++  ];
++  skills.forEach(function (k) {
++    label(s, { x: 7.391, y: k.y, w: 1.281, text: k.name, color: WHITE, spc: 0.4 });
++    label(s, { x: 10.563, y: k.y, w: 0.557, h: 0.286, text: k.pct, size: 11, color: WHITE, align: 'right', spc: 0.4 });
++    slantBar(s, { x: 7.419, y: k.barY, w: 3.7, h: 0.115, color: GREY });
++    slantBar(s, { x: 7.391, y: k.barY, w: k.fillW, h: 0.115, color: BLUE });
++  });
++  para(s, { x: 7.357, y: 5.366, w: 4.228, h: 0.646, text: LOREM.tempor });
++}
++
++/* ------------------------------------------------------------------ slide 8 */
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 8);
++  label(s, { x: 5.794, y: 0.837, w: 1.812, text: 'ESPORT GAMING', align: 'center', spc: 0.4 });
++  headline(s, { x: 4.332, y: 1.14, w: 4.735, h: 0.841, align: 'center', parts: [['OUR BEST ', WHITE], ['SQUAD', GOLD]] });
++  const team = [
++    { x: 0.621, role: 'Leader Team', name: 'DYLAN EMBER' },
++    { x: 3.649, role: 'Attacker', name: 'ZOEY EMBER' },
++    { x: 6.677, role: 'Defender', name: 'JULIAN BLAZE' },
++    { x: 9.705, role: 'Flanker', name: 'ELIJAH BROOKS' },
++  ];
++  team.forEach(function (m) {
++    s.addShape('hexagon', { x: m.x, y: 2.29, w: 3.073, h: 2.909, fill: { color: BLUE } });
++    label(s, { x: m.x + 0.357, y: 5.502, w: 2.291, text: m.role, italic: true, bold: false, align: 'center' });
++    label(s, { x: m.x + 0.357, y: 5.805, w: 2.291, text: m.name, color: WHITE, align: 'center' });
++    para(s, { x: m.x + 0.160, y: 6.184, w: 2.686, h: 0.646, text: LOREM.ameteu, align: 'center' });
++  });
++}
++
++/* ------------------------------------------------------------------ slide 9 */
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 9);
++  label(s, { x: 1.274, y: 1.33, w: 1.812, text: 'ESPORT GAMING', spc: 0.4 });
++  headline(s, { x: 1.274, y: 1.633, w: 3.545, h: 2.322, parts: [['OUR GAMER TOURNAMENT RECORD', WHITE]] });
++  s.addText([
++    { text: LOREM.magna },
++    { text: LOREM.sedDo, options: { fontFace: ALT } },
++  ], {
++    x: 1.274, y: 3.955, w: 3.637, h: 1.497,
++    fontFace: BODY, fontSize: 13, color: GREY, align: 'justify', lineSpacingMultiple: 1.3, valign: 'top',
++  });
++  snipButton(s, { x: 1.402, y: 5.719, w: 2.115, h: 0.559, text: 'CLICK HERE' });
++}
++
++/* ----------------------------------------------------------------- slide 10 */
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 10);
++  label(s, { x: 7.224, y: 1.142, w: 2.234, h: 0.32, text: 'ESPORT GAMING', size: 13, spc: 0.4 });
++  headline(s, { x: 7.186, y: 1.553, w: 3.91, h: 1.582, spc: 0.9, parts: [['GAMERS OUR ', WHITE], ['SERVICE', GOLD]] });
++  s.addText([
++    { text: LOREM.magna },
++    { text: 'Lorem ipsum dolor sit amet, conse', options: { fontFace: ALT } },
++  ], {
++    x: 7.224, y: 3.135, w: 4.581, h: 0.928,
++    fontFace: BODY, fontSize: 13, color: GREY, align: 'justify', lineSpacingMultiple: 1.3, valign: 'top',
++  });
++}
++
++/* ----------------------------------------------------------------- slide 11 */
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 11);
++  headline(s, {
++    x: 1.213, y: 1.3, w: 4.345, h: 1.582,
++    parts: [['ESPORT ', WHITE], ['GAMERS ', GOLD], ['SERVICE', WHITE]],
++  });
++  rule(s, { x: 1.33, y: 2.926, w: 1.878 });
++  s.addText([
++    { text: LOREM.magna },
++    { text: 'Lorem ipsum dolor sit amet, consectetur adipiscing', options: { fontFace: ALT } },
++  ], {
++    x: 1.213, y: 3.233, w: 4.176, h: 1.213,
++    fontFace: BODY, fontSize: 13, color: GREY, align: 'justify', lineSpacingMultiple: 1.3, valign: 'top',
++  });
++  para(s, { x: 1.213, y: 4.608, w: 4.176, h: 0.646, text: LOREM.tempor });
++  snipButton(s, { x: 1.34, y: 5.641, w: 2.115, h: 0.559, text: 'CLICK HERE' });
++}
++
++/* ----------------------------------------------------------------- slide 12 */
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s); // this layout hides the master's page-number tab
++  s.addShape('rect', { x: 0.722, y: 0, w: 11.881, h: 7.5, fill: { color: '0D0D0D', transparency: 30 } });
++  rule(s, { x: 5.108, y: 2.167, w: 3.117 });
++  headline(s, {
++    x: 2.384, y: 2.432, w: 8.564, h: 1.717, size: 96, align: 'center', spc: 6,
++    parts: [['BREAK ', WHITE], ['SLIDE', GOLD]],
++  });
++  s.addText([
++    { text: LOREM.magna },
++    { text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod ', options: { fontFace: ALT } },
++  ], {
++    x: 2.316, y: 4.091, w: 8.701, h: 0.644,
++    fontFace: BODY, fontSize: 13, color: SILVER, align: 'center', lineSpacingMultiple: 1.3, valign: 'top',
++  });
++  label(s, {
++    x: 4.431, y: 5.307, w: 4.471, h: 0.37, size: 16, align: 'center', spc: 1,
++    text: 'LET\u2019S TAKE A 15 MINUTES BREAK',
++  });
++  s.addShape('rect', { x: 0, y: 0, w: 0.722, h: 7.5, fill: { color: BLUE } });
++  s.addShape('rect', { x: 12.603, y: 0, w: 0.752, h: 7.5, fill: { color: BLUE } });
++}
++
++/* ----------------------------------------------------------------- slide 13 */
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 13);
++  label(s, { x: 1.261, y: 1.312, w: 1.812, text: 'ESPORT GAMING', spc: 0.4 });
++  headline(s, { x: 1.261, y: 1.615, w: 4.735, h: 1.582, parts: [['READY TO PLAY ', WHITE], ['THE GAMERS', GOLD]] });
++  rule(s, { x: 1.386, y: 3.206, w: 2.906 });
++  para(s, { x: 1.261, y: 3.528, w: 4.489, h: 1.499, text: LOREM.varius, color: SILVER });
++  flatButton(s, { x: 1.344, y: 5.347, w: 3.074, h: 0.591, text: 'OUR TOURNAMENT' });
++}
++
++/* ----------------------------------------------------------------- slide 14 */
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 14);
++  label(s, { x: 1.231, y: 4.642, w: 2.234, h: 0.32, text: 'ESPORT GAMING', size: 13, spc: 0.4 });
++  headline(s, { x: 1.193, y: 5.053, w: 4.316, h: 1.582, spc: 0.9, parts: [['BEST PORTFOLIO ', WHITE], ['GAMERS', GOLD]] });
++  [{ x: 6.078, color: WHITE }, { x: 9.48, color: GOLD }].forEach(function (col) {
++    label(s, { x: col.x, y: 4.604, w: 2.727, h: 0.337, text: 'YOUR TEXT HERE', size: 14, color: col.color, spc: 0.9 });
++    para(s, { x: col.x, y: 4.964, w: 2.727, h: 1.499, text: LOREM.tellus.replace(' at in tellus', '') });
++  });
++}
++
++/* ----------------------------------------------------------------- slide 15 */
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 15);
++  label(s, { x: 7.944, y: 0.805, w: 2.234, h: 0.32, text: 'ESPORT GAMING', size: 13, spc: 0.4 });
++  headline(s, {
++    x: 7.906, y: 1.216, w: 4.316, h: 1.582, spc: 0.9,
++    parts: [['BEST ', WHITE], ['ESPORT GAMING ', GOLD], ['& ICONS', WHITE]],
++  });
++  para(s, { x: 7.944, y: 2.701, w: 4.316, h: 1.783, text: LOREM.varius + ' et. consectetur' });
++}
++
++/* ----------------------------------------------------------------- slide 16 */
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 16);
++  imagePlaceholder(s, { x: 7.001, y: 1.722, w: 6.332, h: 4.429, label: '[laptop mockup]' });
++  label(s, { x: 1.193, y: 1.531, w: 1.812, text: 'ESPORT GAMING', spc: 0.4 });
++  headline(s, {
++    x: 1.193, y: 1.834, w: 4.035, h: 1.582,
++    parts: [['OUR MOCKUP ', WHITE], ['ON ESPORT ', GOLD], ['GAME', WHITE]],
++  });
++  rule(s, { x: 1.318, y: 3.49, w: 1.417 });
++  para(s, { x: 1.19, y: 3.667, w: 4.966, h: 1.499, text: LOREM.varius + ' et. consectetur adipiscing elit, sed do' });
++  para(s, { x: 1.19, y: 5.323, w: 4.966, h: 0.646, text: LOREM.labore + ' et ' });
++}
++
++/* ----------------------------------------------------------------- slide 17 */
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 17);
++  imagePlaceholder(s, { x: 0, y: 1.322, w: 4.376, h: 4.856, label: '[desktop mockup]' });
++  label(s, { x: 7.025, y: 1.505, w: 1.812, text: 'ESPORT GAMING', spc: 0.4 });
++  headline(s, {
++    x: 7.025, y: 1.807, w: 4.735, h: 1.582,
++    parts: [['MOCKUP ESPORT GAMING ', WHITE], ['TURN WAY', GOLD]],
++  });
++  rule(s, { x: 7.15, y: 3.399, w: 3.128 });
++  const stats = [
++    { dx: 7.15, tx: 7.931, cx: 7.925, dy: 3.942 },
++    { dx: 7.15, tx: 7.931, cx: 7.925, dy: 4.940 },
++    { dx: 9.77, tx: 10.551, cx: 10.546, dy: 3.942 },
++    { dx: 9.77, tx: 10.551, cx: 10.546, dy: 4.940 },
++  ];
++  stats.forEach(function (t) {
++    s.addShape('ellipse', { x: t.dx, y: t.dy, w: 0.582, h: 0.582, fill: { color: BLUE } });
++    checkMark(s, { x: t.dx + 0.176, y: t.dy + 0.175, s: 0.231 });
++    label(s, { x: t.tx, y: t.dy - 0.026, w: 1.061, h: 0.438, text: '7.24K', size: 20, spc: 0.4 });
++    label(s, { x: t.cx, y: t.dy + 0.455, w: 1.325, h: 0.286, text: 'Popular Game', size: 11, bold: false, color: WHITE, spc: 0.4 });
++  });
++  imagePlaceholder(s, { x: 1.302, y: 3.382, w: 4.539, h: 2.728, label: '[laptop mockup]' });
++}
++
++/* ----------------------------------------------------------------- slide 18 */
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 18);
++  label(s, { x: 1.251, y: 1.185, w: 1.812, text: 'ESPORT GAMING', spc: 0.4 });
++  headline(s, { x: 1.251, y: 1.488, w: 4.33, h: 1.582, parts: [['READY TO PLAY ', WHITE], ['THE GAME?', GOLD]] });
++  rule(s, { x: 1.376, y: 3.132, w: 1.686 });
++  para(s, { x: 1.251, y: 3.34, w: 4.33, h: 1.215, text: LOREM.tellus + ' integer feugiat' });
++  para(s, { x: 1.251, y: 4.754, w: 4.33, h: 0.646, text: LOREM.tempor });
++  flatButton(s, { x: 1.316, y: 5.673, w: 1.933, h: 0.591, text: 'OUR TEAM' });
++}
++
++/* ----------------------------------------------------------------- slide 19 */
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  backdrop(s, 19);
++  label(s, { x: 7.292, y: 1.101, w: 1.812, text: 'ESPORT GAMING', spc: 0.4 });
++  headline(s, { x: 7.292, y: 1.468, w: 3.444, h: 0.841, parts: [['CONTACT ', WHITE], ['US', GOLD]] });
++  para(s, { x: 7.292, y: 2.256, w: 4.422, h: 0.607, text: LOREM.numquam, color: WHITE, align: 'left', line: 1.2 });
++  [{ n: '01', y: 3.109 }, { n: '02', y: 4.267 }, { n: '03', y: 5.359 }].forEach(function (item) {
++    s.addShape('snip2DiagRect', { x: 7.381, y: item.y + 0.04, w: 0.639, h: 0.639, line: { color: BLUE, width: 3 } });
++    s.addText(item.n, {
++      x: 7.381, y: item.y + 0.167, w: 0.639, h: 0.404, align: 'center', valign: 'top',
++      fontFace: BODY, fontSize: 18, bold: true, color: WHITE,
++    });
++    label(s, { x: 8.148, y: item.y, w: 3.317, h: 0.337, text: 'YOUR STATEMENT GOES HERE', size: 14 });
++    para(s, { x: 8.148, y: item.y + 0.341, w: 3.916, h: 0.607, text: LOREM.numquam, color: WHITE, align: 'left', line: 1.2 });
++  });
++}
++
++/* -------------------------------------------------------------------- main */
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.layout = 'LAYOUT_WIDE';
++  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++  pptx.title = 'TURN WAY - Esport Presentation 2025';
++  pptx.author = 'PptxGenJS';
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++    .forEach(function (fn) { fn(pptx); });
++
++  const out = path.join(__dirname, '16b5a4a8-1f95-44ff-ba60-c73ed55f6e2d_grok_final.pptx');
++  return pptx.writeFile({ fileName: out }).then(function () { console.log('wrote ' + out); });
++}
++
++build().catch(function (err) { console.error(err); process.exit(1); });

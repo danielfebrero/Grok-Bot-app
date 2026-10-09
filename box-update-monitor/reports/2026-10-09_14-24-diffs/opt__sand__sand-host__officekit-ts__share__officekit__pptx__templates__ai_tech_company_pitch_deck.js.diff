@@ -1,0 +1,839 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/ai_tech_company_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/ai_tech_company_pitch_deck.js
+@@ -0,0 +1,836 @@
++#!/usr/bin/env node
++/**
++ * "AI Technology Company" — 15 slides, 13.333 x 7.5 in — rebuilt with pptxgenjs.
++ *
++ * Layout of this file:
++ *   1. palette + fonts
++ *   2. MOTIFS: the deck's vector art (circuit traces, icons, tags) as normalised
++ *      0..1 outlines that get scaled into place
++ *   3. small drawing helpers (chamfered rectangles, traces, photo placeholders, …)
++ *   4. shared furniture used on nearly every slide (background, eyebrow, title band)
++ *   5. one build function per slide, in order
++ *
++ * The reference deck's photographs are replaced with grey "[image]" placeholders.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++const SLIDE_W = 13.3333;
++const SLIDE_H = 7.5;
++
++// ---------------------------------------------------------------- palette ----
++// Theme colours plus the lumMod/lumOff variants the original deck derives.
++const C = {
++  accent1:  '481BFF', // electric indigo
++  accent1d: '1C008D', // accent1 @ lumMod 50%  – the light end of the page wash
++  accent1m: '2A00D4', // accent1 @ lumMod 75%
++  accent2:  '0B0038', // near-black violet    – the dark end of the page wash
++  accent2l: '2F00EE', // accent2 @ lumMod 60% / lumOff 40%
++  accent2m: '491CFF', // accent2 @ lumMod 50% / lumOff 50%
++  accent2p: 'A48EFF', // accent2 @ lumMod 25% / lumOff 75%
++  accent5:  '2900D3',
++  accent5l: '6E4CFF',
++  accent5p: 'CFC3FF',
++  accent3l: 'B1A4E3',
++  accent3p: 'E5E1F6',
++  white:    'FFFFFF',
++  grey95:   'F2F2F2',
++  grey85:   'D9D9D9',
++  grey65:   'A6A6A6',
++  photo:    'CCCCCC', // stand-in fill for the reference photographs
++  photoInk: '9A9AA6',
++};
++
++const FONT_MAJOR = 'Poppins Medium'; // theme major latin
++const FONT_MINOR = 'Poppins Light';  // theme minor latin
++const FONT_BOLD  = 'Poppins';        // used where the deck asks for bold weight
++
++// ----------------------------------------------------------------- motifs ----
++// Circuit traces: `lines` are polylines and `dots` are solder points
++// ([x, y, r] or [x, y, r, 1] for a ring), all normalised to the motif box.
++const circuitWide = { lines: [
++  [0.47,0.739,0.946,0.739,1,0.836],
++  [0.997,0.118,0.791,0.118,0.789,0.114,0.782,0.12,0.781,0.127,0.721,0.235,0.481,0.235],
++  [0.999,0.406,0.956,0.329,0.718,0.329],
++  [0.997,0.996,0.809,0.996,0.706,0.81,0.262,0.81],
++  [0.994,0.652,0.994,0.643,0.873,0.424,0.824,0.424,0.759,0.541,0.589,0.541],
++  [0.994,0.652,0.292,0.652,0.159,0.41,0.044,0.41],
++  [0.14,0.118,0.305,0.118,0.422,0.329,0.641,0.329],
++  [0.673,0.118,0.782,0.118,0.789,0.114,0.849,0.002,0.996,0.002],
++  [0.001,0.268,0.19,0.268,0.342,0.543,0.496,0.543],
++  [0.877,0.33,0.826,0.422],
++  [0.88,0.328,0.94,0.215,0.997,0.215],
++  [0.824,0.426,0.376,0.426]],
++  dots: [[0.188,0.281,0.017],[0.191,0.265,0.02],[0.263,0.81,0.021,1],
++         [0.472,0.74,0.021,1],[0.482,0.236,0.021,1],[0.7,0.329,0.024]] };
++
++const circuitLow = { lines: [
++  [0.745,0.997,0.65,0.724,0.511,0.724,0.422,0.47,0.394,0.47,0.394,0.48,0.364,0.566,0.275,0.566],
++  [0.998,0.003,0.831,0.483,0.765,0.483,0.723,0.362,0.634,0.362],
++  [0.631,0.359,0.612,0.305,0.455,0.305,0.398,0.47],
++  [0.522,0.557,0.551,0.641,0.734,0.641,0.81,0.859,0.827,0.88,0.999,0.88],
++  [0.81,0.859,0.807,0.879,0.812,0.907,0.823,0.907,0.827,0.879],
++  [0.522,0.552,0.465,0.389,0.341,0.389],
++  [0.394,0.471,0.166,0.471],
++  [0,0.46,0.056,0.46,0.124,0.654,0.486,0.654,0.589,0.358,0.631,0.358,0.674,0.484,0.768,0.484,0.801,0.578,0.882,0.578]],
++  dots: [[0.514,0.557,0.018],[0.522,0.535,0.018],[0.522,0.579,0.018],[0.529,0.557,0.018],
++         [0.63,0.35,0.02,1],[0.631,0.375,0.022],[0.819,0.867,0.021]] };
++
++const circuitFlat = { lines: [
++  [0.247,0.573,0.17,0.573,0.095,0.354,0.001,0.354],
++  [0.999,0.256,0.885,0.586,0.804,0.586,0.773,0.493,0.683,0.493,0.642,0.375],
++  [0.534,0.565,0.562,0.646,0.741,0.646,0.814,0.863],
++  [0.999,0.881,0.831,0.881,0.814,0.864],
++  [0.789,0.235,0.336,0.235],
++  [0.998,0.018,0.835,0.491,0.771,0.491,0.73,0.372,0.6,0.372,0.5,0.661,0.146,0.661,0.079,0.465,0.026,0.465],
++  [0.188,0.478,0.437,0.478,0.523,0.727,0.658,0.727,0.751,0.998],
++  [0.533,0.562,0.478,0.401,0.441,0.401,0.415,0.468,0.415,0.478,0.379,0.569,0.295,0.569],
++  [0.745,0.815,0.717,0.732],
++  [0.644,0.997,0.623,0.937,0.403,0.937,0.351,0.786,0.131,0.786],
++  [0.837,0.731,0.937,0.731,0.999,0.551],
++  [0.319,0.401,0.21,0.401,0.153,0.235,0.095,0.235],
++  [0.438,0.404,0.359,0.404],
++  [0.24,0.327,0.36,0.327,0.391,0.239],
++  [0.67,0.14,0.424,0.14,0.394,0.228],
++  [0.235,0.731,0.472,0.731,0.551,0.96],
++  [0.641,0.372,0.621,0.313,0.471,0.313,0.441,0.4],
++  [0.814,0.863,0.813,0.889,0.819,0.908,0.827,0.908,0.831,0.892,0.831,0.881]],
++  dots: [[0.094,0.365,0.013],[0.095,0.353,0.016],[0.132,0.789,0.017,1],[0.236,0.733,0.017,1],
++         [0.241,0.329,0.017,1],[0.35,0.404,0.019],[0.527,0.564,0.018],[0.534,0.542,0.018],
++         [0.534,0.585,0.018],[0.542,0.564,0.018],[0.64,0.36,0.02,1],[0.641,0.385,0.022],
++         [0.824,0.869,0.02],[0.828,0.733,0.019]] };
++
++// Filled outlines (each entry is a list of rings, normalised to its own box).
++const tagBolt = [[0.003,0.086,0.344,0.086,0.362,0.151,0.377,0.155,0.389,0.139,0.666,0.92,0.938,0.92,0.952,0.986,0.969,1,0.981,0.993,0.995,0.961,1,0.912,0.995,0.863,0.975,0.826,0.952,0.838,0.938,0.904,0.668,0.904,0.393,0.128,0.399,0.063,0.383,0.006,0.372,0,0.357,0.012,0.344,0.07,0.003,0.07]];
++const tagArrow = [[0.112,0.844,0.099,0.778,0.076,0.736,0.045,0.729,0.016,0.767,0.001,0.836,0.004,0.917,0.025,0.977,0.056,1,0.076,0.991,0.092,0.966,0.111,0.882,0.662,0.883,1,0.054,1,0,0.656,0.844]];
++const tagStep = [[0.003,0.022,0.25,0.022,0.501,0.926,0.953,0.926,0.964,0.988,0.981,0.998,1,0.915,0.976,0.829,0.953,0.904,0.504,0.904,0.253,0,0.003,0]];
++const iconNode = [[1,0,0.075,0.917,0.047,0.907,0.014,0.921,0,0.954,0.014,0.986,0.047,1,0.08,0.986,0.094,0.954,0.083,0.924,1,0.016]];
++const iconBulb = [[0.273,0.887,0.369,0.993,0.61,0.998,0.718,0.914,0.727,0.813,0.273,0.813],[0,0.344,0.051,0.495,0.205,0.649,0.272,0.75,0.728,0.75,0.795,0.649,0.949,0.495,1,0.344,0.961,0.21,0.853,0.1,0.694,0.027,0.498,0,0.298,0.028,0.141,0.104,0.037,0.213]];
++const iconAtom = [[0.222,0.42,0.002,0.74,0.449,0.791],[0.015,0.616,0.172,0.377,0.008,0.286,0,0.612],[0.038,0.827,0.443,0.999,0.467,0.856,0.043,0.813],[0.207,0.324,0.374,0.045,0.367,0.023,0.034,0.219],[0.5,0.344,0.728,0.344,0.5,0,0.272,0.344],[0.987,0.287,0.828,0.377,0.991,0.62],[0.793,0.324,0.966,0.218,0.633,0.023,0.626,0.045],[0.957,0.813,0.533,0.856,0.557,0.999,0.962,0.827],[0.778,0.42,0.551,0.791,0.998,0.74],[0.5,0.406,0.291,0.406,0.5,0.75,0.709,0.406]];
++const iconWave = [[0.552,0.676,0.489,0.782,0.552,0.888,0.614,0.782],[0.129,0.343,0.069,0.445,0.129,0.547,0.189,0.445],[0.822,0.129,0.721,0.3,0.822,0.472,0.924,0.3],[0.822,0,0.97,0.132,0.999,0.269,0.922,0.549,0.799,0.597,0.679,0.755,0.632,0.952,0.536,0.998,0.458,0.93,0.423,0.792,0.201,0.627,0.129,0.664,0.048,0.616,0.004,0.495,0.013,0.35,0.072,0.249,0.158,0.233,0.23,0.309,0.257,0.458,0.469,0.615,0.521,0.57,0.581,0.57,0.652,0.38,0.675,0.132,0.738,0.036]];
++const iconCheck = [[0.499,0,0.301,0.041,0.142,0.151,0.038,0.314,0,0.512,0.038,0.695,0.142,0.851,0.301,0.958,0.499,0.998,0.698,0.958,0.856,0.851,0.961,0.695,0.998,0.512,0.961,0.314,0.856,0.151,0.698,0.041],[0.499,0.928,0.328,0.895,0.184,0.806,0.084,0.674,0.047,0.512,0.084,0.335,0.184,0.195,0.328,0.104,0.499,0.071,0.67,0.104,0.814,0.195,0.914,0.335,0.952,0.512,0.914,0.674,0.814,0.806,0.67,0.895],[0.69,0.279,0.641,0.302,0.452,0.65,0.333,0.534,0.286,0.534,0.269,0.572,0.428,0.72,0.475,0.72,0.712,0.326]];
++const iconHome = [[0.5,0.192,0.857,0.588,0.857,1,0.571,1,0.571,0.653,0.429,0.653,0.429,1,0.143,1,0.143,0.588],[0.5,0,1,0.556,0.946,0.608,0.5,0.114,0.054,0.608,0,0.556]];
++const iconPhone = [[0.773,0.593,0.992,0.79,0.965,0.878,0.716,0.63],[0.083,0.074,0.332,0.322,0.294,0.397,0.606,0.708,0.679,0.667,0.927,0.916,0.881,0.962,0.766,1,0.589,0.952,0.431,0.85,0.231,0.661,0.073,0.45,0.011,0.306,0.008,0.167],[0.18,0,0.397,0.196,0.371,0.284,0.122,0.035]];
++const iconGlobe = [[0.572,0.914,0.72,0.687,0.762,0.526,0.92,0.526,0.887,0.665,0.813,0.782,0.705,0.868],[0.08,0.526,0.238,0.526,0.28,0.687,0.428,0.914,0.295,0.868,0.187,0.782,0.113,0.665],[0.428,0.086,0.28,0.313,0.238,0.474,0.08,0.474,0.113,0.335,0.187,0.218,0.295,0.132],[0.526,0.526,0.709,0.526,0.669,0.673,0.526,0.888],[0.474,0.526,0.474,0.888,0.331,0.673,0.291,0.526],[0.526,0.112,0.669,0.326,0.709,0.474,0.526,0.474],[0.474,0.474,0.291,0.474,0.331,0.327,0.474,0.112],[0.92,0.474,0.762,0.474,0.72,0.313,0.572,0.086,0.705,0.132,0.813,0.218,0.887,0.335],[0.5,0,0.305,0.039,0.146,0.146,0.039,0.305,0,0.5,0.039,0.695,0.146,0.854,0.305,0.961,0.5,1,0.695,0.961,0.854,0.854,0.961,0.695,1,0.5,0.961,0.305,0.854,0.146,0.695,0.039]];
++const iconMail = [[0.376,0.549,0.5,0.701,0.624,0.549,0.977,0.973,0.928,1,0.072,1,0.023,0.973],[0.072,0,0.928,0,0.977,0.028,0.5,0.602,0.023,0.028],[0,0.088,0.345,0.509,0,0.92],[1,0.088,1,0.92,0.655,0.509]];
++const iconReddit = [[0.352,0.498,0.419,0.577,0.352,0.657,0.285,0.577],[0.854,0.393,0.825,0.399,0.929,0.586,0.942,0.466],[0.146,0.393,0.058,0.466,0.075,0.593,0.179,0.401],[0.503,0.337,0.234,0.426,0.122,0.639,0.234,0.851,0.503,0.939,0.772,0.851,0.883,0.639,0.772,0.426],[0.807,0.06,0.743,0.136,0.807,0.211,0.87,0.136],[0.807,0,0.913,0.087,0.917,0.169,0.882,0.237,0.766,0.262,0.694,0.122,0.58,0.09,0.525,0.278,0.777,0.36,0.885,0.337,0.962,0.392,0.996,0.554,0.887,0.801,0.765,0.925,0.617,0.987,0.413,0.992,0.254,0.934,0.137,0.83,0.02,0.603,0,0.512,0.028,0.406,0.115,0.337,0.222,0.365,0.471,0.278,0.547,0.018,0.71,0.064],[0.641,0.498,0.709,0.577,0.641,0.657,0.573,0.577],[0.351,0.75,0.48,0.807,0.641,0.75,0.67,0.783,0.481,0.867,0.336,0.805]];
++const iconCloud = [[0.568,0,0.753,0.075,0.85,0.285,0.962,0.369,1,0.492,0.959,0.62,0.856,0.695,0.72,0.696,0.833,0.665,0.963,0.527,0.959,0.439,0.878,0.334,0.737,0.311,0.816,0.28,0.736,0.106,0.65,0.05,0.549,0.036,0.454,0.064,0.363,0.143,0.405,0.281,0.308,0.149,0.238,0.145,0.171,0.194,0.15,0.293,0.046,0.411,0.042,0.534,0.128,0.646,0.316,0.692,0.195,0.703,0.091,0.662,0.02,0.574,0.001,0.458,0.146,0.17,0.234,0.109,0.335,0.123,0.448,0.028],[0.517,0.491,0.67,0.576,0.701,0.704,0.659,0.808,0.814,0.97,0.81,0.998,0.635,0.832,0.48,0.874,0.355,0.776,0.333,0.684,0.414,0.524]];
++const iconPeople = [[0.143,0.304,0.214,0.359,0.157,0.442,0.076,0.377,0.092,0.322],[0.379,0.304,0.45,0.362,0.393,0.442,0.312,0.382,0.329,0.322],[0.615,0.304,0.686,0.36,0.629,0.442,0.548,0.377,0.565,0.322],[0.852,0.304,0.922,0.359,0.865,0.442,0.784,0.372],[0.148,0.459,0.17,0.528,0.198,0.459,0.264,0.488,0.33,0.459,0.358,0.528,0.381,0.459,0.406,0.528,0.434,0.459,0.5,0.488,0.566,0.459,0.594,0.528,0.612,0.46,0.642,0.528,0.67,0.459,0.736,0.488,0.802,0.459,0.83,0.528,0.845,0.46,0.878,0.528,0.906,0.459,0.977,0.491,0.997,0.585,0.945,0.702,0.905,0.99,0.803,0.99,0.736,0.651,0.669,0.99,0.57,0.994,0.5,0.651,0.433,0.99,0.339,0.997,0.264,0.651,0.197,0.99,0.103,0.997,0,0.53,0.094,0.459,0.122,0.528],[0.265,0.15,0.333,0.219,0.252,0.29,0.195,0.206],[0.502,0.15,0.569,0.224,0.488,0.29,0.431,0.206],[0.738,0.15,0.804,0.23,0.724,0.29,0.667,0.208],[0.384,0,0.452,0.074,0.382,0.14,0.312,0.06],[0.62,0,0.688,0.068,0.618,0.14,0.548,0.064]];
++const iconTarget = [[0.05,0.467,0.097,0.498,0.159,0.719,0.315,0.859,0.474,0.903,0.608,0.89,0.77,0.805,0.739,0.762,0.912,0.688,0.908,0.879,0.852,0.863,0.716,0.953,0.558,0.997,0.409,0.991,0.266,0.943,0.127,0.837,0.045,0.717,0,0.515],[0.464,0.062,0.611,0.083,0.742,0.143,0.677,0.217,0.515,0.161,0.358,0.171,0.196,0.256,0.227,0.3,0.042,0.369,0.062,0.177,0.113,0.199,0.275,0.098],[0.881,0.277,0.963,0.487,0.963,0.563,0.925,0.594,0.87,0.563,0.814,0.354],[0.948,0,0.992,0.026,0.992,0.082,0.513,0.63,0.455,0.631,0.177,0.467,0.181,0.404,0.236,0.386,0.483,0.516,0.901,0.019]];
++
++// Slide 12's block arrows (drawn flat; the reference builds them from rotated pieces).
++const arrowRight = [0,0.247, 0.72,0.247, 0.72,0, 1,0.503, 0.72,1, 0.72,0.753, 0,0.753];
++const arrowLeft  = [1,0.247, 0.28,0.247, 0.28,0, 0,0.503, 0.28,1, 0.28,0.753, 1,0.753];
++
++// Photo placeholder silhouettes (clipped photo frames in the original).
++const framePlate  = [0,0,0.993,0,1,0.006,1,0.872,0.858,1,0,1];
++const frameLeftCut= [0.13,0,1,0,1,1,0.13,1,0,0.8,0,0.2];
++const frameOct    = [0.189,0,0.836,0,1,0.152,1,0.848,0.836,1,0.189,1,0,0.825,0,0.175];
++const frameOctB   = [0.189,0,0.798,0,1,0.187,1,0.813,0.798,1,0.189,1,0,0.825,0,0.175];
++const frameRightCut=[0,0,0.884,0,1,0.2,1,0.8,0.884,1,0,1];
++const frameRightCut2=[0,0,0.877,0,1,0.175,1,0.825,0.877,1,0,1];
++const frameTallCut= [0.2,0,1,0,1,1,0.2,1,0,0.901,0,0.099];
++const frameChip   = [0.188,0,0.799,0,1,0.202,1,0.798,0.799,1,0.188,1,0,0.811,0,0.189];
++const frameChipW  = [0.156,0,0.833,0,1,0.202,1,0.798,0.833,1,0.156,1,0,0.811,0,0.189];
++const frameCard   = [0.2,0,0.818,0,1,0.106,1,0.894,0.818,1,0.2,1,0,0.884,0,0.116];
++const frameWideCut= [0,0,0.829,0,1,0.238,1,0.762,0.829,1,0,1];
++const framePhone  = [0.094,0,0.216,0,0.238,0.027,0.291,0.037,0.726,0.037,0.773,0.022,0.785,0,0.925,0.001,0.993,0.026,1,0.043,1,0.957,0.993,0.974,0.925,0.999,0.906,1,0.094,1,0.075,0.999,0.007,0.974,0,0.957,0,0.043,0.007,0.026,0.075,0.001];
++
++// ---------------------------------------------------------------- helpers ----
++const pt = (x, y) => ({ x, y });
++
++// custGeom point coordinates are measured from the shape's own top-left corner.
++
++/** Flat [x0,y0,x1,y1,…] normalised ring -> closed pptxgenjs custGeom points. */
++function ringPoints(flat, w, h) {
++  const out = [];
++  for (let i = 0; i < flat.length; i += 2) {
++    const p = pt(flat[i] * w, flat[i + 1] * h);
++    if (i === 0) p.moveTo = true;
++    out.push(p);
++  }
++  out.push({ close: true });
++  return out;
++}
++
++/**
++ * Filled shape built from normalised rings. All rings go into a single custGeom so
++ * that inner rings punch holes (eyes, counters) instead of covering them over.
++ */
++function drawRings(slide, rings, x, y, w, h, color) {
++  const points = [];
++  rings.forEach(ring => points.push(...ringPoints(ring, w, h)));
++  slide.addShape('custGeom', { x, y, w, h, fill: { color }, line: { type: 'none' }, points });
++}
++
++/** Rectangle with individually chamfered corners: cuts = [tl, tr, br, bl] in inches. */
++function chamferPoints(w, h, cuts) {
++  const [tl, tr, br, bl] = cuts;
++  const p = [pt(tl, 0), pt(w - tr, 0)];
++  if (tr) p.push(pt(w, tr));
++  p.push(pt(w, h - br));
++  if (br) p.push(pt(w - br, h));
++  p.push(pt(bl, h));
++  if (bl) p.push(pt(0, h - bl));
++  p.push(pt(0, tl));
++  p[0].moveTo = true;
++  p.push({ close: true });
++  return p;
++}
++
++function chamferRect(slide, x, y, w, h, cuts, opts) {
++  slide.addShape('custGeom', Object.assign({ x, y, w, h, points: chamferPoints(w, h, cuts) }, opts));
++}
++
++/** Circuit-trace motif scaled into the box (x, y, w, h). */
++function drawCircuit(slide, motif, x, y, w, h, opts) {
++  const o = opts || {};
++  const color = o.color || C.accent1;
++  const weight = o.weight || 0.75;
++  const flipH = !!o.flipH, flipV = !!o.flipV;
++  const fx = u => (flipH ? 1 - u : u) * w;
++  const fy = v => (flipV ? 1 - v : v) * h;
++  motif.lines.forEach(flat => {
++    const pts = [];
++    for (let i = 0; i < flat.length; i += 2) {
++      const p = pt(fx(flat[i]), fy(flat[i + 1]));
++      if (i === 0) p.moveTo = true;
++      pts.push(p);
++    }
++    slide.addShape('custGeom', {
++      x, y, w, h, points: pts, fill: { type: 'none' },
++      line: { color, width: weight },
++    });
++  });
++  motif.dots.forEach(([u, v, r, ring]) => {
++    const d = 2 * r * w;
++    const dot = { x: x + fx(u) - d / 2, y: y + fy(v) - d / 2, w: d, h: d };
++    if (ring) slide.addShape('ellipse', Object.assign(dot, { fill: { type: 'none' }, line: { color, width: weight } }));
++    else slide.addShape('ellipse', Object.assign(dot, { fill: { color }, line: { type: 'none' } }));
++  });
++}
++
++/** Grey stand-in for a reference photograph, clipped to `frame`. */
++function photo(slide, frame, x, y, w, h, opts) {
++  const o = opts || {};
++  slide.addShape('custGeom', {
++    x, y, w, h, fill: { color: C.photo }, line: { type: 'none' },
++    points: ringPoints(frame, w, h),
++  });
++  slide.addText('[image]', {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontFace: FONT_MINOR, fontSize: o.label || 14, color: C.photoInk,
++  });
++}
++
++/** Horizontal wash: a soft accent glow fading from `from` to `to` across the box. */
++function washH(slide, x, y, w, h, color, fromAlpha, toAlpha, steps) {
++  const n = steps || 26;
++  for (let i = 0; i < n; i++) {
++    const t = i / (n - 1);
++    slide.addShape('rect', {
++      x: x + (w * i) / n, y, w: w / n + 0.012, h,
++      fill: { color, transparency: Math.round(fromAlpha + (toAlpha - fromAlpha) * t) },
++      line: { type: 'none' },
++    });
++  }
++}
++
++/** Vertical wash used for the card fills (accent1 50% at the top -> accent2). */
++function washV(slide, x, y, w, h, top, bottom, steps) {
++  const n = steps || 18;
++  for (let i = 0; i < n; i++) {
++    slide.addShape('rect', {
++      x, y: y + (h * i) / n, w, h: h / n + 0.01,
++      fill: { color: i < n / 2 ? top : bottom, transparency: Math.round(100 * Math.abs(i / (n - 1) - 0.5) * 0) },
++      line: { type: 'none' },
++    });
++  }
++}
++
++/** The narrow vertical "scanline" glow bar the deck drops on some slides. */
++function scanBar(slide, cx, w) {
++  slide.addShape('rect', { x: cx - w / 2, y: 0, w, h: SLIDE_H,
++    fill: { color: C.accent2l, transparency: 55 }, line: { type: 'none' } });
++}
++
++// ------------------------------------------------------- shared furniture ----
++const BG_STEPS = 30;
++
++/** Page background: accent1@50% at the top fading down into accent2. */
++function background(slide) {
++  slide.background = { color: C.accent2 };
++  for (let i = 0; i < BG_STEPS; i++) {
++    slide.addShape('rect', {
++      x: 0, y: (SLIDE_H * i) / BG_STEPS, w: SLIDE_W, h: SLIDE_H / BG_STEPS + 0.02,
++      fill: { color: C.accent1d, transparency: Math.round((100 * i) / (BG_STEPS - 1)) },
++      line: { type: 'none' },
++    });
++  }
++}
++
++/** Small letter-spaced eyebrow that sits in the top-left of most slides. */
++function eyebrow(slide) {
++  slide.addText('AI TECHNOLOGY COMPANY', {
++    x: 0.846, y: 0.449, w: 3.941, h: 0.286, fontFace: FONT_MINOR, fontSize: 11,
++    charSpacing: 6, color: C.white, valign: 'middle',
++  });
++}
++
++/**
++ * Title band: a wide accent wash with the section title over it.
++ * `dir` is 'l' for a band anchored at the left edge, 'r' for the right edge.
++ */
++function titleBand(slide, opts) {
++  const { x, y, w, h, dir } = opts.band;
++  if (dir === 'l') washH(slide, x, y, w, h, C.accent1, 100, 51);
++  else washH(slide, x, y, w, h, C.accent1, 51, 100);
++  slide.addText(opts.title, {
++    x: opts.tx, y: opts.ty, w: opts.tw, h: 0.707, fontFace: FONT_MAJOR, fontSize: 36,
++    color: C.white, valign: 'middle', align: opts.align || 'left',
++  });
++}
++
++/** The paired play-triangles that mark a section title. */
++function playMark(slide, x, y, w, h, rot, colors) {
++  const back = colors && colors[0] ? colors[0] : C.accent1;
++  const front = colors && colors[1] ? colors[1] : C.accent1;
++  slide.addShape('triangle', { x: x + w * 0.3, y: y + h * 0.19, w: w * 0.73, h: h * 0.62,
++    rotate: rot, fill: { color: back, transparency: 67 }, line: { type: 'none' } });
++  slide.addShape('triangle', { x, y: y + h * 0.08, w, h: h * 0.85,
++    rotate: rot, fill: { color: front }, line: { type: 'none' } });
++}
++
++/** Icon badge: an octagonal chip with a white glyph inside. */
++function iconBadge(slide, x, y, size, fillColor, glyph, inset) {
++  const cut = size * 0.167;
++  chamferRect(slide, x, y, size, size, [cut, cut, cut * 1.083, cut * 1.083],
++    { fill: { color: fillColor }, line: { type: 'none' } });
++  if (glyph) {
++    const m = inset === undefined ? 0.2 : inset;
++    drawRings(slide, glyph, x + size * m, y + size * m, size * (1 - 2 * m), size * (1 - 2 * m), C.white);
++  }
++}
++
++/** Heading + body pair used beside the icon badges. */
++function captionBlock(slide, x, y, w, heading, body, opts) {
++  const o = opts || {};
++  slide.addText(heading, { x, y, w, h: 0.337, fontFace: FONT_BOLD, bold: true, fontSize: 14,
++    color: C.white, valign: 'middle', align: o.align || 'left' });
++  slide.addText(body, { x: o.bx === undefined ? x : o.bx, y: y + 0.321, w: o.bw || w, h: o.bh || 0.98,
++    fontFace: FONT_MINOR, fontSize: 12, color: o.bodyColor || C.grey65,
++    lineSpacingMultiple: 1.5, align: o.align || 'left', valign: 'top' });
++}
++
++const BODY = {
++  fontFace: FONT_MINOR, fontSize: 12, color: C.grey65, lineSpacingMultiple: 1.5, valign: 'top',
++};
++const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.';
++const LOREM_MED  = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit';
++const LOREM_SHORT= 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ';
++const LOREM_ROW  = 'Lorem dolor sit amet consectetur adipiscing elit sed do';
++const LOREM_PARA = 'PLACEHOLDER';
++
++// -------------------------------------------------------------- slide 01 ----
++// Cover: giant "AI TECHNO / COMPANY" lock-up beside a full-bleed photo panel.
++function buildSlide01(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  photo(s, framePlate, 0, 0, 5.806, 6.423, { label: 22 });
++  drawCircuit(s, circuitWide, 9.773, -0.575, 3.504, 1.936, { flipV: true, weight: 0.9 });
++  drawCircuit(s, circuitLow, -0.191, 6.519, 4.2, 1.464, { flipH: true, weight: 0.9 });
++  scanBar(s, 13.07, 0.262);
++
++  s.addText('AI TECHNO', { x: 6.597, y: 2.215, w: 5.581, h: 1.212,
++    fontFace: FONT_MAJOR, bold: true, fontSize: 66, color: C.accent1, valign: 'middle' });
++  s.addText('COMPANY', { x: 6.597, y: 3.074, w: 6.432, h: 1.447,
++    fontFace: FONT_MAJOR, bold: true, fontSize: 80, color: C.white, valign: 'middle' });
++
++  // tag-line plaque
++  chamferRect(s, 0.755, 5.961, 3.254, 0.882, [0.211, 0.183, 0.183, 0.211],
++    { fill: { color: C.accent1d }, line: { color: C.accent1, width: 1 } });
++  s.addText('Innovating the Future with Artificial Intelligence', {
++    x: 1.018, y: 5.99, w: 2.728, h: 0.82, align: 'center', valign: 'middle',
++    fontFace: FONT_MINOR, fontSize: 12, color: C.white });
++
++  // feature callout with the octagonal chip icon
++  iconBadge(s, 7.344, 5.656, 0.539, C.accent5, iconReddit, 0.14);
++  captionBlock(s, 8.061, 5.758, 2.595, 'Machine Learning', 'Lorem ipsum dolor sit amet, consectetuer',
++    { bh: 0.678 });
++  playMark(s, 11.352, 5.847, 0.753, 0.575, 270, [C.accent5p, C.accent1]);
++}
++
++// -------------------------------------------------------------- slide 02 ----
++// "Introduce AI Tech": copy on the left, notched photo panel on the right.
++function buildSlide02(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  photo(s, frameLeftCut, 7.259, 2.834, 6.074, 3.931, { label: 20 });
++  drawCircuit(s, circuitWide, 10.614, 0.015, 2.702, 1.493, { flipV: true });
++  drawCircuit(s, circuitLow, 0, 6.118, 3.333, 1.162, { flipH: true });
++  drawRings(s, tagBolt, 6.667, 6.208, 2.135, 0.755, C.accent1);
++
++  washH(s, 0, 1.594, 6.074, 1.595, C.accent1, 51, 100);
++  s.addText('INTRODUCE AI TECH', { x: 0.969, y: 2.044, w: 5.105, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  s.addText('Technology Company', { x: 0.969, y: 3.707, w: 2.427, h: 0.337,
++    fontFace: FONT_BOLD, bold: true, fontSize: 14, color: C.white, valign: 'middle' });
++  s.addText(LOREM_LONG, Object.assign({ x: 0.969, y: 4.297, w: 5.105, h: 1.284 }, BODY));
++
++  // callout plaque pointing at the photo
++  chamferRect(s, 9.845, 2.279, 3.589, 1.118, [0.559, 0, 0, 0.559],
++    { fill: { color: C.accent1d }, line: { color: C.accent1, width: 1 } });
++  s.addText(LOREM_SHORT, Object.assign({ x: 10.989, y: 2.353, w: 2.176, h: 0.981 }, BODY));
++  drawRings(s, iconBulb, 10.427, 2.588, 0.336, 0.499, C.white);
++  playMark(s, 9.102, 2.627, 0.54, 0.412, 270, [C.accent1, C.accent2]);
++  drawRings(s, tagBolt, 9.55, 3.189, 1.27, 0.449, C.accent1);
++}
++
++// -------------------------------------------------------------- slide 03 ----
++// "Core Technologies": three labelled octagon photos with connector tags.
++function buildSlide03(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  photo(s, frameOct, 6.913, 0.481, 3.63, 3.931, { label: 18 });
++  photo(s, frameOctB, 4.524, 3.846, 2.93, 3.173, { label: 18 });
++  drawCircuit(s, circuitLow, 0.022, 3.168, 3.333, 1.162, { flipH: true });
++  drawCircuit(s, circuitLow, 10.02, 6.167, 3.333, 1.162);
++
++  washH(s, 0, 1.329, 4.787, 1.595, C.accent1, 51, 100);
++  s.addText('CORE TECHNOLOGIES', { x: 0.846, y: 1.773, w: 5.475, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 0.243, 1.968, 0.371, 0.283, 90, [C.accent1, C.accent1]);
++
++  drawRings(s, tagArrow, 10.569, 1.884, 0.592, 0.241, C.accent1);
++  iconBadge(s, 10.273, 1.654, 0.539, C.accent2m, iconReddit, 0.14);
++  captionBlock(s, 10.865, 2.126, 2.067, 'Machine Learning', LOREM_SHORT, { bodyColor: '808080' });
++
++  drawRings(s, iconNode, 8.778, 4.362, 0.631, 0.636, C.accent1);
++  iconBadge(s, 8.555, 4.143, 0.539, C.accent2m, iconAtom, 0.17);
++  captionBlock(s, 8.189, 5.018, 3.662, 'Natural Language Processing', LOREM_SHORT,
++    { bh: 0.678, bodyColor: '808080' });
++
++  drawRings(s, tagBolt, 3.73, 5.787, 0.952, 0.337, C.accent1);
++  iconBadge(s, 4.248, 5.735, 0.539, C.accent2m, iconWave, 0.14);
++  s.addText('Computer Vision', { x: 1.697, y: 5.618, w: 1.88, h: 0.337, align: 'right',
++    fontFace: FONT_BOLD, bold: true, fontSize: 14, color: C.white, valign: 'middle' });
++  s.addText(LOREM_SHORT, Object.assign({ x: 0.89, y: 5.939, w: 2.686, h: 0.678 }, BODY, { color: '808080' }));
++}
++
++// -------------------------------------------------------------- slide 04 ----
++// "Products and Services": numbered service list plus a right-hand blurb.
++function buildSlide04(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  photo(s, frameRightCut, 0, 1.1, 4.437, 2.558, { label: 18 });
++  drawCircuit(s, circuitWide, 10.458, 5.605, 2.875, 1.589);
++  drawRings(s, tagBolt, 1.841, 3.065, 1.27, 0.449, C.accent1);
++
++  washH(s, 7.419, 1.1, 5.914, 1.595, C.accent1, 100, 51);
++  s.addText('PRODUCTS AND SERVICES', { x: 6.235, y: 1.544, w: 6.574, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 5.515, 1.726, 0.449, 0.342, 270, [C.accent1, C.accent1]);
++
++  // "Company Services" tab that hangs off the left edge
++  chamferRect(s, 0, 3.263, 2.726, 0.789, [0, 0.395, 0.395, 0],
++    { fill: { color: C.accent1 }, line: { type: 'none' } });
++  s.addText('Company Services', { x: 0.162, y: 3.514, w: 2.092, h: 0.337, align: 'center',
++    fontFace: FONT_BOLD, bold: true, fontSize: 14, color: C.white, valign: 'middle' });
++
++  s.addShape('line', { x: 1.233, y: 3.977, w: 0, h: 3.523,
++    line: { color: C.accent1, width: 1, transparency: 80 } });
++
++  const services = [
++    { n: '1', title: 'Service One',   y: 4.629, badge: C.accent1 },
++    { n: '2', title: 'Service Two',   y: 5.495, badge: C.accent1d },
++    { n: '3', title: 'Service Three', y: 6.361, badge: C.accent2m },
++  ];
++  services.forEach(item => {
++    s.addShape('roundRect', { x: 1.108, y: item.y + 0.179, w: 0.25, h: 0.247, rectRadius: 0.12,
++      fill: { color: item.badge }, line: item.badge === C.accent1d ? { color: C.accent1, width: 1.75 } : { type: 'none' } });
++    s.addText(item.n, { x: 1.108, y: item.y + 0.179, w: 0.25, h: 0.247, align: 'center', valign: 'middle',
++      fontFace: FONT_BOLD, bold: true, fontSize: 10, color: C.white });
++    s.addText(item.title, { x: 1.769, y: item.y, w: 1.6, h: 0.337,
++      fontFace: FONT_BOLD, bold: true, fontSize: 14, color: C.white, valign: 'middle' });
++    s.addText(LOREM_ROW, Object.assign({ x: 1.769, y: item.y + 0.245, w: 4.938, h: 0.375 }, BODY));
++  });
++
++  s.addText('Technology Company', { x: 8.108, y: 3.261, w: 2.427, h: 0.337,
++    fontFace: FONT_BOLD, bold: true, fontSize: 14, color: C.white, valign: 'middle' });
++  s.addText(LOREM_LONG, Object.assign({ x: 8.108, y: 3.85, w: 4.701, h: 1.284 }, BODY));
++}
++
++// -------------------------------------------------------------- slide 05 ----
++// "Market Analysis": three chamfered stat cards over a photo panel.
++function buildSlide05(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  photo(s, frameRightCut2, 0, 3.552, 5.629, 3.948, { label: 20 });
++  drawCircuit(s, circuitWide, 10.026, 0.021, 2.702, 1.493, { flipV: true });
++  scanBar(s, 12.714, 0.609);
++
++  washH(s, 0, 1.646, 6.074, 1.151, C.accent2l, 51, 100);
++  s.addText('MARKET ANALYSIS', { x: 0.969, y: 1.868, w: 4.66, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 6.021, 2.05, 0.449, 0.342, 270, [C.accent3p, C.accent1]);
++  s.addText(LOREM_MED, Object.assign({ x: 7.259, y: 1.731, w: 5.105, h: 0.981 }, BODY));
++
++  const cards = [
++    { x: 3.611, label: 'Consumer Technology',  pct: '30%' },
++    { x: 6.638, label: 'Enterprise Solutions', pct: '50%' },
++    { x: 9.666, label: 'Healthcare Technology', pct: '20%' },
++  ];
++  cards.forEach((card, i) => {
++    chamferRect(s, card.x, 4.639, 2.62, 1.775, [0.335, 0.359, 0.359, 0.335],
++      { fill: { color: C.accent1d }, line: { color: C.accent1, width: 1 } });
++    s.addText(card.label, { x: card.x, y: 4.835, w: 2.62, h: 0.303, align: 'center', valign: 'middle',
++      fontFace: FONT_BOLD, bold: true, fontSize: 12, color: C.white });
++    s.addText(card.pct, { x: card.x, y: 5.138, w: 2.62, h: 0.64, align: 'center', valign: 'middle',
++      fontFace: FONT_BOLD, bold: true, fontSize: 32, color: C.white });
++    s.addText('Lorem ipsum dolor sit amet, consectetuer',
++      Object.assign({ x: card.x + 0.2, y: 5.634, w: 2.22, h: 0.678, align: 'center' }, BODY));
++    drawRings(s, tagBolt, [4.881, 7.692, 10.474][i], i === 0 ? 3.981 : 4.005, 1.27, 0.449, C.accent1);
++  });
++}
++
++// -------------------------------------------------------------- slide 06 ----
++// "Future Innovations": a timeline column beside a tall photo panel.
++function buildSlide06(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  photo(s, frameTallCut, 9.625, 0, 3.708, 7.5, { label: 22 });
++  drawCircuit(s, circuitWide, 7.31, 1.458, 2.315, 1.279, { flipV: true });
++
++  washH(s, 0, 1.329, 7.479, 1.595, C.accent1, 51, 100);
++  s.addText('FUTURE INNOVATIONS', { x: 1.139, y: 1.773, w: 5.603, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 0.243, 1.985, 0.371, 0.283, 90, [C.accent1, C.accent1]);
++
++  s.addShape('line', { x: 0.984, y: 3.729, w: 0, h: 3.771, line: { color: C.accent1, width: 1, transparency: 60 } });
++  s.addText('2027', { x: 1.337, y: 3.43, w: 1.27, h: 0.64,
++    fontFace: FONT_BOLD, bold: true, fontSize: 32, color: C.white, valign: 'middle' });
++  s.addText('Our Future Innovation', { x: 1.337, y: 4.094, w: 2.064, h: 0.303,
++    fontFace: FONT_BOLD, bold: true, fontSize: 12, color: C.white, valign: 'middle' });
++  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue',
++    Object.assign({ x: 1.344, y: 4.419, w: 3.708, h: 0.678 }, BODY));
++
++  [5.52, 6.351].forEach(y => {
++    drawRings(s, iconCheck, 1.365, y, 0.183, 0.19, C.accent1);
++    s.addText('PLACEHOLDER',
++      Object.assign({ x: 1.705, y: y - 0.132, w: 3.614, h: 0.678 }, BODY));
++  });
++
++  s.addShape('line', { x: 6.255, y: 5.079, w: 0, h: 2.421, line: { color: C.accent1, width: 1, transparency: 60 } });
++  drawRings(s, tagArrow, 6.28, 4.98, 0.592, 0.241, C.accent1);
++  iconBadge(s, 5.984, 4.751, 0.539, C.accent1, iconReddit, 0.14);
++  captionBlock(s, 6.635, 5.23, 2.067, 'Machine Learning', LOREM_SHORT);
++}
++
++// -------------------------------------------------------------- slide 07 ----
++// "Our Technology Portfolio": a scatter of octagon photo tiles.
++function buildSlide07(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  drawCircuit(s, circuitFlat, 0, 0.988, 3.527, 1.218, { flipH: true, weight: 0.7 });
++  drawCircuit(s, circuitLow, 10.957, -0.262, 3.333, 1.162, { weight: 0.7 });
++  washH(s, -0.02, 7.149, SLIDE_W, 0.355, C.accent1, 100, 0);
++
++  washH(s, 7.419, 0.771, 5.914, 1.595, C.accent1, 100, 51);
++  s.addText('OUR TECHNOLOGY PORTFOLIO', { x: 5.237, y: 1.215, w: 7.61, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 4.517, 1.397, 0.449, 0.342, 270, [C.accent1, C.accent1]);
++
++  const tiles = [
++    [3.857, 2.684, 1.429, 1.419, frameChip],  [9.956, 2.998, 2.042, 2.026, frameChip],
++    [7.774, 3.556, 1.429, 1.419, frameChip],  [5.168, 3.854, 1.091, 1.083, frameChip],
++    [2.885, 3.925, 1.141, 0.942, frameChipW], [1.101, 4.665, 2.042, 2.026, frameChip],
++    [3.857, 4.689, 1.429, 1.419, frameChip],  [6.001, 4.717, 2.042, 2.026, frameChip],
++    [9.042, 4.813, 1.141, 0.942, frameChipW], [10.026, 5.592, 1.429, 1.419, frameChip],
++  ];
++  tiles.forEach(([x, y, w, h, frame]) => photo(s, frame, x, y, w, h, { label: 9 }));
++}
++
++// -------------------------------------------------------------- slide 08 ----
++// "Meet Our Team": two portrait cards with name plates.
++function buildSlide08(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  photo(s, frameCard, 6.809, 1.467, 2.875, 4.97, { label: 18 });
++  photo(s, frameCard, 9.976, 1.467, 2.875, 4.97, { label: 18 });
++  drawCircuit(s, circuitLow, 0, 6.118, 3.333, 1.162, { flipH: true });
++  drawRings(s, tagBolt, 6.667, 6.499, 1.29, 0.456, C.accent1);
++
++  washH(s, 0, 2.201, 4.134, 1.338, C.accent1, 51, 100);
++  s.addText('MEET OUR TEAM', { x: 0.846, y: 2.517, w: 4.134, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 5.448, 2.729, 0.371, 0.283, 90, [C.accent1, C.accent1]);
++  s.addText('Best Employee In 2025', { x: 0.846, y: 4.133, w: 2.434, h: 0.337,
++    fontFace: FONT_BOLD, bold: true, fontSize: 14, color: C.white, valign: 'middle' });
++  s.addText(LOREM_LONG, Object.assign({ x: 0.846, y: 4.723, w: 5.105, h: 1.284 }, BODY));
++
++  const plates = [
++    { x: 7.102, name: 'Isabella Adams', fill: C.accent1 },
++    { x: 10.269, name: 'Emma Walker',   fill: C.accent5 },
++  ];
++  plates.forEach(plate => {
++    chamferRect(s, plate.x, 5.384, 2.289, 1.357, [0.324, 0.324, 0.342, 0.342],
++      { fill: { color: plate.fill }, line: { color: C.accent3l, width: 1 } });
++    s.addText(plate.name, { x: plate.x + 0.076, y: 5.605, w: 2.136, h: 0.404, align: 'center', valign: 'middle',
++      fontFace: FONT_BOLD, bold: true, fontSize: 18, color: C.white });
++    s.addText('Lorem ipsum dolor sit amet, consectetuer', { x: plate.x + 0.111, y: 5.938, w: 2.067, h: 0.582,
++      align: 'center', fontFace: FONT_MINOR, fontSize: 10, color: C.white, lineSpacingMultiple: 1.5 });
++  });
++}
++
++// -------------------------------------------------------------- slide 09 ----
++// "AI Tech Mockup Design": phone mockup plus two chamfered pill buttons.
++function buildSlide09(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  scanBar(s, 6.669, 0.449);
++  drawCircuit(s, circuitLow, 10.001, 0.148, 3.333, 1.162);
++  drawRings(s, tagBolt, 0.464, 6.097, 1.27, 0.449, C.accent1);
++  photo(s, framePhone, 1.342, 1.574, 2.111, 4.591, { label: 16 });
++
++  washH(s, 7.259, 1.469, 6.074, 1.151, C.accent2l, 100, 51);
++  s.addText('AI TECH MOCKUP DESIGN', { x: 6.475, y: 1.691, w: 6.394, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 5.615, 1.873, 0.449, 0.342, 270, [C.accent3p, C.accent3l]);
++
++  [['Computer Vision', 6.011], ['Machine Learning', 9.658]].forEach(([label, x]) => {
++    chamferRect(s, x, 3.359, 3.211, 0.816, [0.154, 0.165, 0.165, 0.154],
++      { fill: { color: C.accent1d }, line: { color: C.accent1, width: 1 } });
++    s.addText(label, { x, y: 3.359, w: 3.211, h: 0.816, align: 'center', valign: 'middle',
++      fontFace: FONT_BOLD, bold: true, fontSize: 16, color: C.white });
++  });
++
++  iconBadge(s, 3.1, 4.416, 0.705, C.accent1d, iconWave, 0.14);
++  s.addText('Natural Language Processing', { x: 5.332, y: 4.947, w: 3.154, h: 0.337,
++    fontFace: FONT_BOLD, bold: true, fontSize: 14, color: C.white, valign: 'middle' });
++  s.addText(LOREM_MED, Object.assign({ x: 5.332, y: 5.353, w: 7.537, h: 0.678 }, BODY));
++}
++
++// -------------------------------------------------------------- slide 10 ----
++// Infographic: five chamfered "Topic Here" chips strung along a rule.
++function buildSlide10(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  washH(s, 0, 1.329, 4.787, 1.595, C.accent1, 51, 100);
++  s.addText('INFOGRAPHIC SECTION', { x: 0.846, y: 1.773, w: 5.868, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 0.243, 1.968, 0.371, 0.283, 90, [C.accent2p, C.accent1]);
++
++  s.addShape('rect', { x: 2.811, y: 4.164, w: 8.204, h: 0.05, fill: { color: C.grey85 }, line: { type: 'none' } });
++
++  const chips = [
++    { x: 1.489, tx: 1.519, fill: C.accent1,  btn: C.accent1 },
++    { x: 3.526, tx: 3.261, fill: C.accent5,  btn: C.accent5 },
++    { x: 5.700, tx: 5.378, fill: C.accent2m, btn: C.accent1m },
++    { x: 7.712, tx: 7.447, fill: C.accent2m, btn: C.accent2m },
++    { x: 9.833, tx: 9.568, fill: C.accent1m, btn: C.accent1m },
++  ];
++  const subtitleX = [1.656, 3.694, 5.868, 7.88, 10.001];
++  const bodyX = [1.427, 3.465, 5.639, 7.65, 9.771];
++  const btnX = [1.743, 3.781, 5.955, 7.967, 10.088];
++
++  chips.forEach((chip, i) => {
++    chamferRect(s, chip.x, 3.75, 1.809, 0.877, [0.257, 0.257, 0, 0],
++      { fill: { color: chip.fill }, line: { type: 'none' } });
++    s.addText('Topic Here', { x: chip.tx, y: 3.97, w: chip.x === 1.489 ? 1.749 : 2.338, h: 0.438,
++      align: 'center', valign: 'middle', fontFace: FONT_MINOR, fontSize: 20, color: C.white });
++    s.addText('Subtitle Here', { x: subtitleX[i], y: 5.063, w: 1.473, h: 0.337, align: 'center', valign: 'middle',
++      fontFace: FONT_BOLD, bold: true, fontSize: 14, color: C.white });
++    s.addText('Lorem dolor sit amet consectetur adip',
++      Object.assign({ x: bodyX[i], y: 5.389, w: 1.932, h: 0.676, align: 'center' }, BODY));
++    s.addShape('rect', { x: btnX[i], y: 6.255, w: 1.299, h: 0.33, fill: { color: chip.btn }, line: { type: 'none' } });
++    s.addText('Show All', { x: btnX[i], y: 6.255, w: 1.299, h: 0.33, align: 'center', valign: 'middle',
++      fontFace: FONT_MINOR, fontSize: 14, color: C.white });
++  });
++}
++
++// -------------------------------------------------------------- slide 11 ----
++// Infographic: three icon panels on the left, a titled blurb on the right.
++function buildSlide11(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  washH(s, 8.572, 1.329, 4.787, 1.595, C.accent1, 100, 51);
++  s.addText('INFOGRAPHIC SECTION', { x: 6.646, y: 1.773, w: 5.868, h: 0.707, align: 'right',
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 12.745, 1.968, 0.371, 0.283, 270, [C.accent1d, C.accent1]);
++
++  const panels = [
++    { x: 0.766, y: 3.385, fill: C.accent5,  label: 'NETWORK',  glyph: iconCloud,  gw: 0.309, gh: 0.294, outline: false },
++    { x: 3.066, y: 3.385, fill: C.accent1,  label: 'RELATION', glyph: iconPeople, gw: 0.223, gh: 0.286, outline: false },
++    { x: 5.334, y: 3.367, fill: C.accent1d, label: 'RELATION', glyph: iconTarget, gw: 0.251, gh: 0.26,  outline: true },
++  ];
++  panels.forEach((p, i) => {
++    s.addShape('rect', { x: p.x, y: p.y, w: 2.08, h: 3.126, fill: { color: p.fill },
++      line: p.outline ? { color: C.accent1, width: 1.75 } : { type: 'none' } });
++    s.addShape('ellipse', { x: p.x + 0.74, y: p.y + 0.247, w: 0.6, h: 0.6, fill: { color: C.white }, line: { type: 'none' } });
++    drawRings(s, p.glyph, p.x + 0.886 - p.gw / 2 + 0.154, p.y + 0.4, p.gw, p.gh, C.accent1);
++    s.addText(p.label, { x: p.x + 0.122, y: p.y + 0.999, w: 1.837, h: 0.305, align: 'center', valign: 'middle',
++      fontFace: FONT_MINOR, fontSize: 16, color: C.white });
++    s.addText('Lorem ipsum dolor sit amet, consectetur', { x: p.x + 0.132, y: p.y + 1.548, w: 1.837, h: 0.924,
++      align: 'center', fontFace: FONT_MINOR, fontSize: 12, color: C.white });
++    s.addShape('rect', { x: [1.265, 3.499, 5.733][i], y: 5.768, w: 1.138, h: 0.364,
++      fill: { color: C.white }, line: { type: 'none' } });
++    s.addText('Show All', { x: [1.265, 3.499, 5.733][i], y: 5.768, w: 1.138, h: 0.364, align: 'center',
++      valign: 'middle', fontFace: FONT_MINOR, fontSize: 14, color: C.white });
++  });
++
++  drawRings(s, iconPeople, 8.086, 3.491, 0.47, 0.603, C.accent1);
++  s.addText('Insert Title Here', { x: 7.996, y: 4.384, w: 2.392, h: 0.438,
++    fontFace: FONT_BOLD, bold: true, fontSize: 20, color: C.white, valign: 'middle' });
++  s.addText('PLACEHOLDER',
++    Object.assign({ x: 7.996, y: 4.931, w: 3.599, h: 1.284 }, BODY));
++}
++
++// -------------------------------------------------------------- slide 12 ----
++// Infographic: three interlocking arrows with paragraphs on either side.
++function buildSlide12(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  washH(s, 0, 1.329, 4.787, 1.595, C.accent1, 51, 100);
++  s.addText('INFOGRAPHIC SECTION', { x: 0.846, y: 1.773, w: 5.868, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 0.243, 1.968, 0.371, 0.283, 90, [C.accent1, C.accent1]);
++
++  // Three block arrows: a left-pointing outlined one and two solid right-pointing ones.
++  const arrows = [
++    { x: 3.393, y: 4.145, w: 3.125, h: 1.75, ring: arrowLeft,  fill: C.accent1d, outline: true,
++      num: '02', nx: 4.50 },
++    { x: 5.415, y: 3.196, w: 3.125, h: 1.75, ring: arrowRight, fill: C.accent5,  outline: false,
++      num: '01', nx: 7.55 },
++    { x: 5.147, y: 5.06,  w: 3.125, h: 1.75, ring: arrowRight, fill: C.accent1,  outline: false,
++      num: '03', nx: 7.05 },
++  ];
++  arrows.forEach(a => {
++    s.addShape('custGeom', { x: a.x, y: a.y, w: a.w, h: a.h,
++      fill: { color: a.fill }, line: a.outline ? { color: C.accent1, width: 1.75 } : { type: 'none' },
++      points: ringPoints(a.ring, a.w, a.h) });
++    s.addText(a.num, { x: a.nx, y: a.y + 0.678, w: 0.6, h: 0.395, align: 'center', valign: 'middle',
++      fontFace: FONT_MINOR, fontSize: 17.5, color: C.white });
++  });
++
++  s.addText(LOREM_PARA, Object.assign({ x: 9.524, y: 3.503, w: 3.032, h: 1.284 }, BODY));
++  s.addText(LOREM_PARA, Object.assign({ x: 9.524, y: 5.26, w: 3.032, h: 1.284 }, BODY));
++  s.addText(LOREM_PARA, Object.assign({ x: 0.926, y: 4.338, w: 3.032, h: 1.284, align: 'right' }, BODY));
++}
++
++// -------------------------------------------------------------- slide 13 ----
++// Infographic: four outlined pricing columns.
++function buildSlide13(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  washH(s, 8.572, 0.651, 4.787, 1.595, C.accent1, 100, 51);
++  s.addText('INFOGRAPHIC SECTION', { x: 6.646, y: 1.095, w: 5.868, h: 0.707, align: 'right',
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 12.745, 1.289, 0.371, 0.283, 270, [C.accent2p, C.accent1]);
++
++  const tiers = [
++    { x: 1.233, price: '$3000', name: 'BASIC',    fill: C.accent5,  outline: false, body: 'PLACEHOLDER' },
++    { x: 3.975, price: '$6000', name: 'MODERATE', fill: C.accent1,  outline: false, body: 'PLACEHOLDER' },
++    { x: 6.721, price: '$8000', name: 'PRO',      fill: C.accent1d, outline: true,  body: 'PLACEHOLDER' },
++    { x: 9.457, price: '$10000', name: 'EXTREME', fill: C.accent1,  outline: false, body: 'PLACEHOLDER' },
++  ];
++  tiers.forEach(tier => {
++    s.addShape('rect', { x: tier.x, y: 2.898, w: 2.602, h: 3.765,
++      fill: { type: 'none' }, line: { color: C.grey95, width: 1.5 } });
++    const priceX = tier.x + 0.233;
++    s.addShape('rect', { x: priceX, y: 2.68, w: 2.134, h: 0.811, fill: { color: tier.fill },
++      line: tier.outline ? { color: C.accent1, width: 1.75 } : { type: 'none' } });
++    s.addText(tier.price, { x: priceX, y: 2.68, w: 2.134, h: 0.811, align: 'center', valign: 'middle',
++      fontFace: FONT_BOLD, bold: true, fontSize: 24, color: C.white });
++    s.addText(tier.body, Object.assign({ x: tier.x + 0.232, y: 3.882, w: 2.137, h: 2.193 }, BODY,
++      { bullet: { characterCode: '2022', indent: 13.5 } }));
++    const nameX = tier.x + 0.596;
++    s.addShape('rect', { x: nameX, y: 6.468, w: 1.41, h: 0.378, fill: { color: tier.fill },
++      line: tier.outline ? { color: C.accent1, width: 1.75 } : { type: 'none' } });
++    s.addText(tier.name, { x: nameX, y: 6.468, w: 1.41, h: 0.378, align: 'center', valign: 'middle',
++      fontFace: FONT_BOLD, bold: true, fontSize: 14, color: C.white });
++  });
++}
++
++// -------------------------------------------------------------- slide 14 ----
++// "Contact Information's": a details panel beside a photo panel.
++function buildSlide14(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  photo(s, frameWideCut, 0, 3.213, 5.229, 3.75, { label: 20 });
++  drawCircuit(s, circuitWide, 9.36, 0.529, 3.973, 2.196, { flipV: true });
++  drawRings(s, tagStep, 3.906, 3.084, 1.906, 0.529, C.accent1);
++  drawRings(s, tagStep, 3.906, 6.563, 1.906, 0.529, C.accent1);
++  drawRings(s, tagBolt, 6.667, 6.208, 2.135, 0.755, C.accent1);
++
++  washH(s, 0, 1.329, 8.563, 1.38, C.accent1, 51, 100);
++  s.addText('CONTACT INFORMATION\u2019S', { x: 1.139, y: 1.665, w: 6.673, h: 0.707,
++    fontFace: FONT_MAJOR, fontSize: 36, color: C.white, valign: 'middle' });
++  playMark(s, 0.243, 1.877, 0.371, 0.283, 90, [C.accent2p, C.accent1]);
++
++  washH(s, 5.226, 4.129, 8.107, 1.917, C.accent1m, 100, 45);
++
++  const rows = [
++    { glyph: iconPhone, gx: 5.77,  gy: 4.652, gw: 0.18,  gh: 0.18,  label: 'Phone',   lx: 6.149, value: ': (123) 123-4567',  vx: 7.11,   y: 4.574 },
++    { glyph: iconHome,  gx: 5.741, gy: 5.331, gw: 0.238, gh: 0.204, label: 'Address', lx: 6.149, value: ': 123 Street Name', vx: 7.11,   y: 5.265 },
++    { glyph: iconMail,  gx: 9.281, gy: 4.676, gw: 0.18,  gh: 0.132, label: 'Mail',    lx: 9.698, value: ':info@yourmail.com', vx: 10.597, y: 4.574 },
++    { glyph: iconGlobe, gx: 9.259, gy: 5.321, gw: 0.224, gh: 0.224, label: 'Website', lx: 9.698, value: ': yoursitehere.com', vx: 10.597, y: 5.265 },
++  ];
++  rows.forEach(row => {
++    drawRings(s, row.glyph, row.gx, row.gy, row.gw, row.gh, C.white);
++    s.addText(row.label, { x: row.lx, y: row.y, w: 1.089, h: 0.337,
++      fontFace: FONT_MINOR, fontSize: 14, color: C.white, valign: 'middle' });
++    s.addText(row.value, { x: row.vx, y: row.y, w: 2.917, h: 0.337,
++      fontFace: FONT_MINOR, fontSize: 14, color: C.white, valign: 'middle' });
++  });
++}
++
++// -------------------------------------------------------------- slide 15 ----
++// Closing slide: an oversized "THANK YOU" with a highlight plaque behind "YOU".
++function buildSlide15(pptx) {
++  const s = pptx.addSlide();
++  background(s);
++  eyebrow(s);
++  drawCircuit(s, circuitWide, 9.246, 0.015, 4.07, 2.249, { flipV: true, color: C.accent1m });
++  drawCircuit(s, circuitLow, 0, 4.969, 5.131, 1.789, { flipH: true, color: C.accent1m });
++  drawRings(s, tagBolt, 7.235, 4.612, 1.27, 0.449, C.accent1m);
++  scanBar(s, 6.669, 0.449);
++
++  chamferRect(s, 7.687, 2.801, 3.644, 1.899, [0.359, 0.384, 0.384, 0.359],
++    { fill: { color: C.accent1d }, line: { color: C.accent1, width: 1 } });
++  s.addText('THANK YOU', { x: 2.002, y: 2.732, w: 9.328, h: 2.036, align: 'center', valign: 'middle',
++    fontFace: FONT_MAJOR, fontSize: 115, color: C.white });
++  playMark(s, 0.859, 3.463, 0.753, 0.575, 90, [C.accent5l, C.accent5]);
++}
++
++// -------------------------------------------------------------------- main --
++function main() {
++  const pptx = new PptxGenJS();
++  pptx.author = 'AI Technology Company';
++  pptx.title = 'AI Technology Company';
++  pptx.defineLayout({ name: 'WIDE_16x9', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'WIDE_16x9';
++
++  [buildSlide01, buildSlide02, buildSlide03, buildSlide04, buildSlide05,
++   buildSlide06, buildSlide07, buildSlide08, buildSlide09, buildSlide10,
++   buildSlide11, buildSlide12, buildSlide13, buildSlide14, buildSlide15]
++    .forEach(build => build(pptx));
++
++  const out = path.join(__dirname, '0235186d-6d20-4071-85d3-b8e767da4f67_grok_final.pptx');
++  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote ' + out));
++}
++
++main();

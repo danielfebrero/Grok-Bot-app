@@ -1,0 +1,925 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/creative_resume_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/creative_resume_presentation.js
+@@ -0,0 +1,922 @@
++/**
++ * Recreation of "Creative Resume" (25 slides, 13.333 x 7.5 in) with pptxgenjs.
++ * Raster icons/photos from the original are redrawn as native shapes / placeholder blocks.
++ */
++'use strict';
++
++const PptxGenJS = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ palette */
++const NAVY = '054255', BLUE = '0F95BA', TEAL = '03DBA8', GOLD = 'FFD56F',
++      PEACH = 'F69874', PINK = 'F2527E', WHITE = 'FFFFFF', BLACK = '000000';
++
++// tints / shades used by the illustrations
++const NAVY_XD = '02212A', NAVY_D = '043140', NAVY_L = '084A5D', SKY = '11BCF1', SKY_L = '53CFF1',
++      BLUE_D = '0B708C', TEAL_D = '016E54', TEAL_M = '02A47E', TEAL_L = '55FDD5',
++      GOLD_D = 'B78200', GOLD_M = 'FFBA14', GOLD_L = 'FFE6A9', ORANGE = 'F0591F', PEACH_L = 'FAC1AC';
++const PALE_BLUE = 'C6EFFA', PALE_TEAL = 'C6FEF1', PALE_GOLD = 'FFF7E2',
++      PALE_PEACH = 'FDEAE3', PALE_PINK = 'FCDCE5', PALE_SKY = 'D7F4FD';
++const G05 = 'F2F2F2', G15 = 'D9D9D9', G25 = 'BFBFBF', G35 = 'A6A6A6', G45 = '8C8C8C',
++      G50 = '808080', G65 = '595959', G75 = '404040', G92 = '0D0D0D', G_E7 = 'E7E6E6';
++
++const MAJOR = 'Sora SemiBold';      // theme major font
++const MINOR = 'Open Sans';          // theme minor font
++
++const NOLINE = { type: 'none' };
++// pptxgenjs rewrites the shadow object in place, so hand every shape a fresh one
++function soft(blur, opacity) {
++  return { type: 'outer', color: G50, blur: blur || 10, offset: 2, angle: 90, opacity: opacity || 0.2 };
++}
++
++/* ---------------------------------------------------------------- utilities */
++const pres = new PptxGenJS();
++pres.defineLayout({ name: 'W16', width: 13.333, height: 7.5 });
++pres.layout = 'W16';
++pres.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
++
++/** filled shape (no outline unless asked) */
++function shape(s, kind, o) {
++  const opt = Object.assign({ line: NOLINE }, o);
++  if (opt.fill && typeof opt.fill === 'string') opt.fill = { color: opt.fill };
++  if (opt.line && typeof opt.line === 'string') opt.line = { color: opt.line };
++  s.addShape(kind, opt);
++}
++
++/** text box; `t` is a string or an array of runs */
++function text(s, t, o) {
++  s.addText(t, Object.assign({ fontFace: MINOR, fontSize: 18, color: BLACK, margin: [3.6, 7.2, 3.6, 7.2] }, o));
++}
++
++/** two-tone headline: black part + accent part */
++function headline(s, a, b, o) {
++  text(s, [{ text: a, options: { breakLine: !!o.breakAfter } },
++           { text: b, options: { color: o.accent || BLUE } }],
++    Object.assign({ fontFace: MAJOR, fontSize: 40 }, o));
++}
++
++/** short label that must stay on one line (`wrap="none"` in the original) */
++function label(s, t, o) {
++  text(s, t, Object.assign({ wrap: false }, o));
++}
++
++/** grey body copy */
++function body(s, t, o) {
++  text(s, t, Object.assign({ fontSize: 12, color: G75, lineSpacingMultiple: 1.3 }, o));
++}
++
++/* ------------------------------------------------------------------- icons */
++// The deck uses flat pictogram PNGs; each is redrawn from native shapes.
++// Every recipe is a list of [shapeName, x, y, w, h, rotate] in 0..1 icon space.
++const ICONS = {
++  target:      [['donut', 0.00, 0.00, 1.00, 1.00], ['ellipse', 0.34, 0.34, 0.32, 0.32],
++                ['rtTriangle', 0.62, 0.02, 0.36, 0.36, 90]],
++  coins:       [['can', 0.02, 0.06, 0.60, 0.52], ['ellipse', 0.38, 0.40, 0.60, 0.60],
++                ['mathPlus', 0.60, 0.52, 0.16, 0.36]],
++  code:        [['rect', 0.00, 0.10, 0.86, 0.56], ['rect', 0.34, 0.72, 0.20, 0.12],
++                ['rect', 0.16, 0.84, 0.56, 0.10], ['gear6', 0.52, 0.40, 0.48, 0.48]],
++  growth:      [['rect', 0.02, 0.62, 0.18, 0.36], ['rect', 0.26, 0.44, 0.18, 0.54],
++                ['rect', 0.50, 0.26, 0.18, 0.72], ['rightArrow', 0.44, 0.02, 0.56, 0.34, 315]],
++  gearArrow:   [['gear6', 0.00, 0.00, 1.00, 1.00], ['ellipse', 0.26, 0.26, 0.48, 0.48],
++                ['rightArrow', 0.32, 0.40, 0.36, 0.20]],
++  handCoin:    [['ellipse', 0.24, 0.02, 0.52, 0.52], ['mathPlus', 0.44, 0.14, 0.12, 0.28],
++                ['moon', 0.02, 0.50, 0.96, 0.46, 270]],
++  arrowCircle: [['ellipse', 0.00, 0.00, 1.00, 1.00], ['chevron', 0.30, 0.26, 0.34, 0.48, 0, 1]]
++};
++function icon(s, kind, x, y, sz, color, accent) {
++  (ICONS[kind] || ICONS.target).forEach(function (p) {
++    shape(s, p[0], { x: x + p[1] * sz, y: y + p[2] * sz, w: p[3] * sz, h: p[4] * sz,
++      rotate: p[5] || 0, fill: p[6] && accent ? accent : color });
++  });
++}
++
++/** icon knocked out of a coloured disc (used for the target/coins glyphs) */
++function iconOnDisc(s, kind, x, y, sz, disc, glyph) {
++  shape(s, 'ellipse', { x: x, y: y, w: sz, h: sz, fill: disc });
++  icon(s, kind, x + sz * 0.18, y + sz * 0.18, sz * 0.64, glyph);
++}
++
++/* ------------------------------------------------- per-slide chrome (master) */
++function addSlide(kind) {
++  const s = pres.addSlide();
++  const light = kind !== 'navy';
++  if (!light) shape(s, 'rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: NAVY });
++  if (kind !== 'bare') {
++    text(s, [{ text: 'Creative ' }, { text: 'Resume', options: { color: light ? NAVY : WHITE } }],
++      { x: 0.387, y: 0.32, w: 2.195, h: 0.303, fontFace: MAJOR, fontSize: 12, bold: true,
++        color: light ? BLACK : WHITE });
++  }
++  text(s, String(pres.slides.length), {
++    x: 12.322, y: 6.877, w: 0.624, h: 0.303, align: 'right', fontSize: 12,
++    color: light ? G35 : WHITE
++  });
++  return s;
++}
++
++/* ===================================================================== SLIDES */
++
++/* 1 — title */
++function slide01() {
++  const s = addSlide();
++  shape(s, 'rect', { x: 0, y: 1.624, w: 6.736, h: 4.027, fill: NAVY });
++  shape(s, 'rect', { x: 0, y: 5.666, w: 6.736, h: 0.210, fill: BLUE });
++  shape(s, 'rect', { x: 1.027, y: 2.380, w: 2.303, h: 0.438, fill: WHITE });
++  text(s, 'Presentation Template', { x: 1.114, y: 2.447, w: 2.128, h: 0.303, fontSize: 12, align: 'center' });
++  text(s, [{ text: 'Creative ', options: { color: BLUE } }, { text: 'Resume', options: { color: WHITE } }],
++    { x: 0.866, y: 3.044, w: 5.554, h: 2.076, fontFace: MAJOR, fontSize: 72, lineSpacingMultiple: 0.8 });
++}
++
++/* 2 — intro + stat card */
++function slide02() {
++  const s = addSlide();
++
++  shape(s, 'rect', { x: 9.717, y: 3.750, w: 2.730, h: 2.880, fill: NAVY });
++  text(s, 'Historical Insights ', { x: 9.894, y: 4.059, w: 2.252, h: 0.774, fontFace: MAJOR, fontSize: 20, color: WHITE });
++  ['Lorem ipsum cectetuer', 'Aenean dolor legit cum', 'Donec quam, pellent'].forEach(function (line, i) {
++    const y = 5.013 + i * 0.339;
++    icon(s, 'arrowCircle', 9.980, y, 0.229, WHITE, NAVY);
++    text(s, line, { x: 10.187, y: y - 0.028, w: 2.172, h: 0.286, fontSize: 11, color: WHITE });
++  });
++  shape(s, 'rect', { x: 9.717, y: 6.420, w: 2.730, h: 0.210, fill: BLUE });
++  shape(s, 'line', { x: 9.717, y: 6.414, w: 2.730, h: 0, line: { color: WHITE, width: 1 } });
++
++  shape(s, 'rect', { x: 5.459, y: 0.808, w: 2.095, h: 0.665, fill: WHITE, shadow: soft(8, 0.15) });
++  label(s, '125+', { x: 5.521, y: 0.865, w: 1.098, h: 0.572, fontFace: MAJOR, fontSize: 28, color: BLUE });
++  label(s, 'Followers', { x: 6.563, y: 1.051, w: 0.893, h: 0.303, fontSize: 12, italic: true, color: G25 });
++
++  headline(s, 'Design Smarter a Powerful Options Bold ', 'Presentation',
++    { x: 0.887, y: 2.190, w: 4.882, h: 2.794 });
++  body(s, 'lorem ipsum dolor sit amet, consectetuer adipiscing elit. aenean commodo ligula eget dolor. aenean massa. cum sociis natoque',
++    { x: 0.887, y: 5.284, w: 4.426, h: 0.870 });
++}
++
++/* 3 — strategy + numbered notes */
++function slide03() {
++  const s = addSlide();
++  shape(s, 'rect', { x: 0, y: 3.542, w: 4.343, h: 3.958, fill: G05 });
++  shape(s, 'rect', { x: 4.514, y: 0.990, w: 2.392, h: 2.392, fill: NAVY });
++  shape(s, 'rect', { x: 4.514, y: 3.166, w: 2.392, h: 0.210, fill: BLUE });
++  shape(s, 'line', { x: 4.514, y: 3.166, w: 2.392, h: 0, line: { color: WHITE, width: 1 } });
++  icon(s, 'target', 5.359, 1.370, 0.702, WHITE);
++  text(s, 'Your Strategy', { x: 4.910, y: 2.232, w: 1.601, h: 0.640, fontFace: MAJOR, fontSize: 16, color: WHITE, align: 'center' });
++
++  text(s, 'Registered Participants', { x: 1.051, y: 3.980, w: 3.063, h: 0.370, fontFace: MAJOR, fontSize: 16 });
++  const checks = ['Lorem ipsum dolor sit amet legit', 'Aenean commodo gula eget dolor',
++                  'Behind the word mountains cum', ' Consequat massa quis enim qus'];
++  text(s, checks.map(function (t) {
++    return { text: t, options: { breakLine: true, bullet: { characterCode: '2713', indent: 13.5 } } };
++  }), { x: 1.066, y: 4.424, w: 2.917, h: 1.321, fontSize: 11, color: G65, lineSpacingMultiple: 1.7 });
++  label(s, '13.478+', { x: 1.066, y: 5.905, w: 1.704, h: 0.572, fontFace: MAJOR, fontSize: 28, color: BLUE });
++  text(s, 'People', { x: 2.678, y: 6.067, w: 1.062, h: 0.337, fontSize: 14, color: G35 });
++
++  headline(s, 'The Power of Creative Resume Turning Ideas', 'Into Impact',
++    { x: 7.560, y: 1.426, w: 5.138, h: 2.794, breakAfter: true });
++  ['01', '02'].forEach(function (n, i) {
++    const y = 4.539 + i * 0.762;
++    body(s, 'lorem ipsum dolor sit amet, consectetuer adipiscing elit. aenean commodo ligula eget dolor. aenean',
++      { x: 8.251, y: y, w: 4.426, h: 0.604 });
++    text(s, n, { x: 7.560, y: y + 0.077, w: 0.712, h: 0.505, fontFace: MAJOR, fontSize: 24, color: G15 });
++  });
++}
++
++/* ------------------------------------------- shared "Section Infographic" bits */
++const LOREM_S = 'lorem ipsum dolor sit amet, consectetuer adipiscing';
++const LOREM_M = 'lorem ipsum dolor sit amet, consectetuer adipiscing elit. aenean commodo';
++const LOREM_L = 'lorem ipsum dolor sit amet, consectetuer adipiscing elit. aenean commodo ligula';
++
++/** centred deck title used on most infographic pages */
++function sectionTitle(s, plain, accent, onNavy) {
++  const runs = accent
++    ? [{ text: plain }, { text: accent, options: { color: BLUE } }]
++    : [{ text: plain }];
++  text(s, runs, { x: 1.907, y: 0.797, w: 9.519, h: 0.708, fontFace: MAJOR, fontSize: 36,
++    align: 'center', color: onNavy ? WHITE : BLACK });
++}
++
++/** "Your Subtitle Here" + paragraph, right- or left-aligned */
++function captionBlock(s, o) {
++  const right = o.align === 'right';
++  text(s, o.title || 'Your Subtitle Here', {
++    x: right ? o.x : o.x + 0.17, y: o.y, w: 2.6, h: 0.37, align: o.align,
++    fontFace: MAJOR, fontSize: 16, color: o.color || BLACK, paraSpaceBefore: 12
++  });
++  body(s, o.text || LOREM_S, {
++    x: right ? o.x - 0.17 : o.x, y: o.y + 0.405, w: 2.77, h: o.h || 0.604,
++    align: o.align, color: o.bodyColor || G75
++  });
++}
++
++/**
++ * Custom outline. `flat` is a flat list of unit coordinates [u0,v0,u1,v1,...]
++ * traced from the original artwork; `flip` mirrors it ('H', 'V' or 'HV').
++ */
++function poly(s, x, y, w, h, fill, flat, flip, line) {
++  const fh = flip && flip.indexOf('H') >= 0, fv = flip && flip.indexOf('V') >= 0;
++  const pts = [];
++  for (let i = 0; i < flat.length; i += 2) {           // custGeom points are box-relative
++    pts.push({ x: (fh ? 1 - flat[i] : flat[i]) * w,
++               y: (fv ? 1 - flat[i + 1] : flat[i + 1]) * h });
++  }
++  pts.push({ close: true });
++  s.addShape('custGeom', { x: x, y: y, w: w, h: h, fill: { color: fill },
++    line: line || NOLINE, points: pts });
++}
++
++/** draw a whole table of [x,y,w,h,color,outline,flip] rows */
++function polys(s, rows) {
++  rows.forEach(function (r) { poly(s, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]); });
++}
++
++/** isometric cube: rhombus top + two side faces */
++const CUBE_TOP = [0, 0.5, 0.5, 0, 1, 0.5, 0.5, 1];
++const CUBE_SIDE = [0, 0, 1, 0.29, 1, 1, 0, 0.71];
++function isoCube(s, x, y, w, faceH, top, left, right) {
++  const th = w * 0.583;                       // height of the rhombus top face
++  poly(s, x, y, w, th, top, CUBE_TOP);
++  poly(s, x, y + th / 2, w / 2, faceH + th / 2, left, CUBE_SIDE);
++  poly(s, x + w / 2, y + th / 2, w / 2, faceH + th / 2, right, CUBE_SIDE, 'H');
++}
++
++/* 4 — hexagon cluster */
++const S4A = [0.99,0.29,0.99,0.86,0.69,1,0.67,0.98,0.65,0.74,0.29,0.58,0.28,0.27,0,0.12,0.33,0];
++const S4B = [0.99,0.33,0.98,1,0.58,0.75,0.5,0.73,0.01,0.99,0.01,0.34,0.47,0.01,0.53,0.01];
++const S4C = [0.99,0.26,0.99,0.75,0.53,0.99,0.46,0.99,0,0.75,0.44,0.48,0.5,0];
++const S4D = [1,0.09,0.98,0.53,0.52,1,0.47,0.99,0.01,0.52,0.01,0.07,0.23,0.25,0.5,0,0.76,0.25,0.97,0.07];
++const S4E = [1,0.12,0.99,0.15,0.72,0.28,0.71,0.59,0.34,0.75,0.32,0.99,0.01,0.87,0,0.32,0.03,0.28,0.68,0];
++const S4F = [0.52,0.02,0.53,0.41,0.55,0.47,1,0.75,0.5,1,0.01,0.75,0,0.27,0.03,0.23,0.49,0];
++const S4P = [
++  [9.82, 1.13, 2.44, 3.33, BLUE, S4A], [8.86, 1.65, 1.54, 1.33, G05, S4B],
++  [9.80, 3.26, 1.54, 1.76, G05,  S4C], [7.93, 4.65, 3.41, 1.97, TEAL, S4D],
++  [6.99, 1.12, 2.45, 3.33, NAVY, S4E], [7.90, 3.25, 1.53, 1.75, G05, S4F]
++];
++function slide04() {
++  const s = addSlide();
++  polys(s, S4P);
++  icon(s, 'target', 7.91, 2.47, 0.60, WHITE);
++  icon(s, 'code', 10.72, 2.48, 0.60, WHITE);
++  icon(s, 'coins', 9.32, 5.30, 0.60, WHITE);
++
++  headline(s, 'Section ', 'Infographic', { x: 0.887, y: 1.365, w: 4.882, h: 1.447 });
++  numberedNotes(s, 1.048, 3.279, 2.092, LOREM_L);
++}
++
++/** three white number discs with a paragraph next to each (slides 4 and 14) */
++function numberedNotes(s, dx, dy, tx, copy) {
++  [['01', NAVY], ['02', BLUE], ['03', TEAL]].forEach(function (n, i) {
++    const y = dy + i * 1.073;
++    shape(s, 'ellipse', { x: dx, y: y, w: 0.709, h: 0.709, fill: WHITE, shadow: soft() });
++    label(s, n[0], { x: dx, y: y + 0.186, w: 0.709, h: 0.337, align: 'center',
++      fontFace: MAJOR, fontSize: 14, color: n[1] });
++    body(s, copy, { x: tx, y: y + 0.026, w: 3.544, h: 0.604 });
++  });
++}
++
++/* 5 — radial flow on navy */
++const S5A = [1,0.58,0.88,1,0,0.42,0.12,0,0.24,0.24,0.51,0.48,0.8,0.61,0.94,0.61,0.99,0.58];
++const S5B = [1,0.92,0.49,1,0,0.09,0.51,0,0.46,0.05,0.43,0.19,0.53,0.5,0.74,0.78,0.91,0.89,1,0.91];
++const S5P = [                                     // ribbon arms radiating from the hub
++  [7.16, 3.14, 1.51, 0.99, BLUE,      S5A],       [6.98, 3.55, 1.51, 0.99, PALE_BLUE, S5A, 'HV'],
++  [4.81, 3.61, 1.51, 0.88, TEAL,      S5A, 'V'],  [4.67, 3.17, 1.51, 0.87, PALE_TEAL, S5A, 'H'],
++  [6.91, 3.39, 0.85, 1.51, TEAL,      S5B],       [6.48, 3.52, 0.85, 1.52, PALE_TEAL, S5B, 'HV'],
++  [5.99, 3.56, 0.84, 1.52, BLUE,      S5B, 'V'],  [5.55, 3.44, 0.84, 1.51, PALE_BLUE, S5B, 'H']
++];
++function slide05() {
++  const s = addSlide('navy');
++  sectionTitle(s, 'Section Infographic', '', true);
++  [[0.887, 3.400, 'right'], [9.851, 3.400, 'left'],
++   [2.200, 5.310, 'right'], [8.531, 5.310, 'left']].forEach(function (c) {
++    captionBlock(s, { x: c[0], y: c[1], align: c[2], color: WHITE, bodyColor: WHITE,
++      text: LOREM_M, h: 0.87 });
++  });
++  polys(s, S5P);
++  shape(s, 'ellipse', { x: 5.691, y: 1.802, w: 2.002, h: 2.002, fill: WHITE });
++  icon(s, 'target', 6.361, 2.472, 0.662, NAVY);
++
++  [[3.836, 3.419, '01', TEAL, PALE_TEAL], [8.165, 3.526, '04', BLUE, PALE_BLUE],
++   [5.241, 4.621, '02', BLUE, PALE_BLUE], [6.819, 4.637, '03', TEAL, PALE_TEAL]]
++    .forEach(function (n) {
++      shape(s, 'ellipse', { x: n[0], y: n[1], w: 1.332, h: 1.332, fill: n[3],
++        line: { color: n[4], width: 9 } });
++      label(s, n[2], { x: n[0] + 0.28, y: n[1] + 0.45, w: 0.78, h: 0.435, align: 'center',
++        fontFace: MAJOR, fontSize: 20, color: WHITE });
++    });
++}
++
++/* 6 — four swoosh arrows */
++const S6A = [1,0.78,0.89,0.97,0.77,0.99,0.57,0.89,0.15,0.46,0.08,0.58,0,0,0.41,0,0.34,0.13,0.46,0.3,0.83,0.73,0.93,0.81];
++const S6B = [0.82,0.97,0.75,0.78,0.58,0.56,0,0,0.61,0.47,0.89,0.74,1,0.95,0.95,1];
++const S6C = [0,0.14,0.39,0.12,0,0.14,0.99,0.97,0.96,1,0.75,0.85,0.33,0.27,0.35,0.24,0.8,0.85,0.97,0.97,0.98,0.86,0.91,0.66,0.49,0,0.91,0.65,0.99,0.97];
++const S6D = [0.39,0.03,0.61,0.03,0.92,0.2,1,0.31,0.97,0.75,0.54,1,0.43,0.99,0.11,0.82,0,0.69,0.03,0.25];
++const S6P = [                                     // arrow body / dark inner fold / mid tone
++  [6.73, 4.49, 2.78, 1.86, NAVY,   S6A],       [8.13, 4.27, 1.37, 1.68, NAVY_XD, S6B],
++  [6.73, 4.24, 2.81, 1.76, NAVY_D, S6C],
++  [3.82, 4.51, 2.78, 1.86, TEAL,   S6A, 'H'],  [3.83, 4.30, 1.37, 1.68, TEAL_D,  S6B, 'H'],
++  [3.79, 4.27, 2.81, 1.75, TEAL_M, S6C, 'H'],
++  [6.73, 2.06, 2.78, 1.86, BLUE,   S6A, 'V'],  [8.13, 2.46, 1.37, 1.68, NAVY_L,  S6B, 'V'],
++  [6.73, 2.42, 2.81, 1.75, BLUE_D, S6C, 'V'],
++  [3.82, 2.09, 2.78, 1.86, GOLD,   S6A, 'HV'], [3.83, 2.49, 1.37, 1.68, GOLD_D,  S6B, 'HV'],
++  [3.79, 2.44, 2.81, 1.75, GOLD_M, S6C, 'HV'],
++  [5.99, 3.50, 1.35, 1.47, WHITE,  S6D]
++];
++function slide06() {
++  const s = addSlide();
++  sectionTitle(s, 'Section ', 'Infographic');
++  polys(s, S6P);
++  icon(s, 'target', 6.40, 3.97, 0.53, G45);
++
++  [[2.50, 2.06, 'growth', GOLD], [10.26, 2.07, 'code', BLUE],
++   [2.51, 4.61, 'coins', TEAL],  [10.26, 4.61, 'target', NAVY]].forEach(function (b) {
++    shape(s, 'ellipse', { x: b[0], y: b[1], w: 0.60, h: 0.60, fill: WHITE, shadow: soft() });
++    icon(s, b[2], b[0] + 0.17, b[1] + 0.15, 0.28, b[3]);
++  });
++  [[0.60, 2.85, 'right'], [10.30, 2.85, 'left'],
++   [0.60, 5.37, 'right'], [10.30, 5.37, 'left']].forEach(function (c) {
++    captionBlock(s, { x: c[0], y: c[1], align: c[2],
++      text: 'lorem ipsum dolor sit amet, consectetuer adipiscing elit. ' });
++  });
++}
++
++/* 7 — four diamonds */
++function slide07() {
++  const s = addSlide();
++  const tiles = [[4.20, 1.36, GOLD, '01', 3.69, 1.96], [7.22, 1.36, BLUE, '03', 9.04, 1.96],
++                 [4.20, 4.30, TEAL, '02', 3.69, 4.90], [7.22, 4.30, NAVY, '04', 9.04, 4.90]];
++  shape(s, 'roundRect', { x: 5.12, y: 2.20, w: 3.10, h: 3.10, rotate: 45, fill: G05, rectRadius: 0.35 });
++  tiles.forEach(function (t) {
++    shape(s, 'roundRect', { x: t[0], y: t[1], w: 1.84, h: 1.84, rotate: 45, fill: t[2], rectRadius: 0.25 });
++    shape(s, 'ellipse', { x: t[4], y: t[5], w: 0.60, h: 0.64, fill: WHITE,
++      shadow: soft(6) });
++    label(s, t[3], { x: t[4] - 0.08, y: t[5] + 0.15, w: 0.76, h: 0.34, align: 'center', fontFace: MAJOR, fontSize: 14 });
++  });
++  shape(s, 'roundRect', { x: 5.67, y: 2.78, w: 1.94, h: 1.94, rotate: 45, fill: WHITE, rectRadius: 0.25 });
++  text(s, [{ text: 'Section ' }, { text: 'Infographic', options: { color: BLUE } }],
++    { x: 5.66, y: 3.43, w: 1.97, h: 0.64, align: 'center', fontFace: MAJOR, fontSize: 16 });
++  [[0.80, 1.64, 'right'], [10.10, 1.64, 'left'], [0.80, 4.59, 'right'], [10.10, 4.59, 'left']]
++    .forEach(function (c) { captionBlock(s, { x: c[0], y: c[1], align: c[2], text: LOREM_M, h: 0.87 }); });
++}
++
++/* 8 — two stacked cards */
++function slide08() {
++  const s = addSlide();
++  shape(s, 'rect', { x: 4.343, y: 1.055, w: 2.947, h: 3.019, fill: G05 });
++  shape(s, 'ellipse', { x: 4.681, y: 1.324, w: 0.760, h: 0.760, fill: NAVY });
++  icon(s, 'code', 4.911, 1.554, 0.305, WHITE);
++  text(s, 'That Captivate and Convert', { x: 4.59, y: 2.21, w: 2.12, h: 0.73,
++    fontFace: MAJOR, fontSize: 16, lineSpacingMultiple: 1.2 });
++  body(s, [{ text: 'lorem ipsum dolor sit amet, consectetuer ' },
++           { text: 'adipiscing elit. aenean ', options: { italic: true } },
++           { text: 'commodo ligula' }], { x: 4.59, y: 2.94, w: 2.46, h: 0.87 });
++
++  shape(s, 'rect', { x: 4.343, y: 4.239, w: 2.947, h: 3.261, fill: NAVY });
++  text(s, 'Over', { x: 4.59, y: 4.51, w: 1.31, h: 0.34, fontSize: 14, italic: true, color: WHITE });
++  text(s, '100%', { x: 4.59, y: 4.77, w: 1.78, h: 0.77, fontFace: MAJOR, fontSize: 40, color: WHITE });
++  body(s, LOREM_M, { x: 4.59, y: 5.59, w: 2.46, h: 0.87, color: WHITE });
++  shape(s, 'rect', { x: 4.343, y: 7.29, w: 2.947, h: 0.21, fill: BLUE });
++
++  headline(s, 'The Art of Making Meaningful Decisions in ', 'Design',
++    { x: 8.058, y: 1.601, w: 4.242, h: 3.469 });
++  body(s, LOREM_L, { x: 8.058, y: 5.286, w: 3.544, h: 0.604, italic: true });
++}
++
++/* 9 — two style cards */
++function slide09() {
++  const s = addSlide();
++  shape(s, 'rect', { x: 10.033, y: 0, w: 3.300, h: 6.630, fill: NAVY });
++  shape(s, 'rect', { x: 10.940, y: 6.420, w: 2.393, h: 0.210, fill: BLUE });
++  shape(s, 'line', { x: 10.940, y: 6.414, w: 2.393, h: 0, line: { color: WHITE, width: 1 } });
++  headline(s, 'Creative Resume Matters in Building ', 'a Unique Style',
++    { x: 0.887, y: 1.588, w: 5.719, h: 2.120 });
++
++  [[1.011, NAVY, WHITE, WHITE, NAVY], [4.003, G05, BLACK, NAVY, WHITE]].forEach(function (c) {
++    shape(s, 'rect', { x: c[0], y: 4.130, w: 2.871, h: 2.500, fill: c[1] });
++    shape(s, 'ellipse', { x: c[0] + 0.283, y: 4.402, w: 0.760, h: 0.760, fill: c[3] });
++    icon(s, 'code', c[0] + 0.513, 4.632, 0.305, c[4]);
++    text(s, 'Your Style Here', { x: c[0] + 0.19, y: 5.22, w: 2.12, h: 0.41,
++      fontFace: MAJOR, fontSize: 16, color: c[2], lineSpacingMultiple: 1.2 });
++    body(s, [{ text: 'lorem ipsum dolor sit amet, consectetuer ' },
++             { text: 'adipiscing', options: { italic: true } }],
++      { x: c[0] + 0.19, y: 5.63, w: 2.68, h: 0.60, color: c[2] === WHITE ? WHITE : G75 });
++  });
++  shape(s, 'rect', { x: 1.011, y: 6.420, w: 2.871, h: 0.210, fill: BLUE });
++  shape(s, 'line', { x: 1.011, y: 6.414, w: 2.871, h: 0, line: { color: WHITE, width: 1 } });
++}
++
++/* 10 — four option bars on navy */
++const S10A = [0.98,0.23,0.98,1,0,1,0,0.23,0.1,0.03,1,0,0.94,0.04];   // pennant shadow
++const S10B = [0.16,0.23,0.16,0.75,0.58,1,1,0.75,0.99,0.17,0.91,0.03,0,0,0.11,0.07]; // pennant
++function slide10() {
++  const s = addSlide('navy');
++  sectionTitle(s, 'Creative Option Infographic', '', true);
++  const rows = [
++    { y: 1.62, left: true,  n: '01', v: '52+', c: BLUE, pale: PALE_BLUE, dark: NAVY_L, ic: 'growth' },
++    { y: 2.85, left: false, n: '02', v: '47+', c: TEAL, pale: PALE_TEAL, dark: TEAL_D, ic: 'coins' },
++    { y: 4.08, left: true,  n: '03', v: '89+', c: BLUE, pale: PALE_BLUE, dark: NAVY_L, ic: 'code' },
++    { y: 5.32, left: false, n: '04', v: '71+', c: TEAL, pale: PALE_TEAL, dark: TEAL_D, ic: 'target' }
++  ];
++  rows.forEach(function (r) {
++    shape(s, 'round2SameRect', { x: r.left ? 0.91 : 3.60, y: r.y + 0.196, w: 8.82, h: 1.01,
++      fill: WHITE, rotate: r.left ? 0 : 180, rectRadius: 0.12 });
++    poly(s, r.left ? 1.79 : 10.60, r.y, 0.96, 1.09, r.dark, S10A, r.left ? '' : 'H');
++    poly(s, r.left ? 1.97 : 10.24, r.y, 1.13, 1.10, r.c,    S10B, r.left ? '' : 'H');
++    icon(s, r.ic, r.left ? 2.47 : 10.53, r.y + 0.33, 0.36, WHITE);
++
++    const badgeX = r.left ? 1.19 : 11.46;
++    shape(s, 'ellipse', { x: badgeX, y: r.y + 0.37, w: 0.68, h: 0.68, fill: r.c,
++      line: { color: r.pale, width: 5.5 } });
++    label(s, r.n, { x: badgeX - 0.1, y: r.y + 0.52, w: 0.88, h: 0.37, align: 'center',
++      fontFace: MAJOR, fontSize: 16, color: WHITE });
++    shape(s, 'roundRect', { x: r.left ? 9.69 : 3.59, y: r.y + 0.43, w: 0.05, h: 0.55,
++      fill: r.c, rectRadius: 0.02 });
++
++    const vX = r.left ? 3.43 : 4.54;
++    label(s, r.v, { x: vX, y: r.y + 0.245, w: 1.13, h: 0.64, align: 'center', fontSize: 24, color: r.c });
++    text(s, 'Options', { x: vX, y: r.y + 0.765, w: 1.13, h: 0.34, align: 'center',
++      fontFace: MAJOR, fontSize: 14 });
++    shape(s, 'line', { x: vX + 1.31, y: r.y + 0.385, w: 0, h: 0.57, line: { color: G_E7, width: 0.25 } });
++    text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.',
++      { x: vX + 1.40, y: r.y + 0.385, w: 3.82, h: 0.57, fontSize: 12, color: G92, lineSpacingMultiple: 1.2 });
++  });
++}
++
++/* 11 — jigsaw circle inside a magnifier, six callouts */
++const S11A = [0.7,0,0.66,0,0.61,0.11,0.52,0.17,0.41,0.12,0.36,0,0.1,0,0.1,0.28,0.03,0.36,0,0.49,0.03,0.63,0.1,0.7,0.1,1,0.3,0.96,0.49,0.87,0.8,0.52,1,0];
++const S11B = [0.73,0,0.62,0.14,0.52,0.19,0.42,0.14,0.34,0,0.12,0,0.12,0.3,0.03,0.36,0,0.49,0.03,0.63,0.12,0.68,0.12,1,0.31,0.96,0.48,0.86,0.79,0.51,1,0];
++const S11C = [1,0.42,0.94,0,0.58,0,0.52,0.11,0.43,0.14,0.32,0.1,0.26,0,0,0,0,0.22,0.07,0.28,0.11,0.42,0.08,0.55,0,0.63,0,0.85,0.28,0.85,0.33,0.96,0.42,1,0.52,0.96,0.56,0.85,0.94,0.85];
++const S11D = [1,0.4,0.95,0,0.61,0,0.53,0.11,0.42,0.15,0.31,0.12,0.23,0,0,0,0,0.17,0.08,0.28,0.11,0.42,0.08,0.57,0,0.66,0,0.83,0.3,0.83,0.34,0.96,0.42,1,0.51,0.94,0.54,0.83,0.95,0.83];
++const S11E = [0,0,0.26,0.04,0.64,0.26,0.91,0.62,1,0.85,0.6,0.85,0.55,0.96,0.45,1,0.35,0.96,0.3,0.85,0,0.85];
++const S11F = [1,0.83,0.85,0.52,0.58,0.22,0.33,0.07,0,0,0,0.83,0.32,0.83,0.36,0.95,0.45,1,0.55,0.95,0.59,0.83];
++const S11G = [0.97,0.38,1,0.36,1,0.15,0.7,0.15,0.65,0.04,0.58,0.01,0.45,0.04,0.4,0.15,0,0.15,0.09,0.38,0.38,0.76,0.57,0.89,0.78,0.97,1,1,1,0.78,0.92,0.7,0.88,0.58,0.9,0.46];
++const S11H = [0.99,0.34,1,0.17,0.68,0.17,0.65,0.06,0.58,0.01,0.46,0.04,0.41,0.17,0,0.17,0.15,0.48,0.4,0.76,0.69,0.93,1,1,1,0.82,0.91,0.72,0.88,0.59,0.91,0.44];
++const S11I = [0.9,0.29,0.9,0,0.66,0,0.61,0.12,0.53,0.17,0.43,0.12,0.37,0,0.05,0,0,0.5,0.05,1,0.37,1,0.44,0.87,0.52,0.83,0.61,0.88,0.66,1,0.9,1,0.9,0.71,0.97,0.64,1,0.5,0.97,0.36];
++const S11J = [0.89,0.31,0.89,0,0.69,0,0.61,0.14,0.52,0.19,0.42,0.14,0.35,0,0.05,0,0,0.5,0.05,1,0.35,1,0.42,0.85,0.52,0.81,0.61,0.85,0.69,1,0.89,1,0.89,0.69,0.97,0.63,1,0.5,0.97,0.36];
++const S11K = [0.98,0,0.66,0.08,0.36,0.27,0.15,0.52,0,0.83,0.41,0.83,0.45,0.95,0.55,1,0.64,0.95,0.68,0.83,1,0.83];
++const S11P = [
++  [6.5,4.62,1.84,1.15,PALE_PINK,S11A],
++  [6.55,4.67,1.72,1.04,PINK,S11B],
++  [6.69,3.41,1.76,1.36,PALE_GOLD,S11C],
++  [6.75,3.46,1.66,1.26,GOLD,S11D],
++  [6.69,2.19,1.65,1.35,PALE_BLUE,S11E],
++  [6.75,2.25,1.52,1.25,BLUE,S11F],
++  [4.99,4.41,1.63,1.36,PALE_PEACH,S11G],
++  [5.07,4.46,1.5,1.25,PEACH,S11H],
++  [4.86,3.41,1.96,1.17,PALE_TEAL,S11I],
++  [4.91,3.46,1.85,1.06,TEAL,S11J],
++  [4.98,2.19,1.63,1.35,PALE_SKY,S11E,'H'],
++  [5.07,2.25,1.5,1.25,NAVY,S11K]
++];
++function slide11() {
++  const s = addSlide();
++  sectionTitle(s, 'Section ', 'Infographic');
++  shape(s, 'rect', { x: 6.30, y: 5.20, w: 0.75, h: 2.30, fill: G05 });      // magnifier handle
++  shape(s, 'ellipse', { x: 4.59, y: 1.89, w: 4.17, h: 4.17, fill: G05 });   // lens rim
++  shape(s, 'ellipse', { x: 4.77, y: 2.07, w: 3.81, h: 3.81, fill: WHITE });
++  polys(s, S11P);
++  [['growth', 5.75, 2.73, 0.30], ['coins', 7.26, 2.72, 0.33], ['code', 5.72, 3.83, 0.36],
++   ['target', 7.29, 3.93, 0.34], ['gearArrow', 5.82, 4.89, 0.32], ['handCoin', 6.99, 5.03, 0.35]]
++    .forEach(function (p) { icon(s, p[0], p[1], p[2], p[3], WHITE); });
++
++  // numbered pins with a dotted drop line
++  [[4.05, 2.19, '1', NAVY, PALE_SKY],  [8.95, 2.20, '2', BLUE,  PALE_BLUE],
++   [3.45, 3.78, '3', TEAL, PALE_TEAL], [9.54, 3.79, '4', GOLD,  PALE_GOLD],
++   [4.05, 5.37, '5', PEACH, PALE_PEACH], [8.95, 5.39, '6', PINK, PALE_PINK]].forEach(function (p) {
++    shape(s, 'ellipse', { x: p[0], y: p[1], w: 0.34, h: 0.34, fill: p[3], line: { color: p[4], width: 4 } });
++    shape(s, 'line', { x: p[0] + 0.17, y: p[1] + 0.35, w: 0, h: 0.37,
++      line: { color: p[3], width: 1, dashType: 'sysDot' } });
++    label(s, p[2], { x: p[0] - 0.11, y: p[1] + 0.02, w: 0.56, h: 0.28, align: 'center',
++      fontSize: 10.5, color: WHITE });
++  });
++  [[1.10, 2.06], [0.59, 3.63], [1.10, 5.21]].forEach(function (c) {
++    captionBlock(s, { x: c[0], y: c[1], align: 'right' });
++  });
++  [[9.80, 2.06], [10.31, 3.63], [9.80, 5.21]].forEach(function (c) {
++    captionBlock(s, { x: c[0], y: c[1], align: 'left' });
++  });
++}
++
++/* 12 — arrow ring */
++const S12A = [0.15,1,0.41,0.92,0.65,0.58,1,0.35,0.65,0.28,0.76,0,0.38,0.24,0.12,0.55,0,0.78];
++const S12B = [0.69,1,0.96,0.77,0.88,0.57,0.88,0.42,1,0.14,0.48,0.21,0.18,0,0.06,0.2,0,0.41,0.01,0.64,0.1,0.86,0.16,0.96];
++const S12C = [0.89,0,0.64,0.1,0.58,0.23,0.39,0.44,0.14,0.6,0,0.65,0.21,0.77,0.13,1,0.36,0.91,0.57,0.79,0.89,0.47,1,0.28];
++const S12D = [0.76,0.53,0.77,0.48,1,0.24,0.86,0.1,0.7,0.02,0.49,0,0.38,0.03,0.28,0.08,0.08,0.27,0,0.84,0.29,1,0.41,0.92,0.53,0.88,0.66,0.9,0.8,0.98];
++const S12E = [0.69,0.02,0.2,0,0,0.17,0.15,0.33,0.23,0.5,0.22,0.67,0.12,0.84,0.59,0.75,0.81,1,0.88,0.91,0.98,0.72,0.99,0.48,0.9,0.24];
++const S12F = [0.96,0.76,1,0.47,0.83,0.23,0.64,0.29,0.47,0.25,0.36,0.18,0.2,0,0.18,0.41,0.11,0.51,0,0.56,0.15,0.75,0.4,0.94,0.64,1,0.79,0.98,0.93,0.91];
++const S12G = [0.81,0.97,0.94,0.94,0.98,0.89,0.99,0.62,0.69,0.34,0.49,0,0.33,0.26,0,0.22,0.22,0.6,0.45,0.85,0.65,1];
++const S12H = [0.89,0.56,0.63,0.23,0.32,0,0,0.16,0.05,0.44,0.37,0.66,0.61,1,0.73,0.73,1,0.76];
++const S12P = [
++  [4.59, 2.21, 1.46, 1.53, BLUE,  S12A], [4.43, 3.47, 0.73, 1.53, TEAL,  S12B],
++  [7.12, 4.64, 1.57, 1.70, PEACH, S12C], [5.60, 1.99, 1.91, 0.72, NAVY,  S12D],
++  [8.05, 3.12, 0.83, 1.92, PINK,  S12E], [5.39, 5.54, 2.00, 0.90, GOLD,  S12F],
++  [4.58, 4.71, 1.17, 1.29, WHITE, S12G], [7.11, 2.19, 1.48, 1.21, WHITE, S12H]
++];
++function slide12() {
++  const s = addSlide();
++  sectionTitle(s, 'Section ', 'Infographic');
++  shape(s, 'ellipse', { x: 5.20, y: 2.77, w: 2.92, h: 2.92, fill: G05 });   // hub plate
++  polys(s, S12P);
++  shape(s, 'ellipse', { x: 5.39, y: 2.96, w: 2.54, h: 2.54, fill: WHITE, shadow: soft(8, 0.12) });
++  text(s, '76,3%', { x: 5.51, y: 3.75, w: 2.30, h: 0.66, align: 'center', fontFace: MAJOR, fontSize: 36 });
++  text(s, 'Business', { x: 5.51, y: 4.38, w: 2.30, h: 0.34, align: 'center', fontSize: 16 });
++  label(s, 'Process', { x: 4.82, y: 5.29, w: 0.77, h: 0.28, rotate: 49, align: 'center', fontSize: 12 });
++  label(s, 'Process', { x: 7.41, y: 2.54, w: 0.77, h: 0.28, rotate: 38, align: 'center', fontSize: 12 });
++
++  [[6.30, 2.15, 0.36, 'code'], [5.04, 2.83, 0.32, 'coins'], [8.39, 3.84, 0.32, 'target'],
++   [4.62, 4.15, 0.29, 'growth'], [6.31, 5.96, 0.31, 'gearArrow'], [7.83, 5.37, 0.33, 'handCoin']]
++    .forEach(function (p) { icon(s, p[3], p[0], p[1], p[2], WHITE); });
++
++  [[1.41, 2.06, NAVY], [0.90, 3.63, BLUE], [1.41, 5.21, BLUE]].forEach(function (c) {
++    captionBlock(s, { x: c[0], y: c[1], align: 'right', color: c[2] });
++  });
++  [[9.32, 2.06, PINK], [9.83, 3.63, PEACH], [9.32, 5.21, GOLD]].forEach(function (c) {
++    captionBlock(s, { x: c[0], y: c[1], align: 'left', color: c[2] });
++  });
++}
++
++/* 13 — six petal badges around a flower */
++const S13A = [0.5,0,0.58,0.14,0.69,0.22,0.83,0.26,1,0.25,0.91,0.36,0.87,0.5,0.91,0.63,1,0.75,0.82,0.74,0.68,0.78,0.58,0.87,0.5,1,0.42,0.86,0.31,0.78,0.17,0.74,0.01,0.75,0.1,0.63,0.14,0.49,0.09,0.34,0.02,0.27,0,0.29,0.02,0.25,0.15,0.27,0.32,0.22,0.43,0.13];
++const S13B = [0.4,0.01,0.53,0,0.66,0.03,0.78,0.08,0.87,0.17,0.95,0.27,0.99,0.4,1,0.53,0.97,0.66,0.92,0.78,0.83,0.87,0.73,0.95,0.6,0.99,0.47,1,0.34,0.97,0.23,0.92,0.13,0.83,0.05,0.73,0.01,0.6,0,0.47,0.03,0.34,0.08,0.23,0.17,0.13,0.27,0.05];
++function slide13() {
++  const s = addSlide();
++  poly(s, 5.05, 1.95, 3.20, 3.64, WHITE, S13A);
++  const buds = [[4.96, 1.28, NAVY, PALE_SKY, 'growth', 5.44, 1.73, 0.31],
++                [7.13, 1.28, BLUE, PALE_BLUE, 'coins', 7.60, 1.75, 0.34],
++                [8.20, 3.13, TEAL, PALE_TEAL, 'code', 8.64, 3.56, 0.38],
++                [7.14, 4.99, GOLD, PALE_GOLD, 'target', 7.59, 5.45, 0.35],
++                [4.98, 4.99, PEACH, PALE_PEACH, 'handCoin', 5.41, 5.41, 0.36],
++                [3.91, 3.13, PINK, PALE_PINK, 'gearArrow', 4.34, 3.56, 0.37]];
++  buds.forEach(function (b) {
++    poly(s, b[0], b[1], 1.23, 1.23, b[2], S13B, '', { color: b[3], width: 12 });
++    icon(s, b[4], b[5], b[6], b[7], WHITE);
++  });
++  text(s, [{ text: 'Section ' }, { text: 'Infographic', options: { color: BLUE } }],
++    { x: 5.68, y: 3.43, w: 1.97, h: 0.64, align: 'center', fontFace: MAJOR, fontSize: 16 });
++  [[1.10, 1.50], [0.59, 3.08], [1.10, 4.99]].forEach(function (c) {
++    captionBlock(s, { x: c[0], y: c[1], align: 'right' });
++  });
++  [[9.80, 1.50], [10.31, 3.08], [9.80, 4.99]].forEach(function (c) {
++    captionBlock(s, { x: c[0], y: c[1], align: 'left' });
++  });
++}
++
++/* 14 — infinity-loop flower + numbered list */
++const S14A = [0.38,0.14,0.23,0.21,0.12,0.41,0.15,0.67,0.28,0.83,0.39,0.85,0.5,0.82,0.79,0.56,0.94,0.5,0.79,0.44,0.52,0.19,0.38,0.14,0.36,0,0.54,0.1,0.83,0.45,1,0.5,0.83,0.55,0.51,0.93,0.35,1,0.2,0.95,0.1,0.85,0.03,0.69,0,0.5,0.03,0.31,0.1,0.15,0.23,0.03,0.36,0];
++const S14B = [0.53,0.13,0.37,0.15,0.21,0.25,0.16,0.38,0.19,0.5,0.34,0.64,0.78,0.82,0.94,0.94,0.88,0.78,0.9,0.46,0.88,0.34,0.73,0.18,0.53,0.13,0.53,0,0.69,0.03,0.83,0.09,0.94,0.19,1,0.34,0.9,0.77,0.92,0.9,0.98,1,0.89,0.91,0.76,0.83,0.21,0.68,0.1,0.6,0.02,0.49,0.01,0.32,0.1,0.15,0.29,0.03,0.53,0];
++const S14C = [0.07,0.06,0.12,0.22,0.11,0.6,0.2,0.77,0.41,0.87,0.67,0.84,0.79,0.75,0.83,0.56,0.72,0.4,0.18,0.15,0.02,0,0.19,0.14,0.71,0.28,0.9,0.4,0.98,0.51,1,0.64,0.96,0.77,0.9,0.85,0.69,0.97,0.5,1,0.26,0.96,0.09,0.84,0,0.66,0.1,0.23,0.08,0.1,0.02,0];
++const S14D = [0.94,0.06,0.78,0.18,0.28,0.4,0.19,0.5,0.16,0.62,0.21,0.75,0.34,0.84,0.51,0.88,0.74,0.81,0.88,0.66,0.9,0.54,0.89,0.18,0.98,0,0.92,0.1,0.9,0.23,1,0.66,0.91,0.84,0.74,0.96,0.5,1,0.31,0.97,0.1,0.85,0.04,0.77,0,0.64,0.02,0.51,0.1,0.4,0.29,0.28,0.81,0.14,0.98,0];
++const S14P = [
++  [1.35, 2.80, 2.76, 1.91, TEAL, S14A],      [2.19, 1.35, 1.89, 2.52, NAVY, S14B],
++  [3.88, 1.35, 1.89, 2.52, BLUE, S14B, 'H'], [3.84, 2.79, 2.76, 1.91, TEAL, S14A, 'H'],
++  [3.87, 3.63, 1.89, 2.52, NAVY, S14C],      [2.19, 3.63, 1.89, 2.52, BLUE, S14D]
++];
++function slide14() {
++  const s = addSlide();
++  polys(s, S14P);
++  [[1.12, 1.55, 2.39, '913+ Creative', NAVY], [4.85, 2.57, 2.39, '528+ Creative', TEAL],
++   [1.37, 5.12, 2.27, '760+ Creative', BLUE]].forEach(function (t) {
++    shape(s, 'roundRect', { x: t[0], y: t[1], w: t[2], h: 0.42, fill: WHITE, rectRadius: 0.21, shadow: soft() });
++    icon(s, 'arrowCircle', t[0] + 0.09, t[1] + 0.07, 0.28, t[4], WHITE);
++    text(s, t[3], { x: t[0] + 0.41, y: t[1] + 0.04, w: t[2] - 0.5, h: 0.35, fontSize: 14, valign: 'middle' });
++  });
++  headline(s, 'Section ', 'Infographic', { x: 7.606, y: 1.365, w: 4.882, h: 1.447 });
++  numberedNotes(s, 7.78, 3.279, 8.82, LOREM_L);
++}
++
++/* 15 — four bubbles around a gear wheel (navy) */
++const S15A = [1,0.73,0.88,0.76,0.77,0.69,0.74,0.62,0.67,0.24,0.5,0.03,0.31,0,0.14,0.1,0.07,0.19,0.02,0.31,0,0.57,0.07,0.81,0.23,0.96,0.3,0.99,0.46,0.98,0.7,0.76,0.76,0.75,0.87,0.81,0.94,0.94];
++const S15B = [0.96,0.94,0.83,0.87,0.78,0.76,0.79,0.7,0.99,0.45,0.99,0.29,0.89,0.13,0.68,0.02,0.42,0,0.3,0.03,0.09,0.15,0,0.33,0,0.42,0.1,0.59,0.26,0.69,0.58,0.73,0.71,0.78,0.79,0.89,0.77,1];
++const S15C = [0.53,1,0.27,0.71,0.17,0.55,0.09,0.39,0,0.04,0.61,0,0.73,0.38,1,0.7];      // wheel spoke, four rotations
++const S15D = [0.96,1,0.61,0.91,0.45,0.83,0.29,0.73,0,0.47,0.3,0,0.63,0.27,1,0.38];
++const S15E = [1,0.3,0.73,0.63,0.61,1,0,0.96,0.04,0.79,0.17,0.45,0.39,0.14,0.53,0];
++const S15F = [1,0.62,0.63,0.74,0.3,1,0,0.53,0.14,0.39,0.45,0.17,0.61,0.09,0.96,0];
++const S15P = [
++  [3.50, 3.70, 2.22, 1.61, BLUE, S15A],      [4.85, 2.33, 1.61, 2.18, TEAL, S15B],
++  [7.58, 3.69, 2.24, 1.61, TEAL, S15A, 'H'], [6.87, 2.32, 1.60, 2.20, BLUE, S15B, 'H']
++];
++const S15W = [                                   // grey wheel then the coloured quarter
++  [5.69, 5.52, 0.42, 0.56, G15, S15C],       [6.04, 6.00, 0.56, 0.42, G15, S15D],
++  [5.69, 4.83, 0.42, 0.56, G15, S15E],       [6.04, 4.49, 0.56, 0.42, G15, S15F],
++  [7.20, 5.52, 0.42, 0.56, G15, S15E, 'HV'], [6.72, 6.00, 0.55, 0.42, G15, S15F, 'HV'],
++  [7.20, 4.83, 0.42, 0.56, G15, S15C, 'HV'], [6.72, 4.49, 0.55, 0.42, G15, S15D, 'HV'],
++  [5.69, 4.83, 0.42, 0.56, BLUE, S15E],      [6.04, 4.48, 0.56, 0.42, TEAL, S15F],
++  [7.20, 4.83, 0.42, 0.56, TEAL, S15C, 'HV'],[6.72, 4.48, 0.55, 0.42, BLUE, S15D, 'HV']
++];
++function slide15() {
++  const s = addSlide('navy');
++  sectionTitle(s, 'Section Infographic', '', true);
++  polys(s, S15P);
++  icon(s, 'coins', 5.45, 2.87, 0.45, WHITE);
++  icon(s, 'code', 7.48, 2.85, 0.48, WHITE);
++  icon(s, 'growth', 4.10, 4.27, 0.42, WHITE);
++  icon(s, 'target', 8.84, 4.29, 0.43, WHITE);
++  shape(s, 'ellipse', { x: 5.56, y: 4.35, w: 2.21, h: 2.21, fill: WHITE });
++  polys(s, S15W);
++
++  [[1.72, 2.00, 'right'], [9.18, 2.00, 'left'],
++   [0.59, 3.81, 'right'], [10.31, 3.81, 'left']].forEach(function (c) {
++    captionBlock(s, { x: c[0], y: c[1], align: c[2], color: WHITE, bodyColor: WHITE });
++  });
++}
++
++/* 16 — navy panel, two icon rows */
++function slide16() {
++  const s = addSlide('bare');
++  shape(s, 'rect', { x: 0, y: 0, w: 4.291, h: 6.366, fill: NAVY });
++  shape(s, 'rect', { x: 0, y: 6.156, w: 2.393, h: 0.210, fill: BLUE });
++  shape(s, 'line', { x: 0, y: 6.150, w: 2.393, h: 0, line: { color: WHITE, width: 1 } });
++  text(s, 'Creative Choices', { x: 0.387, y: 0.32, w: 2.195, h: 0.303,
++    fontFace: MAJOR, fontSize: 12, bold: true, color: WHITE });
++  text(s, '16', { x: 12.322, y: 6.877, w: 0.624, h: 0.303, align: 'right', fontSize: 12, color: G35 });
++
++  headline(s, 'Think Outside the Slide Creative for ', 'Resume Inspire',
++    { x: 7.196, y: 1.487, w: 5.732, h: 2.120 });
++  [[4.140, 'code', 0.35], [5.253, 'coins', 0.31]].forEach(function (r, i) {
++    shape(s, 'ellipse', { x: 7.37, y: r[0], w: 0.76, h: 0.76, fill: WHITE,
++      shadow: soft() });
++    icon(s, r[1], 7.575, r[0] + 0.20, r[2], NAVY);
++    body(s, LOREM_L, { x: 8.35, y: r[0] + 0.07, w: 3.544, h: 0.604, italic: true });
++  });
++}
++
++/* 17 — section break */
++function slide17() {
++  const s = addSlide();
++  text(s, [{ text: 'Section ', options: { color: BLUE } }, { text: 'Break' }],
++    { x: 0.866, y: 1.497, w: 4.823, h: 2.076, fontFace: MAJOR, fontSize: 72, lineSpacingMultiple: 0.8 });
++  shape(s, 'rect', { x: 0, y: 4.049, w: 7.444, h: 2.362, fill: NAVY });
++  body(s, [{ text: 'PLACEHOLDER' },
++           { text: 'ligula eget dolor aenean massa ', options: { italic: true } },
++           { text: 'cum sociis natoque' }],
++    { x: 0.866, y: 4.483, w: 5.077, h: 0.604, color: WHITE });
++  body(s, [{ text: 'lorem ipsum dolor sit amet ' },
++           { text: 'consectetuer adipiscing elit aenean commodo', options: { italic: true } },
++           { text: ' ligula eget dolor aenean massa cum sociis natoque' }],
++    { x: 0.866, y: 5.163, w: 5.077, h: 0.604, color: WHITE });
++  shape(s, 'rect', { x: 6.583, y: 3.190, w: 1.730, h: 1.720, fill: WHITE,
++    shadow: soft(14, 0.25) });
++  label(s, '30', { x: 6.88, y: 3.45, w: 1.13, h: 0.91, align: 'center', fontFace: MAJOR, fontSize: 48, color: NAVY });
++  label(s, 'Minute', { x: 6.94, y: 4.21, w: 1.01, h: 0.37, align: 'center', fontFace: MAJOR, fontSize: 16 });
++  shape(s, 'rect', { x: 0, y: 6.198, w: 7.444, h: 0.210, fill: BLUE });
++  shape(s, 'line', { x: 0, y: 6.192, w: 7.444, h: 0, line: { color: WHITE, width: 1 } });
++}
++
++/* 18 — four percentage cards */
++const S18A = [0.92,0,0.02,0.01,0,0.23,0.07,1,1,1];                        // grey slab under the card
++const S18B = [1,0.94,0.97,1,0.01,0.99,0.01,0.01,0.98,0.01];        // card body
++const S18C = [0,0,0,1,0.5,0.93,0.71,0.85,0.96,0.63,1,0.5,0.96,0.37,0.86,0.25,0.5,0.07];// folded number tab
++const S18D = [0.97,0,0.03,0,0,0.54,0.74,0.54,0.81,0.66,0.84,0.97,1,1];       // header band
++function slide18() {
++  const s = addSlide();
++  sectionTitle(s, 'Section ', 'Infographic');
++  const cards = [
++    { x: 1.60, y: 1.92, mirror: true,  n: '01', pct: '34', c: BLUE, dark: NAVY_L,  ic: 'code' },
++    { x: 7.15, y: 1.92, mirror: false, n: '02', pct: '41', c: NAVY, dark: NAVY_XD, ic: 'target' },
++    { x: 1.60, y: 4.35, mirror: true,  n: '03', pct: '76', c: GOLD, dark: GOLD_D,  ic: 'growth' },
++    { x: 7.15, y: 4.35, mirror: false, n: '04', pct: '62', c: TEAL, dark: TEAL_D,  ic: 'coins' }
++  ];
++  cards.forEach(function (k) {
++    const f = k.mirror ? 'H' : '';
++    const bx = k.mirror ? k.x : k.x;            // card body origin
++    poly(s, k.mirror ? k.x + 0.13 : k.x - 0.27, k.y + 1.66, 4.72, 0.52, G15, S18A, f);
++    poly(s, bx, k.y, 4.58, 2.20, G05, S18B, f);
++    const tabX = k.mirror ? bx + 3.95 : bx;
++    poly(s, tabX + (k.mirror ? -0.03 : 0.03), k.y + 0.64, 0.60, 1.22, k.dark, S18C, f);
++    poly(s, bx, k.y, 4.58, 0.68, k.c, S18D, f);
++    poly(s, tabX, k.y + 0.64, 0.60, 1.22, k.c, S18C, f);
++    label(s, k.n, { x: tabX, y: k.y + 1.15, w: 0.60, h: 0.27, align: 'center',
++      fontFace: MAJOR, fontSize: 16, color: WHITE, valign: 'middle', margin: 0 });
++    icon(s, k.ic, k.mirror ? bx + 0.20 : bx + 3.98, k.y + 0.11, 0.45, WHITE);
++
++    const align = k.mirror ? 'right' : 'left';
++    text(s, 'Your option', { x: k.mirror ? bx + 0.43 : bx + 1.64, y: k.y + 0.77, w: 2.17, h: 0.37,
++      align: align, fontFace: MAJOR, fontSize: 16, color: k.c });
++    text(s, [{ text: k.pct, options: { fontSize: 28 } }, { text: '%', options: { fontSize: 18 } }],
++      { x: k.mirror ? bx + 2.34 : bx + 0.79, y: k.y + 0.67, w: 1.12, h: 0.57, align: align,
++        valign: 'middle', fontFace: MAJOR, color: k.c, charSpacing: -1.8 });
++    text(s, 'Nullam quis ante. Etiam sit amet orci eget eros faucibus tincidunt.',
++      { x: k.mirror ? bx + 0.09 : bx + 0.79, y: k.y + 1.19, w: 3.37, h: 0.60,
++        align: align, fontSize: 12, lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* 19 — isometric cube stack */
++function slide19() {
++  const s = addSlide();
++  sectionTitle(s, 'Section ', 'Infographic');
++  // back-to-front so the faces overlap correctly
++  isoCube(s, 5.35, 1.84, 1.75, 0.91, GOLD, GOLD_L, GOLD_M);
++  isoCube(s, 4.48, 3.26, 1.75, 0.91, TEAL, TEAL_L, TEAL_M);
++  isoCube(s, 6.23, 3.26, 1.75, 0.91, BLUE, SKY_L, BLUE_D);
++  isoCube(s, 5.35, 4.68, 1.76, 0.91, NAVY, SKY, NAVY_D);
++  isoCube(s, 7.10, 4.68, 1.75, 0.91, PEACH, PEACH_L, ORANGE);
++
++  const notes = [
++    { x: 8.22, y: 1.90, dot: 7.38, dy: 2.07, ix: 7.54, iy: 2.22, is: 0.27, c: GOLD, ic: 'growth', align: 'left' },
++    { x: 9.17, y: 3.38, dot: 8.32, dy: 3.55, ix: 8.49, iy: 3.70, is: 0.31, c: BLUE, ic: 'code', align: 'left' },
++    { x: 10.05, y: 4.89, dot: 9.20, dy: 5.05, ix: 9.36, iy: 5.20, is: 0.29, c: PEACH, ic: 'handCoin', align: 'left' },
++    { x: 0.83, y: 3.38, dot: 3.50, dy: 3.55, ix: 3.68, iy: 3.72, is: 0.25, c: TEAL, ic: 'coins', align: 'right' },
++    { x: 1.54, y: 5.35, dot: 4.21, dy: 5.51, ix: 4.37, iy: 5.68, is: 0.26, c: NAVY, ic: 'target', align: 'right' }
++  ];
++  notes.forEach(function (n) {
++    shape(s, 'ellipse', { x: n.dot, y: n.dy, w: 0.59, h: 0.59, fill: WHITE,
++      shadow: soft() });
++    icon(s, n.ic, n.ix, n.iy, n.is, n.c);
++    text(s, 'Your option here', { x: n.x, y: n.y, w: 2.44, h: 0.37,
++      align: n.align, fontFace: MAJOR, fontSize: 16, color: n.c });
++    text(s, 'Cum sociis natoque penatibus et magnis dis parturient',
++      { x: n.align === 'right' ? n.x - 0.30 : n.x, y: n.y + 0.355, w: 2.74, h: 0.62,
++        align: n.align, fontSize: 12, lineSpacingMultiple: 1.35 });
++  });
++}
++
++/* 20 — diamond dashboard */
++function slide20() {
++  const s = addSlide();
++  [[2.20, 3.75], [3.93, 3.75], [2.20, 2.02], [3.93, 2.02]].forEach(function (d) {
++    shape(s, 'diamond', { x: d[0], y: d[1], w: 1.73, h: 1.73, fill: G05, line: { color: WHITE, width: 2 } });
++  });
++  const dia = [[2.85, 0.91, NAVY, '34,600', 3.33, 1.67, 1.25, 3.31],
++               [4.58, 2.64, BLUE, '64,100', 5.09, 3.39, 1.20, 5.05],
++               [1.12, 2.64, TEAL, '92,800', 1.60, 3.39, 1.25, 1.58],
++               [2.85, 4.37, GOLD, '53,700', 3.35, 5.12, 1.22, 3.31]];
++  dia.forEach(function (d) {
++    shape(s, 'diamond', { x: d[0], y: d[1], w: 2.22, h: 2.22, fill: d[2], line: { color: WHITE, width: 2 } });
++    label(s, d[3], { x: d[4], y: d[5], w: d[6], h: 0.44, align: 'center',
++      fontFace: MAJOR, fontSize: 20, color: WHITE });
++    shape(s, 'line', { x: d[7], y: d[5] + 0.44, w: 1.29, h: 0, line: { color: WHITE, width: 1 } });
++    label(s, 'Your text', { x: d[7] + 0.18, y: d[5] + 0.48, w: 0.94, h: 0.28, align: 'center',
++      fontFace: MAJOR, fontSize: 12, color: WHITE });
++  });
++
++  headline(s, 'Section ', 'Infographic', { x: 7.472, y: 1.311, w: 5.038, h: 1.447 });
++  text(s, 'Vivamus elementum semper nisi. Aenean vulputate eleifend tellus. Aenean leo',
++    { x: 7.472, y: 3.100, w: 4.48, h: 0.77, fontSize: 14, lineSpacingMultiple: 1.5 });
++  const bullets = [['Aenean commodo ligula eget dolor', GOLD], ['Cum sociis natoque penatibus et', TEAL],
++                   ['Donec quam felis, ultricies nec', BLUE], ['Donec pede justo, fringilla vel,', NAVY]];
++  bullets.forEach(function (b, i) {
++    const y = 4.18 + i * 0.556;
++    icon(s, 'arrowCircle', 7.63, y + 0.055, 0.28, b[1], WHITE);
++    text(s, b[0], { x: 8.23, y: y, w: 4.48, h: 0.35, fontSize: 14, valign: 'middle', lineSpacingMultiple: 1.1 });
++  });
++}
++
++/* 21 — timeline with four callouts (navy) */
++function slide21() {
++  const s = addSlide('navy');
++  sectionTitle(s, 'Section Infographic', '', true);
++  // the connecting rail
++  shape(s, 'roundRect', { x: 0.99, y: 3.90, w: 11.36, h: 0.57, rectRadius: 0.28,
++    fill: { color: WHITE, transparency: 65 } });
++  const stops = [
++    { x: 2.37, c: BLUE, pale: SKY_L, dark: BLUE_D, n: '01', card: [0.77, 5.12], tip: [3.26, 4.62, 0],
++      title: 'Option One', tcol: BLUE },
++    { x: 5.00, c: TEAL, pale: TEAL_L, dark: TEAL_M, n: '02', card: [3.10, 1.83], tip: [5.59, 3.19, 180],
++      title: 'Option Two', tcol: TEAL },
++    { x: 7.62, c: BLUE, pale: SKY_L, dark: BLUE_D, n: '03', card: [6.01, 5.12], tip: [8.50, 4.62, 0],
++      title: 'Option Three', tcol: BLUE },
++    { x: 10.25, c: TEAL, pale: TEAL_L, dark: TEAL_M, n: '04', card: [8.40, 1.83], tip: [10.89, 3.19, 180],
++      title: 'Option Four', tcol: TEAL }
++  ];
++  stops.forEach(function (t) {
++    shape(s, 'roundRect', { x: t.x, y: 3.68, w: 1.65, h: 1.01, fill: t.c, rectRadius: 0.20 });
++    shape(s, 'ellipse', { x: t.x, y: 3.68, w: 0.84, h: 1.01, fill: t.pale });
++    shape(s, 'ellipse', { x: t.x + 0.13, y: 3.84, w: 0.58, h: 0.70, fill: t.dark });
++    label(s, t.n, { x: t.x + 0.97, y: 3.98, w: 0.51, h: 0.40, fontFace: MAJOR, fontSize: 18, color: WHITE });
++
++    shape(s, 'roundRect', { x: t.card[0], y: t.card[1], w: 3.02, h: 1.39, fill: WHITE, rectRadius: 0.08 });
++    shape(s, 'triangle', { x: t.tip[0], y: t.tip[1], w: 0.38, h: 0.55, rotate: t.tip[2], fill: WHITE });
++    text(s, t.title, { x: t.card[0] + 0.26, y: t.card[1] + 0.20, w: 1.97, h: 0.37,
++      fontFace: MAJOR, fontSize: 16, color: t.tcol });
++    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing. ',
++      { x: t.card[0] + 0.26, y: t.card[1] + 0.56, w: 2.66, h: 0.60, fontSize: 12, lineSpacingMultiple: 1.3 });
++  });
++}
++
++/* 22 — four converging arrows */
++const S22A = [0.2,0.19,0,0.86,0.05,0.97,0.48,0.98,1,0.86,0.75,0.36,0.46,0,0.32,0.01]; // dark fold
++const S22B = [0.07,0,0.68,0,0.92,0.38,1,0.25,1,1,0.53,1,0.61,0.87,0.14,0.08,0.06,0.03,0,0.08];  // arrow body
++function slide22() {
++  const s = addSlide();
++  sectionTitle(s, 'Section ', 'Infographic');
++  const quads = [
++    { bar: [1.17, 2.38], f: '',   c: GOLD, tip: GOLD_D,  fold: [4.14, 2.09], arr: [4.29, 2.07],
++      num: '54', nx: 4.17, ny: 2.70, tx: 1.43, ty: 2.75, align: 'right' },
++    { bar: [6.70, 2.37], f: 'H',  c: BLUE, tip: NAVY_L,  fold: [8.50, 2.09], arr: [7.05, 2.07],
++      num: '28', nx: 8.30, ny: 2.70, tx: 9.23, ty: 2.75, align: 'left' },
++    { bar: [1.17, 4.38], f: 'V',  c: TEAL, tip: TEAL_D,  fold: [4.14, 5.89], arr: [4.29, 5.07],
++      num: '47', nx: 4.17, ny: 4.71, tx: 1.43, ty: 4.75, align: 'right' },
++    { bar: [6.69, 4.38], f: 'HV', c: NAVY, tip: NAVY_XD, fold: [8.50, 5.89], arr: [7.05, 5.07],
++      num: '35', nx: 8.30, ny: 4.71, tx: 9.23, ty: 4.75, align: 'left' }
++  ];
++  quads.forEach(function (q) {
++    shape(s, 'rect', { x: q.bar[0], y: q.bar[1], w: 5.47, h: 1.59, fill: G05 });
++    poly(s, q.fold[0], q.fold[1], 0.72, 0.36, q.tip, S22A, q.f);
++    poly(s, q.arr[0], q.arr[1], 2.02, 1.20, q.c, S22B, q.f);
++    text(s, q.num, { x: q.nx, y: q.ny, w: 0.95, h: 0.77, align: 'center', valign: 'middle',
++      fontFace: MAJOR, fontSize: 40, color: q.c });
++    text(s, 'Option', { x: q.nx, y: q.ny + 0.64, w: 0.95, h: 0.29, align: 'center',
++      fontSize: 14, color: q.c, lineSpacingMultiple: 0.8 });
++    text(s, 'Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat ',
++      { x: q.tx, y: q.ty, w: 2.67, h: 0.87, align: q.align, fontSize: 12, lineSpacingMultiple: 1.3 });
++  });
++  shape(s, 'ellipse', { x: 5.83, y: 3.32, w: 1.68, h: 1.68, fill: WHITE, shadow: soft() });
++  icon(s, 'gearArrow', 6.38, 3.88, 0.58, G35);
++}
++
++/* 23 — segmented "leaf" chart with callouts */
++const S23A = [0.18,1,0.92,0.8,0.99,0.41,0.99,0,0,0.27];
++const S23B = [0.23,1,0.56,0.71,0.69,0.55,0.92,0.19,1,0,0,0.21];
++const S23C = [0.85,0,0,0.26,0.15,1,1,0.74,0.95,0.36];
++const S23D = [1,0.73,0.7,0.4,0.54,0.26,0.36,0.15,0,0,0.19,1];
++const S23E = [0.15,1,1,0.71,0.84,0.33,0.64,0,0,0.21];
++const S23F = [0.85,0,0,0.27,0.05,0.65,0.15,1,1,0.73];
++const S23P = [
++  [6.78, 4.29, 1.26, 1.20, TEAL_M, S23A],       [7.00, 5.25, 0.94, 1.10, TEAL_M, S23B],
++  [6.55, 3.40, 1.48, 1.20, NAVY_D, S23C],       [6.11, 1.98, 1.16, 0.88, GOLD_M, S23D],
++  [6.34, 2.62, 1.47, 1.10, GOLD_M, S23E],       [5.51, 4.60, 1.49, 1.12, TEAL, S23E, 'HV'],
++  [6.05, 5.48, 1.17, 0.87, TEAL,   S23D, 'HV'], [5.29, 3.72, 1.49, 1.20, NAVY, S23F],
++  [5.39, 1.98, 0.95, 1.12, GOLD,   S23B, 'HV'], [5.28, 2.86, 1.27, 1.19, GOLD, S23A, 'HV']
++];
++function slide23() {
++  const s = addSlide();
++  sectionTitle(s, 'Section ', 'Infographic');
++  shape(s, 'ellipse', { x: 4.40, y: 1.89, w: 4.54, h: 4.54, fill: G05 });
++  polys(s, S23P);
++
++  [[8.24, 1.91, '54.563-78.542', 8.44, 2.21, 'coins', TEAL],
++   [2.08, 3.83, '98.230-83.278', 2.28, 4.12, 'target', GOLD_M]].forEach(function (c) {
++    shape(s, 'roundRect', { x: c[0], y: c[1], w: 2.88, h: 0.89, fill: WHITE, rectRadius: 0.05, shadow: soft() });
++    icon(s, c[5], c[3], c[4], 0.33, c[6]);
++    shape(s, 'line', { x: c[0] + 0.70, y: c[1] + 0.01, w: 0, h: 0.88, line: { color: G_E7, width: 1 } });
++    text(s, 'Your Option', { x: c[0] + 0.78, y: c[1] + 0.04, w: 2.00, h: 0.36,
++      fontFace: MAJOR, fontSize: 12, lineSpacingMultiple: 1.4 });
++    text(s, c[2], { x: c[0] + 0.78, y: c[1] + 0.30, w: 2.24, h: 0.49,
++      fontFace: MAJOR, fontSize: 18, lineSpacingMultiple: 1.4 });
++  });
++  shape(s, 'line', { x: 6.84, y: 2.31, w: 1.38, h: 0.66, line: { color: WHITE, width: 2 } });
++  shape(s, 'line', { x: 4.95, y: 3.61, w: 1.38, h: 0.66, line: { color: WHITE, width: 2 } });
++
++  icon(s, 'arrowCircle', 0.85, 5.50, 0.24, WHITE, BLACK);
++  text(s, 'This Content', { x: 1.30, y: 5.41, w: 2.58, h: 0.42, fontFace: MAJOR, fontSize: 18,
++    bold: true, valign: 'middle', lineSpacingMultiple: 1.1 });
++  text(s, 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.',
++    { x: 1.30, y: 5.89, w: 3.16, h: 0.57, fontSize: 12, color: G92, lineSpacingMultiple: 1.2 });
++
++  shape(s, 'roundRect', { x: 9.38, y: 4.44, w: 3.15, h: 2.21, fill: WHITE, rectRadius: 0.05, shadow: soft() });
++  text(s, [{ text: '50%', options: { fontSize: 28 } }, { text: ' ', options: { fontSize: 24 } },
++           { text: 'profit ', options: { fontSize: 14, fontFace: MINOR } }],
++    { x: 9.60, y: 4.88, w: 1.80, h: 0.57, fontFace: MAJOR, color: NAVY });
++  shape(s, 'upArrow', { x: 11.62, y: 4.90, w: 0.31, h: 0.48, fill: NAVY });
++  text(s, 'Donec pede justo, fringilla vel, aliquet nec',
++    { x: 9.60, y: 5.56, w: 2.71, h: 0.77, fontSize: 14, lineSpacingMultiple: 1.5, paraSpaceBefore: 6 });
++}
++
++/* 24 — closing statement + CTA */
++function slide24() {
++  const s = addSlide();
++  headline(s, 'Transform Your Content for Bold ', 'Design Resume',
++    { x: 0.864, y: 1.427, w: 5.100, h: 2.120 });
++  text(s, 'Your Text', { x: 0.887, y: 3.940, w: 1.29, h: 0.37, fontFace: MAJOR, fontSize: 16 });
++  body(s, 'lorem ipsum dolor sit amet consectetuer dipiscing elit nean commodo ligula eget dolor aenean massa cum sociis toque penatibus et magnis  parturient ntes nascetur ridiculus mus ',
++    { x: 0.887, y: 4.310, w: 4.849, h: 0.870 });
++  shape(s, 'rect', { x: 1.00, y: 5.640, w: 1.51, h: 0.43, fill: NAVY });
++  text(s, 'Continue', { x: 1.00, y: 5.640, w: 1.51, h: 0.43, align: 'center', valign: 'middle',
++    fontFace: MAJOR, fontSize: 12, color: WHITE });
++  label(s, '01.', { x: 9.82, y: 1.940, w: 0.85, h: 0.64, fontFace: MAJOR, fontSize: 32, color: BLUE });
++  body(s, 'Lorem ipsum dolor sit amet consectetuer adipiscing elit',
++    { x: 9.82, y: 2.580, w: 2.43, h: 0.604 });
++}
++
++/* 25 — thank you */
++function slide25() {
++  const s = addSlide();
++  shape(s, 'rect', { x: 1.481, y: 3.556, w: 10.371, h: 1.890, fill: NAVY });
++  text(s, 'Thank you for watching!', { x: 1.741, y: 3.940, w: 9.851, h: 1.010,
++    align: 'center', fontFace: MAJOR, fontSize: 54, color: WHITE });
++  shape(s, 'rect', { x: 1.481, y: 5.240, w: 10.371, h: 0.210, fill: BLUE });
++  shape(s, 'line', { x: 1.481, y: 5.240, w: 10.371, h: 0, line: { color: WHITE, width: 1 } });
++
++  const contacts = [
++    { ix: 2.34, iy: 6.07, tx: 2.85, title: 'Phone Number', line: '+123 456 7890 / 067 837 7367', w: 3.30 },
++    { ix: 7.51, iy: 6.07, tx: 7.99, title: 'Your Address', line: '12 Your Street Name, Your City', w: 3.33 }
++  ];
++  contacts.forEach(function (c, i) {
++    if (i === 0) {                                  // handset: two rounded cuffs on a diagonal
++      shape(s, 'roundRect', { x: c.ix, y: c.iy + 0.13, w: 0.14, h: 0.10, rotate: 40, fill: BLUE, rectRadius: 0.04 });
++      shape(s, 'roundRect', { x: c.ix + 0.13, y: c.iy, w: 0.14, h: 0.10, rotate: 40, fill: BLUE, rectRadius: 0.04 });
++      shape(s, 'arc', { x: c.ix, y: c.iy, w: 0.27, h: 0.27, angleRange: [140, 40],
++        line: { color: BLUE, width: 2 } });
++    } else {
++      shape(s, 'teardrop', { x: c.ix, y: c.iy, w: 0.30, h: 0.30, rotate: 225, fill: BLUE });
++      shape(s, 'ellipse', { x: c.ix + 0.09, y: c.iy + 0.07, w: 0.11, h: 0.11, fill: WHITE });
++    }
++    text(s, c.title, { x: c.tx, y: 5.80, w: 2.46, h: 0.47, fontFace: MAJOR, fontSize: 16, lineSpacingMultiple: 1.5 });
++    text(s, c.line, { x: c.tx, y: 6.25, w: c.w, h: 0.37, fontSize: 14, color: G75, lineSpacingMultiple: 1.2 });
++  });
++}
++
++/* ------------------------------------------------------------------- build */
++[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++ slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++ slide19, slide20, slide21, slide22, slide23, slide24, slide25].forEach(function (fn) { fn(); });
++
++pres.writeFile({ fileName: path.join(__dirname, '16d574f0-3aff-4b75-af96-35bc279f2c79_grok_final.pptx') })
++  .then(function (f) { console.log('wrote', f); });

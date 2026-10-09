@@ -1,0 +1,875 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/hipster_apparel_shop_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/hipster_apparel_shop_presentation.js
+@@ -0,0 +1,872 @@
++/**
++ * Recreation of "Apparel Shop" multipurpose deck (25 slides, 13.333 x 7.5 in)
++ * with pptxgenjs.  Photographs in the original are replaced by flat colored
++ * placeholder rectangles labelled "[image]".
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++const C = {
++  ink: '0D0D0D',        // headline black
++  body: '404040',       // body grey
++  navy: '2D3847',       // logo tile / dark button
++  teal: '10606C',       // dark teal panel
++  cyan: '00A4E6',       // brand cyan
++  white: 'FFFFFF',
++  greyText: 'D9D9D9',
++  photo: 'B8E3F4',      // stand-in colour for photographs
++  photoInk: '5FA8C6',   // "[image]" caption colour
++};
++
++/* -------------------------------------------------------------- typography */
++const F = {
++  black: 'Montserrat Black',
++  semi: 'Montserrat SemiBold',
++  medium: 'Montserrat Medium',
++  light: 'Montserrat ExtraLight',
++  plain: 'Montserrat',
++  body: 'Lato',
++};
++
++/* ------------------------------------------------------------ boiler plate */
++const LOREM_LONG =
++  'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero ' +
++  'vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, ' +
++  'eros in lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, ' +
++  'conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt';
++const LOREM_MED =
++  'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero ' +
++  'vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, ' +
++  'eros in lacus nulla ac netus nibh aliquet, ';
++const LOREM_SHORT =
++  'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero ' +
++  'vivamus porttitor dolor, conubia mollit., ';
++const LOREM_TINY = 'Lorem ipsum dolor sit amet, lacus nulla ac';
++const LOREM_HALF =
++  'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero ' +
++  'vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, ';
++const FEATURE = 'PLACEHOLDER';
++const FEATURE_L = FEATURE + ' duisal neil';
++const INFO_TXT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do tempor incididunt. ';
++const SHUTTER_TXT = 'Lorem ipsum dolor sit amet, consetur adipin nnscing elit';
++
++const NOLINE = { type: 'none' };
++const OUTPUT_NAME = '0dff0128-7cbd-4366-9987-2b08fef2e2ad_grok_final.pptx';
++
++/* ==================================================================== atoms */
++
++/** Flat rectangle stand-in for a photograph. */
++function photo(s, x, y, w, h, opts) {
++  const o = opts || {};
++  s.addShape('rect', { x, y, w, h, fill: { color: o.color || C.photo }, line: NOLINE });
++  if (o.caption !== false) {
++    s.addText('[image]', {
++      x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle',
++      fontFace: F.medium, fontSize: Math.max(9, Math.min(14, w * 2.6)), color: o.ink || C.photoInk,
++    });
++  }
++}
++
++function rect(s, x, y, w, h, color) {
++  s.addShape('rect', { x, y, w, h, fill: { color }, line: NOLINE });
++}
++
++/**
++ * Free-form shape from a normalised outline.
++ *   start = [x, y]                    (0..1 inside the bounding box)
++ *   segs  = [[x, y] | [c1x, c1y, c2x, c2y, x, y], ...]
++ */
++function outline(s, box, color, start, segs) {
++  const [x, y, w, h] = box;
++  const pt = (u, v) => ({ x: u * w, y: v * h });
++  const pts = [Object.assign({ moveTo: true }, pt(start[0], start[1]))];
++  segs.forEach((g) => {
++    if (g.length === 2) pts.push(pt(g[0], g[1]));
++    else pts.push({ x: g[4] * w, y: g[5] * h, curve: { type: 'cubic', x1: g[0] * w, y1: g[1] * h, x2: g[2] * w, y2: g[3] * h } });
++  });
++  pts.push({ close: true });
++  s.addShape('custGeom', { x, y, w, h, points: pts, fill: { color }, line: NOLINE });
++}
++
++/** Thin white arrow used inside the cyan / teal call-to-action squares. */
++function arrow(s, x, y, w, color, width) {
++  s.addShape('line', {
++    x, y, w, h: 0,
++    line: { color: color || C.white, width: width || 2.25, endArrowType: 'triangle' },
++  });
++}
++
++/** Text box using PowerPoint's default insets (0.1in / 0.05in), as the deck does. */
++function txt(s, text, o) {
++  s.addText(text, Object.assign({ isTextBox: true, wrap: true, valign: 'top' }, o));
++}
++
++/** Text box with zero insets - used by the imported infographic slides. */
++function gtxt(s, text, o) {
++  txt(s, text, Object.assign({ margin: 0 }, o));
++}
++
++/* The 3x3 dotted logo tile that sits top-left on every slide, plus the
++   "APPARREL / SHOP" nav labels top-right. */
++function chrome(s) {
++  rect(s, 0.29, 0.38, 0.703, 0.703, C.navy);
++  const cell = 0.0705, gap = 0.0345;
++  for (let r = 0; r < 3; r++) {
++    for (let c = 0; c < 3; c++) {
++      rect(s, 0.532 + c * (cell + gap), 0.627 + r * (cell + gap), cell, cell, C.white);
++    }
++  }
++  const nav = { h: 0.269, fontFace: F.medium, fontSize: 10, color: C.ink, align: 'center', charSpacing: 3 };
++  txt(s, 'APPARREL', Object.assign({ x: 9.89, y: 0.568, w: 1.809 }, nav));
++  txt(s, 'SHOP', Object.assign({ x: 12.047, y: 0.568, w: 0.939 }, nav));
++}
++
++/* --------------------------------------------------------- text primitives */
++
++/** 32pt Montserrat Black headline line. */
++function headline(s, text, x, y, w) {
++  txt(s, text, { x, y, w: w || 4.283, h: 0.64, fontFace: F.black, fontSize: 32, bold: true, color: C.ink });
++}
++
++/** 9pt justified Lato body paragraph. */
++function body(s, text, x, y, w, h, color, align) {
++  txt(s, text, {
++    x, y, w, h: h || 1.01, fontFace: F.body, fontSize: 9, color: color || C.body,
++    align: align || 'justify', lineSpacingMultiple: 1.2, valign: 'top',
++  });
++}
++
++/** "Service 01" style caption + its small paragraph. */
++function feature(s, title, text, x, y, textW, color) {
++  txt(s, title, {
++    x, y, w: 1.45, h: 0.373, fontFace: F.semi, fontSize: 12,
++    color: color || C.ink, lineSpacingMultiple: 1.5,
++  });
++  txt(s, text, {
++    x, y: y + 0.354, w: textW, h: 0.555, fontFace: F.body, fontSize: 9,
++    color: color || C.ink, lineSpacingMultiple: 1.2,
++  });
++}
++
++/** Solid banner with "WRITE SOMETHING HERE" + small paragraph. */
++function banner(s, x, y, w, h, fill, tx, ty, tw) {
++  rect(s, x, y, w, h, fill);
++  txt(s, 'WRITE SOMETHING HERE', {
++    x: tx, y: ty, w: 2.372, h: 0.327, fontFace: F.semi, fontSize: 10,
++    color: C.white, lineSpacingMultiple: 1.5,
++  });
++  body(s, LOREM_SHORT, tx - 0.004, ty + 0.349, tw || 2.698, 0.555, C.white);
++}
++
++/** Teal footer strip: "Multipurpose / Presentation" + two lorem columns + play mark. */
++function tealFooter(s, x, y) {
++  rect(s, x, y, 4.551, 1.288, C.teal);
++  const lab = { h: 0.303, fontFace: F.semi, fontSize: 12, color: C.white };
++  txt(s, 'Multipurpose', Object.assign({ x: x + 0.21, y: y + 0.27, w: 1.512 }, lab));
++  txt(s, 'Presentation', Object.assign({ x: x + 2.055, y: y + 0.27, w: 1.389 }, lab));
++  body(s, LOREM_TINY, x + 0.218, y + 0.572, 1.504, 0.404, C.white);
++  body(s, LOREM_TINY, x + 2.055, y + 0.547, 1.504, 0.404, C.white);
++  s.addShape('triangle', {
++    x: x + 3.95, y: y + 0.485, w: 0.189, h: 0.163, rotate: 90, fill: { color: C.white }, line: NOLINE,
++  });
++}
++
++/* ---------------------------------------------------------- iconography
++   White pictograms assembled from primitive shapes; they stand in for the
++   vector icons of the original infographic slides. */
++
++function iconChart(s, x, y, w, h, color) {
++  const bw = w * 0.13;
++  [0.4, 0.58, 0.76, 0.95].forEach((f, i) => {
++    rect(s, x + w * (0.14 + i * 0.2), y + h * (0.92 - f * 0.78), bw, h * f * 0.78, color);
++  });
++  rect(s, x, y + h * 0.92, w, h * 0.08, color);          // x axis
++  rect(s, x, y + h * 0.1, w * 0.06, h * 0.9, color);     // y axis
++}
++
++function iconBriefcase(s, x, y, w, h, color, bg) {
++  s.addShape('roundRect', { x, y: y + h * 0.3, w, h: h * 0.7, rectRadius: 0.05, fill: { color }, line: NOLINE });
++  rect(s, x + w * 0.34, y, w * 0.32, h * 0.09, color);   // handle top
++  rect(s, x + w * 0.34, y, w * 0.06, h * 0.3, color);    // handle left
++  rect(s, x + w * 0.6, y, w * 0.06, h * 0.3, color);     // handle right
++  rect(s, x + w * 0.43, y + h * 0.54, w * 0.14, h * 0.16, bg);   // latch
++}
++
++function iconPeople(s, x, y, w, h, color) {
++  for (let i = 0; i < 3; i++) {
++    const cx = x + w * (0.18 + i * 0.32);
++    s.addShape('ellipse', { x: cx - w * 0.1, y, w: w * 0.2, h: h * 0.42, fill: { color }, line: NOLINE });
++    s.addShape('roundRect', {
++      x: cx - w * 0.14, y: y + h * 0.5, w: w * 0.28, h: h * 0.5,
++      rectRadius: 0.05, fill: { color }, line: NOLINE,
++    });
++  }
++}
++
++/** Two clasped hands: tilted forearms meeting at a gripped fist. */
++function iconHandshake(s, x, y, w, h, color, bg) {
++  const armH = h * 0.26;
++  s.addShape('roundRect', { x, y: y + h * 0.37, w: w * 0.6, h: armH, rectRadius: 0.04, rotate: 348, fill: { color }, line: NOLINE });
++  s.addShape('roundRect', { x: x + w * 0.4, y: y + h * 0.37, w: w * 0.6, h: armH, rectRadius: 0.04, rotate: 12, fill: { color }, line: NOLINE });
++  s.addShape('roundRect', { x: x + w * 0.26, y: y + h * 0.3, w: w * 0.48, h: h * 0.46, rectRadius: 0.07, fill: { color }, line: NOLINE });
++  for (let i = 0; i < 3; i++) {                                  // knuckle grooves
++    rect(s, x + w * (0.35 + i * 0.13), y + h * 0.34, w * 0.02, h * 0.2, bg);
++  }
++}
++
++function iconBulb(s, x, y, w, h, color) {
++  s.addShape('ellipse', { x, y, w, h: h * 0.66, fill: { color }, line: NOLINE });
++  rect(s, x + w * 0.33, y + h * 0.5, w * 0.34, h * 0.24, color);
++  rect(s, x + w * 0.3, y + h * 0.78, w * 0.4, h * 0.08, color);
++  rect(s, x + w * 0.34, y + h * 0.92, w * 0.32, h * 0.08, color);
++}
++
++function iconDollar(s, x, y, w, h, color) {
++  gtxt(s, '$', { x, y, w, h, align: 'center', valign: 'middle', fontFace: F.black, fontSize: h * 78, color });
++}
++
++/* ===================================================================== slides */
++
++/* 1 - cover */
++function slide01(s) {
++  photo(s, 0, 0, 13.333, 7.5, { caption: false });
++  s.addShape('rect', { x: 0, y: 0, w: 8.782, h: 7.5, fill: { color: C.cyan, transparency: 30 }, line: NOLINE });
++  chrome(s);
++  txt(s, 'HIPSTER', { x: 2.555, y: 2.188, w: 5.653, h: 1.447, fontFace: F.black, fontSize: 80, bold: true, color: C.white, charSpacing: 3 });
++  txt(s, 'APPAREL', { x: 6.523, y: 3.189, w: 6.355, h: 1.447, fontFace: F.light, fontSize: 80, bold: true, color: C.white, charSpacing: 3 });
++  body(s, LOREM_MED, 2.626, 3.64, 3.521, 0.707, C.greyText, 'right');
++  const lab = { h: 0.269, fontFace: F.semi, fontSize: 10, color: C.white };
++  txt(s, 'Something', Object.assign({ x: 0.993, y: 5.943, w: 1.512 }, lab));
++  txt(s, 'Text Here', Object.assign({ x: 0.993, y: 6.127, w: 1.512 }, lab));
++  body(s, LOREM_SHORT, 0.993, 6.408, 2.698, 0.555, C.white);
++  tealFooter(s, 8.782, 6.212);
++}
++
++/* 2 - hi there */
++function slide02(s) {
++  photo(s, 1.478, 0.909, 6.439, 5.143);
++  rect(s, -0.002, 6.052, 5.189, 1.448, C.teal);
++  rect(s, 5.187, 6.052, 1.549, 1.448, C.cyan);
++  chrome(s);
++  headline(s, 'HI THERE', 8.527, 2.195, 3.052);
++  txt(s, 'WELCOME TO HIPSTER', { x: 8.527, y: 2.645, w: 4.458, h: 1.178, fontFace: F.black, fontSize: 32, bold: true, color: C.ink });
++  body(s, LOREM_LONG, 8.527, 3.924, 3.521, 1.01);
++  body(s, LOREM_MED, 8.527, 5.12, 3.521, 0.707);
++  txt(s, 'WRITE SOMETHING HERE', { x: 0.713, y: 6.256, w: 2.372, h: 0.327, fontFace: F.semi, fontSize: 10, color: C.white, lineSpacingMultiple: 1.5 });
++  body(s, LOREM_SHORT, 0.71, 6.605, 2.698, 0.555, C.white);
++  txt(s, 'Text Here', { x: 5.197, y: 6.641, w: 1.512, h: 0.269, align: 'center', fontFace: F.semi, fontSize: 10, color: C.white });
++}
++
++/* 3 - welcome message from ceo */
++function slide03(s) {
++  chrome(s);
++  photo(s, 7.031, 0.948, 5.573, 5.604);
++  headline(s, 'WELCOME MESSAGE', 1.036, 1.589, 5.3);
++  headline(s, 'FROM CEO', 1.036, 2.04, 4.458);
++  body(s, LOREM_LONG, 1.036, 2.91, 3.521, 1.01);
++  body(s, LOREM_MED, 1.036, 4.288, 3.521, 0.707);
++  rect(s, 4.796, 6.237, 1.549, 1.288, C.cyan);
++  arrow(s, 5.259, 6.928, 0.521);
++  tealFooter(s, 6.302, 6.237);
++}
++
++/* 4 - more about hipster */
++function slide04(s) {
++  chrome(s);
++  photo(s, 3.861, 1.292, 5.611, 6.208);
++  rect(s, 9.472, 6.137, 3.861, 1.363, C.teal);
++  headline(s, 'MORE ', 9.905, 2.745, 3.052);
++  headline(s, 'ABOUT', 9.905, 3.209, 2.567);
++  headline(s, 'HIPSTER', 9.919, 3.698, 2.567);
++  body(s, LOREM_LONG, 0.96, 2.842, 2.454, 1.464);
++  body(s, LOREM_MED, 0.96, 4.553, 2.454, 1.01);
++  body(s, LOREM_HALF, 9.962, 4.702, 2.454, 0.707);
++  txt(s, 'WRITE SOMETHING HERE', { x: 9.73, y: 6.286, w: 2.372, h: 0.327, fontFace: F.semi, fontSize: 10, color: C.white, lineSpacingMultiple: 1.5 });
++  body(s, LOREM_SHORT, 9.726, 6.635, 2.682, 0.555, C.white);
++}
++
++/* 5 - history */
++function slide05(s) {
++  chrome(s);
++  photo(s, 1.285, 0, 4.34, 7.5);
++  headline(s, 'HISTORY OF', 6.236, 1.311);
++  headline(s, 'HIPSTER APPRAREL', 6.236, 1.761, 5.639);
++  body(s, LOREM_LONG, 6.236, 2.64, 3.521, 1.01);
++  photo(s, 6.125, 3.972, 1.583, 2.319);
++  photo(s, 8.021, 3.972, 1.583, 2.319);
++  body(s, LOREM_LONG, 9.817, 3.972, 2.743, 1.313);
++  rect(s, 9.604, 5.525, 0.792, 0.767, C.teal);
++  arrow(s, 9.795, 5.897, 0.417, C.white, 3);
++}
++
++/* 6 - new arrival */
++function slide06(s) {
++  photo(s, 0, 1.067, 6.952, 5.366);
++  chrome(s);
++  headline(s, 'NEW ARRIVAL', 7.987, 2.072);
++  headline(s, 'PRODUCT', 7.987, 2.523, 4.458);
++  body(s, LOREM_LONG, 7.987, 3.584, 3.521, 1.01);
++  body(s, LOREM_MED, 7.987, 4.989, 3.521, 0.707);
++  rect(s, 5.403, 6.433, 1.549, 1.067, C.cyan);
++  arrow(s, 5.866, 6.994, 0.521);
++}
++
++/* 7 - new concept */
++function slide07(s) {
++  photo(s, 0, 0, 6.812, 7.5);
++  chrome(s);
++  rect(s, 5.932, 4.698, 1.76, 2.802, C.teal);
++  headline(s, 'NEW CONCEPT', 8.101, 1.627, 4.458);
++  headline(s, 'APPAREL', 8.101, 2.125, 4.458);
++  body(s, LOREM_LONG, 8.101, 3.132, 3.521, 1.01);
++  body(s, LOREM_MED, 8.101, 4.537, 3.521, 0.707);
++  const lab = { h: 0.303, fontFace: F.semi, fontSize: 12, color: C.white };
++  txt(s, 'Multipurpose', Object.assign({ x: 6.181, y: 5.723, w: 1.512 }, lab));
++  txt(s, 'Presentation', Object.assign({ x: 6.181, y: 5.959, w: 1.389 }, lab));
++  txt(s, 'Template', Object.assign({ x: 6.181, y: 6.195, w: 1.134 }, lab));
++  rect(s, 7.693, 6.052, 1.549, 1.448, C.cyan);
++  txt(s, 'Something', { x: 7.703, y: 6.646, w: 1.512, h: 0.269, align: 'center', fontFace: F.semi, fontSize: 10, color: C.white });
++}
++
++/* 8 - six missions */
++function slide08(s) {
++  photo(s, 0, 0, 5.417, 7.5);
++  chrome(s);
++  rect(s, 5.291, 4.991, 7.147, 1.654, C.teal);
++  body(s, LOREM_LONG, 6.214, 2.097, 3.07, 1.161);
++  const cols = [6.199, 8.248, 10.301];
++  [[3.828, C.ink, 0], [5.31, C.white, 3]].forEach(([y, color, base]) => {
++    cols.forEach((x, i) => {
++      feature(s, 'Mission 0' + (base + i + 1), FEATURE, x, y, 1.643, color);
++    });
++  });
++}
++
++/* 9 - our vision */
++function slide09(s) {
++  chrome(s);
++  photo(s, 8.581, 0.855, 4.753, 6.645);
++  headline(s, 'OUR VISION', 2.148, 1.814);
++  body(s, LOREM_LONG, 2.148, 2.625, 4.283, 0.858);
++  [[2.148, 3.975, 1], [4.364, 3.975, 2], [2.148, 5.327, 3], [4.364, 5.327, 4]].forEach(([x, y, n]) => {
++    feature(s, 'Vision 0' + n, FEATURE, x, y, 1.643);
++  });
++  banner(s, 6.667, 6.137, 3.943, 1.363, C.cyan, 7.006, 6.286, 2.682);
++}
++
++/* 10 + 11 - our services (same content, mirrored layout) */
++function servicesSlide(s, colX, titleY, photoBox, footer) {
++  chrome(s);
++  photo(s, photoBox[0], photoBox[1], photoBox[2], photoBox[3]);
++  headline(s, 'OUR SERVICES', colX[0], titleY);
++  body(s, LOREM_LONG, colX[0], titleY + 0.84, 3.521, 1.01);
++  [[0, 0, 1], [1, 0, 2], [0, 1, 3], [1, 1, 4]].forEach(([c, r, n]) => {
++    feature(s, 'Service 0' + n, FEATURE_L, colX[c], titleY + 2.049 + r * 1.101, 1.938);
++  });
++  if (footer) footer(s);
++}
++
++function slide10(s) {
++  servicesSlide(s, [7.24, 9.75], 1.589, [1.381, 1.281, 5.286, 4.938], function (sl) {
++    rect(sl, 5.361, 6.213, 1.306, 1.287, C.cyan);
++    arrow(sl, 5.819, 6.839, 0.388);
++    banner(sl, 6.665, 6.23, 5.189, 1.27, C.teal, 7.38, 6.434, 2.698);
++  });
++}
++
++function slide11(s) {
++  servicesSlide(s, [5.826, 8.336], 1.574, [1.479, 1.069, 3.519, 5.361], null);
++}
++
++/* 12 - john doe */
++function slide12(s) {
++  chrome(s);
++  photo(s, 1.319, 1.438, 4.625, 4.625);
++  headline(s, 'JOHN DOE', 6.93, 1.752, 4.923);
++  headline(s, 'FOUNDER HIPSTER', 6.93, 2.203, 4.942);
++  txt(s, 'About me', { x: 6.93, y: 3.203, w: 1.102, h: 0.373, fontFace: F.semi, fontSize: 12, color: C.ink, lineSpacingMultiple: 1.5 });
++  body(s, LOREM_LONG, 6.93, 3.604, 3.521, 1.01);
++  body(s, LOREM_MED, 6.93, 5.009, 3.521, 0.707);
++  banner(s, 2.002, 6.062, 3.943, 1.438, C.cyan, 2.341, 6.211, 2.682);
++}
++
++/* 13 - meet designer */
++function slide13(s) {
++  chrome(s);
++  photo(s, 4.33, 0, 5.03, 6.431);
++  headline(s, 'MEET', 0.993, 2.352);
++  txt(s, [{ text: 'DESIGNER', options: { breakLine: true } }, { text: 'HIPSTER' }],
++    { x: 0.993, y: 2.802, w: 2.8, h: 1.178, fontFace: F.black, fontSize: 32, bold: true, color: C.ink });
++  txt(s, 'Renata - About me', { x: 0.993, y: 3.96, w: 2.641, h: 0.373, fontFace: F.semi, fontSize: 12, color: C.ink, lineSpacingMultiple: 1.5 });
++  txt(s, LOREM_MED + 'porttitor ligula justo', { x: 0.993, y: 4.332, w: 2.004, h: 1.616, fontFace: F.body, fontSize: 10, color: C.ink, align: 'justify' });
++  banner(s, 8.206, 5.905, 5.189, 1.051, C.cyan, 8.794, 5.978, 4.001);
++}
++
++/* 14 - photography & videography */
++function slide14(s) {
++  chrome(s);
++  headline(s, 'PHOTOGRAPHY &', 0.906, 2.479, 4.458);
++  headline(s, 'VIDEOGRAPHY', 0.906, 2.93, 4.458);
++  body(s, LOREM_LONG, 0.943, 4.312, 3.521, 1.01);
++  [['Paul', 5.328], ['Andre', 8.762]].forEach(([name, x], i) => {
++    photo(s, 5.708 + i * 3.417, 1.736, 3.075, 4.028);
++    txt(s, name, { x, y: 5.844, w: 2.21, h: 0.37, fontFace: F.black, fontSize: 16, bold: true, color: C.ink });
++  });
++}
++
++/* ---------------------------------------------------------- device mockups
++   Simplified vector stand-ins for the photographic device mockups; the screen
++   area carries the usual "[image]" placeholder. */
++
++function screenFill(s, x, y, w, h) {
++  rect(s, x, y, w, h, C.photo);
++  txt(s, '[image]', {
++    x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle',
++    fontFace: F.medium, fontSize: 12, color: C.photoInk,
++  });
++}
++
++function phoneMockup(s, x, y, w, h) {
++  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.36, fill: { color: '1A1A1A' }, line: NOLINE });
++  screenFill(s, x + 0.104, y + 0.103, w - 0.208, h - 0.24);
++  s.addShape('roundRect', { x: x + w * 0.31, y, w: w * 0.38, h: 0.19, rectRadius: 0.08, fill: { color: '1A1A1A' }, line: NOLINE });
++}
++
++function tabletMockup(s, x, y, w, h) {
++  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.3, fill: { color: '141414' }, line: NOLINE });
++  screenFill(s, x + 0.196, y + 0.2, w - 0.392, h - 0.4);
++}
++
++function laptopMockup(s, x, y, w, h) {
++  const lidH = h - 0.22;
++  rect(s, x, y, w, lidH, '2B2B2B');
++  screenFill(s, x + 0.09, y + 0.08, w - 0.18, lidH - 0.16);
++  s.addShape('trapezoid', { x: x - 0.16, y: y + lidH, w: w + 0.32, h: 0.22, fill: { color: 'C9CDD1' }, line: NOLINE, flipV: true });
++}
++
++function desktopMockup(s, x, y, w, h) {
++  const screenH = 3.42, chinH = 0.48, neckH = 0.44;
++  rect(s, x, y, w, screenH, '1E1E1E');
++  screenFill(s, x + 0.1, y + 0.1, w - 0.2, screenH - 0.2);
++  rect(s, x, y + screenH, w, chinH, 'C9CDD1');
++  rect(s, x + w / 2 - 0.6, y + screenH + chinH, 1.2, neckH, 'BFC4C8');
++  s.addShape('trapezoid', { x: x + w / 2 - 2.24, y: y + screenH + chinH + neckH, w: 4.48, h: h - screenH - chinH - neckH, fill: { color: 'D5D9DC' }, line: NOLINE });
++}
++
++/* 15 - phone mockup */
++function slide15(s) {
++  chrome(s);
++  phoneMockup(s, 6.84, 1.42, 2.3, 4.96);
++  headline(s, 'PHONE', 1.036, 1.767);
++  headline(s, 'MOCKUP SECTION', 1.036, 2.218, 4);
++  body(s, LOREM_LONG, 0.991, 3.498, 4.283, 0.858);
++  txt(s, 'WRITE SOMETHING HERE', { x: 1.04, y: 4.833, w: 2.372, h: 0.327, fontFace: F.semi, fontSize: 10, color: C.ink, lineSpacingMultiple: 1.5 });
++  body(s, LOREM_SHORT, 1.036, 5.182, 2.698, 0.555, C.ink);
++  body(s, LOREM_LONG, 10.639, 3.39, 1.833, 2.07);
++  rect(s, 8.448, 4.698, 1.76, 2.802, C.cyan);
++  const lab = { h: 0.303, fontFace: F.semi, fontSize: 12, color: C.white };
++  txt(s, 'Multipurpose', Object.assign({ x: 8.696, y: 5.723, w: 1.512 }, lab));
++  txt(s, 'Presentation', Object.assign({ x: 8.696, y: 5.959, w: 1.389 }, lab));
++  txt(s, 'Template', Object.assign({ x: 8.696, y: 6.195, w: 1.134 }, lab));
++  rect(s, 10.208, 6.052, 1.549, 1.448, C.teal);
++  txt(s, 'Something', { x: 10.218, y: 6.646, w: 1.512, h: 0.269, align: 'center', fontFace: F.semi, fontSize: 10, color: C.white });
++}
++
++/* 16 - ipad mockup */
++function slide16(s) {
++  chrome(s);
++  tabletMockup(s, 8.22, 0.98, 4.12, 5.7);
++  headline(s, 'IPAD', 1.203, 1.269);
++  headline(s, 'MOCKUP SECTION', 1.203, 1.72, 4);
++  body(s, LOREM_LONG, 1.273, 2.906, 3.521, 1.01);
++  body(s, LOREM_MED, 1.271, 4.295, 3.521, 0.707);
++  [['Text Here', 1.271, 1.791, C.navy], ['Option', 3.062, 1.791, C.teal], ['Setting', 4.842, 1.955, C.cyan]].forEach(([label, x, w, color]) => {
++    rect(s, x, 5.256, w, 0.719, color);
++    txt(s, label, { x: x + 0.303, y: 5.481, w: 1.174, h: 0.269, align: 'center', fontFace: F.semi, fontSize: 10, color: C.white });
++  });
++}
++
++/* 17 - laptop mockup */
++function slide17(s) {
++  chrome(s);
++  laptopMockup(s, 1.32, 2.14, 5.66, 3.5);
++  headline(s, 'LAPTOP', 7.59, 1.984);
++  headline(s, 'MOCKUP SECTION', 7.59, 2.434, 4);
++  body(s, LOREM_LONG, 7.544, 3.714, 4.283, 0.858);
++  txt(s, 'WRITE SOMETHING HERE', { x: 7.593, y: 4.826, w: 2.372, h: 0.327, fontFace: F.semi, fontSize: 10, color: C.ink, lineSpacingMultiple: 1.5 });
++  body(s, LOREM_SHORT, 7.59, 5.175, 2.698, 0.555, C.ink);
++}
++
++/* 18 - desktop mockup */
++function slide18(s) {
++  chrome(s);
++  desktopMockup(s, 6.48, 1.5, 5.63, 4.8);
++  headline(s, 'DEKSTOP', 1.118, 1.986);
++  headline(s, 'MOCKUP SECTION', 1.118, 2.436, 4);
++  body(s, LOREM_LONG, 1.115, 3.553, 3.094, 1.161);
++  banner(s, 1.115, 5.211, 5.189, 1.051, C.cyan, 1.703, 5.284, 4.001);
++}
++
++/* 19 - pricing table -------------------------------------------------------- */
++
++/* Rounded card outline plus five stacked "wave" layers, all as normalised
++   outlines shared by the three plan cards. */
++const CARD_PATH = {
++  start: [0.942, 1],
++  segs: [[0.059, 1], [0.027, 1, 0, 0.983, 0, 0.962], [0, 0.038], [0, 0.017, 0.027, 0, 0.059, 0],
++    [0.942, 0], [0.974, 0, 1, 0.017, 1, 0.038], [1, 0.962], [1, 0.983, 0.974, 1, 0.942, 1]],
++};
++const WAVES = [
++  { y: 5.385, h: 1.023, start: [0.058, 1], segs: [[0.942, 1], [0.973, 1, 1, 0.926, 1, 0.835], [1, 0.042], [1, 0.042, 0.786, 0, 0.5, 0.145], [0.259, 0.268, 0, 0.139, 0, 0.139], [0, 0.835], [0, 0.926, 0.026, 1, 0.058, 1]] },
++  { y: 5.417, h: 0.991, start: [0.058, 1], segs: [[0.942, 1], [0.973, 1, 1, 0.923, 1, 0.83], [1, 0.253], [1, 0.253, 0.76, 0.42, 0.495, 0.193], [0.267, 0, 0, 0.29, 0, 0.29], [0, 0.83], [0, 0.923, 0.026, 1, 0.058, 1]] },
++  { y: 5.622, h: 0.786, start: [0.058, 1], segs: [[0.942, 1], [0.973, 1, 1, 0.903, 1, 0.786], [1, 0.206], [1, 0.206, 0.84, 0.626, 0.5, 0.324], [0.141, 0, 0, 0.206, 0, 0.206], [0, 0.786], [0, 0.903, 0.026, 1, 0.058, 1]] },
++  { y: 5.774, h: 0.682, start: [0.058, 0.928], segs: [[0.942, 0.928], [0.973, 0.928, 1, 0.816, 1, 0.681], [1, 0.309], [1, 0.309, 0.77, 0, 0.5, 0.44], [0.155, 1, 0, 0.304, 0, 0.304], [0, 0.681], [0, 0.816, 0.026, 0.928, 0.058, 0.928]] },
++  { y: 5.91, h: 0.504, start: [0.058, 0.987], segs: [[0.942, 0.987], [0.973, 0.987, 1, 0.837, 1, 0.654], [1, 0.281], [1, 0.281, 0.766, 1, 0.5, 0.458], [0.277, 0, 0, 0.634, 0, 0.634], [0, 0.654], [0, 0.837, 0.026, 0.987, 0.058, 0.987]] },
++];
++
++/** Stadium-shaped "SELECT THIS PLAN" button. */
++const PILL = {
++  start: [0.885, 1],
++  segs: [[0.113, 1], [0.052, 1, 0, 0.772, 0, 0.505], [0, 0.505], [0, 0.228, 0.052, 0, 0.113, 0],
++    [0.885, 0], [0.948, 0, 1, 0.228, 1, 0.505], [1, 0.505], [1, 0.772, 0.948, 1, 0.885, 1]],
++};
++
++const PLANS = [
++  {
++    x: 1.694, title: 'BASIC', price: '$49', accent: 'AB71FC',
++    waveColors: ['EBDEFF', 'D6BAFC', 'CCA9FC', 'BA8BFC', 'AB71FC'],
++    items: ['Lorem ipsum dolor sit', 'Dolor sit amet conscter pod', 'Consectetur adipiscing'],
++    itemsY: [3.34, 3.648, 3.976], plus: null, popular: false,
++  },
++  {
++    x: 5.233, title: 'PRO', price: '$299', accent: '2FC1F5',
++    waveColors: ['D9F6FF', 'AEE7FC', '87DBFA', '5CCFF7', '2FC1F5'],
++    items: ['Lorem ipsum dolor', 'Dolor sit amet cons mecter', 'Consectetur adipis'],
++    itemsY: [3.182, 3.49, 3.819], plus: 'Basic plan', popular: true,
++  },
++  {
++    x: 8.743, title: 'ENTERPRISE', price: '$1999', accent: 'FC667D',
++    waveColors: ['FFE3E8', 'FCBAC3', 'FCA9B5', 'FC8B9C', 'FC667D'],
++    items: ['Lorem ipsum dolor', 'Dolor sit amet cons mecter', 'Consectetur adipis'],
++    itemsY: [3.182, 3.49, 3.819], plus: 'Pro plan', popular: false,
++  },
++];
++
++/** Small black check mark. */
++function tick(s, x, y, size, color) {
++  outline(s, [x, y, size, size], color, [0, 0.5], [
++    [0.14, 0.36], [0.38, 0.6], [0.86, 0.06], [1, 0.2], [0.38, 0.94],
++  ]);
++}
++
++function planCard(s, p) {
++  const w = 2.835, cardY = 2.028, cardH = 4.38;
++  outline(s, [p.x, cardY, w, cardH], C.white, CARD_PATH.start, CARD_PATH.segs);
++  WAVES.forEach((wv, i) => {
++    outline(s, [p.x, wv.y, w, wv.h], p.waveColors[i], wv.start, wv.segs);
++  });
++
++  gtxt(s, p.title, { x: p.x, y: 2.207, w, h: 0.405, align: 'center', fontFace: F.plain, fontSize: 24, bold: true, color: '000000', lineSpacingMultiple: 1 });
++  rect(s, p.x + 0.526, 2.707, 0.747, 0.023, p.accent);
++  p.items.forEach((label, i) => {
++    tick(s, p.x + 0.345, p.itemsY[i] - 0.01, 0.15, '0A0A0A');
++    gtxt(s, label, { x: p.x + 0.652, y: p.itemsY[i], w: 1.95, h: 0.186, fontFace: F.body, fontSize: 11, bold: true, color: '000000', lineSpacingMultiple: 1 });
++  });
++  if (p.plus) {
++    gtxt(s, '+', { x: p.x + 0.375, y: 4.043, w: 0.148, h: 0.302, fontFace: F.body, fontSize: 18, color: '000000', lineSpacingMultiple: 1 });
++    gtxt(s, p.plus, { x: p.x + 0.652, y: 4.13, w: 1.2, h: 0.184, fontFace: F.body, fontSize: 11, bold: true, color: '000000', lineSpacingMultiple: 1 });
++  }
++  gtxt(s, p.price, { x: p.x, y: 4.693, w, h: 0.538, align: 'center', fontFace: F.body, fontSize: 32, color: '000000', lineSpacingMultiple: 1 });
++  gtxt(s, 'per month', { x: p.x, y: 5.16, w, h: 0.177, align: 'center', fontFace: F.body, fontSize: 10.5, bold: true, color: '000000' });
++  outline(s, [p.x + 0.66, 5.814, 1.462, 0.333], C.white, PILL.start, PILL.segs);
++  gtxt(s, 'SELECT THIS PLAN', { x: p.x + 0.66, y: 5.814, w: 1.462, h: 0.333, align: 'center', valign: 'middle', fontFace: F.body, fontSize: 10.5, bold: true, color: '333333' });
++  if (p.popular) {
++    outline(s, [p.x + 1.975, 2.042, 0.84, 0.842], 'FC667D', [0.436, 0], [[0, 0], [1, 1], [1, 0.565]]);
++    gtxt(s, 'P O P U L A R', { x: p.x + 2.199, y: 2.31, w: 0.646, h: 0.16, rotate: 45, align: 'center', fontFace: F.body, fontSize: 8, bold: true, color: C.white });
++  }
++}
++
++function slide19(s) {
++  rect(s, 1.38, 1.66, 10.524, 5.069, '15579D');
++  PLANS.forEach((p) => { planCard(s, p); });
++  chrome(s);
++}
++
++/* 20 - "our audience" bar chart (drawn with shapes, as in the original) ------ */
++
++const AUDIENCE = [
++  { label: '23K', x: 2.854, w: 0.833, top: 3.578, h: 2.349, color: 'E84C88', icon: 'dribbble' },
++  { label: '27K', x: 4.771, w: 0.832, top: 3.156, h: 2.812, color: '48CEFB', icon: 'twitter' },
++  { label: '16K', x: 6.675, w: 0.833, top: 4.431, h: 1.545, color: '0B7DFF', icon: 'behance' },
++  { label: '25K', x: 8.587, w: 0.832, top: 3.335, h: 2.578, color: 'CB2027', icon: 'pinterest' },
++  { label: '32K', x: 10.502, w: 0.828, top: 2.58, h: 3.29, color: '3B5998', icon: 'facebook' },
++];
++const GRIDLINES = [{ label: '30K', y: 2.646 }, { label: '20K', y: 3.798 }, { label: '10K', y: 4.953 }];
++
++function socialGlyph(s, kind, cx, bottom) {
++  const white = C.white;
++  if (kind === 'dribbble' || kind === 'pinterest') {
++    s.addShape('ellipse', { x: cx - 0.3, y: bottom - 0.6, w: 0.6, h: 0.6, fill: { color: white }, line: NOLINE });
++    gtxt(s, kind === 'pinterest' ? 'P' : 'd', {
++      x: cx - 0.3, y: bottom - 0.62, w: 0.6, h: 0.6, align: 'center', valign: 'middle',
++      fontFace: F.black, fontSize: 22, bold: true, color: kind === 'pinterest' ? 'CB2027' : 'E84C88',
++    });
++  } else if (kind === 'twitter') {
++    outline(s, [cx - 0.3, bottom - 0.52, 0.6, 0.5], white, [1, 0.1], [
++      [0.9, 0.16, 0.79, 0.19, 0.68, 0.18],
++      [0.6, 0.06, 0.42, 0.04, 0.32, 0.14],
++      [0.23, 0.23, 0.22, 0.36, 0.27, 0.46],
++      [0.17, 0.44, 0.08, 0.38, 0.02, 0.3],
++      [0, 0.42, 0.05, 0.55, 0.16, 0.6],
++      [0.1, 0.62, 0.05, 0.62, 0.01, 0.6],
++      [0.05, 0.73, 0.15, 0.83, 0.28, 0.83],
++      [0.2, 0.91, 0.09, 0.95, 0, 0.94],
++      [0.12, 1, 0.26, 1, 0.38, 0.96],
++      [0.72, 0.86, 0.9, 0.55, 0.86, 0.28],
++      [0.92, 0.23, 0.97, 0.17, 1, 0.1],
++    ]);
++  } else if (kind === 'behance') {
++    gtxt(s, 'B\u0113', { x: cx - 0.4, y: bottom - 0.42, w: 0.8, h: 0.4, align: 'center', fontFace: F.black, fontSize: 19, bold: true, color: white });
++  } else {
++    gtxt(s, 'f', { x: cx - 0.3, y: bottom - 0.68, w: 0.6, h: 0.68, align: 'center', valign: 'bottom', fontFace: F.black, fontSize: 34, bold: true, color: white });
++  }
++}
++
++function slide20(s) {
++  GRIDLINES.forEach((g) => {
++    s.addShape('line', { x: 2.642, y: g.y, w: 8.862, h: 0, line: { color: 'E8E8E8', width: 1.62 } });
++    gtxt(s, g.label, { x: 1.951, y: g.y - 0.15, w: 0.655, h: 0.321, align: 'right', fontFace: F.plain, fontSize: 20, color: 'BFBFBF' });
++  });
++  AUDIENCE.forEach((b) => {
++    rect(s, b.x, b.top, b.w, b.h, b.color);
++    gtxt(s, b.label, {
++      x: b.x + b.w / 2 - 0.59, y: b.top - 0.554, w: 1.179, h: 0.51,
++      align: 'center', fontFace: F.plain, fontSize: 30, bold: true, color: '000000',
++    });
++    socialGlyph(s, b.icon, b.x + b.w / 2, b.top + b.h - 0.06);
++  });
++  gtxt(s, 'our audience', { x: 2.72, y: 1.274, w: 7.892, h: 0.734, align: 'center', fontFace: F.plain, fontSize: 40, bold: true, color: '000000' });
++  chrome(s);
++}
++
++/* 21 - four-segment donut infographic -------------------------------------- */
++
++const DONUT_PARTS = [
++  {
++    color: '4CE1FF', box: [1.531, 1.335, 2.8, 2.333],
++    start: [1, 0.291],
++    segs: [[0.857, 0], [0.397, 0.01, 0.023, 0.45, 0, 0.998], [0.242, 0.826], [0.488, 1],
++      [0.509, 0.774, 0.666, 0.594, 0.857, 0.584]],
++    icon: iconPeople, ibox: [2.323, 2.052, 1.141, 0.595],
++  },
++  {
++    color: '00B0D3', box: [4.092, 1.339, 2.332, 2.799],
++    start: [1, 0.857],
++    segs: [[0.99, 0.396, 0.55, 0.021, 0.002, 0], [0.174, 0.241], [0, 0.487],
++      [0.226, 0.508, 0.406, 0.665, 0.416, 0.857], [0.709, 1]],
++    icon: iconChart, ibox: [5.068, 2.418, 0.79, 0.663],
++  },
++  {
++    color: '00586A', box: [3.625, 3.898, 2.799, 2.333],
++    start: [0, 0.709],
++    segs: [[0.143, 1], [0.603, 0.992, 0.977, 0.55, 1, 0.002], [0.758, 0.174], [0.512, 0],
++      [0.491, 0.228, 0.334, 0.406, 0.143, 0.416]],
++    icon: iconHandshake, ibox: [4.609, 4.976, 0.941, 0.63],
++  },
++  {
++    color: '00849E', box: [1.531, 3.429, 2.332, 2.802],
++    start: [0.998, 1],
++    segs: [[0.826, 0.758], [1, 0.512], [0.774, 0.491, 0.594, 0.336, 0.584, 0.143], [0.291, 0],
++      [0, 0.143], [0.01, 0.603, 0.45, 0.977, 0.998, 1]],
++    icon: iconBriefcase, ibox: [2.253, 4.469, 0.736, 0.663],
++  },
++];
++const INFO_LABELS = [
++  { title: '1 OPTION', x: 7.771, y: 3.168, tx: 8.314, ty: 3.476, align: 'right' },
++  { title: '3 OPTION', x: 10.097, y: 3.168, tx: 10.179, ty: 3.497, align: 'left' },
++  { title: '2 OPTION', x: 7.771, y: 4.823, tx: 8.323, ty: 5.151, align: 'right' },
++  { title: '4 OPTION', x: 10.097, y: 4.823, tx: 10.179, ty: 5.172, align: 'left' },
++];
++
++function slide21(s) {
++  DONUT_PARTS.forEach((p) => {
++    outline(s, p.box, p.color, p.start, p.segs);
++    p.icon(s, p.ibox[0], p.ibox[1], p.ibox[2], p.ibox[3], C.white, p.color);
++  });
++  gtxt(s, 'infographic', {
++    x: 7.651, y: 1.701, w: 4.892, h: 0.825, align: 'center',
++    fontFace: 'Playfair Display Black', fontSize: 40, bold: true, color: '00849E',
++  });
++  INFO_LABELS.forEach((l) => {
++    gtxt(s, l.title, { x: l.tx, y: l.y, w: 1.439, h: 0.354, align: l.align, fontFace: F.body, fontSize: 14, bold: true, color: '1C1C1C', lineSpacingMultiple: 1 });
++    txt(s, INFO_TXT, { x: l.x, y: l.ty, w: 2.062, h: 0.976, align: l.align, fontFace: F.body, fontSize: 10, color: '000000', lineSpacingMultiple: 1 });
++  });
++  chrome(s);
++}
++
++/* 22 - five-blade shutter infographic -------------------------------------- */
++
++const BLADES = [
++  {
++    color: '4CE1FF', box: [7.375, 1.165, 1.953, 3.58],
++    start: [1, 0.65],
++    segs: [[0.947, 0.341, 0.541, 0.081, 0, 0], [0.07, 0.037, 0.171, 0.104, 0.246, 0.228],
++      [0.364, 0.425, 0.286, 0.59, 0.28, 0.596], [0.062, 1], [0.07, 1],
++      [0.073, 1, 0.35, 0.994, 0.655, 0.879], [0.941, 0.771, 0.994, 0.665, 1, 0.65]],
++    icon: iconBulb, ibox: [8.257, 2.97, 0.651, 0.778],
++  },
++  {
++    color: '00849E', box: [4.488, 1.071, 3.479, 2.151],
++    start: [0.947, 0.433],
++    segs: [[0.885, 0.13, 0.788, 0.036, 0.775, 0.023], [0.726, 0.008, 0.678, 0, 0.627, 0],
++      [0.374, 0, 0.143, 0.196, 0, 0.529], [0.047, 0.491, 0.132, 0.443, 0.266, 0.448],
++      [0.48, 0.455, 0.61, 0.601, 0.616, 0.606], [0.621, 0.613], [0.97, 1],
++      [0.98, 0.926, 1, 0.695, 0.947, 0.433]],
++    icon: iconBriefcase, ibox: [6.528, 1.427, 0.679, 0.613],
++  },
++  {
++    color: '87EBFF', box: [5.943, 3.688, 3.398, 2.568],
++    start: [1, 0.021],
++    segs: [[1, 0.015, 1, 0.006, 1, 0], [0.976, 0.064, 0.923, 0.166, 0.812, 0.269],
++      [0.631, 0.435, 0.469, 0.441, 0.462, 0.441], [0, 0.458],
++      [0.016, 0.512, 0.072, 0.676, 0.205, 0.825], [0.362, 1, 0.478, 0.996, 0.49, 0.996],
++      [0.795, 0.844, 1, 0.454, 1, 0.021]],
++    icon: iconChart, ibox: [7.233, 5.149, 0.696, 0.582],
++  },
++  {
++    color: '00B0D3', box: [4.46, 3.431, 2.965, 2.984],
++    start: [0.301, 0],
++    segs: [[0.255, 0.04, 0.153, 0.143, 0.083, 0.317], [0, 0.53, 0.042, 0.655, 0.048, 0.672],
++      [0.221, 0.881, 0.474, 1, 0.745, 1], [0.832, 1, 0.917, 0.987, 1, 0.963],
++      [0.937, 0.952, 0.838, 0.917, 0.718, 0.817], [0.526, 0.655, 0.47, 0.479, 0.469, 0.472],
++      [0.467, 0.462]],
++    icon: iconDollar, ibox: [5.062, 4.745, 0.502, 0.734],
++  },
++  {
++    color: '00586A', box: [4, 2.095, 2.538, 3.181],
++    start: [0.554, 0.005],
++    segs: [[0.282, 0, 0.164, 0.079, 0.149, 0.088], [0.052, 0.219, 0, 0.367, 0, 0.518],
++      [0, 0.69, 0.069, 0.861, 0.192, 1], [0.181, 0.943, 0.183, 0.843, 0.25, 0.707],
++      [0.338, 0.53, 0.472, 0.429, 0.522, 0.396], [1, 0.098],
++      [0.946, 0.074, 0.784, 0.01, 0.554, 0.005]],
++    icon: iconHandshake, ibox: [4.575, 2.571, 0.88, 0.587],
++  },
++];
++const SHUTTER_LABELS = [
++  { title: 'LEARN', tx: 3.735, ty: 0.99, tw: 1.106, px: 2.969, py: 1.278, align: 'right' },
++  { title: 'IDEA', tx: 9.51, ty: 2.377, tw: 0.835, px: 9.41, py: 2.719, align: 'left' },
++  { title: 'STRATEGY', tx: 9.16, ty: 5.118, tw: 1.59, px: 9.04, py: 5.46, align: 'left' },
++  { title: 'BUSINESS', tx: 2.965, ty: 5.986, tw: 1.545, px: 2.639, py: 6.318, align: 'right' },
++  { title: 'STARTUP', tx: 2.109, ty: 3.019, tw: 1.444, px: 1.655, py: 3.347, align: 'right' },
++];
++
++function slide22(s) {
++  BLADES.forEach((b) => { outline(s, b.box, b.color, b.start, b.segs); });
++  BLADES.forEach((b) => { b.icon(s, b.ibox[0], b.ibox[1], b.ibox[2], b.ibox[3], C.white, b.color); });
++  SHUTTER_LABELS.forEach((l) => {
++    gtxt(s, l.title, { x: l.tx, y: l.ty, w: l.tw, h: 0.486, align: l.align, fontFace: F.body, fontSize: 11, bold: true, color: '231F20', lineSpacingMultiple: 1 });
++    txt(s, SHUTTER_TXT, { x: l.px, y: l.py, w: 2.07, h: 0.809, align: l.align, fontFace: F.body, fontSize: 9, color: '000000', lineSpacingMultiple: 1 });
++  });
++  chrome(s);
++}
++
++/* 23 - "every cool project starts here" ------------------------------------ */
++
++/* Pill body: rounded left end, the right end curves inward so the darker
++   round cap can nest into it. */
++const PILL_BODY = {
++  start: [0.149, 0],
++  segs: [[1, 0], [0.918, 0, 0.851, 0.224, 0.851, 0.498], [0.851, 0.776, 0.785, 1, 0.703, 1],
++    [0.149, 1], [0.067, 1, 0, 0.776, 0, 0.498], [0, 0.224, 0.067, 0, 0.149, 0]],
++};
++const PILL_CAP = {
++  start: [0.332, 0.498],
++  segs: [[0.332, 0.224, 0.481, 0, 0.666, 0], [0.851, 0, 1, 0.224, 1, 0.498],
++    [1, 0.776, 0.851, 1, 0.666, 1], [0, 1], [0.182, 1, 0.332, 0.776, 0.332, 0.498]],
++};
++const OPTIONS = [
++  { title: 'OPTION A', y: 1.564, h: 1.127, body: '1990A1', cap: '10606C', icon: iconChart, ibox: [10.851, 1.831, 0.628, 0.529] },
++  { title: 'OPTION B', y: 3.189, h: 1.128, body: '0B2B4E', cap: '104176', icon: iconBriefcase, ibox: [10.862, 3.479, 0.576, 0.517] },
++  { title: 'OPTION C', y: 4.816, h: 1.132, body: '007BAC', cap: '00A4E6', icon: iconHandshake, ibox: [10.806, 5.192, 0.715, 0.477] },
++];
++const OPT_TXT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit';
++
++/** Dotted elbow: diagonal from the circle, then a horizontal run to the pill. */
++function elbow(s, x1, y1, kneeX, x2, y2) {
++  const ln = { color: '00849E', width: 1.62 };
++  s.addShape('line', { x: x1, y: y1, w: kneeX - x1, h: y2 - y1, line: ln });
++  s.addShape('line', { x: kneeX, y: y2, w: x2 - kneeX, h: 0, line: ln });
++  [[x1, y1], [x2, y2]].forEach(([dx, dy]) => {
++    s.addShape('ellipse', { x: dx - 0.036, y: dy - 0.036, w: 0.072, h: 0.072, fill: { color: '00849E' }, line: NOLINE });
++  });
++}
++
++function slide23(s) {
++  s.addShape('ellipse', { x: 1.531, y: 2.158, w: 3.182, h: 3.189, fill: { color: '15579D' }, line: NOLINE });
++  gtxt(s, 'e  v  e  r  y     c  o  o  l', { x: 1.91, y: 3.252, w: 2.46, h: 0.161, align: 'center', fontFace: F.plain, fontSize: 11, color: C.white });
++  gtxt(s, 'project', { x: 1.771, y: 3.417, w: 2.738, h: 0.63, align: 'center', fontFace: F.plain, fontSize: 43, bold: true, color: C.white });
++  gtxt(s, 's  t  a  r  t  s    h  e  r  e', { x: 1.938, y: 4.285, w: 2.405, h: 0.161, align: 'center', fontFace: F.plain, fontSize: 11, color: C.white });
++
++  elbow(s, 4.675, 2.673, 5.234, 6.656, 2.165);
++  elbow(s, 5.26, 3.752, 5.26, 6.69, 3.752);
++  elbow(s, 4.642, 4.83, 5.216, 6.638, 5.351);
++
++  OPTIONS.forEach((o) => {
++    outline(s, [7.347, o.y, 3.797, o.h], o.body, PILL_BODY.start, PILL_BODY.segs);
++    outline(s, [9.998, o.y, 1.693, o.h], o.cap, PILL_CAP.start, PILL_CAP.segs);
++    gtxt(s, o.title, { x: 8.252, y: o.y + 0.22, w: 1.7, h: 0.25, align: 'right', fontFace: F.body, fontSize: 12, bold: true, color: C.white });
++    txt(s, OPT_TXT, { x: 7.9, y: o.y + 0.43, w: 2.127, h: 0.7, align: 'right', fontFace: F.body, fontSize: 10.5, color: C.white });
++    o.icon(s, o.ibox[0], o.ibox[1], o.ibox[2], o.ibox[3], C.white, o.cap);
++  });
++  chrome(s);
++}
++
++/* 24 - follow and contact us */
++function slide24(s) {
++  chrome(s);
++  photo(s, 6.667, 1.247, 5.021, 4.712);
++  headline(s, 'FOLLOW', 1.354, 1.361);
++  headline(s, 'AND CONTACT US', 1.354, 1.811, 5.021);
++  [['- Youtube', 2.644], ['- Instagram', 2.873], ['- Twitter', 3.101], ['- Skype', 3.29]].forEach(([label, y]) => {
++    txt(s, label, { x: 1.354, y, w: 1.914, h: 0.303, fontFace: F.semi, fontSize: 12, color: C.ink });
++  });
++  body(s, LOREM_LONG, 1.355, 3.864, 3.521, 1.01);
++  body(s, LOREM_MED, 1.353, 5.253, 3.521, 0.707);
++}
++
++/* 25 - thank you */
++function slide25(s) {
++  photo(s, 7.031, 0.948, 5.573, 5.604);
++  chrome(s);
++  txt(s, 'THANK', { x: 1.198, y: 2.437, w: 5.469, h: 1.313, fontFace: F.black, fontSize: 72, color: C.ink });
++  txt(s, 'YOU', { x: 1.247, y: 3.331, w: 5.469, h: 1.313, fontFace: F.black, fontSize: 72, color: C.ink });
++  const lab = { h: 0.303, fontFace: F.semi, fontSize: 12, color: C.ink };
++  txt(s, 'Multipurpose', Object.assign({ x: 1.247, y: 5.056, w: 1.512 }, lab));
++  txt(s, 'Presentation', Object.assign({ x: 1.247, y: 5.292, w: 1.389 }, lab));
++  txt(s, 'Template', Object.assign({ x: 1.247, y: 5.528, w: 1.134 }, lab));
++  banner(s, 4.691, 5.292, 5.189, 1.27, C.cyan, 5.406, 5.496, 2.698);
++  rect(s, 11.299, 5.275, 1.306, 1.287, C.teal);
++  arrow(s, 11.757, 5.919, 0.388);
++}
++
++/* ====================================================================== main */
++
++const SLIDES = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
++  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25,
++];
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++pptx.layout = 'WIDE';
++pptx.title = 'Apparel Shop';
++
++SLIDES.forEach((build) => { build(pptx.addSlide()); });
++
++pptx.writeFile({ fileName: path.join(__dirname, OUTPUT_NAME) })
++  .then((f) => { console.log('wrote', f); })
++  .catch((e) => { console.error(e); process.exit(1); });

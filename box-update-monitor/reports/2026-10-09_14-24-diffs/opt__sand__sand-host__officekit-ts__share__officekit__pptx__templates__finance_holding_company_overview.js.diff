@@ -1,0 +1,1280 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/finance_holding_company_overview.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/finance_holding_company_overview.js
+@@ -0,0 +1,1277 @@
++/**
++ * "Holding Company" presentation template, rebuilt with pptxgenjs.
++ *
++ * Slide size 13.333 x 7.5 in (16:9). Theme: Roboto SemiBold headings,
++ * Roboto Light body, amber (#F09410) + dark cocoa (#332007) palette.
++ *
++ * The reference deck ships no raster artwork: every "Picture Placeholder"
++ * is an empty prompt that renders as nothing, so none is drawn here either.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Palette: theme colours plus their luminance-modified variants
++ * ------------------------------------------------------------------ */
++const C = {
++  amber: 'F09410', // accent1
++  cocoa: '332007', // accent2
++  amber60: 'F6BF70', // accent1 lum 60/40
++  amber40: 'F9D49F', // accent1 lum 40/60
++  cream: 'FCEACF', // accent1 lum 20/80
++  bark: '5B390C', // accent2 lum 90/10
++  bronze: '965E15', // accent2 lum 75/25, also the card gradient mid-tone
++  sand: 'F1CC9C',
++  shell: 'FAEBD7',
++};
++
++/* pptxgenjs has no gradient fill. Small gradients are replaced by the flat
++ * colour that best matches how they render; the large washes (slide
++ * backgrounds, decorative circles, the slide-13 banner) are painted as a
++ * stack of narrow bands by the helpers below. */
++const G = {
++  cardLight: 'A06A24', // bottom-left end of the card ramp (85% alpha over amber)
++  cardDark: '533709', //  top-right end of the same ramp
++  barLight: '9B6114', // fully opaque variant used by bars, pills and boxes
++  barDark: '3B2508',
++  buttonLight: 'B16D0B', // small "Learn More" pill
++  buttonDark: '7C4C08',
++  pillOnDark: '6E450B', // amber lozenge fading into a dark background
++  pillOnLight: 'F3A940', // amber lozenge fading into a light background
++};
++
++const FONT = { head: 'Roboto SemiBold', body: 'Roboto Light', plain: 'Roboto' };
++
++const W = 13.333; // slide width, inches
++const H = 7.5; // slide height, inches
++const MARGIN = 0.366; // standard left / right gutter
++const INSET = [3.6, 7.2, 3.6, 7.2]; // PowerPoint default text-box insets, pt
++
++/* Repeated body copy. */
++const LOREM_LONG =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud ' +
++  'exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.';
++const LOREM_MED =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
++  'incididunt ut labore et dolore.';
++const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do.';
++const LOREM_TINY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.';
++const LOREM_BULLET =
++  'Lorem ipsum dolor sit amet, adipiscing elit, sed do eiusmod tempor incididunt ut labore';
++
++/* ------------------------------------------------------------------ *
++ * Colour + gradient helpers
++ * ------------------------------------------------------------------ */
++
++/** Interpolate between two hex colours; t runs 0 -> 1. */
++function mix(from, to, t) {
++  const channel = (i) => {
++    const a = parseInt(from.substr(i * 2, 2), 16);
++    const b = parseInt(to.substr(i * 2, 2), 16);
++    return Math.round(a + (b - a) * t).toString(16).padStart(2, '0');
++  };
++  return (channel(0) + channel(1) + channel(2)).toUpperCase();
++}
++
++/** How far a row at `depth` below a rounded corner must be inset. */
++function cornerInset(radius, depth) {
++  return radius - Math.sqrt(Math.max(radius * radius - Math.max(radius - depth, 0) ** 2, 0));
++}
++
++/**
++ * Top-to-bottom wash drawn as stacked rows. `topR` / `botR` round the
++ * corners: rows in a corner zone are narrowed to follow the arc.
++ */
++function verticalWash(slide, o) {
++  const topR = o.topR || 0;
++  const botR = o.botR || 0;
++  const rows = Math.max(Math.ceil(o.h / 0.12), 12);
++  const rowH = o.h / rows;
++  const inset = (y) => Math.max(cornerInset(topR, y), cornerInset(botR, o.h - y));
++  for (let i = 0; i < rows; i++) {
++    const y0 = rowH * i;
++    const pad = Math.max(inset(y0), inset(y0 + rowH));
++    slide.addShape('rect', {
++      x: o.x + pad, y: o.y + y0, w: o.w - pad * 2, h: rowH + 0.01,
++      fill: { color: mix(o.top, o.bottom, i / (rows - 1)) }, line: { type: 'none' },
++    });
++  }
++}
++
++/** The deck's dark title background: cocoa 90/10 fading down into cocoa. */
++function darkBackdrop(slide) {
++  slide.background = { color: C.cocoa };
++  verticalWash(slide, { x: 0, y: 0, w: W, h: H, top: C.bark, bottom: C.cocoa });
++}
++
++/* ------------------------------------------------------------------ *
++ * Shape and text helpers
++ * ------------------------------------------------------------------ */
++
++/** Heading text in Roboto SemiBold, top-anchored, 120% leading. */
++function heading(slide, text, o) {
++  slide.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: FONT.head, fontSize: o.size, color: o.color,
++    align: o.align || 'left', valign: 'top', margin: INSET,
++    lineSpacing: o.size * 1.2, rotate: o.rotate,
++  });
++}
++
++/** Body copy in Roboto Light with the deck's 130% leading. */
++function body(slide, text, o) {
++  slide.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: FONT.body, fontSize: o.size || 12, color: o.color || C.cocoa,
++    align: o.align || 'left', valign: 'top', margin: INSET,
++    lineSpacingMultiple: 1.3,
++  });
++}
++
++/** Single-line label; `face` defaults to the light body font. */
++function label(slide, text, o) {
++  slide.addText(text, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fontFace: o.face || FONT.body, fontSize: o.size, color: o.color,
++    align: o.align || 'left', valign: 'top', margin: INSET,
++    lineSpacing: o.size * 1.2, rotate: o.rotate,
++  });
++}
++
++/** Rounded rectangle; `adj` is the OOXML corner adjust value (0..50000). */
++function roundRect(slide, o) {
++  slide.addShape('roundRect', {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: o.fill ? { color: o.fill } : undefined,
++    line: o.line ? { color: o.line, width: o.lineWidth || 1 } : { type: 'none' },
++    rectRadius: (o.adj / 100000) * Math.min(o.w, o.h),
++  });
++}
++
++/* Every card in the deck carries the same 290-degree gradient: light at the
++ * bottom-left corner, dark towards the top-right. */
++const GRAD_DX = Math.cos((-70 * Math.PI) / 180);
++const GRAD_DY = Math.sin((-70 * Math.PI) / 180);
++
++/**
++ * Tile the interior of a panel with cells shaded along the 290-degree ramp.
++ * `topR` / `botR` are the corner radii; rows near a rounded corner are pulled
++ * in horizontally so no cell pokes outside the silhouette drawn beneath.
++ */
++function diagonalCells(slide, o) {
++  const lo = o.h * GRAD_DY; // ramp value at the bottom-left corner
++  const hi = o.w * GRAD_DX; // ramp value at the top-right corner
++  // Size the cells so no neighbour differs by more than ~5 levels per
++  // channel, then cap row height so the rounded corners stay smooth.
++  const spread = Math.max(
++    ...[0, 1, 2].map((i) =>
++      Math.abs(parseInt(o.light.substr(i * 2, 2), 16) - parseInt(o.dark.substr(i * 2, 2), 16)))
++  );
++  const perLevel = (5 * (hi - lo)) / Math.max(spread, 1);
++  const maxR = Math.max(o.topR, o.botR);
++  const COLS = Math.min(Math.max(Math.ceil(o.w / (perLevel / GRAD_DX)), 2), 24);
++  const ROWS = Math.min(
++    Math.max(Math.ceil(o.h / Math.min(perLevel / -GRAD_DY, maxR ? maxR / 4 : Infinity)), 4), 48);
++  const rowH = o.h / ROWS;
++  const bite = (radius, depth) =>
++    radius - Math.sqrt(Math.max(radius * radius - Math.max(radius - depth, 0) ** 2, 0));
++  const inset = (y) => Math.max(bite(o.topR, y), bite(o.botR, o.h - y));
++  for (let r = 0; r < ROWS; r++) {
++    const y0 = rowH * r;
++    const pad = Math.max(inset(y0), inset(y0 + rowH));
++    const cellW = (o.w - pad * 2) / COLS;
++    for (let c = 0; c < COLS; c++) {
++      const cx = pad + cellW * c;
++      const ramp = (cx + cellW / 2) * GRAD_DX + (y0 + rowH / 2) * GRAD_DY;
++      slide.addShape('rect', {
++        x: o.x + cx, y: o.y + y0, w: cellW + 0.008, h: rowH + 0.008,
++        fill: { color: mix(o.light, o.dark, (ramp - lo) / (hi - lo)) }, line: { type: 'none' },
++      });
++    }
++  }
++}
++
++/** Rounded card carrying the 290-degree gradient, with an optional border. */
++function gradientCard(slide, o) {
++  const r = (o.adj / 100000) * Math.min(o.w, o.h);
++  roundRect(slide, { ...o, fill: mix(o.light, o.dark, 0.5), line: null });
++  diagonalCells(slide, { ...o, topR: r, botR: r });
++  roundRect(slide, { ...o, fill: null, line: o.line });
++}
++
++function ellipse(slide, x, y, d, fill) {
++  slide.addShape('ellipse', {
++    x, y, w: d, h: d, fill: { color: fill }, line: { type: 'none' },
++  });
++}
++
++function freeform(slide, o) {
++  slide.addShape('custGeom', {
++    x: o.x, y: o.y, w: o.w, h: o.h, rotate: o.rotate,
++    fill: o.fill ? { color: o.fill } : undefined,
++    line: o.line ? { color: o.line, width: 1 } : { type: 'none' },
++    points: o.points,
++  });
++}
++
++/**
++ * A disc carrying a linear fade from `from` to `to`, sliced perpendicular to
++ * the fade. Each slice's outer edges are quadratic curves through the true
++ * circle, so the silhouette stays round. `axis` is 'v' for a top-to-bottom
++ * fade or 'h' for left-to-right. The source deck fades each disc out into
++ * the slide background, so the far colour is normally that background.
++ */
++function gradientDisc(slide, x, y, d, from, to, axis) {
++  const BANDS = 18;
++  const r = d / 2;
++  const chord = (t) => Math.sqrt(Math.max(r * r - (t - r) * (t - r), 0));
++  const step = d / BANDS;
++  for (let i = 0; i < BANDS; i++) {
++    const t0 = step * i;
++    const t1 = Math.min(t0 + step * 1.3, d); // slices overlap to hide seams
++    const span = t1 - t0;
++    const c0 = chord(t0);
++    const c1 = chord(t1);
++    const half = Math.max(c0, c1, chord((t0 + t1) / 2));
++    // Control offset that makes the quadratic pass through the mid chord.
++    const ctrl = 2 * chord((t0 + t1) / 2) - (c0 + c1) / 2;
++    const across = (a, b) => (axis === 'h' ? { x: b, y: a } : { x: a, y: b });
++    const curveTo = (a, b, ca, cb) => ({
++      ...across(a, b),
++      curve: axis === 'h'
++        ? { type: 'quadratic', x1: cb, y1: ca }
++        : { type: 'quadratic', x1: ca, y1: cb },
++    });
++    freeform(slide, {
++      x: x + (axis === 'h' ? t0 : r - half),
++      y: y + (axis === 'h' ? r - half : t0),
++      w: axis === 'h' ? span : half * 2,
++      h: axis === 'h' ? half * 2 : span,
++      fill: mix(from, to, i / (BANDS - 1)),
++      points: [
++        { ...across(half - c0, 0), moveTo: true },
++        across(half + c0, 0),
++        curveTo(half + c1, span, half + ctrl, span / 2),
++        across(half - c1, span),
++        curveTo(half - c0, 0, half - ctrl, span / 2),
++        { close: true },
++      ],
++    });
++  }
++}
++
++/** Decorative motif of three overlapping, fading discs. */
++function circleRun(slide, o) {
++  for (let i = 0; i < 3; i++) {
++    gradientDisc(slide, o.x + (o.dx || 0) * i, o.y + (o.dy || 0) * i, o.d,
++      o.from, o.to, o.axis);
++  }
++}
++
++/** The small dark "Learn More" call-to-action pill. */
++function learnMore(slide, x, y) {
++  gradientCard(slide, {
++    x, y, w: 1.284, h: 0.372, adj: 29082, light: G.buttonLight, dark: G.buttonDark,
++  });
++  label(slide, 'Learn More', {
++    x, y: y + 0.027, w: 1.284, h: 0.303, size: 12, color: C.cream, align: 'center',
++  });
++}
++
++/** Bulleted row: a filled disc with a tick glyph, then two lines of copy. */
++function bulletRow(slide, o) {
++  body(slide, o.text, { x: o.x + 0.321, y: o.y, w: o.w - 0.321, h: 0.626, color: o.color });
++  ellipse(slide, o.x, o.y + 0.089, 0.236, o.disc);
++  freeform(slide, {
++    x: o.x + 0.053, y: o.y + 0.158, w: 0.132, h: 0.097, fill: o.tick,
++    points: [
++      { x: 0.046, y: 0.097, moveTo: true }, { x: 0.0, y: 0.051 }, { x: 0.012, y: 0.04 },
++      { x: 0.046, y: 0.074 }, { x: 0.12, y: 0.0 }, { x: 0.132, y: 0.012 },
++      { x: 0.046, y: 0.097 }, { close: true },
++    ],
++  });
++}
++
++/** Bottom-right page caption inherited from the slide master. */
++function pageNumber(slide, n) {
++  slide.addText(
++    [
++      { text: ' ', options: { fontSize: 10.5 } },
++      { text: 'Page', options: { fontSize: 6 } },
++      { text: ' ' + n, options: { fontSize: 10.5 } },
++    ],
++    {
++      x: 12.375, y: 7.097, w: 0.826, h: 0.286, align: 'right', valign: 'top',
++      fontFace: FONT.head, color: C.cream, margin: INSET,
++    }
++  );
++}
++
++/** Rectangle whose two bottom corners are rounded (card / caption bars). */
++function bottomRoundedCard(slide, o) {
++  const r = o.r;
++  freeform(slide, {
++    x: o.x, y: o.y, w: o.w, h: o.h, fill: o.fill, line: o.line,
++    points: [
++      { x: 0, y: 0, moveTo: true }, { x: o.w, y: 0 }, { x: o.w, y: o.h - r },
++      { x: o.w - r, y: o.h, curve: { type: 'cubic', x1: o.w, y1: o.h - r * 0.45, x2: o.w - r * 0.45, y2: o.h } },
++      { x: r, y: o.h },
++      { x: 0, y: o.h - r, curve: { type: 'cubic', x1: r * 0.45, y1: o.h, x2: 0, y2: o.h - r * 0.45 } },
++      { x: 0, y: 0 }, { close: true },
++    ],
++  });
++}
++
++/** Bottom-rounded card carrying the 290-degree gradient. */
++function gradientBottomCard(slide, o) {
++  bottomRoundedCard(slide, { ...o, fill: mix(o.light, o.dark, 0.5), line: null });
++  diagonalCells(slide, { ...o, topR: 0, botR: o.r });
++  bottomRoundedCard(slide, { ...o, fill: null, line: o.line });
++}
++
++/* The lozenge ("pill") of the title / closing slides: a bar with one flat
++ * and one semicircular end, used at +-45 degrees. */
++const PILL_POINTS = [
++  { x: 0.398, y: 0.0, moveTo: true }, { x: 2.385, y: 0.0 }, { x: 2.459, y: 0.008 },
++  { x: 2.776, y: 0.398, curve: { type: 'cubic', x1: 2.64, y1: 0.045, x2: 2.776, y2: 0.206 } },
++  { x: 2.459, y: 0.788, curve: { type: 'cubic', x1: 2.776, y1: 0.59, x2: 2.64, y2: 0.751 } },
++  { x: 2.385, y: 0.796 }, { x: 0.398, y: 0.796 },
++  { x: 0.0, y: 0.398, curve: { type: 'cubic', x1: 0.178, y1: 0.796, x2: 0.0, y2: 0.618 } },
++  { x: 0.398, y: 0.0, curve: { type: 'cubic', x1: 0.0, y1: 0.178, x2: 0.178, y2: 0.0 } },
++  { close: true },
++];
++
++function pill(slide, x, y, rotate, fill) {
++  freeform(slide, { x, y, w: 2.776, h: 0.796, rotate, fill, points: PILL_POINTS });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 1 - title
++ * ------------------------------------------------------------------ */
++function slide01(pptx) {
++  const s = pptx.addSlide();
++  darkBackdrop(s);
++
++  heading(s, 'Holding Company', {
++    x: MARGIN, y: 0.403, w: 7.14, h: 3.972, size: 115, color: C.cream,
++  });
++  label(s, 'Presentation Template', {
++    x: MARGIN, y: 4.375, w: 5.228, h: 0.707, size: 36, color: C.cream,
++  });
++
++  // Interlocking lozenge motif; discs sit on top of the bars.
++  [
++    [9.087, 1.107, -45], [7.688, 1.107, -45], [7.688, 3.907, 45], [9.087, 3.907, 45],
++    [10.487, 3.907, -45], [9.087, 5.306, 45], [7.688, 5.306, -45], [10.487, 2.507, 45],
++  ].forEach(([x, y, r]) => pill(s, x, y, r, G.pillOnDark));
++
++  [
++    [9.377, 1.807], [7.977, 1.807], [7.977, 0.407], [10.777, 1.807], [7.977, 4.607],
++    [9.377, 3.207], [12.177, 3.207], [7.977, 6.006], [12.177, 6.006], [9.381, 3.207],
++    [12.177, 1.791],
++  ].forEach(([x, y]) => ellipse(s, x, y, 0.796, C.amber));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 2 - introduction
++ * ------------------------------------------------------------------ */
++function slide02(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber };
++
++  circleRun(s, { x: 11.249, y: 0.403, dy: 1.224, d: 1.718, axis: 'v', from: 'B7700B', to: C.amber });
++
++  heading(s, 'Introduction to Holding Companies', {
++    x: MARGIN, y: 0.403, w: 5.231, h: 3.433, size: 66, color: C.cocoa,
++  });
++  body(s, LOREM_LONG, { x: MARGIN, y: 3.968, w: 5.231, h: 1.313 });
++  learnMore(s, MARGIN, 6.725);
++
++  // 78,97% statistic card sits behind the wider caption card.
++  gradientCard(s, {
++    x: 10.078, y: 3.968, w: 2.163, h: 1.411, adj: 15038,
++    light: G.cardLight, dark: G.cardDark, line: C.cream,
++  });
++  heading(s, '78,97%', { x: 10.307, y: 4.201, w: 1.947, h: 0.64, size: 32, color: C.cream });
++  body(s, 'Lorem ipsum dolor.', { x: 10.307, y: 4.743, w: 1.947, h: 0.404, color: C.cream });
++
++  gradientBottomCard(s, {
++    x: 6.375, y: 5.598, w: 4.236, h: 1.5, r: 0.241,
++    light: G.barLight, dark: G.barDark, line: C.cream,
++  });
++  heading(s, 'What is a holding company?', {
++    x: 6.604, y: 5.736, w: 4.007, h: 0.909, size: 24, color: C.cream,
++  });
++  body(s, 'Lorem ipsum dolor sit amet.', {
++    x: 6.604, y: 6.555, w: 4.007, h: 0.404, color: C.cream,
++  });
++
++  pageNumber(s, 2);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 3 - types of holding companies
++ * ------------------------------------------------------------------ */
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber60 };
++
++  heading(s, 'Types of Holding Companies', {
++    x: 5.77, y: 0.403, w: 7.197, h: 2.322, size: 66, color: C.cocoa,
++  });
++
++  [
++    { x: 9.162, y: 2.977, title: 'Mixed Holding Company', text: 'Owns shares and manages operations' },
++    { x: 9.162, y: 5.209, title: 'Intermediate Holding Company', text: 'Acts between the main and subsidiary companies' },
++    { x: 5.523, y: 5.209, title: 'Immediate \nHolding Company', text: 'Subsidiary of another holding \ncompany' },
++  ].forEach((card) => {
++    roundRect(s, { x: card.x, y: card.y, w: 3.323, h: 1.873, fill: C.amber40, adj: 14796 });
++    heading(s, card.title, {
++      x: card.x + 0.229, y: card.y + 0.169, w: 3.094, h: 0.909, size: 24, color: C.cocoa,
++    });
++    body(s, card.text, { x: card.x + 0.229, y: card.y + 1.078, w: 3.094, h: 0.626 });
++  });
++
++  // Highlighted dark card, overlapping the light ones, with a building glyph.
++  gradientCard(s, {
++    x: 4.736, y: 2.863, w: 4.11, h: 2.01, adj: 14796,
++    light: G.cardLight, dark: G.cardDark, line: C.cream,
++  });
++  heading(s, 'Pure Holding Company', {
++    x: 5.752, y: 3.101, w: 3.094, h: 0.909, size: 24, color: C.cream,
++  });
++  body(s, 'Owns shares but doesn\u2019t operate \nbusinesses', {
++    x: 5.752, y: 4.01, w: 3.094, h: 0.626, color: C.cream,
++  });
++  buildingGlyph(s, 5.101, 3.101);
++
++  pageNumber(s, 3);
++}
++
++/** Office-block icon: silhouette outline plus a grid of punched windows. */
++function buildingGlyph(slide, x, y) {
++  const window = (wx, wy) => [
++    { x: wx, y: wy, moveTo: true }, { x: wx + 0.047, y: wy },
++    { x: wx + 0.047, y: wy - 0.047 }, { x: wx, y: wy - 0.047 },
++    { x: wx, y: wy }, { close: true },
++  ];
++  let pts = [
++    { x: 0.0, y: 0.446, moveTo: true }, { x: 0.0, y: 0.117 }, { x: 0.141, y: 0.117 },
++    { x: 0.141, y: 0.07 }, { x: 0.211, y: 0.0 }, { x: 0.282, y: 0.07 },
++    { x: 0.282, y: 0.211 }, { x: 0.423, y: 0.211 }, { x: 0.423, y: 0.446 },
++    { x: 0.0, y: 0.446 }, { close: true },
++  ];
++  [0.047, 0.188, 0.329].forEach((wx) => {
++    [0.399, 0.305, 0.211].forEach((wy) => { pts = pts.concat(window(wx, wy)); });
++  });
++  pts = pts.concat(window(0.188, 0.117));
++  freeform(slide, { x, y, w: 0.423, h: 0.446, fill: C.cream, points: pts });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 4 - benefits (staggered statistic bars)
++ * ------------------------------------------------------------------ */
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  darkBackdrop(s);
++
++  circleRun(s, { x: 0.338, y: 0.403, dy: 0.807, d: 1.557, axis: 'v', from: C.cocoa, to: '432A09' });
++
++  [
++    { y: 0.403, w: 2.819, pct: '29%', text: 'Asset \nprotection', fill: C.cocoa, fg: C.bark, tw: 0.953 },
++    { y: 1.578, w: 5.499, pct: '61%', text: 'Tax \nbenefits', fill: C.amber, fg: C.cocoa, tw: 0.953 },
++    { y: 2.753, w: 4.469, pct: '59%', text: 'Risk \nmanagement', fill: C.cocoa, fg: C.bark, tw: 1.254 },
++    { y: 3.928, w: 7.128, pct: '78%', text: 'Centralized \ncontrol', fill: C.cocoa, fg: C.bark, tw: 1.254 },
++  ].forEach((bar) => {
++    const x = W - bar.w; // bars are flush with the right edge
++    // round2SameRect rotated -90 deg gives a bar rounded on its left end only.
++    s.addShape('round2SameRect', {
++      x: x + bar.w / 2 - 0.506, y: bar.y + 0.506 - bar.w / 2, w: 1.012, h: bar.w,
++      rotate: -90, flipH: true, fill: { color: bar.fill }, line: { type: 'none' },
++    });
++    label(s, bar.pct, {
++      x: x + 0.34, y: bar.y + 0.152, w: 1.395, h: 0.707, size: 36, color: bar.fg,
++      face: FONT.plain,
++    });
++    body(s, bar.text, { x: x + 1.486, y: bar.y + 0.193, w: bar.tw, h: 0.626, color: bar.fg });
++  });
++
++  heading(s, 'Benefits of a Holding Company Structure', {
++    x: 1.335, y: 0.426, w: 4.818, h: 4.544, size: 66, color: C.cream,
++  });
++  body(s, LOREM_LONG, { x: 3.002, y: 5.379, w: 6.396, h: 0.889, color: C.cream });
++  learnMore(s, 3.002, 6.725);
++
++  pageNumber(s, 4);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 5 - legal structure (isometric staircase)
++ * ------------------------------------------------------------------ */
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber };
++
++  heading(s, 'Legal Structure & Formation', {
++    x: MARGIN, y: 0.403, w: 12.601, h: 1.212, size: 66, color: C.cocoa,
++  });
++
++  const STEPS = [
++    { n: '01', x: 9.953, y: 2.149, title: 'Sole Proprietorship', tx: 6.668, ty: 1.666, bx: 5.461 },
++    { n: '02', x: 8.263, y: 3.404, title: 'Partnership', tx: 4.929, ty: 3.055, bx: 3.722 },
++    { n: '03', x: 6.573, y: 4.659, title: 'Limited Liability Company', tx: 1.979, ty: 4.444, bx: 1.986, tw: 4.409 },
++    { n: '04', x: 4.883, y: 5.914, title: 'Corporation', tx: 1.573, ty: 5.833, bx: 0.366 },
++  ];
++  STEPS.forEach((st) => {
++    // Top face: a flattened hexagon seen in isometric projection.
++    freeform(s, {
++      x: st.x, y: st.y, w: 3.38, h: 1.099, fill: C.bark,
++      points: [
++        { x: 1.69, y: 0.0, moveTo: true }, { x: 3.38, y: 0.328 }, { x: 3.38, y: 1.099 },
++        { x: 1.69, y: 0.772 }, { x: 0.0, y: 1.099 }, { x: 0.0, y: 0.328 },
++        { x: 1.69, y: 0.0 }, { close: true },
++      ],
++    });
++    freeform(s, { // left side face
++      x: st.x, y: st.y + 0.332, w: 1.69, h: 1.255, fill: C.bronze,
++      points: [
++        { x: 1.69, y: 1.255, moveTo: true }, { x: 0.0, y: 0.927 }, { x: 0.0, y: 0.0 },
++        { x: 1.69, y: 0.328 }, { x: 1.69, y: 1.255 }, { close: true },
++      ],
++    });
++    freeform(s, { // right side face
++      x: st.x + 1.69, y: st.y + 0.332, w: 1.69, h: 1.255, fill: C.cocoa,
++      points: [
++        { x: 0.0, y: 1.255, moveTo: true }, { x: 1.69, y: 0.927 }, { x: 1.69, y: 0.0 },
++        { x: 0.0, y: 0.328 }, { x: 0.0, y: 1.255 }, { close: true },
++      ],
++    });
++    heading(s, st.n, {
++      x: st.x, y: st.y + 0.046, w: 3.38, h: 0.572, size: 28, color: C.cream, align: 'center',
++    });
++    heading(s, st.title, {
++      x: st.tx, y: st.ty, w: st.tw || 3.196, h: 0.505, size: 24, color: C.cocoa, align: 'right',
++    });
++    body(s, LOREM_MED, { x: st.bx, y: st.ty + 0.505, w: 4.409, h: 0.626, align: 'right' });
++  });
++
++  pageNumber(s, 5);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 6 - tax advantages (two comparison cards)
++ * ------------------------------------------------------------------ */
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber60 };
++
++  heading(s, 'Tax Advantages of Holding Companies', {
++    x: MARGIN, y: 0.373, w: 12.601, h: 2.121, size: 60, color: C.cocoa, align: 'center',
++  });
++  [10.56, 0.366].forEach((x) => {
++    circleRun(s, { x, y: 1.565, dx: 0.74, d: 0.928, axis: 'h', from: C.amber, to: C.amber60 });
++  });
++
++  [
++    { x: 0.366, name: 'Company A', pct: '23,67%', amount: '$346,67M' },
++    { x: 6.861, name: 'Company B', pct: '21,67%', amount: '$456,31M' },
++  ].forEach((card) => {
++    gradientCard(s, {
++      x: card.x, y: 2.847, w: 6.106, h: 4.25, adj: 7334,
++      light: G.cardLight, dark: G.cardDark, line: C.cream,
++    });
++    heading(s, card.name, {
++      x: card.x + 3.384, y: 3.251, w: 2.722, h: 0.572, size: 28, color: C.amber,
++    });
++    const tx = card.x + 0.509;
++    label(s, 'Tax deferral strategies', { x: tx, y: 4.177, w: 5.597, h: 0.37, size: 16, color: C.cream });
++    heading(s, card.pct, { x: tx, y: 4.585, w: 5.597, h: 0.774, size: 40, color: C.cream });
++    label(s, 'Benefits of offshore holding companies', { x: tx, y: 5.498, w: 5.597, h: 0.37, size: 16, color: C.cream });
++    heading(s, card.amount, { x: tx, y: 5.919, w: 5.597, h: 0.774, size: 40, color: C.cream });
++  });
++
++  pageNumber(s, 6);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 7 - holding company vs conglomerate
++ * ------------------------------------------------------------------ */
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber60 };
++
++  circleRun(s, { x: -0.472, y: 2.665, dy: 1.42, d: 1.783, axis: 'h', from: C.amber60, to: C.amber });
++  heading(s, 'Holding Company vs. Conglomerate', {
++    x: MARGIN, y: 0.403, w: 8.314, h: 2.121, size: 60, color: C.cocoa,
++  });
++  body(s, LOREM_LONG, { x: 8.974, y: 0.972, w: 3.993, h: 1.414 });
++
++  [
++    { x: 1.722, title: 'Holding Company' },
++    { x: 7.55, title: 'Conglomerate' },
++  ].forEach((col) => {
++    gradientBottomCard(s, {
++      x: col.x, y: 5.972, w: 5.417, h: 1.125, r: 0.324,
++      light: G.barLight, dark: G.barDark, line: C.cream,
++    });
++    heading(s, col.title, {
++      x: col.x + 0.289, y: 6.215, w: 5.127, h: 0.64, size: 32, color: C.amber60,
++    });
++  });
++
++  pageNumber(s, 7);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 8 - case study
++ * ------------------------------------------------------------------ */
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber };
++
++  roundRect(s, { x: 2.097, y: 2.134, w: 3.233, h: 3.233, fill: C.cream, adj: 10914 });
++  label(s, 'Successful Holding \nCompany', {
++    x: 2.336, y: 2.522, w: 2.755, h: 0.774, size: 20, color: C.cocoa, align: 'center',
++  });
++  heading(s, '67%', {
++    x: 2.097, y: 3.262, w: 3.233, h: 1.717, size: 96, color: C.cocoa, align: 'center',
++  });
++
++  heading(s, 'Case Study:', { x: 7.556, y: 0.802, w: 5.411, h: 1.111, size: 60, color: C.cocoa });
++  label(s, 'Successful Holding Company', {
++    x: 7.556, y: 1.886, w: 5.411, h: 0.572, size: 28, color: C.cocoa,
++  });
++  body(s, LOREM_LONG, { x: 8.278, y: 2.575, w: 4.689, h: 1.151 });
++
++  heading(s, '67%', { x: 9.402, y: 4.181, w: 3.565, h: 0.909, size: 48, color: C.cocoa });
++  label(s, 'Successful Holding Company', {
++    x: 9.402, y: 4.999, w: 3.565, h: 0.37, size: 16, color: C.cocoa,
++  });
++  s.addShape('line', { x: 9.402, y: 5.611, w: 3.19, h: 0, line: { color: C.cocoa, width: 0.75 } });
++  body(s, LOREM_MED, { x: 9.402, y: 5.809, w: 3.565, h: 0.889 });
++
++  pageNumber(s, 8);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 9 - risk heat map
++ * ------------------------------------------------------------------ */
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  darkBackdrop(s);
++
++  circleRun(s, { x: 0.366, y: 0.685, dx: 0.998, d: 1.557, axis: 'h', from: '553409', to: C.cocoa });
++  heading(s, 'Risk Management\nin Holding Companies', {
++    x: 4.194, y: 0.403, w: 8.773, h: 2.121, size: 60, color: C.cream,
++  });
++
++  // 5 x 5 matrix; rows run from the highest likelihood downwards.
++  const HEAT = [
++    [C.amber60, C.amber60, C.amber, C.amber, C.amber],
++    [C.cream, C.amber60, C.amber60, C.amber, C.amber],
++    [C.cream, C.amber60, C.amber60, C.amber, C.amber],
++    [C.cream, C.cream, C.amber60, C.amber60, C.amber],
++    [C.cream, C.cream, C.cream, C.cream, C.amber60],
++  ];
++  HEAT.forEach((row, r) => {
++    row.forEach((fill, c) => {
++      roundRect(s, {
++        x: 0.972 + c * 1.473, y: 3.091 + r * 0.7265, w: 1.205, h: 0.483,
++        fill, adj: 24830, line: '241602', lineWidth: 0.75,
++      });
++    });
++  });
++  ['Very Low', 'Low', 'Medium', 'High', 'Critical'].forEach((name, c) => {
++    body(s, name, {
++      x: 0.972 + c * 1.473, y: 2.727, w: 1.205, h: 0.363, color: C.cream, align: 'center',
++    });
++  });
++
++  label(s, 'Impact', {
++    x: 0.972, y: 6.693, w: 1.205, h: 0.404, size: 18, color: C.cream, face: FONT.head,
++  });
++  s.addShape('line', { x: 2.178, y: 6.889, w: 5.892, h: 0, line: { color: C.cream, width: 0.75 } });
++  s.addShape('line', { x: 0.568, y: 3.091, w: 0, h: 1.541, line: { color: C.cream, width: 0.75 } });
++  label(s, 'Likehood', {
++    x: -0.362, y: 5.359, w: 1.86, h: 0.404, size: 18, color: C.cream, face: FONT.head,
++    rotate: -90,
++  });
++
++  body(s, LOREM_LONG + '\n\nUt enim ad minim veniam, quis nostrud exercitation ullamco ' +
++    'laboris nisi ut aliquip ex ea commodo consequat.', {
++    x: 8.819, y: 4.095, w: 4.148, h: 2.464, color: C.cream,
++  });
++
++  pageNumber(s, 9);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 10 - ownership chart
++ * ------------------------------------------------------------------ */
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  darkBackdrop(s);
++
++  heading(s, 'How a Holding \nCompany Works', {
++    x: 3.315, y: 0.403, w: 9.652, h: 2.322, size: 66, color: C.cream, align: 'center',
++  });
++  heading(s, 'Shareholders', {
++    x: 5.475, y: 3.043, w: 5.333, h: 0.572, size: 28, color: C.cream, align: 'center',
++  });
++
++  [
++    [8.089, 3.667, 0.394], [10.193, 4.917, 0.394],
++    [6.089, 4.917, 0.394], [8.089, 4.989, 1.354],
++  ].forEach(([x, y, h]) => {
++    s.addShape('line', {
++      x, y, w: 0, h, line: { color: C.amber, width: 1.5, endArrowType: 'arrow' },
++    });
++  });
++
++  [
++    { x: 5.475, y: 4.192, w: 5.333, text: 'Holding Company' },
++    { x: 4.296, y: 5.396, w: 3.585, text: 'Subsidiary 01' },
++    { x: 8.401, y: 5.396, w: 3.585, text: 'Subsidiary 02' },
++    { x: 6.349, y: 6.471, w: 3.585, text: 'Subsidiary 03' },
++  ].forEach((node) => {
++    gradientCard(s, {
++      x: node.x, y: node.y, w: node.w, h: 0.627, adj: 26191,
++      light: G.barLight, dark: G.barDark, line: C.cream,
++    });
++    heading(s, node.text, {
++      x: node.x, y: node.y + 0.095, w: node.w, h: 0.438, size: 20, color: C.cream, align: 'center',
++    });
++  });
++
++  pageNumber(s, 10);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 11 - subsidiary radial chart
++ * ------------------------------------------------------------------ */
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber60 };
++
++  heading(s, 'Managing Subsidiary Companies', {
++    x: MARGIN, y: 0.414, w: 4.783, h: 3.13, size: 60, color: C.cocoa,
++  });
++  body(s, LOREM_LONG, { x: MARGIN, y: 5.946, w: 4.74, h: 1.151 });
++
++  s.addShape('donut', {
++    x: 5.866, y: 0.496, w: 6.507, h: 6.507,
++    fill: { color: C.amber40 }, line: { type: 'none' },
++  });
++
++  gradientCard(s, {
++    x: 8.225, y: 4.307, w: 1.755, h: 0.524, adj: 26191,
++    light: G.barLight, dark: G.barDark, line: C.cream,
++  });
++  heading(s, 'CEO/Founder', {
++    x: 8.225, y: 4.367, w: 1.701, h: 0.404, size: 18, color: C.cream, align: 'center',
++  });
++
++  // Ring captions: teams at 16 pt, staff at 12 pt, mirrored left / right.
++  [
++    ['Creative Team', 10.066, 2.963, 1.786, 16, 'left'],
++    ['Accounting Team', 10.066, 4.199, 1.997, 16, 'left'],
++    ['Production Team', 6.103, 2.963, 2.064, 16, 'right'],
++    ['Sales Team', 6.103, 4.199, 2.064, 16, 'right'],
++    ['Creative Staff', 11.619, 2.41, 1.348, 12, 'left'],
++    ['Creative Staff', 11.037, 1.078, 1.348, 12, 'left'],
++    ['Accounting Staff', 11.619, 6.043, 1.664, 12, 'left'],
++    ['Accounting Staff', 11.072, 6.797, 1.664, 12, 'left'],
++    ['Production Staff', 5.158, 2.41, 1.457, 12, 'right'],
++    ['Production Staff', 5.741, 1.078, 1.457, 12, 'right'],
++    ['Sales Staff', 5.158, 6.043, 1.457, 12, 'right'],
++    ['Sales Staff', 5.705, 6.797, 1.457, 12, 'right'],
++  ].forEach(([text, x, y, w, size, align]) => {
++    heading(s, text, { x, y, w, h: size === 16 ? 0.37 : 0.303, size, color: C.cocoa, align });
++  });
++
++  pageNumber(s, 11);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 12 - benefit cards
++ * ------------------------------------------------------------------ */
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber };
++
++  heading(s, 'Managing Subsidiary Companies', {
++    x: MARGIN, y: 0.414, w: 12.601, h: 1.111, size: 60, color: C.cocoa,
++  });
++  body(s, LOREM_LONG, { x: 1.96, y: 1.631, w: 9.414, h: 0.626, align: 'center' });
++
++  [
++    { x: 4.704, y: 2.653, title: 'Holding companies can help \nto manage risk' },
++    { x: 9.042, y: 2.653, title: 'Holding companies can \nprovide liability' },
++    { x: 0.366, y: 5.115, title: 'Holding companies can help \nto save on taxes' },
++    { x: 4.704, y: 5.115, title: 'Holding companies can \nfacilitate estate planning', dark: true },
++    { x: 9.042, y: 5.115, title: 'Holding companies can \nprovide flexibility' },
++  ].forEach((card) => {
++    const fg = card.dark ? C.cream : C.cocoa;
++    if (card.dark) {
++      gradientCard(s, {
++        x: card.x, y: card.y, w: 3.925, h: 1.971, adj: 11789,
++        light: G.cardLight, dark: G.cardDark, line: C.cream,
++      });
++    } else {
++      roundRect(s, { x: card.x, y: card.y, w: 3.925, h: 1.971, adj: 11789, fill: C.amber40 });
++    }
++    heading(s, card.title, {
++      x: card.x + 0.175, y: card.y + 0.278, w: 3.588, h: 0.707, size: 18, color: fg,
++      align: 'center',
++    });
++    body(s, LOREM_TINY, {
++      x: card.x + 0.175, y: card.y + 1.117, w: 3.588, h: 0.626, color: fg, align: 'center',
++    });
++  });
++
++  pageNumber(s, 12);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 13 - mergers & acquisitions
++ * ------------------------------------------------------------------ */
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber };
++
++  // Banner across the top: amber fading down into cocoa, bottom corners rounded.
++  const BANDS = 24;
++  for (let i = 0; i < BANDS; i++) {
++    const h = 3.918 / BANDS;
++    const fill = mix(C.amber, C.cocoa, i / (BANDS - 1));
++    if (i === BANDS - 1) {
++      bottomRoundedCard(s, { x: 0, y: h * i, w: W, h: h + 0.428, r: 0.428, fill });
++    } else {
++      s.addShape('rect', {
++        x: 0, y: h * i, w: W, h: h + 0.02, fill: { color: fill }, line: { type: 'none' },
++      });
++    }
++  }
++  heading(s, 'Holding Company and Mergers \n& Acquisitions', {
++    x: MARGIN, y: 1.629, w: 12.601, h: 2.121, size: 60, color: C.cream, align: 'center',
++  });
++
++  // Segmented percentage bar, rounded only at the far left and far right.
++  [
++    { x: 0.366, w: 4.8, pct: '43%', fill: C.bark, fg: C.cream, cap: -90 },
++    { x: 5.167, w: 2.403, pct: '19%', fill: C.bronze, fg: C.cream },
++    { x: 7.569, w: 3.167, pct: '23%', fill: C.sand, fg: C.cocoa },
++    { x: 10.736, w: 2.231, pct: '15%', fill: C.shell, fg: C.cocoa, cap: 90 },
++  ].forEach((seg, i) => {
++    if (seg.cap) {
++      s.addShape('round2SameRect', {
++        x: seg.x + seg.w / 2 - 0.447, y: 4.486 + 0.447 - seg.w / 2, w: 0.894, h: seg.w,
++        rotate: seg.cap, fill: { color: seg.fill }, line: { type: 'none' },
++      });
++    } else {
++      s.addShape('rect', {
++        x: seg.x, y: 4.486, w: seg.w, h: 0.894, fill: { color: seg.fill }, line: { type: 'none' },
++      });
++    }
++    heading(s, seg.pct, { x: seg.x + 0.3, y: 4.613, w: 1.607, h: 0.64, size: 32, color: seg.fg });
++    heading(s, 'Process 0' + (i + 1), {
++      x: seg.x + 0.3, y: 5.652, w: 1.893, h: 0.438, size: 20, color: C.cocoa,
++    });
++    body(s, LOREM_SHORT, { x: seg.x + 0.3, y: 6.203, w: 1.893, h: 0.889 });
++  });
++
++  pageNumber(s, 13);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 14 - pros and cons
++ * ------------------------------------------------------------------ */
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  darkBackdrop(s);
++
++  heading(s, 'Challenges of Operating a Holding Company', {
++    x: MARGIN, y: 0.421, w: 4.898, h: 4.14, size: 60, color: C.cream,
++  });
++  circleRun(s, { x: 0.366, y: 5.534, dx: 0.998, d: 1.557, axis: 'h', from: '392407', to: C.cocoa });
++
++  s.addShape('line', { x: 6.402, y: 3.75, w: 6.565, h: 0, line: { color: C.bronze, width: 0.75 } });
++
++  [
++    { title: 'Pros', ty: 0.516, y0: 1.352 },
++    { title: 'Cons', ty: 4.136, y0: 4.973 },
++  ].forEach((group) => {
++    heading(s, group.title, {
++      x: 8.644, y: group.ty, w: 4.323, h: 0.707, size: 36, color: C.cream,
++    });
++    for (let i = 0; i < 3; i++) {
++      bulletRow(s, {
++        x: 8.694, y: group.y0 + i * 0.7455, w: 4.087, text: LOREM_BULLET,
++        color: C.cream, disc: C.cream, tick: C.cocoa,
++      });
++    }
++  });
++
++  pageNumber(s, 14);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 15 - corporate governance
++ * ------------------------------------------------------------------ */
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber60 };
++
++  circleRun(s, { x: 9.882, y: 3.154, dx: 0.948, d: 1.19, axis: 'h', from: C.amber, to: C.amber60 });
++
++  heading(s, 'Corporate Governance & Compliance', {
++    x: 4.561, y: 1.11, w: 5.523, h: 3.13, size: 60, color: C.cocoa,
++  });
++  body(s, LOREM_LONG, { x: 4.566, y: 4.633, w: 2.42, h: 2.464 });
++
++  for (let i = 0; i < 3; i++) {
++    bulletRow(s, {
++      x: 7.778, y: 4.633 + i * 0.9164, w: 5.189, text: LOREM_BULLET,
++      color: C.cocoa, disc: C.cocoa, tick: C.amber60,
++    });
++  }
++
++  pageNumber(s, 15);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 16 - financial performance list
++ * ------------------------------------------------------------------ */
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  darkBackdrop(s);
++
++  heading(s, 'Financial Performance & Reporting', {
++    x: -1.113, y: 1.882, w: 6.694, h: 3.736, size: 72, color: C.amber60, rotate: -90,
++  });
++
++  // Amber panel with rounded top corners, filling the right two thirds.
++  s.addShape('round2SameRect', {
++    x: 4.542, y: 0.403, w: 8.425, h: 7.097,
++    fill: { color: C.amber }, line: { type: 'none' },
++  });
++  heading(s, 'Performance & Reporting', {
++    x: 6.892, y: 1.183, w: 3.307, h: 1.178, size: 32, color: C.cocoa,
++  });
++
++  [
++    ['Lorem ipsum dolor sit amet', '$345'],
++    ['Consectetur adipiscing elit', '$546'],
++    ['Sed do eiusmod tempor', '$124'],
++    ['Incididunt ut labore et dolore', '$78'],
++    ['Magna aliqua. Ut enim ad', '$756'],
++  ].forEach(([name, amount], i) => {
++    const y = 3.245 + i * 0.7225;
++    body(s, name, { x: 5.389, y, w: 2.667, h: 0.407, size: 14 });
++    s.addText(amount, {
++      x: 11.125, y, w: 1.053, h: 0.407, fontFace: FONT.head, fontSize: 14, color: C.cocoa,
++      align: 'right', valign: 'top', margin: INSET, lineSpacingMultiple: 1.3,
++    });
++    if (i < 4) {
++      s.addShape('line', {
++        x: 5.331, y: y + 0.505, w: 6.847, h: 0, line: { color: C.bronze, width: 0.75 },
++      });
++    }
++  });
++
++  pageNumber(s, 16);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 17 - future trends (four-petal fan)
++ * ------------------------------------------------------------------ */
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber };
++
++  heading(s, 'Future Trends in Holding Companies', {
++    x: MARGIN, y: 0.403, w: 12.6, h: 2.121, size: 60, color: C.cocoa, align: 'center',
++  });
++
++  freeform(s, { // outer-left petal
++    x: 3.289, y: 5.38, w: 1.804, h: 2.12, fill: C.cream,
++    points: [
++      { x: 0.657, y: 0.101, moveTo: true },
++      { x: 0.001, y: 1.852, curve: { type: 'cubic', x1: 0.278, y1: 0.611, x2: 0.05, y2: 1.218 } },
++      { x: 0.233, y: 2.119, curve: { type: 'cubic', x1: -0.009, y1: 1.99, x2: 0.095, y2: 2.109 } },
++      { x: 0.251, y: 2.12 }, { x: 1.203, y: 2.12 },
++      { x: 1.451, y: 1.9, curve: { type: 'cubic', x1: 1.329, y1: 2.12, x2: 1.436, y2: 2.026 } },
++      { x: 1.763, y: 1.046, curve: { type: 'cubic', x1: 1.486, y1: 1.594, x2: 1.592, y2: 1.302 } },
++      { x: 1.726, y: 0.728, curve: { type: 'cubic', x1: 1.829, y1: 0.945, x2: 1.814, y2: 0.811 } },
++      { x: 1.032, y: 0.068 },
++      { x: 0.657, y: 0.101, curve: { type: 'cubic', x1: 0.932, y1: -0.027, x2: 0.7, y2: 0.0 } },
++      { close: true },
++    ],
++  });
++  freeform(s, { // inner-left petal
++    x: 4.422, y: 4.135, w: 2.113, h: 1.854, fill: C.amber40,
++    points: [
++      { x: 1.092, y: 1.804, moveTo: true },
++      { x: 1.909, y: 1.454, curve: { type: 'cubic', x1: 1.333, y1: 1.626, x2: 1.613, y2: 1.506 } },
++      { x: 2.113, y: 1.207, curve: { type: 'cubic', x1: 2.028, y1: 1.432, x2: 2.113, y2: 1.328 } },
++      { x: 2.113, y: 0.25 },
++      { x: 1.859, y: 0.0, curve: { type: 'cubic', x1: 2.112, y1: 0.111, x2: 1.999, y2: 0.0 } },
++      { x: 0.092, y: 0.747, curve: { type: 'cubic', x1: 1.191, y1: 0.079, x2: 0.588, y2: 0.338 } },
++      { x: 0.056, y: 1.101, curve: { type: 'cubic', x1: -0.015, y1: 0.835, x2: -0.031, y2: 0.993 } },
++      { x: 0.078, y: 1.124 }, { x: 0.771, y: 1.783 },
++      { x: 1.092, y: 1.804, curve: { type: 'cubic', x1: 0.859, y1: 1.867, x2: 0.994, y2: 1.876 } },
++      { close: true },
++    ],
++  });
++  freeform(s, { // inner-right petal
++    x: 6.797, y: 4.135, w: 2.111, h: 1.853, fill: C.bronze,
++    points: [
++      { x: 0.0, y: 0.25, moveTo: true }, { x: 0.0, y: 1.208 },
++      { x: 0.204, y: 1.454, curve: { type: 'cubic', x1: 0.0, y1: 1.328, x2: 0.085, y2: 1.432 } },
++      { x: 1.021, y: 1.805, curve: { type: 'cubic', x1: 0.5, y1: 1.506, x2: 0.78, y2: 1.626 } },
++      { x: 1.342, y: 1.783, curve: { type: 'cubic', x1: 1.119, y1: 1.876, x2: 1.254, y2: 1.867 } },
++      { x: 2.034, y: 1.124 },
++      { x: 2.042, y: 0.768, curve: { type: 'cubic', x1: 2.134, y1: 1.028, x2: 2.111, y2: 0.869 } },
++      { x: 2.019, y: 0.747 },
++      { x: 0.282, y: 0.001, curve: { type: 'cubic', x1: 1.523, y1: 0.338, x2: 0.921, y2: 0.079 } },
++      { x: 0.0, y: 0.25, curve: { type: 'cubic', x1: 0.144, y1: -0.016, x2: 0.019, y2: 0.082 } },
++      { close: true },
++    ],
++  });
++  freeform(s, { // outer-right petal
++    x: 8.241, y: 5.379, w: 1.804, h: 2.121, fill: C.bark,
++    points: [
++      { x: 0.771, y: 0.069, moveTo: true }, { x: 0.078, y: 0.728 },
++      { x: 0.041, y: 1.046, curve: { type: 'cubic', x1: -0.01, y1: 0.811, x2: -0.026, y2: 0.945 } },
++      { x: 0.353, y: 1.9, curve: { type: 'cubic', x1: 0.212, y1: 1.302, x2: 0.319, y2: 1.595 } },
++      { x: 0.602, y: 2.12, curve: { type: 'cubic', x1: 0.368, y1: 2.026, x2: 0.475, y2: 2.12 } },
++      { x: 1.553, y: 2.12 },
++      { x: 1.804, y: 1.87, curve: { type: 'cubic', x1: 1.691, y1: 2.12, x2: 1.804, y2: 2.008 } },
++      { x: 1.147, y: 0.101, curve: { type: 'cubic', x1: 1.804, y1: 1.5, x2: 1.527, y2: 0.611 } },
++      { x: 0.771, y: 0.069, curve: { type: 'cubic', x1: 1.065, y1: -0.01, x2: 0.9, y2: 0.0 } },
++      { close: true },
++    ],
++  });
++
++  [
++    ['01', 3.547, 6.188, C.cocoa], ['02', 4.94, 4.607, C.cocoa],
++    ['03', 7.051, 4.607, C.amber60], ['04', 8.5, 6.188, C.amber60],
++  ].forEach(([n, x, y, color]) => {
++    heading(s, n, { x, y, w: 1.286, h: 0.909, size: 48, color, align: 'center' });
++  });
++
++  [
++    ['Future Trends 01', 0.366, 5.497, 'right'],
++    ['Future Trends 02', 2.195, 2.985, 'right'],
++    ['Future Trends 03', 8.478, 2.985, 'left'],
++    ['Future Trends 04', 10.307, 5.497, 'left'],
++  ].forEach(([text, x, y, align]) => {
++    heading(s, text, { x, y, w: 2.66, h: 0.438, size: 20, color: C.cocoa, align });
++    body(s, LOREM_MED, { x, y: y + 0.437, w: 2.66, h: 1.151, align });
++  });
++
++  pageNumber(s, 17);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 18 - winding road roadmap
++ * ------------------------------------------------------------------ */
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber60 };
++
++  heading(s, 'Steps to Establish a Holding Company', {
++    x: MARGIN, y: 0.403, w: 12.6, h: 0.909, size: 48, color: C.cocoa, align: 'center',
++  });
++
++  // Landscape behind the road: two dark blocks, then three shaped hills.
++  s.addShape('rect', {
++    x: 10.549, y: 3.735, w: 2.088, h: 2.974, fill: { color: C.cocoa }, line: { type: 'none' },
++  });
++  s.addShape('rect', {
++    x: 3.826, y: 5.003, w: 2.258, h: 1.706, fill: { color: C.cocoa }, line: { type: 'none' },
++  });
++  freeform(s, {
++    x: -0.02, y: 5.965, w: 6.436, h: 1.781, fill: C.bronze,
++    points: [
++      { x: 0.0, y: 1.781, moveTo: true }, { x: 2.605, y: 1.781 },
++      { x: 5.433, y: 1.021, curve: { type: 'cubic', x1: 2.605, y1: 1.781, x2: 4.884, y2: 0.953 } },
++      { x: 6.436, y: 1.358, curve: { type: 'cubic', x1: 5.982, y1: 1.088, x2: 6.436, y2: 1.358 } },
++      { x: 6.435, y: 0.0 }, { x: 0.0, y: 0.0 }, { x: 0.0, y: 1.781 }, { close: true },
++    ],
++  });
++  freeform(s, {
++    x: 4.113, y: 4.256, w: 8.061, h: 3.49, fill: C.bark,
++    points: [
++      { x: 1.09, y: 0.002, moveTo: true },
++      { x: 1.894, y: 0.101, curve: { type: 'cubic', x1: 1.317, y1: -0.007, x2: 1.583, y2: 0.021 } },
++      { x: 5.806, y: 1.532, curve: { type: 'cubic', x1: 3.134, y1: 0.418, x2: 5.096, y2: 1.38 } },
++      { x: 8.061, y: 1.195, curve: { type: 'cubic', x1: 6.516, y1: 1.684, x2: 7.744, y2: 1.91 } },
++      { x: 8.061, y: 3.49 }, { x: 2.302, y: 3.49 }, { x: 2.302, y: 2.131 },
++      { x: 1.185, y: 1.316, curve: { type: 'cubic', x1: 2.302, y1: 2.131, x2: 1.464, y2: 1.456 } },
++      { x: 0.007, y: 0.722, curve: { type: 'cubic', x1: 0.906, y1: 1.177, x2: -0.094, y2: 1.166 } },
++      { x: 1.09, y: 0.002, curve: { type: 'cubic', x1: 0.083, y1: 0.389, x2: 0.408, y2: 0.028 } },
++      { close: true },
++    ],
++  });
++  freeform(s, {
++    x: 10.934, y: 3.167, w: 2.455, h: 4.578, fill: C.bronze,
++    points: [
++      { x: 1.331, y: 0.001, moveTo: true },
++      { x: 2.455, y: 0.392, curve: { type: 'cubic', x1: 1.804, y1: -0.012, x2: 2.266, y2: 0.094 } },
++      { x: 2.455, y: 4.578 }, { x: 1.24, y: 4.578 }, { x: 1.24, y: 2.284 },
++      { x: 0.012, y: 0.48, curve: { type: 'cubic', x1: 1.24, y1: 2.284, x2: -0.141, y2: 0.924 } },
++      { x: 1.331, y: 0.001, curve: { type: 'cubic', x1: 0.097, y1: 0.23, x2: 0.723, y2: 0.018 } },
++      { close: true },
++    ],
++  });
++  freeform(s, { // the cream ribbon of road
++    x: -0.159, y: 2.861, w: 13.687, h: 4.236, fill: C.cream,
++    points: [
++      { x: 5.461, y: 4.235, moveTo: true },
++      { x: 5.181, y: 4.224, curve: { type: 'cubic', x1: 5.372, y1: 4.235, x2: 5.279, y2: 4.232 } },
++      { x: 3.064, y: 3.715, curve: { type: 'cubic', x1: 4.573, y1: 4.18, x2: 3.841, y2: 4.004 } },
++      { x: 3.057, y: 3.712 },
++      { x: 0.14, y: 3.383, curve: { type: 'cubic', x1: 1.465, y1: 3.075, x2: 0.153, y2: 3.38 } },
++      { x: 0.0, y: 2.811 },
++      { x: 3.273, y: 3.164, curve: { type: 'cubic', x1: 0.06, y1: 2.796, x2: 1.497, y2: 2.455 } },
++      { x: 5.201, y: 3.634, curve: { type: 'cubic', x1: 3.976, y1: 3.425, x2: 4.661, y2: 3.592 } },
++      { x: 5.986, y: 3.549, curve: { type: 'cubic', x1: 5.716, y1: 3.675, x2: 5.935, y2: 3.592 } },
++      { x: 5.876, y: 3.369, curve: { type: 'cubic', x1: 5.981, y1: 3.527, x2: 5.96, y2: 3.468 } },
++      { x: 5.116, y: 3.022, curve: { type: 'cubic', x1: 5.716, y1: 3.24, x2: 5.411, y2: 3.13 } },
++      { x: 4.001, y: 2.249, curve: { type: 'cubic', x1: 4.595, y1: 2.834, x2: 4.104, y2: 2.656 } },
++      { x: 4.23, y: 1.568, curve: { type: 'cubic', x1: 3.946, y1: 2.028, x2: 4.023, y2: 1.799 } },
++      { x: 4.241, y: 1.556 }, { x: 4.253, y: 1.545 },
++      { x: 6.912, y: 1.411, curve: { type: 'cubic', x1: 4.75, y1: 1.101, x2: 5.645, y2: 1.056 } },
++      { x: 8.587, y: 2.033, curve: { type: 'cubic', x1: 7.485, y1: 1.575, x2: 8.045, y2: 1.783 } },
++      { x: 8.604, y: 2.042 },
++      { x: 9.927, y: 2.627, curve: { type: 'cubic', x1: 9.029, y1: 2.271, x2: 9.471, y2: 2.467 } },
++      { x: 11.657, y: 2.698, curve: { type: 'cubic', x1: 10.77, y1: 2.915, x2: 11.385, y2: 2.941 } },
++      { x: 11.746, y: 2.556, curve: { type: 'cubic', x1: 11.742, y1: 2.625, x2: 11.744, y2: 2.575 } },
++      { x: 11.267, y: 1.833, curve: { type: 'cubic', x1: 11.756, y1: 2.377, x2: 11.485, y2: 2.075 } },
++      { x: 10.721, y: 0.752, curve: { type: 'cubic', x1: 10.945, y1: 1.475, x2: 10.64, y2: 1.136 } },
++      { x: 11.2, y: 0.244, curve: { type: 'cubic', x1: 10.767, y1: 0.537, x2: 10.928, y2: 0.366 } },
++      { x: 11.206, y: 0.242 },
++      { x: 13.687, y: 0.126, curve: { type: 'cubic', x1: 11.251, y1: 0.223, x2: 12.31, y2: -0.21 } },
++      { x: 13.547, y: 0.698 },
++      { x: 11.436, y: 0.784, curve: { type: 'cubic', x1: 12.398, y1: 0.418, x2: 11.492, y2: 0.762 } },
++      { x: 11.298, y: 0.876, curve: { type: 'cubic', x1: 11.33, y1: 0.832, x2: 11.302, y2: 0.868 } },
++      { x: 11.382, y: 1.053, curve: { type: 'cubic', x1: 11.298, y1: 0.886, x2: 11.303, y2: 0.936 } },
++      { x: 11.705, y: 1.439, curve: { type: 'cubic', x1: 11.462, y1: 1.17, x2: 11.58, y2: 1.301 } },
++      { x: 12.333, y: 2.589, curve: { type: 'cubic', x1: 12.026, y1: 1.796, x2: 12.357, y2: 2.165 } },
++      { x: 12.047, y: 3.139, curve: { type: 'cubic', x1: 12.321, y1: 2.797, x2: 12.225, y2: 2.982 } },
++      { x: 9.728, y: 3.182, curve: { type: 'cubic', x1: 11.594, y1: 3.54, x2: 10.814, y2: 3.555 } },
++      { x: 8.325, y: 2.561, curve: { type: 'cubic', x1: 9.245, y1: 3.012, x2: 8.775, y2: 2.805 } },
++      { x: 6.745, y: 1.976, curve: { type: 'cubic', x1: 8.244, y1: 2.523, x2: 7.542, y2: 2.199 } },
++      { x: 4.657, y: 1.974, curve: { type: 'cubic', x1: 5.731, y1: 1.692, x2: 4.99, y2: 1.692 } },
++      { x: 4.573, y: 2.106, curve: { type: 'cubic', x1: 4.589, y1: 2.052, x2: 4.576, y2: 2.095 } },
++      { x: 5.316, y: 2.469, curve: { type: 'cubic', x1: 4.618, y1: 2.17, x2: 4.919, y2: 2.324 } },
++      { x: 6.277, y: 2.937, curve: { type: 'cubic', x1: 5.671, y1: 2.597, x2: 6.038, y2: 2.73 } },
++      { x: 6.292, y: 2.95 }, { x: 6.305, y: 2.965 },
++      { x: 6.479, y: 3.877, curve: { type: 'cubic', x1: 6.696, y1: 3.411, x2: 6.581, y2: 3.728 } },
++      { x: 5.461, y: 4.235, curve: { type: 'cubic', x1: 6.314, y1: 4.115, x2: 5.972, y2: 4.235 } },
++      { close: true },
++    ],
++  });
++
++  // Numbered markers on vertical stems.
++  [
++    { n: '01', x: 0.366, y: 3.905, stem: 1.393, text: 'Planning', lx: 1.268, ly: 4.073, lh: 0.438 },
++    { n: '02', x: 3.676, y: 2.625, stem: 1.735, text: 'Funding', lx: 4.592, ly: 2.797, lh: 0.438 },
++    { n: '03', x: 6.985, y: 3.135, stem: 1.146, text: 'Legal setup', lx: 7.849, ly: 3.34, lh: 0.438 },
++    { n: '04', x: 10.295, y: 1.846, stem: 1.182, text: 'Operational \nexecution', lx: 11.278, ly: 1.799, lh: 0.774 },
++  ].forEach((m) => {
++    s.addShape('line', {
++      x: m.x + 0.386, y: m.y + 0.576, w: 0, h: m.stem, line: { color: C.cocoa, width: 1.5 },
++    });
++    ellipse(s, m.x, m.y, 0.771, C.cocoa);
++    heading(s, m.n, {
++      x: m.x, y: m.y + 0.092, w: 0.771, h: 0.572, size: 28, color: C.amber60, align: 'center',
++    });
++    heading(s, m.text, { x: m.lx, y: m.ly, w: 1.689, h: m.lh, size: 20, color: C.cocoa });
++  });
++
++  pageNumber(s, 18);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 19 - problem / solution
++ * ------------------------------------------------------------------ */
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.cocoa };
++
++  heading(s, 'Holding Company Failure & Lessons Learned', {
++    x: MARGIN, y: 0.403, w: 3.812, h: 5.15, size: 60, color: C.amber60,
++  });
++  body(s, LOREM_LONG, { x: MARGIN, y: 5.684, w: 3.812, h: 1.414, color: C.cream });
++
++  [
++    { x: 4.874, tx: 5.119, title: 'Problem.' },
++    { x: 9.155, tx: 9.4, title: 'Solution.' },
++  ].forEach((card) => {
++    roundRect(s, { x: card.x, y: 0.403, w: 3.812, h: 6.694, fill: C.amber, adj: 7825 });
++    heading(s, card.title, { x: card.tx, y: 4.31, w: 3.322, h: 0.64, size: 32, color: C.cocoa });
++  });
++
++  body(s, LOREM_LONG, { x: 5.119, y: 5.093, w: 3.322, h: 1.676 });
++  for (let i = 0; i < 2; i++) {
++    bulletRow(s, {
++      x: 9.51, y: 5.093 + i * 0.696, w: 3.151, text: LOREM_SHORT,
++      color: C.cocoa, disc: C.cocoa, tick: C.amber,
++    });
++  }
++
++  pageNumber(s, 19);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 20 - thank you
++ * ------------------------------------------------------------------ */
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  s.background = { color: C.amber60 };
++
++  heading(s, 'Thank You!', {
++    x: MARGIN, y: 0.403, w: 12.601, h: 2.423, size: 138, color: C.cocoa,
++  });
++
++  [
++    [4.888, 5.306, -45], [3.488, 5.306, -45], [7.688, 3.907, 45], [9.087, 3.907, 45],
++    [10.487, 3.907, -45], [9.087, 5.306, 45], [7.688, 5.306, -45],
++  ].forEach(([x, y, r]) => pill(s, x, y, r, G.pillOnLight));
++
++  [
++    [6.578, 4.607], [3.778, 6.006], [3.778, 4.607], [7.977, 4.607], [9.377, 3.207],
++    [12.177, 3.207], [7.977, 6.006], [12.177, 6.006], [9.381, 3.207], [6.578, 6.006],
++  ].forEach(([x, y]) => ellipse(s, x, y, 0.796, C.amber));
++}
++
++/* ------------------------------------------------------------------ *
++ * Build and save
++ * ------------------------------------------------------------------ */
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'W16x9', width: W, height: H });
++  pptx.layout = 'W16x9';
++  pptx.title = 'Holding Company';
++  pptx.theme = { headFontFace: FONT.head, bodyFontFace: FONT.body };
++
++  [
++    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++    slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++  ].forEach((buildSlide) => buildSlide(pptx));
++
++  return pptx.writeFile({
++    fileName: path.join(__dirname, '166dbede-1e29-4c84-b499-62b18ab9fff9_grok_final.pptx'),
++  });
++}
++
++build()
++  .then((file) => console.log('wrote', file))
++  .catch((err) => {
++    console.error(err);
++    process.exit(1);
++  });

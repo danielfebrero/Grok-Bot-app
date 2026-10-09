@@ -1,0 +1,832 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/podcast_pitch_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/podcast_pitch_presentation.js
+@@ -0,0 +1,829 @@
++/**
++ * STAGETALK — Podcast Presentation.
++ * 30 slides, 13.333in x 7.5in (16:9). Rebuilt with pptxgenjs only.
++ *
++ * The reference template's photo frames are empty picture placeholders, so
++ * they contribute no artwork; the three real raster mockups it does ship
++ * (tablet / laptop / smart-watch) are redrawn from native shapes by the
++ * `*Mock` helpers, and `ph()` is available for any flat image stand-in.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------- palette --- */
++const RED = 'EF2525';       // theme accent1
++const RED_DK = 'B4141C';    // theme accent2 - gradient start
++const RED_SH = 'C10E0E';    // accent1 @ lumMod 75% - headline colour
++const NAVY = '030022';      // theme dk2 - dark slide background
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const GREY_LT = 'F2F2F2';
++const GREY = 'D9D9D9';
++const GREY_MD = 'D8D9DC';   // theme lt2
++const GREY_TX = '808080';
++const PINK = 'FCD3D3';      // pale play-button disc
++const PINK_MD = 'F57C7C';   // icon tiles on the red panel
++const GOLD = 'FFC000';
++
++const HEAD = 'Anton';       // theme major font
++const BODY = 'Montserrat';  // theme minor font
++
++// pptxgenjs rewrites shadow objects in place, so hand each shape its own copy
++const shadow = () => ({ type: 'outer', color: BLACK, opacity: 0.1, blur: 12, offset: 3, angle: 90 });
++const CHECK = { characterCode: '2713', indent: 13.5 };   // Wingdings tick in the original
++
++/* ------------------------------------------------------- shared strings --- */
++const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit';
++const WELCOME = 'Welcome to Stagetalk, your ultimate template for presenting podcasts in style. ';
++const WHETHER = 'Whether you are promoting your own show or pitching a concept, this presentation is ' +
++  'designed to highlight the power of your voice and the impact of your message.';
++const WHETHER_DIVE = 'Whether you are promoting your own show or pitching a concept, this presentation ' +
++  'is designed to highlight the power of your voice and the impact of your message. Dive into the ' +
++  'world of podcasts with confidence using Stagetalk';
++const GALLERY = 'A visual collection of memorable moments from past podcast episodes. Showcase images ' +
++  'of guests, studio setups, or featured audio clips, capturing the essence of your show\u2019s content';
++const AUDIENCE = 'Understanding your audience helps in refining your content, driving loyalty, and ' +
++  'growing your listener base.';
++const INDUSTRY = 'podcasts have grown exponentially, becoming a mainstream form of entertainment and ' +
++  'education. ';
++const TEAMTXT = 'Podcasts have become one of the most engaging mediums for storytelling, interviews, ' +
++  'and knowledge-sharing. ';
++
++/* ---------------------------------------------------------- primitives --- */
++function mix(a, b, t) {
++  const ch = (h, i) => parseInt(h.substr(i * 2, 2), 16);
++  const v = i => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, '0');
++  return (v(0) + v(1) + v(2)).toUpperCase();
++}
++
++function rect(s, x, y, w, h, fill, opt) {
++  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color: fill }, line: { type: 'none' } }, opt || {}));
++}
++
++/** red gradient B4141C -> EF2525 (dark at top / left) built from thin bands */
++function grad(s, x, y, w, h, opt) {
++  const o = opt || {};
++  const n = o.bands || 16;
++  for (let i = 0; i < n; i++) {
++    const col = mix(RED_DK, RED, i / (n - 1));
++    if (o.horiz) rect(s, x + w * i / n, y, w / n + 0.015, h, col);
++    else rect(s, x, y + h * i / n, w, h / n + 0.015, col);
++  }
++}
++
++/** right-angled triangle; `corner` names the square corner: tl / tr / bl / br */
++function rtri(s, x, y, w, h, color, corner) {
++  const c = { tl: [[0, 0], [1, 0], [0, 1]], tr: [[0, 0], [1, 0], [1, 1]],
++              bl: [[0, 0], [0, 1], [1, 1]], br: [[1, 0], [1, 1], [0, 1]] }[corner];
++  s.addShape('custGeom', { x, y, w, h, fill: { color }, line: { type: 'none' },
++    points: c.map(p => ({ x: p[0] * w, y: p[1] * h })).concat([{ close: true }]) });
++}
++
++/** gradient version of the `bl` wedge, sliced into horizontal trapezoids */
++function wedge(s, x, y, w, h) {
++  const n = 10;
++  for (let i = 0; i < n; i++) {
++    const y0 = h * i / n, y1 = h * (i + 1) / n + 0.004;
++    s.addShape('custGeom', { x, y, w, h, fill: { color: mix(RED_DK, RED, i / (n - 1)) },
++      line: { type: 'none' },
++      points: [{ x: 0, y: y0 }, { x: w * y0 / h, y: y0 }, { x: w * y1 / h, y: y1 }, { x: 0, y: y1 },
++               { close: true }] });
++  }
++}
++
++/** flat stand-in for a raster image, labelled so it reads as a placeholder */
++function ph(s, x, y, w, h, color, opt) {
++  const o = opt || {};
++  s.addShape(o.shape || 'rect', { x, y, w, h, fill: { color }, line: { type: 'none' },
++    rectRadius: o.rectRadius });
++  if (o.label) {
++    s.addText('[image]', { x, y: y + h / 2 - 0.16, w, h: 0.32, align: 'center', valign: 'middle',
++      fontFace: BODY, fontSize: 9, color: o.labelColor || '9AA0A6' });
++  }
++}
++
++/** text box (defaults match the deck's Montserrat 11pt body copy) */
++function tx(s, t, o) {
++  s.addText(t, Object.assign({ fontFace: BODY, fontSize: 11, color: BLACK, valign: 'top' }, o));
++}
++
++/** Anton display headline; the original paints these with a red gradient fill */
++function head(s, t, o) {
++  tx(s, t, Object.assign({ fontFace: HEAD, fontSize: 54, color: RED_SH }, o));
++}
++
++/** justified 11pt paragraph at 150% leading - the deck's standard body block */
++function para(s, t, x, y, w, h, o) {
++  tx(s, t, Object.assign({ x, y, w, h, align: 'justify', lineSpacingMultiple: 1.5 }, o || {}));
++}
++
++/** hairline red outline triangle doodle */
++function tri(s, x, y, w, h, rot) {
++  s.addShape('triangle', { x, y, w, h, rotate: rot, fill: { type: 'none' }, line: { color: RED, width: 1 } });
++}
++
++/* --------------------------------------------------------------- icons --- */
++/** microphone glyph inside a d x d box */
++function micGlyph(s, x, y, d, color) {
++  const part = (fx, fy, fw, fh, shape, r) => s.addShape(shape || 'rect', {
++    x: x + fx * d, y: y + fy * d, w: fw * d, h: fh * d, fill: { color }, line: { type: 'none' },
++    rectRadius: r ? r * d : undefined });
++  part(0.295, 0.03, 0.41, 0.55, 'roundRect', 0.205);                    // capsule
++  s.addShape('blockArc', { x: x + 0.10 * d, y: y + 0.17 * d, w: 0.80 * d, h: 0.72 * d,
++    fill: { color }, line: { type: 'none' }, angleRange: [0, 180], arcThicknessRatio: 0.20 });
++  part(0.455, 0.72, 0.09, 0.16);                                        // stem
++  part(0.29, 0.865, 0.42, 0.085, 'roundRect', 0.04);                    // foot
++}
++
++/** briefcase glyph */
++function bagGlyph(s, x, y, d, color) {
++  s.addShape('roundRect', { x: x + 0.06 * d, y: y + 0.28 * d, w: 0.88 * d, h: 0.52 * d,
++    fill: { type: 'none' }, line: { color, width: 2.2 }, rectRadius: 0.1 * d });
++  s.addShape('roundRect', { x: x + 0.32 * d, y: y + 0.13 * d, w: 0.36 * d, h: 0.2 * d,
++    fill: { type: 'none' }, line: { color, width: 2.2 }, rectRadius: 0.05 * d });
++  s.addShape('rect', { x: x + 0.40 * d, y: y + 0.47 * d, w: 0.20 * d, h: 0.16 * d,
++    fill: { type: 'none' }, line: { color, width: 2 } });
++}
++
++/** audio waveform glyph - five rounded bars */
++function waveGlyph(s, x, y, d, color) {
++  [0.42, 0.72, 1.0, 0.66, 0.36].forEach((f, i) => s.addShape('roundRect', {
++    x: x + (0.10 + i * 0.20) * d, y: y + (0.5 - f / 2) * d, w: 0.07 * d, h: f * d,
++    fill: { color }, line: { type: 'none' }, rectRadius: 0.035 * d }));
++}
++
++/** megaphone glyph */
++function hornGlyph(s, x, y, d, color) {
++  s.addShape('ellipse', { x: x + 0.62 * d, y: y + 0.16 * d, w: 0.28 * d, h: 0.68 * d,
++    fill: { type: 'none' }, line: { color, width: 2.2 } });
++  s.addShape('ellipse', { x: x + 0.06 * d, y: y + 0.33 * d, w: 0.20 * d, h: 0.34 * d,
++    fill: { type: 'none' }, line: { color, width: 2.2 } });
++  rect(s, x + 0.16 * d, y + 0.325 * d, 0.62 * d, 0.03 * d, color);
++  rect(s, x + 0.16 * d, y + 0.645 * d, 0.62 * d, 0.03 * d, color);
++}
++
++/** circular red mic badge with two side dots - the deck's logo mark */
++function micBadge(s, x, y, d, dotColor) {
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: RED }, line: { type: 'none' } });
++  micGlyph(s, x + 0.178 * d, y + 0.185 * d, 0.645 * d, WHITE);
++  [0.104, 0.823].forEach(f => s.addShape('ellipse', { x: x + f * d, y: y + 0.471 * d,
++    w: 0.074 * d, h: 0.074 * d, fill: { color: dotColor || WHITE }, line: { type: 'none' } }));
++}
++
++/** rounded-square badge holding one glyph */
++function iconTile(s, x, y, d, fill, glyph) {
++  s.addShape('roundRect', { x, y, w: d, h: d, fill: { color: fill }, line: { type: 'none' },
++    rectRadius: d * 0.21 });
++  glyph(s, x + 0.19 * d, y + 0.19 * d, 0.62 * d, WHITE);
++}
++
++/** pale disc + red play triangle */
++function playBtn(s, x, y, d, opt) {
++  const o = opt || {};
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: o.disc || PINK }, line: { type: 'none' } });
++  s.addShape('triangle', { x: x + 0.315 * d, y: y + 0.325 * d, w: 0.444 * d, h: 0.382 * d,
++    rotate: 90, fill: { color: o.arrow || RED }, line: { type: 'none' } });
++}
++
++/** five review stars - `lit` of them gold, the rest `rest` */
++function stars(s, x, y, w, h, lit, rest) {
++  for (let i = 0; i < 5; i++) {
++    s.addShape('star5', { x: x + i * 0.369, y, w, h, fill: { color: i < lit ? GOLD : rest },
++      line: { type: 'none' } });
++  }
++}
++
++/** pill progress bar */
++function bar(s, x, y, w, h, frac, opt) {
++  const o = opt || {};
++  const fw = w * frac;
++  s.addShape('roundRect', { x, y, w, h, fill: { color: o.track || GREY_LT }, line: { type: 'none' },
++    rectRadius: h / 2 });
++  if (o.grad) {
++    const n = 12;
++    for (let i = 0; i < n; i++) {
++      rect(s, x + h / 2 + (fw - h) * i / n, y, (fw - h) / n + 0.02, h, mix(RED_DK, RED, i / (n - 1)));
++    }
++    s.addShape('roundRect', { x, y, w: h, h, fill: { color: RED_DK }, line: { type: 'none' }, rectRadius: h / 2 });
++    s.addShape('roundRect', { x: x + fw - h, y, w: h, h, fill: { color: RED }, line: { type: 'none' }, rectRadius: h / 2 });
++  } else {
++    s.addShape('roundRect', { x, y, w: fw, h, fill: { color: o.fill || RED }, line: { type: 'none' },
++      rectRadius: h / 2 });
++  }
++}
++
++/** small "growth" arrow drawn as three strokes */
++function arrowUpRight(s, x, y, d) {
++  s.addShape('custGeom', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: BLACK, width: 3 },
++    points: [{ x: 0, y: d }, { x: d, y: 0 }, { x: 0.1 * d, y: 0, moveTo: true }, { x: d, y: 0 },
++             { x: d, y: 0, moveTo: true }, { x: d, y: 0.9 * d }] });
++}
++
++/* -------------------------------------------------- repeated components --- */
++/** numbered list entry: Anton number, bold title, grey blurb */
++function agendaItem(s, x, y, o) {
++  tx(s, o.n, { x, y, w: 0.7, h: 0.707, fontFace: HEAD, fontSize: 36, color: o.numColor || BLACK });
++  tx(s, o.title, { x: x + 0.791, y, w: o.tw || 2.69, h: 0.303, fontSize: o.titleSize || 12,
++    bold: true, color: o.titleColor || BLACK });
++  tx(s, LOREM, { x: x + 0.791, y: y + (o.titleSize === 16 ? 0.354 : 0.303), w: o.tw || 2.69, h: 0.577,
++    fontSize: 10, color: o.bodyColor || GREY_TX, lineSpacingMultiple: 1.5 });
++}
++
++/** list entry with a red "top corners rounded" number chip (slide 5) */
++function agendaChip(s, x, y, item) {
++  s.addShape('round2SameRect', { x, y, w: 0.74, h: 0.823, fill: { color: RED }, line: { type: 'none' } });
++  s.addText(item.n, { x, y, w: 0.74, h: 0.823, align: 'center', valign: 'middle', fontFace: BODY,
++    fontSize: 18, color: WHITE });
++  tx(s, item.b ? [{ text: item.a, options: { bold: true } },
++                  { text: item.b, options: { bold: true, italic: true } }]
++              : item.a,
++    { x: x + 0.873, y, w: 2.69, h: 0.303, fontSize: 12, bold: true });
++  tx(s, LOREM, { x: x + 0.873, y: y + 0.302, w: 2.69, h: 0.577, fontSize: 10, color: GREY_TX,
++    lineSpacingMultiple: 1.5 });
++}
++
++/** red "STREAM NOW" pill button */
++function streamBtn(s, x, y) {
++  rect(s, x, y, 2.341, 0.648, RED);
++  s.addText('STREAM NOW \u2197', { x, y, w: 2.341, h: 0.648, align: 'center', valign: 'middle',
++    fontFace: BODY, fontSize: 14, color: WHITE });
++}
++
++/** white episode card with title, caption and progress bar (slides 28, 29) */
++function episodeCard(s, x, y) {
++  s.addShape('roundRect', { x, y, w: 3.935, h: 1.787, fill: { color: WHITE },
++    line: { color: GREY, width: 1 }, rectRadius: 0.163 });
++  tx(s, 'Episode #1', { x: x + 0.242, y: y + 0.253, w: 2.366, h: 0.505, fontFace: HEAD,
++    fontSize: 24, color: '262626' });
++  tx(s, 'On Listening', { x: x + 0.242, y: y + 0.886, w: 2.035, h: 0.337, fontSize: 14, color: GREY_TX });
++  tx(s, '87%', { x: x + 2.583, y: y + 0.886, w: 1.107, h: 0.337, fontSize: 14, color: GREY_TX, align: 'right' });
++  bar(s, x + 0.311, y + 1.272, 3.313, 0.221, 0.725);
++}
++
++/** bulleted body list - each string becomes its own ticked paragraph */
++function checkList(s, lines, o) {
++  s.addText(lines.map(t => ({ text: t, options: { bullet: CHECK, breakLine: true } })),
++    Object.assign({ fontFace: BODY, fontSize: 10, color: BLACK, lineSpacingMultiple: 1.5,
++      valign: 'top' }, o));
++}
++
++/* ---------------------------------------------------------- mockups ------ */
++/** tablet: dark rounded body with a white screen (slide 27) */
++function tabletMock(s, x, y, w, h) {
++  s.addShape('roundRect', { x, y, w, h, fill: { color: '141414' }, line: { type: 'none' }, rectRadius: 0.17 });
++  rect(s, x + 0.19, y + 0.42, w - 0.38, h - 0.42, WHITE);
++  s.addShape('ellipse', { x: x + w / 2 - 0.03, y: y + 0.19, w: 0.06, h: 0.06,
++    fill: { color: '454545' }, line: { type: 'none' } });
++}
++
++/** laptop: dark bezel, white screen and a silver base (slide 28) */
++function laptopMock(s, x, y, w, h) {
++  s.addShape('roundRect', { x, y, w, h, fill: { color: '141414' }, line: { type: 'none' }, rectRadius: 0.14 });
++  rect(s, x + 0.23, y + 0.27, w - 0.23, h - 0.6, WHITE);
++  s.addShape('ellipse', { x: x + 2.95, y: y + 0.1, w: 0.06, h: 0.06, fill: { color: '454545' }, line: { type: 'none' } });
++  rect(s, x - 0.95, y + h, w + 1.4, 0.3, 'C8CCD0', { rectRadius: 0.09 });
++  rect(s, x + 2.2, y + h + 0.07, 1.25, 0.09, 'AAAFB4', { rectRadius: 0.04 });
++}
++
++/** smart watch: tapered straps, bezel and a white screen (slide 29) */
++function watchMock(s, x, y, w, h, sx, sy, sw, sh) {
++  const cx = x + w / 2, caseTop = y + 0.94, caseBot = y + h - 0.96;
++  const strap = (yTop, yBot, wTop, wBot) => s.addShape('custGeom', {
++    x: cx - w / 2, y: yTop, w, h: yBot - yTop, fill: { color: '3B3B3D' }, line: { type: 'none' },
++    points: [{ x: w / 2 - wTop / 2, y: 0 }, { x: w / 2 + wTop / 2, y: 0 },
++             { x: w / 2 + wBot / 2, y: yBot - yTop }, { x: w / 2 - wBot / 2, y: yBot - yTop },
++             { close: true }] });
++  strap(y, caseTop + 0.2, w * 0.56, w * 0.80);          // upper strap, widening
++  strap(caseBot - 0.2, y + h, w * 0.80, w * 0.45);      // lower strap, tapering
++  s.addShape('roundRect', { x, y: caseTop, w, h: caseBot - caseTop, fill: { color: '4C4C4E' },
++    line: { type: 'none' }, rectRadius: 0.62 });
++  s.addShape('roundRect', { x: x + 0.13, y: caseTop + 0.13, w: w - 0.26, h: caseBot - caseTop - 0.26,
++    fill: { color: '242426' }, line: { type: 'none' }, rectRadius: 0.55 });
++  s.addShape('roundRect', { x: sx, y: sy, w: sw, h: sh, fill: { color: WHITE },
++    line: { type: 'none' }, rectRadius: 0.42 });
++  rect(s, x + w - 0.02, y + h / 2 - 0.32, 0.14, 0.64, '5C5C5E', { rectRadius: 0.05 });
++}
++
++/* --------------------------------------------------------- world map ----- */
++/** continents traced from the reference layout, normalised to a 0..1000 box */
++const MAP = [
++  [997,204,958,166,890,155,859,123,886,111,850,97,858,137,832,155,822,127,782,126,779,92,734,32,722,51,750,74,746,93,676,145,664,128,654,171,604,168,584,198,533,153,484,238,485,267,504,281,492,281,494,306,474,326,460,265,441,303,444,323,460,299,466,375,444,383,452,437,422,519,422,571,447,619,496,624,522,851,542,843,580,730,578,663,609,588,588,574,628,536,626,497,670,527,692,612,692,557,722,519,736,553,740,656,810,706,820,694,760,679,766,662,742,583,768,580,762,527,770,541,798,501,802,416,826,437,822,408,861,326,854,418,826,453,856,437,858,390,874,377,862,372,863,304,846,294,910,242,903,330,922,259],
++  [396,0,246,8,200,41,214,90,175,57,178,104,144,79,126,95,204,113,182,132,199,147,193,185,180,183,176,124,126,115,118,142,136,142,140,171,31,150,0,205,18,219,0,257,28,271,14,298,56,253,82,264,111,316,124,414,162,513,158,487,180,540,249,597,242,679,272,758,257,945,274,1001,286,993,276,959,287,893,354,773,372,686,298,584,240,594,222,554,226,521,200,535,204,472,235,471,244,500,262,403,302,364,290,341,322,356,288,251,279,269,245,236,248,323,204,253,218,220,244,223,232,207,241,163,266,184,250,217,284,239,298,196,253,127,231,126,280,40,287,55,270,85,306,102,324,217,348,257,358,207,408,162,419,87,410,65,436,28],
++  [892,794,890,794,884,782,884,777,882,775,878,762,872,756,870,732,864,727,864,716,862,708,860,716,858,740,856,747,853,747,844,735,844,723,846,721,846,716,839,715,834,710,827,714,828,722,824,730,818,725,813,730,810,739,805,744,805,750,800,760,782,772,780,799,786,831,786,843,784,847,788,854,794,854,798,847,808,847,815,836,831,832,838,836,842,853,844,855,845,861,852,858,854,870,858,875,864,879,871,878,872,881,876,874,882,871,883,859,891,831,892,815],
++  [768,638,768,643,768,644,769,651,771,653,772,661,774,664,776,664,776,666,783,666,784,669,787,668,788,665,789,657,792,650,792,645,792,643,797,643,798,651,796,654,796,658,795,662,795,665,798,668,798,679,800,676,800,673,804,673,806,671,806,656,808,652,808,646,810,645,813,639,813,637,810,641,806,641,802,639,799,643,796,643,796,639,793,635,792,623,795,618,796,618,796,614,793,613,790,608,788,609,788,614,785,619,782,619,780,623,780,628,779,630,775,631,774,636,770,635],
++  [830,654,832,656,832,663,834,666,834,669,840,669,841,672,846,673,850,680,850,688,848,691,848,694,856,694,858,699,862,700,866,691,870,691,876,704,883,708,884,706,880,699,878,697,877,683,878,682,884,683,888,679,890,673,892,673,892,671,889,666,889,671,887,676,885,678,878,678,878,680,874,680,871,677,867,669,850,656,848,655,843,664,840,664,838,652,836,649,832,649],
++  [544,48,543,46,539,46,536,44,533,44,532,43,532,43,530,45,526,45,524,42,524,42,523,44,519,44,518,50,515,50,514,48,513,51,501,51,500,53,500,53,500,62,498,63,498,65,502,71,506,71,506,75,507,77,507,81,511,85,511,88,512,88,514,91,516,90,517,82,520,77,520,74,522,73,522,68,525,68,527,72,527,78,526,79,527,80,530,80,532,83,537,76,536,74,534,74,533,71,531,71,530,68,528,65,528,58,528,57,532,57,535,59,536,57,539,57],
++  [604,713,604,713,604,715,602,718,602,721,602,722,600,722,600,724,600,729,598,731,598,731,596,733,594,735,592,735,592,736,590,736,590,737,590,742,588,745,588,751,590,754,590,762,587,771,587,778,588,781,589,789,592,793,596,792,598,788,598,782,600,779,600,777,600,773,601,765,602,762,602,760,603,756,604,749,604,748,604,742,605,741,605,737,607,735,607,730,606,729,606,721],
++  [661,89,660,87,658,87,654,89,651,93,648,93,647,95,642,95,642,94,638,97,633,99,628,106,626,106,626,112,624,114,624,118,620,122,620,128,618,129,617,132,615,133,615,140,612,142,612,145,612,147,614,147,614,151,617,152,620,156,628,157,628,155,624,145,624,139,625,136,625,133,628,125,630,125,630,122,632,120,632,116,634,115,635,113,637,113,638,110,644,104,645,104,651,99,656,97,660,94,661,91],
++  [950,854,948,853,947,856,950,862,952,867,952,878,949,882,952,886,952,892,952,893,946,893,945,892,942,903,940,909,934,916,932,919,930,921,929,926,929,928,932,931,932,936,932,937,933,937,934,934,936,934,938,931,940,927,940,925,942,921,942,917,944,915,946,914,946,909,948,907,948,903,951,898,954,898,955,897,956,891,958,889,958,883,959,882,960,882,962,876,962,872,956,873,956,871,956,867,954,865,952,865,952,864,952,862,951,860,951,857],
++  [402,205,402,207,402,208,402,214,406,214,406,215,406,222,406,223,408,223,408,222,412,222,412,224,413,224,414,225,414,225,415,226,418,226,418,225,419,225,420,222,422,222,424,220,424,220,425,219,426,219,427,218,428,218,429,215,430,215,431,212,431,211,432,210,431,209,431,207,430,206,429,206,428,204,428,200,426,200,424,198,423,198,423,200,422,201,413,201,412,202,410,202,408,200,408,200,406,198,405,198,405,200,404,201,403,202,403,203],
++  [800,540,800,541,800,552,800,553,798,553,798,558,800,562,800,573,802,576,804,576,804,570,804,569,807,569,808,571,808,578,808,579,804,579,804,585,806,587,806,593,806,594,806,600,804,603,804,606,806,604,810,604,810,605,810,609,810,611,812,612,814,615,814,608,815,607,816,607,818,604,818,600,816,597,816,591,814,589,814,583,815,581,814,579,814,576,812,574,812,574,808,565,804,565,804,564,804,555,806,553,805,541],
++  [232,518,232,519,234,520,236,516,240,516,240,518,242,518,242,519,245,519,246,520,246,520,248,523,250,525,251,525,252,530,263,530,264,531,264,537,263,538,260,539,261,541,262,541,263,542,264,541,267,541,268,543,272,540,276,540,278,538,276,535,274,532,270,532,269,531,265,530,264,529,262,529,259,525,258,525,256,523,254,522,250,517,248,517,246,514,245,514,243,512,238,512,234,516],
++  [620,41,624,41,625,42,625,48,626,49,630,49,631,47,632,47,632,46,634,46,634,44,640,44,640,43,641,43,642,42,643,40,649,40,650,39,650,39,652,37,652,35,650,34,649,34,648,37,646,37,646,38,642,38,640,35,638,35,638,37,636,37,636,40,634,43,630,43,630,42,630,33,630,32,634,32,634,30,632,29,630,29,628,31,626,31,624,33,622,33,622,37,621,39,620,39],
++  [164,69,164,68,164,67,163,66,162,66,161,65,159,65,158,66,158,66,157,67,156,67,156,68,154,68,153,69,152,69,152,74,152,75,148,75,148,78,152,78,153,79,153,80,154,82,156,82,156,83,158,83,159,82,160,82,160,80,160,79,161,78,161,77,162,76,162,76,162,75,162,73,164,71,164,70],
++  [868,892,868,894,868,896,868,897,869,898,869,906,871,910,872,910,872,911,874,911,874,910,874,909,875,909,875,908,876,907,876,907,876,906,877,905,877,902,878,901,878,894,877,893,877,892,876,892,876,893,874,893,874,894,870,894,870,893,869,893,868,892],
++  [612,39,612,39,611,38,610,38,610,37,608,37,606,39,602,39,602,38,601,38,600,39,598,39,598,40,596,40,595,41,594,41,596,43,596,43,596,44,600,44,600,45,600,46,600,46,601,47,602,47,602,48,604,48,604,47,605,47,606,46,606,46,607,45,607,44,608,42,610,42,610,41,612,41],];
++
++function worldMap(s, x, y, w, h, color) {
++  MAP.forEach(flat => {
++    const pts = [];
++    for (let i = 0; i < flat.length; i += 2) pts.push({ x: flat[i] / 1000 * w, y: flat[i + 1] / 1000 * h });
++    pts.push({ close: true });
++    s.addShape('custGeom', { x, y, w, h, fill: { color }, line: { type: 'none' }, points: pts });
++  });
++}
++
++/* =========================================================== the slides === */
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'W16x9', width: 13.333, height: 7.5 });
++pptx.layout = 'W16x9';
++pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
++pptx.title = 'Stagetalk Podcast Presentation';
++
++function slide(bg) {
++  const s = pptx.addSlide();
++  s.background = { color: bg || WHITE };
++  return s;
++}
++
++/* --- 1 & 30: title / closing --------------------------------------------- */
++function titleSlide(word) {
++  const s = slide(WHITE);
++  rtri(s, 4.756, 4.448, 3.545, 3.056, RED, 'br');
++  rtri(s, 6.311, 5.778, 1.99, 1.715, RED_SH, 'br');
++  head(s, word, { x: 0.539, y: 2.541, w: 7.439, h: 2.036, fontSize: 115 });
++  micBadge(s, 0.539, 0.666, 0.703);
++  tx(s, 'Podcast Presentation - Conversations that Matter ',
++    { x: 0.612, y: 4.577, w: 7.161, h: 0.37, fontSize: 16 });
++}
++
++/* --- 2: introduction, dark ------------------------------------------------ */
++function slide02() {
++  const s = slide(NAVY);
++  s.addShape('triangle', { x: -2.26, y: 2.26, w: 7.5, h: 2.981, rotate: 90,
++    fill: { color: RED }, line: { type: 'none' } });
++  tri(s, 4.951, 0.856, 1.129, 0.973, 334.3);
++  tri(s, 11.84, 5.951, 1.16, 1.0, 16.5);
++  head(s, 'INTRODUCTION STAGETALK', { x: 6.397, y: 1.831, w: 5.108, h: 1.919 });
++  para(s, WELCOME, 6.397, 3.989, 5.379, 0.625, { color: WHITE });
++  para(s, WHETHER_DIVE, 6.397, 4.853, 5.379, 1.18, { color: WHITE, bullet: CHECK });
++  micBadge(s, 11.153, 2.296, 0.703, BLACK);
++}
++
++/* --- 3: introduction, two photo columns ----------------------------------- */
++function slide03() {
++  const s = slide(WHITE);
++  tri(s, 9.243, 0.197, 1.129, 0.973, 334.3);
++  tri(s, 6.908, 6.004, 1.16, 1.0, 16.5);
++  rtri(s, 0, 0, 1.043, 0.899, RED, 'tl');
++  rect(s, 7.488, 1.745, 2.573, 0.706, RED);
++  rect(s, 10.322, 5.088, 2.573, 0.706, RED);
++  head(s, 'INTRODUCTION OF STAGETALK', { x: 0.612, y: 1.492, w: 5.108, h: 1.919 });
++  para(s, WELCOME, 0.612, 3.649, 5.379, 0.625);
++  para(s, WHETHER_DIVE, 0.612, 4.513, 5.379, 1.18, { bullet: CHECK });
++  micBadge(s, 11.257, 6.166, 0.703);
++}
++
++/* --- 4: introduction with a red side bar ---------------------------------- */
++function slide04() {
++  const s = slide(WHITE);
++  rect(s, 0, 0, 2.32, 7.5, RED);
++  head(s, 'INTRODUCTION OF STAGETALK', { x: 7.485, y: 1.051, w: 5.108, h: 1.919 });
++  tx(s, 'Introduction', { x: 7.485, y: 3.167, w: 3.897, h: 0.459, fontSize: 16, bold: true,
++    align: 'justify', lineSpacingMultiple: 1.5 });
++  para(s, WELCOME + WHETHER, 7.485, 3.698, 3.897, 1.736);
++  tx(s, 'INTRODUCTION', { x: -1.308, y: 3.245, w: 5.108, h: 1.01, rotate: 270, align: 'center',
++    fontFace: HEAD, fontSize: 54, charSpacing: 6, color: WHITE });
++  iconTile(s, 7.647, 5.833, 0.931, RED, bagGlyph);
++  tx(s, [{ text: 'Welcome to ', options: { bold: true } },
++         { text: 'Stagetalk', options: { bold: true, italic: true } },
++         { text: ',', options: { bold: true } }],
++    { x: 8.758, y: 5.861, w: 3.01, h: 0.303, fontSize: 12 });
++  tx(s, LOREM, { x: 8.758, y: 6.214, w: 3.01, h: 0.471 });
++}
++
++/* --- 5: agenda with red number chips -------------------------------------- */
++function slide05() {
++  const s = slide(WHITE);
++  rect(s, 7.406, 0.229, 5.711, 2.698, RED);
++  head(s, 'Agenda -', { x: 7.954, y: 1.061, w: 3.005, h: 1.01, color: WHITE });
++  [[0.508, 4.089, { n: '01', a: 'Introduction ', b: 'Stagetalk' }],
++   [0.508, 5.505, { n: '02', a: 'About ', b: 'Stagetalk' }],
++   [4.391, 4.133, { n: '03', a: 'Podcast Industry' }],
++   [4.391, 5.505, { n: '04', a: 'Podcast Concept' }],
++   [8.087, 4.133, { n: '05', a: 'Podcast Gallery' }],
++   [8.087, 5.505, { n: '05', a: 'Podcast Mockup' }]].forEach(([x, y, it]) => agendaChip(s, x, y, it));
++}
++
++/* --- 6: table of content, light ------------------------------------------- */
++function slide06() {
++  const s = slide(WHITE);
++  head(s, 'Table Of Content Stagetalk', { x: 0.517, y: 0.644, w: 5.108, h: 1.919 });
++  [[0.517, 3.016, '01', 'Introduction Stagetalk'],
++   [0.517, 4.369, '02', 'About Stagetalk'],
++   [0.517, 5.723, '03', 'Podcast Industry'],
++   [4.088, 3.564, '04', 'Podcast Gallery'],
++   [4.088, 5.015, '05', 'Podcast Mockup']].forEach(([x, y, n, title]) => agendaItem(s, x, y, { n, title }));
++  micBadge(s, 7.283, 1.065, 1.079);
++}
++
++/* --- 7: table of content, dark -------------------------------------------- */
++function slide07() {
++  const s = slide(NAVY);
++  tri(s, 4.227, 0.291, 1.129, 0.973, 334.3);
++  tri(s, 11.861, 1.132, 0.762, 0.657, 16.5);
++  tri(s, 4.939, 6.72, 0.93, 0.802, 36.7);
++  head(s, [{ text: 'Table Of Content ' }, { text: 'Stagetalk', options: { italic: true } }],
++    { x: 5.132, y: 1.208, w: 5.108, h: 1.919 });
++  [[5.257, 3.495, '01', 'Introduction Stagetalk'],
++   [5.257, 4.849, '02', 'About Stagetalk'],
++   [8.91, 3.495, '03', 'Podcast Industry'],
++   [8.91, 4.849, '04', 'Podcast Gallery']].forEach(([x, y, n, title]) =>
++    agendaItem(s, x, y, { n, title, numColor: WHITE, titleColor: WHITE, bodyColor: WHITE }));
++  para(s, WELCOME + WHETHER, 0.296, 5.44, 4.496, 1.458, { color: WHITE });
++}
++
++/* --- 8: about, grey band + red panel -------------------------------------- */
++function slide08() {
++  const s = slide(WHITE);
++  rect(s, 7.99, 0.562, 4.938, 6.938, RED);
++  rect(s, 0, 0.896, 7.99, 3.031, GREY_LT);
++  tx(s, 'About Stagetalk Podcast Presentation', { x: 0.635, y: 1.623, w: 6.389, h: 1.717,
++    fontFace: HEAD, fontSize: 48 });
++  para(s, WELCOME + WHETHER, 0.635, 4.156, 6.487, 1.18);
++  rect(s, 0.635, 5.562, 2.927, 1.457, RED);
++  s.addText('100+ Episode', { x: 0.635, y: 5.562, w: 2.927, h: 1.457, align: 'center',
++    valign: 'middle', fontFace: HEAD, fontSize: 24, color: WHITE });
++  tx(s, 'SINCE 2021', { x: 4.63, y: 5.5, w: 2.599, h: 1.582, align: 'center', fontFace: HEAD, fontSize: 44 });
++  playBtn(s, 4.022, 5.902, 0.777);
++  micBadge(s, 9.922, 6.002, 1.079);
++}
++
++/* --- 9: about + three stat cards ------------------------------------------ */
++function slide09() {
++  const s = slide(WHITE);
++  tri(s, 4.606, 0.197, 1.129, 0.973, 334.3);
++  tri(s, 0.356, 4.069, 0.762, 0.657, 16.5);
++  [[6.667, 0.618, '90k+', 48, 'STREAM'],
++   [8.799, 0.618, '10k', 48, 'SUBSCRIPTION'],
++   [10.931, 0.625, '#2', 40, 'BEST PODCAST']].forEach(([x, y, big, sz, label]) => {
++    rect(s, x, y, 1.961, 2.764, WHITE, { shadow: shadow() });
++    s.addText(big, { x, y, w: 1.961, h: 2.764, align: 'center', valign: 'middle', fontFace: HEAD,
++      fontSize: sz, color: BLACK });
++    playBtn(s, x + 0.707, y + 2.492, 0.545);
++    rect(s, x, y + 3.132, 1.961, 0.648, RED);
++    s.addText(label, { x, y: y + 3.132, w: 1.961, h: 0.648, align: 'center', valign: 'middle',
++      fontFace: BODY, fontSize: 14, color: WHITE });
++  });
++  head(s, 'About Stagetalk Podcast Presentation', { x: 0.556, y: 4.963, w: 5.939, h: 1.582, fontSize: 44 });
++  agendaItem(s, 9.84, 5.314, { n: '01', title: 'Introduction Stagetalk', tw: 2.262 });
++  para(s, WELCOME + 'Whether you are promoting your own show or pitching a concept.',
++    6.667, 5.025, 2.839, 1.458);
++}
++
++/* --- 10: about, rounded photo on the right -------------------------------- */
++function slide10() {
++  const s = slide(WHITE);
++  tri(s, 11.524, 1.671, 1.129, 0.973, 334.3);
++  tri(s, 2.809, 0.378, 0.531, 0.457, 55.4);
++  tri(s, 0.409, 6.515, 0.762, 0.657, 16.5);
++  tx(s, 'About Stagetalk Podcast Presentation', { x: 0.635, y: 1.623, w: 6.389, h: 1.717,
++    fontFace: HEAD, fontSize: 48 });
++  para(s, WELCOME + WHETHER, 0.635, 3.822, 5.014, 1.458);
++  micBadge(s, 8.809, 1.942, 1.079);
++}
++
++/* --- 11: two speaker cards ------------------------------------------------ */
++function slide11() {
++  const s = slide(WHITE);
++  grad(s, 0, 0, 2.32, 7.5);
++  tx(s, 'OUR TEAMS', { x: -1.308, y: 3.245, w: 5.108, h: 1.01, rotate: 270, align: 'center',
++    fontFace: HEAD, fontSize: 54, charSpacing: 6, color: WHITE });
++  [[2.01, 'John Doe'], [5.321, 'Harry Ken']].forEach(([y, name]) => {
++    rect(s, 7.038, y, 4.346, 1.619, WHITE, { shadow: shadow() });
++    tx(s, name, { x: 7.001, y: y - 1.039, w: 1.989, h: 0.64, fontFace: HEAD, fontSize: 32 });
++    tx(s, TEAMTXT, { x: 7.345, y: y + 0.322, w: 3.668, h: 0.976, fontSize: 12, lineSpacingMultiple: 1.5 });
++    tx(s, 'Speakers', { x: 10.39, y: y - 1.039, w: 1.989, h: 0.64, fontFace: HEAD, fontSize: 32 });
++    playBtn(s, 9.403, y - 0.992, 0.545);
++    rect(s, 11.384, y, 0.45, 1.619, RED);
++  });
++}
++
++/* --- 12: three team portraits --------------------------------------------- */
++function slide12() {
++  const s = slide(WHITE);
++  tri(s, 7.114, 0.68, 1.129, 0.973, 334.3);
++  tri(s, 0.499, 5.574, 0.531, 0.457, 55.4);
++  tri(s, 11.564, 6.748, 0.762, 0.657, 16.5);
++  [[1.531, 'John Doe', 'Podcaster 1'], [5.358, 'Samantha', 'Podcaster 2'],
++   [9.184, 'Michael', 'Podcaster 3']].forEach(([x, name, role], i) => {
++    const y = 5.237 + i * 0.036;
++    rect(s, x, y, 2.618, 1.175, WHITE, { shadow: shadow() });
++    tx(s, name, { x: x - 0.005, y: y + 0.186, w: 2.618, h: 0.572, align: 'center', fontFace: HEAD,
++      fontSize: 28, color: RED_SH });
++    tx(s, role, { x: x + 0.572, y: y + 0.624, w: 1.47, h: 0.37, align: 'center', fontSize: 12,
++      lineSpacingMultiple: 1.5 });
++  });
++  tx(s, 'Our Teams', { x: 3.472, y: 0.464, w: 6.389, h: 0.909, align: 'center', fontFace: HEAD, fontSize: 48 });
++}
++
++/* --- 13: teams with a red divider ----------------------------------------- */
++function slide13() {
++  const s = slide(WHITE);
++  rect(s, 3.794, 0, 0.797, 4.784, RED);
++  tri(s, 11.303, 6.63, 1.129, 0.973, 334.3);
++  tri(s, 0.446, 0.006, 0.961, 0.829, 55.4);
++  tx(s, 'Teams of Stagetalk', { x: 0.429, y: 2.033, w: 3.045, h: 1.717, fontFace: HEAD, fontSize: 48 });
++  agendaItem(s, 4.591, 5.53, { n: '01', title: 'Jerry Jr', tw: 2.262, titleSize: 16 });
++  agendaItem(s, 8.962, 5.53, { n: '02', title: 'Joseph', tw: 2.262, titleSize: 16 });
++  playBtn(s, 1.428, 5.202, 0.932);
++  tx(s, '2 Episode Trending', { x: 0.372, y: 6.394, w: 3.045, h: 0.505, align: 'center',
++    fontFace: HEAD, fontSize: 24, color: WHITE });
++}
++
++/* --- 14: services over a full-bleed photo --------------------------------- */
++function slide14() {
++  const s = slide(WHITE);
++  rect(s, 3.495, 2.206, 9.34, 4.979, 'F25050');   // accent1 @ 80% alpha over white
++  [[4.01, 2.754, '01'], [4.01, 4.844, '02'], [6.887, 2.754, '03'], [6.887, 4.844, '04']]
++    .forEach(([x, y, n]) => {
++      tx(s, n, { x, y, w: 0.7, h: 0.707, fontFace: HEAD, fontSize: 36, color: WHITE });
++      tx(s, 'Service here', { x, y: y + 0.715, w: 2.262, h: 0.37, fontSize: 16, bold: true, color: WHITE });
++      tx(s, LOREM, { x, y: y + 1.068, w: 2.262, h: 0.577, fontSize: 10, color: WHITE,
++        lineSpacingMultiple: 1.5 });
++    });
++  tx(s, 'OUR SERVICES', { x: 9.307, y: 3.885, w: 3.984, h: 1.919, rotate: 270, align: 'center',
++    fontFace: HEAD, fontSize: 54, charSpacing: 6, color: WHITE });
++  rect(s, 0.268, 2.206, 3.011, 4.082, WHITE, { shadow: shadow() });
++  s.addText('NEW EPISODE', { x: 0.268, y: 2.206, w: 3.011, h: 4.082, align: 'center',
++    valign: 'middle', fontFace: HEAD, fontSize: 48, color: BLACK });
++  playBtn(s, 0.268, 6.541, 0.545);
++  streamBtn(s, 0.938, 6.49);
++}
++
++/* --- 15: four service cards ----------------------------------------------- */
++function slide15() {
++  const s = slide(WHITE);
++  tri(s, 0.29, 0.185, 1.061, 0.915, 334.3);
++  tri(s, 12.389, 5.233, 0.762, 0.657, 16.5);
++  tri(s, 0.527, 6.445, 0.587, 0.506, 85.7);
++  const bullets = ['Lorem ipsum dolor sit amet, consectetur Lorem ipsum',
++                   'dolor sit amet, consectetur adipiscing elit',
++                   'dolor sit amet, consectetur adipiscing elit'];
++  [0.893, 3.947, 7.0, 10.053].forEach((x, i) => {
++    grad(s, x, 3.276, 2.381, 0.57, { bands: 8 });
++    s.addText('SERVICE ' + (i + 1), { x, y: 3.276, w: 2.381, h: 0.57, align: 'center',
++      valign: 'middle', fontFace: HEAD, fontSize: 20, color: WHITE });
++    tx(s, 'Service here', { x, y: 4.005, w: 2.381, h: 0.37, fontSize: 16, bold: true });
++    checkList(s, bullets, { x, y: 4.358, w: 2.381, h: 1.84 });
++  });
++  tx(s, 'OUR BEST SERVICE', { x: 3.495, y: 1.453, w: 5.798, h: 1.01, align: 'center',
++    fontFace: HEAD, fontSize: 54 });
++  playBtn(s, 9.293, 1.637, 0.545);
++  micBadge(s, 6.424, 0.319, 0.485);
++}
++
++/* --- 16: services, dark --------------------------------------------------- */
++function slide16() {
++  const s = slide(NAVY);
++  tri(s, 8.6, 5.788, 0.765, 0.66, 12.8);
++  tri(s, 12.376, 0.29, 0.573, 0.494, 16.5);
++  tri(s, 0.321, 3.96, 0.587, 0.506, 85.7);
++  tri(s, 12.543, 0.457, 0.573, 0.494, 16.5);
++  [[5.144, 2.757], [9.507, 2.757], [5.144, 5.727], [9.507, 5.727]].forEach(([x, y]) => {
++    tx(s, 'Service here', { x, y, w: 2.262, h: 0.37, fontSize: 16, bold: true, color: WHITE });
++    checkList(s, [LOREM], { x, y: y + 0.354, w: 3.237, h: 0.577, color: WHITE });
++  });
++  tx(s, 'OUR BEST SERVICE', { x: 0.507, y: 2.791, w: 3.319, h: 1.919, fontFace: HEAD,
++    fontSize: 54, color: WHITE });
++  micBadge(s, 3.854, 3.507, 0.485, BLACK);
++}
++
++/* --- 17: podcast industry ------------------------------------------------- */
++function slide17() {
++  const s = slide(WHITE);
++  tri(s, 0.084, 3.185, 0.587, 0.506, 85.7);
++  tri(s, 12.686, 6.868, 0.67, 0.577, 143.2);
++  head(s, 'PODCASTS HAVE GROWN EXPONENTIALLY', { x: 0.445, y: 4.17, w: 5.318, h: 2.524, fontSize: 48 });
++  rect(s, 6.421, 1.285, 6.107, 6.215, RED);
++  tx(s, 'Title Goes Here', { x: 6.792, y: 2.249, w: 2.262, h: 0.37, fontSize: 16, bold: true, color: WHITE });
++  tx(s, INDUSTRY, { x: 6.792, y: 2.603, w: 3.536, h: 0.83, fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
++  tx(s, '78%', { x: 10.73, y: 2.435, w: 1.348, h: 0.774, fontFace: HEAD, fontSize: 40, color: WHITE });
++  tx(s, '10K+', { x: 6.792, y: 4.064, w: 1.129, h: 0.774, fontFace: HEAD, fontSize: 40, color: WHITE });
++  tx(s, 'Title Goes Here', { x: 8.62, y: 3.747, w: 2.262, h: 0.37, fontSize: 16, bold: true, color: WHITE });
++  tx(s, INDUSTRY, { x: 8.62, y: 4.1, w: 3.536, h: 0.83, fontSize: 10, color: WHITE, lineSpacingMultiple: 1.5 });
++  iconTile(s, 6.792, 5.716, 0.931, PINK_MD, bagGlyph);
++  iconTile(s, 7.94, 5.716, 0.931, PINK_MD, waveGlyph);
++  iconTile(s, 9.085, 5.716, 0.931, PINK_MD, hornGlyph);
++  tx(s, 'And Many More', { x: 10.273, y: 5.895, w: 1.514, h: 0.64, fontSize: 16, bold: true, color: WHITE });
++}
++
++/* --- 18: industry stats --------------------------------------------------- */
++function slide18() {
++  const s = slide(WHITE);
++  rect(s, 7.456, 0, 5.877, 7.5, GREY_LT);
++  rect(s, 3.817, 0.834, 2.82, 2.535, WHITE, { shadow: shadow() });
++  wedge(s, 0.653, 5.962, 0.769, 0.663);
++  wedge(s, 0.653, 2.889, 0.557, 0.48);
++  tx(s, 'ACTIVE SHOWS AND LISTENERS WORLDWIDE', { x: 7.762, y: 1.014, w: 5.062, h: 1.447,
++    fontFace: HEAD, fontSize: 40 });
++  para(s, WHETHER, 7.762, 2.726, 4.639, 0.903);
++  [[7.762, RED, '1200+', 'Listener', 1.845], [10.471, RED_DK, '10K+', 'Subscriber', 1.462]]
++    .forEach(([x, col, big, label, bw]) => {
++      s.addShape('roundRect', { x, y: 4.048, w: 2.43, h: 2.278, fill: { color: col },
++        line: { type: 'none' }, rectRadius: 0.19 });
++      tx(s, label, { x: x + 0.227, y: 4.394, w: 1.164, h: 0.37, fontFace: HEAD, fontSize: 16,
++        bold: true, color: WHITE });
++      tx(s, big, { x: x + 0.227, y: 4.765, w: bw, h: 0.909, fontFace: HEAD, fontSize: 48,
++        bold: true, charSpacing: 3, color: WHITE });
++      s.addShape('ellipse', { x: x + 0.279, y: 5.667, w: 0.37, h: 0.37, fill: { color: WHITE },
++        line: { type: 'none' } });
++      s.addShape('triangle', { x: x + 0.389, y: 5.776, w: 0.178, h: 0.153, rotate: 90,
++        fill: { color: col }, line: { type: 'none' } });
++    });
++}
++
++/* --- 19: world map -------------------------------------------------------- */
++function slide19() {
++  const s = slide(WHITE);
++  worldMap(s, 1.605, 2.562, 10.124, 4.661, GREY);
++  tri(s, 0.213, 0.33, 0.503, 0.433, 334.3);
++  tri(s, 12.389, 5.233, 0.762, 0.657, 16.5);
++  tri(s, 11.897, 1.646, 0.587, 0.506, 122.5);
++  [[3.298, 3.924], [8.652, 3.778], [9.558, 5.643]].forEach(([x, y]) =>
++    s.addShape('ellipse', { x, y, w: 0.279, h: 0.279, fill: { color: RED },
++      line: { color: WHITE, width: 2.25 } }));
++  head(s, 'WITH MILLIONS OF ACTIVE SHOWS AND LISTENERS WORLDWIDE',
++    { x: 2.026, y: 0.471, w: 9.281, h: 1.447, fontSize: 40, align: 'center' });
++  para(s, 'PLACEHOLDER' +
++    'And Make An Impact. Stagetalk Helps You Capture This Potential.', 0.449, 6.126, 4.639, 0.903);
++}
++
++/* --- 20: trending episode ------------------------------------------------- */
++function slide20() {
++  const s = slide(WHITE);
++  rect(s, 0, 0, 13.333, 1.938, RED);
++  playBtn(s, 6.394, 2.712, 0.545);
++  streamBtn(s, 8.315, 5.146);
++  tx(s, 'PODCAST EPISODE TRENDING #1', { x: 2.585, y: 5.233, w: 5.062, h: 1.447,
++    fontFace: HEAD, fontSize: 40 });
++  para(s, AUDIENCE, 7.022, 5.971, 3.634, 0.903);
++  wedge(s, 2.677, 4.306, 0.769, 0.663);
++  wedge(s, 0, 4.306, 0.769, 0.663);
++  wedge(s, 11.01, 4.327, 0.769, 0.663);
++}
++
++/* --- 21: audience metrics ------------------------------------------------- */
++function slide21() {
++  const s = slide(WHITE);
++  tri(s, 0.157, 0.341, 0.587, 0.506, 85.7);
++  tri(s, 12.686, 6.868, 0.67, 0.577, 143.2);
++  tri(s, 12.028, 0.686, 0.512, 0.441, 110.4);
++  tri(s, 12.264, 0.495, 0.512, 0.441, 110.4);
++  [[0.926, '90K+', 3.244, 1.03, 'STREAM', 1.93],
++   [5.415, '#1', 1.675, 5.519, 'TRENDING', 2.265],
++   [9.03, '10k+', 3.016, 9.134, 'SUBSCRIBER', 2.814]].forEach(([x, big, bw, lx, label, lw]) => {
++    tx(s, big, { x, y: 1.964, w: bw, h: 2.036, fontFace: HEAD, fontSize: 115, bold: true, charSpacing: 3 });
++    tx(s, label, { x: lx, y: 3.856, w: lw, h: 0.707, fontFace: HEAD, fontSize: 36, bold: true,
++      charSpacing: 3, color: GREY_MD });
++  });
++  [[1.182, 'Podcast Performance', '87%', 0.812], [6.667, 'Audio Quality', '92%', 0.916]]
++    .forEach(([x, label, pct, frac]) => {
++      tx(s, label, { x, y: 5.53, w: 2.49, h: 0.337, fontSize: 14 });
++      arrowUpRight(s, x + 4.13, 5.624, 0.213);
++      bar(s, x + 0.042, 5.941, 4.461, 0.597, frac, { grad: true });
++      tx(s, pct, { x: x + 0.137, y: 6.037, w: 0.94, h: 0.404, fontFace: HEAD, fontSize: 18, color: WHITE });
++    });
++  tx(s, 'PODCAST AUDIENCE', { x: 4.135, y: 0.434, w: 5.062, h: 0.774, align: 'center',
++    fontFace: HEAD, fontSize: 40 });
++}
++
++/* --- 22: trending episode, two tall photos -------------------------------- */
++function slide22() {
++  const s = slide(WHITE);
++  tri(s, 0.157, 0.341, 0.587, 0.506, 85.7);
++  tri(s, 12.686, 6.868, 0.67, 0.577, 143.2);
++  tri(s, 3.093, 5.044, 0.512, 0.441, 110.4);
++  playBtn(s, 3.723, 4.638, 0.932);
++  playBtn(s, 1.247, 1.93, 0.932);
++  streamBtn(s, 6.702, 4.663);
++  tx(s, 'PODCAST EPISODE TRENDING #1', { x: 6.667, y: 1.828, w: 5.062, h: 1.447,
++    fontFace: HEAD, fontSize: 40 });
++  para(s, AUDIENCE, 6.667, 3.391, 3.634, 0.903);
++  micBadge(s, 12.357, 3.507, 0.485);
++}
++
++/* --- 23: gallery with a now-playing card ---------------------------------- */
++function slide23() {
++  const s = slide(WHITE);
++  tx(s, 'MOMENTS FROM PAST PODCAST EPISODES', { x: 6.063, y: 1.293, w: 5.062, h: 1.447,
++    fontFace: HEAD, fontSize: 40 });
++  para(s, GALLERY, 6.063, 2.906, 4.873, 1.18);
++  s.addShape('roundRect', { x: 11.568, y: 1.293, w: 0.337, h: 1.282, fill: { color: RED },
++    line: { type: 'none' }, rectRadius: 0.16 });
++  playBtn(s, 1.682, 5.506, 0.618);
++  playBtn(s, 5.095, 5.506, 0.618);
++  rect(s, 7.181, 4.742, 4.723, 2.151, WHITE, { shadow: shadow() });
++  playBtn(s, 7.583, 6.006, 0.364);
++  bar(s, 8.083, 6.162, 3.049, 0.104, 0.551, { track: GREY });
++  tx(s, 'Smart Business #1', { x: 7.49, y: 5.22, w: 3.196, h: 0.572, fontFace: HEAD, fontSize: 28 });
++  tx(s, '20:12', { x: 11.126, y: 6.006, w: 0.706, h: 0.347, align: 'center', lineSpacingMultiple: 1.5 });
++}
++
++/* --- 24: photo mosaic ----------------------------------------------------- */
++function slide24() {
++  const s = slide(WHITE);
++  tri(s, 0.213, 0.33, 0.503, 0.433, 334.3);
++  tri(s, 12.389, 5.233, 0.762, 0.657, 16.5);
++  tri(s, 12.554, 0.811, 0.587, 0.506, 122.5);
++  tx(s, 'MOMENTS FROM PAST PODCAST EPISODES', { x: 0.92, y: 1.651, w: 5.062, h: 1.447,
++    fontFace: HEAD, fontSize: 40, color: WHITE });
++  playBtn(s, 10.78, 5.159, 0.932);
++  tx(s, '90K+', { x: 1.31, y: 4.879, w: 2.02, h: 1.212, fontFace: HEAD, fontSize: 66, bold: true,
++    charSpacing: 3, color: WHITE });
++  tx(s, 'STREAM', { x: 1.31, y: 6.0, w: 1.191, h: 0.404, fontFace: HEAD, fontSize: 18, bold: true,
++    charSpacing: 3, color: WHITE });
++}
++
++/* --- 25: listener review, dark -------------------------------------------- */
++function slide25() {
++  const s = slide(NAVY);
++  tx(s, 'REVIEW FROM LISTENER STAGETALK', { x: 5.67, y: 1.158, w: 5.062, h: 1.447,
++    fontFace: HEAD, fontSize: 40, color: WHITE });
++  para(s, GALLERY, 5.67, 2.771, 4.873, 1.18, { color: WHITE });
++  stars(s, 5.788, 4.227, 0.264, 0.264, 4, BLACK);
++  tx(s, '4,7/5', { x: 7.79, y: 4.14, w: 1.086, h: 0.438, align: 'center', fontFace: HEAD,
++    fontSize: 20, color: WHITE });
++  grad(s, 5.788, 4.853, 4.873, 2.175, { horiz: true });
++  tx(s, 'HANA STYLE', { x: 6.052, y: 5.301, w: 4.067, h: 0.64, fontFace: HEAD, fontSize: 32, color: WHITE });
++  tx(s, 'JOB POSITION', { x: 6.073, y: 6.08, w: 4.067, h: 0.404, fontFace: HEAD, fontSize: 18, color: WHITE });
++  playBtn(s, 10.195, 5.474, 0.932);
++}
++
++/* --- 26: two listener reviews --------------------------------------------- */
++function slide26() {
++  const s = slide(WHITE);
++  [[0.568, 'SAMANTHA', GALLERY, 1.458, 4, '4,7/5', 0.686],
++   [4.777, 'AYU', AUDIENCE, 0.903, 5, '5/5', 4.892]].forEach(([x, name, body, bh, lit, score, sx]) => {
++    rect(s, x, 3.75, 2.219, 0.901, RED);
++    tx(s, name, { x: x + 0.168, y: 3.914, w: 1.904, h: 0.572, align: 'center', fontFace: HEAD,
++      fontSize: 28, color: WHITE });
++    para(s, body, x, 4.816, 3.781, bh);
++    stars(s, sx, 6.506, 0.264, 0.235, lit, GREY);
++    tx(s, score, { x: sx + 2.002, y: 6.419, w: 1.086, h: 0.438, align: 'center', fontFace: HEAD, fontSize: 20 });
++  });
++  tx(s, [{ text: 'REVIEW FROM ' }, { text: 'LISTENER', options: { color: RED } }, { text: ' STAGETALK' }],
++    { x: 9.433, y: 2.046, w: 3.333, h: 3.736, fontFace: HEAD, fontSize: 54, color: BLACK });
++}
++
++/* --- 27: two tablets ------------------------------------------------------ */
++function slide27() {
++  const s = slide(WHITE);
++  tri(s, 0.29, 0.185, 1.061, 0.915, 334.3);
++  tri(s, 12.389, 5.233, 0.762, 0.657, 16.5);
++  tri(s, 0.527, 6.445, 0.587, 0.506, 85.7);
++  tabletMock(s, 1.70, 3.99, 3.48, 3.51);
++  tabletMock(s, 8.06, 3.99, 3.48, 3.51);
++  tx(s, 'MARKET YOUR PODCAST TO ATTRACT NEW LISTENERS.', { x: 3.448, y: 1.159, w: 6.438, h: 1.313,
++    align: 'center', fontFace: HEAD, fontSize: 36 });
++  tx(s, GALLERY, { x: 2.629, y: 2.657, w: 8.075, h: 0.624, align: 'center', lineSpacingMultiple: 1.5 });
++  micBadge(s, 6.17, 5.045, 0.993);
++}
++
++/* --- 28: laptop mockup ---------------------------------------------------- */
++function slide28() {
++  const s = slide(WHITE);
++  tri(s, 6.907, 0.539, 1.061, 0.915, 334.3);
++  tri(s, 6.816, 5.634, 0.762, 0.657, 16.5);
++  tri(s, 0.638, 1.386, 0.587, 0.506, 85.7);
++  laptopMock(s, 7.40, 1.02, 6.05, 4.94);
++  episodeCard(s, 0.977, 4.291);
++  tx(s, 'Product or User Interface Mockups', { x: 0.977, y: 1.156, w: 4.408, h: 1.447,
++    fontFace: HEAD, fontSize: 40 });
++  tx(s, GALLERY, { x: 0.977, y: 2.732, w: 4.232, h: 1.18, lineSpacingMultiple: 1.5 });
++}
++
++/* --- 29: watch mockup ----------------------------------------------------- */
++function slide29() {
++  const s = slide(WHITE);
++  grad(s, 0, 0, 3.317, 7.5);
++  watchMock(s, 1.77, 1.05, 3.00, 5.40, 2.062, 2.316, 2.417, 2.872);
++  tx(s, 'Product or User Interface Mockups', { x: 5.568, y: 1.201, w: 4.408, h: 1.447,
++    fontFace: HEAD, fontSize: 40 });
++  tx(s, GALLERY, { x: 5.657, y: 2.941, w: 4.232, h: 1.18, lineSpacingMultiple: 1.5 });
++  episodeCard(s, 5.657, 4.415);
++  playBtn(s, 9.214, 4.123, 0.675);
++}
++
++/* ------------------------------------------------------------- assemble --- */
++titleSlide('STAGETALK');
++[slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++ slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19,
++ slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28,
++ slide29].forEach(fn => fn());
++titleSlide('THANKS');
++
++pptx.writeFile({ fileName: path.join(__dirname, '10d8fe0f-e7e9-4a27-95bf-d6650804a9ed_grok_final.pptx') })
++  .then(f => console.log('wrote ' + f));

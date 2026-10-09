@@ -1,0 +1,932 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/general_business_plan_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/general_business_plan_deck.js
+@@ -0,0 +1,929 @@
++/*
++ * UWESLAH — Business Plan deck (20 slides, 13.333 x 7.5 in)
++ * Standalone pptxgenjs re-creation of the reference presentation.
++ *
++ * The reference deck uses empty PowerPoint *picture placeholders* (no raster
++ * data is stored in the file).  They are re-created here with `imageSlot()`,
++ * which draws a rounded rectangle at the placeholder's exact position/size.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++const pptx = new PptxGenJS();
++const SH = pptx.ShapeType;
++const CH = pptx.ChartType;
++
++pptx.defineLayout({ name: 'UWESLAH', width: 12192000 / 914400, height: 6858000 / 914400 });
++pptx.layout = 'UWESLAH';
++pptx.author = 'UWESLAH';
++pptx.title = 'Business Plan';
++
++/* ------------------------------------------------------------------ palette */
++const BG = 'E0E0E0';   // slide background
++const DARK = '404040'; // primary dark card
++const DARK2 = '363636'; // slightly deeper card variant
++const GRAY = 'BFBFBF'; // light gray card
++const LIME = 'D0F750'; // accent
++const LIME2 = 'DCF78A'; // soft accent (SWOT headings)
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const SILVER = 'D9D9D9'; // body copy on dark cards
++const INK = '0D0D0D';    // chart text
++
++const FONT = 'Poppins';
++const FONT_B = 'Poppins SemiBold';
++
++/* ---------------------------------------------------------------- primitives */
++
++// PowerPoint stores roundRect corners as an "adj" value (1/100000 of the
++// shorter side); pptxgenjs wants the radius in inches.
++const radius = (adj, w, h) => (adj / 100000) * Math.min(w, h);
++
++function box(s, x, y, w, h, fill, adj) {
++  const o = { x, y, w, h, fill: { color: fill }, line: { type: 'none' } };
++  if (adj) { o.rectRadius = radius(adj, w, h); return s.addShape(SH.roundRect, o); }
++  return s.addShape(SH.rect, o);
++}
++
++// pill = fully rounded rectangle (adj 50000)
++const pill = (s, x, y, w, h, fill) => box(s, x, y, w, h, fill, 50000);
++
++const oval = (s, x, y, w, h, fill) =>
++  s.addShape(SH.ellipse, { x, y, w, h, fill: { color: fill }, line: { type: 'none' } });
++
++/**
++ * Text box. Defaults mirror the deck: Poppins, 10pt, black, top aligned,
++ * PowerPoint's standard 0.1"/0.05" insets.
++ */
++function T(s, text, x, y, w, h, o) {
++  o = o || {};
++  s.addText(text, {
++    x, y, w, h,
++    valign: 'top',
++    fontFace: o.bold ? FONT_B : FONT,
++    bold: !!o.bold,
++    fontSize: o.size || 10,
++    color: o.color || BLACK,
++    align: o.align || 'left',
++    lineSpacingMultiple: o.ls,
++    charSpacing: o.spc,
++  });
++}
++
++const title = (s, text, x, y, w, h) => T(s, text, x, y, w, h, { bold: true, size: 40 });
++const lead = (s, text, x, y, w, h, color) =>
++  T(s, text, x, y, w, h, { size: 10, ls: 1.5, color: color || DARK });
++
++/** Empty picture placeholder from the reference deck. */
++const imageSlot = (s, x, y, w, h, adj, fill) => box(s, x, y, w, h, fill || BG, adj || 7989);
++
++/** Small square avatar placeholder: framed [image] tile. */
++function avatarSlot(s, x, y, d) {
++  box(s, x, y, d, d, WHITE);
++  box(s, x + d * 0.10, y + d * 0.10, d * 0.80, d * 0.80, 'F2F2F2');
++  oval(s, x + d * 0.20, y + d * 0.20, d * 0.20, d * 0.20, 'F2C46D');
++  s.addShape(SH.triangle, { x: x + d * 0.16, y: y + d * 0.46, w: d * 0.34, h: d * 0.34,
++    fill: { color: '7FADDE' }, line: { type: 'none' } });
++  s.addShape(SH.triangle, { x: x + d * 0.40, y: y + d * 0.34, w: d * 0.44, h: d * 0.46,
++    fill: { color: '5B9BD5' }, line: { type: 'none' } });
++}
++
++/* --------------------------------------------------------------------- icons */
++
++/** Eight-ray asterisk inside a dark disc (the deck's recurring "spark" mark). */
++function spark(s, x, y, d, disc, ray) {
++  oval(s, x, y, d, d, disc || DARK);
++  const len = d * 0.663, bar = d * 0.0679;
++  const bx = x + (d - bar) / 2, by = y + (d - len) / 2;
++  [0, 45, 90, 135].forEach(rotate => s.addShape(SH.roundRect, {
++    x: bx, y: by, w: bar, h: len, rotate,
++    fill: { color: ray || LIME }, line: { type: 'none' }, rectRadius: bar / 2,
++  }));
++}
++
++/**
++ * The deck's "open corner" arrow: a right-angle bracket hugging two sides of
++ * the box plus a diagonal running into the corner it points at.
++ * dir: 'ne' | 'nw' | 'se'
++ */
++function arrow(s, x, y, w, h, color, dir) {
++  const ln = { color, width: 1.5 };
++  const seg = (sx, sy, sw, sh, flipH, flipV) =>
++    s.addShape(SH.line, { x: sx, y: sy, w: sw, h: sh, flipH, flipV, line: ln });
++  if (dir === 'ne') {
++    seg(x, y, w, 0);            // top edge
++    seg(x + w, y, 0, h);        // right edge
++    seg(x, y, w, h, false, true); // diagonal SW -> NE
++  } else if (dir === 'nw') {
++    seg(x, y, w, 0);
++    seg(x, y, 0, h);
++    seg(x, y, w, h, true, true); // diagonal SE -> NW
++  } else { // 'se'
++    seg(x, y + h, w, 0);        // bottom edge
++    seg(x + w, y, 0, h);
++    seg(x, y, w, h);            // diagonal NW -> SE
++  }
++}
++
++/** Flame mark of the UWESLAH logo: a teardrop plus a small curling tongue. */
++function flame(s, x, y, w, h, color) {
++  const f = { fill: { color }, line: { type: 'none' } };
++  s.addShape(SH.teardrop, Object.assign(
++    { x: x + w * 0.24, y, w: w * 0.76, h: h * 0.80, rotate: 315 }, f));
++  s.addShape(SH.moon, Object.assign(
++    { x: x - w * 0.03, y: y + h * 0.36, w: w * 0.44, h: h * 0.62, rotate: 355 }, f));
++}
++
++/** "+" inside a disc. */
++function plusBadge(s, x, y, d, disc, glyph) {
++  oval(s, x, y, d, d, disc);
++  const p = d * 0.68;
++  s.addShape(SH.mathPlus, {
++    x: x + (d - p) / 2, y: y + (d - p) / 2, w: p, h: p,
++    fill: { color: glyph }, line: { type: 'none' },
++  });
++}
++
++/** Two overlapping heart badges + "10K Likes" + a "Like" pill. */
++function likesRow(s, o) {
++  [0, 0.171].forEach(dx => {
++    oval(s, o.x + dx, o.y, 0.288, 0.288, o.disc);
++    s.addShape(SH.heart, {
++      x: o.x + dx + 0.065, y: o.y + 0.085, w: 0.146, h: 0.146,
++      fill: { color: o.heart }, line: { type: 'none' },
++    });
++  });
++  T(s, '10K Likes', o.labelX, o.y - 0.031, 0.806, 0.332, { ls: 1.5, color: o.labelColor || BLACK });
++  pill(s, o.btnX, o.btnY, 1.023, 0.320, o.btnFill);
++  T(s, 'Like ', o.btnX + 0.010, o.btnY + 0.025, 1.003, 0.269,
++    { bold: true, align: 'center', color: o.btnColor });
++}
++
++/** Two-person "customers" glyph on a white disc pair. */
++function peopleBadge(s, x, y, d) {
++  [0, 0.128].forEach(dx => {
++    oval(s, x + dx, y, d, d, WHITE);
++    oval(s, x + dx + d * 0.36, y + d * 0.18, d * 0.28, d * 0.28, BLACK);
++    s.addShape(SH.roundRect, {
++      x: x + dx + d * 0.20, y: y + d * 0.50, w: d * 0.60, h: d * 0.32,
++      fill: { color: BLACK }, line: { type: 'none' }, rectRadius: d * 0.12,
++    });
++  });
++}
++
++/** Small bar-chart glyph on a white disc (Profit & Loss card). */
++function chartBadge(s, x, y, d) {
++  oval(s, x, y, d, d, WHITE);
++  const bx = x + d * 0.28, base = y + d * 0.70;
++  [0.10, 0.22, 0.34, 0.18].forEach((hh, i) => {
++    box(s, bx + i * d * 0.095, base - d * hh, d * 0.065, d * hh, BLACK);
++  });
++  box(s, bx - d * 0.04, y + d * 0.28, d * 0.04, d * 0.46, BLACK);
++  box(s, bx - d * 0.04, base, d * 0.50, d * 0.04, BLACK);
++}
++
++/** Three figures over a zig-zag rising arrow (Profit card, slide 12). */
++function growthBadge(s, x, y, w, h, color) {
++  [0.04, 0.26, 0.48].forEach(f => {
++    oval(s, x + w * (f + 0.035), y, w * 0.11, w * 0.11, color);
++    box(s, x + w * f, y + w * 0.13, w * 0.18, h * 0.52, color, 30000);
++  });
++  // polyline: low-left, peak, dip, arrowhead top-right
++  const pts = [[0.02, 0.98], [0.30, 0.52], [0.46, 0.72], [0.98, 0.16]];
++  pts.slice(1).forEach(([px, py], i) => {
++    const [qx, qy] = pts[i];
++    s.addShape(SH.line, {
++      x: x + w * Math.min(qx, px), y: y + h * Math.min(qy, py),
++      w: w * Math.abs(px - qx), h: h * Math.abs(py - qy),
++      flipV: py < qy,
++      line: { color, width: 2.5, endArrowType: i === 2 ? 'triangle' : 'none' },
++    });
++  });
++}
++
++/** Briefcase glyph on a disc (slide 6). */
++function briefcaseBadge(s, x, y, d) {
++  oval(s, x, y, d, d, DARK);
++  box(s, x + d * 0.38, y + d * 0.26, d * 0.24, d * 0.12, LIME, 25000);
++  box(s, x + d * 0.43, y + d * 0.31, d * 0.14, d * 0.10, DARK);
++  box(s, x + d * 0.20, y + d * 0.36, d * 0.60, d * 0.38, LIME, 16000);
++}
++
++/* ------------------------------------------------------------------- chrome */
++
++const NAV = [['Home', 6.035], ['About', 7.530], ['Support', 9.026]];
++
++/** Top navigation bar, identical on every slide except the active item. */
++function chrome(slide, active) {
++  slide.background = { color: BG };
++
++  oval(slide, 0.564, 0.508, 0.318, 0.318, DARK);
++  flame(slide, 0.658, 0.561, 0.144, 0.211, LIME);
++  T(slide, 'UWESLAH', 0.922, 0.535, 0.870, 0.269, { bold: true });
++
++  NAV.forEach(([label, x]) => T(slide, label, x, 0.522, 1.263, 0.269,
++    { bold: true, align: 'center', color: label === active ? BLACK : GRAY }));
++  T(slide, 'Login', 10.711, 0.522, 1.263, 0.269, { bold: true, align: 'center' });
++
++  pill(slide, 11.757, 0.506, 1.023, 0.320, DARK);
++  T(slide, 'Sign In', 11.637, 0.531, 1.263, 0.269,
++    { bold: true, align: 'center', color: LIME });
++
++  const activeX = NAV.filter(n => n[0] === active)[0][1];
++  pill(slide, activeX + (1.263 - 0.072) / 2, 0.782, 0.072, 0.050, DARK);
++}
++
++/** Small dark "Explore / Next / Close" call-to-action pill. */
++function ctaPill(s, label, x, y, fill, color) {
++  pill(s, x, y, 1.023, 0.320, fill || DARK);
++  T(s, label, x + 0.010, y + 0.035, 1.003, 0.269,
++    { bold: true, align: 'center', color: color || LIME });
++}
++
++/** Dark stat card: heading + oversized percentage. */
++function statCard(s, o) {
++  box(s, o.x, o.y, o.w, o.h, o.fill || DARK, o.adj || 11074);
++  T(s, o.label, o.x + o.lx, o.y + o.ly, 1.968, 0.682,
++    { bold: true, size: 12, ls: 1.5, color: o.labelColor || LIME });
++  T(s, o.value, o.x + o.lx, o.y + o.vy, 1.389, 0.774,
++    { bold: true, size: 40, color: o.valueColor || WHITE });
++}
++
++/**
++ * "Quote card": dark panel, avatar, name, Follow pill, quote, arrow.
++ * `framedAvatar` picks the framed picture tile (slide 14) over the plain
++ * circular slot the reference leaves invisible on slide 2.
++ */
++function quoteCard(s, o) {
++  box(s, o.x, o.y, 4.793, 1.662, DARK, 13616);
++  if (o.framedAvatar) avatarSlot(s, o.avatarX, o.avatarY, 0.443);
++  else imageSlot(s, o.avatarX, o.avatarY, 0.443, 0.443, 50000, DARK);
++  T(s, 'Your Name Was Here', o.nameX, o.nameY, 1.717, 0.332, { ls: 1.5, color: WHITE });
++  pill(s, o.followX, o.followY, 1.023, 0.320, BG);
++  T(s, 'Follow', o.followX + 0.010, o.followY + 0.026, 1.003, 0.269,
++    { bold: true, align: 'center' });
++  T(s, '”A babbling brook meadners thorugh the landscape”', o.quoteX, o.quoteY, 3.383, 0.682,
++    { bold: true, size: 12, ls: 1.5, color: LIME });
++  arrow(s, o.arrowX, o.arrowY, 0.380, 0.355, WHITE, 'ne');
++}
++
++/* ------------------------------------------------------- recurring copy text */
++
++const COPY = {
++  air: 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling when leaves. ',
++  airTower: 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling when leaves. Towering trees, adorned',
++  crisp: 'The crisp air carries the man  promise of adventure and the scent of pine, and I know it em was good for you',
++  brook: 'A babbling brook in the  where meanders through the when landscape, I know i was never be better.',
++  brookShort: 'A babbling brook in the  where meanders through the when landscape',
++  man: 'The air is alive with the man to symphony of chirping birds, buzzing insects',
++  manFull: 'The air is alive with the man to symphony of chirping birds, buzzing insects, and rustling when leaves. ',
++  symphony: 'The air is alive with the symphony ',
++  buzzing: 'The air is alive with the symphony of chirping birds, buzzing  insects, and rustling when leaves. ',
++  chriping: 'The air is alive with chriping',
++  weProvide: '”We provide the best service, For our clients!',
++};
++
++/* -------------------------------------------------------------- slide 1 — hero */
++function slide01() {
++  const s = pptx.addSlide();
++  chrome(s, 'Home');
++  imageSlot(s, 0.553, 3.238, 12.029, 4.712, 4683);
++  T(s, 'Business Plan', 0.651, 1.333, 2.701, 0.303, { bold: true, size: 12 });
++  T(s, 'UWESLAH', 0.615, 1.615, 4.625, 1.111, { bold: true, size: 60 });
++  lead(s, 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling when leaves. Towering trees, adorned with.',
++    5.569, 1.707, 3.919, 0.837);
++  spark(s, 11.757, 1.707, 0.825);
++}
++
++/* --------------------------------------------------- slide 2 — exec summary */
++function slide02() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  box(s, -0.386, 1.348, 1.523, 5.031, GRAY, 5542);
++  imageSlot(s, 2.046, 1.348, 4.793, 5.031, 4683);
++  title(s, 'Executive Summary', 7.748, 1.343, 3.690, 1.447);
++  lead(s, 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling when leaves. Towering trees, adorned with vibrant moss and lichens, stand as ancient sentinels, ',
++    7.748, 2.943, 4.781, 0.832);
++  lead(s, 'A babbling brook meanders through the landscape, its', 7.736, 3.986, 4.432, 0.332);
++  quoteCard(s, {
++    x: 7.736, y: 4.716,
++    avatarX: 8.076, avatarY: 4.915,
++    nameX: 8.611, nameY: 4.957,
++    followX: 11.191, followY: 4.978,
++    quoteX: 7.989, quoteY: 5.459,
++    arrowX: 11.824, arrowY: 5.678,
++  });
++  spark(s, 11.832, 1.342, 0.696);
++}
++
++/* ------------------------------------------------- slide 3 — our business */
++function slide03() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 0.861, 1.276, 4.044, 3.639);
++  box(s, 9.254, 5.240, 3.324, 1.567, DARK, 13616);
++
++  title(s, 'Our Business', 0.883, 5.313, 4.022, 0.774);
++  lead(s, 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling when leaves.',
++    0.916, 6.023, 4.044, 0.585);
++  T(s, 'Your Business', 5.586, 5.364, 1.837, 0.379, { bold: true, size: 12, ls: 1.5 });
++  lead(s, COPY.air, 5.586, 5.785, 2.863, 0.837);
++  T(s, 'Your Business', 9.446, 5.364, 1.837, 0.379, { bold: true, size: 12, ls: 1.5, color: LIME });
++  lead(s, COPY.air, 9.446, 5.785, 2.863, 0.837, WHITE);
++
++  // testimonial strip
++  box(s, 5.586, 3.142, 3.771, 1.773, DARK, 13616);
++  T(s, COPY.weProvide, 5.875, 3.913, 3.078, 0.682, { bold: true, size: 12, ls: 1.5, color: LIME });
++  likesRow(s, {
++    x: 6.001, y: 3.528, disc: WHITE, heart: DARK, labelX: 6.463, labelColor: WHITE,
++    btnX: 8.063, btnY: 3.503, btnFill: BG, btnColor: BLACK,
++  });
++
++  // 87% + customers band
++  box(s, 10.037, 3.012, 2.029, 1.908, DARK, 11074);
++  box(s, 12.746, 3.012, 0.806, 1.908, GRAY, 12851);
++  T(s, '87%', 10.133, 4.028, 1.389, 0.774, { bold: true, size: 40, color: WHITE });
++  T(s, COPY.chriping, 10.133, 3.162, 1.968, 0.682, { bold: true, size: 12, ls: 1.5, color: LIME });
++
++  box(s, 5.583, 1.270, 1.947, 1.422, GRAY, 12851);
++  box(s, 8.208, 1.270, 4.264, 1.422, DARK, 12851);
++  T(s, 'Customer Satisfied statistic', 8.426, 1.405, 1.968, 0.585,
++    { bold: true, size: 10, ls: 1.5, color: LIME });
++  T(s, '97%', 10.942, 1.766, 1.389, 0.774, { bold: true, size: 40, color: WHITE });
++  arrow(s, 10.455, 1.952, 0.358, 0.335, WHITE, 'ne');
++  peopleBadge(s, 8.532, 2.091, 0.320);
++}
++
++/* ----------------------------------------------- slide 4 — market analysis */
++function slide04() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 0.691, 1.276, 4.044, 5.217);
++
++  title(s, 'Market Analysis', 5.287, 1.365, 2.974, 1.447);
++  lead(s, 'The air is alive with the symphony of chirping birds, buzzing', 5.287, 2.796, 3.149, 0.585);
++  T(s, 'Business Scale ', 5.314, 4.079, 1.665, 0.379, { bold: true, size: 12, ls: 1.5 });
++  T(s, '85%', 5.314, 4.415, 1.665, 0.564, { bold: true, size: 20, ls: 1.5 });
++  lead(s, 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling',
++    5.314, 5.026, 1.931, 1.090);
++
++  box(s, 8.977, 1.274, 2.339, 2.339, DARK2, 16317);
++  box(s, 12.161, 1.274, 1.441, 2.339, GRAY, 16317);
++  T(s, COPY.chriping, 9.163, 1.493, 1.968, 0.682, { bold: true, size: 12, ls: 1.5, color: LIME });
++  T(s, '87%', 9.163, 2.636, 1.389, 0.774, { bold: true, size: 40, color: WHITE });
++
++  // two doughnut gauges
++  [{ cx: 7.742, chx: 7.928, chy: 4.259, chh: 1.515, ch2: 2.425, pct: 75, ty: 5.847, vy: 4.865, vx: 8.320, tx: 7.915 },
++   { cx: 10.136, chx: 10.322, chy: 4.270, chh: 1.507, ch2: 2.411, pct: 50, ty: 5.858, vy: 4.876, vx: 10.714, tx: 10.309 },
++  ].forEach(g => {
++    box(s, g.cx, g.cx === 7.742 ? 4.071 : 4.082, 1.837, g.ch2, DARK2, 16317);
++    s.addChart(CH.doughnut, [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [g.pct, 100 - g.pct] }], {
++      x: g.chx, y: g.chy, w: 1.464, h: g.chh,
++      holeSize: 50, chartColors: [LIME, WHITE], dataBorder: { pt: 0, color: WHITE },
++      showLegend: false, showTitle: false, showValue: false,
++      chartArea: { fill: { type: 'none' } }, plotArea: { fill: { type: 'none' } },
++    });
++    T(s, g.pct + '%', g.vx, g.vy, 0.746, 0.303, { bold: true, size: 12, align: 'center', color: WHITE });
++    T(s, 'Your Target 001', g.tx, g.ty, 1.491, 0.269, { align: 'center', color: WHITE });
++  });
++  box(s, 12.503, 4.071, 1.099, 2.422, GRAY, 16317);
++
++  spark(s, 4.006, 1.233, 0.873);
++}
++
++/* ------------------------------------------------- slide 5 — SWOT analysis */
++function slide05() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, -0.365, 1.406, 6.815, 3.845);
++  box(s, 0.574, 4.403, 2.759, 3.617, DARK2, 16317);
++  box(s, 3.935, 4.403, 2.759, 3.617, DARK2, 16317);
++
++  title(s, 'SWOT Analysis', 7.234, 1.792, 5.063, 0.774);
++  lead(s, COPY.air, 7.234, 2.584, 5.485, 0.585, BLACK);
++
++  const SWOT = [
++    { letter: 'S', label: 'Strengths', discX: 0.861, titleX: 1.575, bodyX: 0.797, disc: WHITE, glyph: BLACK, titleColor: LIME2, bodyColor: SILVER },
++    { letter: 'W', label: 'Weakness', discX: 4.297, titleX: 5.011, bodyX: 4.233, disc: WHITE, glyph: BLACK, titleColor: LIME2, bodyColor: SILVER },
++    { letter: 'O', label: 'Opportunities', discX: 7.362, titleX: 8.076, bodyX: 7.298, disc: DARK, glyph: LIME, titleColor: BLACK, bodyColor: DARK },
++    { letter: 'T', label: 'Threats', discX: 10.567, titleX: 11.282, bodyX: 10.502, disc: DARK, glyph: LIME, titleColor: BLACK, bodyColor: DARK },
++  ];
++  SWOT.forEach(q => {
++    oval(s, q.discX, 4.653, 0.448, 0.446, q.disc);
++    T(s, q.letter, q.discX, 4.707, 0.448, 0.34,
++      { bold: true, size: 19, align: 'center', color: q.glyph });
++    T(s, q.label, q.titleX, 4.663, 1.439, 0.379,
++      { bold: true, size: 12, ls: 1.5, color: q.titleColor });
++    T(s, COPY.brook, q.bodyX, 5.252, 2.217, 1.090, { ls: 1.5, color: q.bodyColor });
++  });
++
++  likesRow(s, {
++    x: 7.298, y: 3.780, disc: DARK, heart: LIME, labelX: 7.821, labelColor: BLACK,
++    btnX: 11.627, btnY: 3.756, btnFill: DARK, btnColor: LIME,
++  });
++  spark(s, 6.109, 1.881, 0.585);
++}
++
++/* ---------------------------------------------- slide 6 — business models */
++function slide06() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 0.651, 4.175, 5.039, 3.684);
++  box(s, 9.998, 1.271, 2.654, 1.889, DARK, 12851);
++
++  title(s, 'Business Models', 0.722, 1.486, 5.063, 0.774);
++  lead(s, COPY.air, 0.722, 2.239, 4.860, 0.585, BLACK);
++  likesRow(s, {
++    x: 0.786, y: 3.190, disc: DARK, heart: LIME, labelX: 1.309, labelColor: BLACK,
++    btnX: 6.767, btnY: 3.166, btnFill: DARK, btnColor: LIME,
++  });
++
++  T(s, 'Revenue', 6.699, 1.486, 1.784, 0.303, { bold: true, size: 12 });
++  lead(s, COPY.crisp, 6.699, 1.796, 2.305, 1.090);
++  plusBadge(s, 8.557, 1.493, 0.303, DARK, LIME);
++
++  T(s, 'Pricing', 10.201, 1.486, 1.784, 0.303, { bold: true, size: 12, color: LIME });
++  lead(s, COPY.crisp, 10.201, 1.828, 2.305, 1.090, WHITE);
++  plusBadge(s, 12.072, 1.493, 0.303, WHITE, DARK);
++
++  box(s, 6.692, 4.165, 2.313, 2.325, DARK, 12851);
++  T(s, 'Market Participations', 6.863, 4.343, 1.968, 0.682,
++    { bold: true, size: 12, ls: 1.5, color: LIME });
++  T(s, '74%', 6.863, 5.485, 1.389, 0.774, { bold: true, size: 40, color: WHITE });
++
++  T(s, 'Business Descriptions', 9.631, 4.353, 2.186, 0.303, { bold: true, size: 12 });
++  lead(s, COPY.crisp, 9.665, 4.757, 2.830, 0.837);
++  briefcaseBadge(s, 11.982, 4.214, 0.446);
++
++  spark(s, 4.774, 3.799, 0.944);
++}
++
++/* ------------------------------------------------- slide 7 — our services */
++function slide07() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 0.600, 3.153, 3.940, 3.738);
++  imageSlot(s, 5.229, 3.153, 2.934, 3.738);
++  imageSlot(s, 8.851, 3.201, 3.940, 3.738);
++
++  title(s, 'Our Services', 0.564, 1.309, 5.063, 0.774);
++  lead(s, COPY.air, 0.564, 2.074, 3.920, 0.585, BLACK);
++
++  [{ head: 'Your Services 01', x: 5.204, bw: 3.073, hh: 0.303 },
++   { head: 'Your Services 2', x: 8.810, bw: 3.006, hh: 0.505 },
++  ].forEach(c => {
++    T(s, c.head, c.x, 1.424, 2.186, c.hh, { bold: true, size: 12 });
++    lead(s, COPY.crisp, c.x, 1.828, c.bw, 0.837);
++  });
++
++  spark(s, 9.050, 3.365, 0.944);
++}
++
++/* ------------------------------------------- slide 8 — marketing strategy */
++function slide08() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 0.651, 4.175, 5.039, 3.684);
++  box(s, 6.837, 4.256, 5.761, 2.147, DARK, 12851);
++
++  title(s, 'Marketing Strategy', 6.876, 1.354, 5.928, 0.774);
++  lead(s, COPY.air, 6.876, 2.155, 5.761, 0.585);
++  ctaPill(s, 'Explore  ', 7.019, 3.045);
++
++  T(s, 'Business Scale ', 7.200, 4.472, 1.665, 0.379, { bold: true, size: 12, ls: 1.5, color: LIME });
++  T(s, '85%', 7.200, 4.808, 1.665, 0.564, { bold: true, size: 20, ls: 1.5, color: BG });
++  lead(s, 'The air is alive with the symphony of chirping', 7.200, 5.419, 1.931, 0.585, BG);
++
++  T(s, 'Promotions', 10.141, 4.472, 2.068, 0.379, { bold: true, size: 12, ls: 1.5, color: LIME });
++  lead(s, COPY.brook, 10.141, 4.959, 2.259, 1.090, WHITE);
++
++  box(s, 3.649, 1.213, 2.139, 2.150, DARK, 12851);
++  T(s, 'Market Increase predict', 3.820, 1.373, 1.968, 0.682,
++    { bold: true, size: 12, ls: 1.5, color: LIME });
++  T(s, '74%', 3.820, 2.451, 1.680, 0.774, { bold: true, size: 40, color: WHITE });
++
++  T(s, 'Your Strategy', 0.572, 1.707, 2.334, 0.303, { bold: true, size: 12 });
++  lead(s, COPY.crisp, 0.564, 2.086, 2.334, 1.090);
++}
++
++/* ---------------------------------------------- slide 9 — sales strategy */
++function slide09() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 5.942, 1.383, 3.438, 5.556);
++
++  title(s, 'Sales Strategy', 0.883, 1.354, 5.928, 0.774);
++  lead(s, COPY.air, 0.883, 2.155, 4.298, 0.585);
++
++  box(s, 0.796, 3.080, 4.385, 1.214, GRAY, 16317);
++  T(s, 'Sales Upgrade Procject', 0.922, 3.156, 2.458, 0.379, { bold: true, size: 12, ls: 1.5 });
++  lead(s, 'The crisp air carries the man  promise of adventure and the scent of pine.',
++    0.922, 3.538, 4.298, 0.585);
++
++  T(s, 'Project Impact', 0.922, 4.654, 1.665, 0.379, { bold: true, size: 12, ls: 1.5 });
++  T(s, '90%', 0.922, 4.990, 1.665, 0.564, { bold: true, size: 20, ls: 1.5 });
++  lead(s, 'The air is alive with the symphony of chirping birds, ', 0.922, 5.601, 1.931, 0.837);
++
++  statCard(s, {
++    x: 3.152, y: 4.647, w: 2.029, h: 1.908,
++    label: COPY.chriping, lx: 0.095, ly: 0.150, value: '87%', vy: 1.016,
++  });
++
++  // right-hand strategy stack
++  [{ y: 1.368, h: 1.788, label: 'Strategy Plan 01', fill: DARK },
++   { y: 3.750, h: 1.788, label: 'Strategy Plan 02', fill: DARK },
++   { y: 6.132, h: 1.544, label: null, fill: GRAY },
++  ].forEach(c => {
++    box(s, 10.108, c.y, 2.702, c.h, c.fill, 12851);
++    if (!c.label) return;
++    T(s, c.label, 10.305, c.y + 0.115, 2.068, 0.379, { bold: true, size: 12, ls: 1.5, color: LIME });
++    lead(s, COPY.manFull, 10.288, c.y + 0.491, 2.400, 1.090, WHITE);
++  });
++}
++
++/* -------------------------------------------- slide 10 — operations plan */
++function slide10() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 6.191, 1.383, 3.189, 4.954);
++  imageSlot(s, 10.065, 1.383, 3.831, 4.954);
++
++  title(s, 'Operations Plan', 0.564, 1.574, 5.190, 0.774);
++  lead(s, COPY.buzzing, 0.564, 2.338, 4.874, 0.585);
++  ctaPill(s, 'Explore ', 0.625, 3.175);
++
++  [{ y: 3.992, fill: GRAY, head: 'Your Another Property', headColor: BLACK, body: DARK, disc: DARK, glyph: LIME },
++   { y: 5.381, fill: DARK, head: 'Your office name was here', headColor: LIME, body: WHITE, disc: WHITE, glyph: DARK },
++  ].forEach(r => {
++    box(s, 0.651, r.y, 4.787, 0.956, r.fill, 16317);
++    plusBadge(s, 0.891, r.y + 0.254, 0.303, r.disc, r.glyph);
++    T(s, r.head, 1.345, r.y + 0.110, 2.820, 0.379, { bold: true, size: 12, ls: 1.5, color: r.headColor });
++    lead(s, '123 Main street, City and Your Country was here', 1.345, r.y + 0.438, 3.867, 0.332, r.body);
++  });
++
++  spark(s, 9.767, 1.746, 0.944);
++}
++
++/* ------------------------------------------------ slide 11 — meet our teams */
++function slide11() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 0.574, 1.515, 2.931, 4.622);
++  imageSlot(s, 4.446, 1.515, 2.931, 4.622);
++  imageSlot(s, 8.388, 3.762, 4.163, 2.083);
++
++  title(s, 'Meet Our Teams', 8.318, 1.376, 3.188, 1.447);
++  lead(s, COPY.buzzing, 8.318, 2.824, 4.668, 0.585);
++
++  [{ x: 0.574, w: 2.931, fill: DARK, name: LIME, role: WHITE, ax: 3.034 },
++   { x: 4.446, w: 2.931, fill: GRAY, name: BLACK, role: DARK, ax: 6.906 },
++   { x: 8.388, w: 4.163, fill: DARK, name: LIME, role: WHITE, ax: 11.961 },
++  ].forEach(c => {
++    box(s, c.x, 5.846, c.w, 0.722, c.fill, 16317);
++    T(s, 'Your Name Was Here', c.x + 0.077, 5.867, 2.820, 0.379,
++      { bold: true, size: 12, ls: 1.5, color: c.name });
++    lead(s, 'As a Head Manager', c.x + 0.077, 6.137, 1.923, 0.332, c.role);
++    arrow(s, c.ax, 6.054, 0.297, 0.317, WHITE, 'nw');
++  });
++
++  spark(s, 2.995, 1.628, 0.944);
++}
++
++/* --------------------------------------------- slide 12 — financial plan */
++function slide12() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  box(s, 10.403, 1.289, 2.313, 2.125, GRAY, 12851);
++
++  title(s, 'Financial Plan', 1.112, 1.485, 5.082, 0.774);
++  lead(s, COPY.buzzing, 1.091, 2.263, 4.874, 0.585);
++  ctaPill(s, 'Explore ', 1.151, 3.101);
++
++  [{ x: 7.530, head: 'Your Descriptions', hw: 1.899, value: '60%' },
++   { x: 10.671, head: 'Project Impact', hw: 1.665, value: '90%' },
++  ].forEach(c => {
++    T(s, c.head, c.x, 1.546, c.hw, 0.379, { bold: true, size: 12, ls: 1.5 });
++    T(s, c.value, c.x, 1.882, 1.665, 0.564, { bold: true, size: 20, ls: 1.5 });
++    lead(s, COPY.symphony, c.x, 2.493, 1.931, 0.585);
++  });
++
++  // Profit & Loss panel
++  box(s, 7.298, 3.891, 5.418, 3.009, DARK, 16317);
++  chartBadge(s, 7.872, 4.208, 0.333);
++  T(s, 'Profit & Loss Statement', 8.275, 4.224, 2.616, 0.302,
++    { bold: true, size: 12, color: LIME });
++
++  const AXIS = [
++    { y: 4.719, label: '$9.000.000', gridY: 4.934 },
++    { y: 5.115, label: '$8.000.000', gridY: 5.323 },
++    { y: 5.511, label: '$5.000.000', gridY: 5.695 },
++    { y: 5.905, label: '$2.500.000', gridY: 6.092 },
++    { y: 6.300, label: '$1.000.000', gridY: 6.516 },
++  ];
++  AXIS.forEach(a => {
++    T(s, a.label, 7.790, a.y, 1.095, 0.332, { ls: 1.5, color: SILVER });
++    s.addShape(SH.line, { x: 8.886, y: a.gridY, w: 3.188, h: 0,
++      line: { color: WHITE, width: 1.5, dashType: 'dash' } });
++  });
++  [9.197, 9.829, 10.506, 11.171, 11.834].forEach(x =>
++    s.addShape(SH.line, { x, y: 4.934, w: 0, h: 1.158,
++      line: { color: WHITE, width: 1.5, dashType: 'dash' } }));
++
++  // lime columns with white caps
++  [{ x: 9.080, y: 5.995, h: 0.541, capX: 9.067, capY: 5.978 },
++   { x: 9.721, y: 5.618, h: 0.919, capX: 9.705, capY: 5.601 },
++   { x: 10.388, y: 5.250, h: 1.288, capX: 10.377, capY: 5.219 },
++   { x: 11.056, y: 5.080, h: 1.458, capX: 11.041, capY: 5.063 },
++   { x: 11.724, y: 4.954, h: 1.584, capX: 11.712, capY: 4.934 },
++  ].forEach(b => {
++    box(s, b.x, b.y, 0.234, b.h, LIME, 29366);
++    box(s, b.capX, b.capY, 0.259, 0.084, WHITE, 50000);
++  });
++
++  // profit / financial point cards
++  box(s, 0.920, 4.577, 2.313, 2.325, DARK, 12851);
++  T(s, 'Profit', 1.091, 4.811, 1.968, 0.379, { bold: true, size: 12, ls: 1.5, color: LIME });
++  T(s, '$9.364.987', 1.091, 6.187, 2.142, 0.438, { bold: true, size: 20, color: WHITE });
++  growthBadge(s, 2.444, 4.861, 0.526, 0.438, WHITE);
++
++  box(s, 4.109, 4.577, 2.313, 2.325, GRAY, 12851);
++  s.addText([{ text: 'Financial ', options: { breakLine: true } }, { text: 'Point' }], {
++    x: 4.280, y: 4.805, w: 1.488, h: 0.682, valign: 'top',
++    fontFace: FONT_B, bold: true, fontSize: 12, color: BLACK, lineSpacingMultiple: 1.5,
++  });
++  T(s, '$2.000.000', 4.280, 6.187, 2.142, 0.438, { bold: true, size: 20 });
++  s.addShape(SH.swooshArrow, { x: 5.898, y: 4.962, w: 0.236, h: 0.480,
++    flipH: true, fill: { color: WHITE }, line: { type: 'none' } });
++}
++
++/* ---------------------------------------- slide 13 — funding requirements */
++function slide13() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 8.189, 4.050, 4.620, 4.166);
++
++  title(s, 'Funding Requirements', 0.672, 1.378, 6.858, 0.774);
++  lead(s, 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling when leaves. Towering trees, adorned with vibrant moss and lichens, stand as ancient sentinels, ',
++    0.651, 2.244, 6.757, 0.585);
++  ctaPill(s, 'Next', 0.809, 3.192);
++
++  box(s, -0.156, 4.242, 0.641, 0.946, GRAY, 16317);
++  box(s, -0.151, 5.705, 0.641, 0.946, DARK, 16317);
++
++  [{ x: 1.274, y: 4.282, fill: DARK, amount: '$167,986', amountColor: LIME, desc: WHITE, ax: 3.477, ay: 4.538 },
++   { x: 4.673, y: 4.242, fill: GRAY, amount: '$467,986', amountColor: BLACK, desc: DARK, ax: 6.876, ay: 4.498 },
++   { x: 1.274, y: 5.705, fill: GRAY, amount: '$467,986', amountColor: BLACK, desc: DARK, ax: 3.477, ay: 5.960 },
++   { x: 4.678, y: 5.705, fill: DARK, amount: '$167,986', amountColor: LIME, desc: WHITE, ax: 6.881, ay: 5.960 },
++  ].forEach(c => {
++    box(s, c.x, c.y, 2.620, 0.946, c.fill, 16317);
++    T(s, c.amount, c.x + 0.089, c.y + 0.033, 1.537, 0.564,
++      { bold: true, size: 20, ls: 1.5, color: c.amountColor });
++    lead(s, 'Your description was here', c.x + 0.089, c.y + 0.491, 2.222, 0.332, c.desc);
++    arrow(s, c.ax, c.ay, 0.202, 0.216, WHITE, 'se');
++  });
++
++  [{ x: 8.184, fill: GRAY, label: 'Budget need', labelColor: BLACK, value: '5%', valueColor: BLACK },
++   { x: 10.780, fill: DARK, label: 'Work Scale', labelColor: LIME, value: '80%', valueColor: WHITE },
++  ].forEach(c => {
++    box(s, c.x, 1.396, 2.029, 1.908, c.fill, 11074);
++    T(s, c.label, c.x + 0.096, 1.546, 1.968, 0.379,
++      { bold: true, size: 12, ls: 1.5, color: c.labelColor });
++    T(s, c.value, c.x + 0.096, 2.413, 1.389, 0.774,
++      { bold: true, size: 40, color: c.valueColor });
++  });
++}
++
++/* --------------------------------------------------- slide 14 — milestones */
++function slide14() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 0.659, 1.151, 4.620, 3.183);
++
++  title(s, 'Milestones', 0.672, 4.652, 4.230, 0.774);
++  lead(s, COPY.airTower, 0.651, 5.497, 4.406, 0.585);
++  ctaPill(s, 'Next', 0.809, 6.401);
++
++  [{ x: 6.949, head: 'Awards & Certification', hw: 2.431, value: '60%', vw: 1.665 },
++   { x: 10.235, head: 'Grade Certification', hw: 2.029, value: 'A+', vw: 0.851 },
++  ].forEach(c => {
++    T(s, c.head, c.x, 5.195, c.hw, 0.379, { bold: true, size: 12, ls: 1.5 });
++    T(s, c.value, c.x, 5.578, c.vw, 0.564, { bold: true, size: 20, ls: 1.5 });
++    lead(s, COPY.symphony, c.x, 6.142, 1.931, 0.585);
++  });
++
++  quoteCard(s, {
++    x: 6.035, y: 1.176, framedAvatar: true,
++    avatarX: 6.445, avatarY: 1.370,
++    nameX: 7.023, nameY: 1.440,
++    followX: 9.490, followY: 1.438,
++    quoteX: 6.289, quoteY: 1.918,
++    arrowX: 10.123, arrowY: 2.137,
++  });
++  box(s, 11.806, 1.151, 1.821, 1.687, GRAY, 11074);
++
++  // award chips
++  [{ x: 6.701, y: 3.400, w: 2.018, fill: GRAY, color: BLACK, label: 'Your Awards Here' },
++   { x: 9.481, y: 3.400, w: 2.018, fill: DARK, color: LIME, label: 'Your Awards Here' },
++   { x: 12.264, y: 3.400, w: 1.364, fill: GRAY, color: null, label: null },
++   { x: 6.035, y: 4.297, w: 2.018, fill: DARK, color: LIME, label: 'Your Awards Here' },
++   { x: 8.815, y: 4.297, w: 2.018, fill: GRAY, color: BLACK, label: 'Your Awards Here' },
++   { x: 11.598, y: 4.297, w: 1.322, fill: GRAY, color: null, label: null },
++  ].forEach(c => {
++    pill(s, c.x, c.y, c.w, 0.423, c.fill);
++    if (c.label) {
++      T(s, c.label, c.x + 0.026, c.y + 0.006, 1.968, 0.379,
++        { bold: true, size: 12, ls: 1.5, align: 'center', color: c.color });
++    }
++  });
++}
++
++/* ------------------------------------------------ slide 15 — risk analysis */
++function slide15() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 0.564, 2.838, 4.251, 3.718);
++
++  title(s, 'Risk Analysis', 0.585, 1.227, 4.230, 0.774);
++  lead(s, COPY.airTower, 0.564, 1.967, 4.406, 0.585);
++
++  [{ x: 4.444, fill: DARK, head: 'Risk Analysis 01', headColor: LIME, body: WHITE },
++   { x: 7.431, fill: null, head: 'Risk Analysis 02', headColor: BLACK, body: DARK },
++   { x: 10.418, fill: GRAY, head: 'Risk Analysis 03', headColor: BLACK, body: DARK },
++  ].forEach(c => {
++    if (c.fill) box(s, c.x, 4.444, 2.431, 2.260, c.fill, 12851);
++    T(s, c.head, c.x + 0.314, 4.798, 1.790, 0.379,
++      { bold: true, size: 12, ls: 1.5, color: c.headColor });
++    lead(s, COPY.brookShort, c.x + 0.314, 5.226, 1.866, 1.090, c.body);
++  });
++
++  box(s, 5.586, 1.940, 3.771, 1.908, DARK, 13616);
++  T(s, 'Every challenges its easy for us, Cause we are together!', 5.875, 2.847, 3.078, 0.682,
++    { bold: true, size: 12, ls: 1.5, color: LIME });
++  likesRow(s, {
++    x: 6.001, y: 2.319, disc: WHITE, heart: DARK, labelX: 6.463, labelColor: WHITE,
++    btnX: 8.063, btnY: 2.293, btnFill: BG, btnColor: BLACK,
++  });
++
++  box(s, 10.114, 1.946, 2.029, 1.908, DARK, 11074);
++  box(s, 12.746, 1.946, 0.806, 1.908, GRAY, 12851);
++  T(s, COPY.chriping, 10.209, 2.096, 1.968, 0.682, { bold: true, size: 12, ls: 1.5, color: LIME });
++  T(s, '87%', 10.209, 2.962, 1.389, 0.774, { bold: true, size: 40, color: WHITE });
++}
++
++/* ------------------------------------------------- slide 16 — exit strategy */
++function slide16() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 7.058, 1.609, 5.722, 3.000);
++  box(s, 0.553, 4.476, 5.834, 1.988, GRAY, 12851);
++
++  title(s, 'Exit Strategy ', 0.796, 1.776, 3.651, 1.447);
++  lead(s, COPY.airTower, 0.796, 3.341, 4.561, 0.585);
++
++  [{ x: 0.956, y: 4.672, hw: 0.831, head: 'IPO', bw: 2.498, body: COPY.air },
++   { x: 3.894, y: 4.729, hw: 1.234, head: 'Criteria', bw: 2.526, body: 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling when leaves' },
++  ].forEach(c => {
++    T(s, c.head, c.x, c.y, c.hw, 0.379, { bold: true, size: 12, ls: 1.5 });
++    lead(s, c.body, c.x, 5.091, c.bw, 1.090);
++  });
++
++  T(s, 'Your Description', 7.298, 4.902, 2.285, 0.379, { bold: true, size: 12, ls: 1.5 });
++  lead(s, 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling when leaves. But the Towering trees, adorned',
++    7.298, 5.316, 5.240, 0.585);
++  ctaPill(s, 'Explore ', 7.298, 6.144);
++
++  spark(s, 4.670, 1.776, 0.585);
++}
++
++/* ------------------------------------------ slide 17 — social responsibility */
++function slide17() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 4.504, 1.661, 3.523, 4.578);
++  box(s, 0.667, 2.644, 3.291, 1.530, GRAY, 12851);
++  box(s, 0.667, 4.710, 3.291, 1.530, DARK, 12851);
++  box(s, 8.411, 4.393, 4.489, 1.847, GRAY, 12851);
++
++  title(s, 'Social Responsibility', 8.578, 1.668, 4.755, 1.447);
++  lead(s, COPY.airTower, 8.578, 3.165, 4.309, 0.585);
++
++  T(s, 'The air alive with the ', 8.677, 4.733, 2.225, 0.303, { bold: true, size: 12 });
++  lead(s, COPY.crisp, 8.677, 5.108, 3.894, 0.837);
++  plusBadge(s, 12.140, 4.710, 0.303, DARK, LIME);
++
++  [{ y: 2.771, color: BLACK, body: DARK, bw: 2.707, discY: 2.862, disc: DARK, glyph: LIME },
++   { y: 4.823, color: LIME, body: WHITE, bw: 2.642, discY: 4.956, disc: WHITE, glyph: DARK },
++  ].forEach(c => {
++    T(s, 'Lorem ipsum dolor', 0.979, c.y, 2.068, 0.379,
++      { bold: true, size: 12, ls: 1.5, color: c.color });
++    lead(s, COPY.man + '.', 0.979, c.y + 0.394, c.bw, 0.837, c.body);
++    plusBadge(s, 3.383, c.discY, 0.303, c.disc, c.glyph);
++  });
++
++  spark(s, 3.374, 1.524, 0.585);
++}
++
++/* ------------------------------------------------ slide 18 — future growth */
++function slide18() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++  imageSlot(s, 0.564, 1.192, 4.264, 2.259);
++  imageSlot(s, 5.384, 1.192, 3.523, 5.707);
++  box(s, 11.466, 3.365, 1.195, 1.124, DARK, 15721);
++
++  title(s, 'Future Growth', 0.504, 4.055, 4.582, 0.774);
++  lead(s, COPY.man + '. ' + COPY.man + '.', 0.564, 4.832, 4.264, 0.837);
++  ctaPill(s, 'Explore ', 0.651, 6.064);
++
++  T(s, 'Sales Increase', 9.456, 1.202, 2.660, 0.564, { bold: true, size: 20, ls: 1.5 });
++  T(s, '17%', 9.456, 1.758, 0.832, 0.564, { bold: true, size: 20, ls: 1.5, align: 'center' });
++  arrow(s, 12.371, 1.980, 0.242, 0.226, BLACK, 'ne');
++  lead(s, 'The air is alive with the symphony of chirping birds, buzzing insects, and rustling',
++    9.456, 2.365, 3.177, 0.585);
++
++  T(s, '12.000', 9.456, 3.434, 1.490, 0.564, { bold: true, size: 20, ls: 1.5, align: 'center' });
++  T(s, 'Sales', 9.657, 3.997, 1.195, 0.303, { bold: true, size: 12, align: 'center', color: DARK });
++  T(s, '80%', 11.290, 3.434, 1.490, 0.564,
++    { bold: true, size: 20, ls: 1.5, align: 'center', color: WHITE });
++  T(s, 'Profit', 11.429, 3.997, 1.195, 0.303,
++    { bold: true, size: 12, align: 'center', color: LIME });
++
++  box(s, 9.458, 4.904, 3.311, 1.909, DARK, 12851);
++  T(s, COPY.weProvide, 9.690, 5.803, 2.899, 0.682, { bold: true, size: 12, ls: 1.5, color: LIME });
++  likesRow(s, {
++    x: 9.815, y: 5.314, disc: WHITE, heart: DARK, labelX: 10.278, labelColor: WHITE,
++    btnX: 11.576, btnY: 5.288, btnFill: BG, btnColor: BLACK,
++  });
++}
++
++/* ---------------------------------------------------- slide 19 — appendix */
++function slide19() {
++  const s = pptx.addSlide();
++  chrome(s, 'About');
++
++  title(s, 'Appendix', 0.734, 1.603, 3.441, 0.774);
++  lead(s, COPY.man + '. ', 0.734, 2.436, 3.295, 0.585);
++
++  [{ x: 8.198, fill: GRAY, color: BLACK },
++   { x: 10.836, fill: DARK2, color: LIME },
++  ].forEach(c => {
++    box(s, c.x, 1.326, 1.944, 1.944, c.fill, 16317);
++    T(s, 'Your Statement', c.x + 0.152, 1.431, 1.449, 0.682,
++      { bold: true, size: 12, ls: 1.5, color: c.color });
++    T(s, '$750,500', c.x + 0.152, 2.656, 1.793, 0.438,
++      { bold: true, size: 20, color: c.color === LIME ? WHITE : BLACK });
++  });
++
++  const cats = ['Example 01', 'Exmaple 02', 'Example 03', 'Example 04'];
++  s.addChart(CH.bar, [
++    { name: 'Example A', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++    { name: 'Example B', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
++    { name: 'Example C', labels: cats, values: [2, 2, 3, 5] },
++  ], {
++    x: 0.564, y: 3.750, w: 12.216, h: 3.149,
++    barDir: 'bar', barGrouping: 'clustered', barGapWidthPct: 182,
++    chartColors: [LIME, DARK, INK],
++    showTitle: true, title: 'Exampe Your Chart', titleFontFace: FONT_B,
++    titleFontSize: 12, titleBold: true, titleColor: INK,
++    showLegend: true, legendPos: 'b', legendFontFace: FONT, legendFontSize: 10, legendColor: INK,
++    catAxisLabelFontFace: FONT, catAxisLabelFontSize: 10, catAxisLabelColor: INK,
++    catAxisLineColor: SILVER, catAxisMajorTickMark: 'none', catAxisMinorTickMark: 'none',
++    valAxisLabelFontFace: FONT, valAxisLabelFontSize: 10, valAxisLabelColor: INK,
++    valAxisLineShow: false, valAxisMajorTickMark: 'none', valAxisMinorTickMark: 'none',
++    valGridLine: { color: SILVER, style: 'solid', size: 1 },
++    catGridLine: { style: 'none' },
++    layout: { x: 0.0849, y: 0.1352, w: 0.8990, h: 0.6368 },
++    chartArea: { fill: { type: 'none' } }, plotArea: { fill: { type: 'none' } },
++  });
++
++  spark(s, 5.894, 1.605, 0.585);
++}
++
++/* --------------------------------------------------- slide 20 — thank you */
++function slide20() {
++  const s = pptx.addSlide();
++  chrome(s, 'Home');
++  imageSlot(s, 6.667, 1.469, 6.959, 4.578);
++
++  spark(s, 0.753, 1.911, 0.661);
++  T(s, 'THANK YOU', 0.651, 2.958, 5.783, 1.111, { bold: true, size: 60 });
++  lead(s, '“' + COPY.man + '. of chirping birds, buzzing insects.”', 0.651, 4.064, 4.962, 0.585);
++  ctaPill(s, 'Close', 0.743, 4.866);
++
++  T(s, '+1234567890 (Dadang Yupi)', 0.564, 6.459, 2.945, 0.332,
++    { bold: true, ls: 1.5, color: DARK });
++  T(s, 'www.examplesite.com', 5.194, 6.459, 2.945, 0.332,
++    { bold: true, ls: 1.5, align: 'center', color: DARK });
++  T(s, 'exampleemail@email.com', 9.870, 6.459, 2.945, 0.332,
++    { bold: true, ls: 1.5, align: 'right', color: DARK });
++}
++
++/* ------------------------------------------------------------------- build */
++[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++ slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++  .forEach(build => build());
++
++const outFile = path.join(__dirname, '0df7cf1d-9de2-4c3d-b306-00ce5849c88b_grok_final.pptx');
++pptx.writeFile({ fileName: outFile }).then(() => console.log('wrote ' + outFile));

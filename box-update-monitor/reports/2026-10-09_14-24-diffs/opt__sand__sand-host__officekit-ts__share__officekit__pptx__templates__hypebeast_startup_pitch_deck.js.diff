@@ -1,0 +1,1056 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/hypebeast_startup_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/hypebeast_startup_pitch_deck.js
+@@ -0,0 +1,1053 @@
++/**
++ * Cegia / Hypebeast pitch deck - 42 slides, 13.333 x 7.5 in (16:9).
++ * Rebuilt with pptxgenjs only; photographs are stand-in colour blocks.
++ *   node 05ec1ea9-71c2-4737-abcf-196880275c7a_grok_final.js
++ */
++'use strict';
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette
++const C = {
++  maroon: '461616',
++  teal: '295459',
++  yellow: 'FED33F',
++  pink: 'F3D9D9',
++  mint: 'D5E9EB',
++  cream: 'FFF6D5',
++  sand: 'EAD7C0',
++  white: 'FFFFFF',
++  ink: '262626',
++  head: '595959',
++  body: '808080',
++  slate: '404040',
++  gray: 'BFBFBF',
++  gray2: 'D9D9D9',
++  black: '0D0D0D',
++  maroonD: '351010',
++  tealL: '63AEB7',
++  yellowL: 'FEE58C',
++  wood: '88502E',
++  woodD: '633D1A',
++  steel: '59595C',
++  steelD: '424143',
++  steelL: '929497',
++  glass: 'D0EAE6',
++  photoB: '0A4571',
++  photoR: 'D01413',
++};
++
++const F = { sans: 'PT Sans', serif: 'Source Serif Pro' };
++
++// Long body copy that the deck repeats on several slides.
++const T = {
++  p1: 'Proactively envisioned multimedia based expertise and cross media growth quality intellectual capital without superior collaboration product benefits.',
++  p2: 'Proactively envisioned multimedia based expertise and cross-media growth strategies quality Make a type specimen book unknown printer took type.',
++  p3: 'PLACEHOLDER',
++  p4: 'Leverage agile frameworks to provide a robust synopsis for high level views new normal that has.',
++  p5: 'Dominate extensible testing procedures for reliable good uniquely matrix sound make a type book known printer took a galley of type good user testing.',
++  p6: 'Proactively envisioned multimedia based expertise and cross-media growth strategies quality Make a type specimen book unknown printer.',
++  p7: 'Leverage agile frameworks to provide a robust high level views new normal. that has good.',
++  p8: 'Scalable customer service through. Collaboratively administrate empowered markets networks scrambled it to make a type process.',
++  p9: 'Credibly pontificate highly efficient manufactured products and enabled data. Efficiently unleash cross-media information.',
++  p10: 'Make a type specimen book unknown printer took a galley of type and scrambled it to make a type process centric pursue.',
++  p11: 'Proactively envisioned multimedia based expertise and cross-media growth strategies. Seamlessly visualize quality intellectual capital without superior collaboration. Leverage agile frameworks to provide a robust synopsis for high level.',
++  p12: 'Leverage agile frameworks to provide a robust synopsis for high level views new normal that has evolve generation.',
++  p13: 'Make a type specimen book amet unknown printer took a galley dolor.',
++  p14: 'Leverage agile frameworks to provide a robust synopsis for high level views hanging powered. High level views new normal has evolve generation visualize customer directed revolution.',
++  p15: 'Capitalize on low hanging fruit to identify a ballpark value content in provide a robust .',
++  p16: 'Make a type specimen book amet unknown printer took a galley dolor and scrambled it to.',
++  p17: 'Interactively coordinate proactive via process centric outside the box  thinking pursue',
++  p18: 'Proactively envisioned multimedia based expertise and cross media growth strategies. Seamlessly visualize quality intellectual capital without superior.',
++  p19: 'Leverage agile frameworks to provide a robust synopsis for high level views new normal views new normal that ensure coordinate proactive.',
++  p20: 'Predominate extensible testing procedures for reliable good.',
++  p21: 'Make a type specimen book unknown printer took a galley of type and scrambled it to make a type good customers.',
++  p22: 'Leverage agile frameworks to provide a robust synopsis for high level views new normal that has on the runway.',
++  p23: 'Individual commitment to a group effort that is what makes a team work, a company work, a society',
++  p24: 'Collaboratively administrate markets via plug and play networks users after installed base.',
++};
++
++
++// ------------------------------------------------------------ tiny primitives
++function shape(s, kind, x, y, w, h, fill, opt) {
++  const o = Object.assign({}, opt || {});
++  const solid = fill ? { color: fill } : { type: 'none' };
++  if (o.transparency) { solid.transparency = o.transparency; delete o.transparency; }
++  s.addShape(kind, Object.assign({ x: x, y: y, w: w, h: h, fill: solid, line: { type: 'none' } }, o));
++}
++function box(s, x, y, w, h, fill, opt) { shape(s, 'rect', x, y, w, h, fill, opt); }
++function oval(s, x, y, w, h, fill, opt) { shape(s, 'ellipse', x, y, w, h, fill, opt); }
++
++// A stand-in for a photograph: flat colour block with a discreet caption.
++function photo(s, x, y, w, h, tint) {
++  s.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: tint }, line: { type: 'none' } });
++  s.addText('[image]', { x: x, y: y, w: w, h: h, margin: 0, align: 'center', valign: 'middle',
++    fontFace: F.sans, fontSize: 11, color: C.white, transparency: 55 });
++}
++
++// ------------------------------------------------------------- text wrappers
++function textBase(s, x, y, w, h, content, base, opt) {
++  s.addText(content, Object.assign({ x: x, y: y, w: w, h: h, margin: 0, wrap: true }, base, opt || {}));
++}
++// running body copy: 10pt grey, 1.5 line spacing
++function p(s, x, y, w, h, content, opt) {
++  textBase(s, x, y, w, h, content,
++    { fontFace: F.sans, fontSize: 10, color: C.body, valign: 'top', lineSpacingMultiple: 1.5 }, opt);
++}
++// small bold sub-heading
++function h(s, x, y, w, h_, content, opt) {
++  textBase(s, x, y, w, h_, content,
++    { fontFace: F.sans, fontSize: 14, bold: true, color: C.head, valign: 'top' }, opt);
++}
++// italic serif slide title
++function title(s, x, y, w, h, content, opt) {
++  textBase(s, x, y, w, h, content,
++    { fontFace: F.serif, fontSize: 28, italic: true, color: C.ink, valign: 'middle' }, opt);
++}
++// the letter-spaced W W W . C E G I A . C O M footer
++function url(s, x, y, w, h, opt) {
++  textBase(s, x, y, w, h, 'W   W   W   .   C   E   G   I   A   .   C   O   M',
++    { fontFace: F.sans, fontSize: 9, color: C.body, align: 'center', valign: 'top' }, opt);
++}
++
++// -------------------------------------------------------- composite fragments
++// hollow rectangle drawn as four hairlines (pptxgenjs shape outlines only)
++function outline(s, x, y, w, h, color, pt) {
++  s.addShape('rect', { x: x, y: y, w: w, h: h, fill: { type: 'none' },
++    line: { color: color, width: pt } });
++}
++// numbered square badge used by the SWOT slide
++function numberBadge(s, x, y, color, n) {
++  outline(s, x, y, 0.507, 0.507, color, 2);
++  outline(s, x - 0.09, y + 0.09, 0.507, 0.507, color, 2);
++  s.addText(String(n), { x: x - 0.09, y: y + 0.09, w: 0.507, h: 0.507, margin: 0,
++    align: 'center', valign: 'middle', fontFace: F.sans, fontSize: 12, bold: true, color: color });
++}
++
++// hourglass silhouette: two round bulbs pinched into a narrow waist
++function hourglass(s, x, y, w, h) {
++  const half = h / 2, neck = w * 0.13;
++  oval(s, x, y, w, half * 1.05, C.glass);                          // upper bulb
++  oval(s, x, y + half * 0.95, w, half * 1.05, C.glass);            // lower bulb
++  shape(s, 'triangle', x, y + half * 0.35, w, half * 0.65, C.glass, { flipV: true });
++  shape(s, 'triangle', x, y + half, w, half * 0.65, C.glass);
++  box(s, x + (w - neck) / 2, y + half * 0.85, neck, half * 0.3, C.glass);
++}
++
++// cheering figure used on the "What We Are Looking To Achieve" slide
++function dancer(s, x, y, w, h) {
++  shape(s, 'roundRect', x + w * .22, y + h * .02, w * .06, h * .26, C.sand, { rectRadius: .04, rotate: 15 });
++  shape(s, 'roundRect', x + w * .72, y + h * .02, w * .06, h * .26, C.sand, { rectRadius: .04, rotate: -15 });
++  shape(s, 'roundRect', x + w * .38, y + h * .17, w * .24, h * .2, C.ink, { rectRadius: .13 });  // hair
++  oval(s, x + w * .44, y + h * .2, w * .16, h * .1, C.sand);                                     // face
++  shape(s, 'roundRect', x + w * .44, y + h * .28, w * .15, h * .21, C.cream, { rectRadius: .06 });
++  shape(s, 'roundRect', x + w * .35, y + h * .27, w * .11, h * .23, C.teal, { rectRadius: .06 });
++  shape(s, 'roundRect', x + w * .57, y + h * .27, w * .11, h * .23, C.teal, { rectRadius: .06 });
++  shape(s, 'roundRect', x + w * .47, y + h * .47, w * .11, h * .51, C.maroon, { rectRadius: .07 });
++  shape(s, 'roundRect', x + w * .22, y + h * .5, w * .28, h * .07, C.maroon, { rectRadius: .04, rotate: -22 });
++  oval(s, x + w * .15, y + h * .52, w * .09, h * .025, C.ink);   // raised shoe
++  oval(s, x + w * .45, y + h * .96, w * .13, h * .025, C.ink);   // standing shoe
++}
++
++// head-and-shoulders silhouette (market-share slide)
++function headProfile(s, x, y, w, h) {
++  oval(s, x, y, w * 0.85, h * 0.72, C.mint);
++  box(s, x, y + h * 0.33, w * 0.62, h * 0.67, C.mint);
++  shape(s, 'roundRect', x + w * 0.05, y + h * 0.55, w * 0.72, h * 0.45, C.mint, { rectRadius: 0.4 });
++}
++
++// device mock-ups
++function phone(s, x, y, w, h) {
++  shape(s, 'roundRect', x, y, w, h, C.ink, { rectRadius: 0.28 });
++  box(s, x + w * 0.31, y + h * 0.035, w * 0.38, h * 0.012, C.steelL);
++  oval(s, x + w * 0.42, y + h * 0.86, w * 0.16, w * 0.16, C.steelD);
++}
++function watch(s, x, y, w, h) {
++  shape(s, 'roundRect', x + w * 0.16, y, w * 0.68, h, C.slate, { rectRadius: 0.5 });
++  shape(s, 'roundRect', x, y + h * 0.2, w, h * 0.6, C.steelD, { rectRadius: 0.35 });
++  box(s, x + w * 0.97, y + h * 0.3, w * 0.05, h * 0.08, C.steel);
++}
++
++// ------------------------------------------------------------------- pixel art
++// Maps are drawn from ASCII rows: each run of '#' becomes one rectangle.
++function pixelArt(s, rows, x0, y0, cell, color) {
++  rows.forEach(function (row, r) {
++    let c = 0;
++    while (c < row.length) {
++      if (row[c] === '#') {
++        let end = c;
++        while (end < row.length && row[end] === '#') end++;
++        box(s, x0 + c * cell, y0 + r * cell, (end - c) * cell, cell, color);
++        c = end;
++      } else c++;
++    }
++  });
++}
++
++// ------------------------------------------------------------- icon libraries
++// The last twelve slides are pictogram catalogues: 10 columns of small dark
++// glyphs. Each glyph is assembled from native shapes; the recipe is chosen
++// deterministically so every sheet shows a different mix.
++const GLYPHS = [
++  function (s, x, y, d, k) { shape(s, 'roundRect', x, y, d, d, k, { rectRadius: d / 5 });
++    box(s, x + d * .22, y + d * .22, d * .56, d * .18, C.white); },
++  function (s, x, y, d, k) { oval(s, x, y, d, d, k); oval(s, x + d * .3, y + d * .3, d * .4, d * .4, C.white); },
++  function (s, x, y, d, k) {
++    [0.35, 0.65, 1].forEach(function (f, i) { box(s, x + i * d * .36, y + d * (1 - f), d * .24, d * f, k); });
++  },
++  function (s, x, y, d, k) { shape(s, 'triangle', x, y, d, d, k); },
++  function (s, x, y, d, k) {
++    box(s, x + d * .38, y, d * .24, d, k); box(s, x, y + d * .38, d, d * .24, k);
++  },
++  function (s, x, y, d, k) { shape(s, 'rightArrow', x, y + d * .2, d, d * .6, k); },
++  function (s, x, y, d, k) { outline(s, x, y, d, d, k, 3); },
++  function (s, x, y, d, k) { shape(s, 'diamond', x, y, d, d, k); },
++  function (s, x, y, d, k) { shape(s, 'pie', x, y, d, d, k, { angleRange: [270, 180] }); },
++  function (s, x, y, d, k) {
++    [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(function (q) {
++      oval(s, x + q[0] * d * .58, y + q[1] * d * .58, d * .42, d * .42, k);
++    });
++  },
++  function (s, x, y, d, k) { shape(s, 'donut', x, y, d, d, k, { rectRadius: d / 4 }); },
++  function (s, x, y, d, k) {
++    box(s, x, y + d * .1, d, d * .18, k); box(s, x, y + d * .45, d, d * .18, k);
++    box(s, x, y + d * .8, d * .6, d * .18, k);
++  },
++  function (s, x, y, d, k) { shape(s, 'star5', x, y, d, d, k); },
++  function (s, x, y, d, k) { shape(s, 'chevron', x, y + d * .15, d, d * .7, k); },
++];
++
++// one pictogram, sized to fit the given box
++function glyph(s, x, y, w, h, color, i) {
++  const d = Math.min(w, h);
++  GLYPHS[i % GLYPHS.length](s, x + (w - d) / 2, y + (h - d) / 2, d, color);
++}
++
++function iconSheet(s, cfg) {
++  const cols = 10, dx = 1.1795, d = 0.42;
++  const skip = cfg.skip || [];
++  for (let r = 0; r < cfg.rows; r++) {
++    for (let c = 0; c < cols; c++) {
++      if (skip.some(function (p2) { return p2[0] === r && p2[1] === c; })) continue;
++      glyph(s, cfg.x0 + c * dx - d / 2, cfg.y0 + r * cfg.dy - d / 2, d, d, C.ink, cfg.seed + r * 5 + c * 11);
++    }
++  }
++}
++
++
++// Silhouette of Norway (slide 28) and Russia (slide 30) as pixel grids.
++const NORWAY = [
++  '                                   #',
++  '                              ## # # #',
++  '                             ## #######',
++  '                             ## ########',
++  '                           # #########',
++  '                      #  ########   ##',
++  '                      ###########    ###',
++  '                   #############',
++  '                    ##### ######',
++  '                    ####   #####',
++  '                  ######',
++  '                    #  #',
++  '                  ###',
++  '                 ##',
++  '                 #',
++  '                ##',
++  '                ##',
++  '              ####',
++  '              ###',
++  '             ####',
++  '             ###',
++  '             ##',
++  '            ###',
++  '            ###',
++  '            ###',
++  '           ###',
++  '          #####',
++  '         ######',
++  '        ## #',
++  '      #   ##',
++  '       #####',
++  '      ######',
++  '     #######',
++  '   #########',
++  '  ##########',
++  ' ###########',
++  '  ###########',
++  ' ############',
++  '  ##########',
++  '  ##########',
++  '   #########',
++  '  #########',
++  '   ########',
++  '   ###### #',
++  '  #####',
++  '  #####',
++  '    #',
++];
++
++const RUSSIA = [
++  '                                #',
++  '                                ##                          #',
++  '                                 #',
++  '                                  #                              #',
++  '                                   #          ##           #######',
++  '                       ##          ###                     #######',
++  '                     ##           #####               #  #######',
++  '                    #          #######          ################',
++  '                   #          ########    ##    #################',
++  '          #        #         ###############  ##################',
++  '          ##       #    ##  ####################################',
++  '         ####           ########################################',
++  '         ####        # ########################################',
++  '        ##    # ####### #################################### #',
++  '        ## ############## ################################  #',
++  '       ###################################################  ##',
++  '      ####################################################  ##',
++  '     ###################################################    ###',
++  '     #################################################      ###',
++  '     ################################################       ##',
++  '     ################################################        #',
++  '     ################################################',
++  '     ##  ###########################################',
++  '      ####  ######################################### ##',
++  '      #################################################',
++  '       ################################################ #',
++  '       #####  ####     #######################   #######',
++  '      ####     ###        ####################   ######',
++  '     ######                ###################       ##',
++  '      #####                  ######   #####          ##',
++  '      ###                    ##                      ##',
++  '        #                                            #',
++];
++
++function slide01(s) {
++  box(s, 4, 3.555, 3.528, 3.945, C.teal);
++  p(s, .853, 3.584, 2.293, 1.992, 'Interactively coordinate proactive for without commerce via process-centric outside the box  thinking pursue.\n\nEmpowered markets via plug-and-play networks. Dynamic procrastinate B2C users after installed base benefits dramatic highly efficient.');
++  title(s, .853, .816, 7.068, .744, 'Cegia Presentation', { fontSize: 48 });
++  h(s, 8.826, 1.037, 3.754, .303, [{ text: 'Hypebeast Pitch Deck' }], { fontSize: 18, align: 'right' });
++  url(s, 3.267, 5.481, 2.804, .151, { color: C.white, rotate: 270 });
++  photo(s, 5.333, 2.377, 7.246, 4.406, C.photoB);
++}
++
++function slide02(s) {
++  h(s, 9.26, 2.701, 3.108, .982, 'Hello,\nWe Are Cegia!', { fontSize: 32, italic: true, color: C.ink, valign: 'middle' });
++  title(s, 1.348, .708, 6.532, .744, 'Welcome Message', { fontSize: 48 });
++  p(s, 5.836, 5.154, 6.117, .724, 'Bring to the table win-win survival strategies to ensure proactive domination. At the end of the day, going forward, a new normal that has evolved from generation. Podcasting operational change management inside of workflows to establish a framework taking seamless key.');
++  photo(s, 1.348, 2.16, 3.108, 2.064, C.photoR);
++  photo(s, 4.771, 2.16, 3.108, 2.064, C.photoR);
++  photo(s, 1.348, 4.484, 3.108, 2.064, C.photoB);
++}
++
++function slide03(s) {
++  photo(s, 0, 0, 13.333, 3.358, C.photoB);
++  oval(s, 2.145, 4.832, .353, .353, C.maroon);
++  p(s, 2.768, 4.77, 4.609, .478, 'Proactively envisioned multimedia based expertise and cross media growth quality intellectual capital without superior collaboration agile.');
++  oval(s, 2.145, 5.539, .353, .353, C.yellow);
++  p(s, 2.768, 5.476, 4.609, .478, 'Interactively coordinate proactive via outside the box pursue scalable service intellectual capital without superior collaboration agile frameworks.');
++  oval(s, 2.145, 6.245, .353, .353, C.teal);
++  p(s, 2.768, 6.183, 4.609, .478, 'Leverage agile frameworks to provide robust synopsis for high level views new intellectual capital without superior collaboration agile frameworks.');
++  h(s, 2.145, 4.198, 5.232, .269, 'The early history of the company developed :', { fontSize: 16 });
++  box(s, .943, -.527, 13.333, 3.358, C.black, { transparency: 30 });
++  p(s, 2.95, 1.732, 7.433, .483, 'Proactively envisioned multimedia based expertise and cross-media growth strategies. Seamlessly visualize quality intellectual capital without superior agile frameworks to provide a robust.', { color: C.white, align: 'center' });
++  title(s, 2.95, 1.138, 7.433, .431, 'Our Company History', { color: C.white, align: 'center' });
++  photo(s, 9.522, 2.799, 2.971, 3.854, C.photoR);
++}
++
++function slide04(s) {
++  p(s, 2.809, 5.609, 7.715, .478, 'Proactively envisioned multimedia based expertise and cross media growth strategies. Seamlessly visualize quality intellectual. Collaboration leverage agile frameworks to provide a robust. Seamlessly visualize quality intellectual capital.', { align: 'center' });
++  title(s, 3.114, .614, 7.104, .432, 'An Overview Of The Problem', { align: 'center' });
++  url(s, 5.267, 6.734, 2.8, .151);
++  photo(s, .968, 1.728, 3.3, 3.3, C.photoB);
++  photo(s, 5.017, 1.728, 3.3, 3.3, C.photoR);
++  photo(s, 9.065, 1.728, 3.3, 3.3, C.photoB);
++  box(s, 5.267, 1.978, 2.8, 2.8, C.yellow, { transparency: 30 });
++  box(s, 9.315, 1.978, 2.8, 2.8, C.teal, { transparency: 30 });
++  box(s, 1.218, 1.978, 2.8, 2.8, C.maroon, { transparency: 30 });
++  h(s, 5.667, 3.305, 2, .236, 'Problem Two', { color: C.white, align: 'center' });
++  glyph(s, 6.334, 2.421, .666, .666, C.white, 1);
++  p(s, 5.667, 3.663, 2, .73, T.p16, { color: C.white, align: 'center' });
++  h(s, 9.715, 3.305, 2, .236, 'Problem Three', { color: C.white, align: 'center' });
++  p(s, 9.715, 3.663, 2, .73, T.p16, { color: C.white, align: 'center' });
++  h(s, 1.618, 3.305, 2, .236, 'Problem One', { color: C.white, align: 'center' });
++  p(s, 1.618, 3.663, 2, .73, T.p16, { color: C.white, align: 'center' });
++  box(s, 2.289, 2.268, .658, .819, C.white);
++  glyph(s, 10.355, 2.443, .72, .649, C.white, 4);
++}
++
++function slide05(s) {
++  hourglass(s, 1.624, 2.282, 2.672, 3.811);
++  box(s, 1.141, 1.667, 3.635, .55, C.wood);
++  box(s, 1.141, 6.161, 3.635, .55, C.wood);
++  box(s, 1.421, 2.216, 3.093, .256, C.steel);
++  box(s, 1.421, 2.216, 3.093, .256, C.steelD);
++  box(s, 3.872, 2.216, .455, .256, C.steel);
++  box(s, 1.405, 5.905, 3.093, .256, C.steel);
++  box(s, 3.288, 5.905, .816, .256, C.steelD);
++  box(s, 1.594, 5.905, .436, .256, C.steelL);
++  box(s, 2.967, 1.667, 1.808, .55, C.woodD);
++  box(s, 2.967, 6.161, 1.808, .55, C.woodD);
++  box(s, 1.565, 2.472, 2.804, .139, C.steelD, { transparency: 40 });
++  box(s, 2.93, 3.823, .1, 1.23, C.tealL);
++  box(s, 3.03, 3.823, .1, 1.23, C.teal);
++  box(s, 1.791, 5.336, .737, .285, C.yellowL);
++  box(s, 2.507, 5.336, 1.605, .285, C.yellow);
++  box(s, 1.916, 5.052, .76, .285, C.maroon);
++  box(s, 2.514, 5.052, 1.526, .285, C.maroonD);
++  box(s, 1.771, 5.621, .737, .285, C.tealL);
++  box(s, 2.498, 5.621, 1.634, .285, C.teal);
++  box(s, 1.983, 3.253, .68, .285, C.yellowL);
++  box(s, 2.562, 3.253, 1.387, .285, C.yellow);
++  box(s, 1.858, 2.968, .704, .285, C.tealL);
++  box(s, 2.496, 2.968, 1.58, .285, C.teal);
++  box(s, 2.183, 3.538, .66, .285, C.maroon);
++  box(s, 2.663, 3.538, 1.087, .285, C.maroonD);
++  box(s, 1.895, 2.611, .833, 1.21, C.white, { transparency: 30 });
++  box(s, 1.895, 4.556, .833, 1.21, C.white, { transparency: 30 });
++  title(s, 2.421, .618, 8.49, .431, 'Our Expected Growth Path', { align: 'center' });
++  p(s, 2.687, 3.01, .543, .202, '2027', { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1 });
++  p(s, 2.687, 3.295, .543, .202, '2026', { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1 });
++  p(s, 2.687, 3.579, .543, .202, '2025', { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1 });
++  p(s, 2.687, 4.808, .543, .202, '2024', { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1 });
++  p(s, 2.687, 5.094, .543, .202, '2023', { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1 });
++  p(s, 2.687, 5.377, .543, .202, '2022', { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1 });
++  p(s, 2.687, 5.662, .543, .202, '2021', { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1 });
++  oval(s, 6.393, 1.867, .3, .3, C.teal);
++  p(s, 7.638, 1.778, 4.554, .478, T.p1);
++  h(s, 6.917, 1.882, .55, .269, '2027', { fontSize: 16, color: C.teal, align: 'center' });
++  oval(s, 6.393, 2.575, .3, .3, C.yellow);
++  p(s, 7.638, 2.486, 4.554, .478, T.p1);
++  h(s, 6.917, 2.59, .55, .269, '2026', { fontSize: 16, color: C.yellow, align: 'center' });
++  oval(s, 6.393, 3.283, .3, .3, C.maroon);
++  p(s, 7.638, 3.194, 4.554, .478, T.p1);
++  h(s, 6.917, 3.298, .55, .269, '2025', { fontSize: 16, align: 'center' });
++  oval(s, 6.393, 3.99, .3, .3, C.teal);
++  p(s, 7.638, 3.902, 4.554, .478, T.p1);
++  h(s, 6.917, 4.006, .55, .269, '2024', { fontSize: 16, color: C.teal, align: 'center' });
++  oval(s, 6.393, 4.698, .3, .3, C.maroon);
++  p(s, 7.638, 4.609, 4.554, .478, T.p1);
++  h(s, 6.917, 4.714, .55, .269, '2023', { fontSize: 16, align: 'center' });
++  oval(s, 6.393, 6.114, .3, .3, C.teal);
++  p(s, 7.638, 6.025, 4.554, .478, T.p1);
++  h(s, 6.917, 6.129, .55, .269, '2021', { fontSize: 16, color: C.teal, align: 'center' });
++  oval(s, 6.393, 5.406, .3, .3, C.yellow);
++  p(s, 7.638, 5.317, 4.554, .478, T.p1);
++  h(s, 6.917, 5.421, .55, .269, '2022', { fontSize: 16, color: C.yellow, align: 'center' });
++}
++
++function slide06(s) {
++  shape(s, 'blockArc', 3.204, 3.582, 2.366, 2.366, C.maroon, { flipH: true, angleRange: [25.131, 270.24], arcThicknessRatio: .335 });
++  oval(s, 4.191, 3.579, .398, .398, C.maroon);
++  shape(s, 'blockArc', 3.633, 4.01, 1.509, 1.509, C.teal, { flipH: true, angleRange: [56.733, 269.626], arcThicknessRatio: .528 });
++  oval(s, 4.191, 4.01, .398, .398, C.teal);
++  shape(s, 'blockArc', 2.774, 3.151, 3.227, 3.227, C.teal, { flipH: true, angleRange: [345.901, 270.059], arcThicknessRatio: .246 });
++  oval(s, 4.191, 3.148, .398, .398, C.teal);
++  shape(s, 'blockArc', 2.346, 2.724, 4.082, 4.082, C.maroon, { flipH: true, angleRange: [322.704, 270.21], arcThicknessRatio: .197 });
++  oval(s, 4.191, 2.724, .398, .398, C.maroon);
++  h(s, 2.956, 2.805, 1.1, .236, '+ $8,000.00', { align: 'right' });
++  h(s, 2.956, 3.23, 1.1, .236, '+ $1,500.00', { align: 'right' });
++  h(s, 2.956, 3.66, 1.1, .236, '+ $875.00', { align: 'right' });
++  h(s, 2.956, 4.091, 1.1, .236, '+ $428.00', { align: 'right' });
++  h(s, 8.119, 2.906, 2.868, .236, 'Your Title Goes Here');
++  p(s, 8.119, 3.18, 2.868, .478, T.p7);
++  box(s, 7.285, 2.906, .6, .6, C.maroon);
++  h(s, 7.435, 3.105, .3, .202, '01', { fontSize: 12, color: C.white, align: 'center' });
++  h(s, 8.119, 3.894, 2.868, .236, 'Your Title Goes Here');
++  p(s, 8.119, 4.168, 2.868, .478, T.p7);
++  box(s, 7.285, 3.894, .6, .6, C.teal);
++  h(s, 7.435, 4.093, .3, .202, '02', { fontSize: 12, color: C.white, align: 'center' });
++  h(s, 8.119, 4.883, 2.868, .236, 'Your Title Goes Here');
++  p(s, 8.119, 5.157, 2.868, .478, T.p7);
++  box(s, 7.285, 4.883, .6, .6, C.maroon);
++  h(s, 7.435, 5.082, .3, .202, '03', { fontSize: 12, color: C.white, align: 'center' });
++  h(s, 8.119, 5.871, 2.868, .236, 'Your Title Goes Here');
++  p(s, 8.119, 6.145, 2.868, .478, T.p7);
++  box(s, 7.285, 5.871, .6, .6, C.teal);
++  h(s, 7.435, 6.07, .3, .202, '04', { fontSize: 12, color: C.white, align: 'center' });
++  p(s, 2.79, 1.556, 7.754, .225, 'Proactively envisioned multimedia based expertise and cross-media growth strategies seamlessly visualize quality intellectual.', { align: 'center' });
++  title(s, 2.79, .936, 7.754, .431, 'How The Fund Will Be Used', { align: 'center' });
++}
++
++function slide07(s) {
++  box(s, 5.966, 1.649, 1.402, 1.402, C.yellow);
++  h(s, 6.169, 1.996, .996, .707, 'We Have\nFour\nPrograms', { color: C.white, align: 'center' });
++  box(s, 1.896, 1.649, 1.404, 1.402, C.yellow);
++  oval(s, 2.423, 1.963, .35, .35, C.white);
++  h(s, 2.1, 2.501, .996, .236, 'Title Here', { color: C.white, align: 'center' });
++  box(s, 3.931, 1.649, 1.404, 1.402, C.yellow);
++  oval(s, 4.458, 1.963, .35, .35, C.white);
++  h(s, 4.135, 2.501, .996, .236, 'Title Here', { color: C.white, align: 'center' });
++  box(s, 8, 1.649, 1.402, 1.402, C.yellow);
++  oval(s, 8.526, 1.963, .35, .35, C.white);
++  h(s, 8.203, 2.501, .996, .236, 'Title Here', { color: C.white, align: 'center' });
++  box(s, 10.034, 1.649, 1.404, 1.402, C.yellow);
++  oval(s, 10.561, 1.963, .35, .35, C.white);
++  h(s, 10.238, 2.501, .996, .236, 'Title Here', { color: C.white, align: 'center' });
++  dancer(s, 5.25, 2.55, 2.35, 4.95);
++  title(s, 2.878, .608, 7.578, .431, 'What We Are Looking To Achieve', { align: 'center' });
++  h(s, 1.399, 3.925, 3.075, .236, 'Your Program Name Here');
++  p(s, 1.399, 4.176, 3.075, .73, T.p6);
++  oval(s, .803, 3.925, .4, .4, C.yellow);
++  h(s, 1.399, 5.644, 3.075, .236, 'Your Program Name Here');
++  p(s, 1.399, 5.896, 3.075, .73, T.p6);
++  oval(s, .803, 5.644, .4, .4, C.yellow);
++  h(s, 8.854, 3.925, 3.075, .236, 'Your Program Name Here', { align: 'right' });
++  p(s, 8.854, 4.176, 3.075, .73, T.p6, { align: 'right' });
++  oval(s, 12.125, 3.925, .4, .4, C.yellow);
++  h(s, 8.854, 5.644, 3.075, .236, 'Your Program Name Here', { align: 'right' });
++  p(s, 8.854, 5.896, 3.075, .73, T.p6, { align: 'right' });
++  oval(s, 12.125, 5.644, .4, .4, C.yellow);
++}
++
++function slide08(s) {
++  box(s, 1.896, 5.989, 1.129, .4, C.teal);
++  box(s, 7.578, 5.989, 1.129, .4, C.yellow);
++  h(s, 2.01, 6.072, .9, .236, '$ 56,930', { color: C.white, align: 'center' });
++  h(s, 7.693, 6.072, .9, .236, '$ 79,350', { color: C.white, align: 'center' });
++  h(s, 3.587, 4.96, 2.466, .269, 'Hype Item One', { fontSize: 16 });
++  p(s, 3.587, 5.332, 2.466, .657, T.p21, { fontSize: 9 });
++  h(s, 9.271, 4.96, 2.466, .269, 'Hype Item Two', { fontSize: 16 });
++  p(s, 9.271, 5.332, 2.466, .657, T.p21, { fontSize: 9 });
++  p(s, 1.596, 1.627, 6.375, .73, 'Bring the table win-win survival strategies ensure proactive dominan. At the end of the day, going forward, for new normal that has evolved from runway heading to our solution administrate. Seamlessly visualize quality intellectual capital without superior frameworks to provide a robust synopsis.');
++  title(s, 1.596, 1.06, 6.375, .431, 'Sales & Distribution Strategy');
++  url(s, 8.738, 1.633, 3, .151, { align: 'right' });
++  photo(s, 3.587, 3.417, 2.466, 1.336, C.photoB);
++  photo(s, 9.271, 3.417, 2.466, 1.336, C.photoR);
++  shape(s, 'line', 1.826, 3.439, 0, 2.354, null, { line: { color: C.teal } });
++  box(s, 1.908, 4.425, .197, 1.368, C.teal);
++  box(s, 2.208, 5.205, .197, .591, C.mint);
++  box(s, 2.492, 4.888, .236, .906, C.yellow);
++  box(s, 2.813, 5.323, .236, .472, C.cream);
++  p(s, 1.623, 5.705, .114, .168, '0', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 1.623, 5.244, .114, .168, '1', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 1.623, 4.783, .114, .168, '2', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 1.623, 4.322, .114, .168, '3', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 1.623, 3.862, .114, .168, '4', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 1.623, 3.401, .114, .168, '5', { color: C.head, lineSpacingMultiple: 1 });
++  shape(s, 'line', 7.633, 3.439, 0, 2.354, null, { line: { color: C.teal } });
++  box(s, 7.715, 4.425, .197, 1.368, C.teal);
++  box(s, 8.015, 5.205, .197, .591, C.mint);
++  box(s, 8.299, 4.888, .236, .906, C.yellow);
++  box(s, 8.62, 5.323, .236, .472, C.cream);
++  p(s, 7.429, 5.705, .114, .168, '0', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 7.429, 5.244, .114, .168, '1', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 7.429, 4.783, .114, .168, '2', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 7.429, 4.322, .114, .168, '3', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 7.429, 3.862, .114, .168, '4', { color: C.head, lineSpacingMultiple: 1 });
++  p(s, 7.429, 3.401, .114, .168, '5', { color: C.head, lineSpacingMultiple: 1 });
++}
++
++function slide09(s) {
++  headProfile(s, .729, 1.754, 4.262, 5.229);
++  oval(s, 1.416, 3.018, 2.243, 1.413, C.maroon);
++  oval(s, 1.319, 2.159, 1.901, 1.313, C.yellow);
++  oval(s, 2.725, 2.264, 1.625, 1.823, C.maroon);
++  oval(s, 1.127, 3.327, .664, .864, C.yellow);
++  shape(s, 'roundRect', 1.358, 4.094, 1.471, .715, C.yellow);
++  box(s, 6.638, 2.181, .73, .73, C.yellow);
++  oval(s, 6.858, 2.4, .29, .292, C.white);
++  h(s, 7.757, 2.175, 4.55, .236, 'Structure Name Goes Here', { color: C.yellow });
++  p(s, 7.757, 2.427, 4.55, .478, T.p2);
++  box(s, 6.638, 3.166, .73, .73, C.maroon);
++  h(s, 7.757, 3.16, 4.55, .236, 'Structure Name Goes Here');
++  p(s, 7.757, 3.412, 4.55, .478, T.p2);
++  box(s, 6.638, 4.151, .73, .73, C.yellow);
++  h(s, 7.757, 4.145, 4.55, .236, 'Structure Name Goes Here', { color: C.yellow });
++  p(s, 7.757, 4.397, 4.55, .478, T.p2);
++  box(s, 6.638, 5.136, .73, .73, C.maroon);
++  h(s, 7.757, 5.13, 4.55, .236, 'Structure Name Goes Here');
++  p(s, 7.757, 5.382, 4.55, .478, T.p2);
++  box(s, 6.638, 6.121, .73, .73, C.yellow);
++  h(s, 7.757, 6.115, 4.55, .236, 'Structure Name Goes Here', { color: C.yellow });
++  p(s, 7.757, 6.367, 4.55, .478, T.p2);
++  oval(s, 6.858, 5.356, .29, .29, C.white);
++  oval(s, 6.858, 6.341, .29, .29, C.white);
++  oval(s, 6.858, 3.386, .29, .29, C.white);
++  oval(s, 6.858, 4.371, .29, .29, C.white);
++  shape(s, 'line', 5.314, 4.516, 1, 0, null, { flipH: true, line: { color: C.yellow, dashType: 'dash', beginArrowType: 'oval' } });
++  shape(s, 'line', 5.314, 3.531, 1, 0, null, { flipH: true, line: { color: C.maroon, dashType: 'dash', beginArrowType: 'oval' } });
++  shape(s, 'line', 5.314, 2.546, 1, 0, null, { flipH: true, line: { color: C.yellow, dashType: 'dash', beginArrowType: 'oval' } });
++  shape(s, 'line', 5.314, 5.501, 1, 0, null, { flipH: true, line: { color: C.maroon, dashType: 'dash', beginArrowType: 'oval' } });
++  shape(s, 'line', 5.314, 6.486, 1, 0, null, { flipH: true, line: { color: C.yellow, dashType: 'dash', beginArrowType: 'oval' } });
++  title(s, 3.91, .799, 5.514, .431, 'Possible Market Share', { align: 'center' });
++}
++
++function slide10(s) {
++  box(s, 0, .902, 8.42, 5.696, C.yellow);
++  box(s, 2.463, 4.962, 2.212, .711, C.pink, { flipV: true });
++  shape(s, 'triangle', 4.636, 5.002, .711, .63, C.pink, { rotate: 90 });
++  box(s, 2.47, 4.244, 3.784, .717, C.teal, { flipV: true });
++  shape(s, 'triangle', 5.926, 4.287, .717, .63, C.teal, { rotate: 90 });
++  shape(s, 'blockArc', .528, 1.827, 4.232, 3.846, C.pink, { angleRange: [90, 270], arcThicknessRatio: .336 });
++  box(s, 2.485, 1.827, 2.212, .711, C.pink);
++  shape(s, 'triangle', 4.663, 1.862, .701, .63, C.pink, { rotate: 90 });
++  shape(s, 'blockArc', 1.255, 2.528, 3.732, 2.434, C.teal, { angleRange: [90, 270], arcThicknessRatio: .384 });
++  box(s, 2.492, 2.528, 3.784, .717, C.teal);
++  shape(s, 'triangle', 6.151, 2.571, .717, .63, C.teal, { rotate: 90 });
++  oval(s, 1.856, 3.032, 1.501, 1.501, C.cream);
++  h(s, 2.491, 1.983, 2.6, .202, 'Your Title Goes Here', { fontSize: 12, color: C.slate });
++  p(s, 2.491, 2.172, 2.6, .225, 'Make a type specimen book known printer.');
++  h(s, 3.651, 2.687, 2.6, .202, 'Your Title Goes Here', { fontSize: 12, color: C.white });
++  p(s, 3.651, 2.876, 2.6, .225, 'Make a type specimen book known printer.', { color: C.white });
++  glyph(s, 2.291, 3.467, .63, .63, C.ink, 7);
++  h(s, 2.491, 5.117, 2.6, .202, 'Your Title Goes Here', { fontSize: 12, color: C.slate });
++  p(s, 2.491, 5.306, 2.6, .225, 'Make a type specimen book known printer.');
++  h(s, 3.651, 4.403, 2.6, .202, 'Your Title Goes Here', { fontSize: 12, color: C.white });
++  p(s, 3.651, 4.592, 2.6, .225, 'Make a type specimen book known printer.', { color: C.white });
++  p(s, 5.594, 1.863, .802, .572, [{ text: '35', options: { fontSize: 24 } }, { text: '%', options: { fontSize: 16, breakLine: true } }, { text: 'Market Sale' }], { color: C.white, lineSpacingMultiple: 1 });
++  p(s, 7.09, 2.601, .802, .572, [{ text: '57', options: { fontSize: 24 } }, { text: '%', options: { fontSize: 16, breakLine: true } }, { text: 'Market Sale' }], { color: C.white, lineSpacingMultiple: 1 });
++  p(s, 6.865, 4.317, .802, .572, [{ text: '55', options: { fontSize: 24 } }, { text: '%', options: { fontSize: 16, breakLine: true } }, { text: 'Market Sale' }], { color: C.white, lineSpacingMultiple: 1 });
++  p(s, 5.594, 5.031, .802, .572, [{ text: '35', options: { fontSize: 24 } }, { text: '%', options: { fontSize: 16, breakLine: true } }, { text: 'Market Sale' }], { color: C.white, lineSpacingMultiple: 1 });
++  h(s, 3.87, 3.604, 2.447, .303, [{ text: 'Market Probability' }], { fontSize: 18, color: C.white });
++  p(s, 9.314, 3.513, 3.126, 1.992, 'Collaboratively administrate empowered markets via plug and play networks. Dynamic procrastinate B2C users after installed base benefits.\n\nDramatic visualize. Predominate extensible testing. Interactively coordinate proactive  e-commerce. Predominate extensible testing procedures for reliable good user to get Austria map.');
++  title(s, 9.314, 1.995, 3.126, 1.262, 'Growth With Additional Funding');
++}
++
++function slide11(s) {
++  box(s, 6.36, 1.071, 2.251, 2.251, C.maroon);
++  box(s, .769, 1.071, 5.262, 2.251, C.mint);
++  h(s, 6.959, 1.63, 1.054, .539, '61%', { fontSize: 32, color: C.white, align: 'center' });
++  h(s, 6.959, 2.225, 1.054, .539, 'Complete Customers', { fontSize: 16, color: C.white, align: 'center' });
++  h(s, 1.188, 3.868, 5.714, .269, 'Hype Beast Product One', { fontSize: 16, align: 'right' });
++  p(s, 1.188, 4.411, 5.714, .478, T.p14, { align: 'right' });
++  p(s, 1.188, 4.174, 5.714, .202, 'Your Title Goes Here', { fontSize: 12, color: C.head, align: 'right', lineSpacingMultiple: 1 });
++  h(s, 1.188, 5.437, 5.714, .269, 'Hype Beast Product Two', { fontSize: 16, align: 'right' });
++  p(s, 1.188, 5.98, 5.714, .478, T.p14, { align: 'right' });
++  p(s, 1.188, 5.742, 5.714, .202, 'Your Title Goes Here', { fontSize: 12, color: C.head, align: 'right', lineSpacingMultiple: 1 });
++  p(s, 1.399, 2.078, 4.003, .73, 'Collaboratively administrate empowered markets via plug and play networks. Dynamic procrastinate B2C users after installed base benefits dramatic customer directed revolution.', { align: 'right' });
++  title(s, 1.399, 1.58, 4.003, .431, 'Comparison Statistics', { align: 'right' });
++  photo(s, 8.94, 1.071, 3.625, 5.358, C.photoR);
++  oval(s, 7.351, 3.752, 1.258, 1.258, C.ink);
++  shape(s, 'pie', 7.349, 3.75, 1.262, 1.262, C.maroon, { angleRange: [191.281, 88.979] });
++  oval(s, 7.455, 3.856, 1.05, 1.05, C.white);
++  h(s, 7.684, 4.213, .591, .337, '72%', { align: 'center' });
++  oval(s, 7.353, 5.318, 1.258, 1.258, C.ink);
++  shape(s, 'pie', 7.349, 5.311, 1.262, 1.262, C.teal, { angleRange: [46.357, 1.41] });
++  oval(s, 7.457, 5.422, 1.05, 1.05, C.white);
++  h(s, 7.686, 5.779, .591, .337, '87%', { align: 'center' });
++}
++
++function slide12(s) {
++  box(s, 0, 5.368, 13.435, 2.132, C.slate);
++  h(s, 8.996, 2.928, 2.439, .236, 'Your Title Goes Here', { align: 'center' });
++  p(s, 8.996, 3.271, 2.439, .731, T.p12, { align: 'center' });
++  h(s, 5.447, 2.928, 2.439, .236, 'Your Title Goes Here', { align: 'center' });
++  p(s, 5.447, 3.271, 2.439, .731, T.p12, { align: 'center' });
++  h(s, 1.898, 2.928, 2.439, .236, 'Your Title Goes Here', { align: 'center' });
++  p(s, 1.898, 3.271, 2.439, .731, T.p12, { align: 'center' });
++  p(s, 2.505, 1.535, 8.323, .478, T.p11, { align: 'center' });
++  title(s, 3.045, .949, 7.243, .431, 'Products Benefits', { align: 'center' });
++  oval(s, 2.071, 4.321, 2.093, 2.093, C.teal);
++  oval(s, 2.173, 4.423, 1.89, 1.89, C.white);
++  h(s, 2.718, 5.132, .8, .471, '54,49 M\nIncome', { color: C.slate, align: 'center' });
++  oval(s, 5.62, 4.321, 2.093, 2.093, C.maroon);
++  oval(s, 5.722, 4.423, 1.89, 1.89, C.white);
++  h(s, 6.267, 5.132, .8, .471, '43,74 M\nIncome', { color: C.slate, align: 'center' });
++  oval(s, 9.169, 4.321, 2.093, 2.093, C.yellow);
++  oval(s, 9.271, 4.423, 1.89, 1.89, C.white);
++  h(s, 9.816, 5.132, .8, .471, '35,61 M\nIncome', { color: C.slate, align: 'center' });
++  url(s, 5.417, 6.88, 2.5, .151, { color: C.white });
++}
++
++function slide13(s) {
++  oval(s, 10.089, 3.07, 1.112, 1.112, C.maroon);
++  glyph(s, 10.416, 3.393, .458, .462, C.white, 4);
++  shape(s, 'roundRect', 10.024, 4.044, 1.242, .386, C.yellow, { rectRadius: .193 });
++  h(s, 10.145, 4.144, 1, .185, 'Project 04', { fontSize: 11, color: C.white, align: 'center' });
++  h(s, 9.695, 4.684, 1.9, .269, 'Your Title Here', { fontSize: 16, align: 'center' });
++  p(s, 9.695, 5.056, 1.9, .726, T.p13, { align: 'center' });
++  oval(s, 7.437, 3.07, 1.112, 1.112, C.teal);
++  glyph(s, 7.764, 3.397, .458, .458, C.white, 3);
++  shape(s, 'roundRect', 7.372, 4.044, 1.242, .386, C.yellow, { rectRadius: .193 });
++  h(s, 7.493, 4.144, 1, .185, 'Project 03', { fontSize: 11, color: C.white, align: 'center' });
++  h(s, 7.043, 4.684, 1.9, .269, 'Your Title Here', { fontSize: 16, align: 'center' });
++  p(s, 7.043, 5.056, 1.9, .726, T.p13, { align: 'center' });
++  oval(s, 4.784, 3.07, 1.112, 1.112, C.maroon);
++  glyph(s, 5.111, 3.397, .458, .458, C.white, 2);
++  shape(s, 'roundRect', 4.72, 4.044, 1.242, .386, C.yellow, { rectRadius: .193 });
++  h(s, 4.84, 4.144, 1, .185, 'Project 02', { fontSize: 11, color: C.white, align: 'center' });
++  h(s, 4.39, 4.684, 1.9, .269, 'Your Title Here', { fontSize: 16, align: 'center' });
++  p(s, 4.39, 5.056, 1.9, .726, T.p13, { align: 'center' });
++  oval(s, 2.132, 3.07, 1.112, 1.112, C.teal);
++  glyph(s, 2.459, 3.397, .458, .462, C.white, 1);
++  shape(s, 'roundRect', 2.067, 4.044, 1.242, .386, C.yellow, { rectRadius: .193 });
++  h(s, 2.188, 4.144, 1, .185, 'Project 01', { fontSize: 11, color: C.white, align: 'center' });
++  h(s, 1.738, 4.684, 1.9, .269, 'Your Title Here', { fontSize: 16, align: 'center' });
++  p(s, 1.738, 5.056, 1.9, .726, T.p13, { align: 'center' });
++  url(s, 5.417, 6.569, 2.5, .151);
++  p(s, 2.83, 1.592, 7.673, .478, 'Proactively envisioned multimedia based expertise and cross-media growth strategies. Seamlessly visualize quality intellectual capital without superior collaboration and idea-sharing.  Interactively coordinate proactive e-commerce.', { align: 'center' });
++  title(s, 2.83, 1.005, 7.673, .431, 'A Look At Our Business', { align: 'center' });
++}
++
++function slide14(s) {
++  shape(s, 'donut', 4.867, 2.765, 3.6, 3.6, C.cream, { rectRadius: .029 });
++  shape(s, 'triangle', 6.417, 2.515, .5, .5, C.yellow, { rotate: 90 });
++  shape(s, 'triangle', 6.417, 6.115, .5, .5, C.yellow, { rotate: 270, flipH: true });
++  oval(s, 4.707, 3.008, 1.05, 1.049, C.maroon);
++  h(s, 4.882, 3.398, .7, .269, '80,123', { fontSize: 16, color: C.white, align: 'center' });
++  oval(s, 7.577, 3.008, 1.05, 1.049, C.teal);
++  h(s, 7.752, 3.398, .7, .269, '62,769', { fontSize: 16, color: C.white, align: 'center' });
++  oval(s, 7.577, 5.074, 1.05, 1.049, C.maroon);
++  h(s, 7.752, 5.464, .7, .269, '45,731', { fontSize: 16, color: C.white, align: 'center' });
++  oval(s, 4.707, 5.074, 1.05, 1.049, C.teal);
++  h(s, 4.882, 5.464, .7, .269, '93,821', { fontSize: 16, color: C.white, align: 'center' });
++  h(s, 1.162, 3.023, 2.26, .236, 'Progress One', { align: 'right' });
++  p(s, 1.162, 3.312, 2.26, .73, T.p4, { align: 'right' });
++  h(s, 1.162, 5.088, 2.26, .236, 'Progress Four', { align: 'right' });
++  p(s, 1.162, 5.378, 2.26, .73, T.p4, { align: 'right' });
++  h(s, 9.905, 3.023, 2.26, .236, 'Progress Two');
++  p(s, 9.905, 3.312, 2.26, .73, T.p4);
++  h(s, 9.905, 5.088, 2.26, .236, 'Progress Three');
++  p(s, 9.905, 5.378, 2.26, .73, T.p4);
++  p(s, 3.045, 1.29, 7.243, .478, 'Proactively envisioned multimedia based expertise and cross-media growth strategies. Seamlessly visualize quality intellectual capital without superior collaboration to provide a robust synopsis for high level.', { align: 'center' });
++  title(s, 3.045, .748, 7.243, .431, 'A Look At The Numbers', { align: 'center' });
++}
++
++function slide15(s) {
++  box(s, 2.819, .61, 10.035, 6.28, C.pink);
++  box(s, .48, 2.086, .755, 3.328, C.pink);
++  url(s, -.343, 3.666, 2.4, .168, { fontSize: 10, rotate: 270 });
++  title(s, 5.216, 1.743, 6.825, .431, 'Product Strength & Opportunities');
++  h(s, 6.005, 2.609, 2.4, .236, 'Strengths');
++  p(s, 6.005, 2.96, 2.4, .983, T.p5);
++  numberBadge(s, 5.216, 2.609, C.yellow, 1);
++  numberBadge(s, 5.216, 4.419, C.teal, 2);
++  h(s, 6.005, 4.419, 2.4, .236, 'Weaknesses');
++  p(s, 6.005, 4.769, 2.4, .983, T.p5);
++  numberBadge(s, 8.853, 2.609, C.teal, 3);
++  h(s, 9.642, 2.609, 2.4, .236, 'Opportunities');
++  p(s, 9.642, 2.96, 2.4, .983, T.p5);
++  numberBadge(s, 8.853, 4.419, C.yellow, 4);
++  h(s, 9.642, 4.419, 2.4, .236, 'Threats');
++  p(s, 9.642, 4.769, 2.4, .983, T.p5);
++  photo(s, 1.234, 1.216, 3.17, 5.069, C.photoB);
++}
++
++function slide16(s) {
++  title(s, .598, 3.077, 2.79, 1.346, 'This Is\nBreak Slide', { fontSize: 40 });
++  photo(s, 3.794, .918, 4.583, 5.663, C.photoR);
++  box(s, 7.718, 2.21, 5.615, 3.08, C.white);
++  box(s, 7.957, 2.45, 5.377, 2.6, C.pink);
++  h(s, 8.557, 3.416, 4.175, .669, T.p23, { italic: true, lineSpacingMultiple: 1.5 });
++}
++
++function slide17(s) {
++  outline(s, 4.86, 2.244, 3.614, 4.22, C.maroon, 1);
++  h(s, 5.165, 2.586, 3.004, .808, 'Special Package\nPrice', { fontSize: 24 });
++  outline(s, 8.819, 2.244, 3.614, 4.22, C.ink, 1);
++  h(s, 9.124, 2.586, 3.004, .808, 'Basic Package\nPrice', { fontSize: 24 });
++  outline(s, .9, 2.244, 3.614, 4.22, C.teal, 1);
++  h(s, 1.205, 2.586, 3.004, .808, 'Lite Package\nPrice', { fontSize: 24 });
++  box(s, 1.205, 3.667, 1, .02, C.teal);
++  h(s, 1.91, 5.754, 2.299, .337, '$275.00', { fontSize: 20, color: C.slate });
++  outline(s, 1.205, 5.722, .4, .4, C.teal, 1.5);
++  p(s, 3.442, 1.137, 6.45, .478, 'Proactively envisioned multimedia based expertise and cross-media growth strategies. Seamlessly visualize quality intellectual capital without superior collaboration agile frameworks to provide.', { align: 'center' });
++  title(s, 3.442, .614, 6.45, .431, 'Pricing Plan Slide', { align: 'center' });
++  url(s, 5.367, 6.976, 2.6, .151);
++  p(s, 1.205, 3.961, 3.004, 1.487, 'Interactively coordinate proactive via process centric outside the box  thinking pursue\n\nScalable customer service through. Collaboratively administrate empowered markets networks scrambled it to make a type process.');
++  box(s, 5.165, 3.667, 1, .02, C.maroon);
++  h(s, 5.87, 5.754, 2.299, .337, '$425.00', { fontSize: 20, color: C.slate });
++  outline(s, 5.165, 5.722, .4, .4, C.maroon, 1.5);
++  p(s, 5.165, 3.961, 3.004, 1.487, 'Interactively coordinate proactive via process centric outside the box  thinking pursue\n\nScalable customer service through. Collaboratively administrate empowered markets networks scrambled it to make a type process.');
++  box(s, 9.124, 3.667, 1, .02, C.yellow);
++  h(s, 9.829, 5.754, 2.299, .337, '$350.00', { fontSize: 20, color: C.slate });
++  outline(s, 9.124, 5.722, .4, .4, C.yellow, 1.5);
++  p(s, 9.124, 3.961, 3.004, 1.487, 'Interactively coordinate proactive via process centric outside the box  thinking pursue\n\nScalable customer service through. Collaboratively administrate empowered markets networks scrambled it to make a type process.');
++}
++
++function slide18(s) {
++  shape(s, 'chevron', .773, 4.232, 2.056, .892, C.pink, { rectRadius: .431 });
++  shape(s, 'chevron', 2.722, 4.232, 2.056, .892, C.maroon, { rectRadius: .431 });
++  shape(s, 'chevron', 4.67, 4.232, 2.056, .892, C.mint, { rectRadius: .431 });
++  shape(s, 'chevron', 6.619, 4.232, 2.056, .892, C.teal, { rectRadius: .431 });
++  shape(s, 'chevron', 8.567, 4.232, 2.056, .892, C.cream, { rectRadius: .431 });
++  h(s, 1.284, 4.526, 1.033, .303, [{ text: '2022' }], { fontSize: 18, color: C.slate, align: 'center' });
++  h(s, 3.233, 4.526, 1.033, .303, [{ text: '2023' }], { fontSize: 18, color: C.white, align: 'center' });
++  h(s, 5.181, 4.526, 1.033, .303, [{ text: '2024' }], { fontSize: 18, color: C.slate, align: 'center' });
++  h(s, 7.13, 4.526, 1.033, .303, [{ text: '2025' }], { fontSize: 18, color: C.white, align: 'center' });
++  h(s, 9.078, 4.526, 1.033, .303, [{ text: '2026' }], { fontSize: 18, color: C.slate, align: 'center' });
++  shape(s, 'line', 1.139, 2.882, 0, 1.35, null, { line: { color: C.body, endArrowType: 'triangle' } });
++  shape(s, 'line', 5.044, 2.882, 0, 1.35, null, { line: { color: C.body, endArrowType: 'triangle' } });
++  shape(s, 'line', 8.918, 2.882, 0, 1.35, null, { line: { color: C.body, endArrowType: 'triangle' } });
++  shape(s, 'line', 3.108, 5.124, 0, 1.35, null, { flipV: true, line: { color: C.body, endArrowType: 'triangle' } });
++  shape(s, 'line', 6.967, 5.124, 0, 1.35, null, { flipV: true, line: { color: C.body, endArrowType: 'triangle' } });
++  h(s, 1.253, 2.822, 2.26, .269, '2022', { fontSize: 16 });
++  p(s, 1.253, 3.192, 2.26, .73, T.p3);
++  h(s, 5.158, 2.822, 2.26, .269, '2024', { fontSize: 16 });
++  p(s, 5.158, 3.192, 2.26, .73, T.p3);
++  h(s, 9.033, 2.822, 2.26, .269, '2026', { fontSize: 16 });
++  p(s, 9.033, 3.192, 2.26, .73, T.p3);
++  shape(s, 'chevron', 10.516, 4.232, 2.056, .892, C.yellow, { rectRadius: .431 });
++  h(s, 11.027, 4.526, 1.033, .303, [{ text: '2027' }], { fontSize: 18, color: C.white, align: 'center' });
++  shape(s, 'line', 10.913, 5.138, 0, 1.35, null, { flipV: true, line: { color: C.body, endArrowType: 'triangle' } });
++  h(s, .762, 5.433, 2.26, .269, '2023', { fontSize: 16, align: 'right' });
++  p(s, .762, 5.804, 2.26, .73, T.p3, { align: 'right' });
++  h(s, 4.621, 5.433, 2.26, .269, '2025', { fontSize: 16, align: 'right' });
++  p(s, 4.621, 5.804, 2.26, .73, T.p3, { align: 'right' });
++  h(s, 8.567, 5.448, 2.26, .269, '2027', { fontSize: 16, align: 'right' });
++  p(s, 8.567, 5.818, 2.26, .73, T.p3, { align: 'right' });
++  p(s, 2.623, 1.482, 8.087, .478, T.p11, { align: 'center' });
++  title(s, 2.623, .862, 8.087, .431, 'Alternative Flow', { align: 'center' });
++}
++
++function slide19(s) {
++  box(s, 0, 0, 5.762, 7.5, C.teal);
++  h(s, .956, 3.972, 2.494, .337, 'Evelyn Simmons', { fontSize: 20, color: C.white });
++  p(s, .956, 4.344, 2.494, .236, 'Leaders Team One', { fontSize: 14, color: C.white, lineSpacingMultiple: 1 });
++  url(s, .956, 6.244, 3, .168, { fontSize: 10, color: C.white, align: 'left' });
++  p(s, 8.143, 2.745, 1.964, .202, 'Team Work', { fontSize: 12, lineSpacingMultiple: 1 });
++  p(s, 8.143, 3.298, 1.964, .202, 'Leaders Team', { fontSize: 12, lineSpacingMultiple: 1 });
++  shape(s, 'line', 8.166, 3.106, 3.061, 0, null, { flipH: true, line: { color: C.maroon, width: 10 } });
++  shape(s, 'line', 8.166, 3.66, 3.353, 0, null, { flipH: true, line: { color: C.maroon, width: 10 } });
++  shape(s, 'line', 8.177, 4.242, 2.293, 0, null, { flipH: true, line: { color: C.maroon, width: 10 } });
++  p(s, 8.143, 3.88, 1.964, .202, 'Technical Skill', { fontSize: 12, lineSpacingMultiple: 1 });
++  p(s, 11.432, 3.022, .431, .185, '95%', { fontSize: 11, lineSpacingMultiple: 1 });
++  p(s, 11.709, 3.568, .452, .185, '100%', { fontSize: 11, lineSpacingMultiple: 1 });
++  p(s, 10.687, 4.15, .431, .185, '80%', { fontSize: 11, lineSpacingMultiple: 1 });
++  p(s, 8.143, 4.824, 4.018, .983, 'Bring to the table win-win survival strategies to ensure proactive domination. At the end of the day, going forward, a new normal that has evolved from generation X is on the runway heading to get solution will extensible testing.');
++  title(s, .956, 1.087, 3.71, .483, 'Our Team Profile', { color: C.white });
++  photo(s, 4.32, 2.838, 2.875, 2.875, C.photoB);
++}
++
++function slide20(s) {
++  box(s, 8.033, 1.31, 4.279, 2.256, C.maroon);
++  p(s, 8.975, 1.658, 2.2, .202, 'Leader Marketing Team', { fontSize: 12, color: C.white, lineSpacingMultiple: 1 });
++  h(s, 8.975, 1.936, 2.2, .269, 'Stefie Williams', { fontSize: 16, color: C.white });
++  box(s, 8.975, 2.461, 1.464, .02, C.pink);
++  p(s, 8.975, 2.736, 2.928, .483, T.p24, { color: C.white });
++  box(s, 8.033, 3.933, 4.279, 2.256, C.teal);
++  p(s, 8.975, 4.281, 2.2, .202, 'Leader Programing Team', { fontSize: 12, color: C.white, lineSpacingMultiple: 1 });
++  h(s, 8.975, 4.559, 2.2, .269, 'Gisella Dominic', { fontSize: 16, color: C.white });
++  box(s, 8.975, 5.084, 1.464, .02, C.pink);
++  p(s, 8.975, 5.359, 2.928, .483, T.p24, { color: C.white });
++  title(s, 1.304, 2.145, 3.03, .431, 'Our Team');
++  p(s, 1.304, 2.867, 3.03, 1.992, 'Interactively coordinate proactive e-commerce via process centric "outside the box" thinking pursue scalable charity event to bes success.\n\nCollaboratively administrate empowered markets via plug-and-play networks. Standards in web readiness. Energistically scale future-proof core competencies impactful framework.');
++  url(s, 1.304, 5.204, 3.03, .151, { align: 'left' });
++  photo(s, 5.637, 1.577, 2.929, 1.722, C.photoR);
++  photo(s, 5.637, 4.201, 2.929, 1.722, C.photoB);
++}
++
++function slide21(s) {
++  url(s, 9.957, .853, 3, .151, { align: 'left' });
++  p(s, 1.263, 5.299, 3.641, .983, 'Proactively envisioned multimedia based expertise and cross media growth strategies visualize quality intellectual capital without superior collaboration agile frameworks to get provide a robust quality intellectual.');
++  title(s, 1.263, 4.672, 3.641, .431, 'Service In Detail');
++  h(s, 6.119, 4.781, 2.623, .269, 'Your Title Goes Here', { fontSize: 16 });
++  p(s, 6.119, 5.181, 2.623, .73, T.p10);
++  h(s, 6.119, 3.185, 2.623, .269, 'Your Title Goes Here', { fontSize: 16 });
++  p(s, 6.119, 3.585, 2.623, .73, T.p10);
++  h(s, 6.119, 1.589, 2.623, .269, 'Your Title Goes Here', { fontSize: 16 });
++  p(s, 6.119, 1.989, 2.623, .73, T.p10);
++  photo(s, 0, 0, 5, 3.454, C.photoB);
++  photo(s, 9.957, 1.858, 3.377, 4.399, C.photoR);
++}
++
++function slide22(s) {
++  box(s, 4.851, 5.261, 8.483, 2.239, C.maroon);
++  h(s, 6.109, 5.985, 5.967, .236, 'Your Title Goes Here', { color: C.white });
++  p(s, 6.109, 6.298, 5.967, .478, 'Globally incubate standards compliant channels before scalable benefits extensible testing fruit to identify a ballpark value B2C users after installed. Interactively coordinate proactive.', { color: C.white });
++  h(s, 9.351, 1.844, 2.699, 1.572, T.p23, { fontSize: 16, italic: true, lineSpacingMultiple: 1.5 });
++  title(s, .896, 2.148, 3.058, .851, 'You should always feel pretty');
++  p(s, .896, 3.36, 3.058, 1.992, 'Collaboratively administrate empowered markets via plug and play networks. Dynamic procrastinate B2C users after installed.\n\nDramatic visualize. Predominate extensible testing. Interactively coordinate proactive e-commerce. Predominate extensible testing procedures for reliable good user generated normal.');
++  photo(s, 4.851, 0, 3.217, 4.884, C.photoR);
++}
++
++function slide23(s) {
++  box(s, 4.918, .996, 2.691, 1.062, C.maroon);
++  box(s, 0, .996, .884, 5.507, C.maroon);
++  p(s, 6.302, 3.141, 2.403, .983, T.p18);
++  p(s, 9.394, 3.141, 2.403, .983, 'Leverage agile frameworks to provide seamlessly visualize quality intellectual capital without superior and idea sharing coordinate via outside.');
++  title(s, 6.302, 4.934, 5.497, .431, 'Only dead fish go with the flow');
++  p(s, 6.302, 5.687, 5.495, .73, 'Interactively coordinate proactive e-commerce via process-centric outside the box  thinking pursue scalable customer service through. Collaboratively administrate empowered markets networks process centric pursue intellectual capital without superior.');
++  url(s, 8.8, 1.443, 3, .168, { fontSize: 10, align: 'right' });
++  photo(s, 1.034, .996, 3.735, 5.507, C.photoB);
++}
++
++function slide24(s) {
++  box(s, 11.145, 0, 2.188, 3.623, C.teal);
++  box(s, 0, 4.652, 1.464, 2.848, C.yellow);
++  url(s, 9.339, 6.087, 2.9, .151, { align: 'right' });
++  title(s, 1.763, 1.929, 3.866, .431, 'Different is beautiful');
++  p(s, 1.763, 2.543, 3.866, .731, 'Proactively envisioned multimedia based expertise and cross media growth strategies seamlessly visualize quality intellectual. Collaboration frameworks to provide a robust visualize.');
++  h(s, 1.763, 3.589, 3.375, .236, 'Your Title Goes Here');
++  p(s, 1.763, 3.902, 3.375, .478, T.p22);
++  h(s, 1.763, 4.774, 3.375, .236, 'Your Title Goes Here');
++  p(s, 1.763, 5.087, 3.375, .478, T.p22);
++  photo(s, 7.391, 1.464, 4.848, 3.362, C.photoR);
++}
++
++function slide25(s) {
++  box(s, 0, 3.75, 13.333, 3.756, C.cream);
++  title(s, 1.166, 1.232, 4.511, .432, 'Classy since birth');
++  p(s, 1.166, 1.785, 4.511, .731, 'Proactively envisioned multimedia based expertise and cross media growth strategies seamlessly visualize quality intellectual. Collaboration frameworks to provide a robust visualize quality intellectual capital.');
++  h(s, 10.091, 5.164, 2.236, .303, [{ text: 'Your Content' }], { fontSize: 18 });
++  p(s, 9.592, 5.655, 2.735, .983, T.p19);
++  glyph(s, 9.592, 5.164, .303, .303, C.maroon, 8);
++  h(s, 6.39, 5.164, 2.236, .303, [{ text: 'Your Content' }], { fontSize: 18 });
++  p(s, 5.891, 5.655, 2.735, .983, T.p19);
++  glyph(s, 5.891, 5.164, .336, .303, C.teal, 9);
++  photo(s, 6.843, .833, 5.701, 3.21, C.photoB);
++  photo(s, .796, 4.223, 4.088, 2.443, C.photoR);
++}
++
++function slide26(s) {
++  box(s, 0, 0, 5.226, 7.5, C.teal);
++  phone(s, 3.952, 1.103, 2.548, 5.294);
++  phone(s, 1.222, 1.103, 2.548, 5.294);
++  p(s, 8.765, 5.04, 2.488, .726, T.p4);
++  glyph(s, 8.074, 5.046, .458, .458, C.teal, 11);
++  glyph(s, 8.074, 3.961, .458, .458, C.yellow, 3);
++  p(s, 8.765, 3.961, 2.488, .726, T.p4);
++  title(s, 8.071, 1.734, 3.712, .851, 'Product\nMockup Slide');
++  p(s, 8.071, 2.762, 3.712, .731, 'Interactively coordinate proactive e-commerce via process centric pursue outside the box  thinking pursue scalable customer service through administrate empowered.');
++  photo(s, 1.404, 1.815, 2.22, 3.979, C.photoB);
++  photo(s, 4.134, 1.815, 2.214, 3.969, C.photoR);
++}
++
++function slide27(s) {
++  p(s, 1.018, 3.102, 3.263, 1.998, 'Proactively envisioned multimedia based expertise and cross media growth strategies. Seamlessly visualize quality intellectual capital without superior.\n\nCollaboration. Leverage agile frameworks to provide a robust. Seamlessly visualize quality intellectual capital without superior collaboration and idea sharing coordinate proactive outside thinking.');
++  title(s, 1.018, 1.894, 3.263, .853, 'Product\nMockup Slide');
++  url(s, 1.018, 5.454, 2.7, .151, { align: 'left' });
++  glyph(s, 10.204, .983, .532, .593, C.teal, 13);
++  h(s, 10.173, 1.687, 1.874, .269, 'Message One', { fontSize: 16 });
++  p(s, 10.176, 1.994, 1.874, .483, T.p20);
++  glyph(s, 10.173, 2.966, .593, .594, C.yellow, 12);
++  h(s, 10.173, 3.67, 1.874, .269, 'Message Two', { fontSize: 16 });
++  p(s, 10.176, 3.976, 1.874, .483, T.p20);
++  glyph(s, 10.185, 4.948, .565, .595, C.maroon, 13);
++  h(s, 10.171, 5.654, 1.874, .269, 'Message Three', { fontSize: 16 });
++  p(s, 10.173, 5.961, 1.874, .483, T.p20);
++  watch(s, 5.299, .57, 3.589, 6.361);
++  photo(s, 5.756, 2.147, 2.599, 3.199, C.photoB);
++}
++
++function slide28(s) {
++  h(s, 6.182, 2.378, 1.547, .471, '+ $155k', { fontSize: 28, align: 'right' });
++  shape(s, 'line', 1.109, 3.507, 6.62, 0, null, { line: { color: C.pink, width: 3, dashType: 'dash' } });
++  h(s, 6.182, 4.238, 1.547, .471, '+ $285k', { fontSize: 28, align: 'right' });
++  h(s, 6.182, 6.098, 1.547, .471, '+ $215k', { fontSize: 28, align: 'right' });
++  shape(s, 'line', 1.109, 5.367, 6.62, 0, null, { line: { color: C.pink, width: 3, dashType: 'dash' } });
++  glyph(s, 1.109, 2.24, .504, .433, C.maroon, 13);
++  glyph(s, 1.109, 4.1, .504, .471, C.yellow, 12);
++  glyph(s, 1.109, 5.96, .504, .494, C.teal, 11);
++  h(s, 1.852, 2.24, 3.916, .236, 'Market Sales In This Year');
++  p(s, 1.852, 2.509, 3.916, .478, T.p9);
++  h(s, 1.852, 4.1, 3.916, .236, 'Promotion In This Year');
++  p(s, 1.852, 4.369, 3.916, .478, T.p9);
++  h(s, 1.852, 5.96, 3.916, .236, 'Human Resources In This Year');
++  p(s, 1.852, 6.229, 3.916, .478, T.p9);
++  h(s, 8.742, 2.733, .9, .269, '79,541K', { fontSize: 16 });
++  p(s, 8.742, 2.985, .9, .187, 'Populations', { fontSize: 11, color: C.head, lineSpacingMultiple: 1 });
++  h(s, 10.22, 5.233, .9, .269, '798', { fontSize: 16 });
++  p(s, 10.22, 5.485, .9, .187, 'Countries', { fontSize: 11, color: C.head, lineSpacingMultiple: 1 });
++  h(s, 10.72, 4.115, .9, .269, '6,912km', { fontSize: 16 });
++  p(s, 10.72, 4.367, .9, .187, 'Area', { fontSize: 11, color: C.head, lineSpacingMultiple: 1 });
++  pixelArt(s, NORWAY, 8.6, 2.3, .09, C.gray);
++  title(s, 3.518, .905, 6.298, .431, 'Our Location', { align: 'center' });
++}
++
++function slide29(s) {
++  pixelArt(s, RUSSIA, 1.16, .54, .09, C.gray2);
++  box(s, -.006, 4.691, 13.333, 2.166, C.yellow);
++  oval(s, 2.558, 4.362, .671, .671, C.teal);
++  glyph(s, 2.756, 4.553, .275, .289, C.white, 12);
++  oval(s, 6.331, 4.362, .671, .671, C.maroon);
++  glyph(s, 6.534, 4.553, .265, .289, C.white, 11);
++  oval(s, 10.104, 4.362, .671, .671, C.teal);
++  glyph(s, 10.309, 4.553, .26, .289, C.white, 11);
++  h(s, 1.824, 5.449, 2.127, .236, 'Your Title Here', { color: C.white, align: 'center' });
++  p(s, 1.824, 5.711, 2.127, .73, T.p15, { color: C.white, align: 'center' });
++  h(s, 5.597, 5.449, 2.127, .236, 'Your Title Here', { color: C.white, align: 'center' });
++  p(s, 5.597, 5.711, 2.127, .73, T.p15, { color: C.white, align: 'center' });
++  h(s, 9.37, 5.449, 2.127, .236, 'Your Title Here', { color: C.white, align: 'center' });
++  p(s, 9.37, 5.711, 2.127, .73, T.p15, { color: C.white, align: 'center' });
++  shape(s, 'line', 1.84, 3.417, 1.054, .945, null, { flipH: true, flipV: true, line: { color: C.teal, width: 2.25, endArrowType: 'oval' } });
++  shape(s, 'line', 1.859, 2.83, 4.808, 1.532, null, { flipH: true, flipV: true, line: { color: C.maroon, width: 2.25, endArrowType: 'oval' } });
++  shape(s, 'line', 4.298, 2.398, 6.141, 1.964, null, { flipH: true, flipV: true, line: { color: C.teal, width: 2.25, endArrowType: 'oval' } });
++  p(s, 8.676, 1.733, 3.456, 1.488, 'Collaboratively administrate empowered markets via plug and play networks procrastinate B2C users after.\n\nDramatic visualize. Predominate extensible testing. Interactively coordinate proactive  e-commerce. Predominate extensible testing procedures.');
++  title(s, 8.676, 1.137, 3.456, .431, 'Our Location');
++}
++
++function slide30(s) {
++  box(s, 8.275, 6.29, 4.116, 1.21, C.maroon);
++  p(s, 8.447, 3.534, 3.772, .73, 'Collaboratively administrate empowered markets via plug and play networks. Dynamic procrastinate B2C users after. Dramatic visualize. Predominate extensible testing.');
++  title(s, 8.447, 2.025, 3.772, 1.244, 'Thanks\nFor Watching', { fontSize: 40 });
++  url(s, 9.033, 6.819, 2.6, .151, { color: C.white });
++  photo(s, 0, .717, 3.435, 4.891, C.photoB);
++  box(s, 2.023, 3.16, 1.556, 2.623, C.white);
++  box(s, 3.729, 1.95, 3.604, 1.21, C.teal);
++  photo(s, 2.319, 3.464, 5.014, 2.826, C.photoR);
++}
++
++function slide31(s) {
++  iconSheet(s, { rows: 7, x0: 1.359, y0: .899, dy: .949, seed: 0 });
++}
++
++function slide32(s) {
++  iconSheet(s, { rows: 7, x0: 1.377, y0: .879, dy: .956, seed: 7 });
++}
++
++function slide33(s) {
++  iconSheet(s, { rows: 7, x0: 1.361, y0: .882, dy: .952, seed: 14 });
++}
++
++function slide34(s) {
++  iconSheet(s, { rows: 7, x0: 1.375, y0: .893, dy: .95, seed: 21 });
++}
++
++function slide35(s) {
++  iconSheet(s, { rows: 7, x0: 1.363, y0: .904, dy: .949, seed: 28 });
++}
++
++function slide36(s) {
++  iconSheet(s, { rows: 7, x0: 1.389, y0: .879, dy: .953, seed: 35 });
++}
++
++function slide37(s) {
++  iconSheet(s, { rows: 7, x0: 1.356, y0: .892, dy: .952, seed: 42 });
++}
++
++function slide38(s) {
++  iconSheet(s, { rows: 7, x0: 1.378, y0: .905, dy: .952, seed: 49 });
++}
++
++function slide39(s) {
++  iconSheet(s, { rows: 8, x0: 1.362, y0: .879, dy: .814, seed: 56 });
++}
++
++function slide40(s) {
++  iconSheet(s, { rows: 7, x0: 1.387, y0: .904, dy: .949, seed: 63 });
++}
++
++function slide41(s) {
++  iconSheet(s, { rows: 7, x0: 1.375, y0: .883, dy: .952, seed: 70 });
++}
++
++function slide42(s) {
++  iconSheet(s, { rows: 7, x0: 1.38, y0: .904, dy: .957, seed: 77, skip: [[6,5],[6,6],[6,7]] });
++}
++
++const SLIDES = [
++  slide01, slide02, slide03, slide04, slide05, slide06, slide07,
++  slide08, slide09, slide10, slide11, slide12, slide13, slide14,
++  slide15, slide16, slide17, slide18, slide19, slide20, slide21,
++  slide22, slide23, slide24, slide25, slide26, slide27, slide28,
++  slide29, slide30, slide31, slide32, slide33, slide34, slide35,
++  slide36, slide37, slide38, slide39, slide40, slide41, slide42,
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'CEGIA', width: 13.333, height: 7.5 });
++  pptx.layout = 'CEGIA';
++  pptx.author = 'Cegia';
++  pptx.title = 'Cegia Presentation';
++  SLIDES.forEach(function (fn) {
++    const s = pptx.addSlide();
++    s.background = { color: C.white };
++    fn(s);
++  });
++  const out = path.join(__dirname, '05ec1ea9-71c2-4737-abcf-196880275c7a_grok_final.pptx');
++  return pptx.writeFile({ fileName: out }).then(function () { console.log(out); });
++}
++
++build().catch(function (e) { console.error(e); process.exit(1); });

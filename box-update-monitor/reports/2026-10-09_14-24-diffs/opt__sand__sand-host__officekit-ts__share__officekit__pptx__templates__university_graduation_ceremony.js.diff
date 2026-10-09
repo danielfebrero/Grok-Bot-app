@@ -1,0 +1,596 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/university_graduation_ceremony.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/university_graduation_ceremony.js
+@@ -0,0 +1,593 @@
++/**
++ * "Graduation University" deck — rebuilt with pptxgenjs.
++ * Run: node 0cf1b034-bd42-4d22-bfcf-cfd347499086_grok_final.js
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ theme */
++
++const C = {
++  bg: 'F0F0F0',        // page background (theme lt1)
++  green: '03BA81',     // accent1
++  dark: '0F241F',      // accent2 - dark cards
++  black: '000000',
++  white: 'F0F0F0',
++  muted: '787878',     // 50% dimmed kicker text
++  hairline: 'D8D8D8',  // outlined decoration frames
++  gray: 'CCCCCC',
++  lightGray: 'E4E4E4',
++  phoneBody: '414041',
++  phoneEdge: '131313',
++  phoneBtn: '919191',
++};
++
++const F = { head: 'Lexend', body: 'Poppins' };
++
++const SZ = { hero: 72, title: 44, stat: 48, money: 28, sub: 16, card: 14, body: 12, note: 18 };
++
++/* ---------------------------------------------------------------- helpers */
++
++// Multi-coloured heading, e.g. [['Welcome & Opening ', null], ['Remarks', C.green]]
++function heading(slide, x, y, w, h, runs, size = SZ.title, align = 'left') {
++  slide.addText(
++    runs.map(([text, color]) => ({
++      text,
++      options: { fontFace: F.head, fontSize: size, color: color || C.black },
++    })),
++    { x, y, w, h, valign: 'top', align }
++  );
++}
++
++// 16pt Lexend section sub-heading (also used at 14pt inside dark cards)
++function label(slide, x, y, w, h, text, o = {}) {
++  slide.addText(text, {
++    x, y, w, h, valign: 'top',
++    fontFace: F.head, fontSize: o.size || SZ.sub, color: o.color || C.black,
++    align: o.align || 'left', charSpacing: o.charSpacing,
++    italic: o.italic, transparency: o.transparency,
++  });
++}
++
++// 12pt Poppins body copy (1.3 line spacing, justified by default)
++function para(slide, x, y, w, h, text, o = {}) {
++  slide.addText(text, {
++    x, y, w, h, valign: 'top',
++    fontFace: F.body, fontSize: o.size || SZ.body, color: o.color || C.black,
++    align: o.align || 'justify', italic: o.italic,
++    lineSpacingMultiple: o.spacing === undefined ? 1.3 : o.spacing,
++  });
++}
++
++// Big number / stat in Lexend
++function stat(slide, x, y, w, h, text, o = {}) {
++  slide.addText(text, {
++    x, y, w, h, valign: 'top',
++    fontFace: F.head, fontSize: o.size || SZ.stat, color: o.color || C.black,
++    align: o.align || 'left',
++  });
++}
++
++// Green pill used as a title underline / accent mark
++function bar(slide, x, y, w = 1.393, h = 0.112) {
++  slide.addShape('roundRect', { x, y, w, h, fill: { color: C.green }, rectRadius: h / 2 });
++}
++
++function hLine(slide, x, y, w, color = C.black, width = 0.5) {
++  slide.addShape('line', { x, y, w, h: 0, line: { color, width } });
++}
++
++function vLine(slide, x, y, h, color = C.black, width = 0.5) {
++  slide.addShape('line', { x, y, w: 0, h, line: { color, width } });
++}
++
++function rect(slide, x, y, w, h, color) {
++  slide.addShape('rect', { x, y, w, h, fill: { color } });
++}
++
++// Dark rounded "Recognizing Hard Work" style card
++function card(slide, x, y, w, h) {
++  slide.addShape('roundRect', {
++    x, y, w, h, fill: { color: C.dark }, rectRadius: 0.06362 * Math.min(w, h),
++  });
++}
++
++// Outlined decoration: a plain rectangle, optionally followed by a half-disc
++// (chord) of the same height butted against its right edge.
++function frame(slide, x, y, w, h, withChord) {
++  const line = { color: C.hairline, width: 2.75, transparency: 62 };
++  slide.addShape('rect', { x, y, w, h, line });
++  if (withChord) {
++    slide.addShape('chord', { x: x + w, y, w: h, h, line, angleRange: [90.3556, 270] });
++  }
++}
++
++/**
++ * The reference deck decorates sections with small single-colour pictograms
++ * (raster + svg pairs). They are redrawn here from native shapes: each glyph
++ * is a list of [shape, x, y, w, h] parts in a 0..1 unit square, scaled to the
++ * icon box. Parts flagged `true` are knocked out in the surface colour.
++ */
++const GLYPHS = {
++  // school building with flag
++  school: [
++    ['rect', 0.485, 0.00, 0.025, 0.18],
++    ['rtTriangle', 0.510, 0.01, 0.12, 0.08],
++    ['ellipse', 0.45, 0.17, 0.10, 0.10],
++    ['triangle', 0.31, 0.22, 0.38, 0.15],
++    ['rect', 0.31, 0.34, 0.38, 0.62],
++    ['triangle', 0.00, 0.36, 0.33, 0.14],
++    ['rect', 0.02, 0.48, 0.29, 0.48],
++    ['triangle', 0.67, 0.36, 0.33, 0.14],
++    ['rect', 0.69, 0.48, 0.29, 0.48],
++    ['rect', 0.07, 0.55, 0.07, 0.12, true],
++    ['rect', 0.19, 0.55, 0.07, 0.12, true],
++    ['rect', 0.07, 0.74, 0.07, 0.12, true],
++    ['rect', 0.19, 0.74, 0.07, 0.12, true],
++    ['rect', 0.74, 0.55, 0.07, 0.12, true],
++    ['rect', 0.86, 0.55, 0.07, 0.12, true],
++    ['rect', 0.74, 0.74, 0.07, 0.12, true],
++    ['rect', 0.86, 0.74, 0.07, 0.12, true],
++    ['rect', 0.46, 0.41, 0.08, 0.10, true],
++    ['roundRect', 0.40, 0.66, 0.20, 0.30, true],
++  ],
++  // mortar board resting on an open book with a ribbon bookmark
++  cap: [
++    ['diamond', 0.08, 0.00, 0.84, 0.30],
++    ['triangle', 0.28, 0.15, 0.44, 0.24, false, 180],
++    ['rect', 0.06, 0.48, 0.34, 0.13],
++    ['rect', 0.60, 0.48, 0.34, 0.13],
++    ['rect', 0.06, 0.65, 0.34, 0.13],
++    ['rect', 0.60, 0.65, 0.34, 0.13],
++    ['rect', 0.42, 0.44, 0.16, 0.40],
++    ['triangle', 0.42, 0.71, 0.16, 0.13, true],
++    ['rect', 0.02, 0.84, 0.96, 0.14],
++  ],
++  // two raised hands tossing caps, small book between the palms
++  hands: [
++    ['diamond', 0.00, 0.05, 0.28, 0.16],
++    ['diamond', 0.64, 0.00, 0.30, 0.17],
++    ['roundRect', 0.02, 0.46, 0.09, 0.34],
++    ['roundRect', 0.13, 0.34, 0.09, 0.46],
++    ['roundRect', 0.24, 0.40, 0.09, 0.40],
++    ['roundRect', 0.02, 0.72, 0.31, 0.26],
++    ['roundRect', 0.60, 0.40, 0.09, 0.40],
++    ['roundRect', 0.71, 0.32, 0.09, 0.48],
++    ['roundRect', 0.82, 0.44, 0.09, 0.36],
++    ['roundRect', 0.60, 0.72, 0.31, 0.26],
++    ['rect', 0.38, 0.74, 0.17, 0.06],
++    ['rect', 0.38, 0.86, 0.17, 0.06],
++  ],
++  // lecturer in front of a whiteboard with an audience
++  lecture: [
++    ['rect', 0.34, 0.02, 0.62, 0.40],
++    ['rect', 0.44, 0.11, 0.42, 0.05, true],
++    ['rect', 0.44, 0.22, 0.42, 0.05, true],
++    ['rect', 0.44, 0.31, 0.28, 0.05, true],
++    ['ellipse', 0.04, 0.04, 0.14, 0.14],
++    ['roundRect', 0.03, 0.21, 0.16, 0.26],
++    ['rect', 0.17, 0.22, 0.16, 0.04],
++    ['ellipse', 0.04, 0.56, 0.18, 0.18],
++    ['ellipse', 0.40, 0.52, 0.20, 0.20],
++    ['ellipse', 0.76, 0.56, 0.18, 0.18],
++    ['rect', 0.00, 0.80, 0.98, 0.16],
++  ],
++};
++
++function glyph(slide, kind, x, y, size, ink, surface) {
++  GLYPHS[kind].forEach(([shape, gx, gy, gw, gh, cut, rotate]) => {
++    slide.addShape(shape, {
++      x: x + gx * size, y: y + gy * size, w: gw * size, h: gh * size,
++      fill: { color: cut ? surface : ink }, rotate,
++      rectRadius: shape === 'roundRect' ? gw * size * 0.45 : undefined,
++    });
++  });
++}
++
++// Master header / footer / slide number (slide 1 hides them).
++function chrome(slide, num) {
++  slide.addText('Graduation University Presentation', {
++    x: 0.431, y: 0.25, w: 3.194, h: 0.338, valign: 'top',
++    fontFace: F.head, fontSize: SZ.body, lineSpacingMultiple: 1.3,
++  });
++  slide.addText('www.GraduationUniversity.com', {
++    x: 0.431, y: 6.912, w: 3.194, h: 0.342, valign: 'top',
++    fontFace: F.body, fontSize: SZ.body, lineSpacingMultiple: 1.3,
++  });
++  slide.addText('Slide ' + num, {
++    x: 9.708, y: 6.912, w: 3.194, h: 0.342, valign: 'top', align: 'right',
++    fontFace: F.body, fontSize: SZ.body, lineSpacingMultiple: 1.3,
++  });
++}
++
++/* ------------------------------------------------------------- shared copy */
++
++const LOREM = {
++  short: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. ',
++  sociis: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis',
++  penatibus: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus',
++  card: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula',
++  project: 'Lorem Cum ipsum dolor sit amet, consectetuer adipiscing',
++};
++LOREM.long = LOREM.penatibus + ' ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. ';
++LOREM.medium = LOREM.penatibus + ' ipsum dolor sit amet, consectetuer';
++LOREM.years = LOREM.penatibus + ' dolor ipsum dolor sit amet, ';
++LOREM.bio = LOREM.penatibus + ' ipsum dolor sit amet, consectetuer penatibus ipsum';
++LOREM.numbered = 'Lorem ipsum dolor sit amet, eget consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. ';
++LOREM.growth = LOREM.penatibus + ' dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus dolor sit amet, ';
++LOREM.programs = LOREM.penatibus + ' dolor sit amet, ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus dolor sit amet, ';
++
++const CARD_TITLE = 'Recognizing Hard Work Dedication';
++
++/* --------------------------------------------------------------- slides */
++
++// 1 — cover
++function slide01(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  heading(s, 0.436, 3.094, 12.461, 1.313,
++    [['Graduation', C.green], [' University', null]], SZ.hero, 'center');
++  bar(s, 2.577, 4.406, 3.417, 0.167);
++  frame(s, 7.12, 0, 6.213, 1.692);
++  frame(s, 0, 5.808, 6.213, 1.692);
++  para(s, 7.12, 5.808, 3.931, 0.867, LOREM.sociis, { align: 'left' });
++  label(s, 1.316, 2.796, 5.939, 0.378, 'Graduation University Presentation',
++    { size: 14, color: C.muted, charSpacing: 3 });
++  return s;
++}
++
++// 2 — welcome & opening remarks
++function slide02(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 2);
++  heading(s, 0.697, 1.094, 9.647, 0.841,
++    [['Welcome & Opening ', null], ['Remarks', C.green]]);
++  frame(s, 0, 2.49, 3.76, 4.292, true);
++  para(s, 6.667, 4.312, 5.429, 1.133, LOREM.long);
++  para(s, 6.667, 5.476, 5.429, 0.87, LOREM.medium);
++  label(s, 6.667, 3.573, 4.908, 0.37, 'A Message of Celebration and Gratitude');
++  hLine(s, 6.802, 4.073, 2.833);
++  bar(s, 7.028, 0.988);
++}
++
++// 3 — journey through the years (two dark timeline cards)
++function slide03(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 3);
++  heading(s, 0.697, 1.094, 9.647, 0.841,
++    [['Journey ', null], ['Through', C.green], [' the Years', null]]);
++  bar(s, 3.477, 0.963);
++  card(s, 3.24, 2.64, 4.463, 2.421);
++  card(s, 8.129, 4.354, 4.463, 2.421);
++  frame(s, 0, 2.49, 0.697, 4.292, true);
++  [[3.495, 4.474, 3.477, 4.55, '2024'], [8.393, 6.166, 8.376, 6.242, '2025']]
++    .forEach(([lx, ly, tx, ty, year]) => {
++      hLine(s, lx, ly, 3.952, C.white);
++      label(s, tx, ty, 0.841, 0.404, year, { size: SZ.note, color: C.white });
++    });
++  para(s, 3.477, 3.026, 3.952, 1.133, LOREM.years, { color: C.white });
++  para(s, 8.393, 4.774, 3.952, 1.133, LOREM.years, { color: C.white });
++  label(s, 8.129, 3.217, 3.427, 0.64, 'Reflecting on Our Academic and Personal Growth');
++  label(s, 3.24, 5.559, 4.292, 0.64,
++    'PLACEHOLDER');
++}
++
++// 4 — unforgettable moments
++function slide04(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 4);
++  heading(s, 6.667, 5.121, 5.351, 1.582,
++    [['Unforgettable ', null], ['Moments', C.green]]);
++  para(s, 6.667, 3.206, 5.429, 0.87, LOREM.medium);
++  label(s, 6.667, 2.531, 4.908, 0.37, 'Capturing the Experiences That Shaped Us');
++  hLine(s, 6.802, 3.031, 2.833);
++  frame(s, 7.12, -0.708, 7.746, 2.4);
++  para(s, 1.092, 5.477, 4.965, 0.87, LOREM.penatibus + ' ipsum dolor sit, ',
++    { align: 'right' });
++  bar(s, 9.677, 6.291);
++}
++
++// 5 — academic achievements
++function slide05(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 5);
++  heading(s, 0.585, 1.356, 5.351, 1.582,
++    [['Academic', C.green], [' Achievements', null]]);
++  card(s, 7.378, 4.061, 4.173, 1.747);
++  hLine(s, 7.497, 4.676, 3.952, C.white);
++  label(s, 7.48, 4.269, 3.603, 0.337, CARD_TITLE, { size: SZ.card, color: C.white });
++  para(s, 7.48, 4.868, 3.798, 0.608, LOREM.card, { color: C.white });
++  bar(s, 0.585, 1.3);
++  glyph(s, 'lecture', 0.699, 3.348, 0.481, C.black, C.bg);
++  label(s, 1.366, 3.404, 2.909, 0.37, 'Your Title Achievements');
++  para(s, 0.585, 4.061, 4.266, 1.133, LOREM.medium);
++  para(s, 0.585, 5.266, 4.266, 0.608,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget');
++  hLine(s, 0.671, 4.014, 4.18);
++}
++
++// 6 — learning beyond the classroom
++function slide06(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 6);
++  heading(s, 7.096, 1.769, 5.501, 2.322,
++    [['Learning', C.green], [' Beyond the Classroom Experience', null]]);
++  frame(s, 8.096, -1.373, 7.746, 2.4);
++  bar(s, 7.225, 1.657);
++  [['01', 0.818], ['02', 3.666]].forEach(([n, x]) => {
++    stat(s, x, 4.231, 1.165, 0.841, n, { size: SZ.title });
++    para(s, x, 5.072, 2.279, 1.395, LOREM.numbered);
++  });
++  card(s, 0.771, 1.657, 4.173, 1.747);
++  hLine(s, 0.89, 2.273, 3.952, C.white);
++  label(s, 0.873, 1.866, 3.603, 0.337, CARD_TITLE, { size: SZ.card, color: C.white });
++  para(s, 0.873, 2.464, 3.798, 0.608, LOREM.card, { color: C.white });
++}
++
++// 7 — looking ahead to the future
++function slide07(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 7);
++  heading(s, 0.804, 3.99, 5.102, 1.582,
++    [['Looking', C.green], [' Ahead to the Future', null]]);
++  bar(s, 0.95, 3.877);
++  para(s, 0.804, 5.684, 4.89, 0.608, LOREM.short);
++  frame(s, 0, -0.717, 3.498, 3.992, true);
++  vLine(s, 6.229, 5.448, 0.969);
++  label(s, 7.878, 5.448, 2.909, 0.37, 'Your Title Here');
++  para(s, 7.878, 5.803, 4.89, 0.608, LOREM.short);
++  stat(s, 6.442, 5.512, 1.437, 0.841, '89+', { size: SZ.title, color: C.green });
++}
++
++// 8 — faculty and mentors
++function slide08(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 8);
++  frame(s, 7.907, -0.68, 3.498, 3.992, true);
++  heading(s, 0.804, 1.042, 6.571, 0.841,
++    [['Faculty', C.green], [' and Mentors', null]]);
++  label(s, 8.743, 3.062, 2.909, 0.404, 'Jennifer William', { size: SZ.note });
++  para(s, 8.743, 2.754, 1.799, 0.303, 'Your Position here',
++    { align: 'left', color: C.muted, italic: true, spacing: null });
++  glyph(s, 'school', 8.85, 3.586, 0.411, C.green, C.bg);
++  glyph(s, 'hands', 9.364, 3.608, 0.366, C.green, C.bg);
++  glyph(s, 'cap', 9.832, 3.608, 0.366, C.green, C.bg);
++  rect(s, 10.708, 4.396, 1.764, 0.3, C.dark);
++  rect(s, 8.743, 4.396, 1.966, 0.3, C.green);
++  [['3.4', 9.119], ['4.4', 10.984]].forEach(([v, x]) => {
++    s.addText(v, {
++      x, y: 4.407, w: 1.212, h: 0.278, valign: 'top', align: 'center',
++      fontFace: F.body, fontSize: 10.5, italic: true, color: C.white,
++    });
++  });
++  para(s, 8.743, 5.051, 3.729, 1.133, LOREM.penatibus + ' ipsum dolor sit amet, ');
++  label(s, 0.804, 3.217, 3.281, 0.64, 'Honoring the Educators Who Guided Our Journey');
++  para(s, 0.804, 4.325, 3.845, 1.395, LOREM.bio);
++  hLine(s, 0.921, 3.996, 3.363);
++  bar(s, 0.921, 1.911);
++}
++
++// Smartphone mock-up drawn from primitives (was a vector group).
++function phoneMockup(s) {
++  s.addShape('roundRect', { x: 5.031, y: 1.501, w: 0.049, h: 1.445, fill: { color: C.phoneBtn }, rectRadius: 0.02 });
++  s.addShape('roundRect', { x: 8.089, y: 2.103, w: 0.05, h: 0.689, fill: { color: C.phoneBtn }, rectRadius: 0.02 });
++  s.addShape('roundRect', { x: 5.057, y: 0.654, w: 3.056, h: 6.193, fill: { color: C.phoneBody }, rectRadius: 0.46 });
++  s.addShape('roundRect', { x: 5.103, y: 0.7, w: 2.963, h: 6.099, fill: { color: C.phoneEdge }, rectRadius: 0.42 });
++  s.addShape('roundRect', { x: 5.24, y: 0.83, w: 2.69, h: 5.84, fill: { color: C.bg }, rectRadius: 0.33 });
++  s.addShape('roundRect', { x: 5.79, y: 0.72, w: 1.585, h: 0.39, fill: { color: C.phoneEdge }, rectRadius: 0.18 });
++  s.addShape('roundRect', { x: 6.395, y: 0.87, w: 0.373, h: 0.053, fill: { color: C.phoneBody }, rectRadius: 0.026 });
++  s.addShape('ellipse', { x: 6.861, y: 0.853, w: 0.087, h: 0.087, fill: { color: C.phoneBody } });
++}
++
++// 9 — graduation highlights
++function slide09(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 9);
++  frame(s, 7.875, -1.436, 3.498, 3.992, true);
++  heading(s, 8.644, 3.088, 3.876, 1.582,
++    [['Graduation', C.green], [' Highlights', null]]);
++  phoneMockup(s);
++  para(s, 8.644, 5.099, 3.845, 1.395, LOREM.bio);
++  const feature = 'Lorem ipsum elit dolor sit amet, consectetuer adipiscing elit. Aenean';
++  [['hands', 0.661, 1.543, 0.45, 1.279, 1.65],
++    ['school', 0.638, 3.408, 0.506, 3.173, 3.543],
++    ['cap', 0.661, 5.329, 0.45, 5.066, 5.436]]
++    .forEach(([kind, ix, iy, isize, ty, by]) => {
++      glyph(s, kind, ix, iy, isize, C.black, C.bg);
++      label(s, 1.277, ty, 2.909, 0.37, 'Your Title Here');
++      para(s, 1.277, by, 3.332, 0.608, feature);
++    });
++  bar(s, 8.766, 2.984);
++}
++
++// 10 — the complete journey (Q1 / Q2 columns)
++function slide10(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 10);
++  rect(s, 10.616, 2.173, 2.149, 5.327, C.dark);
++  rect(s, 8.245, 4.194, 2.149, 3.306, C.green);
++  stat(s, 8.711, 5.393, 1.216, 0.909, 'Q1', { color: C.white, align: 'center' });
++  stat(s, 11.083, 4.382, 1.216, 0.909, 'Q2', { color: C.white, align: 'center' });
++  [[8.362, 2.695, 8.596, 3.431], [10.734, 0.786, 10.967, 1.523]]
++    .forEach(([px, py, lx, ly]) => {
++      stat(s, px, py, 1.914, 0.909, '90%', { align: 'center' });
++      para(s, lx, ly, 1.447, 0.345, 'Your Title Here', { align: 'center' });
++    });
++  heading(s, 0.768, 1.07, 7.828, 1.582,
++    [['The Complete Journey of Our ', null], ['Academic', C.green], [' Growth', null]]);
++  stat(s, 0.768, 4.322, 2.923, 0.909, '928,83+');
++  para(s, 3.641, 4.776, 1.447, 0.345, 'Your Title Here', { align: 'center' });
++  para(s, 0.768, 5.297, 6.746, 1.133, LOREM.growth);
++  bar(s, 2.751, 2.638);
++}
++
++// 11 — academic programs (three colour bands)
++function slide11(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 11);
++  heading(s, 0.768, 1.033, 6.742, 1.582,
++    [['Academic Programs & ', null], ['Achievements', C.green]]);
++  rect(s, 0, 3.122, 5.546, 2.102, C.gray);
++  rect(s, 5.546, 3.122, 3.894, 2.102, C.dark);
++  rect(s, 9.44, 3.122, 3.894, 2.102, C.green);
++  stat(s, 8.408, 2.043, 1.582, 0.572, '$28,0', { size: SZ.money });
++  para(s, 9.7, 2.209, 1.447, 0.345, 'Your Title Here', { align: 'center' });
++  [[3.495, 3.881, C.black], [7.295, 7.681, C.white], [11.108, 11.494, C.white]]
++    .forEach(([px, lx, color]) => {
++      stat(s, px, 3.633, 1.914, 0.909, '90%', { color, align: 'right' });
++      para(s, lx, 4.369, 1.447, 0.345, 'Your Title Here', { color, align: 'right' });
++    });
++  para(s, 2.878, 5.592, 9.306, 0.87, LOREM.programs);
++  label(s, 0.768, 5.657, 1.742, 0.37, 'Faculties');
++  bar(s, 5.857, 2.217);
++}
++
++// 12 — career pathways (three staggered project cards)
++function slide12(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 12);
++  heading(s, 0.768, 1.07, 11.368, 0.841,
++    [['Career Pathways After ', null], ['Graduation', C.green]]);
++  const cards = [
++    { x: 0.768, y: 2.385, fill: C.green, title: 'Project One', ink: C.white },
++    { x: 4.837, y: 3.526, fill: C.dark, title: 'Project Two', ink: C.white },
++    { x: 8.906, y: 4.667, fill: C.gray, title: 'Project Three', ink: C.black },
++  ];
++  cards.forEach(c => rect(s, c.x, c.y, 3.24, 2.281, c.fill));
++  cards.forEach(c => {
++    label(s, c.x + 0.228, c.y + 1.141, 1.897, 0.337, c.title,
++      { size: SZ.card, color: c.ink });
++    para(s, c.x + 0.228, c.y + 1.478, 2.783, 0.608, LOREM.project, { color: c.ink });
++  });
++  label(s, 6.274, 2.214, 2.909, 0.37, 'Your Title Here');
++  para(s, 6.274, 2.569, 2.737, 0.608,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ');
++  stat(s, 4.837, 2.278, 1.437, 0.841, '89+', { size: SZ.title, color: C.green });
++  para(s, 0.768, 5.34, 3.089, 1.133, LOREM.sociis);
++  para(s, 8.906, 3.479, 3.089, 0.87,
++    'Lorem ipsum dolor sit amet, consectetuer eget adipiscing elit. Aenean commodo ligula eget');
++  glyph(s, 'school', 0.993, 2.699, 0.653, C.white, C.green);
++  glyph(s, 'hands', 5.084, 3.889, 0.581, C.white, C.dark);
++  glyph(s, 'cap', 9.154, 5.03, 0.581, C.black, C.gray);
++  bar(s, 7.848, 0.916);
++}
++
++// 13 — student accomplishments (stacked panels on the right)
++function slide13(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 13);
++  heading(s, 0.768, 1.07, 5.467, 2.322,
++    [['Student', C.green], [' Accomplishments & Recognitions', null]]);
++  rect(s, 7.483, 2.5, 5.85, 2.5, C.green);
++  para(s, 8.21, 3.515, 4.796, 0.87,
++    LOREM.project.replace('adipiscing', 'adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus dolor'),
++    { color: C.white });
++  label(s, 8.21, 3.115, 1.897, 0.337, 'Project Two', { size: SZ.card, color: C.white });
++  rect(s, 7.483, 0, 3.974, 2.5, C.dark);
++  para(s, 8.359, 0.913, 2.783, 1.133, LOREM.project + ' elit. Aenean commodo ligula eget dolor. Aenean massa. ',
++    { color: C.white });
++  label(s, 8.359, 0.514, 1.897, 0.337, 'Project One', { size: SZ.card, color: C.white });
++  rect(s, 7.483, 5, 3.974, 2.5, C.lightGray);
++  para(s, 8.359, 5.913, 2.783, 1.133, LOREM.project + ' elit. Aenean commodo ligula eget dolor. Aenean massa. ');
++  label(s, 8.359, 5.499, 1.897, 0.337, 'Project Three', { size: SZ.card });
++  stat(s, 0.768, 4.617, 2.923, 0.909, '928,83+');
++  para(s, 3.641, 5.071, 1.447, 0.345, 'Your Title Here', { align: 'center' });
++  para(s, 0.768, 5.592, 5.899, 0.87,
++    LOREM.penatibus + ' dolor sit amet, consectetuer adipiscing elit. Aenean');
++  bar(s, 3.529, 1.48, 2.533);
++  glyph(s, 'school', 7.632, 0.393, 0.578, C.white, C.dark);
++  glyph(s, 'hands', 7.664, 3.026, 0.514, C.white, C.green);
++  glyph(s, 'cap', 7.664, 5.404, 0.514, C.black, C.lightGray);
++}
++
++// 14 — alumni network bar chart (drawn with rectangles, as in the original)
++function slide14(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 14);
++  const bars = [
++    { x: 0.67, y: 4.698, h: 1.494, pct: '30%', month: 'Jan', fill: C.gray },
++    { x: 2.693, y: 3.917, h: 2.275, pct: '40%', month: 'Feb', fill: C.gray },
++    { x: 4.716, y: 3.623, h: 2.569, pct: '50%', month: 'Mar', fill: C.green },
++    { x: 6.739, y: 4.083, h: 2.108, pct: '60%', month: 'Apr', fill: C.gray },
++    { x: 8.762, y: 4.698, h: 1.494, pct: '70%', month: 'May', fill: C.gray },
++    { x: 10.785, y: 5.146, h: 1.046, pct: '80%', month: 'Jun', fill: C.gray },
++  ];
++  bars.forEach(b => rect(s, b.x, b.y, 1.878, b.h, b.fill));
++  bars.forEach(b => label(s, b.x + 0.477, 2.614, 0.925, 0.37, b.pct, { align: 'center' }));
++  hLine(s, 0.278, 6.192, 12.778, C.black, 1);
++  bars.forEach(b => label(s, b.x + 0.477, 6.342, 0.925, 0.37, b.month, { align: 'center' }));
++  s.addShape('line', {
++    x: 5.655, y: 3.118, w: 0, h: 0.505,
++    line: { color: C.green, width: 0.5, beginArrowType: 'oval' },
++  });
++  heading(s, 0.768, 1.07, 10.232, 0.841,
++    [['Alumni Network & ', null], ['Community', C.green]]);
++  bar(s, 6.411, 0.958);
++}
++
++// 15 — testimonial, green half-page
++function slide15(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 15);
++  rect(s, 0, 0, 7.788, 7.5, C.green);
++  label(s, 0.431, 0.25, 3.194, 0.338, 'Graduation University Presentation',
++    { size: SZ.body, color: C.white, charSpacing: 0 });
++  s.addText('www.GraduationUniversity.com', {
++    x: 0.431, y: 6.912, w: 3.194, h: 0.342, valign: 'top',
++    fontFace: F.body, fontSize: SZ.body, color: C.white, lineSpacingMultiple: 1.3,
++  });
++  label(s, 0.431, 1.954, 2.909, 0.404, 'Jennifer William',
++    { size: SZ.note, color: C.white });
++  para(s, 0.431, 1.646, 1.799, 0.303, 'Your Position here',
++    { align: 'left', color: C.white, italic: true, spacing: null });
++  glyph(s, 'school', 0.538, 2.478, 0.411, C.white, C.green);
++  glyph(s, 'hands', 1.052, 2.501, 0.366, C.white, C.green);
++  glyph(s, 'cap', 1.52, 2.501, 0.366, C.white, C.green);
++  para(s, 0.431, 3.489, 3.294, 1.395,
++    'Lorem ipsum Aenean dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Aenean Cum sociis natoque penatibus Aenean dolor sit amet, ',
++    { color: C.white });
++  para(s, 0.431, 4.911, 3.294, 0.87,
++    'Lorem ipsum Aenean dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean',
++    { color: C.white });
++  label(s, 2.293, 1.928, 1.598, 3.45, '\u201C',
++    { size: 199, color: C.white, transparency: 83 });
++  heading(s, 8.233, 1.158, 4.508, 1.582, [['Voices of Our Graduates', null]]);
++  para(s, 8.233, 2.981, 4.399, 0.87,
++    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque');
++  frame(s, 8.321, 4.307, 3.498, 3.992, true);
++}
++
++// 16 — thank you
++function slide16(pres) {
++  const s = pres.addSlide({ masterName: 'BASE' });
++  chrome(s, 16);
++  frame(s, 6.908, 0.76, 3.498, 3.992, true);
++  hLine(s, 0.535, 6.681, 12.264);
++  heading(s, 0.487, 4.78, 6.329, 1.313,
++    [['Thank ', null], ['You!!', C.green]], SZ.hero);
++  label(s, 0.487, 4.363, 5.939, 0.378, 'Graduation University Presentation',
++    { size: 14, color: C.muted, charSpacing: 3 });
++  bar(s, 4.004, 6.093, 2.017, 0.167);
++  [['+214-704-76532', 2.207, 1.615], ['thesisone@gmail.com', 1.724, 2.089],
++    ['www.companyinfo.com', 1.24, 2.231]].forEach(([text, y, w]) => {
++    para(s, 0.487, y, w, 0.345, text, { align: 'left' });
++  });
++}
++
++/* ------------------------------------------------------------------ build */
++
++function build() {
++  const pres = new PptxGenJS();
++  pres.layout = 'LAYOUT_WIDE';           // 13.333 x 7.5 in
++  pres.theme = { headFontFace: F.head, bodyFontFace: F.body };
++  pres.defineSlideMaster({ title: 'BASE', background: { color: C.bg } });
++
++  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++    slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16]
++    .forEach(fn => fn(pres));
++
++  return pres.writeFile({
++    fileName: path.join(__dirname, '0cf1b034-bd42-4d22-bfcf-cfd347499086_grok_final.pptx'),
++  });
++}
++
++build().then(f => console.log('wrote', f));

@@ -1,0 +1,1274 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/ai_technology_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/ai_technology_pitch_deck.js
+@@ -0,0 +1,1271 @@
++/**
++ * Recreation of "Ai Technology Template" (32 slides, 13.333 x 7.5 in) with pptxgenjs.
++ *
++ * Design notes
++ * ------------
++ * The source deck leans on OOXML gradient fills, which pptxgenjs does not expose.
++ * Gradients are therefore approximated with two readable helpers:
++ *   - `gradRect`  : bilinear wash built from horizontal + 50%-opacity vertical strips
++ *   - `gradShape` : concentric copies of a preset shape shrunk toward one corner
++ * Raster picture placeholders in the original are drawn as flat `[image]` panels.
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ---------------------------------------------------------------- palette */
++
++const BLUE = '5263AE';   // theme accent2
++const ORANGE = 'F47937'; // theme accent1
++const BLACK = '000000';
++const WHITE = 'FFFFFF';
++
++const FONT = 'Inter';     // body typeface
++const HEAD = 'Poppins';   // heading typeface
++
++const SLIDE_W = 13.333;
++const SLIDE_H = 7.5;
++
++/* ------------------------------------------------------------ color maths */
++
++const hex2rgb = (h) => [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16));
++const rgb2hex = (c) => c.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('').toUpperCase();
++
++/** Linear blend of two hex colors; t=0 -> a, t=1 -> b. */
++function mix(a, b, t) {
++  const A = hex2rgb(a);
++  const B = hex2rgb(b);
++  return rgb2hex(A.map((v, i) => v + (B[i] - v) * Math.max(0, Math.min(1, t))));
++}
++
++/** Flatten a translucent color over an opaque one (alpha given in percent). */
++const over = (fg, alphaPct, bg) => mix(bg, fg, alphaPct / 100);
++
++/* ------------------------------------------------------------- primitives */
++
++/**
++ * The deck only ever uses two gradient ramps. `NIGHT` is the moody blue-to-black
++ * wash behind almost every slide and panel; `FLARE` is the warm blue-to-orange
++ * accent on cards, pills and bars. Mirrored variants come from `flip()`.
++ */
++const NIGHT = [BLUE, BLACK];
++const FLARE = [BLUE, ORANGE];
++
++/** Sample a ramp at 0..1. */
++function rampAt(ramp, t) {
++  const u = Math.max(0, Math.min(1, t)) * (ramp.length - 1);
++  const i = Math.min(ramp.length - 2, Math.floor(u));
++  return mix(ramp[i], ramp[i + 1], u - i);
++}
++
++/** Reverse a ramp (the deck uses several mirrored variants). */
++const flip = (ramp) => ramp.slice().reverse();
++
++/** Direction vectors keyed by OOXML gradient angle (degrees, y pointing down). */
++const DIR = { 0: [1, 0], 45: [1, 1], 90: [0, 1], 135: [-1, 1], 180: [-1, 0], 225: [-1, -1], 270: [0, -1], 315: [1, -1] };
++
++/**
++ * Rectangular gradient panel. A horizontal band pass plus a half-transparent
++ * vertical band pass compose into a bilinear ramp for the diagonal angles.
++ * `deg` is the direction the ramp travels, so 45 runs top-left -> bottom-right.
++ */
++function gradRect(s, o, ramp, deg, bands) {
++  const [dx, dy] = DIR[deg];
++  const n = bands || 26;
++  const diag = dx !== 0 && dy !== 0;
++  if (dx !== 0) {
++    // opaque pass: hairline overlap hides seams between bands
++    for (let i = 0; i < n; i++) {
++      const t = (i + 0.5) / n;
++      s.addShape('rect', {
++        x: o.x + (o.w * i) / n, y: o.y, w: o.w / n + 0.01, h: o.h,
++        fill: { color: rampAt(ramp, dx > 0 ? t : 1 - t) }, line: { type: 'none' },
++      });
++    }
++  }
++  if (dy !== 0) {
++    // translucent pass: butt-jointed, since overlapping would double-darken
++    for (let j = 0; j < n; j++) {
++      const t = (j + 0.5) / n;
++      s.addShape('rect', {
++        x: o.x, y: o.y + (o.h * j) / n, w: o.w, h: o.h / n,
++        fill: { color: rampAt(ramp, dy > 0 ? t : 1 - t), transparency: diag ? 50 : 0 }, line: { type: 'none' },
++      });
++    }
++  }
++}
++
++/** Full-bleed background wash: every slide but 14 and 32 uses this exact fill. */
++function wash(s, ramp, deg) {
++  gradRect(s, { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H }, ramp || NIGHT, deg === undefined ? 45 : deg, 34);
++}
++
++/**
++ * Gradient fill for a non-rectangular preset shape. The silhouette is the
++ * full-size copy; `n` progressively smaller copies anchored to the corner the
++ * ramp runs away from paint the ramp back toward its start.
++ */
++function gradShape(s, shape, o, ramp, deg, bands) {
++  const [dx, dy] = DIR[deg];
++  const n = bands || 22;
++  for (let k = n; k >= 1; k--) {
++    const f = k / n;
++    const w = dx ? o.w * f : o.w;
++    const h = dy ? o.h * f : o.h;
++    s.addShape(shape, Object.assign({}, o, {
++      x: dx < 0 ? o.x + o.w - w : o.x,
++      y: dy < 0 ? o.y + o.h - h : o.y,
++      w, h,
++      fill: { color: rampAt(ramp, (k - 0.5) / n) },
++      line: { type: 'none' },
++    }));
++  }
++}
++
++/**
++ * Gradient fill for a stadium (fully rounded) bar. Plain `gradShape` would
++ * square off the leading cap once a copy gets narrower than the bar is tall,
++ * so copies here never shrink past that point and the ramp's first color is
++ * carried by a circle sitting exactly on the cap.
++ */
++function gradPill(s, o, ramp, bands) {
++  const n = bands || 30;
++  const r = o.h / 2;
++  for (let k = n; k >= 0; k--) {
++    const w = o.h + (o.w - o.h) * (k / n);
++    s.addShape('roundRect', {
++      x: o.x, y: o.y, w, h: o.h, rectRadius: r,
++      fill: { color: rampAt(ramp, (k + 0.5) / (n + 1)) }, line: { type: 'none' },
++    });
++  }
++}
++
++/**
++ * Gradient fill for a big ellipse. Nesting (see `gradShape`) would show as
++ * crescent banding at this size, so the disc is instead built from horizontal
++ * chords whose width follows the ellipse, each chord carrying its own ramp.
++ */
++function gradOval(s, o, ramp, deg, rows, cols) {
++  const [dx, dy] = DIR[deg];
++  const nr = rows || 26;
++  const nc = cols || 14;
++  const a = o.w / 2;
++  const b = o.h / 2;
++  for (let j = 0; j < nr; j++) {
++    const y0 = (j / nr) * 2 - 1;          // chord edges in unit circle space
++    const y1 = ((j + 1) / nr) * 2 - 1;
++    const yn = Math.min(Math.abs(y0), Math.abs(y1));
++    const half = a * Math.sqrt(Math.max(0, 1 - yn * yn));
++    if (half <= 0) continue;
++    const tv = dy > 0 ? (j + 0.5) / nr : dy < 0 ? 1 - (j + 0.5) / nr : 0;
++    for (let i = 0; i < nc; i++) {
++      const th = dx > 0 ? (i + 0.5) / nc : dx < 0 ? 1 - (i + 0.5) / nc : 0;
++      const t = (tv + th) / (Math.abs(dx) + Math.abs(dy));
++      s.addShape('rect', {
++        x: o.x + a - half + (2 * half * i) / nc, y: o.y + b + y0 * b,
++        w: (2 * half) / nc + 0.008, h: (o.h / nr) + 0.008,
++        fill: { color: rampAt(ramp, t) }, line: { type: 'none' },
++      });
++    }
++  }
++}
++
++/** Solid preset shape, no outline. */
++function solid(s, shape, o, color) {
++  s.addShape(shape, Object.assign({ fill: { color }, line: { type: 'none' } }, o));
++}
++
++/** Outlined circle, no fill. */
++function ring(s, o, width, color) {
++  s.addShape('ellipse', Object.assign({ fill: { type: 'none' }, line: { color: color || WHITE, width: width || 1 } }, o));
++}
++
++/** Straight connector. */
++function line(s, x, y, w, h, width, color) {
++  s.addShape('line', { x, y, w, h, line: { color: color || WHITE, width: width === undefined ? 1 : width } });
++}
++
++/* ------------------------------------------------------------------ text */
++
++/**
++ * Text box. `o` carries geometry, `t` the string or run array.
++ * Defaults mirror the deck: white Inter, top-left, no autofit, tight insets.
++ */
++function txt(s, t, o) {
++  s.addText(t, Object.assign({
++    color: WHITE, fontFace: FONT, align: 'left', valign: 'top',
++    margin: [7.2, 7.2, 3.6, 3.6], isTextBox: true, wrap: true,
++  }, o));
++}
++
++/* --------------------------------------------------------------- motifs */
++
++/** Top navigation bar repeated on every slide. */
++const NAV = [
++  { t: 'Aero link', x: 0.623, w: 0.939, align: 'left' },
++  { t: 'Home ', x: 5.712, w: 0.738, align: 'center' },
++  { t: 'About', x: 7.251, w: 0.738, align: 'center' },
++  { t: 'Team', x: 8.79, w: 0.67, align: 'center' },
++  { t: 'Practice', x: 10.261, w: 0.854, align: 'center' },
++  { t: 'Contact', x: 11.917, w: 0.827, align: 'right' },
++];
++
++function nav(s) {
++  NAV.forEach((n) => txt(s, n.t, { x: n.x, y: 0.671, w: n.w, h: 0.303, fontSize: 12, align: n.align }));
++}
++
++/** Concentric-rings "radar" motif; `d` is the diameter of the outermost ring. */
++function radar(s, cx, cy, d, lw) {
++  const w = lw === undefined ? 1 : lw;
++  [1, 0.87, 0.75, 0.63, 0.5, 0.37].forEach((f) => ring(s, { x: cx - (d * f) / 2, y: cy - (d * f) / 2, w: d * f, h: d * f }, w));
++  gradShape(s, 'ellipse', { x: cx - d * 0.125, y: cy - d * 0.125, w: d * 0.25, h: d * 0.25 }, FLARE, 90, 10);
++  solid(s, 'ellipse', { x: cx - d * 0.053, y: cy - d * 0.053, w: d * 0.107, h: d * 0.107 }, WHITE);
++}
++
++/** Small concentric-rings dot used as a decorative node. */
++function node(s, cx, cy, d) {
++  [1, 0.77, 0.55].forEach((f) => ring(s, { x: cx - (d * f) / 2, y: cy - (d * f) / 2, w: d * f, h: d * f }, 1));
++  solid(s, 'ellipse', { x: cx - d * 0.173, y: cy - d * 0.173, w: d * 0.346, h: d * 0.346 }, WHITE);
++}
++
++/**
++ * "Title Text" pill: gradient lozenge with a radar node parked on one end.
++ * `side` = 'right' puts the node at the right end (default), 'left' mirrors it.
++ */
++function pill(s, x, y, w, label, side) {
++  const h = 0.296;
++  gradPill(s, { x, y, w, h }, side === 'left' ? FLARE : flip(FLARE), 14);
++  const nx = side === 'left' ? x - 0.006 : x + w - 0.289;
++  gradShape(s, 'ellipse', { x: nx, y: y + 0.003, w: 0.292, h: 0.292 }, FLARE, 45, 10);
++  [0.62, 0.503, 0.396].forEach((d) => ring(s, { x: nx + 0.146 - d / 2, y: y + 0.149 - d / 2, w: d, h: d }, 0.5));
++  solid(s, 'ellipse', { x: nx + 0.083, y: y + 0.086, w: 0.125, h: 0.125 }, WHITE);
++  txt(s, label, { x: side === 'left' ? x + 0.34 : x + 0.047, y: y + 0.014, w: 0.851, h: 0.269, fontSize: 10 });
++}
++
++/**
++ * Punched-card KPI tile: "0.5 ↗ / 100% / Title Text", sitting on a slightly
++ * larger punched card of the same family.
++ *   deg      gradient direction for both cards
++ *   ramp     inner card ramp (defaults to FLARE)
++ *   outerRamp / outerDeg  overrides for the backing card
++ *   opacity  percent fill opacity, for the translucent variant on slide 12
++ */
++function kpiCard(s, x, y, opt) {
++  const o = opt || {};
++  const deg = o.deg === undefined ? 0 : o.deg;
++  const op = o.opacity === undefined ? 100 : o.opacity;
++  const bg = o.bg || '2B3357';
++  const fade = (r) => (op < 100 ? r.map((c) => over(c, op, bg)) : r);
++  gradShape(s, 'flowChartPunchedCard', { x, y, w: 1.794, h: 2.25 },
++    fade(o.outerRamp || o.ramp || FLARE), o.outerDeg === undefined ? deg : o.outerDeg, 18);
++  gradShape(s, 'flowChartPunchedCard', { x: x + 0.207, y: y + 0.218, w: 1.381, h: 1.46 },
++    fade(o.ramp || FLARE), deg, 20);
++  txt(s, '0.5', { x: x + 0.393, y: y + 0.58, w: 0.411, h: 0.252, fontSize: 9 });
++  ring(s, { x: x + 0.817, y: y + 0.588, w: 0.311, h: 0.311 }, 1);
++  txt(s, '↗', { x: x + 0.85, y: y + 0.6, w: 0.28, h: 0.28, fontSize: 11, align: 'center' });
++  txt(s, '100%', { x: x + 0.316, y: y + 0.908, w: 1.207, h: 0.505, fontSize: 24, align: 'center' });
++  txt(s, 'Title Text', { x: x + 0.393, y: y + 1.817, w: 1.069, h: 0.303, fontSize: 12, bold: true });
++}
++
++/**
++ * Picture-frame stand-in. The source deck ships every picture frame empty (it
++ * carries no media part at all) and PowerPoint renders those as see-through,
++ * so an unfilled outline is the faithful substitute. Only the device mock-ups
++ * on slides 29-30 need a filled screen, which `screen()` provides.
++ */
++function photo(s, x, y, w, h) {
++  s.addShape('rect', { x, y, w, h, fill: { type: 'none' }, line: { type: 'none' } });
++}
++
++/**
++ * Filled display panel for a device mock-up: repaint the slice of the slide
++ * wash that the shell is covering, then label it as a stand-in image.
++ */
++function screen(s, x, y, w, h) {
++  const at = (u, v) => rampAt(NIGHT, (u / SLIDE_W + v / SLIDE_H) / 2);
++  gradRect(s, { x, y, w, h }, [at(x, y), at(x + w, y + h)], 45, 12);
++  txt(s, '[image]', { x, y: y + h / 2 - 0.16, w, h: 0.32, fontSize: 10, color: '646E96', align: 'center' });
++}
++
++/** Two-line "Good Idea / Makes Everything Is Better" lockup used across the deck. */
++function goodIdea(s, x, y, align) {
++  txt(s, [
++    { text: 'Good Idea ', options: { breakLine: true } },
++    { text: 'Makes Everything Is Better' },
++  ], { x, y, w: 2.451, h: 1.027, fontSize: 18, bold: true, lineSpacing: 22, align: align || 'left' });
++}
++
++/** Body copy at the deck's standard 9 pt / 12 pt-leading setting. */
++function body(s, t, o) {
++  txt(s, t, Object.assign({ fontSize: 9, lineSpacing: 12 }, o));
++}
++
++/* -------------------------------------------------------- slide builders */
++
++/** Slides 1 & 2: hero title. `mirror` swaps the whole layout left-for-right. */
++function heroSlide(pptx, mirror) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  // Big headline
++  txt(s, 'Ai Technology Template', {
++    x: mirror ? 6.938 : 0.587, y: 1.463, w: mirror ? 5.836 : 5.736, h: 3.214,
++    fontSize: 70, lineSpacing: 74, align: mirror ? 'right' : 'left',
++  });
++
++  // Centre radar with leader lines and the 200K caption
++  const rx = mirror ? 5.559 : 7.813;
++  radar(s, rx, 4.173, 1.401);
++  line(s, mirror ? 5.673 : 6.604, 4.174, 1.019, 0);
++  line(s, mirror ? 6.682 : 6.604, 4.171, 0, 1.672);
++  txt(s, '200K', { x: mirror ? 6.271 : 6.197, y: 6.227, w: 0.821, h: 0.337, fontSize: 14, bold: true, align: 'center' });
++  txt(s, 'Title Text', { x: mirror ? 6.087 : 6.013, y: 6.521, w: 1.189, h: 0.337, fontSize: 14, bold: true, align: 'center' });
++
++  // Photo frame
++  photo(s, mirror ? 1.625 : 7.812, 1.597, 3.914, 5.153);
++
++  // KPI card
++  kpiCard(s, mirror ? 0.729 : 10.831, 3.049, { ramp: NIGHT, deg: mirror ? 45 : 225, outerRamp: mirror ? FLARE : NIGHT, outerDeg: 45 });
++
++  // Small punched card + pill + antenna lines
++  const cx = mirror ? 9.125 : 3.06;
++  gradShape(s, 'flowChartPunchedCard', { x: cx, y: mirror ? 5.333 : 5.336, w: 1.146, h: 1.417 }, FLARE, mirror ? 0 : 135, 18);
++  pill(s, mirror ? 9.563 : 2.476, mirror ? 5.893 : 5.896, mirror ? 1.393 : 1.304, 'Title Text');
++  if (mirror) {
++    line(s, 11.641, 5.584, 0.984, 0, 1.5);
++    line(s, 12.625, 5.25, 0.708, 0.333, 1.5);
++    line(s, 11.2, 5.607, 0.495, 0.367, 1.5);
++    solid(s, 'ellipse', { x: 11.094, y: 5.947, w: 0.131, h: 0.131 }, WHITE);
++    node(s, 11.685, 5.602, 0.496);
++  } else {
++    line(s, 0.724, 5.741, 0.984, 0, 1.5);
++    line(s, -0.044, 5.248, 0.771, 0.485, 1.5);
++    line(s, 1.716, 5.742, 0.491, 0.294, 1.5);
++    solid(s, 'ellipse', { x: 2.124, y: 5.973, w: 0.131, h: 0.131 }, WHITE);
++    node(s, 1.706, 5.738, 0.496);
++  }
++}
++
++/** Slide 3: agenda / index. */
++const INDEX_ITEMS = ['About Us ', 'Welcome', 'Highlight', 'Introduction', 'Problem Statement', 'Solution Overview'];
++
++function slide03(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  INDEX_ITEMS.forEach((label, i) => {
++    const y = 1.475 + i * 0.9835;
++    txt(s, label, { x: 6.738, y, w: 3.6, h: 0.505, fontSize: 24, bold: true });
++    txt(s, '0' + (i + 1), { x: 12.083, y: y - 0.009, w: 0.669, h: 0.505, fontSize: 24, bold: true, align: 'right' });
++  });
++
++  gradShape(s, 'flowChartPunchedCard', { x: 0.729, y: 1.583, w: 1.381, h: 1.708 }, FLARE, 0, 18);
++  pill(s, 1.285, 2.289, 1.393, 'Title Text');
++  s.addShape('arc', { x: 0.424, y: 1.913, w: 2.075, h: 2.075, line: { color: WHITE, width: 1 }, rotate: 150 });
++  line(s, -0.005, 3.675, 0.729, 0);
++  solid(s, 'ellipse', { x: 2.127, y: 3.578, w: 0.156, h: 0.156 }, WHITE);
++
++  goodIdea(s, 0.619, 4.4);
++  body(s, 'the majority have suffered alteration in some form, by injected humor  Are many variations of passages Lorem Ipsum available majority',
++    { x: 0.638, y: 5.425, w: 3.264, h: 0.69, lineSpacing: 14 });
++  txt(s, 'Index', { x: 0.605, y: 6.267, w: 1.499, h: 0.673, fontSize: 34, fontFace: HEAD });
++}
++
++/** Slide 4: "Welcome To Al Technology". */
++function slide04(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Welcome To Al Technology', { x: 4.875, y: 1.429, w: 3.584, h: 1.245, fontSize: 34, fontFace: HEAD, align: 'center' });
++  body(s, 'suffered alteration in some form, by injected humor  passages Lorem',
++    { x: 4.525, y: 2.862, w: 4.283, h: 0.297, align: 'center', lineSpacing: 14 });
++  body(s, 'the majority have suffered alteration in some form, by injected humor  Are many variations of passages Lorem Ipsum available majority have suffered alteration in some form,  injected humor',
++    { x: 4.258, y: 3.506, w: 4.817, h: 0.69, align: 'center', lineSpacing: 14 });
++
++  gradShape(s, 'roundRect', { x: 5.317, y: 4.634, w: 2.698, h: 0.698, rectRadius: 0.349 }, FLARE, 45, 20);
++  txt(s, 'Subtitle Text Here', { x: 5.547, y: 4.798, w: 2.24, h: 0.37, fontSize: 16, bold: true, align: 'center' });
++
++  // Left rail: vertical line, arc + dot, KPI card
++  line(s, 1.626, 1.583, 0, 4.718);
++  s.addShape('arc', { x: 1.321, y: 2.737, w: 1.583, h: 1.583, line: { color: WHITE, width: 1 }, rotate: 322 });
++  solid(s, 'ellipse', { x: 2.653, y: 2.975, w: 0.124, h: 0.124 }, WHITE);
++  kpiCard(s, 0.729, 4.5);
++
++  // Right rail: punched card + pill, vertical line, arc + dot
++  gradShape(s, 'flowChartPunchedCard', { x: 11.235, y: 1.583, w: 1.381, h: 1.708, flipH: true }, FLARE, 180, 18);
++  pill(s, 10.681, 2.289, 1.393, 'Title Text', 'left');
++  line(s, 11.926, 2.385, 0, 4.676);
++  s.addShape('arc', { x: 10.728, y: 4.259, w: 1.583, h: 1.583, line: { color: WHITE, width: 1 }, rotate: 150 });
++  solid(s, 'ellipse', { x: 10.778, y: 5.413, w: 0.124, h: 0.124 }, WHITE);
++
++  // Ghost donuts
++  [[2.972, 3.25], [9.736, 4.514]].forEach(([x, y]) => solid(s, 'donut', { x, y, w: 0.833, h: 0.833 }, '3B4067'));
++}
++
++/** Slide 5: "About Us / Al Technology" with a play button. */
++function slide05(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  goodIdea(s, 0.619, 1.497);
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majority have suffered alteration some form injected humor many variations  passages Lorem Ipsum available suffered alteration some injected majority alteration suffered alteration some',
++    { x: 0.638, y: 2.52, w: 4.445, h: 0.762, lineSpacing: 12 });
++  body(s, 'the majority have suffered alteration in some form, by injected humor  Are many variations of passages Lorem Ipsum available majority have suffered alteration in some form,  injected humor',
++    { x: 0.638, y: 3.451, w: 4.445, h: 0.69, lineSpacing: 14 });
++  txt(s, [{ text: 'About Us ', options: { breakLine: true } }, { text: 'Al Technology' }],
++    { x: 0.624, y: 5.571, w: 3.738, h: 1.245, fontSize: 34, fontFace: HEAD });
++
++  photo(s, 7.972, 1.597, 4.653, 3.124);
++  gradShape(s, 'ellipse', { x: 7.542, y: 2.735, w: 0.861, h: 0.861 }, FLARE, 45, 14);
++  s.addShape('triangle', { x: 7.79, y: 3.008, w: 0.365, h: 0.315, fill: { color: WHITE }, line: { type: 'none' }, rotate: 90 });
++
++  line(s, 9.396, 4.521, 0.79, 0.79, 1);
++  line(s, 7.891, 5.308, 1.521, 0, 1);
++  solid(s, 'star4', { x: 7.464, y: 5.155, w: 0.305, h: 0.305 }, WHITE);
++  line(s, 12.616, 3.165, 0.717, 0, 1);
++}
++
++/** Slide 6: 2x2 quadrant matrix A/B/C/D. */
++const QUAD_BODY = 'humor randomized majority suffered alterato variations  passages Lorem Ipsum available';
++
++function slide06(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'This Is Story About Al Technology ', { x: 4.351, y: 1.432, w: 4.631, h: 1.245, fontSize: 34, fontFace: HEAD, align: 'center' });
++
++  gradShape(s, 'roundRect', { x: 4.817, y: 3.318, w: 3.698, h: 3.432, rectRadius: 0.11 }, FLARE, 45, 26);
++  line(s, 6.667, 3.314, 0, 3.436, 2);
++  line(s, 4.829, 5.032, 3.676, 0, 2);
++  [['A', 5.49, 3.831], ['B', 7.353, 3.831], ['C', 5.49, 5.563], ['D', 7.353, 5.563]].forEach(([t, x, y]) =>
++    txt(s, t, { x, y, w: 0.49, h: 0.673, fontSize: 34, align: 'center' }));
++
++  // Four callouts: right column left-aligned, left column right-aligned
++  [
++    { x: 8.942, bx: 8.944, y: 3.658, align: 'left' },
++    { x: 8.942, bx: 8.944, y: 5.39, align: 'left' },
++    { x: 2.384, bx: 2.006, y: 3.658, align: 'right' },
++    { x: 2.384, bx: 2.006, y: 5.39, align: 'right' },
++  ].forEach((c) => {
++    txt(s, 'Subtitle Text Here', { x: c.x, y: c.y, w: 2.005, h: 0.337, fontSize: 14, bold: true, align: c.align });
++    body(s, QUAD_BODY, { x: c.bx, y: c.y + 0.33, w: 2.383, h: 0.69, align: c.align, lineSpacing: 14 });
++  });
++}
++
++/** Slide 7: "Al Technology Company Profile" card grid. */
++function slide07(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Al Technology Company Profile ', { x: 0.619, y: 1.463, w: 4.246, h: 1.245, fontSize: 34, fontFace: HEAD });
++  line(s, 0.983, 3.314, 0.715, 1.472, 1, 'FBFBFB');
++  node(s, 1.001, 3.341, 0.496);
++  node(s, 1.708, 4.82, 0.494);
++  body(s, 'THE MAJORITY HAVE SUFFERED ALTERATION SOME FORM INJECTED HUMOR RANDOMIZED WORD MAJORITY HAVE SUFFERED ALTERATION SOME FORM INJECTED HUMOR VARIATIONS  PASSAGES LOREM IPSUM AVAILABLE SUFFERED ALTERATION INJECTED MAJORITY ALTERATION SUFFERED ALTERATION SOME',
++    { x: 0.629, y: 5.569, w: 3.621, h: 1.279, fontSize: 10, lineSpacing: 12 });
++
++  goodIdea(s, 5.829, 1.497);
++  body(s, 'the majority have suffered alteration in some injected humor  Are many variations of', { x: 5.842, y: 2.525, w: 3.481, h: 0.438 });
++
++  // White content cards
++  [[5.946, 3.319, 1.922, 1.5], [5.946, 5.25, 1.922, 1.5], [10.694, 3.319, 1.922, 3.431]].forEach(([x, y, w, h]) =>
++    solid(s, 'rect', { x, y, w, h }, WHITE));
++  txt(s, 'Case Study', { x: 6.132, y: 3.926, w: 0.896, h: 0.718, fontSize: 16, bold: true, color: BLACK, lineSpacing: 22 });
++  txt(s, 'Introduction', { x: 6.132, y: 6.204, w: 1.551, h: 0.41, fontSize: 16, bold: true, color: BLACK, lineSpacing: 22 });
++  txt(s, [{ text: 'ROI &', options: { breakLine: true } }, { text: 'Cost-Benefit' }],
++    { x: 10.861, y: 5.912, w: 1.638, h: 0.678, fontSize: 16, bold: true, color: BLACK, lineSpacing: 22 });
++
++  gradShape(s, 'snip1Rect', { x: 8.3, y: 3.319, w: 1.928, h: 1.5 }, FLARE, 0, 18);
++  txt(s, 'Roadmap', { x: 8.532, y: 4.234, w: 1.465, h: 0.41, fontSize: 16, bold: true, align: 'center', lineSpacing: 22 });
++  txt(s, '↙', { x: 10.0, y: 3.28, w: 0.3, h: 0.3, fontSize: 14 });
++  photo(s, 8.306, 5.25, 1.922, 1.5);
++}
++
++/** Slide 8: "Our Mission" four-up copy blocks. */
++const MISSION_BODY = 'the majority have suffered alteration some form, by injected humor randomized word majority suffered alteration some injected humor many variations';
++
++function slide08(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'About Us', { x: 0.634, y: 1.462, w: 1.13, h: 0.41, fontSize: 14, bold: true, lineSpacing: 22 });
++  txt(s, 'Our Mission  Company Slide ', { x: 0.627, y: 1.835, w: 4.109, h: 1.245, fontSize: 34, fontFace: HEAD });
++
++  [[0.636, 3.357], [4.091, 3.357], [0.636, 5.31], [4.091, 5.31]].forEach(([x, y]) => {
++    txt(s, 'Subtitle Text Here', { x, y, w: 2.005, h: 0.337, fontSize: 14, bold: true });
++    body(s, MISSION_BODY, { x: x + 0.002, y: y + 0.329, w: 2.709, h: 0.774 });
++  });
++
++  photo(s, 7.677, 3.448, 4.948, 3.302);
++}
++
++/** Slide 9: "Our Vision" with photo left, stats right. */
++function slide09(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  photo(s, 0.743, 1.594, 4.299, 4.153);
++  line(s, 2.892, 5.993, 0, 1.507);
++  solid(s, 'ellipse', { x: 2.845, y: 5.954, w: 0.094, h: 0.094 }, WHITE);
++
++  kpiCard(s, 4.132, 2.545);
++
++  txt(s, 'Our Vision Company Slide ', { x: 7.141, y: 1.425, w: 4.109, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 7.175, 3.018);
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majority have suffered alteration some form injected humor many variations  passages Lorem Ipsum available suffered alteration some injected majority alteration suffered alteration some',
++    { x: 7.188, y: 4.088, w: 4.028, h: 0.942 });
++
++  line(s, 8.911, 5.382, 1.083, 1.083);
++  txt(s, '200K+', { x: 7.164, y: 5.744, w: 1.303, h: 0.505, fontSize: 24 });
++  txt(s, 'Here', { x: 8.228, y: 5.598, w: 0.543, h: 0.269, fontSize: 10 });
++  txt(s, '29.9%', { x: 9.83, y: 5.744, w: 1.303, h: 0.505, fontSize: 24 });
++  txt(s, 'Title Text', { x: 10.895, y: 5.598, w: 0.918, h: 0.269, fontSize: 10 });
++}
++
++/** Slide 10: "Problem" — three gradient cards along a curve. */
++const PROBLEM_CARDS = [
++  { x: 0.729, lines: ['Mongol Data ', 'Entry Errors'] },
++  { x: 5.091, lines: ['Introduction', 'Workflow', 'Monogamist'] },
++  { x: 9.453, lines: ['Lock of Rack ', 'Time Visibisty'] },
++];
++
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, [{ text: 'Problem', options: { breakLine: true } }, { text: 'Al Technology ' }],
++    { x: 0.616, y: 1.425, w: 3.687, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.625, 2.774);
++  body(s, 'the majority have suffered alteration injected humor randomized word majority have suffered alterato variations  passages Lorem Ipsum available suffered alteration',
++    { x: 8.741, y: 1.499, w: 4.028, h: 0.594 });
++
++  line(s, 5.33, 1.831, 1.906, 0);
++  node(s, 5.31, 1.832, 0.496);
++  node(s, 7.356, 1.832, 0.496);
++
++  PROBLEM_CARDS.forEach((c) => {
++    gradShape(s, 'roundRect', { x: c.x, y: 4.454, w: 3.164, h: 2.296, rectRadius: 0.11 }, FLARE, 0, 22);
++    c.lines.forEach((t, i) => txt(s, t, { x: c.x + 0.381, y: 4.834 + i * 0.583, w: 1.9, h: 0.37, fontSize: 16, bold: true }));
++    txt(s, '↗', { x: c.x + 2.24, y: 5.75, w: 0.6, h: 0.6, fontSize: 28, bold: true });
++  });
++}
++
++/** Slide 11: "Solution" — three stat cards. */
++const SOLUTION_CARDS = [
++  { x: 3.245, k: '20k' },
++  { x: 6.462, k: '30k' },
++  { x: 9.679, k: '50k' },
++];
++
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, [{ text: 'Solution ', options: { breakLine: true } }, { text: 'Al Technology ' }],
++    { x: 0.616, y: 1.425, w: 3.562, h: 1.245, fontSize: 34, fontFace: HEAD });
++  body(s, 'humor randomized word majority suffered alterato variations  passages Lorem Ipsum available suffered alteration',
++    { x: 0.639, y: 2.777, w: 2.705, h: 0.606 });
++  body(s, 'the majority have suffered alteration injected humor randomize majority have suffered alterato variations  passages Lorem Ipsum available suffered alteration majohave some injected randomized word majority snuff reed alteration some form injected humor many vacations',
++    { x: 6.366, y: 1.499, w: 6.391, h: 0.606 });
++
++  gradShape(s, 'flowChartPunchedCard', { x: 0.729, y: 4.347, w: 1.381, h: 1.708 }, FLARE, 0, 18);
++  pill(s, 1.285, 5.053, 1.393, 'Title Text');
++  s.addShape('arc', { x: 0.427, y: 4.679, w: 2.075, h: 2.075, line: { color: WHITE, width: 1 }, rotate: 150 });
++  line(s, -0.005, 6.438, 0.729, 0);
++  solid(s, 'ellipse', { x: 2.127, y: 6.342, w: 0.156, h: 0.156 }, WHITE);
++
++  SOLUTION_CARDS.forEach((c) => {
++    gradShape(s, 'rect', { x: c.x, y: 4.651, w: 2.938, h: 2.099 }, FLARE, 0, 22);
++    txt(s, 'Subtitle Text Here', { x: c.x + 0.297, y: 4.968, w: 2.222, h: 0.37, fontSize: 16, bold: true });
++    body(s, QUAD_BODY, { x: c.x + 0.299, y: 5.318, w: 2.383, h: 0.69, lineSpacing: 14 });
++    txt(s, c.k, { x: c.x + 0.299, y: 6.151, w: 0.51, h: 0.303, fontSize: 12 });
++    line(s, c.x + 0.931, 6.302, 0.643, 0, 1, 'FAFAFA');
++    txt(s, 'Title Text', { x: c.x + 1.715, y: 6.151, w: 0.946, h: 0.303, fontSize: 12 });
++  });
++}
++
++/** Slide 12: "Our Project" with two +N tiles. */
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, [{ text: 'Our Project', options: { breakLine: true } }, { text: 'Al Technology ' }],
++    { x: 0.622, y: 1.425, w: 3.614, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.634, 3.077);
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majority have suffered alteration some form injected humor many variations  passages Lorem Ipsum available suffered alteration some injected majority alteration suffered alteration some',
++    { x: 0.647, y: 4.109, w: 4.895, h: 0.774 });
++
++  numberTile(s, 0.739, 5.306, '+445');
++  numberTile(s, 3.249, 5.306, '+220');
++
++  photo(s, 7.167, 3.153, 5.45, 3.597);
++  radar(s, 7.177, 4.951, 1.401, 0.5);
++  kpiCard(s, 7.16, 1.583, { opacity: 85, bg: '2A3255' });
++  solid(s, 'donut', { x: 11.792, y: 1.944, w: 0.833, h: 0.833 }, '2E3149');
++}
++
++/** Rounded "+445 / Title Text" tile used on slides 12, 30 and 31. */
++function numberTile(s, x, y, value) {
++  gradShape(s, 'roundRect', { x, y, w: 2.125, h: 1.444, rectRadius: 0.13 }, FLARE, 45, 20);
++  txt(s, value, { x: x + 0.524, y: y + 0.306, w: 1.077, h: 0.505, fontSize: 24, align: 'center' });
++  txt(s, 'Title Text', { x: x + 0.528, y: y + 0.834, w: 1.069, h: 0.303, fontSize: 12, bold: true, align: 'center' });
++}
++
++/** Slide 13: "New Project". */
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, [{ text: 'New Project', options: { breakLine: true } }, { text: 'Al Technology ' }],
++    { x: 0.609, y: 1.435, w: 3.53, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.634, 2.894);
++  body(s, 'the majority have suffered alteration injected humor randomize majority suffered alteration variations  passages Lorem Ipsum available suffered alteration majohave some injected randomized word majority snuff reed alteration some form injected humor many vacations',
++    { x: 0.647, y: 3.944, w: 4.547, h: 0.774 });
++
++  txt(s, '3.50 Y', { x: 0.626, y: 5.476, w: 1.029, h: 0.404, fontSize: 18, bold: true });
++  line(s, 1.879, 5.244, 0.602, 0.867);
++  body(s, 'Subtitle Text Here', { x: 2.705, y: 5.459, w: 0.894, h: 0.478, fontSize: 10, lineSpacing: 14 });
++
++  kpiCard(s, 10.831, 1.587);
++}
++
++/** Slide 14: light "Break Slide" divider. */
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  // The picture placeholder behind this slide is empty, so the deck's 50%-alpha
++  // wash sits on white and reads as a pale lavender-to-grey field.
++  wash(s, NIGHT.map((c) => over(c, 50, WHITE)), 45);
++  nav(s);
++
++  gradShape(s, 'ellipse', { x: 3.153, y: 2.333, w: 2.639, h: 2.639 }, NIGHT, 45, 22);
++  txt(s, 'Break Slide', { x: 3.897, y: 3.181, w: 5.538, h: 1.139, fontSize: 70, lineSpacing: 74, align: 'center' });
++
++  gradShape(s, 'ellipse', { x: 7.379, y: 1.587, w: 0.833, h: 0.833 }, flip(FLARE), 45, 12);
++  gradShape(s, 'ellipse', { x: 11.639, y: 5.894, w: 0.507, h: 0.507 }, FLARE, 45, 10);
++  gradShape(s, 'triangle', { x: 1.029, y: 3.792, w: 0.967, h: 0.833 }, flip(FLARE), 90, 12);
++  solid(s, 'donut', { x: 4.659, y: 6.389, w: 0.361, h: 0.361 }, ORANGE);
++}
++
++/** Slides 15 & 16 share the same four service cards, laid out differently. */
++const SERVICE_ICONS = ['▮▮▮', '📣', '💬', '💳'];
++const SERVICE_BODY = 'hu randomized majority suffered alterato variations  passages Lor Ipsum available';
++
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Our Services Al Technology  ', { x: 0.621, y: 1.46, w: 3.623, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.634, 2.908);
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majority have suffered alteration some form injected humor many variations',
++    { x: 0.637, y: 3.979, w: 4.028, h: 0.606 });
++
++  line(s, 0.727, 5.389, 0.508, 0.508);
++  line(s, 0.0, 5.389, 0.729, 0);
++  line(s, 1.228, 5.896, 0.758, 0);
++  solid(s, 'ellipse', { x: 2.115, y: 5.826, w: 0.142, h: 0.142 }, WHITE);
++  node(s, 0.738, 5.391, 0.446);
++  gradShape(s, 'flowChartPunchedCard', { x: 3.149, y: 5.042, w: 1.381, h: 1.708 }, FLARE, 0, 18);
++  pill(s, 2.595, 5.748, 1.393, 'Title Text');
++
++  [[6.249, 1.587], [9.641, 1.587], [6.249, 4.384], [9.641, 4.384]].forEach(([x, y], i) => {
++    gradShape(s, 'rect', { x, y, w: 2.984, h: 2.366 }, NIGHT, 45, 20);
++    txt(s, SERVICE_ICONS[i], { x: x + 0.4, y: y + 0.34, w: 0.6, h: 0.6, fontSize: 22 });
++    txt(s, 'Subtitle Text Here', { x: x + 0.402, y: y + 1.066, w: 2.222, h: 0.37, fontSize: 16, bold: true });
++    body(s, SERVICE_BODY, { x: x + 0.404, y: y + 1.407, w: 2.203, h: 0.69, lineSpacing: 14 });
++  });
++}
++
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Best Services Al Technology  ', { x: 0.605, y: 1.432, w: 3.544, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.634, 2.789);
++
++  [0.729, 3.803, 6.877, 9.951].forEach((x, i) => {
++    gradShape(s, 'roundRect', { x, y: 4.513, w: 0.964, h: 0.926, rectRadius: 0.18 }, NIGHT, 45, 14);
++    txt(s, SERVICE_ICONS[3 - i], { x: x + 0.2, y: 4.72, w: 0.6, h: 0.5, fontSize: 20 });
++    txt(s, 'Subtitle Text Here', { x: x + 0.089, y: 5.7, w: 2.222, h: 0.37, fontSize: 16, bold: true });
++    body(s, MISSION_BODY, { x: x + 0.091, y: 6.08, w: 2.747, h: 0.774 });
++  });
++}
++
++/** Slide 17: "Professional Services" with a large rounded panel. */
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  photo(s, 8.188, 1.594, 5.146, 5.146);
++  gradShape(s, 'round2SameRect', { x: 7.948, y: 1.594, w: 5.146, h: 5.146, rotate: 270 }, NIGHT, 90, 22);
++
++  txt(s, 'Professional Services Al Technology  ', { x: 0.6, y: 1.442, w: 5.131, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.631, 3.035);
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majority have suffered alteration some form injected humor many variations  passages Lorem Ipsum available suffered alteration some injected majority alteration suffered alteration some',
++    { x: 0.634, y: 4.064, w: 5.097, h: 0.774 });
++
++  txt(s, '30%', { x: 0.635, y: 5.338, w: 0.804, h: 0.404, fontSize: 18, bold: true });
++  line(s, 1.569, 5.216, 0.482, 0.648);
++  gradShape(s, 'roundRect', { x: 2.291, y: 5.378, w: 1.013, h: 0.325, rectRadius: 0.16 }, FLARE, 0, 12);
++  txt(s, 'Title Text', { x: 2.338, y: 5.406, w: 0.918, h: 0.269, fontSize: 10 });
++}
++
++/** Slide 18: team grid. */
++const TEAM = [
++  { name: 'Devin Richards', x: 1.649, nx: 1.732, nw: 2.064 },
++  { name: 'Bill Kinney', x: 5.552, nx: 5.915, nw: 1.504 },
++  { name: 'Erin Kessler', x: 9.455, nx: 9.538, nw: 2.064 },
++];
++const TEAM_BODY = 'suffered alteration some injected available majority have suffer alteration  some injected humor';
++
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Meet Our Best Team', { x: 4.025, y: 1.432, w: 5.284, h: 0.673, fontSize: 34, fontFace: HEAD, align: 'center' });
++
++  TEAM.forEach((m) => {
++    photo(s, m.x, 2.938, 2.229, 2.229);
++    txt(s, m.name, { x: m.nx, y: 5.559, w: m.nw, h: 0.404, fontSize: 18, align: 'center', valign: 'middle' });
++    txt(s, 'Graphic Designer', { x: m.x + 0.376, y: 5.955, w: 1.478, h: 0.269, fontSize: 10, align: 'center' });
++    body(s, TEAM_BODY, { x: m.x - 0.229, y: 6.253, w: 2.688, h: 0.606, align: 'center' });
++  });
++}
++
++/** Slide 19: profile page with two progress bars. */
++const BARS = [
++  { y: 4.945, label: 4.528, pct: '70%', pctY: 4.968, pctW: 0.588, fill: 2.985, color: ORANGE, track: 'F8AF83' },
++  { y: 5.998, label: 5.583, pct: '30%', pctY: 6.021, pctW: 0.579, fill: 1.433, color: BLUE, track: '9AA5D2' },
++];
++
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  photo(s, 0.743, 1.597, 5.33, 5.153);
++  gradRect(s, { x: 0, y: 3.458, w: 3.667, h: 4.042 }, NIGHT, 225, 20);
++
++  txt(s, 'Bianca Smith', { x: 6.799, y: 1.442, w: 3.336, h: 0.673, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 6.829, 2.432);
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majority have suffered alteration some form injected humor many variations  passages Lorem Ipsum available suffered alteration some injected majority alteration suffered alteration some',
++    { x: 6.832, y: 3.461, w: 5.097, h: 0.774 });
++
++  BARS.forEach((b) => {
++    txt(s, 'You Here', { x: 6.822, y: b.label, w: 1.002, h: 0.303, fontSize: 12 });
++    solid(s, 'roundRect', { x: 6.927, y: b.y, w: 4.254, h: 0.349, rectRadius: 0.175 }, b.track);
++    solid(s, 'roundRect', { x: 6.927, y: b.y, w: b.fill, h: 0.349, rectRadius: 0.175 }, b.color);
++    txt(s, b.pct, { x: 11.391, y: b.pctY, w: b.pctW, h: 0.303, fontSize: 12 });
++  });
++}
++
++/** Slides 20 & 21: roadmap timeline lozenges. */
++const ROADMAP_BODY = 'word majority have suffered alteration some injected humor variations  passages Lorem  Ipsum available  suffered alteration injected majority alteration suffered alteration s majority have suffered alteration some injected humor randomized ';
++
++/**
++ * One timeline lozenge; `side` is 'right' (upper pod) or 'left' (lower pod).
++ * The ramp runs along the long axis so that shrinking copies keep the stadium
++ * end-caps intact.
++ */
++function roadmapPod(s, side, date, subtitle) {
++  const right = side === 'right';
++  const x = right ? 7.097 : 0.745;
++  const y = right ? 1.583 : 4.333;
++  gradPill(s, { x, y, w: 5.519, h: 2.417 }, right ? flip(FLARE) : FLARE, 34);
++  const align = right ? 'left' : 'right';
++  txt(s, date, { x: right ? 7.688 : 3.919, y: y + 0.442, w: 1.763, h: 0.37, fontSize: 16, align });
++  txt(s, subtitle, { x: right ? 7.688 : 3.113, y: y + 0.812, w: 2.569, h: 0.37, fontSize: 16, align });
++  body(s, ROADMAP_BODY, { x: right ? 7.686 : 1.274, y: y + 1.201, w: 4.408, h: 0.774, align });
++}
++
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Development Roadmap', { x: 0.609, y: 1.425, w: 3.444, h: 1.245, fontSize: 34, fontFace: HEAD });
++  line(s, 6.673, 2.746, 0, 4.754);
++  roadmapPod(s, 'right', 'January 2025', 'Subtitle Text Here 01 ');
++  roadmapPod(s, 'left', 'February 2026', 'Subtitle Text Here 02');
++  solid(s, 'ellipse', { x: 6.556, y: 2.681, w: 0.222, h: 0.222 }, WHITE);
++  solid(s, 'ellipse', { x: 6.556, y: 5.431, w: 0.222, h: 0.222 }, WHITE);
++}
++
++function slide21(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  line(s, 6.673, 0, 0, 5.583);
++  roadmapPod(s, 'right', 'March 2027', 'Subtitle Text Here 03 ');
++  roadmapPod(s, 'left', 'April 2028', 'Subtitle Text Here 04');
++  solid(s, 'ellipse', { x: 6.556, y: 2.681, w: 0.222, h: 0.222 }, WHITE);
++  solid(s, 'ellipse', { x: 6.556, y: 5.431, w: 0.222, h: 0.222 }, WHITE);
++  txt(s, 'Future-proof your business with pops designed to adopt and evolve',
++    { x: 6.954, y: 4.734, w: 5.749, h: 1.616, fontSize: 30 });
++}
++
++/** Slide 22: portfolio, three photo frames on the left. */
++function slide22(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  photo(s, 0.743, 1.59, 3.535, 3.907);
++  photo(s, 4.664, 1.597, 3.535, 2.302);
++  photo(s, 4.664, 4.317, 3.535, 3.412);
++  gradShape(s, 'roundRect', { x: 0.743, y: 5.902, w: 3.535, h: 3.749, rectRadius: 0.05 }, NIGHT, 0, 18);
++
++  txt(s, 'Our Portfolio', { x: 8.755, y: 1.471, w: 3.011, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 8.76, 3.02);
++  body(s, 'the majority have suffered alteration some form, by icted humor randomized word majority have suffered alteration some injecte humor many variations  passages some',
++    { x: 8.768, y: 4.234, w: 4.049, h: 0.606 });
++  gradShape(s, 'roundRect', { x: 8.883, y: 5.125, w: 0.842, h: 0.142, rectRadius: 0.071 }, NIGHT, 45, 10);
++  body(s, 'the majority have suffered alteration some form, by icted humor randomized word majority have suffered alteration some injecte humor many variations  passages Lorem Ipsum avalable salterat some injected majority alteration suffered alteration some',
++    { x: 8.768, y: 5.551, w: 4.049, h: 0.774 });
++}
++
++/** Slide 23: portfolio, text left / photos right. */
++function slide23(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Our Portfolio', { x: 0.597, y: 1.471, w: 3.347, h: 0.673, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.621, 2.358);
++  txt(s, 'Subtitle Text Here', { x: 0.613, y: 3.504, w: 2.223, h: 0.37, fontSize: 16 });
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majority have suffered alteration some form injected humor many variations  passages Lorem Ipsum available suffered alteration some inje\ncted majority alteration suffered alteration some',
++    { x: 0.631, y: 3.903, w: 4.136, h: 0.942 });
++  txt(s, 'Subtitle Text Here', { x: 0.613, y: 5.157, w: 2.223, h: 0.37, fontSize: 16 });
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majority have suffered alteration some form injected humor many variations  passages Lorem Ipsum available suffered alteration some injected majority alteration suffered alteration some',
++    { x: 0.631, y: 5.556, w: 4.136, h: 0.942 });
++
++  photo(s, 5.882, 1.587, 3.222, 2.431);
++  photo(s, 9.403, 1.601, 3.222, 5.149);
++  photo(s, 5.882, 4.319, 3.222, 2.431);
++}
++
++/** Slide 24: dense four-column ROI dashboard. */
++function slide24(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  [4.302, 7.163, 10.147].forEach((x) => line(s, x, 1.583, 0, 5.917));
++  txt(s, 'Rol & Cost- Benefit Analysis', { x: 0.602, y: 1.414, w: 2.887, h: 1.818, fontSize: 34, fontFace: HEAD });
++
++  // Column 1
++  line(s, 0, 3.835, 4.308, 0);
++  solid(s, 'ellipse', { x: 4.242, y: 3.774, w: 0.122, h: 0.122 }, WHITE);
++  txt(s, [{ text: 'GOOD IDEA ', options: { breakLine: true } }, { text: 'MAKES EVERYTHING IS BETTER' }],
++    { x: 0.629, y: 4.232, w: 2.301, h: 0.808, fontSize: 14, bold: true });
++  radar(s, 1.241, 6.237, 1.005);
++  txt(s, '$210K', { x: 2.838, y: 6.183, w: 1.038, h: 0.404, fontSize: 18, bold: true, align: 'right' });
++  txt(s, 'Text Here', { x: 3.002, y: 6.562, w: 0.905, h: 0.269, fontSize: 10, bold: true });
++
++  // Column 2
++  txt(s, [{ text: 'GOOD IDEA ', options: { breakLine: true } }, { text: 'MAKES EVERYTHING IS BETTER' }],
++    { x: 4.688, y: 1.506, w: 2.149, h: 0.707, fontSize: 12 });
++  txt(s, 'Subtitle Text Here', { x: 4.693, y: 3.054, w: 0.915, h: 0.438, fontSize: 10, bold: true });
++  txt(s, '30%', { x: 4.685, y: 3.496, w: 0.929, h: 0.404, fontSize: 18, bold: true });
++  body(s, 'PLACEHOLDER', { x: 4.698, y: 3.893, w: 2.12, h: 0.606 });
++  body(s, 'NDOMIZED MAJORITY', { x: 4.695, y: 5.24, w: 1.749, h: 0.269 });
++  txt(s, '70%', { x: 4.695, y: 5.537, w: 0.86, h: 0.404, fontSize: 18, bold: true });
++  txt(s, '$140K', { x: 5.753, y: 6.183, w: 1.038, h: 0.404, fontSize: 18, bold: true, align: 'right' });
++  txt(s, 'Text Here', { x: 5.916, y: 6.562, w: 0.905, h: 0.269, fontSize: 10, bold: true });
++
++  // Column 3 (highlight panel)
++  gradRect(s, { x: 7.174, y: 1.583, w: 2.958, h: 2.552 }, NIGHT, 45, 18);
++  body(s, 'HAVE SUFFEREDTERATION SOME INJECTE', { x: 7.263, y: 1.872, w: 2.842, h: 0.269 });
++  body(s, 'SUFFERED SOME', { x: 7.273, y: 2.322, w: 1.308, h: 0.269 });
++  txt(s, '210K', { x: 8.808, y: 2.254, w: 0.874, h: 0.404, fontSize: 18, bold: true });
++  line(s, 8.923, 2.755, 0.593, 0);
++  txt(s, 'X', { x: 9.49, y: 2.629, w: 0.256, h: 0.252, fontSize: 9 });
++  txt(s, '100', { x: 9.639, y: 2.629, w: 0.439, h: 0.252, fontSize: 9, bold: true });
++  txt(s, '210K', { x: 8.808, y: 2.852, w: 0.874, h: 0.404, fontSize: 18, bold: true });
++  body(s, 'ALTERATION SOME', { x: 7.273, y: 3.464, w: 0.988, h: 0.438 });
++  txt(s, '100%', { x: 9.179, y: 3.48, w: 0.985, h: 0.404, fontSize: 18, bold: true });
++  body(s, 'FORMI NDOMIZED MAJORITY SUFFERED', { x: 7.269, y: 4.49, w: 2.735, h: 0.269 });
++  body(s, 'HAVE SUFFERED', { x: 7.274, y: 5.018, w: 1.308, h: 0.257 });
++  txt(s, '40K', { x: 9.202, y: 4.944, w: 0.84, h: 0.404, fontSize: 18, bold: true, align: 'right' });
++  line(s, 7.374, 5.41, 2.566, 0);
++  body(s, 'HAVE SUFFERED', { x: 7.274, y: 5.539, w: 1.308, h: 0.257 });
++  txt(s, '60K', { x: 9.202, y: 5.472, w: 0.84, h: 0.404, fontSize: 18, bold: true, align: 'right' });
++  radar(s, 7.706, 6.437, 0.62);
++  txt(s, [{ text: 'Subtitle', options: { breakLine: true } }, { text: 'Text Here' }],
++    { x: 8.222, y: 6.218, w: 0.915, h: 0.438, fontSize: 10, bold: true });
++  txt(s, '300k', { x: 9.105, y: 6.249, w: 0.937, h: 0.404, fontSize: 18, bold: true, align: 'right' });
++
++  // Column 4
++  txt(s, 'GOOD IDEA MAKES EVERYTHING IS BETTER', { x: 10.412, y: 1.506, w: 2.315, h: 0.505, fontSize: 12, bold: true, align: 'right' });
++  body(s, 'HAVE SUFFERED', { x: 10.556, y: 2.106, w: 1.308, h: 0.257 });
++  line(s, 10.651, 2.498, 1.965, 0);
++  body(s, 'THE MAJORITY HAVE', { x: 10.556, y: 2.627, w: 1.613, h: 0.269 });
++  txt(s, 'Subtitle Text Here', { x: 10.544, y: 2.889, w: 1.761, h: 0.303, fontSize: 12, bold: true });
++  txt(s, '40K', { x: 10.551, y: 4.091, w: 0.84, h: 0.404, fontSize: 18, bold: true });
++  line(s, 10.651, 4.64, 1.965, 0);
++  txt(s, '210K-80K', { x: 10.551, y: 4.785, w: 1.533, h: 0.404, fontSize: 18, bold: true });
++  body(s, 'PLACEHOLDER', { x: 10.561, y: 5.198, w: 2.12, h: 0.606 });
++  txt(s, '1.58', { x: 10.545, y: 6.232, w: 0.824, h: 0.404, fontSize: 18, bold: true });
++  txt(s, 'Text Here', { x: 10.552, y: 6.562, w: 0.905, h: 0.269, fontSize: 10, bold: true });
++}
++
++/** Slide 25: stacked-bar infographic. Each column is [pct, blueBarTop, blueBarH]. */
++const BARS25 = [
++  { x: 6.787, label: 'A1', pct: '23%', pctY: 4.378, blueY: 4.796, blueH: 1.13, orangeH: 2.856 },
++  { x: 7.709, label: 'B2', pct: '76%', pctY: 3.219, blueY: 3.621, blueH: 2.304, orangeH: 1.771, pctW: 0.564 },
++  { x: 8.63, label: 'C3', pct: '47%', pctY: 3.952, blueY: 4.354, blueH: 1.571, orangeH: 2.404 },
++  { x: 9.552, label: 'D4', pct: '64%', pctY: 3.423, blueY: 3.83, blueH: 2.095, orangeH: 1.771 },
++  { x: 10.474, label: 'E5', pct: '84%', pctY: 2.919, blueY: 3.324, blueH: 2.601, orangeH: 1.771 },
++  { x: 11.396, label: 'F6', pct: '99%', pctY: 2.269, blueY: 2.682, blueH: 3.244, orangeH: 0 },
++];
++
++function slide25(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  gradShape(s, 'snip2DiagRect', { x: 5.741, y: 1.583, w: 6.875, h: 5.167 }, NIGHT, 45, 26);
++  gradShape(s, 'rtTriangle', { x: 11.773, y: 1.583, w: 0.844, h: 0.844, rotate: 180 }, NIGHT, 225, 10);
++
++  BARS25.forEach((b) => {
++    if (b.orangeH) gradShape(s, 'roundRect', { x: b.x, y: 2.682, w: 0.698, h: b.orangeH, rectRadius: 0.349 }, flip(FLARE), 45, 14);
++    gradShape(s, 'roundRect', { x: b.x, y: b.blueY, w: 0.698, h: b.blueH, rectRadius: 0.349 }, NIGHT, 45, 16);
++    txt(s, b.pct, { x: b.x + 0.054, y: b.pctY, w: b.pctW || 0.591, h: 0.303, fontSize: 12, align: 'center' });
++    txt(s, b.label, { x: b.x + 0.111, y: 5.455, w: 0.476, h: 0.303, fontSize: 12, align: 'center' });
++  });
++  ['50%', '30%', '20%'].forEach((t, i) => txt(s, t, { x: 6.124, y: 2.586 + i * 1.4345, w: 0.598, h: 0.303, fontSize: 12 }));
++  radar(s, 6.272, 6.22, 1.061);
++
++  txt(s, 'Our Infographic', { x: 0.622, y: 2.551, w: 3.933, h: 0.673, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.625, 3.598);
++  body(s, 'PLACEHOLDER', { x: 0.628, y: 4.711, w: 3.612, h: 0.438 });
++  line(s, 0.724, 1.804, 0.984, 0, 1.5);
++  line(s, -0.042, 1.321, 0.771, 0.485, 1.5);
++  line(s, 1.7, 1.812, 0.473, 0.291, 1.5);
++  solid(s, 'ellipse', { x: 2.119, y: 2.039, w: 0.131, h: 0.131 }, WHITE);
++  node(s, 1.691, 1.81, 0.41);
++  txt(s, '30%', { x: 0.632, y: 5.63, w: 0.804, h: 0.404, fontSize: 18, bold: true });
++  line(s, 1.565, 5.508, 0.482, 0.648, 1.5);
++  gradShape(s, 'roundRect', { x: 2.287, y: 5.67, w: 1.013, h: 0.325, rectRadius: 0.16 }, FLARE, 0, 12);
++  txt(s, 'Title Text', { x: 2.335, y: 5.697, w: 0.918, h: 0.269, fontSize: 10 });
++}
++
++/** Slide 26: lollipop chart on an orange panel. */
++const LOLLI = [
++  { x: 5.496, barY: 5.654, barH: 0.292, pct: '8%', lab: '00', pctX: 5.352, pctW: 0.476 },
++  { x: 5.972, barY: 5.473, barH: 0.472, pct: '18%', lab: '01', pctX: 5.77, pctW: 0.593 },
++  { x: 6.515, barY: 4.946, barH: 1.0, pct: '32%', lab: '02', pctX: 6.305, pctW: 0.609 },
++  { x: 7.054, barY: 4.619, barH: 1.326, pct: '46%', lab: '03', pctX: 6.856, pctW: 0.584 },
++  { x: 7.585, barY: 5.168, barH: 0.778, pct: '28%', lab: '04', pctX: 7.382, pctW: 0.594 },
++  { x: 8.126, barY: 4.281, barH: 1.665, pct: '59%', lab: '05', pctX: 7.918, pctW: 0.604 },
++  { x: 8.676, barY: 4.827, barH: 1.118, pct: '38%', lab: '06', pctX: 8.464, pctW: 0.613 },
++  { x: 9.216, barY: 3.989, barH: 1.957, pct: '73%', lab: '07', pctX: 9.019, pctW: 0.582 },
++  { x: 9.747, barY: 3.656, barH: 2.29, pct: '83%', lab: '08', pctX: 9.543, pctW: 0.598 },
++  { x: 10.272, barY: 3.4, barH: 2.545, pct: '91%', lab: '09', pctX: 10.083, pctW: 0.566 },
++  { x: 10.795, barY: 3.109, barH: 2.837, pct: '99%', lab: '10', pctX: 10.591, pctW: 0.59 },
++];
++const CHIPS = [{ x: 4.854, k: '1-3', v: '20%' }, { x: 7.505, k: '5-6', v: '49%' }, { x: 10.156, k: '8-10', v: '99%' }];
++
++function slide26(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  gradRect(s, { x: 4.854, y: 2.222, w: 6.825, h: 4.528 }, [BLACK, ORANGE], 45, 24);
++  LOLLI.forEach((b) => {
++    line(s, b.x + 0.094, 3.057, 0, 2.749, 3, '6C7BB8');
++    solid(s, 'rect', { x: b.x, y: b.barY, w: 0.188, h: b.barH }, WHITE);
++    txt(s, b.pct, { x: b.pctX, y: 2.603, w: b.pctW, h: 0.303, fontSize: 12, align: 'center' });
++    txt(s, b.lab, { x: b.x - 0.144, y: 6.066, w: 0.476, h: 0.303, fontSize: 12, align: 'center' });
++  });
++  CHIPS.forEach((c) => {
++    gradRect(s, { x: c.x, y: 1.587, w: 0.93, h: 0.448 }, [ORANGE, BLACK], 45, 10);
++    txt(s, c.k, { x: c.x + 0.116, y: 1.643, w: 0.699, h: 0.337, fontSize: 14, align: 'center' });
++    txt(s, c.v, { x: c.x + 1.023, y: 1.643, w: 0.651, h: 0.337, fontSize: 14 });
++  });
++
++  txt(s, 'Our Infographic', { x: 0.605, y: 1.42, w: 2.999, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.625, 2.875);
++  line(s, 0.724, 4.569, 0.984, 0, 1.5);
++  line(s, -0.042, 4.086, 0.771, 0.485, 1.5);
++  line(s, 1.7, 4.567, 0.633, 0.39, 1.5);
++  solid(s, 'ellipse', { x: 2.275, y: 4.887, w: 0.131, h: 0.131 }, WHITE);
++  gradShape(s, 'flowChartPunchedCard', { x: 2.423, y: 5.042, w: 1.381, h: 1.708 }, FLARE, 0, 18);
++  pill(s, 1.868, 5.53, 1.393, 'Title Text');
++  txt(s, '100%', { x: 2.631, y: 6.111, w: 0.965, h: 0.438, fontSize: 20, align: 'center' });
++
++  line(s, 11.632, 4.486, 0.675, 0);
++  line(s, 12.31, 2.508, 0, 1.984);
++  radar(s, 11.655, 4.486, 0.704);
++  txt(s, '60%', { x: 11.999, y: 1.515, w: 0.701, h: 0.252, fontSize: 9, bold: true, align: 'center' });
++  txt(s, 'Title Text', { x: 11.835, y: 1.779, w: 1.029, h: 0.252, fontSize: 9, bold: true, align: 'center' });
++}
++
++/** Slide 27: four pricing columns. */
++const PLANS = [
++  { x: 0.739, name: 'FREE', nx: 1.537, nw: 1.052, price: '$0/mo' },
++  { x: 3.818, name: 'BASIC', nx: 4.542, nw: 1.201, price: '$55/mo' },
++  { x: 6.897, name: 'PRO', nx: 7.751, nw: 0.941, price: '$99/mo' },
++  { x: 9.976, name: 'ENTERPRISE', nx: 10.249, nw: 2.103, price: '$150/mo' },
++];
++const PLAN_ROWS = [
++  { t: 'printing setting', tx: 0.794, tw: 1.179, cx: 0.676 },
++  { t: 'sim printing setting Indus', tx: 0.486, tw: 1.804, cx: 0.359 },
++  { t: 'sim printing setting', tx: 0.67, tw: 1.427, cx: 0.551 },
++];
++
++function slide27(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Pricing Tables', { x: 4.85, y: 1.456, w: 3.634, h: 0.673, fontSize: 34, fontFace: HEAD, align: 'center' });
++
++  PLANS.forEach((p) => {
++    gradShape(s, 'roundRect', { x: p.x, y: 2.581, w: 2.649, h: 4.169, rectRadius: 0.24 }, flip(FLARE), 180, 26);
++    txt(s, p.name, { x: p.nx, y: 2.821, w: p.nw, h: 0.471, fontSize: 22, bold: true, align: 'center' });
++    [3.49, 3.944, 4.399, 4.854].forEach((y) => line(s, p.x + 0.395, y, 1.859, 0));
++    PLAN_ROWS.forEach((r, i) => {
++      txt(s, r.t, { x: p.x + r.tx, y: 3.578 + i * 0.455, w: r.tw, h: 0.278, fontSize: 9, align: 'center', lineSpacing: 14 });
++      txt(s, '✓', { x: p.x + r.cx - 0.06, y: 3.6 + i * 0.455, w: 0.3, h: 0.25, fontSize: 10, bold: true });
++    });
++    txt(s, p.price, { x: p.x + 0.556, y: 5.058, w: 1.537, h: 0.471, fontSize: 22, bold: true, align: 'center' });
++    txt(s, 'Free Marketed', { x: p.x + 0.735, y: 5.462, w: 1.179, h: 0.278, fontSize: 9, align: 'center', lineSpacing: 14 });
++    s.addShape('roundRect', { x: p.x + 0.739, y: 5.966, w: 1.17, h: 0.429, rectRadius: 0.1, fill: { type: 'none' }, line: { color: WHITE, width: 1 } });
++    txt(s, 'SELECT', { x: p.x + 0.896, y: 6.031, w: 0.856, h: 0.297, fontSize: 12, bold: true, align: 'center', lineSpacing: 14 });
++  });
++}
++
++/** Slide 28: SWOT pinwheel. */
++const SWOT = [
++  { letter: 'S', tri: { x: 5.732, y: 2.561, rotate: 180 }, lx: 6.441, ly: 2.975, tx: 5.556, ty: 1.497, bx: 5.565, by: 1.837, align: 'center' },
++  { letter: 'W', tri: { x: 6.538, y: 3.366, rotate: 270 }, lx: 7.414, ly: 3.905, tx: 8.507, ty: 3.755, bx: 8.511, by: 4.095, align: 'left' },
++  { letter: 'T', tri: { x: 5.732, y: 4.172, rotate: 0 }, lx: 6.441, ly: 4.919, tx: 5.556, ty: 6.027, bx: 5.565, by: 6.367, align: 'center' },
++  { letter: 'O', tri: { x: 4.927, y: 3.366, rotate: 90 }, lx: 5.469, ly: 3.905, tx: 2.604, ty: 3.755, bx: 2.622, by: 4.095, align: 'right' },
++];
++
++function slide28(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Our Infographic', { x: 0.619, y: 1.436, w: 2.978, h: 1.245, fontSize: 34, fontFace: HEAD });
++
++  SWOT.forEach((q) => {
++    gradShape(s, 'triangle', Object.assign({ w: 1.869, h: 1.611 }, q.tri), NIGHT, 270, 14);
++    txt(s, q.letter, { x: q.lx, y: q.ly, w: 0.451, h: 0.606, fontSize: 30, align: 'center' });
++    txt(s, 'Subtitle Text Here', { x: q.tx, y: q.ty, w: 2.222, h: 0.37, fontSize: 16, bold: true, align: q.align });
++    body(s, 'hu randomized majority suffered alteration variations', { x: q.bx, y: q.by, w: 2.203, h: 0.494, align: q.align, lineSpacing: 14 });
++  });
++  solid(s, 'ellipse', { x: 6.5, y: 4.083, w: 0.333, h: 0.333 }, ORANGE);
++}
++
++/** Slide 29: two phone mock-ups. */
++function slide29(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Our Phone Mock-up Design', { x: 0.605, y: 1.42, w: 4.157, h: 1.245, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.622, 2.978);
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majorty have suffered alteration some form injected humor many variations  passages Lorem Ipsum available suffered alteration some',
++    { x: 0.637, y: 4.05, w: 5.349, h: 0.69, lineSpacing: 14 });
++  body(s, 'the majority have suffered alteration some form, by injected humor randomized word majorty have suffered alteration some form',
++    { x: 0.637, y: 4.806, w: 5.349, h: 0.494, lineSpacing: 14 });
++  gradShape(s, 'roundRect', { x: 0.729, y: 5.556, w: 2.396, h: 0.667, rectRadius: 0.33 }, NIGHT, 45, 16);
++  txt(s, 'Subtitle Text Here', { x: 0.941, y: 5.721, w: 1.972, h: 0.337, fontSize: 14, bold: true, align: 'center' });
++
++  phone(s, 7.125, 1.578, 2.806, 5.186, WHITE, 0.28);
++  phone(s, 10.123, 1.592, 2.51, 5.17, 'E1C6A3', 0.34);
++}
++
++/** Phone mock-up: rounded body, screen placeholder, speaker slit and camera dot. */
++function phone(s, x, y, w, h, shell, topBar) {
++  solid(s, 'roundRect', { x, y, w, h, rectRadius: 0.11 }, shell);
++  screen(s, x + w * 0.055, y + topBar + 0.14, w * 0.89, h - topBar - 0.7);
++  solid(s, 'roundRect', { x: x + w * 0.42, y: y + topBar * 0.42, w: w * 0.24, h: 0.052, rectRadius: 0.026 }, '111111');
++  solid(s, 'ellipse', { x: x + w * 0.13, y: y + topBar * 0.36, w: 0.075, h: 0.075 }, '111111');
++}
++
++/** Slide 30: laptop mock-up. */
++function slide30(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Our Phone Mock-up Design', { x: 0.605, y: 1.42, w: 4.157, h: 1.245, fontSize: 34, fontFace: HEAD });
++  [2.948, 4.004].forEach((y) => {
++    txt(s, 'Subtitle Text Here', { x: 0.613, y, w: 2.223, h: 0.37, fontSize: 16 });
++    body(s, 'PLACEHOLDER', { x: 0.631, y: y + 0.344, w: 4.605, h: 0.438 });
++  });
++  numberTile(s, 0.739, 5.306, '+445');
++  numberTile(s, 3.249, 5.306, '+220');
++
++  // Laptop: lid, bezel, screen, base
++  solid(s, 'roundRect', { x: 6.776, y: 3.049, w: 5.237, h: 3.67, rectRadius: 0.06 }, 'F3F3F3');
++  solid(s, 'rect', { x: 6.9, y: 3.18, w: 4.99, h: 3.4 }, '414141');
++  screen(s, 7.007, 3.283, 4.807, 3.054);
++  solid(s, 'roundRect', { x: 6.18, y: 6.611, w: 6.445, h: 0.139, rectRadius: 0.06 }, 'D9D9D8');
++  solid(s, 'roundRect', { x: 8.849, y: 6.611, w: 1.074, h: 0.035, rectRadius: 0.017 }, '000000');
++}
++
++/** Slide 31: dotted world map. Two colored point clouds read from an ASCII plan. */
++const MAP_ROWS = [
++  '                             BBBBBB                                                     ',
++  '                   BBBBBBBBBBBBBBBBBBB                                                  ',
++  '                 BBBBBBBBBBBBBBBBBBBBB       AAA    AAAAA       AA                      ',
++  '               B BBBBBBBBBBBBBBBBBBBB      AAAAA               AAAA                     ',
++  '           B BBBBBBBBBBBBBBBBBBBBBBBB       AAAA                AAAA                    ',
++  '           BBBBBBBBBBB BBBBBBBBBBBBBB                  AAA     AAAAAA      AAA          ',
++  '           BBBB BBBBBB     BBBBBBBBBB                 AA      AAAAAAAA     AAA          ',
++  '          BBBBBBBBBBBBB    BBBBBBBBBB                AA   AAAAAAAAAAAAAAAA  AA          ',
++  '  BB       BBBBB BBBBBBBB   BBBBBBBB           AA     AA AAAAAAAAAAAAAAAAAAAAAAAA    A  ',
++  'BBBBBBBBBBBBBBBBBBBBBBBBB   BBBBBBBB        AAAAAAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA  ',
++  ' BBBBBBBBBBBBBBBBBBBB BBBB  BBBBB  B        AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
++  'BBBBBBBBBBBBBBBBBBBBB BBBB  BBBB   BBB      AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
++  'BBBBBBBBBBBBBBBBBBBBB BBBB  BBBB    B     AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   ',
++  'BBBBBBBBBBBBBBBBBB   BBBBB   BB           AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAA    ',
++  'BBBBB BBBBBBBBBBBBB   BBBB             AA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA   AAA      ',
++  ' BBB   BBBBBBBBBBBBB  BBBBB            AA  AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA    AA       ',
++  '        BBBBBBBBBBBBBBBBBBBB          AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA  AA       ',
++  '        BBBBBBBBBBBBBBBBBBBB          AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA           ',
++  '         BBBBBBBBBBBBBBBBBBBB           AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA           ',
++  '          BBBBBBBBBBBBBBBBB B           AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAA         ',
++  '          BBBBBBBBBBBBBBBB             AAAAAAAAAA  AA AAAAAAAAAAAAAAAAAAAAA A           ',
++  '          BBBBBBBBBBBBBB               AAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AA           ',
++  '           BBBBBBBBBBBB                AAAAAA AAAAAAAAAAAAAAAAAAAAAAAAA AAAA            ',
++  '           BBBBBBBBBBBB                AAAAA   A AAAAAAAAAAAAAAAAAAAAAA AAAA            ',
++  '            BBBBBBBBBB                 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA  A              ',
++  '            BBBBBBB BB                AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA                 ',
++  '             BBBBB   BB              AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA                 ',
++  '              BBBB BBBB              AAAAAAAAAAAAAAAAAAA  AAAAAAAAAAAAA                 ',
++  '               BBBBB  BBB            AAAAAAAAAAAAAAAAAA    AAA  AAAAA A                 ',
++  '                BBBBB                AAAAAAAAAAAAAAAAAA    AA   AAAA  A                 ',
++  '                   BB  BB            AAAAAAAAAAAAA AA      AA    AAA   A                ',
++  '                    BBBBBBB           AAAAAAAAAAAAAAAA      A    A A  AAA               ',
++  '                     BBBBBBBB         AAAAAAAAAAAAAAAA       A  AAA  AAAA               ',
++  '                      BBBBBBB              AAAAAAAAAA            AA AAAAA               ',
++  '                     BBBBBBBBB             AAAAAAAAA             AAAAAAAAAAA            ',
++  '                     BBBBBBBBBBBB          AAAAAAAAA              AAAAAAAAAAAAAA        ',
++  '                     BBBBBBBBBBBB           AAAAAAA                AAAAA   AAA A        ',
++  '                      BBBBBBBBBBB           AAAAAAAA                  AA AA A A A       ',
++  '                      BBBBBBBBBB            AAAAAAAAAA                  AAA A           ',
++  '                       BBBBBBBBB            AAAAAAA AA                 AAAAAAA          ',
++  '                        BBBBBBBB            AAAAAA AAA               AAAAAAAAA          ',
++  '                        BBBBBB              AAAAAA AA                AAAAAAAAAA         ',
++  '                        BBBBBB               AAAAA                   AAAAAAAAAA         ',
++  '                       BBBBBB                AAAA                    AAAAAAAAAA         ',
++  '                       BBBBBB                AAAA                    AA   AAAAA         ',
++  '                       BBBBB                                               AAAA    AAA  ',
++  '                       BBBB                                                 A       A   ',
++  '                       BBB                                                  AA    AA    ',
++  '                       BBB                                                        AA    ',
++  '                       BBB                                                        A     ',
++  '                       BB                                                               ',
++  '                       BB                                                               ',
++  '                       BB                                                               ',
++];
++
++function worldMap(s, x0, y0, pitch, dot) {
++  MAP_ROWS.forEach((row, j) => {
++    for (let i = 0; i < row.length; i++) {
++      const c = row[i];
++      if (c === ' ') continue;
++      solid(s, 'ellipse', { x: x0 + i * pitch, y: y0 + j * pitch, w: dot, h: dot }, c === 'A' ? ORANGE : BLUE);
++    }
++  });
++}
++
++function slide31(pptx) {
++  const s = pptx.addSlide();
++  wash(s);
++  nav(s);
++
++  txt(s, 'Global Map', { x: 0.619, y: 1.431, w: 2.919, h: 0.673, fontSize: 34, fontFace: HEAD });
++  goodIdea(s, 0.625, 2.955);
++  body(s, 'the majority have suffered alteration some formicted humor randomized word majority suffered alteration injected variations  passages',
++    { x: 0.633, y: 4.047, w: 3.378, h: 0.606 });
++
++  worldMap(s, 4.048, 1.596, 0.0983, 0.033);
++
++  [['+445', 0.596, 0.6], ['+220', 2.377, 2.381], ['+445', 4.159, 4.163]].forEach(([v, vx, tx]) => {
++    txt(s, v, { x: vx, y: 5.162, w: 1.077, h: 0.505, fontSize: 24, align: 'center' });
++    txt(s, 'Title Text', { x: tx, y: 5.689, w: 1.069, h: 0.303, fontSize: 12, bold: true, align: 'center' });
++  });
++  line(s, 2.025, 5.112, 0, 0.931);
++  line(s, 3.806, 5.112, 0, 0.931);
++}
++
++/** Slide 32: light "Thank You" closer. */
++const CLOSER_SHAPES = [
++  { s: 'ellipse', x: 3.097, y: 1.587, w: 1.833, h: 1.833 },
++  { s: 'ellipse', x: 9.194, y: 5.319, w: 1.833, h: 1.833 },
++  { s: 'ellipse', x: 0.729, y: 1.587, w: 0.333, h: 0.333 },
++  { s: 'rect', x: 11.319, y: 1.587, w: 1.306, h: 1.306 },
++  { s: 'rect', x: 3.111, y: 5.917, w: 0.833, h: 0.833 },
++  { s: 'rect', x: -0.597, y: 4.125, w: 1.194, h: 1.194, rotate: 291 },
++];
++const CLOSER_TILES = [
++  { x: 10.737, y: 3.725, deg: 315 }, { x: 11.221, y: 3.725, deg: 45 },
++  { x: 10.737, y: 4.205, deg: 225 }, { x: 11.221, y: 4.205, deg: 135 },
++];
++
++function slide32(pptx) {
++  const s = pptx.addSlide();
++  // Pale peach-to-lavender field: the deck's 30%-alpha wash over an empty photo frame.
++  wash(s, flip(FLARE).map((c) => over(c, 30, WHITE)), 45);
++  nav(s);
++
++  CLOSER_SHAPES.forEach((c) => gradShape(s, c.s, { x: c.x, y: c.y, w: c.w, h: c.h, rotate: c.rotate }, NIGHT, 45, 14));
++  CLOSER_TILES.forEach((c) => gradShape(s, 'rect', { x: c.x, y: c.y, w: 0.439, h: 0.439, rotate: 270 }, NIGHT, c.deg, 8));
++  [[2.361, 3.616, 90], [1.46, 3.616, 270], [1.91, 3.375, 0], [1.91, 3.852, 180]].forEach(([x, y, deg]) =>
++    gradShape(s, 'flowChartSort', { x, y, w: 0.438, h: 0.876, rotate: 90 }, NIGHT.map((c) => over(c, 80, 'B9B3CB')), deg, 10));
++
++  gradShape(s, 'ellipse', { x: 3.349, y: 1.603, w: 6.635, h: 6.635 }, NIGHT.map((c) => over(c, 90, 'D8CFDA')), 45, 26);
++  gradShape(s, 'roundRect', { x: 5.472, y: 2.941, w: 2.389, h: 0.569, rectRadius: 0.285 }, NIGHT.map((c) => over(c, 80, '3A4066')), 225, 14);
++  txt(s, 'Subtitle Text Here', { x: 5.694, y: 3.057, w: 1.944, h: 0.337, fontSize: 14, align: 'center' });
++  txt(s, 'Thank  You', { x: 4.674, y: 3.695, w: 3.985, h: 2.457, fontSize: 70, fontFace: HEAD, align: 'center' });
++  body(s, 'majorty have suffered alteration some form injected humor variations  passages Lorem Ipsum available suffered',
++    { x: 4.431, y: 6.184, w: 4.472, h: 0.438, align: 'center' });
++}
++
++/* -------------------------------------------------------------- assembly */
++
++const BUILDERS = [
++  (p) => heroSlide(p, false),
++  (p) => heroSlide(p, true),
++  slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
++  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
++  slide25, slide26, slide27, slide28, slide29, slide30, slide31, slide32,
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'CUSTOM_16x9', width: SLIDE_W, height: SLIDE_H });
++  pptx.layout = 'CUSTOM_16x9';
++  pptx.theme = { headFontFace: HEAD, bodyFontFace: FONT };
++  pptx.title = 'Ai Technology Template';
++
++  BUILDERS.forEach((fn) => fn(pptx));
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '12555557-ee6d-4c24-b4d6-d4eab2632285_grok_final.pptx') });
++}
++
++build().then((f) => console.log('wrote ' + f)).catch((e) => { console.error(e); process.exit(1); });

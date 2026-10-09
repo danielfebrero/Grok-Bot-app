@@ -1,0 +1,750 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/renewable_energy_provider_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/renewable_energy_provider_presentation.js
+@@ -0,0 +1,747 @@
++/**
++ * "Newens - Renewable Energy" deck, rebuilt with pptxgenjs.
++ *
++ * 24 slides, 13.333 x 7.5 in.  Every photograph in the source file is a flat
++ * grey stand-in bitmap, so each one is recreated here as a native shape filled
++ * with the same grey (see `photo()` / `PHOTO`); the logo, the icon set and the
++ * device mock-ups are drawn from primitives instead of being embedded.
++ *
++ *   node 1041193b-f67d-4315-b7ec-2e36a89b724c_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++
++const GREEN = '81BF38';
++const NAVY = '06253A';
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const INK = '202332';
++const PHOTO = 'C3C3C3'; // grey of every placeholder photo
++const PHOTO_DK = '7F7F7F'; // darker grey of the big laptop screen (slide 21)
++
++/* -------------------------------------------------------------------- fonts */
++
++const MAJOR = 'Poppins'; // theme major font (+mj-lt)
++const BODY = 'Open Sans';
++const SEMI = 'Poppins SemiBold';
++const INTER = 'Inter';
++const INTER_SEMI = 'Inter SemiBold';
++
++/* ------------------------------------------------------------- text helpers */
++
++// Every text frame in the source is top-anchored; pptxgenjs centres by default.
++function text(slide, str, x, y, w, h, opts) {
++    slide.addText(str, Object.assign({ x: x, y: y, w: w, h: h, valign: 'top', color: WHITE }, opts));
++}
++
++// Heading in the theme font (Poppins).
++function title(slide, str, x, y, w, h, size, opts) {
++    text(slide, str, x, y, w, h, Object.assign({ fontFace: MAJOR, fontSize: size, bold: true }, opts));
++}
++
++// Body copy: Open Sans, 1.5 line spacing.
++function para(slide, str, x, y, w, h, size, opts) {
++    text(slide, str, x, y, w, h,
++        Object.assign({ fontFace: BODY, fontSize: size || 11, lineSpacingMultiple: 1.5 }, opts));
++}
++
++// Small bold label ("Simple Text Here", "01. Service One", ...).
++function label(slide, str, x, y, w, h, opts) {
++    text(slide, str, x, y, w, h, Object.assign({ fontFace: SEMI, fontSize: 14 }, opts));
++}
++
++// Pill / rectangle button with centred caption.
++function button(slide, str, x, y, w, h, rad, face, size) {
++    slide.addText(str, Object.assign({
++        x: x, y: y, w: w, h: h, fill: { color: GREEN }, align: 'center', valign: 'middle',
++        fontFace: face, fontSize: size, color: WHITE,
++    }, rad ? { shape: 'roundRect', rectRadius: rad } : { shape: 'rect' }));
++}
++
++/* ------------------------------------------------------------ shape helpers */
++
++function rect(slide, x, y, w, h, color) {
++    slide.addShape('rect', { x: x, y: y, w: w, h: h, fill: { color: color } });
++}
++
++function ellipse(slide, x, y, w, h, color) {
++    slide.addShape('ellipse', { x: x, y: y, w: w, h: h, fill: { color: color } });
++}
++
++// roundRect where `rad` is the corner radius in inches (default = PowerPoint's 1/6).
++function roundRect(slide, x, y, w, h, color, rad) {
++    slide.addShape('roundRect', {
++        x: x, y: y, w: w, h: h, fill: { color: color },
++        rectRadius: rad === undefined ? Math.min(w, h) / 6 : rad,
++    });
++}
++
++function line(slide, x, y, w, h, color, width) {
++    slide.addShape('line', { x: x, y: y, w: w, h: h, line: { color: color, width: width } });
++}
++
++function outline(slide, shape, x, y, w, h, color, width) {
++    slide.addShape(shape, { x: x, y: y, w: w, h: h, fill: { type: 'none' }, line: { color: color, width: width } });
++}
++
++/**
++ * Free-form shape.  `pts` is a compact list where
++ *   [x, y]                       -> move/line to
++ *   [x, y, cx1, cy1, cx2, cy2]   -> cubic bezier to (x,y)
++ * All values are inches relative to (x, y); the path is auto-closed.
++ */
++function poly(slide, x, y, w, h, color, pts) {
++    const points = pts.map(function (p, i) {
++        const pt = { x: p[0], y: p[1] };
++        if (i > 0 && p.length === 6) pt.curve = { type: 'cubic', x1: p[2], y1: p[3], x2: p[4], y2: p[5] };
++        return pt;
++    });
++    points.push({ close: true });
++    slide.addShape('custGeom', { x: x, y: y, w: w, h: h, fill: { color: color }, points: points });
++}
++
++function mix(c1, c2, t) {
++    let out = '';
++    for (let i = 0; i < 6; i += 2) {
++        const a = parseInt(c1.substr(i, 2), 16), b = parseInt(c2.substr(i, 2), 16);
++        out += ('0' + Math.round(a + (b - a) * t).toString(16)).slice(-2);
++    }
++    return out.toUpperCase();
++}
++
++/**
++ * Left-to-right colour ramp, drawn as a run of slices because pptxgenjs has no
++ * gradient fill.  The first slice is rounded so the band keeps its left corners.
++ */
++function gradientBand(slide, x, y, w, h, from, to, rad, steps) {
++    const n = steps || 40;
++    roundRect(slide, x, y, w, h, from, rad); // keeps the rounded left corners
++    const step = (w - rad) / n;
++    for (let i = 0; i < n; i++) {
++        rect(slide, x + rad + i * step, y, step + 0.01, h, mix(from, to, (i + 0.5) / n));
++    }
++}
++
++/**
++ * Circular band (crescent) from angle a0 to a1, degrees, clockwise, y down.
++ * Used for the wave strokes of the logo mark.
++ */
++function arcBand(slide, x, y, cx, cy, rOut, rIn, a0, a1, color) {
++    const rad = Math.PI / 180;
++    const arc = function (r, from, to) {
++        const steps = 4, out = [];
++        for (let i = 0; i < steps; i++) {
++            const s = from + (to - from) * (i / steps), e = from + (to - from) * ((i + 1) / steps);
++            const k = (4 / 3) * Math.tan((e - s) * rad / 4);
++            const px = cx + r * Math.cos(s * rad), py = cy + r * Math.sin(s * rad);
++            const qx = cx + r * Math.cos(e * rad), qy = cy + r * Math.sin(e * rad);
++            out.push([qx, qy,
++                px - k * r * Math.sin(s * rad), py + k * r * Math.cos(s * rad),
++                qx + k * r * Math.sin(e * rad), qy - k * r * Math.cos(e * rad)]);
++        }
++        return out;
++    };
++    const pts = [[cx + rOut * Math.cos(a0 * rad), cy + rOut * Math.sin(a0 * rad)]];
++    arc(rOut, a0, a1).forEach(function (p) { pts.push(p); });
++    pts.push([cx + rIn * Math.cos(a1 * rad), cy + rIn * Math.sin(a1 * rad)]);
++    arc(rIn, a1, a0).forEach(function (p) { pts.push(p); });
++    poly(slide, x, y, cx * 2, cy * 2, color, pts);
++}
++
++/* --------------------------------------------------------------- photo mask */
++
++// Grey stand-in for a photo.  `mask` picks the frame the original photo is cropped to.
++function photo(slide, x, y, w, h, mask, rad, color) {
++    const c = color || PHOTO;
++    if (mask === 'ellipse') ellipse(slide, x, y, w, h, c);
++    else if (mask === 'round') roundRect(slide, x, y, w, h, c, rad);
++    else rect(slide, x, y, w, h, c);
++}
++
++/* ---------------------------------------------------------------- Newens logo
++ * Two leaves either side of a capped stem, over a bowl of three water waves.
++ * Everything is expressed in fractions of the requested box.
++ */
++
++// Right-hand leaf: base at the stem, tip at the top-outer corner.
++const LEAF_TIP = [0.960, 0.045];
++const LEAF_BASE = [0.505, 0.560];
++const LEAF_OUTER = [0.56, 0.64, 1.02, 0.34]; // lower edge, bulging out and up
++const LEAF_INNER = [0.93, 0.02, 0.57, 0.26]; // upper edge, curving back to the stem
++
++// One wavy stroke of the bowl: a shallow arc with a ripple, tapered at both ends.
++function waveStroke(slide, x, y, w, h, cy, half, bowl, th, color) {
++    const N = 18, top = [], bottom = [];
++    for (let i = 0; i <= N; i++) {
++        const u = i / N, px = (0.5 + (u - 0.5) * 2 * half) * w;
++        const base = cy - bowl * Math.pow(2 * u - 1, 2) + 0.022 * Math.sin(u * 3.4 * Math.PI);
++        const taper = th * Math.pow(Math.sin(Math.PI * u), 0.45);
++        top.push([px, (base - taper / 2) * h]);
++        bottom.unshift([px, (base + taper / 2) * h]);
++    }
++    poly(slide, x, y, w, h, color, top.concat(bottom));
++}
++
++function logo(slide, x, y, w, h, color) {
++    [false, true].forEach(function (flip) { // right leaf, then its mirror
++        const fx = function (v) { return (flip ? 1 - v : v) * w; };
++        poly(slide, x, y, w, h, color, [
++            [fx(LEAF_BASE[0]), LEAF_BASE[1] * h],
++            [fx(LEAF_TIP[0]), LEAF_TIP[1] * h,
++                fx(LEAF_OUTER[0]), LEAF_OUTER[1] * h, fx(LEAF_OUTER[2]), LEAF_OUTER[3] * h],
++            [fx(LEAF_BASE[0]), LEAF_BASE[1] * h,
++                fx(LEAF_INNER[0]), LEAF_INNER[1] * h, fx(LEAF_INNER[2]), LEAF_INNER[3] * h],
++        ]);
++    });
++    rect(slide, x + 0.472 * w, y + 0.10 * h, 0.056 * w, 0.46 * h, color); // stem
++    rect(slide, x + 0.395 * w, y + 0.020 * h, 0.21 * w, 0.042 * h, color); // upper cap bar
++    rect(slide, x + 0.395 * w, y + 0.085 * h, 0.21 * w, 0.042 * h, color); // lower cap bar
++    [[1.00, 0.50, 0.36, 0.075], [0.90, 0.44, 0.30, 0.065], [0.80, 0.37, 0.25, 0.055]]
++        .forEach(function (wv) { waveStroke(slide, x, y, w, h, wv[0], wv[1], wv[2], wv[3], color); });
++}
++
++/* --------------------------------------------------------------------- icons
++ * Pictograms drawn inside a unit box (x, y, s, s).  `fg` is the stroke colour,
++ * `bg` the colour of whatever sits behind, used for the cut-out details.
++ */
++
++function iconTurbine(slide, x, y, s, fg) {
++    const lw = Math.max(0.75, s * 3);
++    [0, 120, 240].forEach(function (a) { // three blades radiating from the hub
++        const r = a * Math.PI / 180, bw = s * 0.17, bh = s * 0.34;
++        slide.addShape('ellipse', {
++            x: x + s * (0.50 + 0.20 * Math.sin(r)) - bw / 2,
++            y: y + s * (0.28 - 0.20 * Math.cos(r)) - bh / 2,
++            w: bw, h: bh, rotate: a,
++            fill: { type: 'none' }, line: { color: fg, width: lw },
++        });
++    });
++    outline(slide, 'ellipse', x + s * 0.44, y + s * 0.22, s * 0.12, s * 0.12, fg, lw); // hub
++    poly(slide, x, y, s, s, fg, [ // tapered mast
++        [s * 0.465, s * 0.30], [s * 0.535, s * 0.30], [s * 0.565, s * 0.83], [s * 0.435, s * 0.83]]);
++    rect(slide, x + s * 0.24, y + s * 0.855, s * 0.52, lw / 72, fg); // ground line
++}
++
++function iconSolar(slide, x, y, s, fg, bg) {
++    const lw = s * 0.045;
++    const panel = function (inset, color) {
++        poly(slide, x, y, s, s, color, [
++            [s * 0.08 + inset, s * 0.22 + inset], [s * 0.92 - inset, s * 0.22 + inset],
++            [s * 0.83 - inset, s * 0.63 - inset], [s * 0.17 + inset, s * 0.63 - inset]]);
++    };
++    panel(0, fg);
++    panel(lw, bg); // hollow it out, leaving a stroked frame
++    for (let c = 1; c < 5; c++) { // vertical grid bars
++        poly(slide, x, y, s, s, fg, [
++            [s * (0.08 + 0.168 * c) - lw / 2, s * 0.22], [s * (0.08 + 0.168 * c) + lw / 2, s * 0.22],
++            [s * (0.17 + 0.132 * c) + lw / 2, s * 0.63], [s * (0.17 + 0.132 * c) - lw / 2, s * 0.63]]);
++    }
++    [0.355, 0.492].forEach(function (yy) { rect(slide, x + s * 0.115, y + s * yy, s * 0.77, lw, fg); });
++    poly(slide, x, y, s, s, fg, [ // stand
++        [s * 0.455, s * 0.63], [s * 0.545, s * 0.63], [s * 0.58, s * 0.82], [s * 0.42, s * 0.82]]);
++    rect(slide, x + s * 0.24, y + s * 0.845, s * 0.52, lw, fg); // base line
++}
++
++function iconBulb(slide, x, y, s, fg) {
++    outline(slide, 'ellipse', x + s * 0.18, y + s * 0.06, s * 0.64, s * 0.64, fg, Math.max(0.75, s * 3));
++    poly(slide, x, y, s, s, fg, [[s * 0.56, s * 0.16], [s * 0.34, s * 0.42], [s * 0.47, s * 0.42], [s * 0.42, s * 0.62], [s * 0.64, s * 0.36], [s * 0.51, s * 0.36]]);
++    [0.72, 0.79].forEach(function (yy) { rect(slide, x + s * 0.36, y + s * yy, s * 0.28, s * 0.035, fg); });
++    rect(slide, x + s * 0.42, y + s * 0.86, s * 0.16, s * 0.07, fg);
++}
++
++function iconHouseBolt(slide, x, y, s, fg) {
++    poly(slide, x, y, s, s, fg, [[s * 0.5, s * 0.10], [s * 0.94, s * 0.42], [s * 0.88, s * 0.50], [s * 0.5, s * 0.22], [s * 0.12, s * 0.50], [s * 0.06, s * 0.42]]);
++    [[0.14, 0.44, 0.05, 0.42], [0.81, 0.44, 0.05, 0.42], [0.10, 0.84, 0.80, 0.05]].forEach(function (r) {
++        rect(slide, x + s * r[0], y + s * r[1], s * r[2], s * r[3], fg);
++    });
++    poly(slide, x, y, s, s, fg, [[s * 0.58, s * 0.48], [s * 0.38, s * 0.68], [s * 0.50, s * 0.68], [s * 0.44, s * 0.84], [s * 0.62, s * 0.63], [s * 0.50, s * 0.63]]);
++}
++
++function iconCheckCircle(slide, x, y, s, fg) {
++    outline(slide, 'ellipse', x + s * 0.06, y + s * 0.06, s * 0.88, s * 0.88, fg, Math.max(0.75, s * 6));
++    poly(slide, x, y, s, s, fg, [[s * 0.26, s * 0.48], [s * 0.44, s * 0.66], [s * 0.88, s * 0.14], [s * 0.98, s * 0.24], [s * 0.44, s * 0.86], [s * 0.17, s * 0.57]]);
++}
++
++function iconCheckMark(slide, x, y, s, fg) {
++    poly(slide, x, y, s, s, fg, [[s * 0.24, s * 0.50], [s * 0.42, s * 0.68], [s * 0.76, s * 0.30], [s * 0.84, s * 0.38], [s * 0.42, s * 0.82], [s * 0.17, s * 0.57]]);
++}
++
++function iconClipboard(slide, x, y, s, fg, bg) {
++    roundRect(slide, x + s * 0.18, y + s * 0.14, s * 0.64, s * 0.78, fg, s * 0.09);
++    rect(slide, x + s * 0.34, y + s * 0.06, s * 0.32, s * 0.14, fg);
++    [0.32, 0.50, 0.68].forEach(function (yy) {
++        rect(slide, x + s * 0.27, y + s * yy, s * 0.10, s * 0.10, bg);
++        rect(slide, x + s * 0.43, y + s * yy + s * 0.025, s * 0.30, s * 0.05, bg);
++    });
++}
++
++function iconBadge(slide, x, y, s, fg, bg) {
++    roundRect(slide, x + s * 0.10, y + s * 0.16, s * 0.80, s * 0.76, fg, s * 0.18);
++    rect(slide, x + s * 0.26, y + s * 0.08, s * 0.48, s * 0.14, fg);
++    iconCheckMark(slide, x + s * 0.16, y + s * 0.24, s * 0.68, bg);
++}
++
++function iconCrown(slide, x, y, s, fg) {
++    poly(slide, x, y, s, s, fg, [[s * 0.06, s * 0.20], [s * 0.30, s * 0.54], [s * 0.50, s * 0.12], [s * 0.70, s * 0.54], [s * 0.94, s * 0.20], [s * 0.86, s * 0.82], [s * 0.14, s * 0.82]]);
++}
++
++function iconBuildings(slide, x, y, s, fg, bg) {
++    [[0.04, 0.38, 0.28, 0.58], [0.34, 0.52, 0.26, 0.44], [0.62, 0.14, 0.32, 0.82]].forEach(function (b) {
++        rect(slide, x + s * b[0], y + s * b[1], s * b[2], s * b[3], fg);
++    });
++    for (let r = 0; r < 3; r++) {
++        for (let k = 0; k < 2; k++) {
++            rect(slide, x + s * (0.09 + k * 0.12), y + s * (0.44 + r * 0.15), s * 0.07, s * 0.08, bg);
++            rect(slide, x + s * (0.68 + k * 0.13), y + s * (0.22 + r * 0.17), s * 0.07, s * 0.08, bg);
++        }
++    }
++}
++
++function iconMail(slide, x, y, s, fg, bg) {
++    poly(slide, x, y, s, s, fg, [[s * 0.04, s * 0.34], [s * 0.50, s * 0.08], [s * 0.96, s * 0.34], [s * 0.96, s * 0.90], [s * 0.04, s * 0.90]]);
++    poly(slide, x, y, s, s, bg, [[s * 0.04, s * 0.40], [s * 0.50, s * 0.72], [s * 0.96, s * 0.40], [s * 0.96, s * 0.50], [s * 0.50, s * 0.82], [s * 0.04, s * 0.50]]);
++    ellipse(slide, x + s * 0.28, y + s * 0.06, s * 0.44, s * 0.44, bg);
++    outline(slide, 'ellipse', x + s * 0.36, y + s * 0.14, s * 0.28, s * 0.28, fg, Math.max(0.75, s * 2.5));
++    ellipse(slide, x + s * 0.45, y + s * 0.23, s * 0.10, s * 0.10, fg);
++}
++
++function iconPhone(slide, x, y, s, fg, bg) {
++    poly(slide, x, y, s, s, fg, [ // handset arc
++        [s * 0.02, s * 0.38], [s * 0.98, s * 0.38, s * 0.12, s * 0.10, s * 0.88, s * 0.10],
++        [s * 0.80, s * 0.50], [s * 0.20, s * 0.50, s * 0.72, s * 0.30, s * 0.28, s * 0.30]]);
++    roundRect(slide, x + s * 0.12, y + s * 0.52, s * 0.76, s * 0.40, fg, s * 0.06);
++    for (let r = 0; r < 3; r++) {
++        for (let k = 0; k < 3; k++) {
++            rect(slide, x + s * (0.22 + k * 0.17), y + s * (0.58 + r * 0.11), s * 0.09, s * 0.07, bg);
++        }
++    }
++}
++
++/* -------------------------------------------------------- slide furniture */
++
++// Right-hand colour bar, logo mark, tick line and page number all come from the
++// slide master, so they repeat on every slide.  On the three full-bleed cover
++// pages the deck redraws them on top of the artwork in navy instead of green.
++function chrome(slide, num, cover) {
++    rect(slide, 12.738, 0, 0.595, 7.5, cover ? NAVY : GREEN);
++    logo(slide, 12.853, 0.253, 0.366, 0.321, cover ? GREEN : WHITE);
++    line(slide, 13.036, 4.593, 0, 2.29, cover ? GREEN : WHITE, 0.75);
++    slide.addText(String(num), {
++        x: 12.828, y: 6.992, w: 0.414, h: 0.286, margin: 0,
++        align: 'center', valign: 'middle', fontFace: MAJOR, fontSize: 11, color: WHITE,
++    });
++}
++
++/* --------------------------------------------------------------- copy blocks */
++
++const LOREM_LONG =
++    'Imperdiet proin fermentum leo vel orci porta non pulvinar. Egestas integer eget aliquet nibh praesent ' +
++    'tristique magna sit. Amet cursus sit amet tortor dictum sit amet justo donec. Arcu dictum varius duis at ' +
++    'consectetur lorem. Sed vulputate mi sit amet mauris. ';
++const LOREM_MED =
++    'Imperdiet proin fermentum leo vel orci porta non pulvinar. Egestas integer eget aliquet nibh praesent ' +
++    'tristique magna sit. Amet cursus sit amet tortor dictum sit amet justo donec. ';
++const LOREM_TRACK =
++    'Imperdiet proin fermentum leo vel orci porta non magna pulvinar. Egestas integer eget aliquet nibh ' +
++    'praesent enim tristique magna sit. Amet cursus sit amet';
++const LOREM_SERVICE =
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et ' +
++    'dolore magna aliqua. ';
++const LOREM_TORTOR =
++    'PLACEHOLDER';
++const LOREM_SETEUP =
++    'Lorem ipsum dolor seteup sitamet, consectetuer tortor adipiscing elit, seddiam nonummy nibh euismod magna ' +
++    'PLACEHOLDER';
++
++/* ------------------------------------------------------------- device mocks */
++
++// Landscape phone: concentric rings make the polished metal shell, then the screen.
++const PHONE_RINGS = [[0.000, '1F1F1F'], [0.013, 'DEDEDE'], [0.037, '202020'], [0.062, '8A8A8A'],
++                     [0.098, '141414']];
++
++function phoneMock(slide, x, y, w, h, sx, sy, sw, sh) {
++    PHONE_RINGS.forEach(function (ring) {
++        const d = ring[0];
++        roundRect(slide, x + d, y + d, w - 2 * d, h - 2 * d, ring[1], (h - 2 * d) * 0.15);
++    });
++    roundRect(slide, sx, sy, sw, sh, PHOTO, 0.2722);
++}
++
++// Open laptop: screen slab in a hairline silver lid, sitting on a wider deck.
++function laptopMock(slide, x, y, w, h, screen) {
++    roundRect(slide, x + w * 0.098, y, w * 0.798, h * 0.892, 'C6CACC', h * 0.018); // lid edge
++    roundRect(slide, x + w * 0.101, y + h * 0.004, w * 0.792, h * 0.884, '15181B', h * 0.016);
++    rect(slide, x + w * 0.124, y + h * 0.058, w * 0.751, h * 0.779, screen);
++    rect(slide, x, y + h * 0.892, w, h * 0.036, 'F1F1F1'); // deck
++    roundRect(slide, x, y + h * 0.920, w, h * 0.028, 'C2C5C7', h * 0.014); // front lip
++    rect(slide, x + w * 0.42, y + h * 0.896, w * 0.16, h * 0.020, 'CFD1D2'); // latch notch
++}
++
++// Desktop monitor: dark bezel, brushed-silver chin, neck and flared foot.
++function monitorMock(slide, x, y, w, h) {
++    roundRect(slide, x + 0.106, y + 0.101, 5.777, 3.380, '111417', 0.07); // bezel
++    rect(slide, x + 0.279, y + 0.261, 5.438, 3.000, PHOTO); // screen
++    roundRect(slide, x + 0.106, y + 3.481, 5.777, 0.515, 'A8A9A9', 0.07); // chin ...
++    rect(slide, x + 0.106, y + 3.481, 5.777, 0.24, 'D2D2D2'); // ... lit along its top edge
++    poly(slide, x, y, w, h, 'A0A2A3', [ // neck, flaring towards the desk
++        [2.398, 3.960], [3.591, 3.960],
++        [3.790, 4.640, 3.640, 4.320, 3.720, 4.500], [2.210, 4.640],
++        [2.398, 3.960, 2.280, 4.500, 2.360, 4.320]]);
++    poly(slide, x, y, w, h, 'CBCDCE', [ // foot
++        [2.210, 4.600], [3.790, 4.600],
++        [3.971, 4.769, 3.880, 4.660, 3.960, 4.730], [2.025, 4.769],
++        [2.210, 4.600, 2.040, 4.730, 2.120, 4.660]]);
++}
++
++/* =============================================================== the slides */
++
++function slide01(s) {
++    photo(s, 0, 0, 13.333, 7.5);
++    s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: GREEN, transparency: 20 } });
++    title(s, 'Newens', 2.008, 2.858, 8.723, 1.717, 96, { align: 'center' });
++    text(s, 'RENEWABLE ENERGY PRESENTATION', 4.207, 4.482, 4.323, 0.337,
++        { fontFace: BODY, fontSize: 14, align: 'center' });
++    text(s, 'www.newens.co.id', 0.268, 0.222, 3.294, 0.337, { fontFace: MAJOR, fontSize: 14 });
++}
++
++function slide02(s) {
++    title(s, 'Newens Renewable Energy Provider', 0.957, 1.56, 5.026, 1.178, 32);
++    para(s, LOREM_LONG, 0.957, 2.989, 5.026, 1.182);
++    label(s, 'Simple Text Here', 0.957, 4.422, 3.222, 0.337);
++    para(s, LOREM_LONG, 0.957, 4.758, 5.026, 1.182);
++    photo(s, 6.667, 1.129, 5.242, 5.242, 'ellipse');
++}
++
++function slide03(s) {
++    roundRect(s, 7.3, 1.18, 4.859, 5.141, GREEN, 0.0819 * 4.859);
++    title(s, 'We Offer The Most Sought-after Renewable Energy Alternatives', 7.714, 1.695, 4.03, 2.07, 28);
++    para(s, LOREM_SETEUP, 7.714, 3.829, 4.03, 1.082, 10);
++    para(s, 'Lorem ipsum dolor seteup sitamet, consectetuer tortor adipiscing elit, seddiam nonummy nibh ' +
++        'euismod magna tincidunt ut laoreet dolore magna aliquam erat', 7.714, 4.975, 4.03, 0.83, 10);
++    photo(s, 0.566, 1.18, 2.996, 5.141, 'round', 0.4993);
++    photo(s, 3.816, 1.18, 2.996, 5.141, 'round', 0.4993);
++}
++
++function slide04(s) {
++    photo(s, 0.851, 0.724, 11.037, 2.928, 'round', 0.3235);
++    // green panel fading out to the right across the banner photo
++    gradientBand(s, 0.851, 0.724, 6.689, 2.928, GREEN, PHOTO, 0.3235);
++    title(s, 'Power The Future With Sustainable Energy.', 1.446, 1.599, 5.791, 1.178, 32);
++    label(s, 'Simple Text Here', 0.851, 4.598, 3.222, 0.337);
++    para(s, LOREM_LONG + 'Gravida ipsum tortor dignissim convallis viverra justo nec ultrices dui sapien. ',
++        0.851, 4.934, 5.525, 1.46);
++    [['Save The Electricity', 4.317, 4.369, iconHouseBolt, 0.425],
++     ['Affordable Rates', 5.711, 5.766, iconBulb, 0.329]].forEach(function (row) {
++        label(s, row[0], 7.967, row[1], 3.436, 0.337, { bold: true });
++        para(s, LOREM_TORTOR, 7.967, row[1] + 0.337, 3.921, 0.627);
++        ellipse(s, 7.174, row[2], 0.639, 0.639, GREEN);
++        row[3](s, 7.174 + (0.639 - row[4]) / 2, row[2] + (0.639 - row[4]) / 2, row[4], WHITE, GREEN);
++    });
++}
++
++function slide05(s) {
++    // photo masked by a wave sweeping down the middle of the slide
++    poly(s, 0, 0, 6.667, 7.5, PHOTO, [
++        [0.0466, 0], [6.0864, 0], [6.0223, 0.2119],
++        [5.3080, 1.9115, 5.8026, 0.7951, 5.3098, 1.2805],
++        [6.1374, 3.4536, 5.3061, 2.5235, 5.7637, 2.9987],
++        [6.5626, 5.1032, 6.5111, 3.9085, 6.8418, 4.5730],
++        [3.9787, 6.0663, 6.0903, 5.9995, 4.6357, 5.3222],
++        [3.7328, 7.4337, 3.6620, 6.4251, 3.6782, 6.9159],
++        [3.7402, 7.5], [0, 7.5], [0, 0.0902],
++    ]);
++    title(s, 'Reliable Renewable Energy Solutions.', 7.411, 1.6, 4.655, 1.178, 32);
++    para(s, 'PLACEHOLDER' +
++        'praesent tristique magna sit. Amet cursus sit amet tortor dictum sit amet justo donec. Arcu dictum ' +
++        'varius duis at consectetur lorem. ', 7.411, 2.847, 4.655, 1.182);
++    [['Save Energy', 4.244], ['Environmentally Friendly', 4.705],
++     ['100% Guaranteed', 5.17], ['Efficient and Reliable', 5.625]].forEach(function (row) {
++        iconCheckCircle(s, 7.495, row[1], 0.25, GREEN);
++        label(s, row[0], 7.76, row[1] - 0.029, 2.75, 0.303, { fontSize: 12, bold: true });
++    });
++}
++
++function slide06(s) {
++    title(s, 'The Leading Provider of Eco Energy Solution Since 2005', 0.799, 1.382, 5.026, 1.616, 30);
++    para(s, LOREM_LONG, 0.799, 3.166, 5.026, 1.182);
++    label(s, 'Simple Text Here', 0.799, 4.599, 3.222, 0.337);
++    para(s, LOREM_LONG, 0.799, 4.936, 5.026, 1.182);
++    photo(s, 6.667, 1.015, 5.479, 2.891, 'round', 0.3012);
++    [['253k', 'Customers', 6.667], ['314+', 'Projects', 9.532]].forEach(function (card) {
++        const x = card[2];
++        roundRect(s, x, 4.294, 2.613, 2.064, GREEN, 0.1472 * 2.064);
++        title(s, card[0], x + 0.493, 4.549, 1.626, 0.64, 32, { align: 'center' });
++        label(s, card[1], x + 0.277, 5.186, 2.059, 0.337, { align: 'center', bold: true });
++        para(s, 'Tortor id aliquet lectus proin nibh nisl sit euismod', x + 0.277, 5.523, 2.059, 0.579, 10,
++            { align: 'center' });
++    });
++}
++
++function slide07(s) {
++    [['NIKOLAS BAUTISTA', 0.454, 2.827], ['AMANDA C. ROFLES', 3.898, 6.271]].forEach(function (card) {
++        photo(s, 0.874, card[1], 3.837, 3.147);
++        rect(s, 0.874, card[2], 3.837, 0.775, GREEN);
++        title(s, card[0], 0.874, card[2] + 0.185, 3.837, 0.37, 16, { align: 'center' });
++    });
++    title(s, 'Meet Our Professional Team Genergy.', 6.151, 1.452, 5.463, 2.02, 38);
++    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' +
++        'labore et dolore magna aliqua. Faucibus vitae amet aliquet nec ullamcorper sit amet risus nullam eget. ' +
++        'Elementum pulvinar etiam non quam lacus suspendisse. Sed elementum tempus egestas sed sed. Nibh ipsum ' +
++        'consequat nisl vel pretium lectus quam. ', 6.151, 3.636, 5.463, 1.46);
++    button(s, 'Discover More', 6.23, 5.5, 2.048, 0.549, 0, MAJOR, 12);
++}
++
++function slide08(s) {
++    title(s, 'Newens Proficiency in Alternative Energy Solutions', 2.985, 0.693, 7.363, 1.043, 28,
++        { align: 'center' });
++    [['Paul A Smith', 1.417], ['Paula  Anderson', 5.062], ['Andry Davidson', 8.708]].forEach(function (card) {
++        const x = card[1];
++        photo(s, x, 2.333, 3.042, 2.635);
++        rect(s, x, 4.968, 3.042, 1.466, WHITE);
++        line(s, x, 6.435, 3.042, 0, GREEN, 3);
++        text(s, card[0], x + 0.166, 5.361, 2.7, 0.404,
++            { fontFace: SEMI, fontSize: 18, color: NAVY, align: 'center' });
++        text(s, 'Your Position', x + 0.566, 5.756, 1.899, 0.303,
++            { fontFace: BODY, fontSize: 12, color: BLACK, align: 'center' });
++    });
++}
++
++function slide09(s) {
++    photo(s, 6.688, 0, 6.667, 7.5);
++    title(s, 'ANDRE C. PAULSEN', 1.165, 1.592, 5.083, 0.64, 32, { charSpacing: 1 });
++    text(s, 'Head of Marketing', 1.165, 2.295, 2.429, 0.337, { fontFace: INTER, fontSize: 14 });
++    para(s, LOREM_LONG, 1.165, 2.994, 5.083, 1.182);
++    // two skill meters, five slanted segments each
++    [['Your Skill One', '90%', 4.427, 3], ['Your Skill Two', '80%', 5.355, 2]].forEach(function (row) {
++        title(s, row[0], 1.165, row[2], 2.839, 0.303, 12);
++        text(s, row[1], 5.166, row[2], 0.959, 0.303,
++            { fontFace: INTER, fontSize: 12, bold: true, color: INK, align: 'right' });
++        for (let i = 0; i < 5; i++) {
++            poly(s, 1.232 + i * 0.961, row[2] + 0.428, 0.972, 0.126, i <= row[3] ? GREEN : WHITE,
++                [[0.082, 0.009], [0.970, 0.009], [0.899, 0.126], [0.009, 0.126]]);
++        }
++    });
++}
++
++function slide10(s) {
++    title(s, 'Experience The Power of The Sun at Its Finest.', 0.898, 1.483, 5.083, 2.121, 40);
++    para(s, LOREM_LONG, 0.898, 3.818, 5.083, 1.182);
++    para(s, LOREM_MED, 0.898, 5.214, 5.083, 0.904);
++    [['01. Service One', 1.27, iconTurbine], ['02. Service Two', 3.177, iconSolar],
++     ['03. Service Three', 4.983, iconBulb]].forEach(function (row) {
++        roundRect(s, 6.618, row[1], 1.303, 1.248, GREEN, 1.248 / 6);
++        row[2](s, 6.924, row[1] + 0.278, 0.69, WHITE, GREEN);
++        label(s, row[0], 8.212, row[1] + 0.05, 2.313, 0.337, { bold: true });
++        para(s, LOREM_SERVICE, 8.212, row[1] + 0.366, 3.619, 0.831, 10);
++    });
++}
++
++function slide11(s) {
++    photo(s, 1.396, 0.828, 9.946, 2.818, 'round', 0.4697);
++    [[1.483, iconClipboard], [5.199, iconBadge], [8.915, iconCrown]].forEach(function (card) {
++        const x = card[0];
++        roundRect(s, x, 4.537, 2.427, 2.136, WHITE, 2.136 / 6);
++        roundRect(s, x + 0.767, 4.144, 0.893, 0.786, GREEN, 0.786 / 6);
++        card[1](s, x + 0.984, 4.307, 0.459, WHITE, GREEN);
++        text(s, 'Simple Text Here', x + 0.309, 5.18, 1.81, 0.303,
++            { fontFace: SEMI, fontSize: 12, bold: true, color: NAVY, align: 'center' });
++        para(s, 'Lorem ipsum dolor sit amet consectetur adipiscing elit, sed do eiusmod tempor',
++            x + 0.094, 5.542, 2.239, 0.831, 10, { color: BLACK, align: 'center' });
++    });
++}
++
++function slide12(s) {
++    title(s, 'Excellence in Alternative Energy Services', 0.94, 1.015, 4.541, 1.717, 32);
++    para(s, LOREM_MED, 0.94, 2.846, 5.043, 0.904);
++    photo(s, 6.432, 1.015, 5.479, 2.735, 'round', 0.3012);
++    roundRect(s, 0.94, 4.373, 5.043, 1.894, GREEN, 1.894 / 6);
++    roundRect(s, 6.433, 4.373, 5.479, 1.894, GREEN, 1.894 / 6);
++    [['01. Service One', 1.369, 4.185, 'Imperdiet proin fermentum leo vel orci porta non pulvinar. Egestas ' +
++        'integer eget aliquet nibh praesent tristique magna sit. Amet cursus sit amet tortor justo donec. '],
++     ['012 Service Two', 6.839, 4.666, LOREM_MED]].forEach(function (card) {
++        label(s, card[0], card[1], 4.746, 2.313, 0.337, { bold: true });
++        para(s, card[3], card[1], 5.062, card[2], 0.831, 10);
++    });
++}
++
++function slide13(s) {
++    // photo masked by the same S-curve wave, mirrored to the left edge
++    poly(s, 0, 0, 6.2404, 7.5, PHOTO, [
++        [0, 0], [6.1275, 0], [6.1175, 0.0593],
++        [5.2941, 1.8258, 6.0074, 0.5615, 5.7499, 1.1461],
++        [4.7668, 4.5762, 4.7648, 2.6151, 4.5414, 3.6535],
++        [6.0519, 6.9031, 4.9781, 5.4407, 5.6917, 6.0891],
++        [6.1649, 7.2062, 6.0951, 7.0026, 6.1327, 7.1037],
++        [6.2404, 7.5], [0, 7.5],
++    ]);
++    title(s, 'Adding Light And Hope to Every Home.', 6.746, 1.012, 5.156, 1.178, 32, { charSpacing: 0.5 });
++    [[2.430, 2.390, iconTurbine], [3.891, 3.794, iconSolar], [5.349, 5.198, iconBulb]]
++        .forEach(function (row) {
++            ellipse(s, 6.828, row[0], 0.715, 0.715, GREEN);
++            row[2](s, 6.989, row[0] + 0.161, 0.393, WHITE, GREEN);
++            text(s, 'Simple Text Here', 7.722, row[1], 2.529, 0.303,
++                { fontFace: SEMI, fontSize: 12, bold: true });
++            para(s, LOREM_SERVICE, 7.722, row[1] + 0.302, 4.067, 0.904);
++        });
++}
++
++function slide14(s) {
++    photo(s, 3.4086, 0.9113, 3.2581, 5.6774);
++    photo(s, 0, 0, 3.2581, 5.6774);
++    title(s, 'Power The Future With Sustainable Energy.', 7.324, 1.637, 4.721, 1.919, 36);
++    para(s, 'Imperdiet proin fermentum leo vel orci porta pulvinar. Egestas integer eget aliquet nibh praesent ' +
++        'tristique magna sit. Amet sit cursus sit amet tortor dictum sit amet justo donec. Arcu dictum varius ' +
++        'duis at consectetur lorem.', 7.324, 3.658, 4.721, 1.182);
++    [['Wind Energy', 7.726, 5.025, 7.395, 5.08], ['Solar Energy', 7.726, 5.526, 7.395, 5.585],
++     ['Bioenergy', 10.257, 5.025, 9.927, 5.08], ['Hydroelectric', 10.257, 5.526, 9.927, 5.581]]
++        .forEach(function (row) {
++            ellipse(s, row[3], row[4], 0.227, 0.227, GREEN);
++            iconCheckMark(s, row[3], row[4], 0.227, WHITE);
++            text(s, row[0], row[1], row[2], 1.885, 0.337, { fontFace: INTER_SEMI, fontSize: 14 });
++        });
++}
++
++function slide15(s) {
++    photo(s, 0, 0, 13.333, 7.5);
++    s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: GREEN, transparency: 20 } });
++    title(s, 'Break Slide', 2.185, 3.136, 6.562, 1.447, 80, { align: 'center' });
++    text(s, 'LET\u2019S TAKE A 15 MINUTES BREAK', 2.284, 4.415, 4.323, 0.337,
++        { fontFace: MAJOR, fontSize: 14, charSpacing: 1 });
++    logo(s, 9.067, 3.136, 1.501, 1.317, WHITE);
++    text(s, 'www.newens.co.id', 0.268, 0.222, 3.294, 0.337, { fontFace: MAJOR, fontSize: 14 });
++}
++
++function slide16(s) {
++    title(s, 'Newens Impressive Portfolio Of Projects', 2.713, 0.826, 7.312, 1.178, 32, { align: 'center' });
++    text(s, 'Lorem ipsum dolor seteup sitamet, consectetuer adipiscing elit, seddiam nonummy nibh euismod ' +
++        'tincidunt ut laoreet dolore magna aliquam erat volutpat utwisienim adminim veniam, quis aliquam erat ' +
++        'volutpat ut wisienim adminim consectetuer adipiscing elit, seddiam nonummy nibh euismod',
++        1.768, 2.172, 9.203, 0.842,
++        { fontFace: BODY, fontSize: 11, lineSpacingMultiple: 1.38, align: 'center' });
++    photo(s, 1.22, 3.63, 4.834, 2.703, 'round', 0.3437);
++    photo(s, 6.684, 3.63, 4.834, 2.703, 'round', 0.3437);
++}
++
++function slide17(s) {
++    photo(s, 1.034, 1.164, 1.887, 2.43, 'round', 0.2465);
++    photo(s, 3.25, 1.164, 3.507, 2.43, 'round', 0.3079);
++    photo(s, 1.034, 3.906, 3.507, 2.43, 'round', 0.3371);
++    roundRect(s, 4.87, 3.906, 1.887, 2.43, GREEN, 1.887 / 6);
++    logo(s, 5.329, 4.382, 1.027, 0.901, WHITE);
++    title(s, 'Newens', 4.56, 5.456, 2.565, 0.404, 18, { align: 'center' });
++    title(s, 'Newens Outstanding Track Record In Projects', 7.65, 1.666, 4.319, 1.515, 28);
++    para(s, LOREM_TRACK, 7.65, 3.335, 4.319, 0.904);
++    label(s, 'Simple Text Here', 7.65, 4.593, 3.222, 0.337);
++    para(s, LOREM_TRACK, 7.65, 4.93, 4.319, 0.904);
++}
++
++function slide18(s) {
++    title(s, 'Experience The Power of The Sun at Its Finest.', 0.825, 1.219, 5.05, 2.121, 40);
++    photo(s, 6.65, 1.058, 5.235, 2.442, 'round', 0.2232);
++    photo(s, 6.65, 4.0, 5.235, 2.442, 'round', 0.2232);
++    [['01', 3.649, 3.7], ['02', 5.043, 5.097]].forEach(function (row) {
++        ellipse(s, 0.872, row[2], 0.639, 0.639, GREEN);
++        s.addText(row[0], {
++            x: 0.872, y: row[2], w: 0.639, h: 0.639, margin: 0,
++            align: 'center', valign: 'middle', fontFace: INTER_SEMI, fontSize: 14, color: WHITE,
++        });
++        label(s, 'Simple Text Here', 1.664, row[1], 3.436, 0.337);
++        para(s, LOREM_TORTOR + ' non euismod elementum nisi quis eleifend quam. ',
++            1.664, row[1] + 0.336, 3.921, 0.901);
++    });
++}
++
++function slide19(s) {
++    photo(s, 0.706, 0.81, 5.961, 2.94, 'round', 0.405);
++    photo(s, 0.706, 4.13, 2.771, 2.56, 'round', 0.405);
++    photo(s, 3.896, 4.13, 2.771, 2.56, 'round', 0.405);
++    title(s, 'Noteworthy Portfolio of Work by Newens', 7.585, 1.325, 4.319, 1.717, 32);
++    para(s, LOREM_TRACK, 7.585, 3.201, 4.319, 0.904);
++    para(s, LOREM_TRACK, 7.585, 4.264, 4.319, 0.904);
++    button(s, 'Learn More', 7.675, 5.507, 2.153, 0.668, 0.2299 * 0.668, MAJOR, 14);
++}
++
++function slide20(s) {
++    title(s, 'Be The Change You Wish to See in The World.', 0.893, 1.376, 4.689, 1.818, 34);
++    phoneMock(s, 6.386, 1.0625, 5.475, 2.54, 6.512, 1.191, 5.224, 2.256);
++    phoneMock(s, 6.386, 3.9010, 5.475, 2.54, 6.512, 4.042, 5.224, 2.256);
++    [['01', 3.401, 3.457], ['02', 4.883, 4.939]].forEach(function (row) {
++        button(s, row[0], 1.045, row[2], 0.667, 0.667, 0, INTER_SEMI, 16);
++        label(s, 'Simple Text Here', 1.9, row[1], 3.436, 0.337);
++        para(s, 'Lorem dolor sed viverra ipsum nunc aliquet bibendum enim facilisis. Vestibulum non lectus ' +
++            'mauris ultrices eros in cursus. ', 1.9, row[1] + 0.336, 3.682, 0.904);
++    });
++}
++
++function slide21(s) {
++    title(s, 'Excellent Eco-energy Mockup By Newens', 2.403, 0.843, 7.933, 1.178, 32, { align: 'center' });
++    laptopMock(s, 0.718, 4.001, 4.173, 2.617, PHOTO);
++    laptopMock(s, 7.847, 4.001, 4.173, 2.617, PHOTO);
++    laptopMock(s, 2.840, 2.763, 7.059, 3.956, PHOTO_DK);
++}
++
++function slide22(s) {
++    monitorMock(s, 0.68, 1.266, 5.997, 4.968);
++    title(s, 'Visit Our \nWebsite For Get Solutions.', 7.434, 1.492, 4.634, 2.02, 38);
++    para(s, LOREM_LONG + 'gravida ipsum tortor dignissim.', 7.434, 3.692, 4.634, 1.46);
++    button(s, 'www.website.com', 7.53, 5.459, 2.016, 0.549, 0, INTER, 12);
++}
++
++function slide23(s) {
++    photo(s, 6.953, 0, 5.797, 7.5);
++    title(s, 'If Need Any Info Please Contact Us!', 1.033, 1.167, 4.909, 1.245, 34);
++    iconBuildings(s, 1.043, 2.937, 0.656, GREEN, NAVY);
++    iconMail(s, 1.098, 3.88, 0.547, GREEN, NAVY);
++    iconPhone(s, 1.011, 4.701, 0.72, GREEN, NAVY);
++    text(s, 'East 68th Street, \nNew York, NY 10065', 2.051, 2.969, 3.4, 0.64, { fontFace: SEMI, fontSize: 16 });
++    text(s, 'www.newens.com', 2.051, 3.969, 2.66, 0.37, { fontFace: SEMI, fontSize: 16 });
++    text(s, '+123 456 7890', 2.051, 4.871, 2.66, 0.37, { fontFace: SEMI, fontSize: 16 });
++    [3.803, 4.598, 5.431].forEach(function (y) { line(s, 2.164, y, 3.287, 0, WHITE, 0.75); });
++    para(s, 'PLACEHOLDER' +
++        'tortor dignissim.', 1.029, 5.706, 4.909, 0.627);
++}
++
++function slide24(s) {
++    photo(s, 0, 0.007, 13.333, 7.5);
++    s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: GREEN, transparency: 20 } });
++    logo(s, 5.619, 2.234, 1.501, 1.317, WHITE);
++    title(s, 'Thank You', 2.26, 3.757, 8.219, 1.717, 96, { align: 'center' });
++    text(s, 'www.newens.co.id', 0.268, 0.222, 3.294, 0.337, { fontFace: MAJOR, fontSize: 14 });
++}
++
++/* ==================================================================== build */
++
++const SLIDES = [
++    slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++    slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
++    slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
++];
++const COVERS = [1, 15, 24]; // full-bleed green pages: navy bar instead of green
++
++function build() {
++    const pres = new PptxGenJS();
++    pres.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++    pres.layout = 'WIDE';
++    pres.author = 'Newens';
++    pres.title = 'Newens Renewable Energy Presentation';
++
++    SLIDES.forEach(function (draw, i) {
++        const s = pres.addSlide();
++        const cover = COVERS.indexOf(i + 1) !== -1;
++        s.background = { color: NAVY };
++        if (!cover) chrome(s, i + 1, false); // master art is painted under the slide
++        draw(s);
++        if (cover) chrome(s, i + 1, true);
++    });
++
++    return pres.writeFile({
++        fileName: path.join(__dirname, '1041193b-f67d-4315-b7ec-2e36a89b724c_grok_final.pptx'),
++    });
++}
++
++build().then(function (f) { console.log('wrote', f); }, function (e) { console.error(e); process.exit(1); });

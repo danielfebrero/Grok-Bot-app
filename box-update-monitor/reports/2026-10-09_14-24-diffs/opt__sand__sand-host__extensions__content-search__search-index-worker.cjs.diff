@@ -1,0 +1,78 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-09_14-24:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -483,37 +483,6 @@
+ }
+ var VOICE_CALL_LANGUAGE_OPTIONS = Object.keys(VOICE_CALL_LANGUAGE_LABELS).filter(isVoiceCallLanguage).map((id) => ({ id, label: VOICE_CALL_LANGUAGE_LABELS[id] }));
+ 
+-// ../packages/voice-call-harness/dist/session/fault-facet.js
+-function readVoiceCallFaultFacet(known, value) {
+-  if (value === "absent" || value === "unrecognized")
+-    return value;
+-  return known.find((candidate) => candidate === value) ?? "unrecognized";
+-}
+-
+-// ../packages/voice-call-harness/dist/session/mint-fault.js
+-var VOICE_CALL_MINT_REASONS = [
+-  "not_configured",
+-  "unsupported_model",
+-  "rejected",
+-  "unreachable",
+-  "malformed_response"
+-];
+-var VOICE_CALL_MINT_HTTP = ["429", "401", "403", "503"];
+-var MINT_HEADER_PREFIX = "voice_mint_";
+-var MINT_HEADER_BY_VALUE = (() => {
+-  const headers = /* @__PURE__ */ new Map();
+-  for (const reason of VOICE_CALL_MINT_REASONS) {
+-    headers.set(`${MINT_HEADER_PREFIX}${reason}`, {
+-      reason,
+-      http: "absent"
+-    });
+-    for (const http of VOICE_CALL_MINT_HTTP) {
+-      headers.set(`${MINT_HEADER_PREFIX}${reason}_${http}`, { reason, http });
+-    }
+-  }
+-  return headers;
+-})();
+-
+ // ../packages/voice-call-harness/dist/prompt/nudge-reply.js
+ var VOICE_CALL_REQUEST_CHAR_LIMIT = 2e3;
+ var VOICE_CALL_REQUEST_TOO_LONG_ERROR = `The task was not sent: request exceeds ${VOICE_CALL_REQUEST_CHAR_LIMIT} characters. Reformulate it within the limit while preserving every constraint, especially prohibitions and approval requirements. Do not drop constraints or split the task into executable pieces. Ask the caller to clarify if it cannot fit safely.`;
+@@ -600,6 +569,37 @@
+   }
+ };
+ 
++// ../packages/voice-call-harness/dist/session/fault-facet.js
++function readVoiceCallFaultFacet(known, value) {
++  if (value === "absent" || value === "unrecognized")
++    return value;
++  return known.find((candidate) => candidate === value) ?? "unrecognized";
++}
++
++// ../packages/voice-call-harness/dist/session/mint-fault.js
++var VOICE_CALL_MINT_REASONS = [
++  "not_configured",
++  "unsupported_model",
++  "rejected",
++  "unreachable",
++  "malformed_response"
++];
++var VOICE_CALL_MINT_HTTP = ["429", "401", "403", "503"];
++var MINT_HEADER_PREFIX = "voice_mint_";
++var MINT_HEADER_BY_VALUE = (() => {
++  const headers = /* @__PURE__ */ new Map();
++  for (const reason of VOICE_CALL_MINT_REASONS) {
++    headers.set(`${MINT_HEADER_PREFIX}${reason}`, {
++      reason,
++      http: "absent"
++    });
++    for (const http of VOICE_CALL_MINT_HTTP) {
++      headers.set(`${MINT_HEADER_PREFIX}${reason}_${http}`, { reason, http });
++    }
++  }
++  return headers;
++})();
++
+ // ../packages/voice-call-harness/dist/session/async-update.js
+ var VoiceCallAsyncUpdate = class {
+   static frame({ topic, eventId, texts, atMs }) {

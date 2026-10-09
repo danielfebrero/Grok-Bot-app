@@ -1,0 +1,1008 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_hospital_overview.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/healthcare_hospital_overview.js
+@@ -0,0 +1,1005 @@
++/**
++ * "Wilson Health Care" — 31-slide deck rebuilt with pptxgenjs.
++ *
++ * Photographs / mockups from the original deck are replaced by flat grey
++ * placeholder shapes of the same geometry (see `photo()`); everything else is
++ * drawn with native pptxgenjs shapes, text runs and charts.
++ *
++ *   node 103eeb02-5a15-49ca-a4a8-7dd9bbc22f52_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ palette */
++
++const TEAL = '01C6B2';
++const INK = '262626';
++const COAL = '0C0C0C';
++const DARK = '3F3F3F';
++const GREY = '7F7F7F';
++const SILVER = 'A5A5A5';
++const HAIR = 'D8D8D8';
++const MIST = 'F2F2F2';
++const WHITE = 'FFFFFF';
++const BLACK = '000000';
++const PHOTO = '3D3C3E'; // average colour of the replaced photographs
++const SCREEN = '333335'; // device-mockup screens
++const BONUS_BLUE = '3A78DE';
++const BONUS_GREEN = '92D050';
++
++const SANS = 'Inter'; // headings / UI
++const BODY = 'Open Sans'; // paragraph copy
++
++/* ------------------------------------------------------------------ helpers */
++
++// text-frame insets used by every text box of the source deck (points)
++const INSET = [7.2, 7.2, 3.6, 3.6];
++
++// the single soft drop shadow the deck re-uses everywhere
++const shadow = (color = INK) => ({
++	type: 'outer', blur: 45, offset: 22, angle: 25, color, opacity: 0.17,
++});
++
++// pptxgenjs surfaces `<a:gd name="adj">` through `rectRadius` (inches) …
++const adj = (val, w, h) => ({ rectRadius: (val / 100000) * Math.min(w, h) });
++// … and `<a:gd name="adj1">` / `<a:gd name="adj2">` through `angleRange`.
++const adj2 = (a1, a2) => ({ angleRange: [a1 / 60000, a2 / 60000] });
++
++function text(slide, runs, opts) {
++	slide.addText(runs, Object.assign(
++		{ fontFace: SANS, color: INK, align: 'left', valign: 'top', margin: INSET },
++		opts));
++}
++
++// 9 pt Open Sans body copy on double leading — the deck's default paragraph
++function para(slide, str, opts) {
++	text(slide, str, Object.assign(
++		{ fontFace: BODY, fontSize: 9, color: BLACK, lineSpacingMultiple: 2 }, opts));
++}
++
++function shape(slide, kind, opts) {
++	slide.addShape(kind, opts);
++}
++
++// grey stand-in for a photograph, keeping the original frame geometry
++function photo(slide, o) {
++	const kind = o.shape || 'rect';
++	const geom = Object.assign({ x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.color || PHOTO } }, o.geom);
++	slide.addShape(kind, geom);
++	if (o.label !== false) {
++		text(slide, '[image]', {
++			x: o.x, y: o.y + o.h / 2 - 0.2, w: o.w, h: 0.4,
++			align: 'center', valign: 'middle', fontSize: 12, color: '6E6E70',
++		});
++	}
++}
++
++// pill-shaped teal label ("About Us", "Wilson Hospital", …)
++function pill(slide, o) {
++	slide.addText(o.text, Object.assign({
++		shape: 'roundRect', x: o.x, y: o.y, w: o.w, h: o.h || 0.41,
++		fill: { color: o.fill || TEAL }, fontFace: SANS, fontSize: o.fontSize || 16,
++		bold: !!o.bold, color: o.color || WHITE, align: o.align || 'left', valign: 'top',
++		margin: INSET,
++	}, adj(16667, o.w, o.h || 0.41)));
++}
++
++// ring + medical cross logo mark
++function logoMark(slide, x, y, size, color) {
++	shape(slide, 'blockArc', {
++		x, y, w: size, h: size, fill: { color }, line: { type: 'none' },
++		angleRange: [0, 359.99], arcThicknessRatio: 0.158,
++	});
++	const c = size * 0.633;
++	shape(slide, 'plus', Object.assign(
++		{ x: x + (size - c) / 2, y: y + (size - c) / 2, w: c, h: c, fill: { color }, line: { type: 'none' } },
++		adj(34000, c, c)));
++}
++
++// header furniture: logo + "Wilson Health Care" (left) and "Presentation 2021" (right)
++function chrome(slide, o) {
++	o = o || {};
++	if (o.brand !== false) {
++		logoMark(slide, 0.574, 0.5, 0.276, o.logo || TEAL);
++		text(slide, [
++			{ text: 'Wilson ', options: { bold: true } },
++			{ text: 'Health Care' },
++		], { x: 0.853, y: 0.503, w: 1.784, h: 0.286, fontSize: 11, color: o.brand || SILVER });
++	}
++	if (o.pres !== false) {
++		text(slide, 'Presentation 2021', {
++			x: 10.803, y: 0.5, w: 1.784, h: 0.286, align: 'right',
++			fontSize: 11, color: o.pres || SILVER,
++		});
++	}
++}
++
++// map-pin marker (teardrop head pointing down + white dot)
++function pin(slide, x, y, w, h, color) {
++	shape(slide, 'teardrop', Object.assign(
++		{ x, y, w, h: h * 0.9, fill: { color }, line: { type: 'none' }, rotate: 135 },
++		adj(100000, w, h * 0.9)));
++	shape(slide, 'ellipse', {
++		x: x + w * 0.29, y: y + h * 0.19, w: w * 0.42, h: h * 0.28, fill: { color: WHITE },
++	});
++}
++
++/* --------------------------------------------------------------- icon glyphs
++ * The original deck uses hand-drawn vector icon groups. They are rebuilt here
++ * from a handful of preset shapes — same silhouette, far less geometry.        */
++
++function icon(slide, kind, x, y, s, color, cut) {
++	cut = cut || WHITE;
++	const f = { color };
++	const put = (k, dx, dy, dw, dh, extra) => shape(slide, k, Object.assign(
++		{ x: x + dx * s, y: y + dy * s, w: dw * s, h: dh * s, fill: f, line: { type: 'none' } }, extra));
++	const knockout = (k, dx, dy, dw, dh, extra) => shape(slide, k, Object.assign(
++		{ x: x + dx * s, y: y + dy * s, w: dw * s, h: dh * s, fill: { color: cut }, line: { type: 'none' } }, extra));
++	const cross = (dx, dy, d) => knockout('plus', dx, dy, d, d, adj(34000, s * d, s * d));
++	switch (kind) {
++		case 'cross':
++			put('plus', 0, 0, 1, 1, adj(34000, s, s));
++			break;
++		case 'kit': // first-aid case with a white asterisk
++			put('roundRect', 0, 0.22, 1, 0.78, adj(12000, s, s * 0.78));
++			put('roundRect', 0.3, 0.02, 0.4, 0.24, adj(20000, s * 0.4, s * 0.24));
++			knockout('star6', 0.31, 0.43, 0.38, 0.38);
++			break;
++		case 'heart': // heart crossed by an ECG trace
++			put('heart', 0, 0.04, 1, 0.92);
++			[[0.12, 0.44, 0.18, 0], [0.29, 0.36, 0.11, 62], [0.40, 0.50, 0.13, -62], [0.53, 0.44, 0.32, 0]]
++				.forEach(([dx, dy, dw, rot]) => knockout('rect', dx, dy, dw, 0.055, { rotate: rot }));
++			break;
++		case 'hand': // heart resting on a cupped palm
++			put('heart', 0.26, 0, 0.48, 0.44);
++			shape(slide, 'blockArc', {
++				x, y: y + 0.34 * s, w: s, h: s * 0.66, fill: f, line: { type: 'none' },
++				angleRange: [10, 170], arcThicknessRatio: 0.34,
++			});
++			break;
++		case 'iv': // drip bag on a stand
++			put('roundRect', 0.2, 0.06, 0.6, 0.6, adj(28000, s * 0.6, s * 0.6));
++			put('rect', 0.46, 0, 0.08, 0.1);
++			put('rect', 0.44, 0.62, 0.12, 0.2);
++			put('rect', 0.28, 0.8, 0.44, 0.14);
++			break;
++		case 'mask': // head in profile wearing a mask
++			put('ellipse', 0.08, 0.03, 0.66, 0.62);
++			put('rect', 0.18, 0.5, 0.42, 0.47);
++			knockout('rect', 0.02, 0.3, 0.66, 0.045, { rotate: 22 });
++			knockout('roundRect', 0.44, 0.44, 0.5, 0.33, adj(28000, s * 0.5, s * 0.33));
++			put('roundRect', 0.46, 0.46, 0.46, 0.29, adj(28000, s * 0.46, s * 0.29));
++			knockout('roundRect', 0.49, 0.49, 0.4, 0.23, adj(28000, s * 0.4, s * 0.23));
++			knockout('ellipse', 0.55, 0.28, 0.06, 0.06);
++			break;
++		case 'maskFront': // surgical mask seen head-on, with ear loops
++			put('moon', 0, 0.12, 0.28, 0.62, { rotate: 20 });
++			put('moon', 0.72, 0.12, 0.28, 0.62, { rotate: 200 });
++			put('roundRect', 0.1, 0.1, 0.8, 0.78, adj(38000, s * 0.8, s * 0.78));
++			knockout('roundRect', 0.17, 0.18, 0.66, 0.62, adj(34000, s * 0.66, s * 0.62));
++			[0.28, 0.44, 0.6].forEach(dy => put('rect', 0.26, dy, 0.48, 0.055));
++			break;
++		case 'virus':
++			put('ellipse', 0.24, 0.24, 0.52, 0.52);
++			[0, 45, 90, 135, 180, 225, 270, 315].forEach(a => {
++				const rad = a * Math.PI / 180;
++				put('ellipse', 0.43 + 0.42 * Math.cos(rad), 0.43 + 0.42 * Math.sin(rad), 0.15, 0.15);
++			});
++			break;
++		case 'shield': // crest with a virus inside
++			put('homePlate', 0.08, 0.05, 0.84, 0.9, { rotate: 90 });
++			knockout('ellipse', 0.34, 0.3, 0.32, 0.32);
++			[0, 60, 120, 180, 240, 300].forEach(a => {
++				const rad = a * Math.PI / 180;
++				knockout('ellipse', 0.45 + 0.24 * Math.cos(rad), 0.41 + 0.24 * Math.sin(rad), 0.1, 0.1);
++			});
++			break;
++		case 'bed': // patient in bed under a vitals monitor
++			put('rect', 0, 0.34, 0.09, 0.48);
++			put('rect', 0.09, 0.58, 0.86, 0.24);
++			put('ellipse', 0.14, 0.36, 0.2, 0.2);
++			put('parallelogram', 0.28, 0.4, 0.34, 0.2, adj(60000, s * 0.34, s * 0.2));
++			put('rect', 0.5, 0.4, 0.45, 0.2);
++			put('rect', 0.04, 0.82, 0.07, 0.16);
++			put('rect', 0.86, 0.82, 0.07, 0.16);
++			put('rect', 0.52, 0, 0.36, 0.3);
++			knockout('rect', 0.56, 0.13, 0.28, 0.04);
++			break;
++		case 'hospital': // pitched roof over a windowed block
++			put('triangle', 0.14, 0, 0.72, 0.3);
++			put('rect', 0, 0.28, 1, 0.1);
++			put('rect', 0.06, 0.38, 0.88, 0.62);
++			knockout('star6', 0.38, 0.4, 0.24, 0.24);
++			for (let r = 0; r < 3; r++) {
++				for (let c = 0; c < 6; c++) {
++					if (c > 1 && c < 4 && r < 2) continue;
++					knockout('rect', 0.12 + c * 0.14, 0.46 + r * 0.16, 0.08, 0.09);
++				}
++			}
++			knockout('rect', 0.44, 0.8, 0.12, 0.2);
++			break;
++		case 'pill': // medicine bottle with a capsule beside it
++			put('roundRect', 0.14, 0.24, 0.68, 0.56, adj(18000, s * 0.68, s * 0.56));
++			put('roundRect', 0.28, 0, 0.4, 0.26, adj(20000, s * 0.4, s * 0.26));
++			knockout('rect', 0.24, 0.44, 0.36, 0.18);
++			put('roundRect', 0.56, 0.76, 0.42, 0.22, adj(50000, s * 0.42, s * 0.22), { rotate: 340 });
++			break;
++		case 'stethoscope': // ear tubes, tubing loop and chest piece
++			shape(slide, 'blockArc', {
++				x, y, w: s * 0.8, h: s * 0.8, fill: f, line: { type: 'none' },
++				angleRange: [200, 340], arcThicknessRatio: 0.2,
++			});
++			put('rect', 0.02, 0.38, 0.12, 0.3);
++			put('rect', 0.66, 0.38, 0.12, 0.3);
++			put('ellipse', 0.52, 0.58, 0.42, 0.42);
++			knockout('ellipse', 0.64, 0.70, 0.18, 0.18);
++			break;
++		case 'syringe': // needle, barrel and graduation marks, on the diagonal
++			put('rect', 0.16, 0.46, 0.5, 0.16, { rotate: 315 });
++			put('rect', 0.55, 0.20, 0.3, 0.24, { rotate: 315 });
++			put('rect', 0, 0.82, 0.24, 0.05, { rotate: 315 });
++			[0.30, 0.42].forEach(t => knockout('rect', t + 0.03, 0.86 - t, 0.02, 0.14, { rotate: 315 }));
++			break;
++		case 'dna': // double helix: two crossing strands tied by rungs
++			put('triangle', 0.12, 0, 0.76, 0.47, { rotate: 180 });
++			put('triangle', 0.12, 0.53, 0.76, 0.47);
++			knockout('rect', 0.2, 0.14, 0.6, 0.05);
++			knockout('rect', 0.2, 0.81, 0.6, 0.05);
++			break;
++		case 'tooth':
++			put('roundRect', 0.08, 0, 0.84, 0.55, adj(45000, s * 0.84, s * 0.55));
++			put('rect', 0.1, 0.35, 0.32, 0.65);
++			put('rect', 0.58, 0.35, 0.32, 0.65);
++			break;
++		default:
++			put('ellipse', 0, 0, 1, 1);
++	}
++}
++
++/* --------------------------------------------------------- reusable content */
++
++const LOREM = {
++	about: 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse lect viverra ctetur adipiscing viverra ctetur adipiscing us ornare ue',
++	pellent: 'Pellentesque scelerisque males Pellentesque sceleris amet, conse ectus ornare,entesque. viverra ctetur adipiscing elit. Pellentesque scelerisque malesdwa Pellentesque scelerisq dolor sit amet, conse',
++	pellent2: 'Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse ectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse lect viverra ctetur adipiscing',
++	medicine: 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur a elit. Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse lect dipiscing viverra ctetur adipiscing viverra Pellentesque scelerisque males Pellentesque',
++	quality: 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse lect viverra',
++	service: 'Lorem ipsu c scelerisq dolor sit onse lectus ornare, scelerisque males Pel scelerisq dolor',
++	step: 'Pellentesque scelerisque males Pellentesque sceleris ametconse',
++	numbered: 'Lorem ipsu conse lectus ornare, pelle scelerisq dolor sitonse lect viverra ctetur adipiscing viverra ctetur',
++	improving: 'Lorem ipsu co dolor sit amet, conse lect dipiscing viverra ctetur adipiscingwaw viverra Pellentesque scelerisque nse lectus ornare, pellentesque. viverra ctetur alit. Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse lect dipiscing viverra ctetur adipiscing viverra Pellentesque',
++	conse: 'Lorem ipsu conse conse lect viverra adipiscing lectus ornare, pellentesque. viverra Pellentesque scelerisq dolor sit ctetur adipiscing lectus ornare, pellentesque. viverra Pellentesque scelerisq',
++	trusted: 'Lorem ip , pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse lect viverra ctetur adipiscing su conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque males Pellentesque scelerisq',
++	doctor: 'Lorem ipsu conse lectus ornare, pellentesque. viverra Pellentesque scelerisq dolor sit amet, conse lect viverra ctetur adipiscing viverra ctetur adipiscing us ornare ue',
++	card: 'Lorem ipsu conse lectus ornare, scelerisque males Pellentesque scelerisq dolor sit amet, conse',
++};
++
++const BULLETS = ['The heart of your healthcare', 'Because Your Life Matters', 'Caring. Healing. Leading'];
++
++// bulleted list used on slides 7 and 24
++function bulletList(slide, x, y, w, h) {
++	text(slide, BULLETS.map(t => ({ text: t, options: { bullet: { indent: 22.5 }, breakLine: true } })),
++		{ x, y, w, h, fontSize: 12, color: INK, lineSpacingMultiple: 2 });
++}
++
++// the three numbered "01 / 02 / 03" cards (slides 10 and 26)
++const NUMBERED = [
++	['01', 'Hand In Hand We Learn'],
++	['02', 'Knowledge is power'],
++	['03', 'Learn to love to learn'],
++];
++
++// donut gauge — a thick arc covering `pct`, closed by a hairline arc for the rest.
++// Both arcs are circles of diameter `d` centred in the frame.
++function gauge(slide, o) {
++	const x = o.x + (o.w - o.d) / 2;
++	const y = o.y + (o.h - o.d) / 2;
++	const end = 270 + o.pct * 360 - 360; // sweeps clockwise from 12 o'clock
++	const ring = (a1, a2, thick) => shape(slide, 'blockArc', {
++		x, y, w: o.d, h: o.d, fill: { color: o.color }, line: { type: 'none' },
++		angleRange: [a1, a2], arcThicknessRatio: (2 * thick) / o.d,
++	});
++	ring(270, end, o.thick);
++	ring(end, 270, o.thin);
++}
++
++function hexagon(slide, x, y, w, h, fill) {
++	shape(slide, 'hexagon', { x, y, w, h, fill, line: { type: 'none' } });
++}
++
++/* ---------------------------------------------------------------- the slides */
++
++const builders = [];
++
++// 1 — title
++builders.push(s => {
++	shape(s, 'rect', { x: 0, y: 5.854, w: 13.333, h: 1.646, fill: { color: MIST } });
++	shape(s, 'rect', { x: 0, y: 5.854, w: 13.333, h: 0.05, fill: { color: TEAL } });
++	logoMark(s, 1.16, 1.125, 1.1, TEAL);
++	text(s, 'Wilson Health Care', { x: 1.088, y: 2.853, w: 11.157, h: 1.447, fontSize: 80, bold: true, color: INK });
++	text(s, 'Because Your Life Matters', { x: 1.088, y: 4.24, w: 6.684, h: 0.505, fontSize: 24, color: GREY });
++	pin(s, 1.173, 6.382, 0.286, 0.474, TEAL);
++	text(s, 'Wilson Street 354 Avenue. Melbourne. London',
++		{ x: 1.544, y: 6.382, w: 3.563, h: 0.572, fontSize: 14 });
++	text(s, [{ text: 'Call : ', options: { bold: true } }, { text: '01-2333-999-0808' }],
++		{ x: 8.826, y: 6.5, w: 3.385, h: 0.337, align: 'right', fontSize: 14 });
++});
++
++// 2 — About us
++builders.push(s => {
++	shape(s, 'ellipse', { x: -1.382, y: -1.405, w: 5.297, h: 5.297, fill: { type: 'none' }, line: { color: TEAL, width: 6 } });
++	photo(s, { x: 1.257, y: 2.285, w: 3.601, h: 4.201 });
++	shape(s, 'rect', { x: 4.858, y: 1.636, w: 0.677, h: 0.648, fill: { color: WHITE }, shadow: shadow() });
++	shape(s, 'rect', { x: 0, y: 6.485, w: 1.257, h: 1.015, fill: { color: WHITE }, shadow: shadow() });
++	shape(s, 'roundRect', Object.assign(
++		{ x: 3.738, y: 4.64, w: 2.464, h: 1.846, fill: { color: TEAL } }, adj(11194, 2.464, 1.846)));
++	text(s, 'Advancing the boundaries of medicine',
++		{ x: 4.069, y: 5.216, w: 1.942, h: 0.909, fontSize: 16, color: WHITE });
++	pill(s, { x: 8.159, y: 2.024, w: 1.295, text: 'About Us' });
++	text(s, 'Advancing The Boundaries Of Medicine',
++		{ x: 8.089, y: 2.721, w: 3.988, h: 1.919, fontSize: 36, bold: true });
++	para(s, LOREM.about, { x: 8.093, y: 5.216, w: 3.602, h: 1.27 });
++	chrome(s);
++});
++
++// 3 — Improving the quality of your life at home
++builders.push(s => {
++	photo(s, { x: 9.476, y: 0, w: 3.858, h: 7.5 });
++	pill(s, { x: 0.877, y: 1.707, w: 1.948, text: 'Wilson Hospital' });
++	text(s, 'Improving the Quality of Your Life at Home',
++		{ x: 0.799, y: 2.463, w: 7.473, h: 1.313, fontSize: 36, bold: true });
++	[0.799, 4.596].forEach(x => {
++		text(s, 'Advanced Medicine, Trusted Care.', { x, y: 4.894, w: 3.493, h: 0.337, fontSize: 14, color: TEAL });
++		para(s, LOREM.pellent, { x, y: 5.402, w: 3.337, h: 1.27 });
++	});
++	chrome(s, { pres: WHITE });
++});
++
++// 4 — Medicine of the highest order
++builders.push(s => {
++	shape(s, 'ellipse', { x: -2.217, y: 2.752, w: 6.608, h: 6.608, fill: { type: 'none' }, line: { color: TEAL, width: 6 } });
++	photo(s, { x: 0.981, y: 1.543, w: 2.382, h: 3.352 });
++	photo(s, { x: 3.736, y: 2.314, w: 2.382, h: 3.352 });
++	shape(s, 'roundRect', Object.assign(
++		{ x: 0.574, y: 4.564, w: 1.931, h: 1.392, fill: { color: WHITE }, shadow: shadow() }, adj(7601, 1.931, 1.392)));
++	text(s, 'Dedication Beyond Measure', { x: 0.869, y: 4.806, w: 1.469, h: 0.909, fontSize: 16, bold: true, color: GREY });
++	shape(s, 'roundRect', Object.assign(
++		{ x: 3.363, y: 5.26, w: 1.931, h: 1.392, fill: { color: WHITE }, shadow: shadow() }, adj(11785, 1.931, 1.392)));
++	text(s, 'Because Your Life Matters', { x: 3.661, y: 5.537, w: 1.363, h: 0.909, fontSize: 16, bold: true, color: GREY });
++	pill(s, { x: 7.44, y: 1.544, w: 1.2, text: 'Medicine' });
++	text(s, 'Medicine of the Highest Order', { x: 7.348, y: 2.258, w: 4.825, h: 1.313, fontSize: 36, bold: true, color: DARK });
++	para(s, LOREM.medicine, { x: 7.348, y: 3.929, w: 4.825, h: 0.967 });
++	shape(s, 'rect', { x: 7.44, y: 5.33, w: 5.146, h: 1.322, fill: { color: TEAL } });
++	icon(s, 'kit', 7.865, 5.693, 0.5, WHITE, TEAL);
++	text(s, 'Dedication Beyond Measure', { x: 8.641, y: 5.63, w: 1.223, h: 0.707, fontSize: 12, color: WHITE });
++	para(s, 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur a elit. ',
++		{ x: 10.013, y: 5.63, w: 2.16, h: 0.531, color: WHITE, lineSpacingMultiple: 1.5 });
++	chrome(s);
++});
++
++// 5 — The area's most experienced hospital
++builders.push(s => {
++	shape(s, 'rect', { x: 8.067, y: 0, w: 5.282, h: 7.5, fill: { color: TEAL } });
++	photo(s, { x: 0.573, y: 1.505, w: 6.884, h: 4.292 });
++	icon(s, 'kit', 10.533, 1.505, 0.4, WHITE, TEAL);
++	text(s, 'The Area\u2019s Most Experienced Hospital',
++		{ x: 8.522, y: 2.002, w: 4.418, h: 1.043, align: 'center', fontSize: 28, bold: true, color: WHITE });
++	gauge(s, { x: 9.759, y: 3.78, w: 1.897, h: 1.457, d: 1.33, thick: 0.097, thin: 0.014, color: WHITE, pct: 0.72 });
++	text(s, '72%', { x: 10.315, y: 4.306, w: 0.832, h: 0.404, align: 'center', fontSize: 18, bold: true, color: WHITE });
++	text(s, 'Good Medicine', { x: 9.54, y: 5.429, w: 2.381, h: 0.404, align: 'center', fontSize: 18, color: WHITE });
++	para(s, 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque',
++		{ x: 8.93, y: 5.833, w: 3.602, h: 0.664, align: 'center', color: WHITE });
++	text(s, 'Advancing The Boundaries Of Medicine', { x: 0.454, y: 6.124, w: 5.282, h: 0.404, fontSize: 18 });
++	pill(s, { x: 5.824, y: 6.124, w: 1.685, h: 0.372, text: 'Wilson Hospital', fontSize: 14, align: 'right' });
++	chrome(s, { pres: WHITE });
++});
++
++// 6 — Where compassion and healing come together
++builders.push(s => {
++	photo(s, { x: 0, y: 0, w: 13.333, h: 4.757, label: false });
++	shape(s, 'rect', { x: 0, y: -0.004, w: 13.333, h: 4.757, fill: { color: TEAL, transparency: 20 } });
++	logoMark(s, 10.576, -0.101, 4.96, WHITE);
++	text(s, 'Where Compassion and Healing Come Together',
++		{ x: 0.85, y: 1.655, w: 9.442, h: 1.447, fontSize: 40, bold: true, color: WHITE });
++	text(s, 'Advancing the\nboundaries of medicine', { x: 0.85, y: 3.475, w: 2.874, h: 0.64, fontSize: 16, color: WHITE });
++	shape(s, 'roundRect', Object.assign(
++		{ x: 5.406, y: 4.115, w: 7.181, h: 0.967, fill: { color: WHITE }, shadow: shadow() }, adj(11848, 7.181, 0.967)));
++	pin(s, 5.986, 4.417, 0.203, 0.337, DARK);
++	text(s, 'Wilson Street 354 Avenue, London', { x: 6.341, y: 4.451, w: 3.158, h: 0.303, fontSize: 12, color: DARK });
++	text(s, [{ text: 'Call : ', options: { bold: true } }, { text: '01 \u2013 2333 - 999' }],
++		{ x: 9.745, y: 4.451, w: 2.181, h: 0.306, fontSize: 12, color: DARK });
++	para(s, LOREM.pellent2, { x: 0.799, y: 5.751, w: 5.21, h: 0.967 });
++	para(s, LOREM.pellent2, { x: 6.485, y: 5.753, w: 5.21, h: 0.967 });
++	chrome(s, { logo: WHITE, brand: WHITE, pres: false });
++});
++
++// 7 — The highest quality healthcare
++builders.push(s => {
++	shape(s, 'rect', { x: 0, y: 0, w: 9.058, h: 7.5, fill: { color: WHITE }, shadow: shadow() });
++	photo(s, { x: 6.585, y: 1.592, w: 4.955, h: 4.905, shape: 'ellipse' });
++	text(s, 'The Highest Quality Healthcare', { x: 0.947, y: 1.761, w: 3.988, h: 1.919, fontSize: 36, bold: true, color: DARK });
++	para(s, LOREM.quality, { x: 0.947, y: 3.979, w: 3.602, h: 0.967 });
++	bulletList(s, 0.947, 5.245, 3.988, 1.252);
++	shape(s, 'rect', { x: 6.183, y: 5.332, w: 1.23, h: 1.165, fill: { color: WHITE }, shadow: shadow() });
++	shape(s, 'rect', { x: 5.665, y: 4.786, w: 0.518, h: 0.546, fill: { color: WHITE }, shadow: shadow() });
++	shape(s, 'roundRect', Object.assign(
++		{ x: 9.979, y: 5.303, w: 2.581, h: 1.267, fill: { color: TEAL } }, adj(17993, 2.581, 1.267)));
++	icon(s, 'iv', 10.31, 5.647, 0.6, WHITE);
++	text(s, 'Advancing the boundaries of medicine', { x: 10.803, y: 5.543, w: 1.557, h: 0.808, fontSize: 14, color: WHITE });
++	chrome(s);
++});
++
++// 8 — Our services
++builders.push(s => {
++	photo(s, { x: 4.163, y: 0.538, w: 5.016, h: 6.962, shape: 'trapezoid', geom: adj(36033, 5.016, 6.962) });
++	shape(s, 'roundRect', Object.assign(
++		{ x: 0.922, y: 1.466, w: 11.558, h: 1.596, fill: { color: TEAL } }, adj(10585, 11.558, 1.596)));
++	text(s, 'Our Services', { x: 1.466, y: 1.902, w: 3.446, h: 0.707, fontSize: 36, bold: true, color: WHITE });
++	['bed', 'hospital', 'pill'].forEach((k, i) => icon(s, k, 9.463 + i * 0.79, 1.979, 0.55, WHITE, TEAL));
++	[[0.843, 3.827], [0.853, 5.467], [9.693, 3.827], [9.702, 5.467]].forEach(([x, y]) => {
++		text(s, 'Good Medicine', { x, y, w: 2.381, h: 0.37, fontSize: 16, bold: true, color: TEAL });
++	});
++	[[0.843, 4.272], [0.843, 5.912], [9.693, 4.272], [9.693, 5.912]].forEach(([x, y]) => {
++		para(s, LOREM.service, { x, y, w: 2.788, h: 0.664 });
++	});
++	chrome(s);
++});
++
++// 9 — 4-step to prevent virus spread
++builders.push(s => {
++	photo(s, { x: 0, y: 1.776, w: 13.333, h: 3.186, label: false });
++	shape(s, 'rect', { x: 0, y: 4.958, w: 13.333, h: 0.082, fill: { color: TEAL } });
++	shape(s, 'roundRect', Object.assign(
++		{ x: 0.932, y: 1.407, w: 5.735, h: 1.816, fill: { color: TEAL } }, adj(11194, 5.735, 1.816)));
++	text(s, '4-Step to Prevent Virus Spread', { x: 1.38, y: 1.726, w: 4.698, h: 1.178, fontSize: 32, bold: true, color: WHITE });
++	const steps = [
++		[0.932, 0.85, 'Mencuci Tangan', 'hand'],
++		[4.010, 3.927, 'Memakai Masker', 'virus'],
++		[7.174, 7.092, 'Menjaga Jarak', 'mask'],
++		[10.210, 10.128, 'Melawan balik', 'shield'],
++	];
++	steps.forEach(([cx, tx, title, ic], i) => {
++		const y = i === 0 ? 4.631 : 4.633;
++		shape(s, 'ellipse', { x: cx, y, w: 0.856, h: 0.869, fill: { color: WHITE }, shadow: shadow() });
++		icon(s, ic, cx + 0.19, y + 0.19, 0.48, TEAL);
++		text(s, title, { x: tx, y: i === 0 ? 5.754 : 5.756, w: 2.267, h: 0.37, fontSize: 16, bold: true, color: TEAL });
++		para(s, LOREM.step, { x: tx, y: i === 0 ? 6.182 : 6.185, w: 2.15, h: 0.664 });
++	});
++	chrome(s);
++});
++
++// 10 — Medical checkup
++builders.push(s => {
++	photo(s, { x: 0, y: 0, w: 7.951, h: 7.5, shape: 'parallelogram', geom: adj(55230, 7.951, 7.5), label: false });
++	shape(s, 'rtTriangle', { x: 0, y: 0, w: 5.276, h: 7.5, fill: { color: TEAL }, rotate: 180, flipH: true });
++	s.addShape('line', {
++		x: 5.276, y: 2.826, w: 3.086, h: 6.055, line: { color: MIST, width: 10 }, flipH: true,
++	});
++	text(s, 'Advancing the\nboundaries of medicine', { x: 0.437, y: 1.778, w: 1.942, h: 0.909, fontSize: 16, color: WHITE });
++	text(s, 'Medical Checkup', { x: 7.777, y: 1.306, w: 4.848, h: 0.707, fontSize: 36, bold: true });
++	[[7.669, 2.687, 9.129, 2.658, 3.096], [6.902, 4.231, 8.361, 4.202, 4.641], [6.130, 5.757, 7.589, 5.727, 6.166]]
++		.forEach(([cx, cy, tx, ty, py], i) => {
++			shape(s, 'roundRect', Object.assign(
++				{ x: cx, y: cy, w: 0.907, h: 0.997, fill: { color: WHITE }, shadow: shadow() }, adj(16667, 0.907, 0.997)));
++			text(s, NUMBERED[i][0], { x: cx + 0.108, y: cy + 0.31, w: 0.692, h: 0.438, align: 'center', fontSize: 20, color: TEAL });
++			text(s, NUMBERED[i][1], { x: tx, y: ty, w: 3.103, h: 0.337, fontSize: 14, bold: true, color: TEAL });
++			para(s, LOREM.numbered, { x: tx, y: py, w: 3.496, h: 0.664 });
++		});
++	chrome(s, { logo: WHITE, brand: WHITE });
++});
++
++// 11 — Meet the doctor
++builders.push(s => {
++	photo(s, { x: 0, y: 0, w: 3.552, h: 3.75 });
++	photo(s, { x: 0, y: 3.75, w: 3.552, h: 3.75 });
++	photo(s, { x: 3.552, y: 3.75, w: 3.552, h: 3.75 });
++	shape(s, 'rect', { x: 3.552, y: 0, w: 3.559, h: 3.75, fill: { color: TEAL } });
++	text(s, 'Improving the Quality of Your Life at Home',
++		{ x: 4.009, y: 1.312, w: 2.658, h: 1.111, fontSize: 20, bold: true, color: WHITE });
++	logoMark(s, 4.061, 2.664, 0.374, WHITE);
++	text(s, 'Satgas Kopit', { x: 4.523, y: 2.711, w: 1.501, h: 0.337, fontSize: 14, color: WHITE });
++	icon(s, 'kit', 8.524, 1.235, 0.78, TEAL);
++	text(s, 'Meet the Doctor', { x: 8.399, y: 2.289, w: 4.025, h: 0.64, fontSize: 32, bold: true });
++	s.addShape('line', { x: 8.524, y: 3.048, w: 3.477, h: 0, line: { color: HAIR, width: 0.75 } });
++	text(s, 'Dr. Giovani Suhend\nVirology Specialist', { x: 8.399, y: 3.178, w: 2.381, h: 0.572, fontSize: 14, color: TEAL });
++	para(s, 'Lorem ipsu conse lectus ornare, pellentesque. viverra Pellentesque scelerisq dolor sit amet, conse lect viverra ctetur adipiscing viverra ctetur adipiscing us ornare ue',
++		{ x: 8.399, y: 5.625, w: 3.602, h: 0.967 });
++	chrome(s, { logo: WHITE, brand: WHITE });
++});
++
++// 12 — Advancing medicine, touching lives
++builders.push(s => {
++	hexagon(s, 7.119, -2.191, 4.218, 3.689, { color: MIST });
++	hexagon(s, 10.739, -0.190, 4.218, 3.689, { color: TEAL });
++	hexagon(s, 10.750, 3.811, 4.218, 3.689, { color: TEAL });
++	hexagon(s, 7.158, 1.811, 4.179, 3.689, { color: PHOTO });
++	text(s, '[image]', { x: 7.158, y: 3.456, w: 4.179, h: 0.4, align: 'center', valign: 'middle', fontSize: 12, color: '6E6E70' });
++	text(s, 'Advancing Medicine Touching lives', { x: 1.094, y: 1.763, w: 4.382, h: 1.919, fontSize: 36, bold: true, color: DARK });
++	s.addShape('line', { x: 1.252, y: 4.077, w: 3.477, h: 0, line: { color: HAIR, width: 0.75 } });
++	text(s, 'The Highest Quality Healthcare', { x: 1.094, y: 5.129, w: 3.988, h: 0.37, fontSize: 16, bold: true, color: TEAL });
++	para(s, 'Lorem ip , pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse lect viverra ctetur adipiscing su conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, ',
++		{ x: 1.094, y: 5.649, w: 6.063, h: 0.967 });
++	chrome(s, { pres: false });
++});
++
++// 13 — Improving the quality (teal side panel)
++builders.push(s => {
++	shape(s, 'rect', { x: 0, y: 0, w: 4.029, h: 7.5, fill: { color: TEAL } });
++	shape(s, 'rect', { x: 0, y: 0, w: 4.029, h: 1.337, fill: { color: WHITE }, shadow: shadow() });
++	photo(s, { x: 1.003, y: 1.337, w: 3.026, h: 5.255 });
++	shape(s, 'rect', { x: 4.029, y: 6.592, w: 0.903, h: 0.908, fill: { color: WHITE }, shadow: shadow() });
++	pill(s, { x: 5.192, y: 1.337, w: 1.948, text: 'Wilson Hospital' });
++	text(s, 'Improving the Quality of Your Life at Home', { x: 5.113, y: 2.093, w: 7.473, h: 1.313, fontSize: 36, bold: true });
++	icon(s, 'maskFront', 5.298, 4.323, 0.94, TEAL);
++	para(s, LOREM.improving, { x: 7.505, y: 4.094, w: 4.825, h: 1.27 });
++	para(s, LOREM.medicine, { x: 7.505, y: 5.621, w: 4.825, h: 0.967 });
++	chrome(s);
++});
++
++// 14 — Medicine of the highest order (wide banner)
++builders.push(s => {
++	shape(s, 'ellipse', { x: 5.67, y: -2, w: 10.19, h: 10.479, fill: { type: 'none' }, line: { color: TEAL, width: 3 } });
++	text(s, 'Medicine of the Highest Order', { x: 0.733, y: 1.956, w: 4.825, h: 1.313, fontSize: 36, bold: true });
++	para(s, 'Lorem ipsu co dolor sit amet, conse lect dipiscing viverra ctetur adipiscingwaw viverra Pellentesque scelerisque nse lectus ornare, pellentesque. viverra ctetur alit. Pellentesque scelerisque malesgalangf Pellentesque scelerisq viverra Pellentesque scelerisque nse lectus ornare, pellentesque. viverra ctetur alit. Pellentesque scelerisque males dolor sit',
++		{ x: 7.049, y: 1.956, w: 5.435, h: 1.27 });
++	photo(s, { x: 0.849, y: 3.892, w: 11.635, h: 2.835 });
++	pill(s, { x: 0.85, y: 3.607, w: 1.948, text: 'Wilson Hospital' });
++	chrome(s);
++});
++
++// 15 — The highest quality healthcare (cross photo)
++builders.push(s => {
++	shape(s, 'rect', { x: 10, y: 0, w: 3.333, h: 7.5, fill: { color: TEAL } });
++	photo(s, { x: 7.37, y: 1.087, w: 5.285, h: 5.521, shape: 'plus', geom: adj(31827, 5.285, 5.521) });
++	text(s, 'The Highest Quality Healthcare', { x: 0.854, y: 1.995, w: 5.813, h: 1.313, fontSize: 36, bold: true, color: DARK });
++	['dna', 'cross', 'iv', 'tooth'].forEach((k, i) => icon(s, k, 0.986 + i * 0.53, 3.801, 0.46, TEAL));
++	para(s, LOREM.conse, { x: 0.85, y: 5.362, w: 3.102, h: 1.27 });
++	para(s, LOREM.conse, { x: 3.951, y: 5.356, w: 3.102, h: 1.27 });
++	chrome(s, { pres: WHITE });
++});
++
++// 16 — Good hospital services
++builders.push(s => {
++	photo(s, { x: 0, y: 3.821, w: 13.333, h: 3.679, label: false });
++	shape(s, 'round2DiagRect', Object.assign(
++		{ x: -1, y: 0, w: 7.667, h: 3.82, fill: { color: WHITE }, shadow: shadow(GREY) }, adj2(25653, 0)));
++	[1.014, 7.540].forEach((x, i) => {
++		pill(s, { x, y: 1.675, w: 2.797, text: 'Good Hospital Services', bold: true });
++		para(s, LOREM.pellent2, { x: [0.93, 7.456][i], y: 2.329, w: 4.863, h: 0.967 });
++	});
++	shape(s, 'roundRect', Object.assign(
++		{ x: 11.738, y: 6.184, w: 1.019, h: 0.864, fill: { color: WHITE }, shadow: shadow() }, adj(7072, 1.019, 0.864)));
++	icon(s, 'kit', 11.977, 6.381, 0.5, TEAL);
++	chrome(s);
++});
++
++// 17 — Your hospital for life
++builders.push(s => {
++	shape(s, 'ellipse', { x: 11.711, y: 5.801, w: 2.859, h: 2.941, fill: { type: 'none' }, line: { color: TEAL, width: 3 } });
++	photo(s, { x: 0.927, y: 2.432, w: 2.859, h: 5.068 });
++	photo(s, { x: 2.962, y: 0, w: 3.16, h: 4.562 });
++	photo(s, { x: 11.322, y: 5.41, w: 1.306, h: 1.25, label: false });
++	shape(s, 'rect', { x: 0, y: 1.563, w: 0.927, h: 0.869, fill: { color: WHITE }, shadow: shadow() });
++	text(s, 'Your Hospital for Life', { x: 7.212, y: 1.299, w: 4.5, h: 1.582, fontSize: 44, bold: true, color: DARK });
++	pill(s, { x: 9.624, y: 2.276, w: 1.948, text: 'Wilson Hospital' });
++	para(s, LOREM.improving, { x: 7.212, y: 3.394, w: 4.825, h: 1.27 });
++	shape(s, 'rect', { x: 4.25, y: 5.039, w: 1.872, h: 1.667, fill: { color: WHITE }, line: { color: TEAL, width: 1 }, shadow: shadow() });
++	text(s, 'The Highest Quality Healthcare', { x: 4.554, y: 5.41, w: 1.264, h: 1.043, fontSize: 14, color: TEAL });
++	text(s, 'Dr. Giovani Suhend\nVirology Specialist', { x: 9.223, y: 6.201, w: 1.858, h: 0.505, align: 'right', fontSize: 12 });
++	chrome(s);
++});
++
++// 18 — Your most trusted health partner
++builders.push(s => {
++	photo(s, { x: 2.878, y: 0, w: 4.109, h: 7.5 });
++	shape(s, 'ellipse', { x: 1.058, y: 1.539, w: 2.233, h: 2.269, fill: { color: TEAL }, shadow: shadow() });
++	text(s, '98%', { x: 1.472, y: 2.008, w: 1.462, h: 0.774, fontSize: 40, bold: true, color: WHITE });
++	text(s, 'Success Health Care', { x: 1.472, y: 2.657, w: 1.462, h: 0.64, fontSize: 16, color: WHITE });
++	shape(s, 'ellipse', { x: 1.058, y: 4.332, w: 2.233, h: 2.269, fill: { color: TEAL }, shadow: shadow() });
++	text(s, '+354K', { x: 1.272, y: 5.043, w: 1.662, h: 0.572, fontSize: 28, bold: true, color: WHITE });
++	text(s, 'Happy Patient', { x: 1.333, y: 5.509, w: 1.741, h: 0.37, fontSize: 16, color: WHITE });
++	text(s, 'Your Most Trusted Health Partner for Life', { x: 7.939, y: 1.539, w: 4.382, h: 1.919, fontSize: 36, bold: true, color: DARK });
++	s.addShape('line', { x: 8.097, y: 3.853, w: 3.477, h: 0, line: { color: HAIR, width: 0.75 } });
++	text(s, 'The Highest Quality Healthcare', { x: 7.939, y: 4.806, w: 3.988, h: 0.37, fontSize: 16, bold: true, color: TEAL });
++	para(s, LOREM.trusted, { x: 7.939, y: 5.326, w: 4.557, h: 1.27 });
++	chrome(s);
++});
++
++// 19 — Caring for the growing needs of our community
++builders.push(s => {
++	photo(s, { x: 0, y: 0, w: 13.333, h: 7.5, label: false });
++	shape(s, 'rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: TEAL, transparency: 20 } });
++	text(s, 'Caring For The Growing Needs Of Our Community',
++		{ x: 0.799, y: 1.911, w: 11.788, h: 2.322, fontSize: 66, bold: true, color: WHITE });
++	shape(s, 'rect', { x: 0, y: 6.223, w: 13.333, h: 0.05, fill: { color: WHITE } });
++	text(s, [{ text: 'Wilson ', options: { bold: true } }, { text: 'Health Care' }],
++		{ x: 0.853, y: 6.593, w: 2.996, h: 0.404, fontSize: 18, color: WHITE });
++	pin(s, 4.978, 6.651, 0.175, 0.29, WHITE);
++	text(s, 'Wilson Street 354 Avenue, Melbourne. London', { x: 5.272, y: 6.641, w: 4.036, h: 0.303, fontSize: 12, color: WHITE });
++	text(s, [{ text: 'Call : ', options: { bold: true } }, { text: '01 \u2013 2333 - 999' }],
++		{ x: 9.611, y: 6.641, w: 2.975, h: 0.303, align: 'right', fontSize: 12, color: WHITE });
++	chrome(s, { logo: WHITE, brand: WHITE, pres: WHITE });
++});
++
++// 20 — Wilson health care facilities
++builders.push(s => {
++	shape(s, 'rect', { x: 6.378, y: 6.689, w: 6.955, h: 0.811, fill: { color: TEAL } });
++	shape(s, 'rect', { x: 5.472, y: 6.689, w: 0.907, h: 0.811, fill: { color: WHITE }, shadow: shadow() });
++	shape(s, 'rect', { x: 0, y: 1.57, w: 1.05, h: 5.119, fill: { color: TEAL } });
++	photo(s, { x: 1.05, y: 1.571, w: 4.401, h: 5.118 });
++	text(s, [
++		{ text: 'Wilson', options: { color: TEAL } },
++		{ text: ' Health Care Facilities' },
++	], { x: 6.734, y: 1.413, w: 5.549, h: 1.178, fontSize: 32, bold: true, color: DARK });
++	[3.781, 6.734, 9.686].forEach(x => {
++		shape(s, 'rect', { x, y: 3.214, w: 2.597, h: 2.874, fill: { color: WHITE }, shadow: shadow(DARK) });
++		photo(s, { x, y: 3.214, w: 2.597, h: 1.986, label: false });
++		text(s, 'Because Your Life Matters', { x: x + 0.258, y: 5.357, w: 1.678, h: 0.572, fontSize: 14, color: DARK });
++		shape(s, 'rtTriangle', { x: x + 1.848, y: 5.199, w: 0.749, h: 0.888, fill: { color: HAIR }, flipH: true });
++	});
++	chrome(s);
++});
++
++// 21 — Professional specialist
++builders.push(s => {
++	[[-1.263, -0.84, 9.181], [-1.544, -0.559, 8.618]].forEach(([x, y, h]) => {
++		shape(s, 'round2SameRect', Object.assign(
++			{ x, y, w: 7.5, h, fill: { color: WHITE }, rotate: 90, shadow: shadow(DARK) }, adj2(49741, 0)));
++	});
++	photo(s, { x: 1.023, y: 1.602, w: 4.144, h: 4.295, shape: 'ellipse' });
++	icon(s, 'mask', 8.344, 1.469, 0.6, TEAL);
++	text(s, 'Professional Specialist', { x: 8.285, y: 2.542, w: 4.025, h: 1.178, fontSize: 32, bold: true, color: DARK });
++	s.addShape('line', { x: 8.388, y: 3.803, w: 3.477, h: 0, line: { color: HAIR, width: 0.75 } });
++	text(s, 'Dr. Galang Bryan\nMantri Sunat', { x: 8.292, y: 4.026, w: 2.381, h: 0.572, fontSize: 14, color: TEAL });
++	para(s, LOREM.doctor, { x: 8.292, y: 5.548, w: 3.602, h: 0.967 });
++	chrome(s);
++});
++
++// 22 — Wilson good quality healthcare (teal, arch of cards)
++builders.push(s => {
++	s.background = { color: TEAL };
++	shape(s, 'ellipse', { x: 0.394, y: 4.34, w: 12.545, h: 9.894, fill: { color: MIST }, line: { color: WHITE, width: 15 } });
++	text(s, 'Wilson Good Quality Healthcare', { x: 1.499, y: 1.454, w: 5.06, h: 1.178, fontSize: 32, bold: true, color: WHITE });
++	s.addShape('line', { x: 4.382, y: 2.317, w: 8.952, h: 0, line: { color: WHITE, width: 0.75 } });
++	const cards = [
++		[1.606, 4.798, 1.177, 4.320, 'Healthcare', 'stethoscope'],
++		[4.382, 3.810, 3.952, 3.374, '24/7 Care', 'heart'],
++		[7.250, 3.810, 6.821, 3.374, 'Facilities', 'iv'],
++		[10.119, 4.798, 9.685, 4.314, 'Medicine', 'syringe'],
++	];
++	cards.forEach(([x, y, lx, ly, label, ic]) => {
++		shape(s, 'roundRect', Object.assign(
++			{ x, y, w: 1.459, h: 1.53, fill: { color: WHITE }, shadow: shadow() }, adj(16667, 1.459, 1.53)));
++		icon(s, ic, x + 0.44, y + 0.42, 0.62, DARK);
++		text(s, label, { x: lx, y: ly, w: 2.301, h: 0.337, align: 'center', fontSize: 14, color: WHITE });
++	});
++	para(s, LOREM.conse, { x: 4.34, y: 5.822, w: 4.654, h: 0.967, align: 'center' });
++	chrome(s, { logo: WHITE, brand: WHITE, pres: WHITE });
++});
++
++// 23 — Worldwide leaders in health care
++builders.push(s => {
++	worldMap(s, 0.964, 1.306, 7.704, 3.799, TEAL);
++	text(s, 'Worldwide leaders in Health Care', { x: 0.964, y: 5.47, w: 4.89, h: 1.178, fontSize: 32, bold: true });
++	pill(s, { x: 3.842, y: 6.125, w: 1.948, text: 'Wilson Hospital' });
++	text(s, 'Passion for Healing', { x: 9.648, y: 1.306, w: 2.067, h: 0.337, fontSize: 14 });
++	para(s, 'Lorem ipsu conse lectus ornare, pellentesque. viverra Pellentesque scelerisq dolor sit amet, conse lect viverra ctetur adipiscing viverra',
++		{ x: 9.648, y: 1.872, w: 2.309, h: 1.27 });
++	[[3.679, '72%', 4.121, 4.194], [5.223, '354', 5.665, 5.737]].forEach(([y, val, ly, vy]) => {
++		gauge(s, { x: 9.648, y, w: 1.607, h: 1.426, d: 1.375, thick: 0.153, thin: 0.028, color: TEAL, pct: 0.72 });
++		text(s, val, { x: 10.078, y: vy, w: 0.832, h: 0.438, align: 'center', fontSize: 20, bold: true, color: TEAL });
++		text(s, 'Good Medicine', { x: 11.34, y: ly, w: 1.087, h: 0.505, fontSize: 12, bold: true });
++	});
++	chrome(s);
++});
++
++// 24 — stacked area chart
++builders.push(s => {
++	text(s, 'The Highest Quality Healthcare', { x: 0.947, y: 1.761, w: 3.988, h: 1.919, fontSize: 36, bold: true, color: DARK });
++	para(s, LOREM.quality, { x: 0.947, y: 3.979, w: 3.602, h: 0.967 });
++	bulletList(s, 0.947, 5.245, 3.988, 1.252);
++	const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++	s.addChart('area', [
++		{ name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++		{ name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
++		{ name: 'Series 3', labels: cats, values: [2.0, 2.0, 3.0, 5.0] },
++	], {
++		x: 5.534, y: 1.592, w: 7.052, h: 4.905,
++		barGrouping: 'stacked', chartColors: [TEAL, HAIR, MIST], showLegend: false,
++		catAxisLabelColor: GREY, valAxisLabelColor: GREY,
++		catAxisLabelFontFace: BODY, valAxisLabelFontFace: BODY,
++		catAxisLabelFontSize: 8, valAxisLabelFontSize: 8,
++		valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
++		valAxisMaxVal: 14, valAxisMajorUnit: 2, valAxisLineShow: false, catAxisLineShow: false,
++	});
++	chrome(s);
++});
++
++// 25 — line chart
++builders.push(s => {
++	pill(s, { x: 5.8, y: 0.932, w: 1.734, text: '2021 Statistic', align: 'center' });
++	text(s, 'Progressive Care With Compassion',
++		{ x: 2.256, y: 1.487, w: 8.822, h: 0.572, align: 'center', fontSize: 28, bold: true, color: DARK });
++	const cats = ['1', '2', '3', '4'];
++	s.addChart('line', [
++		{ name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.0, 4.5] },
++		{ name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
++		{ name: 'Series 3', labels: cats, values: [2.0, 2.0, 3.0, 5.0] },
++	], {
++		x: 1.102, y: 2.44, w: 11.129, h: 3.92,
++		chartColors: [INK, TEAL, SILVER], lineDataSymbol: 'none', lineSize: 2,
++		showLegend: true, legendPos: 'b', legendColor: GREY, legendFontSize: 8, legendFontFace: BODY,
++		catAxisLabelColor: GREY, valAxisLabelColor: GREY, catAxisLabelFontSize: 8, valAxisLabelFontSize: 8,
++		valAxisMaxVal: 6, valAxisMajorUnit: 1,
++		valGridLine: { color: HAIR, size: 0.75 }, catGridLine: { color: HAIR, size: 0.75 },
++	});
++	para(s, 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque males',
++		{ x: 3.007, y: 6.655, w: 7.32, h: 0.39, align: 'center', fontSize: 10, color: INK });
++	chrome(s);
++});
++
++// 26 — bar chart + numbered list
++builders.push(s => {
++	const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++	s.addChart('bar', [
++		{ name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
++		{ name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
++		{ name: 'Series 3', labels: cats, values: [2.0, 2.0, 3.0, 5.0] },
++	], {
++		x: 0.85, y: 1.388, w: 5.607, h: 4.845,
++		barDir: 'col', barGrouping: 'clustered', chartColors: [TEAL, DARK, MIST], showLegend: false,
++		catAxisTitle: 'Axis Title', showCatAxisTitle: true, catAxisTitleColor: GREY,
++		catAxisTitleFontSize: 8, catAxisTitleFontFace: BODY,
++		catAxisLabelColor: GREY, valAxisLabelColor: GREY, catAxisLabelFontSize: 8, valAxisLabelFontSize: 8,
++		valAxisMaxVal: 6, valAxisMajorUnit: 1,
++		valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
++	});
++	[[1.417, 1.827, 1.388], [3.146, 3.555, 3.117], [4.874, 5.283, 4.845]].forEach(([cy, py, ty], i) => {
++		shape(s, 'roundRect', Object.assign(
++			{ x: 7.593, y: cy, w: 0.907, h: 0.997, fill: { color: WHITE }, shadow: shadow() }, adj(16667, 0.907, 0.997)));
++		text(s, NUMBERED[i][0], { x: 7.7, y: cy + 0.31, w: 0.692, h: 0.438, align: 'center', fontSize: 20, color: TEAL });
++		text(s, NUMBERED[i][1], { x: 9.053, y: ty, w: 3.103, h: 0.337, fontSize: 14, bold: true, color: TEAL });
++		para(s, LOREM.numbered, { x: 9.053, y: py, w: 3.496, h: 0.664 });
++	});
++	shape(s, 'rect', { x: 0, y: 6.68, w: 13.333, h: 0.82, fill: { color: TEAL } });
++	para(s, 'Lorem ipsu conse conse lect viverra adipiscing lectus ornare, pellentesque. viverra Pellentesque scelerisq dolor sit ctetur adipiscing lectus ornare, pellentesque. ',
++		{ x: 1.837, y: 6.816, w: 9.66, h: 0.361, align: 'center', color: WHITE });
++	chrome(s);
++});
++
++// 27 — phone mockup
++builders.push(s => {
++	shape(s, 'rect', { x: 6.264, y: 2.35, w: 5.561, h: 2.873, fill: { color: WHITE }, shadow: shadow() });
++	shape(s, 'rect', { x: 11.825, y: 5.223, w: 1.523, h: 2.269, fill: { color: WHITE }, shadow: shadow() });
++	shape(s, 'rect', { x: 11.825, y: 1.738, w: 0.604, h: 0.612, fill: { color: WHITE }, shadow: shadow() });
++	phoneMockup(s, 8.078, 0.96, 2.767, 5.58);
++	pill(s, { x: 1.014, y: 1.504, w: 1.173, text: 'Mockup' });
++	text(s, 'Improving the Quality of Your Life at Home', { x: 0.904, y: 2.014, w: 4.698, h: 1.919, fontSize: 36, bold: true });
++	s.addShape('line', { x: 1.039, y: 4.141, w: 7.186, h: 0, line: { color: HAIR, width: 0.75 } });
++	['dna', 'cross', 'iv', 'tooth'].forEach((k, i) => icon(s, k, 1.039 + i * 0.39, 4.9, 0.35, TEAL));
++	para(s, 'Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse ectus ornare, pellentesque. viverra ctetur adipiscing elit. Pellentesque scelerisque males Pellentesque scelerisq dolor sit amet, conse lect viverra ctetur adipiscing viverra ctetur',
++		{ x: 0.904, y: 5.577, w: 5.561, h: 0.967 });
++	chrome(s);
++});
++
++// 28 — phone mockup on teal, four petal cards
++builders.push(s => {
++	s.background = { color: TEAL };
++	shape(s, 'rect', { x: 0, y: 3.291, w: 13.333, h: 1.422, fill: { color: TEAL }, shadow: shadow() });
++	shape(s, 'rect', { x: 5.879, y: 0, w: 1.576, h: 7.5, fill: { color: TEAL }, shadow: shadow() });
++	const petals = [
++		[3.454, 1.183, 1.879, 20666, { flipH: true }, 'heart', 4.062, 1.912],
++		[7.914, 1.183, 1.879, 26866, {}, 'iv', 8.510, 1.734],
++		[3.440, 4.714, 1.893, 18980, { rotate: 180 }, 'stethoscope', 4.060, 5.294],
++		[7.900, 4.714, 1.893, 18467, { rotate: 180, flipH: true }, 'syringe', 8.448, 5.375],
++	];
++	petals.forEach(([x, y, w, a2, flip, ic, ix, iy]) => {
++		shape(s, 'round2DiagRect', Object.assign(
++			{ x, y, w, h: 2.108, fill: { color: WHITE } }, adj2(50000, a2), flip));
++		icon(s, ic, ix, iy, 0.8, DARK);
++	});
++	phoneMockup(s, 5.283, 0.96, 2.767, 5.58);
++	[[0.843, 1.495, 1.940], [0.843, 4.982, 5.427], [10.389, 1.495, 1.940], [10.389, 4.982, 5.427]]
++		.forEach(([x, ty, py]) => {
++			text(s, 'Good Medicine', { x, y: ty, w: 2.381, h: 0.37, fontSize: 16, bold: true, color: WHITE });
++			para(s, LOREM.card, { x, y: py, w: 2.155, h: 0.967, color: WHITE });
++		});
++	chrome(s, { brand: WHITE, pres: WHITE });
++});
++
++// 29 — pricing table
++builders.push(s => {
++	shape(s, 'rect', { x: 0, y: 2.952, w: 13.333, h: 2.262, fill: { color: WHITE }, shadow: shadow(COAL) });
++	const cards = [
++		{ x: 1.343, label: 'Insurance 01', price: '$39/', tx: 1.690, px: 1.581, bx: 1.706, bh: 0.967, bw: 2.749, by: 4.747, cx: 2.086, ctx: 2.344, cty: 3.596, bonus: null },
++		{ x: 5.009, label: 'Insurance 02', price: '$59/', tx: 5.354, px: 5.244, bx: 5.370, bh: 1.270, bw: 2.749, by: 4.743, cx: 5.719, ctx: 5.978, cty: 3.602, bonus: BONUS_BLUE },
++		{ x: 8.671, label: 'Insurance 03', price: '$89/', tx: 9.017, px: 8.908, bx: 9.033, bh: 1.270, bw: 2.749, by: 4.743, cx: 9.383, ctx: 9.641, cty: 3.606, bonus: BONUS_GREEN },
++	];
++	const services = [
++		'Gentesque m dolor sit amet, conse lect ',
++		'viverra ctetur adipiscing viverra ctetur ',
++		'adipiscing us ornare, viverra ctetur, ',
++	];
++	cards.forEach((c, i) => {
++		shape(s, 'roundRect', Object.assign(
++			{ x: c.x, y: 1.36, w: 3.33, h: 5.194, fill: { color: MIST } }, adj(6000, 3.33, 5.194)));
++		text(s, c.label, { x: c.tx, y: 1.697, w: 2.781, h: 0.37, align: 'center', fontSize: 16, color: COAL });
++		text(s, [
++			{ text: c.price, options: { fontSize: 48 } },
++			{ text: 'mo', options: { fontSize: 36 } },
++		], { x: c.px, y: i === 1 ? 2.539 : 2.542, w: 3.0, h: 0.909, align: 'center', bold: true, color: DARK });
++		shape(s, 'roundRect', Object.assign(
++			{ x: c.cx, y: i === 2 ? 3.521 : 3.512, w: 2.035, h: 0.482, fill: { color: TEAL }, shadow: shadow() },
++			adj(16667, 2.035, 0.482)));
++		text(s, [{ text: '20% ', options: { bold: true } }, { text: 'Cashback' }],
++			{ x: c.ctx, y: c.cty, w: 1.518, h: 0.303, align: 'center', fontSize: 12, color: WHITE });
++		text(s, 'Services :', { x: c.px, y: 4.337, w: 3.0, h: 0.337, align: 'center', fontSize: 14, color: COAL });
++		const list = services.slice();
++		if (i === 1) list.push('entesque m dolor sit amet, conse lectus');
++		const runs = list.map(t => ({ text: t, options: { bullet: { indent: 13.5 }, breakLine: true } }));
++		if (i === 2) runs.push({ text: 'entesque molor sit ametconse lectus', options: { bullet: { indent: 13.5 }, bold: true } });
++		text(s, runs, {
++			x: c.bx, y: c.by, w: c.bw, h: c.bh, align: 'center',
++			fontFace: BODY, fontSize: 9, color: COAL, lineSpacingMultiple: 2,
++		});
++		if (c.bonus) ribbon(s, c.x + 3.33 - 0.952, 1.259, c.bonus);
++	});
++	chrome(s);
++});
++
++// 30 — desktop mockup
++builders.push(s => {
++	shape(s, 'rect', { x: 0, y: 3.369, w: 13.333, h: 2.341, fill: { color: TEAL } });
++	text(s, 'Progressive Care With Compassion', { x: 1.028, y: 1.548, w: 8.962, h: 0.707, fontSize: 36, bold: true });
++	pill(s, { x: 10.191, y: 1.698, w: 1.948, text: 'Wilson Hospital' });
++	desktopMockup(s, 4.109, 2.748, 5.115, 4.248);
++	[[1.028, 3.799, 4.244], [10.191, 3.797, 4.242]].forEach(([x, ty, py]) => {
++		text(s, 'Good Medicine', { x, y: ty, w: 2.381, h: 0.37, fontSize: 16, color: WHITE });
++		para(s, LOREM.card, { x, y: py, w: 2.155, h: 0.967, color: WHITE });
++	});
++	chrome(s);
++});
++
++// 31 — laptop mockup
++builders.push(s => {
++	shape(s, 'rect', { x: 0.942, y: 5.27, w: 12.391, h: 1.322, fill: { color: TEAL } });
++	laptopMockup(s, 6.614, 1.316, 9.203, 5.327);
++	pill(s, { x: 0.942, y: 1.483, w: 1.291, text: 'Macbook' });
++	text(s, 'Medicine of the Highest Order', { x: 0.85, y: 2.197, w: 4.825, h: 1.313, fontSize: 36, bold: true, color: DARK });
++	para(s, LOREM.medicine, { x: 0.85, y: 3.869, w: 4.825, h: 0.967 });
++	icon(s, 'kit', 1.366, 5.632, 0.5, WHITE, TEAL);
++	text(s, 'Dedication Beyond Measure', { x: 2.142, y: 5.57, w: 1.223, h: 0.707, fontSize: 12, color: WHITE });
++	para(s, 'Lorem ipsu conse lectus ornare, pellentesque. viverra ctetur a elit. ',
++		{ x: 3.515, y: 5.57, w: 2.16, h: 0.531, color: WHITE, lineSpacingMultiple: 1.5 });
++	chrome(s);
++});
++
++/* --------------------------------------------------- device mockup stand-ins
++ * The reference deck drops in rendered photos of an iPhone / iMac / MacBook.
++ * They are approximated here with plain rounded rectangles.                    */
++
++function phoneMockup(slide, x, y, w, h) {
++	shape(slide, 'roundRect', Object.assign(
++		{ x, y, w, h, fill: { color: '1A1A1C' }, shadow: shadow() }, adj(9000, w, h)));
++	shape(slide, 'roundRect', Object.assign(
++		{ x: x + 0.07, y: y + 0.07, w: w - 0.14, h: h - 0.14, fill: { color: SCREEN } }, adj(8000, w, h)));
++	shape(slide, 'roundRect', Object.assign(
++		{ x: x + w / 2 - 0.42, y: y + 0.07, w: 0.84, h: 0.2, fill: { color: '1A1A1C' } }, adj(30000, 0.84, 0.2)));
++	text(slide, '[image]', { x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle', fontSize: 12, color: '6E6E70' });
++}
++
++function desktopMockup(slide, x, y, w, h) {
++	const bezel = h * 0.62;
++	shape(slide, 'roundRect', Object.assign(
++		{ x, y, w, h: bezel, fill: { color: '111113' }, shadow: shadow() }, adj(4000, w, bezel)));
++	shape(slide, 'rect', { x: x + 0.09, y: y + 0.09, w: w - 0.18, h: bezel - 0.42, fill: { color: SCREEN } });
++	shape(slide, 'rect', { x: x + 0.09, y: y + bezel - 0.3, w: w - 0.18, h: 0.28, fill: { color: 'BFC1C4' } });
++	shape(slide, 'trapezoid', Object.assign(
++		{ x: x + w / 2 - 0.45, y: y + bezel, w: 0.9, h: h * 0.26, fill: { color: 'B4B6B9' }, rotate: 180 },
++		adj2(30000, 0)));
++	shape(slide, 'ellipse', { x: x + w / 2 - 0.85, y: y + h - 0.28, w: 1.7, h: 0.24, fill: { color: 'C9CBCE' } });
++	text(slide, '[image]', { x, y: y + bezel / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle', fontSize: 12, color: '6E6E70' });
++}
++
++function laptopMockup(slide, x, y, w, h) {
++	const lid = h * 0.86;
++	shape(slide, 'roundRect', Object.assign(
++		{ x, y, w, h: lid, fill: { color: '111113' }, shadow: shadow() }, adj(3000, w, lid)));
++	shape(slide, 'rect', { x: x + 0.14, y: y + 0.22, w: w - 0.28, h: lid - 0.36, fill: { color: SCREEN } });
++	shape(slide, 'trapezoid', Object.assign(
++		{ x: x - 0.2, y: y + lid, w: w + 0.4, h: h - lid, fill: { color: 'C9CBCE' } }, adj2(3000, 0)));
++	text(slide, '[image]', { x, y: y + lid / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle', fontSize: 12, color: '6E6E70' });
++}
++
++// "+BONUS" corner ribbon (slide 29)
++function ribbon(slide, x, y, color) {
++	shape(slide, 'diagStripe', Object.assign(
++		{ x, y, w: 0.952, h: 0.952, fill: { color }, rotate: 90 }, adj(49016, 0.952, 0.952)));
++	text(slide, '+BONUS', {
++		x: x + 0.039, y: y + 0.217, w: 1.06, h: 0.269, rotate: 45, align: 'center',
++		fontFace: BODY, fontSize: 10, bold: true, color: WHITE, valign: 'top', margin: INSET,
++	});
++}
++
++/* ------------------------------------------------------------------ world map
++ * A low-resolution raster of the reference deck's silhouette map, painted as
++ * one rectangle per run of filled cells (slide 23).                            */
++
++const MAP_ROWS = [
++	'...................######...######..................................................',
++	'.................###################................#........#......................',
++	'...............#.##################.......###................###....................',
++	'...........#.#...####..############........#...................#....................',
++	'............###.#####.....#########.................##......######.....##...........',
++	'..........############....#########.................#.....###########...#...........',
++	'..###.....#.###..######....#######..........###.....#..#####################........',
++	'.###################.###...######..........######..###############################..',
++	'####################..###..####...##......##########################################',
++	'.#################.#..##...###.....#.....########################################...',
++	'##################...##.....##...........#######################################....',
++	'..##...###########...####.............#..###############################....#.......',
++	'........############.#####...........##..###############################...##.......',
++	'.........#################...........####################################...........',
++	'..........##############..#............##################################...........',
++	'..........###############..............################################.............',
++	'..........#############..............###..############################..#...........',
++	'..........############...............###....#######.#################..#............',
++	'...........###########................####.....####################..###............',
++	'............#########................###############################................',
++	'.............####...#...............###############################.................',
++	'..............###..................##################..############.................',
++	'...............####...#............##################...###..###....................',
++	'.................###...............################.....##....###..#................',
++	'...................#..###...........###############......#....###...................',
++	'.....................#####...........##############...........#.....#...............',
++	'.....................#######..............########............#..##.................',
++	'....................#########.............#######.............##.###..##............',
++	'....................###########...........#######..............##......###..........',
++	'.....................##########...........#######........................#..........',
++	'.....................##########...........#######.#..................##.#...........',
++	'.......................#######............######.##................#######..........',
++	'.......................#######.............#####.##...............########..........',
++	'.......................#####...............####..................##########.........',
++	'......................######...............####...................#########.........',
++	'......................#####.................##....................##..#####.........',
++	'......................####..............................................##......#...',
++	'......................###................................................#......#...',
++	'......................##......................................................##....',
++	'......................##............................................................',
++	'......................#.............................................................',
++	'......................##............................................................',
++];
++
++function worldMap(slide, x, y, w, h, color) {
++	const cw = w / MAP_ROWS[0].length;
++	const ch = h / MAP_ROWS.length;
++	MAP_ROWS.forEach((row, r) => {
++		let run = 0;
++		for (let c = 0; c <= row.length; c++) {
++			if (row[c] === '#') { run++; continue; }
++			if (run) {
++				shape(slide, 'rect', {
++					x: x + (c - run) * cw, y: y + r * ch, w: run * cw + cw * 0.06, h: ch * 1.06,
++					fill: { color }, line: { type: 'none' },
++				});
++				run = 0;
++			}
++		}
++	});
++}
++
++/* ------------------------------------------------------------------- writing */
++
++const pptx = new PptxGenJS();
++pptx.author = 'Wilson Health Care';
++pptx.title = 'Wilson Health Care';
++pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
++pptx.layout = 'WIDE_16x9';
++
++builders.forEach(build => build(pptx.addSlide()));
++
++pptx.writeFile({ fileName: path.join(__dirname, '103eeb02-5a15-49ca-a4a8-7dd9bbc22f52_grok_final.pptx') })
++	.then(f => console.log('wrote ' + f));

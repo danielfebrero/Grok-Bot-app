@@ -1,0 +1,1097 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/construction_contractor_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/construction_contractor_company_profile.js
+@@ -0,0 +1,1094 @@
++/**
++ * Recreation of the "Crator" contractor presentation template (30 slides, 16:9)
++ * with pptxgenjs. Raster photos/logos in the source deck are replaced with
++ * programmatic placeholders (flat rectangles / native shapes).
++ */
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ palette */
++const YEL = 'FFCF01';   // brand yellow
++const YEL2 = 'FFC000';  // secondary yellow (progress track)
++const AMB = 'EE9012';   // amber gradient end
++const DARK = '2C292F';  // brand near-black
++const DARK2 = '3D3941';
++const INK = '262626';   // headline black
++const INK2 = '0C0C0C';
++const SOFT = 'F2F2F2';  // page background
++const GREY = '7F7F7F';
++const GREY2 = 'BFBFBF';
++const GREY3 = 'D8D8D8';
++const SLATE = '323F4F';
++const PURPLE = '662D91';
++const PURPLE2 = '7030A0';
++const PLUM = '3C1A56';
++const WHITE = 'FFFFFF';
++const PHOTO = 'E9E9E9';  // stand-in fill for photographs
++const SKIN = 'B6B8D4';   // stand-in fill for the person cut-outs
++
++/* body copy reused across the deck (the template ships lorem-ipsum text) */
++const L1 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis eu libero ex. Phasellus ac tellus venenatis, sagittis odio a, vulputate ex. Donec sit amet leo ipsum. ';
++const L2 = 'diam vitae viverra. Suspendisse pretium, ex vitae ullamcorper cursus, nibh dolor tempor diam, ac tempor libero ipsum a orci. ';
++const L3 = 'Aliquam gravida sapien a laoreet elementum. Proin molestie, est a vestibulum fermentum, enim justo venenatis tortor, non dictum orci purus vel eros. Vestibulum interdum hendrerit cursus';
++const L4 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis eu libero ex. Phasellus ac tellus venenatis. ';
++const NCS = 'Nullam commodo scelerisque ';
++const FAU = 'Faucibus interdum posuere lorem ipsum dolor sit amet consectetur. Urna molestie at elementum';
++
++const F = 'Roboto Condensed';
++const FL = 'Roboto Condensed Light';
++const NONE = { type: 'none' };
++const INSET = [7.2, 7.2, 3.6, 3.6];   // Google-Slides default text insets (pt)
++
++/* ------------------------------------------------------------------ helpers */
++function txt(s, body, o) {
++  s.addText(body, Object.assign({
++    fontFace: F, fontSize: 12, color: DARK, align: 'left', valign: 'top',
++    margin: INSET, lineSpacingMultiple: 1,
++  }, o));
++}
++
++function box(s, x, y, w, h, color, o) {
++  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: NONE }, o));
++}
++
++function roundBox(s, x, y, w, h, color, radius, o) {
++  s.addShape('roundRect', Object.assign(
++    { x, y, w, h, fill: { color }, line: NONE, rectRadius: radius }, o));
++}
++
++function hline(s, x, y, w, color, pt, dash) {
++  s.addShape('line', { x, y, w, h: 0, line: { color, width: pt, dashType: dash || 'solid' } });
++}
++
++/* photograph stand-in: flat grey panel with a small caption */
++function photo(s, x, y, w, h, o) {
++  o = o || {};
++  s.addShape(o.radius ? 'roundRect' : 'rect', {
++    x, y, w, h, fill: { color: o.color || PHOTO }, rectRadius: o.radius || 0,
++    line: o.line || NONE, rotate: o.rotate, shadow: o.shadow,
++  });
++  if (o.label !== false) {
++    txt(s, '[image]', {
++      x, y, w, h, align: 'center', valign: 'middle', margin: 0,
++      fontSize: Math.max(8, Math.min(12, h * 6)), color: 'A8A8A8',
++    });
++  }
++}
++
++/* stand-in for the photographed person cut-out (head, torso, two legs).
++   Proportions traced from the source image: the figure sits in the left
++   two-thirds of its frame.                                              */
++function person(s, x, y, w, h) {
++  const px = (a, b, aw, ah, r) => s.addShape('roundRect', {
++    x: x + a * w, y: y + b * h, w: aw * w, h: ah * h,
++    fill: { color: SKIN }, line: NONE, rectRadius: r * w,
++  });
++  s.addShape('ellipse', { x: x + 0.295 * w, y: y + 0.115 * h, w: 0.16 * w, h: 0.115 * h, fill: { color: SKIN }, line: NONE });
++  px(0.275, 0.215, 0.16, 0.07, 0.03);          // neck
++  px(0.145, 0.275, 0.47, 0.36, 0.08);          // torso + arms
++  px(0.155, 0.615, 0.19, 0.385, 0.05);         // left leg
++  px(0.355, 0.615, 0.19, 0.385, 0.05);         // right leg
++}
++
++/* The "C" brand mark: a 270-degree ring whose notch faces right, with the
++   yellow pie wedge filling the inner hole. `d` is the outer diameter; the
++   visible width is 0.854*d because the notch clips the right side.       */
++function cMark(s, x, y, d, ringColor, ringAlpha, wedgeColor, wedgeAlpha) {
++  s.addShape('blockArc', {
++    x, y, w: d, h: d, angleRange: [45, 315], arcThicknessRatio: 0.4585,
++    fill: { color: ringColor, transparency: ringAlpha || 0 }, line: NONE,
++  });
++  if (wedgeColor) {
++    s.addShape('pie', {
++      x: x + 0.2294 * d, y: y + 0.2294 * d, w: 0.5413 * d, h: 0.5413 * d, angleRange: [315, 45],
++      fill: { color: wedgeColor, transparency: wedgeAlpha || 0 }, line: NONE,
++    });
++  }
++}
++
++/* the standalone yellow wedge accent (same shape as the logo's wedge).
++   A pie sector only fills the right half of its bounding box, so the
++   ellipse is scaled up to make the visible wedge match (x,y,w,h).      */
++function wedge(s, x, y, w, h, color, rotate) {
++  s.addShape('pie', {
++    x: x - w, y: y - h * 0.207, w: 2 * w, h: h * 1.414, angleRange: [315, 45],
++    fill: { color }, line: NONE, rotate,
++  });
++}
++
++/* full CRATOR lock-up: mark + word-mark */
++function logo(s, x, y, w, h, dark) {
++  const ink = dark ? '3A353D' : WHITE;
++  cMark(s, x, y, h, ink, 0, YEL, 0);
++  txt(s, 'CRATOR', {
++    x: x + w * 0.42, y, w: w * 0.62, h, fontSize: 27.4 * h, bold: true, color: ink,
++    valign: 'middle', margin: 0, charSpacing: 0.35 * h,
++  });
++}
++
++/* the 8x8 dotted square used as a decorative accent */
++function dotGrid(s, x, y, w, h, color, alpha) {
++  const d = w * 0.033, stepX = w * 0.1381, stepY = h * 0.1383;
++  for (let r = 0; r < 8; r++) {
++    for (let c = 0; c < 8; c++) {
++      s.addShape('ellipse', {
++        x: x + c * stepX, y: y + r * stepY, w: d, h: d,
++        fill: { color, transparency: alpha || 0 }, line: NONE,
++      });
++    }
++  }
++}
++
++/* rotated rounded tab that bleeds off the top-left corner of many slides */
++function cornerTab(s, color) {
++  s.addShape('roundRect', {
++    x: -0.577, y: -0.656, w: 2.708, h: 2.029, rotate: -11.3,
++    fill: { color }, line: NONE, rectRadius: 0.5,
++  });
++}
++
++/* vertical "www.crator.com" strap on the right edge */
++function sideUrl(s, x, y, color) {
++  txt(s, 'www.crator.com', {
++    x, y, w: 1.492, h: 0.303, rotate: 270, color, fontSize: 12, margin: INSET,
++  });
++}
++
++/* slim right-pointing arrow glyph used inside the round/square buttons */
++function arrowGlyph(s, x, y, d, color) {
++  s.addShape('line', {
++    x: x + d * 0.26, y: y + d * 0.5, w: d * 0.48, h: 0,
++    line: { color, width: Math.max(1, d * 4), endArrowType: 'triangle' },
++  });
++}
++function arrowDot(s, x, y, d, bg, fg) {
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: bg }, line: NONE });
++  arrowGlyph(s, x, y, d, fg);
++}
++function arrowBadge(s, x, y, d, bg, fg) {
++  s.addShape('roundRect', { x, y, w: d, h: d, fill: { color: bg }, line: NONE, rectRadius: d * 0.22 });
++  arrowGlyph(s, x, y, d, fg);
++}
++function checkDot(s, x, y, d, bg, fg) {
++  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: bg }, line: NONE });
++  txt(s, '\u2713', { x, y, w: d, h: d, align: 'center', valign: 'middle', margin: 0, color: fg, fontSize: d * 52, bold: true });
++}
++
++/* one row of four social glyphs: linkedin, instagram, facebook, twitter */
++function socialRow(s, x, y, w, color) {
++  const step = w / 4, d = 0.155, cy = y + 0.012;
++  const c = i => x + i * step + (step - d) / 2;
++  txt(s, 'in', { x: c(0) - 0.03, y: cy - 0.07, w: d + 0.06, h: d + 0.14, align: 'center', valign: 'middle', margin: 0, color, fontSize: 9, bold: true });
++  s.addShape('roundRect', { x: c(1), y: cy, w: d, h: d, fill: NONE, line: { color, width: 1 }, rectRadius: d * 0.28 });
++  s.addShape('ellipse', { x: c(1) + d * 0.3, y: cy + d * 0.3, w: d * 0.4, h: d * 0.4, fill: NONE, line: { color, width: 1 } });
++  txt(s, 'f', { x: c(2) - 0.03, y: cy - 0.07, w: d + 0.06, h: d + 0.14, align: 'center', valign: 'middle', margin: 0, color, fontSize: 11, bold: true });
++  s.addShape('triangle', { x: c(3) + d * 0.14, y: cy + d * 0.2, w: d * 0.72, h: d * 0.56, rotate: 90, fill: { color }, line: NONE });
++}
++
++/* four simple line-art construction icons (stand-ins for the source artwork) */
++function icon(s, kind, x, y, d, color) {
++  const ln = { color, width: 1.25 };
++  const g = (px, py, pw, ph, shape, opt) => s.addShape(shape || 'rect',
++    Object.assign({ x: x + px * d, y: y + py * d, w: pw * d, h: ph * d, fill: NONE, line: ln }, opt));
++  if (kind === 'house') {                       // construction manage
++    s.addShape('triangle', { x: x + 0.06 * d, y: y + 0.08 * d, w: 0.88 * d, h: 0.34 * d, fill: NONE, line: ln });
++    g(0.16, 0.42, 0.68, 0.28);
++    s.addShape('ellipse', { x: x + 0.40 * d, y: y + 0.18 * d, w: 0.2 * d, h: 0.2 * d, fill: NONE, line: ln });
++    g(0.06, 0.74, 0.88, 0.16);
++  } else if (kind === 'building') {             // architecture & building
++    g(0.12, 0.26, 0.76, 0.64);
++    s.addShape('triangle', { x: x + 0.12 * d, y: y + 0.06 * d, w: 0.76 * d, h: 0.22 * d, fill: NONE, line: ln });
++    s.addShape('arc', { x: x + 0.36 * d, y: y + 0.52 * d, w: 0.28 * d, h: 0.5 * d, fill: NONE, line: ln, angleRange: [180, 360] });
++    g(0.36, 0.74, 0.28, 0.16);
++  } else if (kind === 'chart') {                // planning & scheduling
++    [[0.08, 0.62], [0.30, 0.48], [0.52, 0.56], [0.74, 0.34]].forEach(b =>
++      g(b[0], b[1], 0.16, 0.9 - b[1]));
++    s.addShape('line', { x: x + 0.1 * d, y: y + 0.34 * d, w: 0.8 * d, h: -0.22 * d, line: { color, width: 1.25, endArrowType: 'triangle' } });
++  } else {                                      // construction consultant (crane)
++    g(0.10, 0.08, 0.84, 0.08);                  // jib
++    g(0.20, 0.16, 0.18, 0.60);                  // mast
++    g(0.08, 0.76, 0.52, 0.14);                  // base
++    s.addShape('line', { x: x + 0.76 * d, y: y + 0.16 * d, w: 0, h: 0.22 * d, line: ln });
++    g(0.68, 0.38, 0.16, 0.12);                  // hook block
++  }
++}
++
++/* ------------------------------------------------------- shared backgrounds */
++/* layout "2_" : dark page with the giant C mark bleeding off the bottom-left */
++function bgDarkC(s) {
++  box(s, 0, 0, 13.333, 7.5, DARK);
++  cMark(s, -0.522, 3.691, 5.104, INK2, 80, YEL, 80);
++}
++/* layout "5_" : dark right column + dotted accent */
++function bgDarkRight(s) {
++  box(s, 8.309, 0, 5.024, 7.5, DARK);
++  dotGrid(s, 12.200, 0.246, 0.856, 0.891, YEL, 15);
++}
++/* layout "6_" : full yellow page with a faint crane photo bottom-left */
++function bgYellow(s) {
++  box(s, 0, 0, 13.333, 7.5, YEL, { fill: { color: YEL, transparency: 10 } });
++  photo(s, 0.318, 2.978, 5.319, 4.520, { color: 'F7C900', label: false });
++}
++/* layout "9_" : slanted yellow panel, watermark C and two cards */
++function bgSlantYellow(s) {
++  s.addShape('custGeom', {
++    x: 0, y: -0.010, w: 8.919, h: 7.510, fill: { color: YEL }, line: NONE,
++    points: [{ x: 0, y: 0.010 }, { x: 8.919, y: 0 }, { x: 7.799, y: 7.500 }, { x: 0, y: 7.510 }, { close: true }],
++  });
++  cMark(s, 5.133, -0.557, 9.026, INK2, 95, YEL, 90);
++  roundBox(s, 7.215, 2.604, 2.574, 3.042, YEL, 0.19, { fill: { color: YEL, transparency: 10 } });
++  roundBox(s, 10.381, 2.604, 2.574, 3.042, YEL, 0.19, { fill: { color: YEL, transparency: 10 } });
++  dotGrid(s, 11.459, 5.477, 0.856, 0.891, YEL, 15);
++}
++/* layout "10_" : yellow panel with a big round bite on its left edge */
++function bgRoundYellow(s) {
++  s.addShape('custGeom', {
++    x: 1.268, y: 0, w: 12.065, h: 7.5, fill: { color: YEL }, line: NONE,
++    points: [
++      { x: 1.107, y: 0 }, { x: 12.065, y: 0 }, { x: 12.065, y: 7.5 }, { x: 1.107, y: 7.5 },
++      { x: 0, y: 3.722, curve: { type: 'cubic', x1: 1.105, y1: 6.230, x2: 0.001, y2: 4.991 } },
++      { x: 1.107, y: 0, curve: { type: 'cubic', x1: 0.001, y1: 2.491, x2: 1.105, y2: 1.230 } },
++      { close: true },
++    ],
++  });
++  cMark(s, 4.966, -0.557, 9.026, INK2, 95, '3A3838', 90);
++}
++
++/* ---------------------------------------------------------------- slide 1 */
++function slide01(s) {
++  photo(s, 0, 0, 13.333, 7.5, { label: false });
++  box(s, 0, 0, 13.333, 7.5, DARK, { fill: { color: DARK, transparency: 45 } });
++  txt(s, 'CONTRACTOR PRESENTATION TEMPLATE', {
++    x: 7.046, y: 3.476, w: 3.917, h: 0.337, align: 'center', fontSize: 14, color: WHITE,
++  });
++  logo(s, 2.199, 2.609, 4.467, 2.07, false);
++}
++
++/* ---------------------------------------------------------------- slide 2 */
++function slide02(s) {
++  bgDarkC(s);
++  photo(s, 7.670, 0.646, 4.670, 6.208);
++  box(s, 1.688, 1.256, 7.833, 2.550, YEL, { fill: { color: YEL, transparency: 15 } });
++  box(s, 1.687, 3.806, 6.964, 2.438, DARK, { fill: { color: DARK, transparency: 10 } });
++  txt(s, 'ABOUT US', { x: 2.372, y: 1.662, w: 1.184, h: 0.286, fontSize: 11, color: DARK });
++  dotGrid(s, 7.166, 5.723, 0.856, 0.891, YEL, 15);
++  sideUrl(s, 12.226, 6.357, WHITE);
++  txt(s, [
++    { text: 'Neque viverra justo nec ultrices. ', options: { color: GREY2 } },
++    { text: 'Est sit amet facilisis magna', options: { color: YEL } },
++    { text: '. Sed velit dignissim sodales ut eu. Felis bibendum ut tristique et egestas quis ipsum suspendisse. Orci eu lobortis elementum nibh. Lorem mollis aliquam ut porttitor leo. Pharetra et ultrices neque ornare aenean euismod elementum nisi quis. ', options: { color: GREY2 } },
++  ], { x: 2.372, y: 4.269, w: 5.420, h: 1.493, fontFace: FL, fontSize: 14, lineSpacingMultiple: 1.2 });
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++  txt(s, [
++    { text: 'Leading The Way ', options: { color: WHITE } },
++    { text: 'In Building And Civil Construction', options: { color: INK } },
++  ], { x: 2.372, y: 2.353, w: 6.964, h: 1.184, fontSize: 40, bold: true, lineSpacingMultiple: 0.8 });
++  hline(s, 2.448, 2.021, 6.556, '2D2B2B', 0.75);
++}
++
++/* ---------------------------------------------------------------- slide 3 */
++function slide03(s) {
++  s.background = { color: SOFT };
++  photo(s, 0.639, 1.278, 4.368, 5.093);
++  box(s, 4.507, 1.278, 8.187, 3.098, YEL, { fill: { color: YEL, transparency: 15 } });
++  sideUrl(s, 12.226, 6.357, GREY);
++  txt(s, 'ABOUT US', { x: 5.264, y: 1.669, w: 1.238, h: 0.303, color: WHITE });
++  hline(s, 5.346, 2.176, 6.556, '2D2B2B', 0.75);
++  box(s, 4.507, 4.376, 8.187, 1.996, DARK, { fill: { color: DARK, transparency: 10 } });
++  txt(s, [
++    { text: 'Neque viverra justo nec ultrices. Est sit amet facilisis magna. Sed velit dignissim sodales ut eu. ', options: { color: GREY3 } },
++    { text: 'Felis bibendum ut tristique ', options: { color: YEL } },
++    { text: 'et egestas quis ipsum suspendisse. Orci eu lobortis elementum nibh. Lorem mollis aliquam ut porttitor leo. Pharetra et ultrices neque ornare aenean euismod elementum nisi quis. ', options: { color: GREY3 } },
++  ], { x: 5.191, y: 4.672, w: 6.402, h: 1.299, fontFace: FL, fontSize: 14, lineSpacingMultiple: 1.3 });
++  dotGrid(s, 11.256, 3.269, 0.856, 0.891, PURPLE, 15);
++  box(s, 5.007, 3.136, 3.868, 0.477, WHITE);
++  txt(s, 'PLACEHOLDER', {
++    x: 5.191, y: 2.715, w: 5.943, h: 1.398, fontSize: 32, color: INK, lineSpacingMultiple: 0.8,
++  });
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++}
++
++/* ---------------------------------------------------------------- slide 4 */
++function slide04(s) {
++  s.background = { color: SOFT };
++  photo(s, 0, 0, 6.268, 7.5);
++  box(s, 7.175, 0.869, 1.418, 0.370, YEL);
++  box(s, 6.267, 6.609, 3.640, 0.891, YEL);
++  sideUrl(s, 12.226, 5.461, GREY);
++  txt(s, [
++    { text: 'Committed to Delivering High ', options: { color: INK } },
++    { text: 'Quality Construction ', options: { color: YEL } },
++    { text: 'Projects', options: { color: INK } },
++  ], { x: 7.066, y: 1.548, w: 5.511, h: 1.722, fontSize: 40, bold: true, lineSpacingMultiple: 0.8 });
++  txt(s, 'QUALITY CONTROL SYSTEM', { x: 6.786, y: 6.918, w: 2.455, h: 0.337, align: 'center', fontSize: 14, bold: true, color: '2D2B2B' });
++  box(s, 9.907, 6.609, 3.426, 0.891, DARK);
++  txt(s, [
++    { text: L1, options: {} },
++    { text: NCS, options: { color: YEL } },
++    { text: L2 + L3 + '. Phasellus aliquet interdum erat. ', options: {} },
++  ], { x: 7.066, y: 3.863, w: 5.063, h: 2.021, fontFace: FL, lineSpacingMultiple: 1.2 });
++  dotGrid(s, 5.021, 6.364, 0.856, 0.891, YEL, 15);
++  txt(s, 'HIGHLY PROFESSIONAL STAFF', { x: 10.156, y: 6.918, w: 2.665, h: 0.337, align: 'center', fontSize: 14, bold: true, color: YEL });
++  txt(s, 'ABOUT US', { x: 7.315, y: 0.869, w: 1.138, h: 0.37, align: 'center', fontSize: 16, color: '2D2B2B' });
++  wedge(s, 5.929, 1.872, 0.669, 0.729, YEL, -25);
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++  txt(s, 'OUR SPECIALIZATION', { x: 7.066, y: 3.556, w: 1.918, h: 0.303, color: SLATE });
++  arrowDot(s, 9.443, 6.966, 0.219, DARK, WHITE);
++  arrowDot(s, 12.920, 6.966, 0.219, YEL, DARK);
++}
++
++/* ---------------------------------------------------------------- slide 5 */
++function slide05(s) {
++  s.background = { color: SOFT };
++  bgDarkRight(s);
++  txt(s, [
++    { text: 'High Quality Construction Solutions For ', options: { color: INK } },
++    { text: 'Residentials & Industries', options: { color: YEL } },
++    { text: '.', options: { color: INK } },
++  ], { x: 1.074, y: 2.342, w: 5.511, h: 2.261, fontSize: 40, bold: true, lineSpacingMultiple: 0.8 });
++  txt(s, [
++    { text: L1, options: {} },
++    { text: NCS, options: { color: YEL } },
++    { text: L2 + L3, options: {} },
++  ], { x: 1.123, y: 4.760, w: 5.377, h: 1.779, fontFace: FL, lineSpacingMultiple: 1.2 });
++  txt(s, 'ABOUT US', { x: 1.123, y: 1.882, w: 1.238, h: 0.303, color: '2D2B2B' });
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  sideUrl(s, 12.226, 6.357, GREY);
++  photo(s, 7.197, 1.881, 6.136, 3.738);
++  box(s, 7.188, 5.173, 2.199, 0.891, YEL, { fill: { color: YEL, transparency: 10 } });
++}
++
++/* ---------------------------------------------------------------- slide 6 */
++function slide06(s) {
++  bgYellow(s);
++  txt(s, [
++    { text: L1 + NCS + 'diam vitae viverra. ', options: { color: INK2 } },
++    { text: 'Suspendisse pretium', options: { color: WHITE } },
++    { text: ', ex vitae ullamcorper cursus, nibh dolor tempor diam, ac tempor libero ipsum a orci. ' + L3 + '.', options: { color: INK2 } },
++  ], { x: 3.347, y: 4.401, w: 4.125, h: 2.264, fontFace: FL, lineSpacingMultiple: 1.2 });
++  txt(s, 'ABOUT US', { x: 1.423, y: 1.956, w: 1.238, h: 0.303, color: '2D2B2B' });
++  sideUrl(s, 12.226, 4.524, INK2);
++  txt(s, [
++    { text: 'We Help You Build On Your Past And ', options: { color: INK } },
++    { text: 'Prepare For The Future.', options: { color: WHITE } },
++  ], { x: 1.380, y: 2.407, w: 5.511, h: 1.722, fontSize: 40, bold: true, lineSpacingMultiple: 0.8 });
++  arrowDot(s, 6.008, 6.385, 0.219, DARK, WHITE);
++  cMark(s, 7.842, 0.750, 6.000, PHOTO, 0, YEL, 0);   // photo clipped to the brand mark
++  photo(s, 1.380, 4.507, 1.728, 1.728, { radius: 0.16 });
++  cornerTab(s, WHITE);
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++}
++
++/* ---------------------------------------------------------------- slide 7 */
++function slide07(s) {
++  box(s, 9.361, 0, 3.972, 7.5, DARK);
++  box(s, 0, 0, 4.832, 7.5, YEL);
++  txt(s, [
++    { text: L1 + NCS + 'diam vitae viverra. ', options: { color: INK2 } },
++    { text: 'Suspendisse pretium', options: { color: WHITE } },
++    { text: ', ex vitae ullamcorper cursus, nibh dolor tempor diam, ac tempor libero ipsum a orci. ', options: { color: INK2 } },
++  ], { x: 0.527, y: 4.454, w: 3.784, h: 1.537, fontFace: FL, lineSpacingMultiple: 1.2 });
++  txt(s, 'ABOUT US', { x: 0.570, y: 2.127, w: 1.238, h: 0.303, color: '2D2B2B' });
++  txt(s, [
++    { text: 'Leading Way ', options: { color: WHITE } },
++    { text: 'In Building & Civil Construction.', options: { color: INK } },
++  ], { x: 0.527, y: 2.693, w: 3.784, h: 1.722, fontSize: 40, bold: true, lineSpacingMultiple: 0.8 });
++  sideUrl(s, 8.354, 6.388, WHITE);
++
++  [
++    ['TRANSPARENT PRICING', 0.954, 1.331, 3.014, FAU + ' eu facilisis sed odio morbi quis.', 'building'],
++    ['ACCURATE TESTING', 3.130, 3.506, 3.172, 'Dictum varius duis at consectetur lorem donec massa sapien. Pellentesque pulvinar pellentesque habitant morbi tristique senectus et netus. ', 'chart'],
++    ['100% SATISFACTION', 5.457, 5.833, 3.172, 'Rhoncus aenean vel elit scelerisque mauris pellentesque. At urna condimentum mattis pellentesque id nibh tortor id aliquet', 'house'],
++  ].forEach(([head, hy, by, bw, body, ic]) => {
++    txt(s, head, { x: 10.367, y: hy, w: 1.85, h: 0.303, fontSize: 12, bold: true, color: YEL, margin: [0, 7.2, 3.6, 3.6] });
++    txt(s, body, { x: 9.761 + (bw > 3.1 ? 0.012 : 0.012), y: by, w: bw, h: 0.75, fontFace: FL, fontSize: 11, color: WHITE, lineSpacingMultiple: 1.2, margin: [0, 7.2, 3.6, 3.6] });
++    icon(s, ic, 9.79, hy - 0.145, 0.35, YEL);
++  });
++  hline(s, 9.761, 2.545, 3.280, GREY, 0.75, 'dash');
++  hline(s, 9.761, 4.805, 3.280, GREY, 0.75, 'dash');
++  hline(s, 1.808, 2.312, 2.337, DARK, 0.75);
++  arrowDot(s, 0.622, 6.131, 0.219, DARK, WHITE);
++  photo(s, 4.832, 0, 4.529, 7.5);
++  cornerTab(s, DARK);
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++}
++
++/* ---------------------------------------------------------------- slide 8 */
++const TEAM4 = [
++  ['Pacey Virgil', 'Director', 0.717, DARK, 'FBB505', GREY3],
++  ['Adam Smith', 'Director of Finance & HR', 3.717, YEL, DARK, DARK],
++  ['Joshua Edwards', 'Marketing Director', 6.915, YEL, DARK, DARK],
++  ['Gerald Jimenez', 'Manager of Civil and Environment Buildings', 9.998, YEL, DARK, DARK],
++];
++function slide08(s) {
++  s.background = { color: SOFT };
++  cMark(s, 4.966, -0.557, 9.026, INK2, 95, YEL, 90);
++  TEAM4.forEach(([name, role, cx, card, nameCol, roleCol]) => {
++    roundBox(s, cx, 3.594, 2.574, 3.125, card, 0.19);
++    photo(s, cx - 0.217, 3.271, 2.385, 1.687, { radius: 0.16, line: { color: WHITE, width: 6 } });
++    txt(s, name, { x: cx + 0.095, y: 5.251, w: 2.385, h: 0.438, align: 'center', fontSize: 20, color: nameCol });
++    txt(s, role, { x: cx + 0.369, y: 5.622, w: 1.849, h: 0.438, align: 'center', fontSize: 10, color: roleCol });
++    socialRow(s, cx + 0.731, 6.238, 1.222, card === DARK ? 'A5A5A5' : DARK);
++  });
++  box(s, 4.740, 1.759, 3.823, 0.445, YEL, { fill: { color: YEL, transparency: 10 } });
++  txt(s, 'Meet Our Team', { x: 4.815, y: 1.559, w: 3.704, h: 0.645, align: 'center', fontSize: 40, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  dotGrid(s, 11.523, 6.364, 0.856, 0.891, YEL, 15);
++  txt(s, 'OUR AMAZING TEAM', { x: 5.518, y: 1.141, w: 2.297, h: 0.303, align: 'center', color: '2D2B2B' });
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  sideUrl(s, 12.226, 6.357, GREY);
++}
++
++/* ---------------------------------------------------------------- slide 9 */
++function slide09(s) {
++  s.background = { color: SOFT };
++  bgSlantYellow(s);
++  person(s, 0.339, 0.681, 4.546, 6.819);
++  socialRow(s, 3.457, 6.238, 1.222, WHITE);
++  sideUrl(s, -0.413, 6.163, WHITE);
++  txt(s, L1 + NCS + L2,
++    { x: 3.353, y: 3.905, w: 3.483, h: 1.779, fontFace: FL, lineSpacingMultiple: 1.2 });
++  txt(s, 'Raymond Bryant', { x: 3.353, y: 2.655, w: 3.356, h: 0.536, fontSize: 32, color: INK, lineSpacingMultiple: 0.8 });
++  txt(s, 'Director', { x: 3.466, y: 3.138, w: 0.729, h: 0.337, fontSize: 14, color: WHITE, margin: [0, 7.2, 3.6, 3.6] });
++  hline(s, 3.425, 3.668, 3.778, WHITE, 0.75);
++  [['Joshua Edwards', 'Director of Finance & HR', 7.212, 7.584, 7.667, 7.891],
++   ['Gerald Jimenez', 'Project Manager', 10.400, 10.750, 10.833, 11.112]].forEach(
++    ([name, role, nx, rx, px, sx]) => {
++      photo(s, px, 2.198, 2.052, 1.452, { radius: 0.16, line: { color: WHITE, width: 6 } });
++      txt(s, name, { x: nx, y: 4.131, w: 2.574, h: 0.438, align: 'center', fontSize: 20 });
++      txt(s, role, { x: rx, y: 4.570, w: 1.849, h: 0.278, align: 'center', fontSize: 10.5 });
++      socialRow(s, sx, 5.134, 1.222, WHITE);
++    });
++  cornerTab(s, DARK);
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++}
++
++/* --------------------------------------------------------------- slide 10 */
++function slide10(s) {
++  s.background = { color: SOFT };
++  bgRoundYellow(s);
++  dotGrid(s, 0.235, 5.733, 0.856, 0.891, YEL, 15);
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  sideUrl(s, 12.226, 6.357, WHITE);
++  txt(s, 'Raymond Bryant', { x: 5.016, y: 1.623, w: 4.313, h: 0.645, fontSize: 40, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  txt(s, 'MARKETING DIRECTOR', { x: 5.128, y: 2.229, w: 2.681, h: 0.337, fontSize: 14, color: WHITE, margin: [0, 7.2, 3.6, 3.6] });
++  txt(s, L1 + NCS + L2,
++    { x: 5.016, y: 2.787, w: 5.214, h: 1.493, fontFace: FL, fontSize: 14, lineSpacingMultiple: 1.2 });
++  [['Your First Skill', '80%', 4.909, 4.497, 5.214, 1.262],
++   ['Your Second Skill', '90%', 5.723, 5.314, 5.913, 1.489]].forEach(
++    ([label, pct, by, ly, fw, lw]) => {
++      box(s, 5.128, by, 6.403, 0.138, YEL2);
++      box(s, 5.128, by, fw, 0.138, WHITE);
++      txt(s, label, { x: 5.522, y: ly, w: lw, h: 0.337, fontSize: 14, color: WHITE, margin: [0, 7.2, 3.6, 3.6] });
++      txt(s, pct, { x: 11.127, y: ly, w: 0.422, h: 0.337, align: 'right', fontSize: 14, color: WHITE, margin: [0, 7.2, 3.6, 3.6] });
++      checkDot(s, 5.128, by - 0.374, 0.25, DARK, WHITE);
++    });
++  socialRow(s, 3.027, 6.619, 1.222, DARK);
++  photo(s, 0.539, 1.623, 3.711, 4.666, { radius: 0.24 });
++}
++
++/* --------------------------------------------------------------- slide 11 */
++const SERVICES = [
++  ['Construction \nManage', 'house', L4 + NCS + 'diam vitae viverra'],
++  ['Architecture & Building', 'building', 'Suspendisse pretium, ex vitae ullamcorper cursus, nibh dolor tempor diam, ac tempor libero ipsum a orci.'],
++  ['Planning & Scheduling', 'chart', 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis eu libero ex. Phasellus ac tellus venenatis.'],
++  ['Construction\nConsultant', 'crane', L4 + NCS + 'diam vitae viverra'],
++];
++function slide11(s) {
++  s.background = { color: SOFT };
++  photo(s, 9.126, 0, 4.207, 7.5);
++  [0.485, 3.723, 6.955].forEach((x, i) => {
++    roundBox(s, x, 2.571, 2.991, 4.128, YEL, 0.19);
++    const [title, ic, body] = SERVICES[i];
++    icon(s, ic, x + 1.106, 3.070, 0.80, WHITE);
++    txt(s, title, { x: x + 0.253, y: 4.172, w: 2.385, h: 0.707, align: 'center', fontSize: 18 });
++    txt(s, body, { x: x + 0.253, y: 5.054, w: 2.520, h: 1.294, align: 'center', fontFace: FL, lineSpacingMultiple: 1.2 });
++  });
++  box(s, 3.671, 1.227, 3.360, 0.445, YEL, { fill: { color: YEL, transparency: 10 } });
++  txt(s, 'Our Services', { x: 3.777, y: 1.027, w: 3.178, h: 0.645, align: 'center', fontSize: 40, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  txt(s, 'WHAT WE BUILD', { x: 4.436, y: 0.608, w: 1.860, h: 0.303, align: 'center', color: YEL });
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  sideUrl(s, 12.226, 6.357, WHITE);
++}
++
++/* --------------------------------------------------------------- slide 12 */
++function slide12(s) {
++  s.background = { color: SOFT };
++  photo(s, 0, 0, 13.333, 4.458, { label: false });
++  box(s, 0, 0, 13.333, 4.458, DARK, { fill: { color: DARK, transparency: 30 } });
++  [0.331, 3.568, 6.801, 10.058].forEach((x, i) => {
++    box(s, x, 2.963, 2.991, 4.128, YEL, { fill: { color: YEL, transparency: 10 } });
++    const [title, ic, body] = SERVICES[i];
++    box(s, x + 0.871, 3.206, 1.230, 1.258, '3A3838');
++    icon(s, ic, x + 1.191, 3.526, 0.62, YEL);
++    txt(s, title, { x: x + 0.252, y: 4.653, w: 2.385, h: 0.707, align: 'center', fontSize: 18 });
++    txt(s, SERVICES[0][2], { x: x + 0.252, y: 5.446, w: 2.520, h: 1.294, align: 'center', fontFace: FL, lineSpacingMultiple: 1.2 });
++  });
++  txt(s, 'Our Services', { x: 2.662, y: 1.666, w: 3.854, h: 0.645, fontSize: 40, bold: true, color: SOFT, lineSpacingMultiple: 0.8 });
++  txt(s, 'WHAT WE BUILD', { x: 2.662, y: 1.287, w: 1.860, h: 0.303, color: YEL });
++  sideUrl(s, 12.226, 0.774, GREY2);
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++  txt(s, L1 + NCS + L2,
++    { x: 6.416, y: 0.764, w: 5.214, h: 1.493, fontFace: FL, fontSize: 14, color: WHITE, lineSpacingMultiple: 1.2 });
++  hline(s, 2.748, 0.907, 0.574, YEL, 4);
++}
++
++/* --------------------------------------------------------------- slide 13 */
++function slide13(s) {
++  s.background = { color: SOFT };
++  photo(s, 0, 3.845, 5.828, 3.403);
++  const cards = [
++    [6.052, 0.251, DARK, SOFT, 'Construction \nManage', 'building', 6.557, 6.266],
++    [9.671, 0.251, YEL, DARK, 'Architecture & Building', 'crane', 10.176, 9.976],
++    [6.052, 3.858, YEL, DARK, 'Planning & Scheduling', 'house', 6.557, 6.266],
++    [9.671, 3.853, YEL, DARK, 'Construction\nConsultant', 'chart', 10.176, 9.976],
++  ];
++  photo(s, 6.052, 0.251, 7.014, 6.997, { label: false });
++  cards.forEach(([x, y, bg, fg, title, ic, tx2, bx]) => {
++    box(s, x, y, 3.395, 3.399, bg, { fill: { color: bg, transparency: 10 } });
++    icon(s, ic, x + 1.372, y + 0.547, 0.62, bg === DARK ? YEL : DARK);
++    txt(s, title, { x: tx2, y: y + 1.381, w: 2.385, h: 0.707, align: 'center', fontSize: 18, color: fg });
++    txt(s, L4,
++      { x: bx, y: y + 2.173, w: bg === DARK ? 2.967 : 2.784, h: 0.809, align: 'center', fontFace: FL, color: fg, lineSpacingMultiple: 1.2 });
++  });
++  txt(s, 'WHAT WE BUILD', { x: 1.045, y: 1.347, w: 1.860, h: 0.303, color: YEL });
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  txt(s, L1 + NCS + 'diam vitae viverra. ',
++    { x: 1.045, y: 2.417, w: 4.503, h: 1.052, fontFace: FL, lineSpacingMultiple: 1.2 });
++  arrowBadge(s, 4.979, 4.015, 0.629, YEL, WHITE);
++  txt(s, 'Our Services', { x: 1.003, y: 1.702, w: 3.178, h: 0.645, fontSize: 40, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  dotGrid(s, 0.173, 6.165, 0.856, 0.891, YEL, 15);
++}
++
++/* --------------------------------------------------------------- slide 14 */
++function bigWordSlide(s, parts, sub) {
++  photo(s, 0, 0, 13.333, 7.5, { label: false });
++  box(s, 0, 0, 13.333, 7.5, DARK, { fill: { color: DARK, transparency: 10 } });
++  txt(s, parts, { x: 2.030, y: 3.001, w: 9.274, h: 1.313, align: 'center', fontSize: 72 });
++  if (sub) txt(s, sub, { x: 4.584, y: 4.412, w: 3.730, h: 0.337, align: 'center', fontSize: 14, color: WHITE, margin: [0, 7.2, 3.6, 3.6] });
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++  sideUrl(s, 12.226, 6.357, GREY);
++}
++function slide14(s) {
++  bigWordSlide(s, [
++    { text: '[ B R E A K ', options: { color: WHITE } },
++    { text: 'S L I D E ', options: { color: YEL } },
++    { text: ']', options: { color: WHITE } },
++  ], 'LET\u2019S TAKE A 5-MINUTE BREAK');
++}
++
++/* --------------------------------------------------------------- slide 15 */
++function slide15(s) {
++  box(s, 0.210, 0.190, 5.703, 7.129, YEL);
++  photo(s, 0.606, 2.990, 5.101, 4.335, { color: 'F9C900', label: false });
++  txt(s, 'OUR WORKS', { x: 0.842, y: 2.099, w: 1.408, h: 0.303, color: WHITE });
++  txt(s, 'Portfolio', { x: 0.801, y: 2.454, w: 3.178, h: 0.917, fontSize: 60, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  sideUrl(s, 12.226, 6.357, YEL);
++  txt(s, [
++    { text: L1, options: {} },
++    { text: NCS, options: { color: WHITE } },
++    { text: L2 + L3 + 's', options: {} },
++  ], { x: 0.842, y: 3.472, w: 4.653, h: 2.021, fontFace: FL, lineSpacingMultiple: 1.2 });
++  arrowBadge(s, 0.945, 5.762, 0.425, DARK, WHITE);
++  sideUrl(s, 4.901, 6.285, WHITE);
++  photo(s, 6.083, 0.191, 4.125, 3.480);
++  photo(s, 10.379, 0.190, 2.954, 3.480);
++  photo(s, 6.083, 3.838, 7.260, 3.480);
++  cornerTab(s, DARK);
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++}
++
++/* --------------------------------------------------------------- slide 16 */
++function slide16(s) {
++  s.background = { color: WHITE };
++  photo(s, 7.615, 4.531, 5.719, 2.969);
++  cMark(s, 0.989, 0.305, 6.946, INK2, 95, YEL, 90);
++  box(s, 0, 5.146, 0.698, 2.354, YEL);
++  sideUrl(s, 12.226, 6.357, DARK);
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis eu libero ex. Phasellus ac tellus venenatis, sagittis odio a, vulputate ex. ',
++    { x: 3.832, y: 5.699, w: 3.178, h: 0.809, fontFace: FL, lineSpacingMultiple: 1.2 });
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis eu libero ex. Phasellus ac tellus venenatis, sagittis odio a, vulputate ex. ',
++    { x: 9.028, y: 2.138, w: 2.742, h: 1.052, fontFace: FL, lineSpacingMultiple: 1.2 });
++  dotGrid(s, 8.758, 4.084, 0.856, 0.891, YEL, 15);
++  txt(s, 'FIRST PORTO', { x: 3.850, y: 5.396, w: 1.576, h: 0.303, color: YEL });
++  txt(s, 'SECOND PORTO', { x: 9.028, y: 1.817, w: 1.794, h: 0.303, color: YEL });
++  sideUrl(s, 12.393, 6.524, SOFT);
++  photo(s, 0.698, 3.625, 2.885, 3.875);
++  photo(s, 5.822, 0, 2.885, 3.433);
++  box(s, 5.410, 2.838, 1.019, 1.089, YEL, { fill: { color: YEL, transparency: 5 } });
++  txt(s, 'Portfolio', { x: 1.008, y: 3.166, w: 3.178, h: 0.917, fontSize: 60, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++}
++
++/* --------------------------------------------------------------- slide 17 */
++function slide17(s) {
++  [[5.354, 0, 5.260, 3.277], [10.708, 0, 2.625, 3.277], [5.354, 3.354, 3.219, 4.146],
++   [8.667, 3.354, 4.667, 4.146], [0, 0, 5.260, 3.277]].forEach(r => photo(s, r[0], r[1], r[2], r[3]));
++  box(s, 0, 3.354, 5.260, 4.146, YEL);
++  txt(s, 'Portfolio', { x: 0.885, y: 4.845, w: 3.178, h: 0.917, fontSize: 60, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  sideUrl(s, 12.226, 6.357, DARK);
++  txt(s, [
++    { text: L1, options: {} },
++    { text: NCS, options: { color: WHITE } },
++    { text: 'diam vitae viverra. ', options: {} },
++  ], { x: 0.926, y: 5.702, w: 4.110, h: 1.052, fontFace: FL, lineSpacingMultiple: 1.2 });
++  arrowBadge(s, 4.458, 3.528, 0.606, DARK, WHITE);
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++  txt(s, 'OUR WORKS', { x: 0.926, y: 4.441, w: 1.408, h: 0.303, color: WHITE });
++  box(s, 0, 3.354, 0.366, 4.146, DARK);
++}
++
++/* --------------------------------------------------------------- slide 18 */
++function slide18(s) {
++  s.background = { color: WHITE };
++  [[5.925, 0, 7.422, 4.426], [9.190, 4.426, 4.169, 3.074], [3.635, 4.426, 5.555, 3.074],
++   [0, 4.426, 3.635, 3.074]].forEach(r => photo(s, r[0], r[1], r[2], r[3]));
++  sideUrl(s, 12.226, 6.357, WHITE);
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  dotGrid(s, 4.894, 0.203, 0.856, 0.891, YEL, 15);
++  [['01', 6.136, 0.303], ['02', 0.159, 4.697], ['03', 3.807, 4.697], ['04', 9.421, 4.697]].forEach(
++    ([n, x, y]) => txt(s, n, { x, y, w: 0.760, h: 0.536, fontSize: 32, bold: true, color: WHITE, lineSpacingMultiple: 0.8 }));
++  box(s, 0.539, 1.194, 5.705, 3.588, YEL, { fill: { color: YEL, transparency: 15 } });
++  txt(s, L1 + NCS + 'diam vitae viverra. ',
++    { x: 1.067, y: 3.192, w: 4.490, h: 1.052, fontFace: FL, color: INK2, lineSpacingMultiple: 1.2 });
++  txt(s, [
++    { text: 'Pushing The Boundaries of ', options: { color: DARK } },
++    { text: 'What\u2019s Possible.', options: { color: WHITE } },
++  ], { x: 1.067, y: 2.143, w: 4.940, h: 0.967, fontSize: 32, bold: true, lineSpacingMultiple: 0.8 });
++  txt(s, 'OUR PORTFOLIO ', { x: 1.096, y: 1.658, w: 1.941, h: 0.303, color: DARK });
++  arrowBadge(s, 5.569, 4.129, 0.439, DARK, WHITE);
++  hline(s, 3.037, 1.848, 2.812, INK2, 0.75);
++}
++
++/* --------------------------------------------------------------- slide 19 */
++function monitorMock(s, x, y, w, h) {
++  box(s, x, y, w, 3.078, SLATE);                      // bezel
++  photo(s, x + 0.16, y + 0.16, w - 0.32, 2.76, { label: false, color: PHOTO });
++  box(s, x, y + 3.078, w, 0.481, SOFT);               // chin
++  s.addShape('ellipse', { x: x + 2.562, y: y + 3.225, w: 0.156, h: 0.156, fill: { color: 'E6E7E8' }, line: NONE });
++  s.addShape('trapezoid', { x: x + 1.742, y: y + 3.559, w: 1.796, h: 0.699, fill: { color: 'E6E7E8' }, line: NONE });
++  box(s, x + 1.742, y + 4.244, 1.796, 0.06, 'BCBEC0');
++}
++function slide19(s) {
++  photo(s, 0.750, 0, 12.583, 7.5, { color: 'F5C800', label: false });
++  box(s, 0.750, 0, 12.583, 7.5, YEL, { fill: { color: YEL, transparency: 15 } });
++  box(s, 0, 0, 0.750, 7.5, DARK);
++  txt(s, 'MOCKUP DEVICE', { x: 2.825, y: 2.663, w: 1.894, h: 0.303, color: WHITE });
++  txt(s, L1 + NCS + L2,
++    { x: 2.887, y: 4.883, w: 4.125, h: 1.537, fontFace: FL, lineSpacingMultiple: 1.2 });
++  txt(s, [
++    { text: 'Leading Way ', options: { color: WHITE } },
++    { text: 'In Building & Civil Construction.', options: { color: INK } },
++  ], { x: 2.827, y: 3.126, w: 3.784, h: 1.722, fontSize: 40, bold: true, lineSpacingMultiple: 0.8 });
++  sideUrl(s, 12.260, 0.812, DARK);
++  photo(s, 0.427, 2.663, 2.106, 2.639);
++  monitorMock(s, 7.622, 2.502, 5.279, 4.273);
++  dotGrid(s, 7.188, 2.061, 1.225, 1.275, WHITE, 15);
++  cornerTab(s, WHITE);
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++}
++
++/* --------------------------------------------------------------- slide 20 */
++function slide20(s) {
++  s.background = { color: WHITE };
++  s.addShape('custGeom', {                            // rotated yellow blob
++    x: 8.049, y: 2.484, w: 4.575, h: 3.427, rotate: -40.4, fill: { color: YEL }, line: NONE,
++    points: [
++      { x: 1.108, y: 1.744 }, { x: 3.732, y: 0, curve: { type: 'cubic', x1: 1.741, y1: 1.043, x2: 2.768, y2: 0 } },
++      { x: 4.575, y: 0.843, curve: { type: 'cubic', x1: 4.198, y1: 0, x2: 4.575, y2: 0.377 } },
++      { x: 4.575, y: 2.584 }, { x: 3.732, y: 3.427, curve: { type: 'cubic', x1: 4.575, y1: 3.050, x2: 4.198, y2: 3.427 } },
++      { x: 0.843, y: 3.427 }, { x: 0, y: 2.584, curve: { type: 'cubic', x1: 0.377, y1: 3.427, x2: 0, y2: 3.050 } },
++      { x: 1.108, y: 1.744, curve: { type: 'cubic', x1: 0, y1: 2.100, x2: 0.560, y2: 2.300 } }, { close: true },
++    ],
++  });
++  roundBox(s, 8.353, 0.688, 3.146, 6.124, DARK, 0.40, { shadow: { type: 'outer', color: '000000', opacity: 0.4, blur: 26, offset: 8, angle: 90 } });
++  roundBox(s, 8.541, 0.862, 2.768, 5.778, WHITE, 0.32);
++  photo(s, 8.541, 0.860, 2.768, 5.778, { radius: 0.32 });
++  roundBox(s, 9.320, 0.855, 1.210, 0.230, WHITE, 0.11);   // screen notch
++  photo(s, 0.852, 1.786, 2.106, 2.639);
++  txt(s, 'MOCKUP DEVICE', { x: 3.587, y: 2.819, w: 1.894, h: 0.303, color: YEL });
++  txt(s, L1 + NCS + L2,
++    { x: 3.650, y: 5.129, w: 4.125, h: 1.537, fontFace: FL, lineSpacingMultiple: 1.2 });
++  dotGrid(s, 2.513, 1.171, 1.225, 1.275, YEL, 15);
++  txt(s, 'Leading Way In Building & Civil Construction.',
++    { x: 3.589, y: 3.283, w: 3.784, h: 1.722, fontSize: 40, bold: true, color: DARK, lineSpacingMultiple: 0.8 });
++  wedge(s, 8.062, 4.404, 0.791, 0.863, YEL, -35);
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  sideUrl(s, 12.226, 6.357, GREY);
++}
++
++/* ------------------------------------------------- infographic title block */
++function infoTitle(s, badgeColor, badgeAlpha, kickerColor, y0) {
++  box(s, 5.240, 1.048 + y0, 2.822, 0.445, badgeColor, { fill: { color: badgeColor, transparency: badgeAlpha } });
++  txt(s, 'Infographic', { x: 5.168, y: 0.848 + y0, w: 2.997, h: 0.645, align: 'center', fontSize: 40, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  txt(s, 'OUR MISSION', { x: 5.871, y: 0.531 + y0, w: 1.590, h: 0.303, align: 'center', color: kickerColor });
++}
++const MISSION_BODY = FAU + ' eu facilisis sed odio morbi quis.';
++
++/* --------------------------------------------------------------- slide 21 */
++function slide21(s) {
++  s.background = { color: WHITE };
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  /* isometric cube built from six flat faces */
++  const cube = (x, y, w, h, pts, c1, c2, ang) => s.addShape('custGeom', {
++    x, y, w, h, line: NONE,
++    fill: { type: 'solid', color: c1 },
++    points: pts.map(p => ({ x: p[0] * w, y: p[1] * h })).concat([{ close: true }]),
++  });
++  cube(8.515, 2.137, 4.037, 1.730, [[0.498, 0.711], [0.717, 1.000], [1.000, 0.619], [0.576, 0.048],
++    [0.424, 0.048], [0.000, 0.619], [0.283, 1.000]], YEL);
++  cube(8.493, 3.247, 2.018, 3.495, [[0.566, 0.475], [0.566, 0.189], [0.188, 0.063], [0.000, 0.000],
++    [0.000, 0.565], [0.152, 0.718], [1.000, 1.000], [1.000, 0.623]], PURPLE2);
++  cube(10.557, 3.247, 2.018, 3.495, [[0.434, 0.475], [0.000, 0.623], [0.000, 1.000], [0.848, 0.718],
++    [1.000, 0.565], [1.000, 0.000], [0.820, 0.060], [0.434, 0.188]], DARK2);
++  cube(9.701, 4.416, 1.672, 0.966, [[0.500, 0.000], [0.000, 0.501], [0.129, 0.629], [0.500, 1.000],
++    [0.871, 0.629], [1.000, 0.501]], YEL);
++  cube(9.683, 3.416, 0.836, 1.448, [[1.000, 0.667], [1.000, 0.000], [0.333, 0.222], [0.000, 0.334],
++    [0.000, 1.000], [0.326, 0.892]], DARK2);
++  cube(10.557, 3.416, 0.837, 1.448, [[0.000, 0.500], [0.000, 0.667], [0.716, 0.906], [1.000, 1.000],
++    [1.000, 0.334], [0.667, 0.222], [0.000, 0.000]], PURPLE2);
++  [['01', 9.827, 3.914], ['02', 10.726, 3.914], ['03', 10.274, 4.612]].forEach(
++    ([n, x, y]) => txt(s, n, { x, y, w: 0.548, h: 0.505, align: 'center', valign: 'middle', fontSize: 24, bold: true, color: WHITE }));
++  icon(s, 'house', 8.846, 4.884, 0.498, WHITE);
++  icon(s, 'building', 10.274, 2.498, 0.504, WHITE);
++  icon(s, 'crane', 11.719, 4.946, 0.498, WHITE);
++  /* left copy column */
++  [[2.912, 2.598, 'Construction ', 'Manage', 3.289, 3.521],
++   [4.350, 4.042, 'Architecture & ', 'Building', 4.068, 2.742],
++   [5.763, 5.495, 'Construction ', 'Consultant', 3.926, 2.884]].forEach(([by, hy, a, b, hx, hw]) => {
++    txt(s, MISSION_BODY, { x: 1.583, y: by, w: 5.271, h: 0.769, align: 'right', fontFace: FL, fontSize: 14, color: GREY, lineSpacingMultiple: 1.5, margin: [0, 7.2, 3.6, 3.6] });
++    txt(s, [{ text: a, options: { color: DARK } }, { text: b, options: { color: YEL } }],
++      { x: hx, y: hy, w: hw, h: 0.404, align: 'right', fontSize: 18 });
++  });
++  hline(s, 1.574, 5.281, 5.114, GREY, 0.75, 'dash');
++  hline(s, 1.583, 3.865, 5.104, GREY, 0.75, 'dash');
++  icon(s, 'building', 6.996, 2.653, 0.504, PLUM);
++  icon(s, 'house', 7.024, 4.085, 0.498, PLUM);
++  icon(s, 'crane', 6.996, 5.525, 0.498, PLUM);
++  infoTitle(s, YEL, 10, '2D2B2B', 0);
++  sideUrl(s, 12.226, 6.357, GREY);
++}
++
++/* --------------------------------------------------------------- slide 22 */
++function slide22(s) {
++  photo(s, 0, 0, 13.333, 7.5, { color: 'F5C800', label: false });
++  box(s, 0, 0, 13.333, 7.5, YEL, { fill: { color: YEL, transparency: 10 } });
++  infoTitle(s, WHITE, 10, '2D2B2B', 0);
++  /* road barrier: two posts, a dark band and diagonal hazard stripes */
++  [3.960, 8.780].forEach(px => roundBox(s, px, 1.700, 0.400, 2.900, 'F0B400', 0.12));
++  const BX = 2.990, BW = 7.290, BY = 2.180, BH = 1.600, SLANT = 0.56, SW = 0.34;
++  box(s, BX, BY, BW, BH, DARK);
++  for (let i = -1; i < 14; i++) {
++    /* parallelogram (top edge shifted right by SLANT), clipped to the band */
++    const t = BX + 0.10 + i * 0.58;
++    const poly = [[t + SLANT, BY], [t + SLANT + SW, BY], [t + SW, BY + BH], [t, BY + BH]]
++      .map(pt => [Math.max(BX, Math.min(BX + BW, pt[0])), pt[1]]);
++    s.addShape('custGeom', {
++      x: BX, y: BY, w: BW, h: BH, fill: { color: YEL }, line: NONE,
++      points: poly.map(pt => ({ x: pt[0] - BX, y: pt[1] - BY })).concat([{ close: true }]),
++    });
++  }
++  [3.822, 5.372, 6.922, 8.472].forEach((x, i) => {
++    s.addShape('triangle', { x, y: 2.470, w: 1.019, h: 0.932, fill: { color: YEL }, line: { color: DARK, width: 2 } });
++    icon(s, ['house', 'building', 'chart', 'crane'][i], x + 0.28, 2.78, 0.45, DARK);
++  });
++  /* four cards */
++  [[1.231, 4.480, 1.258, 1.422, 'Construction \nManage', 'house', 2.101],
++   [3.979, 4.496, 4.048, 4.133, 'Architecture & Building', 'building', 4.891],
++   [6.767, 4.489, 6.794, 6.917, 'Planning & Scheduling', 'chart', 7.657],
++   [9.555, 4.489, 9.563, 9.721, 'Construction\nConsultant', 'crane', 10.452]].forEach(
++    ([x, y, tx2, bx, title, ic, ix]) => {
++      roundBox(s, x, y, 2.412, 2.727, PLUM, 0.40, { fill: { color: PLUM, transparency: 10 }, line: { color: YEL, width: 5 } });
++      icon(s, ic, ix, y + 0.30, 0.60, YEL);
++      txt(s, title, { x: tx2, y: 5.637, w: 2.385, h: 0.707, align: 'center', fontSize: 18, color: WHITE });
++      txt(s, FAU + '.',
++        { x: bx, y: 6.341, w: 2.176, h: 0.750, align: 'center', fontFace: FL, fontSize: 11, color: GREY2, lineSpacingMultiple: 1.2, margin: [0, 7.2, 3.6, 3.6] });
++    });
++  /* elbow connectors from under each triangle down to the card above it */
++  [[2.371, 4.331], [5.206, 5.881], [7.987, 7.431], [10.723, 8.981]].forEach(([cardX, barX]) => {
++    s.addShape('line', { x: barX, y: 3.402, w: 0, h: 0.650, line: { color: WHITE, width: 2 } });
++    hline(s, Math.min(cardX, barX), 4.052, Math.abs(barX - cardX), WHITE, 2);
++    s.addShape('line', { x: cardX, y: 4.052, w: 0, h: 0.437, line: { color: WHITE, width: 2 } });
++    s.addShape('ellipse', { x: cardX - 0.074, y: 4.416, w: 0.147, h: 0.147, fill: { color: WHITE }, line: NONE });
++  });
++  cornerTab(s, DARK);
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++}
++
++/* --------------------------------------------------------------- slide 23 */
++function slide23(s) {
++  s.background = { color: WHITE };
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  /* shield-shaped funnel with four coloured bands */
++  s.addShape('custGeom', {
++    x: 4.369, y: 1.618, w: 4.595, h: 5.408, fill: { color: PLUM }, line: NONE,
++    points: [{ x: 2.799, y: 0.140 }, { x: 4.595, y: 1.230 }, { x: 4.257, y: 3.611 },
++      { x: 3.740, y: 4.464 }, { x: 2.298, y: 5.408 }, { x: 0.855, y: 4.464 },
++      { x: 0.338, y: 3.611 }, { x: 0.000, y: 1.230 }, { x: 1.796, y: 0.140 },
++      { x: 2.799, y: 0.140, curve: { type: 'cubic', x1: 2.100, y1: -0.047, x2: 2.500, y2: -0.047 } }, { close: true }],
++  });
++  const band = (x, y, w, h, color, top) => s.addShape('custGeom', {
++    x, y, w, h, fill: { color }, line: NONE,
++    points: top
++      ? [{ x: w * 0.391, y: h * 0.115 }, { x: 0, y: h }, { x: w, y: h }, { x: w * 0.609, y: h * 0.115 }, { close: true }]
++      : [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w * (1 - 0.043), y: h }, { x: w * 0.043, y: h }, { close: true }],
++  });
++  band(4.715, 1.963, 3.885, 1.040, YEL, true);
++  band(4.715, 3.058, 3.885, 1.176, PURPLE, false);
++  band(4.888, 4.289, 3.550, 1.178, AMB, false);
++  band(5.112, 5.521, 3.109, 1.176, PLUM, false);
++  s.addShape('custGeom', {                       // shading on the left half of the top band
++    x: 4.715, y: 1.964, w: 1.937, h: 1.039, fill: { color: AMB, transparency: 67 }, line: NONE,
++    points: [{ x: 1.937, y: 0 }, { x: 1.937, y: 1.039 }, { x: 0, y: 1.039 }, { x: 1.518, y: 0.119 }, { close: true }],
++  });
++  [[4.715, 3.058, 1.937, 1.176], [4.888, 4.289, 1.764, 1.178], [5.112, 5.521, 1.539, 1.166]].forEach(
++    ([x, y, w, h]) => s.addShape('custGeom', {
++      x, y, w, h, fill: { color: '000000', transparency: 85 }, line: NONE,
++      points: [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: w * 0.12, y: h }, { close: true }],
++    }));
++  [2.087, 3.212, 4.462, 5.637].forEach((y, i) => {
++    s.addShape('ellipse', { x: 6.232, y, w: 0.833, h: 0.833, fill: { color: SOFT, transparency: 10 }, line: NONE });
++    icon(s, ['house', 'building', 'chart', 'crane'][i], 6.422, y + 0.164, 0.49, DARK);
++  });
++  /* left / right copy columns */
++  [[0.666, 3.189, 3.531, 0.666, 2.876, 3.521, 'right', 'Construction ', 'Manage'],
++   [0.666, 5.715, 3.463, 0.312, 5.407, 3.827, 'right', 'Architecture & ', 'Building'],
++   [9.359, 3.194, 3.480, 9.275, 2.880, 3.521, 'left', 'Planning & ', 'Scheduling'],
++   [9.359, 5.819, 3.437, 9.275, 5.506, 3.521, 'left', 'Construction ', 'Consultant']].forEach(
++    ([bx, by, bw, hx, hy, hw, al, a, b]) => {
++      txt(s, MISSION_BODY, { x: bx, y: by, w: bw, h: 1.122, align: al, fontFace: FL, fontSize: 14, color: GREY, lineSpacingMultiple: 1.5, margin: [0, 7.2, 3.6, 3.6] });
++      txt(s, [{ text: a, options: { color: DARK } }, { text: b, options: { color: YEL } }],
++        { x: hx, y: hy, w: hw, h: 0.404, align: al, fontSize: 18 });
++    });
++  icon(s, 'chart', 3.610, 2.236, 0.49, DARK);
++  icon(s, 'crane', 3.564, 4.820, 0.49, DARK);
++  icon(s, 'house', 9.359, 2.234, 0.49, DARK);
++  icon(s, 'building', 9.342, 4.872, 0.49, DARK);
++  hline(s, 0.539, 4.535, 3.506, GREY, 0.75, 'dash');
++  hline(s, 9.333, 4.535, 3.506, GREY, 0.75, 'dash');
++  txt(s, 'Infographic', { x: 5.168, y: 0.694, w: 2.997, h: 0.645, align: 'center', fontSize: 40, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  txt(s, 'OUR MISSION', { x: 5.871, y: 0.377, w: 1.590, h: 0.303, align: 'center', color: YEL });
++  sideUrl(s, 12.226, 0.865, GREY);
++}
++
++/* --------------------------------------------------------------- slide 24 */
++const LINE_SERIES = [
++  { name: 'Series 1', labels: ['1', '2', '3', '4'], values: [4.3, 2.5, 3.5, 4.5] },
++  { name: 'Series 2', labels: ['1', '2', '3', '4'], values: [2.4, 4.4, 1.8, 2.8] },
++  { name: 'Series 3', labels: ['1', '2', '3', '4'], values: [2.0, 2.0, 3.0, 5.0] },
++];
++function slide24(s) {
++  s.background = { color: WHITE };
++  photo(s, 11.326, 0.280, 1.779, 1.779);
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  s.addChart('line', LINE_SERIES, {
++    x: 0.948, y: 2.780, w: 5.719, h: 3.791,
++    chartColors: ['4472C4', 'ED7D31', 'A5A5A5'],
++    lineSmooth: true, lineSize: 2, lineDataSymbolSize: 6,
++    showTitle: true, title: 'Series 1', titleFontFace: F, titleFontSize: 16, titleColor: SLATE, titleBold: true,
++    showLegend: true, legendPos: 'b', legendFontFace: F, legendFontSize: 9,
++    catAxisLabelFontFace: F, catAxisLabelFontSize: 9, valAxisLabelFontFace: F, valAxisLabelFontSize: 9,
++    valAxisMaxVal: 6, valAxisMinVal: 0, valAxisMajorUnit: 1,
++    valGridLine: { style: 'solid', color: 'D9D9D9', size: 1 },
++    catGridLine: { style: 'solid', color: 'D9D9D9', size: 1 },
++    border: { pt: 0, color: 'FFFFFF' }, fill: 'FFFFFF',
++  });
++  txt(s, 'Line Chart', { x: 5.168, y: 0.929, w: 2.997, h: 0.645, align: 'center', fontSize: 40, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  txt(s, 'OUR MISSION', { x: 5.871, y: 0.612, w: 1.590, h: 0.303, align: 'center', color: YEL });
++  txt(s, [
++    { text: L1, options: { color: DARK2 } },
++    { text: NCS, options: { color: YEL } },
++    { text: L2 + L3 + 's', options: { color: DARK2 } },
++  ], { x: 7.222, y: 3.408, w: 5.469, h: 1.779, fontFace: FL, lineSpacingMultiple: 1.2 });
++  txt(s, 'Proin molestie, est a vestibulum fermentum, enim justo venenatis tortor, non dictum orci purus vel eros. Vestibulum interdum hendrerit cursuss',
++    { x: 7.222, y: 5.898, w: 5.119, h: 0.567, fontFace: FL, lineSpacingMultiple: 1.2 });
++  txt(s, 'Construction Manage ', { x: 7.660, y: 2.886, w: 2.404, h: 0.404, fontSize: 18, color: SLATE });
++  arrowBadge(s, 7.285, 2.921, 0.318, YEL, WHITE);
++  txt(s, 'Planning & Scheduling', { x: 7.660, y: 5.494, w: 2.448, h: 0.404, fontSize: 18, color: SLATE });
++  arrowBadge(s, 7.285, 5.530, 0.318, YEL, WHITE);
++  box(s, 11.047, 1.760, 0.558, 0.596, YEL, { fill: { color: YEL, transparency: 5 } });
++  dotGrid(s, 10.330, 0.280, 0.856, 0.891, YEL, 15);
++  sideUrl(s, 12.226, 6.357, GREY);
++}
++
++/* --------------------------------------------------------------- slide 25 */
++function slide25(s) {
++  box(s, 0, 0, 6.546, 7.5, YEL);
++  box(s, 6.546, 0, 6.787, 7.5, INK);
++  txt(s, 'Line Chart', { x: 0.988, y: 1.887, w: 2.997, h: 0.645, fontSize: 40, bold: true, color: INK, lineSpacingMultiple: 0.8 });
++  txt(s, [
++    { text: L1, options: { color: DARK2 } },
++    { text: NCS, options: { color: WHITE } },
++    { text: 'diam vitae viverra. Suspendisse pretium, ex vitae ullamcorper cursus.', options: { color: DARK2 } },
++  ], { x: 0.925, y: 3.592, w: 5.031, h: 1.052, fontFace: FL, lineSpacingMultiple: 1.2 });
++  txt(s, 'Construction Manage ', { x: 1.364, y: 3.071, w: 2.404, h: 0.404, fontSize: 18, color: SLATE });
++  arrowBadge(s, 0.988, 3.106, 0.318, DARK, WHITE);
++  txt(s, 'Planning & Scheduling', { x: 1.364, y: 4.858, w: 2.448, h: 0.404, fontSize: 18, color: SLATE });
++  arrowBadge(s, 0.988, 4.894, 0.318, DARK, WHITE);
++  dotGrid(s, 5.395, 0.275, 0.856, 0.891, YEL, 15);
++  txt(s, [
++    { text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis eu libero ex. Phasellus ac tellus venenatis, ', options: { color: DARK2 } },
++    { text: 'sagittis odio a, vulputate ex. ', options: { color: WHITE } },
++    { text: 'Donec sit amet leo ipsum. ' + NCS + 'diam vitae viverra. Suspendisse pretium, ex vitae ullamcorper cursus, nibh dolor tempor diam, ac tempor libero ipsum a orci.', options: { color: DARK2 } },
++  ], { x: 0.867, y: 5.344, w: 5.031, h: 1.294, fontFace: FL, lineSpacingMultiple: 1.2 });
++  hline(s, 0.988, 2.772, 4.702, WHITE, 0.75, 'dash');
++  s.addChart('bar', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'], values: [8.2, 3.2, 1.4, 1.2] }], {
++    x: 7.402, y: 0.426, w: 5.469, h: 6.648,
++    barDir: 'col', barGapWidthPct: 120, chartColors: ['7030A0', 'FFCF01', '595959', 'ED7D31'],
++    showValue: true, dataLabelFontFace: F, dataLabelFontSize: 12, dataLabelColor: 'FFFFFF',
++    dataLabelFontBold: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: '0.0',
++    showLegend: true, legendPos: 'tr', legendFontFace: F, legendFontSize: 10, legendColor: 'BFBFBF',
++    catAxisLabelFontFace: F, catAxisLabelFontSize: 10, catAxisLabelColor: 'BFBFBF',
++    valAxisLabelFontFace: F, valAxisLabelFontSize: 10, valAxisLabelColor: 'BFBFBF',
++    valAxisMaxVal: 9, valAxisMinVal: 0, valAxisMajorUnit: 1,
++    valGridLine: { style: 'solid', color: '595959', size: 1 },
++    catAxisLineShow: true, border: { pt: 0, color: INK }, fill: INK, plotArea: { fill: { color: INK } },
++  });
++  txt(s, 'OUR MISSION', { x: 0.988, y: 1.502, w: 1.590, h: 0.303, color: WHITE });
++  sideUrl(s, 12.226, 6.357, GREY);
++  cornerTab(s, DARK);
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++}
++
++/* --------------------------------------------------------------- slide 26 */
++const PLANS = [
++  { x: 2.192, name: 'Base', price: '$2000', dark: false,
++    feats: ['DRAWING PLANS', 'CONSTRUCTION PLANS', 'SUPPORT 24 / 7'] },
++  { x: 5.252, name: 'Popular', price: '$9000', dark: true,
++    feats: ['DRAWING PLANS', 'CONSTRUCTION PLANS', 'CONSULTATION', 'CONSTRUCTION MANAGE', 'SUPPORT 24 / 7'] },
++  { x: 8.311, name: 'Enterprise', price: '$15000', dark: false,
++    feats: ['DRAWING PLANS', 'CONSTRUCTION PLANS', 'CONSULTATION', 'CONSTRUCTION MANAGE', 'ARCHITECTURE & BUILDING', 'SUPPORT 24 / 7'] },
++];
++function slide26(s) {
++  photo(s, 0, 0, 13.333, 7.5, { color: 'F5C800', label: false });
++  box(s, 0, 0, 13.333, 7.5, YEL, { fill: { color: YEL, transparency: 15 } });
++  PLANS.forEach(p => {
++    const x = p.x;
++    if (p.dark) {
++      roundBox(s, x, 1.788, 2.854, 5.020, DARK, 0.17, { fill: { color: DARK, transparency: 10 } });
++    } else {
++      s.addShape('roundRect', {
++        x, y: 1.788, w: 2.854, h: 5.020, rectRadius: 0.17, line: { color: WHITE, width: 1 },
++        fill: { type: 'solid', color: 'F8F6EC', transparency: 35 },
++      });
++    }
++    const nameCol = p.dark ? YEL : DARK;
++    const bodyCol = p.dark ? 'D5DBE5' : SLATE;
++    txt(s, p.name, { x: x + 0.31, y: 2.268, w: 1.3, h: 0.404, fontSize: 18, color: nameCol });
++    txt(s, p.price, { x: x + 0.30, y: 2.640, w: 1.8, h: 0.707, fontSize: 36, color: p.dark ? 'D5DBE5' : DARK });
++    txt(s, 'For most businesses that want to optimize building construction',
++      { x: x + 0.29, y: 3.447, w: 2.493, h: 0.471, fontSize: 11, color: bodyCol });
++    hline(s, x + 0.397, 4.016, 0.637, p.dark ? GREY3 : '3F3F3F', 1);
++    txt(s, p.feats.join('\n'), {
++      x: x + 0.575, y: 4.284, w: 2.0, h: p.feats.length * 0.28,
++      fontSize: 11, color: p.dark ? GREY3 : DARK, lineSpacingMultiple: 1.5,
++    });
++    p.feats.forEach((f, i) => checkDot(s, x + 0.397, 4.320 + i * 0.276, 0.173, YEL, WHITE));
++    roundBox(s, x + 0.189, 6.058, 2.484, 0.483, YEL, 0.16);
++    txt(s, 'Choose Plan', { x: x + 0.189, y: 6.058, w: 2.484, h: 0.483, align: 'center', valign: 'middle', fontSize: 12, bold: true, color: p.dark ? PLUM : DARK });
++    arrowBadge(s, x + 2.300, 6.140, 0.318, DARK, YEL);
++  });
++  txt(s, 'PRICING PLAN', { x: 3.860, y: 0.886, w: 5.613, h: 0.572, align: 'center', fontSize: 28, bold: true, color: DARK });
++  sideUrl(s, 12.226, 6.357, DARK);
++  cornerTab(s, DARK);
++  logo(s, 0.524, 0.393, 1.09, 0.505, false);
++}
++
++/* ------------------------------------------------------------ slides 27/28 */
++function quoteBlock(s, x, yQuote, yBody, w, body, author, authorColor) {
++  txt(s, '\u201C', { x: x - 0.031, y: yQuote, w: 0.754, h: 2.625, fontSize: 150, color: INK });
++  txt(s, body, { x, y: yBody, w, h: 1.986, fontFace: FL, fontSize: 28, color: '101010' });
++  hline(s, x + 0.100, yBody + 1.727, 0.655, DARK, 0.75);
++  txt(s, author, { x, y: yBody + 1.927, w: 5.360, h: 0.337, fontSize: 14, color: authorColor });
++}
++function slide27(s) {
++  s.background = { color: WHITE };
++  photo(s, 0, 0, 4.0, 7.5, { color: 'F5C800', label: false });
++  box(s, 0, 0, 4.0, 7.5, YEL, { fill: { color: YEL, transparency: 10 } });
++  s.addShape('rect', { x: 2.087, y: 2.111, w: 3.324, h: 3.324, rotate: -10.5, fill: NONE, line: { color: DARK, width: 4 } });
++  box(s, 6.665, 4.180, 3.918, 0.445, YEL, { fill: { color: YEL, transparency: 5 } });
++  dotGrid(s, 1.720, 1.689, 1.009, 1.050, WHITE, 15);
++  quoteBlock(s, 5.897, 1.984, 3.169, 6.457,
++    'Let us be grateful to people who make us happy, they are the charming gardeners who make our souls blossom.',
++    'Marcel Proust', YEL);
++  logo(s, 11.837, 0.409, 1.035, 0.48, true);
++  sideUrl(s, 12.226, 6.357, DARK);
++  photo(s, 2.083, 2.068, 3.365, 3.365, { shadow: { type: 'outer', color: '000000', opacity: 0.3, blur: 12, offset: 5, angle: 45 } });
++}
++function slide28(s) {
++  photo(s, 0, 0, 13.333, 7.5, { color: 'F5C800', label: false });
++  box(s, 0, 0, 13.333, 7.5, YEL, { fill: { color: YEL, transparency: 5 } });
++  person(s, 1.131, 0.681, 4.546, 6.819);
++  txt(s, [
++    { text: 'Moral excellence comes about as a ', options: { fontFace: FL } },
++    { text: 'result of habit', options: { fontFace: F } },
++    { text: '. We become just by doing just acts, temperate by doing temperate acts, brave by doing brave acts.', options: { fontFace: FL } },
++  ], { x: 4.402, y: 2.676, w: 7.025, h: 1.986, fontSize: 28, color: '101010' });
++  txt(s, 'Aristotle', { x: 4.402, y: 5.150, w: 5.360, h: 0.337, fontSize: 14, color: INK });
++  hline(s, 4.502, 4.950, 0.655, DARK, 0.75);
++  txt(s, '\u201C', { x: 4.371, y: 1.465, w: 0.754, h: 2.625, fontSize: 150, color: INK });
++  sideUrl(s, 12.226, 6.357, DARK);
++  cornerTab(s, WHITE);
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++}
++
++/* --------------------------------------------------------------- slide 29 */
++const CONTACT = [
++  { label: 'OFFICE HOURS', lx: 7.174, lw: 1.550, bar: [7.268, 4.661 - 1.341, 1.456],
++    body: ['Monday \u2013 Thursday', '08.00 \u2013 17.00'], bx: 7.191, by: 3.751, bw: 1.950, bh: 0.606 },
++  { label: 'OFFICE ADDRESS', lx: 9.432, lw: 1.766, bar: [9.492, 3.332, 1.706],
++    body: ['1234 Amphitheatre Parkway Mountain View, CA 12345. United States'], bx: 9.432, by: 3.763, bw: 3.007, bh: 0.606 },
++  { label: 'GET IN TOUCH', lx: 7.179, lw: 1.522, bar: [7.268, 4.661, 1.456],
++    body: ['+62 812 3456 7890'], bx: 7.500, by: 5.122, bw: 1.950, bh: 0.303, icons: [[7.308, 5.203]] },
++  { label: 'FOLLOW US', lx: 9.446, lw: 1.263, bar: [9.472, 4.665, 1.290],
++    body: ['www.crator.com', 'Crator Studio', 'cratorstudio'], bx: 9.730, by: 5.098, bw: 1.548, bh: 0.909,
++    icons: [[9.493, 5.151], [9.492, 5.446], [9.492, 5.768]] },
++];
++function slide29(s) {
++  s.background = { color: WHITE };
++  box(s, 4.718, 5.123, 1.361, 1.454, YEL, { fill: { color: YEL, transparency: 5 } });
++  dotGrid(s, 0.320, 1.651, 1.009, 1.050, YEL, 15);
++  CONTACT.forEach(c => {
++    box(s, c.bar[0], c.bar[1], c.bar[2], 0.348, YEL);
++    txt(s, c.label, { x: c.lx, y: c.bar[1] + 0.014, w: c.lw, h: 0.370, fontSize: 16, bold: true, color: INK2 });
++    txt(s, c.body.join('\n'), { x: c.bx, y: c.by, w: c.bw, h: c.bh, fontSize: 12, color: '3A3838', lineSpacingMultiple: 1.5 });
++    (c.icons || []).forEach(p => s.addShape('ellipse', { x: p[0], y: p[1], w: 0.185, h: 0.185, fill: { color: YEL }, line: NONE }));
++  });
++  txt(s, 'Please feel free to contact us on (phone cell) or contact us by (email), if you require any further information.',
++    { x: 7.178, y: 2.349, w: 5.331, h: 0.678, fontSize: 12, lineSpacingMultiple: 1.5 });
++  txt(s, 'CONTACT US', { x: 7.139, y: 1.580, w: 1.711, h: 0.438, fontSize: 20, bold: true, color: INK2 });
++  hline(s, 7.272, 2.176, 5.167, DARK, 0.75, 'dash');
++  logo(s, 0.539, 0.409, 1.035, 0.48, true);
++  sideUrl(s, 12.226, 6.357, DARK);
++  photo(s, 1.619, 1.639, 4.398, 4.398, { shadow: { type: 'outer', color: '000000', opacity: 0.25, blur: 20, offset: 8, angle: 45 } });
++}
++
++/* --------------------------------------------------------------- slide 30 */
++function slide30(s) {
++  bigWordSlide(s, [
++    { text: '[ T H A N K', options: { color: WHITE } },
++    { text: ' Y O U ', options: { color: YEL } },
++    { text: ']', options: { color: WHITE } },
++  ], null);
++}
++
++/* ------------------------------------------------------------------- build */
++const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
++  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
++  slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28,
++  slide29, slide30];
++
++function build() {
++  const pres = new pptxgen();
++  pres.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++  pres.layout = 'WIDE';
++  pres.author = 'Crator';
++  pres.title = 'Contractor Presentation Template';
++  BUILDERS.forEach(fn => {
++    const s = pres.addSlide();
++    s.background = { color: WHITE };
++    fn(s);
++  });
++  return pres.writeFile({ fileName: path.join(__dirname, '133e9db8-df5b-4262-bc4f-5df77bad4c1b_grok_final.pptx') });
++}
++
++build().then(f => console.log('wrote', f));

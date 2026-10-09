@@ -1,0 +1,813 @@
+#!/usr/bin/env node
+/**
+ * "Sales Pitch Deck" — 15-slide 16:9 deck rebuilt with pptxgenjs.
+ * Raster photos in the original are replaced by flat grey placeholder blocks.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Theme  (clrScheme "Custom 32" / fontScheme "Custom 3")
+ * ------------------------------------------------------------------ */
+const NAVY = '002060'; // accent1
+const MINT = 'AEF0B4'; // accent2
+const SKY = 'D5E3FF'; // accent3
+const SKY2 = 'D6E3FF'; // accent1 @ lum 10% / off 90%  (near-identical tint)
+const PALE_MINT = 'C7F5CB'; // accent4
+const MINT_WASH = 'EFFCF0';
+const CORNFLOWER = '98BAFF';
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const INK = '404040'; // tx1 lum 75 / off 25 — body copy
+const GREY = '595959';
+const GREY_MID = '7F7F7F';
+const GREY_DARK = '3F3F3F';
+const HAIRLINE = '808080';
+const SILVER = 'A5A5A5';
+const SLATE = '8A9AA8';
+const OFFWHITE = 'F2F2F2';
+
+const HEAD = 'Questrial'; // +mj-lt
+const BODY = 'Open Sans'; // +mn-lt
+
+const PH_FILL = 'CCCCCC'; // stand-in colour for the removed photographs
+const PH_TEXT = '8C8C8C';
+
+const NOLINE = { type: 'none' };
+// pptxgenjs rescales a shadow object in place, so hand out a fresh copy each time
+const cardShadow = () => ({ type: 'outer', blur: 37, offset: 0.01, angle: 90, color: GREY_MID, opacity: 0.11 });
+const petalShadow = () => ({ type: 'outer', blur: 15, offset: 3, angle: 45, color: BLACK, opacity: 0.15 });
+const orbShadow = () => ({ type: 'outer', blur: 40, offset: 10, angle: 90, color: BLACK, opacity: 0.15 });
+
+/* Reusable text recipes ------------------------------------------------ */
+const H1 = { fontFace: HEAD, fontSize: 44, bold: true, color: BLACK, valign: 'top' };
+const P = { fontFace: BODY, fontSize: 11, color: INK, lineSpacingMultiple: 1.5, valign: 'top' };
+const CHROME = { fontFace: HEAD, fontSize: 12, color: BLACK, valign: 'top' };
+
+const t = (base, o) => Object.assign({}, base, o);
+
+/* ------------------------------------------------------------------ *
+ * Small drawing helpers
+ * ------------------------------------------------------------------ */
+
+/**
+ * Flat block standing in for a photo that was stripped from the deck.
+ * `box` names the visible area when the block itself is rotated.
+ */
+function photo(slide, o) {
+  const opt = { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: PH_FILL }, line: NOLINE };
+  if (o.rectRadius) opt.rectRadius = o.rectRadius;
+  if (o.rotate) opt.rotate = o.rotate;
+  slide.addShape(o.shape || 'rect', opt);
+  const b = o.box || o;
+  slide.addText('[image]', {
+    x: b.x, y: b.y + b.h / 2 - 0.16, w: b.w, h: 0.32,
+    align: 'center', valign: 'middle', margin: 0, fontFace: BODY, fontSize: 12, color: PH_TEXT,
+  });
+}
+
+/**
+ * Pre-rotation box for a shape that should end up covering `x,y,w,h` after a
+ * quarter turn — used where the deck rounds the corners on one vertical side.
+ */
+function quarterTurn(x, y, w, h, rotate) {
+  return { x: x + w / 2 - h / 2, y: y + h / 2 - w / 2, w: h, h: w, rotate };
+}
+
+/** Navy disc with a white tick — the deck's recurring "bullet" badge. */
+function tickBadge(slide, x, y, d, color) {
+  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: color || NAVY }, line: NOLINE });
+  slide.addText('\u2713', {
+    x, y, w: d, h: d, align: 'center', valign: 'middle', margin: 0,
+    fontFace: BODY, fontSize: Math.round(d * 42), bold: true, color: WHITE,
+  });
+}
+
+/** Outlined lozenge + tick + caption used all over the deck. */
+function tickPill(slide, o) {
+  slide.addShape('roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.h / 2,
+    fill: o.fill ? { color: o.fill } : NOLINE, line: { color: o.line || BLACK, width: 0.75 },
+  });
+  tickBadge(slide, o.x + 0.144, o.y + 0.107, 0.278);
+  slide.addText(o.text, t(P, {
+    x: o.x + (o.tdx || 0.504), y: o.y + 0.052, w: o.tw || o.w - 0.6, h: 0.371,
+    fontSize: 12, color: o.color || BLACK, fontFace: o.face || BODY,
+  }));
+}
+
+/** Linear blend of two hex colours; f = 0 -> a, f = 1 -> b. */
+function mix(a, b, f) {
+  const ch = (h, i) => parseInt(h.substr(i * 2, 2), 16);
+  return [0, 1, 2]
+    .map((i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * f).toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+}
+
+/**
+ * Slide 1 hero wash: the source uses a vertical gradFill fading accent3 in from
+ * fully transparent at the top, through 61% at 40%, to solid at 87%.
+ * pptxgenjs has no gradient fill, so it is stacked from opaque bands whose
+ * colour is pre-blended against whatever sits behind that column.
+ */
+function verticalFade(slide, x, y, w, h, color, behind, bands) {
+  const stops = [[0, 0], [0.40, 0.39], [0.87, 1], [1, 1]];
+  for (let i = 0; i < bands; i++) {
+    const p = (i + 0.5) / bands;
+    let k = 1;
+    while (stops[k][0] < p) k++;
+    const [p0, a0] = stops[k - 1];
+    const [p1, a1] = stops[k];
+    const y0 = y + (h * i) / bands;
+    const y1 = y + (h * (i + 1)) / bands;
+    slide.addShape('rect', {
+      x, y: +y0.toFixed(4), w, h: +(y1 - y0).toFixed(4),
+      fill: { color: mix(behind, color, a0 + ((a1 - a0) * (p - p0)) / (p1 - p0)) }, line: NOLINE,
+    });
+  }
+}
+
+/** White capsule button with a hairline border. */
+function readMore(slide, x, y, color) {
+  slide.addShape('roundRect', {
+    x, y, w: 1.385, h: 0.387, rectRadius: 0.1935,
+    fill: { color: WHITE }, line: { color: color === NAVY ? WHITE : BLACK, width: 0.75 },
+  });
+  slide.addText('Read More', {
+    x: x + 0.149, y: y + 0.042, w: 1.087, h: 0.303,
+    align: 'center', margin: 0, fontFace: HEAD, fontSize: 12, color: color || BLACK,
+  });
+}
+
+/** Convert a 0..1 normalised path into pptxgenjs custGeom points (inches). */
+function pathPoints(cmds, w, h) {
+  const X = (v) => +(v * w).toFixed(4);
+  const Y = (v) => +(v * h).toFixed(4);
+  return cmds.map((c) => {
+    if (c[0] === 'Z') return { close: true };
+    if (c[0] === 'M') return { x: X(c[1]), y: Y(c[2]), moveTo: true };
+    if (c[0] === 'L') return { x: X(c[1]), y: Y(c[2]) };
+    return { x: X(c[5]), y: Y(c[6]), curve: { type: 'cubic', x1: X(c[1]), y1: Y(c[2]), x2: X(c[3]), y2: Y(c[4]) } };
+  });
+}
+
+// Notched banner (slide 10) and round speech bubble with a right-hand tail (slide 12).
+const CHEVRON = [['M', 0, 0], ['L', 0.8, 0], ['L', 1, 0.5], ['L', 0.8, 1], ['L', 0, 1], ['L', 0.2, 0.5], ['Z']];
+/**
+ * Waist joining two discs of the slide-11 chain: full disc height where it meets
+ * each disc, pinched to a narrow neck at the midpoint. Spans centre to centre, so
+ * the straight left/right edges stay hidden inside the discs.
+ */
+const CHAIN_WAIST = [
+  ['M', 0, 0],
+  ['C', 0.1197, 0, 0.2252, 0.0874, 0.2875, 0.2204],
+  ['L', 0.3170, 0.2987], ['L', 0.3221, 0.3083],
+  ['C', 0.3398, 0.3399, 0.3844, 0.4056, 0.4574, 0.4258],
+  ['L', 0.5022, 0.4318], ['L', 0.5460, 0.4258],
+  ['C', 0.6174, 0.4056, 0.6610, 0.3399, 0.6784, 0.3083],
+  ['L', 0.6832, 0.2989], ['L', 0.7127, 0.2205],
+  ['C', 0.7750, 0.0875, 0.8805, 0, 1, 0],
+  ['L', 1, 1],
+  ['C', 0.8805, 1, 0.7750, 0.9125, 0.7127, 0.7795],
+  ['L', 0.6832, 0.7011], ['L', 0.6784, 0.6917],
+  ['C', 0.6610, 0.6601, 0.6174, 0.5944, 0.5460, 0.5742],
+  ['L', 0.5022, 0.5682], ['L', 0.4574, 0.5742],
+  ['C', 0.3844, 0.5944, 0.3398, 0.6601, 0.3221, 0.6917],
+  ['L', 0.3170, 0.7013], ['L', 0.2875, 0.7796],
+  ['C', 0.2252, 0.9126, 0.1197, 1, 0, 1],
+  ['Z'],
+];
+const BUBBLE = [
+  ['M', 0.4234, 0],
+  ['C', 0.6134, 0, 0.7742, 0.1478, 0.8278, 0.3513],
+  ['L', 0.8357, 0.3875], ['L', 1, 0.5], ['L', 0.8357, 0.6125], ['L', 0.8278, 0.6487],
+  ['C', 0.7742, 0.8522, 0.6134, 1, 0.4234, 1],
+  ['C', 0.1896, 1, 0, 0.7761, 0, 0.5],
+  ['C', 0, 0.2239, 0.1896, 0, 0.4234, 0],
+  ['Z'],
+];
+
+/* ------------------------------------------------------------------ *
+ * Page furniture: logo, top bar links, bell + burger icons, hairline
+ * ------------------------------------------------------------------ */
+function brandLogo(slide) {
+  // rounded square rotated 45deg, doubled for the pale "shadow" half, plus the mint dot
+  slide.addShape('roundRect', { x: 0.6385, y: 0.382, w: 0.177, h: 0.177, rectRadius: 0.05, rotate: 45, fill: { color: CORNFLOWER }, line: NOLINE });
+  slide.addShape('roundRect', { x: 0.6385, y: 0.352, w: 0.177, h: 0.177, rectRadius: 0.05, rotate: 45, fill: { color: NAVY }, line: NOLINE });
+  slide.addShape('ellipse', { x: 0.683, y: 0.470, w: 0.09, h: 0.09, fill: { color: NAVY }, line: NOLINE });
+  slide.addShape('ellipse', { x: 0.696, y: 0.483, w: 0.064, h: 0.064, fill: { color: MINT }, line: NOLINE });
+}
+
+function bellIcon(slide) {
+  slide.addShape('ellipse', { x: 12.253, y: 0.362, w: 0.046, h: 0.036, fill: { color: NAVY }, line: NOLINE });
+  slide.addShape('ellipse', { x: 12.199, y: 0.382, w: 0.154, h: 0.148, fill: { color: NAVY }, line: NOLINE });
+  slide.addShape('rect', { x: 12.199, y: 0.452, w: 0.154, h: 0.058, fill: { color: NAVY }, line: NOLINE });
+  slide.addShape('roundRect', { x: 12.184, y: 0.502, w: 0.184, h: 0.036, rectRadius: 0.018, fill: { color: NAVY }, line: NOLINE });
+  slide.addShape('ellipse', { x: 12.246, y: 0.533, w: 0.059, h: 0.044, fill: { color: NAVY }, line: NOLINE });
+}
+
+function burgerIcon(slide) {
+  [0.384, 0.4534, 0.5228].forEach((y) => {
+    slide.addShape('roundRect', { x: 12.574, y, w: 0.195, h: 0.0312, rectRadius: 0.0156, fill: { color: NAVY }, line: NOLINE });
+  });
+}
+
+/**
+ * Header strip shared by every slide.
+ *  opts.marketPoint – show the extra "Market Point" nav link
+ *  opts.color       – nav link colour  (navy on the tinted slides, black elsewhere)
+ *  opts.rule        – hairline colour under the header, or null for none
+ */
+function chrome(slide, opts) {
+  const o = opts || {};
+  const color = o.color || BLACK;
+  brandLogo(slide);
+  bellIcon(slide);
+  burgerIcon(slide);
+  slide.addText('Sales Pitch Deck', t(CHROME, { x: 0.836, y: 0.318, w: 1.693, h: 0.303, color }));
+  if (o.marketPoint) slide.addText('Market Point', t(CHROME, { x: 8.793, y: 0.318, w: 1.201, h: 0.303, color }));
+  slide.addText('Innovative Company', t(CHROME, { x: 10.054, y: 0.318, w: 1.861, h: 0.303, color }));
+  if (o.rule !== null) {
+    slide.addShape('line', { x: 0, y: 0.884, w: 13.333, h: 0, line: { color: o.rule || HAIRLINE, width: 0.75 } });
+  }
+}
+
+/* ================================================================== *
+ * SLIDE 1 — cover
+ * ================================================================== */
+function slide1(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: SKY2 };
+
+  s.addShape('rect', { x: 6.537, y: 0.884, w: 6.278, h: 6.616, fill: { color: PH_FILL }, line: NOLINE });
+  // wash is split per column so each band can be pre-blended with what is behind it
+  verticalFade(s, 0, 2.688, 6.537, 4.812, SKY, SKY2, 26);
+  verticalFade(s, 6.537, 2.688, 6.278, 4.812, SKY, PH_FILL, 26);
+  verticalFade(s, 12.815, 2.688, 0.518, 4.812, SKY, SKY2, 26);
+  s.addText('[image]', { x: 6.537, y: 4.032, w: 6.278, h: 0.32, align: 'center', valign: 'middle', margin: 0, fontFace: BODY, fontSize: 12, color: PH_TEXT });
+
+  s.addShape('roundRect', { x: 6.536, y: 2.546, w: 2.073, h: 0.991, rectRadius: 0.165, fill: { color: WHITE }, line: NOLINE, shadow: cardShadow() });
+  s.addText('1.2M+', { x: 6.681, y: 2.644, w: 1.784, h: 0.646, fontFace: BODY, fontSize: 36, color: NAVY, valign: 'top' });
+  s.addText('Average Sale', { x: 6.753, y: 3.141, w: 1.534, h: 0.298, fontFace: BODY, fontSize: 10.5, color: BLACK, lineSpacingMultiple: 1.2, valign: 'top' });
+
+  s.addText('Sales Pitch Deck', {
+    x: 0.593, y: 3.963, w: 8.222, h: 2.866,
+    fontFace: HEAD, fontSize: 115, bold: true, color: NAVY, lineSpacingMultiple: 0.7, valign: 'top',
+  });
+  s.addText('BOOST YOUR SALES PERFORMANCE WITH DATA-DRIVEN INSIGHTS AND PROVEN TACTICS.', {
+    x: 0.593, y: 6.73, w: 10.361, h: 0.303, fontFace: BODY, fontSize: 12, color: NAVY, charSpacing: 3, valign: 'top',
+  });
+
+  s.addShape('roundRect', { x: 10.696, y: 4.516, w: 2.073, h: 0.991, rectRadius: 0.165, fill: { color: WHITE }, line: NOLINE, shadow: cardShadow() });
+  s.addText('More Innovation', { x: 10.943, y: 4.516, w: 1.58, h: 0.414, align: 'center', fontFace: HEAD, fontSize: 14, bold: true, color: NAVY, lineSpacingMultiple: 1.5, valign: 'top' });
+  s.addText('Lorem ipsum dolor sit amet, consectetuer', t(P, { x: 10.803, y: 4.816, w: 1.859, h: 0.579, fontSize: 10, align: 'center' }));
+
+  chrome(s, { color: NAVY, rule: NAVY });
+}
+
+/* ================================================================== *
+ * SLIDE 2 — agenda
+ * ================================================================== */
+function slide2(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: SKY };
+
+  photo(s, { x: 0, y: 4.005, w: 5.158, h: 3.495, shape: 'round1Rect', rectRadius: 0.53 });
+  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 0.884, fill: { color: WHITE }, line: NOLINE });
+
+  const agenda = [
+    { y: 1.757, title: 'Company Overview' },
+    { y: 3.059, title: 'Our Product' },
+    { y: 4.357, title: 'Problem Statement' },
+    { y: 5.658, title: 'Proposed Solution\u2019s' },
+  ];
+  const blurb = 'Lorem ipsum dolor sit, consectetur adipisicing elit, sed do eiusmod tempor incididunt labore dolore magna. Lorem ipsum dolor sit, consectetur.';
+  agenda.forEach((it) => {
+    s.addShape('roundRect', { x: 6.456, y: it.y, w: 2.655, h: 0.453, rectRadius: 0.0755, fill: { color: PALE_MINT }, line: NOLINE });
+    s.addText(it.title, { x: 6.646, y: it.y + 0.017, w: 2.845, h: 0.37, fontFace: HEAD, fontSize: 16, color: BLACK, valign: 'top' });
+    s.addText(blurb, t(P, { x: 6.456, y: it.y + 0.438, w: 5.538, h: 0.627 }));
+  });
+
+  s.addText('Agenda', t(H1, { x: 0.76, y: 1.589, w: 2.845, h: 0.841 }));
+  s.addText('Lorem ipsum dolor sit, consectetur adipisicing elit, sed do eiusmod tempor incididunt labore', t(P, { x: 0.76, y: 2.508, w: 3.558, h: 0.627 }));
+
+  chrome(s, { color: NAVY });
+}
+
+/* ================================================================== *
+ * SLIDE 3 — company overview
+ * ================================================================== */
+function slide3(pptx) {
+  const s = pptx.addSlide();
+
+  s.addShape('round2SameRect', { x: 9.758, y: 0.322, w: 2.473, h: 4.646, rotate: 270, fill: { color: WHITE }, line: NOLINE, shadow: cardShadow() });
+  // photo bleeds off the right edge; only its left-hand corners are rounded
+  photo(s, Object.assign(quarterTurn(8.793, 1.543, 4.54, 2.223, 270),
+    { shape: 'round2SameRect', box: { x: 8.793, y: 1.543, w: 4.54, h: 2.223 } }));
+
+  s.addText('Company Overview', t(H1, { x: 0.772, y: 1.543, w: 6.483, h: 0.841 }));
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+    t(P, { x: 0.772, y: 2.391, w: 7.037, h: 0.904 }));
+  readMore(s, 0.898, 3.537);
+
+  s.addShape('roundRect', { x: 0.836, y: 4.449, w: 11.738, h: 2.504, rectRadius: 0.212, fill: { color: SKY }, line: NOLINE });
+  const cols = [
+    { x: 1.461, label: 'Challenge Does The Customer Face', face: HEAD },
+    { x: 7.112, label: 'Statistic Or Real-world Example', face: BODY },
+  ];
+  cols.forEach((c) => {
+    tickPill(s, { x: c.x, y: 4.928, w: 3.574, h: 0.493, text: c.label, face: c.face });
+    s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada',
+      t(P, { x: c.x - 0.111, y: 5.59, w: 5.115, h: 0.904 }));
+  });
+
+  chrome(s, { marketPoint: true });
+}
+
+/* ================================================================== *
+ * SLIDE 4 — best seller product
+ * ================================================================== */
+function productIcon(slide, kind, x, y, size, color) {
+  const s = size;
+  const stroke = { color, width: 1.5 };
+  if (kind === 'camera') {
+    slide.addShape('roundRect', { x, y: y + s * 0.18, w: s, h: s * 0.66, rectRadius: s * 0.12, fill: NOLINE, line: stroke });
+    slide.addShape('roundRect', { x: x + s * 0.3, y: y + s * 0.04, w: s * 0.36, h: s * 0.18, rectRadius: s * 0.05, fill: NOLINE, line: stroke });
+    slide.addShape('ellipse', { x: x + s * 0.32, y: y + s * 0.34, w: s * 0.36, h: s * 0.36, fill: NOLINE, line: stroke });
+  } else if (kind === 'tv') {
+    slide.addShape('roundRect', { x, y: y + s * 0.26, w: s, h: s * 0.68, rectRadius: s * 0.12, fill: NOLINE, line: stroke });
+    slide.addShape('line', { x: x + s * 0.3, y: y + s * 0.26, w: -s * 0.2, h: -s * 0.22, line: stroke });
+    slide.addShape('line', { x: x + s * 0.7, y: y + s * 0.26, w: s * 0.2, h: -s * 0.22, line: stroke });
+    slide.addShape('rect', { x: x + s * 0.1, y: y + s * 0.38, w: s * 0.5, h: s * 0.44, fill: NOLINE, line: stroke });
+    slide.addShape('ellipse', { x: x + s * 0.72, y: y + s * 0.42, w: s * 0.12, h: s * 0.12, fill: { color }, line: NOLINE });
+    slide.addShape('ellipse', { x: x + s * 0.72, y: y + s * 0.62, w: s * 0.12, h: s * 0.12, fill: { color }, line: NOLINE });
+  } else if (kind === 'headphones') {
+    slide.addShape('arc', { x, y: y + s * 0.06, w: s, h: s * 0.84, angleRange: [180, 360], line: stroke });
+    slide.addShape('roundRect', { x, y: y + s * 0.46, w: s * 0.24, h: s * 0.46, rectRadius: s * 0.1, fill: { color }, line: NOLINE });
+    slide.addShape('roundRect', { x: x + s * 0.76, y: y + s * 0.46, w: s * 0.24, h: s * 0.46, rectRadius: s * 0.1, fill: { color }, line: NOLINE });
+  } else { // handheld console
+    slide.addShape('roundRect', { x: x + s * 0.16, y, w: s * 0.68, h: s, rectRadius: s * 0.1, fill: NOLINE, line: stroke });
+    slide.addShape('rect', { x: x + s * 0.28, y: y + s * 0.12, w: s * 0.44, h: s * 0.46, fill: NOLINE, line: stroke });
+    slide.addShape('mathPlus', { x: x + s * 0.24, y: y + s * 0.68, w: s * 0.2, h: s * 0.2, fill: { color }, line: NOLINE });
+    slide.addShape('ellipse', { x: x + s * 0.58, y: y + s * 0.7, w: s * 0.1, h: s * 0.1, fill: { color }, line: NOLINE });
+    slide.addShape('ellipse', { x: x + s * 0.7, y: y + s * 0.78, w: s * 0.1, h: s * 0.1, fill: { color }, line: NOLINE });
+  }
+}
+
+function slide4(pptx) {
+  const s = pptx.addSlide();
+
+  s.addShape('round2SameRect', { x: 0.524, y: 4.854, w: 6.407, h: 2.646, fill: { color: WHITE }, line: NOLINE, shadow: cardShadow() });
+  photo(s, { x: 0.668, y: 5.013, w: 6.117, h: 2.487, shape: 'round2SameRect' });
+
+  s.addText('Our Best Seller Product', t(H1, { x: 0.672, y: 1.499, w: 7.313, h: 0.841 }));
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit',
+    t(P, { x: 0.72, y: 2.529, w: 5.656, h: 0.904 }));
+
+  const products = [
+    { y: 1.7, card: SKY, tile: NAVY, glyph: WHITE, icon: 'camera', tx: 9.229 },
+    { y: 2.982, card: MINT_WASH, tile: MINT, glyph: BLACK, icon: 'tv', tx: 9.265 },
+    { y: 4.262, card: SKY, tile: NAVY, glyph: WHITE, icon: 'headphones', tx: 9.301 },
+    { y: 5.563, card: MINT_WASH, tile: MINT, glyph: BLACK, icon: 'mobile', tx: 9.301 },
+  ];
+  products.forEach((p) => {
+    s.addShape('roundRect', { x: 8.607, y: p.y, w: 4.13, h: 1.183, rectRadius: 0.1, fill: { color: p.card }, line: NOLINE });
+    s.addShape('roundRect', { x: 8.283, y: p.y + 0.299, w: 0.642, h: 0.642, rectRadius: 0.08, fill: { color: p.tile }, line: NOLINE });
+    productIcon(s, p.icon, 8.452, p.y + 0.463, 0.304, p.glyph);
+    s.addText('Product Name', { x: p.tx, y: p.y + 0.114, w: 3.446, h: 0.414, fontFace: HEAD, fontSize: 14, bold: true, color: BLACK, lineSpacingMultiple: 1.5, valign: 'top' });
+    s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue',
+      t(P, { x: p.tx, y: p.y + 0.455, w: 3.508, h: 0.627 }));
+  });
+
+  tickPill(s, { x: 0.76, y: 3.783, w: 4.439, h: 0.493, tw: 3.935, text: 'Our solution is fast, scalable, and cost-effective.' });
+
+  chrome(s, { marketPoint: true });
+}
+
+/* ================================================================== *
+ * SLIDE 5 — market trend (hand-drawn bar chart, as in the original)
+ * ================================================================== */
+function slide5(pptx) {
+  const s = pptx.addSlide();
+  s.addShape('rect', { x: 8.268, y: 0.884, w: 5.108, h: 6.616, fill: { color: MINT }, line: NOLINE });
+
+  s.addText('Market Trend', t(H1, { x: 0.672, y: 1.487, w: 4.203, h: 0.841 }));
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+    t(P, { x: 0.672, y: 2.439, w: 6.333, h: 0.904 }));
+
+  s.addShape('roundRect', { x: 0.753, y: 3.826, w: 6.618, h: 3.126, rectRadius: 0.264, fill: { color: SKY }, line: NOLINE });
+
+  const BASE = 5.794; // common bar baseline
+  const bars = [
+    { x: 4.252, h: 0.389, label: 'JUN', lx: 4.207, lw: 0.472 },
+    { x: 4.701, h: 0.604, label: 'JUL', lx: 4.680, lw: 0.437 },
+    { x: 5.150, h: 0.797, label: 'AUG', lx: 5.091, lw: 0.525 },
+    { x: 5.599, h: 1.338, label: 'SEPT', lx: 5.532, lw: 0.549, hi: true },
+    { x: 6.047, h: 0.492, label: 'OCT', lx: 5.998, lw: 0.502, ly: 5.834 },
+    { x: 6.496, h: 0.151, label: 'NOV', lx: 6.435, lw: 0.528 },
+  ];
+  bars.forEach((b) => {
+    s.addShape('rect', { x: b.x, y: BASE - b.h, w: 0.406, h: b.h, fill: { color: b.hi ? NAVY : CORNFLOWER }, line: NOLINE });
+    s.addText(b.label, { x: b.lx, y: b.ly || 5.839, w: b.lw, h: 0.286, align: 'center', margin: 0, fontFace: BODY, fontSize: 11, color: GREY, valign: 'top' });
+  });
+  s.addText('108', { x: 5.556, y: 4.196, w: 0.491, h: 0.303, margin: 0, fontFace: BODY, fontSize: 12, color: GREY, valign: 'top' });
+  s.addText('2016 sales', { x: 4.794, y: 6.179, w: 1.581, h: 0.404, align: 'center', fontFace: HEAD, fontSize: 18, color: NAVY, valign: 'top' });
+
+  s.addText('RESEARCH', { x: 1.16, y: 4.529, w: 1.35, h: 0.293, margin: 0, fontFace: HEAD, fontSize: 16, bold: true, color: NAVY, lineSpacing: 13.4, valign: 'top' });
+  s.addShape('line', { x: 1.268, y: 4.932, w: 0.207, h: 0, line: { color: BLACK, width: 1 } });
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna',
+    t(P, { x: 1.16, y: 5.068, w: 2.516, h: 1.182 }));
+
+  tickPill(s, { x: 9.035, y: 2.084, w: 3.574, h: 0.493, text: 'Statistic Or Real-world Example', line: NAVY, color: NAVY });
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada',
+    t(P, { x: 8.955, y: 3.019, w: 3.734, h: 1.182, color: NAVY, align: 'center' }));
+  s.addText('12,8%', { x: 9.726, y: 4.375, w: 2.192, h: 0.909, align: 'center', fontFace: HEAD, fontSize: 48, bold: true, color: NAVY, valign: 'top' });
+  s.addText('Grow Sales', t(P, { x: 9.715, y: 5.274, w: 2.213, h: 0.371, fontSize: 12, color: NAVY, align: 'center' }));
+  readMore(s, 10.129, 5.913, NAVY);
+
+  chrome(s, { marketPoint: true });
+}
+
+/* ================================================================== *
+ * SLIDE 6 — problem statement
+ * ================================================================== */
+function slide6(pptx) {
+  const s = pptx.addSlide();
+
+  s.addShape('round2SameRect', { x: -0.709, y: 1.784, w: 6.287, h: 4.846, rotate: 90, fill: { color: WHITE }, line: NOLINE, shadow: cardShadow() });
+  // photo is flush to the left slide edge, rounded only down its right-hand side
+  photo(s, Object.assign(quarterTurn(0, 1.233, 4.673, 5.923, 90),
+    { shape: 'round2SameRect', box: { x: 0, y: 1.233, w: 4.673, h: 5.923 } }));
+
+  s.addText('State The Problem You\u2019ll Address', t(H1, { x: 5.829, y: 1.495, w: 6.745, h: 1.582 }));
+  s.addText('What Challenge Does The Customer Face?', { x: 5.829, y: 3.213, w: 5.514, h: 0.404, fontFace: BODY, fontSize: 18, bold: true, color: BLACK, valign: 'top' });
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada',
+    t(P, { x: 5.829, y: 3.713, w: 6.561, h: 0.627 }));
+  readMore(s, 5.923, 4.702);
+
+  s.addShape('roundRect', { x: 6.414, y: 5.512, w: 5.927, h: 1.22, rectRadius: 0.185, fill: { color: SKY2 }, line: NOLINE });
+  s.addShape('roundRect', { x: 5.989, y: 5.739, w: 0.772, h: 0.772, rectRadius: 0.097, fill: { color: NAVY }, line: NOLINE });
+  // "audience" glyph: head + shoulders + info dot
+  s.addShape('ellipse', { x: 6.213, y: 5.925, w: 0.2, h: 0.2, fill: { color: WHITE }, line: NOLINE });
+  s.addShape('round2SameRect', { x: 6.135, y: 6.16, w: 0.357, h: 0.2, fill: { color: WHITE }, line: NOLINE });
+  s.addShape('ellipse', { x: 6.451, y: 5.885, w: 0.241, h: 0.241, fill: { color: WHITE }, line: NOLINE });
+  s.addText('i', { x: 6.451, y: 5.885, w: 0.241, h: 0.241, align: 'center', valign: 'middle', margin: 0, fontFace: BODY, fontSize: 10, bold: true, color: NAVY });
+
+  s.addText('70%', { x: 6.829, y: 5.667, w: 2.192, h: 0.909, align: 'center', fontFace: HEAD, fontSize: 48, bold: true, color: BLACK, valign: 'top' });
+  s.addText('Of Businesses Struggle With [Problem].', { x: 8.917, y: 5.802, w: 2.862, h: 0.64, fontFace: BODY, fontSize: 16, color: BLACK, valign: 'top' });
+
+  chrome(s, { marketPoint: true });
+}
+
+/* ================================================================== *
+ * SLIDE 7 — the solutions
+ * ================================================================== */
+function slide7(pptx) {
+  const s = pptx.addSlide();
+
+  s.addShape('roundRect', { x: 9.197, y: 0.156, w: 2.39, h: 4.983, rotate: 270, rectRadius: 0.37, fill: { color: WHITE }, line: NOLINE, shadow: cardShadow() });
+  s.addShape('round2SameRect', { x: 0.76, y: 5.431, w: 4.99, h: 2.069, fill: { color: WHITE }, line: NOLINE, shadow: cardShadow() });
+  photo(s, { x: 8.0, y: 1.527, w: 4.769, h: 2.223, shape: 'roundRect', rectRadius: 0.371 });
+  photo(s, { x: 0.866, y: 5.538, w: 4.788, h: 1.962, shape: 'round2SameRect' });
+
+  s.addText('The Solutions', t(H1, { x: 0.836, y: 1.634, w: 5.305, h: 0.841 }));
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+    t(P, { x: 0.836, y: 2.516, w: 6.561, h: 0.904 }));
+  s.addText('More Innovation', { x: 0.836, y: 3.753, w: 3.446, h: 0.414, fontFace: HEAD, fontSize: 14, bold: true, color: BLACK, lineSpacingMultiple: 1.5, valign: 'top' });
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue',
+    t(P, { x: 0.836, y: 4.216, w: 4.497, h: 0.627 }));
+
+  s.addShape('roundRect', { x: 6.704, y: 4.39, w: 3.558, h: 0.453, rectRadius: 0.0755, fill: { color: MINT }, line: NOLINE });
+  s.addText('Step By Step Process', { x: 6.894, y: 4.407, w: 2.845, h: 0.404, fontFace: HEAD, fontSize: 18, color: NAVY, valign: 'top' });
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+    t(P, { x: 6.667, y: 4.979, w: 6.24, h: 0.904 }));
+  readMore(s, 6.745, 6.157);
+
+  chrome(s, { marketPoint: true });
+}
+
+/* ================================================================== *
+ * SLIDE 8 — the team
+ * ================================================================== */
+function slide8(pptx) {
+  const s = pptx.addSlide();
+
+  const team = [
+    { x: 0.851, name: 'Jennifer Harris', bar: NAVY, ink: OFFWHITE, tx: 1.294 },
+    { x: 4.743, name: 'Joshua Martin', bar: MINT, ink: NAVY, tx: 5.244 },
+    { x: 8.636, name: 'Charlotte Nelson', bar: NAVY, ink: OFFWHITE, tx: 9.194 },
+  ];
+  team.forEach((m) => photo(s, { x: m.x, y: 3.83, w: 3.732, h: 2.966, shape: 'roundRect', rectRadius: 0.359 }));
+
+  s.addText('Meet Our Sales Marketing Team', t(H1, { x: 0.836, y: 1.597, w: 5.831, h: 1.582 }));
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+    t(P, { x: 6.296, y: 1.936, w: 6.278, h: 0.904 }));
+
+  team.forEach((m) => {
+    s.addShape('round2SameRect', { x: m.x, y: 6.071, w: 3.732, h: 0.725, flipV: true, fill: { color: m.bar }, line: NOLINE });
+    s.addText(m.name, { x: m.tx, y: 6.187, w: 2.845, h: 0.505, align: 'center', fontFace: HEAD, fontSize: 24, bold: true, color: m.ink, valign: 'top' });
+  });
+
+  chrome(s, { marketPoint: true });
+}
+
+/* ================================================================== *
+ * SLIDE 9 — mockup
+ * ================================================================== */
+function slide9(pptx) {
+  const s = pptx.addSlide();
+
+  // panel + tilted handset come from the slide layout in the source deck
+  s.addShape('roundRect', { x: 1.02, y: 3.327, w: 11.554, h: 2.882, rectRadius: 0.244, fill: { color: SKY }, line: NOLINE });
+  s.addShape('roundRect', { x: 8.534, y: 1.582, w: 2.696, h: 5.471, rotate: 12.2, rectRadius: 0.38, fill: { color: '1A1A1A' }, line: NOLINE, shadow: orbShadow() });
+  photo(s, {
+    x: 8.632, y: 1.686, w: 2.500, h: 5.263, rotate: 12.2, shape: 'roundRect', rectRadius: 0.3,
+    box: { x: 8.632, y: 1.686, w: 2.500, h: 5.263 },
+  });
+
+  s.addText('Sales Pitch Deck Mockup Design', t(H1, { x: 1.02, y: 1.298, w: 5.831, h: 1.582 }));
+  s.addText('Pitch Your Proposed Solutions', { x: 1.492, y: 3.503, w: 6.514, h: 0.727, fontFace: HEAD, fontSize: 28, bold: true, color: BLACK, lineSpacingMultiple: 1.5, valign: 'top' });
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+    t(P, { x: 1.492, y: 4.25, w: 6.195, h: 0.904 }));
+  tickPill(s, { x: 1.616, y: 5.309, w: 4.084, h: 0.454, text: 'Elaborated On The Future Statistic', face: HEAD });
+
+  chrome(s, {});
+}
+
+/* ================================================================== *
+ * SLIDE 10 — infographic: chevrons
+ * ================================================================== */
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  s.addText('Infographic Section', t(H1, { x: 3.751, y: 1.298, w: 5.831, h: 0.841, align: 'center' }));
+
+  const CW = 2.199;
+  const CH = 0.88;
+  [3.049, 4.64].forEach((y) => {
+    [1.285, 3.264, 5.243].forEach((x, i) => {
+      const dark = i !== 1;
+      s.addText('aspect', {
+        shape: 'custGeom', points: pathPoints(CHEVRON, CW, CH),
+        x, y, w: CW, h: CH, fill: { color: dark ? NAVY : MINT }, line: NOLINE,
+        align: 'center', valign: 'middle', fontFace: BODY, fontSize: 18, color: dark ? WHITE : BLACK,
+      });
+    });
+  });
+
+  const copy = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi';
+  [{ y: 3.049, by: 4.286, fill: NAVY, ink: WHITE }, { y: 4.913, by: 6.15, fill: MINT, ink: BLACK }].forEach((r) => {
+    s.addText(copy, t(P, { x: 7.889, y: r.y, w: 4.478, h: 0.904 }));
+    s.addText('Download Here :', {
+      shape: 'roundRect', x: 8.113, y: r.by, w: 1.623, h: 0.318, rectRadius: 0.053,
+      fill: { color: r.fill }, line: NOLINE, align: 'center', valign: 'middle',
+      fontFace: BODY, fontSize: 11, color: r.ink,
+    });
+  });
+
+  chrome(s, {});
+}
+
+/* ================================================================== *
+ * SLIDE 11 — infographic: linked circles timeline
+ * ================================================================== */
+function timelineIcon(slide, kind, x, y, w, h, color) {
+  if (kind === 'mail') {
+    slide.addShape('rect', { x, y, w, h, fill: { color }, line: NOLINE });
+    slide.addShape('triangle', { x: x + w * 0.08, y: y + h * 0.06, w: w * 0.84, h: h * 0.62, flipV: true, fill: { color: WHITE }, line: NOLINE });
+  } else if (kind === 'clipboard') {
+    slide.addShape('roundRect', { x, y: y + h * 0.12, w, h: h * 0.88, rectRadius: w * 0.16, fill: { color }, line: NOLINE });
+    slide.addShape('roundRect', { x: x + w * 0.18, y, w: w * 0.64, h: h * 0.2, rectRadius: w * 0.06, fill: { color }, line: NOLINE });
+    slide.addShape('trapezoid', { x: x + w * 0.1, y: y + h * 0.16, w: w * 0.8, h: h * 0.12, flipV: true, fill: { color: WHITE }, line: NOLINE });
+  } else if (kind === 'calendar') {
+    slide.addShape('roundRect', { x, y: y + h * 0.12, w, h: h * 0.88, rectRadius: w * 0.12, fill: { color }, line: NOLINE });
+    slide.addShape('rect', { x: x + w * 0.1, y: y + h * 0.36, w: w * 0.8, h: h * 0.46, fill: { color: WHITE }, line: NOLINE });
+    slide.addShape('rect', { x: x + w * 0.22, y, w: w * 0.1, h: h * 0.24, fill: { color }, line: NOLINE });
+    slide.addShape('rect', { x: x + w * 0.68, y, w: w * 0.1, h: h * 0.24, fill: { color }, line: NOLINE });
+  } else { // archive box
+    slide.addShape('rect', { x, y, w, h: h * 0.28, fill: { color }, line: NOLINE });
+    slide.addShape('rect', { x: x + w * 0.08, y: y + h * 0.34, w: w * 0.84, h: h * 0.66, fill: { color }, line: NOLINE });
+    slide.addShape('rect', { x: x + w * 0.3, y: y + h * 0.52, w: w * 0.4, h: h * 0.12, fill: { color: WHITE }, line: NOLINE });
+  }
+}
+
+function slide11(pptx) {
+  const s = pptx.addSlide();
+  s.addText('Infographic Section', t(H1, { x: 3.751, y: 1.298, w: 5.831, h: 0.841, align: 'center' }));
+
+  // dash-dot semicircles weaving above and below the chain
+  const dash = { color: SILVER, width: 1.18, dashType: 'dashDot' };
+  [
+    { x: 0.844, y: 2.341, w: 2.902, h: 2.890, range: [180, 360] },
+    { x: 3.758, y: 2.325, w: 2.902, h: 2.906, range: [0, 180] },
+    { x: 6.661, y: 2.341, w: 2.902, h: 2.890, range: [180, 360] },
+    { x: 9.575, y: 2.321, w: 2.890, h: 2.910, range: [0, 180] },
+  ].forEach((a) => s.addShape('arc', { x: a.x, y: a.y, w: a.w, h: a.h, angleRange: a.range, line: dash }));
+
+  // path markers
+  s.addShape('ellipse', { x: 0.777, y: 3.713, w: 0.134, h: 0.134, fill: { color: SLATE }, line: NOLINE });
+  s.addShape('triangle', { x: 3.069, y: 2.518, w: 0.159, h: 0.159, rotate: 135, fill: { color: SLATE }, line: NOLINE });
+  s.addShape('triangle', { x: 6.191, y: 4.676, w: 0.159, h: 0.159, rotate: 200, fill: { color: SLATE }, line: NOLINE });
+  s.addShape('triangle', { x: 8.971, y: 2.579, w: 0.159, h: 0.159, rotate: 135, fill: { color: SILVER }, line: NOLINE });
+  s.addShape('triangle', { x: 12.361, y: 3.713, w: 0.195, h: 0.134, rotate: 0, fill: { color: SLATE }, line: NOLINE });
+
+  // navy chain: four discs joined by pinched waists
+  const NODES = [2.2885, 5.2035, 8.1055, 11.0135]; // disc centres
+  const D = 2.012; // disc diameter
+  NODES.slice(0, 3).forEach((cx, i) => {
+    const w = NODES[i + 1] - cx;
+    s.addShape('custGeom', { points: pathPoints(CHAIN_WAIST, w, D), x: cx, y: 2.774, w, h: D, fill: { color: NAVY }, line: NOLINE });
+  });
+  NODES.forEach((cx) => s.addShape('ellipse', { x: cx - D / 2, y: 2.774, w: D, h: D, fill: { color: NAVY }, line: NOLINE }));
+
+  const steps = [
+    { cx: 2.2885, icon: 'mail', ink: NAVY, ix: 2.035, iy: 3.623, iw: 0.507, ih: 0.314, pct: '60%', date: 'January, 12 2024', tx: 1.021, lx: 1.280, lw: 2.042 },
+    { cx: 5.2035, icon: 'clipboard', ink: MINT, ix: 5.008, iy: 3.509, iw: 0.391, ih: 0.542, pct: '70%', date: 'February, 20 2024', tx: 3.923, lx: 4.148, lw: 2.109 },
+    { cx: 8.1055, icon: 'calendar', ink: NAVY, ix: 7.861, iy: 3.536, iw: 0.488, ih: 0.488, pct: '80%', date: 'March, 21 2024', tx: 6.832, lx: 7.001, lw: 2.222 },
+    { cx: 11.0135, icon: 'archive', ink: MINT, ix: 10.770, iy: 3.563, iw: 0.488, ih: 0.434, pct: '90%', date: 'April, 18 2024', tx: 9.747, lx: 10.006, lw: 2.042 },
+  ];
+  steps.forEach((st) => {
+    s.addShape('ellipse', { x: st.cx - 0.8535, y: 2.932, w: 1.707, h: 1.695, fill: { color: WHITE }, line: NOLINE, shadow: orbShadow() });
+    timelineIcon(s, st.icon, st.ix, st.iy, st.iw, st.ih, st.ink);
+    s.addText(st.pct, { x: st.tx, y: 5.208, w: 2.559, h: 0.808, align: 'center', fontFace: BODY, fontSize: 28, bold: true, color: GREY_DARK, lineSpacingMultiple: 1.5, valign: 'top' });
+    s.addText(st.date, { x: st.tx, y: 5.848, w: 2.559, h: 0.471, align: 'center', fontFace: BODY, fontSize: 14.67, color: GREY_DARK, lineSpacingMultiple: 1.5, valign: 'top' });
+    s.addText('Lorem ipsum dolor sit amet, consectetur', { x: st.lx, y: 6.218, w: st.lw, h: 0.707, align: 'center', fontFace: BODY, fontSize: 12, color: GREY_MID, lineSpacingMultiple: 1.5, valign: 'top' });
+  });
+
+  chrome(s, {});
+}
+
+/* ================================================================== *
+ * SLIDE 12 — infographic: speech bubbles
+ * ================================================================== */
+function slide12(pptx) {
+  const s = pptx.addSlide();
+  s.addText('Infographic Section', t(H1, { x: 3.751, y: 1.298, w: 5.831, h: 0.841, align: 'center' }));
+
+  const BW = 4.032;
+  const BH = 3.414;
+  const groups = [
+    { bx: 8.391, fill: NAVY, ink: WHITE, title: 'Progress Three', tx: 9.143, tw: 2.107, num: '650+', nx: 9.445, lx: 9.468, lw: 1.782, bx2: 9.311 },
+    { bx: 4.593, fill: MINT, ink: BLACK, title: 'Progress Two', tx: 5.309, tw: 1.958, num: '550+', nx: 5.536, lx: 5.559, lw: 1.817, bx2: 5.402 },
+    { bx: 0.911, fill: NAVY, ink: WHITE, title: 'Progress One', tx: 1.610, tw: 1.958, num: '450+', nx: 1.838, lx: 1.861, lw: 1.834, bx2: 1.704 },
+  ];
+  groups.forEach((g) => {
+    s.addShape('custGeom', { points: pathPoints(BUBBLE, BW, BH), x: g.bx, y: 3.085, w: BW, h: BH, fill: { color: g.fill }, line: NOLINE });
+  });
+  groups.forEach((g) => {
+    s.addText(g.num, { x: g.nx, y: 3.814, w: 1.504, h: 0.572, align: 'center', fontFace: HEAD, fontSize: 28, bold: true, color: g.ink, valign: 'top' });
+    s.addText(g.title, { x: g.tx, y: 4.367, w: g.tw, h: 0.404, align: 'center', fontFace: HEAD, fontSize: 18, bold: true, color: g.ink, valign: 'top' });
+    [4.783, 5.135, 5.487].forEach((y) => {
+      s.addText('Lorem ipsum dolor.', { x: g.lx, y, w: g.lw, h: 0.346, align: 'center', fontFace: BODY, fontSize: 12, color: g.ink, lineSpacingMultiple: 1.3, valign: 'top' });
+      s.addShape('ellipse', { x: g.bx2, y: y + 0.095, w: 0.157, h: 0.157, fill: { color: WHITE }, line: NOLINE });
+      s.addText('\u2713', { x: g.bx2, y: y + 0.095, w: 0.157, h: 0.157, align: 'center', valign: 'middle', margin: 0, fontFace: BODY, fontSize: 6, bold: true, color: g.fill });
+    });
+  });
+
+  chrome(s, {});
+}
+
+/* ================================================================== *
+ * SLIDE 13 — infographic: four-petal wheel
+ * ================================================================== */
+function strategyIcon(slide, kind, x, y, w, h, color, back) {
+  if (kind === 'save') { // floppy disk
+    slide.addShape('snip1Rect', { x, y, w, h, rectRadius: w * 0.22, flipH: true, fill: { color }, line: NOLINE });
+    slide.addShape('rect', { x: x + w * 0.22, y, w: w * 0.46, h: h * 0.34, fill: { color: back }, line: NOLINE });
+    slide.addShape('ellipse', { x: x + w * 0.34, y: y + h * 0.5, w: w * 0.32, h: h * 0.32, fill: { color: back }, line: NOLINE });
+  } else if (kind === 'puzzle') {
+    slide.addShape('rect', { x, y: y + h * 0.26, w: w * 0.74, h: h * 0.74, fill: { color }, line: NOLINE });
+    slide.addShape('ellipse', { x: x + w * 0.2, y, w: w * 0.36, h: h * 0.36, fill: { color }, line: NOLINE });
+    slide.addShape('ellipse', { x: x + w * 0.62, y: y + h * 0.4, w: w * 0.38, h: h * 0.38, fill: { color }, line: NOLINE });
+    slide.addShape('ellipse', { x: x - w * 0.1, y: y + h * 0.44, w: w * 0.3, h: h * 0.3, fill: { color: back }, line: NOLINE });
+  } else if (kind === 'chart') {
+    slide.addShape('roundRect', { x, y, w, h, rectRadius: w * 0.16, fill: { color }, line: NOLINE });
+    const zig = { color: back, width: 1.6 };
+    slide.addShape('line', { x: x + w * 0.18, y: y + h * 0.66, w: w * 0.2, h: -h * 0.24, line: zig });
+    slide.addShape('line', { x: x + w * 0.38, y: y + h * 0.42, w: w * 0.16, h: h * 0.16, line: zig });
+    slide.addShape('line', { x: x + w * 0.54, y: y + h * 0.58, w: w * 0.28, h: -h * 0.28, line: zig });
+  } else if (kind === 'doc') { // page with a folded corner
+    slide.addShape('snip1Rect', { x, y, w, h, rectRadius: w * 0.42, flipH: true, fill: { color }, line: NOLINE });
+  } else { // push pin
+    slide.addShape('roundRect', { x: x + w * 0.14, y, w: w * 0.72, h: h * 0.42, rectRadius: w * 0.14, fill: { color }, line: NOLINE });
+    slide.addShape('roundRect', { x, y: y + h * 0.38, w, h: h * 0.14, rectRadius: w * 0.06, fill: { color }, line: NOLINE });
+    slide.addShape('rect', { x: x + w * 0.43, y: y + h * 0.5, w: w * 0.14, h: h * 0.5, fill: { color }, line: NOLINE });
+  }
+}
+
+function slide13(pptx) {
+  const s = pptx.addSlide();
+  s.addText('Infographic Section', t(H1, { x: 3.751, y: 1.298, w: 5.831, h: 0.841, align: 'center' }));
+
+  const copy = 'Lorem ipsum dolor sit amet, elit. Sed do eiusmod tempor  amus consectetur';
+  [
+    { label: 'Strategy 01', y: 2.896, lx: 2.263, bx: 1.497, align: 'right' },
+    { label: 'Strategy 04', y: 4.995, lx: 2.263, bx: 1.497, align: 'right' },
+    { label: 'Strategy 02', y: 2.896, lx: 9.434, bx: 9.434, align: 'left' },
+    { label: 'Strategy 03', y: 4.995, lx: 9.434, bx: 9.434, align: 'left' },
+  ].forEach((c) => {
+    s.addText(c.label, { x: c.lx, y: c.y, w: 1.636, h: 0.337, align: c.align, fontFace: BODY, fontSize: 14, bold: true, color: BLACK, valign: 'top' });
+    s.addText(copy, t(P, { x: c.bx, y: c.y + 0.366, w: 2.402, h: 0.978, fontSize: 12, align: c.align }));
+  });
+
+  // four "single rounded corner" petals, each a white backing plate plus a coloured face
+  const petals = [
+    { plate: [4.679, 2.631, 1.933], face: [4.756, 2.708, 1.779], fill: NAVY, flipH: true, flipV: false },
+    { plate: [6.722, 4.670, 1.933], face: [6.799, 4.747, 1.779], fill: NAVY, flipH: false, flipV: true },
+    { plate: [4.527, 4.670, 2.086], face: [4.610, 4.753, 1.920], fill: MINT, flipH: true, flipV: true },
+    { plate: [6.721, 2.478, 2.086], face: [6.796, 2.553, 1.936], fill: MINT, flipH: false, flipV: false },
+  ];
+  petals.forEach((p) => {
+    s.addShape('round1Rect', { x: p.plate[0], y: p.plate[1], w: p.plate[2], h: p.plate[2], rectRadius: p.plate[2] / 2, flipH: p.flipH, flipV: p.flipV, fill: { color: WHITE }, line: NOLINE, shadow: petalShadow() });
+    s.addShape('round1Rect', { x: p.face[0], y: p.face[1], w: p.face[2], h: p.face[2], rectRadius: p.face[2] / 2, flipH: p.flipH, flipV: p.flipV, fill: { color: p.fill }, line: NOLINE });
+  });
+  s.addShape('ellipse', { x: 5.853, y: 3.651, w: 1.779, h: 1.779, fill: { color: WHITE }, line: NOLINE, shadow: petalShadow() });
+
+  strategyIcon(s, 'save', 5.464, 3.416, 0.363, 0.363, WHITE, NAVY);
+  strategyIcon(s, 'puzzle', 7.497, 3.255, 0.533, 0.533, BLACK, MINT);
+  strategyIcon(s, 'chart', 7.485, 5.433, 0.408, 0.408, WHITE, NAVY);
+  strategyIcon(s, 'doc', 5.379, 5.477, 0.381, 0.472, BLACK, MINT);
+  strategyIcon(s, 'pin', 6.569, 4.250, 0.348, 0.582, NAVY, WHITE);
+
+  chrome(s, {});
+}
+
+/* ================================================================== *
+ * SLIDE 14 — contact
+ * ================================================================== */
+function contactIcon(slide, kind, cx, cy, size, color) {
+  if (kind === 'phone') {
+    slide.addShape('roundRect', { x: cx - size / 2, y: cy - size / 2, w: size * 0.62, h: size, rectRadius: size * 0.2, rotate: -30, fill: { color }, line: NOLINE });
+  } else if (kind === 'home') {
+    slide.addShape('triangle', { x: cx - size / 2, y: cy - size / 2, w: size, h: size * 0.5, fill: { color }, line: NOLINE });
+    slide.addShape('rect', { x: cx - size * 0.32, y: cy - size * 0.02, w: size * 0.64, h: size * 0.52, fill: { color }, line: NOLINE });
+  } else { // globe
+    slide.addShape('ellipse', { x: cx - size / 2, y: cy - size / 2, w: size, h: size, fill: NOLINE, line: { color, width: 1.4 } });
+    slide.addShape('ellipse', { x: cx - size * 0.22, y: cy - size / 2, w: size * 0.44, h: size, fill: NOLINE, line: { color, width: 1.4 } });
+    slide.addShape('line', { x: cx - size / 2, y: cy, w: size, h: 0, line: { color, width: 1.4 } });
+  }
+}
+
+function slide14(pptx) {
+  const s = pptx.addSlide();
+
+  s.addShape('rect', { x: 7.678, y: 0, w: 5.655, h: 7.497, fill: { color: OFFWHITE, transparency: 53 }, line: NOLINE });
+  photo(s, { x: 0, y: 3.519, w: 10.63, h: 3.978, shape: 'round1Rect', rectRadius: 0.66 });
+
+  s.addText('Our Contact', t(H1, { x: 0.836, y: 1.379, w: 7.581, h: 0.841 }));
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus',
+    t(P, { x: 0.836, y: 2.221, w: 6.331, h: 0.627 }));
+
+  s.addShape('roundRect', { x: 2.529, y: 4.883, w: 9.977, h: 1.779, rectRadius: 0.153, fill: { color: SKY2 }, line: NOLINE });
+
+  const contacts = [
+    { disc: [3.064, 5.296], fill: NAVY, icon: 'phone', ink: WHITE, lx: 3.719, label: 'Phone Number', value: '+123-4567890', vw: 1.632, vh: 0.37 },
+    { disc: [6.022, 5.283], fill: MINT, icon: 'home', ink: NAVY, lx: 6.673, label: 'Address', value: '123 Company Name, Street Name', vw: 2.471, vh: 0.64 },
+    { disc: [9.241, 5.296], fill: NAVY, icon: 'globe', ink: WHITE, lx: 9.988, label: 'Social Media', value: '@social_media', vw: 1.741, vh: 0.37 },
+  ];
+  contacts.forEach((c) => {
+    s.addShape('ellipse', { x: c.disc[0], y: c.disc[1], w: 0.47, h: 0.47, fill: { color: c.fill }, line: NOLINE });
+    contactIcon(s, c.icon, c.disc[0] + 0.235, c.disc[1] + 0.235, 0.215, c.ink);
+    s.addText(c.label, { x: c.lx, y: 5.346, w: 1.75, h: 0.37, fontFace: HEAD, fontSize: 16, bold: true, color: BLACK, valign: 'top' });
+    s.addText(c.value, { x: c.lx, y: 5.781, w: c.vw, h: c.vh, fontFace: HEAD, fontSize: 16, color: BLACK, valign: 'top' });
+  });
+
+  chrome(s, {});
+}
+
+/* ================================================================== *
+ * SLIDE 15 — thank you
+ * ================================================================== */
+function slide15(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: SKY };
+
+  photo(s, { x: 0, y: 4.769, w: 13.333, h: 2.728, shape: 'round2SameRect' });
+
+  s.addText('Thank You', { x: 0.511, y: 2.044, w: 7.581, h: 1.582, fontFace: HEAD, fontSize: 88, bold: true, color: NAVY, valign: 'top' });
+  s.addText('Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+    t(P, { x: 0.602, y: 3.496, w: 8.185, h: 0.627, color: NAVY }));
+
+  tickPill(s, { x: 8.787, y: 1.361, w: 4.035, h: 0.448, text: 'Our solution is fast, scalable, and', color: NAVY, face: HEAD });
+  tickPill(s, { x: 9.573, y: 1.937, w: 3.249, h: 0.448, text: 'Statistic Or Real-world Example', color: NAVY });
+
+  chrome(s, { color: NAVY });
+}
+
+/* ------------------------------------------------------------------ */
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK16x9', width: 13.333, height: 7.5 });
+  pptx.layout = 'DECK16x9';
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+  pptx.title = 'Sales Pitch Deck';
+
+  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8,
+    slide9, slide10, slide11, slide12, slide13, slide14, slide15].forEach((fn) => fn(pptx));
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '18fb0ed4-fba3-4c86-a844-c8335ec7c5b7_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f)).catch((e) => { console.error(e); process.exit(1); });

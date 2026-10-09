@@ -1,0 +1,536 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/dormitory_construction_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/dormitory_construction_company_profile.js
+@@ -0,0 +1,533 @@
++/**
++ * "Dormitory Constructions" company-profile deck — rebuilt with pptxgenjs.
++ *
++ * 24 slides, 13.333in x 7.5in (16:9).  Every shape, colour and string below is a
++ * plain literal so the deck's design can be read straight out of this file.
++ *
++ * Note on images: the source deck contains no embedded photographs — only empty
++ * picture placeholders (invisible when the deck is presented) plus three 96px
++ * line-art icons on the contact slides.  The icons are redrawn here with native
++ * pptxgenjs shapes instead of embedded bitmaps.
++ */
++
++const pptxgen = require('pptxgenjs');
++const path = require('path');
++
++/* ------------------------------------------------------------------ palette */
++const GOLD = 'FFC000'; // theme accent4 — the deck's signature yellow
++const ORANGE = 'ED7D31'; // theme accent2 — left band on the vision slide
++const INK = '000000'; // theme dk1
++const WHITE = 'FFFFFF'; // theme lt1
++const PAGE = 'F2F2F2'; // default slide background
++const CHARCOAL = '3A3838'; // cover background
++const GREY = 'D8D8D8'; // back diamond
++const MUTED = '7F7F7F'; // secondary body copy
++const LOGO_DOT = '7F6000'; // logo cloud dots (69% opaque)
++
++/* -------------------------------------------------------------------- fonts */
++const SERIF = 'Playfair Display Medium';
++const SERIF_SB = 'Playfair Display SemiBold';
++const SERIF_XB = 'Playfair Display ExtraBold';
++const SANS = 'Poppins';
++const SANS_MED = 'Poppins Medium';
++
++/* Google-Slides text-box insets: 0.1in sides, 0.05in top/bottom (given in pt) */
++const INSET = [7.2, 7.2, 3.6, 3.6];
++
++const LOREM =
++  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod ' +
++  'tempor incididunt ut labore dan dolore magna aliqua. ';
++
++const WWW = 'www.dormitoryconstruction.com';
++const BRAND = 'Dormitory Constructions';
++
++/* ---------------------------------------------------------------- primitives */
++const box = (s, x, y, w, h, color) =>
++  s.addShape('rect', { x, y, w, h, fill: { color } });
++
++const diamond = (s, x, y, w, h, color) =>
++  s.addShape('diamond', { x, y, w, h, fill: { color } });
++
++function text(s, content, opts) {
++  s.addText(content, Object.assign({ fontFace: SANS, color: INK, valign: 'top', margin: INSET }, opts));
++}
++
++/** 12pt Poppins caption — headers, page numbers, urls. */
++const label = (s, str, x, y, w, color, extra) =>
++  text(s, str, Object.assign({ x, y, w, h: 0.303, fontSize: 12, color }, extra));
++
++/** Playfair display heading. */
++const heading = (s, str, x, y, w, h, fontSize, extra) =>
++  text(s, str, Object.assign({ x, y, w, h, fontSize, fontFace: SERIF }, extra));
++
++/** 12pt Poppins body copy at 150% leading. */
++const body = (s, content, x, y, w, h, extra) =>
++  text(s, content, Object.assign({ x, y, w, h, fontSize: 12, lineSpacingMultiple: 1.5 }, extra));
++
++/** Gold "cloud" badge that sits in the top-right corner of every slide. */
++function logoBadge(s, discColor) {
++  s.addShape('ellipse', { x: 11.908, y: 0.549, w: 0.563, h: 0.563, fill: { color: discColor || GOLD } });
++  [[12.087, 0.697], [12.177, 0.787], [12.025, 0.787]].forEach(([x, y]) =>
++    s.addShape('ellipse', { x, y, w: 0.177, h: 0.177, fill: { color: LOGO_DOT, transparency: 31 } })
++  );
++}
++
++/**
++ * Standard slide furniture: gold footer band, brand line, page number, year, url.
++ * cfg = { bar, brand:[x,y,color], page:[str,x,color], year:[x,color], url:[x,color], disc }
++ */
++function chrome(s, cfg) {
++  if (cfg.bar !== false) box(s, 0, 6.558, 13.333, 0.942, GOLD);
++  if (cfg.brand) label(s, BRAND, cfg.brand[0], cfg.brand[1], 2.248, cfg.brand[2]);
++  if (cfg.page) label(s, cfg.page[0], cfg.page[1], 6.876, 0.95, cfg.page[2]);
++  if (cfg.year) label(s, '2030', cfg.year[0], 6.87, 0.609, cfg.year[1]);
++  if (cfg.url) label(s, WWW, cfg.url[0], 6.873, 2.949, cfg.url[1]);
++  logoBadge(s, cfg.disc);
++}
++
++/* ------------------------------------------------------------- vector icons */
++/* Redraws of the three line-art icons used on the contact slides.  All three
++   are laid out on the original 96x96 icon grid, scaled by `d` (the icon side). */
++
++const G = 1 / 96; // one unit of the icon grid, as a fraction of the icon side
++
++/** classic handset: a thick quarter-ring with a square pad at each end */
++function phoneIcon(s, x, y, d) {
++  const pad = { fill: { color: WHITE }, line: { color: INK, width: 4 } };
++  s.addShape('blockArc', {
++    x: x + d * 18 * G, y: y - d * 9 * G, w: d * 84 * G, h: d * 84 * G,
++    fill: { color: INK }, angleRange: [72, 201], arcThicknessRatio: 0.3,
++  });
++  s.addShape('rect', Object.assign({ x: x + d * 13 * G, y: y + d * 13 * G, w: d * 21 * G, h: d * 20 * G }, pad));
++  s.addShape('rect', Object.assign({ x: x + d * 62 * G, y: y + d * 62 * G, w: d * 21 * G, h: d * 20 * G }, pad));
++}
++
++/** open envelope: outlined rectangle plus the two flap diagonals */
++function mailIcon(s, x, y, d) {
++  const line = { color: INK, width: 4 };
++  s.addShape('rect', {
++    x: x + d * 8 * G, y: y + d * 18 * G, w: d * 80 * G, h: d * 62 * G,
++    fill: { color: WHITE }, line,
++  });
++  s.addShape('line', { x: x + d * 13 * G, y: y + d * 23 * G, w: d * 35 * G, h: d * 27 * G, line });
++  s.addShape('line', { x: x + d * 48 * G, y: y + d * 50 * G, w: d * 35 * G, h: -d * 27 * G, line });
++}
++
++/** two office blocks: a windowed tower beside a hollow annex */
++function officeIcon(s, x, y, d) {
++  const cell = (gx, gy, gw, gh, c) => box(s, x + d * gx * G, y + d * gy * G, d * gw * G, d * gh * G, c);
++  cell(8, 12, 40, 72, INK); // tower
++  [16, 32].forEach((gx) => [20, 36, 52, 68].forEach((gy) => cell(gx, gy, 8, 8, WHITE)));
++  cell(48, 28, 40, 56, INK); // annex
++  cell(56, 36, 24, 40, WHITE); // hollow core
++  [44, 60].forEach((gy) => cell(64, gy, 8, 8, INK)); // annex windows
++}
++
++/** icon + medium-weight caption + value, as used on slides 23 and 24. */
++function contactBlock(s, c) {
++  c.icon(s, c.iconX, c.iconY, 0.609);
++  text(s, c.caption, { x: c.x, y: c.y, w: c.w, h: 0.37, fontSize: 16, fontFace: SANS_MED, align: c.align });
++  text(s, c.value, { x: c.valueX, y: c.y + 0.348, w: c.valueW, h: 0.303, fontSize: 12, align: c.align });
++}
++
++/* =================================================================== slides */
++
++/* 1 — cover */
++function slide01(pres) {
++  const s = pres.addSlide();
++  s.background = { color: CHARCOAL };
++  logoBadge(s);
++  // gold apron with rounded top corners
++  s.addShape('round2SameRect', { x: 3.014, y: 6.349, w: 7.402, h: 1.151, fill: { color: GOLD }, rectRadius: 0.315 });
++  label(s, BRAND, 1.133, 0.783, 2.248, WHITE);
++  text(s, 'DORMITORY', { x: 2.388, y: 1.359, w: 8.845, h: 1.717, fontSize: 96, bold: true, fontFace: SERIF_SB, color: WHITE });
++  text(s, 'Construction Company Pofile Presentation', {
++    x: 2.582, y: 2.991, w: 8.161, h: 0.505, fontSize: 24, color: WHITE, align: 'center',
++  });
++  label(s, '2030', 3.429, 6.876, 1.575, INK);
++  label(s, 'www.dormitory.construction', 7.293, 6.876, 2.567, INK);
++  // off-canvas leftovers from the original template
++  text(s, 'KY', { x: 15.836, y: 5.85, w: 0.621, h: 0.505, fontSize: 24, fontFace: SERIF, color: WHITE });
++  text(s, '2025', { x: 15.812, y: 12.19, w: 0.742, h: 0.37, fontSize: 16, color: WHITE });
++  text(s, 'construction', { x: -2.008, y: 8.12, w: 2.008, h: 0.438, fontSize: 20, color: WHITE });
++}
++
++/* 2 — table of contents */
++const TOC_LEFT = [
++  [' 3. ', 'Our History & Expertise', 3.898, 3.075],
++  ['6. ', 'Comprehensive Construction Services', 4.416, 4.853],
++  ['9. ', 'Project Portfolio: Showcase Of Excellence', 4.933, 5.098],
++  ['11. ', 'Commitment To Quality And Safety', 5.461, 4.53],
++];
++const TOC_RIGHT = [
++  ['15. ', 'Our Valued Clients', 3.898, 2.723],
++  ['17. ', 'Innovation And Technology', 4.412, 3.682],
++  ['20. ', 'Sustainability Initiatives', 4.93, 3.321],
++  ['22. ', 'Contact Us', 5.449, 1.93],
++];
++
++function slide02(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  chrome(s, { brand: [4.441, 0.783, INK], year: [0.862, WHITE], url: [9.783, WHITE] });
++  // two gold rules stepping down the left margin
++  s.addShape('line', { x: 3.627, y: 0.942, w: 0, h: 2.292, line: { color: GOLD, width: 6 } });
++  s.addShape('line', { x: 3.084, y: 3.442, w: 0, h: 2.292, line: { color: GOLD, width: 6 } });
++  text(s, 'Table Of Content', { x: 4.441, y: 1.88, w: 6.399, h: 1.01, fontSize: 54, fontFace: SERIF_SB });
++  const entry = (num, title, y, w, x, lead) =>
++    text(s, [
++      { text: lead, options: { color: INK } },
++      { text: num, options: { color: GOLD } },
++      { text: title, options: { color: INK } },
++    ], { x, y, w, h: 0.37, fontSize: 16 });
++  TOC_LEFT.forEach(([n, t, y, w], i) => entry(n, t, y, w, 3.641, i === 0 ? ' ' : '  '));
++  TOC_RIGHT.forEach(([n, t, y, w]) => entry(n, t, y, w, 9.11, '  '));
++}
++
++/* 3, 6, 9, 11, 15, 17, 20 — diamond section dividers */
++const DIVIDERS = [
++  { page: 'Page 03', title: 'Our history & expertise', size: 60, box: [6.005, 1.552, 6.383, 2.121], loremY: 4.299 },
++  { page: 'Page 06', title: 'Comprehensive Construction Services', size: 54, box: [5.676, 1.169, 6.794, 2.827], loremY: 4.384 },
++  { page: 'Page 09', title: 'Portfolio Showcase of Excellence', size: 54, box: [5.837, 1.223, 6.525, 2.827], loremY: 4.364 },
++  { page: 'Page  11', title: 'Commitment to Quality and Safety', size: 54, box: [6.573, 1.229, 5.788, 2.827], loremY: 4.364 },
++  { page: 'Page 15', title: 'Our Valued Clients', size: 60, box: [5.664, 1.464, 6.607, 2.121], loremY: 4.168 },
++  { page: 'Page 17', title: 'Innovation and Technology', size: 60, box: [6.488, 1.436, 5.983, 2.121], loremY: 4.168 },
++  { page: 'Page 20', title: 'Sustainability Initiatives', size: 60, box: [6.22, 1.578, 6.253, 2.121], loremY: 4.11 },
++];
++
++function dividerSlide(pres, cfg) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  diamond(s, 1.644, 0.608, 5.857, 5.496, GREY);
++  diamond(s, 0.484, 0.608, 5.857, 5.496, GOLD);
++  heading(s, cfg.title, cfg.box[0], cfg.box[1], cfg.box[2], cfg.box[3], cfg.size, { align: 'right' });
++  body(s, LOREM, 7.832, cfg.loremY, 4.529, 0.985, { align: 'right' });
++  chrome(s, { brand: [0.862, 0.449, INK], page: [cfg.page, 0.862, WHITE], year: [6.108, WHITE], url: [9.783, WHITE] });
++}
++
++/* 4 — history & expertise detail */
++function slide04(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, 0, 0, 0.733, 7.5, GOLD); // full-height left band
++  box(s, 12.6, 1.736, 0.733, 5.764, GOLD); // right band
++  box(s, 5.613, 4.657, 1.2, 0.117, GOLD); // rule under the intro copy
++  heading(s, 'Our history & expertise', 5.475, 1.385, 6.632, 1.919, 54);
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ',
++    5.538, 3.698, 6.632, 0.682);
++  const bullet = { type: 'number', style: 'arabicPeriod', indent: 27 };
++  body(s, [
++    { text: 'Has 25 years of experience in the construction industry. ', options: { breakLine: true, bullet } },
++    { text: "Exclusive operator for passengers who use the company's services. ", options: { breakLine: true, bullet } },
++    { text: 'Offer construction services tailored to your needs.', options: { bullet } },
++  ], 5.538, 5.307, 6.293, 0.985);
++  chrome(s, {
++    bar: false, brand: [5.543, 0.783, INK], page: ['Page 04', 0.976, INK],
++    year: [6.221, INK], url: [9.404, INK],
++  });
++}
++
++/* 5 — vision & mission (gold slide) */
++function slide05(pres) {
++  const s = pres.addSlide();
++  s.background = { color: GOLD };
++  box(s, 0, 0, 0.862, 7.5, ORANGE);
++  text(s, 'VISION & MISSION', { x: 1.442, y: 0.719, w: 7.915, h: 1.01, fontSize: 54, fontFace: SERIF, color: WHITE });
++  body(s,
++    'To become a leading construction company that provides innovative and high quality solutions, ' +
++    'committed to building sustainable infrastructure and having.',
++    1.442, 1.887, 4.748, 1.287, { color: WHITE });
++  const bullet = { type: 'number', style: 'arabicPeriod', indent: 27 };
++  body(s, [
++    { text: 'Provide Superior Quality – Provide safe, timely and high quality construction results to meet client expectations. ', options: { breakLine: true, bullet } },
++    { text: 'Innovation and Technology – Integrate the latest technology and innovative construction methods for.', options: { bullet } },
++  ], 6.949, 1.933, 5.429, 1.287, { color: WHITE });
++  chrome(s, {
++    bar: false, disc: WHITE, brand: [1.442, 0.257, WHITE], page: ['Page 05', 1.442, INK],
++    year: [6.221, WHITE], url: [9.783, WHITE],
++  });
++}
++
++/* 7 — service list */
++function slide07(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, 0.007, 5.001, 2.401, 2.501, GOLD);
++  box(s, 2.054, 0, 2.401, 3.189, GOLD);
++  heading(s, 'Comprehensive Construction Services', 5.048, 0.984, 7.799, 1.919, 54);
++  const bullet = { type: 'number', style: 'arabicPeriod', indent: 18 };
++  body(s, [
++    { text: 'General Contracting: managing projects from inception to completion', options: { breakLine: true, bullet } },
++    { text: 'Design-Build: integrated services for streamlined construction', options: { breakLine: true, bullet } },
++    { text: 'Construction Management: overseeing projects to ensure quality and efficiency', options: { breakLine: true, bullet } },
++    { text: 'Preconstruction Services: planning, budgeting, and risk assessment', options: { bullet } },
++  ], 5.048, 3.713, 7.163, 1.287);
++  chrome(s, {
++    bar: false, brand: [0.862, 0.449, INK], page: ['Page 07', 0.862, INK],
++    year: [5.048, INK], url: [9.783, INK],
++  });
++}
++
++/* 8 — construction management */
++function slide08(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, 0, 4.703, 0.862, 2.803, GOLD); // narrow strip running past the footer
++  box(s, 0, 3.75, 13.333, 2.803, GOLD); // wide gold band
++  heading(s, 'Construction Management', 5.324, 1.347, 6.919, 1.919, 54);
++  const bullet = { type: 'number', style: 'arabicPeriod', indent: 18 };
++  body(s, [
++    { text: 'Project Planning & Coordination: Overseeing the entire construction process, managing resources and teams.', options: { breakLine: true, bullet } },
++    { text: 'Contractor Selection: Managing subcontracts and working with trusted partners for specialized tasks.', options: { breakLine: true, bullet } },
++    { text: 'Procurement: Sourcing materials and equipment required for the construction.', options: { bullet } },
++  ], 5.324, 4.334, 6.105, 1.893);
++  chrome(s, {
++    bar: false, brand: [5.324, 0.449, INK], page: ['Page 08', 0.862, INK],
++    year: [5.324, INK], url: [9.783, INK],
++  });
++}
++
++/* 10 — portfolio highlights */
++const PORTFOLIO = [
++  { title: 'Client Success Stories', copy: 'Dive into real client success stories. Learn how we drive brand growth. Our team ensures customer engagement and loyalty.', x: 0.96, y: 3.367, w: 3.965, h: 1.223 },
++  { title: 'Award-Winning Designs', copy: 'Explore our award-winning designs and campaigns. Experience the power of visual storytelling. See creativity that captivates and converts.', x: 0.96, y: 4.723, w: 3.43, h: 1.486 },
++  { title: 'Diverse Industries', copy: 'Our portfolio represents clients across diverse industries. We tailor strategies to unique challenges. Our creative solutions deliver measurable results.', x: 4.765, y: 4.723, w: 3.43, h: 1.486 },
++];
++
++function slide10(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  heading(s, 'Portfolio Showcase of Excellence', 0.96, 1.102, 7.503, 1.919, 54);
++  PORTFOLIO.forEach((c) =>
++    text(s, [
++      { text: c.title, options: { fontSize: 16, color: INK, breakLine: true } },
++      { text: c.copy, options: { fontSize: 12, color: MUTED } },
++    ], { x: c.x, y: c.y, w: c.w, h: c.h, lineSpacingMultiple: 1.3 })
++  );
++  chrome(s, { brand: [0.862, 0.449, INK], page: ['Page 10', 0.862, WHITE], year: [6.108, WHITE], url: [9.783, WHITE] });
++}
++
++/* 12 — shared responsibility */
++function slide12(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, 0.009, 0, 3.457, 7.5, GOLD);
++  box(s, 13.023, 1.124, 0.31, 5.431, GOLD);
++  heading(s, 'Commitment to Quality and Safety', 5.875, 0.765, 6.495, 1.919, 54);
++  body(s, [
++    { text: 'Shared Responsibility: ', options: { fontSize: 16, color: GOLD, breakLine: true } },
++    { text: 'Every individual within our organization is responsible for ensuring that commitments to quality and safety are met in every action taken. We are committed to carrying out regular and transparent evaluations to maintain and improve these standards.', options: {} },
++  ], 5.875, 3.428, 6.168, 1.691);
++  body(s,
++    'PLACEHOLDER' +
++    'and ensuring safety and security for all parties involved. ',
++    5.875, 5.293, 4.738, 0.985);
++  chrome(s, {
++    bar: false, brand: [0.862, 0.449, WHITE], page: ['Page  12', 0.862, WHITE],
++    year: [5.875, INK], url: [9.783, INK],
++  });
++}
++
++/* 13 — security / quality / approach */
++const PILLARS = [
++  { lead: 'Security : ', copy: 'Security is our responsibility to protect customers, employees and communities from any potential risks. ', x: 4.746, y: 3.823, w: 3.73, h: 1.085 },
++  { lead: 'Quality : ', copy: 'We strive to continuously improve the quality of our products and services through a systematic. ', x: 9.101, y: 3.798, w: 3.37, h: 1.085 },
++  { lead: 'Approach: ', copy: 'Integrated Our commitment to quality and safety is reflected in an organizational culture that emphasizes care and attention.', x: 4.746, y: 5.346, w: 6.534, h: 0.783 },
++];
++
++function slide13(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, 5.574, 2.517, 7.759, 0.572, GOLD);
++  box(s, 0, 0, 0.656, 3.089, GOLD);
++  heading(s, 'Commitment to Quality and Safety', 0.96, 1.298, 8.823, 1.919, 54);
++  PILLARS.forEach((p) =>
++    body(s, [
++      { text: p.lead, options: { fontSize: 16, color: GOLD } },
++      { text: p.copy, options: {} },
++    ], p.x, p.y, p.w, p.h)
++  );
++  chrome(s, {
++    bar: false, brand: [0.96, 0.527, INK], page: ['Page  13', 0.862, WHITE],
++    year: [4.746, INK], url: [9.783, INK],
++  });
++}
++
++/* 14 — break time */
++function slide14(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, 3.446, 2.508, 9.887, 2.691, GOLD);
++  text(s, 'Break Time!', { x: 4.147, y: 2.675, w: 7.989, h: 1.717, fontSize: 96, bold: true, fontFace: SERIF_XB, color: WHITE });
++  text(s, '“Let’s Take A Break Now”', { x: 7.818, y: 4.224, w: 4.318, h: 0.505, fontSize: 24, fontFace: SANS_MED, color: WHITE });
++  chrome(s, {
++    bar: false, brand: [0.862, 0.449, INK], page: ['Page  14', 0.862, WHITE],
++    year: [6.108, WHITE], url: [9.783, INK],
++  });
++}
++
++/* 16 — valued clients detail */
++function slide16(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, 0, 4.473, 13.333, 3.027, GOLD);
++  heading(s, 'Our Valued Clients', 6.485, 1.423, 4.473, 1.919, 54);
++  body(s,
++    'At  dormitory, we are proud to have built lasting relationships with a wide range of clients across ' +
++    'diverse industries. We view each partnership as an opportunity to deliver excellence and ensure',
++    6.667, 4.826, 4.291, 1.287);
++  chrome(s, {
++    bar: false, brand: [6.108, 0.449, INK], page: ['Page 16', 0.862, WHITE],
++    year: [6.108, WHITE], url: [9.783, WHITE],
++  });
++}
++
++/* 18 — role of innovation */
++function slide18(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, 6.667, 2.704, 6.667, 2.985, GOLD);
++  heading(s, 'The Role of Innovation in Technology', 0.96, 1.385, 8.475, 1.919, 54);
++  body(s,
++    'Innovation is at the heart of technological advancements. It involves the creation of new ideas, ' +
++    'methods, or products that have the potential to change industries and improve the quality of life. ' +
++    "Whether it's through groundbreaking medical treatments, green energy solutions, or smarter digital " +
++    'tools, innovation leads to the continuous improvement of systems that affect every aspect of society.',
++    6.972, 3.25, 6.056, 1.893, { color: WHITE, align: 'justify' });
++  chrome(s, {
++    bar: false, brand: [0.862, 0.449, INK], page: ['Page 18', 0.862, INK],
++    year: [6.108, INK], url: [9.783, INK],
++  });
++}
++
++/* 19 — types of innovation */
++const INNOVATIONS = [
++  { lead: 'Information and Communication Technology (ICT): ', copy: 'The development of the internet, smart devices (smartphones), and cloud-based systems make communication, remote work, and data processing.', x: 2.52, y: 3.336, w: 5.304, h: 1.388 },
++  { lead: 'Artificial Intelligence (AI) and Machine Learning: ', copy: 'AI and machine learning enable computer systems to “learn” from data and make decisions without human intervention, changing the way we work and live.', x: 7.824, y: 3.386, w: 4.968, h: 1.338 },
++  { lead: 'Internet of Things (IoT): ', copy: 'IoT is a network of interconnected and data-sharing devices, such as smart home devices, that enables automation and more efficient management of daily life.', x: 2.52, y: 4.91, w: 6.221, h: 1.035 },
++];
++
++function slide19(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  heading(s, 'Types of Innovation and Technology', 2.52, 1.091, 7.108, 1.919, 54);
++  INNOVATIONS.forEach((i) =>
++    body(s, [
++      { text: i.lead, options: { fontSize: 14, color: GOLD } },
++      { text: i.copy, options: {} },
++    ], i.x, i.y, i.w, i.h)
++  );
++  chrome(s, { brand: [2.52, 0.449, INK], page: ['Page 19', 2.52, WHITE], year: [6.108, WHITE], url: [9.783, WHITE] });
++}
++
++/* 21 — sustainability intro */
++function slide21(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  heading(s, 'Sustainability Initiatives', 5.83, 0.937, 5.533, 1.919, 54);
++  body(s,
++    'At dormitory, we are committed to advancing sustainability in every aspect of our operations. ' +
++    'Our sustainability initiatives are designed to reduce our environmental impact, foster responsible resource use.',
++    5.83, 3.338, 4.92, 1.287);
++  chrome(s, { brand: [0.862, 0.449, WHITE], page: ['Page 21', 0.862, WHITE], year: [6.108, WHITE], url: [9.783, WHITE] });
++}
++
++/* 22 — sustainability programme */
++const CARBON = [
++  ['Initiative: ', "Implementation of environmentally friendly technology to reduce the company's carbon footprint."],
++  ['Action: ', 'Use renewable energy, such as solar or wind power, to replace fossil energy use, as well as optimize.'],
++  ['Goal: ', 'Reduce greenhouse gas emissions and contribute to reducing global warming.'],
++];
++const REPORTING = [
++  ['Initiative: ', 'Prepare transparent reports regarding the social, economic and environmental impacts produced by the company.'],
++  ['Action: ', 'Provide easily accessible information regarding sustainability targets and achievements that have been made.'],
++];
++
++/** turns [[lead, copy], ...] into gold-lead / black-copy paragraphs */
++const leadRuns = (rows) =>
++  rows.reduce((runs, [lead, copy], i) => {
++    runs.push({ text: lead, options: { fontSize: 16, color: GOLD } });
++    runs.push({ text: copy, options: { breakLine: i < rows.length - 1 } });
++    return runs;
++  }, []);
++
++function slide22(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, 0, 0, 0.432, 5.3, GOLD);
++  heading(s, 'Sustainability Initiatives', 0.862, 0.932, 9.774, 1.01, 54);
++  text(s, 'Carbon Emission Reduction', { x: 0.862, y: 2.087, w: 5.854, h: 0.505, fontSize: 24 });
++  body(s, leadRuns(CARBON), 0.862, 2.6, 9.538, 1.279);
++  text(s, 'Transparency and Sustainability Reporting', { x: 0.862, y: 4.334, w: 8.398, h: 0.505, fontSize: 24 });
++  body(s, leadRuns(REPORTING), 0.862, 4.839, 8.046, 1.489);
++  chrome(s, { brand: [0.92, 0.549, INK], page: ['Page 22', 0.862, WHITE], year: [6.108, WHITE], url: [9.783, WHITE] });
++}
++
++/* 23 — contact us */
++function slide23(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  box(s, -0.049, 0.77, 2.709, 3.58, GOLD);
++  heading(s, 'Contact Us', 5.663, 1.301, 3.931, 1.01, 54);
++  body(s,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ' +
++    'et dolore magna aliqua. Ut enim ad minim veniam.',
++    5.66, 2.883, 5.427, 0.985, { align: 'justify' });
++  contactBlock(s, { icon: phoneIcon, iconX: 1.278, iconY: 5.019, caption: 'Phone Number', value: '+0812-3456-7890', x: 1.999, y: 4.971, w: 1.883, valueX: 2.094, valueW: 1.692, align: 'center' });
++  contactBlock(s, { icon: mailIcon, iconX: 5.005, iconY: 5.013, caption: 'Email', value: '@dreamlandgmail.com', x: 5.88, y: 4.971, w: 0.824, valueX: 5.82, valueW: 2.221, align: 'center' });
++  contactBlock(s, { icon: officeIcon, iconX: 8.703, iconY: 5.013, caption: 'Office', value: 'dreamland.construction', x: 9.535, y: 4.971, w: 0.858, valueX: 9.579, valueW: 2.237, align: 'left' });
++  chrome(s, { brand: [5.66, 0.449, INK], page: ['Page 23', 0.862, WHITE], year: [6.108, WHITE], url: [9.783, WHITE] });
++}
++
++/* 24 — thank you */
++function slide24(pres) {
++  const s = pres.addSlide();
++  s.background = { color: PAGE };
++  text(s, 'Thanks You!', { x: 3.321, y: 1.441, w: 8.019, h: 1.717, fontSize: 96, fontFace: SERIF });
++  text(s, '"With the spirit of innovation, we can achieve more together. Thank you!"', {
++    x: 4.735, y: 3.336, w: 6.695, h: 0.774, fontSize: 20,
++  });
++  contactBlock(s, { icon: phoneIcon, iconX: 5.945, iconY: 4.948, caption: 'Phone Number', value: '+0812-3456-7890', x: 6.667, y: 4.9, w: 1.883, valueX: 6.762, valueW: 1.692, align: 'right' });
++  contactBlock(s, { icon: mailIcon, iconX: 9.673, iconY: 4.942, caption: 'Email', value: '@dreamlandgmail.com', x: 10.548, y: 4.9, w: 0.824, valueX: 10.488, valueW: 2.221, align: 'right' });
++  chrome(s, { brand: [0.862, 0.449, INK], year: [7.128, WHITE], url: [9.783, WHITE] });
++}
++
++/* ==================================================================== build */
++function build() {
++  const pres = new pptxgen();
++  pres.defineLayout({ name: 'WIDE_16x9', width: 13.333333, height: 7.5 });
++  pres.layout = 'WIDE_16x9';
++  pres.title = 'Dormitory Construction Company Profile';
++
++  slide01(pres);
++  slide02(pres);
++  dividerSlide(pres, DIVIDERS[0]); // 3
++  slide04(pres);
++  slide05(pres);
++  dividerSlide(pres, DIVIDERS[1]); // 6
++  slide07(pres);
++  slide08(pres);
++  dividerSlide(pres, DIVIDERS[2]); // 9
++  slide10(pres);
++  dividerSlide(pres, DIVIDERS[3]); // 11
++  slide12(pres);
++  slide13(pres);
++  slide14(pres);
++  dividerSlide(pres, DIVIDERS[4]); // 15
++  slide16(pres);
++  dividerSlide(pres, DIVIDERS[5]); // 17
++  slide18(pres);
++  slide19(pres);
++  dividerSlide(pres, DIVIDERS[6]); // 20
++  slide21(pres);
++  slide22(pres);
++  slide23(pres);
++  slide24(pres);
++
++  return pres.writeFile({
++    fileName: path.join(__dirname, '0a16f179-4848-444b-8450-f4ec626a83b5_grok_final.pptx'),
++  });
++}
++
++build().then((f) => console.log('wrote', f));

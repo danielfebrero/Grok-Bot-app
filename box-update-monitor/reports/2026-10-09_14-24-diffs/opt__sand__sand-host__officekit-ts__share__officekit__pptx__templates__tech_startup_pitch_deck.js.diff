@@ -1,0 +1,935 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tech_startup_pitch_deck.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tech_startup_pitch_deck.js
+@@ -0,0 +1,932 @@
++/*
++ * "Shpuka" — Technology Startup Business Plan (20 slides, 13.333 x 7.5 in)
++ * Rebuilt with pptxgenjs only. Run:  node <this file>
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Palette / typography
++ * ------------------------------------------------------------------ */
++const C = {
++  ink: '163E3E',     // dark teal
++  orange: 'F2B670',
++  sage: 'ABC19E',
++  mint: 'C7D6BF',
++  pale: 'DEE9D9',
++  bg: 'F5F7F2',      // slide background
++  gray: 'A6A6A6',    // body copy
++  silver: 'D9D9D9',  // hairlines
++  ash: 'BFBFBF',     // decorative SWOT letters
++  navy: '1D3155',    // theme default outline
++  black: '000000',
++  white: 'FFFFFF',
++};
++const F = { reg: 'Jost', light: 'Jost Light', med: 'Jost Medium', semi: 'Jost SemiBold' };
++
++const HAIR = { color: C.black, width: 0.5 };            // 0.5pt black outline
++const HAIR_INK = { color: C.ink, width: 0.5 };
++const HAIR_NAVY = { color: C.navy, width: 0.5 };
++const NOLINE = { type: 'none' };
++
++/* ------------------------------------------------------------------ *
++ * Generic helpers
++ * ------------------------------------------------------------------ */
++const box = (x, y, w, h) => ({ x, y, w, h });
++
++/** Filled rectangle. `line` defaults to none. */
++function rect(s, x, y, w, h, fill, line) {
++  s.addShape('rect', { x, y, w, h, fill: fill ? { color: fill } : { type: 'none' }, line: line || NOLINE });
++}
++
++/** Text block, top-aligned like every text frame in the deck. */
++function text(s, str, x, y, w, h, o = {}) {
++  s.addText(str, {
++    x, y, w, h,
++    fontFace: o.font || F.reg,
++    fontSize: o.size || 12,
++    color: o.color || C.black,
++    align: o.align || 'left',
++    valign: o.valign || 'top',
++    lineSpacingMultiple: o.lsm,
++    charSpacing: o.spc,
++  });
++}
++
++/** Solid horizontal rule. */
++function hrule(s, x, y, w, color, width) {
++  s.addShape('line', { x, y, w, h: 0, line: { color, width: width || 0.75 } });
++}
++
++/** Long-dashed teal connector (horizontal unless h is given). */
++function dashed(s, x, y, w, h) {
++  s.addShape('line', { x, y, w, h: h || 0, line: { color: C.ink, width: 1, dashType: 'lgDash' } });
++}
++
++/* ------------------------------------------------------------------ *
++ * Icons — custom geometries, coordinates normalised to a 0..1 box
++ * ------------------------------------------------------------------ */
++const ARROW_PTS = [
++  { x: 0.7625, y: 0.5625 }, { x: 0, y: 0.5625 }, { x: 0, y: 0.4375 }, { x: 0.7625, y: 0.4375 },
++  { x: 0.4125, y: 0.0875 }, { x: 0.5, y: 0 }, { x: 1, y: 0.5 }, { x: 0.5, y: 1 },
++  { x: 0.4125, y: 0.9125 }, { x: 0.7625, y: 0.5625 }, { close: true },
++];
++const TREND_PTS = [
++  { x: 0.7, y: 1 }, { x: 0.7, y: 0.8333 }, { x: 0.83, y: 0.8333 }, { x: 0.57, y: 0.4 },
++  { x: 0.37, y: 0.7333 }, { x: 0, y: 0.1167 }, { x: 0.07, y: 0 }, { x: 0.37, y: 0.5 },
++  { x: 0.57, y: 0.1667 }, { x: 0.9, y: 0.7167 }, { x: 0.9, y: 0.5 }, { x: 1, y: 0.5 },
++  { x: 1, y: 1 }, { x: 0.7, y: 1 }, { close: true },
++];
++/* magnifying glass: outer body + inner ring, drawn with cubic beziers */
++const SEARCH_PTS = [
++  { x: 0.9222, y: 1 }, { x: 0.5722, y: 0.65 },
++  { x: 0.4778, y: 0.7056, curve: { type: 'cubic', x1: 0.5444, y1: 0.6722, x2: 0.5111, y2: 0.6889 } },
++  { x: 0.3611, y: 0.7222, curve: { type: 'cubic', x1: 0.4389, y1: 0.7167, x2: 0.4, y2: 0.7222 } },
++  { x: 0.1056, y: 0.6167, curve: { type: 'cubic', x1: 0.2611, y1: 0.7222, x2: 0.1722, y2: 0.6889 } },
++  { x: 0, y: 0.3611, curve: { type: 'cubic', x1: 0.0389, y1: 0.5444, x2: 0, y2: 0.4611 } },
++  { x: 0.1056, y: 0.1056, curve: { type: 'cubic', x1: 0, y1: 0.2611, x2: 0.0333, y2: 0.1722 } },
++  { x: 0.3611, y: 0, curve: { type: 'cubic', x1: 0.1778, y1: 0.0389, x2: 0.2611, y2: 0 } },
++  { x: 0.6167, y: 0.1056, curve: { type: 'cubic', x1: 0.4611, y1: 0, x2: 0.55, y2: 0.0333 } },
++  { x: 0.7222, y: 0.3611, curve: { type: 'cubic', x1: 0.6833, y1: 0.1778, x2: 0.7222, y2: 0.2611 } },
++  { x: 0.7056, y: 0.4778, curve: { type: 'cubic', x1: 0.7222, y1: 0.4, x2: 0.7167, y2: 0.4389 } },
++  { x: 0.65, y: 0.5722, curve: { type: 'cubic', x1: 0.6944, y1: 0.5167, x2: 0.6722, y2: 0.5444 } },
++  { x: 1, y: 0.9222 }, { x: 0.9222, y: 1 }, { close: true },
++  { x: 0.3611, y: 0.6111, moveTo: true },
++  { x: 0.5389, y: 0.5389, curve: { type: 'cubic', x1: 0.4278, y1: 0.6111, x2: 0.4889, y2: 0.5889 } },
++  { x: 0.6111, y: 0.3611, curve: { type: 'cubic', x1: 0.5889, y1: 0.4889, x2: 0.6111, y2: 0.4333 } },
++  { x: 0.5389, y: 0.1833, curve: { type: 'cubic', x1: 0.6111, y1: 0.2889, x2: 0.5889, y2: 0.2333 } },
++  { x: 0.3611, y: 0.1111, curve: { type: 'cubic', x1: 0.4889, y1: 0.1333, x2: 0.4333, y2: 0.1111 } },
++  { x: 0.1833, y: 0.1833, curve: { type: 'cubic', x1: 0.2889, y1: 0.1111, x2: 0.2333, y2: 0.1333 } },
++  { x: 0.1111, y: 0.3611, curve: { type: 'cubic', x1: 0.1333, y1: 0.2333, x2: 0.1111, y2: 0.2889 } },
++  { x: 0.1833, y: 0.5389, curve: { type: 'cubic', x1: 0.1111, y1: 0.4333, x2: 0.1333, y2: 0.4889 } },
++  { x: 0.3611, y: 0.6111, curve: { type: 'cubic', x1: 0.2333, y1: 0.5889, x2: 0.2889, y2: 0.6111 } },
++  { close: true },
++];
++/* dollar sign, drawn in a 0.522 : 1 box */
++const DOLLAR_PTS = [
++  { x: 0.3936, y: 1 }, { x: 0.3936, y: 0.8833 },
++  { x: 0.1489, y: 0.8167, curve: { type: 'cubic', x1: 0.2979, y1: 0.8722, x2: 0.2234, y2: 0.85 } },
++  { x: 0, y: 0.6833, curve: { type: 'cubic', x1: 0.0851, y1: 0.7833, x2: 0.0319, y2: 0.7389 } },
++  { x: 0.2021, y: 0.6389 },
++  { x: 0.3192, y: 0.7444, curve: { type: 'cubic', x1: 0.2234, y1: 0.6889, x2: 0.266, y2: 0.7222 } },
++  { x: 0.5213, y: 0.7778, curve: { type: 'cubic', x1: 0.3724, y1: 0.7667, x2: 0.4362, y2: 0.7778 } },
++  { x: 0.7021, y: 0.75, curve: { type: 'cubic', x1: 0.5958, y1: 0.7778, x2: 0.6596, y2: 0.7667 } },
++  { x: 0.7766, y: 0.6722, curve: { type: 'cubic', x1: 0.7553, y1: 0.7333, x2: 0.7766, y2: 0.7056 } },
++  { x: 0.7234, y: 0.5944, curve: { type: 'cubic', x1: 0.7766, y1: 0.6389, x2: 0.7553, y2: 0.6167 } },
++  { x: 0.4468, y: 0.5333, curve: { type: 'cubic', x1: 0.6809, y1: 0.5778, x2: 0.5958, y2: 0.5556 } },
++  { x: 0.1383, y: 0.4444, curve: { type: 'cubic', x1: 0.2979, y1: 0.5111, x2: 0.1915, y2: 0.4778 } },
++  { x: 0.0532, y: 0.3167, curve: { type: 'cubic', x1: 0.0851, y1: 0.4111, x2: 0.0532, y2: 0.3667 } },
++  { x: 0.1702, y: 0.1778, curve: { type: 'cubic', x1: 0.0532, y1: 0.2556, x2: 0.0958, y2: 0.2111 } },
++  { x: 0.4043, y: 0.1222, curve: { type: 'cubic', x1: 0.2447, y1: 0.1444, x2: 0.3192, y2: 0.1278 } },
++  { x: 0.4043, y: 0 }, { x: 0.617, y: 0 }, { x: 0.617, y: 0.1167 },
++  { x: 0.8298, y: 0.1667, curve: { type: 'cubic', x1: 0.6915, y1: 0.1222, x2: 0.766, y2: 0.1389 } },
++  { x: 0.9575, y: 0.2611, curve: { type: 'cubic', x1: 0.8936, y1: 0.1944, x2: 0.9255, y2: 0.2278 } },
++  { x: 0.7553, y: 0.3111 },
++  { x: 0.6596, y: 0.2389, curve: { type: 'cubic', x1: 0.7341, y1: 0.2778, x2: 0.7021, y2: 0.2556 } },
++  { x: 0.5106, y: 0.2222, curve: { type: 'cubic', x1: 0.6277, y1: 0.2278, x2: 0.5745, y2: 0.2222 } },
++  { x: 0.3298, y: 0.2444, curve: { type: 'cubic', x1: 0.4255, y1: 0.2222, x2: 0.3724, y2: 0.2278 } },
++  { x: 0.266, y: 0.3167, curve: { type: 'cubic', x1: 0.2872, y1: 0.2667, x2: 0.266, y2: 0.2889 } },
++  { x: 0.3511, y: 0.3889, curve: { type: 'cubic', x1: 0.266, y1: 0.35, x2: 0.2872, y2: 0.3722 } },
++  { x: 0.6277, y: 0.4444, curve: { type: 'cubic', x1: 0.4043, y1: 0.4056, x2: 0.5, y2: 0.4222 } },
++  { x: 0.9043, y: 0.5333, curve: { type: 'cubic', x1: 0.7553, y1: 0.4611, x2: 0.8404, y2: 0.4944 } },
++  { x: 1, y: 0.6722, curve: { type: 'cubic', x1: 0.9681, y1: 0.5722, x2: 1, y2: 0.6222 } },
++  { x: 0.883, y: 0.8222, curve: { type: 'cubic', x1: 1, y1: 0.7389, x2: 0.9575, y2: 0.7889 } },
++  { x: 0.6064, y: 0.8889, curve: { type: 'cubic', x1: 0.8085, y1: 0.8556, x2: 0.7128, y2: 0.8778 } },
++  { x: 0.6064, y: 1 }, { x: 0.3936, y: 1 }, { close: true },
++];
++
++/** Place one of the normalised icon paths. */
++function icon(s, pts, x, y, w, h, color, rotate) {
++  s.addShape('custGeom', {
++    x, y, w, h, rotate: rotate || 0,
++    points: pts.map(p => (p.close ? p : {
++      ...p,
++      x: +(p.x * w).toFixed(4), y: +(p.y * h).toFixed(4),
++      ...(p.curve ? { curve: { type: 'cubic', x1: +(p.curve.x1 * w).toFixed(4), y1: +(p.curve.y1 * h).toFixed(4), x2: +(p.curve.x2 * w).toFixed(4), y2: +(p.curve.y2 * h).toFixed(4) } } : {}),
++    })),
++    fill: { color }, line: NOLINE,
++  });
++}
++const arrowIcon = (s, x, y, sz, color, rot) => icon(s, ARROW_PTS, x, y, sz, sz, color, rot);
++const searchIcon = (s, x, y, sz, color) => icon(s, SEARCH_PTS, x, y, sz, sz, color);
++const dollarIcon = (s, x, y, h, color) => icon(s, DOLLAR_PTS, x, y, h * 0.5222, h, color);
++const trendIcon = (s, x, y, w, color, rot) => icon(s, TREND_PTS, x, y, w, w * 0.6, color, rot);
++
++/** Bold black slanted arrow used as a big decorative pointer. */
++const bigArrow = (s, x, y, rot, sz) => arrowIcon(s, x, y, sz || 0.508, C.black, rot);
++
++/** Small square tile with an arrow glyph centred in it. */
++function arrowTile(s, x, y, sz, o = {}) {
++  rect(s, x, y, sz, sz, o.tile || C.pale, o.line === null ? NOLINE : (o.line || HAIR));
++  const g = sz * 0.5;
++  arrowIcon(s, x + (sz - g) / 2, y + (sz - g) / 2, g, o.icon || C.sage, o.rot || 0);
++}
++/** Small square tile with a magnifier centred in it. */
++function searchTile(s, x, y, sz, o = {}) {
++  rect(s, x, y, sz, sz, o.tile || C.mint, o.line === null ? NOLINE : (o.line || HAIR));
++  const g = sz * 0.385;
++  searchIcon(s, x + (sz - g) / 2, y + (sz - g) / 2, g, o.icon || C.white);
++}
++
++/* ------------------------------------------------------------------ *
++ * Buttons
++ * ------------------------------------------------------------------ */
++/** Pill-less rectangular button with centred label. */
++function button(s, x, y, w, h, label, o = {}) {
++  rect(s, x, y, w, h, o.fill || C.ink, o.line || NOLINE);
++  s.addText(label, {
++    x, y, w, h, align: 'center', valign: 'middle',
++    fontFace: F.reg, fontSize: o.size || 11, color: o.color || C.white,
++  });
++}
++/** Button with a magnifier at the left and a left-aligned label. */
++function searchButton(s, x, y, w, h, label, o = {}) {
++  rect(s, x, y, w, h, o.fill || C.ink, o.line || NOLINE);
++  searchIcon(s, x + 0.136, y + (h - 0.139) / 2, 0.139, o.icon || C.white);
++  s.addText(label, {
++    x: x + 0.375, y, w: w - 0.45, h, align: 'left', valign: 'middle',
++    fontFace: F.reg, fontSize: o.size || 11, color: o.color || C.white,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Repeating page furniture
++ * ------------------------------------------------------------------ */
++const NAV_LINKS = [
++  ['Business', 4.221, 0.838, F.reg], ['About', 5.386, 0.629, F.light],
++  ['Solution', 6.342, 0.785, F.light], ['Marketing', 7.454, 0.926, F.light],
++];
++/** Logo + top navigation + rule, present on every slide. */
++function chrome(s, ctaSize) {
++  s.addShape('triangle', { x: 0.357, y: 0.446, w: 0.265, h: 0.228, rotate: 90, fill: { color: C.black }, line: NOLINE });
++  s.addShape('triangle', { x: 0.471, y: 0.446, w: 0.265, h: 0.228, rotate: 90, fill: { color: C.orange }, line: NOLINE });
++  text(s, 'Shpuka.', 0.809, 0.375, 1.034, 0.37, { font: F.semi, size: 16 });
++  NAV_LINKS.forEach(([label, x, w, font]) =>
++    text(s, label, x, 0.409, w, 0.303, { font, size: 12, align: 'center' }));
++  text(s, 'Login', 11.0, 0.409, 0.656, 0.303, { size: 12, align: 'center' });
++  rect(s, 11.708, 0.395, 1.25, 0.303, C.ink);
++  text(s, 'Get Started', 11.823, 0.409, 1.022, 0.303, { size: ctaSize || 10, color: C.white, align: 'center' });
++  hrule(s, 0.375, 1.003, 12.583, C.silver);
++}
++
++/** Frame reserved by the template for a photo; the source deck leaves them empty. */
++const photo = (s, x, y, w, h) => rect(s, x, y, w, h, C.bg);
++
++/** Horizontal fade, used where the deck has a gradient-filled decorative tile. */
++function fadeRect(s, x, y, w, h, color, from, to) {
++  const steps = 6;
++  for (let i = 0; i < steps; i++) {
++    s.addShape('rect', {
++      x: x + (w / steps) * i, y, w: w / steps + 0.005, h, line: NOLINE,
++      fill: { type: 'solid', color, transparency: Math.round(from + ((to - from) * i) / (steps - 1)) },
++    });
++  }
++}
++
++/* ------------------------------------------------------------------ *
++ * Small composite blocks used on many slides
++ * ------------------------------------------------------------------ */
++/** Big number over a small two-line caption ("50k / Active Users"). */
++function stat(s, value, caption, x, y, o = {}) {
++  text(s, value, x, y, 0.962, 0.505, { size: o.size || 24 });
++  text(s, caption, x + 0.02, y + (o.gap || 0.463), 0.844, 0.438, { font: F.light, size: 10, color: o.capColor || C.ink });
++}
++/** Card heading + muted body copy. */
++function cardText(s, title, body, x, y, o = {}) {
++  text(s, title, x, y, o.tw || 1.985, o.th || 0.37, { font: o.titleFont || F.reg, size: o.titleSize || 16, color: o.titleColor || C.black });
++  text(s, body, x, y + (o.bodyGap || 0.362), o.bw || 2.326, 0.438, { font: F.light, size: o.bodySize || 10, color: C.ink });
++}
++const LOREM_S = 'Etiam erat velit serisque in. Purus sit amet luctus venenatis lectus';
++const LOREM_F = 'Etiam erat velit serisque in.Fot purus sit amet luctus venenatis lectus';
++const LOREM_L = 'Etiam erat velit scelerisque in. Purus sit amet luctus venenatis lectus. Vitae ultricies leo integer malesuada commodo viverra.';
++const LOREM_G = 'Eget nunc scelerisque viverrafro mauris inte aliquam sem fringilla. At elementum eure facilisis sed.';
++const FAMES = 'Fames ac turpis egestas maecenas pharetra convallis. Aliquam malesuada Bibendum for arcu vitae elementum curabitur vitae.';
++
++/* ------------------------------------------------------------------ *
++ * Charts
++ * ------------------------------------------------------------------ */
++const AXIS = {
++  showLegend: false, showTitle: false,
++  catAxisLabelFontFace: 'Calibri', catAxisLabelFontSize: 12, catAxisLabelColor: '595959',
++  valAxisLabelFontFace: 'Calibri', valAxisLabelFontSize: 12, valAxisLabelColor: '595959',
++  catAxisLineColor: C.silver, valAxisLineShow: false,
++  catAxisMajorTickMark: 'none', catAxisMinorTickMark: 'none',
++  valAxisMajorTickMark: 'none', valAxisMinorTickMark: 'none',
++  valGridLine: { color: C.silver, size: 0.75 }, catGridLine: { style: 'none' },
++  chartArea: { fill: { type: 'none' } }, plotArea: { fill: { type: 'none' } },
++};
++
++/** Two-slice ring used as a mini "progress" dial. */
++function donutChart(s, pptx, x, y) {
++  s.addChart(pptx.ChartType.doughnut, [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [8.2, 3.2] }], {
++    x, y, w: 1.35, h: 0.9, holeSize: 75, chartColors: [C.pale, C.ink],
++    showLegend: false, showTitle: false, showValue: false, dataBorder: { pt: 0, color: C.bg },
++    chartArea: { fill: { type: 'none' } }, plotArea: { fill: { type: 'none' } },
++  });
++}
++const SERIES_3 = [
++  { name: 'Series 1', values: [4.3, 2.5, 3.5, 4.5] },
++  { name: 'Series 2', values: [2.4, 4.4, 1.8, 2.8] },
++  { name: 'Series 3', values: [2, 2, 3, 5] },
++];
++const withLabels = labels => SERIES_3.map(s => ({ ...s, labels }));
++
++function lineChart(s, pptx, x, y, w, h) {
++  s.addChart(pptx.ChartType.line, withLabels(['Category 1', 'Category 2', 'Category 3', 'Category 4']), {
++    x, y, w, h, ...AXIS, chartColors: [C.ink, C.sage, C.orange],
++    lineSize: 2.25, lineDataSymbol: 'none', lineSmooth: false,
++  });
++}
++function barChart(s, pptx, x, y, w, h) {
++  s.addChart(pptx.ChartType.bar, withLabels(['2021', '2022', '2023', '2024']), {
++    x, y, w, h, ...AXIS, barDir: 'col', barGrouping: 'clustered',
++    chartColors: [C.mint, C.sage, C.ink], barGapWidthPct: 219, barOverlapPct: -27,
++  });
++}
++
++/* ================================================================== *
++ * Slide builders
++ * ================================================================== */
++
++/* 1 — Title */
++function slide1(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 8.12, 1.933, 2.026, 2.668);
++  chrome(s);
++
++  // headline block
++  rect(s, 1.375, 1.97, 2.151, 0.32, C.orange, HAIR);
++  text(s, 'Presentation Template', 1.641, 1.992, 1.618, 0.286, { size: 11, color: C.white, align: 'center' });
++  text(s, 'Technology Startup\nBusiness Plan.', 1.224, 2.805, 5.642, 1.582, { font: F.semi, size: 44 });
++  text(s, LOREM_L, 1.286, 4.65, 4.995, 0.505, { size: 12, color: C.gray });
++  arrowTile(s, 1.375, 5.571, 0.395, { tile: C.pale, line: null, rot: 315 });
++  button(s, 1.981, 5.571, 1.249, 0.395, 'Explore More');
++
++  // "Overview" card
++  rect(s, 10.312, 2.409, 1.922, 0.792, C.pale, HAIR);
++  text(s, 'Overview', 10.343, 2.483, 0.811, 0.286, { size: 11, color: C.ink });
++  hrule(s, 10.449, 3.043, 1.648, C.ink);
++  text(s, 'Reqruitors', 10.348, 2.781, 0.811, 0.236, { font: F.light, size: 8, color: C.ink });
++  text(s, '$18.000.00', 11.381, 2.781, 0.811, 0.236, { font: F.light, size: 8, color: C.ink, align: 'right' });
++
++  // "Insign" card with paired bars
++  rect(s, 10.312, 3.426, 1.797, 2.391, C.pale, HAIR);
++  rect(s, 10.49, 3.557, 1.441, 0.338, C.ink);
++  text(s, 'Insign', 10.496, 3.582, 0.592, 0.286, { size: 11, color: C.white });
++  text(s, 'This Week', 11.232, 3.618, 0.698, 0.236, { font: F.light, size: 8, color: C.sage });
++  [[10.49, 4.181, 0.439, 1.059], [10.816, 4.181, 1.031, 0.467], [11.141, 4.181, 0.337, 1.161],
++   [11.466, 4.181, 0.609, 0.889], [11.792, 4.181, 0.866, 0.632]].forEach(([x, top, hTop, hBot]) => {
++    rect(s, x, top, 0.14, hTop, C.mint);
++    rect(s, x, top + hTop, 0.14, hBot, C.sage);
++  });
++
++  // donut widget + "Learn More" + KPI card
++  rect(s, 7.604, 3.395, 1.049, 1.019, C.sage, HAIR);
++  donutChart(s, pptx, 7.454, 3.367);
++  rect(s, 7.866, 4.219, 0.525, 0.087, C.mint);
++  searchButton(s, 8.113, 4.828, 2.027, 0.385, 'Learn More');
++  rect(s, 7.891, 5.439, 2.249, 0.672, C.pale, HAIR);
++  text(s, '30k+', 8.004, 5.494, 0.751, 0.404, { size: 18 });
++  text(s, '2.1k+', 8.976, 5.494, 0.802, 0.404, { size: 18 });
++  text(s, 'Total Users', 8.024, 5.789, 0.844, 0.269, { font: F.light, size: 10, color: C.sage });
++  text(s, 'Users Ratings', 8.983, 5.789, 1.108, 0.269, { font: F.light, size: 10, color: C.sage });
++}
++
++/* 2 — Executive summary */
++function slide2(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  text(s, 'Executive Summary.', 1.252, 2.096, 2.838, 1.447, { font: F.semi, size: 40 });
++  rect(s, 1.375, 3.811, 1.724, 0.32, C.orange, HAIR);
++  text(s, 'Graphic Template', 1.533, 3.833, 1.408, 0.286, { size: 11, color: C.white, align: 'center' });
++  text(s, 'Eget nunc scelerisque viverra mauris inte aliquam sem fringilla. At elementum eure facilisis sed odio morbi.',
++    1.286, 4.531, 3.168, 0.707, { size: 12, color: C.gray });
++  text(s, 'Learn More', 1.286, 5.561, 1.145, 0.337, { size: 14, color: C.ink });
++  arrowIcon(s, 2.643, 5.631, 0.198, C.ink);
++
++  // card, chip, title and body coordinates are all set individually in the deck
++  const cards = [
++    { title: 'Mission Statement',  card: [5.435, 1.901], chip: [5.653, 2.079], head: [5.568, 2.485], body: [5.568, 3.09] },
++    { title: 'Vission Statement',  card: [7.734, 1.901], chip: [7.993, 2.079], head: [7.885, 2.485], body: [7.868, 3.09] },
++    { title: 'Objectives',         card: [10.043, 1.901], chip: [10.326, 2.079], head: [10.218, 2.482], body: [10.183, 3.09] },
++    { title: 'Key Achievements',   card: [6.106, 4.155], chip: [6.331, 4.286], head: [6.25, 4.702], body: [6.233, 5.325] },
++    { title: 'Market Validation',  card: [8.415, 4.155], chip: [8.671, 4.286], head: [8.567, 4.692], body: [8.603, 5.325] },
++  ];
++  cards.forEach(({ title, card, chip, head, body }) => {
++    rect(s, card[0], card[1], 1.968, 1.968, C.pale, HAIR);
++    rect(s, chip[0], chip[1], 0.299, 0.299, C.orange, HAIR);
++    text(s, title, head[0], head[1], 1.635, 0.64, { size: 16 });
++    text(s, LOREM_S, body[0], body[1], 1.635, 0.606, { font: F.light, size: 10, color: C.ink });
++  });
++
++  // sixth tile is an empty card that fades out to the left-to-right
++  fadeRect(s, 10.724, 4.155, 1.968, 1.968, C.pale, 42, 100);
++}
++
++/* 3 — Problem statement */
++function slide3(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 1.375, 2.511, 2.538, 2.321);
++  chrome(s);
++  text(s, 'Problem\nStatement.', 1.244, 5.15, 2.874, 1.447, { font: F.semi, size: 40 });
++  rect(s, 4.619, 5.373, 1.906, 0.32, C.orange, HAIR);
++  searchIcon(s, 4.75, 5.459, 0.139, C.white);
++  text(s, 'Why Its Matters?', 4.986, 5.395, 1.407, 0.286, { size: 11, color: C.white });
++  text(s, 'Eget nunc scelerisque viverra mauris inte aliquam fringilla.', 4.527, 5.951, 2.295, 0.505,
++    { font: F.light, size: 12, color: C.gray });
++
++  searchButton(s, 1.375, 1.759, 1.975, 0.385, 'Learn More');
++  dashed(s, 4.372, 1.952, 2.295);
++  rect(s, 4.372, 2.511, 2.295, 2.321, C.pale, HAIR);
++  rect(s, 4.688, 2.72, 0.299, 0.299, C.orange, HAIR);
++  text(s, 'Conection To\nYour Solution.', 4.589, 3.261, 1.601, 0.64, { font: F.med, size: 16, color: C.ink });
++  text(s, LOREM_S, 4.585, 3.987, 1.635, 0.606, { font: F.light, size: 10, color: C.ink });
++  arrowTile(s, 3.71, 3.467, 0.409, { tile: C.sage, icon: C.ink, line: null });
++
++  // monthly downtime column chart (hand-built bars)
++  rect(s, 7.666, 1.759, 2.366, 0.385, C.sage, HAIR);
++  text(s, 'Monthly Downtime Percentage', 7.742, 1.811, 2.185, 0.286, { size: 11, color: C.white });
++  const months = [
++    // label, value, x, pale-stub bottom, solid colour  (bars share a 4.459 baseline)
++    ['Jan', '55%', 7.666, 0.419, 3.467, C.mint],
++    ['Feb', '70%', 8.327, 0.419, 3.261, C.sage],
++    ['Mar', '45%', 8.989, 0.506, 3.620, C.ink],
++    ['Apr', '90%', 9.651, 0.419, 2.975, C.mint],
++    ['May', '50%', 10.312, 0.485, 3.467, C.sage],
++    ['Jun', '30%', 10.974, 0.419, 3.987, C.ink],
++  ];
++  months.forEach(([label, pct, x, labelW, top, fill]) => {
++    rect(s, x, 2.781, 0.354, top - 2.781, C.pale);   // light stub above the value
++    rect(s, x, top, 0.354, 4.459 - top, fill);       // solid bar down to the baseline
++    text(s, pct, x - 0.116, 2.448, 0.586, 0.269, { size: 10, color: C.ink, align: 'center' });
++    text(s, label, x + (0.354 - labelW) / 2, 4.517, labelW, 0.269,
++      { font: F.light, size: 10, color: C.ink, align: 'center' });
++  });
++
++  // years & demand index panel
++  rect(s, 7.43, 5.08, 4.236, 1.566, null, HAIR_INK);
++  text(s, 'Years & Market\nDemand Index', 7.588, 5.34, 1.247, 0.471, { size: 11, color: C.ink });
++  arrowTile(s, 8.265, 5.958, 0.409, { tile: C.ink, icon: C.bg, line: null });
++  [['2022', 5.356, 1.013, '65'], ['2023', 5.741, 0.856, '50'], ['2024', 6.136, 1.301, '80']]
++    .forEach(([year, y, fillW, value]) => {
++      rect(s, 9.399, y + 0.017, 1.655, 0.225, C.pale);   // full track
++      rect(s, 9.399, y + 0.017, fillW, 0.225, C.mint);   // filled portion
++      text(s, year, 8.876, y, 0.523, 0.252, { font: F.light, size: 9, color: C.ink, align: 'center' });
++      text(s, value, 11.047, y - 0.005, 0.586, 0.252, { size: 9, color: C.ink, align: 'center' });
++    });
++}
++
++/* 4 — The best solution */
++function slide4(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 8.86, 1.948, 2.469, 2.605);
++  chrome(s);
++  text(s, 'The Best Solution.', 1.297, 2.059, 2.874, 1.447, { font: F.semi, size: 40 });
++  text(s, 'Resent Income', 1.297, 3.775, 1.287, 0.303, { font: F.light, size: 12 });
++  text(s, '$2.15M', 1.288, 4.031, 1.287, 0.438, { size: 20 });
++
++  dashed(s, 5.441, 2.427, 0.497);
++  arrowTile(s, 4.914, 2.222, 0.409, { tile: C.sage, icon: C.ink });
++  rect(s, 5.938, 1.948, 2.469, 2.605, C.pale, HAIR);
++  text(s, 'Eget nunc scelere iquinthe viverra mauris inte aliquam sem fringilla. At elementum eure facilisis sed odio morbi.',
++    6.12, 2.346, 2.156, 1.111, { font: F.light, size: 12, color: C.ink });
++  rect(s, 7.634, 3.826, 0.523, 0.523, C.sage, HAIR);
++  rect(s, 11.0, 2.289, 0.523, 0.523, C.sage, HAIR);
++  button(s, 3.684, 3.829, 1.462, 0.52, 'Learn More');
++  button(s, 5.292, 3.829, 1.462, 0.52, 'Discover Now', { fill: C.orange, line: HAIR });
++
++  const cols = [['The Solution', 1.288], ['Key Features', 4.173], ['How Its Works?', 7.058], ['Benefits', 9.921]];
++  cols.forEach(([title, x]) => {
++    text(s, title, x, 5.07, 1.85, 0.37, { font: F.med, size: 16, color: C.ink });
++    text(s, LOREM_G, x - 0.002, 5.632, 2.625, 0.656, { font: F.light, size: 11, color: C.gray });
++  });
++}
++
++/* 5 — Market analysis */
++function slide5(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 6.667, 1.792, 2.668, 1.584);
++  chrome(s);
++  rect(s, 1.375, 1.792, 4.764, 3.445, C.pale, HAIR);
++  lineChart(s, pptx, 1.616, 2.13, 4.224, 2.816);
++
++  text(s, 'Market Analysis.', 6.687, 3.724, 5.172, 0.841, { font: F.semi, size: 44 });
++  dashed(s, 6.779, 4.899, 2.182);
++  text(s, FAMES, 6.687, 5.314, 4.224, 0.707, { size: 12, color: C.gray });
++  [0, 1, 2, 3, 4].forEach(i =>
++    s.addShape('star5', { x: 6.807 + i * 0.2835, y: 6.312, w: 0.186, h: 0.186, fill: { color: C.orange }, line: NOLINE }));
++
++  button(s, 9.615, 1.792, 1.462, 0.52, 'Learn More');
++  arrowTile(s, 11.328, 1.781, 0.531, { tile: C.pale, rot: 135 });
++
++  rect(s, 1.375, 5.661, 0.352, 0.352, C.orange, HAIR);
++  stat(s, '89%', 'Customer\nHappy', 1.841, 5.593, { gap: 0.505 });
++  rect(s, 3.401, 5.661, 0.352, 0.352, C.ink);
++  stat(s, '5.0', 'User\nRatings', 3.867, 5.593, { gap: 0.505 });
++}
++
++/* 6 — Competitive analysis */
++function slide6(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  text(s, 'Competitive Analysis.', 1.297, 1.867, 5.683, 0.774, { font: F.semi, size: 40 });
++  searchButton(s, 7.397, 2.034, 1.975, 0.385, 'Learn More', { fill: C.orange, line: HAIR });
++  arrowTile(s, 9.516, 2.032, 0.393, { tile: C.pale, rot: 45 });
++
++  rect(s, 1.565, 3.141, 4.011, 3.014, C.pale, HAIR);
++  barChart(s, pptx, 1.81, 3.69, 3.523, 2.349);
++  rect(s, 1.375, 2.854, 1.715, 0.503, C.orange, HAIR);
++  text(s, 'Company 1', 1.41, 2.97, 1.009, 0.286, { size: 11, color: C.white });
++
++  rect(s, 6.123, 3.141, 4.011, 3.014, null, HAIR_INK);
++  barChart(s, pptx, 6.386, 3.69, 3.523, 2.349);
++  rect(s, 5.933, 2.854, 1.715, 0.503, C.ink);
++  text(s, 'Company 2', 6.002, 2.97, 1.009, 0.286, { size: 11, color: C.white });
++
++  rect(s, 10.452, 3.141, 1.049, 1.019, C.sage, HAIR);
++  donutChart(s, pptx, 10.301, 3.113);
++  rect(s, 10.713, 3.965, 0.525, 0.087, C.mint);
++  text(s, 'Eget nunc scelerisque fori viverra mauris inte aliquam sem fringilla. At elmentum eure facilisis sed odio.',
++    10.355, 4.53, 2.24, 0.909, { size: 12, color: C.gray });
++  button(s, 10.452, 5.77, 1.126, 0.385, 'Get Started', { fill: C.orange, line: HAIR });
++}
++
++/* 7 — Business model */
++function slide7(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 6.878, 1.877, 3.733, 2.045);
++  dashed(s, 3.823, 5.058, 5.864, 0.021);
++  chrome(s);
++  text(s, 'Business Model.', 1.228, 1.861, 4.776, 0.774, { font: F.semi, size: 40 });
++  text(s, 'Fames ac turpis egestas maecenas pharetra convallis. Aliquam malesuada Bibendum for arcu vi elementum curabitur vitae.',
++    1.311, 2.716, 4.694, 0.505, { size: 12, color: C.gray });
++  bigArrow(s, 1.328, 3.457, 45);
++  button(s, 7.127, 3.18, 1.462, 0.52, 'Discover Now', { fill: C.orange, line: HAIR });
++
++  // "$" badge and income card
++  rect(s, 11.613, 2.088, 0.526, 0.526, C.ink);
++  dollarIcon(s, 11.793, 2.192, 0.318, C.bg);
++  rect(s, 10.138, 2.919, 1.725, 0.593, C.pale, HAIR);
++  rect(s, 10.234, 2.99, 0.45, 0.45, C.ink);
++  trendIcon(s, 10.304, 3.122, 0.31, C.bg, 180);
++  text(s, 'Income', 10.703, 2.968, 0.844, 0.269, { font: F.light, size: 10, color: C.ink });
++  text(s, '$50.000', 10.684, 3.145, 1.067, 0.337, { size: 14 });
++
++  const pillars = [
++    { title: 'Pricing Strategy',     x: 1.375, tx: 1.392, tw: 1.985, fill: C.bg,   line: HAIR_INK, chip: [1.476, C.orange] },
++    { title: 'Cost Structure',       x: 4.146, tx: 4.152, tw: 1.985, fill: C.pale, line: HAIR,     chip: [4.235, C.ink] },
++    { title: 'Profitability Model',  x: 6.916, tx: 6.94,  tw: 1.985, fill: C.bg,   line: HAIR_INK, chip: [7.024, C.mint] },
++    { title: 'Customer Acquisition', x: 9.687, tx: 9.704, tw: 2.237, fill: C.bg,   line: HAIR_INK, chip: [9.787, C.sage] },
++  ];
++  pillars.forEach(({ title, x, tx, tw, fill, line, chip }) => {
++    rect(s, x, 4.277, 2.448, 1.562, fill, line);
++    rect(s, chip[0], 4.403, 0.326, 0.326, chip[1], HAIR);
++    text(s, title, tx, 4.875, tw, 0.37, { size: 16 });
++    text(s, LOREM_S, tx, 5.237, 2.326, 0.438, { font: F.light, size: 10, color: C.ink });
++  });
++
++  button(s, 1.375, 6.218, 2.032, 0.37, 'This is business we have');
++  searchTile(s, 3.607, 6.222, 0.361);
++}
++
++/* 8 — Marketing strategy */
++function slide8(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 5.288, 1.867, 2.561, 4.498);
++  chrome(s);
++  text(s, 'Marketing\nStrategy.', 1.297, 1.867, 3.602, 1.717, { font: F.semi, size: 48 });
++  searchButton(s, 1.388, 3.941, 2.038, 0.32, 'What is our strategy?', { fill: C.orange, line: HAIR });
++  text(s, FAMES, 1.297, 4.619, 3.297, 0.707, { size: 12, color: C.gray });
++  stat(s, '50k', 'Active\nUsers', 1.313, 5.623);
++  stat(s, '89%', 'Positive\nFeedback', 2.561, 5.623);
++  searchButton(s, 4.217, 5.633, 1.975, 0.385, 'Learn More');
++
++  const rows = [
++    ['Brand Introduction',     1.867, 1.931, 2.293, C.orange, HAIR],
++    ['Digital Marketing',      3.046, 3.103, 3.465, C.sage,   HAIR],
++    ['Marketing Partnerships', 4.226, 4.274, 4.636, C.mint,   HAIR],
++    ['Performance Evaluation', 5.406, 5.447, 5.809, C.ink,    NOLINE],
++  ];
++  rows.forEach(([title, chipY, titleY, bodyY, chip, line]) => {
++    rect(s, 8.38, chipY, 0.467, 0.467, chip, line);
++    text(s, title, 9.222, titleY, 2.486, 0.37, { size: 16 });
++    text(s, LOREM_S, 9.222, bodyY, 2.326, 0.438, { font: F.light, size: 10, color: C.ink });
++  });
++}
++
++/* 9 — Sales strategy */
++function slide9(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  const cards = [
++    { title: 'Sales Channels',           card: [1.371, 1.958], chip: [1.471, 2.058, C.orange, HAIR],   head: [1.495, 2.344], tw: 1.985, fill: C.bg },
++    { title: 'Sales Cycle Overview',     card: [4.547, 1.958], chip: [4.653, 2.058, C.sage, HAIR],     head: [4.671, 2.344], tw: 2.321, fill: C.bg },
++    { title: 'Customer Relationship',    card: [0.957, 3.392], chip: [1.057, 3.489, C.ink, NOLINE],    head: [1.08, 3.775],  tw: 2.399, fill: C.bg },
++    { title: 'Sales Team Structure',     card: [4.133, 3.392], chip: [4.238, 3.489, C.orange, HAIR],   head: [4.257, 3.775], tw: 2.326, fill: C.pale },
++    { title: 'Sales Training Enablement', card: [1.583, 4.826], chip: [1.702, 4.952, C.mint, HAIR],    head: [1.726, 5.237], tw: 2.917, fill: C.bg },
++    { title: 'Performance Measurement',  card: [4.759, 4.826], chip: [4.884, 4.952, C.sage, HAIR],     head: [4.902, 5.237], tw: 2.865, fill: C.bg },
++  ];
++  cards.forEach(({ title, card, chip, head, tw, fill }) => {
++    rect(s, card[0], card[1], 2.936, 1.285, fill, fill === C.pale ? HAIR : HAIR_INK);
++    rect(s, chip[0], chip[1], 0.219, 0.219, chip[2], chip[3]);
++    text(s, title, head[0], head[1], tw, 0.37, { size: 16 });
++    text(s, LOREM_S, head[0], head[1] + 0.333, 2.326, 0.438, { font: F.light, size: 10, color: C.ink });
++  });
++
++  dashed(s, 7.069, 3.597, 0.497);
++  arrowTile(s, 7.644, 3.392, 0.409, { tile: C.sage, icon: C.ink, rot: 180 });
++  text(s, 'What is our sales strategy?', 8.601, 1.939, 2.07, 0.286, { size: 11 });
++  text(s, 'Sales\nStrategy.', 8.56, 2.628, 3.602, 1.717, { font: F.semi, size: 48 });
++  text(s, 'Fames ac turpis egestas maecenas pharetra convallis. Aliquam malesuada Bibendu.',
++    8.601, 4.732, 3.297, 0.505, { size: 12, color: C.gray });
++  button(s, 8.699, 5.741, 1.377, 0.37, 'Get Premium');
++  searchTile(s, 10.223, 5.744, 0.361);
++}
++
++/* 10 — Break */
++function slide10(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 6.667, 2.049, 5.194, 2.767);
++  chrome(s);
++  text(s, 'Let\u2019s Take\na Break.', 1.297, 2.158, 3.651, 1.919, { font: F.semi, size: 54 });
++  button(s, 1.375, 4.218, 1.462, 0.52, 'Discover Now');
++  arrowTile(s, 3.024, 4.218, 0.52, { tile: C.pale, rot: 315 });
++  searchButton(s, 6.203, 4.218, 2.027, 0.385, 'Learn More');
++
++  rect(s, 1.375, 5.489, 0.468, 0.468, C.silver);
++  text(s, 'Stay on top of market trends. Build\nYour crypto portfolio and execute',
++    1.939, 5.599, 2.727, 0.505, { font: F.light, size: 12, color: C.ink });
++  arrowIcon(s, 5.136, 5.582, 0.211, C.ink, 270);
++  stat(s, '80%', 'People\ntrust us', 5.387, 5.47, { gap: 0.453 });
++  text(s, LOREM_L, 7.216, 5.594, 4.995, 0.505, { size: 12, color: C.gray });
++
++  // little bar-chart badge
++  rect(s, 11.299, 4.336, 0.806, 0.806, C.pale, HAIR);
++  [[11.455, 4.655, 0.233], [11.64, 4.489, 0.399], [11.825, 4.587, 0.301]]
++    .forEach(([x, y, h]) => rect(s, x, y, 0.122, h, C.ink));
++  rect(s, 11.455, 4.979, 0.492, 0.052, C.bg);
++}
++
++/* 11 — Development roadmap */
++function slide11(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 1.375, 1.852, 3.795, 1.573);
++  dashed(s, 7.805, 2.573, 4.542);
++  dashed(s, 7.416, 4.14, 4.542, 0.019);
++  dashed(s, 7.912, 5.728, 4.542);
++  chrome(s);
++  bigArrow(s, 6.234, 1.812, 45);
++  searchButton(s, 2.735, 3.266, 2.375, 0.32, 'Navigating the Future Path', { fill: C.orange, line: HAIR });
++  button(s, 5.378, 3.266, 1.3, 0.32, 'Learn More');
++  text(s, 'Development\nRoadmap.', 1.225, 3.97, 4.718, 1.447, { font: F.semi, size: 40 });
++  text(s, LOREM_L, 1.266, 5.668, 4.677, 0.505, { size: 12, color: C.gray });
++
++  const phases = [
++    ['Research Phase',    7.805, 1.87,  7.911, 2.089, 2.451, C.bg],
++    ['Design Phase',      10.14, 1.87,  10.246, 2.089, 2.451, C.bg],
++    ['Development Phase', 7.416, 3.456, 7.522, 3.674, 4.036, C.mint],
++    ['Testing Phase',     9.751, 3.437, 9.858, 3.656, 4.018, C.bg],
++    ['Launch Preparation', 7.912, 5.026, 8.018, 5.296, 5.657, C.bg],
++    ['Product Launch',    10.246, 5.026, 10.353, 5.296, 5.657, C.bg],
++  ];
++  phases.forEach(([title, x, y, tx, ty, by, fill]) => {
++    rect(s, x, y, 2.207, 1.405, fill, fill === C.mint ? HAIR : HAIR_INK);
++    text(s, title, tx, ty, 1.985, 0.337, { size: 14 });
++    text(s, LOREM_F, tx, by, 1.931, 0.606, { font: F.light, size: 10, color: C.ink });
++  });
++}
++
++/* 12 — Management team */
++function slide12(pptx) {
++  const s = pptx.addSlide();
++  const people = [
++    { name: 'Nelly Dean',   role: 'CEO',               x: 1.375, y: 1.873, nx: 1.776, nw: 1.276, rx: 1.776, rw: 1.276 },
++    { name: 'William Jones', role: 'Head of Marketing', x: 3.657, y: 1.873, nx: 4.01,  nw: 1.376, rx: 4.01,  rw: 1.376 },
++    { name: 'Artful Dodger', role: 'CFO',               x: 1.375, y: 4.337, nx: 1.694, nw: 1.44,  rx: 1.694, rw: 1.44 },
++    { name: 'James Vane',   role: 'Head of Operation', x: 3.657, y: 4.337, nx: 4.06,  nw: 1.276, rx: 3.935, rw: 1.526 },
++  ];
++  people.forEach(P => photo(s, P.x, P.y, 2.078, 1.746));
++  chrome(s);
++  people.forEach(P => {
++    rect(s, P.x + 0.083, P.y + 0.083, 0.371, 0.371, C.orange, HAIR);
++    rect(s, P.x, P.y + 1.615, 2.078, 0.669, C.bg, HAIR_INK);
++    text(s, P.name, P.nx, P.y + 1.682, P.nw, 0.337, { font: F.med, size: 14, align: 'center' });
++    text(s, P.role, P.rx, P.y + 1.93, P.rw, 0.269, { font: F.light, size: 10, align: 'center' });
++  });
++
++  button(s, 6.849, 1.904, 1.3, 0.32, 'Our team');
++  arrowTile(s, 8.308, 1.904, 0.315, { tile: C.pale, rot: 135 });
++  dashed(s, 8.847, 2.065, 1.669);
++  text(s, 'Management\nTeam.', 6.742, 2.617, 4.841, 1.717, { font: F.semi, size: 48 });
++  rect(s, 6.849, 4.772, 0.52, 0.52, C.orange, HAIR);
++  text(s, LOREM_L, 7.599, 4.771, 4.616, 0.505, { size: 12, color: C.gray });
++  stat(s, '50k', 'Active\nUsers', 6.786, 5.72);
++  stat(s, '90k', 'Satisfied\nclient', 8.271, 5.72);
++  bigArrow(s, 11.568, 6.057, 225);
++}
++
++/* 13 — Financial project */
++function slide13(pptx) {
++  const s = pptx.addSlide();
++  chrome(s);
++  arrowTile(s, 1.375, 1.981, 0.41, { tile: C.pale, rot: 45 });
++  text(s, 'Financial Project.', 2.198, 1.84, 4.776, 0.774, { font: F.semi, size: 40 });
++  text(s, FAMES, 1.326, 2.689, 4.689, 0.505, { size: 12, color: C.gray });
++  button(s, 1.375, 3.418, 1.462, 0.319, 'Learn More');
++  button(s, 2.983, 3.418, 1.462, 0.319, 'Discover Now', { fill: C.orange, line: HAIR });
++
++  // Three year panels: each row is a light track with a coloured fill on top.
++  const ROWS = ['Revenue\nProject', 'Expenses\nOverview', 'Profilitability\nMetrics'];
++  const years = [
++    { title: 'Year 1', tx: 9.137, ty: 1.751, x: 7.19, y: 2.212, fill: C.bg, line: HAIR_INK,
++      lx: 7.295, vx: 11.367, bx: 8.326, track: C.pale, trackW: 2.945,
++      rows: [[2.557, 2.198, C.mint, '$2.800.000'], [3.027, 1.018, C.sage, '$760.000'], [3.497, 1.33, C.ink, '35%']] },
++    { title: 'Year 2', tx: 3.329, ty: 4.157, x: 1.375, y: 4.618, fill: C.bg, line: HAIR_INK,
++      lx: 1.469, vx: 5.541, bx: 2.5, track: C.pale, trackW: 2.946,
++      rows: [[4.978, 2.067, C.mint, '$2.000.000'], [5.447, 1.473, C.sage, '$1.100.000'], [5.917, 1.123, C.ink, '30%']] },
++    { title: 'Year 3', tx: 9.137, ty: 4.157, x: 7.183, y: 4.618, fill: C.pale, line: HAIR,
++      lx: 7.295, vx: 11.367, bx: 8.326, track: C.bg, trackW: 2.946,
++      rows: [[4.962, 1.947, C.mint, '$2.200.000'], [5.432, 1.205, C.sage, '$800.000'], [5.902, 1.205, C.ink, '28%']] },
++  ];
++  years.forEach(Y => {
++    rect(s, Y.x, Y.y, 5.14, 1.879, Y.fill, Y.line);
++    text(s, Y.title, Y.tx, Y.ty, 1.231, 0.37, { size: 16, align: 'center' });
++    Y.rows.forEach(([by, fillW, color, value], i) => {
++      rect(s, Y.bx, by, Y.trackW, 0.252, Y.track);
++      rect(s, Y.bx, by, fillW, 0.252, color);
++      text(s, ROWS[i], Y.lx, by - 0.094, 0.95, 0.404, { font: F.light, size: 9, color: C.ink });
++      text(s, value, Y.vx, by + 0.011, 0.879, 0.252, { font: F.light, size: 9, color: C.ink });
++    });
++  });
++}
++
++/* 14 — Funding requirements */
++function slide14(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 1.375, 1.913, 2.845, 3.79);
++  chrome(s);
++  bigArrow(s, 4.79, 1.837, 45);
++  text(s, 'Funding\nRequirements.', 6.04, 1.714, 4.61, 1.717, { font: F.semi, size: 48 });
++  text(s, LOREM_L, 6.084, 3.651, 4.677, 0.505, { size: 12, color: C.gray });
++  button(s, 1.797, 4.451, 3.51, 0.374, 'Looking for Attractive Investment Prospects?');
++  button(s, 3.845, 4.986, 1.462, 0.374, 'Learn More', { fill: C.orange, line: HAIR });
++  button(s, 1.375, 5.825, 1.377, 0.37, 'Get Premium');
++  searchTile(s, 2.899, 5.829, 0.361);
++
++  const items = [
++    ['Investment\nOpportunities', 6.143, 4.413, C.orange, 5.124],
++    ['Utilization of\nFunds', 9.371, 4.413, C.mint, 5.046],
++    ['Timeline for\nInvestment', 6.143, 5.834, C.bg, 6.467],
++    ['Funding\nStrategy', 9.371, 5.834, C.sage, 6.467],
++  ];
++  items.forEach(([title, cx, cy, chip, by]) => {
++    rect(s, cx, cy, 0.278, 0.278, chip, HAIR);
++    text(s, title, cx + 0.452, cy - 0.078, 1.985, 0.64, { size: 16 });
++    text(s, LOREM_S, cx + 0.452, by, 2.326, 0.438, { font: F.light, size: 10, color: C.ink });
++  });
++}
++
++/* 15 — Funding strategy */
++function slide15(pptx) {
++  const s = pptx.addSlide();
++  dashed(s, 2.042, 4.895, 8.338);
++  chrome(s);
++  text(s, 'Funding\nStrategy.', 1.254, 1.915, 3.445, 1.717, { font: F.semi, size: 48 });
++  bigArrow(s, 5.188, 2.965, 45);
++  button(s, 6.756, 2.182, 1.623, 0.37, 'Learn More', { fill: C.orange, line: HAIR });
++  searchTile(s, 8.665, 2.185, 0.361);
++  text(s, LOREM_L, 6.667, 2.919, 4.733, 0.505, { size: 12, color: C.gray });
++
++  const steps = [
++    ['Target Investors',              2.595, 4.147, 2.774, 1.552, C.bg],
++    ['Networking and\nRelationships',  5.19,  3.858, 5.372, 1.552, C.pale],
++    ['Negotiation and\nTerms',         7.784, 4.147, 7.963, 1.552, C.bg],
++    ['Alternative\nFunding Sources',   10.379, 3.858, 10.556, 1.626, C.bg],
++  ];
++  steps.forEach(([title, x, y, tx, tw, fill]) => {
++    rect(s, x, y, 2.042, 1.925, fill, HAIR);
++    text(s, title, tx, y + 0.346, tw, 0.572, { size: 14 });
++    text(s, LOREM_F, tx, y + 0.951, 1.626, 0.606, { font: F.light, size: 10, color: C.ink });
++  });
++
++  button(s, 1.384, 6.377, 1.377, 0.37, 'Get Premium');
++  rect(s, 3.034, 6.373, 0.374, 0.374, C.bg, HAIR);
++  dollarIcon(s, 3.174, 6.469, 0.182, C.ink);
++  photo(s, 0, 4.035, 2.042, 1.925);
++}
++
++/* 16 — SWOT */
++function slide16(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 1.375, 4.663, 2.707, 2.047);
++  // Oversized S W O T watermark letters behind the quadrants. Each entry is the
++  // ink box the reference occupies; GLYPH holds Jost SemiBold ink metrics measured
++  // at 100pt (inches) so the point size and frame offset can be derived from it.
++  const GLYPH = { S: [0.1458, 0.4410, 1.0208], W: [0.1076, 0.4167, 1.0694],
++                  O: [0.1458, 0.4410, 1.0208], T: [0.1042, 0.4618, 0.9722] };
++  [['S', 7.191, 1.58, 0.973], ['W', 9.705, 1.581, 1.004],
++   ['O', 7.084, 4.237, 0.966], ['T', 9.779, 4.233, 0.972]].forEach(([ch, inkX, inkY, inkH]) => {
++    const [dx, dy, h100] = GLYPH[ch];
++    const pt = (inkH / h100) * 100;
++    s.addText(ch, {
++      x: inkX - dx * (pt / 100), y: inkY - dy * (pt / 100), w: 2.6, h: 2.6,
++      fontFace: F.semi, fontSize: pt, color: C.ash, valign: 'top',
++    });
++  });
++  chrome(s, 12);
++
++  rect(s, 1.375, 1.904, 1.77, 0.32, C.orange, HAIR);
++  text(s, 'Analysis Competitiv', 1.375, 1.926, 1.77, 0.286, { size: 11, color: C.white, align: 'center' });
++  arrowTile(s, 3.34, 1.904, 0.315, { tile: C.pale, rot: 135 });
++  text(s, 'SWOT Analysis.', 1.254, 2.648, 5.088, 0.909, { font: F.semi, size: 48 });
++  text(s, FAMES, 1.326, 3.769, 4.689, 0.505, { size: 12, color: C.gray });
++  dashed(s, 4.082, 5.027, 1.595);
++  arrowTile(s, 5.811, 4.822, 0.409, { tile: C.sage, icon: C.ink, rot: 180 });
++  stat(s, '50k', 'Active\nUsers', 4.445, 5.81);
++  stat(s, '89%', 'Positive\nFeedback', 5.478, 5.81);
++
++  const quads = [
++    ['Strengths', 7.561, 1.94, C.pale, HAIR], ['Weaknesses', 10.164, 1.94, C.bg, HAIR],
++    ['Opportunities', 7.561, 4.652, C.bg, HAIR], ['Threats', 10.164, 4.652, C.bg, HAIR],
++  ];
++  quads.forEach(([title, x, y, fill, line]) => {
++    rect(s, x, y, 2.059, 2.059, fill, line);
++    text(s, title, x + 0.174, y + 0.546, 1.712, 0.37, { size: 16 });
++    text(s, LOREM_S, x + 0.174, y + 0.908, 1.632, 0.606, { font: F.light, size: 10, color: C.ink });
++  });
++}
++
++/* 17 — Use of fund */
++function slide17(pptx) {
++  const s = pptx.addSlide();
++  dashed(s, 4.119, 5.453, 6.242);
++  chrome(s, 12);
++  bigArrow(s, 1.358, 2.149, 45);
++  text(s, 'Use of Fund.', 2.677, 1.992, 4.377, 0.909, { font: F.semi, size: 48 });
++  text(s, 'Etiam erat velit scelerisque in. Purus sit amet luctus venenatis lectus. Vitae ultricies leo commodo viverra.',
++    2.689, 3.115, 4.677, 0.505, { size: 12, color: C.gray });
++  button(s, 8.098, 2.329, 1.462, 0.319, 'Learn More');
++  button(s, 9.706, 2.329, 1.462, 0.319, 'Discover Now', { fill: C.orange, line: HAIR });
++
++  const panels = [
++    { title: 'Product Development', x: 1.375, fill: C.pale, hdr: C.bg, hdrColor: C.black,
++      bars: [[2.034, '50%', 'Research &\nProtoyping',   1.753, 0.917, 5.121, 0.473, 5.594, 0.548, C.bg,   C.mint],
++             [3.105, '40%', 'Feature\nEnhancement',     2.725, 1.113, 5.121, 0.588, 5.709, 0.434, C.bg,   C.sage]] },
++    { title: 'Marketing & Sales', x: 4.371, fill: C.bg, hdr: C.pale, hdrColor: C.ink,
++      bars: [[5.03,  '60%', 'Digital Market-\ning Campaigs', 4.633, 1.127, 5.121, 0.371, 5.492, 0.65, C.pale, C.mint],
++             [6.1,   '20%', 'Sales Team\nExpansions',    5.848, 0.86,  5.121, 0.717, 5.838, 0.305, C.pale, C.sage]] },
++    { title: 'Research & Development', x: 7.366, fill: C.bg, hdr: C.pale, hdrColor: C.ink,
++      bars: [[8.025, '40%', 'Innovation\nInitiatives',   7.773, 0.86,  5.121, 0.519, 5.641, 0.502, C.pale, C.mint],
++             [9.096, '35%', 'Product\nTesting',          8.964, 0.606, 5.121, 0.618, 5.739, 0.404, C.pale, C.sage]] },
++  ];
++  panels.forEach(P => {
++    rect(s, P.x, 4.135, 2.744, 2.614, P.fill, HAIR);
++    rect(s, P.x + 0.153, 4.274, 2.438, 0.443, P.hdr, HAIR);
++    text(s, P.title, P.x + 0.278, 4.343, 2.059, 0.303, { font: F.med, size: 12, color: P.hdrColor, align: 'center' });
++    P.bars.forEach(([bx, pct, cap, cx, cw, ty, th, by, bh, topColor, botColor]) => {
++      rect(s, bx, ty, 0.354, th, topColor);
++      rect(s, bx, by, 0.354, bh, botColor);
++      text(s, pct, bx - 0.075, 4.771, 0.504, 0.286, { font: F.light, size: 11, color: C.ink, align: 'center' });
++      text(s, cap, cx, 6.225, cw, 0.404, { font: F.light, size: 9, align: 'center' });
++    });
++  });
++  // fourth panel is an empty tile that fades out to the right
++  fadeRect(s, 10.362, 4.135, 2.614, 2.614, C.pale, 42, 100);
++}
++
++/* 18 — Risks and challenges */
++function slide18(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 9.292, 1.832, 2.676, 4.397);
++  dashed(s, 3.003, 3.221, 0, 1.616);
++  chrome(s);
++  text(s, 'Risks and\nChallenges.', 5.386, 1.956, 3.805, 1.447, { font: F.semi, size: 40 });
++  rect(s, 11.457, 1.975, 0.371, 0.371, C.orange, HAIR);
++  text(s, 'Fames ac turpis egestas maecenas pharetra convallis. Aliquam malesuada Bibendu.',
++    5.386, 5.588, 3.297, 0.505, { size: 12, color: C.gray });
++
++  const risks = [
++    ['Developing Backup Systems', 1.83, C.pale], ['Market Diversification', 3.334, C.bg], ['Regulatory Collaboration', 4.871, C.bg],
++  ];
++  risks.forEach(([title, y, fill]) => {
++    rect(s, 1.388, y, 3.23, 1.392, fill, HAIR_NAVY);
++    text(s, title, 1.578, y + 0.186, 2.686, 0.337, { size: 14 });
++    text(s, 'Eget nunc scelerisque viverrafro mauris inte aliquam sem fringilla. At elementum eure facilisis sed.',
++      1.578, y + 0.549, 2.731, 0.656, { font: F.light, size: 11, color: C.ink });
++  });
++
++  dashed(s, 6.072, 4.495, 0.564);
++  arrowTile(s, 5.586, 4.291, 0.409, { tile: C.sage, icon: C.ink, rot: 180 });
++  // two spend cards, each with five stacked-height sparkline bars
++  const SPARK_ROWS = [[4.066, 0.437], [3.959, 0.651], [3.879, 0.811], [4.066, 0.437], [3.959, 0.651]];
++  function spark(x0, panelFill, barX0, barColors, value, caption) {
++    rect(s, x0, 3.712, 1.447, 1.566, panelFill, HAIR);
++    SPARK_ROWS.forEach(([y, h], i) => rect(s, barX0 + i * 0.169, y, 0.111, h, barColors[i]));
++    text(s, value, x0 + 0.204, 4.741, 0.913, 0.303, { size: 12 });
++    text(s, caption, x0 + 0.225, 4.99, 0.982, 0.236, { font: F.light, size: 8, color: C.ink });
++  }
++  spark(6.636, C.bg,  6.966, [C.pale, C.sage, C.pale, C.sage, C.pale], '$22.63', 'Spent Today');
++  spark(8.387, C.pale, 8.764, [C.ink, C.sage, C.ink, C.sage, C.ink], '$155.00', 'Today');
++}
++
++/* 19 — Contact */
++function slide19(pptx) {
++  const s = pptx.addSlide();
++  photo(s, 1.375, 4.092, 3.444, 1.413);
++  chrome(s, 12);
++  text(s, 'Contact\nInformation.', 1.254, 1.916, 4.364, 1.919, { font: F.semi, size: 54 });
++  button(s, 6.667, 2.298, 2.417, 0.319, 'Embracing the Future Together');
++  button(s, 9.416, 2.298, 1.462, 0.319, 'Discover Now', { fill: C.orange, line: HAIR });
++  text(s, 'Etiam erat velit scelerisque in. Purus sit amet luctus venenatis lectus. Vitae ultricies leo commodo viverra.',
++    6.607, 3.083, 4.677, 0.505, { size: 12, color: C.gray });
++
++  text(s, 'General inquiries', 6.607, 4.045, 1.517, 0.303, { font: F.med, size: 12 });
++  ['www.example.com', '+00 111 222 333 444', 'youremail@mail.com'].forEach((line, i) =>
++    text(s, line, 6.627, 4.365 + i * 0.246, 1.9, 0.269, { size: 10, color: C.gray }));
++  text(s, 'Our Address 1', 9.716, 4.045, 1.445, 0.303, { font: F.med, size: 12 });
++  text(s, '000 Main Street,\nYour City, Your State\n000', 9.735, 4.365, 1.445, 0.606, { size: 10, color: C.gray });
++  text(s, 'Our Address 2', 6.607, 5.37, 1.445, 0.303, { font: F.med, size: 12 });
++  text(s, '000 Main Street,\nYour City, Your State\n000', 6.627, 5.689, 1.426, 0.606, { size: 10, color: C.gray });
++  text(s, 'Follow Us', 9.716, 5.37, 1.445, 0.303, { font: F.med, size: 12 });
++  text(s, 'Tw    Fb    Ins', 9.716, 5.689, 1.061, 0.269, { size: 10, color: C.gray });
++
++  rect(s, 1.375, 5.472, 3.445, 0.639, C.bg, HAIR);
++  text(s, 'Contact Us', 1.478, 5.559, 0.996, 0.303, { font: F.med, size: 12 });
++  text(s, '2024', 1.486, 5.798, 0.582, 0.269, { size: 10, color: C.gray });
++  arrowTile(s, 4.624, 5.609, 0.409, { tile: C.sage, icon: C.ink });
++}
++
++/* 20 — Thank you */
++function slide20(pptx) {
++  const s = pptx.addSlide();
++  chrome(s, 12);
++  text(s, 'Thank you.', 1.282, 2.929, 4.874, 1.212, { font: F.semi, size: 66 });
++  rect(s, 1.375, 4.398, 0.265, 0.265, C.orange, HAIR);
++  text(s, 'Presentation Template.', 1.754, 4.398, 1.964, 0.303, { size: 12 });
++  text(s, 'Thank you for your time, passion,\nand commitment to excellence.', 1.278, 5.005, 2.682, 0.505,
++    { size: 12, color: C.gray });
++  button(s, 1.375, 5.812, 1.882, 0.319, 'See you next time');
++  bigArrow(s, 11.568, 5.728, 225);
++}
++
++/* ================================================================== *
++ * Build
++ * ================================================================== */
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
++  pptx.layout = 'WIDE';
++  pptx.defineSlideMaster({ title: 'BASE', background: { color: C.bg } });
++  pptx.title = 'Technology Startup Business Plan';
++
++  const original = pptx.addSlide.bind(pptx);
++  pptx.addSlide = () => original({ masterName: 'BASE' });
++
++  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10,
++   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++    .forEach(fn => fn(pptx));
++
++  return pptx.writeFile({ fileName: path.join(__dirname, '0c01cfd2-a368-4f45-bb83-57abf12bed5b_grok_final.pptx') });
++}
++
++build().then(f => console.log('wrote', f)).catch(e => { console.error(e); process.exit(1); });

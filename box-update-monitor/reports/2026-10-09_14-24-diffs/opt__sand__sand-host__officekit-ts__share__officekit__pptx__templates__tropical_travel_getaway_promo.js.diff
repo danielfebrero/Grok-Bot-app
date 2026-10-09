@@ -1,0 +1,811 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tropical_travel_getaway_promo.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tropical_travel_getaway_promo.js
+@@ -0,0 +1,808 @@
++/**
++ * "Tropical Travel" — 20-slide deck rebuilt with pptxgenjs.
++ * Photographs / mockups from the original are replaced by flat grey
++ * placeholder shapes; icons are redrawn from native pptxgenjs primitives.
++ */
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- palette ---
++const C = {
++  navy: '011A3F', // theme accent1
++  blue: '5886C2', // theme accent2
++  deep: '07317D', // theme accent3
++  cyan: '0F9ED5', // theme accent4
++  ink: '262626', // tx1 lum85
++  ink65: '595959',
++  ink50: '808080',
++  gray40: '404040', // tx2 lum75
++  light: 'E8E8E8', // theme bg2
++  white: 'FFFFFF',
++  f2: 'F2F2F2', // bg1 lum95
++  d1: 'D1D1D1', // bg2 lum90
++  navy90: '022C6B',
++  deep75: '05255E',
++  paleBlue: 'DEE7F3', // accent2 lum20/off80
++  navy10: 'D3E5FE', // accent1 lum10/off90
++  slate: '3A3F4A',
++  photo: 'CDCDCD', // stand-in tone for the "replace your image" photos
++  photoEdge: 'C2C2C2',
++};
++
++const MAJOR = 'SUSE'; // theme major (heading) font
++const MINOR = 'Plus Jakarta Sans'; // theme minor (body) font
++const SHADOW = { type: 'outer', color: '000000', opacity: 0.25, blur: 8, offset: 3, angle: 90 };
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'W16x9', width: 13.333, height: 7.5 });
++pptx.layout = 'W16x9';
++pptx.theme = { headFontFace: MAJOR, bodyFontFace: MINOR };
++pptx.title = 'Tropical Travel';
++
++const T = pptx.ShapeType;
++
++// ---------------------------------------------------------------- helpers ---
++
++/** Grey block standing in for a photograph in the reference deck. */
++function photo(s, o) {
++  s.addShape(o.shape || T.rect, {
++    x: o.x, y: o.y, w: o.w, h: o.h, rotate: o.rotate,
++    fill: { color: o.color || C.photo },
++    line: { color: o.edge || C.photoEdge, width: o.edgeWidth || 0.75 },
++    rectRadius: o.rectRadius,
++  });
++  if (o.label) {
++    s.addText(o.label === true ? '[image]' : o.label, {
++      x: o.x, y: o.y + o.h / 2 - 0.18, w: o.w, h: 0.36,
++      align: 'center', valign: 'middle', fontFace: MINOR, fontSize: 11, color: '9A9A9A',
++    });
++  }
++}
++
++/** Body copy: minor font, 1.5 line spacing — the deck's default paragraph. */
++function body(s, x, y, w, h, text, o = {}) {
++  s.addText(text, {
++    x, y, w, h,
++    fontFace: MINOR, fontSize: o.size || 12, color: o.color || C.ink,
++    align: o.align || 'left', valign: o.valign || 'top', bold: o.bold || false,
++    lineSpacingMultiple: o.lineSpacing === null ? undefined : (o.lineSpacing || 1.5),
++    wrap: o.wrap !== false,
++  });
++}
++
++/** Small label / stat text (single line, no extra leading). */
++function label(s, x, y, w, h, text, o = {}) {
++  s.addText(text, {
++    x, y, w, h,
++    fontFace: o.face || MINOR, fontSize: o.size || 12, color: o.color || C.ink,
++    bold: o.bold || false, italic: o.italic || false,
++    align: o.align || 'left', valign: o.valign || 'top', wrap: o.wrap !== false,
++    charSpacing: o.charSpacing,
++  });
++}
++
++/** Two-tone heading built from a list of [text, color] pairs. */
++function heading(s, x, y, w, h, parts, o = {}) {
++  s.addText(parts.map(([text, color]) => ({ text, options: { color } })), {
++    x, y, w, h,
++    fontFace: o.face || MAJOR, fontSize: o.size || 40, bold: true,
++    align: o.align || 'left', valign: o.valign || 'top',
++    lineSpacingMultiple: o.lineSpacing,
++  });
++}
++
++/** Top-right "Home / Service / Contact" pill nav repeated on every slide. */
++function nav(s, o = {}) {
++  s.addShape(T.roundRect, {
++    x: 10.094, y: 0.352, w: 0.911, h: 0.254,
++    fill: { color: o.pill || C.navy }, rectRadius: 0.127,
++  });
++  label(s, 10.204, 0.321, 0.717, 0.303, 'Home', { italic: true, color: o.onPill || C.white });
++  label(s, 11.087, 0.306, 0.866, 0.303, 'Service', { italic: true, color: o.plain || C.ink });
++  label(s, 11.954, 0.304, 0.866, 0.303, 'Contact', { italic: true, color: o.plain || C.ink });
++}
++
++/** Contact-slide variant: the highlighted pill sits under "Contact". */
++function navContact(s) {
++  s.addShape(T.roundRect, { x: 11.932, y: 0.352, w: 0.911, h: 0.254, fill: { color: C.white }, rectRadius: 0.127 });
++  label(s, 10.204, 0.321, 0.717, 0.303, 'Home', { italic: true, color: C.white });
++  label(s, 11.065, 0.306, 0.866, 0.303, 'Service', { italic: true, color: C.white });
++  label(s, 11.954, 0.304, 0.866, 0.303, 'Contact', { italic: true, color: C.navy });
++}
++
++/** Donut gauge: grey track arc + coloured value arc + centred percentage. */
++function gauge(s, x, y, size, pct, text, valueColor, o = {}) {
++  s.addShape(T.arc, { x, y, w: size, h: size, angleRange: [339, 284], fill: { type: 'none' }, line: { color: C.f2, width: 12 } });
++  s.addShape(T.arc, { x, y, w: size, h: size, angleRange: [270, 117], fill: { type: 'none' }, line: { color: valueColor, width: 12 } });
++  label(s, x - 0.1, y + size / 2 - 0.185, size + 0.2, 0.37, pct, { size: 16, face: MAJOR, color: C.gray40, align: 'center' });
++  label(s, x - 0.7, y + size + 0.16, size + 1.4, 0.337, text, { size: 14, align: 'center', bold: o.bold, color: o.color || C.ink });
++}
++
++/** Horizontal progress slider: rounded rail, coloured fill, ringed knob. */
++function slider(s, o) {
++  const t = o.thickness || 0.111;
++  s.addShape(T.roundRect, { x: o.x, y: o.y - t / 2, w: o.w, h: t, fill: { color: o.track || C.d1 }, rectRadius: t / 2 });
++  s.addShape(T.roundRect, { x: o.x, y: o.y - t / 2, w: o.w * o.pct, h: t, fill: { color: o.color }, rectRadius: t / 2 });
++  const k = o.knob || 0.42;
++  const kx = o.x + o.w * o.pct - k / 2;
++  s.addShape(T.ellipse, { x: kx, y: o.y - k / 2, w: k, h: k, fill: { color: o.ring || C.light }, shadow: SHADOW });
++  s.addShape(T.ellipse, { x: kx + k * 0.105, y: o.y - k * 0.395, w: k * 0.79, h: k * 0.79, fill: { color: o.color } });
++}
++
++/** Draw a closed polygon whose points are given in unit-square (0..1) space. */
++function polygon(s, pts, x, y, w, h, opts) {
++  s.addShape(T.custGeom, {
++    x, y, w, h, ...opts,
++    points: pts.map(([px, py]) => ({ x: px * w, y: py * h })).concat([{ close: true }]),
++  });
++}
++
++// Unit-square outlines (0..1) used to draw the deck's small vector glyphs.
++const GLYPH_PATHS = {
++  plane: [[0.00, 0.46], [0.30, 0.30], [0.20, 0.00], [0.36, 0.00], [0.62, 0.26],
++    [0.90, 0.16], [1.00, 0.30], [0.44, 0.72], [0.26, 0.66], [0.42, 0.48]],
++  sail: [[0.46, 0.00], [0.52, 0.86], [0.06, 0.86]],
++};
++
++/** Line-art glyphs standing in for the deck's icon graphics. */
++function icon(s, kind, x, y, size, color) {
++  const box = (ox, oy, ow, oh) => ({ x: x + ox * size, y: y + oy * size, w: ow * size, h: oh * size });
++  const solid = { fill: { color } };
++  const stroke = (pt) => ({ fill: { type: 'none' }, line: { color, width: Math.max(0.75, size * pt) } });
++  switch (kind) {
++    case 'play':
++      s.addShape(T.ellipse, { ...box(0.03, 0.03, 0.94, 0.94), ...stroke(9) });
++      s.addShape(T.triangle, { ...box(0.36, 0.3, 0.34, 0.4), ...solid, rotate: 90 });
++      break;
++    case 'route': { // winding road ending in a location dot, with a small plane
++      const b = box(0, 0, 1, 1);
++      s.addShape(T.ellipse, { ...box(0.66, 0.00, 0.30, 0.30), ...stroke(9) });
++      s.addShape(T.roundRect, { ...box(0.30, 0.38, 0.52, 0.13), ...solid, rectRadius: 0.065 * size });
++      s.addShape(T.roundRect, { ...box(0.69, 0.20, 0.13, 0.28), ...solid, rectRadius: 0.065 * size });
++      s.addShape(T.roundRect, { ...box(0.30, 0.38, 0.13, 0.33), ...solid, rectRadius: 0.065 * size });
++      s.addShape(T.roundRect, { ...box(0.30, 0.62, 0.42, 0.13), ...solid, rectRadius: 0.065 * size });
++      polygon(s, GLYPH_PATHS.plane, b.x, b.y + 0.42 * size, 0.42 * size, 0.42 * size, solid);
++      break;
++    }
++    case 'plane':
++      polygon(s, GLYPH_PATHS.plane, ...Object.values(box(0.02, 0.12, 0.96, 0.76)), solid);
++      break;
++    case 'umbrella':
++      s.addShape(T.pie, { ...box(0.04, 0.10, 0.92, 0.72), ...solid, angleRange: [180, 0] });
++      s.addShape(T.rect, { ...box(0.46, 0.42, 0.07, 0.44), ...solid });
++      s.addShape(T.wave, { ...box(0.02, 0.80, 0.96, 0.18), ...stroke(4) });
++      break;
++    case 'star':
++      s.addShape(T.star5, { ...box(0, 0, 1, 1), ...solid });
++      break;
++    case 'starOutline':
++      s.addShape(T.star5, { ...box(0, 0, 1, 1), ...stroke(6) });
++      break;
++    case 'star6':
++      s.addShape(T.star6, { ...box(0, 0, 1, 1), ...stroke(6) });
++      break;
++    case 'sun': { // ringed core with eight radiating strokes
++      s.addShape(T.ellipse, { ...box(0.34, 0.34, 0.32, 0.32), ...stroke(5) });
++      for (let a = 0; a < 8; a++) {
++        const rad = (a * Math.PI) / 4;
++        const cx = 0.5 + Math.cos(rad) * 0.38;
++        const cy = 0.5 + Math.sin(rad) * 0.38;
++        s.addShape(T.line, {
++          ...box(cx - 0.09, cy, 0.18, 0),
++          line: { color, width: Math.max(0.75, size * 5) }, rotate: a * 45,
++        });
++      }
++      break;
++    }
++    case 'wave': // breaking crest above two ripple lines
++      s.addShape(T.moon, { ...box(0.12, 0.06, 0.68, 0.50), ...stroke(4), rotate: 200 });
++      s.addShape(T.wave, { ...box(0.02, 0.62, 0.96, 0.16), ...stroke(4) });
++      s.addShape(T.wave, { ...box(0.02, 0.82, 0.96, 0.16), ...stroke(4) });
++      break;
++    case 'recycle':
++      s.addShape(T.circularArrow, { ...box(0.04, 0.04, 0.92, 0.92), ...stroke(4) });
++      break;
++    case 'island': // sail boat above ripples
++      polygon(s, GLYPH_PATHS.sail, ...Object.values(box(0.06, 0.02, 0.88, 0.62)), stroke(4));
++      s.addShape(T.wave, { ...box(0.02, 0.68, 0.96, 0.14), ...stroke(4) });
++      s.addShape(T.wave, { ...box(0.02, 0.84, 0.96, 0.14), ...stroke(4) });
++      break;
++    case 'pin':
++      s.addShape(T.teardrop, { ...box(0.16, 0.04, 0.68, 0.68), ...solid, rotate: 225 });
++      s.addShape(T.ellipse, { ...box(0.37, 0.22, 0.26, 0.26), fill: { color: C.white } });
++      break;
++    case 'send':
++      s.addShape(T.ellipse, { ...box(0, 0, 1, 1), ...solid });
++      s.addShape(T.triangle, { ...box(0.26, 0.26, 0.44, 0.48), fill: { color: C.white }, rotate: 90 });
++      break;
++    default:
++      break;
++  }
++}
++
++// ------------------------------------------------------------ slides 1/20 ---
++// Full-bleed photo behind a navy scrim; oversized title + CTA pill.
++function coverSlide(title, titleY, blurb) {
++  const s = pptx.addSlide();
++  photo(s, { x: 0, y: 0, w: 13.333, h: 7.5, edgeWidth: 0 });
++  s.addShape(T.rect, { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: C.navy, transparency: 12 } });
++  photo(s, { x: 0, y: 2.208, w: 4.026, h: 5.292, edgeWidth: 0 });
++  s.addText(title, {
++    x: 4.368, y: titleY, w: 8.36, h: 3.972,
++    fontFace: MAJOR, fontSize: 115, bold: true, color: C.white, valign: 'top',
++  });
++  body(s, 4.677, blurb.y, blurb.w, 0.667, blurb.text, { color: C.white });
++  s.addShape(T.roundRect, { x: 10.726, y: 6.54, w: 1.245, h: 0.353, fill: { color: C.white }, rectRadius: 0.176 });
++  label(s, 10.792, 6.548, 1.127, 0.337, 'Start Now', { size: 14, color: C.navy });
++  nav(s, { pill: C.white, onPill: C.navy, plain: C.white });
++}
++
++const slide1 = () => coverSlide('TROPICAL TRAVEL', 1.764, {
++  y: 5.345, w: 6.698,
++  text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Vivamus',
++});
++
++const slide20 = () => coverSlide('THANK\nYOU', 1.239, {
++  y: 5.159, w: 5.698,
++  text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac',
++});
++
++// --------------------------------------------------------------- slide 2 ----
++// Navy card on the right, two icon bullets on the left, photo band below.
++function slide2() {
++  const s = pptx.addSlide();
++  photo(s, { x: 0.762, y: 4.0, w: 9.113, h: 2.919, shape: T.roundRect, rectRadius: 0.35 });
++  s.addShape(T.round2DiagRect, { x: 7.045, y: 1.081, w: 5.514, h: 4.136, fill: { color: C.navy } });
++  heading(s, 7.633, 1.683, 4.595, 1.313, [['Planning the ', C.white], ['Perfect Getaway', C.blue]],
++    { size: 36, face: MINOR, valign: 'middle', lineSpacing: 1.0 });
++  s.addShape(T.line, { x: 7.757, y: 3.366, w: 4.03, h: 0, line: { color: C.blue, width: 1.5 } });
++  body(s, 7.633, 3.617, 4.442, 0.97,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua',
++    { color: C.white });
++
++  const bullets = [
++    { y: 1.152, ty: 1.041, by: 1.351, dot: C.deep, title: 'Turning', color: C.navy, glyph: 'play', ix: 1.025, iy: 1.384, is: 0.393 },
++    { y: 2.545, ty: 2.467, by: 2.802, dot: C.blue, title: 'Explore', color: C.blue, glyph: 'route', ix: 1.01, iy: 2.762, is: 0.424 },
++  ];
++  bullets.forEach((b) => {
++    s.addShape(T.ellipse, { x: 0.793, y: b.y, w: 0.857, h: 0.857, fill: { color: b.dot } });
++    icon(s, b.glyph, b.ix, b.iy, b.is, C.white);
++    label(s, 1.761, b.ty, 1.19, 0.404, b.title, { size: 18, bold: true, color: b.color });
++    body(s, 1.761, b.by, 4.27, 0.667, 'consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua');
++  });
++  nav(s);
++}
++
++// ------------------------------------------------------------- slide 3/4 ----
++// Headline + paragraph, photo block, two pill cards and a donut gauge.
++function pillCard(s, o) {
++  s.addShape(T.roundRect, { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.fill }, rectRadius: o.h / 2, shadow: SHADOW });
++  s.addShape(T.ellipse, { x: o.cx, y: o.cy, w: 0.648, h: 0.648, fill: { color: C.light }, shadow: SHADOW });
++  icon(s, o.glyph, o.ix, o.iy, o.is, o.iconColor);
++  label(s, o.tx, o.ty, o.tw, 0.37, o.title, { size: 16, bold: true, color: C.white });
++  body(s, o.tx, o.ty + 0.351, o.sw, 0.375, o.sub, { color: C.white });
++}
++
++function slide3() {
++  const s = pptx.addSlide();
++  heading(s, 6.691, 1.217, 5.737, 1.447, [['Romantic Escapes in ', C.navy], ['Tropical Heaven', C.ink]]);
++  body(s, 6.674, 2.883, 5.466, 1.284,
++    'foundation of sustainable and innovation. Whether between individuals, successful collaboration drives shared value and Long-term impact This presentation explores the strategy, structure, benefits, and best');
++  photo(s, { x: 1.02, y: 1.296, w: 4.743, h: 2.97, shape: T.round2DiagRect });
++
++  pillCard(s, {
++    x: 1.02, y: 5.057, w: 4.336, h: 1.272, fill: C.navy,
++    cx: 1.394, cy: 5.369, glyph: 'play', ix: 1.541, iy: 5.516, is: 0.354, iconColor: C.navy,
++    tx: 2.284, ty: 5.33, tw: 2.237, sw: 2.745, title: 'Nature in Bloom', sub: 'Whether between companies,',
++  });
++  pillCard(s, {
++    x: 5.589, y: 5.045, w: 4.336, h: 1.272, fill: C.blue,
++    cx: 5.962, cy: 5.339, glyph: 'route', ix: 6.113, iy: 5.49, is: 0.346, iconColor: C.blue,
++    tx: 6.853, ty: 5.317, tw: 2.445, sw: 2.707, title: 'Passport to Paradise', sub: 'Whether between companies',
++  });
++  gauge(s, 10.869, 4.903, 1.085, '60%', 'Tropical Flora', C.navy);
++  nav(s);
++}
++
++function slide4() {
++  const s = pptx.addSlide();
++  heading(s, 4.707, 1.262, 7.053, 0.774, [['Tropical Travel ', C.ink], ['Experience', C.navy]], { align: 'right' });
++  body(s, 4.104, 2.241, 7.656, 0.981,
++    'foundation of sustainable growth innovation. Whether between companies, communities,  individuals, successful collaboration drives shared value and long-term impact. This presentation explores the strategy, structure, benefits, and best practices of effective',
++    { align: 'right' });
++  gauge(s, 1.834, 1.502, 1.085, '60%', 'Client Feedback', C.navy);
++  photo(s, { x: 1.485, y: 3.506, w: 5.399, h: 2.845, shape: T.round2DiagRect });
++
++  pillCard(s, {
++    x: 7.377, y: 3.75, w: 4.167, h: 1.05, fill: C.navy,
++    cx: 7.695, cy: 3.951, glyph: 'umbrella', ix: 7.878, iy: 4.134, is: 0.282, iconColor: C.navy,
++    tx: 8.538, ty: 3.916, tw: 2.383, sw: 2.669, title: 'Islands Of Wonder', sub: 'Whether between companies',
++  });
++  pillCard(s, {
++    x: 7.377, y: 5.341, w: 4.167, h: 1.05, fill: C.blue,
++    cx: 7.695, cy: 5.565, glyph: 'plane', ix: 7.867, iy: 5.737, is: 0.304, iconColor: C.blue,
++    tx: 8.538, ty: 5.503, tw: 2.24, sw: 2.77, title: 'Turquoise Waters', sub: 'Whether between companies',
++  });
++  nav(s);
++}
++
++// --------------------------------------------------------------- slide 5 ----
++// Three labelled sliders plus a stat badge over a tall photo.
++function slide5() {
++  const s = pptx.addSlide();
++  photo(s, { x: 0.841, y: 1.035, w: 3.975, h: 5.429, shape: T.round2DiagRect });
++  photo(s, { x: 9.979, y: 3.75, w: 2.66, h: 2.66, shape: T.round2DiagRect });
++  heading(s, 5.164, 1.175, 6.551, 0.774, [['Island ', C.navy], ['Adventures Await', C.ink]]);
++  body(s, 5.197, 2.141, 6.192, 0.981,
++    'foundation of sustainable growinnovation. Whether between companies, communities, or individuals, successful collaboration drives shared value  long term impact. This presentation explores the strategy, structure,best');
++
++  const bars = [
++    { y: 4.195, text: 'Pack Light', lx: 5.169, lw: 1.21, pct: 0.523, color: C.deep, value: '67%', vx: 9.263 },
++    { y: 5.129, text: 'Travel Far', lx: 5.245, lw: 0.984, pct: 0.63, color: C.blue, value: '78%', vx: 9.244 },
++    { y: 6.044, text: 'Feel Free', lx: 5.261, lw: 0.947, pct: 0.342, color: C.deep, value: '45%', vx: 9.244 },
++  ];
++  bars.forEach((b) => {
++    slider(s, { x: 6.43, y: b.y, w: 2.684, pct: b.pct, color: b.color });
++    label(s, b.lx, b.y - 0.152, b.lw, 0.303, b.text, { bold: true, align: 'center', wrap: false });
++    label(s, b.vx, b.y - 0.152, 0.59, 0.303, b.value, { bold: true, wrap: false });
++  });
++
++  s.addShape(T.roundRect, { x: 0.512, y: 2.273, w: 1.739, h: 1.023, fill: { color: C.navy }, rectRadius: 0.166, shadow: SHADOW });
++  label(s, 0.919, 2.414, 0.926, 0.438, '250+', { size: 20, bold: true, color: C.light, align: 'center', wrap: false });
++  label(s, 0.794, 2.853, 1.175, 0.303, 'Wild Tropics', { color: C.white, align: 'center', wrap: false });
++  nav(s);
++}
++
++// --------------------------------------------------------------- slide 6 ----
++// Big two-tone headline, a slider strip and a navy caption tab over a photo.
++function slide6() {
++  const s = pptx.addSlide();
++  photo(s, { x: 6.455, y: 1.581, w: 5.771, h: 4.703, shape: T.round2DiagRect });
++  heading(s, 1.108, 1.313, 4.336, 2.121, [['Mapping Out Your Next ', C.ink], ['Sunny Escape', C.navy]]);
++  body(s, 1.124, 3.574, 4.32, 0.981,
++    'foundation of sustainable growinnovation.  between companies, communities, or individuals, drive value  long-term impact. This presentation explores the');
++
++  // Wide caption bar: a round2DiagRect turned on its side, as in the original.
++  s.addShape(T.round2DiagRect, { x: 3.466, y: 2.972, w: 1.2, h: 5.917, rotate: 270, fill: { color: C.navy } });
++  label(s, 1.502, 5.542, 2.872, 0.337, 'Azure Waters Await', { size: 14, bold: true, color: C.white });
++  slider(s, { x: 1.637, y: 6.108, w: 4.606, pct: 0.671, color: C.paleBlue, track: C.f2, thickness: 0.18, ring: C.deep });
++  label(s, 5.749, 5.578, 0.706, 0.303, '40%', { bold: true, color: C.light, align: 'center' });
++
++  s.addShape(T.round2DiagRect, { x: 8.55, y: -0.375, w: 1.289, h: 3.979, rotate: 270, fill: { color: C.navy } });
++  label(s, 7.719, 1.155, 2.611, 0.337, 'Beneath Tropical Skies', { size: 14, bold: true, color: C.white });
++  body(s, 7.719, 1.491, 2.868, 0.582, 'foundation sustainable innovation. between companie communities', { size: 10, color: C.white });
++  s.addShape(T.ellipse, { x: 10.79, y: 1.275, w: 0.678, h: 0.678, fill: { color: C.light } });
++  icon(s, 'umbrella', 10.988, 1.473, 0.282, C.navy);
++  nav(s);
++}
++
++// --------------------------------------------------------------- slide 7 ----
++// Numbered 01/02/03 list right of a tall photo; stat slider on the left.
++function slide7() {
++  const s = pptx.addSlide();
++  photo(s, { x: 4.78, y: 0.708, w: 3.941, h: 6.083, shape: T.round2DiagRect });
++  s.addShape(T.round2DiagRect, { x: 9.65, y: 0.533, w: 1.38, h: 4.332, rotate: 270, fill: { color: C.navy }, shadow: SHADOW });
++
++  const items = [
++    { n: '01', nx: 8.515, nw: 0.753, ny: 2.331, align: 'left', tx: 9.326, ty: 2.346, color: C.white },
++    { n: '02', nx: 8.832, nw: 0.937, ny: 3.848, align: 'center', tx: 9.872, ty: 3.829, color: C.ink },
++    { n: '03', nx: 8.832, nw: 0.937, ny: 4.892, align: 'center', tx: 9.872, ty: 4.872, color: C.ink },
++  ];
++  items.forEach((it) => {
++    label(s, it.nx, it.ny, it.nw, 0.64, it.n, { size: 32, bold: true, color: it.color, align: it.align });
++    body(s, it.tx, it.ty, 2.82, 0.63, 'ransforming todayinnovation is reshaping industries, unlocking', { size: 11, color: it.color });
++  });
++
++  heading(s, 0.764, 1.661, 3.806, 1.313, [['Backpacking', C.navy], [' The Tropics', C.ink]], { size: 36 });
++  body(s, 0.764, 3.237, 3.333, 0.981, 'sustainable growth and innovation. Whether between companies, communities, or individuals');
++  label(s, 0.764, 4.749, 1.747, 0.64, '80%', { size: 32, bold: true, color: C.navy, valign: 'middle' });
++  body(s, 2.119, 4.676, 1.873, 0.375, 'Client Feedback', { bold: true });
++  slider(s, { x: 2.228, y: 5.29, w: 1.896, pct: 0.7, color: C.deep, track: C.light, knob: 0.338, ring: C.white });
++  nav(s);
++}
++
++// --------------------------------------------------------------- slide 8 ----
++// Two testimonial cards with avatar circles and star ratings.
++function slide8() {
++  const s = pptx.addSlide();
++  const cards = [
++    { x: 0.92, y: 2.606, fill: C.navy, av: 1.344, name: 'Houlvard sam', nx: 1.345, ny: 3.777, by: 4.374, sx: 1.46, sy: 5.464 },
++    { x: 4.869, y: 2.608, fill: C.deep, av: 5.391, name: 'Christina jane', nx: 5.319, ny: 3.724, by: 4.308, sx: 5.38, sy: 5.393 },
++  ];
++  cards.forEach((c) => {
++    s.addShape(T.round2DiagRect, { x: c.x, y: c.y, w: 3.748, h: 3.763, fill: { color: c.fill } });
++    photo(s, { x: c.av, y: 1.707, w: 1.797, h: 1.797, shape: T.ellipse });
++    label(s, c.nx, c.ny, 2.06, 0.438, c.name, { size: 20, bold: true, color: C.white, wrap: false });
++    body(s, c.nx, c.by, 3.066, 0.97, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ', { color: C.white });
++    for (let i = 0; i < 6; i++) icon(s, 'star', c.sx + 0.08 + i * 0.26, c.sy + 0.26, 0.24, C.white);
++  });
++
++  heading(s, 9.273, 1.707, 4.062, 1.313, [['From Here to There', C.navy]], { size: 36 });
++  body(s, 9.294, 3.126, 3.33, 2.181,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    { align: 'justify' });
++  [
++    { x: 9.294, tx: 9.294, v: '+250', color: C.navy },
++    { x: 11.321, tx: 11.281, v: '+550', color: C.deep75 },
++  ].forEach((st) => {
++    label(s, st.x, 5.558, 1.37, 0.64, st.v, { size: 32, bold: true, color: st.color, wrap: false });
++    body(s, st.tx, 6.11, 2.082, 0.667, 'Lorem ipsum dolor  amet, consectetur ');
++  });
++  nav(s);
++}
++
++// --------------------------------------------------------------- slide 9 ----
++// Split layout: dark navy panel on the right with a blue icon rail.
++function slide9() {
++  const s = pptx.addSlide();
++  photo(s, { x: 6.667, y: 0, w: 6.667, h: 7.5, edgeWidth: 0 });
++  s.addShape(T.rect, { x: 6.682, y: 0, w: 6.667, h: 7.5, fill: { color: C.navy, transparency: 15 } });
++  // Icon rail: flipped so the rounded diagonal pair is top-right / bottom-left.
++  s.addShape(T.round2DiagRect, { x: 5.805, y: 0.806, w: 1.722, h: 5.888, fill: { color: C.blue }, flipH: true });
++  icon(s, 'route', 6.251, 1.603, 0.714, C.white);
++  icon(s, 'play', 6.336, 3.422, 0.692, C.white);
++  icon(s, 'plane', 6.357, 5.324, 0.62, C.white);
++  s.addShape(T.line, { x: 6.201, y: 2.915, w: 0.932, h: 0, line: { color: C.white, width: 1 } });
++  s.addShape(T.line, { x: 6.201, y: 4.573, w: 0.932, h: 0, line: { color: C.white, width: 1 } });
++
++  heading(s, 8.441, 1.603, 4.022, 1.313, [['Budgeting For Your Tripe', C.white]], { size: 36 });
++  body(s, 8.441, 3.35, 3.519, 1.273,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam',
++    { color: C.white, align: 'justify' });
++  s.addShape(T.line, { x: 8.778, y: 4.025, w: 3.347, h: 0, line: { color: C.navy, width: 1.5 } });
++  s.addShape(T.roundRect, { x: 8.441, y: 5.506, w: 1.269, h: 0.438, fill: { color: C.white }, rectRadius: 0.219 });
++  label(s, 8.488, 5.494, 1.174, 0.364, 'Learn More', { color: C.navy, align: 'center' });
++
++  s.addText([
++    { text: '$', options: { fontSize: 48 } },
++    { text: '20,5', options: { fontSize: 54 } },
++  ], { x: 0.932, y: 1.197, w: 2.526, h: 1.01, fontFace: MINOR, bold: true, color: C.deep, valign: 'top' });
++  label(s, 0.932, 4.182, 2.839, 1.111, '+225', { size: 60, bold: true, color: C.navy });
++  [2.322, 5.389].forEach((y) => body(s, 0.979, y, 3.555, 1.576,
++    'sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ',
++    { align: 'justify', valign: 'middle' }));
++  nav(s, { pill: C.white, onPill: C.navy, plain: C.white });
++}
++
++// -------------------------------------------------------------- slide 10 ----
++// Four numbered feature cards in a 2x2 grid beside a photo block.
++function slide10() {
++  const s = pptx.addSlide();
++  photo(s, { x: 0, y: 2.471, w: 4.537, h: 5.029, shape: T.round2DiagRect });
++  heading(s, 3.426, 0.746, 6.778, 0.774, [['From Jungle to ', C.ink], ['Shoreline', C.navy]]);
++  label(s, 4.44, 1.52, 4.221, 0.404, 'Capturing the Hues of the Tropics', { size: 18 });
++
++  const cards = [
++    { x: 6.167, y: 2.471, fill: C.cyan, n: '01.', nx: 6.348, nw: 0.703, tx: 7.021, tw: 2.065, title: 'Tropical Escapes', bx: 6.385, flip: false },
++    { x: 9.759, y: 2.471, fill: C.navy, n: '02.', nx: 10.034, nw: 0.77, tx: 10.707, tw: 1.909, title: 'Tropical Trails', bx: 10.07, flip: true },
++    { x: 6.131, y: 4.737, fill: C.navy, n: '03.', nx: 6.348, nw: 0.773, tx: 7.021, tw: 2.065, title: 'Fraud Detection', bx: 6.385, flip: false },
++    { x: 9.766, y: 4.737, fill: C.cyan, n: '04.', nx: 10.034, nw: 0.789, tx: 10.707, tw: 2.213, title: 'Island Hopping', bx: 10.07, flip: true },
++  ];
++  cards.forEach((c) => {
++    s.addShape(T.round2DiagRect, { x: c.x, y: c.y, w: 3.153, h: 1.696, fill: { color: c.fill }, flipH: c.flip });
++    label(s, c.nx, c.y + 0.228, c.nw, 0.505, c.n, { size: 24, bold: true, color: C.white, wrap: false });
++    label(s, c.tx, c.y + 0.294, c.tw, 0.37, c.title, { size: 16, bold: true, color: C.white });
++    body(s, c.bx, c.y + 0.76, 2.545, 0.667, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit,se', { color: C.white, align: 'justify' });
++  });
++
++  s.addShape(T.round2DiagRect, { x: 3.647, y: 5.36, w: 1.812, h: 0.817, fill: { color: C.cyan } });
++  label(s, 3.755, 5.435, 0.979, 0.37, '+85,5k', { size: 16, bold: true, color: C.white, wrap: false });
++  label(s, 3.922, 5.73, 0.868, 0.303, 'Traveller', { color: C.white, wrap: false });
++  icon(s, 'umbrella', 4.79, 5.54, 0.381, C.white);
++  nav(s);
++}
++
++// -------------------------------------------------------------- slide 11 ----
++// Four big stat numbers under an intro paragraph, photo on the right.
++function slide11() {
++  const s = pptx.addSlide();
++  heading(s, 0.829, 0.988, 5.397, 1.313, [['Exploring the Hidden Gems of the World', C.navy]], { size: 36 });
++  body(s, 0.829, 2.3, 5.397, 1.273,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
++    { align: 'justify' });
++  [
++    { v: '+456', x: 0.829, y: 3.999, cy: 4.611, color: C.navy },
++    { v: '+789', x: 4.27, y: 3.999, cy: 4.611, color: C.navy90 },
++    { v: '+345', x: 0.826, y: 5.451, cy: 6.09, color: C.deep },
++    { v: '+678', x: 4.27, y: 5.451, cy: 6.09, color: C.deep75 },
++  ].forEach((st) => {
++    label(s, st.x, st.y, 1.34, 0.64, st.v, { size: 32, bold: true, color: st.color, wrap: false });
++    body(s, st.x, st.cy, 2.082, 0.667, 'Lorem ipsum dolor sit amet, consectetur ');
++  });
++  photo(s, { x: 6.667, y: 1.197, w: 5.841, h: 5.56, shape: T.round2DiagRect });
++  nav(s);
++}
++
++// -------------------------------------------------------------- slide 12 ----
++// Flat illustration, a column of stat tiles, and a highlighted text block.
++/**
++ * Flat "reader on a stack of books in front of an open book" illustration,
++ * approximated with primitives (the original is a large vector artwork).
++ */
++function readerIllustration(s) {
++  // Open book: two leaves splayed from the spine, each with ruled page lines.
++  const LEAF = [[0.00, 0.09], [1.00, 0.00], [1.00, 0.92], [0.02, 1.00]];
++  const leaf = (x, flip) => {
++    polygon(s, LEAF, x, 1.86, 2.10, 2.42, { fill: { color: '407BFF' }, flipH: flip, line: { color: C.white, width: 1.5 } });
++    for (let row = 0; row < 8; row++) {
++      const y = 2.08 + row * 0.27 + (flip ? 0.09 * (1 - row / 8) : 0.09 * (row / 8));
++      [0.14, 1.10].forEach((dx) => s.addShape(T.roundRect, {
++        x: x + dx, y, w: 0.84, h: 0.10, fill: { color: C.light }, rectRadius: 0.05,
++      }));
++    }
++  };
++  leaf(0.83, false);
++  leaf(2.87, true);
++  s.addShape(T.rect, { x: 0.85, y: 4.18, w: 4.12, h: 0.22, fill: { color: '022C6B' } });
++  s.addShape(T.rect, { x: 0.85, y: 4.28, w: 4.12, h: 0.12, fill: { color: C.blue } });
++
++  // Reader: hair bun + headphones, torso, legs crossed out to the right.
++  s.addShape(T.roundRect, { x: 2.78, y: 3.42, w: 0.82, h: 1.10, fill: { color: C.cyan }, rectRadius: 0.26 });
++  s.addShape(T.roundRect, { x: 3.10, y: 4.36, w: 1.50, h: 0.40, fill: { color: '404040' }, rectRadius: 0.2, rotate: 16 });
++  s.addShape(T.roundRect, { x: 4.34, y: 4.86, w: 0.40, h: 1.12, fill: { color: '404040' }, rectRadius: 0.2, rotate: 6 });
++  s.addShape(T.roundRect, { x: 4.28, y: 5.88, w: 0.46, h: 0.36, fill: { color: '263238' }, rectRadius: 0.12 });
++  s.addShape(T.roundRect, { x: 3.34, y: 3.70, w: 0.20, h: 0.30, fill: { color: C.deep } });
++  s.addShape(T.ellipse, { x: 2.94, y: 2.78, w: 0.42, h: 0.56, fill: { color: 'FFCC99' } });
++  s.addShape(T.pie, { x: 2.88, y: 2.68, w: 0.54, h: 0.40, fill: { color: '263238' }, angleRange: [180, 0] });
++  s.addShape(T.ellipse, { x: 3.02, y: 2.48, w: 0.30, h: 0.26, fill: { color: '263238' } });
++  s.addShape(T.ellipse, { x: 2.84, y: 2.94, w: 0.17, h: 0.20, fill: { color: C.deep } });
++
++  // Leaf sprigs left and right of the book stack.
++  [[1.02, 4.62, 40], [1.42, 4.98, -25], [1.15, 5.36, 12]].forEach(([x, y, r]) =>
++    s.addShape(T.teardrop, { x, y, w: 0.72, h: 0.50, fill: { color: C.blue }, rotate: r }));
++  s.addShape(T.teardrop, { x: 4.44, y: 5.18, w: 0.68, h: 0.48, fill: { color: '022C6B' }, rotate: 200 });
++
++  // Book stack under the reader: coloured spine + white page block.
++  [
++    { x: 2.48, y: 5.55, w: 1.86, h: 0.55, color: '407BFF' },
++    { x: 2.28, y: 5.02, w: 1.52, h: 0.52, color: C.cyan },
++  ].forEach((bk) => {
++    s.addShape(T.roundRect, { x: bk.x, y: bk.y, w: bk.w, h: bk.h, fill: { color: bk.color }, rectRadius: 0.09 });
++    s.addShape(T.roundRect, { x: bk.x + 0.22, y: bk.y + 0.07, w: bk.w - 0.32, h: bk.h - 0.14, fill: { color: 'F5F9FF' }, rectRadius: 0.05 });
++  });
++  s.addShape(T.donut, { x: 5.16, y: 6.27, w: 0.27, h: 0.27, fill: { color: C.deep } });
++}
++
++function slide12() {
++  const s = pptx.addSlide();
++  readerIllustration(s);
++
++  [
++    { y: 2.176, fill: C.navy, value: '15k+', vx: 6.316, vw: 0.873, text: 'Planning', lx: 6.009, lw: 1.487, ly: 2.689 },
++    { y: 3.487, fill: C.blue, value: '98%', vx: 6.291, vw: 0.840, text: 'Agenda', lx: 6.089, lw: 1.245, ly: 3.988 },
++    { y: 4.799, fill: C.deep, value: '17k+', vx: 6.356, vw: 0.782, text: 'Going', lx: 5.932, lw: 1.580, ly: 5.132, noWrap: true },
++  ].forEach((t) => {
++    s.addShape(T.round2DiagRect, { x: 6.009, y: t.y, w: 1.405, h: 0.908, fill: { color: t.fill }, shadow: SHADOW });
++    label(s, t.vx, t.y + 0.107, t.vw, 0.438, t.value, { size: 20, bold: true, color: C.light, align: 'center', wrap: !t.noWrap });
++    label(s, t.lx, t.ly, t.lw, 0.337, t.text, { size: 14, color: C.white, align: 'center' });
++  });
++
++  heading(s, 8.218, 1.687, 4.046, 1.313, [['Fly South to ', C.navy], ['Paradise Holiday', C.ink]], { size: 36 });
++  label(s, 8.218, 3.265, 2.858, 0.37, 'Return on Investment', { size: 16, bold: true, color: C.deep });
++  body(s, 8.218, 3.732, 4.046, 0.678, 'Whether between companies, communities, or individuals, successful collaboration drives');
++
++  s.addShape(T.round2DiagRect, { x: 8.218, y: 4.737, w: 4.128, h: 1.372, fill: { color: C.navy }, shadow: SHADOW });
++  s.addShape(T.ellipse, { x: 8.559, y: 5.122, w: 0.648, h: 0.648, fill: { color: C.light }, shadow: SHADOW });
++  icon(s, 'route', 8.684, 5.247, 0.398, C.navy);
++  label(s, 9.482, 5.066, 2.47, 0.37, 'Meets Adventure', { size: 16, bold: true, color: C.white });
++  body(s, 9.482, 5.405, 2.612, 0.375, 'communities, or individuals, ', { color: C.white });
++  nav(s);
++}
++
++// -------------------------------------------------------------- slide 13 ----
++// Phone mockup placeholder with floating pill labels and a gauge.
++function slide13() {
++  const s = pptx.addSlide();
++  s.addShape(T.roundRect, { x: 1.66, y: 0.99, w: 3.0, h: 5.92, fill: { color: '1E1E1E' }, rectRadius: 0.45 });
++  photo(s, { x: 1.878, y: 1.197, w: 2.565, h: 5.509, shape: T.roundRect, rectRadius: 0.3, edgeWidth: 0, label: '[phone mockup]' });
++  s.addShape(T.roundRect, { x: 2.63, y: 1.24, w: 1.06, h: 0.19, fill: { color: '1E1E1E' }, rectRadius: 0.09 });
++
++  s.addShape(T.roundRect, { x: 3.541, y: 1.711, w: 2.886, h: 1.037, fill: { color: C.blue }, rectRadius: 0.518, shadow: SHADOW });
++  s.addShape(T.ellipse, { x: 3.744, y: 1.871, w: 0.717, h: 0.717, fill: { color: C.light }, shadow: SHADOW });
++  icon(s, 'send', 3.93, 2.057, 0.345, C.blue);
++  label(s, 4.53, 2.061, 1.685, 0.337, 'Sail into Tropics', { size: 14, bold: true, color: C.white });
++
++  heading(s, 6.741, 1.49, 5.318, 1.447, [['A Passport to ', C.ink], ['Paradise', C.navy]]);
++  body(s, 6.741, 3.283, 4.546, 0.981,
++    'foundation of sustainable growinnovation.  between companies, communities, or individuals, drive value  long-term impact. This presentation explores the');
++
++  s.addShape(T.roundRect, { x: 6.734, y: 4.835, w: 4.128, h: 1.372, fill: { color: C.deep }, rectRadius: 0.686, shadow: SHADOW });
++  s.addShape(T.ellipse, { x: 6.964, y: 5.084, w: 0.874, h: 0.874, fill: { color: C.light }, shadow: SHADOW });
++  icon(s, 'route', 7.167, 5.287, 0.468, C.deep);
++  label(s, 7.986, 5.158, 2.237, 0.37, 'The Tropical Route', { size: 16, bold: true, color: C.white });
++  body(s, 7.986, 5.509, 2.513, 0.375, 'Lorem ipsum dolor sit amet', { color: C.light });
++  gauge(s, 11.376, 4.717, 1.085, '60%', 'Golden Sands', C.blue, { bold: true });
++  nav(s);
++}
++
++// -------------------------------------------------------------- slide 14 ----
++// Numbered list with a highlighted middle row; tablet mockups on the right.
++function slide14() {
++  const s = pptx.addSlide();
++  s.addShape(T.round2SameRect, { x: 1.835, y: 1.531, w: 1.587, h: 5.354, rotate: 90, fill: { color: C.blue, transparency: 60 } });
++  photo(s, { x: 7.35, y: 1.55, w: 4.45, h: 3.55, shape: T.roundRect, rectRadius: 0.2, color: 'D6D6DC', rotate: 6, edgeWidth: 0 });
++  s.addShape(T.roundRect, { x: 6.34, y: 2.36, w: 5.35, h: 3.83, fill: { color: '111111' }, rectRadius: 0.26, rotate: 349 });
++  photo(s, { x: 6.5, y: 2.5, w: 5.03, h: 3.55, shape: T.roundRect, rectRadius: 0.18, rotate: 349, edgeWidth: 0, label: true });
++
++  const rows = [
++    { n: '01.', ny: 1.916, title: 'Winter Escapes', ty: 1.749, by: 2.108, color: C.ink },
++    { n: '02.', ny: 3.854, title: 'Island Hopping', ty: 3.611, by: 4.006, color: C.deep },
++    { n: '03.', ny: 5.583, title: 'Summer Getaways', ty: 5.442, by: 5.809, color: C.navy },
++  ];
++  rows.forEach((r) => {
++    label(s, 0.492, r.ny, 1.06, 0.707, r.n, { size: 36, bold: true, color: r.color, wrap: false });
++    label(s, 1.435, r.ty, 3.19, 0.438, r.title, { size: 20, bold: true, color: r.color });
++    body(s, 1.435, r.by, 3.436, 0.667, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod temporin', { color: r.color });
++  });
++  heading(s, 4.721, 0.456, 3.891, 0.707, [[' Stunning ', C.ink], ['Places', C.navy]], { size: 36 });
++  nav(s);
++}
++
++// -------------------------------------------------------------- slide 15 ----
++// Stylised archipelago map: irregular island blobs with red pin markers.
++const ISLAND_SHAPES = [
++  [[0.04, 0.38], [0.22, 0.10], [0.41, 0.22], [0.58, 0.02], [0.83, 0.26], [0.97, 0.55],
++    [0.78, 0.72], [0.84, 0.93], [0.52, 0.87], [0.31, 1.00], [0.17, 0.75], [0.00, 0.60]],
++  [[0.00, 0.28], [0.19, 0.05], [0.44, 0.15], [0.63, 0.00], [0.88, 0.19], [1.00, 0.47],
++    [0.81, 0.63], [0.90, 0.85], [0.60, 0.94], [0.36, 1.00], [0.13, 0.79], [0.08, 0.52]],
++  [[0.07, 0.24], [0.30, 0.03], [0.52, 0.17], [0.79, 0.06], [1.00, 0.35], [0.88, 0.62],
++    [0.96, 0.84], [0.66, 0.92], [0.42, 1.00], [0.19, 0.83], [0.00, 0.55], [0.14, 0.44]],
++  [[0.02, 0.44], [0.15, 0.16], [0.38, 0.06], [0.63, 0.14], [0.86, 0.00], [1.00, 0.31],
++    [0.90, 0.58], [0.99, 0.80], [0.71, 0.90], [0.44, 1.00], [0.22, 0.86], [0.09, 0.66]],
++];
++const MAP_ISLANDS = [
++  [6.187, 5.351, 0.186, 0.180, 'slate'], [3.540, 3.004, 0.754, 1.212, 'cyan'],
++  [8.198, 3.483, 0.257, 0.757, 'slate'], [10.634, 2.948, 1.376, 1.496, 'cyan'],
++  [7.522, 5.498, 0.789, 0.287, 'slate'], [5.869, 2.667, 1.278, 1.436, 'navy'],
++  [5.340, 4.892, 0.580, 0.532, 'cyan'], [4.345, 3.719, 0.923, 0.904, 'navy'],
++  [7.941, 3.760, 0.970, 1.552, 'cyan'], [7.172, 3.624, 0.524, 1.179, 'blue'],
++  [8.685, 4.047, 0.806, 0.875, 'blue'], [4.627, 1.922, 1.345, 1.510, 'slate'],
++  [3.885, 2.537, 0.860, 1.014, 'cyan'], [11.773, 3.420, 1.560, 2.365, 'navy'],
++  [3.192, 2.052, 0.779, 1.363, 'navy'], [9.204, 1.700, 0.933, 1.472, 'slate'],
++  [9.481, 2.395, 1.734, 1.540, 'blue'], [7.228, 2.022, 0.796, 0.949, 'cyan'],
++  [9.809, 4.020, 2.118, 1.555, 'cyan'], [4.700, 4.289, 0.531, 0.677, 'slate'],
++  [4.125, 3.456, 0.791, 0.565, 'blue'], [5.413, 4.934, 0.066, 0.089, 'slate'],
++  [8.751, 2.959, 0.546, 0.207, 'slate'], [8.239, 5.492, 1.442, 0.828, 'slate'],
++  [7.049, 2.531, 1.210, 1.374, 'navy'], [6.393, 4.842, 1.232, 0.851, 'cyan'],
++  [8.367, 2.874, 1.053, 1.280, 'cyan'], [6.351, 3.042, 1.171, 1.197, 'cyan'],
++  [5.844, 4.842, 0.718, 0.700, 'blue'], [4.105, 3.867, 0.629, 0.913, 'cyan'],
++  [5.048, 4.860, 0.380, 0.343, 'slate'], [5.053, 3.663, 0.730, 0.491, 'slate'],
++  [7.203, 5.492, 0.291, 0.225, 'slate'], [2.714, 1.606, 0.754, 1.082, 'cyan'],
++];
++const MAP_PINS = [
++  [7.366, 2.054, 0.885], [12.653, 3.312, 0.826], [8.977, 2.533, 0.662],
++  [6.162, 2.553, 0.613], [4.894, 3.648, 0.602], [3.493, 1.974, 0.505],
++  [8.409, 5.329, 0.403], [9.418, 5.488, 0.403],
++];
++
++function slide15() {
++  const s = pptx.addSlide();
++  MAP_ISLANDS.forEach(([x, y, w, h, key], i) => {
++    polygon(s, ISLAND_SHAPES[i % ISLAND_SHAPES.length], x, y, w, h, { fill: { color: C[key] } });
++  });
++  MAP_PINS.forEach(([x, y, size]) => icon(s, 'pin', x, y, size, 'FF0000'));
++
++  heading(s, 3.33, 0.413, 8.956, 0.707, [['Choosing Your ', C.deep], ['Destination', C.navy]], { size: 36, face: MINOR });
++  label(s, 0.664, 4.224, 2.685, 0.438, 'Around the World', { size: 20, bold: true, color: C.deep });
++  body(s, 0.657, 4.754, 3.295, 1.273,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua', { align: 'justify' });
++  s.addShape(T.roundRect, { x: 0.714, y: 6.227, w: 1.269, h: 0.438, fill: { color: C.navy }, rectRadius: 0.219 });
++  label(s, 0.505, 6.216, 1.708, 0.364, 'Learn More', { color: C.white, align: 'center' });
++  nav(s);
++}
++
++// -------------------------------------------------------------- slide 16 ----
++// Three numbered circles on the left; outlined "flag" graphic on the right.
++function slide16() {
++  const s = pptx.addSlide();
++  [
++    { y: 2.126, n: '01', color: C.navy, title: 'Coastal Charms', tw: 1.929 },
++    { y: 3.859, n: '02', color: C.blue, title: 'The Island Life', tw: 1.729 },
++    { y: 5.591, n: '03', color: C.deep, title: 'Seashell Secrets', tw: 2.001 },
++  ].forEach((r) => {
++    s.addShape(T.ellipse, { x: 1.536, y: r.y, w: 0.81, h: 0.81, fill: { color: r.color } });
++    label(s, 1.544, r.y + 0.085, 0.794, 0.64, r.n, { size: 32, bold: true, face: MAJOR, color: C.light, align: 'center' });
++    label(s, 2.68, r.y - 0.185, r.tw, 0.37, r.title, { size: 16, bold: true, color: r.color, wrap: false });
++    body(s, 2.68, r.y + 0.178, 3.258, 1.125, 'Various versions have evolved over the years, sometimes by accident, sometimes on purpose', { size: 14, color: C.ink65 });
++  });
++
++  [
++    { fx: 8.351, fy: 2.024, fs: 1.5, color: C.navy, lw: 7.5, lx: 9.851, ly: 2.869, lh: 4.627, glyph: 'route', ix: 8.867, iy: 2.467, is: 0.468, flip: true },
++    { fx: 10.115, fy: 3.5, fs: 1.683, color: C.deep, lw: 8.5, lx: 10.115, ly: 4.817, lh: 2.683, glyph: 'plane', ix: 10.669, iy: 4.037, is: 0.62, flip: false },
++    { fx: 7.641, fy: 3.885, fs: 2.21, color: C.blue, lw: 9.5, lx: 9.851, ly: 4.817, lh: 2.683, glyph: 'play', ix: 8.4, iy: 4.668, is: 0.692, flip: true },
++  ].forEach((f) => {
++    s.addShape(T.line, { x: f.lx, y: f.ly, w: 0, h: f.lh, line: { color: f.color, width: f.lw } });
++    s.addShape(T.round2DiagRect, { x: f.fx, y: f.fy, w: f.fs, h: f.fs, fill: { type: 'none' }, line: { color: f.color, width: f.lw }, flipH: f.flip });
++    icon(s, f.glyph, f.ix, f.iy, f.is, f.color);
++  });
++  heading(s, 4.325, 0.456, 4.683, 0.707, [['Best ', C.navy], ['Tropical Spots', C.ink]], { size: 36 });
++  nav(s);
++}
++
++// -------------------------------------------------------------- slide 17 ----
++// Four paper-plane arrows, each built from two rotated right triangles.
++const PLANES = [
++  { a: [2.605, 1.913, 305.2, '0462EF'], b: [1.890, 2.716, 138.9, C.navy],
++    title: 'Hopping Tips', tc: C.navy, tx: 1.367, ty: 4.484, tw: 1.804, glyph: 'recycle', ix: 1.438, iy: 4.065, is: 0.419, ic: C.navy },
++  { a: [4.661, 2.963, 273.8, '61CBF4'], b: [4.467, 4.020, 107.5, C.cyan],
++    title: 'Tropical Vibe', tc: C.cyan, tx: 4.202, ty: 6.065, tw: 1.755, glyph: 'island', ix: 4.278, iy: 5.625, is: 0.458, ic: C.cyan },
++  { a: [6.573, 2.651, 239.9, '2870F3'], b: [7.002, 3.637, 73.6, C.deep],
++    title: 'Travel Far', tc: C.deep, tx: 7.333, ty: 5.854, tw: 1.345, glyph: 'sun', ix: 7.422, iy: 5.391, is: 0.474, ic: '0347AD' },
++  { a: [8.398, 1.461, 210.6, '61CBF4'], b: [9.255, 2.110, 44.3, '0B76A0'],
++    title: 'Tropical Flora', tc: C.cyan, tx: 10.162, ty: 3.311, tw: 1.791, glyph: 'wave', ix: 10.284, iy: 2.883, is: 0.466, ic: C.cyan },
++];
++
++function slide17() {
++  const s = pptx.addSlide();
++  PLANES.forEach((p) => {
++    const [ax, ay, arot, acol] = p.a;
++    const [bx, by, brot, bcol] = p.b;
++    s.addShape(T.rtTriangle, { x: ax, y: ay, w: 1.354, h: 2.203, fill: { color: acol }, rotate: arot, flipV: true });
++    s.addShape(T.rtTriangle, { x: bx, y: by, w: 1.354, h: 2.203, fill: { color: bcol }, rotate: brot });
++    icon(s, p.glyph, p.ix, p.iy, p.is, p.ic);
++    label(s, p.tx, p.ty, p.tw, 0.37, p.title, { size: 16, bold: true, color: p.tc });
++    body(s, p.tx, p.ty + 0.359, 1.804, 0.505, 'Lorem Ipsum is simply dummy text', { lineSpacing: null });
++  });
++  heading(s, 4.066, 0.571, 5.201, 0.707, [['Welcome To Paradise', C.ink]], { size: 36 });
++  label(s, 4.507, 1.24, 4.192, 0.37, 'Top Tropical Destinations to Visit Now', { size: 16 });
++  nav(s);
++}
++
++// -------------------------------------------------------------- slide 18 ----
++// Venn-style trio of overlapping circles plus a legend column.
++function slide18() {
++  const s = pptx.addSlide();
++  label(s, -1.984, 0.673, 11.653, 0.653, 'Three Circular Infographic',
++    { size: 32, bold: true, face: MAJOR, align: 'right', valign: 'middle', charSpacing: 3 });
++
++  [
++    { x: 3.986, y: 3.585, w: 2.648, h: 3.242, fill: C.deep },
++    { x: 1.344, y: 3.684, w: 3.240, h: 3.139, fill: C.navy },
++    { x: 2.373, y: 1.801, w: 3.238, h: 3.012, fill: C.blue },
++  ].forEach((l) => s.addShape(T.ellipse, { x: l.x, y: l.y, w: l.w, h: l.h, fill: { color: l.fill } }));
++  [[3.456, 2.903], [4.474, 4.651], [2.429, 4.670]].forEach(([x, y]) =>
++    s.addShape(T.ellipse, { x, y, w: 1.07, h: 1.07, fill: { color: C.light } }));
++  [['02', 3.539, 2.093], ['01', 1.599, 5.377], ['03', 5.420, 5.377]].forEach(([n, x, y]) =>
++    label(s, x, y, 0.893, 0.551, n, { size: 20, bold: true, face: MAJOR, color: C.light, align: 'center', valign: 'middle' }));
++
++  [
++    { title: 'Exotic Bliss', color: C.navy, ty: 2.499, by: 2.883, glyph: 'starOutline', iy: 2.698, tw: 1.609 },
++    { title: 'Sunny Escape', color: C.blue, ty: 3.950, by: 4.336, glyph: 'sun', iy: 4.191, tw: 1.996 },
++    { title: 'Visual Tour', color: C.deep, ty: 5.450, by: 5.844, glyph: 'star6', iy: 5.682, tw: 1.693 },
++  ].forEach((l) => {
++    icon(s, l.glyph, 7.681, l.iy, 0.49, l.color);
++    label(s, 8.349, l.ty, l.tw, 0.404, l.title, { size: 18, bold: true, color: l.color });
++    body(s, 8.349, l.by, 3.604, 0.667, 'Nam libero tempore, cum soluta nobis est id quod maxime placeat facere possimus', { color: C.ink50 });
++  });
++  nav(s);
++}
++
++// -------------------------------------------------------------- slide 19 ----
++// Full-bleed navy contact slide with three rounded contact chips.
++function slide19() {
++  const s = pptx.addSlide();
++  photo(s, { x: 0, y: 0, w: 13.333, h: 7.5, edgeWidth: 0 });
++  s.addShape(T.rect, { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: C.navy, transparency: 12 } });
++  label(s, 1.004, 1.299, 11.281, 1.582, 'CONTACT US ', { size: 88, bold: true, face: MAJOR, color: C.white, align: 'center' });
++  body(s, 1.96, 3.122, 9.369, 1.273,
++    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
++    { color: C.white, align: 'center', valign: 'middle' });
++
++  [
++    { x: 1.317, y: 5.004, fill: C.navy10, tx: 1.664, ty: 5.220, tw: 2.285, text: '@travelens.co.id', color: C.ink },
++    { x: 5.317, y: 4.993, fill: C.deep, tx: 5.583, ty: 5.215, tw: 2.750, text: 'www.travelens.com', color: C.white },
++    { x: 9.270, y: 4.983, fill: C.navy10, tx: 9.653, ty: 5.215, tw: 2.249, text: '+08957345289', color: C.ink },
++  ].forEach((c) => {
++    s.addShape(T.roundRect, { x: c.x, y: c.y, w: 3.016, h: 0.878, fill: { color: c.fill }, rectRadius: 0.439 });
++    label(s, c.tx, c.ty, c.tw, 0.414, c.text, { size: 18, color: c.color });
++  });
++  navContact(s);
++}
++
++// ----------------------------------------------------------------- build ----
++[slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10,
++  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
++  .forEach((build) => build());
++
++pptx.writeFile({ fileName: path.join(__dirname, '1696348b-f3e4-4171-aacc-8ddd5b3d0a67_grok_final.pptx') })
++  .then((f) => console.log('wrote', f));

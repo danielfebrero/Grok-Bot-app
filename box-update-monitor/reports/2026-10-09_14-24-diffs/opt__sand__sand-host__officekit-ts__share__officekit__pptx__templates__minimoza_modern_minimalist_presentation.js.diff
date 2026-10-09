@@ -1,0 +1,560 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/minimoza_modern_minimalist_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/minimoza_modern_minimalist_presentation.js
+@@ -0,0 +1,557 @@
++/**
++ * MINIMOZA — minimalist presentation deck (30 slides, 13.333in x 7.5in).
++ *
++ * Recreated with pptxgenjs only — every shape, colour and string below is a
++ * plain literal. The deck's photo slots are empty PowerPoint picture
++ * placeholders, so they are reproduced as same-size unfilled frames.
++ *
++ *   node 1540170d-d200-428c-8883-a31a532a4384_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++// ---------------------------------------------------------------- design tokens
++
++const C = {
++  ink: '0D0D0D',    // near-black panels & display type
++  dark: '404040',   // body copy / secondary type
++  mid: '595959',    // first line of a two-line heading
++  gray: '808080',   // hairline rules on light backgrounds
++  white: 'FFFFFF',
++  navy: '102C57',   // accent used on labels and eyebrows
++  green: '45583E',  // olive accent panels
++};
++
++const F = {
++  display: 'Montserrat', // headings
++  ui: 'Inter',           // labels, chrome, all-caps captions
++  body: 'Open Sans',     // paragraphs
++};
++
++// Shared lorem strings — the source deck reuses these verbatim.
++const L1 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc auctor efficitur mi sit amet euismod. Nullam at vehicula tortor, auctor placerat sapien. ';
++const L2 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc auctor efficitur mi sit amet euismod. ';
++const L4 = L1 + 'Morbi suscipit turpis erat, vehicula finibus massa congue in. ';
++const L5 = L4 + 'Donec eget nunc nec lectus tempus luctus. ';
++const L3 = L5 + 'Vivamus auctor eros sit amet orci efficitur suscipit.';
++const L6 = 'Donec eget nunc nec lectus tempus luctus. Vivamus auctor eros sit amet orci efficitur suscipit.';
++const CAP = 'LOREM IPSUM DOLOR SIT AMET, CONSECTETUR ADIPISCING ELIT. ';
++const BIG = 'LOREM IPSUM DOLOR SIT AMET, CONSECTETUR ADIPISCING ELIT. NUNC AUCTOR EFFICITUR MI SIT AMET EUISMOD. NULLAM AT VEHICULA TORTOR, AUCTOR PLACERAT SAPIEN. ';
++
++// Every text box in the source deck keeps PowerPoint's default insets and grows
++// downward from its top edge. pptxgenjs takes margins in points, ordered
++// [left, right, bottom, top].
++const INSET = [7.2, 7.2, 3.6, 3.6];
++
++// ---------------------------------------------------------------- primitives
++
++/**
++ * Plain text box: `y` is the top edge, text is top-anchored. Pass an array of
++ * strings for multiple paragraphs (an empty string yields a blank line).
++ */
++function txt(s, x, y, w, h, text, o) {
++  const runs = Array.isArray(text)
++    ? text.map(t => ({ text: t, options: { breakLine: true } }))
++    : text;
++  s.addText(runs, {
++    x, y, w, h,
++    fontFace: o.font,
++    fontSize: o.size,
++    color: o.color,
++    bold: !!o.bold,
++    align: o.align || 'left',
++    valign: 'top',
++    charSpacing: o.cs,
++    lineSpacingMultiple: o.ls,
++    rotate: o.rot,
++    margin: INSET,
++    wrap: true,
++  });
++}
++
++/** Solid colour block. */
++function panel(s, x, y, w, h, fill) {
++  s.addShape('rect', { x, y, w, h, fill: { color: fill }, line: { type: 'none' } });
++}
++
++/**
++ * Empty picture frame. The source deck's photo slots are unfilled PowerPoint
++ * picture placeholders — they hold no bitmap and render as nothing — so the
++ * frame is reproduced as a same-size shape with no fill and no outline.
++ */
++function photo(s, x, y, w, h) {
++  s.addShape('rect', {
++    x, y, w, h,
++    fill: { type: 'none' }, line: { type: 'none' }, altText: '[image]',
++  });
++}
++
++/** Thin horizontal divider. */
++function rule(s, x, y, w, color, width) {
++  s.addShape('line', { x, y, w, h: 0, line: { color, width: width || 0.75 } });
++}
++
++// ---------------------------------------------------------------- composites
++
++/**
++ * Paragraph + hairline + tiny caps label — the deck's recurring "note" unit.
++ * `tone` picks the palette: dark = on a dark panel, light = on white with a
++ * grey rule and navy label, plain = all mid-grey.
++ */
++function note(s, x, y, w, h, ruleW, text, label, tone, o) {
++  o = o || {};
++  const bodyColor = tone === 'dark' ? C.white : C.dark;
++  const ruleColor = tone === 'dark' ? C.white : (tone === 'plain' ? C.dark : C.gray);
++  const labelColor = tone === 'dark' ? C.white : (tone === 'plain' ? C.dark : C.navy);
++  const pad = o.pad === undefined ? 0.121 : o.pad;
++  const ruleDy = o.ruleDy === undefined ? 1.463 : o.ruleDy;
++  const labelDx = o.labelDx === undefined ? 0.025 : o.labelDx;
++  const labelDy = o.labelDy === undefined ? 0.039 : o.labelDy;
++  txt(s, x, y, w, h, text, {
++    size: o.size || 10,
++    font: o.font || F.body,
++    color: bodyColor,
++    align: o.align,
++    ls: o.ls === null ? undefined : (o.ls || 1.5),
++  });
++  rule(s, x + pad, y + ruleDy, ruleW, ruleColor);
++  txt(s, x + labelDx, y + ruleDy + labelDy, 2.114, 0.236, label, {
++    size: 8, font: F.ui, color: labelColor,
++  });
++}
++
++/** Coloured tile carrying a four-line all-caps caption. */
++function badge(s, x, y, w, h, fill, capX, capY, capW) {
++  panel(s, x, y, w, h, fill);
++  txt(s, capX, capY, capW, 1.081, CAP, { size: 10, font: F.ui, color: C.white, ls: 1.5 });
++}
++
++/** Olive strip of justified copy closed by a black square holding a big "M". */
++function mCard(s, x, y) {
++  panel(s, x, y, 3.724, 1.177, C.green);
++  panel(s, x + 3.725, y, 1.142, 1.177, C.ink);
++  txt(s, x + 0.221, y + 0.205, 3.219, 0.774, L1, {
++    size: 10, font: F.body, color: C.white, align: 'justify',
++  });
++  txt(s, x + 3.932, y + 0.202, 0.727, 0.774, 'M', {
++    size: 40, font: F.display, color: C.white, align: 'center',
++  });
++}
++
++/** Two-line 40pt heading with the navy "MINIMALIST PRESENTATION" eyebrow. */
++function heading(s, x, y, line1, line2, w2, tone, o) {
++  o = o || {};
++  const first = tone === 'dark' ? C.white : C.mid;
++  const second = tone === 'dark' ? C.white : C.dark;
++  txt(s, x, y, 4.493, 0.774, line1, { size: 40, font: F.display, color: first });
++  txt(s, x, y + 0.5415, w2, 0.774, line2, { size: 40, font: F.display, color: second });
++  if (o.sub !== false) {
++    txt(s, x + (o.subDx === undefined ? 0.025 : o.subDx),
++        y + (o.subDy === undefined ? 1.37 : o.subDy),
++        3.219, 0.269, 'MINIMALIST PRESENTATION', {
++      size: 10, font: F.ui, color: tone === 'dark' ? C.white : C.navy, cs: 3, bold: true,
++    });
++  }
++}
++
++// ---------------------------------------------------------------- page chrome
++
++/**
++ * Corner furniture repeated on every slide: the MINIMOZA wordmark, the
++ * REGISTER badge with its outlined avatar glyph, the "MODERN DESIGN — 30 PAGE"
++ * footer and the "P.01/30" page marker. Each slide picks light or dark tones.
++ */
++const CHROME = [
++  /*  1 */ { brand: 'dark', foot: 'plain', page: 'navy', reg: 'dark' },
++  /*  2 */ { brand: 'dark', foot: 'white', page: 'navy', reg: 'dark' },
++  /*  3 */ { brand: 'dark', foot: 'plain', page: 'navy', reg: 'dark' },
++  /*  4 */ { brand: 'dark', foot: 'plain', page: 'white', reg: 'white' },
++  /*  5 */ { brand: 'white', foot: 'white', page: 'navy', reg: 'dark' },
++  /*  6 */ { brand: 'dark', foot: 'plain', page: 'white', reg: 'white' },
++  /*  7 */ { brand: 'white', foot: 'white', page: 'navy', reg: 'dark' },
++  /*  8 */ { brand: 'dark', foot: 'plain', page: 'dark', reg: 'dark' },
++  /*  9 */ { brand: 'dark', reg: 'dark' },
++  /* 10 */ { brand: 'dark', foot: 'plain', page: 'white', reg: 'white' },
++  /* 11 */ { brand: 'dark', foot: 'plain', page: 'dark', reg: 'dark' },
++  /* 12 */ { brand: 'dark', foot: 'plain', page: 'dark', reg: 'dark' },
++  /* 13 */ { brand: 'white', foot: 'white', page: 'navy', reg: 'dark' },
++  /* 14 */ { brand: 'dark', brandX: 0.599, foot: 'plain', footX: 0.624, page: 'white', reg: 'white' },
++  /* 15 */ { brand: 'dark', foot: 'white', page: 'dark', reg: 'dark' },
++  /* 16 */ { brand: 'dark', brandX: 0.599, foot: 'plain', footX: 0.624, footY: 6.854, page: 'dark', pageX: 11.625, pageY: 6.854, reg: 'dark' },
++  /* 17 */ { brand: 'dark', foot: 'plain', footX: 0.624, page: 'dark', reg: 'dark' },
++  /* 18 */ { brand: 'dark', brandX: 0.574, foot: 'plain', footX: 0.636, page: 'dark', pageX: 11.625, pageY: 6.854, reg: 'dark' },
++  /* 19 */ { page: 'dark', reg: 'dark' },
++  /* 20 */ { brand: 'dark', brandX: 0.574, foot: 'plain', footX: 0.636, page: 'dark', pageX: 11.625, pageY: 6.854, reg: 'dark' },
++  /* 21 */ { brand: 'dark', brandX: 0.574, foot: 'plain', footX: 0.636, page: 'dark', pageX: 11.625, pageY: 6.854, reg: 'dark' },
++  /* 22 */ { brand: 'white', foot: 'white', page: 'navy', reg: 'dark' },
++  /* 23 */ { brand: 'white', brandX: 0.574, foot: 'white', footX: 0.636, page: 'navy', reg: 'dark' },
++  /* 24 */ { brand: 'dark', brandX: 0.574, foot: 'plain', footX: 0.636, page: 'navy', reg: 'dark' },
++  /* 25 */ { brand: 'dark', foot: 'plain', page: 'white', reg: 'white' },
++  /* 26 */ { brand: 'dark', foot: 'plain', page: 'navy', reg: 'dark' },
++  /* 27 */ { bg: C.green, brand: 'white', foot: 'white', page: 'white', reg: 'white' },
++  /* 28 */ { brand: 'white', foot: 'white', page: 'navy', reg: 'dark' },
++  /* 29 */ { brand: 'dark', foot: 'plain', page: 'navy', reg: 'dark' },
++  /* 30 */ { brand: 'white', brandX: 0.799, foot: 'plain', footX: 1.224, page: 'navy', reg: 'white' },
++];
++
++function registerGlyph(s, color) {
++  // Rounded square holding a head-and-shoulders outline (the source uses an SVG).
++  s.addShape('roundRect', {
++    x: 12.551, y: 0.5065, w: 0.1586, h: 0.1586, rectRadius: 0.03,
++    fill: { type: 'none' }, line: { color, width: 0.75 },
++  });
++  s.addShape('ellipse', {
++    x: 12.6, y: 0.535, w: 0.062, h: 0.062,
++    fill: { type: 'none' }, line: { color, width: 0.6 },
++  });
++  s.addShape('arc', {
++    x: 12.578, y: 0.598, w: 0.105, h: 0.09,
++    fill: { type: 'none' }, line: { color, width: 0.6 }, angleRange: [180, 360],
++  });
++}
++
++function addChrome(s, spec) {
++  if (spec.brand) {
++    txt(s, spec.brandX === undefined ? 0.786 : spec.brandX, 0.4639, 2.114, 0.269, 'MINIMOZA', {
++      size: 10, font: F.ui, color: spec.brand === 'white' ? C.white : C.dark, bold: true,
++    });
++  }
++  if (spec.foot) {
++    const fx = spec.footX === undefined ? 0.824 : spec.footX;
++    const fy = spec.footY === undefined ? 6.7669 : spec.footY;
++    const tone = spec.foot === 'white' ? C.white : C.dark;
++    s.addText(
++      [{ text: 'MODERN', options: { bold: true } }, { text: ' DESIGN' }],
++      { x: fx, y: fy, w: 2.114, h: 0.269, fontFace: F.ui, fontSize: 10, color: tone,
++        valign: 'top', margin: INSET },
++    );
++    rule(s, fx + 1.4013, fy + 0.1456, 0.4875, spec.foot === 'white' ? C.white : C.ink, 1);
++    txt(s, fx + 1.8013, fy + 0.011, 0.882, 0.269, '30 PAGE', {
++      size: 10, font: F.ui, color: spec.foot === 'white' ? C.white : C.navy, align: 'right',
++    });
++  }
++  if (spec.page) {
++    const px = spec.pageX === undefined ? 11.5 : spec.pageX;
++    const py = spec.pageY === undefined ? 6.7669 : spec.pageY;
++    const runs = spec.page === 'navy'
++      ? [{ text: 'P', options: { bold: true, color: C.navy } },
++         { text: '.', options: { bold: true, color: C.gray } },
++         { text: '01/30', options: { color: C.gray } }]
++      : [{ text: 'P.', options: { bold: true } }, { text: '01/30' }];
++    s.addText(runs, {
++      x: px, y: py, w: 1.1034, h: 0.269, fontFace: F.ui, fontSize: 10,
++      color: spec.page === 'white' ? C.white : C.dark,
++      align: 'right', valign: 'top', margin: INSET,
++    });
++  }
++  const regColor = spec.reg === 'white' ? C.white : C.dark;
++  txt(s, 11.6721, 0.4639, 0.8625, 0.2524, 'REGISTER', {
++    size: 9, font: F.ui, color: regColor, align: 'center',
++  });
++  registerGlyph(s, regColor);
++}
++
++// ---------------------------------------------------------------- slides
++
++const SLIDES = [
++  // 1 — MINIMOZA
++  s => {
++    photo(s, 4.796, 1.73, 3.741, 3.2);
++    txt(s, 3.203, 4.206, 6.928, 1.447, 'MINIMOZA', { size: 80, font: F.display, color: C.ink, align: 'center', cs: 3 });
++  },
++  // 2 — INTRODUCE
++  s => {
++    photo(s, 0, 0, 5.717, 7.5);
++    txt(s, 7.041, 1.57, 5.669, 1.111, 'INTRODUCE', { size: 60, font: F.display, color: C.dark });
++    note(s, 7.117, 2.863, 3.744, 0.833, 3.636, L1, 'MESSAGE HERE 01', 'light', { pad: 0.096, ruleDy: 1.247, labelDx: 0.013, labelDy: 0.051 });
++    badge(s, 4.704, 3.147, 1.85, 1.637, C.ink, 4.929, 3.425, 1.663);
++    rule(s, 7.225, 4.784, 3.636, C.gray);
++    txt(s, 7.129, 4.823, 2.114, 0.236, 'MESSAGE HERE 02', { size: 8, font: F.ui, color: C.navy });
++    txt(s, 7.142, 5.5, 1.586, 0.774, CAP, { size: 10, font: F.ui, color: C.dark });
++    txt(s, 9.083, 5.5, 2.015, 0.606, CAP, { size: 10, font: F.ui, color: C.dark });
++  },
++  // 3 — WELCOME TO MINIMOZA.
++  s => {
++    photo(s, 0, 0, 13.333, 3.412);
++    panel(s, 0.889, 2.627, 7.619, 2.988, C.green);
++    badge(s, 8.508, 2.633, 1.85, 1.637, C.ink, 8.733, 2.911, 1.663);
++    note(s, 1.328, 3.134, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 4.697, 3.134, 3.081, 0.833, 2.886, L2, 'MESSAGE HERE 02', 'dark', { pad: 0.096, labelDx: 0 });
++    txt(s, 8.733, 4.469, 4.317, 0.774, 'WELCOME TO', { size: 40, font: F.display, color: C.mid });
++    txt(s, 8.733, 5.035, 3.744, 0.774, 'MINIMOZA.', { size: 40, font: F.display, color: C.dark });
++  },
++  // 4 — layout only
++  s => {
++    photo(s, 7.754, 1.55, 4.01, 4.401);
++    panel(s, 9.75, 0, 3.583, 7.5, C.ink);
++    note(s, 1.569, 2.061, 3.744, 0.833, 3.476, L1, 'MESSAGE HERE 01', 'light', { ruleDy: 1.13 });
++    badge(s, 6.844, 3.083, 1.85, 1.637, C.green, 7.069, 3.361, 1.663);
++    note(s, 1.569, 4.035, 3.744, 0.833, 3.476, L1, 'MESSAGE HERE 01', 'light', { ruleDy: 1.13 });
++  },
++  // 5 — ABOUT OUR MINIMOZA.
++  s => {
++    photo(s, 1.376, 1.985, 5.059, 3.53);
++    panel(s, 0, 0, 4.138, 7.5, C.ink);
++    heading(s, 7.281, 1.736, 'ABOUT OUR', 'MINIMOZA.', 5.01, 'light');
++    note(s, 7.294, 3.686, 4.551, 1.279, 4.248, [L4, '', L6], 'MESSAGE HERE 02', 'light', { pad: 0.096, ruleDy: 1.624, labelDx: 0, ls: null, align: 'justify' });
++    badge(s, 4.585, 3.877, 1.85, 1.637, C.green, 4.81, 4.155, 1.663);
++  },
++  // 6 — ABOUT OUR MINIMOZA.
++  s => {
++    photo(s, 8.152, 1.161, 3.837, 2.588);
++    photo(s, 8.152, 3.75, 3.837, 2.588);
++    panel(s, 8.152, 0, 5.181, 7.5, C.green);
++    panel(s, 0.889, 3.75, 7.263, 2.588, C.ink);
++    heading(s, 1.24, 1.649, 'ABOUT OUR', 'MINIMOZA.', 5.01, 'light', { subDx: 0.05, subDy: 1.389 });
++    badge(s, 6.313, 2.119, 1.85, 1.637, C.green, 6.538, 2.397, 1.663);
++    note(s, 1.328, 4.201, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 4.697, 4.201, 3.081, 0.833, 2.886, L2, 'MESSAGE HERE 02', 'dark', { pad: 0.096, labelDx: 0 });
++  },
++  // 7 — ABOUT OUR VISION.
++  s => {
++    photo(s, 1.412, 1.92, 3.283, 3.66);
++    panel(s, 0, 0, 5.95, 7.5, C.ink);
++    heading(s, 6.662, 1.732, 'ABOUT OUR', 'VISION.', 2.901, 'light');
++    txt(s, 9.361, 3.186, 5.763, 1.111, 'MINIMOZA', { size: 60, font: F.display, color: C.dark, align: 'center', cs: 3, rot: 270 });
++    note(s, 6.674, 3.682, 4.238, 1.279, 4.043, [L4, '', L6], 'MESSAGE HERE 02', 'light', { pad: 0.096, ruleDy: 1.624, labelDx: 0, ls: null, align: 'justify' });
++  },
++  // 8 — ABOUT OUR MISSION.
++  s => {
++    photo(s, 8.141, 0, 5.193, 7.5);
++    panel(s, 0.927, 3.75, 7.848, 2.588, C.ink);
++    heading(s, 0.786, 1.682, 'ABOUT OUR', 'MISSION.', 5.01, 'light');
++    note(s, 1.265, 4.163, 7.447, 1.267, 2.602, BIG, 'MESSAGE HERE 01', 'dark', { size: 16, font: F.display });
++  },
++  // 9 — OUR GOALS
++  s => {
++    photo(s, 0, 4.082, 13.333, 3.418);
++    panel(s, 0.786, 2.676, 3.476, 2.588, C.ink);
++    panel(s, 4.551, 2.676, 3.476, 2.588, C.ink);
++    panel(s, 8.317, 2.676, 3.476, 2.588, C.ink);
++    txt(s, 4.023, 1.142, 4.493, 0.774, 'OUR GOALS', { size: 40, font: F.display, color: C.mid, align: 'center' });
++    note(s, 1.099, 3.127, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 4.865, 3.127, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 02', 'dark');
++    note(s, 8.63, 3.127, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 03', 'dark');
++  },
++  // 10 — ABOUT OUR COMPANY.
++  s => {
++    photo(s, 9.094, 2.18, 3.094, 3.141);
++    panel(s, 8, 0, 5.333, 7.5, C.ink);
++    heading(s, 0.845, 1.446, 'ABOUT OUR', 'COMPANY.', 5.01, 'light');
++    txt(s, 0.857, 3.22, 4.551, 1.338, L3, { size: 10, font: F.body, color: C.dark, align: 'justify', ls: 1.5 });
++    mCard(s, 0.924, 4.928);
++  },
++  // 11 — layout only
++  s => {
++    photo(s, 0, 1.632, 5.458, 4.236);
++    panel(s, 4.586, 1.632, 3.476, 4.236, C.ink);
++    panel(s, 8.125, 1.632, 3.476, 4.236, C.green);
++    txt(s, 4.899, 2.307, 2.81, 0.833, L2, { size: 10, font: F.body, color: C.white, ls: 1.5 });
++    txt(s, 8.376, 2.307, 2.81, 0.833, L2, { size: 10, font: F.body, color: C.white, ls: 1.5 });
++    txt(s, 9.361, 3.186, 5.763, 1.111, 'MINIMOZA', { size: 60, font: F.display, color: C.dark, align: 'center', cs: 3, rot: 270 });
++    note(s, 4.875, 3.712, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 8.381, 3.712, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 02', 'dark');
++  },
++  // 12 — OUR DESIGN MINIMOZA.
++  s => {
++    photo(s, 8.342, 1.245, 3.634, 2.505);
++    photo(s, 1.358, 3.389, 2.293, 2.693);
++    panel(s, 3.651, 0, 4.691, 7.5, C.ink);
++    panel(s, 8.342, 3.75, 3.634, 2.332, C.green);
++    heading(s, 4.049, 1.073, 'OUR DESIGN', 'MINIMOZA.', 3.967, 'dark');
++    badge(s, 1.358, 1.245, 2.293, 2.133, C.green, 1.583, 1.771, 1.742);
++    txt(s, 4.062, 2.933, 3.726, 1.591, L3, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++    note(s, 8.602, 4.022, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    txt(s, 4.052, 4.841, 3.726, 1.338, L5, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++  },
++  // 13 — MINIMOZA FURNITURE.
++  s => {
++    photo(s, 1.729, 1.644, 3.741, 4.212);
++    panel(s, 0, 0, 3.612, 7.5, C.ink);
++    heading(s, 6.594, 1.446, 'MINIMOZA', 'FURNITURE.', 5.01, 'light');
++    txt(s, 6.606, 3.22, 4.551, 1.338, L3, { size: 10, font: F.body, color: C.dark, align: 'justify', ls: 1.5 });
++    mCard(s, 6.673, 4.866);
++  },
++  // 14 — layout only
++  s => {
++    photo(s, 0.718, 1.235, 3.448, 2.401);
++    photo(s, 0.718, 3.864, 3.448, 2.401);
++    panel(s, 8.938, 0, 4.396, 7.5, C.ink);
++    panel(s, 4.683, 0, 4.254, 7.5, C.green);
++    note(s, 9.503, 1.64, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 03', 'dark');
++    txt(s, 4.924, 1.64, 3.726, 1.591, L3, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++    note(s, 9.503, 4.26, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 03', 'dark');
++    txt(s, 4.915, 4.26, 3.726, 1.338, L5, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++  },
++  // 15 — layout only
++  s => {
++    photo(s, 9.577, 4.482, 2.505, 1.835);
++    photo(s, 0, 0, 5.318, 7.5);
++    panel(s, 5.338, 0, 4.239, 7.5, C.ink);
++    note(s, 5.941, 1.615, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 03', 'dark');
++    badge(s, 9.577, 2.349, 2.505, 2.133, C.green, 9.889, 2.888, 1.742);
++    note(s, 5.941, 4.235, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 03', 'dark');
++  },
++  // 16 — BEST OFFER MINIMOZA.
++  s => {
++    photo(s, 0.738, 3.564, 11.858, 3.024);
++    panel(s, 8.311, 1.632, 3.476, 4.236, C.ink);
++    heading(s, 0.611, 1.501, 'BEST OFFER', 'MINIMOZA.', 5.01, 'light');
++    txt(s, 8.624, 2.307, 2.81, 0.833, L2, { size: 10, font: F.body, color: C.white, ls: 1.5 });
++    note(s, 8.6, 3.712, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++  },
++  // 17 — layout only
++  s => {
++    photo(s, 8.944, 1.353, 3.236, 2.174);
++    photo(s, 5.049, 1.353, 3.236, 2.174);
++    photo(s, 1.153, 1.353, 3.236, 2.174);
++    panel(s, 1.153, 3.551, 3.236, 2.332, C.ink);
++    panel(s, 8.925, 3.551, 3.236, 2.332, C.ink);
++    panel(s, 5.049, 3.551, 3.236, 2.332, C.green);
++    note(s, 1.376, 3.835, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 9.148, 3.835, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 5.271, 3.835, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++  },
++  // 18 — layout only
++  s => {
++    photo(s, 3.765, 0, 9.569, 7.5);
++    panel(s, 3.765, 3.75, 7.848, 2.588, C.ink);
++    note(s, 0.586, 1.64, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 03', 'plain');
++    note(s, 0.586, 3.837, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 03', 'plain');
++    note(s, 4.103, 4.163, 7.447, 1.267, 2.602, BIG, 'MESSAGE HERE 01', 'dark', { size: 16, font: F.display });
++  },
++  // 19 — MINIMOZA PORTFOLIO.
++  s => {
++    photo(s, 0, 0, 6.412, 3.611);
++    panel(s, 6.412, 0, 3.989, 7.5, C.ink);
++    note(s, 6.929, 0.506, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 6.93, 2.813, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    txt(s, 9.361, 3.186, 5.763, 1.111, 'MINIMOZA', { size: 60, font: F.display, color: C.dark, align: 'center', cs: 3, rot: 270 });
++    heading(s, 0.624, 4.173, 'MINIMOZA', 'PORTFOLIO.', 5.01, 'light');
++    note(s, 6.932, 5.12, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    txt(s, 0.636, 5.946, 3.989, 0.833, L1, { size: 10, font: F.body, color: C.dark, align: 'justify', ls: 1.5 });
++  },
++  // 20 — layout only
++  s => {
++    photo(s, 8.611, 0, 4.722, 7.5);
++    panel(s, 2.75, 4.055, 7.038, 2.588, C.ink);
++    note(s, 0.636, 1.73, 7.447, 1.267, 2.602, BIG, 'MESSAGE HERE 01', 'plain', { size: 16, font: F.display });
++    badge(s, 0.75, 4.055, 1.999, 2.588, C.green, 0.948, 4.808, 1.742);
++    note(s, 3.051, 4.506, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 6.332, 4.506, 3.081, 0.833, 2.886, L2, 'MESSAGE HERE 02', 'dark', { pad: 0.096, labelDx: 0 });
++  },
++  // 21 — GALLERY MINIMOZA.
++  s => {
++    photo(s, 9.839, 1.097, 2.47, 1.691);
++    photo(s, 9.839, 4.712, 2.47, 1.691);
++    photo(s, 1.024, 1.097, 4.377, 5.306);
++    panel(s, 5.4, 0, 4.439, 7.5, C.ink);
++    txt(s, 5.793, 1.11, 3.726, 1.591, L3, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++    badge(s, 9.839, 2.788, 2.47, 1.924, C.green, 10.178, 3.241, 1.742);
++    badge(s, 0.631, 3, 1.85, 1.637, C.green, 0.856, 3.278, 1.663);
++    heading(s, 5.783, 3, 'GALLERY', 'MINIMOZA.', 3.735, 'dark');
++    txt(s, 5.783, 4.949, 3.726, 1.338, L5, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++  },
++  // 22 — STRATEGY MINIMOZA.
++  s => {
++    photo(s, 7.13, 2.103, 4.917, 3.293);
++    panel(s, 0, 0, 5.95, 7.5, C.ink);
++    txt(s, 0.833, 1.11, 3.726, 1.591, L3, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++    badge(s, 10.66, 2.897, 1.85, 1.637, C.green, 10.885, 3.175, 1.663);
++    heading(s, 0.824, 3, 'STRATEGY', 'MINIMOZA.', 3.735, 'dark');
++    txt(s, 0.824, 4.949, 3.726, 1.338, L5, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++  },
++  // 23 — layout only
++  s => {
++    photo(s, 10.236, 4.117, 2.259, 2.424);
++    photo(s, 0, 0, 4.882, 7.5);
++    panel(s, 4.898, 0, 5.321, 7.5, C.ink);
++    note(s, 5.416, 0.719, 3.872, 0.833, 3.588, L1, 'MESSAGE HERE 01', 'dark', { ruleDy: 1.251 });
++    badge(s, 10.219, 2.479, 2.275, 1.637, C.green, 10.523, 2.758, 1.663);
++    note(s, 5.417, 3.026, 3.87, 0.833, 3.587, L1, 'MESSAGE HERE 01', 'dark', { ruleDy: 1.25 });
++    note(s, 5.419, 5.333, 3.869, 0.833, 3.586, L1, 'MESSAGE HERE 01', 'dark', { ruleDy: 1.251 });
++  },
++  // 24 — EXCLUSIVE FURNITURE.
++  s => {
++    photo(s, 3.765, 1.727, 3.281, 4.047);
++    panel(s, 0.734, 2.762, 3.236, 2.332, C.ink);
++    heading(s, 7.474, 1.571, 'EXCLUSIVE', 'FURNITURE.', 5.01, 'light', { subDx: 0.062 });
++    note(s, 0.957, 3.046, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    txt(s, 7.537, 3.345, 4.135, 0.833, L1, { size: 10, font: F.body, color: C.dark, align: 'justify', ls: 1.5 });
++    mCard(s, 7.604, 4.596);
++  },
++  // 25 — NEW DESIGN MINIMOZA.
++  s => {
++    photo(s, 8.564, 1.903, 3.271, 3.694);
++    panel(s, 8.564, 0, 4.769, 7.5, C.ink);
++    heading(s, 1.473, 1.534, 'NEW DESIGN', 'MINIMOZA.', 5.01, 'light', { subDx: 0.05 });
++    txt(s, 1.511, 3.307, 4.127, 1.086, L4, { size: 10, font: F.body, color: C.dark, align: 'justify', ls: 1.5 });
++    badge(s, 10.637, 3.373, 1.966, 1.637, C.green, 10.941, 3.651, 1.663);
++    mCard(s, 1.615, 4.672);
++  },
++  // 26 — LIMITED FURNITURE.
++  s => {
++    photo(s, 3.741, 0, 3.471, 7.5);
++    panel(s, 2.925, 4.125, 7.038, 2.318, C.ink);
++    heading(s, 7.849, 0.998, 'LIMITED', 'FURNITURE.', 5.01, 'light', { subDx: 0.062 });
++    txt(s, 7.912, 2.771, 4.135, 0.833, L1, { size: 10, font: F.body, color: C.dark, align: 'justify', ls: 1.5 });
++    badge(s, 0.925, 4.125, 1.999, 2.318, C.green, 1.123, 4.744, 1.742);
++    note(s, 3.226, 4.393, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 6.507, 4.393, 3.081, 0.833, 2.886, L2, 'MESSAGE HERE 02', 'dark', { pad: 0.096, labelDx: 0 });
++  },
++  // 27 — GALLERY MINIMOZA.
++  s => {
++    photo(s, 6.796, 1.976, 2.601, 1.707);
++    photo(s, 9.571, 1.976, 2.601, 1.707);
++    photo(s, 9.571, 3.852, 2.601, 1.707);
++    photo(s, 6.796, 3.852, 2.601, 1.707);
++    panel(s, 0, 0, 5.95, 7.5, C.ink);
++    txt(s, 0.833, 1.31, 3.726, 1.591, L3, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++    heading(s, 0.824, 3.2, 'GALLERY', 'MINIMOZA.', 3.735, 'dark');
++    txt(s, 0.824, 5.149, 3.726, 0.833, L1, { size: 10, font: F.body, color: C.white, align: 'justify', ls: 1.5 });
++  },
++  // 28 — THE KITCHEN MINIMOZA.
++  s => {
++    photo(s, 1.658, 1.609, 4.049, 4.281);
++    panel(s, 0, 0, 3.7, 7.5, C.green);
++    heading(s, 6.667, 1.421, 'THE KITCHEN', 'MINIMOZA.', 5.01, 'light', { subDx: 0.05 });
++    txt(s, 6.704, 3.332, 4.127, 1.086, L4, { size: 10, font: F.body, color: C.dark, align: 'justify', ls: 1.5 });
++    mCard(s, 6.809, 4.697);
++  },
++  // 29 — layout only
++  s => {
++    photo(s, 8.2, 1.739, 5.134, 4.023);
++    panel(s, 1.124, 1.739, 3.476, 4.023, C.ink);
++    panel(s, 4.662, 1.739, 3.476, 4.023, C.green);
++    txt(s, 1.437, 2.307, 2.81, 0.833, L2, { size: 10, font: F.body, color: C.white, ls: 1.5 });
++    txt(s, 4.913, 2.307, 2.81, 0.833, L2, { size: 10, font: F.body, color: C.white, ls: 1.5 });
++    note(s, 1.412, 3.712, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 01', 'dark');
++    note(s, 4.918, 3.712, 2.81, 1.086, 2.602, L1, 'MESSAGE HERE 02', 'dark');
++  },
++  // 30 — THANKYOU.
++  s => {
++    photo(s, 0, 0, 13.333, 7.5);
++    panel(s, 0.925, 1.413, 12.408, 6.088, C.white);
++    txt(s, 3.337, 3.424, 8.072, 1.447, 'THANKYOU.', { size: 80, font: F.display, color: C.ink, cs: 3 });
++    txt(s, 7.545, 4.908, 3.219, 0.269, 'MINIMALIST PRESENTATION', { size: 10, font: F.ui, color: C.navy, cs: 3, bold: true });
++  },
++];
++
++function build() {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'DECK', width: 13.3333, height: 7.5 });
++  pptx.layout = 'DECK';
++
++  SLIDES.forEach((draw, i) => {
++    const s = pptx.addSlide();
++    s.background = { color: CHROME[i].bg || C.white };
++    draw(s);
++    addChrome(s, CHROME[i]);
++  });
++
++  const out = path.join(__dirname, '1540170d-d200-428c-8883-a31a532a4384_grok_final.pptx');
++  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote ' + out));
++}
++
++build();

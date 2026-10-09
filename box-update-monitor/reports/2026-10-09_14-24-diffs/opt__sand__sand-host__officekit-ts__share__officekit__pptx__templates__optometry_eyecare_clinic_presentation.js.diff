@@ -1,0 +1,1110 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/optometry_eyecare_clinic_presentation.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/optometry_eyecare_clinic_presentation.js
+@@ -0,0 +1,1107 @@
++/*
++ * "Optica" - Optometrist & Eyecare presentation, rebuilt with pptxgenjs.
++ *
++ * 41 slides, 26.66" x 15" (16:9).  Photographs in the source deck are replaced
++ * by flat grey placeholder rectangles; every other element (typography, shapes,
++ * charts, icon sheets) is drawn natively.
++ *
++ *   node 153c40a3-1889-493c-ae1f-f10dc7d8680b_grok_final.js
++ */
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Deck constants
++ * ------------------------------------------------------------------ */
++
++const SLIDE_W = 26.6614;
++const SLIDE_H = 15;
++
++// Theme palette ("Jonathan jecho") plus the tint/shade variants the deck uses.
++const C = {
++  white: 'FFFFFF',
++  black: '000000',
++  ink: '031529',        // dk2 / tx2
++  mist: 'EFF2F7',       // lt2 / bg2
++  blue: '37B6F7',       // accent1
++  lime: 'AEDC47',       // accent2
++  navy: '0D4685',       // accent3
++  sky: '63DDF1',        // accent4
++  azure: '31A9EF',      // accent5
++  aqua: 'A9DFE9',       // accent6
++
++  blueDark: '0993DA',   // accent1 -25%
++  blueSoft: '87D3FA',   // accent1 +40%
++  bluePale: 'D7F0FD',   // accent1 +80%
++  limeSoft: 'CEEA91',   // accent2 +40%
++  navyDark: '0A3464',   // accent3 -25%
++  navyMid: '0C3F78',    // accent3 -10%
++  navySoft: '92C2F7',   // dk2 +75%
++  ghost: 'CFD8E7',      // bg2 -10%  (dimmed SWOT letters)
++  azureSoft: '83CBF5',  // accent5 +40%
++  skySoft: 'A1EBF7',    // accent4 +40%
++  limeDark: '8AB723',   // accent2 -25%
++  azureDark: '1084C8',  // accent5 -25%
++
++  body: 'A6A6A6',       // white -35%  (paragraph grey)
++  bodyLight: 'F2F2F2',  // white -5%   (paragraph on blue)
++  silver: 'BFBFBF',     // white -25%
++  slate: '595959',      // black +35%
++  steel: '808080',      // black +50%
++  mistDark: 'DFE5EF',   // bg2 -5%
++  mistBlue: '516FA2',   // bg2 -50%
++  grid: 'D9D9D9',
++  photo: 'AEAEAE',      // stand-in for every photograph
++  timeline: '9EB0CE',
++};
++
++const FONT = { head: 'Inter', body: 'Open Sans' };
++
++// pptxgenjs rewrites the shadow object in place, so hand out a fresh copy each time.
++const cardShadow = () => ({ type: 'outer', color: '000000', blur: 40, offset: 3, angle: 45, opacity: 0.11 });
++const softShadow = () => ({ type: 'outer', color: '37B6F7', blur: 32, offset: 3, angle: 125, opacity: 0.11 });
++
++/* ------------------------------------------------------------------ *
++ * Small drawing helpers
++ * ------------------------------------------------------------------ */
++
++const shp = (s, shape, o) => s.addShape(shape, o);
++const rect = (s, x, y, w, h, color, o = {}) => s.addShape('rect', Object.assign({ x, y, w, h, fill: { color } }, o));
++const oval = (s, x, y, w, h, color, o = {}) => s.addShape('ellipse', Object.assign({ x, y, w, h, fill: { color } }, o));
++const rrect = (s, x, y, w, h, color, r, o = {}) =>
++  s.addShape('roundRect', Object.assign({ x, y, w, h, fill: { color }, rectRadius: r }, o));
++
++// Grey stand-in for a photograph (optionally circular / rounded).
++function photo(s, x, y, w, h, o = {}) {
++  const shape = o.shape || 'rect';
++  const opt = { x, y, w, h, fill: { color: C.photo } };
++  if (o.r) opt.rectRadius = o.r;
++  if (o.rotate) opt.rotate = o.rotate;
++  s.addShape(shape, opt);
++}
++
++// Paragraph / label text.  PowerPoint text boxes anchor to the top.
++function tx(s, content, o) {
++  s.addText(content, Object.assign(
++    { fontFace: FONT.body, fontSize: 24, color: C.body, valign: 'top', h: 0.64 }, o));
++}
++
++// Body copy: 24pt Open Sans, grey, 1.5 line spacing.
++function para(s, x, y, w, h, content, o = {}) {
++  tx(s, content, Object.assign({ x, y, w, h, lineSpacingMultiple: 1.5 }, o));
++}
++
++// Big two-tone headline, e.g. head(s, x, y, w, [['Welcome To '], ['Optica', C.lime]])
++function head(s, x, y, w, runs, o = {}) {
++  s.addText(runs.map(r => ({ text: r[0], options: { color: r[1] || C.black } })), Object.assign({
++    x, y, w, h: 2.79, fontFace: FONT.head, fontSize: 80, bold: true, valign: 'top',
++  }, o));
++}
++
++// The "+ + +" rule that sits under most headlines.
++function plusTrio(s, x, y, color = C.blue) {
++  for (let i = 0; i < 3; i++) shp(s, 'plus', { x: x + i * 0.549, y, w: 0.446, h: 0.463, fill: { color } });
++}
++
++// Rounded pill button with a white circle + chevron on its right edge.
++function button(s, x, y, w, label, o = {}) {
++  const h = 1.152;
++  rrect(s, x, y, w, h, o.color || C.blue, h / 2);
++  tx(s, label, { x: x + 0.516, y: y + 0.29, w: w - 1.45, h: 0.572, fontSize: 28, bold: true, color: C.white });
++  const cd = 0.794;
++  oval(s, x + w - cd - 0.22, y + (h - cd) / 2, cd, 0.823, C.white);
++  s.addText('\u00BB', {
++    x: x + w - cd - 0.22, y: y + (h - cd) / 2, w: cd, h: 0.823, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 24, bold: true, color: o.color || C.blue,
++  });
++}
++
++// The Optica mark.  Two variants exist in the deck: a blue tile with an eye and
++// a lime badge ('eye'), and a lime tile with spectacles and a blue badge ('specs').
++function logoMark(s, x, y, size, variant = 'eye') {
++  const u = size / 2.158;
++  const tile = variant === 'eye' ? C.blue : C.lime;
++  const badge = variant === 'eye' ? C.lime : C.blue;
++  rrect(s, x, y + 0.19 * u, 1.97 * u, 1.97 * u, tile, 0.55 * u);
++  if (variant === 'eye') {
++    oval(s, x + 0.43 * u, y + 0.83 * u, 1.11 * u, 0.68 * u, C.white);
++    oval(s, x + 0.785 * u, y + 0.97 * u, 0.40 * u, 0.40 * u, tile);
++    oval(s, x + 0.895 * u, y + 1.08 * u, 0.18 * u, 0.18 * u, C.white);
++  } else {
++    oval(s, x + 0.38 * u, y + 0.83 * u, 0.55 * u, 0.55 * u, C.white);
++    oval(s, x + 1.03 * u, y + 0.83 * u, 0.55 * u, 0.55 * u, C.white);
++    rect(s, x + 0.86 * u, y + 1.02 * u, 0.24 * u, 0.16 * u, C.white);
++  }
++  oval(s, x + 1.39 * u, y - 0.09 * u, 0.86 * u, 0.86 * u, C.white);
++  oval(s, x + 1.48 * u, y, 0.68 * u, 0.68 * u, badge);
++  shp(s, 'plus', { x: x + 1.64 * u, y: y + 0.16 * u, w: 0.37 * u, h: 0.37 * u, fill: { color: C.white } });
++}
++
++// Mark + "Optica" wordmark, used as a small brand lockup.
++function logoLockup(s, x, y, size, variant) {
++  logoMark(s, x, y, size, variant);
++  s.addText('Optica', {
++    x: x + size * 1.30, y: y + size * 0.16, w: size * 3.0, h: size * 1.0,
++    fontFace: FONT.head, fontSize: Math.round(size * 66), bold: true, color: C.ink, valign: 'middle',
++  });
++}
++
++// Circular percentage gauge (grey track + coloured arc + caption).
++function gauge(s, x, y, d, pct, caption, o = {}) {
++  const end = 270 + 360 * pct;
++  shp(s, 'ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: o.track || C.bodyLight, width: 14 } });
++  shp(s, 'arc', {
++    x, y, w: d, h: d, fill: { type: 'none' }, line: { color: o.arc || C.blue, width: 14 },
++    angleRange: [270, end % 360],
++  });
++  s.addText(Math.round(pct * 100) + '%', {
++    x, y, w: d, h: d, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 32, bold: true, color: o.textColor || C.black,
++  });
++  if (caption) tx(s, caption, { x: x - (4.15 - d) / 2, y: y + d + 0.7, w: 4.15, fontSize: 32, bold: true, fontFace: FONT.head, color: o.textColor || C.black, align: 'center' });
++}
++
++/* -- Pictograms -------------------------------------------------------
++ * The template ships hand-drawn eyecare icons.  They are rebuilt here from
++ * native shapes: line-art versions for the service cards / timelines, and
++ * solid versions for the four icon-sheet slides.
++ */
++
++const ring = (s, x, y, d, c, lw) =>
++  shp(s, 'ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: c, width: lw } });
++
++// Line-art icons, drawn inside a d-inch box at (x, y).
++const LINE_ICON = {
++  glasses(s, x, y, d, c, lw) {
++    const r = d * 0.42;
++    ring(s, x, y + d * 0.29, r, c, lw);
++    ring(s, x + d - r, y + d * 0.29, r, c, lw);
++    s.addShape('line', { x: x + r, y: y + d * 0.29 + r / 2, w: d - 2 * r, h: 0, line: { color: c, width: lw } });
++  },
++  eye(s, x, y, d, c, lw) {
++    shp(s, 'ellipse', { x, y: y + d * 0.25, w: d, h: d * 0.5, fill: { type: 'none' }, line: { color: c, width: lw } });
++    ring(s, x + d * 0.34, y + d * 0.34, d * 0.32, c, lw);
++    oval(s, x + d * 0.43, y + d * 0.43, d * 0.14, d * 0.14, c);
++  },
++  scan(s, x, y, d, c, lw) {
++    shp(s, 'ellipse', { x: x + d * 0.15, y: y + d * 0.3, w: d * 0.7, h: d * 0.4, fill: { type: 'none' }, line: { color: c, width: lw } });
++    oval(s, x + d * 0.42, y + d * 0.42, d * 0.16, d * 0.16, c);
++    [[0, 0], [0.75, 0], [0, 0.75], [0.75, 0.75]].forEach(([dx, dy]) =>
++      shp(s, 'rect', { x: x + dx * d, y: y + dy * d, w: d * 0.25, h: d * 0.25, fill: { type: 'none' }, line: { color: c, width: lw } }));
++  },
++  drops(s, x, y, d, c, lw) {
++    shp(s, 'teardrop', { x: x + d * 0.28, y, w: d * 0.44, h: d * 0.55, rotate: 135, fill: { type: 'none' }, line: { color: c, width: lw } });
++    shp(s, 'ellipse', { x, y: y + d * 0.55, w: d, h: d * 0.45, fill: { type: 'none' }, line: { color: c, width: lw } });
++  },
++  bulb(s, x, y, d, c, lw) {
++    ring(s, x + d * 0.22, y + d * 0.05, d * 0.56, c, lw);
++    shp(s, 'rect', { x: x + d * 0.38, y: y + d * 0.62, w: d * 0.24, h: d * 0.22, fill: { type: 'none' }, line: { color: c, width: lw } });
++  },
++  mail(s, x, y, d, c, lw) {
++    shp(s, 'rect', { x, y: y + d * 0.2, w: d, h: d * 0.6, fill: { type: 'none' }, line: { color: c, width: lw } });
++    shp(s, 'triangle', { x, y: y + d * 0.2, w: d, h: d * 0.4, rotate: 180, fill: { type: 'none' }, line: { color: c, width: lw } });
++  },
++  chart(s, x, y, d, c, lw) {
++    shp(s, 'rect', { x, y: y + d * 0.2, w: d, h: d * 0.6, fill: { type: 'none' }, line: { color: c, width: lw } });
++    [0.25, 0.45, 0.65].forEach((bx, i) =>
++      shp(s, 'rect', { x: x + bx * d, y: y + (0.65 - i * 0.12) * d, w: d * 0.1, h: (0.1 + i * 0.12) * d, fill: { color: c } }));
++  },
++  target(s, x, y, d, c, lw) {
++    ring(s, x, y + d * 0.12, d * 0.76, c, lw);
++    ring(s, x + d * 0.22, y + d * 0.34, d * 0.32, c, lw);
++    s.addShape('line', { x: x + d * 0.5, y: y + d * 0.5, w: d * 0.45, h: -d * 0.45, line: { color: c, width: lw } });
++  },
++  coins(s, x, y, d, c, lw) {
++    [0.15, 0.42, 0.69].forEach(by =>
++      shp(s, 'rect', { x: x + d * 0.1, y: y + by * d, w: d * 0.8, h: d * 0.17, fill: { type: 'none' }, line: { color: c, width: lw } }));
++  },
++  lens(s, x, y, d, c, lw) {
++    ring(s, x, y + d * 0.1, d * 0.62, c, lw);
++    shp(s, 'rect', { x: x + d * 0.55, y: y + d * 0.5, w: d * 0.4, h: d * 0.12, rotate: 45, fill: { color: c } });
++  },
++};
++const LINE_ICON_KEYS = Object.keys(LINE_ICON);
++
++function lineIcon(s, name, x, y, d, color, lw = 3) {
++  LINE_ICON[name](s, x, y, d, color, lw);
++}
++
++// Pictograms for the icon-sheet slides: each entry paints one glyph in a
++// d-inch box at (x, y).  Mixed solid and outline styles, as in the template.
++const K = C.black;
++const SOLID_GLYPHS = [
++  (s, x, y, d) => { shp(s, 'teardrop', { x: x + d * .08, y: y + d * .08, w: d * .84, h: d * .84, rotate: 225, fill: { color: K } }); },
++  (s, x, y, d) => { rrect(s, x + d * .26, y, d * .48, d, K, d * .09); rect(s, x + d * .32, y + d * .12, d * .36, d * .7, C.white); },
++  (s, x, y, d) => { rect(s, x, y + d * .22, d, d * .56, K); shp(s, 'triangle', { x, y: y + d * .22, w: d, h: d * .36, rotate: 180, fill: { color: C.white } }); },
++  (s, x, y, d) => { shp(s, 'triangle', { x, y: y + d * .1, w: d, h: d * .8, rotate: 105, fill: { color: K } }); },
++  (s, x, y, d) => { rect(s, x + d * .40, y + d * .05, d * .18, d * .7, K, { rotate: 45 }); shp(s, 'triangle', { x: x + d * .06, y: y + d * .7, w: d * .26, h: d * .26, rotate: 225, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'star5', { x, y, w: d, h: d, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'heart', { x, y: y + d * .05, w: d, h: d * .9, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'gear6', { x, y, w: d, h: d, fill: { color: K } }); },
++  (s, x, y, d) => { rrect(s, x, y + d * .25, d, d * .58, K, d * .08); rect(s, x + d * .3, y + d * .12, d * .3, d * .16, K); oval(s, x + d * .32, y + d * .38, d * .36, d * .36, C.white); },
++  (s, x, y, d) => { shp(s, 'donut', { x, y, w: d, h: d, fill: { color: K } }); rect(s, x + d * .46, y + d * .2, d * .08, d * .32, K); },
++  (s, x, y, d) => { shp(s, 'teardrop', { x: x + d * .12, y: y + d * .04, w: d * .76, h: d * .76, rotate: 135, fill: { color: K } }); oval(s, x + d * .38, y + d * .26, d * .24, d * .24, C.white); },
++  (s, x, y, d) => { shp(s, 'cloud', { x, y: y + d * .16, w: d, h: d * .68, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'lightningBolt', { x: x + d * .24, y, w: d * .52, h: d, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'triangle', { x, y: y + d * .08, w: d, h: d * .44, fill: { color: K } }); rect(s, x + d * .16, y + d * .56, d * .68, d * .34, K); },
++  (s, x, y, d) => { ring(s, x, y, d * .74, K, 5); rect(s, x + d * .60, y + d * .60, d * .34, d * .13, K, { rotate: 45 }); },
++  (s, x, y, d) => { shp(s, 'wedgeRoundRectCallout', { x, y: y + d * .08, w: d, h: d * .74, fill: { color: K } }); },
++  (s, x, y, d) => { rect(s, x + d * .08, y, d * .1, d, K); shp(s, 'triangle', { x: x + d * .18, y: y + d * .08, w: d * .72, h: d * .44, rotate: 90, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'triangle', { x: x + d * .12, y: y + d * .1, w: d * .78, h: d * .8, rotate: 90, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'snip1Rect', { x: x + d * .18, y, w: d * .64, h: d, rotate: 180, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'sun', { x, y, w: d, h: d, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'moon', { x: x + d * .18, y, w: d * .64, h: d, fill: { color: K } }); },
++  (s, x, y, d) => { oval(s, x, y + d * .22, d, d * .56, K); oval(s, x + d * .34, y + d * .36, d * .32, d * .28, C.white); },
++  (s, x, y, d) => { shp(s, 'plus', { x, y, w: d, h: d, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'pentagon', { x, y: y + d * .16, w: d, h: d * .68, fill: { color: K } }); oval(s, x + d * .16, y + d * .44, d * .14, d * .14, C.white); },
++  (s, x, y, d) => { shp(s, 'trapezoid', { x: x + d * .1, y: y + d * .06, w: d * .8, h: d * .46, rotate: 180, fill: { color: K } }); rect(s, x + d * .40, y + d * .52, d * .2, d * .38, K); },
++  (s, x, y, d) => { shp(s, 'cube', { x: x + d * .1, y: y + d * .1, w: d * .8, h: d * .8, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'homePlate', { x: x + d * .12, y: y + d * .1, w: d * .76, h: d * .8, rotate: 90, fill: { color: K } }); },
++  (s, x, y, d) => { oval(s, x + d * .02, y + d * .62, d * .32, d * .28, K); rect(s, x + d * .30, y + d * .08, d * .09, d * .66, K); shp(s, 'triangle', { x: x + d * .36, y: y + d * .08, w: d * .5, h: d * .3, rotate: 90, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'can', { x: x + d * .2, y: y + d * .1, w: d * .6, h: d * .8, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'smileyFace', { x, y, w: d, h: d, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'flowChartInternalStorage', { x: x + d * .06, y: y + d * .1, w: d * .88, h: d * .8, fill: { color: K } }); },
++  (s, x, y, d) => { ring(s, x + d * .1, y + d * .1, d * .8, K, 5); [0.5, 0.5].forEach(() => {}); rect(s, x + d * .48, y + d * .24, d * .06, d * .28, K); rect(s, x + d * .48, y + d * .48, d * .22, d * .06, K); },
++  (s, x, y, d) => { rect(s, x + d * .08, y + d * .18, d * .84, d * .64, K); rect(s, x + d * .18, y + d * .30, d * .64, d * .1, C.white); rect(s, x + d * .18, y + d * .48, d * .44, d * .1, C.white); },
++  (s, x, y, d) => { shp(s, 'chevron', { x: x + d * .1, y: y + d * .16, w: d * .8, h: d * .68, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'bevel', { x: x + d * .08, y: y + d * .08, w: d * .84, h: d * .84, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'hexagon', { x, y: y + d * .1, w: d, h: d * .8, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'diamond', { x: x + d * .06, y: y + d * .06, w: d * .88, h: d * .88, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'noSmoking', { x, y, w: d, h: d, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'blockArc', { x, y, w: d, h: d, angleRange: [180, 0], arcThicknessRatio: 0.5, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'upArrow', { x: x + d * .18, y: y + d * .05, w: d * .64, h: d * .9, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'leftRightArrow', { x, y: y + d * .26, w: d, h: d * .48, fill: { color: K } }); },
++  (s, x, y, d) => { shp(s, 'lineInv', { x: x + d * .1, y: y + d * .1, w: d * .8, h: d * .8, fill: { type: 'none' }, line: { color: K, width: 6 } }); rect(s, x + d * .1, y + d * .74, d * .8, d * .16, K); },
++];
++
++// A tick drawn from two thin bars, sized to fit a d-inch box at (x, y).
++function tick(s, x, y, d, color) {
++  const t = d * 0.13;
++  rect(s, x + d * 0.16, y + d * 0.46, d * 0.34, t, color, { rotate: 45 });
++  rect(s, x + d * 0.38, y + d * 0.36, d * 0.58, t, color, { rotate: -45 });
++}
++
++// Check-mark bullet used on the SWOT slides and the "great place" slide.
++function checkItem(s, x, y, label, o = {}) {
++  oval(s, x, y + 0.08, 0.47, 0.47, o.dot || C.white);
++  tick(s, x + 0.10, y + 0.18, 0.28, o.tick || C.blue);
++  tx(s, label, { x: x + 0.8, y, w: o.w || 4.15, fontSize: 32, bold: true, fontFace: FONT.head, color: o.color || C.white });
++}
++
++// Row of four social glyphs (G+, camera, bird, f) rendered as simple marks.
++function socialRow(s, x, y, color) {
++  const d = 0.34;
++  ring(s, x, y, d, color, 2);                                    // G+
++  rect(s, x + 0.15, y + 0.14, 0.14, 0.05, color);
++  shp(s, 'roundRect', { x: x + 0.72, y, w: d, h: d, rectRadius: 0.09, fill: { type: 'none' }, line: { color, width: 2 } });
++  ring(s, x + 0.80, y + 0.08, d * 0.55, color, 2);               // camera
++  shp(s, 'triangle', { x: x + 1.44, y: y + 0.04, w: d, h: d * 0.8, rotate: 105, fill: { color } });  // bird
++  s.addText('f', {
++    x: x + 2.16, y: y - 0.06, w: d, h: d + 0.12, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 20, bold: true, color,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Deck
++ * ------------------------------------------------------------------ */
++
++const pptx = new PptxGenJS();
++pptx.defineLayout({ name: 'OPTICA', width: SLIDE_W, height: SLIDE_H });
++pptx.layout = 'OPTICA';
++pptx.author = 'MasdikaStudio';
++pptx.title = 'Optica - Optometrist & Eyecare Presentation';
++
++const slide = () => pptx.addSlide();
++
++/* 1 - Cover ------------------------------------------------------- */
++function slide01() {
++  const s = slide();
++  rect(s, 0, 0, SLIDE_W, SLIDE_H, 'F0F0F0');            // photo washed out by 82% white
++  rect(s, 6.956, 4.830, 12.750, 5.855, C.white);
++  rect(s, 6.956, 9.359, 12.750, 1.326, C.lime);
++  s.addText('Optica', {
++    x: 8.00, y: 5.60, w: 10.66, h: 3.40, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 200, bold: true, color: C.black,
++  });
++  logoMark(s, 12.252, 3.483, 2.158);
++  tx(s, 'OPTOMETRIST & EYECARE PRESENTATION TEMPLATE', {
++    x: 8.482, y: 9.700, w: 9.698, fontSize: 20, bold: true, color: C.white,
++    align: 'center', charSpacing: 3, lineSpacingMultiple: 1.5,
++  });
++  [[6.739, 4.682], [6.801, 10.387], [19.414, 4.689], [19.476, 10.387]].forEach(([x, y]) =>
++    shp(s, 'plus', { x, y, w: 0.446, h: 0.463, fill: { color: C.blue } }));
++}
++
++/* 2 - Title ------------------------------------------------------- */
++function slide02() {
++  const s = slide();
++  photo(s, 15.406, 0.041, 11.255, 14.959);
++  shp(s, 'blockArc', {
++    x: 14.176, y: 3.134, w: 14.193, h: 14.193, fill: { color: C.blue },
++    angleRange: [0, 359.9], arcThicknessRatio: 0.28,
++  });
++  head(s, 2.329, 3.997, 13.077, [
++    ['Optometris'], [' & '], ['Eyes Care ', C.lime], ['Specialis'],
++  ], { fontSize: 96, h: 3.332 });
++  para(s, 2.329, 7.500, 6.997, 1.587,
++    'Optometrist & Eyecare Presentation Template By MasdikaStudio', { fontSize: 28 });
++  button(s, 2.329, 9.941, 4.789, 'Discover More');
++  logoLockup(s, 0.776, 0.621, 0.60);
++}
++
++/* 3 - Welcome ----------------------------------------------------- */
++function slide03() {
++  const s = slide();
++  rect(s, 0, 0, 6.385, SLIDE_H, C.blue);
++  photo(s, 1.729, 1.978, 9.049, 13.022);
++  rrect(s, 8.550, 0.970, 3.863, 3.944, C.white, 0.56, { shadow: cardShadow() });
++  logoMark(s, 9.659, 1.577, 1.645, 'specs');
++  s.addText('Optica', {
++    x: 9.30, y: 3.35, w: 2.36, h: 0.90, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 44, bold: true, color: C.ink,
++  });
++  head(s, 14.051, 1.956, 11.413, [
++    ['Welcome To '], ['Optica', C.lime], [' '], ['Optometrist', C.lime], [' & Eyecare'],
++  ], { h: 4.14 });
++  plusTrio(s, 14.051, 6.581);
++  para(s, 14.051, 7.561, 10.362, 5.483, [
++    { text: 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est, tincidunt mattis lorem luctus id. Donec eget massa a diam condimentum pretium. ', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: 'Aliquam erat volutpat. Integer ut tincidunt orci. Etiam tristique, elit ut consectetur iaculis, metus lectus mattis justo.' },
++  ]);
++}
++
++/* 4 - Quote ------------------------------------------------------- */
++function slide04() {
++  const s = slide();
++  photo(s, 1.804, 0, 24.857, 13.475);
++  rect(s, 1.804, 6.412, 13.847, 7.063, C.blue);
++  rect(s, 2.937, 5.464, 2.013, 2.013, C.blueDark);
++  s.addText('\u201C', {
++    x: 3.30, y: 5.30, w: 1.60, h: 1.60, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 110, bold: true, color: C.white,
++  });
++  s.addText('PLACEHOLDER', {
++    x: 2.937, y: 7.990, w: 11.516, h: 3.433,
++    fontFace: FONT.head, fontSize: 66, bold: true, color: C.white, valign: 'top',
++  });
++  tx(s, 'Mokokoma Mokhonoana', {
++    x: 2.937, y: 11.820, w: 4.574, fontSize: 24, italic: true, color: C.white,
++  });
++  s.addShape('line', { x: 6.964, y: 12.073, w: 2.165, h: 0, line: { color: C.white, width: 2 } });
++}
++
++/* 5 - Introducing the clinic -------------------------------------- */
++function slide05() {
++  const s = slide();
++  photo(s, 0, 1.446, 8.982, 13.554);
++  photo(s, 5.890, 10.782, 5.238, 4.217);
++  head(s, 13.329, 1.446, 11.413, [
++    ['Introducing '], ['The Quality ', C.lime], ['Optometrist Clinic'],
++  ], { h: 4.14 });
++  plusTrio(s, 13.329, 6.071);
++  para(s, 13.329, 7.258, 9.853, 3.066,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu.');
++  oval(s, 5.900, 0.664, 3.553, 3.553, C.white, { shadow: cardShadow() });
++  shp(s, 'ellipse', { x: 6.017, y: 0.785, w: 3.315, h: 3.311, fill: { type: 'none' }, line: { color: C.lime, width: 1 } });
++  s.addText('25', {
++    x: 6.579, y: 1.188, w: 2.193, h: 1.447, align: 'center', valign: 'top',
++    fontFace: FONT.head, fontSize: 80, bold: true, color: C.blue,
++  });
++  tx(s, 'Years of Practicing', { x: 6.659, y: 2.522, w: 2.033, h: 0.909, align: 'center' });
++  [['8700', 'Patients', 13.329], ['700', 'Eye Surgery', 18.677]].forEach(([n, label, x]) => {
++    s.addText(n, { x, y: 11.167, w: 4.25, h: 1.447, fontFace: FONT.head, fontSize: 80, bold: true, color: C.blue, valign: 'top' });
++    tx(s, label, { x, y: 12.718, w: 3.55, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black });
++  });
++}
++
++/* 6 - Certified & professional ------------------------------------ */
++function slide06() {
++  const s = slide();
++  head(s, 1.874, 2.329, 10.259, [
++    ['Oktilcal'], [' '], ['Certified &', C.lime], [' Professional '],
++  ]);
++  plusTrio(s, 1.874, 5.421);
++  para(s, 1.874, 6.650, 10.632, 3.066,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est, tincidunt');
++  button(s, 1.874, 10.802, 6.048, 'Book Appointment');
++  photo(s, 20.612, 0, 6.049, SLIDE_H);
++  [0.012, 5.143, 10.274].forEach(y => photo(s, 14.123, y, 6.049, 4.724));
++}
++
++/* 7 - A great place to receive care -------------------------------- */
++function slide07() {
++  const s = slide();
++  rrect(s, -0.055, -0.140, 13.859, 13.148, C.photo, 3.30);
++  rect(s, -0.055, -0.140, 6.90, 6.50, C.photo);          // squares off the top-left corner
++  shp(s, 'roundRect', { x: 0.353, y: 12.322, w: 5.432, h: 0.197, rectRadius: 0.1, rotate: 40, fill: { color: C.bluePale } });
++  shp(s, 'roundRect', { x: 10.596, y: 1.336, w: 2.677, h: 0.197, rectRadius: 0.1, rotate: 45, fill: { color: C.bluePale } });
++  head(s, 15.187, 1.926, 10.100, [['A great place '], ['to receive', C.lime], [' care']]);
++  plusTrio(s, 15.187, 5.365);
++  para(s, 15.187, 6.473, 9.767, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ');
++  [['Health System', 8.989], ['Health offers ', 9.889], ['Benefis Health', 10.789]].forEach(([label, y]) =>
++    checkItem(s, 15.187, y, label, { dot: C.blue, tick: C.white, color: C.black, w: 5.2 }));
++  para(s, 15.187, 12.056, 9.767, 1.450, [
++    { text: 'Donec viverra  ', options: { fontSize: 32, bold: true, color: C.black } },
++    { text: 'Eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ' },
++  ]);
++}
++
++/* 8 - The role of an ophthalmologist ------------------------------- */
++function slide08() {
++  const s = slide();
++  photo(s, 0, 0, 15.583, 6.878);
++  rect(s, 13.710, 5.890, 11.482, 7.449, C.blue);
++  oval(s, 13.329, 5.390, 1.252, 1.252, C.white);
++  shp(s, 'plus', { x: 13.733, y: 5.785, w: 0.446, h: 0.463, fill: { color: C.blue } });
++  [['Provide primary eye care', 7.286, 8.052], ['Low vision care', 9.925, 10.692]].forEach(([title, ty, by]) => {
++    tx(s, title, { x: 15.063, y: ty, w: 8.5, fontSize: 32, bold: true, fontFace: FONT.head, color: C.white });
++    para(s, 15.063, by, 9.033, 1.248,
++      'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, ', { color: C.bodyLight });
++  });
++  head(s, 1.467, 7.644, 11.145, [['The role '], ['of an ', C.lime], ['ophthalmologist']]);
++  plusTrio(s, 1.467, 10.736);
++  para(s, 1.467, 11.487, 11.417, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod');
++  logoLockup(s, 17.336, 1.818, 1.007, 'specs');
++  tx(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend', {
++    x: 17.336, y: 3.188, w: 7.856, h: 0.909, italic: true,
++  });
++}
++
++/* 9 - Our great directors ------------------------------------------ */
++function slide09() {
++  const s = slide();
++  photo(s, 8.004, 5.937, 5.325, 9.063);
++  photo(s, 13.329, 5.937, 5.325, 9.063);
++  head(s, 7.365, 0.981, 11.929, [['Our'], [' Great ', C.lime], ['Directors']], { h: 1.447, align: 'center' });
++  plusTrio(s, 12.559, 2.839);
++  para(s, 2.362, 3.686, 21.933, 1.248,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. ',
++    { align: 'center' });
++  const bio = 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ';
++  // left doctor is right-aligned, right doctor is left-aligned
++  tx(s, 'Dr John Doe', { x: 1.565, y: 5.921, w: 5.122, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black, align: 'right' });
++  tx(s, 'Lasik Surgeon', { x: 3.780, y: 6.622, w: 2.889, italic: true, color: C.blue, align: 'right', lineSpacingMultiple: 1.5 });
++  para(s, 1.067, 7.729, 5.618, 3.671, bio, { align: 'right' });
++  socialRow(s, 2.350, 12.790, C.body);
++  tx(s, 'Dr Seema Doe', { x: 19.973, y: 5.921, w: 5.122, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black });
++  tx(s, 'Senior Doctor', { x: 19.995, y: 6.622, w: 2.889, italic: true, color: C.blue, lineSpacingMultiple: 1.5 });
++  para(s, 19.973, 7.729, 5.618, 3.671, bio);
++  socialRow(s, 19.973, 12.790, C.body);
++}
++
++/* 10 - Our ophthalmologist ----------------------------------------- */
++function slide10() {
++  const s = slide();
++  photo(s, 2.208, 5.244, 5.921, 5.921, { shape: 'ellipse' });
++  photo(s, 18.531, 5.244, 5.921, 5.921, { shape: 'ellipse' });
++  photo(s, 9.602, 4.161, 7.393, 7.393, { shape: 'ellipse' });
++  head(s, 7.365, 0.981, 11.929, [['Our '], ['Ophthalmologist', C.lime]], { h: 1.447, align: 'center' });
++  plusTrio(s, 12.559, 2.839);
++  [
++    ['Dr. John Doe', 'Lasik Surgeon', 3.133, 11.531, 3.80],
++    ['Dr. Adeline', 'Senior Doctor', 11.262, 12.157, 11.93],
++    ['Dr. Seema Doe', 'Lasik Surgeon', 19.457, 11.531, 20.13],
++  ].forEach(([name, role, x, y, sx]) => {
++    tx(s, name, { x, y, w: 4.070, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black, align: 'center' });
++    tx(s, role, { x: x + 0.59, y: y + 0.60, w: 2.889, italic: true, color: C.blue, align: 'center', lineSpacingMultiple: 1.5 });
++    socialRow(s, sx, y + 1.62, C.body);
++  });
++}
++
++/* 11 - Dr. Andersen Hans Christian --------------------------------- */
++function slide11() {
++  const s = slide();
++  photo(s, 0, 0, 12.330, SLIDE_H);
++  shp(s, 'ellipse', { x: -1.15, y: -0.21, w: 5.86, h: 14.02, rotate: 350, fill: { color: C.bluePale } });
++  shp(s, 'ellipse', { x: -1.85, y: 1.82, w: 6.75, h: 14.16, rotate: 342, fill: { color: C.blue } });
++  head(s, 14.561, 1.910, 10.520, [['Dr. Andersen '], ['Hans', C.lime], [' Christian']]);
++  plusTrio(s, 14.561, 5.349);
++  para(s, 14.561, 6.457, 10.520, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ');
++  rect(s, 14.561, 8.962, 5.776, 1.114, C.blue);
++  lineIcon(s, 'glasses', 14.98, 9.26, 0.56, C.white, 2);
++  tx(s, 'Eye specialist', { x: 15.892, y: 9.190, w: 3.64, fontSize: 32, bold: true, fontFace: FONT.head, color: C.white });
++  [
++    ['Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec', 11.007],
++    ['Donecaisit euismod scelerisque ligula', 11.797],
++    ['Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ', 12.587],
++  ].forEach(([t, y]) => {
++    shp(s, 'plus', { x: 14.561, y: y + 0.09, w: 0.312, h: 0.323, fill: { color: C.blue } });
++    tx(s, t, { x: 15.180, y, w: 9.750, h: 0.51, italic: true, color: C.slate });
++  });
++}
++
++/* 12 - Eye clinic services ----------------------------------------- */
++function slide12() {
++  const s = slide();
++  head(s, 1.684, 1.144, 11.844, [
++    ['Eye Clinic '], ['Services We\u2019re ', C.lime], ['Offering To Our Clients'],
++  ], { h: 4.14 });
++  plusTrio(s, 1.684, 5.779);
++  para(s, 14.001, 1.362, 10.967, 2.464,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. ');
++  [
++    ['Surgical Procedure', '01', 1.684],
++    ['All Laser Lasik', '02', 9.622],
++    ['Cornea & Glaucoma', '03', 17.551],
++  ].forEach(([title, num, x], i) => {
++    rrect(s, x, 7.010, 7.430, 6.600, C.white, 0.40, { shadow: cardShadow() });
++    photo(s, x, 7.010, 7.430, 4.800, { shape: 'roundRect', r: 0.40 });
++    shp(s, 'round2SameRect', { x: x + 0.63, y: 10.120, w: 1.920, h: 1.690, rectRadius: 0.95, fill: { color: C.blue } });
++    lineIcon(s, ['glasses', 'eye', 'scan'][i], x + 1.17, 10.65, 0.82, C.white, 4);
++    tx(s, title, { x: x + 0.63, y: 12.320, w: 4.74, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black });
++    s.addText(num, {
++      x: x + 4.48, y: 11.900, w: 2.32, h: 1.58, align: 'right', valign: 'top',
++      fontFace: FONT.head, fontSize: 88, bold: true, color: C.bodyLight,
++    });
++  });
++}
++
++/* 13 - Why choose our services ------------------------------------- */
++function slide13() {
++  const s = slide();
++  photo(s, 0, 1.702, 10.192, 13.298, { shape: 'roundRect', r: 0.8 });
++  head(s, 11.784, 1.702, 13.470, [
++    ['Oktilcal'], [' Why '], ['You Should ', C.lime], ['Choose Our Services'],
++  ], { h: 4.14 });
++  plusTrio(s, 11.784, 6.327);
++  para(s, 11.784, 7.267, 13.470, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. ');
++  [['Eye Treatment', 11.784, 12.766], ['Lasik Care', 16.441, 17.433], ['Contact Lenses', 21.108, 22.100]].forEach(
++    ([label, bx, cx], i) => {
++      rrect(s, bx, 12.213, 4.140, 1.152, C.blue, 0.576);
++      tx(s, label, { x: bx, y: 12.500, w: 4.140, fontSize: 28, bold: true, color: C.white, align: 'center' });
++      oval(s, cx, 9.600, 2.140, 2.140, C.white, { shadow: cardShadow() });
++      shp(s, 'arc', {
++        x: cx + 0.06, y: 9.66, w: 2.02, h: 2.02, fill: { type: 'none' },
++        line: { color: C.lime, width: 6 }, angleRange: [300, 60],
++      });
++      lineIcon(s, ['glasses', 'eye', 'lens'][i], cx + 0.61, 10.19, 0.92, C.blue, 4);
++    });
++}
++
++/* 14 - Full scope optometric services ------------------------------ */
++function slide14() {
++  const s = slide();
++  head(s, 4.394, 1.070, 17.890, [['Full Scope '], ['Optometric ', C.lime], ['Services']],
++    { h: 1.447, align: 'center' });
++  plusTrio(s, 12.559, 2.930);
++  para(s, 2.362, 3.780, 21.933, 1.248,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. ',
++    { align: 'center' });
++  const cols = [
++    { x: 3.95, div: 6.60, color: C.blue, tail: C.blueDark, num: '01', icon: 'scan', title: 'Comprehensive Eye Exams', tx: 1.92, tw: 3.55, dx: 1.36 },
++    { x: 10.00, div: 12.65, color: C.lime, tail: C.limeDark, num: '02', icon: 'eye', title: 'Complete Optical Services', tx: 7.37, tw: 4.72, dx: 7.41 },
++    { x: 16.04, div: 18.69, color: C.navy, tail: C.navyDark, num: '03', icon: 'lens', title: 'Contact Lens Examination', tx: 13.57, tw: 4.41, dx: 13.45 },
++    { x: 22.08, div: 24.73, color: C.azure, tail: C.azureDark, num: '04', icon: 'glasses', title: 'Optica Urgent Care', tx: 20.07, tw: 3.55, dx: 19.52 },
++  ];
++  cols.forEach(c => {
++    rect(s, c.div, 5.880, 0.21, 8.040, C.mistDark);                 // vertical rule
++    rrect(s, c.x, 7.020, 3.245, 1.900, c.color, 0.42);              // flag body
++    shp(s, 'rtTriangle', { x: c.div, y: 8.420, w: 0.55, h: 0.670, flipH: true, fill: { color: c.tail } });
++    s.addText(c.num, {
++      x: c.x + 0.93, y: 7.280, w: 1.15, h: 0.91, align: 'center', valign: 'top',
++      fontFace: FONT.head, fontSize: 48, bold: true, color: C.white,
++    });
++    lineIcon(s, c.icon, c.x - 0.80, 9.50, 1.08, c.color, 4);
++    tx(s, c.title, { x: c.tx, y: 10.930, w: c.tw, h: 1.18, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black, align: 'center' });
++    para(s, c.dx, 12.330, 4.65, 1.248, 'Fusce vehicula dolorIili arcu, sit amet', { align: 'center' });
++  });
++}
++
++/* 15 - Our eye services -------------------------------------------- */
++function slide15() {
++  const s = slide();
++  head(s, 8.194, 0.911, 10.270, [['Our '], ['Eye', C.lime], [' Services']], { h: 1.447, align: 'center' });
++  plusTrio(s, 12.559, 2.774);
++  const titles = [
++    ['Post Operative Lasik Care', 'Great Lasik Consultation', 'Free Lense Consultation'],
++    ['Computerized Eye Exam', 'Eye Infection Care', 'Dry Infection Threat'],
++  ];
++  const capW = [5.21, 5.60, 5.21];
++  [4.00, 9.00].forEach((cy, row) => {
++    [1.52, 9.51, 17.50].forEach((cx, col) => {
++      rect(s, cx, cy, 7.640, 4.650, C.white, { shadow: cardShadow() });
++      photo(s, cx + 2.15, cy + 0.53, 3.340, 1.810, { shape: 'ellipse' });
++      tx(s, titles[row][col], {
++        x: cx + (7.64 - capW[col]) / 2, y: cy + 2.91, w: capW[col], h: 1.18, align: 'center',
++        fontSize: 32, bold: true, fontFace: FONT.head, color: C.black,
++      });
++      rect(s, cx + 6.42, cy + 3.75, 1.220, 0.900, C.blue);
++      shp(s, 'plus', { x: cx + 6.81, y: cy + 3.97, w: 0.446, h: 0.463, fill: { color: C.white } });
++    });
++  });
++}
++
++/* 16 - Testimonial -------------------------------------------------- */
++function slide16() {
++  const s = slide();
++  rect(s, 0, 0, 26.661, 10.900, C.blue);                   // blue wash with a curved foot
++  shp(s, 'ellipse', { x: -4.00, y: 4.60, w: 24.00, h: 7.60, fill: { color: C.blue } });
++  head(s, 1.713, 2.858, 10.520, [['Dr. Caroline Hans Allison', C.white]]);
++  for (let i = 0; i < 5; i++) shp(s, 'star5', { x: 1.713 + i * 0.663, y: 6.240, w: 0.51, h: 0.52, fill: { color: 'FFC000' } });
++  tx(s, 'Lasik Care', { x: 1.713, y: 7.644, w: 3.08, fontSize: 28, bold: true, color: C.white });
++  oval(s, 1.713, 8.462, 0.680, 0.680, C.white);
++  s.addText('\u275D', { x: 1.713, y: 8.35, w: 0.68, h: 0.68, align: 'center', valign: 'middle', fontFace: FONT.head, fontSize: 26, bold: true, color: C.lime });
++  para(s, 1.713, 8.600, 7.470, 1.854,
++    '            Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus',
++    { italic: true, color: C.bodyLight });
++  rrect(s, 10.450, 8.280, 4.630, 4.250, C.white, 0.67, { shadow: cardShadow() });
++  logoMark(s, 11.940, 9.040, 1.500, 'specs');
++  s.addText('Optica', {
++    x: 11.20, y: 10.95, w: 3.13, h: 1.00, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 44, bold: true, color: C.ink,
++  });
++  photo(s, 14.670, 0, 11.991, SLIDE_H);   // right photo sits on top, clipping the card
++}
++
++/* 17 - Best price (single card) ------------------------------------- */
++function slide17() {
++  const s = slide();
++  photo(s, 8.030, 8.259, 18.631, 6.741);
++  rect(s, 1.863, 3.353, 9.010, 10.870, C.white, { shadow: cardShadow() });
++  photo(s, 1.863, 3.353, 9.010, 6.210);
++  tx(s, 'Library Style Classic', { x: 2.750, y: 10.070, w: 4.14, fontSize: 28, bold: true, color: C.black });
++  para(s, 2.750, 10.720, 7.060, 1.248, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec');
++  rect(s, 2.750, 12.380, 3.230, 1.110, C.blue);
++  tx(s, '$2500', { x: 3.010, y: 12.610, w: 2.71, fontSize: 32, bold: true, italic: true, color: C.white, align: 'center' });
++  head(s, 12.100, 1.078, 9.490, [['Start with '], ['a best ', C.lime], ['price.']]);
++  plusTrio(s, 12.100, 4.517);
++  para(s, 12.100, 5.550, 13.320, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. ');
++}
++
++/* 18 - Best price (two cards) --------------------------------------- */
++function slide18() {
++  const s = slide();
++  head(s, 1.863, 3.190, 8.730, [['Start with '], ['a best ', C.lime], ['price.']]);
++  plusTrio(s, 1.863, 6.620);
++  para(s, 1.863, 7.650, 7.480, 4.280,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur');
++  [
++    ['Bridge Black Classic', 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis', '$20,00', 1.840],
++    ['I-C Glass Eyewear', 'Fusce vehicula dolor arcu, sit amet blandit dolor nec', '$15,00', 7.800],
++  ].forEach(([title, copy, price, y]) => {
++    rect(s, 11.550, y, 13.800, 5.420, C.white, { shadow: cardShadow() });
++    photo(s, 11.550, y, 7.170, 5.420);
++    tx(s, title, { x: 19.570, y: y + 1.03, w: 4.14, fontSize: 28, bold: true, color: C.black });
++    para(s, 19.570, y + 1.68, 4.950, 1.248, copy);
++    rect(s, 19.570, y + 3.46, 3.230, 1.110, C.blue);
++    tx(s, price, { x: 19.830, y: y + 3.70, w: 2.71, fontSize: 32, bold: true, italic: true, color: C.white, align: 'center' });
++  });
++}
++
++/* 19 - Our portfolio ------------------------------------------------ */
++function slide19() {
++  const s = slide();
++  photo(s, 1.720, 1.310, 12.310, 4.950);
++  photo(s, 14.380, 1.310, 5.280, 12.380);
++  photo(s, 20.000, 1.280, 5.280, 12.380);
++  head(s, 1.720, 7.190, 10.570, [['Our '], ['Portfolio', C.lime], [' Optica ']]);
++  plusTrio(s, 1.720, 10.680);
++  para(s, 1.720, 11.830, 11.380, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ');
++}
++
++/* 20 - Our gallery -------------------------------------------------- */
++function slide20() {
++  const s = slide();
++  [0, 8.890, 17.780].forEach(x => photo(s, x, 4.330, 8.890, 5.500));
++  head(s, 8.194, 0.911, 10.270, [['Our '], ['Gallery ', C.lime], ['Optica ']], { h: 1.447, align: 'center' });
++  plusTrio(s, 12.559, 2.774);
++  tx(s, 'Complete Optical Services', { x: 1.750, y: 10.870, w: 7.59, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black });
++  para(s, 1.750, 11.810, 11.740, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. ');
++  gauge(s, 17.060, 10.870, 1.940, 0.80, 'Eye Treatment');
++  gauge(s, 22.120, 10.870, 1.940, 0.90, 'Lasik Care');
++}
++
++/* 21 - Often in search of people ------------------------------------ */
++function slide21() {
++  const s = slide();
++  rect(s, 13.329, 6.330, 13.330, 8.670, C.white, { shadow: cardShadow() });
++  head(s, 1.720, 6.850, 10.480, [['Often in '], ['search of ', C.lime], ['people']]);
++  plusTrio(s, 1.720, 10.340);
++  para(s, 1.720, 11.500, 10.950, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ');
++  [['Eye Treatment', 8.14, 9.15, 'glasses'], ['Lasik Care', 11.50, 12.78, 'eye']].forEach(([label, iy, ty, icon]) => {
++    lineIcon(s, icon, 15.13, iy, 0.95, C.blue, 4);
++    tx(s, label, { x: 14.060, y: ty, w: 3.08, fontSize: 28, bold: true, color: C.black, align: 'center' });
++  });
++  photo(s, 0, 0, 15.960, 5.830);
++  tx(s, 'Eye Treatment', { x: 17.880, y: 1.190, w: 3.08, fontSize: 28, bold: true, color: C.black, align: 'center' });
++  para(s, 17.880, 2.080, 7.600, 2.464,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ');
++  photo(s, 17.880, 6.330, 8.780, 8.670);
++}
++
++/* Chart data shared by slides 22 and 23 ----------------------------- */
++const CHART_CATS = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
++const CHART_SERIES = [
++  { name: 'Series 1', labels: CHART_CATS, values: [4.3, 2.5, 3.5, 4.5] },
++  { name: 'Series 2', labels: CHART_CATS, values: [2.4, 4.4, 1.8, 2.8] },
++  { name: 'Series 3', labels: CHART_CATS, values: [2, 2, 3, 5] },
++];
++const CHART_STYLE = {
++  chartColors: [C.blue, C.lime, C.navy],
++  showLegend: false,
++  catAxisLabelColor: C.slate, valAxisLabelColor: C.slate,
++  catAxisLabelFontFace: FONT.body, valAxisLabelFontFace: FONT.body,
++  catAxisLabelFontSize: 24, valAxisLabelFontSize: 24,
++  catAxisLineShow: false, valAxisLineShow: false,
++  valAxisMaxVal: 6, valAxisMinVal: 0, valAxisMajorUnit: 1,
++  valGridLine: { color: C.grid, size: 1 }, catGridLine: { style: 'none' },
++  border: { pt: 0, color: 'FFFFFF' }, fill: 'FFFFFF',
++};
++
++/* 22 - Chart analysis (line) ---------------------------------------- */
++function slide22() {
++  const s = slide();
++  head(s, 2.010, 1.630, 10.570, [['Chart '], ['Analysis ', C.lime], ['slide']]);
++  plusTrio(s, 2.010, 5.120);
++  para(s, 2.010, 6.350, 10.070, 2.464,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. ');
++  oval(s, 2.010, 10.580, 2.420, 2.390, C.blue);
++  s.addText('84%', {
++    x: 2.010, y: 10.580, w: 2.420, h: 2.390, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 44, bold: true, color: C.white,
++  });
++  tx(s, 'Daily Sales', { x: 4.960, y: 10.740, w: 4.74, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black });
++  para(s, 4.960, 11.630, 7.620, 1.248, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. ');
++  s.addChart(pptx.ChartType.line, CHART_SERIES, Object.assign({}, CHART_STYLE, {
++    x: 13.96, y: 1.68, w: 10.85, h: 11.45, lineSize: 4, lineSmooth: false, lineDataSymbol: 'none',
++  }));
++}
++
++/* 23 - Optica analysis (bar) ---------------------------------------- */
++function slide23() {
++  const s = slide();
++  s.addChart(pptx.ChartType.bar, CHART_SERIES, Object.assign({}, CHART_STYLE, {
++    x: 1.50, y: 1.80, w: 12.72, h: 12.05, barGrouping: 'clustered',
++    barGapWidthPct: 258, barOverlapPct: -33,
++  }));
++  head(s, 15.880, 1.630, 9.200, [['Our '], ['Optica Analysis ', C.lime], ['slide']]);
++  plusTrio(s, 15.880, 5.120);
++  para(s, 15.880, 6.350, 9.870, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc.');
++  oval(s, 15.880, 8.910, 2.050, 2.020, C.white, { shadow: cardShadow() });
++  s.addText('90%', {
++    x: 15.880, y: 8.910, w: 2.050, h: 2.020, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 40, bold: true, color: C.lime,
++  });
++  tx(s, 'Daily Marketing', { x: 18.580, y: 9.060, w: 4.74, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black });
++  para(s, 18.580, 9.700, 6.510, 1.248, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. ');
++  button(s, 15.880, 11.980, 6.048, 'Book Appointment');
++}
++
++/* Shared timeline captions (slides 24 & 25) -------------------------- */
++const TIMELINE = [
++  { label: 'Creative', year: '2017', color: C.blue, icon: 'bulb' },
++  { label: 'Investment', year: '2018', color: C.lime, icon: 'mail' },
++  { label: 'Strategy', year: '2019', color: C.navy, icon: 'chart' },
++  { label: 'Target', year: '2020', color: C.sky, icon: 'target' },
++  { label: 'Goal', year: '2021', color: C.azure, icon: 'coins' },
++];
++
++/* 24 - Timeline (hexagons over a rail) ------------------------------- */
++function slide24() {
++  const s = slide();
++  head(s, 7.930, 1.070, 10.810, [['Time'], [' Line ', C.lime], ['Optica']], { h: 1.447, align: 'center' });
++  plusTrio(s, 12.559, 2.930);
++  para(s, 2.362, 3.780, 21.933, 1.248,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. ',
++    { align: 'center' });
++  rrect(s, 3.970, 12.260, 19.160, 0.530, C.timeline, 0.26);          // rail
++  const hexX = [5.41, 8.62, 11.92, 15.18, 18.29];
++  const dotX = [6.68, 9.89, 13.11, 16.45, 19.55];
++  TIMELINE.forEach((t, i) => {
++    const high = i % 2 === 1;                                        // 2nd & 4th sit higher
++    const hy = high ? 6.01 : 6.82;
++    shp(s, 'hexagon', { x: hexX[i], y: hy, w: 3.43, h: 2.96, rotate: 90, fill: { color: t.color } });
++    oval(s, hexX[i] + 0.44, hy + 0.21, 2.56, 2.55, C.white);
++    lineIcon(s, t.icon, hexX[i] + 1.14, hy + 0.90, 1.16, t.color, 5);
++    s.addShape('line', { x: dotX[i] + 0.44, y: high ? 9.56 : 10.21, w: 0, h: high ? 2.97 : 2.32, line: { color: 'A7A9AC', width: 3 } });
++    oval(s, dotX[i], 12.080, 0.89, 0.89, t.color, { line: { color: C.white, width: 4 } });
++    tx(s, t.label, { x: dotX[i] - 1.17, y: 13.290, w: 3.23, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black, align: 'center' });
++  });
++}
++
++/* 25 - Timeline (chevron pills) -------------------------------------- */
++function slide25() {
++  const s = slide();
++  head(s, 7.930, 1.360, 10.810, [['Time'], [' Line ', C.lime], ['Optica']], { h: 1.447, align: 'center' });
++  plusTrio(s, 12.559, 3.220);
++  para(s, 2.362, 4.070, 21.933, 1.248,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. ',
++    { align: 'center' });
++  // Each step is a disc whose right half is covered by a lighter arrow head.
++  const steps = [
++    { disc: 1.485, arrow: 3.54, dark: C.blue, light: C.blueSoft, iconX: 2.26, textX: 3.93, capX: 1.28 },
++    { disc: 6.275, arrow: 8.32, dark: C.lime, light: C.limeSoft, iconX: 7.05, textX: 8.79, capX: 6.27 },
++    { disc: 11.055, arrow: 13.10, dark: C.navyDark, light: C.navyMid, iconX: 11.83, textX: 13.46, capX: 11.26 },
++    { disc: 15.845, arrow: 17.87, dark: C.sky, light: C.skySoft, iconX: 16.62, textX: 18.29, capX: 16.25 },
++  ];
++  steps.forEach((st, i) => {
++    shp(s, 'ellipse', { x: st.disc, y: 6.91, w: 4.14, h: 3.94, fill: { color: st.dark } });
++    shp(s, 'homePlate', { x: st.disc + 2.07, y: 6.91, w: 2.73, h: 3.94, fill: { color: st.light } });
++    lineIcon(s, TIMELINE[i].icon, st.iconX, 8.35, 1.00, C.white, 5);
++    s.addText(TIMELINE[i].year, {
++      x: st.textX, y: 8.490, w: 1.77, h: 0.64, align: 'center', valign: 'top',
++      fontFace: FONT.head, fontSize: 32, bold: true, color: C.white,
++    });
++    tx(s, TIMELINE[i].label, { x: st.capX + 0.65, y: 11.790, w: 3.23, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black, align: 'center' });
++    para(s, st.capX, 12.910, 4.51, 0.91, 'Fusce vehicula dolor arcu, sit amet blandit', { align: 'center', lineSpacingMultiple: 1 });
++  });
++  oval(s, 20.620, 6.910, 3.920, 3.920, C.azure);
++  lineIcon(s, TIMELINE[4].icon, 22.08, 8.05, 1.00, C.white, 5);
++  s.addText('2021', {
++    x: 21.690, y: 9.520, w: 1.77, h: 0.64, align: 'center', valign: 'top',
++    fontFace: FONT.head, fontSize: 32, bold: true, color: C.white,
++  });
++  tx(s, 'Goal', { x: 20.960, y: 11.790, w: 3.23, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black, align: 'center' });
++}
++
++/* 26 - Break slide ---------------------------------------------------- */
++function slide26() {
++  const s = slide();
++  photo(s, 0, 0, 13.330, SLIDE_H);
++  rect(s, 11.660, 1.700, 11.390, 11.730, C.white, { shadow: cardShadow() });
++  shp(s, 'frame', { x: 12.140, y: 2.200, w: 10.390, h: 10.730, fill: { color: C.blue }, rectRadius: 0.06 });
++  s.addText([
++    { text: 'Break', options: { color: C.ink } },
++    { text: '  ', options: { color: C.black } },
++    { text: 'Slide', options: { color: C.lime } },
++  ], {
++    x: 12.980, y: 4.820, w: 7.940, h: 5.690, align: 'center', valign: 'top',
++    fontFace: FONT.head, fontSize: 166, bold: true,
++  });
++  [[12.75, 3.16], [12.88, 11.64], [21.39, 3.16], [21.39, 11.64]].forEach(([x, y]) =>
++    shp(s, 'plus', { x, y, w: 0.446, h: 0.463, fill: { color: C.blue } }));
++}
++
++/* 27-30 - SWOT -------------------------------------------------------- */
++const SWOT_COPY = 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu';
++const SWOT_ITEMS = ['introduction', 'Situation analysis', 'Recommendation'];
++
++// One SWOT slide: a full-bleed blue panel, the huge SWOT wordmark with one
++// letter highlighted, a gauge and three check-list rows.
++function swotSlide(cfg) {
++  const s = slide();
++  photo(s, cfg.panel[0], cfg.panel[1], cfg.panel[2], cfg.panel[3]);
++  rect(s, cfg.panel[0], cfg.panel[1], cfg.panel[2], cfg.panel[3], C.blue);
++  s.addText(cfg.word.map(w => ({ text: w[0], options: { color: w[1] ? C.black : C.ghost } })), {
++    x: cfg.wordAt[0], y: cfg.wordAt[1], w: cfg.wordAt[2], h: 4.93, align: cfg.wordAlign || 'center',
++    fontFace: FONT.head, fontSize: 287, bold: true, valign: 'top',
++  });
++  head(s, cfg.textAt[0], cfg.textAt[1], 15.08, [[cfg.title, C.white]], { h: 1.447 });
++  para(s, cfg.textAt[0], cfg.textAt[1] + 1.70, 15.08, 1.854, SWOT_COPY, { color: C.bodyLight });
++  SWOT_ITEMS.forEach((item, i) =>
++    checkItem(s, cfg.textAt[0], cfg.textAt[1] + 4.40 + i * 1.035, item));
++  gauge(s, cfg.gaugeAt[0], cfg.gaugeAt[1], 1.940, cfg.pct, 'References', { track: C.bodyLight });
++}
++
++const slide27 = () => swotSlide({
++  panel: [7.880, 3.330, 18.790, 11.670], word: [['S', 1], ['WOT', 0]], wordAt: [2.330, 1.250, 14.45],
++  title: 'Strength Analysis Slide', textAt: [9.750, 6.410], gaugeAt: [3.070, 10.180], pct: 0.90,
++});
++const slide28 = () => swotSlide({
++  panel: [0, 3.330, 18.790, 11.670], word: [['S', 0], ['W', 1], ['OT', 0]], wordAt: [12.500, 1.210, 14.45],
++  wordAlign: 'left', title: 'Weakness Analysis Slide', textAt: [2.340, 6.200], gaugeAt: [21.700, 9.930], pct: 0.80,
++});
++const slide29 = () => swotSlide({
++  panel: [7.880, 0, 18.790, 11.670], word: [['SW', 0], ['O', 1], ['T', 0]], wordAt: [2.390, 9.400, 14.45],
++  title: 'Opportunity Analysis Slide', textAt: [9.730, 1.960], gaugeAt: [3.040, 1.960], pct: 0.70,
++});
++const slide30 = () => swotSlide({
++  panel: [0, 0, 18.790, 11.670], word: [['SWO', 0], ['T', 1]], wordAt: [11.720, 9.100, 13.07],
++  title: 'Threat Analysis Slide', textAt: [1.980, 1.580], gaugeAt: [21.680, 1.580], pct: 0.85,
++});
++
++/* 31 - Launching new site (desktop mock) ------------------------------ */
++function slide31() {
++  const s = slide();
++  head(s, 2.280, 2.290, 10.570, [['We are '], ['launching  ', C.lime], ['optica', C.lime], [' new site']]);
++  plusTrio(s, 2.280, 5.779);
++  para(s, 2.280, 6.940, 9.190, 3.671,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est, tincidunt');
++  button(s, 2.310, 11.730, 6.048, 'WWW.OPTICA.COM');
++  // monitor: bezel, screen, neck, base
++  rrect(s, 13.070, 2.760, 11.590, 7.010, '181818', 0.25);
++  rect(s, 13.570, 3.290, 10.580, 5.950, '7E7E7E');
++  oval(s, 18.780, 2.940, 0.16, 0.16, '0A0A0A');
++  rrect(s, 13.070, 9.760, 11.590, 1.100, 'D2D3D5', 0.1);
++  shp(s, 'trapezoid', { x: 16.870, y: 10.860, w: 3.940, h: 1.100, rotate: 180, fill: { color: 'D2D3D5' } });
++  rrect(s, 16.400, 11.930, 4.900, 0.160, 'A8A9AA', 0.08);
++}
++
++/* 32 - Check our apps (phone mock) ------------------------------------ */
++function slide32() {
++  const s = slide();
++  rect(s, 0, 0, 5.730, SLIDE_H, C.blue);
++  rrect(s, 2.140, 2.820, 7.240, 14.510, '181818', 0.9);
++  rrect(s, 2.400, 3.100, 6.720, 13.950, C.photo, 0.75);
++  rrect(s, 4.400, 3.240, 2.700, 0.42, '181818', 0.2);
++  head(s, 11.890, 2.480, 10.570, [['Check '], ['Optica Our ', C.lime], ['Apps']]);
++  plusTrio(s, 11.760, 5.910);
++  para(s, 11.760, 7.060, 11.830, 1.854,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit');
++  [['Daily Sales', '80%', 9.71, 10.71, 9.17], ['Daily Sales', '76%', 11.43, 12.43, 8.27]].forEach(
++    ([label, pct, ly, by, fill]) => {
++      tx(s, label, { x: 11.760, y: ly, w: 3.89, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black });
++      tx(s, pct, { x: 22.060, y: ly, w: 1.52, fontSize: 32, bold: true, fontFace: FONT.head, color: C.black, align: 'right' });
++      rrect(s, 11.760, by, 11.830, 0.160, C.silver, 0.08);
++      rrect(s, 11.760, by, fill, 0.160, C.blue, 0.08);
++    });
++}
++
++/* 33 - Get easy order (tilted phones) --------------------------------- */
++function slide33() {
++  const s = slide();
++  head(s, 2.010, 2.290, 11.320, [['Get Easy Order '], ['with Our ', C.lime], ['Apps']]);
++  plusTrio(s, 2.010, 5.779);
++  para(s, 2.010, 6.940, 9.190, 2.464,
++    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula');
++  button(s, 2.010, 10.680, 4.760, 'DOWNLOAD');
++  [[13.390, 2.400], [21.590, 0.670]].forEach(([x, y]) => {
++    shp(s, 'roundRect', { x, y, w: 5.710, h: 11.460, rotate: 30, rectRadius: 0.75, fill: { color: '181818' } });
++    shp(s, 'roundRect', { x: x + 0.16, y: y + 0.16, w: 5.390, h: 11.140, rotate: 30, rectRadius: 0.66, fill: { color: C.photo } });
++  });
++}
++
++/* 34 - Our prices ------------------------------------------------------ */
++function slide34() {
++  const s = slide();
++  head(s, 7.930, 1.100, 10.810, [['Our '], ['Prices ', C.lime]], { h: 1.447, align: 'center' });
++  plusTrio(s, 12.559, 2.960);
++  const plans = [
++    { x: 2.04, hx: 2.10, hy: 4.35, price: 'from$79,99', name: 'Complete Optical Services', nameH: 1.04, featured: false },
++    { x: 10.06, hx: 10.06, hy: 4.37, price: 'from$19,99', name: 'Urgent Care', nameH: 0.57, featured: true },
++    { x: 18.08, hx: 18.08, hy: 4.37, price: 'from$29,99', name: 'Contact Lens Examination', nameH: 1.04, featured: false },
++  ];
++  const features = ['Individualized treatment plan', 'Contact lens prescription', 'Retinal photography', 'OCT & Visual Fields'];
++  plans.forEach(p => {
++    const bodyTop = p.featured ? 4.37 : 7.87;
++    const bodyH = p.featured ? 9.41 : 5.91;
++    rect(s, p.x, bodyTop, 6.680, bodyH, p.featured ? C.blue : C.white, { shadow: p.featured ? null : softShadow() });
++    photo(s, p.hx, p.hy, 6.640, p.featured ? 9.41 : 3.52);
++    s.addShape('rect', { x: p.hx, y: p.hy, w: 6.640, h: p.featured ? 9.41 : 3.52, fill: { color: C.blue, transparency: 24 } });
++    tx(s, p.price, {
++      x: p.hx + 0.82, y: 5.100, w: 4.88, h: 1.11, fontSize: 60, bold: true,
++      fontFace: FONT.body, color: C.white, align: 'center',
++    });
++    tx(s, p.name, {
++      x: p.hx + 1.45, y: 6.330, w: 3.73, h: p.nameH, fontSize: 28, bold: true,
++      fontFace: FONT.body, color: C.white, align: 'center',
++    });
++    features.forEach((f, i) => {
++      const y = 8.95 + i * 1.07;
++      const lineColor = p.featured ? C.navySoft : C.bodyLight;
++      oval(s, p.x + 0.81, y + 0.19, 0.12, 0.12, p.featured ? C.white : C.blue);
++      tx(s, f, { x: p.x + 1.06, y, w: 5.42, h: 0.51, color: p.featured ? C.white : C.body });
++      s.addShape('line', { x: p.x + 0.50, y: y + 0.69, w: 5.32, h: 0, line: { color: lineColor, width: 1 } });
++    });
++  });
++}
++
++/* 35 - Contact us ------------------------------------------------------ */
++function slide35() {
++  const s = slide();
++  photo(s, 0, 0, 18.160, SLIDE_H);
++  rect(s, 18.160, 0, 8.500, SLIDE_H, C.ink);
++  rect(s, 14.900, 2.160, 8.980, 11.400, C.blue);
++  rrect(s, 22.710, 1.080, 2.360, 2.160, C.white, 0.3, { shadow: cardShadow() });
++  logoMark(s, 23.470, 1.390, 0.770, 'specs');
++  s.addText('Optica', {
++    x: 22.80, y: 2.40, w: 2.18, h: 0.60, align: 'center', valign: 'middle',
++    fontFace: FONT.head, fontSize: 22, bold: true, color: C.ink,
++  });
++  head(s, 16.140, 3.210, 6.340, [['Contact us', C.white]], { h: 1.447 });
++  plusTrio(s, 16.140, 5.150, C.white);
++  [
++    ['Address', '123, New Lenox Chicago, IL 60606', 6.500],
++    ['Phone', '+221 7888 666 777', 8.690],
++    ['Email', 'www.optica@mail.com', 10.880],
++  ].forEach(([label, value, y]) => {
++    tx(s, label, { x: 16.140, y, w: 3.89, fontSize: 32, bold: true, fontFace: FONT.head, color: C.white });
++    para(s, 16.140, y + 0.80, 5.790, 0.64, value, { color: C.bodyLight });
++  });
++}
++
++/* 36 - Icon slide divider ---------------------------------------------- */
++function slide36() {
++  const s = slide();
++  photo(s, 12.610, 0, 14.050, SLIDE_H);
++  rect(s, 0, 0, 12.610, SLIDE_H, C.ink);
++  rect(s, 3.270, 5.150, 9.350, 6.800, C.blue);
++  rect(s, 3.940, 4.290, 15.230, 7.030, C.white, { shadow: cardShadow() });
++  s.addText([
++    { text: 'Icon ', options: { color: C.black } },
++    { text: 'Slide', options: { color: C.lime } },
++    { text: '.', options: { color: C.black } },
++  ], { x: 5.750, y: 5.760, w: 12.590, h: 2.90, fontFace: FONT.head, fontSize: 166, bold: true, valign: 'top' });
++  tx(s, 'Optometrist & Eyecare Presentation Template', {
++    x: 5.750, y: 8.910, w: 11.620, h: 0.78, fontSize: 28, bold: true,
++    color: C.steel, align: 'center', charSpacing: 3, lineSpacingMultiple: 1.5,
++  });
++}
++
++/* 37-40 - Icon sheets --------------------------------------------------- */
++// Four sheets of vector pictograms, laid out as an 11 x 6 grid.  Each sheet
++// starts at a different offset into the glyph library so no two look alike.
++function iconSheet(x0, y0, offset) {
++  const s = slide();
++  const dx = 2.253, dy = 2.04, d = 0.95;
++  for (let r = 0; r < 6; r++) {
++    for (let c = 0; c < 11; c++) {
++      const draw = SOLID_GLYPHS[(offset + r * 11 + c) % SOLID_GLYPHS.length];
++      draw(s, x0 + c * dx, y0 + r * dy, d);
++    }
++  }
++}
++
++const slide37 = () => iconSheet(1.69, 2.00, 0);
++const slide38 = () => iconSheet(1.85, 2.24, 7);
++const slide39 = () => iconSheet(1.89, 2.26, 14);
++const slide40 = () => iconSheet(1.96, 2.13, 21);
++
++/* 41 - Thank you --------------------------------------------------------- */
++function slide41() {
++  const s = slide();
++  photo(s, 0, 0, SLIDE_W, 10.792);
++  s.addShape('rect', { x: 0, y: 0, w: SLIDE_W, h: 10.822, fill: { color: C.white, transparency: 30 } });
++  rect(s, 5.247, 4.968, 3.581, 5.825, C.blue);
++  rect(s, 8.828, 4.968, 12.750, 5.855, C.white);
++  s.addText('Thank You', {
++    x: 7.038, y: 6.450, w: 12.590, h: 2.90, align: 'center', valign: 'top',
++    fontFace: FONT.head, fontSize: 166, bold: true, color: C.black,
++  });
++  logoMark(s, 12.252, 3.890, 2.158);
++  s.addText([
++    { text: '\u201C', options: { fontSize: 44 } },
++    { text: ' ', options: { fontSize: 36 } },
++    { text: 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donecaisit euismod scelerisque ligula. Maecenas eu varius risus', options: { fontSize: 24 } },
++    { text: ', \u201C', options: { fontSize: 36 } },
++  ], {
++    x: 2.631, y: 12.257, w: 21.400, h: 1.447, align: 'center', valign: 'top',
++    fontFace: FONT.body, italic: true, color: C.body,
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Build
++ * ------------------------------------------------------------------ */
++
++[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++ slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++ slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
++ slide31, slide32, slide33, slide34, slide35, slide36, slide37, slide38, slide39, slide40,
++ slide41].forEach(fn => fn());
++
++pptx.writeFile({
++  fileName: path.join(__dirname, '153c40a3-1889-493c-ae1f-f10dc7d8680b_grok_final.pptx'),
++}).then(f => console.log('wrote', f));

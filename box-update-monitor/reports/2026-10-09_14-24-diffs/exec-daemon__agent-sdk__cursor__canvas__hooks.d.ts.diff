@@ -1,0 +1,8 @@
+--- 2026-10-09_14-11:/exec-daemon/agent-sdk/cursor/canvas/hooks.d.ts
++++ 2026-10-09_14-24:/exec-daemon/agent-sdk/cursor/canvas/hooks.d.ts
+@@ -1,4 +1,4 @@
+-import type { CanvasHostThemeBrand, CanvasPalette, CanvasTokens, ChartPalette } from "./canvas-tokens.js";
++import { type CanvasHostThemeBrand, type CanvasPalette, type CanvasTokens, type ChartPalette } from "./canvas-tokens.js";
+ import { type CanvasAction } from "./internal/canvas-action-dispatch.js";
+ import { type CanvasRadius, type CanvasTypography } from "./theme.js";
+ /**

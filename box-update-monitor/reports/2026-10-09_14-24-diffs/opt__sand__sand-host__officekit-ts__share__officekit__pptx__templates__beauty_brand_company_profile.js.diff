@@ -1,0 +1,896 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/beauty_brand_company_profile.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/beauty_brand_company_profile.js
+@@ -0,0 +1,893 @@
++/*
++ * "Demia — Beauty And Cosmetic": a 30-slide 16:9 template rebuilt with pptxgenjs.
++ * Every slide is a plain builder function; geometry is in inches, colours are hex.
++ * Raster photos / device mock-ups of the original are drawn as labelled placeholders.
++ *
++ *   node 070b2a49-dea4-40ae-bc3f-866cfd7db317_grok_final.js
++ */
++
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Theme — the source theme's palette, flattened to literal hex values
++ * ------------------------------------------------------------------ */
++
++const C = {
++  pink: 'FF7C80',        // accent1
++  pink2: 'FFA7A9',       // accent2
++  pink3: 'FFB9BB',       // accent3
++  pink4: 'FFCDCE',       // accent4
++  pinkPale: 'FFE5E6',    // accent1 @ 20% lum — empty star
++  blush: 'FFF5F5',       // accent4 @ 20% lum — full-height tint panels
++  pinkFaint: 'FFB7B9',   // accent1 @ 55% alpha on white — page chrome
++  pinkTrack: 'FFC0C2',   // white @ 52% alpha on pink — inverted bar track
++  white: 'FFFFFF',
++  dark: '1F1F1F',        // tx1
++  slate: '595959',       // tx2 — sub-heads
++  gray: '7F7F7F',        // accent6 — body copy
++  grayDark: '5F5F5F',    // accent6 @ 75% lum — pull quote
++  grayMid: '848484',     // tx1 @ 55% alpha on white — wordmark
++  grayLight: 'B2B2B2',   // accent6 @ 60/40 lum — strap-line
++  track: 'E5E5E5',       // accent6 @ 20/80 lum — progress-bar track
++  dash: 'CCCCCC',        // accent6 @ 40/60 lum — dashed connectors
++  ghost: 'F0F0F0',       // image placeholder fill
++  ghostEdge: 'BFBFBF'
++};
++
++const HEAD = 'Raleway SemiBold';   // theme major latin
++const BODY = 'Montserrat';         // theme minor latin
++const ICON = 'DejaVu Sans';        // pictographic glyphs
++
++const SUBTITLE = 'Beauty Solution For Everyone';
++const LOREM_S = 'Lorem adi pis cing elit. Viva mus vel euismod leo. Donec com conse ctetur adi pis';
++
++// PowerPoint's default text insets, in points: [left, right, bottom, top].
++const INSET = [7.2, 7.2, 3.6, 3.6];
++const SHADOW = { type: 'outer', blur: 10, offset: 1, angle: 90, color: '000000', opacity: 0.16 };
++
++/* ------------------------------------------------------------------ *
++ * Primitives
++ * ------------------------------------------------------------------ */
++
++// Text box. `runs` is a string or an array of pptxgenjs text objects.
++function T (s, runs, o) {
++  s.addText(runs, Object.assign({
++    fontFace: BODY, fontSize: 11, color: C.gray, valign: 'top', margin: INSET
++  }, o));
++}
++
++// Body copy: 11 pt grey, justified, 1.5 line spacing — the deck's workhorse.
++function body (s, x, y, w, h, text, o) {
++  T(s, text, Object.assign({ x, y, w, h, align: 'justify', lineSpacingMultiple: 1.5 }, o));
++}
++
++// 32 pt display headline. `runs` = [[text, color], ...]; a [null] entry breaks the line.
++function title (s, x, y, runs, o) {
++  const parts = [];
++  runs.forEach(([t, color]) => {
++    if (t === null) {
++      if (parts.length) parts[parts.length - 1].options.breakLine = true;
++    } else {
++      parts.push({ text: t, options: { color: color || C.dark } });
++    }
++  });
++  T(s, parts, Object.assign({ x, y, w: 5.333, h: 1.178, fontSize: 32, fontFace: HEAD, color: C.dark }, o));
++}
++
++// Grey strap-line printed under nearly every headline.
++function strap (s, x, y, o) {
++  T(s, SUBTITLE, Object.assign({ x, y, w: 2.493, h: 0.286, color: C.grayLight, wrap: false }, o));
++}
++
++// Small bold section label (14 pt).
++function label (s, x, y, w, h, text, o) {
++  T(s, text, Object.assign({
++    x, y, w, h, fontSize: 14, bold: true, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5
++  }, o));
++}
++
++function rect (s, x, y, w, h, color, o) {
++  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: { type: 'none' } }, o));
++}
++
++function hline (s, x, y, w, color, width) {
++  s.addShape('line', { x, y, w, h: 0, line: { color: color || C.pink, width: width || 0.5 } });
++}
++
++function vline (s, x, y, h, color, width) {
++  s.addShape('line', { x, y, w: 0, h, line: { color: color || C.pink, width: width || 0.5 } });
++}
++
++function dot (s, cx, cy, d, color, o) {
++  s.addShape('ellipse', Object.assign({ x: cx - d / 2, y: cy - d / 2, w: d, h: d, fill: { color }, line: { type: 'none' } }, o));
++}
++
++// Open circle drawn as a stroked ellipse so the ring weight is controllable.
++function ring (s, cx, cy, d, color, weight) {
++  s.addShape('ellipse', { x: cx - d / 2, y: cy - d / 2, w: d, h: d, fill: { type: 'none' }, line: { color, width: weight } });
++}
++
++// A pictographic character, centred in the given box.
++function glyph (s, cx, cy, size, ch, color) {
++  T(s, ch, {
++    x: cx - size, y: cy - size * 0.62, w: size * 2, h: size * 1.24,
++    fontFace: ICON, fontSize: size * 96, color, align: 'center', valign: 'middle', margin: 0
++  });
++}
++
++// Flat pictograms assembled from native shapes, used by the two infographic
++// slides. Coordinates are normalised to a 2 x 2 box that `icon()` scales and
++// centres, so each drawing below reads in units of -1 .. +1.
++const ICONS = {
++  camera (d, c) {
++    d.roundRect(-1, -1, 2, 2, 0.55, null, c, 0.16);
++    d.ring(0, 0, 0.95, c, 0.16);
++    d.dot(0.6, -0.62, 0.22, c);
++  },
++  chat (d, c) {
++    d.dot(-0.3, -0.25, 1.4, c);
++    d.dot(0.5, 0.4, 0.95, c);
++    d.dot(-0.5, 0.72, 0.3, c);
++  },
++  people (d, c) {
++    [[-0.72, 0.3], [0.72, 0.3], [0, -0.55]].forEach(([x, y]) => {
++      d.dot(x, y, 0.5, c);
++      d.roundRect(x - 0.38, y + 0.28, 0.76, 0.62, 0.26, c);
++    });
++    d.line(-0.72, -0.15, 1.44, 0, c, 0.09);
++    d.line(0, -0.15, 0, -0.3, c, 0.09);
++  },
++  hands (d, c) {          // handshake: two forearms rising to a central clasp
++    d.roundRect(-1.05, -0.05, 1.05, 0.42, 0.21, c, null, 0, -17);
++    d.roundRect(0, -0.05, 1.05, 0.42, 0.21, c, null, 0, 17);
++    d.roundRect(-0.42, -0.34, 0.84, 0.66, 0.28, c);
++    d.dot(0.14, -0.12, 0.38, c);
++  },
++  phone (d, c) {
++    d.roundRect(-0.95, -0.15, 1.1, 0.75, 0.32, c, null, 0, -35);
++    [0.55, 0.95].forEach((r, i) => d.arc(0.15, -0.35, r, -70, 30, c, 0.13 - i * 0.02));
++  },
++  money (d, c) {
++    d.roundRect(-0.82, -0.4, 1.64, 1.4, 0.55, c);
++    d.roundRect(-0.4, -0.95, 0.8, 0.6, 0.2, c);
++    d.text(0, 0.28, 0.62, '$', C.pink3);
++  },
++  chart (d, c) {
++    [[-0.72, 0.55], [0, 0.95], [0.72, 1.35]].forEach(([x, h]) => d.rect(x - 0.25, 1 - h, 0.5, h, c));
++    d.line(-0.85, -0.15, 1.75, -0.65, c, 0.13, true);
++  },
++  pencil (d, c) {
++    d.rect(-0.85, -1, 1.3, 2, c);
++    d.roundRect(0.25, -0.7, 0.38, 1.25, 0.1, c, null, 0, 38);
++    [-0.5, -0.1, 0.3].forEach(y => d.line(-0.55, y, 0.7, 0, C.pink3, 0.1));
++  },
++  gear (d, c) {           // a big cog with a smaller one meshed below-right
++    d.star8(-0.25, -0.25, 1.5, c);
++    d.dot(-0.25, -0.25, 0.5, C.pink3);
++    d.star8(0.62, 0.62, 0.85, c);
++    d.dot(0.62, 0.62, 0.28, C.pink3);
++  }
++};
++
++// Draws `kind` centred on (cx, cy); `k` is half the icon's width in inches.
++function icon (s, kind, cx, cy, k, color) {
++  const X = u => cx + u * k, Y = u => cy + u * k, L = u => u * k;
++  const d = {
++    rect: (x, y, w, h, c) => rect(s, X(x), Y(y), L(w), L(h), c),
++    roundRect: (x, y, w, h, r, fill, stroke, sw, rot) => s.addShape('roundRect', {
++      x: X(x), y: Y(y), w: L(w), h: L(h), rectRadius: L(r), rotate: rot || 0,
++      fill: fill ? { color: fill } : { type: 'none' },
++      line: stroke ? { color: stroke, width: L(sw) * 72 } : { type: 'none' }
++    }),
++    dot: (x, y, dia, c) => dot(s, X(x), Y(y), L(dia), c),
++    ring: (x, y, dia, c, sw) => ring(s, X(x), Y(y), L(dia), c, L(sw) * 72),
++    line: (x, y, w, h, c, sw, arrow) => s.addShape('line', {
++      x: X(x), y: Y(y), w: L(w), h: L(h),
++      line: { color: c, width: L(sw) * 72, endArrowType: arrow ? 'triangle' : 'none' }
++    }),
++    arc: (x, y, r, a0, a1, c, sw) => s.addShape('arc', {
++      x: X(x - r), y: Y(y - r), w: L(2 * r), h: L(2 * r),
++      angleRange: [(a0 + 360) % 360, (a1 + 360) % 360], fill: { type: 'none' },
++      line: { color: c, width: L(sw) * 72 }
++    }),
++    star8: (x, y, dia, c) => s.addShape('star8', {
++      x: X(x - dia / 2), y: Y(y - dia / 2), w: L(dia), h: L(dia), fill: { color: c }, line: { type: 'none' }
++    }),
++    text: (x, y, size, ch, c) => glyph(s, X(x), Y(y), L(size) / 2, ch, c)
++  };
++  ICONS[kind](d, color);
++}
++
++// Stand-in for a photograph / device mock-up. The rectangle covers the visible
++// artwork rather than the (often larger, transparent) picture frame.
++function photo (s, x, y, w, h) {
++  rect(s, x, y, w, h, C.ghost, { line: { color: C.ghostEdge, width: 0.75 } });
++  T(s, '[image]', { x, y: y + h / 2 - 0.15, w, h: 0.3, align: 'center', fontSize: 10, color: '9A9A9A' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Page chrome (the repeated header / footer marks)
++ * ------------------------------------------------------------------ */
++
++function chrome (s, opts) {
++  if (opts.logo) {
++    T(s, [
++      { text: 'De', options: { color: C.pinkFaint } },
++      { text: 'mia', options: { color: C.grayMid } }
++    ], { x: 0.562, y: 0.566, w: 0.591, h: 0.236, fontSize: 8, fontFace: HEAD, align: 'center', wrap: false });
++    hline(s, 0.661, 0.569, 0.615, C.pinkFaint);
++  }
++  if (opts.page) {
++    T(s, 'Page ' + opts.page, {
++      x: 12.231, y: 0.573, w: 0.518, h: 0.219, fontSize: 7, color: C.pinkFaint, align: 'center', wrap: false
++    });
++  }
++  if (opts.hdrline) hline(s, 9.646, 0.716, 2.585, C.pinkFaint);
++  if (opts.vrule) vline(s, 0.677, 5.516, 1.359, C.pinkFaint);
++  if (opts.foot) {
++    T(s, 'Beauty And Cosmetic', {
++      x: 11.633, y: 6.719, w: 1.117, h: 0.202, fontSize: 6, color: C.grayLight, align: 'right', wrap: false
++    });
++  }
++}
++
++/* ------------------------------------------------------------------ *
++ * Composite widgets
++ * ------------------------------------------------------------------ */
++
++// Rounded skill bar: caption, grey track, coloured fill, pointer and value flag.
++// Geometry is given explicitly because the source art is not strictly proportional.
++function skillBar (s, b) {
++  T(s, b.cap, { x: b.capX, y: b.capY, w: b.capW, h: 0.454, fontSize: 14, color: b.txt, align: 'justify', lineSpacingMultiple: 1.5 });
++  s.addShape('roundRect', { x: b.x, y: b.y, w: b.w, h: 0.219, rectRadius: 0.11, fill: { color: b.track }, line: { type: 'none' } });
++  s.addShape('roundRect', { x: b.x + 0.006, y: b.y, w: b.fill, h: 0.219, rectRadius: 0.11, fill: { color: b.fg }, line: { type: 'none' } });
++  s.addShape('triangle', { x: b.x + b.fill - 0.102, y: b.y - 0.273, w: 0.102, h: 0.088, rotate: 180, fill: { color: b.fg }, line: { type: 'none' } });
++  T(s, b.pct, {
++    x: b.x + b.fill - 0.051, y: b.y - 0.525, w: 0.865, h: 0.415, fontSize: 14, bold: true, color: b.fg,
++    align: 'justify', lineSpacingMultiple: 1.5
++  });
++}
++
++// The left half of a 5-point star, using the same proportions as the OOXML
++// `star5` preset so a half rating lines up with the whole stars beside it.
++function halfStar (s, x, y, size) {
++  const RX = 0.5257 * size, RY = 0.5527 * size, INNER = 0.382;
++  const at = i => {
++    const a = (-90 + i * 36) * Math.PI / 180, k = i % 2 ? INNER : 1;
++    return { x: size / 2 + RX * k * Math.cos(a), y: RY + RY * k * Math.sin(a) };
++  };
++  // Anticlockwise from the top point round to the bottom notch, then straight
++  // back up the vertical axis.
++  const pts = [0, 9, 8, 7, 6, 5].map(at);
++  s.addShape('custGeom', {
++    x, y, w: size, h: size, fill: { color: C.pink }, line: { type: 'none' },
++    points: [{ x: pts[0].x, y: pts[0].y, moveTo: true }].concat(pts.slice(1), [{ close: true }])
++  });
++}
++
++// `n` may end in .5, which draws a pale star with its left half filled in.
++function starRow (s, x, y, n) {
++  const size = 0.218;
++  for (let i = 0; i < Math.floor(n); i++) {
++    s.addShape('star5', { x: x + i * size, y, w: size, h: size, fill: { color: C.pink }, line: { type: 'none' } });
++  }
++  if (n % 1) {
++    const hx = x + Math.floor(n) * size;
++    s.addShape('star5', { x: hx, y, w: size, h: size, fill: { color: C.pinkPale }, line: { type: 'none' } });
++    halfStar(s, hx, y, size);
++  }
++}
++
++// Donut gauge: grey ring, pink progress arc from `start`, marker dot, centred percentage.
++// Angles are OOXML degrees (0 = 3 o'clock, growing clockwise); every arc ends at 260.09.
++function gauge (s, x, y, start, pctText) {
++  const d = 0.929, END = 260.09, THICK = 0.2516;
++  s.addShape('blockArc', {
++    x, y, w: d, h: d, rotate: 330, angleRange: [264.23, END], arcThicknessRatio: THICK,
++    fill: { color: C.track }, line: { type: 'none' }
++  });
++  s.addShape('blockArc', {
++    x, y, w: d, h: d, angleRange: [start, END], arcThicknessRatio: THICK,
++    fill: { color: C.pink }, line: { type: 'none' }
++  });
++  const a = start * Math.PI / 180, r = d / 2 * 0.874;
++  dot(s, x + d / 2 + r * Math.cos(a), y + d / 2 + r * Math.sin(a), 0.18, C.pink, { line: { color: C.white, width: 0.5 } });
++  T(s, pctText, { x: x - 0.009, y: y + 0.313, w: 0.963, h: 0.303, fontSize: 12, bold: true, color: C.pink, align: 'center' });
++}
++
++// Award rosette: a scalloped medal sitting over two splayed ribbon tails.
++function rosette (s, cx, cy, color, behind) {
++  [[-0.075, -22], [0.075, 22]].forEach(([dx, rot]) => {
++    s.addShape('rect', { x: cx + dx - 0.042, y: cy + 0.06, w: 0.084, h: 0.22, rotate: rot, fill: { color }, line: { type: 'none' } });
++  });
++  s.addShape('star16', { x: cx - 0.165, y: cy - 0.165, w: 0.33, h: 0.33, fill: { color }, line: { type: 'none' } });
++  dot(s, cx, cy, 0.2, behind);
++  dot(s, cx, cy, 0.1, color);
++}
++
++// Ordinal such as 1st / 2nd / 3rd with a raised suffix.
++function ordinal (n, suffix, tail, o) {
++  return [
++    { text: String(n), options: o },
++    { text: suffix, options: Object.assign({ superscript: true }, o) },
++    { text: tail, options: o }
++  ];
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides
++ * ------------------------------------------------------------------ */
++
++const build = [];
++
++// 1 — Cover
++build.push(s => {
++  rect(s, 5.689, 0, 6.005, 1.729, C.pink);
++  chrome(s, { logo: true });
++  s.addShape('rtTriangle', { x: 1.301, y: 2.211, w: 0.524, h: 0.524, flipV: true, fill: { color: C.pink }, line: { type: 'none' } });
++  T(s, [{ text: 'D E ' }, { text: 'M I A', options: { color: C.pink } }],
++    { x: 1.479, y: 2.473, w: 5.682, h: 1.582, fontSize: 88, fontFace: HEAD, color: C.dark });
++  T(s, 'BEAUTY SOLUTION FOR EVERYONE', { x: 1.542, y: 4.081, w: 3.773, h: 0.337, fontSize: 14, wrap: false });
++  hline(s, 1.479, 5.74, 3.0, C.pink, 3);
++  T(s, 'Lorem ipsum dolor sit amet, consectetur adipis cing elit, sed do eiusmod temp or inci didunt ut labore et dolore magna ',
++    { x: 3.075, y: 5.92, w: 3.591, h: 0.903, lineSpacingMultiple: 1.5 });
++});
++
++// 2 — Welcome
++build.push(s => {
++  rect(s, 1.646, 0.749, 3.042, 4.001, C.pink);
++  chrome(s, { foot: true });
++  title(s, 5.562, 3.123, [['Talk About Demia ', C.dark], [null], ['Beauty And Cosmetic', C.pink]]);
++  strap(s, 5.562, 4.301);
++  T(s, [
++    { text: '2022, ', options: { fontSize: 16, bold: true } },
++    { text: 'Welcome Message', options: { fontSize: 11 } }
++  ], { x: 5.562, y: 4.854, w: 3.634, h: 0.459, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
++  body(s, 5.562, 5.274, 6.021, 0.934,
++    'Lorem ipsum dolor sit amet, consectetur adipis cing elit, sed do eiusmod temp or incididunt ut labore et dolore magna ipsum dolor sit amet, con sectetur adipis cing elit, sed do eiusmod temp or incididunt ut');
++});
++
++// 3 — Project vision
++build.push(s => {
++  rect(s, 8.667, 0.769, 2.062, 4.001, C.pink);
++  title(s, 3.017, 1.549, [['Let\u2019s Talk About ', C.dark], [null], ['Demia Project Vision', C.pink]]);
++  strap(s, 3.017, 2.727);
++  body(s, 3.017, 3.315, 5.189, 0.934,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse ctetur adi pis cing elit. Vivamus ipsum dolor sit amet, consectetur adi pis cing elit. Vivamus vel euis mod leo. ');
++  [['Demia\u2019s Purpose', 3.238, 3.097, 3.017], ['Daily Activity', 6.042, 5.901, 5.821]].forEach(([txt, tx, bx, cx]) => {
++    T(s, txt, { x: tx, y: 4.55, w: 1.927, h: 0.37, fontSize: 12, bold: true, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
++    rect(s, bx, 4.707, 0.104, 0.104, C.pink);
++    body(s, cx, 5.017, 2.386, 0.934, LOREM_S);
++  });
++});
++
++// 4 — Mission
++build.push(s => {
++  rect(s, 0.646, 3.75, 2.104, 3.042, C.pink);
++  chrome(s, { page: 4, hdrline: true });
++  title(s, 5.556, 1.571, [['About Our Mission ', C.dark], ['To', C.pink], [' ', C.dark], ['Be Successful', C.pink]], { w: 4.09 });
++  strap(s, 5.556, 2.75);
++  [[5.688, '1', C.pink, C.white, 6.173], [9.021, '2', C.white, C.gray, 9.506]].forEach(([bx, num, fill, fg, tx]) => {
++    s.addShape('rect', { x: bx, y: 3.576, w: 0.347, h: 0.347, fill: { color: fill }, line: { type: 'none' }, shadow: SHADOW });
++    T(s, num, { x: bx, y: 3.62, w: 0.347, h: 0.26, fontSize: 11, color: fg, align: 'center', margin: 0 });
++    body(s, tx, 3.426, 2.384, 0.934, LOREM_S);
++  });
++});
++
++// 5 — Company history
++build.push(s => {
++  rect(s, 7.635, 2.688, 3.031, 3.125, C.pink);
++  chrome(s, { logo: true });
++  title(s, 1.484, 1.648, [['Know About Demia', C.dark], [null], ['Company History', C.pink]]);
++  strap(s, 1.484, 2.826);
++  body(s, 1.484, 3.421, 5.452, 0.934,
++    'Lorem ipsum dolor sit amet, consectetur adipis cing elit, sed do eiusmod temp or incididunt ut labore et dolore magna ipsum adipis cing elit, sed do eiusmod temp or incididunt ut labore et dolore ');
++  // calendar mark
++  s.addShape('rect', { x: 7.995, y: 3.38, w: 0.39, h: 0.346, fill: { type: 'none' }, line: { color: C.white, width: 1 } });
++  hline(s, 7.995, 3.49, 0.39, C.white, 1);
++  vline(s, 8.075, 3.309, 0.085, C.white, 1);
++  vline(s, 8.305, 3.309, 0.085, C.white, 1);
++  T(s, 'August, 2019', { x: 8.477, y: 3.315, w: 1.69, h: 0.37, fontSize: 12, bold: true, color: C.white, align: 'justify', lineSpacingMultiple: 1.5 });
++  [3.888, 4.535].forEach(y => {
++    T(s, 'Lorem ipsum dolor sit amet, con sectetur adipis cing elit, ', {
++      x: 7.875, y, w: 2.553, h: 0.656, color: C.white, align: 'justify', lineSpacingMultiple: 1.5,
++      bullet: { characterCode: '2713', indent: 13.5 }
++    });
++  });
++});
++
++// 6 — What we provide
++build.push(s => {
++  rect(s, 10.646, 0, 2.688, 7.5, C.blush);
++  rect(s, 0, 0, 1.708, 7.5, C.pink);
++  title(s, 4.49, 1.578, [['What We Provide ', C.dark], [null], ['To Our Customer ?', C.pink]]);
++  strap(s, 4.49, 2.756);
++  label(s, 4.49, 3.352, 2.038, 0.415, 'Description Here');
++  body(s, 4.49, 3.879, 5.333, 1.458,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse ctetur adi pis cing elit. Vivamus ipsum dolor sit amet, consectetur adi pis cing Vivamus vel euismod leo. Donec com conse ctetur Donec com conse ctetur adi pis cing elit. Vivamus ipsum dolor sit amet Donec com conse ctetur adi pis cing elit. Vivamus');
++  T(s, 'Read More.', { x: 4.49, y: 5.739, w: 1.19, h: 0.303, fontSize: 12, underline: { style: 'sng' }, color: C.pink2 });
++});
++
++// 7 — Meet the team
++build.push(s => {
++  chrome(s, { logo: true, vrule: true, page: 7, hdrline: true, foot: true });
++  T(s, [{ text: 'Meet Our ' }, { text: 'Professional', options: { color: C.pink } }],
++    { x: 2.634, y: 1.262, w: 8.201, h: 0.64, fontSize: 32, fontFace: HEAD, color: C.dark, align: 'center' });
++  strap(s, 5.488, 1.902);
++  const team = [
++    { first: 'Ella ', last: 'Rihana, ', role: 'CEO ', nx: 2.054, nw: 2.359, bx: 1.723, lx: 2.875 },
++    { first: 'Elaine ', last: 'Zara, ', role: 'Skincare Expert', nx: 4.74, nw: 3.854, bx: 5.156, lx: 6.308 },
++    { first: 'Samira ', last: 'Jen, ', role: 'Aesthetic Doctor', nx: 7.946, nw: 4.308, bx: 8.589, lx: 9.741 }
++  ];
++  team.forEach(m => {
++    T(s, [
++      { text: m.first, options: { fontSize: 16, bold: true, color: C.pink } },
++      { text: m.last, options: { fontSize: 16, color: C.slate } },
++      { text: m.role, options: { fontSize: 11, color: C.slate } }
++    ], { x: m.nx, y: 5.149, w: m.nw, h: 0.37, align: 'center' });
++    T(s, 'Lorem ipsum dolor sit amet, consec tetur adi pis cing',
++      { x: m.bx, y: 5.48, w: 3.021, h: 0.625, align: 'center', lineSpacingMultiple: 1.5 });
++    hline(s, m.lx, 6.342, 0.717, C.pink);
++  });
++});
++
++// 8 — CEO profile
++build.push(s => {
++  rect(s, 9.625, 2.708, 2.042, 4.0, C.pink);
++  chrome(s, { logo: true, vrule: true });
++  title(s, 1.553, 1.547, [['Let\u2019s Meet Our Amazing ', C.dark], ['CEO, Ella Rihana', C.pink]]);
++  strap(s, 1.553, 2.725);
++  body(s, 1.553, 3.347, 4.589, 0.934,
++    'Lorem ipsum dolor sit amet, consectetur adi pis cing elit. Vivamus vel euismod leo. Donec com amet, consectetur adi pis cing elit. Vivamus vel euismod leo. ');
++  skillBar(s, { x: 1.659, y: 4.951, w: 4.482, fill: 3.352, pct: '87%', cap: 'About Skill Ratio ', capX: 1.613, capY: 4.526, capW: 2.302, fg: C.pink, track: C.track, txt: C.slate });
++  skillBar(s, { x: 1.659, y: 5.734, w: 4.482, fill: 3.86, pct: '95%', cap: 'Work Experience', capX: 1.635, capY: 5.342, capW: 2.636, fg: C.pink, track: C.track, txt: C.slate });
++});
++
++// 9 — Skincare expert profile
++build.push(s => {
++  rect(s, 2.698, 0, 2.969, 3.75, C.pink);
++  chrome(s, { page: 9, hdrline: true });
++  title(s, 6.554, 1.598, [['Elaine Zara As ', C.dark], [null], ['Skincare Expert', C.pink]]);
++  strap(s, 6.554, 2.776);
++  body(s, 6.554, 3.351, 5.113, 0.934,
++    'Lorem ipsum dolor sit amet, consectetur adi pis cing elit. Vivamus vel euismod leo. Donec com amet, consectetur adi pis cing elit. Vivamus vel euismod leo. com amet, ');
++  skillBar(s, { x: 5.46, y: 5.173, w: 4.482, fill: 3.86, pct: '94%', cap: 'About Skill Ratio ', capX: 5.414, capY: 4.748, capW: 1.804, fg: C.pink, track: C.track, txt: C.slate });
++  skillBar(s, { x: 5.46, y: 5.956, w: 4.482, fill: 3.968, pct: '96%', cap: 'Work Experience', capX: 5.436, capY: 5.564, capW: 2.195, fg: C.pink, track: C.track, txt: C.slate });
++});
++
++// 10 — Aesthetic doctor profile (inverted)
++build.push(s => {
++  rect(s, 6.206, 0.771, 6.771, 6.021, C.pink);
++  title(s, 6.804, 1.555, [['Samira Jen As ', C.white], [null], ['Aesthetic Doctor', C.white]]);
++  strap(s, 6.804, 2.733, { color: C.white });
++  body(s, 6.804, 3.298, 5.333, 0.903,
++    'Lorem ipsum dolor sit amet, consectetur adi pis cing elit. Vivamus vel euismod leo. Donec com amet, consectetur adi pis cing elit. Vivamus vel euismod leo. consectetur adi pis cing elit. ',
++    { color: C.white });
++  skillBar(s, { x: 6.91, y: 5.006, w: 5.144, fill: 4.187, pct: '89%', cap: 'About Skill Ratio ', capX: 6.822, capY: 4.57, capW: 2.302, fg: C.white, track: C.pinkTrack, txt: C.white });
++  skillBar(s, { x: 6.91, y: 5.788, w: 5.144, fill: 4.604, pct: '95%', cap: 'Work Experience', capX: 6.843, capY: 5.386, capW: 2.636, fg: C.white, track: C.pinkTrack, txt: C.white });
++});
++
++// 11 — Services
++build.push(s => {
++  rect(s, 7.667, 0, 5.667, 7.5, C.blush);
++  chrome(s, { logo: true, vrule: true });
++  title(s, 1.578, 1.473, [['About Demia ', C.dark], [null], ['Service Here', C.pink]], { w: 3.314 });
++  strap(s, 1.594, 2.651);
++  [{ t: 'Healthy Skin ', tx: 1.589, ty: 3.449, tw: 3.795, by: 3.752, h: 0.934 },
++   { t: 'Makeup Use', tx: 1.557, ty: 4.916, tw: 2.184, by: 5.22, h: 0.903 }].forEach(it => {
++    T(s, it.t, { x: it.tx, y: it.ty, w: it.tw, h: 0.37, fontSize: 16, bold: true, color: C.slate });
++    body(s, it.tx, it.by, 3.795, it.h,
++      'Lorem ipsum dolor sit amet, consec tetur adi pis cing elit. Vivamus vel euismod leo. Lorem ipsum consec tetur adi pis cing elit. ');
++  });
++  [[1, 'st', 1.386, 1.69], [2, 'nd', 3.131, 3.435], [3, 'rd', 4.876, 5.18]].forEach(([n, sfx, ty, by]) => {
++    T(s, ordinal(n, sfx, ' Service', { fontSize: 16, bold: true, color: C.slate }), { x: 8.942, y: ty, w: 3.795, h: 0.37 });
++    body(s, 8.942, by, 3.458, 0.934,
++      'Lorem ipsum dolor sit amet, consec tetur adi pis cing elit. Vivamus vel euismod leo. Lorem ipsum consec tetur adi pis cing');
++  });
++});
++
++// 12 — Best service
++build.push(s => {
++  rect(s, 9.625, 0, 3.708, 7.5, C.blush);
++  rect(s, 1.625, 4.729, 6.062, 2.062, C.pink);
++  hline(s, 9.625, 5.623, 2.565, C.pink, 2.5);
++  title(s, 4.479, 1.265, [['We Provide', C.dark], [null], ['The Best Service', C.pink]], { align: 'center' });
++  strap(s, 5.899, 2.443, { align: 'center' });
++  T(s, 'Description Here', { x: 4.966, y: 3.126, w: 4.36, h: 0.454, fontSize: 14, bold: true, color: C.slate, align: 'center', lineSpacingMultiple: 1.5 });
++  T(s, 'Lorem ipsum dolor sit amet, consectetur adipis cing elit,  do eiusmod or incididunt ut labore et',
++    { x: 4.966, y: 3.503, w: 4.36, h: 0.656, align: 'center', lineSpacingMultiple: 1.5 });
++  [2.113, 4.652].forEach(x => {
++    T(s, 'Insert Title Here', {
++      x, y: 5.271, w: 2.547, h: 0.347, bold: true, color: C.white, align: 'justify', lineSpacingMultiple: 1.5,
++      bullet: { characterCode: '2713', indent: 22.5 }
++    });
++    T(s, 'Lorem ipsum dolor sit amet, consectetur adipis cing',
++      { x, y: 5.594, w: 2.368, h: 0.656, color: C.white, align: 'justify', lineSpacingMultiple: 1.5 });
++  });
++  T(s, [
++    { text: '2020', options: { fontSize: 20, bold: true, breakLine: true } },
++    { text: 'Best Make Up', options: { fontSize: 14 } }
++  ], { x: 11.101, y: 5.772, w: 1.709, h: 0.673, color: C.slate });
++});
++
++// 13 — Recommended services (star ratings)
++build.push(s => {
++  rect(s, 2.625, 0.792, 6.0, 2.958, C.pink);
++  title(s, 3.452, 1.161, [['Recommendation ', C.white], [null], ['Service By Demia ', C.white]], { w: 4.347 });
++  strap(s, 3.452, 2.339, { color: C.white });
++  body(s, 3.452, 2.724, 4.347, 0.656,
++    'Lorem ipsum dolor sit amet, consectetur adipis cing elit, sed do eiusmod temp or incididunt ut labore et', { color: C.white, italic: true });
++  body(s, 5.118, 4.235, 6.569, 0.934,
++    'Lorem ipsum dolor sit amet, consectetur adipis cing elit, sed do eiusmod temp or incididunt ut labore et dolore magna ipsum dolor sit amet, con sectetur adipis cing elit, sed do eiusmod temp or incididunt ut sit amet, con sectetur ');
++  [{ n: 1, tx: 5.118, ty: 5.392, sx: 7.305, sy: 5.491, stars: 4 },
++   { n: 2, tx: 5.118, ty: 5.906, sx: 7.305, sy: 6.005, stars: 3.5 },
++   { n: 3, tx: 8.632, ty: 5.392, sx: 10.819, sy: 5.491, stars: 3 },
++   { n: 4, tx: 8.632, ty: 5.906, sx: 10.819, sy: 6.005, stars: 4 }].forEach(p => {
++    label(s, p.tx, p.ty, 2.666, 0.454, 'Service Product ' + p.n);
++    starRow(s, p.sx, p.sy, p.stars);
++  });
++});
++
++// 14 — Gallery
++build.push(s => {
++  rect(s, 7.708, 0, 5.625, 7.5, C.pink);
++  title(s, 3.083, 1.436, [['Demia Beauty & ', C.dark], ['Cosmetic', C.pink], [' ', C.dark], ['Gallery', C.pink]], { w: 3.898 });
++  strap(s, 3.083, 2.558);
++  T(s, '+153K', { x: 3.083, y: 3.28, w: 1.521, h: 0.459, fontSize: 16, bold: true, color: C.pink, align: 'justify', lineSpacingMultiple: 1.5 });
++  T(s, 'Productions Value', { x: 3.083, y: 3.672, w: 3.12, h: 0.347, align: 'justify', lineSpacingMultiple: 1.5 });
++  body(s, 3.083, 4.176, 4.159, 0.934,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse ctetur adi pis cing elit. Vivamus ipsum dolor sit amet, consectetur adi pis');
++  body(s, 3.083, 5.184, 4.159, 0.656,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse ctetur adi pis cing elit. ');
++  [[1, 8.446, 8.041, 2.505, 2.872], [2, 11.254, 10.848, 2.505, 2.872],
++   [3, 8.446, 8.041, 5.636, 6.004], [4, 11.254, 10.848, 5.636, 6.004]].forEach(([n, hx, bx, hy, by]) => {
++    T(s, 'Project 0' + n, { x: hx, y: hy, w: 1.342, h: 0.415, fontSize: 14, bold: true, color: C.white, lineSpacingMultiple: 1.5 });
++    T(s, 'Lorem ipsum dolor sit amet, consectetur', { x: bx, y: by, w: 2.153, h: 0.656, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
++  });
++});
++
++// 15 — Implemented projects (donut gauges)
++build.push(s => {
++  rect(s, 1.656, 0, 2.885, 3.75, C.pink);
++  chrome(s, { page: 15, hdrline: true, foot: true });
++  title(s, 6.3, 1.42, [['Demia\u2019s Project That ', C.dark], [null], ['Has', C.pink], [' ', C.dark], ['Been Implemented', C.pink]]);
++  strap(s, 6.3, 2.598);
++  T(s, 'The Progress of Demia\u2019s Beauty and Cosmetic',
++    { x: 6.295, y: 3.163, w: 5.173, h: 0.37, fontSize: 12, bold: true, color: C.pink, align: 'justify', lineSpacingMultiple: 1.5 });
++  [{ x: 6.309, start: 338.8, pct: '80%', n: 1, sfx: 'st', lx: 6.271, ly: 4.865, tail: ' Aspects ' },
++   { x: 7.813, start: 28.09, pct: '64%', n: 2, sfx: 'nd', lx: 7.708, ly: 4.845, tail: ' Aspects ' },
++   { x: 9.253, start: 308.33, pct: '96%', n: 3, sfx: 'rd', lx: 9.247, ly: 4.821, tail: 'Aspects ' }].forEach(g => {
++    gauge(s, g.x, 3.874, g.start, g.pct);
++    T(s, ordinal(g.n, g.sfx, g.tail, { italic: true, color: C.gray, fontSize: 11 }),
++      { x: g.lx, y: g.ly, w: 1.438, h: 0.347, align: 'justify', lineSpacingMultiple: 1.5 });
++  });
++  body(s, 6.271, 5.257, 5.173, 0.934,
++    'Lorem ipsum dolor sit amet, consectetur adi pis cing elit. Vivam us vel euismod leo. Donec com amet, consectetur adipis cing elit. Vivamus vel euismod leo. Donec com amet, consec');
++});
++
++// 16 — Achievements
++build.push(s => {
++  rect(s, 7.667, 0.771, 5.667, 3.979, C.blush);
++  rect(s, 6.667, 3.75, 6.0, 2.042, C.pink);
++  chrome(s, { logo: true, vrule: true });
++  title(s, 1.563, 1.798, [['Achievement\u2019s', C.dark], [null], ['- On 2021', C.pink]]);
++  strap(s, 1.563, 2.976);
++  T(s, '90.83 %', { x: 1.565, y: 3.869, w: 1.271, h: 0.37, fontSize: 16, bold: true, color: C.pink });
++  s.addShape('line', { x: 2.621, y: 3.786, w: 0, h: 0.167, line: { color: C.pink, width: 0.75, beginArrowType: 'triangle' } });
++  body(s, 1.563, 4.214, 3.229, 1.489,
++    'Lorem ipsum dolor sit amet, consec tetur adi pis cing elit. Vivam us vel euis mod leo. Donec com amet, cons ctetur adipis cing elit. Vivamus vel euismod leo. Donec com amet, consec');
++  label(s, 8.906, 1.597, 3.442, 0.415, 'Insert Title Here');
++  body(s, 8.906, 2.098, 3.229, 1.212,
++    'Lorem ipsum dolor sit amet, consec tetur adi pis cing elit. Vivam us vel euis mod leo. Donec com amet, cons ctetur adipis cing elit. Vivamus vel');
++  [['01', 4.191, 4.214, 'Lorem ipsum dolor sit amet, consec tetur adi pis cing elit. Vivam us vel', 0.656],
++   ['02', 4.896, 4.919, 'Lorem ipsum dolor sit amet, consec', 0.379]].forEach(([num, ny, by, txt, h]) => {
++    label(s, 8.909, ny, 0.476, 0.454, num, { color: C.white });
++    body(s, 9.27, by, 3.115, h, txt, { color: C.white });
++  });
++});
++
++// 17 — 2022 targets
++build.push(s => {
++  rect(s, 0, 2.792, 7.458, 3.979, C.pink);
++  title(s, 1.262, 0.892, [['Target Project And ', C.dark], ['Movement On 2022', C.pink]], { w: 4.704 });
++  strap(s, 1.262, 2.07);
++  T(s, 'Description About Our Target', { x: 6.942, y: 1.038, w: 4.478, h: 0.37, fontSize: 12, bold: true, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
++  body(s, 6.942, 1.443, 5.129, 0.903,
++    'Lorem ipsum dolor sit amet, consectetur adi pis cing elit. Vivam us vel euismod leo. Donec com amet, consectetur adipis cing elit. Vivamus vel consectetur adi pis cing elit');
++  [{ m: 'February -', ly: 3.433, yy: 3.517, by: 3.821, h: 0.934, t: 'PLACEHOLDER' },
++   { m: 'November -', ly: 5.086, yy: 5.17, by: 5.473, h: 0.656, t: 'PLACEHOLDER' }].forEach(r => {
++    T(s, r.m, { x: 3.094, y: r.ly, w: 1.604, h: 0.37, fontSize: 16, bold: true, color: C.white });
++    T(s, '2022', { x: 4.562, y: r.yy, w: 1.333, h: 0.286, italic: true, color: C.white });
++    body(s, 3.094, r.by, 3.715, r.h, r.t, { color: C.white });
++  });
++});
++
++// 18 — Client testimony cards
++build.push(s => {
++  rect(s, 0.986, 3.411, 5.594, 2.667, C.pink);
++  s.addShape('rect', { x: 6.754, y: 3.411, w: 5.594, h: 2.667, fill: { color: C.white }, line: { type: 'none' }, shadow: SHADOW });
++  title(s, 1.527, 1.308, [['About Demia\u2019s', C.dark], [null], ['Clients Testimony', C.pink]], { w: 4.471 });
++  strap(s, 1.548, 2.507);
++  T(s, 'All Testimonials', { x: 7.307, y: 1.465, w: 1.623, h: 0.37, fontSize: 12, bold: true, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
++  body(s, 7.307, 1.87, 4.478, 0.934,
++    'Lorem ipsum dolor sit amet, consectetur adi pis cing elit. Vivam us vel euismod leo. Donec com amet, consectetur adipis cing elit. Vivamus vel');
++  T(s, [
++    { text: '7.8 ', options: { fontSize: 20, bold: true } },
++    { text: '/ 10', options: { fontSize: 11 } }
++  ], { x: 10.811, y: 1.318, w: 0.975, h: 0.549, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
++  [{ x: 3.005, name: 'Emma Nailson', c: C.white, card: C.pink, mx: 5.952 },
++   { x: 8.79, name: 'Sabila Ziudith', c: C.pink, bc: C.gray, card: C.white, mx: 11.747 }].forEach(t => {
++    label(s, t.x, 4.028, 1.997, 0.415, t.name, { color: t.c });
++    body(s, t.x, 4.527, 3.211, 0.934,
++      'Lorem ipsum dolor sit amet, consecte tur adi pis cingelit. Vivam us veladi pis cingelit. Vivam cingelit. Vivam ', { color: t.bc || C.white });
++    rosette(s, t.mx, 4.16, t.c, t.card);
++  });
++});
++
++// 19 — Testimony scores
++build.push(s => {
++  rect(s, 0, 3.75, 13.333, 3.75, C.blush);
++  chrome(s, { logo: true, page: 19, hdrline: true });
++  T(s, [{ text: 'Demia ' }, { text: 'Client Testimony', options: { color: C.pink } }],
++    { x: 2.634, y: 1.127, w: 8.201, h: 0.64, fontSize: 32, fontFace: HEAD, color: C.dark, align: 'center' });
++  strap(s, 5.488, 1.767);
++  [{ bx: 0.948, by: 5.158, h: 0.934, sx: 2.012, lx: 1.474, v: '5.9 ', t: 'Lorem ipsum dolor sit amet, consectetur adi pis cing elit. Vivam us vel euismod' },
++   { bx: 3.891, by: 5.158, h: 0.934, sx: 4.956, lx: 4.417, v: '8.1 ', t: 'Lorem ipsum dolor sit amet, consectetur adi pis cing elit. Vivam us vel euismod' },
++   { bx: 6.994, by: 5.437, h: 0.656, sx: 8.058, lx: 7.52, v: '9.9 ', t: 'Lorem ipsum dolor sit amet, consectetur adi pis cing' },
++   { bx: 9.963, by: 5.156, h: 0.934, sx: 11.027, lx: 10.489, v: '6.2 ', t: 'Lorem ipsum dolor sit amet, consectetur adi pis cing elit. Vivam us vel euismod' }].forEach(sc => {
++    T(s, sc.t, { x: sc.bx, y: sc.by, w: 2.365, h: sc.h, align: 'center', lineSpacingMultiple: 1.5 });
++    T(s, [
++      { text: sc.v, options: { fontSize: 16, bold: true } },
++      { text: '/ 10', options: { fontSize: 11 } }
++    ], { x: sc.sx, y: 5.999, w: 0.975, h: 0.459, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
++    hline(s, sc.lx, 6.281, 0.539, C.pink);
++  });
++});
++
++// 20 — Website search (phone mock-up)
++build.push(s => {
++  rect(s, 9.667, 3.75, 3.062, 3.75, C.pink);
++  photo(s, 8.067, 1.108, 3.614, 5.586);   // phone mock-up
++  chrome(s, { logo: true, vrule: true });
++  title(s, 1.46, 1.684, [['Search Demia Name, All ', C.dark], ['Information Will Appear', C.pink]]);
++  strap(s, 1.46, 2.862);
++  label(s, 1.46, 3.514, 2.038, 0.415, 'Visit Our Website');
++  body(s, 1.46, 4.04, 5.644, 0.934,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse cte tur adi pis cing elit. Vivamus ipsum dolor sit amet, consectetur adi pis cing Vivamus vel euismod leo. Donec com conse');
++  body(s, 1.46, 5.143, 5.644, 0.673,
++    '\u201C Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse cte tur adi pis cing elit. Vivamus ipsum dolor sit amet \u201C',
++    { fontSize: 12, bold: true, italic: true, color: C.pink });
++});
++
++// 21 — Tablet mock-ups
++build.push(s => {
++  rect(s, 1.667, 0, 3.062, 4.708, C.pink);
++  photo(s, 0.716, 1.736, 2.783, 4.121);   // tablet mock-ups
++  photo(s, 3.857, 1.736, 2.783, 4.121);
++  chrome(s, { page: 21, hdrline: true, foot: true });
++  title(s, 7.17, 1.7, [['Phone Makes Easier ', C.dark], [null], ['To Find The Product', C.pink]], { w: 5.578 });
++  strap(s, 7.17, 2.878);
++  // "24 hours" badge
++  ring(s, 7.518, 4.013, 0.4, C.pink, 1.5);
++  T(s, '24', { x: 7.318, y: 3.895, w: 0.4, h: 0.24, fontSize: 9, bold: true, color: C.pink, align: 'center', margin: 0 });
++  // "community" mark: three heads over a bar
++  [-0.12, 0, 0.12].forEach((dx, i) => dot(s, 7.551 + dx, 5.245 + (i === 1 ? -0.04 : 0.02), 0.11, C.pink));
++  s.addShape('roundRect', { x: 7.351, y: 5.35, w: 0.4, h: 0.16, rectRadius: 0.08, fill: { color: C.pink }, line: { type: 'none' } });
++  [3.545, 4.866].forEach((y, i) => {
++    body(s, i ? 7.865 : 7.861, y, 3.892, i ? 0.934 : 0.903,
++      'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse cte tur adi pis cing elit. Vivamus ipsum dolor sit amet, consectetur');
++  });
++});
++
++// 22 — Website features (laptop mock-up)
++build.push(s => {
++  rect(s, 7.625, 0, 3.042, 4.708, C.pink);
++  photo(s, 8.077, 3.131, 4.597, 2.682);
++  chrome(s, { logo: true, vrule: true });
++  title(s, 1.559, 1.577, [['Let\u2019s Find Out What ', C.dark], [null], ['In Our Website', C.pink]]);
++  strap(s, 1.559, 2.755);
++  [[1.909, 3.548, 1.662, 3.693], [4.72, 3.548, 4.473, 3.693],
++   [1.903, 4.952, 1.656, 5.097], [4.714, 4.952, 4.467, 5.097]].forEach(([tx, ty, bx, by]) => {
++    rect(s, bx, by, 0.124, 0.124, C.pink);
++    label(s, tx, ty, 2.384, 0.415, 'Insert Title Here', { color: C.pink });
++    body(s, tx, ty + 0.418, 2.384, 0.656, 'Lorem adi pis cing elit. Viva mus vel euismod leo. ');
++  });
++  T(s, 'You Can Access Our Social Media With Any Device',
++    { x: 7.789, y: 2.081, w: 2.713, h: 0.673, fontSize: 12, bold: true, italic: true, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
++});
++
++// 23 — Desktop mock-up
++build.push(s => {
++  rect(s, 0.646, 0, 3.104, 4.771, C.pink);
++  photo(s, 1.317, 2.608, 4.77, 3.965);    // desktop mock-up
++  chrome(s, { page: 23, hdrline: true, foot: true });
++  title(s, 6.519, 1.491, [['Demia Computer', C.dark], [' ', C.pink], [null], ['Device Mokcup Present', C.pink]]);
++  strap(s, 6.519, 2.669);
++  T(s, 'Social Media Analysis', { x: 6.519, y: 3.233, w: 5.333, h: 0.459, fontSize: 16, bold: true, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
++  body(s, 6.519, 3.803, 5.333, 1.212,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec adi piscom conse ctetur adi pis cing elit. Vivamus ipsum dolor sit amet, consectetur com conse ctetur adi pis cing elit. Vivamus dolor sit amet, consectetur com conse ctetur adi pis cing elit. Vivamus');
++  [['+153K', 'Visitor Per Month ', 6.519, 1.675], ['$ 72.981', 'Income From Insight', 8.533, 1.918]].forEach(([big, small, x, sw]) => {
++    T(s, big, { x, y: 5.239, w: 1.521, h: 0.459, fontSize: 16, bold: true, color: C.pink, align: 'justify', lineSpacingMultiple: 1.5 });
++    T(s, small, { x, y: 5.63, w: sw, h: 0.379, align: 'justify', lineSpacingMultiple: 1.5 });
++  });
++});
++
++// 24 — Infographic pills
++build.push(s => {
++  chrome(s, { logo: true, vrule: true });
++  T(s, [{ text: 'Our ' }, { text: 'Infographic', options: { color: C.pink } }],
++    { x: 1.319, y: 2.062, w: 3.734, h: 0.64, fontSize: 32, fontFace: HEAD, color: C.dark });
++  strap(s, 1.319, 2.723);
++  body(s, 1.323, 3.391, 3.994, 1.212,
++    'Lorem ipsum dolor sit amet, consec tetur adi pis cing elit. Vivam us vel euis mod leo. Donec com amet, cons ctetur adipis cing elit. Vivamus vel euismod leo. Donec com amet, consec');
++  body(s, 1.323, 4.782, 3.994, 0.656,
++    'Lorem ipsum dolor sit amet, consec tetur adi pis cing elit. Vivam us vel euis mod leo. Donec');
++  [{ y: 1.277, h: 1.214, fill: C.pink4, ty: 1.389, by: 1.721, arrow: 1.883, icon: 'camera' },
++   { y: 2.577, h: 1.214, fill: C.pink3, ty: 2.689, by: 3.021, arrow: 3.183, icon: 'chat' },
++   { y: 3.878, h: 1.21, fill: C.pink2, ty: 3.988, by: 4.321, arrow: 4.483, icon: 'people' },
++   { y: 5.158, h: 1.065, fill: C.pink, ty: 5.197, by: 5.529, arrow: 5.691, icon: 'hands' }].forEach(p => {
++    s.addShape('roundRect', { x: 5.657, y: p.y, w: 2.019, h: p.h, rectRadius: 0.5, fill: { color: p.fill }, line: { type: 'none' } });
++    icon(s, p.icon, 6.666, p.y + p.h / 2, 0.235, C.white);
++    s.addShape('line', {
++      x: 7.608, y: p.arrow, w: 1.167, h: 0,
++      line: { color: C.dash, width: 1.5, dashType: 'lgDash', endArrowType: 'triangle' }
++    });
++    label(s, 9.044, p.ty, 2.966, 0.415, 'Subtitle Here', { color: p.fill });
++    body(s, 9.044, p.by, 2.966, 0.656, 'Lorem ipsum dolor sit amet, consec tetur adi pis cing elit. Vivam us');
++  });
++});
++
++// 25 — Puzzle-ring infographic
++build.push(s => {
++  chrome(s, { page: 25, hdrline: true, foot: true });
++  // A six-piece jigsaw ring. Angles are OOXML degrees: 0 = 3 o'clock, clockwise;
++  // each piece spans 60 deg and pushes a round tab into the piece after it.
++  const cx = 3.853, cy = 3.751, d = 4.573;
++  const polar = (ang, r) => [cx + r * Math.cos(ang * Math.PI / 180), cy + r * Math.sin(ang * Math.PI / 180)];
++  const pieces = [
++    { start: 207, color: C.pink, icon: 'phone' },   // top-left     — call us
++    { start: 267, color: C.pink2, icon: 'people' }, // top-right    — our team
++    { start: 327, color: C.pink3, icon: 'money' },  // right        — revenue
++    { start: 27, color: C.pink4, icon: 'chart' },   // bottom-right — growth
++    { start: 87, color: C.pink, icon: 'pencil' },   // bottom-left  — reports
++    { start: 147, color: C.pink3, icon: 'gear' }    // left         — process
++  ];
++  pieces.forEach(p => {
++    s.addShape('blockArc', {
++      x: cx - d / 2, y: cy - d / 2, w: d, h: d,
++      angleRange: [p.start, (p.start + 60) % 360], arcThicknessRatio: 0.537,
++      fill: { color: p.color }, line: { color: C.white, width: 3.5 }
++    });
++  });
++  // Each piece pushes a round jigsaw tab across the boundary into the next one.
++  pieces.forEach(p => {
++    const [kx, ky] = polar(p.start + 66, 1.66);
++    dot(s, kx, ky, 0.45, p.color, { line: { color: C.white, width: 3.5 } });
++  });
++  pieces.forEach(p => {
++    const [ix, iy] = polar(p.start + 30, 1.69);
++    icon(s, p.icon, ix, iy, 0.18, C.white);
++  });
++  T(s, '2022', { x: cx - 0.857, y: cy - 0.253, w: 1.713, h: 0.505, fontSize: 24, bold: true, color: C.dark, align: 'center' });
++  T(s, [{ text: 'Demia\u2019s ' }, { text: 'Infographic', options: { color: C.pink } }],
++    { x: 6.897, y: 1.634, w: 5.333, h: 0.64, fontSize: 32, fontFace: HEAD, color: C.dark });
++  strap(s, 6.897, 2.295);
++  [2.909, 3.727, 4.545].forEach(y => {
++    T(s, 'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse cte tur adi pis cing elit. Vivamus ipsum dolor', {
++      x: 6.897, y, w: 4.735, h: 0.625, align: 'justify', lineSpacingMultiple: 1.5,
++      bullet: { characterCode: '2713', indent: 13.5 }
++    });
++  });
++  T(s, 'Another Information.', {
++    x: 6.897, y: 5.496, w: 4.735, h: 0.37, fontSize: 12, bold: true, underline: { style: 'sng' },
++    color: C.pink, align: 'justify', lineSpacingMultiple: 1.5
++  });
++});
++
++// 26 — Timeline 01
++build.push(s => {
++  rect(s, 3.93, 3.735, 9.404, 0.088, C.pink);
++  chrome(s, { logo: true, vrule: true });
++  T(s, [{ text: 'Demia ' }, { text: 'Timelines 01', options: { color: C.pink } }],
++    { x: 2.634, y: 1.245, w: 8.201, h: 0.64, fontSize: 32, fontFace: HEAD, color: C.dark, align: 'center' });
++  strap(s, 5.488, 1.885);
++  label(s, 2.634, 5.03, 2.966, 0.415, 'We Post In Social Media', { color: C.pink });
++  body(s, 2.634, 5.516, 3.892, 0.903,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse cte tur adi pis cing elit. Vivamus ipsum dolor sit amet, consectetur');
++  label(s, 7.66, 5.03, 2.966, 0.454, 'Controlling The Insight');
++  body(s, 7.66, 5.516, 3.892, 0.656,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse cte tur adi pis cing');
++});
++
++// 27 — Timeline 02
++build.push(s => {
++  rect(s, 0, 3.735, 9.404, 0.088, C.pink);
++  chrome(s, { page: 27, hdrline: true });
++  T(s, [{ text: 'Demia ' }, { text: 'Timelines 02', options: { color: C.pink } }],
++    { x: 2.634, y: 1.245, w: 8.201, h: 0.64, fontSize: 32, fontFace: HEAD, color: C.dark, align: 'center' });
++  strap(s, 5.488, 1.885);
++  label(s, 1.532, 5.156, 2.966, 0.415, 'Analysis, Increase Insight');
++  body(s, 1.532, 5.642, 3.615, 0.903,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse cte tur adi pis cing elit. Vivamus ipsum dolor sit');
++  T(s, '98.2 %', { x: 6.625, y: 5.156, w: 1.235, h: 0.459, fontSize: 16, bold: true, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
++  s.addShape('rightArrow', { x: 7.444, y: 5.185, w: 0.18, h: 0.121, rotate: 270, fill: { color: C.pink }, line: { type: 'none' } });
++  T(s, 'There is an Increase', { x: 7.705, y: 5.179, w: 2.281, h: 0.415, fontSize: 14, color: C.slate, align: 'justify', lineSpacingMultiple: 1.5 });
++  body(s, 6.625, 5.642, 4.091, 0.903,
++    'Lorem adi pis cing elit. Vivamus vel euismod leo. Donec com conse cte tur adi pis cing elit. Vivamus ipsum dolor sit amet, consectetur');
++});
++
++// 28 — Pull quote
++build.push(s => {
++  rect(s, 3.667, 1.708, 3.0, 5.073, C.pink);
++  chrome(s, { page: 28, hdrline: true, foot: true });
++  T(s, [
++    { text: '\u201CMakeup is not a mask that covers up your beauty; it\u2019s a weapon that helps you express who you are from the inside\u201D ', options: { italic: true, color: C.grayDark } },
++    { text: '- ', options: { bold: true, italic: true, color: C.grayDark } },
++    { text: 'Michelle Phan', options: { bold: true, color: C.pink } }
++  ], { x: 7.107, y: 2.73, w: 5.383, h: 2.573, fontSize: 20, lineSpacingMultiple: 1.5 });
++});
++
++// 29 — Contact
++build.push(s => {
++  rect(s, 0.646, 0.719, 10.104, 6.062, C.pink);
++  title(s, 1.838, 1.469, [['About Demia\u2019s Contact Information', C.white]], { w: 4.829 });
++  strap(s, 1.838, 2.647, { color: C.white });
++  [{ ringY: 3.227, hy: 3.212, head: 'Phone Number', by: 3.582, bw: 3.215, bh: 0.348, icon: '\u260E',
++     lines: ['+11 1029 1231 11/  (0002) 221133 144'] },
++   { ringY: 4.192, hy: 4.152, head: 'E-mail Address', by: 4.522, bw: 3.423, bh: 0.379, icon: '\u2709',
++     lines: ['demiabeautyandcosmetic@domain.com'] },
++   { ringY: 5.158, hy: 5.004, head: 'Offices Location', by: 5.375, bw: 3.637, bh: 0.625, icon: 'pin',
++     lines: ['3rd Floor, Demia Building, Sidney Streets,', 'Australia, 153T 2Fh'] }].forEach(c => {
++    const cx = 2.199, cy = c.ringY + 0.376;
++    ring(s, cx, cy, 0.66, C.white, 7);
++    if (c.icon === 'pin') {
++      dot(s, cx, cy - 0.04, 0.2, C.white);
++      s.addShape('triangle', { x: cx - 0.075, y: cy + 0.03, w: 0.15, h: 0.17, rotate: 180, fill: { color: C.white }, line: { type: 'none' } });
++      dot(s, cx, cy - 0.045, 0.07, C.pink);
++    } else {
++      glyph(s, cx, cy, 0.17, c.icon, C.white);
++    }
++    T(s, c.head, { x: 2.792, y: c.hy, w: 2.296, h: 0.462, fontSize: 16, bold: true, color: C.white, lineSpacingMultiple: 1.5 });
++    T(s, c.lines.map((t, k) => ({ text: t, options: { breakLine: k < c.lines.length - 1 } })),
++      { x: 2.792, y: c.by, w: c.bw, h: c.bh, color: C.white, lineSpacingMultiple: 1.5 });
++  });
++});
++
++// 30 — Thanks
++build.push(s => {
++  rect(s, 5.689, 0, 6.005, 1.729, C.pink);
++  chrome(s, { logo: true });
++  s.addShape('rtTriangle', { x: 1.301, y: 2.211, w: 0.524, h: 0.524, flipV: true, fill: { color: C.pink }, line: { type: 'none' } });
++  T(s, [{ text: 'T H A ' }, { text: 'N K S', options: { color: C.pink } }],
++    { x: 1.479, y: 2.64, w: 5.682, h: 1.313, fontSize: 72, fontFace: HEAD, color: C.dark });
++  T(s, 'AND TIME TO SAY SEE YOU NEST TIME', { x: 1.542, y: 4.081, w: 4.018, h: 0.337, fontSize: 14, wrap: false });
++  hline(s, 1.479, 5.74, 3.0, C.pink, 3);
++  T(s, 'Lorem ipsum dolor sit amet, consectetur adipis cing elit, sed do eiusmod temp or inci didunt ut labore et dolore magna ',
++    { x: 3.075, y: 5.92, w: 3.591, h: 0.903, lineSpacingMultiple: 1.5 });
++});
++
++/* ------------------------------------------------------------------ *
++ * Assemble & write
++ * ------------------------------------------------------------------ */
++
++function main () {
++  const pptx = new PptxGenJS();
++  pptx.defineLayout({ name: 'DEMIA_16x9', width: 13.333, height: 7.5 });
++  pptx.layout = 'DEMIA_16x9';
++  pptx.author = 'Demia';
++  pptx.title = 'Demia \u2014 Beauty And Cosmetic';
++
++  build.forEach(fn => {
++    const slide = pptx.addSlide();
++    slide.background = { color: C.white };
++    fn(slide);
++  });
++
++  const out = path.join(__dirname, '070b2a49-dea4-40ae-bc3f-866cfd7db317_grok_final.pptx');
++  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote ' + out));
++}
++
++main();

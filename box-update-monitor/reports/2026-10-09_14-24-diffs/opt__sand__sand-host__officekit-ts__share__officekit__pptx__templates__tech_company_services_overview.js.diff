@@ -1,0 +1,1257 @@
+--- 2026-10-09_14-11:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tech_company_services_overview.js
++++ 2026-10-09_14-24:/opt/sand/sand-host/officekit-ts/share/officekit/pptx/templates/tech_company_services_overview.js
+@@ -0,0 +1,1254 @@
++/**
++ * Kuloa - Technology Presentation.  42 slides, 13.333 x 7.5 in.
++ * Rebuilt from scratch with pptxgenjs (no external assets).
++ *
++ * Images: the source deck's picture placeholders are all empty - they render
++ * as nothing - so they are simply not drawn here.  The three real raster
++ * photos (device mock-ups on slides 23-25) are replaced by flat vector
++ * stand-ins built from native shapes; no bitmap data is embedded.
++ */
++'use strict';
++
++const path = require('path');
++const PptxGenJS = require('pptxgenjs');
++
++/* ------------------------------------------------------------------ *
++ * Theme palette (from the deck's "Kuloa-Presentation-Light" scheme)
++ * ------------------------------------------------------------------ */
++const C = {
++  white: 'FFFFFF',
++  cream: 'EFE7D9',   // accent1
++  blue: '3733A2',    // accent2
++  lilac: 'D2D0F0',   // accent3
++  orange: 'FA8905',  // accent4
++  peach: 'FEE1BE',   // accent5
++  tan: 'DECEB2',     // accent6
++  ink: '262626',
++  dark: '404040',
++  mid: '595959',
++  gray: '808080',
++  rule: 'BFBFBF',
++  rule2: 'A6A6A6',
++  bezel: '1B1B1B',
++  skin: 'E8C4A8'
++};
++const SERIF = 'PT Serif';
++const SANS = 'Source Sans Pro';
++const NOLINE = { type: 'none' };
++const WWW = 'W   W   W   .   K   U   L   O   A   .   C   O   M';
++
++/* Boilerplate body copy reused verbatim on several slides. */
++const PROACTIVE = 'Proactively envisioned multimedia based expertise and cross-media growth ' +
++  'strategies. Seamlessly visualize quality intellectual capital without superior collaboration ';
++const PROACTIVE_NETWORKS = PROACTIVE +
++  'and idea-sharing interactively networks without scrambled it to make.';
++const PROACTIVE_SHARING = PROACTIVE + 'and idea-sharing interactively.';
++const GLOBAL_BALLPARK = 'Globally incubate standards compliant channels before scalable ' +
++  'PLACEHOLDER' +
++  'empowered markets.';
++
++const pptx = new PptxGenJS();
++
++/* ------------------------------------------------------------------ *
++ * Generic helpers
++ * ------------------------------------------------------------------ */
++function shape(slide, kind, o) {
++  slide.addShape(kind, Object.assign({ line: NOLINE }, o));
++}
++
++/** Solid rectangle. */
++function box(slide, x, y, w, h, color, transparency) {
++  shape(slide, pptx.ShapeType.rect,
++    { x, y, w, h, fill: Object.assign({ color }, transparency ? { transparency } : {}) });
++}
++
++/** Solid ellipse. */
++function oval(slide, x, y, w, h, color) {
++  shape(slide, pptx.ShapeType.ellipse, { x, y, w, h, fill: { color } });
++}
++
++/** Rounded rectangle. */
++function round(slide, x, y, w, h, color, radius) {
++  shape(slide, pptx.ShapeType.roundRect,
++    { x, y, w, h, fill: { color }, rectRadius: radius === undefined ? 0.09 : radius });
++}
++
++/** Straight rule; `o` may add dashType / beginArrowType / endArrowType. */
++function line(slide, x, y, w, h, color, width, o) {
++  slide.addShape(pptx.ShapeType.line,
++    { x, y, w, h, line: Object.assign({ color, width }, o || {}) });
++}
++
++/** Free polygon; `pts` are [u,v] fractions of the w x h bounding box. */
++function poly(slide, o) {
++  slide.addShape(pptx.ShapeType.custGeom, {
++    x: o.x, y: o.y, w: o.w, h: o.h,
++    fill: Object.assign({ color: o.color }, o.transparency ? { transparency: o.transparency } : {}),
++    line: NOLINE,
++    points: o.pts.map(p => ({ x: +(o.w * p[0]).toFixed(4), y: +(o.h * p[1]).toFixed(4) }))
++      .concat([{ close: true }])
++  });
++}
++
++/** Text box. Deck defaults: Source Sans Pro, no inset, top aligned. */
++function text(slide, body, o) {
++  slide.addText(body, Object.assign({
++    fontFace: SANS, margin: 0, valign: 'top', isTextBox: true, autoFit: false
++  }, o));
++}
++
++/* ------------------------------------------------------------------ *
++ * Deck-specific building blocks
++ * ------------------------------------------------------------------ */
++
++/** PT Serif headline; one array entry per line, 36pt / 40pt leading. */
++function title(slide, o) {
++  text(slide, (o.lines || [o.line]).map((t, i, a) => ({
++    text: t, options: { breakLine: i < a.length - 1 }
++  })), {
++    x: o.x, y: o.y, w: o.w, h: o.h || 0.561,
++    fontFace: SERIF, fontSize: o.size || 36, color: o.color || C.ink,
++    align: o.align || 'left', valign: o.valign || 'middle', lineSpacing: o.leading || 40
++  });
++}
++
++/** Grey body copy at 1.5 line spacing. */
++function para(slide, body, o) {
++  text(slide, body, Object.assign({
++    fontSize: 10, color: C.gray, lineSpacingMultiple: 1.5
++  }, o));
++}
++
++/** Bold sub-heading. */
++function head(slide, body, o) {
++  text(slide, body, Object.assign({ fontSize: 14, bold: true, color: C.mid }, o));
++}
++
++/** 0.6 x 0.3 accent chip that bleeds off the left or right slide edge. */
++function chip(slide, x, y, color) {
++  box(slide, x, y, 0.6, 0.3, color);
++}
++
++/** Letter-spaced website line; pass rotate:270 for the vertical variant. */
++function www(slide, o) {
++  text(slide, WWW, Object.assign({
++    fontSize: 9, color: C.gray, h: 0.151, align: 'left'
++  }, o));
++}
++
++/**
++ * Flat stand-in for a device photograph, given the outer bezel rectangle and
++ * the inner screen rectangle measured off the original image.
++ */
++function device(slide, bezel, screen) {
++  round(slide, bezel.x, bezel.y, bezel.w, bezel.h, C.bezel, bezel.r === undefined ? 0.12 : bezel.r);
++  box(slide, screen.x, screen.y, screen.w, screen.h, C.white);
++  const cx = bezel.x + bezel.w / 2;
++  oval(slide, cx - 0.055, screen.y + screen.h + (bezel.y + bezel.h - screen.y - screen.h) / 2 - 0.055,
++    0.11, 0.11, '3A3A3A');
++  oval(slide, cx - 0.03, bezel.y + (screen.y - bezel.y) / 2 - 0.03, 0.06, 0.06, '3A3A3A');
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 1 - cover
++ * ------------------------------------------------------------------ */
++function slide01() {
++  const s = pptx.addSlide();
++  box(s, 0, 0, 13.333, 7.5, C.cream);
++  box(s, 0, 3.75, 0.6, 3.75, C.blue);
++  box(s, 12.733, 3.45, 0.6, 0.6, C.blue);
++
++  // "69 ISSUE" set on its side up the right-hand edge
++  text(s, '69', { x: 11.457, y: 0.726, w: 0.852, h: 0.606, rotate: 270,
++    fontSize: 36, bold: true, color: C.blue, align: 'right' });
++  text(s, 'ISSUE', { x: 11.772, y: 0.927, w: 1.318, h: 0.606, rotate: 270,
++    fontSize: 36, bold: true, color: C.blue, align: 'right' });
++
++  www(s, { x: 10.856, y: 5.512, w: 2.6, rotate: 270, fontSize: 10, color: C.blue });
++  text(s, 'Technology Presentation',
++    { x: 0.6, y: 0.6, w: 2.878, h: 0.269, fontSize: 16, bold: true, color: C.blue });
++  title(s, { x: 2.353, y: 2.406, w: 4.374, h: 1.122, line: 'KULOA',
++    size: 72, color: C.blue, leading: 80 });
++  text(s, 'Your Introduce Goes Here',
++    { x: 2.353, y: 4.183, w: 4.374, h: 0.303, fontSize: 18, bold: true, color: C.blue });
++  para(s, 'PLACEHOLDER' +
++    'extensible testing fruit to identify a ballpark value B2C users.',
++    { x: 2.353, y: 4.616, w: 4.374, h: 0.478, color: C.blue });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 2 - intro
++ * ------------------------------------------------------------------ */
++function slide02() {
++  const s = pptx.addSlide();
++  title(s, { x: 1.117, y: 2.526, w: 4.497, h: 1.122, lines: ['We are at your', 'Tech service'] });
++  para(s, 'Interactively coordinate proactive via process centric outside the box  thinking ' +
++    'pursue scalable customer service through. Collaboratively administrate empowered markets ' +
++    'networks without scrambled it to make a type process centric with great test.',
++    { x: 1.117, y: 3.991, w: 4.028, h: 0.983 });
++  chip(s, 0, 2.526, C.blue);
++
++  // white-ringed badge holding a small "office" glyph
++  shape(s, pptx.ShapeType.flowChartConnector, { x: 6.131, y: 3.214, w: 1.072, h: 1.072,
++    fill: { color: C.blue }, line: { color: C.white, width: 10 } });
++  box(s, 6.477, 3.62, 0.38, 0.33, C.white);
++  box(s, 6.53, 3.55, 0.26, 0.08, C.white);
++  box(s, 6.60, 3.76, 0.13, 0.19, C.blue);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 3 - hardware / software
++ * ------------------------------------------------------------------ */
++function slide03() {
++  const s = pptx.addSlide();
++  poly(s, { x: 5.97, y: 1.92, w: 7.363, h: 3.825, color: C.orange,
++    pts: [[1, 0], [0, 0], [0.1331, 1], [1, 1]] });
++  title(s, { x: 1.113, y: 1.755, w: 3.745, h: 1.683, valign: 'top',
++    lines: ['Hardware. Software. Anywhere.'] });
++  para(s, GLOBAL_BALLPARK, { x: 1.113, y: 5.014, w: 3.745, h: 0.731 });
++  chip(s, 0, 1.77, C.orange);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 4 - service content
++ * ------------------------------------------------------------------ */
++const SERVICES_4 = [
++  { x: 0.984, no: '01', color: C.blue, numColor: C.white, w: 2.388, name: 'Information Technology' },
++  { x: 5.038, no: '02', color: C.tan, numColor: C.dark, w: 2.527, name: 'Communication Technology' },
++  { x: 9.093, no: '03', color: C.orange, numColor: C.white, w: 2.388, name: 'Transportation Technology' }
++];
++
++function slide04() {
++  const s = pptx.addSlide();
++  poly(s, { x: 4.565, y: 1.531, w: 8.768, h: 3.021, color: C.tan,
++    pts: [[0, 0], [1, 0], [1, 1], [0.0861, 1]] });
++  title(s, { x: 0.984, y: 1.42, w: 3.016, h: 1.122, lines: ['Our Service', 'Content'] });
++  chip(s, 0, 1.422, C.tan);
++  para(s, 'PLACEHOLDER' +
++    'extensible testing fruit to identify a ballpark.',
++    { x: 0.984, y: 3.821, w: 2.668, h: 0.731 });
++
++  SERVICES_4.forEach(it => {
++    round(s, it.x, 5.654, 0.613, 0.61, it.color);
++    text(s, it.no, { x: it.x + 0.056, y: 5.824, w: 0.5, h: 0.269,
++      fontSize: 16, bold: true, color: it.numColor, align: 'center' });
++    head(s, it.name, { x: it.x + 0.868, y: 5.654, w: it.w, h: 0.236 });
++    para(s, 'Globally incubate standards compliant channels before scalable benefits.',
++      { x: it.x + 0.868, y: 5.916, w: 2.388, h: 0.483 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 5 - vision content
++ * ------------------------------------------------------------------ */
++const VISIONS_5 = [
++  { y: 3.116, no: '01', color: C.blue, numColor: C.white },
++  { y: 4.343, no: '02', color: C.tan, numColor: C.dark },
++  { y: 5.569, no: '03', color: C.orange, numColor: C.white }
++];
++
++function slide05() {
++  const s = pptx.addSlide();
++  poly(s, { x: 0.157, y: 1.492, w: 6.252, h: 6.008, color: C.blue,
++    pts: [[0, 0], [1, 0], [0.8044, 1], [0, 1]] });
++  title(s, { x: 7.556, y: 1.226, w: 4.63, h: 0.561, line: 'Our Vision Content', align: 'right' });
++  para(s, 'Proactively envisioned multimedia based expertise and cross-media growth strategies. ' +
++    'Seamlessly visualize quality intellectual capital without superior collaboration. Leverage ' +
++    'agile frameworks to provide a robust synopsis.',
++    { x: 7.555, y: 2.002, w: 4.632, h: 0.658, fontSize: 9, align: 'right' });
++  chip(s, 12.733, 1.226, C.blue);
++
++  VISIONS_5.forEach(v => {
++    head(s, 'Vision Name Goes Here', { x: 7.773, y: v.y, w: 3.579, h: 0.236, align: 'right' });
++    para(s, 'Leverage agile frameworks to provide a robust high level views new normal. ' +
++      'that has reliable channels before scalable.',
++      { x: 7.773, y: v.y + 0.274, w: 3.579, h: 0.43, fontSize: 9, align: 'right' });
++    oval(s, 11.585, v.y, 0.6, 0.6, v.color);
++    text(s, v.no, { x: 11.735, y: v.y + 0.199, w: 0.3, h: 0.202,
++      fontSize: 12, bold: true, color: v.numColor, align: 'center' });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 6 - core business
++ * ------------------------------------------------------------------ */
++function slide06() {
++  const s = pptx.addSlide();
++  shape(s, pptx.ShapeType.flowChartConnector,
++    { x: 6.708, y: 0.804, w: 5.892, h: 5.892, fill: { color: C.tan } });
++  title(s, { x: 1.098, y: 1.194, w: 4.47, h: 1.122, lines: ['Your IT is Our', 'Core Business'] });
++  para(s, PROACTIVE_SHARING, { x: 1.098, y: 2.483, w: 4.47, h: 0.731 });
++  chip(s, 0, 1.194, C.tan);
++  www(s, { x: -0.326, y: 4.73, w: 3.0, rotate: 270 });
++
++  head(s, 'Information Techonology', { x: 2.409, y: 4.108, w: 3.159, h: 0.269, fontSize: 16 });
++  para(s, 'PLACEHOLDER' +
++    'compliant channels.', { x: 2.409, y: 4.475, w: 3.159, h: 0.478 });
++  head(s, 'Communication Technology', { x: 2.409, y: 5.459, w: 3.159, h: 0.269, fontSize: 16 });
++  para(s, 'PLACEHOLDER' +
++    'standards compliant.', { x: 2.409, y: 5.828, w: 3.159, h: 0.478 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 7 - quote
++ * ------------------------------------------------------------------ */
++function slide07() {
++  const s = pptx.addSlide();
++  poly(s, { x: 0, y: 1.303, w: 7.337, h: 3.811, color: C.orange,
++    pts: [[0, 0], [1, 0], [0.8669, 1], [0, 1]] });
++  text(s, '\u201CEvery luxury must be paid for, and everything is a luxury, starting with ' +
++    'being in this world."',
++    { x: 0.899, y: 5.755, w: 5.304, h: 0.606,
++      fontSize: 18, bold: true, color: C.dark, align: 'right' });
++  title(s, { x: 8.463, y: 1.139, w: 3.745, h: 1.683, valign: 'top', align: 'right',
++    lines: ['Technology Is Wonderful When It Works'] });
++  para(s, GLOBAL_BALLPARK, { x: 8.463, y: 4.384, w: 3.745, h: 0.731, align: 'right' });
++  chip(s, 12.733, 1.139, C.orange);
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 8 - team member
++ * ------------------------------------------------------------------ */
++const SKILLS_8 = [
++  { y: 4.194, label: 'Team Work', w: 3.196, pct: '95%', px: 10.553, color: C.tan },
++  { y: 4.598, label: 'Leaders Team', w: 3.501, pct: '100%', px: 10.843, color: C.blue }
++];
++
++function slide08() {
++  const s = pptx.addSlide();
++  title(s, { x: 7.143, y: 1.495, w: 4.153, h: 1.122, lines: ['Nathalie', 'Williams Frana'] });
++  SKILLS_8.forEach(b => {
++    text(s, b.label, { x: 7.119, y: b.y, w: 2.952, h: 0.185, fontSize: 11, color: C.gray });
++    line(s, 7.143, b.y + 0.29, b.w, 0, b.color, 6);
++    text(s, b.pct, { x: b.px, y: b.y + 0.205, w: 0.453, h: 0.177,
++      fontSize: 10.5, color: C.gray });
++  });
++  para(s, 'Collaboratively administrate empowered markets via plug-and-play networks. Dynamic ' +
++    'PLACEHOLDER' +
++    'web-readiness.', { x: 7.119, y: 5.64, w: 4.177, h: 0.73 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 9 - team profile
++ * ------------------------------------------------------------------ */
++function slide09() {
++  const s = pptx.addSlide();
++  poly(s, { x: 0, y: 3.854, w: 0.734, h: 2.348, color: C.tan,
++    pts: [[0, 0], [0.2006, 0], [1, 1], [0, 1]] });
++  poly(s, { x: 12.599, y: 1.298, w: 0.734, h: 2.348, color: C.tan,
++    pts: [[0, 0], [1, 0], [1, 1], [0.7994, 1]] });
++  title(s, { x: 1.026, y: 1.298, w: 2.481, h: 1.122, lines: ['Our Team', 'Profile'] });
++  chip(s, 0, 1.3, C.tan);
++  para(s, 'PLACEHOLDER' +
++    'PLACEHOLDER' +
++    'with customers.', { x: 9.755, y: 5.219, w: 2.876, h: 0.983 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides 10-12 - timeline
++ * ------------------------------------------------------------------ */
++const TIMELINE_TEXT = 'PLACEHOLDER' +
++  'PLACEHOLDER' +
++  'without scrambled it to.';
++
++/** One dated timeline entry: marker tile, stub connector, rotated date, copy. */
++function timelineRow(s, o) {
++  box(s, 5.103, o.y, 1.538, 1.538, o.color);
++  o.glyph(s, 5.872, o.y + 0.769);
++  line(s, 4.303, o.y + 0.765, 0.496, 0, C.rule, 2, { beginArrowType: 'oval' });
++  text(s, o.date, { x: 2.29, y: o.y + 0.496, w: 1.888, h: 0.539, rotate: 270,
++    fontSize: 32, color: C.mid, align: 'center' });
++  text(s, 'Your Timeline Schedule',
++    { x: 7.209, y: o.y, w: 3.159, h: 0.337, fontSize: 20, color: C.mid });
++  para(s, TIMELINE_TEXT, { x: 7.209, y: o.y + 0.555, w: 3.159, h: 0.983 });
++}
++
++/* Marker glyphs, each centred on (cx, cy). */
++function glyphAndroid(s, cx, cy) {
++  const c = C.blue;
++  round(s, cx - 0.21, cy - 0.10, 0.42, 0.34, c, 0.06);
++  shape(s, pptx.ShapeType.chord,
++    { x: cx - 0.21, y: cy - 0.36, w: 0.42, h: 0.42, fill: { color: c }, rotate: 180 });
++  round(s, cx - 0.31, cy - 0.09, 0.07, 0.26, c, 0.03);
++  round(s, cx + 0.24, cy - 0.09, 0.07, 0.26, c, 0.03);
++  oval(s, cx - 0.11, cy - 0.26, 0.05, 0.05, C.lilac);
++  oval(s, cx + 0.06, cy - 0.26, 0.05, 0.05, C.lilac);
++}
++function glyphPointer(s, cx, cy) {
++  poly(s, { x: cx - 0.17, y: cy - 0.26, w: 0.34, h: 0.5, color: C.white,
++    pts: [[0, 0], [1, 0.62], [0.45, 0.66], [0.72, 1], [0.5, 1], [0.24, 0.72], [0, 1]] });
++}
++function glyphCart(s, cx, cy) {
++  box(s, cx - 0.22, cy - 0.20, 0.44, 0.06, C.white);
++  poly(s, { x: cx - 0.22, y: cy - 0.14, w: 0.44, h: 0.26, color: C.white,
++    pts: [[0, 0], [1, 0], [0.86, 1], [0.14, 1]] });
++  oval(s, cx - 0.16, cy + 0.14, 0.1, 0.1, C.white);
++  oval(s, cx + 0.06, cy + 0.14, 0.1, 0.1, C.white);
++}
++function glyphDollar(s, cx, cy) {
++  text(s, '$', { x: cx - 0.3, y: cy - 0.3, w: 0.6, h: 0.6,
++    fontSize: 34, bold: true, color: C.white, align: 'center', valign: 'middle' });
++}
++
++function slide10() {
++  const s = pptx.addSlide();
++  title(s, { x: 2.704, y: 1.515, w: 7.925, h: 0.561, line: 'Our Timeline', align: 'center' });
++  para(s, PROACTIVE_NETWORKS, { x: 2.704, y: 2.314, w: 7.925, h: 0.478, align: 'center' });
++  line(s, 4.303, 4.308, 0, 3.192, C.rule, 2, { beginArrowType: 'oval' });
++  timelineRow(s, { y: 5.135, color: C.lilac, date: '03/23/21', glyph: glyphAndroid });
++}
++
++function slide11() {
++  const s = pptx.addSlide();
++  line(s, 4.303, 0, 0, 7.5, C.rule, 2);
++  timelineRow(s, { y: 1.42, color: C.orange, date: '04/29/21', glyph: glyphPointer });
++  timelineRow(s, { y: 4.549, color: C.blue, date: '05/17/21', glyph: glyphCart });
++}
++
++/**
++ * Skyline silhouette for slide 12: roof height (inches from the top of the
++ * slide) sampled across 160 equal columns.
++ */
++const SKYLINE = [
++  6.60, 6.60, 7.05, 7.05, 7.05, 7.12, 7.12, 7.12, 7.12, 7.08, 7.12, 6.88, 7.12, 7.02, 7.02, 7.02,
++  7.17, 7.13, 7.33, 7.10, 7.37, 7.37, 7.37, 7.05, 7.05, 7.32, 6.87, 6.77, 6.77, 6.82, 5.90, 5.90,
++  5.90, 5.90, 6.53, 6.15, 6.15, 6.28, 6.87, 5.83, 5.82, 5.97, 5.98, 7.07, 6.45, 6.43, 6.45, 6.98,
++  6.88, 6.38, 6.38, 6.38, 6.82, 6.08, 6.15, 6.82, 6.93, 6.82, 6.87, 6.98, 6.53, 6.37, 7.32, 6.28,
++  6.20, 6.32, 6.70, 6.12, 6.97, 6.28, 6.32, 5.88, 5.88, 5.88, 6.48, 6.48, 6.48, 6.48, 6.68, 6.33,
++  6.33, 6.80, 7.10, 6.32, 6.32, 6.32, 6.32, 7.32, 7.13, 6.62, 6.62, 7.05, 7.05, 6.97, 7.07, 7.07,
++  7.20, 6.13, 7.17, 7.15, 7.18, 6.63, 6.62, 7.25, 6.62, 6.62, 6.62, 6.52, 6.12, 7.08, 6.72, 6.72,
++  6.73, 7.20, 7.15, 6.37, 7.07, 7.23, 6.65, 6.65, 6.73, 6.80, 7.17, 7.17, 7.17, 6.37, 6.35, 6.70,
++  6.37, 6.35, 7.13, 7.05, 7.00, 7.02, 7.02, 7.03, 7.03, 7.00, 7.02, 7.03, 7.03, 7.03, 6.87, 6.87,
++  7.25, 6.90, 6.87, 7.13, 6.95, 7.25, 7.23, 7.13, 7.12, 7.07, 7.12, 7.13, 7.15, 6.82, 6.73, 6.78
++];
++
++function slide12() {
++  const s = pptx.addSlide();
++  line(s, 4.303, -0.013, 0, 3.192, C.rule, 2, { endArrowType: 'oval' });
++  timelineRow(s, { y: 0.814, color: C.tan, date: '06/11/21', glyph: glyphDollar });
++  title(s, { x: 2.704, y: 4.212, w: 7.925, h: 0.561, line: 'End The Timeline', align: 'center' });
++  const cw = 13.333 / SKYLINE.length;
++  SKYLINE.forEach((top, i) => box(s, i * cw, top, cw + 0.008, 7.5 - top, C.tan));
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 13 - don't let technology get to you
++ * ------------------------------------------------------------------ */
++function slide13() {
++  const s = pptx.addSlide();
++  poly(s, { x: 0.041, y: 1.049, w: 7.301, h: 6.451, color: C.blue,
++    pts: [[0.7657, 0], [0, 0], [0, 1], [1, 1]] });
++  title(s, { x: 6.882, y: 0.771, w: 5.101, h: 1.122, lines: ["Don't let technology get to you"] });
++  para(s, PROACTIVE_NETWORKS, { x: 6.882, y: 2.119, w: 5.101, h: 0.731 });
++  chip(s, 12.733, 0.771, C.blue);
++  head(s, 'Information Techonology', { x: 8.824, y: 3.926, w: 3.159, h: 0.269, fontSize: 16 });
++  para(s, 'PLACEHOLDER' +
++    'compliant channels.', { x: 8.824, y: 4.323, w: 3.159, h: 0.478 });
++  head(s, 'Communication Technology', { x: 8.824, y: 5.307, w: 3.159, h: 0.269, fontSize: 16 });
++  para(s, 'PLACEHOLDER' +
++    'standards compliant.', { x: 8.824, y: 5.675, w: 3.159, h: 0.478 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 14 - section banner
++ * ------------------------------------------------------------------ */
++function slide14() {
++  const s = pptx.addSlide();
++  box(s, 0.433, -0.42, 13.333, 4.651, '0D0D0D', 50);
++  box(s, 0, 4.651, 13.333, 0.19, C.peach);
++  oval(s, 5.917, 3.901, 1.5, 1.5, C.white);
++  oval(s, 6.015, 4.0, 1.303, 1.303, C.orange);
++  poly(s, { x: 6.348, y: 4.329, w: 0.639, h: 0.643, color: C.white,
++    pts: [[1, 0.81], [0.69, 0.5], [0.87, 0.5], [0.62, 0.25], [0.75, 0.25], [0.5, 0],
++      [0.24, 0.25], [0.37, 0.25], [0.12, 0.5], [0.31, 0.5], [0, 0.81], [0.37, 0.81],
++      [0.37, 1], [0.62, 1], [0.62, 0.81]] });
++  title(s, { x: 2.704, y: 1.389, w: 7.925, h: 1.122, align: 'center', color: C.white,
++    lines: ['Taking the Anxiety out of Technology'] });
++  para(s, PROACTIVE_NETWORKS, { x: 2.704, y: 6.166, w: 7.925, h: 0.478, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 15 - break slide
++ * ------------------------------------------------------------------ */
++function slide15() {
++  const s = pptx.addSlide();
++  box(s, 4.932, 2.759, 8.401, 2.632, C.tan);
++  title(s, { x: 5.13, y: 1.045, w: 6.058, h: 0.561, line: 'Time For Break Slide' });
++  para(s, 'Collaboratively administrate empowered markets via plug and play networks. Dynamic ' +
++    'procrastinate B2C users after installed base benefits. Dramatic visualize. Predominate ' +
++    'extensible testing interactively coordinate proactive.',
++    { x: 5.13, y: 5.977, w: 6.942, h: 0.478 });
++  www(s, { x: 2.862, y: 3.674, w: 2.7, rotate: 270, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 16 - three circles
++ * ------------------------------------------------------------------ */
++function slide16() {
++  const s = pptx.addSlide();
++  box(s, 0, 1.667, 13.333, 5.317, C.blue);
++  title(s, { x: 2.704, y: 0.553, w: 7.925, h: 0.561,
++    line: 'Our Service Content', align: 'center' });
++  [1.549, 5.19, 8.83].forEach(x => {
++    shape(s, pptx.ShapeType.ellipse, { x, y: 2.26, w: 2.954, h: 2.954,
++      fill: { color: C.white }, line: { color: C.white, width: 5 } });
++    head(s, 'Your Content Name Here',
++      { x: x + 0.048, y: 5.65, w: 2.859, h: 0.236, color: C.white, align: 'center' });
++    para(s, 'PLACEHOLDER' +
++      'extensible testing.',
++      { x: x + 0.048, y: 5.912, w: 2.859, h: 0.478, color: C.white, align: 'center' });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 17 - never too late
++ * ------------------------------------------------------------------ */
++const PLANS_17 = [
++  { x: 7.271, no: '01', color: C.orange, name: 'Luxury' },
++  { x: 10.195, no: '02', color: C.blue, name: 'Deluxe' }
++];
++
++function slide17() {
++  const s = pptx.addSlide();
++  poly(s, { x: 0.155, y: 0, w: 6.211, h: 5.968, color: C.orange,
++    pts: [[0, 0], [0.8258, 0], [1, 1], [0, 1]] });
++  title(s, { x: 7.271, y: 1.289, w: 5.157, h: 1.122,
++    lines: ["It's Never Too Late To", 'Mend Your Tech!'] });
++  para(s, 'Interactively coordinate proactive via process centric outside the box  thinking ' +
++    'pursue scalable customer service through. Collaboratively administrate empowered markets ' +
++    'networks without scrambled it to make a type process centric.',
++    { x: 7.271, y: 2.578, w: 5.155, h: 0.652, fontSize: 9 });
++  chip(s, 12.733, 1.289, C.orange);
++  www(s, { x: 0.661, y: 6.79, w: 2.869 });
++
++  PLANS_17.forEach(it => {
++    shape(s, pptx.ShapeType.roundRect, { x: it.x, y: 4.519, w: 0.611, h: 0.611,
++      fill: { type: 'none' }, line: { color: it.color, width: 2.25 }, rectRadius: 0.09 });
++    text(s, it.no, { x: it.x + 0.106, y: 4.694, w: 0.4, h: 0.269,
++      fontSize: 16, bold: true, color: C.mid, align: 'center' });
++    head(s, it.name, { x: it.x, y: 5.258, w: 2.234, h: 0.269, fontSize: 16 });
++    para(s, 'PLACEHOLDER' +
++      'before scalable enabled.', { x: it.x, y: 5.574, w: 2.234, h: 0.658, fontSize: 9 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 18 - bar chart
++ * ------------------------------------------------------------------ */
++function slide18() {
++  const s = pptx.addSlide();
++  poly(s, { x: 5.991, y: 1.049, w: 7.301, h: 6.451, color: C.tan,
++    pts: [[0.2343, 0], [1, 0], [1, 1], [0, 1]] });
++  title(s, { x: 1.018, y: 1.114, w: 4.476, h: 1.122, lines: ['Need a Teck? Get a Teck!'] });
++  para(s, 'Proactively envisioned multimedia based expertise and cross-media with growth ' +
++    'strategies. Seamlessly visualize quality intellectual capital via plug-and-play.',
++    { x: 1.018, y: 2.386, w: 4.476, h: 0.43, fontSize: 9 });
++  chip(s, 0, 1.114, C.tan);
++
++  s.addChart(pptx.ChartType.bar, [{
++    name: 'Series 1',
++    labels: ['DP', 'FP', 'GH', 'JK', 'LM', 'AG'],
++    values: [32, 28, 12, 15, 12, 25]
++  }], {
++    x: 1.018, y: 2.92, w: 4.476, h: 2.363,
++    barDir: 'col', barGapWidthPct: 80,
++    chartColors: [C.blue, C.orange, C.blue, C.orange, C.blue, C.orange],
++    showValue: true, dataLabelFontSize: 9, dataLabelFontFace: 'Lato',
++    dataLabelColor: C.gray, dataLabelPosition: 'outEnd',
++    catAxisLabelFontSize: 8, catAxisLabelFontFace: 'Lato', catAxisLabelColor: C.gray,
++    catAxisLineShow: false, valAxisHidden: true, valGridLine: { style: 'none' },
++    showLegend: false,
++    chartArea: { fill: { color: C.white }, border: { pt: 0, color: C.white } },
++    plotArea: { fill: { color: C.white }, border: { pt: 0, color: C.white } }
++  });
++
++  text(s, '68%', { x: 1.018, y: 5.578, w: 1.623, h: 0.808,
++    fontSize: 48, bold: true, color: C.mid });
++  head(s, 'Your Technology Data in 2021', { x: 2.77, y: 5.573, w: 2.725, h: 0.236 });
++  para(s, 'Globally incubate standards compliant channels before scalable benefits.',
++    { x: 2.77, y: 5.867, w: 2.725, h: 0.43, fontSize: 9 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 19 - S.W.O.T
++ * ------------------------------------------------------------------ */
++const HEX_TOP = [[0.75, 0], [1, 0.5], [0.75, 1], [0.25, 1], [0, 0.5], [0.25, 0]];
++const HEX_RIGHT = [[1, 0], [1, 0.404], [0, 1], [0, 0.595]];
++const HEX_LEFT = [[0, 0], [0, 0.404], [1, 1], [1, 0.595]];
++
++/** One isometric hexagonal slab of the S.W.O.T stack. */
++function swotSlab(s, y, top, right, left, front) {
++  poly(s, { x: 1.684, y: y + 0.347, w: 2.7, h: 1.023, color: 'A2FFFB', pts: HEX_TOP });
++  poly(s, { x: 1.684, y, w: 2.7, h: 1.023, color: top, pts: HEX_TOP });
++  poly(s, { x: 3.709, y: y + 0.51, w: 0.675, h: 0.858, color: right, pts: HEX_RIGHT });
++  poly(s, { x: 1.684, y: y + 0.51, w: 0.675, h: 0.858, color: left, pts: HEX_LEFT });
++  box(s, 2.36, y + 1.023, 1.349, 0.347, front);
++}
++
++const SWOT_ROWS = [
++  { y: 2.839, letter: 'S', name: 'Strengths Analysis', color: C.blue },
++  { y: 3.844, letter: 'W', name: 'Weaknesses Analysis', color: C.tan },
++  { y: 4.849, letter: 'O', name: 'Opportunities Analysis', color: C.blue },
++  { y: 5.855, letter: 'T', name: 'Threats Analysis', color: C.tan }
++];
++
++function slide19() {
++  const s = pptx.addSlide();
++  swotSlab(s, 5.281, 'F2EBE0', 'EBE2D1', 'C0A16C', C.tan);
++  swotSlab(s, 4.430, 'A7A5E3', '7B77D4', '29267A', C.blue);
++  swotSlab(s, 3.578, 'F2EBE0', 'EBE2D1', 'C0A16C', C.tan);
++  swotSlab(s, 2.727, 'A7A5E3', '7B77D4', '29267A', C.blue);
++
++  SWOT_ROWS.forEach(r => {
++    text(s, r.letter, { x: 5.857, y: r.y, w: 0.452, h: 0.536,
++      fontSize: 32, bold: true, color: r.color });
++    line(s, 4.766, r.y + 0.399, 0.709, 0, r.color, 1, { endArrowType: 'oval' });
++    text(s, r.name, { x: 6.454, y: r.y, w: 5.195, h: 0.269,
++      fontSize: 16, bold: true, color: r.color });
++    para(s, 'Proactively envisioned multimedia based expertise and cross-media growth ' +
++      'PLACEHOLDER' +
++      'scrambled.', { x: 6.454, y: r.y + 0.319, w: 5.195, h: 0.478 });
++  });
++
++  title(s, { x: 1.684, y: 0.763, w: 6.203, h: 0.561, line: 'S.W.O.T Analysis Slide' });
++  para(s, 'Bring to the table win-win survival strategies to ensure proactive domination. At ' +
++    'the end of the day, going forward, a new normal that has evolved from generation X is on ' +
++    'the runway heading.', { x: 1.684, y: 1.486, w: 6.203, h: 0.478 });
++  www(s, { x: 8.489, y: 1.288, w: 3.16, align: 'right' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 20 - mountain infographic
++ * ------------------------------------------------------------------ */
++const PEAKS = [
++  { x: 1.288, y: 2.772, w: 4.375, h: 2.230, color: C.cream },
++  { x: 3.395, y: 3.296, w: 3.107, h: 1.706, color: C.blue },
++  { x: 4.085, y: 4.133, w: 3.685, h: 0.869, color: C.peach },
++  { x: 5.486, y: 3.887, w: 3.685, h: 1.115, color: C.orange },
++  { x: 6.820, y: 3.715, w: 3.685, h: 1.287, color: C.lilac },
++  { x: 8.360, y: 3.887, w: 3.685, h: 1.115, color: C.tan }
++];
++const MONTHS = [
++  { x: 3.103, w: 0.745, label: 'Jan', dot: 3.420, color: C.cream },
++  { x: 4.579, w: 0.740, label: 'Feb', dot: 4.894, color: C.blue },
++  { x: 5.535, w: 0.785, label: 'Mar', dot: 5.872, color: C.peach },
++  { x: 6.970, w: 0.716, label: 'Apr', dot: 7.273, color: C.orange },
++  { x: 8.241, w: 0.843, label: 'May', dot: 8.607, color: C.lilac },
++  { x: 9.820, w: 0.766, label: 'Jun', dot: 10.148, color: C.tan }
++];
++
++/** Bell-shaped peak: two cubic segments closed along the baseline. */
++function peak(s, p) {
++  const X = u => +(p.w * u).toFixed(4);
++  const Y = v => +(p.h * v).toFixed(4);
++  s.addShape(pptx.ShapeType.custGeom, {
++    x: p.x, y: p.y, w: p.w, h: p.h,
++    fill: { color: p.color, transparency: 20 }, line: NOLINE,
++    points: [
++      { x: X(0), y: Y(1) },
++      { x: X(0.5052), y: Y(0),
++        curve: { type: 'cubic', x1: X(0.1667), y1: Y(0.7772), x2: X(0.4169), y2: Y(0.0046) } },
++      { x: X(1), y: Y(1),
++        curve: { type: 'cubic', x1: X(0.5936), y1: Y(0), x2: X(0.8333), y2: Y(0.7772) } },
++      { x: X(0), y: Y(1) },
++      { close: true }
++    ]
++  });
++}
++
++function slide20() {
++  const s = pptx.addSlide();
++  title(s, { x: 2.704, y: 0.637, w: 7.925, h: 0.561, line: 'Infographic Slide', align: 'center' });
++  PEAKS.forEach(p => peak(s, p));
++  round(s, 1.322, 5.142, 10.599, 0.04, C.rule, 0.02);
++  MONTHS.forEach(m => {
++    oval(s, m.dot, 5.106, 0.111, 0.111, m.color);
++    text(s, m.label, { x: m.x, y: 5.363, w: m.w, h: 0.303,
++      fontSize: 18, bold: true, color: C.mid, align: 'center' });
++  });
++  line(s, 3.510, 2.344, 0, 0.429, C.cream, 1.5, { dashType: 'sysDash' });
++  text(s, '$21M', { x: 2.940, y: 1.834, w: 1.156, h: 0.438,
++    fontSize: 20, bold: true, color: C.mid, align: 'center' });
++  para(s, PROACTIVE_NETWORKS, { x: 2.704, y: 6.344, w: 7.925, h: 0.478, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 21 - rocket infographic
++ * ------------------------------------------------------------------ */
++function rocketArt(s) {
++  // laptop lid and screen
++  poly(s, { x: 2.557, y: 2.521, w: 3.065, h: 1.640, color: '3D586B',
++    pts: [[0, 0], [1, 0], [1, 1], [0, 1]] });
++  poly(s, { x: 5.017, y: 2.521, w: 0.713, h: 1.640, color: '2E4452',
++    pts: [[0, 0], [1, 0], [0.6, 1], [0, 1]] });
++  box(s, 2.675, 2.618, 2.830, 1.444, '2E4452');
++  box(s, 3.114, 2.647, 2.382, 0.137, 'BCBEC0');
++  box(s, 2.714, 2.784, 2.738, 1.278, C.lilac);
++  // orange blocks and rules on the screen
++  box(s, 3.065, 2.898, 0.568, 0.438, C.orange);
++  box(s, 2.899, 3.463, 0.566, 0.439, C.orange);
++  [2.898, 3.039, 3.181, 3.322].forEach((y, i) =>
++    box(s, 3.731 - i * 0.042, y, 1.535, 0.079, C.orange));
++  box(s, 3.502, 3.463, 1.590, 0.282, C.orange);
++  box(s, 3.462, 3.800, 1.526, 0.079, C.orange);
++  // keyboard deck
++  poly(s, { x: 1.145, y: 4.107, w: 2.378, h: 0.244, color: '354D5D',
++    pts: [[0, 0], [1, 0], [0.94, 1], [0.06, 1]] });
++  poly(s, { x: 3.406, y: 4.107, w: 1.821, h: 0.244, color: '2E4452',
++    pts: [[0, 0], [1, 0], [0.93, 1], [0.07, 1]] });
++  box(s, 1.931, 4.107, 0.804, 0.082, '486780');
++  // exhaust plume and cloud
++  poly(s, { x: 2.690, y: 2.10, w: 0.423, h: 1.10, color: C.cream,
++    pts: [[0.22, 0], [0.78, 0], [1, 1], [0, 1]] });
++  shape(s, pptx.ShapeType.cloud,
++    { x: 1.435, y: 2.85, w: 2.814, h: 1.259, fill: { color: C.cream } });
++  // rocket
++  poly(s, { x: 2.672, y: 0.696, w: 0.438, h: 0.416, color: 'A07F44',
++    pts: [[0.5, 0], [1, 1], [0, 1]] });
++  poly(s, { x: 2.648, y: 0.794, w: 0.525, h: 0.358, color: C.tan,
++    pts: [[0.5, 0], [1, 1], [0, 1]] });
++  box(s, 2.554, 1.151, 0.756, 1.006, 'E1D3B9');
++  box(s, 3.090, 1.151, 0.220, 1.006, 'EBEBEB');
++  oval(s, 2.671, 1.289, 0.482, 0.482, 'EBEBEB');
++  oval(s, 2.689, 1.308, 0.445, 0.445, 'FF7D70');
++  oval(s, 2.744, 1.364, 0.304, 0.304, C.cream);
++  poly(s, { x: 2.352, y: 1.813, w: 0.268, h: 0.538, color: C.tan,
++    pts: [[1, 0], [1, 1], [0, 1]] });
++  poly(s, { x: 3.230, y: 1.840, w: 0.241, h: 0.511, color: C.tan,
++    pts: [[0, 0], [1, 1], [0, 1]] });
++  box(s, 2.847, 1.861, 0.099, 0.485, C.tan);
++  box(s, 2.902, 1.850, 0.062, 0.504, 'EBE2D1');
++}
++
++const CELLS_21 = [
++  { x: 7.173, y: 0.885, no: '01', color: C.tan },
++  { x: 9.955, y: 0.884, no: '02', color: C.blue },
++  { x: 7.173, y: 2.747, no: '03', color: C.blue },
++  { x: 9.955, y: 2.748, no: '04', color: C.tan }
++];
++
++function slide21() {
++  const s = pptx.addSlide();
++  rocketArt(s);
++  CELLS_21.forEach(c => {
++    text(s, c.no, { x: c.x, y: c.y, w: 0.616, h: 0.404,
++      fontSize: 24, bold: true, color: c.color });
++    head(s, 'Your Title Here', { x: c.x, y: c.y + 0.458, w: 2.233, h: 0.236 });
++    para(s, 'PLACEHOLDER' +
++      'matrix sound good product.', { x: c.x, y: c.y + 0.755, w: 2.233, h: 0.726 });
++  });
++  box(s, 0, 5.047, 13.333, 2.453, C.orange);
++  title(s, { x: 1.145, y: 5.993, w: 4.585, h: 0.561,
++    line: 'Infographic Slide', color: C.white });
++  para(s, 'Collaboratively administrate empowered markets via plug-and-play networks. Dynamic ' +
++    'procrastinate B2C users after installed base benefits dramatic visualize. Standards in web ' +
++    'readiness. Energistically scale future-proof core competencies vis-a-vis impactful ' +
++    'experiences dramatically.', { x: 6.155, y: 5.908, w: 6.034, h: 0.73, color: C.white });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 22 - donut infographic
++ * ------------------------------------------------------------------ */
++/** Pie chart masked by a lilac disc, giving a ring gauge. */
++function donut(s, x, pct, color) {
++  s.addChart(pptx.ChartType.pie, [{
++    name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [100 - pct, pct]
++  }], {
++    x, y: 1.407, w: 1.764, h: 1.759,
++    chartColors: ['F2F2F2', color], firstSliceAng: 45,
++    showLegend: false, showValue: false, dataBorder: { pt: 0, color: C.white },
++    chartArea: { fill: { color: C.lilac }, border: { pt: 0, color: C.lilac } },
++    plotArea: { fill: { color: C.lilac }, border: { pt: 0, color: C.lilac } }
++  });
++  oval(s, x + 0.088, 1.492, 1.587, 1.587, C.lilac);
++  text(s, pct + '%', { x: x + 0.558, y: 2.101, w: 0.647, h: 0.37,
++    fontSize: 16, bold: true, color: C.mid, align: 'center' });
++  oval(s, x + 1.306, 1.61, 0.37, 0.37, color);
++  oval(s, x + 1.380, 1.684, 0.222, 0.222, C.lilac);
++}
++
++function slide22() {
++  const s = pptx.addSlide();
++  box(s, 0, 0.743, 13.333, 6.014, C.lilac);
++  donut(s, 7.127, 40, C.orange);
++  donut(s, 10.216, 70, C.blue);
++  [6.931, 10.02].forEach(x => {
++    head(s, 'Your Title Goes Here', { x, y: 3.422, w: 2.156, h: 0.236, align: 'center' });
++    para(s, 'PLACEHOLDER' +
++      'normal scale.', { x, y: 5.363, w: 2.156, h: 0.731, align: 'center' });
++  });
++  title(s, { x: 1.334, y: 2.51, w: 4.263, h: 0.561, line: 'Infographic Slide' });
++  para(s, [
++    { text: 'Interactively coordinate proactive e-commerce via process centric "outside the box" ' +
++        'thinking pursue scalable charity event to bes success.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: 'Collaboratively administrate empowered markets via plug and play networks. ' +
++        'Standards in web readiness. Energistically scale future-proof core competencies ' +
++        'impactful framework.' }
++  ], { x: 1.334, y: 3.503, w: 4.263, h: 1.487 });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 23 - tablet mock-up
++ * ------------------------------------------------------------------ */
++const MOCKUP_MSGS = ['01. Main Message', '02. Main Message ', '03. Main Message'];
++const MOCKUP_BODY = 'Predominate extensible  procedures for reliable good user generated ' +
++  'normal normal that has.';
++
++function slide23() {
++  const s = pptx.addSlide();
++  shape(s, pptx.ShapeType.rtTriangle, { x: 0, y: 0, w: 7.862, h: 7.515, fill: { color: C.cream } });
++  shape(s, pptx.ShapeType.rtTriangle,
++    { x: 10.9, y: 0, w: 2.433, h: 2.326, fill: { color: C.cream }, rotate: 180 });
++  device(s, { x: 1.512, y: 1.05, w: 3.75, h: 5.40, r: 0.1 },
++    { x: 1.732, y: 1.655, w: 3.312, h: 4.31 });
++  title(s, { x: 6.696, y: 1.746, w: 2.55, h: 1.683, valign: 'top',
++    lines: ['Product', 'Mockup Slide'] });
++  para(s, [
++    { text: 'Proactively envisioned multimedia based expertise it cross media growth strategies. ' +
++        'Seamlessly visualize quality.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: 'PLACEHOLDER' +
++        'quality intellectual capital without superior collaboration and idea sharing.' }
++  ], { x: 6.696, y: 3.622, w: 2.55, h: 1.993 });
++  MOCKUP_MSGS.forEach((m, i) => {
++    head(s, m, { x: 9.791, y: 1.747 + i * 1.42, w: 2.162, h: 0.236 });
++    para(s, MOCKUP_BODY, { x: 9.791, y: 2.044 + i * 1.42, w: 2.162, h: 0.73 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 24 - phone mock-up
++ * ------------------------------------------------------------------ */
++const PRODUCTS_24 = [
++  { y: 4.079, no: '01', body: 'Globally incubate standards compliant channels before scalable ' +
++      'benefits extensible testing.' },
++  { y: 5.188, no: '02', body: 'PLACEHOLDER' +
++      'level views  competencies.' }
++];
++
++function slide24() {
++  const s = pptx.addSlide();
++  box(s, 9.568, 0, 3.765, 7.5, C.orange);
++  line(s, 6.667, 5.67, 0.957, 0, C.rule, 2);
++  line(s, 6.679, 5.67, 0, 1.83, C.rule, 2);
++  // the handset runs off the bottom edge of the slide
++  device(s, { x: 7.857, y: 1.65, w: 3.395, h: 6.90, r: 0.16 },
++    { x: 8.073, y: 2.467, w: 3.046, h: 5.40 });
++  title(s, { x: 1.53, y: 1.572, w: 4.47, h: 1.122, lines: ['Product', 'Mockup Slide'] });
++  para(s, PROACTIVE_SHARING, { x: 1.53, y: 2.884, w: 4.47, h: 0.731 });
++  chip(s, 0, 1.572, C.orange);
++  www(s, { x: 10.838, y: 3.674, w: 3.0, rotate: 270, color: C.white, align: 'center' });
++
++  PRODUCTS_24.forEach(it => {
++    round(s, 1.53, it.y, 0.613, 0.61, C.orange);
++    text(s, it.no, { x: 1.586, y: it.y + 0.17, w: 0.5, h: 0.269,
++      fontSize: 16, bold: true, color: C.white, align: 'center' });
++    head(s, 'Your Product Name', { x: 2.399, y: it.y, w: 2.924, h: 0.236 });
++    para(s, it.body, { x: 2.399, y: it.y + 0.262, w: 2.924, h: 0.478, color: C.mid });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 25 - phone held in a hand
++ * ------------------------------------------------------------------ */
++/** Presentation-screen glyph for the "16+ Sponsor" statistic. */
++function glyphScreen(s, x, y, w, h, color) {
++  shape(s, pptx.ShapeType.rect, { x, y, w, h: h * 0.62,
++    fill: { type: 'none' }, line: { color, width: 2 } });
++  box(s, x + w * 0.44, y + h * 0.62, w * 0.12, h * 0.24, color);
++  box(s, x + w * 0.20, y + h * 0.86, w * 0.60, h * 0.14, color);
++}
++
++const STATS_25 = [
++  { ix: 7.483, tx: 8.025, label: '32+ Products', glyph: glyphBriefcase },
++  { ix: 9.935, tx: 10.478, label: '16+ Sponsor', glyph: glyphScreen }
++];
++
++function slide25() {
++  const s = pptx.addSlide();
++  box(s, 0, 0, 4.197, 7.5, C.blue);
++  line(s, 6.679, 0, 0, 1.862, C.rule, 2);
++  line(s, 6.429, 1.85, 0.251, 0, C.rule, 2);
++  // hand: back of the hand to the right of the phone, wrist trailing down
++  round(s, 5.30, 2.23, 1.95, 4.60, C.skin, 0.30);
++  round(s, 3.55, 6.20, 3.70, 1.30, C.skin, 0.30);
++  // four fingertips curling round the left edge, drawn before the handset
++  [[2.34, 2.40, 2.95], [2.16, 3.36, 4.06], [2.12, 4.30, 5.00], [2.60, 5.30, 5.85]
++  ].forEach(f2 => round(s, f2[0], f2[1], 3.30, f2[2] - f2[1], C.skin, 0.26));
++  device(s, { x: 2.93, y: 1.583, w: 2.58, h: 5.334, r: 0.16 },
++    { x: 3.063, y: 1.90, w: 2.43, h: 4.383 });
++  www(s, { x: -0.444, y: 3.674, w: 3.0, rotate: 270, color: C.white, align: 'center' });
++  title(s, { x: 7.483, y: 1.748, w: 5.046, h: 1.122, lines: ['Product', 'Mockup Slide'] });
++  para(s, 'Proactively envisioned multimedia based expertise and cross-media growth strategies. ' +
++    'PLACEHOLDER' +
++    'idea-sharing interactively with great product mockup.',
++    { x: 7.483, y: 3.06, w: 5.046, h: 0.731 });
++
++  STATS_25.forEach(it => {
++    it.glyph(s, it.ix, 4.303, 0.33, 0.314, C.blue);
++    text(s, it.label, { x: it.tx, y: 4.303, w: 1.698, h: 0.314,
++      fontSize: 18, bold: true, color: C.mid });
++    para(s, 'Collaboratively administrate empower markets via plug-and-play networks dynamic ' +
++      'procrastinate B2C users.', { x: it.tx, y: 4.77, w: 1.698, h: 0.983 });
++  });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides 26 / 27 - maps painted from character grids
++ * ------------------------------------------------------------------ */
++/**
++ * Paint a character grid; each run of identical characters becomes one bar.
++ * Rows are right-trimmed, so the nominal column count is passed in `cols`.
++ */
++function pixelMap(s, grid, cols, palette, x0, y0, w, h) {
++  const cw = w / cols;
++  const ch = h / grid.length;
++  grid.forEach((row, j) => {
++    let i = 0;
++    while (i < row.length) {
++      const c = row[i];
++      let k = i;
++      while (k < row.length && row[k] === c) k++;
++      if (palette[c]) box(s, x0 + i * cw, y0 + j * ch, (k - i) * cw + 0.003, ch + 0.003, palette[c]);
++      i = k;
++    }
++  });
++}
++
++/* '#' land, 'T' North America, 'B' Brazil, 'O' Australia */
++const WORLD = [
++  '......................#######...#######',
++  '...................#######################..................##.......##',
++  '.................#########.#############........####.................####',
++  '.............############.##############........###....................##',
++  '............############..##############....................###......######......###',
++  '...........####.#.######......##########...................##......#########..#...#',
++  '...........###############....#########....................#...#################.####',
++  '.#######.##################...#########..........#####.......#.##############################',
++  '#######################.####..#######............#############################################',
++  '#######################.####...#####...###......################################################',
++  '.###########################...###.....##......##############################################',
++  '####################....###.....##............#############################################',
++  '..##....#############...#####..............##..####################################..#.##',
++  '.........##############.######.............##..###################################....###',
++  '.........#####################............#########################################...##',
++  '...........#TTTTTTTT###########.............#######################################',
++  '...........TTTTTTTTTTTT###T####.............#######################################',
++  '...........TTTTTTTTTTTT#TTT#...............##########..##########################.##',
++  '...........TTTTTTTTTTTTTTT................####.#.#########.#####################..#',
++  '............TTTTTTTTTTTTT..................#####....#########################.##.##',
++  '.............TTTTTTTTTTTT..................######.....#######################..###',
++  '..............#TTTTTTTTT..................####################################',
++  '..............####T....T.................####################################',
++  '................###....#................#####################..##############',
++  '.................#####..###.............#####################...####.#####',
++  '..................#####.................###################.....###...####..##',
++  '.....................##..##.............##################.......##....###...#',
++  '......................#######............##################......##....#.....##',
++  '........................####B##...........###.############............###..##',
++  '.......................###BBBBBB...............##########..............#######',
++  '.......................###BBBBBBBBB.............########...............##.####.####',
++  '.......................##BBBBBBBBBBB............########.................##......####',
++  '........................##BBBBBBBBBB............########....................#...O.#.#',
++  '........................####BBBBBBB.............########.##...................OOO.OO',
++  '..........................###BBBBBB.............#######.##...................OOOOOOO........#',
++  '..........................###BBBBB..............#######.##.................OOOOOOOOOO',
++  '..........................####BBB................#####.....................OOOOOOOOOOO',
++  '..........................####BB.................#####.....................OOOOOOOOOOO',
++  '.........................#####B..................####......................OOOOOOOOOOO',
++  '.........................#####...................................................OOOO......#',
++  '.........................####.....................................................OO.......##',
++  '.........................###.......................................................#......##',
++  '.........................##..............................................................##',
++  '.........................##',
++  '.........................##',
++  '.........................##'
++];
++
++/** Briefcase glyph for the "286K" statistic. */
++function glyphBriefcase(s, x, y, w, h, color) {
++  round(s, x, y + h * 0.22, w, h * 0.78, color, 0.05);
++  box(s, x + w * 0.33, y, w * 0.34, h * 0.16, color);
++  box(s, x + w * 0.30, y + h * 0.10, w * 0.40, h * 0.14, color);
++}
++/** Classical bank facade for the "+212%" statistic. */
++function glyphBank(s, x, y, w, h, color) {
++  poly(s, { x, y, w, h: h * 0.30, color, pts: [[0.5, 0], [1, 1], [0, 1]] });
++  [0.12, 0.34, 0.56, 0.78].forEach(u => box(s, x + w * u, y + h * 0.34, w * 0.11, h * 0.46, color));
++  box(s, x, y + h * 0.85, w, h * 0.15, color);
++}
++/** Cog for the "$129mio" statistic. */
++function glyphGear(s, x, y, w, h, color) {
++  oval(s, x, y, w, h, color);
++  [0, 45, 90, 135].forEach(a => shape(s, pptx.ShapeType.rect,
++    { x: x - w * 0.11, y: y + h * 0.34, w: w * 1.22, h: h * 0.32,
++      fill: { color }, rotate: a }));
++  oval(s, x + w * 0.32, y + h * 0.32, w * 0.36, h * 0.36, C.white);
++}
++
++const STATS_26 = [
++  { x: 1.606, big: '286', sup: 'K', ix: 0.863, iw: 0.607, icon: C.blue, glyph: glyphBriefcase },
++  { x: 4.163, big: '+212', sup: '%', ix: 3.468, iw: 0.494, icon: C.tan, glyph: glyphBank },
++  { x: 6.768, big: '$129', sup: 'mio', ix: 6.025, iw: 0.539, icon: C.orange, glyph: glyphGear }
++];
++
++function slide26() {
++  const s = pptx.addSlide();
++  pixelMap(s, WORLD, 96, { '#': C.rule, T: C.tan, B: C.blue, O: C.orange }, 0.863, 1.41, 7.068, 3.484);
++  title(s, { x: 9.138, y: 1.456, w: 3.007, h: 1.122, lines: ['Location Production'] });
++  para(s, [
++    { text: 'Collaboratively administrate empowered markets via plug and play networks. Dynamic ' +
++        'procrastinate B2C users after installed base benefits.', options: { breakLine: true } },
++    { text: '', options: { breakLine: true } },
++    { text: 'Dramatic visualize. Predominate extensible testing. Interactively coordinate ' +
++        'proactive ', options: { breakLine: true } },
++    { text: 'e-commerce. Predominate extensible testing procedures for reliable good user.' }
++  ], { x: 9.138, y: 2.855, w: 3.007, h: 1.993 });
++
++  line(s, 3.217, 5.54, 0, 0.55, C.rule, 1);
++  line(s, 5.774, 5.54, 0, 0.55, C.rule, 1);
++  STATS_26.forEach(st => {
++    st.glyph(s, st.ix, 5.543, st.iw, 0.547, st.icon);
++    text(s, [{ text: st.big, options: { charSpacing: 1 } },
++             { text: st.sup, options: { charSpacing: 1, superscript: true } }],
++      { x: st.x, y: 5.433, w: 1.36, h: 0.415, fontSize: 18, bold: true, color: C.mid });
++    text(s, 'Your Title Here', { x: st.x, y: 5.836, w: 1.36, h: 0.253,
++      fontSize: 11, charSpacing: 1, color: C.gray });
++  });
++  www(s, { x: 9.245, y: 5.938, w: 2.9 });
++}
++
++/* '#' country outline, 'B' highlighted provinces, 'O' capital marker */
++const BELGIUM = [
++  '..........................#..##..#',
++  '.........................######..##',
++  '.........................##########',
++  '........###............############',
++  '......######..#.......###############',
++  '.....############...################BBBBB',
++  '...#################################BBBBBB',
++  '..###################################BBBBBBBB',
++  '.##################################BBBBBBBBBB',
++  '#################################BBBBBBBBBBBB',
++  '#################################BBBBBBBBBBB',
++  '.#################################BBBBBBBBBB',
++  '.#################################BBBBBBBBBB',
++  '########################OO##########BBBBBBB',
++  '.######################OOO#########BBBBBBB',
++  '..######################OO#########BBBBBBB#',
++  '...####.###########################BBBBBB######',
++  '....#....##########################B############',
++  '.........########################################',
++  '.........######################BBB################',
++  '..........##################BBBBBB################',
++  '..........#################BBBBBBBB###############',
++  '...........#.###############BBBBBBBB###############',
++  '...............#############BBBBBBBBB###############',
++  '...............#############BBBBBBBBBBB#############',
++  '...............#############BBBBBBBBBBB#############',
++  '.....................####BBBBBBBBBBBBBB#############',
++  '......................##BBBBBBBBBBBBBB#############',
++  '......................###BBBBBBBBBBBB############',
++  '.....................####BBBBBBBBBBBB############',
++  '......................###BBBBB.BBBBBB#########',
++  '......................###BBBB..BBB###########',
++  '......................###BBBB..BBB###########',
++  '......................###BBBB.BBBBB##########',
++  '.........................#B....BBBB#########',
++  '...............................BBB##########',
++  '...............................BBB##########',
++  '...............................BB###########',
++  '..................................##########',
++  '...................................##########',
++  '.....................................########',
++  '.....................................########',
++  '.......................................######',
++  '.......................................###'
++];
++
++const ITEMS_27 = [
++  { y: 1.376, color: C.blue, label: '01. Your Items Name' },
++  { y: 3.083, color: C.orange, label: '02. Your Items Name' },
++  { y: 4.790, color: C.blue, label: '03. Your Items Name' }
++];
++const METRICS_27 = [
++  { x: 0.996, y: 3.641, name: 'USABILITY', value: '72%' },
++  { x: 2.559, y: 3.641, name: 'UTILITY', value: '91%' },
++  { x: 0.996, y: 5.214, name: 'DESIRABILITY', value: '28%' },
++  { x: 2.559, y: 5.214, name: 'ACCESSIBILITY', value: '88%' }
++];
++
++function slide27() {
++  const s = pptx.addSlide();
++  box(s, 8.778, 0, 4.556, 7.5, C.cream);
++  ITEMS_27.forEach(it => {
++    box(s, 9.547, it.y, 3.016, 0.478, it.color);
++    head(s, it.label, { x: 9.806, y: it.y + 0.121, w: 2.5, h: 0.236, color: C.white });
++    para(s, 'PLACEHOLDER' +
++      'sound good product standards compliant.',
++      { x: 9.547, y: it.y + 0.603, w: 3.016, h: 0.73 });
++  });
++
++  line(s, 2.352, 3.168, 0, 3.146, C.rule2, 0.5, { dashType: 'lgDash' });
++  line(s, 0.792, 4.741, 3.123, 0, C.rule2, 0.5, { dashType: 'lgDash' });
++  METRICS_27.forEach(m => {
++    text(s, m.name, { x: m.x, y: m.y, w: 1.15, h: 0.185,
++      fontSize: 11, charSpacing: 0.5, color: C.mid });
++    text(s, m.value, { x: m.x, y: m.y + 0.223, w: 1.15, h: 0.404,
++      fontSize: 24, bold: true, charSpacing: 0.5, color: C.mid });
++  });
++
++  pixelMap(s, BELGIUM, 52, { '#': C.lilac, B: C.blue, O: C.orange }, 4.136, 3.168, 3.853, 3.146);
++  title(s, { x: 0.789, y: 1.186, w: 6.285, h: 0.561, line: 'Location Production' });
++  para(s, 'Bring the table win-win survival strategies ensure proactive dominan. At the end of ' +
++    'the day, going forward, for new normal that has evolved from runway heading to our ' +
++    'solution administrate.', { x: 0.789, y: 1.908, w: 6.285, h: 0.478 });
++
++  line(s, 7.073, 1.615, 2.474, 1.991, C.blue, 2.25, { beginArrowType: 'oval' });
++  line(s, 6.029, 3.322, 3.518, 0.845, C.blue, 2.25, { beginArrowType: 'oval' });
++  line(s, 6.588, 4.762, 2.96, 0.268, C.blue, 2.25, { endArrowType: 'oval' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 28 - gallery
++ * ------------------------------------------------------------------ */
++function slide28() {
++  const s = pptx.addSlide();
++  box(s, 5.93, 0, 7.403, 7.5, C.orange);
++  www(s, { x: 11.424, y: 3.674, w: 2.7, rotate: 270, color: C.white });
++  box(s, 0, 2.701, 3.594, 2.097, C.orange);
++  title(s, { x: 0.995, y: 3.189, w: 2.11, h: 1.122, color: C.white,
++    lines: ['Gallery', 'Image'] });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 29 - contact
++ * ------------------------------------------------------------------ */
++function slide29() {
++  const s = pptx.addSlide();
++  shape(s, pptx.ShapeType.rect, { x: 7.526, y: 0.875, w: 4.928, h: 5.75,
++    fill: { type: 'none' }, line: { color: C.tan, width: 4.75 } });
++  title(s, { x: 8.172, y: 1.844, w: 3.636, h: 1.122, align: 'center',
++    lines: ['Contact', 'Information'] });
++  text(s, '+ 1234 567 8910 | + 4567 890 777', { x: 8.79, y: 3.238, w: 2.4, h: 0.187,
++    fontSize: 11, color: C.mid, align: 'center' });
++  box(s, 9.49, 3.706, 1.0, 0.02, C.blue);
++  text(s, 'kuloa@technology.com', { x: 8.79, y: 4.008, w: 2.4, h: 0.187,
++    fontSize: 11, color: C.mid, align: 'center' });
++  box(s, 9.49, 4.476, 1.0, 0.02, C.blue);
++  text(s, '17 WEST AVENUE, NY 1910, USA', { x: 8.693, y: 4.778, w: 2.594, h: 0.187,
++    fontSize: 11, color: C.mid, align: 'center' });
++  www(s, { x: 8.596, y: 5.505, w: 2.8, align: 'center' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slide 30 - thanks
++ * ------------------------------------------------------------------ */
++function slide30() {
++  const s = pptx.addSlide();
++  box(s, 0, 0, 10.894, 7.5, C.orange);
++  box(s, 9.681, 2.275, 3.652, 5.225, C.blue);
++  www(s, { x: 5.928, y: 1.656, w: 3.0, fontSize: 10, color: C.white });
++  title(s, { x: 1.039, y: 2.487, w: 5.901, h: 1.010, line: 'Thanks',
++    size: 60, color: C.white, leading: 66 });
++  title(s, { x: 1.039, y: 3.498, w: 5.901, h: 0.617, line: 'for Watching',
++    size: 40, color: C.white, leading: 44 });
++  para(s, 'Interactively coordinate proactive via process centric outside. Proactively ' +
++    'envisioned with multimedia based expertise and cross-media growth strategies visualize ' +
++    'quality good.', { x: 1.039, y: 4.535, w: 5.901, h: 0.478, color: C.white });
++  text(s, '\u201C Every time you smile at someone, it is an action of love, a gift to that ' +
++    'person, a beautiful thing.\u201D', { x: 5.928, y: 5.917, w: 5.273, h: 0.606,
++      fontSize: 18, bold: true, italic: true, color: C.white, align: 'right' });
++}
++
++/* ------------------------------------------------------------------ *
++ * Slides 31-42 - pictogram sheets
++ * ------------------------------------------------------------------ *
++ * The deck closes with twelve pages of monochrome icons on a fixed
++ * 10-column grid.  They are rebuilt from a rotating set of simple
++ * vector glyphs placed on the very same grid coordinates.
++ */
++const ICON_COLS = [1.359, 2.537, 3.716, 4.894, 6.073, 7.251, 8.428, 9.607, 10.785, 11.962];
++const ROWS_7 = [0.899, 1.847, 2.797, 3.747, 4.696, 5.645, 6.594];
++const ROWS_8 = [0.879, 1.693, 2.507, 3.320, 4.133, 4.946, 5.761, 6.574];
++
++const ICON_GLYPHS = [
++  (s, x, y, r) => oval(s, x - r, y - r, 2 * r, 2 * r, C.ink),
++  (s, x, y, r) => round(s, x - r, y - r, 2 * r, 2 * r, C.ink, 0.05),
++  (s, x, y, r) => poly(s, { x: x - r, y: y - r, w: 2 * r, h: 2 * r, color: C.ink,
++    pts: [[0.5, 0], [1, 1], [0, 1]] }),
++  (s, x, y, r) => shape(s, pptx.ShapeType.ellipse, { x: x - r, y: y - r, w: 2 * r, h: 2 * r,
++    fill: { type: 'none' }, line: { color: C.ink, width: 3 } }),
++  (s, x, y, r) => poly(s, { x: x - r, y: y - r, w: 2 * r, h: 2 * r, color: C.ink,
++    pts: [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]] }),
++  (s, x, y, r) => {
++    box(s, x - r, y - r, 2 * r, 0.42 * r, C.ink);
++    box(s, x - r, y - 0.21 * r, 2 * r, 0.42 * r, C.ink);
++    box(s, x - r, y + 0.58 * r, 2 * r, 0.42 * r, C.ink);
++  },
++  (s, x, y, r) => {
++    box(s, x - 0.24 * r, y - r, 0.48 * r, 2 * r, C.ink);
++    box(s, x - r, y - 0.24 * r, 2 * r, 0.48 * r, C.ink);
++  },
++  (s, x, y, r) => shape(s, pptx.ShapeType.rect, { x: x - r, y: y - r, w: 2 * r, h: 2 * r,
++    fill: { type: 'none' }, line: { color: C.ink, width: 3 } }),
++  (s, x, y, r) => poly(s, { x: x - r, y: y - 0.85 * r, w: 2 * r, h: 1.7 * r, color: C.ink,
++    pts: [[0, 0], [1, 0], [1, 0.7], [0.6, 0.7], [0.36, 1], [0.36, 0.7], [0, 0.7]] }),
++  (s, x, y, r) => {
++    oval(s, x - r, y - r, 2 * r, 2 * r, C.ink);
++    oval(s, x - 0.45 * r, y - 0.45 * r, 0.9 * r, 0.9 * r, C.white);
++  },
++  (s, x, y, r) => {
++    box(s, x - r, y - 0.7 * r, 2 * r, 1.15 * r, C.ink);
++    box(s, x - 0.4 * r, y + 0.55 * r, 0.8 * r, 0.35 * r, C.ink);
++  },
++  (s, x, y, r) => poly(s, { x: x - r, y: y - r, w: 2 * r, h: 2 * r, color: C.ink,
++    pts: [[0.5, 0], [0.62, 0.36], [1, 0.38], [0.7, 0.62], [0.82, 1], [0.5, 0.77],
++      [0.18, 1], [0.3, 0.62], [0, 0.38], [0.38, 0.36]] }),
++  (s, x, y, r) => {
++    round(s, x - r, y - 0.8 * r, 2 * r, 1.35 * r, C.ink, 0.05);
++    poly(s, { x: x - 0.6 * r, y: y + 0.5 * r, w: 0.8 * r, h: 0.55 * r, color: C.ink,
++      pts: [[0, 0], [1, 0], [0.15, 1]] });
++  },
++  (s, x, y, r) => {
++    oval(s, x - 0.45 * r, y - r, 0.9 * r, 0.9 * r, C.ink);
++    poly(s, { x: x - r, y: y + 0.05 * r, w: 2 * r, h: 0.95 * r, color: C.ink,
++      pts: [[0.5, 0], [1, 1], [0, 1]] });
++  }
++];
++
++function iconSheet(rows, count) {
++  const s = pptx.addSlide();
++  let n = 0;
++  for (let j = 0; j < rows.length && n < count; j++) {
++    for (let i = 0; i < ICON_COLS.length && n < count; i++, n++) {
++      const glyph = ICON_GLYPHS[(n * 5 + j * 3) % ICON_GLYPHS.length];
++      glyph(s, ICON_COLS[i], rows[j], 0.2 + 0.02 * ((n * 7) % 3));
++    }
++  }
++}
++
++/* ------------------------------------------------------------------ *
++ * Build the deck
++ * ------------------------------------------------------------------ */
++pptx.defineLayout({ name: 'KULOA', width: 13.333, height: 7.5 });
++pptx.layout = 'KULOA';
++pptx.author = 'Kuloa';
++pptx.title = 'Technology Presentation';
++
++[slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
++ slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
++ slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30
++].forEach(build => build());
++
++// slides 31-42: eight 70-icon sheets, one 80-icon sheet, then 70, 70 and 67
++[70, 70, 70, 70, 70, 70, 70, 70].forEach(n => iconSheet(ROWS_7, n));
++iconSheet(ROWS_8, 80);
++iconSheet(ROWS_7, 70);
++iconSheet(ROWS_7, 70);
++iconSheet(ROWS_7, 67);
++
++pptx.writeFile({
++  fileName: path.join(__dirname, '139d74d7-2194-4bc8-b233-4b38ecad70f8_grok_final.pptx')
++}).then(f => console.log('wrote', f));
