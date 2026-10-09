@@ -1,0 +1,120 @@
+--- 2026-10-08_20-36:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-09_02-53:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -117,6 +117,14 @@
+ var import_node_path = require("node:path");
+ var import_node_sqlite2 = require("node:sqlite");
+ 
++// src/shared/ids.ts
++function isAgentId(raw) {
++  return typeof raw === "string" && raw.length > 0 && raw === raw.trim() && !raw.includes("/") && !raw.includes("\\") && !raw.includes("\0") && raw !== "." && raw !== "..";
++}
++function parseAgentId(raw) {
++  return isAgentId(raw) ? raw : null;
++}
++
+ // src/shared/media/attachment-open-policy.ts
+ function attachmentExtension(nameOrPath) {
+   const segments = nameOrPath.split(/[/\\]/);
+@@ -1460,13 +1468,14 @@
+ function collectMessageMatches(rows, snippetOf) {
+   const results = [];
+   for (const row of rows) {
+-    if (typeof row.agentId !== "string" || typeof row.entryId !== "string" || row.role !== "user" && row.role !== "assistant" || typeof row.timestampMs !== "number") {
++    const agentId = parseAgentId(row.agentId);
++    if (agentId == null || typeof row.entryId !== "string" || row.role !== "user" && row.role !== "assistant" || typeof row.timestampMs !== "number") {
+       continue;
+     }
+     const snippet = snippetOf(row);
+     if (snippet == null) continue;
+     results.push({
+-      agentId: row.agentId,
++      agentId,
+       entryId: row.entryId,
+       role: row.role,
+       timestampMs: row.timestampMs,
+@@ -1575,11 +1584,12 @@
+   const rows = mediaMatchRows(db, query, limit, isFtsEnabled);
+   const results = [];
+   for (const row of rows) {
+-    if (typeof row.agentId !== "string" || typeof row.entryId !== "string" || typeof row.fileName !== "string" || typeof row.ext !== "string" || typeof row.kind !== "string" || typeof row.timestampMs !== "number") {
++    const agentId = parseAgentId(row.agentId);
++    if (agentId == null || typeof row.entryId !== "string" || typeof row.fileName !== "string" || typeof row.ext !== "string" || typeof row.kind !== "string" || typeof row.timestampMs !== "number") {
+       continue;
+     }
+     results.push({
+-      agentId: row.agentId,
++      agentId,
+       entryId: row.entryId,
+       fileName: row.fileName,
+       ext: row.ext,
+@@ -1597,16 +1607,6 @@
+ var import_node_fs = require("node:fs");
+ var import_node_path2 = require("node:path");
+ var import_node_sqlite3 = require("node:sqlite");
+-
+-// src/shared/ids.ts
+-function isAgentId(raw) {
+-  return typeof raw === "string" && raw.length > 0 && raw === raw.trim() && !raw.includes("/") && !raw.includes("\\") && !raw.includes("\0") && raw !== "." && raw !== "..";
+-}
+-function parseAgentId(raw) {
+-  return isAgentId(raw) ? raw : null;
+-}
+-
+-// src/host/extensions/content-search/search-index-writer.ts
+ var STORE_FILENAME = "store.db";
+ var INCREMENTAL_VACUUM_PAGES = 512;
+ function prepareStatements(db) {
+@@ -1719,18 +1719,19 @@
+     return this.statements.readIsServerOwned.get(agentId) != null;
+   }
+   applyServerRange(range) {
+-    if (parseAgentId(range.agentId) == null || !(0, import_node_fs.existsSync)((0, import_node_path2.join)(this.agentsRootDir, range.agentId))) {
++    const agentId = parseAgentId(range.agentId);
++    if (agentId == null || !(0, import_node_fs.existsSync)((0, import_node_path2.join)(this.agentsRootDir, agentId))) {
+       return "unknown-agent";
+     }
+     return this.inTransaction(() => {
+-      const step = nextServerCursor(readServerCursor(this.db, range.agentId), range);
++      const step = nextServerCursor(readServerCursor(this.db, agentId), range);
+       switch (step.kind) {
+         case "superseded":
+           return "superseded";
+         case "reset":
+-          this.statements.deleteAgentMessages.run(range.agentId);
+-          this.statements.deleteAgentMedia.run(range.agentId);
+-          this.statements.deleteFingerprint.run(range.agentId);
++          this.statements.deleteAgentMessages.run(agentId);
++          this.statements.deleteAgentMedia.run(agentId);
++          this.statements.deleteFingerprint.run(agentId);
+           break;
+         case "advance":
+         case "verify":
+@@ -1741,12 +1742,12 @@
+         }
+       }
+       const beforeSeq = range.beforeSeq ?? Number.MAX_SAFE_INTEGER;
+-      this.statements.deleteMessageSpan.run(range.agentId, range.fromSeq, beforeSeq);
+-      this.statements.deleteMediaSpan.run(range.agentId, range.fromSeq, beforeSeq);
+-      for (const row of range.rows) this.applyEntry(range.agentId, row, row.seq);
++      this.statements.deleteMessageSpan.run(agentId, range.fromSeq, beforeSeq);
++      this.statements.deleteMediaSpan.run(agentId, range.fromSeq, beforeSeq);
++      for (const row of range.rows) this.applyEntry(agentId, row, row.seq);
+       if (step.kind !== "verify") {
+         this.statements.upsertCursor.run(
+-          range.agentId,
++          agentId,
+           step.next.generation,
+           step.next.toppedThroughSeq,
+           step.next.backfilledFromSeq
+@@ -1922,7 +1923,10 @@
+   reconcile() {
+     let agentDirs;
+     try {
+-      agentDirs = (0, import_node_fs.readdirSync)(this.agentsRootDir, { withFileTypes: true }).filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
++      agentDirs = (0, import_node_fs.readdirSync)(this.agentsRootDir, { withFileTypes: true }).flatMap((dirent) => {
++        const agentId = dirent.isDirectory() ? parseAgentId(dirent.name) : null;
++        return agentId == null ? [] : [agentId];
++      });
+     } catch {
+       agentDirs = [];
+     }

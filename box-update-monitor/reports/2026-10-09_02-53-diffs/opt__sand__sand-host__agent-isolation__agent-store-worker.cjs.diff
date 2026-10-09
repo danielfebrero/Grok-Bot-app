@@ -1,0 +1,118 @@
+--- 2026-10-08_20-36:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-09_02-53:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -6867,6 +6867,7 @@
+     this.skipApproval = false;
+     this.serverIdentifier = "";
+     this.symbolicPathArguments = [];
++    this.argumentsRepaired = false;
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -6882,7 +6883,7 @@
+     return proto3.util.equals(_McpArgs, a, b);
+   }
+   static $() {
+-    return ["McpArgs|1 name 9|2 args 9,#0|3 tool_call_id 9|4 provider_identifier 9|5 tool_name 9|6 smart_mode_approval #1?|7 smart_mode_approval_only 8|8 skip_approval 8|9 server_identifier 9|10 symbolic_path_arguments #2*", Value, SmartModeApproval, McpSymbolicPathArgument];
++    return ["McpArgs|1 name 9|2 args 9,#0|3 tool_call_id 9|4 provider_identifier 9|5 tool_name 9|6 smart_mode_approval #1?|7 smart_mode_approval_only 8|8 skip_approval 8|9 server_identifier 9|10 symbolic_path_arguments #2*|11 arguments_repaired 8", Value, SmartModeApproval, McpSymbolicPathArgument];
+   }
+ };
+ var McpSymbolicPathArgument = class _McpSymbolicPathArgument extends __protoMessage320 {
+@@ -13984,7 +13985,70 @@
+     return proto3.util.equals(_ConnectScmArgs, a, b);
+   }
+   static $() {
+-    return ["ConnectScmArgs|1 tool_call_id 9|2 github #0 target", ConnectScmGithub];
++    return ["ConnectScmArgs|1 tool_call_id 9|2 github #0 target|3 gitlab #1 target|4 bitbucket #2 target|5 azure_devops #3 target|6 reconnect 8?|7 repo_url 9?|8 instance_host 9?", ConnectScmGithub, ConnectScmGitlab, ConnectScmBitbucket, ConnectScmAzureDevops];
++  }
++};
++var ConnectScmGitlab = class _ConnectScmGitlab extends __protoMessage368 {
++  constructor(data) {
++    super();
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ConnectScmGitlab().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ConnectScmGitlab().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ConnectScmGitlab().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ConnectScmGitlab, a, b);
++  }
++  static $() {
++    return ["ConnectScmGitlab|1 instance_id 9?"];
++  }
++};
++var ConnectScmBitbucket = class _ConnectScmBitbucket extends __protoMessage368 {
++  constructor(data) {
++    super();
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ConnectScmBitbucket().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ConnectScmBitbucket().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ConnectScmBitbucket().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ConnectScmBitbucket, a, b);
++  }
++  static $() {
++    return ["ConnectScmBitbucket|1 instance_id 9?"];
++  }
++};
++var ConnectScmAzureDevops = class _ConnectScmAzureDevops extends __protoMessage368 {
++  constructor(data) {
++    super();
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ConnectScmAzureDevops().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ConnectScmAzureDevops().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ConnectScmAzureDevops().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ConnectScmAzureDevops, a, b);
++  }
++  static $() {
++    return ["ConnectScmAzureDevops"];
+   }
+ };
+ var ConnectScmGithub = class _ConnectScmGithub extends __protoMessage368 {
+@@ -14050,7 +14114,7 @@
+     return proto3.util.equals(_ConnectScmResult, a, b);
+   }
+   static $() {
+-    return ["ConnectScmResult|1 success #0 result|2 error #1 result|3 rejected #2 result", ConnectScmSuccess, ConnectScmError, ConnectScmRejected];
++    return ["ConnectScmResult|1 success #0 result|2 error #1 result|3 rejected #2 result|4 scm_target 9?", ConnectScmSuccess, ConnectScmError, ConnectScmRejected];
+   }
+ };
+ var ConnectScmSuccess = class _ConnectScmSuccess extends __protoMessage368 {
+@@ -14179,7 +14243,7 @@
+     return proto3.util.equals(_ConnectScmRequestResponse_Approved, a, b);
+   }
+   static $() {
+-    return ["ConnectScmRequestResponse.Approved"];
++    return ["ConnectScmRequestResponse.Approved|1 scm_target 9?"];
+   }
+ };
+ var ConnectScmRequestResponse_Rejected = class _ConnectScmRequestResponse_Rejected extends __protoMessage368 {
+@@ -14201,7 +14265,7 @@
+     return proto3.util.equals(_ConnectScmRequestResponse_Rejected, a, b);
+   }
+   static $() {
+-    return ["ConnectScmRequestResponse.Rejected|1 reason 9"];
++    return ["ConnectScmRequestResponse.Rejected|1 reason 9|2 recorded_args #0?", ConnectScmArgs];
+   }
+ };
+ var ConnectScmRequestResponse_Failed = class _ConnectScmRequestResponse_Failed extends __protoMessage368 {

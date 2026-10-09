@@ -1,0 +1,1295 @@
+/*
+ * "Sustainable Farming Practices" infographic deck — 31 slides, 13.333 x 7.5 in.
+ * Rebuilt from scratch with pptxgenjs only. Raster artwork of the original deck
+ * is replaced by flat colour placeholders that keep the original geometry.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ---------------------------------------------------------------- palette */
+
+const C = {
+  green: '76C642', // theme accent1
+  dgreen: '46891A', // theme accent2
+  yellow: 'FFC600', // theme accent3
+  dyellow: '997000', // theme accent4
+  cyan: '2EB6DB', // theme accent5
+  dcyan: '1D7F96', // theme accent6
+  white: 'FFFFFF',
+  black: '000000',
+  bg: '000000', // slide background (theme tx1)
+  panel: '181717', // dark card fill
+  ink: '262626',
+  grey: '404040',
+  midgrey: '595959',
+  softgrey: '808080',
+  palegrey: 'BFBFBF',
+  olive: '3A651F',
+  leaf: '58982E',
+  bark: '735400',
+  pale: 'C8E8B3',
+};
+
+const HEAD = 'Open Sans SemiBold'; // theme major latin font
+const BODY = 'Nunito'; // theme minor latin font
+const NOLINE = { type: 'none' };
+
+/* ---------------------------------------------------------------- helpers */
+
+/** Text box. `box` = [x, y, w, h] in inches. */
+function T(s, box, runs, o) {
+  s.addText(runs, Object.assign({
+    x: box[0], y: box[1], w: box[2], h: box[3],
+    fontFace: BODY, fontSize: 12, color: C.black,
+    valign: 'top', align: 'left', margin: [7.2, 7.2, 3.6, 3.6],
+  }, o || {}));
+}
+
+/** Auto shape. */
+function S(s, kind, box, o) {
+  s.addShape(kind, Object.assign({ x: box[0], y: box[1], w: box[2], h: box[3] }, o || {}));
+}
+
+function rect(s, box, color, o) {
+  S(s, 'rect', box, Object.assign({ fill: { color: color }, line: NOLINE }, o || {}));
+}
+
+/** Rounded rectangle; `r` = corner radius in inches. */
+function rrect(s, box, color, r, o) {
+  S(s, 'roundRect', box, Object.assign({ fill: { color: color }, line: NOLINE, rectRadius: r }, o || {}));
+}
+
+function oval(s, box, color, o) {
+  S(s, 'ellipse', box, Object.assign({ fill: color ? { color: color } : { type: 'none' }, line: NOLINE }, o || {}));
+}
+
+/** Straight line between two absolute points. */
+function line(s, x1, y1, x2, y2, o) {
+  S(s, 'line', [Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1)],
+    Object.assign({ flipH: x2 < x1, flipV: y2 < y1 }, o || {}));
+}
+
+/** Closed polygon through absolute [x, y] points. */
+function poly(s, pts, o) {
+  const xs = pts.map(function (q) { return q[0]; });
+  const ys = pts.map(function (q) { return q[1]; });
+  const x = Math.min.apply(null, xs);
+  const y = Math.min.apply(null, ys);
+  const rel = pts.map(function (q) { return { x: q[0] - x, y: q[1] - y }; });
+  rel.push({ close: true });
+  S(s, 'custGeom', [x, y, Math.max.apply(null, xs) - x, Math.max.apply(null, ys) - y],
+    Object.assign({ points: rel }, o || {}));
+}
+
+/**
+ * Rectangle with two opposite corners rounded (OOXML `round2DiagRect`).
+ * `pair` — 'tr' rounds top-right + bottom-left, 'tl' rounds top-left + bottom-right.
+ */
+function diagRect(s, box, color, r, pair) {
+  const w = box[2];
+  const h = box[3];
+  const pts = pair === 'tr'
+    ? [{ x: 0, y: 0 }, { x: w - r, y: 0 }, { x: w, y: r, curve: { type: 'arc', hR: r, wR: r, stAng: 270, swAng: 90 } },
+      { x: w, y: h }, { x: r, y: h }, { x: 0, y: h - r, curve: { type: 'arc', hR: r, wR: r, stAng: 90, swAng: 90 } }, { close: true }]
+    : [{ x: r, y: 0 }, { x: w, y: 0 }, { x: w, y: h - r }, { x: w - r, y: h, curve: { type: 'arc', hR: r, wR: r, stAng: 0, swAng: 90 } },
+      { x: 0, y: h }, { x: 0, y: r, curve: { type: 'arc', hR: r, wR: r, stAng: 180, swAng: 90 } }, { close: true }];
+  S(s, 'custGeom', box, { points: pts, fill: { color: color }, line: NOLINE });
+}
+
+/** Blend two hex colours; f = 0 gives a, f = 1 gives b. */
+function mix(a, b, f) {
+  let out = '';
+  for (let i = 0; i < 3; i++) {
+    const ca = parseInt(a.substr(i * 2, 2), 16);
+    const cb = parseInt(b.substr(i * 2, 2), 16);
+    out += ('0' + Math.round(ca + (cb - ca) * f).toString(16)).slice(-2).toUpperCase();
+  }
+  return out;
+}
+
+/** Vertical gradient painted as opaque strips (top colour -> bottom colour). */
+function vgrad(s, box, top, bottom, steps) {
+  const n = steps || 40;
+  const h = box[3] / n;
+  for (let i = 0; i < n; i++) {
+    rect(s, [box[0], box[1] + i * h, box[2], h + 0.03], mix(top, bottom, (i + 0.5) / n));
+  }
+}
+
+/**
+ * Stand-in for a photo / illustration the original deck embedded as a bitmap.
+ * `alpha` (0-100) lets a decorative panel underneath stay readable.
+ */
+function art(s, box, color, label, alpha) {
+  S(s, 'roundRect', box, {
+    fill: { color: color, transparency: alpha || 0 }, line: NOLINE,
+    rectRadius: Math.min(0.12, box[2] / 8, box[3] / 8),
+  });
+  if (label) {
+    T(s, [box[0], box[1] + box[3] / 2 - 0.18, box[2], 0.36], label,
+      { align: 'center', fontSize: 11, color: 'FFFFFF', transparency: 45 });
+  }
+}
+
+/** Stand-in for a small line-art pictogram: an outlined rounded square. */
+function icon(s, box, color) {
+  S(s, 'roundRect', box, { fill: { type: 'none' }, line: { color: color, width: 1.25 }, rectRadius: box[2] * 0.18 });
+}
+
+/** Three-bar chart glyph used as a decorative mark on several slides. */
+function barGlyph(s, x, y, w, h, color) {
+  const bw = w * 0.26;
+  [[0, 0.4], [0.37, 0], [0.74, 0.57]].forEach(function (b) {
+    rect(s, [x + b[0] * w, y + b[1] * h, bw, h * (1 - b[1])], color);
+  });
+}
+
+/** Master footer: caption, accent rule and page number. */
+function footer(s, n, o) {
+  o = o || {};
+  T(s, [0.427, 6.901, 3.475, 0.303], 'Sustainable Farming Practices Infographic',
+    { fontSize: 12, color: o.capColor || C.midgrey });
+  line(s, 12.290, 6.703, 13.333, 6.703, { line: { color: o.ruleColor || C.green, width: 1.25 } });
+  T(s, [11.931, 6.901, 0.975, 0.303], [
+    { text: 'Page ', options: { color: o.pageColor || C.midgrey } },
+    { text: String(n), options: { color: o.numColor || C.green } },
+  ], { fontSize: 12, align: 'right', charSpacing: 0 });
+}
+
+/** Two-tone headline; `parts` = [[text, color, breakAfter], ...]. */
+function headline(s, box, parts, o) {
+  o = o || {};
+  const runs = parts.map(function (q) {
+    return { text: q[0], options: Object.assign({ color: q[1], breakLine: q[2] === true }, o.run || {}) };
+  });
+  T(s, box, runs, Object.assign({ fontFace: HEAD, fontSize: 40, charSpacing: -1.5, color: C.white }, o.box || {}));
+}
+
+/**
+ * Livestock silhouette built from primitives, drawn inside `box` and facing
+ * right. Used for the stacked cow / sheep / pig / hen motif.
+ */
+function animal(s, kind, box, color) {
+  const x = box[0];
+  const y = box[1];
+  const w = box[2];
+  const h = box[3];
+  const fill = { fill: { color: color }, line: NOLINE };
+  const put = function (fx, fy, fw, fh, shape, o) {
+    S(s, shape || 'ellipse', [x + fx * w, y + fy * h, fw * w, fh * h], Object.assign({}, fill, o || {}));
+  };
+  const legs = function (tops, top, bottom, lw) {
+    tops.forEach(function (lx) { put(lx, top, lw, bottom - top, 'rect'); });
+  };
+  if (kind === 'cow') {
+    put(0.05, 0.18, 0.72, 0.60); // barrel
+    put(0.63, 0.10, 0.33, 0.42); // head
+    put(0.60, 0.03, 0.13, 0.12, 'triangle'); // horns
+    put(0.88, 0.03, 0.13, 0.12, 'triangle');
+    legs([0.12, 0.26, 0.55, 0.68], 0.70, 1.0, 0.08);
+    put(0.01, 0.24, 0.05, 0.50, 'rect'); // tail
+    put(0.00, 0.70, 0.07, 0.10); // tail tuft
+  } else if (kind === 'sheep') {
+    put(0.02, 0.08, 0.76, 0.72); // fleece
+    put(0.66, 0.24, 0.32, 0.40); // head
+    legs([0.16, 0.28, 0.55, 0.66], 0.74, 1.0, 0.08);
+  } else if (kind === 'pig') {
+    put(0.02, 0.06, 0.82, 0.72);
+    put(0.72, 0.24, 0.26, 0.44); // snout
+    put(0.62, 0.00, 0.15, 0.22, 'triangle'); // ear
+    legs([0.16, 0.28, 0.58, 0.70], 0.76, 1.0, 0.08);
+  } else { // hen
+    put(0.10, 0.30, 0.68, 0.55); // body
+    put(0.54, 0.10, 0.32, 0.34); // head
+    put(0.62, 0.02, 0.13, 0.11, 'triangle'); // comb
+    put(0.00, 0.18, 0.28, 0.34, 'triangle'); // tail
+    legs([0.34, 0.52], 0.82, 1.0, 0.06);
+  }
+}
+
+/** Small dark badge holding a coloured arrow (repeated on many slides). */
+function arrowBadge(s, x, y, size, arrowColor, boxColor) {
+  rrect(s, [x, y, size, size], boxColor || C.panel, size * 0.18, { line: { color: boxColor || C.panel, width: 2.25 } });
+  line(s, x + size * 0.285, y + size / 2, x + size * 0.72, y + size / 2,
+    { line: { color: arrowColor, width: 1.25, endArrowType: 'arrow' } });
+}
+
+/* ------------------------------------------------------------- slide 1 */
+
+function slide01(p) {
+  const s = p.addSlide();
+  diagRect(s, [6.438, 0, 6.896, 7.5], C.yellow, 2.878, 'tr');
+  art(s, [7.850, 1.064, 3.909, 5.269], 'C0A020', '[illustration]', 45);
+  headline(s, [0.8, 1.784, 4.683, 3.13], [['Sustainable', C.dgreen, true], ['Farming Practices', C.dgreen]],
+    { box: { fontSize: 60, lineSpacingMultiple: 0.9 } });
+  T(s, [0.8, 4.986, 2.539, 0.37], 'Infographic Templates', { fontSize: 16, color: C.white });
+}
+
+/* ------------------------------------------------------------- slide 2 */
+
+function slide02(p) {
+  const s = p.addSlide();
+  diagRect(s, [0, 0, 4.032, 6.177], C.green, 1.683, 'tr');
+  art(s, [0.8, 0.797, 6.652, 5.906], '5E7A3A', '[windmill illustration]', 50);
+  headline(s, [8.566, 0.75, 4.032, 1.447], [['Sustainable Farming ', C.green], ['Target', C.white]],
+    { box: { align: 'right', lineSpacingMultiple: 0.9 } });
+  [0, 1, 2].forEach(function (i) {
+    const y = 2.356 + i * 0.4415;
+    T(s, [8.729, y, 3.24, 0.333], 'Lorem ipsum dolor sit amet qui sint',
+      { fontSize: 12, color: C.white, align: 'right', lineSpacingMultiple: 1.2 });
+    arrowBadge(s, 12.181, y + 0.04, 0.287, C.yellow);
+  });
+  rrect(s, [11.755, 4.189, 0.783, 0.783], C.yellow, 0.141);
+  barGlyph(s, 11.954, 4.407, 0.387, 0.348, C.black);
+  T(s, [8.632, 5.110, 3.966, 0.873],
+    'Farmers in developing countries have a hard time transporting their produce to markets due to lack of roads, vehicles and money.',
+    { fontSize: 12, color: C.white, align: 'right', lineSpacingMultiple: 1.3 });
+  footer(s, 2);
+}
+
+/* ------------------------------------------------------------- slide 3 */
+
+function slide03(p) {
+  const s = p.addSlide();
+  vgrad(s, [6.667, 0, 6.667, 5.407], C.green, C.bg);
+  headline(s, [6.820, 0.633, 5.708, 1.447], [['Sustainable ', C.black, true], ['Food Product', C.black]],
+    { box: { align: 'right', lineSpacingMultiple: 0.9 } });
+  barGlyph(s, 1.004, 1.012, 0.387, 0.348, C.yellow);
+  T(s, [0.805, 1.454, 3.966, 0.873],
+    'Farmers in developing countries have a hard time transporting their produce to markets due to lack of roads, vehicles and money.',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+
+  const cards = [
+    { x: 1.019, photo: '756940', title: 'Best rice', ico: [2.083, 2.928, 0.431] },
+    { x: 5.322, photo: 'B6AE40', title: 'Healthy rice', ico: [6.397, 2.937, 0.422] },
+    { x: 9.624, photo: '5B532C', title: 'Good yields', ico: [10.754, 2.986, 0.315] },
+  ];
+  cards.forEach(function (c) {
+    rrect(s, [c.x, 3.322, 2.572, 3.381], C.panel, 0.118);
+    art(s, [c.x + 0.286, 3.674, 1.987, 1.701], c.photo);
+    T(s, [c.x + 0.286, 5.561, 2.286, 0.337], c.title, { fontSize: 14, bold: true, color: C.white });
+    T(s, [c.x + 0.286, 5.874, 1.81, 0.611], 'Lorem ipsum dolor sit amet',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+    S(s, 'ellipse', [c.ico[0] - 0.138, c.ico[1] - 0.139, 0.708, 0.708], { fill: { color: C.yellow }, line: NOLINE, rotate: 45 });
+    icon(s, [c.ico[0], c.ico[1], c.ico[2], c.ico[2]], '6B4E00');
+  });
+  footer(s, 3);
+}
+
+/* ------------------------------------------------------------- slide 4 */
+
+function slide04(p) {
+  const s = p.addSlide();
+  const dash = { color: C.ink, width: 1.75, dashType: 'dash' };
+  line(s, 2.495, 1.566, 9.981, 1.538, { line: dash });
+  line(s, 2.495, 5.899, 9.864, 5.899, { line: dash });
+  S(s, 'arc', [7.825, 1.538, 4.362, 4.362], { line: dash, angleRange: [270, 90.2] });
+
+  const opts = [
+    { x: 1.281, y: 1.954, label: 'Options One', color: C.green, dot: [2.304, 1.470], ty: 2.495, tx: 1.020 },
+    { x: 4.512, y: 1.954, label: 'Options Two', color: C.yellow, dot: [5.535, 1.470], ty: 2.495, tx: 4.251 },
+    { x: 1.281, y: 4.125, label: 'Options Four', color: C.dcyan, dot: [2.304, 5.804], ty: 4.667, tx: 1.020 },
+    { x: 4.512, y: 4.125, label: 'Options Three', color: C.cyan, dot: [5.535, 5.804], ty: 4.680, tx: 4.251 },
+  ];
+  opts.forEach(function (o) {
+    rrect(s, [o.x, o.y, 2.238, 0.429], o.color, 0.2145);
+    T(s, [o.x, o.y, 2.238, 0.429], o.label, { fontSize: 14, bold: true, color: C.black, align: 'center', valign: 'middle' });
+    oval(s, [o.dot[0], o.dot[1], 0.191, 0.191], o.color);
+    T(s, [o.tx, o.ty, 2.759, 0.576], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ',
+      { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.2 });
+  });
+
+  art(s, [7.345, 2.164, 3.409, 3.025], '4F3415', '[wheelbarrow]');
+  S(s, 'ellipse', [10.103, 0.756, 2.160, 2.160], { fill: { color: C.green }, line: NOLINE });
+  S(s, 'triangle', [10.085, 2.325, 0.472, 0.323], { fill: { color: C.green }, line: NOLINE, rotate: 233, flipV: true });
+  T(s, [10.181, 1.315, 2.004, 1.043], [
+    { text: '4 Step', options: { breakLine: true } }, { text: 'Of Farm' },
+  ], { fontSize: 28, bold: true, color: C.black, align: 'center', valign: 'middle' });
+  footer(s, 4);
+}
+
+/* ------------------------------------------------------------- slide 5 */
+
+function slide05(p) {
+  const s = p.addSlide();
+  S(s, 'ellipse', [4.527, 1.695, 4.111, 4.111],
+    { fill: { type: 'none' }, line: { color: C.grey, width: 1.75, dashType: 'lgDash' } });
+  T(s, [5.721, 3.087, 1.724, 1.111], [
+    { text: 'Sustainable', options: { breakLine: true } },
+    { text: 'Farming', options: { breakLine: true } },
+    { text: 'Practices' },
+  ], { fontFace: HEAD, fontSize: 20, bold: true, color: C.white, align: 'center', valign: 'middle', margin: 0 });
+
+  const steps = [
+    { label: 'Step 1', color: C.green, ring: [5.652, 0.797], art: [6.013, 1.222, 1.139, 1.010], lx: 8.115, ly: 0.960, tx: 8.115, ty: 1.478, al: 'left' },
+    { label: 'Step 2', color: C.yellow, ring: [7.670, 2.819], art: [7.965, 3.271, 1.271, 0.957], lx: 9.486, ly: 4.354, tx: 9.486, ty: 4.871, al: 'left' },
+    { label: 'Step 3', color: C.cyan, ring: [5.652, 4.842], art: [5.971, 5.264, 1.224, 1.017], lx: 3.139, ly: 5.378, tx: 2.190, ty: 5.895, al: 'right' },
+    { label: 'Step 4', color: C.dcyan, ring: [3.625, 2.819], art: [3.986, 3.193, 1.139, 1.103], lx: 1.845, ly: 1.820, tx: 0.902, ty: 2.338, al: 'right' },
+  ];
+  steps.forEach(function (st) {
+    S(s, 'ellipse', [st.ring[0], st.ring[1], 1.861, 1.861], { fill: { color: C.black }, line: { color: st.color, width: 1.75 } });
+    art(s, st.art, '4E3018');
+    T(s, [st.lx, st.ly, 1.724, 0.572], st.label,
+      { fontFace: HEAD, fontSize: 28, bold: true, color: st.color, align: st.al, valign: 'middle' });
+    T(s, [st.tx, st.ty, 2.759, 0.576], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ',
+      { fontSize: 12, color: C.white, align: st.al, lineSpacingMultiple: 1.2 });
+  });
+  footer(s, 5);
+}
+
+/* ------------------------------------------------------------- slide 6 */
+
+function slide06(p) {
+  const s = p.addSlide();
+  diagRect(s, [7.403, 0, 5.930, 6.703], C.green, 2.173, 'tl');
+  headline(s, [0.8, 0.797, 5.280, 2.121],
+    [['Sustainable', C.green, true], ['Farming ', C.green], ['Accomodation', C.white]],
+    { box: { lineSpacingMultiple: 0.9 } });
+
+  // stacked livestock silhouettes
+  animal(s, 'cow', [8.570, 3.912, 3.551, 2.365], C.olive);
+  animal(s, 'sheep', [9.170, 2.452, 2.284, 1.937], C.leaf);
+  animal(s, 'pig', [9.250, 1.910, 1.839, 1.003], C.pale);
+  animal(s, 'hen', [9.602, 0.837, 0.978, 1.184], C.white);
+
+  [[0.811, 3.179], [3.949, 3.179], [0.811, 4.634], [3.949, 4.634]].forEach(function (pos) {
+    arrowBadge(s, pos[0], pos[1], 0.287, C.yellow);
+    T(s, [pos[0] + 0.368, pos[1] - 0.042, 1.555, 0.372], 'Your text here',
+      { fontSize: 14, bold: true, color: C.white, lineSpacingMultiple: 1.2 });
+    T(s, [pos[0] + 0.363, pos[1] + 0.320, 2.631, 0.873],
+      'PLACEHOLDER',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+  });
+  footer(s, 6);
+}
+
+/* ------------------------------------------------------------- slide 7 */
+
+function slide07(p) {
+  const s = p.addSlide();
+  const bars = [
+    { x: 1.272, cap: '250k', top: 3.675 },
+    { x: 2.421, cap: '400k', top: 3.063 },
+    { x: 3.571, cap: '150k', top: 3.859, color: C.green, badge: 3.330 },
+    { x: 4.720, cap: '580k', top: 2.536 },
+    { x: 5.832, cap: '300k', top: 3.063, color: C.yellow, badge: 2.497 },
+  ];
+  bars.forEach(function (b) {
+    const cx = b.x + 0.1725;
+    if (b.color) {
+      S(s, 'roundRect', [b.x, 1.759, 0.345, 3.993],
+        { fill: { color: C.panel }, line: { color: C.panel, width: 2.25 }, rectRadius: 0.1725 });
+      S(s, 'roundRect', [b.x + 0.093, 1.880, 0.159, 3.750],
+        { fill: { color: C.midgrey, transparency: 85 }, line: NOLINE, rectRadius: 0.0795 });
+      S(s, 'roundRect', [b.x + 0.091, b.top, 0.159, 5.630 - b.top], { fill: { color: b.color }, line: NOLINE, rectRadius: 0.0795 });
+      rrect(s, [cx - 0.363, b.badge, 0.726, 0.728], C.panel, 0.09);
+      icon(s, [cx - 0.208, b.badge + 0.155, 0.417, 0.417], b.color);
+      T(s, [cx - 0.494, 1.119, 0.988, 0.438], b.cap,
+        { fontFace: HEAD, fontSize: 20, bold: true, color: C.white, align: 'center' });
+      T(s, [cx - 0.625, 5.866, 1.250, 0.572], 'Your Text Here',
+        { fontSize: 14, bold: true, color: C.white, align: 'center' });
+    } else {
+      S(s, 'roundRect', [b.x, 1.759, 0.345, 3.993],
+        { fill: { color: C.palegrey, transparency: 85 }, line: NOLINE, rectRadius: 0.1725 });
+      S(s, 'roundRect', [b.x + 0.088, b.top, 0.170, 5.630 - b.top], { fill: { color: C.grey }, line: NOLINE, rectRadius: 0.085 });
+      T(s, [cx - 0.494, 1.291, 0.988, 0.303], b.cap, { fontSize: 12, bold: true, color: C.softgrey, align: 'center' });
+      T(s, [cx - 0.531, 5.866, 1.062, 0.505], 'Your Text Here',
+        { fontSize: 12, bold: true, color: C.softgrey, align: 'center' });
+    }
+  });
+
+  headline(s, [7.737, 1.686, 4.563, 1.447], [['Data ', C.white], ['Sustainable Farming', C.green]],
+    { box: { bold: true, lineSpacingMultiple: 0.9 } });
+  [[3.614, C.green], [4.961, C.yellow]].forEach(function (r) {
+    rrect(s, [7.857, r[0] + 0.072, 0.477, 0.477], r[1], 0.06);
+    line(s, 7.967, r[0] + 0.311, 8.224, r[0] + 0.311, { line: { color: C.black, width: 1.5, endArrowType: 'arrow' } });
+    T(s, [8.485, r[0], 2.244, 0.337], 'Your Text Here', { fontSize: 14, bold: true, color: C.white });
+    T(s, [8.485, r[0] + 0.301, 3.815, 0.611], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ut dolor',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+  });
+  footer(s, 7);
+}
+
+/* ------------------------------------------------------------- slide 8 */
+
+function slide08(p) {
+  const s = p.addSlide();
+  diagRect(s, [7.403, 0, 5.930, 4.568], C.green, 2.284, 'tl');
+  art(s, [6.518, 0.837, 1.049, 2.355], '3D441C', null, 20);
+  art(s, [8.268, 1.157, 1.114, 2.615], '4E7A2A', null, 20);
+  art(s, [10.053, 1.594, 2.612, 3.316], '559534', null, 20);
+
+  headline(s, [0.754, 1.333, 4.775, 1.447],
+    [['Sustainable', C.green, true], ['Farming ', C.green], ['Data', C.white]],
+    { box: { valign: 'bottom', lineSpacingMultiple: 0.9 } });
+  T(s, [0.754, 2.980, 4.429, 0.390], 'Your Text Here', { fontSize: 14, bold: true, color: C.white, lineSpacingMultiple: 1.3 });
+  T(s, [0.754, 3.356, 3.839, 0.873],
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. ',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+
+  [{ x: 0.837, val: '1,600', color: C.green, end: 189 },
+    { x: 4.806, val: '4,214', color: C.yellow, end: 207 },
+    { x: 8.810, val: '2,491', color: C.cyan, end: 160 }].forEach(function (st) {
+    rrect(s, [st.x, 4.911, 3.723, 1.506], C.panel, 0.135);
+    S(s, 'pie', [st.x + 0.287, 5.188, 0.951, 0.951],
+      { fill: { color: st.color }, line: NOLINE, angleRange: [270, st.end] });
+    oval(s, [st.x + 0.419, 5.320, 0.686, 0.686], C.panel);
+    icon(s, [st.x + 0.600, 5.501, 0.325, 0.325], st.color);
+    T(s, [st.x + 1.686, 5.219, 1.006, 0.370], st.val, { fontFace: HEAD, fontSize: 16, bold: true, color: st.color });
+    T(s, [st.x + 1.686, 5.530, 2.070, 0.611], 'The quick, brown fox jumps ',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+  });
+  footer(s, 8);
+}
+
+/* ------------------------------------------------------------- slide 9 */
+
+function slide09(p) {
+  const s = p.addSlide();
+  rect(s, [2.348, 0, 10.985, 4.097], C.olive);
+  diagRect(s, [0, 0, 5.423, 4.742], C.green, 2.371, 'tr');
+  art(s, [1.404, 1.206, 3.909, 5.269], '536729', '[farmer illustration]', 45);
+
+  S(s, 'ellipse', [1.200, 1.124, 1.689, 1.689], { fill: { color: C.black }, line: { color: C.ink, width: 4 } });
+  S(s, 'arc', [1.200, 1.124, 1.689, 1.689],
+    { line: { color: C.yellow, width: 6, beginArrowType: 'oval' }, angleRange: [24.4, 269.6] });
+  T(s, [1.316, 1.416, 1.423, 0.678], '45', { fontSize: 28, bold: true, color: C.white, align: 'center' });
+  T(s, [1.350, 1.991, 1.320, 0.505], [
+    { text: 'Sustainable', options: { breakLine: true } }, { text: 'Farmers' },
+  ], { fontSize: 12, color: C.white, align: 'center' });
+
+  headline(s, [6.639, 0.811, 5.465, 0.774], [['Sustainable', C.white], [' ', C.white], ['Farmer', C.yellow]],
+    { box: { valign: 'middle', charSpacing: 0 } });
+  T(s, [6.667, 1.823, 5.000, 0.873], [
+    { text: 'A wonderful ' }, { text: 'serenity', options: { bold: true } },
+    { text: ' has taken possession of my ' }, { text: 'entire', options: { bold: true } },
+    { text: ' soul, like these sweet ' }, { text: 'mornings', options: { bold: true } },
+    { text: ' of spring which I enjoy with my ' }, { text: 'whole', options: { bold: true } },
+    { text: ' heart. A wonderful' },
+  ], { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+  T(s, [6.607, 2.786, 1.309, 1.111], '19', { fontSize: 60, bold: true, color: C.yellow, align: 'center' });
+  T(s, [7.934, 2.928, 0.630, 0.438], '/05', { fontSize: 20, color: C.white });
+  T(s, [7.934, 3.261, 3.088, 0.438], 'Yesterday 2024', { fontSize: 20, color: C.white });
+
+  [{ x: 5.792, t: 'Text One', a: [5.933, 4.565, 0.644] },
+    { x: 9.364, t: 'Text Two', a: [9.553, 4.530, 0.678] }].forEach(function (b) {
+    icon(s, [b.a[0], b.a[1], b.a[2], b.a[2]], C.yellow);
+    T(s, [b.x, 5.354, 1.693, 0.411], b.t, { fontSize: 16, bold: true, color: C.white, lineSpacingMultiple: 1.2 });
+    T(s, [b.x, 5.816, 3.220, 0.873],
+      'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. ',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, margin: [7.2, 0, 3.6, 3.6] });
+  });
+  footer(s, 9);
+}
+
+/* ------------------------------------------------------------ slide 10 */
+
+function slide10(p) {
+  const s = p.addSlide();
+  headline(s, [4.398, 0.804, 4.538, 0.707], [['Sustainable', C.green], [' ', C.ink], ['Cost', C.white]],
+    { box: { bold: true, align: 'center', lineSpacingMultiple: 0.9 } });
+
+  // cow silhouette, sliced into four labelled cuts (head, shoulder, loin, rump)
+  const cuts = [
+    { color: C.green, tx: 6.767, ty: 2.652, pct: '20%',
+      pts: [[6.90, 2.19], [7.05, 2.62], [7.55, 2.55], [8.41, 2.62], [8.20, 4.90], [7.75, 4.85],
+        [7.62, 6.38], [7.38, 6.38], [7.45, 4.75], [6.90, 3.95], [6.21, 3.15], [6.35, 2.80], [6.72, 2.72]] },
+    { color: C.dgreen, tx: 8.531, ty: 3.628, pct: '35%',
+      pts: [[8.05, 2.62], [9.90, 2.79], [9.72, 5.05], [8.10, 4.94]] },
+    { color: C.yellow, tx: 9.930, ty: 3.628, pct: '30%',
+      pts: [[9.30, 2.79], [11.30, 2.85], [11.20, 5.15], [9.26, 5.05]] },
+    { color: C.dyellow, tx: 11.275, ty: 3.548, pct: '15%',
+      pts: [[10.93, 2.85], [12.53, 3.30], [12.32, 4.60], [12.20, 6.40], [11.94, 6.40], [11.96, 4.85],
+        [11.55, 4.95], [11.58, 6.38], [11.32, 6.38], [11.30, 4.95], [10.86, 5.15]] },
+  ];
+  cuts.forEach(function (c) {
+    poly(s, c.pts, { fill: { color: c.color }, line: { color: C.black, width: 5 } });
+    T(s, [c.tx, c.ty, 1.000, 0.404], c.pct, { fontSize: 12, color: C.white, align: 'center', rotate: 270 });
+  });
+  // black notches marking the joints between cuts
+  [[8.077, 3.444], [9.466, 3.444], [10.964, 3.444]].forEach(function (o) { oval(s, [o[0], o[1], 0.529, 0.529], C.black); });
+
+  rrect(s, [0.814, 2.184, 4.787, 2.066], C.green, 0.14);
+  T(s, [1.114, 2.459, 2.042, 0.333], 'Option Here', { fontSize: 12, color: C.black, lineSpacingMultiple: 1.2 });
+  T(s, [1.114, 2.785, 1.416, 0.841], '32', { fontSize: 44, bold: true, color: C.black });
+  T(s, [1.114, 3.484, 1.382, 0.370], 'Value One', { fontSize: 16, bold: true, color: C.black });
+  [[2.971, 3.344, 0.521, true], [3.418, 3.145, 0.720, true], [3.866, 3.145, 0.720, false],
+    [4.313, 2.525, 1.340, true], [4.761, 3.145, 0.720, true]].forEach(function (b) {
+    S(s, 'round2SameRect', [b[0], b[1], 0.251, b[2]],
+      { fill: b[3] ? { color: C.olive, transparency: 50 } : { color: C.black }, line: NOLINE, rectRadius: 0.06 });
+  });
+
+  [{ x: 0.753, t: 'Pests and Diseases.', w: 1.886 }, { x: 3.064, t: 'Access To Markets', w: 2.113 }].forEach(function (b) {
+    T(s, [b.x, 4.578, 1.558, 0.640], b.t, { fontSize: 16, bold: true, color: C.white });
+    T(s, [b.x, 5.271, b.w, 0.818], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+  });
+  footer(s, 10);
+}
+
+/* ------------------------------------------------------------ slide 11 */
+
+function slide11(p) {
+  const s = p.addSlide();
+  headline(s, [0.817, 1.588, 3.769, 1.919], [['Sustainable', C.green, true], ['Farming ', C.green], ['Chart', C.white]],
+    { box: { fontFace: 'Lato', bold: true, valign: 'bottom', lineSpacingMultiple: 0.9, charSpacing: 0 } });
+  T(s, [0.818, 3.828, 2.100, 0.390], 'Your Text Here', { fontSize: 14, bold: true, color: C.white, lineSpacingMultiple: 1.3 });
+  T(s, [0.817, 4.214, 2.933, 1.136],
+    'A wonderful serenity has taken possession of my entire soul, like these sweet mornings of spring which I enjoy.',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+
+  // radial gauge: filled half disc plus four concentric arcs
+  line(s, 5.480, 0, 5.480, 4.580, { line: { color: C.grey, width: 0.75 } });
+  S(s, 'pie', [4.577, 2.304, 1.812, 1.786], { fill: { color: C.green }, line: NOLINE, angleRange: [270, 90] });
+  [{ box: [4.427, 2.090, 2.214], color: C.yellow, end: 337 },
+    { box: [4.150, 1.813, 2.768], color: C.dyellow, end: 14 },
+    { box: [3.873, 1.536, 3.321], color: C.cyan, end: 42 },
+    { box: [3.596, 1.259, 3.875], color: C.dcyan, end: 71 }].forEach(function (a) {
+    S(s, 'arc', [a.box[0], a.box[1], a.box[2], a.box[2]],
+      { line: { color: a.color, width: 7 }, angleRange: [270, a.end] });
+  });
+  T(s, [5.525, 2.944, 0.681, 0.505], '85%',
+    { fontFace: HEAD, fontSize: 18, bold: true, color: C.black, align: 'center', valign: 'middle', margin: 0 });
+  T(s, [5.062, 1.671, 0.269, 3.075], 'Avg. Percentage',
+    { fontSize: 16, color: C.white, align: 'center', valign: 'middle', vert: 'vert270', margin: 0, charSpacing: 1 });
+
+  const dashLn = { color: C.midgrey, width: 0.75, dashType: 'sysDash' };
+  [{ y: 0.725, pct: '60', color: C.yellow, from: [5.730, 2.056], mid: [6.671, 0.960] },
+    { y: 1.436, pct: '70', color: C.dyellow, from: [6.556, 2.195], mid: [7.194, 1.672] },
+    { y: 2.148, pct: '80', color: C.cyan, from: [7.131, 2.842], mid: [7.690, 2.395] },
+    { y: 2.859, pct: '90', color: C.dcyan, from: [7.471, 3.515], mid: [8.148, 3.092] }].forEach(function (g) {
+    line(s, g.from[0], g.from[1], g.mid[0], g.mid[1], { line: Object.assign({ beginArrowType: 'oval' }, dashLn) });
+    line(s, g.mid[0], g.mid[1], 9.379, g.mid[1], { line: dashLn });
+    T(s, [9.379, g.y, 0.681, 0.471], [
+      { text: g.pct, options: { fontSize: 16 } }, { text: '%', options: { fontSize: 18 } },
+    ], { bold: true, color: g.color, align: 'center', valign: 'middle', margin: [7.2, 0, 7.2, 0] });
+    T(s, [10.080, g.y + 0.061, 2.629, 0.348], 'A wonderful serenity has taken.',
+      { fontSize: 12, color: C.white, valign: 'middle', lineSpacingMultiple: 1.3 });
+  });
+
+  rect(s, [7.502, 4.914, 5.831, 1.730], C.green);
+  [{ x: 7.199, v: '200+' }, { x: 9.079, v: '+345' }, { x: 10.959, v: '$1.7M' }].forEach(function (c) {
+    rrect(s, [c.x, 4.646, 1.750, 1.756], C.panel, 0.115);
+    T(s, [c.x + 0.277, 4.803, 1.196, 0.513], c.v,
+      { fontSize: 20, bold: true, color: C.green, align: 'center', valign: 'bottom', lineSpacingMultiple: 1.3 });
+    T(s, [c.x + 0.094, 5.337, 1.566, 0.873], 'A wonderful serenity has taken possession.',
+      { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+  });
+  footer(s, 11);
+}
+
+/* ------------------------------------------------------------ slide 12 */
+
+function slide12(p) {
+  const s = p.addSlide();
+  headline(s, [3.646, 0.797, 6.042, 1.043],
+    [['Strategy to build your ', C.white], ['dream sustainable farm to come true', C.green]],
+    { box: { fontSize: 28, align: 'center', charSpacing: 0 } });
+
+  const body = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque';
+  [{ y: 2.209, h: 0.611, runs: [{ text: body }] },
+    { y: 3.194, h: 0.611, runs: [{ text: body }] },
+    { y: 4.180, h: 0.611, runs: [{ text: body }] },
+    { y: 5.165, h: 0.873, runs: [
+      { text: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean ' },
+      { text: 'commodo ligula eget dolor. Aenean massa. Cum sociis natoque', options: { bold: true, color: C.green } }] },
+  ].forEach(function (r, i) {
+    T(s, [1.438, r.y, 0.490, 0.513], '0' + (i + 1),
+      { fontSize: 20, bold: true, color: C.yellow, wrap: false, margin: [7.2, 0, 3.6, 3.6] });
+    T(s, [1.927, r.y, 4.927, r.h], r.runs,
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, margin: [7.2, 0, 3.6, 3.6] });
+  });
+  T(s, [7.700, 5.557, 4.833, 0.640], '\u201CThe simple heart of the small farm is the true center of our universe.\u201D',
+    { fontSize: 16, italic: true, color: C.white, align: 'right' });
+  footer(s, 12, { capColor: C.white, ruleColor: C.white, pageColor: C.white, numColor: C.white });
+}
+
+/* ------------------------------------------------------------ slide 13 */
+
+function slide13(p) {
+  const s = p.addSlide();
+  headline(s, [2.873, 0.811, 7.586, 0.707], [['Sustainable ', C.green], ['Timeline', C.white]],
+    { box: { bold: true, align: 'center', valign: 'bottom', lineSpacingMultiple: 0.9 } });
+
+  // serpentine rail: three straight runs joined by two half-round bends
+  const rail = { color: C.grey, width: 1.5 };
+  line(s, 2.795, 3.121, 11.537, 3.121, { line: Object.assign({ beginArrowType: 'oval' }, rail) });
+  line(s, 1.796, 4.832, 11.537, 4.834, { line: rail });
+  line(s, 1.796, 6.545, 5.251, 6.542, { line: Object.assign({ endArrowType: 'oval' }, rail) });
+  S(s, 'arc', [10.632, 3.121, 1.811, 1.577], { line: rail, angleRange: [270, 0] });
+  S(s, 'arc', [10.632, 3.255, 1.811, 1.577], { line: rail, angleRange: [270, 0], flipV: true });
+  line(s, 12.443, 3.903, 12.443, 4.062, { line: rail });
+  S(s, 'arc', [0.891, 4.834, 1.811, 1.577], { line: rail, angleRange: [270, 0], flipH: true });
+  S(s, 'arc', [0.891, 4.968, 1.811, 1.577], { line: rail, angleRange: [270, 0], flipH: true, flipV: true });
+  line(s, 0.891, 5.616, 0.891, 5.775, { line: rail });
+
+  [{ x: 1.600, y: 1.819, dot: [2.607, 3.027], date: '17 Feb 2024', color: C.green },
+    { x: 4.243, y: 1.819, dot: [5.251, 3.027], date: '25 Feb 2024', color: C.dgreen },
+    { x: 6.887, y: 1.819, dot: [7.894, 3.027], date: '10 Mar 2024', color: C.yellow },
+    { x: 9.531, y: 1.819, dot: [10.538, 3.027], date: '23 Mar 2024', color: C.dyellow },
+    { x: 1.600, y: 3.534, dot: [2.607, 4.736], date: '6 May 2024', color: C.dgreen },
+    { x: 4.243, y: 3.534, dot: [5.251, 4.736], date: '21 Apr 2024', color: C.green },
+    { x: 6.887, y: 3.534, dot: [7.894, 4.736], date: '14 Apr 2024', color: C.dcyan },
+    { x: 9.531, y: 3.534, dot: [10.538, 4.736], date: '1 Apr 2024', color: C.cyan },
+    { x: 1.600, y: 5.225, dot: [2.607, 6.448], date: '12 May 2024', color: C.yellow },
+    { x: 4.243, y: 5.225, dot: [5.251, 6.448], date: '20 May 2024', color: C.dyellow },
+  ].forEach(function (it) {
+    oval(s, [it.dot[0], it.dot[1], 0.188, 0.188], it.color);
+    T(s, [it.x, it.y, 2.203, 0.431], it.date,
+      { fontSize: 16, bold: true, color: it.color, align: 'center', valign: 'bottom', lineSpacingMultiple: 1.3 });
+    T(s, [it.x + 0.004, it.y + 0.431, 2.198, 0.611], 'A wonderful serenity has taken possession.',
+      { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+  });
+  footer(s, 13);
+}
+
+/* -------------------------------------------------------- slides 14, 15 */
+
+function continuousTimeline(p, num, railX, cells, cards) {
+  const s = p.addSlide();
+  headline(s, [2.873, 0.797, 7.586, 0.707], [['Continuous ', C.green], ['Timeline', C.white]],
+    { box: { bold: true, align: 'center', valign: 'bottom', lineSpacingMultiple: 0.9 } });
+
+  S(s, 'roundRect', [railX, 3.935, 13.030, 0.574],
+    { fill: { type: 'none' }, line: { color: C.grey, width: 1.5 }, rectRadius: 0.287 });
+  cells.forEach(function (c, i) {
+    const x = railX + 0.155 + i * 2.517;
+    if (c.color) {
+      S(s, 'roundRect', [x, 4.042, 2.360, 0.367], { fill: { color: c.color }, line: NOLINE, rectRadius: 0.1835 });
+    } else {
+      rect(s, [x, 4.042, 2.360, 0.367], C.panel);
+    }
+    T(s, [x, 4.042, 2.360, 0.367], c.label,
+      { fontSize: 12, color: c.color ? C.black : C.white, align: 'center', valign: 'middle' });
+  });
+
+  cards.forEach(function (c) {
+    const ty = c.above ? 1.736 : 5.366;
+    T(s, [c.x, ty, 2.203, 0.431], c.title,
+      { fontSize: 16, bold: true, color: c.color, align: 'center', valign: 'bottom', lineSpacingMultiple: 1.3 });
+    T(s, [c.x + 0.005, ty + 0.431, 2.198, 0.873], 'A wonderful serenity has taken possession of my entire soul.',
+      { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+    const ly = c.above ? 3.241 : 4.722;
+    line(s, c.x + 1.102, ly, c.x + 1.102, ly + 0.451,
+      { line: { color: C.grey, width: 1, beginArrowType: 'oval', endArrowType: 'oval' } });
+  });
+  footer(s, num);
+}
+
+function slide14(p) {
+  continuousTimeline(p, 14, 0.667, [
+    { label: 'Jul, 2024', color: C.green }, { label: 'Aug, 2024' }, { label: 'Sep, 2024' },
+    { label: 'Oct, 2024' }, { label: 'Nov, 2024' },
+  ], [
+    { x: 0.900, title: 'Schedule One', color: C.green, above: true },
+    { x: 5.934, title: 'Schedule Three', color: C.yellow, above: true },
+    { x: 10.968, title: 'Schedule Five', color: C.cyan, above: true },
+    { x: 3.417, title: 'Schedule Two', color: C.dgreen, above: false },
+    { x: 8.451, title: 'Schedule Four', color: C.dyellow, above: false },
+  ]);
+}
+
+function slide15(p) {
+  continuousTimeline(p, 15, -0.373, [
+    { label: 'Dec, 2024' }, { label: 'Jan, 2025' }, { label: 'Feb, 2025' },
+    { label: 'Mar, 2025' }, { label: 'Apr, 2019', color: C.cyan },
+  ], [
+    { x: 2.666, title: 'Schedule Seven', color: C.dgreen, above: true },
+    { x: 7.704, title: 'Schedule  Nine', color: C.dyellow, above: true },
+    { x: 0.153, title: 'Schedule Six', color: C.green, above: false },
+    { x: 5.189, title: 'Schedule Eight', color: C.yellow, above: false },
+    { x: 10.225, title: 'Schedule  Ten', color: C.cyan, above: false },
+  ]);
+}
+
+/* ------------------------------------------------------------ slide 16 */
+
+function slide16(p) {
+  const s = p.addSlide();
+  headline(s, [0.777, 1.599, 3.645, 1.447], [['2024 Data ', C.white], ['Milestone', C.green]],
+    { box: { bold: true, lineSpacingMultiple: 0.9 } });
+  T(s, [0.819, 3.486, 2.120, 0.337], 'Your Text Here', { fontSize: 14, bold: true, color: C.white });
+  T(s, [0.819, 3.819, 2.862, 1.399],
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ut dolor non ipsum tincidunt luctus. Integer auctor, libero ac sollicitudin dignissim, libero massa tincidunt',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+
+  [[4.509, 2.373, false], [6.419, 1.852, true], [7.985, 3.135, false], [9.860, 2.645, true]].forEach(function (a) {
+    S(s, 'leftCircularArrow', [a[0], a[1], 2.565, 2.565],
+      { fill: { color: C.grey, transparency: 50 }, line: NOLINE, flipV: a[2] });
+  });
+
+  [{ x: 4.970, y: 2.838, dark: C.leaf, light: C.green },
+    { x: 6.881, y: 2.317, dark: '356714', light: C.dgreen },
+    { x: 8.446, y: 3.599, dark: 'BF9500', light: C.yellow },
+    { x: 10.321, y: 3.110, dark: C.bark, light: C.dyellow }].forEach(function (g) {
+    S(s, 'gear9', [g.x, g.y, 1.642, 1.636], { fill: { color: g.light }, line: NOLINE });
+    S(s, 'ellipse', [g.x + 0.270, g.y + 0.270, 1.100, 1.100], { fill: { color: g.dark }, line: NOLINE });
+    icon(s, [g.x + 0.62, g.y + 0.61, 0.41, 0.41], C.black);
+  });
+
+  [{ nx: 4.402, ny: 4.983, num: '20', mon: 'Jan ', color: C.green, tx: 5.294, ty: 5.081, tw: 2.031, txt: 'A wonderful serenity has taken possession ' },
+    { nx: 5.985, ny: 1.055, num: '11', mon: 'Feb', color: C.dgreen, tx: 6.799, ty: 1.092, tw: 2.868, txt: 'A wonderful serenity has taken possession of my entire' },
+    { nx: 7.922, ny: 5.725, num: '15', mon: 'Mar', color: C.yellow, tx: 8.725, ty: 5.784, tw: 2.031, txt: 'A wonderful serenity has taken possession' },
+    { nx: 9.616, ny: 1.771, num: '19', mon: 'Apr', color: C.dyellow, tx: 10.378, ty: 1.830, tw: 2.031, txt: 'A wonderful serenity has taken possession' },
+  ].forEach(function (m) {
+    T(s, [m.nx, m.ny, 0.892, 0.606], m.num, { fontSize: 30, bold: true, color: m.color, align: 'center', valign: 'middle' });
+    T(s, [m.nx + 0.04, m.ny + 0.476, 0.810, 0.262], m.mon,
+      { fontSize: 11.25, color: C.white, align: 'center', lineSpacingMultiple: 0.8 });
+    T(s, [m.tx, m.ty, m.tw, 0.576], m.txt, { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+  });
+  footer(s, 16);
+}
+
+/* ------------------------------------------------------------ slide 17 */
+
+function slide17(p) {
+  const s = p.addSlide();
+  vgrad(s, [0, 0, 13.333, 5.271], C.green, C.bg);
+  headline(s, [0.773, 0.777, 5.893, 2.121],
+    [['Implementing Sustainable', C.black, true], ['Farming Practices', C.black]],
+    { box: { lineSpacingMultiple: 0.9 } });
+  T(s, [10.413, 0.817, 2.120, 0.337], 'Your Text Here', { fontSize: 14, bold: true, color: C.black, align: 'right' });
+  T(s, [9.117, 1.165, 3.416, 1.136],
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis',
+    { fontSize: 12, color: C.black, align: 'right', lineSpacingMultiple: 1.3 });
+
+  [{ x: 0.792, t: 'Option One', a: [1.200, 4.860, 0.574] },
+    { x: 5.141, t: 'Option Two', a: [5.419, 4.896, 0.553] },
+    { x: 9.489, t: 'Option Three', a: [9.837, 4.899, 0.550] }].forEach(function (c) {
+    rrect(s, [c.x, 4.603, 3.052, 2.064], C.panel, 0.09);
+    icon(s, [c.a[0], c.a[1], c.a[2], c.a[2]], C.green);
+    T(s, [c.x + 0.278, 5.449, 1.828, 0.390], c.t, { fontSize: 14, bold: true, color: C.white, lineSpacingMultiple: 1.3 });
+    T(s, [c.x + 0.278, 5.770, 2.629, 0.611], 'A wonderful serenity has taken possession of my entire soul',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+  });
+  footer(s, 17);
+}
+
+/* ------------------------------------------------------------ slide 18 */
+
+function slide18(p) {
+  const s = p.addSlide();
+  const orbit = { color: C.grey, width: 1, dashType: 'dash' };
+  [[4.508, 1.591, 4.317], [3.083, 0.167, 7.167], [1.417, -1.500, 10.500], [-0.132, -3.048, 13.597]]
+    .forEach(function (o) { S(s, 'ellipse', [o[0], o[1], o[2], o[2]], { fill: { type: 'none' }, line: orbit }); });
+
+  [[3.370, 5.138, 240], [10.017, 2.575, 68.6], [6.403, 1.454, 354.6], [1.896, 1.246, 300.4]].forEach(function (m) {
+    S(s, 'custGeom', [m[0], m[1], 0.154, 0.300], {
+      points: [{ x: 0, y: 0.13 }, { x: 0.07, y: 0.30 }, { x: 0.154, y: 0 }],
+      fill: { type: 'none' }, line: { color: C.green, width: 3 }, rotate: m[2],
+    });
+  });
+
+  oval(s, [5.510, 2.594, 2.312, 2.312], C.green);
+  T(s, [5.671, 3.397, 1.992, 0.841], [
+    { text: 'Sustainable', options: { breakLine: true } }, { text: 'Farming' },
+  ], { fontSize: 22, bold: true, color: C.black, align: 'center' });
+
+  [{ c: [0.458, 1.798, 2.312], color: C.dyellow, title: 'Agriculture', tx: 0.675, ty: 2.299, bx: 0.645, by: 2.602, bw: 1.939, bh: 1.007, body: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula.' },
+    { c: [10.530, 3.949, 2.312], color: C.dgreen, title: 'Livestock', tx: 10.747, ty: 4.474, bx: 10.717, by: 4.776, bw: 1.939, bh: 1.007, body: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula.' },
+    { c: [8.663, 0.760, 1.610], color: C.cyan, title: 'Vegetable', tx: 8.526, ty: 1.184, bx: 8.758, by: 1.458, bw: 1.416, bh: 0.547, body: 'Lorem ipsum dolor sit amet' },
+  ].forEach(function (b) {
+    oval(s, [b.c[0], b.c[1], b.c[2], b.c[2]], b.color);
+    T(s, [b.tx, b.ty, 1.882, 0.337], b.title, { fontSize: 14, bold: true, color: C.black, align: 'center' });
+    T(s, [b.bx, b.by, b.bw, b.bh], b.body, { fontSize: 10.5, color: C.black, align: 'center', lineSpacingMultiple: 1.3 });
+  });
+
+  oval(s, [3.441, 5.322, 1.857, 1.857], C.yellow);
+  T(s, [3.429, 5.722, 1.882, 0.303], 'Farming', { fontSize: 12, bold: true, color: C.black, align: 'center' });
+  T(s, [3.778, 6.025, 1.181, 0.777], 'Lorem ipsum dolor sit amet, consectetuer',
+    { fontSize: 10.5, color: C.black, align: 'center', lineSpacingMultiple: 1.3 });
+  oval(s, [5.042, 1.468, 0.935, 0.935], C.leaf);
+  T(s, [5.052, 1.784, 0.915, 0.303], 'Your text', { fontSize: 12, color: C.black, align: 'center' });
+
+  [{ o: [1.434, 5.441, 0.935], c: C.dgreen, a: [1.662, 5.669, 0.479] },
+    { o: [11.537, 2.435, 0.568], c: C.dyellow, a: [11.644, 2.536, 0.354] },
+    { o: [7.513, 5.252, 0.568], c: C.dcyan, a: [7.663, 5.401, 0.268] },
+    { o: [3.583, 1.193, 0.568], c: '356714', a: [3.702, 1.312, 0.330] }].forEach(function (g) {
+    oval(s, [g.o[0], g.o[1], g.o[2], g.o[2]], g.c);
+    icon(s, [g.a[0], g.a[1], g.a[2], g.a[2]], C.black);
+  });
+
+  [{ x: 1.467, w: 0.910, y: 4.689, tx: 1.462, tw: 0.915, t: 'Team', al: 'center', trx: 1.522 },
+    { x: 3.761, w: 0.910, y: 3.184, tx: 3.759, tw: 0.915, t: 'Goals', al: 'center', trx: 3.864 },
+    { x: 8.508, w: 1.407, y: 5.160, tx: 8.630, tw: 1.155, t: 'Observation', al: 'right', trx: 8.580 }].forEach(function (tag) {
+    rrect(s, [tag.x, tag.y, tag.w, 0.285], C.green, 0.02);
+    S(s, 'triangle', [tag.trx, tag.y + 0.283, 0.137, 0.052], { fill: { color: C.green }, line: NOLINE, flipV: true });
+    T(s, [tag.tx, tag.y - 0.018, tag.tw, 0.303], tag.t, { fontSize: 12, color: C.black, align: tag.al });
+  });
+  footer(s, 18);
+}
+
+/* ------------------------------------------------------------ slide 19 */
+
+function slide19(p) {
+  const s = p.addSlide();
+  headline(s, [6.965, 0.816, 5.568, 1.447],
+    [['Sustainable Farming', C.green, true], ['Percentage', C.white]], { box: { lineSpacingMultiple: 0.9 } });
+  T(s, [6.965, 2.344, 3.457, 0.873],
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa.',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+
+  // stacked animal silhouettes
+  animal(s, 'cow', [1.562, 4.146, 3.851, 2.565], C.green);
+  animal(s, 'sheep', [2.213, 2.563, 2.477, 2.100], C.dgreen);
+  animal(s, 'pig', [2.299, 1.975, 1.994, 1.088], C.yellow);
+  animal(s, 'hen', [2.681, 0.811, 1.061, 1.284], C.dyellow);
+
+  [{ x: 7.051, y: 3.744, ty: 3.776, pct: '78%', color: C.green },
+    { x: 9.336, y: 3.744, ty: 3.770, pct: '25%', color: C.dgreen },
+    { x: 7.051, y: 5.391, ty: 5.431, pct: '45%', color: C.yellow },
+    { x: 9.336, y: 5.386, ty: 5.426, pct: '80%', color: C.dyellow }].forEach(function (st) {
+    S(s, 'triangle', [st.x + 0.033, st.ty, 0.214, 0.306], { fill: { color: st.color }, line: NOLINE });
+    T(s, [st.x + 0.187, st.y, 1.112, 0.505], st.pct, { fontSize: 24, bold: true, color: C.white, align: 'center' });
+    T(s, [st.x, st.y + 0.485, 1.903, 0.611], 'Ut wisi enim ad minim veniam, quis nostrud',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+  });
+  footer(s, 19);
+}
+
+/* ------------------------------------------------------------ slide 20 */
+
+function slide20(p) {
+  const s = p.addSlide();
+  rect(s, [6.650, 0, 6.683, 7.5], C.panel);
+  headline(s, [0.807, 0.797, 5.760, 1.447],
+    [['Sustainable ', C.green, true], ['Farming ', C.green], ['Funnel', C.white]], { box: { lineSpacingMultiple: 0.9 } });
+  T(s, [0.801, 2.241, 4.429, 0.611],
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa.',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+
+  [{ x: 0.810, y: 3.517, bg: C.green, tc: C.black, ic: C.dgreen, a: [0.914, 3.700, 0.506], tx: 0.914 },
+    { x: 3.114, y: 3.517, bg: C.panel, tc: C.white, ic: C.yellow, a: [3.252, 3.630, 0.479], tx: 3.252 },
+    { x: 0.810, y: 5.209, bg: C.panel, tc: C.white, ic: C.dgreen, a: [0.914, 5.416, 0.497], tx: 0.914 },
+    { x: 3.114, y: 5.209, bg: C.panel, tc: C.white, ic: C.dyellow, a: [3.331, 5.336, 0.513], tx: 3.252 }].forEach(function (c) {
+    rrect(s, [c.x, c.y, 2.112, 1.407], c.bg, 0.145);
+    icon(s, [c.a[0], c.a[1], c.a[2], c.a[2]], c.ic);
+    T(s, [c.tx, c.y + 0.709, 1.903, 0.611], 'Ut wisi enim ad minim veniam, quis nostrud',
+      { fontSize: 12, color: c.tc, lineSpacingMultiple: 1.3 });
+  });
+
+  // 3-D funnel: shrinking elliptical slabs stacked over a shadow
+  oval(s, [8.570, 5.560, 3.010, 0.970], C.ink);
+  const slabs = [
+    { top: 1.530, w: 5.230, x: 7.465, deep: 1.330, face: C.pale, side: C.green, label: '3.200.000', ly: 2.850, bw: 4.160 },
+    { top: 3.070, w: 4.160, x: 8.000, deep: 0.630, face: '23440D', side: C.dgreen, label: '1.720.000', ly: 3.690, bw: 3.060 },
+    { top: 3.730, w: 3.060, x: 8.540, deep: 0.790, face: 'BF9500', side: C.yellow, label: '780.000', ly: 4.500, bw: 1.960 },
+    { top: 4.710, w: 1.960, x: 9.090, deep: 0.520, face: C.bark, side: C.dyellow, label: '42.500', ly: 5.210, bw: 1.400 },
+  ];
+  slabs.forEach(function (sl) {
+    const mid = sl.x + sl.w / 2;
+    const bot = sl.ly + 0.52;
+    poly(s, [[sl.x, sl.top + sl.deep / 2], [sl.x + sl.w, sl.top + sl.deep / 2],
+      [mid + sl.bw / 2, bot], [mid - sl.bw / 2, bot]], { fill: { color: sl.side }, line: NOLINE });
+    S(s, 'ellipse', [sl.x, sl.top, sl.w, sl.deep], { fill: { color: sl.face }, line: NOLINE });
+  });
+  S(s, 'ellipse', [9.100, 1.760, 1.960, 0.660], { fill: { color: C.dgreen }, line: NOLINE }); // well
+  art(s, [8.268, 0.829, 0.670, 1.510], C.leaf, null, 20);
+  slabs.forEach(function (sl) {
+    T(s, [9.110, sl.ly, 1.940, 0.520], sl.label,
+      { fontSize: 20, bold: true, color: C.black, align: 'center', valign: 'middle' });
+  });
+  footer(s, 20, { capColor: C.midgrey, pageColor: C.palegrey });
+}
+
+/* ------------------------------------------------------------ slide 21 */
+
+function slide21(p) {
+  const s = p.addSlide();
+  headline(s, [0.803, 1.428, 4.300, 2.121],
+    [['Sustainable Farming ', C.green], ['Matrix Diagram', C.white]], { box: { lineSpacingMultiple: 0.9 } });
+  icon(s, [0.803, 3.856, 0.760, 0.760], C.green);
+  T(s, [0.803, 4.821, 2.808, 0.572], 'We want to raise your crops and livestock',
+    { fontSize: 14, bold: true, color: C.white });
+  T(s, [0.803, 5.393, 3.425, 0.611],
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula.',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3 });
+
+  rrect(s, [5.850, 1.414, 6.565, 4.673], C.panel, 0.383);
+  const colX = [6.483, 8.347, 10.225];
+  const rowY = [1.982, 3.248, 4.514];
+  const grid = [[C.green, C.green, C.dgreen], [C.green, C.dgreen, C.dgreen], [C.green, C.dgreen, C.dgreen]];
+  const vals = [['$3000', '$4000', '$5000'], ['$4000', '$4000', '$4000'], ['$5000', '$4000', '$5000']];
+  rowY.forEach(function (y, r) {
+    colX.forEach(function (x, c) {
+      rrect(s, [x, y, 1.775, 1.185], grid[r][c], 0.161);
+      T(s, [x + 0.111, y + 0.424, 1.554, 0.337], vals[r][c],
+        { fontSize: 14, bold: true, color: C.black, align: 'center' });
+    });
+  });
+  ['High', 'Medium', 'Low'].forEach(function (t, i) {
+    T(s, [6.635 + i * 1.871, 1.611, 1.471, 0.318], t,
+      { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.1 });
+    T(s, [5.760, 2.415 + i * 1.266, 1.010, 0.318], t,
+      { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.1, rotate: 270 });
+  });
+  rrect(s, [8.008, 3.021, 2.453, 1.638], C.yellow, 0.223);
+  T(s, [8.168, 3.374, 2.148, 0.640], '$53000', { fontSize: 32, bold: true, color: C.black, align: 'center' });
+  T(s, [8.266, 3.995, 1.951, 0.303], 'Wonderful Serenity', { fontSize: 12, color: C.black, align: 'center' });
+  footer(s, 21);
+}
+
+/* ------------------------------------------------------------ slide 22 */
+
+function slide22(p) {
+  const s = p.addSlide();
+  diagRect(s, [7.661, 0.800, 5.672, 5.728], C.green, 1.762, 'tr');
+  art(s, [7.123, 1.228, 6.210, 5.300], '86A557', '[hand with seedling]', 45);
+  headline(s, [0.814, 0.800, 5.541, 1.447],
+    [['Sustainable Farming ', C.green, true], ['Prospect', C.white]],
+    { box: { valign: 'bottom', lineSpacingMultiple: 0.9 } });
+
+  poly(s, [[10.402, 2.550], [10.083, 3.017], [10.402, 3.050]], { fill: { color: C.panel }, line: NOLINE });
+  rect(s, [10.402, 1.433, 2.336, 1.704], C.panel);
+  T(s, [10.619, 1.632, 1.900, 0.707], '0,18%', { fontSize: 36, bold: true, color: C.dgreen });
+  T(s, [10.619, 2.339, 1.900, 0.611], 'Sed ut perspiciatis unde omnis iste natus.',
+    { fontSize: 12, color: C.dgreen, lineSpacingMultiple: 1.3 });
+
+  [{ y: 2.689, bg: C.yellow, badge: C.yellow, tc: C.black },
+    { y: 4.038, bg: C.panel, badge: C.green, tc: C.white },
+    { y: 5.380, bg: C.panel, badge: C.green, tc: C.white }].forEach(function (r) {
+    S(s, 'homePlate', [1.007, r.y, 5.474, 1.151], { fill: { color: r.bg }, line: NOLINE });
+    T(s, [1.448, r.y + 0.125, 4.579, 0.370], 'We want to raise your crops', { fontSize: 16, bold: true, color: r.tc });
+    T(s, [1.508, r.y + 0.434, 4.186, 0.611],
+      'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. ',
+      { fontSize: 12, color: r.tc, lineSpacingMultiple: 1.3 });
+    S(s, 'ellipse', [0.804, r.y + 0.100, 0.402, 0.402], { fill: { color: r.badge }, line: NOLINE, rotate: 45 });
+    S(s, 'cloud', [0.912, r.y + 0.234, 0.188, 0.135], { fill: { color: C.black }, line: NOLINE });
+  });
+  footer(s, 22);
+}
+
+/* ------------------------------------------------------------ slide 23 */
+
+function slide23(p) {
+  const s = p.addSlide();
+  vgrad(s, [0, 2.542, 13.333, 4.958], C.bg, C.green);
+  headline(s, [0.773, 0.787, 4.889, 1.447],
+    [['Sustainable Cow', C.white, true], ['Farming Target', C.white]], { box: { lineSpacingMultiple: 0.9 } });
+  T(s, [9.117, 0.797, 3.416, 1.136],
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis',
+    { fontSize: 12, color: C.white, align: 'right', lineSpacingMultiple: 1.3 });
+
+  [{ x: 0.800, y: 3.977, tx: 1.900, title: 'Cow Breeds for Meat and Milk ', a: [1.051, 4.194, 0.640] },
+    { x: 8.698, y: 3.977, tx: 8.949, title: 'Best Cow Breeds for Meat and Milk ', a: [11.491, 4.194, 0.645] },
+    { x: 2.106, y: 5.544, tx: 3.206, title: 'Best Cow Breeds for Meat and Milk ', a: [2.339, 5.743, 0.657] },
+    { x: 7.392, y: 5.544, tx: 7.643, title: 'Best Cow Breeds for Meat and Milk ', a: [10.119, 5.743, 0.681] },
+  ].forEach(function (c) {
+    rrect(s, [c.x, c.y, 3.835, 1.078], C.black, 0.145);
+    icon(s, [c.a[0], c.a[1], c.a[2], c.a[2]], C.green);
+    T(s, [c.tx, c.y + 0.161, 2.582, 0.545], c.title,
+      { fontSize: 16, bold: true, color: C.white, lineSpacingMultiple: 0.8 });
+    T(s, [c.tx, c.y + 0.645, 2.666, 0.333], 'Lorem ipsum dolor sit amet',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+  });
+  footer(s, 23, { capColor: C.white, ruleColor: C.white, pageColor: C.white, numColor: C.white });
+}
+
+/* ------------------------------------------------------------ slide 24 */
+
+function slide24(p) {
+  const s = p.addSlide();
+  // two "competitor" half discs; each flat edge faces the column of figures
+  S(s, 'pie', [0.812, 1.512, 5.152, 5.152], { fill: { color: C.yellow }, line: NOLINE, angleRange: [90, 270] });
+  S(s, 'pie', [1.006, 0.897, 5.152, 5.152], { fill: { color: C.green }, line: NOLINE, angleRange: [270, 90] });
+
+  T(s, [3.785, 2.339, 1.881, 0.376], 'Competitor Two',
+    { fontSize: 20, bold: true, color: C.black, valign: 'bottom', wrap: false });
+  T(s, [3.785, 2.717, 1.881, 1.091], '89%',
+    { fontSize: 72, bold: true, color: C.black, valign: 'bottom', wrap: false, lineSpacing: 74 });
+  T(s, [3.785, 3.697, 2.074, 1.050], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc vitae euismod',
+    { fontSize: 12, color: C.black, lineSpacingMultiple: 1.2 });
+  T(s, [1.235, 2.954, 1.881, 0.376], 'Competitor One',
+    { fontSize: 20, bold: true, color: C.black, align: 'right', valign: 'bottom', wrap: false });
+  T(s, [1.235, 3.333, 1.881, 1.091], '11%',
+    { fontSize: 72, bold: true, color: C.black, align: 'right', valign: 'bottom', wrap: false, lineSpacing: 74 });
+  T(s, [1.042, 4.312, 2.074, 1.050], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc vitae euismod',
+    { fontSize: 12, color: C.black, align: 'right', lineSpacingMultiple: 1.2 });
+
+  S(s, 'ellipse', [4.332, 0.743, 0.897, 0.897], { fill: { color: C.green, transparency: 90 }, line: NOLINE });
+  S(s, 'ellipse', [4.405, 0.816, 0.752, 0.752], { fill: { color: C.panel }, line: { color: C.panel, width: 2.25 } });
+  T(s, [4.405, 0.816, 0.752, 0.752], '%', { fontSize: 22, bold: true, color: C.dgreen, align: 'center', valign: 'middle' });
+  art(s, [3.722, 4.965, 2.582, 1.794], '35606A', null, 20);
+
+  headline(s, [7.103, 1.511, 6.158, 1.447],
+    [['Competitor', C.white, true], ['Sustainable Farming', C.green]], { box: { bold: true, lineSpacingMultiple: 0.9 } });
+  T(s, [7.103, 3.329, 2.225, 0.370], 'Your text here', { fontSize: 16, bold: true, color: C.white });
+  T(s, [7.103, 3.700, 5.138, 0.818],
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc vitae euismod quam. Maecenas nec quam in leo dictum suscipit vitae eget purus. ',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+  T(s, [7.103, 4.879, 1.589, 0.841], '48%', { fontSize: 44, bold: true, color: C.yellow });
+  T(s, [8.692, 4.961, 2.500, 0.576], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+  footer(s, 24);
+}
+
+/* ------------------------------------------------------------ slide 25 */
+
+function slide25(p) {
+  const s = p.addSlide();
+  headline(s, [0.656, 0.720, 4.676, 2.794],
+    [['Sustainable Farming ', C.green, true], ['Competitor', C.white, true], ['Data', C.white]],
+    { box: { bold: true, lineSpacingMultiple: 0.9 } });
+  T(s, [0.706, 3.657, 2.225, 0.370], 'Your text here', { fontSize: 16, bold: true, color: C.white });
+  T(s, [0.706, 4.027, 3.466, 1.060],
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc vitae euismod quam. Maecenas nec quam in leo dictum suscipit vitae eget purus. ',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+
+  // exploded pie chart of four slices
+  [{ box: [8.129, 0.888, 4.048], color: C.green, range: [222, 291] },
+    { box: [7.935, 0.694, 4.448], color: C.dgreen, range: [291, 345] },
+    { box: [7.780, 0.542, 4.747], color: C.dyellow, range: [345, 68] },
+    { box: [7.705, 0.403, 4.886], color: C.yellow, range: [68, 222] }].forEach(function (w) {
+    S(s, 'pie', [w.box[0], w.box[1], w.box[2], w.box[2]], { fill: { color: w.color }, line: NOLINE, angleRange: w.range });
+  });
+  [[10.169, 1.367, 0.592, 0.532], [10.416, 3.194, 0.651, 0.532],
+    [8.861, 1.698, 0.592, 0.532], [8.625, 3.303, 0.592, 0.592]].forEach(function (i) {
+    icon(s, [i[0], i[1], i[2], i[3]], C.black);
+  });
+  art(s, [5.315, 2.772, 3.775, 2.620], '4A7A2C', null, 35);
+
+  [{ x: 0.800, c: C.green }, { x: 3.940, c: C.dgreen }, { x: 6.941, c: C.yellow }, { x: 10.158, c: C.dyellow }]
+    .forEach(function (col) {
+      T(s, [col.x, 5.760, 2.225, 0.370], 'Your text here', { fontSize: 16, bold: true, color: col.c });
+      T(s, [col.x, 6.131, 2.861, 0.576], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
+        { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+    });
+  footer(s, 25);
+}
+
+/* ------------------------------------------------------------ slide 26 */
+
+function slide26(p) {
+  const s = p.addSlide();
+  rect(s, [6.650, 0, 6.683, 7.5], C.panel);
+  headline(s, [0.680, 0.734, 6.346, 1.313],
+    [['Sustainable Farming', C.green, true], ['Competitor Layer', C.white]],
+    { box: { bold: true, lineSpacingMultiple: 0.9 } });
+  T(s, [0.740, 2.251, 5.111, 0.576],
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc vitae euismod quam. Maecenas nec quam',
+    { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+
+  [{ y: 3.743, pct: '80%', color: C.green, a: [0.840, 3.839, 1.166, 0.810] },
+    { y: 5.074, pct: '35%', color: C.yellow, a: [0.844, 5.060, 1.243, 0.862] }].forEach(function (r) {
+    art(s, r.a, r.color);
+    arrowBadge(s, 2.419, r.y + 0.273, 0.287, r.color);
+    T(s, [2.901, r.y, 1.598, 0.774], r.pct, { fontSize: 40, bold: true, color: r.color });
+    T(s, [4.369, r.y + 0.087, 2.225, 0.370], 'Your text here', { fontSize: 16, bold: true, color: C.white });
+    T(s, [4.369, r.y + 0.400, 1.539, 0.576], 'Lorem ipsum dolor sit amet, ',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+  });
+
+  // stack of 3-D discs, green on top
+  [{ y: 5.270, face: C.palegrey, side: C.softgrey }, { y: 4.400, face: C.palegrey, side: C.white },
+    { y: 3.540, face: C.palegrey, side: C.white }, { y: 2.001, face: 'ADDD8E', side: C.green }]
+    .forEach(function (d) {
+      poly(s, [[8.348, d.y + 0.46], [11.508, d.y + 0.46], [11.508, d.y + 0.92], [8.348, d.y + 0.92]],
+        { fill: { color: d.side }, line: NOLINE });
+      S(s, 'ellipse', [8.348, d.y + 0.46, 3.160, 0.920], { fill: { color: d.side }, line: NOLINE });
+      S(s, 'ellipse', [8.348, d.y, 3.160, 0.920], { fill: { color: d.face }, line: NOLINE });
+    });
+  art(s, [9.350, 1.142, 1.156, 1.558], '5E653E', null, 25);
+  S(s, 'ellipse', [10.855, 1.935, 1.006, 1.006], { fill: { color: C.dgreen, transparency: 90 }, line: NOLINE });
+  S(s, 'ellipse', [10.937, 2.017, 0.843, 0.843], { fill: { color: C.white }, line: { color: C.white, width: 2.25 } });
+  T(s, [10.937, 2.017, 0.843, 0.843], '%', { fontSize: 22, bold: true, color: C.dgreen, align: 'center', valign: 'middle' });
+  footer(s, 26, { capColor: C.midgrey, pageColor: C.palegrey });
+}
+
+/* ------------------------------------------------------------ slide 27 */
+
+function slide27(p) {
+  const s = p.addSlide();
+  headline(s, [1.206, 0.808, 10.922, 0.707], [['Tools Used for ', C.white], ['Sustainable Farming', C.green]],
+    { box: { bold: true, align: 'center', lineSpacingMultiple: 0.9 } });
+
+  [{ box: [3.056, 2.601, 7.222], color: C.dgreen, range: [180, 300] },
+    { box: [3.392, 2.937, 6.549], color: C.dgreen, range: [252, 359] },
+    { box: [3.705, 3.251, 5.923], color: C.green, range: [219, 337] },
+    { box: [4.042, 3.587, 5.250], color: C.dgreen, range: [181, 293] }].forEach(function (h) {
+    S(s, 'arc', [h.box[0], h.box[1], h.box[2], h.box[2]], { line: { color: h.color, width: 6.75 }, angleRange: h.range });
+  });
+  art(s, [5.144, 4.175, 3.192, 2.217], '2F5560', null, 15);
+
+  [{ x: 1.216, y: 4.796, t: 'Tool One', dot: [4.492, 4.418], from: [2.181, 4.564], to: [4.492, 4.564] },
+    { x: 1.398, y: 2.974, t: 'Tool Two', dot: [4.935, 3.552], from: [2.792, 2.645], to: [5.081, 2.645] },
+    { x: 9.821, y: 2.848, t: 'Tool Three', dot: [7.512, 2.552], from: [7.806, 2.698], to: [10.590, 2.698] },
+    { x: 10.521, y: 5.049, t: 'Tool Four', dot: [9.503, 4.775], from: [9.797, 4.920], to: [11.056, 4.920] },
+  ].forEach(function (l) {
+    T(s, [l.x, l.y, 2.798, 0.370], l.t, { fontSize: 16, bold: true, color: C.white });
+    T(s, [l.x - 0.001, l.y + 0.321, 1.931, 0.333], 'Best Teamwork',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+    S(s, 'ellipse', [l.dot[0], l.dot[1], 0.292, 0.292], { fill: { type: 'none' }, line: { color: C.dgreen, width: 0.5 } });
+    oval(s, [l.dot[0] + 0.036, l.dot[1] + 0.035, 0.221, 0.221], C.dgreen);
+    line(s, l.from[0], l.from[1], l.to[0], l.to[1], { line: { color: C.dgreen, width: 0.75 } });
+  });
+  line(s, 5.081, 2.645, 5.081, 3.552, { line: { color: C.dgreen, width: 0.75 } }); // elbow drop to Tool Two
+
+  rect(s, [0, 6.392, 13.333, 1.123], C.olive);
+  T(s, [0.528, 7.054, 3.617, 0.278], 'Agricultural Challenge Infographic ',
+    { fontSize: 10.5, color: C.white, valign: 'middle' });
+  T(s, [11.778, 7.080, 1.014, 0.252], [
+    { text: 'page ' }, { text: '27', options: { bold: true } },
+  ], { fontSize: 9, color: C.white, align: 'right', valign: 'middle' });
+}
+
+/* ------------------------------------------------------------ slide 28 */
+
+function slide28(p) {
+  const s = p.addSlide();
+  vgrad(s, [0, 0, 13.333, 7.5], '76C441', C.dgreen);
+  headline(s, [2.659, 0.674, 8.404, 0.774], [['Sustainable Farming Vehicle', C.black]],
+    { box: { bold: true, align: 'center' } });
+
+  [{ num: '01', nx: 1.431, ny: 4.762, tx: 2.349, ty: 4.721, tw: 1.742, th: 1.136, a: [1.736, 2.441, 2.315, 1.783], color: '6B8927' },
+    { num: '02', nx: 5.042, ny: 2.487, tx: 5.991, ty: 2.516, tw: 1.870, th: 0.873, a: [5.879, 4.180, 2.116, 1.729], color: '547426' },
+    { num: '03', nx: 9.224, ny: 4.695, tx: 10.179, ty: 4.729, tw: 1.766, th: 1.136, a: [9.635, 2.433, 2.196, 1.717], color: '7E9331' },
+  ].forEach(function (it) {
+    art(s, it.a, it.color);
+    T(s, [it.nx, it.ny, 0.903, 0.774], it.num, { fontSize: 40, bold: true, color: C.black, align: 'center' });
+    T(s, [it.tx, it.ty, 1.649, 0.390], 'Your Text Here', { fontSize: 14, bold: true, color: C.black, lineSpacingMultiple: 1.3 });
+    T(s, [it.tx, it.ty + 0.373, it.tw, it.th], 'A wonderful serenity has taken possession of my entire soul',
+      { fontSize: 12, color: C.black, lineSpacingMultiple: 1.3 });
+  });
+}
+
+/* ------------------------------------------------------------ slide 29 */
+
+function slide29(p) {
+  const s = p.addSlide();
+  headline(s, [1.667, 0.794, 10.000, 0.774],
+    [['Sustainable Farming ', C.green], ['Target Process', C.white]],
+    { box: { align: 'center', valign: 'bottom' } });
+  T(s, [3.051, 1.577, 7.231, 0.348],
+    'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. ',
+    { fontSize: 12, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+
+  [{ num: '01', nx: 0.618, nw: 0.811, ny: 3.130, tx: 1.428, ty: 3.219, a: [1.528, 2.562, 0.516] },
+    { num: '02', nx: 3.450, nw: 0.930, ny: 5.018, tx: 4.380, ty: 5.107, a: [4.489, 4.397, 0.592] },
+    { num: '03', nx: 6.387, nw: 0.943, ny: 3.130, tx: 7.331, ty: 3.219, a: [7.400, 2.478, 0.595] },
+    { num: '04', nx: 9.125, nw: 1.157, ny: 5.018, tx: 10.282, ty: 5.107, a: [10.412, 4.394, 0.595] },
+  ].forEach(function (st) {
+    icon(s, [st.a[0], st.a[1], st.a[2], st.a[2]], C.yellow);
+    T(s, [st.nx, st.ny, st.nw, 0.640], st.num, { fontSize: 32, bold: true, color: C.green, align: 'right' });
+    T(s, [st.tx, st.ty, 2.251, 0.572], 'We want to raise your crops and livestock',
+      { fontSize: 14, bold: true, color: C.white });
+    T(s, [st.tx, st.ty + 0.597, 2.496, 1.278], 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.2 });
+  });
+
+  // dashed swooshes that lead the eye from one step down to the next
+  const swoosh = { color: C.yellow, width: 1.5, dashType: 'dash', endArrowType: 'arrow' };
+  [{ x: 2.216, y: 4.435, w: 1.151, h: 1.357, down: true },
+    { x: 4.991, y: 3.164, w: 1.331, h: 1.315, down: false },
+    { x: 8.036, y: 4.435, w: 1.151, h: 1.357, down: true }].forEach(function (a) {
+    const pts = a.down
+      ? [{ x: 0, y: 0 }, { x: a.w, y: a.h * 0.86, curve: { type: 'cubic', x1: a.w * 0.10, y1: a.h * 0.85, x2: a.w * 0.55, y2: a.h } }]
+      : [{ x: 0, y: a.h }, { x: a.w, y: a.h * 0.14, curve: { type: 'cubic', x1: a.w * 0.10, y1: a.h * 0.15, x2: a.w * 0.55, y2: 0 } }];
+    S(s, 'custGeom', [a.x, a.y, a.w, a.h], { points: pts, fill: { type: 'none' }, line: swoosh });
+  });
+  footer(s, 29, { capColor: C.white, ruleColor: C.white, pageColor: C.white, numColor: C.white });
+}
+
+/* ------------------------------------------------------------ slide 30 */
+
+function slide30(p) {
+  const s = p.addSlide();
+  rect(s, [6.650, 0, 6.683, 7.5], C.panel);
+  headline(s, [0.685, 0.643, 5.584, 1.447],
+    [['Sustainable Farming ', C.white, true], ['Tree Diagram', C.green]], { box: { lineSpacingMultiple: 0.9 } });
+
+  // stylised tree: straight trunk with three short branches, then leaf ovals
+  rect(s, [9.54, 3.16, 0.98, 4.34], C.green);
+  [[9.21, 2.99, 0.81, 0.96, 15], [10.10, 3.89, 0.60, 0.75, 90], [9.03, 5.16, 0.81, 0.96, 345]]
+    .forEach(function (b) {
+      S(s, 'rect', [b[0], b[1], b[2], b[3] * 0.32], { fill: { color: C.green }, line: NOLINE, rotate: b[4] });
+    });
+  [[7.61, 0.92, 2.13, 1.08, C.green, 60], [9.03, 1.49, 1.52, 0.77, C.dgreen, 105],
+    [7.63, 2.29, 1.52, 0.77, C.dyellow, 15], [9.67, 2.31, 1.07, 0.54, C.yellow, 150],
+    [11.14, 2.81, 1.80, 0.91, C.yellow, 150], [11.04, 3.89, 1.29, 0.65, C.dgreen, 195],
+    [10.38, 2.70, 1.29, 0.65, C.dyellow, 105], [10.64, 4.34, 0.91, 0.46, C.green, 240],
+    [7.01, 3.81, 1.80, 0.91, C.dyellow, 45], [8.27, 4.04, 1.29, 0.65, C.dgreen, 90],
+    [7.30, 5.00, 1.29, 0.65, C.green, 0], [8.00, 5.63, 0.91, 0.46, C.yellow, 150],
+  ].forEach(function (l) {
+    S(s, 'ellipse', [l[0], l[1], l[2], l[3]], { fill: { color: l[4] }, line: NOLINE, rotate: l[5] });
+  });
+  [[7.67, 3.97, 0.52], [11.80, 2.97, 0.54], [8.27, 1.08, 0.64]].forEach(function (i) {
+    icon(s, [i[0], i[1], i[2], i[2]], C.black);
+  });
+
+  [{ y: 2.884, color: C.green, num: '01', tx: 1.688, tw: 3.883 },
+    { y: 4.077, color: C.yellow, num: '02', tx: 1.677, tw: 3.894 },
+    { y: 5.269, color: C.dyellow, num: '03', tx: 1.688, tw: 3.936 }].forEach(function (r) {
+    rrect(s, [0.810, r.y, 0.745, 0.745], r.color, 0.051);
+    T(s, [0.810, r.y, 0.745, 0.745], r.num, { fontSize: 18, bold: true, color: C.black, align: 'center', valign: 'middle' });
+    T(s, [r.tx, r.y + 0.078, r.tw, 0.611],
+      'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. ',
+      { fontSize: 12, color: C.white, lineSpacingMultiple: 1.3, margin: [7.2, 0, 3.6, 3.6] });
+  });
+  footer(s, 30, { capColor: C.midgrey, pageColor: C.palegrey });
+}
+
+/* ------------------------------------------------------------ slide 31 */
+
+function slide31(p) {
+  const s = p.addSlide();
+  art(s, [1.021, 1.545, 11.292, 5.576], '1A1A1A', '[world map]');
+  headline(s, [1.930, 0.678, 9.473, 0.707], [['Sustainable Farming ', C.green], ['World Maps', C.white]],
+    { box: { bold: true, align: 'center', valign: 'bottom', lineSpacingMultiple: 0.9 } });
+
+  [{ x: 1.770, y: 4.445, color: C.green, tail: 'tl' },
+    { x: 5.313, y: 2.548, color: C.dgreen, tail: 'l' },
+    { x: 5.555, y: 5.508, color: C.yellow, tail: 'tl' },
+    { x: 8.190, y: 3.164, color: C.dyellow, tail: 'br' },
+    { x: 10.808, y: 3.899, color: C.cyan, tail: 'tl' },
+  ].forEach(function (pin) {
+    const bx = pin.tail === 'l' || pin.tail === 'br' ? pin.x : pin.x + 0.075;
+    rrect(s, [bx, pin.y + 0.011, 1.076, 0.719], pin.color, 0.016);
+    if (pin.tail === 'l') {
+      S(s, 'rtTriangle', [pin.x, pin.y + 0.656, 0.144, 0.144], { fill: { color: pin.color }, line: NOLINE, rotate: 90 });
+    } else if (pin.tail === 'br') {
+      S(s, 'rtTriangle', [pin.x + 0.466, pin.y + 0.635, 0.144, 0.144], { fill: { color: pin.color }, line: NOLINE, rotate: 315 });
+    } else {
+      S(s, 'rtTriangle', [pin.x, pin.y + 0.011, 0.144, 0.144], { fill: { color: pin.color }, line: NOLINE, rotate: 180 });
+    }
+    T(s, [bx + 0.055, pin.y, 0.967, 0.431], '+34',
+      { fontSize: 16, bold: true, color: C.white, align: 'center', valign: 'bottom', lineSpacingMultiple: 1.3 });
+    T(s, [bx + 0.010, pin.y + 0.359, 1.059, 0.317], 'A wonderful',
+      { fontSize: 10.5, color: C.white, align: 'center', lineSpacingMultiple: 1.3 });
+  });
+
+  const dot = { color: C.softgrey, width: 2, dashType: 'sysDot', beginArrowType: 'oval', endArrowType: 'oval' };
+  [[2.286, 4.334, 5.169, 2.916], [5.558, 3.454, 6.111, 5.369], [6.788, 5.955, 8.071, 3.564],
+    [6.496, 3.062, 8.743, 2.914], [9.381, 3.555, 10.778, 4.346]].forEach(function (l) {
+    line(s, l[0], l[1], l[2], l[3], { line: dot });
+  });
+  footer(s, 31);
+}
+
+/* --------------------------------------------------------------- build */
+
+const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16,
+  slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24,
+  slide25, slide26, slide27, slide28, slide29, slide30, slide31];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE';
+  pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+
+  const addSlide = pptx.addSlide.bind(pptx);
+  pptx.addSlide = function () {
+    const s = addSlide();
+    s.background = { color: C.bg };
+    return s;
+  };
+
+  SLIDES.forEach(function (fn) { fn(pptx); });
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '0449d8d0-26fb-4ed5-9277-d92ea0ca903f_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote', f); }).catch(function (e) { console.error(e); process.exit(1); });

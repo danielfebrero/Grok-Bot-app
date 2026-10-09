@@ -1,0 +1,208 @@
+--- 2026-10-08_20-36:/home/box/sand-data/managed-skills/skills/office-pptx/SKILL.md
++++ 2026-10-09_02-53:/home/box/sand-data/managed-skills/skills/office-pptx/SKILL.md
+@@ -32,7 +32,7 @@
+ 
+ ```bash
+ python3 -m markitdown deck.pptx           # all text as markdown
+-office pptx inventory deck.pptx                  # shapes, boxes, fonts, sizes, theme colors, media, notes
++office pptx inventory deck.pptx                  # shapes, boxes, text with run fonts, pictures, theme fonts
+ office pptx inventory deck.pptx --slides 3 4 --json
+ office pptx inventory work/unpacked --slides slide7.xml slide12.xml   # unpacked folder, by slide file
+ office pptx check-fonts deck.pptx                # fonts the file uses vs fonts installed (+ substitutes)
+@@ -42,7 +42,7 @@
+ ## Look at it: contact sheet first
+ 
+ ```bash
+-office pptx render-slides deck.pptx out/render                       # PDF, slide-NN.jpg, contact.jpg
++office render deck.pptx out/render                                   # PDF, slide-NN.jpg, contact.jpg
+ office pptx thumbnail-grid deck.pptx grid.jpg --titles                # small labeled grid
+ office pptx thumbnail-grid work/unpacked grid.jpg --cols 3 --per-grid 12   # grid-1.jpg, grid-2.jpg, ...
+ office pptx thumbnail-grid a.jpg b.jpg c.jpg -o grid.jpg              # grid from any images
+@@ -61,32 +61,28 @@
+ ## Check
+ 
+ ```bash
+-office pptx check-overlap deck.pptx              # collisions, off-slide, text overflow
++office pptx check-overlap deck.pptx              # text boxes that collide or leave the slide
+ office pptx check-overlap deck.pptx --autofit -o fixed.pptx
+ office validate out.pptx --original source.pptx
+ ```
+ 
+-`office pptx check-overlap` reports text on text (error), text across a picture's
+-edge (warning), shapes or text past the slide edge, and text that does not
+-fit its box. Text size is measured with the real installed font, so a
+-finding that says "font not installed" is only an estimate. Decorative
+-lines, frames, and backgrounds are skipped; `--all` includes them.
+-`--autofit` adds `normAutofit` (shrink on overflow), but never below 70%.
+-Anything that needs more shrinking stays open: cut the copy or enlarge the
+-box. Exit code 1 means an error-level finding is still open.
++`office pptx check-overlap` compares the boxes written in the slide XML: text
++on text, and shapes past the slide edge. Only shapes holding text are
++compared. It does not measure text, so it cannot see text that overflows
++its own box; find that on the render. `--autofit` sets `normAutofit` on
++the text boxes in each finding, so PowerPoint shrinks their text on open.
++Exit code 1 means a finding is still open.
+ 
+-`office validate` runs the OOXML schemas and structure checks: content
+-types, relationships, duplicate shape ids, and `sldIdLst`. `--original`
++`office validate` runs the OOXML schemas and checks shape ids. `--original`
+ hides issues that the source already had, so you only see the ones your
+-edit added. `--repair` fixes duplicate ids, `xml:space`, and the generator
+-defects in PptxGenJS and python-pptx output (part order, stale content
+-types, chart axis ids, repeated `a:pPr`). Run it once on every PptxGenJS
+-build.
+-
+-`office pptx check-fonts` counts text runs, style defaults, and paragraph marks
+-separately. Exit code 1 means a run with text names a font that is
+-neither installed nor embedded. A font that is missing but only appears
+-as a style default or an empty paragraph mark is listed, not failed.
++edit added. `--repair` fixes duplicate shape ids, the negative chart axis ids
++python-pptx writes, and the element order PptxGenJS gets wrong (a misordered
++`presentation.xml`, repeated `a:pPr`, a dangling third chart axis id). Run
++it once on every PptxGenJS build.
++
++`office pptx check-fonts` exit code 1 means a theme font, or a font that a
++run with text names, is neither installed nor embedded. Each missing font
++lists the face LibreOffice renders instead.
+ 
+ ## Finish line
+ 
+@@ -112,12 +108,11 @@
+ ```bash
+ office pptx thumbnail-grid source.pptx work/source_grid.jpg --titles   # what is in the deck
+ office pptx inventory source.pptx --slides 4 9                         # shape names, boxes, fonts
+-office pptx rearrange source.pptx work/cut.pptx 1 4 9 9 12             # keep, reorder, duplicate
+-#   ... python-pptx edits on work/cut.pptx -> work/out.pptx (below) ...
+-office pptx clean work/out.pptx                                        # unused layouts, orphaned media
++#   ... python-pptx: cut and reorder, then edit -> work/out.pptx (below) ...
++office pptx clean work/out.pptx                                        # unlisted slides, orphaned media
+ office pptx check-overlap work/out.pptx
+ office validate work/out.pptx --original source.pptx             # add --repair for python-pptx charts
+-office pptx render-slides work/out.pptx work/render                    # open work/render/contact.jpg
++office render work/out.pptx work/render                                # open work/render/contact.jpg
+ ```
+ 
+ ### Cut, reorder, and re-layout
+@@ -125,32 +120,29 @@
+ Cutting a big template deck down to the slides you need is usually the
+ fastest good result.
+ 
+-```bash
+-office pptx rearrange source.pptx out.pptx 1 4 4 7 12                  # positions; a repeat is a copy
+-office pptx rearrange work/unpacked work/unpacked slide1.xml slide5.xml slide5.xml --keep-unlisted
+-office pptx swap-layout work/unpacked slide24.xml slide12.xml --template work/template
++```python
++from pptx import Presentation
++
++prs = Presentation("source.pptx")
++ids = prs.slides._sldIdLst
++slides = list(ids)
++for el in slides:
++    ids.remove(el)
++for n in [1, 4, 7, 12]:          # 1-based positions, in the new order
++    ids.append(slides[n - 1])
++prs.save("work/cut.pptx")
+ ```
+ 
+-`office pptx rearrange` takes positions or slide file names and prints one line
+-per new position, `slide N: slideK.xml`. It keeps masters, layouts, theme,
+-and media. A repeated slide gets a copy with its own speaker notes; it
+-shares media and never copies comments. Source and output may be the same
+-unpacked folder; then only changed files are rewritten. Slides left out
+-are removed with parts only they used, unless `--keep-unlisted` keeps them
+-for later reuse.
+-
+-`office pptx swap-layout` moves a slide to another layout: it replaces the slide
+-(third argument) with a fresh copy of a template slide (second argument).
+-The slide keeps its file name, its place, and its speaker notes. Its text
+-and pictures become the template slide's, so write its content again
+-afterwards. A slide whose layout is wrong for its copy is cheaper to swap
+-than to patch.
++A slide left out of `sldIdLst` stays in the file until `office pptx clean`
++removes it. python-pptx has no copy-slide call: to reuse a layout, add a
++slide on the same slide layout (`prs.slides.add_slide(slide.slide_layout)`)
++and fill it.
+ 
+ Run `office pptx clean` after your edits, not right after the cut. It drops
+-unlisted slides, slide layouts no kept slide uses (template decks often
+-hide most of their image weight there), and media whose picture you
+-deleted, since python-pptx leaves the relationship behind. Hidden slides
+-(`show="0"`) count as slides.
++slides that `p:sldIdLst` no longer lists, media whose picture you deleted
++(python-pptx leaves the relationship behind), and every part nothing links
++to any more. Unused slide layouts stay, because the master still lists
++them. Hidden slides (`show="0"`) count as slides.
+ 
+ ### Prefer python-pptx
+ 
+@@ -201,12 +193,12 @@
+ 
+ Unpack, edit the XML with a parser (lxml), and pack again. Do not hand-zip a
+ folder: `office pack` puts `[Content_Types].xml` first, condenses the
+-pretty-printed whitespace, and can validate in the same step.
++pretty-printed whitespace, and validates against `--original` in the same step.
+ 
+ ```bash
+ office unpack source.pptx work/x/
+ #   ... edit work/x/ppt/slides/slide3.xml ...
+-office pack work/x/ work/out.pptx --validate --original source.pptx
++office pack work/x/ work/out.pptx --original source.pptx
+ ```
+ 
+ Namespaces you will see:
+@@ -215,10 +207,11 @@
+ - `a` `http://schemas.openxmlformats.org/drawingml/2006/main`
+ - `r` `http://schemas.openxmlformats.org/officeDocument/2006/relationships`
+ 
+-Slide order lives in `ppt/presentation.xml` (`p:sldIdLst`). Use
+-`office pptx rearrange` to change it. To delete slides by hand, remove the
+-`p:sldId`, then run `office pptx clean`. `office validate` flags `<p:sldId>`
+-entries that point nowhere, which would otherwise produce a repair dialog.
++Slide order lives in `ppt/presentation.xml` (`p:sldIdLst`). To reorder or
++delete slides, change that list, then run `office pptx clean`, which
++removes the slides the list no longer names. A `<p:sldId>` that points
++nowhere makes PowerPoint show a repair dialog, so change the list and
++`ppt/_rels/presentation.xml.rels` together.
+ 
+ ### What to replace
+ 
+@@ -235,11 +228,11 @@
+ `font.name` and size.
+ 
+ Look for overflow, collisions, leftover template strings, empty wells, and
+-footer chrome that no longer matches the new topic. Mechanical overflow is
+-usually a box size or `word_wrap` fix. Use `--autofit` only for small
+-overflows. A missing font on this box changes the preview, not the file:
+-overflow found while measuring with a substitute face is a warning, not an
+-error.
++footer chrome that no longer matches the new topic. Find overflow on the
++render; `office pptx check-overlap` does not measure text. Mechanical
++overflow is usually a box size or `word_wrap` fix. Use `--autofit` only
++for small overflows. A missing font on this box changes the preview, not
++the file.
+ 
+ ## Create a new deck
+ 
+@@ -321,16 +314,15 @@
+    office validate output.pptx --repair       # once after every node run
+    office pptx check-overlap output.pptx
+    office pptx check-fonts output.pptx
+-   office pptx render-slides output.pptx render/    # open render/contact.jpg
++   office render output.pptx render/                # open render/contact.jpg
+    ```
+ 
+    PptxGenJS writes a few schema defects PowerPoint tolerates: a
+-   misordered `presentation.xml`, content types for slide masters that do
+-   not exist, a dangling third chart axis id, repeated `a:pPr` in
+-   multi-run paragraphs, and duplicate shape ids on tables. `--repair`
+-   fixes exactly those, so the output reports OK. Everything else: fix
+-   the source `.js` and run it again; do not hand-patch the generated
+-   file. Repeat until `office pptx check-overlap` has no errors and the contact
++   misordered `presentation.xml`, a dangling third chart axis id, repeated
++   `a:pPr` in multi-run paragraphs, and duplicate shape ids on tables.
++   `--repair` fixes exactly those, so the output reports OK. Everything
++   else: fix the source `.js` and run it again; do not hand-patch the
++   generated file. Repeat until `office pptx check-overlap` has no errors and the contact
+    sheet reads well.
+ 
+ ### PptxGenJS from scratch
