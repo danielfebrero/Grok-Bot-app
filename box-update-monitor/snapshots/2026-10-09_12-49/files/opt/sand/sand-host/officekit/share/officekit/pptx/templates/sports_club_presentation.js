@@ -1,0 +1,663 @@
+/**
+ * "darotavan — Sports Presentation" (18 slides, 13.333 x 7.5 in)
+ * Rebuilt with pptxgenjs only. Photographs in the source deck are replaced by
+ * flat grey placeholder shapes that keep the original crop geometry.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+
+const RED = 'E61A23';
+const NAVY = '202C59';
+const DARK = '262626';
+const SLATE = '3F3F3F';
+const GREY = '7F7F7F';
+const PALE = 'C0C8EA'; // body copy on navy
+const MIST = 'C9C8D0';
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const TRACK = 'BFBFBF'; // unfilled part of a progress bar
+const PHOTO = 'C3C3C3'; // image placeholder
+const PHOTO_DARK = '7F7F7F'; // second image placeholder tone
+
+const HEAD = 'Poppins SemiBold';
+const PLAIN = 'Poppins';
+const EYEBROW_FONT = 'Work Sans Medium';
+const BODY = 'Montserrat';
+
+const SLIDE_W = 13.333;
+const SLIDE_H = 7.5;
+
+/** Google-Slides text-box insets used throughout the deck: [l, r, b, t] in points. */
+const INSET = [7.2, 7.2, 3.6, 3.6];
+
+const eyebrow = { fontFace: EYEBROW_FONT, fontSize: 18, color: RED };
+const heading = { fontFace: HEAD, fontSize: 32, bold: true, color: DARK };
+const subhead = { fontFace: HEAD, fontSize: 12, bold: true, color: DARK };
+const body = { fontFace: BODY, fontSize: 12, color: GREY, align: 'justify', lineSpacingMultiple: 1.5 };
+const nameStyle = { fontFace: HEAD, fontSize: 14, bold: true, color: DARK };
+
+/* ------------------------------------------------------------------ *
+ * Lorem strings reused across slides
+ * ------------------------------------------------------------------ */
+
+const L_FULL =
+  'Enim praesent elementum facilisis leo vel fringilla est. Et tortor at risus viverra adipiscing at in tellus. ' +
+  'Eget mi proin sed libero enim sed faucibus turpis. Sed ullamcorper morbi tincidunt ornare. Scelerisque';
+const L_SHORT = 'Elementum facilisis iba leo vel fringilla iki est. Et tortor at risus viverra adipiscing leo vel';
+const L_SHORT2 = 'Elementum facilisis iba leo vel fringilla iki est. Et tortor at risus viverra adipiscing at in  leo vel';
+const L_CARD = 'Enim praesent elementum facilisis leo vel fringilla est. Et tortor at risus viverra';
+const L_TILE = 'Enim praesent elementum facilisis leo vel fringilla est. Et tortor at risus viverra adipiscing at in tellus. Eget mi proin ki';
+const SUBTITLE = 'Your Subtitle Here';
+const BRAND = 'Darotavan Sports';
+
+/* ------------------------------------------------------------------ *
+ * Primitive helpers
+ * ------------------------------------------------------------------ */
+
+/** Text box with the deck's standard insets. */
+function text(slide, content, opts) {
+  slide.addText(content, Object.assign({ valign: 'top', margin: INSET, wrap: true }, opts));
+}
+
+/** Solid rectangle. */
+function rect(slide, x, y, w, h, color, line) {
+  slide.addShape('rect', { x, y, w, h, fill: color ? { color } : undefined, line });
+}
+
+/**
+ * Filled polygon. `pts` are fractions of the shape box, e.g. [[0,0],[1,0],[1,1]].
+ * This is how every angled banner / ribbon in the deck is built.
+ */
+function poly(slide, x, y, w, h, color, pts) {
+  slide.addShape('custGeom', {
+    x, y, w, h,
+    fill: { color },
+    points: pts.map(([px, py], i) => ({ x: px * w, y: py * h, moveTo: i === 0 })).concat([{ close: true }])
+  });
+}
+
+/** Grey stand-in for a photograph; `pts` optionally clips it to a parallelogram etc. */
+function photo(slide, x, y, w, h, pts, tone) {
+  if (pts) poly(slide, x, y, w, h, tone || PHOTO, pts);
+  else rect(slide, x, y, w, h, tone || PHOTO);
+}
+
+/** Thin horizontal rule (1.75 pt) used as a title accent. */
+function rule(slide, x, y, w, color) {
+  slide.addShape('line', { x, y, w, h: 0, line: { color: color || RED, width: 1.75 } });
+}
+
+/** Solid pill — the deck's progress bars are 6.25 pt strokes with round caps. */
+function bar(slide, x, yCenter, w, color) {
+  const h = 0.0868;
+  slide.addShape('roundRect', { x, y: yCenter - h / 2, w, h, rectRadius: h / 2, fill: { color } });
+}
+
+/** Rectangular "LEARN MORE" call-to-action button. */
+function button(slide, x, y, w, h, label) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: RED } });
+  text(slide, label, {
+    x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: HEAD, fontSize: 12, bold: true, color: WHITE
+  });
+}
+
+/** Small right-pointing arrow glyph that trails the flat "LEARN MORE" links. */
+function arrowGlyph(slide, x, y, color) {
+  const w = 0.148, h = 0.085;
+  slide.addShape('custGeom', {
+    x, y: y + h / 2, w: w * 0.66, h: 0.001,
+    points: [{ x: 0, y: 0 }, { x: w * 0.66, y: 0 }],
+    line: { color, width: 1 }
+  });
+  slide.addShape('custGeom', {
+    x: x + w * 0.55, y, w: w * 0.45, h,
+    fill: { color },
+    points: [{ x: 0, y: 0 }, { x: w * 0.45, y: h / 2 }, { x: 0, y: h }, { close: true }]
+  });
+}
+
+/** Flat "LEARN MORE  ->" link: right-aligned label plus arrow 1.682" further right. */
+function learnMore(slide, x, y, color) {
+  text(slide, 'LEARN MORE', {
+    x, y, w: 1.6, h: 0.303, align: 'right',
+    fontFace: PLAIN, fontSize: 12, bold: true, color: color || WHITE
+  });
+  arrowGlyph(slide, x + 1.682, y + 0.101, color || WHITE);
+}
+
+/** Red eyebrow + big section title. `y` is the title's top; the eyebrow sits 0.404" above. */
+function sectionTitle(slide, o) {
+  text(slide, o.brand || BRAND, Object.assign({}, eyebrow, {
+    x: o.x, y: o.y - 0.404, w: o.ew || o.w, h: 0.404, align: o.align || 'left'
+  }));
+  text(slide, o.title, Object.assign({}, heading, {
+    x: o.x, y: o.y, w: o.w, h: 0.64, align: o.align || 'left', color: o.color || DARK
+  }));
+}
+
+/* ------------------------------------------------------------------ *
+ * Icon library
+ *
+ * Each icon is a list of parts drawn inside a unit box:
+ *   ['e'|'r', x, y, w, h, rot?]  outlined ellipse / rectangle
+ *   ['E'|'R', x, y, w, h, rot?]  filled ellipse / rectangle
+ *   ['p', [[x,y], ...]]          open polyline (stroked)
+ *   ['o', [[x,y], ...]]          closed polygon (stroked)
+ *   ['f', [[x,y], ...]]          closed polygon (filled)
+ * ------------------------------------------------------------------ */
+
+const ICONS = {
+  // slide 8 — team sports, thin white line art
+  hoop: [['e', 0.02, 0, 0.32, 0.32], ['p', [[0.02, 0.16], [0.34, 0.16]]], ['p', [[0.18, 0], [0.18, 0.32]]],
+    ['r', 0.04, 0.38, 0.44, 0.30],
+    ['p', [[0.15, 0.38], [0.15, 0.68]]], ['p', [[0.26, 0.38], [0.26, 0.68]]], ['p', [[0.37, 0.38], [0.37, 0.68]]],
+    ['p', [[0.04, 0.53], [0.48, 0.53]]],
+    ['r', 0.48, 0.30, 0.10, 0.20], ['p', [[0.58, 0.40], [0.80, 0.40]]], ['p', [[0.80, 0.40], [0.80, 1]]]],
+  bat: [['o', [[0.00, 0.86], [0.08, 0.94], [0.20, 0.86], [0.62, 0.34], [0.72, 0.10], [0.66, 0.00],
+    [0.44, 0.14], [0.10, 0.66]]],
+    ['p', [[0.10, 0.66], [0.20, 0.86]]], ['p', [[0.05, 0.72], [0.15, 0.80]]], ['p', [[0.11, 0.79], [0.20, 0.87]]],
+    ['e', 0.58, 0.56, 0.40, 0.40],
+    ['p', [[0.67, 0.62], [0.73, 0.76], [0.67, 0.90]]], ['p', [[0.89, 0.62], [0.83, 0.76], [0.89, 0.90]]]],
+  hockey: [['p', [[0.92, 0], [0.24, 0.72]]], ['p', [[0.80, 0], [0.14, 0.72]]],
+    ['p', [[0.24, 0.72], [0.06, 0.86], [0.20, 0.94], [0.44, 0.94]]], ['p', [[0.14, 0.72], [0.06, 0.80]]],
+    ['e', 0.44, 0.80, 0.28, 0.18], ['p', [[0.44, 0.89], [0.44, 0.96]]], ['p', [[0.72, 0.89], [0.72, 0.96]]]],
+  pingpong: [['e', 0.02, 0.06, 0.66, 0.66], ['e', 0.62, 0.00, 0.28, 0.28],
+    ['o', [[0.24, 0.66], [0.46, 0.66], [0.44, 1], [0.28, 1]]]],
+  // slide 9 — sport disciplines
+  football: [['e', 0.00, 0.19, 1.00, 0.62, -45], ['p', [[0.32, 0.68], [0.68, 0.32]]],
+    ['p', [[0.351, 0.564], [0.436, 0.648]]], ['p', [[0.423, 0.493], [0.507, 0.577]]],
+    ['p', [[0.493, 0.423], [0.577, 0.507]]], ['p', [[0.564, 0.351], [0.648, 0.436]]]],
+  pool: [['p', [[0.20, 0.56], [0.20, 0.14], [0.28, 0.04], [0.36, 0.14], [0.36, 0.56]]],
+    ['p', [[0.44, 0.56], [0.44, 0.14], [0.52, 0.04], [0.60, 0.14], [0.60, 0.56]]],
+    ['p', [[0.20, 0.26], [0.44, 0.26]]], ['p', [[0.20, 0.36], [0.44, 0.36]]], ['p', [[0.20, 0.46], [0.44, 0.46]]],
+    ['p', [[0.06, 0.18], [0.94, 0.18]]], ['p', [[0.06, 0.14], [0.06, 0.22]]],
+    ['p', [[0.06, 0.66], [0.22, 0.60], [0.38, 0.70], [0.54, 0.60], [0.70, 0.70], [0.94, 0.62]]],
+    ['p', [[0.06, 0.79], [0.22, 0.73], [0.38, 0.83], [0.54, 0.73], [0.70, 0.83], [0.94, 0.75]]],
+    ['p', [[0.06, 0.92], [0.22, 0.86], [0.38, 0.96], [0.54, 0.86], [0.70, 0.96], [0.94, 0.88]]]],
+  dumbbell: [['o', [[0.262, 0.742], [0.742, 0.262], [0.778, 0.298], [0.298, 0.778]]],
+    ['o', [[0.317, 0.907], [0.267, 0.957], [0.083, 0.773], [0.133, 0.723]]],
+    ['o', [[0.392, 0.790], [0.350, 0.832], [0.208, 0.690], [0.250, 0.648]]],
+    ['p', [[0.083, 0.857], [0.183, 0.957]]], ['p', [[0.183, 0.757], [0.283, 0.857]]],
+    ['o', [[0.917, 0.227], [0.867, 0.277], [0.683, 0.093], [0.733, 0.043]]],
+    ['o', [[0.792, 0.310], [0.750, 0.352], [0.608, 0.210], [0.650, 0.168]]],
+    ['p', [[0.817, 0.127], [0.917, 0.227]]], ['p', [[0.717, 0.227], [0.817, 0.327]]]],
+  golf: [['p', [[0.40, 0], [0.22, 0.58]]],
+    ['o', [[0.24, 0.54], [0.02, 0.72], [0.06, 0.88], [0.40, 0.76], [0.34, 0.62]]],
+    ['p', [[0.06, 0.80], [0.37, 0.69]]],
+    ['e', 0.58, 0.58, 0.40, 0.40], ['E', 0.68, 0.68, 0.05, 0.05], ['E', 0.80, 0.66, 0.05, 0.05],
+    ['E', 0.76, 0.80, 0.05, 0.05]],
+  bowling: [['o', [[0.00, 0.50], [0.05, 0.16], [0.14, 0.02], [0.23, 0.16], [0.28, 0.50], [0.24, 0.88], [0.04, 0.88]]],
+    ['o', [[0.26, 0.46], [0.31, 0.12], [0.40, 0.00], [0.49, 0.12], [0.54, 0.46], [0.50, 0.88], [0.30, 0.88]]],
+    ['e', 0.54, 0.42, 0.46, 0.46], ['E', 0.65, 0.53, 0.06, 0.06], ['E', 0.79, 0.51, 0.06, 0.06],
+    ['E', 0.74, 0.66, 0.06, 0.06]],
+  // slide 12 — gym equipment
+  pressMachine: [['r', 0.42, 0, 0.16, 0.10],
+    ['p', [[0.06, 0.30], [0.06, 0.17], [0.19, 0.13], [0.81, 0.13], [0.94, 0.17], [0.94, 0.30]]],
+    ['r', 0.02, 0.28, 0.11, 0.28], ['r', 0.87, 0.28, 0.11, 0.28],
+    ['o', [[0.32, 0.62], [0.32, 0.35], [0.40, 0.25], [0.50, 0.22], [0.60, 0.25], [0.68, 0.35], [0.68, 0.62]]],
+    ['p', [[0.42, 0.52], [0.42, 0.37], [0.50, 0.31]]],
+    ['r', 0.28, 0.62, 0.44, 0.09], ['r', 0.44, 0.71, 0.12, 0.20],
+    ['r', 0.06, 0.91, 0.88, 0.07]],
+  weightStack: [['r', 0.24, 0.02, 0.52, 0.28],
+    ['R', 0.36, 0.14, 0.28, 0.04], ['r', 0.30, 0.09, 0.06, 0.14], ['r', 0.64, 0.09, 0.06, 0.14],
+    ['r', 0.26, 0.11, 0.04, 0.10], ['r', 0.70, 0.11, 0.04, 0.10],
+    ['r', 0.36, 0.30, 0.28, 0.08], ['r', 0.28, 0.38, 0.44, 0.08],
+    ['o', [[0.28, 0.46], [0.14, 0.54], [0.14, 0.96], [0.28, 0.96]]],
+    ['o', [[0.72, 0.46], [0.86, 0.54], [0.86, 0.96], [0.72, 0.96]]],
+    ['r', 0.28, 0.46, 0.44, 0.50], ['r', 0.34, 0.54, 0.32, 0.42], ['p', [[0.50, 0.54], [0.50, 0.96]]],
+    ['E', 0.465, 0.72, 0.018, 0.045], ['E', 0.517, 0.72, 0.018, 0.045]],
+  benchPress: [['p', [[0.12, 0.13], [0.88, 0.13]]],
+    ['e', 0.00, 0.03, 0.05, 0.20], ['e', 0.035, 0.03, 0.05, 0.20], ['e', 0.07, 0.03, 0.05, 0.20],
+    ['e', 0.95, 0.03, 0.05, 0.20], ['e', 0.915, 0.03, 0.05, 0.20], ['e', 0.88, 0.03, 0.05, 0.20],
+    ['r', 0.245, 0.13, 0.05, 0.78], ['r', 0.705, 0.13, 0.05, 0.78],
+    ['r', 0.36, 0.42, 0.28, 0.12], ['r', 0.42, 0.54, 0.16, 0.28],
+    ['p', [[0.36, 0.82], [0.64, 0.82]]], ['r', 0.06, 0.91, 0.88, 0.07]],
+  // slide 16 — pricing tiers
+  plane: [['o', [[0, 0.44], [1, 0], [0.52, 1], [0.36, 0.66]]],
+    ['p', [[0.36, 0.66], [1, 0]]], ['p', [[0.36, 0.66], [0.15, 0.86]]]],
+  rocket: [['o', [[0.50, 0], [0.68, 0.24], [0.68, 0.66], [0.32, 0.66], [0.32, 0.24]]],
+    ['e', 0.38, 0.20, 0.24, 0.24],
+    ['o', [[0.32, 0.34], [0.14, 0.56], [0.14, 0.70], [0.32, 0.62]]],
+    ['o', [[0.68, 0.34], [0.86, 0.56], [0.86, 0.70], [0.68, 0.62]]],
+    ['p', [[0.36, 0.66], [0.36, 0.80]]], ['p', [[0.50, 0.68], [0.50, 0.88]]],
+    ['p', [[0.64, 0.66], [0.64, 0.80]]], ['p', [[0.24, 0.74], [0.28, 0.86]]],
+    ['p', [[0.76, 0.74], [0.72, 0.86]]], ['p', [[0.42, 0.86], [0.42, 1]]], ['p', [[0.58, 0.86], [0.58, 1]]]],
+  buildings: [['r', 0.04, 0.28, 0.34, 0.72], ['r', 0.42, 0.10, 0.26, 0.90], ['r', 0.72, 0.34, 0.26, 0.66],
+    ['p', [[0.12, 0.40], [0.30, 0.40]]], ['p', [[0.12, 0.54], [0.30, 0.54]]], ['p', [[0.12, 0.68], [0.30, 0.68]]],
+    ['p', [[0.12, 0.82], [0.30, 0.82]]], ['p', [[0.55, 0.10], [0.55, 1]]],
+    ['p', [[0.42, 0.26], [0.68, 0.26]]], ['p', [[0.42, 0.42], [0.68, 0.42]]], ['p', [[0.42, 0.58], [0.68, 0.58]]],
+    ['p', [[0.42, 0.74], [0.68, 0.74]]], ['p', [[0.85, 0.34], [0.85, 1]]],
+    ['p', [[0.72, 0.52], [0.98, 0.52]]], ['p', [[0.72, 0.70], [0.98, 0.70]]], ['p', [[0.72, 0.88], [0.98, 0.88]]]],
+  // slide 17 — contact details
+  pin: [['o', [[0.50, 1], [0.06, 0.42], [0.14, 0.14], [0.50, 0], [0.86, 0.14], [0.94, 0.42]]],
+    ['e', 0.30, 0.20, 0.40, 0.40]],
+  clock: [['e', 0.02, 0.02, 0.96, 0.96], ['p', [[0.50, 0.22], [0.50, 0.52], [0.72, 0.66]]]],
+  phone: [['o', [[0.10, 0.06], [0.32, 0.02], [0.44, 0.28], [0.30, 0.40], [0.60, 0.72], [0.72, 0.58],
+    [0.98, 0.70], [0.94, 0.92], [0.72, 1], [0.30, 0.78], [0.08, 0.36]]]],
+  mail: [['r', 0.02, 0.06, 0.96, 0.88], ['p', [[0.02, 0.06], [0.50, 0.58], [0.98, 0.06]]],
+    ['p', [[0.02, 0.94], [0.36, 0.48]]], ['p', [[0.98, 0.94], [0.64, 0.48]]]],
+  // slide 6 — social row (tiny marks, ~0.1")
+  li: [['R', 0, 0, 0.26, 0.22], ['R', 0, 0.34, 0.26, 0.66],
+    ['R', 0.40, 0.34, 0.24, 0.66], ['R', 0.40, 0.34, 0.60, 0.22], ['R', 0.76, 0.34, 0.24, 0.66]],
+  ig: [['r', 0, 0, 1, 1], ['e', 0.26, 0.26, 0.48, 0.48], ['E', 0.74, 0.12, 0.14, 0.14]],
+  fb: [['R', 0.34, 0.22, 0.42, 0.78], ['R', 0.02, 0.40, 0.86, 0.20],
+    ['f', [[0.34, 0.30], [0.42, 0.06], [0.66, 0], [1, 0], [1, 0.20], [0.72, 0.20], [0.66, 0.30]]]],
+  tw: [['f', [[0, 0.80], [0.26, 0.88], [0.56, 0.78], [0.78, 0.54], [0.88, 0.24], [1, 0.06],
+    [0.80, 0.14], [0.58, 0.08], [0.38, 0.22], [0.36, 0.44], [0.12, 0.30], [0.20, 0.54], [0.06, 0.52], [0.18, 0.70]]]]
+};
+
+function icon(slide, name, x, y, w, h, color, weight) {
+  const stroke = { color, width: weight || 1.25 };
+  for (const part of ICONS[name]) {
+    const kind = part[0];
+    if ('erER'.includes(kind)) {
+      const [, fx, fy, fw, fh, rot] = part;
+      slide.addShape(kind === 'e' || kind === 'E' ? 'ellipse' : 'rect', {
+        x: x + fx * w, y: y + fy * h, w: fw * w, h: fh * h, rotate: rot || 0,
+        fill: kind === 'E' || kind === 'R' ? { color } : undefined,
+        line: kind === 'E' || kind === 'R' ? undefined : stroke
+      });
+    } else {
+      const pts = part[1].map(([px, py], i) => ({ x: px * w, y: py * h, moveTo: i === 0 }));
+      if (kind !== 'p') pts.push({ close: true });
+      slide.addShape('custGeom', {
+        x, y, w, h, points: pts,
+        fill: kind === 'f' ? { color } : undefined,
+        line: kind === 'f' ? undefined : stroke
+      });
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Recurring geometry
+ * ------------------------------------------------------------------ */
+
+/** Right-leaning parallelogram used for photo frames and icon chips. */
+const PARA_R = (s) => [[s, 0], [1, 0], [1 - s, 1], [0, 1]];
+/** Left-leaning parallelogram (mirror of PARA_R). */
+const PARA_L = (s) => [[0, 0], [1 - s, 0], [1, 1], [s, 1]];
+/** Thin diagonal stripe. */
+const STRIPE = (s) => [[s, 0], [0, 1], [1 - s, 1], [1, 0]];
+
+/* ------------------------------------------------------------------ *
+ * Slide builders
+ * ------------------------------------------------------------------ */
+
+// 1 — cover
+function slide01(pres) {
+  const s = pres.addSlide();
+  photo(s, 0, 0, SLIDE_W, SLIDE_H);
+  rect(s, 0.554, 0.554, 12.225, 6.392, null, { color: RED, width: 1.75 });
+  text(s, 'darotavan', { x: 3.275, y: 2.562, w: 6.784, h: 1.111, align: 'center', fontFace: HEAD, fontSize: 60, bold: true, color: WHITE });
+  text(s, 'Sports Presentation', { x: 3.275, y: 3.672, w: 6.784, h: 0.438, align: 'center', fontFace: PLAIN, fontSize: 20, color: WHITE });
+  button(s, 5.696, 4.475, 1.942, 0.464, 'LEARN MORE');
+}
+
+// 2 — Welcome To Sport Club
+function slide02(pres) {
+  const s = pres.addSlide();
+  poly(s, 9.489, 0, 3.844, 7.5, RED, [[1, 1], [0.5813, 1], [0, 0], [0.4187, 0]]);
+  poly(s, 11.411, 0, 1.389, 3.272, NAVY, [[1, 1], [0.2983, 0], [0, 0], [0.7017, 1]]);
+  sectionTitle(s, { x: 0.728, y: 2.008, w: 6.02, title: 'Welcome To Sport Club' });
+  text(s, L_FULL, Object.assign({ x: 0.728, y: 2.85, w: 6.02, h: 0.976 }, body));
+  text(s, L_FULL, Object.assign({ x: 0.728, y: 4.141, w: 6.02, h: 0.976 }, body));
+  button(s, 0.842, 5.55, 1.888, 0.447, 'LEARN MORE');
+  photo(s, 7.33, 1.711, 4.812, 4.078, PARA_L(0.2525));
+}
+
+// 3 — About Our Business (navy band bottom-left)
+function slide03(pres) {
+  const s = pres.addSlide();
+  rect(s, 10.71, 0, 0.406, 3.491, RED);
+  rect(s, 0, 3.491, 7.014, 4.009, NAVY);
+  sectionTitle(s, { x: 0.728, y: 4.765, w: 5.559, title: 'About Our Business', color: WHITE });
+  text(s, L_FULL.replace('turpis. Sed ullamcorper morbi tincidunt ornare. Scelerisque', 'turpis sed ullamcorper morbi tincidunt iki ba'),
+    Object.assign({}, body, { x: 0.728, y: 6.006, w: 5.559, h: 0.976, color: PALE }));
+  rule(s, 0.87, 5.71, 1.116);
+  const blurb = 'Enim praesent elementum facilisis leo vel fringilla est. Et tortor at risus viverra adipiscing at in tellus. Eget mi proin sed libero enim sed faucibus turpis. ';
+  [4.009, 5.71].forEach((y) => {
+    text(s, SUBTITLE, Object.assign({}, subhead, { x: 7.859, y, w: 4.63, h: 0.303, color: SLATE }));
+    text(s, blurb, Object.assign({}, body, { x: 7.859, y: y + 0.3, w: 4.63, h: 0.976 }));
+  });
+  photo(s, 0, 0, 10.71, 3.491);
+}
+
+// 4 — About Our Business (three link columns on a navy slab)
+function slide04(pres) {
+  const s = pres.addSlide();
+  rect(s, 11.305, 0, 2.028, 7.5, RED);
+  rect(s, 1.014, 3.186, 11.305, 3.299, NAVY);
+  sectionTitle(s, { x: 5.407, y: 0.842, w: 5.29, title: 'About Our Business' });
+  text(s, 'Enim praesent elementum facilisis leo vel fringilla est. Et tortor at risus viverra adipiscing at in tellus. Eget mi proin sed libero enim sed faucibus turpis. Sed ullamcorper morbi',
+    Object.assign({}, body, { x: 5.407, y: 1.685, w: 5.29, h: 0.976 }));
+  [1.94, 5.294, 8.647].forEach((x) => {
+    text(s, SUBTITLE, Object.assign({}, subhead, { x, y: 3.889, w: 2.746, h: 0.303, color: WHITE }));
+    text(s, L_SHORT, Object.assign({}, body, { x, y: 4.192, w: 2.746, h: 0.976, color: PALE }));
+    learnMore(s, x + 0.804, 5.48, WHITE);
+  });
+  photo(s, 1.014, 0, 3.784, 3.186);
+}
+
+// 5 — Sports Club Strategy (full-bleed navy curve)
+function slide05(pres) {
+  const s = pres.addSlide();
+  // Navy backdrop: a wide band whose bottom-left corner sweeps up in a curve.
+  s.addShape('custGeom', {
+    x: 0, y: 0, w: SLIDE_W, h: 6.753, fill: { color: NAVY },
+    points: [
+      { x: 13.333, y: 2.631 },
+      { x: 5.045, y: 6.604 },
+      { x: 3.592, y: 6.527, curve: { type: 'cubic', x1: 4.579, y1: 6.827, x2: 4.031, y2: 6.798 } },
+      { x: 0, y: 4.313 }, { x: 0, y: 0 }, { x: 13.333, y: 0 }, { close: true }
+    ]
+  });
+  poly(s, 0, 4.656, 2.126, 1.742, RED, [[1, 1], [0, 0.2474], [0, 0], [1, 0.7526]]);
+  sectionTitle(s, { x: 0.728, y: 1.276, w: 5.672, title: 'Sports Club Strategy', color: WHITE });
+  text(s, 'Enim praesent elementum facilisis leo vel fringilla est. Et tortor at risus viverra adipiscing at in tellus. Eget mi proin sed libero enim',
+    Object.assign({}, body, { x: 0.728, y: 2.055, w: 5.678, h: 0.673, color: PALE }));
+  [0.728, 3.777].forEach((x) => {
+    text(s, SUBTITLE, Object.assign({}, subhead, { x, y: 3.131, w: 2.623, h: 0.303, color: WHITE }));
+    text(s, 'Elementum facilisis iba leo vel fringilla iki est. Et tortor',
+      Object.assign({}, body, { x, y: 3.438, w: 2.623, h: 0.673, color: PALE }));
+  });
+  poly(s, 8.439, 0, 3.511, 1.683, RED, [[1, 0], [0, 1], [0, 0.7348], [0.7348, 0]]);
+  photo(s, 7.137, 0.444, 4.456, 5.802, [[1, 0], [1, 0.6319], [0, 1], [0, 0.3681]]);
+  poly(s, 8.119, 3.029, 5.218, 2.947, NAVY, [[0, 1], [1, 0.1514], [1, 0], [0, 0.8486]]);
+}
+
+// 6 — Meet Our Team
+function slide06(pres) {
+  const s = pres.addSlide();
+  const cardPara = [[0, 1], [0.2443, 0], [1, 0], [0.7557, 1]];
+  [[1.178, NAVY], [4.907, RED], [8.501, NAVY]].forEach(([x, c]) => poly(s, x, 3.105, 3.655, 2.33, c, cardPara));
+  // corner chevrons
+  poly(s, 12.429, 3.23, 0.904, 3.47, RED, [[1, 1], [0, 0.6793], [1, 0]]);
+  poly(s, 12.662, 6.12, 0.672, 1.211, NAVY, [[1, 0.6827], [0, 0], [1, 1]]);
+  poly(s, 0, 0.798, 0.904, 3.47, RED, [[0, 0], [1, 0.3207], [0, 1]]);
+  poly(s, 0, 0.167, 0.672, 1.211, NAVY, [[0, 0.3173], [1, 1], [0, 0]]);
+  sectionTitle(s, { x: 4.533, y: 0.835, w: 4.612, title: 'Meet Our Team', align: 'center' });
+  text(s, L_FULL + ' eu ultrices vitae auctor eu augue ut. Fringilla urna porttitor rhoncus',
+    Object.assign({}, body, { x: 2.773, y: 1.683, w: 8.061, h: 0.976, align: 'center' }));
+  [1.359, 5.089, 8.682].forEach((x) => {
+    photo(s, x, 3.23, 3.292, 2.08, PARA_R(0.2422));
+    text(s, 'Your Name Here', Object.assign({}, nameStyle, { x, y: 5.863, w: 2.275, h: 0.337 }));
+    text(s, 'Job Descriptions', { x, y: 6.199, w: 2.275, h: 0.303, fontFace: BODY, fontSize: 12, color: GREY, valign: 'top', margin: INSET });
+    icon(s, 'li', x + 0.117, 6.84, 0.102, 0.102, RED);
+    icon(s, 'ig', x + 0.463, 6.835, 0.113, 0.113, RED, 0.75);
+    icon(s, 'fb', x + 0.819, 6.831, 0.066, 0.122, RED);
+    icon(s, 'tw', x + 1.128, 6.845, 0.113, 0.092, RED);
+  });
+}
+
+// 7 — Our Talented Team (skill bars)
+function slide07(pres) {
+  const s = pres.addSlide();
+  poly(s, 5.031, 5.774, 8.302, 1.726, RED, [[0, 0], [1, 0], [1, 1], [0.0457, 1]]);
+  sectionTitle(s, { x: 5.306, y: 1.356, w: 6.929, ew: 6.979, title: 'Our Talented Team', brand: 'Darovatan Sports' });
+  rule(s, 10.509, 1.675, 2.825);
+  text(s, 'Daniel Edelmar', Object.assign({}, nameStyle, { x: 5.548, y: 2.171, w: 6.686, h: 0.337 }));
+  text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed un do eiusmod tempor incididunt ut labore et dolore magna aliqua urna cursus eget nunc et',
+    Object.assign({}, body, { x: 5.548, y: 2.514, w: 6.686, h: 0.673 }));
+  const skills = [
+    { y: 3.463, labelX: 5.862, pctX: 10.175, barX: 6.013, fill: 5.338, dotX: 11.253, pct: '90%' },
+    { y: 4.188, labelX: 6.165, pctX: 10.479, barX: 6.316, fill: 4.290, dotX: 10.509, pct: '70%' },
+    { y: 4.913, labelX: 6.479, pctX: 10.792, barX: 6.630, fill: 3.545, dotX: 10.078, pct: '64%' }
+  ];
+  skills.forEach((k) => {
+    text(s, 'Your Title Here', Object.assign({}, subhead, { x: k.labelX, y: k.y, w: 2.273, h: 0.303 }));
+    text(s, k.pct, Object.assign({}, subhead, { x: k.pctX, y: k.y, w: 1.925, h: 0.303, align: 'right' }));
+    bar(s, k.barX, k.y + 0.392, 5.969, TRACK);
+    bar(s, k.barX, k.y + 0.392, k.fill, RED);
+    s.addShape('ellipse', { x: k.dotX, y: k.y + 0.291, w: 0.196, h: 0.196, fill: { color: RED } });
+  });
+  poly(s, 4.672, 6.622, 0.5, 0.878, NAVY, [[0, 0], [0.6141, 0], [1, 1], [0.3859, 1]]);
+  photo(s, 0.847, 0.787, 4.924, 5.475, [[0, 0], [0.7395, 0], [1, 1], [0.2442, 1]]);
+}
+
+// 8 — Our Services (2x2 icon grid on a navy wedge)
+function slide08(pres) {
+  const s = pres.addSlide();
+  photo(s, 0, 0, 5.85, 7.5, [[0, 0], [0.7335, 0], [1, 1], [0.2665, 1]]);
+  poly(s, 0.612, 5.846, 0.691, 1.654, RED, [[0, 0], [0.4959, 0.9966], [1, 1], [0.5041, 0.0034]]);
+  poly(s, 4.535, 0, 0.691, 1.654, RED, [[0, 0], [0.4959, 0.9966], [1, 1], [0.5041, 0.0034]]);
+  poly(s, 3.992, 3.109, 9.341, 3.944, NAVY, [[0, 0], [0.0878, 1], [1, 1], [1, 0]]);
+  sectionTitle(s, { x: 5.806, y: 0.841, w: 7.053, ew: 6.878, title: 'Our Services' });
+  rule(s, 9.311, 1.161, 4.022);
+  text(s, L_FULL + ' eu ultrices vitae auctor eu dis',
+    Object.assign({}, body, { x: 5.806, y: 1.682, w: 6.878, h: 0.976 }));
+  const cells = [
+    { tx: 5.821, ty: 3.554, ix: 4.881, iy: 3.615, iw: 0.787, ih: 0.738, name: 'hoop' },
+    { tx: 9.938, ty: 3.554, ix: 8.998, iy: 3.615, iw: 0.787, ih: 0.787, name: 'bat' },
+    { tx: 6.085, ty: 5.290, ix: 5.145, iy: 5.350, iw: 0.787, ih: 0.787, name: 'hockey' },
+    { tx: 10.113, ty: 5.290, ix: 9.345, iy: 5.350, iw: 0.616, ih: 0.787, name: 'pingpong' }
+  ];
+  cells.forEach((c) => {
+    icon(s, c.name, c.ix, c.iy, c.iw, c.ih, WHITE);
+    text(s, SUBTITLE, Object.assign({}, subhead, { x: c.tx, y: c.ty, w: 2.746, h: 0.303, color: WHITE }));
+    text(s, L_SHORT, Object.assign({}, body, { x: c.tx, y: c.ty + 0.303, w: 2.746, h: 0.976, color: PALE }));
+  });
+}
+
+// 9 — Our Services (stacked list with chip icons)
+function slide09(pres) {
+  const s = pres.addSlide();
+  sectionTitle(s, { x: 1.098, y: 1.172, w: 5.569, title: 'Our Services' });
+  text(s, 'Enim praesent elementum facilisis leo vel fringilla est. Et tortor at risus viverra adipiscing at in tellus. Eget mi proin sed libero iki',
+    Object.assign({}, body, { x: 1.098, y: 1.97, w: 5.569, h: 0.673 }));
+  const chip = [[0, 0], [0.8548, 0], [1, 1], [0.1452, 1]];
+  const rows = [
+    { y: 3.040, color: RED, name: 'football', iy: 3.141, iw: 0.591, ih: 0.591, ix: 1.370 },
+    { y: 4.403, color: NAVY, name: 'pool', iy: 4.504, iw: 0.591, ih: 0.591, ix: 1.370 },
+    { y: 5.766, color: RED, name: 'dumbbell', iy: 5.847, iw: 0.623, ih: 0.630, ix: 1.362 }
+  ];
+  rows.forEach((r) => {
+    poly(s, 1.098, r.y, 1.135, 0.793, r.color, chip);
+    icon(s, r.name, r.ix, r.iy, r.iw, r.ih, WHITE);
+    text(s, SUBTITLE, Object.assign({}, subhead, { x: 2.532, y: r.y - 0.009, w: 4.134, h: 0.303 }));
+    text(s, L_SHORT2, Object.assign({}, body, { x: 2.532, y: r.y + 0.294, w: 4.134, h: 0.673 }));
+  });
+  rect(s, 0, 7.197, 7.758, 0.303, NAVY);
+  photo(s, 7.758, 0.768, 4.808, 6.732);
+}
+
+// 10 — Our Services (two link cards)
+function slide10(pres) {
+  const s = pres.addSlide();
+  photo(s, 0, 0, 2.503, 4.99, null, PHOTO_DARK);
+  photo(s, 2.503, 0, 2.505, 4.99);
+  rect(s, 3.953, 4.556, 9.38, 2.944, NAVY);
+  rect(s, 5.006, 0, 0.46, 2.333, RED);
+  sectionTitle(s, { x: 6.198, y: 0.894, w: 6.404, title: 'Our Services' });
+  rule(s, 9.703, 1.199, 3.631);
+  const para = L_FULL + ' eu ultrices';
+  text(s, para, Object.assign({}, body, { x: 6.198, y: 1.755, w: 6.404, h: 0.976 }));
+  text(s, para, Object.assign({}, body, { x: 6.198, y: 3.047, w: 6.404, h: 0.976 }));
+  [{ ix: 4.685, tx: 5.624, lx: 6.429, name: 'golf' }, { ix: 8.915, tx: 9.855, lx: 10.66, name: 'bowling' }].forEach((c) => {
+    icon(s, c.name, c.ix, 5.094, 0.787, 0.787, WHITE);
+    text(s, SUBTITLE, Object.assign({}, subhead, { x: c.tx, y: 5.033, w: 2.746, h: 0.303, color: WHITE }));
+    text(s, L_SHORT, Object.assign({}, body, { x: c.tx, y: 5.376, w: 2.746, h: 0.976, color: PALE }));
+    learnMore(s, c.lx, 6.664, WHITE);
+  });
+}
+
+// 11 — break slides
+function slide11(pres) {
+  const s = pres.addSlide();
+  poly(s, 2.404, 0, 2.6, 2.051, RED, [[1, 0.7284], [1, 1], [0, 0], [0.2716, 0]]);
+  text(s, 'break slides', { x: 5.004, y: 3.84, w: 7.015, h: 1.111, fontFace: HEAD, fontSize: 60, bold: true, color: BLACK, valign: 'top', margin: INSET });
+  text(s, 'It\u2019s Time For a Break', { x: 5.004, y: 4.951, w: 7.015, h: 0.438, fontFace: PLAIN, fontSize: 20, color: RED, valign: 'top', margin: INSET });
+  text(s, 'Adipiscing at in tellus. Eget mi proin sed libero enim sed faucibus turpis. Sed ullamcorper morbi tincidunt ornare. Scelerisque eu ultrices vitae auctor eu augue',
+    Object.assign({}, body, { x: 5.004, y: 5.686, w: 7.015, h: 0.673 }));
+  rect(s, 4.244, 7.02, 9.09, 0.48, NAVY);
+  photo(s, 0, 0, 4.244, 7.5, [[0, 0], [0.4653, 0], [1, 0.2387], [1, 1], [0.4287, 1], [0, 0.8086]]);
+}
+
+// 12 — Our Sport Facility
+function slide12(pres) {
+  const s = pres.addSlide();
+  photo(s, 0, 0, 3.538, 7.5);
+  [2.968, 6.564, 10.16].forEach((x) => rect(s, x, 3.442, 3.173, 4.058, NAVY));
+  rect(s, 3.538, 0, 0.423, 3.442, RED);
+  sectionTitle(s, { x: 4.614, y: 0.88, w: 8.067, title: 'Our Sport Facility' });
+  text(s, L_FULL + ' eu ultrices vitae auctor eu augue ut. Fringilla urna porttitor rhoncus dolor',
+    Object.assign({}, body, { x: 4.614, y: 1.827, w: 8.067, h: 0.976 }));
+  const cards = [
+    { tx: 3.281, ix: 4.055, iy: 4.085, iw: 0.999, ih: 1.142, name: 'pressMachine' },
+    { tx: 6.878, ix: 7.669, iy: 4.085, iw: 0.963, ih: 1.142, name: 'weightStack' },
+    { tx: 10.474, ix: 11.176, iy: 4.121, iw: 1.142, ih: 1.070, name: 'benchPress' }
+  ];
+  cards.forEach((c) => {
+    icon(s, c.name, c.ix, c.iy, c.iw, c.ih, WHITE);
+    text(s, SUBTITLE, Object.assign({}, subhead, { x: c.tx, y: 5.579, w: 2.546, h: 0.303, color: WHITE, align: 'center' }));
+    text(s, L_CARD, Object.assign({}, body, { x: c.tx, y: 5.881, w: 2.546, h: 0.976, color: PALE, align: 'center' }));
+  });
+}
+
+// 13 — Our Gallery (navy title block over a photo pair)
+function slide13(pres) {
+  const s = pres.addSlide();
+  photo(s, 4.719, 1.594, 3.5, 2.938, null, PHOTO_DARK);
+  photo(s, 1.219, 1.594, 3.5, 2.938);
+  rect(s, 7.708, 0.687, 4.406, 1.797, NAVY);
+  sectionTitle(s, { x: 8.265, y: 1.468, w: 3.454, title: 'Our Gallery', color: WHITE });
+  text(s, SUBTITLE, Object.assign({}, subhead, { x: 8.693, y: 3.02, w: 3.422, h: 0.303 }));
+  text(s, L_TILE, Object.assign({}, body, { x: 8.693, y: 3.323, w: 3.422, h: 0.976 }));
+  [1.219, 4.956, 8.693].forEach((x) => {
+    text(s, SUBTITLE, Object.assign({}, subhead, { x, y: 5.251, w: 3.422, h: 0.303, color: SLATE }));
+    text(s, L_TILE, Object.assign({}, body, { x, y: 5.548, w: 3.422, h: 0.976 }));
+  });
+  rect(s, 0, 7.172, 4.641, 0.328, RED);
+}
+
+// 14 — Our Gallery (numbered items)
+function slide14(pres) {
+  const s = pres.addSlide();
+  // Source uses a 90deg-rotated rectangle; the axis-aligned equivalent is used here.
+  rect(s, 5.141, 4.246, 8.193, 3.268, NAVY);
+  sectionTitle(s, { x: 3.613, y: 1.733, w: 4.494, title: 'Our Gallery' });
+  text(s, L_FULL, Object.assign({}, body, { x: 6.711, y: 2.774, w: 6.11, h: 0.976 }));
+  [{ x: 6.667, n: '01', lx: 7.709 }, { x: 9.859, n: '02', lx: 10.901 }].forEach((c) => {
+    text(s, c.n, { x: c.x, y: 4.601, w: 0.98, h: 0.707, fontFace: HEAD, fontSize: 36, bold: true, color: RED, valign: 'top', margin: INSET });
+    text(s, SUBTITLE, Object.assign({}, subhead, { x: c.x, y: 5.308, w: 2.962, h: 0.303, color: WHITE, align: 'justify' }));
+    text(s, 'PLACEHOLDER',
+      Object.assign({}, body, { x: c.x, y: 5.611, w: 2.962, h: 0.673, color: MIST }));
+    learnMore(s, c.lx, 6.535, WHITE);
+  });
+  photo(s, 0.513, 0.513, 2.596, 4.088);
+  photo(s, 3.601, 2.899, 2.596, 4.088);
+}
+
+// 15 — Our Gallery (right-aligned, angled navy column)
+function slide15(pres) {
+  const s = pres.addSlide();
+  poly(s, 0, 0, 3.649, 7.5, NAVY, [[1, 0], [0.5473, 1], [0, 1], [0.4527, 0]]);
+  poly(s, 0.71, 0, 0.655, 1.494, RED, [[0, 1], [0.5, 0.0046], [1, 0], [0.5, 0.9954]]);
+  sectionTitle(s, { x: 7.12, y: 2.081, w: 5.245, title: 'Our Gallery', align: 'right' });
+  rule(s, 11.377, 3.016, 0.889);
+  text(s, 'Enim praesent elementum facilisis leo vel fringilla est. Et tortor at risus viverra adipiscing at in tellus. Eget mi proin sed vel ki libero enim sed faucibus turpis. Sed ullamcorper morbi tincidunt ornare fringilla ',
+    Object.assign({}, body, { x: 6.181, y: 3.29, w: 6.184, h: 0.976, align: 'right' }));
+  photo(s, 1.084, 1.046, 5.13, 5.649, PARA_R(0.2425));
+  photo(s, 5.537, 4.905, 3.306, 1.79, PARA_R(0.1192));
+  photo(s, 9.059, 4.905, 3.306, 1.79, PARA_R(0.1192));
+  poly(s, 2.294, 6.006, 0.655, 1.494, RED, [[0, 1], [0.5, 0.0046], [1, 0], [0.5, 0.9954]]);
+}
+
+// 16 — Pricing Plans
+function slide16(pres) {
+  const s = pres.addSlide();
+  const PERKS = ['Lobortis feugiat vivamus at augue', 'Eleifend quam adipiscing vitae', 'Quis nostrud exercitation', 'Commodo consequat'];
+  const plans = [
+    { cx: 0.507, ch: 5.977, card: null, name: 'Standard Plan', price: '$199/year', tx: 0.866, px: 1.028, bx: 0.957, btnX: 0.972, btnFill: RED, btnText: WHITE, ink: DARK, perk: GREY, icon: 'plane', ix: 1.875, iy: 2.273, iw: 1.063, ih: 0.864, iColor: RED },
+    { cx: 4.767, ch: 5.790, card: NAVY, name: 'Business Plan', price: '$399/year', tx: 5.172, px: 5.334, bx: 5.263, btnX: 5.277, btnFill: WHITE, btnText: NAVY, ink: WHITE, perk: PALE, icon: 'rocket', ix: 6.077, iy: 2.114, iw: 1.179, ih: 1.181, iColor: WHITE },
+    { cx: 9.087, ch: 5.977, card: null, name: 'Enterprise Plan', price: '$599/year', tx: 9.446, px: 9.608, bx: 9.537, btnX: 9.552, btnFill: RED, btnText: WHITE, ink: DARK, perk: GREY, icon: 'buildings', ix: 10.435, iy: 2.135, iw: 1.102, ih: 1.138, iColor: RED }
+  ];
+  plans.forEach((p) => {
+    rect(s, p.cx, 1.71, 3.8, p.ch, p.card, { color: NAVY, width: 1.75 });
+    icon(s, p.icon, p.ix, p.iy, p.iw, p.ih, p.iColor, 1.5);
+    text(s, p.name, { x: p.tx, y: 3.536, w: 2.99, h: 0.404, align: 'center', fontFace: HEAD, fontSize: 18, bold: true, color: p.ink, valign: 'top', margin: INSET });
+    text(s, p.price, { x: p.px, y: 3.943, w: 2.665, h: 0.404, align: 'center', fontFace: HEAD, fontSize: 18, bold: true, color: p.ink, valign: 'top', margin: INSET });
+    PERKS.forEach((perk, i) => {
+      text(s, perk, {
+        x: p.bx, y: 4.637 + i * 0.442, w: i === 0 ? 2.807 : (i === 1 ? 2.99 : 2.665), h: 0.269,
+        fontFace: BODY, fontSize: 10, color: p.perk, valign: 'top', margin: INSET,
+        bullet: { characterCode: '2714', indent: 13.5 }
+      });
+    });
+    s.addShape('roundRect', { x: p.btnX, y: 6.563, w: 2.779, h: 0.446, rectRadius: 0.0743, fill: { color: p.btnFill } });
+    text(s, 'SELECT PLAN', {
+      x: p.btnX, y: 6.563, w: 2.779, h: 0.446, align: 'center', valign: 'middle',
+      fontFace: PLAIN, fontSize: 11, bold: true, color: p.btnText, margin: INSET
+    });
+  });
+  sectionTitle(s, { x: 4.247, y: 0.655, w: 4.84, title: 'Pricing Plans', align: 'center' });
+}
+
+// 17 — contact details on a navy diagonal
+function slide17(pres) {
+  const s = pres.addSlide();
+  poly(s, 2.319, 0, 11.014, 7.5, NAVY, [[0.2832, 0], [0, 1], [1, 1], [1, 0]]);
+  poly(s, 1.678, 5.981, 0.948, 1.519, RED, STRIPE(0.6667));
+  poly(s, 6.382, 0, 0.948, 1.519, RED, STRIPE(0.6667));
+  sectionTitle(s, { x: 6.213, y: 2.466, w: 6.404, title: 'Our Services', color: WHITE });
+  text(s, 'If you have any question, Feel free to contact us any time on (phone cell) or contact us by (email). We will get back to you as soon as we can ',
+    Object.assign({}, body, { x: 6.213, y: 3.24, w: 6.404, h: 0.673, color: PALE }));
+  const contacts = [
+    { x: 6.876, y: 4.299, w: 2.496, label: 'Location', lines: ['1234 Queens Bayside Point,', 'CA 12345 United States'], icon: 'pin', ix: 6.329, iy: 4.364, iw: 0.416, ih: 0.512 },
+    { x: 10.213, y: 4.299, w: 2.365, label: 'Office Hours', lines: ['Monday-Friday', '09.00-17.00'], icon: 'clock', ix: 9.638, iy: 4.364, iw: 0.472, ih: 0.472 },
+    { x: 6.876, y: 5.785, w: 2.365, label: 'Get In Touch', lines: ['(+62) 123 5678 000', '(+62) 123 4678 900'], icon: 'phone', ix: 6.301, iy: 5.85, iw: 0.472, ih: 0.472 },
+    { x: 10.213, y: 5.785, w: 2.583, label: 'More Information', lines: ['www.darotavansportscom', 'contact@darotavan.com'], icon: 'mail', ix: 9.638, iy: 5.85, iw: 0.472, ih: 0.346 }
+  ];
+  contacts.forEach((c) => {
+    icon(s, c.icon, c.ix, c.iy, c.iw, c.ih, WHITE, 1.5);
+    text(s, c.label, Object.assign({}, subhead, { x: c.x, y: c.y, w: 2.365, h: 0.303, color: WHITE }));
+    text(s, c.lines.map((t) => ({ text: t, options: { breakLine: true } })),
+      Object.assign({}, body, { x: c.x, y: c.y + 0.307, w: c.w, h: 0.707, color: PALE, align: 'left' }));
+  });
+  // Photo placeholder: slanted right edge whose bottom corner is rounded off.
+  s.addShape('custGeom', {
+    x: 0, y: 0, w: 6.667, h: 4.857, fill: { color: PHOTO },
+    points: [
+      { x: 0, y: 0 }, { x: 6.667, y: 0 }, { x: 4.771, y: 4.558 },
+      { x: 4.200, y: 4.841, curve: { type: 'cubic', x1: 4.679, y1: 4.781, x2: 4.435, y2: 4.902 } },
+      { x: 0, y: 3.750 }, { close: true }
+    ]
+  });
+}
+
+// 18 — thank you
+function slide18(pres) {
+  const s = pres.addSlide();
+  photo(s, 0, 0, SLIDE_W, SLIDE_H);
+  poly(s, 7.292, 4.565, 6.039, 2.932, RED, [[1, 0], [0, 1], [1, 1]]);
+  poly(s, 10.056, 3.694, 3.274, 2.048, NAVY, [[0, 0.776], [1, 0], [1, 0.224], [0, 1]]);
+  text(s, 'thank you', { x: 4.041, y: 2.976, w: 5.251, h: 1.111, align: 'center', fontFace: HEAD, fontSize: 60, bold: true, color: WHITE, valign: 'top', margin: INSET });
+  text(s, 'Sports Presentation', { x: 4.041, y: 4.087, w: 5.251, h: 0.438, align: 'center', fontFace: PLAIN, fontSize: 20, color: WHITE, valign: 'top', margin: INSET });
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+  const pres = new PptxGenJS();
+  pres.defineLayout({ name: 'DAROTAVAN', width: SLIDE_W, height: SLIDE_H });
+  pres.layout = 'DAROTAVAN';
+  pres.author = 'darotavan';
+  pres.title = 'Darotavan Sports Presentation';
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+    slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18]
+    .forEach((fn) => fn(pres));
+
+  return pres;
+}
+
+const OUT = path.join(__dirname, '01d14f98-68ef-4cca-839f-af58dbf99f92_grok_final.pptx');
+build().writeFile({ fileName: OUT }).then(() => console.log('wrote', OUT));

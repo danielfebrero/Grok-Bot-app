@@ -1,0 +1,937 @@
+/*
+ * GORJES — /presentation template/  (30 slides, 13.333 x 7.5 in)
+ *
+ * A standalone pptxgenjs rebuild of the reference deck. Every photograph in the
+ * original is a flat light-grey plate, so each one is redrawn here as a grey
+ * placeholder shape that keeps the original silhouette (rounded rectangle,
+ * circle, rounded diamond, arch, ...).
+ *
+ *   node <this file>   ->  writes the .pptx next to this file
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ tokens */
+
+const SLIDE = { w: 13.333, h: 7.5 };
+
+const C = {
+  bg: '2B2118', // page background — dark espresso (theme bg1)
+  ink: 'EBEAE6', // primary type — warm off-white (theme tx1)
+  accent: '674E37', // walnut (theme accent1)
+  white: 'FFFFFF',
+  dim: 'B7B4A5', // tx1 @ 75% lum — "2021", small caps labels
+  body: 'D6D4CC', // tx1 @ 75%/25% — paragraph copy
+  soft: 'F0EFEC', // pricing-card feature copy
+  photo: 'DDDDDD', // stand-in fill for every replaced photograph
+};
+
+const F = { display: 'Playfair Display', text: 'Lato' };
+
+const BODY = 10.5; // paragraph size used all through the deck
+const PHOTO = { fill: { color: C.photo }, line: { type: 'none' } };
+
+/* ------------------------------------------------------- geometry helpers */
+
+// Circular-arc control-point ratio for cubic beziers.
+const K = 0.5523;
+
+// Outline of a rectangle whose top two corners are rounded (bottom stays square).
+function topRoundedOutline (w, h, r) {
+  return [
+    { x: r, y: 0, moveTo: true },
+    { x: w - r, y: 0 },
+    { x: w, y: r, curve: { type: 'cubic', x1: w - r + r * K, y1: 0, x2: w, y2: r - r * K } },
+    { x: w, y: h },
+    { x: 0, y: h },
+    { x: 0, y: r },
+    { x: r, y: 0, curve: { type: 'cubic', x1: 0, y1: r - r * K, x2: r - r * K, y2: 0 } },
+    { close: true },
+  ];
+}
+
+// Outlines expressed in 0..1 of the shape box, scaled by `outline()` below.
+const OUTLINES = {
+  // Slide 3 — square top, quarter-circle bitten out of the bottom-left.
+  archLeft: [
+    ['M', 0.065, 0.000], ['L', 1.000, 0.000], ['L', 1.000, 0.942], ['L', 0.994, 0.945],
+    ['C', 0.908, 0.980, 0.814, 1.000, 0.715, 1.000],
+    ['C', 0.320, 1.000, 0.000, 0.684, 0.000, 0.294],
+    ['C', 0.000, 0.197, 0.020, 0.104, 0.056, 0.019], ['Z'],
+  ],
+  // Slide 6 — square top-right, pointed "tag" corner at the bottom-left.
+  tagPoint: [
+    ['M', 0.288, 0.000], ['L', 1.000, 0.000], ['L', 1.000, 0.774], ['L', 0.780, 0.983],
+    ['C', 0.756, 1.006, 0.719, 1.006, 0.695, 0.983],
+    ['L', 0.018, 0.338],
+    ['C', -0.006, 0.316, -0.006, 0.280, 0.018, 0.258], ['Z'],
+  ],
+  // Slide 25 — top-left plate that curves away into a big quarter circle.
+  quarterLeaf: [
+    ['M', 0.000, 0.000], ['L', 0.965, 0.000], ['L', 0.971, 0.018],
+    ['C', 0.990, 0.081, 1.000, 0.146, 1.000, 0.214],
+    ['C', 1.000, 0.648, 0.584, 1.000, 0.071, 1.000],
+    ['C', 0.055, 1.000, 0.040, 1.000, 0.024, 0.999],
+    ['L', 0.000, 0.998], ['Z'],
+  ],
+  // Slides 18 & 27 — diamond with softly rounded points.
+  roundDiamond: [
+    ['M', 0.500, 0.000],
+    ['C', 0.512, 0.000, 0.523, 0.004, 0.532, 0.013],
+    ['L', 0.987, 0.468],
+    ['C', 1.004, 0.486, 1.004, 0.514, 0.987, 0.532],
+    ['L', 0.532, 0.987],
+    ['C', 0.514, 1.004, 0.486, 1.004, 0.468, 0.987],
+    ['L', 0.013, 0.532],
+    ['C', -0.004, 0.514, -0.004, 0.486, 0.013, 0.468],
+    ['L', 0.468, 0.013],
+    ['C', 0.477, 0.004, 0.488, 0.000, 0.500, 0.000], ['Z'],
+  ],
+};
+
+// Turn a normalised OUTLINES entry into pptxgenjs `points` for a w x h box.
+function outline (norm, w, h) {
+  return norm.map(seg => {
+    const [op] = seg;
+    if (op === 'Z') return { close: true };
+    if (op === 'M') return { x: seg[1] * w, y: seg[2] * h, moveTo: true };
+    if (op === 'L') return { x: seg[1] * w, y: seg[2] * h };
+    return {
+      x: seg[5] * w,
+      y: seg[6] * h,
+      curve: { type: 'cubic', x1: seg[1] * w, y1: seg[2] * h, x2: seg[3] * w, y2: seg[4] * h },
+    };
+  });
+}
+
+/* ------------------------------------------------------------ draw helpers */
+
+// Flat colour block.
+function block (s, x, y, w, h, color, extra) {
+  s.addShape('rect', { x, y, w, h, fill: { color }, line: { type: 'none' }, ...extra });
+}
+
+// Short accent rule used as a corner tick throughout the deck.
+function dash (s, x, y, color = C.accent, w = 0.333) {
+  s.addShape('line', { x, y, w, h: 0, line: { color, width: 3 } });
+}
+
+// The deck's logo mark: three stacked "wave" bars, mirrored so the crest
+// leads on the left.
+function waveMark (s, x, y, w, color = C.ink) {
+  const h = w * 0.2878;
+  const step = w * 0.3766;
+  for (let i = 0; i < 3; i++) {
+    s.addShape('wave', { x, y: y + i * step, w, h, flipH: true, fill: { color } });
+  }
+}
+
+// Corner-to-corner colour wash, painted as a stack of opaque diagonal bands.
+// (pptxgenjs has no gradient fill, so the ramp is drawn band by band.)
+// Iso-colour lines run along x + y = const, so each band is a long strip
+// rotated 45 deg and slid down the diagonal.
+function diagonalWash (s, fromHex, toHex, bands = 56) {
+  const span = SLIDE.w + SLIDE.h;
+  const len = 1.2 * Math.hypot(SLIDE.w, SLIDE.h);
+  const step = span / bands;
+  for (let i = 0; i < bands; i++) {
+    const c = (i + 0.5) * step / 2; // centre of the strip, on the diagonal
+    s.addShape('rect', {
+      x: c - len / 2, y: c - step / 2, w: len, h: step, rotate: 315,
+      fill: { color: mix(fromHex, toHex, i / (bands - 1)) }, line: { type: 'none' },
+    });
+  }
+}
+
+// Linear blend between two hex colours.
+function mix (a, b, t) {
+  const ch = i => Math.round(
+    parseInt(a.substr(i, 2), 16) * (1 - t) + parseInt(b.substr(i, 2), 16) * t
+  ).toString(16).padStart(2, '0');
+  return (ch(0) + ch(2) + ch(4)).toUpperCase();
+}
+
+// Halftone corner ornament: a grid of small dots drawn as one custom shape.
+function dotGrid (s, x, y, w, h, color = C.accent, cols = 10, rows = 8) {
+  const dx = w / (cols - 0.86); // matches the reference pitch/diameter ratio
+  const r = dx * 0.1386;
+  const dy = h / (rows - 0.9);
+  const pts = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const cx = r + col * dx;
+      const cy = r + row * dy;
+      pts.push({ x: cx + r, y: cy, moveTo: true });
+      pts.push({ x: cx, y: cy + r, curve: { type: 'cubic', x1: cx + r, y1: cy + r * K, x2: cx + r * K, y2: cy + r } });
+      pts.push({ x: cx - r, y: cy, curve: { type: 'cubic', x1: cx - r * K, y1: cy + r, x2: cx - r, y2: cy + r * K } });
+      pts.push({ x: cx, y: cy - r, curve: { type: 'cubic', x1: cx - r, y1: cy - r * K, x2: cx - r * K, y2: cy - r } });
+      pts.push({ x: cx + r, y: cy, curve: { type: 'cubic', x1: cx + r * K, y1: cy - r, x2: cx + r, y2: cy - r * K } });
+      pts.push({ close: true });
+    }
+  }
+  s.addShape('custGeom', { x, y, w, h, points: pts, fill: { color }, line: { type: 'none' } });
+}
+
+/* ------------------------------------------ photo placeholders (grey plates) */
+
+const photo = {
+  rect: (s, x, y, w, h) => s.addShape('rect', { x, y, w, h, ...PHOTO }),
+  round: (s, x, y, w, h) =>
+    s.addShape('roundRect', { x, y, w, h, rectRadius: 0.0618 * Math.min(w, h), ...PHOTO }),
+  circle: (s, x, y, w, h) => s.addShape('ellipse', { x, y, w, h, ...PHOTO }),
+  diamond: (s, x, y, w, h) =>
+    s.addShape('custGeom', { x, y, w, h, points: outline(OUTLINES.roundDiamond, w, h), ...PHOTO }),
+  topRound: (s, x, y, w, h, r) =>
+    s.addShape('custGeom', { x, y, w, h, points: topRoundedOutline(w, h, r), ...PHOTO }),
+  shape: (s, x, y, w, h, norm) =>
+    s.addShape('custGeom', { x, y, w, h, points: outline(norm, w, h), ...PHOTO }),
+};
+
+/* -------------------------------------------------------------- type helpers */
+
+// Multi-colour display heading. `pieces` = [text, colour, breakLineAfter?].
+function heading (s, box, size, pieces, opts = {}) {
+  const runs = pieces.map(([text, color, brk]) => ({
+    text,
+    options: { color: color || C.ink, breakLine: !!brk },
+  }));
+  s.addText(runs, { ...box, fontFace: F.display, fontSize: size, valign: 'top', ...opts });
+}
+
+// Justified body copy at 150% leading — the deck's standard paragraph.
+function para (s, box, text, opts = {}) {
+  s.addText(text, {
+    ...box, fontFace: F.text, fontSize: BODY, color: C.body,
+    align: 'justify', lineSpacingMultiple: 1.5, valign: 'top', ...opts,
+  });
+}
+
+// The "/fashion you want/" eyebrow that sits above almost every heading.
+function eyebrow (s, x, y, w = 2.209, opts = {}) {
+  s.addText('/fashion you want/', {
+    x, y, w, h: 0.331, fontFace: F.text, fontSize: BODY, color: C.ink,
+    align: 'justify', lineSpacingMultiple: 1.5, valign: 'top', ...opts,
+  });
+}
+
+// Small bulleted label ("• style one", "• lorem ipsum dolor").
+function bulletLabel (s, x, y, w, h, lines, opts = {}) {
+  const runs = (Array.isArray(lines) ? lines : [lines]).map(text => ({
+    text, options: { bullet: { characterCode: '2022', indent: 13.5 }, breakLine: true },
+  }));
+  s.addText(runs, {
+    x, y, w, h, fontFace: F.text, fontSize: BODY, color: C.ink, valign: 'top', ...opts,
+  });
+}
+
+// Footer marks: page number in braces, plus the year.
+function pageMark (s, n, x = 12.472) {
+  s.addText(`{ ${n} }`, {
+    x, y: 6.829, w: 0.375, h: 0.236, fontFace: F.text, fontSize: 8, bold: true,
+    color: C.ink, align: 'center', valign: 'top', wrap: false,
+  });
+}
+
+function yearMark (s, x, opts = {}) {
+  s.addText('2021', {
+    x, y: 6.785, w: 0.97, h: 0.303, fontFace: F.display, fontSize: 12,
+    color: C.dim, align: 'center', valign: 'top', ...opts,
+  });
+}
+
+
+// Rotated rounded square used as the "No. n" badge on the service slides.
+function badge (s, x, y, size = 0.847) {
+  s.addShape('roundRect', {
+    x, y, w: size, h: size, rotate: 45, flipH: true,
+    rectRadius: 0.06184 * size, fill: { color: C.accent }, line: { type: 'none' },
+  });
+}
+
+function badgeLabel (s, x, y, text) {
+  s.addText(text, {
+    x, y, w: 0.97, h: 0.337, fontFace: F.display, fontSize: 14,
+    color: C.dim, align: 'center', valign: 'top',
+  });
+}
+
+// Name + role caption pair used on the team slides.
+function person (s, x, y, name, role, nameSize = 14) {
+  s.addText(name, {
+    x, y, w: 2.071, h: 0.337, fontFace: F.display, fontSize: nameSize,
+    color: C.ink, align: 'center', valign: 'top',
+  });
+  if (role) {
+    s.addText(role, {
+      x, y: y + 0.344, w: 2.071, h: 0.331, fontFace: F.text, fontSize: BODY,
+      color: C.body, align: 'center', lineSpacingMultiple: 1.5, valign: 'top',
+    });
+  }
+}
+
+/* --------------------------------------------------------------- copy deck */
+
+const T = {
+  intro: 'PLACEHOLDER',
+  card: 'PLACEHOLDER',
+  service: 'PLACEHOLDER',
+  content: 'PLACEHOLDER',
+  caption: 'PLACEHOLDER',
+  role: 'lorem ipsum dolor sita amet',
+  dot: 'lorem ipsum dolor ',
+};
+
+/* ------------------------------------------------------------ slide builders */
+
+// 1 — Title. Full-bleed photo washed with a corner-to-corner gradient.
+function slide01 (s) {
+  diagonalWash(s, '69635D', C.bg);
+  pageMark(s, 1);
+  yearMark(s, 6.181);
+  s.addText('GORJES', {
+    x: 2.619, y: 2.7, w: 8.095, h: 2.036, fontFace: F.display, fontSize: 115,
+    color: C.ink, align: 'center', valign: 'top',
+  });
+  s.addText('/presentation template/', {
+    x: 5.562, y: 4.777, w: 2.209, h: 0.331, fontFace: F.text, fontSize: BODY,
+    color: C.ink, align: 'center', lineSpacingMultiple: 1.5, valign: 'top',
+  });
+  dash(s, 0.666, 3.747);
+  dash(s, 12.35, 3.747);
+  waveMark(s, 6.349, 0.737, 0.636, C.dim);
+  dotGrid(s, 12.026, 0, 1.308, 1.102);
+  dotGrid(s, 0.002, 6.398, 1.308, 1.102);
+}
+
+// 2 — About: rounded-square photo against a walnut side panel.
+function slide02 (s) {
+  block(s, 0, 0, 2.667, 7.5, C.accent);
+  photo.round(s, 1.192, 1.111, 5.278, 5.278);
+  dash(s, 0.416, 3.75, C.bg);
+  pageMark(s, 2);
+  dotGrid(s, 11.651, 0.737, 1.033, 0.87);
+  heading(s, { x: 7.561, y: 1.743, w: 4.481, h: 2.827 }, 54, [
+    ['ABOUT '], ['BOHEMIAN ', C.accent], ['STYLE'],
+  ]);
+  para(s, { x: 7.561, y: 4.995, w: 4.994, h: 0.861 }, T.intro);
+  waveMark(s, 6.16, 5.12, 0.636);
+  eyebrow(s, 7.635, 1.246);
+  bulletLabel(s, 1.071, 0.602, 0.97, 0.269, 'style one', { fontFace: F.display, fontSize: 10, color: C.dim });
+  yearMark(s, 5.592, { align: 'right' });
+}
+
+// 3 — Big circle-bitten photo bleeding off the right edge.
+function slide03 (s) {
+  photo.shape(s, 7.679, 0, 5.655, 5.729, OUTLINES.archLeft);
+  block(s, 0, 0, 0.667, 7.5, C.accent);
+  heading(s, { x: 1.492, y: 1.634, w: 5.314, h: 2.827 }, 54, [
+    ['WHY SHOULD IT BE ', C.accent], ['BOHEMIAN ?'],
+  ]);
+  para(s, { x: 1.538, y: 4.9, w: 5.985, h: 1.126 },
+    T.intro + 'PLACEHOLDER');
+  eyebrow(s, 1.492, 0.959);
+  waveMark(s, 9.35, 4.999, 0.636);
+  pageMark(s, 3);
+  yearMark(s, 6.181);
+  dotGrid(s, 1.654, 6.738, 1.033, 0.87);
+  bulletLabel(s, -0.183, 3.9, 0.97, 0.269, 'style two',
+    { fontFace: F.display, fontSize: 10, color: C.dim, rotate: 270 });
+  dash(s, 6.5, 0.591);
+}
+
+// 4 — Wide banner photo over a full-width walnut band.
+function slide04 (s) {
+  block(s, 0, 0, 13.333, 2.757, C.accent);
+  photo.round(s, 1.25, 1.01, 10.858, 3.122, 0.201);
+  pageMark(s, 4);
+  heading(s, { x: 1.478, y: 3.343, w: 5.314, h: 2.827 }, 54, [
+    ['FIND THE '], ['NEW FASHION STYLE', C.accent],
+  ]);
+  para(s, { x: 7.556, y: 5.188, w: 4.202, h: 1.126 },
+    'PLACEHOLDER');
+  yearMark(s, 6.181);
+  eyebrow(s, 1.478, 6.719);
+  dotGrid(s, 0.734, 0.737, 1.033, 0.87, C.bg);
+  waveMark(s, 11.035, 3.8, 0.636);
+  bulletLabel(s, 11.941, 1.526, 1.485, 0.269, 'style three',
+    { fontFace: F.display, fontSize: 10, color: C.dim, rotate: 90 });
+  dash(s, 0.493, 5.66);
+}
+
+// 5 — Two circular photos on the left, headline on the right.
+function slide05 (s) {
+  dotGrid(s, 0.676, 5.883, 1.033, 0.87);
+  photo.circle(s, 1.019, 4.651, 1.53, 1.53);
+  photo.circle(s, 1.019, 0.936, 4.643, 4.643);
+  block(s, 11.694, 0, 1.639, 7.5, C.accent);
+  pageMark(s, 5);
+  heading(s, { x: 3.06, y: 2.102, w: 7.082, h: 2.019 }, 57, [
+    ['GET BOHEMIAN FASHION '], ['TODAY', C.accent],
+  ]);
+  eyebrow(s, 3.133, 1.606);
+  bulletLabel(s, 9.871, 0.667, 1.229, 0.269, 'style four',
+    { fontFace: F.display, fontSize: 10, color: C.dim, align: 'right' });
+  para(s, { x: 5.558, y: 4.896, w: 5.244, h: 1.126 },
+    'PLACEHOLDER');
+  yearMark(s, 5.544, { align: 'left' });
+  waveMark(s, 11.376, 2.313, 0.636);
+  dash(s, 0.667, 0.751);
+}
+
+// 6 — Tag-shaped photo top-right, headline underneath.
+function slide06 (s) {
+  photo.shape(s, 7.029, 0, 6.304, 6.624, OUTLINES.tagPoint);
+  block(s, 0, 0, 0.667, 7.5, C.accent);
+  pageMark(s, 6);
+  yearMark(s, 5.544, { align: 'left' });
+  heading(s, { x: 1.671, y: 4.247, w: 7.121, h: 1.919 }, 54, [
+    ['WHY SHOULD ', C.ink, true], ['IT BE BOHEMIAN ?', C.accent],
+  ]);
+  eyebrow(s, 1.744, 3.75);
+  dotGrid(s, 1.78, 1.18, 1.033, 0.87);
+  para(s, { x: 3.586, y: 1.016, w: 2.636, h: 1.126 },
+    'PLACEHOLDER');
+  bulletLabel(s, -0.261, 1.48, 1.126, 0.269, 'style five',
+    { fontFace: F.display, fontSize: 10, color: C.dim, rotate: 270, align: 'center' });
+  dash(s, 1.783, 6.943);
+  waveMark(s, 11.344, 4.407, 0.636);
+}
+
+// 7 — "These are our services": three diamond badges stacked on the right.
+function slide07 (s) {
+  [['No. 1', 1.5], ['No. 2', 3.306], ['No. 3', 5.082]].forEach(([label, y], i) => {
+    badge(s, 8.036, y);
+    para(s, { x: 9.634, y: y - 0.008, w: 2.575, h: 0.861 }, T.service);
+    badgeLabel(s, 7.974, y + 0.255, label);
+  }, [1.5, 3.306, 5.082]);
+  pageMark(s, 7);
+  block(s, 0, 0, 0.667, 7.5, C.accent);
+  heading(s, { x: 1.829, y: 1.766, w: 4.481, h: 2.827 }, 54, [
+    ['THESE ARE '], ['OUR ', C.accent], ['SERVICES'],
+  ]);
+  para(s, { x: 1.829, y: 5.041, w: 4.994, h: 0.861 }, T.intro);
+  eyebrow(s, 1.887, 1.078);
+  yearMark(s, 6.181);
+  waveMark(s, 0.405, 2.004, 0.522);
+  dash(s, 1.915, 6.943);
+}
+
+// 8 — Centred title with three badges on a translucent photo strip.
+function slide08 (s) {
+  photo.rect(s, 0, 3.041, 13.333, 1.985);
+  s.addShape('rect', { x: 0, y: 3.041, w: 13.333, h: 1.985, fill: { color: C.bg, transparency: 15 }, line: { type: 'none' } });
+  [0.985, 4.964, 8.943].forEach((x, i) => {
+    badge(s, x, 3.625);
+    para(s, { x: x + 1.472, y: 3.618, w: 1.996, h: 0.861 }, T.card);
+    badgeLabel(s, x - 0.062, 3.88, `No. ${i + 1}`);
+  });
+  pageMark(s, 8);
+  yearMark(s, 6.181);
+  heading(s, { x: 1.591, y: 1.334, w: 10.152, h: 1.01 }, 54, [
+    ['SERVICE IN '], ['DETAILS', C.accent],
+  ], { align: 'center' });
+  eyebrow(s, 5.562, 0.786, 2.209, { align: 'center' });
+  para(s, { x: 1.833, y: 5.72, w: 9.667, h: 0.596 },
+    'PLACEHOLDER',
+    { align: 'center' });
+  waveMark(s, 0.912, 0.995, 0.522);
+  dotGrid(s, 11.651, 0.816, 1.033, 0.87);
+}
+
+// 9 — "The contents": photo plate over a walnut panel, two badges right.
+function slide09 (s) {
+  block(s, 0, 0, 3.683, 7.5, C.accent);
+  photo.round(s, 1.341, 3.323, 5.326, 2.715);
+  pageMark(s, 9);
+  yearMark(s, 6.181);
+  [3.488, 5.118].forEach((y, i) => {
+    badge(s, 7.797, y, 0.756);
+    para(s, { x: 9.277, y: y - 0.053, w: 2.857, h: 0.861 }, T.content);
+    badgeLabel(s, 7.69, y + 0.209, `No. ${i + 1}`);
+  });
+  heading(s, { x: 1.258, y: 1.581, w: 5.547, h: 0.959 }, 51, [
+    ['THE', C.bg], [' CONTENTS'],
+  ]);
+  eyebrow(s, 1.332, 1.084);
+  para(s, { x: 7.578, y: 1.615, w: 4.556, h: 0.861 },
+    'PLACEHOLDER');
+  waveMark(s, 1.079, 4.4, 0.522);
+  dotGrid(s, 12.301, 0, 1.033, 0.87);
+  dash(s, 0.666, 0.727, C.bg);
+}
+
+// 10 — Full-height photo column, four badges in a 2x2 grid.
+function slide10 (s) {
+  photo.rect(s, 3.849, 0, 4.236, 7.5);
+  s.addShape('rect', { x: 3.849, y: 0, w: 4.236, h: 7.5, fill: { color: C.bg, transparency: 15 }, line: { type: 'none' } });
+  [[8.821, 3.535, 'No. 2'], [8.821, 5.341, 'No. 4'], [4.333, 3.535, 'No. 1'], [4.333, 5.341, 'No. 3']]
+    .forEach(([x, y, label]) => {
+      badge(s, x, y);
+      para(s, { x: x + 1.472, y: y - 0.008, w: 1.996, h: 0.861 }, T.card);
+      badgeLabel(s, x - 0.062, y + 0.255, label);
+    });
+  pageMark(s, 10);
+  heading(s, { x: 1.266, y: 0.971, w: 6.011, h: 1.919 }, 54, [['THESE ARE OUR SERVICES']]);
+  yearMark(s, 1.322, { w: 0.578, align: 'left' });
+  dotGrid(s, 1.413, 3.831, 1.033, 0.87);
+  waveMark(s, 12.08, 1.175, 0.522);
+  eyebrow(s, 10.293, 1.255, 1.492);
+  block(s, 0, 0, 0.667, 7.5, C.accent);
+}
+
+// 11 — Centred title, two badges mirrored around a divider rule.
+function slide11 (s) {
+  pageMark(s, 11);
+  yearMark(s, 6.181);
+  heading(s, { x: 1.591, y: 1.529, w: 10.152, h: 1.06 }, 57, [
+    ['SERVICE IN '], ['DETAILS', C.accent],
+  ], { align: 'center' });
+  eyebrow(s, 5.562, 1.03, 2.209, { align: 'center' });
+  waveMark(s, 0.912, 0.995, 0.522);
+  dotGrid(s, 11.651, 0.816, 1.033, 0.87);
+  para(s, { x: 1.159, y: 3.184, w: 11.015, h: 0.596 },
+    'PLACEHOLDER',
+    { align: 'center' });
+  s.addShape('line', { x: 6.667, y: 4.845, w: 0, h: 1.01, line: { color: C.accent, width: 1.5 } });
+  badge(s, 7.387, 4.939);
+  para(s, { x: 9.261, y: 4.799, w: 2.857, h: 1.126 },
+    'PLACEHOLDER');
+  badgeLabel(s, 7.325, 5.194, 'No. 2');
+  badge(s, 5.1, 4.939); // mirrored twin of the right-hand badge
+  para(s, { x: 1.216, y: 4.799, w: 2.857, h: 1.126 },
+    'PLACEHOLDER', { align: 'right' });
+  badgeLabel(s, 5.038, 5.194, 'No. 1');
+}
+
+// 12 — "Our best creative work": three loosely scattered photo plates.
+function slide12 (s) {
+  photo.round(s, 8.135, 1.147, 4.032, 5.206, 0.197);
+  photo.round(s, 1.167, 1.147, 2.489, 1.611, 0.146);
+  photo.round(s, 6.96, 4.191, 1.957, 2.162, 0.096);
+  pageMark(s, 12);
+  heading(s, { x: 1.073, y: 4.743, w: 5.102, h: 1.582 }, 44, [
+    ['OUR BEST ', C.accent], ['CREATIVE WORK'],
+  ]);
+  eyebrow(s, 1.167, 4.08);
+  dash(s, 6.5, 0.576);
+  para(s, { x: 4.431, y: 1.389, w: 2.911, h: 1.126 },
+    'PLACEHOLDER');
+  yearMark(s, 1.123, { align: 'left' });
+  waveMark(s, 6.73, 3.961, 0.522);
+}
+
+// 13 — "Our creative portfolio": two overlapping circles.
+function slide13 (s) {
+  photo.circle(s, 8.889, 0.98, 3.556, 3.556);
+  photo.circle(s, 6.775, 3.884, 2.431, 2.431);
+  block(s, 0, 0, 0.667, 7.5, C.accent);
+  pageMark(s, 13);
+  heading(s, { x: 1.547, y: 1.717, w: 5.302, h: 1.717 }, 48, [
+    ['OUR CREATIVE '], ['PORTFOLIO', C.accent],
+  ]);
+  eyebrow(s, 1.597, 0.893, 1.892);
+  waveMark(s, 8.747, 1.91, 0.522);
+  para(s, { x: 1.597, y: 4.142, w: 3.828, h: 1.391 },
+    'PLACEHOLDER');
+  yearMark(s, 6.181);
+  bulletLabel(s, 9.96, 5.214, 1.69, 0.985, [T.dot, '', 'lorem ipsum dolor', '', 'lorem ipsum dolor']);
+  dash(s, 1.671, 6.941);
+}
+
+// 14 — "Gallery image": a stack of three plates on the left.
+function slide14 (s) {
+  photo.round(s, 1.053, 1.246, 4.625, 2.204);
+  photo.round(s, 1.053, 3.731, 4.625, 2.204);
+  photo.topRound(s, 1.053, 6.216, 4.625, 1.284, 0.136);
+  pageMark(s, 14);
+  heading(s, { x: 6.964, y: 2.15, w: 4.994, h: 0.842 }, 44, [
+    ['GALLERY', C.accent], [' IMAGE'],
+  ]);
+  eyebrow(s, 7.037, 1.608);
+  s.addText([
+    { text: 'PLACEHOLDER', options: { breakLine: true } },
+    { text: '', options: { breakLine: true } },
+    { text: 'eget tincidunt velas aliqueta nisa adipiscinge elit sedesani cursus misani utasisau nasat sapienan tincidun haniasl velas as sed cursus mi ut sapien sapien tincidunt velas aliqueta nibuhasel nasat sapienan tincidunt velas nibhasi elitas sedasas cursus  sapien salu' },
+  ], {
+    x: 7.006, y: 3.72, w: 4.859, h: 2.187, fontFace: F.text, fontSize: BODY, color: C.body,
+    align: 'justify', lineSpacingMultiple: 1.5, valign: 'top',
+  });
+  waveMark(s, 5.36, 4.522, 0.636);
+  dotGrid(s, 11.865, 0.738, 0.817, 0.688);
+  yearMark(s, 7.006, { w: 0.724, align: 'left' });
+  dash(s, 1.053, 0.738);
+}
+
+// 15 — "The photograph of our work": three captioned circles.
+function slide15 (s) {
+  block(s, 12.681, 0, 0.667, 7.5, C.accent);
+  waveMark(s, 12.178, 3.672, 0.636);
+  heading(s, { x: 1.585, y: 1.387, w: 9.601, h: 0.774 }, 40, [
+    ['THE PHOTOGRAPH ', C.accent], ['OF OUR WORK'],
+  ]);
+  eyebrow(s, 1.659, 0.89);
+  pageMark(s, 15, 11.99);
+  [1.685, 5.01, 8.335].forEach(x => {
+    para(s, { x, y: 5.669, w: 2.323, h: 0.861 }, T.caption, { align: 'center' });
+  });
+  dotGrid(s, 0, 6.737, 0.903, 0.761);
+  dash(s, 0.502, 3.995);
+  photo.circle(s, 1.685, 2.841, 2.323, 2.323);
+  photo.circle(s, 5.01, 2.817, 2.323, 2.323);
+  photo.circle(s, 8.335, 2.817, 2.323, 2.323);
+}
+
+// 16 — Mosaic of six plates with small bulleted captions.
+function slide16 (s) {
+  [[1.472, 1.259, 2.309, 2.323], [4.176, 1.259, 2.309, 2.323], [6.879, 1.259, 2.309, 5.013],
+    [9.553, 1.259, 2.309, 2.309], [9.553, 3.963, 2.309, 2.309], [1.472, 3.949, 5.013, 2.323]]
+    .forEach(([x, y, w, h]) => photo.round(s, x, y, w, h));
+  pageMark(s, 16);
+  yearMark(s, 0.187);
+  dash(s, 6.5, 0.441);
+  waveMark(s, 1.21, 4.838, 0.522);
+  const tag = (x, y, opts) => bulletLabel(s, x, y, 1.646, 0.252, T.dot, { fontSize: 9, ...opts });
+  tag(1.38, 0.8);
+  tag(4.084, 0.8);
+  tag(11.49, 1.881, { rotate: 90 });
+  tag(11.49, 4.585, { rotate: 90 });
+  tag(6.792, 6.567);
+}
+
+// 17 — Break section: washed full-bleed photo with a centred statement.
+function slide17 (s) {
+  diagonalWash(s, '463D36', '342A22');
+  pageMark(s, 17);
+  yearMark(s, 6.181);
+  s.addText('THIS IS BREAK SECTION', {
+    x: 0.983, y: 2.174, w: 11.367, h: 2.794, fontFace: F.display, fontSize: 80,
+    color: C.ink, align: 'center', valign: 'top',
+  });
+  dash(s, 0.666, 3.622);
+  dash(s, 12.35, 3.622);
+  waveMark(s, 6.349, 0.737, 0.636, C.dim);
+  dotGrid(s, 12.026, 0, 1.308, 1.102);
+  dotGrid(s, 0.002, 6.398, 1.308, 1.102);
+  para(s, { x: 2.479, y: 5.492, w: 8.375, h: 0.596 },
+    'PLACEHOLDER',
+    { align: 'center' });
+}
+
+// 18 — "Trust our great team": two rounded diamonds over a halftone field.
+function slide18 (s) {
+  dotGrid(s, 1.407, 1.802, 4.524, 3.902, C.accent, 40, 32);
+  photo.diamond(s, 0.917, 0.99, 3.45, 3.45);
+  photo.diamond(s, 2.988, 3.06, 3.45, 3.45);
+  pageMark(s, 18);
+  yearMark(s, 6.181);
+  heading(s, { x: 7.339, y: 1.547, w: 4.778, h: 2.827 }, 54, [
+    ['TRUST ', C.white, true], ['OUR GREAT ', C.white], ['TEAM', C.accent],
+  ]);
+  para(s, { x: 7.385, y: 4.671, w: 4.778, h: 1.126 },
+    'PLACEHOLDER');
+  eyebrow(s, 7.339, 0.89);
+  waveMark(s, 5.661, 1.792, 0.522);
+  dash(s, 0.663, 6.951);
+  dash(s, 12.504, 1.087);
+}
+
+// 19 — "Our fashion team": four staggered portraits.
+function slide19 (s) {
+  pageMark(s, 19);
+  yearMark(s, 0.182);
+  person(s, 1.357, 4.936, 'Lidia Wright', T.role);
+  person(s, 9.905, 4.942, 'Kayne Ingram', T.role);
+  person(s, 7.076, 5.991, 'Jesse Adams', T.role);
+  person(s, 4.247, 5.998, 'Myla Zuniga', T.role);
+  heading(s, { x: 3.167, y: 0.884, w: 7, h: 0.842 }, 44, [
+    ['OUR FASHION '], ['TEAM', C.accent],
+  ], { align: 'center' });
+  eyebrow(s, 5.562, 1.913, 2.209, { align: 'center' });
+  waveMark(s, 0.912, 0.995, 0.522);
+  dotGrid(s, 11.651, 0.784, 1.033, 0.87);
+  [[1.357, 2.472], [4.206, 3.507], [7.056, 3.507], [9.905, 2.472]]
+    .forEach(([x, y]) => photo.round(s, x, y, 2.071, 2.071));
+}
+
+// 20 — "The manager": right-aligned headline beside three plates.
+function slide20 (s) {
+  photo.round(s, 7.022, 1.259, 2.309, 5.013);
+  photo.round(s, 9.696, 1.259, 2.309, 2.309);
+  photo.round(s, 9.696, 3.963, 2.309, 2.309);
+  pageMark(s, 20);
+  yearMark(s, 6.181);
+  heading(s, { x: 1.029, y: 1.923, w: 5.005, h: 2.625 }, 50, [
+    ['THE ', C.white], ['MANAGER ', C.accent], ['OUR FASHION', C.white],
+  ], { align: 'right' });
+  para(s, { x: 0.967, y: 5.097, w: 5.005, h: 1.126 },
+    'PLACEHOLDER',
+    { align: 'right' });
+  eyebrow(s, 3.825, 1.178, 2.209, { align: 'right' });
+  waveMark(s, 6.666, 3.01, 0.522);
+  dotGrid(s, 0.709, 0.784, 1.033, 0.87);
+  dash(s, 0.663, 6.951);
+}
+
+// 21 — Two circular portraits flanking a block of copy.
+function slide21 (s) {
+  heading(s, { x: 3.167, y: 0.801, w: 7, h: 0.842 }, 44, [
+    ['OUR FASHION '], ['TEAM', C.accent],
+  ], { align: 'center' });
+  eyebrow(s, 5.562, 1.83, 2.209, { align: 'center' });
+  waveMark(s, 0.912, 0.953, 0.522);
+  dotGrid(s, 11.651, 0.796, 1.033, 0.87);
+  person(s, 9.26, 5.998, 'Myla Zuniga', T.role);
+  pageMark(s, 21);
+  yearMark(s, 6.189);
+  person(s, 2.002, 5.991, 'Jesse Adams', T.role);
+  para(s, { x: 5.37, y: 3.069, w: 2.594, h: 2.187 },
+    'PLACEHOLDER',
+    { align: 'center' });
+  photo.circle(s, 1.455, 2.369, 3.165, 3.165);
+  photo.circle(s, 8.713, 2.369, 3.165, 3.165);
+}
+
+// 22 — Eight-up team grid across a walnut band.
+function slide22 (s) {
+  block(s, -0.008, 0.022, 13.341, 2.554, C.accent);
+  const cols = [1.659, 4.458, 7.257, 10.056];
+  const names = [['Lidia Wright', 'Myla Zuniga', 'Jesse Adams', 'Kayne Ingram'],
+    ['Ewan Amin', 'Keavy Lutz', 'Ursula Senior', 'Fabien Adams']];
+  [1.739, 4.222].forEach(y => cols.forEach(x => photo.round(s, x, y, 1.618, 1.618)));
+  dash(s, 0.416, 3.75);
+  pageMark(s, 22);
+  dotGrid(s, 12.301, 0, 1.033, 0.87, C.bg);
+  yearMark(s, 6.181);
+  [3.614, 6.125].forEach((y, row) => cols.forEach((x, col) => {
+    s.addText(names[row][col], {
+      x, y, w: 1.618, h: 0.303, fontFace: F.display, fontSize: 12,
+      color: C.ink, align: 'center', valign: 'top',
+    });
+  }));
+  eyebrow(s, 5.562, 0.625, 2.209, { align: 'center' });
+  waveMark(s, 12.506, 3.58, 0.326);
+}
+
+// 23 — Portrait plate on the left, manager blurb + pull quote on the right.
+function slide23 (s) {
+  block(s, 0, 0, 4.683, 3.75, C.accent);
+  photo.round(s, 1.131, 1.075, 4.551, 5.349, 0.262);
+  pageMark(s, 23);
+  para(s, { x: 6.936, y: 4.079, w: 5.069, h: 1.126 },
+    'PLACEHOLDER');
+  heading(s, { x: 6.919, y: 1.743, w: 5.346, h: 1.784 }, 50, [
+    ['THE MANAGER '], ['OUR FASHION', C.accent],
+  ]);
+  eyebrow(s, 6.961, 1.246);
+  para(s, { x: 6.961, y: 5.75, w: 5.069, h: 0.331 },
+    '\u201Clorem ipsum dolor sita amet consea teturasisa adipiscingesa nibuhaset eget\u201D');
+  waveMark(s, 5.36, 4.346, 0.636);
+  dotGrid(s, 12.431, 0, 0.903, 0.761);
+  yearMark(s, 3.045, { w: 0.724 });
+}
+
+// 24 — "Our leader team": tall arch plate plus a row of thumbnails.
+function slide24 (s) {
+  photo.topRound(s, 7.667, 1.133, 4.348, 6.367, 0.269);
+  [1.553, 3.234, 4.915].forEach(x => photo.round(s, x, 4.861, 1.343, 1.343));
+  pageMark(s, 24);
+  para(s, { x: 1.488, y: 3.762, w: 4.851, h: 0.596 },
+    'PLACEHOLDER');
+  heading(s, { x: 1.472, y: 1.629, w: 5.19, h: 1.919 }, 54, [
+    ['OUR LEADER '], ['TEAM', C.accent],
+  ]);
+  eyebrow(s, 1.514, 1.133);
+  waveMark(s, 7.349, 5.201, 0.636);
+  yearMark(s, 3.511, { w: 0.724 });
+  dotGrid(s, 11.526, 0.949, 0.979, 0.825);
+  dash(s, 0.502, 5.538);
+}
+
+// 25 — "Arley Neal": quarter-circle portrait plate bleeding off the left.
+function slide25 (s) {
+  photo.shape(s, 0, 0, 5.655, 6.681, OUTLINES.quarterLeaf);
+  photo.circle(s, 11.0, 5.21, 1.347, 1.347);
+  pageMark(s, 25);
+  para(s, { x: 6.571, y: 3.455, w: 5.776, h: 1.391 },
+    'PLACEHOLDER');
+  heading(s, { x: 6.54, y: 1.752, w: 6.984, h: 1.111 }, 60, [
+    ['ARLEY ', C.accent], ['NEAL'],
+  ]);
+  eyebrow(s, 6.581, 1.12);
+  dotGrid(s, 12.186, 0, 1.148, 0.967);
+  waveMark(s, 3.05, 5.553, 0.636);
+  bulletLabel(s, 6.556, 5.584, 1.69, 0.631, [T.dot, '', 'lorem ipsum dolor']);
+  bulletLabel(s, 8.544, 5.584, 1.69, 0.631, [T.dot, '', 'lorem ipsum dolor']);
+  yearMark(s, 2.855);
+}
+
+// 26 — "To be a model": circular portrait straddling a walnut column.
+function slide26 (s) {
+  block(s, 6.667, 0, 2.0, 7.5, C.accent);
+  photo.circle(s, 5.611, 1.694, 4.111, 4.111);
+  pageMark(s, 26);
+  yearMark(s, 3.976, { align: 'right' });
+  heading(s, { x: 1.202, y: 1.982, w: 3.259, h: 1.919 }, 54, [
+    ['TO BE A '], ['MODEL', C.accent],
+  ]);
+  eyebrow(s, 1.244, 1.294);
+  para(s, { x: 1.227, y: 4.379, w: 3.72, h: 1.391 },
+    'PLACEHOLDER');
+  waveMark(s, 9.404, 3.419, 0.636);
+  dotGrid(s, 11.538, 0.735, 1.148, 0.967);
+  bulletLabel(s, 10.761, 2.885, 1.69, 1.691,
+    [T.dot, '', 'lorem ipsum dolor', '', 'lorem ipsum dolor', '', 'lorem ipsum dolor', '', 'lorem ipsum dolor']);
+  dash(s, 0.559, 2.495, C.accent, 0.207);
+}
+
+// 27 — "Enya Searle": rounded diamond portrait over a halftone field.
+function slide27 (s) {
+  block(s, 12.681, 0, 0.667, 7.5, C.accent);
+  pageMark(s, 27, 11.99);
+  heading(s, { x: 6.866, y: 2.189, w: 4.606, h: 0.942 }, 48, [
+    ['ENYA', C.accent], [' SEARLE'],
+  ]);
+  eyebrow(s, 6.908, 1.619);
+  para(s, { x: 6.904, y: 4.404, w: 4.422, h: 1.391 },
+    'PLACEHOLDER');
+  dash(s, 0.481, 3.75);
+  waveMark(s, 12.366, 3.5, 0.48);
+  yearMark(s, 3.32, { y: 0.54, w: 0.724 });
+  bulletLabel(s, 6.904, 3.598, 1.69, 0.278, T.dot);
+  bulletLabel(s, 8.607, 3.598, 1.418, 0.278, 'lorem ipsum sit');
+  bulletLabel(s, 10.133, 3.598, 1.247, 0.278, 'lorem ipsum');
+  dotGrid(s, 1.422, 1.802, 4.524, 3.902, C.accent, 40, 32);
+  photo.diamond(s, 1.295, 1.363, 4.774, 4.774);
+}
+
+// 28 — Pricing plan: three outlined cards.
+function slide28 (s) {
+  [['PREMIUM', '299', 9.902], ['REGULER', '199', 7.282], ['BASIC', '99', 4.662]]
+    .forEach(([tier, price, x]) => priceCard(s, x, tier, price));
+  pageMark(s, 28);
+  yearMark(s, 0.186);
+  heading(s, { x: 1.202, y: 2.187, w: 2.565, h: 1.447 }, 40, [
+    ['PRICING', C.ink, true], ['PLAN', C.accent],
+  ]);
+  eyebrow(s, 1.235, 1.484, 1.738);
+  para(s, { x: 1.228, y: 4.02, w: 2.369, h: 1.921 },
+    'PLACEHOLDER');
+  dash(s, 6.5, 6.881);
+  waveMark(s, -0.146, 2.356, 0.452);
+  dotGrid(s, 12.186, 0, 1.148, 0.967);
+}
+
+// [label, box width] — every line starts at the same left edge and is
+// shrink-wrapped, so longer features hang further right.
+const FEATURES = [
+  ['First  Feature', 1.223],
+  ['Second  Feature', 1.421],
+  ['Third  Feature', 1.274],
+  ['Forth  Feature', 1.281],
+  ['Fifth  Feature', 1.231],
+];
+
+function priceCard (s, x, tier, price) {
+  s.addShape('rect', {
+    x, y: 1.609, w: 2.266, h: 4.301,
+    fill: { color: C.bg }, line: { color: C.accent, width: 1.5 },
+  });
+  s.addText([
+    { text: '$', options: { fontSize: 24, fontFace: F.display } },
+    { text: price, options: { fontSize: 32, fontFace: F.text } },
+  ], { x: x - 0.036, y: 2.527, w: 2.266, h: 0.64, color: C.white, align: 'center', valign: 'top' });
+  FEATURES.forEach(([label, w], i) => {
+    s.addText(label, {
+      x: x + 0.49, y: 3.322 + i * 0.3791, w, h: 0.263, fontFace: F.text, fontSize: 11,
+      color: C.soft, valign: 'top', wrap: false,
+      bullet: { characterCode: '2713', indent: 13.5 },
+    });
+  });
+  s.addText(tier, {
+    x, y: 1.609, w: 2.271, h: 0.747, fontFace: F.display, fontSize: 14, color: C.white,
+    align: 'center', valign: 'middle', fill: { color: C.accent },
+  });
+  s.addText('Buy Now', {
+    x, y: 5.452, w: 2.271, h: 0.458, fontFace: F.text, fontSize: 12, color: C.white,
+    align: 'center', valign: 'middle', fill: { color: C.accent },
+  });
+}
+
+// 29 — Contact: portrait plate on a walnut panel, two office addresses.
+function slide29 (s) {
+  block(s, 0, 0, 3.818, 7.5, C.accent);
+  photo.round(s, 0.996, 1.079, 5.67, 5.221, 0.243);
+  address(s, 10.127, 'Second Office :');
+  address(s, 7.864, 'Address One :');
+  pageMark(s, 29);
+  yearMark(s, 6.181);
+  dotGrid(s, 12.186, 0, 1.148, 0.967);
+  dash(s, 0.663, 6.951, C.bg);
+  heading(s, { x: 7.81, y: 1.908, w: 4.085, h: 0.842 }, 44, [
+    ['CONTACT', C.white], [' US', C.accent],
+  ]);
+  eyebrow(s, 7.851, 1.277);
+  para(s, { x: 7.864, y: 3.092, w: 3.902, h: 1.126 },
+    'PLACEHOLDER');
+  waveMark(s, 6.42, 2.071, 0.494);
+}
+
+function address (s, x, label) {
+  s.addText(label, {
+    x, y: 4.707, w: 1.768, h: 0.337, fontFace: F.display, fontSize: 14,
+    color: 'EDECE9', valign: 'top',
+  });
+  s.addText([
+    { text: 'J. Maecenas at ', options: { breakLine: true } },
+    { text: 'Faucis, nandasa 1Q', options: { breakLine: true } },
+    { text: 'No.11' },
+  ], {
+    x, y: 5.21, w: 1.618, h: 0.97, fontFace: F.text, fontSize: 12, color: C.soft,
+    lineSpacingMultiple: 1.5, valign: 'top', wrap: false,
+  });
+}
+
+// 30 — Thank you (mirrors the title slide).
+function slide30 (s) {
+  diagonalWash(s, '69635D', C.bg);
+  pageMark(s, 30);
+  yearMark(s, 6.181);
+  s.addText('Thank You', {
+    x: 2.619, y: 2.7, w: 8.095, h: 2.036, fontFace: F.display, fontSize: 115,
+    color: C.ink, align: 'center', valign: 'top',
+  });
+  s.addText('/presentation template/', {
+    x: 5.562, y: 4.777, w: 2.209, h: 0.331, fontFace: F.text, fontSize: BODY,
+    color: C.ink, align: 'center', lineSpacingMultiple: 1.5, valign: 'top',
+  });
+  dash(s, 0.666, 3.747);
+  dash(s, 12.35, 3.747);
+  waveMark(s, 6.349, 0.737, 0.636, C.dim);
+  dotGrid(s, 12.026, 0, 1.308, 1.102);
+  dotGrid(s, 0.002, 6.398, 1.308, 1.102);
+}
+
+/* ------------------------------------------------------------------- build */
+
+const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28,
+  slide29, slide30];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'GORJES', width: SLIDE.w, height: SLIDE.h });
+pptx.layout = 'GORJES';
+pptx.theme = { headFontFace: F.display, bodyFontFace: F.text };
+pptx.title = 'GORJES';
+
+SLIDES.forEach(build => {
+  const slide = pptx.addSlide();
+  slide.background = { color: C.bg };
+  build(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '03491511-7e1a-43c9-b2c3-df699857376a_grok_final.pptx') })
+  .then(f => console.log('wrote', f));
