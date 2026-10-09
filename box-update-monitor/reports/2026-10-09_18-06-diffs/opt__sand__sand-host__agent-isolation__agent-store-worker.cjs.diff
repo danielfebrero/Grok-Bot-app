@@ -1,0 +1,58 @@
+--- 2026-10-09_14-24:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-09_18-06:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -9310,6 +9310,7 @@
+ var MouseButton = /* @__PURE__ */ enumType(proto3, __protoPackage37, "MouseButton", [[0, "UNSPECIFIED"], [1, "LEFT"], [2, "RIGHT"], [3, "MIDDLE"], [4, "BACK"], [5, "FORWARD"]], 1);
+ var ScrollDirection = /* @__PURE__ */ enumType(proto3, __protoPackage37, "ScrollDirection", [[0, "UNSPECIFIED"], [1, "UP"], [2, "DOWN"], [3, "LEFT"], [4, "RIGHT"]], 1);
+ var KeyStroke = /* @__PURE__ */ enumType(proto3, __protoPackage37, "KeyStroke", [[0, "UNSPECIFIED"], [1, "TAP"], [2, "DOWN"], [3, "UP"]], 1);
++var ComputerUseDriver = /* @__PURE__ */ enumType(proto3, __protoPackage37, "ComputerUseDriver", [[0, "UNSPECIFIED"], [1, "XDOTOOL"], [2, "NATIVE_X11"]], 1);
+ var Coordinate = class _Coordinate extends __protoMessage336 {
+   constructor(data) {
+     super();
+@@ -9353,7 +9354,28 @@
+     return proto3.util.equals(_ComputerUseArgs, a, b);
+   }
+   static $() {
+-    return ["ComputerUseArgs|1 tool_call_id 9|2 actions #0*|3 description 9?|4 bind_unmapped_characters 8?|5 desktop_lease_actor_id 9?|6 screenshot_settle_ms 5?", ComputerUseAction];
++    return ["ComputerUseArgs|1 tool_call_id 9|2 actions #0*|3 description 9?|4 bind_unmapped_characters 8?|5 desktop_lease_actor_id 9?|6 screenshot_settle_ms 5?|10 native_x11_driver #1?", ComputerUseAction, NativeX11Driver];
++  }
++};
++var NativeX11Driver = class _NativeX11Driver extends __protoMessage336 {
++  constructor(data) {
++    super();
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _NativeX11Driver().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _NativeX11Driver().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _NativeX11Driver().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_NativeX11Driver, a, b);
++  }
++  static $() {
++    return ["NativeX11Driver|1 typing_delay_ms 5?|2 allow_fallback 8?"];
+   }
+ };
+ var ComputerUseAction = class _ComputerUseAction extends __protoMessage336 {
+@@ -9663,7 +9685,7 @@
+     return proto3.util.equals(_ComputerUseSuccess, a, b);
+   }
+   static $() {
+-    return ["ComputerUseSuccess|1 action_count 5|2 duration_ms 5|3 screenshot 9?|4 log 9?|5 screenshot_path 9?|6 cursor_position #0?|7 settle_ms 5?", Coordinate];
++    return ["ComputerUseSuccess|1 action_count 5|2 duration_ms 5|3 screenshot 9?|4 log 9?|5 screenshot_path 9?|6 cursor_position #0?|7 settle_ms 5?|9 driver #1?", Coordinate, ComputerUseDriver];
+   }
+ };
+ var ComputerUseError = class _ComputerUseError extends __protoMessage336 {
+@@ -9687,7 +9709,7 @@
+     return proto3.util.equals(_ComputerUseError, a, b);
+   }
+   static $() {
+-    return ["ComputerUseError|1 error 9|2 action_count 5|3 duration_ms 5|4 log 9?|5 screenshot 9?|6 screenshot_path 9?"];
++    return ["ComputerUseError|1 error 9|2 action_count 5|3 duration_ms 5|4 log 9?|5 screenshot 9?|6 screenshot_path 9?|7 driver #0?", ComputerUseDriver];
+   }
+ };
+ var ComputerUseToolCall = class _ComputerUseToolCall extends __protoMessage336 {

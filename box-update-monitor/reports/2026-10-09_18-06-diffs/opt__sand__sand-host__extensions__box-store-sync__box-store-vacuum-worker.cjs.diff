@@ -1,0 +1,14 @@
+--- 2026-10-09_14-24:/opt/sand/sand-host/extensions/box-store-sync/box-store-vacuum-worker.cjs
++++ 2026-10-09_18-06:/opt/sand/sand-host/extensions/box-store-sync/box-store-vacuum-worker.cjs
+@@ -113,7 +113,10 @@
+   "EIO"
+ ];
+ var SAND_ERRNO_FALLBACK = "E_OTHER";
+-var brandedErrno = brandedEnumOf(SAND_ERRNO_TAGS, SAND_ERRNO_FALLBACK);
++var brandedErrno = brandedEnumOf(
++  SAND_ERRNO_TAGS,
++  SAND_ERRNO_FALLBACK
++);
+ var BOUNDED_TELEMETRY_ERROR_NAMES = [
+   "Error",
+   "TypeError",

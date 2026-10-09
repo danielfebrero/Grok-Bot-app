@@ -1,0 +1,102 @@
+--- 2026-10-09_14-24:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-09_18-06:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -777,6 +777,26 @@
+ ];
+ 
+ // ../packages/voice-call-harness/dist/telemetry.js
++var VOICE_CALL_MIC_PERMISSIONS = ["granted", "denied", "undetermined"];
++var VOICE_CALL_MIC_TAP_SKIPS = [
++  "input_format_empty",
++  "voice_processing_off",
++  "tap_refused"
++];
++var VOICE_CALL_AUDIO_PORTS = [
++  "none",
++  "built_in_mic",
++  "built_in_receiver",
++  "built_in_speaker",
++  "bluetooth_hfp",
++  "bluetooth_a2dp",
++  "bluetooth_le",
++  "car",
++  "wired",
++  "usb",
++  "airplay",
++  "other"
++];
+ function isTelemetryInteger(value) {
+   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+ }
+@@ -808,6 +828,30 @@
+   fault_recovered: readFlag
+ };
+ var SOCKET_FAULT_DETAIL_KEYS = Object.keys(SOCKET_FAULT_DETAIL_READERS);
++var VOICE_CALL_LOUDEST_SAMPLE = 32767;
++var readMember = (known) => (raw) => known.find((candidate) => candidate === raw);
++var readLevel = (raw) => isTelemetryInteger(raw) && raw <= VOICE_CALL_LOUDEST_SAMPLE ? raw : void 0;
++var CAPTURE_FIGURE_READERS = {
++  mic_permission: readMember(VOICE_CALL_MIC_PERMISSIONS),
++  mic_tap_installs: readMs,
++  mic_tap_skip: readMember(VOICE_CALL_MIC_TAP_SKIPS),
++  mic_input_hz: readMs,
++  mic_input_channels: readMs,
++  mic_frames_captured: readMs,
++  mic_frames_sent: readMs,
++  mic_peak: readLevel,
++  mic_rms: readLevel,
++  mic_first_sound_ms: readMs,
++  speech_starts: readMs,
++  route_in_start: readMember(VOICE_CALL_AUDIO_PORTS),
++  route_out_start: readMember(VOICE_CALL_AUDIO_PORTS),
++  route_in_end: readMember(VOICE_CALL_AUDIO_PORTS),
++  route_out_end: readMember(VOICE_CALL_AUDIO_PORTS),
++  route_changes: readMs,
++  mute_toggles: readMs,
++  muted_ms: readMs
++};
++var CAPTURE_FIGURE_KEYS = Object.keys(CAPTURE_FIGURE_READERS);
+ 
+ // ../packages/voice-call-harness/dist/prompt/session-tools.js
+ var TOOLS = [
+@@ -981,6 +1025,7 @@
+ 
+ // ../packages/voice-call-harness/dist/prompt/speak-policy.js
+ var NEXT_STEP = "what happens now: the job you are taking and what it is about, where the work stands and when you will say more, or the answer if you already have it. A confirmation on its own \u2014 okay, got it, sure, will do \u2014 is not a reply.";
++var RECEIPT_TURN_LEAD = "The job is under way. Keep talking with a natural question or a suggestion. Do not announce that you started.";
+ var VoiceSpeakPolicy = class _VoiceSpeakPolicy {
+   /**
+    * How long a spoken update holds the floor against further work news.
+@@ -1057,26 +1102,23 @@
+   /**
+    * The `response.create` instructions for the unpaid `send_task` receipt
+    * turn, over the tools on that line. `stay_silent` is refused with it
+-   * built over `stay_silent` alone.
++   * built over `stay_silent` alone. A host may word the turn's lead itself.
+    */
+-  static receiptTurnOwed(tools = []) {
+-    return [
+-      "The job is under way. Keep talking with a natural question or a suggestion. Do not announce that you started.",
+-      ...VoiceCallToolPrompts.receipt(tools)
+-    ].join(" ");
++  static receiptTurnOwed(tools = [], lead = RECEIPT_TURN_LEAD) {
++    return [lead, ...VoiceCallToolPrompts.receipt(tools)].join(" ");
+   }
+-  static staySilentPlan({ theyJustTalked, newsOwed, receiptOwed, alreadySpokeThisTurn = false }) {
++  static staySilentPlan({ theyJustTalked, newsOwed, receiptOwed, alreadySpokeThisTurn = false }, refusals = VOICE_STAY_SILENT_REFUSALS) {
+     if (theyJustTalked) {
+-      return { kind: "spoken", error: VOICE_STAY_SILENT_REFUSALS.theyJustSpoke };
++      return { kind: "spoken", error: refusals.theyJustSpoke };
+     }
+     if (alreadySpokeThisTurn) {
+       return { kind: "silent" };
+     }
+     if (newsOwed) {
+-      return { kind: "spoken", error: VOICE_STAY_SILENT_REFUSALS.newsOwed };
++      return { kind: "spoken", error: refusals.newsOwed };
+     }
+     if (receiptOwed) {
+-      return { kind: "spoken", error: VOICE_STAY_SILENT_REFUSALS.receiptOwed };
++      return { kind: "spoken", error: refusals.receiptOwed };
+     }
+     return { kind: "silent" };
+   }

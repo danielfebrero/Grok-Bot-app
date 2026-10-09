@@ -1,0 +1,914 @@
+/*
+ * "Option Infographic" — 18-slide 16:9 deck rebuilt with pptxgenjs.
+ *
+ * Run:  node 0e115b7e-0ca9-4cde-8972-5c4dc7d19352_grok_final.js
+ * Writes 0e115b7e-0ca9-4cde-8972-5c4dc7d19352_grok_final.pptx next to this file.
+ *
+ * The original deck's small pictograms are third-party brand logos; they are
+ * rebuilt here as simple programmatic glyph placeholders (see `glyph`).
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const TEAL = '01B9C5';
+const ORANGE = 'F65C2A';
+const GREEN = 'A3D13D';
+const PINK = 'E32661';
+const PURPLE = '4E3F9C';
+const INK = '000000';
+const BODY = '262626';
+const GREY_BG = 'F2F2F2';
+const GREY_LT = 'E7E6E6';
+const WHITE = 'FFFFFF';
+
+const TEAL_DK = '018B94';
+const TEAL_LT = '45F3FE';
+const ORANGE_DK = 'CF3909';
+const ORANGE_LT = 'FA9D7F';
+const GREEN_DK = '7DA427';
+const GREEN_LT = 'C8E38B';
+
+const HEAD = 'Poppins SemiBold';
+const TEXT = 'Poppins Light';
+
+const ACCENTS = [TEAL, ORANGE, GREEN, PINK];
+
+/* soft drop shadows used throughout the deck */
+const SH_CARD = { type: 'outer', color: '000000', opacity: 0.1, blur: 25, offset: 25, angle: 45 };
+const SH_SOFT = { type: 'outer', color: '000000', opacity: 0.15, blur: 50, offset: 5, angle: 137 };
+const SH_PILL = { type: 'outer', color: '000000', opacity: 0.1, blur: 25, offset: 5, angle: 50 };
+const SH_TAB = { type: 'outer', color: '000000', opacity: 0.1, blur: 35, offset: 10, angle: 50 };
+
+/* --------------------------------------------------------------- helpers */
+
+/** rectRadius (inches) for a prstGeom `adj` fraction on a shape of size w x h */
+function radius(adjFraction, w, h) {
+    return adjFraction * Math.min(w, h);
+}
+
+/**
+ * Draw a normalised custom-geometry outline. `d` holds ['M'|'L'|'C'|'Z', ...coords]
+ * with coordinates in 0..1 of the shape box; pptxgenjs wants them relative to it.
+ */
+function poly(slide, d, o) {
+    const pts = [];
+    d.forEach(function (seg) {
+        if (seg[0] === 'Z') { pts.push({ close: true }); return; }
+        const c = [];
+        for (let i = 1; i < seg.length; i += 2) c.push({ x: seg[i] * o.w, y: seg[i + 1] * o.h });
+        if (seg[0] === 'M') pts.push({ x: c[0].x, y: c[0].y, moveTo: true });
+        else if (seg[0] === 'L') pts.push(c[0]);
+        else pts.push({ x: c[2].x, y: c[2].y, curve: { type: 'cubic', x1: c[0].x, y1: c[0].y, x2: c[1].x, y2: c[1].y } });
+    });
+    slide.addShape('custGeom', Object.assign({}, o, { points: pts }));
+}
+
+/* Text-box insets, in points, as [left, right, bottom, top]. */
+const INSET = [7.2, 7.2, 3.6, 3.6];      // PowerPoint default (0.10" / 0.05")
+const INSET_WIDE = [11.25, 11.25, 5.6, 5.6];  // caption blocks (0.156" / 0.078")
+const INSET_CARD = [5.6, 5.6, 2.8, 2.8];      // slide 14 title card (0.078" / 0.039")
+
+/** Text box. Defaults mirror the deck: Poppins Light, 18pt, top-left. */
+function txt(slide, text, o) {
+    slide.addText(text, Object.assign({
+        fontFace: TEXT, fontSize: 18, color: INK, align: 'left', valign: 'top',
+        margin: INSET, isTextBox: true
+    }, o));
+}
+
+/** "Option Infographic" heading — same box on every content slide. */
+function heading(slide, size) {
+    slide.addText([
+        { text: 'Option ', options: { color: TEAL } },
+        { text: 'Infographic', options: { color: INK } }
+    ], {
+        x: 2.812, y: 0.501, w: 7.704, h: 0.774,
+        fontFace: HEAD, fontSize: size || 40, align: size ? 'left' : 'center',
+        valign: 'middle', margin: INSET
+    });
+}
+
+/** Bottom-centre page number with its two pale dots (from the slide master). */
+function pageNumber(slide, n) {
+    slide.addShape('ellipse', { x: 6.301, y: 7.049, w: 0.089, h: 0.089, fill: { color: 'C1FBFF' } });
+    slide.addShape('ellipse', { x: 6.943, y: 7.049, w: 0.089, h: 0.089, fill: { color: 'C1FBFF' } });
+    txt(slide, String(n), {
+        x: 6.358, y: 6.908, w: 0.616, h: 0.37,
+        fontFace: HEAD, fontSize: 16, color: TEAL, align: 'center', valign: 'middle'
+    });
+}
+
+/** Heading + body pair used for most option captions. */
+function caption(slide, o) {
+    const pad = o.inset || INSET_WIDE;
+    txt(slide, o.title, {
+        x: o.x, y: o.y, w: o.w, h: o.titleH || 0.46, fontFace: HEAD, fontSize: o.titleSize || 18,
+        color: o.color, align: o.align || 'left', valign: o.titleH ? 'top' : 'bottom', margin: pad
+    });
+    txt(slide, o.body, {
+        x: o.bodyX === undefined ? o.x : o.bodyX, y: o.y + (o.gap || 0.445),
+        w: o.bodyW || o.w, h: o.bodyH || 0.664, fontSize: 12, color: o.bodyColor || BODY,
+        align: o.align || 'left', valign: 'top', lineSpacingMultiple: 1.3, margin: pad
+    });
+}
+
+/**
+ * Simple pictogram placeholder standing in for a logo/icon in the source deck.
+ * Drawn from native shapes inside the square (cx, cy) of side `s`.
+ */
+function glyph(slide, kind, cx, cy, s, color) {
+    const f = { color: color };
+    const box = function (dx, dy, dw, dh, extra) {
+        slide.addShape('rect', Object.assign({ x: cx + dx * s, y: cy + dy * s, w: dw * s, h: dh * s, fill: f }, extra));
+    };
+    const dot = function (dx, dy, dd) {
+        slide.addShape('ellipse', { x: cx + dx * s, y: cy + dy * s, w: dd * s, h: dd * s, fill: f });
+    };
+    const ring = function (dx, dy, dd, th) {
+        slide.addShape('ellipse', {
+            x: cx + dx * s, y: cy + dy * s, w: dd * s, h: dd * s,
+            fill: { type: 'none' }, line: { color: color, width: th * s * 72 }
+        });
+    };
+    switch (kind) {
+        case 'doc':
+            slide.addShape('snip1Rect', { x: cx + 0.08 * s, y: cy, w: 0.6 * s, h: 0.78 * s, fill: { type: 'none' }, line: { color: color, width: 0.09 * s * 72 } });
+            ring(0.45, 0.42, 0.55, 0.09);
+            break;
+        case 'grid':
+            box(0.04, 0.06, 0.4, 0.4); box(0.56, 0.06, 0.4, 0.4);
+            box(0.04, 0.54, 0.4, 0.4); box(0.56, 0.54, 0.4, 0.4);
+            break;
+        case 'bars':
+            box(0.02, 0.34, 0.28, 0.64); box(0.36, 0.1, 0.28, 0.88); box(0.7, 0.5, 0.28, 0.48);
+            break;
+        case 'chart':
+            box(0.02, 0.1, 0.46, 0.88); box(0.56, 0.42, 0.42, 0.56);
+            break;
+        case 'ring':
+            ring(0, 0, 1, 0.14);
+            break;
+        case 'badge':
+            ring(0.06, 0.06, 0.88, 0.09);
+            slide.addShape('triangle', { x: cx + 0.32 * s, y: cy + 0.3 * s, w: 0.4 * s, h: 0.4 * s, fill: f, rotate: 90 });
+            break;
+        case 'bank':
+            slide.addShape('triangle', { x: cx, y: cy, w: s, h: 0.3 * s, fill: f });
+            box(0.12, 0.36, 0.14, 0.46); box(0.43, 0.36, 0.14, 0.46); box(0.74, 0.36, 0.14, 0.46);
+            box(0, 0.88, 1, 0.12);
+            break;
+        case 'house':
+            slide.addShape('triangle', { x: cx, y: cy, w: s, h: 0.44 * s, fill: f });
+            box(0.16, 0.44, 0.68, 0.56);
+            break;
+        case 'store':
+            box(0, 0, 1, 0.24); box(0.08, 0.3, 0.84, 0.7);
+            break;
+        case 'send':
+            slide.addShape('triangle', { x: cx, y: cy + 0.1 * s, w: s, h: 0.8 * s, fill: f, rotate: 90 });
+            break;
+        case 'play':
+            slide.addShape('roundRect', { x: cx, y: cy + 0.15 * s, w: s, h: 0.7 * s, rectRadius: 0.18 * s, fill: f });
+            slide.addShape('triangle', { x: cx + 0.4 * s, y: cy + 0.3 * s, w: 0.4 * s, h: 0.4 * s, fill: { color: WHITE }, rotate: 90 });
+            break;
+        case 'cart':
+            box(0.06, 0.14, 0.8, 0.42); dot(0.12, 0.66, 0.22); dot(0.62, 0.66, 0.22);
+            break;
+        case 'crown':
+            slide.addShape('triangle', { x: cx, y: cy + 0.15 * s, w: s, h: 0.45 * s, fill: f });
+            box(0.06, 0.62, 0.88, 0.2);
+            break;
+        case 'tag':
+            slide.addShape('diamond', { x: cx, y: cy, w: s, h: s, fill: { type: 'none' }, line: { color: color, width: 0.1 * s * 72 } });
+            dot(0.4, 0.4, 0.2);
+            break;
+        case 'coin':
+            ring(0, 0, 1, 0.1); box(0.44, 0.14, 0.12, 0.72);
+            break;
+        case 'card':
+            slide.addShape('roundRect', { x: cx, y: cy + 0.15 * s, w: s, h: 0.7 * s, rectRadius: 0.12 * s, fill: { type: 'none' }, line: { color: color, width: 0.1 * s * 72 } });
+            box(0.55, 0.4, 0.3, 0.2);
+            break;
+        case 'globe':
+            ring(0, 0, 1, 0.1); box(0.46, 0.05, 0.08, 0.9); box(0.05, 0.46, 0.9, 0.08);
+            break;
+        case 'award':
+            ring(0.1, 0, 0.8, 0.11);
+            slide.addShape('triangle', { x: cx + 0.2 * s, y: cy + 0.6 * s, w: 0.6 * s, h: 0.4 * s, fill: f, rotate: 180 });
+            break;
+        case 'calendar':
+            slide.addShape('rect', { x: cx, y: cy + 0.12 * s, w: s, h: 0.88 * s, fill: { type: 'none' }, line: { color: color, width: 0.1 * s * 72 } });
+            box(0.2, 0, 0.12, 0.28); box(0.68, 0, 0.12, 0.28); box(0.1, 0.42, 0.8, 0.1);
+            break;
+        case 'paint':
+            ring(0, 0, 1, 0.12); dot(0.42, 0.14, 0.16); dot(0.7, 0.4, 0.16);
+            break;
+        case 'ruler':
+            slide.addShape('rect', { x: cx + 0.1 * s, y: cy + 0.35 * s, w: 0.8 * s, h: 0.3 * s, fill: f, rotate: -45 });
+            break;
+        case 'compass':
+            slide.addShape('triangle', { x: cx + 0.15 * s, y: cy, w: 0.7 * s, h: s, fill: { type: 'none' }, line: { color: color, width: 0.1 * s * 72 } });
+            break;
+        case 'eraser':
+            slide.addShape('diamond', { x: cx, y: cy + 0.1 * s, w: s, h: 0.8 * s, fill: f });
+            break;
+        default:
+            box(0.1, 0.1, 0.8, 0.8);
+    }
+}
+
+/* ------------------------------------------------- shared vector outlines */
+
+/* Slide 1 / 10: the two "goblet" pedestals holding the dice */
+const GOBLET_A = [['M', .848, .849], ['L', .722, .849], ['C', .607, .849, .514, .801, .514, .742], ['L', .514, .404], ['C', .514, .348, .57, .298, .659, .267], ['C', .74, .238, .791, .189, .783, .135], ['C', .773, .063, .659, .005, .519, 0], ['C', .353, -.005, .216, .062, .216, .146], ['C', .216, .199, .271, .245, .353, .271], ['C', .438, .297, .486, .345, .486, .395], ['L', .486, .742], ['C', .486, .801, .393, .849, .278, .849], ['L', .152, .849], ['C', .076, .849, .008, .878, .001, .917], ['C', -.008, .962, .062, 1, .148, 1], ['L', .852, 1], ['C', .938, 1, 1.008, .962, .999, .917], ['C', .992, .878, .925, .849, .848, .849], ['Z']];
+const GOBLET_B = [['M', .848, .821], ['L', .629, .821], ['C', .563, .821, .509, .789, .508, .748], ['L', .505, .463], ['C', .505, .428, .54, .397, .595, .386], ['C', .729, .359, .825, .279, .817, .188], ['C', .809, .093, .671, .007, .515, 0], ['C', .324, -.008, .165, .084, .165, .198], ['C', .165, .285, .257, .358, .385, .385], ['C', .44, .397, .477, .428, .477, .463], ['L', .477, .748], ['C', .477, .788, .423, .821, .356, .821], ['L', .152, .821], ['C', .076, .821, .008, .855, .001, .902], ['C', -.008, .955, .062, 1, .148, 1], ['L', .852, 1], ['C', .938, 1, 1.008, .955, .999, .902], ['C', .992, .855, .924, .821, .848, .821], ['Z']];
+
+/* Slide 1 / 10: the two tumbling dice. Each is five facets, [dx, dy, w, h] from
+ * the tower origin, drawn back to front. */
+const DIE1 = [
+    [.793, .397, .854, 1.462, WHITE, [['M', .711, 1], ['L', .812, .99], ['C', .85, .991, .886, .982, .911, .965], ['L', 1, .925], ['L', .31, 0], ['L', 0, .095], ['L', .711, 1], ['Z']]],
+    [.052, .552, 1.431, 1.306, 'DCDADA', [['M', .942, 1], ['L', .387, .988], ['C', .344, .984, .32, .979, .305, .941], ['L', .007, .192], ['C', -.008, .155, .003, .112, .032, .095], ['L', .562, .003], ['C', .602, -.006, .637, .003, .654, .045], ['L', .993, .897], ['C', .999, .913, 1.001, .928, .999, .943], ['C', .995, .977, .971, 1, .942, 1], ['Z']]],
+    [1.001, 0, 1.305, 1.776, 'DCDADA', [['M', .495, .985], ['L', .965, .659], ['C', .997, .646, 1.009, .615, .993, .588], ['L', .666, .036], ['C', .649, .009, .61, -.006, .575, .002], ['L', .046, .263], ['C', .005, .283, -.011, .307, .008, .338], ['L', .38, .965], ['C', .38, .966, .381, .968, .382, .969], ['C', .405, 1.003, .463, 1.01, .495, .985], ['Z']]],
+    [.098, .004, 1.655, .671, 'DCDADA', [['M', 0, 1], ['L', .527, .798], ['L', 1, 0], ['L', .444, .223], ['C', .43, .231, .417, .245, .405, .264], ['L', 0, 1], ['Z']]],
+    [.098, .004, 1.655, .671, WHITE, [['M', 0, 1], ['L', .527, .798], ['L', 1, 0], ['L', .535, .827], ['C', .535, .827, .202, .99, 0, 1], ['Z']]]
+];
+const DIE2 = [
+    [.689, .301, 1.149, 1.310, WHITE, [['M', 1, .13], ['L', .955, .076], ['C', .943, .054, .921, .038, .893, .031], ['L', .818, 0], ['L', 0, .868], ['L', .212, 1], ['L', 1, .13], ['Z']]],
+    [.888, .426, 1.316, 1.755, 'DCDADA', [['M', .722, .026], ['L', .984, .433], ['C', 1.002, .466, 1.009, .485, .983, .508], ['L', .466, .977], ['C', .44, 1.001, .398, 1.007, .368, .992], ['L', .026, .637], ['C', -.002, .611, -.011, .582, .018, .556], ['L', .606, .023], ['C', .616, .013, .629, .006, .643, .003], ['C', .675, -.005, .707, .005, .722, .026], ['Z']]],
+    [0, 0, 1.691, 1.424, 'DCDADA', [['M', .963, .211], ['L', .494, .01], ['C', .471, -.009, .438, -.001, .418, .028], ['L', .015, .606], ['C', -.005, .635, -.005, .675, .015, .699], ['L', .444, .985], ['C', .476, 1.007, .505, 1.006, .528, .974], ['L', .986, .316], ['C', .986, .315, .987, .314, .988, .313], ['C', 1.012, .274, .999, .223, .963, .211], ['Z']]],
+    [.025, .995, 1.347, 1.172, 'DCDADA', [['M', 1, 1], ['L', .618, .389], ['L', 0, 0], ['L', .384, .565], ['C', .395, .581, .408, .594, .424, .604], ['L', 1, 1], ['Z']]],
+    [.025, .995, 1.347, 1.172, WHITE, [['M', 1, 1], ['L', .618, .389], ['L', 0, 0], ['L', .626, .372], ['C', .626, .372, .883, .748, 1, 1], ['Z']]]
+];
+/* one pip outline, reused for every dot on both dice */
+const PIP = [['M', .232, .021], ['C', -.001, .099, -.07, .378, .079, .643], ['C', .227, .908, .536, 1.058, .769, .979], ['C', 1.001, .901, 1.07, .622, .922, .357], ['C', .773, .093, .464, -.058, .232, .021], ['Z']];
+/* pips: [dx, dy, w, h, shadowDX, shadowDY, backColour] — a pale disc with a dark one on top */
+const DIE1_PIPS = [
+    [.261, .808, .219, .282, .017, .019, 'E3E3E4'], [.615, 1.117, .219, .282, .018, .019, 'E3E3E4'],
+    [1.006, 1.421, .219, .282, .017, .019, 'E3E3E4'], [1.578, 1.205, .218, .283, .026, .013, WHITE],
+    [1.225, .477, .209, .289, .015, .021, WHITE], [1.397, .829, .209, .289, .015, .021, WHITE],
+    [1.907, .922, .207, .267, .016, .019, WHITE], [1.581, .230, .192, .278, .010, .022, WHITE],
+    [1.741, .563, .192, .278, .014, .020, WHITE], [.913, .136, .237, .145, .022, .005, 'FCFCFC'],
+    [.625, .376, .237, .145, .022, .004, 'FCFCFC']
+];
+const DIE2_PIPS = [
+    [1.820, 1.154, .229, .245, .008, -.022, 'E3E3E4'], [1.581, .762, .243, .261, .009, -.024, 'E3E3E4'],
+    [1.430, 1.618, .229, .245, .008, -.023, 'E3E3E4'], [1.191, 1.232, .244, .261, .008, -.024, 'E3E3E4'],
+    [.633, .160, .248, .257, .010, -.024, WHITE], [.679, .994, .255, .249, .012, -.023, WHITE],
+    [.571, 1.497, .267, .235, -.011, -.027, 'FCFCFC']
+];
+
+/* Slide 2: the three-lobed spinner outline behind the icon circles */
+const SPINNER = [['M', .5, 0], ['C', .608, 0, .695, .095, .695, .213], ['L', .694, .229], ['C', .694, .231, .694, .233, .694, .235], ['C', .692, .263, .684, .29, .672, .314], ['L', .662, .331], ['L', .647, .361], ['C', .64, .379, .636, .4, .636, .421], ['C', .636, .507, .699, .576, .778, .576], ['L', .79, .575], ['L', .805, .574], ['C', .832, .574, .857, .58, .881, .591], ['L', .898, .6], ['C', .959, .636, 1, .706, 1, .787], ['C', 1, .905, .913, 1, .805, 1], ['C', .764, 1, .727, .987, .696, .964], ['L', .667, .938], ['C', .658, .928, .65, .918, .643, .906], ['L', .635, .892], ['L', .621, .859], ['L', .618, .853], ['C', .593, .811, .549, .784, .5, .784], ['C', .451, .784, .407, .811, .382, .853], ['L', .369, .879], ['L', .357, .906], ['C', .35, .918, .342, .928, .333, .938], ['L', .306, .962], ['C', .273, .987, .236, 1, .195, 1], ['C', .087, 1, 0, .905, 0, .787], ['C', 0, .706, .041, .636, .102, .6], ['L', .119, .591], ['C', .143, .58, .168, .574, .195, .574], ['L', .21, .575], ['L', .22, .576], ['C', .301, .576, .364, .507, .364, .421], ['C', .364, .4, .36, .379, .353, .361], ['L', .34, .335], ['L', .328, .314], ['C', .316, .29, .308, .263, .306, .235], ['L', .305, .229], ['L', .305, .213], ['C', .305, .095, .392, 0, .5, 0], ['Z'], ['M', .5, .058], ['C', .421, .058, .358, .127, .358, .213], ['C', .358, .234, .362, .255, .369, .273], ['L', .382, .299], ['L', .394, .32], ['C', .406, .344, .413, .371, .416, .399], ['L', .417, .421], ['C', .417, .502, .376, .572, .315, .608], ['L', .298, .617], ['C', .274, .628, .249, .634, .222, .634], ['L', .197, .632], ['C', .117, .632, .053, .701, .053, .787], ['C', .053, .873, .117, .943, .195, .943], ['C', .244, .943, .288, .915, .313, .874], ['L', .327, .848], ['C', .338, .823, .346, .81, .362, .789], ['C', .372, .78, .376, .774, .391, .763], ['C', .422, .74, .46, .727, .5, .727], ['C', .54, .727, .578, .74, .609, .763], ['L', .638, .789], ['C', .647, .799, .655, .809, .662, .82], ['L', .67, .835], ['L', .684, .868], ['L', .687, .874], ['C', .712, .915, .756, .943, .805, .943], ['C', .884, .943, .947, .873, .947, .787], ['C', .947, .701, .884, .632, .805, .632], ['L', .793, .633], ['L', .778, .634], ['C', .751, .634, .726, .628, .702, .617], ['L', .685, .608], ['C', .624, .572, .583, .502, .583, .421], ['L', .584, .405], ['C', .587, .371, .594, .344, .607, .32], ['L', .616, .303], ['L', .631, .273], ['C', .639, .255, .642, .234, .642, .213], ['C', .642, .127, .579, .058, .5, .058], ['Z']];
+
+/* Slide 4: the "hook" / loop marker */
+const HOOK = [['M', 0, .273], ['C', 0, .423, .222, .546, .495, .546], ['C', .623, .546, .739, .519, .827, .475], ['C', .827, .693, .827, .929, .827, .953], ['C', .827, .979, .866, 1, .912, 1], ['C', .961, 1, 1, .979, 1, .953], ['C', 1, .923, 1, .599, 1, .336], ['C', 1, .332, 1, .329, 1, .325], ['C', 1, .299, .988, .254, .988, .254], ['C', .969, .113, .756, 0, .495, 0], ['C', .222, 0, 0, .123, 0, .273], ['M', .153, .273], ['C', .153, .169, .306, .084, .495, .084], ['C', .672, .084, .819, .159, .835, .254], ['C', .835, .254, .839, .281, .827, .317], ['C', .79, .401, .656, .461, .495, .461], ['C', .306, .461, .153, .377, .153, .273]];
+
+/* Slide 5: speech-banner with a folded tail at the bottom-right */
+const BANNER = [['M', 1, .212], ['C', 1, .094, .953, 0, .894, 0], ['L', .107, 0], ['C', .048, 0, 0, .094, 0, .212], ['L', 0, .534], ['C', 0, .65, .048, .746, .107, .746], ['L', .864, .746], ['C', .936, .746, .995, .859, 1, 1], ['L', 1, .554], ['L', 1, .212], ['Z']];
+
+/* Slide 6: the eight quarter-segments of the split ring (upper half / lower half) */
+const ARC_UL = [['M', 1, .297], ['C', .781, .494, .641, .738, .609, 1], ['L', 0, .959], ['C', .039, .61, .227, .267, .531, 0], ['L', 1, .297], ['Z']];
+const ARC_TL = [['M', 1, .617], ['C', .741, .641, .494, .781, .294, 1], ['L', 0, .531], ['C', .271, .227, .606, .039, .959, 0], ['L', 1, .617], ['Z']];
+const ARC_TR = [['M', .041, 0], ['C', .392, .039, .725, .227, 1, .531], ['L', .702, 1], ['C', .503, .781, .257, .641, 0, .617], ['L', .041, 0], ['Z']];
+const ARC_UR = [['M', .465, 0], ['C', .767, .267, .953, .61, 1, .959], ['L', .388, 1], ['C', .357, .738, .225, .494, 0, .297], ['L', .465, 0], ['Z']];
+const ARC_LL = [['M', .531, 1], ['C', .227, .727, .039, .39, 0, .041], ['L', .609, 0], ['C', .641, .262, .781, .5, 1, .703], ['L', .531, 1], ['Z']];
+const ARC_BL = [['M', .959, 1], ['C', .606, .953, .271, .773, 0, .469], ['L', .294, 0], ['C', .494, .219, .741, .352, 1, .383], ['L', .959, 1], ['Z']];
+const ARC_BR = [['M', 0, .383], ['C', .257, .352, .503, .219, .702, 0], ['L', 1, .469], ['C', .725, .773, .392, .953, .041, 1], ['L', 0, .383], ['Z']];
+const ARC_LR = [['M', 0, .703], ['C', .225, .5, .357, .262, .388, 0], ['L', 1, .041], ['C', .953, .39, .767, .727, .465, 1], ['L', 0, .703], ['Z']];
+
+/* Slide 7: chevron arrows. Each is a slanted shaft plus a triangular head, both
+ * drawn upright then rotated 90 degrees so the arrow reads left-to-right. */
+const SHAFT_1 = [['M', 1, 0], ['L', 0, .214], ['L', 0, 1], ['L', 1, 1], ['Z']];
+const SHAFT_2 = [['M', 1, 0], ['L', 0, 0], ['L', 0, .762], ['L', 1, 1], ['Z']];
+const SHAFT_3 = [['M', 0, 0], ['L', 0, 1], ['L', 1, 1], ['L', 1, .246], ['Z']];
+const SHAFT_4 = [['M', 1, 0], ['L', 0, 0], ['L', 0, 1], ['L', 1, .819], ['Z']];
+const HEAD_DOWN = [['M', 1, 0], ['L', 0, 0], ['L', .501, 1], ['Z']];
+const HEAD_UP = [['M', .501, 0], ['L', 1, 1], ['L', 0, 1], ['Z']];
+
+/* Slide 9: rounded flower petal (one corner rounded, one square) */
+const PETAL = [['M', .513, 0], ['L', 0, 0], ['L', 0, .526], ['C', 0, .792, .212, 1, .475, 1], ['L', 1, 1], ['L', 1, .487], ['C', 1, .218, .775, 0, .513, 0]];
+
+/* Slide 12: lens outline (a hollow ring) plus the six wedges filling each half */
+const LENS = [['M', .5, 1], ['L', .495, 1], ['C', .346, .957, .225, .889, .137, .8], ['C', .071, .741, .033, .672, .011, .6], ['C', 0, .567, 0, .534, 0, .502], ['C', 0, .466, 0, .433, .011, .4], ['C', .033, .328, .071, .262, .132, .2], ['C', .22, .111, .346, .043, .495, 0], ['L', .5, 0], ['L', .505, 0], ['C', .648, .043, .775, .111, .863, .2], ['C', .923, .262, .962, .328, .984, .4], ['C', .995, .433, 1, .466, 1, .502], ['C', 1, .534, .995, .567, .984, .6], ['C', .962, .672, .923, .741, .863, .8], ['C', .775, .889, .648, .957, .5, 1], ['Z'], ['M', .495, .997], ['L', .5, .997], ['C', .643, .954, .764, .885, .852, .797], ['C', .912, .738, .956, .672, .973, .6], ['C', .984, .567, .989, .534, .989, .502], ['C', .989, .466, .984, .433, .973, .4], ['C', .956, .331, .912, .262, .852, .203], ['C', .769, .118, .643, .049, .5, .007], ['L', .495, .007], ['C', .352, .049, .231, .118, .143, .203], ['C', .082, .262, .038, .331, .022, .4], ['C', .011, .433, .005, .466, .005, .502], ['C', .005, .534, .011, .567, .022, .6], ['C', .038, .672, .082, .738, .143, .797], ['C', .231, .885, .352, .954, .495, .997], ['Z']];
+/* right half, top to bottom */
+const RW_TOP = [['M', 1, 1], ['C', .754, .557, .415, .213, 0, 0], ['L', 0, 1], ['L', 1, 1], ['Z']];
+const RW_UPR = [['M', 0, 1], ['L', 1, 1], ['C', .966, .633, .874, .3, .747, 0], ['L', 0, 0], ['L', 0, 1], ['Z']];
+const RW_MID = [['M', .967, 0], ['L', 0, 0], ['L', 0, 1], ['L', .967, 1], ['C', .989, .836, 1, .672, 1, .508], ['C', 1, .328, .989, .164, .967, 0], ['Z']];
+const RW_LWR = [['M', 0, 1], ['L', .747, 1], ['C', .874, .705, .954, .361, 1, 0], ['L', 0, 0], ['L', 0, 1], ['Z']];
+const RW_BOT = [['M', 0, 1], ['C', .4, .783, .754, .433, 1, 0], ['L', 0, 0], ['L', 0, 1], ['Z']];
+/* left half, top to bottom */
+const LW_TOP = [['M', 1, 0], ['L', .985, 0], ['C', .576, .213, .242, .557, 0, 1], ['L', 1, 1], ['L', 1, 0], ['Z']];
+const LW_UPR = [['M', 1, 0], ['L', .25, 0], ['C', .125, .3, .045, .633, 0, 1], ['L', 1, 1], ['L', 1, 0], ['Z']];
+const LW_MID = [['M', 1, 0], ['L', .033, 0], ['C', .011, .164, 0, .328, 0, .508], ['C', 0, .672, .011, .836, .033, 1], ['L', 1, 1], ['L', 1, 0], ['Z']];
+const LW_LWR = [['M', 1, 0], ['L', 0, 0], ['C', .045, .361, .125, .705, .25, 1], ['L', 1, 1], ['L', 1, 0], ['Z']];
+const LW_BOT = [['M', 0, 0], ['C', .242, .433, .591, .783, .985, 1], ['L', 1, 1], ['L', 1, 0], ['L', 0, 0], ['Z']];
+
+/* Slide 13: hairline ring around the hub */
+const RING = [['M', .5, 0], ['C', .224, 0, 0, .224, 0, .5], ['C', 0, .776, .224, 1, .5, 1], ['C', .776, 1, 1, .776, 1, .5], ['C', 1, .224, .776, 0, .5, 0], ['Z'], ['M', .5, .982], ['C', .234, .982, .019, .766, .019, .5], ['C', .019, .234, .234, .019, .5, .019], ['C', .766, .019, .982, .234, .982, .5], ['C', .982, .766, .766, .982, .5, .982], ['Z']];
+
+/* Slide 13: rounded speech bubbles, one per pointing direction */
+const BUBBLE_R = [['M', .436, 0], ['C', .646, 0, .822, .171, .863, .399], ['L', .864, .411], ['L', 1, .498], ['L', .864, .59], ['L', .863, .601], ['C', .822, .829, .646, 1, .436, 1], ['C', .195, 1, 0, .776, 0, .5], ['C', 0, .224, .195, 0, .436, 0], ['Z']];
+const BUBBLE_L = [['M', .564, 0], ['C', .805, 0, 1, .224, 1, .5], ['C', 1, .776, .805, 1, .564, 1], ['C', .354, 1, .178, .829, .137, .601], ['L', .137, .59], ['L', 0, .498], ['L', .136, .411], ['L', .137, .399], ['C', .178, .171, .354, 0, .564, 0], ['Z']];
+const BUBBLE_T = [['M', .502, 0], ['L', .589, .136], ['L', .601, .137], ['C', .829, .178, 1, .354, 1, .564], ['C', 1, .805, .776, 1, .5, 1], ['C', .224, 1, 0, .805, 0, .564], ['C', 0, .354, .171, .178, .399, .137], ['L', .41, .137], ['Z']];
+const BUBBLE_B = [['M', .5, 0], ['C', .776, 0, 1, .195, 1, .436], ['C', 1, .646, .829, .822, .601, .863], ['L', .589, .864], ['L', .502, 1], ['L', .41, .864], ['L', .399, .863], ['C', .171, .822, 0, .646, 0, .436], ['C', 0, .195, .224, 0, .5, 0], ['Z']];
+
+/* Slide 14: isometric cube facets */
+const CUBE_TOP = [['M', 1, .5], ['L', .502, 1], ['L', 0, .5], ['L', .5, 0], ['L', 1, .5], ['Z']];
+const CUBE_RIGHT = [['M', 1, 0], ['L', .998, .641], ['L', 0, 1], ['L', .002, .359], ['L', 1, 0], ['Z']];
+const CUBE_LEFT = [['M', 1, .359], ['L', .998, 1], ['L', 0, .641], ['L', .003, 0], ['L', 1, .359], ['Z']];
+
+/* Slide 16: rounded track behind each progress pill */
+const TRACK = [['M', .111, 0], ['L', .944, 0], ['L', .959, .057], ['C', .985, .171, 1, .328, 1, .501], ['C', 1, .675, .985, .832, .959, .945], ['L', .945, 1], ['L', .111, 1], ['C', .057, 1, .013, .829, .002, .601], ['L', 0, .5], ['L', .002, .399], ['C', .013, .171, .057, 0, .111, 0], ['Z']];
+
+/* Slide 17: rounded card cap with a swept right edge */
+const CARD_CAP = [['M', .031, 1], ['C', .014, 1, 0, .972, 0, .936], ['L', 0, .064], ['C', 0, .029, .014, 0, .031, 0], ['L', 1, 0], ['C', .992, .125, .957, .323, .89, .517], ['C', .832, .685, .731, .905, .58, 1], ['L', .031, 1], ['Z']];
+/* small up-arrow marker */
+const UP_ARROW = [['M', .5, 0], ['L', 1, .55], ['L', .68, .55], ['L', .68, 1], ['L', .32, 1], ['L', .32, .55], ['L', 0, .55], ['Z']];
+
+/* -------------------------------------------------------------- builders */
+
+/* Slide 1 — title slide with two dice balanced on coloured pedestals */
+function slide01(pptx) {
+    const s = pptx.addSlide();
+    txt(s, 'Editable Presentation Template', { x: 0.771, y: 4.594, w: 5.796, h: 0.404, color: '404040', charSpacing: 3 });
+    s.addText([
+        { text: 'Option ', options: { color: TEAL } },
+        { text: 'Infographic', options: { color: INK } }
+    ], { x: 0.771, y: 2.502, w: 6.052, h: 1.927, fontFace: HEAD, fontSize: 60, valign: 'middle', margin: INSET });
+
+    diceTower(s, TOWER_1, 7.535, 0.879, 5.480);
+    diceTower(s, TOWER_2, 9.877, 1.988, 6.235);
+}
+
+/* the two towers, shared by slides 1 and 10 */
+const TOWER_1 = {
+    color: TEAL, goblet: GOBLET_A, gx: 0, gy: 1.646, gw: 2.375, gh: 3.356,
+    die: DIE1, pips: DIE1_PIPS, dark: '38353F', icon: 'doc', ix: 1.004, iy: 2.018, is: 0.41,
+    label: 'Option #01', lx: 0.086
+};
+const TOWER_2 = {
+    color: ORANGE, goblet: GOBLET_B, gx: 0.133, gy: 1.863, gw: 2.375, gh: 2.770,
+    die: DIE2, pips: DIE2_PIPS, dark: '4F4C54', icon: 'grid', ix: 1.124, iy: 2.314, is: 0.365,
+    label: 'Option #02', lx: 0.198
+};
+
+/** Shared between slides 1 and 10: pedestal + dice + icon badge + label. */
+function diceTower(s, t, ox, oy, labelY) {
+    poly(s, t.goblet, { x: ox + t.gx, y: oy + t.gy, w: t.gw, h: t.gh, fill: { color: t.color } });
+    t.die.forEach(function (f) {
+        poly(s, f[5], { x: ox + f[0], y: oy + f[1], w: f[2], h: f[3], fill: { color: f[4] } });
+    });
+    t.pips.forEach(function (p) {
+        poly(s, PIP, { x: ox + p[0], y: oy + p[1], w: p[2], h: p[3], fill: { color: p[6] } });
+        poly(s, PIP, { x: ox + p[0] + p[4], y: oy + p[1] + p[5], w: p[2], h: p[3], fill: { color: t.dark } });
+    });
+    glyph(s, t.icon, ox + t.ix, oy + t.iy, t.is, WHITE);
+    txt(s, t.label, { x: ox + t.lx, y: labelY, w: 2.22, h: 0.277, fontFace: HEAD, fontSize: 12, color: WHITE, align: 'center', valign: 'middle', margin: 0 });
+}
+
+/* Slide 2 — three-lobed spinner with captions on each arm */
+function slide02(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+    poly(s, SPINNER, { x: 4.341, y: 2.056, w: 4.652, h: 4.265, fill: { color: GREY_BG } });
+
+    const lobes = [
+        { x: 6.122, y: 2.411, color: ORANGE, icon: 'doc' },
+        { x: 4.710, y: 4.854, color: TEAL, icon: 'bank' },
+        { x: 7.543, y: 4.854, color: GREEN, icon: 'grid' }
+    ];
+    lobes.forEach(function (l) {
+        s.addShape('ellipse', { x: l.x, y: l.y, w: 1.088, h: 1.088, fill: { color: WHITE }, line: { color: GREY_BG, width: 1 }, shadow: SH_CARD });
+        s.addShape('ellipse', { x: l.x + 0.122, y: l.y + 0.122, w: 0.844, h: 0.844, fill: { color: l.color } });
+        glyph(s, l.icon, l.x + 0.394, l.y + 0.384, 0.32, WHITE);
+    });
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt';
+    [
+        { tx: 9.608, ty: 4.753, bx: 9.608, by: 5.206, w: 2.915, color: GREEN, align: 'left' },
+        { tx: 1.522, ty: 4.707, bx: 0.881, by: 5.133, w: 2.889, color: TEAL, align: 'right' },
+        { tx: 2.955, ty: 1.871, bx: 2.382, by: 2.277, w: 2.821, color: ORANGE, align: 'right' }
+    ].forEach(function (c) {
+        txt(s, 'Your Option', { x: c.tx, y: c.ty, w: 2.248, h: 0.404, fontFace: HEAD, color: c.color, align: c.align });
+        txt(s, body, { x: c.bx, y: c.by, w: c.w, h: 0.870, fontSize: 12, align: c.align, lineSpacingMultiple: 1.3 });
+    });
+    pageNumber(s, 2);
+}
+
+/* Slide 3 — two rotated rounded squares with percentage call-outs */
+function slide03(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    [[5.814, 1.902, TEAL, 'compass'], [5.814, 4.506, ORANGE, 'globe']].forEach(function (d, i) {
+        s.addShape('roundRect', { x: d[0], y: d[1], w: 1.7, h: 1.7, rectRadius: radius(0.16667, 1.7, 1.7), rotate: -45, fill: { color: d[2] } });
+        s.addShape('ellipse', { x: 6.12, y: d[1] + 0.305, w: 1.088, h: 1.088, fill: { color: WHITE }, line: { color: GREY_BG, width: 1 }, shadow: SH_CARD });
+        glyph(s, d[3], 6.45, d[1] + 0.63, 0.42, d[2]);
+    });
+
+    const body = 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.';
+    s.addShape('roundRect', { x: 4.113, y: 1.799, w: 0.152, h: 0.152, rectRadius: 0.025, rotate: 45, fill: { color: TEAL } });
+    txt(s, '83,6%', { x: 1.486, y: 1.564, w: 2.352, h: 0.472, fontFace: HEAD, fontSize: 32, color: TEAL, align: 'right', margin: INSET });
+    txt(s, 'Your Option 01', { x: 1.538, y: 2.151, w: 2.248, h: 0.404, fontFace: HEAD, align: 'right' });
+    txt(s, body, { x: 0.454, y: 2.707, w: 3.384, h: 0.514, fontSize: 12, color: '0D0D0D', align: 'right', lineSpacingMultiple: 1.2, margin: INSET });
+    leader(s, TEAL, [[4.458, 1.875], [5.125, 1.875], [5.125, 2.111], [5.792, 2.111]]);
+
+    s.addShape('roundRect', { x: 9.074, y: 5.471, w: 0.152, h: 0.152, rectRadius: 0.025, rotate: 45, fill: { color: ORANGE } });
+    txt(s, '79,1%', { x: 9.472, y: 5.204, w: 2.352, h: 0.472, fontFace: HEAD, fontSize: 32, color: ORANGE, margin: INSET });
+    txt(s, 'Your Option 02', { x: 9.482, y: 5.786, w: 2.248, h: 0.404, fontFace: HEAD });
+    txt(s, body, { x: 9.482, y: 6.341, w: 3.397, h: 0.514, fontSize: 12, color: '0D0D0D', lineSpacingMultiple: 1.2, margin: INSET });
+    leader(s, ORANGE, [[7.333, 6.181], [8.097, 6.181], [8.097, 5.542], [8.861, 5.542]]);
+    pageNumber(s, 3);
+}
+
+/* Slide 4 — four hook markers pointing at their captions */
+function slide04(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed.';
+    [
+        { x: 2.458, y: 1.751, tx: 3.224, title: 'Option 01', color: ORANGE, align: 'right' },
+        { x: 7.876, y: 1.751, tx: 7.876, title: 'Option 02', color: TEAL, align: 'left' },
+        { x: 2.458, y: 5.244, tx: 3.224, title: 'Option 03', color: GREEN, align: 'right' },
+        { x: 7.876, y: 5.244, tx: 7.876, title: 'Option 04', color: PINK, align: 'left' }
+    ].forEach(function (c) {
+        txt(s, c.title, { x: c.tx, y: c.y, w: 2.248, h: 0.404, fontFace: HEAD, color: c.color, align: c.align });
+        txt(s, body, { x: c.x, y: c.y + 0.405, w: 3.014, h: 0.608, fontSize: 12, align: c.align, lineSpacingMultiple: 1.3 });
+    });
+
+    /* hooks: [x, y, w, h, rotate, flipH, flipV, colour, icon, iconX, iconY] */
+    poly(s, HOOK, { x: 6.096, y: 4.591, w: 1.166, h: 2.109, fill: { color: TEAL } });
+    poly(s, HOOK, { x: 7.777, y: 3.010, w: 1.166, h: 2.109, rotate: -90, flipH: true, fill: { color: ORANGE } });
+    poly(s, HOOK, { x: 4.390, y: 3.057, w: 1.166, h: 2.109, rotate: -90, flipV: true, fill: { color: PINK } });
+    poly(s, HOOK, { x: 6.096, y: 1.427, w: 1.166, h: 2.109, flipH: true, flipV: true, fill: { color: GREEN } });
+    glyph(s, 'store', 6.55, 5.02, 0.28, TEAL);
+    glyph(s, 'bank', 7.74, 3.91, 0.28, ORANGE);
+    glyph(s, 'house', 5.33, 3.98, 0.25, PINK);
+    glyph(s, 'bars', 6.55, 2.81, 0.26, GREEN);
+    pageNumber(s, 4);
+}
+
+/* Slide 5 — descending staircase of speech banners */
+function slide05(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    const body = 'Lorem ipsum dolor sit consectetur adipiscing.';
+    const steps = [
+        { bx: 0.867, by: 1.980, bw: 3.075, bh: 1.420, color: TEAL, label: 'Option 01', lx: 1.094, ly: 2.327, cx: 0.769, cy: 3.204, ix: 3.543, iy: 1.593, icon: 'bank' },
+        { bx: 4.062, by: 2.912, bw: 2.880, bh: 1.451, color: ORANGE, label: 'Option 02', lx: 4.351, ly: 3.269, cx: 4.052, cy: 4.352, ix: 6.539, iy: 2.546, icon: 'store' },
+        { bx: 7.083, by: 3.814, bw: 2.733, bh: 1.329, color: GREEN, label: 'Option 03', lx: 7.354, ly: 4.108, cx: 7.073, cy: 5.151, ix: 9.430, iy: 3.424, icon: 'bars' },
+        { bx: 9.976, by: 4.566, bw: 2.125, bh: 1.176, color: PINK, label: 'Option 04', lx: 10.132, ly: 4.835, cx: 9.938, cy: 5.802, ix: 11.707, iy: 4.168, icon: 'chart' }
+    ];
+    steps.forEach(function (t) {
+        poly(s, BANNER, { x: t.bx, y: t.by + 0.047, w: t.bw, h: t.bh, fill: { color: GREY_BG } });
+        poly(s, BANNER, { x: t.bx, y: t.by, w: t.bw, h: t.bh, fill: { color: t.color } });
+        txt(s, t.label, { x: t.lx, y: t.ly, w: 1.729, h: 0.337, fontFace: HEAD, fontSize: 14, color: WHITE });
+        txt(s, 'Your Option', { x: t.cx, y: t.cy, w: 2.248, h: 0.404, fontFace: HEAD, color: t.color });
+        txt(s, body, { x: t.cx, y: t.cy + 0.377, w: 2.427, h: 0.608, fontSize: 12, lineSpacingMultiple: 1.3 });
+        s.addShape('roundRect', { x: t.ix, y: t.iy, w: 0.776, h: 0.776, rectRadius: radius(0.16667, 0.776, 0.776), fill: { color: WHITE }, shadow: SH_SOFT });
+        glyph(s, t.icon, t.ix + 0.208, t.iy + 0.208, 0.36, t.color);
+    });
+    pageNumber(s, 5);
+}
+
+/* Slide 6 — segmented ring with four elbow-linked captions */
+function slide06(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    /* pale upper half of the ring, then the four coloured lower segments (with a grey shadow) */
+    [
+        { d: ARC_UR, x: 6.962, y: 2.068, w: 0.420, h: 0.560 },
+        { d: ARC_TR, x: 6.480, y: 1.726, w: 0.556, h: 0.417 },
+        { d: ARC_UL, x: 5.458, y: 2.068, w: 0.417, h: 0.560 },
+        { d: ARC_TL, x: 5.803, y: 1.726, w: 0.553, h: 0.417 }
+    ].forEach(function (t) { poly(s, t.d, { x: t.x, y: t.y, w: t.w, h: t.h, fill: { color: GREY_BG } }); });
+
+    const seg = [
+        { d: ARC_LR, x: 6.962, y: 2.752, w: 0.420, h: 0.560, color: PINK },
+        { d: ARC_BR, x: 6.480, y: 3.238, w: 0.556, h: 0.417, color: GREEN },
+        { d: ARC_LL, x: 5.458, y: 2.752, w: 0.417, h: 0.560, color: TEAL },
+        { d: ARC_BL, x: 5.803, y: 3.238, w: 0.553, h: 0.417, color: ORANGE }
+    ];
+    seg.forEach(function (t) { poly(s, t.d, { x: t.x, y: t.y - 0.006, w: t.w, h: t.h, fill: { color: 'D9D9D9' } }); });
+    seg.forEach(function (t) { poly(s, t.d, { x: t.x, y: t.y, w: t.w, h: t.h, fill: { color: t.color } }); });
+    glyph(s, 'play', 6.19, 2.52, 0.46, '262626');
+
+    /* elbow leaders from each caption to its icon bubble */
+    leader(s, TEAL, [[1.833, 2.764], [1.833, 3.903], [3.556, 3.903]], 'dot');
+    leader(s, ORANGE, [[2.194, 6.194], [3.792, 6.194], [3.792, 5.542], [5.208, 5.542]], 'dot');
+    leader(s, PINK, [[9.125, 3.931], [11.097, 3.931], [11.097, 2.792]], 'dot');
+    leader(s, GREEN, [[7.403, 5.458], [9.264, 5.458], [9.264, 6.292], [11.125, 6.292]], 'dot');
+
+    [
+        { x: 4.923, y: 5.535, d: 0.833, icon: 'compass', color: ORANGE },
+        { x: 7.083, y: 5.582, d: 0.739, icon: 'eraser', color: GREEN },
+        { x: 3.538, y: 4.127, d: 0.833, icon: 'paint', color: TEAL },
+        { x: 8.643, y: 4.127, d: 0.833, icon: 'ruler', color: PINK }
+    ].forEach(function (b) {
+        s.addShape('ellipse', { x: b.x, y: b.y, w: b.d, h: b.d, fill: { color: WHITE }, shadow: SH_SOFT });
+        glyph(s, b.icon, b.x + b.d * 0.28, b.y + b.d * 0.28, b.d * 0.44, b.color);
+    });
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+    caption(s, { x: 0.787, y: 1.514, w: 2.885, title: 'Option #1', color: TEAL, body: body });
+    caption(s, { x: 0.787, y: 4.972, w: 2.885, title: 'Option #2', color: ORANGE, body: body });
+    caption(s, { x: 9.661, y: 1.514, w: 2.885, title: 'Option #4', color: PINK, body: body, align: 'right' });
+    caption(s, { x: 9.661, y: 4.972, w: 2.885, title: 'Option #3', color: GREEN, body: body, align: 'right' });
+    pageNumber(s, 6);
+}
+
+/**
+ * Poly-line leader. `cap` is 'dot' (slide 6), 'diamond' (slides 12/15) or
+ * omitted for a plain line (slide 3).
+ */
+function leader(s, color, pts, cap) {
+    const ln = { color: color, width: 1 };
+    for (let i = 1; i < pts.length; i++) {
+        s.addShape('line', { x: pts[i - 1][0], y: pts[i - 1][1], w: pts[i][0] - pts[i - 1][0], h: pts[i][1] - pts[i - 1][1], line: ln });
+    }
+    if (!cap) return;
+    [pts[0], pts[pts.length - 1]].forEach(function (p) {
+        s.addShape(cap === 'diamond' ? 'diamond' : 'ellipse',
+            { x: p[0] - 0.037, y: p[1] - 0.037, w: 0.074, h: 0.074, fill: { color: color } });
+    });
+}
+
+/* Slide 7 — four alternating chevron arrows */
+function slide07(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    const body = 'Lorem ipsum dolor sit consectetur adipiscing.';
+    const rows = [
+        { shaft: SHAFT_1, sx: 5.195, sy: 0.971, sw: 0.731, sh: 2.727, head: HEAD_DOWN, hx: 3.159, hy: 2.020, hw: 1.449, hh: 0.627, color: TEAL, label: 'Option #01', lx: 4.417, ly: 2.216, cx: 0.667, cy: 1.815, tx: 0.846, align: 'right', ix: 6.317, iy: 1.934, icon: 'bank' },
+        { shaft: SHAFT_2, sx: 6.738, sy: 2.358, sw: 0.737, sh: 2.452, head: HEAD_UP, hx: 7.919, hy: 3.269, hw: 1.454, hh: 0.627, color: ORANGE, label: 'Option #02', lx: 6.908, ly: 3.465, cx: 9.378, cy: 3.079, tx: 9.378, align: 'left', ix: 5.787, iy: 3.195, icon: 'store' },
+        { shaft: SHAFT_3, sx: 6.059, sy: 3.623, sw: 0.737, sh: 2.362, head: HEAD_DOWN, hx: 4.209, hy: 4.487, hw: 1.449, hh: 0.627, color: GREEN, label: 'Option #03', lx: 5.182, ly: 4.682, cx: 1.743, cy: 4.335, tx: 1.922, align: 'right', ix: 6.908, iy: 4.401, icon: 'bars' },
+        { shaft: SHAFT_4, sx: 7.240, sy: 4.472, sw: 0.731, sh: 3.208, head: HEAD_UP, hx: 8.798, hy: 5.765, hw: 1.449, hh: 0.624, color: PINK, label: 'Option #04', lx: 7.007, ly: 5.959, cx: 10.226, cy: 5.596, tx: 10.226, align: 'left', ix: 5.864, iy: 5.689, icon: 'chart' }
+    ];
+    rows.forEach(function (r) {
+        poly(s, r.shaft, { x: r.sx, y: r.sy, w: r.sw, h: r.sh, rotate: 90, fill: { color: r.color } });
+        poly(s, r.head, { x: r.hx, y: r.hy, w: r.hw, h: r.hh, rotate: 90, fill: { color: r.color } });
+        txt(s, r.label, { x: r.lx, y: r.ly, w: 1.767, h: 0.236, fontFace: HEAD, fontSize: 14, color: WHITE, align: 'center', valign: 'middle', margin: 0 });
+        txt(s, 'Your Option', { x: r.tx, y: r.cy, w: 2.248, h: 0.404, fontFace: HEAD, color: r.color, align: r.align });
+        txt(s, body, { x: r.cx, y: r.cy + 0.377, w: 2.427, h: 0.608, fontSize: 12, align: r.align, lineSpacingMultiple: 1.3 });
+        s.addShape('roundRect', { x: r.ix, y: r.iy, w: 0.776, h: 0.776, rectRadius: radius(0.16667, 0.776, 0.776), fill: { color: WHITE }, shadow: SH_SOFT });
+        glyph(s, r.icon, r.ix + 0.208, r.iy + 0.208, 0.36, r.color);
+    });
+    pageNumber(s, 7);
+}
+
+/* Slide 8 — bar chart with teardrop pins and left-hand caption list */
+function slide08(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+    s.addShape('line', { x: 12.249, y: 1.973, w: 0, h: 5.549, line: { color: 'BFBFBF', width: 1, dashType: 'dash' } });
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.';
+    const bars = [
+        { x: 8.477, y: 3.857, h: 3.650, color: TEAL, pin: [8.412, 2.440], label: 'Option #01', icon: 'building' },
+        { x: 9.720, y: 2.416, h: 5.090, color: ORANGE, pin: [9.690, 1.029], label: 'Option #02', icon: 'chart' },
+        { x: 11.067, y: 5.222, h: 2.284, color: GREEN, pin: [10.997, 3.833], label: 'Option #03', icon: 'house' }
+    ];
+    bars.forEach(function (b) {
+        s.addShape('rect', { x: b.x, y: b.y, w: 0.835, h: b.h, fill: { color: b.color } });
+        s.addShape('teardrop', { x: b.pin[0], y: b.pin[1], w: 0.918, h: 0.918, rotate: 135, fill: { color: b.color } });
+        txt(s, b.label, { x: b.pin[0] + 0.015, y: b.pin[1] + 0.29, w: 0.875, h: 0.404, fontFace: HEAD, fontSize: 12, color: WHITE, align: 'center', valign: 'middle', margin: 0 });
+    });
+    glyph(s, 'bars', 8.68, 4.30, 0.42, WHITE);
+    glyph(s, 'chart', 9.89, 2.90, 0.46, WHITE);
+    glyph(s, 'house', 11.25, 5.66, 0.42, WHITE);
+
+    [
+        { y: 2.105, color: TEAL, ty: 2.223, icon: 'bars', flipV: false },
+        { y: 3.647, color: ORANGE, ty: 3.775, icon: 'chart', flipV: false },
+        { y: 5.252, color: 'A8E10C', ty: 5.377, icon: 'house', flipV: true }
+    ].forEach(function (c) {
+        s.addShape('teardrop', { x: 1.164, y: c.ty, w: 0.919, h: 0.919, rotate: c.flipV ? 180 : 0, flipH: !c.flipV, fill: { color: WHITE }, line: { color: GREY_BG, width: 1 }, shadow: SH_SOFT });
+        glyph(s, c.icon, 1.40, c.ty + 0.24, 0.42, c.color);
+        caption(s, { x: 2.344, y: c.y, w: 3.994, bodyW: 4.008, gap: 0.412, title: 'Your Option', color: c.color, body: body });
+    });
+    pageNumber(s, 8);
+}
+
+/* Slide 9 — four petals around a grey disc */
+function slide09(pptx) {
+    const s = pptx.addSlide();
+    s.addShape('ellipse', { x: 5.101, y: 2.088, w: 2.965, h: 2.965, fill: { color: GREY_LT } });
+    heading(s);
+
+    const petals = [
+        { x: 4.363, y: 1.647, w: 1.465, color: TEAL, flipH: false, flipV: false, icon: 'doc', ix: 4.86, iy: 2.11 },
+        { x: 7.554, y: 1.647, w: 1.448, color: ORANGE, flipH: true, flipV: false, icon: 'send', ix: 8.02, iy: 2.09 },
+        { x: 4.363, y: 3.826, w: 1.465, color: PINK, flipH: false, flipV: true, icon: 'grid', ix: 4.82, iy: 4.33 },
+        { x: 7.554, y: 3.826, w: 1.448, color: GREEN, flipH: true, flipV: true, icon: 'ring', ix: 8.02, iy: 4.29 }
+    ];
+    petals.forEach(function (p) {
+        poly(s, PETAL, { x: p.x, y: p.y, w: p.w, h: 1.448, flipH: p.flipH, flipV: p.flipV, fill: { color: p.color } });
+        glyph(s, p.icon, p.ix, p.iy, 0.52, WHITE);
+    });
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+    caption(s, { x: 1.078, y: 1.627, w: 2.885, title: 'Your Option 01.', color: TEAL, body: body });
+    caption(s, { x: 1.078, y: 4.203, w: 2.885, title: 'Your Option 02.', color: PINK, body: body });
+    caption(s, { x: 9.370, y: 1.627, w: 2.885, title: 'Your Option 03.', color: ORANGE, body: body, align: 'right' });
+    caption(s, { x: 9.370, y: 4.203, w: 2.885, title: 'Your Option 04.', color: GREEN, body: body, align: 'right' });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+        { x: 2.856, y: 5.971, w: 7.622, h: 0.707, fontSize: 12, color: BODY, align: 'center' });
+    pageNumber(s, 9);
+}
+
+/* Slide 10 — the slide-1 dice, moved left, with two text blocks */
+function slide10(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+    diceTower(s, TOWER_1, 1.201, 1.016, 5.616);
+    diceTower(s, TOWER_2, 3.544, 2.125, 6.372);
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco.';
+    [
+        { y: 1.819, ty: 2.021, by: 2.857, color: TEAL, title: 'Your Option 01.', icon: 'doc' },
+        { y: 4.654, ty: 4.815, by: 5.723, color: ORANGE, title: 'Your Option 02.', icon: 'grid' }
+    ].forEach(function (c) {
+        s.addShape('roundRect', { x: 6.933, y: c.y, w: 0.782, h: 0.782, rectRadius: radius(0.16667, 0.782, 0.782), rotate: 46.1, fill: { color: WHITE }, shadow: SH_SOFT });
+        glyph(s, c.icon, 7.17, c.y + 0.22, 0.34, c.color);
+        txt(s, c.title, { x: 8.125, y: c.ty, w: 2.885, h: 0.46, fontFace: HEAD, color: c.color, valign: 'bottom', margin: INSET_WIDE });
+        txt(s, body, { x: 6.807, y: c.by, w: 5.522, h: 0.926, fontSize: 12, color: BODY, lineSpacingMultiple: 1.3, margin: INSET_WIDE });
+    });
+    pageNumber(s, 10);
+}
+
+/* Slide 11 — four diamonds threaded on a horizontal rail */
+function slide11(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+    s.addShape('line', { x: 1.106, y: 4.087, w: 11.121, h: 0, line: { color: GREY_LT, width: 10, beginArrowType: 'diamond', endArrowType: 'diamond' } });
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+    const nodes = [
+        { x: 1.753, color: TEAL, icon: 'grid', title: 'Your Option 01.', tx: 1.220, ty: 1.626 },
+        { x: 4.470, color: ORANGE, icon: 'ring', title: 'Your Option 02.', tx: 3.852, ty: 5.439 },
+        { x: 7.185, color: GREEN, icon: 'crown', title: 'Your Option 03.', tx: 6.609, ty: 1.626 },
+        { x: 9.844, color: PINK, icon: 'send', title: 'Your Option 04.', tx: 9.232, ty: 5.439 }
+    ];
+    nodes.forEach(function (n) {
+        s.addShape('roundRect', { x: n.x, y: 3.223, w: 1.771, h: 1.771, rectRadius: radius(0.16667, 1.771, 1.771), rotate: 47.3, fill: { color: n.color } });
+        s.addShape('roundRect', { x: n.x + 0.446, y: 3.653, w: 0.878, h: 0.878, rectRadius: radius(0.16667, 0.878, 0.878), rotate: 47.3, fill: { color: WHITE } });
+        glyph(s, n.icon, n.x + 0.65, 3.87, 0.46, n.color);
+        caption(s, { x: n.tx, y: n.ty, w: 2.885, title: n.title, color: n.color, body: body, align: 'center' });
+    });
+    pageNumber(s, 11);
+}
+
+/* Slide 12 — tilted lens split into six coloured wedges */
+function slide12(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    const TILT = -14.2;
+    [
+        { d: RW_LWR, x: 6.841, y: 4.301, w: 1.112, h: 0.781, c: GREEN_DK },
+        { d: RW_BOT, x: 7.035, y: 5.093, w: 0.831, h: 0.767, c: GREEN_DK },
+        { d: RW_MID, x: 6.649, y: 3.537, w: 1.149, h: 0.783, c: ORANGE_DK },
+        { d: RW_TOP, x: 6.273, y: 2.075, w: 0.831, h: 0.781, c: TEAL },
+        { d: RW_UPR, x: 6.459, y: 2.798, w: 1.112, h: 0.767, c: TEAL },
+        { d: LW_LWR, x: 5.753, y: 4.575, w: 1.122, h: 0.781, c: GREEN },
+        { d: LW_BOT, x: 6.219, y: 5.298, w: 0.842, h: 0.767, c: GREEN },
+        { d: LW_MID, x: 5.522, y: 3.821, w: 1.162, h: 0.783, c: ORANGE },
+        { d: LW_TOP, x: 5.457, y: 2.280, w: 0.842, h: 0.781, c: TEAL_DK },
+        { d: LW_UPR, x: 5.371, y: 3.072, w: 1.122, h: 0.767, c: TEAL_DK }
+    ].forEach(function (w) {
+        poly(s, w.d, { x: w.x, y: w.y, w: w.w, h: w.h, rotate: TILT, fill: { color: w.c } });
+    });
+    poly(s, LENS, { x: 5.505, y: 2.117, w: 2.324, h: 3.906, rotate: TILT, fill: { color: '808080' } });
+
+    const body = 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi quo numquam.';
+    txt(s, '83,6%', { x: 10.415, y: 1.564, w: 2.352, h: 0.472, fontFace: HEAD, fontSize: 32, color: GREEN, margin: INSET });
+    txt(s, 'Your Option 02', { x: 10.467, y: 2.151, w: 2.248, h: 0.404, fontFace: HEAD });
+    txt(s, body, { x: 9.383, y: 2.707, w: 3.384, h: 0.514, fontSize: 12, color: '0D0D0D', lineSpacingMultiple: 1.2, margin: INSET });
+    txt(s, '83,6%', { x: 1.467, y: 4.745, w: 2.352, h: 0.472, fontFace: HEAD, fontSize: 32, color: TEAL, align: 'right', margin: INSET });
+    txt(s, 'Your Option 01', { x: 1.519, y: 5.332, w: 2.248, h: 0.404, fontFace: HEAD, align: 'right' });
+    txt(s, body, { x: 0.435, y: 5.889, w: 3.384, h: 0.514, fontSize: 12, color: '0D0D0D', align: 'right', lineSpacingMultiple: 1.2, margin: INSET });
+
+    leader(s, TEAL, [[3.014, 4.236], [4.278, 4.236], [4.278, 2.847], [5.542, 2.847]], 'diamond');
+    leader(s, GREEN, [[7.653, 5.500], [10.806, 5.500], [10.806, 3.778]], 'diamond');
+    pageNumber(s, 12);
+}
+
+/* Slide 13 — four speech bubbles around a central hub */
+function slide13(pptx) {
+    const s = pptx.addSlide();
+    [[1.170, 2.062, PINK], [1.170, 5.060, GREEN], [7.955, 5.060, ORANGE], [7.955, 2.062, TEAL]].forEach(function (c) {
+        s.addShape('roundRect', { x: c[0], y: c[1], w: 4.202, h: 1.300, rectRadius: radius(0.16667, 4.202, 1.300), fill: { color: c[2] } });
+    });
+    heading(s);
+
+    /* hub: hairline ring, inner white disc, pale grey face, purple badge, four dots */
+    poly(s, RING, { x: 5.777, y: 3.322, w: 1.780, h: 1.780, fill: { color: 'EBEEF2' } });
+    s.addShape('ellipse', { x: 6.073, y: 3.618, w: 1.186, h: 1.186, fill: { color: WHITE } });
+    s.addShape('ellipse', { x: 6.126, y: 3.671, w: 1.081, h: 1.081, fill: { color: GREY_LT } });
+    glyph(s, 'badge', 6.286, 3.830, 0.762, PURPLE);
+    [[7.136, 3.451, TEAL], [5.868, 4.642, GREEN], [5.906, 3.412, PINK], [7.098, 4.681, ORANGE]].forEach(function (d) {
+        s.addShape('ellipse', { x: d[0], y: d[1], w: 0.330, h: 0.330, fill: { color: WHITE } });
+        s.addShape('ellipse', { x: d[0] + 0.099, y: d[1] + 0.099, w: 0.132, h: 0.132, fill: { color: d[2] } });
+    });
+
+    const TILT = 46.8;
+    [
+        { d: BUBBLE_R, x: 4.336, y: 1.908, w: 1.846, h: 1.608, color: PINK, dx: 4.584, dy: 2.033, icon: 'ring' },
+        { d: BUBBLE_T, x: 4.364, y: 4.697, w: 1.608, h: 1.846, color: GREEN, dx: 4.488, dy: 5.108, icon: 'send' },
+        { d: BUBBLE_L, x: 7.152, y: 4.906, w: 1.846, h: 1.608, color: ORANGE, dx: 7.563, dy: 5.203, icon: 'grid' },
+        { d: BUBBLE_B, x: 7.361, y: 1.880, w: 1.608, h: 1.846, color: TEAL, dx: 7.659, dy: 2.129, icon: 'doc' }
+    ].forEach(function (b) {
+        poly(s, b.d, { x: b.x, y: b.y, w: b.w, h: b.h, rotate: TILT, fill: { color: b.color } });
+        s.addShape('ellipse', { x: b.dx, y: b.dy, w: 1.186, h: 1.186, fill: { color: WHITE } });
+        glyph(s, b.icon, b.dx + 0.36, b.dy + 0.36, 0.46, b.color);
+    });
+
+    [[1.341, 2.344], [8.974, 2.344], [8.974, 5.341], [1.341, 5.341]].forEach(function (t) {
+        txt(s, 'Your Option 01.', { x: t[0], y: t[1], w: 3.072, h: 0.46, fontFace: HEAD, color: WHITE, valign: 'bottom', margin: INSET_WIDE });
+        txt(s, 'Lorem ipsum dolor sit amet elit.', { x: t[0], y: t[1] + 0.336, w: 3.081, h: 0.401, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.3, margin: INSET_WIDE });
+    });
+    pageNumber(s, 13);
+}
+
+/* Slide 14 — three stacked isometric cubes */
+function slide14(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    /* each cube = top facet + left facet + right facet, drawn back to front */
+    const cubes = [
+        { x: 4.491, y: 3.970, top: TEAL, left: TEAL_LT, right: TEAL_DK, label: 'Option #02', lx: 5.125, ly: 4.398 },
+        { x: 5.580, y: 2.212, top: ORANGE, left: ORANGE_LT, right: ORANGE_DK, label: 'Option #01', lx: 6.235, ly: 2.614 },
+        { x: 6.666, y: 3.973, top: GREEN, left: GREEN_LT, right: GREEN_DK, label: 'Option #3', lx: 7.335, ly: 4.398 }
+    ];
+    cubes.forEach(function (c) {
+        poly(s, CUBE_TOP, { x: c.x + 0.003, y: c.y, w: 2.173, h: 1.261, fill: { color: c.top } });
+        poly(s, CUBE_LEFT, { x: c.x, y: c.y + 0.632, w: 1.094, h: 1.758, fill: { color: c.left } });
+        poly(s, CUBE_RIGHT, { x: c.x + 1.092, y: c.y + 0.632, w: 1.086, h: 1.758, fill: { color: c.right } });
+    });
+    cubes.forEach(function (c) {
+        txt(s, c.label, { x: c.lx, y: c.ly, w: 0.880, h: 0.404, fontFace: HEAD, fontSize: 12, color: WHITE, align: 'center', valign: 'middle', margin: 0 });
+    });
+
+    s.addShape('roundRect', { x: 0.556, y: 1.666, w: 3.371, h: 1.823, rectRadius: radius(0.03805, 3.371, 1.823), fill: { color: WHITE }, shadow: SH_CARD });
+    txt(s, 'Your Title Here', { x: 1.089, y: 1.921, w: 2.278, h: 0.382, fontFace: HEAD, align: 'center', valign: 'bottom', margin: INSET_CARD });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut.',
+        { x: 0.771, y: 2.347, w: 2.912, h: 0.848, fontSize: 12, color: BODY, align: 'center', lineSpacingMultiple: 1.3, margin: INSET_CARD });
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+    [
+        { bx: 0.556, by: 4.708, tx: 1.495, ty: 4.557, color: TEAL, icon: 'store' },
+        { bx: 8.172, by: 2.047, tx: 9.093, ty: 1.896, color: ORANGE, icon: 'chart' },
+        { bx: 9.396, by: 5.030, tx: 10.317, ty: 4.879, color: GREEN, icon: 'house' }
+    ].forEach(function (m) {
+        s.addShape('ellipse', { x: m.bx, y: m.by, w: 0.739, h: 0.739, fill: { color: WHITE }, shadow: SH_SOFT });
+        glyph(s, m.icon, m.bx + 0.22, m.by + 0.23, 0.29, m.color);
+        txt(s, 'Your Option Here', { x: m.tx, y: m.ty, w: 2.437, h: 0.370, fontFace: HEAD, fontSize: 16, color: m.color });
+        txt(s, body, { x: m.tx, y: m.ty + 0.419, w: 2.741, h: 0.623, fontSize: 12, color: BODY, lineSpacingMultiple: 1.3 });
+    });
+    pageNumber(s, 14);
+}
+
+/* Slide 15 — four diamonds in a row with elbow leaders */
+function slide15(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur.';
+    const nodes = [
+        { x: 2.859, color: TEAL, icon: 'crown', tx: 0.616, ty: 5.489, align: 'right', leader: [[3.556, 5.292], [3.556, 6.000], [2.889, 6.000]] },
+        { x: 4.939, color: ORANGE, icon: 'coin', tx: 2.465, ty: 1.714, align: 'right', leader: [[4.903, 2.236], [5.639, 2.236], [5.639, 2.931]] },
+        { x: 6.994, color: GREEN, icon: 'tag', tx: 8.779, ty: 1.714, align: 'left', leader: [[8.431, 2.236], [7.694, 2.236], [7.694, 2.931]] },
+        { x: 9.050, color: PINK, icon: 'card', tx: 10.685, ty: 5.489, align: 'left', leader: [[9.750, 5.306], [9.750, 6.000], [10.403, 6.000]] }
+    ];
+    nodes.forEach(function (n) {
+        s.addShape('roundRect', {
+            x: n.x, y: 3.367, w: 1.403, h: 1.403, rectRadius: radius(0.16667, 1.403, 1.403), rotate: 45,
+            fill: { color: n.color }, line: { color: WHITE, width: 2 }, shadow: SH_CARD
+        });
+        glyph(s, n.icon, n.x + 0.52, 3.89, 0.37, WHITE);
+        txt(s, 'Option 01', { x: n.tx, y: n.ty, w: 2.101, h: 0.370, fontFace: HEAD, fontSize: 16, color: n.color, align: n.align });
+        txt(s, body, { x: n.tx, y: n.ty + 0.419, w: 2.101, h: 0.608, fontSize: 12, color: BODY, align: n.align, lineSpacingMultiple: 1.3 });
+        leader(s, n.color, n.leader, 'diamond');
+    });
+    pageNumber(s, 15);
+}
+
+/* Slide 16 — three horizontal progress pills */
+function slide16(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    const pills = [
+        { trackX: 1.707, trackY: 4.054, x: 2.982, label: 'Option 01', lx: 2.067, lw: 1.382, pct: '79%', px: 4.052, pw: 0.707, color: TEAL, light: TEAL_LT, dark: TEAL_DK, tx: 2.766, dotX: 3.634 },
+        { trackX: 4.475, trackY: 4.060, x: 5.749, label: 'Option 02', lx: 4.990, lw: 1.436, pct: '62%', px: 6.806, pw: 0.717, color: GREEN, light: GREEN_LT, dark: GREEN_DK, tx: 5.577, dotX: 6.446 },
+        { trackX: 7.253, trackY: 4.060, x: 8.516, label: 'Option 03', lx: 7.778, lw: 1.441, pct: '54%', px: 9.565, pw: 0.740, color: ORANGE, light: ORANGE_LT, dark: ORANGE_DK, tx: 8.373, dotX: 9.241 }
+    ];
+
+    /* Right to left: each grey track is drawn on top of the previous pill so it
+     * masks the left half of that pill's inner circle — as in the original. */
+    poly(s, TRACK, { x: 9.525, y: 4.060, w: 2.101, h: 0.558, flipH: true, fill: { color: GREY_BG } });
+    poly(s, TRACK, { x: 9.326, y: 4.060, w: 2.101, h: 0.558, fill: { color: GREY_BG } });
+    pills.slice().reverse().forEach(function (p) {
+        s.addShape('roundRect', { x: p.x, y: 3.834, w: 1.905, h: 1.011, rectRadius: radius(0.5, 1.905, 1.011), fill: { color: p.color }, shadow: SH_PILL });
+        s.addShape('ellipse', { x: p.x, y: 3.835, w: 0.974, h: 1.009, fill: { color: p.light } });
+        s.addShape('ellipse', { x: p.x + 0.149, y: 3.990, w: 0.676, h: 0.700, fill: { color: p.dark } });
+        txt(s, p.pct, { x: p.px, y: 4.137, w: p.pw, h: 0.404, fontFace: HEAD, color: WHITE, align: 'center', wrap: false });
+        poly(s, TRACK, { x: p.trackX, y: p.trackY, w: 2.101, h: 0.558, fill: { color: GREY_BG } });
+    });
+    pills.forEach(function (p) {
+        txt(s, p.label, { x: p.lx, y: 4.131, w: p.lw, h: 0.404, fontFace: HEAD, color: INK, align: 'center', wrap: false });
+        s.addShape('roundRect', { x: p.dotX, y: 2.053, w: 0.168, h: 0.168, rectRadius: radius(0.31615, 0.168, 0.168), fill: { color: p.color }, shadow: SH_PILL });
+        txt(s, p.label, { x: p.tx + 0.187, y: 2.383, w: 1.531, h: 0.365, fontSize: 14, color: INK, align: 'center', lineSpacingMultiple: 1.2 });
+        txt(s, 'Lorem ipsum dolor sit, consectetur.', { x: p.tx, y: 2.747, w: 1.905, h: 0.678, fontSize: 12, color: INK, align: 'center', lineSpacingMultiple: 1.5 });
+    });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. aute irure dolor in.',
+        { x: 1.235, y: 5.507, w: 10.863, h: 0.678, fontSize: 12, color: BODY, align: 'center', lineSpacingMultiple: 1.5 });
+    pageNumber(s, 16);
+}
+
+/* Slide 17 — three statistic cards bleeding off the left edge */
+function slide17(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    const body = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore';
+    const cards = [
+        { y: 1.973, ty: 1.745, color: TEAL, value: '31.200-83.500', num: '01', icon: 'globe' },
+        { y: 3.771, ty: 3.572, color: ORANGE, value: '39.400-54.000', num: '02', icon: 'award' },
+        { y: 5.577, ty: 5.397, color: GREEN, value: '75.400-86.800', num: '03', icon: 'calendar' }
+    ];
+    cards.forEach(function (c) {
+        s.addShape('roundRect', { x: 0, y: c.y, w: 5.060, h: 0.923, rectRadius: radius(0.05, 5.060, 0.923), fill: { color: WHITE }, shadow: SH_TAB });
+        poly(s, CARD_CAP, { x: 0, y: c.y, w: 1.414, h: 0.923, fill: { color: c.color } });
+        /* white tab notched out of the coloured cap, carrying the icon */
+        poly(s, CARD_CAP, { x: -0.001, y: c.y - 0.336, w: 1.030, h: 0.672, fill: { color: WHITE }, shadow: SH_TAB });
+        glyph(s, c.icon, 0.25, c.y - 0.20, 0.36, c.color);
+        poly(s, UP_ARROW, { x: 1.916, y: c.y + 0.230, w: 0.127, h: 0.139, fill: { color: c.color } });
+        txt(s, 'Lorem ipsum', { x: 2.043, y: c.y + 0.119, w: 2.491, h: 0.325, fontSize: 12, color: INK, lineSpacingMultiple: 1.2 });
+        txt(s, c.value, { x: 2.043, y: c.y + 0.366, w: 2.491, h: 0.438, fontFace: HEAD, fontSize: 20, color: INK });
+        s.addShape('rect', { x: 4.973, y: c.y + 0.401, w: 0.345, h: 0.121, fill: { color: c.color } });
+        s.addShape('ellipse', { x: 5.307, y: c.y + 0.269, w: 0.384, h: 0.384, fill: { color: c.color } });
+        txt(s, c.num, { x: 5.307, y: c.y + 0.310, w: 0.384, h: 0.303, fontFace: HEAD, fontSize: 12, color: WHITE, align: 'center' });
+        txt(s, 'Your Option Here', { x: 6.856, y: c.ty, w: 2.885, h: 0.46, fontFace: HEAD, color: c.color, valign: 'bottom', margin: INSET_WIDE });
+        txt(s, body, { x: 6.856, y: c.ty + 0.445, w: 5.026, h: 0.664, fontSize: 12, color: BODY, lineSpacingMultiple: 1.3, margin: INSET_WIDE });
+    });
+    pageNumber(s, 17);
+}
+
+/* Slide 18 — two ribbon panels with pill headings and note cards */
+function slide18(pptx) {
+    const s = pptx.addSlide();
+    heading(s);
+
+    const panels = [
+        { x: 2.374, color: TEAL, dark: TEAL_DK, deep: '005C62', label: 'Option 1', cardX: 1.598, pillX: 2.254, textX: 2.712, textW: 1.788, icon: 'cart' },
+        { x: 8.388, color: GREEN, dark: GREEN_DK, deep: '536D1A', label: 'Option 2', cardX: 7.621, pillX: 8.276, textX: 8.618, textW: 2.004, icon: 'cart' }
+    ];
+    panels.forEach(function (p) {
+        s.addShape('round2SameRect', { x: p.x + 0.056, y: 2.274, w: 2.293, h: 2.385, rectRadius: radius(0.05, 2.293, 2.385), flipV: true, fill: { color: p.color } });
+        s.addShape('triangle', { x: p.x + 0.306, y: 1.997, w: 0.444, h: 0.279, fill: { color: p.deep } });
+        s.addShape('triangle', { x: p.x + 1.713, y: 1.997, w: 0.444, h: 0.279, fill: { color: p.deep } });
+        s.addShape('triangle', { x: p.x + 0.529, y: 1.997, w: 1.407, h: 0.885, rotate: 180, fill: { color: p.dark } });
+        glyph(s, p.icon, p.x + 1.075, 2.184, 0.255, WHITE);
+        txt(s, p.label, { x: p.x, y: 3.051, w: 2.465, h: 0.443, fontFace: HEAD, fontSize: 16, color: WHITE, align: 'center', lineSpacingMultiple: 1.4 });
+        txt(s, 'Lorem ipsum sit amet, consectetur.', { x: p.textX, y: 3.484, w: p.textW, h: 0.608, fontSize: 12, color: WHITE, align: 'center', lineSpacingMultiple: 1.3 });
+
+        s.addShape('roundRect', { x: p.cardX, y: 5.413, w: 3.957, h: 1.151, rectRadius: radius(0.09878, 3.957, 1.151), fill: { color: WHITE }, shadow: SH_CARD });
+        txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor.',
+            { x: p.cardX + 0.112, y: 5.705, w: 3.735, h: 0.608, fontSize: 12, color: BODY, align: 'center', lineSpacingMultiple: 1.3 });
+        s.addShape('roundRect', { x: p.pillX, y: 5.079, w: 2.646, h: 0.406, rectRadius: radius(0.5, 2.646, 0.406), fill: { color: p.color }, shadow: SH_PILL });
+        txt(s, 'Your Option Here', { x: p.pillX + 0.256, y: 5.097, w: 2.134, h: 0.370, fontFace: HEAD, fontSize: 16, color: WHITE, align: 'center', valign: 'middle' });
+    });
+
+    /* lone orange ribbon between the two panels */
+    s.addShape('triangle', { x: 5.688, y: 1.997, w: 0.404, h: 0.254, fill: { color: '8A2606' } });
+    s.addShape('triangle', { x: 7.094, y: 1.997, w: 0.404, h: 0.254, fill: { color: '8A2606' } });
+    s.addShape('triangle', { x: 5.910, y: 1.997, w: 1.281, h: 0.806, rotate: 180, fill: { color: ORANGE_DK } });
+    pageNumber(s, 18);
+}
+
+/* ------------------------------------------------------------------- main */
+
+function build() {
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'W16x9', width: 13.3333, height: 7.5 });
+    pptx.layout = 'W16x9';
+    pptx.theme = { headFontFace: HEAD, bodyFontFace: TEXT };
+
+    [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+        slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18]
+        .forEach(function (fn) { fn(pptx); });
+
+    return pptx.writeFile({ fileName: path.join(__dirname, '0e115b7e-0ca9-4cde-8972-5c4dc7d19352_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote', f); }, function (e) { console.error(e); process.exit(1); });
