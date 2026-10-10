@@ -1,0 +1,1018 @@
+/*
+ * Yooga - Health & Yoga Presentation Template
+ * Standalone pptxgenjs re-creation of the 40-slide reference deck (13.333in x 7.5in).
+ * Raster images in the original are replaced by flat coloured placeholders.
+ *
+ *   node <this file>   ->  writes the .pptx next to itself
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const INK     = '000000';  // headings
+const WHITE   = 'FFFFFF';
+const PURPLE  = '8600FF';  // primary brand purple
+const VIOLET  = '6D1FFF';  // secondary violet
+const BLEND   = '7900FA';  // flattened purple gradient (also used at low opacity)
+const BLEND2  = '7E0FF9';
+const BLEND3  = '790FFF';
+const GRAY    = '7F7F7F';  // body copy
+const GRAY_D  = '595959';  // sub-headings
+const GRAY_X  = '3F3F3F';
+const GRAY_K  = '262626';
+const NAVY    = '222A35';
+const NAVY_D  = '001132';
+const INDIGO  = '381192';
+const LINE_G  = 'D8D8D8';
+const PHOTO   = 'FF8989';  // stand-in colour for every photograph
+const PHOTO_T = 'FFB3B3';  // caption colour inside a placeholder
+
+/* -------------------------------------------------------------------- fonts */
+const MONT  = 'Montserrat ExtraBold';
+const POP   = 'Poppins';
+const POP_M = 'Poppins Medium';
+const POP_S = 'Poppins SemiBold';
+const NS    = 'Nunito Sans';
+const NS_S  = 'Nunito Sans SemiBold';
+const NS_X  = 'Nunito Sans ExtraBold';
+const NS_B  = 'Nunito Sans Black';
+
+/* ---------------------------------------------------------------- utilities */
+// Colours are either 'RRGGBB' or ['RRGGBB', transparencyPercent].
+function paint(c) {
+  if (c === null || c === undefined) return undefined;
+  return Array.isArray(c) ? { color: c[0], transparency: c[1] } : { color: c };
+}
+function stroke(l) {
+  if (!l) return { type: 'none' };
+  return { color: l[0], width: l[1], transparency: l[2] || 0 };
+}
+function common(o) {
+  const r = { fill: paint(o.fill), line: stroke(o.line) };
+  if (o.rot) r.rotate = o.rot;
+  return r;
+}
+
+/* Rounded / square rectangle. r = corner radius in inches (0 = square). */
+function rr(s, x, y, w, h, r, o) {
+  o = o || {};
+  const op = Object.assign({ x: x, y: y, w: w, h: h }, common(o));
+  if (r > 0) op.rectRadius = r;
+  s.addShape(r > 0 ? 'roundRect' : 'rect', op);
+}
+/* Any other preset shape. */
+function shp(s, kind, x, y, w, h, o) {
+  o = o || {};
+  s.addShape(kind, Object.assign({ x: x, y: y, w: w, h: h }, common(o)));
+}
+/* Small filled circle used as scattered confetti. */
+function dot(s, x, y, d, c) {
+  s.addShape('ellipse', { x: x, y: y, w: d, h: d, fill: paint(c), line: { type: 'none' } });
+}
+function oval(s, x, y, w, h, o) {
+  o = o || {};
+  s.addShape('ellipse', Object.assign({ x: x, y: y, w: w, h: h }, common(o)));
+}
+/* Donut ring; r is the OOXML "adj" fraction of the diameter. */
+function ring(s, x, y, d, r, c) {
+  s.addShape('donut', { x: x, y: y, w: d, h: d, fill: paint(c), line: { type: 'none' }, rectRadius: r * d });
+}
+/* Thin horizontal divider (the deck uses straight connectors). */
+function hline(s, x, y, w, c, pt) {
+  s.addShape('line', { x: x, y: y, w: w, h: 0, line: { color: c, width: pt } });
+}
+/* Free-form outline. Every entry is [x,y] for a vertex, a six-number array for a
+   cubic bezier [c1x,c1y,c2x,c2y,x,y], or the string 'Z' to close the sub-path. */
+function poly(s, x, y, w, h, pts, o) {
+  o = o || {};
+  const points = [];
+  let fresh = true;
+  pts.forEach(function (p) {
+    if (p === 'Z') { points.push({ close: true }); fresh = true; return; }
+    if (p.length === 6) {
+      points.push({ x: p[4], y: p[5], curve: { type: 'cubic', x1: p[0], y1: p[1], x2: p[2], y2: p[3] } });
+    } else {
+      points.push(fresh ? { x: p[0], y: p[1], moveTo: true } : { x: p[0], y: p[1] });
+    }
+    fresh = false;
+  });
+  s.addShape('custGeom', Object.assign({ x: x, y: y, w: w, h: h, points: points }, common(o)));
+}
+
+/* Text block. Opts: f font, sz size, c colour, b bold, i italic, ls line spacing
+   multiple, al align (l|c|r), v vertical anchor (t|m), rot rotation.
+   `body` is a plain string, or an array of [text, overrides] lines. */
+function txt(s, body, x, y, w, h, o) {
+  const lines = typeof body === 'string' ? [[body]] : body;
+  const runs = lines.map(function (ln, i) {
+    const ov = ln[1] || {};
+    const ro = {
+      breakLine: i < lines.length - 1,
+      fontFace: ov.f || o.f, fontSize: ov.sz || o.sz, color: ov.c || o.c,
+      bold: ('b' in ov ? ov.b : o.b) ? true : false,
+      italic: ('i' in ov ? ov.i : o.i) ? true : false,
+    };
+    if (ov.bu) ro.bullet = { characterCode: ov.bu.charCodeAt(0).toString(16).padStart(4, '0') };
+    else ro.bullet = false;
+    return { text: ln[0], options: ro };
+  });
+  const op = {
+    x: x, y: y, w: w, h: h, margin: [0.1, 0.1, 0.05, 0.05],
+    align: o.al === 'c' ? 'center' : o.al === 'r' ? 'right' : 'left',
+    valign: o.v === 'm' ? 'middle' : 'top',
+    fontFace: o.f, fontSize: o.sz, color: o.c, bold: !!o.b, italic: !!o.i,
+  };
+  if (o.ls) op.lineSpacingMultiple = o.ls;
+  if (o.rot) op.rotate = o.rot;
+  s.addText(runs, op);
+}
+
+/* ------------------------------------------------- recurring design elements */
+/* Photo stand-in: a flat salmon rectangle where the template had a picture. */
+function photo(s, x, y, w, h, o) {
+  o = o || {};
+  const op = { x: x, y: y, w: w, h: h, fill: { color: PHOTO }, line: { type: 'none' } };
+  if (o.r) op.rectRadius = Math.min(o.r, Math.min(w, h) / 2);
+  if (o.rot) op.rotate = o.rot;
+  s.addShape(o.r ? 'roundRect' : 'rect', op);
+  if (w > 1.2 && h > 0.7) {
+    s.addText('[image]', {
+      x: x, y: y, w: w, h: h, rotate: o.rot || undefined,
+      align: 'center', valign: 'middle', fontFace: POP, fontSize: 11, color: PHOTO_T,
+    });
+  }
+}
+function photoOval(s, x, y, w, h) {
+  s.addShape('ellipse', { x: x, y: y, w: w, h: h, fill: { color: PHOTO }, line: { color: WHITE, width: 2.25 } });
+}
+/* Numbered badge: soft ghost square behind a solid violet square with a digit. */
+function badge(s, x, y, label) {
+  const d = 0.437;
+  rr(s, x + 0.11, y + 0.12, d, d, 0.119, { fill: [BLEND, 88] });
+  rr(s, x, y, d, d, 0.119, { fill: VIOLET });
+  txt(s, label, x, y, d, d, { f: POP_S, sz: 14, c: WHITE, b: 1, al: 'c', v: 'm' });
+}
+/* Three small squares used as a decorative full stop under body copy. */
+function trio(s, x, y, d, gap) {
+  [VIOLET, PURPLE, VIOLET].forEach(function (c, i) {
+    rr(s, x + i * gap, y, d, d, d / 6, { fill: c });
+  });
+}
+/* Short purple underline beneath a heading block. */
+function rule(s, x, y) {
+  rr(s, x, y, 1.271, 0.071, 0.012, { fill: PURPLE });
+}
+/* Vertical run of three tiny circles. */
+function dots3(s, x, y, d, gap, c) {
+  for (let i = 0; i < 3; i++) dot(s, x, y + i * gap, d, c);
+}
+
+/* Blank device mock-up: dark bezel with a photo-coloured screen. */
+function deviceFrame(s, x, y, w, h, bez, rot) {
+  const r = Math.min(w, h) * 0.09;
+  rr(s, x, y, w, h, r, { fill: '1B1B1B', rot: rot });
+  photo(s, x + bez, y + bez, w - 2 * bez, h - 2 * bez, { r: Math.max(r - bez, 0.02), rot: rot });
+}
+/* "GET IT ON Google Play" / "Download on the App Store" pill. */
+function storeBadge(s, x, y, w, h, small, big) {
+  rr(s, x, y, w, h, 0.06, { fill: INK });
+  txt(s, small, x + 0.24, y + 0.03, w - 0.28, 0.15, { f: NS, sz: 6, c: WHITE });
+  txt(s, big, x + 0.24, y + 0.14, w - 0.28, 0.24, { f: NS, sz: 11, c: WHITE, b: 1 });
+  dot(s, x + 0.07, y + h / 2 - 0.07, 0.14, WHITE);
+}
+
+/* ------------------------------------------------------------------ charts */
+/* Slide 29: four thin stacked bars inside the white card. */
+function statChart(s, x, y, w, h) {
+  s.addChart('bar', [
+    { name: 'Done',      labels: ['Q1', 'Q2', 'Q3', 'Q4'], values: [64, 37, 66, 62] },
+    { name: 'Remaining', labels: ['Q1', 'Q2', 'Q3', 'Q4'], values: [36, 63, 34, 38] },
+  ], {
+    x: x, y: y, w: w, h: h,
+    barDir: 'col', barGrouping: 'stacked', barGapWidthPct: 90,
+    chartColors: [VIOLET, 'C7C7CF'],
+    showLegend: false, showTitle: false, showValue: false,
+    catAxisHidden: true, valAxisHidden: true,
+    catAxisLineShow: false, valAxisLineShow: false,
+    valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
+    valAxisMaxVal: 100, valAxisMinVal: 0,
+    chartArea: { fill: { color: WHITE } }, plotArea: { fill: { color: WHITE } },
+  });
+}
+/* Slide 30: clustered two-series column chart with light gridlines. */
+function groupChart(s, x, y, w, h) {
+  s.addChart('bar', [
+    { name: 'Series 1', labels: ['Category 1', 'Category 2', 'Category 3'], values: [4.3, 6.5, 2.7] },
+    { name: 'Series 2', labels: ['Category 1', 'Category 2', 'Category 3'], values: [14.0, 4.3, 5.8] },
+  ], {
+    x: x, y: y, w: w, h: h,
+    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 60,
+    chartColors: ['6D4EEF', 'D9D9D9'],
+    showLegend: false, showTitle: false, showValue: false,
+    catAxisLabelColor: GRAY, catAxisLabelFontFace: POP, catAxisLabelFontSize: 9,
+    catAxisLineShow: true, catAxisLineColor: '404040',
+    valAxisHidden: true, valAxisLineShow: false,
+    valGridLine: { color: 'E6E6E6', size: 1 }, catGridLine: { style: 'none' },
+    chartArea: { fill: { color: WHITE } }, plotArea: { fill: { color: WHITE } },
+  });
+}
+
+/* ------------------------------------------------------------------- table */
+/* Slide 28: 4-column banded table. */
+function fullTable(s) {
+  const head = ['Table Header 1', 'Table Header 2', 'Table Header 3', 'Table Header 4'];
+  const bands = [[VIOLET, 65, WHITE], [PURPLE, 95, VIOLET]];
+  const rows = [head.map(function (t) {
+    return { text: t, options: { fill: { color: INDIGO }, color: WHITE, fontFace: POP_M, fontSize: 14 } };
+  })];
+  for (let i = 0; i < 5; i++) {
+    const b = bands[i % 2];
+    rows.push([0, 1, 2, 3].map(function () {
+      return {
+        text: 'Text Here',
+        options: { fill: { color: b[0], transparency: b[1] }, color: b[2], fontFace: POP, fontSize: 12 },
+      };
+    }));
+  }
+  s.addTable(rows, {
+    x: 1.328, y: 2.927, colW: [2.669, 2.669, 2.669, 2.669], rowH: 0.557,
+    align: 'center', valign: 'middle', border: { type: 'none' },
+  });
+}
+
+/* ================================================================= slides */
+
+/* --- Slide 1: title */
+function slide01(s) {
+  poly(s, 7.253,0.165,6.278,6.278, [[0,1.873],[1.288,0],[3.765,0],[6.278,1.728],[6.278,5.741],[6.278,6.037,6.037,6.278,5.741,6.278],[0.537,6.278],[0.24,6.278,0,6.037,0,5.741],'Z'], {fill:[BLEND,88.236], rot:55.48});
+  poly(s, 7.681,-0.75,6.639,7.041, [[2.453,0],[6.639,2.072],[4.18,7.041],[0.53,7.041],[0.237,7.041,0,6.804,0,6.511],[0,0.53],[0,0.237,0.237,0,0.53,0],'Z'], {fill:BLEND, rot:-26.33});
+  txt(s, "Yooga", 1.631,2.979,3.969,1.447, {f:MONT, sz:80, c:NAVY, b:1});
+  txt(s, "Health & Yoga Presentation Template", 1.659,4.427,3.913,0.337, {f:POP_M, sz:13, c:GRAY_D});
+  rr(s, 7.564,5.919,0.388,0.388,0.124, {fill:BLEND2, rot:78.94});
+  rr(s, -0.164,0.619,1.505,1.505,0.408, {fill:[BLEND,88.236], rot:62.94});
+  rr(s, 0.833,6.341,0.628,0.628,0.17, {fill:BLEND, rot:62.94});
+  rr(s, 1.241,6.545,0.48,0.48,0.13, {fill:[BLEND,88.236], rot:62.94});
+  rr(s, 0.83,1.693,0.388,0.388,0.124, {fill:BLEND2, rot:63.95});
+  rr(s, 5.753,0.283,0.476,0.476,0.16, {fill:BLEND, rot:62.94});
+  rr(s, 5.799,-0.264,0.742,0.742,0.201, {fill:[BLEND,88.236], rot:62.94});
+  photo(s, 7.79,0.596,5.662,5.66, {r:0.671, rot:-8.8});
+}
+
+/* --- Slide 2: section: About */
+function slide02(s) {
+  poly(s, 0,0,3.076,3.456, [[0.006,0],[3.07,0],[3.076,0.12],[3.076,1.918],[3.076,2.767,2.387,3.456,1.538,3.456],[0.689,3.456,0,2.767,0,1.918],[0,0.12],'Z'], {fill:BLEND});
+  poly(s, 0,-0.039,2.51,2.819, [[0.005,0],[2.505,0],[2.51,0.098],[2.51,1.565],[2.51,2.258,1.948,2.819,1.255,2.819],[0.562,2.819,0,2.258,0,1.565],[0,0.098],'Z'], {fill:[WHITE,85.099]});
+  photo(s, 0.812,4.658,5.854,2.4, {r:0.236});
+  photo(s, 1.959,0.386,5.345,4.12, {r:0.405});
+  txt(s, "About", 8.441,3.051,2.691,1.01, {f:MONT, sz:54, c:INK, b:1});
+  txt(s, "About Our Company", 8.441,4.061,2.246,0.337, {f:POP_M, sz:13, c:GRAY_D});
+  poly(s, 4.407,5.555,1.75,1.945, [[0.875,0],[1.359,0,1.75,0.392,1.75,0.875],[1.75,1.216,1.75,1.557,1.75,1.898],[1.746,1.945],[0.005,1.945],[0,1.898],[0,0.875],[0,0.392,0.392,0,0.875,0],'Z'], {fill:BLEND});
+  poly(s, 4.709,6.215,1.156,1.285, [[0.578,0],[0.897,0,1.156,0.259,1.156,0.578],[1.156,0.803,1.156,1.028,1.156,1.254],[1.153,1.285],[0.003,1.285],[0,1.254],[0,0.578],[0,0.259,0.259,0,0.578,0],'Z'], {fill:[WHITE,85.099]});
+  dot(s, 11.907,1.106,0.16, PURPLE);
+  dot(s, 10.901,6.371,0.312, PURPLE);
+  dot(s, 1.346,4.15,0.16, PURPLE);
+}
+
+/* --- Slide 3: About Yooga */
+function slide03(s) {
+  poly(s, 7.209,0.352,2.155,6.795, [[0.284,0],[2.155,0],[2.155,6.795],[0.284,6.795],[0.127,6.795,0,6.668,0,6.511],[0,0.284],[0,0.127,0.127,0,0.284,0],'Z'], {line:[VIOLET,1.5,65.099]});
+  rr(s, 9.365,0,3.969,7.5,0, {fill:BLEND});
+  poly(s, 9.365,0.352,2.61,6.795, [[0,0],[2.326,0],[2.483,0,2.61,0.127,2.61,0.284],[2.61,6.511],[2.61,6.668,2.483,6.795,2.326,6.795],[0,6.795],'Z'], {line:[WHITE,1.5,35.295]});
+  rr(s, 0,0,0.565,7.5,0, {fill:[BLEND,88.236]});
+  txt(s, "About Yooga", 1.71,1.581,3.705,0.707, {f:MONT, sz:36, c:INK, b:1});
+  txt(s, "Your Text Here", 1.71,2.288,1.508,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, [["The first use of the root of the word \"yoga\" is in hymn 5.81.1 of the Rig Veda, a dedication to the rising Sun-god in the morning (Savitri), where it has been interpreted as \"yoke\" or \"yogically control\"."], [""], ["Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."]], 1.71,2.939,4.278,2.299, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rule(s, 1.71,5.848);
+  photo(s, 7.475,5.238,4.278,1.647, {r:0.181});
+  photo(s, 7.475,0.615,4.278,4.471, {r:0.218});
+}
+
+/* --- Slide 4: Our Goals */
+function slide04(s) {
+  poly(s, -1.602,-0.406,6.594,7.269, [[6.594,1.581],[6.594,6.035],[6.594,6.717,6.042,7.269,5.36,7.269],[0.95,7.269],[0,6.843],[3.069,0],'Z'], {fill:BLEND, rot:-24.16});
+  txt(s, "Our Goals", 7.285,1.311,2.828,0.707, {f:MONT, sz:36, c:INK, b:1});
+  txt(s, "Yooga Presentation", 7.285,2.018,2.001,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam,", 8.14,2.79,3.819,0.911, {f:POP, sz:11, c:GRAY, ls:1.5});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam,", 8.14,4.034,3.819,0.911, {f:POP, sz:11, c:GRAY, ls:1.5});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam,", 8.14,5.278,3.819,0.911, {f:POP, sz:11, c:GRAY, ls:1.5});
+  badge(s, 7.48,2.79, "1");
+  badge(s, 7.48,4.034, "2");
+  badge(s, 7.48,5.399, "3");
+  dot(s, 12.598,0.471,0.16, [BLEND,88.236]);
+  dot(s, 11.799,6.657,0.16, [BLEND,88.236]);
+  dot(s, 6.442,1.15,0.323, [BLEND,88.236]);
+  photo(s, 1.058,3.25,4.862,3.699, {});
+  photo(s, 1.058,0.551,4.862,2.563, {});
+}
+
+/* --- Slide 5: Yoga is very good for your health */
+function slide05(s) {
+  rr(s, 7.243,0.391,5.423,6.718,0.353, {fill:[BLEND,88.236]});
+  photo(s, 7.517,0.647,4.876,6.205, {r:0.236});
+  rr(s, 6.864,2.928,1.289,1.289,0.253, {fill:BLEND, line:[WHITE,1.5]});
+  poly(s, 7.243,3.148,0.53,0.849, [[0.438,0.721],[0.431,0.72,0.425,0.719,0.42,0.718],[0.406,0.716,0.402,0.716,0.385,0.71],[0.378,0.708,0.352,0.682,0.352,0.631],[0.352,0.564,0.368,0.506,0.375,0.484],[0.375,0.483,0.375,0.481,0.376,0.479],[0.377,0.475,0.385,0.45,0.385,0.45],[0.39,0.437,0.394,0.424,0.397,0.411],[0.397,0.41],[0.402,0.39,0.417,0.319,0.418,0.219],[0.418,0.209,0.409,0.201,0.405,0.196],[0.404,0.195,0.403,0.194,0.402,0.193],[0.397,0.187,0.391,0.181,0.384,0.173],[0.379,0.167,0.374,0.162,0.368,0.155],[0.359,0.145,0.349,0.136,0.339,0.127],[0.327,0.116,0.314,0.105,0.304,0.092],[0.289,0.073,0.275,0.04,0.277,0.013],[0.277,0.009,0.277,0.005,0.274,0.003],[0.272,0,0.268,-0.001,0.265,0.001],[0.262,-0.001,0.258,0,0.256,0.003],[0.254,0.005,0.253,0.009,0.253,0.013],[0.256,0.04,0.242,0.073,0.226,0.092],[0.216,0.105,0.203,0.116,0.191,0.127],[0.182,0.136,0.171,0.145,0.162,0.155],[0.157,0.162,0.151,0.167,0.146,0.173],[0.139,0.181,0.133,0.187,0.128,0.193],[0.128,0.194,0.127,0.195,0.126,0.196],[0.121,0.201,0.113,0.209,0.113,0.219],[0.114,0.319,0.128,0.39,0.133,0.41],[0.133,0.411],[0.136,0.424,0.141,0.437,0.145,0.45],[0.145,0.45,0.153,0.475,0.154,0.479],[0.155,0.481,0.155,0.483,0.156,0.484],[0.162,0.506,0.178,0.564,0.178,0.631],[0.178,0.682,0.152,0.708,0.145,0.71],[0.129,0.716,0.125,0.716,0.11,0.718],[0.105,0.719,0.1,0.72,0.092,0.721],[0.009,0.73,0,0.771,0,0.788],[0,0.793,0.002,0.808,0.013,0.822],[0.023,0.835,0.043,0.849,0.08,0.849],[0.086,0.849,0.092,0.849,0.098,0.848],[0.123,0.846,0.148,0.842,0.173,0.838],[0.181,0.836,0.19,0.835,0.199,0.834],[0.211,0.832,0.232,0.831,0.262,0.83],[0.264,0.83,0.265,0.83,0.265,0.83],[0.266,0.83,0.267,0.83,0.268,0.83],[0.298,0.831,0.319,0.832,0.331,0.834],[0.34,0.835,0.349,0.836,0.358,0.838],[0.382,0.842,0.407,0.846,0.432,0.848],[0.438,0.849,0.444,0.849,0.45,0.849],[0.487,0.849,0.507,0.835,0.517,0.822],[0.528,0.808,0.53,0.793,0.53,0.788],[0.53,0.771,0.521,0.73,0.438,0.721],'Z',[0.309,0.383],[0.308,0.383,0.307,0.383,0.305,0.383],[0.302,0.381,0.297,0.374,0.296,0.371],[0.315,0.357,0.328,0.332,0.328,0.303],[0.328,0.26,0.324,0.225,0.265,0.225],[0.206,0.225,0.202,0.26,0.202,0.303],[0.202,0.332,0.215,0.357,0.234,0.371],[0.234,0.374,0.229,0.381,0.225,0.383],[0.224,0.383,0.222,0.383,0.221,0.383],[0.209,0.383,0.193,0.356,0.189,0.346],[0.182,0.327,0.174,0.296,0.172,0.25],[0.172,0.248],[0.171,0.238,0.186,0.214,0.188,0.209],[0.19,0.204,0.225,0.151,0.235,0.139],[0.239,0.134,0.257,0.11,0.265,0.099],[0.273,0.11,0.292,0.134,0.295,0.139],[0.305,0.151,0.34,0.204,0.343,0.209],[0.344,0.214,0.359,0.238,0.359,0.248],[0.358,0.25],[0.357,0.296,0.348,0.327,0.341,0.346],[0.337,0.356,0.321,0.383,0.309,0.383],'Z'], {fill:WHITE});
+  txt(s, [["Yoga is very good"], ["for your health"]], 1.315,2.181,4.194,1.111, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Your Text Here", 1.315,1.861,1.508,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "The Yogis of Vedic times left little evidence of their existence, practices and achievements. And such evidence as has survived in the Vedas is scanty and indirect. Nevertheless, the existence of accomplished Yogis in Vedic times cannot be doubted.", 1.315,3.612,4.278,1.466, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rule(s, 1.433,5.568);
+  rr(s, -0.231,-0.234,0.873,0.873,0.237, {fill:BLEND, rot:62.94});
+  rr(s, 0.336,0.05,0.668,0.668,0.181, {fill:[BLEND,88.236], rot:62.94});
+  rr(s, 5.277,6.695,0.491,0.491,0.165, {fill:BLEND, rot:62.94});
+  rr(s, 4.966,6.985,0.765,0.765,0.207, {fill:[BLEND,88.236], rot:62.94});
+}
+
+/* --- Slide 6: Meditation is the art of doing nothing */
+function slide06(s) {
+  rr(s, 5.526,0,7.808,7.5,0, {fill:[BLEND,88.236]});
+  rr(s, 5.841,0.299,7.186,6.903,0, {fill:WHITE});
+  txt(s, [["Meditation is the art"], ["of doing nothing"]], 6.981,2.208,4.762,1.111, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "About Yooga", 6.981,1.888,1.44,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non.", 6.981,4.111,4.278,0.911, {f:POP, sz:11, c:GRAY, ls:1.5});
+  txt(s, "Lorem ipsum dolor", 6.981,3.792,1.915,0.32, {f:POP_M, sz:13, c:INK});
+  trio(s, 7.076,5.382,0.23,0.351);
+  photo(s, 0,0,5.526,7.5, {});
+}
+
+/* --- Slide 7: How Yoga Teach You Life? */
+function slide07(s) {
+  poly(s, 5.731,0,3.003,1.811, [[0,0],[3.003,0],[3.003,1.455],[3.003,1.652,2.844,1.811,2.647,1.811],[0.356,1.811],[0.159,1.811,0,1.652,0,1.455],'Z'], {fill:[BLEND,88.236]});
+  rr(s, 9.904,3.156,3.156,3.156,0.374, {fill:[BLEND,88.236]});
+  poly(s, 7.246,6.105,1.488,1.395, [[0.176,0],[1.312,0],[1.409,0,1.488,0.079,1.488,0.176],[1.488,1.312],[1.488,1.336,1.483,1.359,1.474,1.38],[1.464,1.395],[0.024,1.395],[0.014,1.38],[0.005,1.359,0,1.336,0,1.312],[0,0.176],[0,0.079,0.079,0,0.176,0],'Z'], {fill:[BLEND,88.236]});
+  photo(s, 6.797,0.568,2.243,2.243, {r:0.347});
+  photo(s, 9.189,1.662,3.156,3.156, {r:0.374});
+  photo(s, 9.189,4.989,1.944,1.944, {r:0.298});
+  photo(s, 6.322,2.971,2.718,2.718, {r:0.336});
+  txt(s, [["How Yoga "], ["Teach You Life ? "]], 0.989,2.499,4.742,1.313, {f:MONT, sz:36, c:INK, b:1});
+  txt(s, "About Yooga", 0.989,2.18,1.44,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Systematic Yoga concepts begin to emerge in the texts of c. 500–200 BCE such as the Early Buddhist texts, the middle Upanishads, the Bhagavad Gita and Shanti Parva of the Mahabharata.", 0.989,4.132,4.278,1.189, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rr(s, 9.95,1.054,0.437,0.437,0.113, {fill:BLEND});
+  rr(s, 7.686,5.849,0.64,0.64,0.166, {fill:BLEND});
+  rr(s, 6.322,2.355,0.185,0.185,0.048, {fill:PURPLE});
+  rr(s, 12.165,6.129,0.36,0.36,0.093, {fill:PURPLE});
+}
+
+/* --- Slide 8: Yoga is the best for mental health */
+function slide08(s) {
+  rr(s, 2.419,3.794,3.362,3.3,0.287, {fill:[BLEND,88.236]});
+  poly(s, 0,0,3.04,3.3, [[0,0],[2.752,0],[2.911,0,3.04,0.129,3.04,0.287],[3.04,3.012],[3.04,3.171,2.911,3.3,2.752,3.3],[0,3.3],'Z'], {fill:[BLEND,88.236]});
+  txt(s, [["Yoga is the best for"], ["mental health"]], 7.001,4.37,4.266,1.043, {f:MONT, sz:28, c:INK, b:1});
+  txt(s, "Your Text Here", 7.001,4.05,1.508,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam.", 7.001,5.643,4.278,0.911, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rr(s, 7.339,1.028,4.636,2.421,0.232, {fill:[BLEND,88.236]});
+  rr(s, 7.001,0.691,4.724,2.467,0.236, {fill:BLEND});
+  txt(s, "“Yoga is almost like music in a way; there's no end to it.”", 7.339,1.05,4.048,0.875, {f:POP, sz:16, c:WHITE, i:1, ls:1.5});
+  txt(s, [["Rita Moreno"], ["CEO & Founder Yooga", {f:POP, sz:12}]], 7.339,2.092,2.037,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5});
+  dots3(s, 6.663,0.937,0.103,0.224, VIOLET);
+  photo(s, 0.674,0.691,4.835,6.119, {r:0.284});
+}
+
+/* --- Slide 9: Our team is rock and awesome */
+function slide09(s) {
+  rr(s, 9.956,3.024,3.195,3.195,0.392, {fill:[BLEND,95.295], rot:45});
+  rr(s, 0.183,3.024,3.195,3.195,0.392, {fill:[BLEND,95.295], rot:45});
+  rr(s, 8.052,1.961,1.2,1.2,0.147, {fill:[BLEND,88.236], rot:45});
+  rr(s, 4.033,1.961,1.2,1.2,0.147, {fill:[BLEND,88.236], rot:45});
+  txt(s, "Our team is rock And awesome", 3.274,4.523,6.785,0.572, {f:MONT, sz:28, c:INK, b:1, al:'c'});
+  txt(s, "Yooga Team", 5.982,5.096,1.369,0.32, {f:POP_M, sz:13, c:GRAY_D, al:'c'});
+  txt(s, "Our team strives to create a customized user experience with a website built to be an incredible advantage.", 3.774,5.552,5.785,0.633, {f:POP, sz:11, c:GRAY, ls:1.5, al:'c'});
+  rr(s, 12.366,1.403,0.31,0.31,0.1, {fill:PURPLE, rot:45});
+  rr(s, 7.453,3.376,0.31,0.31,0.1, {fill:VIOLET, rot:45});
+  rr(s, 0.658,1.408,0.31,0.31,0.1, {fill:VIOLET, rot:45});
+  rr(s, 5.703,3.376,0.31,0.31,0.1, {fill:PURPLE, rot:45});
+  photo(s, 0.249,1.896,2.572,2.572, {r:0.271, rot:45});
+  photo(s, 2.456,0.76,1.653,1.653, {r:0.203, rot:45});
+  photo(s, 5.673,1.026,1.987,1.987, {r:0.244, rot:45});
+  photo(s, 9.206,0.76,1.653,1.653, {r:0.203, rot:45});
+  photo(s, 10.486,1.896,2.572,2.572, {r:0.271, rot:45});
+}
+
+/* --- Slide 10: Meet The Founders */
+function slide10(s) {
+  rr(s, 11.6,0,1.733,7.5,0, {fill:[BLEND,88.236]});
+  poly(s, 0,0,8.945,7.5, [[0,0],[0.507,0],[0.507,6.725],[0.507,6.911,0.658,7.061,0.843,7.061],[8.945,7.061],[8.945,7.5],[0,7.5],'Z'], {fill:BLEND});
+  photo(s, 5.345,0,3.383,4.45, {r:0.231});
+  photo(s, 8.945,3.05,3.383,4.45, {r:0.244});
+  txt(s, [["Meet The"], ["Founders"]], 1.302,2.117,2.74,1.313, {f:MONT, sz:36, c:INK, b:1});
+  txt(s, "Yooga Founders", 1.302,3.43,1.69,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  rr(s, 7.465,5.403,2.251,1.176,0.113, {fill:[BLEND,88.236]});
+  rr(s, 7.3,5.239,2.294,1.198,0.115, {fill:PURPLE});
+  rr(s, 8.304,0.84,2.251,1.176,0.113, {fill:[BLEND,88.236]});
+  rr(s, 8.139,0.676,2.294,1.198,0.115, {fill:PURPLE});
+  txt(s, [["Jeniver Sylvie"], ["Founder", {f:POP, sz:12}]], 8.472,0.921,1.447,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5});
+  txt(s, [["Cintya Gabriela"], ["CO-Founder", {f:POP, sz:12}]], 7.643,5.485,1.645,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5});
+  rule(s, 1.402,4.273);
+}
+
+/* --- Slide 11: Our Amazing Team */
+function slide11(s) {
+  rr(s, 0.26,0.244,12.812,7.013,0.331, {line:[VIOLET,1]});
+  rr(s, 1.558,1.818,1.855,1.481,0.195, {fill:[BLEND,88.236]});
+  rr(s, 1.24,1.13,2.49,1.988,0.261, {fill:VIOLET});
+  txt(s, [["Mater Deviana"], ["Exclusive Coach", {f:POP, sz:12}]], 1.708,2.117,1.554,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5, al:'c'});
+  rr(s, 4.623,2.364,1.855,1.481,0.195, {fill:[BLEND,88.236]});
+  rr(s, 4.305,1.677,2.49,1.988,0.261, {fill:VIOLET});
+  txt(s, [["Mike Landre"], ["Exclusive Coach", {f:POP, sz:12}]], 4.774,2.663,1.554,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5, al:'c'});
+  rr(s, 1.558,4.818,1.855,1.481,0.195, {fill:[BLEND,88.236]});
+  rr(s, 1.24,4.13,2.49,1.988,0.261, {fill:VIOLET});
+  txt(s, [["Adelia Clara"], ["Exclusive Coach", {f:POP, sz:12}]], 1.708,5.117,1.554,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5, al:'c'});
+  rr(s, 4.623,5.364,1.855,1.481,0.195, {fill:[BLEND,88.236]});
+  rr(s, 4.305,4.677,2.49,1.988,0.261, {fill:VIOLET});
+  txt(s, [["Jeniver Doe"], ["Exclusive Coach", {f:POP, sz:12}]], 4.774,5.663,1.554,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5, al:'c'});
+  txt(s, [["Our Amazing"], ["Team"]], 8.168,2.04,2.953,1.043, {f:MONT, sz:28, c:INK, b:1});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto", 8.168,3.344,3.925,1.466, {f:POP, sz:11, c:GRAY, ls:1.5});
+  trio(s, 8.273,5.23,0.23,0.351);
+  photoOval(s, 1.815,0.656,1.34,1.34);
+  photoOval(s, 4.881,1.202,1.34,1.34);
+  photoOval(s, 4.881,4.202,1.34,1.34);
+  photoOval(s, 1.815,3.656,1.34,1.34);
+}
+
+/* --- Slide 12: Our Team */
+function slide12(s) {
+  rr(s, 0.727,2.952,2.185,2.185,0.264, {fill:WHITE, line:[VIOLET,1.5], rot:-45});
+  rr(s, 3.958,2.952,2.185,2.185,0.264, {fill:WHITE, line:[VIOLET,1.5], rot:-45});
+  rr(s, 7.19,2.952,2.185,2.185,0.264, {fill:WHITE, line:[VIOLET,1.5], rot:-45});
+  rr(s, 10.421,2.952,2.185,2.185,0.264, {fill:WHITE, line:[VIOLET,1.5], rot:-45});
+  txt(s, "Our Team", 5.247,1.025,2.84,0.707, {f:MONT, sz:36, c:INK, b:1, al:'c'});
+  txt(s, "Our Best Team", 5.891,1.732,1.552,0.32, {f:POP_M, sz:13, c:GRAY_D, al:'c'});
+  txt(s, [["Mater Deviana"], ["Exclusive Coach", {f:POP, sz:12, c:GRAY}]], 1.043,5.768,1.554,0.707, {f:POP_M, sz:13, c:INK, ls:1.5, al:'c'});
+  txt(s, [["Mike Landre"], ["Exclusive Coach", {f:POP, sz:12, c:GRAY}]], 4.269,5.768,1.554,0.707, {f:POP_M, sz:13, c:INK, ls:1.5, al:'c'});
+  txt(s, [["Adelia Clara"], ["Exclusive Coach", {f:POP, sz:12, c:GRAY}]], 7.511,5.768,1.554,0.707, {f:POP_M, sz:13, c:INK, ls:1.5, al:'c'});
+  txt(s, [["Jeniver Doe"], ["Exclusive Coach", {f:POP, sz:12, c:GRAY}]], 10.737,5.768,1.554,0.707, {f:POP_M, sz:13, c:INK, ls:1.5, al:'c'});
+  dot(s, 12.051,0.865,0.16, PURPLE);
+  dot(s, 1.043,0.612,0.16, PURPLE);
+  dot(s, 9.905,2.052,0.16, PURPLE);
+  dot(s, 3.428,1.812,0.16, PURPLE);
+  photo(s, 0.854,3.078,1.932,1.932, {r:0.233, rot:45});
+  photo(s, 4.085,3.078,1.932,1.932, {r:0.233, rot:45});
+  photo(s, 7.317,3.078,1.932,1.932, {r:0.233, rot:45});
+  photo(s, 10.548,3.078,1.932,1.932, {r:0.233, rot:45});
+}
+
+/* --- Slide 13: Mater Deviana profile */
+function slide13(s) {
+  photo(s, 6.688,0,6.646,7.525, {r:0.956});
+  txt(s, "Mater Deviana", 1.522,1.101,3.68,0.64, {f:MONT, sz:32, c:INK, b:1});
+  txt(s, "Exclusive Coach", 1.522,1.74,1.678,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta. ", 1.522,2.38,4.278,1.466, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rr(s, 5.671,4.666,4.636,2.421,0.232, {fill:[BLEND,88.236]});
+  rr(s, 5.333,4.666,4.724,2.13,0.204, {fill:BLEND});
+  txt(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ", 5.736,5.087,3.918,1.287, {f:POP, sz:12, c:WHITE, ls:1.5});
+  poly(s, 0,4.666,5.107,2.13, [[0,0],[4.904,0],[5.016,0,5.107,0.091,5.107,0.204],[5.107,1.926],[5.107,2.039,5.016,2.13,4.904,2.13],[0,2.13],'Z'], {fill:BLEND});
+  dot(s, 0.43,5.079,0.543, [WHITE,55.295]);
+  txt(s, "@materdevina", 1.039,5.191,1.585,0.32, {f:POP_M, sz:13, c:WHITE});
+  dot(s, 1.251,5.839,0.543, [WHITE,55.295]);
+  txt(s, "@materdevina@yooga.com", 1.859,5.951,2.818,0.32, {f:POP_M, sz:13, c:WHITE});
+  poly(s, 0.555,5.121,0.418,0.354, [[0.406,0.05],[0.404,0.051,0.402,0.051,0.4,0.052],[0.387,0.055,0.386,0.051,0.395,0.041],[0.399,0.037,0.403,0.033,0.406,0.028],[0.413,0.017,0.407,0.012,0.395,0.017],[0.391,0.019,0.386,0.021,0.382,0.022],[0.37,0.026,0.352,0.02,0.341,0.013],[0.327,0.004,0.311,0,0.294,0],[0.269,0,0.248,0.009,0.231,0.026],[0.213,0.044,0.204,0.065,0.204,0.089],[0.204,0.093,0.205,0.096,0.205,0.1],[0.206,0.105,0.196,0.109,0.183,0.108],[0.155,0.104,0.129,0.095,0.104,0.082],[0.079,0.069,0.057,0.053,0.038,0.034],[0.029,0.025,0.017,0.025,0.013,0.038],[0.011,0.045,0.01,0.053,0.01,0.061],[0.01,0.077,0.014,0.091,0.021,0.104],[0.025,0.111,0.029,0.116,0.034,0.122],[0.042,0.131,0.04,0.136,0.029,0.133],[0.018,0.129,0.01,0.125,0.01,0.125],[0.01,0.125,0.01,0.126,0.01,0.126],[0.01,0.147,0.016,0.166,0.03,0.182],[0.038,0.193,0.048,0.2,0.059,0.206],[0.071,0.212,0.076,0.215,0.07,0.216],[0.066,0.216,0.062,0.216,0.058,0.216],[0.055,0.216,0.052,0.216,0.049,0.216],[0.045,0.216,0.044,0.225,0.051,0.236],[0.057,0.245,0.064,0.253,0.072,0.259],[0.081,0.266,0.091,0.271,0.101,0.274],[0.114,0.277,0.116,0.284,0.105,0.29],[0.078,0.307,0.047,0.315,0.014,0.315],[0.01,0.315,0.006,0.315,0.003,0.315],[-0.003,0.315,0.001,0.32,0.012,0.326],[0.048,0.345,0.087,0.354,0.129,0.354],[0.161,0.354,0.191,0.349,0.219,0.339],[0.246,0.329,0.27,0.316,0.29,0.299],[0.31,0.282,0.327,0.262,0.341,0.24],[0.355,0.218,0.366,0.196,0.373,0.172],[0.38,0.148,0.383,0.124,0.383,0.1],[0.383,0.098,0.383,0.096,0.383,0.094],[0.383,0.091,0.392,0.082,0.401,0.073],[0.406,0.069,0.41,0.065,0.414,0.061],[0.422,0.051,0.418,0.046,0.406,0.05],'Z'], {fill:WHITE});
+  rr(s, 1.416,5.941,0.415,0.129,0.052, {fill:WHITE});
+  poly(s, 1.416,6.01,0.415,0.217, [[0.213,0.086],[0.211,0.086,0.209,0.087,0.208,0.087],[0.206,0.087,0.204,0.086,0.202,0.086],[0,0],[0,0.191],[0,0.205,0.012,0.217,0.026,0.217],[0.389,0.217],[0.403,0.217,0.415,0.205,0.415,0.191],[0.415,0],[0.213,0.086],'Z'], {fill:WHITE});
+  poly(s, 3.836,4.666,1.271,1.318, [[1.27,0],[1.271,0],[1.271,0.001],'Z',[0.071,0],[0.645,0],[0.619,0.022],[0.532,0.108,0.479,0.228,0.479,0.36],[0.479,0.625,0.693,0.839,0.958,0.839],[1.057,0.839,1.149,0.809,1.225,0.757],[1.271,0.719],[1.271,1.264],[1.242,1.275],[1.153,1.303,1.057,1.318,0.958,1.318],[0.429,1.318,0,0.889,0,0.36],[0,0.294,0.007,0.23,0.019,0.167],'Z'], {fill:[WHITE,90.197]});
+  poly(s, 0.003,6.067,0.699,0.725, [[0.698,0],[0.699,0],[0.699,0.001],'Z',[0.039,0],[0.355,0],[0.34,0.012],[0.293,0.06,0.263,0.125,0.263,0.198],[0.263,0.343,0.381,0.461,0.527,0.461],[0.581,0.461,0.632,0.445,0.674,0.416],[0.699,0.396],[0.699,0.695],[0.683,0.701],[0.634,0.716,0.581,0.725,0.527,0.725],[0.236,0.725,0,0.489,0,0.198],[0,0.162,0.004,0.126,0.011,0.092],'Z'], {fill:[WHITE,90.197], rot:180});
+  dot(s, 0.604,4.016,0.16, PURPLE);
+  dot(s, 7.298,0.916,0.16, PURPLE);
+}
+
+/* --- Slide 14: section: Service & Features */
+function slide14(s) {
+  rr(s, 7.472,0.416,2.582,3.065,0.246, {fill:BLEND});
+  photo(s, 9.768,3.662,3.361,3.423, {r:0.32});
+  photo(s, 7.636,5.084,1.939,2.43, {r:0.132});
+  photo(s, 6.667,0.909,2.909,3.838, {r:0.316});
+  photo(s, 10.298,0,3.035,2.842, {r:0.226});
+  txt(s, [["Service & "], ["Features"]], 1.289,2.723,3.734,1.717, {f:MONT, sz:48, c:INK, b:1});
+  txt(s, "Our Best Service and Facilities", 1.289,4.44,3.165,0.337, {f:POP_M, sz:13, c:GRAY_D});
+  rr(s, 11.753,3.116,2.582,2.258,0.215, {fill:BLEND});
+  dot(s, 0.929,6.628,0.16, PURPLE);
+  dot(s, 5.645,0.781,0.257, PURPLE);
+  dot(s, 6.968,5.602,0.16, PURPLE);
+  rr(s, 12.468,3.116,1.867,1.661,0.158, {fill:[WHITE,85.099]});
+}
+
+/* --- Slide 15: Professional Coaching for You */
+function slide15(s) {
+  rr(s, 1.178,1.405,5.385,5.385,0.305, {fill:BLEND, rot:3.06});
+  txt(s, [["Professional "], ["Coaching for You"]], 7.966,2.461,4.069,1.111, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Your Text Here", 7.966,2.142,1.508,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat", 7.966,3.892,4.278,1.466, {f:POP, sz:11, c:GRAY, ls:1.5});
+  ring(s, 11.689,0.571,1.111, 0.282, BLEND);
+  ring(s, 7.404,6.252,0.562, 0.282, BLEND);
+  photo(s, 1.088,0.708,5.388,5.388, {r:0.294, rot:12});
+}
+
+/* --- Slide 16: Best service & place for doing yoga */
+function slide16(s) {
+  rr(s, 8.319,0,5.014,7.5,0, {fill:[BLEND,88.236]});
+  photo(s, 7.201,1.154,6.132,5.192, {r:0.231});
+  photo(s, 9.437,0.82,3.897,5.86, {r:0.193});
+  poly(s, 7.201,1.154,6.132,5.192, [[0.26,0],[6.132,0],[6.132,5.192],[0.26,5.192],[0.116,5.192,0,5.075,0,4.932],[0,0.26],[0,0.116,0.116,0,0.26,0],'Z'], {fill:[BLEND,88.236]});
+  poly(s, 9.437,0.803,3.897,5.877, [[0.165,0],[3.897,0],[3.897,5.877],[0.165,5.877],[0.074,5.877,0,5.745,0,5.583],[0,0.294],[0,0.132,0.074,0,0.165,0],'Z'], {fill:[BLEND,50.197]});
+  rr(s, 12.019,1.154,0.921,0.921,0.181, {fill:BLEND, line:[WHITE,1.5]});
+  poly(s, 12.289,1.311,0.379,0.607, [[0.313,0.515],[0.308,0.514,0.304,0.514,0.3,0.513],[0.29,0.512,0.287,0.511,0.275,0.508],[0.27,0.506,0.252,0.487,0.252,0.451],[0.252,0.403,0.263,0.361,0.268,0.346],[0.268,0.345,0.268,0.344,0.269,0.342],[0.269,0.339,0.275,0.321,0.275,0.321],[0.278,0.312,0.282,0.303,0.284,0.293],[0.284,0.293],[0.287,0.279,0.298,0.228,0.299,0.157],[0.299,0.15,0.293,0.143,0.289,0.14],[0.288,0.139,0.288,0.138,0.287,0.138],[0.284,0.134,0.279,0.129,0.274,0.123],[0.271,0.12,0.267,0.115,0.263,0.111],[0.256,0.104,0.249,0.097,0.242,0.091],[0.234,0.083,0.225,0.075,0.217,0.066],[0.206,0.052,0.196,0.028,0.198,0.009],[0.198,0.006,0.198,0.004,0.196,0.002],[0.194,0,0.192,0,0.189,0],[0.187,0,0.185,0,0.183,0.002],[0.181,0.004,0.181,0.006,0.181,0.009],[0.183,0.028,0.173,0.052,0.162,0.066],[0.154,0.075,0.145,0.083,0.137,0.091],[0.13,0.097,0.122,0.104,0.116,0.111],[0.112,0.115,0.108,0.12,0.105,0.123],[0.099,0.129,0.095,0.134,0.092,0.138],[0.091,0.138,0.091,0.139,0.09,0.14],[0.086,0.143,0.08,0.15,0.08,0.157],[0.081,0.228,0.092,0.279,0.095,0.293],[0.095,0.293],[0.097,0.303,0.1,0.312,0.104,0.321],[0.104,0.321,0.11,0.339,0.11,0.342],[0.111,0.344,0.111,0.345,0.111,0.346],[0.116,0.361,0.127,0.403,0.127,0.451],[0.127,0.487,0.109,0.506,0.104,0.508],[0.092,0.511,0.089,0.512,0.079,0.513],[0.075,0.514,0.071,0.514,0.066,0.515],[0.006,0.521,0,0.551,0,0.563],[0,0.567,0.002,0.577,0.01,0.587],[0.017,0.596,0.031,0.607,0.057,0.607],[0.061,0.607,0.066,0.607,0.07,0.606],[0.088,0.604,0.106,0.601,0.123,0.599],[0.13,0.598,0.136,0.597,0.142,0.596],[0.151,0.594,0.166,0.593,0.187,0.593],[0.188,0.593,0.189,0.593,0.189,0.593],[0.19,0.593,0.19,0.593,0.191,0.593],[0.213,0.593,0.228,0.594,0.237,0.596],[0.243,0.597,0.249,0.598,0.256,0.599],[0.273,0.601,0.291,0.604,0.309,0.606],[0.313,0.607,0.317,0.607,0.321,0.607],[0.348,0.607,0.362,0.596,0.369,0.587],[0.377,0.577,0.379,0.567,0.379,0.563],[0.379,0.551,0.372,0.521,0.313,0.515],'Z',[0.221,0.274],[0.22,0.274,0.219,0.274,0.218,0.273],[0.215,0.272,0.212,0.267,0.212,0.265],[0.225,0.255,0.235,0.237,0.235,0.216],[0.235,0.186,0.231,0.161,0.189,0.161],[0.147,0.161,0.144,0.186,0.144,0.216],[0.144,0.237,0.154,0.255,0.167,0.265],[0.167,0.267,0.163,0.272,0.161,0.273],[0.16,0.274,0.159,0.274,0.158,0.274],[0.149,0.274,0.138,0.255,0.135,0.247],[0.13,0.234,0.124,0.211,0.123,0.179],[0.123,0.177],[0.122,0.17,0.133,0.153,0.134,0.15],[0.136,0.145,0.161,0.108,0.168,0.099],[0.171,0.096,0.184,0.079,0.189,0.071],[0.195,0.079,0.208,0.096,0.211,0.099],[0.218,0.108,0.243,0.145,0.245,0.15],[0.246,0.153,0.257,0.17,0.256,0.177],[0.256,0.179],[0.255,0.211,0.249,0.234,0.244,0.247],[0.241,0.255,0.23,0.274,0.221,0.274],'Z'], {fill:WHITE});
+  txt(s, [["Best service &"], ["place for doing yoga"]], 1.315,1.825,4.818,1.111, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Your Text Here", 1.315,1.505,1.508,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta. ", 1.315,3.256,4.278,1.466, {f:POP, sz:11, c:GRAY, ls:1.5});
+  txt(s, [["Ipsum dolor sit amet", {bu:'o'}], ["consectetur adipiscing elit", {bu:'o'}]], 1.315,5.361,4.278,0.633, {f:POP, sz:11, c:GRAY, ls:1.5});
+  txt(s, "Lorem ipsum dolor", 1.315,5.042,1.915,0.32, {f:POP_M, sz:13, c:INK});
+  rr(s, 0.25,2.215,1.271,0.071,0.012, {fill:PURPLE, rot:-90});
+}
+
+/* --- Slide 17: Features (purple panel) */
+function slide17(s) {
+  rr(s, 5.066,0,8.268,7.5,0, {fill:BLEND});
+  dot(s, 3.917,5.204,3.529, [WHITE,90.197]);
+  dot(s, 10.187,-1.267,4.625, [WHITE,90.197]);
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non lorem ipsum", 6.199,0.971,3.073,0.837, {f:POP, sz:10, c:WHITE, ls:1.5});
+  txt(s, "Space Area", 6.199,0.668,1.18,0.303, {f:POP_M, sz:12, c:WHITE});
+  txt(s, "Health Restaurant", 9.644,2.428,1.734,0.303, {f:POP_M, sz:12, c:WHITE});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non lorem ipsum", 9.644,2.745,3.073,0.837, {f:POP, sz:10, c:WHITE, ls:1.5});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non lorem ipsum", 6.199,4.197,3.073,0.837, {f:POP, sz:10, c:WHITE, ls:1.5});
+  txt(s, "Best Mentors", 6.199,3.894,1.292,0.303, {f:POP_M, sz:12, c:WHITE});
+  txt(s, "Free Consulting", 9.644,5.678,1.52,0.303, {f:POP_M, sz:12, c:WHITE});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non lorem ipsum", 9.644,5.995,3.073,0.837, {f:POP, sz:10, c:WHITE, ls:1.5});
+  dot(s, 5.681,0.671,0.451, WHITE);
+  txt(s, "1", 5.681,0.671,0.451,0.451, {f:POP_S, sz:14, c:VIOLET, b:1, al:'c', v:'m'});
+  dot(s, 5.681,3.871,0.451, WHITE);
+  txt(s, "3", 5.681,3.871,0.451,0.451, {f:POP_S, sz:14, c:VIOLET, b:1, al:'c', v:'m'});
+  dot(s, 9.12,2.428,0.451, WHITE);
+  txt(s, "2", 9.12,2.428,0.451,0.451, {f:POP_S, sz:14, c:VIOLET, b:1, al:'c', v:'m'});
+  dot(s, 9.12,5.652,0.451, WHITE);
+  txt(s, "4", 9.12,5.652,0.451,0.451, {f:POP_S, sz:14, c:VIOLET, b:1, al:'c', v:'m'});
+  txt(s, "Features", 0.652,2.18,2.171,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Our Service Facilities / Facilities", 0.652,2.786,3.073,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta. ", 0.652,3.408,3.877,1.466, {f:POP, sz:11, c:GRAY, ls:1.5});
+  trio(s, 0.758,5.178,0.143,0.218);
+}
+
+/* --- Slide 18: Features (photo split) */
+function slide18(s) {
+  txt(s, "Space Area", 1.48,1.639,1.18,0.303, {f:POP_M, sz:12, c:INK});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, ", 1.48,3.483,2.995,0.837, {f:POP, sz:10, c:GRAY, ls:1.5});
+  txt(s, "Best Mentors", 1.48,3.18,1.292,0.303, {f:POP_M, sz:12, c:INK});
+  txt(s, "Free Consulting", 1.48,4.721,1.52,0.303, {f:POP_M, sz:12, c:INK});
+  badge(s, 0.742,1.639, "1");
+  badge(s, 0.742,3.18, "2");
+  badge(s, 0.742,4.725, "3");
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, ", 1.48,1.942,2.995,0.837, {f:POP, sz:10, c:GRAY, ls:1.5});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, ", 1.48,5.024,2.995,0.837, {f:POP, sz:10, c:GRAY, ls:1.5});
+  txt(s, "Features", 9.479,1.623,2.171,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Our Service Facilities / Facilities", 9.479,2.229,3.073,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam,", 9.479,2.835,3.112,1.189, {f:POP, sz:11, c:GRAY, ls:1.5});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam,", 9.479,4.285,3.112,1.189, {f:POP, sz:11, c:GRAY, ls:1.5});
+  trio(s, 9.575,5.735,0.143,0.218);
+  photo(s, 5.096,0,3.762,7.5, {});
+}
+
+/* --- Slide 19: section: Portfolio & Gallery */
+function slide19(s) {
+  poly(s, 0,0,4.256,5.884, [[0,0],[4.256,0],[4.256,5.598],[4.256,5.756,4.128,5.884,3.97,5.884],[0.286,5.884],[0.128,5.884,0,5.756,0,5.598],'Z'], {fill:BLEND});
+  dots3(s, 0.871,0.533,0.103,0.224, WHITE);
+  poly(s, 0.898,0,3.627,5.513, [[0,0],[3.627,0],[3.627,5.269],[3.627,5.404,3.518,5.513,3.383,5.513],[0.244,5.513],[0.109,5.513,0,5.404,0,5.269],'Z'], {fill:[WHITE,90.197]});
+  txt(s, [["Portfolio &"], ["Gallery"]], 7.135,2.723,4.041,1.717, {f:MONT, sz:48, c:INK, b:1});
+  txt(s, "Our Awards and Photo Gallery", 7.135,4.44,3.172,0.337, {f:POP_M, sz:13, c:GRAY_D});
+  dot(s, 11.997,0.808,0.16, PURPLE);
+  dot(s, 12.147,6.451,0.257, PURPLE);
+  dot(s, 6.976,5.884,0.16, PURPLE);
+  photo(s, 1.462,0,4.256,6.744, {r:0.274});
+}
+
+/* --- Slide 20: Stay healthy with yoga */
+function slide20(s) {
+  poly(s, 9.983,0,3.35,3.127, [[0.029,0],[1.018,0],[1.013,0.02],[0.99,0.136,0.977,0.255,0.977,0.377],[0.977,1.357,1.771,2.15,2.75,2.15],[2.934,2.15,3.111,2.122,3.277,2.071],[3.35,2.044],[3.35,3.06],[3.304,3.072],[3.125,3.108,2.94,3.127,2.75,3.127],[1.231,3.127,0,1.896,0,0.377],[0,0.283,0.005,0.189,0.014,0.096],'Z'], {fill:BLEND});
+  photo(s, 6.42,0.628,2.795,6.115, {r:0.235});
+  photo(s, 9.381,0.628,2.795,6.115, {r:0.235});
+  txt(s, [["Stay healthy with"], ["yoga"]], 1.27,2.017,4.146,1.111, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Your Text Here", 1.27,1.697,1.508,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat", 1.27,3.447,4.278,1.466, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rr(s, 1.27,5.233,1.743,0.57,0.285, {fill:BLEND});
+  txt(s, "Yooga.com", 1.27,5.233,1.743,0.57, {f:POP_M, sz:12, c:WHITE, al:'c', v:'m'});
+  rr(s, 0,0,0.565,7.5,0, {fill:[BLEND,88.236]});
+  ring(s, 6.015,6.188,0.96, 0.246, BLEND);
+}
+
+/* --- Slide 21: Photo grid */
+function slide21(s) {
+  poly(s, 1.926,5.448,3.403,2.052, [[0,0],[3.403,0],[3.403,1.649],[3.403,1.871,3.223,2.052,3,2.052],[0.403,2.052],[0.181,2.052,0,1.871,0,1.649],'Z'], {fill:[BLEND,88.236], rot:180});
+  poly(s, 7.926,5.448,3.403,2.052, [[0,0],[3.403,0],[3.403,1.649],[3.403,1.871,3.223,2.052,3,2.052],[0.403,2.052],[0.181,2.052,0,1.871,0,1.649],'Z'], {fill:[BLEND,88.236], rot:180});
+  poly(s, 11.293,0.004,2.046,1.234, [[0,0],[2.046,0],[2.046,0.991],[2.046,1.125,1.938,1.234,1.804,1.234],[0.242,1.234],[0.109,1.234,0,1.125,0,0.991],'Z'], {fill:[BLEND,88.236]});
+  poly(s, 0,0,3.003,1.811, [[0,0],[3.003,0],[3.003,1.455],[3.003,1.652,2.844,1.811,2.647,1.811],[0.356,1.811],[0.159,1.811,0,1.652,0,1.455],'Z'], {fill:[BLEND,88.236]});
+  dot(s, 10.204,6.548,0.16, PURPLE);
+  dot(s, 12.52,6.75,0.257, PURPLE);
+  dot(s, 1.063,0.39,0.16, PURPLE);
+  dot(s, 0.892,5.636,0.16, PURPLE);
+  photo(s, 0.556,1.094,5.494,3.023, {r:0.205});
+  photo(s, 1.247,4.289,4.803,2.584, {r:0.175});
+  photo(s, 6.245,2.951,3.442,4.325, {r:0.234});
+  photo(s, 6.245,0.224,3.442,2.545, {r:0.173});
+  photo(s, 9.881,0.75,2.896,5.37, {r:0.197});
+}
+
+/* --- Slide 22: Three vertical banners */
+function slide22(s) {
+  rr(s, 8.169,0,0.565,7.5,0, {fill:[BLEND,88.236]});
+  rr(s, 3.287,0,0.565,7.5,0, {fill:[BLEND,88.236]});
+  photo(s, 0,0,3.569,7.5, {});
+  photo(s, 4.882,0,3.569,7.5, {});
+  photo(s, 9.764,0,3.569,7.5, {});
+  rr(s, 2.064,4.848,3.01,1.015,0.175, {fill:BLEND, rot:-90});
+  txt(s, [["Yooga Workshop"], ["Lorem ipsum dolor sit amet", {f:POP, sz:12}]], 2.316,5.079,2.507,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5, rot:-90});
+  rr(s, 6.941,2.166,3.01,1.015,0.175, {fill:BLEND, rot:-90});
+  txt(s, [["Yooga Consulting"], ["Lorem ipsum dolor sit amet", {f:POP, sz:12}]], 7.192,2.32,2.507,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5, rot:-90});
+  rr(s, 10.927,5.595,3.179,1.015,0.175, {fill:BLEND, rot:-90});
+  txt(s, [["Yooga Event"], ["Lorem ipsum dolor sit amet", {f:POP, sz:12}]], 11.263,5.684,2.507,0.707, {f:POP_M, sz:13, c:WHITE, ls:1.5, rot:-90});
+}
+
+/* --- Slide 23: section: Timeline */
+function slide23(s) {
+  rr(s, 7.295,0,0.682,7.5,0, {fill:BLEND});
+  txt(s, "Timeline", 1.675,3.077,3.682,1.01, {f:MONT, sz:54, c:INK, b:1});
+  txt(s, "Project Roadmap", 1.675,4.087,1.92,0.337, {f:POP_M, sz:13, c:GRAY_D});
+  dot(s, 0.929,6.628,0.16, PURPLE);
+  dot(s, 4.063,0.883,0.257, PURPLE);
+  dot(s, 5.879,5.64,0.16, PURPLE);
+  dot(s, 6.768,0.48,0.16, [BLEND,88.236]);
+  dot(s, 4.722,6.974,0.16, [BLEND,88.236]);
+  dot(s, 0.298,1.377,0.323, [BLEND,88.236]);
+  photo(s, 7.976,0,5.357,7.5, {});
+}
+
+/* --- Slide 24: Project Timeline */
+function slide24(s) {
+  poly(s, 0,1.628,7.041,5.872, [[0,0],[0.19,0.173,0.794,0.501,1.69,0.435],[2.809,0.352,3.966,-0.128,4.008,1.281],[4.049,2.689,3.023,3.842,4.595,4.429],[6.167,5.016,6.914,4.837,7.041,5.872]], {line:[VIOLET,2.53]});
+  rr(s, 0.676,1.497,3.016,1.381,0.132, {fill:[BLEND,88.236]});
+  rr(s, 0.456,1.304,3.074,1.408,0.135, {fill:BLEND});
+  dot(s, 3.262,1.42,0.154, WHITE);
+  rr(s, 2.596,3.473,3.016,1.381,0.132, {fill:[BLEND,88.236]});
+  rr(s, 2.376,3.281,3.074,1.408,0.135, {fill:BLEND});
+  dot(s, 5.182,3.417,0.154, WHITE);
+  rr(s, 4.324,5.45,3.016,1.381,0.132, {fill:[BLEND,88.236]});
+  rr(s, 4.104,5.257,3.074,1.408,0.135, {fill:BLEND});
+  dot(s, 6.888,5.405,0.154, WHITE);
+  txt(s, "Plan 1", 0.676,1.542,0.672,0.303, {f:POP_M, sz:12, c:WHITE});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, ", 0.676,1.845,2.663,0.585, {f:POP, sz:10, c:WHITE, ls:1.5});
+  txt(s, "Plan 2", 2.596,3.518,0.709,0.303, {f:POP_M, sz:12, c:WHITE});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, ", 2.596,3.821,2.663,0.585, {f:POP, sz:10, c:WHITE, ls:1.5});
+  txt(s, "Plan 3", 4.324,5.495,0.712,0.303, {f:POP_M, sz:12, c:WHITE});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, ", 4.324,5.797,2.663,0.585, {f:POP, sz:10, c:WHITE, ls:1.5});
+  txt(s, "Project Timeline", 8.207,1.611,3.882,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Timeline", 8.207,2.217,0.979,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta. ", 8.207,2.782,3.882,1.466, {f:POP, sz:11, c:GRAY, ls:1.5});
+  trio(s, 8.309,4.643,0.193,0.295);
+  dot(s, 12.426,0.638,0.16, [BLEND,88.236]);
+  dot(s, 5.788,1.599,0.323, [BLEND,88.236]);
+  dot(s, 9.009,5.961,0.16, [BLEND,88.236]);
+  dot(s, 1.186,5.677,0.323, [BLEND,88.236]);
+  dot(s, 0.596,0.638,0.16, [BLEND,88.236]);
+  dot(s, 5.672,7.086,0.16, [BLEND,88.236]);
+  dot(s, 12.236,5.974,0.16, [BLEND,88.236]);
+}
+
+/* --- Slide 25: Project Milestones */
+function slide25(s) {
+  txt(s, [["Project"], ["Milestones"]], 0.638,2.077,2.626,1.111, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Timeline", 0.638,1.758,0.979,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, [["Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, "], [""], ["Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta."]], 0.638,3.508,3.794,1.744, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rule(s, 0.757,5.672);
+  txt(s, "Plan 1", 10.032,1.428,0.672,0.303, {f:POP_M, sz:12, c:INK});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, ", 10.032,1.731,2.663,0.837, {f:POP, sz:10, c:GRAY, ls:1.5});
+  txt(s, "Plan 2", 10.032,3.178,0.709,0.303, {f:POP_M, sz:12, c:INK});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, ", 10.032,3.481,2.663,0.837, {f:POP, sz:10, c:GRAY, ls:1.5});
+  txt(s, "Plan 3", 10.032,4.932,0.712,0.303, {f:POP_M, sz:12, c:INK});
+  txt(s, "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, ", 10.032,5.235,2.663,0.837, {f:POP, sz:10, c:GRAY, ls:1.5});
+  badge(s, 9.295,1.428, "1");
+  badge(s, 9.295,3.181, "2");
+  badge(s, 9.295,4.932, "3");
+  photo(s, 4.994,3.237,3.6,4.263, {r:0.246});
+  photo(s, 4.994,0,3.6,3.088, {r:0.232});
+}
+
+/* --- Slide 26: Meeting with Health Studio */
+function slide26(s) {
+  rr(s, 9.227,0,4.107,7.5,0, {fill:BLEND3});
+  txt(s, [["Meeting with "], ["Health Studio"]], 1.635,1.739,3.31,1.111, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Timeline", 1.635,1.419,0.979,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, [["08:00 - 10:00"], ["Plenary Hall, New Jersey 88776"], [""], ["Notes", {f:POP_S, c:INK, b:1}], ["Please bring a laptop and stationery", {i:1}]], 1.635,4.49,3.915,1.59, {f:POP, sz:12, c:GRAY, ls:1.5});
+  rr(s, 1.75,3.169,2.29,0.984,0.099, {fill:INDIGO});
+  txt(s, "monday", 2.048,3.363,1.038,0.337, {f:POP_M, sz:13, c:WHITE});
+  txt(s, "13 Nov 2020", 2.048,3.699,1.35,0.337, {f:POP_M, sz:13, c:WHITE});
+  dots3(s, 11.809,1.144,0.103,0.224, WHITE);
+  dots3(s, 11.809,5.582,0.103,0.224, WHITE);
+  rr(s, 0,0,0.565,7.5,0, {fill:[BLEND,88.236]});
+  photo(s, 7.125,0.79,4.48,5.92, {r:0.253});
+}
+
+/* --- Slide 27: section: Table & Charts */
+function slide27(s) {
+  rr(s, 2.736,5.074,2.104,2.104,0.251, {fill:[BLEND,88.236]});
+  rr(s, 5.615,2.074,2.104,2.104,0.251, {fill:[BLEND,88.236]});
+  rr(s, 0.509,0.808,2.104,2.104,0.251, {fill:[BLEND,88.236]});
+  txt(s, [["Table & "], ["Charts"]], 8.495,2.723,3.063,1.717, {f:MONT, sz:48, c:INK, b:1});
+  txt(s, "Table and Chart Overview", 8.495,4.44,2.775,0.337, {f:POP_M, sz:13, c:GRAY_D});
+  dot(s, 11.997,0.808,0.16, PURPLE);
+  dot(s, 12.312,6.532,0.257, PURPLE);
+  dot(s, 8.056,5.684,0.16, PURPLE);
+  photo(s, 1.584,4.444,2.344,2.344, {r:0.211});
+  photo(s, 4.101,3.235,3.035,3.035, {r:0.273});
+  photo(s, 0.893,1.245,3.035,3.035, {r:0.273});
+  photo(s, 4.101,0.712,2.344,2.344, {r:0.211});
+}
+
+/* --- Slide 28: Full Table */
+function slide28(s) {
+  fullTable(s);
+  txt(s, "Full Table", 2.35,1.232,2.374,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Subtitle", 2.35,1.838,0.898,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta. ", 5.243,1.232,5.74,0.911, {f:POP, sz:11, c:GRAY, ls:1.5});
+  dot(s, 12.272,0.718,0.257, PURPLE);
+  dot(s, 11.503,2.137,0.16, PURPLE);
+  dot(s, 1.729,2.137,0.16, PURPLE);
+  dot(s, 0.725,0.718,0.257, PURPLE);
+  ring(s, 12.247,6.501,0.562, 0.282, BLEND);
+  ring(s, 0.524,6.501,0.562, 0.282, BLEND);
+}
+
+/* --- Slide 29: Overview - stat cards + bar chart */
+function slide29(s) {
+  rr(s, 5.965,3.9,6.045,2.525,0.242, {fill:[BLEND,88.236]});
+  rr(s, 5.395,3.058,6.392,3.129,0.3, {fill:BLEND});
+  rr(s, 10.02,1.075,1.767,1.434,0.239, {fill:WHITE, line:[VIOLET,1.5,80]});
+  rr(s, 5.399,1.075,2.415,1.434,0.239, {fill:WHITE, line:[VIOLET,1.5,80]});
+  txt(s, "4.328", 5.709,1.321,1.405,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Satisfied Clients", 5.709,1.926,1.794,0.337, {f:POP_M, sz:14, c:INK});
+  rr(s, 8.033,1.075,1.767,1.434,0.239, {fill:WHITE, line:[VIOLET,1.5,80]});
+  txt(s, "352", 8.434,1.321,0.965,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Awards", 8.434,1.926,0.947,0.337, {f:POP_M, sz:14, c:INK});
+  txt(s, "4.9", 10.459,1.321,0.889,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Rating", 10.459,1.926,0.847,0.337, {f:POP_M, sz:14, c:INK});
+  txt(s, "Overview", 1.323,1.287,2.483,0.64, {f:MONT, sz:32, c:INK, b:1});
+  txt(s, "Latest 5 Years", 1.323,1.985,1.48,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.", 7.044,4.456,4.278,1.189, {f:POP, sz:11, c:WHITE, ls:1.5});
+  txt(s, "2015 - 2020", 7.044,3.601,1.334,0.337, {f:POP_M, sz:13, c:WHITE});
+  txt(s, "Statistics", 7.044,3.938,1.042,0.32, {f:POP_M, sz:13, c:WHITE});
+  dot(s, 5.86,3.601,0.87, WHITE);
+  rr(s, 1.323,3.052,3.8,3.135,0.3, {fill:WHITE, line:[VIOLET,1.5,80]});
+  statChart(s, 1.539,3.266,3.369,2.707);
+  rr(s, 6.1,4.02,0.096,0.207,0.008, {fill:VIOLET});
+  rr(s, 6.243,3.845,0.096,0.382,0.008, {fill:VIOLET});
+  rr(s, 6.386,3.925,0.096,0.303,0.008, {fill:VIOLET});
+}
+
+/* --- Slide 30: Overview - clustered bar chart */
+function slide30(s) {
+  rr(s, 10.488,0,2.846,7.5,0, {fill:[BLEND,88.236]});
+  txt(s, "Overview", 1.001,1.717,2.339,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Latest 5 Years", 1.001,2.323,1.48,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, "Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.", 1.001,3.147,4.278,1.189, {f:POP, sz:11, c:GRAY, ls:1.5});
+  txt(s, "84%", 1.001,4.841,1.156,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Produ Sales", 1.001,5.447,1.362,0.337, {f:POP_M, sz:13, c:INK});
+  txt(s, "96%", 3.248,4.841,1.126,0.606, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Product Usage", 3.248,5.447,1.65,0.337, {f:POP_M, sz:13, c:INK});
+  rr(s, 6.37,0.895,5.962,5.711,0.295, {fill:WHITE, line:[VIOLET,1.5,80]});
+  groupChart(s, 6.594,1.494,5.516,4.495);
+}
+
+/* --- Slide 31: Company Overview */
+function slide31(s) {
+  poly(s, 1.1,2.129,4.784,2.989, [[0.398,0],[0.16,0.265,-0.221,0.956,0.165,1.602],[0.647,2.41,1.292,1.638,1.811,1.892],[2.33,2.147,3.083,3.666,4.273,2.634],[5.225,1.809,4.63,0.765,4.214,0.347]], {line:[PURPLE,2.99,25.099], rot:30.31});
+  rr(s, 1.162,1.793,2.352,1.413,0.182, {fill:BLEND});
+  txt(s, "4.328", 1.636,2.028,1.405,0.606, {f:MONT, sz:30, c:WHITE, b:1});
+  txt(s, "Clients", 1.636,2.634,0.887,0.337, {f:POP_M, sz:14, c:WHITE});
+  rr(s, 3.987,2.499,2.352,1.413,0.182, {fill:BLEND});
+  txt(s, "352", 4.461,2.734,0.965,0.606, {f:MONT, sz:30, c:WHITE, b:1});
+  txt(s, "Awards", 4.461,3.34,0.947,0.337, {f:POP_M, sz:14, c:WHITE});
+  rr(s, 2.233,4.294,2.352,1.413,0.182, {fill:BLEND});
+  txt(s, "4.9", 2.707,4.53,0.889,0.606, {f:MONT, sz:30, c:WHITE, b:1});
+  txt(s, "Google Rating", 2.707,5.135,1.606,0.337, {f:POP_M, sz:14, c:WHITE});
+  rr(s, 12.995,0,0.338,7.5,0, {fill:[BLEND,88.236]});
+  txt(s, [["Company "], ["Overview"]], 7.763,2.119,2.467,1.111, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Timeline", 7.763,1.8,0.979,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, [["Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, "], [""], ["Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta."]], 7.763,3.55,4.278,1.744, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rule(s, 7.893,5.63);
+  dot(s, 5.394,1.196,0.323, [BLEND,88.236]);
+  dot(s, 0.98,4.206,0.323, [BLEND,88.236]);
+  dot(s, 5.986,5.7,0.16, [BLEND,88.236]);
+}
+
+/* --- Slide 32: section: Pricing */
+function slide32(s) {
+  rr(s, 5.718,2.935,1.63,1.63,0.272, {fill:[BLEND,88.236], rot:-45});
+  rr(s, 10.98,2.935,1.63,1.63,0.272, {fill:[BLEND,88.236], rot:-45});
+  txt(s, "Pricing", 1.367,3.077,3.086,1.01, {f:MONT, sz:54, c:INK, b:1});
+  txt(s, "Price Package", 1.367,4.087,1.601,0.337, {f:POP_M, sz:13, c:GRAY_D});
+  dot(s, 1.742,6.273,0.16, PURPLE);
+  dot(s, 5.123,1.729,0.257, PURPLE);
+  dot(s, 12.047,6.353,0.16, PURPLE);
+  dot(s, 1.418,0.757,0.16, [BLEND,88.236]);
+  dot(s, 6.122,5.999,0.16, [BLEND,88.236]);
+  dot(s, 12.081,0.722,0.323, [BLEND,88.236]);
+  rr(s, 0,0,0.65,7.5,0, {fill:BLEND});
+  photo(s, 6.849,1.407,4.687,4.687, {r:0.348, rot:45});
+}
+
+/* --- Slide 33: Pricing Package (2 plans) */
+function slide33(s) {
+  rr(s, 6.667,0,0.565,7.5,0, {fill:[BLEND,88.236]});
+  rr(s, 0,0,6.667,7.5,0, {fill:BLEND3});
+  rr(s, 4.934,1.772,3.341,4.412,0.26, {fill:WHITE, line:[LINE_G,1.5]});
+  rr(s, 8.498,1.342,3.647,4.816,0.273, {fill:BLEND});
+  dot(s, 11.653,0.85,0.985, NAVY);
+  txt(s, "BEST CHOICE", 11.653,0.85,0.985,0.985, {f:NS, sz:12, c:WHITE, b:1, al:'c', v:'m'});
+  txt(s, "Basic", 6.086,2.51,1.038,0.505, {f:NS_X, sz:24, c:NAVY_D, b:1, al:'c'});
+  txt(s, "Start From", 6.026,3.286,1.157,0.337, {f:NS_S, sz:13, c:GRAY, al:'c'});
+  txt(s, "$250", 5.831,3.699,1.548,0.774, {f:NS_B, sz:40, c:NAVY_D, b:1, al:'c'});
+  txt(s, "Lorem ipsum dolor", 5.672,4.622,1.866,0.337, {f:NS_S, sz:13, c:GRAY_X, al:'c'});
+  txt(s, "Sit amet consectetur", 5.587,5.11,2.036,0.337, {f:NS_S, sz:13, c:GRAY_X, al:'c'});
+  hline(s, 5.587,5.023,2.007, LINE_G, 1.5);
+  txt(s, "Platinum", 9.514,1.975,1.615,0.505, {f:NS_X, sz:24, c:WHITE, b:1, al:'c'});
+  txt(s, "Start From", 9.743,2.709,1.157,0.337, {f:NS_S, sz:13, c:WHITE, al:'c'});
+  txt(s, "$450", 9.414,3.129,1.815,0.909, {f:NS_B, sz:48, c:WHITE, b:1, al:'c'});
+  txt(s, "Lorem ipsum dolor", 9.389,4.21,1.866,0.337, {f:NS_S, sz:13, c:WHITE, al:'c'});
+  txt(s, "Sit amet consectetur", 9.304,4.699,2.036,0.337, {f:NS_S, sz:13, c:WHITE, al:'c'});
+  hline(s, 9.304,4.611,2.007, 'FBE4D4', 1.5);
+  txt(s, "Sit amet consectetur", 9.304,5.188,2.036,0.337, {f:NS_S, sz:13, c:WHITE, al:'c'});
+  hline(s, 9.304,5.101,2.007, 'FBE4D4', 1.5);
+  txt(s, [["Pricing "], ["Package"]], 0.974,2.323,2.151,1.111, {f:MONT, sz:30, c:WHITE, b:1});
+  txt(s, "Service Plan", 0.974,2.003,1.313,0.32, {f:POP_M, sz:13, c:WHITE});
+  txt(s, [["Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."], [""], ["Excepteur sint occaecat cupidatat non proident"]], 0.974,3.753,3.341,1.744, {f:POP, sz:11, c:WHITE, ls:1.5});
+}
+
+/* --- Slide 34: Pricing Package (3 plans) */
+function slide34(s) {
+  rr(s, 0,3.355,13.347,4.145,0.013, {fill:[BLEND,88.236]});
+  rr(s, 8.778,2.508,3.341,4.412,0.273, {fill:WHITE, line:[LINE_G,1.5]});
+  txt(s, "Platinum", 9.641,2.998,1.615,0.505, {f:NS_X, sz:24, c:GRAY_K, b:1, al:'c'});
+  txt(s, "Start From", 9.87,3.774,1.157,0.337, {f:NS_S, sz:13, c:GRAY, al:'c'});
+  txt(s, "$550", 9.674,4.187,1.548,0.774, {f:NS_B, sz:40, c:NAVY_D, b:1, al:'c'});
+  txt(s, "Lorem ipsum dolor", 9.516,5.11,1.866,0.337, {f:NS_S, sz:13, c:GRAY_X, al:'c'});
+  txt(s, "Sit amet consectetur", 9.431,5.599,2.036,0.337, {f:NS_S, sz:13, c:GRAY_X, al:'c'});
+  hline(s, 9.431,5.511,2.007, LINE_G, 1.5);
+  txt(s, "Adipiscing elit", 9.718,6.094,1.461,0.337, {f:NS_S, sz:13, c:GRAY_X, al:'c'});
+  hline(s, 9.431,6.006,2.007, LINE_G, 1.5);
+  rr(s, 4.85,2.105,3.647,4.816,0.273, {fill:BLEND});
+  txt(s, "Platinum", 5.866,2.737,1.615,0.505, {f:NS_X, sz:24, c:WHITE, b:1, al:'c'});
+  txt(s, "Start From", 6.094,3.471,1.157,0.337, {f:NS_S, sz:13, c:WHITE, al:'c'});
+  txt(s, "$450", 5.766,3.891,1.815,0.909, {f:NS_B, sz:48, c:WHITE, b:1, al:'c'});
+  txt(s, "Lorem ipsum dolor", 5.74,4.972,1.866,0.337, {f:NS_S, sz:13, c:WHITE, al:'c'});
+  txt(s, "Sit amet consectetur", 5.655,5.461,2.036,0.337, {f:NS_S, sz:13, c:WHITE, al:'c'});
+  hline(s, 5.655,5.373,2.007, '8DA9DB', 1.5);
+  txt(s, "Sit amet consectetur", 5.655,5.951,2.036,0.337, {f:NS_S, sz:13, c:WHITE, al:'c'});
+  hline(s, 5.655,5.863,2.007, '8DA9DB', 1.5);
+  dot(s, 7.987,1.612,0.985, NAVY);
+  txt(s, "BEST CHOICE", 7.987,1.612,0.985,0.985, {f:NS, sz:12, c:WHITE, b:1, al:'c', v:'m'});
+  rr(s, 1.227,2.508,3.341,4.412,0.234, {fill:WHITE, line:[LINE_G,1.5]});
+  txt(s, "Basic", 2.379,3.245,1.038,0.505, {f:NS_X, sz:24, c:GRAY_K, b:1, al:'c'});
+  txt(s, "Start From", 2.319,4.021,1.157,0.337, {f:NS_S, sz:13, c:GRAY, al:'c'});
+  txt(s, "$250", 2.123,4.435,1.548,0.774, {f:NS_B, sz:40, c:NAVY_D, b:1, al:'c'});
+  txt(s, "Lorem ipsum dolor", 1.965,5.357,1.866,0.337, {f:NS_S, sz:13, c:GRAY_X, al:'c'});
+  txt(s, "Sit amet consectetur", 1.88,5.846,2.036,0.337, {f:NS_S, sz:13, c:GRAY_X, al:'c'});
+  hline(s, 1.88,5.758,2.007, LINE_G, 1.5);
+  txt(s, "Pricing Package", 1.227,1.156,3.265,0.522, {f:MONT, sz:25, c:INK, b:1});
+  txt(s, "Service Plan", 1.227,0.836,1.313,0.32, {f:POP_M, sz:13, c:GRAY_D});
+}
+
+/* --- Slide 35: Break Slide */
+function slide35(s) {
+  txt(s, "Break Slide", 4.011,3.261,5.31,1.111, {f:MONT, sz:60, c:NAVY, b:1, al:'c'});
+  txt(s, "Take a Short Break", 5.644,4.372,2.044,0.337, {f:POP_M, sz:13, c:GRAY_D, al:'c'});
+  rr(s, 10.349,-0.481,1.505,1.505,0.408, {fill:[BLEND,88.236], rot:62.94});
+  rr(s, 6.517,1.97,0.355,0.355,0.096, {fill:BLEND, rot:62.94});
+  rr(s, 6.747,2.085,0.271,0.271,0.074, {fill:[BLEND,88.236], rot:62.94});
+  rr(s, 11.388,0.521,0.656,0.656,0.21, {fill:BLEND2, rot:63.95});
+  rr(s, 3.375,6.107,0.476,0.476,0.16, {fill:BLEND, rot:62.94});
+  rr(s, 3.421,5.561,0.742,0.742,0.201, {fill:[BLEND,88.236], rot:62.94});
+  photo(s, 0,0,4.709,4.625, {r:1.045});
+  photo(s, 8.624,2.786,4.709,4.714, {r:1.323});
+}
+
+/* --- Slide 36: section: Mockup */
+function slide36(s) {
+  rr(s, 0,0,3.561,5.463,0, {fill:[BLEND,88.236]});
+  rr(s, 5.537,4.22,1.402,3.28,0, {fill:[BLEND,88.236]});
+  txt(s, "Mockup", 8.56,3.077,3.454,1.01, {f:MONT, sz:54, c:INK, b:1});
+  txt(s, "Device Mockup", 8.56,4.087,1.703,0.337, {f:POP_M, sz:13, c:GRAY_D});
+  dot(s, 11.997,0.808,0.16, PURPLE);
+  dot(s, 12.147,6.451,0.257, PURPLE);
+  dot(s, 8.108,5.7,0.16, PURPLE);
+  photo(s, 0.878,3.538,3.877,3.144, {r:0.3});
+  photo(s, 4.938,1.698,2.451,3.815, {r:0.234});
+  photo(s, 1.645,0.818,3.11,2.573, {r:0.246});
+}
+
+/* --- Slide 37: Yooga Coaching (laptop mockup) */
+function slide37(s) {
+  shp(s, 'parallelogram', 8.098,0,3.955,7.5, {fill:[BLEND,88.236]});
+  shp(s, 'parallelogram', 8.72,0,3.955,7.5, {fill:BLEND});
+  photo(s, 7.556,1.61,5.778,3.918, {});
+  deviceFrame(s, 6.527,1.435,6.806,4.63, 0.06, 0);
+  txt(s, "Yooga Coaching", 1.281,1.61,4.593,0.707, {f:MONT, sz:36, c:INK, b:1});
+  txt(s, "Device Mockup", 1.281,2.316,1.594,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, [["The first use of the root of the word \"yoga\" is in hymn 5.81.1 of the Rig Veda, a dedication to the rising Sun-god in the morning (Savitri), where it has been interpreted as \"yoke\" or \"yogically control\"."], [""], ["Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt."]], 1.281,2.968,4.278,2.022, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rr(s, 1.281,5.321,1.743,0.57,0.285, {fill:BLEND});
+  txt(s, "Yooga.com", 1.281,5.321,1.743,0.57, {f:POP_M, sz:12, c:WHITE, al:'c', v:'m'});
+}
+
+/* --- Slide 38: Try Our Mobile Apps */
+function slide38(s) {
+  dot(s, -0.469,0.252,2.395, BLEND);
+  dot(s, 5.962,1.224,0.834, BLEND);
+  dot(s, 3.894,3.953,2.618, [BLEND,88.236]);
+  photo(s, 3.629,1.893,4.021,1.98, {r:0.25, rot:-18.1});
+  photo(s, -0.278,2.246,6.014,2.961, {r:0.374, rot:-18.1});
+  deviceFrame(s, 1.105,0.602,3.283,6.297, 0.42, -17.7);
+  deviceFrame(s, 4.538,0.77,2.203,4.225, 0.28, -17.7);
+  txt(s, [["Try Our "], ["Mobile Apps"]], 8.066,1.916,2.979,1.111, {f:MONT, sz:30, c:INK, b:1});
+  txt(s, "Compatible with all device", 8.066,1.597,2.651,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  txt(s, [["All of our websites are designed to be easily used by mobile users. With a mobile display that is easy to use"], [""], ["Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore."]], 8.066,3.347,4.278,1.744, {f:POP, sz:11, c:GRAY, ls:1.5});
+  rr(s, 8.146,5.453,1.544,0.45,0.071, {fill:INK});
+  storeBadge(s, 8.199,5.477,1.438,0.404, "GET IT ON", "Google Play");
+  rr(s, 9.882,5.453,1.586,0.45,0.062, {fill:INK});
+  storeBadge(s, 9.919,5.474,1.511,0.409, "Download on the", "App Store");
+}
+
+/* --- Slide 39: section: Contact */
+function slide39(s) {
+  rr(s, 7.488,0,5.846,7.5,0, {fill:BLEND});
+  txt(s, "Contact", 1.572,3.077,3.401,1.01, {f:MONT, sz:54, c:INK, b:1});
+  txt(s, "Get in Touch", 1.572,4.087,1.44,0.337, {f:POP_M, sz:13, c:GRAY_D});
+  dot(s, 1.742,6.273,0.16, PURPLE);
+  dot(s, 5.123,1.729,0.257, PURPLE);
+  dot(s, 1.418,0.757,0.16, [BLEND,88.236]);
+  dot(s, 6.122,5.999,0.16, [BLEND,88.236]);
+  photo(s, 8.075,0.481,4.669,6.537, {r:0.303});
+}
+
+/* --- Slide 40: Get in Touch */
+function slide40(s) {
+  txt(s, [["Kyle Joes"], [""], ["266  Mutton Town Road, South Dakota, 57551"], [""], ["360-638-1700"], [""], ["kylejoes@barista.com"]], 7.959,3.713,3.612,1.851, {f:NS, sz:13, c:GRAY_D});
+  dot(s, 7.601,3.727,0.183, VIOLET);
+  dot(s, 7.601,4.178,0.183, PURPLE);
+  dot(s, 7.601,4.84,0.183, VIOLET);
+  dot(s, 7.601,5.319,0.183, PURPLE);
+  txt(s, "Get in Touch", 7.601,2.08,3.606,0.707, {f:MONT, sz:36, c:INK, b:1});
+  txt(s, "Your Text Here", 7.601,2.787,1.508,0.32, {f:POP_M, sz:13, c:GRAY_D});
+  ring(s, 12,0.486,0.885, 0.282, BLEND);
+  ring(s, 0.324,2.08,0.562, 0.282, BLEND);
+  ring(s, 10.556,6.418,0.371, 0.282, BLEND);
+  photo(s, 4.615,-0.15,1.494,7.801, {r:0.22, rot:8.4});
+  photo(s, 1.176,-0.283,3.285,8.066, {r:0.485, rot:8.4});
+}
+
+/* ------------------------------------------------------------------ build */
+const BUILDERS = [
+  slide01,
+  slide02,
+  slide03,
+  slide04,
+  slide05,
+  slide06,
+  slide07,
+  slide08,
+  slide09,
+  slide10,
+  slide11,
+  slide12,
+  slide13,
+  slide14,
+  slide15,
+  slide16,
+  slide17,
+  slide18,
+  slide19,
+  slide20,
+  slide21,
+  slide22,
+  slide23,
+  slide24,
+  slide25,
+  slide26,
+  slide27,
+  slide28,
+  slide29,
+  slide30,
+  slide31,
+  slide32,
+  slide33,
+  slide34,
+  slide35,
+  slide36,
+  slide37,
+  slide38,
+  slide39,
+  slide40,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'YOOGA', width: 13.333, height: 7.5 });
+pptx.layout = 'YOOGA';
+pptx.title = 'Yooga - Health & Yoga Presentation Template';
+
+BUILDERS.forEach(function (build) {
+  const s = pptx.addSlide();
+  s.background = { color: WHITE };
+  build(s);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '08752a90-e071-4937-8edf-e5969157412a_grok_final.pptx') })
+  .then(function (f) { console.log('wrote ' + f); })
+  .catch(function (e) { console.error(e); process.exit(1); });

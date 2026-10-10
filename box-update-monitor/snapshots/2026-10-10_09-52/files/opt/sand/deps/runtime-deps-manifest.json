@@ -1,0 +1,25 @@
+{
+  "platform": "linux",
+  "arch": "x64",
+  "required": [
+    "cursor-proclist",
+    "sand-notification-settings",
+    "tree-sitter",
+    "tree-sitter-bash"
+  ],
+  "copied": [
+    "cursor-proclist",
+    "node-addon-api",
+    "node-gyp-build",
+    "sand-notification-settings",
+    "tree-sitter",
+    "tree-sitter-bash",
+    "web-tree-sitter"
+  ],
+  "nodeFiles": [
+    "cursor-proclist/build/Release/cursor_proclist.node",
+    "sand-notification-settings/build/Release/sand_notification_settings.node",
+    "tree-sitter-bash/prebuilds/linux-x64/tree-sitter-bash.node",
+    "tree-sitter/build/Release/tree_sitter_runtime_binding.node"
+  ]
+}

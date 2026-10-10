@@ -9,8 +9,22 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
-## 2026-10-10 07:51 (Paris) — snapshot `2026-10-10_05-45` → `2026-10-10_07-51`
+## 2026-10-10 09:52 (Paris) — snapshot `2026-10-10_07-51` → `2026-10-10_09-52`
 - Commit GitHub : commit à venir
+- Rapport brut : [reports/2026-10-10_09-52.md](reports/2026-10-10_09-52.md) (diffs complets : `reports/2026-10-10_09-52-diffs/`)
+- Versions touchées : **sand-host** `91efc0d` → `964107d`. Inchangés : image/box-scripts `91a9d91`, agent-store-fuse `7356478`, exec-daemon, Chrome 154.0.8037.97, Node, Python, Debian.
+- Fichiers : +1 / −0 / ~9.
+
+**Bugfix** — —
+**Change** — Skills gérées : `in-chat-forms` précise que le Secure Form sert aux codes à usage unique *qu'on ne peut pas lire depuis une boîte mail* ; retouches de texte dans `sign-in` et `no-connector-fallback`.
+**Features** — Nouvelle skill gérée `agent-email` (inbox native Grok Bot : claim, envoi, lecture, adresses à tag +).
+**Perf** — —
+**Autre/infra** — `host-main.cjs`, `sand-eval-runner.cjs`, `agent-isolation/agent-store-worker.cjs` reconstruits (rebuild opaque, classement hypothétique) ; `cache.json` des skills rafraîchi.
+
+---
+
+## 2026-10-10 07:51 (Paris) — snapshot `2026-10-10_05-45` → `2026-10-10_07-51`
+- Commit GitHub : [a5c963e](../../../commit/a5c963e45360ac83e6c89f7870a3fe0acf184acb)
 - Rapport brut : [reports/2026-10-10_07-51.md](reports/2026-10-10_07-51.md) (diffs complets : `reports/2026-10-10_07-51-diffs/`)
 - Versions touchées : **agent-store-fuse** `36088c9` → `7356478`. Inchangés : image/box-scripts `91a9d91`, sand-host `91efc0d`, exec-daemon, Chrome 154.0.8037.97, Node, Python, Debian.
 - Diff : 0 ajouté, 0 supprimé, 1 modifié (`/usr/local/bin/cursor_agent_store_fuse_version`).

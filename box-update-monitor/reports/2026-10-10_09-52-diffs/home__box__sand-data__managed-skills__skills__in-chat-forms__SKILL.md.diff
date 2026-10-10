@@ -1,0 +1,11 @@
+--- 2026-10-10_07-51:/home/box/sand-data/managed-skills/skills/in-chat-forms/SKILL.md
++++ 2026-10-10_09-52:/home/box/sand-data/managed-skills/skills/in-chat-forms/SKILL.md
+@@ -9,7 +9,7 @@
+ ---
+ # In-chat forms for typed steps
+ 
+-When a page needs the USER to type something, such as a login (username and password), a checkout address, card details at checkout, a phone number, or a one-time code, call RequestUserForm to show the Secure Form, a native in-chat form, instead of handing over the box and instead of ever asking them to paste values in chat. The host fills the live page with what they submit;
++When a page needs the USER to type something, such as a login (username and password), a checkout address, card details at checkout, a phone number, or a one-time code you cannot read from a mailbox, call RequestUserForm to show the Secure Form, a native in-chat form, instead of handing over the box and instead of ever asking them to paste values in chat. The host fills the live page with what they submit;
+  every value is write-only and never comes back to you. The receipt reports only per-field fill status. For secret fields (password/otp/secret:true), that receipt IS the verification. Recover from a failed secret fill by re-asking with a new form (fresh target) or with request_box_help, and NEVER take a screenshot to check what landed in a secret field. Structured snapshots redact secret values, but a screenshot is raw page pixels and redacts nothing. Non-secret outcomes can be verified from the page itself (fresh snapshot) or re-asked. Keep request_box_help for steps a form cannot express: a captcha the subagent tried and could not get past, passkeys, 3DS confirmation prompts, QR codes, device approvals, and unusual custom widgets. Dispatch the subagent to attempt any captcha itself first, whether a checkbox, a puzzle, an image challenge, or a press-and-hold I'm-human button (holdDurationMs), rather than handing the box over.
+ - Hard rule: after the typed page is open, take a fresh snapshot. Call `RequestUserForm` whenever the fields are on the page and each one has a target (ref/selector/label). Fields inside iframes (cross-origin ones included, such as a checkout's Shopify or Stripe card frame) and inside shadow roots count;
+  the host reaches them. Using `request_box_help` for a typed field that has a usable target is wrong.
