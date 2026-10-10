@@ -1,0 +1,1103 @@
+/**
+ * Compiler environment for `grok/canvas` pages. The staged `grok` package
+ * points its `types` here (staged from `kit-env/grok/` by the build), so
+ * TypeScript loads this file only for a canvas that imports `grok/canvas`;
+ * a `cursor/canvas` program never sees it, and the shared React stub it
+ * builds on is untouched. There is nothing to import from this file: the
+ * kit's exports are re-exported below, and the rest widens what the check
+ * accepts to what the page runtime already serves.
+ *
+ * - The event types carry the fields the grok skill promises (`nativeEvent`,
+ *   `repeat`, `relatedTarget`, `pageX`, `buttons`, …) plus `UIEvent`,
+ *   `PointerEvent`, and `FocusEvent`, merged into the stub's declarations for
+ *   this kit only.
+ * - Common intrinsic elements carry the `@types/react` prop shapes, so an
+ *   inline handler such as `onChange={(e) => ...}` gets its parameter typed
+ *   from the element. Unlisted tags keep the stub's permissive index.
+ * - The runtime installs React on `globalThis` before a page module runs, so
+ *   `React.<hook>` reaches a real value and `React.<Type>` names a real type;
+ *   `JSX.Element` names the same element type as the module's `JSX`.
+ */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+import type * as ReactTypes from "react";
+
+export * from "./index.js";
+
+/**
+ * The event shapes the grok skill promises, as a module augmentation so the
+ * shared React stub itself stays as it is. Member and interface names follow
+ * `@types/react`; the stub's single type parameter is the element the
+ * handler is attached to, and `nativeEvent` narrows per interface instead of
+ * taking a second parameter. The `globalThis.*` references are the `lib.dom`
+ * interfaces, which these module-level names would otherwise shadow.
+ */
+declare module "react" {
+  interface SyntheticEvent<T = Element> {
+    nativeEvent: Event;
+    type: string;
+    timeStamp: number;
+    bubbles: boolean;
+    cancelable: boolean;
+    defaultPrevented: boolean;
+    isTrusted: boolean;
+    isDefaultPrevented(): boolean;
+    isPropagationStopped(): boolean;
+    persist(): void;
+  }
+  interface UIEvent<T = Element> extends SyntheticEvent<T> {
+    nativeEvent: globalThis.UIEvent;
+    detail: number;
+  }
+  interface MouseEvent<T = Element> extends UIEvent<T> {
+    nativeEvent: globalThis.MouseEvent;
+    buttons: number;
+    pageX: number;
+    pageY: number;
+    screenX: number;
+    screenY: number;
+    movementX: number;
+    movementY: number;
+    relatedTarget: EventTarget | null;
+    getModifierState(key: string): boolean;
+  }
+  interface PointerEvent<T = Element> extends MouseEvent<T> {
+    nativeEvent: globalThis.PointerEvent;
+    pointerId: number;
+    pointerType: "mouse" | "pen" | "touch";
+    isPrimary: boolean;
+    pressure: number;
+    tangentialPressure: number;
+    tiltX: number;
+    tiltY: number;
+    twist: number;
+    width: number;
+    height: number;
+  }
+  interface KeyboardEvent<T = Element> extends UIEvent<T> {
+    nativeEvent: globalThis.KeyboardEvent;
+    location: number;
+    repeat: boolean;
+    getModifierState(key: string): boolean;
+  }
+  interface FocusEvent<Target = Element, RelatedTarget = Element> extends SyntheticEvent<Target> {
+    nativeEvent: globalThis.FocusEvent;
+    relatedTarget: (EventTarget & RelatedTarget) | null;
+  }
+}
+
+/** The `@types/react` attribute and event shapes the tag table below uses. */
+declare namespace Env {
+  type RefCallback<T> = (instance: T | null) => void | (() => void);
+  type Ref<T> = RefCallback<T> | ReactTypes.RefObject<T> | null;
+  interface ClassAttributes<T> extends ReactTypes.Attributes {
+    ref?: Ref<T> | undefined;
+  }
+  type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = ClassAttributes<T> & E;
+  interface ClipboardEvent<T = Element> extends ReactTypes.SyntheticEvent<T> {
+    nativeEvent: globalThis.ClipboardEvent;
+    clipboardData: DataTransfer;
+  }
+  interface DragEvent<T = Element> extends ReactTypes.MouseEvent<T> {
+    nativeEvent: globalThis.DragEvent;
+    dataTransfer: DataTransfer;
+  }
+  interface WheelEvent<T = Element> extends ReactTypes.MouseEvent<T> {
+    nativeEvent: globalThis.WheelEvent;
+    deltaMode: number;
+    deltaX: number;
+    deltaY: number;
+    deltaZ: number;
+  }
+  interface TouchEvent<T = Element> extends ReactTypes.UIEvent<T> {
+    nativeEvent: globalThis.TouchEvent;
+    altKey: boolean;
+    changedTouches: TouchList;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    shiftKey: boolean;
+    targetTouches: TouchList;
+    touches: TouchList;
+    getModifierState(key: string): boolean;
+  }
+  interface AnimationEvent<T = Element> extends ReactTypes.SyntheticEvent<T> {
+    nativeEvent: globalThis.AnimationEvent;
+    animationName: string;
+    elapsedTime: number;
+    pseudoElement: string;
+  }
+  interface TransitionEvent<T = Element> extends ReactTypes.SyntheticEvent<T> {
+    nativeEvent: globalThis.TransitionEvent;
+    elapsedTime: number;
+    propertyName: string;
+    pseudoElement: string;
+  }
+  type EventHandler<E extends ReactTypes.SyntheticEvent<any>> = {
+    bivarianceHack(event: E): void;
+  }["bivarianceHack"];
+  type ReactEventHandler<T = Element> = EventHandler<ReactTypes.SyntheticEvent<T>>;
+  type ClipboardEventHandler<T = Element> = EventHandler<ClipboardEvent<T>>;
+  type DragEventHandler<T = Element> = EventHandler<DragEvent<T>>;
+  type FocusEventHandler<T = Element> = EventHandler<ReactTypes.FocusEvent<T>>;
+  type FormEventHandler<T = Element> = EventHandler<ReactTypes.FormEvent<T>>;
+  type ChangeEventHandler<T = Element> = EventHandler<ReactTypes.ChangeEvent<T>>;
+  type KeyboardEventHandler<T = Element> = EventHandler<ReactTypes.KeyboardEvent<T>>;
+  type MouseEventHandler<T = Element> = EventHandler<ReactTypes.MouseEvent<T>>;
+  type TouchEventHandler<T = Element> = EventHandler<TouchEvent<T>>;
+  type PointerEventHandler<T = Element> = EventHandler<ReactTypes.PointerEvent<T>>;
+  type UIEventHandler<T = Element> = EventHandler<ReactTypes.UIEvent<T>>;
+  type WheelEventHandler<T = Element> = EventHandler<WheelEvent<T>>;
+  type AnimationEventHandler<T = Element> = EventHandler<AnimationEvent<T>>;
+  type TransitionEventHandler<T = Element> = EventHandler<TransitionEvent<T>>;
+  interface DOMAttributes<T> {
+    children?: ReactTypes.ReactNode | undefined;
+    dangerouslySetInnerHTML?: { __html: string } | undefined;
+
+    // Clipboard
+    onCopy?: ClipboardEventHandler<T> | undefined;
+    onCut?: ClipboardEventHandler<T> | undefined;
+    onPaste?: ClipboardEventHandler<T> | undefined;
+
+    // Focus
+    onFocus?: FocusEventHandler<T> | undefined;
+    onBlur?: FocusEventHandler<T> | undefined;
+
+    // Form
+    onChange?: FormEventHandler<T> | undefined;
+    onBeforeInput?: FormEventHandler<T> | undefined;
+    onInput?: FormEventHandler<T> | undefined;
+    onReset?: FormEventHandler<T> | undefined;
+    onSubmit?: FormEventHandler<T> | undefined;
+    onInvalid?: FormEventHandler<T> | undefined;
+
+    // Image / media load
+    onLoad?: ReactEventHandler<T> | undefined;
+    onError?: ReactEventHandler<T> | undefined;
+
+    // Keyboard
+    onKeyDown?: KeyboardEventHandler<T> | undefined;
+    /** @deprecated Use `onKeyDown` or `onKeyUp`. */
+    onKeyPress?: KeyboardEventHandler<T> | undefined;
+    onKeyUp?: KeyboardEventHandler<T> | undefined;
+
+    // Mouse
+    onAuxClick?: MouseEventHandler<T> | undefined;
+    onClick?: MouseEventHandler<T> | undefined;
+    onContextMenu?: MouseEventHandler<T> | undefined;
+    onDoubleClick?: MouseEventHandler<T> | undefined;
+    onDrag?: DragEventHandler<T> | undefined;
+    onDragEnd?: DragEventHandler<T> | undefined;
+    onDragEnter?: DragEventHandler<T> | undefined;
+    onDragExit?: DragEventHandler<T> | undefined;
+    onDragLeave?: DragEventHandler<T> | undefined;
+    onDragOver?: DragEventHandler<T> | undefined;
+    onDragStart?: DragEventHandler<T> | undefined;
+    onDrop?: DragEventHandler<T> | undefined;
+    onMouseDown?: MouseEventHandler<T> | undefined;
+    onMouseEnter?: MouseEventHandler<T> | undefined;
+    onMouseLeave?: MouseEventHandler<T> | undefined;
+    onMouseMove?: MouseEventHandler<T> | undefined;
+    onMouseOut?: MouseEventHandler<T> | undefined;
+    onMouseOver?: MouseEventHandler<T> | undefined;
+    onMouseUp?: MouseEventHandler<T> | undefined;
+
+    // Selection
+    onSelect?: ReactEventHandler<T> | undefined;
+
+    // Touch
+    onTouchCancel?: TouchEventHandler<T> | undefined;
+    onTouchEnd?: TouchEventHandler<T> | undefined;
+    onTouchMove?: TouchEventHandler<T> | undefined;
+    onTouchStart?: TouchEventHandler<T> | undefined;
+
+    // Pointer
+    onPointerDown?: PointerEventHandler<T> | undefined;
+    onPointerMove?: PointerEventHandler<T> | undefined;
+    onPointerUp?: PointerEventHandler<T> | undefined;
+    onPointerCancel?: PointerEventHandler<T> | undefined;
+    onPointerEnter?: PointerEventHandler<T> | undefined;
+    onPointerLeave?: PointerEventHandler<T> | undefined;
+    onPointerOver?: PointerEventHandler<T> | undefined;
+    onPointerOut?: PointerEventHandler<T> | undefined;
+    onGotPointerCapture?: PointerEventHandler<T> | undefined;
+    onLostPointerCapture?: PointerEventHandler<T> | undefined;
+
+    // UI
+    onScroll?: UIEventHandler<T> | undefined;
+    onScrollEnd?: UIEventHandler<T> | undefined;
+
+    // Wheel
+    onWheel?: WheelEventHandler<T> | undefined;
+
+    // Animation
+    onAnimationStart?: AnimationEventHandler<T> | undefined;
+    onAnimationEnd?: AnimationEventHandler<T> | undefined;
+    onAnimationIteration?: AnimationEventHandler<T> | undefined;
+
+    // Transition
+    onTransitionCancel?: TransitionEventHandler<T> | undefined;
+    onTransitionEnd?: TransitionEventHandler<T> | undefined;
+    onTransitionRun?: TransitionEventHandler<T> | undefined;
+    onTransitionStart?: TransitionEventHandler<T> | undefined;
+  }
+  type Booleanish = boolean | "true" | "false";
+  type CrossOrigin = "anonymous" | "use-credentials" | "" | undefined;
+  type HTMLInputTypeAttribute =
+    | "button"
+    | "checkbox"
+    | "color"
+    | "date"
+    | "datetime-local"
+    | "email"
+    | "file"
+    | "hidden"
+    | "image"
+    | "month"
+    | "number"
+    | "password"
+    | "radio"
+    | "range"
+    | "reset"
+    | "search"
+    | "submit"
+    | "tel"
+    | "text"
+    | "time"
+    | "url"
+    | "week"
+    | (string & {});
+  type HTMLInputAutoCompleteAttribute = string;
+  type HTMLAttributeAnchorTarget = "_self" | "_blank" | "_parent" | "_top" | (string & {});
+  type HTMLAttributeReferrerPolicy =
+    | ""
+    | "no-referrer"
+    | "no-referrer-when-downgrade"
+    | "origin"
+    | "origin-when-cross-origin"
+    | "same-origin"
+    | "strict-origin"
+    | "strict-origin-when-cross-origin"
+    | "unsafe-url";
+  interface HTMLAttributes<T> extends DOMAttributes<T> {
+    // React-specific
+    defaultChecked?: boolean | undefined;
+    defaultValue?: string | number | readonly string[] | undefined;
+    suppressContentEditableWarning?: boolean | undefined;
+    suppressHydrationWarning?: boolean | undefined;
+
+    // Standard HTML
+    accessKey?: string | undefined;
+    autoCapitalize?:
+      | "off"
+      | "none"
+      | "on"
+      | "sentences"
+      | "words"
+      | "characters"
+      | (string & {})
+      | undefined;
+    autoFocus?: boolean | undefined;
+    className?: string | undefined;
+    contentEditable?: Booleanish | "inherit" | "plaintext-only" | undefined;
+    contextMenu?: string | undefined;
+    dir?: string | undefined;
+    draggable?: Booleanish | undefined;
+    enterKeyHint?: "enter" | "done" | "go" | "next" | "previous" | "search" | "send" | undefined;
+    hidden?: boolean | undefined;
+    id?: string | undefined;
+    lang?: string | undefined;
+    nonce?: string | undefined;
+    slot?: string | undefined;
+    spellCheck?: Booleanish | undefined;
+    style?: ReactTypes.CSSProperties | undefined;
+    tabIndex?: number | undefined;
+    title?: string | undefined;
+    translate?: "yes" | "no" | undefined;
+
+    // Unknown / non-standard but React-accepted
+    radioGroup?: string | undefined;
+    role?: string | undefined;
+    about?: string | undefined;
+    content?: string | undefined;
+    datatype?: string | undefined;
+    inlist?: any;
+    prefix?: string | undefined;
+    property?: string | undefined;
+    rel?: string | undefined;
+    resource?: string | undefined;
+    rev?: string | undefined;
+    typeof?: string | undefined;
+    vocab?: string | undefined;
+    autoCorrect?: string | undefined;
+    autoSave?: string | undefined;
+    color?: string | undefined;
+    itemProp?: string | undefined;
+    itemScope?: boolean | undefined;
+    itemType?: string | undefined;
+    itemID?: string | undefined;
+    itemRef?: string | undefined;
+    results?: number | undefined;
+    security?: string | undefined;
+    unselectable?: "on" | "off" | undefined;
+    popover?: "" | "auto" | "manual" | undefined;
+    popoverTargetAction?: "toggle" | "show" | "hide" | undefined;
+    popoverTarget?: string | undefined;
+    inert?: boolean | undefined;
+    inputMode?:
+      | "none"
+      | "text"
+      | "tel"
+      | "url"
+      | "email"
+      | "numeric"
+      | "decimal"
+      | "search"
+      | undefined;
+    is?: string | undefined;
+    exportparts?: string | undefined;
+    part?: string | undefined;
+  }
+  interface AnchorHTMLAttributes<T> extends HTMLAttributes<T> {
+    download?: any;
+    href?: string | undefined;
+    hrefLang?: string | undefined;
+    media?: string | undefined;
+    ping?: string | undefined;
+    target?: HTMLAttributeAnchorTarget | undefined;
+    type?: string | undefined;
+    referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+  }
+  interface BlockquoteHTMLAttributes<T> extends HTMLAttributes<T> {
+    cite?: string | undefined;
+  }
+  interface ButtonHTMLAttributes<T> extends HTMLAttributes<T> {
+    disabled?: boolean | undefined;
+    form?: string | undefined;
+    formAction?: string | ((formData: FormData) => void | Promise<void>) | undefined;
+    formEncType?: string | undefined;
+    formMethod?: string | undefined;
+    formNoValidate?: boolean | undefined;
+    formTarget?: string | undefined;
+    name?: string | undefined;
+    type?: "submit" | "reset" | "button" | undefined;
+    value?: string | readonly string[] | number | undefined;
+  }
+  interface CanvasHTMLAttributes<T> extends HTMLAttributes<T> {
+    height?: number | string | undefined;
+    width?: number | string | undefined;
+  }
+  interface ColHTMLAttributes<T> extends HTMLAttributes<T> {
+    span?: number | undefined;
+    width?: number | string | undefined;
+  }
+  interface ColgroupHTMLAttributes<T> extends HTMLAttributes<T> {
+    span?: number | undefined;
+  }
+  interface DelHTMLAttributes<T> extends HTMLAttributes<T> {
+    cite?: string | undefined;
+    dateTime?: string | undefined;
+  }
+  interface DetailsHTMLAttributes<T> extends HTMLAttributes<T> {
+    open?: boolean | undefined;
+    name?: string | undefined;
+    onToggle?: ReactEventHandler<T> | undefined;
+  }
+  interface DialogHTMLAttributes<T> extends HTMLAttributes<T> {
+    onCancel?: ReactEventHandler<T> | undefined;
+    onClose?: ReactEventHandler<T> | undefined;
+    open?: boolean | undefined;
+  }
+  interface FieldsetHTMLAttributes<T> extends HTMLAttributes<T> {
+    disabled?: boolean | undefined;
+    form?: string | undefined;
+    name?: string | undefined;
+  }
+  interface FormHTMLAttributes<T> extends HTMLAttributes<T> {
+    acceptCharset?: string | undefined;
+    action?: string | ((formData: FormData) => void | Promise<void>) | undefined;
+    autoComplete?: string | undefined;
+    encType?: string | undefined;
+    method?: string | undefined;
+    name?: string | undefined;
+    noValidate?: boolean | undefined;
+    target?: string | undefined;
+  }
+  interface ImgHTMLAttributes<T> extends HTMLAttributes<T> {
+    alt?: string | undefined;
+    crossOrigin?: CrossOrigin;
+    decoding?: "async" | "auto" | "sync" | undefined;
+    fetchPriority?: "high" | "low" | "auto";
+    height?: number | string | undefined;
+    loading?: "eager" | "lazy" | undefined;
+    referrerPolicy?: HTMLAttributeReferrerPolicy | undefined;
+    sizes?: string | undefined;
+    src?: string | undefined;
+    srcSet?: string | undefined;
+    useMap?: string | undefined;
+    width?: number | string | undefined;
+  }
+  interface InsHTMLAttributes<T> extends HTMLAttributes<T> {
+    cite?: string | undefined;
+    dateTime?: string | undefined;
+  }
+  interface InputHTMLAttributes<T> extends HTMLAttributes<T> {
+    accept?: string | undefined;
+    alt?: string | undefined;
+    autoComplete?: HTMLInputAutoCompleteAttribute | undefined;
+    capture?: boolean | "user" | "environment" | undefined;
+    checked?: boolean | undefined;
+    disabled?: boolean | undefined;
+    form?: string | undefined;
+    formAction?: string | ((formData: FormData) => void | Promise<void>) | undefined;
+    formEncType?: string | undefined;
+    formMethod?: string | undefined;
+    formNoValidate?: boolean | undefined;
+    formTarget?: string | undefined;
+    height?: number | string | undefined;
+    list?: string | undefined;
+    max?: number | string | undefined;
+    maxLength?: number | undefined;
+    min?: number | string | undefined;
+    minLength?: number | undefined;
+    multiple?: boolean | undefined;
+    name?: string | undefined;
+    pattern?: string | undefined;
+    placeholder?: string | undefined;
+    readOnly?: boolean | undefined;
+    required?: boolean | undefined;
+    size?: number | undefined;
+    src?: string | undefined;
+    step?: number | string | undefined;
+    type?: HTMLInputTypeAttribute | undefined;
+    value?: string | readonly string[] | number | undefined;
+    width?: number | string | undefined;
+
+    onChange?: ChangeEventHandler<T> | undefined;
+  }
+  interface LabelHTMLAttributes<T> extends HTMLAttributes<T> {
+    form?: string | undefined;
+    htmlFor?: string | undefined;
+  }
+  interface LiHTMLAttributes<T> extends HTMLAttributes<T> {
+    value?: string | readonly string[] | number | undefined;
+  }
+  interface MeterHTMLAttributes<T> extends HTMLAttributes<T> {
+    form?: string | undefined;
+    high?: number | undefined;
+    low?: number | undefined;
+    max?: number | string | undefined;
+    min?: number | string | undefined;
+    optimum?: number | undefined;
+    value?: string | readonly string[] | number | undefined;
+  }
+  interface OlHTMLAttributes<T> extends HTMLAttributes<T> {
+    reversed?: boolean | undefined;
+    start?: number | undefined;
+    type?: "1" | "a" | "A" | "i" | "I" | undefined;
+  }
+  interface OptgroupHTMLAttributes<T> extends HTMLAttributes<T> {
+    disabled?: boolean | undefined;
+    label?: string | undefined;
+  }
+  interface OptionHTMLAttributes<T> extends HTMLAttributes<T> {
+    disabled?: boolean | undefined;
+    label?: string | undefined;
+    selected?: boolean | undefined;
+    value?: string | readonly string[] | number | undefined;
+  }
+  interface OutputHTMLAttributes<T> extends HTMLAttributes<T> {
+    form?: string | undefined;
+    htmlFor?: string | undefined;
+    name?: string | undefined;
+  }
+  interface ProgressHTMLAttributes<T> extends HTMLAttributes<T> {
+    max?: number | string | undefined;
+    value?: string | readonly string[] | number | undefined;
+  }
+  interface SelectHTMLAttributes<T> extends HTMLAttributes<T> {
+    autoComplete?: string | undefined;
+    disabled?: boolean | undefined;
+    form?: string | undefined;
+    multiple?: boolean | undefined;
+    name?: string | undefined;
+    required?: boolean | undefined;
+    size?: number | undefined;
+    value?: string | readonly string[] | number | undefined;
+    onChange?: ChangeEventHandler<T> | undefined;
+  }
+  interface TableHTMLAttributes<T> extends HTMLAttributes<T> {
+    align?: "left" | "center" | "right" | undefined;
+    bgcolor?: string | undefined;
+    border?: number | undefined;
+    cellPadding?: number | string | undefined;
+    cellSpacing?: number | string | undefined;
+    frame?: boolean | undefined;
+    rules?: "none" | "groups" | "rows" | "columns" | "all" | undefined;
+    summary?: string | undefined;
+    width?: number | string | undefined;
+  }
+  interface TextareaHTMLAttributes<T> extends HTMLAttributes<T> {
+    autoComplete?: string | undefined;
+    cols?: number | undefined;
+    dirName?: string | undefined;
+    disabled?: boolean | undefined;
+    form?: string | undefined;
+    maxLength?: number | undefined;
+    minLength?: number | undefined;
+    name?: string | undefined;
+    placeholder?: string | undefined;
+    readOnly?: boolean | undefined;
+    required?: boolean | undefined;
+    rows?: number | undefined;
+    value?: string | readonly string[] | number | undefined;
+    wrap?: string | undefined;
+
+    onChange?: ChangeEventHandler<T> | undefined;
+  }
+  interface TdHTMLAttributes<T> extends HTMLAttributes<T> {
+    align?: "left" | "center" | "right" | "justify" | "char" | undefined;
+    colSpan?: number | undefined;
+    headers?: string | undefined;
+    rowSpan?: number | undefined;
+    scope?: string | undefined;
+    abbr?: string | undefined;
+    height?: number | string | undefined;
+    width?: number | string | undefined;
+    valign?: "top" | "middle" | "bottom" | "baseline" | undefined;
+  }
+  interface ThHTMLAttributes<T> extends HTMLAttributes<T> {
+    align?: "left" | "center" | "right" | "justify" | "char" | undefined;
+    colSpan?: number | undefined;
+    headers?: string | undefined;
+    rowSpan?: number | undefined;
+    scope?: string | undefined;
+    abbr?: string | undefined;
+  }
+  interface TimeHTMLAttributes<T> extends HTMLAttributes<T> {
+    dateTime?: string | undefined;
+  }
+  interface SVGAttributes<T> extends DOMAttributes<T> {
+    // Shared with HTML
+    className?: string | undefined;
+    color?: string | undefined;
+    height?: number | string | undefined;
+    id?: string | undefined;
+    lang?: string | undefined;
+    max?: number | string | undefined;
+    media?: string | undefined;
+    method?: string | undefined;
+    min?: number | string | undefined;
+    name?: string | undefined;
+    style?: ReactTypes.CSSProperties | undefined;
+    target?: string | undefined;
+    type?: string | undefined;
+    width?: number | string | undefined;
+
+    // Other HTML-like
+    role?: string | undefined;
+    tabIndex?: number | undefined;
+    crossOrigin?: CrossOrigin;
+
+    // SVG-specific
+    accentHeight?: number | string | undefined;
+    accumulate?: "none" | "sum" | undefined;
+    additive?: "replace" | "sum" | undefined;
+    alignmentBaseline?:
+      | "auto"
+      | "baseline"
+      | "before-edge"
+      | "text-before-edge"
+      | "middle"
+      | "central"
+      | "after-edge"
+      | "text-after-edge"
+      | "ideographic"
+      | "alphabetic"
+      | "hanging"
+      | "mathematical"
+      | "inherit"
+      | undefined;
+    allowReorder?: "no" | "yes" | undefined;
+    alphabetic?: number | string | undefined;
+    amplitude?: number | string | undefined;
+    arabicForm?: "initial" | "medial" | "terminal" | "isolated" | undefined;
+    ascent?: number | string | undefined;
+    attributeName?: string | undefined;
+    attributeType?: string | undefined;
+    autoReverse?: Booleanish | undefined;
+    azimuth?: number | string | undefined;
+    baseFrequency?: number | string | undefined;
+    baselineShift?: number | string | undefined;
+    baseProfile?: number | string | undefined;
+    bbox?: number | string | undefined;
+    begin?: number | string | undefined;
+    bias?: number | string | undefined;
+    by?: number | string | undefined;
+    calcMode?: number | string | undefined;
+    capHeight?: number | string | undefined;
+    clip?: number | string | undefined;
+    clipPath?: string | undefined;
+    clipPathUnits?: number | string | undefined;
+    clipRule?: number | string | undefined;
+    colorInterpolation?: number | string | undefined;
+    colorInterpolationFilters?: "auto" | "sRGB" | "linearRGB" | "inherit" | undefined;
+    colorProfile?: number | string | undefined;
+    colorRendering?: number | string | undefined;
+    contentScriptType?: number | string | undefined;
+    contentStyleType?: number | string | undefined;
+    cursor?: number | string | undefined;
+    cx?: number | string | undefined;
+    cy?: number | string | undefined;
+    d?: string | undefined;
+    decelerate?: number | string | undefined;
+    descent?: number | string | undefined;
+    diffuseConstant?: number | string | undefined;
+    direction?: number | string | undefined;
+    display?: number | string | undefined;
+    divisor?: number | string | undefined;
+    dominantBaseline?: number | string | undefined;
+    dur?: number | string | undefined;
+    dx?: number | string | undefined;
+    dy?: number | string | undefined;
+    edgeMode?: number | string | undefined;
+    elevation?: number | string | undefined;
+    enableBackground?: number | string | undefined;
+    end?: number | string | undefined;
+    exponent?: number | string | undefined;
+    externalResourcesRequired?: Booleanish | undefined;
+    fill?: string | undefined;
+    fillOpacity?: number | string | undefined;
+    fillRule?: "nonzero" | "evenodd" | "inherit" | undefined;
+    filter?: string | undefined;
+    filterRes?: number | string | undefined;
+    filterUnits?: number | string | undefined;
+    floodColor?: number | string | undefined;
+    floodOpacity?: number | string | undefined;
+    focusable?: Booleanish | "auto" | undefined;
+    fontFamily?: string | undefined;
+    fontSize?: number | string | undefined;
+    fontSizeAdjust?: number | string | undefined;
+    fontStretch?: number | string | undefined;
+    fontStyle?: number | string | undefined;
+    fontVariant?: number | string | undefined;
+    fontWeight?: number | string | undefined;
+    format?: number | string | undefined;
+    fr?: number | string | undefined;
+    from?: number | string | undefined;
+    fx?: number | string | undefined;
+    fy?: number | string | undefined;
+    g1?: number | string | undefined;
+    g2?: number | string | undefined;
+    glyphName?: number | string | undefined;
+    glyphOrientationHorizontal?: number | string | undefined;
+    glyphOrientationVertical?: number | string | undefined;
+    glyphRef?: number | string | undefined;
+    gradientTransform?: string | undefined;
+    gradientUnits?: string | undefined;
+    hanging?: number | string | undefined;
+    horizAdvX?: number | string | undefined;
+    horizOriginX?: number | string | undefined;
+    href?: string | undefined;
+    ideographic?: number | string | undefined;
+    imageRendering?: number | string | undefined;
+    in2?: number | string | undefined;
+    in?: string | undefined;
+    intercept?: number | string | undefined;
+    k1?: number | string | undefined;
+    k2?: number | string | undefined;
+    k3?: number | string | undefined;
+    k4?: number | string | undefined;
+    k?: number | string | undefined;
+    kernelMatrix?: number | string | undefined;
+    kernelUnitLength?: number | string | undefined;
+    kerning?: number | string | undefined;
+    keyPoints?: number | string | undefined;
+    keySplines?: number | string | undefined;
+    keyTimes?: number | string | undefined;
+    lengthAdjust?: number | string | undefined;
+    letterSpacing?: number | string | undefined;
+    lightingColor?: number | string | undefined;
+    limitingConeAngle?: number | string | undefined;
+    local?: number | string | undefined;
+    markerEnd?: string | undefined;
+    markerHeight?: number | string | undefined;
+    markerMid?: string | undefined;
+    markerStart?: string | undefined;
+    markerUnits?: number | string | undefined;
+    markerWidth?: number | string | undefined;
+    mask?: string | undefined;
+    maskContentUnits?: number | string | undefined;
+    maskUnits?: number | string | undefined;
+    mathematical?: number | string | undefined;
+    mode?: number | string | undefined;
+    numOctaves?: number | string | undefined;
+    offset?: number | string | undefined;
+    opacity?: number | string | undefined;
+    operator?: number | string | undefined;
+    order?: number | string | undefined;
+    orient?: number | string | undefined;
+    orientation?: number | string | undefined;
+    origin?: number | string | undefined;
+    overflow?: number | string | undefined;
+    overlinePosition?: number | string | undefined;
+    overlineThickness?: number | string | undefined;
+    paintOrder?: number | string | undefined;
+    panose1?: number | string | undefined;
+    path?: string | undefined;
+    pathLength?: number | string | undefined;
+    patternContentUnits?: string | undefined;
+    patternTransform?: number | string | undefined;
+    patternUnits?: string | undefined;
+    pointerEvents?: number | string | undefined;
+    points?: string | undefined;
+    pointsAtX?: number | string | undefined;
+    pointsAtY?: number | string | undefined;
+    pointsAtZ?: number | string | undefined;
+    preserveAlpha?: Booleanish | undefined;
+    preserveAspectRatio?: string | undefined;
+    primitiveUnits?: number | string | undefined;
+    r?: number | string | undefined;
+    radius?: number | string | undefined;
+    refX?: number | string | undefined;
+    refY?: number | string | undefined;
+    renderingIntent?: number | string | undefined;
+    repeatCount?: number | string | undefined;
+    repeatDur?: number | string | undefined;
+    requiredExtensions?: number | string | undefined;
+    requiredFeatures?: number | string | undefined;
+    restart?: number | string | undefined;
+    result?: string | undefined;
+    rotate?: number | string | undefined;
+    rx?: number | string | undefined;
+    ry?: number | string | undefined;
+    scale?: number | string | undefined;
+    seed?: number | string | undefined;
+    shapeRendering?: number | string | undefined;
+    slope?: number | string | undefined;
+    spacing?: number | string | undefined;
+    specularConstant?: number | string | undefined;
+    specularExponent?: number | string | undefined;
+    speed?: number | string | undefined;
+    spreadMethod?: string | undefined;
+    startOffset?: number | string | undefined;
+    stdDeviation?: number | string | undefined;
+    stemh?: number | string | undefined;
+    stemv?: number | string | undefined;
+    stitchTiles?: number | string | undefined;
+    stopColor?: string | undefined;
+    stopOpacity?: number | string | undefined;
+    strikethroughPosition?: number | string | undefined;
+    strikethroughThickness?: number | string | undefined;
+    string?: number | string | undefined;
+    stroke?: string | undefined;
+    strokeDasharray?: string | number | undefined;
+    strokeDashoffset?: string | number | undefined;
+    strokeLinecap?: "butt" | "round" | "square" | "inherit" | undefined;
+    strokeLinejoin?: "miter" | "round" | "bevel" | "inherit" | undefined;
+    strokeMiterlimit?: number | string | undefined;
+    strokeOpacity?: number | string | undefined;
+    strokeWidth?: number | string | undefined;
+    surfaceScale?: number | string | undefined;
+    systemLanguage?: number | string | undefined;
+    tableValues?: number | string | undefined;
+    targetX?: number | string | undefined;
+    targetY?: number | string | undefined;
+    textAnchor?: string | undefined;
+    textDecoration?: number | string | undefined;
+    textLength?: number | string | undefined;
+    textRendering?: number | string | undefined;
+    to?: number | string | undefined;
+    transform?: string | undefined;
+    transformOrigin?: string | undefined;
+    u1?: number | string | undefined;
+    u2?: number | string | undefined;
+    underlinePosition?: number | string | undefined;
+    underlineThickness?: number | string | undefined;
+    unicode?: number | string | undefined;
+    unicodeBidi?: number | string | undefined;
+    unicodeRange?: number | string | undefined;
+    unitsPerEm?: number | string | undefined;
+    vAlphabetic?: number | string | undefined;
+    values?: string | undefined;
+    vectorEffect?: number | string | undefined;
+    version?: string | undefined;
+    vertAdvY?: number | string | undefined;
+    vertOriginX?: number | string | undefined;
+    vertOriginY?: number | string | undefined;
+    vHanging?: number | string | undefined;
+    vIdeographic?: number | string | undefined;
+    viewBox?: string | undefined;
+    viewTarget?: number | string | undefined;
+    visibility?: number | string | undefined;
+    vMathematical?: number | string | undefined;
+    widths?: number | string | undefined;
+    wordSpacing?: number | string | undefined;
+    writingMode?: number | string | undefined;
+    x1?: number | string | undefined;
+    x2?: number | string | undefined;
+    x?: number | string | undefined;
+    xChannelSelector?: string | undefined;
+    xHeight?: number | string | undefined;
+    xlinkActuate?: string | undefined;
+    xlinkArcrole?: string | undefined;
+    xlinkHref?: string | undefined;
+    xlinkRole?: string | undefined;
+    xlinkShow?: string | undefined;
+    xlinkTitle?: string | undefined;
+    xlinkType?: string | undefined;
+    xmlBase?: string | undefined;
+    xmlLang?: string | undefined;
+    xmlns?: string | undefined;
+    xmlnsXlink?: string | undefined;
+    xmlSpace?: string | undefined;
+    y1?: number | string | undefined;
+    y2?: number | string | undefined;
+    y?: number | string | undefined;
+    yChannelSelector?: string | undefined;
+    z?: number | string | undefined;
+    zoomAndPan?: string | undefined;
+  }
+  interface SVGProps<T> extends SVGAttributes<T>, ClassAttributes<T> {}
+}
+
+declare module "react/jsx-runtime" {
+  namespace JSX {
+    interface IntrinsicElements {
+      // Document structure and text
+      a: Env.DetailedHTMLProps<Env.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>;
+      abbr: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      article: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      aside: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      b: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      blockquote: Env.DetailedHTMLProps<
+        Env.BlockquoteHTMLAttributes<HTMLQuoteElement>,
+        HTMLQuoteElement
+      >;
+      br: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLBRElement>, HTMLBRElement>;
+      code: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      dd: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      del: Env.DetailedHTMLProps<Env.DelHTMLAttributes<HTMLModElement>, HTMLModElement>;
+      details: Env.DetailedHTMLProps<
+        Env.DetailsHTMLAttributes<HTMLDetailsElement>,
+        HTMLDetailsElement
+      >;
+      dialog: Env.DetailedHTMLProps<Env.DialogHTMLAttributes<HTMLDialogElement>, HTMLDialogElement>;
+      div: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
+      dl: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLDListElement>, HTMLDListElement>;
+      dt: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      em: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      figcaption: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      figure: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      footer: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      h1: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+      h2: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+      h3: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+      h4: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+      h5: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+      h6: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+      header: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      hr: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLHRElement>, HTMLHRElement>;
+      i: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      ins: Env.DetailedHTMLProps<Env.InsHTMLAttributes<HTMLModElement>, HTMLModElement>;
+      kbd: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      li: Env.DetailedHTMLProps<Env.LiHTMLAttributes<HTMLLIElement>, HTMLLIElement>;
+      main: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      mark: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      nav: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      ol: Env.DetailedHTMLProps<Env.OlHTMLAttributes<HTMLOListElement>, HTMLOListElement>;
+      p: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLParagraphElement>, HTMLParagraphElement>;
+      pre: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLPreElement>, HTMLPreElement>;
+      s: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      section: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      small: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      span: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLSpanElement>, HTMLSpanElement>;
+      strong: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      sub: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      summary: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      sup: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      time: Env.DetailedHTMLProps<Env.TimeHTMLAttributes<HTMLTimeElement>, HTMLTimeElement>;
+      u: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLElement>, HTMLElement>;
+      ul: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLUListElement>, HTMLUListElement>;
+      // Forms
+      button: Env.DetailedHTMLProps<Env.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>;
+      datalist: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLDataListElement>, HTMLDataListElement>;
+      fieldset: Env.DetailedHTMLProps<
+        Env.FieldsetHTMLAttributes<HTMLFieldSetElement>,
+        HTMLFieldSetElement
+      >;
+      form: Env.DetailedHTMLProps<Env.FormHTMLAttributes<HTMLFormElement>, HTMLFormElement>;
+      input: Env.DetailedHTMLProps<Env.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>;
+      label: Env.DetailedHTMLProps<Env.LabelHTMLAttributes<HTMLLabelElement>, HTMLLabelElement>;
+      legend: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLLegendElement>, HTMLLegendElement>;
+      meter: Env.DetailedHTMLProps<Env.MeterHTMLAttributes<HTMLMeterElement>, HTMLMeterElement>;
+      optgroup: Env.DetailedHTMLProps<
+        Env.OptgroupHTMLAttributes<HTMLOptGroupElement>,
+        HTMLOptGroupElement
+      >;
+      option: Env.DetailedHTMLProps<Env.OptionHTMLAttributes<HTMLOptionElement>, HTMLOptionElement>;
+      output: Env.DetailedHTMLProps<Env.OutputHTMLAttributes<HTMLOutputElement>, HTMLOutputElement>;
+      progress: Env.DetailedHTMLProps<
+        Env.ProgressHTMLAttributes<HTMLProgressElement>,
+        HTMLProgressElement
+      >;
+      select: Env.DetailedHTMLProps<Env.SelectHTMLAttributes<HTMLSelectElement>, HTMLSelectElement>;
+      textarea: Env.DetailedHTMLProps<
+        Env.TextareaHTMLAttributes<HTMLTextAreaElement>,
+        HTMLTextAreaElement
+      >;
+      // Tables
+      caption: Env.DetailedHTMLProps<
+        Env.HTMLAttributes<HTMLTableCaptionElement>,
+        HTMLTableCaptionElement
+      >;
+      col: Env.DetailedHTMLProps<Env.ColHTMLAttributes<HTMLTableColElement>, HTMLTableColElement>;
+      colgroup: Env.DetailedHTMLProps<
+        Env.ColgroupHTMLAttributes<HTMLTableColElement>,
+        HTMLTableColElement
+      >;
+      table: Env.DetailedHTMLProps<Env.TableHTMLAttributes<HTMLTableElement>, HTMLTableElement>;
+      tbody: Env.DetailedHTMLProps<
+        Env.HTMLAttributes<HTMLTableSectionElement>,
+        HTMLTableSectionElement
+      >;
+      td: Env.DetailedHTMLProps<Env.TdHTMLAttributes<HTMLTableCellElement>, HTMLTableCellElement>;
+      tfoot: Env.DetailedHTMLProps<
+        Env.HTMLAttributes<HTMLTableSectionElement>,
+        HTMLTableSectionElement
+      >;
+      th: Env.DetailedHTMLProps<Env.ThHTMLAttributes<HTMLTableCellElement>, HTMLTableCellElement>;
+      thead: Env.DetailedHTMLProps<
+        Env.HTMLAttributes<HTMLTableSectionElement>,
+        HTMLTableSectionElement
+      >;
+      tr: Env.DetailedHTMLProps<Env.HTMLAttributes<HTMLTableRowElement>, HTMLTableRowElement>;
+      // Media
+      canvas: Env.DetailedHTMLProps<Env.CanvasHTMLAttributes<HTMLCanvasElement>, HTMLCanvasElement>;
+      img: Env.DetailedHTMLProps<Env.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>;
+      // SVG
+      svg: Env.SVGProps<SVGSVGElement>;
+      circle: Env.SVGProps<SVGCircleElement>;
+      clipPath: Env.SVGProps<SVGClipPathElement>;
+      defs: Env.SVGProps<SVGDefsElement>;
+      desc: Env.SVGProps<SVGDescElement>;
+      ellipse: Env.SVGProps<SVGEllipseElement>;
+      foreignObject: Env.SVGProps<SVGForeignObjectElement>;
+      g: Env.SVGProps<SVGGElement>;
+      line: Env.SVGProps<SVGLineElement>;
+      linearGradient: Env.SVGProps<SVGLinearGradientElement>;
+      marker: Env.SVGProps<SVGMarkerElement>;
+      mask: Env.SVGProps<SVGMaskElement>;
+      path: Env.SVGProps<SVGPathElement>;
+      pattern: Env.SVGProps<SVGPatternElement>;
+      polygon: Env.SVGProps<SVGPolygonElement>;
+      polyline: Env.SVGProps<SVGPolylineElement>;
+      radialGradient: Env.SVGProps<SVGRadialGradientElement>;
+      rect: Env.SVGProps<SVGRectElement>;
+      stop: Env.SVGProps<SVGStopElement>;
+      symbol: Env.SVGProps<SVGSymbolElement>;
+      text: Env.SVGProps<SVGTextElement>;
+      textPath: Env.SVGProps<SVGTextPathElement>;
+      tspan: Env.SVGProps<SVGTSpanElement>;
+      use: Env.SVGProps<SVGUseElement>;
+    }
+  }
+}
+
+declare global {
+  const React: typeof ReactTypes;
+  namespace React {
+    type Key = ReactTypes.Key;
+    type ReactNode = ReactTypes.ReactNode;
+    type ReactElement = ReactTypes.ReactElement;
+    type Attributes = ReactTypes.Attributes;
+    type PropsWithChildren<P = unknown> = ReactTypes.PropsWithChildren<P>;
+    type FunctionComponent<P = {}> = ReactTypes.FunctionComponent<P>;
+    type FC<P = {}> = ReactTypes.FC<P>;
+    type JSXElementConstructor<P = any> = ReactTypes.JSXElementConstructor<P>;
+    type CSSProperties = ReactTypes.CSSProperties;
+    type RefObject<T> = ReactTypes.RefObject<T>;
+    type Dispatch<A> = ReactTypes.Dispatch<A>;
+    type SetStateAction<S> = ReactTypes.SetStateAction<S>;
+    type SyntheticEvent<T = Element> = ReactTypes.SyntheticEvent<T>;
+    type UIEvent<T = Element> = ReactTypes.UIEvent<T>;
+    type MouseEvent<T = Element> = ReactTypes.MouseEvent<T>;
+    type PointerEvent<T = Element> = ReactTypes.PointerEvent<T>;
+    type KeyboardEvent<T = Element> = ReactTypes.KeyboardEvent<T>;
+    type FocusEvent<Target = Element, RelatedTarget = Element> = ReactTypes.FocusEvent<
+      Target,
+      RelatedTarget
+    >;
+    type ChangeEvent<T = Element> = ReactTypes.ChangeEvent<T>;
+    type FormEvent<T = Element> = ReactTypes.FormEvent<T>;
+    type RefCallback<T> = Env.RefCallback<T>;
+    type Ref<T> = Env.Ref<T>;
+    type ClassAttributes<T> = Env.ClassAttributes<T>;
+    type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = Env.DetailedHTMLProps<E, T>;
+    type ClipboardEvent<T = Element> = Env.ClipboardEvent<T>;
+    type DragEvent<T = Element> = Env.DragEvent<T>;
+    type WheelEvent<T = Element> = Env.WheelEvent<T>;
+    type TouchEvent<T = Element> = Env.TouchEvent<T>;
+    type AnimationEvent<T = Element> = Env.AnimationEvent<T>;
+    type TransitionEvent<T = Element> = Env.TransitionEvent<T>;
+    type EventHandler<E extends SyntheticEvent<any>> = Env.EventHandler<E>;
+    type ReactEventHandler<T = Element> = Env.ReactEventHandler<T>;
+    type ClipboardEventHandler<T = Element> = Env.ClipboardEventHandler<T>;
+    type DragEventHandler<T = Element> = Env.DragEventHandler<T>;
+    type FocusEventHandler<T = Element> = Env.FocusEventHandler<T>;
+    type FormEventHandler<T = Element> = Env.FormEventHandler<T>;
+    type ChangeEventHandler<T = Element> = Env.ChangeEventHandler<T>;
+    type KeyboardEventHandler<T = Element> = Env.KeyboardEventHandler<T>;
+    type MouseEventHandler<T = Element> = Env.MouseEventHandler<T>;
+    type TouchEventHandler<T = Element> = Env.TouchEventHandler<T>;
+    type PointerEventHandler<T = Element> = Env.PointerEventHandler<T>;
+    type UIEventHandler<T = Element> = Env.UIEventHandler<T>;
+    type WheelEventHandler<T = Element> = Env.WheelEventHandler<T>;
+    type AnimationEventHandler<T = Element> = Env.AnimationEventHandler<T>;
+    type TransitionEventHandler<T = Element> = Env.TransitionEventHandler<T>;
+    type DOMAttributes<T> = Env.DOMAttributes<T>;
+    type Booleanish = Env.Booleanish;
+    type CrossOrigin = Env.CrossOrigin;
+    type HTMLInputTypeAttribute = Env.HTMLInputTypeAttribute;
+    type HTMLInputAutoCompleteAttribute = Env.HTMLInputAutoCompleteAttribute;
+    type HTMLAttributeAnchorTarget = Env.HTMLAttributeAnchorTarget;
+    type HTMLAttributeReferrerPolicy = Env.HTMLAttributeReferrerPolicy;
+    type HTMLAttributes<T> = Env.HTMLAttributes<T>;
+    type AnchorHTMLAttributes<T> = Env.AnchorHTMLAttributes<T>;
+    type BlockquoteHTMLAttributes<T> = Env.BlockquoteHTMLAttributes<T>;
+    type ButtonHTMLAttributes<T> = Env.ButtonHTMLAttributes<T>;
+    type CanvasHTMLAttributes<T> = Env.CanvasHTMLAttributes<T>;
+    type ColHTMLAttributes<T> = Env.ColHTMLAttributes<T>;
+    type ColgroupHTMLAttributes<T> = Env.ColgroupHTMLAttributes<T>;
+    type DelHTMLAttributes<T> = Env.DelHTMLAttributes<T>;
+    type DetailsHTMLAttributes<T> = Env.DetailsHTMLAttributes<T>;
+    type DialogHTMLAttributes<T> = Env.DialogHTMLAttributes<T>;
+    type FieldsetHTMLAttributes<T> = Env.FieldsetHTMLAttributes<T>;
+    type FormHTMLAttributes<T> = Env.FormHTMLAttributes<T>;
+    type ImgHTMLAttributes<T> = Env.ImgHTMLAttributes<T>;
+    type InsHTMLAttributes<T> = Env.InsHTMLAttributes<T>;
+    type InputHTMLAttributes<T> = Env.InputHTMLAttributes<T>;
+    type LabelHTMLAttributes<T> = Env.LabelHTMLAttributes<T>;
+    type LiHTMLAttributes<T> = Env.LiHTMLAttributes<T>;
+    type MeterHTMLAttributes<T> = Env.MeterHTMLAttributes<T>;
+    type OlHTMLAttributes<T> = Env.OlHTMLAttributes<T>;
+    type OptgroupHTMLAttributes<T> = Env.OptgroupHTMLAttributes<T>;
+    type OptionHTMLAttributes<T> = Env.OptionHTMLAttributes<T>;
+    type OutputHTMLAttributes<T> = Env.OutputHTMLAttributes<T>;
+    type ProgressHTMLAttributes<T> = Env.ProgressHTMLAttributes<T>;
+    type SelectHTMLAttributes<T> = Env.SelectHTMLAttributes<T>;
+    type TableHTMLAttributes<T> = Env.TableHTMLAttributes<T>;
+    type TextareaHTMLAttributes<T> = Env.TextareaHTMLAttributes<T>;
+    type TdHTMLAttributes<T> = Env.TdHTMLAttributes<T>;
+    type ThHTMLAttributes<T> = Env.ThHTMLAttributes<T>;
+    type TimeHTMLAttributes<T> = Env.TimeHTMLAttributes<T>;
+    type SVGAttributes<T> = Env.SVGAttributes<T>;
+    type SVGProps<T> = Env.SVGProps<T>;
+  }
+  namespace JSX {
+    type ElementType = string | ReactTypes.JSXElementConstructor<any>;
+    type Element = ReactTypes.ReactElement;
+    interface IntrinsicElements extends ReactTypes.JSX.IntrinsicElements {}
+    interface IntrinsicAttributes extends ReactTypes.Attributes {}
+  }
+}

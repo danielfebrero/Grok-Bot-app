@@ -1,0 +1,932 @@
+/**
+ * "GIBSON BARBER SHOP" — 41-slide deck rebuilt with pptxgenjs.
+ * Slide size 26.661 x 15 in (widescreen, 4x scale).  Raster photos in the
+ * original are represented by programmatic placeholder rectangles.
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Theme
+ * ------------------------------------------------------------------ */
+const W = 26.661459; // slide width  (in)
+const H = 15.0; // slide height (in)
+
+const C = {
+  gold: 'D5A252', // accent1
+  gold2: 'BE9355', // accent2
+  olive: '95865F', // accent3
+  ink: '191C20', // accent4 - near black
+  cream: 'F3F2EB', // accent6 - page background
+  white: 'FFFFFF',
+  black: '000000',
+  grey: '7F7F7F', // body copy
+  greyLt: 'E7E6E6', // hairlines / empty cards
+  photo: 'FAF5EC', // "drag picture here" plate
+  photoDk: '7F7F7F', // same plate, dark variant (slide 22)
+};
+
+const F = { display: 'Teko', body: 'Open Sans', label: 'Montserrat' };
+
+const TITLE = { fontFace: F.display, fontSize: 80, color: C.ink };
+const BODY = { fontFace: F.body, fontSize: 24, color: C.grey, lineSpacingMultiple: 1.5 };
+const EYEBROW = { fontFace: F.label, fontSize: 18, color: C.gold, charSpacing: 3 };
+const HAIR = 1; // 12700 EMU hairline, in points
+
+/* ------------------------------------------------------------------ *
+ * Vector art.  Paths are unit-square fractions of the shape box:
+ *   [x, y, 'm']                       moveTo
+ *   [x, y]                            lineTo
+ *   [x, y, x1, y1, x2, y2]            cubic bezier (end point first)
+ *   []                                closePath
+ * ------------------------------------------------------------------ */
+const RAZOR = [
+  [0.1205, 0.9314, 'm'], [0.074, 0.9625], [0.0382, 0.9559, 0.0622, 0.9704, 0.0462, 0.9674], [0.0045, 0.9073],
+  [0.0112, 0.8722, -0.0035, 0.8958, -0.0005, 0.8801], [0.1061, 0.8088], [0.1085, 0.8294, 0.1069, 0.8157, 0.1077, 0.8225], [0.1121, 0.8694],
+  [0.1122, 0.8699], [0.1176, 0.9104, 0.1143, 0.8876, 0.1158, 0.8982], [0.1204, 0.9306, 0.1184, 0.9163, 0.1193, 0.9227], [0.1205, 0.9314, 0.1204, 0.9309, 0.1205, 0.9312],
+  [], [0.9926, 0.3485, 'm'], [0.3321, 0.79], [0.33, 0.6592, 0.3287, 0.7464, 0.328, 0.7027],
+  [0.6561, 0.4412], [0.5906, 0.3469], [0.5927, 0.336, 0.5881, 0.3433, 0.589, 0.3384], [0.8745, 0.1476],
+  [0.8856, 0.1497, 0.8781, 0.1452, 0.8831, 0.1461], [0.9511, 0.244], [0.9994, 0.3134], [0.9926, 0.3485, 1.0074, 0.3249, 1.0043, 0.3406],
+  [], [0.8877, 0.2041, 'm'], [0.8607, 0.1991, 0.8816, 0.1954, 0.8696, 0.1932], [0.6444, 0.3437],
+  [0.6393, 0.3702, 0.6355, 0.3497, 0.6332, 0.3615], [0.6553, 0.3785, 0.643, 0.3756, 0.6491, 0.3785], [0.6662, 0.3752, 0.6591, 0.3785, 0.6629, 0.3775], [0.8826, 0.2306],
+  [0.8877, 0.2041, 0.8914, 0.2247, 0.8937, 0.2128], [], [0.465, 0.1091, 'm'], [0.4406, 0.1509],
+  [0.3019, 0.8689, 0.3143, 0.3673, 0.2651, 0.6223], [0.309, 0.9166], [0.2532, 0.9985, 0.3147, 0.9547, 0.2902, 0.9907], [0.2223, 0.9989, 0.2431, 1.0007, 0.2326, 1.0008],
+  [0.1589, 0.9256, 0.1819, 0.9914, 0.1631, 0.9561], [0.156, 0.9051, 0.1578, 0.9176, 0.1569, 0.9111], [0.1508, 0.8657, 0.1543, 0.8932, 0.1528, 0.8828], [0.1472, 0.8256],
+  [0.1471, 0.8249], [0.2834, 0.1338, 0.1171, 0.5918, 0.1643, 0.3528], [0.3064, 0.0889], [0.32, 0.0641, 0.3113, 0.0804, 0.3155, 0.0725],
+  [0.3267, 0.0516, 0.3221, 0.06, 0.3243, 0.0559], [0.4005, 0.0, 0.3371, 0.0323, 0.3606, 0.0], [0.415, 0.0014, 0.4052, 0.0, 0.4101, 0.0005], [0.4436, 0.0128, 0.4253, 0.0033, 0.435, 0.0071],
+  [0.465, 0.1091, 0.4751, 0.0334, 0.4845, 0.0757], [], [0.2349, 0.9047, 'm'], [0.2141, 0.9187, 0.2259, 0.905, 0.2176, 0.9105],
+  [0.237, 0.9517, 0.207, 0.9348, 0.2191, 0.9522], [0.2579, 0.9377, 0.246, 0.9514, 0.2543, 0.9459], [0.2349, 0.9047, 0.265, 0.9216, 0.2528, 0.9042], [],
+  [0.4003, 0.0486, 'm'], [0.3794, 0.0625, 0.3913, 0.0489, 0.383, 0.0544], [0.4024, 0.0956, 0.3724, 0.0787, 0.3845, 0.0961], [0.4232, 0.0816, 0.4114, 0.0953, 0.4197, 0.0898],
+  [0.4003, 0.0486, 0.4303, 0.0655, 0.4182, 0.048], [],
+];
+
+// three interlocking "SWOT" rings (slide 29)
+const RING_L = [
+  [0.497, 0.5, 'm'], [0.2751, 0.9018, 0.497, 0.7224, 0.3975, 0.9018], [0.054, 0.5, 0.1536, 0.9018, 0.054, 0.7224], [0.2751, 0.0966, 0.054, 0.2776, 0.1536, 0.0966],
+  [0.4768, 0.3328, 0.3646, 0.0966, 0.4414, 0.1933], [0.5038, 0.2209, 0.4835, 0.2929, 0.4928, 0.2561], [0.2751, 0.0, 0.454, 0.0874, 0.3705, 0.0], [0.0, 0.5, 0.1241, 0.0, 0.0, 0.2239],
+  [0.2751, 1.0, 0.0, 0.7761, 0.1241, 1.0], [0.5502, 0.5, 0.427, 1.0, 0.5502, 0.7761], [0.7722, 0.0966, 0.5502, 0.2776, 0.6498, 0.0966], [0.973, 0.3328, 0.8616, 0.0966, 0.9384, 0.1933],
+  [1.0, 0.2209, 0.9797, 0.2929, 0.989, 0.2561], [0.7722, 0.0, 0.9511, 0.0874, 0.8667, 0.0], [0.497, 0.5, 0.6203, 0.0, 0.4970, 0.2239], [],
+];
+const RING_M = [
+  [0.4717, 0.5, 'm'], [0.2398, 0.9018, 0.4717, 0.7224, 0.3673, 0.9018], [0.0283, 0.6672, 0.146, 0.9018, 0.0655, 0.8052], [0.0, 0.7791, 0.0212, 0.7071, 0.0124, 0.7439],
+  [0.2398, 1.0, 0.0522, 0.9126, 0.1398, 1.0], [0.5283, 0.5, 0.3991, 1.0, 0.5283, 0.7761], [0.7602, 0.0966, 0.5283, 0.2776, 0.6327, 0.0966], [0.9717, 0.3328, 0.854, 0.0966, 0.9345, 0.1933],
+  [1.0, 0.2209, 0.9788, 0.2929, 0.9885, 0.2561], [0.7602, 0.0, 0.9478, 0.0874, 0.8602, 0.0], [0.4717, 0.5, 0.6009, 0.0, 0.4717, 0.2239], [],
+];
+const RING_R = [
+  [0.4498, 0.5, 'm'], [0.2278, 0.9018, 0.4498, 0.7224, 0.3502, 0.9018], [0.027, 0.6672, 0.1384, 0.9018, 0.0616, 0.8052], [0.0, 0.7791, 0.0203, 0.7071, 0.011, 0.7439],
+  [0.2278, 1.0, 0.0489, 0.9126, 0.1333, 1.0], [0.503, 0.5, 0.3797, 1.0, 0.503, 0.7761], [0.7249, 0.0966, 0.503, 0.2776, 0.6025, 0.0966], [0.946, 0.5, 0.8464, 0.0966, 0.946, 0.2776],
+  [0.7249, 0.9018, 0.946, 0.7224, 0.8464, 0.9018], [0.5232, 0.6672, 0.6354, 0.9018, 0.5586, 0.8052], [0.4962, 0.7791, 0.5165, 0.7071, 0.5072, 0.7439], [0.7249, 1.0, 0.546, 0.9126, 0.6295, 1.0],
+  [1.0, 0.5, 0.8759, 1.0, 1.0, 0.7761], [0.7249, 0.0, 1.0, 0.2239, 0.8759, 0.0], [0.4498, 0.5, 0.573, 0.0, 0.4498, 0.2239], [],
+];
+
+// freeform accents drawn behind the photo plates
+const G_ROUNDSQ = [ // slide 7 - big rotated rounded square
+  [0.9492, 0.0508, 'm'], [1.0, 0.1736, 0.9806, 0.0823, 1.0, 0.1257], [1.0, 0.8264], [0.8264, 1.0, 1.0, 0.9223, 0.9223, 1.0],
+  [0.1736, 1.0], [0.0, 0.8264, 0.0777, 1.0, 0.0, 0.9223], [0.0, 0.1736], [0.1736, 0.0, 0.0, 0.0777, 0.0777, 0.0],
+  [0.8264, 0.0], [0.9492, 0.0508, 0.8743, 0.0, 0.9177, 0.0194], [],
+];
+const G_ARROW8 = [[0.0, 0.9638, 'm'], [0.3082, 0.0], [1.0, 1.0], [0.0, 0.9638], []]; // slide 8 outline
+const G_WEDGE30 = [[1.0, 1.0, 'm'], [0.574, 1.0], [0.0, 0.0], [1.0, 0.0], [1.0, 1.0], []]; // slide 30
+
+/* ------------------------------------------------------------------ *
+ * Drawing helpers
+ * ------------------------------------------------------------------ */
+const pptx = new PptxGenJS();
+
+// OOXML preset-geometry names used in this deck
+const S = {
+  rect: 'rect', roundRect: 'roundRect', ellipse: 'ellipse', triangle: 'triangle',
+  line: 'line', arc: 'arc', pie: 'pie', frame: 'frame', teardrop: 'teardrop',
+  custGeom: 'custGeom', flowChartManualOperation: 'flowChartManualOperation',
+  flowChartExtract: 'flowChartExtract',
+};
+
+/** custom-geometry polygon; `pts` are unit fractions of the w x h box */
+function poly(s, x, y, w, h, pts, opts) {
+  const points = pts.map(p => {
+    if (p.length === 0) return { close: true };
+    if (p.length === 6) {
+      return { x: p[0] * w, y: p[1] * h, curve: { type: 'cubic', x1: p[2] * w, y1: p[3] * h, x2: p[4] * w, y2: p[5] * h } };
+    }
+    return { x: p[0] * w, y: p[1] * h, moveTo: p[2] === 'm' };
+  });
+  s.addShape(S.custGeom, Object.assign({ x, y, w, h, points }, opts));
+}
+
+/** the straight-razor mark used as the studio logo */
+function razor(s, x, y, size, color) {
+  poly(s, x + 0.0073 * size, y, 0.9817 * size, size, RAZOR, { fill: { color } });
+}
+
+/** gold (or ink) corner tile with the razor mark inside */
+function badge(s, x, y, tile) {
+  s.addShape(S.rect, { x, y, w: 1.947, h: 1.921, fill: { color: tile || C.gold } });
+  razor(s, x + 0.489, y + 0.476, 0.969, C.white);
+}
+
+/** short rule with a ring in the middle - the deck's section divider */
+function divider(s, x, y) {
+  s.addShape(S.line, { x, y: y + 0.158, w: 1.043, h: 0, line: { color: C.gold, width: HAIR } });
+  s.addShape(S.ellipse, { x: x + 0.365, y, w: 0.315, h: 0.315, line: { color: C.gold, width: HAIR } });
+}
+
+function eyebrow(s, text, x, y, opts) {
+  s.addText(text, Object.assign({ x, y, w: 6, h: 0.404, valign: 'top' }, EYEBROW, opts));
+}
+
+function title(s, text, x, y, w, h, opts) {
+  s.addText(text, Object.assign({ x, y, w, h, valign: 'top' }, TITLE, opts));
+}
+
+function body(s, text, x, y, w, h, opts) {
+  s.addText(text, Object.assign({ x, y, w, h, valign: 'top' }, BODY, opts));
+}
+
+/** cream page background (comes from the slide master in the original) */
+function page(s) {
+  s.addShape(S.rect, { x: 0, y: -0.022, w: W, h: 15.022, fill: { color: C.cream } });
+}
+
+/**
+ * Stand-in for an empty "Drag Picture here" picture placeholder: a pale plate
+ * the size of the placeholder box, captioned like the original prompt and
+ * carrying the little "insert picture" glyph in the middle.
+ */
+function photo(s, x, y, w, h, opts) {
+  const o = opts || {};
+  s.addShape(S.rect, { x, y, w, h, fill: { color: o.color || C.photo } });
+  const gw = 0.9;
+  const gh = 0.67;
+  const gx = x + w / 2 - gw / 2;
+  const gy = y + h / 2 - gh / 2;
+  s.addShape(S.rect, { x: gx, y: gy, w: gw, h: gh, fill: { color: C.white }, line: { color: C.grey, width: 0.75 } });
+  s.addShape(S.triangle, { x: gx + 0.12, y: gy + 0.26, w: 0.52, h: 0.34, fill: { color: '5B9BD5' } });
+  s.addShape(S.ellipse, { x: gx + 0.13, y: gy + 0.1, w: 0.14, h: 0.14, fill: { color: C.gold } });
+  if (o.label !== false) {
+    s.addText(o.label || 'Drag Picture here', {
+      x, y: y + 0.06, w, h: 0.72, align: 'center', valign: 'top',
+      fontFace: 'Calibri', fontSize: 40, color: o.labelColor || C.ink,
+    });
+  }
+}
+
+/** isosceles triangle whose apex sits at `adj` across the top edge */
+function tri(s, x, y, w, h, adj, opts) {
+  poly(s, x, y, w, h, [[adj, 0, 'm'], [1, 1], [0, 1], []], opts);
+}
+
+/** stand-in for a real photograph (device mock-ups, portraits) */
+function imagePlate(s, x, y, w, h, opts) {
+  const o = opts || {};
+  s.addShape(o.shape || S.rect, Object.assign({ x, y, w, h, fill: { color: o.color || C.greyLt } }, o.shapeOpts));
+  s.addText(o.label || '[image]', {
+    x, y: y + h / 2 - 0.4, w, h: 0.8, align: 'center', valign: 'middle',
+    fontFace: F.label, fontSize: 20, color: o.labelColor || C.grey, charSpacing: 2,
+  });
+}
+
+/* --- small line-art icons ----------------------------------------- */
+function icoRazor(s, x, y, d, col) { razor(s, x, y, d, col); }
+
+function icoScissors(s, x, y, d, col) {
+  const ln = { color: col, width: 2 };
+  s.addShape(S.line, { x: x + 0.18 * d, y: y + 0.05 * d, w: 0.62 * d, h: 0.6 * d, line: ln });
+  s.addShape(S.line, { x: x + 0.18 * d, y: y + 0.05 * d, w: 0.62 * d, h: 0.6 * d, line: ln, flipH: true });
+  s.addShape(S.ellipse, { x: x + 0.1 * d, y: y + 0.68 * d, w: 0.26 * d, h: 0.26 * d, line: ln });
+  s.addShape(S.ellipse, { x: x + 0.64 * d, y: y + 0.68 * d, w: 0.26 * d, h: 0.26 * d, line: ln });
+}
+
+function icoClipper(s, x, y, d, col) {
+  const ln = { color: col, width: 2 };
+  s.addShape(S.roundRect, { x: x + 0.32 * d, y: y + 0.06 * d, w: 0.36 * d, h: 0.58 * d, rectRadius: 0.04 * d, line: ln });
+  s.addShape(S.rect, { x: x + 0.26 * d, y: y + 0.66 * d, w: 0.48 * d, h: 0.1 * d, fill: { color: col } });
+  s.addShape(S.rect, { x: x + 0.36 * d, y: y + 0.78 * d, w: 0.28 * d, h: 0.16 * d, line: ln });
+}
+
+function icoShower(s, x, y, d, col) {
+  const ln = { color: col, width: 2 };
+  s.addShape(S.pie, { x: x + 0.12 * d, y: y + 0.1 * d, w: 0.62 * d, h: 0.62 * d, angleRange: [180, 0], line: ln });
+  s.addShape(S.line, { x: x + 0.74 * d, y: y + 0.41 * d, w: 0.16 * d, h: 0, line: ln });
+  [0.24, 0.42, 0.6].forEach(fx => s.addShape(S.line, { x: x + fx * d, y: y + 0.74 * d, w: 0, h: 0.18 * d, line: ln }));
+}
+
+function icoPin(s, x, y, d, col) {
+  const ln = { color: col, width: 1.5 };
+  s.addShape(S.teardrop, { x, y, w: d, h: d, rotate: 225, line: ln });
+  s.addShape(S.ellipse, { x: x + 0.34 * d, y: y + 0.24 * d, w: 0.32 * d, h: 0.32 * d, line: ln });
+}
+
+function icoPhone(s, x, y, d, col) {
+  s.addShape(S.roundRect, { x: x + 0.08 * d, y: y + 0.08 * d, w: 0.84 * d, h: 0.84 * d, rectRadius: 0.2 * d, line: { color: col, width: 1.5 } });
+  s.addShape(S.ellipse, { x: x + 0.36 * d, y: y + 0.36 * d, w: 0.28 * d, h: 0.28 * d, fill: { color: col } });
+}
+
+/** ring-and-dot bullet used on the SWOT slides */
+function bullet(s, x, y, d) {
+  s.addShape(S.ellipse, { x, y, w: d, h: d, line: { color: C.black, width: 1.5 } });
+  s.addShape(S.ellipse, { x: x + 0.24 * d, y: y + 0.24 * d, w: 0.52 * d, h: 0.52 * d, fill: { color: C.black } });
+}
+
+/**
+ * Letters set on an elliptical arc — the stand-in for PowerPoint's
+ * textArchUp / textArchDown WordArt warp.
+ *   cx, cy  centre of the ellipse      rx, ry  its radii
+ *   spread  total sweep in degrees     down    arch the other way
+ */
+function archText(s, text, o) {
+  const n = text.length;
+  const cell = o.cell || 1;
+  for (let i = 0; i < n; i++) {
+    if (text[i] === ' ') continue;
+    const deg = ((i + 0.5) / n - 0.5) * o.spread;
+    const a = (deg * Math.PI) / 180;
+    const px = o.cx + o.rx * Math.sin(a);
+    const py = o.down ? o.cy + o.ry * Math.cos(a) : o.cy - o.ry * Math.cos(a);
+    const tilt = (Math.atan2(o.ry * Math.sin(a), o.rx * Math.cos(a)) * 180) / Math.PI;
+    s.addText(text[i], {
+      x: px - cell / 2, y: py - cell / 2, w: cell, h: cell,
+      rotate: o.down ? -tilt : tilt, align: 'center', valign: 'middle',
+      fontFace: F.display, fontSize: o.fontSize, color: o.color, wrap: false,
+    });
+  }
+}
+
+function paras(arr) {
+  const out = [];
+  arr.forEach((t, i) => {
+    if (i) out.push({ text: '', options: { breakLine: true } });
+    out.push({ text: t, options: { breakLine: true } });
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------------ *
+ * Copy used again and again through the deck
+ * ------------------------------------------------------------------ */
+const L1 = 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ';
+const L2 = 'Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est, tincidunt mattis lorem luctus id. ';
+const L3 = 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra';
+const LIFESTYLE = "BARBERSHOP IS NOT A HOBBY, IT'S A LIFESTYLE";
+
+/* ================================================================== *
+ * Slides
+ * ================================================================== */
+
+// 1 — cover
+function slide01(s) {
+  photo(s, 0, 0, W, H);
+  s.addShape(S.rect, { x: 0, y: 0.005, w: W, h: H, fill: { color: C.ink, transparency: 40 } });
+  eyebrow(s, 'A HAIR SALON FOR MAN', 11.226, 3.074, { w: 4.209, align: 'center' });
+  archText(s, 'GIBSON', { cx: 13.33, cy: 8.7, rx: 3.5, ry: 3.35, spread: 132, fontSize: 199, cell: 2.6, color: C.white });
+  s.addText('BARBER', { x: 12.048, y: 6.828, w: 2.565, h: 1.313, align: 'center', valign: 'middle', fontFace: F.display, fontSize: 72, color: C.white, wrap: false });
+  s.addText('SHOP', { x: 12.448, y: 7.82, w: 1.766, h: 1.313, align: 'center', valign: 'middle', fontFace: F.display, fontSize: 72, color: C.white, wrap: false });
+  eyebrow(s, 'SINCE', 10.216, 7.618, { w: 1.185 });
+  eyebrow(s, '1997', 15.39, 7.618, { w: 0.994 });
+  razor(s, 12.809, 9.185, 1.043, C.gold);
+  divider(s, 10.63, 9.605);
+  divider(s, 14.914, 9.605);
+  archText(s, 'GALLERY \u25E6 STORE \u25E6 SERVICES',
+    { cx: 13.33, cy: 6.8, rx: 3.65, ry: 4.5, spread: 118, fontSize: 48, cell: 0.72, color: C.white, down: true });
+  s.addShape(S.rect, { x: 0.287, y: 0.239, w: 26.087, h: 14.522, line: { color: C.gold, width: HAIR } });
+}
+
+// 2 — pull quote
+function slide02(s) {
+  photo(s, 0, 0, W, H);
+  s.addShape(S.rect, { x: 0, y: 0.005, w: W, h: H, fill: { color: C.ink, transparency: 40 } });
+  eyebrow(s, 'QUOTES OF THE DAY', 11.521, 4.085, { w: 3.62, align: 'center' });
+  razor(s, 12.809, 2.568, 1.043, C.gold);
+  s.addText("DOING BARBERSHOP HAS MADE US ALL BETTER SINGERS. WHEN WE HIT JUST THE RIGHT CHORD TOGETHER, THERE'S NO BETTER FEELING",
+    { x: 4.18, y: 5.326, w: 18.301, h: 4.948, align: 'center', valign: 'top', fontFace: F.display, fontSize: 96, color: C.white });
+  divider(s, 12.809, 11.364);
+}
+
+// 3 — welcome screen
+function slide03(s) {
+  page(s);
+  s.addShape(S.rect, { x: 0, y: 0, w: 6.632, h: H, fill: { color: C.ink } });
+  badge(s, 0, 0);
+  photo(s, 1.947, 0, 8.842, 13.079);
+  eyebrow(s, 'WELCOME SCREEN', 12.74, 1.897);
+  title(s, LIFESTYLE, 12.737, 2.301, 10.999, 2.794);
+  divider(s, 12.737, 5.513);
+  body(s, paras([L1, 'Donec eget massa a diam condimentum pretium. Aliquam erat volutpat. Integer ut tincidunt orci. ']), 12.737, 7.047, 11.184, 4.879);
+}
+
+// 4 — about us, video frame
+function slide04(s) {
+  page(s);
+  photo(s, 14.804, 0, 11.857, H);
+  eyebrow(s, 'ABOUT US', 2.762, 2.316);
+  title(s, "YOU DON'T EVER ASK A BARBER WHETHER YOU NEED A HAIRCUT", 2.762, 2.878, 9.095, 4.14);
+  divider(s, 2.762, 7.641);
+  body(s, L1 + 'Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est, tincidunt mattis', 2.762, 8.737, 9.095, 3.672);
+  s.addShape(S.frame, { x: 19.725, y: 6.619, w: 2.016, h: 1.761, line: { color: C.gold, width: HAIR } });
+  s.addShape(S.triangle, { x: 20.435, y: 7.281, w: 0.597, h: 0.438, rotate: 90, fill: { color: C.gold } });
+  eyebrow(s, 'PLAY VIDEOS', 19.55, 8.686, { w: 2.365, align: 'center' });
+}
+
+// 5 — triangle collage
+function slide05(s) {
+  page(s);
+  tri(s, 0.568, 2.169, 12.515, 10.961, 0.782, { fill: { color: C.ink } });
+  tri(s, 3.491, 2.728, 9.344, 7.796, 0.683, { line: { color: C.gold, width: 2 }, rotate: 81.8 });
+  badge(s, 0, 0);
+  eyebrow(s, 'ABOUT US', 14.846, 2.713);
+  title(s, 'A BARBER WILL PROVIDE AN EXCELLENT HAIRCUT THAT CAN GET YOU', 14.846, 3.236, 9.847, 4.14);
+  divider(s, 14.846, 7.496);
+  body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula', 14.846, 8.21, 9.847, 2.46);
+  tri(s, 4.448, 2.322, 2.789, 1.921, 0.154, { fill: { color: C.ink }, rotate: -58.8 });
+  tri(s, 6.26, 2.709, 1.411, 1.085, 0.435, { fill: { color: C.gold }, rotate: 132.5 });
+  photo(s, 1.806, 2.365, 12.038, 10.27);
+}
+
+// 6 — diagonal ribbons
+function slide06(s) {
+  page(s);
+  poly(s, 13.006, -0.022, 17.538, 15.022, G_STRIPES, { fill: { color: C.photo } });
+  eyebrow(s, 'ABOUT US', 2.629, 2.117);
+  title(s, 'NO BARBER SHAVES SO CLOSE BUT ANOTHER FINDS WORK', 2.629, 2.577, 9.2, 4.14);
+  divider(s, 2.629, 6.856);
+  body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. ' + L2, 2.629, 7.766, 8.219, 5.489);
+}
+
+// 7 — rounded photo card + opening hours
+function slide07(s) {
+  page(s);
+  poly(s, 2.823, 2.384, 10.055, 9.656, G_ROUNDSQ, { fill: { color: C.gold }, rotate: -34.5 });
+  badge(s, 0, 0);
+  eyebrow(s, 'ABOUT US', 16.101, 1.705);
+  title(s, 'YOUR BARBER ALWAYS KNOWS EVERYTHING THAT GOES ON IN THE TOWN', 16.101, 2.109, 8.468, 4.14);
+  divider(s, 16.278, 7.075);
+  body(s, L1, 16.101, 8.006, 8.468, 2.46);
+  s.addShape(S.rect, { x: 16.101, y: 11.52, w: 6.207, h: 1.253, fill: { color: C.ink } });
+  s.addText('OPEN HOURS : 10 AM \u2013 10 PM', { x: 16.443, y: 11.893, w: 5.626, h: 0.505, align: 'center', valign: 'top', fontFace: F.body, fontSize: 24, bold: true, color: C.gold });
+  photo(s, 2.256, 0.961, 12.085, 12.085);
+}
+
+// 8 — arrow-head collage
+function slide08(s) {
+  page(s);
+  tri(s, 14.262, 1.439, 10.119, 9.953, 0.207, { fill: { color: C.ink } });
+  poly(s, 11.618, -0.315, 11.913, 13.287, G_ARROW8, { line: { color: C.gold, width: 4.75 }, rotate: -25 });
+  badge(s, 0, 0);
+  eyebrow(s, 'ABOUT US', 2.281, 2.732);
+  title(s, 'A BARBER LATHERS A MAN BEFORE HE SHAVES HIM. ', 2.281, 3.193, 7.872, 4.14);
+  divider(s, 2.281, 7.654);
+  body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. ', 2.281, 8.943, 8.219, 3.066);
+  photo(s, 13.914, 2.6, 9.543, 10.739);
+}
+
+// 9 — quote card + four photos
+function slide09(s) {
+  page(s);
+  s.addShape(S.rect, { x: 1.735, y: 1.535, w: 6.958, h: 11.706, fill: { color: C.ink } });
+  badge(s, 1.735, 1.541);
+  eyebrow(s, 'ABOUT US', 2.76, 4.906);
+  s.addText("BARBERSHOP IS NOT A HOBBY, IT'S A LIFESTYLE.", { x: 2.76, y: 5.389, w: 4.982, h: 5.486, valign: 'top', fontFace: F.display, fontSize: 80, color: C.white });
+  divider(s, 2.76, 11.854);
+  photo(s, 8.959, 1.535, 9.624, 5.741);
+  photo(s, 18.873, 1.535, 6.323, 5.741);
+  photo(s, 15.453, 7.5, 9.743, 5.741);
+  photo(s, 8.959, 7.5, 6.237, 5.741);
+}
+
+// 10 — team, two portrait cards with social tiles
+function slide10(s) {
+  page(s);
+  photo(s, 12.429, 0, 6.833, 11.184);
+  photo(s, 19.829, 0, 6.833, 9.629);
+  s.addShape(S.rect, { x: 19.829, y: 9.629, w: 6.833, h: 2.761, fill: { color: C.ink } });
+  s.addShape(S.rect, { x: 12.429, y: 11.096, w: 6.833, h: 2.761, fill: { color: C.ink } });
+  const card = [
+    { name: 'WILLIAM ROBERT', role: 'Professional Barber', x: 13.507, y: 11.58, rx: 13.961, ry: 12.49, w: 4.676, rw: 3.768 },
+    { name: 'FRANK MORRIS', role: 'Director of Gibson', x: 21.12, y: 10.124, rx: 21.376, ry: 11.034, w: 4.25, rw: 3.737 },
+  ];
+  card.forEach(c => {
+    s.addText(c.name, { x: c.x, y: c.y, w: c.w, h: 1.111, align: 'center', valign: 'top', fontFace: F.display, fontSize: 60, color: C.white });
+    s.addText(c.role, { x: c.rx, y: c.ry, w: c.rw, h: 0.572, align: 'center', valign: 'top', fontFace: F.body, fontSize: 28, italic: true, color: C.gold });
+  });
+  // social tiles down the right edge of each portrait
+  [18.08, 25.48].forEach(x => {
+    [0.018, 1.434, 2.851].forEach((y, i) => {
+      s.addShape(S.rect, { x, y, w: 1.181, h: 1.181, fill: { color: C.gold } });
+      s.addText(['f', 'y', 'o'][i], { x, y, w: 1.181, h: 1.181, align: 'center', valign: 'middle', fontFace: F.body, fontSize: 40, bold: true, color: C.ink });
+    });
+  });
+  badge(s, 0, 0);
+  eyebrow(s, 'TEAM', 2.133, 2.778);
+  title(s, 'GIBSON OFFICIAL TEAM', 2.133, 3.182, 9.095, 1.447);
+  divider(s, 2.325, 4.826);
+  body(s, paras([L1, L2]), 2.133, 5.7, 7.764, 6.095);
+}
+
+// 11 — director + two skill dials
+function slide11(s) {
+  page(s);
+  s.addShape(S.rect, { x: 0, y: 0, w: 8.584, h: H, fill: { color: C.gold } });
+  s.addShape(S.arc, { x: 3.648, y: 2.382, w: 10.236, h: 10.236, rotate: 23.8, angleRange: [24, 307.2], line: { color: C.ink, width: 5 } });
+  photo(s, 3.834, 2.579, 9.843, 9.843);
+  badge(s, 0, 0, C.ink);
+  eyebrow(s, 'TEAM', 15.639, 1.921);
+  title(s, 'FRANK MORRIS \u2013 DIRECTOR OF GIBSON', 15.635, 2.325, 7.982, 2.794);
+  divider(s, 15.635, 5.547);
+  body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin', 15.635, 6.36, 8.918, 1.854);
+  const dial = [
+    { x: 15.922, pct: '90%', sweep: 233, label: 'BARBER SPECIALIST', lx: 16.074, lw: 2.21 },
+    { x: 20.067, pct: '75%', sweep: 192, label: 'PROFESSIONAL SHAVES', lx: 20.004, lw: 2.489 },
+  ];
+  dial.forEach(d => {
+    s.addShape(S.arc, { x: d.x, y: 9.145, w: 2.362, h: 2.362, rotate: 60, angleRange: [270, 268.2], line: { color: C.greyLt, width: 24 } });
+    s.addShape(S.arc, { x: d.x, y: 9.149, w: 2.362, h: 2.362, angleRange: [270, d.sweep], line: { color: C.gold, width: 24 } });
+    s.addText(d.pct, { x: d.x + 0.305, y: 9.824, w: 1.887, h: 1.003, align: 'center', valign: 'top', fontFace: F.body, fontSize: 40, bold: true, color: C.ink });
+    s.addText(d.label, { x: d.lx, y: 12.017, w: d.lw, h: 1.313, align: 'center', valign: 'top', fontFace: F.display, fontSize: 36, color: C.ink });
+  });
+}
+
+// 12 — break slide
+function slide12(s) {
+  photo(s, 0, 0, W, H);
+  s.addShape(S.rect, { x: 0, y: 0.005, w: W, h: H, fill: { color: C.ink, transparency: 40 } });
+  s.addShape(S.flowChartManualOperation, { x: 7.542, y: 4.143, w: 10.958, h: 6.715, line: { color: C.white, width: HAIR } });
+  archText(s, 'BREAK', { cx: 13.33, cy: 10.3, rx: 3.5, ry: 3.35, spread: 116, fontSize: 199, cell: 2.6, color: C.white });
+  s.addText('SLIDES', { x: 12.226, y: 7.971, w: 2.209, h: 1.313, align: 'center', valign: 'middle', fontFace: F.display, fontSize: 72, color: C.white, wrap: false });
+  divider(s, 12.809, 9.283);
+}
+
+// 13 — services, four dark tiles
+function slide13(s) {
+  page(s);
+  photo(s, 2.32, 1.991, 5.0, 4.25, { color: C.photoDk, labelColor: C.white });
+  s.addShape(S.rect, { x: 2.32, y: 2.004, w: 5.0, h: 4.25, fill: { color: C.ink, transparency: 40 } });
+  s.addShape(S.rect, { x: 2.32, y: 6.485, w: 5.0, h: 4.25, fill: { color: C.ink } });
+  s.addShape(S.rect, { x: 7.569, y: 4.11, w: 5.0, h: 4.25, fill: { color: C.ink } });
+  s.addShape(S.rect, { x: 7.569, y: 8.637, w: 5.0, h: 4.25, fill: { color: C.ink } });
+  icoRazor(s, 4.327, 3.194, 1.429, C.white);
+  icoClipper(s, 4.105, 7.329, 1.429, C.white);
+  icoScissors(s, 9.528, 5.088, 1.083, C.white);
+  icoShower(s, 9.437, 9.341, 1.561, C.white);
+  const tile = [
+    { t: 'SHAVING', x: 3.938, y: 4.861, w: 2.207 },
+    { t: 'TRIMMING', x: 3.555, y: 9.027, w: 2.53 },
+    { t: 'HAIRCUTTING', x: 8.387, y: 6.493, w: 3.364 },
+    { t: 'WHASING HAIR', x: 8.596, y: 11.179, w: 3.156 },
+  ];
+  tile.forEach(v => s.addText(v.t, { x: v.x, y: v.y, w: v.w, h: 0.909, align: 'center', valign: 'top', fontFace: F.display, fontSize: 48, color: C.white }));
+  badge(s, 24.714, 0);
+  eyebrow(s, 'SERVICES', 15.232, 3.254);
+  title(s, 'OUR AMAZING SERVICES', 15.232, 3.714, 8.219, 1.447);
+  divider(s, 15.232, 5.413);
+  body(s, paras([L1, L2]), 15.232, 6.295, 8.219, 4.883);
+}
+
+// 14 — tips & tricks intro
+function slide14(s) {
+  page(s);
+  photo(s, 0, 0, 16.51, 12.184);
+  s.addShape(S.rect, { x: 14.583, y: 3.796, w: 7.396, h: 10.139, fill: { color: C.ink } });
+  badge(s, 14.583, 3.802);
+  eyebrow(s, 'TIPS & TRICKS', 15.607, 7.167);
+  s.addText('3 EASY STEPS FOR A PERFECT HAIRCUT', { x: 15.607, y: 7.649, w: 5.436, h: 4.14, valign: 'top', fontFace: F.display, fontSize: 80, color: C.white });
+  divider(s, 15.607, 12.629);
+}
+
+/** numbered step tile: gold square with a big numeral */
+function stepTile(s, num, x, y, w) {
+  s.addShape(S.rect, { x, y, w: w || 2.308, h: 2.468, fill: { color: C.gold } });
+  s.addText(num, { x, y: y + 0.379, w: w || 2.308, h: 2.036, align: 'center', valign: 'top', fontFace: F.display, fontSize: 115, color: C.white });
+}
+
+// 15 — step 01
+function slide15(s) {
+  page(s);
+  stepTile(s, '01', 2.306, 10.558);
+  title(s, 'DECIDE ON A HAIRSTYLE YOU WANT', 5.292, 10.558, 7.435, 2.794);
+  s.addShape(S.line, { x: 15.452, y: 10.789, w: 0, h: 2.396, line: { color: C.gold, width: HAIR } });
+  body(s, L1, 15.868, 10.725, 8.487, 2.46);
+  photo(s, 0, 0, W, 9.821);
+}
+
+// 16 — step 02
+function slide16(s) {
+  page(s);
+  photo(s, 0, 0, 17.928, H);
+  imagePlate(s, 17.035, 9.744, 1.682, 1.682, { shape: S.ellipse, color: C.gold2, labelColor: C.white });
+  razor(s, 0.806, 0.744, 0.969, C.white);
+  stepTile(s, '02', 14.087, 3.099);
+  title(s, 'FIND A QUALITY BARBERSHOP', 17.035, 3.099, 5.682, 2.794);
+  body(s, L1, 17.035, 6.198, 7.725, 2.46);
+  s.addText('JAMES RAQUEL', { x: 19.079, y: 9.918, w: 5.682, h: 1.01, valign: 'top', fontFace: F.display, fontSize: 54, color: C.ink });
+  eyebrow(s, 'PROFESSIONAL BARBER', 19.079, 10.773);
+}
+
+// 17 — step 03
+function slide17(s) {
+  page(s);
+  stepTile(s, '03', 1.947, 1.859);
+  title(s, 'LEARN TO COMMUNICATE WITH YOUR BARBER', 4.826, 1.859, 8.058, 2.794);
+  body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, ', 1.947, 5.204, 8.803, 1.248);
+  eyebrow(s, 'CEPAK KRITENG', 2.405, 9.927, { w: 2.839, align: 'center' });
+  eyebrow(s, 'LOW BLUSHY', 6.769, 9.927, { w: 2.325, align: 'center' });
+  body(s, L2, 1.947, 10.862, 8.803, 2.46);
+  photo(s, 14.25, 0, 12.411, H);
+  photo(s, 2.643, 7.253, 2.362, 2.362, { label: false });
+  photo(s, 6.75, 7.253, 2.362, 2.362, { label: false });
+}
+
+/** gold price chip */
+function priceTag(s, text, x, y, font) {
+  s.addShape(S.rect, { x, y, w: 2.57, h: 1.28, fill: { color: C.gold } });
+  s.addText(text, { x: x + 0.21, y: y + 0.32, w: 2.151, h: 0.64, align: 'center', valign: 'top', fontFace: font || F.label, fontSize: 32, bold: true, charSpacing: 3, color: C.ink });
+}
+
+// 18 — offer
+function slide18(s) {
+  page(s);
+  photo(s, 0, 3.548, 6.839, 11.452);
+  photo(s, 7.29, 0, 6.839, 11.452);
+  priceTag(s, '$65.00', 4.268, 2.805);
+  priceTag(s, '$55.00', 11.559, 10.812);
+  eyebrow(s, 'OFFER', 16.312, 1.672);
+  title(s, 'YOU CAN CUSTOMIZE STYLES', 16.312, 2.076, 7.328, 2.794);
+  divider(s, 16.312, 5.116);
+  body(s, paras([
+    'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum quis nunc sollicitudin ultrices. Donec euismod scelerisque ligula. Maecenas eu varius risus, eu aliquet arcu. Curabitur fermentum suscipit est',
+    'Tincidunt mattis lorem luctus id. Donec eget massa a diam condimentum pretium. Aliquam erat volutpat. Integer ut tincidunt orci. ',
+  ]), 16.312, 5.996, 8.424, 6.095);
+}
+
+// 19 — product
+function slide19(s) {
+  page(s);
+  photo(s, 0, 6.387, 12.742, 8.613);
+  s.addShape(S.rect, { x: 20.03, y: 0, w: 6.632, h: H, fill: { color: C.ink } });
+  priceTag(s, '$276.00', 9.806, 6.387, F.body);
+  eyebrow(s, 'PRODUCT', 1.609, 1.602);
+  title(s, 'GIBSON CLASSIC 76 UNIVERSAL MOTOR CLIPPER 76076010', 1.609, 2.222, 10.171, 2.794);
+  photo(s, 13.331, 0, 12.121, 13.226);
+}
+
+// 20 — story timeline
+function slide20(s) {
+  page(s);
+  photo(s, 10.571, 0, 7.714, 11.571);
+  photo(s, 18.629, 0, 8.033, 11.571);
+  badge(s, 0, 0);
+  eyebrow(s, 'PORTFOLIO', 1.946, 2.778);
+  title(s, 'GIBSON STORY', 1.946, 3.182, 9.095, 1.447);
+  divider(s, 1.946, 4.669);
+  body(s, paras([L1, L2]), 1.946, 5.7, 7.204, 6.701);
+  stepTile(s, '1997', 10.571, 10.762, 3.079);
+  stepTile(s, '2020', 18.629, 10.762, 3.079);
+}
+
+// 21 — portfolio, three cards
+function slide21(s) {
+  page(s);
+  s.addShape(S.rect, { x: 2.983, y: 8.562, w: 6.042, h: 5.406, fill: { color: C.ink } });
+  s.addShape(S.rect, { x: 10.338, y: 8.562, w: 6.041, h: 5.406, line: { color: C.greyLt, width: HAIR } });
+  s.addShape(S.rect, { x: 17.692, y: 8.438, w: 6.039, h: 5.406, line: { color: C.greyLt, width: HAIR } });
+  badge(s, 0, 0);
+  eyebrow(s, 'PORTFOLIO', 12.276, 1.045, { w: 2.109, align: 'center' });
+  title(s, 'OUR PORTFOLIO', 10.427, 1.481, 5.807, 1.447, { align: 'center' });
+  divider(s, 12.809, 2.993);
+  const cards = [
+    { px: 2.983, name: 'COZY PLACE', nx: 3.484, nw: 4.983, cx: 3.848, cw: 4.256, copy: 'Fusce vehicula dolor arcu, sit amet blandit dolor', col: C.white },
+    { px: 10.337, name: 'PROFESSIONAL TEAM', nx: 10.72, nw: 5.276, cx: 11.06, cw: 4.597, copy: 'Fusce vehicula dolor arcu, sit amet blandit', col: C.ink },
+    { px: 17.692, name: 'GOOD SERVICES', nx: 18.22, nw: 4.983, cx: 18.073, cw: 5.276, copy: 'Fusce vehicula dolor arcu, sit amet blandit dolor', col: C.ink },
+  ];
+  cards.forEach(c => {
+    s.addText(c.name, { x: c.nx, y: 11.171, w: c.nw, h: 1.111, align: 'center', valign: 'top', fontFace: F.display, fontSize: 60, color: c.col });
+    s.addText(c.copy, { x: c.cx, y: 12.021, w: c.cw, h: 1.248, align: 'center', valign: 'top', fontFace: F.body, fontSize: 24, lineSpacingMultiple: 1.5, color: c.col === C.white ? C.white : C.grey });
+  });
+  cards.forEach(c => photo(s, c.px, 4.066, 6.042, 7.125));
+}
+
+// 22 — break slide
+function slide22(s) {
+  photo(s, 0, 0, W, H, { color: C.photoDk, labelColor: C.ink });
+  razor(s, 5.918, 2.554, 1.043, C.gold);
+  s.addText([
+    { text: 'BREAK', options: { breakLine: true, color: C.white } },
+    { text: 'SLIDES', options: { color: C.gold } },
+  ], { x: 2.632, y: 4.07, w: 7.616, h: 8.145, align: 'center', valign: 'top', fontFace: F.display, fontSize: 239 });
+  divider(s, 5.918, 11.908);
+  s.addShape(S.rect, { x: 2.149, y: 1.39, w: 8.581, h: 11.798, line: { color: C.gold, width: HAIR } });
+}
+
+/** shared body of the four SWOT slides */
+function swotColumn(s, x, headline, tw) {
+  eyebrow(s, 'SWOT', x, 2.267);
+  title(s, headline, x, 2.694, tw, 2.794);
+  divider(s, x, 5.999);
+  [['FUSCE DOLOR ARCU', 7.3], ['SIT AMET BLANDIT', 10.446]].forEach(([label, y]) => {
+    bullet(s, x, y + 0.158, 0.46);
+    s.addText(label, { x: x + 0.7, y, w: 4.485, h: 0.909, valign: 'top', fontFace: F.display, fontSize: 48, color: C.black });
+    body(s, L3, x + 0.7, y + 0.718, 7.085, 1.248);
+  });
+}
+
+// 23..26 — SWOT analysis
+function slide23(s) {
+  page(s);
+  badge(s, 0, 0);
+  swotColumn(s, 3.279, 'STRENGTH BARBERSHOP SLIDE ANALYSIS', 8.209);
+  photo(s, 14.274, 0, 12.387, H);
+}
+
+function slide24(s) {
+  page(s);
+  swotColumn(s, 15.133, 'WEAKNESS BARBERSHOP SLIDE ANALYSIS', 8.623);
+  photo(s, 0, 0, 12.387, H);
+}
+
+function slide25(s) {
+  page(s);
+  s.addShape(S.flowChartExtract, { x: 11.713, y: -0.23, w: 12.0, h: 11.905, rotate: -45, fill: { color: C.black } });
+  s.addShape(S.flowChartExtract, { x: 13.865, y: 0.115, w: 11.018, h: 10.642, line: { color: C.gold, width: HAIR } });
+  badge(s, 0, 0);
+  swotColumn(s, 3.279, 'OPPORTUNITY BARBERSHOP SLIDE ANALYSIS', 9.233);
+  photo(s, 17.24, 1.658, 5.662, 11.685);
+}
+
+function slide26(s) {
+  page(s);
+  swotColumn(s, 12.631, 'THREAT BARBERSHOP SLIDE ANALYSIS', 8.623);
+  s.addShape(S.rect, { x: 21.618, y: 0, w: 5.043, h: H, fill: { color: C.ink } });
+  s.addText('GIBSON', { x: 19.872, y: 5.127, w: 7.616, h: 4.123, rotate: 90, align: 'center', valign: 'top', fontFace: F.display, fontSize: 239, color: C.white });
+  razor(s, 23.618, 1.456, 1.043, C.gold);
+  divider(s, 23.618, 13.163);
+  s.addShape(S.rect, { x: 21.901, y: 0.22, w: 4.478, h: 14.512, line: { color: C.gold, width: HAIR } });
+  photo(s, 0, 0, 10.293, H);
+}
+
+// 27 — hair styles
+function slide27(s) {
+  page(s);
+  s.addShape(S.rect, { x: 0, y: 0, w: 9.334, h: H, fill: { color: C.ink } });
+  badge(s, 0, 0.023);
+  eyebrow(s, 'STYLE', 1.254, 3.388);
+  s.addText('TO MAKE A FINE GENTLEMAN, SEVERAL TRADES ARE REQUIRED, BUT CHIEFLY A BARBER',
+    { x: 1.254, y: 3.871, w: 6.195, h: 8.179, valign: 'top', fontFace: F.display, fontSize: 80, color: C.white });
+  divider(s, 1.254, 12.733);
+  [
+    { t: 'HAIR STYLE #20', tx: 19.604, ty: 1.22, bx: 19.389, by: 2.816 },
+    { t: 'HAIR STYLE #23', tx: 11.404, ty: 8.597, bx: 11.188, by: 10.192 },
+  ].forEach(v => {
+    s.addText(v.t, { x: v.tx, y: v.ty, w: 5.388, h: 1.447, align: 'center', valign: 'top', fontFace: F.display, fontSize: 80, color: C.black });
+    body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus. Sed sollicitudin ipsum', v.bx, v.by, 5.819, 3.066, { align: 'center' });
+  });
+  photo(s, 9.334, 0, 8.602, 7.065);
+  photo(s, 17.935, 7.087, 8.726, 7.913);
+}
+
+// 28 — logo lock-up + three photos
+function slide28(s) {
+  page(s);
+  s.addShape(S.rect, { x: 19.703, y: 6.913, w: 6.958, h: 8.087, fill: { color: C.ink } });
+  s.addText("BARBERSHOP IS NOT A HOBBY, IT'S A LIFESTYLE.", { x: 20.691, y: 7.92, w: 4.982, h: 5.486, valign: 'top', fontFace: F.display, fontSize: 80, color: C.white });
+  divider(s, 20.691, 13.626);
+  razor(s, 15.434, 0.833, 1.043, C.gold);
+  s.addText('GIBSON', { x: 13.758, y: 2.013, w: 4.395, h: 2.423, align: 'center', valign: 'top', fontFace: F.display, fontSize: 138, color: C.ink, wrap: false });
+  s.addShape(S.rect, { x: 12.477, y: 0.239, w: 6.958, h: 4.333, line: { color: C.gold, width: HAIR } });
+  eyebrow(s, 'SINCE 1997', 14.908, 3.898, { w: 2.095, align: 'center' });
+  photo(s, 0, 0, 12.208, 14.958, { label: 'Drag Picture' });
+  photo(s, 12.477, 4.878, 6.958, 10.122);
+  photo(s, 19.703, 0, 6.958, 6.694);
+}
+
+// 29 — SWOT rings
+function slide29(s) {
+  page(s);
+  poly(s, 13.363, 4.812, 9.759, 5.375, RING_R, { fill: { color: C.olive } });
+  poly(s, 8.51, 4.812, 9.309, 5.375, RING_M, { fill: { color: C.gold } });
+  poly(s, 3.207, 4.812, 9.759, 5.375, RING_L, { fill: { color: C.black } });
+  badge(s, 0, 0);
+  eyebrow(s, 'SWOT', 12.749, 0.977, { w: 1.164, align: 'center' });
+  title(s, 'SWOT ANALYSIS SLIDE', 8.676, 1.809, 9.309, 1.447, { align: 'center' });
+  divider(s, 12.869, 3.662);
+  const cols = [
+    { letter: 'S', lx: 4.957, name: 'STRENGTH', nx: 4.176, nw: 2.652, cx: 3.601 },
+    { letter: 'W', lx: 9.785, name: 'WEAKNESS', nx: 9.393, nw: 2.652, cx: 8.818 },
+    { letter: 'O', lx: 14.716, name: 'OPPORTUNITY', nx: 13.945, nw: 3.301, cx: 13.694 },
+    { letter: 'T', lx: 19.647, name: 'THREAT', nx: 19.264, nw: 2.652, cx: 18.689 },
+  ];
+  cols.forEach(c => {
+    s.addText(c.letter, { x: c.lx, y: 5.767, w: 1.802, h: 4.123, align: 'center', valign: 'top', fontFace: F.display, fontSize: 239, color: C.ink });
+    s.addText(c.name, { x: c.nx, y: 10.613, w: c.nw, h: 0.909, align: 'center', valign: 'top', fontFace: F.display, fontSize: 48, color: C.black });
+    body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. ', c.cx, 11.521, 3.801, 1.854, { align: 'center' });
+  });
+}
+
+// 30 — desktop mock-up
+function slide30(s) {
+  page(s);
+  poly(s, 15.603, 0, 11.078, H, G_WEDGE30, { fill: { color: C.ink }, flipV: true });
+  imagePlate(s, 11.682, 1.673, 13.954, 11.938, { label: '[image] desktop mock-up' });
+  badge(s, 0, 0);
+  eyebrow(s, 'MOCKUP', 2.643, 3.274);
+  title(s, 'CHECK BARBER VIDEOS ON OUR SITE', 2.643, 3.677, 7.732, 2.794);
+  divider(s, 2.648, 6.843);
+  body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus', 2.648, 7.92, 8.219, 1.854);
+  s.addShape(S.rect, { x: 2.643, y: 10.628, w: 4.235, h: 1.225, fill: { color: C.gold } });
+  s.addText('WWW.GIBSON.COM', { x: 3.032, y: 10.987, w: 3.455, h: 0.507, align: 'center', valign: 'top', fontFace: F.body, fontSize: 18, bold: true, charSpacing: 3, color: C.ink });
+  photo(s, 13.375, 2.332, 9.708, 7.835);
+}
+
+// 31 — ordering app
+function slide31(s) {
+  page(s);
+  s.addShape(S.rect, { x: 0, y: 0, w: 5.878, h: H, fill: { color: C.gold } });
+  razor(s, 0.489, 0.476, 0.969, C.white);
+  eyebrow(s, 'MOCKUP', 14.184, 2.531);
+  title(s, 'GET EASY ORDER WITH OUR APPS', 14.184, 3.128, 7.982, 2.794);
+  divider(s, 14.284, 6.078);
+  [
+    { ico: icoRazor, iy: 7.699, id: 1.248, name: 'BARBER ORDER', nx: 15.978, ny: 7.681, by: 8.323 },
+    { ico: icoScissors, iy: 10.603, id: 1.29, name: 'ONLINE COURSE', nx: 15.906, ny: 10.606, by: 11.248 },
+  ].forEach(v => {
+    v.ico(s, 14.284, v.iy, v.id, C.black);
+    s.addText(v.name, { x: v.nx, y: v.ny, w: 3.613, h: 0.909, valign: 'top', fontFace: F.display, fontSize: 48, color: C.black });
+    body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec Donec viverra    ', v.nx, v.by, 7.236, 1.248);
+  });
+  photo(s, 2.516, 2.935, 6.569, 13.917);
+  imagePlate(s, 2.183, 2.639, 7.236, 14.509, { shape: S.roundRect, shapeOpts: { rectRadius: 0.9, fill: { color: 'FFFFFF' }, line: { color: C.ink, width: 6 } }, color: 'FFFFFF', label: '[image] phone' });
+}
+
+// 32 — catalog app
+function slide32(s) {
+  page(s);
+  badge(s, 0, 0);
+  eyebrow(s, 'MOCKUP', 3.441, 3.306);
+  title(s, 'GET THE CATALOG IN OUR APPS', 3.441, 4.081, 6.024, 2.794);
+  divider(s, 3.514, 7.246);
+  body(s, 'Fusce vehicula dolor arcu, sit amet blandit dolor mollis nec. Donec viverra eleifend lacus, vitae ullamcorper metus', 3.447, 8.845, 8.219, 1.854);
+  s.addShape(S.rect, { x: 3.441, y: 11.553, w: 4.754, h: 1.225, fill: { color: C.gold } });
+  s.addText('DOWNLOAD IN STORE', { x: 3.831, y: 11.912, w: 4.103, h: 0.507, align: 'center', valign: 'top', fontFace: F.body, fontSize: 18, bold: true, charSpacing: 3, color: C.ink });
+  photo(s, 15.048, -0.594, 6.569, 13.917);
+  photo(s, 23.812, -0.594, 6.569, 13.917);
+  [14.714, 23.429].forEach(x => imagePlate(s, x, -0.88, 7.236, 14.509, {
+    shape: S.roundRect,
+    shapeOpts: { rectRadius: 0.9, rotate: -31, fill: { color: 'FFFFFF' }, line: { color: C.ink, width: 6 } },
+    color: 'FFFFFF', label: '[image] phone',
+  }));
+}
+
+// 33 — clustered bar chart
+function slide33(s) {
+  page(s);
+  eyebrow(s, 'CHART', 1.873, 8.757);
+  title(s, 'CHART ANALYSIS SLIDES', 1.873, 9.235, 8.399, 1.447);
+  body(s, L1, 1.873, 10.83, 10.289, 2.46);
+  const labels = ['Shaving', 'haircutting', 'trimming', 'whasinghair'];
+  s.addChart(pptx.ChartType.bar, [
+    { name: 'Series 1', labels, values: [4.3, 2.5, 3.5, 4.5] },
+    { name: 'Series 2', labels, values: [2.4, 4.4, 1.8, 2.8] },
+    { name: 'Series 3', labels, values: [2, 2, 3, 5] },
+  ], {
+    x: 13.862, y: 8.253, w: 10.927, h: 5.645,
+    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 219, barOverlapPct: -27,
+    chartColors: [C.gold, C.gold2, C.olive],
+    showLegend: false, showTitle: false,
+    catAxisLabelFontFace: F.body, catAxisLabelFontSize: 24, catAxisLabelColor: C.grey,
+    valAxisLabelFontFace: F.body, valAxisLabelFontSize: 28, valAxisLabelColor: C.grey,
+    catAxisLineShow: true, valAxisLineShow: false,
+    valGridLine: { style: 'solid', size: 1, color: C.greyLt },
+    catGridLine: { style: 'none' },
+  });
+  photo(s, 0, 0.023, W, 7.477);
+}
+
+// 34 — price list
+function slide34(s) {
+  page(s);
+  s.addShape(S.rect, { x: 0, y: 0, w: 8.032, h: H, fill: { color: C.ink } });
+  badge(s, 0, 0);
+  eyebrow(s, 'PRICING', 19.604, 1.816, { w: 1.592, align: 'center' });
+  title(s, 'PRICES LIST', 17.076, 2.279, 6.649, 1.447, { align: 'center' });
+  divider(s, 19.879, 4.048);
+  const rows = [
+    ['HAIR CUT', '$40', 5.29, 3.386],
+    ['SHAVE', '$35', 6.592, 3.386],
+    ['HAIR CUT & SHAVE', '$70', 7.969, 3.386],
+    ['TRIM (BACK AND SIDES)', '$40', 9.259, 4.028],
+    ['BEARD TRIM', '$50', 10.603, 3.386],
+  ];
+  rows.forEach(([name, price, y, w]) => {
+    s.addText(name, { x: 16.585, y, w, h: 0.774, valign: 'top', fontFace: F.display, fontSize: 40, color: C.ink });
+    s.addText(price, { x: 22.172, y: y + 0.067, w: 1.999, h: 0.64, align: 'right', valign: 'top', fontFace: F.body, fontSize: 32, color: C.gold });
+  });
+  s.addShape(S.rect, { x: 16.585, y: 12.137, w: 7.586, h: 1.314, fill: { color: C.gold } });
+  s.addText('DISCOUNT 30% ON MONDAY', { x: 17.497, y: 12.592, w: 5.762, h: 0.404, align: 'center', valign: 'top', fontFace: F.label, fontSize: 18, bold: true, charSpacing: 3, color: C.ink });
+  s.addShape(S.rect, { x: 15.362, y: 0.902, w: 10.077, h: 13.195, line: { color: C.gold, width: HAIR } });
+  photo(s, 1.947, -0.028, 12.085, 15.028);
+}
+
+// 35 — contact + opening hours grid
+function slide35(s) {
+  page(s);
+  eyebrow(s, 'CONTACT', 1.769, 1.514);
+  title(s, 'GET IN TOUCH', 1.769, 1.992, 6.495, 1.447);
+  const days = [
+    ['MON', '9 AM \u2013 9 PM', 15.931, 0.99], ['TUE', '9 AM \u2013 9 PM', 19.218, 0.99],
+    ['WED', '9 AM \u2013 9 PM', 22.506, 0.99], ['THU', '9 AM \u2013 9 PM', 15.931, 3.852],
+    ['FRI', '9 AM \u2013 9 PM', 19.218, 3.852], ['SAT', '10 AM \u2013 5 PM', 22.506, 3.852],
+  ];
+  days.forEach(([day, hrs, x, y], i) => {
+    s.addShape(S.rect, { x, y, w: 2.958, h: 2.599, fill: { color: i === 5 ? C.gold : C.ink } });
+    s.addText(day, { x, y: y + 0.587, w: 2.958, h: 1.111, align: 'center', valign: 'middle', fontFace: F.display, fontSize: 60, color: C.white });
+    s.addText(hrs, { x: x + 0.12, y: y + 1.462, w: 2.717, h: 0.552, align: 'center', valign: 'top', fontFace: F.body, fontSize: 20, lineSpacingMultiple: 1.5, color: C.white });
+  });
+  icoPin(s, 1.769, 3.709, 0.601, C.ink);
+  s.addText('LOCATION', { x: 2.542, y: 3.589, w: 2.42, h: 0.841, valign: 'top', fontFace: F.display, fontSize: 44, color: C.ink });
+  s.addText(paras(['ROBINHO STREET, CALIFORNIA', 'UNITED STATES']).filter(t => t.text !== ''),
+    { x: 2.542, y: 4.217, w: 5.274, h: 0.959, valign: 'top', fontFace: F.label, fontSize: 18, charSpacing: 3, color: C.ink, lineSpacingMultiple: 1.5 });
+  icoPhone(s, 9.152, 3.797, 0.436, C.ink);
+  s.addText('CALL & MAIL', { x: 9.952, y: 3.589, w: 3.841, h: 0.841, valign: 'top', fontFace: F.display, fontSize: 44, color: C.ink });
+  s.addText(paras(['+123 449 302', 'INFO@GIBSON.COM']).filter(t => t.text !== ''),
+    { x: 9.952, y: 4.217, w: 3.379, h: 0.959, valign: 'top', fontFace: F.label, fontSize: 18, charSpacing: 3, color: C.ink, lineSpacingMultiple: 1.5 });
+  photo(s, 0, 7.5, W, 7.5);
+}
+
+// 36 — icon slides divider
+function slide36(s) {
+  page(s);
+  s.addShape(S.rect, { x: 0, y: 0, w: 8.561, h: 14.994, fill: { color: C.ink } });
+  razor(s, 3.759, 2.065, 1.043, C.gold);
+  s.addText([
+    { text: 'ICON', options: { breakLine: true, color: C.white } },
+    { text: 'SLIDES', options: { color: C.gold } },
+  ], { x: 0.473, y: 4.417, w: 7.616, h: 6.799, align: 'center', valign: 'top', fontFace: F.display, fontSize: 199 });
+  divider(s, 3.759, 12.524);
+  s.addShape(S.rect, { x: 0.417, y: 0.366, w: 7.875, h: 14.171, line: { color: C.gold, width: HAIR } });
+  photo(s, 8.561, 0, 18.1, H);
+}
+
+/* ---- 37..40: four sheets of pictogram samples -------------------- */
+const GLYPHS = [
+  'ellipse', 'rect', 'triangle', 'star5', 'heart', 'rightArrow', 'roundRect', 'diamond',
+  'pentagon', 'hexagon', 'donut', 'cloud', 'moon', 'sun', 'mathPlus', 'can',
+  'chevron', 'upArrow', 'smileyFace', 'lightningBolt', 'leftArrow', 'octagon', 'teardrop', 'bevel',
+];
+
+/** grid of small ink pictograms - stands in for the deck's icon libraries */
+function iconSheet(s, seed) {
+  page(s);
+  const cols = 11;
+  const rows = 6;
+  const x0 = 1.65;
+  const y0 = 1.95;
+  const dx = 2.245;
+  const dy = 2.03;
+  const d = 1.0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const shape = GLYPHS[(seed * 7 + r * cols + c) % GLYPHS.length];
+      const inset = shape === 'rect' || shape === 'roundRect' ? 0.1 : 0;
+      s.addShape(shape, {
+        x: x0 + c * dx + inset, y: y0 + r * dy + inset,
+        w: d - 2 * inset, h: d - 2 * inset, fill: { color: C.ink },
+      });
+    }
+  }
+}
+
+// 41 — thank you
+function slide41(s) {
+  photo(s, 0, 0, W, H);
+  s.addShape(S.rect, { x: 0, y: 0.005, w: W, h: H, fill: { color: C.ink, transparency: 40 } });
+  razor(s, 12.809, 3.827, 1.043, C.gold);
+  s.addText('THANK YOU', { x: 7.864, y: 5.112, w: 10.932, h: 4.123, align: 'center', valign: 'top', fontFace: F.display, fontSize: 239, color: C.white, wrap: false });
+  s.addText('FOR WATCHING', { x: 11.389, y: 8.421, w: 3.883, h: 0.572, align: 'center', valign: 'top', fontFace: F.label, fontSize: 28, charSpacing: 3, color: C.gold });
+  divider(s, 12.809, 9.389);
+  s.addShape(S.line, { x: 0, y: 13.526, w: W, h: 0, line: { color: C.grey, width: HAIR } });
+  s.addText('MASDIKASTUDIO PRESENT', { x: 0.932, y: 14.035, w: 4.534, h: 0.404, valign: 'top', fontFace: F.label, fontSize: 18, charSpacing: 3, color: 'A6A6A6' });
+  s.addText('BARBERSHOP PRESENTATION', { x: 20.682, y: 14.035, w: 5.047, h: 0.404, align: 'right', valign: 'top', fontFace: F.label, fontSize: 18, charSpacing: 3, color: 'A6A6A6' });
+}
+
+/* ================================================================== *
+ * Build
+ * ================================================================== */
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+  slide31, slide32, slide33, slide34, slide35, slide36,
+  s => iconSheet(s, 0), s => iconSheet(s, 1), s => iconSheet(s, 2), s => iconSheet(s, 3),
+  slide41,
+];
+
+pptx.defineLayout({ name: 'GIBSON', width: W, height: H });
+pptx.layout = 'GIBSON';
+pptx.theme = { headFontFace: F.display, bodyFontFace: F.body };
+
+BUILDERS.forEach(build => {
+  const s = pptx.addSlide();
+  s.background = { color: C.cream };
+  build(s);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '14f2c95b-186f-45e2-8dc6-718b329454a0_grok_final.pptx') })
+  .then(f => console.log('wrote', f));
+
