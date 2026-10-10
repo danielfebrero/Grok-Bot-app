@@ -9,8 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-10 17:49 (Paris) — snapshot `2026-10-10_09-52` → `2026-10-10_17-49`
+
+Versions touchées : sand-host `964107d` → `fd09280` ; app 0.70.0-pre.16 → 0.70.0-pre.18. Image, box-scripts, exec-daemon, Chrome inchangés. Fichiers : +0 / −0 / ~4.
+
+- **Bugfix** — —
+- **Change** — Les serveurs MCP en statut `error` remontent désormais leur message d'erreur (`errorMessage`) dans l'état MCP ; flag client `email` retiré de la liste des fonctionnalités.
+- **Features** — Nouveaux outils `ReadMeetingLines` et `RespondInMeeting` ; canal `meeting-request:` (agents de requêtes en réunion, consignes de wake associées) ; message dédié pour les MCP sur réseau Tailscale privé (suggère Tailscale Funnel).
+- **Perf** — —
+- **Autre/infra** — `managed-skills/cache.json` : seul `fetchedAt` change. Reste des bundles `host-main.cjs` / `sand-eval-runner.cjs` : rebuild opaque, classement hypothétique.
+
+Rapport : [reports/2026-10-10_17-49.md](reports/2026-10-10_17-49.md) — commit à venir
+
 ## 2026-10-10 09:52 (Paris) — snapshot `2026-10-10_07-51` → `2026-10-10_09-52`
-- Commit GitHub : commit à venir
+- Commit GitHub : [2a7bb15](../../../commit/2a7bb15cf20e01c907ce715390edd25f6bc03b99)
 - Rapport brut : [reports/2026-10-10_09-52.md](reports/2026-10-10_09-52.md) (diffs complets : `reports/2026-10-10_09-52-diffs/`)
 - Versions touchées : **sand-host** `91efc0d` → `964107d`. Inchangés : image/box-scripts `91a9d91`, agent-store-fuse `7356478`, exec-daemon, Chrome 154.0.8037.97, Node, Python, Debian.
 - Fichiers : +1 / −0 / ~9.

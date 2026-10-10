@@ -1,0 +1,748 @@
+/*
+ * TALKZEMS - Seminar Talkactive Presentation (10 slides, 13.333 x 7.5 in)
+ *
+ * Rebuilt with pptxgenjs only. Every icon and decorative freeform from the
+ * source deck is re-created with native shapes / traced polygons. The deck's
+ * picture slots are empty PowerPoint placeholders (see photoFrame below).
+ *
+ * Run:  node 03ba1ae2-d9fc-4ef0-9037-21f867915924_grok_final.js
+ */
+'use strict';
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ *
+ * Theme
+ * ------------------------------------------------------------------ */
+
+const C = {
+  purple: '4403BF',      // accent1
+  purpleDeep: '33028F',  // accent1 shade 75%
+  purpleSoft: '8444FC',  // accent1 lumMod 60% / lumOff 40%
+  lime: 'DAEE51',        // accent2
+  limeDeep: 'C1DA15',    // accent2 lumMod 75%
+  white: 'FFFFFF',
+  ink: '262626',         // tx1 lumMod 85%
+  ink70: '404040',       // tx1 lumMod 75%
+  grey: '808080',        // tx1 lumMod 50%
+  greyBtn: 'F2F2F2',     // bg1 lumMod 95%
+  imgGrey: 'D9D9D9'      // bg1 lumMod 85% - empty picture placeholder
+};
+
+const HEAD = 'Montserrat';   // +mj-lt
+const BODY = 'Open Sans';    // +mn-lt
+
+// Text-frame insets of the source deck: [left, right, bottom, top] in points.
+const INSET = [7.2, 7.2, 3.6, 3.6];
+
+/* ------------------------------------------------------------------ *
+ * Small helpers
+ * ------------------------------------------------------------------ */
+
+// A plain top-aligned text box (the deck never vertically centres its text boxes).
+function textBox(slide, content, opts) {
+  slide.addText(content, Object.assign({ valign: 'top', margin: INSET, fontFace: HEAD }, opts));
+}
+
+// 36pt bold section heading.
+function heading(slide, str, x, y, w, h) {
+  textBox(slide, str, { x, y, w, h, fontSize: 36, bold: true, color: C.ink });
+}
+
+// 14pt bold sub-heading. `opts` may carry `align` and `lineSpacing`.
+function subHeading(slide, str, x, y, w, h, color, opts) {
+  const o = opts || {};
+  textBox(slide, str, {
+    x, y, w, h, fontSize: 14, bold: true, color: color || C.ink,
+    align: o.align || 'left',
+    lineSpacingMultiple: o.lineSpacing === undefined ? 1.5 : o.lineSpacing
+  });
+}
+
+// 12pt grey-ish paragraph copy, 150% leading.
+function paragraph(slide, str, x, y, w, h, color, align) {
+  textBox(slide, str, {
+    x, y, w, h, fontSize: 12, fontFace: BODY, color: color || C.grey,
+    lineSpacingMultiple: 1.5, align: align || 'left'
+  });
+}
+
+// Closed polygon from points normalised to a unit square.
+function polygon(slide, pts, x, y, w, h, opts) {
+  const points = pts.map(function (p) { return { x: p[0] * w, y: p[1] * h }; });
+  points.push({ close: true });
+  slide.addShape('custGeom', Object.assign({ x, y, w, h, points }, opts));
+}
+
+/* ------------------------------------------------------------------ *
+ * Recurring decorations
+ * ------------------------------------------------------------------ */
+
+// 16-point spiky starburst, traced from the deck's freeform.
+const BURST = [
+  [0.956, 0.319], [0.776, 0.447], [1.000, 0.500], [0.798, 0.548], [0.983, 0.667], [0.737, 0.640],
+  [0.863, 0.847], [0.646, 0.743], [0.681, 0.970], [0.550, 0.787], [0.500, 1.000], [0.453, 0.802],
+  [0.344, 0.971], [0.368, 0.754], [0.157, 0.883], [0.264, 0.659], [0.030, 0.696], [0.229, 0.554],
+  [0.000, 0.500], [0.221, 0.448], [0.041, 0.332], [0.229, 0.353], [0.121, 0.176], [0.341, 0.282],
+  [0.304, 0.044], [0.443, 0.240], [0.500, 0.000], [0.553, 0.224], [0.680, 0.029], [0.656, 0.246],
+  [0.828, 0.141], [0.725, 0.355]
+];
+
+// The "Z" swoosh inside the TALKZEMS badge.
+const LOGO_GLYPH = [
+  [0.651, 0.000], [0.741, 0.050], [0.835, 0.102], [0.648, 0.447], [1.000, 0.447], [1.000, 0.660],
+  [0.533, 0.660], [0.467, 0.782], [0.955, 0.782], [0.841, 0.994], [0.352, 0.994], [0.349, 1.000],
+  [0.165, 0.898], [0.294, 0.660], [0.000, 0.660], [0.000, 0.447], [0.409, 0.447], [0.535, 0.214],
+  [0.056, 0.214], [0.170, 0.002], [0.650, 0.002]
+];
+
+/*
+ * Starburst. On the two purple slides it is a flat lilac; everywhere else the
+ * source paints brand purple at 28% opacity over white, which reads paler.
+ */
+function starburst(slide, x, y, size, onPurple) {
+  const fill = onPurple ? { color: C.purpleSoft } : { color: C.purple, transparency: 72 };
+  polygon(slide, BURST, x, y, size, size, { fill, rotate: 292.15 });
+}
+
+// Four-pointed sparkle.
+function sparkle(slide, x, y, size, rotate) {
+  slide.addShape('star4', {
+    x, y, w: size, h: size, fill: { color: C.lime }, rotate: rotate === undefined ? 347.81 : rotate
+  });
+}
+
+// Big sparkle with a smaller companion below-right (a grouped pair in the source).
+function sparklePair(slide, x, y, rotate, dx, dy) {
+  const rot = rotate === undefined ? 7.86 : rotate;
+  sparkle(slide, x, y, 0.446, rot);
+  slide.addShape('star4', {
+    x: x + (dx === undefined ? 0.242 : dx), y: y + (dy === undefined ? 0.415 : dy),
+    w: 0.231, h: 0.292, fill: { color: C.lime }, rotate: rot
+  });
+}
+
+// Four overlapping ellipse outlines - the "coil" motif. Geometry mirrors the
+// grouped shape of the source deck: 1.354 x 0.958 child space, rotated as a group.
+const COIL_OFFSETS = [[0.000, 0.000], [0.000, 0.124], [0.013, 0.232], [0.013, 0.356]];
+
+function coil(slide, gx, gy, gw, gh, rotate, color) {
+  const sx = gw / 1.354, sy = gh / 0.958;
+  const w = 1.341 * sx, h = 0.602 * sy;
+  const pivotX = gx + gw / 2, pivotY = gy + gh / 2;
+  const th = (rotate * Math.PI) / 180;
+  COIL_OFFSETS.forEach(function (off) {
+    const cx = gx + off[0] * sx + w / 2 - pivotX;
+    const cy = gy + off[1] * sy + h / 2 - pivotY;
+    slide.addShape('ellipse', {
+      x: pivotX + cx * Math.cos(th) - cy * Math.sin(th) - w / 2,
+      y: pivotY + cx * Math.sin(th) + cy * Math.cos(th) - h / 2,
+      w, h, rotate, line: { color, width: 1 }
+    });
+  });
+}
+
+// 2 x 2 rounded-square "apps" glyph used inside the top-right button.
+function gridGlyph(slide, x, y, size, color) {
+  const cell = size * 0.448, gap = size * 0.552;
+  [[0, 0], [gap, 0], [0, gap], [gap, gap]].forEach(function (o) {
+    slide.addShape('roundRect', {
+      x: x + o[0], y: y + o[1], w: cell, h: cell, fill: { color }, rectRadius: cell * 0.12
+    });
+  });
+}
+
+// Header furniture shared by every slide: badge + wordmark on the left,
+// round button with the grid glyph on the right.
+function chrome(slide, dark) {
+  const badge = dark ? C.lime : C.purple;
+  const glyph = dark ? C.purple : C.white;
+  slide.addShape('roundRect', {
+    x: 0.529, y: 0.298, w: 0.237, h: 0.225, fill: { color: badge }, rectRadius: 0.037, rotate: 28.55
+  });
+  polygon(slide, LOGO_GLYPH, 0.533, 0.298, 0.226, 0.223, { fill: { color: glyph } });
+  textBox(slide, [
+    { text: 'TALK', options: { color: dark ? C.white : C.ink } },
+    { text: 'ZEMS', options: { color: dark ? C.lime : C.purple } }
+  ], { x: 0.804, y: 0.264, w: 1.958, h: 0.303, fontSize: 12, bold: true });
+  slide.addShape('ellipse', {
+    x: 12.488, y: 0.212, w: 0.458, h: 0.458,
+    fill: { color: dark ? C.white : C.greyBtn, transparency: dark ? 88 : 0 }
+  });
+  gridGlyph(slide, 12.634, 0.358, 0.166, dark ? C.lime : C.purple);
+}
+
+// Soft drop shadows used by the card shapes. pptxgenjs rewrites the object it
+// is handed, so each call gets a fresh copy.
+const SHADOW_PRESETS = {
+  card: { blur: 10, offset: 4, angle: 80, opacity: 0.06 },
+  soft: { blur: 15, offset: 3, angle: 90, opacity: 0.10 },
+  wide: { blur: 24, offset: 3, angle: 90, opacity: 0.10 }
+};
+
+function shadow(name) {
+  return Object.assign({ type: 'outer', color: '000000' }, SHADOW_PRESETS[name]);
+}
+
+/*
+ * Photo frame. Every picture slot in the source deck is an *empty* PowerPoint
+ * picture placeholder - no bitmap is embedded and the frames render as bare
+ * slide background - so nothing is painted. The calls below stay in each slide
+ * builder with their true geometry so the intended photo layout remains
+ * readable; set DRAW_PHOTO_FRAMES to true to see the frames blocked out.
+ */
+const DRAW_PHOTO_FRAMES = false;
+
+function photoFrame(slide, x, y, w, h, opts) {
+  if (!DRAW_PHOTO_FRAMES) return;
+  const o = opts || {};
+  slide.addShape(o.shape || 'roundRect', {
+    x, y, w, h, fill: { color: C.imgGrey }, rectRadius: o.radius || 0.01
+  });
+  slide.addText('[image]', {
+    x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle',
+    fontFace: BODY, fontSize: 11, color: 'A6A6A6'
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Icon glyphs (small vector art from the source deck)
+ * ------------------------------------------------------------------ */
+
+// Rounded purple tile with a white "person" pictogram.
+function personIcon(slide, x, y, size) {
+  slide.addShape('roundRect', { x, y, w: size, h: size, fill: { color: C.purple }, rectRadius: size * 0.25 });
+  slide.addShape('donut', {
+    x: x + size * 0.31, y: y + size * 0.19, w: size * 0.38, h: size * 0.38,
+    fill: { color: C.white }, rectRadius: 0
+  });
+  slide.addShape('blockArc', {
+    x: x + size * 0.19, y: y + size * 0.55, w: size * 0.62, h: size * 0.52,
+    fill: { color: C.white }, angleRange: [180, 360], arcThicknessRatio: 0.34
+  });
+}
+
+// Award rosette: scalloped disc (a 14-lobe cloud) plus two ribbon tails.
+const MEDAL_TAIL_L = [[0.14, 0.58], [0.47, 0.70], [0.36, 0.98], [0.26, 0.86], [0.03, 0.90]];
+const MEDAL_TAIL_R = [[0.86, 0.58], [0.53, 0.70], [0.64, 0.98], [0.74, 0.86], [0.97, 0.90]];
+
+function medalIcon(slide, x, y, w, h, color, holeColor) {
+  polygon(slide, MEDAL_TAIL_L, x, y, w, h, { fill: { color } });
+  polygon(slide, MEDAL_TAIL_R, x, y, w, h, { fill: { color } });
+  // Scalloped edge: a ring of small circles around a solid disc.
+  const r = w * 0.44, cx = x + w / 2, cy = y + w / 2, lobe = w * 0.16;
+  for (let i = 0; i < 14; i++) {
+    const a = (i * 2 * Math.PI) / 14;
+    slide.addShape('ellipse', {
+      x: cx + r * Math.cos(a) - lobe / 2, y: cy + r * Math.sin(a) - lobe / 2,
+      w: lobe, h: lobe, fill: { color }
+    });
+  }
+  slide.addShape('ellipse', {
+    x: cx - r, y: cy - r, w: r * 2, h: r * 2, fill: { color }
+  });
+  slide.addShape('ellipse', {
+    x: cx - w * 0.25, y: cy - w * 0.25, w: w * 0.50, h: w * 0.50, fill: { color: holeColor }
+  });
+}
+
+// Faceted icosahedron mark: dark disc scored with light seams.
+const POLY_SEAMS = [
+  [0.50, 0.02, 0.10, 0.34], [0.50, 0.02, 0.90, 0.34], [0.14, 0.38, 0.86, 0.38],
+  [0.10, 0.34, 0.22, 0.74], [0.90, 0.34, 0.78, 0.74], [0.16, 0.38, 0.50, 0.76],
+  [0.84, 0.38, 0.50, 0.76], [0.14, 0.74, 0.86, 0.74], [0.22, 0.74, 0.50, 0.99],
+  [0.78, 0.74, 0.50, 0.99], [0.50, 0.76, 0.50, 0.99]
+];
+
+function polyhedronIcon(slide, x, y, w, h, color, seam) {
+  slide.addShape('decagon', { x, y, w, h, fill: { color } });
+  POLY_SEAMS.forEach(function (l) {
+    slide.addShape('line', {
+      x: x + l[0] * w, y: y + l[1] * h, w: (l[2] - l[0]) * w, h: (l[3] - l[1]) * h,
+      line: { color: seam, width: 1.25 }
+    });
+  });
+}
+
+// Speaker at a lectern.
+function podiumIcon(slide, x, y, w, h, color) {
+  slide.addShape('ellipse', { x: x + w * 0.30, y, w: w * 0.40, h: w * 0.40, fill: { color } });
+  slide.addShape('roundRect', {
+    x: x + w * 0.14, y: y + h * 0.22, w: w * 0.72, h: h * 0.28, fill: { color }, rectRadius: 0.02
+  });
+  slide.addShape('roundRect', {
+    x, y: y + h * 0.53, w, h: h * 0.12, fill: { color }, rectRadius: 0.015
+  });
+  slide.addShape('roundRect', {
+    x: x + w * 0.16, y: y + h * 0.70, w: w * 0.68, h: h * 0.30, fill: { color }, rectRadius: 0.02
+  });
+}
+
+// Group of three people.
+function peopleIcon(slide, x, y, w, h, color) {
+  [[0.02, 0.14, 0.30], [0.68, 0.14, 0.30], [0.31, 0.24, 0.38]].forEach(function (p) {
+    const bw = w * p[2];
+    slide.addShape('ellipse', {
+      x: x + w * p[0] + bw * 0.14, y: y + h * (p[1] - 0.13), w: bw * 0.72, h: bw * 0.72, fill: { color }
+    });
+    slide.addShape('roundRect', {
+      x: x + w * p[0], y: y + h * (p[1] + 0.10), w: bw, h: h * 0.62, fill: { color }, rectRadius: 0.03
+    });
+  });
+}
+
+// Facebook "f" and the Twitter bird, traced as unit-square polygons.
+const FACEBOOK_F = [
+  [0.40, 1.00], [0.40, 0.56], [0.26, 0.56], [0.26, 0.37], [0.40, 0.37], [0.40, 0.25],
+  [0.45, 0.11], [0.58, 0.02], [0.74, 0.00], [0.82, 0.00], [0.82, 0.17], [0.70, 0.17],
+  [0.60, 0.21], [0.58, 0.30], [0.58, 0.37], [0.80, 0.37], [0.76, 0.56], [0.58, 0.56],
+  [0.58, 1.00]
+];
+const TWITTER_BIRD = [
+  [1.00, 0.12], [0.86, 0.20], [0.94, 0.05], [0.78, 0.13], [0.64, 0.06], [0.48, 0.13],
+  [0.42, 0.30], [0.44, 0.40], [0.20, 0.33], [0.06, 0.14], [0.02, 0.30], [0.09, 0.44],
+  [0.17, 0.51], [0.08, 0.50], [0.16, 0.66], [0.30, 0.72], [0.20, 0.74], [0.33, 0.86],
+  [0.18, 0.93], [0.03, 0.94], [0.30, 1.00], [0.62, 0.94], [0.82, 0.74], [0.89, 0.48],
+  [0.88, 0.30]
+];
+
+// Flat social buttons: white tile + purple mark.
+function socialIcons(slide, y, xs, size) {
+  xs.forEach(function (x, i) {
+    slide.addShape('roundRect', {
+      x, y, w: size, h: size * 1.14, fill: { color: C.white }, rectRadius: size * 0.2
+    });
+    const gx = x + size * 0.18, gy = y + size * 0.24, g = size * 0.64;
+    if (i === 0) polygon(slide, FACEBOOK_F, gx, gy, g, g, { fill: { color: C.purple } });
+    if (i === 1) polygon(slide, TWITTER_BIRD, gx, gy, g, g, { fill: { color: C.purple } });
+    if (i === 2) {
+      slide.addShape('roundRect', {
+        x: gx, y: gy, w: g, h: g, line: { color: C.purple, width: 1.5 }, rectRadius: g * 0.25
+      });
+      slide.addShape('ellipse', {
+        x: gx + g * 0.24, y: gy + g * 0.24, w: g * 0.52, h: g * 0.52,
+        line: { color: C.purple, width: 1.5 }
+      });
+    }
+  });
+}
+
+// Contact-strip pictograms on the closing slide.
+function globeIcon(slide, x, y, size, color, bg) {
+  slide.addShape('ellipse', { x, y, w: size, h: size, fill: { color } });
+  slide.addShape('ellipse', {
+    x: x + size * 0.30, y, w: size * 0.40, h: size, line: { color: bg, width: 1.25 }
+  });
+  [0.33, 0.5, 0.67].forEach(function (f) {
+    slide.addShape('line', {
+      x, y: y + size * f, w: size, h: 0, line: { color: bg, width: 1.25 }
+    });
+  });
+}
+
+const HANDSET = [
+  [0.04, 0.20], [0.18, 0.02], [0.36, 0.04], [0.44, 0.24], [0.31, 0.37], [0.36, 0.53],
+  [0.49, 0.66], [0.65, 0.71], [0.78, 0.58], [0.98, 0.66], [0.97, 0.84], [0.80, 0.98],
+  [0.58, 0.96], [0.37, 0.86], [0.19, 0.68], [0.07, 0.45]
+];
+
+function phoneIcon(slide, x, y, size, color) {
+  polygon(slide, HANDSET, x, y, size, size, { fill: { color } });
+}
+
+function mailIcon(slide, x, y, size, color) {
+  const h = size * 0.72;
+  slide.addShape('rect', { x, y: y + size * 0.14, w: size, h, line: { color, width: 2 } });
+  slide.addShape('line', {
+    x, y: y + size * 0.14, w: size * 0.5, h: h * 0.6, line: { color, width: 2 }
+  });
+  slide.addShape('line', {
+    x: x + size * 0.5, y: y + size * 0.14 + h * 0.6, w: size * 0.5, h: -h * 0.6, line: { color, width: 2 }
+  });
+}
+
+// Open laptop mock-up (comes from the slide layout in the source deck).
+function laptop(slide) {
+  slide.addShape('blockArc', {
+    x: 9.647, y: 0.033, w: 7.467, h: 7.467, fill: { color: C.white, transparency: 93 },
+    angleRange: [180, 0], arcThicknessRatio: 0.5, rotate: 270
+  });
+  slide.addShape('roundRect', { x: 6.691, y: 1.219, w: 7.683, h: 5.330, fill: { color: 'C6C7CA' }, rectRadius: 0.16 });
+  slide.addShape('roundRect', { x: 6.734, y: 1.262, w: 7.597, h: 5.240, fill: { color: '202021' }, rectRadius: 0.14 });
+  slide.addShape('roundRect', { x: 6.734, y: 1.262, w: 7.597, h: 4.991, fill: { color: '131313' }, rectRadius: 0.14 });
+  slide.addShape('ellipse', { x: 10.498, y: 1.386, w: 0.069, h: 0.069, fill: { color: '414041' } });
+  slide.addShape('rect', { x: 7.508, y: 6.249, w: 6.050, h: 0.253, fill: { color: '2C2C2E' } });
+  slide.addShape('roundRect', { x: 5.814, y: 6.525, w: 9.436, h: 0.132, fill: { color: '919191' }, rectRadius: 0.06 });
+  slide.addShape('rect', { x: 5.812, y: 6.378, w: 9.440, h: 0.161, fill: { color: 'C6C7CA' } });
+  slide.addShape('roundRect', { x: 9.871, y: 6.378, w: 1.324, h: 0.101, fill: { color: 'A9A9A9' }, rectRadius: 0.05 });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+// 1 - Cover
+function slide1(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.purple };
+
+  photoFrame(s, 7.349, 3.325, 4.206, 3.454, { radius: 0.195 });
+  starburst(s, 10.554, 0.941, 1.205, true);
+
+  // Top navigation pill
+  s.addShape('roundRect', {
+    x: 9.464, y: 0.213, w: 2.95, h: 0.458, fill: { color: C.white, transparency: 88 }, rectRadius: 0.229
+  });
+  ['Menu', 'Home ', 'Contact'].forEach(function (item, i) {
+    textBox(s, item, {
+      x: [9.666, 10.480, 11.329][i], y: i === 2 ? 0.220 : 0.212, w: 0.849, h: 0.373,
+      fontSize: 12, fontFace: BODY, align: 'center', lineSpacingMultiple: 1.5,
+      color: i === 1 ? C.white : C.purpleSoft
+    });
+  });
+  s.addShape('line', { x: 10.646, y: 0.541, w: 0.532, h: 0, line: { color: C.lime, width: 1.25 } });
+
+  // Browser-card header over the picture frame
+  s.addShape('round2SameRect', {
+    x: 7.349, y: 3.325, w: 4.206, h: 0.613, fill: { color: C.white }, rectRadius: 0.22
+  });
+  subHeading(s, 'Seminar Activities', 7.534, 3.459, 2.579, 0.337, C.ink, { lineSpacing: 1.0 });
+  [0, 0.165, 0.331].forEach(function (dx) {
+    s.addShape('ellipse', { x: 10.769 + dx, y: 3.575, w: 0.104, h: 0.104, fill: { color: C.purple } });
+  });
+
+  // Hero wordmark
+  textBox(s, [
+    { text: 'TALK', options: { color: C.white } },
+    { text: 'ZEMS', options: { color: C.lime } }
+  ], { x: 1.366, y: 0.986, w: 10.601, h: 2.036, fontSize: 115, bold: true, align: 'center' });
+  textBox(s, 'Seminar Talkactive Presentation', {
+    x: 3.651, y: 0.935, w: 6.032, h: 0.337, fontSize: 14, color: C.white,
+    align: 'center', charSpacing: 3, lineSpacingMultiple: 1.0
+  });
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. dolore Maecenas porttitor congue massa. Fusce',
+    1.549, 3.293, 3.645, 0.985, C.white);
+
+  // Speaker chip
+  s.addShape('roundRect', {
+    x: 1.653, y: 4.652, w: 2.556, h: 0.543, fill: { color: C.white }, rectRadius: 0.051, shadow: shadow('card')
+  });
+  personIcon(s, 1.842, 4.798, 0.25);
+  textBox(s, 'Speaker: \u201C Van Doe\u201D', {
+    x: 2.222, y: 4.772, w: 1.901, h: 0.303, fontSize: 12, fontFace: BODY, color: C.grey, lineSpacingMultiple: 1.0
+  });
+
+  // Stat cards
+  [['300+', 'Listener', 1.653, 1.880], ['120k', 'Volunteer', 3.375, 3.587]].forEach(function (card) {
+    s.addShape('roundRect', { x: card[2], y: 5.576, w: 1.616, h: 1.172, fill: { color: C.lime }, rectRadius: 0.102 });
+    textBox(s, card[0], { x: card[3], y: 5.732, w: 1.293, h: 0.572, fontSize: 28, bold: true, color: C.purple });
+    textBox(s, card[1], { x: card[3], y: 6.233, w: 1.226, h: 0.337, fontSize: 14, bold: true, color: C.purple });
+  });
+
+  sparkle(s, 1.013, 0.928, 0.506);
+  coil(s, -0.827, 5.220, 1.975, 1.397, 270, C.white);
+  sparklePair(s, 12.265, 4.549);
+  photoFrame(s, 4.497, 2.127, 4.119, 5.373);
+  chrome(s, true);
+}
+
+// 2 - Our Speaker
+function slide2(pptx) {
+  const s = pptx.addSlide();
+  starburst(s, 5.640, 3.481, 1.205);
+
+  heading(s, 'Our Speaker', 1.495, 2.050, 4.529, 0.707);
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore',
+    1.495, 3.278, 3.483, 0.978);
+  textBox(s, 'More than 5 years experience', {
+    x: 1.495, y: 4.632, w: 3.594, h: 0.303, fontSize: 12, bold: true, color: C.purple
+  });
+  textBox(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do', {
+    x: 1.495, y: 5.036, w: 3.483, h: 0.675, fontSize: 12, fontFace: BODY, color: C.grey, lineSpacingMultiple: 1.5
+  });
+
+  // Speaker cards (the first is a vertical purple gradient in the source)
+  s.addShape('roundRect', { x: 6.211, y: 1.951, w: 3.619, h: 1.347, fill: { color: '3D029F' }, rectRadius: 0.082 });
+  textBox(s, 'Mr. Antonio Stang', {
+    x: 6.430, y: 2.324, w: 2.228, h: 0.337, fontSize: 14, bold: true, color: C.white, align: 'center'
+  });
+  textBox(s, 'Creative Designer', {
+    x: 6.367, y: 2.708, w: 2.355, h: 0.286, fontSize: 11, italic: true, fontFace: BODY,
+    color: C.white, align: 'center', lineSpacingMultiple: 1.0
+  });
+
+  s.addShape('roundRect', {
+    x: 8.480, y: 4.715, w: 3.619, h: 1.347, fill: { color: C.lime }, rectRadius: 0.082, shadow: shadow('wide')
+  });
+  textBox(s, 'Mr. Yayan Kobra', {
+    x: 9.604, y: 5.062, w: 2.228, h: 0.337, fontSize: 14, bold: true, color: C.ink70, align: 'center'
+  });
+  textBox(s, 'Internship Designer', {
+    x: 9.541, y: 5.446, w: 2.355, h: 0.286, fontSize: 11, italic: true, fontFace: BODY,
+    color: C.ink70, align: 'center', lineSpacingMultiple: 1.0
+  });
+
+  sparkle(s, 0.680, 6.040, 0.506);
+  coil(s, -0.659, 1.649, 1.627, 1.151, 270, C.purple);
+  sparklePair(s, 12.161, 0.936);
+  photoFrame(s, 6.206, 4.045, 3.125, 2.448, { radius: 0.15 });
+  photoFrame(s, 8.975, 1.400, 3.125, 2.448, { radius: 0.15 });
+  chrome(s, false);
+}
+
+// 3 - Welcome
+function slide3(pptx) {
+  const s = pptx.addSlide();
+  starburst(s, 12.189, 6.378, 1.514);
+
+  heading(s, 'Welcome to seminar presentation', 7.741, 1.286, 4.400, 1.919);
+  [['Planning One ', 3.640, 4.140], ['Planning Two', 5.184, 5.684]].forEach(function (row) {
+    subHeading(s, row[0], 7.741, row[1], 1.947, 0.425);
+    paragraph(s, 'Lorem ipsum dolor sit amet, consectetur elit, sed do eiusmod tempor incididunt ut labore',
+      7.741, row[2], 4.044, 0.675);
+  });
+
+  sparkle(s, 0.686, 5.307, 0.506);
+  coil(s, 12.132, 1.574, 1.627, 1.151, 270, C.purple);
+  sparklePair(s, 6.420, 1.176);
+  photoFrame(s, 1.941, 3.826, 4.715, 2.765, { radius: 0.15 });
+  photoFrame(s, 1.578, 1.323, 4.734, 2.604, { radius: 0.15 });
+  chrome(s, false);
+}
+
+// 4 - Our Great Facility
+function slide4(pptx) {
+  const s = pptx.addSlide();
+  photoFrame(s, 4.152, 3.190, 5.031, 4.310, { radius: 0.194, shape: 'round2SameRect' });
+  starburst(s, 11.412, 2.937, 1.205);
+
+  heading(s, 'Our Great Facility to Enchanced Quality', 1.469, 1.218, 5.928, 1.313);
+  subHeading(s, 'Dominate Market', 7.845, 1.197, 2.326, 0.425);
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur elit, sed do eiusmod tempor incididunt ut labore',
+    7.845, 1.741, 4.044, 0.675);
+
+  // Two feature cards
+  s.addShape('roundRect', { x: 1.288, y: 3.374, w: 3.270, h: 3.422, fill: { color: C.purple }, rectRadius: 0.180 });
+  medalIcon(s, 2.682, 3.888, 0.480, 0.641, C.white, C.purple);
+  subHeading(s, 'Future Innovation', 1.722, 4.804, 2.366, 0.417, C.white, { align: 'center' });
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur elit, sed do eiusmod', 1.633, 5.304, 2.580, 0.978, C.white, 'center');
+
+  s.addShape('roundRect', { x: 8.775, y: 3.374, w: 3.270, h: 3.422, fill: { color: C.lime }, rectRadius: 0.211 });
+  polyhedronIcon(s, 10.110, 3.888, 0.601, 0.641, C.ink, C.lime);
+  subHeading(s, 'Modern Concept', 9.247, 4.804, 2.326, 0.425, C.ink, { align: 'center', lineSpacing: 1.5 });
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur elit, sed do eiusmod', 9.120, 5.304, 2.580, 0.978, C.ink70, 'center');
+
+  sparkle(s, 11.832, 1.150, 0.506);
+  coil(s, -0.569, 1.280, 1.627, 1.151, 270, C.purple);
+  sparklePair(s, 0.484, 4.523, 352.41, 0.327, 0.367);
+  chrome(s, false);
+}
+
+// 5 - Our Entire Big Project
+function slide5(pptx) {
+  const s = pptx.addSlide();
+  coil(s, 11.110, 5.511, 1.627, 1.151, 0, C.purple);
+  photoFrame(s, 6.539, 1.156, 2.636, 4.952, { radius: 0.161 });
+  photoFrame(s, 9.414, 1.574, 2.636, 4.952, { radius: 0.161 });
+
+  heading(s, 'Our Entire Big Project Here', 1.453, 1.109, 5.007, 1.313);
+
+  // Description cards
+  s.addShape('roundRect', {
+    x: 1.487, y: 2.857, w: 4.095, h: 1.719, fill: { color: C.white }, rectRadius: 0.161, shadow: shadow('soft')
+  });
+  podiumIcon(s, 1.984, 3.135, 0.226, 0.391, C.purple);
+  subHeading(s, 'Description 01', 2.431, 3.092, 1.947, 0.425, C.ink70);
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur, sed do eiusmod tempor incididunt', 1.859, 3.592, 3.537, 0.675);
+
+  s.addShape('roundRect', {
+    x: 1.479, y: 4.909, w: 4.095, h: 1.719, fill: { color: C.white }, rectRadius: 0.161, shadow: shadow('soft')
+  });
+  peopleIcon(s, 1.972, 5.208, 0.360, 0.361, C.limeDeep);
+  subHeading(s, 'Description 02', 2.423, 5.144, 1.947, 0.425, C.ink70);
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur, sed do eiusmod tempor incididunt', 1.852, 5.644, 3.537, 0.675);
+
+  // Numbered bubbles
+  s.addShape('ellipse', { x: 7.422, y: 5.686, w: 0.870, h: 0.870, fill: { color: C.purple } });
+  textBox(s, '01', { x: 7.408, y: 5.835, w: 0.870, h: 0.572, fontSize: 28, bold: true, color: C.white, align: 'center' });
+  s.addShape('ellipse', { x: 10.296, y: 1.133, w: 0.870, h: 0.870, fill: { color: C.lime } });
+  textBox(s, '02', { x: 10.282, y: 1.288, w: 0.870, h: 0.572, fontSize: 28, bold: true, color: C.ink, align: 'center' });
+
+  starburst(s, -0.388, 1.330, 1.298);
+  sparkle(s, 0.680, 6.040, 0.506);
+  sparklePair(s, 5.829, 1.568);
+  chrome(s, false);
+}
+
+// 6 - Our Program
+function slide6(pptx) {
+  const s = pptx.addSlide();
+  photoFrame(s, 0.000, 1.251, 5.083, 5.379, { radius: 0.231 });
+  starburst(s, 6.509, 5.389, 1.205);
+
+  // Program cards
+  s.addShape('roundRect', { x: 3.940, y: 1.734, w: 3.349, h: 2.036, fill: { color: C.purple }, rectRadius: 0.159 });
+  subHeading(s, 'Program 01', 4.410, 1.982, 1.947, 0.417, C.white);
+  paragraph(s, 'Lorem ipsum dolor sit amet ipsum dolor sit amet, consectetur, ', 4.410, 2.481, 2.571, 0.978, C.white);
+
+  s.addShape('roundRect', { x: 3.940, y: 4.097, w: 3.349, h: 2.036, fill: { color: C.lime }, rectRadius: 0.151 });
+  subHeading(s, 'Program 02', 4.410, 4.345, 1.947, 0.417, C.ink);
+  paragraph(s, 'Lorem ipsum dolor sit amet ipsum dolor sit amet, consectetur, ', 4.410, 4.845, 2.571, 0.978, C.ink70);
+
+  heading(s, 'Our Program', 8.215, 2.009, 3.909, 0.707);
+  textBox(s, '50K', { x: 8.222, y: 3.226, w: 1.620, h: 0.572, fontSize: 28, bold: true, color: C.purple });
+  textBox(s, 'Active members', { x: 9.317, y: 3.381, w: 2.290, h: 0.303, fontSize: 12, color: C.ink });
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore',
+    8.215, 4.075, 3.555, 0.978);
+  s.addShape('ellipse', { x: 8.293, y: 5.461, w: 0.212, h: 0.212, fill: { color: C.lime } });
+  paragraph(s, 'Lorem ipsum dolor sit consectetur, sed do eiusmod tempor', 8.665, 5.202, 3.074, 0.675);
+
+  sparkle(s, 3.737, 3.343, 0.506);
+  coil(s, 12.250, 6.507, 1.627, 1.151, 270, C.purple);
+  sparklePair(s, 12.178, 1.440);
+  chrome(s, false);
+}
+
+// 7 - Revolutionizing Education
+function slide7(pptx) {
+  const s = pptx.addSlide();
+  starburst(s, 11.360, 3.028, 1.205);
+  s.addShape('roundRect', {
+    x: 8.820, y: 4.499, w: 3.117, h: 1.978, fill: { color: C.purple }, rectRadius: 0.138, shadow: shadow('card')
+  });
+
+  heading(s, 'Revolutionizing Education Through Edtech', 1.528, 1.288, 5.040, 1.919);
+
+  const step = 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. dolore Maecenas';
+  subHeading(s, 'Step one ', 5.763, 4.710, 2.366, 0.417, '000000');
+  paragraph(s, step, 5.763, 5.210, 2.580, 0.978);
+  subHeading(s, 'Step Two', 9.156, 4.710, 2.366, 0.417, C.white);
+  paragraph(s, step, 9.156, 5.210, 2.580, 0.978, C.white);
+
+  sparkle(s, 0.629, 5.753, 0.506);
+  coil(s, -0.659, 1.649, 1.627, 1.151, 270, C.purple);
+  sparklePair(s, 6.174, 0.852);
+  photoFrame(s, 6.923, 1.064, 5.040, 2.726, { radius: 0.167 });
+  photoFrame(s, 1.276, 3.950, 3.795, 2.527, { radius: 0.154 });
+  chrome(s, false);
+}
+
+// 8 - See Our Latest Video
+function slide8(pptx) {
+  const s = pptx.addSlide();
+  starburst(s, 6.046, 0.647, 1.205);
+  laptop(s);
+  photoFrame(s, 7.087, 1.619, 6.247, 4.466);
+  coil(s, -0.540, 6.539, 1.627, 1.151, 180, C.purple);
+
+  heading(s, 'See Our Latest Video', 1.587, 1.789, 3.568, 1.313);
+  subHeading(s, 'Watch Latest Video', 1.611, 3.636, 2.514, 0.415, C.ink70);
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore',
+    1.587, 4.125, 3.867, 0.978);
+  textBox(s, '\u201CLorem ipsum dolor sit amet, consectetur\u201D', {
+    x: 1.495, y: 5.523, w: 4.162, h: 0.303, fontSize: 12, bold: true, italic: true,
+    color: C.purple, lineSpacingMultiple: 1.0
+  });
+
+  sparkle(s, 0.393, 5.531, 0.506);
+  sparklePair(s, 6.850, 5.321);
+  chrome(s, false);
+}
+
+// 9 - Our Best Team
+function slide9(pptx) {
+  const s = pptx.addSlide();
+  photoFrame(s, 1.535, 1.429, 2.908, 2.325, { radius: 0.234 });
+  photoFrame(s, 1.547, 4.212, 2.908, 2.325, { radius: 0.234 });
+  photoFrame(s, 4.893, 4.212, 2.908, 2.325, { radius: 0.234 });
+  starburst(s, 7.163, 3.609, 1.205);
+
+  heading(s, 'Our Best Team', 5.103, 1.794, 3.329, 1.313);
+  subHeading(s, 'Our Special Team', 8.368, 1.661, 2.386, 0.337, C.ink, { lineSpacing: 1.0 });
+  paragraph(s, 'Lorem ipsum dolor amet, consectetuer adipiscing elit. dolore Maecenas porttitor congue massa. Fusce',
+    8.368, 2.106, 3.645, 0.978);
+
+  // Social card
+  s.addShape('roundRect', {
+    x: 8.432, y: 4.211, w: 3.270, h: 2.310, fill: { color: C.purple }, rectRadius: 0.231, shadow: shadow('card')
+  });
+  subHeading(s, '@youraccount', 8.866, 4.530, 2.366, 0.417, C.white, { align: 'center' });
+  socialIcons(s, 5.123, [9.478, 9.952, 10.427], 0.204);
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur elit, ', 8.777, 5.527, 2.580, 0.675, C.white, 'center');
+
+  // Name pills under the photos
+  [['Margareth S.', 2.768, 2.820, 2.162, 3.487], ['Anna Zie', 2.781, 5.610, 2.175, 6.277],
+   ['Kim Saccha', 6.127, 5.572, 5.521, 6.239]].forEach(function (pill) {
+    s.addShape('roundRect', {
+      x: pill[1], y: pill[2], w: 0.440, h: 1.652, fill: { color: C.lime }, rectRadius: 0.22, rotate: 90
+    });
+    textBox(s, pill[0], {
+      x: pill[3], y: pill[4], w: 1.652, h: 0.303, fontSize: 12, bold: true, color: C.ink, align: 'center'
+    });
+  });
+
+  sparkle(s, 11.448, 5.856, 0.506);
+  coil(s, 12.415, 1.895, 1.627, 1.151, 270, C.purple);
+  sparklePair(s, 0.967, 1.140);
+  chrome(s, false);
+}
+
+// 10 - Thank You
+function slide10(pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: C.purple };
+
+  photoFrame(s, 0.000, 3.811, 13.333, 3.730, { radius: 0.168, shape: 'round2SameRect' });
+  coil(s, 11.911, 2.555, 1.975, 1.397, 270, C.white);
+  starburst(s, 3.041, 0.783, 1.205, true);
+
+  textBox(s, 'Thank You', {
+    x: 3.002, y: 0.978, w: 7.330, h: 1.447, fontSize: 80, bold: true, color: C.white, align: 'center'
+  });
+  textBox(s, 'For Your Attention !!', {
+    x: 3.979, y: 2.388, w: 5.376, h: 0.370, fontSize: 16, color: C.white,
+    align: 'center', charSpacing: 6, lineSpacingMultiple: 1.0
+  });
+
+  // Contact strip
+  s.addShape('roundRect', { x: 1.896, y: 3.212, w: 9.542, h: 1.082, fill: { color: C.lime }, rectRadius: 0.101 });
+  globeIcon(s, 2.303, 3.552, 0.390, C.ink, C.lime);
+  phoneIcon(s, 5.390, 3.566, 0.375, C.ink);
+  mailIcon(s, 8.319, 3.546, 0.415, C.ink);
+  [['Website', 'www.yourwebsite.com', 2.825], ['Phone', '+123-456-7890', 5.905],
+   ['Email', 'youremail@gmail.com', 8.853]].forEach(function (col) {
+    subHeading(s, col[0], col[2], 3.375, 1.309, 0.425, C.ink);
+    textBox(s, col[1], {
+      x: col[2], y: 3.700, w: 2.038, h: 0.379, fontSize: 12, fontFace: BODY,
+      color: C.ink, lineSpacingMultiple: 1.5
+    });
+  });
+
+  sparkle(s, 10.638, 0.776, 0.506);
+  sparklePair(s, 0.934, 2.473);
+  chrome(s, true);
+}
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE_16x9';
+  pptx.title = 'TALKZEMS - Seminar Talkactive Presentation';
+
+  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10]
+    .forEach(function (fn) { fn(pptx); });
+
+  return pptx.writeFile({
+    fileName: path.join(__dirname, '03ba1ae2-d9fc-4ef0-9037-21f867915924_grok_final.pptx')
+  });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }).catch(function (e) {
+  console.error(e);
+  process.exit(1);
+});
