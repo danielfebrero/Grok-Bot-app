@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "service": "orbitd",
+  "revision": "d2ed47598489aee9d5169669dec7253a8d71179d",
+  "targets": {
+    "x86_64-unknown-linux-gnu": {
+      "payload": {
+        "compression": "zstd",
+        "size_bytes": 6638772,
+        "sha256": "c1552e809d4fae3eed5a8279d5e0018b1480bb7ee853beb998817e4a5722a8f1"
+      },
+      "executable": {
+        "size_bytes": 20371216,
+        "sha256": "cbeef1388b595837b039d231aecb877021ed0182c5877f0600a7d9775e08c6c8"
+      }
+    }
+  }
+}

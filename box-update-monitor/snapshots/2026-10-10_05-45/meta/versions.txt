@@ -1,0 +1,20 @@
+image_sha (/etc/sand-box-image-sha)	91a9d91
+box_scripts_version (/usr/local/share/sand-box-scripts/version)	91a9d91
+sand_host_version (/opt/sand/sand-host/version)	91efc0d
+supervisor_status.hostVersion (runtime)	91efc0d
+supervisor_status.lastCommandId (runtime)	upgrade-91efc0d
+supervisor_status.pendingUpgradeVersion (runtime)	None
+exec_daemon.name	@anysphere/exec-daemon-runtime
+exec_daemon.gitCommit	unknown
+exec_daemon.buildTimestamp	2026-10-08T22:37:28.764Z
+canvas_sdk_version	604ba4f7bede5ebf0f7d14b650fcdc4d6abb71c10e501f72fdc60fa24fa3650d
+orbitd.bundled_revision	88287498b7278d865be0a9d54e3cbaae9eded227
+orbitd.releases	d2ed47598489aee9d5169669dec7253a8d71179d
+agent_store_fuse.commit	36088c90bcdac3beddac51816e5dd0f70503f5b9
+chrome	Google Chrome 154.0.8037.97
+node (/exec-daemon/node)	v22.14.0
+node (system)	v20.19.2
+python3	Python 3.13.5
+debian_version	13.7
+kernel (runtime)	6.12.94+
+runtime	anyrun
