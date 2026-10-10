@@ -1,0 +1,691 @@
+/**
+ * "Navia" presentation template — rebuilt with pptxgenjs.
+ *
+ *   node 161583cf-eeb1-4c0c-921d-c917b8d5f1f3_grok_final.js
+ *
+ * Writes 161583cf-eeb1-4c0c-921d-c917b8d5f1f3_grok_final.pptx next to this file.
+ * Photographs in the original deck are redrawn as flat placeholder rectangles;
+ * icons and device mockups are redrawn from native pptx shapes.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ── palette ─────────────────────────────────────────────────────────────── */
+const C = {
+  navy:     '44546A', // theme tx2 — nearly every piece of copy
+  white:    'FFFFFF',
+  black:    '000000',
+  ink:      '222019', // theme accent5
+  gray:     '4E4A49', // theme accent4
+  green:    '6EAD44', // theme accent3
+  silver:   'CECCCF', // theme accent2
+  mist:     'EFEDF0', // theme accent1
+  shade:    '181818', // translucent scrim over photos
+  photo:    'DADDE1', // photo placeholder tint
+  photoDim: 'B4BBC3', // darker photo placeholder tint
+};
+
+const SERIF = 'Playfair Display'; // theme major font
+const SANS = 'Oxygen';            // theme minor font
+
+/* ── reusable text presets ───────────────────────────────────────────────── */
+const P = {
+  // every preset anchors to the top of its box, as the source deck does
+  hero:     { fontFace: SERIF, fontSize: 96, color: C.navy, lineSpacingMultiple: 0.9, paraSpaceBefore: 10, valign: 'top' },
+  title:    { fontFace: SERIF, fontSize: 72, color: C.navy, lineSpacingMultiple: 0.9, paraSpaceBefore: 10, valign: 'top' },
+  title60:  { fontFace: SERIF, fontSize: 60, color: C.navy, lineSpacingMultiple: 0.9, paraSpaceBefore: 10, valign: 'top' },
+  stat:     { fontFace: SERIF, fontSize: 40, color: C.navy, bold: true, lineSpacingMultiple: 1.5, valign: 'top' },
+  numeral:  { fontFace: SERIF, fontSize: 36, color: C.navy, lineSpacingMultiple: 1.5, valign: 'top' },
+  tag:      { fontFace: SERIF, fontSize: 18, color: C.navy, bold: true, charSpacing: 3, valign: 'top' },
+  tagLight: { fontFace: SANS, fontSize: 18, color: C.white, charSpacing: 3, valign: 'top' },
+  name:     { fontFace: SERIF, fontSize: 18, color: C.navy, bold: true, lineSpacingMultiple: 1.5, valign: 'top' },
+  role:     { fontFace: SERIF, fontSize: 16, color: C.navy, bold: true, italic: true, lineSpacingMultiple: 1.5, valign: 'top' },
+  contact:  { fontFace: SERIF, fontSize: 16, color: C.black, lineSpacingMultiple: 1.5, valign: 'top' },
+  label:    { fontFace: SERIF, fontSize: 14, color: C.navy, bold: true, lineSpacingMultiple: 1.5, valign: 'top' },
+  kicker:   { fontFace: SERIF, fontSize: 12, color: C.navy, bold: true, lineSpacingMultiple: 1.5, valign: 'top' },
+  unit:     { fontFace: SERIF, fontSize: 12, color: C.navy, lineSpacingMultiple: 1.5, valign: 'top' },
+  body:     { fontFace: SANS, fontSize: 12, color: C.navy, lineSpacingMultiple: 1.5, valign: 'top' },
+};
+
+/* ── primitive helpers ───────────────────────────────────────────────────── */
+
+/** Flat colour block (the deck's translucent scrims and mist panels). */
+function panel(s, o) {
+  const { shape = 'rect', fill, rotate, ...box } = o;
+  s.addShape(shape, { ...box, fill, rotate, line: { type: 'none' } });
+}
+
+/** Photo placeholder: the original artwork is replaced by a tinted rectangle. */
+function photo(s, box, color = C.photo) {
+  s.addShape('rect', { ...box, fill: { color }, line: { type: 'none' } });
+  s.addText('[image]', {
+    ...box, fontFace: SANS, fontSize: 10, color: C.white, align: 'center', valign: 'middle',
+  });
+}
+
+/** 2.25pt hairline used as a section divider. */
+function rule(s, o) {
+  const { color, rotate, ...box } = o;
+  s.addShape('line', { ...box, rotate, line: { color, width: 2.25 } });
+}
+
+/** The four-dot brand motif; `axis` runs the row left→right or top→bottom. */
+function dots(s, o, colors) {
+  colors.forEach((color, i) => {
+    s.addShape('ellipse', {
+      x: o.x + (o.axis === 'y' ? 0 : i * o.step),
+      y: o.y + (o.axis === 'y' ? i * o.step : 0),
+      w: o.d, h: o.d, rotate: o.rotate,
+      fill: { color }, line: { type: 'none' },
+    });
+  });
+}
+
+/* ── icon set ────────────────────────────────────────────────────────────────
+ * The reference deck draws its pictograms as freeform paths. Each is rebuilt
+ * here from native shapes placed on a 0..1 unit square that `icon()` scales
+ * into the target box. A part marked `cut: true` is a knock-out, painted with
+ * whatever colour reads as "behind" the glyph.
+ * Part tuple: [shapeName, x, y, w, h, extra?]
+ */
+
+/** Window chrome shared by the four "browser" glyphs. */
+const BROWSER = [
+  ['rect', 0.00, 0.00, 1.00, 1.00],
+  ['rect', 0.08, 0.26, 0.84, 0.64, { cut: true }],
+  ['ellipse', 0.07, 0.09, 0.06, 0.07, { cut: true }],
+  ['ellipse', 0.15, 0.09, 0.06, 0.07, { cut: true }],
+  ['ellipse', 0.23, 0.09, 0.06, 0.07, { cut: true }],
+];
+
+/** Hub with `n` spokes and satellite dots — the "connected network" motif. */
+function hub(cx, cy, r, dots) {
+  const parts = [['ellipse', cx - 0.09 * r, cy - 0.09 * r, 0.18 * r, 0.18 * r]];
+  dots.forEach(([ang, dist, size]) => {
+    const rad = (ang * Math.PI) / 180;
+    const len = dist * r;
+    parts.push(['rect', cx + Math.cos(rad) * len * 0.5 - len / 2,
+      cy + Math.sin(rad) * len * 0.5 - 0.035 * r, len, 0.07 * r, { rotate: ang }]);
+    parts.push(['ellipse', cx + Math.cos(rad) * len - (size * r) / 2,
+      cy + Math.sin(rad) * len - (size * r) / 2, size * r, size * r]);
+  });
+  return parts;
+}
+const HUB_DOTS = [[20, 0.42, 0.30], [98, 0.40, 0.18], [172, 0.40, 0.20], [252, 0.42, 0.24], [318, 0.38, 0.22]];
+
+const GLYPHS = {
+  // head silhouette struck by a lightning bolt
+  headBolt: [
+    ['ellipse', 0.08, 0.00, 0.84, 0.78],
+    ['triangle', 0.00, 0.58, 0.34, 0.42, { rotate: 200 }],
+    ['lightningBolt', 0.34, 0.14, 0.30, 0.50, { cut: true }],
+  ],
+  // person beside a circular download arrow
+  personDown: [
+    ['ellipse', 0.02, 0.06, 0.24, 0.24],
+    ['round2SameRect', 0.00, 0.36, 0.28, 0.64],
+    ['donut', 0.34, 0.04, 0.66, 0.66],
+    ['downArrow', 0.53, 0.16, 0.28, 0.42],
+  ],
+  // magnifier over a rising trend arrow
+  search: [
+    ['donut', 0.00, 0.14, 0.70, 0.70],
+    ['roundRect', 0.50, 0.62, 0.46, 0.14, { rotate: 45 }],
+    ['bentArrow', 0.44, 0.00, 0.56, 0.46, { rotate: 90 }],
+  ],
+  // bar chart with a speech bubble
+  barChart: [
+    ['rect', 0.00, 0.34, 0.18, 0.66],
+    ['rect', 0.26, 0.16, 0.18, 0.84],
+    ['rect', 0.52, 0.48, 0.18, 0.52],
+    ['ellipse', 0.56, 0.00, 0.44, 0.44],
+  ],
+  // two overlapping browser windows
+  windows: [
+    ['rect', 0.00, 0.10, 0.62, 0.52], ['rect', 0.05, 0.24, 0.52, 0.33, { cut: true }],
+    ['rect', 0.38, 0.38, 0.62, 0.52], ['rect', 0.43, 0.52, 0.52, 0.33, { cut: true }],
+  ],
+  // browser window framing a hub-and-spoke network
+  winNetwork: [...BROWSER, ...hub(0.50, 0.58, 0.30, HUB_DOTS)],
+  // browser window framing a person
+  winPerson: [
+    ...BROWSER,
+    ['ellipse', 0.42, 0.36, 0.16, 0.18],
+    ['round2SameRect', 0.34, 0.58, 0.32, 0.30],
+  ],
+  // browser window framing a bulleted list
+  winList: [
+    ...BROWSER,
+    ['ellipse', 0.18, 0.38, 0.08, 0.09], ['rect', 0.32, 0.40, 0.48, 0.05],
+    ['ellipse', 0.18, 0.56, 0.08, 0.09], ['rect', 0.32, 0.58, 0.48, 0.05],
+    ['ellipse', 0.18, 0.74, 0.08, 0.09], ['rect', 0.32, 0.76, 0.48, 0.05],
+  ],
+  // browser window framing a shopping cart
+  winCart: [
+    ...BROWSER,
+    ['trapezoid', 0.24, 0.40, 0.50, 0.24, { rotate: 180 }],
+    ['ellipse', 0.30, 0.70, 0.11, 0.12], ['ellipse', 0.58, 0.70, 0.11, 0.12],
+  ],
+  // telephone handset
+  phone: [
+    ['blockArc', 0.00, 0.00, 1.00, 1.00, { rotate: 225 }],
+    ['roundRect', 0.02, 0.02, 0.35, 0.27, { rotate: 315 }],
+    ['roundRect', 0.65, 0.65, 0.35, 0.27, { rotate: 315 }],
+  ],
+  // wireframe globe: outer ring, meridian and two latitude lines
+  globe: [
+    ['ellipse', 0.00, 0.00, 1.00, 1.00],
+    ['ellipse', 0.09, 0.09, 0.82, 0.82, { cut: true }],
+    ['donut', 0.33, 0.09, 0.34, 0.82],
+    ['rect', 0.09, 0.47, 0.82, 0.06],
+    ['rect', 0.16, 0.28, 0.68, 0.05],
+    ['rect', 0.16, 0.67, 0.68, 0.05],
+  ],
+  // gear ringed by circulating arrows
+  gear: [
+    ['circularArrow', 0.00, 0.00, 1.00, 1.00],
+    ['circularArrow', 0.00, 0.00, 1.00, 1.00, { rotate: 180 }],
+    ['gear6', 0.20, 0.20, 0.60, 0.60],
+  ],
+  // free-standing hub-and-spoke network
+  network: hub(0.50, 0.50, 0.94, HUB_DOTS),
+  // envelope
+  mail: [
+    ['rect', 0.00, 0.14, 1.00, 0.72],
+    ['rect', 0.06, 0.20, 0.88, 0.60, { cut: true }],
+    ['triangle', 0.06, 0.20, 0.88, 0.42, { rotate: 180 }],
+    ['triangle', 0.13, 0.20, 0.74, 0.32, { cut: true, rotate: 180 }],
+  ],
+  // smartphone
+  mobile: [
+    ['roundRect', 0.18, 0.00, 0.64, 1.00],
+    ['rect', 0.24, 0.10, 0.52, 0.72, { cut: true }],
+    ['ellipse', 0.43, 0.86, 0.14, 0.09, { cut: true }],
+  ],
+};
+
+/** Draw one glyph from GLYPHS, scaled into `o` (x/y/w/h) and tinted `o.color`. */
+function icon(s, kind, o) {
+  GLYPHS[kind].forEach(([shape, gx, gy, gw, gh, ex = {}]) => {
+    s.addShape(shape, {
+      x: o.x + gx * o.w, y: o.y + gy * o.h, w: gw * o.w, h: gh * o.h,
+      rotate: ex.rotate,
+      fill: { color: ex.cut ? contrastOf(o.color) : o.color },
+      line: { type: 'none' },
+    });
+  });
+}
+
+/** Knock-outs inside an icon are painted with the colour behind the glyph. */
+function contrastOf(color) {
+  return color === C.white ? C.gray : C.white;
+}
+
+/* ── device mockups ──────────────────────────────────────────────────────── */
+const SCREEN = 'ECECEC'; // the off-white glass in every mockup
+const BEZEL = '151515';
+
+/**
+ * Redraw of the photographic device mockups on slides 26-28. Each device is a
+ * short stack of rectangles given in fractions of the bounding box.
+ * Rounded corners take a radius in inches, so they are derived from the box.
+ */
+function device(s, kind, b) {
+  const put = (shape, fx, fy, fw, fh, color, radius) =>
+    s.addShape(shape, {
+      x: b.x + fx * b.w, y: b.y + fy * b.h, w: fw * b.w, h: fh * b.h,
+      fill: { color }, line: { type: 'none' },
+      rectRadius: radius ? radius * Math.min(b.w, b.h) : undefined,
+    });
+  if (kind === 'monitor') {
+    put('rect', 0.000, 0.000, 1.00, 0.720, BEZEL);      // black display bezel
+    put('rect', 0.041, 0.045, 0.918, 0.640, SCREEN);    // glass
+    put('rect', 0.000, 0.685, 1.00, 0.150, 'D6D8DA');   // aluminium chin
+    put('trapezoid', 0.400, 0.835, 0.20, 0.120, 'DEDFE1'); // stand neck
+    put('roundRect', 0.355, 0.950, 0.29, 0.050, 'B5B5B5', 0.03); // foot
+  } else if (kind === 'tablet') {
+    put('roundRect', 0.000, 0.000, 1.00, 1.000, BEZEL, 0.05);
+    put('rect', 0.051, 0.060, 0.902, 0.820, SCREEN);
+    put('ellipse', 0.455, 0.915, 0.09, 0.060, '3A3A3A'); // home button
+  } else if (kind === 'phone') {
+    put('roundRect', 0.000, 0.000, 1.00, 1.000, '3C3C3E', 0.13);
+    put('roundRect', 0.030, 0.017, 0.94, 0.966, BEZEL, 0.12);
+    put('roundRect', 0.073, 0.040, 0.86, 0.920, SCREEN, 0.10);
+    put('roundRect', 0.270, 0.033, 0.46, 0.050, BEZEL, 0.03); // notch
+  } else if (kind === 'watch') {
+    put('roundRect', 0.20, 0.000, 0.55, 0.250, '464646', 0.08); // upper strap
+    put('roundRect', 0.20, 0.780, 0.55, 0.220, '464646', 0.08); // lower strap
+    put('roundRect', 0.05, 0.200, 0.86, 0.610, '3E3E3E', 0.12); // case
+    put('roundRect', 0.14, 0.258, 0.69, 0.492, 'E32D2C', 0.08); // watch face
+    put('roundRect', 0.90, 0.360, 0.06, 0.090, '5A5A5A', 0.02); // digital crown
+  }
+}
+
+/* ── charts ──────────────────────────────────────────────────────────────── */
+const SERIES_COLORS = [C.mist, C.silver, C.green];
+const CHART_BASE = {
+  chartColors: SERIES_COLORS,
+  showLegend: false,
+  showTitle: false,
+  plotArea: { fill: { color: null } },   // no fill — the slide shows through
+  chartArea: { fill: { color: null } },
+  catAxisLabelColor: C.navy,
+  valAxisLabelColor: C.navy,
+  catAxisLineColor: 'E6E6E6',
+  valAxisLineShow: false,
+  catAxisMajorTickMark: 'none',
+  valAxisMajorTickMark: 'none',
+  catGridLine: { style: 'none' },
+  valGridLine: { color: 'E6E6E6', size: 1 },
+};
+
+/** Slide 23 — clustered columns with outside-end value labels. */
+function chart23(s, box) {
+  const cats = ['Number One', 'Number Two', 'Number Three', 'Number Four'];
+  s.addChart('bar', [
+    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
+    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
+    { name: 'Series 3', labels: cats, values: [2, 2, 6, 5] },
+  ], {
+    ...box, ...CHART_BASE,
+    barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 219, barOverlapPct: -27,
+    catAxisLabelFontFace: SERIF, catAxisLabelFontSize: 14,
+    valAxisLabelFontFace: SANS, valAxisLabelFontSize: 12,
+    showValue: true, dataLabelPosition: 'outEnd',
+    dataLabelFontFace: SANS, dataLabelFontSize: 12, dataLabelColor: '404040',
+  });
+}
+
+/** Slide 24 — stacked area over a monthly axis. */
+function chart24(s, box) {
+  const cats = ['5/1/2020', '6/1/2020', '7/1/2020', '8/1/2020', '9/1/2020'];
+  s.addChart('area', [
+    { name: 'Series 1', labels: cats, values: [32, 32, 28, 12, 15] },
+    { name: 'Series 2', labels: cats, values: [12, 12, 12, 21, 28] },
+    { name: 'Series 3', labels: cats, values: [13, 14, 12, 16, 18] },
+  ], {
+    ...box, ...CHART_BASE,
+    catAxisLabelFontFace: SANS, catAxisLabelFontSize: 12,
+    valAxisLabelFontFace: SANS, valAxisLabelFontSize: 12,
+  });
+}
+
+/** Slide 25 — 100% stacked horizontal bars. */
+function chart25(s, box) {
+  const cats = ['1', '2', '3', '4'];
+  s.addChart('bar', [
+    { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
+    { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
+    { name: 'Series 3', labels: cats, values: [2, 2, 3, 5] },
+  ], {
+    ...box, ...CHART_BASE,
+    barDir: 'bar', barGrouping: 'percentStacked', barGapWidthPct: 150, barOverlapPct: 100,
+    catAxisLabelFontFace: SERIF, catAxisLabelFontSize: 14,
+    valAxisLabelFontFace: SERIF, valAxisLabelFontSize: 14, valAxisLabelFormatCode: '0%',
+  });
+}
+
+/* ── slides ───────────────────────────────────────────────────────────────── */
+function slide01(s) {
+  panel(s, { x: 0.366, y: 0.325, w: 12.601, h: 6.851, fill: { color: C.shade, transparency: 70 } });
+  s.addText('Navia.', { ...P.hero, x: 0.861, y: 3.056, w: 8.986, h: 1.75, align: 'left', color: C.white });
+  rule(s, { x: 0.675, y: 1.328, w: 9.77, h: 0, color: C.mist });
+  s.addText('Creative.', { ...P.tag, x: 10.445, y: 1.126, w: 2.213, h: 0.404, align: 'left', color: C.white });
+  s.addText('Presentation Template Design', { ...P.tagLight, x: 0.849, y: 4.402, w: 7.038, h: 0.404, align: 'left' });
+  dots(s, { x: 11.037, y: 6.562, d: 0.357, step: 0.452 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide02(s) {
+  panel(s, { x: 0, y: 5.033, w: 6.667, h: 2.467, fill: { color: C.mist, transparency: 50 } });
+  rule(s, { x: 0.675, y: 6.361, w: 3.997, h: 0, color: C.mist });
+  s.addText('Creative.', { ...P.tag, x: 4.82, y: 6.159, w: 2.213, h: 0.404, align: 'left', color: C.white });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus. ', { ...P.body, x: 7.139, y: 3.769, w: 5.041, h: 1.616, align: 'left' });
+  s.addText('About Navia', { ...P.title, x: 7.139, y: 1.282, w: 4.93, h: 2.427, align: 'left' });
+  dots(s, { x: 7.181, y: 5.803, d: 0.357, step: 0.451 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide03(s) {
+  s.addText('Navia Presentation', { ...P.title, x: 0.993, y: 5.851, w: 11.348, h: 1.331, align: 'center' });
+  panel(s, { x: 1.365, y: 1.114, w: 10.603, h: 3.684, fill: { color: C.white, transparency: 5 } });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula.', { ...P.body, x: 2.115, y: 2.99, w: 3.813, h: 1.01, align: 'justify' });
+  s.addText('Description One', { ...P.label, x: 2.115, y: 2.6, w: 3.667, h: 0.413, align: 'justify' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula.', { ...P.body, x: 7.405, y: 2.99, w: 3.813, h: 1.01, align: 'justify' });
+  s.addText('Description Two', { ...P.label, x: 7.405, y: 2.6, w: 3.667, h: 0.413, align: 'justify' });
+  icon(s, 'headBolt', { x: 7.405, y: 1.924, w: 0.525, h: 0.68, color: C.navy });
+  icon(s, 'personDown', { x: 2.203, y: 1.929, w: 0.617, h: 0.668, color: C.navy });
+}
+
+function slide04(s) {
+  panel(s, { x: 6.667, y: 0.325, w: 6.3, h: 3.425, fill: { color: C.shade, transparency: 70 } });
+  s.addText('About Navia', { ...P.title, x: 7.46, y: 0.824, w: 4.917, h: 2.427, align: 'right', color: C.white });
+  panel(s, { x: 0.366, y: 5.033, w: 12.601, h: 2.152, fill: { color: C.mist, transparency: 50 } });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula gravida fermentum.', { ...P.body, x: 1.033, y: 4.357, w: 4.967, h: 2.221, align: 'justify' });
+  s.addText('In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum, euismod consectetur lectus. Vivamus nec feugiat tortor. Donec dui ligula, aliquam in finibus in, ullamcorper a dolor. Morbi eget arcu vulputate, interdum nibh et, efficitur ipsum.', { ...P.body, x: 7.41, y: 4.357, w: 4.967, h: 2.187, align: 'justify' });
+  dots(s, { x: 0.662, y: 3.121, d: 0.357, step: 0.452 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide05(s) {
+  panel(s, { x: 4.016, y: 0.325, w: 1.517, h: 6.851, fill: { color: C.mist } });
+  s.addText('In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum.', { ...P.body, x: 4.515, y: 3.083, w: 6.547, h: 0.707, align: 'justify' });
+  s.addText('Navia Company', { ...P.title, x: 4.515, y: 0.684, w: 6.547, h: 2.427, align: 'left' });
+  dots(s, { x: 4.537, y: 4.151, d: 0.357, step: 0.451 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide06(s) {
+  s.addText('About Navia', { ...P.title, x: -0.119, y: 2.537, w: 4.123, h: 2.427, align: 'center', rotate: 270 });
+  panel(s, { x: 6.667, y: 1.121, w: 6.3, h: 5.259, fill: { color: C.white, transparency: 5 } });
+  s.addText('In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum, euismod consectetur lectus. Vivamus nec feugiat tortor. Donec dui ligula, aliquam in finibus in, ullamcorper a dolor. Morbi eget arcu vulputate, interdum nibh et, efficitur ipsum.', { ...P.body, x: 8.218, y: 2.336, w: 3.351, h: 2.827, align: 'justify' });
+  rule(s, { x: 7.284, y: 5.962, w: 3.09, h: 0, color: C.navy });
+  s.addText('Creative.', { ...P.tag, x: 10.522, y: 5.76, w: 1.828, h: 0.404, align: 'left' });
+  dots(s, { x: 7.284, y: 2.894, d: 0.357, step: 0.452, axis: 'y', rotate: 90 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide07(s) {
+  panel(s, { x: 6.667, y: 0.325, w: 6.3, h: 4.102, fill: { color: C.mist } });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus. ', { ...P.body, x: 7.333, y: 1.097, w: 4.967, h: 1.616, align: 'justify' });
+  rule(s, { x: 4.243, y: 6.886, w: 3.09, h: 0, color: C.mist });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus.', { ...P.body, x: 7.333, y: 5.018, w: 4.967, h: 1.279, align: 'justify' });
+  s.addText('Navia Company', { ...P.title, x: 0.366, y: 1.213, w: 6.3, h: 2.427, align: 'center' });
+  dots(s, { x: 8.961, y: 3.764, d: 0.357, step: 0.452 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide08(s) {
+  panel(s, { x: 0.366, y: 0.325, w: 3.748, h: 6.851, fill: { color: C.mist } });
+  s.addText('Creative.', { ...P.tag, x: 0.588, y: 4.766, w: 1.828, h: 0.404, align: 'left', color: C.white });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 8.785, y: 5.477, w: 3.667, h: 1.01, align: 'justify' });
+  s.addText('Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum, euismod consectetur lectus. Vivamus nec feugiat tortor.', { ...P.body, x: 4.432, y: 5.477, w: 3.667, h: 1.581, align: 'justify' });
+  s.addText('Navia Company', { ...P.title, x: 1.956, y: 0.984, w: 9.421, h: 1.194, align: 'center' });
+  dots(s, { x: 1.385, y: 6.09, d: 0.357, step: 0.451 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide09(s) {
+  panel(s, { x: 4.443, y: 0.325, w: 6.459, h: 6.851, fill: { color: C.mist } });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 5.817, y: 1.036, w: 3.667, h: 1.01, align: 'justify' });
+  dots(s, { x: 1.257, y: 6.422, d: 0.478, step: 0.606 }, [C.gray, C.green, C.silver, C.mist]);
+  s.addText('About Navia', { ...P.title, x: 8.648, y: 2.537, w: 5.344, h: 2.427, align: 'center', rotate: 90 });
+  s.addText('Description One', { ...P.label, x: 5.817, y: 0.647, w: 3.667, h: 0.413, align: 'justify' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 5.817, y: 2.639, w: 3.667, h: 1.01, align: 'justify' });
+  s.addText('Description Two', { ...P.label, x: 5.817, y: 2.249, w: 3.667, h: 0.413, align: 'justify' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 5.817, y: 4.241, w: 3.667, h: 1.01, align: 'justify' });
+  s.addText('Description Three', { ...P.label, x: 5.817, y: 3.852, w: 3.667, h: 0.413, align: 'justify' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 5.817, y: 5.844, w: 3.667, h: 1.01, align: 'justify' });
+  s.addText('Description Four', { ...P.label, x: 5.817, y: 5.454, w: 3.667, h: 0.413, align: 'justify' });
+  icon(s, 'winCart', { x: 5.068, y: 5.578, w: 0.648, h: 0.477, color: C.navy });
+  icon(s, 'winNetwork', { x: 5.068, y: 0.806, w: 0.648, h: 0.477, color: C.navy });
+  icon(s, 'winList', { x: 5.065, y: 3.981, w: 0.648, h: 0.477, color: C.navy });
+  icon(s, 'winPerson', { x: 5.069, y: 2.393, w: 0.644, h: 0.479, color: C.navy });
+}
+
+function slide10(s) {
+  panel(s, { x: 0.366, y: 0.325, w: 12.601, h: 6.851, fill: { color: C.shade, transparency: 30 } });
+  s.addText('Navia Company', { ...P.title, x: 0.727, y: 1.096, w: 5.956, h: 2.427, align: 'left', color: C.white });
+  rule(s, { x: 8.686, y: 3.103, w: 3.997, h: 0, color: C.white });
+  s.addText('Creative.', { ...P.tag, x: 7.027, y: 2.901, w: 2.213, h: 0.404, align: 'left', color: C.white });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 1.474, y: 5.044, w: 3.001, h: 1.01, align: 'justify', color: C.white });
+  s.addText('Description One', { ...P.label, x: 1.474, y: 4.654, w: 3.001, h: 0.41, align: 'justify', color: C.white });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 5.166, y: 5.044, w: 3.001, h: 1.01, align: 'justify', color: C.white });
+  s.addText('Description Two', { ...P.label, x: 5.166, y: 4.654, w: 3.001, h: 0.41, align: 'justify', color: C.white });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 8.858, y: 5.044, w: 3.001, h: 1.01, align: 'justify', color: C.white });
+  s.addText('Description Three', { ...P.label, x: 8.858, y: 4.654, w: 3.001, h: 0.41, align: 'justify', color: C.white });
+  icon(s, 'barChart', { x: 5.274, y: 3.853, w: 0.775, h: 0.785, color: C.white });
+  icon(s, 'search', { x: 1.61, y: 3.895, w: 0.686, h: 0.702, color: C.white });
+  icon(s, 'windows', { x: 8.986, y: 3.965, w: 0.768, h: 0.56, color: C.white });
+  dots(s, { x: 9.503, y: 1.699, d: 0.357, step: 0.452 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide11(s) {
+  panel(s, { x: 9.219, y: 3.016, w: 3.748, h: 4.159, fill: { color: C.white, transparency: 10 } });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus. ', { ...P.body, x: 6.861, y: 1.045, w: 5.806, h: 1.313, align: 'justify' });
+  s.addText('About Navia', { ...P.title, x: 0.366, y: 0.488, w: 6.12, h: 2.427, align: 'left', valign: 'middle' });
+  s.addText('Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus.', { ...P.body, x: 9.408, y: 4.726, w: 3.37, h: 0.972, align: 'center' });
+  s.addText('Description One', { ...P.label, x: 9.564, y: 4.315, w: 3.057, h: 0.41, align: 'center' });
+  s.addText('261K+', { ...P.stat, x: 9.219, y: 3.331, w: 3.748, h: 0.985, align: 'center' });
+  dots(s, { x: 10.237, y: 6.258, d: 0.357, step: 0.452 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide12(s) {
+  panel(s, { x: 0.366, y: 3.96, w: 12.601, h: 2.76, fill: { color: C.shade, transparency: 30 } });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci.', { ...P.body, x: 0.366, y: 2.294, w: 8.216, h: 1.01, align: 'justify' });
+  s.addText('Navia Services', { ...P.title, x: 0.366, y: 0.987, w: 8.761, h: 1.315, align: 'left' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla.', { ...P.body, x: 5.166, y: 5.388, w: 3.001, h: 1.01, align: 'center', color: C.white });
+  s.addText('Description Two', { ...P.label, x: 5.166, y: 4.999, w: 3.001, h: 0.41, align: 'center', color: C.white });
+  icon(s, 'globe', { x: 6.287, y: 4.316, w: 0.759, h: 0.6, color: C.white });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla.', { ...P.body, x: 1.232, y: 5.388, w: 3.001, h: 1.01, align: 'center', color: C.white });
+  s.addText('Description One', { ...P.label, x: 1.232, y: 4.999, w: 3.001, h: 0.41, align: 'center', color: C.white });
+  icon(s, 'phone', { x: 2.425, y: 4.308, w: 0.615, h: 0.617, color: C.white });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla.', { ...P.body, x: 9.1, y: 5.388, w: 3.001, h: 1.01, align: 'center', color: C.white });
+  s.addText('Description Three', { ...P.label, x: 9.1, y: 4.999, w: 3.001, h: 0.413, align: 'center', color: C.white });
+  icon(s, 'network', { x: 10.261, y: 4.309, w: 0.678, h: 0.614, color: C.white });
+}
+
+function slide13(s) {
+  s.addText('Creative.', { ...P.tag, x: 10.477, y: 0.388, w: 2.213, h: 0.404, align: 'left' });
+  dots(s, { x: 0.989, y: 6.432, d: 0.478, step: 0.606 }, [C.gray, C.green, C.silver, C.mist]);
+  s.addText('About Service', { ...P.title, x: 2.131, y: 2.537, w: 5.183, h: 2.427, align: 'center', valign: 'middle', rotate: 270, fill: { color: C.mist, transparency: 10 } });
+  rule(s, { x: 0.643, y: 0.59, w: 9.77, h: 0, color: C.navy });
+  s.addText('Cras vel tincidunt ante, ac aliquet orci. Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus.', { ...P.body, x: 7.1, y: 3.24, w: 5.112, h: 1.275, align: 'justify' });
+  s.addText('2,579', { ...P.stat, x: 7.1, y: 4.648, w: 2.705, h: 0.985, align: 'left' });
+  s.addText('93K ', { ...P.stat, x: 9.02, y: 4.701, w: 2.407, h: 0.985, align: 'left' });
+  s.addText('Description Service', { ...P.label, x: 7.1, y: 2.827, w: 2.289, h: 0.41, align: 'left' });
+  icon(s, 'gear', { x: 7.225, y: 2.165, w: 0.649, h: 0.661, color: C.navy });
+  s.addText('New Sales', { ...P.label, x: 7.1, y: 4.691, w: 2.289, h: 0.41, align: 'left' });
+  s.addText('New Product', { ...P.label, x: 9.02, y: 4.656, w: 2.289, h: 0.41, align: 'left' });
+}
+
+function slide14(s) {
+  panel(s, { x: 1.179, y: 2.379, w: 4.545, h: 2.776, fill: { color: C.mist, transparency: 10 } });
+  s.addText('Navia Services', { ...P.title, x: 1.331, y: 2.537, w: 4.224, h: 2.427, align: 'center', valign: 'middle' });
+  panel(s, { x: 6.52, y: 0.325, w: 6.447, h: 6.851, fill: { color: C.mist } });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 8.066, y: 1.591, w: 3.356, h: 0.972, align: 'left' });
+  s.addText('Description One', { ...P.label, x: 8.066, y: 1.201, w: 2.534, h: 0.454, align: 'left' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 8.066, y: 3.591, w: 3.356, h: 0.972, align: 'left' });
+  s.addText('Description One', { ...P.label, x: 8.066, y: 3.202, w: 2.534, h: 0.454, align: 'left' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus.', { ...P.body, x: 8.066, y: 5.592, w: 3.356, h: 0.972, align: 'left' });
+  s.addText('Description One', { ...P.label, x: 8.066, y: 5.202, w: 2.534, h: 0.454, align: 'left' });
+  icon(s, 'winCart', { x: 7.089, y: 5.365, w: 0.792, h: 0.584, color: C.navy });
+  icon(s, 'winNetwork', { x: 7.089, y: 1.364, w: 0.792, h: 0.584, color: C.navy });
+  icon(s, 'winPerson', { x: 7.092, y: 3.367, w: 0.787, h: 0.585, color: C.navy });
+  dots(s, { x: 12.249, y: 4.249, d: 0.357, step: -0.452, axis: 'y', rotate: 270 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide15(s) {
+  s.addText([{ text: '$1,3M ' }, { text: 'Income', options: { fontSize: 12, bold: false } }], { ...P.stat, x: 1.087, y: 4.225, w: 3.001, h: 0.985, align: 'center' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla.', { ...P.body, x: 1.087, y: 5.676, w: 3.001, h: 1.01, align: 'center' });
+  s.addText('Description One', { ...P.label, x: 1.087, y: 5.287, w: 3.001, h: 0.413, align: 'center' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla.', { ...P.body, x: 5.166, y: 5.676, w: 3.001, h: 1.01, align: 'center' });
+  s.addText('Description Two', { ...P.label, x: 5.166, y: 5.287, w: 3.001, h: 0.413, align: 'center' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla.', { ...P.body, x: 9.245, y: 5.676, w: 3.001, h: 1.01, align: 'center' });
+  s.addText('Description Three', { ...P.label, x: 9.245, y: 5.287, w: 3.001, h: 0.413, align: 'center' });
+  dots(s, { x: 5.519, y: 0.706, d: 0.478, step: 0.606 }, [C.gray, C.green, C.silver, C.mist]);
+  s.addText('About Navia', { ...P.title, x: 1.971, y: 2.914, w: 9.391, h: 1.386, align: 'center', valign: 'middle' });
+  s.addText([{ text: '3.756 ' }, { text: 'People', options: { fontSize: 12, bold: false } }], { ...P.stat, x: 5.166, y: 4.225, w: 3.001, h: 0.985, align: 'center' });
+  s.addText([{ text: '93% ' }, { text: 'Good Rating', options: { fontSize: 12, bold: false } }], { ...P.stat, x: 9.245, y: 4.225, w: 3.001, h: 0.985, align: 'center' });
+}
+
+function slide16(s) {
+  panel(s, { x: 0.366, y: 0.325, w: 12.601, h: 6.851, fill: { color: C.shade, transparency: 10 } });
+  s.addText('Navia Team', { ...P.title, x: 0.748, y: 1.775, w: 7.078, h: 1.213, align: 'left', color: C.white });
+  s.addText('Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum, euismod consectetur lectus.', { ...P.body, x: 0.748, y: 3.161, w: 5.464, h: 1.616, align: 'justify', color: C.white });
+  dots(s, { x: 2.624, y: 5.312, d: 0.357, step: 0.452 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide17(s) {
+  panel(s, { x: 0.366, y: 3.75, w: 3.54, h: 3.425, fill: { color: C.mist, transparency: 50 } });
+  s.addText('Nulla laoreet fermentum ex eget pulvinar. Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis, metus tellus consectetur massa, eget viverra ipsum leo ac magna. ', { ...P.body, x: 0.565, y: 4.288, w: 3.143, h: 2.221, align: 'justify' });
+  s.addText('Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet.', { ...P.body, x: 8.66, y: 1.967, w: 3.975, h: 0.707, align: 'left' });
+  s.addText('Evan Mardovick', { ...P.name, x: 8.66, y: 1.467, w: 3.001, h: 0.555, align: 'left' });
+  s.addText('Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum', { ...P.body, x: 8.66, y: 3.55, w: 3.784, h: 1.01, align: 'left' });
+  s.addText('Nathalie Chloe', { ...P.name, x: 8.66, y: 3.05, w: 3.001, h: 0.499, align: 'left' });
+  s.addText('Creative.', { ...P.tag, x: 10.199, y: 0.561, w: 1.828, h: 0.404, align: 'left' });
+  s.addText('Navia Team', { ...P.title, x: 5.667, y: 5.397, w: 7.087, h: 1.221, align: 'center' });
+  rule(s, { x: 6.961, y: 0.763, w: 3.09, h: 0, color: C.navy });
+  dots(s, { x: 5.111, y: 5.896, d: 0.357, step: -0.451, axis: 'y', rotate: 270 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide18(s) {
+  panel(s, { x: 6.103, y: 0.724, w: 3.976, h: 2.009, fill: { color: C.mist, transparency: 25 } });
+  s.addText('Robert Dawson', { ...P.title60, x: 6.361, y: 0.569, w: 3.718, h: 2.404, align: 'left', valign: 'middle' });
+  s.addText('Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum.', { ...P.body, x: 8.66, y: 3.812, w: 3.715, h: 1.01, align: 'left' });
+  s.addText('Coffee Maker', { ...P.role, x: 8.66, y: 3.349, w: 3.001, h: 0.455, align: 'left' });
+  panel(s, { x: 0.366, y: 5.381, w: 12.601, h: 1.794, fill: { color: C.mist, transparency: 10 } });
+  s.addText('Nulla laoreet fermentum ex eget pulvinar. Vivamus at diam vestibulum, varius quam eu, pellentesque nisl. Duis rhoncus, nulla nec accumsan facilisis, metus tellus consectetur massa, eget viverra ipsum leo ac magna. ', { ...P.body, x: 0.886, y: 5.773, w: 6.594, h: 1.01, align: 'justify' });
+  rule(s, { x: -0.659, y: 4.032, w: 3.09, h: 0, color: C.mist, rotate: 270 });
+  s.addText('Creative.', { ...P.tag, x: -0.027, y: 1.224, w: 1.828, h: 0.404, align: 'left', color: C.white, rotate: 270 });
+  dots(s, { x: 9.628, y: 6.1, d: 0.357, step: 0.451 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide19(s) {
+  panel(s, { x: 0.366, y: 0.662, w: 6.065, h: 2.009, fill: { color: C.mist, transparency: 25 } });
+  s.addText('Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum.', { ...P.body, x: 4.436, y: 5.49, w: 3.736, h: 1.01, align: 'left' });
+  s.addText('Evan Mardovick', { ...P.name, x: 4.436, y: 5.008, w: 3.001, h: 0.499, align: 'left' });
+  s.addText('Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum.', { ...P.body, x: 8.822, y: 5.49, w: 3.736, h: 1.01, align: 'left' });
+  s.addText('Jane Canester', { ...P.name, x: 8.822, y: 5.008, w: 3.001, h: 0.499, align: 'left' });
+  panel(s, { x: 0.366, y: 2.671, w: 3.829, h: 4.505, fill: { color: C.mist, transparency: 50 } });
+  rule(s, { x: 0.886, y: 4.72, w: 0, h: 1.908, color: C.mist });
+  s.addText('Creative.', { ...P.tag, x: -0.027, y: 3.456, w: 1.828, h: 0.404, align: 'left', rotate: 270 });
+  dots(s, { x: 3.505, y: 4.704, d: 0.478, step: -0.605, axis: 'y', rotate: 270 }, [C.gray, C.green, C.silver, C.mist]);
+  s.addText('Navia Team', { ...P.title, x: 0.366, y: 0.992, w: 5.806, h: 1.313, align: 'left', valign: 'middle' });
+}
+
+function slide20(s) {
+  panel(s, { x: 6.411, y: 0.533, w: 6.452, h: 1.809, fill: { color: C.mist, transparency: 25 } });
+  s.addText('PORTFOLIO', { ...P.title, x: 6.667, y: 0.873, w: 5.84, h: 1.193, align: 'right', valign: 'middle' });
+  panel(s, { x: 0.366, y: 2.651, w: 4.587, h: 4.524, fill: { color: C.mist, transparency: 10 } });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla.', { ...P.body, x: 8.873, y: 2.863, w: 3.784, h: 0.707, align: 'left' });
+  s.addText('Description ', { ...P.label, x: 8.873, y: 2.474, w: 2.248, h: 0.454, align: 'left' });
+  rule(s, { x: 6.961, y: 6.842, w: 3.09, h: 0, color: C.mist });
+  s.addText('Creative.', { ...P.tag, x: 10.199, y: 6.64, w: 1.828, h: 0.404, align: 'left', color: C.white });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. ', { ...P.body, x: 1.009, y: 3.491, w: 3.301, h: 1.919, align: 'justify' });
+  dots(s, { x: 1.804, y: 6.123, d: 0.357, step: 0.452 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide21(s) {
+  panel(s, { x: 0.366, y: 1.906, w: 12.601, h: 1.385, fill: { color: C.mist } });
+  rule(s, { x: 4.398, y: 6.842, w: 6.594, h: 0, color: C.mist });
+  s.addText('Creative.', { ...P.tag, x: 11.139, y: 6.64, w: 1.828, h: 0.404, align: 'left', color: C.white });
+  s.addText('Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. ', { ...P.body, x: 4.628, y: 2.074, w: 7.722, h: 1.01, align: 'justify' });
+  s.addText('PORTFOLIO', { ...P.title, x: 4.515, y: 0.636, w: 6.547, h: 1.3, align: 'left' });
+  dots(s, { x: 1.433, y: 6.283, d: 0.357, step: 0.452 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+function slide22(s) {
+  panel(s, { x: 0.366, y: 0.325, w: 12.601, h: 6.851, fill: { color: C.white, transparency: 20 } });
+  s.addText('PORTFOLIO', { ...P.title, x: 2.444, y: 0.609, w: 8.444, h: 1.3, align: 'center' });
+  s.addText('132K+', { ...P.stat, x: 10.145, y: 2.551, w: 2.175, h: 0.774, align: 'left', lineSpacingMultiple: 1 });
+  s.addText('New Followers', { ...P.kicker, x: 10.148, y: 2.335, w: 2.358, h: 0.366, align: 'left' });
+  s.addText('Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. Nullam a ligula luctus.', { ...P.body, x: 10.145, y: 3.293, w: 2.535, h: 1.01, align: 'justify' });
+  s.addText('971+', { ...P.stat, x: 0.683, y: 5.151, w: 2.535, h: 0.774, align: 'left', lineSpacingMultiple: 1 });
+  s.addText('New Product', { ...P.kicker, x: 0.686, y: 4.935, w: 2.532, h: 0.366, align: 'left' });
+  s.addText('Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. Nullam a ligula luctus.', { ...P.body, x: 0.683, y: 5.893, w: 2.535, h: 1.01, align: 'justify' });
+}
+
+function slide23(s) {
+  panel(s, { x: 8.111, y: 0.325, w: 4.856, h: 6.851, fill: { color: C.mist } });
+  chart23(s, { x: 6.667, y: 1.356, w: 5.899, h: 4.789 });
+  s.addText('01.', { ...P.numeral, x: 1.903, y: 1.151, w: 1.217, h: 0.897, align: 'center', rotate: 270 });
+  s.addText('Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. ', { ...P.body, x: 2.974, y: 1.426, w: 2.978, h: 0.707, align: 'justify' });
+  s.addText('Description One ', { ...P.label, x: 2.974, y: 1.088, w: 2.686, h: 0.413, align: 'justify' });
+  s.addText('02.', { ...P.numeral, x: 1.903, y: 2.585, w: 1.217, h: 0.897, align: 'center', rotate: 270 });
+  s.addText('Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. ', { ...P.body, x: 2.974, y: 2.86, w: 2.978, h: 0.707, align: 'justify' });
+  s.addText('Description Two ', { ...P.label, x: 2.974, y: 2.522, w: 2.686, h: 0.413, align: 'justify' });
+  s.addText('03.', { ...P.numeral, x: 1.903, y: 4.019, w: 1.217, h: 0.897, align: 'center', rotate: 270 });
+  s.addText('Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. ', { ...P.body, x: 2.974, y: 4.294, w: 2.978, h: 0.707, align: 'justify' });
+  s.addText('Description Three ', { ...P.label, x: 2.974, y: 3.956, w: 2.686, h: 0.413, align: 'justify' });
+  s.addText('04.', { ...P.numeral, x: 1.903, y: 5.453, w: 1.217, h: 0.897, align: 'center', rotate: 270 });
+  s.addText('Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. ', { ...P.body, x: 2.974, y: 5.728, w: 2.978, h: 0.707, align: 'justify' });
+  s.addText('Description Four ', { ...P.label, x: 2.974, y: 5.39, w: 2.686, h: 0.413, align: 'justify' });
+  s.addText('Our Chart', { ...P.title, x: -2.087, y: 3.102, w: 6.854, h: 1.3, align: 'center', rotate: 270 });
+}
+
+function slide24(s) {
+  panel(s, { x: 6.937, y: 0.325, w: 6.031, h: 6.851, fill: { color: C.mist } });
+  chart24(s, { x: 0.626, y: 1.204, w: 8.019, h: 5.38 });
+  s.addText('Mauris ligula sem, mollis ut blandit vel, imperdiet et enim. Nullam a ligula luctus, porttitor libero nec, lacinia libero. Integer ut diam eu lorem convallis consectetur. Nulla laoreet fermentum ex eget pulvinar. Vivamus at diam vestibulum, ', { ...P.body, x: 8.833, y: 3.339, w: 3.68, h: 1.919, align: 'justify' });
+  s.addText('Navia Chart', { ...P.title, x: 8.83, y: 0.785, w: 3.683, h: 2.524, align: 'left' });
+  s.addText('132K+', { ...P.stat, x: 8.83, y: 5.572, w: 2.175, h: 0.774, align: 'left', lineSpacingMultiple: 1 });
+  s.addText('New Followers', { ...P.kicker, x: 8.833, y: 5.355, w: 2.358, h: 0.366, align: 'left' });
+}
+
+function slide25(s) {
+  panel(s, { x: 9.317, y: 0.325, w: 3.65, h: 6.851, fill: { color: C.mist, transparency: 50 } });
+  chart25(s, { x: 2.333, y: 0.787, w: 10.079, h: 4.434 });
+  s.addText('Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum, euismod consectetur lectus. Vivamus nec feugiat tortor. Donec dui ligula, aliquam in finibus in, ullamcorper a dolor. Morbi eget arcu vulputate, interdum nibh et, efficitur ipsum.', { ...P.body, x: 3.712, y: 5.613, w: 8.316, h: 1.01, align: 'justify' });
+  s.addText('Navia Chart', { ...P.title, x: -2.087, y: 3.102, w: 6.854, h: 1.3, align: 'center', rotate: 270 });
+  s.addText('92%', { ...P.stat, x: 2.339, y: 5.829, w: 2.175, h: 0.774, align: 'left', lineSpacingMultiple: 1 });
+  s.addText('Average Point', { ...P.kicker, x: 2.342, y: 5.613, w: 2.358, h: 0.366, align: 'left' });
+}
+
+function slide26(s) {
+  panel(s, { x: 0.366, y: 2.512, w: 12.601, h: 2.783, fill: { color: C.mist } });
+  device(s, 'monitor', { x: 6.284, y: 0.976, w: 6.683, h: 5.548 });
+  s.addText('In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum, euismod consectetur lectus. Vivamus nec feugiat tortor. Donec dui ligula, aliquam.', { ...P.body, x: 1.24, y: 2.944, w: 4.26, h: 1.919, align: 'justify' });
+  dots(s, { x: 2.223, y: 6.092, d: 0.478, step: 0.605 }, [C.gray, C.green, C.silver, C.mist]);
+  s.addText('Mockup', { ...P.title, x: 0.744, y: 0.969, w: 5.253, h: 1.3, align: 'center' });
+}
+
+function slide27(s) {
+  panel(s, { x: 0.366, y: 4.807, w: 12.601, h: 2.054, fill: { color: C.mist } });
+  device(s, 'tablet', { x: 0.501, y: 0.849, w: 3.838, h: 5.802 });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla.', { ...P.body, x: 5.099, y: 3.727, w: 2.669, h: 1.01, align: 'justify' });
+  s.addText('Description One', { ...P.label, x: 5.099, y: 3.337, w: 2.669, h: 0.454, align: 'justify' });
+  s.addText('Etiam fermentum maximus leo id finibus. In augue orci, rutrum id aliquam fringilla.', { ...P.body, x: 8.821, y: 3.727, w: 2.669, h: 1.01, align: 'justify' });
+  s.addText('Description Two', { ...P.label, x: 8.821, y: 3.337, w: 2.669, h: 0.413, align: 'justify' });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus, mollis nibh eu, ullamcorper lacus. Etiam fermentum maximus leo id finibus. In augue orci.', { ...P.body, x: 5.099, y: 5.321, w: 7.108, h: 1.01, align: 'justify' });
+  s.addText('Navia Mockup', { ...P.title, x: 5.005, y: 0.996, w: 8.899, h: 1.3, align: 'left' });
+  icon(s, 'phone', { x: 5.099, y: 2.591, w: 0.615, h: 0.617, color: C.navy });
+  icon(s, 'globe', { x: 8.821, y: 2.596, w: 0.759, h: 0.6, color: C.navy });
+}
+
+function slide28(s) {
+  panel(s, { x: 0.366, y: 0.325, w: 5.062, h: 6.851, fill: { color: C.mist, transparency: 50 } });
+  device(s, 'watch', { x: 3.727, y: 1.543, w: 2.502, h: 4.378 });
+  device(s, 'phone', { x: 0.704, y: 0.504, w: 3.242, h: 6.493 });
+  s.addText('Smartphone Mockup', { ...P.role, x: 7.348, y: 2.355, w: 2.669, h: 0.455, align: 'justify' });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus.', { ...P.body, x: 7.348, y: 2.809, w: 4.84, h: 1.01, align: 'justify' });
+  s.addText('Smartwatch Mockup', { ...P.role, x: 7.348, y: 4.159, w: 2.669, h: 0.455, align: 'justify' });
+  s.addText('Morbi malesuada neque sit amet sem dapibus scelerisque. Sed bibendum faucibus nisi, bibendum hendrerit leo aliquam a. Fusce id est rhoncus.', { ...P.body, x: 7.348, y: 4.614, w: 4.84, h: 1.01, align: 'justify' });
+  dots(s, { x: 8.67, y: 6.179, d: 0.478, step: 0.605 }, [C.gray, C.green, C.silver, C.mist]);
+  s.addText('Mockup', { ...P.title, x: 7.348, y: 0.782, w: 4.938, h: 1.313, align: 'center' });
+}
+
+function slide29(s) {
+  panel(s, { x: 0.366, y: 2.639, w: 12.601, h: 2.138, fill: { color: C.mist } });
+  s.addText('Our Contact', { ...P.title, x: 3.333, y: 0.55, w: 6.667, h: 1.433, align: 'center' });
+  s.addText('+24 246 2324 7543', { ...P.contact, x: 8.843, y: 3.54, w: 2.758, h: 0.505, align: 'center' });
+  icon(s, 'mobile', { x: 10.031, y: 2.914, w: 0.382, h: 0.585, color: C.navy });
+  s.addText('message@email.com', { ...P.contact, x: 5.287, y: 3.538, w: 2.758, h: 0.505, align: 'center' });
+  icon(s, 'mail', { x: 6.389, y: 3, w: 0.556, h: 0.414, color: C.navy });
+  s.addText('www.yourwebsite.com', { ...P.contact, x: 1.691, y: 3.54, w: 2.775, h: 0.505, align: 'center' });
+  icon(s, 'globe', { x: 2.825, y: 2.949, w: 0.509, h: 0.516, color: C.navy });
+  s.addText('In augue orci, rutrum id aliquam fringilla, dapibus eu metus. Pellentesque vel est eu ligula gravida fermentum. Integer ut tincidunt mi. Integer sit amet malesuada ipsum, euismod consectetur lectus. Vivamus nec feugiat tortor. Donec dui ligula, aliquam.', { ...P.body, x: 1.763, y: 1.833, w: 9.838, h: 0.707, align: 'center' });
+}
+
+function slide30(s) {
+  panel(s, { x: 0.366, y: 0.325, w: 12.601, h: 6.851, fill: { color: C.shade, transparency: 70 } });
+  s.addText('Thank You', { ...P.hero, x: 0.869, y: 3.052, w: 12.098, h: 1.3, align: 'left', color: C.white });
+  s.addText('Creative.', { ...P.tag, x: 10.445, y: 1.126, w: 2.213, h: 0.404, align: 'left', color: C.white });
+  s.addText('Presentation Template Design', { ...P.tagLight, x: 0.869, y: 4.318, w: 7.038, h: 0.404, align: 'left' });
+  rule(s, { x: 0.675, y: 1.328, w: 9.77, h: 0, color: C.mist });
+  dots(s, { x: 0.986, y: 5.044, d: 0.357, step: 0.451 }, [C.ink, C.gray, C.green, C.silver]);
+}
+
+/* ── assembly ────────────────────────────────────────────────────────────── */
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'NAVIA', width: 13.333, height: 7.5 });
+pptx.layout = 'NAVIA';
+pptx.author = 'Navia';
+pptx.title = 'Navia Presentation Template';
+
+SLIDES.forEach(build => build(pptx.addSlide()));
+
+pptx.writeFile({
+  fileName: path.join(__dirname, '161583cf-eeb1-4c0c-921d-c917b8d5f1f3_grok_final.pptx'),
+}).then(f => console.log('wrote', f));

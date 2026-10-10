@@ -1,0 +1,951 @@
+/**
+ * "Segoro Infographic" — fish / fishing themed deck, 31 slides, 13.333 x 7.5 in.
+ * Rebuilt with pptxgenjs only. Raster/vector artwork from the original is
+ * approximated with native shapes; photographic icons become flat placeholders.
+ */
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ palette */
+const C = {
+  pink1: 'FFE0E9', // accent1 - palest pink
+  pink2: 'FF7AA2', // accent2
+  rose: 'E05780', // accent3
+  wine: '8A2846', // accent4
+  wine2: '602437', // accent5
+  wine3: '522E38', // accent6
+  hot: 'FF6894', // accent1 lumMod 75% - heading pink
+  ink: '262626', // body text
+  rule: 'F2F2F2', // hairlines
+  gray1: 'D9D9D9',
+  gray2: 'BFBFBF',
+  gray3: 'A6A6A6',
+  gray4: '808080',
+  white: 'FFFFFF',
+  navy: '2D313B', // cover background
+  skin: 'FED4AC',
+  skin2: 'FBBCA1',
+  skin3: 'E5BD99',
+  denim: '545869',
+};
+
+const FONT = 'Poppins';
+const FONT_B = 'Poppins SemiBold';
+
+/* boilerplate copy that repeats across the deck */
+const T = {
+  title: 'Segoro Infographic',
+  sub: 'Your Text Here',
+  head: 'Your Text Here',
+  s: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit',
+  xs: 'Lorem ipsum dolor sit amet, consectetur.',
+  m: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut.',
+  l: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim.',
+};
+
+/* --------------------------------------------------------------- text atoms */
+const HEAD = { fontFace: FONT_B, fontSize: 14, bold: true, color: C.ink, lineSpacingMultiple: 1.5, valign: 'top' };
+const BODY = { fontFace: FONT, fontSize: 12, color: C.ink, lineSpacingMultiple: 1.5, valign: 'top' };
+
+function heading(s, x, y, w, o = {}) {
+  s.addText(o.text || T.head, Object.assign({ x, y, w, h: 0.418 }, HEAD, o));
+}
+function body(s, x, y, w, h, o = {}) {
+  s.addText(o.text || T.s, Object.assign({ x, y, w, h }, BODY, o));
+}
+/** heading + paragraph stacked, the deck's most common building block */
+function labelPair(s, o) {
+  const align = o.align || 'left';
+  heading(s, o.x, o.y, o.hw || 1.865, { align, color: o.hc || C.ink, text: o.head });
+  body(s, o.bx === undefined ? o.x : o.bx, o.y + 0.402, o.bw || 2.314, o.bh || 0.678, { align, text: o.text });
+}
+/** big centred deck title + spaced subtitle used on slides 2..31 */
+function titleBlock(s, o = {}) {
+  s.addText(T.title, {
+    x: o.x === undefined ? 3.935 : o.x, y: o.y === undefined ? 0.27 : o.y, w: o.w || 5.463, h: o.h || 0.64,
+    fontFace: FONT_B, fontSize: 32, color: C.hot, align: o.align || 'center', valign: 'top',
+  });
+  s.addText(T.sub, {
+    x: o.sx === undefined ? 4.969 : o.sx, y: o.sy === undefined ? 0.984 : o.sy, w: 3.396, h: 0.337,
+    fontFace: FONT, fontSize: 14, charSpacing: 3, color: C.gray1, align: o.align || 'center', valign: 'top',
+  });
+}
+
+/* -------------------------------------------------------------- shape atoms */
+function shape(s, type, o) {
+  s.addShape(type, Object.assign({ line: { type: 'none' } }, o));
+}
+function ellipse(s, x, y, w, h, color, o = {}) {
+  shape(s, 'ellipse', Object.assign({ x, y, w, h, fill: { color } }, o));
+}
+function rect(s, x, y, w, h, color, o = {}) {
+  shape(s, 'rect', Object.assign({ x, y, w, h, fill: { color } }, o));
+}
+/** polygon from absolute inch coordinates */
+function poly(s, color, pts, o = {}) {
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys);
+  shape(s, 'custGeom', Object.assign({
+    x: x0, y: y0, w: Math.max(...xs) - x0 || 0.01, h: Math.max(...ys) - y0 || 0.01,
+    fill: { color },
+    points: pts.map((p) => ({ x: p[0] - x0, y: p[1] - y0 })).concat([{ close: true }]),
+  }, o));
+}
+/** closed path from absolute coordinates; a 3rd element is a quadratic control point */
+function curveShape(s, color, pts, o = {}) {
+  const all = pts.reduce((a, p) => a.concat([[p[0], p[1]], p[2] ? [p[2], p[3]] : [p[0], p[1]]]), []);
+  const x0 = Math.min(...all.map((p) => p[0])), y0 = Math.min(...all.map((p) => p[1]));
+  shape(s, 'custGeom', Object.assign({
+    x: x0, y: y0, w: Math.max(...all.map((p) => p[0])) - x0, h: Math.max(...all.map((p) => p[1])) - y0,
+    fill: { color },
+    points: pts.map((p, i) => (i > 0 && p.length > 2
+      ? { x: p[0] - x0, y: p[1] - y0, curve: { type: 'quadratic', x1: p[2] - x0, y1: p[3] - y0 } }
+      : { x: p[0] - x0, y: p[1] - y0 })).concat([{ close: true }]),
+  }, o));
+}
+/** straight connector between two points; `dot` puts a round cap on (x2,y2) */
+function conn(s, x1, y1, x2, y2, o = {}) {
+  s.addShape('line', {
+    x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1),
+    flipH: x2 < x1, flipV: y2 < y1,
+    line: {
+      color: o.color || C.rule, width: o.width || 2, dashType: o.dash,
+      endArrowType: o.dot ? 'oval' : undefined, beginArrowType: o.dotStart ? 'oval' : undefined,
+    },
+  });
+}
+/** flat stand-in for a raster/SVG icon from the original deck */
+function iconTile(s, x, y, size, color, o = {}) {
+  shape(s, o.round === false ? 'rect' : 'ellipse', {
+    x, y, w: size, h: size, fill: { color }, line: o.line,
+  });
+}
+
+/* ------------------------------------------------------------------- fishes */
+/**
+ * Side-view fish drawn from primitives. `u` runs nose(0) -> tail(1),
+ * `v` runs back(0) -> belly(1). `flip` swaps nose/tail, `vert` stands the
+ * fish upright (nose at the top).
+ */
+function fish(s, x, y, w, h, o = {}) {
+  const bodyC = o.body || C.pink1, tailC = o.tail || C.wine, finC = o.fin || C.pink2;
+  const P = (u, v) => {
+    const a = o.flip ? 1 - u : u, b = v;
+    return o.vert ? [x + b * w, y + a * h] : [x + a * w, y + b * h];
+  };
+  const across = o.vert ? w : h; // extent across the fish, sets detail scale
+  poly(s, tailC, [P(0.84, 0.34), P(1.0, 0.02), P(0.92, 0.5), P(1.0, 0.98), P(0.84, 0.66)]);
+  poly(s, finC, [P(0.36, 0.20), P(0.54, -0.06), P(0.64, 0.24)]);
+  poly(s, finC, [P(0.32, 0.80), P(0.46, 1.06), P(0.58, 0.76)]);
+  // body: pointed snout, widest a third back, tapering to a narrow tail stock
+  curveShape(s, bodyC, [
+    [...P(0.0, 0.5)],
+    [...P(0.86, 0.36), ...P(0.34, -0.03)],
+    [...P(0.86, 0.64)],
+    [...P(0.0, 0.5), ...P(0.34, 1.03)],
+  ]);
+  // optional darker back saddle and pale belly, both kept inside the outline
+  if (o.back) curveShape(s, o.back, [[...P(0.24, 0.32)], [...P(0.78, 0.32), ...P(0.50, 0.15)], [...P(0.24, 0.32), ...P(0.50, 0.40)]]);
+  if (o.belly) curveShape(s, o.belly, [[...P(0.16, 0.64)], [...P(0.80, 0.62), ...P(0.50, 0.66)], [...P(0.16, 0.64), ...P(0.45, 0.94)]]);
+  const eye = P(0.14, 0.38), r = 0.075 * across;
+  ellipse(s, eye[0] - r, eye[1] - r, 2 * r, 2 * r, o.eye || C.wine2);
+}
+
+/**
+ * Small fish silhouette standing in for the deck's SVG/raster creature icons
+ * (dolphin, crab, seahorse, shell, ...). Reads cleanly down to ~0.4 in.
+ */
+function critter(s, x, y, w, color) {
+  const h = w * 0.46, cy = y + 0.5 * h;
+  ellipse(s, x + 0.26 * w, y + 0.02 * h, 0.74 * w, 0.96 * h, color);
+  poly(s, color, [[x, y + 0.02 * h], [x + 0.38 * w, cy], [x, y + 0.98 * h]]);
+  poly(s, color, [[x + 0.46 * w, y + 0.16 * h], [x + 0.66 * w, y - 0.34 * h], [x + 0.80 * w, y + 0.22 * h]]);
+  poly(s, color, [[x + 0.44 * w, y + 0.82 * h], [x + 0.60 * w, y + 1.28 * h], [x + 0.72 * w, y + 0.80 * h]]);
+}
+
+/**
+ * Stylised standing person (fisherman) built from primitives.
+ * `bib` draws dungarees over the shirt instead of plain trousers.
+ */
+function person(s, x, y, w, h, o = {}) {
+  const skin = o.skin || C.skin, top = o.top || C.pink1, legs = o.legs || C.pink2;
+  shape(s, 'roundRect', { x: x + 0.32 * w, y: y + 0.03 * h, w: 0.36 * w, h: 0.15 * h, fill: { color: skin }, rectRadius: 0.14 });
+  poly(s, o.hair || C.wine2, [[x + 0.30 * w, y + 0.09 * h], [x + 0.36 * w, y], [x + 0.64 * w, y], [x + 0.70 * w, y + 0.09 * h]]);
+  shape(s, 'roundRect', { x: x + 0.22 * w, y: y + 0.17 * h, w: 0.56 * w, h: 0.38 * h, fill: { color: top }, rectRadius: 0.16 });
+  shape(s, 'roundRect', { x: x + 0.26 * w, y: y + 0.50 * h, w: 0.19 * w, h: 0.44 * h, fill: { color: legs }, rectRadius: 0.08 });
+  shape(s, 'roundRect', { x: x + 0.55 * w, y: y + 0.50 * h, w: 0.19 * w, h: 0.44 * h, fill: { color: legs }, rectRadius: 0.08 });
+  if (o.bib) {
+    rect(s, x + 0.28 * w, y + 0.32 * h, 0.44 * w, 0.24 * h, legs);
+    [0.32, 0.60].forEach((f) => rect(s, x + f * w, y + 0.20 * h, 0.06 * w, 0.14 * h, legs));
+    [0.31, 0.59].forEach((f) => ellipse(s, x + f * w, y + 0.31 * h, 0.08 * w, 0.05 * h, C.white));
+  }
+  shape(s, 'roundRect', { x: x + 0.22 * w, y: y + 0.92 * h, w: 0.26 * w, h: 0.08 * h, fill: { color: o.shoe || C.wine }, rectRadius: 0.05 });
+  shape(s, 'roundRect', { x: x + 0.52 * w, y: y + 0.92 * h, w: 0.26 * w, h: 0.08 * h, fill: { color: o.shoe || C.wine }, rectRadius: 0.05 });
+}
+
+/* ============================================================ slide builders */
+
+/* 1 — dark cover */
+function slide01(s) {
+  s.background = { color: C.navy };
+  s.addText(T.title, { x: 3.364, y: 3.153, w: 6.605, h: 0.892, fontFace: FONT_B, fontSize: 47, color: C.white, align: 'center', valign: 'top' });
+  s.addText('Fish Infographic', { x: 3.731, y: 4.024, w: 5.871, h: 0.337, fontFace: FONT, fontSize: 14, charSpacing: 3, color: C.gray1, align: 'center', valign: 'top' });
+}
+
+/* 2 — tuna in a pink disc, four elbow connectors */
+function slide02(s) {
+  titleBlock(s);
+  ellipse(s, 5.535, 1.921, 2.264, 2.264, C.pink2, { fill: { color: C.pink2, transparency: 70 } });
+  fish(s, 5.386, 2.492, 2.562, 0.999, { body: C.pink1, tail: C.wine, fin: C.pink2, back: C.pink2, flip: true });
+  const links = [
+    { leg: 2.195, from: [5.181, 3.721], to: [2.190, 4.865] },
+    { leg: 5.032, from: [6.072, 4.370], to: [5.023, 4.864] },
+    { leg: 8.301, from: [7.261, 4.370], to: [8.310, 4.864] },
+    { leg: 11.139, from: [8.152, 3.721], to: [11.143, 4.865] },
+  ];
+  links.forEach((l) => {
+    conn(s, l.from[0], l.from[1], l.to[0], l.to[1], { color: C.gray2, width: 2.5 });
+    conn(s, l.leg, 4.851, l.leg, 5.449, { color: C.gray2, width: 2.5, dot: true });
+  });
+  [1.258, 4.091, 7.377, 10.211].forEach((x) => {
+    labelPair(s, { x, y: 5.646, bx: x - 0.216, bw: 2.298, bh: 0.981, align: 'center' });
+  });
+}
+
+/* 3 — barracuda with a 26 cm measuring bracket */
+function slide03(s) {
+  titleBlock(s);
+  fish(s, 2.0, 3.181, 9.33, 2.754, { body: C.pink1, tail: C.wine, fin: C.pink2, flip: true, eye: C.gray4 });
+  // dark blotches along the flank
+  [[3.90, 4.58, 0.08], [4.93, 4.63, 0.11], [5.46, 4.30, 0.07], [6.14, 4.42, 0.05], [6.39, 4.24, 0.12],
+    [6.77, 4.51, 0.05], [7.12, 4.46, 0.07], [7.30, 4.43, 0.16], [7.84, 4.35, 0.09], [7.87, 4.06, 0.11]]
+    .forEach((p) => ellipse(s, p[0], p[1], p[2], p[2], C.wine));
+  [[4.06, 3.95, 1.10, 0.50], [5.51, 3.93, 0.23, 0.45], [6.00, 3.94, 0.27, 0.41], [6.37, 3.95, 0.33, 0.48],
+    [6.98, 4.00, 0.29, 0.29], [7.43, 4.06, 0.21, 0.59], [7.89, 4.16, 0.25, 0.50], [8.42, 4.24, 0.25, 0.18],
+    [8.65, 4.30, 0.24, 0.50], [9.06, 4.37, 0.18, 0.19]]
+    .forEach((b) => shape(s, 'roundRect', { x: b[0], y: b[1], w: b[2], h: b[3], fill: { color: C.wine }, rectRadius: Math.min(b[2], b[3]) / 2 }));
+  // measuring bracket
+  conn(s, 2.0, 6.514, 5.973, 6.514, { width: 3 });
+  conn(s, 7.36, 6.514, 11.33, 6.514, { width: 3 });
+  conn(s, 2.0, 6.3, 2.0, 6.739, { width: 3 });
+  conn(s, 11.309, 6.3, 11.309, 6.739, { width: 3 });
+  s.addText('26cm', { x: 5.734, y: 6.089, w: 1.865, h: 0.65, fontFace: FONT_B, fontSize: 24, color: C.ink, align: 'center', valign: 'top', lineSpacingMultiple: 1.5 });
+  iconTile(s, 2.306, 1.468, 0.79, C.pink2);
+  labelPair(s, { x: 1.373, y: 2.31, bx: 0.582, bw: 2.656, bh: 0.682, align: 'right' });
+  iconTile(s, 10.188, 1.468, 0.79, C.wine3);
+  labelPair(s, { x: 10.095, y: 2.31, bw: 2.656, bh: 0.682 });
+}
+
+/* 4 — fish inside concentric circles with four satellite badges */
+function slide04(s) {
+  ellipse(s, 4.942, 2.049, 3.46, 3.46, C.white, { fill: { color: C.white }, line: { color: 'F2F2F2', width: 2.25 } });
+  ellipse(s, 5.563, 2.723, 2.218, 2.218, C.white);
+  ellipse(s, 5.764, 2.924, 1.816, 1.816, C.pink2, { fill: { color: C.pink2, transparency: 52 } });
+  fish(s, 5.841, 3.416, 1.661, 0.688, { body: C.pink1, tail: C.wine, fin: C.pink2, flip: true });
+  const badges = [
+    { x: 6.170, y: 1.567, c: C.wine2, tx: 5.734, ty: 0.278, bx: 5.181, bw: 2.972, align: 'center' },
+    { x: 7.907, y: 3.331, c: C.rose, tx: 9.140, ty: 3.227, bx: 9.140, bw: 2.740, align: 'left' },
+    { x: 4.423, y: 3.331, c: C.rose, tx: 2.317, ty: 3.227, bx: 1.454, bw: 2.728, align: 'right' },
+    { x: 6.214, y: 5.074, c: C.wine2, tx: 5.734, ty: 6.141, bx: 5.181, bw: 2.972, align: 'center' },
+  ];
+  badges.forEach((b) => {
+    ellipse(s, b.x, b.y, 1.003, 1.003, b.c);
+    critter(s, b.x + 0.26, b.y + 0.35, 0.49, C.white);
+    labelPair(s, { x: b.tx, y: b.ty, bx: b.bx, bw: b.bw, bh: 0.678, align: b.align });
+  });
+}
+
+/* 5 — angler on a pier */
+function slide05(s) {
+  titleBlock(s);
+  // pier deck + posts
+  rect(s, 0, 6.06, 5.34, 0.287, '2E2E2E');
+  [0.67, 1.98, 3.29, 4.60].forEach((x) => rect(s, x, 6.06, 0.142, 1.44, '2E2E2E'));
+  rect(s, 0, 6.66, 1.0, 0.1, '2E2E2E');
+  person(s, 2.30, 2.09, 1.28, 3.97, { top: C.rule, legs: C.pink2, hair: C.wine, shoe: C.gray4 });
+  // rod, line and hooked fish
+  conn(s, 2.72, 3.35, 5.33, 2.09, { color: C.wine3, width: 3 });
+  conn(s, 5.33, 2.09, 6.55, 4.90, { color: C.gray4, width: 0.75 });
+  conn(s, 6.55, 4.90, 6.42, 5.35, { color: C.gray4, width: 0.75 });
+  fish(s, 6.10, 5.28, 0.62, 0.42, { body: C.pink1, tail: C.wine, fin: C.pink2, vert: true });
+  body(s, 7.232, 2.226, 5.623, 0.981, { text: T.l });
+  [7.232, 10.044].forEach((x, i) => {
+    critter(s, x + 0.10, 3.90, 0.68, i === 0 ? C.pink2 : C.wine);
+    labelPair(s, { x, y: 4.631, bw: 2.314, bh: 0.981 });
+  });
+}
+
+/* 6 — angler holding a big fish, three labels each side */
+function slide06(s) {
+  titleBlock(s);
+  person(s, 5.85, 1.90, 1.55, 4.90, { top: C.pink2, legs: C.wine, hair: '2A2B33', shoe: C.pink1 });
+  rect(s, 7.36, 2.10, 0.14, 0.45, C.ink);
+  fish(s, 6.55, 2.50, 1.60, 3.55, { body: C.pink1, tail: C.pink2, fin: C.pink2, back: C.pink2, vert: true });
+  const rows = [1.856, 3.844, 5.832];
+  const fills = [C.pink2, C.wine, C.wine3];
+  rows.forEach((y, i) => {
+    const ty = [1.717, 3.729, 5.564][i];
+    ellipse(s, 3.456, y, 0.874, 0.874, fills[i]);
+    critter(s, 3.456 + 0.21, y + 0.30, 0.45, C.white);
+    labelPair(s, { x: 1.274, y: ty, bx: 0.411, bw: 2.728, bh: 0.678, align: 'right' });
+    ellipse(s, 9.068, y, 0.874, 0.874, fills[i]);
+    critter(s, 9.068 + 0.21, y + 0.30, 0.45, C.white);
+    labelPair(s, { x: 11.058, y: ty, bx: 10.194, bw: 2.728, bh: 0.678 });
+  });
+}
+
+/* 7 — four scallop shells */
+function slide07(s) {
+  titleBlock(s);
+  [{ x: 1.35, c: C.pink2 }, { x: 4.145, c: C.rose }, { x: 6.94, c: C.wine }, { x: 9.735, c: C.wine3 }].forEach((col) => {
+    const cx = col.x + 1.012, top = 2.267, bot = 2.267 + 1.715;
+    // fan body: domed top over a scalloped foot
+    shape(s, 'chord', { x: col.x, y: top, w: 2.024, h: 2.90, fill: { color: col.c }, angleRange: [180, 0] });
+    rect(s, col.x, top + 0.90, 2.024, bot - top - 1.15, col.c);
+    [0.10, 0.50, 0.90, 1.30, 1.70, 1.93].forEach((d) => ellipse(s, col.x + d - 0.20, bot - 0.62, 0.40, 0.56, col.c));
+    // radiating white ribs, splayed from the hinge
+    [-0.62, -0.31, 0, 0.31, 0.62].forEach((f) => {
+      conn(s, cx + f * 0.10, top + 1.28, cx + f * 1.05, top + 0.32 + Math.abs(f) * 0.30, { color: C.white, width: 5 });
+    });
+    critter(s, col.x + 0.68, 3.20, 0.65, C.white);
+    labelPair(s, { x: col.x + 0.079, y: 4.431, bx: col.x - 0.146, bw: 2.314, bh: 1.587, align: 'center', text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut ' });
+  });
+}
+
+/* 8 — seated angler at the water */
+function slide08(s) {
+  titleBlock(s);
+  ellipse(s, 5.608, 5.782, 7.305, 1.123, C.gray3);
+  // seated figure facing left: head, hair, torso, thigh + shin, arm
+  ellipse(s, 10.92, 2.22, 0.72, 0.86, C.skin);
+  poly(s, C.wine, [[10.88, 2.02], [11.66, 2.02], [11.72, 3.10], [11.40, 2.60], [10.88, 2.70]]);
+  shape(s, 'roundRect', { x: 10.96, y: 2.30, w: 0.44, h: 0.30, fill: { color: C.pink2 }, rectRadius: 0.1 });
+  shape(s, 'roundRect', { x: 10.82, y: 2.95, w: 1.14, h: 1.62, fill: { color: C.pink1 }, rectRadius: 0.32 });
+  poly(s, C.rose, [[10.10, 4.32], [11.96, 4.32], [11.96, 5.10], [10.42, 5.10]]);
+  poly(s, C.rose, [[10.10, 4.32], [10.62, 4.32], [10.42, 5.95], [9.92, 5.95]]);
+  shape(s, 'roundRect', { x: 9.70, y: 5.80, w: 0.78, h: 0.32, fill: { color: C.wine2 }, rectRadius: 0.12 });
+  poly(s, C.skin, [[10.90, 3.30], [11.30, 3.55], [10.42, 4.22], [10.16, 3.92]]);
+  ellipse(s, 10.14, 3.86, 0.34, 0.34, C.denim);
+  // folding stool
+  conn(s, 10.70, 4.55, 11.75, 6.10, { color: C.ink, width: 3 });
+  conn(s, 12.05, 4.55, 11.00, 6.10, { color: C.ink, width: 3 });
+  rect(s, 10.55, 4.48, 1.65, 0.13, C.ink);
+  // rod, line and float
+  conn(s, 7.80, 3.32, 10.30, 4.00, { color: C.wine, width: 3 });
+  conn(s, 7.82, 3.36, 7.82, 5.85, { color: C.gray4, width: 0.75 });
+  rect(s, 7.75, 5.72, 0.13, 0.22, C.pink2);
+  ellipse(s, 7.62, 5.90, 0.40, 0.16, C.gray2);
+  heading(s, 0.933, 1.828, 1.865);
+  body(s, 0.933, 2.349, 5.774, 0.981, { text: T.l });
+  [0.933, 3.558].forEach((x, i) => {
+    critter(s, x + 0.10, 4.00, 0.68, i === 0 ? C.pink2 : C.wine);
+    labelPair(s, { x, y: 4.811, bw: 2.314, bh: 0.981 });
+  });
+}
+
+/* 9 — segmented fish, four callouts */
+function slide09(s) {
+  titleBlock(s, { x: 0.982, y: 1.599, w: 3.714, h: 1.178, sx: 0.982, sy: 2.92, align: 'left' });
+  body(s, 0.958, 3.708, 2.293, 2.193, { text: T.l });
+  const segs = [
+    { x: 4.593, y: 2.981, w: 1.937, h: 1.643, c: C.pink2 },
+    { x: 6.400, y: 2.670, w: 1.651, h: 2.094, c: C.wine },
+    { x: 7.596, y: 2.407, w: 1.924, h: 2.770, c: C.wine2 },
+    { x: 9.463, y: 2.588, w: 2.741, h: 2.022, c: C.wine3 },
+  ];
+  // nose segment is a leaf, the rest are rounded blocks, tail is a fan
+  shape(s, 'custGeom', {
+    x: segs[0].x, y: segs[0].y, w: segs[0].w, h: segs[0].h, fill: { color: segs[0].c },
+    points: [
+      { x: 0, y: 0.82 },
+      { x: 1.937, y: 0, curve: { type: 'quadratic', x1: 0.9, y1: 0 } },
+      { x: 1.937, y: 1.643 },
+      { x: 0, y: 0.82, curve: { type: 'quadratic', x1: 0.9, y1: 1.643 } },
+      { close: true },
+    ],
+  });
+  shape(s, 'custGeom', {
+    x: segs[1].x, y: segs[1].y, w: segs[1].w, h: segs[1].h, fill: { color: segs[1].c },
+    points: [{ x: 0.1, y: 0.16 }, { x: 1.651, y: 0 }, { x: 1.651, y: 2.094 }, { x: 0.1, y: 1.93 }, { close: true }],
+  });
+  shape(s, 'custGeom', {
+    x: segs[2].x, y: segs[2].y, w: segs[2].w, h: segs[2].h, fill: { color: segs[2].c },
+    points: [{ x: 0.12, y: 0.28 }, { x: 1.2, y: 0 }, { x: 1.92, y: 1.0 }, { x: 1.2, y: 2.5 }, { x: 0.6, y: 2.77 }, { x: 0.12, y: 2.2 }, { close: true }],
+  });
+  shape(s, 'custGeom', {
+    x: segs[3].x, y: segs[3].y, w: segs[3].w, h: segs[3].h, fill: { color: segs[3].c },
+    points: [{ x: 0, y: 0.62 }, { x: 1.1, y: 0.2 }, { x: 2.741, y: 0 }, { x: 2.2, y: 1.05 }, { x: 2.741, y: 2.022 }, { x: 0.9, y: 1.6 }, { x: 0, y: 1.35 }, { close: true }],
+  });
+  segs.forEach((g, i) => critter(s, [5.656, 7.058, 8.653, 10.002][i], 3.55, 0.42, C.white));
+  const callouts = [
+    { lx: 6.825, y1: 3.406, y2: 2.323, tx: 6.342, ty: 1.011 },
+    { lx: 10.566, y1: 3.406, y2: 2.323, tx: 10.136, ty: 1.011 },
+    { lx: 5.538, y1: 4.259, y2: 5.342, tx: 5.167, ty: 5.408 },
+    { lx: 8.724, y1: 4.259, y2: 5.342, tx: 8.403, ty: 5.408 },
+  ];
+  callouts.forEach((c) => {
+    conn(s, c.lx, c.y1, c.lx, c.y2, { width: 2.5, dot: true });
+    labelPair(s, { x: c.tx, y: c.ty, bw: 2.314, bh: 0.678, text: T.xs });
+  });
+}
+
+/* 10 — grouper between two big circle badges */
+function slide10(s) {
+  titleBlock(s);
+  fish(s, 4.467, 3.102, 4.40, 2.092, {
+    body: C.pink2, tail: C.wine, fin: C.wine2, flip: true, back: C.wine2, belly: C.pink1, eye: C.gray4,
+  });
+  [[5.949, 3.708, 0.074], [6.207, 3.708, 0.077], [6.102, 3.863, 0.105], [6.494, 3.863, 0.124],
+    [7.038, 4.125, 0.124], [6.923, 4.277, 0.045], [7.430, 4.205, 0.048]]
+    .forEach((p) => ellipse(s, p[0], p[1], p[2], p[2], C.wine2));
+  const sides = [
+    { cx: 1.217, c: C.pink2, align: 'left', tx: 1.222, lx: 4.003, dx1: 2.500, dx2: 4.003, num: (i) => `${i}. Lorem ipsum dolor sit amet.` },
+    { cx: 10.315, c: C.wine, align: 'right', tx: 9.797, lx: 9.331, dx1: 9.331, dx2: 10.834, num: (i) => `Lorem ipsum dolor sit amet. .${i}` },
+  ];
+  sides.forEach((sd, k) => {
+    conn(s, sd.lx, 3.863, sd.lx, 4.691, { width: 2 });
+    conn(s, sd.dx1, 4.249, sd.dx2, 4.249, { width: 2, dash: 'dash' });
+    ellipse(s, sd.cx, 3.348, 1.802, 1.802, sd.c);
+    critter(s, sd.cx + 0.45, 3.90, 0.90, C.white);
+    body(s, k === 0 ? 1.222 : 9.797, 2.011, 2.314, 0.981, { align: sd.align });
+    [1, 2, 3].forEach((i) => {
+      body(s, k === 0 ? 1.217 : 9.331, 5.404 + (i - 1) * 0.423, 2.786, 0.375, { text: sd.num(i), align: sd.align, bold: k === 0 });
+    });
+  });
+}
+
+/* 11 — fishbone diagram */
+function slide11(s) {
+  // pale tail and head of the skeleton
+  poly(s, C.pink1, [[3.496, 2.206], [2.048, 3.802], [3.496, 5.398], [3.10, 3.802]]);
+  curveShape(s, C.pink1, [
+    [8.816, 2.624],
+    [10.189, 3.756, 10.00, 2.85],
+    [8.816, 4.888, 10.00, 4.66],
+  ]);
+  ellipse(s, 9.05, 3.05, 0.36, 0.36, C.white);
+  rect(s, 3.443, 3.698, 5.776, 0.105, C.pink1);
+  const ribs = [
+    { c: C.wine3, x: 4.586, num: '01', nx: 4.326, cx: 4.246, top: [4.621, 1.872], bot: [4.621, 4.832], spine: 2.239, sh: 2.938 },
+    { c: C.wine, x: 6.245, num: '02', nx: 6.009, cx: 5.924, top: [6.257, 1.359], bot: [6.257, 5.344], spine: 1.921, sh: 3.659 },
+    { c: C.pink2, x: 7.922, num: '03', nx: 7.701, cx: 7.601, top: [7.922, 1.872], bot: [7.922, 4.832], spine: 2.239, sh: 2.938 },
+  ];
+  ribs.forEach((r) => {
+    rect(s, r.x, r.spine, 0.476, r.sh, r.c);
+    [r.top, r.bot, [r.cx, 3.303]].forEach((p) => {
+      ellipse(s, p[0], p[1], 0.796, 0.796, r.c);
+      ellipse(s, p[0] + 0.038, p[1] + 0.038, 0.72, 0.72, C.white);
+    });
+    critter(s, r.top[0] + 0.18, r.top[1] + 0.26, 0.44, r.c);
+    critter(s, r.bot[0] + 0.18, r.bot[1] + 0.26, 0.44, r.c);
+    heading(s, r.nx, 3.458, 0.596, { align: 'center', text: r.num });
+  });
+  const notes = [
+    { x: 2.437, bx: 1.988, y: 0.892, align: 'right' },
+    { x: 5.734, bx: 5.510, y: 0.175, align: 'center' },
+    { x: 9.031, bx: 9.031, y: 0.783, align: 'left' },
+    { x: 2.437, bx: 1.988, y: 5.408, align: 'right' },
+    { x: 5.734, bx: 5.510, y: 6.171, align: 'center' },
+    { x: 9.031, bx: 9.031, y: 5.408, align: 'left' },
+  ];
+  notes.forEach((n) => labelPair(s, { x: n.x, bx: n.bx, y: n.y, bw: 2.314, bh: 0.678, align: n.align, text: T.xs }));
+}
+
+/* 12 — man holding a fish, four leader lines */
+function slide12(s) {
+  titleBlock(s);
+  person(s, 5.642, 2.139, 2.05, 4.689, { top: C.pink1, legs: C.wine, hair: '1A1A1A', shoe: C.pink2 });
+  fish(s, 5.05, 3.60, 1.90, 0.78, { body: C.rose, tail: C.wine, fin: C.wine, flip: true, eye: C.ink });
+  const legs = [
+    { x1: 3.947, x2: 6.528, y: 3.229, tx: 1.448, ty: 2.791, align: 'right' },
+    { x1: 3.947, x2: 6.392, y: 5.060, tx: 1.448, ty: 4.632, align: 'right' },
+    { x1: 9.180, x2: 6.703, y: 3.939, tx: 9.281, ty: 3.459, align: 'left' },
+    { x1: 9.181, x2: 7.042, y: 5.837, tx: 9.281, ty: 5.339, align: 'left' },
+  ];
+  legs.forEach((l) => {
+    conn(s, l.x1, l.y, l.x2, l.y, { width: 1.75, dotStart: true });
+    labelPair(s, { x: l.tx, y: l.ty, bw: 2.353, bh: 0.981, align: l.align });
+  });
+}
+
+/* 13 — three column cards with fish above and shell below */
+function slide13(s) {
+  titleBlock(s);
+  conn(s, 4.575, 1.701, 4.575, 7.002, { width: 2 });
+  conn(s, 8.713, 1.701, 8.713, 7.002, { width: 2 });
+  const cols = [
+    { fx: 1.667, fw: 1.851, fh: 0.88, tx: 1.660, bx: 1.436, lx: 1.457, ix: 2.133, fill: C.pink2, back: C.wine2, flip: false },
+    { fx: 5.682, fw: 1.661, fh: 0.688, tx: 5.734, bx: 5.510, lx: 5.531, ix: 6.167, fill: C.pink1, back: C.pink2, flip: true },
+    { fx: 9.563, fw: 1.966, fh: 0.767, tx: 9.583, bx: 9.359, lx: 9.380, ix: 10.151, fill: C.pink1, back: C.pink2, flip: false },
+  ];
+  cols.forEach((c) => {
+    fish(s, c.fx, 1.977, c.fw, c.fh, { body: c.fill, tail: C.wine, fin: C.wine, back: c.back, flip: c.flip });
+    labelPair(s, { x: c.tx, y: 3.273, bx: c.bx, bw: 2.314, bh: 1.587, align: 'center', text: T.m });
+    conn(s, c.lx, 5.747, c.lx + 2.272, 5.747, { width: 1.75 });
+    critter(s, c.ix + 0.05, 6.20, 0.9, [C.rose, C.wine, C.wine3][cols.indexOf(c)]);
+  });
+}
+
+/* 14 — semicircular fan of six petals around a turtle */
+function slide14(s) {
+  titleBlock(s);
+  const petals = [
+    { x: 3.511, y: 1.700, w: 1.523, h: 1.762, n: '1', nx: 3.562, ny: 1.443, bx: 3.424, by: 1.395, tx: 0.671, ty: 1.737, align: 'right', bw: 2.353, bh: 0.981 },
+    { x: 3.665, y: 3.425, w: 1.797, h: 1.812, n: '2', nx: 3.484, ny: 3.516, bx: 3.354, by: 3.486, tx: 1.449, ty: 4.294, align: 'right', bw: 2.353, bh: 0.981 },
+    { x: 4.836, y: 4.367, w: 1.815, h: 1.699, n: '3', nx: 4.764, ny: 5.130, bx: 4.625, by: 5.077, tx: 2.611, ty: 6.001, align: 'right', bw: 3.167, bh: 0.678 },
+    { x: 6.823, y: 4.378, w: 1.706, h: 1.680, n: '4', nx: 8.273, ny: 5.232, bx: 8.141, by: 5.159, tx: 7.556, ty: 6.001, align: 'left', bw: 3.167, bh: 0.678 },
+    { x: 7.942, y: 3.430, w: 1.785, h: 1.801, n: '5', nx: 9.437, ny: 3.571, bx: 9.298, by: 3.516, tx: 9.727, ty: 4.294, align: 'left', bw: 2.353, bh: 0.981 },
+    { x: 8.375, y: 1.676, w: 1.511, h: 1.765, n: '6', nx: 9.437, ny: 1.443, bx: 9.298, by: 1.395, tx: 10.310, ty: 1.737, align: 'left', bw: 2.353, bh: 0.981 },
+  ];
+  petals.forEach((p, i) => {
+    // petals fan out around the centre, so each one is tilted along the ring
+    shape(s, 'roundRect', {
+      x: p.x, y: p.y, w: p.w, h: p.h, fill: { color: C.pink1 }, rectRadius: 0.18,
+      rotate: [-24, -60, -84, 84, 60, 24][i],
+    });
+    critter(s, p.x + p.w / 2 - 0.33, p.y + p.h / 2 - 0.20, 0.66, C.pink2);
+  });
+  ellipse(s, 5.749, 1.942, 1.825, 1.825, C.white, { fill: { color: C.white }, line: { color: C.rule, width: 1 } });
+  // turtle: shell, four flippers and a head
+  ellipse(s, 5.95, 2.134, 1.423, 1.441, C.pink2);
+  [[-0.10, 0.10], [-0.10, 0.95], [1.22, 0.10], [1.22, 0.95]].forEach((d) =>
+    ellipse(s, 5.95 + d[0], 2.134 + d[1], 0.42, 0.36, C.pink2));
+  ellipse(s, 6.52, 1.90, 0.30, 0.34, C.pink2);
+  // dotted arc under the turtle
+  shape(s, 'arc', { x: 5.279, y: 2.872, w: 2.765, h: 2.765, angleRange: [180, 0], fill: { type: 'none' }, line: { color: C.pink2, width: 2.5 } });
+  [[5.239, 2.817], [5.479, 3.563], [6.173, 4.094], [7.073, 4.066], [7.751, 3.496], [7.942, 2.805]].forEach((d) =>
+    ellipse(s, d[0], d[1], 0.134, 0.134, C.white, { line: { color: C.wine, width: 0.75 } }));
+  petals.forEach((p) => {
+    ellipse(s, p.bx, p.by, 0.683, 0.683, C.wine);
+    s.addText(p.n, { x: p.nx, y: p.ny, w: 0.406, h: 0.512, fontFace: FONT_B, fontSize: 18, bold: true, color: C.white, align: 'center', valign: 'top', lineSpacingMultiple: 1.5 });
+    labelPair(s, { x: p.tx, y: p.ty, bw: p.bw, bh: p.bh, align: p.align });
+  });
+}
+
+/* 15 — humpback whale */
+function slide15(s) {
+  titleBlock(s);
+  body(s, 1.989, 1.754, 9.356, 0.678, { text: T.l, align: 'center' });
+  // body: snout at the left, arched back, tail stock rising to the right
+  curveShape(s, C.pink2, [
+    [3.75, 3.35],
+    [7.00, 3.35, 5.10, 2.90],
+    [8.25, 4.35, 7.90, 3.75],
+    [8.45, 3.20, 8.55, 3.95],
+    [9.55, 2.85, 9.05, 2.85],
+    [9.10, 3.85, 9.40, 3.45],
+    [9.55, 3.95, 9.50, 3.85],
+    [7.20, 4.85, 8.70, 4.75],
+    [3.75, 3.35, 5.10, 4.55],
+  ]);
+  // long pectoral fins hanging below
+  curveShape(s, C.pink2, [[4.55, 4.30], [4.45, 6.45, 3.85, 5.65], [5.10, 4.45, 5.25, 5.75]]);
+  curveShape(s, C.pink2, [[5.50, 4.55], [5.70, 6.65, 5.15, 5.85], [6.10, 4.60, 6.40, 5.90]]);
+  // throat pleats, blowhole ridge and eye
+  [0.0, 0.13, 0.26].forEach((d) => conn(s, 4.05, 3.72 + d, 7.30, 4.48 + d, { color: C.ink, width: 0.75 }));
+  [0, 1, 2, 3].forEach((i) => conn(s, 3.82 + i * 0.10, 3.20, 3.88 + i * 0.10, 3.50, { color: C.white, width: 1.5 }));
+  ellipse(s, 4.66, 3.26, 0.09, 0.09, C.ink);
+  [2.306, 10.188].forEach((x, i) => {
+    critter(s, x + 0.06, 5.20, 0.70, i === 0 ? C.pink2 : C.wine);
+    labelPair(s, i === 0
+      ? { x: 1.373, y: 5.959, bx: 0.582, bw: 2.656, bh: 0.682, align: 'right' }
+      : { x: 10.095, y: 5.959, bw: 2.656, bh: 0.682 });
+  });
+}
+
+/* 16 — six map pins on a timeline bar */
+function slide16(s) {
+  titleBlock(s);
+  shape(s, 'rect', { x: 0.748, y: 4.247, w: 11.843, h: 0.157, fill: { color: C.pink1 } });
+  // top row hangs above the bar with the point downwards, bottom row is inverted
+  const pins = [
+    { x: 1.467, y: 2.229, c: C.wine, up: true, tx: 3.070, ty: 2.442, bx: 2.910, nx: 1.991, ny: 4.162 },
+    { x: 5.315, y: 2.220, c: C.wine, up: true, tx: 6.919, ty: 2.442, bx: 6.760, nx: 5.839, ny: 4.156 },
+    { x: 9.162, y: 2.210, c: C.wine, up: true, tx: 10.785, ty: 2.442, bx: 10.625, nx: 9.685, ny: 4.146 },
+    { x: 3.345, y: 4.967, c: C.pink2, up: false, tx: 5.055, ty: 4.986, bx: 4.896, nx: 3.869, ny: 4.388 },
+    { x: 7.193, y: 4.977, c: C.pink2, up: false, tx: 8.903, ty: 4.986, bx: 8.743, nx: 7.715, ny: 4.388 },
+    { x: 11.040, y: 4.986, c: C.pink2, up: false, tx: 1.162, ty: 4.986, bx: 1.003, nx: 11.563, ny: 4.388 },
+  ];
+  pins.forEach((p) => {
+    shape(s, 'teardrop', { x: p.x, y: p.y, w: 1.32, h: 1.535, fill: { color: p.c }, rotate: p.up ? 135 : 315 });
+    ellipse(s, p.x + 0.21, p.y + (p.up ? 0.16 : 0.48), 0.894, 0.894, C.white);
+    critter(s, p.x + 0.42, p.y + (p.up ? 0.44 : 0.76), 0.48, p.c);
+    // little pink notch where the pin meets the bar
+    shape(s, 'triangle', { x: p.nx, y: p.ny, w: 0.273, h: 0.118, fill: { color: C.pink1 }, rotate: p.up ? 180 : 0 });
+    labelPair(s, { x: p.tx, y: p.ty, bx: p.bx, bw: 2.184, bh: 0.981, align: 'center' });
+  });
+}
+
+/* 17 — boat at the lower right, four icon rows on the left */
+function slide17(s) {
+  titleBlock(s);
+  body(s, 5.724, 1.926, 7.207, 0.678, { text: T.l });
+  // cabin
+  rect(s, 9.63, 3.59, 3.05, 1.68, C.pink2);
+  rect(s, 10.72, 3.28, 0.55, 0.32, C.wine);
+  [10.15, 10.90].forEach((wx) => poly(s, C.rose, [[wx, 4.05], [wx + 0.5, 4.05], [wx + 0.38, 4.77], [wx + 0.12, 4.77]]));
+  // deck and scallop-topped hull
+  rect(s, 6.20, 5.30, 7.14, 0.42, C.pink1);
+  poly(s, C.wine, [[6.20, 5.95], [13.34, 5.95], [13.34, 7.50], [7.60, 7.50]]);
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].forEach((i) => ellipse(s, 6.20 + i * 0.68, 5.77, 0.70, 0.38, C.wine));
+  conn(s, 5.51, 4.05, 8.10, 5.35, { color: C.ink, width: 2 });
+  ellipse(s, 7.75, 5.05, 0.22, 0.22, C.pink2);
+  const cells = [
+    { x: 0.517, ix: 0.595, iy: 2.057, y: 2.866, c: C.wine },
+    { x: 2.988, ix: 2.988, iy: 2.057, y: 2.866, c: C.wine },
+    { x: 0.517, ix: 0.595, iy: 4.677, y: 5.511, c: C.pink2 },
+    { x: 2.988, ix: 2.988, iy: 4.677, y: 5.511, c: C.pink2 },
+  ];
+  cells.forEach((c) => {
+    critter(s, c.ix, c.iy + 0.1, 0.81, c.c);
+    labelPair(s, { x: c.x, y: c.y, bw: 2.353, bh: 0.981 });
+  });
+}
+
+/* 18 — four-arc donut around a bowl of shrimp */
+function slide18(s) {
+  titleBlock(s);
+  // blockArc angles run clockwise from 3 o'clock, so the top wedge is 225..315
+  const quads = [
+    { angle: [225, 315], c: C.pink2, ic: [6.263, 2.251] },
+    { angle: [315, 405], c: C.wine, ic: [7.948, 3.981] },
+    { angle: [45, 135], c: C.wine2, ic: [6.263, 5.669] },
+    { angle: [135, 225], c: C.wine3, ic: [4.499, 3.981] },
+  ];
+  quads.forEach((q) => {
+    shape(s, 'blockArc', {
+      x: 4.07, y: 1.82, w: 5.16, h: 5.16, fill: { color: q.c },
+      angleRange: [q.angle[0] + 4, q.angle[1] - 4], arcThicknessRatio: 0.52,
+    });
+    critter(s, q.ic[0], q.ic[1] + 0.10, 0.81, C.white);
+  });
+  // bowl of shrimp in the middle
+  ellipse(s, 6.074, 3.948, 1.142, 0.367, C.gray3);
+  poly(s, 'FFB0C7', [[6.074, 4.13], [7.216, 4.13], [7.014, 4.923], [6.274, 4.923]]);
+  [[6.20, 3.82], [6.55, 3.78], [6.85, 3.85]].forEach((p) => ellipse(s, p[0], p[1], 0.20, 0.20, 'EAC8D3'));
+  // corner leader lines
+  [[2.94, 1.28, 3.61, 2.03], [10.36, 1.28, 9.69, 2.03], [2.94, 5.72, 3.61, 4.97], [10.36, 5.72, 9.69, 4.97]]
+    .forEach((l, i) => conn(s, l[0], l[1], l[2], l[3], { color: i === 0 ? C.pink2 : C.wine, width: 1.5 }));
+  const notes = [
+    { x: 1.913, bx: 0.528, y: 2.312, align: 'right', hc: C.pink2, bw: 3.25 },
+    { x: 1.913, bx: 0.528, y: 5.126, align: 'right', hc: C.wine3, bw: 3.25 },
+    { x: 9.556, bx: 9.556, y: 2.312, align: 'left', hc: C.wine, bw: 3.002 },
+    { x: 9.556, bx: 9.556, y: 5.126, align: 'left', hc: C.wine, bw: 3.002 },
+  ];
+  notes.forEach((n) => labelPair(s, { x: n.x, bx: n.bx, y: n.y, bw: n.bw, bh: 0.678, align: n.align, hc: n.hc }));
+}
+
+/* 19 — fisherman holding a salmon, three badges on the right */
+function slide19(s) {
+  titleBlock(s);
+  person(s, 3.6, 1.853, 3.5, 5.278, { top: C.pink1, legs: C.pink2, hair: 'E2C6AF', skin: 'E2C6AF', shoe: C.pink2, bib: true });
+  poly(s, 'B17D51', [[4.90, 2.95], [5.80, 2.95], [5.60, 3.55], [5.10, 3.55]]); // beard
+  fish(s, 3.35, 4.10, 3.60, 1.35, { body: C.pink1, tail: 'F00046', fin: 'F00046', back: 'F00046', flip: true });
+  const badges = [
+    { y: 1.803, c: C.pink2, ty: 1.664 }, { y: 3.791, c: C.wine, ty: 3.676 }, { y: 5.779, c: C.wine3, ty: 5.511 },
+  ];
+  badges.forEach((b) => {
+    ellipse(s, 9.068, b.y, 0.874, 0.874, b.c);
+    critter(s, 9.29, b.y + 0.30, 0.44, C.white);
+    labelPair(s, { x: 10.194, y: b.ty, bw: 2.728, bh: 0.678 });
+  });
+  heading(s, 0.984, 2.546, 1.865);
+  body(s, 0.984, 3.049, 2.084, 2.193, { text: T.l });
+}
+
+/* 20 — three fish of decreasing size with leader lines */
+function slide20(s) {
+  titleBlock(s);
+  const rows = [
+    { fx: 0.789, fy: 1.635, fw: 5.495, fh: 1.97, lx1: 6.461, lx2: 9.954, ly: 2.800, tx: 10.095, ty: 2.119, fill: C.pink2, back: C.wine, belly: C.pink1 },
+    { fx: 1.847, fy: 4.007, fw: 3.380, fh: 1.089, lx1: 5.524, lx2: 8.278, ly: 4.563, tx: 8.478, ty: 3.937, fill: C.rose, back: C.wine, belly: C.pink2 },
+    { fx: 2.397, fy: 5.756, fw: 2.280, fh: 1.171, lx1: 4.806, lx2: 6.667, ly: 6.270, tx: 6.747, ty: 5.631, fill: C.pink1, back: C.wine, belly: C.pink1 },
+  ];
+  rows.forEach((r) => {
+    fish(s, r.fx, r.fy, r.fw, r.fh, { body: r.fill, tail: C.wine, fin: C.wine, back: r.back, belly: r.belly, flip: true });
+    conn(s, r.lx1, r.ly, r.lx2, r.ly, { width: 1.75, dot: true });
+    labelPair(s, { x: r.tx, y: r.ty, bw: 2.728, bh: 0.678 });
+  });
+}
+
+/* 21 — three overlapping fish, numbered notes */
+function slide21(s) {
+  titleBlock(s);
+  // three overlapping fish, all facing right, drawn back-to-front
+  [{ x: 2.442, y: 2.137, w: 3.93, h: 2.343 },
+    { x: 1.093, y: 4.564, w: 5.082, h: 2.166 },
+    { x: 0.680, y: 2.902, w: 5.458, h: 2.603 }].forEach((f) => {
+    fish(s, f.x, f.y, f.w, f.h, { body: C.rose, tail: C.pink1, fin: C.pink1, belly: C.pink2, eye: C.gray4, flip: true });
+  });
+  [1, 2, 3].forEach((n, i) => {
+    const y = [1.851, 3.750, 5.672][i];
+    s.addText(String(n), { x: 8.469, y: y + 0.088, w: 0.59, h: 0.909, fontFace: FONT_B, fontSize: 48, color: C.hot, align: 'center', valign: 'top' });
+    labelPair(s, { x: 9.276, y, bw: 2.656, bh: 0.682, hc: C.hot });
+  });
+}
+
+/* 22 — single fish outline with four pointer callouts */
+function slide22(s) {
+  titleBlock(s);
+  fish(s, 3.387, 2.602, 6.556, 2.292, { body: C.pink2, tail: C.wine, fin: C.wine, eye: C.pink2, flip: true });
+  ellipse(s, 8.90, 3.45, 0.42, 0.28, C.white);
+  const pins = [
+    { x: 3.746, y1: 3.301, y2: 1.730, tx: 2.435, bx: 1.570, ty: 1.336, align: 'right' },
+    { x: 9.398, y1: 3.586, y2: 2.403, tx: 9.587, bx: 9.587, ty: 1.899, align: 'left' },
+    { x: 6.175, y1: 4.653, y2: 5.904, tx: 4.936, bx: 4.071, ty: 5.449, align: 'right' },
+    { x: 8.063, y1: 4.095, y2: 5.851, tx: 8.276, bx: 8.276, ty: 5.449, align: 'left' },
+  ];
+  pins.forEach((p) => {
+    conn(s, p.x, p.y1, p.x, p.y2, { width: 1.75, dotStart: true });
+    heading(s, p.tx, p.ty, 1.112, { align: p.align, text: 'Your Text' });
+    body(s, p.bx, p.ty + 0.402, 1.977, 0.671, { align: p.align, text: 'Lorem ipsum dolor sit amet, consectetur' });
+  });
+}
+
+/* 23 — two koi curving around each other (yin-yang arrangement) */
+function slide23(s) {
+  titleBlock(s);
+  /** comma-shaped koi: fat belly at the bottom, tapering into a flicked tail on top */
+  const koi = (x, y, color, flip) => {
+    const M = (u) => (flip ? 2.316 - u : u);
+    // curved body: tail stock at the top left, belly bulging to the bottom right
+    curveShape(s, color, [
+      [x + M(0.55), y + 0.85],
+      [x + M(0.15), y + 2.30, x + M(0.00), y + 1.45],
+      [x + M(1.10), y + 3.66, x + M(0.20), y + 3.40],
+      [x + M(2.05), y + 2.45, x + M(2.10), y + 3.40],
+      [x + M(1.15), y + 1.15, x + M(1.95), y + 1.60],
+      [x + M(0.55), y + 0.85, x + M(0.90), y + 0.90],
+    ]);
+    // forked tail flicking off the top
+    poly(s, color, [[x + M(0.30), y + 1.30], [x + M(0.55), y + 0.00], [x + M(1.00), y + 0.75],
+      [x + M(1.50), y + 0.45], [x + M(1.05), y + 1.45]]);
+    // side fin
+    poly(s, color, [[x + M(1.45), y + 1.95], [x + M(2.15), y + 1.80], [x + M(1.70), y + 2.40]]);
+  };
+  koi(4.245, 2.266, C.hot, false);
+  koi(6.773, 3.059, C.wine, true);
+  critter(s, 2.613, 1.62, 0.81, C.pink2);
+  labelPair(s, { x: 1.505, y: 2.352, hw: 1.901, bx: 1.236, bw: 2.170, bh: 0.978, align: 'right', hc: C.hot });
+  critter(s, 9.927, 4.40, 0.81, C.wine);
+  labelPair(s, { x: 10.210, y: 5.133, hw: 1.901, bx: 9.927, bw: 2.184, bh: 0.978, hc: '3E222A' });
+}
+
+/* 24 — left-aligned title, four badge rows, fish on a hook at the right */
+function slide24(s) {
+  conn(s, 8.9, 0.0, 8.9, 5.07, { color: C.gray2, width: 1 });
+  fish(s, 10.03, 1.83, 1.70, 1.39, { body: C.pink1, tail: 'F00046', fin: '780023', back: '780023', flip: true });
+  fish(s, 9.631, 3.626, 3.406, 2.423, { body: C.pink1, tail: C.pink2, fin: C.pink2, back: C.pink2, flip: true });
+  // scale texture on the big fish
+  [0, 1, 2].forEach((r) => [0, 1, 2, 3, 4].forEach((cix) =>
+    ellipse(s, 10.30 + cix * 0.34 + (r % 2) * 0.17, 4.30 + r * 0.30, 0.26, 0.26, C.pink2, { fill: { color: C.pink2, transparency: 65 } })));
+  // hook and bait
+  conn(s, 8.9, 4.4, 8.9, 4.9, { color: C.gray4, width: 1.5 });
+  shape(s, 'arc', { x: 8.62, y: 4.53, w: 0.6, h: 0.6, angleRange: [0, 180], fill: { type: 'none' }, line: { color: C.gray4, width: 2 } });
+  [8.55, 8.75].forEach((bx, i) => ellipse(s, bx, 4.95 + i * 0.06, 0.28, 0.20, 'F00046'));
+  titleBlock(s, { x: 0.433, y: 1.063, sx: 0.433, sy: 1.777, align: 'left' });
+  body(s, 0.371, 2.337, 8.127, 0.678, { text: T.l });
+  const rows = [
+    { bx: 0.433, by: 3.475, c: C.pink2, tx: 2.423, bxx: 1.559, ty: 3.336 },
+    { bx: 4.644, by: 3.573, c: C.wine3, tx: 6.633, bxx: 5.769, ty: 3.306 },
+    { bx: 0.433, by: 5.243, c: C.wine, tx: 2.423, bxx: 1.559, ty: 5.128 },
+    { bx: 4.644, by: 5.365, c: C.wine3, tx: 6.633, bxx: 5.769, ty: 5.097 },
+  ];
+  rows.forEach((r) => {
+    ellipse(s, r.bx, r.by, 0.874, 0.874, r.c);
+    critter(s, r.bx + 0.21, r.by + 0.30, 0.45, C.white);
+    labelPair(s, { x: r.tx, y: r.ty, bx: r.bxx, bw: 2.728, bh: 0.678 });
+  });
+}
+
+/* 25 — five rounded photo cards */
+function slide25(s) {
+  titleBlock(s);
+  const cards = [
+    { x: 0.988, tx: 1.173, bx: 1.232, bw: 1.747, fill: C.rose, band: C.wine },
+    { x: 3.307, tx: 3.393, bx: 3.459, bw: 1.733, fill: C.pink2, band: C.wine },
+    { x: 5.626, tx: 5.739, bx: 5.805, bw: 1.733, fill: C.rose, band: C.wine },
+    { x: 7.945, tx: 8.046, bx: 8.112, bw: 1.733, fill: C.pink2, band: C.wine },
+    { x: 10.264, tx: 10.382, bx: 10.448, bw: 1.733, fill: C.pink2, band: null },
+  ];
+  cards.forEach((c, i) => {
+    shape(s, 'roundRect', { x: c.x, y: 2.208, w: 2.102, h: 2.102, fill: { color: C.pink1 }, rectRadius: 0.2 });
+    if (c.band) shape(s, 'round2SameRect', { x: c.x, y: 3.75, w: 2.102, h: 0.56, fill: { color: c.band }, rotate: 180, rectRadius: 0.2 });
+    if (i === 3) { // grill uprights behind the fish
+      [c.x + 0.30, c.x + 1.72].forEach((gx) => rect(s, gx, 2.55, 0.07, 1.55, C.ink));
+      rect(s, c.x + 0.24, 3.20, 1.60, 0.06, C.ink);
+    }
+    fish(s, c.x + 0.35, 2.60, 1.40, 0.85, { body: c.fill, tail: C.wine, fin: C.wine, eye: '0A1C26' });
+    labelPair(s, { x: c.tx, y: 4.709, bx: c.bx, bw: c.bw, bh: 1.284, align: 'center' });
+  });
+}
+
+/* 26 — fish on a spit over a fire, numbers 1..6 */
+function slide26(s) {
+  titleBlock(s);
+  body(s, 4.667, 1.794, 3.998, 0.981, { text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.', align: 'center' });
+  rect(s, 4.447, 3.991, 4.408, 0.084, C.gray4);
+  [4.636, 8.456].forEach((x) => rect(s, x, 3.801, 0.13, 3.338, C.ink));
+  fish(s, 5.39, 3.31, 2.56, 1.33, { body: C.rose, tail: C.pink2, fin: C.pink2, eye: '0A1C26', flip: true });
+  [[6.422, 3.626], [6.684, 3.881], [7.016, 3.707], [7.218, 4.001], [6.480, 4.315], [6.908, 4.258]]
+    .forEach((p) => shape(s, 'roundRect', { x: p[0], y: p[1], w: 0.069, h: 0.16, fill: { color: C.wine }, rectRadius: 0.03 }));
+  // flame: pink outer tongue, deeper core
+  curveShape(s, C.pink2, [
+    [6.639, 7.102], [5.739, 6.197, 5.839, 6.897], [6.189, 5.697], [6.089, 6.297], [6.639, 4.797],
+    [7.089, 6.197], [7.189, 5.647], [7.563, 6.297, 7.539, 5.897], [6.639, 7.102, 7.439, 6.897],
+  ]);
+  curveShape(s, C.wine, [
+    [6.648, 7.103], [6.028, 6.386, 6.078, 6.936], [6.578, 5.536], [6.878, 6.236], [7.269, 6.386],
+    [6.648, 7.103, 7.228, 6.936],
+  ]);
+  shape(s, 'roundRect', { x: 5.958, y: 7.047, w: 1.317, h: 0.144, fill: { color: C.ink }, rectRadius: 0.07 });
+  const nums = [
+    { n: '1', x: 0.569, tx: 1.376, y: 1.858, align: 'right' },
+    { n: '2', x: 0.569, tx: 1.376, y: 3.757, align: 'right' },
+    { n: '3', x: 0.569, tx: 1.376, y: 5.678, align: 'right' },
+    { n: '4', x: 9.301, tx: 10.109, y: 1.858, align: 'left' },
+    { n: '5', x: 9.301, tx: 10.109, y: 3.757, align: 'left' },
+    { n: '6', x: 9.301, tx: 10.109, y: 5.678, align: 'left' },
+  ];
+  nums.forEach((d) => {
+    s.addText(d.n, { x: d.x, y: d.y + 0.087, w: 0.59, h: 0.909, fontFace: FONT_B, fontSize: 48, color: C.hot, align: d.align === 'right' ? 'right' : 'center', valign: 'top' });
+    labelPair(s, { x: d.tx, y: d.y, bw: 2.656, bh: 0.682, align: d.align, hc: C.hot });
+  });
+}
+
+/* 27 — fisherman with a big catch, two notes left, one right */
+function slide27(s) {
+  titleBlock(s);
+  person(s, 5.0, 1.913, 2.6, 5.242, { top: C.pink1, legs: C.wine, hair: C.ink, skin: 'EFD0B4', shoe: C.wine, bib: true });
+  shape(s, 'roundRect', { x: 6.60, y: 1.913, w: 1.28, h: 0.42, fill: { color: C.rose }, rectRadius: 0.1 }); // cap peak
+  // hanging fish, tail up
+  curveShape(s, C.rose, [
+    [5.54, 6.90], [4.99, 4.80, 5.04, 6.20], [5.54, 3.90, 5.14, 4.10],
+    [6.09, 4.80, 5.94, 4.10], [5.54, 6.90, 6.04, 6.20],
+  ]);
+  poly(s, C.wine, [[5.19, 3.90], [5.54, 3.40], [5.89, 3.90], [5.54, 4.05]]);
+  ellipse(s, 5.48, 6.45, 0.10, 0.10, C.ink);
+  labelPair(s, { x: 9.398, y: 2.815, bw: 2.789, bh: 2.499, hc: C.hot, text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ' });
+  [{ iy: 2.139, ty: 2.921 }, { iy: 4.419, ty: 5.164 }].forEach((r) => {
+    critter(s, 1.36, r.iy + 0.1, 0.81, r.iy < 3 ? C.wine : C.pink2);
+    labelPair(s, { x: 1.305, y: r.ty, bw: 2.656, bh: 0.682, hc: C.hot });
+  });
+}
+
+/* 28 — angler in a boat, numbers 1..3 on the left */
+function slide28(s) {
+  titleBlock(s);
+  shape(s, 'roundRect', { x: 6.8, y: 3.73, w: 4.7, h: 1.22, fill: { color: C.rose }, rectRadius: 0.6 });
+  rect(s, 10.11, 3.32, 0.70, 0.46, C.pink2);
+  person(s, 7.1, 1.70, 1.90, 2.10, { top: C.wine, legs: C.wine, hair: C.ink, skin: 'EFD0B4', shoe: C.wine });
+  shape(s, 'roundRect', { x: 7.41, y: 1.72, w: 0.90, h: 0.30, fill: { color: C.rose }, rectRadius: 0.1 });
+  conn(s, 6.21, 1.50, 7.60, 2.55, { color: C.ink, width: 4 });
+  ellipse(s, 6.22, 2.57, 0.28, 0.28, C.pink2);
+  conn(s, 5.42, 1.88, 5.42, 5.19, { color: C.gray1, width: 1 });
+  rect(s, 5.31, 4.77, 0.19, 0.30, C.pink2);
+  conn(s, 5.42, 5.04, 5.42, 6.06, { color: C.gray1, width: 1 });
+  shape(s, 'arc', { x: 5.30, y: 6.04, w: 0.3, h: 0.3, angleRange: [0, 180], fill: { type: 'none' }, line: { color: 'F12613', width: 1.5 } });
+  body(s, 6.842, 5.767, 5.409, 0.981, { text: T.l });
+  ['1', '2', '3'].forEach((n, i) => {
+    const y = [1.851, 3.750, 5.672][i];
+    s.addText(n, { x: 1.081, y: y + 0.088, w: 0.59, h: 0.909, fontFace: FONT_B, fontSize: 48, color: C.hot, align: 'center', valign: 'top' });
+    labelPair(s, { x: 1.889, y, bw: 2.656, bh: 0.682, hc: C.hot });
+  });
+}
+
+/* 29 — hand holding a rod, six numbered notes */
+function slide29(s) {
+  titleBlock(s);
+  // hand: rounded palm gripping the shaft, with a thumb over the top
+  curveShape(s, 'E3B891', [
+    [0.156, 4.500],
+    [1.700, 4.386, 0.900, 4.330],
+    [2.314, 5.000, 2.200, 4.560],
+    [1.500, 5.660, 2.150, 5.520],
+    [0.156, 5.540, 0.800, 5.700],
+  ]);
+  poly(s, 'DBAC7C', [[0.489, 5.060], [2.150, 5.230], [1.900, 5.650], [0.589, 5.560]]);
+  // rod: dark shaft, pink mid-section, wine grip
+  conn(s, 1.157, 5.63, 5.675, 3.01, { color: C.wine, width: 6 });
+  conn(s, 1.276, 5.35, 4.409, 3.53, { color: C.pink2, width: 12 });
+  conn(s, 0.582, 5.63, 2.689, 4.40, { color: C.wine, width: 14 });
+  ellipse(s, 3.044, 4.176, 1.151, 1.151, 'F00046');
+  ellipse(s, 3.288, 4.421, 0.662, 0.662, C.gray1);
+  ellipse(s, 3.507, 4.639, 0.225, 0.225, C.wine);
+  [[4.359, 3.417], [4.938, 3.025]].forEach((p) => ellipse(s, p[0], p[1], 0.222, 0.298, C.pink1));
+  const notes = [
+    { n: '1', x: 5.762, tx: 6.569, y: 1.927 }, { n: '2', x: 5.762, tx: 6.569, y: 3.826 }, { n: '3', x: 5.762, tx: 6.569, y: 5.748 },
+    { n: '4', x: 9.505, tx: 10.313, y: 1.927 }, { n: '5', x: 9.505, tx: 10.313, y: 3.826 }, { n: '6', x: 9.505, tx: 10.313, y: 5.748 },
+  ];
+  notes.forEach((d) => {
+    s.addText(d.n, { x: d.x, y: d.y + 0.088, w: 0.59, h: 0.909, fontFace: FONT_B, fontSize: 48, color: C.hot, align: 'center', valign: 'top' });
+    labelPair(s, { x: d.tx, y: d.y, bw: 2.656, bh: 0.682, hc: C.hot });
+  });
+}
+
+/* 30 — full-width fishing rod with reel, three notes below */
+function slide30(s) {
+  titleBlock(s);
+  rect(s, 0.724, 2.213, 8.873, 0.125, C.pink2);
+  [[0.65, 2.285, 0.26], [2.375, 2.288, 0.35], [4.258, 2.296, 0.40], [6.626, 2.315, 0.51]].forEach((g) =>
+    poly(s, C.rose, [[g[0], g[1]], [g[0] + g[2] * 0.35, g[1]], [g[0] + g[2], g[1] + 0.42], [g[0] + g[2] * 0.55, g[1] + 0.42]]));
+  rect(s, 9.726, 2.063, 2.972, 0.422, C.rose);
+  rect(s, 9.596, 2.071, 0.128, 0.408, C.rose);
+  [10.049, 11.150].forEach((gx) => rect(s, gx, 2.063, 0.50, 0.422, C.pink1));
+  // reel foot, spool, handle
+  poly(s, C.pink2, [[10.449, 2.432], [10.699, 2.432], [11.081, 3.332], [10.549, 3.693], [10.049, 3.332]]);
+  ellipse(s, 10.481, 3.219, 0.373, 0.373, C.wine);
+  ellipse(s, 10.521, 3.259, 0.294, 0.294, C.pink1);
+  ellipse(s, 9.807, 3.228, 0.374, 0.517, C.pink2);
+  ellipse(s, 9.811, 3.239, 0.303, 0.500, C.pink1);
+  conn(s, 10.80, 3.60, 11.25, 3.95, { color: C.pink2, width: 2 });
+  ellipse(s, 11.107, 3.821, 0.293, 0.293, C.wine);
+  ellipse(s, 11.132, 3.846, 0.243, 0.243, C.pink2);
+  body(s, 0.703, 3.214, 8.770, 0.678, { text: T.l, align: 'right' });
+  [{ rx: 0.899, ry: 4.697, ix: 1.431, iy: 4.580, tx: 1.277, ty: 5.093 },
+    { rx: 5.150, ry: 4.697, ix: 5.559, iy: 4.580, tx: 5.528, ty: 5.093 },
+    { rx: 9.401, ry: 4.754, ix: 9.841, iy: 4.580, tx: 9.779, ty: 5.150 }].forEach((r, i) => {
+    rect(s, r.rx, r.ry, 0.125, 1.481, C.pink2);
+    critter(s, r.ix, r.iy + 0.08, 0.60, [C.pink2, C.wine, 'F00046'][i]);
+    labelPair(s, { x: r.tx, y: r.ty, bw: 2.656, bh: 0.682, hc: C.hot });
+  });
+}
+
+/* 31 — four basket cards numbered 01..04 */
+function slide31(s) {
+  titleBlock(s);
+  const cards = [
+    { x: 1.405, c: C.pink2, n: '01', nx: 1.537, tx: 1.405, bx: 1.142, ix: 2.066 },
+    { x: 4.243, c: C.rose, n: '02', nx: 4.374, tx: 4.243, bx: 3.979, ix: 4.903 },
+    { x: 7.080, c: C.wine, n: '03', nx: 7.212, tx: 7.080, bx: 6.817, ix: 7.740 },
+    { x: 9.918, c: C.wine3, n: '04', nx: 10.049, tx: 9.918, bx: 9.654, ix: 10.578 },
+  ];
+  cards.forEach((c) => {
+    // pale ring behind, then the coloured lower half of the basket
+    shape(s, 'arc', { x: c.x, y: 1.856, w: 2.128, h: 2.128, angleRange: [180, 0], fill: { type: 'none' }, line: { color: C.pink1, width: 8 } });
+    shape(s, 'chord', { x: c.x - 0.095, y: 2.963 - 1.06, w: 2.321, h: 2.213, fill: { color: c.c }, angleRange: [0, 180] });
+    shape(s, 'roundRect', { x: c.x - 0.145, y: 2.963, w: 2.419, h: 0.281, fill: { color: c.c }, rectRadius: 0.14 });
+    critter(s, c.ix, 3.30, 0.81, C.white);
+    s.addText(c.n, { x: c.nx, y: 2.042, w: 1.865, h: 0.832, fontFace: FONT_B, fontSize: 32, bold: true, color: C.ink, align: 'center', valign: 'top', lineSpacingMultiple: 1.5 });
+    labelPair(s, { x: c.tx, y: 4.704, bx: c.bx, bw: 2.392, bh: 1.587, align: 'center', text: T.m });
+  });
+}
+
+/* ==================================================================== render */
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+  slide31,
+];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+  pptx.layout = 'WIDE';
+  pptx.title = 'Segoro Infographic';
+  BUILDERS.forEach((fn) => fn(pptx.addSlide()));
+  return pptx.writeFile({ fileName: path.join(__dirname, '11f7f1bc-68fa-4398-853b-074c3c03c324_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote', f));

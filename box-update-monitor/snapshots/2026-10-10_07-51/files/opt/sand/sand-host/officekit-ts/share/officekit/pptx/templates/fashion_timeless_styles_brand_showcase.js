@@ -1,0 +1,710 @@
+/**
+ * "Timeless Style" deck - rebuilt with pptxgenjs.
+ * Raster photos of the original are replaced by flat grey placeholder shapes.
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const C = {
+  ink: '1B1200',        // accent1
+  gold: 'FBA101',       // accent2
+  grey: '53514F',       // accent3
+  greyDark: '3E3D3B',   // accent3 lumMod 75%
+  goldPale: 'FEC765',   // accent2 lumMod 60% / lumOff 40%
+  white: 'FFFFFF',
+  cream: 'FFECCC',      // master background
+  creamLight: 'FFEFCF', // slide-1 background
+  body: '262626',       // tx1 lumMod 85%
+  rule: 'EBEBEB',       // bg2
+  edge: '0B0700',       // accent1 shaded 15% - default shape outline
+  imgFill: 'CCCCCC',
+  imgLabel: '8C8C8C',
+};
+
+const F = { serif: 'Cardo', sans: 'Work Sans', alt: 'Open Sans' };
+
+const SLIDE_W = 13.3333333; // 12192000 EMU
+const SLIDE_H = 7.5;
+
+/* ------------------------------------------------------------- copy deck */
+
+const T = {
+  heroLead: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor',
+  heroBody: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ' +
+    'incididunt. dolor sit amet Ut enim ad minim veniam, quis nostrud exercitation ullamco',
+  about: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ' +
+    'ut labore et consectetur adipiscing incididunt. dolor sit amet, Lorem ipsum dolor sit amet ' +
+    'dconsectetur adipiscing incididunt',
+  facility: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. ',
+  showcase: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. ' +
+    'dolor sit. amet Ut enim ad minim veniam, nostrud exercitation incididunt.',
+  team: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. ' +
+    'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi aute in. tei enim ad minim veniam, ',
+  service: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod. Ietter eiusmod tempor incididunt.',
+  portfolio: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sedo eiusmod tempor, ut enim ad minim veniam',
+  card: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore',
+  info: 'Lorem ipsum dolor sit amet, consectetuer adipiscing ceask elit maecenas dolor porttitor',
+  infoLead: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt. dolor sit. amet',
+};
+
+/* ----------------------------------------------------------- path helpers */
+
+// Normalised path commands -> pptxgenjs `points` (inches, shape-relative).
+// ['M',x,y] move, ['L',x,y] line, ['C',x1,y1,x2,y2,x,y] cubic, ['Z'] close.
+function scalePath(cmds, w, h) {
+  const r = (v) => Math.round(v * 10000) / 10000;
+  return cmds.map((c) => {
+    if (c[0] === 'Z') return { close: true };
+    if (c[0] === 'C') {
+      return {
+        x: r(c[5] * w), y: r(c[6] * h),
+        curve: { type: 'cubic', x1: r(c[1] * w), y1: r(c[2] * h), x2: r(c[3] * w), y2: r(c[4] * h) },
+      };
+    }
+    return { x: r(c[1] * w), y: r(c[2] * h), moveTo: c[0] === 'M' };
+  });
+}
+
+const KAPPA = 0.5523;
+
+// Rectangle outline with a separate corner radius (inches) per corner:
+// [topLeft, topRight, bottomRight, bottomLeft]. Returns pptxgenjs points.
+function roundedRectPoints(w, h, radii) {
+  const [tl, tr, br, bl] = radii;
+  const k = KAPPA;
+  const p = [];
+  const push = (x, y, c) => p.push(c ? { x, y, curve: { type: 'cubic', x1: c[0], y1: c[1], x2: c[2], y2: c[3] } } : { x, y });
+  p.push({ x: tl, y: 0, moveTo: true });
+  push(w - tr, 0);
+  if (tr) push(w, tr, [w - tr + tr * k, 0, w, tr - tr * k]);
+  push(w, h - br);
+  if (br) push(w - br, h, [w, h - br + br * k, w - br + br * k, h]);
+  push(bl, h);
+  if (bl) push(0, h - bl, [bl - bl * k, h, 0, h - bl + bl * k]);
+  push(0, tl);
+  if (tl) push(tl, 0, [0, tl - tl * k, tl - tl * k, 0]);
+  p.push({ close: true });
+  return p;
+}
+
+/* -------------------------------------------------------- shape helpers */
+
+// Flat grey stand-in for a photo in the original deck.
+// `radii` = per-corner rounding in inches, or null for a plain rectangle.
+function imagePlaceholder(slide, x, y, w, h, radii) {
+  const fill = { color: C.imgFill };
+  if (radii) slide.addShape('custGeom', { x, y, w, h, fill, points: roundedRectPoints(w, h, radii) });
+  else slide.addShape('rect', { x, y, w, h, fill });
+  slide.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: F.sans, fontSize: 12, color: C.imgLabel,
+  });
+}
+
+function pill(w, h) {
+  const r = Math.min(w, h) / 2;
+  return [r, r, r, r];
+}
+
+// Thin horizontal rule. Omitting `width` yields the theme hairline.
+function rule(slide, x, y, w, color, width) {
+  slide.addShape('line', { x, y, w, h: 0, line: width ? { color, width } : { color } });
+}
+
+// Four-point "sparkle" (star4 with a very thin waist).
+function sparkle(slide, x, y, size) {
+  const a = 0.048;
+  slide.addShape('custGeom', {
+    x, y, w: size, h: size, fill: { color: C.gold },
+    points: scalePath([
+      ['M', 0.5, 0], ['L', 0.5 + a, 0.5 - a], ['L', 1, 0.5], ['L', 0.5 + a, 0.5 + a],
+      ['L', 0.5, 1], ['L', 0.5 - a, 0.5 + a], ['L', 0, 0.5], ['L', 0.5 - a, 0.5 - a], ['Z'],
+    ], size, size),
+  });
+}
+
+// Ring + gold dot bullet used as a section marker.
+function marker(slide, x, y, filled) {
+  slide.addShape('ellipse', {
+    x, y, w: 0.27, h: 0.27,
+    fill: filled ? { color: C.ink } : undefined,
+    line: filled ? undefined : { color: C.ink },
+  });
+  slide.addShape('ellipse', { x: x + 0.076, y: y + 0.076, w: 0.119, h: 0.119, fill: { color: C.gold } });
+}
+
+/* -------------------------------------------------------------- nav bar */
+
+const NAV_LINKS = [
+  { text: 'Home', x: 4.377, w: 0.64 },
+  { text: 'Gallery', x: 5.708, w: 0.717 },
+  { text: 'Event', x: 7.117, w: 0.616 },
+  { text: 'Contacts', x: 8.424, w: 0.859 },
+];
+
+// Menu glyph: four stacked bars, [xStart, xEnd, yStart, yEnd] in 0..1 units.
+const MENU_BARS = [[0.281, 0.703, 0.00, 0.18], [0.062, 0.922, 0.26, 0.46],
+  [0.203, 0.781, 0.54, 0.72], [0.000, 1.000, 0.82, 1.00]];
+
+function navBar(slide, o) {
+  const opt = o || {};
+  const linkColors = opt.linkColors || [C.grey, C.grey, C.ink, C.ink];
+  const border = (x, y, w, color, fill) => slide.addShape('rect', {
+    x, y, w, h: 0.611, fill: fill ? { color: fill } : undefined, line: { color: color || C.edge },
+  });
+
+  border(3.519, 0, 6.306, opt.midLine);
+  border(0, 0.001, 3.526, opt.leftLine);
+  NAV_LINKS.forEach((l, i) => slide.addText(l.text, {
+    x: l.x, y: 0.165, w: l.w, h: 0.278, valign: 'top',
+    fontFace: F.sans, fontSize: 10.5, color: linkColors[i],
+  }));
+  slide.addText([
+    { text: 'Timeless', options: { color: C.gold } },
+    { text: ' ', options: { color: C.white } },
+    { text: 'Styles', options: { color: opt.wordmark || C.grey } },
+  ], { x: 1.077, y: 0.059, w: 0.988, h: 0.505, valign: 'top', fontFace: F.sans, fontSize: 12, bold: true });
+  border(9.833, 0, 3.493, null, opt.rightFill);
+
+  const mx = 11.103, my = 0.214, mw = 0.235, mh = 0.184;
+  MENU_BARS.forEach(([x0, x1, y0, y1]) => slide.addShape('roundRect', {
+    x: mx + x0 * mw, y: my + y0 * mh, w: (x1 - x0) * mw, h: (y1 - y0) * mh,
+    fill: { color: C.gold }, rectRadius: 0.012,
+  }));
+  slide.addShape('ellipse', {
+    x: 11.874, y: 0.213, w: 0.136, h: 0.136, line: { color: C.grey, width: 2.2 },
+  });
+  slide.addShape('line', { x: 11.995, y: 0.336, w: 0.05, h: 0.05, line: { color: C.grey, width: 2.2 } });
+}
+
+/* ---------------------------------------------------------------- icons */
+
+function filmIcon(slide, x, y, w, h) {
+  slide.addShape('roundRect', { x, y, w, h, fill: { color: C.gold }, rectRadius: 0.03 });
+  [0.11, 0.55].forEach((fy) => slide.addShape('rect', {
+    x: x + 0.28 * w, y: y + fy * h, w: 0.44 * w, h: 0.34 * h, fill: { color: C.cream },
+  }));
+  [0.09, 0.32, 0.54, 0.76].forEach((fy) => [0.07, 0.79].forEach((fx) => slide.addShape('rect', {
+    x: x + fx * w, y: y + fy * h, w: 0.14 * w, h: 0.15 * h, fill: { color: C.cream },
+  })));
+}
+
+function photoIcon(slide, x, y, w, h) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: C.gold } });
+  slide.addShape('rect', { x: x + 0.1 * w, y: y + 0.12 * h, w: 0.8 * w, h: 0.76 * h, fill: { color: C.cream } });
+  slide.addShape('ellipse', { x: x + 0.18 * w, y: y + 0.22 * h, w: 0.2 * w, h: 0.23 * h, fill: { color: C.gold } });
+  slide.addShape('triangle', { x: x + 0.3 * w, y: y + 0.33 * h, w: 0.55 * w, h: 0.45 * h, fill: { color: C.gold } });
+  slide.addShape('rect', { x: x + 0.14 * w, y: y + 0.63 * h, w: 0.72 * w, h: 0.15 * h, fill: { color: C.gold } });
+}
+
+function houseIcon(slide, x, y, w, h, color, back) {
+  slide.addShape('triangle', { x, y, w, h: 0.55 * h, fill: { color } });
+  slide.addShape('rect', { x: x + 0.16 * w, y: y + 0.45 * h, w: 0.68 * w, h: 0.55 * h, fill: { color } });
+  slide.addShape('rect', { x: x + 0.28 * w, y: y + 0.6 * h, w: 0.2 * w, h: 0.2 * h, fill: { color: back } });
+  slide.addShape('rect', { x: x + 0.56 * w, y: y + 0.6 * h, w: 0.18 * w, h: 0.4 * h, fill: { color: back } });
+}
+
+function giftIcon(slide, x, y, w, h, color) {
+  [0, 0.55].forEach((fy) => [0, 0.54].forEach((fx) => slide.addShape('rect', {
+    x: x + fx * w, y: y + 0.3 * h + fy * 0.36 * h, w: 0.46 * w, h: 0.32 * h, fill: { color },
+  })));
+  [-35, 35].forEach((rot, i) => slide.addShape('ellipse', {
+    x: x + (i ? 0.44 : 0.18) * w, y: y + 0.02 * h, w: 0.38 * w, h: 0.24 * h, rotate: rot, line: { color, width: 1.5 },
+  }));
+  slide.addShape('rect', { x: x + 0.46 * w, y: y + 0.18 * h, w: 0.08 * w, h: 0.82 * h, fill: { color } });
+}
+
+function bankIcon(slide, x, y, w, h, color) {
+  slide.addShape('triangle', { x, y, w, h: 0.36 * h, fill: { color } });
+  slide.addShape('rect', { x, y: y + 0.32 * h, w, h: 0.1 * h, fill: { color } });
+  [0.14, 0.42, 0.7].forEach((fx) => slide.addShape('rect', {
+    x: x + fx * w, y: y + 0.44 * h, w: 0.16 * w, h: 0.38 * h, fill: { color },
+  }));
+  slide.addShape('rect', { x, y: y + 0.84 * h, w, h: 0.16 * h, fill: { color } });
+}
+
+function bellIcon(slide, x, y, w, h, color) {
+  slide.addShape('ellipse', { x: x + 0.12 * w, y: y + 0.1 * h, w: 0.76 * w, h: 0.75 * h, line: { color, width: 1.5 } });
+  slide.addShape('rect', { x, y: y + 0.62 * h, w, h: 0.13 * h, fill: { color } });
+  slide.addShape('ellipse', { x: x + 0.36 * w, y: y + 0.72 * h, w: 0.28 * w, h: 0.24 * h, fill: { color } });
+  slide.addShape('rect', { x: x + 0.44 * w, y, w: 0.12 * w, h: 0.14 * h, fill: { color } });
+}
+
+// Classic handset: a thick curved band with flared ear and mouth pieces.
+const HANDSET = [
+  ['M', 0.16, 0.00], ['L', 0.45, 0.26], ['L', 0.30, 0.42],
+  ['C', 0.34, 0.55, 0.46, 0.67, 0.59, 0.71], ['L', 0.74, 0.56], ['L', 1.00, 0.84],
+  ['C', 0.86, 1.00, 0.58, 1.00, 0.36, 0.83],
+  ['C', 0.13, 0.63, 0.00, 0.28, 0.16, 0.00], ['Z'],
+];
+
+function phoneIcon(slide, x, y, w, h, color) {
+  slide.addShape('custGeom', { x, y, w, h, fill: { color }, points: scalePath(HANDSET, w, h) });
+}
+
+function caseIcon(slide, x, y, w, h, color) {
+  slide.addShape('roundRect', { x: x + 0.3 * w, y, w: 0.4 * w, h: 0.3 * h, line: { color, width: 1.5 }, rectRadius: 0.02 });
+  slide.addShape('roundRect', { x, y: y + 0.22 * h, w, h: 0.78 * h, fill: { color }, rectRadius: 0.03 });
+  slide.addShape('rect', { x: x + 0.08 * w, y: y + 0.42 * h, w: 0.84 * w, h: 0.14 * h, fill: { color: C.ink } });
+}
+
+/* -------------------------------------------------------- slide builders */
+
+// Every slide paints its own background: the original inherits a flat
+// cream fill from the master (slide 1 uses a marginally lighter tone).
+function newSlide(pres, bg) {
+  const s = pres.addSlide();
+  s.background = { color: bg || C.cream };
+  return s;
+}
+
+function slide01(pres) {
+  const s = newSlide(pres, C.creamLight);
+
+  imagePlaceholder(s, 10.492, 0.094, 1.967, 1.959, [0, 0.98, 0, 0.98]);
+  imagePlaceholder(s, 10.147, 2.429, 2.656, 3.526, [0, 1.328, 0, 1.328]);
+  imagePlaceholder(s, 10.497, 6.338, 1.956, 1.162, [0, 0.87, 0, 0]);
+
+  navBar(s, { midLine: C.ink, rightFill: C.creamLight, linkColors: [C.grey, C.grey, C.grey, C.grey] });
+
+  s.addShape('line', { x: 9.83, y: 0.611, w: 0, h: 6.889, line: { color: C.ink, width: 1.5 } });
+  [2.041, 5.975].forEach((y) => {
+    marker(s, 9.695, y, true);
+    rule(s, 9.965, y + 0.135, 1.186, C.gold);
+  });
+
+  s.addText('TIMELESS', {
+    x: 1.072, y: 1.197, w: 7.428, h: 1.717, valign: 'top',
+    fontFace: F.serif, fontSize: 96, bold: true, color: C.grey,
+  });
+  s.addText('STYLE', {
+    x: 1.058, y: 2.501, w: 6.387, h: 1.717, valign: 'top',
+    fontFace: F.serif, fontSize: 96, bold: true, color: C.gold,
+  });
+  rule(s, 1.128, 4.331, 5.072, C.gold);
+  s.addText(T.heroLead, {
+    x: 1.076, y: 4.908, w: 7.502, h: 0.37, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+    fontFace: F.sans, fontSize: 12, bold: true, italic: true, color: C.body,
+  });
+  s.addText(T.heroBody, {
+    x: 1.069, y: 5.558, w: 7.187, h: 0.601, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+    fontFace: F.sans, fontSize: 10.5, color: C.body,
+  });
+}
+
+function slide02(pres) {
+  const s = newSlide(pres);
+  s.addShape('rect', { x: 0, y: 0, w: 5.089, h: 7.5, fill: { color: C.ink } });
+  navBar(s, {
+    midLine: C.ink, leftLine: C.gold, wordmark: C.white,
+    linkColors: [C.white, C.grey, C.ink, C.ink],
+  });
+
+  s.addShape('custGeom', {
+    x: 1.167, y: 1.833, w: 11.0, h: 4.528, fill: { color: C.grey },
+    points: roundedRectPoints(11.0, 4.528, [2.144, 0, 2.144, 0]),
+  });
+  s.addText([
+    { text: 'ABOUT OUR ', options: { color: C.white } },
+    { text: 'STORY', options: { color: C.gold } },
+  ], { x: 5.854, y: 2.976, w: 5.368, h: 0.707, valign: 'top', fontFace: F.serif, fontSize: 36 });
+  s.addText(T.about, {
+    x: 5.857, y: 4.16, w: 4.739, h: 1.132, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+    fontFace: F.sans, fontSize: 10.5, color: C.white,
+  });
+  marker(s, 5.636, 3.681, false);
+  rule(s, 5.906, 3.816, 4.703, C.gold);
+  imagePlaceholder(s, 1.836, 2.197, 2.933, 3.801, [1.467, 1.467, 0, 0]);
+}
+
+function slide03(pres) {
+  const s = newSlide(pres);
+  imagePlaceholder(s, 0.422, 1.415, 2.178, 3.944, pill(2.178, 3.944));
+  imagePlaceholder(s, 3.467, 2.276, 2.178, 3.944, pill(2.178, 3.944));
+  navBar(s);
+
+  sparkle(s, 2.754, 1.328, 0.632);
+  rule(s, 4.058, 1.341, 3.442, C.gold);
+  s.addText([
+    { text: 'Timeless Style ', options: { color: C.grey } },
+    { text: 'Vission & Mission', options: { color: C.gold } },
+  ], { x: 7.36, y: 1.278, w: 4.071, h: 1.313, valign: 'top', fontFace: F.serif, fontSize: 36 });
+
+  [['Vision', 3.182, 3.611, 0.958, 4.917], ['Mission', 4.864, 5.298, 1.167, 4.89]]
+    .forEach(([label, yHead, yBody, wHead, wBody]) => {
+      s.addText(label, {
+        x: 7.346, y: yHead, w: wHead, h: 0.404, valign: 'top',
+        fontFace: F.sans, fontSize: 18, bold: true, color: C.body,
+      });
+      s.addText(T.heroBody, {
+        x: 7.346, y: yBody, w: wBody, h: 0.867, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+        fontFace: F.sans, fontSize: 10.5, color: C.body,
+      });
+    });
+
+  footerRule(s);
+  [[0.589, 1.415], [3.633, 2.276]].forEach(([x, y]) => s.addShape('roundRect', {
+    x, y, w: 2.178, h: 3.944, rectRadius: 1.089, line: { color: C.grey },
+  }));
+}
+
+function footerRule(s) {
+  rule(s, 0.363, 6.913, 11.684, C.gold);
+  marker(s, 12.047, 6.778, false);
+}
+
+function slide04(pres) {
+  const s = newSlide(pres);
+  imagePlaceholder(s, 5.875, 1.417, 5.542, 5.514, [2.256, 0, 0, 0]);
+  navBar(s);
+
+  s.addShape('rect', { x: 11.417, y: 1.422, w: 0.792, h: 5.504, fill: { color: C.ink }, line: { color: C.edge } });
+  s.addText([
+    { text: 'Best', options: { color: C.white } },
+    { text: ' Facilities', options: { color: C.gold } },
+  ], {
+    x: 9.947, y: 3.821, w: 3.732, h: 0.707, rotate: 90, valign: 'top',
+    fontFace: F.serif, fontSize: 36, bold: true,
+  });
+
+  s.addShape('rect', { x: 1.194, y: 2.167, w: 6.319, h: 3.972, fill: { color: C.grey } });
+  [['01. Facilities', 2.622, 3.149, 3.968, 2.824, 1.781, '78%', 2.664],
+    ['02. Facilities', 4.188, 4.719, 4.041, 4.394, 1.233, '60%', 4.247]]
+    .forEach(([label, yHead, yBody, wBody, yBar, barW, pct, yPct]) => {
+      s.addText(label, {
+        x: 1.825, y: yHead, w: 1.878, h: 0.404, valign: 'top', align: 'justify',
+        fontFace: F.sans, fontSize: 18, bold: true, color: C.white,
+      });
+      s.addText(T.facility, {
+        x: 1.825, y: yBody, w: wBody, h: 0.601, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+        fontFace: F.sans, fontSize: 10.5, color: C.white,
+      });
+      rule(s, 3.774, yBar, 2.132, C.rule, 1);
+      rule(s, 3.774, yBar, barW, C.gold, 1);
+      s.addText(pct, {
+        x: 6.114, y: yPct, w: 0.553, h: 0.286, valign: 'top', align: 'justify',
+        fontFace: F.sans, fontSize: 10.5, bold: true, color: C.ink, fill: { color: C.gold },
+      });
+    });
+
+  sparkle(s, 0.74, 1.342, 0.632);
+  rule(s, 1.127, 6.524, 7.942, C.gold);
+}
+
+function slide05(pres) {
+  const s = newSlide(pres);
+  navBar(s);
+  s.addText([
+    { text: 'Showcase ', options: { color: C.grey } },
+    { text: 'Timeless Style ', options: { color: C.gold } },
+    { text: 'Product', options: { color: C.grey } },
+  ], { x: 1.849, y: 1.305, w: 3.46, h: 1.919, valign: 'top', fontFace: F.serif, fontSize: 36 });
+
+  s.addShape('rect', { x: -0.014, y: 0, w: 0.5, h: 7.514, fill: { color: C.ink } });
+  s.addText(T.showcase, {
+    x: 7.5, y: 1.831, w: 4.972, h: 0.867, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+    fontFace: F.sans, fontSize: 10.5, color: C.body,
+  });
+  sparkle(s, 11.643, 3.434, 0.632);
+  sparkle(s, 0.75, 3.55, 0.632);
+  [1.139, 5.062, 8.986].forEach((x) => imagePlaceholder(s, x, 3.75, 3.194, 3.111, [1.556, 1.556, 0, 0]));
+}
+
+function slide06(pres) {
+  const s = newSlide(pres);
+  navBar(s);
+  s.addText([
+    { text: 'Timeless Style ', options: { color: C.grey, breakLine: true } },
+    { text: 'Best Team Support', options: { color: C.gold } },
+  ], { x: 7.936, y: 1.267, w: 4.419, h: 1.313, valign: 'top', align: 'right', fontFace: F.serif, fontSize: 36 });
+  footerRule(s);
+
+  [['ALLEA', 2.189, 4.185, 2.798, 4.258, 0.85], ['TIYYA', 6.506, 4.263, 7.114, 4.335, 0.789]]
+    .forEach(([name, cx, cy, tx, ty, tw]) => {
+      s.addShape('roundRect', { x: cx, y: cy, w: 2.107, h: 0.806, fill: { color: C.grey }, rectRadius: 0.134 });
+      s.addText(name, {
+        x: tx, y: ty, w: tw, h: 0.337, valign: 'top', fontFace: F.sans, fontSize: 14, bold: true, color: C.gold,
+      });
+      s.addText('Creat Your Job', {
+        x: tx, y: ty + 0.303, w: 1.337, h: 0.348, valign: 'top', lineSpacingMultiple: 1.5,
+        fontFace: F.sans, fontSize: 11, color: C.white,
+      });
+    });
+
+  s.addText(T.team, {
+    x: 9.744, y: 3.75, w: 2.443, h: 1.927, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+    fontFace: F.sans, fontSize: 10.5, color: C.body,
+  });
+  sparkle(s, 1.185, 1.607, 0.632);
+  rule(s, 2.044, 1.943, 4.623, C.gold);
+  imagePlaceholder(s, 4.721, 3.112, 2.336, 3.401, pill(2.336, 3.401));
+  imagePlaceholder(s, 0.405, 3.034, 2.336, 3.401, pill(2.336, 3.401));
+}
+
+function slide07(pres) {
+  const s = newSlide(pres);
+  s.addText([
+    { text: 'Timeless Style ', options: { color: C.grey } },
+    { text: 'Best Service', options: { color: C.gold } },
+  ], { x: 1.186, y: 1.267, w: 3.508, h: 1.313, valign: 'top', fontFace: F.serif, fontSize: 36 });
+  sparkle(s, 11.516, 1.607, 0.632);
+  rule(s, 6.667, 1.943, 4.623, C.gold);
+  navBar(s);
+
+  [[3.744, 3.428, '01. Service'], [10.108, 9.719, '02. Service']].forEach(([hx, bx, label]) => {
+    s.addText(label, {
+      x: hx, y: 4.428, w: 1.614, h: 0.404, valign: 'top',
+      fontFace: F.sans, fontSize: 18, bold: true, color: C.body,
+    });
+    s.addText(T.service, {
+      x: bx, y: 5.02, w: 2.558, h: 1.132, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+      fontFace: F.sans, fontSize: 10.5, color: C.body,
+    });
+  });
+  filmIcon(s, 3.52, 4.54, 0.243, 0.21);
+  photoIcon(s, 9.801, 4.495, 0.331, 0.264);
+  imagePlaceholder(s, 6.667, 3.75, 2.292, 3.139, [0, 1.146, 0, 1.146]);
+  imagePlaceholder(s, 0.347, 3.75, 2.292, 3.139, [0, 1.146, 0, 1.146]);
+}
+
+function slide08(pres) {
+  const s = newSlide(pres);
+  navBar(s);
+  s.addText([
+    { text: 'Showcase Our ', options: { color: C.grey } },
+    { text: 'Best', options: { color: C.gold } },
+    { text: ' ', options: { color: C.grey } },
+    { text: 'Portfolio', options: { color: C.gold } },
+  ], { x: 8.006, y: 1.267, w: 4.244, h: 1.313, valign: 'top', align: 'right', fontFace: F.serif, fontSize: 36 });
+  sparkle(s, 1.185, 1.607, 0.632);
+  rule(s, 2.044, 1.943, 4.623, C.gold);
+
+  [1.036, 7.457].forEach((x) => {
+    s.addText('Project Description', {
+      x, y: 5.199, w: 2.07, h: 0.337, valign: 'top', fontFace: F.sans, fontSize: 14, bold: true, color: C.gold,
+    });
+    s.addText(T.portfolio, {
+      x: x - 0.002, y: 5.502, w: 4.827, h: 0.625, valign: 'top', lineSpacingMultiple: 1.5,
+      fontFace: F.sans, fontSize: 11, color: C.body,
+    });
+  });
+  imagePlaceholder(s, 7.446, 3.059, 4.722, 1.72, [0, 0.86, 0, 0.86]);
+  imagePlaceholder(s, 1.083, 3.059, 4.801, 1.72, [0, 0.705, 0, 0.705]);
+}
+
+// Infographic cards: [x of card, fill, tag fill, y of card]
+const INFO_CARDS = [
+  { x: 1.538, y: 3.147, fill: C.ink, tag: C.greyDark, num: '01' },
+  { x: 5.558, y: 3.145, fill: C.gold, tag: C.goldPale, num: '02' },
+];
+
+function slide09(pres) {
+  const s = newSlide(pres);
+  imagePlaceholder(s, 9.578, 2.189, 2.365, 4.678, [0.395, 0.395, 0.395, 0.395]);
+
+  INFO_CARDS.forEach((card) => {
+    s.addShape('roundRect', { x: card.x, y: card.y, w: 2.365, h: 2.978, fill: { color: card.fill }, rectRadius: 0.394 });
+    s.addShape('flowChartDisplay', {
+      x: card.x - 0.596, y: card.y + 0.056, w: 1.191, h: 0.739,
+      rotate: 270, flipV: true, fill: { color: card.tag },
+    });
+    s.addShape('flowChartDisplay', {
+      x: card.x + 1.933, y: card.y + 2.436, w: 0.864, h: 0.536,
+      rotate: 90, flipV: true, fill: { color: card.tag },
+    });
+    s.addText(card.num, {
+      x: card.x - 0.416, y: card.y + 0.012, w: 0.831, h: 0.572, align: 'center', valign: 'top',
+      fontFace: F.sans, fontSize: 28, bold: true, color: C.white,
+    });
+    s.addText('Title Here', {
+      x: card.x + 0.398, y: card.y + 0.24, w: 1.904, h: 0.505, align: 'center', valign: 'top',
+      fontFace: F.sans, fontSize: 24, bold: true, color: C.white,
+    });
+    s.addText(T.card, {
+      x: card.x + 0.34, y: card.y + 0.882, w: 1.779, h: 1.662, valign: 'top', align: 'justify',
+      lineSpacingMultiple: 1.5, fontFace: F.sans, fontSize: 10.5, color: C.white,
+    });
+  });
+
+  s.addShape('flowChartDisplay', { x: 8.983, y: 2.835, w: 1.191, h: 0.739, rotate: 270, flipV: true, fill: { color: C.greyDark } });
+  s.addShape('flowChartDisplay', { x: 11.511, y: 5.8, w: 0.864, h: 0.536, rotate: 90, flipV: true, fill: { color: C.greyDark } });
+  s.addText('03', {
+    x: 9.163, y: 2.791, w: 0.831, h: 0.572, align: 'center', valign: 'top',
+    fontFace: F.sans, fontSize: 28, bold: true, color: C.white,
+  });
+
+  s.addText([
+    { text: 'Infographic', options: { color: C.gold } },
+    { text: ' Here', options: { color: C.grey } },
+  ], { x: 1.099, y: 1.378, w: 4.069, h: 0.707, valign: 'top', fontFace: F.serif, fontSize: 36 });
+  navBar(s);
+  sparkle(s, 0.33, 1.83, 0.632);
+  rule(s, 1.189, 2.165, 4.623, C.gold);
+}
+
+// Four-petal "X" made of radial ellipses (the original nests rotated groups).
+function petalCross(slide, cx, cy, color) {
+  [45, 135, 225, 315].forEach((deg) => {
+    const a = (deg * Math.PI) / 180;
+    const px = cx + 0.2825 * Math.sin(a);
+    const py = cy - 0.2825 * Math.cos(a);
+    slide.addShape('ellipse', {
+      x: px - 0.1885, y: py - 0.2845, w: 0.377, h: 0.569, rotate: deg, fill: { color },
+    });
+  });
+}
+
+function slide10(pres) {
+  const s = newSlide(pres);
+  imagePlaceholder(s, 1.111, 1.367, 11.089, 1.611, pill(11.089, 1.611));
+  s.addShape('roundRect', {
+    x: 1.122, y: 1.356, w: 11.089, h: 1.611, rectRadius: 0.805, fill: { color: C.ink, transparency: 15 },
+  });
+
+  [{ y: 3.757, fill: C.gold, cx: 4.502, cy: 4.167, tx: 6.054, ty: 3.946, bx: 1.075, by: 3.733, bw: 2.614, x: 4.975 },
+    { y: 5.304, fill: C.ink, cx: 8.897, cy: 5.707, tx: 5.941, ty: 5.518, bx: 9.599, by: 5.273, bw: 2.614, x: 4.885 }]
+    .forEach((row) => {
+      s.addShape('roundRect', { x: row.x, y: row.y, w: 3.547, h: 0.806, rectRadius: 0.403, fill: { color: row.fill } });
+      petalCross(s, row.cx, row.cy, row.fill);
+      s.addText('Title Here', {
+        x: row.tx, y: row.ty, w: 1.395, h: 0.37, valign: 'top',
+        fontFace: F.sans, fontSize: 16, bold: true, color: C.white,
+      });
+      s.addText(T.info, {
+        x: row.bx, y: row.by, w: row.bw, h: 0.868, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+        fontFace: F.alt, fontSize: 10.5, color: C.body,
+      });
+    });
+
+  navBar(s);
+  s.addText([
+    { text: 'Infographic', options: { color: C.gold } },
+    { text: ' ', options: { color: C.grey } },
+    { text: 'Here', options: { color: C.white } },
+  ], { x: 5.05, y: 1.63, w: 4.069, h: 0.707, valign: 'top', fontFace: F.serif, fontSize: 36 });
+  sparkle(s, 3.915, 2.082, 0.632);
+  rule(s, 4.774, 2.417, 4.623, C.gold);
+  s.addText(T.info, {
+    x: 9.078, y: 3.75, w: 3.136, h: 0.868, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+    fontFace: F.alt, fontSize: 10.5, color: C.body,
+  });
+  s.addText(T.info, {
+    x: 1.075, y: 5.289, w: 3.225, h: 0.868, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+    fontFace: F.alt, fontSize: 10.5, color: C.body,
+  });
+}
+
+// Ribbon outline used for the two photo strips on the "infographic" slide.
+const RIBBON = [
+  ['M', 0.1, 0], ['L', 0.9, 0],
+  ['C', 0.845, 0, 0.8, 0.112, 0.8, 0.25], ['C', 0.8, 0.388, 0.845, 0.5, 0.9, 0.5],
+  ['C', 0.955, 0.5, 1, 0.612, 1, 0.75], ['C', 1, 0.888, 0.955, 1, 0.9, 1],
+  ['L', 0.1, 1],
+  ['C', 0.155, 1, 0.2, 0.888, 0.2, 0.75], ['C', 0.2, 0.612, 0.155, 0.5, 0.1, 0.5],
+  ['C', 0.045, 0.5, 0, 0.388, 0, 0.25], ['C', 0, 0.112, 0.045, 0, 0.1, 0], ['Z'],
+];
+
+function slide11(pres) {
+  const s = newSlide(pres);
+  s.addShape('flowChartPunchedTape', { x: 5.221, y: 3.812, w: 1.454, h: 3.167, rotate: 270, fill: { color: C.ink } });
+  s.addShape('flowChartPunchedTape', { x: 5.212, y: 2.105, w: 1.454, h: 3.167, rotate: 270, fill: { color: C.gold } });
+  giftIcon(s, 5.37, 5.026, 0.589, 0.634, C.white);
+  houseIcon(s, 5.368, 3.409, 0.533, 0.509, C.white, C.gold);
+
+  [{ y: 2.927, x: 1.776, color: C.gold }, { y: 4.762, x: 1.704, color: C.ink }].forEach((row) => {
+    s.addText('Title Here', {
+      x: row.x, y: row.y, w: 1.207, h: 0.303, valign: 'top', align: 'justify',
+      fontFace: F.sans, fontSize: 12, bold: true, color: row.color,
+    });
+    s.addText(T.info, {
+      x: row.x, y: row.y + 0.23, w: 2.588, h: 0.868, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+      fontFace: F.sans, fontSize: 10.5, color: C.body,
+    });
+    s.addShape('flowChartDelay', {
+      x: row.x - 0.269, y: row.y + 0.051, w: 0.269, h: 0.188, flipH: true, fill: { color: row.color },
+    });
+  });
+
+  navBar(s);
+  s.addText([
+    { text: 'Infographic', options: { color: C.gold } },
+    { text: ' Here', options: { color: C.grey } },
+  ], { x: 1.099, y: 1.378, w: 4.069, h: 0.707, valign: 'top', fontFace: F.serif, fontSize: 36 });
+  sparkle(s, 0.33, 1.83, 0.632);
+  rule(s, 1.189, 2.165, 4.623, C.gold);
+  s.addText(T.infoLead, {
+    x: 7.289, y: 1.431, w: 4.972, h: 0.601, valign: 'top', align: 'justify', lineSpacingMultiple: 1.5,
+    fontFace: F.sans, fontSize: 10.5, color: C.body,
+  });
+  [2.971, 4.659].forEach((y) => {
+    s.addShape('custGeom', { x: 6.157, y, w: 5.91, h: 1.454, fill: { color: C.imgFill }, points: scalePath(RIBBON, 5.91, 1.454) });
+    s.addText('[image]', {
+      x: 6.157, y, w: 5.91, h: 1.454, align: 'center', valign: 'middle',
+      fontFace: F.sans, fontSize: 12, color: C.imgLabel,
+    });
+  });
+}
+
+const CONTACT_BLOCKS = [
+  { icon: bankIcon, ix: 5.941, iy: 4.322, iw: 0.208, ih: 0.193, x: 6.213, y: 4.159, hw: 1.685, head: 'Our Addres', bw: 1.546, lines: ['Green Stay no.567, Anycity 26789'] },
+  { icon: bellIcon, ix: 5.893, iy: 5.918, iw: 0.216, ih: 0.233, x: 6.168, y: 5.759, hw: 1.608, head: 'Follow Us', bw: 2.151, lines: ['yourwebside.www.com', 'campony' + 'office@yourmail.com'] },
+  { icon: phoneIcon, ix: 10.277, iy: 4.326, iw: 0.204, ih: 0.212, x: 10.51, y: 4.159, hw: 1.84, head: 'Get in Touch', bw: 1.546, lines: ['+123 8795 43211', '+234 5678 91213', '+76 1234 5689 104'] },
+  { icon: caseIcon, ix: 10.222, iy: 5.922, iw: 0.25, ih: 0.222, x: 10.51, y: 5.759, hw: 1.735, head: 'Office Hour', bw: 1.439, lines: ['Monday \u2013 Friday', '08.00 \u2013 18.00'] },
+];
+
+function slide12(pres) {
+  const s = newSlide(pres);
+  s.addShape('rect', { x: 0, y: 3.75, w: SLIDE_W, h: 3.75, fill: { color: C.ink } });
+  navBar(s);
+  s.addText([
+    { text: 'Contact Us if You ', options: { color: C.white } },
+    { text: 'Need Some Help!', options: { color: C.gold } },
+  ], { x: 1.124, y: 4.666, w: 3.46, h: 1.919, valign: 'top', fontFace: F.serif, fontSize: 36 });
+
+  CONTACT_BLOCKS.forEach((b) => {
+    b.icon(s, b.ix, b.iy, b.iw, b.ih, C.white);
+    s.addText(b.head, {
+      x: b.x, y: b.y, w: b.hw, h: 0.52, valign: 'middle',
+      fontFace: F.sans, fontSize: 18, bold: true, color: C.gold,
+    });
+    s.addText(b.lines.map((t, i) => ({ text: t, options: { breakLine: i < b.lines.length - 1 } })), {
+      x: b.x, y: b.y + 0.5, w: b.bw, h: 0.52, valign: 'middle',
+      fontFace: F.sans, fontSize: 10.5, color: C.white,
+    });
+  });
+  imagePlaceholder(s, 0.403, 1.025, 12.625, 2.363, pill(12.625, 2.363));
+}
+
+function slide13(pres) {
+  const s = newSlide(pres);
+  imagePlaceholder(s, 0, 0, SLIDE_W, SLIDE_H, null);
+  s.addShape('rect', { x: 0, y: -0.049, w: SLIDE_W, h: 7.597, fill: { color: C.creamLight, transparency: 10 } });
+  s.addText('Thank\u2019s', {
+    x: 4.202, y: 2.531, w: 4.93, h: 1.582, valign: 'top',
+    fontFace: F.serif, fontSize: 88, bold: true, color: C.grey,
+  });
+  s.addText('for Your Time!', {
+    x: 2.14, y: 3.757, w: 9.054, h: 1.582, valign: 'top',
+    fontFace: F.serif, fontSize: 88, bold: true, color: C.gold,
+  });
+  navBar(s);
+}
+
+/* ------------------------------------------------------------------ main */
+
+function build() {
+  const pres = new PptxGenJS();
+  pres.defineLayout({ name: 'DECK', width: SLIDE_W, height: SLIDE_H });
+  pres.layout = 'DECK';
+  pres.theme = { headFontFace: F.serif, bodyFontFace: F.sans };
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07,
+    slide08, slide09, slide10, slide11, slide12, slide13].forEach((fn) => fn(pres));
+
+  return pres.writeFile({ fileName: path.join(__dirname, '0f0ddbfd-6d75-479e-ab61-e271bd689c8b_grok_final.pptx') });
+}
+
+build().then((f) => console.log('wrote ' + f)).catch((e) => { console.error(e); process.exit(1); });

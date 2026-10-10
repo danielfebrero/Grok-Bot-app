@@ -9,8 +9,27 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
-## 2026-10-10 05:45 (Paris) — snapshot `2026-10-10_04-52` → `2026-10-10_05-45`
+## 2026-10-10 07:51 (Paris) — snapshot `2026-10-10_05-45` → `2026-10-10_07-51`
 - Commit GitHub : commit à venir
+- Rapport brut : [reports/2026-10-10_07-51.md](reports/2026-10-10_07-51.md) (diffs complets : `reports/2026-10-10_07-51-diffs/`)
+- Versions touchées : **agent-store-fuse** `36088c9` → `7356478`. Inchangés : image/box-scripts `91a9d91`, sand-host `91efc0d`, exec-daemon, Chrome 154.0.8037.97, Node, Python, Debian.
+- Diff : 0 ajouté, 0 supprimé, 1 modifié (`/usr/local/bin/cursor_agent_store_fuse_version`).
+
+### Bugfix
+- —
+### Change
+- Nouveau commit agent-store-fuse (`7356478`) ; seul le fichier de version change, contenu du changement non visible.
+### Features
+- —
+### Perf
+- —
+### Autre/infra
+- Bump du marqueur de version agent-store-fuse (classement hypothétique, pas de diff de code lisible).
+
+---
+
+## 2026-10-10 05:45 (Paris) — snapshot `2026-10-10_04-52` → `2026-10-10_05-45`
+- Commit GitHub : [486fbe6](../../../commit/486fbe611c9a607ed4dd8646ada49d181e1e24b5)
 - Rapport brut : [reports/2026-10-10_05-45.md](reports/2026-10-10_05-45.md) (diffs complets : `reports/2026-10-10_05-45-diffs/`)
 - Versions touchées : **agent-store-fuse** `a5520b0` → `36088c9`. Inchangés : image/box-scripts `91a9d91`, sand-host `91efc0d`, exec-daemon, Chrome 154.0.8037.97, Node, Python, Debian.
 - Diff : 0 ajouté, 0 supprimé, 1 modifié (`/usr/local/bin/cursor_agent_store_fuse_version`).

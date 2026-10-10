@@ -1,0 +1,800 @@
+/**
+ * FINERY — Financial & Investment Presentation Template
+ * Standalone pptxgenjs re-creation of the 30-slide reference deck (13.333" x 7.5").
+ *
+ * Run:  node 076071a1-243a-497a-99a7-a7640079d0dc_grok_final.js
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+
+const BLUE = '0033FF'; // accent6
+const ORANGE = 'FF6600'; // accent1
+const WHITE = 'FFFFFF';
+const DARK = '262626'; // tx1 lum85/off15 — headings
+const GRAY = '7F7F7F'; // tx1 lum50/off50 — body copy
+const RULE = 'D9D9D9'; // bg1 lum85 — header divider / chart gridlines
+
+const HEAD_FONT = 'Poppins';
+const BODY_FONT = 'Open Sans';
+
+// Soft ambient shadow used by every white panel/bubble. `offset` must stay
+// truthy or pptxgenjs substitutes its own 4pt default, which shifts the shadow
+// off-centre. Returns a fresh object each call: pptxgenjs rewrites shadow
+// props in place, so a shared literal would only work for the first shape.
+const cardShadow = () => ({ type: 'outer', color: '404040', blur: 18, offset: 0.001, angle: 90, opacity: 0.55 });
+
+const SLIDE_W = 13.333;
+const SLIDE_H = 7.5;
+
+/* ------------------------------------------------------------------ *
+ * Copy deck (the template ships with lorem ipsum everywhere)
+ * ------------------------------------------------------------------ */
+
+const T = {
+  hero: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation',
+  intro: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat aute irure dolor in reprehenderit',
+  med: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore',
+  sm: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod',
+  short: 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do eiusmod',
+  why: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu',
+  why7: 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ',
+  about8: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse',
+  about9: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ',
+  vision: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ',
+  col: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor',
+  mission: 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do eiusmod tempor incididunt ut',
+  full: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. ',
+  bio: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ',
+  bio15: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea',
+  svc: 'Lorem ipsum dolor sit amet, consectetur adipiscing',
+  svcIntro: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. ',
+  gallery: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut',
+  gallery23: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex',
+  tiny: 'Lorem ipsum dolor sit consectetur adipiscing',
+  mock25: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea velit esse cillum dolore eu fugiat nulla pariatur. ',
+  price: 'Lorem ipsum dolor sit consectetur adipiscing elit, sed do',
+  contact: 'Lorem ipsum dolor sit amet, consectetur adipis elit, sed do eiusmod tempor incididunt ',
+  tagline: 'Financial & Investment Presentation Template',
+};
+
+/* ------------------------------------------------------------------ *
+ * Reusable geometry (custGeom point lists, in inches, shape-relative)
+ * ------------------------------------------------------------------ */
+
+// Cubic control offset for a quarter circle of radius r.
+const K = 0.5523;
+
+// Hero blob: 7.784 x 3.373 rectangle whose right edge is a semicircular cap.
+function heroBlobPoints() {
+  const w = 7.784;
+  const h = 3.373;
+  const r = h / 2;
+  const k = K * r;
+  return [
+    { x: 0, y: 0 },
+    { x: w - r, y: 0 },
+    { curve: { type: 'cubic', x1: w - r + k, y1: 0, x2: w, y2: r - k }, x: w, y: r },
+    { curve: { type: 'cubic', x1: w, y1: r + k, x2: w - r + k, y2: h }, x: w - r, y: h },
+    { x: 0, y: h },
+    { close: true },
+  ];
+}
+
+// Card whose right-hand corners are rounded (slide 7).
+function rightRoundedCardPoints(w, h, r) {
+  const k = K * r;
+  return [
+    { x: 0, y: 0 },
+    { x: w - r, y: 0 },
+    { curve: { type: 'cubic', x1: w - r + k, y1: 0, x2: w, y2: r - k }, x: w, y: r },
+    { x: w, y: h - r },
+    { curve: { type: 'cubic', x1: w, y1: h - r + k, x2: w - r + k, y2: h }, x: w - r, y: h },
+    { x: 0, y: h },
+    { close: true },
+  ];
+}
+
+// Banner with a concave (bitten-out) right edge — slide 17.
+function concaveBannerPoints() {
+  const w = 6.302;
+  const h = 1.69;
+  return [
+    { x: 0, y: 0 },
+    { x: w - 0.002, y: 0 },
+    { curve: { type: 'cubic', x1: 6.156, y1: 0.249, x2: 6.074, y2: 0.537 }, x: 6.074, y: 0.843 },
+    { curve: { type: 'cubic', x1: 6.074, y1: 1.15, x2: 6.156, y2: 1.437 }, x: w, y: h },
+    { x: 0, y: h },
+    { close: true },
+  ];
+}
+
+// Thick "r"-shaped bracket: top bar curving into a full-height right rail (slide 6).
+function cornerRailPoints() {
+  const t = 0.193; // stroke thickness
+  const w = 0.917;
+  const h = 3.552;
+  const r = w - t;
+  return [
+    { x: 0, y: 0 },
+    { x: t, y: 0 },
+    { curve: { type: 'cubic', x1: 0.593, y1: 0, x2: w, y2: 0.324 }, x: w, y: r },
+    { x: w, y: h },
+    { x: r, y: h },
+    { x: r, y: r },
+    { curve: { type: 'cubic', x1: r, y1: 0.324, x2: 0.4, y2: 0 }, x: 0, y: 0 },
+    { close: true },
+  ];
+}
+
+/* ------------------------------------------------------------------ *
+ * Element helpers
+ * ------------------------------------------------------------------ */
+
+// Header nav + rule + page counter that appears on every slide.
+function chrome(slide, pageNo) {
+  slide.addText('FINERY', {
+    x: 0.193, y: 0.157, w: 1.287, h: 0.303, align: 'left', valign: 'top', wrap: false,
+    fontFace: HEAD_FONT, fontSize: 12, bold: true, charSpacing: 6, color: ORANGE,
+  });
+  [['About Us', 8.671, 0.924], ['Service', 10.557, 0.759], ['Contact', 12.279, 0.807]].forEach(([txt, x, w]) => {
+    slide.addText(txt, {
+      x, y: 0.157, w, h: 0.303, align: 'left', valign: 'top', wrap: false,
+      fontFace: BODY_FONT, fontSize: 12, color: GRAY,
+    });
+  });
+  slide.addShape('line', { x: 0, y: 0.622, w: SLIDE_W, h: 0, line: { color: RULE, width: 1 } });
+  slide.addText(String(pageNo).padStart(2, '0') + '/30', {
+    x: 12.4, y: 7.0, w: 0.686, h: 0.303, align: 'right', valign: 'top', wrap: false,
+    fontFace: HEAD_FONT, fontSize: 12, bold: true, color: DARK,
+  });
+}
+
+// Orange stadium "pill" with centred FINERY wordmark.
+function pill(slide, x, y, opts = {}) {
+  const w = opts.w || 1.982;
+  const h = 0.527;
+  slide.addShape('roundRect', { x, y, w, h, rectRadius: h / 2, fill: { color: opts.fill || ORANGE } });
+  slide.addText(opts.label || 'FINERY', {
+    x, y: y + 0.113, w, h: 0.303, align: 'center', valign: 'top', wrap: false,
+    fontFace: opts.font || HEAD_FONT, fontSize: opts.size || 12, bold: opts.bold !== false,
+    charSpacing: opts.charSpacing === undefined ? 6 : opts.charSpacing, color: WHITE,
+  });
+}
+
+// White panel with the deck's signature soft drop shadow.
+function card(slide, x, y, w, h) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: WHITE }, shadow: cardShadow() });
+}
+
+// White circle with the same soft shadow (stat bubbles, price bubbles).
+function bubble(slide, x, y, d) {
+  slide.addShape('ellipse', { x, y, w: d, h: d, fill: { color: WHITE }, shadow: cardShadow() });
+}
+
+function blueRect(slide, x, y, w, h) {
+  slide.addShape('rect', { x, y, w, h, fill: { color: BLUE } });
+}
+
+// Section / slide heading.
+function heading(slide, text, x, y, w, h, opts = {}) {
+  slide.addText(text, {
+    x, y, w, h, align: opts.align || 'left', valign: 'top', wrap: opts.wrap !== false,
+    fontFace: HEAD_FONT, fontSize: opts.size || 36, bold: true, color: opts.color || DARK,
+  });
+}
+
+// 11pt justified body copy at 1.5 line spacing.
+function body(slide, text, x, y, w, h, opts = {}) {
+  slide.addText(text, {
+    x, y, w, h, align: opts.align || 'justify', valign: 'top', wrap: true,
+    fontFace: BODY_FONT, fontSize: 11, color: opts.color || GRAY, lineSpacingMultiple: 1.5,
+  });
+}
+
+// Bold 14pt Poppins mini-title.
+function label(slide, text, x, y, w, opts = {}) {
+  slide.addText(text, {
+    x, y, w, h: 0.337, align: opts.align || 'left', valign: 'top', wrap: false,
+    fontFace: HEAD_FONT, fontSize: 14, bold: true, color: opts.color || DARK,
+  });
+}
+
+// Big bold percentage / price figure.
+function stat(slide, text, x, y, w, opts = {}) {
+  slide.addText(text, {
+    x, y, w, h: 0.505, align: opts.align || 'center', valign: 'top', wrap: false,
+    fontFace: HEAD_FONT, fontSize: opts.size || 24, bold: true, color: opts.color || BLUE,
+  });
+}
+
+// One chunky opening-quote glyph, drawn as geometry (normalised 0..1 box).
+const QUOTE_GLYPH = [
+  { x: 0.928, y: 0 },
+  { x: 0.928, y: 0.233 },
+  { curve: { type: 'cubic', x1: 0.695, y1: 0.233, x2: 0.579, y2: 0.317 }, x: 0.579, y: 0.485 },
+  { x: 0.579, y: 0.541 },
+  { x: 1, y: 0.541 },
+  { x: 1, y: 1 },
+  { x: 0.138, y: 1 },
+  { curve: { type: 'cubic', x1: 0.046, y1: 0.852, x2: 0, y2: 0.705 }, x: 0, y: 0.559 },
+  { curve: { type: 'cubic', x1: 0, y1: 0.391, x2: 0.079, y2: 0.256 }, x: 0.237, y: 0.154 },
+  { curve: { type: 'cubic', x1: 0.395, y1: 0.051, x2: 0.625, y2: 0 }, x: 0.928, y: 0 },
+  { close: true },
+];
+
+function quoteMarks(slide, x, y, w, h) {
+  const glyphW = w * 0.446;
+  [0, w * 0.554].forEach((dx) => {
+    slide.addShape('custGeom', {
+      x: x + dx, y, w: glyphW, h, fill: { color: ORANGE },
+      points: QUOTE_GLYPH.map((p) => (p.close
+        ? p
+        : {
+          x: p.x * glyphW, y: p.y * h,
+          ...(p.curve && { curve: { type: 'cubic', x1: p.curve.x1 * glyphW, y1: p.curve.y1 * h, x2: p.curve.x2 * glyphW, y2: p.curve.y2 * h } }),
+        })),
+    });
+  });
+}
+
+// Circle traced with four cubic quarter-arcs; `ccw` reverses the winding so a
+// second circle punches a hole out of the first.
+function circlePath(cx, cy, r, ccw) {
+  const k = K * r;
+  const pts = ccw
+    ? [[cx, cy - r], [cx - k, cy - r, cx - r, cy - k, cx - r, cy], [cx - r, cy + k, cx - k, cy + r, cx, cy + r],
+      [cx + k, cy + r, cx + r, cy + k, cx + r, cy], [cx + r, cy - k, cx + k, cy - r, cx, cy - r]]
+    : [[cx, cy - r], [cx + k, cy - r, cx + r, cy - k, cx + r, cy], [cx + r, cy + k, cx + k, cy + r, cx, cy + r],
+      [cx - k, cy + r, cx - r, cy + k, cx - r, cy], [cx - r, cy - k, cx - k, cy - r, cx, cy - r]];
+  return pts.map((p, i) => (i === 0
+    ? { x: p[0], y: p[1] }
+    : { curve: { type: 'cubic', x1: p[0], y1: p[1], x2: p[2], y2: p[3] }, x: p[4], y: p[5] }));
+}
+
+// Crescent ring: outer circle with an inner circle offset sideways, so the band
+// is thick on one side and tapers away on the other (slides 4 & 13).
+function crescent(slide, cx, cy, outerR, thickness, mirrored) {
+  const innerR = outerR - thickness / 2;
+  const dx = (mirrored ? -1 : 1) * (outerR - innerR);
+  slide.addShape('custGeom', {
+    x: cx - outerR, y: cy - outerR, w: outerR * 2, h: outerR * 2, fill: { color: BLUE },
+    points: [
+      ...circlePath(outerR, outerR, outerR, false), { close: true },
+      ...circlePath(outerR + dx, outerR, innerR, true), { close: true },
+    ],
+  });
+}
+
+// Angles below are degrees clockwise on screen: 0 = right, 90 = bottom, 180 = left.
+function arcPoints(cx, cy, r, fromDeg, toDeg) {
+  const steps = Math.max(1, Math.ceil(Math.abs(toDeg - fromDeg) / 90));
+  const step = ((toDeg - fromDeg) / steps) * (Math.PI / 180);
+  const k = (4 / 3) * Math.tan(step / 4);
+  const at = (a) => ({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+  let a = (fromDeg * Math.PI) / 180;
+  const out = [at(a)];
+  for (let i = 0; i < steps; i++) {
+    const p0 = at(a);
+    const p1 = at(a + step);
+    out.push({
+      curve: {
+        type: 'cubic',
+        x1: p0.x - k * r * Math.sin(a), y1: p0.y + k * r * Math.cos(a),
+        x2: p1.x + k * r * Math.sin(a + step), y2: p1.y - k * r * Math.cos(a + step),
+      },
+      x: p1.x, y: p1.y,
+    });
+    a += step;
+  }
+  return out;
+}
+
+// Tapered "C" swoosh: a band between two slightly offset circles, swept from
+// `from` to `to`. Coordinates are absolute inches on the slide.
+function arcBand(slide, b) {
+  const x0 = b.ocx - b.orad;
+  const y0 = b.ocy - b.orad;
+  slide.addShape('custGeom', {
+    x: x0, y: y0, w: b.orad * 2, h: b.orad * 2, fill: { color: BLUE },
+    points: [
+      ...arcPoints(b.ocx - x0, b.ocy - y0, b.orad, b.from, b.to),
+      ...arcPoints(b.icx - x0, b.icy - y0, b.irad, b.to, b.from),
+      { close: true },
+    ],
+  });
+}
+
+// The swoosh that anchors the top-right of slides 3 & 21 (mirrored on slide 8).
+const SWOOSH = { ocx: 11.262, ocy: 2.605, orad: 2.855, icx: 11.321, icy: 2.548, irad: 2.774, from: 224, to: 45 };
+const SWOOSH_MIRRORED = { ocx: 2.073, ocy: 5.517, orad: 2.855, icx: 2.014, icy: 5.574, irad: 2.774, from: 44, to: -135 };
+
+
+
+// The reference's two raster mockups are redrawn from native shapes rather than
+// embedded, so the deck stays image-free.
+
+// Stand-in for the phone photo on slide 24: dark rounded body + blank screen.
+function phonePlaceholder(slide, x, y, w, h) {
+  const bezel = 0.09;
+  slide.addShape('roundRect', { x, y, w, h, rectRadius: 0.3, fill: { color: '2B2B2B' } });
+  slide.addShape('roundRect', {
+    x: x + bezel, y: y + bezel, w: w - bezel * 2, h: h - bezel * 2,
+    rectRadius: 0.24, fill: { color: WHITE },
+  });
+  slide.addShape('roundRect', { x: x + w * 0.29, y, w: w * 0.42, h: 0.19, rectRadius: 0.08, fill: { color: '2B2B2B' } });
+  slide.addText('[image]', {
+    x, y: y + h / 2 - 0.2, w, h: 0.4, align: 'center', valign: 'middle',
+    fontFace: BODY_FONT, fontSize: 11, color: 'A6A6A6',
+  });
+}
+
+// Stand-in for the laptop photo on slide 25: dark lid, blank screen, silver base.
+function laptopPlaceholder(slide, x, y, w, h) {
+  const lidW = w * 0.766;
+  const lidH = h * 0.94;
+  const lidX = x + (w - lidW) / 2;
+  const bezel = 0.11;
+  slide.addShape('roundRect', { x: lidX, y, w: lidW, h: lidH, rectRadius: 0.06, fill: { color: '1A1A1A' } });
+  slide.addShape('rect', {
+    x: lidX + bezel, y: y + bezel * 1.6, w: lidW - bezel * 2, h: lidH - bezel * 2.6, fill: { color: WHITE },
+  });
+  slide.addShape('roundRect', { x, y: y + lidH, w, h: h - lidH, rectRadius: 0.05, fill: { color: 'C9CBCD' } });
+  slide.addText('[image]', {
+    x: lidX, y: y + lidH / 2 - 0.2, w: lidW, h: 0.4, align: 'center', valign: 'middle',
+    fontFace: BODY_FONT, fontSize: 11, color: 'A6A6A6',
+  });
+}
+
+// "10% | Simple Text Here | lorem" info strip used on many slides.
+// dir: 'pill-first' puts the FINERY pill left of the figure.
+function statStrip(slide, o) {
+  pill(slide, o.pillX, o.pillY);
+  stat(slide, o.value, o.statX, o.statY, o.statW || 0.879, { color: o.valueColor || BLUE });
+  if (o.title) label(slide, o.title, o.textX, o.textY, 1.878, { color: o.textColor || DARK });
+  if (o.text) body(slide, o.text, o.textX, o.textY + 0.337, o.textW || 2.875, 0.627, { color: o.textColor || GRAY });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+// 1 / 16 / 30 — full-bleed hero: blue blob + wordmark + orange tagline pill.
+function heroSlide(slide, pageNo, titleRuns) {
+  slide.addShape('custGeom', {
+    x: 0, y: 2.064, w: 7.784, h: 3.373,
+    fill: { color: BLUE, transparency: 20 }, points: heroBlobPoints(),
+  });
+  slide.addText(titleRuns.runs, {
+    x: titleRuns.x, y: titleRuns.y, w: titleRuns.w, h: titleRuns.h,
+    align: 'center', valign: 'top', wrap: false,
+  });
+  pill(slide, 7.158, 3.486, { w: 5.284, label: T.tagline, font: BODY_FONT, bold: false, charSpacing: 1, size: 12 });
+  body(slide, T.hero, 3.892, 6.154, 6.667, 0.627);
+  chrome(slide, pageNo);
+}
+
+function slide01(slide) {
+  heroSlide(slide, 1, {
+    x: 1.48, y: 2.979, w: 4.825, h: 1.717,
+    runs: [{ text: 'FINERY', options: { fontFace: HEAD_FONT, fontSize: 96, bold: true, color: WHITE } }],
+  });
+}
+
+function slide02(slide) {
+  heading(slide, 'Welcome To Our Financial & Investment Agency', 1.078, 1.522, 6.204, 1.178, { size: 32 });
+  body(slide, T.intro, 1.078, 2.932, 7.375, 0.905);
+  body(slide, T.med, 9.14, 2.932, 3.185, 0.905);
+  blueRect(slide, 5.239, 4.917, 7.39, 1.921);
+  pill(slide, 4.248, 5.614);
+  stat(slide, '10%', 6.941, 5.625, 0.809, { color: WHITE });
+  label(slide, 'Simple Text Here', 8.436, 5.396, 1.878, { color: WHITE });
+  body(slide, T.sm, 8.436, 5.732, 3.185, 0.627, { color: WHITE });
+  chrome(slide, 2);
+}
+
+function slide03(slide) {
+  arcBand(slide, SWOOSH);
+  card(slide, 0, 1.706, 6.419, 1.921);
+  statStrip(slide, {
+    pillX: 5.428, pillY: 2.402, value: '10%', statX: 0.661, statY: 2.414, statW: 0.809,
+    title: 'Simple Text Here', text: T.short, textX: 1.925, textY: 2.184,
+  });
+  heading(slide, 'Welcome To Our Financial & Investment Agency', 1.078, 4.406, 6.204, 1.178, { size: 32 });
+  body(slide, T.intro, 1.078, 5.816, 8.517, 0.905);
+  chrome(slide, 3);
+}
+
+function slide04(slide) {
+  crescent(slide, 3.612, 4.061, 2.334, 0.178, false);
+  quoteMarks(slide, 7.317, 2.374, 0.479, 0.379);
+  heading(slide, 'We Are Professional Financial & Investment Agency', 7.197, 3.068, 4.796, 1.717, { size: 32 });
+  pill(slide, 9.835, 5.221);
+  stat(slide, '10%', 8.786, 5.232, 0.809);
+  chrome(slide, 4);
+}
+
+function slide05(slide) {
+  heading(slide, 'We Are Professional Financial & Investment Agency', 1.078, 1.543, 6.993, 1.178, { size: 32 });
+  body(slide, T.intro, 1.078, 2.953, 8.517, 0.905);
+  card(slide, 3.288, 4.775, 6.419, 1.921);
+  statStrip(slide, {
+    pillX: 2.297, pillY: 5.471, value: '10%', statX: 4.907, statY: 5.483, statW: 0.809,
+    title: 'Simple Text Here', text: T.short, textX: 6.171, textY: 5.253,
+  });
+  chrome(slide, 5);
+}
+
+function slide06(slide) {
+  slide.addShape('custGeom', { x: 5.521, y: 3.948, w: 0.917, h: 3.552, fill: { color: BLUE }, points: cornerRailPoints() });
+  heading(slide, 'Why Choose Us?', 1.216, 1.629, 3.578, 1.313, { size: 36 });
+  body(slide, T.why, 5.914, 1.694, 6.365, 1.183);
+  [
+    { y: 3.948, value: '10%', color: BLUE, ty: 4.062 },
+    { y: 5.379, value: '25%', color: ORANGE, ty: 5.493 },
+  ].forEach((row) => {
+    bubble(slide, 7.406, row.y, 1.192);
+    stat(slide, row.value, 7.563, row.y + 0.344, 0.879, { color: row.color });
+    label(slide, 'Simple Text Here', 9.404, row.ty, 1.878);
+    body(slide, T.short, 9.404, row.ty + 0.337, 2.875, 0.627);
+  });
+  chrome(slide, 6);
+}
+
+function slide07(slide) {
+  slide.addShape('custGeom', {
+    x: 1.138, y: 0.893, w: 5.529, h: 2.586, fill: { color: WHITE }, shadow: cardShadow(),
+    points: rightRoundedCardPoints(5.529, 2.586, 0.431),
+  });
+  heading(slide, 'Why Choose Us?', 2.114, 1.53, 3.578, 1.313, { size: 36 });
+  blueRect(slide, 5.975, 4.665, 6.419, 1.921);
+  body(slide, T.why7, 1.069, 4.482, 2.918, 2.016);
+  pill(slide, 4.984, 5.361);
+  stat(slide, '30%', 7.552, 5.373, 0.893, { color: WHITE });
+  label(slide, 'Simple Text Here', 8.858, 5.143, 1.878, { color: WHITE });
+  body(slide, T.short, 8.858, 5.48, 2.875, 0.627, { color: WHITE });
+  chrome(slide, 7);
+}
+
+function slide08(slide) {
+  arcBand(slide, SWOOSH_MIRRORED);
+  heading(slide, 'More About Us', 5.757, 1.564, 4.318, 0.707, { size: 36 });
+  body(slide, T.about8, 5.757, 2.489, 6.522, 1.183);
+  card(slide, 6.914, 4.62, 6.419, 2.04);
+  statStrip(slide, {
+    pillX: 5.923, pillY: 5.376, value: '25%', statX: 8.498, statY: 5.388,
+    title: 'Simple Text Here', text: T.short, textX: 9.797, textY: 5.158,
+  });
+  chrome(slide, 8);
+}
+
+function slide09(slide) {
+  // Blue picture frame: 0.175" band, right side runs off the slide edge.
+  blueRect(slide, 8.806, 1.71, 4.527, 0.175);
+  blueRect(slide, 8.806, 6.237, 4.527, 0.175);
+  blueRect(slide, 8.806, 1.71, 0.175, 4.702);
+  card(slide, 0, 2.193, 8.806, 3.735);
+  heading(slide, 'More About Us', 1.142, 3.007, 4.283, 0.707, { size: 36 });
+  body(slide, T.about9, 4.263, 3.932, 3.401, 1.183);
+  pill(slide, 1.247, 4.254);
+  chrome(slide, 9);
+}
+
+function slide10(slide) {
+  // Blue "L" bracket: thin left rail + bottom rail.
+  blueRect(slide, 1.035, 0.789, 0.158, 5.834);
+  blueRect(slide, 1.035, 6.456, 4.333, 0.167);
+  pill(slide, 4.535, 1.397);
+  heading(slide, 'Our Vision', 6.771, 2.46, 3.156, 0.774, { size: 40, wrap: false });
+  body(slide, T.vision, 6.771, 3.514, 5.508, 0.627);
+  label(slide, 'Simple Text', 6.771, 4.42, 1.368, { color: BLUE });
+  body(slide, T.col, 6.771, 4.757, 2.34, 0.905);
+  label(slide, 'Simple Text', 9.939, 4.42, 1.368, { color: ORANGE });
+  body(slide, T.col, 9.939, 4.757, 2.34, 0.905);
+  chrome(slide, 10);
+}
+
+function slide11(slide) {
+  blueRect(slide, 1.375, 1.945, 4.134, 2.186);
+  body(slide, T.mission, 2.01, 2.447, 1.872, 1.183, { color: WHITE });
+  pill(slide, 4.518, 2.775);
+  heading(slide, 'Our Mission', 1.045, 5.671, 3.571, 0.774, { size: 40, wrap: false });
+  slide.addText('Simple Text', {
+    x: 5.41, y: 5.42, w: 1.536, h: 0.37, align: 'left', valign: 'top', wrap: false,
+    fontFace: HEAD_FONT, fontSize: 16, bold: true, color: BLUE,
+  });
+  body(slide, T.med, 5.41, 5.79, 3.211, 0.905);
+  slide.addText('Simple Text', {
+    x: 9.148, y: 5.425, w: 1.536, h: 0.37, align: 'left', valign: 'top', wrap: false,
+    fontFace: HEAD_FONT, fontSize: 16, bold: true, color: ORANGE,
+  });
+  body(slide, T.med, 9.148, 5.79, 3.211, 0.905);
+  chrome(slide, 11);
+}
+
+function slide12(slide) {
+  blueRect(slide, 7.947, 1.719, 3.715, 1.69);
+  pill(slide, 10.671, 2.298);
+  [2.046, 2.388, 2.73].forEach((y) => label(slide, 'Simple Text Here', 8.37, y, 1.878, { color: WHITE, align: 'center' }));
+  heading(slide, 'Our Great Team', 1.174, 4.671, 4.767, 0.774, { size: 40, wrap: false });
+  body(slide, T.full, 1.174, 5.674, 11.055, 0.905);
+  chrome(slide, 12);
+}
+
+function slide13(slide) {
+  crescent(slide, 9.595, 4.061, 2.334, 0.178, true);
+  card(slide, 0, 4.84, 6.123, 1.555);
+  heading(slide, 'Philip Newel', 1.174, 1.669, 3.326, 0.707, { size: 36, wrap: false });
+  body(slide, T.bio, 1.174, 2.61, 5.036, 1.183);
+  stat(slide, '25%', 0.855, 5.196, 0.879, { align: 'left', color: BLUE });
+  label(slide, 'Simple Text Here', 0.855, 5.701, 1.878);
+  stat(slide, '40%', 3.39, 5.196, 0.915, { align: 'left', color: ORANGE });
+  label(slide, 'Simple Text Here', 3.39, 5.701, 1.878);
+  chrome(slide, 13);
+}
+
+function slide14(slide) {
+  // Blue "]"-style brackets: a bar top and bottom, each turning down/up at the right.
+  blueRect(slide, 1.567, 1.827, 4.269, 0.199);
+  blueRect(slide, 5.637, 1.827, 0.199, 0.516);
+  blueRect(slide, 1.567, 6.096, 4.269, 0.199);
+  blueRect(slide, 5.637, 5.779, 0.199, 0.516);
+  card(slide, 5.638, 2.366, 7.075, 3.39);
+  heading(slide, 'Steven Clay', 6.757, 2.999, 3.293, 0.707, { size: 36, wrap: false });
+  body(slide, T.bio, 6.757, 3.94, 5.036, 1.183);
+  pill(slide, 0.576, 3.797);
+  chrome(slide, 14);
+}
+
+function slide15(slide) {
+  // Upper-left open frame ("[" rotated): top bar, left rail, part of the base.
+  blueRect(slide, 1.012, 1.352, 6.127, 0.14);
+  blueRect(slide, 1.012, 1.352, 0.14, 3.309);
+  blueRect(slide, 1.012, 4.521, 2.667, 0.14);
+  // Lower-right open frame: right rail plus base.
+  blueRect(slide, 11.634, 0.798, 0.153, 4.009);
+  blueRect(slide, 7.307, 4.654, 4.48, 0.153);
+  card(slide, 2.06, 2.27, 5.079, 1.474);
+  heading(slide, 'Jackie Brown', 2.773, 2.649, 3.654, 0.707, { size: 36, align: 'center', wrap: false });
+  pill(slide, 3.679, 4.321);
+  body(slide, T.bio15, 1.356, 5.391, 4.433, 1.183);
+  stat(slide, '25%', 7.054, 5.733, 0.879, { align: 'left', color: BLUE });
+  label(slide, 'Simple Text Here', 7.054, 6.238, 1.878);
+  stat(slide, '40%', 9.992, 5.733, 0.915, { align: 'left', color: ORANGE });
+  label(slide, 'Simple Text Here', 9.992, 6.238, 1.878);
+  chrome(slide, 15);
+}
+
+function slide16(slide) {
+  heroSlide(slide, 16, {
+    x: 0.836, y: 3.026, w: 5.482, h: 1.447,
+    runs: [
+      { text: 'Break ', options: { fontFace: HEAD_FONT, fontSize: 80, bold: true, color: WHITE } },
+      { text: 'Slides', options: { fontFace: HEAD_FONT, fontSize: 40, bold: true, color: WHITE } },
+    ],
+  });
+}
+
+// Reusable "01 / Service One / lorem" column.
+function serviceItem(slide, num, title, x, y, numW) {
+  stat(slide, num, x, y, numW, { align: 'left', color: ORANGE });
+  label(slide, title, x, y + 0.505, 1.6);
+  body(slide, T.svc, x, y + 0.842, 2.34, 0.627);
+}
+
+const SERVICE_WIDTHS = { '01': 0.539, '02': 0.61, '03': 0.623 };
+
+function slide17(slide) {
+  slide.addShape('custGeom', { x: 0, y: 1.46, w: 6.302, h: 1.69, fill: { color: BLUE }, points: concaveBannerPoints() });
+  heading(slide, 'Our Services', 1.305, 1.95, 3.464, 0.707, { size: 36, color: WHITE, align: 'center', wrap: false });
+  body(slide, T.svcIntro, 1.305, 5.024, 4.116, 1.461);
+  serviceItem(slide, '01', 'Service One', 6.489, 5.016, SERVICE_WIDTHS['01']);
+  serviceItem(slide, '02', 'Service Two', 9.591, 5.016, SERVICE_WIDTHS['02']);
+  chrome(slide, 17);
+}
+
+function slide18(slide) {
+  blueRect(slide, 5.734, 1.732, 6.214, 1.69);
+  heading(slide, 'Our Services', 7.604, 2.223, 3.464, 0.707, { size: 36, color: WHITE, align: 'center', wrap: false });
+  pill(slide, 4.743, 2.319);
+  card(slide, 0, 4.531, 10.028, 2.469);
+  serviceItem(slide, '01', 'Service One', 0.742, 5.031, SERVICE_WIDTHS['01']);
+  serviceItem(slide, '02', 'Service Two', 3.844, 5.031, SERVICE_WIDTHS['02']);
+  serviceItem(slide, '03', 'Service Three', 6.946, 5.031, SERVICE_WIDTHS['03']);
+  stat(slide, '50%', 11.228, 5.513, 0.905);
+  chrome(slide, 18);
+}
+
+function slide19(slide) {
+  card(slide, 4.56, 1.169, 3.617, 5.785);
+  serviceItem(slide, '01', 'Service One', 5.199, 1.642, SERVICE_WIDTHS['01']);
+  serviceItem(slide, '02', 'Service Two', 5.199, 3.327, SERVICE_WIDTHS['02']);
+  serviceItem(slide, '03', 'Service Three', 5.199, 5.013, SERVICE_WIDTHS['03']);
+  blueRect(slide, 0, 2.986, 4.56, 2.15);
+  heading(slide, 'Our Services', 0.973, 3.405, 2.614, 1.313, { size: 36, color: WHITE, align: 'center' });
+  chrome(slide, 19);
+}
+
+function slide20(slide) {
+  card(slide, 8.488, 0.622, 3.791, 4.515);
+  serviceItem(slide, '01', 'Service One', 9.214, 1.254, SERVICE_WIDTHS['01']);
+  serviceItem(slide, '02', 'Service Two', 9.214, 3.037, SERVICE_WIDTHS['02']);
+  blueRect(slide, 0, 1.157, 6.439, 1.69);
+  heading(slide, 'Our Services', 0.993, 1.649, 3.464, 0.707, { size: 36, color: WHITE, align: 'center', wrap: false });
+  pill(slide, 5.45, 1.739);
+  chrome(slide, 20);
+}
+
+function slide21(slide) {
+  arcBand(slide, SWOOSH);
+  card(slide, 0, 4.273, 5.75, 2.051);
+  heading(slide, 'Our Gallery', 1.13, 1.504, 3.454, 0.774, { size: 40, wrap: false });
+  body(slide, T.gallery, 1.13, 2.486, 5.796, 0.905);
+  pill(slide, 4.759, 5.034);
+  stat(slide, '80%', 0.635, 5.046, 0.907);
+  label(slide, 'Simple Text', 1.948, 4.816, 1.368);
+  body(slide, T.tiny, 1.948, 5.153, 2.008, 0.627);
+  chrome(slide, 21);
+}
+
+function slide22(slide) {
+  card(slide, 6.154, 1.694, 5.75, 1.789);
+  pill(slide, 10.917, 2.325);
+  stat(slide, '25%', 6.807, 2.336, 0.879);
+  label(slide, 'Simple Text', 8.106, 2.106, 1.368);
+  body(slide, T.tiny, 8.106, 2.443, 2.008, 0.627);
+  heading(slide, 'Our Great Gallery', 1.174, 4.671, 5.196, 0.774, { size: 40, wrap: false });
+  body(slide, T.full, 1.174, 5.674, 11.055, 0.905);
+  chrome(slide, 22);
+}
+
+function slide23(slide) {
+  blueRect(slide, 0, 2.073, SLIDE_W, 3.977);
+  heading(slide, 'Our Gallery', 1.174, 2.871, 3.13, 0.707, { size: 36, color: WHITE, wrap: false });
+  body(slide, T.gallery23, 1.174, 3.806, 4.379, 1.183, { color: WHITE });
+  pill(slide, 3.482, 5.786);
+  chrome(slide, 23);
+}
+
+function slide24(slide) {
+  phonePlaceholder(slide, 1.115, 1.519, 2.521, 5.085);
+  blueRect(slide, 3.635, 2.08, 5.775, 1.462);
+  heading(slide, 'Our Mockup', 4.36, 2.458, 3.343, 0.707, { size: 36, color: WHITE, wrap: false });
+  pill(slide, 8.429, 2.547);
+  stat(slide, '90%', 11.216, 2.559, 0.891, { color: DARK });
+  body(slide, T.full, 4.732, 4.834, 7.375, 1.183);
+  chrome(slide, 24);
+}
+
+function slide25(slide) {
+  blueRect(slide, 3.058, 2.08, 4.793, 1.462);
+  heading(slide, 'Our Mockup', 3.783, 2.458, 3.343, 0.707, { size: 36, color: WHITE, wrap: false });
+  laptopPlaceholder(slide, 7.322, 1.355, 5.423, 3.291);
+  body(slide, T.mock25, 6.16, 5.381, 5.655, 1.183);
+  card(slide, 0, 5.078, 4.763, 1.789);
+  stat(slide, '25%', 0.653, 5.72, 0.879, { color: ORANGE });
+  label(slide, 'Simple Text', 1.952, 5.491, 1.368);
+  body(slide, T.tiny, 1.952, 5.827, 2.008, 0.627);
+  chrome(slide, 25);
+}
+
+function slide26(slide) {
+  slide.addChart('doughnut',
+    [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr', '3rd Qtr'], values: [8.2, 3.2, 1.4] }],
+    {
+      x: 0.825, y: 1.689, w: 5.13, h: 4.744,
+      chartColors: [ORANGE, BLUE, RULE], holeSize: 75, dataBorder: { pt: 1.5, color: WHITE },
+      showLegend: true, legendPos: 'b', legendFontFace: BODY_FONT, legendFontSize: 12, legendColor: '595959',
+      showValue: false, showTitle: false,
+    });
+  bubble(slide, 2.794, 3.289, 1.192);
+  stat(slide, '85%', 2.938, 3.633, 0.905, { color: DARK });
+  heading(slide, 'Our Chart', 6.667, 2.46, 3.035, 0.774, { size: 40, wrap: false });
+  body(slide, T.vision, 6.667, 3.514, 5.508, 0.627);
+  label(slide, 'Simple Text', 6.667, 4.42, 1.368, { color: BLUE });
+  body(slide, T.col, 6.667, 4.757, 2.34, 0.905);
+  label(slide, 'Simple Text', 9.835, 4.42, 1.368, { color: ORANGE });
+  body(slide, T.col, 9.835, 4.757, 2.34, 0.905);
+  chrome(slide, 26);
+}
+
+function slide27(slide) {
+  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+  slide.addChart('bar',
+    [
+      { name: 'Series 1', labels: cats, values: [4.3, 2.5, 3.5, 4.5] },
+      { name: 'Series 2', labels: cats, values: [2.4, 4.4, 1.8, 2.8] },
+      // The source workbook carries an empty third column; it keeps the
+      // clustered bars at their reference width. Drawn white so it is invisible.
+      { name: ' ', labels: cats, values: [0, 0, 0, 0] },
+    ],
+    {
+      x: 5.397, y: 1.246, w: 6.882, h: 5.63,
+      barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 219, barOverlapPct: -27,
+      chartColors: [ORANGE, BLUE, WHITE],
+      showLegend: true, legendPos: 'b', legendFontFace: BODY_FONT, legendFontSize: 12, legendColor: '595959',
+      catAxisLabelFontFace: BODY_FONT, catAxisLabelFontSize: 12, catAxisLabelColor: '595959',
+      valAxisLabelFontFace: BODY_FONT, valAxisLabelFontSize: 12, valAxisLabelColor: '595959',
+      catGridLine: { style: 'none' }, valGridLine: { color: RULE, size: 0.75 },
+      catAxisLineShow: true, valAxisLineShow: false, showTitle: false,
+    });
+  card(slide, 0, 2.366, 4.281, 3.39);
+  label(slide, 'Simple Text', 0.681, 2.909, 1.368, { color: ORANGE });
+  body(slide, T.short, 0.681, 3.246, 2.918, 0.627);
+  label(slide, 'Simple Text', 0.681, 4.249, 1.368, { color: BLUE });
+  body(slide, T.short, 0.681, 4.585, 2.918, 0.627);
+  chrome(slide, 27);
+}
+
+function slide28(slide) {
+  heading(slide, 'Pricing Plan', 4.868, 1.43, 3.598, 0.774, { size: 40, align: 'center', wrap: false });
+  body(slide, T.full, 1.139, 2.34, 11.055, 0.905, { align: 'center' });
+  [
+    { x: 2.195, price: '$25', priceX: 2.38, priceW: 0.823, name: 'Bronze Package', nameX: 1.885, nameW: 1.813, textX: 1.332, color: ORANGE },
+    { x: 6.071, price: '$50', priceX: 6.243, priceW: 0.849, name: 'Silver Package', nameX: 5.825, nameW: 1.685, textX: 5.209, color: DARK },
+    { x: 9.946, price: '$70', priceX: 10.139, priceW: 0.805, name: 'Gold Package', nameX: 9.749, nameW: 1.587, textX: 9.083, color: BLUE },
+  ].forEach((p) => {
+    bubble(slide, p.x, 3.873, 1.192);
+    stat(slide, p.price, p.priceX, 4.217, p.priceW, { color: p.color });
+    label(slide, p.name, p.nameX, 5.599, p.nameW, { color: p.color, align: 'center' });
+    body(slide, T.price, p.textX, 5.935, 2.918, 0.627, { align: 'center' });
+  });
+  chrome(slide, 28);
+}
+
+function slide29(slide) {
+  heading(slide, 'Contact', 6.228, 1.711, 2.549, 0.774, { size: 40, wrap: false });
+  body(slide, T.about8, 6.228, 2.622, 5.966, 1.183);
+  card(slide, 3.439, 4.894, 9.895, 1.91);
+  label(slide, 'Phone Number', 4.352, 5.367, 1.701, { color: ORANGE });
+  body(slide, T.contact, 4.357, 5.704, 3.572, 0.627);
+  label(slide, 'Email Address', 8.848, 5.367, 2.468, { color: BLUE });
+  body(slide, T.contact, 8.848, 5.704, 3.572, 0.627);
+  chrome(slide, 29);
+}
+
+function slide30(slide) {
+  heroSlide(slide, 30, {
+    x: 1.275, y: 2.959, w: 5.235, h: 1.582,
+    runs: [{ text: 'THANKS', options: { fontFace: HEAD_FONT, fontSize: 88, bold: true, color: WHITE } }],
+  });
+}
+
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+];
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.author = 'FINERY';
+  pptx.title = 'FINERY — Financial & Investment Presentation Template';
+  pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
+  pptx.layout = 'WIDE';
+  pptx.theme = { headFontFace: HEAD_FONT, bodyFontFace: BODY_FONT };
+
+  BUILDERS.forEach((buildSlide) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: WHITE };
+    buildSlide(slide);
+  });
+
+  const out = path.join(__dirname, '076071a1-243a-497a-99a7-a7640079d0dc_grok_final.pptx');
+  return pptx.writeFile({ fileName: out }).then(() => console.log('wrote', out));
+}
+
+build().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
