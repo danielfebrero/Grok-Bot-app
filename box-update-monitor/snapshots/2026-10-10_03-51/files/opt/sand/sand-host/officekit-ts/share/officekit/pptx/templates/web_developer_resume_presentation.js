@@ -1,0 +1,852 @@
+/**
+ * "MOSCOV RIDER - Professional Resume" -- 34 slide deck, rebuilt with pptxgenjs.
+ * Run: node 051ed4c9-f5d5-4c54-9656-79b3064faff7_grok_final.js
+ */
+'use strict';
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens (theme "Green Yellow", fonts "Work Sans" / "Cabin")
+ * ------------------------------------------------------------------ */
+const GREEN = '99CB38';   // accent1
+const DARK = '404040';    // tx1 @ 75% lum -- panels + strong body copy
+const GRAY = '808080';    // bg1 @ 50% lum -- muted body copy
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const ICON_GREEN = '455F51'; // dk2, used by the icon-library slides 31-34
+const PHOTO = 'FF002A';   // stand-in fill for every raster photo of the source deck
+
+const HEAD = 'Work Sans'; // +mj-lt
+const BODY = 'Cabin';     // +mn-lt
+const NOLINE = { type: 'none' };
+
+/* ------------------------------------------------------------------ *
+ * Reusable copy
+ * ------------------------------------------------------------------ */
+const LOREM_LEO =
+  'PLACEHOLDER' +
+  'est placerat in egestas erat imperdiet sed euismod nisi porta lorem mollis aliquam ut porttitor leo.';
+const LOREM_PORTA =
+  'PLACEHOLDER' +
+  'est placerat in egestas erat imperdiet sed euismod nisi porta.';
+const LOREM_TINCI =
+  'PLACEHOLDER';
+const LOREM_EGET =
+  'PLACEHOLDER' +
+  'PLACEHOLDER' +
+  'tristique senectus et netus et malesuada';
+// Alternating plain / bold runs of the pull quote.
+const QUOTE_RUNS = ['CHOOSE A JOB YOU ', 'LOVE', ', AND YOU WILL ', 'NEVER',
+  ' HAVE TO WORK A DAY IN YOUR ', 'LIFE', '.'];
+const QUOTE_TITLE = ['Choose a Job You Love, And You Will Never Have To Work ', 'a Day In Your Life.'];
+const URL = 'www.moscovrider.com';
+
+/* ------------------------------------------------------------------ *
+ * Primitive helpers
+ * ------------------------------------------------------------------ */
+
+/** Plain filled rectangle. */
+function rect(s, x, y, w, h, color, extra) {
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color }, line: NOLINE }, extra));
+}
+
+/** Every photograph in the source deck is replaced by a flat colour block. */
+function photo(s, x, y, w, h, extra) {
+  s.addShape('rect', Object.assign({ x, y, w, h, fill: { color: PHOTO }, line: NOLINE }, extra));
+}
+
+/** Circular photo crop (white ring), used by the portrait slides. */
+function photoCircle(s, x, y, d) {
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: PHOTO }, line: { color: WHITE, width: 2.25 } });
+}
+
+/** Text box: top anchored, no autofit, Cabin by default. */
+function text(s, content, o) {
+  s.addText(content, Object.assign({ fontFace: BODY, valign: 'top', color: DARK }, o));
+}
+
+/** Turn [[run, opts], ...] rows into a pptxgenjs paragraph list. */
+function paragraphs(rows) {
+  const out = [];
+  rows.forEach(function (row) {
+    const runs = typeof row === 'string' ? [[row]] : row;
+    runs.forEach(function (run, i) {
+      out.push({
+        text: run[0],
+        options: Object.assign({}, run[1], i === runs.length - 1 ? { breakLine: true } : {}),
+      });
+    });
+  });
+  return out;
+}
+
+/** 18pt green section title with the small green tick to its left. */
+function sectionTitle(s, x, y, w, label, o) {
+  s.addShape('rect', { x: x - 0.074, y: y + 0.113, w: 0.062, h: 0.167, fill: { color: GREEN }, line: NOLINE });
+  text(s, label, Object.assign({ x, y, w, h: 0.404, fontFace: HEAD, fontSize: 18, bold: true, color: GREEN }, o));
+}
+
+/** Centred "kicker / TITLE / rule" stack used by the divider slides. */
+function centeredTitle(s, cfg) {
+  text(s, cfg.kicker, {
+    x: cfg.kickerX || 3.79, y: cfg.kickerY, w: 2.44, h: cfg.kickerH || 0.24,
+    fontSize: 8.25, charSpacing: 2.25, color: cfg.kickerColor || WHITE, align: 'center',
+  });
+  text(s, cfg.title, {
+    x: cfg.titleX || 3.843, y: cfg.titleY, w: cfg.titleW || 2.314, h: cfg.titleH || 0.404,
+    fontFace: HEAD, fontSize: cfg.titleSize || 18, bold: true, color: GREEN, align: 'center',
+  });
+  rect(s, cfg.ruleX || 4.553, cfg.ruleY, 0.895, 0.081, cfg.ruleColor || WHITE);
+}
+
+/** Muted paragraph of body copy at 8.25pt / 150% leading. */
+function bodyCopy(s, x, y, w, h, rows, o) {
+  text(s, paragraphs(rows), Object.assign({
+    x, y, w, h, fontSize: 8.25, color: GRAY, lineSpacingMultiple: 1.5,
+  }, o));
+}
+
+/**
+ * Small pictogram stand-ins for the source deck's freeform icon groups.
+ * Every pictogram is a short list of autoshape parts, each written as
+ * [preset, x%, y%, w%, h%, {rotate, flipV, cut}]. `cut: true` paints the part
+ * in the surrounding background colour so it reads as a hole in the icon.
+ */
+const GLYPHS = {
+  person: [['ellipse', 0.28, 0, 0.44, 0.44], ['trapezoid', 0.05, 0.52, 0.9, 0.48]],
+  card: [['frame', 0, 0.08, 1, 0.84], ['ellipse', 0.16, 0.26, 0.2, 0.2],
+    ['rect', 0.52, 0.3, 0.32, 0.08], ['rect', 0.52, 0.46, 0.32, 0.08],
+    ['rect', 0.13, 0.6, 0.26, 0.08]],
+  mail: [['rect', 0, 0.12, 1, 0.76],
+    ['triangle', 0.05, 0.18, 0.9, 0.5, { flipV: true, cut: true }]],
+  phone: [['roundRect', 0.22, 0, 0.56, 1],
+    ['rect', 0.31, 0.13, 0.38, 0.68, { cut: true }]],
+  pin: [['teardrop', 0, 0, 1, 1, { rotate: 135 }],
+    ['ellipse', 0.28, 0.2, 0.44, 0.44, { cut: true }]],
+  globe: [['donut', 0, 0, 1, 1]],
+  cap: [['trapezoid', 0, 0.2, 1, 0.6, { flipV: true }]],
+  monitor: [['rect', 0, 0, 1, 0.74], ['rect', 0.35, 0.78, 0.3, 0.22],
+    ['rect', 0.12, 0.14, 0.76, 0.44, { cut: true }]],
+  people: [['ellipse', 0, 0.2, 0.36, 0.36], ['ellipse', 0.64, 0.2, 0.36, 0.36],
+    ['ellipse', 0.3, 0, 0.4, 0.4], ['trapezoid', 0.15, 0.6, 0.7, 0.4]],
+  gear: [['gear6', 0, 0, 1, 1], ['ellipse', 0.36, 0.36, 0.28, 0.28, { cut: true }]],
+  trophy: [['trapezoid', 0.12, 0, 0.76, 0.66, { flipV: true }],
+    ['rect', 0.42, 0.62, 0.16, 0.2], ['rect', 0.22, 0.84, 0.56, 0.16]],
+  share: [['ellipse', 0.6, 0, 0.4, 0.4], ['ellipse', 0, 0.3, 0.4, 0.4],
+    ['ellipse', 0.6, 0.6, 0.4, 0.4]],
+  disk: [['rect', 0, 0, 1, 1], ['rect', 0.24, 0, 0.52, 0.36, { cut: true }],
+    ['rect', 0.2, 0.56, 0.6, 0.44, { cut: true }]],
+  clip: [['teardrop', 0, 0, 1, 1, { rotate: 135 }],
+    ['ellipse', 0.3, 0.3, 0.4, 0.4, { cut: true }]],
+  chart: [['rect', 0, 0, 1, 1], ['upArrow', 0.2, 0.18, 0.6, 0.64, { cut: true }]],
+  megaphone: [['homePlate', 0, 0.18, 0.8, 0.64], ['rect', 0.76, 0.06, 0.16, 0.88]],
+};
+
+function glyph(s, kind, x, y, w, h, color, bg) {
+  (GLYPHS[kind] || [['ellipse', 0, 0, 1, 1]]).forEach(function (p) {
+    const o = p[5] || {};
+    s.addShape(p[0], {
+      x: x + w * p[1], y: y + h * p[2], w: w * p[3], h: h * p[4],
+      rotate: o.rotate || 0, flipV: !!o.flipV,
+      fill: { color: o.cut ? (bg || WHITE) : color }, line: NOLINE,
+    });
+  });
+}
+
+/** Green disc + white pictogram: the milestone bullets of the timeline slides. */
+function milestone(s, x, y, d, kind) {
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: GREEN }, line: NOLINE });
+  glyph(s, kind, x + d * 0.33, y + d * 0.33, d * 0.34, d * 0.34, WHITE, GREEN);
+}
+
+/** 10-dot proficiency meter. */
+function skillDots(s, x, y, filled) {
+  const D = 0.096, STEP = 0.2889;
+  for (let i = 0; i < 10; i++) {
+    s.addShape('ellipse', {
+      x: x + i * STEP, y, w: D, h: D,
+      fill: { color: i < filled ? BLACK : WHITE },
+      line: { color: BLACK, width: 0.75 },
+    });
+  }
+}
+
+/** Label + dot-meter rows for the "skill" slides. */
+function skillBlock(s, cfg) {
+  text(s, paragraphs([[[cfg.heading[0]], [cfg.heading[1]]]]), {
+    x: 4.923, y: cfg.headingY, w: 2.0, h: 0.278,
+    fontFace: HEAD, fontSize: 10.5, bold: true, color: GREEN,
+  });
+  cfg.rows.forEach(function (row, i) {
+    const y = cfg.rowY[i];
+    text(s, row[0], { x: 4.923, y, w: 1.1, h: 0.24, fontSize: 8.25, color: GRAY });
+    skillDots(s, cfg.dotX, y + 0.06, row[1]);
+  });
+}
+
+/**
+ * White phone mock-up with a photo-coloured screen, plus its earpiece,
+ * camera dot and home button. Detail parts are given in the phone's own
+ * (unrotated) frame and then spun about the body centre to match `rotate`.
+ */
+/** [preset, dx from body centre, dy from top edge, w, h, colour] */
+const PHONE_DETAILS = [
+  ['roundRect', 0.05, 0.25, 0.42, 0.028, DARK],   // earpiece slot
+  ['ellipse', -0.28, 0.25, 0.045, 0.045, DARK],   // camera dot
+  ['ellipse', 0, -0.30, 0.32, 0.32, WHITE],       // home button (negative dy = from bottom)
+];
+function phoneMock(s, body, screen) {
+  const rot = body.rotate || 0;
+  const rad = (rot * Math.PI) / 180;
+  const cx = body.x + body.w / 2;
+  const cy = body.y + body.h / 2;
+  s.addShape('roundRect', Object.assign({ fill: { color: WHITE }, line: { color: 'E6E6E6', width: 1 }, rectRadius: 0.25 }, body));
+  s.addShape('rect', Object.assign({ fill: { color: PHOTO }, line: NOLINE }, screen));
+  PHONE_DETAILS.forEach(function (d) {
+    const dx = d[1];
+    const dy = (d[2] < 0 ? body.h + d[2] : d[2]) - body.h / 2;
+    s.addShape(d[0], {
+      x: cx + dx * Math.cos(rad) - dy * Math.sin(rad) - d[3] / 2,
+      y: cy + dx * Math.sin(rad) + dy * Math.cos(rad) - d[4] / 2,
+      w: d[3], h: d[4], rotate: rot, rectRadius: 0.014,
+      fill: { color: d[5] }, line: d[5] === WHITE ? { color: 'D9D9D9', width: 1 } : NOLINE,
+    });
+  });
+}
+
+/** Rounded/square social badge with its initial. */
+function socialBadge(s, shape, x, y, d, letter) {
+  s.addShape(shape, { x, y, w: d, h: d, fill: { color: GREEN }, line: NOLINE, rectRadius: 0.05 });
+  text(s, letter, {
+    x: x - 0.1, y: y - 0.01, w: d + 0.2, h: d, fontFace: HEAD, fontSize: 7.5, bold: true,
+    color: WHITE, align: 'center', valign: 'middle', wrap: false,
+  });
+}
+
+/**
+ * Six-row / sixteen-column pictogram wall (slides 31-34). The reference deck
+ * holds ~96 detailed freeform icons per slide; each is stood in for by an
+ * autoshape, half of them hollowed out so the wall keeps its line-art texture.
+ */
+const WALL_GLYPHS = ['ellipse', 'roundRect', 'donut', 'diamond', 'hexagon', 'octagon', 'plaque',
+  'teardrop', 'pie', 'blockArc', 'star5', 'heart', 'sun', 'moon', 'cloud', 'gear6',
+  'rect', 'triangle', 'chevron', 'plus', 'star6', 'flowChartMagneticDisk', 'can', 'bevel'];
+const WALL_HOLLOW = ['ellipse', 'roundRect', 'rect', 'diamond', 'hexagon', 'octagon'];
+
+function iconWall(s, cfg) {
+  cfg.rowY.forEach(function (cy, r) {
+    for (let c = 0; c < 16; c++) {
+      const i = r * 7 + c * 3;
+      const d = cfg.size;
+      const x = cfg.x0 + c * cfg.step - d / 2;
+      const y = cy - d / 2;
+      s.addShape(WALL_GLYPHS[i % WALL_GLYPHS.length], {
+        x, y, w: d, h: d, fill: { color: ICON_GREEN }, line: NOLINE,
+      });
+      if (i % 2 === 0) {
+        s.addShape(WALL_HOLLOW[i % WALL_HOLLOW.length], {
+          x: x + d * 0.28, y: y + d * 0.28, w: d * 0.44, h: d * 0.44,
+          fill: { color: WHITE }, line: NOLINE,
+        });
+      }
+    }
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Composite blocks shared by several slides
+ * ------------------------------------------------------------------ */
+
+/** Cover lock-up: kicker / name / rule / role / url. */
+function coverLockup(s, top) {
+  text(s, 'PROFESSIONAL RESUME', {
+    x: 3.471 + top.dx, y: top.y, w: 3.08, h: 0.252,
+    fontSize: 9, charSpacing: 5.25, color: WHITE, align: 'center',
+  });
+  text(s, 'MOSCOV RIDER', {
+    x: 3.452 + top.dx, y: top.y + 0.121, w: 3.117, h: 0.555,
+    fontFace: HEAD, fontSize: 27, bold: true, color: GREEN, align: 'center',
+  });
+  rect(s, 4.563 + top.dx, top.y + 0.732, 0.895, 0.081, WHITE);
+  text(s, 'WEB DEVELOPER', {
+    x: 3.471 + top.dx, y: top.y + 0.933, w: 3.08, h: 0.252,
+    fontSize: 9, bold: true, charSpacing: 2.25, color: WHITE, align: 'center',
+  });
+  text(s, URL, {
+    x: 3.851 + top.dx, y: top.urlY, w: 2.313, h: 0.252,
+    fontSize: 9, charSpacing: 2.25, color: GRAY, align: 'center',
+  });
+}
+
+/** The "DAILY QUOTE" stack of slides 3 & 4. */
+function quoteBlock(s, cfg) {
+  text(s, '\u201C', {
+    x: cfg.markX, y: cfg.markY, w: 1.592, h: 2.196,
+    fontFace: HEAD, fontSize: 124.5, bold: true, color: WHITE, align: cfg.markAlign,
+  });
+  centeredTitle(s, {
+    kicker: 'QUOTE OF THE DAY', kickerY: cfg.y, kickerX: 3.46,
+    title: 'DAILY QUOTE', titleX: 3.441, titleW: 3.117, titleY: cfg.y + 0.139,
+    titleH: 0.555, titleSize: 27, ruleY: cfg.ruleY,
+  });
+  text(s, paragraphs([QUOTE_RUNS.map(function (t, i) { return [t, { bold: i % 2 === 1 }]; })]), {
+    x: 2.484, y: cfg.quoteY, w: 5.031, h: 1.237,
+    fontSize: 15, charSpacing: 2.25, color: WHITE, align: 'center', lineSpacingMultiple: 1.5,
+  });
+}
+
+/** Six labelled contact rows with their pictograms. */
+const CONTACT_ROWS = [
+  ['person', 'MOSCOV RIDER'],
+  ['card', 'August 29th 2018'],
+  ['mail', 'moscovrider@email.com'],
+  ['phone', '1-800-000-0000'],
+  ['pin', '23 Green Avenue Apartment No 455 Brooklyn New-York'],
+  ['globe', URL],
+];
+function contactList(s, cfg) {
+  const yText = [0, 0.371, 0.75, 1.12, 1.465, 1.844];
+  const yIcon = [0.058, 0.462, 0.858, 1.186, 1.52, 1.918];
+  const iconSize = [[0.163, 0.214], [0.207, 0.163], [0.172, 0.127], [0.11, 0.196], [0.17, 0.214], [0.184, 0.183]];
+  CONTACT_ROWS.forEach(function (row, i) {
+    glyph(s, row[0], cfg.iconX, cfg.y + yIcon[i], iconSize[i][0], iconSize[i][1], GREEN, cfg.bg);
+    text(s, row[1], {
+      x: cfg.textX, y: cfg.y + yText[i], w: i === 4 ? 3.594 : 3.047, h: 0.309,
+      fontSize: 8.25, color: cfg.color, lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+/** One education / experience entry: icon, heading, sub-line, paragraph. */
+function entry(s, cfg) {
+  if (cfg.icon) glyph(s, cfg.icon, cfg.iconX, cfg.iconY, cfg.iconW, cfg.iconH, GREEN, cfg.iconBg);
+  text(s, cfg.title, {
+    x: cfg.x, y: cfg.y, w: 2.44, h: 0.252,
+    fontFace: HEAD, fontSize: 9, bold: true, color: cfg.titleColor || GREEN, align: cfg.align,
+  });
+  if (cfg.sub) {
+    text(s, paragraphs([cfg.sub]), {
+      x: cfg.subX !== undefined ? cfg.subX : cfg.x, y: cfg.subY, w: 2.44, h: 0.24,
+      fontFace: HEAD, fontSize: cfg.subSize || 8.25, color: cfg.subColor || DARK, align: cfg.align,
+    });
+  }
+  if (cfg.years) {
+    text(s, paragraphs([[[cfg.years, { italic: true }]]]), {
+      x: cfg.x, y: cfg.yearsY, w: 2.44, h: 0.24,
+      fontFace: HEAD, fontSize: 8.25, color: cfg.yearsColor || DARK, align: cfg.align,
+    });
+  }
+  bodyCopy(s, cfg.bodyX !== undefined ? cfg.bodyX : cfg.x, cfg.bodyY, 3.181, 0.726,
+    [cfg.body], { color: cfg.bodyColor || GRAY, align: cfg.align });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+
+function slide01(s) {                                   // cover, dark panel
+  rect(s, 0, 0, 10, 4.003, DARK);
+  coverLockup(s, { dx: 0, y: 1.225, urlY: 4.842 });
+  photoCircle(s, 4.278, 3.282, 1.443);
+}
+
+function slide02(s) {                                   // cover, photo panel
+  photo(s, 0, 0, 10, 4.581);
+  rect(s, 0, -0.001, 10, 4.581, DARK, { fill: { color: DARK, transparency: 50 } });
+  coverLockup(s, { dx: -0.011, y: 1.578, urlY: 4.807 });
+}
+
+function slide03(s) {                                   // quote, dark band
+  rect(s, 0, 0.811, 10, 4.003, DARK);
+  quoteBlock(s, { markX: 0.685, markY: 0.225, markAlign: 'left', y: 1.488, ruleY: 2.274, quoteY: 2.643 });
+}
+
+function slide04(s) {                                   // quote, full photo
+  photo(s, 0, 0, 10, 5.625);
+  rect(s, 0.116, 0.136, 9.77, 5.384, DARK, { fill: { color: DARK, transparency: 50 } });
+  quoteBlock(s, { markX: 4.214, markY: -0.014, markAlign: 'center', y: 1.965, ruleY: 2.733, quoteY: 3.234 });
+}
+
+function slide05(s) {                                   // introduction, dark
+  rect(s, 2.639, 0.811, 7.361, 4.003, DARK);
+  photo(s, 0, 0.811, 2.639, 4.003);
+  sectionTitle(s, 3.3, 1.355, 2.196, 'INTRODUCTION');
+  glyph(s, 'card', 3.225, 1.914, 0.241, 0.19, WHITE, DARK);
+  text(s, 'LET ME INTRODUCE MYSELF', {
+    x: 3.484, y: 1.903, w: 2.44, h: 0.252, fontFace: HEAD, fontSize: 9, bold: true, color: WHITE,
+  });
+  bodyCopy(s, 3.143, 2.223, 6.002, 1.351, [
+    [['My Name Is '], ['MOSCOV RIDER ', { bold: true }],
+      ['PLACEHOLDER' +
+        'PLACEHOLDER' +
+        'sollicitudin tempor id eu nisl nunc mi.']],
+    ' ',
+    LOREM_EGET,
+  ], { color: WHITE });
+  photo(s, 3.235, 3.591, 1.17, 0.512);
+  text(s, 'MOSCOV RIDER', {
+    x: 3.313, y: 4.106, w: 1.014, h: 0.227,
+    fontFace: HEAD, fontSize: 7.5, bold: true, color: WHITE, align: 'center',
+  });
+}
+
+function slide06(s) {                                   // introduction, light
+  photo(s, 5, 0, 5, 5.625);
+  sectionTitle(s, 0.952, 0.763, 2.196, 'INTRODUCTION');
+  glyph(s, 'card', 0.831, 1.478, 0.241, 0.19, DARK, WHITE);
+  text(s, 'LET ME INTRODUCE MYSELF', {
+    x: 1.072, y: 1.468, w: 2.44, h: 0.252, fontFace: HEAD, fontSize: 9, bold: true, color: DARK,
+  });
+  bodyCopy(s, 0.794, 1.819, 3.814, 2.184, [
+    [['My name is '], ['MOSCOV RIDER', { bold: true, color: DARK }],
+      ['PLACEHOLDER' +
+        'PLACEHOLDER' +
+        'PLACEHOLDER' +
+        'risus nullam']],
+    ' ',
+    LOREM_EGET + ' fames ac.',
+  ]);
+  photo(s, 0.876, 4.075, 1.17, 0.512);
+  text(s, 'MOSCOV RIDER', {
+    x: 0.876, y: 4.58, w: 1.17, h: 0.227,
+    fontFace: HEAD, fontSize: 7.5, bold: true, color: DARK, align: 'center',
+  });
+}
+
+function slide07(s) {                                   // about me, light
+  photo(s, 0, 0, 4.409, 5.625);
+  sectionTitle(s, 5.678, 0.763, 2.196, 'ABOUT ME');
+  text(s, 'DETAILS INFORMATION', {
+    x: 5.52, y: 1.468, w: 2.44, h: 0.252, fontFace: HEAD, fontSize: 9, bold: true, color: DARK,
+  });
+  contactList(s, { iconX: 5.6, textX: 5.99, y: 2.228, color: DARK, bg: WHITE });
+}
+
+function slide08(s) {                                   // about me, dark
+  rect(s, 1.455, 0, 8.545, 5.625, DARK);
+  photoCircle(s, 0.277, 2.232, 2.359);
+  text(s, paragraphs(QUOTE_TITLE), {
+    x: 0.781, y: 0.549, w: 2.496, h: 1.111, fontFace: HEAD, fontSize: 15, bold: true, color: GREEN,
+  });
+  sectionTitle(s, 3.878, 1.157, 2.196, 'ABOUT ME');
+  text(s, 'DETAILS INFORMATION', {
+    x: 3.72, y: 1.609, w: 2.44, h: 0.252, fontFace: HEAD, fontSize: 9, bold: true, color: WHITE,
+  });
+  contactList(s, { iconX: 3.82, textX: 4.262, y: 2.447, color: WHITE, bg: DARK });
+}
+
+function slide09(s) {                                   // education, four entries
+  sectionTitle(s, 0.932, 0.763, 2.196, 'EDUCATION');
+  bodyCopy(s, 0.782, 1.261, 8.356, 0.726, [LOREM_LEO + ' ' + LOREM_EGET + ' fames ac.']);
+  const cols = [
+    { x: 1.231, x2: 1.22, iconX: 0.881, iconX2: 0.858 },
+    { x: 5.967, x2: 5.957, iconX: 5.617, iconX2: 5.597 },
+  ];
+  const top = [
+    { title: 'NEW YORK JUNIOR HIGH SCHOOL', years: 'Year of 2013' },
+    { title: 'NEW YORK SENIOR HIGH SCHOOL', years: 'Year of 2015' },
+  ];
+  const bottom = [
+    { title: 'UNIVERSITY OF INDONESIE', sub: [['IT:', { bold: true }], [' Year of 2016', { italic: true }]] },
+    { title: 'UNIVERSITY OF INDONESIE', sub: [['MANAGEMENT:', { bold: true }], [' Year of 2018', { italic: true }]] },
+  ];
+  cols.forEach(function (col, i) {
+    entry(s, Object.assign({
+      x: col.x, y: 2.356, yearsY: 2.539, bodyY: 2.813, body: LOREM_LEO,
+      icon: 'cap', iconX: col.iconX, iconY: 2.413, iconW: 0.187, iconH: 0.151,
+    }, top[i]));
+    entry(s, Object.assign({
+      x: col.x2, y: 3.825, subY: 4.008, bodyY: 4.281, body: LOREM_LEO,
+      icon: i === 0 ? 'monitor' : 'people', iconX: col.iconX2, iconY: 3.87,
+      iconW: i === 0 ? 0.174 : 0.256, iconH: i === 0 ? 0.161 : 0.145,
+    }, bottom[i]));
+  });
+}
+
+function slide10(s) {                                   // education, photo banner
+  photo(s, 0, 0, 10, 2.812);
+  rect(s, 0.01, -0.01, 10, 2.812, DARK, { fill: { color: DARK, transparency: 50 } });
+  centeredTitle(s, {
+    kicker: 'BACKGROUND', kickerY: 0.812, kickerX: 3.79,
+    title: 'EDUCATION', titleX: 3.902, titleW: 2.196, titleY: 0.943, ruleY: 1.331,
+  });
+  bodyCopy(s, 2.017, 1.545, 5.966, 0.518, [LOREM_LEO], { color: WHITE, align: 'center' });
+  entry(s, {
+    x: 1.22, y: 3.64, years: 'Year of 2013', yearsY: 3.823, bodyY: 4.097, body: LOREM_LEO,
+    title: 'NEW YORK SENIOR HIGH SCHOOL',
+    icon: 'cap', iconX: 0.871, iconY: 3.732, iconW: 0.211, iconH: 0.17,
+  });
+  entry(s, {
+    x: 5.967, y: 3.64, years: 'Year of 2015', yearsY: 3.823, bodyY: 4.097, body: LOREM_LEO,
+    title: 'INFORMATION TECHNOLOGY',
+    icon: 'monitor', iconX: 5.605, iconY: 3.746, iconW: 0.208, iconH: 0.192,
+  });
+}
+
+/** Shared 2x2 job grid of slides 11 & 12. */
+function experienceGrid(s, cfg) {
+  cfg.jobs.forEach(function (job) {
+    text(s, job.company, {
+      x: job.x, y: job.y, w: 2.44, h: 0.252,
+      fontFace: HEAD, fontSize: 9, bold: true, color: cfg.companyColor,
+    });
+    text(s, job.role, {
+      x: job.roleX, y: job.y + 0.183, w: 2.44, h: 0.227,
+      fontFace: HEAD, fontSize: job.roleSize, bold: true, color: cfg.textColor,
+    });
+    text(s, paragraphs([[[job.years, { italic: true }]]]), {
+      x: job.x, y: job.yearsY, w: 2.44, h: 0.24, fontFace: HEAD, fontSize: 8.25, color: cfg.textColor,
+    });
+    bodyCopy(s, job.x, job.bodyY, 3.181, 0.726, [LOREM_PORTA], { color: cfg.bodyColor });
+  });
+}
+
+function slide11(s) {                                   // working experience, light
+  photo(s, 0, 0, 10, 1.634);
+  rect(s, 0, -0.009, 10, 1.634, DARK, { fill: { color: DARK, transparency: 50 } });
+  sectionTitle(s, 0.932, 0.763, 3.264, 'WORKING EXPERIENCE');
+  bodyCopy(s, 5.715, 0.623, 3.181, 0.726, [LOREM_PORTA], { color: WHITE });
+  experienceGrid(s, {
+    companyColor: DARK, textColor: DARK, bodyColor: GRAY,
+    jobs: [
+      { x: 1.388, roleX: 1.388, y: 2.044, yearsY: 2.373, bodyY: 2.595, company: 'COMPANY NAME', role: 'Designer', roleSize: 7.5, years: '2013-2016' },
+      { x: 6.096, roleX: 6.096, y: 2.044, yearsY: 2.373, bodyY: 2.595, company: 'COMPANY NAME', role: 'Senior Designer', roleSize: 6.75, years: '2016-2017' },
+      { x: 1.388, roleX: 1.388, y: 3.701, yearsY: 4.03, bodyY: 4.251, company: 'COMPANY NAME', role: 'Art Director', roleSize: 7.5, years: '2017-2017' },
+      { x: 6.096, roleX: 6.096, y: 3.701, yearsY: 4.03, bodyY: 4.251, company: 'COMPANY NAME', role: 'Managing Director', roleSize: 6.75, years: '2017-Present' },
+    ],
+  });
+}
+
+function slide12(s) {                                   // working experience, full photo
+  photo(s, 0, 0, 10, 5.625);
+  rect(s, 0, 0, 10, 5.625, DARK, { fill: { color: DARK, transparency: 50 } });
+  sectionTitle(s, 0.932, 0.763, 3.264, 'WORKING EXPERIENCE');
+  bodyCopy(s, 5.715, 0.623, 3.181, 0.726, [LOREM_PORTA], { color: WHITE });
+  experienceGrid(s, {
+    companyColor: GREEN, textColor: WHITE, bodyColor: WHITE,
+    jobs: [
+      { x: 1.388, roleX: 1.388, y: 2.065, yearsY: 2.35, bodyY: 2.522, company: 'COMPANY NAME', role: 'Designer', roleSize: 7.5, years: '2013-2016' },
+      { x: 6.096, roleX: 6.096, y: 2.065, yearsY: 2.35, bodyY: 2.522, company: 'COMPANY NAME', role: 'Senior Designer', roleSize: 6.75, years: '2013-2016' },
+      { x: 1.378, roleX: 1.388, y: 3.71, yearsY: 4.008, bodyY: 4.281, company: 'COMPANY NAME', role: 'Art Director', roleSize: 7.5, years: '2016-2017' },
+      { x: 6.086, roleX: 6.096, y: 3.71, yearsY: 4.008, bodyY: 4.281, company: 'COMPANY NAME', role: 'Managing Director', roleSize: 6.75, years: '2017-2018' },
+    ],
+  });
+}
+
+/** Dashed spine of the vertical timeline slides. */
+function timelineSpine(s, y, h) {
+  s.addShape('line', { x: 5, y, w: 0, h, line: { color: DARK, width: 1, dashType: 'sysDash' } });
+}
+
+/** One timeline row: year, company, paragraph -- flush left or right of the spine. */
+function timelineItem(s, item) {
+  const right = item.side === 'right';
+  const align = right ? 'left' : 'right';
+  text(s, item.year, {
+    x: right ? 5.677 : 3.285, y: item.y, w: 1.051, h: 0.353,
+    fontFace: HEAD, fontSize: 15, bold: true, color: GREEN, align: align,
+  });
+  text(s, 'COMPANY NAME', {
+    x: right ? 5.672 : 1.895, y: item.y + 0.25, w: 2.44, h: 0.252,
+    fontFace: HEAD, fontSize: 9, bold: true, color: DARK, align: align,
+  });
+  bodyCopy(s, right ? 5.677 : 1.155, item.y + 0.477, 3.181, 0.726, [LOREM_PORTA], { align: align });
+}
+
+function slide13(s) {                                   // journey, "Let's Start"
+  rect(s, 0, -0.003, 10.025, 2.695, DARK);
+  centeredTitle(s, { kicker: 'EXPERIENCE', kickerY: 0.821, title: 'JOURNEY', titleY: 0.936, ruleY: 1.331 });
+  timelineSpine(s, 4.135, 2.078);
+  milestone(s, 4.659, 3.418, 0.682, 'megaphone');
+  timelineItem(s, { side: 'right', y: 3.384, year: '2013' });
+  text(s, paragraphs([[['Let\u2019s ', { color: DARK }], ['Start', { bold: true, color: GREEN }]]]), {
+    x: 0.648, y: 3.713, w: 1.412, h: 1.01, fontFace: HEAD, fontSize: 27,
+  });
+  s.addShape('swooshArrow', { x: 2.218, y: 3.719, w: 1.541, h: 1.473, fill: { color: DARK }, line: NOLINE });
+}
+
+function slide14(s) {                                   // journey, three milestones
+  timelineSpine(s, 0.004, 5.746);
+  [['gear', 0.793], ['trophy', 2.388], ['share', 3.829]].forEach(function (m) {
+    milestone(s, 4.653, m[1], 0.681, m[0]);
+  });
+  timelineItem(s, { side: 'right', y: 0.793, year: '2015' });
+  timelineItem(s, { side: 'left', y: 2.337, year: '2016' });
+  timelineItem(s, { side: 'right', y: 3.829, year: '2017' });
+}
+
+function slide15(s) {                                   // journey, mirrored
+  timelineSpine(s, 0.004, 5.746);
+  [['disk', 0.793], ['clip', 2.388], ['chart', 3.829]].forEach(function (m) {
+    milestone(s, 4.653, m[1], 0.681, m[0]);
+  });
+  timelineItem(s, { side: 'left', y: 0.789, year: '2016' });
+  timelineItem(s, { side: 'right', y: 2.336, year: '2015' });
+  timelineItem(s, { side: 'left', y: 3.829, year: '2016' });
+}
+
+const CARD_X = [0.476, 3.521, 6.567];
+
+function journeyCardPhotos(s) {
+  CARD_X.forEach(function (x) { photo(s, x, 2.996, 2.964, 1.562); });
+}
+
+/** Tint, green caption strip and copy of the three journey cards (slides 16 & 17). */
+function journeyCardChrome(s, cfg) {
+  CARD_X.forEach(function (x, i) {
+    s.addShape('rect', {
+      x: x + (cfg.outlined ? 0.006 : 0), y: 2.996, w: 2.964, h: 1.562,
+      fill: { color: DARK, transparency: 50 },
+      line: cfg.outlined ? { color: WHITE, width: 2 } : NOLINE,
+    });
+    s.addShape('rect', {
+      x, y: 4.555, w: 2.964, h: 0.587,
+      fill: { color: GREEN }, line: cfg.outlined ? { color: WHITE, width: 1 } : NOLINE,
+    });
+    text(s, cfg.years[i], {
+      x: x + 0.087, y: 3.905, w: 1.051, h: 0.353,
+      fontFace: HEAD, fontSize: 15, bold: true, color: WHITE,
+    });
+    text(s, 'COMPANY NAME', {
+      x: x + 0.082, y: 4.154, w: 2.44, h: 0.252,
+      fontFace: HEAD, fontSize: 9, bold: true, color: WHITE,
+    });
+    bodyCopy(s, x + 0.087, 4.591, 2.877, 0.518, [LOREM_TINCI], { color: WHITE });
+  });
+}
+
+function slide16(s) {                                   // journey cards, dark band
+  rect(s, 0, -0.095, 10.025, 3.965, DARK);
+  journeyCardPhotos(s);
+  journeyCardChrome(s, { years: ['2016', '2017', '2018'], outlined: false });
+  centeredTitle(s, { kicker: 'EXPERIENCE', kickerY: 0.821, title: 'JOURNEY', titleY: 0.936, ruleY: 1.331 });
+  milestone(s, 4.659, 1.681, 0.682, 'megaphone');
+}
+
+function slide17(s) {                                   // journey cards, full photo
+  photo(s, 0, 0, 10, 3.962);
+  journeyCardPhotos(s);
+  rect(s, 0, -0.004, 10, 3.962, DARK, { fill: { color: DARK, transparency: 50 } });
+  journeyCardChrome(s, { years: ['2017', '2018', '2019'], outlined: true });
+  centeredTitle(s, { kicker: 'EXPERIENCE', kickerY: 0.821, title: 'JOURNEY', titleY: 0.936, ruleY: 1.331 });
+  milestone(s, 4.659, 1.681, 0.682, 'megaphone');
+}
+
+const SKILL_ROWS = [['Photoshop', 7], ['Illustrator', 8], ['InDesign', 7], ['After Effects', 9]];
+const LEVEL_ROWS = [['Leadership', 7], ['Team Player', 8], ['Creative', 7], ['Decision Making', 9]];
+
+function slide18(s) {                                   // professional skill, diagonal panel
+  s.addShape('custGeom', {
+    x: 0, y: -0.003, w: 5.041, h: 5.628, fill: { color: DARK }, line: NOLINE,
+    points: [{ x: 0, y: 0 }, { x: 5.041, y: 0 }, { x: 0.886, y: 5.628 }, { x: 0, y: 5.628 }, { close: true }],
+  });
+  photoCircle(s, 1.05, 1.321, 2.996);
+  sectionTitle(s, 5.074, 1.517, 3.264, 'PROFESSIONAL SKILL');
+  skillBlock(s, {
+    heading: ['SKILLS', ' LEVEL'], headingY: 2.488, dotX: 5.786,
+    rows: SKILL_ROWS, rowY: [2.828, 3.077, 3.346, 3.602],
+  });
+}
+
+function slide19(s) {                                   // professional skill + level
+  rect(s, 0, -0.003, 4.249, 5.628, DARK);
+  photoCircle(s, 1.154, 0.873, 1.94);
+  sectionTitle(s, 5.074, 1.177, 3.264, 'PROFESSIONAL SKILL');
+  skillBlock(s, {
+    heading: ['SKILLS', ' LEVEL'], headingY: 1.869, dotX: 6.07,
+    rows: SKILL_ROWS, rowY: [2.134, 2.383, 2.652, 2.908],
+  });
+  skillBlock(s, {
+    heading: ['PROFESSIONAL ', 'LEVEL'], headingY: 3.408, dotX: 6.07,
+    rows: LEVEL_ROWS, rowY: [3.674, 3.922, 4.191, 4.447],
+  });
+  bodyCopy(s, 0.709, 3.548, 2.831, 0.934, [LOREM_LEO], { color: WHITE, align: 'center' });
+}
+
+const PROJECT_META = [
+  [['FASHION ', { bold: true }], ['PHOTOSHOOT']],
+  [['PHOTO: ', { bold: true }], ['OLLIE O BRIAN']],
+  [['MODEL: ', { bold: true }], ['KEANU HARRIS']],
+  [['TOOL: ', { bold: true }], ['CANON 5D MARK II']],
+];
+function featureProject(s, cfg) {
+  sectionTitle(s, 0.932, 0.763, 3.264, 'FEATURE PROJECT');
+  photo(s, cfg.photoX, 1.406, 5, 2.812);
+  text(s, paragraphs(PROJECT_META), {
+    x: cfg.x, y: cfg.metaY, w: 2.303, h: 0.783,
+    fontSize: 6.75, color: DARK, align: 'justify', lineSpacingMultiple: 1.5,
+  });
+  text(s, 'FASHION SUPERMODEL', {
+    x: cfg.x, y: cfg.metaY + 1.023, w: 2.44, h: 0.252,
+    fontFace: cfg.headFont, fontSize: 9, bold: true, color: DARK,
+  });
+  bodyCopy(s, cfg.x, cfg.metaY + 1.25, 3.181, 0.726, [LOREM_LEO]);
+}
+
+function slide20(s) { featureProject(s, { photoX: 5, x: 0.777, metaY: 2.133, headFont: HEAD }); }
+function slide21(s) { featureProject(s, { photoX: 0, x: 5.518, metaY: 2.055, headFont: BODY }); }
+
+function slide22(s) {                                   // clients, centred
+  centeredTitle(s, {
+    kicker: 'AWESOME CLIENTS', kickerY: 0.821, kickerColor: DARK,
+    title: 'CLIENTS', titleY: 0.936, ruleY: 1.331, ruleColor: DARK,
+  });
+  bodyCopy(s, 1.164, 1.644, 7.681, 0.518, [LOREM_LEO + ' '], { align: 'center' });
+  [1.637, 3.011, 4.386, 5.76, 7.135].forEach(function (x) { photo(s, x, 2.722, 1.228, 0.573); });
+  [2.314, 3.689, 5.064, 6.438].forEach(function (x) { photo(s, x, 4.068, 1.228, 0.573); });
+}
+
+function slide23(s) {                                   // clients, left aligned
+  text(s, 'AWESOME CLIENTS', {
+    x: 1.085, y: 0.895, w: 2.44, h: 0.24, fontSize: 8.25, charSpacing: 2.25, color: DARK,
+  });
+  sectionTitle(s, 1.076, 1.01, 2.314, 'CLIENTS');
+  bodyCopy(s, 5.774, 3.734, 3.063, 0.934, [LOREM_LEO + ' '], { align: 'right' });
+  [[1.158, 2.234], [2.532, 2.234], [3.907, 2.234], [5.282, 2.234],
+   [1.162, 3.097], [2.532, 3.097], [3.908, 3.097],
+   [1.158, 3.959], [2.532, 3.959]].forEach(function (p) { photo(s, p[0], p[1], 1.228, 0.573); });
+}
+
+function slide24(s) {                                   // portfolio, four numbered tiles
+  [[0, 2.495], [2.495, 2.495], [4.989, 2.505], [7.495, 2.505]].forEach(function (c) {
+    photo(s, c[0], 3.339, c[1], 2.286);
+  });
+  centeredTitle(s, {
+    kicker: 'AWESOME WORK', kickerX: 3.782, kickerY: 0.821, kickerColor: DARK,
+    title: 'PORTFOLIO', titleX: 3.835, titleY: 0.936, ruleX: 4.545, ruleY: 1.331, ruleColor: DARK,
+  });
+  bodyCopy(s, 1.164, 1.644, 7.681, 1.351, [LOREM_LEO + ' ' + LOREM_LEO, ' ', LOREM_LEO], { align: 'center' });
+  const tiles = [
+    { overlay: -0.008, x: 0.251, n: '01.' },
+    { overlay: 2.491, x: 2.742, n: '02.' },
+    { overlay: 4.982, x: 5.243, n: '03.' },
+    { overlay: 7.469, x: 7.74, n: '04.' },
+  ];
+  tiles.forEach(function (t) {
+    s.addShape('rect', {
+      x: t.overlay, y: 3.339, w: 2.503, h: 2.286,
+      fill: { color: GREEN, transparency: 30 }, line: NOLINE,
+    });
+    text(s, t.n, {
+      x: t.x - 0.005, y: 3.71, w: 1.353, h: 0.858,
+      fontFace: HEAD, fontSize: 45, bold: true, color: WHITE,
+    });
+    text(s, paragraphs([[['PROJECT'], [' NAME']]]), {
+      x: t.x, y: 4.482, w: 1.875, h: 0.252, fontFace: HEAD, fontSize: 9, bold: true, color: WHITE,
+    });
+    bodyCopy(s, t.x, 4.734, 1.695, 0.726, [LOREM_TINCI], { color: WHITE });
+  });
+}
+
+/** Portfolio wall: eight photo tiles with a white title band between them. */
+function portfolioWall(s, cfg) {
+  const cols = [[0, 2.495], [2.495, 2.495], [4.989, 2.505], [7.495, 2.505]];
+  [cfg.topY, 3.339].forEach(function (y) {
+    cols.forEach(function (c) { photo(s, c[0], y, c[1], 2.286); });
+  });
+  centeredTitle(s, {
+    kicker: 'AWESOME WORK', kickerX: cfg.kickerX, kickerY: cfg.kickerY, kickerColor: DARK,
+    title: 'PORTFOLIO', titleX: 3.835, titleY: cfg.kickerY + 0.115,
+    ruleX: cfg.ruleX, ruleY: cfg.kickerY + 0.51, ruleColor: DARK,
+  });
+}
+
+function slide25(s) { portfolioWall(s, { topY: 0, kickerX: 3.782, kickerY: 2.517, ruleX: 4.545 }); }
+function slide26(s) { portfolioWall(s, { topY: 1.052, kickerX: 3.79, kickerY: 0.259, ruleX: 4.553 }); }
+
+const SOCIAL_ROWS = [
+  ['ellipse', 'f', URL],
+  ['roundRect', '\u25CE', '@moscovrider'],
+  ['rect', 'in', URL],
+  ['rect', 'B\u0113', URL],
+  ['ellipse', 'P', URL],
+];
+
+function slide27(s) {                                   // get social, upright phone
+  rect(s, 0, -0.003, 3.571, 5.628, DARK);
+  phoneMock(s,
+    { x: 2.464, y: 0.446, w: 2.286, h: 4.741 },
+    { x: 2.579, y: 0.982, w: 2.04, h: 3.647 });
+  text(s, paragraphs(QUOTE_TITLE), {
+    x: 0.407, y: 1.333, w: 1.835, h: 3.282, fontFace: HEAD, fontSize: 21, bold: true, color: GREEN,
+  });
+  sectionTitle(s, 5.348, 1.049, 3.264, 'GET SOCIAL');
+  bodyCopy(s, 5.187, 1.82, 4.289, 0.726, [LOREM_LEO + ' ']);
+  const iconY = [2.832, 3.258, 3.642, 4.068, 4.434];
+  const textY = [2.817, 3.253, 3.615, 4.043, 4.411];
+  SOCIAL_ROWS.forEach(function (row, i) {
+    socialBadge(s, row[0], 5.28, iconY[i], i === 0 ? 0.293 : 0.26, row[1]);
+    text(s, row[2], { x: 5.611, y: textY[i], w: 3.047, h: 0.309, fontSize: 8.25, color: DARK, lineSpacingMultiple: 1.5 });
+  });
+}
+
+function slide28(s) {                                   // get social, tilted phones
+  [[-0.586, -1.469, -0.467, -0.916], [0.68, 1.641, 0.799, 2.193], [4.758, -1.711, 4.877, -1.158]]
+    .forEach(function (p) {
+      phoneMock(s,
+        { x: p[0], y: p[1], w: 2.351, h: 4.875, rotate: 49.8 },
+        { x: p[2], y: p[3], w: 2.098, h: 3.75, rotate: 49.8 });
+    });
+  sectionTitle(s, 6.606, 2.776, 3.264, 'GET SOCIAL');
+  const iconY = [3.485, 3.814, 4.149, 4.494, 4.842];
+  const textY = [3.468, 3.807, 4.138, 4.485, 4.815];
+  SOCIAL_ROWS.forEach(function (row, i) {
+    socialBadge(s, row[0], 6.533, iconY[i], 0.25, row[1]);
+    text(s, row[2], { x: 6.823, y: textY[i], w: 1.887, h: 0.309, fontSize: 8.25, color: DARK, lineSpacingMultiple: 1.5 });
+  });
+}
+
+function slide29(s) {                                   // thank you, photo banner
+  photo(s, 0, 0, 10, 2.281);
+  centeredTitle(s, {
+    kicker: 'FOR YOUR TIME', kickerY: 3.181, kickerColor: DARK,
+    title: 'THANK YOU', titleY: 3.304, ruleY: 3.699, ruleColor: DARK,
+  });
+  bodyCopy(s, 1.164, 4.16, 7.681, 0.518, [LOREM_LEO + ' '], { align: 'center' });
+}
+
+function slide30(s) {                                   // thank you, full photo
+  photo(s, 0, 0, 10, 5.625);
+  text(s, 'FOR YOUR TIME', {
+    x: 1.08, y: 2.754, w: 2.44, h: 0.24, fontSize: 8.25, charSpacing: 2.25, color: DARK,
+  });
+  text(s, 'THANK YOU', {
+    x: 1.073, y: 2.844, w: 4.381, h: 0.858, fontFace: HEAD, fontSize: 45, bold: true, color: GREEN,
+  });
+  bodyCopy(s, 1.08, 3.685, 4.289, 0.726, [LOREM_LEO + ' ']);
+}
+
+function slide31(s) { iconWall(s, { x0: 0.428, step: 0.6093, size: 0.24, rowY: [0.582, 1.454, 2.331, 3.237, 4.131, 5.030] }); }
+function slide32(s) { iconWall(s, { x0: 0.470, step: 0.6027, size: 0.22, rowY: [0.564, 1.455, 2.374, 3.273, 4.152, 5.037] }); }
+function slide33(s) { iconWall(s, { x0: 0.580, step: 0.5890, size: 0.24, rowY: [0.659, 1.549, 2.429, 3.297, 4.144, 4.990] }); }
+function slide34(s) { iconWall(s, { x0: 0.525, step: 0.5966, size: 0.26, rowY: [0.732, 1.568, 2.424, 3.236, 4.045, 4.926] }); }
+
+const SLIDES = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09,
+  slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19,
+  slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29,
+  slide30, slide31, slide32, slide33, slide34];
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+function build() {
+  const pres = new PptxGenJS();
+  pres.defineLayout({ name: 'RESUME_16x9', width: 10, height: 5.625 });
+  pres.layout = 'RESUME_16x9';
+  pres.title = 'MOSCOV RIDER - Professional Resume';
+  pres.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+
+  SLIDES.forEach(function (fn) {
+    const slide = pres.addSlide();
+    slide.background = { color: WHITE };
+    fn(slide);
+  });
+
+  return pres.writeFile({
+    fileName: path.join(__dirname, '051ed4c9-f5d5-4c54-9656-79b3064faff7_grok_final.pptx'),
+  });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }, function (e) { console.error(e); process.exit(1); });

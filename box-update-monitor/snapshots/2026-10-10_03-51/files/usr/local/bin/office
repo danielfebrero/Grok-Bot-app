@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec /opt/sand/sand-host/officekit-ts/bin/office "$@"

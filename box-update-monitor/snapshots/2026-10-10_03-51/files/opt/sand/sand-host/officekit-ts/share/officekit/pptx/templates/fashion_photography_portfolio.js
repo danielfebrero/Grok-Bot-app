@@ -1,0 +1,796 @@
+/*
+ * Evelyn - Fashion & Photography presentation template (30 slides, 13.333 x 7.5 in)
+ * Rebuilt from scratch with pptxgenjs.  Photographs in the original deck are
+ * replaced by flat "[image]" placeholder boxes that keep the original geometry.
+ *
+ *   node <this file>   ->  writes the .pptx next to the script
+ */
+'use strict';
+
+const pptxgen = require('pptxgenjs');
+const path = require('path');
+
+const OUT_FILE = path.join(__dirname, '02119eb3-77ec-43c6-ae0d-59f1529b0228_grok_final.pptx');
+
+/* ------------------------------------------------------------------ theme */
+const YELLOW = 'FEC52B';   // accent1
+const YELLOW2 = 'FEDC7F';  // accent2
+const YELLOW3 = 'FEE7AA';  // accent3
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const GREY = 'D9D9D9';     // track / map grey
+const MIDGREY = '808080';  // second chart series
+const AXIS = '595959';     // chart tick labels
+const PHOTO = '383838';    // image placeholder box
+const SCREEN = '292A2E';   // darker placeholder used inside the device mock-ups
+const STAR = 'FFC000';
+
+const SERIF = 'DM Serif Display';  // major (headings)
+const SANS = 'Raleway';            // minor (body)
+const UI = 'Poppins';              // baked into the original placeholder bitmaps
+
+/* ------------------------------------------------- recurring template copy */
+const EU_A = "The European languages are members of the same family. Their separate existence is a myth.";
+const EU_B = EU_A + " For science, music, sport, etc, Europe uses the same vocabulary.";
+const EU_C = EU_B + " The languages only differ in their grammar, their pronunciation";
+const EU_D = EU_C + " and their most common words.";
+const EU_E = EU_D + " Everyone realizes why a new common language would be desirable: one could refuse to pay expensive";
+const LOREM = "Lorem ipsum dolor sit amet, consectetuer adipiscing elit.";
+const LOREM2 = LOREM + " Maecenas porttitor congue";
+const LOREM3 = LOREM2 + " massa. Fusce posuere, magna sed";
+const SEREN = "A wonderful serenity has taken possession of my entire soul, like";
+const SEREN2 = SEREN + " these sweet mornings of";
+const SEREN3 = SEREN2 + " spring which I enjoy";
+const SUITABLE = "Suitable for all categories business and personal presentation.";
+const VISION = "The European languages are members of the same family. Their separate existence from us.";
+
+/* ---------------------------------------------------------------- helpers */
+
+// Flat stand-in for a photo: dark panel + centred caption, like the template's
+// own "INSERT IMAGE" placeholder bitmaps.
+// `dy` nudges the caption off-centre, matching where it sat in the cropped bitmap.
+function photo(s, x, y, w, h, fontSize, dy) {
+  s.addShape('rect', { x, y, w, h, fill: { color: PHOTO } });
+  s.addText('INSERT IMAGE', {
+    x, y: y + (dy || 0), w, h, fontFace: UI, fontSize, bold: true, color: WHITE,
+    align: 'center', valign: 'middle',
+  });
+}
+
+// Portrait variant used behind the phone screens: caption wraps to two lines.
+function photoTall(s, x, y, w, h, fontSize) {
+  s.addShape('rect', { x, y, w, h, fill: { color: SCREEN } });
+  s.addText([{ text: 'INSERT', options: { breakLine: true } }, { text: 'IMAGE' }], {
+    x, y, w, h, fontFace: UI, fontSize, color: WHITE, align: 'center', valign: 'middle',
+    lineSpacingMultiple: 1.35,
+  });
+}
+
+// The slide master paints three marks on every slide: a "hamburger" of three
+// short rules top-left, and a rule + "Evelyn" wordmark bottom-right.  Slides
+// with a dark photo panel repaint them on top in their own colour.
+function hamburger(s, color) {
+  [0.519, 0.685, 0.852].forEach((y) =>
+    s.addShape('line', { x: 0.498, y, w: 0.419, h: 0, line: { color, width: 1.5 } }));
+}
+
+function sigRule(s, color) {
+  s.addShape('line', { x: 10.492, y: 6.982, w: 1.365, h: 0, line: { color, width: 1.5 } });
+}
+
+function sigText(s, color) {
+  s.addText('Evelyn', {
+    x: 11.958, y: 6.78, w: 0.929, h: 0.404, fontFace: SERIF, fontSize: 18,
+    color, italic: true, align: 'left', valign: 'top', wrap: false,
+  });
+}
+
+function masterDecor(s) {
+  hamburger(s, YELLOW);
+  sigRule(s, YELLOW);
+  sigText(s, YELLOW);
+}
+
+// Horizontal progress bar: grey track with a coloured fill on top.
+function meter(s, x, y, w, h, pct, color) {
+  s.addShape('rect', { x, y, w, h, fill: { color: GREY } });
+  s.addShape('rect', { x, y, w: w * pct, h, fill: { color } });
+}
+
+// Row of five rating stars, `filled` of them coloured.
+function starRow(s, x, y, filled) {
+  for (let i = 0; i < 5; i++) {
+    s.addShape('star5', { x: x + i * 0.29, y, w: 0.218, h: 0.208, fill: { color: i < filled ? STAR : GREY } });
+  }
+}
+
+// Simple pictograms, described as a list of [shape, x, y, w, h, extraOptions]
+// in a normalised 0..1 box so they can be dropped at any size.
+const ICONS = {
+  target: [['donut', 0, 0, 1, 1], ['ellipse', 0.34, 0.34, 0.32, 0.32]],
+  bars: [['rect', 0.02, 0.55, 0.2, 0.45], ['rect', 0.29, 0.3, 0.2, 0.7],
+         ['rect', 0.56, 0.12, 0.2, 0.88], ['ellipse', 0.76, 0, 0.24, 0.24]],
+  support: [['ellipse', 0.28, 0, 0.44, 0.44], ['trapezoid', 0.06, 0.52, 0.88, 0.48]],
+  camera: [['roundRect', 0, 0.22, 1, 0.78], ['rect', 0.26, 0.04, 0.32, 0.2],
+           ['ellipse', 0.32, 0.38, 0.36, 0.36, { fill: { color: YELLOW } }]],
+  tag: [['pentagon', 0.05, 0.2, 0.9, 0.6, { rotate: 315 }],
+        ['ellipse', 0.3, 0.42, 0.16, 0.16, { fill: { color: YELLOW } }]],
+  heart: [['heart', 0, 0, 1, 1]],
+  trophy: [['trapezoid', 0.16, 0, 0.68, 0.5, { flipV: true }], ['rect', 0.42, 0.45, 0.16, 0.3],
+           ['rect', 0.22, 0.75, 0.56, 0.18]],
+  card: [['roundRect', 0, 0.1, 1, 0.8], ['ellipse', 0.32, 0.28, 0.22, 0.22, { fill: { color: YELLOW } }],
+         ['rect', 0.26, 0.58, 0.34, 0.1, { fill: { color: YELLOW } }]],
+  search: [['donut', 0, 0, 0.74, 0.74], ['rect', 0.6, 0.72, 0.4, 0.14, { rotate: 45 }]],
+  idea: [['ellipse', 0, 0.14, 0.76, 0.86], ['ellipse', 0.56, 0, 0.44, 0.44],
+         ['rect', 0.68, 0.42, 0.2, 0.12]],
+  rocket: [['ellipse', 0.3, 0, 0.4, 0.68], ['triangle', 0.0, 0.42, 0.34, 0.4],
+           ['triangle', 0.66, 0.42, 0.34, 0.4], ['triangle', 0.36, 0.7, 0.28, 0.3, { flipV: true }]],
+  pie: [['ellipse', 0, 0, 1, 1], ['pie', 0.02, 0.02, 0.96, 0.96, { fill: { color: YELLOW2 } }]],
+};
+
+function icon(s, kind, x, y, w, h, color) {
+  ICONS[kind].forEach(([shape, dx, dy, dw, dh, extra]) =>
+    s.addShape(shape, Object.assign({ x: x + dx * w, y: y + dy * h, w: dw * w, h: dh * h, fill: { color } },
+                                    extra || {})));
+}
+
+// Map marker used on the "Contact Us" slide.
+function mapPin(s, x, y, w, h, color) {
+  s.addShape('ellipse', { x, y, w, h: w, fill: { color } });
+  s.addShape('triangle', { x: x + w * 0.18, y: y + w * 0.55, w: w * 0.64, h: h - w * 0.55,
+                           fill: { color }, flipV: true });
+  s.addShape('ellipse', { x: x + w * 0.32, y: y + w * 0.26, w: w * 0.36, h: w * 0.36, fill: { color: BLACK } });
+}
+
+// Laptop mock-up, proportioned like the bitmap the template used: the lid
+// occupies 0.098..0.902 of the width and 0..0.889 of the height, with a light
+// base slab under it.  The screen itself is a separate photo placeholder.
+function laptop(s, x, y, w, h) {
+  s.addShape('roundRect', { x: x + w * 0.098, y, w: w * 0.804, h: h * 0.889,
+                            fill: { color: '1B1B1F' }, rectRadius: 0.05 });
+  s.addShape('roundRect', { x: x + w * 0.008, y: y + h * 0.888, w: w * 0.984, h: h * 0.067,
+                            fill: { color: 'EDEDED' }, line: { color: 'C6C6C6', width: 0.75 }, rectRadius: 0.02 });
+  s.addShape('roundRect', { x: x + w * 0.43, y: y + h * 0.905, w: w * 0.14, h: h * 0.017,
+                            fill: { color: '9A9A9A' }, rectRadius: 0.02 });
+}
+
+// Phone mock-up: silver rail, black bezel, screen placeholder and notch.
+function phone(s, x, y, w, h, fontSize) {
+  s.addShape('roundRect', { x, y, w, h, fill: { color: '8C8E92' }, rectRadius: 0.3 });
+  s.addShape('roundRect', { x: x + w * 0.017, y: y + h * 0.008, w: w * 0.966, h: h * 0.984,
+                            fill: { color: 'DCDDDF' }, rectRadius: 0.3 });
+  s.addShape('roundRect', { x: x + w * 0.036, y: y + h * 0.018, w: w * 0.928, h: h * 0.964,
+                            fill: { color: '141417' }, rectRadius: 0.29 });
+  s.addShape('roundRect', { x: x + w * 0.058, y: y + h * 0.029, w: w * 0.884, h: h * 0.942,
+                            fill: { color: SCREEN }, rectRadius: 0.27 });
+  s.addShape('roundRect', { x: x + w * 0.3, y: y + h * 0.029, w: w * 0.4, h: h * 0.026,
+                            fill: { color: '141417' }, rectRadius: 0.015 });
+  s.addText([{ text: 'INSERT', options: { breakLine: true } }, { text: 'IMAGE' }],
+    { x, y, w, h, fontFace: UI, fontSize, color: WHITE, align: 'center', valign: 'middle',
+      lineSpacingMultiple: 1.35 });
+}
+
+/* ------------------------------------------------------- simplified US map */
+// normalised (0..1) outlines traced from the original artwork
+const US_MAINLAND = [
+  [0.081, 0.010], [0.030, 0.340], [0.057, 0.516], [0.110, 0.609], [0.154, 0.618],
+  [0.224, 0.689], [0.312, 0.693], [0.368, 0.802], [0.408, 0.780], [0.454, 0.904],
+  [0.489, 0.927], [0.492, 0.854], [0.542, 0.790], [0.657, 0.809], [0.655, 0.758],
+  [0.770, 0.760], [0.806, 0.859], [0.852, 0.919], [0.854, 0.852], [0.811, 0.691],
+  [0.901, 0.517], [0.878, 0.425], [0.891, 0.465], [0.907, 0.331], [0.972, 0.269],
+  [0.951, 0.218], [0.999, 0.137], [0.970, 0.069], [0.937, 0.153], [0.872, 0.188],
+  [0.856, 0.246], [0.803, 0.306], [0.757, 0.347], [0.750, 0.265], [0.734, 0.218],
+  [0.708, 0.198], [0.700, 0.164], [0.645, 0.165], [0.592, 0.176], [0.622, 0.129],
+];
+const US_ALASKA = [
+  [0.046, 0.737], [0.062, 0.791], [0.028, 0.790], [0.059, 0.840], [0.027, 0.888],
+  [0.069, 0.941], [0.011, 0.999], [0.128, 0.894], [0.250, 0.979], [0.208, 0.909],
+  [0.170, 0.905], [0.154, 0.732], [0.090, 0.704],
+];
+// the three states called out by the bar chart on the right of the slide
+const US_HIGHLIGHTS = [
+  { color: YELLOW, pts: [[0.044, 0.232], [0.030, 0.337], [0.058, 0.516], [0.093, 0.550],
+                         [0.111, 0.609], [0.159, 0.617], [0.169, 0.540], [0.091, 0.364], [0.111, 0.261]] },
+  { color: YELLOW, pts: [[0.113, 0.262], [0.094, 0.363], [0.170, 0.535], [0.187, 0.490], [0.211, 0.297]] },
+  { color: YELLOW2, pts: [[0.391, 0.539], [0.383, 0.697], [0.312, 0.697], [0.369, 0.802], [0.409, 0.780],
+                          [0.455, 0.905], [0.489, 0.926], [0.488, 0.853], [0.565, 0.782], [0.558, 0.653],
+                          [0.460, 0.627], [0.446, 0.544]] },
+  { color: YELLOW3, pts: [[0.894, 0.484], [0.881, 0.444], [0.841, 0.403], [0.811, 0.479],
+                          [0.780, 0.487], [0.758, 0.519]] },
+];
+
+function polygon(s, x, y, w, h, pts, opts) {
+  s.addShape('custGeom', Object.assign({
+    x, y, w, h,
+    points: pts.map(([px, py]) => ({ x: px * w, y: py * h })).concat([{ close: true }]),
+  }, opts));
+}
+
+function usMap(s, x, y, w, h) {
+  const base = { fill: { color: GREY }, line: { color: WHITE, width: 0.5 } };
+  polygon(s, x, y, w, h, US_MAINLAND, base);
+  polygon(s, x, y, w, h, US_ALASKA, base);
+  US_HIGHLIGHTS.forEach((st) =>
+    polygon(s, x, y, w, h, st.pts, { fill: { color: st.color }, line: { color: WHITE, width: 0.5 } }));
+}
+
+/* ---------------------------------------------------------------- charts */
+const CHART_BASE = {
+  showLegend: false, showTitle: false, chartArea: { fill: { color: WHITE } },
+  barGapWidthPct: 219, catAxisLineColor: GREY, valAxisLineShow: false,
+  valGridLine: { color: GREY, size: 1 }, catGridLine: { style: 'none' },
+  catAxisLabelColor: AXIS, valAxisLabelColor: AXIS, catAxisLabelFontFace: SANS,
+  valAxisLabelFontFace: SANS, catAxisLabelFontSize: 12, valAxisLabelFontSize: 12,
+  catAxisMajorTickMark: 'none', valAxisMajorTickMark: 'none',
+};
+
+const CATS4 = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+
+
+/* ------------------------------------------------------------- slides */
+
+// 1. Title Slide
+function slide01(s) {
+  masterDecor(s);
+  photo(s, 0, 0, 13.333, 7.5, 74.3, -0.167);
+  s.addShape('rect', { x: 0, y: -0.006, w: 13.333, h: 7.506, fill: { color: BLACK, transparency: 70 }, flipH: true, flipV: true });
+  s.addText("Evelyn", { x: 1.667, y: 2.56, w: 10, h: 1.811, fontFace: SERIF, fontSize: 96, color: YELLOW, bold: true, align: "center", valign: "bottom", lineSpacingMultiple: 0.9 });
+  sigRule(s, WHITE);
+  sigText(s, YELLOW);
+  s.addText(EU_A + " For science, music, sport, etc, Europe uses the same vocabulary. ", { x: 3.937, y: 4.474, w: 5.46, h: 0.974, fontFace: SANS, fontSize: 12, color: YELLOW, align: "center", valign: "top", lineSpacingMultiple: 1.5 });
+  hamburger(s, YELLOW);
+  s.addText("Fashion and Photography Presentation Template", { x: 1.667, y: 4.206, w: 10, h: 0.326, fontFace: SANS, fontSize: 11, color: WHITE, italic: true, charSpacing: 3, align: "center", valign: "top", lineSpacingMultiple: 0.9 });
+}
+
+// 2. Welcome Message
+function slide02(s) {
+  masterDecor(s);
+  s.addText(EU_E, { x: 6.667, y: 3.821, w: 5.479, h: 1.886, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 0, y: 4.972, w: 3.514, h: 2.528, fill: { color: YELLOW } });
+  s.addText("Description", { x: 6.667, y: 3.5, w: 2.128, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "top" });
+  s.addText([{ text: "Introduction Of", options: { breakLine: true } }, { text: "A Company" }], { x: 6.667, y: 2.084, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  hamburger(s, YELLOW);
+  photo(s, 1.188, 0.932, 4.749, 5.635, 31.4, -0.07);
+}
+
+// 3. TOC
+function slide03(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 9.417, y: 0, w: 3.917, h: 2.469, fill: { color: YELLOW } });
+  s.addText(EU_E, { x: 0.914, y: 3.087, w: 4.317, h: 2.489, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  photo(s, 6.667, 1.416, 5.492, 2.334, 30.6, -0.069);
+  s.addText([{ text: "Today’s ", options: { breakLine: true } }, { text: "Agenda" }], { x: 0.917, y: 1.691, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText("Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ", { x: 6.581, y: 4.446, w: 2.613, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Introducing", { x: 6.581, y: 4.185, w: 2.337, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, bold: true, align: "left", valign: "top" });
+  s.addText("About Us", { x: 6.581, y: 5.402, w: 2.337, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, bold: true, align: "left", valign: "top" });
+  s.addText("Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ", { x: 6.581, y: 5.663, w: 2.814, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ", { x: 9.926, y: 4.457, w: 2.613, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Portofolio", { x: 9.872, y: 4.2, w: 2.337, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, bold: true, align: "left", valign: "top" });
+  s.addText("Thank You", { x: 9.926, y: 5.39, w: 2.337, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, bold: true, align: "left", valign: "top" });
+  s.addText("Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ", { x: 9.926, y: 5.663, w: 2.814, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Template 2020", { x: 0.914, y: 5.943, w: 1.932, h: 0.303, fontFace: SANS, fontSize: 12, color: YELLOW, bold: true, italic: true, charSpacing: 3, align: "left", valign: "top", wrap: false });
+}
+
+// 4. Section Break
+function slide04(s) {
+  masterDecor(s);
+  photo(s, 0, 0, 13.333, 7.5, 74.3, -0.167);
+  s.addShape('rect', { x: 0, y: -0.006, w: 13.333, h: 7.506, fill: { color: BLACK, transparency: 70 }, flipH: true, flipV: true });
+  hamburger(s, YELLOW);
+  s.addText([{ text: "Section", options: { breakLine: true } }, { text: "Break" }], { x: 0.798, y: 3.313, w: 10.442, h: 1.851, fontFace: SERIF, fontSize: 54, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText(EU_B + " The languages only differ in their grammar, their pronunciation. ", { x: 0.798, y: 4.957, w: 7.216, h: 0.974, fontFace: SANS, fontSize: 12, color: YELLOW, align: "left", valign: "top", lineSpacingMultiple: 1.5 });
+  sigText(s, YELLOW);
+  s.addText(EU_B + " The languages only differ in their grammar, their pronunciation. ", { x: 9.837, y: 1.835, w: 2.698, h: 2.489, fontFace: SANS, fontSize: 12, color: WHITE, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 9.837, y: 1.531, w: 1.357, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "top", wrap: false });
+  sigRule(s, WHITE);
+}
+
+// 5. About Us
+function slide05(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 9.688, y: -0.014, w: 3.646, h: 7.514, fill: { color: YELLOW } });
+  sigText(s, WHITE);
+  s.addText(EU_D + " Everyone realizes why a new common language would be desirable: one could refuse", { x: 10.376, y: 1.864, w: 2.432, h: 4.004, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText(EU_E, { x: 0.783, y: 3.408, w: 4.654, h: 2.186, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  photo(s, 6.472, 1.6, 3.646, 4.317, 24, -0.054);
+  s.addText([{ text: "About Our", options: { breakLine: true } }, { text: "Company" }], { x: 0.783, y: 2.036, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText("Template 2020", { x: 0.79, y: 5.943, w: 1.932, h: 0.303, fontFace: SANS, fontSize: 12, color: YELLOW, bold: true, italic: true, charSpacing: 3, align: "left", valign: "top", wrap: false });
+  sigRule(s, WHITE);
+}
+
+// 6. Vision and Mission
+function slide06(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 1.937, y: 1.644, w: 3.646, h: 4.189, fill: { color: YELLOW } });
+  s.addText([{ text: "Our Vision", options: { breakLine: true } }, { text: "And Mission" }], { x: 7.7, y: 1.142, w: 8.133, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText("Description", { x: 8.545, y: 3.015, w: 3.867, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "left", valign: "middle" });
+  s.addText(VISION, { x: 8.545, y: 3.367, w: 3.166, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 8.545, y: 4.81, w: 3.867, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "left", valign: "middle" });
+  s.addText(VISION, { x: 8.545, y: 5.166, w: 3.166, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 7.783, y: 3.106, w: 0.643, h: 0.643, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 7.783, y: 4.9, w: 0.643, h: 0.643, fill: { color: YELLOW } });
+  icon(s, 'bars', 7.94, 5.08, 0.33, 0.28, BLACK);
+  icon(s, 'target', 7.94, 3.26, 0.33, 0.33, BLACK);
+  photo(s, 3.782, -0.013, 3.397, 5.21, 29, -0.065);
+  photo(s, -0.007, 2.29, 3.397, 5.21, 29, -0.065);
+}
+
+// 7. 1_Timeline
+function slide07(s) {
+  masterDecor(s);
+  s.addShape('line', { x: 2.722, y: 3.403, w: 10.611, h: 0, line: { color: BLACK, width: 1.5 } });
+  photo(s, 1.429, 2.135, 2.508, 2.469, 14, -0.031);
+  photo(s, 5.422, 2.135, 2.508, 2.469, 14, -0.031);
+  photo(s, 9.415, 2.135, 2.508, 2.469, 14, -0.031);
+  s.addText(SUITABLE, { x: 9.332, y: 5.358, w: 2.745, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 8.839, y: 4.92, w: 3.73, h: 0.516, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText(SUITABLE, { x: 5.304, y: 5.358, w: 2.745, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 4.811, y: 4.92, w: 3.73, h: 0.516, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText(SUITABLE, { x: 1.304, y: 5.358, w: 2.745, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 0.812, y: 4.92, w: 3.73, h: 0.516, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText([{ text: "Our Hitory", options: { breakLine: true } }, { text: "Timeline" }], { x: 0.926, y: 0.482, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "center", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addShape('rect', { x: 1.429, y: 4.002, w: 2.508, h: 0.602, fill: { color: YELLOW, transparency: 10 } });
+  s.addText("1998", { x: 0.818, y: 4.022, w: 3.73, h: 0.562, fontFace: SERIF, fontSize: 20, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 5.422, y: 4.002, w: 2.508, h: 0.602, fill: { color: YELLOW, transparency: 10 } });
+  s.addText("2004", { x: 4.811, y: 4.022, w: 3.73, h: 0.562, fontFace: SERIF, fontSize: 20, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 9.415, y: 4.002, w: 2.508, h: 0.602, fill: { color: YELLOW, transparency: 10 } });
+  s.addText("2010", { x: 8.804, y: 4.022, w: 3.73, h: 0.562, fontFace: SERIF, fontSize: 20, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+}
+
+// 8. Timeline
+function slide08(s) {
+  masterDecor(s);
+  s.addShape('line', { x: -0.001, y: 3.403, w: 10.611, h: 0, line: { color: BLACK, width: 1.5 } });
+  photo(s, 1.429, 2.135, 2.508, 2.469, 14, -0.031);
+  photo(s, 5.422, 2.135, 2.508, 2.469, 14, -0.031);
+  photo(s, 9.415, 2.135, 2.508, 2.469, 14, -0.031);
+  s.addText(SUITABLE, { x: 9.332, y: 5.358, w: 2.745, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 8.839, y: 4.92, w: 3.73, h: 0.516, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText(SUITABLE, { x: 5.304, y: 5.358, w: 2.745, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 4.811, y: 4.92, w: 3.73, h: 0.516, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText(SUITABLE, { x: 1.304, y: 5.358, w: 2.745, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 0.812, y: 4.92, w: 3.73, h: 0.516, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 1.429, y: 4.002, w: 2.508, h: 0.602, fill: { color: YELLOW, transparency: 10 } });
+  s.addText("2010", { x: 0.818, y: 4.022, w: 3.73, h: 0.562, fontFace: SERIF, fontSize: 20, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 5.422, y: 4.002, w: 2.508, h: 0.602, fill: { color: YELLOW, transparency: 10 } });
+  s.addText("2018", { x: 4.811, y: 4.022, w: 3.73, h: 0.562, fontFace: SERIF, fontSize: 20, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 9.415, y: 4.002, w: 2.508, h: 0.602, fill: { color: YELLOW, transparency: 10 } });
+  s.addText("2020", { x: 8.804, y: 4.022, w: 3.73, h: 0.562, fontFace: SERIF, fontSize: 20, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+}
+
+// 9. Our Services
+function slide09(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 10.655, y: 0, w: 2.684, h: 4.833, fill: { color: YELLOW } });
+  photo(s, 10.163, 2.556, 2.684, 3.364, 18.7, -0.042);
+  photo(s, 7.015, 1.024, 2.684, 3.364, 18.7, -0.042);
+  s.addText("Our Services", { x: 0.917, y: 1.247, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText("One morning, when Gregor Samsa woke from troubled dreams, he found himself transformed in his bed into.", { x: 0.918, y: 2.207, w: 4.854, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText(LOREM2, { x: 1.865, y: 3.474, w: 3.81, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Services One", { x: 1.865, y: 3.209, w: 3.933, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "middle" });
+  s.addShape('rect', { x: 0.932, y: 3.322, w: 0.742, h: 0.742, fill: { color: YELLOW } });
+  s.addText(LOREM2, { x: 1.865, y: 4.649, w: 3.81, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Services Two", { x: 1.865, y: 4.388, w: 3.933, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "middle" });
+  s.addShape('rect', { x: 0.932, y: 4.496, w: 0.742, h: 0.742, fill: { color: YELLOW } });
+  s.addText(LOREM2, { x: 1.886, y: 5.802, w: 3.81, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Services Three", { x: 1.886, y: 5.541, w: 3.933, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "middle" });
+  s.addShape('rect', { x: 0.953, y: 5.65, w: 0.742, h: 0.742, fill: { color: YELLOW } });
+  icon(s, 'support', 1.16, 3.53, 0.33, 0.33, BLACK);
+  icon(s, 'camera', 1.14, 4.75, 0.33, 0.25, BLACK);
+  icon(s, 'tag', 1.13, 5.81, 0.38, 0.42, BLACK);
+  photo(s, 7.772, 3.408, 3.1, 3.296, 18.4, -0.041);
+}
+
+// 10. Our Achievement
+function slide10(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 11.016, y: 4.193, w: 2.317, h: 1.921, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 0, y: 1.119, w: 2.317, h: 2.197, fill: { color: YELLOW } });
+  s.addText(EU_B + " The languages.", { x: 7.065, y: 2.743, w: 4.896, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 7.065, y: 2.433, w: 2.128, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "top" });
+  s.addText("Description", { x: 0.865, y: 5.401, w: 3.401, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "left", valign: "middle" });
+  s.addText(EU_A, { x: 0.865, y: 5.716, w: 2.948, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 4.876, y: 5.401, w: 3.401, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "left", valign: "middle" });
+  s.addText(EU_A, { x: 4.876, y: 5.716, w: 2.948, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 0.968, y: 4.727, w: 0.604, h: 0.604, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 4.977, y: 4.727, w: 0.604, h: 0.604, fill: { color: YELLOW } });
+  s.addText("Our Achievement", { x: 7.027, y: 1.308, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  icon(s, 'heart', 1.1, 4.89, 0.33, 0.28, BLACK);
+  icon(s, 'trophy', 5.08, 4.85, 0.39, 0.37, BLACK);
+  photo(s, 0.951, 1.57, 4.896, 2.532, 27.3, -0.061);
+  photo(s, 8.469, 4.58, 3.401, 2.113, 18.9, -0.042);
+}
+
+// 11. 1_Section Break 3
+function slide11(s) {
+  masterDecor(s);
+  photo(s, 0, 0, 13.333, 4.51, 74.3, -0.167);
+  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 4.51, fill: { color: BLACK, transparency: 70 } });
+  s.addShape('rect', { x: 0, y: 2.583, w: 4.292, h: 4.917, fill: { color: YELLOW } });
+  s.addText([{ text: "Section", options: { breakLine: true } }, { text: "Break" }], { x: 1.084, y: 4.18, w: 11.5, h: 1.976, fontFace: SERIF, fontSize: 54, color: BLACK, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText(EU_B + " The languages only differ in their grammar, their pronunciation. ", { x: 5.204, y: 5.606, w: 7.216, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 5.204, y: 5.279, w: 1.357, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "top", wrap: false });
+  s.addText(EU_B + " The languages only differ in their grammar, their pronunciation. ", { x: 5.204, y: 3.042, w: 7.216, h: 0.974, fontFace: SANS, fontSize: 12, color: YELLOW, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  hamburger(s, YELLOW);
+}
+
+// 12. Meet The Team
+function slide12(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 0, y: 5, w: 13.339, h: 2.5, fill: { color: YELLOW } });
+  sigText(s, WHITE);
+  s.addText("Meet The Team", { x: 0.917, y: 0.692, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, align: "center", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText("Manager", { x: 2.078, y: 6.225, w: 2.37, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "middle" });
+  s.addText("Amanda Larry", { x: 2.078, y: 5.866, w: 2.37, h: 0.404, fontFace: SERIF, fontSize: 18, color: BLACK, align: "center", valign: "middle" });
+  s.addText("Manager", { x: 5.456, y: 6.225, w: 2.37, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "middle" });
+  s.addText("Sarah Jonshon", { x: 5.456, y: 5.866, w: 2.37, h: 0.404, fontFace: SERIF, fontSize: 18, color: BLACK, align: "center", valign: "middle" });
+  s.addText("Manager", { x: 8.758, y: 6.225, w: 2.37, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "middle" });
+  s.addText("Merry Larry", { x: 8.758, y: 5.866, w: 2.37, h: 0.404, fontFace: SERIF, fontSize: 18, color: BLACK, align: "center", valign: "middle" });
+  photo(s, 1.776, 2.142, 3.081, 3.636, 20.2, -0.045);
+  photo(s, 5.126, 2.142, 3.081, 3.636, 20.3, -0.045);
+  photo(s, 8.426, 2.142, 3.081, 3.636, 20.3, -0.045);
+  sigRule(s, WHITE);
+}
+
+// 13. Meet The Team 2
+function slide13(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 0, y: 0, w: 13.339, h: 1.889, fill: { color: YELLOW } });
+  hamburger(s, WHITE);
+  s.addText([{ text: "Meet The", options: { breakLine: true } }, { text: "Team" }], { x: 0.915, y: 2.193, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText(EU_E, { x: 0.918, y: 3.505, w: 4.654, h: 2.186, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText("Template 2020", { x: 0.925, y: 6.376, w: 1.932, h: 0.303, fontFace: SANS, fontSize: 12, color: YELLOW, bold: true, italic: true, charSpacing: 3, align: "left", valign: "top", wrap: false });
+  s.addText("Manager", { x: 6.73, y: 5.597, w: 2.37, h: 0.303, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle" });
+  s.addText("Sheila Rachelia", { x: 6.73, y: 5.243, w: 2.37, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle" });
+  s.addText("Manager", { x: 10.07, y: 5.597, w: 2.37, h: 0.303, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle" });
+  s.addText("Ivanka Romawa", { x: 10.07, y: 5.243, w: 2.37, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle" });
+  photo(s, 6.365, 1.508, 3.1, 3.619, 20.1, -0.045);
+  photo(s, 9.705, 1.508, 3.1, 3.619, 20.1, -0.045);
+}
+
+// 14. Meet The Team 3
+function slide14(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 0, y: 3.75, w: 4.208, h: 3.75, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 3.771, y: 0, w: 9.569, h: 3.601, fill: { color: YELLOW } });
+  photo(s, 0.917, 1.417, 5.748, 4.938, 32, -0.072);
+  s.addText([{ text: "Hana", options: { breakLine: true } }, { text: "Hanifah" }], { x: 7.247, y: 1.417, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: BLACK, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText("Experience", { x: 7.247, y: 4.446, w: 1.191, h: 0.341, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "top" });
+  s.addShape('rect', { x: 8.435, y: 4.534, w: 3.334, h: 0.203, fill: { color: GREY } });
+  s.addShape('rect', { x: 8.435, y: 4.534, w: 2.864, h: 0.203, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 8.435, y: 5.059, w: 3.334, h: 0.203, fill: { color: GREY } });
+  s.addShape('rect', { x: 8.435, y: 5.059, w: 3.141, h: 0.203, fill: { color: YELLOW } });
+  s.addText("Knowledge", { x: 7.247, y: 4.971, w: 1.191, h: 0.341, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "top" });
+  s.addText("86%", { x: 11.998, y: 4.446, w: 0.762, h: 0.341, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "top" });
+  s.addText("95%", { x: 11.998, y: 4.971, w: 0.762, h: 0.341, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "top" });
+  s.addText("Skill and ability", { x: 7.247, y: 3.899, w: 2.029, h: 0.416, fontFace: SANS, fontSize: 16, color: BLACK, align: "left", valign: "top" });
+  s.addShape('rect', { x: 8.435, y: 5.57, w: 3.334, h: 0.203, fill: { color: GREY } });
+  s.addShape('rect', { x: 8.435, y: 5.57, w: 2.572, h: 0.203, fill: { color: YELLOW } });
+  s.addText("Specialist", { x: 7.247, y: 5.482, w: 1.191, h: 0.341, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "top" });
+  s.addText("78%", { x: 11.998, y: 5.482, w: 0.762, h: 0.341, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "top" });
+  s.addText(SEREN2 + " spring which I enjoy.", { x: 7.247, y: 2.744, w: 4.859, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+}
+
+// 15. Section Break 3
+function slide15(s) {
+  masterDecor(s);
+  photo(s, 0, 0, 13.333, 4.51, 74.3, -0.167);
+  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 4.529, fill: { color: BLACK, transparency: 70 } });
+  s.addShape('rect', { x: 9.042, y: 2.583, w: 4.292, h: 4.917, fill: { color: YELLOW } });
+  sigText(s, WHITE);
+  hamburger(s, YELLOW);
+  s.addText([{ text: "Section", options: { breakLine: true } }, { text: "Break" }], { x: 9.834, y: 4.18, w: 11.5, h: 1.976, fontFace: SERIF, fontSize: 54, color: BLACK, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText(EU_B + " The languages only differ in their grammar, their pronunciation. ", { x: 0.918, y: 5.606, w: 7.216, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 0.918, y: 5.279, w: 1.357, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "top", wrap: false });
+  s.addText(EU_B + " The languages only differ in their grammar, their pronunciation. ", { x: 0.918, y: 3.303, w: 7.216, h: 0.974, fontFace: SANS, fontSize: 12, color: YELLOW, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  sigRule(s, WHITE);
+}
+
+// 16. Our Portfolio 4
+function slide16(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 4.079, y: 0, w: 2.587, h: 2.5, fill: { color: YELLOW } });
+  photo(s, 2.813, 1.028, 3.056, 3.667, 20.4, -0.046);
+  s.addShape('rect', { x: 0, y: 5, w: 2.587, h: 2.5, fill: { color: YELLOW } });
+  s.addText([{ text: "Our", options: { breakLine: true } }, { text: "Portfolio" }], { x: 7.828, y: 2.273, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText(EU_C + " and their most common words. ", { x: 7.832, y: 3.585, w: 4.654, h: 1.58, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  photo(s, 4.542, 4, 3.056, 3.667, 20.4, -0.046);
+  photo(s, 0.917, 3.006, 3.056, 3.667, 20.4, -0.046);
+}
+
+// 17. Our Portfolio
+function slide17(s) {
+  masterDecor(s);
+  photo(s, 10.408, -0.011, 2.935, 3.636, 20.2, -0.045);
+  s.addShape('rect', { x: 10.756, y: 4.607, w: 2.587, h: 1.797, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 1.155, y: 4.978, w: 2.587, h: 1.797, fill: { color: YELLOW } });
+  s.addText([{ text: "Our", options: { breakLine: true } }, { text: "Portfolio" }], { x: 4.09, y: 2.242, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText(EU_E, { x: 4.093, y: 3.564, w: 4.654, h: 2.186, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  photo(s, 0, 2.114, 3.302, 3.636, 20.2, -0.045);
+  photo(s, 9.61, 2.354, 2.935, 3.636, 20.2, -0.045);
+}
+
+// 18. 1_Our Portfolio
+function slide18(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 4.832, y: 2.869, w: 2.587, h: 1.797, fill: { color: YELLOW } });
+  s.addText([{ text: "Our", options: { breakLine: true } }, { text: "Portfolio" }], { x: 0.917, y: 2.169, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText(EU_D + " Everyone realizes why a new common language.", { x: 6.667, y: 4.895, w: 5.265, h: 1.58, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  photo(s, 0, 3.802, 5.104, 3.71, 28.4, -0.064);
+  photo(s, 6.667, 0, 6.667, 3.802, 37.1, -0.083);
+}
+
+// 19. Our Portfolio 3
+function slide19(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 0, y: 3.452, w: 13.333, h: 4.08, fill: { color: YELLOW } });
+  s.addText(EU_D + " Everyone realizes why a new common.", { x: 1.107, y: 1.048, w: 4.893, h: 1.58, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText([{ text: "Our", options: { breakLine: true } }, { text: "Portfolio" }], { x: 8.533, y: 4.767, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: BLACK, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  sigText(s, WHITE);
+  photo(s, 6.53, 0.912, 5.623, 3.602, 31.3, -0.07);
+  photo(s, 0.949, 2.924, 6.967, 3.414, 38.8, -0.087);
+  sigRule(s, WHITE);
+}
+
+// 20. Our Laptop
+function slide20(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 11.451, y: -0.022, w: 1.882, h: 1.563, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 0, y: 5.735, w: 1.882, h: 1.765, fill: { color: YELLOW } });
+  laptop(s, 7.195, 2.333, 7.147, 4.192);
+  laptop(s, 0.972, -0.446, 5.515, 3.403);
+  s.addText(EU_B + " The languages only differ in their grammar, their pronunciation.", { x: 7.952, y: 0.884, w: 4.897, h: 1.277, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText([{ text: "Our Laptop", options: { breakLine: true } }, { text: "Mockup" }], { x: 0.972, y: 3.246, w: 11.5, h: 1.524, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  photo(s, 1.625, -0.289, 4.224, 2.701, 23.5, -0.053);
+  photo(s, 8.075, 2.562, 5.425, 3.327, 30.2, -0.067);
+  s.addText(EU_D + " Everyone realizes why a new common language would be desirable:", { x: 0.976, y: 4.733, w: 5.512, h: 1.58, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+}
+
+// 21. Our Mockup
+function slide21(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 11.222, y: 0, w: 2.111, h: 1.976, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 0, y: 5.556, w: 2.111, h: 1.976, fill: { color: YELLOW } });
+  phone(s, 9.693, 0.436, 2.722, 5.458, 32);
+  phone(s, 0.918, 2.402, 2.722, 5.458, 32);
+  s.addText([{ text: "Our Device", options: { breakLine: true } }, { text: "Mockup" }], { x: 4.336, y: 2.347, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText(EU_E, { x: 4.34, y: 3.709, w: 4.654, h: 2.186, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText(EU_A + " For science, music, sport, etc, ", { x: 1.062, y: 1.27, w: 6.07, h: 0.671, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 1.062, y: 0.956, w: 1.357, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "top", wrap: false });
+}
+
+// 22. Section Break 4
+function slide22(s) {
+  masterDecor(s);
+  photo(s, 0, 2.99, 13.333, 4.51, 74.3, -0.167);
+  s.addShape('rect', { x: 0, y: 2.986, w: 13.333, h: 4.514, fill: { color: BLACK, transparency: 70 } });
+  s.addShape('rect', { x: 0, y: 0, w: 4.292, h: 4.917, fill: { color: YELLOW } });
+  s.addText([{ text: "Section", options: { breakLine: true } }, { text: "Break" }], { x: 0.915, y: 2.16, w: 11.5, h: 1.976, fontFace: SERIF, fontSize: 54, color: BLACK, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  sigText(s, YELLOW);
+  hamburger(s, WHITE);
+  s.addText(EU_B + " The languages only differ in their grammar, their pronunciation. ", { x: 7.278, y: 1.206, w: 4.849, h: 1.277, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 7.278, y: 0.901, w: 1.357, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "top", wrap: false });
+  s.addText(EU_B + " The languages only differ in their grammar, their pronunciation. ", { x: 8.687, y: 3.394, w: 4.188, h: 1.58, fontFace: SANS, fontSize: 12, color: YELLOW, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  sigRule(s, WHITE);
+}
+
+// 23. Our Process
+function slide23(s) {
+  masterDecor(s);
+  s.addText("Our Process", { x: 0.917, y: 0.298, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "center", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addShape('rect', { x: 0, y: 6.037, w: 2.111, h: 1.494, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 11.216, y: -0.015, w: 2.111, h: 1.543, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 1.408, y: 2.387, w: 1.544, h: 1.544, fill: { color: YELLOW }, line: { color: BLACK, width: 1 } });
+  s.addShape('rect', { x: 3.651, y: 2.933, w: 1.544, h: 1.544, fill: { color: YELLOW }, line: { color: BLACK, width: 1 } });
+  s.addShape('rect', { x: 5.895, y: 2.387, w: 1.544, h: 1.544, fill: { color: YELLOW }, line: { color: BLACK, width: 1 } });
+  s.addShape('rect', { x: 8.138, y: 2.933, w: 1.544, h: 1.544, fill: { color: YELLOW }, line: { color: BLACK, width: 1 } });
+  s.addShape('rect', { x: 10.381, y: 2.387, w: 1.544, h: 1.544, fill: { color: YELLOW }, line: { color: BLACK, width: 1 } });
+  s.addText("Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ", { x: 1.151, y: 4.517, w: 2.058, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 1.151, y: 4.228, w: 2.058, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle" });
+  s.addText("Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ", { x: 3.395, y: 5.063, w: 2.058, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 3.395, y: 4.774, w: 2.058, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle" });
+  s.addText("Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ", { x: 5.638, y: 4.517, w: 2.058, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 5.638, y: 4.228, w: 2.058, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle" });
+  s.addText("Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ", { x: 7.881, y: 5.063, w: 2.058, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 7.881, y: 4.774, w: 2.058, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle" });
+  s.addText("Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ", { x: 10.125, y: 4.517, w: 2.058, h: 0.974, fontFace: SANS, fontSize: 12, color: BLACK, align: "center", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 10.125, y: 4.228, w: 2.058, h: 0.404, fontFace: SERIF, fontSize: 18, color: YELLOW, align: "center", valign: "middle" });
+  icon(s, 'idea', 6.51, 2.95, 0.32, 0.41, BLACK);
+  icon(s, 'bars', 8.66, 3.45, 0.5, 0.5, BLACK);
+  icon(s, 'search', 4.17, 3.48, 0.51, 0.44, BLACK);
+  icon(s, 'rocket', 10.93, 2.93, 0.45, 0.45, BLACK);
+  icon(s, 'card', 1.93, 2.96, 0.51, 0.39, BLACK);
+}
+
+// 24. 2_Our Chart
+function slide24(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 0, y: 5.578, w: 2.111, h: 1.953, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 0.918, y: 4.188, w: 4.231, h: 1.804, fill: { color: WHITE }, shadow: { type: 'outer', color: BLACK, opacity: 0.3, blur: 20, offset: 4, angle: 90 } });
+  s.addText(SEREN2, { x: 1.245, y: 5.064, w: 3.757, h: 0.671, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  s.addText("$655", { x: 1.142, y: 4.35, w: 1.669, h: 0.841, fontFace: SERIF, fontSize: 44, color: YELLOW, bold: true, align: "left", valign: "top" });
+  s.addText("Description", { x: 2.669, y: 4.712, w: 1.883, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "top" });
+  s.addChart('bar', [
+    { name: 'Series 1', labels: CATS4, values: [3.3, 2.5, 3.5, 2.5] },
+    { name: 'Series 2', labels: CATS4, values: [1.3, 2.1, 1.0, 1.1] },
+  ], Object.assign({ x: 6.1, y: 2.548, w: 6.55, h: 1.804, barDir: 'col',
+    chartColors: [YELLOW, MIDGREY] }, CHART_BASE));
+  s.addChart('bar', [
+    { name: 'Series 1', labels: CATS4, values: [4.3, 3.9, 2.5, 4.5] },
+    { name: 'Series 2', labels: CATS4, values: [1.2, 1.1, 1.3, 1.4] },
+  ], Object.assign({ x: 6.1, y: 4.46, w: 6.55, h: 1.678, barDir: 'col',
+    chartColors: [YELLOW, MIDGREY] }, CHART_BASE));
+  s.addText("Our Chart", { x: 0.915, y: 1.843, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addShape('rect', { x: 11.216, y: -0.015, w: 2.111, h: 1.45, fill: { color: YELLOW } });
+  s.addText(SEREN3 + " with my whole heart. ", { x: 0.918, y: 2.997, w: 4.231, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+}
+
+// 25. Our Chart
+function slide25(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 10.792, y: 4.118, w: 2.542, h: 1.899, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 7.651, y: 3.37, w: 4.231, h: 1.655, fill: { color: WHITE }, shadow: { type: 'outer', color: BLACK, opacity: 0.3, blur: 20, offset: 4, angle: 90 } });
+  s.addText("Description", { x: 9.097, y: 3.698, w: 3.944, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW, align: "left", valign: "middle" });
+  s.addText(SEREN, { x: 9.112, y: 4.018, w: 2.889, h: 0.627, fontFace: SANS, fontSize: 11, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Description", { x: 9.081, y: 5.309, w: 3.944, h: 0.37, fontFace: SERIF, fontSize: 16, color: YELLOW2, align: "left", valign: "middle" });
+  s.addText(SEREN, { x: 9.097, y: 5.629, w: 2.889, h: 0.627, fontFace: SANS, fontSize: 11, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 8.007, y: 3.744, w: 0.9, h: 0.9, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 7.992, y: 5.356, w: 0.9, h: 0.9, fill: { color: YELLOW2 } });
+  s.addText(SEREN3 + " with my whole heart. ", { x: 7.603, y: 2.205, w: 4.231, h: 0.978, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "top", lineSpacingMultiple: 1.5 });
+  icon(s, 'pie', 8.22, 5.6, 0.44, 0.42, BLACK);
+  icon(s, 'bars', 8.19, 4.0, 0.53, 0.39, BLACK);
+  s.addText("Our Chart", { x: 7.603, y: 1.179, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addChart('bar', [
+    { name: 'Series 1', labels: ['2014', '2015'], values: [4.3, 2.5] },
+    { name: 'Series 2', labels: ['2014', '2015'], values: [2.4, 4.4] },
+  ], Object.assign({}, CHART_BASE, { x: 0.893, y: 2.078, w: 5.815, h: 4.098,
+    barDir: 'col', barGrouping: 'stacked', barGapWidthPct: 130,
+    chartColors: [YELLOW, YELLOW2] }));
+  s.addShape('rect', { x: 0, y: 6.739, w: 2.542, h: 0.761, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 10.792, y: -0.021, w: 2.542, h: 0.761, fill: { color: YELLOW } });
+}
+
+// 26. Our Map
+function slide26(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 0, y: 5.607, w: 1.638, h: 1.925, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 11.652, y: -0.015, w: 1.682, h: 3.231, fill: { color: YELLOW } });
+  s.addText("United States", { x: 0.917, y: 0.298, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "center", valign: "middle", lineSpacingMultiple: 0.9 });
+  usMap(s, 0.834, 2.242, 6.301, 4.119);
+  s.addShape('rect', { x: 1.161, y: 1.514, w: 1.542, h: 1.542, fill: { color: YELLOW }, line: { color: YELLOW, width: 2.25 } });
+  s.addText("155K", { x: 1.161, y: 1.965, w: 1.542, h: 0.64, fontFace: SANS, fontSize: 32, color: BLACK, bold: true, align: "center", valign: "middle" });
+  s.addShape('rect', { x: 4.461, y: 5.793, w: 1.158, h: 1.158, fill: { color: YELLOW2 }, line: { color: YELLOW2, width: 2.25 } });
+  s.addText("55K", { x: 4.461, y: 6.12, w: 1.158, h: 0.505, fontFace: SANS, fontSize: 24, color: BLACK, bold: true, align: "center", valign: "middle" });
+  s.addShape('rect', { x: 5.631, y: 2.691, w: 0.933, h: 0.933, fill: { color: YELLOW3 }, line: { color: YELLOW3, width: 2.25 } });
+  s.addText("10K", { x: 5.631, y: 2.939, w: 0.933, h: 0.438, fontFace: SANS, fontSize: 20, color: BLACK, bold: true, align: "center", valign: "middle" });
+  s.addShape('line', { x: 1.414, y: 3.056, w: 0.517, h: 0.974, line: { color: YELLOW, width: 2.25 }, flipH: true });
+  s.addShape('line', { x: 6.097, y: 3.624, w: 0.065, h: 0.5, line: { color: YELLOW3, width: 2.25 } });
+  s.addShape('line', { x: 4.096, y: 5.362, w: 0.535, h: 0.601, line: { color: YELLOW2, width: 2.25 }, flipH: true, flipV: true });
+  s.addText(LOREM3 + " pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna. Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus. Pellentesque habitant morbi", { x: 7.664, y: 2.369, w: 5.082, h: 1.576, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("California", { x: 7.713, y: 4.259, w: 1.729, h: 0.303, fontFace: SERIF, fontSize: 12, color: BLACK, align: "left", valign: "top" });
+  s.addShape('rect', { x: 7.774, y: 4.577, w: 4.842, h: 0.203, fill: { color: GREY } });
+  s.addShape('rect', { x: 7.774, y: 4.577, w: 4.16, h: 0.203, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 7.774, y: 5.101, w: 4.842, h: 0.203, fill: { color: GREY } });
+  s.addShape('rect', { x: 7.774, y: 5.101, w: 4.563, h: 0.203, fill: { color: YELLOW2 } });
+  s.addText("New York", { x: 7.713, y: 4.796, w: 1.729, h: 0.303, fontFace: SERIF, fontSize: 12, color: BLACK, align: "left", valign: "top" });
+  s.addShape('rect', { x: 7.774, y: 5.612, w: 4.842, h: 0.203, fill: { color: GREY } });
+  s.addShape('rect', { x: 7.774, y: 5.612, w: 3.735, h: 0.203, fill: { color: YELLOW3 } });
+  s.addText("Texas", { x: 7.715, y: 5.304, w: 1.729, h: 0.303, fontFace: SERIF, fontSize: 12, color: BLACK, align: "left", valign: "top" });
+}
+
+// 27. Our Pricelist
+function slide27(s) {
+  masterDecor(s);
+  photo(s, 0, 3.802, 13.333, 3.698, 74.3, -0.167);
+  s.addShape('rect', { x: 0, y: 3.817, w: 13.333, h: 3.683, fill: { color: BLACK, transparency: 70 }, flipH: true, flipV: true });
+  s.addText("Our Pricelist", { x: 0.917, y: 0.298, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "center", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addShape('rect', { x: 8.912, y: 2.104, w: 3.304, h: 4.431, fill: { color: WHITE }, shadow: { type: 'outer', color: BLACK, opacity: 0.3, blur: 20, offset: 4, angle: 90 } });
+  s.addShape('rect', { x: 5.015, y: 2.104, w: 3.304, h: 4.431, fill: { color: WHITE }, shadow: { type: 'outer', color: BLACK, opacity: 0.3, blur: 20, offset: 4, angle: 90 } });
+  s.addShape('rect', { x: 1.142, y: 2.104, w: 3.304, h: 4.431, fill: { color: WHITE }, shadow: { type: 'outer', color: BLACK, opacity: 0.3, blur: 20, offset: 4, angle: 90 } });
+  s.addShape('rect', { x: 2.012, y: 5.743, w: 1.564, h: 0.46, fill: { color: YELLOW } });
+  s.addText("Basic", { x: 2.014, y: 3.413, w: 1.56, h: 0.404, fontFace: SANS, fontSize: 18, color: BLACK, bold: true, align: "center", valign: "top" });
+  s.addText("$35", { x: 1.415, y: 2.437, w: 2.758, h: 0.841, fontFace: SERIF, fontSize: 44, color: YELLOW, bold: true, align: "center", valign: "top" });
+  s.addText("100MB Bandwith", { x: 1.911, y: 4.018, w: 1.766, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("5GB Space", { x: 2.194, y: 4.399, w: 1.201, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("Unlimited User", { x: 2.01, y: 4.781, w: 1.568, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("Free Design", { x: 2.145, y: 5.123, w: 1.298, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addShape('rect', { x: 5.885, y: 5.743, w: 1.564, h: 0.46, fill: { color: YELLOW } });
+  s.addText("Basic", { x: 5.887, y: 3.413, w: 1.56, h: 0.404, fontFace: SANS, fontSize: 18, color: BLACK, bold: true, align: "center", valign: "top" });
+  s.addText("$35", { x: 5.288, y: 2.437, w: 2.758, h: 0.841, fontFace: SERIF, fontSize: 44, color: YELLOW, bold: true, align: "center", valign: "top" });
+  s.addText("100MB Bandwith", { x: 5.784, y: 4.018, w: 1.766, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("5GB Space", { x: 6.066, y: 4.399, w: 1.201, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("Unlimited User", { x: 5.883, y: 4.781, w: 1.568, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("Free Design", { x: 6.018, y: 5.123, w: 1.298, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addShape('rect', { x: 9.782, y: 5.743, w: 1.564, h: 0.46, fill: { color: YELLOW } });
+  s.addText("Basic", { x: 9.784, y: 3.413, w: 1.56, h: 0.404, fontFace: SANS, fontSize: 18, color: BLACK, bold: true, align: "center", valign: "top" });
+  s.addText("$35", { x: 9.185, y: 2.437, w: 2.758, h: 0.841, fontFace: SERIF, fontSize: 44, color: YELLOW, bold: true, align: "center", valign: "top" });
+  s.addText("100MB Bandwith", { x: 9.681, y: 4.018, w: 1.766, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("5GB Space", { x: 9.963, y: 4.399, w: 1.201, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("Unlimited User", { x: 9.78, y: 4.781, w: 1.568, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("Free Design", { x: 9.915, y: 5.123, w: 1.298, h: 0.337, fontFace: SANS, fontSize: 14, color: BLACK, align: "center", valign: "top", wrap: false });
+  s.addText("Select", { x: 1.334, y: 5.771, w: 2.921, h: 0.404, fontFace: SERIF, fontSize: 18, color: WHITE, bold: true, align: "center", valign: "top" });
+  s.addText("Select", { x: 5.206, y: 5.771, w: 2.921, h: 0.404, fontFace: SERIF, fontSize: 18, color: WHITE, bold: true, align: "center", valign: "top" });
+  s.addText("Select", { x: 9.103, y: 5.771, w: 2.921, h: 0.404, fontFace: SERIF, fontSize: 18, color: WHITE, bold: true, align: "center", valign: "top" });
+  sigText(s, YELLOW);
+  sigRule(s, WHITE);
+}
+
+// 28. Our Testimonials
+function slide28(s) {
+  masterDecor(s);
+  s.addShape('rect', { x: 0, y: 6.082, w: 2.111, h: 1.45, fill: { color: YELLOW } });
+  s.addText("Our Testimony", { x: 0.917, y: 0.298, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "center", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addShape('rect', { x: 9.067, y: 1.767, w: 3.236, h: 0.809, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 9.067, y: 4.491, w: 3.236, h: 0.809, fill: { color: YELLOW } });
+  s.addText("Customer", { x: 9.301, y: 2.137, w: 3.008, h: 0.303, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle" });
+  s.addText("Elisabeth Rose", { x: 9.301, y: 1.82, w: 3.008, h: 0.438, fontFace: SERIF, fontSize: 20, color: BLACK, align: "left", valign: "middle" });
+  s.addText("Customer", { x: 9.295, y: 4.869, w: 3.008, h: 0.303, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle" });
+  s.addText("Nadya Chill", { x: 9.295, y: 4.552, w: 3.008, h: 0.438, fontFace: SERIF, fontSize: 20, color: BLACK, align: "left", valign: "middle" });
+  s.addText(LOREM3, { x: 9.014, y: 2.595, w: 3.444, h: 0.97, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText(LOREM3, { x: 9.014, y: 5.329, w: 3.617, h: 0.97, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addShape('rect', { x: 3.083, y: 1.764, w: 3.236, h: 0.809, fill: { color: YELLOW } });
+  s.addShape('rect', { x: 3.083, y: 4.487, w: 3.236, h: 0.809, fill: { color: YELLOW } });
+  s.addText("Customer", { x: 3.317, y: 2.137, w: 3.008, h: 0.303, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle" });
+  s.addText("Anisa Yunlaw", { x: 3.317, y: 1.82, w: 3.008, h: 0.438, fontFace: SERIF, fontSize: 20, color: BLACK, align: "left", valign: "middle" });
+  s.addText("Customer", { x: 3.311, y: 4.869, w: 3.008, h: 0.303, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle" });
+  s.addText("Lee Xiau", { x: 3.311, y: 4.552, w: 3.008, h: 0.438, fontFace: SERIF, fontSize: 20, color: BLACK, align: "left", valign: "middle" });
+  s.addText(LOREM3, { x: 3.03, y: 2.595, w: 3.444, h: 0.97, fontFace: SANS, fontSize: 12, color: BLACK, align: "justify", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText(LOREM3, { x: 3.03, y: 5.329, w: 3.617, h: 0.97, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  starRow(s, 3.14, 3.692, 5);
+  starRow(s, 3.14, 6.423, 3);
+  starRow(s, 9.158, 3.692, 4);
+  starRow(s, 9.158, 6.423, 5);
+  photo(s, 1.019, 4.486, 1.861, 2.083, 11.6, -0.026);
+  photo(s, 1.019, 1.775, 1.861, 2.083, 11.6, -0.026);
+  photo(s, 7, 1.775, 1.861, 2.083, 11.6, -0.026);
+  photo(s, 7, 4.486, 1.861, 2.083, 11.6, -0.026);
+}
+
+// 29. Contact Us
+function slide29(s) {
+  masterDecor(s);
+  photo(s, 0, 1.416, 8.794, 6.127, 49, -0.11);
+  s.addShape('rect', { x: 0, y: 0, w: 6.667, h: 1.408, fill: { color: YELLOW } });
+  s.addText([{ text: "Contact", options: { breakLine: true } }, { text: "Us" }], { x: 9.5, y: 1.571, w: 11.5, h: 1.45, fontFace: SERIF, fontSize: 40, color: YELLOW, bold: true, align: "left", valign: "middle", lineSpacingMultiple: 0.9 });
+  s.addText([{ text: "58 Old Theatre Ave. ", options: { breakLine: true } }, { text: "Norwalk, CT 06851" }], { x: 9.5, y: 3.478, w: 2.995, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Address", { x: 9.5, y: 3.223, w: 2.622, h: 0.337, fontFace: SERIF, fontSize: 14, color: YELLOW, align: "left", valign: "middle" });
+  s.addText([{ text: "+1 234 567 890", options: { breakLine: true } }, { text: "+1 098 765 432" }], { x: 9.524, y: 4.559, w: 2.995, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Phone", { x: 9.524, y: 4.304, w: 2.622, h: 0.337, fontFace: SERIF, fontSize: 14, color: YELLOW, align: "left", valign: "middle" });
+  s.addText([{ text: "manager@company.com", options: { breakLine: true } }, { text: "director@company.com" }], { x: 9.549, y: 5.661, w: 2.995, h: 0.675, fontFace: SANS, fontSize: 12, color: BLACK, align: "left", valign: "middle", lineSpacingMultiple: 1.5 });
+  s.addText("Emails", { x: 9.549, y: 5.406, w: 2.622, h: 0.337, fontFace: SERIF, fontSize: 14, color: YELLOW, align: "left", valign: "middle" });
+  hamburger(s, WHITE);
+  s.addShape('rect', { x: 12.122, y: 0, w: 1.212, h: 1.408, fill: { color: YELLOW } });
+  mapPin(s, 4.92, 4.4, 0.79, 1.18, YELLOW);
+}
+
+// 30. Thank You
+function slide30(s) {
+  masterDecor(s);
+  photo(s, 0, 0, 13.333, 7.5, 74.3, -0.167);
+  s.addShape('rect', { x: 0, y: -0.006, w: 13.333, h: 7.506, fill: { color: BLACK, transparency: 70 }, flipH: true, flipV: true });
+  s.addText("Thanks", { x: 1.667, y: 2.56, w: 10, h: 1.811, fontFace: SERIF, fontSize: 96, color: YELLOW, bold: true, align: "center", valign: "bottom", lineSpacingMultiple: 0.9 });
+  s.addText("Thank You For All Participants", { x: 1.667, y: 4.148, w: 10, h: 0.399, fontFace: SANS, fontSize: 11, color: WHITE, italic: true, align: "center", valign: "top", lineSpacingMultiple: 0.9 });
+  sigText(s, YELLOW);
+  hamburger(s, YELLOW);
+  s.addText(EU_A + " For science, music, sport, etc, Europe uses the same vocabulary. ", { x: 3.937, y: 4.474, w: 5.46, h: 0.974, fontFace: SANS, fontSize: 12, color: YELLOW, align: "center", valign: "top", lineSpacingMultiple: 1.5 });
+  sigRule(s, WHITE);
+}
+
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05,
+  slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15,
+  slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25,
+  slide26, slide27, slide28, slide29, slide30,
+];
+
+/* ------------------------------------------------------------------ main */
+const pres = new pptxgen();
+pres.defineLayout({ name: 'CUSTOM', width: 13.333, height: 7.5 });
+pres.layout = 'CUSTOM';
+pres.theme = { headFontFace: SERIF, bodyFontFace: SANS };
+
+SLIDES.forEach((build) => build(pres.addSlide()));
+
+pres.writeFile({ fileName: OUT_FILE }).then(() => console.log('wrote ' + OUT_FILE));

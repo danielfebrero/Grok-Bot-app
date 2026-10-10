@@ -1,0 +1,632 @@
+/**
+ * "Agenda / Schedule" meeting deck - rebuilt with pptxgenjs.
+ *
+ * Two things pptxgenjs has no native API for, and how they are handled here:
+ *   - Gradient fills : painted by `gradientFill()` / `ringCorner()` as a stack of solid
+ *                      bands (or angular slices) that interpolate between the two stops.
+ *   - Gradient text  : drawn in the gradient stop that dominates the glyphs on screen.
+ * The deck's small SVG glyphs are redrawn from native shapes - see ICONS / arrowDisc.
+ */
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ------------------------------------------------------------------ design tokens
+const FONT = 'DM Sans 14pt';
+
+const C = {
+  dark: '28303B',   // page + panel charcoal
+  white: 'FFFFFF',
+  orange: 'F47A1F', // gradient start
+  pink: 'EC146A',   // gradient end
+  purple: 'B723DB', // third stop of the display-type gradient
+  warm: 'F04744',   // flat stand-in for orange -> pink on tiny shapes
+  grey: '595959',   // body copy
+  light: 'F2F2F2',  // card surface
+  subtle: 'D9D9D9', // muted copy on charcoal
+};
+
+// blurRad 20pt / dist 8pt / 45deg / 5% black - every card in the deck uses this
+const SHADOW = { type: 'outer', color: '000000', opacity: 0.05, blur: 20, offset: 8, angle: 45 };
+const NO_LINE = { type: 'none' };
+const NO_FILL = { type: 'none' };
+
+const LOREM =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor ' +
+  'incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.';
+const LOREM_SHORT =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.';
+
+// ------------------------------------------------------------------ colour + geometry utils
+function mix(from, to, t) {
+  let out = '';
+  for (let i = 0; i < 6; i += 2) {
+    const a = parseInt(from.substr(i, 2), 16);
+    const b = parseInt(to.substr(i, 2), 16);
+    out += Math.round(a + (b - a) * t).toString(16).padStart(2, '0');
+  }
+  return out.toUpperCase();
+}
+
+/** Filled polygon from absolute slide coordinates. */
+function polygon(slide, pts, color) {
+  const xs = pts.map(function (p) { return p[0]; });
+  const ys = pts.map(function (p) { return p[1]; });
+  const x = Math.min.apply(null, xs);
+  const y = Math.min.apply(null, ys);
+  const w = Math.max.apply(null, xs) - x;
+  const h = Math.max.apply(null, ys) - y;
+  slide.addShape('custGeom', {
+    x: x, y: y, w: w, h: h,
+    points: pts.map(function (p) { return { x: p[0] - x, y: p[1] - y }; }).concat([{ close: true }]),
+    fill: { color: color }, line: NO_LINE,
+  });
+}
+
+function line(slide, x1, y1, x2, y2, widthPt, color, endArrow) {
+  slide.addShape('line', {
+    x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1),
+    flipH: x2 < x1, flipV: y2 < y1,
+    line: { color: color, width: widthPt, endArrowType: endArrow },
+  });
+}
+
+/** Keep the part of a polygon where `signedDist(point) >= 0` (Sutherland-Hodgman). */
+function clipHalfPlane(poly, signedDist) {
+  const out = [];
+  poly.forEach(function (b, i) {
+    const a = poly[(i + poly.length - 1) % poly.length];
+    const da = signedDist(a);
+    const db = signedDist(b);
+    if (da * db < 0) {
+      const t = da / (da - db);
+      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+    if (db >= 0) out.push(b);
+  });
+  return out;
+}
+
+/** Clip a polygon to a convex window polygon. */
+function clipToConvex(poly, win) {
+  let out = poly;
+  const mid = win.reduce(function (acc, p) { return [acc[0] + p[0] / win.length, acc[1] + p[1] / win.length]; }, [0, 0]);
+  win.forEach(function (b, i) {
+    if (out.length < 3) return;
+    const a = win[(i + win.length - 1) % win.length];
+    const side = function (p) { return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]); };
+    const sign = side(mid) >= 0 ? 1 : -1;
+    out = clipHalfPlane(out, function (p) { return sign * side(p); });
+  });
+  return out;
+}
+
+/** Rounded rectangle as a polygon (6 segments per corner). */
+function roundRectPoly(x, y, w, h, r) {
+  if (!r) return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  const pts = [];
+  [[x + w - r, y + r, -90], [x + w - r, y + h - r, 0], [x + r, y + h - r, 90], [x + r, y + r, 180]]
+    .forEach(function (c) {
+      for (let k = 0; k <= 6; k++) {
+        const a = (c[2] + 90 * k / 6) * Math.PI / 180;
+        pts.push([c[0] + r * Math.cos(a), c[1] + r * Math.sin(a)]);
+      }
+    });
+  return pts;
+}
+
+/** Sample a [position, colour] stop list at 0 <= t <= 1. */
+function sampleStops(stops, t) {
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0] || i === stops.length - 1) {
+      const span = stops[i][0] - stops[i - 1][0];
+      return mix(stops[i - 1][1], stops[i][1], span ? (t - stops[i - 1][0]) / span : 0);
+    }
+  }
+  return stops[0][1];
+}
+
+/**
+ * Linear gradient fill, painted as a stack of interpolated bands clipped to the shape.
+ * `dir` is 'd' (the deck's default 45-degree ramp), 'v' or 'h'; `radius` rounds corners;
+ * `stops` overrides the default orange -> pink ramp with a [position, colour] list;
+ * `fade: true` reproduces the source's "transparent -> opaque" ramp composited on white.
+ */
+function gradientFill(slide, o) {
+  const stops = o.stops || [[0, o.from || C.orange], [1, o.to || C.pink]];
+  const steps = o.steps || 20;
+  const r = o.radius || 0;
+  const dir = o.dir === 'v' ? [0, 1] : o.dir === 'h' ? [1, 0] : [Math.SQRT1_2, Math.SQRT1_2];
+  const at = function (t) {
+    const c = sampleStops(stops, t);
+    return o.fade ? mix(C.white, c, t) : c;
+  };
+  const win = roundRectPoly(o.x, o.y, o.w, o.h, r);
+  const proj = function (p) { return p[0] * dir[0] + p[1] * dir[1]; };
+  const lo = Math.min.apply(null, win.map(proj));
+  const hi = Math.max.apply(null, win.map(proj));
+  const band = (hi - lo) / steps;
+
+  // base shape carries the silhouette + drop shadow; bands paint the ramp over it
+  slide.addShape(r ? 'roundRect' : 'rect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: r,
+    fill: { color: at(0.5) }, line: NO_LINE, shadow: o.shadow,
+  });
+  for (let i = 0; i < steps; i++) {
+    const near = lo + i * band - band * 0.4; // bands overlap so no seams show through
+    const far = lo + (i + 1) * band + band * 0.4;
+    let strip = clipHalfPlane(win, function (p) { return far - proj(p); });
+    strip = clipHalfPlane(strip, function (p) { return proj(p) - near; });
+    strip = clipToConvex(strip, win);
+    if (strip.length > 2) polygon(slide, strip, at((i + 0.5) / steps));
+  }
+}
+
+/**
+ * Quarter-ring corner ornament. The ring is centred on the named corner of the box,
+ * its band runs from radius 0.6 * size to size, and it fades orange (at the horizontal
+ * end of the sweep) to pink (at the vertical end). Drawn as overlapping angular slices.
+ */
+function ringCorner(slide, o) {
+  // corner -> [centre fx, centre fy, angle of the horizontal end, sweep direction]
+  const CORNERS = { tl: [0, 0, 0, 1], tr: [1, 0, 180, -1], bl: [0, 1, 0, -1], br: [1, 1, 180, 1] };
+  const spec = CORNERS[o.corner];
+  const cx = o.x + spec[0] * o.size;
+  const cy = o.y + spec[1] * o.size;
+  const slices = 30;
+  const at = function (deg, radius) {
+    const a = (spec[2] + spec[3] * deg) * Math.PI / 180;
+    return [cx + radius * o.size * Math.cos(a), cy + radius * o.size * Math.sin(a)];
+  };
+  const wedge = function (from, to, segments, color) {
+    const pts = [];
+    for (let k = 0; k <= segments; k++) pts.push(at(from + (to - from) * k / segments, 1));
+    for (let k = segments; k >= 0; k--) pts.push(at(from + (to - from) * k / segments, 0.6));
+    polygon(slide, pts, color);
+  };
+
+  // full-sweep base first, so each slice's antialiased edge lands on the ring, not the page
+  wedge(0, 90, 4 * slices, mix(C.orange, C.pink, 0.5));
+  for (let i = 0; i < slices; i++) {
+    const from = Math.max(0, (i - 0.5) * 90 / slices); // slices overlap so no seams show
+    const to = Math.min(90, (i + 1.5) * 90 / slices);
+    wedge(from, to, 4, mix(C.orange, C.pink, (i + 0.5) / slices));
+  }
+}
+
+/**
+ * The two "frosted glass" panels on the charcoal slides: a barely-there white sheen
+ * fading out along the diagonal, inside a pink hairline border.
+ */
+function glassPanel(slide, o) {
+  gradientFill(slide, {
+    x: o.x, y: o.y, w: o.w, h: o.h, radius: o.radius, steps: 16,
+    from: mix(C.dark, C.white, 0.05), to: C.dark,
+  });
+  slide.addShape('roundRect', {
+    x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: o.radius,
+    fill: NO_FILL, line: { color: C.pink, width: 2 },
+  });
+}
+
+/** Small right-pointing chevron (a freeform in the source deck). */
+function chevron(slide, x, y, w, h) {
+  polygon(slide, [
+    [x, y], [x + w, y + h / 2], [x, y + h],
+    [x, y + 0.765 * h], [x + 0.529 * w, y + h / 2], [x, y + 0.235 * h],
+  ], C.white);
+}
+
+/** The deck's "arrow inside a disc" motif (three strokes on a 24-unit grid, as in the source). */
+function arrowDisc(slide, x, y, size, discColor, arrowColor) {
+  slide.addShape('ellipse', { x: x, y: y, w: size, h: size, fill: { color: discColor }, line: NO_LINE });
+  const g = size * 0.835; // the source art inset the glyph inside the disc
+  const u = g / 24;
+  const gx = x + (size - g) / 2;
+  const gy = y + (size - g) / 2;
+  const stroke = 2 * u * 72;
+  line(slide, gx + 6 * u, gy + 12 * u, gx + 18 * u, gy + 12 * u, stroke, arrowColor);
+  line(slide, gx + 18 * u, gy + 12 * u, gx + 13 * u, gy + 7 * u, stroke, arrowColor);
+  line(slide, gx + 18 * u, gy + 12 * u, gx + 13 * u, gy + 17 * u, stroke, arrowColor);
+}
+
+// ------------------------------------------------------------------ icon library
+// Each glyph is described on the source SVGs' 96 x 96 grid.
+//   r = rect(x,y,w,h)   o = ring(x,y,diameter,stroke)   l = line(x1,y1,x2,y2,stroke)
+//   p = polyline([x,y,...], stroke)                      a = arrow-line(x1,y1,x2,y2,stroke)
+const ICONS = {
+  barChart: [
+    ['r', 14, 14, 6, 68], ['r', 14, 76, 68, 6],
+    ['r', 26, 35, 11, 35], ['r', 41, 14, 11, 56], ['r', 56, 35, 11, 35], ['r', 71, 52, 11, 18],
+  ],
+  document: [
+    // page outline with the top-right corner folded back
+    ['p', [54, 10, 19, 10, 19, 86, 77, 86, 77, 31, 54, 10], 5],
+    ['p', [54, 12, 54, 31, 75, 31], 5],
+    ['r', 29, 37, 13, 4], ['r', 29, 45, 38, 4], ['r', 29, 53, 38, 4], ['r', 29, 61, 38, 4], ['r', 29, 69, 38, 4],
+  ],
+  search: [
+    ['o', 11, 11, 54, 6],
+    ['l', 60, 60, 84, 84, 8],
+    ['p', [17, 39, 25, 39, 30, 25, 36, 54, 43, 32, 48, 45, 54, 39, 59, 39], 4],
+  ],
+  target: [
+    ['o', 8.5, 11.5, 76, 6], ['o', 22.5, 25.5, 48, 6], ['o', 36.5, 39.5, 20, 6],
+    ['a', 52, 44, 82, 14, 5],
+  ],
+  checklist: [
+    ['r', 17, 8, 62, 5], ['r', 17, 83, 62, 5], ['r', 17, 8, 5, 80], ['r', 74, 8, 5, 80],
+    ['r', 50, 23, 17, 4], ['r', 50, 39, 17, 4], ['r', 50, 55, 17, 4], ['r', 50, 71, 17, 4],
+    ['p', [29, 24, 34, 30, 41, 18], 4], ['p', [29, 40, 34, 46, 41, 34], 4],
+    ['p', [29, 56, 34, 62, 41, 50], 4], ['p', [29, 72, 34, 78, 41, 66], 4],
+  ],
+};
+
+function icon(slide, name, x, y, size, color) {
+  const u = size / 96; // grid unit -> inches
+  ICONS[name].forEach(function (part) {
+    const kind = part[0];
+    if (kind === 'r') {
+      slide.addShape('rect', {
+        x: x + part[1] * u, y: y + part[2] * u, w: part[3] * u, h: part[4] * u,
+        fill: { color: color }, line: NO_LINE,
+      });
+    } else if (kind === 'o') {
+      slide.addShape('ellipse', {
+        x: x + part[1] * u, y: y + part[2] * u, w: part[3] * u, h: part[3] * u,
+        fill: NO_FILL, line: { color: color, width: part[4] * u * 72 },
+      });
+    } else if (kind === 'p') {
+      for (let i = 0; i + 3 < part[1].length; i += 2) {
+        line(slide, x + part[1][i] * u, y + part[1][i + 1] * u,
+          x + part[1][i + 2] * u, y + part[1][i + 3] * u, part[2] * u * 72, color);
+      }
+    } else {
+      line(slide, x + part[1] * u, y + part[2] * u, x + part[3] * u, y + part[4] * u,
+        part[5] * u * 72, color, kind === 'a' ? 'triangle' : undefined);
+    }
+  });
+}
+
+// ------------------------------------------------------------------ text helpers
+// Every text box in the source deck is "resize shape to fit text" (spAutoFit), which is
+// what keeps the non-wrapping display lines centred on their frame.
+function text(slide, body, o) {
+  slide.addText(body, Object.assign({ fontFace: FONT, valign: 'top', isTextBox: true, fit: 'resize' }, o));
+}
+
+/** Section heading: 16pt bold charcoal. */
+function heading(slide, body, o) {
+  text(slide, body, Object.assign({ h: 0.37, fontSize: 16, bold: true, color: C.dark }, o));
+}
+
+/** Body copy: 12pt grey, 150% leading. */
+function paragraph(slide, body, o) {
+  text(slide, body, Object.assign({ h: 0.679, fontSize: 12, color: C.grey, lineSpacingMultiple: 1.5 }, o));
+}
+
+/**
+ * Display type: one shrink-wrapped (non-wrapping) box, 54pt bold by default.
+ * `lines` holds one entry per line; an entry is either a single [text, colour, overrides]
+ * segment or an array of such segments when a line changes colour mid-way.
+ */
+function display(slide, lines, o) {
+  const runs = [];
+  lines.forEach(function (entry, li) {
+    const segments = typeof entry[0] === 'string' ? [entry] : entry;
+    segments.forEach(function (seg, si) {
+      // `bold` lives on the run, not the box: pptxgenjs lets box options override a
+      // falsy run option, so a non-bold line has to opt out at run level.
+      runs.push({
+        text: seg[0],
+        options: Object.assign(
+          { color: seg[1], bold: true, breakLine: si === segments.length - 1 && li < lines.length - 1 },
+          seg[2]),
+      });
+    });
+  });
+  text(slide, runs, Object.assign({ fontSize: 54, wrap: false }, o));
+}
+
+// ------------------------------------------------------------------ slides
+function slide1(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.dark };
+
+  ringCorner(s, { x: 0, y: 0, size: 1.969, corner: 'tl' });
+  ringCorner(s, { x: 11.363, y: 5.531, size: 1.969, corner: 'br' });
+  glassPanel(s, { x: 2.533, y: 1.159, w: 8.268, h: 4.331, radius: 0.435 });
+
+  display(s, [
+    ['Agenda', C.pink, { fontSize: 115 }],
+    ['Schedule', C.white, { fontSize: 88, bold: false }],
+  ], { x: 3.545, y: 1.565, w: 6.243, h: 3.517, align: 'center' });
+  text(s, 'Meeting Overview & Key Discussions', {
+    x: 3.149, y: 5.836, w: 7.033, h: 0.505, fontSize: 24, italic: true, color: C.subtle, align: 'center',
+  });
+}
+
+function slide2(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.white };
+
+  display(s, [
+    ['Welcome to', C.purple],
+    [['Today\u2019s ', C.purple], ['Session', C.pink]],
+  ], { x: 5.235, y: 0.797, w: 6.024, h: 1.919 });
+
+  [
+    { y: 3.324, title: 'Purpose of the Session', glyph: 'target' },
+    { y: 5.249, title: 'What to Expect', glyph: 'checklist' },
+  ].forEach(function (row) {
+    gradientFill(s, { x: 6.667, y: row.y, w: 0.472, h: 0.472, radius: 0.095, steps: 10, shadow: SHADOW });
+    icon(s, row.glyph, 6.706, row.y + 0.039, 0.394, C.white);
+    heading(s, row.title, { x: 7.316, y: row.y + 0.052, w: 5.415 });
+    paragraph(s, LOREM, { x: 7.316, y: row.y + 0.473, w: 5.415, h: 0.982 });
+  });
+
+  gradientFill(s, { x: 2.831, y: 5.274, w: 3.0, h: 1.429, radius: 0.151, shadow: SHADOW });
+  text(s, 'Let\u2019s begin with a productive mindset', {
+    x: 3.016, y: 5.505, w: 2.63, h: 0.968, fontSize: 18, italic: true, color: C.white, lineSpacingMultiple: 1.5,
+  });
+}
+
+function slide3(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.white };
+
+  s.addShape('rect', { x: 6.667, y: 0, w: 6.667, h: 7.5, fill: { color: C.dark }, line: NO_LINE });
+
+  display(s, [['Today\u2019s', C.pink], ['Agenda', C.purple]], { x: 0.602, y: 1.288, w: 3.038, h: 1.919 });
+  heading(s, 'What We\u2019ll Cover Today', { x: 0.602, y: 3.757, w: 4.575 });
+  paragraph(s, LOREM, { x: 0.602, y: 4.128, w: 4.575, h: 0.982 });
+
+  s.addShape('roundRect', {
+    x: 0.685, y: 5.66, w: 2.205, h: 0.551, rectRadius: 0.276,
+    fill: { color: C.dark }, line: NO_LINE, shadow: SHADOW,
+  });
+  text(s, 'Explore More', {
+    x: 0.801, y: 5.768, w: 1.973, h: 0.337, fontSize: 14, bold: true, color: C.white, align: 'center',
+  });
+
+  // highlight bar behind agenda item 03
+  gradientFill(s, { x: 5.881, y: 4.063, w: 6.85, h: 0.982, radius: 0.142, steps: 40, shadow: SHADOW });
+  s.addShape('triangle', {
+    x: 6.436, y: 4.447, w: 0.248, h: 0.214, rotate: 90, fill: { color: C.white }, line: NO_LINE,
+  });
+
+  [
+    ['01', 'Welcome & Opening Remarks', 1.019],
+    ['02', 'Project & Operational Updates', 2.626],
+    ['03', 'Discussion & Key Issues Review', 4.234],
+    ['04', 'Action Plans & Next Steps', 5.842],
+  ].forEach(function (row) {
+    text(s, row[0], { x: 7.269, y: row[2], w: 0.978, h: 0.64, fontSize: 32, bold: true, color: C.white });
+    text(s, row[1], {
+      x: 8.408, y: row[2] + 0.086, w: 3.947, h: 0.468, fontSize: 16, color: C.light, lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+function slide4(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.white };
+
+  gradientFill(s, { x: 0.602, y: 0.601, w: 2.362, h: 2.362 });
+
+  heading(s, 'Key Points', { x: 7.819, y: 1.307, w: 4.912 });
+  paragraph(s, LOREM, { x: 7.819, y: 1.677, w: 4.912, h: 0.982 });
+  heading(s, 'Outcome', { x: 7.819, y: 3.137, w: 4.912 });
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.',
+    { x: 7.819, y: 3.507, w: 4.912 });
+
+  s.addShape('roundRect', {
+    x: 4.742, y: 4.86, w: 7.087, h: 1.575, rectRadius: 0.262,
+    fill: { color: C.light }, line: NO_LINE, shadow: SHADOW,
+  });
+  gradientFill(s, { x: 10.923, y: 4.664, w: 1.811, h: 1.969, radius: 0.207, shadow: SHADOW });
+
+  display(s, [['Agenda 01', C.pink]], { x: 5.415, y: 5.143, w: 4.025, h: 1.01 });
+  display(s, [['24', C.white]], { x: 11.166, y: 5.015, w: 1.326, h: 1.01, align: 'center' });
+  text(s, 'Nov', {
+    x: 11.328, y: 5.91, w: 1.002, h: 0.37, fontSize: 16, color: C.white, align: 'center', wrap: false,
+  });
+}
+
+function slide5(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.white };
+
+  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 3.228, fill: { color: C.dark }, line: NO_LINE });
+
+  [
+    { x: 0.599, glyph: 'barChart', title: 'Latest Performance Insights', accent: false },
+    { x: 4.797, glyph: 'document', title: 'Important Progress Highlights', accent: false },
+    { x: 8.994, glyph: 'search', title: 'Key Announcements & Changes', accent: true },
+  ].forEach(function (card) {
+    if (card.accent) {
+      gradientFill(s, { x: card.x, y: 4.149, w: 3.74, h: 2.756, radius: 0.216, shadow: SHADOW });
+    } else {
+      s.addShape('roundRect', {
+        x: card.x, y: 4.149, w: 3.74, h: 2.756, rectRadius: 0.216,
+        fill: { color: C.light }, line: NO_LINE, shadow: SHADOW,
+      });
+    }
+    icon(s, card.glyph, card.x + 0.531, 4.525, 0.551, card.accent ? C.white : C.dark);
+    heading(s, card.title, {
+      x: card.x + 0.443, y: 5.212, w: 2.855, h: 0.64, color: card.accent ? C.white : C.dark,
+    });
+    paragraph(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit', {
+      x: card.x + 0.443, y: 5.849, w: 2.855, color: card.accent ? C.light : C.grey,
+    });
+  });
+
+  text(s, [
+    { text: 'Progress Begins With Clear ', options: { breakLine: true } },
+    { text: 'and Honest Updates' },
+  ], { x: 0.602, y: 1.025, w: 6.21, h: 1.178, fontSize: 32, bold: true, italic: true, color: C.white, wrap: false });
+
+  gradientFill(s, { x: 0.599, y: 2.953, w: 2.205, h: 0.551, radius: 0.276, shadow: SHADOW });
+  text(s, 'Recent Updates', {
+    x: 0.766, y: 3.06, w: 1.87, h: 0.337, fontSize: 14, bold: true, color: C.white, align: 'center',
+  });
+}
+
+function slide6(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.white };
+
+  s.addShape('roundRect', {
+    x: 0.878, y: 2.507, w: 3.386, h: 2.992, rectRadius: 0.238,
+    fill: { color: C.light }, line: NO_LINE, shadow: SHADOW,
+  });
+  gradientFill(s, { x: 0.602, y: 2.113, w: 3.937, h: 0.787, radius: 0.394, shadow: SHADOW });
+  s.addShape('ellipse', {
+    x: 0.76, y: 2.231, w: 0.551, h: 0.551, fill: { color: C.white }, line: NO_LINE, shadow: SHADOW,
+  });
+  s.addShape('triangle', {
+    x: 0.934, y: 2.4, w: 0.248, h: 0.214, rotate: 90, fill: { color: C.warm }, line: NO_LINE,
+  });
+  text(s, 'Thursday', {
+    x: 1.497, y: 2.288, w: 2.385, h: 0.438, fontSize: 20, bold: true, color: C.white, align: 'center',
+  });
+  display(s, [['20', C.pink, { fontSize: 80 }]], { x: 1.753, y: 3.281, w: 1.636, h: 1.447, align: 'center' });
+  text(s, 'November 2025', {
+    x: 1.378, y: 4.604, w: 2.385, h: 0.514, fontSize: 18, color: C.grey, align: 'center', lineSpacingMultiple: 1.5,
+  });
+
+  text(s, [
+    { text: 'Insight Begins with', options: { breakLine: true } },
+    { text: 'Honest Conversation' },
+  ], { x: 5.408, y: 1.219, w: 5.603, h: 1.043, fontSize: 28, bold: true, color: C.dark });
+  paragraph(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut ' +
+    'labore et dolore magna aliqua.', { x: 5.408, y: 2.346, w: 7.323 });
+
+  [
+    { x: 5.469, y: 3.711, title: 'Present Key Topics' },
+    { x: 5.469, y: 5.296, title: 'Facilitate Open Discussion' },
+    { x: 9.313, y: 3.711, title: 'Share Supporting Data' },
+    { x: 9.313, y: 5.296, title: 'Identify Key Priorities' },
+  ].forEach(function (p) {
+    s.addShape('ellipse', {
+      x: p.x, y: p.y, w: 0.236, h: 0.236, fill: { color: C.warm }, line: NO_LINE, shadow: SHADOW,
+    });
+    heading(s, p.title, { x: p.x + 0.319, y: p.y - 0.067, w: 3.098 });
+    paragraph(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ',
+      { x: p.x + 0.319, y: p.y + 0.306, w: 3.098 });
+  });
+}
+
+function slide7(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.white };
+
+  display(s, [['Today\u2019s', C.pink], ['Schedule', C.pink]], { x: 0.602, y: 1.041, w: 3.663, h: 1.919 });
+
+  // each stop = gradient card + pointer + time + arrow disc + copy block
+  [
+    { x: 2.014, y: 3.946, time: '8.00', copyX: 4.86, copyY: 4.513, title: 'Short Intermission for Refreshments' },
+    { x: 6.488, y: 0.798, time: '9.00', copyX: 9.334, copyY: 1.365, title: 'Opportunity to Network and Discuss Early Thoughts' },
+  ].forEach(function (stop) {
+    gradientFill(s, { x: stop.x, y: stop.y, w: 2.362, h: 2.756, radius: 0.195, shadow: SHADOW });
+    s.addShape('triangle', {
+      x: stop.x + 2.325, y: stop.y + 0.585, w: 0.325, h: 0.281, rotate: 90, fill: { color: C.warm }, line: NO_LINE,
+    });
+    text(s, stop.time, {
+      x: stop.x + 0.232, y: stop.y + 0.337, w: 1.278, h: 0.505, fontSize: 24, bold: true, color: C.white,
+    });
+    text(s, 'AM', {
+      x: stop.x + 0.232, y: stop.y + 0.71, w: 1.278, h: 0.376, fontSize: 12, color: C.white, lineSpacingMultiple: 1.5,
+    });
+    arrowDisc(s, stop.x + 1.658, stop.y + 1.946, 0.472, C.white, C.dark);
+
+    heading(s, stop.title, { x: stop.copyX, y: stop.copyY, w: 3.397, h: 0.64 });
+    paragraph(s, LOREM_SHORT, { x: stop.copyX, y: stop.copyY + 0.64, w: 3.397, h: 0.982 });
+  });
+
+  text(s, [
+    { text: 'Clarity, Efficiency', options: { breakLine: true } },
+    { text: 'And Alignment.' },
+  ], {
+    x: 9.624, y: 5.793, w: 3.107, h: 0.909, fontSize: 24, bold: true, italic: true,
+    color: C.pink, align: 'right', wrap: false,
+  });
+}
+
+function slide8(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.white };
+
+  display(s, [['Our Speaker', C.pink]], { x: 4.278, y: 0.601, w: 4.777, h: 1.01, align: 'center' });
+
+  // portrait frames: a colour wash fading in from the top, name + role over it
+  [
+    { x: 0.602, name: 'Jonathan Miller', role: 'Chief Strategy Officer', wash: C.orange },
+    { x: 3.727, name: 'Maria Chen', role: 'Head of Operations', wash: C.pink },
+    { x: 6.851, name: 'David Ramirez', role: 'Senior Financial Analyst', wash: C.orange },
+    { x: 9.975, name: 'Olivia Hart', role: 'Communications Director', wash: C.orange },
+  ].forEach(function (p) {
+    gradientFill(s, { x: p.x, y: 4.498, w: 2.756, h: 2.402, dir: 'v', to: p.wash, fade: true });
+    text(s, p.name, {
+      x: p.x + 0.197, y: 5.989, w: 2.362, h: 0.337, fontSize: 14, bold: true, color: C.white, align: 'center',
+    });
+    text(s, p.role, {
+      x: p.x + 0.197, y: 6.325, w: 2.362, h: 0.376, fontSize: 12, italic: true, color: C.white,
+      align: 'center', lineSpacingMultiple: 1.5,
+    });
+  });
+}
+
+function slide9(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.white };
+
+  gradientFill(s, { x: 0.602, y: 0.6, w: 6.063, h: 6.299, radius: 0.265, steps: 30, shadow: SHADOW });
+  arrowDisc(s, 1.414, 1.203, 0.787, C.white, C.dark);
+  display(s, [['Today\u2019s', C.white], ['Schedule ', C.white], ['Flow', C.white]],
+    { x: 1.21, y: 3.47, w: 3.841, h: 2.827 });
+
+  ['09:00 \u2013 09:15', '09:15 \u2013 10:00', '10:15 \u2013 11:00', '11:00 \u2013 11:30'].forEach(function (slot, i) {
+    const y = 0.6 + i * 1.75;
+    s.addShape('ellipse', {
+      x: 6.391, y: y + 0.25, w: 0.551, h: 0.551, fill: { color: C.dark }, line: NO_LINE, shadow: SHADOW,
+    });
+    chevron(s, 6.623, y + 0.385, 0.152, 0.281);
+    heading(s, slot, { x: 7.387, y: y, w: 5.344 });
+    paragraph(s, LOREM_SHORT, { x: 7.387, y: y + 0.371, w: 5.344 });
+  });
+}
+
+function slide10(deck) {
+  const s = deck.addSlide();
+  s.background = { color: C.dark };
+
+  ringCorner(s, { x: 9.003, y: 0, size: 4.331, corner: 'tr' });
+
+  display(s, [['Let\u2019s Make ', C.pink], ['Today\u2019s Agenda', C.white], ['Count!', C.white]],
+    { x: 0.602, y: 2.069, w: 7.931, h: 3.736, fontSize: 72 });
+
+  glassPanel(s, { x: 0.67, y: 6.191, w: 4.724, h: 0.709, radius: 0.162 });
+  text(s, [
+    { text: 'Visit us on ' },
+    { text: 'www.yourwebsite.com!', options: { bold: true } },
+  ], { x: 0.762, y: 6.311, w: 4.541, h: 0.468, fontSize: 16, color: C.white, align: 'center', lineSpacingMultiple: 1.5 });
+}
+
+// ------------------------------------------------------------------ build
+function build() {
+  const deck = new PptxGenJS();
+  deck.defineLayout({ name: 'WIDE_16x9', width: 13.333, height: 7.5 });
+  deck.layout = 'WIDE_16x9';
+  deck.theme = { headFontFace: FONT, bodyFontFace: FONT };
+  deck.title = 'Agenda Schedule';
+
+  [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10]
+    .forEach(function (make) { make(deck); });
+
+  return deck.writeFile({
+    fileName: path.join(__dirname, '0f11bf4c-8b3c-4c2f-914d-506613c82515_grok_final.pptx'),
+  });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }).catch(function (e) { console.error(e); process.exit(1); });

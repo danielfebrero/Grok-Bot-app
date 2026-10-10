@@ -1,0 +1,866 @@
+/**
+ * "BIRAMA" music-template deck — rebuilt with pptxgenjs.
+ * 30 slides, 13.333 x 7.5 in (16:9).
+ *
+ *   node 16c77af5-4fd1-4f73-a042-a82bfd9b87f5_grok_final.js
+ *
+ * Raster artwork in the source deck (device mock-ups) is redrawn as labelled
+ * grey placeholder rectangles; every other element is a native shape.
+ */
+
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ theme */
+
+const GREEN = '26A65B'; // accent1
+const GREEN_DK = '1C7D44'; // accent1, lumMod 75%
+const INK = '2B2B2B'; // tx1
+const INK_90 = '404040'; // tx1 lumMod 90 / lumOff 10
+const INK_75 = '606060'; // tx1 lumMod 75 / lumOff 25
+const INK_50 = '959595'; // tx1 lumMod 50 / lumOff 50  (body copy)
+const INK_25 = 'CACACA'; // tx1 lumMod 25 / lumOff 75  (chart series 2)
+const RULE = 'DFDFDF'; // tx1 lumMod 15 / lumOff 85  (chart gridlines)
+const AXIS = '757575'; // tx1 lumMod 65 / lumOff 35  (chart axis labels)
+const WHITE = 'FFFFFF';
+const WHITE_90 = 'E6E6E6'; // bg1 lumMod 90
+
+const HEAD = 'Roboto'; // +mj-lt
+const BODY = 'Open Sans'; // +mn-lt
+
+const LINE_W = 2.25; // pt — every rule/connector in the deck
+
+/* ------------------------------------------------------- shared copy text */
+
+const T = 'THE WORLD\u2019S MOST FAMOUS AND POPULAR LANGUAGE IS MUSIC';
+
+const LOREM_WIDE =
+  'Lorem ipsum dolor sit amet, consectetur amaimi eu antana oneca eget dui necasa at sitampinin atas amet ' +
+  'PLACEHOLDER';
+const LOREM_SIDE =
+  'Lorem ipsum dolor sit amet, consectetur amaimi eu antana oneca eget dui necasa at sitampinin atas amet ' +
+  'PLACEHOLDER';
+const LOREM_CARD = 'Lorem lipsum dolor sit amet an onsectetur amaimi';
+const LOREM_STAT = 'Lorem ipsum dolori sit amet consectetu';
+const LOREM_SVC = 'Lorem ipsum dolor sit amet anilasin consectetur sana';
+const LOREM_BADGE = 'Lorem at lipsum dolor sitas amet annil onsectetur salli amaimi';
+const LOREM_PYR = 'Lorem lipsum dolor sit amet an onsectetur salah ami';
+
+/* --------------------------------------------------------------- helpers */
+
+/** Body copy: 12 pt Open Sans, grey, 1.5 line spacing. */
+function body(slide, text, o) {
+  slide.addText(text, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: BODY, fontSize: o.size || 12, color: o.color || INK_50,
+    align: o.align || 'left', valign: 'top', lineSpacingMultiple: 1.5,
+    charSpacing: o.charSpacing, fit: 'resize',
+  });
+}
+
+/** Section headline: 24 pt Roboto, letter-spaced. */
+function title(slide, o) {
+  slide.addText(o.text || T, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: HEAD, fontSize: o.size || 24, color: o.color || INK,
+    charSpacing: 3, align: o.align || 'left', valign: 'top', fit: 'resize',
+  });
+}
+
+/** Small caps-ish label such as "Service 01" / "Your Name" / "Lorem Ipsum". */
+function label(slide, text, o) {
+  slide.addText(text, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: BODY, fontSize: o.size || 14, color: o.color || INK,
+    charSpacing: 3, align: o.align || 'left', valign: 'top',
+    lineSpacingMultiple: 1.5, fit: 'resize',
+  });
+}
+
+/** Big statistic number: 24 pt Roboto. */
+function stat(slide, text, o) {
+  slide.addText(text, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: HEAD, fontSize: 24, color: o.color || INK_75,
+    charSpacing: o.charSpacing === undefined ? 3 : o.charSpacing,
+    align: o.align || 'left', valign: 'top', lineSpacingMultiple: 1.5, fit: 'resize',
+  });
+}
+
+/** Square-bulleted paragraph (Wingdings "§" in the original). */
+function bulleted(slide, text, o) {
+  slide.addText(text, {
+    x: o.x, y: o.y, w: o.w, h: o.h,
+    fontFace: BODY, fontSize: 12, color: o.color || WHITE,
+    valign: 'top', lineSpacingMultiple: 1.5, fit: 'resize',
+    bullet: { characterCode: '25AA', indent: 13.5 },
+  });
+}
+
+function rect(slide, x, y, w, h, fill, opts) {
+  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color: fill }, line: { type: 'none' } }, opts || {}));
+}
+
+function hline(slide, x, y, w, color) {
+  slide.addShape('line', { x, y, w, h: 0, line: { color: color || GREEN, width: LINE_W } });
+}
+
+/** Horizontal rule with the "Lorem ipsum dolor" caption beside it. */
+function captionRule(slide, o) {
+  hline(slide, o.lineX, o.lineY, o.lineW);
+  body(slide, 'Lorem ipsum dolor', { x: o.textX, y: o.textY, w: 1.757, h: 0.372 });
+}
+
+/** Stand-in for a device mock-up photo: dark bezel around a pale screen. */
+function imagePlaceholder(slide, x, y, w, h) {
+  const bezel = Math.min(w, h) * 0.035;
+  rect(slide, x, y, w, h, INK_90, { rectRadius: bezel });
+  slide.addText('[image]', {
+    x: x + bezel, y: y + bezel, w: w - 2 * bezel, h: h - 2 * bezel,
+    fill: { color: 'F5F5F5' }, line: { type: 'none' },
+    fontFace: BODY, fontSize: 11, color: 'A6A6A6', align: 'center', valign: 'middle',
+  });
+}
+
+/* ------------------------------------------------------------------ icons */
+
+/** Outlined microphone (w:h ratio ~0.54). */
+function iconMic(slide, x, y, w, h, color) {
+  const lw = Math.max(0.75, w * 4.4);
+  const stroke = { color, width: lw };
+  slide.addShape('roundRect', {
+    x: x + 0.27 * w, y: y + 0.09 * h, w: 0.46 * w, h: 0.62 * h,
+    rectRadius: 0.23 * w, line: stroke,
+  });
+  hline(slide, x + 0.27 * w, y + 0.42 * h, 0.46 * w, color);
+  slide.addShape('arc', {
+    x: x + 0.11 * w, y: y + 0.21 * h, w: 0.78 * w, h: 0.58 * h,
+    angleRange: [0, 180], line: stroke,
+  });
+  slide.addShape('line', { x: x + 0.5 * w, y: y + 0.79 * h, w: 0, h: 0.15 * h, line: stroke });
+  hline(slide, x + 0.24 * w, y + 0.94 * h, 0.52 * w, color);
+}
+
+/** Outlined double music note (square icon): two note heads, stems and a beam. */
+function iconMusic(slide, x, y, w, h, color) {
+  const stroke = { color, width: Math.max(0.75, w * 2.6) };
+  slide.addShape('ellipse', { x: x + 0.10 * w, y: y + 0.62 * h, w: 0.30 * w, h: 0.24 * h, line: stroke });
+  slide.addShape('ellipse', { x: x + 0.56 * w, y: y + 0.54 * h, w: 0.30 * w, h: 0.24 * h, line: stroke });
+  slide.addShape('line', { x: x + 0.40 * w, y: y + 0.24 * h, w: 0, h: 0.50 * h, line: stroke });
+  slide.addShape('line', { x: x + 0.86 * w, y: y + 0.14 * h, w: 0, h: 0.52 * h, line: stroke });
+  slide.addShape('custGeom', {
+    x: x + 0.40 * w, y: y + 0.14 * h, w: 0.46 * w, h: 0.21 * h, line: stroke,
+    points: [
+      { x: 0, y: 0.10 * h }, { x: 0.46 * w, y: 0 },
+      { x: 0.46 * w, y: 0.10 * h }, { x: 0, y: 0.20 * h }, { close: true },
+    ],
+  });
+}
+
+/** Outlined die showing five pips. */
+function iconDice(slide, x, y, s, color) {
+  const lw = Math.max(0.75, s * 2.6);
+  const stroke = { color, width: lw };
+  slide.addShape('roundRect', { x, y, w: s, h: s, rectRadius: 0.22 * s, line: stroke });
+  [[0.32, 0.32], [0.68, 0.32], [0.5, 0.5], [0.32, 0.68], [0.68, 0.68]].forEach(function (p) {
+    slide.addShape('ellipse', {
+      x: x + (p[0] - 0.085) * s, y: y + (p[1] - 0.085) * s, w: 0.17 * s, h: 0.17 * s, line: stroke,
+    });
+  });
+}
+
+/** Outlined brilliant-cut diamond: crown facets above the girdle, pavilion below. */
+function iconDiamond(slide, x, y, w, h, color) {
+  const stroke = { color, width: Math.max(0.75, w * 2.0) };
+  slide.addShape('custGeom', {
+    x, y, w, h, line: stroke,
+    points: [
+      { x: 1.0 * w, y: 0.334 * h }, { x: 0.755 * w, y: 0 }, { x: 0.245 * w, y: 0 },
+      { x: 0, y: 0.334 * h }, { x: 0.5 * w, y: 1.0 * h }, { close: true },
+    ],
+  });
+  hline(slide, x, y + 0.334 * h, w, color); // girdle
+  // crown facets, then pavilion facets, as x1,y1 -> x2,y2 pairs
+  [[0.245, 0, 0.32, 0.334], [0.755, 0, 0.68, 0.334],
+    [0.393, 0, 0.20, 0.334], [0.607, 0, 0.80, 0.334],
+    [0.32, 0.334, 0.5, 1.0], [0.68, 0.334, 0.5, 1.0]].forEach(function (l) {
+    slide.addShape('line', {
+      x: x + Math.min(l[0], l[2]) * w, y: y + l[1] * h,
+      w: Math.abs(l[2] - l[0]) * w, h: (l[3] - l[1]) * h,
+      line: stroke, flipH: l[2] < l[0],
+    });
+  });
+}
+
+/** Twitter bird silhouette (traced from the original freeform). */
+const BIRD = [
+  [1.0, 0.12], [0.88, 0.161], [0.973, 0.02], [0.842, 0.08], [0.693, 0.0], [0.486, 0.254],
+  [0.492, 0.311], [0.068, 0.047], [0.041, 0.174], [0.133, 0.385], [0.041, 0.355], [0.038, 0.355],
+  [0.204, 0.605], [0.149, 0.612], [0.111, 0.609], [0.302, 0.783], [0.049, 0.893], [0.0, 0.886],
+  [0.312, 1.0], [0.897, 0.284], [0.897, 0.251],
+];
+
+/** Twitter / Facebook / LinkedIn glyph row, 1.226 x 0.229 in at scale 1. */
+function socialRow(slide, x, y, h, color) {
+  const k = h / 0.229;
+  const bw = 0.277 * k, bh = 0.225 * k;
+  slide.addShape('custGeom', {
+    x, y: y + 0.002 * k, w: bw, h: bh, fill: { color },
+    points: BIRD.map(function (p) { return { x: p[0] * bw, y: p[1] * bh }; }).concat([{ close: true }]),
+  });
+
+  const fx = x + 0.526 * k, fy = y + 0.004 * k, fs = 0.221 * k;
+  slide.addShape('roundRect', {
+    x: fx, y: fy, w: fs, h: fs, rectRadius: 0.167 * fs, fill: { color }, line: { type: 'none' },
+  });
+  rect(slide, fx + 0.50 * fs, fy + 0.30 * fs, 0.156 * fs, 0.70 * fs, WHITE);
+  rect(slide, fx + 0.378 * fs, fy + 0.456 * fs, 0.444 * fs, 0.166 * fs, WHITE);
+  rect(slide, fx + 0.656 * fs, fy + 0.178 * fs, 0.166 * fs, 0.166 * fs, WHITE);
+
+  const lx = x + 0.996 * k, ls = 0.229 * k;
+  slide.addShape('roundRect', {
+    x: lx, y, w: ls, h: ls, rectRadius: 0.07 * ls, fill: { color }, line: { type: 'none' },
+  });
+  slide.addShape('ellipse', {
+    x: lx + 0.142 * ls, y: y + 0.167 * ls, w: 0.169 * ls, h: 0.155 * ls,
+    fill: { color: WHITE }, line: { type: 'none' },
+  });
+  rect(slide, lx + 0.15 * ls, y + 0.383 * ls, 0.153 * ls, 0.453 * ls, WHITE);
+  rect(slide, lx + 0.386 * ls, y + 0.383 * ls, 0.15 * ls, 0.453 * ls, WHITE);
+  rect(slide, lx + 0.536 * ls, y + 0.383 * ls, 0.311 * ls, 0.16 * ls, WHITE);
+  rect(slide, lx + 0.697 * ls, y + 0.492 * ls, 0.15 * ls, 0.344 * ls, WHITE);
+}
+
+/** White badge square with a green icon inside (used on the green cards). */
+function iconBadge(slide, x, y, s, drawIcon) {
+  rect(slide, x, y, s, s * 0.987, WHITE);
+  drawIcon(slide, x + 0.225 * s, y + 0.238 * s, 0.516 * s, 0.512 * s, GREEN);
+}
+
+/* ------------------------------------------------- composite deck motifs */
+
+/** "182." + caption pair. */
+function statBlock(slide, x, y, num, o) {
+  o = o || {};
+  stat(slide, num, { x, y, w: o.w || 1.757, h: 0.64, color: o.numColor || INK_75, align: o.align });
+  body(slide, o.text || LOREM_STAT, {
+    x, y: y + 0.735, w: o.w || 1.757, h: 0.675, color: o.textColor || INK_50, align: o.align,
+  });
+}
+
+/** "Service 01" heading + supporting sentence (`textDy` = gap below heading). */
+function serviceBlock(slide, o) {
+  label(slide, o.title, {
+    x: o.labelX, y: o.y, w: o.labelW, h: 0.417,
+    align: o.align, color: o.labelColor || INK, size: o.labelSize,
+  });
+  body(slide, o.text, {
+    x: o.textX, y: o.y + (o.textDy || 0.441), w: o.textW, h: o.textH || 0.675,
+    align: o.align, color: o.textColor || INK_50, size: o.textSize,
+  });
+}
+
+/** Green panel carrying a bulleted line plus a white icon badge. */
+function greenCard(slide, o) {
+  rect(slide, o.x, o.y, o.w, o.h, GREEN);
+  iconBadge(slide, o.x, o.y, o.badge || 0.531, o.icon || iconMusic);
+  bulleted(slide, o.text, { x: o.textX, y: o.textY, w: o.textW, h: 1.313 });
+}
+
+/** The full-width frame used by the opening and closing slides. */
+function bookendFrame(slide, headline) {
+  slide.addText(headline, {
+    x: 2.699, y: 2.984, w: 7.936, h: 1.582,
+    fontFace: HEAD, fontSize: 88, color: WHITE, charSpacing: 6,
+    align: 'center', valign: 'top', fit: 'resize',
+  });
+  // top bar
+  rect(slide, 11.957, 0, 0.728, 0.778, GREEN);
+  hline(slide, 2.656, 0.578, 9.513);
+  body(slide, 'Lorem ipsum dolor', { x: 0.684, y: 0.356, w: 1.757, h: 0.372 });
+  iconMic(slide, 12.23, 0.221, 0.182, 0.336, WHITE);
+  // bottom bar
+  rect(slide, 0.684, 6.724, 0.728, 0.778, GREEN);
+  hline(slide, 1.208, 6.923, 9.504);
+  body(slide, 'Lorem ipsum dolor', { x: 10.928, y: 6.71, w: 1.757, h: 0.372 });
+  iconMic(slide, 0.956, 6.945, 0.182, 0.336, WHITE);
+}
+
+/* ------------------------------------------------------------ slide 28/29 */
+
+/**
+ * One petal of the six-arrow rotation ring. The band runs between rIn and
+ * rOut; its leading end tapers to an arrowhead at mid radius while its tail
+ * carries a matching V notch, so consecutive petals interlock.
+ * Angles below are offsets from `a0`, measured off the original artwork.
+ */
+const PETAL = { outerEnd: 49.7, tip: 69.4, innerStart: 53.7, innerEnd: 12.4, notch: 22.7, tipR: 1.50, notchR: 1.62 };
+
+function curvedArrow(slide, o) {
+  const rad = function (d) { return (d * Math.PI) / 180; };
+  const pt = function (r, a) { return { x: o.cx + r * Math.cos(rad(a)), y: o.cy + r * Math.sin(rad(a)) }; };
+  const arc = function (r, from, to) {
+    const out = [];
+    for (let i = 0; i <= 12; i++) out.push(pt(r, from + ((to - from) * i) / 12));
+    return out;
+  };
+  const P = PETAL;
+  const pts = arc(o.rOut, o.a0, o.a0 + P.outerEnd)
+    .concat([pt(P.tipR, o.a0 + P.tip)])
+    .concat(arc(o.rIn, o.a0 + P.innerStart, o.a0 + P.innerEnd))
+    .concat([pt(P.notchR, o.a0 + P.notch)]);
+
+  const xs = pts.map(function (p) { return p.x; });
+  const ys = pts.map(function (p) { return p.y; });
+  const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+  const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+  slide.addShape('custGeom', {
+    x: minX, y: minY, w: maxX - minX, h: maxY - minY,
+    fill: { color: o.color }, line: { type: 'none' },
+    points: pts.map(function (p) { return { x: p.x - minX, y: p.y - minY }; }).concat([{ close: true }]),
+  });
+}
+
+/** Double "«" chevron from the pyramid slide. */
+function chevrons(slide, x, y, w, h, color, flip) {
+  const P = [
+    [0.4938, 0.8719], [0.3942, 1.0], [0.0, 0.5007], [0.3942, 0.0], [0.4938, 0.1281], [0.2012, 0.5007],
+  ];
+  const Q = [
+    [0.7075, 0.5007], [1.0, 0.1281], [0.9004, 0.0], [0.5062, 0.5007], [0.9004, 1.0], [1.0, 0.8719],
+  ];
+  [P, Q].forEach(function (poly) {
+    slide.addShape('custGeom', {
+      x, y, w, h, fill: { color }, line: { type: 'none' }, flipH: !!flip,
+      points: poly.map(function (p) { return { x: p[0] * w, y: p[1] * h }; }).concat([{ close: true }]),
+    });
+  });
+}
+
+/** One slab of the pyramid: `poly` holds normalised (0..1) corner points. */
+function pyramidBand(slide, o) {
+  const w = o.w, h = o.h;
+  slide.addShape('custGeom', {
+    x: o.x, y: o.y, w, h, fill: { color: o.color }, line: { type: 'none' },
+    points: o.poly.map(function (p) { return { x: p[0] * w, y: p[1] * h }; }).concat([{ close: true }]),
+  });
+  if (o.num) {
+    slide.addText(o.num, {
+      x: o.x, y: o.y, w, h, fontFace: BODY, fontSize: 24, color: WHITE,
+      align: 'center', valign: 'middle',
+    });
+  }
+}
+
+/* ------------------------------------------------------------------ charts */
+
+const CHART_CATS = ['1', '2', '3', '4'];
+const CHART_STACKED = [
+  { name: 'Series 1', labels: CHART_CATS, values: [4.3, 2.5, 3.5, 4.5] },
+  { name: 'Series 2', labels: CHART_CATS, values: [2.4, 4.4, 1.8, 2.8] },
+  { name: 'Series 3', labels: CHART_CATS, values: [2, 3.2, 1.5, 4] },
+];
+const CHART_CLUSTERED = [
+  { name: 'Series 1', labels: CHART_CATS, values: [4.3, 2.5, 3.5, 4.5] },
+  { name: 'Series 2', labels: CHART_CATS, values: [2.4, 4.4, 1.8, 2.8] },
+  { name: 'Series 3', labels: CHART_CATS, values: [2, 2, 3, 4.7] },
+];
+
+function chartOpts(extra) {
+  return Object.assign({
+    chartColors: [GREEN, INK_25, INK_90],
+    showLegend: false, showTitle: false, showValue: true,
+    dataLabelFontFace: BODY, dataLabelFontSize: 12, dataLabelFormatCode: 'General',
+    catAxisLabelFontFace: BODY, catAxisLabelFontSize: 12, catAxisLabelColor: AXIS,
+    valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12, valAxisLabelColor: AXIS,
+    catAxisLineColor: RULE, valAxisLineColor: RULE,
+    catAxisMajorTickMark: 'none', valAxisMajorTickMark: 'none',
+    valGridLine: { color: RULE, size: 1 }, catGridLine: { style: 'none' },
+  }, extra);
+}
+
+/* ------------------------------------------------------------ slide bodies */
+
+const SLIDES = [];
+
+// 1 — cover
+SLIDES.push(function (s) { bookendFrame(s, 'BIRAMA'); });
+
+// 2 — statement with green side panel
+SLIDES.push(function (s) {
+  rect(s, 8.71, 0, 4.624, 7.5, GREEN);
+  title(s, { x: 0.917, y: 2.503, w: 2.979, h: 2.524, align: 'right' });
+  captionRule(s, { lineX: 2.588, lineY: 0.746, lineW: 6.146, textX: 0.616, textY: 0.523 });
+  socialRow(s, 0.695, 6.65, 0.229, GREEN);
+  [2.171, 4.017].forEach(function (y) {
+    bulleted(s, LOREM_CARD, { x: 11.223, y, w: 1.501, h: 1.313 });
+  });
+});
+
+// 3 — headline, copy, green note card, three figures
+SLIDES.push(function (s) {
+  title(s, { x: 4.542, y: 1.211, w: 6.729, h: 0.909 });
+  body(s, LOREM_WIDE, { x: 4.542, y: 2.708, w: 4.882, h: 1.313 });
+  greenCard(s, {
+    x: 2.513, y: 4.476, w: 2.028, h: 2.303,
+    textX: 2.904, textY: 5.198, textW: 1.501, text: LOREM_CARD,
+  });
+  hline(s, 4.542, 5.74, 6.146);
+  ['182.', '75.', '284.'].forEach(function (n, i) {
+    stat(s, n, { x: 6.829 + i * 1.2245, y: 5.907, w: 1.125, h: 0.64, align: 'center' });
+  });
+});
+
+// 4 — figures column beside a green band
+SLIDES.push(function (s) {
+  rect(s, 2.917, 0, 2.792, 7.5, GREEN);
+  title(s, { x: 8.895, y: 1.226, w: 2.979, h: 2.524 });
+  body(s, LOREM_SIDE, { x: 8.895, y: 4.394, w: 3.372, h: 1.919 });
+  ['182.', '85.', '284.'].forEach(function (n, i) {
+    statBlock(s, 0.646, [1.037, 3.049, 5.062][i], n);
+  });
+});
+
+// 5 — wide photo band with green caption block
+SLIDES.push(function (s) {
+  rect(s, 8.323, 4.75, 4.344, 1.99, GREEN);
+  title(s, { x: 1.13, y: 5.388, w: 6.729, h: 0.909 });
+  [8.836, 10.653].forEach(function (x) {
+    bulleted(s, LOREM_CARD, { x, y: 5.089, w: 1.501, h: 1.313 });
+  });
+  rect(s, 0.667, 0.792, 1.944, 0.743, WHITE);
+  socialRow(s, 1.026, 1.049, 0.229, GREEN);
+});
+
+// 6 — headline left, copy centre, figures right
+SLIDES.push(function (s) {
+  greenCard(s, {
+    x: 0.589, y: 4.678, w: 2.347, h: 2.822,
+    badge: 0.528, textX: 0.958, textY: 5.553, textW: 1.653, text: LOREM_BADGE,
+  });
+  hline(s, 2.935, 6.726, 4.742);
+  title(s, { x: 1.162, y: 1.722, w: 5.734, h: 1.313 });
+  body(s,
+    'PLACEHOLDER' +
+    'PLACEHOLDER',
+    { x: 3.871, y: 3.652, w: 2.87, h: 2.221 });
+  socialRow(s, 0.695, 0.639, 0.175, GREEN);
+  statBlock(s, 8.291, 5.385, '182.');
+  statBlock(s, 10.662, 5.385, '284.');
+});
+
+// 7 — tall photo left, two services under a rule
+SLIDES.push(function (s) {
+  hline(s, 3.585, 4.677, 8.765);
+  title(s, { x: 4.58, y: 1.274, w: 6.729, h: 0.909 });
+  body(s,
+    'Lorem ipsum dolor sit amet, consectetur amaimi eu antana oneca eget dui necasa atasi sitampinin atas amet ' +
+    'PLACEHOLDER' +
+    'ametuspendisse id ipsum placerat vehicula metu eget, venenatis ipsum. Suspendisse scelerisque metus non dapibus tincidun',
+    { x: 4.58, y: 2.771, w: 7.067, h: 1.313 });
+  iconMic(s, 4.676, 5.283, 0.266, 0.49, GREEN);
+  serviceBlock(s, { title: 'Service 01', labelX: 5.434, labelW: 1.995, textX: 5.434, textW: 2.444, y: 5.283, text: LOREM_SVC });
+  iconMusic(s, 8.367, 5.32, 0.442, 0.437, GREEN);
+  serviceBlock(s, { title: 'Service 02', labelX: 9.203, labelW: 1.995, textX: 9.203, textW: 2.444, y: 5.283, text: LOREM_SVC });
+});
+
+// 8 — banner photo across the top, three service tiles
+SLIDES.push(function (s) {
+  title(s, { x: 1.334, y: 0.874, w: 5.734, h: 1.313, color: WHITE });
+  body(s,
+    'PLACEHOLDER',
+    { x: 7.754, y: 1.833, w: 4.287, h: 0.675, color: WHITE });
+  const txt = 'PLACEHOLDER';
+  [[1.427, 'Service 01'], [5.298, 'Service 02'], [9.168, 'Service 03']].forEach(function (c, i) {
+    rect(s, c[0], 4.366, 0.961, 1.031, GREEN);
+    serviceBlock(s, {
+      title: c[1], labelX: c[0] + 1.334, labelW: 1.54, textX: c[0] - 0.11, textW: 2.984,
+      y: 5.037, text: txt, textH: 1.01, textDy: 0.62,
+    });
+  });
+  iconMic(s, 1.795, 4.67, 0.225, 0.414, WHITE);
+  iconDice(s, 5.597, 4.695, 0.363, WHITE);
+  iconMusic(s, 9.46, 4.709, 0.378, 0.375, WHITE);
+});
+
+// 9 — right-aligned service list, tall photo, side copy
+SLIDES.push(function (s) {
+  iconMic(s, 3.839, 0.807, 0.266, 0.49, GREEN);
+  iconDice(s, 3.756, 3.227, 0.432, GREEN);
+  iconMusic(s, 3.718, 5.612, 0.442, 0.437, GREEN);
+  [[0.807, 'Service 01', 0.707], [3.19, 'Service 02', 0.707], [5.57, 'Service 03', 0.675]].forEach(function (r) {
+    serviceBlock(s, {
+      title: r[1], labelX: 1.32, labelW: 1.995, textX: 0.823, textW: 2.444,
+      y: r[0], text: LOREM_SVC, textH: r[2], align: 'right',
+    });
+  });
+  hline(s, 0.679, 2.572, 4.306);
+  hline(s, 0.679, 4.955, 4.306);
+  title(s, { x: 9.177, y: 1.226, w: 2.979, h: 2.524 });
+  body(s, LOREM_SIDE, { x: 9.177, y: 4.394, w: 3.372, h: 1.919 });
+});
+
+// 10 — four service tiles
+SLIDES.push(function (s) {
+  title(s, { x: 0.986, y: 2.494, w: 2.979, h: 2.524, align: 'right' });
+  const txt = 'PLACEHOLDER';
+  [[5.427, 0.852, 'Service 01'], [9.454, 0.852, 'Service 02'],
+    [5.427, 4.185, 'Service 03'], [9.454, 4.185, 'Service 04']].forEach(function (c) {
+    rect(s, c[0], c[1], 1.137, 1.219, GREEN);
+    serviceBlock(s, {
+      title: c[2], labelX: c[0] + 1.414, labelW: 1.54, textX: c[0] - 0.111, textW: 3.083,
+      y: c[1] + 0.86, text: txt, textH: 1.01, textDy: 0.62,
+    });
+  });
+  iconMic(s, 5.862, 1.216, 0.266, 0.49, WHITE);
+  iconDice(s, 9.822, 1.269, 0.404, WHITE);
+  iconMusic(s, 5.722, 4.581, 0.442, 0.437, WHITE);
+  iconDiamond(s, 9.794, 4.604, 0.457, 0.412, WHITE);
+});
+
+// 11 — two stacked service cards on a green panel
+SLIDES.push(function (s) {
+  rect(s, 1.677, 0.71, 3.114, 6.065, GREEN);
+  hline(s, 1.677, 3.742, 3.114, WHITE);
+  title(s, { x: 9.547, y: 2.493, w: 2.786, h: 2.524 });
+  iconMic(s, 3.101, 1.271, 0.266, 0.49, WHITE);
+  iconMusic(s, 2.992, 4.374, 0.442, 0.437, WHITE);
+  [[1.974, 'Service 01'], [5.045, 'Service 02']].forEach(function (r) {
+    serviceBlock(s, {
+      title: r[1], labelX: 2.461, labelW: 1.547, textX: 2.012, textW: 2.444, y: r[0],
+      text: 'Lorem ipsum dolor sit amet anilasin consectetur', textH: 0.707,
+      align: 'center', labelColor: WHITE, textColor: WHITE_90,
+    });
+  });
+  captionRule(s, { lineX: 4.674, lineY: 0.726, lineW: 3.992, textX: 9.547, textY: 0.504 });
+  socialRow(s, 11.445, 6.65, 0.229, GREEN);
+});
+
+// 12 — outlined frame with a four-photo grid
+SLIDES.push(function (s) {
+  s.addShape('rect', {
+    x: 1.264, y: 1.167, w: 10.836, h: 5.175,
+    fill: { color: WHITE }, line: { color: GREEN, width: LINE_W },
+  });
+  s.addText(T, {
+    x: 1.924, y: 0.809, w: 4.143, h: 1.717, fill: { color: WHITE },
+    fontFace: HEAD, fontSize: 24, color: INK, charSpacing: 3, valign: 'top', fit: 'resize',
+  });
+  body(s,
+    'Lorem ipsum dolor sit amet, consectetur amaimi eu antana oneca eget dui necasa at sitampinin ani atas ' +
+    'PLACEHOLDER',
+    { x: 7.231, y: 4.366, w: 4.252, h: 1.313 });
+  rect(s, 10.726, 6.01, 1.593, 0.54, WHITE);
+  socialRow(s, 10.985, 6.226, 0.229, GREEN);
+});
+
+// 13 — numbered green tabs
+SLIDES.push(function (s) {
+  title(s, { x: 8.886, y: 1.227, w: 2.979, h: 2.524 });
+  body(s, LOREM_SIDE, { x: 8.886, y: 4.396, w: 3.372, h: 1.919 });
+  [[0.792, '01.', 1.387, 0.707], [2.822, '02.', 3.417, 0.64], [4.852, '03.', 5.448, 0.64]].forEach(function (r) {
+    rect(s, 0.833, r[0], 0.958, 1.898, GREEN);
+    stat(s, r[1], { x: 0.833, y: r[2], w: 0.958, h: r[3], color: WHITE, align: 'center', charSpacing: 0 });
+  });
+});
+
+// 14 — three captioned thumbnails plus a vertical green tab
+SLIDES.push(function (s) {
+  rect(s, 11.575, 0.908, 0.958, 5.708, GREEN);
+  [[1.219, 0.707], [3.173, 0.675], [5.124, 0.675]].forEach(function (r) {
+    label(s, 'Lorem Ipsum', { x: 5.782, y: r[0], w: 2.492, h: 0.372, size: 12 });
+    body(s, 'Lorem ipsum dolor sit amet anilasin ai consectetur sana',
+      { x: 5.782, y: r[0] + 0.505, w: 2.444, h: r[1] });
+  });
+  title(s, { x: 1.207, y: 1.227, w: 2.979, h: 2.524 });
+  body(s, LOREM_SIDE, { x: 1.207, y: 4.396, w: 3.372, h: 1.919 });
+  s.addText('Lorem ipsum dolor', {
+    x: 10.172, y: 3.555, w: 3.806, h: 0.404, rotate: 90,
+    fontFace: BODY, fontSize: 12, color: WHITE, charSpacing: 6,
+    align: 'center', valign: 'top', lineSpacingMultiple: 1.5,
+  });
+});
+
+// 15 — photo mosaic with two green note squares
+SLIDES.push(function (s) {
+  [1.455, 3.534].forEach(function (y, i) {
+    rect(s, 0.805, y, 1.963, 1.963, GREEN);
+    bulleted(s, LOREM_CARD, { x: 1.037, y: [1.78, 3.86][i], w: 1.501, h: 1.313 });
+  });
+  title(s, { x: 9.754, y: 2.251, w: 2.788, h: 2.524 });
+  captionRule(s, { lineX: 0.805, lineY: 0.729, lineW: 8.056, textX: 9.753, textY: 0.507 });
+  body(s,
+    'Lorem ipsum dolor sit amet, consectetur amaimi eu antana oneca eget dui necasa at sitampinin ani atas amet ' +
+    'atasi anil blandit Integeras anina sanasi',
+    { x: 2.87, y: 6.079, w: 5.991, h: 0.707 });
+  socialRow(s, 11.445, 6.65, 0.229, GREEN);
+  iconMusic(s, 1.427, 6.226, 0.442, 0.437, GREEN);
+});
+
+// 16 — centred headline over a green band
+SLIDES.push(function (s) {
+  rect(s, 0, 3.532, 13.333, 2.197, GREEN);
+  title(s, { x: 2.793, y: 0.738, w: 7.756, h: 0.909, align: 'center' });
+  body(s, LOREM_WIDE, { x: 2.153, y: 6.242, w: 9.055, h: 0.707, align: 'center' });
+  [3.135, 7.225].forEach(function (x, i) {
+    label(s, 'Lorem Ipsum Dolor', {
+      x, y: [4.992, 4.986][i], w: 2.973, h: 0.372, size: 12, color: WHITE, align: 'center',
+    });
+  });
+});
+
+// 17 — three portrait cards beside a green panel
+SLIDES.push(function (s) {
+  rect(s, 4.691, 0, 3.742, 7.5, GREEN);
+  [1.095, 3.19, 5.29].forEach(function (y) {
+    serviceBlock(s, {
+      title: 'Your Name', labelX: 9.969, labelW: 2.492, textX: 10.017, textW: 2.444,
+      y, text: LOREM_SVC,
+    });
+  });
+  title(s, { x: 0.84, y: 2.494, w: 2.979, h: 2.524, align: 'right' });
+});
+
+// 18 — two overlapping portraits on a green plate
+SLIDES.push(function (s) {
+  rect(s, 0.85, 1.784, 6.708, 3.903, GREEN);
+  title(s, { x: 8.887, y: 1.226, w: 2.979, h: 2.524 });
+  body(s, LOREM_SIDE, { x: 8.887, y: 4.394, w: 3.372, h: 1.919 });
+  [[1.204, 5.002], [4.371, 2.056]].forEach(function (p) {
+    label(s, 'Your Name', { x: p[0], y: p[1], w: 2.833, h: 0.372, size: 12, color: WHITE, align: 'center' });
+  });
+});
+
+// 19 — artist profile with a green figures rail
+SLIDES.push(function (s) {
+  rect(s, 10.479, 0, 2.854, 7.5, GREEN);
+  ['182.', '85.', '284.'].forEach(function (n, i) {
+    statBlock(s, 11.104, [1.037, 3.049, 5.062][i], n, { numColor: WHITE, textColor: WHITE_90 });
+  });
+  rect(s, 0.708, 6.239, 1.174, 0.449, WHITE);
+  socialRow(s, 0.848, 6.38, 0.167, GREEN);
+  s.addText([
+    { text: 'GABBY', options: { breakLine: true } },
+    { text: 'SHAA', options: { breakLine: true } },
+    { text: 'THOMPSON' },
+  ], {
+    x: 6.14, y: 1.477, w: 2.979, h: 1.515,
+    fontFace: HEAD, fontSize: 28, color: INK, charSpacing: 3, valign: 'top', fit: 'resize',
+  });
+  body(s, 'Vocal', { x: 6.14, y: 3.474, w: 0.985, h: 0.505, size: 16, charSpacing: 3 });
+  body(s,
+    'Lorem ipsum dolor sit amet, consat etur amaimi eu antana oneca egetil dui necasa at sitampinin atasi amet ' +
+    'PLACEHOLDER',
+    { x: 6.14, y: 4.153, w: 2.979, h: 1.919 });
+});
+
+// 20 — four team cards along the bottom
+SLIDES.push(function (s) {
+  hline(s, 0, 6.957, 3.853);
+  hline(s, 9.505, 0.574, 3.829);
+  const txt = 'PLACEHOLDER';
+  [[1.338, 5.095, 4.833], [4.048, 5.091, 4.829], [6.758, 5.091, 4.829], [9.468, 5.091, 4.829]]
+    .forEach(function (c) {
+      rect(s, c[0], c[1], 2.532, 1.168, GREEN);
+      rect(s, c[0] + 0.206, c[2], 0.531, 0.524, WHITE);
+      label(s, 'Your Name', {
+        x: c[0] + 0.915, y: c[1] + 0.068, w: 1.429, h: 0.326,
+        size: 10, color: WHITE, align: 'right',
+      });
+      body(s, txt, { x: c[0] + 0.206, y: c[1] + 0.48, w: 2.138, h: 0.555, size: 9, color: WHITE_90 });
+    });
+  iconMic(s, 1.73, 4.944, 0.16, 0.295, GREEN);
+  iconMusic(s, 4.374, 4.955, 0.274, 0.272, GREEN);
+  iconDice(s, 7.106, 4.954, 0.26, GREEN);
+  iconDiamond(s, 9.804, 4.968, 0.272, 0.245, GREEN);
+});
+
+// 21 — photo grid with four green name plates
+SLIDES.push(function (s) {
+  captionRule(s, { lineX: 0.984, lineY: 0.713, lineW: 6.459, textX: 8.955, textY: 0.491 });
+  socialRow(s, 11.445, 6.65, 0.229, GREEN);
+  [[0.984, 3.199], [4.284, 3.199], [0.984, 5.85], [4.284, 5.85]].forEach(function (p) {
+    rect(s, p[0], p[1], 3.159, 0.558, GREEN);
+    label(s, 'Your Name', {
+      x: p[0], y: p[1] + 0.09, w: 3.159, h: 0.372, size: 12, color: WHITE, align: 'center',
+    });
+  });
+  title(s, { x: 8.955, y: 1.687, w: 2.979, h: 2.524 });
+  body(s,
+    'Lorem ipsum dolor sit amet, consectetur amaimi eu antana oneca eget dui necasa lacinial sanil hasellus ' +
+    'amet san anim erat consector asinas amet',
+    { x: 8.955, y: 4.493, w: 3.372, h: 1.313 });
+});
+
+// 22 — phone mock-up
+SLIDES.push(function (s) {
+  rect(s, 0, 0, 3.984, 7.5, GREEN);
+  imagePlaceholder(s, 2.846, 1.532, 2.203, 4.445);
+  [2.155, 4.001].forEach(function (y) {
+    bulleted(s, LOREM_CARD, { x: 0.72, y, w: 1.501, h: 1.313 });
+  });
+  hline(s, 6.133, 4.865, 7.201);
+  title(s, { x: 6.037, y: 0.953, w: 6.154, h: 1.313 });
+  body(s,
+    'Lorem ipsum dolor sit amet, consectetur amaimi eu antana oneca en necasa atasi sitampinin atas amet atasi ' +
+    'PLACEHOLDER' +
+    'ametuspendisni ipsum placerat vehicula metu eget, venenatis ipsum suspendisse scelerisque',
+    { x: 6.037, y: 2.908, w: 6.154, h: 1.313 });
+  iconMic(s, 6.133, 5.471, 0.266, 0.49, GREEN);
+  serviceBlock(s, {
+    title: 'Service 01', labelX: 6.891, labelW: 1.849, textX: 6.891, textW: 1.979,
+    y: 5.471, text: 'Lorem ipsum dolor sit consectetur sanam', textH: 0.707,
+  });
+  iconMusic(s, 9.448, 5.507, 0.442, 0.437, GREEN);
+  serviceBlock(s, {
+    title: 'Service 02', labelX: 10.284, labelW: 1.907, textX: 10.284, textW: 1.907,
+    y: 5.471, text: 'Lorem ipsum dolor sit consectetur sanam', textH: 0.707,
+  });
+});
+
+// 23 — laptop mock-up
+SLIDES.push(function (s) {
+  imagePlaceholder(s, 0.979, 1.104, 5.189, 3.028);
+  greenCard(s, {
+    x: 10.318, y: 4.678, w: 2.347, h: 2.822, badge: 0.528,
+    textX: 10.688, textY: 5.553, textW: 1.653, text: LOREM_BADGE,
+  });
+  hline(s, 1.45, 6.726, 8.868);
+  title(s, { x: 1.323, y: 5.114, w: 6.738, h: 0.909 });
+  [6.556, 8.689, 10.822].forEach(function (x) {
+    bulleted(s, LOREM_CARD, { x, y: 1.892, w: 1.501, h: 1.313, color: INK_50 });
+  });
+  socialRow(s, 11.355, 0.666, 0.229, GREEN);
+});
+
+// 24 — two tablets on a green stripe
+SLIDES.push(function (s) {
+  rect(s, 5.413, 0, 2.444, 7.5, GREEN);
+  title(s, { x: 8.919, y: 1.226, w: 2.979, h: 2.524 });
+  body(s, LOREM_SIDE, { x: 8.919, y: 4.394, w: 3.372, h: 1.919 });
+  label(s, 'Lorem Ipsum', { x: 0.968, y: 1.08, w: 2.492, h: 0.372, size: 12, align: 'center' });
+  imagePlaceholder(s, 0.978, 1.905, 2.48, 3.658);
+  imagePlaceholder(s, 4.177, 1.905, 2.48, 3.658);
+  body(s, 'Lorem ipsum dolor sit amet anilasin consecte sana',
+    { x: 0.968, y: 6.011, w: 2.444, h: 0.707, align: 'center' });
+});
+
+// 25 — desktop mock-up with a green figures rail
+SLIDES.push(function (s) {
+  rect(s, 0, 0, 2.854, 7.5, GREEN);
+  ['182.', '85.', '284.'].forEach(function (n, i) {
+    statBlock(s, 0.625, [1.037, 3.049, 5.062][i], n, { numColor: WHITE, textColor: WHITE_90 });
+  });
+  title(s, { x: 9.739, y: 2.427, w: 2.769, h: 2.524 });
+  socialRow(s, 11.445, 6.65, 0.229, GREEN);
+  captionRule(s, { lineX: 2.854, lineY: 0.746, lineW: 5.746, textX: 9.741, textY: 0.523 });
+  imagePlaceholder(s, 4.044, 1.467, 4.666, 4.666);
+});
+
+// 26 — twin stacked column charts
+SLIDES.push(function (s) {
+  [0.864, 7.072].forEach(function (x) {
+    s.addChart('bar', CHART_STACKED, chartOpts({
+      x, y: 2.125, w: 5.428, h: 3.909,
+      barDir: 'col', barGrouping: 'stacked', barGapWidthPct: 150,
+      dataLabelColor: WHITE, dataLabelPosition: 'ctr',
+    }));
+  });
+  title(s, { x: 2.793, y: 0.676, w: 7.756, h: 0.909, align: 'center' });
+  body(s, LOREM_WIDE, { x: 2.153, y: 6.242, w: 9.055, h: 0.707, align: 'center' });
+});
+
+// 27 — clustered horizontal bar chart
+SLIDES.push(function (s) {
+  title(s, { x: 1.384, y: 1.235, w: 2.979, h: 2.524 });
+  body(s, LOREM_SIDE, { x: 1.384, y: 4.404, w: 3.372, h: 1.919 });
+  s.addChart('bar', CHART_CLUSTERED, chartOpts({
+    x: 5.909, y: 0.874, w: 6.639, h: 5.926,
+    barDir: 'bar', barGrouping: 'clustered', barGapWidthPct: 120, barOverlapPct: -30,
+    dataLabelColor: INK_75, dataLabelPosition: 'outEnd',
+  }));
+});
+
+// 28 — six-arrow cycle diagram
+SLIDES.push(function (s) {
+  title(s, { x: 2.793, y: 0.676, w: 7.756, h: 0.909, align: 'center' });
+  for (let i = 0; i < 6; i++) {
+    curvedArrow(s, {
+      cx: 3.65, cy: 4.56, rIn: 1.06, rOut: 2.05, a0: -87.2 + i * 60,
+      color: i % 2 === 0 ? GREEN : INK_90,
+    });
+  }
+  body(s, 'Great Infographic', { x: 7.183, y: 2.554, w: 3.422, h: 0.505, size: 16, color: INK_90, charSpacing: 3 });
+  body(s, LOREM_WIDE, { x: 7.183, y: 3.253, w: 4.882, h: 1.313 });
+  ['Type A', 'Type B', 'Type C', 'Type D'].forEach(function (t, i) {
+    s.addShape('ellipse', {
+      x: 7.183 + i * 1.2718, y: 5.106, w: 1, h: 1,
+      fill: { color: i % 2 === 0 ? INK_90 : GREEN }, line: { type: 'none' },
+    });
+    s.addText(t, {
+      x: [7.183, 8.455, 9.726, 10.998][i], y: [6.297, 6.3, 6.3, 6.275][i], w: 1, h: 0.303,
+      fontFace: BODY, fontSize: 12, color: INK_90, align: 'center', valign: 'top', wrap: false,
+    });
+  });
+  iconMic(s, 7.598, 5.449, 0.171, 0.315, WHITE);
+  iconDice(s, 8.816, 5.468, 0.277, WHITE);
+  iconMusic(s, 10.048, 5.482, 0.284, 0.281, WHITE);
+  iconDiamond(s, 11.343, 5.47, 0.309, 0.279, WHITE);
+});
+
+// 29 — five-step pyramid
+SLIDES.push(function (s) {
+  title(s, { x: 2.793, y: 0.676, w: 7.756, h: 0.909, align: 'center' });
+  // shaded wedges that give each tier its thickness (drawn first, behind)
+  [[4.159, 5.086, 4.758, 1.528, INK, 0.413, 0.9327, 0.0667, 0.5936],
+    [4.617, 4.179, 3.841, 1.538, GREEN_DK, 0.4093, 0.9166, 0.0838, 0.5897],
+    [5.081, 3.283, 2.922, 1.526, INK, 0.4124, 0.8899, 0.1101, 0.5876],
+    [5.537, 2.386, 2.003, 1.529, GREEN_DK, 0.407, 0.8429, 0.1613, 0.5865]].forEach(function (v) {
+    pyramidBand(s, {
+      x: v[0], y: v[1], w: v[2], h: v[3], color: v[4],
+      poly: [[0, 1], [1, v[5]], [v[6], 0], [v[7], v[8]]],
+    });
+  });
+  // lit front faces, top tier first
+  [[6.002, 2.386, 1.538, 0.622, GREEN, 0.2064, 0.7954, '01'],
+    [5.537, 3.283, 2.465, 0.632, INK_90, 0.1311, 0.8695, '02'],
+    [5.081, 4.179, 3.377, 0.63, GREEN, 0.0953, 0.9052, '03'],
+    [4.617, 5.086, 4.3, 0.631, INK_90, 0.0748, 0.9255, '04'],
+    [4.159, 5.993, 5.215, 0.621, GREEN, 0.0609, 0.9391, '05']].forEach(function (b) {
+    pyramidBand(s, {
+      x: b[0], y: b[1], w: b[2], h: b[3], color: b[4], num: b[7],
+      poly: [[b[5], 0], [b[6], 0], [1, 1], [0, 1]],
+    });
+  });
+  // pointer chevrons
+  chevrons(s, 5.471, 2.617, 0.268, 0.215, GREEN);
+  chevrons(s, 4.603, 4.333, 0.268, 0.215, GREEN);
+  chevrons(s, 3.732, 5.99, 0.268, 0.215, GREEN);
+  chevrons(s, 8.339, 3.377, 0.268, 0.215, INK_90, true);
+  chevrons(s, 9.337, 5.145, 0.268, 0.215, INK_90, true);
+  // captions
+  [[2.489, 2.372, 'right'], [1.558, 4.082, 'right'], [0.682, 5.744, 'right']].forEach(function (c) {
+    body(s, LOREM_PYR, { x: c[0], y: c[1], w: 2.586, h: 0.707, align: 'right' });
+  });
+  body(s, LOREM_PYR, { x: 9.061, y: 3.15, w: 2.586, h: 0.675 });
+  body(s, LOREM_PYR, { x: 10.025, y: 4.915, w: 2.592, h: 0.675 });
+});
+
+// 30 — closing
+SLIDES.push(function (s) { bookendFrame(s, 'THANK'); });
+
+/* -------------------------------------------------------------------- build */
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE';
+pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+
+SLIDES.forEach(function (build) {
+  const slide = pptx.addSlide();
+  slide.background = { color: WHITE };
+  build(slide);
+});
+
+pptx.writeFile({ fileName: path.join(__dirname, '16c77af5-4fd1-4f73-a042-a82bfd9b87f5_grok_final.pptx') })
+  .then(function (f) { console.log('wrote ' + f); });
