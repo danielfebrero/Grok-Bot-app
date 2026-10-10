@@ -1,0 +1,1513 @@
+// "The Roadmap" — Roadmap Infographic Presentation Template, 30 slides, 13.333 x 7.5 in.
+// Rebuilt from scratch with pptxgenjs: every position, colour and string below is a
+// literal. Artwork from the source deck is redrawn as coloured placeholder tiles.
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+const C = {
+  PURPLE:  '740580',  // theme accent 1
+  MAGENTA: 'B10065',  // theme accent 2
+  PINK:    'FF1D68',  // theme accent 3
+  ORANGE:  'F76218',  // theme accent 4
+  YELLOW:  'F2C447',  // theme accent 5
+  GREEN:   '92D050',  // theme accent 6
+  ROAD:    '262626',  // asphalt
+  WHITE:   'FFFFFF',
+  BLACK:   '000000',
+  INK:     '0D0D0D',  // near-black headings
+  SLATE:   '595959',  // secondary copy
+  GREY:    '808080',  // body copy
+  RULE:    'D9D9D9',
+  PANEL:   'F2F2F2',  // pale side panels
+  AMBER:   'FFC000',  // car headlights
+};
+
+const F = { head: 'Be Vietnam Pro Medium', body: 'Open Sans' };
+
+const NONE = { type: 'none' };
+// The template's stock drop shadow: wide, soft, barely there.
+const SOFT = { type: 'outer', blur: 15, offset: 0, angle: 90, color: C.BLACK, opacity: 0.1 };
+// White long-dash centre line painted down the middle of every road.
+const DASH = { color: C.WHITE, width: 1.5, dashType: 'lgDash' };
+
+// Body copy reused across the deck.
+const L = {
+  p1: 'Lorem ipsum dolor sit amet, consectetur adipisc elit, sed does eiusmod tempor incididunt ut labo et dolore magna aliqua. Ut enim ad.',
+  p2: 'Lorem ipsum dolor sit amet, consectetu adipiscing elit.',
+  p3: 'Lorem ipsum dolor sit amet, consec adipiscing',
+  p4: 'Lorem ipsum dolor sit amet, consectetu adipiscing.',
+  p5: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod tempor. ',
+  p6: 'Lorem ipsum dolor sit amet, con adipiscing elit sed do eiusmod.',
+  p7: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eius tempor incididunt ut labore et dolore magna aliqua. Ut enim ad mini veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure.',
+  p8: 'Lorem ipsum dolor sit amet, consect adipiscing elit.',
+  p9: 'Lorem ipsum dolor sit amet, consectet adipiscing elit, sedo do eiusmod temp incididunt ut labore et dolore magna aliq. Ut enim ad.',
+  p10: 'Lorem ipsum dolor sit amet, consec adipiscing elit sed do eiusm',
+  p11: 'Lorem ipsum dolor sit amet, consectetu adipiscing elit, sed does eiusmod.',
+  p12: 'Lorem ipsum dolor sit am. Qui sint neque a velit mod.',
+  p13: 'Lorem ipsum dolor sit amet cons adipiscing elit sed do eiusmod.',
+  p14: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sedo do eiusmod tempor.',
+  p15: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eius tempor incididunt ut labore et dolore magna aliqua.',
+  p16: 'Lorem ipsum dolor sit amet. Qui sint neque a velit modi.',
+  p17: 'Lorem ipsum dolor sit amet, consect adipi.',
+  p18: 'Lorem ipsum dolor sit amet, consec adipiscing elit',
+  p19: 'Lorem ipsum dolor sit amet, consectetur adipisc elit, sed does eiusmod tempor.',
+  p20: 'Lorem ipsum dolor sit amet. ',
+  p21: 'Lorem ipsum dolor sit amet.',
+  p22: 'Roadmap Infographic Presentation Template',
+};
+
+// Paragraph presets, one per distinct run style in the source deck.
+const T = {
+  hero:    { fontSize: 72, fontFace: F.head, align: 'center' },
+  subC:    { fontSize: 16, fontFace: F.body, align: 'center' },
+  body:    { fontSize: 11, fontFace: F.body, lineSpacingMultiple: 1.5 },
+  tag:     { fontSize: 14, fontFace: F.body, lineSpacingMultiple: 1 },
+  h1:      { fontSize: 32, bold: true, fontFace: F.head },
+  lead:    { fontSize: 16, bold: true, fontFace: F.head, align: 'justify' },
+  h1c:     { fontSize: 32, bold: true, fontFace: F.head, align: 'center' },
+  bodyC:   { fontSize: 11, fontFace: F.body, align: 'center', lineSpacingMultiple: 1.5 },
+  h3c:     { fontSize: 14, bold: true, fontFace: F.body, align: 'center' },
+  h1r:     { fontSize: 32, bold: true, fontFace: F.head, align: 'right' },
+  h3:      { fontSize: 14, bold: true, fontFace: F.body },
+  numDot:  { fontSize: 24, bold: true, fontFace: F.body, align: 'center', valign: 'middle' },
+  numBig:  { fontSize: 40, bold: true, fontFace: F.body, align: 'center' },
+  card:    { fontSize: 18, bold: true, fontFace: F.body },
+  noteC:   { fontSize: 11, fontFace: F.body, align: 'center', lineSpacingMultiple: 1.2 },
+  leadC:   { fontSize: 16, fontFace: F.head, align: 'center' },
+  cardC:   { fontSize: 18, bold: true, fontFace: F.body, align: 'center' },
+  noteR:   { fontSize: 11, fontFace: F.body, align: 'right', lineSpacingMultiple: 1.2 },
+  leadR:   { fontSize: 16, fontFace: F.head, align: 'right' },
+  cardHC:  { fontSize: 18, bold: true, fontFace: F.head, align: 'center' },
+  note:    { fontSize: 11, fontFace: F.body, lineSpacingMultiple: 1.2 },
+  leadL:   { fontSize: 16, fontFace: F.head },
+  bodyR:   { fontSize: 11, fontFace: F.body, align: 'right', lineSpacingMultiple: 1.5 },
+  cardR:   { fontSize: 18, bold: true, fontFace: F.body, align: 'right' },
+  cardHR:  { fontSize: 18, bold: true, fontFace: F.head, align: 'right' },
+  h3r:     { fontSize: 14, bold: true, fontFace: F.body, align: 'right' },
+  numDot:  { fontSize: 24, bold: true, fontFace: F.body, align: 'center', lineSpacingMultiple: 1, valign: 'middle' },
+  subMid:  { fontSize: 16, bold: true, fontFace: F.body, align: 'center', valign: 'middle' },
+};
+
+// Freeform outlines, given as fractions of each shape's own box so they
+// scale to whatever size the slide needs. M/L/C mirror SVG path verbs.
+const OUTLINE = {
+  ring: [
+    ['M',0.42,0], ['C',0.14,0.03,-0.06,0.28,-0.03,0.55], ['C',0,0.83,0.25,1.03,0.52,1],
+    ['C',0.78,0.97,0.97,0.75,0.97,0.5], ['C',0.96,0.21,0.72,-0.01,0.43,0], ['C',0.43,0,0.42,0,0.42,0], ['Z']
+  ],
+  pin: [
+    ['M',0,0], ['L',1,0], ['L',1,1], ['L',0,1], ['Z']
+  ],
+  balloon: [
+    ['M',0.62,0], ['C',0.49,0,0.37,0.05,0.3,0.15], ['L',0.29,0.15], ['L',0.28,0.02], ['L',-0.01,0.02],
+    ['C',-0.01,0.11,0,0.21,0,0.33], ['L',0,1], ['L',0.33,1], ['L',0.33,0.42],
+    ['C',0.33,0.4,0.34,0.37,0.35,0.35], ['C',0.37,0.28,0.43,0.24,0.5,0.24],
+    ['C',0.62,0.24,0.66,0.32,0.66,0.44], ['L',0.66,1], ['L',0.99,1], ['L',0.99,0.4],
+    ['C',0.99,0.14,0.84,0,0.62,0], ['Z']
+  ],
+  blob: [
+    ['M',0.61,0.35], ['L',0.98,0.35], ['L',0.98,0.53], ['L',0.61,0.53], ['L',0.61,1], ['L',0.26,1],
+    ['L',0.26,0.53], ['L',0,0.53], ['L',0,0.35], ['L',0.26,0.35], ['L',0.26,0.25],
+    ['C',0.26,0.18,0.33,0.12,0.43,0.07], ['C',0.59,0.01,0.8,-0.01,1,0], ['L',0.97,0.17],
+    ['C',0.86,0.16,0.75,0.17,0.66,0.2], ['C',0.63,0.22,0.61,0.23,0.61,0.25], ['Z']
+  ],
+  bar: [
+    ['M',0.88,0], ['C',0.95,0,1,0,1,0], ['L',1,1], ['C',1,1,0.95,1,0.88,1], ['L',0.12,1],
+    ['C',0.05,1,0,1,0,1], ['L',0,0], ['C',0,0,0.05,0,0.12,0], ['Z']
+  ],
+  glyph: [
+    ['M',1,0.96], ['L',0.66,0.51], ['L',0.99,0.04], ['L',0.96,0], ['L',0.49,0.66], ['L',0.03,0.01],
+    ['L',0,0.06], ['L',0.32,0.51], ['L',0,0.96], ['L',0.03,1], ['L',0.35,0.55], ['L',0.49,0.75],
+    ['L',0.63,0.55], ['L',0.97,1], ['L',1,0.96], ['Z']
+  ],
+  plate: [
+    ['M',0.76,1], ['C',0.74,1,0.71,0.83,0.71,0.6], ['L',0.71,0.5], ['L',0.71,0.5],
+    ['C',0.71,0.36,0.69,0.25,0.68,0.25], ['C',0.66,0.25,0.65,0.36,0.65,0.5], ['L',0.65,0.5], ['L',0.65,0.6],
+    ['C',0.64,0.83,0.62,1,0.59,1], ['C',0.56,1,0.54,0.83,0.53,0.6], ['L',0.53,0.5], ['L',0.53,0.5],
+    ['C',0.53,0.36,0.52,0.25,0.5,0.25], ['C',0.48,0.25,0.47,0.36,0.47,0.5], ['L',0.47,0.5], ['L',0.47,0.6],
+    ['C',0.46,0.83,0.44,1,0.41,1], ['C',0.38,1,0.36,0.83,0.35,0.6], ['L',0.35,0.5], ['L',0.35,0.5],
+    ['C',0.35,0.36,0.34,0.25,0.32,0.25], ['C',0.31,0.25,0.29,0.36,0.29,0.5], ['L',0.29,0.5], ['L',0.29,0.6],
+    ['C',0.29,0.83,0.26,1,0.24,1], ['C',0.21,1,0.18,0.83,0.18,0.6], ['L',0.18,0.5], ['L',0.18,0.5],
+    ['C',0.18,0.36,0.16,0.25,0.15,0.25], ['C',0.13,0.25,0.12,0.36,0.12,0.5], ['L',0.12,0.5], ['L',0.12,0.6],
+    ['C',0.11,0.83,0.09,1,0.06,1], ['C',0.03,1,0,0.78,0,0.5], ['L',0.03,0.5],
+    ['C',0.03,0.64,0.04,0.75,0.06,0.75], ['C',0.08,0.75,0.09,0.64,0.09,0.5], ['L',0.09,0.5], ['L',0.09,0.4],
+    ['C',0.09,0.17,0.12,0,0.15,0], ['C',0.18,0,0.2,0.17,0.2,0.4], ['L',0.21,0.5], ['L',0.21,0.5],
+    ['C',0.21,0.64,0.22,0.75,0.24,0.75], ['C',0.25,0.75,0.26,0.64,0.26,0.5], ['L',0.26,0.5], ['L',0.27,0.4],
+    ['C',0.27,0.17,0.3,0,0.32,0], ['C',0.35,0,0.38,0.17,0.38,0.4], ['L',0.38,0.5], ['L',0.38,0.5],
+    ['C',0.38,0.64,0.4,0.75,0.41,0.75], ['C',0.43,0.75,0.44,0.64,0.44,0.5], ['L',0.44,0.5], ['L',0.44,0.4],
+    ['C',0.45,0.17,0.47,0,0.5,0], ['C',0.53,0,0.55,0.17,0.56,0.4], ['L',0.56,0.5], ['L',0.56,0.5],
+    ['C',0.56,0.64,0.57,0.75,0.59,0.75], ['C',0.6,0.75,0.62,0.64,0.62,0.5], ['L',0.62,0.5], ['L',0.62,0.4],
+    ['C',0.62,0.17,0.65,0,0.68,0], ['C',0.7,0,0.73,0.17,0.73,0.4], ['L',0.74,0.5], ['L',0.74,0.5],
+    ['C',0.74,0.64,0.75,0.75,0.76,0.75], ['C',0.78,0.75,0.79,0.64,0.79,0.5], ['L',0.79,0.5], ['L',0.8,0.4],
+    ['C',0.8,0.17,0.82,0,0.85,0], ['C',0.88,0,0.91,0.17,0.91,0.4], ['L',0.91,0.5], ['L',0.91,0.5],
+    ['C',0.91,0.64,0.92,0.75,0.94,0.75], ['C',0.96,0.75,0.97,0.64,0.97,0.5], ['L',1,0.5],
+    ['C',1,0.78,0.97,1,0.94,1], ['C',0.91,1,0.89,0.83,0.88,0.6], ['L',0.88,0.5], ['L',0.88,0.5],
+    ['C',0.88,0.36,0.87,0.25,0.85,0.25], ['C',0.84,0.25,0.82,0.36,0.82,0.5], ['L',0.82,0.5], ['L',0.82,0.6],
+    ['C',0.82,0.83,0.79,1,0.76,1], ['Z']
+  ],
+  cross: [
+    ['M',0.5,1], ['C',0.78,1,1,0.81,1,0.58], ['C',1,0.4,0.87,0.25,0.69,0.19], ['L',0.61,0.16], ['L',0.5,0],
+    ['L',0.39,0.16], ['L',0.31,0.19], ['C',0.13,0.25,0,0.4,0,0.58], ['C',0,0.81,0.22,1,0.5,1], ['Z']
+  ],
+  tick: [
+    ['M',0.69,1], ['L',1,1], ['L',1,0.81], ['L',0.69,0.81], ['L',0.69,0.81], ['L',0.32,0], ['L',0.32,0.01],
+    ['L',0.32,0], ['L',0,0], ['L',0,0.19], ['L',0.31,0.19], ['L',0.68,1], ['L',0.69,0.91], ['Z']
+  ],
+  tickV: [
+    ['M',0,1], ['L',0.79,1], ['C',0.91,1,1,0.95,1,0.88], ['L',1,0.44], ['L',1,0.44], ['L',1,0.44], ['L',1,0],
+    ['L',0.85,0], ['L',0.85,0.44], ['C',0.85,0.46,0.83,0.48,0.79,0.48], ['L',0,0.48], ['L',0,0.56],
+    ['L',0.79,0.56], ['C',0.8,0.56,0.82,0.56,0.83,0.55], ['L',0.85,0.55], ['L',0.85,0.88],
+    ['C',0.85,0.9,0.83,0.92,0.79,0.92], ['L',0,0.92], ['Z']
+  ],
+  roadWave: [
+    ['M',0.85,0], ['L',1,0], ['L',1,0.44], ['L',1,0.44], ['L',1,0.44], ['L',1,0.88],
+    ['C',1,0.95,0.91,1,0.79,1], ['L',0,1], ['L',0,0.92], ['L',0.79,0.92], ['C',0.83,0.92,0.85,0.9,0.85,0.88],
+    ['L',0.85,0.55], ['L',0.83,0.55], ['C',0.82,0.56,0.8,0.56,0.79,0.56], ['L',0,0.56], ['L',0,0.48],
+    ['L',0.79,0.48], ['C',0.83,0.48,0.85,0.46,0.85,0.44], ['Z']
+  ],
+  roadDiag: [
+    ['M',0.79,0], ['C',0.91,0,1,0.09,1,0.21], ['L',1,0.21], ['L',1,1], ['L',0.85,1], ['L',0.85,0.21],
+    ['C',0.85,0.17,0.83,0.15,0.79,0.15], ['L',0,0.15], ['L',0,0], ['L',0.79,0], ['Z']
+  ],
+  roadHookA: [
+    ['M',0,0], ['L',1,0]
+  ],
+  roadHookB: [
+    ['M',0,0], ['L',0.84,0], ['C',0.93,0,1,0.07,1,0.16], ['L',1,1]
+  ],
+  cornerA: [
+    ['M',0,0], ['L',0,1]
+  ],
+  cornerB: [
+    ['M',1,0.79], ['C',1,0.91,0.91,1,0.79,1], ['L',0.79,1], ['L',0,1], ['L',0,0.85], ['L',0.79,0.85],
+    ['C',0.83,0.85,0.85,0.83,0.85,0.79], ['L',0.85,0], ['L',1,0], ['L',1,0.79], ['Z']
+  ],
+  guideA: [
+    ['M',1,0], ['L',1,0.84], ['C',1,0.93,0.93,1,0.84,1], ['L',0,1]
+  ],
+  guideB: [
+    ['M',1,0], ['L',0,0]
+  ],
+  guideC: [
+    ['M',1,0.5], ['C',1,0.78,0.78,1,0.5,1], ['C',0.22,1,0,0.78,0,0.5], ['C',0,0.22,0.22,0,0.5,0],
+    ['C',0.78,0,1,0.22,1,0.5], ['Z']
+  ],
+  guideD: [
+    ['M',0.99,0], ['L',1,0], ['L',1,1], ['L',0.99,1], ['C',0.44,1,0,0.78,0,0.5], ['C',0,0.22,0.44,0,0.99,0],
+    ['Z']
+  ],
+  capsule: [
+    ['M',0.94,0.49], ['L',0.94,0.49], ['L',0.94,0.49], ['C',0.93,0.48,0.92,0.48,0.92,0.47], ['L',0.5,0],
+    ['L',0.08,0.47], ['C',0.08,0.48,0.07,0.48,0.06,0.49], ['L',0.06,0.49], ['L',0.06,0.49],
+    ['C',0.02,0.54,0,0.6,0,0.66], ['C',0,0.85,0.22,1,0.5,1], ['C',0.78,1,1,0.85,1,0.66],
+    ['C',1,0.6,0.98,0.54,0.94,0.49], ['Z']
+  ],
+};
+
+// --- drawing helpers ---------------------------------------------------------
+// Every helper takes the shape box as [x, y, w, h] inches.
+
+function shape(s, kind, [x, y, w, h], opts) {
+  s.addShape(kind, Object.assign({ x, y, w, h, line: NONE }, opts));
+}
+
+function text(s, [x, y, w, h], content, style, color) {
+  s.addText(content, Object.assign(
+    { x, y, w, h, margin: 0, isTextBox: true, valign: 'top', color: color || C.BLACK }, style));
+}
+
+// A straight slab of asphalt.
+function road(s, bx, opts) {
+  shape(s, 'rect', bx, Object.assign({ fill: C.ROAD }, opts));
+}
+
+// The dashed white lane marking that runs along a straight slab.
+function lane(s, bx, opts) {
+  shape(s, 'line', bx, Object.assign({ line: DASH }, opts));
+}
+
+// A straight slab of asphalt with its dashed centre line drawn down the middle.
+// `inset` trims the dashes back from each end of the slab.
+function strip(s, [x, y, w, h], inset, opts) {
+  const [lead, tail] = inset || [0.05, 0.05];
+  road(s, [x, y, w, h], opts);
+  if (w >= h) lane(s, [x + lead, y + h / 2, w - lead - tail, 0], opts);
+  else lane(s, [x + w / 2, y + lead, 0, h - lead - tail], opts);
+}
+
+// A bend in the road, dashed lane marking included. `range` is the asphalt's
+// [start, end] angle; `sweep` is the (slightly shorter) span of the dashes.
+function curve(s, [x, y, w, h], range, sweep, opts, thickness) {
+  const t = thickness || 0.5;
+  bend(s, [x, y, w, h], range, opts, t);
+  const iw = w * (1 - t / 2);
+  const ih = h * (1 - t / 2);
+  const spin = (opts && opts.rotate) || 0;
+  const lane = (opts && opts.flipH)
+    ? { rotate: (spin + 270) % 360 }
+    : { rotate: (spin + 90) % 360, flipH: true };
+  bendLane(s, [x + (w - iw) / 2, y + (h - ih) / 2, iw, ih], sweep, lane);
+}
+
+// A quarter/half turn of asphalt. `range` is [startAngle, endAngle] in degrees.
+function bend(s, bx, range, opts, thickness) {
+  shape(s, 'blockArc', bx, Object.assign(
+    { fill: C.ROAD, angleRange: range, arcThicknessRatio: thickness || 0.5 }, opts));
+}
+
+// The dashed lane marking that follows a bend.
+function bendLane(s, bx, range, opts) {
+  shape(s, 'arc', bx, Object.assign({ line: DASH, angleRange: range }, opts));
+}
+
+function dot(s, bx, color, shadow) {
+  shape(s, 'ellipse', bx, { fill: color, shadow });
+}
+
+// Stand-in for a source image: a soft rounded tile in the artwork's own colour.
+function art(s, [x, y, w, h], color) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: Math.min(w, h) * 0.22,
+    fill: { color, transparency: 15 }, line: NONE });
+}
+
+// Turn an OUTLINE table into the point list pptxgenjs wants, scaled to w x h.
+const P = Object.fromEntries(Object.entries(OUTLINE).map(([key, cmds]) => [key, (w, h) =>
+  cmds.map(([op, ...v]) => {
+    if (op === 'Z') return { close: true };
+    if (op === 'M') return { x: v[0] * w, y: v[1] * h, moveTo: true };
+    if (op === 'L') return { x: v[0] * w, y: v[1] * h };
+    return { x: v[4] * w, y: v[5] * h,
+      curve: { type: 'cubic', x1: v[0] * w, y1: v[1] * h, x2: v[2] * w, y2: v[3] * h } };
+  })]));
+
+// --- slide 1 
+function slide01(s) {
+  shape(s, 'rect', [0, 0, 13.33, 7.5], { fill: { color: C.WHITE, transparency: 10 } });
+  text(s, [2.98, 2.62, 7.38, 1.31], 'THE ROADMAP', T.hero, C.BLACK);
+  text(s, [3.83, 3.92, 5.68, 0.37], L.p22, T.subC, C.PINK);
+  text(s, [0.55, 6.66, 5.9, 0.63], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim.', T.body, C.GREY);
+  shape(s, 'roundRect', [11.53, 0.31, 1.25, 0.47], { rectRadius: 0.24, fill: C.YELLOW });
+  shape(s, 'line', [11.78, 0.55, 0.75, 0], { line: { color: C.WHITE, width: 1.5, endArrowType: 'triangle' } });
+  shape(s, 'line', [0.39, 6.39, 12.69, 0], { line: { color: C.RULE, width: 1.5 } });
+  text(s, [0.55, 0.39, 2.22, 0.34], 'Business Presentation', T.tag, C.PURPLE);
+  shape(s, 'roundRect', [11.4, 6.8, 0.34, 0.32], { rectRadius: 0.03, fill: C.ORANGE });
+  shape(s, 'custGeom', [11.48, 6.86, 0.04, 0.04], { points: P.ring(0.04, 0.04) });
+  shape(s, 'custGeom', [11.48, 6.91, 0.04, 0.12], { points: P.pin(0.04, 0.12) });
+  shape(s, 'custGeom', [11.55, 6.91, 0.12, 0.12], { points: P.balloon(0.12, 0.12) });
+  shape(s, 'roundRect', [12.44, 6.8, 0.34, 0.32], { rectRadius: 0.03, fill: C.ORANGE });
+  shape(s, 'custGeom', [12.56, 6.85, 0.11, 0.21], { points: P.blob(0.11, 0.21), fill: C.WHITE });
+  shape(s, 'roundRect', [11.93, 6.8, 0.34, 0.32], { rectRadius: 0.03, fill: C.ORANGE });
+  shape(s, 'custGeom', [11.98, 6.87, 0.24, 0.16], { points: P.bar(0.24, 0.16), fill: C.WHITE });
+  shape(s, 'custGeom', [11.99, 6.87, 0.23, 0.15], { points: P.glyph(0.23, 0.15), line: { color: C.ORANGE } });
+}
+
+// --- slide 2 
+function slide02(s) {
+  text(s, [1.37, 1.81, 3.65, 1.72], 'Welcome to Roadmap Infographic', T.h1, C.BLACK);
+  text(s, [1.37, 3.97, 3.65, 0.9], L.p1, T.body, C.GREY);
+  text(s, [1.37, 5.07, 3.65, 0.62], L.p19, T.body, C.GREY);
+  for (const [dx, dy, a, b, c] of [
+    [0, 0, C.PINK, C.PINK, 'Content Three'], [0, -2.24, C.MAGENTA, C.MAGENTA, 'Content Two'],
+    [0, -4.48, C.PURPLE, C.PURPLE, 'Content One']
+  ]) {
+    shape(s, 'roundRect', [7.94 + dx, 5.32 + dy, 4.96, 1.34], { rectRadius: 0.25, fill: a });
+    dot(s, [8.15 + dx, 5.45 + dy, 1.08, 1.08], C.WHITE);
+    art(s, [8.4 + dx, 5.7 + dy, 0.59, 0.59], b);
+    text(s, [9.4 + dx, 5.83 + dy, 3.13, 0.62], L.p5, T.body, C.WHITE);
+    text(s, [9.4 + dx, 5.53 + dy, 3.13, 0.37], c, T.lead, C.WHITE);
+  }
+  shape(s, 'triangle', [7.56, 5.9, 0.2, 0.17], { fill: C.PINK, rotate: 90 });
+  shape(s, 'triangle', [7.56, 3.66, 0.2, 0.17], { fill: C.MAGENTA, rotate: 90 });
+  shape(s, 'triangle', [7.56, 1.43, 0.2, 0.17], { fill: C.PURPLE, rotate: 90 });
+  bend(s, [5.91, 0.84, 1.44, 1.44], [180, 0], { rotate: 90, flipH: true });
+  bend(s, [5.92, 1.92, 1.44, 1.44], [180, 0], { rotate: 270 });
+  bend(s, [5.91, 2.99, 1.44, 1.44], [180, 0], { rotate: 90, flipH: true });
+  bend(s, [5.92, 4.07, 1.44, 1.44], [180, 0], { rotate: 270 });
+  bend(s, [5.91, 5.14, 1.44, 1.44], [180, 0], { rotate: 90, flipH: true });
+  bendLane(s, [6.09, 1.01, 1.09, 1.09], [270, 89.8]);
+  bendLane(s, [6.09, 2.1, 1.09, 1.08], [270, 89.8], { flipH: true });
+  bendLane(s, [6.09, 3.18, 1.09, 1.07], [270, 89.8]);
+  bendLane(s, [6.09, 4.25, 1.09, 1.08], [270, 89.8], { flipH: true });
+  bendLane(s, [6.09, 5.34, 1.09, 1.09], [270, 89.8]);
+  shape(s, 'rect', [6.24, 0.71, 0.4, 0.62], { fill: C.WHITE, shadow: SOFT });
+  shape(s, 'rect', [5.98, 0.58, 0.66, 0.88], { fill: C.WHITE });
+  shape(s, 'rect', [6.22, 6.12, 0.4, 0.62], { fill: C.WHITE, shadow: SOFT });
+  shape(s, 'rect', [5.96, 5.99, 0.66, 0.88], { fill: C.WHITE });
+}
+
+// --- slide 3 
+function slide03(s) {
+  text(s, [3.56, 0.78, 6.21, 0.64], 'Our Roadmap Infographic', T.h1c, C.BLACK);
+  text(s, [3.68, 1.61, 5.98, 0.63], L.p1, T.bodyC, C.GREY);
+  text(s, [5.74, 6.33, 1.9, 0.63], L.p17, T.bodyC, C.GREY);
+  text(s, [5.86, 6.02, 1.66, 0.34], 'Timeline Three', T.h3c, C.BLACK);
+  art(s, [6.38, 5.2, 0.62, 0.62], C.PINK);
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Timeline One', C.PURPLE], [2.24, 0, 'Timeline Two', C.MAGENTA],
+    [6.71, 0, 'Timeline Four', C.ORANGE], [8.94, 0, 'Timeline Five', C.YELLOW]
+  ]) {
+    text(s, [1.26 + dx, 6.33 + dy, 1.9, 0.63], L.p17, T.bodyC, C.GREY);
+    text(s, [1.43 + dx, 6.02 + dy, 1.54, 0.34], a, T.h3c, C.BLACK);
+    art(s, [1.9 + dx, 5.2 + dy, 0.62, 0.62], b);
+  }
+  shape(s, 'custGeom', [0.38, 3, 12.56, 1.44], { points: P.plate(12.56, 1.44), fill: C.ROAD, rotate: 180 });
+  shape(s, 'rect', [0.26, 3.71, 0.62, 0.4], { fill: C.WHITE, shadow: SOFT });
+  shape(s, 'rect', [0.13, 3.71, 0.88, 0.66], { fill: C.WHITE });
+  shape(s, 'rect', [12.46, 3.73, 0.62, 0.4], { fill: C.WHITE, shadow: SOFT });
+  shape(s, 'rect', [12.32, 3.73, 0.88, 0.66], { fill: C.WHITE });
+  for (const [dx, dy] of [
+    [0, 0], [6.63, 0]
+  ]) {
+    bendLane(s, [0.57 + dx, 3.18 + dy, 1.12, 1.09], [270, 89.8], { rotate: 270 });
+    bendLane(s, [1.68 + dx, 3.18 + dy, 1.12, 1.08], [270, 89.8], { rotate: 270, flipH: true });
+    bendLane(s, [2.78 + dx, 3.19 + dy, 1.12, 1.07], [270, 89.8], { rotate: 270 });
+    bendLane(s, [3.89 + dx, 3.18 + dy, 1.12, 1.08], [270, 89.8], { rotate: 270, flipH: true });
+    bendLane(s, [5 + dx, 3.17 + dy, 1.12, 1.09], [270, 89.8], { rotate: 270 });
+  }
+  bendLane(s, [6.1, 3.19, 1.12, 1.05], [270, 89.8], { rotate: 270, flipH: true });
+  shape(s, 'triangle', [6.57, 4.74, 0.2, 0.17], { fill: C.PINK });
+  shape(s, 'triangle', [4.34, 4.74, 0.2, 0.17], { fill: C.MAGENTA });
+  shape(s, 'triangle', [2.1, 4.74, 0.2, 0.17], { fill: C.PURPLE });
+  shape(s, 'triangle', [11.04, 4.74, 0.2, 0.17], { fill: C.YELLOW });
+  shape(s, 'triangle', [8.81, 4.74, 0.2, 0.17], { fill: C.ORANGE });
+}
+
+// --- slide 4 
+function slide04(s) {
+  road(s, [5.61, 3.32, 0.36, 0.39]);
+  curve(s, [7.66, 1.04, 1.44, 1.44], [270.3, 0], [270, 359.5], { rotate: 270 });
+  road(s, [7.66, 1.76, 0.36, 2.47]);
+  road(s, [8.38, 1.04, 4.96, 0.36]);
+  lane(s, [7.84, 1.85, 0, 2.38]);
+  lane(s, [8.51, 1.23, 4.54, 0]);
+  curve(s, [4.53, 2.62, 1.44, 1.44], [270.3, 0], [270, 359.5]);
+  lane(s, [5.79, 3.43, 0, 0.18]);
+  strip(s, [3.66, 2.62, 1.6, 0.36], [0.05, 0.09]);
+  curve(s, [2.44, 4.2, 1.44, 1.44], [270.3, 0], [270, 359.5], { rotate: 180, flipH: true });
+  road(s, [0, 5.28, 3.17, 0.36]);
+  road(s, [3.52, 2.74, 0.36, 2.18]);
+  lane(s, [0.14, 5.46, 2.94, 0]);
+  text(s, [7.83, 5.67, 4.51, 1.18], 'Strategic Roadmap Path to Success', T.h1r, C.BLACK);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.PURPLE], [2.05, -2.64, C.MAGENTA, C.MAGENTA], [8.15, -4.24, C.ORANGE, C.ORANGE]
+  ]) {
+    dot(s, [1.17 + dx, 4.97 + dy, 0.97, 0.97], a);
+    dot(s, [1.23 + dx, 5.04 + dy, 0.84, 0.84], C.WHITE);
+    art(s, [1.36 + dx, 5.16 + dy, 0.59, 0.59], b);
+  }
+  for (const [dx, dy, a] of [
+    [0, 0, C.PURPLE], [1.97, -2.57, C.MAGENTA], [8.21, 0.08, C.PINK]
+  ]) {
+    text(s, [0.4 + dx, 4.12 + dy, 2.54, 0.63], L.p6, T.body, C.GREY);
+    text(s, [0.4 + dx, 3.81 + dy, 2.54, 0.34], 'Title Here', T.h3, a);
+  }
+  text(s, [9.33, 2.3, 2.54, 0.63], L.p6, T.body, C.GREY);
+  lane(s, [3.7, 3.29, 0.01, 1.5]);
+  text(s, [9.33, 1.99, 2.54, 0.34], 'Title Here', T.h3, C.ORANGE);
+  curve(s, [5.62, 2.97, 1.44, 1.44], [270.3, 0], [270, 359.5], { rotate: 180 });
+  strip(s, [6.33, 4.05, 1.5, 0.36], [0.09, 0.23]);
+  dot(s, [7.34, 3.74, 0.97, 0.97], C.PINK);
+  dot(s, [7.41, 3.81, 0.84, 0.84], C.WHITE);
+  art(s, [7.54, 3.94, 0.59, 0.59], C.PINK);
+}
+
+// --- slide 5 
+function slide05(s) {
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.PURPLE], [0.97, -1.69, C.MAGENTA, C.MAGENTA], [0, -3.37, C.PINK, C.PINK],
+    [0.97, -5.05, C.ORANGE, C.ORANGE]
+  ]) {
+    dot(s, [6.95 + dx, 5.79 + dy, 0.97, 0.97], a);
+    dot(s, [7.01 + dx, 5.85 + dy, 0.84, 0.84], C.WHITE);
+    art(s, [7.14 + dx, 5.98 + dy, 0.59, 0.59], b);
+  }
+  for (const [dx, dy, a] of [
+    [0, 0, C.PURPLE], [0, -1.65, C.MAGENTA], [0, -3.3, C.PINK], [0, -4.95, C.ORANGE]
+  ]) {
+    text(s, [9.58 + dx, 6.01 + dy, 2.54, 0.63], L.p6, T.body, C.GREY);
+    text(s, [9.58 + dx, 5.7 + dy, 2.54, 0.34], 'Title Here', T.h3, a);
+  }
+  text(s, [1.23, 2.19, 4.23, 1.18], 'Our Best Roadmap Ahead', T.h1, C.BLACK);
+  text(s, [1.23, 3.69, 4.38, 0.9], L.p1, T.body, C.GREY);
+  text(s, [1.23, 4.69, 4.23, 0.63], L.p19, T.body, C.GREY);
+  shape(s, 'uturnArrow', [6.67, 0.99, 1.29, 1.2], { fill: C.ROAD, rotate: 270 });
+  shape(s, 'uturnArrow', [7.88, 1.97, 1.27, 1.2], { fill: C.ROAD, rotate: 90 });
+  shape(s, 'uturnArrow', [6.67, 4.32, 1.29, 1.2], { fill: C.ROAD, rotate: 270 });
+  shape(s, 'uturnArrow', [7.88, 5.29, 1.27, 1.2], { fill: C.ROAD, rotate: 90 });
+  bendLane(s, [6.88, 1.25, 0.84, 0.84], [270, 89.5], { flipH: true });
+  lane(s, [7.37, 2.08, 1.1, 0.01], { rotate: 180 });
+  bendLane(s, [8.12, 2.08, 0.84, 0.82], [270, 89.5]);
+  bendLane(s, [6.87, 4.58, 0.84, 0.84], [270, 89.5], { flipH: true });
+  lane(s, [7.37, 5.41, 1.07, 0.01], { rotate: 180 });
+  bendLane(s, [8.11, 5.41, 0.84, 0.81], [270, 89.5]);
+}
+
+// --- slide 6 
+function slide06(s) {
+  curve(s, [3.94, 4.82, 1.44, 1.44], [270.3, 0], [270, 359.5], { rotate: 180, flipH: true });
+  road(s, [0, 5.9, 4.67, 0.36]);
+  road(s, [1.06, 5.61, 0.33, 0.94], { shadow: SOFT });
+  lane(s, [0.22, 6.08, 4.36, 0]);
+  curve(s, [1.04, 1.19, 1.44, 1.44], [270.3, 0], [270, 359.5], { flipH: true });
+  road(s, [1.75, 1.19, 3.35, 0.36]);
+  road(s, [5.02, 0.88, 0.33, 0.94], { shadow: SOFT });
+  road(s, [1.04, 1.91, 0.36, 5.84]);
+  strip(s, [5.02, 0, 0.36, 5.54], [0.16, 0.13]);
+  lane(s, [1.84, 1.37, 3.13, 0]);
+  lane(s, [1.22, 2.04, 0, 5.5], { rotate: 180 });
+  text(s, [0.77, 2.24, 0.92, 0.92], '01', T.numDot, C.BLACK);
+  text(s, [3.05, 0.91, 0.92, 0.92], '02', T.numDot, C.BLACK);
+  text(s, [4.74, 4.28, 0.92, 0.92], '04', T.numDot, C.BLACK);
+  text(s, [2.47, 5.62, 0.92, 0.92], '03', T.numDot, C.BLACK);
+  text(s, [7.54, 0.52, 4.83, 1.18], [
+    { text: 'Milestones and ', options: { color: C.BLACK, breakLine: true } },
+    { text: 'Goals Roadmap', options: { color: C.BLACK } }
+  ], T.h1);
+  for (const [dx, dy, a, b, c] of [
+    [0, 0, 'Content One', C.PURPLE, C.PURPLE], [0, 1.28, 'Content Two', C.MAGENTA, C.MAGENTA],
+    [0, 2.56, 'Content Three', C.PINK, C.PINK], [0, 3.84, 'Content Four', C.ORANGE, C.ORANGE]
+  ]) {
+    text(s, [8.7 + dx, 2.51 + dy, 3.13, 0.63], L.p11, T.body, C.GREY);
+    text(s, [8.7 + dx, 2.19 + dy, 3.08, 0.34], a, T.h3, b);
+    art(s, [7.79 + dx, 2.36 + dy, 0.62, 0.62], c);
+  }
+  dot(s, [2.21, 2.77, 1.96, 1.96], C.WHITE, SOFT);
+  dot(s, [2.32, 2.88, 1.74, 1.74], C.YELLOW);
+  art(s, [2.72, 3.28, 0.98, 0.98], C.WHITE);
+}
+
+// --- slide 7 
+function slide07(s) {
+  curve(s, [11.1, 2.36, 2.2, 2.21], [269.9, 0], [270, 359.5], { rotate: 270 });
+  road(s, [11.1, 3.46, 0.55, 2.55]);
+  road(s, [12.19, 2.36, 1.16, 0.55]);
+  lane(s, [11.37, 3.59, 0, 2.41]);
+  lane(s, [12.31, 2.65, 0.9, 0]);
+  curve(s, [7.74, 3.9, 2.2, 2.21], [269.8, 0], [270, 359.5], { rotate: 270 });
+  road(s, [7.74, 5, 0.55, 1.56]);
+  road(s, [8.84, 3.9, 2.27, 0.55]);
+  lane(s, [8.01, 5.13, 0, 0.87]);
+  lane(s, [8.99, 4.18, 2.05, 0]);
+  curve(s, [4.52, 6, 2.2, 2.21], [270.3, 1.1], [270, 359.5], { rotate: 270 }, 0.5);
+  road(s, [4.52, 7.1, 0.55, 0.4]);
+  road(s, [5.62, 6, 7.71, 0.55]);
+  lane(s, [4.79, 7.24, 0, 0.26]);
+  lane(s, [5.76, 6.28, 7.34, 0.01], { rotate: 180 });
+  curve(s, [-0.05, 4.99, 2.2, 2.21], [269.6, 0], [270, 359.5]);
+  road(s, [0, 4.99, 1.05, 0.55]);
+  road(s, [1.59, 6.09, 0.55, 1.41]);
+  lane(s, [0, 5.26, 0.92, 0]);
+  lane(s, [1.86, 6.13, 0, 1.37], { rotate: 180 });
+  for (const [dx, dy, a, b, c, d] of [
+    [0, 0, C.PURPLE, C.PURPLE, 'Content One', C.PURPLE],
+    [3.37, 1.2, C.MAGENTA, C.MAGENTA, 'Content Two', C.MAGENTA],
+    [6.66, -0.93, C.PINK, C.PINK, 'Content Three', C.PINK],
+    [9.99, -2.51, C.ORANGE, C.ORANGE, 'Content Four', C.ORANGE]
+  ]) {
+    shape(s, 'custGeom', [0.7 + dx, 3.11 + dy, 1.9, 2.24], { points: P.cross(1.9, 2.24), fill: a, rotate: 180, flipH: true });
+    dot(s, [0.84 + dx, 3.26 + dy, 1.6, 1.6], C.WHITE);
+    art(s, [1.33 + dx, 3.49 + dy, 0.62, 0.62], b);
+    text(s, [0.99 + dx, 4.14 + dy, 1.31, 0.57], c, T.h3c, d);
+  }
+  text(s, [1.09, 0.83, 6.71, 0.64], 'Strategic Roadmap Overview', T.h1, C.BLACK);
+  text(s, [1.09, 2.07, 5.51, 0.63], L.p1, T.body, C.GREY);
+  text(s, [1.09, 1.73, 3.25, 0.34], 'Your Title Here', T.h3, C.BLACK);
+}
+
+// --- slide 8 
+function slide08(s) {
+  shape(s, 'custGeom', [0, 2.4, 13.33, 2.9], { points: P.tick(13.33, 2.9), fill: C.WHITE, rotate: 180, flipH: true, shadow: SOFT });
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.MAGENTA], [-1.72, 0.82, C.PINK, C.ORANGE], [-3.44, 1.64, C.YELLOW, C.GREEN]
+  ]) {
+    dot(s, [7.19 + dx, 1.42 + dy, 1, 1], a);
+    dot(s, [8.38 + dx, 3.4 + dy, 1, 1], b);
+  }
+  art(s, [7.4, 1.63, 0.59, 0.59], C.WHITE);
+  art(s, [5.68, 2.45, 0.59, 0.59], C.WHITE);
+  art(s, [8.59, 3.6, 0.59, 0.59], C.WHITE);
+  art(s, [6.87, 4.43, 0.59, 0.59], C.WHITE);
+  art(s, [3.94, 3.25, 0.62, 0.62], C.WHITE);
+  art(s, [5.13, 5.23, 0.62, 0.62], C.WHITE);
+  text(s, [8.88, 0.65, 0.85, 0.77], '01', T.numBig, C.PURPLE);
+  text(s, [9.73, 0.92, 2.38, 0.63], L.p2, T.body, C.GREY);
+  text(s, [9.73, 0.52, 2.22, 0.4], 'Content One', T.card, C.PURPLE);
+  for (const [dx, dy, a, b, c, d] of [
+    [0, 0, 'Content Two', C.MAGENTA, '02', C.MAGENTA],
+    [-6.71, -3.04, 'Content One', C.PINK, '03', C.PINK],
+    [-2.96, 2.4, 'Content Two', C.ORANGE, '04', C.ORANGE]
+  ]) {
+    text(s, [10.79 + dx, 3.87 + dy, 2.38, 0.63], L.p2, T.body, C.GREY);
+    text(s, [10.79 + dx, 3.46 + dy, 2.22, 0.4], a, T.card, b);
+    text(s, [9.94 + dx, 3.59 + dy, 0.85, 0.77], c, T.numBig, d);
+  }
+  text(s, [0.95, 5.92, 0.85, 0.77], '06', T.numBig, C.GREEN);
+  text(s, [1.81, 6.2, 2.38, 0.63], L.p2, T.body, C.GREY);
+  text(s, [1.81, 5.79, 2.22, 0.4], 'Content Two', T.card, C.GREEN);
+  text(s, [1.03, 3.33, 2.38, 0.63], L.p2, T.body, C.GREY);
+  text(s, [1.03, 2.93, 2.22, 0.4], 'Content Two', T.card, C.YELLOW);
+  text(s, [0.18, 3.06, 0.85, 0.77], '05', T.numBig, C.YELLOW);
+  dot(s, [3.89, 4.6, 0.55, 0.55], C.ROAD);
+  dot(s, [8.79, 2.23, 0.55, 0.55], C.ROAD);
+  road(s, [3.89, 3.42, 5.45, 0.55], { rotate: 154.21 });
+  lane(s, [4.16, 2.51, 4.91, 2.37], { rotate: 180 });
+  road(s, [-0.01, 4.6, 4.14, 0.55]);
+  lane(s, [-0.04, 4.9, 4.12, 0]);
+  strip(s, [9.05, 2.23, 4.39, 0.55], [0.17, 0.24]);
+  shape(s, 'roundRect', [9.13, 2.27, 0.35, 0.18], { rectRadius: 0.03, fill: C.PURPLE });
+  shape(s, 'rect', [9.2, 2.29, 0.08, 0.14], { fill: 'EC6EF9' });
+  shape(s, 'rect', [9.39, 2.29, 0.04, 0.14], { fill: 'EC6EF9' });
+  dot(s, [9.14, 2.29, 0.02, 0.02], C.AMBER);
+  dot(s, [9.14, 2.4, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [9.15, 2.33, 0.02, 0.06], { rectRadius: 0.01, fill: 'F5B6FC' });
+  shape(s, 'roundRect', [10.19, 2.57, 0.35, 0.18], { rectRadius: 0.03, fill: C.MAGENTA });
+  shape(s, 'rect', [10.4, 2.59, 0.08, 0.14], { fill: 'FF7AC6' });
+  shape(s, 'rect', [10.24, 2.59, 0.04, 0.14], { fill: 'FF7AC6' });
+  dot(s, [10.5, 2.59, 0.02, 0.02], C.AMBER);
+  dot(s, [10.5, 2.7, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [10.5, 2.63, 0.02, 0.06], { rectRadius: 0.01, fill: 'FFBCE2' });
+  shape(s, 'roundRect', [5.59, 3.85, 0.35, 0.18], { rectRadius: 0.03, fill: C.PINK, rotate: 154 });
+  shape(s, 'rect', [5.66, 3.9, 0.08, 0.14], { fill: 'FFA5C3', rotate: 154 });
+  shape(s, 'rect', [5.84, 3.83, 0.04, 0.14], { fill: 'FFA5C3', rotate: 154 });
+  dot(s, [5.59, 3.94, 0.02, 0.02], C.AMBER);
+  dot(s, [5.64, 4.04, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [5.62, 3.98, 0.02, 0.06], { rectRadius: 0.01, fill: 'FFD2E1', rotate: 154 });
+  shape(s, 'roundRect', [7.18, 3.42, 0.35, 0.18], { rectRadius: 0.03, fill: C.ORANGE, rotate: 154 });
+  shape(s, 'rect', [7.38, 3.41, 0.08, 0.14], { fill: 'FCC0A3', rotate: 154 });
+  shape(s, 'rect', [7.24, 3.49, 0.04, 0.14], { fill: 'FCC0A3', rotate: 154 });
+  dot(s, [7.5, 3.48, 0.02, 0.02], C.AMBER);
+  dot(s, [7.45, 3.38, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [7.48, 3.41, 0.02, 0.06], { rectRadius: 0.01, fill: 'FDE0D1', rotate: 154 });
+  shape(s, 'roundRect', [1.91, 4.64, 0.35, 0.18], { rectRadius: 0.03, fill: C.YELLOW });
+  shape(s, 'rect', [1.98, 4.66, 0.08, 0.14], { fill: 'FAE7B5' });
+  shape(s, 'rect', [2.17, 4.66, 0.04, 0.14], { fill: 'FAE7B5' });
+  dot(s, [1.93, 4.66, 0.02, 0.02], C.WHITE);
+  dot(s, [1.93, 4.77, 0.02, 0.02], C.WHITE);
+  shape(s, 'roundRect', [1.93, 4.7, 0.02, 0.06], { rectRadius: 0.01, fill: 'FCF3DA' });
+  shape(s, 'roundRect', [2.89, 4.95, 0.35, 0.18], { rectRadius: 0.03, fill: C.GREEN });
+  shape(s, 'rect', [3.1, 4.97, 0.08, 0.14], { fill: 'D3ECB9' });
+  shape(s, 'rect', [2.94, 4.97, 0.04, 0.14], { fill: 'D3ECB9' });
+  dot(s, [3.2, 4.97, 0.02, 0.02], C.AMBER);
+  dot(s, [3.2, 5.08, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [3.21, 5.01, 0.02, 0.06], { rectRadius: 0.01, fill: 'E9F6DC' });
+}
+
+// --- slide 9 
+function slide09(s) {
+  road(s, [3.44, 4.61, 0.59, 0.37]);
+  lane(s, [3.49, 4.79, 0.52, 0], { rotate: 180 });
+  curve(s, [2.81, 3.69, 1.28, 1.28], [269.6, 359.2], [279.7, 359.5], { rotate: 180 }, 0.58);
+  curve(s, [1.9, 3.71, 1.28, 1.28], [269.6, 359.2], [270, 354.6], null, 0.58);
+  strip(s, [0, 3.71, 2.56, 0.37], [0.23, 0.03]);
+  strip(s, [5.91, 3.71, 0.59, 0.37], [0.05, 0.03]);
+  curve(s, [5.29, 3.71, 1.28, 1.28], [269.6, 359.2], [279.7, 359.5], { flipH: true }, 0.58);
+  curve(s, [4.37, 3.69, 1.28, 1.28], [269.6, 359.2], [270, 351.6], { rotate: 180, flipH: true }, 0.58);
+  strip(s, [4.36, 4.61, 0.67, 0.37], [0.05, 0.03]);
+  road(s, [8.39, 4.61, 0.59, 0.37]);
+  lane(s, [8.44, 4.79, 0.52, 0], { rotate: 180 });
+  curve(s, [7.77, 3.69, 1.28, 1.28], [269.6, 359.2], [279.7, 359.5], { rotate: 180 }, 0.58);
+  curve(s, [6.86, 3.71, 1.28, 1.28], [269.6, 359.2], [270, 351.7], null, 0.58);
+  road(s, [6.84, 3.71, 0.67, 0.37]);
+  lane(s, [6.9, 3.89, 0.58, 0], { rotate: 180 });
+  strip(s, [10.87, 3.71, 2.47, 0.37], [0.05, 0.17]);
+  curve(s, [10.24, 3.71, 1.28, 1.28], [269.6, 359.2], [279.7, 359.5], { flipH: true }, 0.58);
+  curve(s, [9.33, 3.69, 1.28, 1.28], [269.6, 359.2], [270, 349.9], { rotate: 180, flipH: true }, 0.58);
+  strip(s, [9.32, 4.61, 0.67, 0.37], [0.05, 0.03]);
+  text(s, [3.93, 0.49, 5.46, 0.64], 'Roadmap to Excellence', T.h1c, C.BLACK);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PINK, 'Content Three'], [-4.94, 0, C.PURPLE, 'Content One'],
+    [-2.47, 4.24, C.MAGENTA, 'Content Two'], [2.47, 4.24, C.ORANGE, 'Content Four'],
+    [4.94, 0, C.YELLOW, 'Content Five']
+  ]) {
+    shape(s, 'roundRect', [5.42 + dx, 1.67 + dy, 2.48, 1.29], { rectRadius: 0.22, fill: a });
+    text(s, [5.54 + dx, 2.14 + dy, 2.25, 0.63], L.p8, T.bodyC, C.WHITE);
+    text(s, [5.69 + dx, 1.82 + dy, 1.95, 0.34], b, T.h3c, C.WHITE);
+  }
+  dot(s, [11.34, 3.63, 0.52, 0.52], C.WHITE, SOFT);
+  dot(s, [11.44, 3.73, 0.33, 0.33], C.YELLOW);
+  shape(s, 'line', [11.6, 2.96, 0, 0.67], { line: { color: C.YELLOW, width: 1.5, dashType: 'dash' } });
+  for (const [dx, dy, a] of [
+    [0, 0, C.ORANGE], [-2.47, -0.91, C.PINK], [-4.94, 0, C.MAGENTA], [-7.41, -0.91, C.PURPLE]
+  ]) {
+    dot(s, [8.88 + dx, 4.54 + dy, 0.52, 0.52], C.WHITE, SOFT);
+    dot(s, [8.97 + dx, 4.63 + dy, 0.33, 0.33], a);
+  }
+  shape(s, 'line', [1.73, 2.96, 0, 0.67], { line: { color: C.PURPLE, width: 1.5, dashType: 'dash' } });
+  shape(s, 'line', [4.2, 5.06, 0, 0.85], { line: { color: C.MAGENTA, width: 1.5, dashType: 'dash' } });
+  shape(s, 'line', [6.67, 2.96, 0, 0.67], { line: { color: C.PINK, width: 1.5, dashType: 'dash' } });
+  shape(s, 'line', [9.13, 5.06, 0, 0.85], { line: { color: C.ORANGE, width: 1.5, dashType: 'dash' } });
+  dot(s, [1.08, 4.78, 1.3, 1.3], C.PURPLE);
+  dot(s, [3.55, 2.56, 1.3, 1.3], C.MAGENTA);
+  dot(s, [6.02, 4.77, 1.3, 1.3], C.PINK);
+  dot(s, [8.48, 2.56, 1.3, 1.3], C.ORANGE);
+  dot(s, [10.95, 4.77, 1.3, 1.3], C.YELLOW);
+  art(s, [1.38, 5.08, 0.7, 0.7], C.WHITE);
+  art(s, [6.32, 5.07, 0.7, 0.7], C.WHITE);
+  art(s, [8.79, 2.86, 0.7, 0.7], C.WHITE);
+  art(s, [3.85, 2.86, 0.7, 0.7], C.WHITE);
+  art(s, [11.25, 5.07, 0.7, 0.7], C.WHITE);
+  shape(s, 'triangle', [1.6, 4.44, 0.27, 0.23], { fill: C.PURPLE });
+  shape(s, 'triangle', [6.53, 4.44, 0.27, 0.23], { fill: C.PINK });
+  shape(s, 'triangle', [11.47, 4.44, 0.27, 0.23], { fill: C.YELLOW });
+  shape(s, 'triangle', [4.07, 3.99, 0.27, 0.23], { fill: C.MAGENTA, rotate: 180 });
+  shape(s, 'triangle', [9, 3.99, 0.27, 0.23], { fill: C.ORANGE, rotate: 180 });
+}
+
+// --- slide 10 
+function slide10(s) {
+  shape(s, 'custGeom', [3.3, 1.47, 3.51, 6.31], { points: P.tickV(3.51, 6.31), fill: C.WHITE, rotate: 180, flipH: true, shadow: SOFT });
+  shape(s, 'custGeom', [-0.07, -0.07, 3.51, 6.31], { points: P.roadWave(3.51, 6.31), fill: C.WHITE, shadow: SOFT });
+  for (const [dx, dy] of [
+    [0, 0], [0, 2.79]
+  ]) {
+    shape(s, 'custGeom', [3.36 + dx, 1.4 + dy, 3.37, 3.37], { points: P.roadDiag(3.37, 3.37), fill: C.ROAD });
+    shape(s, 'custGeom', [3.36 + dx, 1.65 + dy, 0.03, 0], { points: P.roadHookA(0.03, 0), line: { color: C.WHITE, width: 3.22 } });
+    shape(s, 'custGeom', [3.45 + dx, 1.65 + dy, 3.03, 3.06], { points: P.roadHookB(3.03, 3.06), line: { color: C.WHITE, width: 3.22, dashType: 'dash' } });
+    shape(s, 'custGeom', [6.49 + dx, 4.75 + dy, 0, 0.03], { points: P.cornerA(0, 0.03), line: { color: C.WHITE, width: 3.22 } });
+  }
+  for (const [dx, dy] of [
+    [0, 0], [0, -2.79]
+  ]) {
+    shape(s, 'custGeom', [0 + dx, 2.79 + dy, 3.37, 3.37], { points: P.cornerB(3.37, 3.37), fill: C.ROAD });
+    shape(s, 'custGeom', [3.13 + dx, 2.79 + dy, 0, 0.03], { points: P.cornerA(0, 0.03), line: { color: C.WHITE, width: 3.22 } });
+    shape(s, 'custGeom', [0.07 + dx, 2.89 + dy, 3.06, 3.03], { points: P.guideA(3.06, 3.03), line: { color: C.WHITE, width: 3.22, dashType: 'dash' } });
+    shape(s, 'custGeom', [0 + dx, 5.92 + dy, 0.03, 0], { points: P.guideB(0.03, 0), line: { color: C.WHITE, width: 3.22 } });
+  }
+  text(s, [0.45, 1.36, 2.1, 0.75], L.p16, T.noteC, C.SLATE);
+  text(s, [0.45, 0.99, 2.1, 0.37], 'Content Three', T.leadC, C.INK);
+  text(s, [3.86, 5.97, 1.89, 0.75], L.p16, T.noteC, C.SLATE);
+  text(s, [3.86, 5.6, 1.89, 0.37], 'Content Two', T.leadC, C.INK);
+  text(s, [0.44, 4.44, 2.1, 0.75], L.p16, T.noteC, C.SLATE);
+  text(s, [0.44, 4.07, 2.1, 0.37], 'Content One', T.leadC, C.INK);
+  text(s, [8.27, 1.77, 3.85, 1.18], 'Navigating the Future', T.h1, C.BLACK);
+  text(s, [8.27, 3.21, 3.85, 1.18], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sedo do eiusmod tempor incididunt ut labore et dolore magna aliq. Ut enim ad minim veniam, quis nostrud exercitation ullamco.', T.body, C.SLATE);
+  text(s, [8.27, 4.82, 3.25, 0.34], 'Your Title Here', T.h3, C.BLACK);
+  text(s, [8.27, 5.1, 3.85, 0.63], L.p14, T.body, C.SLATE);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.PURPLE], [3.31, -1.47, C.MAGENTA, C.MAGENTA], [0, -2.81, C.PINK, C.PINK],
+    [3.31, -4.26, C.ORANGE, C.ORANGE]
+  ]) {
+    dot(s, [1.01 + dx, 5.44 + dy, 0.97, 0.97], a);
+    dot(s, [1.07 + dx, 5.51 + dy, 0.84, 0.84], C.WHITE);
+    art(s, [1.2 + dx, 5.63 + dy, 0.59, 0.59], b);
+  }
+  text(s, [3.86, 2.71, 1.89, 0.75], L.p16, T.noteC, C.SLATE);
+  text(s, [3.86, 2.34, 1.89, 0.37], 'Content Four', T.leadC, C.INK);
+}
+
+// --- slide 11 
+function slide11(s) {
+  strip(s, [9.9, 2.81, 3.06, 0.47], [0.28, 0.04]);
+  strip(s, [0.36, 2.81, 3.06, 0.47], [0.28, 0.04]);
+  road(s, [5.87, 3.53, 3.06, 0.47], { rotate: 45.09 });
+  lane(s, [6.12, 3.85, 2.74, 0], { rotate: 45.09 });
+  road(s, [4.46, 3.53, 3.06, 0.47], { rotate: 134.91 });
+  lane(s, [4.53, 3.85, 2.74, 0], { rotate: 314.91 });
+  road(s, [7.25, 3.53, 3.06, 0.47], { rotate: 134.91 });
+  lane(s, [7.32, 3.85, 2.74, 0], { rotate: 314.91 });
+  shape(s, 'roundRect', [2.93, 2.83, 0.35, 0.18], { rectRadius: 0.03, fill: C.PINK });
+  shape(s, 'rect', [3.14, 2.85, 0.08, 0.14], { fill: 'FFA5C3' });
+  shape(s, 'rect', [2.98, 2.85, 0.04, 0.14], { fill: 'FFA5C3' });
+  dot(s, [3.24, 2.85, 0.02, 0.02], C.AMBER);
+  dot(s, [3.24, 2.97, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [3.25, 2.89, 0.02, 0.06], { rectRadius: 0.01, fill: 'FFD2E1' });
+  road(s, [3.08, 3.53, 3.06, 0.47], { rotate: 45.09 });
+  lane(s, [3.33, 3.85, 2.74, 0], { rotate: 45.09 });
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.WHITE], [2.79, 0, C.PINK, C.WHITE], [4.18, 1.44, C.ORANGE, C.WHITE],
+    [1.4, 1.44, C.MAGENTA, C.WHITE], [5.58, 0, C.YELLOW, C.WHITE]
+  ]) {
+    dot(s, [3.22 + dx, 2.39 + dy, 1.31, 1.31], a);
+    art(s, [3.52 + dx, 2.69 + dy, 0.7, 0.7], b);
+  }
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content One', C.PURPLE], [1.4, 5.08, 'Content Two', C.MAGENTA],
+    [2.79, 0, 'Content Three', C.PINK], [4.19, 5.08, 'Content Four', C.ORANGE],
+    [5.58, 0, 'Content Five', C.YELLOW]
+  ]) {
+    text(s, [2.69 + dx, 1.1 + dy, 2.38, 0.63], L.p2, T.bodyC, C.GREY);
+    text(s, [2.77 + dx, 0.69 + dy, 2.22, 0.4], a, T.cardC, b);
+  }
+  shape(s, 'round2SameRect', [9.32, 3.49, 7.5, 0.53], { rectRadius: 0.26, fill: C.PANEL, rotate: 270, flipH: true });
+  shape(s, 'round2SameRect', [-3.49, 3.49, 7.5, 0.53], { rectRadius: 0.26, fill: C.PANEL, rotate: 90 });
+  for (const [dx, dy, a, b, c, d] of [
+    [0, 0, C.PURPLE, 'EC6EF9', 'EC6EF9', 'F5B6FC'],
+    [1.21, 0.27, C.MAGENTA, 'FF7AC6', 'FF7AC6', 'FFBCE2']
+  ]) {
+    shape(s, 'roundRect', [0.61 + dx, 2.82 + dy, 0.35, 0.18], { rectRadius: 0.03, fill: a });
+    shape(s, 'rect', [0.81 + dx, 2.84 + dy, 0.08, 0.14], { fill: b });
+    shape(s, 'rect', [0.65 + dx, 2.84 + dy, 0.04, 0.14], { fill: c });
+    dot(s, [0.92 + dx, 2.84 + dy, 0.02, 0.02], C.AMBER);
+    dot(s, [0.92 + dx, 2.95 + dy, 0.02, 0.02], C.AMBER);
+    shape(s, 'roundRect', [0.92 + dx, 2.88 + dy, 0.02, 0.06], { rectRadius: 0.01, fill: d });
+  }
+  shape(s, 'roundRect', [10.7, 2.82, 0.35, 0.18], { rectRadius: 0.03, fill: C.ORANGE });
+  shape(s, 'rect', [10.9, 2.84, 0.08, 0.14], { fill: 'FCC0A3' });
+  shape(s, 'rect', [10.74, 2.84, 0.04, 0.14], { fill: 'FCC0A3' });
+  dot(s, [11.01, 2.95, 0.02, 0.02], C.AMBER);
+  dot(s, [11.01, 2.84, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [11.01, 2.88, 0.02, 0.06], { rectRadius: 0.01, fill: 'FDE0D1' });
+  shape(s, 'roundRect', [11.79, 3.08, 0.35, 0.18], { rectRadius: 0.03, fill: C.YELLOW });
+  shape(s, 'rect', [12, 3.1, 0.08, 0.14], { fill: 'FAE7B5' });
+  shape(s, 'rect', [11.84, 3.1, 0.04, 0.14], { fill: 'FAE7B5' });
+  dot(s, [12.11, 3.1, 0.02, 0.02], C.WHITE);
+  dot(s, [12.11, 3.21, 0.02, 0.02], C.WHITE);
+  shape(s, 'roundRect', [12.11, 3.14, 0.02, 0.06], { rectRadius: 0.01, fill: 'FCF3DA' });
+}
+
+// --- slide 12 
+function slide12(s) {
+  shape(s, 'roundRect', [9.45, 5.07, 3.45, 1.21], { rectRadius: 0.2, fill: C.WHITE, shadow: SOFT });
+  shape(s, 'roundRect', [0.73, 5.04, 3.45, 1.21], { rectRadius: 0.2, fill: C.WHITE, shadow: SOFT });
+  shape(s, 'roundRect', [6.01, 2.19, 3.45, 1.21], { rectRadius: 0.2, fill: C.WHITE, shadow: SOFT });
+  shape(s, 'roundRect', [4.58, 3.69, 3.45, 1.21], { rectRadius: 0.2, fill: C.WHITE, shadow: SOFT });
+  shape(s, 'roundRect', [7.42, 0.69, 3.45, 1.21], { rectRadius: 0.2, fill: C.WHITE, shadow: SOFT });
+  strip(s, [0, 6.45, 5.82, 0.55], [0, 0.16]);
+  strip(s, [7.89, 6.45, 5.45, 0.55], [0, 0]);
+  text(s, [5.92, 2.82, 2.51, 0.31], L.p20, T.noteR, C.SLATE);
+  text(s, [5.82, 2.45, 2.61, 0.37], 'Content Two', T.leadR, C.INK);
+  text(s, [7.61, 1.33, 2.23, 0.31], L.p20, T.noteR, C.SLATE);
+  text(s, [7.42, 0.96, 2.42, 0.37], 'Content One', T.leadR, C.INK);
+  art(s, [10.04, 1, 0.59, 0.59], C.PURPLE);
+  art(s, [8.64, 2.5, 0.59, 0.59], C.MAGENTA);
+  text(s, [4.67, 4.32, 2.27, 0.31], L.p20, T.noteR, C.SLATE);
+  text(s, [4.58, 3.95, 2.35, 0.37], 'Content Three', T.leadR, C.INK);
+  art(s, [7.18, 3.99, 0.59, 0.59], C.PINK);
+  text(s, [1, 0.96, 3.93, 1.18], 'Roadmap to Achievment', T.h1, C.BLACK);
+  text(s, [1, 2.4, 3.7, 0.9], L.p9, T.body, C.SLATE);
+  road(s, [6.17, 2.73, 8.44, 0.55], { rotate: 134.51 });
+  lane(s, [5.86, 1.05, 9.1, 3.86], { rotate: 180 });
+  dot(s, [5.74, 5.54, 2.39, 2.39], C.ROAD);
+  dot(s, [6.32, 6.12, 1.22, 1.22], C.WHITE);
+  shape(s, 'ellipse', [6.03, 5.83, 1.8, 1.8], { line: { color: C.WHITE, width: 1.5, dashType: 'lgDash' } });
+  dot(s, [6.55, 6.35, 0.77, 0.77], C.GREEN, SOFT);
+  art(s, [6.71, 6.51, 0.43, 0.43], C.WHITE);
+  text(s, [9.49, 5.71, 2.27, 0.31], L.p20, T.noteR, C.SLATE);
+  text(s, [9.41, 5.34, 2.35, 0.37], 'Content Five', T.leadR, C.INK);
+  art(s, [12.01, 5.39, 0.59, 0.59], C.ORANGE);
+  art(s, [3.32, 5.39, 0.59, 0.59], C.YELLOW);
+  text(s, [0.82, 5.71, 2.27, 0.31], L.p20, T.noteR, C.SLATE);
+  text(s, [0.73, 5.34, 2.35, 0.37], 'Content Four', T.leadR, C.INK);
+  shape(s, 'roundRect', [7.54, 5.42, 0.35, 0.18], { rectRadius: 0.03, fill: C.PINK, rotate: 133 });
+  shape(s, 'rect', [7.63, 5.49, 0.08, 0.14], { fill: 'FFA5C3', rotate: 133 });
+  shape(s, 'rect', [7.77, 5.36, 0.04, 0.14], { fill: 'FFA5C3', rotate: 133 });
+  dot(s, [7.57, 5.57, 0.02, 0.02], C.AMBER);
+  dot(s, [7.65, 5.65, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [7.61, 5.59, 0.02, 0.06], { rectRadius: 0.01, fill: 'FFD2E1', rotate: 133 });
+  shape(s, 'roundRect', [10.88, 2.04, 0.35, 0.18], { rectRadius: 0.03, fill: C.PURPLE, rotate: 132.96 });
+  shape(s, 'rect', [10.97, 2.11, 0.08, 0.14], { fill: 'EC6EF9', rotate: 132.96 });
+  shape(s, 'rect', [11.11, 1.98, 0.04, 0.14], { fill: 'EC6EF9', rotate: 132.96 });
+  dot(s, [10.9, 2.19, 0.02, 0.02], C.AMBER);
+  dot(s, [10.99, 2.26, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [10.95, 2.21, 0.02, 0.06], { rectRadius: 0.01, fill: 'F5B6FC', rotate: 132.96 });
+  shape(s, 'roundRect', [9.69, 3.65, 0.35, 0.18], { rectRadius: 0.03, fill: C.MAGENTA, rotate: 133 });
+  shape(s, 'rect', [9.78, 3.72, 0.08, 0.14], { fill: 'FF7AC6', rotate: 133 });
+  shape(s, 'rect', [9.92, 3.59, 0.04, 0.14], { fill: 'FF7AC6', rotate: 133 });
+  dot(s, [9.71, 3.8, 0.02, 0.02], C.AMBER);
+  dot(s, [9.79, 3.87, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [9.75, 3.82, 0.02, 0.06], { rectRadius: 0.01, fill: 'FFBCE2', rotate: 133 });
+  shape(s, 'roundRect', [11.44, 6.49, 0.35, 0.18], { rectRadius: 0.03, fill: C.ORANGE });
+  shape(s, 'rect', [11.65, 6.51, 0.08, 0.14], { fill: 'FCC0A3' });
+  shape(s, 'rect', [11.49, 6.51, 0.04, 0.14], { fill: 'FCC0A3' });
+  dot(s, [11.76, 6.62, 0.02, 0.02], C.AMBER);
+  dot(s, [11.76, 6.51, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [11.76, 6.55, 0.02, 0.06], { rectRadius: 0.01, fill: 'FDE0D1' });
+  shape(s, 'roundRect', [3.2, 6.48, 0.35, 0.18], { rectRadius: 0.03, fill: C.YELLOW });
+  shape(s, 'rect', [3.26, 6.5, 0.08, 0.14], { fill: 'FAE7B5' });
+  shape(s, 'rect', [3.46, 6.5, 0.04, 0.14], { fill: 'FAE7B5' });
+  dot(s, [3.21, 6.5, 0.02, 0.02], C.WHITE);
+  dot(s, [3.21, 6.62, 0.02, 0.02], C.WHITE);
+  shape(s, 'roundRect', [3.21, 6.55, 0.02, 0.06], { rectRadius: 0.01, fill: 'FCF3DA' });
+}
+
+// --- slide 13 
+function slide13(s) {
+  strip(s, [9, 5.84, 1.68, 0.55], [0.14, 0.18]);
+  strip(s, [2.62, 5.84, 1.68, 0.55], [0.14, 0.18]);
+  curve(s, [4.78, 3.9, 2.2, 2.21], [269.6, 0], [270, 359.5], { flipH: true });
+  road(s, [5.88, 3.9, 1.68, 0.55]);
+  road(s, [4.78, 5, 0.55, 1.41]);
+  lane(s, [6.02, 4.18, 1.35, 0]);
+  lane(s, [5.07, 5.04, 0, 1.37], { rotate: 180 });
+  curve(s, [6.41, 3.9, 2.2, 2.21], [269.6, 0], [270, 359.5]);
+  road(s, [8.05, 5, 0.55, 1.41]);
+  lane(s, [8.31, 5.04, 0, 1.37], { rotate: 180 });
+  curve(s, [11.13, 2.75, 2.2, 2.21], [269.6, 0], [270, 359.5], { flipH: true });
+  road(s, [12.23, 2.76, 1.05, 0.55]);
+  road(s, [11.13, 3.86, 0.55, 1.41]);
+  lane(s, [12.36, 3.03, 0.92, 0]);
+  lane(s, [11.42, 3.9, 0, 1.37], { rotate: 180 });
+  curve(s, [-0.05, 2.74, 2.2, 2.21], [269.6, 0], [270, 359.5]);
+  road(s, [0, 2.74, 1.05, 0.55]);
+  road(s, [1.59, 3.84, 0.55, 1.41]);
+  lane(s, [0, 3.01, 0.92, 0]);
+  lane(s, [1.86, 3.88, 0, 1.37], { rotate: 180 });
+  text(s, [3.93, 0.74, 5.46, 0.64], 'Roadmap to Success', T.h1c, C.BLACK);
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content Four', C.ORANGE], [-3.2, 0, 'Content Three', C.PINK],
+    [-6.4, 0, 'Content Two', C.MAGENTA], [-9.61, 0, 'Content One', C.PURPLE]
+  ]) {
+    shape(s, 'roundRect', [10.16 + dx, 5.21 + dy, 2.62, 1.82], { rectRadius: 0.3, fill: C.WHITE, shadow: SOFT });
+    text(s, [10.36 + dx, 6.05 + dy, 2.22, 0.63], L.p4, T.bodyC, C.GREY);
+    text(s, [10.38 + dx, 5.56 + dy, 2.18, 0.4], a, T.cardHC, b);
+  }
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.PURPLE], [3.2, 1.06, C.MAGENTA, C.MAGENTA], [6.4, 1.22, C.PINK, C.PINK],
+    [9.61, -0.19, C.ORANGE, C.ORANGE]
+  ]) {
+    shape(s, 'custGeom', [1.31 + dx, 2.08 + dy, 1.1, 1.29], { points: P.cross(1.1, 1.29), fill: a, rotate: 180, flipH: true });
+    dot(s, [1.4 + dx, 2.17 + dy, 0.93, 0.93], C.WHITE);
+    art(s, [1.55 + dx, 2.32 + dy, 0.62, 0.62], b);
+  }
+  text(s, [3.71, 1.55, 5.92, 0.63], L.p1, T.bodyC, C.GREY);
+}
+
+// --- slide 14 
+function slide14(s) {
+  shape(s, 'rect', [2.85, 3.47, 11.12, 0.55], { fill: C.RULE, rotate: 45.49 });
+  shape(s, 'rect', [0.81, 3.5, 11.12, 0.55], { fill: C.RULE, rotate: 45.49 });
+  text(s, [7.82, 1.65, 2.13, 0.53], L.p12, T.note, C.SLATE);
+  text(s, [7.82, 1.27, 2.13, 0.37], 'Content One', T.leadL, C.PURPLE);
+  text(s, [9.54, 3.35, 2.14, 0.53], L.p12, T.note, C.SLATE);
+  text(s, [9.54, 2.98, 2, 0.37], 'Content Two', T.leadL, C.MAGENTA);
+  text(s, [11.19, 5.08, 2.14, 0.53], L.p12, T.note, C.SLATE);
+  text(s, [11.19, 4.71, 2.06, 0.37], 'Content Three', T.leadL, C.PINK);
+  text(s, [0.84, 4.6, 3.77, 1.18], 'Roadmap and Key Milestones', T.h1, C.BLACK);
+  road(s, [3.1, 3.49, 11.12, 0.55], { rotate: 45.49 });
+  lane(s, [4.76, -0.2, 7.79, 7.93], { rotate: 180 });
+  shape(s, 'custGeom', [6.16, 1.08, 1.1, 1.29], { points: P.cross(1.1, 1.29), fill: C.PURPLE, rotate: 90, flipH: true });
+  dot(s, [6.15, 1.26, 0.93, 0.93], C.WHITE);
+  art(s, [6.31, 1.36, 0.62, 0.62], C.PURPLE);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.MAGENTA, C.MAGENTA], [1.72, 1.73, C.PINK, C.PINK]
+  ]) {
+    shape(s, 'custGeom', [7.84 + dx, 2.78 + dy, 1.1, 1.29], { points: P.cross(1.1, 1.29), fill: a, rotate: 90, flipH: true });
+    dot(s, [7.84 + dx, 2.96 + dy, 0.93, 0.93], C.WHITE);
+    art(s, [7.99 + dx, 3.11 + dy, 0.62, 0.62], b);
+  }
+  road(s, [0.97, 3.49, 11.23, 0.55], { rotate: 45.49 });
+  lane(s, [2.65, -0.24, 7.87, 8.01], { rotate: 180 });
+  shape(s, 'custGeom', [7.59, 4.77, 1.1, 1.29], { points: P.cross(1.1, 1.29), fill: C.ORANGE, rotate: 270, flipH: true });
+  dot(s, [7.77, 4.96, 0.93, 0.93], C.WHITE);
+  art(s, [7.93, 5.11, 0.62, 0.62], C.ORANGE);
+  text(s, [4.96, 5.34, 2.14, 0.53], L.p12, T.noteR, C.SLATE);
+  text(s, [5.04, 4.97, 2.06, 0.37], 'Content Four', T.leadR, C.ORANGE);
+  shape(s, 'custGeom', [5.58, 2.67, 1.1, 1.29], { points: P.cross(1.1, 1.29), fill: C.YELLOW, rotate: 270, flipH: true });
+  dot(s, [5.77, 2.85, 0.93, 0.93], C.WHITE);
+  art(s, [5.92, 3, 0.62, 0.62], C.YELLOW);
+  text(s, [2.99, 3.23, 2.14, 0.53], L.p12, T.noteR, C.SLATE);
+  text(s, [3.06, 2.86, 2.06, 0.37], 'Content Five', T.leadR, C.YELLOW);
+  text(s, [0.84, 5.92, 3.7, 0.9], L.p9, T.body, C.SLATE);
+}
+
+// --- slide 15 
+function slide15(s) {
+  road(s, [3.4, 3.69, 3.18, 0.55]);
+  lane(s, [5.08, 2.52, 0, 2.92], { rotate: 270 });
+  curve(s, [5.71, 0, 2.2, 2.21], [269.6, 0], [270, 359.5], { flipH: true });
+  strip(s, [6.8, 0, 6.53, 0.55], [0.14, 0]);
+  road(s, [5.7, 1.1, 0.55, 3.18]);
+  lane(s, [6, 1.15, 0, 2.92], { rotate: 180 });
+  curve(s, [2.12, 5.29, 2.2, 2.21], [269.6, 0], [270, 359.5], { rotate: 180, flipH: true });
+  road(s, [0, 6.95, 3.22, 0.55]);
+  road(s, [3.77, 4.33, 0.55, 2.06]);
+  lane(s, [0, 7.22, 3.09, 0], { rotate: 180 });
+  lane(s, [4.03, 4.54, 0, 1.81]);
+  shape(s, 'round2SameRect', [4.83, 3.93, 1.35, 4.31], { rectRadius: 0.68, fill: C.WHITE, rotate: 270, shadow: SOFT });
+  shape(s, 'custGeom', [3.45, 5.5, 1.17, 1.17], { points: P.guideC(1.17, 1.17), fill: C.PURPLE, rotate: 270 });
+  art(s, [3.72, 5.78, 0.62, 0.62], C.WHITE);
+  text(s, [4.75, 5.93, 2.6, 0.63], L.p13, T.body, C.GREY);
+  text(s, [4.75, 5.62, 1.83, 0.4], 'Content One', T.card, C.PURPLE);
+  shape(s, 'round2SameRect', [1.88, 1.8, 1.35, 4.31], { rectRadius: 0.68, fill: C.WHITE, rotate: 90, flipH: true, shadow: SOFT });
+  shape(s, 'custGeom', [3.45, 3.37, 1.17, 1.17], { points: P.guideC(1.17, 1.17), fill: C.MAGENTA, rotate: 90, flipH: true });
+  art(s, [3.72, 3.64, 0.62, 0.62], C.WHITE);
+  text(s, [0.72, 3.79, 2.6, 0.63], L.p13, T.bodyR, C.GREY);
+  text(s, [1.16, 3.49, 2.16, 0.4], 'Content Two', T.cardR, C.MAGENTA);
+  shape(s, 'round2SameRect', [6.79, 1.81, 1.35, 4.31], { rectRadius: 0.68, fill: C.WHITE, rotate: 270, shadow: SOFT });
+  shape(s, 'custGeom', [5.41, 3.38, 1.17, 1.17], { points: P.guideC(1.17, 1.17), fill: C.PINK, rotate: 270 });
+  art(s, [5.68, 3.65, 0.62, 0.62], C.WHITE);
+  text(s, [6.71, 3.8, 2.6, 0.63], L.p13, T.body, C.GREY);
+  text(s, [6.71, 3.5, 2.16, 0.4], 'Content Three', T.card, C.PINK);
+  shape(s, 'round2SameRect', [3.84, -0.34, 1.35, 4.31], { rectRadius: 0.68, fill: C.WHITE, rotate: 90, flipH: true, shadow: SOFT });
+  shape(s, 'custGeom', [5.41, 1.23, 1.17, 1.17], { points: P.guideC(1.17, 1.17), fill: C.ORANGE, rotate: 90, flipH: true });
+  art(s, [5.68, 1.51, 0.62, 0.62], C.WHITE);
+  text(s, [2.68, 1.66, 2.6, 0.63], L.p13, T.bodyR, C.GREY);
+  text(s, [3.16, 1.35, 2.12, 0.4], 'Content Four', T.cardR, C.ORANGE);
+  text(s, [9.55, 4.3, 2.96, 1.18], 'Roadmap Overview', T.h1r, C.BLACK);
+  text(s, [8.71, 5.75, 3.8, 0.9], L.p9, T.bodyR, C.SLATE);
+}
+
+// --- slide 16 
+function slide16(s) {
+  strip(s, [7, 3.01, 2.2, 0.55], [0.14, 0.15]);
+  road(s, [6.49, 4.88, 3.39, 1.38]);
+  lane(s, [6.63, 5.59, 3.24, 0]);
+  curve(s, [2.88, 3.01, 2.2, 2.21], [269.6, 0], [270, 359.5], { flipH: true });
+  road(s, [3.97, 3.01, 2.31, 0.55]);
+  road(s, [2.87, 4.11, 0.55, 0.64]);
+  lane(s, [4.1, 3.29, 2.18, 0]);
+  lane(s, [3.15, 4.21, 0, 0.44], { rotate: 180 });
+  curve(s, [8.09, 0.63, 2.2, 2.21], [269.6, 0], [270, 359.5]);
+  strip(s, [0.45, 0.63, 8.75, 0.55], [0, 0.14]);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.PURPLE], [3.35, 2.38, C.PINK, C.PINK], [4.95, 0, C.MAGENTA, C.MAGENTA],
+    [1.75, 4.65, C.ORANGE, C.ORANGE], [6.69, 4.65, C.YELLOW, C.YELLOW]
+  ]) {
+    dot(s, [2.84 + dx, 0.44 + dy, 0.97, 0.97], a);
+    dot(s, [2.9 + dx, 0.51 + dy, 0.84, 0.84], C.WHITE);
+    art(s, [3.03 + dx, 0.63 + dy, 0.59, 0.59], b);
+  }
+  text(s, [2.09, 1.99, 2.38, 0.63], L.p2, T.bodyC, C.GREY);
+  text(s, [2.17, 1.58, 2.22, 0.4], 'Content One', T.cardC, C.PURPLE);
+  text(s, [7.08, 1.99, 2.38, 0.63], L.p2, T.bodyC, C.GREY);
+  text(s, [7.16, 1.58, 2.22, 0.4], 'Content Two', T.cardC, C.MAGENTA);
+  text(s, [5.48, 4.3, 2.38, 0.63], L.p2, T.bodyC, C.GREY);
+  text(s, [5.56, 3.86, 2.22, 0.4], 'Content Three', T.cardC, C.PINK);
+  text(s, [3.92, 6.58, 2.38, 0.63], L.p2, T.bodyC, C.GREY);
+  text(s, [4, 6.17, 2.22, 0.4], 'Content Four', T.cardC, C.ORANGE);
+  text(s, [8.82, 6.58, 2.38, 0.63], L.p2, T.bodyC, C.GREY);
+  text(s, [8.9, 6.17, 2.22, 0.4], 'Content Five', T.cardC, C.YELLOW);
+  shape(s, 'round2SameRect', [9.08, 3.25, 7.5, 1], { rectRadius: 0.5, fill: C.PANEL, rotate: 270, flipH: true });
+  shape(s, 'round2SameRect', [-3.25, 3.25, 7.5, 1], { rectRadius: 0.5, fill: C.PANEL, rotate: 90 });
+  curve(s, [2.88, 3.65, 2.2, 2.21], [269.6, 0], [270, 359.5], { rotate: 270, flipH: true });
+  curve(s, [8.08, 1.36, 2.2, 2.21], [269.6, 0], [270, 359.5], { rotate: 180, flipH: true });
+  road(s, [9.74, 1.72, 0.55, 0.78]);
+  lane(s, [10.01, 1.82, 0, 0.56], { rotate: 180 });
+  shape(s, 'custGeom', [12.34, 5.3, 0.28, 0.55], { points: P.guideD(0.28, 0.55), fill: C.RULE, flipH: true });
+  shape(s, 'custGeom', [0.72, 0.63, 0.28, 0.55], { points: P.guideD(0.28, 0.55), fill: C.RULE });
+}
+
+// --- slide 17 
+function slide17(s) {
+  curve(s, [7.59, 4.81, 2.2, 2.21], [269.6, 0], [270, 359.5], { rotate: 270, flipH: true });
+  curve(s, [5.94, 0.36, 2.2, 2.21], [269.6, 0], [270, 359.5], { flipH: true });
+  road(s, [7.58, 1.46, 0.55, 4.47]);
+  lane(s, [7.86, 1.65, 0, 4.09], { rotate: 180 });
+  road(s, [5.72, 2.78, 0.99, 3.39]);
+  lane(s, [6.2, 2.91, 0, 3.24]);
+  curve(s, [5.94, 0.36, 2.2, 2.21], [269.6, 0], [270, 359.5], { rotate: 90, flipH: true });
+  curve(s, [7.58, 4.82, 2.2, 2.21], [269.6, 0], [270, 359.5], { rotate: 90 });
+  strip(s, [9.23, 0, 0.55, 5.97], [0.17, 0.11]);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.PURPLE], [-2.47, -0.73, C.PINK, C.PINK], [-3.32, 4.82, C.ORANGE, C.ORANGE]
+  ]) {
+    dot(s, [9.03 + dx, 0.89 + dy, 0.97, 0.97], a);
+    dot(s, [9.09 + dx, 0.96 + dy, 0.84, 0.84], C.WHITE);
+    art(s, [9.22 + dx, 1.08 + dy, 0.59, 0.59], b);
+  }
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content One', C.PURPLE], [0, 1.61, 'Content Two', C.MAGENTA],
+    [0, 4.82, 'Content Four', C.ORANGE]
+  ]) {
+    text(s, [10.22 + dx, 1.26 + dy, 2.38, 0.63], L.p2, T.bodyC, C.GREY);
+    text(s, [10.3 + dx, 0.86 + dy, 2.22, 0.4], a, T.cardC, b);
+  }
+  dot(s, [8.2, 6.24, 0.97, 0.97], C.MAGENTA);
+  dot(s, [8.26, 6.3, 0.84, 0.84], C.WHITE);
+  art(s, [8.39, 6.43, 0.59, 0.59], C.MAGENTA);
+  text(s, [10.22, 4.48, 2.38, 0.63], L.p2, T.bodyC, C.GREY);
+  text(s, [10.3, 4.08, 2.22, 0.4], 'Content Three', T.cardC, C.PINK);
+  text(s, [1.02, 2.4, 3.67, 1.18], 'Strategic Roadmap', T.h1, C.BLACK);
+  text(s, [1.02, 4.19, 3.67, 0.9], L.p1, T.body, C.GREY);
+  text(s, [1.02, 3.81, 3.25, 0.34], 'Your Title Here', T.h3, C.BLACK);
+}
+
+// --- slide 18 
+function slide18(s) {
+  for (const [dx, dy, a, b, c, d] of [
+    [0, 0, 'Content One', C.PURPLE, '01', C.PURPLE],
+    [0, -1.77, 'Content Two', C.MAGENTA, '02', C.MAGENTA],
+    [0, -3.55, 'Content One', C.PINK, '03', C.PINK], [0, -5.32, 'Content Two', C.ORANGE, '04', C.ORANGE]
+  ]) {
+    text(s, [10.72 + dx, 6.57 + dy, 2.38, 0.35], L.p21, T.body, C.GREY);
+    text(s, [10.72 + dx, 6.25 + dy, 2.22, 0.4], a, T.card, b);
+    text(s, [9.86 + dx, 6.2 + dy, 0.85, 0.77], c, T.numBig, d);
+  }
+  text(s, [1.19, 1.33, 3.25, 1.18], [
+    { text: 'Roadmap to ', options: { color: C.BLACK, breakLine: true } },
+    { text: 'Innovation', options: { color: C.BLACK } }
+  ], T.h1);
+  text(s, [1.2, 3.27, 3.16, 1.18], L.p1, T.body, C.GREY);
+  text(s, [1.2, 2.9, 3.25, 0.34], 'Your Title Here', T.h3, C.BLACK);
+  curve(s, [3.54, 4.62, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { rotate: 180, flipH: true });
+  strip(s, [0, 6.29, 4.65, 0.55], [0, 0.17]);
+  road(s, [6.28, 4.63, 2.06, 0.55]);
+  lane(s, [6.32, 4.89, 1.81, 0]);
+  curve(s, [5.2, 4.63, 2.2, 2.21], [269.6, 0], [270, 356.2], { rotate: 270 });
+  curve(s, [7.24, 2.98, 2.2, 2.21], [179.9, 0], [270, 95.2], { rotate: 90 });
+  road(s, [6.28, 2.98, 2.06, 0.55]);
+  lane(s, [6.33, 3.24, 1.81, 0]);
+  curve(s, [5.19, 1.33, 2.2, 2.21], [178.6, 0], [270, 80.9], { rotate: 270, flipH: true });
+  curve(s, [7.29, -0.32, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { rotate: 180, flipH: true });
+  road(s, [6.29, 1.33, 2.11, 0.55]);
+  lane(s, [6.29, 1.61, 2.03, 0], { rotate: 180 });
+  road(s, [9.1, -0.61, 0.22, 2.06]);
+  lane(s, [9.22, 0.02, 0, 0.73], { rotate: 180 });
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.PURPLE], [3.39, -3.3, C.PINK, C.PINK], [5.48, -5.28, C.ORANGE, C.ORANGE],
+    [3.5, -1.68, C.MAGENTA, C.MAGENTA]
+  ]) {
+    dot(s, [3.12 + dx, 6.06 + dy, 0.97, 0.97], a);
+    dot(s, [3.19 + dx, 6.12 + dy, 0.84, 0.84], C.WHITE);
+    art(s, [3.31 + dx, 6.25 + dy, 0.59, 0.59], b);
+  }
+}
+
+// --- slide 19 
+function slide19(s) {
+  curve(s, [-0.46, 3.55, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { rotate: 180, flipH: true });
+  bend(s, [1.19, 3.55, 2.2, 2.21], [269.6, 139.9], { rotate: 270 }, 0.5);
+  bendLane(s, [1.47, 3.85, 1.63, 1.61], [134.2, 356.2], { flipH: true });
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content Two', C.MAGENTA], [-3.42, -5.01, 'Content One', C.PURPLE],
+    [1.54, -4.23, 'Content Three', C.PINK], [4.38, 0, 'Content Four', C.ORANGE]
+  ]) {
+    text(s, [4.65 + dx, 6.42 + dy, 2.22, 0.63], L.p4, T.bodyC, C.GREY);
+    text(s, [4.67 + dx, 6 + dy, 2.18, 0.4], a, T.cardHC, b);
+  }
+  text(s, [6.99, 0.58, 5.69, 0.64], 'Our Strategic Journey', T.h1r, C.BLACK);
+  strip(s, [-0.03, 5.21, 0.68, 0.55], [0, 0.03]);
+  for (const [dx, dy] of [
+    [0, 0], [4.42, -0.36]
+  ]) {
+    curve(s, [2.25 + dx, 4.81 + dy, 2.2, 2.21], [269.6, 139.9], [134.2, 352.4], { rotate: 90 }, 0.5);
+    curve(s, [3.91 + dx, 4.84 + dy, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { flipH: true });
+    curve(s, [3.92 + dx, 3.18 + dy, 2.2, 2.21], [269.6, 0], [280.2, 357.4], { rotate: 180, flipH: true });
+    bend(s, [5.58 + dx, 3.21 + dy, 2.2, 2.21], [269.6, 139.9], { rotate: 270 }, 0.5);
+    bendLane(s, [5.86 + dx, 3.5 + dy, 1.63, 1.61], [134.2, 356.2], { flipH: true });
+  }
+  curve(s, [11.06, 4.07, 2.2, 2.21], [269.6, 139.9], [134.2, 352.4], { rotate: 90 }, 0.5);
+  curve(s, [12.72, 4.09, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { flipH: true });
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.PURPLE], [5.5, 2.53, C.PINK, C.PINK], [3.22, 1.05, C.MAGENTA, C.MAGENTA],
+    [7.77, 0.51, C.ORANGE, C.ORANGE]
+  ]) {
+    shape(s, 'custGeom', [1.83 + dx, 2.25 + dy, 1.08, 1.57], { points: P.capsule(1.08, 1.57), fill: a, rotate: 180, flipH: true });
+    dot(s, [2.02 + dx, 2.45 + dy, 0.69, 0.69], C.WHITE);
+    art(s, [2.08 + dx, 2.5 + dy, 0.59, 0.59], b);
+  }
+}
+
+// --- slide 20 
+function slide20(s) {
+  curve(s, [7.46, 6.64, 2.2, 2.21], [269.6, 0], [280.2, 357.4], { flipH: true });
+  strip(s, [7.56, 4.99, 1, 0.55], [0, -0.01]);
+  curve(s, [7.45, 4.99, 2.2, 2.21], [180.2, 0], [280.2, 80.6], { rotate: 90, flipH: true });
+  strip(s, [6.56, 3.06, 0.55, 1.43], [0, 0.05]);
+  road(s, [7.62, 1.97, 0.28, 0.55]);
+  curve(s, [6.78, 0.31, 2.2, 2.21], [269.6, 0], [280.2, 356.7], { rotate: 180, flipH: true });
+  strip(s, [8.43, -0.01, 0.55, 1.43], [0, 0.05]);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.WHITE], [0, -1.63, C.MAGENTA, C.WHITE], [0, -3.27, C.PINK, C.WHITE],
+    [0, -4.9, C.ORANGE, C.WHITE]
+  ]) {
+    dot(s, [9.42 + dx, 5.7 + dy, 1.02, 1.02], C.WHITE, SOFT);
+    dot(s, [9.48 + dx, 5.75 + dy, 0.91, 0.91], a);
+    art(s, [9.63 + dx, 5.91 + dy, 0.6, 0.6], b);
+  }
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content One', C.PURPLE], [0, -3.27, 'Content Three', C.PINK],
+    [0, -4.9, 'Content Four', C.ORANGE], [0, -1.58, 'Content Two', C.MAGENTA]
+  ]) {
+    text(s, [10.7 + dx, 6.07 + dy, 1.89, 0.63], L.p3, T.body, C.GREY);
+    text(s, [10.7 + dx, 5.71 + dy, 1.67, 0.34], a, T.h3, b);
+  }
+  dot(s, [8.27, 6.84, 0.18, 0.18], C.PURPLE);
+  dot(s, [8.54, 5.19, 0.18, 0.18], C.MAGENTA);
+  dot(s, [6.8, 3.46, 0.18, 0.18], C.PINK);
+  dot(s, [8.61, 1.23, 0.18, 0.18], C.ORANGE);
+  shape(s, 'line', [8.99, 6.08, 0.31, 1.57], { line: { color: C.PURPLE, width: 1, dashType: 'lgDash' }, rotate: 270 });
+  shape(s, 'line', [8.72, 5.08, 1.21, 0.2], { line: { color: C.MAGENTA, width: 1, dashType: 'lgDash' }, rotate: 180, flipH: true });
+  shape(s, 'line', [6.99, 3.45, 2.94, 0.1], { line: { color: C.PINK, width: 1, dashType: 'lgDash' }, rotate: 180, flipH: true });
+  shape(s, 'line', [9.12, 1, 0.41, 1.23], { line: { color: C.ORANGE, width: 1, dashType: 'lgDash' }, rotate: 270, flipH: true });
+  text(s, [1.01, 2.03, 4.72, 1.72], 'Future Path Strategic Roadmap and Key Milestones', T.h1, C.BLACK);
+  text(s, [1.01, 4.57, 4.72, 0.9], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eius tempor incididunt ut labore et dolore magna aliqua enim ad mini veniam, quis nostrud exercitation ullamco.', T.body, C.GREY);
+  text(s, [1.01, 4.2, 3.25, 0.34], 'Your Title Here', T.h3, C.BLACK);
+  curve(s, [6.57, 1.97, 2.2, 2.21], [269.6, 0], [280.2, 357.4], { flipH: true });
+  curve(s, [6.56, 3.34, 2.2, 2.21], [269.6, 0], [280.2, 357.4], { rotate: 270, flipH: true });
+  lane(s, [7.68, 2.24, 0.19, 0]);
+}
+
+// --- slide 21 
+function slide21(s) {
+  strip(s, [8.49, 2.04, 4.84, 0.55], [0.06, 0]);
+  strip(s, [7.07, 4.94, 6.26, 0.55], [0, 0]);
+  curve(s, [4.33, 5.2, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { rotate: 180, flipH: true });
+  strip(s, [0, 6.86, 5.45, 0.55], [0, 0.17]);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.PURPLE], [6.54, -1.88, C.PINK, C.PINK], [2.47, -1.91, C.MAGENTA, C.MAGENTA],
+    [6.85, -4.81, C.ORANGE, C.ORANGE]
+  ]) {
+    shape(s, 'custGeom', [4.35 + dx, 5.38 + dy, 1.08, 1.57], { points: P.capsule(1.08, 1.57), fill: a, rotate: 180, flipH: true });
+    dot(s, [4.55 + dx, 5.58 + dy, 0.69, 0.69], C.WHITE);
+    art(s, [4.6 + dx, 5.63 + dy, 0.59, 0.59], b);
+  }
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content Two', C.MAGENTA], [-2.51, 1.91, 'Content One', C.PURPLE],
+    [4.07, 0.03, 'Content Three', C.PINK], [4.39, -2.9, 'Content Four', C.ORANGE]
+  ]) {
+    text(s, [4.28 + dx, 3.88 + dy, 2.22, 0.63], L.p4, T.bodyR, C.GREY);
+    text(s, [4.3 + dx, 3.46 + dy, 2.18, 0.4], a, T.cardHR, b);
+  }
+  text(s, [1.19, 0.88, 3.67, 1.18], [
+    { text: 'Best Roadmap ', options: { color: C.BLACK, breakLine: true } },
+    { text: 'Infographic', options: { color: C.BLACK } }
+  ], T.h1);
+  text(s, [1.19, 2.17, 5.3, 0.63], L.p1, T.body, C.GREY);
+  curve(s, [5.99, 4.94, 2.2, 2.21], [269.6, 0], [280.2, 355.9], { flipH: true });
+  road(s, [5.99, 6.04, 0.55, 0.28]);
+  lane(s, [6.26, 6.1, 0, 0.19]);
+  curve(s, [7.4, 0.38, 2.2, 2.21], [269.6, 0], [280.2, 355.5], { rotate: 180 });
+  strip(s, [7.39, 0, 0.55, 1.49], [0, 0]);
+}
+
+// --- slide 22 
+function slide22(s) {
+  strip(s, [10.31, 3.24, 3.06, 0.47], [0.28, 0.04]);
+  strip(s, [-0.01, 3.24, 3.06, 0.47], [0.28, 0.04]);
+  road(s, [3.99, 4.09, 3.06, 0.47], { rotate: 140.08 });
+  lane(s, [4.05, 4.41, 2.74, 0], { rotate: 320.08 });
+  road(s, [1.92, 4.06, 3.06, 0.47], { rotate: 41.12 });
+  lane(s, [2.17, 4.38, 2.74, 0], { rotate: 41.12 });
+  road(s, [8.42, 4.09, 3.06, 0.47], { rotate: 140.08 });
+  lane(s, [8.49, 4.41, 2.74, 0], { rotate: 320.08 });
+  road(s, [6.36, 4.12, 3.06, 0.47], { rotate: 41.12 });
+  lane(s, [6.61, 4.43, 2.74, 0], { rotate: 41.12 });
+  shape(s, 'custGeom', [1.38, 2.6, 1.76, 1.76], { points: P.guideC(1.76, 1.76), fill: C.PURPLE });
+  shape(s, 'custGeom', [1.51, 2.72, 1.52, 1.52], { points: P.guideC(1.52, 1.52), fill: C.WHITE });
+  text(s, [1.31, 5.97, 1.89, 0.9], L.p10, T.bodyC, C.GREY);
+  text(s, [1.42, 5.61, 1.67, 0.34], 'Content One', T.h3c, C.PURPLE);
+  shape(s, 'line', [2.26, 4.61, 0.01, 0.74], { line: { color: 'BFBFBF', width: 2, dashType: 'sysDash', endArrowType: 'triangle' }, rotate: 180, flipH: true });
+  art(s, [1.86, 3.08, 0.81, 0.81], C.PURPLE);
+  for (const [dx, dy, a, b, c] of [
+    [0, 0, C.PINK, 'Content Three', C.PINK], [4.4, 0, C.YELLOW, 'Content Five', C.YELLOW]
+  ]) {
+    shape(s, 'custGeom', [5.8 + dx, 2.6 + dy, 1.76, 1.76], { points: P.guideC(1.76, 1.76), fill: a });
+    shape(s, 'custGeom', [5.92 + dx, 2.72 + dy, 1.52, 1.52], { points: P.guideC(1.52, 1.52), fill: C.WHITE });
+    text(s, [5.72 + dx, 5.97 + dy, 1.89, 0.9], L.p10, T.bodyC, C.GREY);
+    text(s, [5.84 + dx, 5.61 + dy, 1.67, 0.34], b, T.h3c, c);
+    shape(s, 'line', [6.68 + dx, 4.61 + dy, 0.01, 0.74], { line: { color: 'BFBFBF', width: 2, dashType: 'sysDash', endArrowType: 'triangle' }, rotate: 180, flipH: true });
+  }
+  for (const [dx, dy, a, b, c] of [
+    [0, 0, C.ORANGE, 'Content Three', C.ORANGE], [-4.39, 0, C.MAGENTA, 'Content Two', C.MAGENTA]
+  ]) {
+    shape(s, 'custGeom', [7.99 + dx, 4.28 + dy, 1.76, 1.76], { points: P.guideC(1.76, 1.76), fill: a, rotate: 180, flipH: true });
+    shape(s, 'custGeom', [8.11 + dx, 4.4 + dy, 1.52, 1.52], { points: P.guideC(1.52, 1.52), fill: C.WHITE, rotate: 180, flipH: true });
+    text(s, [7.91 + dx, 2.12 + dy, 1.89, 0.9], L.p10, T.bodyC, C.GREY);
+    text(s, [8.02 + dx, 1.76 + dy, 1.67, 0.34], b, T.h3c, c);
+    shape(s, 'line', [8.86 + dx, 3.29 + dy, 0.01, 0.74], { line: { color: 'BFBFBF', width: 2, dashType: 'sysDash', endArrowType: 'triangle' } });
+  }
+  text(s, [3.56, 0.56, 6.21, 0.64], 'Blueprint for Success', T.h1c, C.BLACK);
+  art(s, [6.28, 3.07, 0.81, 0.81], C.PINK);
+  art(s, [4.07, 4.75, 0.81, 0.81], C.MAGENTA);
+  art(s, [8.46, 4.75, 0.81, 0.81], C.ORANGE);
+  art(s, [10.68, 3.07, 0.81, 0.81], C.YELLOW);
+}
+
+// --- slide 23 
+function slide23(s) {
+  road(s, [2.83, 0, 1.4, 7.5]);
+  shape(s, 'rect', [2.93, 0, 1.21, 7.5], { fill: C.RULE });
+  text(s, [4.38, 1.26, 2.25, 0.63], L.p18, T.body, C.GREY);
+  text(s, [4.38, 0.95, 1.67, 0.34], 'Content One', T.h3, C.PURPLE);
+  lane(s, [3.53, -0.01, 0, 7.51], { rotate: 180 });
+  shape(s, 'custGeom', [2.23, 0.72, 1.4, 1.4], { points: P.guideC(1.4, 1.4), fill: C.PURPLE });
+  shape(s, 'custGeom', [2.32, 0.82, 1.21, 1.21], { points: P.guideC(1.21, 1.21), fill: C.WHITE });
+  art(s, [2.61, 1.1, 0.64, 0.64], C.PURPLE);
+  text(s, [4.38, 4.48, 2.25, 0.63], L.p18, T.body, C.GREY);
+  text(s, [4.38, 4.17, 1.67, 0.34], 'Content Three', T.h3, C.PINK);
+  text(s, [0.4, 6.14, 2.25, 0.63], L.p18, T.bodyR, C.GREY);
+  text(s, [0.98, 5.83, 1.67, 0.34], 'Content Four ', T.h3r, C.ORANGE);
+  text(s, [0.41, 2.91, 2.25, 0.63], L.p18, T.bodyR, C.GREY);
+  text(s, [0.99, 2.6, 1.67, 0.34], 'Content Two', T.h3r, C.MAGENTA);
+  shape(s, 'custGeom', [2.19, 3.94, 1.4, 1.4], { points: P.guideC(1.4, 1.4), fill: C.PINK });
+  shape(s, 'custGeom', [2.29, 4.03, 1.21, 1.21], { points: P.guideC(1.21, 1.21), fill: C.WHITE });
+  art(s, [2.57, 4.32, 0.64, 0.64], C.PINK);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.MAGENTA, C.MAGENTA], [-0.01, 3.23, C.ORANGE, C.ORANGE]
+  ]) {
+    shape(s, 'custGeom', [3.4 + dx, 2.37 + dy, 1.4, 1.4], { points: P.guideC(1.4, 1.4), fill: a, rotate: 180, flipH: true });
+    shape(s, 'custGeom', [3.5 + dx, 2.46 + dy, 1.21, 1.21], { points: P.guideC(1.21, 1.21), fill: C.WHITE, rotate: 180, flipH: true });
+    art(s, [3.78 + dx, 2.75 + dy, 0.64, 0.64], b);
+  }
+  text(s, [7.34, 1.92, 4.72, 1.18], 'Our Roadmap Explained', T.h1, C.BLACK);
+  text(s, [7.34, 3.64, 4.72, 1.18], L.p7, T.body, C.GREY);
+  text(s, [7.34, 3.37, 3.25, 0.34], 'Your Title Here', T.h3, C.BLACK);
+  text(s, [7.34, 4.96, 4.72, 0.62], L.p15, T.body, C.GREY);
+}
+
+// --- slide 24 
+function slide24(s) {
+  road(s, [0, 2.83, 13.32, 1.4]);
+  shape(s, 'rect', [0, 2.92, 13.32, 1.21], { fill: C.RULE });
+  lane(s, [6.67, -3.14, 0, 13.33], { rotate: 270 });
+  dot(s, [1.39, 3.02, 1.02, 1.02], C.WHITE, SOFT);
+  text(s, [1.44, 3.07, 0.91, 0.91], '01', T.numDot, C.BLACK);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.MAGENTA, '02'], [3.18, 0, C.PINK, '03'], [6.36, 0, C.ORANGE, '04']
+  ]) {
+    dot(s, [4.57 + dx, 3.02 + dy, 1.02, 1.02], C.WHITE, SOFT);
+    text(s, [4.62 + dx, 3.07 + dy, 0.91, 0.91], b, T.numDot, C.BLACK);
+  }
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content One', C.PURPLE], [6.36, 0, 'Content Three', C.PINK],
+    [9.54, 0, 'Content Four', C.ORANGE], [3.18, 0, 'Content Two', C.MAGENTA]
+  ]) {
+    text(s, [0.95 + dx, 6.2 + dy, 1.89, 0.63], L.p3, T.bodyC, C.GREY);
+    text(s, [1.06 + dx, 5.84 + dy, 1.67, 0.34], a, T.h3c, b);
+  }
+  art(s, [7.94, 4.91, 0.64, 0.64], C.PINK);
+  art(s, [11.12, 4.91, 0.64, 0.64], C.ORANGE);
+  text(s, [3.56, 0.68, 6.21, 0.64], 'Mapping Our Future', T.h1c, C.BLACK);
+  art(s, [1.58, 4.91, 0.64, 0.64], C.PURPLE);
+  art(s, [4.75, 4.91, 0.64, 0.64], C.MAGENTA);
+  text(s, [3.71, 1.5, 5.92, 0.63], L.p1, T.bodyC, C.GREY);
+}
+
+// --- slide 25 
+function slide25(s) {
+  curve(s, [9.83, 4.75, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { rotate: 180 });
+  road(s, [10.91, 6.41, 2.42, 0.55]);
+  road(s, [7.22, 4.75, 2.06, 0.55]);
+  lane(s, [8.34, 4.11, 0, 1.81], { rotate: 270 });
+  curve(s, [8.17, 4.75, 2.2, 2.21], [269.6, 0], [270, 356.2], { rotate: 90, flipH: true });
+  curve(s, [6.13, 3.1, 2.2, 2.21], [179.9, 0], [270, 95.2], { rotate: 270, flipH: true });
+  road(s, [7.22, 3.1, 2.06, 0.55]);
+  lane(s, [8.34, 2.46, 0, 1.81], { rotate: 270 });
+  curve(s, [8.18, 1.46, 2.2, 2.21], [178.6, 0], [270, 80.9], { rotate: 90 });
+  curve(s, [6.08, -0.19, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { rotate: 180 });
+  road(s, [7.17, 1.46, 2.11, 0.55]);
+  lane(s, [7.25, 1.74, 2.03, 0], { rotate: 180 });
+  text(s, [1.09, 2.39, 3.76, 1.18], 'Roadmap to the Next Level', T.h1, C.BLACK);
+  text(s, [1.09, 3.94, 3.85, 1.18], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sedo do eiusmod tempor incididunt ut laboret dolore magna aliq. Ut enim ad minim veniam, quis nostrud exercitation ullamco.', T.body, C.SLATE);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, 'Content One'], [0, 1.94, C.MAGENTA, 'Content Two'],
+    [0, 3.87, C.ORANGE, 'Content One'], [-3.85, 5.15, C.PINK, 'Content Three']
+  ]) {
+    shape(s, 'roundRect', [10.56 + dx, 0.6 + dy, 2.48, 1.29], { rectRadius: 0.22, fill: a });
+    text(s, [10.67 + dx, 1.06 + dy, 2.25, 0.63], L.p8, T.bodyC, C.WHITE);
+    text(s, [10.82 + dx, 0.75 + dy, 1.95, 0.34], b, T.h3c, C.WHITE);
+  }
+  shape(s, 'line', [10.25, 2.36, 0.09, 3.01], { line: { color: C.MAGENTA, width: 1.5, dashType: 'dash' }, rotate: 90 });
+  shape(s, 'line', [5.87, 4.2, 0.84, 2.19], { line: { color: C.PINK, width: 1.5, dashType: 'dash' }, rotate: 180 });
+  shape(s, 'line', [11.72, 5.84, 0.46, 0.3], { line: { color: C.ORANGE, width: 1.5, dashType: 'dash' }, rotate: 270, flipH: true });
+  shape(s, 'line', [8.53, 1.24, 2.02, 1.02], { line: { color: C.MAGENTA, width: 1.5, dashType: 'dash' }, flipH: true });
+  dot(s, [8.02, 1.24, 1.02, 1.02], C.WHITE, SOFT);
+  dot(s, [8.08, 1.3, 0.91, 0.91], C.PURPLE);
+  art(s, [8.23, 1.45, 0.6, 0.6], C.WHITE);
+  lane(s, [11.03, 6.69, 2.18, 0]);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PINK, C.WHITE], [5.72, 2.52, C.ORANGE, C.WHITE], [2.4, -0.8, C.MAGENTA, C.WHITE]
+  ]) {
+    dot(s, [5.87 + dx, 3.69 + dy, 1.02, 1.02], C.WHITE, SOFT);
+    dot(s, [5.93 + dx, 3.75 + dy, 0.91, 0.91], a);
+    art(s, [6.08 + dx, 3.9 + dy, 0.6, 0.6], b);
+  }
+  strip(s, [6.08, -0.02, 0.55, 0.94], [0.04, 0.05]);
+}
+
+// --- slide 26 
+function slide26(s) {
+  curve(s, [0.3, 3.08, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { rotate: 180, flipH: true });
+  road(s, [-0.04, 4.75, 1.46, 0.55]);
+  lane(s, [-0.04, 5.02, 1.34, 0], { rotate: 180 });
+  curve(s, [1.95, 3.09, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { flipH: true });
+  strip(s, [3.04, 3.08, 3.86, 0.55], [0.12, 0.12]);
+  curve(s, [5.75, 3.08, 2.2, 2.21], [269.6, 0], [280.2, 359.5], { rotate: 90, flipH: true });
+  strip(s, [7.41, 4.17, 0.55, 3.33], [0.12, 0.17]);
+  text(s, [8.82, 1.77, 3.85, 1.18], 'Building the Future', T.h1, C.BLACK);
+  text(s, [8.82, 3.37, 3.85, 1.18], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sedo do eiusmod tempor incididunt ut laborer et dolore magna aliq. Ut enim ad minim veniaman, quis nostrud exercitation ullamco.', T.body, C.SLATE);
+  text(s, [8.82, 4.82, 3.25, 0.34], 'Your Title Here', T.h3, C.BLACK);
+  text(s, [8.82, 5.1, 3.85, 0.63], L.p14, T.body, C.SLATE);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.WHITE], [0.78, -3.83, C.MAGENTA, C.WHITE], [2.77, -1.25, C.PINK, C.WHITE],
+    [4.31, -4.04, C.ORANGE, C.WHITE]
+  ]) {
+    dot(s, [1.1 + dx, 5.42 + dy, 1.02, 1.02], C.WHITE, SOFT);
+    dot(s, [1.15 + dx, 5.48 + dy, 0.91, 0.91], a);
+    art(s, [1.31 + dx, 5.63 + dy, 0.6, 0.6], b);
+  }
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content One', C.PURPLE], [2.79, -1.03, 'Content Three', C.PINK],
+    [4.21, -5.78, 'Content Four', C.ORANGE], [0.73, -5.38, 'Content Two', C.MAGENTA]
+  ]) {
+    text(s, [2.22 + dx, 6.51 + dy, 1.89, 0.63], L.p3, T.body, C.GREY);
+    text(s, [2.22 + dx, 6.15 + dy, 1.67, 0.34], a, T.h3, b);
+  }
+  dot(s, [1.53, 4.91, 0.18, 0.18], C.PURPLE);
+  shape(s, 'line', [1.61, 5.09, 0.01, 0.33], { line: { color: C.PURPLE, width: 1, dashType: 'dash' } });
+  dot(s, [2.28, 3.65, 0.18, 0.18], C.MAGENTA);
+  shape(s, 'line', [2.37, 2.61, 0.02, 1.04], { line: { color: C.MAGENTA, width: 1, dashType: 'dash' } });
+  dot(s, [4.3, 3.28, 0.18, 0.18], C.PINK);
+  shape(s, 'line', [4.37, 3.46, 0.02, 0.71], { line: { color: C.PINK, width: 1, dashType: 'dash' } });
+  dot(s, [5.28, 3.27, 0.18, 0.18], C.ORANGE);
+  shape(s, 'line', [5.21, 2.57, 0.87, 0.54], { line: { color: C.ORANGE, width: 1, dashType: 'dash' }, rotate: 90 });
+}
+
+// --- slide 27 
+function slide27(s) {
+  curve(s, [6.43, 0, 2.06, 2.07], [269.6, 0], [280.2, 359.5], { rotate: 90, flipH: true });
+  road(s, [7.98, 1.46, 0.52, 5.07]);
+  lane(s, [5.86, 3.99, 4.76, 0], { rotate: 270 });
+  curve(s, [7.98, 5.43, 2.06, 2.07], [269.6, 0], [280.2, 359.5], { rotate: 180 });
+  road(s, [9, 7, 4.34, 0.52]);
+  lane(s, [9.11, 7.25, 4.11, 0], { rotate: 180 });
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.WHITE], [-0.03, -1.59, C.MAGENTA, C.WHITE], [0.02, -3.18, C.PINK, C.WHITE],
+    [0.02, -4.8, C.ORANGE, C.WHITE]
+  ]) {
+    dot(s, [7.74 + dx, 5.45 + dy, 1.02, 1.02], C.WHITE, SOFT);
+    dot(s, [7.79 + dx, 5.5 + dy, 0.91, 0.91], a);
+    art(s, [7.95 + dx, 5.66 + dy, 0.6, 0.6], b);
+  }
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content One', C.PURPLE], [0, -3.18, 'Content Three', C.PINK],
+    [0, -4.77, 'Content Four', C.ORANGE], [0, -1.59, 'Content Two', C.MAGENTA]
+  ]) {
+    text(s, [10.39 + dx, 5.8 + dy, 1.89, 0.63], L.p3, T.body, C.GREY);
+    text(s, [10.39 + dx, 5.45 + dy, 1.67, 0.34], a, T.h3, b);
+  }
+  text(s, [1.5, 1.92, 4.72, 1.18], 'Roadmap to Transformation', T.h1, C.BLACK);
+  text(s, [1.5, 3.64, 4.72, 1.18], L.p7, T.body, C.GREY);
+  text(s, [1.5, 3.37, 3.25, 0.34], 'Your Title Here', T.h3, C.BLACK);
+  text(s, [1.5, 4.96, 4.72, 0.62], L.p15, T.body, C.GREY);
+  strip(s, [-0.05, 0, 7.52, 0.51], [0.43, 0.02]);
+  text(s, [9.21, 5.55, 0.85, 0.77], '01', T.numBig, C.PURPLE);
+  text(s, [9.21, 3.96, 0.85, 0.77], '02', T.numBig, C.MAGENTA);
+  text(s, [9.21, 2.38, 0.85, 0.77], '03', T.numBig, C.PINK);
+  text(s, [9.21, 0.79, 0.85, 0.77], '04', T.numBig, C.ORANGE);
+}
+
+// --- slide 28 
+function slide28(s) {
+  road(s, [6.45, 2.65, 2.95, 0.47], { rotate: 68.17 });
+  lane(s, [6.65, 2.99, 2.64, 0], { rotate: 68.17 });
+  bend(s, [8.22, 5.17, 2.2, 2.21], [179.6, 0.2], { rotate: 180, flipH: true }, 0.43);
+  bendLane(s, [8.46, 5.43, 1.67, 1.67], [280.2, 87.1], { rotate: 90 });
+  road(s, [8.2, 2.48, 2.95, 0.47], { rotate: 68.17 });
+  lane(s, [8.4, 2.82, 2.64, 0], { rotate: 68.17 });
+  strip(s, [9.93, 4.38, 0.47, 1.77], [0.16, 0.02]);
+  strip(s, [8.91, 0, 0.47, 1.77], [0.16, 0.02]);
+  for (const [dx, dy, a, b] of [
+    [0, 0, C.PURPLE, C.WHITE], [1.02, 2.57, C.MAGENTA, C.WHITE], [1.02, 4.54, C.PINK, C.WHITE]
+  ]) {
+    dot(s, [8.64 + dx, 0.91 + dy, 1.02, 1.02], C.WHITE, SOFT);
+    dot(s, [8.7 + dx, 0.97 + dy, 0.91, 0.91], a);
+    art(s, [8.85 + dx, 1.12 + dy, 0.6, 0.6], b);
+  }
+  for (const [dx, dy, a, b] of [
+    [0, 0, 'Content One', C.PURPLE], [0.91, 4.54, 'Content Three', C.PINK],
+    [0.91, 2.57, 'Content Two', C.MAGENTA]
+  ]) {
+    text(s, [10.01 + dx, 1.29 + dy, 1.89, 0.63], L.p3, T.body, C.GREY);
+    text(s, [10.01 + dx, 0.93 + dy, 1.67, 0.34], a, T.h3, b);
+  }
+  text(s, [1.08, 2.75, 3.85, 1.18], 'Defining Our Strategic Path', T.h1, C.BLACK);
+  text(s, [1.08, 4.77, 3.85, 0.9], 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sedo do eiusmod tempor incididunt ut laborer et dolore magna aliq. Ut enim ad.', T.body, C.SLATE);
+  text(s, [1.08, 4.39, 3.25, 0.34], 'Your Title Here', T.h3, C.BLACK);
+  text(s, [1.08, 5.94, 3.85, 0.63], L.p14, T.body, C.SLATE);
+  strip(s, [8.22, 4.2, 0.47, 2.11], [0.19, 0.03]);
+  strip(s, [7.15, 0, 0.47, 1.77], [0.16, 0.02]);
+  dot(s, [7.89, 3.49, 1.02, 1.02], C.WHITE, SOFT);
+  dot(s, [7.95, 3.54, 0.91, 0.91], C.ORANGE);
+  art(s, [8.1, 3.7, 0.6, 0.6], C.WHITE);
+  text(s, [5.9, 3.84, 1.89, 0.63], L.p3, T.bodyR, C.GREY);
+  text(s, [6.12, 3.49, 1.67, 0.34], 'Content Four', T.h3r, C.ORANGE);
+  dot(s, [6.88, 0.91, 1.02, 1.02], C.WHITE, SOFT);
+  dot(s, [6.93, 0.97, 0.91, 0.91], C.YELLOW);
+  art(s, [7.09, 1.12, 0.6, 0.6], C.WHITE);
+  text(s, [4.81, 1.3, 1.89, 0.63], L.p3, T.bodyR, C.GREY);
+  text(s, [5.03, 0.94, 1.67, 0.34], 'Content Five', T.h3r, C.YELLOW);
+}
+
+// --- slide 29 
+function slide29(s) {
+  road(s, [1.35, 1.94, 0.28, 0.55]);
+  curve(s, [4, 4.17, 2.2, 2.21], [269.6, 0], [270, 359.5], { rotate: 180 });
+  road(s, [2.33, 2.43, 0.11, 1.49]);
+  lane(s, [2.4, 3.04, 0, 0.27]);
+  curve(s, [2.11, 2.21, 2.2, 2.21], [269.6, 0], [270, 359.5], { rotate: 180 });
+  curve(s, [0.36, 0.28, 2.2, 2.21], [269.6, 0], [270, 359.5], { rotate: 180 });
+  road(s, [0.36, -0.03, 0.55, 1.43]);
+  lane(s, [0.65, -0.03, 0, 1.37]);
+  bend(s, [0.46, 1.94, 2.2, 2.21], [269.6, 0]);
+  bendLane(s, [0.68, 2.19, 1.71, 1.71], [273.9, 359.5], { rotate: 90, flipH: true });
+  strip(s, [4.21, 4.42, 0.13, 1.43], [0.61, 0.64]);
+  bend(s, [2.35, 3.87, 2.2, 2.21], [269.6, 0]);
+  bendLane(s, [2.57, 4.12, 1.71, 1.71], [273.9, 359.5], { rotate: 90, flipH: true });
+  road(s, [2.62, 4.09, 1.43, 0.11]);
+  lane(s, [2.85, 4.13, 1.01, 0], { rotate: 180 });
+  bend(s, [4.23, 5.83, 2.2, 2.21], [269.6, 0]);
+  bendLane(s, [4.45, 6.08, 1.71, 1.71], [273.9, 359.5], { rotate: 90, flipH: true });
+  strip(s, [4.5, 6.05, 1.43, 0.11], [0.31, 0.3]);
+  strip(s, [5.88, 6.93, 0.55, 0.57], [0, 0]);
+  for (const [dx, dy, a, b, c] of [
+    [0, 0, C.PINK, C.PINK, 'Content Three'], [-1.81, -1.86, C.MAGENTA, C.MAGENTA, 'Content Two'],
+    [-3.66, -3.72, C.PURPLE, C.PURPLE, 'Content One'], [1.81, 1.86, C.ORANGE, C.ORANGE, 'Content Four']
+  ]) {
+    shape(s, 'roundRect', [4.98 + dx, 4.04 + dy, 4.96, 1.34], { rectRadius: 0.25, fill: a });
+    dot(s, [5.19 + dx, 4.17 + dy, 1.08, 1.08], C.WHITE);
+    art(s, [5.44 + dx, 4.42 + dy, 0.59, 0.59], b);
+    text(s, [6.45 + dx, 4.55 + dy, 3.13, 0.62], L.p5, T.body, C.WHITE);
+    text(s, [6.45 + dx, 4.25 + dy, 3.13, 0.37], c, T.lead, C.WHITE);
+  }
+  text(s, [9.16, 0.87, 3.38, 1.18], 'Roadmap to Growth', T.h1, C.BLACK);
+  text(s, [9.16, 2.31, 3.38, 0.9], 'Lorem ipsum dolor sit amet, consectetur adi elit, sedo do eiusmod tempor incididunt ut laboret dolore magna aliq. Ut enim.', T.body, C.SLATE);
+  for (const [dx, dy, a, b, c, d] of [
+    [0, 0, C.PINK, 'FFA5C3', 'FFA5C3', 'FFD2E1'], [-3.64, -4.1, C.PURPLE, 'EC6EF9', 'EC6EF9', 'F5B6FC'],
+    [-2.17, -1.91, C.MAGENTA, 'FF7AC6', 'FF7AC6', 'FFBCE2']
+  ]) {
+    shape(s, 'roundRect', [4.25 + dx, 5 + dy, 0.35, 0.18], { rectRadius: 0.03, fill: a, rotate: 90 });
+    shape(s, 'rect', [4.36 + dx, 5.12 + dy, 0.14, 0.08], { fill: b });
+    shape(s, 'rect', [4.36 + dx, 4.96 + dy, 0.14, 0.04], { fill: c });
+    dot(s, [4.47 + dx, 5.22 + dy, 0.02, 0.02], C.AMBER);
+    dot(s, [4.36 + dx, 5.22 + dy, 0.02, 0.02], C.AMBER);
+    shape(s, 'roundRect', [4.42 + dx, 5.21 + dy, 0.02, 0.06], { rectRadius: 0.01, fill: d, rotate: 90 });
+  }
+  shape(s, 'roundRect', [5.85, 6.91, 0.35, 0.18], { rectRadius: 0.03, fill: C.ORANGE, rotate: 90 });
+  shape(s, 'rect', [5.96, 7.03, 0.14, 0.08], { fill: 'FCC0A3' });
+  shape(s, 'rect', [5.96, 6.87, 0.14, 0.04], { fill: 'FCC0A3' });
+  dot(s, [5.96, 7.14, 0.02, 0.02], C.AMBER);
+  dot(s, [6.07, 7.14, 0.02, 0.02], C.AMBER);
+  shape(s, 'roundRect', [6.02, 7.12, 0.02, 0.06], { rectRadius: 0.01, fill: 'FDE0D1', rotate: 90 });
+  curve(s, [-0.06, 4.99, 2.2, 2.21], [269.6, 0], [270, 359.5]);
+  road(s, [-0.01, 4.98, 1.05, 0.55]);
+  road(s, [1.59, 6.07, 0.55, 1.43]);
+  lane(s, [-0.01, 5.26, 0.92, 0]);
+  lane(s, [1.85, 6.13, 0, 1.37], { rotate: 180 });
+}
+
+// --- slide 30 
+function slide30(s) {
+  text(s, [2.98, 4.16, 7.38, 1.31], 'THANK YOU', T.hero, C.BLACK);
+  text(s, [3.83, 5.46, 5.68, 0.37], L.p22, T.subC, C.PINK);
+  text(s, [5.77, 6.72, 1.79, 0.47], 'Ended', T.subMid, C.BLACK);
+  shape(s, 'line', [0.39, 6.39, 12.69, 0], { line: { color: C.RULE, width: 1.5 } });
+  text(s, [0.55, 6.8, 2.43, 0.34], 'Business Presentation', T.tag, C.PURPLE);
+  shape(s, 'roundRect', [11.4, 6.8, 0.34, 0.32], { rectRadius: 0.03, fill: C.ORANGE });
+  shape(s, 'custGeom', [11.48, 6.86, 0.04, 0.04], { points: P.ring(0.04, 0.04) });
+  shape(s, 'custGeom', [11.48, 6.91, 0.04, 0.12], { points: P.pin(0.04, 0.12) });
+  shape(s, 'custGeom', [11.55, 6.91, 0.12, 0.12], { points: P.balloon(0.12, 0.12) });
+  shape(s, 'roundRect', [12.44, 6.8, 0.34, 0.32], { rectRadius: 0.03, fill: C.ORANGE });
+  shape(s, 'custGeom', [12.56, 6.85, 0.11, 0.21], { points: P.blob(0.11, 0.21), fill: C.WHITE });
+  shape(s, 'roundRect', [11.93, 6.8, 0.34, 0.32], { rectRadius: 0.03, fill: C.ORANGE });
+  shape(s, 'custGeom', [11.98, 6.87, 0.24, 0.16], { points: P.bar(0.24, 0.16), fill: C.WHITE });
+  shape(s, 'custGeom', [11.99, 6.87, 0.23, 0.15], { points: P.glyph(0.23, 0.15), line: { color: C.ORANGE } });
+}
+
+
+const SLIDES = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20,
+  slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30,
+];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+pptx.layout = 'WIDE';
+pptx.theme = { headFontFace: F.head, bodyFontFace: F.body };
+SLIDES.forEach((fn) => fn(pptx.addSlide()));
+pptx.writeFile({
+  fileName: path.join(__dirname, '04674d45-070e-4738-93f4-aba2f61984a7_grok_final.pptx'),
+}).then((f) => console.log('wrote', f));
