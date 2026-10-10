@@ -1,0 +1,9 @@
+snapshot	2026-10-10_22-51
+created	2026-10-10 22:51:58 CEST
+label	auto: changement détecté (sha:/opt/sand/sand-host/host-main.cjs, sha:/opt/sand/sand-host/sand-eval-runner.cjs, sha:/opt/sand/sand-host/version, sha:/usr/local/bin/cursor_agent_store_fuse_version, tree:/home/box/sand-data/managed-skills)
+files	13597
+text_copies	3266
+big_text_gz	4
+unreadable	0
+bytes_hashed	1694897217
+duration_s	5.8

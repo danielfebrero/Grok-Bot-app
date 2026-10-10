@@ -1,0 +1,13 @@
+--- 2026-10-10_17-49:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-10_22-51:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -19863,6 +19863,10 @@
+   json: "json",
+   string: "string"
+ };
++var LIVE_BYTES_BY_TYPE_KEYS = [
++  ...Object.values(LIVE_BLOB_TYPE_NAMES),
++  "pending"
++];
+ function liveBlobTypeNameOf(name) {
+   return name == null ? void 0 : LIVE_BLOB_TYPE_NAMES[name];
+ }
