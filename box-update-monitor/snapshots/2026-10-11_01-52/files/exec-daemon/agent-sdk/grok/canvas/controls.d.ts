@@ -1,0 +1,28 @@
+import { type JSX } from "react";
+/**
+ * The two controls of a tool page, drawn in the link card's box so the page
+ * keeps one bordered chrome. They hold no state: keep the value in
+ * `useState`. A view switch, a filter, or an on/off is a `Segmented`.
+ */
+export interface InputProps {
+    /** Quiet label over the field. */
+    label?: string;
+    /** The text in the field; keep it in `useState`. */
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    /** `number` brings up the figure keyboard on a phone; the value stays text. */
+    type?: "text" | "number";
+}
+/** A one-line text field, its label above. It fills its block; a `Grid` puts two or three on a row. */
+export declare function Input({ label, value, onChange, placeholder, type, }: InputProps): JSX.Element;
+export interface ButtonProps {
+    /** The verb on the button, one to three words: "Recalculate", "Reset". */
+    label: string;
+    onClick: () => void;
+}
+/**
+ * A pressable as wide as its label. On a heading line, pass it as the
+ * `Section`'s `actions`. One with no words draws nothing.
+ */
+export declare function Button({ label, onClick }: ButtonProps): JSX.Element | null;

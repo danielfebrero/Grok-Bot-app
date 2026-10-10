@@ -1,0 +1,974 @@
+// ---------------------------------------------------------------------------
+// Recreation of a 35-slide, 16:9 e-commerce / product marketing template deck.
+// Everything is plain pptxgenjs: rectangles, ovals, lines, arcs, traced
+// custom-geometry icons and text boxes. The original's empty picture
+// placeholders become tinted panels (see photo()).
+// ---------------------------------------------------------------------------
+'use strict';
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+// ------------------------------------------------------------- palette
+const GREEN   = '87B83A';
+const GOLD    = 'F4C700';
+const GRAY    = '595959';
+const DARK    = '404040';
+const WHITE   = 'FFFFFF';
+const INK     = '202124';
+const SLATE   = '696D74';
+const MID     = '808080';
+const ICE     = 'F4F6F5';
+const CRIMSON = 'AB0221';
+const AMBER   = 'F1B002';
+const INK2    = '262626';
+
+// The template's recurring translucent grey panel (38% opacity #595959).
+const WASH = { fill: GRAY, trans: 62 };
+
+// ----------------------------------------------------------- typefaces
+const PO    = 'Poppins';
+const PSB   = 'Poppins SemiBold';
+const LATO  = 'Lato';
+const SSP   = 'Source Sans Pro';
+
+// ------------------------------------------------------ boilerplate copy
+const L1  = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus';
+const L2  = 'dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor,';
+const L3  = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla';
+const L4  = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, ';
+const L5  = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse,';
+const L6  = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor';
+const L7  = 'Lorem ipsum dolor sit amet, lacus nulla';
+const L8  = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor';
+const L9  = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, ';
+const L10 = 'Conveniently procrastinate client-centric technology via highly efficient';
+const L11 = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet';
+const L12 = 'Lorem ipsum dolor sit amet, lacus nulla ';
+const L13 = 'dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus';
+const L14 = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero';
+const L15 = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor,';
+const L16 = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. In et quam est eget mi. llentesque nunc orci eu enim, eget in fringilla vitae, et ero';
+const L17 = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, ';
+const L18 = ' dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor';
+const L19 = 'the benefits of fruit for the body';
+const L20 = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia';
+const L21 = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in';
+const L22 = 'Conveniently procrastinate client-centric technology via highly efficient manufactured products. ';
+const L23 = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, ';
+const L24 = 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. In et quam';
+
+// ------------------------------------------------- recurring text styles
+// Name = T<pt>[b bold]<colour>[C centred|R right][M middle][P 1.5 line spacing]
+// size is in points, cs is character spacing in points.
+const TxdkC   = {color:DARK,font:PO,align:'center'};
+const Txik    = {color:INK,font:PO};
+const Txwh    = {color:WHITE,font:PO};
+const TxwhC   = {color:WHITE,font:PO,cs:3,align:'center'};
+const T7whCP  = {size:7,color:WHITE,font:PO,align:'center',lh:1.5};
+const T9bgy   = {size:9,bold:1,color:GRAY,font:PO};
+const T9dk    = {size:9,color:DARK,font:LATO};
+const T9dkCMP = {size:9,color:DARK,font:LATO,align:'center',valign:'middle',lh:1.5};
+const T9dkCP  = {size:9,color:DARK,font:LATO,align:'center',lh:1.5};
+const T9dkMP  = {size:9,color:DARK,font:LATO,valign:'middle',lh:1.5};
+const T9dkP   = {size:9,color:DARK,font:LATO,lh:1.5};
+const T9dkP2  = {size:9,color:DARK,font:PO,lh:1.5};
+const T9gy    = {size:9,color:GRAY,font:PO};
+const T9gyP   = {size:9,color:GRAY,font:LATO,lh:1.5};
+const T9wh    = {size:9,color:WHITE,font:LATO};
+const T9whCP  = {size:9,color:WHITE,font:LATO,align:'center',lh:1.5};
+const T9whP   = {size:9,color:WHITE,font:LATO,lh:1.5};
+const T9whP2  = {size:9,color:WHITE,font:PO,lh:1.5};
+const T10slCP = {size:10,color:SLATE,font:LATO,align:'center',lh:1.5};
+const T12gn   = {size:12,color:GREEN,font:LATO};
+const T13bgyCM = {size:13,bold:1,color:GRAY,font:PO,align:'center',valign:'middle'};
+const T14dk   = {size:14,color:DARK,font:PO};
+const T14wh   = {size:14,color:WHITE,font:PO};
+const T14wh2  = {size:14,color:WHITE,font:LATO};
+const T14whC  = {size:14,color:WHITE,font:PO,align:'center'};
+const T14whP  = {size:14,color:WHITE,font:LATO,lh:1.5};
+const T14whR  = {size:14,color:WHITE,font:PO,align:'right'};
+const T16bgy  = {size:16,bold:1,color:GRAY,font:PO};
+const T16bwhC = {size:16,bold:1,color:WHITE,font:PO,cs:3,align:'center'};
+const T16dkC  = {size:16,color:DARK,font:PO,cs:3,align:'center'};
+const T16wh   = {size:16,color:WHITE,font:PO};
+const T16whC  = {size:16,color:WHITE,font:PO,align:'center'};
+const T16whC2 = {size:16,color:WHITE,font:PO,cs:3,align:'center'};
+const T20bgoC = {size:20,bold:1,color:GOLD,font:PSB,align:'center'};
+const T20dk   = {size:20,color:DARK,font:PO};
+const T20dkC  = {size:20,color:DARK,font:PO,align:'center'};
+const T20wh   = {size:20,color:WHITE,font:PO};
+const T24dk   = {size:24,color:DARK,font:PSB};
+const T24gn   = {size:24,color:GREEN,font:PO};
+const T24wh   = {size:24,color:WHITE,font:PO};
+const T24whC  = {size:24,color:WHITE,font:PO,align:'center'};
+const T26gy   = {size:26,color:GRAY,font:PO};
+const T28wh   = {size:28,color:WHITE,font:PO};
+const T28whC  = {size:28,color:WHITE,font:PO,align:'center'};
+const T32dk   = {size:32,color:DARK,font:PO,cs:3};
+const T96bdkC = {size:96,bold:1,color:DARK,font:PO,align:'center'};
+
+const OUT = '0ad20902-450e-4a3b-b635-5999741d113e_grok_final.pptx';
+
+// ----------------------------------------------------------------- helpers
+// All geometry is in inches. Draw helpers share the signature
+//   fn(slide, x, y, w, h, opts)
+// where opts = { fill, trans, line:[color, pt, dash], rot, flipH }.
+function shapeOpts(x, y, w, h, o) {
+  if (typeof o === 'string') o = { fill: o };     // shorthand: just a fill colour
+  else if (Array.isArray(o)) o = { line: o };     // shorthand: just a stroke
+  o = o || {};
+  const r = { x: x, y: y, w: w, h: h };
+  r.fill = o.fill ? (o.trans ? { color: o.fill, transparency: o.trans } : { color: o.fill })
+                  : { type: 'none' };
+  if (o.line) r.line = { color: o.line[0], width: o.line[1] || 0.5, dashType: o.line[2] };
+  if (o.rot) r.rotate = o.rot;
+  if (o.flipH) r.flipH = true;
+  return r;
+}
+function rect(s, x, y, w, h, o) { s.addShape('rect', shapeOpts(x, y, w, h, o)); }
+function oval(s, x, y, w, h, o) { s.addShape('ellipse', shapeOpts(x, y, w, h, o)); }
+function line(s, x, y, w, h, o) {
+  const r = shapeOpts(x, y, w, h, o);
+  if (r.line && r.line.dashType === 'dash') r.line.endArrowType = 'oval';  // leader-line dot
+  s.addShape('line', r);
+}
+
+// Open ring segment of diameter d, sweeping `sweep` degrees clockwise from 12 o'clock.
+function ring(s, x, y, d, sweep, color, pt) {
+  s.addShape('arc', { x: x, y: y, w: d, h: d, line: { color: color, width: pt },
+                      angleRange: [270, (270 + sweep) % 360] });
+}
+
+// Text box. `body` is either a plain string or an array of [string, runProps]
+// pairs, one per paragraph. opts carries run props (size/bold/color/font/cs)
+// plus box props (align/valign/lh/fill/line/rot).
+function text(s, body, x, y, w, h, o) {
+  o = o || {};
+  const parts = Array.isArray(body) ? body : [[body, {}]];
+  const runs = parts.map(function (p, i) {
+    const r = Object.assign({}, o, p[1] || {});
+    return { text: p[0], options: { fontSize: r.size || 18, bold: !!r.bold,
+      color: r.color || DARK, fontFace: r.font || PO, charSpacing: r.cs,
+      breakLine: i < parts.length - 1 } };
+  });
+  s.addText(runs, { x: x, y: y, w: w, h: h, align: o.align || 'left',
+    valign: o.valign || 'top', lineSpacingMultiple: o.lh, rotate: o.rot,
+    shape: o.oval ? 'ellipse' : 'rect', wrap: !o.nowrap,
+    fill: o.fill ? { color: o.fill } : undefined,
+    line: o.line ? { color: o.line[0], width: o.line[1] || 0.5 } : undefined });
+}
+
+// Three-bar "hamburger" menu mark used in the site-style headers.
+function burger(s, x, y, w, color) {
+  [0, 0.14, 0.288].forEach(function (dy) { line(s, x, y + dy, w, 0, [color, 3]); });
+}
+
+// Vertical 3-dot progress rail down the right edge of the cover slides:
+// long stroke, hollow dot, short stroke, filled dot, short stroke, hollow dot, long stroke.
+function rail(s, x, y, color) {
+  const cx = x + 0.131;
+  [[0, 0.653], [0.899, 0.258], [1.387, 0.258], [1.896, 0.653]].forEach(function (seg) {
+    line(s, cx, y + seg[0], 0, seg[1], [color, 1]);
+  });
+  [0.661, 1.157, 1.646].forEach(function (dy, i) {
+    oval(s, x, y + dy, 0.261, 0.251, i === 1 ? color : { line: [color, 1] });
+  });
+}
+
+// Stretch one of the traced ICONS outlines into the given box.
+function icon(s, key, x, y, w, h, o) {
+  const pts = [];
+  ICONS[key].match(/[MLZ]|[-.\d]+/g).forEach(function (tok) {
+    if (tok === 'Z') pts.push({ close: true });
+    else if (tok === 'M' || tok === 'L') pts.push({ moveTo: tok === 'M' });
+    else {
+      const p = pts[pts.length - 1];
+      if (p.x === undefined) p.x = (tok / 100) * w; else p.y = (tok / 100) * h;
+    }
+  });
+  s.addShape('custGeom', Object.assign(shapeOpts(x, y, w, h, o), { points: pts }));
+}
+
+
+// -------------------------------------------------------- icon outlines
+// Unit-square outlines ('M x y L x y ... Z') traced from the template's
+// line-art. icon() scales them into any box.
+const ICONS = {
+  arw02: 'M100 54L22 0L13 23L7 47L2 73L0 100L90 100L92 78L96 64L100 54Z',
+  arw03: 'M57 0L40 12L25 26L11 41L0 57L74 100L78 93L91 81L100 74L57 0Z',
+  arw04: 'M100 0L100 90L88 91L76 93L55 100L0 22L23 13L47 6L73 2L100 0Z',
+  arw05: 'M100 21L45 100L24 93L12 91L0 90L0 0L26 1L52 6L77 12L100 21Z',
+  arw06: 'M100 57L26 100L14 86L0 74L43 0L59 12L74 26L88 41L100 57Z',
+  arw07: 'M100 100L10 100L8 78L4 62L0 52L79 0L87 22L94 45L98 70L100 100Z',
+  arw09: 'PLACEHOLDER',
+  arw10: 'PLACEHOLDER',
+  arw11: 'PLACEHOLDER',
+  arw12: 'PLACEHOLDER',
+  arw13: 'PLACEHOLDER',
+  arw14: 'M100 26L57 100L41 88L26 74L12 59L0 43L74 0L85 14L99 26L100 26Z',
+  arw15: 'PLACEHOLDER',
+  arw16: 'PLACEHOLDER',
+  badgeIcon: 'PLACEHOLDER',
+  behance: 'PLACEHOLDER',
+  cart: 'PLACEHOLDER',
+  cartIcon: 'PLACEHOLDER',
+  chev: 'PLACEHOLDER',
+  chevBarBot: 'M0 0L0 35L65 100L100 100L0 0Z',
+  chevBarTop: 'M100 35L100 0L0 100L35 100L100 35Z',
+  chevOutline: 'M100 44L50 0L0 44L0 100L50 56L100 100L100 44Z',
+  compass: 'PLACEHOLDER',
+  dollar: 'PLACEHOLDER',
+  facebook: 'PLACEHOLDER',
+  facebookLg: 'PLACEHOLDER',
+  freeBox: 'PLACEHOLDER',
+  gift: 'PLACEHOLDER',
+  growth: 'PLACEHOLDER',
+  handshake: 'PLACEHOLDER',
+  imacBase: 'M0 0L0 76L1 95L3 100L97 100L99 95L100 76L100 0L0 0Z',
+  imacBezel: 'M100 1L100 99L0 99L0 1L100 1ZM100 0L0 0L0 100L100 100L100 0Z',
+  imacBody: 'M100 100L100 5L99 1L97 0L3 0L1 1L0 5L0 100L100 100Z',
+  imacNeck: 'PLACEHOLDER',
+  imacScreen: 'M100 1L100 99L0 99L0 1L100 1M100 0L0 0L0 100L100 100L100 0',
+  imacStand: 'PLACEHOLDER',
+  imacStandLit: 'M100 3L82 1L62 1L21 0L17 85L14 91L1 97L0 100L62 100L100 3Z',
+  instagram: 'PLACEHOLDER',
+  instagramLg: 'PLACEHOLDER',
+  mapPin: 'PLACEHOLDER',
+  mbFootL: 'M0 41L1 68L4 86L7 98L9 100L100 100L100 0L0 0L0 41Z',
+  mbFootR: 'M100 41L99 68L96 86L93 98L91 100L0 100L0 0L100 0L100 41Z',
+  mbLid: 'PLACEHOLDER',
+  mbLidBar: 'M100 0L99 22L1 22L0 0L1 71L3 100L97 100L99 71L100 0Z',
+  mbLidInner: 'PLACEHOLDER',
+  mbNotch: 'M0 0L3 71L6 92L7 98L9 100L91 100L93 98L94 92L97 71L100 0L0 0Z',
+  mbSpeck: 'M100 50L100 100L0 50L100 0L100 50Z',
+  medal: 'PLACEHOLDER',
+  padBody: 'PLACEHOLDER',
+  padHome: 'PLACEHOLDER',
+  padInner: 'PLACEHOLDER',
+  padSpeck: 'M100 0L100 100L0 0L100 0Z',
+  people: 'PLACEHOLDER',
+  petalA: 'PLACEHOLDER',
+  petalB: 'PLACEHOLDER',
+  petalC: 'PLACEHOLDER',
+  pill: 'M0 0L92 0L95 7L98 18L100 50L98 82L95 93L92 100L0 100Z',
+  ribbon: 'M0 0L100 0L100 100L50 65L0 100L0 58Z',
+  saleTag: 'PLACEHOLDER',
+  search: 'PLACEHOLDER',
+  star: 'PLACEHOLDER',
+  tag: 'PLACEHOLDER',
+  truck: 'PLACEHOLDER',
+  truckBox: 'PLACEHOLDER',
+  twitter: 'PLACEHOLDER',
+  twitterLg: 'PLACEHOLDER',
+  wallet: 'PLACEHOLDER',
+  wedgeA: 'PLACEHOLDER',
+  wedgeB: 'PLACEHOLDER',
+  wedgeC: 'PLACEHOLDER',
+};
+
+// ---------------------------------------------------------- slide 1
+function slide1(s) {
+  rect(s, 0, 0, 13.333, 7.5, {fill:CRIMSON,trans:80});
+  text(s, 'Linggo', 6.578, 2.096, 4.598, 1.313, {size:72,bold:1,color:WHITE,font:PO});
+  text(s, L23, 6.578, 4.011, 3.668, 1.01, {...T9whP2});
+  rail(s, 12.417, 2.674, WHITE);
+  burger(s, 12.288, 0.589, 0.444, WHITE);
+  text(s, '02', 12.288, 5.345, 0.564, 0.37, {...T16bwhC});
+  text(s, '01', 12.288, 2.292, 0.564, 0.37, {...T16bwhC});
+  text(s, 'Home', 7.772, 0.493, 1.302, 0.37, {...T16whC2});
+  text(s, 'Menu', 9.3, 0.493, 1.302, 0.37, {...T16whC2});
+  text(s, 'Shop', 10.705, 0.493, 1.302, 0.37, {...T16whC2});
+  text(s, 'Buy Now', 6.669, 5.345, 1.922, 0.404, {...TxwhC,fill:GOLD});
+  icon(s, 'chev', 8.827, 5.454, 0.21, 0.187, GOLD);
+  icon(s, 'chev', 9.031, 5.454, 0.21, 0.187, GOLD);
+  text(s, 'Menu', 6.245, 0.477, 1.302, 0.37, {...T16whC2});
+  icon(s, 'cart', 0.389, 0.506, 0.439, 0.372, WHITE);
+}
+
+// ---------------------------------------------------------- slide 2
+function slide2(s) {
+  text(s, 'Welcome', 1.441, 2.465, 4.598, 1.01, {size:54,bold:1,color:DARK,font:PSB,align:'center'});
+  rect(s, 7.815, 1.523, 4.438, 4.954, GREEN);
+  text(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. In et quam est eget mi. llentesque nunc orci eu enim, eget in fringilla vitae, et ero, Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, ', 1.335, 4, 4.705, 1.237, {...T9dkCP});
+  burger(s, 0.434, 0.574, 0.444, DARK);
+  [[2.862, 0.662, 'Home'], [4.39, 0.662, 'Menu'], [5.795, 0.662, 'Shop'], [1.335, 0.647, 'Menu']].forEach(function (c) {
+    text(s, c[2], c[0], c[1], 1.302, 0.37, {...T16dkC});
+  });
+  icon(s, 'cart', 1.627, 5.549, 0.577, 0.526, GREEN);
+  icon(s, 'pill', 2.47, 5.609, 2.648, 0.495, GOLD);
+  text(s, 'Your product here', 2.514, 5.656, 2.518, 0.404, {...Txwh});
+}
+
+// ---------------------------------------------------------- slide 3
+function slide3(s) {
+  text(s, 'About Linggo', 6.195, 2.127, 4.598, 0.841, {size:44,bold:1,color:DARK,font:PSB});
+  text(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo libero vivamus porttitor dolor, conubia mollit. Sapien nam suspendisse, tincidunt eget ante tincidunt, eros in auctor fringilla praesent at diam. In et quam est eget mi. llentesque nunc orci eu enim, eget in fringilla vitae, et ero, Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, ', 6.197, 3.664, 4.312, 1.464, {...T9dkP});
+  text(s, 'Text Here', 6.245, 5.715, 1.922, 0.404, {...TxwhC,fill:GOLD});
+  icon(s, 'chev', 8.403, 5.823, 0.21, 0.187, GOLD);
+  icon(s, 'chev', 8.608, 5.823, 0.21, 0.187, GOLD);
+  rect(s, 1.055, 5.647, 3.389, 0.987, DARK);
+  burger(s, 12.288, 0.589, 0.444, DARK);
+  [[7.772, 0.493, 'Home'], [9.3, 0.493, 'Menu'], [10.705, 0.493, 'Shop'], [6.245, 0.477, 'Menu']].forEach(function (c) {
+    text(s, c[2], c[0], c[1], 1.302, 0.37, {...T16dkC});
+  });
+  text(s, 'Product Here', 1.93, 5.916, 2.087, 0.438, {...T20wh});
+  icon(s, 'cart', 1.376, 5.916, 0.439, 0.372, WHITE);
+  line(s, 2.524, 6.369, 0.656, 0, [WHITE]);
+}
+
+// ---------------------------------------------------------- slide 4
+function slide4(s) {
+  text(s, L5, 1.867, 6.06, 4.435, 0.555, {...T9dkP});
+  text(s, 'Image Text', 1.867, 5.623, 2.498, 0.438, {...T20dk});
+  text(s, L5, 7.042, 6.06, 4.546, 0.555, {...T9dkP});
+  text(s, 'Image Text', 7.042, 5.623, 2.498, 0.438, {...T20dk});
+  rect(s, 1.867, 4.231, 0.955, 0.912, GREEN);
+  text(s, 'Sample Text Here', 1.867, 1.247, 2.498, 0.337, {...T14dk});
+  text(s, 'Sample Text Here', 7.042, 1.247, 2.498, 0.337, {...T14dk});
+  icon(s, 'cart', 2.059, 4.529, 0.439, 0.372, WHITE);
+  icon(s, 'pill', 1.867, 1.651, 1.911, 0.752, GRAY);
+  icon(s, 'tag', 1.991, 1.858, 0.373, 0.37, WHITE);
+  text(s, 'Best Sale', 2.432, 1.858, 1.249, 0.337, {...T14wh});
+  rect(s, 7.042, 4.231, 0.955, 0.912, GREEN);
+  icon(s, 'cart', 7.234, 4.529, 0.439, 0.372, WHITE);
+  icon(s, 'pill', 7.042, 1.651, 1.911, 0.752, GRAY);
+  icon(s, 'tag', 7.165, 1.858, 0.373, 0.37, WHITE);
+  text(s, 'Best Sale', 7.607, 1.858, 1.249, 0.337, {...T14wh});
+}
+
+// ---------------------------------------------------------- slide 5
+function slide5(s) {
+  rect(s, 0.73, 0.587, 11.825, 6.381, GREEN);
+  text(s, 'Slide with Image!', 5.978, 1.308, 3.308, 1.313, {size:36,color:WHITE,font:PO});
+  text(s, L5, 6.038, 3.222, 2.868, 1.01, {...T9whP});
+  [[5.983, '60%'], [7.985, '50%'], [9.942, '70%']].forEach(function (c) {
+    icon(s, 'pill', c[0], 4.687, 1.887, 1.522, {fill:GRAY,rot:90});
+    text(s, c[1], c[0] + 0.472, 4.59, 1.007, 0.572, {...T28whC});
+    rect(s, c[0] + 0.393, 5.122, 1.096, 0.313, GREEN);
+    text(s, 'Presale', c[0] + 0.439, 5.099, 1.175, 0.37, {...T16wh});
+    text(s, L11, c[0] + 0.333, 5.479, 1.215, 0.808, {...T7whCP});
+  });
+  text(s, 'Discount!', 6.081, 2.842, 1.33, 0.37, {...T16wh,fill:GOLD});
+  icon(s, 'pill', 1.039, 0.875, 2.468, 0.76, GRAY);
+  icon(s, 'tag', 1.218, 1.062, 0.433, 0.429, WHITE);
+  text(s, 'Buy Now', 1.745, 1.083, 1.259, 0.404, {...Txwh});
+  icon(s, 'ribbon', 11.529, 0.594, 1.048, 1.413, GOLD);
+  text(s, '80%', 11.58, 0.946, 1.007, 0.505, {...T24whC});
+  text(s, 'SALE!', 11.706, 0.707, 0.881, 0.37, {...T16wh});
+}
+
+// ---------------------------------------------------------- slide 6
+function slide6(s) {
+  rect(s, 0.269, 0.288, 12.774, 6.982, GREEN);
+  rect(s, 1.039, 3.063, 4.992, 0.746, GRAY);
+  rect(s, 1.039, 6.063, 4.992, 0.746, GRAY);
+  [3.224, 6.24].forEach(function (c) {
+    text(s, 'Product Here', 1.743, c, 2.087, 0.438, {...T20wh});
+    icon(s, 'cart', 1.188, c, 0.439, 0.372, WHITE);
+  });
+  line(s, 3.83, 3.224, 0, 0.438, [WHITE]);
+  line(s, 3.83, 6.24, 0, 0.438, [WHITE]);
+  text(s, L12, 3.945, 3.159, 1.985, 0.555, {...T9whP2});
+  text(s, L12, 3.945, 6.181, 1.985, 0.534, {...T9whP2});
+  text(s, 'Price Item! ', 6.834, 1.461, 2.847, 0.572, {...T28wh});
+  [[6.105, '$18,1'], [3.13, '$13,1']].forEach(function (c) {
+    text(s, c[1], 6.965, c[0], 1.01, 0.438, {...T20wh,fill:GOLD});
+    text(s, [['Lorem ipsum',{size:12,color:WHITE,font:PO}],[L18,{...T9wh}]], 6.834, c[0] - 0.915, 3.03, 0.858, {lh:1.5});
+  });
+  rail(s, 12.293, 2.867, WHITE);
+  burger(s, 12.164, 0.937, 0.444, WHITE);
+  text(s, '02', 12.164, 5.538, 0.564, 0.37, {...T16bwhC});
+  text(s, '01', 12.164, 2.485, 0.564, 0.37, {...T16bwhC});
+  line(s, 6.965, 2.086, 0.556, 0, [WHITE]);
+  text(s, 'Price Item! ', 6.834, 4.448, 2.847, 0.572, {...T28wh});
+  line(s, 6.965, 5.073, 0.556, 0, [WHITE]);
+}
+
+// ---------------------------------------------------------- slide 7
+function slide7(s) {
+  rect(s, -0.016, 0.016, 13.364, 7.5, WASH);
+  rect(s, 0.98, 1.698, 11.183, 4.524, WHITE);
+  line(s, 4.988, 3.446, 0, 0.967, [DARK]);
+  text(s, 'More best Fruits!', 1.418, 2.26, 3.308, 1.313, {size:36,color:DARK,font:PO});
+  text(s, 'Lorem Ipsum', 1.552, 3.973, 1.76, 0.37, {...T16wh,fill:GREEN});
+  text(s, L5, 1.47, 4.35, 3.256, 1.111, {size:10,color:DARK,font:LATO,lh:1.5});
+  icon(s, 'chev', 11.572, 3.766, 0.23, 0.493, GOLD);
+  icon(s, 'chev', 5.395, 3.766, 0.23, 0.493, {fill:GOLD,flipH:1});
+  text(s, 'Lorem ipsum Dolor sit', 6.859, 1.979, 3.479, 0.404, {color:GOLD,font:PO,align:'center'});
+  text(s, L8, 6.209, 2.326, 4.778, 0.555, {size:9,color:DARK,font:PO,align:'center',lh:1.5});
+  rect(s, 5.873, 4.906, 5.45, 0.555, GRAY);
+  text(s, 'Fruit Name', 5.97, 5.015, 1.394, 0.337, {...T14whC});
+  text(s, 'Fruit Name', 7.901, 5.015, 1.394, 0.337, {...T14whC});
+  text(s, 'Fruit Name', 9.835, 5.015, 1.394, 0.337, {...T14whC});
+  line(s, 7.628, 5.015, 0, 0.337, [WHITE]);
+  line(s, 9.564, 5.015, 0, 0.337, [WHITE]);
+}
+
+// ---------------------------------------------------------- slide 8
+function slide8(s) {
+  line(s, 1.245, 5.304, 1.088, 0, [GREEN]);
+  text(s, [['Benefit 1',{...T12gn}],[L2,{...T9dk}]], 1.126, 5.538, 2.62, 1.123, {lh:1.5});
+  text(s, L19, 1.126, 4.002, 4.914, 1.178, {size:32,color:INK,font:PO});
+  [[4.306, 5.538, 'Benefit 2'], [9.862, 1.237, 'Vitamin A'], [9.862, 3.591, 'Vitamin B'], [9.862, 5.914, 'Vitamin C']].forEach(function (c) {
+    text(s, [[c[2],{...T12gn}],[L2,{...T9dk}]], c[0], c[1], 2.62, 1.123, {lh:1.5});
+  });
+  text(s, 'Fruit Name!', 9.862, 0.741, 1.694, 0.404, {...Txik});
+  text(s, 'Fruit Name!', 9.862, 3.187, 1.694, 0.404, {...Txik});
+  text(s, 'Fruit Name!', 9.862, 5.534, 1.694, 0.404, {...Txik});
+  [1.921, 4.282, 6.473].forEach(function (c) {
+    rect(s, 7.565, c, 2.054, 0.447, GRAY);
+    text(s, 'Buy Now', 8.283, c + 0.061, 1.206, 0.337, {...T14whR});
+    icon(s, 'saleTag', 7.763, c + 0.093, 0.373, 0.261, WHITE);
+    line(s, 8.347, c + 0.093, 0, 0.261, [WHITE]);
+  });
+}
+
+// ---------------------------------------------------------- slide 9
+function slide9(s) {
+  rect(s, 7.968, 3.017, 4.949, 1.364, WASH);
+  rect(s, 7.968, 6.429, 4.949, 0.778, GRAY);
+  line(s, 9.76, 4.206, 1.351, 0, [WHITE]);
+  text(s, 'Sale!', 8.516, 2.934, 4.012, 1.447, {size:80,bold:1,color:WHITE,font:PO,cs:6,align:'center'});
+  text(s, 'Fruit Name!', 8.2, 6.574, 2.243, 0.505, {...T24wh});
+  line(s, 10.491, 6.558, 0, 0.505, [WHITE]);
+  text(s, L12, 10.565, 6.511, 2.182, 0.606, {size:10,color:WHITE,font:PO,lh:1.5});
+  text(s, 'Safe Your Money with 80% discount', 0.982, 1.129, 5.617, 1.313, {size:36,color:DARK,font:PO});
+  icon(s, 'medal', 0.982, 3.426, 0.445, 0.511, GREEN);
+  text(s, L6, 1.572, 3.676, 2.253, 1.01, {...T9dkP});
+  text(s, 'Big deal!', 1.572, 3.238, 1.499, 0.438, {...T20dk});
+  text(s, 'Safe money!', 4.533, 3.234, 2.086, 0.438, {...T20dk});
+  icon(s, 'dollar', 4.098, 3.506, 0.33, 0.488, GREEN);
+  text(s, L6, 4.564, 3.676, 2.253, 1.01, {...T9dkP});
+  text(s, 'Lorem Ipsum Dolor Sit!', 1.052, 5.442, 4.233, 0.505, {...T24wh,fill:GREEN});
+  text(s, L24, 0.982, 5.947, 6.027, 0.783, {...T9dkP});
+  icon(s, 'ribbon', 7.968, 0.44, 1.048, 1.413, GREEN);
+  text(s, '80%', 8.019, 0.791, 1.007, 0.505, {...T24whC,fill:GREEN});
+  text(s, 'SALE!', 8.145, 0.553, 0.881, 0.37, {...T16wh});
+}
+
+// ---------------------------------------------------------- slide 10
+function slide10(s) {
+  rect(s, 0, -0.036, 13.364, 3.5, WASH);
+  icon(s, 'truckBox', 2.339, 1.484, 0.331, 0.439, GREEN);
+  icon(s, 'truck', 1.139, 1.038, 1.74, 1.424, GREEN);
+  text(s, 'Shipping With No Fee', 3.908, 0.746, 5.801, 0.707, {size:36,color:WHITE,font:PO});
+  icon(s, 'chev', 11.864, 1.246, 0.428, 1.055, GOLD);
+  text(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula', 3.908, 1.412, 5.393, 0.678, {size:12,color:WHITE,font:PO,lh:1.5});
+  icon(s, 'freeBox', 3.956, 2.292, 0.797, 0.545, GREEN);
+  text(s, 'Lorem ipsum', 4.882, 2.311, 2.6, 0.505, {...T24wh,fill:GREEN});
+  [[2.173, '$10.0'], [5.428, '$11.0'], [8.8, '$12.0']].forEach(function (c) {
+    rect(s, c[0], 5.652, 2.054, 0.447, GRAY);
+    text(s, 'Buy Now', c[0] + 0.718, 5.713, 1.206, 0.337, {...T14whR});
+    icon(s, 'saleTag', c[0] + 0.198, 5.745, 0.373, 0.261, WHITE);
+    line(s, c[0] + 0.782, 5.745, 0, 0.261, [WHITE]);
+    text(s, 'Product Name!', c[0] - 0.02, 3.702, 2.106, 0.404, {...TxdkC});
+    text(s, c[1], c[0] - 0.085, 6.691, 1.312, 0.505, {...T24gn});
+    text(s, L7, c[0] - 0.061, 6.198, 2.054, 0.555, {...T9dkP2});
+  });
+}
+
+// ---------------------------------------------------------- slide 11
+function slide11(s) {
+  rect(s, 8.098, 1.375, 5.237, 3.146, WASH);
+  text(s, 'Best Choice to Safe Money!', 1.247, 5.113, 3.967, 1.043, {size:28,color:DARK,font:PO});
+  icon(s, 'pill', 8.151, 2.909, 1.499, 1.209, {fill:GRAY,rot:90});
+  text(s, '70%', 8.526, 2.832, 0.8, 0.404, {color:WHITE,font:PO,align:'center'});
+  text(s, 'Presale', 8.447, 3.236, 0.933, 0.286, {size:11,color:WHITE,font:PO,align:'center',fill:GREEN});
+  text(s, 'Lorem ipsum dolor sit amet, lacus aliquet', 8.416, 3.538, 0.965, 0.614, {...T7whCP});
+  text(s, 'Product Name', 8.214, 1.673, 1.835, 0.37, {...T16wh});
+  rect(s, -0.011, 1.375, 7.825, 3.146, WASH);
+  text(s, L7, 8.214, 1.959, 1.835, 0.555, {...T9whP2});
+  text(s, 'Lorem ipsum Dolor Sit!', 0.436, 1.809, 3.163, 0.774, {...T20wh});
+  text(s, L6, 0.438, 2.632, 5.038, 0.631, {size:10.5,color:WHITE,font:LATO,lh:1.5});
+  rect(s, 0.611, 3.485, 1.937, 0.442, WHITE);
+  icon(s, 'search', 0.708, 3.587, 0.271, 0.25, {fill:GOLD,flipH:1});
+  text(s, 'Find Product', 0.979, 3.549, 1.542, 0.337, {...T14dk});
+  text(s, 'Lorem Ipsum Dolor Sit!', 1.247, 6.422, 2.468, 0.337, {...T14whC,fill:GREEN});
+  text(s, [['Choice 1',{...T12gn}],[L2,{...T9dk}]], 6.935, 5.512, 2.62, 1.123, {lh:1.5});
+  text(s, [['Choice 2',{...T12gn}],[L2,{...T9dk}]], 10.003, 5.512, 2.62, 1.123, {lh:1.5});
+  line(s, 6.048, 5.82, 0, 0.602, [GREEN]);
+  icon(s, 'ribbon', 6.783, 1.375, 1.048, 1.413, GOLD);
+  text(s, '80%', 6.834, 1.727, 1.007, 0.505, {...T24whC});
+  text(s, 'SALE!', 6.96, 1.488, 0.881, 0.37, {...T16wh});
+}
+
+// ---------------------------------------------------------- slide 12
+function slide12(s) {
+  rect(s, 6.841, 2.293, 3.016, 2.984, GREEN);
+  rect(s, 3.746, 2.293, 2.857, 2.984, GREEN);
+  text(s, L19, 4.146, 0.415, 4.914, 1.178, {size:32,color:INK,font:PO,align:'center'});
+  line(s, 5.952, 1.73, 1.095, 0, [GREEN]);
+  text(s, 'Lorem ipsum dolor sit!', 4.852, 5.839, 3.297, 0.438, {size:20,color:WHITE,font:PO,align:'center',fill:GREEN});
+  text(s, L5, 3.717, 6.361, 5.773, 0.555, {...T9dkCP});
+  [3.859, 7.113].forEach(function (c) {
+    text(s, 'Have The nutrition!', c, 2.778, 2.568, 0.37, {...T16whC});
+    text(s, L20, c + 0.142, 3.253, 2.284, 1.01, {...T9whCP});
+    text(s, 'Lorem ipsum', c + 0.293, 4.389, 2.014, 0.37, {...T16whC,fill:GOLD});
+  });
+  text(s, 'New', 0.571, 2.293, 0.857, 0.37, {...T16whC,fill:GOLD});
+  text(s, 'New', 10.016, 2.293, 0.857, 0.37, {...T16whC,fill:GREEN});
+}
+
+// ---------------------------------------------------------- slide 13
+function slide13(s) {
+  rect(s, 0, 0, 3.968, 7.5, WASH);
+  text(s, 'Fruits make you healthy', -0.157, 2.453, 4.282, 1.043, {...T28whC});
+  line(s, 1.984, 3.677, 0, 0.768, [WHITE]);
+  text(s, '100% Organik', 0.592, 4.929, 2.847, 0.505, {...T24whC,line:[WHITE,0.75]});
+  [1.794, 5.29].forEach(function (c) {
+    text(s, [['Benefit 2',{...T12gn}],[L2,{...T9dk}]], 8.535, c, 2.62, 1.123, {lh:1.5});
+    text(s, 'Lorem Ipsum', 8.535, c - 0.536, 2.078, 0.438, {...T20dk});
+    rect(s, 8.638, c + 1.158, 1.937, 0.442, GREEN);
+    icon(s, 'search', 8.735, c + 1.259, 0.271, 0.25, {fill:WHITE,flipH:1});
+    text(s, 'Find Product', 9.006, c + 1.222, 1.542, 0.337, {...T14wh,fill:GREEN});
+  });
+}
+
+// ---------------------------------------------------------- slide 14
+function slide14(s) {
+  text(s, 'Slide with Image!', 3.773, 3.354, 3.986, 1.178, {...T32dk});
+  icon(s, 'truckBox', 5.2, 5.235, 0.13, 0.172, GREEN);
+  icon(s, 'truck', 4.728, 5.059, 0.684, 0.56, GREEN);
+  icon(s, 'saleTag', 7.805, 5.136, 0.623, 0.436, GREEN);
+  icon(s, 'medal', 10.814, 5.059, 0.459, 0.527, GREEN);
+  text(s, [['Lorem Ipsum',{...T12gn}],[L2,{...T9dk}]], 3.773, 5.91, 2.595, 1.085, {align:'center',lh:1.5});
+  text(s, [['Lorem Ipsum',{...T12gn}],[L2,{...T9dk}]], 6.819, 5.91, 2.595, 1.085, {align:'center',lh:1.5});
+  text(s, [['Lorem Ipsum',{...T12gn}],[L2,{...T9dk}]], 9.746, 5.91, 2.595, 1.085, {align:'center',lh:1.5});
+  line(s, 6.829, 3.508, 0, 0.875, [GOLD]);
+  text(s, L3, 7.081, 3.547, 4.951, 0.783, {...T9dkP});
+  rect(s, 0.49, 0.343, 12.51, 2.76, WASH);
+}
+
+// ---------------------------------------------------------- slide 15
+function slide15(s) {
+  rect(s, 0, 3.444, 13.333, 4.056, GREEN);
+  text(s, 'Slide with Image!', 1.059, 0.719, 3.986, 1.178, {...T32dk});
+  text(s, L3, 2.601, 2.055, 3.923, 1.01, {...T9dkP});
+  line(s, 2.067, 2.254, 0, 0.619, [GOLD]);
+  icon(s, 'truckBox', 8.14, 5.066, 0.13, 0.172, WHITE);
+  icon(s, 'truck', 7.668, 4.89, 0.684, 0.56, WHITE);
+  icon(s, 'saleTag', 10.745, 4.967, 0.623, 0.436, WHITE);
+  text(s, [['Lorem Ipsum',{size:12,color:WHITE,font:LATO}],[L2,{...T9wh}]], 6.713, 5.741, 2.595, 1.085, {align:'center',lh:1.5});
+  text(s, [['Lorem Ipsum',{size:12,color:WHITE,font:LATO}],[L2,{...T9wh}]], 9.759, 5.741, 2.595, 1.085, {align:'center',lh:1.5});
+}
+
+// ---------------------------------------------------------- slide 16
+function slide16(s) {
+  rect(s, 1.238, 3.402, 2.317, 2.662, GREEN);
+  rect(s, 5.501, 3.402, 2.317, 2.662, GREEN);
+  rect(s, 9.763, 3.402, 2.317, 2.662, GREEN);
+  [1.362, 5.624, 9.902].forEach(function (c) {
+    text(s, [['Service',{...T14wh2}],[L13,{...T9wh}]], c, 4.347, 2.111, 1.136, {align:'center',lh:1.5});
+    text(s, 'Read more', c + 0.368, 5.496, 1.523, 0.408, {...T14whP});
+    icon(s, 'chev', c + 1.514, 5.686, 0.176, 0.171, GOLD);
+  });
+  icon(s, 'truckBox', 2.527, 3.963, 0.13, 0.172, WHITE);
+  icon(s, 'truck', 2.055, 3.787, 0.684, 0.56, WHITE);
+  icon(s, 'saleTag', 6.363, 3.905, 0.623, 0.436, WHITE);
+  icon(s, 'medal', 10.735, 3.908, 0.445, 0.511, WHITE);
+  rect(s, 0.413, 0.397, 5.58, 2.748, WASH);
+  text(s, 'Our Service', 0.603, 0.513, 2.449, 1.178, {size:32,color:WHITE,font:PO});
+  line(s, 0.754, 1.691, 1.063, 0, [GREEN]);
+  text(s, L4, 0.695, 1.819, 4.098, 0.555, {...T9whP});
+  text(s, 'Learn More', 0.695, 2.502, 1.479, 0.34, {...T14whC,fill:GREEN});
+  burger(s, 12.56, 0.396, 0.359, WHITE);
+  icon(s, 'chev', 4.372, 4.567, 0.426, 0.677, GOLD);
+  icon(s, 'chev', 8.578, 4.567, 0.426, 0.677, GOLD);
+}
+
+// ---------------------------------------------------------- slide 17
+function slide17(s) {
+  rect(s, 5.19, 4.746, 3.794, 1.905, GREEN);
+  line(s, 5.571, 5.46, 0, 0.683, [WHITE]);
+  text(s, L8, 5.729, 5.577, 2.955, 0.783, {...T9whP});
+  text(s, 'Lorem Ipsum', 5.729, 5.139, 2.35, 0.438, {...T20wh});
+  text(s, 'Service!', 1.024, 1.073, 2.964, 0.841, {size:44,color:DARK,font:PO});
+  icon(s, 'medal', 1.024, 3.375, 0.445, 0.511, GREEN);
+  text(s, L6, 1.614, 3.625, 2.253, 1.01, {...T9dkP});
+  text(s, 'Big deal!', 1.614, 3.188, 1.499, 0.438, {...T20dk});
+  text(s, L6, 1.024, 2.02, 4.722, 0.631, {size:10.5,color:DARK,font:PO,lh:1.5});
+  icon(s, 'truckBox', 1.3, 5.309, 0.113, 0.163, GREEN);
+  icon(s, 'truck', 0.889, 5.143, 0.595, 0.529, GREEN);
+  text(s, L6, 1.637, 5.517, 2.253, 1.01, {...T9dkP});
+  text(s, 'Free Shiping', 1.637, 5.143, 1.982, 0.438, {...T20dk});
+  line(s, 1.12, 2.873, 1.034, 0, [GOLD]);
+  icon(s, 'ribbon', 12.286, 1.27, 1.048, 1.413, GOLD);
+  text(s, '80%', 12.337, 1.622, 1.007, 0.505, {...T24whC});
+  text(s, 'SALE!', 12.463, 1.383, 0.881, 0.37, {...T16wh});
+}
+
+// ---------------------------------------------------------- slide 18
+function slide18(s) {
+  rect(s, 5.222, 3.175, 5.381, 1.286, GREEN);
+  text(s, 'Discount 70%', 5.534, 3.397, 4.726, 0.841, {size:44,color:WHITE,font:PO,align:'center'});
+  [5.222, 9].forEach(function (c) {
+    rect(s, c, 6.104, 0.955, 0.912, GREEN);
+    icon(s, 'cart', c + 0.192, 6.402, 0.439, 0.372, WHITE);
+  });
+  icon(s, 'pill', 5.222, 0.509, 2.468, 0.76, GRAY);
+  icon(s, 'tag', 5.401, 0.696, 0.433, 0.429, WHITE);
+  text(s, 'Buy Now', 5.928, 0.717, 1.259, 0.404, {...Txwh});
+  rect(s, 10.857, 4.014, 2.19, 0.447, GRAY);
+  text(s, 'Buy Now', 11.638, 4.075, 1.206, 0.337, {...T14whR});
+  icon(s, 'saleTag', 11.118, 4.107, 0.373, 0.261, WHITE);
+  line(s, 11.702, 4.107, 0, 0.261, [WHITE]);
+  icon(s, 'ribbon', 0.619, 0.508, 1.048, 1.413, GOLD);
+  text(s, '70%', 0.67, 0.86, 1.007, 0.505, {...T24whC});
+  text(s, 'SALE!', 0.796, 0.621, 0.881, 0.37, {...T16wh});
+}
+
+// ---------------------------------------------------------- slide 19
+function slide19(s) {
+  text(s, 'Meet Ceo', 4.578, 0.992, 3.881, 0.707, {size:36,color:DARK,font:PO,cs:3,align:'center'});
+  text(s, 'Lorem Ipsum.', 5.67, 4.38, 1.76, 0.37, {size:16,color:SLATE,font:PO,align:'center'});
+  text(s, 'Profile', 5.971, 4.958, 1.159, 0.37, {size:16,bold:1,color:GREEN,font:SSP,cs:3,valign:'middle',nowrap:1});
+  text(s, L9, 3.338, 5.55, 6.695, 0.783, {size:9,color:MID,font:LATO,align:'center',valign:'middle',lh:1.5});
+  line(s, 6.136, 1.765, 0.55, 0, [SLATE]);
+  [5.765, 6.091, 6.411, 6.731].forEach(function (c) {
+    icon(s, 'star', c, 5.304, 0.232, 0.221, GOLD);
+  });
+  icon(s, 'star', 7.051, 5.304, 0.232, 0.221, SLATE);
+}
+
+// ---------------------------------------------------------- slide 20
+function slide20(s) {
+  rect(s, 1.016, 5.698, 3.73, 0.841, GRAY);
+  text(s, 'Ceo', 1.254, 5.867, 1.1, 0.505, {...T24whC});
+  text(s, 'Meet The CEO', 6.061, 1.2, 3.849, 1.582, {size:44,color:DARK,font:PO});
+  line(s, 6.206, 2.952, 1.023, 0, [GOLD]);
+  text(s, L7, 2.961, 5.844, 1.721, 0.555, {size:9,color:WHITE,font:PO,valign:'middle',lh:1.5});
+  icon(s, 'instagramLg', 6.834, 5.237, 0.359, 0.359, GREEN);
+  icon(s, 'twitterLg', 6.061, 5.305, 0.357, 0.292, GREEN);
+  icon(s, 'facebookLg', 7.729, 5.237, 0.167, 0.359, GREEN);
+  text(s, 'Contact Now!', 6.061, 5.857, 1.812, 0.37, {...T16whC,fill:GREEN});
+  text(s, L5, 6.061, 4.143, 3.388, 0.783, {...T9dkMP});
+  line(s, 2.69, 5.937, 0, 0.369, [WHITE]);
+}
+
+// ---------------------------------------------------------- slide 21
+function slide21(s) {
+  text(s, 'Meet The Team', 4.674, 0.386, 3.986, 1.178, {size:32,color:DARK,font:PO,cs:3,align:'center'});
+  line(s, 6.222, 1.683, 0.778, 0, [GOLD]);
+  text(s, 'Courir', 9.488, 5.164, 1.628, 0.438, {...T20dkC});
+  text(s, 'Marketing', 5.601, 5.164, 2.02, 0.438, {...T20dkC});
+  text(s, 'Planter', 2.303, 5.164, 1.457, 0.438, {...T20dkC});
+  text(s, L14, 1.651, 5.651, 2.587, 0.783, {...T9dkCMP});
+  text(s, L14, 5.23, 5.651, 2.587, 0.783, {...T9dkCMP});
+  text(s, L14, 8.921, 5.651, 2.587, 0.783, {...T9dkCMP});
+  text(s, 'Contact Now!', 2.126, 6.491, 1.812, 0.37, {...T16whC,fill:GREEN});
+  text(s, 'Contact Now!', 5.761, 6.491, 1.812, 0.37, {...T16whC,fill:GREEN});
+  text(s, 'Contact Now!', 9.396, 6.491, 1.812, 0.37, {...T16whC,fill:GREEN});
+}
+
+// ---------------------------------------------------------- slide 22
+function slide22(s) {
+  line(s, 6.619, 2.651, 0, 1.54, [GOLD]);
+  text(s, 'John Doe.', 9.003, 4.888, 1.821, 0.438, {...T20dkC});
+  text(s, 'Jenny Doe.', 2.336, 4.861, 1.821, 0.438, {...T20dkC});
+  text(s, L21, 1.177, 5.322, 4.14, 0.783, {...T9dkCMP});
+  text(s, L21, 7.844, 5.297, 4.14, 0.783, {...T9dkCMP});
+  [10.042, 3.414].forEach(function (c) {
+    icon(s, 'facebook', c, 6.335, 0.119, 0.229, GREEN);
+    icon(s, 'twitter', c - 0.46, 6.357, 0.225, 0.185, GREEN);
+    icon(s, 'behance', c - 0.839, 6.372, 0.244, 0.154, GREEN);
+    icon(s, 'instagram', c + 0.376, 6.345, 0.206, 0.208, {fill:GREEN,rot:90});
+  });
+}
+
+// ---------------------------------------------------------- slide 23
+function slide23(s) {
+  line(s, 5.556, 2.913, 0, 1.667, [GOLD]);
+  text(s, 'Portofolio', 6.094, 2.442, 3.849, 0.774, {size:40,color:GREEN,font:PO});
+  text(s, L9, 6.094, 3.403, 4.569, 1.01, {...T9dkMP});
+  text(s, L9, 6.094, 4.557, 4.569, 1.01, {...T9dkMP});
+  text(s, 'About Team', 6.094, 2.071, 1.62, 0.37, {size:16,color:GOLD,font:PO});
+}
+
+// ---------------------------------------------------------- slide 24
+function slide24(s) {
+  icon(s, 'cart', 3.304, 0.849, 0.577, 0.526, GOLD);
+  icon(s, 'pill', -0.019, 0.877, 3.055, 0.495, GOLD);
+  text(s, 'Your product here', 0.25, 0.923, 2.518, 0.404, {...Txwh});
+  text(s, 'Season Sale', 0.979, 1.646, 4.113, 0.841, {size:44,color:WHITE,font:PO});
+  text(s, 'Lorem ipsum dolor sit amet, lacus nulla ac netus nibh aliquet, porttitor ligula justo', 1.858, 2.487, 2.892, 0.555, {size:9,color:WHITE,font:LATO,valign:'middle',lh:1.5});
+  text(s, 'Slide with Image!', 9.237, 1.327, 3.986, 1.178, {...T32dk});
+  line(s, 9.721, 3.081, 0, 0.528, [GOLD]);
+  text(s, L3, 9.966, 2.913, 2.809, 1.237, {...T9dkP});
+  rect(s, 1.045, 5.214, 3.079, 0.841, GREEN);
+  icon(s, 'truckBox', 1.622, 5.559, 0.113, 0.163, WHITE);
+  icon(s, 'truck', 1.211, 5.393, 0.595, 0.529, WHITE);
+  line(s, 2.053, 5.489, 0, 0.369, [WHITE]);
+  text(s, 'Free Shiping!', 2.194, 5.489, 1.687, 0.369, {...T16wh});
+  rect(s, 5.093, 5.214, 3.079, 0.841, GREEN);
+  line(s, 6.1, 5.489, 0, 0.369, [WHITE]);
+  text(s, 'Big Deals!', 6.241, 5.489, 1.687, 0.369, {...T16wh});
+  rect(s, 8.95, 5.214, 3.079, 0.841, GREEN);
+  line(s, 9.957, 5.489, 0, 0.369, [WHITE]);
+  icon(s, 'medal', 5.378, 5.388, 0.445, 0.511, WHITE);
+  icon(s, 'saleTag', 9.218, 5.489, 0.575, 0.402, WHITE);
+  text(s, 'Big Discount!', 10.121, 5.489, 1.687, 0.369, {...T16wh});
+  rect(s, 1.048, 3.324, 2.19, 0.447, GRAY);
+  text(s, 'Buy Now', 1.83, 3.385, 1.206, 0.337, {...T14whR});
+  icon(s, 'saleTag', 1.309, 3.417, 0.373, 0.261, WHITE);
+  line(s, 1.893, 3.417, 0, 0.261, [WHITE]);
+  text(s, 'Lorem ipsum dolor sit!', 1.045, 4.546, 3.297, 0.404, {color:DARK,font:PO});
+  text(s, L3, 0.979, 6.318, 8.701, 0.555, {...T9dkP});
+}
+
+// ---------------------------------------------------------- slide 25
+function slide25(s) {
+  rect(s, 0.978, 0.218, 11.619, 3.667, GREEN);
+  rect(s, 1.044, 5.325, 3.079, 0.841, GREEN);
+  icon(s, 'truckBox', 1.62, 5.67, 0.113, 0.163, WHITE);
+  icon(s, 'truck', 1.209, 5.504, 0.595, 0.529, WHITE);
+  line(s, 2.051, 5.601, 0, 0.369, [WHITE]);
+  text(s, 'Free Shiping!', 2.192, 5.601, 1.687, 0.369, {...T16wh});
+  rect(s, 5.091, 5.325, 3.079, 0.841, GREEN);
+  line(s, 6.099, 5.601, 0, 0.369, [WHITE]);
+  text(s, 'Big Deals!', 6.24, 5.601, 1.687, 0.369, {...T16wh});
+  rect(s, 8.948, 5.325, 3.079, 0.841, GREEN);
+  line(s, 9.956, 5.601, 0, 0.369, [WHITE]);
+  icon(s, 'medal', 5.377, 5.499, 0.445, 0.511, WHITE);
+  icon(s, 'saleTag', 9.216, 5.601, 0.575, 0.402, WHITE);
+  text(s, 'Big Discount!', 10.119, 5.601, 1.687, 0.369, {...T16wh});
+  text(s, 'Lorem ipsum dolor sit!', 1.044, 4.657, 3.297, 0.404, {color:DARK,font:PO});
+  text(s, L3, 0.978, 6.429, 8.701, 0.555, {...T9dkP});
+  rect(s, 1.805, 0.887, 10.095, 3.496, WASH);
+  text(s, 'Customer Service', 3.88, 1.226, 5.887, 0.841, {size:44,color:WHITE,font:PO});
+  line(s, 6.109, 2.19, 1.427, 0, [AMBER]);
+  text(s, L3, 3.96, 2.466, 5.655, 0.783, {...T9whCP});
+}
+
+// ---------------------------------------------------------- slide 26
+function slide26(s) {
+  text(s, 'Info data 01', 8.201, 1.149, 2.162, 0.505, {...T24dk,nowrap:1});
+  text(s, 'Info data 02', 8.201, 2.995, 2.22, 0.505, {...T24dk,nowrap:1});
+  text(s, 'Info data 03', 8.201, 4.842, 2.23, 0.505, {...T24dk,nowrap:1});
+  icon(s, 'petalC', 2.472, 3.771, 3.465, 2.213, GOLD);
+  icon(s, 'petalB', 4.272, 1.389, 2.47, 3.213, GREEN);
+  icon(s, 'petalA', 1.671, 1.389, 2.467, 3.213, GRAY);
+  icon(s, 'handshake', 3.631, 4.488, 1.155, 0.681, ICE);
+  icon(s, 'growth', 4.694, 2.748, 0.943, 0.729, ICE);
+  icon(s, 'people', 2.822, 2.731, 0.787, 0.78, ICE);
+  [1.813, 3.939, 5.752].forEach(function (c) {
+    line(s, 8.451, c, 0, 0.412, [GOLD]);
+    text(s, L4, 8.601, c - 0.16, 2.809, 0.783, {...T9dkP});
+  });
+}
+
+// ---------------------------------------------------------- slide 27
+function slide27(s) {
+  icon(s, 'wedgeC', 2.203, 4.589, 4.507, 1.88, GOLD);
+  icon(s, 'wedgeB', 4.847, 1.13, 2.741, 4.443, GREEN);
+  icon(s, 'wedgeA', 2.07, 1.042, 3.279, 3.431, GRAY);
+  icon(s, 'handshake', 3.996, 5.13, 1.352, 0.797, ICE);
+  icon(s, 'growth', 5.906, 2.647, 1.104, 0.853, ICE);
+  icon(s, 'people', 2.729, 2.628, 0.922, 0.913, ICE);
+  text(s, 'Info data 01', 8.201, 1.149, 2.162, 0.505, {...T24dk,nowrap:1});
+  text(s, 'Info data 02', 8.201, 2.995, 2.22, 0.505, {...T24dk,nowrap:1});
+  text(s, 'Info data 03', 8.201, 4.842, 2.23, 0.505, {...T24dk,nowrap:1});
+  [1.813, 3.939, 5.752].forEach(function (c) {
+    line(s, 8.451, c, 0, 0.412, [GOLD]);
+    text(s, L4, 8.601, c - 0.16, 2.809, 0.783, {...T9dkP});
+  });
+}
+
+// ---------------------------------------------------------- slide 28
+function slide28(s) {
+  text(s, 'S.W.O.T Analysis!', 3.926, 1.147, 5.644, 0.774, {size:40,bold:1,color:DARK,font:PSB});
+  text(s, 'Lorem Ipsum.', 5.324, 1.824, 2.17, 0.37, {size:16,bold:1,color:DARK,font:PO,align:'center'});
+  [[1.723, 'S'], [4.524, 'W'], [7.371, 'O'], [9.996, 'T']].forEach(function (c) {
+    text(s, c[1], c[0], 2.876, 1.462, 1.717, {...T96bdkC});
+  });
+  text(s, 'Strengh', 1.596, 4.593, 1.62, 0.438, {...T20bgoC});
+  [1.213, 4.105, 6.908, 9.531].forEach(function (c) {
+    text(s, L1, c, 5.03, 2.388, 0.825, {...T10slCP});
+  });
+  text(s, 'Weakness', 4.35, 4.593, 1.89, 0.438, {...T20bgoC});
+  text(s, 'Opportunity', 7.116, 4.593, 1.97, 0.438, {...T20bgoC});
+  text(s, 'Threats', 9.957, 4.593, 1.62, 0.438, {...T20bgoC});
+  [3.248, 6.223, 8.957].forEach(function (c) {
+    icon(s, 'chevOutline', c, 3.42, 1.05, 0.485, {fill:GREEN,rot:90});
+    icon(s, 'chevBarTop', c + 0.05, 3.39, 0.526, 0.212, {fill:GOLD,rot:90});
+    icon(s, 'chevBarBot', c + 0.05, 3.724, 0.526, 0.212, {fill:GOLD,rot:90});
+  });
+}
+
+// ---------------------------------------------------------- slide 29
+function slide29(s) {
+  icon(s, 'arw02', 3.579, 3.087, 0.973, 0.793, GREEN);
+  icon(s, 'arw03', 3.842, 2.419, 1.019, 1.033, GRAY);
+  icon(s, 'arw04', 4.488, 2.165, 0.798, 0.978, GREEN);
+  icon(s, 'arw05', 5.373, 2.165, 0.798, 0.978, GRAY);
+  icon(s, 'arw06', 5.802, 2.419, 1.028, 1.033, GREEN);
+  icon(s, 'arw07', 6.106, 3.078, 0.973, 0.844, GRAY);
+  rect(s, 6.226, 3.98, 0.853, 0.521, GREEN);
+  icon(s, 'arw09', 3.077, 3.968, 1.84, 2.195, GREEN);
+  icon(s, 'arw10', 8.753, 4.605, 0.973, 0.789, GRAY);
+  icon(s, 'arw11', 8.449, 5.033, 1.019, 1.033, GOLD);
+  icon(s, 'arw12', 8.02, 5.338, 0.802, 0.978, GRAY);
+  icon(s, 'arw13', 7.135, 5.338, 0.798, 0.978, GOLD);
+  icon(s, 'arw14', 6.48, 5.033, 1.028, 1.033, GRAY);
+  icon(s, 'arw15', 6.226, 4.558, 0.973, 0.848, GOLD);
+  icon(s, 'arw16', 8.394, 2.34, 1.84, 2.177, GOLD);
+  text(s, 'Infographic', 4.173, 0.591, 5.08, 0.774, {size:40,color:GRAY,font:PO,align:'center'});
+  text(s, [['Unique',{size:13,bold:1,color:GRAY,font:PO}],[L22,{...T9gy}]], 10.273, 2.165, 2.102, 0.926, {});
+  text(s, [['69%',{...T26gy}],['Data Base',{...T9bgy}],[L10,{...T9gy}]], 10.273, 3.889, 2.102, 1.144, {});
+  text(s, [['75%',{...T26gy}],['Data Base',{...T9bgy}],[L10,{...T9gy}]], 10.273, 5.094, 2.102, 1.144, {});
+  text(s, [['Costumer',{size:13,bold:1,color:GRAY,font:PO}],[L22,{...T9gy}]], 0.958, 5.477, 2.118, 0.926, {align:'right'});
+  text(s, [['95%',{...T26gy}],['Data Base',{...T9bgy}],[L10,{...T9gy}]], 0.958, 2.165, 2.079, 1.144, {align:'right'});
+  text(s, [['60%',{...T26gy}],['Data Base',{...T9bgy}],[L10,{...T9gy}]], 0.958, 3.37, 2.079, 1.144, {align:'right'});
+}
+
+// ---------------------------------------------------------- slide 30
+function slide30(s) {
+  text(s, 'Our Vision!', 1.059, 0.882, 3.881, 0.707, {size:36,color:DARK,font:PSB,cs:3});
+  text(s, L3, 1.798, 1.635, 3.806, 1.01, {...T9dkP});
+  line(s, 1.515, 1.891, 0, 0.412, [GOLD]);
+  text(s, 'Vision 1', 6.239, 3.802, 1.138, 0.383, {...T16wh,fill:GREEN});
+  text(s, L1, 6.695, 4.323, 2.54, 0.783, {...T9dkP});
+  icon(s, 'mapPin', 6.223, 4.429, 0.415, 0.57, GREEN);
+  icon(s, 'compass', 6.223, 6.185, 0.486, 0.487, GREEN);
+  text(s, 'Vision 2', 6.275, 5.59, 1.138, 0.383, {...T16wh,fill:GREEN});
+  text(s, L1, 6.73, 6.037, 2.54, 0.783, {...T9dkP});
+  text(s, 'Vision 3', 9.456, 3.802, 1.138, 0.383, {...T16wh,fill:GREEN});
+  text(s, L1, 9.912, 4.323, 2.54, 0.783, {...T9dkP});
+  text(s, 'Vision 4', 9.492, 5.59, 1.138, 0.383, {...T16wh,fill:GREEN});
+  text(s, L1, 9.948, 6.037, 2.54, 0.783, {...T9dkP});
+  icon(s, 'gift', 9.517, 6.185, 0.371, 0.407, GREEN);
+  icon(s, 'wallet', 9.441, 4.486, 0.446, 0.368, GREEN);
+}
+
+// ---------------------------------------------------------- slide 31
+function slide31(s) {
+  icon(s, 'compass', 1.389, 4.67, 0.486, 0.487, GREEN);
+  text(s, 'mission 1', 1.441, 4.075, 1.452, 0.37, {...T16wh,fill:GREEN});
+  text(s, L1, 1.896, 4.522, 2.54, 0.783, {...T9dkP});
+  text(s, L1, 9.642, 4.522, 2.54, 0.783, {...T9dkP});
+  text(s, L1, 5.757, 4.522, 2.54, 0.783, {...T9dkP});
+  icon(s, 'gift', 5.326, 4.67, 0.371, 0.407, GREEN);
+  icon(s, 'wallet', 9.171, 4.685, 0.446, 0.368, GREEN);
+  text(s, 'mission 2', 5.326, 4.075, 1.452, 0.37, {...T16wh,fill:GREEN});
+  text(s, 'mission 3', 9.171, 4.075, 1.452, 0.37, {...T16wh,fill:GREEN});
+  icon(s, 'truckBox', 1.7, 6.545, 0.093, 0.123, GREEN);
+  icon(s, 'truck', 1.364, 6.42, 0.486, 0.398, GREEN);
+  icon(s, 'saleTag', 5.259, 6.461, 0.439, 0.307, GREEN);
+  icon(s, 'medal', 9.171, 6.367, 0.392, 0.45, GREEN);
+  [[1.441, 'mission 4'], [5.326, 'mission 5'], [9.171, 'mission 6']].forEach(function (c) {
+    text(s, c[1], c[0], 5.795, 1.452, 0.37, {...T16wh,fill:GREEN});
+    text(s, L1, c[0] + 0.455, 6.242, 2.54, 0.783, {...T9dkP});
+  });
+  rect(s, 0.937, 0.683, 11.476, 2.455, WASH);
+  text(s, 'Our Mission!', 4.567, 1.195, 3.881, 0.707, {size:36,color:WHITE,font:PSB,cs:3});
+  line(s, 6.179, 1.913, 0.853, 0, [GOLD]);
+  text(s, L1, 4.037, 1.99, 4.941, 0.555, {size:9,color:WHITE,font:PSB,align:'center',lh:1.5});
+}
+
+// ---------------------------------------------------------- slide 32
+function slide32(s) {
+  icon(s, 'imacBody', 1.151, 2.817, 4.741, 2.867, '181818');
+  icon(s, 'imacBezel', 1.336, 3.012, 4.372, 2.474, '0C0D11');
+  icon(s, 'imacScreen', 1.336, 3.012, 4.372, 2.474, null);
+  rect(s, 1.357, 3.033, 4.33, 2.433, 'EFEFEF');
+  icon(s, 'imacNeck', 2.716, 6.57, 1.596, 0.065, '181818');
+  icon(s, 'imacStand', 2.707, 6.069, 1.611, 0.552, 'D2D3D5');
+  oval(s, 3.489, 2.896, 0.065, 0.065, '2C2C2C');
+  oval(s, 3.489, 2.892, 0.065, 0.065, '0A0A0A');
+  oval(s, 3.5, 2.903, 0.044, 0.042, '000000');
+  oval(s, 3.512, 2.911, 0.021, 0.025, '2C99B4');
+  oval(s, 3.519, 2.921, 0.006, 0.006, WHITE);
+  icon(s, 'imacStandLit', 2.707, 6.069, 1.302, 0.552, 'A8A9AA');
+  icon(s, 'imacBase', 1.151, 5.683, 4.741, 0.451, 'D2D3D5');
+  text(s, 'Mock up Slide.', 1.253, 1.165, 3.999, 0.707, {size:36,bold:1,color:GRAY,font:PSB});
+  text(s, '85%', 6.679, 2.217, 0.924, 0.924, {...T13bgyCM,line:[GOLD,6],oval:1});
+  ring(s, 6.679, 2.217, 0.924, 275.3, GREEN, 6);
+  line(s, 7.603, 2.679, 0.686, 0, [SLATE,0.5,'dash']);
+  text(s, '50%', 6.679, 3.885, 0.924, 0.924, {...T13bgyCM,line:[GOLD,6],oval:1});
+  ring(s, 6.679, 3.885, 0.924, 181.1, GREEN, 6);
+  line(s, 7.603, 4.347, 0.686, 0, [SLATE,0.5,'dash']);
+  text(s, '92%', 6.679, 5.552, 0.924, 0.924, {...T13bgyCM,line:[GOLD,6],oval:1});
+  ring(s, 6.679, 5.552, 0.924, 328.6, GREEN, 6);
+  line(s, 7.603, 6.014, 0.686, 0, [SLATE,0.5,'dash']);
+  text(s, L1, 1.882, 1.939, 3.547, 0.555, {...T9dkMP});
+  [2.449, 4.162, 5.856].forEach(function (c) {
+    text(s, 'Lorem Ipsum.', 8.389, c, 2.17, 0.37, {...T16bgy});
+    text(s, L1, 8.389, c + 0.254, 3.116, 0.525, {...T9gyP});
+  });
+  line(s, 1.746, 2.101, 0, 0.232, [GOLD]);
+}
+
+// ---------------------------------------------------------- slide 33
+function slide33(s) {
+  icon(s, 'padBody', 8.086, 0.733, 4.229, 6.005, '333333');
+  icon(s, 'padInner', 8.111, 0.753, 4.183, 5.96, '181818');
+  oval(s, 10.162, 0.976, 0.076, 0.076, '2C2C2C');
+  oval(s, 10.162, 0.971, 0.076, 0.076, '0A0A0A');
+  oval(s, 10.177, 0.987, 0.046, 0.046, '000000');
+  oval(s, 10.187, 0.997, 0.025, 0.025, '2C99B4');
+  icon(s, 'padSpeck', 10.197, 1.007, 0.005, 0.005, WHITE);
+  rect(s, 10.081, 0.997, 0.036, 0.036, '464646');
+  rect(s, 8.339, 1.235, 3.726, 4.97, '0C0D11');
+  rect(s, 8.36, 1.256, 3.686, 4.929, 'EFEFEF');
+  oval(s, 10.045, 6.312, 0.315, 0.32, '333333');
+  icon(s, 'padHome', 10.121, 6.388, 0.162, 0.162, '181818');
+  text(s, 'Tablet Mockup', 1.534, 1.639, 3.996, 0.707, {size:36,color:GRAY,font:PSB,align:'center',nowrap:1});
+  text(s, L1, 1.53, 5.52, 2.253, 0.783, {...T9dkCP});
+  icon(s, 'wallet', 2.456, 4.439, 0.446, 0.368, GREEN);
+  icon(s, 'medal', 5.379, 4.398, 0.392, 0.45, GREEN);
+  text(s, L1, 4.437, 5.52, 2.253, 0.783, {...T9dkCP});
+  text(s, 'Lorem Ipsum', 1.891, 5.141, 1.702, 0.303, {size:12,color:WHITE,font:PO,align:'center',fill:GREEN});
+  text(s, 'Lorem Ipsum', 4.724, 5.138, 1.702, 0.303, {size:12,color:WHITE,font:PO,align:'center',fill:GREEN});
+  text(s, L9, 1.534, 2.607, 4.34, 1.01, {...T9dkMP});
+}
+
+// ---------------------------------------------------------- slide 34
+function slide34(s) {
+  rect(s, 5.725, 1.068, 7.608, 3.556, GREEN);
+  icon(s, 'mbFootL', 0.735, 6.58, 3.36, 0.148, 'B3B4B5');
+  icon(s, 'mbFootR', 4.045, 6.58, 3.36, 0.148, 'B3B4B5');
+  icon(s, 'mbLid', 1.392, 2.889, 5.405, 3.702, 'D2D3D5');
+  icon(s, 'mbLidInner', 1.411, 2.908, 5.371, 3.664, '181818');
+  icon(s, 'mbLidBar', 1.411, 6.416, 5.371, 0.156, '0C0D11');
+  rect(s, 0.735, 6.519, 6.671, 0.122, 'D2D6D7');
+  icon(s, 'mbNotch', 3.589, 6.519, 0.958, 0.068, 'B3B4B5');
+  rect(s, 1.59, 3.14, 5.013, 3.166, '0C0D11');
+  rect(s, 1.605, 3.159, 4.979, 3.132, 'EFEFEF');
+  oval(s, 4.064, 3.007, 0.057, 0.057, '2C2C2C');
+  oval(s, 4.064, 3.003, 0.057, 0.053, '0A0A0A');
+  oval(s, 4.076, 3.011, 0.034, 0.038, '000000');
+  oval(s, 4.083, 3.022, 0.019, 0.019, '2C99B4');
+  icon(s, 'mbSpeck', 4.091, 3.026, 0.004, 0.008, WHITE);
+  text(s, '92%', 11.384, 2.717, 1.01, 0.572, {size:28,bold:1,color:WHITE,font:PO,align:'center',nowrap:1});
+  rect(s, 10.705, 1, 2.329, 2.46, [WHITE,1]);
+  text(s, L15, 10.744, 1.572, 2.29, 1.01, {...T9whCP});
+  text(s, L15, 7.405, 3.404, 3.315, 0.783, {...T9whP});
+  text(s, L8, 7.62, 5.945, 2.425, 0.783, {size:9,color:INK2,font:LATO,align:'center',lh:1.5});
+  icon(s, 'badgeIcon', 8.515, 4.924, 0.561, 0.545, GREEN);
+  icon(s, 'cartIcon', 11.364, 4.918, 0.565, 0.552, GREEN);
+  text(s, 'Lorem Ipsum.', 8.058, 5.618, 1.548, 0.303, {size:12,color:DARK,font:PO,align:'center',valign:'middle'});
+  text(s, L15, 7.349, 2.547, 3.315, 0.783, {...T9whP});
+  text(s, L8, 10.611, 5.945, 2.425, 0.783, {size:9,color:INK2,font:LATO,align:'center',lh:1.5});
+  text(s, 'Lorem Ipsum.', 11.05, 5.618, 1.548, 0.303, {size:12,color:DARK,font:PO,align:'center',valign:'middle'});
+  text(s, 'Mac device slide!', 1.255, 0.891, 4.692, 1.717, {size:48,color:DARK,font:PSB});
+  text(s, 'Fruits make you healthy', 5.998, 1.388, 4.282, 1.043, {...T28wh});
+}
+
+// ---------------------------------------------------------- slide 35
+function slide35(s) {
+  text(s, 'Thanks', 7.667, 3.844, 4.692, 1.313, {size:72,color:DARK,font:PSB,cs:3,align:'center'});
+  text(s, 'Presentation Template', 7.879, 5.059, 4.269, 0.404, {color:DARK,font:PO,cs:3,align:'center'});
+  text(s, 'Rewind', 9.076, 6.065, 1.922, 0.404, {...TxwhC,fill:AMBER});
+  icon(s, 'chev', 8.423, 6.174, 0.21, 0.187, {fill:AMBER,flipH:1});
+  icon(s, 'chev', 8.218, 6.174, 0.21, 0.187, {fill:AMBER,flipH:1});
+  line(s, 9.397, 3.844, 1.175, 0, [AMBER]);
+}
+
+// ---------------------------------------------------------------- build
+const SLIDES = [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30, slide31, slide32, slide33, slide34, slide35];
+
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'W16x9', width: 40 / 3, height: 7.5 });  // 13.333in x 7.5in
+pptx.layout = 'W16x9';
+SLIDES.forEach(function (build) { build(pptx.addSlide()); });
+pptx.writeFile({ fileName: path.join(__dirname, OUT) })
+  .then(function (f) { console.log('wrote ' + f); });
