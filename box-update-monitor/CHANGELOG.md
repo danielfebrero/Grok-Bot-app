@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-11 00:50 (Paris) — snapshot `2026-10-10_22-51` → `2026-10-11_00-50`
+
+Versions touchées : agent-store-fuse `a009ba9` → `f37f6d4`. Image, box-scripts, sand-host, exec-daemon, Chrome inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** — —
+- **Change** — —
+- **Features** — —
+- **Perf** — —
+- **Autre/infra** — Bump agent-store-fuse (marqueur URL uniquement) : `a009ba9f779c…` → `f37f6d46833a…`. Rebuild opaque, classement hypothétique.
+
+Rapport : [reports/2026-10-11_00-50.md](reports/2026-10-11_00-50.md) — commit à venir
+
 ## 2026-10-10 22:51 (Paris) — snapshot `2026-10-10_17-49` → `2026-10-10_22-51`
 
 Versions touchées : sand-host `fd09280` → `f1727e3` ; agent-store-fuse `7356478` → `a009ba9` ; app 0.70.0-pre.18 → 0.71.0-pre.1. Image, box-scripts, exec-daemon, Chrome inchangés. Fichiers : +0 / −0 / ~6.
@@ -19,7 +31,7 @@ Versions touchées : sand-host `fd09280` → `f1727e3` ; agent-store-fuse `73564
 - **Perf** — Tracker de pression event-loop et suppression de sortie côté shell-exec (lisibles dans `sand-eval-runner.cjs`).
 - **Autre/infra** — `managed-skills/cache.json` : seul `fetchedAt` change. Bump agent-store-fuse (marqueur URL uniquement). Reste des bundles `host-main.cjs` / `sand-eval-runner.cjs` : rebuild opaque, classement hypothétique.
 
-Rapport : [reports/2026-10-10_22-51.md](reports/2026-10-10_22-51.md) — commit à venir
+Rapport : [reports/2026-10-10_22-51.md](reports/2026-10-10_22-51.md) — [commit b93da89](../../../commit/b93da895fb76abf70bfd8a2e7e0972d576c7e110)
 
 ## 2026-10-10 17:49 (Paris) — snapshot `2026-10-10_09-52` → `2026-10-10_17-49`
 
