@@ -1,0 +1,11 @@
+--- 2026-10-11_03-46:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-11_17-53:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -15613,7 +15613,7 @@
+     return proto3.util.equals(_GenerateVideoArgs, a, b);
+   }
+   static $() {
+-    return ["GenerateVideoArgs|1 prompt 9|2 file_path 9?|3 image_path 9?|4 reference_image_paths 9*|5 duration_seconds 13?|6 aspect_ratio 9?|7 resolution 9?"];
++    return ["GenerateVideoArgs|1 prompt 9|2 file_path 9?|3 image_path 9?|4 reference_image_paths 9*|5 duration_seconds 13?|6 aspect_ratio 9?|7 resolution 9?|8 last_frame_path 9?"];
+   }
+ };
+ var GenerateVideoResult = class _GenerateVideoResult extends __protoMessage374 {

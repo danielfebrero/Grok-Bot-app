@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-11 17:53 (Paris) — snapshot `2026-10-11_03-46` → `2026-10-11_17-53`
+
+Versions touchées : sand-host `f1727e3` → `7345aa4` (image, box-scripts, agent-store-fuse, exec-daemon, Chrome inchangés). Fichiers : +0 / −0 / ~7.
+
+- **Bugfix** : index content-search : `parseAgentId` avant purge des agents hors disque (au lieu d’un `typeof string` brut) ; shell bash : détection « pipe commande illisible » (fd 5 fermé par `$BASH_ENV` / `.zshenv`, exit 126) avec bascule vers passage en arguments.
+- **Change** : skill gérée `purchases` — section Credit cards (accepter / rappeler une carte avant checkout, ne jamais prétendre qu’elle est déjà sauvée hors Secure Form) ; `GetTeamMembersResponse.former_personal_owner_user_id` ; proto SCM `SCMMergeQueueStatus` ; check GTM MCP via `gtmApiProductionUrl` plutôt qu’hostname en dur.
+- **Features** : génération vidéo — champ `last_frame_path` / `last_frame` sur `GenerateVideoArgs` et `RunGenerateVideoRequest` ; dossier artefacts cloud `publish-preview/` (`CLOUD_AGENT_PUBLISH_PREVIEW_ARTIFACTS_DIR`).
+- **Perf** : —
+- **Autre/infra** : `managed-skills/cache.json` (fetchedAt + miroir description purchases). Reste des bundles `host-main.cjs` / `sand-eval-runner.cjs` : rebuild opaque, classement hypothétique.
+
+Rapport : [reports/2026-10-11_17-53.md](reports/2026-10-11_17-53.md) · commit à venir
+
 ## 2026-10-11 03:46 (Paris) — snapshot `2026-10-11_01-52` → `2026-10-11_03-46`
 
 Versions touchées : agent_store_fuse.commit `df6db54` → `f4c8738` (image, sand-host, exec-daemon inchangés).
@@ -19,7 +31,7 @@ Versions touchées : agent_store_fuse.commit `df6db54` → `f4c8738` (image, san
 - **Perf** : —
 - **Autre/infra** : pointeur `/usr/local/bin/cursor_agent_store_fuse_version` mis à jour vers l'archive agent-store-fuse `f4c8738` (rebuild opaque, classement hypothétique).
 
-Rapport : [reports/2026-10-11_03-46.md](reports/2026-10-11_03-46.md) · commit à venir
+Rapport : [reports/2026-10-11_03-46.md](reports/2026-10-11_03-46.md) · [commit d255132](../../../commit/d255132acc7f87082b855a7345af5406e65295cc)
 
 ## 2026-10-11 01:52 (Paris) — snapshot `2026-10-11_00-50` → `2026-10-11_01-52`
 

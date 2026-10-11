@@ -1,0 +1,604 @@
+/**
+ * "Steak House" food presentation template — 20 slides, 13.333 x 7.5 in.
+ * Rebuilt from scratch with pptxgenjs. Photographs in the original deck are
+ * replaced by flat grey placeholder rectangles labelled "[image]".
+ */
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+const RED = 'F10335'; // theme accent1
+const RED_MID = 'FD6182'; // accent1 lightened 60/40
+const RED_PALE = 'FE96AC'; // accent1 lightened 40/60
+const RED_DARK = 'B50228'; // accent1 at 75% luminance
+const RED_DEEP = '78011A'; // accent1 at 50% luminance
+const WHITE = 'FFFFFF';
+const BLACK = '000000';
+const INK = '030504'; // theme accent3 — the near-black page colour
+const PH_GREY = 'CCCCCC'; // stand-in for the template's photographs
+
+const HEAD = 'Archivo'; // display font
+const BODY = 'Work Sans'; // text font
+
+const NOLINE = { type: 'none' };
+
+/* ---------------------------------------------------------------- shorthands */
+// Filled shape without text. `o` may carry line/rotate/flipH/flipV/rectRadius.
+function box(s, shape, x, y, w, h, color, o) {
+  s.addShape(shape, Object.assign({ x, y, w, h, fill: color ? { color } : { type: 'none' }, line: NOLINE }, o));
+}
+
+// Text block. `runs` is a string or an array of pptxgenjs text run objects.
+// Every text frame in the source deck is "resize shape to fit text", hence fit.
+function txt(s, runs, x, y, w, h, o) {
+  s.addText(runs, Object.assign(
+    { x, y, w, h, fontFace: BODY, fontSize: 18, color: WHITE, valign: 'top', align: 'left', fit: 'resize' }, o));
+}
+
+// Filled shape with centred text inside it (a button, badge, calendar cell...).
+function tbox(s, shape, x, y, w, h, color, label, o) {
+  s.addText(label, Object.assign({
+    shape, x, y, w, h, fill: color ? { color } : { type: 'none' }, line: NOLINE,
+    fontFace: BODY, fontSize: 18, color: WHITE, align: 'center', valign: 'middle',
+  }, o));
+}
+
+// Body copy: 150% leading, justified, 10.5pt by default.
+function para(s, text, x, y, w, h, o) {
+  txt(s, text, x, y, w, h, Object.assign({ fontSize: 10.5, align: 'justify', lineSpacingMultiple: 1.5 }, o));
+}
+
+// Two-tone headline, e.g. "Best Our " + "Product".
+function headline(s, white, red, x, y, w, h, o) {
+  txt(s, [{ text: white, options: { color: WHITE } }, { text: red, options: { color: RED } }],
+    x, y, w, h, Object.assign({ fontFace: HEAD, fontSize: 37, bold: true, wrap: false }, o));
+}
+
+// Free-form polygon. `pts` holds [x,y] corners or [cx1,cy1,cx2,cy2,x,y] cubics,
+// all in 0..1 units of the shape's own bounding box.
+function poly(s, x, y, w, h, color, pts, o) {
+  const points = pts.map(p => p.length === 6
+    ? { x: p[4] * w, y: p[5] * h, curve: { type: 'cubic', x1: p[0] * w, y1: p[1] * h, x2: p[2] * w, y2: p[3] * h } }
+    : { x: p[0] * w, y: p[1] * h });
+  points.push({ close: true });
+  s.addShape('custGeom', Object.assign({ x, y, w, h, points, fill: { color }, line: NOLINE }, o));
+}
+
+/*
+ * pptxgenjs cannot set a preset shape's adjust handles, so the few shapes that
+ * rely on non-default handles are drawn as polygons. `adj` is the OOXML value
+ * divided by 100000; like PowerPoint it is measured against the shorter side.
+ */
+function skew(s, x, y, w, h, color, adj, o) { // parallelogram
+  const d = Math.min(w, h) * adj / w;
+  poly(s, x, y, w, h, color, [[d, 0], [1, 0], [1 - d, 1], [0, 1]], o);
+}
+function trap(s, x, y, w, h, color, adj, o) { // trapezoid
+  const d = Math.min(Math.min(w, h) * adj, w / 2) / w;
+  poly(s, x, y, w, h, color, [[0, 1], [d, 0], [1 - d, 0], [1, 1]], o);
+}
+function point(s, x, y, w, h, color, adj, o) { // homePlate (arrow-shaped tag)
+  const d = 1 - Math.min(w, h) * adj / w;
+  poly(s, x, y, w, h, color, [[0, 0], [d, 0], [1, 0.5], [d, 1], [0, 1]], o);
+}
+function arrowUp(s, x, y, w, h, color, shaft, head, o) { // upArrow
+  const yh = Math.min(w, h) * head / h; // head height, measured from the top
+  const x1 = (1 - shaft) / 2;
+  poly(s, x, y, w, h, color,
+    [[0, yh], [0.5, 0], [1, yh], [1 - x1, yh], [1 - x1, 1], [x1, 1], [x1, yh]], o);
+}
+function snipTRBL(s, x, y, w, h, color, adj, o) { // snip2DiagRect, top-right + bottom-left
+  const dx = Math.min(w, h) * adj / w;
+  const dy = Math.min(w, h) * adj / h;
+  poly(s, x, y, w, h, color, [[0, 0], [1 - dx, 0], [1, dy], [1, 1], [dx, 1], [0, 1 - dy]], o);
+}
+
+// Grey block standing in for a photograph. Pass label=false for the full-bleed
+// backdrops that sit under a dark tint, where a caption would show through.
+function photo(s, x, y, w, h, label) {
+  tbox(s, 'rect', x, y, w, h, PH_GREY, label === false ? '' : '[image]', { fontSize: 11, color: '9A9A9A' });
+}
+
+/* --------------------------------------------------------------------- logo */
+// Fork + knife mark, traced from the original freeforms (unit box coordinates).
+// The knife is one outline: the blade's inner notch is reached through a
+// zero-width channel at x=0.375 so it can be cut from a single path.
+const KNIFE = [[0.33, 0.01], [0.25, 0], [0.08, 0], [0.04, 0.03], [0, 0.05], [0, 1], [0.375, 1],
+  [0.375, 0.697], [0.375, 0.596], [0.583, 0.596], [0.542, 0.404], [0.375, 0.263], [0.375, 0.596],
+  [0.375, 0.697], [0.79, 0.697], [0.92, 0.7], [0.96, 0.69], [1, 0.68], [1, 0.65], [0.96, 0.48],
+  [0.92, 0.35], [0.79, 0.25], [0.71, 0.16], [0.46, 0.05]];
+const FORK = [[1, 0.2], [1, 0], [0.74, 0], [0.74, 0.2], [0.72, 0.25], [0.62, 0.28], [0.62, 0], [0.38, 0],
+  [0.38, 0.28], [0.28, 0.25], [0.26, 0.2], [0.26, 0], [0, 0], [0, 0.2], [0.03, 0.26], [0.1, 0.32],
+  [0.21, 0.36], [0.38, 0.38], [0.38, 1], [0.62, 1], [0.62, 0.38], [0.79, 0.36], [0.92, 0.32],
+  [0.97, 0.26]];
+
+/* -------------------------------------------------------------- white icons */
+// Each pictogram is a handful of preset shapes inside a 0..1 box.
+// Entry: [shape, x, y, w, h, drawInBackgroundColour?, rotate?]
+const GLYPHS = {
+  bowl: [['rect', 0, 0.34, 1, 0.1], ['trapezoid', 0.06, 0.46, 0.88, 0.44, 0, 180], ['ellipse', 0.42, 0.06, 0.16, 0.2]],
+  dish: [['round2SameRect', 0.08, 0.2, 0.84, 0.34], ['rect', 0.02, 0.56, 0.96, 0.1], ['rect', 0.12, 0.7, 0.76, 0.16]],
+  drink: [['triangle', 0.08, 0.06, 0.84, 0.46, 0, 180], ['rect', 0.46, 0.5, 0.08, 0.34], ['rect', 0.24, 0.86, 0.52, 0.1]],
+  globe: [['ellipse', 0, 0, 1, 1], ['ellipse', 0.08, 0.08, 0.84, 0.84, 1], ['rect', 0.08, 0.44, 0.84, 0.12],
+    ['rect', 0.16, 0.24, 0.68, 0.08], ['rect', 0.16, 0.68, 0.68, 0.08],
+    ['ellipse', 0.3, 0.08, 0.4, 0.84], ['ellipse', 0.38, 0.16, 0.24, 0.68, 1]],
+  doc: [['rect', 0.1, 0, 0.8, 1], ['rect', 0.24, 0.16, 0.4, 0.09, 1], ['rect', 0.24, 0.34, 0.52, 0.09, 1],
+    ['ellipse', 0.42, 0.52, 0.5, 0.44, 1], ['ellipse', 0.46, 0.56, 0.42, 0.36]],
+  chart: [['rect', 0.08, 0, 0.12, 1], ['rect', 0.08, 0.88, 0.92, 0.12], ['rect', 0.3, 0.6, 0.5, 0.14],
+    ['rect', 0.3, 0.36, 0.68, 0.14], ['rect', 0.3, 0.12, 0.34, 0.14]],
+  house: [['triangle', 0, 0, 1, 0.42], ['rect', 0.12, 0.4, 0.76, 0.6], ['rect', 0.44, 0.52, 0.12, 0.36, 1],
+    ['ellipse', 0.36, 0.58, 0.28, 0.18, 1]],
+  cart: [['rect', 0, 0.06, 0.22, 0.12], ['trapezoid', 0.18, 0.22, 0.82, 0.42, 0, 180],
+    ['ellipse', 0.32, 0.72, 0.18, 0.2], ['ellipse', 0.68, 0.72, 0.18, 0.2]],
+  laptop: [['rect', 0.12, 0.1, 0.76, 0.56], ['rect', 0.22, 0.2, 0.56, 0.36, 1], ['rect', 0, 0.72, 1, 0.14]],
+  hand: [['ellipse', 0.3, 0, 0.4, 0.4], ['ellipse', 0.38, 0.08, 0.24, 0.24, 1], ['rect', 0.47, 0.1, 0.06, 0.2],
+    ['trapezoid', 0.04, 0.5, 0.92, 0.28, 0, 180], ['rect', 0.16, 0.82, 0.68, 0.12]],
+  pin: [['ellipse', 0.1, 0, 0.8, 0.8], ['triangle', 0.3, 0.6, 0.4, 0.4, 0, 180], ['ellipse', 0.34, 0.22, 0.32, 0.34, 1]],
+  coins: [['ellipse', 0.04, 0.02, 0.92, 0.24], ['ellipse', 0.04, 0.37, 0.92, 0.24], ['ellipse', 0.04, 0.72, 0.92, 0.24],
+    ['rect', 0.04, 0.14, 0.92, 0.1], ['rect', 0.04, 0.49, 0.92, 0.1], ['rect', 0.04, 0.84, 0.92, 0.1]],
+  phone: [['ellipse', 0.04, 0.06, 0.26, 0.26], ['ellipse', 0.7, 0.06, 0.26, 0.26], ['rect', 0.16, 0.14, 0.68, 0.12],
+    ['round2SameRect', 0.1, 0.34, 0.8, 0.5], ['ellipse', 0.38, 0.46, 0.24, 0.24, 1]],
+  mail: [['rect', 0, 0.14, 1, 0.72], ['triangle', 0.06, 0.2, 0.88, 0.46, 1, 180]],
+  web: [['ellipse', 0, 0, 1, 1], ['ellipse', 0.1, 0.1, 0.8, 0.8, 1], ['rect', 0.1, 0.44, 0.8, 0.12],
+    ['ellipse', 0.3, 0.1, 0.4, 0.8], ['ellipse', 0.38, 0.18, 0.24, 0.64, 1]],
+};
+
+function glyph(s, name, x, y, size, bg) {
+  GLYPHS[name].forEach(([shape, gx, gy, gw, gh, useBg, rot]) => s.addShape(shape, {
+    x: x + gx * size, y: y + gy * size, w: gw * size, h: gh * size,
+    fill: { color: useBg ? bg : WHITE }, line: NOLINE, rotate: rot || 0,
+  }));
+}
+
+/* --------------------------------------------------------- shared top chrome */
+const NAV_LINKS = [
+  { t: 'Menu', x: 5.1343, w: 0.5946 },
+  { t: 'About', x: 6.2208, w: 0.6315 },
+  { t: 'Categories', x: 7.3441, w: 0.9593 },
+  { t: 'New Product', x: 8.7952, w: 1.1328 },
+];
+
+// The navigation bar + wordmark that repeats on every slide.
+function chrome(s, contactFill) {
+  box(s, 'rect', 10.6065, 0, 1.5779, 0.8785, contactFill || RED);
+  txt(s, 'Steak', 1.4367, 0.3105, 0.7419, 0.3366, { fontFace: HEAD, fontSize: 14, bold: true, wrap: false });
+  txt(s, 'House', 1.4367, 0.5419, 0.8103, 0.3366, { fontFace: HEAD, fontSize: 14, bold: true, color: RED, wrap: false });
+  poly(s, 1.1721, 0.4262, 0.1333, 0.3366, RED, FORK);
+  poly(s, 1.3535, 0.4262, 0.0834, 0.3366, RED, KNIFE);
+  NAV_LINKS.forEach(l => txt(s, l.t, l.x, 0.4573, l.w, 0.2777, { fontSize: 10.5, wrap: false }));
+  txt(s, 'Contact', 11.0096, 0.4556, 0.7717, 0.2777, { fontSize: 10.5, align: 'center', wrap: false });
+}
+
+// "Infographic Section" heading used by slides 9-18.
+function infographicTitle(s, x, y, w, align) {
+  headline(s, 'Infographic ', 'Section', x, y, w, 0.7237, { align: align || 'center', wrap: true });
+}
+
+/* ------------------------------------------------------------- lorem strings */
+const L_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut '
+  + 'eiusmod tempor incididunt ut consectetur consectetur';
+const L_CARD = 'Lorem ipsum dolor sit amet, consectetuer adi piscing elit. ipsum ipsum dolor sit Maecenas';
+const L_BANNER = 'Lorem ipsum dolor sit amet, consectetuer adi piscing elit. ipsum ipsum dolor sit Maecenas '
+  + 'porttmassa. Fusce posuere, magna sedipsum';
+const L_PRICE = 'Lorem ipsum dolor sit amet, cons ectetuer adipiscing elit. Maecenas porttmassa. Fusce posuere, '
+  + 'magna sed pulvinar osuere, magna pulvinar osuere, magna';
+const L_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod';
+const L_TINY = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, ';
+const L_LABEL = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit';
+const L_TILE = 'Lorem ipsum dolor sit amet, consectetuer adi piscing elit. ipsum ipsum dolor sit';
+
+/* ==================================================================== slides */
+
+// 1 — cover
+function slide01(s) {
+  photo(s, 1.1489, 1.189, 11.0355, 5.1721, false);
+  box(s, 'rect', 1.1721, 1.189, 11.0123, 5.1721, null, { fill: { color: BLACK, transparency: 10 } });
+  photo(s, 3.1368, 1.7745, 5.9158, 3.8459);
+  txt(s, 'Barbercue', 0.752, 5.5972, 0.9365, 0.2777, { fontSize: 10.5, rotate: 270, wrap: false });
+  txt(s, 'Beefsteak', 0.7625, 1.6356, 0.9155, 0.2777, { fontSize: 10.5, rotate: 270, wrap: false });
+  box(s, 'rect', 3.1368, 5.6204, 5.9158, 0.5116, RED);
+  box(s, 'rect', 7.6842, 2.1796, 4.5002, 3.0356, null,
+    { fill: { color: INK, transparency: 27 }, line: { color: RED, width: 1 } });
+  tbox(s, 'rect', 2.6031, 3.1974, 1, 1, RED, '75%', { fontSize: 20, bold: true });
+  headline(s, 'Steak', ' House', 8.3034, 2.6372, 3.2593, 0.7068, { fontSize: 36 });
+  txt(s, 'Food Presentation Template', 8.3034, 3.3941, 3.1203, 0.7068);
+  [9.7801, 10.0556, 10.331].forEach(x => box(s, 'rect', x, 3.8859, 0.0648, 0.0648, RED));
+  tbox(s, 'rect', 8.4444, 4.3819, 2.162, 0.385, RED, 'Start Presentation', { fontSize: 12 });
+  s.addShape('line', { x: 4.4326, y: 5.8762, w: 3.3243, h: 0, line: { color: WHITE, width: 1 } });
+  box(s, 'rect', 5.2103, 5.8333, 1.7689, 0.0975, WHITE);
+  txt(s, '01', 3.9674, 5.7079, 0.4123, 0.3366, { fontSize: 14, bold: true, wrap: false });
+  txt(s, '11', 7.8209, 5.7145, 0.3702, 0.3366, { fontSize: 14, bold: true, wrap: false });
+  chrome(s);
+}
+
+// 2 — welcome / intro
+function slide02(s) {
+  photo(s, 0, 0, 13.3333, 7.5, false);
+  box(s, 'rect', 0, 0, 13.3333, 7.5, null, { fill: { color: BLACK, transparency: 20 } });
+  headline(s, 'Welcome To ', 'Steak House', 3.4049, 1.5677, 6.5235, 0.7237, { align: 'center' });
+  para(s, '\u201CLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut '
+    + 'eiusmod tempor incididunt ut consectetur\u201D', 3.4049, 2.7449, 6.5235, 0.6014,
+  { align: 'center', bold: true, italic: true });
+  txt(s, 'About Our Planning', 5.249, 3.9795, 2.8353, 0.4039, { bold: true, color: RED, align: 'center' });
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut eiusmod '
+    + 'tempor incididunt ut consectetur elit Aliquam tincidunt ante nec sem congue convallis. Pellentesque vel '
+    + 'mauris quis nisl ornare rutrum in id risus. Proin vehicula ut sem et tempus. Interdum et malesuada ac',
+  2.5193, 4.837, 8.2947, 0.8665, { align: 'center' });
+  chrome(s);
+}
+
+// 3 — vision & mission
+function slide03(s) {
+  headline(s, 'Vision & ', 'Mission', 1.0824, 1.2483, 4.2936, 0.7237);
+  txt(s, '1.  Vision Title', 1.0638, 2.5966, 1.9375, 0.4039, { bold: true, color: RED, wrap: false });
+  para(s, L_LONG, 1.0743, 3.206, 4.5092, 0.8665);
+  txt(s, '2. Mission Title', 1.0567, 4.6704, 2.1005, 0.4039, { bold: true, color: RED, wrap: false });
+  para(s, L_LONG, 1.0671, 5.2797, 4.5092, 0.8665);
+  box(s, 'rect', 12.1844, 1.3889, 1.1489, 4.7574, RED);
+  box(s, 'rect', 10.6065, 6.6215, 1.5779, 0.8785, RED);
+  photo(s, 7.0972, 1.3889, 5.0943, 4.7574);
+  chrome(s);
+}
+
+// 4 — facilities
+function slide04(s) {
+  headline(s, 'Best Our ', 'Facilities', 7.3324, 1.2483, 4.7161, 0.7237);
+  [['1.  Facilites', 2.6031, 2.8367, 3.2833], ['2.  Facilites', 4.5714, 4.8051, 5.2516]].forEach(([label, cy, ty, py]) => {
+    box(s, 'rect', 7.477, cy, 4.7074, 1.5512, null,
+      { fill: { color: BLACK, transparency: 20 }, line: { color: RED, width: 1 } });
+    txt(s, label, 7.9781, ty, 1.7243, 0.4039, { bold: true, color: RED });
+    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, do eiusmod tempor', 8.0096, py, 3.6737, 0.6014);
+  });
+  box(s, 'rect', 1.1489, 1.3889, 4.7074, 4.7338, RED);
+  photo(s, 1.385, 1.625, 2.7076, 4.2281);
+  photo(s, 4.3287, 1.625, 2.338, 2.0046);
+  photo(s, 4.3287, 3.8485, 2.338, 2.0046);
+  chrome(s);
+}
+
+// 5 — product list
+function slide05(s) {
+  headline(s, 'Best Our ', 'Product', 1.0508, 1.2272, 4.4409, 0.7237);
+  [['01', 2.5942, 2.6375], ['02', 3.967, 4.0103], ['03', 5.3398, 5.3831]].forEach(([n, by, ty]) => {
+    tbox(s, 'rect', 1.1568, by, 0.7742, 0.7742, RED, n, { fontSize: 24, bold: true });
+    para(s, 'Lorem ipsum dolor sit amet, consectetur elit, sed mauris', 2.1152, ty, 3.0558, 0.6014);
+  });
+  box(s, 'rect', 6.6667, 1.3789, 5.1146, 4.3433, RED);
+  photo(s, 6.9874, 1.6807, 5.1892, 4.4404);
+  chrome(s);
+}
+
+// 6 — team
+function slide06(s) {
+  box(s, 'rect', 6.0278, 0, 7.3056, 7.5, RED);
+  const cards = [
+    ['01', 6.6111, 1.3897, 2.8307, 2.2222, 6.7268, 1.5043],
+    ['02', 9.8525, 1.3897, 2.8307, 2.9565, 9.9557, 1.5043],
+    ['03', 6.6111, 3.9602, 2.8307, 2.9565, 6.7268, 4.0796],
+    ['04', 9.8525, 4.6944, 2.8307, 2.2222, 9.9557, 4.8111],
+  ];
+  cards.forEach(([, x, y, w, h]) => photo(s, x, y, w, h));
+  headline(s, 'Meet Our ', 'Team', 1.0508, 1.2272, 3.9623, 0.7237);
+  const team = [
+    ['1. Benjamin Shah', 1.0638, 2.416, 2.3091, 1.0743, 2.8359],
+    ['2. Francois Mercer', 1.0743, 3.5594, 2.5195, 1.0847, 3.9794],
+    ['3. Jamie Chastain', 1.0847, 4.7028, 2.4213, 1.0951, 5.1228],
+    ['4. Hadi Tampubolon', 1.0951, 5.8463, 2.7071, 1.1055, 6.2662],
+  ];
+  team.forEach(([name, nx, ny, nw, sx, sy]) => {
+    txt(s, name, nx, ny, nw, 0.4039, { bold: true, color: RED, wrap: false });
+    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing', sx, sy, 4.06, 0.3364, { italic: true });
+  });
+  cards.forEach(([n, , , , , bx, by]) => tbox(s, 'rect', bx, by, 0.5371, 0.5371, RED, n, { bold: true }));
+  chrome(s, INK);
+}
+
+// 7 — services
+function slide07(s) {
+  photo(s, 0, 0, 4.8787, 7.5);
+  box(s, 'rect', 3.5634, 1.3889, 3.1032, 2.3308, BLACK);
+  photo(s, 3.7301, 1.5556, 2.9366, 1.9931);
+  headline(s, 'Best Our ', 'Service', 7.3324, 1.2483, 4.3462, 0.7237);
+  para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut eiusmod',
+    7.3733, 2.3989, 4.8975, 0.6014);
+  [['1. Service', 1.1789, 2.1852, 1.3783, 1.6274, 'bowl', 1.3801, 4.0047],
+    ['2. Service', 4.8787, 5.885, 1.4203, 5.3272, 'dish', 5.0799, 3.9777],
+    ['3. Service', 8.6217, 9.6279, 1.4186, 9.0702, 'drink', 8.8228, 3.9669],
+  ].forEach(([label, cx, lx, lw, px, icon, ix, iy]) => {
+    box(s, 'rect', cx, 3.7429, 3.5474, 2.3308, BLACK, { line: { color: RED, width: 1 } });
+    box(s, 'rect', cx, 3.7415, 0.7655, 0.814, RED);
+    txt(s, label, lx, 4.1719, lw, 0.4039, { bold: true, color: RED, wrap: false });
+    para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor ut', px, 4.8744, 2.6504, 0.8665);
+    glyph(s, icon, ix, iy, 0.3632, RED);
+  });
+  chrome(s);
+}
+
+// 8 — portfolio
+function slide08(s) {
+  box(s, 'rect', 0, 4.5417, 2.7269, 2.9583, RED);
+  box(s, 'rect', 10.6065, 0, 2.7269, 2.9583, RED);
+  [[1.1489, 1.3789], [4.961, 1.3943], [8.7732, 1.4097]].forEach(([x, y]) =>
+    box(s, 'rect', x, y, 3.4112, 4.7263, INK, { line: { color: RED_DEEP, width: 1 } }));
+  [[1.3303, 1.5456], [5.1424, 1.561], [8.9545, 1.5764]].forEach(([x, y]) => photo(s, x, y, 3.0496, 4.378));
+  tbox(s, 'rect', 1.1489, 1.3789, 4.4596, 1.1571, RED, 'Best Portfolio', { fontFace: HEAD, fontSize: 37, bold: true });
+  chrome(s);
+}
+
+// 9 — pricing tables
+function slide09(s) {
+  infographicTitle(s, 1.0562, 1.2483, 3.9447, 'left');
+  para(s, L_PRICE, 1.0986, 3.126, 3.511, 1.2117, { fontSize: 11 });
+  para(s, L_PRICE, 1.0986, 4.9272, 3.511, 1.1821, { fontSize: 11 });
+  [['Medium', '$ 50 ', 5.698], ['Premium', '$ 100 ', 9.0726]].forEach(([plan, price, x]) => {
+    box(s, 'rect', x, 1.4132, 3.0791, 4.6961, RED);
+    txt(s, plan, x + 0.3303, 1.7092, 2.4244, 0.2861, { fontSize: 11, bold: true, align: 'center' });
+    txt(s, [{ text: price, options: { fontSize: 32 } }, { text: '/Month', options: { fontSize: 16 } }],
+      x + 0.1316, 1.9924, 2.8217, 0.6395, { bold: true, align: 'center' });
+    for (let i = 0; i < 5; i++) {
+      const y = 3.0033 + i * 0.4244;
+      box(s, 'ellipse', x + 0.8322 - i * 0.0041, y, 0.098, 0.098, WHITE);
+      txt(s, 'Your Service 0' + (i + 1), x + 1.0306 - i * 0.0041, y - 0.094, 1.3648, 0.2861, { fontSize: 11 });
+    }
+    tbox(s, 'rect', x + 0.3241, 5.2437, 2.4456, 0.5308, null, 'REGISTER NOW',
+      { fill: { color: WHITE, transparency: 90 }, fontSize: 12, bold: true });
+  });
+  chrome(s);
+}
+
+// 10 — three banner rows
+const BANNER = [[0.16, 0], [1, 0], [1, 0.899], [0.199, 0.899], [0.137, 0.899], [0.115, 1], [0.037, 0.998],
+  [0.037, 1], [0.021, 0.996], [0, 0.506], [0.008, 0.325], [0.032, 0.881], [0.118, 0.884], [0.16, 0.019]];
+
+function slide10(s) {
+  txt(s, 'Your Title Here', 0.7348, 3.7942, 3.0304, 1.1781, { fontSize: 32, bold: true, align: 'center' });
+  [[2.5694, 2.7404, 'globe'], [3.7781, 3.9484, 'doc'], [4.9867, 5.1213, 'chart']].forEach(([y, ty, icon]) => {
+    box(s, 'pentagon', 4.4783, y + 0.1379, 0.808, 0.7695, RED);
+    poly(s, 4.2762, y, 7.9043, 1.1274, RED, BANNER);
+    para(s, L_BANNER, 5.8817, ty, 5.8892, 0.6268, { fontSize: 11 });
+    glyph(s, icon, 4.708, y + 0.405, 0.345, RED);
+  });
+  infographicTitle(s, 3.8614, 1.4137, 5.6104);
+  chrome(s);
+}
+
+// 11 — stacked bar comparison
+function slide11(s) {
+  // [chip y, title y, body y]
+  [[2.5694, 2.4968, 2.7222], [3.5136, 3.406, 3.6313], [4.4577, 4.34, 4.5654], [5.4019, 5.3, 5.5254]]
+    .forEach(([y, ty, py], i) => {
+      skew(s, 1.2464, y, 0.96, 0.7105, i % 2 ? RED_MID : RED, 0.34365);
+      txt(s, 'Title Here', 2.4543, ty, 1.7185, 0.3702, { fontSize: 16, bold: true, color: RED });
+      para(s, L_SHORT, 2.4543, py, 3.387, 0.6028);
+    });
+  [[7.0228, '2023', [[2.5694, 0.7239, RED], [3.2934, 0.5934, RED_MID], [3.8868, 0.8864, RED], [4.7732, 0.5121, RED_MID]]],
+    [9.999, '2024', [[2.5694, 0.5281, RED], [3.0975, 1.017, RED_MID], [4.1145, 0.3798, RED], [4.4943, 0.791, RED_MID]]],
+  ].forEach(([x, label, segs]) => {
+    segs.forEach(([y, h, c]) => box(s, 'rect', x, y, 2.088, h, c));
+    txt(s, label, x + 0.4021, 5.2953, 1.2838, 0.375, { fontSize: 12, bold: true, align: 'center', lineSpacingMultiple: 1.5 });
+  });
+  txt(s, 'Sales Data', 6.7065, 5.702, 1.4369, 0.4167, { fontSize: 14, bold: true, lineSpacingMultiple: 1.5 });
+  s.addShape('line', { x: 6.5139, y: 5.7352, w: 5.7242, h: 0, line: { color: RED, width: 0.75 } });
+  s.addShape('line', { x: 6.6667, y: 2.5694, w: 0, h: 3.5429, flipV: true,
+    line: { color: RED, width: 0.75, endArrowType: 'triangle' } });
+  infographicTitle(s, 3.8614, 1.4137, 5.6104);
+  chrome(s);
+}
+
+// 12 — two snipped-corner cards
+function slide12(s) {
+  snipTRBL(s, 6.8254, 2.5694, 2.7778, 2.7639, RED, 0.29216);
+  snipTRBL(s, 3.7302, 3.3482, 2.7778, 2.7639, RED, 0.28641);
+  point(s, 3.4397, 2.8271, 1.1057, 0.5247, RED, 0.40924, { rotate: 270 });
+  point(s, 8.788, 5.3234, 1.1057, 0.5247, RED, 0.40924, { rotate: 90, flipV: true });
+  glyph(s, 'cart', 7.2604, 2.842, 0.55, RED);
+  glyph(s, 'house', 4.1746, 3.5947, 0.53, RED);
+  [[4.1746, 4.3948, 4.7154], [7.2974, 3.557, 3.8776]].forEach(([x, ty, py]) => {
+    txt(s, 'Title Here', x, ty, 1.7185, 0.3702, { fontSize: 16, bold: true });
+    para(s, L_TINY, x, py, 1.9248, 0.9044, { fontSize: 11 });
+  });
+  s.addShape('line', { x: 3.3655, y: 5.7755, w: 1.254, h: 0, flipH: true,
+    line: { color: RED, width: 0.75, endArrowType: 'triangle' } });
+  s.addShape('line', { x: 8.7138, y: 3.0171, w: 1.254, h: 0,
+    line: { color: RED, width: 1, endArrowType: 'triangle' } });
+  para(s, L_CARD, 1.063, 4.7108, 2.0956, 1.1821, { fontSize: 11 });
+  para(s, L_CARD, 10.1967, 2.7695, 2.0956, 1.1821, { fontSize: 11 });
+  infographicTitle(s, 3.8614, 1.4137, 5.6104);
+  chrome(s);
+}
+
+// 13 — calendar
+const CAL_X = [4.2735, 5.2761, 6.2787, 7.2814, 8.284, 9.2866, 10.2892];
+const CAL_Y = [4.2477, 4.8588, 5.4699, 6.0811, 6.6801];
+// Calendar body: a rectangle with two notches along the top edge for the rings.
+const CAL_BODY = [[0, 0], [0.098, 0], [0.098, 0.094], [0.138, 0.094], [0.138, 0], [0.789, 0], [0.789, 0.094],
+  [0.829, 0.094], [0.829, 0], [1, 0], [1, 1], [0, 1]];
+
+function slide13(s) {
+  box(s, 'rect', 11.8401, 2.913, 0.3369, 4.587, RED_MID);
+  poly(s, 3.5079, 2.913, 8.3911, 4.587, RED, CAL_BODY);
+  CAL_Y.forEach((y, r) => CAL_X.forEach((x, c) => {
+    const day = r * 7 + c + 1;
+    const highlighted = (r === 0 && c === 3) || (r === 1 && c === 4);
+    tbox(s, 'rect', x, y, 0.8443, 0.4741, highlighted ? BLACK : WHITE,
+      day <= 31 ? String(day).padStart(2, '0') : '',
+      { bold: true, color: c === 6 ? BLACK : RED });
+  }));
+  box(s, 'rect', 4.6152, 2.616, 0.3881, 0.7351, RED_MID);
+  box(s, 'rect', 10.4164, 2.616, 0.3881, 0.7351, RED_MID);
+  txt(s, 'Month', 6.8746, 3.2727, 1.6578, 0.4039, { bold: true, align: 'center' });
+  ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach((d, c) =>
+    txt(s, d, CAL_X[c], 3.8296, 0.8443, 0.3496, { fontSize: 14, align: 'center' }));
+  txt(s, 'Title Here', 1.0689, 3.0321, 1.8907, 0.3702, { fontSize: 16, bold: true, color: RED });
+  para(s, L_TINY, 1.069, 3.3878, 1.7324, 1.1821, { fontSize: 11 });
+  txt(s, 'Title Here', 1.0689, 4.7711, 1.8907, 0.3702, { fontSize: 16, bold: true, color: BLACK });
+  para(s, L_TINY, 1.069, 5.1268, 1.7324, 1.1821, { fontSize: 11 });
+  infographicTitle(s, 3.8614, 1.4137, 5.6104);
+  chrome(s);
+}
+
+// 14 — layered pyramid
+function slide14(s) {
+  // side wall of the bottom slab: hexagon with adj 0.42355 / vf 1.1547, turned on its side
+  poly(s, 2.5473, 2.1511, 2.604, 5.3336, RED_DARK,
+    [[0, 0.5], [0.42355, 0], [0.57645, 0], [1, 0.5], [0.57645, 1], [0.42355, 1]], { rotate: 90 });
+  box(s, 'flowChartDecision', 1.27, 3.3695, 5.1587, 2.1384, RED);
+  box(s, 'flowChartDecision', 1.9764, 2.8934, 3.7458, 1.5527, RED_MID);
+  box(s, 'flowChartDecision', 2.6272, 2.6076, 2.4522, 1.0165, RED_PALE);
+  [['573+', 3.3204, 4.8726, 0.5772, 20], ['249+', 3.3676, 3.8199, 0.5289, 18], ['110+', 3.3676, 2.9733, 0.4813, 16]]
+    .forEach(([label, x, y, h, sz]) =>
+      txt(s, label, x, y, 1.5116, h, { fontSize: sz, bold: true, align: 'center', rotate: -22.2256 }));
+  txt(s, 'Title Here', 3.7941, 5.3228, 1.7185, 0.3702, { fontSize: 16, bold: true, rotate: -21.793 });
+  [[RED_PALE, 2.6076, 2.5686, 2.8891], [RED_MID, 3.9437, 3.9046, 4.2252], [RED, 5.285, 5.2406, 5.5612]]
+    .forEach(([c, sy, ty, py]) => {
+      box(s, 'rect', 7.459, sy, 0.283, 0.2815, c);
+      txt(s, 'Title Here', 7.7657, ty, 1.7185, 0.3702, { fontSize: 16, bold: true, color: c });
+      para(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore',
+        7.7657, py, 4.5241, 0.6268, { fontSize: 11 });
+    });
+  infographicTitle(s, 3.8614, 1.4137, 5.6104);
+  chrome(s);
+}
+
+// 15 — four-blade pinwheel
+function slide15(s) {
+  [[4.8658, 3.1793, RED_DARK, true], [7.3906, 3.1793, RED_DARK, true],
+    [6.4801, 4.4434, RED_DARK, false], [3.9392, 4.4434, RED_DARK, false],
+    [3.7793, 4.4434, RED, false], [5.0406, 3.1793, RED, true],
+    [6.3255, 4.4434, RED, false], [7.5866, 3.1793, RED, true],
+  ].forEach(([x, y, c, flip]) =>
+    trap(s, x, y, 1.7992, 1.1413, c, 0.51545, { rotate: 315, flipV: flip }));
+  [[5.2907, 4.2591, 225], [6.4797, 4.2396, 315], [7.7668, 4.2591, 225]].forEach(([x, y, r]) =>
+    box(s, 'downArrow', x, y, 0.2083, 0.3125, RED, { rotate: r }));
+  [['01', 4.1994, 4.752], ['02', 5.367, 3.4972], ['03', 6.7544, 4.752], ['04', 7.9219, 3.4972]].forEach(([n, x, y]) =>
+    txt(s, n, x, y, 1.0915, 0.5722, { fontSize: 28, bold: true, align: 'center' }));
+  // captions: right-hand pair reads left-to-right, left-hand pair is right-aligned
+  [[9.058, 4.936, 5.2566, 'left', 'justify'], [10.1992, 2.6522, 2.9728, 'left', 'justify'],
+    [2.8882, 2.6522, 2.9728, 'right', 'right'], [1.8261, 4.936, 5.2566, 'right', 'right'],
+  ].forEach(([x, ty, py, titleAlign, bodyAlign]) => {
+    txt(s, 'Title Here', x, ty, 1.7185, 0.3702, { fontSize: 16, bold: true, color: RED, align: titleAlign });
+    para(s, L_LABEL, x, py, 1.7771, 1.1821, { fontSize: 11, align: bodyAlign });
+  });
+  infographicTitle(s, 3.8614, 1.4137, 5.6104);
+  chrome(s);
+}
+
+// 16 — funnel + four icon blurbs
+function slide16(s) {
+  poly(s, 1.1739, 4.6554, 2.832, 0.6892, RED, [[0, 0], [0.757, 0], [1, 1], [0, 1]]);
+  box(s, 'rect', 1.1739, 3.091, 3.7681, 0.6892, RED_PALE);
+  poly(s, 1.1739, 3.8732, 2.8211, 0.6892, RED, [[0, 0], [1, 0], [0.756, 1], [0, 1]]);
+  point(s, 3.4155, 3.8732, 1.5265, 1.4714, RED, 0.16667, { flipH: true });
+  box(s, 'rect', 1.1739, 5.4376, 3.7681, 0.6892, RED_MID);
+  box(s, 'triangle', 2.8299, 1.5563, 0.4561, 2.6361, RED, { rotate: 264.86, flipH: true });
+  [3.2505, 4.0306, 4.8149, 5.5971].forEach((y, i) =>
+    txt(s, 'Title Here', 1.282, y, i === 0 || i === 3 ? 2.1335 : 1.9124, 0.4039, { bold: true }));
+  txt(s, '2024', 3.634, 4.3901, 1.3413, 0.4039, { bold: true, align: 'center' });
+  [[7.1585, 2.6718, 3.0297, 6.1575, 2.754, RED_PALE, 'laptop', 6.3944, 2.9631],
+    [10.4768, 2.6718, 3.0297, 9.4757, 2.754, RED, 'hand', 9.7112, 2.9335],
+    [7.1585, 4.5868, 4.9447, 6.1575, 4.6691, RED, 'pin', 6.4203, 4.8396],
+    [10.4768, 4.5868, 4.9447, 9.4757, 4.6691, RED_PALE, 'coins', 9.7366, 4.881],
+  ].forEach(([tx, ty, py, px, pyy, c, icon, ix, iy]) => {
+    skew(s, px, pyy, 0.7929, 0.6892, c, 0.11579);
+    glyph(s, icon, ix, iy, 0.31, c);
+    txt(s, 'Title Here', tx, ty, 1.4156, 0.3029, { fontSize: 12, bold: true, color: RED });
+    para(s, L_TILE, tx, py, 1.8458, 1.4583, { fontSize: 11 });
+  });
+  infographicTitle(s, 3.8614, 1.4137, 5.6104);
+  chrome(s);
+}
+
+// 17 — four rising arrows
+function slide17(s) {
+  [['1', 1.5709, 3.75, RED, 1.8874, 5.4609, 2.1236, 4.4776, 1.4601, 2.5462, 2.904, RED_MID],
+    ['2', 4.3279, 2.5819, RED_MID, 4.6444, 4.2927, 4.8805, 3.3094, 4.2171, 5.1766, 5.5345, RED_MID],
+    ['3', 7.0848, 3.75, RED, 7.4013, 5.4609, 7.6375, 4.4776, 6.974, 2.5462, 2.904, RED],
+    ['4', 9.8418, 2.5819, RED_MID, 10.1582, 4.2927, 10.3944, 3.3094, 9.731, 5.1766, 5.5345, RED],
+  ].forEach(([n, ax, ay, c, px, py, nx, ny, tx, ty, byy, tc]) => {
+    arrowUp(s, ax, ay, 1.7619, 1.7109, c, 0.62612, 0.37388);
+    skew(s, px, py, 1.4454, 0.6677, c, 0.47371, { flipH: true });
+    txt(s, n, nx, ny, 1.4156, 1.7166, { fontSize: 96, bold: true });
+    txt(s, 'Title Here', tx, ty, 1.4156, 0.3029, { fontSize: 12, bold: true, color: tc });
+    para(s, 'Lorem ipsum dolor sit amet, adi piscing', tx, byy, 2.1422, 0.6268, { fontSize: 11 });
+  });
+  infographicTitle(s, 3.8614, 1.4137, 5.6104);
+  chrome(s);
+}
+
+// 18 — arched price tags
+const TAG = [[0, 1], [0, 0.339], [0, 0.152, 0.224, 0, 0.5, 0], [0.776, 0, 1, 0.152, 1, 0.339], [1, 1]];
+const TAG_HOOK = [[0.305, 0.052], [0.365, 0.019, 0.431, 0, 0.5, 0], [0.776, 0, 1, 0.298, 1, 0.665],
+  [1, 0.757, 0.986, 0.844, 0.961, 0.924], [0.93, 1], [0.936, 0.919],
+  [0.936, 0.579, 0.729, 0.304, 0.473, 0.304], [0.249, 0.304, 0.063, 0.515, 0.02, 0.795], [0.017, 0.828],
+  [0.01, 0.799], [0.004, 0.756, 0, 0.711, 0, 0.665], [0, 0.389, 0.126, 0.153, 0.305, 0.052]];
+
+function slide18(s) {
+  [[1.2698, '$89', RED], [4.0473, '$26', RED_DARK], [6.8247, '$18', RED], [9.6021, '$43', RED_DARK]]
+    .forEach(([x, price, c]) => {
+      box(s, 'rect', x + 0.0704, 3.402, 2.2857, 2.6932, RED_DEEP); // drop shadow behind the tag
+      poly(s, x, 2.5694, 2.2857, 3.3671, c, TAG);
+      box(s, 'roundRect', x + 0.9881, 2.7282, 0.3095, 0.3166, WHITE, { rectRadius: 0.5 });
+      poly(s, x + 1.2138, 2.6329, 1.34, 0.6078, c, TAG_HOOK, { rotate: 16.59 });
+      txt(s, price, x + 0.2342, 3.402, 1.4156, 0.7068, { fontSize: 36, bold: true });
+      txt(s, 'Title Here', x + 0.2342, 4.1291, 1.4156, 0.3029, { fontSize: 12, bold: true });
+      para(s, L_TILE, x + 0.2342, 4.4552, 1.8173, 1.4598, { fontSize: 11 });
+    });
+  infographicTitle(s, 3.8614, 1.4137, 5.6104);
+  chrome(s);
+}
+
+// 19 — contact
+function slide19(s) {
+  headline(s, 'Contact ', 'Us', 8.9219, 1.2483, 2.9437, 0.7237);
+  para(s, 'Lorem ipsum dolor sit amet, consectetur elit, sed do', 8.9628, 2.3042, 2.9028, 0.6014);
+  [['phone', '+123 4567 8910', 3.4818, 1.3344, 3.5697], ['mail', 'yourmail@mail.com', 4.5631, 1.643, 4.6552],
+    ['web', 'www.yourwebsite.com', 5.6444, 1.9042, 5.7365]].forEach(([icon, label, y, tw, ty]) => {
+    box(s, 'rect', 9.0296, y, 0.4619, 0.4619, RED);
+    box(s, 'rect', 9.6129, y, 2.3339, 0.4619, INK, { line: { color: RED, width: 1 } });
+    txt(s, label, 9.7442, ty, tw, 0.2861, { fontSize: 10.5 });
+    glyph(s, icon, 9.1542, y + 0.13, 0.21, RED);
+  });
+  box(s, 'rect', 0, 1.3895, 1.9462, 4.7169, RED, { line: { color: RED_DEEP, width: 1 } });
+  box(s, 'rect', 6.2981, 1.3895, 1.9462, 4.7169, RED, { line: { color: RED_DEEP, width: 1 } });
+  photo(s, 4.0561, 1.387, 3.0802, 2.1802);
+  photo(s, 1.17, 1.3895, 2.5142, 2.1802);
+  photo(s, 1.17, 3.9437, 3.0802, 2.1802);
+  photo(s, 4.6221, 3.9437, 2.5142, 2.1802);
+  chrome(s);
+}
+
+// 20 — thank you
+function slide20(s) {
+  photo(s, 1.1489, 1.3889, 11.0355, 4.7222, false);
+  box(s, 'rect', 1.1489, 1.3889, 11.0355, 4.7222, null, { fill: { color: BLACK, transparency: 10 } });
+  photo(s, 1.9583, 1.8194, 2.7639, 3.9306);
+  photo(s, 5.0598, 1.8194, 2.7639, 3.9306);
+  txt(s, 'Barbercue', 0.752, 5.5972, 0.9365, 0.2777, { fontSize: 10.5, rotate: 270, wrap: false });
+  txt(s, 'Beefsteak', 0.7625, 1.6356, 0.9155, 0.2777, { fontSize: 10.5, rotate: 270, wrap: false });
+  box(s, 'rect', 6.8748, 2.2322, 4.5002, 3.0356, null,
+    { fill: { color: INK, transparency: 27 }, line: { color: RED, width: 1 } });
+  headline(s, 'Thank ', 'You!', 7.494, 2.6897, 2.9297, 0.7068, { fontSize: 36 });
+  txt(s, 'For Watching Us', 7.494, 3.4466, 2.4949, 0.4039);
+  [7.62, 7.8955, 8.1709].forEach(x => box(s, 'rect', x, 3.9805, 0.0648, 0.0648, RED));
+  tbox(s, 'rect', 7.635, 4.2748, 2.162, 0.385, RED, 'Start Presentation', { fontSize: 12 });
+  tbox(s, 'rect', 9.0167, 5.6222, 3.1677, 0.4889, RED, 'See You Next time', { fontSize: 16 });
+  s.addShape('line', { x: 6.6667, y: 1.3889, w: 5.5177, h: 0, line: { color: RED, width: 0.75 } });
+  s.addShape('line', { x: 12.1844, y: 1.3889, w: 0, h: 2.3611, line: { color: RED, width: 0.75 } });
+  chrome(s);
+}
+
+/* ==================================================================== build */
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20];
+
+const pptx = new PptxGenJS();
+pptx.title = 'Steak House';
+pptx.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5 in
+pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+
+pptx.defineSlideMaster({ title: 'STEAK', background: { color: INK } });
+
+BUILDERS.forEach(build => build(pptx.addSlide({ masterName: 'STEAK' })));
+
+pptx.writeFile({ fileName: path.join(__dirname, '03d1fadf-ff2c-4037-8ff6-559f9b90d7f3_grok_final.pptx') })
+  .then(f => console.log('wrote', f));

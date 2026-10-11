@@ -1,0 +1,14 @@
+--- 2026-10-11_03-46:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-11_17-53:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -1975,8 +1975,9 @@
+     const onDisk = new Set(agentDirs);
+     const indexedRows = this.statements.listIndexedAgentIds.all();
+     for (const row of indexedRows) {
+-      if (typeof row.agentId !== "string") continue;
+-      if (!onDisk.has(row.agentId)) this.clearAgent(row.agentId);
++      const agentId = parseAgentId(row.agentId);
++      if (agentId === null) continue;
++      if (!onDisk.has(agentId)) this.clearAgent(agentId);
+     }
+     for (const agentId of agentDirs) {
+       if (!(0, import_node_fs.existsSync)(this.storeDbPath(agentId))) continue;
