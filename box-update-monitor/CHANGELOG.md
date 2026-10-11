@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-11 23:51 (Paris) — snapshot `2026-10-11_20-47` → `2026-10-11_23-51`
+
+Versions touchées : image / box-scripts `91a9d91` → `7345aa4` ; exec-daemon rebuild (build 2026-10-08 → 2026-10-11T15:02Z) ; canvas-sdk nouvelle version ; agent-store-fuse `e1fd3f3` → `0d66b5d` (sand-host, Chrome, Node, Python inchangés). Fichiers : +41 / −38 / ~144.
+
+- **Bugfix** : —
+- **Change** : `sand-web-bot-auth.mjs` — suppression des marqueurs/portée optionnelle `xhrFetch` / `iframes` (WEB_BOT_AUTH_DEFAULT_SCOPE retiré) ; doc canvas `reference.md` : notes de règle d’usage après `—` par composant, props `LineChart` étendues.
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : paquets Python numpy 2.5.3→2.5.4, onnxruntime 1.30.0→1.31.0, soupsieve 2.10→3.0.1 ; Debian libgs10 (Ghostscript) deb13u2→deb13u3 ; extension sand-webauthn-proxy mise à jour ; bundles exec-daemon / canvas-runtime / pnpm (rebuild opaque, classement hypothétique).
+
+Rapport : [reports/2026-10-11_23-51.md](reports/2026-10-11_23-51.md) — commit à venir
+
 ## 2026-10-11 20:47 (Paris) — snapshot `2026-10-11_17-53` → `2026-10-11_20-47`
 
 Versions touchées : agent-store-fuse `f4c8738` → `e1fd3f3` (image, sand-host, exec-daemon, Chrome inchangés). Fichiers : +0 / −0 / ~1.
@@ -19,7 +31,7 @@ Versions touchées : agent-store-fuse `f4c8738` → `e1fd3f3` (image, sand-host,
 - **Perf** : —
 - **Autre/infra** : `cursor_agent_store_fuse_version` pointe vers le nouveau tarball agent-store-fuse `e1fd3f3` (rebuild opaque, classement hypothétique).
 
-Rapport : [reports/2026-10-11_20-47.md](reports/2026-10-11_20-47.md) — commit à venir
+Rapport : [reports/2026-10-11_20-47.md](reports/2026-10-11_20-47.md) — commit [`8187157`](../../../commit/81871572a12f8a884e544f1c0e0bedd4f45de09b)
 
 ## 2026-10-11 17:53 (Paris) — snapshot `2026-10-11_03-46` → `2026-10-11_17-53`
 

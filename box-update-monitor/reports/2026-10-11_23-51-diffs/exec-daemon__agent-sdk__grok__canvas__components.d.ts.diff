@@ -1,0 +1,74 @@
+--- 2026-10-11_20-47:/exec-daemon/agent-sdk/grok/canvas/components.d.ts
++++ 2026-10-11_23-51:/exec-daemon/agent-sdk/grok/canvas/components.d.ts
+@@ -5,8 +5,9 @@
+  * summary, and sections of text, callouts, lists, tables, charts, and custom
+  * visuals. Neutral text, brand-colored data marks: text sits on the type
+  * scale in neutral ink, color in text marks only status, and chart marks take
+- * the Grok Bot data-viz palette (`useGrokTheme().dataviz`). No pills, tints,
+- * cards, logos, or decorative buttons inside the page.
++ * the Grok Bot data-viz palette (`useGrokTheme().dataviz`). Every chart sits
++ * in its own card, which the kit draws; no other pills, tints, cards, logos,
++ * or decorative buttons inside the page.
+  */
+ /** Color for a status word. No other text in a page is colored. */
+ export type Tone = "success" | "warning" | "danger";
+@@ -27,7 +28,7 @@
+      * a diagram; `full` spans the page. On a phone every width is the one column.
+      */
+     width?: PageWidth;
+-    /** `Section`s, 28 px apart. */
++    /** `Section`s, each 64 px below what precedes it; a block placed directly here keeps a block's spacing. */
+     children?: ReactNode;
+ }
+ /**
+@@ -55,13 +56,21 @@
+     collapsible?: boolean;
+     /** Start a collapsible section open. Closed by default. */
+     defaultOpen?: boolean;
+-    /** Its blocks: paragraphs, a callout, a list, a table, a chart, a `Grid`, or a custom visual. */
++    /**
++     * Its blocks: paragraphs, a callout, a list, a table, a chart, a `Grid`, a
++     * custom visual, or a `Section` for a sub-section under a smaller heading.
++     */
+     children?: ReactNode;
+ }
+ /**
+  * One section of a page: a heading, an optional caption, and its blocks,
+- * 10 px apart. `actions` end the heading line and wrap under it on a narrow
+- * page; a `collapsible` section folds its blocks behind a chevron.
++ * spaced by what they are: paragraphs 16 px apart, a list 24 px from the
++ * prose around it, a figure 32 px, a strip of metrics 40 px, two charts 12 px
++ * apart. Directly in the `Page` the heading is the section heading; inside
++ * another `Section` it is the smaller sub-section heading; in a grid cell it
++ * is the card's title, and the cell's plot stands at the floor so the plots
++ * of a row line up. `actions` end the heading line and wrap under it on a
++ * narrow page; a `collapsible` section folds its blocks behind a chevron.
+  */
+ export declare function Section({ heading, caption, actions, collapsible, defaultOpen, children, }: SectionProps): JSX.Element;
+ export interface TextProps {
+@@ -87,7 +96,7 @@
+     /** One plain sentence per item. */
+     items: readonly string[];
+ }
+-/** Bulleted list with a quiet marker column. */
++/** Bulleted list, its marker in the text's own ink. */
+ export declare function BulletList({ items }: ListProps): JSX.Element;
+ /** Numbered list for steps or ranked items. */
+ export declare function NumberedList({ items }: ListProps): JSX.Element;
+@@ -160,11 +169,11 @@
+     align?: readonly ("auto" | "start" | "end")[];
+ }
+ /**
+- * Hairline table with no outer border: label column in secondary ink, figures
+- * right-aligned in tabular numerals, words left-aligned and wrapping,
+- * caption-sized header. One whose words are wider than its page scrolls
+- * sideways; from five columns it scrolls as a unit with every label on one
+- * line.
++ * A bordered grid: one 0.5 px outline with a rule between every cell, the
++ * header a step smaller than the cells in medium weight, figures
++ * right-aligned in tabular numerals, words left-aligned and wrapping. One
++ * whose words are wider than its page scrolls sideways; from five columns it
++ * scrolls as a unit with every label on one line.
+  */
+ export declare function Table({ columns, rows, emphasis, align }: TableProps): JSX.Element;
+ export interface Link {

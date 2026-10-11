@@ -1,0 +1,4 @@
+--- 2026-10-11_20-47:/exec-daemon/250.index.js.LICENSE.txt
++++ 2026-10-11_23-51:/exec-daemon/250.index.js.LICENSE.txt
+@@ -0,0 +1 @@
++/*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */

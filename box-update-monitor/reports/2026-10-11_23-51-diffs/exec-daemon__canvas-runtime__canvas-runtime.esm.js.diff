@@ -1,0 +1,219 @@
+--- 2026-10-11_20-47:/exec-daemon/canvas-runtime/canvas-runtime.esm.js
++++ 2026-10-11_23-51:/exec-daemon/canvas-runtime/canvas-runtime.esm.js
+@@ -28167,6 +28167,71 @@
+   return Number.isSafeInteger(depth) && depth >= 0 ? { type: CANVAS_DESIGN_SELECT_MESSAGE_TYPE, depth } : void 0;
+ }
+ 
++// ../canvas-shared/dist/canvas-error-panel.js
++var CANVAS_ERROR_PANEL_ATTRIBUTE = "data-cursor-canvas-error";
++var CANVAS_ERROR_PANEL_MESSAGE_ATTRIBUTE = "data-cursor-canvas-error-message";
++var CANVAS_ERROR_PANEL_TITLE = "This canvas failed to load";
++var CANVAS_ERROR_PANEL_BODY = "Its code ran into an error. Ask the agent that made it to fix it.";
++var CANVAS_ERROR_PANEL_DETAILS_LABEL = "Error details";
++var CANVAS_ERROR_PANEL_MAX_MESSAGE_CHARS = 4e3;
++function escapeHtml(value) {
++  return value.replace(/[&<>"']/g, (char) => {
++    switch (char) {
++      case "&":
++        return "&amp;";
++      case "<":
++        return "&lt;";
++      case ">":
++        return "&gt;";
++      case '"':
++        return "&quot;";
++      default:
++        return "&#39;";
++    }
++  });
++}
++function truncateCanvasErrorMessage(message) {
++  return message.length > CANVAS_ERROR_PANEL_MAX_MESSAGE_CHARS ? `${message.slice(0, CANVAS_ERROR_PANEL_MAX_MESSAGE_CHARS)}\u2026` : message;
++}
++var PANEL_CSS = `[${CANVAS_ERROR_PANEL_ATTRIBUTE}]{box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;min-height:min(70vh,520px);margin:0;padding:48px 24px;text-align:center;font-family:inherit;font-size:13px;line-height:18px;color:inherit}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] h2{margin:0;font-size:15px;line-height:22px;font-weight:600}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] p{margin:0;max-width:420px;opacity:.72}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] details{margin:8px 0 0;width:100%;max-width:640px;text-align:left}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] details[hidden]{display:none}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] summary{width:max-content;margin:0 auto;padding:2px 6px;border-radius:4px;cursor:pointer;opacity:.72;user-select:none}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] summary:hover{opacity:1}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] summary:focus-visible{outline:2px solid currentColor;outline-offset:2px}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] pre{margin:8px 0 0;padding:10px 12px;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;border-radius:6px;border:1px solid color-mix(in srgb,currentColor 16%,transparent);background:color-mix(in srgb,currentColor 5%,transparent);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:17px;user-select:text}`;
++function canvasErrorPanelHtml(message) {
++  const shown = truncateCanvasErrorMessage(message.trim());
++  const hiddenAttr = shown ? "" : " hidden";
++  return `<style>${PANEL_CSS}</style><div ${CANVAS_ERROR_PANEL_ATTRIBUTE}="" role="alert"><h2>${CANVAS_ERROR_PANEL_TITLE}</h2><p>${CANVAS_ERROR_PANEL_BODY}</p><details${hiddenAttr}><summary>${CANVAS_ERROR_PANEL_DETAILS_LABEL}</summary><pre ${CANVAS_ERROR_PANEL_MESSAGE_ATTRIBUTE}="">${escapeHtml(shown)}</pre></details></div>`;
++}
++
++// ../canvas-shared/dist/canvas-frame-find.js
++var CANVAS_FRAME_FIND_MESSAGE_TYPE = "cursor-canvas-frame-find";
++var CANVAS_FRAME_FIND_RESULT_MESSAGE_TYPE = "cursor-canvas-frame-find-result";
++var CANVAS_FRAME_FIND_REQUEST_MESSAGE_TYPE = "cursor-canvas-frame-find-request";
++var CANVAS_FRAME_FIND_HIGHLIGHT_NAME = "cursor-canvas-find";
++var CANVAS_FRAME_FIND_CURRENT_HIGHLIGHT_NAME = "cursor-canvas-find-current";
++var CANVAS_FRAME_FIND_CSS = `::highlight(${CANVAS_FRAME_FIND_HIGHLIGHT_NAME}){background-color:color-mix(in srgb,#ffc000 30%,transparent)}
++::highlight(${CANVAS_FRAME_FIND_CURRENT_HIGHLIGHT_NAME}){background-color:#ffc000;color:#1f1f1f}`;
++var FIND_SKIP_SELECTOR = 'script,style,noscript,template,textarea,input,select,[contenteditable]:not([contenteditable="false"])';
++var CANVAS_FRAME_FIND_SHORTCUT_TEST = "(e.metaKey||e.ctrlKey)&&!e.altKey&&!e.shiftKey&&(e.key==='f'||e.key==='F')";
++function canvasFrameFindScript() {
++  return `var findState={query:'',current:0,observer:null,pending:false};
++function findFold(data){var lower=data.toLowerCase();if(lower.length===data.length)return{text:lower,map:null};var text='',map=[];for(var i=0;i<data.length;i++){var ch=data.charAt(i).toLowerCase();for(var j=0;j<ch.length;j++)map.push(i);text+=ch}return{text:text,map:map}}
++function findIndex(){var nodes=[],starts=[],maps=[],text='';var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode:function(node){var el=node.parentElement;if(!el||el.closest(${JSON.stringify(FIND_SKIP_SELECTOR)}))return NodeFilter.FILTER_REJECT;return !el.checkVisibility||el.checkVisibility({visibilityProperty:true})?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT}});for(var node=walker.nextNode();node;node=walker.nextNode()){var folded=findFold(node.data);nodes.push(node);starts.push(text.length);maps.push(folded.map);text+=folded.text}return{nodes:nodes,starts:starts,maps:maps,text:text}}
++function findPosition(index,offset){var low=0,high=index.starts.length-1;while(low<high){var mid=(low+high+1)>>1;if(index.starts[mid]<=offset)low=mid;else high=mid-1}var unit=offset-index.starts[low],map=index.maps[low];return{node:index.nodes[low],offset:map?map[unit]:unit}}
++function findRange(index,from,to){var start=findPosition(index,from),end=findPosition(index,to-1);return new StaticRange({startContainer:start.node,startOffset:start.offset,endContainer:end.node,endOffset:end.offset+1})}
++function findReveal(range){var live=document.createRange();live.setStart(range.startContainer,range.startOffset);live.setEnd(range.endContainer,range.endOffset);var el=range.startContainer.parentElement;if(el&&el.scrollIntoView)el.scrollIntoView({block:'nearest',inline:'nearest'});var box=live.getBoundingClientRect(),inset=parseFloat(getComputedStyle(document.documentElement).paddingTop)||0;if(box.top<inset||box.bottom>innerHeight)scrollBy(0,box.top-inset-(innerHeight-inset-box.height)/2)}
++function findPaint(ranges,current){var registry=self.CSS&&CSS.highlights;if(!registry)return;registry.delete(${JSON.stringify(CANVAS_FRAME_FIND_HIGHLIGHT_NAME)});registry.delete(${JSON.stringify(CANVAS_FRAME_FIND_CURRENT_HIGHLIGHT_NAME)});if(!ranges.length)return;var all=new Highlight();for(var i=0;i<ranges.length;i++)all.add(ranges[i]);registry.set(${JSON.stringify(CANVAS_FRAME_FIND_HIGHLIGHT_NAME)},all);registry.set(${JSON.stringify(CANVAS_FRAME_FIND_CURRENT_HIGHLIGHT_NAME)},new Highlight(ranges[current]))}
++function findRun(reveal){var query=findState.query,needle=query.toLowerCase(),ranges=[];if(needle){var index=findIndex(),at=index.text.indexOf(needle);while(at>=0){ranges.push(findRange(index,at,at+needle.length));at=index.text.indexOf(needle,at+needle.length)}}var total=ranges.length,current=total?((findState.current%total)+total)%total:0;findState.current=current;findPaint(ranges,current);if(reveal&&total)findReveal(ranges[current]);try{parent.postMessage({type:${JSON.stringify(CANVAS_FRAME_FIND_RESULT_MESSAGE_TYPE)},query:query,total:total,current:current},'*')}catch{}}
++function findWatch(active){if(active&&!findState.observer&&typeof MutationObserver!=='undefined'){findState.observer=new MutationObserver(function(){if(findState.pending)return;findState.pending=true;requestAnimationFrame(function(){findState.pending=false;if(findState.query)findRun(false)})});findState.observer.observe(document.body,{subtree:true,childList:true,characterData:true})}else if(!active&&findState.observer){findState.observer.disconnect();findState.observer=null}}
++function canvasFind(message){findState.query=typeof message.query==='string'?message.query:'';findState.current=typeof message.current==='number'&&isFinite(message.current)?Math.trunc(message.current):0;findWatch(findState.query.length>0);findRun(true)}
++function canvasFindRequest(){try{parent.postMessage({type:${JSON.stringify(CANVAS_FRAME_FIND_REQUEST_MESSAGE_TYPE)}},'*')}catch{}}`;
++}
++
+ // ../canvas-shared/dist/canvas-root-layout.js
+ var CANVAS_VIEWPORT_HEIGHT_CSS_VAR = "--cursor-canvas-viewport-height";
+ var CANVAS_BODY_PADDING_VERTICAL_PX = 24;
+@@ -28187,16 +28252,18 @@
+ var CANVAS_FRAME_BOTTOM_INSET_CSS_VAR = "--cursor-canvas-bottom-inset";
+ var CANVAS_FRAME_SCROLLED_MESSAGE_TYPE = "cursor-canvas-frame-scrolled";
+ var EMBEDDER_BRIDGE_SCRIPT = `<script>
+-addEventListener('keydown',function(e){if(e.key!=='Escape')return;try{parent.postMessage({type:'${CANVAS_FRAME_CLOSE_REQUEST_MESSAGE_TYPE}'},'*')}catch{}},true);
++addEventListener('keydown',function(e){if(${CANVAS_FRAME_FIND_SHORTCUT_TEST}){e.preventDefault();canvasFindRequest();return}if(e.key!=='Escape')return;try{parent.postMessage({type:'${CANVAS_FRAME_CLOSE_REQUEST_MESSAGE_TYPE}'},'*')}catch{}},true);
+ var scrolled=false;addEventListener('scroll',function(){var next=scrollY>0;if(next===scrolled)return;scrolled=next;try{parent.postMessage({type:'${CANVAS_FRAME_SCROLLED_MESSAGE_TYPE}',isScrolled:next},'*')}catch{}},{passive:true});
+ addEventListener('message',function(e){if(e.source!==parent||!e.data)return;
+ if(e.data.type==='${CANVAS_FRAME_SCROLL_TO_TOP_MESSAGE.type}'){scrollTo(0,0);return}
++if(e.data.type==='${CANVAS_FRAME_FIND_MESSAGE_TYPE}'){canvasFind(e.data);return}
+ if(e.data.type!=='${CANVAS_FRAME_CONTENT_COLUMN_MESSAGE_TYPE}')return;
+ var column=e.data.columnWidthPx,gutter=e.data.gutterPx,inset=e.data.topInsetPx,bottom=e.data.bottomInsetPx,style=document.documentElement.style;
+ if(typeof column==='number'&&column>0)style.setProperty('${CANVAS_FRAME_CONTENT_COLUMN_CSS_VAR}',column+'px');else style.removeProperty('${CANVAS_FRAME_CONTENT_COLUMN_CSS_VAR}');
+ if(typeof gutter==='number'&&gutter>=0)style.setProperty('${CANVAS_FRAME_GUTTER_CSS_VAR}',gutter+'px');else style.removeProperty('${CANVAS_FRAME_GUTTER_CSS_VAR}');
+ if(typeof inset==='number'&&inset>=0)style.setProperty('${CANVAS_FRAME_TOP_INSET_CSS_VAR}',inset+'px');else style.removeProperty('${CANVAS_FRAME_TOP_INSET_CSS_VAR}');
+ if(typeof bottom==='number'&&bottom>=0)style.setProperty('${CANVAS_FRAME_BOTTOM_INSET_CSS_VAR}',bottom+'px');else style.removeProperty('${CANVAS_FRAME_BOTTOM_INSET_CSS_VAR}')});
++${canvasFrameFindScript()}
+ <\/script>`;
+ var CSP_QUOTE = String.fromCodePoint(39);
+ var cspKeyword = (keyword) => `${CSP_QUOTE}${keyword}${CSP_QUOTE}`;
+@@ -28593,9 +28660,9 @@
+ function getCursorCanvas() {
+   return getCanvasRuntimeGlobal().__cursorCanvas;
+ }
+-function reportErrorToHost(message) {
++function reportErrorToHost(message, phase) {
+   try {
+-    getCursorCanvas()?.reportError?.(message);
++    getCursorCanvas()?.reportError?.(message, phase);
+   } catch (error) {
+     console.warn("[CursorCanvas] Failed to report error to host", {
+       errorType: error instanceof Error ? error.name : typeof error
+@@ -28753,31 +28820,66 @@
+   });
+   observer.observe(rootElement);
+ }
+-function renderBootstrapError(message) {
+-  reportErrorToHost(message);
++function errorMessageOf(error) {
++  return error instanceof Error ? error.message : String(error);
++}
++function renderBootstrapError(message, phase = "module") {
+   const root2 = document.getElementById("root") ?? document.body;
+-  if (!root2) return;
+-  root2.replaceChildren();
++  if (root2) {
++    root2.innerHTML = canvasErrorPanelHtml(message);
++  }
++  reportErrorToHost(message, phase);
+ }
+ var HostRuntimeErrorBoundary = class extends import_react10.default.Component {
+   constructor() {
+     super(...arguments);
+-    this.state = { hasError: false };
++    this.state = { errorMessage: null };
+   }
+-  static getDerivedStateFromError() {
+-    return { hasError: true };
++  static getDerivedStateFromError(error) {
++    return { errorMessage: errorMessageOf(error) };
+   }
+   componentDidCatch(error, errorInfo) {
+     console.error("[CursorCanvas] Runtime error", error, errorInfo);
+-    reportErrorToHost(error instanceof Error ? error.message : String(error));
++    reportErrorToHost(errorMessageOf(error), "render");
+   }
+   render() {
+-    if (!this.state.hasError) {
++    const { errorMessage } = this.state;
++    if (errorMessage === null) {
+       return this.props.children;
+     }
+-    return null;
++    if (this.props.silent) {
++      return null;
++    }
++    return import_react10.default.createElement("div", {
++      dangerouslySetInnerHTML: { __html: canvasErrorPanelHtml(errorMessage) }
++    });
+   }
+ };
++var REACT_ELEMENT_TYPE_KEY = "$$typeof";
++function describeInvalidCanvasDefaultExport(value) {
++  const fix = "Default export a component: `export default function Canvas() { ... }`.";
++  if (value === void 0) {
++    return `The canvas module has no default export. ${fix}`;
++  }
++  if (typeof value === "function") {
++    const tag = Object.prototype.toString.call(value);
++    if (tag === "[object AsyncFunction]" || tag === "[object AsyncGeneratorFunction]") {
++      return `The canvas default export is an async function. React components cannot be async; load data in an effect and keep the component synchronous.`;
++    }
++    if (tag === "[object GeneratorFunction]") {
++      return `The canvas default export is a generator function, not a React component. ${fix}`;
++    }
++    return void 0;
++  }
++  if (typeof value === "object" && value !== null && REACT_ELEMENT_TYPE_KEY in value) {
++    if ("props" in value) {
++      return `The canvas default export is a JSX element, not a component. Wrap it in a function: \`export default function Canvas() { return ...; }\`.`;
++    }
++    return void 0;
++  }
++  const kind = value === null ? "null" : Array.isArray(value) ? "an array" : `a ${typeof value}`;
++  return `The canvas default export is ${kind}, not a React component. ${fix}`;
++}
+ async function mountCanvas(appModuleUrl) {
+   await mountCanvasWithKit(appModuleUrl, {
+     globals: dist_exports,
+@@ -28794,7 +28896,7 @@
+   const rootElement = document.getElementById("root");
+   if (!(rootElement instanceof HTMLElement)) {
+     if (!previewMode) {
+-      renderBootstrapError("Canvas root element was not found.");
++      renderBootstrapError("Canvas root element was not found.", "frame");
+     }
+     return;
+   }
+@@ -28807,14 +28909,15 @@
+       appModuleUrl
+     );
+     const CanvasComponent = mod.default;
+-    if (typeof CanvasComponent !== "function" && typeof CanvasComponent !== "object") {
+-      throw new Error("Canvas modules must default export a React component.");
++    const invalidExport = describeInvalidCanvasDefaultExport(CanvasComponent);
++    if (invalidExport !== void 0) {
++      throw new Error(invalidExport);
+     }
+     const root2 = (0, import_client.createRoot)(rootElement);
+     root2.render(
+       import_react10.default.createElement(
+         HostRuntimeErrorBoundary,
+-        null,
++        { silent: previewMode },
+         import_react10.default.createElement(
+           CanvasShell,
+           { previewMode, useBodyTheme: kit.useBodyTheme },
+@@ -28841,6 +28944,7 @@
+   CANVAS_PREVIEW_RESIZE_MESSAGE_TYPE,
+   HostRuntimeErrorBoundary,
+   applyBodyTheme,
++  describeInvalidCanvasDefaultExport,
+   isCanvasPreviewMode,
+   measureNaturalContentHeight,
+   measureNaturalContentWidth,

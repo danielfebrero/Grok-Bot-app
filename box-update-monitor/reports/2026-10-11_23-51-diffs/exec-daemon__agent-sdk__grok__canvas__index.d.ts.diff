@@ -1,0 +1,11 @@
+--- 2026-10-11_20-47:/exec-daemon/agent-sdk/grok/canvas/index.d.ts
++++ 2026-10-11_23-51:/exec-daemon/agent-sdk/grok/canvas/index.d.ts
+@@ -46,6 +46,6 @@
+ /** Page width. */
+ export type { PageWidth } from "./width.js";
+ /** Tokens. */
+-export type { GrokDataViz, GrokPalette, GrokTextStyle, GrokTheme } from "./hooks.js";
++export type { GrokDataViz, GrokPalette, GrokTextStyle, GrokTheme, GrokWeightScale, } from "./hooks.js";
+ export { useGrokTheme } from "./hooks.js";
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file

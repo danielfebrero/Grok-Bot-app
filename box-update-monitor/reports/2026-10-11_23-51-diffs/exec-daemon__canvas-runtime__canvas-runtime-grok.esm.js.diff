@@ -1,0 +1,2078 @@
+--- 2026-10-11_20-47:/exec-daemon/canvas-runtime/canvas-runtime-grok.esm.js
++++ 2026-10-11_23-51:/exec-daemon/canvas-runtime/canvas-runtime-grok.esm.js
+@@ -112,7 +112,7 @@
+     function cloneAndReplaceKey(oldElement, newKey) {
+       return ReactElement(oldElement.type, newKey, oldElement.props);
+     }
+-    function isValidElement3(object) {
++    function isValidElement4(object) {
+       return "object" === typeof object && null !== object && object.$$typeof === REACT_ELEMENT_TYPE;
+     }
+     function escape(key) {
+@@ -179,7 +179,7 @@
+       if (invokeCallback)
+         return callback = callback(children), invokeCallback = "" === nameSoFar ? "." + getElementKey(children, 0) : nameSoFar, isArrayImpl(callback) ? (escapedPrefix = "", null != invokeCallback && (escapedPrefix = invokeCallback.replace(userProvidedKeyEscapeRegex, "$&/") + "/"), mapIntoArray(callback, array, escapedPrefix, "", function(c) {
+           return c;
+-        })) : null != callback && (isValidElement3(callback) && (callback = cloneAndReplaceKey(
++        })) : null != callback && (isValidElement4(callback) && (callback = cloneAndReplaceKey(
+           callback,
+           escapedPrefix + (null == callback.key || children && children.key === callback.key ? "" : ("" + callback.key).replace(
+             userProvidedKeyEscapeRegex,
+@@ -308,7 +308,7 @@
+         }) || [];
+       },
+       only: function(children) {
+-        if (!isValidElement3(children))
++        if (!isValidElement4(children))
+           throw Error(
+             "React.Children.only expected to receive a single React element child."
+           );
+@@ -397,7 +397,7 @@
+     exports.forwardRef = function(render) {
+       return { $$typeof: REACT_FORWARD_REF_TYPE, render };
+     };
+-    exports.isValidElement = isValidElement3;
++    exports.isValidElement = isValidElement4;
+     exports.lazy = function(ctor) {
+       return {
+         $$typeof: REACT_LAZY_TYPE,
+@@ -14585,7 +14585,7 @@
+   ColumnSeries: () => ColumnSeries,
+   Columns: () => Columns,
+   DayView: () => DayView,
+-  Fragment: () => import_react12.Fragment,
++  Fragment: () => import_react14.Fragment,
+   Grid: () => Grid,
+   Input: () => Input,
+   Legend: () => Legend,
+@@ -14602,15 +14602,15 @@
+   Table: () => Table,
+   Text: () => Text,
+   computeDAGLayout: () => computeDAGLayout2,
+-  useCallback: () => import_react12.useCallback,
+-  useEffect: () => import_react12.useEffect,
++  useCallback: () => import_react14.useCallback,
++  useEffect: () => import_react14.useEffect,
+   useGrokTheme: () => useGrokTheme,
+-  useMemo: () => import_react12.useMemo,
+-  useReducer: () => import_react12.useReducer,
+-  useRef: () => import_react12.useRef,
+-  useState: () => import_react12.useState
++  useMemo: () => import_react14.useMemo,
++  useReducer: () => import_react14.useReducer,
++  useRef: () => import_react14.useRef,
++  useState: () => import_react14.useState
+ });
+-var import_react12 = __toESM(require_react(), 1);
++var import_react14 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/grok/calendar.js
+ var import_jsx_runtime = __toESM(require_jsx_runtime(), 1);
+@@ -15138,91 +15138,79 @@
+ 
+ // ../canvas-components/dist/grok/tokens.js
+ var grokPaletteLight = {
+-  bg: { base: "#fcfcfc", subtle: "#f7f7f7" },
++  bg: { base: "#fcfcfc", subtle: "#f7f7f7", elevated: "#fcfcfc" },
+   text: {
+     primary: "#141414",
+     secondary: "#14141499",
+     tertiary: "#14141466",
+     onColor: "#fcfcfc",
+-    accent: "#056098",
+-    success: "#00712e",
+-    warning: "#c24e00",
+-    danger: "#aa122e"
++    onPrimary: "#fcfcfc",
++    accent: "#0c64c1",
++    success: "#009957",
++    warning: "#c27400",
++    danger: "#c21d2e"
+   },
+   fill: {
+-    primary: "#0b0b0b",
+-    secondary: "#7777770f",
+-    accent: "#0e7fcb",
+-    controlChecked: "#0b0b0b"
++    primary: "#070707",
++    primaryHover: "#2f2f2f",
++    secondary: "#77777717",
++    accent: "#1084fe",
++    controlChecked: "#070707"
+   },
+   border: {
+     subtle: "#1414140d",
+     weak: "#1414141a",
+     default: "#14141426",
+-    strong: "#1414144c"
++    strong: "#1414144d",
++    focus: "#14141466"
+   }
+ };
+ var grokPaletteDark = {
+-  bg: { base: "#0b0b0b", subtle: "#101010" },
++  bg: { base: "#070707", subtle: "#111111", elevated: "#181818" },
+   text: {
+     primary: "#fcfcfc",
+     secondary: "#fcfcfc99",
+     tertiary: "#fcfcfc66",
+     onColor: "#fcfcfc",
+-    accent: "#2da0f5",
+-    success: "#2cb663",
++    onPrimary: "#141414",
++    accent: "#459ffe",
++    success: "#38d591",
+     warning: "#ffaf38",
+-    danger: "#fd5c6a"
++    danger: "#ff5667"
+   },
+   fill: {
+     primary: "#fafafa",
+-    secondary: "#77777715",
+-    accent: "#0e7fcb",
+-    controlChecked: "#5c5c5c"
++    primaryHover: "#d5d5d5",
++    secondary: "#7777772c",
++    accent: "#1084fe",
++    controlChecked: "#5a5a5a"
+   },
+   border: {
+     subtle: "#fcfcfc0d",
+     weak: "#fcfcfc1a",
+     default: "#fcfcfc26",
+-    strong: "#fcfcfc4c"
++    strong: "#fcfcfc4d",
++    focus: "#fcfcfc66"
+   }
+ };
+ var grokDataVizLight = {
+-  categorical: [
+-    "#1084FE",
+-    "#C24E00",
+-    "#9159FE",
+-    "#009957",
+-    "#FF309B",
+-    "#C27400",
+-    "#008F7E",
+-    "#97683D"
+-  ],
++  categorical: ["#1084FE", "#FF9800", "#00BCA6"],
+   other: "#777777",
+-  negative: "#C21D2E",
+-  singleSeriesRest: "#B5D9FF",
+-  areaAlpha: "24",
++  negative: "#FF263C",
++  singleSeriesRest: "#80BEFE",
++  areaAlpha: "29",
+   bandAlpha: "40",
+-  sequential: ["#D6EAFF", "#80BEFE", "#459FFE", "#1084FE", "#0C64C1", "#084382"],
++  sequential: ["#80BEFE", "#459FFE", "#1084FE", "#0C64C1", "#084382"],
+   diverging: ["#C21D2E", "#FF8C98", "#E8E8E8", "#80BEFE", "#0C64C1"]
+ };
+ var grokDataVizDark = {
+-  categorical: [
+-    "#1084FE",
+-    "#FF6700",
+-    "#9159FE",
+-    "#00C972",
+-    "#FF309B",
+-    "#FF9800",
+-    "#00BCA6",
+-    "#97683D"
+-  ],
++  categorical: ["#1084FE", "#FF9800", "#00BCA6"],
+   other: "#777777",
+   negative: "#FF263C",
+   singleSeriesRest: "#084382",
+-  areaAlpha: "24",
++  areaAlpha: "3D",
+   bandAlpha: "40",
+-  sequential: ["#052A51", "#084382", "#0C64C1", "#1084FE", "#459FFE", "#80BEFE"],
++  sequential: ["#084382", "#0C64C1", "#1084FE", "#459FFE", "#80BEFE"],
+   diverging: ["#FF5667", "#82131F", "#262626", "#084382", "#459FFE"]
+ };
+ var grokFontSans = '-apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif';
+@@ -15230,53 +15218,76 @@
+ var grokFontSansXvf = `"XVF", ${grokFontSans}`;
+ var grokFontMonoXvf = `"XVF Mono", ${grokFontMono}`;
+ var grokWeight = { regular: 400, medium: 500, semibold: 600 };
++var GROK_XVF_REGULAR_WEIGHT_DARWIN = 425;
++var grokWeightXvfDarwin = {
++  ...grokWeight,
++  regular: GROK_XVF_REGULAR_WEIGHT_DARWIN
++};
+ var grokType = {
+-  heading1: { fontSize: "26px", lineHeight: "30px", letterSpacing: "-0.1px" },
+-  heading2: { fontSize: "22px", lineHeight: "28px", letterSpacing: "-0.264px" },
+-  heading3: { fontSize: "17px", lineHeight: "24px", letterSpacing: "-0.136px" },
+-  body1: { fontSize: "14px", lineHeight: "20px", letterSpacing: "0" },
++  heading1: { fontSize: "30px", lineHeight: "36px", letterSpacing: "-0.4px" },
++  heading2: { fontSize: "24px", lineHeight: "30px", letterSpacing: "-0.25px" },
++  heading3: { fontSize: "20px", lineHeight: "26px", letterSpacing: "-0.1px" },
++  body1: { fontSize: "16px", lineHeight: "24px", letterSpacing: "0.1px" },
++  subtext: { fontSize: "14px", lineHeight: "20px", letterSpacing: "0.1px" },
++  table: { fontSize: "15px", lineHeight: "22px", letterSpacing: "0.1px" },
++  metric: { fontSize: "24px", lineHeight: "30px", letterSpacing: "-0.25px" },
+   body2: { fontSize: "13px", lineHeight: "18px", letterSpacing: "-0.08px" },
+   label: { fontSize: "12px", lineHeight: "16px", letterSpacing: "0" },
+   caption: { fontSize: "11px", lineHeight: "16px", letterSpacing: "0.055px" },
+-  code: { fontSize: "13px", lineHeight: "20px", letterSpacing: "0" }
++  code: { fontSize: "14px", lineHeight: "22px", letterSpacing: "0" }
+ };
++var GROK_XVF_HEADING_VARIATION_SETTINGS = '"opsz" 12';
+ var grokTypeXvf = {
+-  heading1: { ...grokType.heading1, letterSpacing: "0.01em" },
+-  heading2: { ...grokType.heading2, letterSpacing: "0.01em" },
+-  heading3: { ...grokType.heading3, letterSpacing: "0.01em" },
+-  body1: { ...grokType.body1, letterSpacing: "0.01em" },
++  ...grokType,
++  heading1: { ...grokType.heading1, fontVariationSettings: GROK_XVF_HEADING_VARIATION_SETTINGS },
++  heading2: { ...grokType.heading2, fontVariationSettings: GROK_XVF_HEADING_VARIATION_SETTINGS },
+   body2: { ...grokType.body2, letterSpacing: "0.015em" },
+   label: { ...grokType.label, letterSpacing: "0.01em" },
+-  caption: { ...grokType.caption, letterSpacing: "0.01em" },
+-  code: grokType.code
++  caption: { ...grokType.caption, letterSpacing: "0.01em" }
+ };
+-var grokRadius = { sm: 4, md: 8, lg: 12 };
++var grokRadius = { sm: 4, md: 8, lg: 12, xl: 16 };
+ var GROK_PAGE_COLUMN_PX = 700;
+ var GROK_PAGE_WIDE_MAX_PX = 1280;
+ 
+ // ../canvas-components/dist/grok/hooks.js
+-var SUBTLE_INK_PERCENT = 2;
+-function paperOf(palette, paper) {
++var SURFACE_INK_PERCENT = {
++  light: { subtle: 2, elevated: 0 },
++  dark: { subtle: 4, elevated: 7 }
++};
++function paperOf(kind, palette, paper) {
+   if (paper === void 0 || paper === palette.bg.base) {
+     return palette.bg;
+   }
++  const mix = (percent) => percent === 0 ? paper : `color-mix(in srgb, ${palette.text.primary} ${percent}%, ${paper})`;
+   return {
+     base: paper,
+-    subtle: `color-mix(in srgb, ${palette.text.primary} ${SUBTLE_INK_PERCENT}%, ${paper})`
++    subtle: mix(SURFACE_INK_PERCENT[kind].subtle),
++    elevated: mix(SURFACE_INK_PERCENT[kind].elevated)
+   };
+ }
+ var FONTS = {
+   system: { family: grokFontSans, mono: grokFontMono, ...grokType },
+   xvf: { family: grokFontSansXvf, mono: grokFontMonoXvf, ...grokTypeXvf }
+ };
+-function buildGrokTheme(kind, paper, typeface) {
++function isDarwinDesktop(nav = globalThis.navigator) {
++  if (nav === void 0) {
++    return false;
++  }
++  const data = nav.userAgentData;
++  const platform = typeof data?.platform === "string" ? data.platform : nav.platform;
++  return /^mac/i.test(platform ?? "") && (nav.maxTouchPoints ?? 0) <= 1;
++}
++function weightScale(typeface, darwin) {
++  return typeface === "xvf" && darwin ? grokWeightXvfDarwin : grokWeight;
++}
++function buildGrokTheme(kind, paper, typeface, darwin) {
+   const palette = kind === "light" ? grokPaletteLight : grokPaletteDark;
+   return {
+     ...palette,
+-    bg: paperOf(palette, paper),
++    bg: paperOf(kind, palette, paper),
+     kind,
+     font: FONTS[typeface],
+-    weight: grokWeight,
++    weight: weightScale(typeface, darwin),
+     radius: grokRadius,
+     dataviz: kind === "light" ? grokDataVizLight : grokDataVizDark,
+     chart: [
+@@ -15289,14 +15300,14 @@
+ }
+ var THEME_CACHE_LIMIT = 8;
+ var themes = /* @__PURE__ */ new Map();
+-function grokTheme(kind, paper, typeface) {
+-  const key = `${kind}|${paper ?? ""}|${typeface}`;
++function grokTheme(kind, paper, typeface, darwin) {
++  const key = `${kind}|${paper ?? ""}|${typeface}|${darwin ? "darwin" : ""}`;
+   let theme = themes.get(key);
+   if (theme === void 0) {
+     if (themes.size >= THEME_CACHE_LIMIT) {
+       themes.clear();
+     }
+-    theme = buildGrokTheme(kind, paper, typeface);
++    theme = buildGrokTheme(kind, paper, typeface, darwin);
+     themes.set(key, theme);
+   }
+   return theme;
+@@ -15314,12 +15325,12 @@
+   const { kind } = useHostTheme();
+   const paper = useHostPaper();
+   const typeface = useHostTypeface();
+-  return grokTheme(kind === "light" || kind === "hc-light" ? "light" : "dark", paper, typeface);
++  return grokTheme(kind === "light" || kind === "hc-light" ? "light" : "dark", paper, typeface, isDarwinDesktop());
+ }
+ 
+ // ../canvas-components/dist/grok/responsive.js
+ var import_react3 = __toESM(require_react(), 1);
+-var GROK_NARROW_BLOCK_PX = 480;
++var GROK_NARROW_BLOCK_PX = 400;
+ function useBlockWidth() {
+   const [width, setWidth] = (0, import_react3.useState)(void 0);
+   const observer = (0, import_react3.useRef)(void 0);
+@@ -15390,6 +15401,9 @@
+     lineHeight: style.lineHeight,
+     letterSpacing: style.letterSpacing,
+     fontWeight: theme.weight[weight],
++    // A pinned axis also turns off automatic optical sizing, so the two
++    // never disagree in a browser that applies both.
++    ...style.fontVariationSettings === void 0 ? {} : { fontOpticalSizing: "none", fontVariationSettings: style.fontVariationSettings },
+     color
+   };
+ }
+@@ -15403,6 +15417,7 @@
+   fontVariantNumeric: "tabular-nums",
+   overflowWrap: "normal"
+ };
++var LEGEND_GAP = 16;
+ function hairline(theme) {
+   return `0.5px solid ${theme.border.subtle}`;
+ }
+@@ -15875,8 +15890,8 @@
+ }
+ 
+ // ../canvas-components/dist/grok/charts.js
+-var import_jsx_runtime3 = __toESM(require_jsx_runtime(), 1);
+-var import_react6 = __toESM(require_react(), 1);
++var import_jsx_runtime4 = __toESM(require_jsx_runtime(), 1);
++var import_react8 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/grok/chart-detail.js
+ var import_jsx_runtime2 = __toESM(require_jsx_runtime(), 1);
+@@ -16015,6 +16030,103 @@
+   return (0, import_jsx_runtime2.jsx)("svg", { width: 14, height: 2, "aria-hidden": true, style: { display: "block", flexShrink: 0 }, children: (0, import_jsx_runtime2.jsx)("line", { x1: 0, x2: 14, y1: 1, y2: 1, stroke: color, strokeWidth: 2, strokeDasharray: dashed ? "3 2" : void 0 }) });
+ }
+ 
++// ../canvas-components/dist/grok/rhythm.js
++var import_react6 = __toESM(require_react(), 1);
++var RHYTHM = {
++  /** From the page title to whatever follows it. */
++  afterTitle: 20,
++  /** Between two paragraphs. */
++  paragraph: 16,
++  /** Between a paragraph and a list, or two lists: a block of text stands off from the next. */
++  block: 24,
++  /** Between the items of a list. */
++  listItem: 8,
++  /** Around a figure: a chart, a table, a callout, a custom visual. */
++  embed: 32,
++  /** Around a strip of metrics, which stands further off than a chart. */
++  metrics: 40,
++  /** Between two charts in a row, the grid's own gap, so they read as one set. */
++  chartToChart: 12
++};
++var SectionDepthContext = (0, import_react6.createContext)(0);
++var GRID_CELL_SECTION_DEPTH = 2;
++var kinds = /* @__PURE__ */ new WeakMap();
++function markBlockKind(component, kind) {
++  kinds.set(component, kind);
++  return component;
++}
++function kindOf(node) {
++  if (typeof node === "string" || typeof node === "number") {
++    return "text";
++  }
++  if ((0, import_react6.isValidElement)(node) && (typeof node.type === "function" || typeof node.type === "object")) {
++    return kinds.get(node.type) ?? "embed";
++  }
++  return "embed";
++}
++var isProse = (kind) => kind === "text" || kind === "list";
++function spaceBetween({ prev, next }) {
++  if (prev === "control") {
++    return 0;
++  }
++  if (prev === "metrics" || next === "metrics") {
++    return RHYTHM.metrics;
++  }
++  if (prev === "text" && next === "text") {
++    return RHYTHM.paragraph;
++  }
++  if (isProse(prev) && isProse(next)) {
++    return RHYTHM.block;
++  }
++  if (prev === "chart" && next === "chart") {
++    return RHYTHM.chartToChart;
++  }
++  return RHYTHM.embed;
++}
++function gapsBetween(children, { afterHeading, precededBy, beforeSection }) {
++  return children.map((child, i) => {
++    const kind = kindOf(child);
++    if (i === 0) {
++      if (afterHeading !== void 0) {
++        return afterHeading;
++      }
++      if (precededBy === void 0) {
++        return 0;
++      }
++      return kind === "section" ? beforeSection : spaceBetween({ prev: precededBy, next: kind });
++    }
++    if (kind === "section") {
++      return beforeSection;
++    }
++    const prev = kindOf(children[i - 1]);
++    return spaceBetween({ prev: prev === "section" ? "embed" : prev, next: kind });
++  });
++}
++
++// ../canvas-components/dist/grok/chart-card.js
++var import_jsx_runtime3 = __toESM(require_jsx_runtime(), 1);
++var import_react7 = __toESM(require_react(), 1);
++var CARD_PADDING_PX = 20;
++var InCardContext = (0, import_react7.createContext)(false);
++function cardChrome(theme) {
++  return {
++    boxSizing: "border-box",
++    minWidth: 0,
++    background: theme.bg.base,
++    border: `1px solid ${theme.border.default}`,
++    borderRadius: theme.radius.xl,
++    padding: CARD_PADDING_PX
++  };
++}
++function ChartCard({ children }) {
++  const theme = useGrokTheme();
++  const inCard = (0, import_react7.useContext)(InCardContext);
++  if (inCard) {
++    return (0, import_jsx_runtime3.jsx)(import_jsx_runtime3.Fragment, { children });
++  }
++  return (0, import_jsx_runtime3.jsx)("div", { "data-chart-card": true, style: cardChrome(theme), children: (0, import_jsx_runtime3.jsx)(InCardContext.Provider, { value: true, children }) });
++}
++
+ // ../canvas-components/dist/grok/charts.js
+ function indexOfMax(values) {
+   let best;
+@@ -16061,6 +16173,8 @@
+ var STACKED_FIGURE_MAX_SHARE = 0.4;
+ var STACKED_FIGURE_GAP_PX = 8;
+ var STACKED_COLUMN_GAP_PX = 12;
++var STACKED_LEGEND_GAP_PX = 24;
++var STACKED_ROW_GAP_PX = 12;
+ function stackedFigureReserve(figureWidths, rowWidth) {
+   const widest = Math.ceil(Math.max(0, ...figureWidths));
+   const cap = rowWidth === void 0 ? Number.POSITIVE_INFINITY : Math.max(0, rowWidth) * STACKED_FIGURE_MAX_SHARE;
+@@ -16083,7 +16197,7 @@
+   if (bars.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime3.jsx)("div", { ref, style: {
++  return (0, import_jsx_runtime4.jsx)(ChartCard, { children: (0, import_jsx_runtime4.jsx)("div", { ref, style: {
+     display: "grid",
+     gridTemplateColumns: `${labelCol}px minmax(${trackMin(width)}px,1fr) fit-content(40%)`,
+     alignItems: "center",
+@@ -16095,7 +16209,7 @@
+     const value = values[i] ?? Number.NaN;
+     const readable = Number.isFinite(value);
+     const negative = value < 0;
+-    const meta = bar.meta === void 0 ? null : stackMeta ? (0, import_jsx_runtime3.jsx)("span", { style: {
++    const meta = bar.meta === void 0 ? null : stackMeta ? (0, import_jsx_runtime4.jsx)("span", { style: {
+       ...typeStyle(theme, "label", "regular", theme.text.tertiary),
+       gridColumn: "1 / -1",
+       marginTop: -6,
+@@ -16104,32 +16218,32 @@
+       WebkitBoxOrient: "vertical",
+       WebkitLineClamp: 2,
+       overflow: "hidden"
+-    }, children: bar.meta }) : (0, import_jsx_runtime3.jsx)("span", { style: {
++    }, children: bar.meta }) : (0, import_jsx_runtime4.jsx)("span", { style: {
+       ...typeStyle(theme, "label", "regular", theme.text.tertiary),
+       display: "inline"
+     }, children: ` \xB7 ${bar.meta}` });
+-    return (0, import_jsx_runtime3.jsxs)("div", { style: { display: "contents" }, children: [(0, import_jsx_runtime3.jsx)("span", { style: {
++    return (0, import_jsx_runtime4.jsxs)("div", { style: { display: "contents" }, children: [(0, import_jsx_runtime4.jsx)("span", { style: {
+       ...typeStyle(theme, "body2", "regular", on ? theme.text.primary : theme.text.secondary),
+       ...truncate
+-    }, children: bar.label }), (0, import_jsx_runtime3.jsx)("span", { style: {
++    }, children: bar.label }), (0, import_jsx_runtime4.jsx)("span", { style: {
+       display: "block",
+       height: 6,
+       overflow: "hidden",
+       borderRadius: 9999,
+       background: theme.fill.secondary
+-    }, children: readable ? (0, import_jsx_runtime3.jsx)("span", { style: {
++    }, children: readable ? (0, import_jsx_runtime4.jsx)("span", { style: {
+       display: "block",
+       height: "100%",
+       borderRadius: 9999,
+       width: `${Math.abs(value) / max * 100}%`,
+       background: negative ? theme.dataviz.negative : full ? theme.dataviz.categorical[0] : theme.dataviz.singleSeriesRest
+-    } }) : null }), (0, import_jsx_runtime3.jsxs)("span", { style: {
++    } }) : null }), (0, import_jsx_runtime4.jsxs)("span", { style: {
+       ...typeStyle(theme, "body2", "regular", theme.text.primary),
+       ...tabularNums,
+       ...truncate,
+       textAlign: "right"
+     }, title: readable ? bar.display : void 0, children: [readable ? bar.display : NO_READING, stackMeta ? null : meta] }), stackMeta ? meta : null] }, i);
+-  }) });
++  }) }) });
+ }
+ function StackedBars({ series, bars }) {
+   const theme = useGrokTheme();
+@@ -16152,22 +16266,28 @@
+   if (bars.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime3.jsxs)("div", { ref, children: [(0, import_jsx_runtime3.jsx)("div", { style: { display: "flex", flexWrap: "wrap", columnGap: 16, rowGap: 4, marginBottom: 12 }, children: series.map((name, i) => name.trim() === "" ? null : (0, import_jsx_runtime3.jsxs)("span", { style: {
++  return (0, import_jsx_runtime4.jsx)(ChartCard, { children: (0, import_jsx_runtime4.jsxs)("div", { ref, children: [(0, import_jsx_runtime4.jsx)("div", { style: {
++    display: "flex",
++    flexWrap: "wrap",
++    columnGap: 16,
++    rowGap: 4,
++    marginBottom: STACKED_LEGEND_GAP_PX
++  }, children: series.map((name, i) => name.trim() === "" ? null : (0, import_jsx_runtime4.jsxs)("span", { style: {
+     ...typeStyle(theme, "label", "regular", theme.text.tertiary),
+     display: "flex",
+     alignItems: "center",
+     gap: 6
+-  }, children: [(0, import_jsx_runtime3.jsx)("span", { style: { width: 6, height: 6, borderRadius: 9999, background: shade(i) } }), name] }, i)) }), (0, import_jsx_runtime3.jsx)("div", { style: {
++  }, children: [(0, import_jsx_runtime4.jsx)("span", { style: { width: 6, height: 6, borderRadius: 9999, background: shade(i) } }), name] }, i)) }), (0, import_jsx_runtime4.jsx)("div", { style: {
+     display: "grid",
+     gridTemplateColumns: `${labelCol}px minmax(${trackMin(width)}px,1fr)`,
+     alignItems: "center",
+     columnGap: STACKED_COLUMN_GAP_PX,
+-    rowGap: 4
+-  }, children: bars.map((bar, row) => (0, import_jsx_runtime3.jsxs)("div", { style: { display: "contents" }, children: [(0, import_jsx_runtime3.jsx)("span", { style: {
++    rowGap: STACKED_ROW_GAP_PX
++  }, children: bars.map((bar, row) => (0, import_jsx_runtime4.jsxs)("div", { style: { display: "contents" }, children: [(0, import_jsx_runtime4.jsx)("span", { style: {
+     ...typeStyle(theme, "body2", "regular", theme.text.secondary),
+     ...truncate,
+     textAlign: "right"
+-  }, children: bar.label }), (0, import_jsx_runtime3.jsxs)("span", { style: { display: "flex", minWidth: 0, alignItems: "center", gap: 8 }, children: [(0, import_jsx_runtime3.jsx)("span", { style: {
++  }, children: bar.label }), (0, import_jsx_runtime4.jsxs)("span", { style: { display: "flex", minWidth: 0, alignItems: "center", gap: 8 }, children: [(0, import_jsx_runtime4.jsx)("span", { style: {
+     display: "flex",
+     height: 10,
+     minWidth: 2,
+@@ -16176,24 +16296,25 @@
+     overflow: "hidden",
+     borderRadius: 2,
+     width: `max(2px, calc((100% - ${figureReserve}px) * ${(totals[row] ?? 0) / max}))`
+-  }, children: (parts[row] ?? []).map((v, i) => v > 0 ? (0, import_jsx_runtime3.jsx)("span", { style: {
++  }, children: (parts[row] ?? []).map((v, i) => v > 0 ? (0, import_jsx_runtime4.jsx)("span", { style: {
+     display: "block",
+     height: "100%",
+     flexGrow: v,
+     flexBasis: 0,
+     background: shade(i)
+-  } }, i) : null) }), (0, import_jsx_runtime3.jsx)("span", { style: {
++  } }, i) : null) }), (0, import_jsx_runtime4.jsx)("span", { style: {
+     ...typeStyle(theme, "body2", "regular", theme.text.primary),
+     ...tabularNums,
+     ...truncate,
+     maxWidth: `${STACKED_FIGURE_MAX_SHARE * 100}%`
+-  }, title: shown[row], children: shown[row] })] })] }, row)) })] });
++  }, title: shown[row], children: shown[row] })] })] }, row)) })] }) });
+ }
+ var COLUMNS_H = 132;
+ var COLUMNS_LABEL_ROW = 16;
+ var COLUMNS_GAP = 4;
+ var COLUMNS_PLOT_H = COLUMNS_H - 2 * (COLUMNS_LABEL_ROW + COLUMNS_GAP);
+ var COLUMNS_COLUMN_GAP = 8;
++var COLUMNS_COLUMN_MAX_W = 28;
+ function columnLabelPlace(i, fit) {
+   const { count, cellWidth, gap, labelWidth } = fit;
+   const rowWidth = count * cellWidth + Math.max(0, count - 1) * gap;
+@@ -16292,10 +16413,11 @@
+   const cellW = width === void 0 ? Number.POSITIVE_INFINITY : (width - gap * (count - 1)) / count;
+   const labelPx = Number.parseFloat(theme.font.label.fontSize);
+   const widest = (texts) => Math.max(0, ...texts.map((text) => estimateTextWidth(text, labelPx)));
+-  const labelBox = (i, text) => {
++  const cellSpan = (n) => n * cellW + (n - 1) * gap;
++  const labelSpot = (i, text) => {
+     const needed = estimateTextWidth(text, labelPx);
+     if (needed <= cellW || width === void 0) {
+-      return {};
++      return void 0;
+     }
+     const cells = Math.ceil((needed + COLUMNS_GAP) / cellW);
+     const spot = columnLabelPlace(i, {
+@@ -16304,13 +16426,35 @@
+       gap,
+       labelWidth: needed
+     });
+-    const cellSpan = (n) => n * cellW + (n - 1) * gap;
++    return {
++      edge: spot.edge,
++      maxWidth: spot.edge === "start" ? cellSpan(points.length - i) : spot.edge === "end" ? cellSpan(i + 1) : cellSpan(cells)
++    };
++  };
++  const labelBox = (i, text) => {
++    const spot = labelSpot(i, text);
++    if (spot === void 0) {
++      return {};
++    }
+     return {
+       ...truncate,
+       alignSelf: spot.edge === "start" ? "flex-start" : spot.edge === "end" ? "flex-end" : void 0,
+-      maxWidth: spot.edge === "start" ? cellSpan(points.length - i) : spot.edge === "end" ? cellSpan(i + 1) : cellSpan(cells)
++      maxWidth: spot.maxWidth
+     };
+   };
++  const valueBox = (i, text) => {
++    const spot = labelSpot(i, text);
++    if (spot === void 0) {
++      return { left: "50%", transform: "translateX(-50%)" };
++    }
++    if (spot.edge === "start") {
++      return { ...truncate, left: 0, maxWidth: spot.maxWidth };
++    }
++    if (spot.edge === "end") {
++      return { ...truncate, right: 0, maxWidth: spot.maxWidth };
++    }
++    return { ...truncate, left: "50%", transform: "translateX(-50%)", maxWidth: spot.maxWidth };
++  };
+   const shown = points.map((point, i) => {
+     const value = values[i] ?? Number.NaN;
+     return point.display ?? (Number.isFinite(value) ? formatFigure(value) : "");
+@@ -16332,14 +16476,14 @@
+   if (points.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime3.jsxs)("div", { ref, style: {
++  return (0, import_jsx_runtime4.jsx)(ChartCard, { children: (0, import_jsx_runtime4.jsxs)("div", { ref, style: {
+     position: "relative",
+     display: "grid",
+     height: COLUMNS_H,
+     alignItems: "end",
+     gap,
+     gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`
+-  }, children: [below > 0 ? (0, import_jsx_runtime3.jsx)("span", { "aria-hidden": true, style: {
++  }, children: [below > 0 ? (0, import_jsx_runtime4.jsx)("span", { "aria-hidden": true, style: {
+     position: "absolute",
+     left: 0,
+     right: 0,
+@@ -16354,35 +16498,38 @@
+     const label = typeStyle(theme, "label", on ? "medium" : "regular", on ? theme.text.primary : theme.text.tertiary);
+     const room = negative ? COLUMNS_PLOT_H - baseline : baseline;
+     const size = !readable || value === 0 ? 0 : Math.min(room, Math.max(4, Math.abs(value) / span * COLUMNS_PLOT_H));
+-    return (0, import_jsx_runtime3.jsxs)("div", { style: {
++    return (0, import_jsx_runtime4.jsxs)("div", { style: {
+       display: "flex",
+       height: "100%",
+       flexDirection: "column",
+       alignItems: "center",
+       gap: COLUMNS_GAP
+-    }, children: [(0, import_jsx_runtime3.jsx)("span", { style: {
++    }, children: [(0, import_jsx_runtime4.jsxs)("span", { style: { position: "relative", width: "100%", flexGrow: 1 }, children: [(0, import_jsx_runtime4.jsx)("span", { "data-column-value": true, style: {
+       ...label,
+       ...tabularNums,
++      position: "absolute",
++      bottom: `${COLUMNS_PLOT_H - baseline + (negative ? 0 : size) + COLUMNS_GAP}px`,
+       height: COLUMNS_LABEL_ROW,
++      lineHeight: `${COLUMNS_LABEL_ROW}px`,
+       whiteSpace: "nowrap",
+-      ...labelBox(i, shown[i] ?? "")
+-    }, children: shownValues.has(i) ? readable ? shown[i] : NO_READING : "" }), (0, import_jsx_runtime3.jsx)("span", { style: { position: "relative", width: "100%", flexGrow: 1 }, children: (0, import_jsx_runtime3.jsx)("span", { style: {
++      ...valueBox(i, shown[i] ?? "")
++    }, children: shownValues.has(i) ? readable ? shown[i] : NO_READING : "" }), (0, import_jsx_runtime4.jsx)("span", { style: {
+       position: "absolute",
+       left: "50%",
+       transform: "translateX(-50%)",
+       width: "100%",
+-      maxWidth: 28,
++      maxWidth: COLUMNS_COLUMN_MAX_W,
+       borderRadius: 3,
+       height: `${size}px`,
+-      ...negative ? { top: `${baseline}px` } : { bottom: `${COLUMNS_PLOT_H - baseline}px` },
++      ...negative ? { top: `${COLUMNS_LABEL_ROW + COLUMNS_GAP + baseline}px` } : { bottom: `${COLUMNS_PLOT_H - baseline}px` },
+       background: negative ? theme.dataviz.negative : full ? theme.dataviz.categorical[0] : theme.dataviz.singleSeriesRest
+-    } }) }), (0, import_jsx_runtime3.jsx)("span", { style: {
++    } })] }), (0, import_jsx_runtime4.jsx)("span", { style: {
+       ...label,
+       height: COLUMNS_LABEL_ROW,
+       whiteSpace: "nowrap",
+       ...labelBox(i, point.label)
+     }, children: shownLabels.has(i) ? point.label : "" })] }, i);
+-  })] });
++  })] }) });
+ }
+ var LINE_W = 560;
+ var LINE_H = 180;
+@@ -16418,8 +16565,8 @@
+ }
+ var NO_WIDTHS = /* @__PURE__ */ new Map();
+ function useMeasuredTextWidths(svg) {
+-  const [widths, setWidths] = (0, import_react6.useState)(NO_WIDTHS);
+-  (0, import_react6.useLayoutEffect)(() => {
++  const [widths, setWidths] = (0, import_react8.useState)(NO_WIDTHS);
++  (0, import_react8.useLayoutEffect)(() => {
+     const element = svg.current;
+     if (element === null) {
+       return;
+@@ -16460,7 +16607,7 @@
+   return picks.map((i) => written[i] ?? 0);
+ }
+ function LineSwatch({ color, dashed }) {
+-  return (0, import_jsx_runtime3.jsx)("svg", { width: 14, height: 2, "aria-hidden": true, style: { display: "block", flexShrink: 0 }, children: (0, import_jsx_runtime3.jsx)("line", { x1: 0, x2: 14, y1: 1, y2: 1, stroke: color, strokeWidth: 2, strokeDasharray: dashed ? "3 2" : void 0 }) });
++  return (0, import_jsx_runtime4.jsx)("svg", { width: 14, height: 2, "aria-hidden": true, style: { display: "block", flexShrink: 0 }, children: (0, import_jsx_runtime4.jsx)("line", { x1: 0, x2: 14, y1: 1, y2: 1, stroke: color, strokeWidth: 2, strokeDasharray: dashed ? "3 2" : void 0 }) });
+ }
+ function svgText(theme, fill) {
+   const style = theme.font.label;
+@@ -16604,9 +16751,9 @@
+   const plotW = Math.max(0, frame.right - frame.left);
+   const samePoint = (a, b) => Math.abs(a - b) < 1;
+   const overlaps = (tx, ty, width, except) => placed.some((other, at) => at !== except && other.width > 0 && tx < other.tx + other.width + 6 && other.tx < tx + width + 6 && Math.abs(ty - other.ty) < ANNOTATION_ROW);
+-  const labelsAt = (px) => placed.filter((other) => other.width > 0 && samePoint(other.px, px)).length;
+-  const spotFor = (px, py, width) => {
+-    const tx = Math.max(frame.left, Math.min(frame.right - width, px - width / 2));
++  const labelsAt = (px2) => placed.filter((other) => other.width > 0 && samePoint(other.px, px2)).length;
++  const spotFor = (px2, py, width) => {
++    const tx = Math.max(frame.left, Math.min(frame.right - width, px2 - width / 2));
+     const above = py - frame.top >= ANNOTATION_LIFT + frame.fontSize;
+     const baseline = (side, rows) => side === "above" ? py - ANNOTATION_LIFT - rows * ANNOTATION_ROW : py + ANNOTATION_LIFT + frame.fontSize * 0.75 + rows * ANNOTATION_ROW;
+     const sides = above ? ["above", "below"] : ["below", "above"];
+@@ -16699,11 +16846,11 @@
+   }
+   return placed;
+ }
+-function LineChart({ points, ceiling, floor: floorProp, unit = "", format, lines, secondary, labels, annotations }) {
++function LineChart({ points, ceiling, floor: floorProp, unit = "", format, lines, secondary, labels, annotations, legend: showLegend = true }) {
+   const theme = useGrokTheme();
+-  const areaId = `grok-line-area-${(0, import_react6.useId)().replace(/[^\w-]/g, "")}`;
++  const areaId = `grok-line-area-${(0, import_react8.useId)().replace(/[^\w-]/g, "")}`;
+   const { ref, width } = useBlockWidth();
+-  const svgRef = (0, import_react6.useRef)(null);
++  const svgRef = (0, import_react8.useRef)(null);
+   const measured = useMeasuredTextWidths(svgRef);
+   const color = theme.dataviz.categorical[0];
+   const comparison = theme.dataviz.other;
+@@ -16808,7 +16955,7 @@
+     ]
+   ];
+   const legend = [];
+-  if (labels !== void 0 || lines !== void 0) {
++  if (showLegend && (labels !== void 0 || lines !== void 0)) {
+     if (labels?.[0] !== void 0) {
+       legend.push({ name: labels[0], color, dashed: false });
+     }
+@@ -16823,30 +16970,30 @@
+   if (points.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime3.jsxs)("div", { ref, style: { position: "relative" }, children: [(0, import_jsx_runtime3.jsxs)("svg", { ref: svgRef, width: "100%", role: "img", ...width === void 0 ? { viewBox: `0 0 ${chartW} ${LINE_H}` } : { height: LINE_H }, style: {
+-    display: "block",
+-    overflow: "hidden",
+-    touchAction: "pan-y",
+-    ...width === void 0 ? { maxWidth: chartW, aspectRatio: `${chartW} / ${LINE_H}` } : {}
+-  }, onPointerMove: hover.onPointerMove, onPointerDown: hover.onPointerDown, onPointerLeave: hover.onPointerLeave, children: [area === void 0 ? null : (0, import_jsx_runtime3.jsx)("defs", { children: (0, import_jsx_runtime3.jsxs)("linearGradient", { id: areaId, x1: 0, y1: 0, x2: 0, y2: 1, children: [(0, import_jsx_runtime3.jsx)("stop", { offset: "0", stopColor: `${color}${theme.dataviz.areaAlpha}` }), (0, import_jsx_runtime3.jsx)("stop", { offset: "1", stopColor: `${color}00` })] }) }), ticks.map((tick, i) => (0, import_jsx_runtime3.jsxs)("g", { children: [(0, import_jsx_runtime3.jsx)("line", { x1: gutter, x2: plotRight, y1: y(tick), y2: y(tick), stroke: tick === 0 && floor < 0 ? theme.border.weak : theme.border.subtle, shapeRendering: "crispEdges" }), (0, import_jsx_runtime3.jsx)("text", { x: gutter - LINE_TICK_GAP, y: y(tick), textAnchor: "end", dominantBaseline: "middle", "data-measure": "", ...tickStyle, children: tickTexts[i] })] }, tick)), area === void 0 ? null : (0, import_jsx_runtime3.jsx)("path", { d: area, fill: `url(#${areaId})` }), hovered === void 0 ? null : (0, import_jsx_runtime3.jsx)("line", { "data-hover-guide": "", x1: x(hovered), x2: x(hovered), y1: LINE_PAD_TOP, y2: LINE_PAD_TOP + plotH, stroke: theme.border.strong, strokeWidth: 1, shapeRendering: "crispEdges" }), comparisonValues === void 0 ? null : (0, import_jsx_runtime3.jsx)("path", { d: path(comparisonValues), fill: "none", stroke: comparison, strokeWidth: 1.25, strokeDasharray: "3 3", strokeLinejoin: "round" }), series.map((line, s) => (0, import_jsx_runtime3.jsxs)("g", { children: [(0, import_jsx_runtime3.jsx)("path", { d: path(line), fill: "none", stroke: seriesColor(theme, s), strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round" }), dots ? line.map((v, i) => Number.isFinite(v) ? (0, import_jsx_runtime3.jsx)("circle", { cx: x(i), cy: y(v), r: i === hovered ? 4.5 : 2.5, fill: i === hovered ? theme.bg.base : seriesColor(theme, s), stroke: seriesColor(theme, s), strokeWidth: i === hovered ? 2 : 0 }, i) : null) : null] }, s)), axisUnit === void 0 ? null : (0, import_jsx_runtime3.jsx)("text", { x: axisUnitX, y: LINE_H - 4, textAnchor: "start", "data-measure": "", ...tickStyle, children: axisUnit }), xLabels.map((label) => (0, import_jsx_runtime3.jsx)("text", { x: label.cx, y: LINE_H - 4, textAnchor: label.anchor, "data-measure": "", ...tickStyle, children: label.text }, label.key)), notes.map((note, i) => {
+-    const above = note.ty < note.py;
+-    const labelled = note.kind !== "ring";
+-    return (0, import_jsx_runtime3.jsxs)("g", { children: [(0, import_jsx_runtime3.jsx)("title", { children: note.title }), labelled ? (0, import_jsx_runtime3.jsx)("line", { x1: note.px, x2: note.px, y1: above ? note.py - 5 : note.py + 5, y2: above ? note.ty + 3 : note.ty - tickFontPx * 0.75 - 3, stroke: theme.border.strong, strokeWidth: 1 }) : null, note.kind === "more" ? null : (0, import_jsx_runtime3.jsx)("circle", { cx: note.px, cy: note.py, r: 3.5, fill: note.color, stroke: theme.bg.base, strokeWidth: 1.5 }), labelled ? (0, import_jsx_runtime3.jsx)("text", { x: note.tx, y: note.ty, textAnchor: "start", "data-measure": "", paintOrder: "stroke", stroke: theme.bg.base, strokeWidth: 3, strokeLinejoin: "round", ...noteStyle, children: note.label }) : null] }, i);
+-  })] }), hovered === void 0 ? null : (0, import_jsx_runtime3.jsx)(Detail, { label: points[hovered]?.label ?? "", rows: detailRows(hovered), format: detailFigure, left: x(hovered), chartW }), legend.length === 0 ? null : (0, import_jsx_runtime3.jsx)("div", { style: {
++  return (0, import_jsx_runtime4.jsx)(ChartCard, { children: (0, import_jsx_runtime4.jsxs)("div", { ref, children: [legend.length === 0 ? null : (0, import_jsx_runtime4.jsx)("div", { style: {
+     ...typeStyle(theme, "label", "regular", theme.text.tertiary),
+     display: "flex",
+     flexWrap: "wrap",
+     alignItems: "center",
+     columnGap: 16,
+     rowGap: 4,
+-    marginTop: 6
+-  }, children: legend.map((entry, i) => (0, import_jsx_runtime3.jsxs)("span", { style: { display: "flex", alignItems: "center", gap: 6 }, children: [(0, import_jsx_runtime3.jsx)(LineSwatch, { color: entry.color, dashed: entry.dashed }), entry.name] }, i)) })] });
++    marginBottom: LEGEND_GAP
++  }, children: legend.map((entry, i) => (0, import_jsx_runtime4.jsxs)("span", { style: { display: "flex", alignItems: "center", gap: 6 }, children: [(0, import_jsx_runtime4.jsx)(LineSwatch, { color: entry.color, dashed: entry.dashed }), entry.name] }, i)) }), (0, import_jsx_runtime4.jsxs)("div", { style: { position: "relative" }, children: [(0, import_jsx_runtime4.jsxs)("svg", { ref: svgRef, width: "100%", role: "img", ...width === void 0 ? { viewBox: `0 0 ${chartW} ${LINE_H}` } : { height: LINE_H }, style: {
++    display: "block",
++    overflow: "hidden",
++    touchAction: "pan-y",
++    ...width === void 0 ? { maxWidth: chartW, aspectRatio: `${chartW} / ${LINE_H}` } : {}
++  }, onPointerMove: hover.onPointerMove, onPointerDown: hover.onPointerDown, onPointerLeave: hover.onPointerLeave, children: [area === void 0 ? null : (0, import_jsx_runtime4.jsx)("defs", { children: (0, import_jsx_runtime4.jsxs)("linearGradient", { id: areaId, x1: 0, y1: 0, x2: 0, y2: 1, children: [(0, import_jsx_runtime4.jsx)("stop", { offset: "0", stopColor: `${color}${theme.dataviz.areaAlpha}` }), (0, import_jsx_runtime4.jsx)("stop", { offset: "1", stopColor: `${color}00` })] }) }), ticks.map((tick, i) => (0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("line", { x1: gutter, x2: plotRight, y1: y(tick), y2: y(tick), stroke: tick === 0 && floor < 0 ? theme.border.weak : theme.border.subtle, shapeRendering: "crispEdges" }), (0, import_jsx_runtime4.jsx)("text", { x: gutter - LINE_TICK_GAP, y: y(tick), textAnchor: "end", dominantBaseline: "middle", "data-measure": "", ...tickStyle, children: tickTexts[i] })] }, tick)), area === void 0 ? null : (0, import_jsx_runtime4.jsx)("path", { d: area, fill: `url(#${areaId})` }), hovered === void 0 ? null : (0, import_jsx_runtime4.jsx)("line", { "data-hover-guide": "", x1: x(hovered), x2: x(hovered), y1: LINE_PAD_TOP, y2: LINE_PAD_TOP + plotH, stroke: theme.border.strong, strokeWidth: 1, shapeRendering: "crispEdges" }), comparisonValues === void 0 ? null : (0, import_jsx_runtime4.jsx)("path", { d: path(comparisonValues), fill: "none", stroke: comparison, strokeWidth: 1.25, strokeDasharray: "3 3", strokeLinejoin: "round" }), series.map((line, s) => (0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("path", { d: path(line), fill: "none", stroke: seriesColor(theme, s), strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round" }), dots ? line.map((v, i) => Number.isFinite(v) ? (0, import_jsx_runtime4.jsx)("circle", { cx: x(i), cy: y(v), r: i === hovered ? 4.5 : 2.5, fill: i === hovered ? theme.bg.base : seriesColor(theme, s), stroke: seriesColor(theme, s), strokeWidth: i === hovered ? 2 : 0 }, i) : null) : null] }, s)), axisUnit === void 0 ? null : (0, import_jsx_runtime4.jsx)("text", { x: axisUnitX, y: LINE_H - 4, textAnchor: "start", "data-measure": "", ...tickStyle, children: axisUnit }), xLabels.map((label) => (0, import_jsx_runtime4.jsx)("text", { x: label.cx, y: LINE_H - 4, textAnchor: label.anchor, "data-measure": "", ...tickStyle, children: label.text }, label.key)), notes.map((note, i) => {
++    const above = note.ty < note.py;
++    const labelled = note.kind !== "ring";
++    return (0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("title", { children: note.title }), labelled ? (0, import_jsx_runtime4.jsx)("line", { x1: note.px, x2: note.px, y1: above ? note.py - 5 : note.py + 5, y2: above ? note.ty + 3 : note.ty - tickFontPx * 0.75 - 3, stroke: theme.border.strong, strokeWidth: 1 }) : null, note.kind === "more" ? null : (0, import_jsx_runtime4.jsx)("circle", { cx: note.px, cy: note.py, r: 3.5, fill: note.color, stroke: theme.bg.base, strokeWidth: 1.5 }), labelled ? (0, import_jsx_runtime4.jsx)("text", { x: note.tx, y: note.ty, textAnchor: "start", "data-measure": "", paintOrder: "stroke", stroke: theme.bg.base, strokeWidth: 3, strokeLinejoin: "round", ...noteStyle, children: note.label }) : null] }, i);
++  })] }), hovered === void 0 ? null : (0, import_jsx_runtime4.jsx)(Detail, { label: points[hovered]?.label ?? "", rows: detailRows(hovered), format: detailFigure, left: x(hovered), chartW })] })] }) });
+ }
+ var PIE_HOLE_W = 54;
+ var PIE_LEGEND_FIGURE_MAX_SHARE = 0.5;
+ var PIE_LEGEND_TOUCH_ROW_PX = 44;
+ function isPercentage(text) {
+-  return /^\s*[-+]?\d[\d.,]*\s*%\s*$/.test(text);
++  return /^\s*[-+]?\d[\d.,]*\s*%\s*$/.test(text) || /\d\s*%\)?\s*$/.test(text);
+ }
+ function Pie({ parts: given, total: showTotal, label }) {
+   const theme = useGrokTheme();
+@@ -16858,7 +17005,7 @@
+   const sum = sizes.reduce((acc, v) => acc + v, 0);
+   const total = sum || 1;
+   const signature = parts.map((part) => part.label).join("\0");
+-  const [picked, setPicked] = (0, import_react6.useState)(void 0);
++  const [picked, setPicked] = (0, import_react8.useState)(void 0);
+   const hovered = picked !== void 0 && picked.signature === signature ? picked.index : void 0;
+   const setHovered = (index) => setPicked(index === void 0 ? void 0 : { index, signature });
+   const touch = useCoarsePointer();
+@@ -16869,7 +17016,7 @@
+   const C = 2 * Math.PI * R;
+   let offset = 0;
+   const totalText = showTotal === void 0 || showTotal === false ? void 0 : showTotal === true ? parts.every((part) => Number.isInteger(part.value)) ? sum.toLocaleString("en-US") : void 0 : typeof showTotal === "number" ? Number.isFinite(showTotal) ? showTotal.toLocaleString("en-US") : void 0 : showTotal;
+-  const totalType = totalText === void 0 ? "body1" : estimateTextWidth(totalText, 14) <= PIE_HOLE_W ? "body1" : estimateTextWidth(totalText, 12) <= PIE_HOLE_W ? "label" : "caption";
++  const totalType = totalText === void 0 ? "subtext" : estimateTextWidth(totalText, 14) <= PIE_HOLE_W ? "subtext" : estimateTextWidth(totalText, 12) <= PIE_HOLE_W ? "label" : "caption";
+   const leave = (event) => {
+     if (event.pointerType !== "touch") {
+       setHovered(void 0);
+@@ -16884,7 +17031,7 @@
+     event.stopPropagation();
+     setHovered(event.pointerType === "touch" && hovered === i ? void 0 : i);
+   };
+-  return (0, import_jsx_runtime3.jsxs)("div", { ref, "data-pie": true, style: {
++  return (0, import_jsx_runtime4.jsx)(ChartCard, { children: (0, import_jsx_runtime4.jsxs)("div", { ref, "data-pie": true, style: {
+     display: "flex",
+     flexDirection: narrow ? "column" : "row",
+     alignItems: narrow ? "stretch" : "center",
+@@ -16894,20 +17041,19 @@
+     if (event.pointerType === "touch") {
+       setHovered(void 0);
+     }
+-  }, children: [(0, import_jsx_runtime3.jsxs)("div", { style: {
++  }, children: [(0, import_jsx_runtime4.jsxs)("div", { style: {
+     position: "relative",
+     width: 120,
+     height: 120,
+-    flexShrink: 0,
+-    alignSelf: narrow ? "center" : void 0
+-  }, children: [(0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 120 120", role: "img", "aria-label": parts.map((p, i) => `${p.display ?? sizes[i] ?? 0} ${p.label}`).join(", "), style: { width: 120, height: 120, display: "block", transform: "rotate(-90deg)" }, children: [(0, import_jsx_runtime3.jsx)("circle", { cx: 60, cy: 60, r: R, fill: "none", stroke: theme.fill.secondary, strokeWidth: 24 }), sizes.map((size, i) => {
++    flexShrink: 0
++  }, children: [(0, import_jsx_runtime4.jsxs)("svg", { viewBox: "0 0 120 120", role: "img", "aria-label": parts.map((p, i) => `${p.display ?? sizes[i] ?? 0} ${p.label}`).join(", "), style: { width: 120, height: 120, display: "block", transform: "rotate(-90deg)" }, children: [(0, import_jsx_runtime4.jsx)("circle", { cx: 60, cy: 60, r: R, fill: "none", stroke: theme.fill.secondary, strokeWidth: 24 }), sizes.map((size, i) => {
+     const length = size / total * C;
+     const dash = Math.max(0, length - (parts.length > 1 ? 1.5 : 0));
+     const on = hovered === i;
+-    const circle = (0, import_jsx_runtime3.jsx)("circle", { "data-pie-part": i, cx: 60, cy: 60, r: R, fill: "none", stroke: shade(i), strokeWidth: on ? 30 : 24, strokeDasharray: `${dash} ${C - dash}`, strokeDashoffset: -offset, opacity: hovered === void 0 || on ? 1 : 0.35, onPointerEnter: enter(i), onPointerDown: pick(i), style: { transition: "stroke-width 120ms ease, opacity 120ms ease" } }, i);
++    const circle = (0, import_jsx_runtime4.jsx)("circle", { "data-pie-part": i, cx: 60, cy: 60, r: R, fill: "none", stroke: shade(i), strokeWidth: on ? 30 : 24, strokeDasharray: `${dash} ${C - dash}`, strokeDashoffset: -offset, opacity: hovered === void 0 || on ? 1 : 0.35, onPointerEnter: enter(i), onPointerDown: pick(i), style: { transition: "stroke-width 120ms ease, opacity 120ms ease" } }, i);
+     offset += length;
+     return circle;
+-  })] }), totalText === void 0 ? null : (0, import_jsx_runtime3.jsxs)("div", { "data-pie-total": true, style: {
++  })] }), totalText === void 0 ? null : (0, import_jsx_runtime4.jsxs)("div", { "data-pie-total": true, style: {
+     position: "absolute",
+     inset: 0,
+     display: "flex",
+@@ -16916,21 +17062,21 @@
+     justifyContent: "center",
+     pointerEvents: "none",
+     textAlign: "center"
+-  }, children: [(0, import_jsx_runtime3.jsx)("span", { "data-pie-total-figure": true, style: {
++  }, children: [(0, import_jsx_runtime4.jsx)("span", { "data-pie-total-figure": true, style: {
+     ...typeStyle(theme, totalType, "medium", theme.text.primary),
+     ...tabularNums,
+     maxWidth: PIE_HOLE_W,
+     ...truncate
+-  }, children: totalText }), label === void 0 ? null : (0, import_jsx_runtime3.jsx)("span", { "data-pie-total-label": true, style: {
++  }, children: totalText }), label === void 0 ? null : (0, import_jsx_runtime4.jsx)("span", { "data-pie-total-label": true, style: {
+     ...typeStyle(theme, "caption", "regular", theme.text.tertiary),
+     maxWidth: PIE_HOLE_W,
+     ...truncate
+-  }, children: label })] })] }), (0, import_jsx_runtime3.jsx)("div", { style: { display: "flex", minWidth: 0, flexDirection: "column", gap: touch ? 0 : 6 }, children: parts.map((part, i) => {
++  }, children: label })] })] }), (0, import_jsx_runtime4.jsx)("div", { style: { display: "flex", minWidth: 0, flexDirection: "column", gap: touch ? 0 : 6 }, children: parts.map((part, i) => {
+     const share = `${Math.round((sizes[i] ?? 0) / total * 100)}%`;
+     const shown = part.display ?? (sizes[i] ?? 0).toLocaleString("en-US");
+     const showShare = !(isPercentage(shown) || shown === share);
+     const on = hovered === i;
+-    return (0, import_jsx_runtime3.jsxs)("span", { "data-pie-legend": i, onPointerEnter: enter(i), onPointerDown: pick(i), style: {
++    return (0, import_jsx_runtime4.jsxs)("span", { "data-pie-legend": i, onPointerEnter: enter(i), onPointerDown: pick(i), style: {
+       ...typeStyle(theme, "body2", on ? "medium" : "regular", on ? theme.text.primary : theme.text.secondary),
+       display: "flex",
+       alignItems: "center",
+@@ -16938,30 +17084,35 @@
+       // A legend row is a tap target under a finger, so it grows to the kit's 44 px.
+       minHeight: touch ? PIE_LEGEND_TOUCH_ROW_PX : void 0,
+       opacity: hovered === void 0 || on ? 1 : 0.5
+-    }, children: [(0, import_jsx_runtime3.jsx)("span", { style: {
++    }, children: [(0, import_jsx_runtime4.jsx)("span", { style: {
+       width: 8,
+       height: 8,
+       flexShrink: 0,
+       borderRadius: 9999,
+       background: shade(i)
+-    } }), (0, import_jsx_runtime3.jsx)("span", { style: {
++    } }), (0, import_jsx_runtime4.jsx)("span", { style: {
+       ...tabularNums,
+       ...truncate,
+       flex: "0 0 auto",
+       maxWidth: `${PIE_LEGEND_FIGURE_MAX_SHARE * 100}%`,
+       ...i === 0 ? { fontWeight: theme.weight.medium, color: theme.text.primary } : {}
+-    }, title: shown, children: shown }), (0, import_jsx_runtime3.jsx)("span", { style: { ...truncate, flex: "0 100 auto" }, title: part.label, children: part.label }), showShare ? (0, import_jsx_runtime3.jsx)("span", { style: {
++    }, title: shown, children: shown }), (0, import_jsx_runtime4.jsx)("span", { style: { ...truncate, flex: "0 100 auto" }, title: part.label, children: part.label }), showShare ? (0, import_jsx_runtime4.jsx)("span", { style: {
+       ...tabularNums,
+       flexShrink: 0,
+       whiteSpace: "nowrap",
+       color: theme.text.tertiary
+     }, children: share }) : null] }, i);
+-  }) })] });
++  }) })] }) });
+ }
++markBlockKind(Bars, "chart");
++markBlockKind(StackedBars, "chart");
++markBlockKind(Columns, "chart");
++markBlockKind(LineChart, "chart");
++markBlockKind(Pie, "chart");
+ 
+ // ../canvas-components/dist/grok/charts-series.js
+-var import_jsx_runtime4 = __toESM(require_jsx_runtime(), 1);
+-var import_react7 = __toESM(require_react(), 1);
++var import_jsx_runtime5 = __toESM(require_jsx_runtime(), 1);
++var import_react9 = __toESM(require_react(), 1);
+ var CHART_H = 180;
+ var PAD_LEFT_MIN = 52;
+ var GUTTER_MAX_SHARE = 0.35;
+@@ -16972,6 +17123,9 @@
+ var PAD_TOP = 10;
+ var FALLBACK_W = 560;
+ var COLUMN_MAX_W = 28;
++var COLUMN_MAX_SHARE = 0.33;
++var STACK_MAX_W = 48;
++var GROUP_MAX_W = 64;
+ var COLUMN_GAP = 2;
+ var COLUMN_MIN_W = 4;
+ var BAND_FILL = 0.72;
+@@ -16980,13 +17134,7 @@
+   if (!(max > 0)) {
+     return 1;
+   }
+-  const power = 10 ** Math.floor(Math.log10(max));
+-  for (const step of [1, 2, 5, 10]) {
+-    if (step * power >= max) {
+-      return step * power;
+-    }
+-  }
+-  return 10 * power;
++  return niceCeiling(max);
+ }
+ function svgText2(theme, fill) {
+   const style = theme.font.label;
+@@ -16999,20 +17147,20 @@
+ }
+ function Legend({ names, comparison = [], dots = false }) {
+   const theme = useGrokTheme();
+-  return (0, import_jsx_runtime4.jsx)("div", { role: "list", style: {
++  return (0, import_jsx_runtime5.jsx)("div", { role: "list", style: {
+     ...typeStyle(theme, "label", "regular", theme.text.tertiary),
+     display: "flex",
+     flexWrap: "wrap",
+     alignItems: "center",
+     columnGap: 16,
+     rowGap: 4,
+-    marginTop: 6
++    marginBottom: LEGEND_GAP
+   }, children: names.map((name, i) => {
+     const dashed = comparison.includes(i);
+-    return (0, import_jsx_runtime4.jsxs)("span", { role: "listitem", style: { display: "flex", alignItems: "center", gap: 6 }, children: [(0, import_jsx_runtime4.jsx)(Swatch, { color: dashed ? theme.dataviz.other : seriesColor(theme, i), dashed, dot: dots }), name] }, i);
++    return (0, import_jsx_runtime5.jsxs)("span", { role: "listitem", style: { display: "flex", alignItems: "center", gap: 6 }, children: [(0, import_jsx_runtime5.jsx)(Swatch, { color: dashed ? theme.dataviz.other : seriesColor(theme, i), dashed, dot: dots }), name] }, i);
+   }) });
+ }
+-function ColumnSeries({ labels, series, stacked = false, ceiling, unit = "", format, reference }) {
++function ColumnSeries({ labels, series, stacked = false, ceiling, unit = "", format, reference, legend = true }) {
+   const theme = useGrokTheme();
+   const { ref, width } = useBlockWidth();
+   const at = (s, i) => finite(s.values[i]);
+@@ -17051,16 +17199,19 @@
+   const y = (value) => PAD_TOP + plotH - (Math.min(Math.max(value, bottom), top) - bottom) / (top - bottom) * plotH;
+   const hover = useHoveredIndex(centers, labels);
+   const hovered = hover.index;
+-  const [scrollLeft, setScrollLeft] = (0, import_react7.useState)(0);
++  const [scrollLeft, setScrollLeft] = (0, import_react9.useState)(0);
+   const panned = scrolls ? scrollLeft : 0;
+-  const columnW = Math.max(1, Math.min(COLUMN_MAX_W, (band * BAND_FILL - COLUMN_GAP * (perGroup - 1)) / perGroup));
++  const designMaxW = series.length <= 1 ? COLUMN_MAX_W : stacked ? STACK_MAX_W : (GROUP_MAX_W - COLUMN_GAP * (perGroup - 1)) / perGroup;
++  const columnMaxW = Math.min(designMaxW, Math.max(COLUMN_MAX_W, band * COLUMN_MAX_SHARE / perGroup));
++  const columnW = Math.max(1, Math.min(columnMaxW, (band * BAND_FILL - COLUMN_GAP * (perGroup - 1)) / perGroup));
+   const groupW = columnW * perGroup + COLUMN_GAP * (perGroup - 1);
+   const baseY = y(0);
+   const xLabels = fitXLabels(lineLabelIndices(labels).map((i) => {
+     const text = labels[i] ?? "";
+-    const anchor = i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle";
+-    const cx = anchor === "start" ? padLeft : anchor === "end" ? chartW : centers[i] ?? 0;
++    const center = centers[i] ?? 0;
+     const w = textWidth(text);
++    const anchor = center - w / 2 < padLeft ? "start" : center + w / 2 > chartW ? "end" : "middle";
++    const cx = anchor === "start" ? padLeft : anchor === "end" ? chartW : center;
+     const left = anchor === "start" ? cx : anchor === "end" ? cx - w : cx - w / 2;
+     return { key: i, text, anchor, cx, left, right: left + w };
+   }));
+@@ -17069,7 +17220,7 @@
+   if (labels.length === 0 || series.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime4.jsxs)("div", { ref, style: { position: "relative" }, children: [(0, import_jsx_runtime4.jsx)("div", { "data-chart-scroller": scrolls ? "" : void 0, style: { overflowX: scrolls ? "auto" : void 0 }, onScroll: scrolls ? (event) => setScrollLeft(event.currentTarget.scrollLeft) : void 0, children: (0, import_jsx_runtime4.jsxs)("svg", {
++  return (0, import_jsx_runtime5.jsx)(ChartCard, { children: (0, import_jsx_runtime5.jsxs)("div", { ref, children: [legend ? (0, import_jsx_runtime5.jsx)(Legend, { names: series.map((s) => s.name), dots: stacked }) : null, (0, import_jsx_runtime5.jsxs)("div", { style: { position: "relative" }, children: [(0, import_jsx_runtime5.jsx)("div", { "data-chart-scroller": scrolls ? "" : void 0, style: { overflowX: scrolls ? "auto" : void 0 }, onScroll: scrolls ? (event) => setScrollLeft(event.currentTarget.scrollLeft) : void 0, children: (0, import_jsx_runtime5.jsxs)("svg", {
+     width: scrolls ? chartW : "100%",
+     height: CHART_H,
+     role: "img",
+@@ -17078,10 +17229,10 @@
+     onPointerMove: hover.onPointerMove,
+     onPointerDown: hover.onPointerDown,
+     onPointerLeave: hover.onPointerLeave,
+-    children: [ticks.map((tick) => (0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("line", { x1: padLeft, x2: plotRight, y1: y(tick), y2: y(tick), stroke: tick === 0 && bottom < 0 ? theme.border.weak : theme.border.subtle, shapeRendering: "crispEdges" }), (0, import_jsx_runtime4.jsx)("text", { x: padLeft - TICK_GAP, y: y(tick), textAnchor: "end", dominantBaseline: "middle", ...tickStyle, children: tickLabel(tick) })] }, tick)), hovered === void 0 ? null : (0, import_jsx_runtime4.jsx)("rect", { "data-hover-band": true, x: padLeft + band * hovered, y: PAD_TOP, width: band, height: plotH, fill: theme.fill.secondary }), labels.map((_, li) => {
++    children: [ticks.map((tick) => (0, import_jsx_runtime5.jsxs)("g", { children: [(0, import_jsx_runtime5.jsx)("line", { x1: padLeft, x2: plotRight, y1: y(tick), y2: y(tick), stroke: tick === 0 && bottom < 0 ? theme.border.weak : theme.border.subtle, shapeRendering: "crispEdges" }), (0, import_jsx_runtime5.jsx)("text", { x: padLeft - TICK_GAP, y: y(tick), textAnchor: "end", dominantBaseline: "middle", ...tickStyle, children: tickLabel(tick) })] }, tick)), hovered === void 0 ? null : (0, import_jsx_runtime5.jsx)("rect", { "data-hover-band": true, x: padLeft + band * hovered, y: PAD_TOP, width: band, height: plotH, fill: theme.fill.secondary }), labels.map((_, li) => {
+       const groupX = (centers[li] ?? 0) - groupW / 2;
+       let stackTop = 0;
+-      return (0, import_jsx_runtime4.jsx)("g", { "data-column-group": true, children: series.map((s, si) => {
++      return (0, import_jsx_runtime5.jsx)("g", { "data-column-group": true, children: series.map((s, si) => {
+         const raw = at(s, li);
+         if (raw === void 0) {
+           return null;
+@@ -17097,15 +17248,15 @@
+         const end = y(to);
+         const negative = value < 0;
+         const h = Math.max(Math.abs(start - end), value === 0 ? 0 : 2);
+-        return (0, import_jsx_runtime4.jsx)("rect", { "data-series": s.name, "data-negative": negative ? "" : void 0, x, y: negative ? start : start - h, width: columnW, height: h, rx: stacked ? 0 : 3, fill: negative ? theme.dataviz.negative : colorOf(si) }, si);
++        return (0, import_jsx_runtime5.jsx)("rect", { "data-series": s.name, "data-negative": negative ? "" : void 0, x, y: negative ? start : start - h, width: columnW, height: h, rx: stacked ? 0 : 3, fill: negative ? theme.dataviz.negative : colorOf(si) }, si);
+       }) }, li);
+-    }), !referenceShown ? null : (0, import_jsx_runtime4.jsxs)("g", { "data-reference-line": true, children: [(0, import_jsx_runtime4.jsx)("line", { x1: padLeft, x2: plotRight, y1: y(referenceValue ?? 0), y2: y(referenceValue ?? 0), stroke: theme.border.strong, strokeWidth: 1, strokeDasharray: "4 3", shapeRendering: "crispEdges" }), (0, import_jsx_runtime4.jsx)("text", { x: plotRight, y: referenceLabelY({ lineY: y(referenceValue ?? 0), fontPx: tickFontPx }), textAnchor: "end", ...tickStyle, children: clipText2(reference.label, plotW - 8, textWidth) })] }), axisUnit === void 0 ? null : (0, import_jsx_runtime4.jsx)("text", { "data-axis-unit": true, x: padLeft - TICK_GAP, y: CHART_H - 4, textAnchor: "end", ...tickStyle, children: clipText2(axisUnit, padLeft - TICK_GAP - 4, textWidth) }), xLabels.map((label) => (0, import_jsx_runtime4.jsx)("text", { x: label.cx, y: CHART_H - 4, textAnchor: label.anchor, ...tickStyle, children: label.text }, label.key))]
+-  }) }), hovered === void 0 ? null : (0, import_jsx_runtime4.jsx)(Detail, { label: labels[hovered] ?? "", rows: series.flatMap((s, i) => {
++    }), !referenceShown ? null : (0, import_jsx_runtime5.jsxs)("g", { "data-reference-line": true, children: [(0, import_jsx_runtime5.jsx)("line", { x1: padLeft, x2: plotRight, y1: y(referenceValue ?? 0), y2: y(referenceValue ?? 0), stroke: theme.border.strong, strokeWidth: 1, strokeDasharray: "4 3", shapeRendering: "crispEdges" }), (0, import_jsx_runtime5.jsx)("text", { x: plotRight, y: referenceLabelY({ lineY: y(referenceValue ?? 0), fontPx: tickFontPx }), textAnchor: "end", ...tickStyle, children: clipText2(reference.label, plotW - 8, textWidth) })] }), axisUnit === void 0 ? null : (0, import_jsx_runtime5.jsx)("text", { "data-axis-unit": true, x: padLeft - TICK_GAP, y: CHART_H - 4, textAnchor: "end", ...tickStyle, children: clipText2(axisUnit, padLeft - TICK_GAP - 4, textWidth) }), xLabels.map((label) => (0, import_jsx_runtime5.jsx)("text", { x: label.cx, y: CHART_H - 4, textAnchor: label.anchor, ...tickStyle, children: label.text }, label.key))]
++  }) }), hovered === void 0 ? null : (0, import_jsx_runtime5.jsx)(Detail, { label: labels[hovered] ?? "", rows: series.flatMap((s, i) => {
+     if (hovered >= s.values.length) {
+       return [];
+     }
+     return [{ name: s.name, color: colorOf(i), value: at(s, hovered) ?? Number.NaN }];
+-  }), format: figure, total: stacked ? sums[hovered] : void 0, left: (centers[hovered] ?? 0) - panned, chartW: blockW, dots: stacked }), (0, import_jsx_runtime4.jsx)(Legend, { names: series.map((s) => s.name), dots: stacked })] });
++  }), format: figure, total: stacked ? sums[hovered] : void 0, left: (centers[hovered] ?? 0) - panned, chartW: blockW, dots: stacked })] })] }) });
+ }
+ function niceFloorStep(max) {
+   if (!(max > 0)) {
+@@ -17138,6 +17289,7 @@
+ }
+ var SVG_STYLE = { display: "block", overflow: "hidden", touchAction: "pan-y" };
+ var SVG_STYLE_SCROLLING = { ...SVG_STYLE, touchAction: "pan-x pan-y" };
++markBlockKind(ColumnSeries, "chart");
+ 
+ // ../canvas-components/dist/dag-layout.js
+ function findBackEdges(nodeIds, edges, nodeSet) {
+@@ -17378,12 +17530,12 @@
+ }
+ 
+ // ../canvas-components/dist/grok/components.js
+-var import_jsx_runtime5 = __toESM(require_jsx_runtime(), 1);
+-var import_react9 = __toESM(require_react(), 1);
++var import_jsx_runtime6 = __toESM(require_jsx_runtime(), 1);
++var import_react11 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/grok/heading-line.js
+-var import_react8 = __toESM(require_react(), 1);
+-var HeadingLineContext = (0, import_react8.createContext)(false);
++var import_react10 = __toESM(require_react(), 1);
++var HeadingLineContext = (0, import_react10.createContext)(false);
+ 
+ // ../canvas-components/dist/grok/width.js
+ function pageWidthStyle(width) {
+@@ -17400,7 +17552,13 @@
+ // ../canvas-components/dist/grok/components.js
+ function Page({ title, summary, width = "column", children }) {
+   const theme = useGrokTheme();
+-  return (0, import_jsx_runtime5.jsxs)("div", { style: {
++  const blocks = import_react11.Children.toArray(children);
++  const gaps = gapsBetween(blocks, {
++    afterHeading: summary === void 0 ? RHYTHM.afterTitle : void 0,
++    precededBy: summary === void 0 ? void 0 : "text",
++    beforeSection: SECTION_LEVELS[0].before
++  });
++  return (0, import_jsx_runtime6.jsxs)("div", { style: {
+     ...pageWidthStyle(width),
+     fontFamily: theme.font.family,
+     color: theme.text.primary,
+@@ -17412,33 +17570,61 @@
+     // slot that keeps one line does so with `nowrap`, so a squeezed
+     // figure never shatters inside the number; a `Table` opts out whole.
+     overflowWrap: "anywhere"
+-  }, children: [(0, import_jsx_runtime5.jsx)("h1", { style: typeStyle(theme, "heading1", "medium", theme.text.primary), children: title }), summary === void 0 ? null : (0, import_jsx_runtime5.jsx)("p", { style: {
+-    ...typeStyle(theme, "body1", "regular", theme.text.secondary),
+-    marginTop: 10
+-  }, children: summary }), (0, import_jsx_runtime5.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: 28, marginTop: 28 }, children })] });
+-}
+-var FOLD_POINTER_HIT = { padding: 0, margin: 0 };
+-var FOLD_TOUCH_HIT = { padding: "10px 0", margin: "-10px 0" };
+-var FOLD_CHEVRON_TOP_PX = 7;
+-function Chevron({ open, color }) {
+-  return (0, import_jsx_runtime5.jsx)("svg", { width: 10, height: 10, viewBox: "0 0 12 12", "aria-hidden": true, style: {
++  }, children: [(0, import_jsx_runtime6.jsx)("h1", { style: typeStyle(theme, "heading1", "semibold", theme.text.primary), children: title }), summary === void 0 ? null : (0, import_jsx_runtime6.jsx)("p", { style: {
++    ...typeStyle(theme, "body1", "regular", theme.text.primary),
++    marginTop: RHYTHM.afterTitle
++  }, children: summary }), blocks.map((block, i) => (0, import_jsx_runtime6.jsx)("div", { style: { marginTop: gaps[i] }, children: block }, i))] });
++}
++var SECTION_LEVELS = [
++  { tag: "h2", type: "heading2", weight: "semibold", before: 64, after: 16 },
++  { tag: "h3", type: "heading3", weight: "medium", before: 48, after: 12 },
++  { tag: "h4", type: "body1", weight: "semibold", before: RHYTHM.embed, after: 16 }
++];
++function sectionLevel(depth) {
++  return SECTION_LEVELS[Math.min(Math.max(depth, 0), SECTION_LEVELS.length - 1)];
++}
++var FOLD_TOUCH_HIT_PX = 44;
++var CHEVRON_PX = 10;
++function foldHit(touch, lineHeightPx) {
++  if (!touch) {
++    return { padding: 0, margin: 0 };
++  }
++  const pad = Math.max(0, (FOLD_TOUCH_HIT_PX - lineHeightPx) / 2);
++  return { padding: `${pad}px 0`, margin: `${-pad}px 0` };
++}
++function px(length) {
++  return Number.parseFloat(length);
++}
++function Chevron({ open, color, lineHeightPx }) {
++  return (0, import_jsx_runtime6.jsx)("svg", { width: CHEVRON_PX, height: CHEVRON_PX, viewBox: "0 0 12 12", "aria-hidden": true, style: {
+     display: "block",
+     flexShrink: 0,
+-    marginTop: FOLD_CHEVRON_TOP_PX,
++    // Centered on the heading's first line, so a wrapped heading keeps it there.
++    marginTop: (lineHeightPx - CHEVRON_PX) / 2,
+     color,
+     transform: open ? void 0 : "rotate(-90deg)"
+-  }, children: (0, import_jsx_runtime5.jsx)("path", { d: "M3 4.5 6 7.5 9 4.5", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) });
++  }, children: (0, import_jsx_runtime6.jsx)("path", { d: "M3 4.5 6 7.5 9 4.5", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) });
+ }
+ function Section({ heading, caption, actions, collapsible = false, defaultOpen = false, children }) {
+   const theme = useGrokTheme();
+   const touch = useCoarsePointer();
+-  const [open, setOpen] = (0, import_react9.useState)(defaultOpen);
++  const depth = (0, import_react11.useContext)(SectionDepthContext);
++  const level = sectionLevel(depth);
++  const [open, setOpen] = (0, import_react11.useState)(defaultOpen);
+   const folds = collapsible && heading !== void 0 && heading.trim() !== "";
+   const slot = actions ?? void 0;
+-  const blocks = import_react9.Children.toArray(children);
+-  const headingStyle = typeStyle(theme, "heading3", "medium", theme.text.primary);
+-  const title = heading === void 0 ? null : folds ? (0, import_jsx_runtime5.jsx)("h2", { style: { ...headingStyle, flex: "1 1 auto", minWidth: 0 }, children: (0, import_jsx_runtime5.jsxs)("button", { type: "button", "aria-expanded": open, onClick: () => setOpen((value) => !value), style: {
+-    ...touch ? FOLD_TOUCH_HIT : FOLD_POINTER_HIT,
++  const blocks = import_react11.Children.toArray(children);
++  const headed = heading !== void 0 || slot !== void 0;
++  const gaps = gapsBetween(blocks, {
++    afterHeading: headed ? level.after : void 0,
++    beforeSection: sectionLevel(depth + 1).before
++  });
++  const headingStyle = typeStyle(theme, level.type, level.weight, theme.text.primary);
++  const lineHeightPx = px(theme.font[level.type].lineHeight);
++  const HeadingTag = level.tag;
++  const inCell = depth === GRID_CELL_SECTION_DEPTH;
++  const title = heading === void 0 ? null : folds ? (0, import_jsx_runtime6.jsx)(HeadingTag, { style: { ...headingStyle, flex: "1 1 auto", minWidth: 0 }, children: (0, import_jsx_runtime6.jsxs)("button", { type: "button", "aria-expanded": open, onClick: () => setOpen((value) => !value), style: {
++    ...foldHit(touch, lineHeightPx),
+     display: "flex",
+     alignItems: "flex-start",
+     gap: 8,
+@@ -17451,40 +17637,56 @@
+     letterSpacing: "inherit",
+     color: "inherit",
+     cursor: "pointer"
+-  }, children: [(0, import_jsx_runtime5.jsx)(Chevron, { open, color: theme.text.tertiary }), (0, import_jsx_runtime5.jsx)("span", { style: { flex: "1 1 auto", minWidth: 0 }, children: heading })] }) }) : (0, import_jsx_runtime5.jsx)("h2", { style: headingStyle, children: heading });
+-  return (0, import_jsx_runtime5.jsxs)("section", { children: [slot === void 0 ? title : (0, import_jsx_runtime5.jsxs)("div", { style: {
++  }, children: [(0, import_jsx_runtime6.jsx)(Chevron, { open, color: theme.text.tertiary, lineHeightPx }), (0, import_jsx_runtime6.jsx)("span", { style: { flex: "1 1 auto", minWidth: 0 }, children: heading })] }) }) : (0, import_jsx_runtime6.jsx)(HeadingTag, { style: headingStyle, children: heading });
++  const body = blocks.map((block, i) => (0, import_jsx_runtime6.jsx)("div", { style: { marginTop: gaps[i] }, children: block }, i));
++  return (0, import_jsx_runtime6.jsxs)("section", { style: inCell ? CELL_SECTION : void 0, children: [slot === void 0 ? title : (0, import_jsx_runtime6.jsxs)("div", { style: {
+     display: "flex",
+     flexWrap: "wrap",
+     alignItems: "baseline",
+     justifyContent: "space-between",
+     columnGap: 16,
+     rowGap: 6
+-  }, children: [title ?? (0, import_jsx_runtime5.jsx)("span", {}), (0, import_jsx_runtime5.jsx)("div", {
++  }, children: [title ?? (0, import_jsx_runtime6.jsx)("span", {}), (0, import_jsx_runtime6.jsx)("div", {
+     "data-section-actions": true,
+     // The controls move under the heading when the line is short, and
+     // never take more than the page: a wide Segmented wraps its options.
+     style: { display: "flex", alignItems: "center", minWidth: 0, maxWidth: "100%" },
+-    children: (0, import_jsx_runtime5.jsx)(HeadingLineContext.Provider, { value: true, children: slot })
+-  })] }), caption === void 0 ? null : (0, import_jsx_runtime5.jsx)("p", { style: {
+-    ...typeStyle(theme, "label", "regular", theme.text.tertiary),
++    children: (0, import_jsx_runtime6.jsx)(HeadingLineContext.Provider, { value: true, children: slot })
++  })] }), caption === void 0 ? null : (0, import_jsx_runtime6.jsx)("p", { style: {
++    ...typeStyle(theme, "subtext", "regular", theme.text.secondary),
+     marginTop: 2
+-  }, children: caption }), folds && !open ? null : (0, import_jsx_runtime5.jsx)("div", { style: { marginTop: heading === void 0 && slot === void 0 ? 0 : 8 }, children: blocks.map((block, i) => i === 0 ? block : (0, import_jsx_runtime5.jsx)("div", { style: { marginTop: 10 }, children: block }, i)) })] });
++  }, children: caption }), folds && !open ? null : (0, import_jsx_runtime6.jsx)(SectionDepthContext.Provider, { value: depth + 1, children: inCell ? (0, import_jsx_runtime6.jsx)("div", { style: CELL_SECTION_BODY, children: body }) : body })] });
+ }
++markBlockKind(Section, "section");
++var CELL_SECTION = {
++  display: "flex",
++  flexDirection: "column",
++  flex: "1 1 auto",
++  minWidth: 0
++};
++var CELL_SECTION_BODY = {
++  display: "flex",
++  flexDirection: "column",
++  justifyContent: "flex-end",
++  flex: "1 1 auto",
++  minWidth: 0
++};
+ function Text({ children }) {
+   const theme = useGrokTheme();
+-  return (0, import_jsx_runtime5.jsx)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: keepFiguresWholeIn(children) });
++  return (0, import_jsx_runtime6.jsx)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: keepFiguresWholeIn(children) });
+ }
++markBlockKind(Text, "text");
+ function Callout({ lead, tone, children }) {
+   const theme = useGrokTheme();
+-  const body = import_react9.Children.toArray(keepFiguresWholeIn(children));
++  const body = import_react11.Children.toArray(keepFiguresWholeIn(children));
+   if (lead === void 0 && body.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime5.jsxs)("div", { style: {
++  return (0, import_jsx_runtime6.jsxs)("div", { style: {
+     borderRadius: theme.radius.lg,
+     background: theme.fill.secondary,
+     padding: "12px 16px"
+-  }, children: [lead === void 0 ? null : (0, import_jsx_runtime5.jsx)("p", { style: typeStyle(theme, "body1", "medium", tone === void 0 ? theme.text.primary : theme.text[tone]), children: lead }), body.length === 0 ? null : (0, import_jsx_runtime5.jsx)("p", { style: {
++  }, children: [lead === void 0 ? null : (0, import_jsx_runtime6.jsx)("p", { style: typeStyle(theme, "body1", "semibold", tone === void 0 ? theme.text.primary : theme.text[tone]), children: lead }), body.length === 0 ? null : (0, import_jsx_runtime6.jsx)("p", { style: {
+     ...typeStyle(theme, "body1", "regular", theme.text.primary),
+     marginTop: lead === void 0 ? 0 : 2
+   }, children: body })] });
+@@ -17492,33 +17694,37 @@
+ function figureColumn(glyphs, gapCh) {
+   return `${glyphs + gapCh}ch`;
+ }
++var BULLET_COLUMN_PX = 18;
+ function BulletList({ items }) {
+   const theme = useGrokTheme();
+-  return (0, import_jsx_runtime5.jsx)("ul", { style: {
++  return (0, import_jsx_runtime6.jsx)("ul", { style: {
+     display: "flex",
+     flexDirection: "column",
+-    gap: 6,
++    gap: RHYTHM.listItem,
+     margin: 0,
+     padding: 0,
+     listStyle: "none"
+-  }, children: items.map((item, i) => (0, import_jsx_runtime5.jsxs)("li", { style: { display: "grid", gridTemplateColumns: "16px minmax(0,1fr)" }, children: [(0, import_jsx_runtime5.jsx)("span", { "aria-hidden": true, style: typeStyle(theme, "body1", "regular", theme.text.tertiary), children: "\u2022" }), (0, import_jsx_runtime5.jsx)("span", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: item })] }, i)) });
++  }, children: items.map((item, i) => (0, import_jsx_runtime6.jsxs)("li", { style: { display: "grid", gridTemplateColumns: `${BULLET_COLUMN_PX}px minmax(0,1fr)` }, children: [(0, import_jsx_runtime6.jsx)("span", { "aria-hidden": true, style: typeStyle(theme, "body1", "regular", theme.text.primary), children: "\u2022" }), (0, import_jsx_runtime6.jsx)("span", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: item })] }, i)) });
+ }
++markBlockKind(BulletList, "list");
+ function NumberedList({ items }) {
+   const theme = useGrokTheme();
+   const marker = figureColumn(String(items.length).length, 1.5);
+-  return (0, import_jsx_runtime5.jsx)("ol", { style: {
++  return (0, import_jsx_runtime6.jsx)("ol", { style: {
+     display: "flex",
+     flexDirection: "column",
+-    gap: 6,
++    gap: RHYTHM.listItem,
+     margin: 0,
+     padding: 0,
+     listStyle: "none"
+-  }, children: items.map((item, i) => (0, import_jsx_runtime5.jsxs)("li", { style: { display: "grid", gridTemplateColumns: `${marker} minmax(0,1fr)` }, children: [(0, import_jsx_runtime5.jsxs)("span", { style: { ...typeStyle(theme, "body1", "regular", theme.text.tertiary), ...tabularNums }, children: [i + 1, "."] }), (0, import_jsx_runtime5.jsx)("span", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: item })] }, i)) });
++  }, children: items.map((item, i) => (0, import_jsx_runtime6.jsxs)("li", { style: { display: "grid", gridTemplateColumns: `${marker} minmax(0,1fr)` }, children: [(0, import_jsx_runtime6.jsxs)("span", { style: { ...typeStyle(theme, "body1", "regular", theme.text.primary), ...tabularNums }, children: [i + 1, "."] }), (0, import_jsx_runtime6.jsx)("span", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: item })] }, i)) });
+ }
++markBlockKind(NumberedList, "list");
+ function CheckMark() {
+-  return (0, import_jsx_runtime5.jsx)("svg", { width: 10, height: 10, viewBox: "0 0 12 12", "aria-hidden": true, children: (0, import_jsx_runtime5.jsx)("path", { d: "M2.5 6.5 5 9l4.5-6", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) });
++  return (0, import_jsx_runtime6.jsx)("svg", { width: 10, height: 10, viewBox: "0 0 12 12", "aria-hidden": true, children: (0, import_jsx_runtime6.jsx)("path", { d: "M2.5 6.5 5 9l4.5-6", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }) });
+ }
+ var CHECKBOX_HIT_PX = { pointer: 20, touch: 44 };
++var CHECKBOX_LINE_OFFSET_PX = (24 - CHECKBOX_HIT_PX.pointer) / 2;
+ var CHECKLIST_ROW_PADDING_PX = { pointer: 6, touch: 12 };
+ var CHECKLIST_ROW_GAP_PX = 10;
+ var CHECKLIST_TITLE_INSET_PX = CHECKBOX_HIT_PX.pointer + CHECKLIST_ROW_GAP_PX;
+@@ -17532,7 +17738,7 @@
+   const { ref, narrow } = useNarrowBlock();
+   const input = useCoarsePointer() ? "touch" : "pointer";
+   const hit = CHECKBOX_HIT_PX[input];
+-  const [own, setOwn] = (0, import_react9.useState)(() => items.map((item) => item.done === true));
++  const [own, setOwn] = (0, import_react11.useState)(() => items.map((item) => item.done === true));
+   const done = value ?? own;
+   const toggle = (i) => {
+     const next = items.map((_, j) => j === i ? !(done[j] ?? false) : done[j] ?? false);
+@@ -17541,24 +17747,24 @@
+     }
+     onChange?.(next);
+   };
+-  return (0, import_jsx_runtime5.jsx)("div", { ref, style: { display: "flex", flexDirection: "column" }, children: items.map((item, i) => {
++  return (0, import_jsx_runtime6.jsx)("div", { ref, style: { display: "flex", flexDirection: "column" }, children: items.map((item, i) => {
+     const checked = done[i] ?? false;
+-    return (0, import_jsx_runtime5.jsxs)("div", { style: {
++    return (0, import_jsx_runtime6.jsxs)("div", { style: {
+       display: "flex",
+       flexWrap: narrow ? "wrap" : void 0,
+       alignItems: "flex-start",
+       gap: narrow ? `0 ${CHECKLIST_ROW_GAP_PX}px` : CHECKLIST_ROW_GAP_PX,
+       padding: `${CHECKLIST_ROW_PADDING_PX[input]}px 0`
+-    }, children: [(0, import_jsx_runtime5.jsx)("span", { role: "checkbox", "aria-checked": checked, onClick: () => toggle(i), style: {
++    }, children: [(0, import_jsx_runtime6.jsx)("span", { role: "checkbox", "aria-checked": checked, onClick: () => toggle(i), style: {
+       display: "flex",
+       alignItems: "center",
+       justifyContent: "center",
+       width: hit,
+       height: hit,
+-      margin: (CHECKBOX_HIT_PX.pointer - hit) / 2,
++      margin: `${(CHECKBOX_HIT_PX.pointer - hit) / 2 + CHECKBOX_LINE_OFFSET_PX}px ${(CHECKBOX_HIT_PX.pointer - hit) / 2}px ${(CHECKBOX_HIT_PX.pointer - hit) / 2 - CHECKBOX_LINE_OFFSET_PX}px`,
+       flexShrink: 0,
+       cursor: "default"
+-    }, children: (0, import_jsx_runtime5.jsx)("span", { "aria-hidden": true, style: {
++    }, children: (0, import_jsx_runtime6.jsx)("span", { "aria-hidden": true, style: {
+       display: "inline-flex",
+       alignItems: "center",
+       justifyContent: "center",
+@@ -17569,13 +17775,13 @@
+       border: checked ? `0.5px solid ${theme.border.subtle}` : `1px solid ${theme.border.strong}`,
+       background: checked ? theme.fill.controlChecked : theme.bg.base,
+       color: theme.text.onColor
+-    }, children: checked ? (0, import_jsx_runtime5.jsx)(CheckMark, {}) : null }) }), (0, import_jsx_runtime5.jsx)("p", { style: {
+-      ...typeStyle(theme, "body1", "regular", checked ? theme.text.tertiary : theme.text.primary),
++    }, children: checked ? (0, import_jsx_runtime6.jsx)(CheckMark, {}) : null }) }), (0, import_jsx_runtime6.jsx)("p", { style: {
++      ...typeStyle(theme, "body1", "regular", checked ? theme.text.secondary : theme.text.primary),
+       flex: 1,
+       minWidth: 0,
+       textDecoration: checked ? "line-through" : void 0
+-    }, children: item.text }), item.meta === void 0 ? null : (0, import_jsx_runtime5.jsx)("span", { style: {
+-      ...typeStyle(theme, "label", "regular", theme.text.tertiary),
++    }, children: item.text }), item.meta === void 0 ? null : (0, import_jsx_runtime6.jsx)("span", { style: {
++      ...typeStyle(theme, "subtext", "regular", theme.text.tertiary),
+       flexShrink: 0,
+       paddingTop: 2,
+       // Under the title it takes the whole row and starts where
+@@ -17589,6 +17795,7 @@
+     }, children: item.meta })] }, i);
+   }) });
+ }
++markBlockKind(Checklist, "list");
+ function Rows({ rows }) {
+   const theme = useGrokTheme();
+   const leads = rows.some((row) => row.lead !== void 0);
+@@ -17596,32 +17803,31 @@
+   const lead = `min(${leadWidth},${ROW_LEAD_MAX_WIDTH})`;
+   const metaMax = leads ? `max(${ROW_META_MIN_WIDTH},min(${ROW_META_MAX_WIDTH},calc(100% - ${ROW_TITLE_MIN_WIDTH} - ${lead} - ${ROW_COLUMN_GAP_PX * 2}px)))` : ROW_META_MAX_WIDTH;
+   const meta = `fit-content(${metaMax})`;
+-  return (0, import_jsx_runtime5.jsx)("div", { style: { display: "flex", flexDirection: "column" }, children: rows.map((row, i) => (0, import_jsx_runtime5.jsxs)("div", { style: {
++  return (0, import_jsx_runtime6.jsx)("div", { style: { display: "flex", flexDirection: "column" }, children: rows.map((row, i) => (0, import_jsx_runtime6.jsxs)("div", { style: {
+     display: "grid",
+     columnGap: ROW_COLUMN_GAP_PX,
+     gridTemplateColumns: leads ? `${lead} minmax(0,1fr) ${meta}` : `minmax(0,1fr) ${meta}`,
+     borderTop: hairline(theme),
+     padding: "10px 0"
+-  }, children: [leads ? (0, import_jsx_runtime5.jsx)("span", { title: row.lead, style: {
++  }, children: [leads ? (0, import_jsx_runtime6.jsx)("span", { title: row.lead, style: {
+     ...typeStyle(theme, "body1", "regular", theme.text.tertiary),
+     ...tabularNums,
+     ...truncate
+-  }, children: row.lead }) : null, (0, import_jsx_runtime5.jsxs)("div", { style: { minWidth: 0 }, children: [(0, import_jsx_runtime5.jsxs)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: [keepFiguresWhole(row.title), row.status === void 0 ? null : (0, import_jsx_runtime5.jsxs)("span", { style: {
++  }, children: row.lead }) : null, (0, import_jsx_runtime6.jsxs)("div", { style: { minWidth: 0 }, children: [(0, import_jsx_runtime6.jsxs)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: [keepFiguresWhole(row.title), row.status === void 0 ? null : (0, import_jsx_runtime6.jsxs)("span", { style: {
+     fontWeight: theme.weight.medium,
+     color: row.status.tone === void 0 ? theme.text.tertiary : theme.text[row.status.tone]
+-  }, children: [" ", "\xB7 ", row.status.label] })] }), row.detail === void 0 ? null : (0, import_jsx_runtime5.jsx)("p", { style: {
+-    ...typeStyle(theme, "body1", "regular", theme.text.secondary),
++  }, children: [" ", "\xB7 ", row.status.label] })] }), row.detail === void 0 ? null : (0, import_jsx_runtime6.jsx)("p", { style: {
++    ...typeStyle(theme, "subtext", "regular", theme.text.secondary),
+     marginTop: 2
+-  }, children: row.detail })] }), (0, import_jsx_runtime5.jsx)("span", { style: {
+-    ...typeStyle(theme, "label", "regular", theme.text.tertiary),
++  }, children: row.detail })] }), (0, import_jsx_runtime6.jsx)("span", { style: {
++    ...typeStyle(theme, "subtext", "regular", theme.text.tertiary),
+     paddingTop: 2,
+     textAlign: "right"
+   }, children: row.meta })] }, i)) });
+ }
+ function isTonedWord(cell) {
+-  return typeof cell === "object" && cell !== null && !(0, import_react9.isValidElement)(cell) && typeof cell.text === "string";
++  return typeof cell === "object" && cell !== null && !(0, import_react11.isValidElement)(cell) && typeof cell.text === "string";
+ }
+-var TABLE_COLUMN_GAP_PX = 12;
+ var TABLE_SCROLLS_FROM_COLUMNS = 5;
+ var TABLE_SCROLLING_PROSE_MIN_PX = 160;
+ var TABLE_PROSE_MIN_VAR = "--grok-table-prose-min";
+@@ -17640,7 +17846,7 @@
+     if (at > last) {
+       out.push(text.slice(last, at));
+     }
+-    out.push((0, import_jsx_runtime5.jsx)("span", { style: { whiteSpace: "nowrap" }, children: match[0] }, at));
++    out.push((0, import_jsx_runtime6.jsx)("span", { style: { whiteSpace: "nowrap" }, children: match[0] }, at));
+     last = at + match[0].length;
+   }
+   if (last < text.length) {
+@@ -17652,7 +17858,7 @@
+   if (typeof children === "string") {
+     return keepFiguresWhole(children);
+   }
+-  return import_react9.Children.map(children, (child) => typeof child === "string" ? keepFiguresWhole(child) : child);
++  return import_react11.Children.map(children, (child) => typeof child === "string" ? keepFiguresWhole(child) : child);
+ }
+ function cellText(cell) {
+   if (typeof cell === "string") {
+@@ -17682,14 +17888,20 @@
+     return hasProse ? "max-content" : "minmax(min-content,1fr)";
+   }).join(" ");
+ }
++var TABLE_CELL_PADDING_X_PX = 10;
++var TABLE_CELL_PADDING_Y_PX = 8;
++var TABLE_RADIUS_PX = 10;
++function tableRule(theme) {
++  return `0.5px solid ${theme.border.default}`;
++}
+ function Table({ columns, rows, emphasis, align }) {
+   const theme = useGrokTheme();
+   const columnCount = Math.max(columns.length, ...rows.map((row) => row.length));
+   const scrolls = columnCount >= TABLE_SCROLLS_FROM_COLUMNS;
+   const figures = figureColumns(columnCount, rows);
+   const hasProse = figures.some((figure, c) => c > 0 && !figure);
+-  const scroller = (0, import_react9.useRef)(null);
+-  (0, import_react9.useLayoutEffect)(() => {
++  const scroller = (0, import_react11.useRef)(null);
++  (0, import_react11.useLayoutEffect)(() => {
+     const element = scroller.current;
+     const grid = element?.firstElementChild;
+     if (scrolls || !hasProse || element === null || !(grid instanceof HTMLElement)) {
+@@ -17716,12 +17928,15 @@
+     return wanted === "end" ? "right" : "left";
+   };
+   const valueColumn = (c) => ({
+-    paddingLeft: TABLE_COLUMN_GAP_PX,
++    borderLeft: tableRule(theme),
+     textAlign: textAlign(c),
+     ...figures[c] === true ? {} : { minWidth: `var(${TABLE_PROSE_MIN_VAR})` }
+   });
+   const labelColumn = align?.[0] === "end" ? { textAlign: "right" } : {};
+-  const cellColumn = (c) => c > 0 ? valueColumn(c) : labelColumn;
++  const cellColumn = (c) => ({
++    padding: `${TABLE_CELL_PADDING_Y_PX}px ${TABLE_CELL_PADDING_X_PX}px`,
++    ...c > 0 ? valueColumn(c) : labelColumn
++  });
+   const cellContent = (cell, prose) => {
+     if (typeof cell === "string") {
+       return prose ? keepFiguresWhole(cell) : cell;
+@@ -17732,7 +17947,7 @@
+     if (cell.tone === void 0) {
+       return cell.text;
+     }
+-    return (0, import_jsx_runtime5.jsx)("span", { style: { fontWeight: theme.weight.medium, color: theme.text[cell.tone] }, children: cell.text });
++    return (0, import_jsx_runtime6.jsx)("span", { style: { fontWeight: theme.weight.medium, color: theme.text[cell.tone] }, children: cell.text });
+   };
+   const headers = Array.from({ length: columnCount }, (_, c) => columns[c] ?? "");
+   const gridStyle = {
+@@ -17743,31 +17958,39 @@
+     // block narrower than that the table scrolls sideways instead of
+     // folding its labels letter by letter beside nowrap figures.
+     overflowWrap: "normal",
+-    [TABLE_PROSE_MIN_VAR]: scrolls ? `${TABLE_SCROLLING_PROSE_MIN_PX}px` : "0px"
++    [TABLE_PROSE_MIN_VAR]: scrolls ? `${TABLE_SCROLLING_PROSE_MIN_PX}px` : "0px",
++    border: tableRule(theme),
++    borderRadius: TABLE_RADIUS_PX,
++    // The grid's own corners clip its cells, so a table wider than its
++    // scroller still ends in a rounded edge when scrolled to.
++    overflow: "clip",
++    boxSizing: "border-box",
++    // Fills its page when it fits and wraps its words there; one wider than
++    // its page is sized to its tracks instead, so the outline ends on the
++    // last column the reader scrolls to.
++    width: "fit-content",
++    minWidth: "100%"
+   };
+-  return (0, import_jsx_runtime5.jsx)("div", { ref: scroller, style: { overflowX: "auto", minWidth: 0 }, children: (0, import_jsx_runtime5.jsxs)("div", { style: gridStyle, children: [headers.map((column, c) => (0, import_jsx_runtime5.jsx)("span", { "data-table-header": true, style: {
+-    ...typeStyle(theme, "label", "medium", theme.text.tertiary),
++  return (0, import_jsx_runtime6.jsx)("div", { ref: scroller, style: { overflowX: "auto", minWidth: 0 }, children: (0, import_jsx_runtime6.jsxs)("div", { style: gridStyle, children: [headers.map((column, c) => (0, import_jsx_runtime6.jsx)("span", { "data-table-header": true, style: {
++    ...typeStyle(theme, "subtext", "medium", theme.text.primary),
+     ...cellColumn(c),
+     // A scrolling table keeps a two-word header on one line like
+     // its cells; the reader scrolls to it rather than reads it stacked.
+-    ...scrolls ? { whiteSpace: "nowrap" } : {},
+-    paddingBottom: 6
+-  }, children: keepFiguresWhole(column) }, `h${c}`)), rows.map((row, r) => headers.map((_, c) => (0, import_jsx_runtime5.jsx)("span", { style: {
+-    ...typeStyle(theme, "body2", c > 0 && c === emphasis ? "medium" : "regular", c === 0 ? theme.text.secondary : theme.text.primary),
++    ...scrolls ? { whiteSpace: "nowrap" } : {}
++  }, children: keepFiguresWhole(column) }, `h${c}`)), rows.map((row, r) => headers.map((_, c) => (0, import_jsx_runtime6.jsx)("span", { style: {
++    ...typeStyle(theme, "table", c > 0 && c === emphasis ? "medium" : "regular", theme.text.primary),
+     ...cellColumn(c),
+     ...figures[c] === true ? { ...tabularNums, whiteSpace: "nowrap" } : {},
+-    borderTop: hairline(theme),
+-    paddingTop: 8,
+-    paddingBottom: 8
++    borderTop: tableRule(theme)
+   }, children: cellContent(row[c], figures[c] !== true) }, `${r}-${c}`)))] }) });
+ }
+ function ArrowUpRight() {
+-  return (0, import_jsx_runtime5.jsx)("svg", { width: 12, height: 12, viewBox: "0 0 12 12", "aria-hidden": true, style: { flexShrink: 0 }, children: (0, import_jsx_runtime5.jsx)("path", { d: "M3 9 9 3M4 3h5v5", fill: "none", stroke: "currentColor", strokeWidth: 1.25, strokeLinecap: "round", strokeLinejoin: "round" }) });
++  return (0, import_jsx_runtime6.jsx)("svg", { width: 12, height: 12, viewBox: "0 0 12 12", "aria-hidden": true, style: { flexShrink: 0 }, children: (0, import_jsx_runtime6.jsx)("path", { d: "M3 9 9 3M4 3h5v5", fill: "none", stroke: "currentColor", strokeWidth: 1.25, strokeLinecap: "round", strokeLinejoin: "round" }) });
+ }
+ function LinkCards({ links, numbered = false }) {
+   const theme = useGrokTheme();
+   const touch = useCoarsePointer();
+-  return (0, import_jsx_runtime5.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: 6 }, children: links.map((link, i) => (0, import_jsx_runtime5.jsxs)("a", { href: link.href, target: "_blank", rel: "noopener noreferrer", title: link.title, style: {
++  return (0, import_jsx_runtime6.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: RHYTHM.listItem }, children: links.map((link, i) => (0, import_jsx_runtime6.jsxs)("a", { href: link.href, target: "_blank", rel: "noopener noreferrer", title: link.title, style: {
+     display: "flex",
+     alignItems: "center",
+     gap: 10,
+@@ -17775,41 +17998,43 @@
+     minHeight: touch ? BOX_TOUCH_MIN_HEIGHT_PX : void 0,
+     textDecoration: "none",
+     color: theme.text.tertiary
+-  }, children: [numbered ? (0, import_jsx_runtime5.jsx)("span", { style: {
++  }, children: [numbered ? (0, import_jsx_runtime6.jsx)("span", { style: {
+     ...typeStyle(theme, "label", "medium", theme.text.tertiary),
+     ...tabularNums,
+     width: figureColumn(String(links.length).length, 0.5),
+     flexShrink: 0
+-  }, children: i + 1 }) : null, (0, import_jsx_runtime5.jsxs)("div", { style: { minWidth: 0, flex: 1 }, children: [(0, import_jsx_runtime5.jsx)("p", { style: { ...typeStyle(theme, "body1", "regular", theme.text.primary), ...truncate }, children: link.title }), link.site === void 0 && link.date === void 0 ? null : (0, import_jsx_runtime5.jsx)("p", { style: {
++  }, children: i + 1 }) : null, (0, import_jsx_runtime6.jsxs)("div", { style: { minWidth: 0, flex: 1 }, children: [(0, import_jsx_runtime6.jsx)("p", { style: { ...typeStyle(theme, "subtext", "regular", theme.text.primary), ...truncate }, children: link.title }), link.site === void 0 && link.date === void 0 ? null : (0, import_jsx_runtime6.jsx)("p", { style: {
+     ...typeStyle(theme, "label", "regular", theme.text.tertiary),
+     ...truncate
+-  }, children: [link.site, link.date].filter((part) => part !== void 0).join(" \xB7 ") })] }), (0, import_jsx_runtime5.jsx)(ArrowUpRight, {})] }, i)) });
++  }, children: [link.site, link.date].filter((part) => part !== void 0).join(" \xB7 ") })] }), (0, import_jsx_runtime6.jsx)(ArrowUpRight, {})] }, i)) });
+ }
+ 
+ // ../canvas-components/dist/grok/layout.js
+-var import_jsx_runtime6 = __toESM(require_jsx_runtime(), 1);
+-var import_react10 = __toESM(require_react(), 1);
++var import_jsx_runtime7 = __toESM(require_jsx_runtime(), 1);
++var import_react12 = __toESM(require_react(), 1);
+ var GRID_GAP_PX = 12;
+ var GRID_MIN_CELL_PX = 260;
+ var GRID_MIN_CELL_3_PX = 200;
+ var GRID_MIN_CELL_4_PX = 220;
+-var GRID_CELL_PADDING_PX = 16;
+ var METRICS_COLUMN_GAP_PX = 28;
+ var METRICS_ROW_GAP_PX = 16;
++var METRICS_FIGURE_LABEL_GAP_PX = 8;
++var METRICS_LABEL_NOTE_GAP_PX = 4;
+ var METRICS_MIN_CELL_PX = 100;
+-var METRICS_VALUE_CHAR_PX = 13;
++var METRICS_VALUE_CHAR_PX = 14;
+ var METRICS_VALUE_NARROW_CHAR_PX = 7;
+ var METRICS_NARROW_CHAR = /[\s.,:;]/u;
+ var METRICS_WORD_BREAK = /\s+/u;
+-function cellRule(theme) {
+-  return `0.5px solid ${theme.border.default}`;
++function cellDivider(theme) {
++  return `1px solid ${theme.border.weak}`;
+ }
+ function Grid({ columns = 2, joined = false, plain = false, children }) {
+-  if (import_react10.Children.toArray(children).length === 0) {
++  if (import_react12.Children.toArray(children).length === 0) {
+     return null;
+   }
+-  return joined ? (0, import_jsx_runtime6.jsx)(JoinedGrid, { columns, children }) : (0, import_jsx_runtime6.jsx)(CardGrid, { columns, plain, children });
++  return (0, import_jsx_runtime7.jsx)(SectionDepthContext.Provider, { value: GRID_CELL_SECTION_DEPTH, children: (0, import_jsx_runtime7.jsx)(InCardContext.Provider, { value: !plain, children: joined ? (0, import_jsx_runtime7.jsx)(JoinedGrid, { columns, children }) : (0, import_jsx_runtime7.jsx)(CardGrid, { columns, plain, children }) }) });
+ }
++markBlockKind(Grid, "chart");
+ function gridPerRow({ columns, count, width }) {
+   if (width === void 0) {
+     return void 0;
+@@ -17834,10 +18059,10 @@
+ function CardGrid({ columns, plain, children }) {
+   const theme = useGrokTheme();
+   const { ref, width } = useBlockWidth();
+-  const cells = import_react10.Children.toArray(children);
++  const cells = import_react12.Children.toArray(children);
+   const perRow = gridPerRow({ columns, count: cells.length, width });
+   const cell = `calc((100% - ${(columns - 1) * GRID_GAP_PX}px) / ${columns})`;
+-  return (0, import_jsx_runtime6.jsx)("div", { ref, style: {
++  return (0, import_jsx_runtime7.jsx)("div", { ref, style: {
+     display: "grid",
+     // Measured, the row holds the count that fits and divides the cells
+     // evenly (four cells on a column page go 2 + 2, not 3 + 1). Until
+@@ -17845,35 +18070,32 @@
+     gridTemplateColumns: perRow === void 0 ? `repeat(auto-fit, minmax(min(100%, max(${gridMinCellPx(columns)}px, ${cell})), 1fr))` : `repeat(${perRow}, minmax(0, 1fr))`,
+     gap: GRID_GAP_PX,
+     alignItems: "stretch"
+-  }, children: import_react10.Children.toArray(children).map((child, i) => (0, import_jsx_runtime6.jsx)("div", { style: plain ? { minWidth: 0 } : {
+-    minWidth: 0,
+-    padding: GRID_CELL_PADDING_PX,
+-    borderRadius: theme.radius.lg,
+-    border: cellRule(theme)
+-  }, children: child }, i)) });
++  }, children: import_react12.Children.toArray(children).map((child, i) => (0, import_jsx_runtime7.jsx)("div", { style: plain ? { minWidth: 0 } : { ...cardChrome(theme), ...CELL_COLUMN }, children: child }, i)) });
+ }
++var CELL_COLUMN = { display: "flex", flexDirection: "column" };
+ function JoinedGrid({ columns, children }) {
+   const theme = useGrokTheme();
+   const { ref, width } = useBlockWidth();
+-  const cells = import_react10.Children.toArray(children);
++  const cells = import_react12.Children.toArray(children);
+   let perRow = columns;
+   while (perRow > 1 && width !== void 0 && width < perRow * gridMinCellPx(perRow)) {
+     perRow -= 1;
+   }
+   const short = cells.length % perRow;
+-  return (0, import_jsx_runtime6.jsx)("div", { ref, style: { borderRadius: theme.radius.lg, border: cellRule(theme) }, children: (0, import_jsx_runtime6.jsx)("div", { style: { display: "grid", gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))` }, children: cells.map((cell, i) => (0, import_jsx_runtime6.jsx)("div", { style: {
++  return (0, import_jsx_runtime7.jsx)("div", { ref, style: { ...cardChrome(theme), padding: 0 }, children: (0, import_jsx_runtime7.jsx)("div", { style: { display: "grid", gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))` }, children: cells.map((cell, i) => (0, import_jsx_runtime7.jsx)("div", { style: {
++    ...CELL_COLUMN,
+     minWidth: 0,
+-    padding: GRID_CELL_PADDING_PX,
+-    borderTop: i >= perRow ? cellRule(theme) : void 0,
+-    borderLeft: i % perRow > 0 ? cellRule(theme) : void 0,
++    padding: CARD_PADDING_PX,
++    borderTop: i >= perRow ? cellDivider(theme) : void 0,
++    borderLeft: i % perRow > 0 ? cellDivider(theme) : void 0,
+     gridColumn: short > 0 && i === cells.length - 1 ? `span ${perRow - short + 1}` : void 0
+   }, children: cell }, i)) }) });
+ }
+ function Segmented({ options, value, onChange }) {
+   const theme = useGrokTheme();
+   const touch = useCoarsePointer();
+-  const onHeadingLine = (0, import_react10.useContext)(HeadingLineContext);
+-  return (0, import_jsx_runtime6.jsx)("div", { role: "group", style: {
++  const onHeadingLine = (0, import_react12.useContext)(HeadingLineContext);
++  return (0, import_jsx_runtime7.jsx)("div", { role: "group", style: {
+     display: "flex",
+     flexWrap: "wrap",
+     gap: 16,
+@@ -17881,34 +18103,35 @@
+   }, children: options.map((entry) => {
+     const option = typeof entry === "string" ? { value: entry, label: entry } : entry;
+     const on = option.value === value;
+-    return (0, import_jsx_runtime6.jsx)("button", { type: "button", "aria-pressed": on, onClick: () => onChange(option.value), style: {
++    return (0, import_jsx_runtime7.jsx)("button", { type: "button", "aria-pressed": on, onClick: () => onChange(option.value), style: {
+       ...typeStyle(theme, "body2", on ? "medium" : "regular", on ? theme.text.primary : theme.text.tertiary),
+       ...touch ? SEGMENT_TOUCH_HIT : SEGMENT_POINTER_HIT,
+       background: "none",
+       border: "none",
+       cursor: "pointer"
+-    }, children: (0, import_jsx_runtime6.jsxs)("span", { style: {
++    }, children: (0, import_jsx_runtime7.jsxs)("span", { style: {
+       display: "inline-block",
+       padding: "2px 0",
+       borderBottom: `1.5px solid ${on ? theme.text.primary : "transparent"}`
+-    }, children: [option.label, countText(option.count) === void 0 ? null : (0, import_jsx_runtime6.jsx)("span", { style: {
++    }, children: [option.label, countText(option.count) === void 0 ? null : (0, import_jsx_runtime7.jsx)("span", { style: {
+       ...typeStyle(theme, "label", "regular", theme.text.tertiary),
+       ...tabularNums,
+       marginLeft: 5
+     }, children: countText(option.count) })] }) }, option.value);
+   }) });
+ }
++markBlockKind(Segmented, "control");
+ var SEGMENT_POINTER_HIT = { padding: 0, margin: 0 };
+ var SEGMENT_TOUCH_HIT = { padding: "11px 8px", margin: "-11px -8px" };
+ function metricsMinCellPx(values) {
+   let widest = 0;
+   for (const value of values) {
+     for (const run of value.split(METRICS_WORD_BREAK)) {
+-      let px = 0;
++      let px2 = 0;
+       for (const char of run) {
+-        px += METRICS_NARROW_CHAR.test(char) ? METRICS_VALUE_NARROW_CHAR_PX : METRICS_VALUE_CHAR_PX;
++        px2 += METRICS_NARROW_CHAR.test(char) ? METRICS_VALUE_NARROW_CHAR_PX : METRICS_VALUE_CHAR_PX;
+       }
+-      widest = Math.max(widest, px);
++      widest = Math.max(widest, px2);
+     }
+   }
+   return Math.max(METRICS_MIN_CELL_PX, widest);
+@@ -17935,33 +18158,36 @@
+   const { ref, width } = useBlockWidth();
+   const minCellPx = metricsMinCellPx(metrics.map((metric) => metric.value));
+   const perRow = metricsPerRow({ count: metrics.length, width, minCellPx });
+-  return (0, import_jsx_runtime6.jsx)("div", { ref, style: {
++  return (0, import_jsx_runtime7.jsx)("div", { ref, style: {
+     display: "grid",
+     gridTemplateColumns: perRow === void 0 ? `repeat(auto-fit, minmax(min(${minCellPx}px, 100%), 1fr))` : `repeat(${perRow}, minmax(0, 1fr))`,
+     columnGap: METRICS_COLUMN_GAP_PX,
+     rowGap: METRICS_ROW_GAP_PX
+-  }, children: metrics.map((metric, i) => (0, import_jsx_runtime6.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }, children: [(0, import_jsx_runtime6.jsx)("span", { style: {
+-    ...typeStyle(theme, "heading2", "medium", theme.text.primary),
++  }, children: metrics.map((metric, i) => (0, import_jsx_runtime7.jsxs)("div", { style: { display: "flex", flexDirection: "column", minWidth: 0 }, children: [(0, import_jsx_runtime7.jsx)("span", { style: {
++    ...typeStyle(theme, "metric", "medium", theme.text.primary),
+     ...tabularNums,
+     minWidth: 0,
+     overflow: "hidden",
+     textOverflow: "ellipsis"
+-  }, title: metric.value, children: metric.value }), (0, import_jsx_runtime6.jsx)("span", { style: {
+-    ...typeStyle(theme, "label", "regular", theme.text.secondary)
+-  }, children: metric.label }), metric.detail === void 0 ? null : (0, import_jsx_runtime6.jsx)("span", { style: {
+-    ...typeStyle(theme, "label", "regular", metric.tone === void 0 ? theme.text.tertiary : theme.text[metric.tone])
++  }, title: metric.value, children: metric.value }), (0, import_jsx_runtime7.jsx)("span", { style: {
++    ...typeStyle(theme, "subtext", "regular", theme.text.primary),
++    marginTop: METRICS_FIGURE_LABEL_GAP_PX
++  }, children: metric.label }), metric.detail === void 0 ? null : (0, import_jsx_runtime7.jsx)("span", { style: {
++    ...typeStyle(theme, "subtext", "regular", metric.tone === void 0 ? theme.text.secondary : theme.text[metric.tone]),
++    marginTop: METRICS_LABEL_NOTE_GAP_PX
+   }, children: metric.detail })] }, i)) });
+ }
++markBlockKind(Metrics, "metrics");
+ 
+ // ../canvas-components/dist/grok/controls.js
+-var import_jsx_runtime7 = __toESM(require_jsx_runtime(), 1);
+-var import_react11 = __toESM(require_react(), 1);
++var import_jsx_runtime8 = __toESM(require_jsx_runtime(), 1);
++var import_react13 = __toESM(require_react(), 1);
+ function Input({ label, value, onChange, placeholder, type = "text" }) {
+   const theme = useGrokTheme();
+   const touch = useCoarsePointer();
+-  const id = (0, import_react11.useId)();
+-  return (0, import_jsx_runtime7.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }, children: [label === void 0 ? null : (0, import_jsx_runtime7.jsx)("label", { htmlFor: id, style: typeStyle(theme, "label", "regular", theme.text.tertiary), children: label }), (0, import_jsx_runtime7.jsx)("input", { id, type: "text", inputMode: type === "number" ? "decimal" : void 0, value, placeholder, onChange: (event) => onChange(event.target.value), style: {
+-    ...typeStyle(theme, "body1", "regular", theme.text.primary),
++  const id = (0, import_react13.useId)();
++  return (0, import_jsx_runtime8.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }, children: [label === void 0 ? null : (0, import_jsx_runtime8.jsx)("label", { htmlFor: id, style: typeStyle(theme, "label", "regular", theme.text.tertiary), children: label }), (0, import_jsx_runtime8.jsx)("input", { id, type: "text", inputMode: type === "number" ? "decimal" : void 0, value, placeholder, onChange: (event) => onChange(event.target.value), style: {
++    ...typeStyle(theme, "subtext", "regular", theme.text.primary),
+     ...boxChrome(theme),
+     width: "100%",
+     minWidth: 0,
+@@ -17975,8 +18201,8 @@
+   if (label.trim() === "") {
+     return null;
+   }
+-  return (0, import_jsx_runtime7.jsx)("button", { type: "button", onClick, style: {
+-    ...typeStyle(theme, "body1", "medium", theme.text.primary),
++  return (0, import_jsx_runtime8.jsx)("button", { type: "button", onClick, style: {
++    ...typeStyle(theme, "subtext", "medium", theme.text.primary),
+     ...boxChrome(theme),
+     display: "inline-flex",
+     alignItems: "center",
+@@ -17991,21 +18217,21 @@
+ }
+ 
+ // src/canvas-bootstrap-grok.ts
+-var import_react21 = __toESM(require_react(), 1);
++var import_react23 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/index.js
+-var import_react18 = __toESM(require_react(), 1);
++var import_react20 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/chart-primitives.js
+-var import_jsx_runtime10 = __toESM(require_jsx_runtime(), 1);
+-var import_react14 = __toESM(require_react(), 1);
++var import_jsx_runtime11 = __toESM(require_jsx_runtime(), 1);
++var import_react16 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/ui-primitives.js
+-var import_jsx_runtime9 = __toESM(require_jsx_runtime(), 1);
+-var import_react13 = __toESM(require_react(), 1);
++var import_jsx_runtime10 = __toESM(require_jsx_runtime(), 1);
++var import_react15 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/callout-tone-icons.js
+-var import_jsx_runtime8 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime9 = __toESM(require_jsx_runtime(), 1);
+ var CALLOUT_ICON_VIEWBOX = 300;
+ var CALLOUT_ICON_GLYPH_TRANSFORM = `matrix(1 0 0 -1 0 ${CALLOUT_ICON_VIEWBOX})`;
+ var NEUTRAL_FILLED_CIRCLE_CENTER = CALLOUT_ICON_VIEWBOX / 2;
+@@ -18016,7 +18242,7 @@
+ };
+ var rowToneMarkerSizePx = canvasSpacing["1.5"];
+ var rowToneMarkerOffsetTopPx = (20 - rowToneMarkerSizePx) / 2;
+-var typographyInlineContext = (0, import_react13.createContext)(false);
++var typographyInlineContext = (0, import_react15.createContext)(false);
+ var defaultCardChrome = {
+   size: "base",
+   stickyHeader: false,
+@@ -18025,14 +18251,14 @@
+   toggle: () => {
+   }
+ };
+-var CardChromeContext = (0, import_react13.createContext)(defaultCardChrome);
++var CardChromeContext = (0, import_react15.createContext)(defaultCardChrome);
+ 
+ // ../canvas-components/dist/collapsible-section.js
+-var import_jsx_runtime11 = __toESM(require_jsx_runtime(), 1);
+-var import_react15 = __toESM(require_react(), 1);
++var import_jsx_runtime12 = __toESM(require_jsx_runtime(), 1);
++var import_react17 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/diff-view.js
+-var import_jsx_runtime12 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime13 = __toESM(require_jsx_runtime(), 1);
+ 
+ // ../../node_modules/.pnpm/@shikijs+langs@4.0.2/node_modules/@shikijs/langs/dist/shellscript.mjs
+ var lang = Object.freeze(JSON.parse(`{"displayName":"Shell","name":"shellscript","patterns":[{"include":"#initial_context"}],"repository":{"alias_statement":{"begin":"[\\\\t ]*+(alias)[\\\\t ]*+((?:((?<!\\\\w)-\\\\w+)\\\\b[\\\\t ]*+)*)[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))","beginCaptures":{"1":{"name":"storage.type.alias.shell"},"2":{"patterns":[{"match":"(?<!\\\\w)-\\\\w+\\\\b","name":"string.unquoted.argument.shell constant.other.option.shell"}]},"3":{"name":"string.unquoted.argument.shell constant.other.option.shell"},"4":{"name":"variable.other.assignment.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"variable.other.assignment.shell"},"7":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"8":{"name":"punctuation.definition.array.access.shell"},"9":{"name":"keyword.operator.assignment.shell"},"10":{"name":"keyword.operator.assignment.compound.shell"},"11":{"name":"keyword.operator.assignment.compound.shell"}},"end":"(?=[\\\\t ]|$)|(?:(?:(?:(;)|(&&))|(\\\\|\\\\|))|(&))","endCaptures":{"1":{"name":"punctuation.terminator.statement.semicolon.shell"},"2":{"name":"punctuation.separator.statement.and.shell"},"3":{"name":"punctuation.separator.statement.or.shell"},"4":{"name":"punctuation.separator.statement.background.shell"}},"name":"meta.expression.assignment.alias.shell","patterns":[{"include":"#normal_context"}]},"argument":{"begin":"[\\\\t ]++(?![\\\\n#\\\\&(\\\\[|]|$|;)","beginCaptures":{},"end":"(?=[\\\\t \\\\&;|]|$|[\\\\n)\`])","endCaptures":{},"name":"meta.argument.shell","patterns":[{"include":"#argument_context"},{"include":"#line_continuation"}]},"argument_context":{"patterns":[{"captures":{"1":{"name":"string.unquoted.argument.shell","patterns":[{"match":"\\\\*","name":"variable.language.special.wildcard.shell"},{"include":"#variable"},{"include":"#numeric_literal"},{"captures":{"1":{"name":"constant.language.$1.shell"}},"match":"(?<!\\\\w)\\\\b(true|false)\\\\b(?!\\\\w)"}]}},"match":"[\\\\t ]*+([^\\\\t\\\\n \\"$\\\\&-);<>\\\\\\\\\`|]+(?!>))"},{"include":"#normal_context"}]},"arithmetic_double":{"patterns":[{"begin":"\\\\(\\\\(","beginCaptures":{"0":{"name":"punctuation.section.arithmetic.double.shell"}},"end":"\\\\)\\\\s*\\\\)","endCaptures":{"0":{"name":"punctuation.section.arithmetic.double.shell"}},"name":"meta.arithmetic.shell","patterns":[{"include":"#math"},{"include":"#string"}]}]},"arithmetic_no_dollar":{"patterns":[{"begin":"\\\\(","beginCaptures":{"0":{"name":"punctuation.section.arithmetic.single.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.section.arithmetic.single.shell"}},"name":"meta.arithmetic.shell","patterns":[{"include":"#math"},{"include":"#string"}]}]},"array_access_inline":{"captures":{"1":{"name":"punctuation.section.array.shell"},"2":{"patterns":[{"include":"#special_expansion"},{"include":"#string"},{"include":"#variable"}]},"3":{"name":"punctuation.section.array.shell"}},"match":"(\\\\[)([^]\\\\[]+)(])"},"array_value":{"begin":"[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))[\\\\t ]*+(\\\\()","beginCaptures":{"1":{"name":"variable.other.assignment.shell"},"2":{"name":"punctuation.definition.array.access.shell"},"3":{"name":"variable.other.assignment.shell"},"4":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"keyword.operator.assignment.shell"},"7":{"name":"keyword.operator.assignment.compound.shell"},"8":{"name":"keyword.operator.assignment.compound.shell"},"9":{"name":"punctuation.definition.array.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.array.shell"}},"patterns":[{"include":"#comment"},{"captures":{"1":{"name":"variable.other.assignment.array.shell entity.other.attribute-name.shell"},"2":{"name":"keyword.operator.assignment.shell punctuation.definition.assignment.shell"}},"match":"((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(=)"},{"captures":{"1":{"name":"punctuation.definition.bracket.named-array.shell"},"2":{"name":"string.unquoted.shell entity.other.attribute-name.bracket.shell"},"3":{"name":"punctuation.definition.bracket.named-array.shell"},"4":{"name":"punctuation.definition.assignment.shell"}},"match":"(\\\\[)(.+?)(])(=)"},{"include":"#normal_context"},{"include":"#simple_unquoted"}]},"assignment_statement":{"patterns":[{"include":"#array_value"},{"include":"#modified_assignment_statement"},{"include":"#normal_assignment_statement"}]},"basic_command_name":{"captures":{"1":{"name":"storage.modifier.$1.shell"},"2":{"name":"entity.name.function.call.shell entity.name.command.shell","patterns":[{"match":"(?<!\\\\w)(?:continue|return|break)(?!\\\\w)","name":"keyword.control.$0.shell"},{"match":"(?<!\\\\w)(?:unfunction|continue|autoload|unsetopt|bindkey|builtin|getopts|command|declare|unalias|history|unlimit|typeset|suspend|source|printf|unhash|disown|ulimit|return|which|alias|break|false|print|shift|times|umask|unset|read|type|exec|eval|wait|echo|dirs|jobs|kill|hash|stat|exit|test|trap|true|let|set|pwd|cd|fg|bg|fc|[.:])(?!/)(?!\\\\w)(?!-)","name":"support.function.builtin.shell"},{"include":"#variable"}]}},"match":"(?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;])(?!nocorrect |nocorrect\\\\t|nocorrect$|readonly |readonly\\\\t|readonly$|function |function\\\\t|function$|foreach |foreach\\\\t|foreach$|coproc |coproc\\\\t|coproc$|logout |logout\\\\t|logout$|export |export\\\\t|export$|select |select\\\\t|select$|repeat |repeat\\\\t|repeat$|pushd |pushd\\\\t|pushd$|until |until\\\\t|until$|while |while\\\\t|while$|local |local\\\\t|local$|case |case\\\\t|case$|done |done\\\\t|done$|elif |elif\\\\t|elif$|else |else\\\\t|else$|esac |esac\\\\t|esac$|popd |popd\\\\t|popd$|then |then\\\\t|then$|time |time\\\\t|time$|for |for\\\\t|for$|end |end\\\\t|end$|fi |fi\\\\t|fi$|do |do\\\\t|do$|in |in\\\\t|in$|if |if\\\\t|if$)(?:((?<=^|[\\\\t \\\\&;])(?:readonly|declare|typeset|export|local)(?=[\\\\t \\\\&;]|$))|((?![\\"']|\\\\\\\\\\\\n?$)[^\\\\t\\\\n\\\\r !\\"'<>]+?))(?:(?=[\\\\t ])|(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\))","name":"meta.statement.command.name.basic.shell"},"block_comment":{"begin":"\\\\s*+(/\\\\*)","beginCaptures":{"1":{"name":"punctuation.definition.comment.begin.shell"}},"end":"\\\\*/","endCaptures":{"0":{"name":"punctuation.definition.comment.end.shell"}},"name":"comment.block.shell"},"boolean":{"match":"\\\\b(?:true|false)\\\\b","name":"constant.language.$0.shell"},"case_statement":{"begin":"\\\\b(case)\\\\b[\\\\t ]*+(.+?)[\\\\t ]*+\\\\b(in)\\\\b","beginCaptures":{"1":{"name":"keyword.control.case.shell"},"2":{"patterns":[{"include":"#initial_context"}]},"3":{"name":"keyword.control.in.shell"}},"end":"\\\\besac\\\\b","endCaptures":{"0":{"name":"keyword.control.esac.shell"}},"name":"meta.case.shell","patterns":[{"include":"#comment"},{"captures":{"1":{"name":"keyword.operator.pattern.case.default.shell"}},"match":"[\\\\t ]*+(\\\\* *\\\\))"},{"begin":"(?<!\\\\))(?![\\\\t ]*+(?:esac\\\\b|$))","beginCaptures":{},"end":"(?=\\\\besac\\\\b)|(\\\\))","endCaptures":{"1":{"name":"keyword.operator.pattern.case.shell"}},"name":"meta.case.entry.pattern.shell","patterns":[{"include":"#case_statement_context"}]},{"begin":"(?<=\\\\))","beginCaptures":{},"end":"(;;)|(?=\\\\besac\\\\b)","endCaptures":{"1":{"name":"punctuation.terminator.statement.case.shell"}},"name":"meta.case.entry.body.shell","patterns":[{"include":"#typical_statements"},{"include":"#initial_context"}]}]},"case_statement_context":{"patterns":[{"match":"\\\\*","name":"variable.language.special.quantifier.star.shell keyword.operator.quantifier.star.shell punctuation.definition.arbitrary-repetition.shell punctuation.definition.regex.arbitrary-repetition.shell"},{"match":"\\\\+","name":"variable.language.special.quantifier.plus.shell keyword.operator.quantifier.plus.shell punctuation.definition.arbitrary-repetition.shell punctuation.definition.regex.arbitrary-repetition.shell"},{"match":"\\\\?","name":"variable.language.special.quantifier.question.shell keyword.operator.quantifier.question.shell punctuation.definition.arbitrary-repetition.shell punctuation.definition.regex.arbitrary-repetition.shell"},{"match":"@","name":"variable.language.special.at.shell keyword.operator.at.shell punctuation.definition.regex.at.shell"},{"match":"\\\\|","name":"keyword.operator.orvariable.language.special.or.shell keyword.operator.alternation.ruby.shell punctuation.definition.regex.alternation.shell punctuation.separator.regex.alternation.shell"},{"match":"\\\\\\\\.","name":"constant.character.escape.shell"},{"match":"(?<=\\\\tin| in|[\\\\t ]|;;)\\\\(","name":"keyword.operator.pattern.case.shell"},{"begin":"(?<=\\\\S)(\\\\()","beginCaptures":{"1":{"name":"punctuation.definition.group.shell punctuation.definition.regex.group.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.definition.regex.group.shell"}},"name":"meta.parenthese.shell","patterns":[{"include":"#case_statement_context"}]},{"begin":"\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.character-class.shell"}},"end":"]","endCaptures":{"0":{"name":"punctuation.definition.character-class.shell"}},"name":"string.regexp.character-class.shell","patterns":[{"match":"\\\\\\\\.","name":"constant.character.escape.shell"}]},{"include":"#string"},{"match":"[^\\\\t\\\\n )*?@\\\\[|]","name":"string.unquoted.pattern.shell string.regexp.unquoted.shell"}]},"command_name_range":{"begin":"\\\\G","beginCaptures":{},"end":"(?=[\\\\t \\\\&;|]|$|[\\\\n)\`])|(?=<)","endCaptures":{},"name":"meta.statement.command.name.shell","patterns":[{"match":"(?<!\\\\w)(?:continue|return|break)(?!\\\\w)","name":"entity.name.function.call.shell entity.name.command.shell keyword.control.$0.shell"},{"match":"(?<!\\\\w)(?:unfunction|continue|autoload|unsetopt|bindkey|builtin|getopts|command|declare|unalias|history|unlimit|typeset|suspend|source|printf|unhash|disown|ulimit|return|which|alias|break|false|print|shift|times|umask|unset|read|type|exec|eval|wait|echo|dirs|jobs|kill|hash|stat|exit|test|trap|true|let|set|pwd|cd|fg|bg|fc|[.:])(?!/)(?!\\\\w)(?!-)","name":"entity.name.function.call.shell entity.name.command.shell support.function.builtin.shell"},{"include":"#variable"},{"captures":{"1":{"name":"entity.name.function.call.shell entity.name.command.shell"}},"match":"(?<!\\\\w)(?<=\\\\G|[\\"')}])([^\\\\t\\\\n\\\\r \\"\\\\&');->\`{|]+)"},{"begin":"(?:\\\\G|(?<![\\\\t\\\\n #\\\\&;{|]))(\\\\$?)((\\")|('))","beginCaptures":{"1":{"name":"meta.statement.command.name.quoted.shell punctuation.definition.string.shell entity.name.function.call.shell entity.name.command.shell"},"2":{},"3":{"name":"meta.statement.command.name.quoted.shell string.quoted.double.shell punctuation.definition.string.begin.shell entity.name.function.call.shell entity.name.command.shell"},"4":{"name":"meta.statement.command.name.quoted.shell string.quoted.single.shell punctuation.definition.string.begin.shell entity.name.function.call.shell entity.name.command.shell"}},"end":"(?<!\\\\G)(?<=\\\\2)","endCaptures":{},"patterns":[{"include":"#continuation_of_single_quoted_command_name"},{"include":"#continuation_of_double_quoted_command_name"}]},{"include":"#line_continuation"},{"include":"#simple_unquoted"}]},"command_statement":{"begin":"[\\\\t ]*+(?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;])(?!nocorrect |nocorrect\\\\t|nocorrect$|readonly |readonly\\\\t|readonly$|function |function\\\\t|function$|foreach |foreach\\\\t|foreach$|coproc |coproc\\\\t|coproc$|logout |logout\\\\t|logout$|export |export\\\\t|export$|select |select\\\\t|select$|repeat |repeat\\\\t|repeat$|pushd |pushd\\\\t|pushd$|until |until\\\\t|until$|while |while\\\\t|while$|local |local\\\\t|local$|case |case\\\\t|case$|done |done\\\\t|done$|elif |elif\\\\t|elif$|else |else\\\\t|else$|esac |esac\\\\t|esac$|popd |popd\\\\t|popd$|then |then\\\\t|then$|time |time\\\\t|time$|for |for\\\\t|for$|end |end\\\\t|end$|fi |fi\\\\t|fi$|do |do\\\\t|do$|in |in\\\\t|in$|if |if\\\\t|if$)(?!\\\\\\\\\\\\n?$)","beginCaptures":{},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.command.shell","patterns":[{"include":"#command_name_range"},{"include":"#line_continuation"},{"include":"#option"},{"include":"#argument"},{"include":"#string"},{"include":"#heredoc"}]},"comment":{"captures":{"1":{"name":"comment.line.number-sign.shell meta.shebang.shell"},"2":{"name":"punctuation.definition.comment.shebang.shell"},"3":{"name":"comment.line.number-sign.shell"},"4":{"name":"punctuation.definition.comment.shell"}},"match":"(?:^|[\\\\t ]++)(?:((#!).*)|((#).*))"},"comments":{"patterns":[{"include":"#block_comment"},{"include":"#line_comment"}]},"compound-command":{"patterns":[{"begin":"\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"end":"]","endCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"name":"meta.scope.logical-expression.shell","patterns":[{"include":"#logical-expression"},{"include":"#initial_context"}]},{"begin":"(?<=\\\\s|^)\\\\{(?=\\\\s|$)","beginCaptures":{"0":{"name":"punctuation.definition.group.shell"}},"end":"(?<=^|;)\\\\s*(})","endCaptures":{"1":{"name":"punctuation.definition.group.shell"}},"name":"meta.scope.group.shell","patterns":[{"include":"#initial_context"}]}]},"continuation_of_double_quoted_command_name":{"begin":"\\\\G(?<=\\")","beginCaptures":{},"contentName":"meta.statement.command.name.continuation string.quoted.double entity.name.function.call entity.name.command","end":"\\"","endCaptures":{"0":{"name":"string.quoted.double.shell punctuation.definition.string.end.shell entity.name.function.call.shell entity.name.command.shell"}},"patterns":[{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"include":"#variable"},{"include":"#interpolation"}]},"continuation_of_single_quoted_command_name":{"begin":"\\\\G(?<=')","beginCaptures":{},"contentName":"meta.statement.command.name.continuation string.quoted.single entity.name.function.call entity.name.command","end":"'","endCaptures":{"0":{"name":"string.quoted.single.shell punctuation.definition.string.end.shell entity.name.function.call.shell entity.name.command.shell"}}},"custom_command_names":{"patterns":[]},"custom_commands":{"patterns":[]},"double_quote_context":{"patterns":[{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"include":"#variable"},{"include":"#interpolation"}]},"double_quote_escape_char":{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},"floating_keyword":{"patterns":[{"match":"(?<=^|[\\\\t \\\\&;])(?:then|elif|else|done|end|do|if|fi)(?=[\\\\t \\\\&;]|$)","name":"keyword.control.$0.shell"}]},"for_statement":{"patterns":[{"begin":"\\\\b(for)\\\\b[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))[\\\\t ]*+\\\\b(in)\\\\b","beginCaptures":{"1":{"name":"keyword.control.for.shell"},"2":{"name":"variable.other.for.shell"},"3":{"name":"keyword.control.in.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.for.in.shell","patterns":[{"include":"#string"},{"include":"#simple_unquoted"},{"include":"#normal_context"}]},{"begin":"\\\\b(for)\\\\b","beginCaptures":{"1":{"name":"keyword.control.for.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.for.shell","patterns":[{"include":"#arithmetic_double"},{"include":"#normal_context"}]}]},"function_definition":{"applyEndPatternLast":1,"begin":"[\\\\t ]*+(?:\\\\b(function)\\\\b[\\\\t ]*+([^\\\\t\\\\n\\\\r \\"'()=]+)(?:(\\\\()[\\\\t ]*+(\\\\)))?|([^\\\\t\\\\n\\\\r \\"'()=]+)[\\\\t ]*+(\\\\()[\\\\t ]*+(\\\\)))","beginCaptures":{"1":{"name":"storage.type.function.shell"},"2":{"name":"entity.name.function.shell"},"3":{"name":"punctuation.definition.arguments.shell"},"4":{"name":"punctuation.definition.arguments.shell"},"5":{"name":"entity.name.function.shell"},"6":{"name":"punctuation.definition.arguments.shell"},"7":{"name":"punctuation.definition.arguments.shell"}},"end":"(?<=[)}])","endCaptures":{},"name":"meta.function.shell","patterns":[{"match":"\\\\G[\\\\t\\\\n ]"},{"begin":"\\\\{","beginCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"end":"}","endCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"name":"meta.function.body.shell","patterns":[{"include":"#initial_context"}]},{"begin":"\\\\(","beginCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"name":"meta.function.body.shell","patterns":[{"include":"#initial_context"}]},{"include":"#initial_context"}]},"heredoc":{"patterns":[{"begin":"((?<!<)<<-)[\\\\t ]*+([\\"'])[\\\\t ]*+([^\\"']+?)(?=[\\"\\\\&';<\\\\s])(\\\\2)(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.quote.shell"},"3":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"4":{"name":"punctuation.definition.string.heredoc.quote.shell"},"5":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.quoted.heredoc.indent.$3","end":"^\\\\t*\\\\3(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.$0.shell"}},"patterns":[]},{"begin":"((?<!<)<<(?!<))[\\\\t ]*+([\\"'])[\\\\t ]*+([^\\"']+?)(?=[\\"\\\\&';<\\\\s])(\\\\2)(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.quote.shell"},"3":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"4":{"name":"punctuation.definition.string.heredoc.quote.shell"},"5":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.quoted.heredoc.no-indent.$3","end":"^\\\\3(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.delimiter.shell"}},"patterns":[]},{"begin":"((?<!<)<<-)[\\\\t ]*+([^\\\\t \\"']+)(?=[\\"\\\\&';<\\\\s])(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"3":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.unquoted.heredoc.indent.$2","end":"^\\\\t*\\\\2(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.delimiter.shell"}},"patterns":[{"include":"#double_quote_escape_char"},{"include":"#variable"},{"include":"#interpolation"}]},{"begin":"((?<!<)<<(?!<))[\\\\t ]*+([^\\\\t \\"']+)(?=[\\"\\\\&';<\\\\s])(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"3":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.unquoted.heredoc.no-indent.$2","end":"^\\\\2(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.delimiter.shell"}},"patterns":[{"include":"#double_quote_escape_char"},{"include":"#variable"},{"include":"#interpolation"}]}]},"herestring":{"patterns":[{"begin":"(<<<)\\\\s*(('))","beginCaptures":{"1":{"name":"keyword.operator.herestring.shell"},"2":{"name":"string.quoted.single.shell"},"3":{"name":"punctuation.definition.string.begin.shell"}},"contentName":"string.quoted.single.shell","end":"(')","endCaptures":{"0":{"name":"string.quoted.single.shell"},"1":{"name":"punctuation.definition.string.end.shell"}},"name":"meta.herestring.shell"},{"begin":"(<<<)\\\\s*((\\"))","beginCaptures":{"1":{"name":"keyword.operator.herestring.shell"},"2":{"name":"string.quoted.double.shell"},"3":{"name":"punctuation.definition.string.begin.shell"}},"contentName":"string.quoted.double.shell","end":"(\\")","endCaptures":{"0":{"name":"string.quoted.double.shell"},"1":{"name":"punctuation.definition.string.end.shell"}},"name":"meta.herestring.shell","patterns":[{"include":"#double_quote_context"}]},{"captures":{"1":{"name":"keyword.operator.herestring.shell"},"2":{"name":"string.unquoted.herestring.shell","patterns":[{"include":"#initial_context"}]}},"match":"(<<<)\\\\s*(([^)\\\\\\\\\\\\s]|\\\\\\\\.)+)","name":"meta.herestring.shell"}]},"initial_context":{"patterns":[{"include":"#comment"},{"include":"#pipeline"},{"include":"#normal_statement_seperator"},{"include":"#logical_expression_double"},{"include":"#logical_expression_single"},{"include":"#assignment_statement"},{"include":"#case_statement"},{"include":"#for_statement"},{"include":"#loop"},{"include":"#function_definition"},{"include":"#line_continuation"},{"include":"#arithmetic_double"},{"include":"#misc_ranges"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#redirection"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#alias_statement"},{"include":"#normal_statement"},{"include":"#string"},{"include":"#support"}]},"inline_comment":{"captures":{"1":{"name":"comment.block.shell punctuation.definition.comment.begin.shell"},"2":{"name":"comment.block.shell"},"3":{"patterns":[{"match":"\\\\*/","name":"comment.block.shell punctuation.definition.comment.end.shell"},{"match":"\\\\*","name":"comment.block.shell"}]}},"match":"(/\\\\*)((?:[^*]|\\\\*++[^/])*+(\\\\*++/))"},"interpolation":{"patterns":[{"include":"#arithmetic_dollar"},{"include":"#subshell_dollar"},{"begin":"\`","beginCaptures":{"0":{"name":"punctuation.definition.evaluation.backticks.shell"}},"end":"\`","endCaptures":{"0":{"name":"punctuation.definition.evaluation.backticks.shell"}},"name":"string.interpolated.backtick.shell","patterns":[{"match":"\\\\\\\\[$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"begin":"(?<=\\\\W)(?=#)(?!#\\\\{)","beginCaptures":{"1":{"name":"punctuation.whitespace.comment.leading.shell"}},"end":"(?!\\\\G)","patterns":[{"begin":"#","beginCaptures":{"0":{"name":"punctuation.definition.comment.shell"}},"end":"(?=\`)","name":"comment.line.number-sign.shell"}]},{"include":"#initial_context"}]}]},"keyword":{"patterns":[{"match":"(?<=^|[\\\\&;\\\\s])(then|else|elif|fi|for|in|do|done|select|continue|esac|while|until|return)(?=[\\\\&;\\\\s]|$)","name":"keyword.control.shell"},{"match":"(?<=^|[\\\\&;\\\\s])(?:export|declare|typeset|local|readonly)(?=[\\\\&;\\\\s]|$)","name":"storage.modifier.shell"}]},"line_comment":{"begin":"\\\\s*+(//)","beginCaptures":{"1":{"name":"punctuation.definition.comment.shell"}},"end":"(?<=\\\\n)(?<!\\\\\\\\\\\\n)","endCaptures":{},"name":"comment.line.double-slash.shell","patterns":[{"include":"#line_continuation_character"}]},"line_continuation":{"match":"\\\\\\\\(?=\\\\n)","name":"constant.character.escape.line-continuation.shell"},"logical-expression":{"patterns":[{"include":"#arithmetic_no_dollar"},{"match":"=[=~]?|!=?|[<>]|&&|\\\\|\\\\|","name":"keyword.operator.logical.shell"},{"match":"(?<!\\\\S)-(nt|ot|ef|eq|ne|l[et]|g[et]|[GLNOSa-hknopr-uwxz])\\\\b","name":"keyword.operator.logical.shell"}]},"logical_expression_context":{"patterns":[{"include":"#regex_comparison"},{"include":"#arithmetic_no_dollar"},{"include":"#logical-expression"},{"include":"#logical_expression_single"},{"include":"#logical_expression_double"},{"include":"#comment"},{"include":"#boolean"},{"include":"#redirect_number"},{"include":"#numeric_literal"},{"include":"#pipeline"},{"include":"#normal_statement_seperator"},{"include":"#string"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#support"}]},"logical_expression_double":{"begin":"\\\\[\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"end":"]]","endCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"name":"meta.scope.logical-expression.shell","patterns":[{"include":"#logical_expression_context"}]},"logical_expression_single":{"begin":"\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"end":"]","endCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"name":"meta.scope.logical-expression.shell","patterns":[{"include":"#logical_expression_context"}]},"loop":{"patterns":[{"begin":"(?<=^|[\\\\&;\\\\s])(for)\\\\s+(.+?)\\\\s+(in)(?=[\\\\&;\\\\s]|$)","beginCaptures":{"1":{"name":"keyword.control.shell"},"2":{"name":"variable.other.loop.shell","patterns":[{"include":"#string"}]},"3":{"name":"keyword.control.shell"}},"end":"(?<=^|[\\\\&;\\\\s])done(?=[\\\\&;\\\\s]|$|\\\\))","endCaptures":{"0":{"name":"keyword.control.shell"}},"name":"meta.scope.for-in-loop.shell","patterns":[{"include":"#initial_context"}]},{"begin":"(?<=^|[\\\\&;\\\\s])(while|until)(?=[\\\\&;\\\\s]|$)","beginCaptures":{"1":{"name":"keyword.control.shell"}},"end":"(?<=^|[\\\\&;\\\\s])done(?=[\\\\&;\\\\s]|$|\\\\))","endCaptures":{"0":{"name":"keyword.control.shell"}},"name":"meta.scope.while-loop.shell","patterns":[{"include":"#initial_context"}]},{"begin":"(?<=^|[\\\\&;\\\\s])(select)\\\\s+((?:[^\\\\\\\\\\\\s]|\\\\\\\\.)+)(?=[\\\\&;\\\\s]|$)","beginCaptures":{"1":{"name":"keyword.control.shell"},"2":{"name":"variable.other.loop.shell"}},"end":"(?<=^|[\\\\&;\\\\s])(done)(?=[\\\\&;\\\\s]|$|\\\\))","endCaptures":{"1":{"name":"keyword.control.shell"}},"name":"meta.scope.select-block.shell","patterns":[{"include":"#initial_context"}]},{"begin":"(?<=^|[\\\\&;\\\\s])if(?=[\\\\&;\\\\s]|$)","beginCaptures":{"0":{"name":"keyword.control.if.shell"}},"end":"(?<=^|[\\\\&;\\\\s])fi(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"keyword.control.fi.shell"}},"name":"meta.scope.if-block.shell","patterns":[{"include":"#initial_context"}]}]},"math":{"patterns":[{"include":"#variable"},{"match":"\\\\+{1,2}|-{1,2}|[!~]|\\\\*{1,2}|[%/]|<[<=]?|>[=>]?|==|!=|^|\\\\|{1,2}|&{1,2}|[,:=?]|[-%\\\\&*+/^|]=|<<=|>>=","name":"keyword.operator.arithmetic.shell"},{"match":"0[Xx]\\\\h+","name":"constant.numeric.hex.shell"},{"match":";","name":"punctuation.separator.semicolon.range"},{"match":"0\\\\d+","name":"constant.numeric.octal.shell"},{"match":"\\\\d{1,2}#[0-9@-Z_a-z]+","name":"constant.numeric.other.shell"},{"match":"\\\\d+","name":"constant.numeric.integer.shell"},{"match":"(?<!\\\\w)[0-9A-Z_a-z]+(?!\\\\w)","name":"variable.other.normal.shell"}]},"math_operators":{"patterns":[{"match":"\\\\+{1,2}|-{1,2}|[!~]|\\\\*{1,2}|[%/]|<[<=]?|>[=>]?|==|!=|^|\\\\|{1,2}|&{1,2}|[,:=?]|[-%\\\\&*+/^|]=|<<=|>>=","name":"keyword.operator.arithmetic.shell"},{"match":"0[Xx]\\\\h+","name":"constant.numeric.hex.shell"},{"match":"0\\\\d+","name":"constant.numeric.octal.shell"},{"match":"\\\\d{1,2}#[0-9@-Z_a-z]+","name":"constant.numeric.other.shell"},{"match":"\\\\d+","name":"constant.numeric.integer.shell"}]},"misc_ranges":{"patterns":[{"include":"#logical_expression_single"},{"include":"#logical_expression_double"},{"include":"#subshell_dollar"},{"begin":"(?<![^\\\\t ])(\\\\{)(?![$\\\\w])","beginCaptures":{"1":{"name":"punctuation.definition.group.shell"}},"end":"}","endCaptures":{"0":{"name":"punctuation.definition.group.shell"}},"name":"meta.scope.group.shell","patterns":[{"include":"#initial_context"}]}]},"modified_assignment_statement":{"begin":"(?<=^|[\\\\t \\\\&;])(?:readonly|declare|typeset|export|local)(?=[\\\\t \\\\&;]|$)","beginCaptures":{"0":{"name":"storage.modifier.$0.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.shell meta.expression.assignment.modified.shell","patterns":[{"match":"(?<!\\\\w)-\\\\w+\\\\b","name":"string.unquoted.argument.shell constant.other.option.shell"},{"include":"#array_value"},{"captures":{"1":{"name":"variable.other.assignment.shell"},"2":{"name":"punctuation.definition.array.access.shell"},"3":{"name":"variable.other.assignment.shell"},"4":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"keyword.operator.assignment.shell"},"7":{"name":"keyword.operator.assignment.compound.shell"},"8":{"name":"keyword.operator.assignment.compound.shell"},"9":{"name":"constant.numeric.shell constant.numeric.hex.shell"},"10":{"name":"constant.numeric.shell constant.numeric.octal.shell"},"11":{"name":"constant.numeric.shell constant.numeric.other.shell"},"12":{"name":"constant.numeric.shell constant.numeric.decimal.shell"},"13":{"name":"constant.numeric.shell constant.numeric.version.shell"},"14":{"name":"constant.numeric.shell constant.numeric.integer.shell"}},"match":"((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))?(?:(?<=[\\\\t =]|^|[(\\\\[{])(?:(?:(?:(?:(?:(0[Xx]\\\\h+)|(0\\\\d+))|(\\\\d{1,2}#[0-9@-Z_a-z]+))|(-?\\\\d+\\\\.\\\\d+))|(-?\\\\d+(?:\\\\.\\\\d+)+))|(-?\\\\d+))(?=[\\\\t ]|$|[);}]))?"},{"include":"#normal_context"}]},"modifiers":{"match":"(?<=^|[\\\\t \\\\&;])(?:readonly|declare|typeset|export|local)(?=[\\\\t \\\\&;]|$)","name":"storage.modifier.$0.shell"},"normal_assignment_statement":{"begin":"[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))","beginCaptures":{"1":{"name":"variable.other.assignment.shell"},"2":{"name":"punctuation.definition.array.access.shell"},"3":{"name":"variable.other.assignment.shell"},"4":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"keyword.operator.assignment.shell"},"7":{"name":"keyword.operator.assignment.compound.shell"},"8":{"name":"keyword.operator.assignment.compound.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.expression.assignment.shell","patterns":[{"include":"#comment"},{"include":"#string"},{"include":"#normal_assignment_statement"},{"begin":"(?<=[\\\\t ])(?![\\\\t ]|\\\\w+=)","beginCaptures":{},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.command.env.shell","patterns":[{"include":"#command_name_range"},{"include":"#line_continuation"},{"include":"#option"},{"include":"#argument"},{"include":"#string"}]},{"include":"#simple_unquoted"},{"include":"#normal_context"}]},"normal_context":{"patterns":[{"include":"#comment"},{"include":"#pipeline"},{"include":"#normal_statement_seperator"},{"include":"#misc_ranges"},{"include":"#boolean"},{"include":"#redirect_number"},{"include":"#numeric_literal"},{"include":"#string"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#redirection"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#support"},{"include":"#parenthese"}]},"normal_statement":{"begin":"(?!^[\\\\t ]*+$)(?:(?<=(?:^until| until|\\\\tuntil|^while| while|\\\\twhile|^elif| elif|\\\\telif|^else| else|\\\\telse|^then| then|\\\\tthen|^do| do|\\\\tdo|^if| if|\\\\tif) )|(?<=^|[!\\\\&(;\`{|]))[\\\\t ]*+(?!nocorrect\\\\W|nocorrect\\\\$|function\\\\W|function\\\\$|foreach\\\\W|foreach\\\\$|repeat\\\\W|repeat\\\\$|logout\\\\W|logout\\\\$|coproc\\\\W|coproc\\\\$|select\\\\W|select\\\\$|while\\\\W|while\\\\$|pushd\\\\W|pushd\\\\$|until\\\\W|until\\\\$|case\\\\W|case\\\\$|done\\\\W|done\\\\$|elif\\\\W|elif\\\\$|else\\\\W|else\\\\$|esac\\\\W|esac\\\\$|popd\\\\W|popd\\\\$|then\\\\W|then\\\\$|time\\\\W|time\\\\$|for\\\\W|for\\\\$|end\\\\W|end\\\\$|fi\\\\W|fi\\\\$|do\\\\W|do\\\\$|in\\\\W|in\\\\$|if\\\\W|if\\\\$)","beginCaptures":{},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.shell","patterns":[{"include":"#typical_statements"}]},"normal_statement_seperator":{"captures":{"1":{"name":"punctuation.terminator.statement.semicolon.shell"},"2":{"name":"punctuation.separator.statement.and.shell"},"3":{"name":"punctuation.separator.statement.or.shell"},"4":{"name":"punctuation.separator.statement.background.shell"}},"match":"(?:(?:(;)|(&&))|(\\\\|\\\\|))|(&)"},"numeric_literal":{"captures":{"1":{"name":"constant.numeric.shell constant.numeric.hex.shell"},"2":{"name":"constant.numeric.shell constant.numeric.octal.shell"},"3":{"name":"constant.numeric.shell constant.numeric.other.shell"},"4":{"name":"constant.numeric.shell constant.numeric.decimal.shell"},"5":{"name":"constant.numeric.shell constant.numeric.version.shell"},"6":{"name":"constant.numeric.shell constant.numeric.integer.shell"}},"match":"(?<=[\\\\t =]|^|[(\\\\[{])(?:(?:(?:(?:(?:(0[Xx]\\\\h+)|(0\\\\d+))|(\\\\d{1,2}#[0-9@-Z_a-z]+))|(-?\\\\d+\\\\.\\\\d+))|(-?\\\\d+(?:\\\\.\\\\d+)+))|(-?\\\\d+))(?=[\\\\t ]|$|[);}])"},"option":{"begin":"[\\\\t ]++(-)((?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;]))","beginCaptures":{"1":{"name":"string.unquoted.argument.shell constant.other.option.dash.shell"},"2":{"name":"string.unquoted.argument.shell constant.other.option.shell"}},"contentName":"string.unquoted.argument constant.other.option","end":"(?=[\\\\t ])|(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"patterns":[{"include":"#option_context"}]},"option_context":{"patterns":[{"include":"#misc_ranges"},{"include":"#string"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#redirection"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#support"}]},"parenthese":{"patterns":[{"begin":"\\\\(","beginCaptures":{"0":{"name":"punctuation.section.parenthese.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.section.parenthese.shell"}},"name":"meta.parenthese.group.shell","patterns":[{"include":"#initial_context"}]}]},"pathname":{"patterns":[{"match":"(?<=[:=\\\\s]|^)~","name":"keyword.operator.tilde.shell"},{"match":"[*?]","name":"keyword.operator.glob.shell"},{"begin":"([!*+?@])(\\\\()","beginCaptures":{"1":{"name":"keyword.operator.extglob.shell"},"2":{"name":"punctuation.definition.extglob.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.extglob.shell"}},"name":"meta.structure.extglob.shell","patterns":[{"include":"#initial_context"}]}]},"pipeline":{"patterns":[{"match":"(?<=^|[\\\\&;\\\\s])(time)(?=[\\\\&;\\\\s]|$)","name":"keyword.other.shell"},{"match":"[!|]","name":"keyword.operator.pipe.shell"}]},"redirect_fix":{"captures":{"1":{"name":"keyword.operator.redirect.shell"},"2":{"name":"string.unquoted.argument.shell"}},"match":"(>>?)[\\\\t ]*+([^\\\\t\\\\n \\"$\\\\&-);<>\\\\\\\\\`|]+)"},"redirect_number":{"captures":{"1":{"name":"keyword.operator.redirect.stdout.shell"},"2":{"name":"keyword.operator.redirect.stderr.shell"},"3":{"name":"keyword.operator.redirect.$3.shell"}},"match":"(?<=[\\\\t ])(?:(1)|(2)|(\\\\d+))(?=>)"},"redirection":{"patterns":[{"begin":"[<>]\\\\(","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.interpolated.process-substitution.shell","patterns":[{"include":"#initial_context"}]},{"match":"(?<![<>])(&>|\\\\d*>&\\\\d*|\\\\d*(>>|[<>])|\\\\d*<&|\\\\d*<>)(?![<>])","name":"keyword.operator.redirect.shell"}]},"regex_comparison":{"match":"=~","name":"keyword.operator.logical.regex.shell"},"regexp":{"patterns":[{"match":".+"}]},"simple_options":{"captures":{"0":{"patterns":[{"captures":{"1":{"name":"string.unquoted.argument.shell constant.other.option.dash.shell"},"2":{"name":"string.unquoted.argument.shell constant.other.option.shell"}},"match":"[\\\\t ]++(-)(\\\\w+)"}]}},"match":"(?:[\\\\t ]++-\\\\w+)*"},"simple_unquoted":{"match":"[^\\\\t\\\\n \\"$\\\\&-);<>\\\\\\\\\`|]","name":"string.unquoted.shell"},"special_expansion":{"match":"!|:[-=?]?|[*@]|##?|%%|[%/]","name":"keyword.operator.expansion.shell"},"start_of_command":{"match":"[\\\\t ]*+(?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;])(?!nocorrect |nocorrect\\\\t|nocorrect$|readonly |readonly\\\\t|readonly$|function |function\\\\t|function$|foreach |foreach\\\\t|foreach$|coproc |coproc\\\\t|coproc$|logout |logout\\\\t|logout$|export |export\\\\t|export$|select |select\\\\t|select$|repeat |repeat\\\\t|repeat$|pushd |pushd\\\\t|pushd$|until |until\\\\t|until$|while |while\\\\t|while$|local |local\\\\t|local$|case |case\\\\t|case$|done |done\\\\t|done$|elif |elif\\\\t|elif$|else |else\\\\t|else$|esac |esac\\\\t|esac$|popd |popd\\\\t|popd$|then |then\\\\t|then$|time |time\\\\t|time$|for |for\\\\t|for$|end |end\\\\t|end$|fi |fi\\\\t|fi$|do |do\\\\t|do$|in |in\\\\t|in$|if |if\\\\t|if$)(?!\\\\\\\\\\\\n?$)"},"string":{"patterns":[{"match":"\\\\\\\\.","name":"constant.character.escape.shell"},{"begin":"'","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"'","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.quoted.single.shell"},{"begin":"\\\\$?\\"","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"\\"","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.quoted.double.shell","patterns":[{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"include":"#variable"},{"include":"#interpolation"}]},{"begin":"\\\\$'","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"'","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.quoted.single.dollar.shell","patterns":[{"match":"\\\\\\\\['\\\\\\\\abefnrtv]","name":"constant.character.escape.ansi-c.shell"},{"match":"\\\\\\\\[0-9]{3}\\"","name":"constant.character.escape.octal.shell"},{"match":"\\\\\\\\x\\\\h{2}\\"","name":"constant.character.escape.hex.shell"},{"match":"\\\\\\\\c.\\"","name":"constant.character.escape.control-char.shell"}]}]},"subshell_dollar":{"patterns":[{"begin":"\\\\$\\\\(","beginCaptures":{"0":{"name":"punctuation.definition.subshell.single.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.subshell.single.shell"}},"name":"meta.scope.subshell","patterns":[{"include":"#parenthese"},{"include":"#initial_context"}]}]},"support":{"patterns":[{"match":"(?<=^|[\\\\&;\\\\s])[.:](?=[\\\\&;\\\\s]|$)","name":"support.function.builtin.shell"}]},"typical_statements":{"patterns":[{"include":"#assignment_statement"},{"include":"#case_statement"},{"include":"#for_statement"},{"include":"#while_statement"},{"include":"#function_definition"},{"include":"#command_statement"},{"include":"#line_continuation"},{"include":"#arithmetic_double"},{"include":"#normal_context"}]},"variable":{"patterns":[{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.parameter.positional.all.shell"},"2":{"name":"variable.parameter.positional.all.shell"}},"match":"(\\\\$)(@(?!\\\\w))"},{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.parameter.positional.shell"},"2":{"name":"variable.parameter.positional.shell"}},"match":"(\\\\$)([0-9](?!\\\\w))"},{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.language.special.shell"},"2":{"name":"variable.language.special.shell"}},"match":"(\\\\$)([-!#$*0?_](?!\\\\w))"},{"begin":"(\\\\$)(\\\\{)[\\\\t ]*+(?=\\\\d)","beginCaptures":{"1":{"name":"punctuation.definition.variable.shell variable.parameter.positional.shell"},"2":{"name":"punctuation.section.bracket.curly.variable.begin.shell punctuation.definition.variable.shell variable.parameter.positional.shell"}},"contentName":"meta.parameter-expansion","end":"}","endCaptures":{"0":{"name":"punctuation.section.bracket.curly.variable.end.shell punctuation.definition.variable.shell variable.parameter.positional.shell"}},"patterns":[{"include":"#special_expansion"},{"include":"#array_access_inline"},{"match":"[0-9]+","name":"variable.parameter.positional.shell"},{"match":"(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)","name":"variable.other.normal.shell"},{"include":"#variable"},{"include":"#string"}]},{"begin":"(\\\\$)(\\\\{)","beginCaptures":{"1":{"name":"punctuation.definition.variable.shell"},"2":{"name":"punctuation.section.bracket.curly.variable.begin.shell punctuation.definition.variable.shell"}},"contentName":"meta.parameter-expansion","end":"}","endCaptures":{"0":{"name":"punctuation.section.bracket.curly.variable.end.shell punctuation.definition.variable.shell"}},"patterns":[{"include":"#special_expansion"},{"include":"#array_access_inline"},{"match":"(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)","name":"variable.other.normal.shell"},{"include":"#variable"},{"include":"#string"}]},{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.other.normal.shell"},"2":{"name":"variable.other.normal.shell"}},"match":"(\\\\$)(\\\\w+(?!\\\\w))"}]},"while_statement":{"patterns":[{"begin":"\\\\b(while)\\\\b","beginCaptures":{"1":{"name":"keyword.control.while.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.while.shell","patterns":[{"include":"#line_continuation"},{"include":"#math_operators"},{"include":"#option"},{"include":"#simple_unquoted"},{"include":"#normal_context"},{"include":"#string"}]}]}},"scopeName":"source.shell","aliases":["bash","sh","shell","zsh"]}`));
+@@ -18217,18 +18443,18 @@
+ }
+ 
+ // ../canvas-components/dist/form-primitives.js
+-var import_jsx_runtime13 = __toESM(require_jsx_runtime(), 1);
+-var import_react16 = __toESM(require_react(), 1);
++var import_jsx_runtime14 = __toESM(require_jsx_runtime(), 1);
++var import_react18 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/swatch.js
+-var import_jsx_runtime14 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime15 = __toESM(require_jsx_runtime(), 1);
+ 
+ // ../canvas-components/dist/todo-list.js
+-var import_jsx_runtime15 = __toESM(require_jsx_runtime(), 1);
+-var import_react17 = __toESM(require_react(), 1);
++var import_jsx_runtime16 = __toESM(require_jsx_runtime(), 1);
++var import_react19 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/usage-bar.js
+-var import_jsx_runtime16 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime17 = __toESM(require_jsx_runtime(), 1);
+ 
+ // ../canvas-shared/dist/canvas-design-mode.js
+ var CANVAS_DESIGN_CAPABLE_MESSAGE_TYPE = "cursor-canvas-design-capable";
+@@ -18264,6 +18490,71 @@
+   return Number.isSafeInteger(depth) && depth >= 0 ? { type: CANVAS_DESIGN_SELECT_MESSAGE_TYPE, depth } : void 0;
+ }
+ 
++// ../canvas-shared/dist/canvas-error-panel.js
++var CANVAS_ERROR_PANEL_ATTRIBUTE = "data-cursor-canvas-error";
++var CANVAS_ERROR_PANEL_MESSAGE_ATTRIBUTE = "data-cursor-canvas-error-message";
++var CANVAS_ERROR_PANEL_TITLE = "This canvas failed to load";
++var CANVAS_ERROR_PANEL_BODY = "Its code ran into an error. Ask the agent that made it to fix it.";
++var CANVAS_ERROR_PANEL_DETAILS_LABEL = "Error details";
++var CANVAS_ERROR_PANEL_MAX_MESSAGE_CHARS = 4e3;
++function escapeHtml(value) {
++  return value.replace(/[&<>"']/g, (char) => {
++    switch (char) {
++      case "&":
++        return "&amp;";
++      case "<":
++        return "&lt;";
++      case ">":
++        return "&gt;";
++      case '"':
++        return "&quot;";
++      default:
++        return "&#39;";
++    }
++  });
++}
++function truncateCanvasErrorMessage(message) {
++  return message.length > CANVAS_ERROR_PANEL_MAX_MESSAGE_CHARS ? `${message.slice(0, CANVAS_ERROR_PANEL_MAX_MESSAGE_CHARS)}\u2026` : message;
++}
++var PANEL_CSS = `[${CANVAS_ERROR_PANEL_ATTRIBUTE}]{box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;min-height:min(70vh,520px);margin:0;padding:48px 24px;text-align:center;font-family:inherit;font-size:13px;line-height:18px;color:inherit}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] h2{margin:0;font-size:15px;line-height:22px;font-weight:600}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] p{margin:0;max-width:420px;opacity:.72}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] details{margin:8px 0 0;width:100%;max-width:640px;text-align:left}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] details[hidden]{display:none}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] summary{width:max-content;margin:0 auto;padding:2px 6px;border-radius:4px;cursor:pointer;opacity:.72;user-select:none}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] summary:hover{opacity:1}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] summary:focus-visible{outline:2px solid currentColor;outline-offset:2px}
++[${CANVAS_ERROR_PANEL_ATTRIBUTE}] pre{margin:8px 0 0;padding:10px 12px;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;border-radius:6px;border:1px solid color-mix(in srgb,currentColor 16%,transparent);background:color-mix(in srgb,currentColor 5%,transparent);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:17px;user-select:text}`;
++function canvasErrorPanelHtml(message) {
++  const shown = truncateCanvasErrorMessage(message.trim());
++  const hiddenAttr = shown ? "" : " hidden";
++  return `<style>${PANEL_CSS}</style><div ${CANVAS_ERROR_PANEL_ATTRIBUTE}="" role="alert"><h2>${CANVAS_ERROR_PANEL_TITLE}</h2><p>${CANVAS_ERROR_PANEL_BODY}</p><details${hiddenAttr}><summary>${CANVAS_ERROR_PANEL_DETAILS_LABEL}</summary><pre ${CANVAS_ERROR_PANEL_MESSAGE_ATTRIBUTE}="">${escapeHtml(shown)}</pre></details></div>`;
++}
++
++// ../canvas-shared/dist/canvas-frame-find.js
++var CANVAS_FRAME_FIND_MESSAGE_TYPE = "cursor-canvas-frame-find";
++var CANVAS_FRAME_FIND_RESULT_MESSAGE_TYPE = "cursor-canvas-frame-find-result";
++var CANVAS_FRAME_FIND_REQUEST_MESSAGE_TYPE = "cursor-canvas-frame-find-request";
++var CANVAS_FRAME_FIND_HIGHLIGHT_NAME = "cursor-canvas-find";
++var CANVAS_FRAME_FIND_CURRENT_HIGHLIGHT_NAME = "cursor-canvas-find-current";
++var CANVAS_FRAME_FIND_CSS = `::highlight(${CANVAS_FRAME_FIND_HIGHLIGHT_NAME}){background-color:color-mix(in srgb,#ffc000 30%,transparent)}
++::highlight(${CANVAS_FRAME_FIND_CURRENT_HIGHLIGHT_NAME}){background-color:#ffc000;color:#1f1f1f}`;
++var FIND_SKIP_SELECTOR = 'script,style,noscript,template,textarea,input,select,[contenteditable]:not([contenteditable="false"])';
++var CANVAS_FRAME_FIND_SHORTCUT_TEST = "(e.metaKey||e.ctrlKey)&&!e.altKey&&!e.shiftKey&&(e.key==='f'||e.key==='F')";
++function canvasFrameFindScript() {
++  return `var findState={query:'',current:0,observer:null,pending:false};
++function findFold(data){var lower=data.toLowerCase();if(lower.length===data.length)return{text:lower,map:null};var text='',map=[];for(var i=0;i<data.length;i++){var ch=data.charAt(i).toLowerCase();for(var j=0;j<ch.length;j++)map.push(i);text+=ch}return{text:text,map:map}}
++function findIndex(){var nodes=[],starts=[],maps=[],text='';var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode:function(node){var el=node.parentElement;if(!el||el.closest(${JSON.stringify(FIND_SKIP_SELECTOR)}))return NodeFilter.FILTER_REJECT;return !el.checkVisibility||el.checkVisibility({visibilityProperty:true})?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT}});for(var node=walker.nextNode();node;node=walker.nextNode()){var folded=findFold(node.data);nodes.push(node);starts.push(text.length);maps.push(folded.map);text+=folded.text}return{nodes:nodes,starts:starts,maps:maps,text:text}}
++function findPosition(index,offset){var low=0,high=index.starts.length-1;while(low<high){var mid=(low+high+1)>>1;if(index.starts[mid]<=offset)low=mid;else high=mid-1}var unit=offset-index.starts[low],map=index.maps[low];return{node:index.nodes[low],offset:map?map[unit]:unit}}
++function findRange(index,from,to){var start=findPosition(index,from),end=findPosition(index,to-1);return new StaticRange({startContainer:start.node,startOffset:start.offset,endContainer:end.node,endOffset:end.offset+1})}
++function findReveal(range){var live=document.createRange();live.setStart(range.startContainer,range.startOffset);live.setEnd(range.endContainer,range.endOffset);var el=range.startContainer.parentElement;if(el&&el.scrollIntoView)el.scrollIntoView({block:'nearest',inline:'nearest'});var box=live.getBoundingClientRect(),inset=parseFloat(getComputedStyle(document.documentElement).paddingTop)||0;if(box.top<inset||box.bottom>innerHeight)scrollBy(0,box.top-inset-(innerHeight-inset-box.height)/2)}
++function findPaint(ranges,current){var registry=self.CSS&&CSS.highlights;if(!registry)return;registry.delete(${JSON.stringify(CANVAS_FRAME_FIND_HIGHLIGHT_NAME)});registry.delete(${JSON.stringify(CANVAS_FRAME_FIND_CURRENT_HIGHLIGHT_NAME)});if(!ranges.length)return;var all=new Highlight();for(var i=0;i<ranges.length;i++)all.add(ranges[i]);registry.set(${JSON.stringify(CANVAS_FRAME_FIND_HIGHLIGHT_NAME)},all);registry.set(${JSON.stringify(CANVAS_FRAME_FIND_CURRENT_HIGHLIGHT_NAME)},new Highlight(ranges[current]))}
++function findRun(reveal){var query=findState.query,needle=query.toLowerCase(),ranges=[];if(needle){var index=findIndex(),at=index.text.indexOf(needle);while(at>=0){ranges.push(findRange(index,at,at+needle.length));at=index.text.indexOf(needle,at+needle.length)}}var total=ranges.length,current=total?((findState.current%total)+total)%total:0;findState.current=current;findPaint(ranges,current);if(reveal&&total)findReveal(ranges[current]);try{parent.postMessage({type:${JSON.stringify(CANVAS_FRAME_FIND_RESULT_MESSAGE_TYPE)},query:query,total:total,current:current},'*')}catch{}}
++function findWatch(active){if(active&&!findState.observer&&typeof MutationObserver!=='undefined'){findState.observer=new MutationObserver(function(){if(findState.pending)return;findState.pending=true;requestAnimationFrame(function(){findState.pending=false;if(findState.query)findRun(false)})});findState.observer.observe(document.body,{subtree:true,childList:true,characterData:true})}else if(!active&&findState.observer){findState.observer.disconnect();findState.observer=null}}
++function canvasFind(message){findState.query=typeof message.query==='string'?message.query:'';findState.current=typeof message.current==='number'&&isFinite(message.current)?Math.trunc(message.current):0;findWatch(findState.query.length>0);findRun(true)}
++function canvasFindRequest(){try{parent.postMessage({type:${JSON.stringify(CANVAS_FRAME_FIND_REQUEST_MESSAGE_TYPE)}},'*')}catch{}}`;
++}
++
+ // ../canvas-shared/dist/canvas-root-layout.js
+ var CANVAS_VIEWPORT_HEIGHT_CSS_VAR = "--cursor-canvas-viewport-height";
+ var CANVAS_BODY_PADDING_VERTICAL_PX = 24;
+@@ -18284,16 +18575,18 @@
+ var CANVAS_FRAME_BOTTOM_INSET_CSS_VAR = "--cursor-canvas-bottom-inset";
+ var CANVAS_FRAME_SCROLLED_MESSAGE_TYPE = "cursor-canvas-frame-scrolled";
+ var EMBEDDER_BRIDGE_SCRIPT = `<script>
+-addEventListener('keydown',function(e){if(e.key!=='Escape')return;try{parent.postMessage({type:'${CANVAS_FRAME_CLOSE_REQUEST_MESSAGE_TYPE}'},'*')}catch{}},true);
++addEventListener('keydown',function(e){if(${CANVAS_FRAME_FIND_SHORTCUT_TEST}){e.preventDefault();canvasFindRequest();return}if(e.key!=='Escape')return;try{parent.postMessage({type:'${CANVAS_FRAME_CLOSE_REQUEST_MESSAGE_TYPE}'},'*')}catch{}},true);
+ var scrolled=false;addEventListener('scroll',function(){var next=scrollY>0;if(next===scrolled)return;scrolled=next;try{parent.postMessage({type:'${CANVAS_FRAME_SCROLLED_MESSAGE_TYPE}',isScrolled:next},'*')}catch{}},{passive:true});
+ addEventListener('message',function(e){if(e.source!==parent||!e.data)return;
+ if(e.data.type==='${CANVAS_FRAME_SCROLL_TO_TOP_MESSAGE.type}'){scrollTo(0,0);return}
++if(e.data.type==='${CANVAS_FRAME_FIND_MESSAGE_TYPE}'){canvasFind(e.data);return}
+ if(e.data.type!=='${CANVAS_FRAME_CONTENT_COLUMN_MESSAGE_TYPE}')return;
+ var column=e.data.columnWidthPx,gutter=e.data.gutterPx,inset=e.data.topInsetPx,bottom=e.data.bottomInsetPx,style=document.documentElement.style;
+ if(typeof column==='number'&&column>0)style.setProperty('${CANVAS_FRAME_CONTENT_COLUMN_CSS_VAR}',column+'px');else style.removeProperty('${CANVAS_FRAME_CONTENT_COLUMN_CSS_VAR}');
+ if(typeof gutter==='number'&&gutter>=0)style.setProperty('${CANVAS_FRAME_GUTTER_CSS_VAR}',gutter+'px');else style.removeProperty('${CANVAS_FRAME_GUTTER_CSS_VAR}');
+ if(typeof inset==='number'&&inset>=0)style.setProperty('${CANVAS_FRAME_TOP_INSET_CSS_VAR}',inset+'px');else style.removeProperty('${CANVAS_FRAME_TOP_INSET_CSS_VAR}');
+ if(typeof bottom==='number'&&bottom>=0)style.setProperty('${CANVAS_FRAME_BOTTOM_INSET_CSS_VAR}',bottom+'px');else style.removeProperty('${CANVAS_FRAME_BOTTOM_INSET_CSS_VAR}')});
++${canvasFrameFindScript()}
+ <\/script>`;
+ var CSP_QUOTE = String.fromCodePoint(39);
+ var cspKeyword = (keyword) => `${CSP_QUOTE}${keyword}${CSP_QUOTE}`;
+@@ -18335,11 +18628,11 @@
+ };
+ 
+ // src/canvas-bootstrap.ts
+-var import_react20 = __toESM(require_react(), 1);
++var import_react22 = __toESM(require_react(), 1);
+ var import_client = __toESM(require_client(), 1);
+ 
+ // src/canvas-source-anchors.ts
+-var import_react19 = __toESM(require_react(), 1);
++var import_react21 = __toESM(require_react(), 1);
+ 
+ // src/canvas-source-anchors-contract.ts
+ var CANVAS_SOURCE_ANCHORS_GLOBAL = "__cursorCanvasSourceAnchors";
+@@ -18407,16 +18700,16 @@
+ function sourceAnchorJsxDEV(type, props, key, _isStaticChildren, source) {
+   const anchor = readAnchor(source);
+   const elementType = type;
+-  if (anchor === void 0 || type === import_react19.default.Fragment) {
+-    return import_react19.default.createElement(elementType, withKey(props, key));
++  if (anchor === void 0 || type === import_react21.default.Fragment) {
++    return import_react21.default.createElement(elementType, withKey(props, key));
+   }
+   if (typeof type === "string") {
+-    return import_react19.default.createElement(elementType, {
++    return import_react21.default.createElement(elementType, {
+       ...withKey(props, key),
+       [CANVAS_SOURCE_ATTRIBUTE]: `${anchor.line}:${anchor.column}`
+     });
+   }
+-  const element = import_react19.default.createElement(elementType, withKey(props, key));
++  const element = import_react21.default.createElement(elementType, withKey(props, key));
+   componentAnchors.set(element.props, {
+     name: componentName(type),
+     anchor,
+@@ -18685,9 +18978,9 @@
+ function getCursorCanvas() {
+   return getCanvasRuntimeGlobal().__cursorCanvas;
+ }
+-function reportErrorToHost(message) {
++function reportErrorToHost(message, phase) {
+   try {
+-    getCursorCanvas()?.reportError?.(message);
++    getCursorCanvas()?.reportError?.(message, phase);
+   } catch (error) {
+     console.warn("[CursorCanvas] Failed to report error to host", {
+       errorType: error instanceof Error ? error.name : typeof error
+@@ -18736,7 +19029,7 @@
+ }) {
+   const theme = useBodyTheme();
+   const narrowViewport = useNarrowViewport();
+-  import_react20.default.useLayoutEffect(() => {
++  import_react22.default.useLayoutEffect(() => {
+     applyBodyTheme(theme, { previewMode, narrowViewport });
+   }, [theme, previewMode, narrowViewport]);
+   return children;
+@@ -18753,7 +19046,7 @@
+   return () => query?.removeEventListener("change", onChange);
+ }
+ function useNarrowViewport() {
+-  return import_react20.default.useSyncExternalStore(
++  return import_react22.default.useSyncExternalStore(
+     subscribeToNarrowViewport,
+     () => narrowViewportQuery()?.matches ?? false
+   );
+@@ -18832,42 +19125,77 @@
+   });
+   observer.observe(rootElement);
+ }
+-function renderBootstrapError(message) {
+-  reportErrorToHost(message);
++function errorMessageOf(error) {
++  return error instanceof Error ? error.message : String(error);
++}
++function renderBootstrapError(message, phase = "module") {
+   const root = document.getElementById("root") ?? document.body;
+-  if (!root) return;
+-  root.replaceChildren();
++  if (root) {
++    root.innerHTML = canvasErrorPanelHtml(message);
++  }
++  reportErrorToHost(message, phase);
+ }
+-var HostRuntimeErrorBoundary = class extends import_react20.default.Component {
++var HostRuntimeErrorBoundary = class extends import_react22.default.Component {
+   constructor() {
+     super(...arguments);
+-    this.state = { hasError: false };
++    this.state = { errorMessage: null };
+   }
+-  static getDerivedStateFromError() {
+-    return { hasError: true };
++  static getDerivedStateFromError(error) {
++    return { errorMessage: errorMessageOf(error) };
+   }
+   componentDidCatch(error, errorInfo) {
+     console.error("[CursorCanvas] Runtime error", error, errorInfo);
+-    reportErrorToHost(error instanceof Error ? error.message : String(error));
++    reportErrorToHost(errorMessageOf(error), "render");
+   }
+   render() {
+-    if (!this.state.hasError) {
++    const { errorMessage } = this.state;
++    if (errorMessage === null) {
+       return this.props.children;
+     }
+-    return null;
++    if (this.props.silent) {
++      return null;
++    }
++    return import_react22.default.createElement("div", {
++      dangerouslySetInnerHTML: { __html: canvasErrorPanelHtml(errorMessage) }
++    });
+   }
+ };
++var REACT_ELEMENT_TYPE_KEY = "$$typeof";
++function describeInvalidCanvasDefaultExport(value) {
++  const fix = "Default export a component: `export default function Canvas() { ... }`.";
++  if (value === void 0) {
++    return `The canvas module has no default export. ${fix}`;
++  }
++  if (typeof value === "function") {
++    const tag = Object.prototype.toString.call(value);
++    if (tag === "[object AsyncFunction]" || tag === "[object AsyncGeneratorFunction]") {
++      return `The canvas default export is an async function. React components cannot be async; load data in an effect and keep the component synchronous.`;
++    }
++    if (tag === "[object GeneratorFunction]") {
++      return `The canvas default export is a generator function, not a React component. ${fix}`;
++    }
++    return void 0;
++  }
++  if (typeof value === "object" && value !== null && REACT_ELEMENT_TYPE_KEY in value) {
++    if ("props" in value) {
++      return `The canvas default export is a JSX element, not a component. Wrap it in a function: \`export default function Canvas() { return ...; }\`.`;
++    }
++    return void 0;
++  }
++  const kind = value === null ? "null" : Array.isArray(value) ? "an array" : `a ${typeof value}`;
++  return `The canvas default export is ${kind}, not a React component. ${fix}`;
++}
+ async function mountCanvasWithKit(appModuleUrl, kit) {
+   const previewMode = isCanvasPreviewMode();
+   const runtimeGlobal = getCanvasRuntimeGlobal();
+-  runtimeGlobal.React = import_react20.default;
+-  Object.assign(runtimeGlobal, import_react20.default);
++  runtimeGlobal.React = import_react22.default;
++  Object.assign(runtimeGlobal, import_react22.default);
+   Object.assign(runtimeGlobal, kit.globals);
+   installSourceAnchorRuntime();
+   const rootElement = document.getElementById("root");
+   if (!(rootElement instanceof HTMLElement)) {
+     if (!previewMode) {
+-      renderBootstrapError("Canvas root element was not found.");
++      renderBootstrapError("Canvas root element was not found.", "frame");
+     }
+     return;
+   }
+@@ -18880,18 +19208,19 @@
+       appModuleUrl
+     );
+     const CanvasComponent = mod.default;
+-    if (typeof CanvasComponent !== "function" && typeof CanvasComponent !== "object") {
+-      throw new Error("Canvas modules must default export a React component.");
++    const invalidExport = describeInvalidCanvasDefaultExport(CanvasComponent);
++    if (invalidExport !== void 0) {
++      throw new Error(invalidExport);
+     }
+     const root = (0, import_client.createRoot)(rootElement);
+     root.render(
+-      import_react20.default.createElement(
++      import_react22.default.createElement(
+         HostRuntimeErrorBoundary,
+-        null,
+-        import_react20.default.createElement(
++        { silent: previewMode },
++        import_react22.default.createElement(
+           CanvasShell,
+           { previewMode, useBodyTheme: kit.useBodyTheme },
+-          import_react20.default.createElement(CanvasComponent)
++          import_react22.default.createElement(CanvasComponent)
+         )
+       )
+     );
+@@ -18914,7 +19243,7 @@
+ // src/canvas-bootstrap-grok.ts
+ function useGrokBodyTheme() {
+   const theme = useGrokTheme();
+-  return import_react21.default.useMemo(
++  return import_react23.default.useMemo(
+     () => ({
+       kind: theme.kind,
+       background: theme.bg.base,

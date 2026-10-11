@@ -1,0 +1,127 @@
+--- 2026-10-11_20-47:/exec-daemon/agent-sdk/grok/canvas/tokens.d.ts
++++ 2026-10-11_23-51:/exec-daemon/agent-sdk/grok/canvas/tokens.d.ts
+@@ -1,20 +1,21 @@
+ /**
+- * Grok Bot page tokens, pinned from the Sand design prototype's
+- * Figma-generated `globals.css` (light `:root` and dark `[data-theme]`
+- * blocks) and its `.t-*` / `.w-*` type classes. Alpha-hex entries are ink at
+- * the design's percent so they composite over any surface. `text.warning`
+- * is the exception and comes from the Sand hue ramps instead: every yellow
+- * step that holds 4.5:1 on the light page reads brown, so light takes the
+- * most orange step that still passes (orange/light/10, Sand's
+- * `text/supplementary1`), and dark takes Sand's `text/warning`
+- * (yellow/dark/10). When the design tokens change, re-derive these; they do
+- * not update automatically.
++ * Grok Bot page tokens, pinned from the Grok Bot PD System Figma variables
++ * (`Semantic Colors` for ink and surfaces, `Data Colors` for marks, each in
++ * its light and dark mode) and the page type styles. Alpha-hex entries are
++ * ink at the design's percent so they composite over any surface. The values
++ * are exact copies of the design's; when the design tokens change, re-derive
++ * these, they do not update automatically.
+  */
+ /** One text style from the page type scale (Figma text styles on the system font). */
+ export interface GrokTextStyle {
+     readonly fontSize: string;
+     readonly lineHeight: string;
+     readonly letterSpacing: string;
++    /**
++     * A pinned variation-axis setting, where the design locks one: a face with
++     * an `opsz` axis otherwise picks its optical size from the font size.
++     */
++    readonly fontVariationSettings?: string;
+ }
+ /** Ink and surface colors for one polarity. */
+ export interface GrokPalette {
+@@ -23,6 +24,8 @@
+         readonly base: string;
+         /** Soft card behind the calendar. */
+         readonly subtle: string;
++        /** A surface that sits above the page: a chip in a chart, a popover. */
++        readonly elevated: string;
+     };
+     readonly text: {
+         readonly primary: string;
+@@ -32,6 +35,8 @@
+         readonly tertiary: string;
+         /** Text on a checked control. */
+         readonly onColor: string;
++        /** Text on `fill.primary`: a filled button's label. */
++        readonly onPrimary: string;
+         readonly accent: string;
+         readonly success: string;
+         /** Only a genuinely bad status word; neutral states stay in neutral ink. */
+@@ -41,7 +46,9 @@
+     readonly fill: {
+         /** Solid ink fill. */
+         readonly primary: string;
+-        /** Neutral 6% (light) / 8% (dark) tint: callouts, chart tracks. */
++        /** `primary` under the pointer. */
++        readonly primaryHover: string;
++        /** Neutral 9% (light) / 17% (dark) tint: callouts, chart tracks, a quiet button under the pointer. */
+         readonly secondary: string;
+         readonly accent: string;
+         readonly controlChecked: string;
+@@ -55,40 +62,47 @@
+         readonly default: string;
+         /** 30%: unchecked checkbox. */
+         readonly strong: string;
++        /** 40%: the ring on a focused control. */
++        readonly focus: string;
+     };
+ }
+ /**
+- * Grok Bot brand colors for data marks only: bars, columns, lines, points,
++ * Grok Bot data colors for data marks only: bars, columns, lines, points,
+  * areas, slices, funnel bands, and legend swatches. Text never takes these;
+  * labels, values, ticks, and legend names stay on the neutral `text` tokens.
+  *
+- * Hues are the Grok Bot brand midtones (step 9 of the Sand hue ramps). Dark
+- * uses them as-is; light swaps in step 10 wherever step 9 is under 3:1
+- * against the light page (WCAG 1.4.11 non-text contrast), so every
+- * categorical color holds at least 3:1 on its own `bg.base`.
++ * Three series hues and a gray tail, step 3 of the design's `Data Colors`
++ * ramps, the same in light and dark. A single series uses the blue ramp: the
++ * marks that matter at step 3, the rest at step 1, and the ramp flips in dark
++ * so step 1 stays the quiet one. Red is never a series color; it means danger.
+  *
+- * Mirrored in `sand/src/shared/tokens/dataviz.ts` for the document renderer;
+- * the two must stay in sync.
++ * The document renderer keeps its own copy of these values.
+  */
+ export interface GrokDataViz {
+     /**
+-     * Series colors in order: blue, orange, violet, green, magenta, yellow,
+-     * cyan, brown. Neighbors alternate warm and cool. Series 0 is the default
+-     * data color. Past eight series, fold the tail into `other`; never cycle.
++     * Series colors in order: blue, yellow, cyan. Series 0 is the default data
++     * color. Past three series, fold the tail into `other` and label it
++     * directly; never cycle.
+      */
+-    readonly categorical: readonly [string, string, string, string, string, string, string, string];
++    readonly categorical: readonly string[];
+     /** Gray for "Other", the rest, comparison baselines, and de-emphasized marks. */
+     readonly other: string;
+     /** Red, reserved for negative values and danger; not in the rotation. */
+     readonly negative: string;
+-    /** The non-emphasized marks of a single series: a light tint of `categorical[0]`. */
++    /** The non-emphasized marks of a single series: step 1 of the blue ramp. */
+     readonly singleSeriesRest: string;
+-    /** Alpha hex suffix (14%) for an area under a line: `${color}${areaAlpha}`. */
+-    readonly areaAlpha: "24";
++    /** Alpha hex suffix for an area under a line: `${color}${areaAlpha}`, the design's data tint (16% light, 24% dark). */
++    readonly areaAlpha: string;
+     /** Alpha hex suffix (25%) for a funnel's previous-step band: `${color}${bandAlpha}`. */
+-    readonly bandAlpha: "40";
+-    /** Blue ramp, low to high, for ordered values (heatmaps, choropleths). */
++    readonly bandAlpha: string;
++    /** Blue ramp, quiet to strong, for ordered values (heatmaps, choropleths). */
+     readonly sequential: readonly string[];
+     /** Red, neutral, blue: below and above a midpoint. */
+     readonly diverging: readonly string[];
+ }
++/** The page's weights; `regular` is 425 only for the brand variable face on a Mac. */
++export type GrokWeightScale = {
++    readonly regular: 400 | 425;
++    readonly medium: 500;
++    readonly semibold: 600;
++};

@@ -1,0 +1,15 @@
+--- 2026-10-11_20-47:/exec-daemon/agent-sdk/grok/canvas/layout.d.ts
++++ 2026-10-11_23-51:/exec-daemon/agent-sdk/grok/canvas/layout.d.ts
+@@ -16,8 +16,10 @@
+ /**
+  * Two or three blocks side by side: small multiples, a chart next to its
+  * breakdown, a before and after, the tiles of a dashboard. Each cell is a
+- * card with a hairline outline; `joined` draws one outline with dividers
+- * instead. Put it inside a `Section` to share one heading, or directly in
++ * card like a chart's own, and a chart in it draws no second card; `joined`
++ * draws one outline with dividers instead. The cells of a row stand equally
++ * tall, with each cell's title at the top and its plot at the floor. Put
++ * it inside a `Section` to share one heading, or directly in
+  * the `Page` with a `Section` per cell. On a `wide` or `full` page the cells
+  * get the room of a column each. With no cells it draws nothing.
+  *

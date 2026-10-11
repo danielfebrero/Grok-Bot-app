@@ -1,0 +1,5721 @@
+--- 2026-10-11_20-47:/exec-daemon/690.index.js
++++ 2026-10-11_23-51:/exec-daemon/690.index.js
+@@ -1,4813 +1,911 @@
+ "use strict";
+-
+-exports.id = 690;
+-
+-exports.ids = [690];
+-
+-exports.modules = {
+-
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitmapper.js"
+-(__unused_webpack_module, exports, __webpack_require__) {
+-
+-
+-
+-
+-let interlaceUtils = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/interlace.js");
+-
+-
+-let pixelBppMapper = [
+-  // 0 - dummy entry
+-  function () {
+-}
+-,
+-
+-  // 1 - L
+-  // 0: 0, 1: 0, 2: 0, 3: 0xff
+-  function (pxData, data, pxPos, rawPos) {
+-
+-    if (rawPos === data.length) {
+-
+-      throw new Error("Ran out of data");
+-
+-    }
+-
+-
+-    let pixel = data[rawPos];
+-
+-    pxData[pxPos] = pixel;
+-
+-    pxData[pxPos + 1] = pixel;
+-
+-    pxData[pxPos + 2] = pixel;
+-
+-    pxData[pxPos + 3] = 0xff;
+-
+-  }
+-,
+-
+-  // 2 - LA
+-  // 0: 0, 1: 0, 2: 0, 3: 1
+-  function (pxData, data, pxPos, rawPos) {
+-
+-    if (rawPos + 1 >= data.length) {
+-
+-      throw new Error("Ran out of data");
+-
+-    }
+-
+-
+-    let pixel = data[rawPos];
+-
+-    pxData[pxPos] = pixel;
+-
+-    pxData[pxPos + 1] = pixel;
+-
+-    pxData[pxPos + 2] = pixel;
+-
+-    pxData[pxPos + 3] = data[rawPos + 1];
+-
+-  }
+-,
+-
+-  // 3 - RGB
+-  // 0: 0, 1: 1, 2: 2, 3: 0xff
+-  function (pxData, data, pxPos, rawPos) {
+-
+-    if (rawPos + 2 >= data.length) {
+-
+-      throw new Error("Ran out of data");
+-
+-    }
+-
+-
+-    pxData[pxPos] = data[rawPos];
+-
+-    pxData[pxPos + 1] = data[rawPos + 1];
+-
+-    pxData[pxPos + 2] = data[rawPos + 2];
+-
+-    pxData[pxPos + 3] = 0xff;
+-
+-  }
+-,
+-
+-  // 4 - RGBA
+-  // 0: 0, 1: 1, 2: 2, 3: 3
+-  function (pxData, data, pxPos, rawPos) {
+-
+-    if (rawPos + 3 >= data.length) {
+-
+-      throw new Error("Ran out of data");
+-
+-    }
+-
+-
+-    pxData[pxPos] = data[rawPos];
+-
+-    pxData[pxPos + 1] = data[rawPos + 1];
+-
+-    pxData[pxPos + 2] = data[rawPos + 2];
+-
+-    pxData[pxPos + 3] = data[rawPos + 3];
+-
+-  }
+-,
++exports.id=690,exports.ids=[690],exports.modules={
++"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitmapper.js"(e,t,n){
++let i=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/interlace.js"),s=[function(){
++}
++,function(e,t,n,i){
++if(i===t.length)throw new Error("Ran out of data");
++let s=t[i];
++e[n]=s,e[n+1]=s,e[n+2]=s,e[n+3]=255}
++,function(e,t,n,i){
++if(i+1>=t.length)throw new Error("Ran out of data");
++let s=t[i];
++e[n]=s,e[n+1]=s,e[n+2]=s,e[n+3]=t[i+1]}
++,function(e,t,n,i){
++if(i+2>=t.length)throw new Error("Ran out of data");
++e[n]=t[i],e[n+1]=t[i+1],e[n+2]=t[i+2],e[n+3]=255}
++,function(e,t,n,i){
++if(i+3>=t.length)throw new Error("Ran out of data");
++e[n]=t[i],e[n+1]=t[i+1],e[n+2]=t[i+2],e[n+3]=t[i+3]}
++],r=[function(){
++}
++,function(e,t,n,i){
++let s=t[0];
++e[n]=s,e[n+1]=s,e[n+2]=s,e[n+3]=i}
++,function(e,t,n){
++let i=t[0];
++e[n]=i,e[n+1]=i,e[n+2]=i,e[n+3]=t[1]}
++,function(e,t,n,i){
++e[n]=t[0],e[n+1]=t[1],e[n+2]=t[2],e[n+3]=i}
++,function(e,t,n){
++e[n]=t[0],e[n+1]=t[1],e[n+2]=t[2],e[n+3]=t[3]}
+ ];
+-
+-
+-let pixelBppCustomMapper = [
+-  // 0 - dummy entry
+-  function () {
+-}
+-,
+-
+-  // 1 - L
+-  // 0: 0, 1: 0, 2: 0, 3: 0xff
+-  function (pxData, pixelData, pxPos, maxBit) {
+-
+-    let pixel = pixelData[0];
+-
+-    pxData[pxPos] = pixel;
+-
+-    pxData[pxPos + 1] = pixel;
+-
+-    pxData[pxPos + 2] = pixel;
+-
+-    pxData[pxPos + 3] = maxBit;
+-
+-  }
+-,
+-
+-  // 2 - LA
+-  // 0: 0, 1: 0, 2: 0, 3: 1
+-  function (pxData, pixelData, pxPos) {
+-
+-    let pixel = pixelData[0];
+-
+-    pxData[pxPos] = pixel;
+-
+-    pxData[pxPos + 1] = pixel;
+-
+-    pxData[pxPos + 2] = pixel;
+-
+-    pxData[pxPos + 3] = pixelData[1];
+-
+-  }
+-,
+-
+-  // 3 - RGB
+-  // 0: 0, 1: 1, 2: 2, 3: 0xff
+-  function (pxData, pixelData, pxPos, maxBit) {
+-
+-    pxData[pxPos] = pixelData[0];
+-
+-    pxData[pxPos + 1] = pixelData[1];
+-
+-    pxData[pxPos + 2] = pixelData[2];
+-
+-    pxData[pxPos + 3] = maxBit;
+-
+-  }
+-,
+-
+-  // 4 - RGBA
+-  // 0: 0, 1: 1, 2: 2, 3: 3
+-  function (pxData, pixelData, pxPos) {
+-
+-    pxData[pxPos] = pixelData[0];
+-
+-    pxData[pxPos + 1] = pixelData[1];
+-
+-    pxData[pxPos + 2] = pixelData[2];
+-
+-    pxData[pxPos + 3] = pixelData[3];
+-
+-  }
+-,
++function mapImage8Bit(e,t,n,i,r,o){
++let l=e.width,h=e.height,a=e.index;
++for(let e=0;
++e<h;
++e++)for(let h=0;
++h<l;
++h++){
++let l=n(h,e,a);
++s[i](t,r,l,o),o+=i}
++return o}
++function mapImageCustomBit(e,t,n,i,s,o){
++let l=e.width,h=e.height,a=e.index;
++for(let e=0;
++e<h;
++e++){
++for(let h=0;
++h<l;
++h++){
++let l=s.get(i),p=n(h,e,a);
++r[i](t,l,p,o)}
++s.resetAfterLine()}
++}
++t.dataToBitMap=function(e,t){
++let n,s,r=t.width,o=t.height,l=t.depth,h=t.bpp,a=t.interlace;
++8!==l&&(n=function bitRetriever(e,t){
++let n=[],i=0;
++function split(){
++if(i===e.length)throw new Error("Ran out of data");
++let s,r,o,l,h,a,p,d,f=e[i];
++switch(i++,t){
++default:throw new Error("unrecognised depth");
++case 16:p=e[i],i++,n.push((f<<8)+p);
++break;
++case 4:p=15&f,d=f>>4,n.push(d,p);
++break;
++case 2:h=3&f,a=f>>2&3,p=f>>4&3,d=f>>6&3,n.push(d,p,a,h);
++break;
++case 1:s=1&f,r=f>>1&1,o=f>>2&1,l=f>>3&1,h=f>>4&1,a=f>>5&1,p=f>>6&1,d=f>>7&1,n.push(d,p,a,h,l,o,r,s)}
++}
++return{
++get:function(e){
++for(;
++n.length<e;
++)split();
++let t=n.slice(0,e);
++return n=n.slice(e),t}
++,resetAfterLine:function(){
++n.length=0}
++,end:function(){
++if(i!==e.length)throw new Error("extra data found")}
++}
++}
++(e,l)),s=l<=8?Buffer.alloc(r*o*4):new Uint16Array(r*o*4);
++let p,d,f=Math.pow(2,l)-1,u=0;
++if(a)p=i.getImagePasses(r,o),d=i.getInterlaceIterator(r,o);
++else{
++let e=0;
++d=function(){
++let t=e;
++return e+=4,t}
++,p=[{
++width:r,height:o}
++]}
++for(let t=0;
++t<p.length;
++t++)8===l?u=mapImage8Bit(p[t],s,d,h,e,u):mapImageCustomBit(p[t],s,d,h,n,f);
++if(8===l){
++if(u!==e.length)throw new Error("extra data found")}
++else n.end();
++return s}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitpacker.js"(e,t,n){
++let i=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js");
++e.exports=function(e,t,n,s){
++let r=-1!==[i.COLORTYPE_COLOR_ALPHA,i.COLORTYPE_ALPHA].indexOf(s.colorType);
++if(s.colorType===s.inputColorType){
++let t=function(){
++let e=new ArrayBuffer(2);
++return new DataView(e).setInt16(0,256,!0),256!==new Int16Array(e)[0]}
++();
++if(8===s.bitDepth||16===s.bitDepth&&t)return e}
++let o=16!==s.bitDepth?e:new Uint16Array(e.buffer),l=255,h=i.COLORTYPE_TO_BPP_MAP[s.inputColorType];
++4!==h||s.inputHasAlpha||(h=3);
++let a=i.COLORTYPE_TO_BPP_MAP[s.colorType];
++16===s.bitDepth&&(l=65535,a*=2);
++let p=Buffer.alloc(t*n*a),d=0,f=0,u=s.bgColor||{
++}
++;
++function getRGBA(){
++let e,t,n,h=l;
++switch(s.inputColorType){
++case i.COLORTYPE_COLOR_ALPHA:h=o[d+3],e=o[d],t=o[d+1],n=o[d+2];
++break;
++case i.COLORTYPE_COLOR:e=o[d],t=o[d+1],n=o[d+2];
++break;
++case i.COLORTYPE_ALPHA:h=o[d+1],e=o[d],t=e,n=e;
++break;
++case i.COLORTYPE_GRAYSCALE:e=o[d],t=e,n=e;
++break;
++default:throw new Error("input color type:"+s.inputColorType+" is not supported at present")}
++return s.inputHasAlpha&&(r||(h/=l,e=Math.min(Math.max(Math.round((1-h)*u.red+h*e),0),l),t=Math.min(Math.max(Math.round((1-h)*u.green+h*t),0),l),n=Math.min(Math.max(Math.round((1-h)*u.blue+h*n),0),l))),{
++red:e,green:t,blue:n,alpha:h}
++}
++void 0===u.red&&(u.red=l),void 0===u.green&&(u.green=l),void 0===u.blue&&(u.blue=l);
++for(let e=0;
++e<n;
++e++)for(let e=0;
++e<t;
++e++){
++let e=getRGBA();
++switch(s.colorType){
++case i.COLORTYPE_COLOR_ALPHA:case i.COLORTYPE_COLOR:8===s.bitDepth?(p[f]=e.red,p[f+1]=e.green,p[f+2]=e.blue,r&&(p[f+3]=e.alpha)):(p.writeUInt16BE(e.red,f),p.writeUInt16BE(e.green,f+2),p.writeUInt16BE(e.blue,f+4),r&&p.writeUInt16BE(e.alpha,f+6));
++break;
++case i.COLORTYPE_ALPHA:case i.COLORTYPE_GRAYSCALE:{
++let t=(e.red+e.green+e.blue)/3;
++8===s.bitDepth?(p[f]=t,r&&(p[f+1]=e.alpha)):(p.writeUInt16BE(t,f),r&&p.writeUInt16BE(e.alpha,f+2));
++break}
++default:throw new Error("unrecognised color Type "+s.colorType)}
++d+=h,f+=a}
++return p}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/chunkstream.js"(e,t,n){
++let i=n("util"),s=n("stream"),r=e.exports=function(){
++s.call(this),this._buffers=[],this._buffered=0,this._reads=[],this._paused=!1,this._encoding="utf8",this.writable=!0}
++;
++i.inherits(r,s),r.prototype.read=function(e,t){
++this._reads.push({
++length:Math.abs(e),allowLess:e<0,func:t}
++),process.nextTick(function(){
++this._process(),this._paused&&this._reads&&this._reads.length>0&&(this._paused=!1,this.emit("drain"))}
++.bind(this))}
++,r.prototype.write=function(e,t){
++if(!this.writable)return this.emit("error",new Error("Stream not writable")),!1;
++let n;
++return n=Buffer.isBuffer(e)?e:Buffer.from(e,t||this._encoding),this._buffers.push(n),this._buffered+=n.length,this._process(),this._reads&&0===this._reads.length&&(this._paused=!0),this.writable&&!this._paused}
++,r.prototype.end=function(e,t){
++e&&this.write(e,t),this.writable=!1,this._buffers&&(0===this._buffers.length?this._end():(this._buffers.push(null),this._process()))}
++,r.prototype.destroySoon=r.prototype.end,r.prototype._end=function(){
++this._reads.length>0&&this.emit("error",new Error("Unexpected end of input")),this.destroy()}
++,r.prototype.destroy=function(){
++this._buffers&&(this.writable=!1,this._reads=null,this._buffers=null,this.emit("close"))}
++,r.prototype._processReadAllowingLess=function(e){
++this._reads.shift();
++let t=this._buffers[0];
++t.length>e.length?(this._buffered-=e.length,this._buffers[0]=t.slice(e.length),e.func.call(this,t.slice(0,e.length))):(this._buffered-=t.length,this._buffers.shift(),e.func.call(this,t))}
++,r.prototype._processRead=function(e){
++this._reads.shift();
++let t=0,n=0,i=Buffer.alloc(e.length);
++for(;
++t<e.length;
++){
++let s=this._buffers[n++],r=Math.min(s.length,e.length-t);
++s.copy(i,t,0,r),t+=r,r!==s.length&&(this._buffers[--n]=s.slice(r))}
++n>0&&this._buffers.splice(0,n),this._buffered-=e.length,e.func.call(this,i)}
++,r.prototype._process=function(){
++try{
++for(;
++this._buffered>0&&this._reads&&this._reads.length>0;
++){
++let e=this._reads[0];
++if(e.allowLess)this._processReadAllowingLess(e);
++else{
++if(!(this._buffered>=e.length))break;
++this._processRead(e)}
++}
++this._buffers&&!this.writable&&this._end()}
++catch(e){
++this.emit("error",e)}
++}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js"(e){
++e.exports={
++PNG_SIGNATURE:[137,80,78,71,13,10,26,10],TYPE_IHDR:1229472850,TYPE_IEND:1229278788,TYPE_IDAT:1229209940,TYPE_PLTE:1347179589,TYPE_tRNS:1951551059,TYPE_gAMA:1732332865,COLORTYPE_GRAYSCALE:0,COLORTYPE_PALETTE:1,COLORTYPE_COLOR:2,COLORTYPE_ALPHA:4,COLORTYPE_PALETTE_COLOR:3,COLORTYPE_COLOR_ALPHA:6,COLORTYPE_TO_BPP_MAP:{
++0:1,2:3,3:1,4:2,6:4}
++,GAMMA_DIVISION:1e5}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/crc.js"(e){
++let t=[];
++!function(){
++for(let e=0;
++e<256;
++e++){
++let n=e;
++for(let e=0;
++e<8;
++e++)1&n?n=3988292384^n>>>1:n>>>=1;
++t[e]=n}
++}
++();
++let n=e.exports=function(){
++this._crc=-1}
++;
++n.prototype.write=function(e){
++for(let n=0;
++n<e.length;
++n++)this._crc=t[255&(this._crc^e[n])]^this._crc>>>8;
++return!0}
++,n.prototype.crc32=function(){
++return~this._crc}
++,n.crc32=function(e){
++let n=-1;
++for(let i=0;
++i<e.length;
++i++)n=t[255&(n^e[i])]^n>>>8;
++return~n}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-pack.js"(e,t,n){
++let i=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/paeth-predictor.js");
++let s={
++0:function filterNone(e,t,n,i,s){
++for(let r=0;
++r<n;
++r++)i[s+r]=e[t+r]}
++,1:function filterSub(e,t,n,i,s,r){
++for(let o=0;
++o<n;
++o++){
++let n=o>=r?e[t+o-r]:0,l=e[t+o]-n;
++i[s+o]=l}
++}
++,2:function filterUp(e,t,n,i,s){
++for(let r=0;
++r<n;
++r++){
++let o=t>0?e[t+r-n]:0,l=e[t+r]-o;
++i[s+r]=l}
++}
++,3:function filterAvg(e,t,n,i,s,r){
++for(let o=0;
++o<n;
++o++){
++let l=o>=r?e[t+o-r]:0,h=t>0?e[t+o-n]:0,a=e[t+o]-(l+h>>1);
++i[s+o]=a}
++}
++,4:function filterPaeth(e,t,n,s,r,o){
++for(let l=0;
++l<n;
++l++){
++let h=l>=o?e[t+l-o]:0,a=t>0?e[t+l-n]:0,p=t>0&&l>=o?e[t+l-(n+o)]:0,d=e[t+l]-i(h,a,p);
++s[r+l]=d}
++}
++}
++,r={
++0:function filterSumNone(e,t,n){
++let i=0,s=t+n;
++for(let n=t;
++n<s;
++n++)i+=Math.abs(e[n]);
++return i}
++,1:function filterSumSub(e,t,n,i){
++let s=0;
++for(let r=0;
++r<n;
++r++){
++let n=r>=i?e[t+r-i]:0,o=e[t+r]-n;
++s+=Math.abs(o)}
++return s}
++,2:function filterSumUp(e,t,n){
++let i=0,s=t+n;
++for(let r=t;
++r<s;
++r++){
++let s=t>0?e[r-n]:0,o=e[r]-s;
++i+=Math.abs(o)}
++return i}
++,3:function filterSumAvg(e,t,n,i){
++let s=0;
++for(let r=0;
++r<n;
++r++){
++let o=r>=i?e[t+r-i]:0,l=t>0?e[t+r-n]:0,h=e[t+r]-(o+l>>1);
++s+=Math.abs(h)}
++return s}
++,4:function filterSumPaeth(e,t,n,s){
++let r=0;
++for(let o=0;
++o<n;
++o++){
++let l=o>=s?e[t+o-s]:0,h=t>0?e[t+o-n]:0,a=t>0&&o>=s?e[t+o-(n+s)]:0,p=e[t+o]-i(l,h,a);
++r+=Math.abs(p)}
++return r}
++}
++;
++e.exports=function(e,t,n,i,o){
++let l;
++if("filterType"in i&&-1!==i.filterType){
++if("number"!=typeof i.filterType)throw new Error("unrecognised filter types");
++l=[i.filterType]}
++else l=[0,1,2,3,4];
++16===i.bitDepth&&(o*=2);
++let h=t*o,a=0,p=0,d=Buffer.alloc((h+1)*n),f=l[0];
++for(let t=0;
++t<n;
++t++){
++if(l.length>1){
++let t=1/0;
++for(let n=0;
++n<l.length;
++n++){
++let i=r[l[n]](e,p,h,o);
++i<t&&(f=l[n],t=i)}
++}
++d[a]=f,a++,s[f](e,p,h,d,a,o),a+=h,p+=h}
++return d}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse-async.js"(e,t,n){
++let i=n("util"),s=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/chunkstream.js"),r=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse.js"),o=e.exports=function(e){
++s.call(this);
++let t=[],n=this;
++this._filter=new r(e,{
++read:this.read.bind(this),write:function(e){
++t.push(e)}
++,complete:function(){
++n.emit("complete",Buffer.concat(t))}
++}
++),this._filter.start()}
++;
++i.inherits(o,s)}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse-sync.js"(e,t,n){
++let i=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-reader.js"),s=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse.js");
++t.process=function(e,t){
++let n=[],r=new i(e);
++return new s(t,{
++read:r.read.bind(r),write:function(e){
++n.push(e)}
++,complete:function(){
++}
++}
++).start(),r.process(),Buffer.concat(n)}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse.js"(e,t,n){
++let i=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/interlace.js"),s=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/paeth-predictor.js");
++function getByteWidth(e,t,n){
++let i=e*t;
++return 8!==n&&(i=Math.ceil(i/(8/n))),i}
++let r=e.exports=function(e,t){
++let n=e.width,s=e.height,r=e.interlace,o=e.bpp,l=e.depth;
++if(this.read=t.read,this.write=t.write,this.complete=t.complete,this._imageIndex=0,this._images=[],r){
++let e=i.getImagePasses(n,s);
++for(let t=0;
++t<e.length;
++t++)this._images.push({
++byteWidth:getByteWidth(e[t].width,o,l),height:e[t].height,lineIndex:0}
++)}
++else this._images.push({
++byteWidth:getByteWidth(n,o,l),height:s,lineIndex:0}
++);
++this._xComparison=8===l?o:16===l?2*o:1}
++;
++r.prototype.start=function(){
++this.read(this._images[this._imageIndex].byteWidth+1,this._reverseFilterLine.bind(this))}
++,r.prototype._unFilterType1=function(e,t,n){
++let i=this._xComparison,s=i-1;
++for(let r=0;
++r<n;
++r++){
++let n=e[1+r],o=r>s?t[r-i]:0;
++t[r]=n+o}
++}
++,r.prototype._unFilterType2=function(e,t,n){
++let i=this._lastLine;
++for(let s=0;
++s<n;
++s++){
++let n=e[1+s],r=i?i[s]:0;
++t[s]=n+r}
++}
++,r.prototype._unFilterType3=function(e,t,n){
++let i=this._xComparison,s=i-1,r=this._lastLine;
++for(let o=0;
++o<n;
++o++){
++let n=e[1+o],l=r?r[o]:0,h=o>s?t[o-i]:0,a=Math.floor((h+l)/2);
++t[o]=n+a}
++}
++,r.prototype._unFilterType4=function(e,t,n){
++let i=this._xComparison,r=i-1,o=this._lastLine;
++for(let l=0;
++l<n;
++l++){
++let n=e[1+l],h=o?o[l]:0,a=l>r?t[l-i]:0,p=l>r&&o?o[l-i]:0,d=s(a,h,p);
++t[l]=n+d}
++}
++,r.prototype._reverseFilterLine=function(e){
++let t,n=e[0],i=this._images[this._imageIndex],s=i.byteWidth;
++if(0===n)t=e.slice(1,s+1);
++else switch(t=Buffer.alloc(s),n){
++case 1:this._unFilterType1(e,t,s);
++break;
++case 2:this._unFilterType2(e,t,s);
++break;
++case 3:this._unFilterType3(e,t,s);
++break;
++case 4:this._unFilterType4(e,t,s);
++break;
++default:throw new Error("Unrecognised filter type - "+n)}
++this.write(t),i.lineIndex++,i.lineIndex>=i.height?(this._lastLine=null,this._imageIndex++,i=this._images[this._imageIndex]):this._lastLine=t,i?this.read(i.byteWidth+1,this._reverseFilterLine.bind(this)):(this._lastLine=null,this.complete())}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/format-normaliser.js"(e){
++e.exports=function(e,t,n=!1){
++let i=t.depth,s=t.width,r=t.height,o=t.colorType,l=t.transColor,h=t.palette,a=e;
++return 3===o?function dePalette(e,t,n,i,s){
++let r=0;
++for(let o=0;
++o<i;
++o++)for(let i=0;
++i<n;
++i++){
++let n=s[e[r]];
++if(!n)throw new Error("index "+e[r]+" not in palette");
++for(let e=0;
++e<4;
++e++)t[r+e]=n[e];
++r+=4}
++}
++(e,a,s,r,h):(l&&function replaceTransparentColor(e,t,n,i,s){
++let r=0;
++for(let o=0;
++o<i;
++o++)for(let i=0;
++i<n;
++i++){
++let n=!1;
++if(1===s.length?s[0]===e[r]&&(n=!0):s[0]===e[r]&&s[1]===e[r+1]&&s[2]===e[r+2]&&(n=!0),n)for(let e=0;
++e<4;
++e++)t[r+e]=0;
++r+=4}
++}
++(e,a,s,r,l),8===i||n||(16===i&&(a=Buffer.alloc(s*r*4)),function scaleDepth(e,t,n,i,s){
++let r=Math.pow(2,s)-1,o=0;
++for(let s=0;
++s<i;
++s++)for(let i=0;
++i<n;
++i++){
++for(let n=0;
++n<4;
++n++)t[o+n]=Math.floor(255*e[o+n]/r+.5);
++o+=4}
++}
++(e,a,s,r,i))),a}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/interlace.js"(e,t){
++let n=[{
++x:[0],y:[0]}
++,{
++x:[4],y:[0]}
++,{
++x:[0,4],y:[4]}
++,{
++x:[2,6],y:[0,4]}
++,{
++x:[0,2,4,6],y:[2,6]}
++,{
++x:[1,3,5,7],y:[0,2,4,6]}
++,{
++x:[0,1,2,3,4,5,6,7],y:[1,3,5,7]}
+ ];
+-
+-
+-function bitRetriever(data, depth) {
+-
+-  let leftOver = [];
+-
+-  let i = 0;
+-
+-
+-  function split() {
+-
+-    if (i === data.length) {
+-
+-      throw new Error("Ran out of data");
+-
+-    }
+-
+-    let byte = data[i];
+-
+-    i++;
+-
+-    let byte8, byte7, byte6, byte5, byte4, byte3, byte2, byte1;
+-
+-    switch (depth) {
+-
+-      default:
+-        throw new Error("unrecognised depth");
+-
+-      case 16:
+-        byte2 = data[i];
+-
+-        i++;
+-
+-        leftOver.push((byte << 8) + byte2);
+-
+-        break;
+-
+-      case 4:
+-        byte2 = byte & 0x0f;
+-
+-        byte1 = byte >> 4;
+-
+-        leftOver.push(byte1, byte2);
+-
+-        break;
+-
+-      case 2:
+-        byte4 = byte & 3;
+-
+-        byte3 = (byte >> 2) & 3;
+-
+-        byte2 = (byte >> 4) & 3;
+-
+-        byte1 = (byte >> 6) & 3;
+-
+-        leftOver.push(byte1, byte2, byte3, byte4);
+-
+-        break;
+-
+-      case 1:
+-        byte8 = byte & 1;
+-
+-        byte7 = (byte >> 1) & 1;
+-
+-        byte6 = (byte >> 2) & 1;
+-
+-        byte5 = (byte >> 3) & 1;
+-
+-        byte4 = (byte >> 4) & 1;
+-
+-        byte3 = (byte >> 5) & 1;
+-
+-        byte2 = (byte >> 6) & 1;
+-
+-        byte1 = (byte >> 7) & 1;
+-
+-        leftOver.push(byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8);
+-
+-        break;
+-
+-    }
+-
+-  }
+-
+-
+-  return {
+-
+-    get: function (count) {
+-
+-      while (leftOver.length < count) {
+-
+-        split();
+-
+-      }
+-
+-      let returner = leftOver.slice(0, count);
+-
+-      leftOver = leftOver.slice(count);
+-
+-      return returner;
+-
+-    }
+-,
+-    resetAfterLine: function () {
+-
+-      leftOver.length = 0;
+-
+-    }
+-,
+-    end: function () {
+-
+-      if (i !== data.length) {
+-
+-        throw new Error("extra data found");
+-
+-      }
+-
+-    }
+-,
+-  }
+-;
+-
+-}
+-
+-
+-function mapImage8Bit(image, pxData, getPxPos, bpp, data, rawPos) {
+-
+-  // eslint-disable-line max-params
+-  let imageWidth = image.width;
+-
+-  let imageHeight = image.height;
+-
+-  let imagePass = image.index;
+-
+-  for (let y = 0;
+- y < imageHeight;
+- y++) {
+-
+-    for (let x = 0;
+- x < imageWidth;
+- x++) {
+-
+-      let pxPos = getPxPos(x, y, imagePass);
+-
+-      pixelBppMapper[bpp](pxData, data, pxPos, rawPos);
+-
+-      rawPos += bpp;
+- //eslint-disable-line no-param-reassign
+-    }
+-
+-  }
+-
+-  return rawPos;
+-
+-}
+-
+-
+-function mapImageCustomBit(image, pxData, getPxPos, bpp, bits, maxBit) {
+-
+-  // eslint-disable-line max-params
+-  let imageWidth = image.width;
+-
+-  let imageHeight = image.height;
+-
+-  let imagePass = image.index;
+-
+-  for (let y = 0;
+- y < imageHeight;
+- y++) {
+-
+-    for (let x = 0;
+- x < imageWidth;
+- x++) {
+-
+-      let pixelData = bits.get(bpp);
+-
+-      let pxPos = getPxPos(x, y, imagePass);
+-
+-      pixelBppCustomMapper[bpp](pxData, pixelData, pxPos, maxBit);
+-
+-    }
+-
+-    bits.resetAfterLine();
+-
+-  }
+-
+-}
+-
+-
+-exports.dataToBitMap = function (data, bitmapInfo) {
+-
+-  let width = bitmapInfo.width;
+-
+-  let height = bitmapInfo.height;
+-
+-  let depth = bitmapInfo.depth;
+-
+-  let bpp = bitmapInfo.bpp;
+-
+-  let interlace = bitmapInfo.interlace;
+-
+-  let bits;
+-
+-
+-  if (depth !== 8) {
+-
+-    bits = bitRetriever(data, depth);
+-
+-  }
+-
+-  let pxData;
+-
+-  if (depth <= 8) {
+-
+-    pxData = Buffer.alloc(width * height * 4);
+-
+-  }
+- else {
+-
+-    pxData = new Uint16Array(width * height * 4);
+-
+-  }
+-
+-  let maxBit = Math.pow(2, depth) - 1;
+-
+-  let rawPos = 0;
+-
+-  let images;
+-
+-  let getPxPos;
+-
+-
+-  if (interlace) {
+-
+-    images = interlaceUtils.getImagePasses(width, height);
+-
+-    getPxPos = interlaceUtils.getInterlaceIterator(width, height);
+-
+-  }
+- else {
+-
+-    let nonInterlacedPxPos = 0;
+-
+-    getPxPos = function () {
+-
+-      let returner = nonInterlacedPxPos;
+-
+-      nonInterlacedPxPos += 4;
+-
+-      return returner;
+-
+-    }
+-;
+-
+-    images = [{
+- width: width, height: height }
+-];
+-
+-  }
+-
+-
+-  for (let imageIndex = 0;
+- imageIndex < images.length;
+- imageIndex++) {
+-
+-    if (depth === 8) {
+-
+-      rawPos = mapImage8Bit(
+-        images[imageIndex],
+-        pxData,
+-        getPxPos,
+-        bpp,
+-        data,
+-        rawPos
+-      );
+-
+-    }
+- else {
+-
+-      mapImageCustomBit(
+-        images[imageIndex],
+-        pxData,
+-        getPxPos,
+-        bpp,
+-        bits,
+-        maxBit
+-      );
+-
+-    }
+-
+-  }
+-
+-  if (depth === 8) {
+-
+-    if (rawPos !== data.length) {
+-
+-      throw new Error("extra data found");
+-
+-    }
+-
+-  }
+- else {
+-
+-    bits.end();
+-
+-  }
+-
+-
+-  return pxData;
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitpacker.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let constants = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js");
+-
+-
+-module.exports = function (dataIn, width, height, options) {
+-
+-  let outHasAlpha =
+-    [constants.COLORTYPE_COLOR_ALPHA, constants.COLORTYPE_ALPHA].indexOf(
+-      options.colorType
+-    ) !== -1;
+-
+-  if (options.colorType === options.inputColorType) {
+-
+-    let bigEndian = (function () {
+-
+-      let buffer = new ArrayBuffer(2);
+-
+-      new DataView(buffer).setInt16(0, 256, true /* littleEndian */);
+-
+-      // Int16Array uses the platform's endianness.
+-      return new Int16Array(buffer)[0] !== 256;
+-
+-    }
+-)();
+-
+-    // If no need to convert to grayscale and alpha is present/absent in both, take a fast route
+-    if (options.bitDepth === 8 || (options.bitDepth === 16 && bigEndian)) {
+-
+-      return dataIn;
+-
+-    }
+-
+-  }
+-
+-
+-  // map to a UInt16 array if data is 16bit, fix endianness below
+-  let data = options.bitDepth !== 16 ? dataIn : new Uint16Array(dataIn.buffer);
+-
+-
+-  let maxValue = 255;
+-
+-  let inBpp = constants.COLORTYPE_TO_BPP_MAP[options.inputColorType];
+-
+-  if (inBpp === 4 && !options.inputHasAlpha) {
+-
+-    inBpp = 3;
+-
+-  }
+-
+-  let outBpp = constants.COLORTYPE_TO_BPP_MAP[options.colorType];
+-
+-  if (options.bitDepth === 16) {
+-
+-    maxValue = 65535;
+-
+-    outBpp *= 2;
+-
+-  }
+-
+-  let outData = Buffer.alloc(width * height * outBpp);
+-
+-
+-  let inIndex = 0;
+-
+-  let outIndex = 0;
+-
+-
+-  let bgColor = options.bgColor || {
+-}
+-;
+-
+-  if (bgColor.red === undefined) {
+-
+-    bgColor.red = maxValue;
+-
+-  }
+-
+-  if (bgColor.green === undefined) {
+-
+-    bgColor.green = maxValue;
+-
+-  }
+-
+-  if (bgColor.blue === undefined) {
+-
+-    bgColor.blue = maxValue;
+-
+-  }
+-
+-
+-  function getRGBA() {
+-
+-    let red;
+-
+-    let green;
+-
+-    let blue;
+-
+-    let alpha = maxValue;
+-
+-    switch (options.inputColorType) {
+-
+-      case constants.COLORTYPE_COLOR_ALPHA:
+-        alpha = data[inIndex + 3];
+-
+-        red = data[inIndex];
+-
+-        green = data[inIndex + 1];
+-
+-        blue = data[inIndex + 2];
+-
+-        break;
+-
+-      case constants.COLORTYPE_COLOR:
+-        red = data[inIndex];
+-
+-        green = data[inIndex + 1];
+-
+-        blue = data[inIndex + 2];
+-
+-        break;
+-
+-      case constants.COLORTYPE_ALPHA:
+-        alpha = data[inIndex + 1];
+-
+-        red = data[inIndex];
+-
+-        green = red;
+-
+-        blue = red;
+-
+-        break;
+-
+-      case constants.COLORTYPE_GRAYSCALE:
+-        red = data[inIndex];
+-
+-        green = red;
+-
+-        blue = red;
+-
+-        break;
+-
+-      default:
+-        throw new Error(
+-          "input color type:" +
+-            options.inputColorType +
+-            " is not supported at present"
+-        );
+-
+-    }
+-
+-
+-    if (options.inputHasAlpha) {
+-
+-      if (!outHasAlpha) {
+-
+-        alpha /= maxValue;
+-
+-        red = Math.min(
+-          Math.max(Math.round((1 - alpha) * bgColor.red + alpha * red), 0),
+-          maxValue
+-        );
+-
+-        green = Math.min(
+-          Math.max(Math.round((1 - alpha) * bgColor.green + alpha * green), 0),
+-          maxValue
+-        );
+-
+-        blue = Math.min(
+-          Math.max(Math.round((1 - alpha) * bgColor.blue + alpha * blue), 0),
+-          maxValue
+-        );
+-
+-      }
+-
+-    }
+-
+-    return {
+- red: red, green: green, blue: blue, alpha: alpha }
+-;
+-
+-  }
+-
+-
+-  for (let y = 0;
+- y < height;
+- y++) {
+-
+-    for (let x = 0;
+- x < width;
+- x++) {
+-
+-      let rgba = getRGBA(data, inIndex);
+-
+-
+-      switch (options.colorType) {
+-
+-        case constants.COLORTYPE_COLOR_ALPHA:
+-        case constants.COLORTYPE_COLOR:
+-          if (options.bitDepth === 8) {
+-
+-            outData[outIndex] = rgba.red;
+-
+-            outData[outIndex + 1] = rgba.green;
+-
+-            outData[outIndex + 2] = rgba.blue;
+-
+-            if (outHasAlpha) {
+-
+-              outData[outIndex + 3] = rgba.alpha;
+-
+-            }
+-
+-          }
+- else {
+-
+-            outData.writeUInt16BE(rgba.red, outIndex);
+-
+-            outData.writeUInt16BE(rgba.green, outIndex + 2);
+-
+-            outData.writeUInt16BE(rgba.blue, outIndex + 4);
+-
+-            if (outHasAlpha) {
+-
+-              outData.writeUInt16BE(rgba.alpha, outIndex + 6);
+-
+-            }
+-
+-          }
+-
+-          break;
+-
+-        case constants.COLORTYPE_ALPHA:
+-        case constants.COLORTYPE_GRAYSCALE: {
+-
+-          // Convert to grayscale and alpha
+-          let grayscale = (rgba.red + rgba.green + rgba.blue) / 3;
+-
+-          if (options.bitDepth === 8) {
+-
+-            outData[outIndex] = grayscale;
+-
+-            if (outHasAlpha) {
+-
+-              outData[outIndex + 1] = rgba.alpha;
+-
+-            }
+-
+-          }
+- else {
+-
+-            outData.writeUInt16BE(grayscale, outIndex);
+-
+-            if (outHasAlpha) {
+-
+-              outData.writeUInt16BE(rgba.alpha, outIndex + 2);
+-
+-            }
+-
+-          }
+-
+-          break;
+-
+-        }
+-
+-        default:
+-          throw new Error("unrecognised color Type " + options.colorType);
+-
+-      }
+-
+-
+-      inIndex += inBpp;
+-
+-      outIndex += outBpp;
+-
+-    }
+-
+-  }
+-
+-
+-  return outData;
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/chunkstream.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let util = __webpack_require__("util");
+-
+-let Stream = __webpack_require__("stream");
+-
+-
+-let ChunkStream = (module.exports = function () {
+-
+-  Stream.call(this);
+-
+-
+-  this._buffers = [];
+-
+-  this._buffered = 0;
+-
+-
+-  this._reads = [];
+-
+-  this._paused = false;
+-
+-
+-  this._encoding = "utf8";
+-
+-  this.writable = true;
+-
+-}
+-);
+-
+-util.inherits(ChunkStream, Stream);
+-
+-
+-ChunkStream.prototype.read = function (length, callback) {
+-
+-  this._reads.push({
+-
+-    length: Math.abs(length), // if length < 0 then at most this length
+-    allowLess: length < 0,
+-    func: callback,
+-  }
+-);
+-
+-
+-  process.nextTick(
+-    function () {
+-
+-      this._process();
+-
+-
+-      // its paused and there is not enought data then ask for more
+-      if (this._paused && this._reads && this._reads.length > 0) {
+-
+-        this._paused = false;
+-
+-
+-        this.emit("drain");
+-
+-      }
+-
+-    }
+-.bind(this)
+-  );
+-
+-}
+-;
+-
+-
+-ChunkStream.prototype.write = function (data, encoding) {
+-
+-  if (!this.writable) {
+-
+-    this.emit("error", new Error("Stream not writable"));
+-
+-    return false;
+-
+-  }
+-
+-
+-  let dataBuffer;
+-
+-  if (Buffer.isBuffer(data)) {
+-
+-    dataBuffer = data;
+-
+-  }
+- else {
+-
+-    dataBuffer = Buffer.from(data, encoding || this._encoding);
+-
+-  }
+-
+-
+-  this._buffers.push(dataBuffer);
+-
+-  this._buffered += dataBuffer.length;
+-
+-
+-  this._process();
+-
+-
+-  // ok if there are no more read requests
+-  if (this._reads && this._reads.length === 0) {
+-
+-    this._paused = true;
+-
+-  }
+-
+-
+-  return this.writable && !this._paused;
+-
+-}
+-;
+-
+-
+-ChunkStream.prototype.end = function (data, encoding) {
+-
+-  if (data) {
+-
+-    this.write(data, encoding);
+-
+-  }
+-
+-
+-  this.writable = false;
+-
+-
+-  // already destroyed
+-  if (!this._buffers) {
+-
+-    return;
+-
+-  }
+-
+-
+-  // enqueue or handle end
+-  if (this._buffers.length === 0) {
+-
+-    this._end();
+-
+-  }
+- else {
+-
+-    this._buffers.push(null);
+-
+-    this._process();
+-
+-  }
+-
+-}
+-;
+-
+-
+-ChunkStream.prototype.destroySoon = ChunkStream.prototype.end;
+-
+-
+-ChunkStream.prototype._end = function () {
+-
+-  if (this._reads.length > 0) {
+-
+-    this.emit("error", new Error("Unexpected end of input"));
+-
+-  }
+-
+-
+-  this.destroy();
+-
+-}
+-;
+-
+-
+-ChunkStream.prototype.destroy = function () {
+-
+-  if (!this._buffers) {
+-
+-    return;
+-
+-  }
+-
+-
+-  this.writable = false;
+-
+-  this._reads = null;
+-
+-  this._buffers = null;
+-
+-
+-  this.emit("close");
+-
++t.getImagePasses=function(e,t){
++let i=[],s=e%8,r=t%8,o=(e-s)/8,l=(t-r)/8;
++for(let e=0;
++e<n.length;
++e++){
++let t=n[e],h=o*t.x.length,a=l*t.y.length;
++for(let e=0;
++e<t.x.length&&t.x[e]<s;
++e++)h++;
++for(let e=0;
++e<t.y.length&&t.y[e]<r;
++e++)a++;
++h>0&&a>0&&i.push({
++width:h,height:a,index:e}
++)}
++return i}
++,t.getInterlaceIterator=function(e){
++return function(t,i,s){
++let r=t%n[s].x.length,o=(t-r)/n[s].x.length*8+n[s].x[r],l=i%n[s].y.length;
++return 4*o+((i-l)/n[s].y.length*8+n[s].y[l])*e*4}
++}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer-async.js"(e,t,n){
++let i=n("util"),s=n("stream"),r=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js"),o=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer.js"),l=e.exports=function(e){
++s.call(this);
++let t=e||{
++}
++;
++this._packer=new o(t),this._deflate=this._packer.createDeflate(),this.readable=!0}
++;
++i.inherits(l,s),l.prototype.pack=function(e,t,n,i){
++this.emit("data",Buffer.from(r.PNG_SIGNATURE)),this.emit("data",this._packer.packIHDR(t,n)),i&&this.emit("data",this._packer.packGAMA(i));
++let s=this._packer.filterData(e,t,n);
++this._deflate.on("error",this.emit.bind(this,"error")),this._deflate.on("data",function(e){
++this.emit("data",this._packer.packIDAT(e))}
++.bind(this)),this._deflate.on("end",function(){
++this.emit("data",this._packer.packIEND()),this.emit("end")}
++.bind(this)),this._deflate.end(s)}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer-sync.js"(e,t,n){
++let i=!0,s=n("zlib");
++s.deflateSync||(i=!1);
++let r=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js"),o=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer.js");
++e.exports=function(e,t){
++if(!i)throw new Error("To use the sync capability of this library in old node versions, please pin pngjs to v2.3.0");
++let n=new o(t||{
++}
++),l=[];
++l.push(Buffer.from(r.PNG_SIGNATURE)),l.push(n.packIHDR(e.width,e.height)),e.gamma&&l.push(n.packGAMA(e.gamma));
++let h=n.filterData(e.data,e.width,e.height),a=s.deflateSync(h,n.getDeflateOptions());
++if(h=null,!a||!a.length)throw new Error("bad png - invalid compressed data response");
++return l.push(n.packIDAT(a)),l.push(n.packIEND()),Buffer.concat(l)}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer.js"(e,t,n){
++let i=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js"),s=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/crc.js"),r=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitpacker.js"),o=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-pack.js"),l=n("zlib"),h=e.exports=function(e){
++if(this._options=e,e.deflateChunkSize=e.deflateChunkSize||32768,e.deflateLevel=null!=e.deflateLevel?e.deflateLevel:9,e.deflateStrategy=null!=e.deflateStrategy?e.deflateStrategy:3,e.inputHasAlpha=null==e.inputHasAlpha||e.inputHasAlpha,e.deflateFactory=e.deflateFactory||l.createDeflate,e.bitDepth=e.bitDepth||8,e.colorType="number"==typeof e.colorType?e.colorType:i.COLORTYPE_COLOR_ALPHA,e.inputColorType="number"==typeof e.inputColorType?e.inputColorType:i.COLORTYPE_COLOR_ALPHA,-1===[i.COLORTYPE_GRAYSCALE,i.COLORTYPE_COLOR,i.COLORTYPE_COLOR_ALPHA,i.COLORTYPE_ALPHA].indexOf(e.colorType))throw new Error("option color type:"+e.colorType+" is not supported at present");
++if(-1===[i.COLORTYPE_GRAYSCALE,i.COLORTYPE_COLOR,i.COLORTYPE_COLOR_ALPHA,i.COLORTYPE_ALPHA].indexOf(e.inputColorType))throw new Error("option input color type:"+e.inputColorType+" is not supported at present");
++if(8!==e.bitDepth&&16!==e.bitDepth)throw new Error("option bit depth:"+e.bitDepth+" is not supported at present")}
++;
++h.prototype.getDeflateOptions=function(){
++return{
++chunkSize:this._options.deflateChunkSize,level:this._options.deflateLevel,strategy:this._options.deflateStrategy}
++}
++,h.prototype.createDeflate=function(){
++return this._options.deflateFactory(this.getDeflateOptions())}
++,h.prototype.filterData=function(e,t,n){
++let s=r(e,t,n,this._options),l=i.COLORTYPE_TO_BPP_MAP[this._options.colorType];
++return o(s,t,n,this._options,l)}
++,h.prototype._packChunk=function(e,t){
++let n=t?t.length:0,i=Buffer.alloc(n+12);
++return i.writeUInt32BE(n,0),i.writeUInt32BE(e,4),t&&t.copy(i,8),i.writeInt32BE(s.crc32(i.slice(4,i.length-4)),i.length-4),i}
++,h.prototype.packGAMA=function(e){
++let t=Buffer.alloc(4);
++return t.writeUInt32BE(Math.floor(e*i.GAMMA_DIVISION),0),this._packChunk(i.TYPE_gAMA,t)}
++,h.prototype.packIHDR=function(e,t){
++let n=Buffer.alloc(13);
++return n.writeUInt32BE(e,0),n.writeUInt32BE(t,4),n[8]=this._options.bitDepth,n[9]=this._options.colorType,n[10]=0,n[11]=0,n[12]=0,this._packChunk(i.TYPE_IHDR,n)}
++,h.prototype.packIDAT=function(e){
++return this._packChunk(i.TYPE_IDAT,e)}
++,h.prototype.packIEND=function(){
++return this._packChunk(i.TYPE_IEND,null)}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/paeth-predictor.js"(e){
++e.exports=function paethPredictor(e,t,n){
++let i=e+t-n,s=Math.abs(i-e),r=Math.abs(i-t),o=Math.abs(i-n);
++return s<=r&&s<=o?e:r<=o?t:n}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser-async.js"(e,t,n){
++let i=n("util"),s=n("zlib"),r=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/chunkstream.js"),o=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse-async.js"),l=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser.js"),h=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitmapper.js"),a=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/format-normaliser.js"),p=e.exports=function(e){
++r.call(this),this._parser=new l(e,{
++read:this.read.bind(this),error:this._handleError.bind(this),metadata:this._handleMetaData.bind(this),gamma:this.emit.bind(this,"gamma"),palette:this._handlePalette.bind(this),transColor:this._handleTransColor.bind(this),finished:this._finished.bind(this),inflateData:this._inflateData.bind(this),simpleTransparency:this._simpleTransparency.bind(this),headersFinished:this._headersFinished.bind(this)}
++),this._options=e,this.writable=!0,this._parser.start()}
++;
++i.inherits(p,r),p.prototype._handleError=function(e){
++this.emit("error",e),this.writable=!1,this.destroy(),this._inflate&&this._inflate.destroy&&this._inflate.destroy(),this._filter&&(this._filter.destroy(),this._filter.on("error",(function(){
++}
++))),this.errord=!0}
++,p.prototype._inflateData=function(e){
++if(!this._inflate)if(this._bitmapInfo.interlace)this._inflate=s.createInflate(),this._inflate.on("error",this.emit.bind(this,"error")),this._filter.on("complete",this._complete.bind(this)),this._inflate.pipe(this._filter);
++else{
++let e=(1+(this._bitmapInfo.width*this._bitmapInfo.bpp*this._bitmapInfo.depth+7>>3))*this._bitmapInfo.height,t=Math.max(e,s.Z_MIN_CHUNK);
++this._inflate=s.createInflate({
++chunkSize:t}
++);
++let n=e,i=this.emit.bind(this,"error");
++this._inflate.on("error",(function(e){
++n&&i(e)}
++)),this._filter.on("complete",this._complete.bind(this));
++let r=this._filter.write.bind(this._filter);
++this._inflate.on("data",(function(e){
++n&&(e.length>n&&(e=e.slice(0,n)),n-=e.length,r(e))}
++)),this._inflate.on("end",this._filter.end.bind(this._filter))}
++this._inflate.write(e)}
++,p.prototype._handleMetaData=function(e){
++this._metaData=e,this._bitmapInfo=Object.create(e),this._filter=new o(this._bitmapInfo)}
++,p.prototype._handleTransColor=function(e){
++this._bitmapInfo.transColor=e}
++,p.prototype._handlePalette=function(e){
++this._bitmapInfo.palette=e}
++,p.prototype._simpleTransparency=function(){
++this._metaData.alpha=!0}
++,p.prototype._headersFinished=function(){
++this.emit("metadata",this._metaData)}
++,p.prototype._finished=function(){
++this.errord||(this._inflate?this._inflate.end():this.emit("error","No Inflate block"))}
++,p.prototype._complete=function(e){
++if(this.errord)return;
++let t;
++try{
++let n=h.dataToBitMap(e,this._bitmapInfo);
++t=a(n,this._bitmapInfo,this._options.skipRescale),n=null}
++catch(e){
++return void this._handleError(e)}
++this.emit("parsed",t)}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser-sync.js"(e,t,n){
++let i=!0,s=n("zlib"),r=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-inflate.js");
++s.deflateSync||(i=!1);
++let o=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-reader.js"),l=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse-sync.js"),h=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser.js"),a=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitmapper.js"),p=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/format-normaliser.js");
++e.exports=function(e,t){
++if(!i)throw new Error("To use the sync capability of this library in old node versions, please pin pngjs to v2.3.0");
++let n,d,f;
++let u=[];
++let _=new o(e),c=new h(t,{
++read:_.read.bind(_),error:function handleError(e){
++n=e}
++,metadata:function handleMetaData(e){
++d=e}
++,gamma:function handleGamma(e){
++f=e}
++,palette:function handlePalette(e){
++d.palette=e}
++,transColor:function handleTransColor(e){
++d.transColor=e}
++,inflateData:function handleInflateData(e){
++u.push(e)}
++,simpleTransparency:function handleSimpleTransparency(){
++d.alpha=!0}
++}
++);
++if(c.start(),_.process(),n)throw n;
++let m,g=Buffer.concat(u);
++if(u.length=0,d.interlace)m=s.inflateSync(g);
++else{
++let e=(1+(d.width*d.bpp*d.depth+7>>3))*d.height;
++m=r(g,{
++chunkSize:e,maxLength:e}
++)}
++if(g=null,!m||!m.length)throw new Error("bad png - invalid inflate data response");
++let b=l.process(m,d);
++g=null;
++let y=a.dataToBitMap(b,d);
++b=null;
++let w=p(y,d,t.skipRescale);
++return d.data=w,d.gamma=f||0,d}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser.js"(e,t,n){
++let i=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js"),s=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/crc.js"),r=e.exports=function(e,t){
++this._options=e,e.checkCRC=!1!==e.checkCRC,this._hasIHDR=!1,this._hasIEND=!1,this._emittedHeadersFinished=!1,this._palette=[],this._colorType=0,this._chunks={
++}
++,this._chunks[i.TYPE_IHDR]=this._handleIHDR.bind(this),this._chunks[i.TYPE_IEND]=this._handleIEND.bind(this),this._chunks[i.TYPE_IDAT]=this._handleIDAT.bind(this),this._chunks[i.TYPE_PLTE]=this._handlePLTE.bind(this),this._chunks[i.TYPE_tRNS]=this._handleTRNS.bind(this),this._chunks[i.TYPE_gAMA]=this._handleGAMA.bind(this),this.read=t.read,this.error=t.error,this.metadata=t.metadata,this.gamma=t.gamma,this.transColor=t.transColor,this.palette=t.palette,this.parsed=t.parsed,this.inflateData=t.inflateData,this.finished=t.finished,this.simpleTransparency=t.simpleTransparency,this.headersFinished=t.headersFinished||function(){
++}
++}
++;
++r.prototype.start=function(){
++this.read(i.PNG_SIGNATURE.length,this._parseSignature.bind(this))}
++,r.prototype._parseSignature=function(e){
++let t=i.PNG_SIGNATURE;
++for(let n=0;
++n<t.length;
++n++)if(e[n]!==t[n])return void this.error(new Error("Invalid file signature"));
++this.read(8,this._parseChunkBegin.bind(this))}
++,r.prototype._parseChunkBegin=function(e){
++let t=e.readUInt32BE(0),n=e.readUInt32BE(4),r="";
++for(let t=4;
++t<8;
++t++)r+=String.fromCharCode(e[t]);
++let o=Boolean(32&e[4]);
++if(this._hasIHDR||n===i.TYPE_IHDR){
++if(this._crc=new s,this._crc.write(Buffer.from(r)),this._chunks[n])return this._chunks[n](t);
++o?this.read(t+4,this._skipChunk.bind(this)):this.error(new Error("Unsupported critical chunk type "+r))}
++else this.error(new Error("Expected IHDR on beggining"))}
++,r.prototype._skipChunk=function(){
++this.read(8,this._parseChunkBegin.bind(this))}
++,r.prototype._handleChunkEnd=function(){
++this.read(4,this._parseChunkEnd.bind(this))}
++,r.prototype._parseChunkEnd=function(e){
++let t=e.readInt32BE(0),n=this._crc.crc32();
++this._options.checkCRC&&n!==t?this.error(new Error("Crc error - "+t+" - "+n)):this._hasIEND||this.read(8,this._parseChunkBegin.bind(this))}
++,r.prototype._handleIHDR=function(e){
++this.read(e,this._parseIHDR.bind(this))}
++,r.prototype._parseIHDR=function(e){
++this._crc.write(e);
++let t=e.readUInt32BE(0),n=e.readUInt32BE(4),s=e[8],r=e[9],o=e[10],l=e[11],h=e[12];
++if(8!==s&&4!==s&&2!==s&&1!==s&&16!==s)return void this.error(new Error("Unsupported bit depth "+s));
++if(!(r in i.COLORTYPE_TO_BPP_MAP))return void this.error(new Error("Unsupported color type"));
++if(0!==o)return void this.error(new Error("Unsupported compression method"));
++if(0!==l)return void this.error(new Error("Unsupported filter method"));
++if(0!==h&&1!==h)return void this.error(new Error("Unsupported interlace method"));
++this._colorType=r;
++let a=i.COLORTYPE_TO_BPP_MAP[this._colorType];
++this._hasIHDR=!0,this.metadata({
++width:t,height:n,depth:s,interlace:Boolean(h),palette:Boolean(r&i.COLORTYPE_PALETTE),color:Boolean(r&i.COLORTYPE_COLOR),alpha:Boolean(r&i.COLORTYPE_ALPHA),bpp:a,colorType:r}
++),this._handleChunkEnd()}
++,r.prototype._handlePLTE=function(e){
++this.read(e,this._parsePLTE.bind(this))}
++,r.prototype._parsePLTE=function(e){
++this._crc.write(e);
++let t=Math.floor(e.length/3);
++for(let n=0;
++n<t;
++n++)this._palette.push([e[3*n],e[3*n+1],e[3*n+2],255]);
++this.palette(this._palette),this._handleChunkEnd()}
++,r.prototype._handleTRNS=function(e){
++this.simpleTransparency(),this.read(e,this._parseTRNS.bind(this))}
++,r.prototype._parseTRNS=function(e){
++if(this._crc.write(e),this._colorType===i.COLORTYPE_PALETTE_COLOR){
++if(0===this._palette.length)return void this.error(new Error("Transparency chunk must be after palette"));
++if(e.length>this._palette.length)return void this.error(new Error("More transparent colors than palette size"));
++for(let t=0;
++t<e.length;
++t++)this._palette[t][3]=e[t];
++this.palette(this._palette)}
++this._colorType===i.COLORTYPE_GRAYSCALE&&this.transColor([e.readUInt16BE(0)]),this._colorType===i.COLORTYPE_COLOR&&this.transColor([e.readUInt16BE(0),e.readUInt16BE(2),e.readUInt16BE(4)]),this._handleChunkEnd()}
++,r.prototype._handleGAMA=function(e){
++this.read(e,this._parseGAMA.bind(this))}
++,r.prototype._parseGAMA=function(e){
++this._crc.write(e),this.gamma(e.readUInt32BE(0)/i.GAMMA_DIVISION),this._handleChunkEnd()}
++,r.prototype._handleIDAT=function(e){
++this._emittedHeadersFinished||(this._emittedHeadersFinished=!0,this.headersFinished()),this.read(-e,this._parseIDAT.bind(this,e))}
++,r.prototype._parseIDAT=function(e,t){
++if(this._crc.write(t),this._colorType===i.COLORTYPE_PALETTE_COLOR&&0===this._palette.length)throw new Error("Expected palette not found");
++this.inflateData(t);
++let n=e-t.length;
++n>0?this._handleIDAT(n):this._handleChunkEnd()}
++,r.prototype._handleIEND=function(e){
++this.read(e,this._parseIEND.bind(this))}
++,r.prototype._parseIEND=function(e){
++this._crc.write(e),this._hasIEND=!0,this._handleChunkEnd(),this.finished&&this.finished()}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/png-sync.js"(e,t,n){
++let i=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser-sync.js"),s=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer-sync.js");
++t.read=function(e,t){
++return i(e,t||{
++}
++)}
++,t.write=function(e,t){
++return s(e,t)}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/png.js"(e,t,n){
++let i=n("util"),s=n("stream"),r=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser-async.js"),o=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer-async.js"),l=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/png-sync.js"),h=t.O=function(e){
++s.call(this),e=e||{
++}
++,this.width=0|e.width,this.height=0|e.height,this.data=this.width>0&&this.height>0?Buffer.alloc(4*this.width*this.height):null,e.fill&&this.data&&this.data.fill(0),this.gamma=0,this.readable=this.writable=!0,this._parser=new r(e),this._parser.on("error",this.emit.bind(this,"error")),this._parser.on("close",this._handleClose.bind(this)),this._parser.on("metadata",this._metadata.bind(this)),this._parser.on("gamma",this._gamma.bind(this)),this._parser.on("parsed",function(e){
++this.data=e,this.emit("parsed",e)}
++.bind(this)),this._packer=new o(e),this._packer.on("data",this.emit.bind(this,"data")),this._packer.on("end",this.emit.bind(this,"end")),this._parser.on("close",this._handleClose.bind(this)),this._packer.on("error",this.emit.bind(this,"error"))}
++;
++i.inherits(h,s),h.sync=l,h.prototype.pack=function(){
++return this.data&&this.data.length?(process.nextTick(function(){
++this._packer.pack(this.data,this.width,this.height,this.gamma)}
++.bind(this)),this):(this.emit("error","No data provided"),this)}
++,h.prototype.parse=function(e,t){
++if(t){
++let e,n;
++e=function(e){
++this.removeListener("error",n),this.data=e,t(null,this)}
++.bind(this),n=function(n){
++this.removeListener("parsed",e),t(n,null)}
++.bind(this),this.once("parsed",e),this.once("error",n)}
++return this.end(e),this}
++,h.prototype.write=function(e){
++return this._parser.write(e),!0}
++,h.prototype.end=function(e){
++this._parser.end(e)}
++,h.prototype._metadata=function(e){
++this.width=e.width,this.height=e.height,this.emit("metadata",e)}
++,h.prototype._gamma=function(e){
++this.gamma=e}
++,h.prototype._handleClose=function(){
++this._parser.writable||this._packer.readable||this.emit("close")}
++,h.bitblt=function(e,t,n,i,s,r,o,l){
++if(i|=0,s|=0,r|=0,o|=0,l|=0,(n|=0)>e.width||i>e.height||n+s>e.width||i+r>e.height)throw new Error("bitblt reading outside image");
++if(o>t.width||l>t.height||o+s>t.width||l+r>t.height)throw new Error("bitblt writing outside image");
++for(let h=0;
++h<r;
++h++)e.data.copy(t.data,(l+h)*t.width+o<<2,(i+h)*e.width+n<<2,(i+h)*e.width+n+s<<2)}
++,h.prototype.bitblt=function(e,t,n,i,s,r,o){
++return h.bitblt(this,e,t,n,i,s,r,o),this}
++,h.adjustGamma=function(e){
++if(e.gamma){
++for(let t=0;
++t<e.height;
++t++)for(let n=0;
++n<e.width;
++n++){
++let i=e.width*t+n<<2;
++for(let t=0;
++t<3;
++t++){
++let n=e.data[i+t]/255;
++n=Math.pow(n,1/2.2/e.gamma),e.data[i+t]=Math.round(255*n)}
++}
++e.gamma=0}
++}
++,h.prototype.adjustGamma=function(){
++h.adjustGamma(this)}
++}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-inflate.js"(e,t,n){
++let i=n("assert").ok,s=n("zlib"),r=n("util"),o=n("buffer").kMaxLength;
++function Inflate(e){
++if(!(this instanceof Inflate))return new Inflate(e);
++e&&e.chunkSize<s.Z_MIN_CHUNK&&(e.chunkSize=s.Z_MIN_CHUNK),s.Inflate.call(this,e),this._offset=void 0===this._offset?this._outOffset:this._offset,this._buffer=this._buffer||this._outBuffer,e&&null!=e.maxLength&&(this._maxLength=e.maxLength)}
++function _close(e,t){
++t&&process.nextTick(t),e._handle&&(e._handle.close(),e._handle=null)}
++function inflateSync(e,t){
++return function zlibBufferSync(e,t){
++if("string"==typeof t&&(t=Buffer.from(t)),!(t instanceof Buffer))throw new TypeError("Not a string or buffer");
++let n=e._finishFlushFlag;
++return null==n&&(n=s.Z_FINISH),e._processChunk(t,n)}
++(new Inflate(t),e)}
++Inflate.prototype._processChunk=function(e,t,n){
++if("function"==typeof n)return s.Inflate._processChunk.call(this,e,t,n);
++let r,l,h=this,a=e&&e.length,p=this._chunkSize-this._offset,d=this._maxLength,f=0,u=[],_=0;
++function handleChunk(e,t){
++if(h._hadError)return;
++let n=p-t;
++if(i(n>=0,"have should not go down"),n>0){
++let e=h._buffer.slice(h._offset,h._offset+n);
++if(h._offset+=n,e.length>d&&(e=e.slice(0,d)),u.push(e),_+=e.length,d-=e.length,0===d)return!1}
++return(0===t||h._offset>=h._chunkSize)&&(p=h._chunkSize,h._offset=0,h._buffer=Buffer.allocUnsafe(h._chunkSize)),0===t&&(f+=a-e,a=e,!0)}
++this.on("error",(function(e){
++r=e}
++)),i(this._handle,"zlib binding closed");
++do{
++l=this._handle.writeSync(t,e,f,a,this._buffer,this._offset,p),l=l||this._writeState}
++while(!this._hadError&&handleChunk(l[0],l[1]));
++if(this._hadError)throw r;
++if(_>=o)throw _close(this),new RangeError("Cannot create final Buffer. It would be larger than 0x"+o.toString(16)+" bytes");
++let c=Buffer.concat(u,_);
++return _close(this),c}
++,r.inherits(Inflate,s.Inflate),e.exports=t=inflateSync,t.Inflate=Inflate,t.createInflate=function createInflate(e){
++return new Inflate(e)}
++,t.inflateSync=inflateSync}
++,"../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-reader.js"(e){
++let t=e.exports=function(e){
++this._buffer=e,this._reads=[]}
++;
++t.prototype.read=function(e,t){
++this._reads.push({
++length:Math.abs(e),allowLess:e<0,func:t}
++)}
++,t.prototype.process=function(){
++for(;
++this._reads.length>0&&this._buffer.length;
++){
++let e=this._reads[0];
++if(!this._buffer.length||!(this._buffer.length>=e.length||e.allowLess))break;
++{
++this._reads.shift();
++let t=this._buffer;
++this._buffer=t.slice(e.length),e.func.call(this,t.slice(0,e.length))}
++}
++if(this._reads.length>0)throw new Error("There are some read requests waitng on finished stream");
++if(this._buffer.length>0)throw new Error("unrecognised content at end of stream")}
++}
++,"../../node_modules/.pnpm/@jimp+js-png@1.6.0/node_modules/@jimp/js-png/dist/esm/index.js"(e,t,n){
++n.r(t),n.d(t,{
++PNGColorType:()=>s,PNGFilterType:()=>i,default:()=>png}
++);
++var i,s,r=n("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/png.js");
++function png(){
++return{
++mime:"image/png",hasAlpha:!0,encode:(e,{
++deflateLevel:t=9,deflateStrategy:n=3,filterType:o=i.AUTO,colorType:l,inputHasAlpha:h=!0,...a}
++={
++}
++)=>{
++const p=new r.O({
++width:e.width,height:e.height}
++);
++return p.data=e.data,r.O.sync.write(p,{
++...a,deflateLevel:t,deflateStrategy:n,filterType:o,colorType:void 0!==l?l:h?s.COLOR_ALPHA:s.COLOR,inputHasAlpha:h}
++)}
++,decode:(e,t)=>{
++const n=r.O.sync.read(e,t);
++return{
++data:n.data,width:n.width,height:n.height}
++}
++}
++}
++!function(e){
++e[e.AUTO=-1]="AUTO",e[e.NONE=0]="NONE",e[e.SUB=1]="SUB",e[e.UP=2]="UP",e[e.AVERAGE=3]="AVERAGE",e[e.PATH=4]="PATH"}
++(i||(i={
++}
++)),function(e){
++e[e.GRAYSCALE=0]="GRAYSCALE",e[e.COLOR=2]="COLOR",e[e.GRAYSCALE_ALPHA=4]="GRAYSCALE_ALPHA",e[e.COLOR_ALPHA=6]="COLOR_ALPHA"}
++(s||(s={
+ }
+-;
+-
+-
+-ChunkStream.prototype._processReadAllowingLess = function (read) {
+-
+-  // ok there is any data so that we can satisfy this request
+-  this._reads.shift();
+- // == read
+-
+-  // first we need to peek into first buffer
+-  let smallerBuf = this._buffers[0];
+-
+-
+-  // ok there is more data than we need
+-  if (smallerBuf.length > read.length) {
+-
+-    this._buffered -= read.length;
+-
+-    this._buffers[0] = smallerBuf.slice(read.length);
+-
+-
+-    read.func.call(this, smallerBuf.slice(0, read.length));
+-
+-  }
+- else {
+-
+-    // ok this is less than maximum length so use it all
+-    this._buffered -= smallerBuf.length;
+-
+-    this._buffers.shift();
+- // == smallerBuf
+-
+-    read.func.call(this, smallerBuf);
+-
+-  }
+-
++))}
+ }
+ ;
+-
+-
+-ChunkStream.prototype._processRead = function (read) {
+-
+-  this._reads.shift();
+- // == read
+-
+-  let pos = 0;
+-
+-  let count = 0;
+-
+-  let data = Buffer.alloc(read.length);
+-
+-
+-  // create buffer for all data
+-  while (pos < read.length) {
+-
+-    let buf = this._buffers[count++];
+-
+-    let len = Math.min(buf.length, read.length - pos);
+-
+-
+-    buf.copy(data, pos, 0, len);
+-
+-    pos += len;
+-
+-
+-    // last buffer wasn't used all so just slice it and leave
+-    if (len !== buf.length) {
+-
+-      this._buffers[--count] = buf.slice(len);
+-
+-    }
+-
+-  }
+-
+-
+-  // remove all used buffers
+-  if (count > 0) {
+-
+-    this._buffers.splice(0, count);
+-
+-  }
+-
+-
+-  this._buffered -= read.length;
+-
+-
+-  read.func.call(this, data);
+-
+-}
+-;
+-
+-
+-ChunkStream.prototype._process = function () {
+-
+-  try {
+-
+-    // as long as there is any data and read requests
+-    while (this._buffered > 0 && this._reads && this._reads.length > 0) {
+-
+-      let read = this._reads[0];
+-
+-
+-      // read any data (but no more than length)
+-      if (read.allowLess) {
+-
+-        this._processReadAllowingLess(read);
+-
+-      }
+- else if (this._buffered >= read.length) {
+-
+-        // ok we can meet some expectations
+-
+-        this._processRead(read);
+-
+-      }
+- else {
+-
+-        // not enought data to satisfy first request in queue
+-        // so we need to wait for more
+-        break;
+-
+-      }
+-
+-    }
+-
+-
+-    if (this._buffers && !this.writable) {
+-
+-      this._end();
+-
+-    }
+-
+-  }
+- catch (ex) {
+-
+-    this.emit("error", ex);
+-
+-  }
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js"
+-(module) {
+-
+-
+-
+-
+-module.exports = {
+-
+-  PNG_SIGNATURE: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+-
+-  TYPE_IHDR: 0x49484452,
+-  TYPE_IEND: 0x49454e44,
+-  TYPE_IDAT: 0x49444154,
+-  TYPE_PLTE: 0x504c5445,
+-  TYPE_tRNS: 0x74524e53, // eslint-disable-line camelcase
+-  TYPE_gAMA: 0x67414d41, // eslint-disable-line camelcase
+-
+-  // color-type bits
+-  COLORTYPE_GRAYSCALE: 0,
+-  COLORTYPE_PALETTE: 1,
+-  COLORTYPE_COLOR: 2,
+-  COLORTYPE_ALPHA: 4, // e.g. grayscale and alpha
+-
+-  // color-type combinations
+-  COLORTYPE_PALETTE_COLOR: 3,
+-  COLORTYPE_COLOR_ALPHA: 6,
+-
+-  COLORTYPE_TO_BPP_MAP: {
+-
+-    0: 1,
+-    2: 3,
+-    3: 1,
+-    4: 2,
+-    6: 4,
+-  }
+-,
+-
+-  GAMMA_DIVISION: 100000,
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/crc.js"
+-(module) {
+-
+-
+-
+-
+-let crcTable = [];
+-
+-
+-(function () {
+-
+-  for (let i = 0;
+- i < 256;
+- i++) {
+-
+-    let currentCrc = i;
+-
+-    for (let j = 0;
+- j < 8;
+- j++) {
+-
+-      if (currentCrc & 1) {
+-
+-        currentCrc = 0xedb88320 ^ (currentCrc >>> 1);
+-
+-      }
+- else {
+-
+-        currentCrc = currentCrc >>> 1;
+-
+-      }
+-
+-    }
+-
+-    crcTable[i] = currentCrc;
+-
+-  }
+-
+-}
+-)();
+-
+-
+-let CrcCalculator = (module.exports = function () {
+-
+-  this._crc = -1;
+-
+-}
+-);
+-
+-
+-CrcCalculator.prototype.write = function (data) {
+-
+-  for (let i = 0;
+- i < data.length;
+- i++) {
+-
+-    this._crc = crcTable[(this._crc ^ data[i]) & 0xff] ^ (this._crc >>> 8);
+-
+-  }
+-
+-  return true;
+-
+-}
+-;
+-
+-
+-CrcCalculator.prototype.crc32 = function () {
+-
+-  return this._crc ^ -1;
+-
+-}
+-;
+-
+-
+-CrcCalculator.crc32 = function (buf) {
+-
+-  let crc = -1;
+-
+-  for (let i = 0;
+- i < buf.length;
+- i++) {
+-
+-    crc = crcTable[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+-
+-  }
+-
+-  return crc ^ -1;
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-pack.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let paethPredictor = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/paeth-predictor.js");
+-
+-
+-function filterNone(pxData, pxPos, byteWidth, rawData, rawPos) {
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    rawData[rawPos + x] = pxData[pxPos + x];
+-
+-  }
+-
+-}
+-
+-
+-function filterSumNone(pxData, pxPos, byteWidth) {
+-
+-  let sum = 0;
+-
+-  let length = pxPos + byteWidth;
+-
+-
+-  for (let i = pxPos;
+- i < length;
+- i++) {
+-
+-    sum += Math.abs(pxData[i]);
+-
+-  }
+-
+-  return sum;
+-
+-}
+-
+-
+-function filterSub(pxData, pxPos, byteWidth, rawData, rawPos, bpp) {
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let left = x >= bpp ? pxData[pxPos + x - bpp] : 0;
+-
+-    let val = pxData[pxPos + x] - left;
+-
+-
+-    rawData[rawPos + x] = val;
+-
+-  }
+-
+-}
+-
+-
+-function filterSumSub(pxData, pxPos, byteWidth, bpp) {
+-
+-  let sum = 0;
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let left = x >= bpp ? pxData[pxPos + x - bpp] : 0;
+-
+-    let val = pxData[pxPos + x] - left;
+-
+-
+-    sum += Math.abs(val);
+-
+-  }
+-
+-
+-  return sum;
+-
+-}
+-
+-
+-function filterUp(pxData, pxPos, byteWidth, rawData, rawPos) {
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let up = pxPos > 0 ? pxData[pxPos + x - byteWidth] : 0;
+-
+-    let val = pxData[pxPos + x] - up;
+-
+-
+-    rawData[rawPos + x] = val;
+-
+-  }
+-
+-}
+-
+-
+-function filterSumUp(pxData, pxPos, byteWidth) {
+-
+-  let sum = 0;
+-
+-  let length = pxPos + byteWidth;
+-
+-  for (let x = pxPos;
+- x < length;
+- x++) {
+-
+-    let up = pxPos > 0 ? pxData[x - byteWidth] : 0;
+-
+-    let val = pxData[x] - up;
+-
+-
+-    sum += Math.abs(val);
+-
+-  }
+-
+-
+-  return sum;
+-
+-}
+-
+-
+-function filterAvg(pxData, pxPos, byteWidth, rawData, rawPos, bpp) {
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let left = x >= bpp ? pxData[pxPos + x - bpp] : 0;
+-
+-    let up = pxPos > 0 ? pxData[pxPos + x - byteWidth] : 0;
+-
+-    let val = pxData[pxPos + x] - ((left + up) >> 1);
+-
+-
+-    rawData[rawPos + x] = val;
+-
+-  }
+-
+-}
+-
+-
+-function filterSumAvg(pxData, pxPos, byteWidth, bpp) {
+-
+-  let sum = 0;
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let left = x >= bpp ? pxData[pxPos + x - bpp] : 0;
+-
+-    let up = pxPos > 0 ? pxData[pxPos + x - byteWidth] : 0;
+-
+-    let val = pxData[pxPos + x] - ((left + up) >> 1);
+-
+-
+-    sum += Math.abs(val);
+-
+-  }
+-
+-
+-  return sum;
+-
+-}
+-
+-
+-function filterPaeth(pxData, pxPos, byteWidth, rawData, rawPos, bpp) {
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let left = x >= bpp ? pxData[pxPos + x - bpp] : 0;
+-
+-    let up = pxPos > 0 ? pxData[pxPos + x - byteWidth] : 0;
+-
+-    let upleft =
+-      pxPos > 0 && x >= bpp ? pxData[pxPos + x - (byteWidth + bpp)] : 0;
+-
+-    let val = pxData[pxPos + x] - paethPredictor(left, up, upleft);
+-
+-
+-    rawData[rawPos + x] = val;
+-
+-  }
+-
+-}
+-
+-
+-function filterSumPaeth(pxData, pxPos, byteWidth, bpp) {
+-
+-  let sum = 0;
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let left = x >= bpp ? pxData[pxPos + x - bpp] : 0;
+-
+-    let up = pxPos > 0 ? pxData[pxPos + x - byteWidth] : 0;
+-
+-    let upleft =
+-      pxPos > 0 && x >= bpp ? pxData[pxPos + x - (byteWidth + bpp)] : 0;
+-
+-    let val = pxData[pxPos + x] - paethPredictor(left, up, upleft);
+-
+-
+-    sum += Math.abs(val);
+-
+-  }
+-
+-
+-  return sum;
+-
+-}
+-
+-
+-let filters = {
+-
+-  0: filterNone,
+-  1: filterSub,
+-  2: filterUp,
+-  3: filterAvg,
+-  4: filterPaeth,
+-}
+-;
+-
+-
+-let filterSums = {
+-
+-  0: filterSumNone,
+-  1: filterSumSub,
+-  2: filterSumUp,
+-  3: filterSumAvg,
+-  4: filterSumPaeth,
+-}
+-;
+-
+-
+-module.exports = function (pxData, width, height, options, bpp) {
+-
+-  let filterTypes;
+-
+-  if (!("filterType" in options) || options.filterType === -1) {
+-
+-    filterTypes = [0, 1, 2, 3, 4];
+-
+-  }
+- else if (typeof options.filterType === "number") {
+-
+-    filterTypes = [options.filterType];
+-
+-  }
+- else {
+-
+-    throw new Error("unrecognised filter types");
+-
+-  }
+-
+-
+-  if (options.bitDepth === 16) {
+-
+-    bpp *= 2;
+-
+-  }
+-
+-  let byteWidth = width * bpp;
+-
+-  let rawPos = 0;
+-
+-  let pxPos = 0;
+-
+-  let rawData = Buffer.alloc((byteWidth + 1) * height);
+-
+-
+-  let sel = filterTypes[0];
+-
+-
+-  for (let y = 0;
+- y < height;
+- y++) {
+-
+-    if (filterTypes.length > 1) {
+-
+-      // find best filter for this line (with lowest sum of values)
+-      let min = Infinity;
+-
+-
+-      for (let i = 0;
+- i < filterTypes.length;
+- i++) {
+-
+-        let sum = filterSums[filterTypes[i]](pxData, pxPos, byteWidth, bpp);
+-
+-        if (sum < min) {
+-
+-          sel = filterTypes[i];
+-
+-          min = sum;
+-
+-        }
+-
+-      }
+-
+-    }
+-
+-
+-    rawData[rawPos] = sel;
+-
+-    rawPos++;
+-
+-    filters[sel](pxData, pxPos, byteWidth, rawData, rawPos, bpp);
+-
+-    rawPos += byteWidth;
+-
+-    pxPos += byteWidth;
+-
+-  }
+-
+-  return rawData;
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse-async.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let util = __webpack_require__("util");
+-
+-let ChunkStream = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/chunkstream.js");
+-
+-let Filter = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse.js");
+-
+-
+-let FilterAsync = (module.exports = function (bitmapInfo) {
+-
+-  ChunkStream.call(this);
+-
+-
+-  let buffers = [];
+-
+-  let that = this;
+-
+-  this._filter = new Filter(bitmapInfo, {
+-
+-    read: this.read.bind(this),
+-    write: function (buffer) {
+-
+-      buffers.push(buffer);
+-
+-    }
+-,
+-    complete: function () {
+-
+-      that.emit("complete", Buffer.concat(buffers));
+-
+-    }
+-,
+-  }
+-);
+-
+-
+-  this._filter.start();
+-
+-}
+-);
+-
+-util.inherits(FilterAsync, ChunkStream);
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse-sync.js"
+-(__unused_webpack_module, exports, __webpack_require__) {
+-
+-
+-
+-
+-let SyncReader = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-reader.js");
+-
+-let Filter = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse.js");
+-
+-
+-exports.process = function (inBuffer, bitmapInfo) {
+-
+-  let outBuffers = [];
+-
+-  let reader = new SyncReader(inBuffer);
+-
+-  let filter = new Filter(bitmapInfo, {
+-
+-    read: reader.read.bind(reader),
+-    write: function (bufferPart) {
+-
+-      outBuffers.push(bufferPart);
+-
+-    }
+-,
+-    complete: function () {
+-}
+-,
+-  }
+-);
+-
+-
+-  filter.start();
+-
+-  reader.process();
+-
+-
+-  return Buffer.concat(outBuffers);
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let interlaceUtils = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/interlace.js");
+-
+-let paethPredictor = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/paeth-predictor.js");
+-
+-
+-function getByteWidth(width, bpp, depth) {
+-
+-  let byteWidth = width * bpp;
+-
+-  if (depth !== 8) {
+-
+-    byteWidth = Math.ceil(byteWidth / (8 / depth));
+-
+-  }
+-
+-  return byteWidth;
+-
+-}
+-
+-
+-let Filter = (module.exports = function (bitmapInfo, dependencies) {
+-
+-  let width = bitmapInfo.width;
+-
+-  let height = bitmapInfo.height;
+-
+-  let interlace = bitmapInfo.interlace;
+-
+-  let bpp = bitmapInfo.bpp;
+-
+-  let depth = bitmapInfo.depth;
+-
+-
+-  this.read = dependencies.read;
+-
+-  this.write = dependencies.write;
+-
+-  this.complete = dependencies.complete;
+-
+-
+-  this._imageIndex = 0;
+-
+-  this._images = [];
+-
+-  if (interlace) {
+-
+-    let passes = interlaceUtils.getImagePasses(width, height);
+-
+-    for (let i = 0;
+- i < passes.length;
+- i++) {
+-
+-      this._images.push({
+-
+-        byteWidth: getByteWidth(passes[i].width, bpp, depth),
+-        height: passes[i].height,
+-        lineIndex: 0,
+-      }
+-);
+-
+-    }
+-
+-  }
+- else {
+-
+-    this._images.push({
+-
+-      byteWidth: getByteWidth(width, bpp, depth),
+-      height: height,
+-      lineIndex: 0,
+-    }
+-);
+-
+-  }
+-
+-
+-  // when filtering the line we look at the pixel to the left
+-  // the spec also says it is done on a byte level regardless of the number of pixels
+-  // so if the depth is byte compatible (8 or 16) we subtract the bpp in order to compare back
+-  // a pixel rather than just a different byte part. However if we are sub byte, we ignore.
+-  if (depth === 8) {
+-
+-    this._xComparison = bpp;
+-
+-  }
+- else if (depth === 16) {
+-
+-    this._xComparison = bpp * 2;
+-
+-  }
+- else {
+-
+-    this._xComparison = 1;
+-
+-  }
+-
+-}
+-);
+-
+-
+-Filter.prototype.start = function () {
+-
+-  this.read(
+-    this._images[this._imageIndex].byteWidth + 1,
+-    this._reverseFilterLine.bind(this)
+-  );
+-
+-}
+-;
+-
+-
+-Filter.prototype._unFilterType1 = function (
+-  rawData,
+-  unfilteredLine,
+-  byteWidth
+-) {
+-
+-  let xComparison = this._xComparison;
+-
+-  let xBiggerThan = xComparison - 1;
+-
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let rawByte = rawData[1 + x];
+-
+-    let f1Left = x > xBiggerThan ? unfilteredLine[x - xComparison] : 0;
+-
+-    unfilteredLine[x] = rawByte + f1Left;
+-
+-  }
+-
+-}
+-;
+-
+-
+-Filter.prototype._unFilterType2 = function (
+-  rawData,
+-  unfilteredLine,
+-  byteWidth
+-) {
+-
+-  let lastLine = this._lastLine;
+-
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let rawByte = rawData[1 + x];
+-
+-    let f2Up = lastLine ? lastLine[x] : 0;
+-
+-    unfilteredLine[x] = rawByte + f2Up;
+-
+-  }
+-
+-}
+-;
+-
+-
+-Filter.prototype._unFilterType3 = function (
+-  rawData,
+-  unfilteredLine,
+-  byteWidth
+-) {
+-
+-  let xComparison = this._xComparison;
+-
+-  let xBiggerThan = xComparison - 1;
+-
+-  let lastLine = this._lastLine;
+-
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let rawByte = rawData[1 + x];
+-
+-    let f3Up = lastLine ? lastLine[x] : 0;
+-
+-    let f3Left = x > xBiggerThan ? unfilteredLine[x - xComparison] : 0;
+-
+-    let f3Add = Math.floor((f3Left + f3Up) / 2);
+-
+-    unfilteredLine[x] = rawByte + f3Add;
+-
+-  }
+-
+-}
+-;
+-
+-
+-Filter.prototype._unFilterType4 = function (
+-  rawData,
+-  unfilteredLine,
+-  byteWidth
+-) {
+-
+-  let xComparison = this._xComparison;
+-
+-  let xBiggerThan = xComparison - 1;
+-
+-  let lastLine = this._lastLine;
+-
+-
+-  for (let x = 0;
+- x < byteWidth;
+- x++) {
+-
+-    let rawByte = rawData[1 + x];
+-
+-    let f4Up = lastLine ? lastLine[x] : 0;
+-
+-    let f4Left = x > xBiggerThan ? unfilteredLine[x - xComparison] : 0;
+-
+-    let f4UpLeft = x > xBiggerThan && lastLine ? lastLine[x - xComparison] : 0;
+-
+-    let f4Add = paethPredictor(f4Left, f4Up, f4UpLeft);
+-
+-    unfilteredLine[x] = rawByte + f4Add;
+-
+-  }
+-
+-}
+-;
+-
+-
+-Filter.prototype._reverseFilterLine = function (rawData) {
+-
+-  let filter = rawData[0];
+-
+-  let unfilteredLine;
+-
+-  let currentImage = this._images[this._imageIndex];
+-
+-  let byteWidth = currentImage.byteWidth;
+-
+-
+-  if (filter === 0) {
+-
+-    unfilteredLine = rawData.slice(1, byteWidth + 1);
+-
+-  }
+- else {
+-
+-    unfilteredLine = Buffer.alloc(byteWidth);
+-
+-
+-    switch (filter) {
+-
+-      case 1:
+-        this._unFilterType1(rawData, unfilteredLine, byteWidth);
+-
+-        break;
+-
+-      case 2:
+-        this._unFilterType2(rawData, unfilteredLine, byteWidth);
+-
+-        break;
+-
+-      case 3:
+-        this._unFilterType3(rawData, unfilteredLine, byteWidth);
+-
+-        break;
+-
+-      case 4:
+-        this._unFilterType4(rawData, unfilteredLine, byteWidth);
+-
+-        break;
+-
+-      default:
+-        throw new Error("Unrecognised filter type - " + filter);
+-
+-    }
+-
+-  }
+-
+-
+-  this.write(unfilteredLine);
+-
+-
+-  currentImage.lineIndex++;
+-
+-  if (currentImage.lineIndex >= currentImage.height) {
+-
+-    this._lastLine = null;
+-
+-    this._imageIndex++;
+-
+-    currentImage = this._images[this._imageIndex];
+-
+-  }
+- else {
+-
+-    this._lastLine = unfilteredLine;
+-
+-  }
+-
+-
+-  if (currentImage) {
+-
+-    // read, using the byte width that may be from the new current image
+-    this.read(currentImage.byteWidth + 1, this._reverseFilterLine.bind(this));
+-
+-  }
+- else {
+-
+-    this._lastLine = null;
+-
+-    this.complete();
+-
+-  }
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/format-normaliser.js"
+-(module) {
+-
+-
+-
+-
+-function dePalette(indata, outdata, width, height, palette) {
+-
+-  let pxPos = 0;
+-
+-  // use values from palette
+-  for (let y = 0;
+- y < height;
+- y++) {
+-
+-    for (let x = 0;
+- x < width;
+- x++) {
+-
+-      let color = palette[indata[pxPos]];
+-
+-
+-      if (!color) {
+-
+-        throw new Error("index " + indata[pxPos] + " not in palette");
+-
+-      }
+-
+-
+-      for (let i = 0;
+- i < 4;
+- i++) {
+-
+-        outdata[pxPos + i] = color[i];
+-
+-      }
+-
+-      pxPos += 4;
+-
+-    }
+-
+-  }
+-
+-}
+-
+-
+-function replaceTransparentColor(indata, outdata, width, height, transColor) {
+-
+-  let pxPos = 0;
+-
+-  for (let y = 0;
+- y < height;
+- y++) {
+-
+-    for (let x = 0;
+- x < width;
+- x++) {
+-
+-      let makeTrans = false;
+-
+-
+-      if (transColor.length === 1) {
+-
+-        if (transColor[0] === indata[pxPos]) {
+-
+-          makeTrans = true;
+-
+-        }
+-
+-      }
+- else if (
+-        transColor[0] === indata[pxPos] &&
+-        transColor[1] === indata[pxPos + 1] &&
+-        transColor[2] === indata[pxPos + 2]
+-      ) {
+-
+-        makeTrans = true;
+-
+-      }
+-
+-      if (makeTrans) {
+-
+-        for (let i = 0;
+- i < 4;
+- i++) {
+-
+-          outdata[pxPos + i] = 0;
+-
+-        }
+-
+-      }
+-
+-      pxPos += 4;
+-
+-    }
+-
+-  }
+-
+-}
+-
+-
+-function scaleDepth(indata, outdata, width, height, depth) {
+-
+-  let maxOutSample = 255;
+-
+-  let maxInSample = Math.pow(2, depth) - 1;
+-
+-  let pxPos = 0;
+-
+-
+-  for (let y = 0;
+- y < height;
+- y++) {
+-
+-    for (let x = 0;
+- x < width;
+- x++) {
+-
+-      for (let i = 0;
+- i < 4;
+- i++) {
+-
+-        outdata[pxPos + i] = Math.floor(
+-          (indata[pxPos + i] * maxOutSample) / maxInSample + 0.5
+-        );
+-
+-      }
+-
+-      pxPos += 4;
+-
+-    }
+-
+-  }
+-
+-}
+-
+-
+-module.exports = function (indata, imageData, skipRescale = false) {
+-
+-  let depth = imageData.depth;
+-
+-  let width = imageData.width;
+-
+-  let height = imageData.height;
+-
+-  let colorType = imageData.colorType;
+-
+-  let transColor = imageData.transColor;
+-
+-  let palette = imageData.palette;
+-
+-
+-  let outdata = indata;
+- // only different for 16 bits
+-
+-  if (colorType === 3) {
+-
+-    // paletted
+-    dePalette(indata, outdata, width, height, palette);
+-
+-  }
+- else {
+-
+-    if (transColor) {
+-
+-      replaceTransparentColor(indata, outdata, width, height, transColor);
+-
+-    }
+-
+-    // if it needs scaling
+-    if (depth !== 8 && !skipRescale) {
+-
+-      // if we need to change the buffer size
+-      if (depth === 16) {
+-
+-        outdata = Buffer.alloc(width * height * 4);
+-
+-      }
+-
+-      scaleDepth(indata, outdata, width, height, depth);
+-
+-    }
+-
+-  }
+-
+-  return outdata;
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/interlace.js"
+-(__unused_webpack_module, exports) {
+-
+-
+-
+-
+-// Adam 7
+-//   0 1 2 3 4 5 6 7
+-// 0 x 6 4 6 x 6 4 6
+-// 1 7 7 7 7 7 7 7 7
+-// 2 5 6 5 6 5 6 5 6
+-// 3 7 7 7 7 7 7 7 7
+-// 4 3 6 4 6 3 6 4 6
+-// 5 7 7 7 7 7 7 7 7
+-// 6 5 6 5 6 5 6 5 6
+-// 7 7 7 7 7 7 7 7 7
+-
+-let imagePasses = [
+-  {
+-
+-    // pass 1 - 1px
+-    x: [0],
+-    y: [0],
+-  }
+-,
+-  {
+-
+-    // pass 2 - 1px
+-    x: [4],
+-    y: [0],
+-  }
+-,
+-  {
+-
+-    // pass 3 - 2px
+-    x: [0, 4],
+-    y: [4],
+-  }
+-,
+-  {
+-
+-    // pass 4 - 4px
+-    x: [2, 6],
+-    y: [0, 4],
+-  }
+-,
+-  {
+-
+-    // pass 5 - 8px
+-    x: [0, 2, 4, 6],
+-    y: [2, 6],
+-  }
+-,
+-  {
+-
+-    // pass 6 - 16px
+-    x: [1, 3, 5, 7],
+-    y: [0, 2, 4, 6],
+-  }
+-,
+-  {
+-
+-    // pass 7 - 32px
+-    x: [0, 1, 2, 3, 4, 5, 6, 7],
+-    y: [1, 3, 5, 7],
+-  }
+-,
+-];
+-
+-
+-exports.getImagePasses = function (width, height) {
+-
+-  let images = [];
+-
+-  let xLeftOver = width % 8;
+-
+-  let yLeftOver = height % 8;
+-
+-  let xRepeats = (width - xLeftOver) / 8;
+-
+-  let yRepeats = (height - yLeftOver) / 8;
+-
+-  for (let i = 0;
+- i < imagePasses.length;
+- i++) {
+-
+-    let pass = imagePasses[i];
+-
+-    let passWidth = xRepeats * pass.x.length;
+-
+-    let passHeight = yRepeats * pass.y.length;
+-
+-    for (let j = 0;
+- j < pass.x.length;
+- j++) {
+-
+-      if (pass.x[j] < xLeftOver) {
+-
+-        passWidth++;
+-
+-      }
+- else {
+-
+-        break;
+-
+-      }
+-
+-    }
+-
+-    for (let j = 0;
+- j < pass.y.length;
+- j++) {
+-
+-      if (pass.y[j] < yLeftOver) {
+-
+-        passHeight++;
+-
+-      }
+- else {
+-
+-        break;
+-
+-      }
+-
+-    }
+-
+-    if (passWidth > 0 && passHeight > 0) {
+-
+-      images.push({
+- width: passWidth, height: passHeight, index: i }
+-);
+-
+-    }
+-
+-  }
+-
+-  return images;
+-
+-}
+-;
+-
+-
+-exports.getInterlaceIterator = function (width) {
+-
+-  return function (x, y, pass) {
+-
+-    let outerXLeftOver = x % imagePasses[pass].x.length;
+-
+-    let outerX =
+-      ((x - outerXLeftOver) / imagePasses[pass].x.length) * 8 +
+-      imagePasses[pass].x[outerXLeftOver];
+-
+-    let outerYLeftOver = y % imagePasses[pass].y.length;
+-
+-    let outerY =
+-      ((y - outerYLeftOver) / imagePasses[pass].y.length) * 8 +
+-      imagePasses[pass].y[outerYLeftOver];
+-
+-    return outerX * 4 + outerY * width * 4;
+-
+-  }
+-;
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer-async.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let util = __webpack_require__("util");
+-
+-let Stream = __webpack_require__("stream");
+-
+-let constants = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js");
+-
+-let Packer = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer.js");
+-
+-
+-let PackerAsync = (module.exports = function (opt) {
+-
+-  Stream.call(this);
+-
+-
+-  let options = opt || {
+-}
+-;
+-
+-
+-  this._packer = new Packer(options);
+-
+-  this._deflate = this._packer.createDeflate();
+-
+-
+-  this.readable = true;
+-
+-}
+-);
+-
+-util.inherits(PackerAsync, Stream);
+-
+-
+-PackerAsync.prototype.pack = function (data, width, height, gamma) {
+-
+-  // Signature
+-  this.emit("data", Buffer.from(constants.PNG_SIGNATURE));
+-
+-  this.emit("data", this._packer.packIHDR(width, height));
+-
+-
+-  if (gamma) {
+-
+-    this.emit("data", this._packer.packGAMA(gamma));
+-
+-  }
+-
+-
+-  let filteredData = this._packer.filterData(data, width, height);
+-
+-
+-  // compress it
+-  this._deflate.on("error", this.emit.bind(this, "error"));
+-
+-
+-  this._deflate.on(
+-    "data",
+-    function (compressedData) {
+-
+-      this.emit("data", this._packer.packIDAT(compressedData));
+-
+-    }
+-.bind(this)
+-  );
+-
+-
+-  this._deflate.on(
+-    "end",
+-    function () {
+-
+-      this.emit("data", this._packer.packIEND());
+-
+-      this.emit("end");
+-
+-    }
+-.bind(this)
+-  );
+-
+-
+-  this._deflate.end(filteredData);
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer-sync.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let hasSyncZlib = true;
+-
+-let zlib = __webpack_require__("zlib");
+-
+-if (!zlib.deflateSync) {
+-
+-  hasSyncZlib = false;
+-
+-}
+-
+-let constants = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js");
+-
+-let Packer = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer.js");
+-
+-
+-module.exports = function (metaData, opt) {
+-
+-  if (!hasSyncZlib) {
+-
+-    throw new Error(
+-      "To use the sync capability of this library in old node versions, please pin pngjs to v2.3.0"
+-    );
+-
+-  }
+-
+-
+-  let options = opt || {
+-}
+-;
+-
+-
+-  let packer = new Packer(options);
+-
+-
+-  let chunks = [];
+-
+-
+-  // Signature
+-  chunks.push(Buffer.from(constants.PNG_SIGNATURE));
+-
+-
+-  // Header
+-  chunks.push(packer.packIHDR(metaData.width, metaData.height));
+-
+-
+-  if (metaData.gamma) {
+-
+-    chunks.push(packer.packGAMA(metaData.gamma));
+-
+-  }
+-
+-
+-  let filteredData = packer.filterData(
+-    metaData.data,
+-    metaData.width,
+-    metaData.height
+-  );
+-
+-
+-  // compress it
+-  let compressedData = zlib.deflateSync(
+-    filteredData,
+-    packer.getDeflateOptions()
+-  );
+-
+-  filteredData = null;
+-
+-
+-  if (!compressedData || !compressedData.length) {
+-
+-    throw new Error("bad png - invalid compressed data response");
+-
+-  }
+-
+-  chunks.push(packer.packIDAT(compressedData));
+-
+-
+-  // End
+-  chunks.push(packer.packIEND());
+-
+-
+-  return Buffer.concat(chunks);
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let constants = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js");
+-
+-let CrcStream = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/crc.js");
+-
+-let bitPacker = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitpacker.js");
+-
+-let filter = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-pack.js");
+-
+-let zlib = __webpack_require__("zlib");
+-
+-
+-let Packer = (module.exports = function (options) {
+-
+-  this._options = options;
+-
+-
+-  options.deflateChunkSize = options.deflateChunkSize || 32 * 1024;
+-
+-  options.deflateLevel =
+-    options.deflateLevel != null ? options.deflateLevel : 9;
+-
+-  options.deflateStrategy =
+-    options.deflateStrategy != null ? options.deflateStrategy : 3;
+-
+-  options.inputHasAlpha =
+-    options.inputHasAlpha != null ? options.inputHasAlpha : true;
+-
+-  options.deflateFactory = options.deflateFactory || zlib.createDeflate;
+-
+-  options.bitDepth = options.bitDepth || 8;
+-
+-  // This is outputColorType
+-  options.colorType =
+-    typeof options.colorType === "number"
+-      ? options.colorType
+-      : constants.COLORTYPE_COLOR_ALPHA;
+-
+-  options.inputColorType =
+-    typeof options.inputColorType === "number"
+-      ? options.inputColorType
+-      : constants.COLORTYPE_COLOR_ALPHA;
+-
+-
+-  if (
+-    [
+-      constants.COLORTYPE_GRAYSCALE,
+-      constants.COLORTYPE_COLOR,
+-      constants.COLORTYPE_COLOR_ALPHA,
+-      constants.COLORTYPE_ALPHA,
+-    ].indexOf(options.colorType) === -1
+-  ) {
+-
+-    throw new Error(
+-      "option color type:" + options.colorType + " is not supported at present"
+-    );
+-
+-  }
+-
+-  if (
+-    [
+-      constants.COLORTYPE_GRAYSCALE,
+-      constants.COLORTYPE_COLOR,
+-      constants.COLORTYPE_COLOR_ALPHA,
+-      constants.COLORTYPE_ALPHA,
+-    ].indexOf(options.inputColorType) === -1
+-  ) {
+-
+-    throw new Error(
+-      "option input color type:" +
+-        options.inputColorType +
+-        " is not supported at present"
+-    );
+-
+-  }
+-
+-  if (options.bitDepth !== 8 && options.bitDepth !== 16) {
+-
+-    throw new Error(
+-      "option bit depth:" + options.bitDepth + " is not supported at present"
+-    );
+-
+-  }
+-
+-}
+-);
+-
+-
+-Packer.prototype.getDeflateOptions = function () {
+-
+-  return {
+-
+-    chunkSize: this._options.deflateChunkSize,
+-    level: this._options.deflateLevel,
+-    strategy: this._options.deflateStrategy,
+-  }
+-;
+-
+-}
+-;
+-
+-
+-Packer.prototype.createDeflate = function () {
+-
+-  return this._options.deflateFactory(this.getDeflateOptions());
+-
+-}
+-;
+-
+-
+-Packer.prototype.filterData = function (data, width, height) {
+-
+-  // convert to correct format for filtering (e.g. right bpp and bit depth)
+-  let packedData = bitPacker(data, width, height, this._options);
+-
+-
+-  // filter pixel data
+-  let bpp = constants.COLORTYPE_TO_BPP_MAP[this._options.colorType];
+-
+-  let filteredData = filter(packedData, width, height, this._options, bpp);
+-
+-  return filteredData;
+-
+-}
+-;
+-
+-
+-Packer.prototype._packChunk = function (type, data) {
+-
+-  let len = data ? data.length : 0;
+-
+-  let buf = Buffer.alloc(len + 12);
+-
+-
+-  buf.writeUInt32BE(len, 0);
+-
+-  buf.writeUInt32BE(type, 4);
+-
+-
+-  if (data) {
+-
+-    data.copy(buf, 8);
+-
+-  }
+-
+-
+-  buf.writeInt32BE(
+-    CrcStream.crc32(buf.slice(4, buf.length - 4)),
+-    buf.length - 4
+-  );
+-
+-  return buf;
+-
+-}
+-;
+-
+-
+-Packer.prototype.packGAMA = function (gamma) {
+-
+-  let buf = Buffer.alloc(4);
+-
+-  buf.writeUInt32BE(Math.floor(gamma * constants.GAMMA_DIVISION), 0);
+-
+-  return this._packChunk(constants.TYPE_gAMA, buf);
+-
+-}
+-;
+-
+-
+-Packer.prototype.packIHDR = function (width, height) {
+-
+-  let buf = Buffer.alloc(13);
+-
+-  buf.writeUInt32BE(width, 0);
+-
+-  buf.writeUInt32BE(height, 4);
+-
+-  buf[8] = this._options.bitDepth;
+- // Bit depth
+-  buf[9] = this._options.colorType;
+- // colorType
+-  buf[10] = 0;
+- // compression
+-  buf[11] = 0;
+- // filter
+-  buf[12] = 0;
+- // interlace
+-
+-  return this._packChunk(constants.TYPE_IHDR, buf);
+-
+-}
+-;
+-
+-
+-Packer.prototype.packIDAT = function (data) {
+-
+-  return this._packChunk(constants.TYPE_IDAT, data);
+-
+-}
+-;
+-
+-
+-Packer.prototype.packIEND = function () {
+-
+-  return this._packChunk(constants.TYPE_IEND, null);
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/paeth-predictor.js"
+-(module) {
+-
+-
+-
+-
+-module.exports = function paethPredictor(left, above, upLeft) {
+-
+-  let paeth = left + above - upLeft;
+-
+-  let pLeft = Math.abs(paeth - left);
+-
+-  let pAbove = Math.abs(paeth - above);
+-
+-  let pUpLeft = Math.abs(paeth - upLeft);
+-
+-
+-  if (pLeft <= pAbove && pLeft <= pUpLeft) {
+-
+-    return left;
+-
+-  }
+-
+-  if (pAbove <= pUpLeft) {
+-
+-    return above;
+-
+-  }
+-
+-  return upLeft;
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser-async.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let util = __webpack_require__("util");
+-
+-let zlib = __webpack_require__("zlib");
+-
+-let ChunkStream = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/chunkstream.js");
+-
+-let FilterAsync = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse-async.js");
+-
+-let Parser = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser.js");
+-
+-let bitmapper = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitmapper.js");
+-
+-let formatNormaliser = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/format-normaliser.js");
+-
+-
+-let ParserAsync = (module.exports = function (options) {
+-
+-  ChunkStream.call(this);
+-
+-
+-  this._parser = new Parser(options, {
+-
+-    read: this.read.bind(this),
+-    error: this._handleError.bind(this),
+-    metadata: this._handleMetaData.bind(this),
+-    gamma: this.emit.bind(this, "gamma"),
+-    palette: this._handlePalette.bind(this),
+-    transColor: this._handleTransColor.bind(this),
+-    finished: this._finished.bind(this),
+-    inflateData: this._inflateData.bind(this),
+-    simpleTransparency: this._simpleTransparency.bind(this),
+-    headersFinished: this._headersFinished.bind(this),
+-  }
+-);
+-
+-  this._options = options;
+-
+-  this.writable = true;
+-
+-
+-  this._parser.start();
+-
+-}
+-);
+-
+-util.inherits(ParserAsync, ChunkStream);
+-
+-
+-ParserAsync.prototype._handleError = function (err) {
+-
+-  this.emit("error", err);
+-
+-
+-  this.writable = false;
+-
+-
+-  this.destroy();
+-
+-
+-  if (this._inflate && this._inflate.destroy) {
+-
+-    this._inflate.destroy();
+-
+-  }
+-
+-
+-  if (this._filter) {
+-
+-    this._filter.destroy();
+-
+-    // For backward compatibility with Node 7 and below.
+-    // Suppress errors due to _inflate calling write() even after
+-    // it's destroy()'ed.
+-    this._filter.on("error", function () {
+-}
+-);
+-
+-  }
+-
+-
+-  this.errord = true;
+-
+-}
+-;
+-
+-
+-ParserAsync.prototype._inflateData = function (data) {
+-
+-  if (!this._inflate) {
+-
+-    if (this._bitmapInfo.interlace) {
+-
+-      this._inflate = zlib.createInflate();
+-
+-
+-      this._inflate.on("error", this.emit.bind(this, "error"));
+-
+-      this._filter.on("complete", this._complete.bind(this));
+-
+-
+-      this._inflate.pipe(this._filter);
+-
+-    }
+- else {
+-
+-      let rowSize =
+-        ((this._bitmapInfo.width *
+-          this._bitmapInfo.bpp *
+-          this._bitmapInfo.depth +
+-          7) >>
+-          3) +
+-        1;
+-
+-      let imageSize = rowSize * this._bitmapInfo.height;
+-
+-      let chunkSize = Math.max(imageSize, zlib.Z_MIN_CHUNK);
+-
+-
+-      this._inflate = zlib.createInflate({
+- chunkSize: chunkSize }
+-);
+-
+-      let leftToInflate = imageSize;
+-
+-
+-      let emitError = this.emit.bind(this, "error");
+-
+-      this._inflate.on("error", function (err) {
+-
+-        if (!leftToInflate) {
+-
+-          return;
+-
+-        }
+-
+-
+-        emitError(err);
+-
+-      }
+-);
+-
+-      this._filter.on("complete", this._complete.bind(this));
+-
+-
+-      let filterWrite = this._filter.write.bind(this._filter);
+-
+-      this._inflate.on("data", function (chunk) {
+-
+-        if (!leftToInflate) {
+-
+-          return;
+-
+-        }
+-
+-
+-        if (chunk.length > leftToInflate) {
+-
+-          chunk = chunk.slice(0, leftToInflate);
+-
+-        }
+-
+-
+-        leftToInflate -= chunk.length;
+-
+-
+-        filterWrite(chunk);
+-
+-      }
+-);
+-
+-
+-      this._inflate.on("end", this._filter.end.bind(this._filter));
+-
+-    }
+-
+-  }
+-
+-  this._inflate.write(data);
+-
+-}
+-;
+-
+-
+-ParserAsync.prototype._handleMetaData = function (metaData) {
+-
+-  this._metaData = metaData;
+-
+-  this._bitmapInfo = Object.create(metaData);
+-
+-
+-  this._filter = new FilterAsync(this._bitmapInfo);
+-
+-}
+-;
+-
+-
+-ParserAsync.prototype._handleTransColor = function (transColor) {
+-
+-  this._bitmapInfo.transColor = transColor;
+-
+-}
+-;
+-
+-
+-ParserAsync.prototype._handlePalette = function (palette) {
+-
+-  this._bitmapInfo.palette = palette;
+-
+-}
+-;
+-
+-
+-ParserAsync.prototype._simpleTransparency = function () {
+-
+-  this._metaData.alpha = true;
+-
+-}
+-;
+-
+-
+-ParserAsync.prototype._headersFinished = function () {
+-
+-  // Up until this point, we don't know if we have a tRNS chunk (alpha)
+-  // so we can't emit metadata any earlier
+-  this.emit("metadata", this._metaData);
+-
+-}
+-;
+-
+-
+-ParserAsync.prototype._finished = function () {
+-
+-  if (this.errord) {
+-
+-    return;
+-
+-  }
+-
+-
+-  if (!this._inflate) {
+-
+-    this.emit("error", "No Inflate block");
+-
+-  }
+- else {
+-
+-    // no more data to inflate
+-    this._inflate.end();
+-
+-  }
+-
+-}
+-;
+-
+-
+-ParserAsync.prototype._complete = function (filteredData) {
+-
+-  if (this.errord) {
+-
+-    return;
+-
+-  }
+-
+-
+-  let normalisedBitmapData;
+-
+-
+-  try {
+-
+-    let bitmapData = bitmapper.dataToBitMap(filteredData, this._bitmapInfo);
+-
+-
+-    normalisedBitmapData = formatNormaliser(
+-      bitmapData,
+-      this._bitmapInfo,
+-      this._options.skipRescale
+-    );
+-
+-    bitmapData = null;
+-
+-  }
+- catch (ex) {
+-
+-    this._handleError(ex);
+-
+-    return;
+-
+-  }
+-
+-
+-  this.emit("parsed", normalisedBitmapData);
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser-sync.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let hasSyncZlib = true;
+-
+-let zlib = __webpack_require__("zlib");
+-
+-let inflateSync = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-inflate.js");
+-
+-if (!zlib.deflateSync) {
+-
+-  hasSyncZlib = false;
+-
+-}
+-
+-let SyncReader = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-reader.js");
+-
+-let FilterSync = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/filter-parse-sync.js");
+-
+-let Parser = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser.js");
+-
+-let bitmapper = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/bitmapper.js");
+-
+-let formatNormaliser = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/format-normaliser.js");
+-
+-
+-module.exports = function (buffer, options) {
+-
+-  if (!hasSyncZlib) {
+-
+-    throw new Error(
+-      "To use the sync capability of this library in old node versions, please pin pngjs to v2.3.0"
+-    );
+-
+-  }
+-
+-
+-  let err;
+-
+-  function handleError(_err_) {
+-
+-    err = _err_;
+-
+-  }
+-
+-
+-  let metaData;
+-
+-  function handleMetaData(_metaData_) {
+-
+-    metaData = _metaData_;
+-
+-  }
+-
+-
+-  function handleTransColor(transColor) {
+-
+-    metaData.transColor = transColor;
+-
+-  }
+-
+-
+-  function handlePalette(palette) {
+-
+-    metaData.palette = palette;
+-
+-  }
+-
+-
+-  function handleSimpleTransparency() {
+-
+-    metaData.alpha = true;
+-
+-  }
+-
+-
+-  let gamma;
+-
+-  function handleGamma(_gamma_) {
+-
+-    gamma = _gamma_;
+-
+-  }
+-
+-
+-  let inflateDataList = [];
+-
+-  function handleInflateData(inflatedData) {
+-
+-    inflateDataList.push(inflatedData);
+-
+-  }
+-
+-
+-  let reader = new SyncReader(buffer);
+-
+-
+-  let parser = new Parser(options, {
+-
+-    read: reader.read.bind(reader),
+-    error: handleError,
+-    metadata: handleMetaData,
+-    gamma: handleGamma,
+-    palette: handlePalette,
+-    transColor: handleTransColor,
+-    inflateData: handleInflateData,
+-    simpleTransparency: handleSimpleTransparency,
+-  }
+-);
+-
+-
+-  parser.start();
+-
+-  reader.process();
+-
+-
+-  if (err) {
+-
+-    throw err;
+-
+-  }
+-
+-
+-  //join together the inflate datas
+-  let inflateData = Buffer.concat(inflateDataList);
+-
+-  inflateDataList.length = 0;
+-
+-
+-  let inflatedData;
+-
+-  if (metaData.interlace) {
+-
+-    inflatedData = zlib.inflateSync(inflateData);
+-
+-  }
+- else {
+-
+-    let rowSize =
+-      ((metaData.width * metaData.bpp * metaData.depth + 7) >> 3) + 1;
+-
+-    let imageSize = rowSize * metaData.height;
+-
+-    inflatedData = inflateSync(inflateData, {
+-
+-      chunkSize: imageSize,
+-      maxLength: imageSize,
+-    }
+-);
+-
+-  }
+-
+-  inflateData = null;
+-
+-
+-  if (!inflatedData || !inflatedData.length) {
+-
+-    throw new Error("bad png - invalid inflate data response");
+-
+-  }
+-
+-
+-  let unfilteredData = FilterSync.process(inflatedData, metaData);
+-
+-  inflateData = null;
+-
+-
+-  let bitmapData = bitmapper.dataToBitMap(unfilteredData, metaData);
+-
+-  unfilteredData = null;
+-
+-
+-  let normalisedBitmapData = formatNormaliser(
+-    bitmapData,
+-    metaData,
+-    options.skipRescale
+-  );
+-
+-
+-  metaData.data = normalisedBitmapData;
+-
+-  metaData.gamma = gamma || 0;
+-
+-
+-  return metaData;
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser.js"
+-(module, __unused_webpack_exports, __webpack_require__) {
+-
+-
+-
+-
+-let constants = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/constants.js");
+-
+-let CrcCalculator = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/crc.js");
+-
+-
+-let Parser = (module.exports = function (options, dependencies) {
+-
+-  this._options = options;
+-
+-  options.checkCRC = options.checkCRC !== false;
+-
+-
+-  this._hasIHDR = false;
+-
+-  this._hasIEND = false;
+-
+-  this._emittedHeadersFinished = false;
+-
+-
+-  // input flags/metadata
+-  this._palette = [];
+-
+-  this._colorType = 0;
+-
+-
+-  this._chunks = {
+-}
+-;
+-
+-  this._chunks[constants.TYPE_IHDR] = this._handleIHDR.bind(this);
+-
+-  this._chunks[constants.TYPE_IEND] = this._handleIEND.bind(this);
+-
+-  this._chunks[constants.TYPE_IDAT] = this._handleIDAT.bind(this);
+-
+-  this._chunks[constants.TYPE_PLTE] = this._handlePLTE.bind(this);
+-
+-  this._chunks[constants.TYPE_tRNS] = this._handleTRNS.bind(this);
+-
+-  this._chunks[constants.TYPE_gAMA] = this._handleGAMA.bind(this);
+-
+-
+-  this.read = dependencies.read;
+-
+-  this.error = dependencies.error;
+-
+-  this.metadata = dependencies.metadata;
+-
+-  this.gamma = dependencies.gamma;
+-
+-  this.transColor = dependencies.transColor;
+-
+-  this.palette = dependencies.palette;
+-
+-  this.parsed = dependencies.parsed;
+-
+-  this.inflateData = dependencies.inflateData;
+-
+-  this.finished = dependencies.finished;
+-
+-  this.simpleTransparency = dependencies.simpleTransparency;
+-
+-  this.headersFinished = dependencies.headersFinished || function () {
+-}
+-;
+-
+-}
+-);
+-
+-
+-Parser.prototype.start = function () {
+-
+-  this.read(constants.PNG_SIGNATURE.length, this._parseSignature.bind(this));
+-
+-}
+-;
+-
+-
+-Parser.prototype._parseSignature = function (data) {
+-
+-  let signature = constants.PNG_SIGNATURE;
+-
+-
+-  for (let i = 0;
+- i < signature.length;
+- i++) {
+-
+-    if (data[i] !== signature[i]) {
+-
+-      this.error(new Error("Invalid file signature"));
+-
+-      return;
+-
+-    }
+-
+-  }
+-
+-  this.read(8, this._parseChunkBegin.bind(this));
+-
+-}
+-;
+-
+-
+-Parser.prototype._parseChunkBegin = function (data) {
+-
+-  // chunk content length
+-  let length = data.readUInt32BE(0);
+-
+-
+-  // chunk type
+-  let type = data.readUInt32BE(4);
+-
+-  let name = "";
+-
+-  for (let i = 4;
+- i < 8;
+- i++) {
+-
+-    name += String.fromCharCode(data[i]);
+-
+-  }
+-
+-
+-  //console.log('chunk ', name, length);
+-
+-
+-  // chunk flags
+-  let ancillary = Boolean(data[4] & 0x20);
+- // or critical
+-  //    priv = Boolean(data[5] & 0x20), // or public
+-  //    safeToCopy = Boolean(data[7] & 0x20);
+- // or unsafe
+-
+-  if (!this._hasIHDR && type !== constants.TYPE_IHDR) {
+-
+-    this.error(new Error("Expected IHDR on beggining"));
+-
+-    return;
+-
+-  }
+-
+-
+-  this._crc = new CrcCalculator();
+-
+-  this._crc.write(Buffer.from(name));
+-
+-
+-  if (this._chunks[type]) {
+-
+-    return this._chunks[type](length);
+-
+-  }
+-
+-
+-  if (!ancillary) {
+-
+-    this.error(new Error("Unsupported critical chunk type " + name));
+-
+-    return;
+-
+-  }
+-
+-
+-  this.read(length + 4, this._skipChunk.bind(this));
+-
+-}
+-;
+-
+-
+-Parser.prototype._skipChunk = function (/*data*/) {
+-
+-  this.read(8, this._parseChunkBegin.bind(this));
+-
+-}
+-;
+-
+-
+-Parser.prototype._handleChunkEnd = function () {
+-
+-  this.read(4, this._parseChunkEnd.bind(this));
+-
+-}
+-;
+-
+-
+-Parser.prototype._parseChunkEnd = function (data) {
+-
+-  let fileCrc = data.readInt32BE(0);
+-
+-  let calcCrc = this._crc.crc32();
+-
+-
+-  // check CRC
+-  if (this._options.checkCRC && calcCrc !== fileCrc) {
+-
+-    this.error(new Error("Crc error - " + fileCrc + " - " + calcCrc));
+-
+-    return;
+-
+-  }
+-
+-
+-  if (!this._hasIEND) {
+-
+-    this.read(8, this._parseChunkBegin.bind(this));
+-
+-  }
+-
+-}
+-;
+-
+-
+-Parser.prototype._handleIHDR = function (length) {
+-
+-  this.read(length, this._parseIHDR.bind(this));
+-
+-}
+-;
+-
+-Parser.prototype._parseIHDR = function (data) {
+-
+-  this._crc.write(data);
+-
+-
+-  let width = data.readUInt32BE(0);
+-
+-  let height = data.readUInt32BE(4);
+-
+-  let depth = data[8];
+-
+-  let colorType = data[9];
+- // bits: 1 palette, 2 color, 4 alpha
+-  let compr = data[10];
+-
+-  let filter = data[11];
+-
+-  let interlace = data[12];
+-
+-
+-  // console.log('    width', width, 'height', height,
+-  //     'depth', depth, 'colorType', colorType,
+-  //     'compr', compr, 'filter', filter, 'interlace', interlace
+-  // );
+-
+-
+-  if (
+-    depth !== 8 &&
+-    depth !== 4 &&
+-    depth !== 2 &&
+-    depth !== 1 &&
+-    depth !== 16
+-  ) {
+-
+-    this.error(new Error("Unsupported bit depth " + depth));
+-
+-    return;
+-
+-  }
+-
+-  if (!(colorType in constants.COLORTYPE_TO_BPP_MAP)) {
+-
+-    this.error(new Error("Unsupported color type"));
+-
+-    return;
+-
+-  }
+-
+-  if (compr !== 0) {
+-
+-    this.error(new Error("Unsupported compression method"));
+-
+-    return;
+-
+-  }
+-
+-  if (filter !== 0) {
+-
+-    this.error(new Error("Unsupported filter method"));
+-
+-    return;
+-
+-  }
+-
+-  if (interlace !== 0 && interlace !== 1) {
+-
+-    this.error(new Error("Unsupported interlace method"));
+-
+-    return;
+-
+-  }
+-
+-
+-  this._colorType = colorType;
+-
+-
+-  let bpp = constants.COLORTYPE_TO_BPP_MAP[this._colorType];
+-
+-
+-  this._hasIHDR = true;
+-
+-
+-  this.metadata({
+-
+-    width: width,
+-    height: height,
+-    depth: depth,
+-    interlace: Boolean(interlace),
+-    palette: Boolean(colorType & constants.COLORTYPE_PALETTE),
+-    color: Boolean(colorType & constants.COLORTYPE_COLOR),
+-    alpha: Boolean(colorType & constants.COLORTYPE_ALPHA),
+-    bpp: bpp,
+-    colorType: colorType,
+-  }
+-);
+-
+-
+-  this._handleChunkEnd();
+-
+-}
+-;
+-
+-
+-Parser.prototype._handlePLTE = function (length) {
+-
+-  this.read(length, this._parsePLTE.bind(this));
+-
+-}
+-;
+-
+-Parser.prototype._parsePLTE = function (data) {
+-
+-  this._crc.write(data);
+-
+-
+-  let entries = Math.floor(data.length / 3);
+-
+-  // console.log('Palette:', entries);
+-
+-
+-  for (let i = 0;
+- i < entries;
+- i++) {
+-
+-    this._palette.push([data[i * 3], data[i * 3 + 1], data[i * 3 + 2], 0xff]);
+-
+-  }
+-
+-
+-  this.palette(this._palette);
+-
+-
+-  this._handleChunkEnd();
+-
+-}
+-;
+-
+-
+-Parser.prototype._handleTRNS = function (length) {
+-
+-  this.simpleTransparency();
+-
+-  this.read(length, this._parseTRNS.bind(this));
+-
+-}
+-;
+-
+-Parser.prototype._parseTRNS = function (data) {
+-
+-  this._crc.write(data);
+-
+-
+-  // palette
+-  if (this._colorType === constants.COLORTYPE_PALETTE_COLOR) {
+-
+-    if (this._palette.length === 0) {
+-
+-      this.error(new Error("Transparency chunk must be after palette"));
+-
+-      return;
+-
+-    }
+-
+-    if (data.length > this._palette.length) {
+-
+-      this.error(new Error("More transparent colors than palette size"));
+-
+-      return;
+-
+-    }
+-
+-    for (let i = 0;
+- i < data.length;
+- i++) {
+-
+-      this._palette[i][3] = data[i];
+-
+-    }
+-
+-    this.palette(this._palette);
+-
+-  }
+-
+-
+-  // for colorType 0 (grayscale) and 2 (rgb)
+-  // there might be one gray/color defined as transparent
+-  if (this._colorType === constants.COLORTYPE_GRAYSCALE) {
+-
+-    // grey, 2 bytes
+-    this.transColor([data.readUInt16BE(0)]);
+-
+-  }
+-
+-  if (this._colorType === constants.COLORTYPE_COLOR) {
+-
+-    this.transColor([
+-      data.readUInt16BE(0),
+-      data.readUInt16BE(2),
+-      data.readUInt16BE(4),
+-    ]);
+-
+-  }
+-
+-
+-  this._handleChunkEnd();
+-
+-}
+-;
+-
+-
+-Parser.prototype._handleGAMA = function (length) {
+-
+-  this.read(length, this._parseGAMA.bind(this));
+-
+-}
+-;
+-
+-Parser.prototype._parseGAMA = function (data) {
+-
+-  this._crc.write(data);
+-
+-  this.gamma(data.readUInt32BE(0) / constants.GAMMA_DIVISION);
+-
+-
+-  this._handleChunkEnd();
+-
+-}
+-;
+-
+-
+-Parser.prototype._handleIDAT = function (length) {
+-
+-  if (!this._emittedHeadersFinished) {
+-
+-    this._emittedHeadersFinished = true;
+-
+-    this.headersFinished();
+-
+-  }
+-
+-  this.read(-length, this._parseIDAT.bind(this, length));
+-
+-}
+-;
+-
+-Parser.prototype._parseIDAT = function (length, data) {
+-
+-  this._crc.write(data);
+-
+-
+-  if (
+-    this._colorType === constants.COLORTYPE_PALETTE_COLOR &&
+-    this._palette.length === 0
+-  ) {
+-
+-    throw new Error("Expected palette not found");
+-
+-  }
+-
+-
+-  this.inflateData(data);
+-
+-  let leftOverLength = length - data.length;
+-
+-
+-  if (leftOverLength > 0) {
+-
+-    this._handleIDAT(leftOverLength);
+-
+-  }
+- else {
+-
+-    this._handleChunkEnd();
+-
+-  }
+-
+-}
+-;
+-
+-
+-Parser.prototype._handleIEND = function (length) {
+-
+-  this.read(length, this._parseIEND.bind(this));
+-
+-}
+-;
+-
+-Parser.prototype._parseIEND = function (data) {
+-
+-  this._crc.write(data);
+-
+-
+-  this._hasIEND = true;
+-
+-  this._handleChunkEnd();
+-
+-
+-  if (this.finished) {
+-
+-    this.finished();
+-
+-  }
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/png-sync.js"
+-(__unused_webpack_module, exports, __webpack_require__) {
+-
+-
+-
+-
+-let parse = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser-sync.js");
+-
+-let pack = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer-sync.js");
+-
+-
+-exports.read = function (buffer, options) {
+-
+-  return parse(buffer, options || {
+-}
+-);
+-
+-}
+-;
+-
+-
+-exports.write = function (png, options) {
+-
+-  return pack(png, options);
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/png.js"
+-(__unused_webpack_module, exports, __webpack_require__) {
+-
+-
+-
+-
+-let util = __webpack_require__("util");
+-
+-let Stream = __webpack_require__("stream");
+-
+-let Parser = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/parser-async.js");
+-
+-let Packer = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/packer-async.js");
+-
+-let PNGSync = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/png-sync.js");
+-
+-
+-let PNG = (exports.O = function (options) {
+-
+-  Stream.call(this);
+-
+-
+-  options = options || {
+-}
+-;
+- // eslint-disable-line no-param-reassign
+-
+-  // coerce pixel dimensions to integers (also coerces undefined -> 0):
+-  this.width = options.width | 0;
+-
+-  this.height = options.height | 0;
+-
+-
+-  this.data =
+-    this.width > 0 && this.height > 0
+-      ? Buffer.alloc(4 * this.width * this.height)
+-      : null;
+-
+-
+-  if (options.fill && this.data) {
+-
+-    this.data.fill(0);
+-
+-  }
+-
+-
+-  this.gamma = 0;
+-
+-  this.readable = this.writable = true;
+-
+-
+-  this._parser = new Parser(options);
+-
+-
+-  this._parser.on("error", this.emit.bind(this, "error"));
+-
+-  this._parser.on("close", this._handleClose.bind(this));
+-
+-  this._parser.on("metadata", this._metadata.bind(this));
+-
+-  this._parser.on("gamma", this._gamma.bind(this));
+-
+-  this._parser.on(
+-    "parsed",
+-    function (data) {
+-
+-      this.data = data;
+-
+-      this.emit("parsed", data);
+-
+-    }
+-.bind(this)
+-  );
+-
+-
+-  this._packer = new Packer(options);
+-
+-  this._packer.on("data", this.emit.bind(this, "data"));
+-
+-  this._packer.on("end", this.emit.bind(this, "end"));
+-
+-  this._parser.on("close", this._handleClose.bind(this));
+-
+-  this._packer.on("error", this.emit.bind(this, "error"));
+-
+-}
+-);
+-
+-util.inherits(PNG, Stream);
+-
+-
+-PNG.sync = PNGSync;
+-
+-
+-PNG.prototype.pack = function () {
+-
+-  if (!this.data || !this.data.length) {
+-
+-    this.emit("error", "No data provided");
+-
+-    return this;
+-
+-  }
+-
+-
+-  process.nextTick(
+-    function () {
+-
+-      this._packer.pack(this.data, this.width, this.height, this.gamma);
+-
+-    }
+-.bind(this)
+-  );
+-
+-
+-  return this;
+-
+-}
+-;
+-
+-
+-PNG.prototype.parse = function (data, callback) {
+-
+-  if (callback) {
+-
+-    let onParsed, onError;
+-
+-
+-    onParsed = function (parsedData) {
+-
+-      this.removeListener("error", onError);
+-
+-
+-      this.data = parsedData;
+-
+-      callback(null, this);
+-
+-    }
+-.bind(this);
+-
+-
+-    onError = function (err) {
+-
+-      this.removeListener("parsed", onParsed);
+-
+-
+-      callback(err, null);
+-
+-    }
+-.bind(this);
+-
+-
+-    this.once("parsed", onParsed);
+-
+-    this.once("error", onError);
+-
+-  }
+-
+-
+-  this.end(data);
+-
+-  return this;
+-
+-}
+-;
+-
+-
+-PNG.prototype.write = function (data) {
+-
+-  this._parser.write(data);
+-
+-  return true;
+-
+-}
+-;
+-
+-
+-PNG.prototype.end = function (data) {
+-
+-  this._parser.end(data);
+-
+-}
+-;
+-
+-
+-PNG.prototype._metadata = function (metadata) {
+-
+-  this.width = metadata.width;
+-
+-  this.height = metadata.height;
+-
+-
+-  this.emit("metadata", metadata);
+-
+-}
+-;
+-
+-
+-PNG.prototype._gamma = function (gamma) {
+-
+-  this.gamma = gamma;
+-
+-}
+-;
+-
+-
+-PNG.prototype._handleClose = function () {
+-
+-  if (!this._parser.writable && !this._packer.readable) {
+-
+-    this.emit("close");
+-
+-  }
+-
+-}
+-;
+-
+-
+-PNG.bitblt = function (src, dst, srcX, srcY, width, height, deltaX, deltaY) {
+-
+-  // eslint-disable-line max-params
+-  // coerce pixel dimensions to integers (also coerces undefined -> 0):
+-  /* eslint-disable no-param-reassign */
+-  srcX |= 0;
+-
+-  srcY |= 0;
+-
+-  width |= 0;
+-
+-  height |= 0;
+-
+-  deltaX |= 0;
+-
+-  deltaY |= 0;
+-
+-  /* eslint-enable no-param-reassign */
+-
+-  if (
+-    srcX > src.width ||
+-    srcY > src.height ||
+-    srcX + width > src.width ||
+-    srcY + height > src.height
+-  ) {
+-
+-    throw new Error("bitblt reading outside image");
+-
+-  }
+-
+-
+-  if (
+-    deltaX > dst.width ||
+-    deltaY > dst.height ||
+-    deltaX + width > dst.width ||
+-    deltaY + height > dst.height
+-  ) {
+-
+-    throw new Error("bitblt writing outside image");
+-
+-  }
+-
+-
+-  for (let y = 0;
+- y < height;
+- y++) {
+-
+-    src.data.copy(
+-      dst.data,
+-      ((deltaY + y) * dst.width + deltaX) << 2,
+-      ((srcY + y) * src.width + srcX) << 2,
+-      ((srcY + y) * src.width + srcX + width) << 2
+-    );
+-
+-  }
+-
+-}
+-;
+-
+-
+-PNG.prototype.bitblt = function (
+-  dst,
+-  srcX,
+-  srcY,
+-  width,
+-  height,
+-  deltaX,
+-  deltaY
+-) {
+-
+-  // eslint-disable-line max-params
+-
+-  PNG.bitblt(this, dst, srcX, srcY, width, height, deltaX, deltaY);
+-
+-  return this;
+-
+-}
+-;
+-
+-
+-PNG.adjustGamma = function (src) {
+-
+-  if (src.gamma) {
+-
+-    for (let y = 0;
+- y < src.height;
+- y++) {
+-
+-      for (let x = 0;
+- x < src.width;
+- x++) {
+-
+-        let idx = (src.width * y + x) << 2;
+-
+-
+-        for (let i = 0;
+- i < 3;
+- i++) {
+-
+-          let sample = src.data[idx + i] / 255;
+-
+-          sample = Math.pow(sample, 1 / 2.2 / src.gamma);
+-
+-          src.data[idx + i] = Math.round(sample * 255);
+-
+-        }
+-
+-      }
+-
+-    }
+-
+-    src.gamma = 0;
+-
+-  }
+-
+-}
+-;
+-
+-
+-PNG.prototype.adjustGamma = function () {
+-
+-  PNG.adjustGamma(this);
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-inflate.js"
+-(module, exports, __webpack_require__) {
+-
+-
+-
+-
+-let assert = (__webpack_require__("assert").ok);
+-
+-let zlib = __webpack_require__("zlib");
+-
+-let util = __webpack_require__("util");
+-
+-
+-let kMaxLength = (__webpack_require__("buffer").kMaxLength);
+-
+-
+-function Inflate(opts) {
+-
+-  if (!(this instanceof Inflate)) {
+-
+-    return new Inflate(opts);
+-
+-  }
+-
+-
+-  if (opts && opts.chunkSize < zlib.Z_MIN_CHUNK) {
+-
+-    opts.chunkSize = zlib.Z_MIN_CHUNK;
+-
+-  }
+-
+-
+-  zlib.Inflate.call(this, opts);
+-
+-
+-  // Node 8 --> 9 compatibility check
+-  this._offset = this._offset === undefined ? this._outOffset : this._offset;
+-
+-  this._buffer = this._buffer || this._outBuffer;
+-
+-
+-  if (opts && opts.maxLength != null) {
+-
+-    this._maxLength = opts.maxLength;
+-
+-  }
+-
+-}
+-
+-
+-function createInflate(opts) {
+-
+-  return new Inflate(opts);
+-
+-}
+-
+-
+-function _close(engine, callback) {
+-
+-  if (callback) {
+-
+-    process.nextTick(callback);
+-
+-  }
+-
+-
+-  // Caller may invoke .close after a zlib error (which will null _handle).
+-  if (!engine._handle) {
+-
+-    return;
+-
+-  }
+-
+-
+-  engine._handle.close();
+-
+-  engine._handle = null;
+-
+-}
+-
+-
+-Inflate.prototype._processChunk = function (chunk, flushFlag, asyncCb) {
+-
+-  if (typeof asyncCb === "function") {
+-
+-    return zlib.Inflate._processChunk.call(this, chunk, flushFlag, asyncCb);
+-
+-  }
+-
+-
+-  let self = this;
+-
+-
+-  let availInBefore = chunk && chunk.length;
+-
+-  let availOutBefore = this._chunkSize - this._offset;
+-
+-  let leftToInflate = this._maxLength;
+-
+-  let inOff = 0;
+-
+-
+-  let buffers = [];
+-
+-  let nread = 0;
+-
+-
+-  let error;
+-
+-  this.on("error", function (err) {
+-
+-    error = err;
+-
+-  }
+-);
+-
+-
+-  function handleChunk(availInAfter, availOutAfter) {
+-
+-    if (self._hadError) {
+-
+-      return;
+-
+-    }
+-
+-
+-    let have = availOutBefore - availOutAfter;
+-
+-    assert(have >= 0, "have should not go down");
+-
+-
+-    if (have > 0) {
+-
+-      let out = self._buffer.slice(self._offset, self._offset + have);
+-
+-      self._offset += have;
+-
+-
+-      if (out.length > leftToInflate) {
+-
+-        out = out.slice(0, leftToInflate);
+-
+-      }
+-
+-
+-      buffers.push(out);
+-
+-      nread += out.length;
+-
+-      leftToInflate -= out.length;
+-
+-
+-      if (leftToInflate === 0) {
+-
+-        return false;
+-
+-      }
+-
+-    }
+-
+-
+-    if (availOutAfter === 0 || self._offset >= self._chunkSize) {
+-
+-      availOutBefore = self._chunkSize;
+-
+-      self._offset = 0;
+-
+-      self._buffer = Buffer.allocUnsafe(self._chunkSize);
+-
+-    }
+-
+-
+-    if (availOutAfter === 0) {
+-
+-      inOff += availInBefore - availInAfter;
+-
+-      availInBefore = availInAfter;
+-
+-
+-      return true;
+-
+-    }
+-
+-
+-    return false;
+-
+-  }
+-
+-
+-  assert(this._handle, "zlib binding closed");
+-
+-  let res;
+-
+-  do {
+-
+-    res = this._handle.writeSync(
+-      flushFlag,
+-      chunk, // in
+-      inOff, // in_off
+-      availInBefore, // in_len
+-      this._buffer, // out
+-      this._offset, //out_off
+-      availOutBefore
+-    );
+- // out_len
+-    // Node 8 --> 9 compatibility check
+-    res = res || this._writeState;
+-
+-  }
+- while (!this._hadError && handleChunk(res[0], res[1]));
+-
+-
+-  if (this._hadError) {
+-
+-    throw error;
+-
+-  }
+-
+-
+-  if (nread >= kMaxLength) {
+-
+-    _close(this);
+-
+-    throw new RangeError(
+-      "Cannot create final Buffer. It would be larger than 0x" +
+-        kMaxLength.toString(16) +
+-        " bytes"
+-    );
+-
+-  }
+-
+-
+-  let buf = Buffer.concat(buffers, nread);
+-
+-  _close(this);
+-
+-
+-  return buf;
+-
+-}
+-;
+-
+-
+-util.inherits(Inflate, zlib.Inflate);
+-
+-
+-function zlibBufferSync(engine, buffer) {
+-
+-  if (typeof buffer === "string") {
+-
+-    buffer = Buffer.from(buffer);
+-
+-  }
+-
+-  if (!(buffer instanceof Buffer)) {
+-
+-    throw new TypeError("Not a string or buffer");
+-
+-  }
+-
+-
+-  let flushFlag = engine._finishFlushFlag;
+-
+-  if (flushFlag == null) {
+-
+-    flushFlag = zlib.Z_FINISH;
+-
+-  }
+-
+-
+-  return engine._processChunk(buffer, flushFlag);
+-
+-}
+-
+-
+-function inflateSync(buffer, opts) {
+-
+-  return zlibBufferSync(new Inflate(opts), buffer);
+-
+-}
+-
+-
+-module.exports = exports = inflateSync;
+-
+-exports.Inflate = Inflate;
+-
+-exports.createInflate = createInflate;
+-
+-exports.inflateSync = inflateSync;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/sync-reader.js"
+-(module) {
+-
+-
+-
+-
+-let SyncReader = (module.exports = function (buffer) {
+-
+-  this._buffer = buffer;
+-
+-  this._reads = [];
+-
+-}
+-);
+-
+-
+-SyncReader.prototype.read = function (length, callback) {
+-
+-  this._reads.push({
+-
+-    length: Math.abs(length), // if length < 0 then at most this length
+-    allowLess: length < 0,
+-    func: callback,
+-  }
+-);
+-
+-}
+-;
+-
+-
+-SyncReader.prototype.process = function () {
+-
+-  // as long as there is any data and read requests
+-  while (this._reads.length > 0 && this._buffer.length) {
+-
+-    let read = this._reads[0];
+-
+-
+-    if (
+-      this._buffer.length &&
+-      (this._buffer.length >= read.length || read.allowLess)
+-    ) {
+-
+-      // ok there is any data so that we can satisfy this request
+-      this._reads.shift();
+- // == read
+-
+-      let buf = this._buffer;
+-
+-
+-      this._buffer = buf.slice(read.length);
+-
+-
+-      read.func.call(this, buf.slice(0, read.length));
+-
+-    }
+- else {
+-
+-      break;
+-
+-    }
+-
+-  }
+-
+-
+-  if (this._reads.length > 0) {
+-
+-    throw new Error("There are some read requests waitng on finished stream");
+-
+-  }
+-
+-
+-  if (this._buffer.length > 0) {
+-
+-    throw new Error("unrecognised content at end of stream");
+-
+-  }
+-
+-}
+-;
+-
+-
+-
+-/***/ }
+-,
+-
+-/***/ "../../node_modules/.pnpm/@jimp+js-png@1.6.0/node_modules/@jimp/js-png/dist/esm/index.js"
+-(__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) {
+-
+-
+-// ESM COMPAT FLAG
+-__webpack_require__.r(__webpack_exports__);
+-
+-
+-// EXPORTS
+-__webpack_require__.d(__webpack_exports__, {
+-
+-  PNGColorType: () => (/* reexport */ PNGColorType),
+-  PNGFilterType: () => (/* reexport */ PNGFilterType),
+-  "default": () => (/* binding */ png)
+-}
+-);
+-
+-
+-// EXTERNAL MODULE: ../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/png.js
+-var lib_png = __webpack_require__("../../node_modules/.pnpm/pngjs@7.0.0/node_modules/pngjs/lib/png.js");
+-
+-;
+-// ../../node_modules/.pnpm/@jimp+js-png@1.6.0/node_modules/@jimp/js-png/dist/esm/constants.js
+-/**
+- * Filter method is a single-byte integer that indicates the preprocessing method applied to the image data before compression.
+- */
+-var PNGFilterType;
+-
+-(function (PNGFilterType) {
+-
+-    PNGFilterType[PNGFilterType["AUTO"] = -1] = "AUTO";
+-
+-    /** scanline is transmitted unmodified */
+-    PNGFilterType[PNGFilterType["NONE"] = 0] = "NONE";
+-
+-    /** filter transmits the difference between each byte and the value of the corresponding byte of the prior pixel */
+-    PNGFilterType[PNGFilterType["SUB"] = 1] = "SUB";
+-
+-    /** The Up() filter is just like the Sub() filter except that the pixel immediately above the current pixel, rather than just to its left, is used as the predictor. */
+-    PNGFilterType[PNGFilterType["UP"] = 2] = "UP";
+-
+-    /** uses the average of the two neighboring pixels (left and above) to predict the value of a pixel */
+-    PNGFilterType[PNGFilterType["AVERAGE"] = 3] = "AVERAGE";
+-
+-    /** computes a simple linear function of the three neighboring pixels (left, above, upper left), then chooses as predictor the neighboring pixel closest to the computed value. */
+-    PNGFilterType[PNGFilterType["PATH"] = 4] = "PATH";
+-
+-}
+-)(PNGFilterType || (PNGFilterType = {
+-}
+-));
+-
+-/**
+- * Color type is a single-byte integer that describes the interpretation of the image data.
+- * Color type codes represent sums of the following values:
+- *
+- * 1 (palette used), 2 (color used), and 4 (alpha channel used).
+- */
+-var PNGColorType;
+-
+-(function (PNGColorType) {
+-
+-    PNGColorType[PNGColorType["GRAYSCALE"] = 0] = "GRAYSCALE";
+-
+-    PNGColorType[PNGColorType["COLOR"] = 2] = "COLOR";
+-
+-    PNGColorType[PNGColorType["GRAYSCALE_ALPHA"] = 4] = "GRAYSCALE_ALPHA";
+-
+-    PNGColorType[PNGColorType["COLOR_ALPHA"] = 6] = "COLOR_ALPHA";
+-
+-}
+-)(PNGColorType || (PNGColorType = {
+-}
+-));
+-
+-//# sourceMappingURL=constants.js.map
+-;
+-// ../../node_modules/.pnpm/@jimp+js-png@1.6.0/node_modules/@jimp/js-png/dist/esm/index.js
+-
+-
+-
+-function png() {
+-
+-    return {
+-
+-        mime: "image/png",
+-        hasAlpha: true,
+-        encode: (bitmap, {
+- deflateLevel = 9, deflateStrategy = 3, filterType = PNGFilterType.AUTO, colorType, inputHasAlpha = true, ...options }
+- = {
+-}
+-) => {
+-
+-            const png = new lib_png/* PNG */.O({
+-
+-                width: bitmap.width,
+-                height: bitmap.height,
+-            }
+-);
+-
+-            png.data = bitmap.data;
+-
+-            return lib_png/* PNG */.O.sync.write(png, {
+-
+-                ...options,
+-                deflateLevel,
+-                deflateStrategy,
+-                filterType,
+-                colorType: typeof colorType !== "undefined"
+-                    ? colorType
+-                    : inputHasAlpha
+-                        ? PNGColorType.COLOR_ALPHA
+-                        : PNGColorType.COLOR,
+-                inputHasAlpha,
+-            }
+-);
+-
+-        }
+-,
+-        decode: (data, options) => {
+-
+-            const result = lib_png/* PNG */.O.sync.read(data, options);
+-
+-            return {
+-
+-                data: result.data,
+-                width: result.width,
+-                height: result.height,
+-            }
+-;
+-
+-        }
+-,
+-    }
+-;
+-
+-}
+-
+-//# sourceMappingURL=index.js.map
+-
+-/***/ }
+-
+-
+-}
+-;
+-
+-;

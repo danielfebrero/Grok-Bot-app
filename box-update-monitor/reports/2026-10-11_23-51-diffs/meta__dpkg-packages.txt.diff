@@ -1,0 +1,15 @@
+--- 2026-10-11_20-47/meta/dpkg-packages.txt
++++ 2026-10-11_23-51/meta/dpkg-packages.txt
+@@ -235,9 +235,9 @@
+ libgpgmepp6t64	1.24.2-3	amd64
+ libgprofng0	2.44-3	amd64
+ libgraphite2-3	1.3.14-2+deb13u1	amd64
+-libgs-common	10.05.1~dfsg-1+deb13u2	all
+-libgs10	10.05.1~dfsg-1+deb13u2	amd64
+-libgs10-common	10.05.1~dfsg-1+deb13u2	all
++libgs-common	10.05.1~dfsg-1+deb13u3	all
++libgs10	10.05.1~dfsg-1+deb13u3	amd64
++libgs10-common	10.05.1~dfsg-1+deb13u3	all
+ libgsm1	1.0.22-1+b2	amd64
+ libgssapi-krb5-2	1.21.3-5+deb13u1	amd64
+ libgstreamer-plugins-base1.0-0	1.26.2-1+deb13u2	amd64

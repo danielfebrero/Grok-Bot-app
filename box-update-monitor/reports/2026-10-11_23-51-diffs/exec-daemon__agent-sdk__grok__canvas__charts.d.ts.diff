@@ -1,0 +1,60 @@
+--- 2026-10-11_20-47:/exec-daemon/agent-sdk/grok/canvas/charts.d.ts
++++ 2026-10-11_23-51:/exec-daemon/agent-sdk/grok/canvas/charts.d.ts
+@@ -5,7 +5,9 @@
+  * neutral `text` tokens. A single series is `categorical[0]`, the mark that
+  * matters at full strength and the rest in `singleSeriesRest`; parts of a
+  * whole take the categorical hues in order, named by a legend of colored
+- * swatches beside neutral text. No chart has a title or an axis title: the
++ * swatches beside neutral text, above the plot. Every chart sits in a card
++ * (the page's paper, a 1 px rule, a 16 px radius, 20 px of padding), or
++ * takes a grid cell as its card. No chart has a title or an axis title: the
+  * `Section` heading names it. For shapes these don't cover, draw SVG with the
+  * same `dataviz` tokens.
+  */
+@@ -47,7 +49,7 @@
+ }
+ export interface StackedBarsProps {
+     /**
+-     * Names of the parts, in the order of each bar's `values`. Past eight, the
++     * Names of the parts, in the order of each bar's `values`. Past three, the
+      * rest share gray; a nameless part draws but has no legend entry.
+      */
+     series: readonly string[];
+@@ -146,6 +148,13 @@
+     labels?: readonly [string, string?];
+     /** Notes pinned to places on the lines, kept clear of the line and of each other. */
+     annotations?: readonly LineAnnotation[];
++    /**
++     * Whether the chart prints its own legend above the lines (the default).
++     * Set `false` only when one `Legend` placed by the author names the series
++     * for this and a neighboring chart; never add a `Legend` to a chart that
++     * still draws its own.
++     */
++    legend?: boolean;
+ }
+ /**
+  * One line in the series color over a soft area of the same hue, with
+@@ -159,9 +168,12 @@
+  * has no say in the axis; so has a `floor` or `ceiling` that is not one. A
+  * long `unit` prints once under the axis instead of on every tick when the
+  * gutter would otherwise take more than about a third of the chart. Nothing
+- * renders for an empty series.
++ * renders for an empty series. The legend (from `labels` and `lines`) is
++ * built in, above the plot: do not add a `Legend` to it.
++ *
++ * @kitNote Draws its own legend from `labels` and `lines`; add no `Legend` to it (`legend={false}` turns it off).
+  */
+-export declare function LineChart({ points, ceiling, floor: floorProp, unit, format, lines, secondary, labels, annotations, }: LineChartProps): JSX.Element | null;
++export declare function LineChart({ points, ceiling, floor: floorProp, unit, format, lines, secondary, labels, annotations, legend: showLegend, }: LineChartProps): JSX.Element | null;
+ export interface PiePart {
+     label: string;
+     /** Its size, at least zero; a negative counts as zero. */
+@@ -174,7 +186,7 @@
+     display?: string;
+ }
+ export interface PieProps {
+-    /** Parts, largest first. Past eight, the rest share gray; fold small parts into one "Other". */
++    /** Parts, largest first. Past three, the rest share gray; fold small parts into one "Other". */
+     parts: readonly PiePart[];
+     /**
+      * Print a total in the hole: `true` for the plain sum, a number to print

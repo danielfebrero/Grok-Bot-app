@@ -1,0 +1,62 @@
+--- 2026-10-11_20-47:/exec-daemon/agent-sdk/grok/canvas/hooks.d.ts
++++ 2026-10-11_23-51:/exec-daemon/agent-sdk/grok/canvas/hooks.d.ts
+@@ -1,5 +1,5 @@
+-import { type GrokDataViz, type GrokPalette, type GrokTextStyle } from "./tokens.js";
+-export type { GrokDataViz, GrokPalette, GrokTextStyle } from "./tokens.js";
++import { type GrokDataViz, type GrokPalette, type GrokTextStyle, type GrokWeightScale } from "./tokens.js";
++export type { GrokDataViz, GrokPalette, GrokTextStyle, GrokWeightScale } from "./tokens.js";
+ /**
+  * Grok page tokens for custom styling. Always the Grok look, whatever app
+  * shows the canvas: `kind` follows the viewer's light/dark mode, and the page
+@@ -14,34 +14,37 @@
+         /** Sans stack: XVF when the host embeds it, else the system face. */
+         readonly family: string;
+         readonly mono: string;
+-        /** Page title, 26/30. */
++        /** Page title, 30/36, bold. */
+         readonly heading1: GrokTextStyle;
+-        /** 22/28; not used by pages. */
++        /** Section heading, 24/30, bold. */
+         readonly heading2: GrokTextStyle;
+-        /** Section heading, 17/24. */
++        /** Sub-section heading, 20/26, semibold. */
+         readonly heading3: GrokTextStyle;
+-        /** Body, 14/20. */
++        /** Body, 16/24. */
+         readonly body1: GrokTextStyle;
+-        /** Data in tables and charts, 13/18. */
++        /** Labels, notes, captions, table headers, 14/20. */
++        readonly subtext: GrokTextStyle;
++        /** Table cells, 15/22. */
++        readonly table: GrokTextStyle;
++        /** A headline figure, 24/30, medium. */
++        readonly metric: GrokTextStyle;
++        /** Data in charts, 13/18. */
+         readonly body2: GrokTextStyle;
+-        /** Captions, table headers, meta, 12/16. */
++        /** Legends, ticks, meta, 12/16. */
+         readonly label: GrokTextStyle;
+         /** 11/16. */
+         readonly caption: GrokTextStyle;
+-        /** Monospace 13/20. */
++        /** Monospace 14/22. */
+         readonly code: GrokTextStyle;
+     };
+-    /** 400 / 500 / 600. Nothing else is installed on the system faces. */
+-    readonly weight: {
+-        readonly regular: 400;
+-        readonly medium: 500;
+-        readonly semibold: 600;
+-    };
+-    /** Corner radii in px: 4 / 8 / 12. */
++    /** 400 / 500 / 600; the brand face's regular is 425 on a Mac, as in the chat around the page. */
++    readonly weight: GrokWeightScale;
++    /** Corner radii in px: 4 / 8 / 12 / 16. */
+     readonly radius: {
+         readonly sm: 4;
+         readonly md: 8;
+         readonly lg: 12;
++        readonly xl: 16;
+     };
+     /**
+      * Grok Bot brand colors for data marks (bars, lines, points, areas, slices,
