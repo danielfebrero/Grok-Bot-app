@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-11 20:47 (Paris) — snapshot `2026-10-11_17-53` → `2026-10-11_20-47`
+
+Versions touchées : agent-store-fuse `f4c8738` → `e1fd3f3` (image, sand-host, exec-daemon, Chrome inchangés). Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : `cursor_agent_store_fuse_version` pointe vers le nouveau tarball agent-store-fuse `e1fd3f3` (rebuild opaque, classement hypothétique).
+
+Rapport : [reports/2026-10-11_20-47.md](reports/2026-10-11_20-47.md) — commit à venir
+
 ## 2026-10-11 17:53 (Paris) — snapshot `2026-10-11_03-46` → `2026-10-11_17-53`
 
 Versions touchées : sand-host `f1727e3` → `7345aa4` (image, box-scripts, agent-store-fuse, exec-daemon, Chrome inchangés). Fichiers : +0 / −0 / ~7.
@@ -19,7 +31,7 @@ Versions touchées : sand-host `f1727e3` → `7345aa4` (image, box-scripts, agen
 - **Perf** : —
 - **Autre/infra** : `managed-skills/cache.json` (fetchedAt + miroir description purchases). Reste des bundles `host-main.cjs` / `sand-eval-runner.cjs` : rebuild opaque, classement hypothétique.
 
-Rapport : [reports/2026-10-11_17-53.md](reports/2026-10-11_17-53.md) · commit à venir
+Rapport : [reports/2026-10-11_17-53.md](reports/2026-10-11_17-53.md) · [commit 35f55ea](../../../commit/35f55ea41a20f7876e50581aca87ca26d7dc1e8b)
 
 ## 2026-10-11 03:46 (Paris) — snapshot `2026-10-11_01-52` → `2026-10-11_03-46`
 

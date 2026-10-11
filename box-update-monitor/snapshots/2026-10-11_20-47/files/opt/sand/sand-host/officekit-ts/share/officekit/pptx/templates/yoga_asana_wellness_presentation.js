@@ -1,0 +1,841 @@
+/**
+ * Asana — Yoga Presentation Template (32 slides, 13.333 x 7.5 in)
+ * Recreated with pptxgenjs only. Raster art of the original deck is replaced
+ * by programmatic placeholders (gray boxes / flat glyphs).
+ */
+const PptxGenJS = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ palette */
+const PURPLE = '5603AD'; // theme accent1
+const DEEP   = '2B0156'; // accent1 lumMod 50%
+const MID    = '993AFC'; // accent1 lumMod 60% / lumOff 40%
+const LILAC  = 'DDBDFE'; // accent1 lumMod 20% / lumOff 80%
+const INK    = '262626'; // tx1 lumMod 85%
+const GRAY   = '808080'; // tx1 lumMod 50%
+const WHITE  = 'FFFFFF';
+const TRACK  = 'D9D9D9'; // bg2 lumMod 85% (progress-bar track)
+const PHFILL = 'BFBFBF'; // "insert your image here" placeholder gray
+const PHINK  = '0D0D0D';
+const EDGE   = 'F0EAF7'; // white-to-purple gradient outline, as it renders
+
+const MAJOR = 'Bricolage Grotesque ExtraBold'; // theme major font
+const MINOR = 'Montserrat';                    // theme minor font
+
+const SOFT = { type: 'outer', color: '000000', blur: 10, offset: 15, angle: 60, opacity: 0.08 };
+const HALO = { color: EDGE, width: 2 };
+
+/* ---------------------------------------------------------------- utilities */
+const RR   = (size, k = 0.09682) => size * k;          // roundRect corner radius
+const poly = (arr) => arr.map(([x, y]) => ({ x, y })).concat([{ close: true }]);
+
+// body copy (Montserrat 12pt, 120% leading, top aligned)
+function body(s, o) {
+  s.addText(o.text, {
+    x: o.x, y: o.y, w: o.w, h: o.h || 0.6,
+    fontFace: MINOR, fontSize: o.size || 12, color: o.color || INK,
+    bold: o.bold, align: o.align || 'left', valign: 'top',
+    lineSpacingMultiple: o.ls === null ? undefined : (o.ls || 1.2),
+    charSpacing: o.spc,
+  });
+}
+
+// headline set in the major font; `runs` is [[text, color], ...]
+function head(s, o) {
+  s.addText(o.runs.map(([text, color]) => ({ text, options: { color: color || INK } })), {
+    x: o.x, y: o.y, w: o.w, h: o.h || 0.64,
+    fontFace: MAJOR, fontSize: o.size || 32, color: INK,
+    align: o.align || 'left', valign: 'top', lineSpacingMultiple: o.ls,
+    charSpacing: o.spc,
+  });
+}
+
+// standard slide header: multi-colour title + gray subtitle
+function header(s, o) {
+  head(s, { x: o.x, y: o.y, w: o.w || 5.906, h: o.h || 1.178, runs: o.runs, align: o.align, ls: o.ls });
+  if (o.sub !== undefined) {
+    body(s, {
+      x: o.x, y: o.subY, w: o.subW || 5.906, h: 0.303, text: o.sub,
+      color: GRAY, align: o.align, ls: null,
+    });
+  }
+}
+// subtitle + paragraph pair used down the left column of many slides
+function subBlock(s, o) {
+  body(s, { x: o.x, y: o.y, w: o.w, h: 0.328, text: o.sub, color: o.subColor || o.color || INK });
+  body(s, { x: o.x, y: o.y + 0.328, w: o.w, h: o.h || 0.567, text: o.text, color: o.color || INK });
+}
+
+/* placeholder for a photo: flat gray panel + "Insert Your Image Here" caption */
+function photo(s, o) {
+  const shape = o.points ? 'custGeom' : (o.shape || 'rect');
+  s.addShape(shape, {
+    x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.fill || PHFILL },
+    points: o.points, rectRadius: o.r, rotate: o.rotate, line: o.line,
+  });
+  if (o.caption === false) return;
+  const cx = (o.capX !== undefined ? o.capX : o.x + o.w / 2);
+  const cy = (o.capY !== undefined ? o.capY : o.y + o.h / 2);
+  s.addText('Insert Your\nImage Here', {
+    x: cx - 1.6, y: cy - 0.34, w: 3.2, h: 0.68, align: 'center', valign: 'middle',
+    fontFace: MINOR, fontSize: 20, bold: true, color: PHINK, lineSpacing: 21,
+  });
+}
+/* placeholder for a small icon graphic */
+function icon(s, x, y, size, color) {
+  s.addShape('roundRect', { x, y, w: size, h: size, fill: { color: color || PURPLE }, rectRadius: RR(size, 0.25) });
+}
+
+/* diamond = rounded square turned 45 degrees, given its centre */
+function diamond(s, o) {
+  const side = o.d / Math.SQRT2;
+  s.addShape('roundRect', {
+    x: o.cx - side / 2, y: o.cy - side / 2, w: side, h: side, rotate: o.rot || 45,
+    fill: { color: o.fill || PURPLE }, rectRadius: RR(side),
+    line: o.line, shadow: o.shadow,
+  });
+}
+
+/* progress bar: track, filled part, caption and percentage */
+function meter(s, o) {
+  const h = 0.124;
+  s.addShape('roundRect', { x: o.x, y: o.y, w: o.w, h, fill: { color: o.track || TRACK }, rectRadius: h / 2 });
+  s.addShape('roundRect', { x: o.x, y: o.y, w: o.w * o.pct / 100, h, fill: { color: o.fill || PURPLE }, rectRadius: h / 2 });
+  body(s, { x: o.x - 0.089, y: o.y + 0.193, w: 2.533, h: 0.324, text: o.label, color: o.color || INK });
+  s.addText(o.pct + '%', {
+    x: o.x + o.w - 0.947, y: o.y + 0.193, w: 1.036, h: 0.372, align: o.pctAlign || 'right',
+    fontFace: MAJOR, fontSize: 14, color: o.color || INK, valign: 'top', lineSpacingMultiple: 1.2,
+  });
+}
+
+/* purple card holding a big number and a caption */
+function statCard(s, o) {
+  s.addShape('roundRect', { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: PURPLE }, rectRadius: RR(o.h) });
+  s.addText(o.value, {
+    x: o.x + 0.386, y: o.y + 0.14, w: 1.591, h: 0.783, fontFace: MAJOR, fontSize: 36,
+    color: WHITE, valign: 'top', lineSpacingMultiple: 1.2,
+  });
+  body(s, { x: o.x + 0.386, y: o.y + 0.911, w: 1.591, h: 0.328, text: o.label, color: WHITE });
+}
+
+/* small purple square holding a list number, plus the paragraph beside it */
+function numItem(s, o) {
+  s.addShape('roundRect', { x: o.x, y: o.y, w: 0.394, h: 0.394, fill: { color: PURPLE }, rectRadius: RR(0.394) });
+  s.addText(String(o.n), {
+    x: o.x - 0.081, y: o.y + 0.033, w: 0.556, h: 0.328, align: 'center', valign: 'top',
+    fontFace: MAJOR, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.2,
+  });
+  if (o.sub) body(s, { x: o.x + 0.555, y: o.y - 0.325, w: o.w, h: 0.328, text: o.sub });
+  body(s, { x: o.x + 0.555, y: o.y, w: o.w, h: 0.809, text: o.text });
+}
+
+/* the three little squares used as a decorative rule */
+function dots(s, x, y, size, gap, color) {
+  for (let i = 0; i < 3; i++) {
+    s.addShape('roundRect', {
+      x: x + i * gap, y, w: size, h: size,
+      fill: { color: color || PURPLE }, rectRadius: RR(size),
+    });
+  }
+}
+
+/* the deck's leaf logo, drawn from three purple blades */
+function leaf(s, cx, cy, d, color) {
+  const c = color || PURPLE;
+  s.addShape('teardrop', { x: cx - d * 0.17, y: cy - d * 0.42, w: d * 0.34, h: d * 0.46, rotate: 225, fill: { color: c } });
+  s.addShape('ellipse', { x: cx - d * 0.50, y: cy - d * 0.02, w: d * 0.42, h: d * 0.26, rotate: 335, fill: { color: c } });
+  s.addShape('ellipse', { x: cx + d * 0.08, y: cy - d * 0.02, w: d * 0.42, h: d * 0.26, rotate: 25, fill: { color: c } });
+}
+
+/* master furniture: the white corner flap and the page number */
+function chrome(s, n) {
+  diamond(s, { cx: 0.361, cy: 7.151, d: 0.974, rot: 135, fill: WHITE, line: HALO, shadow: SOFT });
+  s.addText(String(n), {
+    x: -0.061, y: 6.951, w: 0.844, h: 0.399, align: 'center', valign: 'middle',
+    fontFace: MAJOR, fontSize: 12, color: PURPLE,
+  });
+}
+
+/* stand-in for the "person in a pose" vector art on the poses slide */
+function poseArt(s, x, y, i) {
+  const cx = x + 1.26;
+  s.addShape('ellipse', { x: cx - 0.9, y: y + 1.25, w: 1.8, h: 0.16, fill: { color: LILAC } });
+  const legs = [[-0.75, 0.55, 1.5, 0.34], [-0.62, 0.30, 0.9, 0.62], [-0.80, 0.20, 1.6, 0.75], [-0.85, 0.55, 1.7, 0.30]][i];
+  s.addShape('roundRect', { x: cx + legs[0], y: y + legs[1], w: legs[2], h: legs[3], fill: { color: PURPLE }, rectRadius: 0.15 });
+  const torso = [[-0.15, 0.35, 0.85, 0.30], [-0.05, 0.10, 0.55, 0.45], [-0.30, 0.05, 0.60, 0.40], [-0.10, 0.20, 0.70, 0.35]][i];
+  s.addShape('roundRect', { x: cx + torso[0], y: y + torso[1], w: torso[2], h: torso[3], fill: { color: MID }, rectRadius: 0.12 });
+  s.addShape('ellipse', { x: cx + torso[0] - 0.1, y: y + torso[1] - 0.26, w: 0.3, h: 0.3, fill: { color: '2F2E41' } });
+}
+
+/* ============================================================= slide builders */
+const build = {};
+
+/* --- 1 / 32: cover + closing, four purple corner wedges around a white diamond */
+const CORNERS = [
+  { x: -0.627, y: -0.696, w: 3.645, h: 2.413, p: [[0, 0.11], [0.26, 0], [3.28, 0], [3.64, 0.36], [3.64, 1.08], [2.31, 2.41]] },
+  { x: 3.616, y: -1.747, w: 3.645, h: 3.645, p: [[3.54, 3.64], [0, 0.11], [0.26, 0], [3.28, 0], [3.64, 0.36], [3.64, 3.39]] },
+  { x: -0.011, y: 5.167, w: 2.413, h: 3.645, p: [[0.11, 0], [2.41, 2.31], [1.08, 3.64], [0.36, 3.64], [0.11, 3.54], [0, 3.28], [0, 0.26]] },
+  { x: 3.616, y: 5.602, w: 3.645, h: 3.645, p: [[0.11, 0], [3.64, 3.54], [3.39, 3.64], [0.36, 3.64], [0.11, 3.54], [0, 3.28], [0, 0.26]] },
+];
+function coverSlide(s, o) {
+  CORNERS.forEach((c) => s.addShape('custGeom', {
+    x: c.x, y: c.y, w: c.w, h: c.h, rotate: 135, points: poly(c.p), fill: { color: PURPLE },
+  }));
+  diamond(s, { cx: 3.100, cy: 3.750, d: 4.678, rot: 135, fill: WHITE, line: HALO, shadow: SOFT });
+  leaf(s, 3.100, 3.750, 1.969);
+  head(s, { x: 7.02, y: o.y, w: 6.314, h: 1.717, size: o.size, runs: [[o.title, PURPLE]] });
+  if (o.dotsY) dots(s, 7.245, o.dotsY, 0.197, 0.766);
+  head(s, { x: 7.02, y: o.subY, w: 6.314, h: 0.37, size: 16, spc: 3, runs: [[o.sub, PURPLE]] });
+}
+build[1] = (s) => coverSlide(s, { title: 'ASANA', size: 96, y: 2.707, sub: 'Yoga Presentation Template', subY: 4.423 });
+build[32] = (s) => coverSlide(s, { title: 'THANK YOU', size: 60, y: 2.554, sub: 'SEE YOU AGAIN NEXT TIME', subY: 4.576, dotsY: 3.935 });
+
+/* --- 2 / 31: photo cover, dimmed, with a chain of purple diamonds */
+const CHAIN = [
+  [11.663, 3.750, 3.340], [1.670, 3.750, 3.340], [3.341, 5.590, 2.227],
+  [9.992, 5.590, 2.227], [6.667, 4.531, 2.227], [8.608, 4.864, 1.113], [4.726, 4.864, 1.113],
+];
+function photoCover(s, o) {
+  photo(s, { x: 0, y: 0, w: 13.333, h: 7.5, capY: 3.78 });
+  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: '000000', transparency: 50 } });
+  CHAIN.forEach(([cx, cy, d]) => diamond(s, { cx, cy, d }));
+  leaf(s, 6.667, 4.531, 0.787, WHITE);
+  head(s, { x: o.x, y: 1.497, w: o.w, h: 1.313, size: 72, align: 'center', runs: [[o.title, WHITE]] });
+  if (o.sub) head(s, { x: 4.232, y: 2.809, w: 4.869, h: 0.37, size: 16, align: 'center', runs: [[o.sub, WHITE]] });
+}
+build[2] = (s) => photoCover(s, { title: 'ASANA', x: 3.929, w: 5.475, sub: 'Yoga Presentation Template' });
+build[31] = (s) => photoCover(s, { title: 'THANK YOU', x: 2.375, w: 8.583 });
+
+/* --- 3: team, four diamond portraits */
+const TEAM = [
+  ['Amelia Scott', 'Lead Trainer'], ['Mia Robinson', 'Assistant Trainer'],
+  ['Olivia Bennett', 'Personal Trainer'], ['Emma Thompson', 'Customer Consultant'],
+];
+build[3] = (s) => {
+  header(s, {
+    x: 3.714, y: 0.797, h: 0.64, align: 'center', subY: 1.436, sub: 'View Each Members',
+    runs: [['Spectacular ', INK], ['Team', PURPLE]],
+  });
+  TEAM.forEach(([name, role], i) => {
+    const col = 0.679 + i * 3.064;
+    diamond(s, { cx: col + 1.395, cy: 3.750, d: 3.062, rot: 135, fill: WHITE, line: HALO, shadow: SOFT });
+    photo(s, { x: col + 0.467, y: 2.822, w: 1.857, h: 1.857, rotate: 45, r: RR(1.857), capY: 3.78 });
+    body(s, { x: col, y: 5.492, w: 2.784, h: 0.324, text: name, bold: true, align: 'center' });
+    body(s, { x: col, y: 5.814, w: 2.784, h: 0.324, text: role, bold: true, align: 'center', color: GRAY });
+  });
+};
+
+/* --- 4: profile page with skills panel */
+build[4] = (s) => {
+  s.addShape('rect', { x: 7.192, y: 0, w: 6.141, h: 7.5, fill: { color: PURPLE } });
+  photo(s, { x: 7.952, y: 0.797, w: 4.621, h: 6.703, shape: 'roundRect', r: 0.409, capY: 3.78 });
+  header(s, {
+    x: 0.76, y: 0.797, h: 0.64, subY: 1.434, sub: 'Title Here',
+    runs: [['Your ', INK], ['Name', PURPLE], [' Here', INK]],
+  });
+  body(s, {
+    x: 0.76, y: 2.248, w: 5.71, h: 1.051,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years ago and has a rich history deeply intertwined with Indian philosophy, spirituality.',
+  });
+  [0.76, 1.411, 2.062].forEach((x) => icon(s, x, 3.82, 0.394));
+  s.addShape('line', { x: 2.847, y: 4.017, w: 3.623, h: 0, line: { color: PURPLE, width: 1.5 } });
+  s.addShape('roundRect', { x: 5.145, y: 4.735, w: 5.118, h: 1.969, fill: { color: PURPLE }, rectRadius: RR(1.969), line: { color: WHITE, width: 3 } });
+  body(s, {
+    x: 5.583, y: 5.193, w: 4.042, h: 1.051, color: WHITE,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years.',
+  });
+  s.addShape('custGeom', {
+    x: 0, y: 4.735, w: 4.822, h: 1.969, fill: { color: PURPLE },
+    points: poly([[0, 0], [4.63, 0], [4.82, 0.19], [4.82, 1.78], [4.63, 1.97], [0, 1.97]]),
+  });
+  meter(s, { x: 0.85, y: 5.153, w: 3.134, pct: 90, label: 'First Skill Here', track: DEEP, fill: WHITE, color: WHITE, pctAlign: 'center' });
+  meter(s, { x: 0.85, y: 5.920, w: 3.134, pct: 75, label: 'Second Skill here', track: DEEP, fill: WHITE, color: WHITE, pctAlign: 'center' });
+};
+
+/* --- 5: introduction, two tilted photo blades and a diamond badge */
+build[5] = (s) => {
+  s.addShape('custGeom', {
+    x: 8.769, y: -0.417, w: 3.333, h: 3.801, rotate: 345, fill: { color: PURPLE },
+    points: poly([[3.01, 3.8], [0.32, 3.8], [0, 3.48], [0, 0.32], [0.26, 0], [3.33, 0.81], [3.33, 3.48]]),
+  });
+  s.addShape('custGeom', {
+    x: 7.898, y: 4.117, w: 3.333, h: 3.801, rotate: 15, fill: { color: PURPLE },
+    points: poly([[3.01, 0], [3.33, 0.32], [3.33, 2.99], [0.26, 3.8], [0, 3.48], [0, 0.32], [0.26, 0.01]]),
+  });
+  photo(s, {
+    x: 10, y: 0, w: 3.333, h: 3.75, capY: 1.90,
+    points: poly([[0.01, 0], [3.33, 0], [3.33, 3.74], [0.35, 3.75], [0, 3.4]]),
+  });
+  photo(s, {
+    x: 6.667, y: 3.75, w: 3.333, h: 3.75, capY: 5.85,
+    points: poly([[0.32, 0], [3.01, 0], [3.33, 0.32], [3.33, 3.75], [0, 3.75], [0, 0.32]]),
+  });
+  header(s, {
+    x: 0.76, y: 1.673, subY: 2.847, sub: 'Subtitle Here',
+    runs: [['Introduction', PURPLE], [' to Yoga: Freedom of Mind', INK]],
+  });
+  body(s, {
+    x: 0.76, y: 3.515, w: 5.212, h: 0.809,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000.',
+  });
+  subBlock(s, {
+    x: 0.76, y: 4.69, w: 5.212, h: 0.809, sub: 'Subtitle Here',
+    text: 'Traditionally, yoga was passed down from teacher\nto student through oral transmission and practical demonstration, evolving over centuries to adapt.',
+  });
+  diamond(s, { cx: 10.000, cy: 3.750, d: 2.784, rot: 315, fill: WHITE, line: HALO, shadow: SOFT });
+  icon(s, 9.606, 3.356, 0.787);
+};
+
+/* --- 6: numbered overview list */
+const LOREM_SHORT = 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated.';
+build[6] = (s) => {
+  s.addShape('rect', { x: 10.262, y: 0, w: 3.071, h: 7.5, fill: { color: PURPLE } });
+  header(s, { x: 0.76, y: 0.797, subY: 1.971, sub: 'Subtitle Here', runs: [['Types', PURPLE], [' of Yoga: An Overview', INK]] });
+  [2.941, 4.418, 5.894].forEach((y, i) => numItem(s, { x: 0.762, y, n: i + 1, w: 4.746, text: LOREM_SHORT }));
+  photo(s, { x: 7.952, y: 0.797, w: 4.621, h: 1.970, shape: 'roundRect', r: 0.19, caption: false });
+  photo(s, { x: 7.952, y: 2.987, w: 4.621, h: 3.720, shape: 'roundRect', r: 0.36, capY: 3.78 });
+};
+
+/* --- 7: three benefits with icons */
+build[7] = (s) => {
+  s.addShape('custGeom', {
+    x: 7.962, y: 0.144, w: 6.344, h: 7.807, rotate: 345, fill: { color: PURPLE },
+    points: poly([[6.34, 0.56], [4.4, 7.81], [0, 6.63], [0, 0.79], [0.79, 0], [4.24, 0]]),
+  });
+  photo(s, { x: 7.952, y: 0.398, w: 5.381, h: 6.703, shape: 'roundRect', r: 0.6, capX: 10.75, capY: 3.78 });
+  [[0.760, 2.856, 1.608], [0.760, 4.484, 1.719], [0.760, 5.960, 1.744]].forEach(([ix, iy, tx]) => {
+    icon(s, ix, iy, 0.591);
+    subBlock(s, {
+      x: tx, y: iy - (iy === 2.856 ? 0 : 0.152), w: 4.714, sub: 'Subtitle Here', subColor: PURPLE,
+      text: 'Traditionally, yoga was passed down from teacher\nto student through oral transmission and practical.',
+    });
+  });
+  header(s, { x: 0.76, y: 0.797, subY: 1.971, sub: 'Subtitle Here', runs: [['Benefits', PURPLE], [' of Yoga for Physical Health', INK]] });
+};
+
+/* --- 8: four KPI cards beside a diamond photo cluster */
+build[8] = (s) => {
+  header(s, {
+    x: 0.76, y: 0.797, subY: 1.971, sub: 'Subtitle Here',
+    runs: [['Mental and Emotional ', INK], ['Benefits', PURPLE], [' of Yoga', INK]],
+  });
+  diamond(s, { cx: 8.565, cy: 6.127, d: 2.227, fill: WHITE, line: HALO, shadow: SOFT });
+  diamond(s, { cx: 11.376, cy: 1.670, d: 3.340, fill: WHITE, line: HALO, shadow: SOFT });
+  [[7.927, 2.791, 1.113], [10.149, 1.075, 0.557], [12.046, 5.013, 1.113], [9.724, 6.420, 0.557]]
+    .forEach(([cx, cy, d]) => diamond(s, { cx, cy, d }));
+  body(s, {
+    x: 0.76, y: 2.671, w: 5.71, h: 0.567,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic.',
+  });
+  statCard(s, { x: 0.776, y: 3.635, w: 2.756, h: 1.378, value: '4.7', label: 'Subtitle Here' });
+  statCard(s, { x: 3.896, y: 3.635, w: 2.756, h: 1.378, value: '32k+', label: 'Subtitle Here' });
+  statCard(s, { x: 0.760, y: 5.325, w: 2.756, h: 1.378, value: '1280', label: 'Subtitle Here' });
+  statCard(s, { x: 3.896, y: 5.325, w: 2.756, h: 1.378, value: '74%', label: 'Subtitle Here' });
+  [[9.036, 1.682, 1.486], [10.933, 2.791, 2.228], [8.981, 4.706, 2.228], [10.933, 5.819, 1.486]]
+    .forEach(([cx, cy, side]) => photo(s, {
+      x: cx - side / 2, y: cy - side / 2, w: side, h: side, rotate: 45, r: RR(side), capY: cy + 0.03,
+    }));
+};
+
+/* --- 9: vinyasa, icon list left, tall photo band centre */
+const YOGA_TOPICS = [['The Way of the Air', 0.797], ['Positive Thinking', 2.408], ['Healthy Mindset', 4.018], ['Blood Pressure', 5.629]];
+build[9] = (s) => {
+  YOGA_TOPICS.forEach(([label, y]) => {
+    icon(s, 0.76, y, 0.591);
+    body(s, { x: 1.608, y, w: 3.0, h: 0.328, text: label, color: PURPLE });
+    body(s, { x: 1.608, y: y + 0.328, w: 3.0, h: 0.567, text: 'Traditionally, yoga was passed down from teacher to student.' });
+  });
+  photo(s, { x: 4.993, y: 0, w: 3.346, h: 7.5, capY: 3.78 });
+  head(s, { x: 8.888, y: 0.956, w: 3.74, h: 1.717, runs: [['Vinyasa Yoga: Flow and ', INK], ['Breath', PURPLE]] });
+  body(s, { x: 8.888, y: 2.673, w: 3.74, h: 0.303, text: 'Subtitle Here', color: GRAY, ls: null });
+  body(s, {
+    x: 8.888, y: 3.431, w: 3.685, h: 2.263,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being.\n\nIt originated in India over 5,000 years ago and has a rich history deeply intertwined with Indian philosophy, spirituality, and culture. Traditionally, yoga was passed',
+  });
+  dots(s, 8.888, 6.15, 0.394, 0.548);
+};
+
+/* --- 10: gallery */
+build[10] = (s) => {
+  diamond(s, { cx: 10.001, cy: 3.751, d: 4.750, fill: WHITE, line: HALO, shadow: SOFT });
+  head(s, { x: 0.76, y: 3.144, w: 5.906, h: 0.909, size: 48, runs: [['Asana ', INK], ['Gallery', PURPLE]] });
+  body(s, { x: 0.76, y: 4.053, w: 5.906, h: 0.303, text: 'Subtitle Here', color: GRAY, ls: null });
+  [[8.372, 2.416, 0.279], [12.606, 5.148, 0.279], [4.144, 1.654, 0.557], [0.774, 6.425, 0.279], [5.181, 5.789, 0.279]]
+    .forEach(([cx, cy, d]) => diamond(s, { cx, cy, d, rot: 315 }));
+  photo(s, { x: 6.667, y: 0, w: 3.688, h: 2.165, shape: 'roundRect', r: 0.19, capX: 8.37, capY: 1.03 });
+  photo(s, { x: 10.812, y: 0, w: 2.521, h: 4.331, shape: 'roundRect', r: 0.22, capX: 12.17, capY: 2.10 });
+  photo(s, { x: 6.667, y: 3.169, w: 2.521, h: 4.331, shape: 'roundRect', r: 0.22, capX: 7.94, capY: 5.43 });
+  photo(s, { x: 9.646, y: 5.335, w: 3.688, h: 2.165, shape: 'roundRect', r: 0.19, capX: 11.54, capY: 6.46 });
+};
+
+/* --- 11: pricing, three plan cards over a lilac wedge */
+const PLANS = [
+  { x: 1.403, price: '250$', name: 'Basic', pct: 70, dark: false },
+  { x: 8.780, price: '500$', name: 'Advanced', pct: 50, dark: false },
+];
+build[11] = (s) => {
+  s.addShape('custGeom', {
+    x: -0.002, y: 2.951, w: 13.335, h: 4.549, fill: { color: LILAC },
+    points: poly([[13.33, 0], [13.33, 4.55], [0, 4.55], [0, 2.46]]),
+  });
+  PLANS.forEach((p) => {
+    s.addShape('roundRect', { x: p.x, y: 3.197, w: 3.15, h: 4.674, fill: { color: WHITE }, rectRadius: 0.391, line: HALO, shadow: SOFT });
+    s.addShape('roundRect', { x: p.x + 2.756, y: 2.803, w: 0.787, h: 0.787, fill: { color: PURPLE }, rectRadius: 0.098 });
+    s.addShape('rightArrow', { x: p.x + 2.905, y: 3.037, w: 0.49, h: 0.32, fill: { color: WHITE } });
+    head(s, { x: p.x + 0.269, y: 3.26, w: 2.614, h: 1.03, size: 48, ls: 1.2, runs: [[p.price, PURPLE]] });
+    body(s, { x: p.x + 0.269, y: 4.221, w: 2.102, h: 0.333, text: p.name });
+    body(s, { x: p.x + 0.269, y: 4.55, w: 2.562, h: 0.809, text: 'Yoga is an ancient practice that encompasses physical postures, breathing rightly' });
+    meter(s, { x: p.x + 0.394, y: 6.549, w: 2.357, pct: p.pct, label: 'Value' });
+  });
+  s.addShape('roundRect', { x: 5.092, y: 1.201, w: 3.15, h: 6.67, fill: { color: PURPLE }, rectRadius: 0.391, shadow: SOFT });
+  head(s, { x: 5.368, y: 1.265, w: 2.614, h: 1.03, size: 48, ls: 1.2, runs: [['350$', WHITE]] });
+  body(s, { x: 5.368, y: 2.225, w: 2.102, h: 0.333, text: 'Best Deal', color: WHITE });
+  body(s, {
+    x: 5.368, y: 2.555, w: 2.562, h: 1.536, color: WHITE,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing rightly exercises, and meditation techniques to foster holistic well-being.',
+  });
+  s.addText([1, 2, 3, 4].map(() => ({ text: 'Subtitle Here', options: { breakLine: true, bullet: { characterCode: '2022' } } })), {
+    x: 5.368, y: 4.431, w: 2.562, h: 1.778, fontFace: MINOR, fontSize: 12, color: WHITE,
+    valign: 'top', lineSpacingMultiple: 1.9, paraSpaceAfter: 0,
+  });
+  meter(s, { x: 5.485, y: 6.549, w: 2.357, pct: 90, label: 'Value', track: DEEP, fill: WHITE, color: WHITE });
+  s.addShape('roundRect', { x: 7.842, y: 0.807, w: 0.787, h: 0.787, fill: { color: WHITE }, rectRadius: 0.098, line: { color: EDGE, width: 1.5 }, shadow: SOFT });
+  s.addShape('rightArrow', { x: 7.991, y: 1.041, w: 0.49, h: 0.32, fill: { color: PURPLE } });
+  header(s, { x: 0.76, y: 0.797, h: 0.64, subY: 1.434, sub: 'Subtitle Here', runs: [['Asana Plan ', INK], ['Price', PURPLE]] });
+};
+
+/* --- 12: hatha yoga, two photo cards inside a purple ring */
+build[12] = (s) => {
+  s.addShape('ellipse', { x: 8.116, y: 1.976, w: 3.547, h: 3.547, fill: { type: 'none' }, line: { color: PURPLE, width: 20 } });
+  photo(s, { x: 10.052, y: 0.797, w: 2.521, h: 4.331, shape: 'roundRect', r: 0.22, capX: 11.29, capY: 3.05 });
+  photo(s, { x: 7.207, y: 2.372, w: 2.521, h: 4.331, shape: 'roundRect', r: 0.22, capX: 8.48, capY: 4.66 });
+  head(s, { x: 0.76, y: 0.977, w: 5.906, h: 1.353, ls: 1.2, runs: [['Hatha Yoga: The ', INK], ['Foundation', PURPLE], [' of All Yoga', INK]] });
+  body(s, { x: 0.76, y: 2.32, w: 5.042, h: 0.303, text: 'Subtitle Here', color: GRAY, ls: null });
+  body(s, {
+    x: 0.76, y: 3.028, w: 5.71, h: 1.051,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years ago and has a rich history deeply intertwined with Indian philosophy, spirituality.',
+  });
+  icon(s, 0.76, 4.635, 0.591);
+  s.addShape('heart', { x: 0.879, y: 4.763, w: 0.354, h: 0.334, fill: { color: WHITE } });
+  subBlock(s, { x: 1.449, y: 4.485, w: 4.051, sub: 'Subtitle Here', text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises.' });
+  s.addShape('roundRect', { x: 0.76, y: 5.932, w: 1.575, h: 0.591, fill: { color: PURPLE }, rectRadius: RR(0.591) });
+  head(s, { x: 0.76, y: 6.059, w: 1.575, h: 0.337, size: 14, align: 'center', runs: [['Learn More', WHITE]] });
+};
+
+/* --- 13: flexibility, photo left, stats right */
+build[13] = (s) => {
+  photo(s, { x: 1.283, y: 0.797, w: 4.621, h: 6.703, shape: 'roundRect', r: 0.409, capX: 3.54, capY: 3.78 });
+  header(s, { x: 6.667, y: 0.797, subY: 1.975, sub: 'Subtitle Here', runs: [['Yoga for ', INK], ['Flexibility', PURPLE], [' and Balance', INK]] });
+  dots(s, 6.799, 2.648, 0.295, 0.766);
+  body(s, {
+    x: 6.667, y: 3.313, w: 5.71, h: 1.051,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years ago and has a rich history deeply intertwined with Indian philosophy, spirituality.',
+  });
+  s.addShape('roundRect', { x: 3.1, y: 4.735, w: 5.118, h: 1.969, fill: { color: PURPLE }, rectRadius: RR(1.969), line: { color: WHITE, width: 3 } });
+  body(s, {
+    x: 3.539, y: 5.193, w: 4.042, h: 1.051, color: WHITE,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years.',
+  });
+  s.addShape('custGeom', {
+    x: 8.657, y: 4.735, w: 4.676, h: 1.969, fill: { color: PURPLE },
+    points: poly([[4.68, 0], [4.68, 1.97], [0.19, 1.97], [0, 1.78], [0, 0.19], [0.19, 0]]),
+  });
+  [['75%', 9.042], ['3120', 11.024]].forEach(([value, x]) => {
+    head(s, { x, y: 5.169, w: 1.591, h: 0.783, size: 36, ls: 1.2, runs: [[value, WHITE]] });
+    body(s, { x, y: 5.94, w: 1.591, h: 0.328, text: 'Subtitle Here', color: WHITE });
+  });
+};
+
+/* --- 14: meditation, illustration left, purple panel right */
+build[14] = (s) => {
+  s.addShape('rect', { x: 7.98, y: 0, w: 5.353, h: 7.5, fill: { color: PURPLE } });
+  // flat stand-in for the "woman meditating at home" illustration
+  s.addShape('rect', { x: 0, y: 4.867, w: 5.944, h: 2.633, fill: { color: PURPLE } });
+  s.addShape('custGeom', { x: 0, y: 3.875, w: 5.944, h: 1.0, fill: { color: PURPLE }, points: poly([[5.94, 0.12], [5.94, 1], [0, 1], [0, 0]]) });
+  [0.665, 2.320, 3.974].forEach((x) => {
+    s.addShape('roundRect', { x, y: 1.656, w: 1.461, h: 3.079, fill: { color: DEEP }, rectRadius: 0.1 });
+    s.addShape('rect', { x: x + 0.207, y: 1.858, w: 1.057, h: 2.675, fill: { color: LILAC } });
+    for (let i = 0; i < 5; i++) s.addShape('rect', { x: x + 0.207, y: 1.95 + i * 0.19, w: 1.057, h: 0.06, fill: { color: 'DDECFD' } });
+  });
+  [0.069, 4.394].forEach((x) => s.addShape('custGeom', { x, y: 4.867, w: 1.482, h: 2.633, fill: { color: LILAC }, points: poly([[1.48, 0], [0.35, 2.63], [0, 2.63], [1.15, 0]]) }));
+  s.addShape('ellipse', { x: 1.55, y: 4.55, w: 2.85, h: 0.9, fill: { color: WHITE } });
+  s.addShape('roundRect', { x: 2.15, y: 3.55, w: 1.65, h: 1.35, fill: { color: WHITE }, rectRadius: 0.3 });
+  s.addShape('ellipse', { x: 2.60, y: 2.75, w: 0.75, h: 0.85, fill: { color: '2F2E41' } });
+  s.addShape('ellipse', { x: 2.72, y: 2.95, w: 0.52, h: 0.6, fill: { color: 'F4BE9A' } });
+  s.addShape('roundRect', { x: 2.30, y: 4.75, w: 1.35, h: 0.35, fill: { color: MID }, rectRadius: 0.15 });
+  head(s, { x: 8.888, y: 0.8, w: 3.74, h: 1.717, runs: [['Meditation and Mindfulness\nin Yoga', WHITE]] });
+  body(s, {
+    x: 8.888, y: 2.928, w: 3.685, h: 1.778, color: WHITE,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being.\nIt originated in India over 5,000 years ago and has a rich history deeply intertwined with Indian philosophy, spirituality, and',
+  });
+  meter(s, { x: 8.977, y: 5.139, w: 3.134, pct: 85, label: 'Subtitle Here', track: DEEP, fill: WHITE, color: WHITE, pctAlign: 'center' });
+  meter(s, { x: 8.977, y: 6.137, w: 3.134, pct: 60, label: 'Subtitle Here', track: DEEP, fill: WHITE, color: WHITE, pctAlign: 'center' });
+  [['Time Essence', 0.797], ['Women Pref', 2.408], ['Men Pref', 4.018], ['Key Patience', 5.628]].forEach(([label, y]) => {
+    icon(s, 6.657, y, 0.591);
+    body(s, { x: 5.934, y: y + 0.75, w: 2.046, h: 0.328, text: label, bold: true, align: 'center' });
+  });
+};
+
+/* --- 15: four pose cards */
+build[15] = (s) => {
+  header(s, {
+    x: 1.222, y: 0.797, w: 10.889, h: 0.64, align: 'center', subY: 1.441, subW: 10.889, sub: 'Subtitle Here',
+    runs: [['Popular Yoga ', INK], ['Poses', PURPLE], [' and Their Benefits', INK]],
+  });
+  [0.765, 3.865, 6.959, 10.052].forEach((x, i) => {
+    s.addShape('roundRect', { x, y: 2.107, w: 2.521, h: 2.897, fill: { color: WHITE }, rectRadius: 0.244, line: HALO, shadow: SOFT });
+    poseArt(s, x, 2.107, i);
+    diamond(s, { cx: x + 1.260, cy: 4.999, d: 1.113 });
+    head(s, { x: x + 0.737, y: 4.679, w: 1.047, h: 0.64, size: 32, align: 'center', runs: [[String(i + 1), WHITE]] });
+    body(s, { x: x + 0.425, y: 5.812, w: 1.67, h: 0.328, text: 'Subtitle Here', align: 'center' });
+    body(s, { x, y: 6.136, w: 2.521, h: 0.567, text: 'Yoga is an ancient practice that encompasses physical.', align: 'center' });
+  });
+};
+
+/* --- 16: laptop mockup */
+build[16] = (s) => {
+  s.addShape('custGeom', {
+    x: 10.023, y: 3.175, w: 2.714, h: 6.187, rotate: 45, fill: { color: PURPLE },
+    points: poly([[1.03, 0], [2.71, 1.69], [2.71, 3.48], [0, 6.19], [0, 1.31], [0.4, 0.35]]),
+  });
+  s.addShape('custGeom', {
+    x: 9.605, y: -1.117, w: 2.714, h: 6.056, rotate: 45, fill: { color: PURPLE },
+    points: poly([[1.68, 0], [2.71, 1.03], [2.71, 4.7], [1.36, 6.06], [0, 4.7], [0, 1.68]]),
+  });
+  // laptop shell
+  s.addShape('roundRect', { x: 7.45, y: 1.223, w: 7.05, h: 4.0, fill: { color: '1A1A1A' }, rectRadius: 0.12 });
+  s.addShape('roundRect', { x: 6.9, y: 5.223, w: 8.15, h: 0.16, fill: { color: '9C9C9C' }, rectRadius: 0.08 });
+  photo(s, { x: 7.723, y: 1.578, w: 6.496, h: 4.067 * 0.86, capX: 10.97, capY: 3.61 });
+  head(s, { x: 0.76, y: 0.977, w: 5.906, h: 1.353, ls: 1.2, runs: [['Creating an Easy Home Yoga ', INK], ['Practice', PURPLE]] });
+  body(s, { x: 0.76, y: 2.32, w: 5.042, h: 0.303, text: 'Subtitle Here', color: GRAY, ls: null });
+  body(s, {
+    x: 0.76, y: 3.028, w: 5.71, h: 1.051,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years ago and has a rich history deeply intertwined with Indian philosophy, spirituality.',
+  });
+  subBlock(s, {
+    x: 0.76, y: 4.485, w: 5.71, sub: 'Subtitle Here',
+    text: 'Traditionally, yoga was passed down from teacher to student through oral transmission and practical demonstration, evolving.',
+  });
+  s.addShape('roundRect', { x: 0.76, y: 5.932, w: 1.575, h: 0.591, fill: { color: PURPLE }, rectRadius: RR(0.591) });
+  head(s, { x: 0.76, y: 6.059, w: 1.575, h: 0.337, size: 14, align: 'center', runs: [['Read More', WHITE]] });
+};
+
+/* --- 17: two phone mockups */
+build[17] = (s) => {
+  s.addShape('custGeom', {
+    x: 9.878, y: 1.077, w: 2.714, h: 8.65, rotate: 225, fill: { color: PURPLE },
+    points: poly([[2.71, 8.65], [0, 5.94], [0, 2.71], [2.71, 0]]),
+  });
+  s.addShape('custGeom', {
+    x: 8.586, y: -1.94, w: 2.714, h: 7.002, rotate: 225, fill: { color: PURPLE },
+    points: poly([[0.06, 7], [0, 1.36], [1.36, 0], [2.71, 1.36], [2.71, 4.35]]),
+  });
+  [[6.825, 0.137], [9.746, 1.726]].forEach(([x, y]) => {
+    s.addShape('roundRect', { x, y, w: 2.95, h: 5.637, fill: { color: '2E2E33' }, rectRadius: 0.36 });
+    photo(s, { x: x + 0.14, y: y + 0.13, w: 2.67, h: 5.377, shape: 'roundRect', r: 0.28, capX: x + 1.475, capY: y + 2.84 });
+    s.addShape('roundRect', { x: x + 1.0, y: y + 0.14, w: 0.95, h: 0.19, fill: { color: '2E2E33' }, rectRadius: 0.09 });
+  });
+  head(s, { x: 0.76, y: 0.887, w: 5.906, h: 1.353, ls: 1.2, runs: [['Yoga for Stress Relief and ', INK], ['Relaxation', PURPLE]] });
+  body(s, { x: 0.76, y: 2.23, w: 5.042, h: 0.303, text: 'Subtitle Here', color: GRAY, ls: null });
+  [3.017, 4.289].forEach((y) => {
+    s.addShape('ellipse', { x: 0.793, y, w: 0.787, h: 0.787, fill: { type: 'none' }, line: { color: TRACK, width: 1 } });
+    s.addShape('mathMultiply', { x: 0.99, y: y + 0.252, w: 0.393, h: 0.284, rotate: 45, fill: { color: PURPLE } });
+    body(s, {
+      x: 1.777, y: y + 0.111, w: 4.922, h: 0.567,
+      text: 'Traditionally, yoga was passed down from teacher\nto student through oral transmission.',
+    });
+  });
+  body(s, {
+    x: 0.76, y: 5.562, w: 5.71, h: 1.051,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years ago and has a rich history deeply intertwined with Indian philosophy, spirituality.',
+  });
+};
+
+/* --- 18: six-limb pinwheel */
+build[18] = (s) => {
+  head(s, { x: 0.76, y: 0.797, w: 5.906, h: 0.707, ls: 1.2, runs: [['The ', INK], ['Six', PURPLE], [' Limbs of Yoga', INK]] });
+  body(s, { x: 0.76, y: 1.505, w: 5.042, h: 0.303, text: 'Subtitle Here', color: GRAY, ls: null });
+  body(s, {
+    x: 0.76, y: 2.211, w: 5.71, h: 1.051,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years ago and has a rich history deeply intertwined with Indian philosophy, spirituality.',
+  });
+  ['01', '02', '03'].forEach((n, i) => {
+    const y = 3.665 + i * 1.147;
+    head(s, { x: 0.76, y, w: 0.658, h: 0.505, size: 24, runs: [[n, PURPLE]] });
+    body(s, { x: 1.331, y: y + 0.027, w: 5.335, h: 0.324, text: 'Subtitle Here', bold: true });
+    body(s, { x: 1.331, y: y + 0.42, w: 5.335, h: 0.324, text: 'Yoga is an ancient practice that encompasses physical.' });
+  });
+  // six purple petals radiating from a hollow centre, each capped by an icon bubble
+  const CX = 9.647, CY = 3.749, PET = 1.902;
+  for (let i = 0; i < 6; i++) {
+    const a = (i * 60 - 90) * Math.PI / 180;
+    s.addShape('teardrop', {
+      x: CX + Math.cos(a) * 1.30 - PET / 2, y: CY + Math.sin(a) * 1.30 - PET / 2, w: PET, h: PET,
+      rotate: (i * 60 - 90) + 135, fill: { color: PURPLE },
+    });
+    const bx = CX + Math.cos(a) * 2.32, by = CY + Math.sin(a) * 2.32;
+    s.addShape('ellipse', { x: bx - 0.503, y: by - 0.503, w: 1.006, h: 1.006, fill: { color: PURPLE }, line: { color: WHITE, width: 4 } });
+    s.addShape('star5', { x: bx - 0.2, y: by - 0.2, w: 0.4, h: 0.4, fill: { color: WHITE } });
+  }
+  s.addShape('ellipse', { x: CX - 1.05, y: CY - 1.05, w: 2.1, h: 2.1, fill: { color: PURPLE }, line: { color: WHITE, width: 8 } });
+  head(s, { x: CX - 1.148, y: CY - 0.858, w: 2.295, h: 1.717, size: 96, align: 'center', runs: [['6', WHITE]] });
+};
+
+/* --- 19: timeline */
+const YEARS = [
+  { year: '2024', tx: 5.502, ty: 3.004, cx: 7.342, cy: 3.365, dark: false },
+  { year: '2025', tx: 7.730, ty: 4.341, cx: 7.331, cy: 4.697, dark: false },
+  { year: '2026', tx: 4.106, ty: 4.342, cx: 5.999, cy: 4.697, dark: true },
+  { year: '2027', tx: 6.385, ty: 5.680, cx: 5.999, cy: 6.041, dark: true },
+];
+build[19] = (s) => {
+  header(s, { x: 3.714, y: 0.797, h: 0.64, align: 'center', subY: 1.436, sub: 'Subtitle Here', runs: [['Asana ', INK], ['Timeline', PURPLE]] });
+  s.addShape('rect', { x: 9.608, y: 3.44, w: 3.725, h: 0.189, fill: { color: PURPLE } });
+  s.addShape('rect', { x: 0, y: 5.553, w: 3.725, h: 0.189, fill: { color: MID } });
+  // S-curve spine: alternating rings connected by the year bubbles
+  [[6.573, 3.822, PURPLE], [5.233, 3.821, PURPLE], [7.332, 2.481, PURPLE], [3.725, 5.162, MID], [6.573, 5.162, MID]]
+    .forEach(([x, y, c]) => s.addShape('donut', { x, y, w: 1.541, h: 1.541, fill: { color: c } }));
+  YEARS.forEach((t) => {
+    s.addShape('ellipse', { x: t.cx - 0.366, y: t.cy - 0.366, w: 0.731, h: 0.731, fill: { color: WHITE }, line: HALO, shadow: SOFT });
+    s.addShape('star5', { x: t.cx - 0.2, y: t.cy - 0.2, w: 0.4, h: 0.4, fill: { color: PURPLE } });
+    head(s, { x: t.tx, y: t.ty, w: 1.508, h: 0.505, size: 24, align: 'center', runs: [[t.year, PURPLE]] });
+  });
+  body(s, {
+    x: 0.76, y: 2.969, w: 3.725, h: 1.051,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being.',
+  });
+  body(s, {
+    x: 8.847, y: 5.162, w: 3.725, h: 1.051, align: 'right',
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being.',
+  });
+  dots(s, 0.76, 4.639, 0.295, 0.766);
+  dots(s, 10.744, 4.248, 0.295, 0.766);
+};
+
+/* --- 20: partner logos on a purple slab */
+const BRANDS = [['First Brand', 6.915, 1.85], ['Second Brand', 9.999, 1.85], ['Third Brand', 6.915, 4.259], ['Fourth Brand', 9.999, 4.259]];
+build[20] = (s) => {
+  photo(s, { x: 0, y: 0, w: 13.333, h: 7.5, capY: 3.78 });
+  s.addShape('roundRect', { x: 0.76, y: 1.388, w: 11.812, h: 4.724, fill: { color: PURPLE }, rectRadius: RR(4.724) });
+  BRANDS.forEach(([label, x, y], i) => {
+    const gx = x + 0.768, gy = y;
+    if (i === 0) s.addShape('star4', { x: gx, y: gy, w: 0.787, h: 0.787, fill: { color: WHITE } });
+    if (i === 1) { s.addShape('ellipse', { x: gx, y: gy, w: 0.787, h: 0.787, fill: { color: WHITE } }); s.addShape('lightningBolt', { x: gx + 0.26, y: gy + 0.16, w: 0.27, h: 0.46, fill: { color: PURPLE } }); }
+    if (i === 2) { s.addShape('ellipse', { x: gx, y: gy, w: 0.787, h: 0.787, fill: { color: WHITE } }); s.addShape('wave', { x: gx + 0.06, y: gy + 0.25, w: 0.67, h: 0.28, fill: { color: PURPLE } }); }
+    if (i === 3) {
+      s.addShape('ellipse', { x: gx, y: gy, w: 0.787, h: 0.787, fill: { color: WHITE } });
+      [[0.20, 0.30], [0.44, 0.30], [0.32, 0.18], [0.32, 0.42]].forEach(([dx, dy]) =>
+        s.addShape('ellipse', { x: gx + dx, y: gy + dy, w: 0.17, h: 0.17, fill: { color: PURPLE } }));
+    }
+    body(s, { x, y: y + 1.088, w: 2.323, h: 0.303, text: label, color: WHITE, align: 'center', ls: null });
+  });
+  head(s, { x: 1.205, y: 1.993, w: 5.462, h: 1.178, runs: [['Asana Business\nPartners', WHITE]] });
+  body(s, { x: 1.205, y: 3.171, w: 5.462, h: 0.303, text: 'Subtitle Here', color: WHITE, ls: null });
+  body(s, {
+    x: 1.205, y: 3.971, w: 4.32, h: 1.536, color: WHITE,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well\n\nAlso It originated in India over 5,000 years ago and has a rich history deeply intertwined with.',
+  });
+};
+
+/* --- 21-24: SWOT pages. A giant gray letter sits behind a purple word band. */
+const LETTERS = {
+  S: [[3.77, 5.53], [1.47, 5.63], [0.22, 4.81], [0, 4.08], [1.18, 3.68], [1.38, 4.27], [1.85, 4.61], [3.1, 4.64],
+      [3.58, 4.12], [3.42, 3.81], [0.8, 2.91], [0.29, 2.43], [0.1, 1.68], [0.36, 0.8], [1.12, 0.21], [2.35, 0],
+      [3.58, 0.21], [4.37, 0.79], [4.67, 1.65], [3.47, 1.99], [3.39, 1.57], [2.82, 1.08], [1.8, 1.09], [1.37, 1.57],
+      [1.54, 1.9], [4.12, 2.77], [4.65, 3.26], [4.86, 4.05], [4.59, 4.94]],
+  W: [[6.01, 0], [5.1, 4.12], [3.7, 4.12], [3.04, 0.86], [2.98, 0.86], [2.33, 4.12], [0.9, 4.12], [0, 0],
+      [1.1, 0], [1.64, 3.27], [1.71, 3.27], [2.39, 0], [3.66, 0], [4.36, 3.27], [4.42, 3.27], [4.97, 0]],
+  T: [[4.57, 0], [4.57, 1.12], [2.95, 1.12], [2.95, 5.5], [1.6, 5.5], [1.6, 1.12], [0, 1.12], [0, 0]],
+};
+function swot(s, o) {
+  if (o.letter === 'O') {
+    s.addShape('ellipse', { x: o.lx, y: o.ly, w: o.lw, h: o.lh, fill: { color: PHFILL } });
+    s.addShape('ellipse', { x: o.lx + o.lw * 0.26, y: o.ly + o.lh * 0.19, w: o.lw * 0.48, h: o.lh * 0.62, fill: { color: WHITE } });
+  } else {
+    s.addShape('custGeom', { x: o.lx, y: o.ly, w: o.lw, h: o.lh, fill: { color: PHFILL }, points: poly(LETTERS[o.letter]) });
+  }
+  s.addShape('rect', { x: o.bandX, y: 3.406, w: o.bandW, h: 0.688, fill: { color: WHITE } });
+  head(s, { x: o.wordX, y: 3.397, w: o.wordW, h: 0.707, align: 'center', ls: 1.2, runs: [[o.word, PURPLE]] });
+  head(s, { x: o.tx, y: 0.789, w: 5.906, h: 1.353, ls: 1.2, runs: [[o.title, PURPLE], [' Analysis\nSlide', INK]] });
+  body(s, { x: o.tx, y: 2.132, w: 5.042, h: 0.303, text: 'Subtitle Here', color: GRAY, ls: null });
+}
+const LOREM_FULL = 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years ago and has a rich history deeply intertwined with Indian philosophy, spirituality.';
+
+build[21] = (s) => {
+  swot(s, { letter: 'S', lx: 7.673, ly: 0.834, lw: 4.858, lh: 5.733, bandX: 7.534, bandW: 5.104, wordX: 8.076, wordW: 4.021, word: 'STRENGTH', title: 'Strength', tx: 0.76 });
+  body(s, {
+    x: 0.76, y: 2.833, w: 5.71, h: 0.567,
+    text: 'Traditionally, yoga was passed down from teacher to student through oral transmission and practical demonstration, evolving.',
+  });
+  [3.798, 5.427].forEach((y) => {
+    s.addShape('roundRect', { x: 0.76, y, w: 5.065, h: 1.231, fill: { color: PURPLE }, rectRadius: RR(1.231) });
+    s.addShape('ellipse', { x: 1.074, y: y + 0.16, w: 0.591, h: 0.591, fill: { color: WHITE } });
+    s.addShape('heart', { x: 1.21, y: y + 0.30, w: 0.32, h: 0.30, fill: { color: PURPLE } });
+    subBlock(s, { x: 1.96, y: y + 0.168, w: 3.0, color: WHITE, sub: 'The Way of the Air', text: 'Traditionally, yoga was passed down from teacher to student.' });
+  });
+};
+
+build[22] = (s) => {
+  swot(s, { letter: 'W', lx: 0.71, ly: 1.65, lw: 6.006, lh: 4.125, bandX: 0.943, bandW: 5.542, wordX: 1.625, wordW: 4.177, word: 'WEAKNESS', title: 'Weakness', tx: 7.192 });
+  body(s, { x: 7.192, y: 2.883, w: 5.71, h: 1.051, text: LOREM_FULL });
+  dots(s, 7.281, 4.382, 0.295, 0.767);
+  meter(s, { x: 7.281, y: 5.124, w: 5.292, pct: 25, label: 'First Data' });
+  meter(s, { x: 7.281, y: 6.137, w: 5.292, pct: 50, label: 'Second Data' });
+};
+
+build[23] = (s) => {
+  swot(s, { letter: 'O', lx: 7.44, ly: 0.834, lw: 5.3, lh: 5.733, bandX: 7.189, bandW: 5.795, wordX: 7.96, wordW: 4.254, word: 'OPPORTUNITY', title: 'Opportunity', tx: 0.76 });
+  body(s, { x: 0.76, y: 2.954, w: 5.71, h: 1.051, text: LOREM_FULL });
+  [['95%', 'First Data', 0.76, 4.523], ['1.8', 'Second Data', 3.145, 4.523],
+   ['318k+', 'Third Data', 0.76, 5.739], ['8370', 'Fourth Data', 3.145, 5.739]].forEach(([v, label, x, y]) => {
+    head(s, { x, y, w: 1.679, h: 0.64, runs: [[v, PURPLE]] });
+    body(s, { x, y: y + 0.64, w: 2.104, h: 0.324, text: label, bold: true });
+  });
+};
+
+build[24] = (s) => {
+  swot(s, { letter: 'T', lx: 0.755, ly: 0.951, lw: 4.567, lh: 5.5, bandX: 0.139, bandW: 5.795, wordX: 0.91, wordW: 4.254, word: 'THREATS', title: 'Threat', tx: 7.192 });
+  body(s, {
+    x: 7.192, y: 2.922, w: 5.71, h: 0.567,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic',
+  });
+  [['Danger', 7.37], ['Outside Threat', 10.145]].forEach(([label, ix]) => {
+    s.addShape('ellipse', { x: ix, y: 3.976, w: 0.394, h: 0.394, fill: { color: PURPLE } });
+    s.addShape('mathMinus', { x: ix + 0.09, y: 4.11, w: 0.21, h: 0.12, fill: { color: WHITE } });
+    subBlock(s, { x: ix + 0.503, y: 3.976, w: 2.168, sub: label, subColor: PURPLE, text: 'Yoga is an ancient practice.' });
+  });
+  [['50%', 'First Data', 7.625], ['25%', 'Second Data', 9.590], ['35%', 'Third Data', 11.555]].forEach(([pct, label, x]) => {
+    const end = 270 + parseInt(pct, 10) * 3.6;
+    s.addShape('arc', { x, y: 5.355, w: 0.943, h: 0.943, angleRange: [270, 269], line: { color: TRACK, width: 10 } });
+    s.addShape('arc', { x, y: 5.355, w: 0.943, h: 0.943, angleRange: [270, end % 360], line: { color: PURPLE, width: 10 } });
+    body(s, { x: x + 0.034, y: 5.645, w: 0.874, h: 0.372, text: pct, bold: true, align: 'center' });
+    body(s, { x: x - 0.433, y: 6.37, w: 1.846, h: 0.333, text: label, bold: true, align: 'center' });
+  });
+};
+
+/* --- 25: kids, photo band over a purple half */
+build[25] = (s) => {
+  photo(s, { x: 0, y: 0, w: 13.333, h: 3.75, capY: 2.07 });
+  s.addShape('rect', { x: 0, y: 3.75, w: 13.333, h: 3.75, fill: { color: PURPLE } });
+  body(s, {
+    x: 6.109, y: 4.736, w: 6.464, h: 1.778, color: WHITE,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000 years ago and has a rich history deeply\n\n\n Traditionally, yoga was passed down from teacher to student through oral transmission and practical demonstration, evolving over centuries to cast.',
+  });
+  head(s, { x: 0.76, y: 4.948, w: 5.906, h: 1.353, ls: 1.2, runs: [[' Fun and Engaging Practices for Kids', WHITE]] });
+};
+
+/* --- 26: strength & endurance, three photo tiles on a purple slab */
+build[26] = (s) => {
+  s.addShape('custGeom', {
+    x: 0, y: 0, w: 6.667, h: 7.5, fill: { color: PURPLE },
+    points: poly([[0, 0], [5.94, 0], [6.67, 0.73], [6.67, 6.77], [5.94, 7.5], [0, 7.5]]),
+  });
+  [[3.861, 0.934], [3.861, 4.516], [0.908, 2.761]].forEach(([x, y]) =>
+    s.addShape('roundRect', { x, y, w: 2.362, h: 2.362, fill: { color: WHITE }, rectRadius: 0.23 }));
+  [[3.714, 0.797], [3.714, 4.341], [0.760, 2.569]].forEach(([x, y]) =>
+    photo(s, { x, y, w: 2.362, h: 2.362, shape: 'roundRect', r: 0.23, capY: y + 1.21 }));
+  head(s, { x: 7.192, y: 1.387, w: 5.906, h: 1.353, ls: 1.2, runs: [['Yoga for ', INK], ['Strength', PURPLE], [' and Endurance', INK]] });
+  body(s, { x: 7.192, y: 2.73, w: 5.042, h: 0.303, text: 'Subtitle Here', color: GRAY, ls: null });
+  body(s, {
+    x: 7.192, y: 3.494, w: 5.71, h: 0.567,
+    text: 'Traditionally, yoga was passed down from teacher to student through oral transmission and practical demonstration, evolving.',
+  });
+  meter(s, { x: 7.281, y: 4.521, w: 5.292, pct: 75, label: 'First Data' });
+  meter(s, { x: 7.281, y: 5.547, w: 5.292, pct: 90, label: 'Second Data' });
+};
+
+/* --- 27: daily routine, angled photo ribbons */
+build[27] = (s) => {
+  photo(s, {
+    x: 7.217, y: 1.384, w: 6.116, h: 6.116, capX: 11.23, capY: 5.63,
+    points: poly([[6.12, 0], [6.12, 3.84], [3.84, 6.12], [0, 6.12]]),
+  });
+  s.addShape('custGeom', {
+    x: 7.912, y: 2.078, w: 5.422, h: 5.422, fill: { color: PURPLE },
+    points: poly([[5.42, 0], [5.42, 3.84], [3.84, 5.42], [0, 5.42]]),
+  });
+  photo(s, {
+    x: 7.07, y: 0, w: 6.263, h: 4.434, capX: 9.50, capY: 2.10,
+    points: poly([[6.26, 0], [2.32, 4.04], [0.4, 4.04], [0.4, 2.12], [2.51, 0]]),
+  });
+  s.addShape('custGeom', {
+    x: 7.764, y: 0, w: 5.569, h: 4.434, fill: { color: PURPLE },
+    points: poly([[5.57, 0], [5.57, 0.78], [2.32, 4.04], [0.4, 4.04], [0.4, 2.12], [2.51, 0]]),
+  });
+  header(s, { x: 0.76, y: 1.673, subY: 2.847, sub: 'Subtitle Here', runs: [['Incorporating Yoga into Your Daily ', INK], ['Routine', PURPLE]] });
+  body(s, {
+    x: 0.76, y: 3.515, w: 5.212, h: 0.809,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000.',
+  });
+  subBlock(s, {
+    x: 0.76, y: 4.69, w: 5.212, h: 0.809, sub: 'Subtitle Here',
+    text: 'Traditionally, yoga was passed down from teacher\nto student through oral transmission and practical demonstration, evolving over centuries to adapt.',
+  });
+};
+
+/* --- 28: finding a class, white rounded card over purple */
+build[28] = (s) => {
+  s.addShape('rect', { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: PURPLE } });
+  s.addShape('roundRect', { x: -0.381, y: -0.398, w: 13.333, h: 7.5, fill: { color: WHITE }, rectRadius: RR(7.5) });
+  header(s, { x: 6.746, y: 0.797, subY: 1.971, sub: 'Subtitle Here', runs: [['Finding the Right Yoga ', INK], ['Class', PURPLE], [' for You', INK]] });
+  [2.941, 4.417, 5.893].forEach((y, i) => numItem(s, { x: 6.748, y, n: i + 1, w: 4.746, sub: 'Subtitle Here', text: LOREM_SHORT }));
+  photo(s, { x: 0.76, y: 0.797, w: 4.621, h: 2.756, shape: 'roundRect', r: 0.24, capY: 2.30 });
+  photo(s, { x: 0.76, y: 3.947, w: 4.621, h: 2.362, shape: 'roundRect', r: 0.21, capY: 5.25 });
+};
+
+/* --- 29: break slide, giant 45 behind a seated figure */
+build[29] = (s) => {
+  head(s, { x: 6.683, y: 0.86, w: 5.906, h: 5.781, size: 300, align: 'center', ls: 1.2, runs: [['45', MID]] });
+  // stand-in for the meditating figure and its leafy backdrop
+  [[6.667, 4.24, 0.483, 1.276, 30], [11.83, 3.547, 0.743, 1.961, -25], [6.809, 4.649, 0.985, 0.881, 15], [10.839, 4.175, 1.515, 1.354, -15]]
+    .forEach(([x, y, w, h, rot]) => s.addShape('teardrop', { x, y, w, h, rotate: rot, fill: { color: LILAC } }));
+  s.addShape('ellipse', { x: 8.416, y: 5.098, w: 1.776, h: 0.887, fill: { color: '2F2E41' } });
+  s.addShape('roundRect', { x: 8.62, y: 3.956, w: 1.96, h: 1.739, fill: { color: '5B21A8' }, rectRadius: 0.35 });
+  s.addShape('ellipse', { x: 9.092, y: 2.508, w: 0.9, h: 1.131, fill: { color: '2F2E41' } });
+  s.addShape('ellipse', { x: 9.209, y: 2.91, w: 0.69, h: 0.69, fill: { color: 'FFB6B6' } });
+  s.addShape('ellipse', { x: 9.34, y: 2.26, w: 0.42, h: 0.42, fill: { color: '2F2E41' } });
+  head(s, { x: 7.98, y: 1.768, w: 3.312, h: 0.48, size: 20, spc: 6, align: 'center', ls: 1.2, runs: [['MINUTES', MID]] });
+  head(s, { x: 0.76, y: 2.207, w: 5.906, h: 1.979, size: 48, ls: 1.2, runs: [['Take a ', INK], ['Break', PURPLE], [' to Catch a Breath', INK]] });
+  dots(s, 0.921, 4.49, 0.197, 0.767);
+  body(s, { x: 0.76, y: 4.991, w: 5.906, h: 0.303, text: 'We\u2019ll Be Back in No Time!', color: GRAY, ls: null });
+};
+
+/* --- 30: contact details */
+const CONTACT = [
+  ['Location ', 'City, Country', 3.417, 3.513, 4.276, 2.39],
+  ['Phone', '+62 231 1920 7812', 4.230, 4.326, 4.565, 2.102],
+  ['E-Mail', 'lorem@youremail.com', 5.043, 5.138, 3.996, 2.67],
+  ['Website', 'yourwebsite.com', 5.855, 5.951, 4.661, 2.005],
+];
+build[30] = (s) => {
+  s.addShape('rect', { x: 7.192, y: 0, w: 6.141, h: 7.5, fill: { color: PURPLE } });
+  photo(s, { x: 7.952, y: 0.797, w: 4.621, h: 6.703, shape: 'roundRect', r: 0.409, capY: 4.26 });
+  head(s, { x: 0.76, y: 0.789, w: 5.906, h: 0.707, ls: 1.2, runs: [['Keep in ', INK], ['Touch', PURPLE], [' with Us!', INK]] });
+  body(s, { x: 0.76, y: 1.496, w: 5.042, h: 0.303, text: 'Subtitle Here', color: GRAY, ls: null });
+  body(s, {
+    x: 0.76, y: 2.204, w: 5.212, h: 0.809,
+    text: 'Yoga is an ancient practice that encompasses physical postures, breathing exercises, and meditation techniques to foster holistic well-being. It originated in India over 5,000.',
+  });
+  CONTACT.forEach(([label, value, iy, ty, vx, vw]) => {
+    s.addShape('roundRect', { x: 0.76, y: iy, w: 0.591, h: 0.591, fill: { color: PURPLE }, rectRadius: 0.148 });
+    s.addShape('ellipse', { x: 0.898, y: iy + 0.128, w: 0.315, h: 0.315, fill: { color: WHITE } });
+    body(s, { x: 1.658, y: ty, w: 2.228, h: 0.399, text: label, bold: true, size: 16 });
+    body(s, { x: vx, y: ty + 0.013, w: vw, h: 0.372, text: value, size: 14, align: 'right' });
+  });
+};
+
+/* ================================================================== assemble */
+const pptx = new PptxGenJS();
+pptx.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5 in
+pptx.title = 'Asana — Yoga Presentation Template';
+
+const NO_CHROME = new Set([1, 2, 14, 20, 25, 26, 28, 31, 32]);
+for (let n = 1; n <= 32; n++) {
+  const slide = pptx.addSlide();
+  slide.background = { color: WHITE };
+  build[n](slide);
+  if (!NO_CHROME.has(n)) chrome(slide, n);
+}
+
+pptx.writeFile({ fileName: path.join(__dirname, '128752bd-678e-4d4f-afbe-c67af788739e_grok_final.pptx') })
+  .then((f) => console.log('wrote', f));

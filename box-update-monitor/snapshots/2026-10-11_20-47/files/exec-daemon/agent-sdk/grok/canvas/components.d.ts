@@ -1,0 +1,186 @@
+import { type JSX, type ReactNode } from "react";
+import { type PageWidth } from "./width.js";
+/**
+ * The one output style every Grok Bot page uses. A page is a title, a short
+ * summary, and sections of text, callouts, lists, tables, charts, and custom
+ * visuals. Neutral text, brand-colored data marks: text sits on the type
+ * scale in neutral ink, color in text marks only status, and chart marks take
+ * the Grok Bot data-viz palette (`useGrokTheme().dataviz`). No pills, tints,
+ * cards, logos, or decorative buttons inside the page.
+ */
+/** Color for a status word. No other text in a page is colored. */
+export type Tone = "success" | "warning" | "danger";
+export interface PageProps {
+    /** Page title, once. */
+    title: string;
+    /** One or two sentences under the title: the point of the page. */
+    summary?: string;
+    /**
+     * @deprecated Renders nothing. Accepted so pages written when it drew a
+     * "From …" line still compile; leave it out of new pages.
+     */
+    sources?: readonly string[];
+    /**
+     * The one width every block of the page shares. `column` (the default) is
+     * the 700 px reading measure, for a report, memo, or write-up; `wide` grows
+     * with the window up to 1280 px, for a dashboard, a wide table, a board, or
+     * a diagram; `full` spans the page. On a phone every width is the one column.
+     */
+    width?: PageWidth;
+    /** `Section`s, 28 px apart. */
+    children?: ReactNode;
+}
+/**
+ * Root of a Grok canvas: title, summary, then sections, all at the page's
+ * one `width`: the 700 px reading column by default, `wide` (up to 1280 px)
+ * or `full` for a page that is mostly visuals. Wrap the whole canvas in one
+ * `Page`.
+ *
+ * @example
+ * ```tsx
+ * <Page title="Fourth shop: where to open" summary="Mill Hill, opening in spring.">
+ *   <Section heading="Pickup orders by neighborhood">…</Section>
+ * </Page>
+ * ```
+ */
+export declare function Page({ title, summary, width, children }: PageProps): JSX.Element;
+export interface SectionProps {
+    /** Section heading. Also names any chart inside; charts have no title of their own. */
+    heading?: string;
+    /** One quiet line under the heading, e.g. the unit or the period. */
+    caption?: string;
+    /** A control at the end of the heading line: a `Segmented` that switches the view, a `Button`. */
+    actions?: ReactNode;
+    /** The heading folds the blocks away; needs a `heading`. */
+    collapsible?: boolean;
+    /** Start a collapsible section open. Closed by default. */
+    defaultOpen?: boolean;
+    /** Its blocks: paragraphs, a callout, a list, a table, a chart, a `Grid`, or a custom visual. */
+    children?: ReactNode;
+}
+/**
+ * One section of a page: a heading, an optional caption, and its blocks,
+ * 10 px apart. `actions` end the heading line and wrap under it on a narrow
+ * page; a `collapsible` section folds its blocks behind a chevron.
+ */
+export declare function Section({ heading, caption, actions, collapsible, defaultOpen, children, }: SectionProps): JSX.Element;
+export interface TextProps {
+    /** One paragraph of plain sentences. */
+    children?: ReactNode;
+}
+/** A paragraph of body text. Use one `Text` per paragraph. */
+export declare function Text({ children }: TextProps): JSX.Element;
+export interface CalloutProps {
+    /** Bold first line: the takeaway in a few words. */
+    lead?: string;
+    /** Colors the `lead` when the takeaway is good or bad news; the box and body stay neutral. */
+    tone?: Tone;
+    /** A line or two of body text. */
+    children?: ReactNode;
+}
+/**
+ * The page's one takeaway: a bold lead and a line or two in a quiet neutral
+ * box. Use at most one or two per page. One with nothing to say draws nothing.
+ */
+export declare function Callout({ lead, tone, children }: CalloutProps): JSX.Element | null;
+export interface ListProps {
+    /** One plain sentence per item. */
+    items: readonly string[];
+}
+/** Bulleted list with a quiet marker column. */
+export declare function BulletList({ items }: ListProps): JSX.Element;
+/** Numbered list for steps or ranked items. */
+export declare function NumberedList({ items }: ListProps): JSX.Element;
+export interface ChecklistItem {
+    text: string;
+    done?: boolean;
+    /** A note, e.g. a due time: right of the title, or under it on a phone. */
+    meta?: string;
+}
+export interface ChecklistProps {
+    items: readonly ChecklistItem[];
+    /** The ticked flags, one per item, when the page keeps them; pair with `onChange`, and `done` is then ignored. */
+    value?: readonly boolean[];
+    /** The next flags after a tick. */
+    onChange?: (value: boolean[]) => void;
+}
+/**
+ * Tasks with a checkbox each. Ticking is local to the page view unless the
+ * page keeps the flags in `value` and `onChange`.
+ */
+export declare function Checklist({ items, value, onChange }: ChecklistProps): JSX.Element;
+export interface Row {
+    /** Short fixed-width lead, e.g. a time or a rank. */
+    lead?: string;
+    title: string;
+    detail?: string;
+    /** Right-aligned note, e.g. an owner, a due time, a count, a value. */
+    meta?: string;
+    /** A status word after the title; `tone` colors it. */
+    status?: {
+        label: string;
+        tone?: Tone;
+    };
+}
+export interface RowsProps {
+    rows: readonly Row[];
+}
+/**
+ * The detailed list: hairline rows with a lead, a title, a status word, a
+ * detail line, and a right-aligned meta. Two or three numbers belong here
+ * (value as `meta`), not in a chart.
+ */
+export declare function Rows({ rows }: RowsProps): JSX.Element;
+/**
+ * One table cell: its text, a status word with a `tone` of `"success"`,
+ * `"warning"`, or `"danger"` that colors it, or any React node (a kit
+ * element, a number) when a word is not enough.
+ */
+export type TableCell = string | {
+    text: string;
+    tone?: Tone;
+} | ReactNode;
+export interface TableProps {
+    /** Header row. The first column is the label column; leave it `""` when it needs no header. */
+    columns: readonly string[];
+    /**
+     * One array per row: label first, then values. A column of figures, dates,
+     * or single words is right-aligned on one line; a column with a phrase or a
+     * sentence in it reads from the left and wraps. A row longer than `columns`
+     * adds columns with no header rather than losing its cells.
+     */
+    rows: readonly (readonly TableCell[])[];
+    /** Index of the column to set in medium weight, e.g. the recommended option. */
+    emphasis?: number;
+    /**
+     * Alignment per column index. `auto`, the default, right-aligns a column
+     * of figures and left-aligns words; set `end` or `start` to override one
+     * column, e.g. a status word that should sit with the figures.
+     */
+    align?: readonly ("auto" | "start" | "end")[];
+}
+/**
+ * Hairline table with no outer border: label column in secondary ink, figures
+ * right-aligned in tabular numerals, words left-aligned and wrapping,
+ * caption-sized header. One whose words are wider than its page scrolls
+ * sideways; from five columns it scrolls as a unit with every label on one
+ * line.
+ */
+export declare function Table({ columns, rows, emphasis, align }: TableProps): JSX.Element;
+export interface Link {
+    title: string;
+    /** Where it lives, e.g. "Slack · #design-review" or "Figma". */
+    site?: string;
+    date?: string;
+    href: string;
+}
+export interface LinkCardsProps {
+    links: readonly Link[];
+    /** Number the cards so findings can cite them. */
+    numbered?: boolean;
+}
+/**
+ * Compact references to documents and pages, in the kit's one box chrome,
+ * because they leave the page.
+ */
+export declare function LinkCards({ links, numbered }: LinkCardsProps): JSX.Element;

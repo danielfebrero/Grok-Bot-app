@@ -1,0 +1,5 @@
+--- 2026-10-11_17-53:/usr/local/bin/cursor_agent_store_fuse_version
++++ 2026-10-11_20-47:/usr/local/bin/cursor_agent_store_fuse_version
+@@ -1 +1 @@
+-https://public-asphr-vm-daemon-bucket.s3.us-east-1.amazonaws.com/agent-store-fuse/agent-store-fuse-x64-f4c8738782c531c22d26dc1a0d0e9d567163cf14-bk.tar.gz
++https://public-asphr-vm-daemon-bucket.s3.us-east-1.amazonaws.com/agent-store-fuse/agent-store-fuse-x64-e1fd3f3b4296656256bcd52df76602c12baa309d-bk.tar.gz
