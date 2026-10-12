@@ -1,0 +1,9 @@
+snapshot	2026-10-12_15-01
+created	2026-10-12 15:02:07 CEST
+label	auto: changement détecté (tree:/var/lib/sand-daemon-supervisor/orbitd/releases, ver:orbitd.releases)
+files	13602
+text_copies	3269
+big_text_gz	4
+unreadable	0
+bytes_hashed	1708247492
+duration_s	8.5

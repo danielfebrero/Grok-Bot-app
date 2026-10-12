@@ -1,0 +1,670 @@
+/**
+ * Rebuild of "Mobile Apps" presentation (15 slides, 13.333 x 7.5 in) with pptxgenjs.
+ * Raster photos in the source deck are replaced with programmatic placeholders.
+ */
+const pptxgen = require('pptxgenjs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ theme */
+const CYAN = '00B0F0';        // accent3 - brand colour
+const WHITE = 'FFFFFF';
+const INK = '000000';         // tx1
+const INK75 = '404040';       // tx1 lumMod 75%
+const INK65 = '595959';       // tx1 lumMod 65%
+const INK95 = '0D0D0D';       // tx1 lumMod 95%
+const LINE = 'D9D9D9';        // bg1 lumMod 85% - card borders
+const RULE = 'BFBFBF';        // bg1 lumMod 75% - dashed rules
+const PAPER = 'F2F2F2';
+const GREY1 = 'DDDDDD', GREY2 = 'B2B2B2', GREY4 = '808080';
+const SHOT = 'CCCCCC';        // stand-in colour for photo placeholders
+const SKIN = 'F2C0A8';
+const DEVICE = '1C1C1E';      // phone / laptop body
+
+const MAJOR = 'Questrial';    // theme major latin font
+const BODY = 'Open Sans';     // theme minor latin font
+
+const W = 13.3333333, H = 7.5;
+
+/* ---------------------------------------------------------------- helpers */
+const shape = (s, kind, o) => s.addShape(kind, o);
+const text = (s, runs, o) => s.addText(runs, Object.assign({ fontFace: BODY, fontSize: 18, color: INK }, o));
+
+/** rounded rectangle: pptxgenjs wants the corner radius in inches */
+function rrect(s, o, adj) {
+    const r = (adj === undefined ? 0.16667 : adj) * Math.min(o.w, o.h);
+    shape(s, 'roundRect', Object.assign({ rectRadius: r }, o));
+}
+
+/** filled pill button with a centered caption */
+function pill(s, o) {
+    text(s, o.label, {
+        shape: 'roundRect', rectRadius: o.h / 2, x: o.x, y: o.y, w: o.w, h: o.h,
+        fill: { color: o.fill || CYAN }, line: { type: 'none' },
+        align: 'center', valign: 'middle', fontSize: o.fontSize || 12, color: o.color || WHITE,
+    });
+}
+
+/** outlined "tag" chip used for the keyword rows */
+function tag(s, o) {
+    text(s, o.label, {
+        shape: 'roundRect', rectRadius: o.h / 2, x: o.x, y: o.y, w: o.w, h: o.h,
+        fill: { type: 'none' }, line: { color: CYAN, width: 0.75 },
+        align: 'center', valign: 'middle', fontSize: 12, color: CYAN,
+    });
+}
+
+/** bordered content card (roundRect, adj 9479 in the source deck) */
+function card(s, o) {
+    rrect(s, {
+        x: o.x, y: o.y, w: o.w, h: o.h,
+        fill: o.fill ? { color: o.fill } : { type: 'none' },
+        line: { color: o.line || LINE, width: 0.75 },
+    }, 0.09479);
+}
+
+/** grey rectangle standing in for a photograph */
+function photo(s, o) {
+    const r = o.round === undefined ? 0.04 : o.round;
+    shape(s, o.ellipse ? 'ellipse' : 'roundRect', {
+        x: o.x, y: o.y, w: o.w, h: o.h, rotate: o.rotate || 0,
+        rectRadius: r * Math.min(o.w, o.h), fill: { color: o.fill || SHOT }, line: { type: 'none' },
+    });
+    if (o.label !== false) {
+        text(s, '[image]', {
+            x: o.x, y: o.y + o.h / 2 - 0.16, w: o.w, h: 0.32, rotate: o.rotate || 0,
+            align: 'center', valign: 'middle', fontSize: 10, color: WHITE,
+        });
+    }
+}
+
+const SOFT_SHADOW = { type: 'outer', color: '808080', opacity: 0.35, blur: 24, offset: 8, angle: 60 };
+
+/**
+ * Position a child box given in un-rotated parent coordinates so that it ends
+ * up in the right spot once the whole assembly is turned by `parent.rot`
+ * around `parent.pivot` (default: the parent's own centre).
+ */
+function place(parent, dx, dy, w, h) {
+    const a = (parent.rot || 0) * Math.PI / 180;
+    const pv = parent.pivot || { x: parent.x + parent.w / 2, y: parent.y + parent.h / 2 };
+    const px = parent.x + dx + w / 2 - pv.x, py = parent.y + dy + h / 2 - pv.y;
+    return {
+        x: pv.x + px * Math.cos(a) - py * Math.sin(a) - w / 2,
+        y: pv.y + px * Math.sin(a) + py * Math.cos(a) - h / 2,
+        w: w, h: h, rotate: parent.rot || 0,
+    };
+}
+
+/** smartphone mock-up: dark body, grey screen placeholder, notch */
+function phone(s, o) {
+    const b = 0.056 * o.w;
+    shape(s, 'roundRect', Object.assign(place(o, 0, 0, o.w, o.h), {
+        rectRadius: 0.152 * o.w, fill: { color: DEVICE }, line: { type: 'none' }, shadow: SOFT_SHADOW,
+    }));
+    photo(s, Object.assign(place(o, b, b, o.w - 2 * b, o.h - 2 * b), { round: 0.13 }));
+    shape(s, 'roundRect', Object.assign(place(o, 0.255 * o.w, 0, 0.49 * o.w, 0.125 * o.w), {
+        rectRadius: 0.045 * o.w, fill: { color: DEVICE }, line: { type: 'none' },
+    }));
+}
+
+/* ------------------------------------------------------------------ icons */
+/* Small pictograms rebuilt from primitive shapes (the deck uses freeforms). */
+const fill = c => ({ fill: { color: c }, line: { type: 'none' } });
+const stroke = (c, w) => ({ fill: { type: 'none' }, line: { color: c, width: w || 1 } });
+
+function iconEnvelope(s, cx, cy, k, c) {          // open envelope + letter
+    shape(s, 'rect', Object.assign({ x: cx - 0.26 * k, y: cy - 0.50 * k, w: 0.52 * k, h: 0.55 * k }, stroke(c, 1.25)));
+    for (let i = 0; i < 3; i++) {
+        shape(s, 'rect', Object.assign({ x: cx - 0.18 * k, y: cy - 0.36 * k + i * 0.13 * k, w: 0.36 * k, h: 0.035 * k }, fill(c)));
+    }
+    shape(s, 'rect', Object.assign({ x: cx - 0.50 * k, y: cy - 0.10 * k, w: 1.0 * k, h: 0.60 * k }, stroke(c, 1.25)));
+    shape(s, 'line', Object.assign({ x: cx - 0.50 * k, y: cy - 0.10 * k, w: 0.50 * k, h: 0.30 * k }, stroke(c, 1.25)));
+    shape(s, 'line', Object.assign({ x: cx, y: cy - 0.10 * k, w: 0.50 * k, h: 0.30 * k, flipV: true }, stroke(c, 1.25)));
+    shape(s, 'line', Object.assign({ x: cx - 0.50 * k, y: cy + 0.20 * k, w: 0.50 * k, h: 0.30 * k, flipV: true }, stroke(c, 1.25)));
+    shape(s, 'line', Object.assign({ x: cx, y: cy + 0.20 * k, w: 0.50 * k, h: 0.30 * k }, stroke(c, 1.25)));
+}
+
+function iconPerson(s, cx, cy, k, c) {            // bust with a shirt collar
+    shape(s, 'ellipse', Object.assign({ x: cx - 0.22 * k, y: cy - 0.55 * k, w: 0.44 * k, h: 0.50 * k }, fill(c)));
+    rrectShape(s, cx - 0.46 * k, cy - 0.02 * k, 0.92 * k, 0.57 * k, 0.12 * k, c);
+    shape(s, 'triangle', Object.assign({ x: cx - 0.10 * k, y: cy - 0.02 * k, w: 0.20 * k, h: 0.30 * k, flipV: true }, fill(WHITE)));
+    shape(s, 'ellipse', Object.assign({ x: cx + 0.30 * k, y: cy + 0.02 * k, w: 0.26 * k, h: 0.12 * k }, fill(c)));
+}
+
+function rrectShape(s, x, y, w, h, r, c) {
+    shape(s, 'roundRect', Object.assign({ x: x, y: y, w: w, h: h, rectRadius: r }, fill(c)));
+}
+
+function stick(s, x, y, k, c, arms) {             // little stick figure
+    shape(s, 'ellipse', Object.assign({ x: x + 0.10 * k, y: y, w: 0.30 * k, h: 0.30 * k }, fill(c)));
+    shape(s, 'rect', Object.assign({ x: x + 0.16 * k, y: y + 0.34 * k, w: 0.18 * k, h: 0.66 * k }, fill(c)));
+    if (arms === 'up') {
+        shape(s, 'line', Object.assign({ x: x - 0.16 * k, y: y - 0.06 * k, w: 0.32 * k, h: 0.42 * k, flipV: true }, stroke(c, 2.5)));
+        shape(s, 'line', Object.assign({ x: x + 0.34 * k, y: y - 0.06 * k, w: 0.32 * k, h: 0.42 * k }, stroke(c, 2.5)));
+    } else {
+        shape(s, 'rect', Object.assign({ x: x - 0.02 * k, y: y + 0.36 * k, w: 0.54 * k, h: 0.16 * k }, fill(c)));
+    }
+}
+
+function iconPeople(s, cx, cy, k, c) {            // two figures, one cheering
+    stick(s, cx - 0.52 * k, cy - 0.42 * k, k * 0.8, c, 'flat');
+    stick(s, cx + 0.02 * k, cy - 0.50 * k, k * 0.9, c, 'up');
+}
+
+function iconCommunity(s, cx, cy, k, c) {         // cluster of people
+    [[-0.42, 0.06], [0.10, 0.06], [-0.16, -0.34], [-0.16, 0.34]].forEach(p => {
+        stick(s, cx + p[0] * k, cy + p[1] * k, k * 0.55, c, 'flat');
+    });
+}
+
+function iconPlay(s, cx, cy, k, c) {              // video tutorial
+    shape(s, 'roundRect', Object.assign({ x: cx - 0.5 * k, y: cy - 0.42 * k, w: k, h: 0.84 * k, rectRadius: 0.12 * k }, fill(c)));
+    shape(s, 'triangle', Object.assign({ x: cx - 0.16 * k, y: cy - 0.22 * k, w: 0.38 * k, h: 0.44 * k, rotate: 90 }, fill(WHITE)));
+}
+
+function iconLevels(s, cx, cy, k, c) {            // three linked nodes
+    shape(s, 'ellipse', Object.assign({ x: cx - 0.16 * k, y: cy - 0.48 * k, w: 0.32 * k, h: 0.32 * k }, fill(c)));
+    shape(s, 'rect', Object.assign({ x: cx - 0.42 * k, y: cy - 0.06 * k, w: 0.84 * k, h: 0.07 * k }, fill(c)));
+    [-0.42, -0.16, 0.10].forEach(dx => {
+        shape(s, 'ellipse', Object.assign({ x: cx + dx * k, y: cy + 0.08 * k, w: 0.32 * k, h: 0.32 * k }, fill(c)));
+    });
+}
+
+function iconGrowth(s, cx, cy, k, c) {            // bar chart + rising arrow + coin
+    const base = cy + 0.48 * k;
+    [[-0.52, 0.22], [-0.24, 0.50]].forEach(b => {
+        shape(s, 'rect', Object.assign({ x: cx + b[0] * k, y: base - b[1] * k, w: 0.20 * k, h: b[1] * k }, fill(c)));
+    });
+    shape(s, 'rect', Object.assign({ x: cx + 0.02 * k, y: cy - 0.20 * k, w: 0.20 * k, h: 0.68 * k }, fill(c)));
+    shape(s, 'triangle', Object.assign({ x: cx - 0.14 * k, y: cy - 0.50 * k, w: 0.52 * k, h: 0.34 * k }, fill(c)));
+    shape(s, 'ellipse', Object.assign({ x: cx + 0.16 * k, y: cy + 0.02 * k, w: 0.50 * k, h: 0.50 * k }, fill(c)));
+    text(s, '$', { x: cx + 0.16 * k, y: cy + 0.02 * k, w: 0.50 * k, h: 0.50 * k, align: 'center', valign: 'middle', fontSize: 10, bold: true, color: WHITE });
+}
+
+function iconSupport(s, cx, cy, k, c) {           // person + info badge
+    iconPerson(s, cx - 0.08 * k, cy, k * 0.9, c);
+    shape(s, 'ellipse', Object.assign({ x: cx + 0.26 * k, y: cy - 0.52 * k, w: 0.36 * k, h: 0.36 * k }, fill(c)));
+    text(s, 'i', { x: cx + 0.26 * k, y: cy - 0.52 * k, w: 0.36 * k, h: 0.36 * k, align: 'center', valign: 'middle', fontSize: 8, bold: true, color: WHITE });
+}
+
+function socialIcon(s, x, y, d, label) {          // cyan disc + glyph
+    shape(s, 'ellipse', Object.assign({ x: x, y: y, w: d, h: d }, fill(CYAN)));
+    text(s, label, { x: x - 0.1, y: y, w: d + 0.2, h: d, align: 'center', valign: 'middle', wrap: false, fontSize: 9, bold: true, color: WHITE });
+}
+
+function iconDatabase(s, x, y, w, c) {            // stack of coins
+    shape(s, 'ellipse', Object.assign({ x: x, y: y, w: w, h: 0.36 * w }, fill(c)));
+    [0.20, 0.37, 0.54].forEach(f => {
+        shape(s, 'ellipse', Object.assign({ x: x, y: y + f * w, w: w, h: 0.24 * w }, fill(c)));
+        shape(s, 'rect', Object.assign({ x: x, y: y + f * w - 0.02 * w, w: w, h: 0.06 * w }, fill(WHITE)));
+    });
+}
+
+function iconRocket(s, cx, cy, k, c) {
+    shape(s, 'teardrop', Object.assign({ x: cx - 0.30 * k, y: cy - 0.34 * k, w: 0.62 * k, h: 0.62 * k, rotate: 45 }, fill(c)));
+    shape(s, 'ellipse', Object.assign({ x: cx + 0.02 * k, y: cy - 0.20 * k, w: 0.16 * k, h: 0.16 * k }, fill(WHITE)));
+    shape(s, 'triangle', Object.assign({ x: cx - 0.36 * k, y: cy + 0.02 * k, w: 0.26 * k, h: 0.22 * k, rotate: 200 }, fill(c)));
+    [0.10, 0.24].forEach(d => shape(s, 'line', Object.assign({ x: cx - 0.52 * k - d * k, y: cy + 0.10 * k + d * k, w: 0.24 * k, h: 0.24 * k, flipV: true }, stroke(c, 1.75))));
+}
+
+/* ------------------------------------------------- page furniture (all 15) */
+function chrome(s, colour) {
+    const c = colour || INK;
+    text(s, 'Mobile Apps Presentation', { x: 0.522, y: 0.441, w: 2.256, h: 0.303, fontSize: 12, color: c });
+    text(s, 'Make Life Easier With Appslio Selular', { x: 8.522, y: 0.441, w: 2.21, h: 0.505, fontSize: 12, color: c });
+    text(s, 'www.appslioseluler.com', { x: 10.732, y: 0.441, w: 2.21, h: 0.303, fontSize: 12, color: c });
+}
+
+/** section heading built from alternating black / cyan runs */
+function heading(s, parts, o) {
+    text(s, parts.map((t, i) => ({ text: t, options: { color: (o.first === 'cyan') === (i % 2 === 0) ? CYAN : INK } })),
+        Object.assign({ fontFace: MAJOR, fontSize: 32 }, o.box));
+}
+
+/** body paragraph, 150% leading, mixed cyan / grey runs */
+function paragraph(s, parts, box, opts) {
+    const o = opts || {};
+    text(s, parts.map((t, i) => ({ text: t, options: { color: (o.first === 'cyan') === (i % 2 === 0) ? CYAN : (o.ink || INK75) } })),
+        Object.assign({ fontSize: 12, lineSpacingMultiple: o.leading || 1.5, align: o.align || 'left' }, box));
+}
+
+/* --------------------------------------------------------------- slide 1 */
+const BLOB = [
+    { x: 0, y: 0 }, { x: 1, y: 0 },
+    { x: 0.6535, y: 0.3191, curve: { type: 'cubic', x1: 1, y1: 0, x2: 1, y2: 0.2681 } },
+    { x: 0.1431, y: 0.7370, curve: { type: 'cubic', x1: 0.3069, y1: 0.3700, x2: 0.1914, y2: 0.6065 } },
+    { x: 0, y: 1, curve: { type: 'cubic', x1: 0.0947, y1: 0.8675, x2: 0.0853, y2: 0.9429 } },
+    { x: 0, y: 0 }, { close: true },
+];
+const WAVE = [
+    { x: 0, y: 0.0015 },
+    { x: 0.4706, y: 0.3683, curve: { type: 'cubic', x1: 0, y1: 0.0015, x2: 0.1646, y2: -0.0444 } },
+    { x: 1, y: 0.3276, curve: { type: 'cubic', x1: 0.7767, y1: 0.7810, x2: 1, y2: 0.3276 } },
+    { x: 1, y: 1 }, { x: 0, y: 1 }, { x: 0, y: 0.0015 }, { close: true },
+];
+const scalePts = (pts, w, h) => pts.map(p => (p.close ? p : Object.assign({ x: p.x * w, y: p.y * h },
+    p.curve ? { curve: { type: 'cubic', x1: p.curve.x1 * w, y1: p.curve.y1 * h, x2: p.curve.x2 * w, y2: p.curve.y2 * h } } : {})));
+
+function glassShape(s, pts, o) {
+    shape(s, 'custGeom', {
+        x: o.x, y: o.y, w: o.w, h: o.h, rotate: o.rot || 0, flipH: !!o.flipH, flipV: !!o.flipV,
+        points: scalePts(pts, o.w, o.h),
+        fill: { color: WHITE, transparency: o.transparency || 80 }, line: { type: 'none' },
+    });
+}
+
+function slide01(p) {
+    const s = p.addSlide();
+    s.background = { color: CYAN };
+    glassShape(s, BLOB, { x: 0, y: 0, w: 3.311, h: 3.417 });
+    glassShape(s, BLOB, { x: 8.875, y: 2.899, w: 4.458, h: 4.601, rot: 180 });
+    [[3.382, 0.399, 1.399], [7.638, 6.047, 0.533], [11.625, 1.853, 0.484], [-0.361, 6.931, 0.930]].forEach(o => {
+        shape(s, 'ellipse', { x: o[0], y: o[1], w: o[2], h: o[2], fill: { color: WHITE, transparency: 80 }, line: { type: 'none' } });
+    });
+    chrome(s, WHITE);
+    text(s, 'Mobile Apps', { x: 0.668, y: 2.497, w: 11.14, h: 2.423, fontFace: MAJOR, fontSize: 138, bold: true, color: WHITE });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+        { x: 0.668, y: 4.827, w: 10.957, h: 0.675, fontSize: 12, color: WHITE, lineSpacingMultiple: 1.5 });
+    shape(s, 'roundRect', { x: 0.668, y: 5.905, w: 4.761, h: 0.694, rectRadius: 0.347, fill: { type: 'none' }, line: { color: WHITE, width: 0.5 } });
+    text(s, 'Start Presentation', { x: 0.942, y: 6.056, w: 2.492, h: 0.404, color: WHITE });
+    pill(s, { x: 4.021, y: 6.047, w: 1.213, h: 0.408, label: 'Let\u2019s Go', fill: WHITE, color: INK, fontSize: 14 });
+}
+
+/* --------------------------------------------------------------- slide 2 */
+function slide02(p) {
+    const s = p.addSlide();
+    chrome(s);
+    heading(s, ['The Role Of ', 'User Interface ', 'And User Experience Design ', 'In Mobile App'],
+        { box: { x: 0.522, y: 2.026, w: 5.954, h: 1.717 } });
+    paragraph(s, ['Lorem ipsum dolor sit amet', ', consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ',
+        'purus lectus malesuada libero', ', sit amet commodo'],
+        { x: 0.522, y: 3.938, w: 5.954, h: 0.978 }, { first: 'cyan' });
+    pill(s, { x: 0.633, y: 5.321, w: 1.407, h: 0.336, label: 'Learn More' });
+
+    phone(s, { x: 10.076, y: 1.256, w: 2.073, h: 4.190, rot: 15.9, pivot: { x: 11.107, y: 3.353 } });
+    phone(s, { x: 8.211, y: 2.286, w: 2.080, h: 4.223, rot: -16.3, pivot: { x: 9.245, y: 4.398 } });
+
+    shape(s, 'ellipse', { x: 6.667, y: 5.311, w: 1.601, h: 1.601, fill: { color: WHITE }, line: { color: LINE, width: 1 } });
+    iconGrowth(s, 7.46, 5.86, 0.63, CYAN);
+    text(s, 'Innovation Of Mobile Apps', { x: 6.819, y: 6.213, w: 1.298, h: 0.471, align: 'center', fontFace: MAJOR, fontSize: 10.5 });
+
+    shape(s, 'ellipse', { x: 11.436, y: 3.158, w: 1.601, h: 1.601, fill: { color: WHITE }, line: { color: LINE, width: 1 } });
+    text(s, '$1200', { x: 11.588, y: 3.571, w: 1.298, h: 0.572, align: 'center', fontFace: MAJOR, fontSize: 28, color: CYAN });
+    text(s, 'Income', { x: 11.846, y: 4.044, w: 0.783, h: 0.303, align: 'center', fontFace: MAJOR, fontSize: 12 });
+}
+
+/* --------------------------------------------------------------- slide 3 */
+const CHIPS_A = [
+    { label: 'Sports', x: 8.392, y: 5.170, w: 0.990 }, { label: 'Video Game', x: 9.499, y: 5.170, w: 1.393 },
+    { label: 'Yoga', x: 11.009, y: 5.170, w: 0.861 }, { label: 'Service Requests', x: 8.392, y: 5.629, w: 1.816 },
+    { label: 'Communication', x: 10.348, y: 5.629, w: 1.712 }, { label: 'Make Video', x: 8.392, y: 6.091, w: 1.332 },
+    { label: 'Sketch App', x: 9.832, y: 6.091, w: 1.372 },
+];
+
+function featureCard(s, o) {
+    card(s, { x: o.x, y: o.y, w: 3.042, h: 1.994 });
+    text(s, o.title, { x: o.x + 0.327, y: o.y + 0.769, w: 2.388, h: 0.303, align: 'center', fontSize: 12, color: CYAN });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipescent',
+        { x: o.x + 0.165, y: o.y + 1.054, w: 2.712, h: 0.675, align: 'center', fontSize: 12, color: INK65, lineSpacingMultiple: 1.5 });
+    o.icon(s, o.x + 1.521, o.y + 0.47, 0.42, INK65);
+}
+
+function slide03(p) {
+    const s = p.addSlide();
+    chrome(s);
+    heading(s, ['Mobiles Apps For ', 'Hobbyists ', 'And The Enthusiast'], { box: { x: 8.253, y: 1.795, w: 4.194, h: 1.717 } });
+    paragraph(s, ['Lorem ipsum dolor sit amet, ', 'consectetuer adipiscing elit', '. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus'],
+        { x: 8.253, y: 3.750, w: 4.437, h: 0.978 });
+    CHIPS_A.forEach(c => tag(s, { x: c.x, y: c.y, w: c.w, h: 0.336, label: c.label }));
+
+    featureCard(s, { x: 0.626, y: 1.938, title: '24 Hour Customer Service', icon: iconEnvelope });
+    featureCard(s, { x: 0.626, y: 4.198, title: 'For Glow Yourself', icon: iconPerson });
+
+    hand(s);
+    phone(s, { x: 5.084, y: 1.910, w: 2.168, h: 4.324 });
+    for (let i = 0; i < 4; i++) {                       // finger tips curling over the right edge
+        shape(s, 'roundRect', {
+            x: 7.02, y: 3.20 + i * 0.53, w: 0.68, h: 0.47,
+            rectRadius: 0.23, fill: { color: SKIN }, line: { type: 'none' },
+        });
+    }
+}
+
+/** hand holding the phone: wrist below, plus the thumb edge left of the device */
+function hand(s) {
+    const skin = { fill: { color: SKIN }, line: { type: 'none' } };
+    shape(s, 'roundRect', Object.assign({ x: 4.25, y: 5.75, w: 1.60, h: 2.40, rotate: 30, rectRadius: 0.5 }, skin));
+    shape(s, 'roundRect', Object.assign({ x: 4.58, y: 3.15, w: 0.46, h: 3.35, rectRadius: 0.23 }, skin));
+}
+
+/* --------------------------------------------------------------- slide 4 */
+function slide04(p) {
+    const s = p.addSlide();
+    chrome(s);
+    phone(s, { x: 0.705, y: 1.688, w: 4.408, h: 9.038 });
+    heading(s, ['Task ', 'Management Apps For The Our ', 'Mobile Device'], { first: 'cyan', box: { x: 5.911, y: 1.783, w: 5.954, h: 1.178 } });
+    paragraph(s, ['Lorem ipsum dolor sit amet', ', consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ',
+        'purus lectus malesuada libero', ', sit amet commodo magna eros quis urna.'],
+        { x: 5.911, y: 3.244, w: 6.843, h: 0.978 }, { first: 'cyan' });
+    shape(s, 'ellipse', { x: 5.990, y: 4.755, w: 0.630, h: 0.630, fill: { type: 'none' }, line: { color: LINE, width: 1 } });
+    iconPeople(s, 6.305, 5.07, 0.42, CYAN);
+    text(s, 'Complete The Task To Advance To The Next Level', { x: 6.844, y: 4.734, w: 4.579, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed',
+        { x: 6.844, y: 5.061, w: 5.710, h: 0.675, fontSize: 12, color: INK75, lineSpacingMultiple: 1.5 });
+    pill(s, { x: 6.928, y: 6.062, w: 1.407, h: 0.336, label: 'Learn More' });
+}
+
+/* --------------------------------------------------------------- slide 5 */
+function miniCard(s, o) {
+    card(s, { x: o.x, y: o.y, w: 3.042, h: 1.524, fill: o.fill });
+    shape(s, 'ellipse', { x: o.x + 0.131, y: o.y + 0.336, w: 0.387, h: 0.387, fill: { type: 'none' }, line: { color: LINE, width: 1 } });
+    o.icon(s, o.x + 0.325, o.y + 0.53, 0.24, INK65);
+    text(s, o.title, { x: o.x + 0.633, y: o.y + 0.283, w: 1.9, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+        { x: o.x + 0.654, y: o.y + 0.615, w: 2.258, h: 0.627, fontSize: 11, color: INK75, lineSpacingMultiple: 1.5 });
+}
+
+function slide05(p) {
+    const s = p.addSlide();
+    chrome(s);
+    phone(s, { x: 4.788, y: 1.571, w: 2.646, h: 5.365 });
+    heading(s, ['Meditation', ' And Relaxing ', 'Apps'], { first: 'cyan', box: { x: 0.627, y: 1.921, w: 3.451, h: 1.178 } });
+    paragraph(s, ['Lorem ipsum dolor', ' sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus'],
+        { x: 0.627, y: 3.241, w: 3.961, h: 1.280 }, { first: 'cyan' });
+    pill(s, { x: 0.711, y: 4.885, w: 1.407, h: 0.336, label: 'Learn More' });
+    ['G+', 'ig', 'f', 't', 'in'].forEach((g, i) => socialIcon(s, 0.726 + i * 0.405, 5.652, 0.245, g));
+
+    text(s, 'Complete The Task To', { x: 8.060, y: 2.516, w: 2.484, h: 0.370, fontFace: MAJOR, fontSize: 16, bold: true, color: CYAN });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus',
+        { x: 8.079, y: 2.944, w: 4.741, h: 0.978, fontSize: 12, color: INK75, lineSpacingMultiple: 1.5 });
+    miniCard(s, { x: 6.539, y: 4.662, fill: WHITE, title: 'Video Tutorials', icon: iconPlay });
+    miniCard(s, { x: 9.773, y: 4.662, title: 'Task To Up Levels', icon: iconLevels });
+}
+
+/* --------------------------------------------------------------- slide 6 */
+function slide06(p) {
+    const s = p.addSlide();
+    chrome(s);
+    phone(s, { x: 3.036, y: 1.478, w: 2.646, h: 5.365 });
+    miniCard(s, { x: 0.755, y: 3.348, fill: WHITE, title: 'Task To Up Levels', icon: iconLevels });
+    heading(s, ['Mobile Music ', 'And Video Production Mobile ', 'App'], { first: 'cyan', box: { x: 6.402, y: 2.099, w: 5.954, h: 1.178 } });
+    paragraph(s, ['Lorem ipsum dolor sit amet', ', consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ',
+        'purus lectus malesuada libero', ', sit amet commodo magna eros quis urna.'],
+        { x: 6.402, y: 3.445, w: 6.497, h: 0.978 }, { first: 'cyan' });
+
+    card(s, { x: 6.482, y: 4.852, w: 2.552, h: 1.371 });
+    iconEnvelope(s, 7.758, 5.32, 0.42, INK65);
+    text(s, '24 Hour Customer Service', { x: 6.564, y: 5.621, w: 2.388, h: 0.303, align: 'center', fontSize: 12, color: CYAN });
+    card(s, { x: 9.288, y: 4.852, w: 2.388, h: 1.371 });
+    iconPerson(s, 10.44, 5.30, 0.42, INK65);
+    text(s, 'For Glow Yourself', { x: 9.288, y: 5.656, w: 2.388, h: 0.303, align: 'center', fontSize: 12, color: CYAN });
+
+    /* dashed elbow connector from the card to the icon */
+    const dash = { fill: { type: 'none' }, line: { color: GREY2, width: 1, dashType: 'dash' } };
+    shape(s, 'line', Object.assign({ x: 5.757, y: 4.335, w: 0, h: 1.185 }, dash));
+    shape(s, 'line', Object.assign({ x: 5.757, y: 5.520, w: 2.000, h: 0 }, dash));
+    shape(s, 'line', Object.assign({ x: 7.757, y: 5.520, w: 0, h: 0.877 },
+        { fill: { type: 'none' }, line: { color: GREY2, width: 1, dashType: 'dash', endArrowType: 'triangle' } }));
+}
+
+/* --------------------------------------------------------------- slide 7 */
+const CHIPS_B = [
+    { label: 'Service Requests', x: 1.798, y: 5.368, w: 1.816 }, { label: 'Communication', x: 3.754, y: 5.368, w: 1.712 },
+    { label: 'Make Video', x: 1.798, y: 5.830, w: 1.332 }, { label: 'Sketch App', x: 3.238, y: 5.830, w: 1.372 },
+];
+
+function slide07(p) {
+    const s = p.addSlide();
+    chrome(s);
+    phone(s, { x: 7.302, y: 1.432, w: 2.577, h: 5.223 });
+    phone(s, { x: 10.131, y: 3.076, w: 2.577, h: 5.223 });
+    heading(s, ['Home Improvement And ', 'Crafting App'], { box: { x: 0.626, y: 1.619, w: 5.202, h: 1.178 } });
+    paragraph(s, ['Lorem ipsum dolor ', 'sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, ',
+        'purus lectus malesuada ', 'libero, sit amet commodo'],
+        { x: 0.626, y: 2.978, w: 5.978, h: 0.978 }, { first: 'cyan' });
+    shape(s, 'ellipse', { x: 0.729, y: 4.376, w: 0.630, h: 0.630, fill: { type: 'none' }, line: { color: LINE, width: 1 } });
+    iconCommunity(s, 1.044, 4.691, 0.42, CYAN);
+    text(s, 'Make Community To Get A Friend', { x: 1.705, y: 4.410, w: 4.579, h: 0.337, fontFace: MAJOR, fontSize: 14, bold: true });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscin', { x: 1.705, y: 4.736, w: 4.579, h: 0.372, fontSize: 12, color: INK75, lineSpacingMultiple: 1.5 });
+    CHIPS_B.forEach(c => tag(s, { x: c.x, y: c.y, w: c.w, h: 0.336, label: c.label }));
+}
+
+/* --------------------------------------------------------------- slide 8 */
+const TEAM = [
+    { name: 'Amelia Mitchell', x: 0.873 }, { name: 'Isabella Adams', x: 3.885 },
+    { name: 'Sarah Williams', x: 6.938, accent: true }, { name: 'Ethan Robinson', x: 9.992 },
+];
+
+function slide08(p) {
+    const s = p.addSlide();
+    chrome(s);
+    heading(s, ['Meet Our ', 'Mobile Team '], { box: { x: 0.873, y: 1.225, w: 5.202, h: 0.640 } });
+    paragraph(s, ['Lorem ipsum dolor ', 'sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce ',
+        'posuere, magna ', 'sed pulvinar ultricies, purus lectus malesuada ', 'libero', ' sit amet commodo'],
+        { x: 0.873, y: 1.952, w: 9.124, h: 0.675 }, { first: 'cyan' });
+    TEAM.forEach(m => {
+        card(s, { x: m.x, y: 3.188, w: 2.552, h: 3.537, fill: m.accent ? CYAN : undefined, line: m.accent ? CYAN : undefined });
+        photo(s, { x: m.x + 0.532, y: 3.467, w: 1.489, h: 1.489, ellipse: true, label: false });
+        text(s, m.name, { x: m.x + 0.137, y: 5.335, w: 2.278, h: 0.404, align: 'center', bold: true, color: m.accent ? WHITE : INK });
+        text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+            { x: m.x + 0.137, y: 5.739, w: 2.278, h: 0.606, align: 'center', fontSize: 10.5, color: m.accent ? PAPER : INK, lineSpacingMultiple: 1.5 });
+    });
+}
+
+/* --------------------------------------------------------------- slide 9 */
+function laptop(s) {
+    shape(s, 'roundRect', { x: 0.600, y: 1.444, w: 4.830, h: 3.410, rectRadius: 0.09, fill: { color: DEVICE }, line: { type: 'none' } });
+    photo(s, { x: 0.688, y: 1.542, w: 4.625, h: 3.076, round: 0.02 });
+    shape(s, 'roundRect', { x: 0.319, y: 4.895, w: 5.390, h: 0.105, rectRadius: 0.05, fill: { color: 'A8A8A8' }, line: { type: 'none' } });
+    shape(s, 'roundRect', { x: 0.583, y: 5.130, w: 4.860, h: 2.370, rectRadius: 0.07, fill: { color: 'A9A9A9' }, line: { type: 'none' } });
+    shape(s, 'roundRect', { x: 0.700, y: 5.235, w: 4.640, h: 0.130, rectRadius: 0.05, fill: { color: 'C2C2C2' }, line: { type: 'none' } });
+    KEY_ROWS.forEach((row, r) => {                      // six rows of keycaps
+        for (let c = 0; c < row.n; c++) {
+            shape(s, 'roundRect', {
+                x: 1.020 + c * row.step, y: row.y, w: row.step - 0.035, h: 0.205,
+                rectRadius: 0.03, fill: { color: '5B5B5B' }, line: { type: 'none' },
+            });
+        }
+    });
+    shape(s, 'roundRect', { x: 2.150, y: 7.150, w: 1.720, h: 0.430, rectRadius: 0.04, fill: { color: 'B4B4B4' }, line: { type: 'none' } });
+}
+
+const KEY_ROWS = [
+    { y: 5.478, n: 20, step: 0.199 }, { y: 5.760, n: 16, step: 0.249 },
+    { y: 6.089, n: 15, step: 0.266 }, { y: 6.353, n: 14, step: 0.285 },
+    { y: 6.631, n: 13, step: 0.307 }, { y: 6.908, n: 9, step: 0.443 },
+];
+
+function slide09(p) {
+    const s = p.addSlide();
+    chrome(s);
+    laptop(s);
+    heading(s, ['Best Portfolio Reflexing ', 'Mobile Apps'], { box: { x: 6.443, y: 1.555, w: 5.030, h: 1.178 } });
+    text(s, 'Complete The Task To Advance To The Next Level', { x: 6.443, y: 2.949, w: 5.405, h: 0.370, fontFace: MAJOR, fontSize: 16, bold: true });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed',
+        { x: 6.443, y: 3.404, w: 5.971, h: 0.675, fontSize: 12, color: INK65, lineSpacingMultiple: 1.5 });
+    card(s, { x: 6.443, y: 4.448, w: 6.145, h: 2.171 });
+    iconSupport(s, 9.515, 4.90, 0.45, CYAN);
+    text(s, '24 Hour Customer Service', { x: 8.321, y: 5.274, w: 2.388, h: 0.303, align: 'center', fontSize: 12, color: CYAN });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna',
+        { x: 6.792, y: 5.622, w: 5.445, h: 0.675, align: 'center', fontSize: 12, color: INK65, lineSpacingMultiple: 1.5 });
+}
+
+/* -------------------------------------------------------------- slide 10 */
+/* Four arrows chasing each other around a square (freeform polygons). */
+const ARROW_BENT = [[0.7835, 0], [0.2175, 0.3109], [0.2175, 0.6647], [0, 0.6647], [0.5005, 1],
+[1, 0.6647], [0.7835, 0.6647], [0.7835, 0.3109], [0.7835, 0]];
+const ARROW_BENT2 = [[0.4995, 0], [0, 0.3353], [0.2165, 0.3353], [0.2165, 1], [0.7825, 0.6891],
+[0.7825, 0.3353], [1, 0.3353], [0.4995, 0]];
+const ARROW_FLAT = [[0.3355, 0], [0, 0.5], [0.3355, 1], [0.3355, 0.7827], [1, 0.7827],
+[0.6889, 0.2173], [0.3355, 0.2173], [0.3355, 0]];
+const ARROW_FLAT2 = [[0.6645, 0], [0.6645, 0.2173], [0.3111, 0.2173], [0, 0.2173], [0.3111, 0.7827],
+[0.6645, 0.7827], [0.6645, 1], [1, 0.5], [0.8102, 0.2173], [0.6645, 0]];
+const SHADE_A = [[1, 0], [0.5, 0.2796], [0, 0.0025], [0, 0.5473], [1, 1], [0, 0.5473], [1, 0.5473], [1, 0]];
+const SHADE_B = [[1, 0], [0, 0], [0, 1], [1, 1], [0.4922, 0.5], [1, 0]];
+const SHADE_C = [[1, 0], [0, 0], [0, 1], [0.5, 0.4922], [1, 1], [1, 0]];
+const SHADE_D = [[1, 0], [0.6254, 1], [0.6254, 0], [0.1754, 0], [0.4039, 0.5], [0.1754, 1], [0.6254, 1], [1, 0]];
+
+function poly(s, pts, o) {
+    shape(s, 'custGeom', {
+        x: o.x, y: o.y, w: o.w, h: o.h, rotate: o.rot || 0,
+        points: pts.map(pt => ({ x: pt[0] * o.w, y: pt[1] * o.h })).concat([{ close: true }]),
+        fill: { color: o.fill }, line: { type: 'none' },
+    });
+}
+
+function slide10(p) {
+    const s = p.addSlide();
+    chrome(s);
+    heading(s, ['Infographic ', 'Section'], { box: { x: 4.066, y: 1.225, w: 5.202, h: 0.640, align: 'center' } });
+    const DARK = '0077A2';
+    poly(s, SHADE_A, { x: 7.957, y: 3.638, w: 0.657, h: 1.452, rot: 45, fill: DARK });
+    poly(s, SHADE_B, { x: 9.962, y: 2.968, w: 0.790, h: 0.657, rot: 45, fill: DARK });
+    poly(s, SHADE_C, { x: 10.853, y: 4.741, w: 0.657, h: 0.790, rot: 45, fill: DARK });
+    poly(s, SHADE_D, { x: 8.574, y: 5.761, w: 1.755, h: 0.657, rot: 45, fill: DARK });
+    poly(s, ARROW_BENT, { x: 8.751, y: 2.245, w: 1.162, h: 2.115, rot: 45, fill: CYAN });
+    poly(s, ARROW_FLAT, { x: 10.119, y: 3.535, w: 2.113, h: 1.163, rot: 45, fill: CYAN });
+    poly(s, ARROW_BENT2, { x: 9.784, y: 4.899, w: 1.162, h: 2.115, rot: 45, fill: CYAN });
+    poly(s, ARROW_FLAT2, { x: 7.467, y: 4.577, w: 2.113, h: 1.163, rot: 45, fill: CYAN });
+
+    [[1.685, 2.761], [4.719, 2.761], [1.688, 4.286], [4.722, 4.286]].forEach(o => {
+        text(s, 'PLACEHOLDER',
+            { x: o[0], y: o[1], w: 2.642, h: 0.978, fontSize: 12, color: INK65, lineSpacingMultiple: 1.5 });
+    });
+    [1.754, 4.787].forEach(x => pill(s, { x: x, y: 5.806, w: 1.742, h: 0.300, label: 'Download' }));
+}
+
+/* -------------------------------------------------------------- slide 11 */
+const TOPICS = [[3.449, 4.118], [5.358, 2.673], [7.349, 4.118], [5.358, 5.563]];
+const NOTES = [
+    { x: 2.223, y: 2.829, tx: 0.835, ty: 3.224, align: 'right' },
+    { x: 2.223, y: 5.676, tx: 0.835, ty: 6.071, align: 'right' },
+    { x: 9.330, y: 2.829, tx: 9.330, ty: 3.224, align: 'left' },
+    { x: 9.330, y: 5.669, tx: 9.330, ty: 6.064, align: 'left' },
+];
+
+function slide11(p) {
+    const s = p.addSlide();
+    chrome(s);
+    heading(s, ['Infographic ', 'Section'], { box: { x: 4.066, y: 1.225, w: 5.202, h: 0.640, align: 'center' } });
+    TOPICS.forEach(o => {
+        rrect(s, { x: o[0], y: o[1], w: 2.535, h: 1.291, fill: { type: 'none' }, line: { color: LINE, width: 0.75 } });
+        text(s, 'Topic Here', { x: o[0] + 0.195, y: o[1] + 0.338, w: 2.145, h: 0.505, align: 'center', fontSize: 24, color: CYAN });
+    });
+    NOTES.forEach(n => {
+        text(s, 'Insert title here', { x: n.x, y: n.y, w: 1.675, h: 0.370, align: n.align, wrap: false, fontFace: MAJOR, fontSize: 16, color: CYAN });
+        text(s, 'PLACEHOLDER',
+            { x: n.tx, y: n.ty, w: 3.063, h: 0.533, align: n.align, fontSize: 12, color: INK65, lineSpacingMultiple: 1.1 });
+    });
+}
+
+/* -------------------------------------------------------------- slide 12 */
+const PILLARS = [
+    { label: 'Market', ax: 6.339, ay: 3.653, aw: 2.845, cx: 7.027, ring: GREY1 },
+    { label: 'Compaction', ax: 7.742, ay: 3.295, aw: 3.560, cx: 8.792, ring: GREY2 },
+    { label: 'Management', ax: 9.214, ay: 3.015, aw: 4.120, cx: 10.517, ring: GREY4 },
+];
+
+function slide12(p) {
+    const s = p.addSlide();
+    chrome(s);
+    heading(s, ['Infographic ', 'Section'], { box: { x: 1.105, y: 2.538, w: 5.202, h: 0.640 } });
+    text(s, '120+', { x: 1.105, y: 3.550, w: 1.416, h: 0.707, fontSize: 36, color: CYAN });
+    text(s, 'Rewards', { x: 2.543, y: 3.688, w: 1.416, h: 0.370, fontSize: 16, color: INK95 });
+    text(s, 'Our Product', { x: 1.105, y: 4.483, w: 2.458, h: 0.370, fontSize: 16, color: INK95 });
+    text(s, 'PLACEHOLDER',
+        { x: 1.105, y: 4.853, w: 4.592, h: 0.978, fontSize: 12, color: INK65, lineSpacingMultiple: 1.5 });
+
+    PILLARS.forEach(c => {
+        shape(s, 'homePlate', {
+            x: c.ax, y: c.ay, w: c.aw, h: 1.470, rotate: 270, fill: { color: CYAN }, line: { type: 'none' },
+            shadow: { type: 'outer', color: GREY2, opacity: 0.3, blur: 45, offset: 30, angle: 90 },
+        });
+        text(s, c.label, { x: c.cx - 0.24, y: 3.904, w: 1.951, h: 0.309, rotate: 270, align: 'center', valign: 'middle', fontSize: 18, color: WHITE });
+        shape(s, 'ellipse', {
+            x: c.cx, y: 5.136, w: 1.470, h: 1.470, fill: { color: WHITE }, line: { type: 'none' },
+            shadow: { type: 'outer', color: '000000', opacity: 0.15, blur: 70, offset: 20, angle: 45 },
+        });
+        shape(s, 'ellipse', { x: c.cx + 0.114, y: 5.250, w: 1.242, h: 1.242, fill: { type: 'none' }, line: { color: c.ring, width: 4 } });
+    });
+    iconDatabase(s, 7.532, 5.669, 0.459, CYAN);
+    iconRocket(s, 9.545, 5.865, 0.60, CYAN);
+    text(s, 'su', { x: 10.90, y: 5.60, w: 0.72, h: 0.52, align: 'center', valign: 'middle', fontFace: MAJOR, fontSize: 24, bold: true, color: CYAN });
+}
+
+/* -------------------------------------------------------------- slide 13 */
+const DONUTS = [
+    { pct: '50', x: 1.300, y: 2.970 }, { pct: '60', x: 3.949, y: 3.017 },
+    { pct: '70', x: 6.597, y: 3.065 }, { pct: '80', x: 9.245, y: 3.112 },
+];
+
+function slide13(p) {
+    const s = p.addSlide();
+    chrome(s);
+    heading(s, ['Infographic ', 'Section'], { box: { x: 4.066, y: 1.225, w: 5.202, h: 0.640, align: 'center' } });
+    text(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim veniam',
+        { x: 3.173, y: 2.094, w: 6.988, h: 0.607, align: 'center', fontSize: 12, lineSpacingMultiple: 1.3 });
+    shape(s, 'line', { x: 0, y: 4.169, w: W, h: 0, line: { color: RULE, width: 1, dashType: 'dash' } });
+    DONUTS.forEach((d, i) => {
+        shape(s, 'ellipse', { x: d.x, y: d.y, w: 2.397, h: 2.397, fill: { color: CYAN }, line: { type: 'none' } });
+        shape(s, 'ellipse', {
+            x: d.x + 0.337, y: d.y + 0.337, w: 1.723, h: 1.723, fill: { color: WHITE }, line: { type: 'none' },
+            shadow: { type: 'outer', color: '000000', opacity: 0.12, blur: 30, offset: 8, angle: 90 },
+        });
+        text(s, [{ text: d.pct }, { text: '%', options: { superscript: true } }],
+            { x: d.x + 0.616, y: d.y + 0.913, w: 1.167, h: 0.572, align: 'center', fontSize: 28, bold: true, color: CYAN });
+        const cx = 1.469 + i * 2.648;
+        text(s, 'Your Tittle Here', { x: cx, y: 5.663, w: 2.060, h: 0.370, align: 'center', fontSize: 16, color: CYAN });
+        text(s, 'Lorem ipsum dolor sit amet consectetur', { x: cx - 0.11, y: 6.094, w: 2.281, h: 0.607, align: 'center', fontSize: 12, lineSpacingMultiple: 1.3 });
+    });
+}
+
+/* -------------------------------------------------------------- slide 14 */
+const CONTACT = [
+    { title: 'Our Address', tx: 3.132, ty: 4.513, body: 'Building State, City Name city 02 ', bx: 2.758, by: 4.929, bw: 2.198 },
+    { title: 'Our Website', tx: 6.645, ty: 4.621, body: 'www.yourwebsite.com', bx: 6.319, by: 5.033, bw: 2.100 },
+    { title: 'Our Phone', tx: 10.117, ty: 4.647, body: '+123-456-7890 (Chandra)', bx: 9.622, by: 5.019, bw: 2.440 },
+];
+
+function slide14(p) {
+    const s = p.addSlide();
+    chrome(s);
+    card(s, { x: 0.605, y: 1.624, w: 12.124, h: 4.995, fill: 'FAFAFA' });
+    phone(s, { x: 1.106, y: 1.176, w: 2.835, h: 5.752 });
+    heading(s, ['Get Our Contact ', 'Information\u2019s'], { box: { x: 4.671, y: 2.228, w: 6.418, h: 0.640 } });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+        { x: 4.671, y: 3.011, w: 7.694, h: 0.978, fontSize: 12, color: INK75, lineSpacingMultiple: 1.5 });
+    rrect(s, { x: 2.562, y: 4.317, w: 9.615, h: 1.558, fill: { color: CYAN }, line: { type: 'none' } });
+    CONTACT.forEach(c => {
+        text(s, c.title, { x: c.tx, y: c.ty, w: 1.450, h: 0.421, align: 'center', fontFace: MAJOR, fontSize: 14, bold: true, color: WHITE });
+        text(s, c.body, { x: c.bx, y: c.by, w: c.bw, h: 0.400, align: 'center', fontFace: MAJOR, fontSize: 12, color: PAPER, lineSpacingMultiple: 1.5 });
+    });
+    [5.643, 9.010].forEach(x => shape(s, 'line', { x: x, y: 4.606, w: 0, h: 0.941, line: { color: WHITE, width: 2.25 } }));
+}
+
+/* -------------------------------------------------------------- slide 15 */
+function slide15(p) {
+    const s = p.addSlide();
+    s.background = { color: CYAN };
+    glassShape(s, WAVE, { x: 0, y: 0, w: W, h: 3.888, flipH: true, flipV: true, transparency: 88 });
+    [[3.004, 2.486, 0.850], [11.998, 6.527, 0.533], [12.264, 1.101, 0.484], [-0.361, 6.931, 0.930]].forEach(o => {
+        shape(s, 'ellipse', { x: o[0], y: o[1], w: o[2], h: o[2], fill: { color: WHITE, transparency: 80 }, line: { type: 'none' } });
+    });
+    chrome(s, WHITE);
+    text(s, 'Thank You', { x: 0.522, y: 4.246, w: 11.874, h: 2.137, fontFace: MAJOR, fontSize: 166, bold: true, color: WHITE, lineSpacingMultiple: 0.7 });
+    text(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue massa. Fusce posuere, magna sed pulvinar ultricies, purus lectus malesuada libero, sit amet commodo magna eros quis urna.',
+        { x: 1.069, y: 6.066, w: 10.604, h: 0.675, fontSize: 12, color: PAPER, lineSpacingMultiple: 1.5 });
+}
+
+/* ------------------------------------------------------------------ main */
+function build() {
+    const pptx = new pptxgen();
+    pptx.defineLayout({ name: 'DECK', width: W, height: H });
+    pptx.layout = 'DECK';
+    pptx.theme = { headFontFace: MAJOR, bodyFontFace: BODY };
+    [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+        slide09, slide10, slide11, slide12, slide13, slide14, slide15].forEach(fn => fn(pptx));
+    return pptx.writeFile({ fileName: path.join(__dirname, '125f2f2d-7f1c-476e-acbd-023059ff3f06_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote', f));

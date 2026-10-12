@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-12 15:01 (Paris) — snapshot `2026-10-12_03-44` → `2026-10-12_15-01`
+
+Versions touchées : orbitd — nouvelle release `28b0833` ajoutée sous `/var/lib/sand-daemon-supervisor/orbitd/releases/` à côté de `d2ed475` (révision embarquée `8828749` inchangée) ; image, sand-host, exec-daemon, agent-store-fuse, Chrome, Node, Python inchangés. Fichiers : +2 / −0 / ~0.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : release orbitd `28b0833` déposée par le superviseur (manifest.json schema 1, cible x86_64, payload zstd ~6,9 Mo, exécutable ~21 Mo) ; binaire sans diff lisible (rebuild opaque, classement hypothétique).
+
+Rapport : [reports/2026-10-12_15-01.md](reports/2026-10-12_15-01.md) — commit à venir.
+
 ## 2026-10-12 03:44 (Paris) — snapshot `2026-10-12_02-51` → `2026-10-12_03-44`
 
 Versions touchées : agent-store-fuse `55863b4` → `db2b1ee` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image, sand-host, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -19,7 +31,7 @@ Versions touchées : agent-store-fuse `55863b4` → `db2b1ee` (pointeur `/usr/lo
 - **Perf** : —
 - **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque, classement hypothétique).
 
-Rapport : [reports/2026-10-12_03-44.md](reports/2026-10-12_03-44.md) — commit à venir.
+Rapport : [reports/2026-10-12_03-44.md](reports/2026-10-12_03-44.md) — [commit](../../../commit/3f3d21f145f93d69099795cef3189269e9098539).
 
 ## 2026-10-12 02:51 (Paris) — snapshot `2026-10-11_23-51` → `2026-10-12_02-51`
 

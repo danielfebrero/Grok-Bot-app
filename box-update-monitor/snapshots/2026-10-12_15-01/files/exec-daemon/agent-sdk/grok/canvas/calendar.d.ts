@@ -1,0 +1,35 @@
+import { type JSX } from "react";
+export interface DayEvent {
+    /** Start hour, e.g. 9.5 for 9:30. */
+    start: number;
+    /** End hour. An event that ends before it starts is drawn as a point at its start. */
+    end: number;
+    title: string;
+    /** Needs something from the reader; drawn in the accent. */
+    flag?: boolean;
+    /** Open time worth protecting, drawn as an outline. On a narrow block it gives way when events need the room. */
+    free?: boolean;
+}
+export interface DayViewProps {
+    /** First hour shown, e.g. 9 or 8.5 for 8:30. */
+    start: number;
+    /** Last hour shown, e.g. 14. Events are clipped to `start..end`; nothing renders when `end` is not after `start`. */
+    end: number;
+    events: readonly DayEvent[];
+    /** One inked line across the day, e.g. a deadline, with a one-line label; skipped when `at` is outside `start..end`. The line breaks over an event's title row rather than striking through it, and the label moves off any title it would cover. */
+    mark?: {
+        at: number;
+        label: string;
+    };
+}
+/**
+ * A calendar day: a soft card, hour labels centered on their lines, events as
+ * tinted blocks with a 2 px rule. Events that need the reader take the
+ * accent; free time is an outline; one inked line marks the deadline, its
+ * label on the line, or the nearest clear row when a title is in the way.
+ * Overlapping events share the width in lanes, or stack
+ * under one another when the block is too narrow for lanes, folding what
+ * will not fit into a "+N more" row.
+ */
+export declare function DayView({ start, end, events, mark }: DayViewProps): JSX.Element | null;
+export {};
