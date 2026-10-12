@@ -1,0 +1,11 @@
+--- 2026-10-12_17-06:/opt/sand/sand-host/extensions/box-store-sync/box-store-vacuum-worker.cjs
++++ 2026-10-12_18-11:/opt/sand/sand-host/extensions/box-store-sync/box-store-vacuum-worker.cjs
+@@ -131,8 +131,6 @@
+   "dev-induced-offline",
+   "network-return",
+   "unknown",
+-  "cold_create",
+-  "first_connect",
+   "manual_update",
+   "manual_reset",
+   "auto_update",

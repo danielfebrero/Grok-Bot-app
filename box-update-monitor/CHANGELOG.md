@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-12 18:11 (Paris) — snapshot `2026-10-12_17-06` → `2026-10-12_18-11`
+
+Versions touchées : sand-host `7345aa4` → `726deab` (superviseur `lastCommandId` = `upgrade-726deab`) ; image, box-scripts, exec-daemon, agent-store-fuse, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~8 (`host-main.cjs`, `sand-eval-runner.cjs`, `agent-store-worker.cjs`, `box-store-vacuum-worker.cjs`, `csnaps`, `version`, skill gérée `agent-email` + `cache.json`).
+
+- **Bugfix** : —
+- **Change** : skill gérée `agent-email` — nouvelle section « Sending from your inbox » : le mail de la boîte native part via `DraftExternalMessage` (carte, ou envoi direct si une règle Allow le couvre) ou via `SendEmail` quand le propriétaire a coupé le brouillon (avec bcc) ; ajout : la carte n'a pas encore de désinscription en un clic, donc pas de prospection / newsletter / envoi de masse depuis la boîte avec la carte. `box-store-vacuum-worker.cjs` : raisons `cold_create` et `first_connect` retirées de la liste. URLs du portail Cursor désormais paramétrables (`cursor-web-base-urls`, `portal-base-url.ts`) au lieu d'hôtes codés en dur dans `parseCloudCanvasWebLink`. Modules retirés du bundle host : `frozen-prompt-tools.ts`, `sand-subagent-management-tools.ts`, `messages-mac/phone.js`.
+- **Features** : outils « PR code tour » (`get-pr-code-tour`, `update-pr-code-tour`, protos `GetPrCodeTour*` / `UpdatePrCodeTour*`, `pr-code-tour-view-context`) dans host-main, agent-store-worker et eval-runner ; brouillons de la boîte agent (`agent-inbox-draft-route.ts`, `agent-inbox-drafts.ts`, `draft-route-verification.ts`, `grok-bot-email-client.ts`) ; nouveaux modules `cloud-agents/` (tool, confirm-policy, environment, images, publish-app, canvas-prompt) ; `tool-permissions.ts`, `background-result-note.ts` ; `ShellStreamStart` gagne un champ `command`. Rôle exact déduit des noms de modules dans un bundle minifié.
+- **Perf** : module `partial-tool-call-throttle.js` ajouté (nom seul, classement hypothétique).
+- **Autre/infra** : patch-hash `@connectrpc/connect-node` changé ; renommages de variables dans `sand-eval-runner.cjs` ; `cache.json` des skills gérées rafraîchi ; binaire `codebase-telemetry/csnaps` reconstruit (rebuild opaque, classement hypothétique).
+
+Rapport : [reports/2026-10-12_18-11.md](reports/2026-10-12_18-11.md) — commit à venir.
+
 ## 2026-10-12 17:06 (Paris) — snapshot `2026-10-12_15-01` → `2026-10-12_17-06`
 
 Versions touchées : agent-store-fuse `db2b1ee` → `ae03d5d` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image, sand-host, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -19,7 +31,7 @@ Versions touchées : agent-store-fuse `db2b1ee` → `ae03d5d` (pointeur `/usr/lo
 - **Perf** : —
 - **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque, classement hypothétique).
 
-Rapport : [reports/2026-10-12_17-06.md](reports/2026-10-12_17-06.md) — commit à venir.
+Rapport : [reports/2026-10-12_17-06.md](reports/2026-10-12_17-06.md) — [commit](../../../commit/dbcbbed43844033203839e87d6725aa883b8c7e7).
 
 ## 2026-10-12 15:01 (Paris) — snapshot `2026-10-12_03-44` → `2026-10-12_15-01`
 
