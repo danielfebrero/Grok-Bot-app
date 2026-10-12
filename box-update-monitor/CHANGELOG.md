@@ -9,6 +9,20 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-12 02:51 (Paris) — snapshot `2026-10-11_23-51` → `2026-10-12_02-51`
+
+Versions touchées : agent-store-fuse `0d66b5d` → `55863b4` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image, sand-host, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque, classement hypothétique).
+
+Rapport : [reports/2026-10-12_02-51.md](reports/2026-10-12_02-51.md) — commit à venir
+
+---
+
 ## 2026-10-11 23:51 (Paris) — snapshot `2026-10-11_20-47` → `2026-10-11_23-51`
 
 Versions touchées : image / box-scripts `91a9d91` → `7345aa4` ; exec-daemon rebuild (build 2026-10-08 → 2026-10-11T15:02Z) ; canvas-sdk nouvelle version ; agent-store-fuse `e1fd3f3` → `0d66b5d` (sand-host, Chrome, Node, Python inchangés). Fichiers : +41 / −38 / ~144.
@@ -19,7 +33,7 @@ Versions touchées : image / box-scripts `91a9d91` → `7345aa4` ; exec-daemon r
 - **Perf** : —
 - **Autre/infra** : paquets Python numpy 2.5.3→2.5.4, onnxruntime 1.30.0→1.31.0, soupsieve 2.10→3.0.1 ; Debian libgs10 (Ghostscript) deb13u2→deb13u3 ; extension sand-webauthn-proxy mise à jour ; bundles exec-daemon / canvas-runtime / pnpm (rebuild opaque, classement hypothétique).
 
-Rapport : [reports/2026-10-11_23-51.md](reports/2026-10-11_23-51.md) — commit à venir
+Rapport : [reports/2026-10-11_23-51.md](reports/2026-10-11_23-51.md) — commit [`d66a337`](../../../commit/d66a33768aef1de367be4a4f3793a860f5825927)
 
 ## 2026-10-11 20:47 (Paris) — snapshot `2026-10-11_17-53` → `2026-10-11_20-47`
 
