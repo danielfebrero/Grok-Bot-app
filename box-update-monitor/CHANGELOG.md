@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-12 19:05 (Paris) — snapshot `2026-10-12_18-11` → `2026-10-12_19-05`
+
+Versions touchées : agent-store-fuse `ae03d5d` → `c44c38f` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image, sand-host, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque, classement hypothétique).
+
+Rapport : [reports/2026-10-12_19-05.md](reports/2026-10-12_19-05.md) — commit à venir.
+
 ## 2026-10-12 18:11 (Paris) — snapshot `2026-10-12_17-06` → `2026-10-12_18-11`
 
 Versions touchées : sand-host `7345aa4` → `726deab` (superviseur `lastCommandId` = `upgrade-726deab`) ; image, box-scripts, exec-daemon, agent-store-fuse, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~8 (`host-main.cjs`, `sand-eval-runner.cjs`, `agent-store-worker.cjs`, `box-store-vacuum-worker.cjs`, `csnaps`, `version`, skill gérée `agent-email` + `cache.json`).
@@ -19,7 +31,7 @@ Versions touchées : sand-host `7345aa4` → `726deab` (superviseur `lastCommand
 - **Perf** : module `partial-tool-call-throttle.js` ajouté (nom seul, classement hypothétique).
 - **Autre/infra** : patch-hash `@connectrpc/connect-node` changé ; renommages de variables dans `sand-eval-runner.cjs` ; `cache.json` des skills gérées rafraîchi ; binaire `codebase-telemetry/csnaps` reconstruit (rebuild opaque, classement hypothétique).
 
-Rapport : [reports/2026-10-12_18-11.md](reports/2026-10-12_18-11.md) — commit à venir.
+Rapport : [reports/2026-10-12_18-11.md](reports/2026-10-12_18-11.md) — [commit](../../../commit/9287c1c0e2d7640aa7418d276a1ef436e8401b4b).
 
 ## 2026-10-12 17:06 (Paris) — snapshot `2026-10-12_15-01` → `2026-10-12_17-06`
 
