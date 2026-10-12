@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-12 03:44 (Paris) — snapshot `2026-10-12_02-51` → `2026-10-12_03-44`
+
+Versions touchées : agent-store-fuse `55863b4` → `db2b1ee` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image, sand-host, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque, classement hypothétique).
+
+Rapport : [reports/2026-10-12_03-44.md](reports/2026-10-12_03-44.md) — commit à venir.
+
 ## 2026-10-12 02:51 (Paris) — snapshot `2026-10-11_23-51` → `2026-10-12_02-51`
 
 Versions touchées : agent-store-fuse `0d66b5d` → `55863b4` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image, sand-host, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
@@ -19,7 +31,7 @@ Versions touchées : agent-store-fuse `0d66b5d` → `55863b4` (pointeur `/usr/lo
 - **Perf** : —
 - **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque, classement hypothétique).
 
-Rapport : [reports/2026-10-12_02-51.md](reports/2026-10-12_02-51.md) — commit à venir
+Rapport : [reports/2026-10-12_02-51.md](reports/2026-10-12_02-51.md) — commit [`2092c7a`](../../../commit/2092c7acd0126892d4cb3abe7b7855d710432282)
 
 ---
 
