@@ -1,0 +1,703 @@
+/**
+ * Harika - Fashion Company Profile deck (20 slides, 13.333 x 7.5 in).
+ * Rebuilt with pptxgenjs; photographs are drawn as flat placeholder rectangles.
+ *
+ *   node 1683d83f-267b-4083-83db-aaaa67fe17c6_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ---------- "Kurota" theme ---------- */
+const DARK = '1B1B1B';    // tx1 - outlines, headings
+const CREAM = 'FFF2E6';   // bg1 - page background
+const GRAY = '828282';    // accent1 - body copy
+const SAND = 'FFB05D';    // accent2 - soft blobs, pills
+const ORANGE = 'FF7505';  // accent3 - dots, asterisks
+const PHOTO = 'CBAF91';   // stand-in colour for the deck's photographs
+
+const HEAD = 'Fraunces 9pt SemiBold';  // major latin font
+const BODY = 'DM Sans';                // minor latin font
+
+/* Two blocks of filler copy the template reuses on nearly every slide. */
+const LI = "A lighthouse stands proudly on the cliff's edge, guiding ships safely through the treacherous waters.";
+const HI = 'Amidst the rolling hills of a lush countryside, endless fields of green stretch out in all ' +
+  'directions. Gentle winds sway the tall grasses like a dance of tranquility, and the earthy ' +
+  'scent of the soil fills the air. ';
+
+/* ---------- text helpers ---------- */
+const TEXT = { fontFace: BODY, color: DARK, valign: 'top', margin: [7.2, 7.2, 3.6, 3.6], fit: 'resize', isTextBox: true };
+
+// 120pt display type used on the cover and the closing slide
+function hero (s, x, y, w, h, text) {
+  s.addText(text, Object.assign({}, TEXT, { x, y, w, h, fontSize: 120, fontFace: HEAD }));
+}
+
+// 40pt section heading; every heading line is its own box in the source deck
+function heading (s, x, y, w, text) {
+  s.addText(text, Object.assign({}, TEXT, { x, y, w, h: 0.774, fontSize: 40, fontFace: HEAD }));
+}
+
+// 15pt bold pull quote
+function tagline (s, x, y, w, h, text, bold) {
+  s.addText(text, Object.assign({}, TEXT, { x, y, w, h, fontSize: 15, bold: bold !== false }));
+}
+
+// 10pt bold kicker above a paragraph
+function label (s, x, y, w, text, color) {
+  s.addText(text, Object.assign({}, TEXT, { x, y, w, h: 0.269, fontSize: 10, bold: true, color: color === 'accent1' ? GRAY : DARK }));
+}
+
+// 10pt grey body copy
+function para (s, x, y, w, h, text, align) {
+  s.addText(text, Object.assign({}, TEXT, { x, y, w, h, fontSize: 10, color: GRAY, align: align || 'left' }));
+}
+
+// team member name (14pt) and job title (11pt, right aligned)
+function person (s, x, y, w, text) {
+  s.addText(text, Object.assign({}, TEXT, { x, y, w, h: 0.337, fontSize: 14, fontFace: HEAD, align: 'justify' }));
+}
+function role (s, x, y, w, h, text) {
+  s.addText(text, Object.assign({}, TEXT, { x, y, w, h, fontSize: 11, align: 'right' }));
+}
+
+/* ---------- shape helpers ---------- */
+
+// thin dark outline used for the big rounded panels
+function frame (s, x, y, w, h, r) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: r, line: { color: DARK, width: 2 } });
+}
+
+// short sand coloured capsule
+function pill (s, x, y, w) {
+  s.addShape('roundRect', { x, y, w, h: 0.167, rectRadius: 0.0835, fill: { color: SAND } });
+}
+
+// soft out-of-focus circle: 12% sand with a wide glow
+function blob (s, x, y, w, h) {
+  s.addShape('ellipse', {
+    x, y, w, h,
+    fill: { color: SAND, transparency: 88 },
+    shadow: { type: 'outer', color: SAND, opacity: 1, blur: 28, offset: 0, angle: 0 }
+  });
+}
+
+// small solid orange circle
+function dot (s, x, y, d) {
+  s.addShape('ellipse', { x, y, w: d, h: d, fill: { color: ORANGE } });
+}
+
+// open circle segment; angles are degrees clockwise from 3 o'clock
+function arc (s, x, y, d, start, end, rotate) {
+  s.addShape('arc', { x, y, w: d, h: d, angleRange: [start, end], rotate: rotate || 0, line: { color: DARK, width: 2 } });
+}
+
+// 12 pointed orange asterisk (unit outline, scaled to the requested box)
+const STAR_PATH = [
+  [1, 0.392], [0.761, 0.392], [0.93, 0.223], [0.777, 0.07], [0.608, 0.239], [0.608, 0],
+  [0.392, 0], [0.392, 0.239], [0.223, 0.07], [0.07, 0.223], [0.239, 0.392], [0, 0.392],
+  [0, 0.608], [0.239, 0.608], [0.07, 0.777], [0.223, 0.93], [0.392, 0.761], [0.392, 1],
+  [0.608, 1], [0.608, 0.761], [0.777, 0.93], [0.93, 0.777], [0.761, 0.608], [1, 0.608]
+];
+function star (s, x, y, d) {
+  s.addShape('custGeom', {
+    x, y, w: d, h: d, fill: { color: ORANGE },
+    points: STAR_PATH.map(function (p) { return { x: p[0] * d, y: p[1] * d }; }).concat([{ close: true }])
+  });
+}
+
+// stand-in for a photograph
+function photo (s, x, y, w, h) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: Math.min(w, h) * 0.089, fill: { color: PHOTO } });
+  s.addText('[image]', {
+    x, y, w, h, align: 'center', valign: 'middle',
+    fontFace: BODY, fontSize: 11, color: 'FFFFFF'
+  });
+}
+
+/* ---------- world map (Market Exposure slide) ---------- */
+// Each entry is one land mass, as flat [x0,y0,x1,y1,...] fractions of the map box.
+const WORLD = [
+  [0.67,0.022,0.704,0.036,0.7,0.053,0.778,0.069,0.787,0.053,0.928,0.108,0.908,0.105,0.918,0.125,0.89,0.142,0.9,0.203,0.878,0.125,0.83,0.159,0.83,0.18,0.868,0.216,0.844,0.274,0.847,0.327,0.816,0.29,0.835,0.379,0.822,0.417,0.794,0.43,0.804,0.5,0.794,0.519,0.775,0.49,0.796,0.627,0.762,0.548,0.782,0.567,0.765,0.465,0.744,0.422,0.716,0.455,0.699,0.523,0.684,0.425,0.626,0.392,0.634,0.436,0.584,0.488,0.613,0.495,0.576,0.613,0.578,0.686,0.557,0.741,0.558,0.769,0.531,0.837,0.508,0.841,0.481,0.718,0.486,0.664,0.472,0.555,0.45,0.537,0.41,0.551,0.385,0.484,0.387,0.415,0.424,0.317,0.417,0.263,0.439,0.255,0.432,0.159,0.452,0.204,0.469,0.163,0.48,0.179,0.462,0.13,0.496,0.075,0.54,0.083,0.551,0.092,0.537,0.098,0.544,0.107,0.592,0.077,0.576,0.064,0.588,0.039,0.607,0.039,0.587,0.07,0.615,0.081,0.613,0.058,0.638,0.06],
+  [0.171,0.046,0.203,0.053,0.198,0.085,0.208,0.09,0.219,0.085,0.221,0.068,0.213,0.061,0.22,0.051,0.236,0.057,0.232,0.092,0.25,0.082,0.234,0.102,0.234,0.12,0.214,0.119,0.196,0.144,0.214,0.195,0.245,0.123,0.256,0.126,0.266,0.151,0.275,0.141,0.278,0.182,0.287,0.191,0.282,0.205,0.288,0.23,0.269,0.231,0.277,0.207,0.252,0.211,0.252,0.233,0.261,0.243,0.245,0.257,0.243,0.246,0.204,0.299,0.18,0.357,0.18,0.392,0.167,0.363,0.135,0.365,0.122,0.414,0.125,0.446,0.135,0.447,0.146,0.421,0.154,0.428,0.148,0.459,0.162,0.473,0.166,0.518,0.186,0.515,0.2,0.49,0.232,0.513,0.264,0.549,0.271,0.575,0.268,0.598,0.285,0.594,0.325,0.636,0.306,0.751,0.285,0.775,0.271,0.845,0.259,0.845,0.262,0.877,0.251,0.882,0.25,0.897,0.241,0.893,0.244,0.982,0.263,0.996,0.255,1,0.234,0.975,0.221,0.939,0.208,0.733,0.187,0.694,0.169,0.63,0.178,0.522,0.167,0.528,0.13,0.469,0.103,0.454,0.078,0.376,0.079,0.408,0.068,0.38,0.059,0.299,0.076,0.225,0.077,0.161,0.064,0.141,0.045,0.141,0,0.17,0.015,0.151,0.008,0.143,0.015,0.12,0.033,0.111,0.026,0.1,0.04,0.099,0.045,0.082,0.081,0.068,0.184,0.09,0.171,0.064,0.157,0.066],
+  [0.918,0.671,0.941,0.793,0.938,0.82,0.913,0.87,0.902,0.88,0.886,0.877,0.883,0.855,0.875,0.851,0.87,0.832,0.863,0.826,0.821,0.852,0.81,0.848,0.814,0.819,0.814,0.768,0.821,0.748,0.842,0.735,0.859,0.696,0.87,0.694,0.887,0.673,0.895,0.682,0.895,0.706,0.909,0.717],
+  [0.316,0,0.321,0.001,0.313,0.013,0.333,0.002,0.425,0.006,0.41,0.019,0.402,0.048,0.393,0.055,0.394,0.065,0.399,0.067,0.393,0.082,0.362,0.092,0.338,0.119,0.333,0.136,0.329,0.139,0.317,0.12,0.317,0.097,0.327,0.074,0.318,0.041,0.301,0.035,0.298,0.026,0.302,0.019,0.263,0.033,0.277,0.003],
+  [0.474,0.259,0.454,0.273,0.433,0.315,0.474,0.3,0.482,0.329,0.501,0.35,0.511,0.337,0.537,0.346,0.552,0.338,0.552,0.32,0.533,0.315,0.526,0.303,0.526,0.284,0.517,0.288,0.515,0.311,0.509,0.308,0.501,0.286,0.488,0.31,0.483,0.303,0.491,0.297,0.491,0.288,0.478,0.272],
+  [0.885,0.591,0.894,0.607,0.905,0.598,0.931,0.624,0.947,0.671,0.94,0.669,0.928,0.646,0.919,0.66,0.904,0.649,0.903,0.626,0.887,0.612,0.883,0.596],
+  [0.261,0.051,0.282,0.074,0.29,0.104,0.279,0.108,0.267,0.124,0.262,0.12,0.259,0.103,0.269,0.09,0.265,0.074,0.246,0.076,0.24,0.069,0.241,0.061,0.247,0.054],
+  [0.834,0.538,0.839,0.543,0.84,0.572,0.831,0.614,0.816,0.609,0.809,0.599,0.807,0.577],
+  [0.605,0.679,0.605,0.71,0.598,0.764,0.594,0.778,0.59,0.777,0.584,0.762,0.587,0.714],
+  [0.87,0.228,0.877,0.253,0.886,0.259,0.886,0.267,0.878,0.276,0.883,0.288,0.887,0.319,0.864,0.351,0.859,0.334,0.861,0.325,0.876,0.31,0.878,0.299,0.867,0.234],
+  [0.844,0.446,0.847,0.452,0.849,0.478,0.859,0.49,0.868,0.528,0.863,0.541,0.851,0.529,0.861,0.514,0.858,0.498,0.846,0.487,0.84,0.469,0.84,0.452],
+  [0.555,0.24,0.546,0.252,0.536,0.243,0.53,0.277,0.544,0.268,0.567,0.271],
+  [0.853,0.576,0.862,0.576,0.857,0.586,0.845,0.585,0.852,0.596,0.853,0.622,0.847,0.612,0.845,0.626,0.841,0.627,0.842,0.589],
+  [0.505,0.114,0.498,0.129,0.497,0.154,0.487,0.177,0.496,0.173,0.509,0.149,0.504,0.135],
+  [0.972,0.903,0.974,0.909,0.959,0.932,0.945,0.935,0.948,0.924],
+  [0.428,0.171,0.431,0.178,0.431,0.195,0.418,0.202,0.417,0.185],
+  [0.55,0.371,0.584,0.488,0.583,0.461],
+  [0.992,0.848,1,0.874,0.984,0.9,0.984,0.886,0.992,0.864],
+  [0.797,0.634,0.82,0.64,0.83,0.652,0.798,0.645],
+  [0.407,0.096,0.411,0.098,0.41,0.112,0.394,0.115,0.393,0.103]
+];
+function worldMap (s, x, y, w, h) {
+  WORLD.forEach(function (flat) {
+    const pts = [];
+    for (let i = 0; i < flat.length; i += 2) pts.push({ x: flat[i] * w, y: flat[i + 1] * h });
+    pts.push({ close: true });
+    s.addShape('custGeom', { x, y, w, h, fill: { color: SAND }, points: pts });
+  });
+}
+
+/* ---------- charts ---------- */
+const CHART_BASE = {
+  showLegend: true, legendPos: 'b', legendFontFace: BODY, legendFontSize: 10, legendColor: DARK,
+  barGrouping: 'clustered',
+  catAxisLineShow: false, valAxisLineShow: false,
+  catAxisMajorTickMark: 'none', valAxisMajorTickMark: 'none',
+  catAxisLabelFontFace: BODY, catAxisLabelFontSize: 10, catAxisLabelColor: DARK, catAxisLabelPos: 'nextTo',
+  valAxisLabelFontFace: BODY, valAxisLabelFontSize: 10, valAxisLabelColor: DARK, valAxisLabelPos: 'nextTo',
+  catGridLine: { style: 'none' }, valGridLine: { color: GRAY, size: 0.75 },
+  chartArea: { roundedCorners: false }
+};
+
+// horizontal bars, category axis hidden, gridlines running up the value axis
+function comparisonChart (s, x, y, w, h) {
+  const cats = ['Category 1', 'Category 2', 'Category 3', 'Category 4'];
+  s.addChart('bar', [
+    { name: 'Series 1', labels: cats, values: [1, 2.5, 3.5, 2] },
+    { name: 'Series 2', labels: cats, values: [2, 4.4, 1.8, 1] },
+    { name: 'Series 3', labels: cats, values: [3, 2, 3, 0.6] }
+  ], Object.assign({}, CHART_BASE, {
+    x, y, w, h, barDir: 'bar', barGapWidthPct: 32, catAxisHidden: true,
+    chartColors: [ORANGE, SAND, GRAY]
+  }));
+}
+
+// vertical bars by month
+function growthChart (s, x, y, w, h) {
+  const months = ['Jan', 'Mar', 'Mei', 'Jul', 'Sep', 'Nov'];
+  s.addChart('bar', [
+    { name: 'Subject 1', labels: months, values: [12, 25, 19, 35, 34, 45] },
+    { name: 'Subject 2', labels: months, values: [11, 15, 25, 21, 23, 43] },
+    { name: 'Subject 3', labels: months, values: [10, 12, 27, 37, 43, 56] }
+  ], Object.assign({}, CHART_BASE, {
+    x, y, w, h, barDir: 'col', barGapWidthPct: 81,
+    chartColors: [GRAY, SAND, ORANGE]
+  }));
+}
+
+/* ---------- page furniture repeated on every slide ---------- */
+function newSlide (pptx) {
+  const s = pptx.addSlide();
+  s.background = { color: CREAM };
+  s.addText('Harika Fashion Company', Object.assign({}, TEXT, {
+    x: 9.5, y: 0.667, w: 2.917, h: 0.303, align: 'right', fontFace: HEAD, fontSize: 12
+  }));
+  s.addShape('rect', { x: 12.4, y: 0.758, w: 0.12, h: 0.12, fill: { color: ORANGE }, line: { color: ORANGE, width: 0.75 } });
+  s.addShape('rect', { x: 12.466, y: 0.758, w: 0.12, h: 0.12, line: { color: SAND, width: 0.75 } });
+  return s;
+}
+
+/* ---------- Slide 1 - Cover ---------- */
+function slide01 (pptx) {
+  const s = newSlide(pptx);
+  hero(s, 0.584, 4.257, 8.667, 2.121, 'Harika');
+  tagline(s, 0.584, 6.044, 3.292, 0.353, 'Fashion Company', false);
+  frame(s, -0.208, 4.167, 13.75, 2.667, 0.153);
+  arc(s, 8.311, 6.833, 6.564, 232.8, 305.5);
+  blob(s, -0.874, 0.386, 3.19, 3.19);
+  arc(s, -1.417, -0.11, 4.276, 277.6, 112.7);
+  blob(s, 12.167, 4.917, 1.89, 1.89);
+  pill(s, 5.951, 3.156, 2.132);
+  pill(s, 10.6, 3.156, 1.15);
+  dot(s, 6.583, 4.744, 0.345);
+  dot(s, 2.53, 1.417, 0.595);
+  para(s, 7.72, 5.792, 3.863, 0.606, 'In the dynamic landscape of contemporary design and innovation, creative technology emerges as a vibrant alternative to traditional placeholders like Lorem Ipsum.');
+  label(s, 7.72, 5.56, 3.113, 'Company Profile Presentation', 'accent1');
+  star(s, 10.267, 3.946, 0.442);
+  photo(s, 4.878, -0.417, 4.278, 3.333);
+  photo(s, 9.666, -0.417, 3.001, 3.333);
+}
+
+/* ---------- Slide 2 - Welcome ---------- */
+function slide02 (pptx) {
+  const s = newSlide(pptx);
+  arc(s, 8.168, 4.954, 4.276, 76.2, 163, 90);
+  photo(s, 9.374, 1.5, 4.271, 5.333);
+  blob(s, 5.679, -0.809, 2.309, 2.309);
+  blob(s, -0.874, 5.249, 3.36, 3.36);
+  heading(s, 0.875, 1.606, 2.886, 'Welcome');
+  heading(s, 0.875, 2.248, 5.565, 'To Our Company');
+  para(s, 2.938, 4.554, 4.553, 1.111, 'In the heart of a pristine forest, sunlight filters through the dense canopy, painting the forest floor with dappled patterns. The air is alive with the symphony of chirping birds, buzzing insects, and rustling leaves. Towering trees, adorned with vibrant moss and lichens, stand as ancient sentinels, witnessing the passing of countless seasons.');
+  para(s, 2.928, 3.7, 4.553, 0.606, HI);
+  frame(s, 0.667, -0.097, 7.5, 7.667, 0.111);
+  label(s, 2.938, 3.462, 3.113, 'About Us');
+  arc(s, 4.797, -2.138, 4.276, 54.8, 185.2);
+  star(s, 4.797, 0.825, 0.442);
+  dot(s, 9.244, 2.201, 0.345);
+  tagline(s, 2.942, 6.044, 3.891, 0.353, 'Where style meets imagination.');
+}
+
+/* ---------- Slide 3 - Vision & Mission ---------- */
+function slide03 (pptx) {
+  const s = newSlide(pptx);
+  blob(s, -0.934, 5.685, 2.516, 2.516);
+  blob(s, 8.263, 3.473, 3.36, 3.36);
+  heading(s, 0.875, 0.987, 2.886, 'Company');
+  heading(s, 0.875, 1.629, 5.565, 'Vision & Mission');
+  frame(s, -0.208, -0.25, 13.875, 3, 0.153);
+  para(s, 0.931, 3.522, 3.739, 0.774, HI);
+  label(s, 0.941, 3.283, 3.113, 'Company Vision');
+  para(s, 0.931, 4.936, 3.739, 0.774, HI);
+  label(s, 0.941, 4.697, 3.113, 'Company Mission');
+  frame(s, -0.208, 2.75, 6.042, 5.25, 0.455);
+  tagline(s, 0.931, 6.052, 3.891, 0.353, 'Crafting dreams into couture.');
+  arc(s, 9.272, -1.505, 4.255, 107.9, 290.9, 270);
+  star(s, 10.903, 2.537, 0.442);
+  dot(s, 5.536, 3.833, 0.595);
+  photo(s, 10.242, 5.25, 2.424, 2.75);
+  photo(s, 6.44, 3.283, 3.196, 4.717);
+}
+
+/* ---------- Slide 4 - Company Values ---------- */
+function slide04 (pptx) {
+  const s = newSlide(pptx);
+  blob(s, -1.044, 4.974, 3.163, 3.163);
+  photo(s, 0.875, 3, 4.792, 5);
+  heading(s, 7.232, 1.779, 3.708, 'Company');
+  heading(s, 7.232, 2.421, 3.708, 'Values');
+  para(s, 9.867, 5.949, 2.5, 0.606, LI);
+  label(s, 9.867, 5.653, 1.292, 'Achievement');
+  frame(s, 9.617, 5.417, 3.042, 2.333, 0.251);
+  para(s, 9.867, 4.507, 2.5, 0.606, LI);
+  label(s, 9.867, 4.21, 1.292, 'Collaboration');
+  frame(s, 9.617, 3.917, 3.042, 1.5, 0.25);
+  para(s, 6.825, 5.949, 2.5, 0.606, LI);
+  label(s, 6.825, 5.653, 1.292, 'Innovation');
+  frame(s, 6.575, 5.417, 3.042, 2.333, 0.265);
+  para(s, 6.825, 4.507, 2.5, 0.606, LI);
+  label(s, 6.825, 4.21, 1.292, 'Integrity');
+  frame(s, 6.575, 3.917, 3.042, 1.5, 0.25);
+  pill(s, 2.205, 2.338, 2.132);
+  frame(s, -0.208, -0.75, 6.784, 8.75, 0.305);
+  arc(s, 3.583, -1.175, 3.083, 109.8, 290.9, 270);
+  blob(s, 3.867, -0.986, 2.516, 2.516);
+  star(s, 6.336, 0.738, 0.546);
+  dot(s, 1, 2.863, 0.472);
+  dot(s, 12.41, 3.845, 0.385);
+}
+
+/* ---------- Slide 5 - Meet Our CEO ---------- */
+function slide05 (pptx) {
+  const s = newSlide(pptx);
+  blob(s, 10.453, 6.328, 2.88, 2.88);
+  blob(s, -0.833, -0.751, 3.487, 3.487);
+  frame(s, -0.302, 4.254, 5.052, 1.767, 0.295);
+  heading(s, 7.406, 1.921, 3.273, 'Meet Our');
+  heading(s, 7.406, 2.562, 3.273, 'CEO');
+  para(s, 1.229, 5.129, 2.938, 0.606, LI);
+  label(s, 1.229, 4.833, 1.292, 'Gabriel Smith');
+  para(s, 7.406, 3.978, 4.677, 0.606, HI);
+  label(s, 7.417, 3.74, 3.113, 'About Our CEO');
+  para(s, 7.406, 5.197, 4.677, 0.606, HI);
+  label(s, 7.417, 4.958, 3.113, 'Our CEO Says');
+  frame(s, 6.728, 1.355, 5.95, 7.062, 0.268);
+  arc(s, 3.167, 5.988, 3.562, 268.8, 88.5, 270);
+  arc(s, 6.728, -1.023, 2.375, 63.9, 297.5, 270);
+  dot(s, 0.574, 5.752, 0.472);
+  star(s, 7.705, 1.088, 0.546);
+  dot(s, 5.562, 5.968, 0.355);
+  photo(s, -0.583, 1.355, 6.583, 3.203);
+}
+
+/* ---------- Slide 6 - Meet Our Team ---------- */
+function slide06 (pptx) {
+  const s = newSlide(pptx);
+  photo(s, 5.242, 1.292, 3.196, 3.77);
+  photo(s, 9.025, 1.292, 3.196, 3.77);
+  blob(s, 7.271, 6.13, 2.624, 2.624);
+  role(s, 7.083, 5.433, 1.263, 0.471, 'As Company Manager');
+  person(s, 5.339, 5.489, 1.443, 'Adian Grey');
+  frame(s, -0.208, 6.243, 13.75, 0.59, 0.034);
+  heading(s, 0.833, 1.889, 3.273, 'Meet Our');
+  heading(s, 0.833, 2.531, 3.273, 'Team');
+  para(s, 0.861, 3.511, 2.5, 0.606, LI);
+  frame(s, -0.302, -0.25, 5.052, 6.493, 0.356);
+  tagline(s, 0.861, 4.997, 1.85, 0.606, 'From sketches to sensations.');
+  frame(s, 5.249, 5.317, 3.189, 0.673, 0.145);
+  role(s, 10.917, 5.433, 1.213, 0.471, 'As Brand Manager');
+  frame(s, 9.032, 5.317, 3.189, 0.673, 0.145);
+  person(s, 9.122, 5.489, 1.443, 'Gieta Solia');
+  arc(s, 3.121, -1.023, 2.375, 158.1, 297.5, 270);
+  blob(s, -0.833, -0.751, 2.435, 2.435);
+  star(s, 8.752, 1.51, 0.546);
+  dot(s, 3.295, 6.011, 0.472);
+  dot(s, 4.581, 1.083, 0.347);
+}
+
+/* ---------- Slide 7 - Team Grid ---------- */
+function slide07 (pptx) {
+  const s = newSlide(pptx);
+  blob(s, 11.833, 3.568, 2.432, 2.432);
+  blob(s, -0.833, -0.751, 3.418, 3.418);
+  photo(s, 0.667, 1.926, 2.809, 3.77);
+  photo(s, 9.858, 1.926, 2.809, 3.77);
+  photo(s, 3.706, 1.926, 2.809, 3.77);
+  photo(s, 6.794, 1.926, 2.809, 3.77);
+  frame(s, -0.208, 6.156, 13.75, 0.677, 0.146);
+  pill(s, 1.005, 1.455, 2.132);
+  pill(s, 4.27, 1.455, 1.73);
+  pill(s, 7.48, 1.455, 1.436);
+  pill(s, 10.775, 1.455, 0.975);
+  role(s, 2.231, 6.286, 1.366, 0.471, 'Business Analyst');
+  person(s, 0.589, 6.332, 1.443, 'Janes Kroas');
+  role(s, 5.173, 6.286, 1.366, 0.471, 'Marketing Manager');
+  person(s, 3.73, 6.332, 1.443, 'Olive Realin');
+  role(s, 8.237, 6.286, 1.366, 0.471, 'Social Media Admin');
+  person(s, 6.794, 6.332, 1.443, 'Sinas Hanoa');
+  role(s, 11.667, 6.286, 1, 0.471, 'Brand Manager');
+  person(s, 9.858, 6.332, 1.443, 'Fienn Giano');
+  dot(s, 3.495, 2.27, 0.48);
+  star(s, 9.624, 4.938, 0.522);
+  arc(s, -0.344, 6.833, 2.375, 282.2, 66, 270);
+}
+
+/* ---------- Slide 8 - Our Problems ---------- */
+function slide08 (pptx) {
+  const s = newSlide(pptx);
+  blob(s, 10.838, 5.677, 3.002, 3.002);
+  blob(s, 0.387, -0.028, 3.418, 3.418);
+  heading(s, 3.805, 3.181, 4.236, 'Our Problems');
+  para(s, 3.805, 3.976, 4.236, 0.438, LI);
+  frame(s, -0.208, 2.75, 13.75, 2.081, 0.119);
+  arc(s, -0.333, -0.557, 4.859, 291.4, 111, 270);
+  star(s, 1.417, 4.545, 0.573);
+  dot(s, 4.2, 2.601, 0.325);
+  dot(s, 11.82, 4.552, 0.519);
+  para(s, 2.1, 5.704, 2.5, 0.606, LI);
+  label(s, 2.1, 5.408, 1.292, 'Problem One');
+  para(s, 4.975, 5.704, 2.5, 0.606, LI);
+  label(s, 4.975, 5.408, 1.292, 'Problem Two');
+  para(s, 8.288, 5.704, 2.5, 0.606, LI);
+  label(s, 8.288, 5.408, 1.292, 'Problem Three');
+  frame(s, 7.955, 4.831, 3.042, 3.002, 0.368);
+  photo(s, 5.428, -0.252, 4.151, 2.622);
+}
+
+/* ---------- Slide 9 - Our Solutions ---------- */
+function slide09 (pptx) {
+  const s = newSlide(pptx);
+  blob(s, 10.363, 5.792, 2.675, 2.675);
+  blob(s, 0.886, -1.398, 3.28, 3.28);
+  frame(s, 0.667, 1.417, 5.667, 6.667, 0.325);
+  heading(s, 1.092, 2.246, 4.236, 'Our Solutions');
+  para(s, 1.092, 3.042, 4.236, 0.438, LI);
+  para(s, 1.092, 4.149, 3.742, 0.774, HI);
+  label(s, 1.092, 3.91, 3.113, 'Long & Short Term Solutions');
+  arc(s, -1.709, 4.458, 2.375, 19.2, 165.1, 270);
+  para(s, 6.952, 4.418, 2.5, 0.606, LI);
+  label(s, 6.952, 4.122, 1.292, 'Solution One');
+  para(s, 9.742, 4.418, 2.5, 0.606, LI);
+  label(s, 9.742, 4.122, 1.292, 'Solution Two');
+  para(s, 6.952, 5.76, 2.5, 0.606, LI);
+  label(s, 6.952, 5.464, 1.292, 'Solution Three');
+  frame(s, 6.333, 3.583, 7.333, 3.25, 0.186);
+  arc(s, 6.333, 1.249, 2.375, 270, 165.1, 270);
+  star(s, 6.121, 3.344, 0.522);
+  dot(s, 9.723, 6.671, 0.325);
+  dot(s, 0.401, 1.602, 0.519);
+  photo(s, 1.092, 5.333, 4.825, 2.417);
+}
+
+/* ---------- Slide 10 - About Our Services ---------- */
+function slide10 (pptx) {
+  const s = newSlide(pptx);
+  heading(s, 0.833, 2.162, 3.273, 'About Our');
+  heading(s, 0.833, 2.804, 3.273, 'Services');
+  para(s, 4.938, 2.679, 4.25, 0.774, HI);
+  label(s, 4.938, 2.44, 3.113, 'Service Description');
+  frame(s, -0.208, 1.877, 13.75, 2.081, 0.119);
+  frame(s, 5.417, 3.958, 8.25, 3.792, 0.217);
+  para(s, 6.167, 4.76, 2.5, 0.606, LI);
+  label(s, 6.167, 4.463, 1.292, 'Service One');
+  para(s, 9.312, 4.76, 2.5, 0.606, LI);
+  label(s, 9.312, 4.463, 1.292, 'Service Two');
+  para(s, 6.167, 6, 2.5, 0.606, LI);
+  label(s, 6.167, 5.703, 1.292, 'Service Three');
+  blob(s, 10.939, 5.792, 2.675, 2.675);
+  star(s, 5.156, 3.733, 0.522);
+  dot(s, 11.487, 1.715, 0.325);
+  dot(s, 0.407, 1.631, 0.519);
+  blob(s, 4.958, -1.941, 3.418, 3.418);
+  arc(s, 4.689, -1.995, 3.859, 86.4, 271.2, 270);
+  photo(s, 0.667, 4.457, 3.908, 3.287);
+}
+
+/* ---------- Slide 11 - Service Category ---------- */
+function slide11 (pptx) {
+  const s = newSlide(pptx);
+  blob(s, 1.446, -0.837, 2.736, 2.736);
+  heading(s, 4.417, 1.988, 3.273, 'Service');
+  heading(s, 4.417, 2.63, 3.273, 'Category');
+  para(s, 4.417, 4.046, 4.25, 0.774, HI);
+  label(s, 4.417, 3.807, 3.113, 'About Our Service');
+  frame(s, -0.5, -0.333, 4.47, 8.139, 0.256);
+  para(s, 4.417, 5.768, 2.5, 0.606, LI);
+  label(s, 4.417, 5.472, 1.292, 'Category One');
+  para(s, 7.083, 5.768, 2.5, 0.606, LI);
+  label(s, 7.083, 5.472, 1.292, 'Category Two');
+  para(s, 9.75, 5.768, 2.5, 0.606, LI);
+  label(s, 9.75, 5.472, 1.292, 'Category Three');
+  blob(s, 11.791, 1.429, 3.418, 3.418);
+  arc(s, 11.404, 1.16, 3.859, 86.4, 271.2);
+  arc(s, 3.97, -0.703, 2.32, 309.2, 179);
+  star(s, 5.802, 0.921, 0.522);
+  dot(s, 3.76, 2.807, 0.42);
+  dot(s, 11.518, 3.995, 0.438);
+  photo(s, -0.372, 1.16, 3.273, 5.423);
+}
+
+/* ---------- Slide 12 - Research & Development ---------- */
+function slide12 (pptx) {
+  const s = newSlide(pptx);
+  blob(s, -0.944, 3.112, 3.418, 3.418);
+  blob(s, 6.809, -0.833, 2.825, 2.825);
+  heading(s, 2.237, 1.815, 4.5, 'Research & ');
+  heading(s, 2.237, 2.456, 4.5, 'Development');
+  para(s, 6.809, 5.658, 4.75, 0.606, HI);
+  label(s, 6.809, 4.593, 3.113, 'About Our Research');
+  para(s, 6.809, 4.862, 4.677, 0.606, HI);
+  frame(s, -0.5, 4.096, 12.583, 2.737, 0.532);
+  arc(s, -0.917, -0.703, 2.825, 311.2, 131.5);
+  arc(s, 2.816, 6.833, 4.5, 210.7, 333.7);
+  star(s, 1, 1.715, 0.522);
+  photo(s, 7.167, 1.361, 5.5, 2.306);
+  photo(s, -0.417, 4.388, 6.372, 2.159);
+  dot(s, 5.65, 4.429, 0.42);
+  dot(s, 9.032, 3.279, 0.651);
+}
+
+/* ---------- Slide 13 - Innovation & Technology ---------- */
+function slide13 (pptx) {
+  const s = newSlide(pptx);
+  heading(s, 1.205, 1.789, 4.5, 'Innovation &');
+  heading(s, 1.205, 2.431, 4.5, 'Technology');
+  para(s, 1.205, 4.482, 4.677, 0.606, HI);
+  label(s, 1.216, 4.244, 3.113, 'Innovation Description');
+  para(s, 6.375, 4.482, 4.677, 0.606, HI);
+  label(s, 6.385, 4.244, 3.113, 'Technology Description');
+  frame(s, -0.333, 3.82, 14, 1.716, 0.198);
+  arc(s, 7.083, 5.536, 6, 197.9, 342.3);
+  tagline(s, 1.216, 6.052, 3.891, 0.353, 'Elevating elegance to new heights.');
+  blob(s, -0.663, -1.49, 2.972, 2.979);
+  blob(s, 8.099, 6.146, 3.969, 3.979);
+  star(s, 11.003, 3.581, 0.522);
+  dot(s, 1.75, 0.675, 0.42);
+  dot(s, 7.769, 5.946, 0.651);
+  photo(s, 6.083, -0.459, 3.5, 3.81);
+}
+
+/* ---------- Slide 14 - Market Exposure ---------- */
+function slide14 (pptx) {
+  const s = newSlide(pptx);
+  heading(s, 1.115, 1.935, 3.878, 'Market');
+  heading(s, 1.115, 2.576, 3.878, 'Exposure');
+  worldMap(s, 5.833, 2.062, 5.763, 2.801);
+  dot(s, 6.443, 2.492, 0.435);
+  dot(s, 9.55, 2.381, 0.435);
+  dot(s, 9.888, 3.161, 0.435);
+  para(s, 1.115, 4.09, 4.25, 0.774, HI);
+  label(s, 1.115, 3.851, 3.113, 'Market Expansion');
+  frame(s, -0.333, 1.417, 14, 3.973, 0.36);
+  para(s, 7.469, 5.956, 2.5, 0.606, LI);
+  label(s, 7.469, 5.659, 1.292, 'Europe');
+  para(s, 10.135, 5.956, 2.5, 0.606, LI);
+  label(s, 10.135, 5.659, 1.292, 'America');
+  dot(s, 10.782, 4.013, 0.435);
+  para(s, 2.135, 5.956, 2.5, 0.606, LI);
+  label(s, 2.135, 5.659, 1.292, 'Asia');
+  para(s, 4.802, 5.956, 2.5, 0.606, LI);
+  label(s, 4.802, 5.659, 1.292, 'Australia');
+  blob(s, -0.664, 5.812, 2.517, 2.523);
+  arc(s, 12.156, 3.879, 1.51, 32, 321.4);
+  blob(s, 6.044, -1.386, 2.517, 2.523);
+  star(s, 0.666, 1.144, 0.522);
+  dot(s, 6.878, 5.202, 0.323);
+  dot(s, 12.474, 3.75, 0.323);
+}
+
+/* ---------- Slide 15 - Company Journey ---------- */
+function slide15 (pptx) {
+  const s = newSlide(pptx);
+  photo(s, -0.405, 1.941, 2.365, 5.924);
+  blob(s, 12.189, 4.958, 2.078, 2.083);
+  heading(s, 8.35, 2.415, 3.878, 'Company');
+  heading(s, 8.35, 3.056, 3.878, 'Journey');
+  para(s, 8.35, 4.153, 3.802, 0.774, HI);
+  frame(s, 2.635, 1.941, 5.135, 6.059, 0.465);
+  para(s, 3.178, 2.792, 3.917, 0.438, LI, 'justify');
+  label(s, 3.178, 2.496, 2.053, 'First Thing In 2031');
+  para(s, 3.178, 3.617, 3.917, 0.438, LI, 'justify');
+  label(s, 3.178, 3.32, 2.053, 'Second Thing in 2032');
+  para(s, 3.178, 4.442, 3.917, 0.438, LI, 'justify');
+  label(s, 3.178, 4.145, 2.053, 'Eventually in 2033');
+  para(s, 3.178, 5.266, 3.917, 0.438, LI, 'justify');
+  label(s, 3.178, 4.969, 2.053, 'Goes on 2034');
+  para(s, 3.178, 6.091, 3.917, 0.438, LI, 'justify');
+  label(s, 3.178, 5.794, 2.053, 'And Then in 2035');
+  tagline(s, 8.35, 5.413, 3.38, 0.606, 'Fusing tradition with modernity in every design.');
+  arc(s, -0.541, -1.523, 3.461, 343, 188);
+  blob(s, -0.074, -1.033, 2.528, 2.534);
+  star(s, 2.635, 1.705, 0.522);
+  dot(s, 7.306, 1.805, 0.497);
+  arc(s, 12.156, 6.025, 1.51, 32, 321.4);
+  dot(s, 11.976, 6.699, 0.35);
+}
+
+/* ---------- Slide 16 - Comparison Chart ---------- */
+function slide16 (pptx) {
+  const s = newSlide(pptx);
+  comparisonChart(s, 1.074, 0.667, 4.601, 6.167);
+  heading(s, 6.583, 1.588, 3.878, 'Comparison');
+  heading(s, 6.583, 2.229, 3.878, 'Chart');
+  frame(s, 0.667, -0.333, 5.417, 8.333, 0.268);
+  para(s, 6.583, 3.258, 3.75, 0.774, HI);
+  para(s, 6.758, 4.92, 2.5, 0.606, LI);
+  label(s, 6.758, 4.623, 1.292, 'Series One');
+  frame(s, 6.583, 4.444, 3.042, 1.307, 0.218);
+  para(s, 6.758, 6.252, 2.5, 0.606, LI);
+  label(s, 6.758, 5.956, 1.292, 'Series Two');
+  frame(s, 6.583, 5.753, 3.042, 2.08, 0.247);
+  para(s, 9.8, 4.92, 2.5, 0.606, LI);
+  label(s, 9.8, 4.623, 1.292, 'Series Three');
+  frame(s, 9.625, 4.444, 3.042, 1.307, 0.218);
+  tagline(s, 9.933, 6.06, 2.367, 0.606, 'Bold designs for the fashion-forward.');
+  blob(s, 11.42, 1.128, 3.034, 3.042);
+  blob(s, -1.006, 6.087, 2.345, 2.35);
+  arc(s, 6.083, -0.248, 1.51, 314, 179.3);
+  star(s, 5.812, 0.406, 0.522);
+  dot(s, 12.097, 4.24, 0.405);
+  dot(s, 5.926, 5.728, 0.291);
+}
+
+/* ---------- Slide 17 - Growth Chart ---------- */
+function slide17 (pptx) {
+  const s = newSlide(pptx);
+  photo(s, -0.405, 1.071, 3.5, 2.143);
+  growthChart(s, 0.667, 3.562, 7.167, 3.271);
+  heading(s, 3.5, 1.709, 3.333, 'Growth');
+  heading(s, 3.5, 2.351, 3.333, 'Chart');
+  frame(s, 8.5, -0.333, 5.25, 8.333, 0.26);
+  para(s, 9, 3.812, 2.5, 0.606, LI);
+  label(s, 9, 3.515, 1.292, 'Subject One');
+  para(s, 9, 4.88, 2.5, 0.606, LI);
+  label(s, 9, 4.583, 1.292, 'Subject Two');
+  para(s, 9, 5.949, 2.5, 0.606, LI);
+  label(s, 9, 5.652, 1.292, 'Subject Three');
+  para(s, 9, 2.142, 3.74, 0.774, HI);
+  arc(s, 5.56, -1.087, 2.94, 341.1, 210.1);
+  blob(s, 5.789, -0.995, 2.482, 2.488);
+  blob(s, 11.581, 5.648, 3.153, 3.161);
+  star(s, 8.239, 1.596, 0.522);
+  dot(s, 2.917, 1.418, 0.291);
+  dot(s, 12.167, 5.683, 0.496);
+}
+
+/* ---------- Slide 18 - Awards Recognition ---------- */
+function slide18 (pptx) {
+  const s = newSlide(pptx);
+  arc(s, -0.45, -1.087, 2.579, 341.1, 193.1);
+  photo(s, 1, 1.396, 3.083, 3.567);
+  blob(s, 12.118, 3.542, 2.929, 2.936);
+  heading(s, 1, 5.275, 3.333, 'Awards');
+  heading(s, 1, 5.917, 3.833, 'Recognition');
+  para(s, 5.694, 2.116, 1.667, 0.438, 'Excellence in Business Consulting Award', 'justify');
+  label(s, 5.694, 1.906, 1.803, '2031');
+  para(s, 5.694, 3.079, 1.667, 0.438, 'Innovator of the Year in Business Solutions', 'justify');
+  label(s, 5.694, 2.869, 1.803, '2031');
+  para(s, 5.694, 4.042, 1.667, 0.438, 'Visionary in Business Transformation', 'justify');
+  label(s, 5.694, 3.832, 1.803, '2032');
+  para(s, 7.944, 2.116, 1.803, 0.438, 'Most Trusted Business Partner Award', 'justify');
+  label(s, 7.944, 1.906, 1.803, '2032');
+  para(s, 7.944, 3.079, 1.667, 0.438, 'Entrepreneurial Excellence Award', 'justify');
+  label(s, 7.944, 2.869, 1.803, '2033');
+  para(s, 7.944, 4.042, 1.667, 0.438, 'Customer Satisfaction Excellence Award', 'justify');
+  label(s, 7.944, 3.832, 1.803, '2033');
+  para(s, 10.194, 2.116, 1.803, 0.438, 'Most Trusted Business Partner Award', 'justify');
+  label(s, 10.194, 1.906, 1.803, '2033');
+  para(s, 10.194, 3.079, 1.667, 0.438, 'Entrepreneurial Excellence Award', 'justify');
+  label(s, 10.194, 2.869, 1.803, '2034');
+  para(s, 10.194, 4.042, 1.667, 0.438, 'Customer Satisfaction Excellence Award', 'justify');
+  label(s, 10.194, 3.832, 1.803, '2035');
+  frame(s, 5.125, 1.396, 7.417, 3.567, 0.323);
+  para(s, 5.694, 5.527, 3.139, 0.942, HI);
+  tagline(s, 9.748, 5.728, 2.367, 0.606, 'Bold designs for the fashion-forward.');
+  blob(s, -0.181, -0.874, 2.035, 2.041);
+  frame(s, 5.125, 4.963, 7.417, 3.037, 0.275);
+  star(s, 3.785, 1.968, 0.522);
+  dot(s, 5.404, 4.789, 0.291);
+  dot(s, 12.321, 1.543, 0.442);
+}
+
+/* ---------- Slide 19 - SWOT Analysis ---------- */
+function slide19 (pptx) {
+  const s = newSlide(pptx);
+  blob(s, 8.329, 5.019, 3.018, 3.026);
+  heading(s, 0.917, 1.4, 3.333, 'SWOT');
+  heading(s, 0.917, 2.041, 3.333, 'Analysis');
+  para(s, 0.917, 2.943, 3.958, 0.774, HI);
+  para(s, 0.841, 4.702, 2.5, 0.606, LI);
+  label(s, 0.841, 4.405, 1.292, 'Strength');
+  frame(s, -0.5, 4.226, 4.208, 1.307, 0.218);
+  para(s, 3.883, 4.702, 2.5, 0.606, LI);
+  label(s, 3.883, 4.405, 1.292, 'Weakness');
+  frame(s, 3.708, 4.226, 3.042, 1.307, 0.218);
+  para(s, 0.841, 6.009, 2.5, 0.606, LI);
+  label(s, 0.841, 5.712, 1.292, 'Opportunity');
+  frame(s, -0.5, 5.534, 4.208, 1.307, 0.218);
+  para(s, 3.883, 6.009, 2.5, 0.606, LI);
+  label(s, 3.883, 5.712, 1.292, 'Treats');
+  frame(s, 3.708, 5.534, 3.042, 1.307, 0.218);
+  frame(s, 8.667, -0.167, 0.771, 8.167, 0.129);
+  arc(s, 5.727, -1.087, 2.94, 341.1, 210.1);
+  blob(s, 5.956, -0.995, 2.482, 2.488);
+  star(s, 6.385, 3.982, 0.564);
+  dot(s, 8.715, 5.224, 0.354);
+  dot(s, 5.605, 0.742, 0.442);
+  photo(s, 9.417, 1.396, 3.25, 5.438);
+}
+
+/* ---------- Slide 20 - Thank You ---------- */
+function slide20 (pptx) {
+  const s = newSlide(pptx);
+  photo(s, 2.163, 0.667, 3.667, 6.167);
+  hero(s, 6.167, 0.986, 6.028, 2.121, 'Thank');
+  hero(s, 6.167, 2.486, 6.028, 2.121, 'You');
+  para(s, 6.194, 5.121, 3.958, 0.774, HI);
+  frame(s, 0.667, -0.167, 1.497, 8.167, 0.25);
+  label(s, 6.194, 4.771, 1.847, 'In Conclusion');
+  label(s, 6.194, 6.272, 1.847, 'www.harika.com');
+  label(s, 8.052, 6.272, 1.847, 'harika@email.com');
+  label(s, 9.931, 6.272, 2.861, '123 Main Street, City, Country 12345');
+  arc(s, -0.777, -1.087, 2.94, 341.1, 91.1);
+  arc(s, 12.012, 3.484, 2.289, 68.6, 298);
+  blob(s, -0.226, -0.637, 2.035, 2.041);
+  blob(s, 12.534, 1.959, 2.289, 2.295);
+  star(s, 0.385, 4.207, 0.564);
+  dot(s, 5.051, 0.446, 0.442);
+  dot(s, 11.973, 4.875, 0.266);
+}
+/* ---------- build ---------- */
+const BUILDERS = [
+  slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+  slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20
+];
+
+const pptx = new PptxGenJS();
+pptx.layout = 'LAYOUT_WIDE';   // 13.333 x 7.5 in
+pptx.title = 'Harika Fashion Company Profile';
+pptx.author = 'Harika';
+BUILDERS.forEach(function (build) { build(pptx); });
+pptx.writeFile({ fileName: path.join(__dirname, '1683d83f-267b-4083-83db-aaaa67fe17c6_grok_final.pptx') })
+  .then(function (f) { console.log('wrote ' + f); });
