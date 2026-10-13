@@ -1,0 +1,69 @@
+--- 2026-10-13_03-54:/exec-daemon/agent-sdk/grok/canvas/charts.d.ts
++++ 2026-10-13_05-45:/exec-daemon/agent-sdk/grok/canvas/charts.d.ts
+@@ -57,10 +57,18 @@
+ }
+ /**
+  * Horizontal bars split into the same parts, with a legend. The longest bar
+- * sets the scale; each total sits just past its bar's end. Only the parts the
+- * legend names draw, each at least zero; a part that is not a finite number
+- * counts as zero, and a row with none readable prints a dash. The track never
+- * goes under 48 px. Nothing renders for an empty series.
++ * sets the scale; each total sits just past its bar's end. The segments
++ * stand 2 px apart, each a rounded rectangle (corners of 2 px, less on a
++ * sliver) with the first one flat against the axis, and none draws under
++ * 4 px; a bar too short to hold every part at that floor is one stub in its
++ * largest part's hue, its own length and at least 4 px, so a short bar
++ * never draws longer than its share. A dense bar (past eight parts) too
++ * short for the gaps drops them first and draws its parts touching
++ * ({@link stackGapPx}). Only the parts the legend names draw, each at least zero; a part
++ * that is not a finite number counts as zero, and a row with none readable
++ * prints a dash. The track never goes under 48 px. On a narrow block each
++ * label and its total share one row over a stack that takes the block's
++ * whole width. Nothing renders for an empty series.
+  */
+ export declare function StackedBars({ series, bars }: StackedBarsProps): JSX.Element | null;
+ export interface ColumnPoint {
+@@ -84,9 +92,10 @@
+  * A series denser than the block can draw at 2 px a column is binned to
+  * runs of neighbors, each reading as its first label and largest reading.
+  * When the block is too narrow for every value or label to print, they thin
+- * to the ones that fit, the emphasized column's always among them, a label
+- * wider than its room is cut with an ellipsis, and a dense series gives up
+- * gap before column width. A reading that is not a
++ * to the ones that fit, the emphasized column's always among them, a value
++ * that would print across a taller neighbour does not print, a label wider
++ * than its room is cut with an ellipsis, and a dense series gives up gap
++ * before column width. A reading that is not a
+  * finite number has no say in the scale and shows no bar and a dash. Nothing
+  * renders for an empty series.
+  */
+@@ -186,7 +195,10 @@
+     display?: string;
+ }
+ export interface PieProps {
+-    /** Parts, largest first. Past three, the rest share gray; fold small parts into one "Other". */
++    /**
++     * Parts, largest first. Past three, the rest share gray. Past eight parts,
++     * those under 2% of the whole fold into one "Other (n)" part on their own.
++     */
+     parts: readonly PiePart[];
+     /**
+      * Print a total in the hole: `true` for the plain sum, a number to print
+@@ -203,9 +215,14 @@
+  * is not a finite number is dropped. Pointing at a part or its legend row
+  * lifts that part and quiets the rest; `total` prints the sum in the hole.
+  * A long part label keeps to one line and truncates while the value and
+- * share never break or shrink, whatever wrapping the page allows; on a
+- * narrow block the legend moves under the donut so labels get the full
+- * width first. Nothing renders for an empty series.
++ * share never break or shrink, whatever wrapping the page allows. On a wide
++ * block the legend sits beside a 120 px ring. On a narrow block (a laptop
++ * page's two-column cell) the ring centres at 106 px and the legend moves
++ * under it, one full-width row per part, so the cell has no empty half and
++ * labels get the whole width; under {@link PIE_STACK_LEGEND_UNDER_PX} (a
++ * phone card) the centred ring is 120 px. Past eight parts, those under 2%
++ * of the whole fold into one "Other (n)" ({@link foldPieParts}). Nothing
++ * renders for an empty series.
+  */
+ export declare function Pie({ parts: given, total: showTotal, label }: PieProps): JSX.Element | null;
+ export {};

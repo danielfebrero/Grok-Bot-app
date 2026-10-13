@@ -1,0 +1,57 @@
+--- 2026-10-13_03-54:/exec-daemon/agent-sdk/grok/canvas/lists.d.ts
++++ 2026-10-13_05-45:/exec-daemon/agent-sdk/grok/canvas/lists.d.ts
+@@ -0,0 +1,54 @@
++import type { JSX, ReactNode } from "react";
++/**
++ * One item of a `BulletList` or `NumberedList`: a sentence, or an object
++ * with the sentence and the items nested one level in under it.
++ */
++export type ListItem = string | {
++    /** The item's own line. */
++    text: ReactNode;
++    /** Items nested under this one: hollow bullets under a bullet, `a.`, `b.` under a number. */
++    items?: readonly ListItem[];
++    /** In a `NumberedList`, mark the nested `items` with bullets instead of `a.`, `b.`. */
++    bullets?: boolean;
++};
++export interface ListProps {
++    /** One plain sentence per item, or `{ text, items }` for an item with items nested under it. */
++    items: readonly ListItem[];
++}
++/** The mark before every item of a pros list (`pro`, a green plus) or a cons list (`con`, a red minus). */
++export type ListMarker = "pro" | "con";
++export interface BulletListProps extends ListProps {
++    /** Replace the dots: `pro` draws a green plus before each item, `con` a red minus, for a pros and cons pair. */
++    marker?: ListMarker;
++}
++/**
++ * Bulleted list: a filled dot in the text's ink, and under an item with
++ * `items` of its own, hollow bullets 24 px in. With `marker="pro"` or
++ * `"con"` each item takes a green plus or a red minus in a tinted tile
++ * instead of the dot; `ProsCons` draws the pair of them as two cards.
++ */
++export declare function BulletList({ items, marker }: BulletListProps): JSX.Element;
++/**
++ * Numbered list for ranked items or a procedure of one-liners: `1.`, `2.`
++ * in secondary ink, and under an item with `items` of its own, `a.`, `b.`
++ * 24 px in (or bullets, when the item says `bullets`). A procedure whose
++ * steps have a title and a line of detail is `Steps`.
++ */
++export declare function NumberedList({ items }: ListProps): JSX.Element;
++export interface Step {
++    /** The step in a few words, set bold. */
++    title: ReactNode;
++    /** One quiet line under the title: the how, the value, or the check. */
++    detail?: ReactNode;
++}
++export interface StepsProps {
++    /** The steps in order; each takes the next circled number. */
++    steps: readonly Step[];
++}
++/**
++ * A procedure: each step a circled number on a rail, a bold title, and an
++ * optional quiet line of detail. Steps follow each other without hairlines;
++ * a thin line joins each circle to the next. One with no steps draws
++ * nothing. A list of one-liners is a `NumberedList` instead.
++ */
++export declare function Steps({ steps }: StepsProps): JSX.Element | null;

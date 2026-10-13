@@ -1,0 +1,34 @@
+--- 2026-10-13_03-54:/exec-daemon/agent-sdk/grok/canvas/properties.d.ts
++++ 2026-10-13_05-45:/exec-daemon/agent-sdk/grok/canvas/properties.d.ts
+@@ -0,0 +1,31 @@
++import type { JSX, ReactNode } from "react";
++export interface PropertyItem {
++    /** The key, a word or two: `Owner`, `Due`, `Source`. */
++    label: string;
++    /** The value: a short string, or a node such as a figure, a date, or a state as `<Status tone="success">On track</Status>`. */
++    value: ReactNode;
++}
++export interface PropertiesProps {
++    /** The key–value pairs in order, one row each. */
++    items: readonly PropertyItem[];
++}
++/**
++ * The facts about a thing as key–value rows: a quiet label column of one
++ * width, the value beside it, no rules and no box. Each row is 20 px of
++ * subtext, 8 px from the next; a value that wraps keeps its label on its
++ * first line. Fits a `Grid` cell and the phone column as it is. A value that
++ * is a state is a `Status` pill, not an italic or colored word. One with no
++ * items draws nothing.
++ *
++ * @example
++ * ```tsx
++ * <Properties
++ *   items={[
++ *     { label: "Owner", value: "Peng Zheng" },
++ *     { label: "Status", value: <Status tone="success">On track</Status> },
++ *     { label: "Due", value: "Oct 27, 2026" },
++ *   ]}
++ * />
++ * ```
++ */
++export declare function Properties({ items }: PropertiesProps): JSX.Element | null;

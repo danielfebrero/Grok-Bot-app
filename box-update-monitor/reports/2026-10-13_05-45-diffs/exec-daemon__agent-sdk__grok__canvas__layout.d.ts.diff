@@ -1,0 +1,34 @@
+--- 2026-10-13_03-54:/exec-daemon/agent-sdk/grok/canvas/layout.d.ts
++++ 2026-10-13_05-45:/exec-daemon/agent-sdk/grok/canvas/layout.d.ts
+@@ -1,8 +1,10 @@
+ import { type JSX, type ReactNode } from "react";
+ import type { Tone } from "./components.js";
++/** Most cells a `Grid` puts on a row. */
++export type GridColumns = 2 | 3 | 4 | 5 | 6 | 7;
+ export interface GridProps {
+-    /** Most cells per row, two by default. Cells wrap to fewer when the page is narrow; four fit a `wide` or `full` page. */
+-    columns?: 2 | 3 | 4;
++    /** Most cells per row, two by default. Cells wrap to fewer when the page is narrow; four fit a `wide` or `full` page, five to seven a `full` page on a laptop. */
++    columns?: GridColumns;
+     /**
+      * One outline with hairlines between the cells instead of a card per cell;
+      * a last cell short of a row then spans the rest of it.
+@@ -14,12 +16,14 @@
+     children?: ReactNode;
+ }
+ /**
+- * Two or three blocks side by side: small multiples, a chart next to its
++ * Two to seven blocks side by side: small multiples, a chart next to its
+  * breakdown, a before and after, the tiles of a dashboard. Each cell is a
+  * card like a chart's own, and a chart in it draws no second card; `joined`
+- * draws one outline with dividers instead. The cells of a row stand equally
+- * tall, with each cell's title at the top and its plot at the floor. Put
+- * it inside a `Section` to share one heading, or directly in
++ * draws one outline with dividers instead. Each card hugs what it holds,
++ * its title at the top and its blocks right under it, so a short card
++ * beside a tall one ends under its own content rather than stretching to
++ * its neighbour's floor; a joined grid's cells share one outline and so
++ * stand equally tall. Put it inside a `Section` to share one heading, or directly in
+  * the `Page` with a `Section` per cell. On a `wide` or `full` page the cells
+  * get the room of a column each. With no cells it draws nothing.
+  *

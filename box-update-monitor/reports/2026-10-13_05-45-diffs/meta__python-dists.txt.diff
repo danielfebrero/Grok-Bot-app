@@ -1,0 +1,11 @@
+--- 2026-10-13_03-54/meta/python-dists.txt
++++ 2026-10-13_05-45/meta/python-dists.txt
+@@ -45,7 +45,7 @@
+ /usr/local/lib/python3.13/dist-packages	python_pptx-1.0.2.dist-info
+ /usr/local/lib/python3.13/dist-packages	requests-2.34.2.dist-info
+ /usr/local/lib/python3.13/dist-packages	six-1.17.0.dist-info
+-/usr/local/lib/python3.13/dist-packages	soupsieve-3.0.1.dist-info
++/usr/local/lib/python3.13/dist-packages	soupsieve-3.0.3.dist-info
+ /usr/local/lib/python3.13/dist-packages	typing_extensions-4.16.0.dist-info
+ /usr/local/lib/python3.13/dist-packages	urllib3-2.8.0.dist-info
+ /usr/local/lib/python3.13/dist-packages	xlsxwriter-3.2.9.dist-info

@@ -1,0 +1,24 @@
+--- 2026-10-13_03-54:/exec-daemon/agent-sdk/grok/canvas/link-cards.d.ts
++++ 2026-10-13_05-45:/exec-daemon/agent-sdk/grok/canvas/link-cards.d.ts
+@@ -0,0 +1,21 @@
++import { type JSX } from "react";
++export interface Link {
++    title: string;
++    /** Where it lives, e.g. "Slack · #design-review" or "Figma". */
++    site?: string;
++    date?: string;
++    href: string;
++}
++export interface LinkCardsProps {
++    links: readonly Link[];
++    /** Number the cards so findings can cite them; the index takes the tile. */
++    numbered?: boolean;
++}
++/**
++ * References to documents and pages, which leave the page: one bordered
++ * card, and a group of links is one card with a divider between its rows.
++ * Each row leads with a tile for the cited app's mark; with no logo library
++ * in the kit the tile shows the `link` glyph, or the row's number when
++ * `numbered`. No links draws nothing, not an empty card.
++ */
++export declare function LinkCards({ links, numbered }: LinkCardsProps): JSX.Element | null;

@@ -1,0 +1,68 @@
+--- 2026-10-13_03-54:/exec-daemon/agent-sdk/grok/canvas/tokens.d.ts
++++ 2026-10-13_05-45:/exec-daemon/agent-sdk/grok/canvas/tokens.d.ts
+@@ -22,7 +22,7 @@
+     readonly bg: {
+         /** Page background. */
+         readonly base: string;
+-        /** Soft card behind the calendar. */
++        /** A soft surface a step off the page: a held slot on the calendar. */
+         readonly subtle: string;
+         /** A surface that sits above the page: a chip in a chart, a popover. */
+         readonly elevated: string;
+@@ -42,6 +42,16 @@
+         /** Only a genuinely bad status word; neutral states stay in neutral ink. */
+         readonly warning: string;
+         readonly danger: string;
++        /**
++         * Deep step of each tone's hue (`data/blue/5`, `data/green/5`,
++         * `data/yellow/5`, `data/red/5`): body text inside a box tinted with the
++         * matching `fill.*Subtle`, under a title in `accent` / `success` /
++         * `warning` / `danger`. The ramp flips in dark so the step stays legible.
++         */
++        readonly accentDeep: string;
++        readonly successDeep: string;
++        readonly warningDeep: string;
++        readonly dangerDeep: string;
+     };
+     readonly fill: {
+         /** Solid ink fill. */
+@@ -52,6 +62,15 @@
+         readonly secondary: string;
+         readonly accent: string;
+         readonly controlChecked: string;
++        /**
++         * Each tone's hue at the same 9% (light) / 17% (dark) as `secondary`
++         * (`fill/accent-subtle`, `fill/success-subtle`, `fill/warning-subtle`,
++         * `fill/danger-subtle`): the box of a toned callout or a tinted mark.
++         */
++        readonly accentSubtle: string;
++        readonly successSubtle: string;
++        readonly warningSubtle: string;
++        readonly dangerSubtle: string;
+     };
+     readonly border: {
+         /** 5%: hairline rows. */
+@@ -70,6 +89,8 @@
+  * Grok Bot data colors for data marks only: bars, columns, lines, points,
+  * areas, slices, funnel bands, and legend swatches. Text never takes these;
+  * labels, values, ticks, and legend names stay on the neutral `text` tokens.
++ * The one exception the design draws is the title on a tinted calendar
++ * event, which takes `blue5`.
+  *
+  * Three series hues and a gray tail, step 3 of the design's `Data Colors`
+  * ramps, the same in light and dark. A single series uses the blue ramp: the
+@@ -95,6 +116,14 @@
+     readonly areaAlpha: string;
+     /** Alpha hex suffix (25%) for a funnel's previous-step band: `${color}${bandAlpha}`. */
+     readonly bandAlpha: string;
++    /**
++     * The design's `data/blue/tint`: step 3 of the blue ramp at the data tint
++     * (16% light, 24% dark), the fill of a calendar event. Equal to
++     * `${categorical[0]}${areaAlpha}`, pinned here under its own name.
++     */
++    readonly blueTint: string;
++    /** The design's `data/blue/5`, the strong end of the blue ramp: the label on a tinted calendar event. */
++    readonly blue5: string;
+     /** Blue ramp, quiet to strong, for ordered values (heatmaps, choropleths). */
+     readonly sequential: readonly string[];
+     /** Red, neutral, blue: below and above a midpoint. */

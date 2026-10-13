@@ -1,0 +1,48 @@
+--- 2026-10-13_03-54:/exec-daemon/agent-sdk/grok/canvas/avatar.d.ts
++++ 2026-10-13_05-45:/exec-daemon/agent-sdk/grok/canvas/avatar.d.ts
+@@ -0,0 +1,45 @@
++import type { JSX } from "react";
++/**
++ * A person as an initials tile, alone or overlapped into a stack. Photos
++ * would need images the canvas can load, so initials on palette tiles are
++ * the whole vocabulary: the tile takes the brand hues data marks take, and
++ * an overflow tile takes the `other` gray.
++ */
++/** Tile diameter in px: 24 on a card or in a dense row, 28 in a chart node, 32 on its own line. */
++export type AvatarSize = 24 | 28 | 32;
++export interface AvatarProps {
++    /** The person's name; the tile shows its initials and the name on hover. */
++    name: string;
++    /** Tile diameter; 32 unless the tile sits on a card (24) or in a diagram node (28). */
++    size?: AvatarSize;
++    /** A quiet tile: `fill.secondary` under `text.secondary` initials, for a node in a chart or a diagram. */
++    neutral?: boolean;
++}
++/**
++ * One person as an initials tile on a brand-hued circle; the hue follows the
++ * name, so one person keeps one color across the page.
++ * @kitNote Alone on a card or in a cell; several people are an `AvatarStack`.
++ */
++export declare function Avatar({ name, size, neutral }: AvatarProps): JSX.Element;
++export interface AvatarPerson {
++    /** The person's name; the tile shows its initials and the name on hover. */
++    name: string;
++}
++export interface AvatarStackProps {
++    /** The people, in the order they show; an empty list draws nothing. */
++    people: readonly AvatarPerson[];
++    /** How many tiles show before the rest fold into one `+N` tile; 3 unless set. */
++    max?: number;
++    /** Tile diameter; 32 unless the stack sits in a dense row or a card (24). */
++    size?: AvatarSize;
++    /** A line beside the stack, as "7 people own this launch"; the names, and "and N more", print under it. */
++    label?: string;
++}
++/**
++ * Several people as overlapping initials tiles in brand hues, in order, with
++ * the rest folded into one gray `+N` tile; each tile is cut out of the next
++ * by a ring in the page's paper. With a `label`, the line and the names
++ * print beside it.
++ * @kitNote Also a `Table` cell; one person is an `Avatar`.
++ */
++export declare function AvatarStack({ people, max, size, label, }: AvatarStackProps): JSX.Element | null;

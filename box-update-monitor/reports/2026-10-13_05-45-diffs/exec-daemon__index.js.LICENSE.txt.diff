@@ -1,0 +1,13 @@
+--- 2026-10-13_03-54:/exec-daemon/index.js.LICENSE.txt
++++ 2026-10-13_05-45:/exec-daemon/index.js.LICENSE.txt
+@@ -23,10 +23,6 @@
+  * Released under the MIT License.
+  */
+ 
+-/*! formdata-polyfill. MIT License. Jimmy Wärting <https://jimmy.warting.se/opensource> */
+-
+-/*! ws. MIT License. Einar Otto Stangvik <einaros@gmail.com> */
+-
+ /**
+      * @license
+      * Copyright 2009 The Closure Library Authors

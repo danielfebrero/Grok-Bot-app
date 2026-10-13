@@ -19,7 +19,7 @@ Versions touchées : agent-store-fuse `c8ef2b3` → `511f501` (pointeur `/usr/lo
 - **Perf** : —
 - **Autre/infra** : retour arrière agent-store-fuse vers `511f501` (rebuild opaque, classement hypothétique).
 
-Rapport : [reports/2026-10-13_03-54.md](reports/2026-10-13_03-54.md) — commit à venir.
+Rapport : [reports/2026-10-13_03-54.md](reports/2026-10-13_03-54.md) — [commit](../../../commit/81397883b37c0bb8d401501cc88853357a6fb653).
 
 ## 2026-10-13 01:51 (Paris) — snapshot `2026-10-13_00-46` → `2026-10-13_01-51`
 

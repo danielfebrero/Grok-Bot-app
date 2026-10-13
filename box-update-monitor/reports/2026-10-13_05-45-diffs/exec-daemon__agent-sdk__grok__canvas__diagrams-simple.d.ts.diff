@@ -1,0 +1,80 @@
+--- 2026-10-13_03-54:/exec-daemon/agent-sdk/grok/canvas/diagrams-simple.d.ts
++++ 2026-10-13_05-45:/exec-daemon/agent-sdk/grok/canvas/diagrams-simple.d.ts
+@@ -0,0 +1,77 @@
++import type { JSX } from "react";
++export interface MatrixAxes {
++    /** The horizontal axis's two ends, low then high, e.g. `["Low effort", "High effort"]`; the high end gets an arrow. */
++    x: readonly [string, string];
++    /** The vertical axis's two ends, low (bottom) then high (top), e.g. `["Low impact", "High impact"]`; set along the left edge, with an arrow on the high end. Omit to name only the horizontal axis. */
++    y?: readonly [string, string];
++}
++export interface MatrixPoint {
++    /** The item's name, printed beside its dot. */
++    label: string;
++    /** Position along the horizontal axis, 0 (left) to 1 (right). */
++    x: number;
++    /** Position along the vertical axis, 0 (bottom) to 1 (top). */
++    y: number;
++}
++export interface Matrix2x2Props {
++    /** The two axes' end labels. */
++    axes: MatrixAxes;
++    /** The four quadrants' names, top-left, top-right, bottom-left, bottom-right, e.g. `["Quick wins", "Big bets", "Fill-ins", "Money pits"]`. */
++    quadrants?: readonly [string, string, string, string];
++    /** The items to plot, each with a label and its 0–1 position on both axes. */
++    points: readonly MatrixPoint[];
++}
++/**
++ * A 2×2 matrix: a plot split into four quadrants by dashed dividers, with
++ * the quadrants named in their outer corners, the axes named along the
++ * plot's edges, and each item a dot with its label. Items are placed by two
++ * 0–1 coordinates; out-of-range values are kept to the edge. Every dot is
++ * the single-series blue. Draws its own chart card.
++ *
++ * @example
++ * ```tsx
++ * <Matrix2x2
++ *   axes={{ x: ["Low effort", "High effort"], y: ["Low impact", "High impact"] }}
++ *   quadrants={["Quick wins", "Big bets", "Fill-ins", "Money pits"]}
++ *   points={[
++ *     { label: "Address autofill", x: 0.15, y: 0.82 },
++ *     { label: "Rebuild the cart", x: 0.77, y: 0.85 },
++ *   ]}
++ * />
++ * ```
++ */
++export declare function Matrix2x2({ axes, quadrants, points }: Matrix2x2Props): JSX.Element;
++export interface VennSet {
++    /** The set's name, beside its circle. */
++    label: string;
++    /** The set's size, under its name, as it should read ("41,200") or as a number the kit formats. */
++    count?: number | string;
++    /** A few members of the set, one per line under the name. */
++    items?: readonly string[];
++}
++export interface VennProps {
++    /** Two or three sets, in palette order (blue, yellow, cyan); a fourth and beyond are not drawn. */
++    sets: readonly VennSet[];
++    /** What the sets share, printed in the middle where every circle overlaps, e.g. the count of members in all of them. */
++    overlap?: number | string;
++}
++/**
++ * A Venn diagram of two or three sets: overlapping circles, each filled with
++ * its series hue at the area tint and outlined by it, with each set named
++ * beside its circle and, in the middle, what every set shares. Sets take the
++ * palette in order. With one set it draws that circle alone; with none it
++ * draws nothing. Draws its own chart card.
++ *
++ * @example
++ * ```tsx
++ * <Venn
++ *   sets={[
++ *     { label: "Opened email", count: 41200 },
++ *     { label: "Visited site", count: 23900 },
++ *     { label: "Bought", count: 3800 },
++ *   ]}
++ *   overlap={1240}
++ * />
++ * ```
++ */
++export declare function Venn({ sets: given, overlap }: VennProps): JSX.Element | null;

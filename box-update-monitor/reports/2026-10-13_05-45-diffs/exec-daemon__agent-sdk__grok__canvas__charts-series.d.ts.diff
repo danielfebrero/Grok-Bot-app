@@ -1,0 +1,11 @@
+--- 2026-10-13_03-54:/exec-daemon/agent-sdk/grok/canvas/charts-series.d.ts
++++ 2026-10-13_05-45:/exec-daemon/agent-sdk/grok/canvas/charts-series.d.ts
+@@ -21,7 +21,7 @@
+ export interface ReferenceLine {
+     /** Where across the value axis the line sits, e.g. a target or a limit. */
+     value: number;
+-    /** Short name printed above the line at its right end. */
++    /** Short name printed at the line's right end, in a gutter the marks leave for it. */
+     label: string;
+ }
+ export interface ColumnSeriesEntry {

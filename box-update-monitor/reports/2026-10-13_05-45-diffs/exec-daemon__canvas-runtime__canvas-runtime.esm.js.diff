@@ -1,0 +1,124 @@
+--- 2026-10-13_03-54:/exec-daemon/canvas-runtime/canvas-runtime.esm.js
++++ 2026-10-13_05-45:/exec-daemon/canvas-runtime/canvas-runtime.esm.js
+@@ -14694,57 +14694,61 @@
+   diffStripAdded: "#007041CC",
+   diffStripRemoved: "#BE1744CC"
+ };
+-var GROK_INK = "#070707";
+-var GROK_PAPER = "#FAFAFA";
++var GROK_INK_LIGHT = "#141414";
++var GROK_INK_DARK = "#FCFCFC";
++var GROK_BASE_LIGHT = "#FCFCFC";
++var GROK_BASE_DARK = "#070707";
++var GROK_FILL_LIGHT = "#070707";
++var GROK_FILL_DARK = "#FAFAFA";
+ var canvasPaletteGrokDark = {
+-  foreground: GROK_PAPER,
+-  foregroundSecondary: "#FAFAFABD",
+-  foregroundTertiary: "#FAFAFA99",
+-  foregroundQuaternary: "#FAFAFA5C",
+-  editor: GROK_INK,
+-  chrome: GROK_INK,
++  foreground: GROK_INK_DARK,
++  foregroundSecondary: "#FCFCFCBD",
++  foregroundTertiary: "#FCFCFC99",
++  foregroundQuaternary: "#FCFCFC5C",
++  editor: GROK_BASE_DARK,
++  chrome: GROK_BASE_DARK,
+   sidebar: "#111111",
+   elevated: "#111111",
+-  fillPrimary: "#FAFAFA33",
+-  fillSecondary: "#FAFAFA24",
+-  fillTertiary: "#FAFAFA14",
+-  fillQuaternary: "#FAFAFA0F",
+-  strokePrimary: "#FAFAFA33",
+-  strokeSecondary: "#FAFAFA1F",
+-  strokeTertiary: "#FAFAFA14",
+-  strokeFocused: GROK_PAPER,
+-  accent: GROK_PAPER,
+-  buttonBackground: GROK_PAPER,
+-  buttonForeground: GROK_INK,
+-  buttonHoverBackground: "#F3F3F3",
+-  link: GROK_PAPER,
++  fillPrimary: "#FCFCFC33",
++  fillSecondary: "#FCFCFC24",
++  fillTertiary: "#FCFCFC14",
++  fillQuaternary: "#FCFCFC0F",
++  strokePrimary: "#FCFCFC33",
++  strokeSecondary: "#FCFCFC1F",
++  strokeTertiary: "#FCFCFC14",
++  strokeFocused: GROK_INK_DARK,
++  accent: GROK_FILL_DARK,
++  buttonBackground: GROK_FILL_DARK,
++  buttonForeground: "#141414",
++  buttonHoverBackground: "#D5D5D5",
++  link: GROK_INK_DARK,
+   diffInsertedLine: "#00C97233",
+   diffRemovedLine: "#FF263C33",
+   diffStripAdded: "#00C9728F",
+   diffStripRemoved: "#FF263C8F"
+ };
+ var canvasPaletteGrokLight = {
+-  foreground: GROK_INK,
+-  foregroundSecondary: "#070707BD",
+-  foregroundTertiary: "#07070799",
+-  foregroundQuaternary: "#0707075C",
+-  editor: GROK_PAPER,
++  foreground: GROK_INK_LIGHT,
++  foregroundSecondary: "#141414BD",
++  foregroundTertiary: "#14141499",
++  foregroundQuaternary: "#1414145C",
++  editor: GROK_BASE_LIGHT,
+   chrome: "#F7F7F7",
+   sidebar: "#F3F3F3",
+-  elevated: GROK_PAPER,
+-  fillPrimary: "#07070733",
+-  fillSecondary: "#07070724",
+-  fillTertiary: "#07070714",
+-  fillQuaternary: "#0707070F",
+-  strokePrimary: "#07070733",
+-  strokeSecondary: "#0707071F",
+-  strokeTertiary: "#07070714",
+-  strokeFocused: GROK_INK,
+-  accent: GROK_INK,
+-  buttonBackground: GROK_INK,
+-  buttonForeground: GROK_PAPER,
+-  buttonHoverBackground: "#262626",
+-  link: GROK_INK,
++  elevated: GROK_BASE_LIGHT,
++  fillPrimary: "#14141433",
++  fillSecondary: "#14141424",
++  fillTertiary: "#14141414",
++  fillQuaternary: "#1414140F",
++  strokePrimary: "#14141433",
++  strokeSecondary: "#1414141F",
++  strokeTertiary: "#14141414",
++  strokeFocused: GROK_INK_LIGHT,
++  accent: GROK_FILL_LIGHT,
++  buttonBackground: GROK_FILL_LIGHT,
++  buttonForeground: "#FCFCFC",
++  buttonHoverBackground: "#2F2F2F",
++  link: GROK_INK_LIGHT,
+   diffInsertedLine: "#00C97224",
+   diffRemovedLine: "#FF263C38",
+   diffStripAdded: "#009957CC",
+@@ -28308,6 +28312,8 @@
+ function canvasSansFontStackForBrand(brand) {
+   return brand === "grok" ? CANVAS_GROK_SANS_FONT_STACK : CANVAS_CURSOR_SANS_FONT_STACK;
+ }
++var CANVAS_FRAME_BASE_FONT_SIZE_PX = 13;
++var CANVAS_FRAME_BASE_LINE_HEIGHT = 1.385;
+ 
+ // src/canvas-bootstrap.ts
+ var import_react10 = __toESM(require_react(), 1);
+@@ -28688,8 +28694,8 @@
+   s2.color = theme.foreground;
+   s2.colorScheme = isLightKind(theme.kind) ? "light" : "dark";
+   s2.fontFamily = theme.fontFamily;
+-  s2.fontSize = "13px";
+-  s2.lineHeight = "18px";
++  s2.fontSize = `${CANVAS_FRAME_BASE_FONT_SIZE_PX}px`;
++  s2.lineHeight = String(CANVAS_FRAME_BASE_LINE_HEIGHT);
+   s2.setProperty("--cursor-canvas-focus-ring-color", theme.focusRing);
+   if (opts?.previewMode) {
+     s2.padding = "0";
