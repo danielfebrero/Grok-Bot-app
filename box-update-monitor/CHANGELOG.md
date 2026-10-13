@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-13 17:59 (Paris) — snapshot `2026-10-13_17-00` → `2026-10-13_17-59`
+
+Versions touchées : agent-store-fuse `5cfc9a4` → `6efa6c7` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive ; binaire `cursor-agent-store-fuse` reconstruit) ; image, sand-host, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~2.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque, classement hypothétique). Côté paquets dpkg : apparition de `grok-bot 0.70.2` + dépendances desktop (`libayatana-appindicator3-1`, `libayatana-ido3-0.4-0`, `libayatana-indicator3-7`, `libsecret-1-0`, `libsecret-common`). Ce n'est **pas** une Update de l'ordinateur poussée par Cursor : un agent de l'équipe a installé en local le `.deb` de l'app desktop (téléchargé dans `/workspace/grok-bot-install`, `dpkg` à 17:33), bruit propre à cette box.
+
+Rapport : [reports/2026-10-13_17-59.md](reports/2026-10-13_17-59.md).
+
 ## 2026-10-13 08:49 (Paris) — snapshot `2026-10-13_07-49` → `2026-10-13_08-49`
 
 Versions touchées : agent-store-fuse `5cadd0d` → `5cfc9a4` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image, sand-host, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
