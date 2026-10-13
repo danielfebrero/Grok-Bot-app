@@ -9,6 +9,30 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-13 07:49 (Paris) — snapshot `2026-10-13_05-45` → `2026-10-13_07-49`
+
+Versions touchées : agent-store-fuse `511f501` → `5cadd0d` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive ; binaire `cursor-agent-store-fuse` reconstruit) ; image, sand-host, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~2.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque, classement hypothétique).
+
+Rapport : [reports/2026-10-13_07-49.md](reports/2026-10-13_07-49.md) — [commit](../../../commit/7a1b4c97fa3ff73f4c7b4bd911fabd1a6956d5c1).
+
+## 2026-10-13 05:45 (Paris) — snapshot `2026-10-13_03-54` → `2026-10-13_05-45`
+
+Versions touchées : image / box-scripts `7345aa4` → `726deab` (aligne l’image sur le sand-host déjà en `726deab` ; `lastCommandId` `upgrade-726deab` → `None`) ; exec-daemon rebuild (build 2026-10-11T15:02Z → 2026-10-12T14:49Z) ; canvas-sdk nouvelle version ; orbitd release `d2ed475` retirée (reste `28b0833`) ; agent-store-fuse, sand-host, Chrome, Node, Python inchangés. Fichiers : +24 / −8 / ~39.
+
+- **Bugfix** : —
+- **Change** : skill gérée `routines` — une routine ne peut pas remplir un login/carte/secret sauvegardé (secure form filling exige l’utilisateur dans le chat) ; le résumé post-save doit prévenir qu’elle pingera l’utilisateur à cette étape.
+- **Features** : canvas SDK Grok — nouveaux composants typés (`Avatar`/`AvatarStack`, `WeekView`/`MonthView`, `Scatter`, `Heatmap`/`CalendarHeatmap`, `Diagram`, `Matrix2x2`/`Venn`, listes, quote, TOC, equation, status, divider, link-cards, pros-cons, properties…) ; `controls.d.ts` et `reference.md` nettement élargis.
+- **Perf** : —
+- **Autre/infra** : Update Computer image `726deab` ; soupsieve 3.0.1→3.0.3 ; extension sand-webauthn-proxy mise à jour (id/crx/update.xml + native messaging) ; `sand-daemon-supervisor` reconstruit ; bundles exec-daemon / canvas-runtime / pnpm / `cursorsandbox` (rebuild opaque, classement hypothétique).
+
+Rapport : [reports/2026-10-13_05-45.md](reports/2026-10-13_05-45.md) — [commit](../../../commit/12e25388c9dc125dbf23e35f0fd7dc1247075605).
+
 ## 2026-10-13 03:54 (Paris) — snapshot `2026-10-13_01-51` → `2026-10-13_03-54`
 
 Versions touchées : agent-store-fuse `c8ef2b3` → `511f501` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` revenu sur l'archive précédente, retour arrière du build de 01:51) ; image, sand-host, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
