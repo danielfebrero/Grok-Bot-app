@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-15 00:50 (Paris) — snapshot `2026-10-14_22-54` → `2026-10-15_00-50`
+
+Versions touchées : agent-store-fuse `85429d0` → `0c0f4a8` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image `726deab`, sand-host `4098fb0`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque / oscillation du pin, classement hypothétique). Seul le fichier de version change : le binaire `cursor-agent-store-fuse` garde le **même hash** (`47779169…`) que dans les snapshots `19:48`, `20:51`, `21:45` et `22:54`.
+
+Rapport : [reports/2026-10-15_00-50.md](reports/2026-10-15_00-50.md).
+
 ## 2026-10-14 22:54 (Paris) — snapshot `2026-10-14_21-45` → `2026-10-14_22-54`
 
 Versions touchées : agent-store-fuse `f5cd108` → `85429d0` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image, sand-host, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
