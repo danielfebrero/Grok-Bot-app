@@ -1,0 +1,47 @@
+{
+  "description": "Get Posts Counts Recent",
+  "inputSchema": {
+    "properties": {
+      "end_time": {
+        "type": "string"
+      },
+      "granularity": {
+        "enum": [
+          "minute",
+          "hour",
+          "day"
+        ],
+        "type": "string"
+      },
+      "next_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      },
+      "pagination_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      },
+      "query": {
+        "type": "string"
+      },
+      "search_count.fields": {
+        "type": "string"
+      },
+      "since_id": {
+        "type": "string"
+      },
+      "start_time": {
+        "description": "Must be within the last 7 days.",
+        "type": "string"
+      },
+      "until_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "tool": "get_posts_counts_recent"
+}

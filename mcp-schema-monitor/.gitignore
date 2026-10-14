@@ -1,0 +1,16 @@
+# --- mcp-schema-monitor : ne jamais publier ---
+.pii-denylist
+.publish.conf
+# sorties brutes des appels d'outil (avant normalisation) et état local
+inbox/
+logs/
+.lock
+reports/NOUVEAU-DIFF.flag
+reports/PUBLISH-BLOCKED.flag
+snapshots/*.partial/
+*.env
+.env*
+*.pem
+*.key
+*secret*
+*credential*

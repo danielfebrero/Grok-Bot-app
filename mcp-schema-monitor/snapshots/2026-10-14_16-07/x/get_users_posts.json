@@ -1,0 +1,64 @@
+{
+  "description": "Get Users Posts Each returned post includes a `url` deeplinking to it on x.com.",
+  "inputSchema": {
+    "properties": {
+      "end_time": {
+        "description": "Must be on or after 2010-11-06.",
+        "type": "string"
+      },
+      "exclude": {
+        "description": "(comma-separated)",
+        "type": "string"
+      },
+      "expansions": {
+        "description": "A comma separated list of fields to expand.",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "media.fields": {
+        "description": "A comma separated list of Media fields to display.",
+        "type": "string"
+      },
+      "pagination_token": {
+        "description": "A base32hex-encoded pagination token.",
+        "type": "string"
+      },
+      "place.fields": {
+        "description": "A comma separated list of Place fields to display.",
+        "type": "string"
+      },
+      "poll.fields": {
+        "description": "A comma separated list of Poll fields to display.",
+        "type": "string"
+      },
+      "post.fields": {
+        "description": "A comma separated list of Post fields to display.",
+        "type": "string"
+      },
+      "since_id": {
+        "type": "string"
+      },
+      "start_time": {
+        "description": "Must be on or after 2010-11-06.",
+        "type": "string"
+      },
+      "until_id": {
+        "type": "string"
+      },
+      "user.fields": {
+        "description": "A comma separated list of User fields to display.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "tool": "get_users_posts"
+}
