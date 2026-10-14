@@ -1,0 +1,66 @@
+import { type JSX } from "react";
+export interface ScatterPoint {
+    /** Where the dot sits along the bottom axis, e.g. a load time. */
+    x: number;
+    /** Where the dot sits along the left axis, e.g. a conversion rate. */
+    y: number;
+    /** Names the dot in the hover detail, e.g. a store or a region; nothing prints on the plot. */
+    label?: string;
+    /** A third measure drawn as the dot's area, e.g. traffic; a chart with none draws every dot the same size. */
+    size?: number;
+    /** The series the dot belongs to; the legend names each series in order of first appearance, in `dataviz.categorical`. */
+    series?: string;
+}
+/** How one measure reads in ticks and in the detail. */
+export interface ScatterMeasure {
+    /** What the measure is, as the detail names it, e.g. "Load time"; the axes default to "x" and "y", the size to "Size". */
+    name?: string;
+    /** Unit after each tick and detail figure, e.g. "s". Ignored when `format` is set. */
+    unit?: string;
+    /** How a tick and a detail figure read, e.g. `(v) => v + "%"`. */
+    format?: (value: number) => string;
+}
+export interface ScatterAxis extends ScatterMeasure {
+    /** Bottom of the axis; defaults to a round number under the data, which a lower reading still lowers. */
+    floor?: number;
+    /** Top of the axis; defaults to a round number over the data, which a higher reading still raises. */
+    ceiling?: number;
+}
+export interface ScatterProps {
+    /** The dots. One whose `x` or `y` is not a finite number is left out. */
+    points: readonly ScatterPoint[];
+    /** The bottom axis: its name, unit or format, and bounds. */
+    x?: ScatterAxis;
+    /** The left axis: its name, unit or format, and bounds. */
+    y?: ScatterAxis;
+    /** What a dot's `size` measures, as the detail names and formats it. */
+    size?: ScatterMeasure;
+    /** A dashed least-squares line through the dots, for the direction of the relationship. */
+    trend?: boolean;
+    /**
+     * Whether the chart prints its own legend above the plot when dots carry a
+     * `series` (the default). Set `false` only when one `Legend` placed by the
+     * author names the series for this and a neighboring chart.
+     */
+    legend?: boolean;
+}
+/**
+ * A dot per item at two measures, a third measure as the dot's area, and a
+ * dashed trend, with a legend when the dots carry a `series` and a detail
+ * for the dot under the pointer. Both axes zoom to the data on round steps.
+ *
+ * @kitNote Draws its own legend from the dots' `series`; add no `Legend` to it (`legend={false}` turns it off).
+ *
+ * @example
+ * ```tsx
+ * <Scatter
+ *   points={stores.map((s) => ({ x: s.loadSeconds, y: s.conversion, size: s.visits, label: s.name, series: s.device }))}
+ *   x={{ name: "Load time", unit: "s" }}
+ *   y={{ name: "Conversion", format: (v) => v.toFixed(1) + "%" }}
+ *   size={{ name: "Visits" }}
+ *   trend
+ * />
+ * ```
+ */
+export declare function Scatter({ points: given, x: xAxis, y: yAxis, size: sizeMeasure, trend, legend, }: ScatterProps): JSX.Element | null;
+export {};

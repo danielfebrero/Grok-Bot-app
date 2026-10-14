@@ -1,0 +1,14 @@
+{
+  "name": "sand-notification-settings",
+  "version": "1.0.0",
+  "description": "Native read of the Sand desktop app's OS notification permission",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "install": "node-gyp rebuild"
+  },
+  "gypfile": true,
+  "dependencies": {
+    "node-addon-api": "^8.0.0"
+  }
+}
