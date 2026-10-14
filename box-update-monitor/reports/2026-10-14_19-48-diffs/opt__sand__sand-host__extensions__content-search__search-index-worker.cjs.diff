@@ -1,0 +1,732 @@
+--- 2026-10-14_17-55:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-14_19-48:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -436,729 +436,6 @@
+   return AUDIO_MIME_FROM_EXTENSION[extensionOf(filePath)];
+ }
+ 
+-// ../packages/voice-call-harness/dist/call/call-record.js
+-var VOICE_CALL_HEARTBEAT_MS = 1e4;
+-var VOICE_CALL_STALE_MS = 3 * VOICE_CALL_HEARTBEAT_MS;
+-
+-// ../packages/voice-call-harness/dist/prompt/channel-platform.js
+-var VOICE_CALL_CHANNEL_PLATFORM = "voice";
+-
+-// ../packages/voice-call-harness/dist/call/voice-channel.js
+-var ADDRESS_PREFIX = `${VOICE_CALL_CHANNEL_PLATFORM}:`;
+-
+-// ../packages/voice-call-harness/dist/call/voice-settings.js
+-var VOICE_CALL_LANGUAGE_LABELS = {
+-  auto: "Auto-detect",
+-  en: "English",
+-  "ar-EG": "Arabic (Egypt)",
+-  "ar-SA": "Arabic (Saudi Arabia)",
+-  "ar-AE": "Arabic (United Arab Emirates)",
+-  bn: "Bengali",
+-  ca: "Catalan",
+-  zh: "Chinese (Simplified)",
+-  da: "Danish",
+-  nl: "Dutch",
+-  fi: "Finnish",
+-  fr: "French",
+-  de: "German",
+-  hi: "Hindi",
+-  hu: "Hungarian",
+-  id: "Indonesian",
+-  it: "Italian",
+-  ja: "Japanese",
+-  ko: "Korean",
+-  pl: "Polish",
+-  "pt-BR": "Portuguese (Brazil)",
+-  "pt-PT": "Portuguese (Portugal)",
+-  ru: "Russian",
+-  "es-MX": "Spanish (Mexico)",
+-  "es-ES": "Spanish (Spain)",
+-  sv: "Swedish",
+-  th: "Thai",
+-  tr: "Turkish",
+-  vi: "Vietnamese"
+-};
+-function isVoiceCallLanguage(language) {
+-  return language !== void 0 && Object.hasOwn(VOICE_CALL_LANGUAGE_LABELS, language);
+-}
+-var VOICE_CALL_LANGUAGE_OPTIONS = Object.keys(VOICE_CALL_LANGUAGE_LABELS).filter(isVoiceCallLanguage).map((id) => ({ id, label: VOICE_CALL_LANGUAGE_LABELS[id] }));
+-
+-// ../packages/voice-call-harness/dist/prompt/nudge-reply.js
+-var VOICE_CALL_REQUEST_CHAR_LIMIT = 2e3;
+-var VOICE_CALL_REQUEST_TOO_LONG_ERROR = `The task was not sent: request exceeds ${VOICE_CALL_REQUEST_CHAR_LIMIT} characters. Reformulate it within the limit while preserving every constraint, especially prohibitions and approval requirements. Do not drop constraints or split the task into executable pieces. Ask the caller to clarify if it cannot fit safely.`;
+-
+-// ../packages/voice-call-harness/dist/prompt/tool-names.js
+-var VOICE_CALL_HANGUP_TOOL = "end_the_call";
+-var VOICE_CALL_NUDGE_MAIN_TOOL = "send_task";
+-var VOICE_CALL_RECALL_TEXTS_TOOL = "recall_text_messages";
+-var VOICE_CALL_SEARCH_CONVERSATIONS_TOOL = "search_conversations";
+-var VOICE_CALL_SILENT_TOOL = "stay_silent";
+-var VOICE_CALL_TOOL_NAMES = [
+-  VOICE_CALL_HANGUP_TOOL,
+-  VOICE_CALL_NUDGE_MAIN_TOOL,
+-  VOICE_CALL_RECALL_TEXTS_TOOL,
+-  VOICE_CALL_SEARCH_CONVERSATIONS_TOOL,
+-  VOICE_CALL_SILENT_TOOL
+-];
+-function isVoiceCallToolName(name) {
+-  return VOICE_CALL_TOOL_NAMES.some((known) => known === name);
+-}
+-var VOICE_CALL_WORK_LANDED_TOOL = "work_landed";
+-var VOICE_CALL_WORK_OVERHEARD_TOOL = "work_overheard";
+-var VOICE_CALL_USER_MESSAGE_TOPIC = "user_message";
+-var VOICE_CALL_SEARCH_HIT_LIMIT = 6;
+-var VOICE_CALL_SEARCH_SCOPES = ["this-chat", "earlier", "everything"];
+-var VOICE_CALL_SEARCH_MISS_FALLBACKS = ["say-no-record", "send-task"];
+-var VOICE_CALL_SEARCH_CONVERSATIONS_SCOPE = `the shared history between you and this caller: this chat, earlier chats, and earlier phone calls with them. Earlier calls are first-class here \u2014 what you two said on a prior call lives in this record, not in the chat window. "you" is what you said or sent, "them" is what they typed or said. Nobody else is in it: not their other agents, not other people, not Slack, mail, or any other app. Word from any of those is a ${VOICE_CALL_NUDGE_MAIN_TOOL} job, never a search of this record.`;
+-var VOICE_CALL_SEARCH_CONVERSATIONS_WHEN = `Use it for a fact from before this call that the last few messages of this chat may not hold \u2014 especially anything from an earlier phone call with them. When they ask what you said on a prior call, when you spoke, on the phone, or "last call", search here (prefer scope "earlier" or "everything") and answer from those hits as something you already know together. Lead with the fact; say when only if they ask, or if it changes the answer. The chat window alone will miss earlier calls. When a later result corrects an earlier one, the newest wins. When two results both fit what they asked, ask which they mean before answering. When nothing comes back, say nothing about what the record holds or lacks; ${VOICE_CALL_NUDGE_MAIN_TOOL} it and answer from what lands. Never invent one. Something they told you on this call beats anything the record says.`;
+-var VOICE_CALL_RECALL_TEXTS_SCOPE = `the written chat between you and this caller: "you" is what you sent them, "them" is what they typed to you. Nobody else writes in it, and nothing anyone else sent them is in it: not their other agents, not other people, not Slack, mail, or any other app. Word from any of those is a ${VOICE_CALL_NUDGE_MAIN_TOOL} job, never a read of this chat.`;
+-var VOICE_CALL_RECALL_TEXTS_WHEN = `If the answer might already be in the written chat, call ${VOICE_CALL_RECALL_TEXTS_TOOL}. Do not guess it, do not say you do not know, and do not ${VOICE_CALL_NUDGE_MAIN_TOOL} for it until you have read that chat.`;
+-var VOICE_CALL_RECALL_TEXTS_IF_UNREAD = `If the answer might already be in the written chat you have not read this call, ${VOICE_CALL_RECALL_TEXTS_TOOL} first.`;
+-var LOOKUP_LINES = {
+-  recall: {
+-    ifUnread: VOICE_CALL_RECALL_TEXTS_IF_UNREAD,
+-    when: VOICE_CALL_RECALL_TEXTS_WHEN,
+-    textOnly: "Written recall contains text, not sign-in cards.",
+-    sendTaskFirst: `${VOICE_CALL_RECALL_TEXTS_TOOL} first when it might already be in this written chat`
+-  },
+-  search: {
+-    ifUnread: `If the answer is not in the recent lines and might be in this chat or an earlier call, ${VOICE_CALL_SEARCH_CONVERSATIONS_TOOL} for the subject.`,
+-    when: `If the answer is not in the recent lines and might be in this chat or an earlier call, call ${VOICE_CALL_SEARCH_CONVERSATIONS_TOOL}. Do not guess it, do not say you do not know, and do not ${VOICE_CALL_NUDGE_MAIN_TOOL} until you have searched.`,
+-    textOnly: "Search and the recent lines are text, not pictures or sign-in cards.",
+-    sendTaskFirst: `${VOICE_CALL_SEARCH_CONVERSATIONS_TOOL} first when it might already be in this chat or an earlier call and is not in the recent lines`
+-  }
+-};
+-var VoiceCallToolDescriptions = class {
+-  static sendTask(lookup = "recall") {
+-    const first = LOOKUP_LINES[lookup].sendTaskFirst;
+-    return `Send a job that needs their computer, files, web, browser, or mail and chat they send. That call is a receipt, never the answer, and never the quick path. Speak a short beat on this response that names the job in how you talk, then call this. Never start that beat with a confirmation. Never say you are calling this tool. The outcome lands later as a ${VOICE_CALL_WORK_LANDED_TOOL} entry. Do not use this for a take, a recap of this call, a quiz from words already on the line, a story, a joke, talk they asked you to do yourself, a fact already on the line, or a name or value they just spoke on this call \u2014 answer from that speech instead. If the useful answer needs a fact you do not have about their world, ${first}; use this only when it is not there.`;
+-  }
+-  static sendTaskRequest() {
+-    return `The job itself: what to do or find out, and what to come back with. Not the caller's sentence. Add their exact words only where the wording itself is part of the job. Maximum ${VOICE_CALL_REQUEST_CHAR_LIMIT} characters; preserve every constraint, prohibition, and approval requirement. Overlong requests are rejected, never truncated.`;
+-  }
+-  static recallTextMessages() {
+-    return `Read ${VOICE_CALL_RECALL_TEXTS_SCOPE} Oldest first. ${VOICE_CALL_RECALL_TEXTS_WHEN} Say nothing about calling this.`;
+-  }
+-  /** A host whose record is not Sand's chat and calls names its own scope. */
+-  static searchConversations(scope = VOICE_CALL_SEARCH_CONVERSATIONS_SCOPE) {
+-    return `Search ${scope} ${VOICE_CALL_SEARCH_CONVERSATIONS_WHEN} Each hit says where and roughly when it was said, who said it, and the words, with a line before and after. At most ${VOICE_CALL_SEARCH_HIT_LIMIT} hits come back, best first; "more" means the record holds others, so search again with different words if the answer is not among them. Say nothing about calling this.`;
+-  }
+-  static searchConversationsQuery() {
+-    return "A few words naming the fact you want: the thing, the name, the number, the place. Not the caller's whole sentence.";
+-  }
+-  static searchConversationsScope() {
+-    return 'Where to look: "this-chat" for this conversation only, "earlier" for earlier chats and calls only, "everything" for all of it. Leave it out to search everything.';
+-  }
+-  static searchConversationsId() {
+-    return "The id of a hit you already have. Pass it to read that message in full.";
+-  }
+-  static searchConversationsFrom() {
+-    return "First day to look in, YYYY-MM-DD. Same as to for one day. Leave it out when the question is not about a day.";
+-  }
+-  static searchConversationsTo() {
+-    return "Last day to look in, YYYY-MM-DD, inclusive.";
+-  }
+-  static searchConversationsIfMissing() {
+-    return `"send-task" when the caller asked you to retrieve a prior call or word from another person, agent, Slack, mail, the web, or another app; "say-no-record" when only the caller could supply the missing fact. Decide before seeing results.`;
+-  }
+-  static staySilent() {
+-    return `Say nothing this turn. This is only for a last-landed ${VOICE_CALL_WORK_LANDED_TOOL} or ${VOICE_CALL_WORK_OVERHEARD_TOOL} entry, when speaking would give them nothing new. Never use it when they just talked to you. Never on the unpaid turn after ${VOICE_CALL_NUDGE_MAIN_TOOL}. Never on a ${VOICE_CALL_WORK_LANDED_TOOL} outcome they have not heard. Never on the same turn as spoken words. The caller hears nothing. Say nothing about calling this.`;
+-  }
+-  static endTheCall() {
+-    return `Hang up and end this call. Use it only when the caller says a parting greeting like "all done", "bye", "thanks, that's all", "stop", "go away", "shut up", "stop listening", "leave me alone", "goodbye", or "hang up". An unclear pause, a task still open, "ok" in the middle of work, or a "stop" that cancels that work is not a hang-up. ALWAYS say your goodbye out loud first, including when hanging up is the last step of something else they asked for: the line drops the moment you call this, so nothing after it is heard. Never call it while they are still asking for something.`;
+-  }
+-};
+-
+-// ../packages/voice-call-harness/dist/session/fault-facet.js
+-function readVoiceCallFaultFacet(known, value) {
+-  if (value === "absent" || value === "unrecognized")
+-    return value;
+-  return known.find((candidate) => candidate === value) ?? "unrecognized";
+-}
+-
+-// ../packages/voice-call-harness/dist/session/mint-fault.js
+-var VOICE_CALL_MINT_REASONS = [
+-  "not_configured",
+-  "unsupported_model",
+-  "rejected",
+-  "unreachable",
+-  "malformed_response"
+-];
+-var VOICE_CALL_MINT_HTTP = ["429", "401", "403", "503"];
+-var MINT_HEADER_PREFIX = "voice_mint_";
+-var MINT_HEADER_BY_VALUE = (() => {
+-  const headers = /* @__PURE__ */ new Map();
+-  for (const reason of VOICE_CALL_MINT_REASONS) {
+-    headers.set(`${MINT_HEADER_PREFIX}${reason}`, {
+-      reason,
+-      http: "absent"
+-    });
+-    for (const http of VOICE_CALL_MINT_HTTP) {
+-      headers.set(`${MINT_HEADER_PREFIX}${reason}_${http}`, { reason, http });
+-    }
+-  }
+-  return headers;
+-})();
+-
+-// ../packages/voice-call-harness/dist/session/async-update.js
+-var VoiceCallAsyncUpdate = class {
+-  static frame({ topic, eventId, texts, atMs }) {
+-    return {
+-      type: "async_update.add",
+-      event_id: eventId,
+-      async_update: {
+-        topic,
+-        payload: texts.map((content) => ({
+-          message: { type: "text", content },
+-          timestampMs: atMs
+-        }))
+-      }
+-    };
+-  }
+-};
+-var VoiceCallWrittenTurns = class _VoiceCallWrittenTurns {
+-  static TOPIC = VOICE_CALL_USER_MESSAGE_TOPIC;
+-  /** A written turn rides in the model's context for the rest of the call, so it is held to a spoken update's size. */
+-  static CHAR_LIMIT = VOICE_CALL_REQUEST_CHAR_LIMIT;
+-  static EVENT_ID_PREFIX = "written-turn";
+-  static eventId(entryId) {
+-    return `${_VoiceCallWrittenTurns.EVENT_ID_PREFIX}-${entryId}`;
+-  }
+-  static rides(wire) {
+-    return wire === "async-update";
+-  }
+-  static frame({ entryId, text, atMs }) {
+-    return VoiceCallAsyncUpdate.frame({
+-      topic: _VoiceCallWrittenTurns.TOPIC,
+-      eventId: _VoiceCallWrittenTurns.eventId(entryId),
+-      texts: [text.slice(0, _VoiceCallWrittenTurns.CHAR_LIMIT)],
+-      atMs
+-    });
+-  }
+-};
+-
+-// ../packages/voice-call-harness/dist/session/response-cancel.js
+-var VoiceCallResponseCancel = class _VoiceCallResponseCancel {
+-  static EVENT_ID_PREFIX = "response_cancel.";
+-  static frame(sequence) {
+-    return {
+-      type: "response.cancel",
+-      event_id: `${_VoiceCallResponseCancel.EVENT_ID_PREFIX}${sequence}`
+-    };
+-  }
+-};
+-
+-// ../packages/voice-call-harness/dist/session/seeded-nudge.js
+-var SEEDED_TOOL_BY_KIND = {
+-  ack: VOICE_CALL_WORK_LANDED_TOOL,
+-  progress: VOICE_CALL_WORK_LANDED_TOOL,
+-  outcome: VOICE_CALL_WORK_LANDED_TOOL,
+-  overheard: VOICE_CALL_WORK_OVERHEARD_TOOL
+-};
+-var SEEDED_CALL_ARGUMENTS = "{}";
+-var VoiceCallItemSeeding = class _VoiceCallItemSeeding {
+-  static SEEDED_TOOL = VOICE_CALL_WORK_LANDED_TOOL;
+-  static OVERHEARD_TOOL = VOICE_CALL_WORK_OVERHEARD_TOOL;
+-  static CALL_ID_PREFIX = "seeded-nudge";
+-  static callId(nudgeId) {
+-    return `${_VoiceCallItemSeeding.CALL_ID_PREFIX}-${nudgeId}`;
+-  }
+-  static seededTool(kind) {
+-    return SEEDED_TOOL_BY_KIND[kind];
+-  }
+-  static progressNote({ kind, texts, atMs }) {
+-    const at = new Date(atMs).toISOString().replace(/\.\d{3}Z$/, "Z");
+-    return kind === "overheard" ? { status: "in progress", steps: texts, at } : { status: "landed", updates: texts, at };
+-  }
+-  static isNudgeKind(value) {
+-    return value === "ack" || value === "progress" || value === "outcome" || value === "overheard";
+-  }
+-  /**
+-   * The kinds a nudge may be *sent* as, because these are the ones the caller
+-   * hears. An ack is the session's own bookkeeping for an update that repeats
+-   * what the voice side already said; offering it to the working side would
+-   * be offering a way to reach nobody.
+-   */
+-  static SPOKEN_KINDS = ["progress", "outcome"];
+-  /**
+-   * A seeded step rides in the model's context for the rest of the call, so it
+-   * is held to the same size a spoken nudge is.
+-   */
+-  static OVERHEARD_CHAR_LIMIT = VOICE_CALL_REQUEST_CHAR_LIMIT;
+-  /**
+-   * Whether seeding this update should also ask the model for a spoken turn.
+-   * The frames land in its history either way; asking is what reaches the ear,
+-   * and spending a turn on something already heard reads as the work stopping
+-   * rather than as progress.
+-   */
+-  static earnsASpokenTurn({ kind }) {
+-    const spoken = _VoiceCallItemSeeding.SPOKEN_KINDS;
+-    return spoken.includes(kind);
+-  }
+-  /**
+-   * An update nobody speaks stays a seeded pair on either wire: the
+-   * orchestrator opens a turn for every async update, and a step in progress
+-   * must not be spoken.
+-   */
+-  static delivery(seed, wire) {
+-    if (!_VoiceCallItemSeeding.earnsASpokenTurn(seed))
+-      return "filed";
+-    return wire === "async-update" ? "orchestrated" : "asked";
+-  }
+-  static frames(seed, wire) {
+-    if (_VoiceCallItemSeeding.delivery(seed, wire) === "orchestrated") {
+-      return [
+-        VoiceCallAsyncUpdate.frame({
+-          topic: VOICE_CALL_WORK_LANDED_TOOL,
+-          eventId: seed.callId,
+-          texts: seed.texts,
+-          atMs: seed.atMs
+-        })
+-      ];
+-    }
+-    return _VoiceCallItemSeeding.pair(seed);
+-  }
+-  /** The note lives on the output side; the call side carries `{}`. */
+-  static pair({ callId, kind, texts, atMs }) {
+-    return [
+-      {
+-        type: "conversation.item.create",
+-        item: {
+-          type: "function_call",
+-          name: _VoiceCallItemSeeding.seededTool(kind),
+-          call_id: callId,
+-          arguments: SEEDED_CALL_ARGUMENTS
+-        }
+-      },
+-      {
+-        type: "conversation.item.create",
+-        item: {
+-          type: "function_call_output",
+-          call_id: callId,
+-          output: JSON.stringify(_VoiceCallItemSeeding.progressNote({ kind, texts, atMs }))
+-        }
+-      }
+-    ];
+-  }
+-};
+-
+-// ../packages/voice-call-harness/dist/session/protocol-fault.js
+-var INBOUND_FRAMES = {
+-  "session-ready": true,
+-  "conversation-created": true,
+-  audio: true,
+-  transcript: true,
+-  truncation: true,
+-  "assistant-delta": true,
+-  tool: true,
+-  "response-created": true,
+-  "response-ended": true,
+-  "speech-started": true,
+-  "speech-stopped": true,
+-  error: true,
+-  other: true
+-};
+-var VOICE_CALL_INBOUND_FRAMES = Object.keys(INBOUND_FRAMES);
+-var VOICE_CALL_OUTBOUND_FRAMES = [
+-  "session.update",
+-  "input_audio_buffer.append",
+-  "conversation.item.create",
+-  "conversation.item.truncate",
+-  "response.create",
+-  "response.cancel",
+-  "async_update.add"
+-];
+-var VOICE_CALL_FAULT_VIA = ["error", "close"];
+-var VOICE_CALL_AUDIO_STATES = ["running", "suspended", "closed", "interrupted"];
+-var FRAME_KIND_BY_EVENT_ID_PREFIX = [
+-  [`${VoiceCallWrittenTurns.EVENT_ID_PREFIX}-`, "async_update_add"],
+-  [`${VoiceCallItemSeeding.CALL_ID_PREFIX}-`, "async_update_add"],
+-  [VoiceCallResponseCancel.EVENT_ID_PREFIX, "response_cancel"]
+-];
+-
+-// ../packages/voice-call-harness/dist/telemetry.js
+-var VOICE_CALL_MIC_PERMISSIONS = ["granted", "denied", "undetermined"];
+-var VOICE_CALL_MIC_TAP_SKIPS = [
+-  "input_format_empty",
+-  "voice_processing_off",
+-  "tap_refused"
+-];
+-var VOICE_CALL_AUDIO_PORTS = [
+-  "none",
+-  "built_in_mic",
+-  "built_in_receiver",
+-  "built_in_speaker",
+-  "bluetooth_hfp",
+-  "bluetooth_a2dp",
+-  "bluetooth_le",
+-  "car",
+-  "wired",
+-  "usb",
+-  "airplay",
+-  "other"
+-];
+-function isTelemetryInteger(value) {
+-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+-}
+-var readFrame = (known) => (raw) => raw === void 0 ? void 0 : readVoiceCallFaultFacet(known, raw);
+-var readMs = (raw) => isTelemetryInteger(raw) ? raw : void 0;
+-var readFlag = (raw) => typeof raw === "boolean" ? raw : void 0;
+-var readVoiceCallUuid = (raw) => typeof raw === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw) ? raw : void 0;
+-var SOCKET_FAULT_DETAIL_READERS = {
+-  fault_last_in: readFrame(VOICE_CALL_INBOUND_FRAMES),
+-  fault_last_in_ms: readMs,
+-  fault_last_out: readFrame(VOICE_CALL_OUTBOUND_FRAMES),
+-  fault_last_out_ms: readMs,
+-  fault_last_in_control: readFrame(VOICE_CALL_INBOUND_FRAMES),
+-  fault_last_in_control_ms: readMs,
+-  fault_last_out_control: readFrame(VOICE_CALL_OUTBOUND_FRAMES),
+-  fault_last_out_control_ms: readMs,
+-  fault_updates: readMs,
+-  fault_last_update_ms: readMs,
+-  fault_responding: readFlag,
+-  fault_muted: readFlag,
+-  fault_via: readFrame(VOICE_CALL_FAULT_VIA),
+-  fault_hidden: readFlag,
+-  fault_online: readFlag,
+-  fault_audio: readFrame(VOICE_CALL_AUDIO_STATES),
+-  realtime_conversation_id: readVoiceCallUuid,
+-  fault_send_task_owed: readFlag,
+-  fault_agent_running: readFlag,
+-  fault_news_owed: readFlag,
+-  fault_recovered: readFlag
+-};
+-var SOCKET_FAULT_DETAIL_KEYS = Object.keys(SOCKET_FAULT_DETAIL_READERS);
+-var VOICE_CALL_LOUDEST_SAMPLE = 32767;
+-var readMember = (known) => (raw) => known.find((candidate) => candidate === raw);
+-var readLevel = (raw) => isTelemetryInteger(raw) && raw <= VOICE_CALL_LOUDEST_SAMPLE ? raw : void 0;
+-var CAPTURE_FIGURE_READERS = {
+-  mic_permission: readMember(VOICE_CALL_MIC_PERMISSIONS),
+-  mic_tap_installs: readMs,
+-  mic_tap_skip: readMember(VOICE_CALL_MIC_TAP_SKIPS),
+-  mic_input_hz: readMs,
+-  mic_input_channels: readMs,
+-  mic_frames_captured: readMs,
+-  mic_frames_sent: readMs,
+-  mic_peak: readLevel,
+-  mic_rms: readLevel,
+-  mic_first_sound_ms: readMs,
+-  speech_starts: readMs,
+-  route_in_start: readMember(VOICE_CALL_AUDIO_PORTS),
+-  route_out_start: readMember(VOICE_CALL_AUDIO_PORTS),
+-  route_in_end: readMember(VOICE_CALL_AUDIO_PORTS),
+-  route_out_end: readMember(VOICE_CALL_AUDIO_PORTS),
+-  route_changes: readMs,
+-  mute_toggles: readMs,
+-  muted_ms: readMs
+-};
+-var CAPTURE_FIGURE_KEYS = Object.keys(CAPTURE_FIGURE_READERS);
+-
+-// ../packages/voice-call-harness/dist/prompt/session-tools.js
+-var TOOLS = [
+-  {
+-    type: "function",
+-    name: VOICE_CALL_NUDGE_MAIN_TOOL,
+-    description: VoiceCallToolDescriptions.sendTask(),
+-    parameters: {
+-      type: "object",
+-      properties: {
+-        request: {
+-          type: "string",
+-          description: VoiceCallToolDescriptions.sendTaskRequest()
+-        }
+-      },
+-      required: ["request"]
+-    }
+-  },
+-  {
+-    type: "function",
+-    name: VOICE_CALL_RECALL_TEXTS_TOOL,
+-    description: VoiceCallToolDescriptions.recallTextMessages(),
+-    parameters: { type: "object", properties: {} }
+-  },
+-  {
+-    type: "function",
+-    name: VOICE_CALL_SILENT_TOOL,
+-    description: VoiceCallToolDescriptions.staySilent(),
+-    parameters: { type: "object", properties: {} }
+-  },
+-  {
+-    type: "function",
+-    name: VOICE_CALL_HANGUP_TOOL,
+-    description: VoiceCallToolDescriptions.endTheCall(),
+-    parameters: { type: "object", properties: {} }
+-  }
+-];
+-var EXPERIMENTAL = [
+-  {
+-    type: "function",
+-    name: VOICE_CALL_SEARCH_CONVERSATIONS_TOOL,
+-    description: VoiceCallToolDescriptions.searchConversations(),
+-    parameters: {
+-      type: "object",
+-      properties: {
+-        query: {
+-          type: "string",
+-          description: VoiceCallToolDescriptions.searchConversationsQuery()
+-        },
+-        scope: {
+-          type: "string",
+-          description: VoiceCallToolDescriptions.searchConversationsScope(),
+-          enum: VOICE_CALL_SEARCH_SCOPES
+-        },
+-        id: {
+-          type: "string",
+-          description: VoiceCallToolDescriptions.searchConversationsId()
+-        },
+-        from: {
+-          type: "string",
+-          description: VoiceCallToolDescriptions.searchConversationsFrom()
+-        },
+-        to: {
+-          type: "string",
+-          description: VoiceCallToolDescriptions.searchConversationsTo()
+-        },
+-        if_missing: {
+-          type: "string",
+-          description: VoiceCallToolDescriptions.searchConversationsIfMissing(),
+-          enum: VOICE_CALL_SEARCH_MISS_FALLBACKS
+-        }
+-      },
+-      required: ["query", "if_missing"]
+-    }
+-  }
+-];
+-var VoiceCallSessionTools = class {
+-  static all() {
+-    return TOOLS;
+-  }
+-  static of(names) {
+-    return TOOLS.filter((tool) => names.includes(tool.name));
+-  }
+-  static descriptor(name) {
+-    const descriptor = [...TOOLS, ...EXPERIMENTAL].find((tool) => tool.name === name);
+-    if (descriptor === void 0) {
+-      throw new Error(`VoiceCallSessionTools.descriptor: ${name} is not a voice tool`);
+-    }
+-    return descriptor;
+-  }
+-  /** The descriptor in a host's words. Without words for it, it is the descriptor itself. */
+-  static worded(descriptor, words) {
+-    const own = isVoiceCallToolName(descriptor.name) ? words[descriptor.name] : void 0;
+-    if (own === void 0 || own.description === void 0 && own.parameters === void 0) {
+-      return descriptor;
+-    }
+-    const parameters = new Map(Object.entries(own.parameters ?? {}));
+-    const properties = Object.fromEntries(Object.entries(descriptor.parameters.properties).map(([name, parameter]) => {
+-      const description = parameters.get(name);
+-      return [name, description === void 0 ? parameter : { ...parameter, description }];
+-    }));
+-    return {
+-      ...descriptor,
+-      description: own.description ?? descriptor.description,
+-      parameters: { ...descriptor.parameters, properties }
+-    };
+-  }
+-  /** Whether a call by this name reaches a tool the line registered; anything else is served as unknown. */
+-  static registers(name, tools) {
+-    return tools.some((tool) => tool.name === name);
+-  }
+-};
+-
+-// ../packages/voice-call-harness/dist/prompt/tool-prompts.js
+-var VoiceCallToolPrompts = class _VoiceCallToolPrompts {
+-  static of(tool) {
+-    return _VoiceCallToolPrompts.KNOWN[tool.name] ?? {
+-      line: `- ${tool.name}: ${tool.description}`,
+-      inFlight: [],
+-      receipt: null
+-    };
+-  }
+-  /** The search bullet over a host's own scope. */
+-  static searchLine(scope) {
+-    return `- ${VOICE_CALL_SEARCH_CONVERSATIONS_TOOL}: search ${scope} ${VOICE_CALL_SEARCH_CONVERSATIONS_WHEN} Speak what you found as something you know, never as a search, a lookup, or a record you consulted.`;
+-  }
+-  static lines(tools, words) {
+-    return tools.map((tool) => (isVoiceCallToolName(tool.name) ? words[tool.name]?.line : void 0) ?? _VoiceCallToolPrompts.of(tool).line);
+-  }
+-  static inFlight(tools) {
+-    return tools.flatMap((tool) => _VoiceCallToolPrompts.of(tool).inFlight);
+-  }
+-  static receipt(tools) {
+-    return tools.flatMap((tool) => {
+-      const receipt = _VoiceCallToolPrompts.of(tool).receipt;
+-      return receipt === null ? [] : [receipt];
+-    });
+-  }
+-  static KNOWN = {
+-    [VOICE_CALL_NUDGE_MAIN_TOOL]: {
+-      line: `- ${VOICE_CALL_NUDGE_MAIN_TOOL}: speak a short beat that names the job in how you talk, then send it. Never start that beat with a confirmation. Never say you are calling the tool. Work that needs their computer, files, web, browser, or mail and chat they send goes through it; do not refuse it. That call is a receipt, never the outcome, and never the quick path. The outcome lands later, on its own, as a ${VOICE_CALL_WORK_LANDED_TOOL} entry.`,
+-      inFlight: [],
+-      receipt: null
+-    },
+-    [VOICE_CALL_RECALL_TEXTS_TOOL]: {
+-      line: `- ${VOICE_CALL_RECALL_TEXTS_TOOL}: read ${VOICE_CALL_RECALL_TEXTS_SCOPE} ${VOICE_CALL_RECALL_TEXTS_WHEN}`,
+-      inFlight: [],
+-      receipt: null
+-    },
+-    [VOICE_CALL_SEARCH_CONVERSATIONS_TOOL]: {
+-      line: _VoiceCallToolPrompts.searchLine(VOICE_CALL_SEARCH_CONVERSATIONS_SCOPE),
+-      inFlight: [],
+-      receipt: null
+-    },
+-    [VOICE_CALL_SILENT_TOOL]: {
+-      line: `- ${VOICE_CALL_SILENT_TOOL}: say nothing this turn, only when the last landed entry is ${VOICE_CALL_WORK_LANDED_TOOL} or ${VOICE_CALL_WORK_OVERHEARD_TOOL} and there is nothing new to say. Never when they just talked to you. Never on the unpaid turn after ${VOICE_CALL_NUDGE_MAIN_TOOL}. Never on a ${VOICE_CALL_WORK_LANDED_TOOL} outcome they have not heard.`,
+-      inFlight: [
+-        `Never ${VOICE_CALL_SILENT_TOOL} on a turn they talked to you, even if a ${VOICE_CALL_WORK_LANDED_TOOL} entry just landed.`,
+-        `${VOICE_CALL_SILENT_TOOL} only when they have said nothing since your last line and the last thing that landed is a ${VOICE_CALL_WORK_LANDED_TOOL} or ${VOICE_CALL_WORK_OVERHEARD_TOOL} entry and speaking would give them nothing new.`,
+-        `Never ${VOICE_CALL_SILENT_TOOL} on the same turn as spoken words.`
+-      ],
+-      receipt: `Do not ${VOICE_CALL_SILENT_TOOL}.`
+-    },
+-    [VOICE_CALL_HANGUP_TOOL]: {
+-      line: `- ${VOICE_CALL_HANGUP_TOOL}: hang up only on a parting greeting. Say your goodbye first; the line drops the moment you call it.`,
+-      inFlight: [],
+-      receipt: null
+-    }
+-  };
+-};
+-
+-// ../packages/voice-call-harness/dist/prompt/speak-policy.js
+-var NEXT_STEP = "what happens now: the job you are taking and what it is about, where the work stands and when you will say more, or the answer if you already have it. A confirmation on its own \u2014 okay, got it, sure, will do \u2014 is not a reply.";
+-var RECEIPT_TURN_LEAD = "The job is under way. Keep talking with a natural question or a suggestion. Do not announce that you started.";
+-var VoiceSpeakPolicy = class _VoiceSpeakPolicy {
+-  /**
+-   * How long a spoken update holds the floor against further work news.
+-   * Inside it, only a genuinely new outcome earns another turn from the work.
+-   * Caller speech always earns a turn.
+-   */
+-  static QUIET_WINDOW_SECONDS = 30;
+-  static ackLines() {
+-    return ["When a tool call will be quick, say nothing and invoke it."];
+-  }
+-  /**
+-   * Call send_task for the job after a short spoken beat on the same
+-   * response. A looping errand may still ask one or two things you
+-   * would otherwise guess at, as its own turn.
+-   */
+-  static receiptLines() {
+-    return [
+-      `${VOICE_CALL_NUDGE_MAIN_TOOL} is never the quick path. Speak a short beat on this response that names the job in how you talk, then call it. Never start that beat with a confirmation. Never say you are calling the tool. Checking or fetching is not that beat.`,
+-      `A real errand that has to loop may ask the one or two things you would otherwise guess at; call ${VOICE_CALL_NUDGE_MAIN_TOOL} anyway, and what they answer reaches the same job.`
+-    ];
+-  }
+-  static voiceLoopLines(tools = []) {
+-    return [
+-      "Starting something owes one short spoken beat on that same response before the tool, in your own words about the job. Never start that beat with a confirmation. Never say you are calling the tool, and it never needs saying twice.",
+-      `If ${VOICE_CALL_NUDGE_MAIN_TOOL} left this response silent, keep talking on the next turn: a question, a suggestion, or a beat already on this call. Do not fill that beat with a start-status or silence.`,
+-      `If they talked to you, speak. A take, a recap, a story, a joke, small talk they asked for is done now; do not ask what kind first, do not ${VOICE_CALL_NUDGE_MAIN_TOOL} it, and do not hold it for the errand.`,
+-      `Never re-announce you are still working within about ${_VoiceSpeakPolicy.QUIET_WINDOW_SECONDS} seconds of your last line.`,
+-      "Speak again for the outcome, a real step, a problem they need to hear, or anything they just said to you.",
+-      "A work update that only repeats a start you already named is not a turn.",
+-      "Never chase or poll the work; it reports back on its own.",
+-      "An empty tool result is not news. Do not announce quiet or that nothing came in.",
+-      ...VoiceCallToolPrompts.inFlight(tools)
+-    ];
+-  }
+-  /** The caller spoke last, so the reply carries what happens now. */
+-  static replyLines() {
+-    return [`When they spoke last, tell them ${NEXT_STEP}`];
+-  }
+-  /**
+-   * After a complete spoken beat, keep the call alive in the same breath.
+-   * Like a person: a follow-up, a suggestion, or a new thread — never an
+-   * invented inbox item. A follow-up is talk, not a ticket you guessed.
+-   */
+-  static continueLines(noInventedWork) {
+-    return [
+-      "After you answer, keep the call going with one natural question, the way a person would: a follow-up, a suggestion, or whatever comes next.",
+-      "It does not have to be about the last line.",
+-      ...noInventedWork
+-    ];
+-  }
+-  /**
+-   * The keep-talking beat is not a briefing you made up. Shared by the
+-   * continue cadence and the never-invent section so a rewrite of one
+-   * still leaves the ban on the other.
+-   */
+-  static noInventedWorkLines() {
+-    return [
+-      "A follow-up is not invented work. Do not invent work, inbox items, or product facts that no tool and no real context on this call returned."
+-    ];
+-  }
+-  static interruptedLines() {
+-    return [
+-      "When they talk over you, stop and listen; they heard only the start.",
+-      "If they have moved on, answer them; if they still want it, pick up where they cut you off without restarting the sentence."
+-    ];
+-  }
+-  /**
+-   * A `send_task` that arrived while a turn was still open. The relay queued
+-   * it. This must not read as started, done, or stopped.
+-   */
+-  static queuedBehindCurrentWork() {
+-    return "This request is waiting behind work already on the call. It has not started. Say that in your own words, in one short line. Do not read this note out.";
+-  }
+-  /**
+-   * The `response.create` instructions for the unpaid `send_task` receipt
+-   * turn, over the tools on that line. `stay_silent` is refused with it
+-   * built over `stay_silent` alone. A host may word the turn's lead itself.
+-   */
+-  static receiptTurnOwed(tools = [], lead = RECEIPT_TURN_LEAD) {
+-    return [lead, ...VoiceCallToolPrompts.receipt(tools)].join(" ");
+-  }
+-  static staySilentPlan({ theyJustTalked, newsOwed, receiptOwed, alreadySpokeThisTurn = false }, refusals = VOICE_STAY_SILENT_REFUSALS) {
+-    if (theyJustTalked) {
+-      return { kind: "spoken", error: refusals.theyJustSpoke };
+-    }
+-    if (alreadySpokeThisTurn) {
+-      return { kind: "silent" };
+-    }
+-    if (newsOwed) {
+-      return { kind: "spoken", error: refusals.newsOwed };
+-    }
+-    if (receiptOwed) {
+-      return { kind: "spoken", error: refusals.receiptOwed };
+-    }
+-    return { kind: "silent" };
+-  }
+-};
+-var VOICE_STAY_SILENT_REFUSALS = Object.freeze({
+-  theyJustSpoke: `They just spoke to you and have heard nothing back. Answer out loud, and tell them ${NEXT_STEP} Do not stay_silent.`,
+-  newsOwed: "Work of yours just landed and they have not heard it. Say what it means out loud now.",
+-  receiptOwed: VoiceSpeakPolicy.receiptTurnOwed(VoiceCallSessionTools.of([VOICE_CALL_SILENT_TOOL]))
+-});
+-
+-// ../packages/voice-call-harness/dist/prompt/grok-bot-voice-loop-words.js
+-var GROK_BOT_VOICE_LOOP_WORDS = {
+-  workSurfaces: "Files, the web, the browser, mail, chat, and their computer",
+-  dictation: { use: "quiz from that", notSent: "a deck" },
+-  factScope: "their world",
+-  missingFactMove: "try: send the job",
+-  inventedThings: "a screen, a page",
+-  narratedRead: "a page",
+-  inventedFiller: "inbox items or product incidents",
+-  sending: [
+-    `When they want something done or looked up that is not already on this call, call ${VOICE_CALL_NUDGE_MAIN_TOOL}. The request is the job itself: what to do or find out, and what to come back with. Carry every explicit limit into the request, including lookup-only and anything they said not to do. Never their sentence with the question trimmed off. Keep their exact words only where the wording is part of the job \u2014 a name, a phrase to search for, a message to send \u2014 and say what to do with them. Never a recap of the chat.`
+-  ],
+-  underWay: [
+-    `A change to a job already under way, stopping it included, is that same errand, changed: send the change through ${VOICE_CALL_NUDGE_MAIN_TOOL}, and your one line says what the job is now, or that it is being stopped. Nothing new was started, so never say it was.`
+-  ],
+-  notInChat: (lookup) => [
+-    `${lookup.textOnly} If they ask whether a sign-in card reached them, ${VOICE_CALL_NUDGE_MAIN_TOOL} to verify it; a promise to provide a card is not evidence that it reached them.`,
+-    `When they ask for word from anyone else, their other agents included, the chat does not hold it: ${VOICE_CALL_NUDGE_MAIN_TOOL} for it.`
+-  ],
+-  speaking: [
+-    `A ${VOICE_CALL_WORK_LANDED_TOOL} entry is the only work to speak. Never speak a ${VOICE_CALL_WORK_OVERHEARD_TOOL} entry.`
+-  ],
+-  landing: [],
+-  noInventedWork: VoiceSpeakPolicy.noInventedWorkLines(),
+-  tools: {}
+-};
+-
+-// ../packages/voice-call-harness/dist/prompt/main-loop-voice-prompt.js
+-var ADDRESS_SHAPE = `${VOICE_CALL_CHANNEL_PLATFORM}:<call>`;
+-
+ // src/shared/transcript/transcript.ts
+ function isOutboundAgentPeerMessageEntry(entry) {
+   return entry != null && entry.kind === "message" && entry.toAgent != null;

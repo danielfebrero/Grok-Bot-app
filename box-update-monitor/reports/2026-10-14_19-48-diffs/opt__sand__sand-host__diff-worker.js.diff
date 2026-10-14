@@ -1,0 +1,157 @@
+--- 2026-10-14_17-55:/opt/sand/sand-host/diff-worker.js
++++ 2026-10-14_19-48:/opt/sand/sand-host/diff-worker.js
+@@ -297,8 +297,8 @@
+   } else {
+     const { callback } = optionsObj;
+     diffLines(oldStr, newStr, Object.assign(Object.assign({}, optionsObj), { callback: (diff) => {
+-      const patch = diffLinesResultToPatch(diff);
+-      callback(patch);
++      const patch2 = diffLinesResultToPatch(diff);
++      callback(patch2);
+     } }));
+   }
+   function diffLinesResultToPatch(diff) {
+@@ -394,24 +394,134 @@
+ }
+ 
+ // ../packages/agent/src/tools/core/edit/diff-worker.ts
++var CONTEXT = 3;
++var CHUNK = 8192;
+ function withGitDiffPrefix(path, prefix) {
+   if (path === "/dev/null") {
+     return path;
+   }
+   return `${prefix}/${path}`;
+ }
++function patch(input) {
++  return structuredPatch("a", "b", input.original, input.updated, "", "", { context: CONTEXT }).hunks;
++}
++function equalExtent(input) {
++  const { text, other, from, otherFrom, max, dir } = input;
++  let run = 0;
++  let step = 128;
++  while (run < max) {
++    const n = Math.min(step, max - run);
++    const start = dir > 0 ? from + run : from - run - n;
++    const otherStart = dir > 0 ? otherFrom + run : otherFrom - run - n;
++    if (text.slice(start, start + n) !== other.slice(otherStart, otherStart + n)) {
++      if (n === 1) break;
++      step = n >> 1;
++      continue;
++    }
++    run += n;
++    if (step < CHUNK) step <<= 1;
++  }
++  return run;
++}
++function trimmedHunks(input) {
++  const { original, updated } = input;
++  if (original === updated) return [];
++  const at = (text, index) => index <= 0 || index >= text.length || text.charCodeAt(index - 1) === 10;
++  const limit = Math.min(original.length, updated.length);
++  let prefix = equalExtent({
++    text: original,
++    other: updated,
++    from: 0,
++    otherFrom: 0,
++    max: limit,
++    dir: 1
++  });
++  if (prefix > 0 && original.charCodeAt(prefix - 1) !== 10) {
++    prefix = original.lastIndexOf("\n", prefix - 1) + 1;
++  }
++  let suffix = original.length;
++  let other = updated.length;
++  const shared = equalExtent({
++    text: original,
++    other: updated,
++    from: suffix,
++    otherFrom: other,
++    max: limit - prefix,
++    dir: -1
++  });
++  suffix -= shared;
++  other -= shared;
++  if (!at(original, suffix) || !at(updated, other)) {
++    const newline = original.indexOf("\n", suffix);
++    const step = newline < 0 ? -1 : newline + 1 - suffix;
++    other += step;
++    suffix = step < 0 || other > updated.length || !at(updated, other) ? original.length : suffix + step;
++  }
++  const total = original.length + updated.length;
++  if ((prefix + original.length - suffix) * 8 <= total) return patch({ original, updated });
++  let prefixLines = 0;
++  for (let index = 0; index < prefix; ) {
++    const newline = original.indexOf("\n", index);
++    if (newline < 0 || newline >= prefix) break;
++    prefixLines++;
++    index = newline + 1;
++  }
++  const tail = original.length - suffix;
++  if (tail > suffix - prefix) {
++    const seen = /* @__PURE__ */ new Set();
++    const take = (text, to) => {
++      let start = prefix;
++      for (let index = prefix; index < to; index++) {
++        if (text.charCodeAt(index) === 10) {
++          seen.add(text.slice(start, index + 1));
++          start = index + 1;
++        }
++      }
++    };
++    take(original, suffix);
++    take(updated, updated.length - tail);
++    for (let newline = original.indexOf("\n", suffix); newline >= 0; newline = original.indexOf("\n", suffix)) {
++      if (!seen.has(original.slice(suffix, newline + 1))) break;
++      suffix = newline + 1;
++    }
++  } else {
++    suffix = original.length;
++  }
++  const keep = Math.max(0, prefixLines - CONTEXT);
++  let suffixLines = 0;
++  for (let index = suffix; suffixLines <= CONTEXT && index < original.length; index++) {
++    if (original.charCodeAt(index) === 10) suffixLines++;
++  }
++  if (keep === 0 && suffixLines <= CONTEXT) return patch({ original, updated });
++  const shift = (index, dir) => {
++    for (let step = 0; step < CONTEXT; step++) {
++      const newline = dir < 0 ? original.lastIndexOf("\n", index - 2) : original.indexOf("\n", index);
++      if (newline < 0) return dir < 0 ? 0 : original.length;
++      index = newline + 1;
++    }
++    return index;
++  };
++  const from = keep === 0 ? 0 : shift(prefix, -1);
++  const drop = suffixLines <= CONTEXT ? 0 : original.length - shift(suffix, 1);
++  if (from + drop > original.length || from + drop > updated.length || (from + drop) * 8 < total) {
++    return patch({ original, updated });
++  }
++  const hunks = patch({
++    original: original.slice(from, original.length - drop),
++    updated: updated.slice(from, updated.length - drop)
++  });
++  for (const hunk of hunks) {
++    hunk.oldStart += keep;
++    hunk.newStart += keep;
++  }
++  return hunks;
++}
+ function calculateDiff(params) {
+   const ensureNL = (s) => s === "" || s.endsWith("\n") ? s : `${s}
+ `;
+-  const { hunks } = structuredPatch(
+-    "a",
+-    "b",
+-    ensureNL(params.original),
+-    ensureNL(params.new),
+-    "",
+-    "",
+-    { context: 3 }
+-  );
++  const original = ensureNL(params.original);
++  const updated = ensureNL(params.new);
++  const hunks = original.length < 4096 && updated.length < 4096 ? patch({ original, updated }) : trimmedHunks({ original, updated });
+   const formatRange = (start, lineCount) => {
+     if (lineCount === 0) {
+       return `${start},0`;

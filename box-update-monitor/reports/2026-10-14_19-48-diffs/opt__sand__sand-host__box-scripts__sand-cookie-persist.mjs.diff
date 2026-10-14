@@ -1,0 +1,85 @@
+--- 2026-10-14_17-55:/opt/sand/sand-host/box-scripts/sand-cookie-persist.mjs
++++ 2026-10-14_19-48:/opt/sand/sand-host/box-scripts/sand-cookie-persist.mjs
+@@ -89,6 +89,7 @@
+   "restore-empty": "no seed cookies to restore",
+   "restore-incomplete": "proceeding to capture with seed cookies still absent from the live jar",
+   "restore-seed-unusable": "seed corrupt or its version is not supported; nothing restored",
++  "restore-port-invalid": "--restore-port needs a TCP port; nothing restored",
+ });
+ 
+ const PERSIST_COUNT_NAMES = new Set(["refused", "total", "cookies", "seed"]);
+@@ -732,7 +733,7 @@
+   seedStep("rename", () => deps.fs.renameSync(tmp, path));
+ }
+ 
+-export async function restoreFromSeed(deps, onlyPort, seen = new Map()) {
++export async function restoreFromSeed(deps, onlyPort, seen = new Map(), ports = undefined) {
+   const seed = readSeed(deps.fs, deps.seedPath);
+   if (seed.kind === "unreadable") {
+     return { injected: 0, missingAfter: 0, seedCount: 0, unreadable: seed.code };
+@@ -751,7 +752,7 @@
+     faults.refusal = { refused, total };
+     reportRefused(browser, refused, total, error);
+   };
+-  const open = await openJars(deps, monitorPorts(deps), faults);
++  const open = await openJars(deps, ports ?? monitorPorts(deps), faults);
+   let injected = 0;
+   let missingAfter = seedCookies.length;
+   try {
+@@ -785,6 +786,25 @@
+   else logLine(deps, "restore-incomplete", code ?? null, refusal ?? null);
+ }
+ 
++export async function restoreLaunchedChrome(deps, port) {
++  const attempt = await restoreFromSeed(deps, port, new Map(), [port]);
++  if (attempt.unreadable != null) {
++    logLine(deps, "restore-waiting", attempt.unreadable);
++    return "waiting";
++  }
++  const outcome = classifyRestoreOutcome(attempt.seedCount, attempt.missingAfter, attempt.corrupt);
++  logRestoreOutcome(deps, outcome, attempt);
++  return outcome;
++}
++
++export function parseRestorePort(argv) {
++  const at = argv.indexOf("--restore-port");
++  if (at === -1) return undefined;
++  const text = argv[at + 1] ?? "";
++  const port = /^\d{1,5}$/.test(text) ? Number.parseInt(text, 10) : 0;
++  return port >= 1 && port <= 65535 ? port : null;
++}
++
+ async function isAnyChromeUp(deps) {
+   for (const port of deps.discoverPorts()) {
+     let browser;
+@@ -897,15 +917,28 @@
+ async function main() {
+   const log = createPersistLog();
+   exitOnUncaught(log);
++  const restorePort = parseRestorePort(process.argv.slice(2));
++  if (restorePort === null) {
++    log("restore-port-invalid");
++    return;
++  }
+   if (!dropToBoxUser(log)) return;
++  const report = persistCdpReporters(log);
++  const connect = (port) => connectBrowser(port, report.onDroppedFrame);
++  if (restorePort !== undefined) {
++    await restoreLaunchedChrome(
++      { connect, discoverPorts: () => [], seedPath: SEED_PATH, fs: { readFileSync }, log },
++      restorePort,
++    );
++    return;
++  }
+   if (!isCookiePersistEnabled()) {
+     log("store-off");
+     return;
+   }
+   log("starting");
+-  const report = persistCdpReporters(log);
+   const deps = {
+-    connect: (port) => connectBrowser(port, report.onDroppedFrame),
++    connect,
+     discoverPorts: () => discoverMonitorPorts(undefined, report.onUnreadable),
+     seedPath: SEED_PATH,
+     fs: {
