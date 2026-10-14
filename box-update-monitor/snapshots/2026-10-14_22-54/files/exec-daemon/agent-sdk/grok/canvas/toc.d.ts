@@ -1,0 +1,39 @@
+import { type JSX } from "react";
+export interface TableOfContentsItem {
+    /** The entry's words: the section's heading as written. */
+    label: string;
+    /**
+     * The section it opens. Left out, it is the `label`'s own anchor (the
+     * heading's words, lower case and hyphenated, numbered past a repeat), the
+     * same id a `Section` with that heading gets; set it only for a `Section`
+     * whose `id` was set by hand.
+     */
+    id?: string;
+    /** 0 for a section (the default), 1 for a sub-section; each step indents the entry 16 px. */
+    depth?: number;
+}
+export interface TableOfContentsProps {
+    /** The page's sections in order, one entry per heading; nothing draws with no entries. */
+    items: readonly TableOfContentsItem[];
+    /** The quiet line above the entries. "On this page" by default. */
+    title?: string;
+}
+/**
+ * The page's own outline: its section headings as an indented list of
+ * in-page links in a quiet bordered box, with the entry of the section the
+ * reader is in set in medium weight. Each entry scrolls its `Section` into
+ * view inside the page without leaving it. Put one after the summary of a
+ * long page; a page of two or three sections needs none.
+ *
+ * @example
+ * ```tsx
+ * <TableOfContents
+ *   items={[
+ *     { label: "What changed" },
+ *     { label: "One page instead of three", depth: 1 },
+ *     { label: "Why Safari shoppers left" },
+ *   ]}
+ * />
+ * ```
+ */
+export declare function TableOfContents({ items, title, }: TableOfContentsProps): JSX.Element | null;

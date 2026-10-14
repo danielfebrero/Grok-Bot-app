@@ -1,0 +1,776 @@
+/*
+ * "Naturel" — Healthy Food Business Pitch Deck (49 slides, 26.667in x 15in).
+ * Standalone recreation with pptxgenjs. Raster photos in the original deck are
+ * replaced by labelled placeholder rectangles (see `photo()`).
+ *
+ * Run:  node 07388dfc-a260-45eb-aff0-e575c262e383_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ palette */
+
+const C = {
+  sage: 'A2ACA4', // primary heading / brand green-grey
+  clay: 'AD9388', // secondary accent brown
+  ink: '000000',
+  white: 'FFFFFF',
+  offwhite: 'F8F6F7', // panel fill
+  cream: 'F6F1ED', // warm panel fill
+  sand: 'EBE5DD', // warm circle fill
+  grey: 'ABABAB',
+  paleGrey: 'D0CECF',
+  lightGrey: 'E6E6E6',
+  silver: 'C0C0C0',
+  body: '818181', // default body copy (theme "lt1")
+  iconBlue: '5F7D95', // flat icon sheets
+  brightBlue: '1B5CF3', // slide 49 pictograms
+  brightRed: 'F92115',
+  brightInk: '190D15',
+};
+
+const FONT = 'Space Grotesk Light Regular';
+const FONT_B = 'Space Grotesk Light Bold';
+
+/* Shadow used by every raised card / circle in the original deck. */
+const CARD_SHADOW = { type: 'outer', angle: 45, blur: 25, offset: 40, color: '000000', opacity: 0.066 };
+
+/* --------------------------------------------------------------- text sizes */
+/* Point sizes as authored in the deck (slide is 2.78x a 16:9 10in deck). */
+const SZ = {
+  display: 180, // "NATUREL", big statement numbers
+  mega: 300, // "46,9" / "ICONS"
+  title: 100, // section titles ("PROBLEM", "SOLUTIONS", ...)
+  h2: 48, // sub headline
+  lead: 32, // lead paragraph / labels
+  body: 22, // default body copy
+  small: 20, // footnote
+};
+
+/* --------------------------------------------------------------- primitives */
+
+/** Default text options mirroring the deck's textbox defaults. */
+function txt(slide, text, o) {
+  slide.addText(text, Object.assign({
+    fontFace: FONT,
+    fontSize: SZ.body,
+    color: C.body,
+    align: 'left',
+    valign: 'middle',
+    margin: 4,
+    wrap: true,
+    lineSpacingMultiple: 1.0,
+  }, o));
+}
+
+/** Section title: 100pt, all-caps, sage, slightly tightened tracking. */
+function title(slide, text, x, y, w, h, o) {
+  txt(slide, text.toUpperCase(), Object.assign({
+    x, y, w, h, fontSize: SZ.title, color: C.sage, charSpacing: -5,
+  }, o));
+}
+
+/** Display/statement text: 180pt all-caps with 90% line spacing. */
+function display(slide, text, x, y, w, h, o) {
+  txt(slide, text.toUpperCase(), Object.assign({
+    x, y, w, h, fontSize: SZ.display, color: C.white,
+    charSpacing: -9, lineSpacingMultiple: 0.9,
+  }, o));
+}
+
+function rect(slide, x, y, w, h, fill, o) {
+  slide.addShape('rect', Object.assign({ x, y, w, h, fill: { color: fill } }, o));
+}
+
+function ellipse(slide, x, y, w, h, o) {
+  slide.addShape('ellipse', Object.assign({ x, y, w, h }, o));
+}
+
+/**
+ * Placeholder standing in for a photograph in the reference deck.
+ * Drawn as a tinted rectangle with a small "[image]" caption.
+ * `o.fill` / `o.line` / `o.caption` tint the placeholder so it stays subtle
+ * on the slides whose background is not white.
+ */
+function photo(slide, x, y, w, h, o) {
+  const opt = o || {};
+  slide.addShape('rect', {
+    x, y, w, h,
+    fill: { color: opt.fill || 'F2F2F2' },
+    line: { color: opt.line || 'E4E4E4', width: 1 },
+  });
+  if (w > 1.4 && h > 0.7) {
+    slide.addText('[image]', {
+      x, y, w: Math.min(w, 26.667 - x), h: Math.min(h, 15 - y), align: 'center', valign: 'middle',
+      fontFace: FONT, fontSize: opt.size || 24, color: opt.caption || 'C9C9C9',
+    });
+  }
+}
+
+/**
+ * The brand mark: a filled disc with a white megaphone knocked out of it
+ * (wide mouth to the left, small handle circle beneath).
+ */
+function logo(slide, x, y, size, color) {
+  const c = color || C.ink;
+  slide.addShape('ellipse', { x, y, w: size, h: size, fill: { color: c } });
+  // horn: trapezoid rotated a quarter turn (w/h are pre-rotation), mouth to the left
+  slide.addShape('trapezoid', {
+    x: x + size * 0.30, y: y + size * 0.12, w: size * 0.42, h: size * 0.78,
+    fill: { color: C.white }, rotate: 78,
+  });
+  slide.addShape('ellipse', {
+    x: x + size * 0.16, y: y + size * 0.56, w: size * 0.25, h: size * 0.22,
+    fill: { color: c }, line: { color: C.white, width: 0.75 },
+  });
+}
+
+/** Footer pair used on many slides. */
+function footer(slide, x, contactX) {
+  txt(slide, 'Healthy Food Business Pitch Deck Presentation', { x, y: 13.003, w: 4.178, h: 0.889 });
+  if (contactX !== undefined) {
+    txt(slide, [{ text: 'P : +123 456 7890', options: { breakLine: true } },
+      { text: 'M : hello@growth.com' }],
+    { x: contactX, y: 13.003, w: 4.404, h: 0.889 });
+  }
+}
+
+/* ------------------------------------------------------------ shared copy */
+
+const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Aliquet nibh praesent tristique magna.';
+const LOREM_SHORT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.';
+const LOREM_TRIS = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Aliquet nibh praesent tristique.';
+const LOREM_LONG = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Aliquet nibh praesent tristique magna. Pellentesque habitant morbi tristique senectus et netus et malesuada. Quis eleifend quam adipiscing vitae proin sagittis nisl rhoncus.';
+const HEALTHY_DIET = 'A healthy diet is\u00a0essential for good health and nutrition.';
+const PROTECTS = 'It protects you against many chronic noncommunicable diseases, such as heart disease, diabetes and cancer. ';
+const TAGLINE = 'Just for the\u00a0Health\u00a0of it!';
+const QUOTE_LONG = 'I should be incapable of drawing a single stroke at the present moment; and yet I feel that I never was a greater artist than now. When, while the lovely valley teems with vapour around me, and the meridian sun strikes.';
+const QUOTE_SHORT = 'I should be incapable of drawing a single stroke at the present moment; and yet I feel that I never was a greater artist than now.';
+
+/* Two-paragraph "protects you..." block, used on slides 13/15/17. */
+function protectsBlock(slide, x, y, w, h) {
+  txt(slide, [
+    { text: PROTECTS, options: { breakLine: true } },
+    { text: '', options: { breakLine: true } },
+    { text: LOREM_TRIS },
+  ], { x, y, w, h });
+}
+
+/* ================================================================= SLIDES */
+
+/* 1 — cover: full-bleed photo, sage panel, big wordmark. */
+function slide01(s) {
+  photo(s, 0, 0, 26.666, 15, { size: 40 });
+  rect(s, 1.807, 1.543, 23.052, 11.915, C.sage);
+  display(s, 'Naturel', 8.423, 3.861, 9.82, 3.306, { align: 'center', fontFace: FONT_B, wrap: false });
+  txt(s, TAGLINE, { x: 8.056, y: 6.833, w: 10.555, h: 0.667, fontSize: SZ.lead, color: C.offwhite, align: 'center' });
+  rect(s, 4.526, 11.566, 17.615, 0.028, C.offwhite); // hairline rule (rotated bar in source)
+  txt(s, 'Healthy Food Business Pitch Deck Presentation',
+    { x: 8.056, y: 11.953, w: 10.555, h: 0.667, fontSize: SZ.lead, color: C.offwhite, align: 'center' });
+  logo(s, 12.776, 2.297, 1.114, C.white);
+}
+
+/* 2 — cover variant: wordmark left, portrait photo right. */
+function slide02(s) {
+  photo(s, 17.62, 1.108, 7.765, 12.783);
+  display(s, 'Naturel', 1.286, 5.681, 9.82, 3.306, { color: C.sage, align: 'center', fontFace: FONT_B, wrap: false });
+  txt(s, TAGLINE, { x: 1.52, y: 8.653, w: 7.297, h: 0.667, fontSize: SZ.lead, color: C.paleGrey });
+  footer(s, 1.284, 9.453);
+  logo(s, 1.286, 1.108, 0.663);
+}
+
+/* 3 — problem statement with two photos. */
+function slide03(s) {
+  txt(s, 'The Problem', { x: 17.615, y: 8.509, w: 7.765, h: 0.958, fontSize: SZ.h2, color: C.ink, fontFace: FONT_B });
+  title(s, 'Higher Sugar Content that Kills Us Slowly', 1.286, 4.961, 7.765, 8.931);
+  txt(s, LOREM, { x: 17.55, y: 9.953, w: 6.68, h: 1.667 });
+  logo(s, 1.286, 1.108, 0.663);
+  photo(s, 9.418, 1.108, 7.765, 12.783);
+  photo(s, 17.615, 1.108, 7.669, 3.938);
+}
+
+/* 4 — problem, two photos across the top. */
+function slide04(s) {
+  title(s, 'Problem', 1.284, 6.562, 6.892, 1.875);
+  txt(s, 'Smoking and Secondhand Smoke Exposure',
+    { x: 9.453, y: 6.562, w: 7.73, h: 2.653, fontSize: SZ.h2, color: C.ink, fontFace: FONT_B });
+  txt(s, LOREM, { x: 17.55, y: 6.562, w: 6.68, h: 3.444, fontSize: SZ.lead });
+  photo(s, 9.453, 1.108, 7.73, 4.42);
+  photo(s, 17.651, 1.108, 7.73, 4.42);
+}
+
+/* 5 — centre photo, copy right, title bottom-left. */
+function slide05(s) {
+  footer(s, 1.284);
+  title(s, 'Problem', 1.284, 10.047, 6.892, 1.875);
+  txt(s, 'Smoking and Secondhand Smoke Exposure',
+    { x: 17.615, y: 2.176, w: 5.615, h: 2.653, fontSize: SZ.h2, color: C.ink, fontFace: FONT_B });
+  txt(s, LOREM, { x: 17.62, y: 5.965, w: 6.68, h: 3.444, fontSize: SZ.lead });
+  logo(s, 1.286, 1.108, 0.663);
+  photo(s, 9.013, 2.176, 7.765, 11.716);
+}
+
+/* 6 — full-height photo right, headline left. */
+function slide06(s) {
+  photo(s, 14.643, 0, 12.024, 15, { size: 32 });
+  logo(s, 1.286, 1.108, 0.663);
+  title(s, 'Higher Sugar Content that Kills Us Slowly', 1.286, 4.064, 11.306, 5.403);
+  txt(s, 'The Problem', { x: 1.286, y: 3.34, w: 6.68, h: 0.667, fontSize: SZ.lead });
+  txt(s, 'Lorem ipsum dolor sit amet.', { x: 1.284, y: 10.475, w: 6.68, h: 0.667, fontSize: SZ.lead });
+  txt(s, LOREM_LONG, { x: 1.286, y: 11.447, w: 8.167, h: 2.444 });
+}
+
+/* 7 — two overlapping venn circles plus two badge rows. */
+function slide07(s) {
+  title(s, 'What is the Customer\u2019s Pain', 4.045, 2.14, 18.576, 1.875, { align: 'center' });
+  ellipse(s, 4.045, 5.547, 7.117, 7.117, { fill: { color: C.clay } });
+  ellipse(s, 9.696, 5.547, 7.117, 7.117, { fill: { color: C.sand, transparency: 8 } });
+  // glyph inside each circle: download arrow / at-sign, drawn as simple marks
+  ellipse(s, 6.632, 7.303, 1.943, 1.943, { fill: { color: C.clay }, line: { color: C.white, width: 4 } });
+  slide07Glyph(s, 6.632, 7.303, 1.943, C.white);
+  ellipse(s, 12.254, 7.303, 2.001, 2.001, { fill: { color: C.sand }, line: { color: C.clay, width: 4 } });
+  slide07Glyph(s, 12.254, 7.303, 2.001, C.clay);
+  txt(s, 'Lorem ipsum dolor sit amet.',
+    { x: 5.594, y: 9.686, w: 4.02, h: 1.222, fontSize: SZ.lead, color: C.white, align: 'center' });
+  txt(s, 'Lorem ipsum dolor sit amet.',
+    { x: 11.245, y: 9.686, w: 4.02, h: 1.222, fontSize: SZ.lead, align: 'center' });
+
+  [['Self-Loveless', 6.425], ['Emotional Bomb', 10.191]].forEach(function (row, i) {
+    const y = row[1];
+    ellipse(s, 16.016, y, 1.594, 1.594, { fill: { color: C.offwhite }, shadow: CARD_SHADOW });
+    ellipse(s, 16.392, y + 0.376, 0.842, 0.842, { fill: { color: C.offwhite }, line: { color: C.ink, width: 2 } });
+    txt(s, row[0], { x: 17.888, y: y + 0.033, w: 3, h: 0.5, fontFace: FONT_B });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do.',
+      { x: 17.888, y: y + 0.672, w: 5.496, h: 0.889 });
+    void i;
+  });
+}
+
+/* Small glyph used inside the venn circles of slide 7. */
+function slide07Glyph(s, x, y, size, color) {
+  s.addShape('downArrow', {
+    x: x + size * 0.3, y: y + size * 0.24, w: size * 0.4, h: size * 0.38, fill: { color },
+  });
+  rect(s, x + size * 0.28, y + size * 0.68, size * 0.44, size * 0.07, color);
+}
+
+/* 8 — two stacked photos left, statement right. */
+function slide08(s) {
+  title(s, 'Heart disease and stroke cause 1 in 3 deaths in the US', 14.019, 1.108, 11.362, 7.167);
+  txt(s, LOREM_LONG, { x: 14.019, y: 8.731, w: 8.167, h: 2.444 });
+  footer(s, 14.019);
+  txt(s, [{ text: 'P : +123 456 7890', options: { breakLine: true } }, { text: 'M : hello@growth.com' }],
+    { x: 21.909, y: 13.003, w: 3.472, h: 0.889 });
+  photo(s, 1.286, 2.467, 4.655, 8.358);
+  photo(s, 5.941, 3.507, 4.655, 9.027);
+}
+
+/* 9 — big off-white card over a full-bleed photo. */
+function slide09(s) {
+  photo(s, 0, 0, 26.666, 15, { size: 40 });
+  rect(s, 1.493, 1.689, 23.68, 11.623, C.offwhite, { shadow: CARD_SHADOW });
+  title(s, 'Solutions', 3.249, 3.28, 7.486, 1.875, { wrap: false });
+  txt(s, 'Leafy Green Vegetables', { x: 3.249, y: 5.155, w: 6.233, h: 0.667, fontSize: SZ.lead });
+  [['01', 3.249, 3.212], ['02', 10.363, 10.363]].forEach(function (col) {
+    title(s, col[0], col[1], 8.042, 2.648, 1.875, { fontFace: FONT_B });
+    txt(s, LOREM_SHORT, { x: col[2], y: 9.917, w: 5.735, h: 2.333, fontSize: SZ.lead });
+  });
+  photo(s, 16.735, 2.75, 6.72, 9.5);
+}
+
+/* 10 — photo left, two icon cards, copy right. */
+function slide10(s) {
+  photo(s, 1.423, 2.511, 9.571, 9.978, { size: 32 });
+  title(s, 'Our Solution for your health', 14.182, 2.511, 11.061, 3.639);
+  [['Whole Grains', 6.872, 7.817], ['Walnuts and Beans', 9.878, 10.822]].forEach(function (row) {
+    txt(s, row[0], { x: 14.248, y: row[1], w: 7.765, h: 0.667, fontSize: SZ.lead, fontFace: FONT_B });
+    txt(s, LOREM, { x: 14.182, y: row[2], w: 6.68, h: 1.667 });
+  });
+  [4.126, 8.063].forEach(function (y, i) {
+    rect(s, 9.051, y, 3.322, 2.889, C.offwhite, { shadow: CARD_SHADOW });
+    const cx = 9.879, cy = y + 0.611;
+    s.addShape(i === 0 ? 'ellipse' : 'circularArrow', {
+      x: cx, y: cy, w: 1.667, h: 1.667, fill: { color: C.ink },
+    });
+    if (i === 0) {
+      s.addShape('rightArrow', {
+        x: cx + 0.4, y: cy + 0.68, w: 0.9, h: 0.3, fill: { color: C.white }, rotate: -45,
+      });
+    }
+  });
+}
+
+/* 11 — bottom-bleed photo, headline over it. */
+function slide11(s) {
+  photo(s, 0, 6.674, 26.666, 8.326, { size: 40 });
+  logo(s, 1.286, 1.108, 0.663);
+  title(s, 'Solution 1', 1.284, 3.172, 6.817, 1.875, { wrap: false });
+  display(s, 'Whole Grains', 1.286, 10.517, 17.111, 3.306);
+  txt(s, 'Best Recommendation', { x: 1.286, y: 10.017, w: 3.486, h: 0.5, color: C.white, wrap: false });
+  txt(s, LOREM_TRIS, { x: 17.62, y: 2.189, w: 7.755, h: 2.889, fontSize: SZ.lead });
+}
+
+/* 12 — two stacked photos right, info card left. */
+function slide12(s) {
+  photo(s, 13.333, 0, 13.333, 9.953, { size: 32 });
+  photo(s, 13.333, 9.953, 13.333, 5.047, { size: 32 });
+  footer(s, 1.284);
+  rect(s, 1.286, 5.547, 15.932, 6.177, C.offwhite, { shadow: CARD_SHADOW });
+  txt(s, 'Whole Grains', { x: 2.195, y: 7.33, w: 6.548, h: 0.667, fontSize: SZ.lead, fontFace: FONT_B });
+  txt(s, LOREM, { x: 2.129, y: 8.274, w: 6.68, h: 1.667 });
+  title(s, '3290', 12.601, 7.698, 3.372, 1.875, { fontFace: FONT_B });
+  title(s, 'Our Solution for your health', 1.286, 1.108, 11.061, 3.639);
+}
+
+/* 13 — three photos across the top, three text columns. */
+function slide13(s) {
+  title(s, 'Our Solution for your health', 1.286, 6.725, 7.765, 7.167);
+  txt(s, HEALTHY_DIET, { x: 9.453, y: 6.725, w: 5.075, h: 1.778, fontSize: SZ.lead, fontFace: FONT_B });
+  protectsBlock(s, 17.615, 6.592, 6.38, 3.222);
+  [1.286, 9.453, 17.62].forEach(function (x) { photo(s, x, 1.108, 7.765, 4.79); });
+}
+
+/* 14 — cream panel bottom-left, photo right. */
+function slide14(s) {
+  photo(s, 17.62, 3.38, 9.047, 11.62, { size: 32 });
+  rect(s, 0, 3.381, 17.62, 11.619, C.cream);
+  title(s, 'Solution 1', 1.284, 4.14, 6.817, 1.875, { wrap: false });
+  title(s, 'Whole Grains', 1.286, 10.35, 6.224, 3.639);
+  txt(s, 'Best Recommendation', { x: 1.286, y: 9.773, w: 3.486, h: 0.5, wrap: false });
+  txt(s, LOREM, { x: 11.348, y: 10.947, w: 4.465, h: 2.444 });
+  logo(s, 1.286, 1.108, 0.663);
+}
+
+/* 15 — sage banner over photo. */
+function slide15(s) {
+  photo(s, 13.333, 5.529, 13.334, 9.471, { size: 32 });
+  rect(s, 1.286, 10.565, 14.858, 2.714, C.sage, { shadow: CARD_SHADOW });
+  title(s, 'Solution 1', 1.284, 2.14, 6.817, 1.875, { wrap: false });
+  protectsBlock(s, 1.284, 5.529, 6.38, 3.222);
+  title(s, 'Walnuts and Beans', 1.709, 10.985, 14.011, 1.875, { color: C.white, align: 'center' });
+}
+
+/* 16 — marketing strategy list with dotted markers. */
+function slide16(s) {
+  photo(s, 1.286, 7.321, 13.4, 6.392, { size: 32 });
+  title(s, 'Marketing Strategy', 1.284, 2.511, 13.4, 1.875, { wrap: false });
+  logo(s, 1.286, 1.108, 0.663);
+  txt(s, 'Content is King but engagement is Queen & the lady rules the house!',
+    { x: 1.284, y: 5.547, w: 7.612, h: 1.222, fontSize: SZ.lead });
+  [3.517, 7.29, 11.062].forEach(function (y, i) {
+    ellipse(s, 17.183, y, 1.946, 1.946, { line: { color: C.ink, width: 2 }, fill: { color: C.white, transparency: 100 } });
+    // i+1 dots centred inside the ring
+    const n = i + 1, d = 0.202, gap = 0.341;
+    const startX = 17.183 + 1.946 / 2 - ((n - 1) * gap + d) / 2;
+    for (let k = 0; k < n; k++) {
+      ellipse(s, startX + k * gap, y + 0.872, d, d, { fill: { color: C.clay } });
+    }
+    txt(s, 'Strategy 0' + n, { x: 19.56, y: y - 0.068, w: 2.941, h: 0.667, fontSize: SZ.lead, fontFace: FONT_B });
+    txt(s, LOREM_SHORT, { x: 19.56, y: y + 0.737, w: 4.465, h: 1.278 });
+  });
+}
+
+/* 17 — "The Data" with a 300pt figure. */
+function slide17(s) {
+  photo(s, 1.286, 8.318, 24.094, 6.682, { size: 40 });
+  txt(s, '46,9', {
+    x: 8.897, y: 2.571, w: 8.873, h: 5.431, fontSize: SZ.mega, color: C.ink,
+    lineSpacingMultiple: 0.9, wrap: false,
+  });
+  txt(s, 'Total Available Market', { x: 8.897, y: 2.092, w: 7.612, h: 0.958, fontSize: SZ.h2 });
+  protectsBlock(s, 19.194, 3.918, 6.186, 3.222);
+  logo(s, 1.286, 1.108, 0.663);
+  title(s, 'The Data', 1.286, 4.349, 5.701, 1.875, { wrap: false });
+}
+
+/* 18 — sage background, two big figures with rules. */
+function slide18(s) {
+  s.background = { color: C.sage };
+  photo(s, 13.601, 3.078, 12.799, 11.922, { fill: 'AEB8B0', line: 'B7C0B9', caption: 'CBD2CC', size: 32 });
+  [[5.269, 5.811, 6.179, 'Total Available Market', '500.987'],
+    [9.676, 10.218, 10.586, 'Market Potential', '374.562']].forEach(function (r) {
+    rect(s, 1.286, r[0], 11.31, 0.042, C.white);
+    txt(s, r[3], { x: 1.286, y: r[1], w: 5.31, h: 0.667, fontSize: SZ.lead, color: C.white });
+    display(s, r[4], 1.286, r[2], 11.31, 3.306);
+  });
+  logo(s, 1.286, 1.108, 0.663, C.offwhite);
+}
+
+/* 19 — products, cream stat card. */
+function slide19(s) {
+  photo(s, 1.286, 5.807, 19.934, 8.085, { size: 40 });
+  photo(s, 21.498, 5.807, 3.883, 8.085);
+  title(s, 'Products', 1.286, 2.14, 7.765, 1.875);
+  txt(s, LOREM, { x: 18.786, y: 1.355, w: 6.595, h: 3.444, fontSize: SZ.lead });
+  rect(s, 9.453, 5.047, 7.093, 7.775, C.cream);
+  txt(s, '$48.7 Mio', { x: 10.148, y: 5.843, w: 3.196, h: 0.958, fontSize: SZ.h2, wrap: false });
+  txt(s, 'New Investor Capital', { x: 10.148, y: 6.802, w: 4.493, h: 0.667, fontSize: SZ.lead, wrap: false });
+  rect(s, 10.148, 7.768, 5.704, 0.046, C.grey);
+  txt(s, LOREM, { x: 10.148, y: 9.58, w: 4.72, h: 2.444 });
+  logo(s, 1.286, 1.108, 0.663);
+}
+
+/* 20 — products, three photos. */
+function slide20(s) {
+  title(s, 'Products', 1.286, 2.14, 7.765, 1.875);
+  txt(s, HEALTHY_DIET, { x: 1.286, y: 4.015, w: 5.075, h: 1.778, fontSize: SZ.lead, fontFace: FONT_B });
+  txt(s, LOREM_TRIS, { x: 17.62, y: 11.003, w: 7.755, h: 2.889, fontSize: SZ.lead });
+  logo(s, 1.286, 1.108, 0.663);
+  photo(s, 1.286, 9.953, 7.765, 3.938);
+  photo(s, 9.448, 1.109, 7.765, 12.783);
+  photo(s, 17.615, 1.108, 7.765, 4.438);
+}
+
+/* 21 — products, four photos. */
+function slide21(s) {
+  photo(s, 9.448, 1.109, 7.765, 12.783);
+  photo(s, 17.615, 1.108, 7.765, 6.19);
+  photo(s, 17.615, 7.702, 7.765, 6.19);
+  photo(s, 1.286, 1.108, 7.765, 3.938);
+  title(s, 'Products', 1.286, 9.953, 7.765, 1.875);
+  txt(s, HEALTHY_DIET, { x: 1.286, y: 11.828, w: 5.075, h: 1.778, fontSize: SZ.lead, fontFace: FONT_B });
+}
+
+/* Team roster shared by slides 22/23. */
+const TEAM = [
+  ['Dima Gregory', 'Executive Creative Director'],
+  ['Ernest Floyd', 'Founder & CEO'],
+  ['Bhami Loque', 'Design Creative Lead'],
+  ['Aleksander Kosarov', 'Project Manager'],
+];
+
+/* 22 — team grid of four portraits. */
+function slide22(s) {
+  logo(s, 1.286, 1.108, 0.663);
+  title(s, 'Our Team', 1.286, 10.297, 6.297, 1.875, { wrap: false });
+  footer(s, 1.284, 9.453);
+  [1.284, 7.415, 13.546, 19.678].forEach(function (x, i) {
+    photo(s, x, 3.078, 5.701, 3.938);
+    txt(s, TEAM[i][0], { x, y: 7.465, w: i === 3 ? 4.572 : 3.663, h: 0.667, fontSize: SZ.lead, fontFace: FONT_B });
+    txt(s, TEAM[i][1], { x, y: 8.131, w: 4.465, h: 0.5 });
+  });
+}
+
+/* 23 — team list on the right, quote left. */
+function slide23(s) {
+  const rows = [['Dima Gregory', 'Founder & CEO', 1.108],
+    ['Ernest Floyd', 'Executive Creative Director', 5.594],
+    ['Bhami Loque', 'Design Creative Lead', 10.079]];
+  rows.forEach(function (r, i) {
+    txt(s, r[0], { x: 21.096, y: r[2], w: 3.663, h: 0.667, fontSize: SZ.lead, fontFace: FONT_B });
+    txt(s, r[1], { x: 21.096, y: r[2] + 0.667, w: 4.285, h: 0.5 });
+    photo(s, 15.34, r[2] + 0.099, 5.339, 3.813);
+    if (i < 2) txt(s, LOREM_SHORT, { x: 21.096, y: r[2] + 2.535, w: 4.285, h: 1.278 });
+  });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.',
+    { x: 21.096, y: 12.225, w: 4.285, h: 1.667 });
+  title(s, 'Our Team', 1.286, 6.179, 6.297, 1.875, { wrap: false });
+  txt(s, 'A wonderful serenity has taken possession of my entire soul.',
+    { x: 1.284, y: 10.586, w: 7.571, h: 1.222, fontSize: SZ.lead, fontFace: FONT_B });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Aliquet nibh praesent tristique. Aliquet nibh praesent tristique.',
+    { x: 1.306, y: 12.225, w: 7.746, h: 1.667 });
+  logo(s, 1.286, 1.108, 0.663);
+}
+
+/* 24 — founder feature with quote card. */
+function slide24(s) {
+  photo(s, 1.286, 3.075, 12.047, 10.816, { size: 32 });
+  logo(s, 1.286, 1.108, 0.663);
+  rect(s, 9.453, 6.32, 15.932, 6.177, C.offwhite, { shadow: CARD_SHADOW });
+  title(s, 'Ernest Floyd', 14.244, 3.078, 8.741, 1.875, { wrap: false });
+  txt(s, 'Founder & CEO', { x: 14.244, y: 4.953, w: 4.285, h: 0.667, fontSize: SZ.lead });
+  txt(s, 'I am alone, and feel the charm of existence in this spot, which was created for the bliss of souls like mine. I am so happy, my dear friend, so absorbed in the exquisite sense of mere tranquil existence, that I neglect my talents.',
+    { x: 10.571, y: 8.242, w: 13.294, h: 2.333, fontSize: SZ.lead });
+}
+
+/* 25 — three testimonial cards. */
+function slide25(s) {
+  rect(s, 9.47, 4.276, 7.73, 3.808, C.sand, { shadow: CARD_SHADOW });
+  rect(s, 2.428, 5.107, 5.485, 3.808, C.offwhite, { shadow: CARD_SHADOW });
+  rect(s, 18.753, 5.107, 5.485, 3.808, C.offwhite, { shadow: CARD_SHADOW });
+  title(s, 'What our clients say', 6.329, 1.51, 14.012, 1.875, { align: 'center', wrap: false });
+  txt(s, QUOTE_LONG, { x: 10.337, y: 4.957, w: 5.997, h: 2.444, align: 'center' });
+  txt(s, QUOTE_SHORT, { x: 3.01, y: 5.983, w: 4.321, h: 2.056, align: 'center', color: C.grey });
+  txt(s, QUOTE_SHORT, { x: 19.34, y: 5.983, w: 4.321, h: 2.056, align: 'center', color: C.grey });
+  [['Kulusevski Agya', 3.334, 12.25, 3.962], ['Dima Gregory', 11.504, 12.324, 11.631],
+    ['Mumtaz Aigoo', 19.673, 12.25, 20.286]].forEach(function (p, i) {
+    const big = i === 1;
+    photo(s, p[3], big ? 8.499 : 9.406, big ? 3.409 : 2.428, big ? 3.409 : 2.428, { size: 14 });
+    txt(s, p[0], { x: p[1], y: p[2], w: 3.663, h: 0.667, fontSize: SZ.lead, fontFace: FONT_B, align: 'center' });
+    txt(s, 'Founder & CEO', { x: p[1], y: p[2] + 0.667, w: 3.663, h: 0.5, align: 'center' });
+  });
+}
+
+/* 26 — clay background, "Market to-go" with a numbered list. */
+function slide26(s) {
+  s.background = { color: C.clay };
+  photo(s, 0, 0, 26.667, 5.047, { fill: 'B69D93', line: 'BFA89F', caption: 'D2C1B9', size: 32 });
+  display(s, 'Market to-go', 1.284, 5.998, 10.191, 6.181);
+  const items = [
+    ['01', 'Traditional Marketing\u00a0refers to brand promotion on offline channels that were around before the rise of the internet.'],
+    ['02', 'Outbound Marketing\u00a0refers to intrusive promotion, such as cold calling, email blasts to purchased lists, and print ads.'],
+    ['03', 'I should be incapable of drawing a single stroke at the present moment; and yet I feel that I never was a greater.'],
+  ];
+  items.forEach(function (it, i) {
+    const y = 6.478 + i * 2.818;
+    txt(s, it[0], { x: 15.199, y, w: 1.074, h: 0.958, fontSize: SZ.h2, color: C.white });
+    txt(s, it[1], { x: 16.55, y, w: 8.83, h: 1.778, fontSize: SZ.lead, color: C.lightGrey });
+  });
+  txt(s, 'Healthy Food Business Pitch Deck Presentation',
+    { x: 1.284, y: 13.003, w: 4.178, h: 0.889, color: C.white });
+}
+
+/* 27 — milestones list with tick badges. */
+function slide27(s) {
+  photo(s, 1.286, 5.529, 12.047, 6.687, { size: 32 });
+  const rows = [
+    ['July 2019', 'Released minimum viable product (MVP) to first 1,000 users', 2.946, 1.222],
+    ['June 2019', '4,600 daily active users', 5.756, 0.667],
+    ['August 2019', '$5K monthly recurring revenue', 8.27, 0.667],
+    ['October 2019', 'Partnership with major company', 10.783, 0.667],
+  ];
+  rows.forEach(function (r) {
+    const y = r[2];
+    ellipse(s, 16.265, y + 0.021, 1.244, 1.244, { line: { color: C.clay, width: 2 }, fill: { color: C.white, transparency: 100 } });
+    s.addShape('line', {
+      x: 16.265 + 0.33, y: y + 0.66, w: 0.22, h: 0.2, line: { color: C.clay, width: 2 },
+    });
+    s.addShape('line', {
+      x: 16.265 + 0.55, y: y + 0.4, w: 0.36, h: 0.46, line: { color: C.clay, width: 2 }, flipV: true,
+    });
+    txt(s, r[0], { x: 17.942, y, w: 2.2, h: 0.5, wrap: false });
+    txt(s, r[1], { x: 17.942, y: y + 0.62, w: 7.439, h: r[3], fontSize: SZ.lead });
+  });
+  title(s, 'Milestones', 1.286, 2.805, 7.579, 1.875, { wrap: false });
+  logo(s, 1.286, 1.108, 0.663);
+}
+
+/* 28 — financial needs, sage background with clay pill. */
+function slide28(s) {
+  s.background = { color: C.sage };
+  photo(s, 0, 0, 26.666, 15, { fill: 'AEB8B0', line: 'B7C0B9', caption: 'CBD2CC', size: 40 });
+  rect(s, 0, 0, 26.667, 15, C.sage, { fill: { color: C.sage, transparency: 25 } });
+  s.addShape('roundRect', {
+    x: 2.245, y: 4.883, w: 10.891, h: 3.818, fill: { color: C.clay }, rectRadius: 1.8,
+  });
+  display(s, '$1450M', 3.048, 5.139, 9.284, 3.306);
+  title(s, 'Financial Needs', 2.245, 1.835, 10.472, 1.875, { color: C.white });
+  ['Offline-Site', 'Online Shop', 'Marketing'].forEach(function (t, i) {
+    txt(s, t, { x: 2.245, y: 10.095 + i * 1.055, w: 4.635, h: 0.958, fontSize: SZ.h2, color: C.white });
+  });
+  txt(s, LOREM_TRIS, { x: 16.666, y: 10.185, w: 7.755, h: 2.889, fontSize: SZ.lead, color: C.white });
+}
+
+/* 29 — full-bleed quote. */
+function slide29(s) {
+  photo(s, 0, 0, 26.666, 15, { size: 40 });
+  display(s, 'It is health that is real wealth and not pieces of gold and silver.',
+    1.286, 1.985, 21.363, 11.029, { bold: true, fontFace: FONT_B });
+}
+
+/* 30 — thank you. */
+function slide30(s) {
+  photo(s, 0, 0, 26.667, 9.467, { size: 40 });
+  rect(s, 0, 0, 26.667, 9.467, C.sage, { fill: { color: C.sage, transparency: 25 } });
+  rect(s, 0, 4.351, 17.183, 7.571, C.offwhite, { shadow: CARD_SHADOW });
+  display(s, 'Thank you very much!', 1.284, 5.412, 14.338, 5.577,
+    { color: C.clay, bold: true, fontFace: FONT_B });
+  logo(s, 24.007, 12.51, 1.373);
+  footer(s, 1.284, 9.453);
+}
+
+/* 31 — icons divider. */
+function slide31(s) {
+  txt(s, 'ICONS', {
+    x: 1.284, y: 4.785, w: 14.098, h: 5.431, fontSize: SZ.mega, color: C.ink, lineSpacingMultiple: 0.9,
+  });
+  txt(s, 'MADE ON 2021', {
+    x: 1.284, y: 13.268, w: 2.684, h: 0.472, fontSize: SZ.small, color: C.silver,
+    charSpacing: 4, wrap: false,
+  });
+}
+
+/* ------------------------------------------------- icon-library slides 32-49 */
+
+/*
+ * Slides 32-49 of the source deck are icon-library sheets: regular grids of
+ * hundreds of tiny vector glyphs. They are recreated as grids of simple
+ * outline/filled marks in the same colour, size and pitch as the original.
+ */
+
+/* Eight little pictogram recipes; each entry lists [shape, dx, dy, dw, dh]
+ * in units of the glyph box, so a glyph can be drawn at any size. */
+const GLYPH_PARTS = [
+  [['rect', 0.16, 0.24, 0.68, 0.52], ['rect', 0.30, 0.76, 0.40, 0.10]], // screen
+  [['ellipse', 0.14, 0.14, 0.72, 0.72], ['rect', 0.44, 0.26, 0.12, 0.30]], // clock
+  [['triangle', 0.12, 0.14, 0.76, 0.62], ['rect', 0.20, 0.78, 0.60, 0.10]], // mountain
+  [['rect', 0.22, 0.10, 0.56, 0.80], ['rect', 0.34, 0.24, 0.32, 0.10]], // document
+  [['ellipse', 0.28, 0.08, 0.44, 0.44], ['trapezoid', 0.14, 0.56, 0.72, 0.36]], // person
+  [['rect', 0.12, 0.58, 0.18, 0.32], ['rect', 0.40, 0.38, 0.18, 0.52],
+    ['rect', 0.68, 0.18, 0.18, 0.72]], // bar chart
+  [['diamond', 0.10, 0.10, 0.80, 0.80], ['rect', 0.42, 0.30, 0.16, 0.40]], // tag
+  [['ellipse', 0.10, 0.20, 0.50, 0.50], ['ellipse', 0.44, 0.42, 0.46, 0.46]], // bubbles
+];
+
+/**
+ * One icon-library glyph.
+ * `framed` wraps it in a ring (slides 32/33 use ringed icons);
+ * `filled` draws the solid variant used by the lower half of each sheet.
+ */
+function glyph(s, cx, cy, size, color, variant, filled, framed) {
+  const lw = Math.max(0.75, size * 2.6);
+  let x = cx - size / 2, y = cy - size / 2, box = size;
+  if (framed) {
+    s.addShape('ellipse', {
+      x, y, w: size, h: size,
+      line: { color, width: lw },
+      fill: filled ? { color } : { color: C.white, transparency: 100 },
+    });
+    box = size * 0.46;
+    x = cx - box / 2; y = cy - box / 2;
+  }
+  const ink = framed && filled ? C.white : color;
+  GLYPH_PARTS[variant % GLYPH_PARTS.length].forEach(function (p) {
+    s.addShape(p[0], {
+      x: x + p[1] * box, y: y + p[2] * box, w: p[3] * box, h: p[4] * box,
+      fill: filled ? { color: ink } : { color: C.white, transparency: 100 },
+      line: { color: ink, width: lw * (framed ? 0.7 : 1) },
+    });
+  });
+}
+
+/**
+ * Icon sheet: `rows` of `[centreY, count, firstCentreX, pitch]` drawn at `size`.
+ * Rows from `solidFrom` down use the solid variant, mirroring the source sheets
+ * where the same icon set is shown twice — outline above, filled below.
+ */
+function iconSheet(s, spec) {
+  spec.rows.forEach(function (row, r) {
+    const cy = row[0], n = row[1], x0 = row[2], dx = row[3];
+    for (let i = 0; i < n; i++) {
+      glyph(s, x0 + i * dx, cy, spec.size, spec.color, r * 3 + i,
+        spec.solidFrom !== undefined && r >= spec.solidFrom, spec.framed);
+    }
+  });
+  (spec.extras || []).forEach(function (e, i) {
+    glyph(s, e[0], e[1], e[2], e[3], i, true, false);
+  });
+}
+
+/** Builds a uniform grid spec: `count` glyphs per row at even pitch. */
+function evenRows(ys, n, x0, dx) {
+  return ys.map(function (y) { return [y, n, x0, dx]; });
+}
+
+const ICON_SHEETS = {
+  32: { color: C.ink, size: 1.32, framed: true, rows: evenRows([2.82, 5.21, 7.51, 9.78, 12.18], 10, 3.33, 2.221) },
+  33: { color: C.ink, size: 1.28, framed: true, rows: evenRows([2.36, 4.96, 7.39, 10.06, 12.63], 10, 2.11, 2.496) },
+  34: {
+    color: C.iconBlue,
+    size: 0.67,
+    solidFrom: 4,
+    // a lone pair of gender symbols sits above the grid in the source
+    extras: [[4.72, 4.11, 0.90, '8697CB'], [5.64, 4.11, 0.90, '71C285']],
+    rows: evenRows([5.36, 6.20, 7.02, 7.84, 8.92, 9.75, 10.58, 11.42], 22, 4.61, 0.831),
+  },
+  35: { color: C.iconBlue, size: 1.08, solidFrom: 3, rows: evenRows([3.39, 5.03, 6.68, 8.32, 9.97, 11.61], 16, 3.20, 1.351) },
+  36: { color: C.iconBlue, size: 1.02, solidFrom: 3, rows: evenRows([4.30, 5.48, 6.65, 8.29, 9.52, 10.71], 17, 3.49, 1.231) },
+  37: { color: C.iconBlue, size: 0.98, solidFrom: 3, rows: evenRows([4.30, 5.51, 6.71, 8.29, 9.49, 10.70], 17, 3.70, 1.229) },
+  38: { color: C.iconBlue, size: 0.98, solidFrom: 3, rows: evenRows([4.35, 5.47, 6.72, 8.31, 9.50, 10.69], 17, 3.66, 1.228) },
+  39: { color: C.iconBlue, size: 1.00, solidFrom: 3, rows: evenRows([4.33, 5.50, 6.65, 8.34, 9.51, 10.66], 17, 3.88, 1.183) },
+  40: { color: C.iconBlue, size: 0.98, solidFrom: 3, rows: evenRows([4.29, 5.54, 6.69, 8.30, 9.52, 10.72], 17, 3.49, 1.231) },
+  41: { color: C.iconBlue, size: 0.98, solidFrom: 3, rows: evenRows([4.30, 5.53, 6.75, 8.23, 9.43, 10.70], 17, 3.48, 1.232) },
+  42: { color: C.iconBlue, size: 0.98, solidFrom: 3, rows: evenRows([4.30, 5.53, 6.74, 8.27, 9.49, 10.70], 17, 3.55, 1.222) },
+  43: { color: C.iconBlue, size: 1.00, solidFrom: 3, rows: evenRows([4.26, 5.45, 6.83, 8.27, 9.51, 10.74], 14, 5.23, 1.247) },
+  44: {
+    color: C.iconBlue,
+    size: 0.88,
+    solidFrom: 4,
+    rows: evenRows([3.46, 4.53, 5.62, 6.67, 8.24, 9.33, 10.48, 11.58], 17, 4.23, 1.139),
+  },
+  45: { color: C.iconBlue, size: 0.96, solidFrom: 3, rows: evenRows([4.32, 5.47, 6.71, 8.29, 9.51, 10.68], 17, 3.54, 1.224) },
+  46: { color: C.ink, size: 1.29, rows: evenRows([4.60, 6.41, 8.22, 10.02, 11.83], 10, 5.05, 1.844) },
+  47: { color: C.ink, size: 1.37, rows: evenRows([3.78, 5.65, 7.50, 9.36, 11.21], 10, 4.98, 1.862) },
+  48: { color: C.ink, size: 1.11, rows: evenRows([3.39, 5.45, 7.50, 9.55, 11.60], 10, 4.87, 1.876) },
+};
+
+/*
+ * 49 — eleven flat pictograms in two rows, each built from a blue body,
+ * a red accent and a dark overlap patch (as in the source artwork).
+ * Layers: [shape, x, y, w, h, colour].
+ */
+const PICTOGRAMS = [
+  [['triangle', 4.05, 4.96, 1.54, 1.58, C.brightBlue, 90],
+    ['ellipse', 4.05, 5.64, 0.88, 0.88, C.brightRed],
+    ['pie', 4.13, 5.64, 0.81, 0.60, C.brightInk]],
+  [['rect', 8.01, 4.96, 1.47, 1.19, C.brightBlue],
+    ['chord', 8.19, 5.89, 1.10, 0.53, C.brightRed, 180],
+    ['chord', 8.27, 5.89, 0.95, 0.26, C.brightInk, 180]],
+  [['ellipse', 11.18, 4.92, 1.47, 1.47, C.brightBlue],
+    ['pie', 11.92, 4.74, 0.91, 0.91, C.brightRed],
+    ['pie', 11.92, 4.93, 0.73, 0.72, C.brightInk]],
+  [['chord', 14.70, 5.24, 1.65, 1.04, C.brightBlue, 180],
+    ['wave', 14.88, 4.74, 0.28, 0.83, C.brightRed],
+    ['wave', 15.25, 4.74, 0.28, 0.83, C.brightRed],
+    ['rect', 14.88, 5.24, 0.28, 0.32, C.brightInk],
+    ['rect', 15.25, 5.24, 0.28, 0.32, C.brightInk]],
+  [['rect', 17.79, 4.86, 1.03, 1.65, C.brightBlue],
+    ['rect', 18.43, 5.56, 0.76, 0.96, C.brightRed],
+    ['rect', 18.43, 5.56, 0.39, 0.96, C.brightInk]],
+  [['homePlate', 21.17, 5.07, 1.47, 1.47, C.brightBlue],
+    ['rect', 20.98, 5.31, 0.64, 0.18, C.brightRed],
+    ['rect', 21.07, 5.67, 0.51, 0.18, C.brightRed]],
+  [['triangle', 4.19, 8.95, 1.46, 1.12, C.brightBlue, 180],
+    ['ellipse', 4.00, 8.69, 0.83, 0.83, C.brightRed],
+    ['pie', 4.18, 8.95, 0.64, 0.56, C.brightInk]],
+  [['diamond', 7.93, 9.01, 1.63, 1.25, C.brightBlue],
+    ['diamond', 8.02, 8.76, 0.50, 0.50, C.brightRed],
+    ['rect', 8.07, 9.01, 0.55, 0.35, C.brightInk]],
+  [['pieWedge', 10.92, 8.84, 1.65, 1.28, C.brightBlue],
+    ['ellipse', 11.75, 8.74, 0.82, 0.82, C.brightRed],
+    ['pie', 11.75, 8.90, 0.73, 0.66, C.brightInk]],
+  [['trapezoid', 15.41, 8.86, 1.47, 1.39, C.brightBlue],
+    ['rect', 15.81, 8.60, 0.66, 0.72, C.brightRed],
+    ['rect', 15.81, 8.86, 0.66, 0.46, C.brightInk]],
+  [['pentagon', 18.13, 8.70, 1.15, 1.46, C.brightBlue],
+    ['ellipse', 17.65, 8.68, 0.92, 0.92, C.brightRed],
+    ['rect', 18.13, 8.85, 0.44, 0.75, C.brightInk]],
+];
+
+function slide49(s) {
+  PICTOGRAMS.forEach(function (parts) {
+    parts.forEach(function (p) {
+      s.addShape(p[0], {
+        x: p[1], y: p[2], w: p[3], h: p[4], fill: { color: p[5] },
+        rotate: p[6] || 0,
+      });
+    });
+  });
+}
+
+/* ------------------------------------------------------------------- build */
+
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08,
+  slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18,
+  slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28,
+  slide29, slide30, slide31];
+
+function build() {
+  const pptx = new PptxGenJS();
+  pptx.defineLayout({ name: 'DECK', width: 26.667, height: 15 });
+  pptx.layout = 'DECK';
+  pptx.author = 'Naturel';
+  pptx.title = 'Healthy Food Business Pitch Deck Presentation';
+
+  BUILDERS.forEach(function (fn) { fn(pptx.addSlide()); });
+  for (let n = 32; n <= 48; n++) iconSheet(pptx.addSlide(), ICON_SHEETS[n]);
+  slide49(pptx.addSlide());
+
+  return pptx.writeFile({ fileName: path.join(__dirname, '07388dfc-a260-45eb-aff0-e575c262e383_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote', f); }).catch(function (e) {
+  console.error(e); process.exit(1);
+});

@@ -1,0 +1,840 @@
+/**
+ * "Pink Fashion" presentation template — rebuilt with pptxgenjs.
+ * Run: node 0639790d-194b-4f1f-94e2-5fb69486a495_grok_final.js
+ *
+ * All geometry is expressed in inches on a 13.333 x 7.5 in stage.
+ * Raster/vector artwork of the original deck is replaced by native shapes.
+ */
+'use strict';
+
+const path = require('path');
+const pptxgen = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * ------------------------------------------------------------------ */
+const W = 13.3333333;           // slide width  (in)
+const H = 7.5;                  // slide height (in)
+
+const BG        = 'FFFBFF';     // page background
+const DARK      = '313131';     // headline / body dark
+const GRAY      = '808080';     // secondary body copy
+const WHITE     = 'FFFFFF';
+const ACCENT    = 'DB459C';     // brand magenta (eyebrow text)
+const PINK      = 'F5BBDA';     // flat stand-in for the 45deg pink gradient
+const PINK_TXT  = 'FCC3DC';     // gradient-filled headline words
+const PINK_MID  = 'FC9DC4';
+const PINK_PALE = 'FFDBE5';
+const RULE      = 'EFABD2';     // thin decorative rules
+const GRID      = 'D9D9D9';
+const MAP_GRAY  = 'E7E6E6';
+const GRAD_A    = 'EDA5D0';     // 45deg gradient start (top-left)
+const GRAD_B    = 'FDCFE3';     // 45deg gradient end   (bottom-right)
+
+const F_TITLE = 'Figtree';        // theme major font
+const F_BODY  = 'Figtree Light';  // theme minor font
+
+const SHADOW_CARD = { type: 'outer', blur: 41, offset: 19, angle: 90,  color: '000000', opacity: 0.07 };
+const SHADOW_SOFT = { type: 'outer', blur: 24, offset:  9, angle: 135, color: '2F305B', opacity: 0.04 };
+const SHADOW_DEEP = { type: 'outer', blur: 68, offset: 34, angle: 135, color: '2F305B', opacity: 0.12 };
+
+const NO_LINE = { type: 'none' };
+
+/* ------------------------------------------------------------------ *
+ * Low level helpers
+ * ------------------------------------------------------------------ */
+function newSlide(pres) {
+  const s = pres.addSlide();
+  s.background = { color: BG };
+  return s;
+}
+
+function shp(slide, kind, o) {
+  slide.addShape(kind, Object.assign({ line: NO_LINE }, o));
+}
+
+function txt(slide, runs, o) {
+  slide.addText(runs, Object.assign(
+    { fontFace: F_BODY, fontSize: 14, color: GRAY, valign: 'top', wrap: true }, o));
+}
+
+/** Mix two hex colours, t = 0..1. */
+function mix(a, b, t) {
+  let out = '';
+  for (let i = 0; i < 3; i++) {
+    const ca = parseInt(a.substr(i * 2, 2), 16);
+    const cb = parseInt(b.substr(i * 2, 2), 16);
+    out += Math.round(ca + (cb - ca) * t).toString(16).padStart(2, '0');
+  }
+  return out.toUpperCase();
+}
+
+/* -- the theme's 45-degree pink gradient ---------------------------- *
+ * pptxgenjs cannot emit gradient fills, so a gradient shape is drawn
+ * twice: once flat in the ramp's mid tone (that copy also carries the
+ * outline/shadow) and once as a tile grid whose cells follow the ramp
+ * t = (localX + localY) / (w + h). A `span` function reports the shape's
+ * vertical extent at a given horizontal position so the tiles stay inside
+ * the silhouette; whatever the tiles miss keeps showing the mid tone.
+ * ------------------------------------------------------------------- */
+
+const SPAN = {
+  rect: () => (/* u */) => [0, 1],
+  /** rounded rectangle, radius r (inches) on a w x h box */
+  round: (w, h, r) => u => {
+    const dx = Math.min(u * w, w - u * w);
+    if (dx >= r) return [0, 1];
+    const dy = r - Math.sqrt(Math.max(0, r * r - (r - dx) * (r - dx)));
+    return [dy / h, 1 - dy / h];
+  },
+  ellipse: () => u => {
+    const d = Math.sqrt(Math.max(0, 0.25 - (u - 0.5) * (u - 0.5)));
+    return [0.5 - d, 0.5 + d];
+  },
+  /** semicircular dome, flat along the bottom */
+  dome: () => u => [0.5 - Math.sqrt(Math.max(0, 0.25 - (u - 0.5) * (u - 0.5))), 1],
+};
+
+/**
+ * @param span  u -> [top, bottom] as fractions of h, for u in 0..1 across w
+ * @param from  corner the ramp starts dark at: 'tl' (default), 'tr', 'bl', 'br'
+ */
+function gradTiles(slide, x, y, w, h, span, from) {
+  const flipX = from === 'tr' || from === 'br';
+  const flipY = from === 'bl' || from === 'br';
+  const cols = Math.max(6, Math.min(30, Math.round(w / 0.22)));
+  const rows = Math.max(3, Math.min(20, Math.round(h / 0.32)));
+  const cw = w / cols;
+  for (let c = 0; c < cols; c++) {
+    // conservative extent: the tightest of the two column edges, so no spill
+    const a = span(c / cols), b = span((c + 1) / cols);
+    const top = Math.max(a[0], b[0]) * h, bot = Math.min(a[1], b[1]) * h;
+    if (bot - top < 0.02) continue;
+    const ch = (bot - top) / rows;
+    for (let r = 0; r < rows; r++) {
+      const cy = top + r * ch;
+      const lx = (c + 0.5) * cw, ly = cy + ch / 2;
+      const t = ((flipX ? w - lx : lx) + (flipY ? h - ly : ly)) / (w + h);
+      shp(slide, 'rect', {
+        x: x + c * cw, y: y + cy, w: cw + 0.008, h: ch + 0.008,
+        fill: { color: mix(GRAD_A, GRAD_B, t) },
+      });
+    }
+  }
+}
+
+/** Solid-pink rectangle (optionally rounded) carrying the diagonal ramp. */
+function gradBox(slide, x, y, w, h, radius, from) {
+  const r = radius || 0;
+  shp(slide, r ? 'roundRect' : 'rect',
+    r ? { x, y, w, h, rectRadius: r, fill: { color: PINK } } : { x, y, w, h, fill: { color: PINK } });
+  gradTiles(slide, x, y, w, h, r ? SPAN.round(w, h, r) : SPAN.rect(), from);
+}
+
+/** Pink disc carrying the diagonal ramp. */
+function gradDisc(slide, x, y, w, h) {
+  shp(slide, 'ellipse', { x, y, w, h, fill: { color: PINK } });
+  gradTiles(slide, x, y, w, h, SPAN.ellipse());
+}
+
+/** Cubic-bezier outline of a rectangle with per-corner radii [tl, tr, br, bl]. */
+function roundedPath(w, h, r) {
+  const k = 0.5523, [tl, tr, br, bl] = r, p = [];
+  p.push({ x: tl, y: 0, moveTo: true });
+  p.push({ x: w - tr, y: 0 });
+  if (tr) p.push({ x: w, y: tr, curve: { type: 'cubic', x1: w - tr * (1 - k), y1: 0, x2: w, y2: tr * (1 - k) } });
+  p.push({ x: w, y: h - br });
+  if (br) p.push({ x: w - br, y: h, curve: { type: 'cubic', x1: w, y1: h - br * (1 - k), x2: w - br * (1 - k), y2: h } });
+  p.push({ x: bl, y: h });
+  if (bl) p.push({ x: 0, y: h - bl, curve: { type: 'cubic', x1: bl * (1 - k), y1: h, x2: 0, y2: h - bl * (1 - k) } });
+  p.push({ x: 0, y: tl });
+  if (tl) p.push({ x: tl, y: 0, curve: { type: 'cubic', x1: 0, y1: tl * (1 - k), x2: tl * (1 - k), y2: 0 } });
+  p.push({ close: true });
+  return p;
+}
+
+/** Rectangle with individually rounded corners, drawn as a custom geometry. */
+function roundedShape(slide, x, y, w, h, radii, o) {
+  shp(slide, 'custGeom', Object.assign({ x, y, w, h, points: roundedPath(w, h, radii) }, o));
+}
+
+/** Same, filled with the diagonal pink ramp. */
+function gradRounded(slide, x, y, w, h, radii, from) {
+  roundedShape(slide, x, y, w, h, radii, { fill: { color: PINK } });
+  const [tl, tr, br, bl] = radii;
+  const cut = (rad, d) => (d >= rad || !rad ? 0 : rad - Math.sqrt(Math.max(0, rad * rad - (rad - d) * (rad - d))));
+  gradTiles(slide, x, y, w, h, u => {
+    const dl = u * w, dr = w - u * w;
+    return [Math.max(cut(tl, dl), cut(tr, dr)) / h, 1 - Math.max(cut(bl, dl), cut(br, dr)) / h];
+  }, from);
+}
+
+/** Semicircular dome: flat bottom edge, half-disc on top, pink ramp fill. */
+function gradDome(slide, x, y, w, h) {
+  const k = 0.5523;
+  shp(slide, 'custGeom', {
+    x, y, w, h, fill: { color: PINK },
+    points: [
+      { x: w / 2, y: 0, moveTo: true },
+      { x: w, y: h, curve: { type: 'cubic', x1: w / 2 + (w / 2) * k, y1: 0, x2: w, y2: h - h * k } },
+      { x: 0, y: h },
+      { x: w / 2, y: 0, curve: { type: 'cubic', x1: 0, y1: h - h * k, x2: w / 2 - (w / 2) * k, y2: 0 } },
+      { close: true },
+    ],
+  });
+  gradTiles(slide, x, y, w, h, SPAN.dome());
+}
+
+/** Quarter disc filling one corner of an r x r box; `pivot` names the disc centre. */
+function quarterDisc(slide, x, y, r, pivot, o) {
+  const k = 0.5523;
+  const corner = { tl: [0, 0], tr: [r, 0], br: [r, r], bl: [0, r] }[pivot];
+  const [px, py] = corner;
+  const ax = px === 0 ? r : 0;        // arc start, on the horizontal edge through pivot
+  const ay = py === 0 ? r : 0;        // arc end,   on the vertical edge through pivot
+  shp(slide, 'custGeom', Object.assign({
+    x, y, w: r, h: r,
+    points: [
+      { x: px, y: py, moveTo: true },
+      { x: ax, y: py },
+      { x: px, y: ay, curve: { type: 'cubic', x1: ax, y1: py + (ay - py) * k, x2: px + (ax - px) * k, y2: ay } },
+      { close: true },
+    ],
+  }, o));
+}
+
+/* ------------------------------------------------------------------ *
+ * Recurring deck furniture
+ * ------------------------------------------------------------------ */
+
+/** Short gradient rule used above card titles. */
+function rule(slide, x, y, w) {
+  shp(slide, 'line', { x, y, w: w, h: 0, line: { color: RULE, width: 2.25 } });
+}
+
+/** "Pink Fashion" magenta kicker above every headline. */
+function eyebrow(slide, x, y, o) {
+  txt(slide, 'Pink Fashion', Object.assign(
+    { x, y, w: 1.741, h: 0.337, color: ACCENT, paraSpaceBefore: 9 }, o));
+}
+
+/** 54 pt two-tone headline; `parts` = [[text, color], ...]. */
+function headline(slide, x, y, w, h, parts, o) {
+  txt(slide, parts.map(([text, color]) => ({ text, options: { color } })), Object.assign(
+    { x, y, w, h, fontFace: F_TITLE, fontSize: 54, bold: true, color: DARK }, o));
+}
+
+/** Master slide furniture: page number top-right, site + tick bottom-left. */
+function chrome(slide, pageNo) {
+  txt(slide, 'Page ' + pageNo, { x: 11.841, y: 0.32, w: 0.982, h: 0.252, fontSize: 9, align: 'right' });
+  txt(slide, 'www.yoursite.com', { x: 0.728, y: 6.928, w: 1.729, h: 0.252, fontSize: 9 });
+  shp(slide, 'line', { x: 0.51, y: 7.054, w: 0.188, h: 0, line: { color: 'E98FC4', width: 1.5 } });
+}
+
+/** White (or pink) disc holding a tiny pictogram — stands in for the deck's SVG icons. */
+function iconBadge(slide, x, y, pinkDisc, glyph) {
+  shp(slide, 'ellipse', {
+    x, y, w: 0.734, h: 0.745,
+    fill: { color: pinkDisc ? PINK : WHITE }, shadow: SHADOW_CARD,
+  });
+  shp(slide, glyph || 'diamond', {
+    x: x + 0.242, y: y + 0.247, w: 0.25, h: 0.25,
+    fill: { color: pinkDisc ? WHITE : PINK_MID },
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 1 — Cover
+ * ------------------------------------------------------------------ */
+function slide01(pres) {
+  const s = newSlide(pres);
+  gradBox(s, 0, 0, W, H);
+  // concentric halo behind the white medallion
+  shp(s, 'ellipse', { x: 3.6, y: 0.686, w: 6.133, h: 6.128, fill: { color: WHITE, transparency: 74 }, shadow: SHADOW_CARD });
+  shp(s, 'ellipse', { x: 3.885, y: 0.971, w: 5.564, h: 5.558, fill: { color: WHITE }, shadow: SHADOW_CARD });
+  // thin outlined circles drifting off the edges
+  [[10.518, 5.083, 3.538], [-3.312, -2.772, 7.972], [7.886, 2.722, 4.4]].forEach(([x, y, d]) => {
+    shp(s, 'ellipse', { x, y, w: d, h: d, fill: { type: 'none' }, line: { color: WHITE, width: 1, transparency: 45 } });
+  });
+  headline(s, 4.069, 3.018, 5.194, 1.01, [['Pink Fashion', PINK_TXT]], { align: 'center' });
+  txt(s, 'PRESENTATION TEMPLATE', {
+    x: 4.297, y: 4.112, w: 4.74, h: 0.37, fontFace: F_TITLE, fontSize: 16,
+    color: DARK, charSpacing: 3, align: 'center',
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 2 — Table of contents (staircase of cards)
+ * ------------------------------------------------------------------ */
+function slide02(pres) {
+  const s = newSlide(pres);
+  chrome(s, 2);
+  headline(s, -1.531, 3.089, 6.355, 1.01,
+    [['Table of ', DARK], ['Content.', PINK_TXT]], { rotate: 270 });
+  eyebrow(s, 0.062, 5.674, { rotate: 270 });
+
+  const items = [
+    { x: 3.294, y: 1.486, label: 'Introduction Pink Fashion', pink: true },
+    { x: 8.910, y: 0.750, label: 'Psychology Pink Fashion', pink: false },
+    { x: 7.889, y: 2.304, label: 'Shades of Pink', pink: false },
+    { x: 6.702, y: 3.858, label: 'Pink in Different Fashion', pink: true },
+    { x: 5.577, y: 5.413, label: 'Iconic Pink Moments', pink: false },
+  ];
+  items.forEach(it => {
+    if (it.pink) gradBox(s, it.x, it.y, 3.673, 1.339, 0.21);
+    else shp(s, 'roundRect', { x: it.x, y: it.y, w: 3.673, h: 1.339, rectRadius: 0.21, fill: { color: WHITE }, shadow: SHADOW_CARD });
+    rule(s, it.x - 0.205, it.y + 0.636, 1.031);
+    txt(s, 'Description', { x: it.x + 0.184, y: it.y + 0.207, w: 1.916, h: 0.337, color: it.pink ? WHITE : GRAY, paraSpaceBefore: 9 });
+    txt(s, it.label, {
+      x: it.x + 0.184, y: it.y + 0.728, w: 3.182, h: 0.404,
+      fontFace: F_TITLE, fontSize: 16, bold: true, color: it.pink ? WHITE : DARK,
+    });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 3 — Evolution of pink (long copy card)
+ * ------------------------------------------------------------------ */
+function slide03(pres) {
+  const s = newSlide(pres);
+  chrome(s, 3);
+  gradBox(s, 0, 0, 2.427, H);
+  shp(s, 'roundRect', { x: 1.733, y: 3.008, w: 10.85, h: 3.537, rectRadius: 0.42, fill: { color: WHITE }, shadow: SHADOW_CARD });
+
+  eyebrow(s, 2.85, 1.086);
+  headline(s, 2.792, 1.421, 10.01, 1.01, [['Evolution of ', DARK], ['Pink in Fashion.', PINK_TXT]]);
+
+  txt(s, 'Cultural and Historical Significance',
+    { x: 2.087, y: 3.372, w: 10.143, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: DARK });
+  txt(s, [
+    { text: 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felids, ultricies nec, pellentesque eu, pretium quis, sem. ', options: { breakLine: true } },
+    { text: 'Nulla consequat massa quis enim. Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo. Nullam dictum felis eu pede mollis pretium. Integer tincidunt. ' },
+  ], { x: 2.087, y: 3.906, w: 10.143, h: 1.731, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+  txt(s, '\u201cLorem ipsum dolor sit amet, consectetuer adipiscing elit.',
+    { x: 2.087, y: 5.803, w: 6.028, h: 0.379, color: ACCENT, italic: true, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 4 — Iconic pink fashion + product card
+ * ------------------------------------------------------------------ */
+function slide04(pres) {
+  const s = newSlide(pres);
+  chrome(s, 4);
+  shp(s, 'roundRect', { x: 9.238, y: 0.852, w: 3.345, h: 5.795, rectRadius: 0.398, fill: { color: WHITE }, shadow: SHADOW_CARD });
+
+  eyebrow(s, 0.809, 1.836);
+  headline(s, 0.75, 2.17, 4.017, 1.919, [['Iconic ', DARK], ['Pink Fashion!', PINK_TXT]]);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget. Aenean',
+    { x: 0.75, y: 4.672, w: 3.437, h: 0.992, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+
+  // "Hello!" bubble
+  gradDisc(s, 4.489, 3.608, 2.25, 2.25);
+  txt(s, 'Hello!', { x: 4.585, y: 4.255, w: 2.058, h: 0.64, fontFace: F_TITLE, fontSize: 32, bold: true, color: WHITE, align: 'center', lineSpacingMultiple: 1 });
+  txt(s, 'Fashion Styles', { x: 4.585, y: 4.871, w: 2.058, h: 0.337, color: WHITE, align: 'center', lineSpacingMultiple: 1, paraSpaceBefore: 9 });
+
+  // product details
+  txt(s, 'Material', { x: 9.534, y: 3.742, w: 1.171, h: 0.303, fontSize: 12, lineSpacingMultiple: 1, paraSpaceBefore: 9 });
+  txt(s, 'Colors',   { x: 11.552, y: 3.742, w: 0.735, h: 0.303, fontSize: 12, lineSpacingMultiple: 1, paraSpaceBefore: 9 });
+  txt(s, 'Silk Fabric', { x: 9.534, y: 4.06, w: 1.975, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: DARK });
+  [ACCENT, PINK_MID, PINK_PALE].forEach((c, i) => {
+    shp(s, 'ellipse', { x: 11.652 + i * 0.1855, y: 4.194, w: 0.119, h: 0.119, fill: { color: c } });
+  });
+  txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Aenean commodo',
+    { x: 9.534, y: 4.514, w: 2.753, h: 0.602, fontSize: 12, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+  txt(s, '$135', { x: 9.534, y: 5.336, w: 1.229, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: ACCENT });
+  gradBox(s, 9.534, 5.888, 1.352, 0.37, 0.185);
+  txt(s, 'Add to Cart', { x: 9.534, y: 5.888, w: 1.352, h: 0.37, fontFace: F_TITLE, fontSize: 12, bold: true, color: WHITE, align: 'center', valign: 'middle' });
+  shp(s, 'heart', { x: 11.077, y: 5.975, w: 0.196, h: 0.196, fill: { type: 'none' }, line: { color: PINK_MID, width: 1 } });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 5 — Pink business attire + three stats
+ * ------------------------------------------------------------------ */
+function slide05(pres) {
+  const s = newSlide(pres);
+  chrome(s, 5);
+  headline(s, 2.653, 2.745, 6.326, 1.919,
+    [['Pink Business and', DARK], [' Formal Attire.', PINK_TXT]], { rotate: 270 });
+  eyebrow(s, 3.774, 5.77, { rotate: 270 });
+
+  txt(s, 'Cultural and Historical Significance',
+    { x: 7.313, y: 1.717, w: 5.27, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: DARK });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies',
+    { x: 7.313, y: 2.231, w: 5.274, h: 1.299, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+
+  [['10+', 7.313], ['120', 9.181], ['9/10', 11.049]].forEach(([value, x]) => {
+    shp(s, 'roundRect', { x, y: 4.414, w: 1.538, h: 1.369, rectRadius: 0.185, fill: { color: WHITE }, shadow: SHADOW_CARD });
+    rule(s, x + 0.529, 4.59, 0.479);
+    txt(s, value, { x: x + 0.069, y: 4.768, w: 1.4, h: 0.505, fontFace: F_TITLE, fontSize: 24, bold: true, color: DARK, align: 'center' });
+    txt(s, 'Experience', { x: x + 0.069, y: 5.242, w: 1.4, h: 0.303, fontSize: 12, align: 'center' });
+  });
+
+  txt(s, 'www.yoursite.com', { x: 0.728, y: 6.928, w: 1.729, h: 0.252, fontSize: 9, color: WHITE });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 6 — Shades of pink
+ * ------------------------------------------------------------------ */
+function slide06(pres) {
+  const s = newSlide(pres);
+  chrome(s, 6);
+  txt(s, 'SHADES OF PINK AND THEIR FASHION APPEAL', {
+    x: 1.74, y: 0.862, w: 9.854, h: 0.337, charSpacing: 3, align: 'center', lineSpacingMultiple: 1, paraSpaceBefore: 9,
+  });
+
+  const shades = [
+    ['Fuchsia',    1.346, 1.518, 3.234, DARK],
+    ['Hot Pink ',  4.930, 1.518, 3.828, DARK],
+    ['Blush Pink', 9.107, 1.518, 2.880, PINK_TXT],
+    ['Dusty Rose', 2.620, 2.344, 4.685, DARK],
+    ['Neon Pink ', 7.654, 2.344, 3.060, DARK],
+  ];
+  shades.forEach(([label, x, y, w, color]) => {
+    txt(s, label, { x, y, w, h: 0.64, fontFace: F_TITLE, fontSize: 32, bold: true, color, align: 'center' });
+  });
+  rule(s, 10.031, 2.209, 1.031);
+
+  roundedShape(s, 3.597, 5.986, 6.139, 1.514, [0.165, 0.165, 0, 0], { fill: { color: WHITE } });
+  txt(s, [
+    { text: '\u201c', options: { color: DARK } },
+    { text: 'Lorem ipsum dolor sit amet', options: { color: PINK_TXT } },
+    { text: ', consectetuer adipiscing elit. Aenean commodo ligula eget.\u201d', options: { color: DARK } },
+  ], { x: 4.021, y: 6.227, w: 5.292, h: 0.64, fontFace: F_TITLE, fontSize: 16, bold: true, align: 'center' });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 7 — Three vertical option cards
+ * ------------------------------------------------------------------ */
+function slide07(pres) {
+  const s = newSlide(pres);
+  chrome(s, 7);
+  const cards = [
+    { x: 1.169, num: '01', label: 'The Vision',  pink: false },
+    { x: 5.031, num: '02', label: 'Inspiration', pink: true },
+    { x: 8.894, num: '03', label: 'The mission', pink: false },
+  ];
+  cards.forEach(c => {
+    if (c.pink) gradBox(s, c.x, 0.75, 3.271, 5.627, 0.267);
+    else shp(s, 'roundRect', { x: c.x, y: 0.75, w: 3.271, h: 5.627, rectRadius: 0.267, fill: { color: WHITE, transparency: 12 }, shadow: SHADOW_CARD });
+    shp(s, 'roundRect', {
+      x: c.x + 0.845, y: 1.386, w: 1.579, h: 4.124, rectRadius: 0.188,
+      fill: { type: 'none' }, line: { color: c.pink ? WHITE : PINK_PALE, width: 2.25 },
+    });
+    txt(s, c.num, { x: c.x + 0.927, y: 1.661, w: 1.417, h: 0.854, fontFace: F_TITLE, fontSize: 44, bold: true, color: c.pink ? WHITE : DARK, align: 'center' });
+    txt(s, c.label, { x: c.x + 0.218, y: 3.606, w: 2.834, h: 0.404, rotate: 270, fontFace: F_TITLE, fontSize: 16, bold: true, color: c.pink ? WHITE : DARK });
+    iconBadge(s, c.x + 1.268, 6.005, !c.pink, c.pink ? 'donut' : 'diamond');
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 8 — Pink in high fashion couture
+ * ------------------------------------------------------------------ */
+function slide08(pres) {
+  const s = newSlide(pres);
+  chrome(s, 8);
+
+  eyebrow(s, 6.386, 0.75);
+  headline(s, 6.327, 1.085, 6.518, 1.919, [['Pink in High ', DARK], ['Fashion Couture.', PINK_TXT]]);
+
+  gradRounded(s, 2.99, 2.736, 2.99, 4.764, [0, 0.717, 0, 0]);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+    { x: 3.222, y: 3.768, w: 2.524, h: 0.909, fontFace: F_TITLE, fontSize: 16, bold: true, color: WHITE });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum',
+    { x: 3.226, y: 4.863, w: 2.52, h: 1.605, color: WHITE, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula',
+    { x: 9.37, y: 3.526, w: 2.651, h: 0.992, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+  gradRounded(s, 8.969, 5.005, 2.99, 2.502, [0, 0.6, 0, 0]);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. ',
+    { x: 9.201, y: 5.802, w: 2.524, h: 0.909, fontFace: F_TITLE, fontSize: 16, bold: true, color: WHITE });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 9 — How to pink style (banner + pills)
+ * ------------------------------------------------------------------ */
+function slide09(pres) {
+  const s = newSlide(pres);
+  chrome(s, 9);
+  gradRounded(s, 2.935, 2.74, 10.399, 3.846, [0.289, 0, 0, 0.289]);
+
+  eyebrow(s, 0.809, 0.75);
+  headline(s, 0.75, 1.085, 9.642, 1.01, [['How to ', DARK], ['Pink Style.', PINK_TXT]]);
+
+  [['Combination', 1.3], ['Accessories', 5.176], ['Seasonal', 9.053]].forEach(([label, x]) => {
+    shp(s, 'roundRect', { x, y: 5.156, w: 1.836, h: 0.538, rectRadius: 0.269, fill: { color: WHITE }, shadow: SHADOW_CARD });
+    txt(s, label, { x: x + 0.141, y: 5.24, w: 1.554, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: DARK, align: 'center' });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 10 — Three domes
+ * ------------------------------------------------------------------ */
+function slide10(pres) {
+  const s = newSlide(pres);
+  chrome(s, 10);
+  const rows = [
+    { domeX: 5.474, y: 0.755, num: '01', tx: 0.997, ty: 1.083, align: 'right', title: 'Women\u2019s Pink Fashion Trends' },
+    { domeX: 4.043, y: 2.857, num: '02', tx: 8.925, ty: 3.185, align: 'left',  title: 'Pink Sport Wear' },
+    { domeX: 5.474, y: 4.958, num: '03', tx: 0.997, ty: 5.286, align: 'right', title: 'Unisex Pink Styles' },
+  ];
+  rows.forEach(r => {
+    gradDome(s, r.domeX, r.y, 3.583, 1.792);
+    txt(s, r.num, { x: 5.85, y: r.y + 0.441, w: 1.4, h: 0.909, fontFace: F_TITLE, fontSize: 48, bold: true, color: PINK_TXT, align: 'center' });
+    txt(s, r.title, { x: r.tx, y: r.ty, w: 3.412, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: DARK, align: r.align });
+    txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Aenean commodo',
+      { x: r.tx, y: r.ty + 0.449, w: 3.412, h: 0.687, align: r.align, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 11 — Best colour combinations
+ * ------------------------------------------------------------------ */
+function slide11(pres) {
+  const s = newSlide(pres);
+  chrome(s, 11);
+
+  eyebrow(s, 0.809, 1.361);
+  headline(s, 0.75, 1.695, 6.518, 2.827,
+    [['Best ', DARK], ['Color Combinations ', PINK_TXT], ['with Pink.', DARK]]);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula dolor. Aenean massa. Cum sociis natoque penatibus',
+    { x: 0.75, y: 5.147, w: 4.417, h: 0.992, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+
+  gradRounded(s, 5.688, 5.414, 7.646, 2.086, [0.522, 0, 0, 0], 'tr');
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean ',
+    { x: 6.596, y: 6.137, w: 5.829, h: 0.64, fontFace: F_TITLE, fontSize: 16, bold: true, color: WHITE });
+  iconBadge(s, 6.309, 5.041, false, 'donut');
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 12 — Predicted trends
+ * ------------------------------------------------------------------ */
+function slide12(pres) {
+  const s = newSlide(pres);
+  chrome(s, 12);
+
+  eyebrow(s, 6.386, 1.613);
+  headline(s, 6.327, 1.948, 5.59, 1.919,
+    [['Predicted', PINK_TXT], [' Pink Fashion ', DARK], ['Trends.', PINK_TXT]]);
+  txt(s, 'Women\u2019s Pink Fashion Trends',
+    { x: 9.283, y: 5.472, w: 3.412, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: DARK });
+  txt(s, 'Lorem ipsum dolor sit amet, adipiscing elit. Aenean commodo',
+    { x: 9.283, y: 5.921, w: 3.412, h: 0.687, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 13 — Overlapping circles + big number
+ * ------------------------------------------------------------------ */
+function slide13(pres) {
+  const s = newSlide(pres);
+  chrome(s, 13);
+  gradDisc(s, 3.375, 0.458, 6.583, 6.583);
+
+  shp(s, 'ellipse', { x: -1.241, y: -1.753, w: 6.198, h: 6.198, fill: { color: WHITE }, shadow: SHADOW_CARD });
+  headline(s, 0.75, 0.911, 3.52, 0.774, [['75,000+', PINK_TXT]], { fontSize: 40 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing. Aenean commodo ligula dolor. ',
+    { x: 0.75, y: 1.744, w: 3.52, h: 0.992, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+
+  shp(s, 'ellipse', { x: 8.377, y: 3.055, w: 6.198, h: 6.198, fill: { color: WHITE }, shadow: SHADOW_CARD });
+  txt(s, 'Women\u2019s Pink Fashion Trends',
+    { x: 9.063, y: 4.561, w: 3.52, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: DARK, align: 'right' });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing. Aenean commodo ligula dolor. ',
+    { x: 9.063, y: 4.966, w: 3.52, h: 0.992, align: 'right', lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+  gradBox(s, 11.231, 6.32, 1.352, 0.37, 0.185);
+  txt(s, 'Read More', { x: 11.231, y: 6.32, w: 1.352, h: 0.37, fontFace: F_TITLE, fontSize: 12, bold: true, color: WHITE, align: 'center', valign: 'middle' });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 14 — Breaking stereotypes
+ * ------------------------------------------------------------------ */
+function slide14(pres) {
+  const s = newSlide(pres);
+  chrome(s, 14);
+
+  eyebrow(s, 0.809, 1.919);
+  headline(s, 0.75, 2.254, 5.542, 1.919, [['Breaking ', DARK], ['Stereotypes.', PINK_TXT]]);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula dolor. Aenean massa. Cum sociis natoque penatibus',
+    { x: 0.75, y: 4.589, w: 4.417, h: 0.992, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+
+  gradBox(s, 10.026, 0, 3.308, 2.521);
+  headline(s, 10.556, 0.551, 2.247, 0.707, [['22,8%', WHITE]], { fontSize: 36 });
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer',
+    { x: 10.556, y: 1.284, w: 2.247, h: 0.686, color: WHITE, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+
+  gradBox(s, 7.04, 5.539, 3.587, 0.745, 0.3725);
+  txt(s, 'Psychological Impact of Pink',
+    { x: 7.238, y: 5.726, w: 3.19, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: WHITE, align: 'center' });
+  iconBadge(s, 6.159, 5.539, true, 'donut');
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 15 — Circular flow of three
+ * ------------------------------------------------------------------ */
+function slide15(pres) {
+  const s = newSlide(pres);
+  chrome(s, 15);
+
+  // three sweeping arrows around a common circle
+  [[187.46, 275.02], [334.92, 5.87], [58.07, 133.73]].forEach(range => {
+    shp(s, 'arc', {
+      x: 3.916, y: 0.999, w: 5.502, h: 5.502, flipV: true, angleRange: range,
+      line: { color: RULE, width: 2.25, beginArrowType: 'triangle' },
+    });
+  });
+
+  const nodes = [
+    { x: 2.853, y: 1.774, label: 'Content One',   pink: true,  tx: 0.635,  ty: 1.223, align: 'right' },
+    { x: 8.293, y: 1.169, label: 'Content Two',   pink: true,  tx: 10.240, ty: 2.477, align: 'left'  },
+    { x: 7.137, y: 4.797, label: 'Content Three', pink: false, tx: 9.481,  ty: 5.645, align: 'left'  },
+  ];
+  nodes.forEach(n => {
+    if (n.pink) gradDisc(s, n.x, n.y, 1.946, 1.946);
+    else shp(s, 'ellipse', { x: n.x, y: n.y, w: 1.946, h: 1.946, fill: { color: WHITE }, shadow: SHADOW_CARD });
+    txt(s, n.label, {
+      x: n.x + 0.064, y: n.y + 0.788, w: 1.819, h: 0.37,
+      fontFace: F_TITLE, fontSize: 16, bold: true, color: n.pink ? WHITE : DARK, align: 'center',
+    });
+    txt(s, 'Lorem ipsum dolor sit amet, adipiscing. Aenean',
+      { x: n.tx, y: n.ty, w: 2.501, h: 0.686, align: n.align, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 16 — United Kingdom map + doughnut gauge
+ * ------------------------------------------------------------------ */
+const UK_OUTLINE = [
+  [2.69, 0.69], [2.71, 0.88], [2.54, 1.06], [2.39, 1.25], [2.15, 1.43], [2.00, 1.61],
+  [1.85, 1.81], [1.78, 1.99], [1.83, 2.18], [1.06, 2.36], [0.96, 2.54], [2.19, 2.74],
+  [2.12, 2.92], [2.14, 3.11], [2.17, 3.29], [2.10, 3.47], [2.21, 3.67], [2.35, 3.85],
+  [3.14, 4.03], [3.18, 4.22], [3.35, 4.40], [3.42, 4.60], [3.31, 4.78], [2.53, 4.96],
+  [2.40, 5.15], [2.39, 5.33], [2.29, 5.53], [2.17, 5.71], [1.32, 5.89], [1.11, 6.08],
+  [1.10, 6.26], [0.96, 6.44], [0.78, 6.64], [1.76, 6.64], [3.42, 6.44], [4.44, 6.26],
+  [4.88, 6.08], [5.15, 5.89], [5.15, 5.71], [4.69, 5.53], [4.86, 5.33], [5.04, 5.15],
+  [5.17, 4.96], [5.32, 4.78], [5.35, 4.60], [5.42, 4.40], [5.40, 4.22], [5.29, 4.03],
+  [5.15, 3.85], [5.11, 3.67], [5.03, 3.47], [4.86, 3.29], [4.40, 3.11], [4.19, 2.92],
+  [4.10, 2.74], [4.14, 2.54], [3.96, 2.36], [3.86, 2.18], [3.60, 1.99], [3.35, 1.81],
+  [3.28, 1.61], [3.22, 1.43], [3.18, 1.25], [3.11, 1.06], [3.11, 0.88], [2.93, 0.69],
+];
+const UK_REGION = [
+  [2.86, 3.58], [2.69, 3.69], [2.60, 3.82], [2.10, 3.93], [2.07, 4.04], [2.15, 4.15],
+  [2.10, 4.28], [2.08, 4.39], [2.06, 4.50], [2.17, 4.61], [2.11, 4.72], [3.36, 4.72],
+  [3.39, 4.61], [3.40, 4.50], [3.32, 4.39], [3.17, 4.28], [3.10, 4.15], [3.12, 4.04],
+  [2.96, 3.93], [3.03, 3.82], [3.00, 3.69], [2.89, 3.58],
+];
+
+function polygon(slide, pts, o) {
+  shp(slide, 'custGeom', Object.assign({
+    x: 0, y: 0, w: W, h: H,
+    points: pts.map(([x, y], i) => (i === 0 ? { x, y, moveTo: true } : { x, y })).concat([{ close: true }]),
+  }, o));
+}
+
+function slide16(pres) {
+  const s = newSlide(pres);
+  chrome(s, 16);
+  polygon(s, UK_OUTLINE, { fill: { color: MAP_GRAY }, line: { color: BG, width: 0.75 } });
+  polygon(s, UK_REGION, { fill: { color: PINK }, line: { color: BG, width: 0.75 } });
+
+  // gauge: soft halo, white dial with a pointer nub, doughnut chart, percentage
+  shp(s, 'ellipse', { x: 3.44, y: 3.022, w: 1.83, h: 1.83, fill: { color: WHITE, transparency: 50 }, shadow: SHADOW_SOFT });
+  shp(s, 'triangle', { x: 3.30, y: 3.86, w: 0.42, h: 0.32, rotate: 270, fill: { color: WHITE } });
+  shp(s, 'ellipse', { x: 3.559, y: 3.141, w: 1.593, h: 1.593, fill: { color: WHITE }, shadow: SHADOW_DEEP });
+  s.addChart('doughnut', [{ name: 'Sales', labels: ['1st Qtr', '2nd Qtr'], values: [68, 32] }], {
+    x: 3.499, y: 2.89, w: 1.712, h: 2.094,
+    holeSize: 75, chartColors: ['F1F1F1', PINK_MID],
+    showLegend: false, showTitle: false, showValue: false,
+    dataBorder: { pt: 0, color: WHITE },
+  });
+  txt(s, '32%', { x: 3.644, y: 3.715, w: 1.422, h: 0.438, fontFace: F_TITLE, fontSize: 20, bold: true, color: DARK, align: 'center', lineSpacingMultiple: 1, paraSpaceBefore: 9 });
+
+  eyebrow(s, 6.266, 1.183);
+  headline(s, 6.208, 1.518, 5.473, 1.919, [['United Kingdom ', PINK_TXT], ['Map', DARK]]);
+
+  [['Point 01', 6.208, 6.412], ['Point 02', 9.403, 9.607]].forEach(([label, cardX, textX], i) => {
+    if (i === 1) shp(s, 'roundRect', { x: 9.232, y: 4.265, w: 2.843, h: 2.052, rectRadius: 0.342, fill: { color: WHITE, transparency: 50 }, shadow: SHADOW_SOFT });
+    shp(s, 'roundRect', { x: cardX, y: 4.431, w: 2.506, h: 1.72, rectRadius: 0.257, fill: { color: WHITE }, shadow: SHADOW_CARD });
+    txt(s, label, { x: textX, y: 4.849, w: 2.097, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true, color: DARK });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetuer', { x: textX, y: 5.233, w: 2.268, h: 0.686, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+  });
+  iconBadge(s, 8.341, 4.076, true, 'donut');
+  iconBadge(s, 11.542, 4.076, true, 'diamond');
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 17 — Pinwheel of four
+ * ------------------------------------------------------------------ */
+function slide17(pres) {
+  const s = newSlide(pres);
+  chrome(s, 17);
+  const R = 1.122;                     // petal corner radius
+  const petals = [
+    { x: 4.030, y: 1.125, radii: [R, 0, R, 0], pink: true,  from: 'bl', tx: 4.184, ty: 1.665, align: 'right', copyX: 0.75,  copyY: 1.900, copyAlign: 'right' },
+    { x: 6.762, y: 1.125, radii: [0, R, 0, R], pink: false, from: 'br', tx: 7.144, ty: 1.665, align: 'left',  copyX: 9.861, copyY: 1.900, copyAlign: 'left'  },
+    { x: 4.030, y: 3.833, radii: [0, R, 0, R], pink: false, from: 'tl', tx: 4.184, ty: 5.031, align: 'right', copyX: 0.75,  copyY: 4.608, copyAlign: 'right' },
+    { x: 6.762, y: 3.833, radii: [R, 0, R, 0], pink: true,  from: 'tl', tx: 7.144, ty: 5.031, align: 'left',  copyX: 9.861, copyY: 4.608, copyAlign: 'left'  },
+  ];
+  petals.forEach(p => {
+    if (p.pink) gradRounded(s, p.x, p.y, 2.542, 2.542, p.radii, p.from);
+    else roundedShape(s, p.x, p.y, 2.542, 2.542, p.radii, { fill: { color: WHITE }, shadow: SHADOW_CARD });
+    txt(s, 'Frankston vic, the loop.', {
+      x: p.tx, y: p.ty, w: 2.005, h: 0.64, fontFace: F_TITLE, fontSize: 16, bold: true,
+      color: p.pink ? WHITE : DARK, align: p.align,
+    });
+    txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo',
+      { x: p.copyX, y: p.copyY, w: 2.723, h: 0.992, align: p.copyAlign, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+  });
+
+  // centre disc: four quarter-circles, each the inverse colour of its petal
+  const quads = [
+    { x: 5.407, y: 2.502, pivot: 'br', num: '01', nx: 5.771, ny: 3.058, pink: false, from: 'tl' },
+    { x: 6.756, y: 2.502, pivot: 'bl', num: '02', nx: 6.796, ny: 3.058, pink: true,  from: 'tl' },
+    { x: 5.407, y: 3.839, pivot: 'tr', num: '03', nx: 5.771, ny: 4.055, pink: true,  from: 'br' },
+    { x: 6.756, y: 3.839, pivot: 'tl', num: '04', nx: 6.796, ny: 4.055, pink: false, from: 'tl' },
+  ];
+  quads.forEach(q => {
+    quarterDisc(s, q.x, q.y, 1.17, q.pivot,
+      q.pink ? { fill: { color: PINK } } : { fill: { color: WHITE }, shadow: SHADOW_DEEP });
+    if (q.pink) {
+      const vert = q.pivot[0] === 't';   // disc centre on the top edge -> body hangs below
+      const left = q.pivot[1] === 'l';
+      gradTiles(s, q.x, q.y, 1.17, 1.17, u => {
+        const d = left ? u : 1 - u;      // distance from the pivot's vertical edge
+        const c = Math.sqrt(Math.max(0, 1 - d * d));
+        return vert ? [0, c] : [1 - c, 1];
+      }, q.from);
+    }
+  });
+  quads.forEach(q => {
+    txt(s, q.num, {
+      x: q.nx, y: q.ny, w: 0.768, h: 0.37, fontFace: F_TITLE, fontSize: 16, bold: true,
+      color: q.pink ? WHITE : DARK, align: 'center',
+    });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 18 — 2025 smarter goals (head + gears)
+ * ------------------------------------------------------------------ */
+const HEAD_OUTLINE = [
+  [5.75, 2.72], [5.69, 3.04], [5.62, 3.22], [5.57, 3.42], [5.57, 3.60], [5.65, 3.79],
+  [5.62, 3.99], [5.51, 4.17], [5.39, 4.36], [5.29, 4.54], [5.25, 4.74], [5.62, 4.93],
+  [5.57, 5.11], [5.68, 5.31], [5.85, 5.50], [5.82, 5.68], [5.74, 5.88], [5.78, 6.06],
+  [6.89, 6.25], [7.00, 6.44], [7.00, 6.62], [6.94, 6.82], [6.88, 7.00], [6.78, 7.19],
+  [6.68, 7.50], [9.42, 7.50], [9.33, 7.19], [9.24, 7.00], [9.15, 6.82], [9.06, 6.62],
+  [8.97, 6.44], [8.88, 6.25], [8.82, 6.06], [8.82, 5.88], [8.85, 5.68], [8.89, 5.50],
+  [8.96, 5.31], [9.03, 5.11], [9.11, 4.93], [9.22, 4.74], [9.31, 4.54], [9.38, 4.36],
+  [9.43, 4.17], [9.46, 3.99], [9.49, 3.79], [9.49, 3.60], [9.49, 3.42], [9.44, 3.22],
+  [9.40, 3.04], [9.33, 2.72],
+];
+
+function slide18(pres) {
+  const s = newSlide(pres);
+  chrome(s, 18);
+
+  polygon(s, HEAD_OUTLINE, { fill: { color: WHITE }, shadow: SHADOW_CARD });
+  // gears turning inside the head (very light) ...
+  [[6.30, 3.35, 1.30], [7.30, 3.10, 1.55], [6.95, 4.05, 1.05]].forEach(([x, y, d]) => {
+    shp(s, 'gear9', { x, y, w: d, h: d, fill: { color: WHITE } });
+  });
+  // ... and the pink ones escaping above it
+  shp(s, 'gear9', { x: 6.479, y: 1.274, w: 0.817, h: 0.82, fill: { color: PINK } });
+  shp(s, 'gear9', { x: 7.176, y: 1.54, w: 1.153, h: 1.158, fill: { color: PINK } });
+  shp(s, 'ellipse', { x: 6.488, y: 2.739, w: 0.308, h: 0.31, fill: { color: PINK_PALE } });
+  shp(s, 'ellipse', { x: 7.884, y: 3.335, w: 0.208, h: 0.215, fill: { color: PINK_MID } });
+  shp(s, 'ellipse', { x: 7.156, y: 3.942, w: 0.14, h: 0.143, fill: { color: ACCENT } });
+
+  eyebrow(s, 0.809, 1.371);
+  headline(s, 0.75, 1.706, 3.361, 2.827, [['2025 ', DARK], ['Smarter Goals', PINK_TXT]]);
+  txt(s, 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula dolor. Aenean',
+    { x: 0.75, y: 5.136, w: 3.412, h: 0.992, lineSpacingMultiple: 1.3, paraSpaceBefore: 9 });
+
+  const stats = [
+    { x: 9.701,  y: 1.396, value: '220', pink: false },
+    { x: 10.481, y: 3.038, value: '75',  pink: true  },
+    { x: 10.194, y: 4.681, value: '50',  pink: false },
+  ];
+  stats.forEach(st => {
+    if (st.pink) gradBox(s, st.x, st.y, 2.103, 1.033, 0.269);
+    else shp(s, 'roundRect', { x: st.x, y: st.y, w: 2.103, h: 1.033, rectRadius: 0.269, fill: { color: WHITE }, shadow: SHADOW_CARD });
+    txt(s, st.value, { x: st.x + 0.42, y: st.y + 0.131, w: 1.262, h: 0.438, fontSize: 20, color: st.pink ? WHITE : DARK, align: 'center' });
+    txt(s, 'Average Value', { x: st.x + 0.233, y: st.y + 0.565, w: 1.637, h: 0.337, color: st.pink ? WHITE : GRAY, align: 'center', lineSpacingMultiple: 1, paraSpaceBefore: 9 });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 19 — Matrix infographic (bubble grid)
+ * ------------------------------------------------------------------ */
+function slide19(pres) {
+  const s = newSlide(pres);
+  chrome(s, 19);
+
+  const COLS = [8.183, 9.054, 9.926, 10.797, 11.669];
+  const ROWS = [2.611, 3.416, 4.221, 5.026, 5.831];
+  COLS.forEach(x => shp(s, 'line', { x, y: 2.272, w: 0, h: 3.559, line: { color: GRID, width: 0.75 } }));
+  ROWS.forEach(y => shp(s, 'line', { x: 7.807, y, w: 3.862, h: 0, line: { color: GRID, width: 0.75 } }));
+
+  // bubbles: [x, y, diameter]
+  const BUBBLES = [
+    [7.915, 2.344, 0.535], [8.787, 2.344, 0.535], [7.915, 3.149, 0.535],
+    [8.850, 3.207, 0.408], [10.593, 3.207, 0.408], [7.979, 4.017, 0.408],
+    [8.850, 4.017, 0.408], [10.626, 4.053, 0.343], [11.541, 4.090, 0.262],
+    [8.886, 4.855, 0.343], [9.751, 4.855, 0.343], [10.532, 5.563, 0.535],
+    [9.792, 5.700, 0.262], [11.541, 5.700, 0.262],
+  ];
+  BUBBLES.forEach(([x, y, d]) => shp(s, 'ellipse', { x, y, w: d, h: d, fill: { color: PINK } }));
+
+  ['Value', 'Value', '0', 'Value', 'Value'].forEach((label, i) => {
+    txt(s, label, { x: 6.831, y: 2.443 + i * 0.7995, w: 0.924, h: 0.337, align: 'right', paraSpaceBefore: 9 });
+    txt(s, label, { x: 7.72 + i * 0.8715, y: 1.558, w: 0.924, h: 0.337, rotate: 270, paraSpaceBefore: 9 });
+  });
+
+  eyebrow(s, 0.809, 1.411);
+  headline(s, 0.75, 1.745, 4.965, 1.919, [['Matrix ', PINK_TXT], ['Infographic', DARK]]);
+
+  [
+    { y: 4.305, w: 3.545, x: 1.688, text: 'The Emotional and Psychological Impact of Pink' },
+    { y: 5.344, w: 4.018, x: 1.697, text: 'Dark and Muted Pinks (Mauve, Dusty Pink, Rosewood)' },
+  ].forEach(item => {
+    iconBadge(s, 0.75, item.y, false, 'diamond');
+    txt(s, item.text, { x: item.x, y: item.y + 0.053, w: item.w, h: 0.64, fontFace: F_TITLE, fontSize: 16, bold: true, color: DARK });
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Slide 20 — Thank you
+ * ------------------------------------------------------------------ */
+function slide20(pres) {
+  const s = newSlide(pres);
+  gradBox(s, 0, 0, W, H);
+  // three oversized outlined ellipses sweeping through the frame
+  [[6.739, -3.352, 13.061, 11.259, 83.4], [5.86, -2.936, 11.26, 11.259, 68.4], [4.898, -0.973, 11.26, 11.259, 53.4]]
+    .forEach(([x, y, w, h, rot]) => {
+      shp(s, 'ellipse', { x, y, w, h, rotate: rot, fill: { type: 'none' }, line: { color: WHITE, width: 0.75 } });
+    });
+  chrome(s, 20);
+
+  headline(s, 0.75, 3.026, 7.708, 1.447, [['Thank You!', WHITE]], { fontSize: 80 });
+  shp(s, 'ellipse', { x: 8.75, y: 1.833, w: 3.834, h: 3.834, fill: { color: WHITE, transparency: 74 }, shadow: SHADOW_CARD });
+  shp(s, 'ellipse', { x: 8.966, y: 2.049, w: 3.401, h: 3.401, fill: { color: WHITE }, shadow: SHADOW_CARD });
+  txt(s, 'See You On Next Presentation.',
+    { x: 9.297, y: 3.363, w: 2.739, h: 0.774, fontSize: 20, color: DARK, align: 'center' });
+}
+
+/* ------------------------------------------------------------------ *
+ * Assemble
+ * ------------------------------------------------------------------ */
+function build() {
+  const pres = new pptxgen();
+  pres.defineLayout({ name: 'PINK16x9', width: W, height: H });
+  pres.layout = 'PINK16x9';
+  pres.title = 'Pink Fashion';
+  pres.theme = { headFontFace: F_TITLE, bodyFontFace: F_BODY };
+  pres.defineSlideMaster({ title: 'PINK_MASTER', background: { color: BG } });
+
+  [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10,
+   slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20]
+    .forEach(fn => fn(pres));
+
+  return pres.writeFile({ fileName: path.join(__dirname, '0639790d-194b-4f1f-94e2-5fb69486a495_grok_final.pptx') });
+}
+
+build().then(f => console.log('wrote ' + f)).catch(e => { console.error(e); process.exit(1); });
