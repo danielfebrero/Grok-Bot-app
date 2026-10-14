@@ -1,0 +1,78 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-14T16:20:53+02:00",
+    "responseKind": "json",
+    "schema": {
+      "items": {
+        "properties": {
+          "_links": {
+            "properties": {
+              "git": {
+                "type": "string"
+              },
+              "html": {
+                "type": "string"
+              },
+              "self": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "git",
+              "html",
+              "self"
+            ],
+            "type": "object"
+          },
+          "download_url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "git_url": {
+            "type": "string"
+          },
+          "html_url": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "_links",
+          "download_url",
+          "git_url",
+          "html_url",
+          "name",
+          "path",
+          "sha",
+          "size",
+          "type",
+          "url"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "source": "inferred"
+  },
+  "tool": "get_file_contents"
+}

@@ -1,14 +1,27 @@
 {
  "fixtures": {
   "web_fetch_exa": {
+   "args": {
+    "maxCharacters": 300,
+    "urls": [
+     "https://json-schema.org/"
+    ]
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "HTTP 429 Exa (rate limit gratuit) après backoff de 5 min ; retenté chaque semaine",
+   "status": "not-run"
   },
   "web_search_exa": {
+   "args": {
+    "numResults": 1,
+    "objective": "official JSON Schema docs",
+    "query": "JSON Schema specification overview"
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "HTTP 429 (rate limit Exa gratuit)",
-   "status": "failed"
+   "reason": "HTTP 429 Exa (rate limit gratuit) après backoff de 5 min ; retenté chaque semaine",
+   "status": "not-run"
   }
  },
  "namespace": "user-exa"

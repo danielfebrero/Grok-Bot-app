@@ -1,150 +1,253 @@
 {
  "fixtures": {
   "add_comment_to_pending_review": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "add_discussion_comment": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "add_issue_comment": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "add_sub_issue": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "create_branch": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "create_issue": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "create_label": {
+   "args": {
+    "color": "cccccc",
+    "name": "msm-fixture-tmp",
+    "owner": "<OWN_REPO_OWNER>",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "b",
    "pair": "delete_label",
-   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
-   "status": "planned-awaiting-approval"
+   "status": "executed-cleaned"
   },
   "create_pull_request": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "create_pull_request_review": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "delete_discussion_comment": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "delete_label": {
+   "args": {
+    "name": "msm-fixture-tmp",
+    "owner": "<OWN_REPO_OWNER>",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "b",
    "pair": "create_label",
-   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
-   "status": "planned-awaiting-approval"
+   "status": "executed-cleaned"
   },
   "delete_pending_pull_request_review": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "get_commit": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "ref": "main",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_commit_combined_status": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "ref": "main",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_discussion": {
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "pas de numéro de discussion exploitable (list_discussions sans items lisibles)",
+   "status": "not-run"
   },
   "get_discussion_comments": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "get_file_contents": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "path": "mcp-schema-monitor",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_git_tree": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "repo": "<OWN_REPO>",
+    "tree_sha": "main"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_issue": {
+   "args": {
+    "issue_number": "<from search_issues items.0.number>",
+    "owner": "octocat",
+    "repo": "Hello-World"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_job": {
+   "args": {
+    "job_id": "<jobs.0.id>",
+    "owner": "cli",
+    "repo": "cli"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_job_logs": {
+   "args": {
+    "job_id": "<idem>",
+    "owner": "cli",
+    "repo": "cli",
+    "tail_bytes": 500
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_label": {
+   "args": {
+    "name": "msm-fixture-tmp",
+    "owner": "<OWN_REPO_OWNER>",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_latest_release": {
+   "args": {
+    "owner": "cli",
+    "repo": "cli"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_me": {
+   "args": {},
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_pull_request": {
+   "args": {
+    "owner": "octocat",
+    "pull_number": "<from search_pull_requests items.0.number>",
+    "repo": "Hello-World"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_pull_request_diff": {
+   "args": {
+    "owner": "octocat",
+    "pull_number": "<idem>",
+    "repo": "Hello-World"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_release_by_tag": {
+   "args": {
+    "owner": "cli",
+    "repo": "cli",
+    "tag": "<get_latest_release tag_name>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_repository": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_tag": {
+   "args": {
+    "owner": "cli",
+    "repo": "cli",
+    "tag": "<idem>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_workflow": {
+   "args": {
+    "owner": "cli",
+    "repo": "cli",
+    "workflow_id": "<workflow_runs.0.workflow_id>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_workflow_run": {
+   "args": {
+    "owner": "cli",
+    "repo": "cli",
+    "run_id": "<workflow_runs.0.id>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_branches": {
    "args": {
@@ -152,13 +255,19 @@
     "per_page": 2,
     "repo": "<OWN_REPO>"
    },
+   "cadence": "daily",
    "category": "a",
    "status": "executed"
   },
   "list_check_runs_for_ref": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "ref": "main",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_commits": {
    "args": {
@@ -166,176 +275,297 @@
     "per_page": 2,
     "repo": "<OWN_REPO>"
    },
+   "cadence": "daily",
    "category": "a",
    "status": "executed"
   },
   "list_discussion_categories": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_discussions": {
+   "args": {
+    "owner": "cli",
+    "per_page": 1,
+    "repo": "cli"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_issue_comments": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "list_issues": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "per_page": 2,
+    "repo": "<OWN_REPO>",
+    "state": "all"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_labels": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "per_page": 3,
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_my_repositories": {
+   "args": {
+    "per_page": 1
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_pull_request_comments": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "list_pull_request_files": {
+   "args": {
+    "owner": "octocat",
+    "per_page": 1,
+    "pull_number": "<idem>",
+    "repo": "Hello-World"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_pull_request_review_comments": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "list_pull_request_reviews": {
+   "args": {
+    "owner": "octocat",
+    "per_page": 1,
+    "pull_number": "<idem>",
+    "repo": "Hello-World"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_pull_requests": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "per_page": 2,
+    "repo": "<OWN_REPO>",
+    "state": "all"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_releases": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "per_page": 1,
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_repository_collaborators": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "per_page": 1,
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_sub_issues": {
+   "args": {
+    "issue_number": "<idem issue>",
+    "owner": "octocat",
+    "per_page": 1,
+    "repo": "Hello-World"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_tags": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "per_page": 2,
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_workflow_run_jobs": {
+   "args": {
+    "owner": "cli",
+    "per_page": 1,
+    "repo": "cli",
+    "run_id": "<idem>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_workflow_runs": {
+   "args": {
+    "owner": "cli",
+    "per_page": 1,
+    "repo": "cli"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_workflows": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "repo": "<OWN_REPO>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "mark_discussion_comment_as_answer": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "merge_pull_request": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "remove_sub_issue": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "reply_to_pull_request_review_comment": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "reprioritize_sub_issue": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "search_code": {
+   "args": {
+    "per_page": 1,
+    "query": "repo:octocat/Hello-World Hello"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_commits": {
+   "args": {
+    "per_page": 1,
+    "query": "repo:octocat/Hello-World readme"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_issues": {
+   "args": {
+    "per_page": 1,
+    "query": "repo:octocat/Hello-World"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_orgs": {
+   "args": {
+    "per_page": 1,
+    "query": "github"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_pull_requests": {
+   "args": {
+    "per_page": 1,
+    "query": "repo:octocat/Hello-World"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_repositories": {
+   "args": {
+    "per_page": 1,
+    "query": "json schema language:python"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_users": {
+   "args": {
+    "per_page": 1,
+    "query": "octocat"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "set_pull_request_draft": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "submit_pending_pull_request_review": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "update_discussion_comment": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "update_issue": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_label": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_pull_request": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_pull_request_branch": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   }

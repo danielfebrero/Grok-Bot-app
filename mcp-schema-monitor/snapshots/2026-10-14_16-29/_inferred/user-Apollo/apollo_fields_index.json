@@ -1,0 +1,72 @@
+{
+  "namespace": "user-Apollo",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-14T16:24:10+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "fields": {
+          "items": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "modality": {
+                "type": "string"
+              },
+              "picklist_values": {
+                "items": {
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "readonly": {
+                "type": "boolean"
+              },
+              "source": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "modality",
+              "source",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "fields",
+        "success"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "apollo_fields_index"
+}

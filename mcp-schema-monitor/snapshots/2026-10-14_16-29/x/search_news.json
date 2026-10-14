@@ -1,0 +1,26 @@
+{
+  "description": "Search News Each returned story includes a `url` deeplinking to its x.com page.",
+  "inputSchema": {
+    "properties": {
+      "max_age_hours": {
+        "type": "integer"
+      },
+      "max_results": {
+        "type": "integer"
+      },
+      "news.fields": {
+        "description": "A comma separated list of News fields to display.",
+        "type": "string"
+      },
+      "query": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "search_news"
+}

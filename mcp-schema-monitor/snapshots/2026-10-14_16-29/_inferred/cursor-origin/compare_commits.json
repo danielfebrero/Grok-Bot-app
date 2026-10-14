@@ -1,0 +1,32 @@
+{
+  "namespace": "cursor-origin",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-14T16:22:01+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "aheadBy": {
+          "type": "integer"
+        },
+        "behindBy": {
+          "type": "integer"
+        },
+        "mergeBase": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "aheadBy",
+        "behindBy",
+        "mergeBase",
+        "status"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "compare_commits"
+}

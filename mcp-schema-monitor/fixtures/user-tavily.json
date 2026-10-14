@@ -1,29 +1,49 @@
 {
  "fixtures": {
   "tavily_crawl": {
+   "args": {
+    "limit": 2,
+    "max_depth": 1,
+    "url": "https://json-schema.org/"
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "non lancé : un crawl consomme plusieurs crédits ; à jouer en hebdo",
+   "status": "not-run"
   },
   "tavily_extract": {
+   "args": {
+    "urls": [
+     "https://json-schema.org/"
+    ]
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "réponse d'erreur Tavily (extraction refusée), retentée chaque semaine",
+   "status": "not-run"
   },
   "tavily_map": {
+   "args": {
+    "limit": 3,
+    "url": "https://json-schema.org/"
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "tavily_research": {
-   "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "cadence": "never",
+   "category": "c",
+   "reason": "coûteux (recherche longue multi-sources) — non lancé"
   },
   "tavily_search": {
+   "args": {
+    "max_results": 1,
+    "query": "JSON Schema specification"
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "appel fait mais réponse = erreur rate-limit/auth, pas de schéma",
-   "status": "failed"
+   "status": "executed"
   }
  },
  "namespace": "user-tavily"

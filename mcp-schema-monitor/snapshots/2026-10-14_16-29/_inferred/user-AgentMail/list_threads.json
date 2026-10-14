@@ -1,0 +1,100 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-14T16:21:33+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "nextPageToken": {
+          "type": "string"
+        },
+        "threads": {
+          "items": {
+            "properties": {
+              "createdAt": {
+                "type": "string"
+              },
+              "inboxId": {
+                "type": "string"
+              },
+              "labels": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "lastMessageId": {
+                "type": "string"
+              },
+              "messageCount": {
+                "type": "integer"
+              },
+              "receivedTimestamp": {
+                "type": "string"
+              },
+              "recipients": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "senders": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "size": {
+                "type": "integer"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "threadId": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "createdAt",
+              "inboxId",
+              "labels",
+              "lastMessageId",
+              "messageCount",
+              "receivedTimestamp",
+              "recipients",
+              "senders",
+              "size",
+              "subject",
+              "threadId",
+              "timestamp",
+              "updatedAt"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "count",
+        "limit",
+        "nextPageToken",
+        "threads"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_threads"
+}

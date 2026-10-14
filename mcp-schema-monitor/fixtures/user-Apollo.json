@@ -1,324 +1,399 @@
 {
  "fixtures": {
   "apollo_accounts_bulk_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_accounts_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_accounts_update": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_analytics_sync_report": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "arguments complexes ; non lancé ce run",
+   "status": "not-run"
   },
   "apollo_contacts_bulk_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_contacts_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_contacts_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_contacts_update": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_context_center_create_product": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_context_center_create_profile": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_context_center_show": {
+   "args": {},
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "réponse d'erreur (pas de Context Center configuré)",
+   "status": "not-run"
   },
   "apollo_context_center_show_product": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "pas de produit existant",
+   "status": "not-run"
   },
   "apollo_context_center_update_product": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_context_center_update_profile": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_conversations_get_insights": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_conversations_get_recording_links": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_conversations_get_transcript": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_conversations_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_deals_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_deals_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_deals_show": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "lit des deals (tiers) ; pas d'id",
+   "status": "not-run"
   },
   "apollo_domain_purchase_index": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_email_account_purchase_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_email_account_purchase_index": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_email_accounts_index": {
+   "args": {},
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "apollo_emailer_campaigns_activity_feed": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "cible un contact (tiers)",
+   "status": "not-run"
   },
   "apollo_emailer_campaigns_add_contact_ids": {
-   "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "cadence": "never",
+   "category": "c",
+   "reason": "écriture : ajoute des contacts à une séquence (envoie des emails)"
   },
   "apollo_emailer_campaigns_approve": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "apollo_emailer_campaigns_remove_or_stop_contact_ids": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "apollo_emailer_campaigns_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_emailer_campaigns_show": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "pas de séquence existante connue",
+   "status": "not-run"
   },
   "apollo_emailer_campaigns_step_content": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "cible des contacts (tiers)",
+   "status": "not-run"
   },
   "apollo_emailer_messages_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_emailer_messages_email_send_status": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "apollo_emailer_messages_get_content": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "contenu d'emails envoyés à des tiers",
+   "status": "not-run"
   },
   "apollo_emailer_messages_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_emailer_messages_send_now": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "apollo_emailer_schedules_index": {
+   "args": {},
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "apollo_feedback_log": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "apollo_fields_index": {
+   "args": {},
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "apollo_labels_add_entity_ids_to_label_names": {
-   "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "cadence": "never",
+   "category": "c",
+   "reason": "écriture sur des listes de contacts (tiers)"
   },
   "apollo_labels_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_labels_index": {
+   "args": {},
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "apollo_labels_remove_entity_ids_from_label_names": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "apollo_labels_update": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_mixed_companies_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_mixed_people_api_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_organizations_bulk_enrich": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_organizations_enrich": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_organizations_job_postings": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_organizations_lookup": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_people_bulk_match": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_people_match": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_phone_calls_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_phone_calls_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_phone_calls_update": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_prompts_suggest": {
+   "args": {},
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "apollo_sequences_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_sequences_update": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_survey_submit": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "apollo_tasks_bulk_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_tasks_complete": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "apollo_tasks_create": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_tasks_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_tasks_show": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "pas de tâche connue",
+   "status": "not-run"
   },
   "apollo_tasks_skip": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "apollo_tasks_update": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "apollo_usage_stats_credit_usage_stats": {
    "args": {},
+   "cadence": "weekly",
    "category": "a",
    "status": "executed"
   },
   "apollo_users_api_profile": {
+   "args": {},
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "apollo_users_search": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "apollo_webhook_result_show": {
+   "cadence": "never",
    "category": "c",
    "reason": "coûte des crédits/argent ou cible des tiers"
   },
   "apollo_website_visitor_domain_tracker_index": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "apollo_website_visitor_domain_tracker_install_script": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "apollo_website_visitor_domain_tracker_send_install_email": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "apollo_website_visitor_domain_tracker_update": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "apollo_website_visitors_domain_aggregates": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   }

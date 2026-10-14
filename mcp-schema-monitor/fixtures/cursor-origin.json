@@ -1,137 +1,207 @@
 {
  "fixtures": {
   "checks_read": {
+   "args": {
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>",
+    "sha": "<commits.0.sha>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "commit_read": {
+   "args": {
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>",
+    "sha": "<list_commits commits.0.sha>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "compare_commits": {
+   "args": {
+    "base": "<commits.1.sha>",
+    "head": "<commits.0.sha>",
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "create_label": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "create_pull_request": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "create_pull_request_comment": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "create_pull_request_inline_comment": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "create_pull_request_review": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "create_repository": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "dismiss_pull_request_review": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "get_file_contents": {
+   "args": {
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>",
+    "path": "README.md"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_git_tree": {
+   "args": {
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_repository": {
+   "args": {
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "grep_contents": {
+   "args": {
+    "literal": true,
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>",
+    "query": "README"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_branches": {
+   "args": {
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_commits": {
+   "args": {
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>",
+    "pageSize": 2
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_namespaces": {
    "args": {
     "pageSize": 5
    },
+   "cadence": "daily",
    "category": "a",
    "status": "executed"
   },
   "list_pull_requests": {
+   "args": {
+    "name": "ai5",
+    "owner": "<ORIGIN_NS>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_repositories": {
+   "args": {
+    "owner": "<ORIGIN_NS>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "pull_request_read": {
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "aucune PR dans le repo Origin de test",
+   "status": "not-run"
   },
   "remove_pull_request_reviewers": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "reply_pull_request_review_thread": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "request_pull_request_reviewers": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "sync_mirror": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_pull_request": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_pull_request_base": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_pull_request_comment": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "update_pull_request_labels": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_pull_request_review": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_pull_request_review_thread": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   }

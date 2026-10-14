@@ -56,33 +56,47 @@ bash /workspace/mcp-schema-monitor/publish.sh [--dry-run]
 
 ## Fixtures et schémas de sortie inférés
 Aucun serveur ne déclare d'`outputSchema` aujourd'hui. On l'infère donc à partir de vraies réponses.
-- `fixtures/<ns>.json` : une entrée par tool, `category` :
-  - `a` lecture seule (`status` executed / planned / failed + raison) ;
-  - `b` révocable : création suivie de son `pair` (delete/undo) dans le même run. **Non exécuté** tant que
-    Dani n'a pas validé explicitement ces écritures (`planned-awaiting-approval`) ;
-  - `c` ignoré + `reason` : envoi de message/email/DM/SMS, publication, crédits/argent, merge/suppression,
-    création d'inbox/domaine/repo, validation de campagne, données de tiers, `get_users_me`.
-- Les valeurs propres à Dani (owner/repo…) sont des placeholders `<OWN_REPO_OWNER>` ; les vraies valeurs
-  sont dans `fixtures/values.local.json` (gitignoré, exclu de la copie).
-- `lib/infer.py <ns> <tool> <réponse_brute>` : infère un JSON Schema (types, clés, `required`, tableaux,
-  types multiples/null) dans `inbox/_inferred.json` (local), puis **supprime la réponse brute**.
-  Aucune valeur n'est conservée ni publiée.
-- `check.sh` écrit `snapshots/<ts>/_inferred/<ns>/<tool>.json`
-  (`outputSchemaInferred` : `source: "inferred"`, `inferredAt`, `responseKind`, `schema`), séparé de
-  l'`outputSchema` déclaré. Le hash d'index ne porte que sur le schéma (pas l'horodatage). Un changement
-  apparaît dans le rapport (section « outputSchemaInferred », ligne « Inférés modifiés »).
-  Sans `inbox/_inferred.json`, les inférences du snapshot précédent sont reprises telles quelles.
-- Cadence recommandée pour rejouer les fixtures : **hebdomadaire** (les sorties bougent peu, les lectures X
-  consomment des crédits et Exa/Tavily limitent le débit). La capture des descripteurs reste quotidienne.
+- `fixtures/<ns>.json` : une entrée par tool avec `category`, `status`, `cadence`, `args`, `reason` :
+  - `a` lecture seule : `executed` / `not-run` (+ raison : rate limit, pas de donnée, timeout…) ;
+  - `b` révocable : création puis `pair` (delete/undo) dans le même run, **suppression vérifiée**
+    par une relecture (404 / liste vide). `executed-cleaned` ou `skipped` (+ raison) ;
+  - `c` ignoré (`cadence: never`) : envoi de message/email/DM/SMS, publication, crédits/argent,
+    merge/suppression de vraies données, création d'inbox/domaine/repo, validation de campagne,
+    données ou notifications de tiers, `get_users_me`.
+- `cadence` : `daily` (sans coût : cursor-github, cursor-origin, user-AgentMail, user-Quo),
+  `weekly` (consomme des crédits ou soumis à quota : x, user-X, user-Apollo, user-exa, user-tavily),
+  `never` (catégorie c).
+- `args` utilise des placeholders (`<OWN_REPO_OWNER>`, `<OWN_REPO>`, `<AGENTMAIL_INBOX>`, `<ORIGIN_NS>`,
+  `<X_SELF_ID>`…) remplacés depuis `fixtures/values.local.json` (gitignoré, exclu de la copie) ; les
+  `<… from …>` désignent un id à reprendre dans la réponse d'une fixture précédente.
+- Fixtures révocables effectivement jouées : label GitHub temporaire `msm-fixture-tmp` sur le repo de Dani,
+  brouillon AgentMail sans destinataire, entrée de blocklist `msm-fixture.invalid` (receive/block),
+  signet X sur un post public de @X.
+- `lib/infer.py <ns> <tool> <réponse_brute> [nom=chemin ...]` : infère un JSON Schema (types, clés,
+  `required`, tableaux, null) dans `inbox/_inferred.json` (local), extrait au besoin des ids vers
+  `fixtures/values.local.json`, puis **supprime la réponse brute**. Une réponse d'erreur (error, HTTP ≥ 400,
+  rate limit) n'est pas conservée (exit 3). `lib/batch.sh` enchaîne plusieurs fichiers.
+- `check.sh` écrit `snapshots/<ts>/_inferred/<ns>/<tool>.json` (`outputSchemaInferred` :
+  `source: "inferred"`, `inferredAt`, `responseKind`, `schema`), séparé de l'`outputSchema` déclaré.
+  Le hash ne porte que sur le schéma ; un changement apparaît dans le rapport (« Inférés modifiés » +
+  diff). Sans `inbox/_inferred.json`, les inférences du snapshot précédent sont reprises.
 
-## Procédure de la routine (quotidienne)
+## Procédure de la routine
+### Chaque jour
 1. `GetDynamicTools` pattern `.` → `inbox/_catalog.json` (statut + noms par namespace).
 2. `GetDynamicTools` namespace=<ns> pour chaque namespace ready → `inbox/<ns>.json` (réponse telle quelle).
-3. (Hebdo) Lire `user-X/get_usage_credits` ; puis pour chaque fixture `a` executed/planned : `CallDynamicTool`
-   avec `write_to_file`, arguments de `fixtures/<ns>.json` (placeholders remplacés depuis
-   `fixtures/values.local.json`), puis `python3 lib/infer.py <ns> <tool> <fichier>` (supprime le brut).
-   Jamais de fixture `b` ou `c` sans accord explicite.
+3. Pour chaque fixture `cadence: daily` de catégorie `a` (`executed`) : `CallDynamicTool` avec
+   `write_to_file`, `args` complétés via `values.local.json`, puis `lib/infer.py` (supprime le brut).
+   Pour chaque paire `b` `daily` : créer, lire, supprimer, puis relire pour vérifier (404 / liste vide) ;
+   tout reste non nettoyé est signalé à Dani immédiatement.
 4. `check.sh` : NO_CHANGE → s'arrêter sans bruit ; BASELINE/CHANGED → `publish.sh`.
-5. PUBLISHED → résumer le rapport à Dani, supprimer `reports/NOUVEAU-DIFF.flag` ; exit 2 → signaler les chemins
-   de `reports/PUBLISH-BLOCKED.flag` sans contourner le scan.
-6. Vider `inbox/` (sauf si l'on veut garder `_inferred.json` pour la semaine).
+5. PUBLISHED → résumer le rapport à Dani, supprimer `reports/NOUVEAU-DIFF.flag` ; exit 2 → signaler
+   les chemins de `reports/PUBLISH-BLOCKED.flag` sans contourner le scan.
+6. Vider `inbox/` sauf `_inferred.json`.
+### Une fois par semaine (outils à crédits)
+1. `user-X/get_usage_credits` d'abord ; si le solde gratuit est bas ou si du prépayé serait consommé,
+   sauter les fixtures X.
+2. Jouer une seule fois chaque fixture `cadence: weekly` (`a` executed + paire X signet), même méthode
+   que l'étape quotidienne 3. Sur rate limit (429 / retry_after_seconds) : une seule nouvelle tentative
+   après le délai indiqué, sinon `not-run` jusqu'à la semaine suivante.
+3. Enchaîner sur `check.sh` / `publish.sh` comme chaque jour.

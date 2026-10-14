@@ -1,80 +1,103 @@
 {
  "fixtures": {
   "get_news": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "crédits X : poignée de lectures atteinte",
+   "status": "not-run"
   },
   "get_posts_by_id": {
+   "args": {
+    "id": "<get_users_posts data.0.id>"
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_posts_by_ids": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "crédits X : poignée de lectures atteinte",
+   "status": "not-run"
   },
   "get_posts_counts_recent": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "crédits X : poignée de lectures atteinte",
+   "status": "not-run"
   },
   "get_posts_quoted_posts": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "crédits X : poignée de lectures atteinte",
+   "status": "not-run"
   },
   "get_posts_reposted_by": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "liste des tiers (repostants)",
+   "status": "not-run"
   },
   "get_trends_by_woeid": {
    "args": {
     "max_trends": 5,
     "woeid": 23424819
    },
+   "cadence": "weekly",
    "category": "a",
    "status": "executed"
   },
   "get_users_by_id": {
+   "args": {
+    "id": "783214"
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_users_by_username": {
    "args": {
-    "user.fields": "created_at,description,public_metrics,verified",
     "username": "X"
    },
+   "cadence": "weekly",
    "category": "a",
    "status": "executed"
   },
   "get_users_by_usernames": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "crédits X : poignée de lectures atteinte",
+   "status": "not-run"
   },
   "get_users_mentions": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "crédits X : poignée de lectures atteinte",
+   "status": "not-run"
   },
   "get_users_posts": {
+   "args": {
+    "id": "783214",
+    "max_results": 5
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_news": {
+   "args": {
+    "max_results": 1,
+    "query": "technology"
+   },
+   "cadence": "weekly",
    "category": "a",
-   "reason": "appel fait, réponse non JSON au parseur v1 ; à refaire",
-   "status": "failed"
+   "status": "executed"
   },
   "search_posts_all": {
+   "cadence": "weekly",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "crédits X : poignée de lectures atteinte",
+   "status": "not-run"
   }
  },
  "namespace": "x"

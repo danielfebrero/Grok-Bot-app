@@ -1,90 +1,108 @@
 {
  "fixtures": {
   "create-contact": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "create-contact-note": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "create-task": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "fetch-call-transcripts": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "fetch-messages": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "fetch-missed-calls": {
+   "cadence": "never",
    "category": "c",
    "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
   },
   "get-contact": {
-   "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "cadence": "never",
+   "category": "c",
+   "reason": "lit les contacts (tiers)"
   },
   "list-contact-notes": {
-   "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "cadence": "never",
+   "category": "c",
+   "reason": "lit les notes de contacts (tiers)"
   },
   "list-contacts": {
-   "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "cadence": "never",
+   "category": "c",
+   "reason": "lit les contacts (tiers)"
   },
   "list-inboxes": {
+   "args": {},
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list-tasks": {
+   "args": {},
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "timeout serveur (MCP -32001)",
+   "status": "not-run"
   },
   "list-users": {
    "args": {
     "maxResults": 1
    },
+   "cadence": "daily",
    "category": "a",
    "status": "executed"
   },
   "mark-conversations": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "send-bulk-messages": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "send-group-message": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "send-message": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "submit-feedback": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "update-contact": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update-contact-note": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update-task": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   }

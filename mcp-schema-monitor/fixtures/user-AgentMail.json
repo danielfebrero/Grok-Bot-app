@@ -1,194 +1,300 @@
 {
  "fixtures": {
   "agent_attach_human": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "agent_verify": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "authorize_inbox": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "connect_app": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "create_draft": {
+   "args": {
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "subject": "msm fixture (temp, deleted)",
+    "text": "temporary schema fixture"
+   },
+   "cadence": "daily",
    "category": "b",
    "pair": "delete_draft",
-   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
-   "status": "planned-awaiting-approval"
+   "status": "executed-cleaned"
   },
   "create_inbox": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "create_list_entry": {
+   "args": {
+    "direction": "receive",
+    "entry": "msm-fixture.invalid",
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "listType": "block",
+    "reason": "temporary schema fixture"
+   },
+   "cadence": "daily",
    "category": "b",
    "pair": "delete_list_entry",
-   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
-   "status": "planned-awaiting-approval"
+   "status": "executed-cleaned"
   },
   "delete_draft": {
+   "args": {
+    "draftId": "<idem>",
+    "inboxId": "<AGENTMAIL_INBOX>"
+   },
+   "cadence": "daily",
    "category": "b",
    "pair": "create_draft",
-   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
-   "status": "planned-awaiting-approval"
+   "status": "executed-cleaned"
   },
   "delete_inbox": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "delete_list_entry": {
+   "args": {
+    "direction": "receive",
+    "entry": "msm-fixture.invalid",
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "listType": "block"
+   },
+   "cadence": "daily",
    "category": "b",
    "pair": "create_list_entry",
-   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
-   "status": "planned-awaiting-approval"
+   "status": "executed-cleaned"
   },
   "delete_thread": {
+   "cadence": "never",
    "category": "c",
    "reason": "destructif / supprime ou valide des données réelles"
   },
   "forward_message": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "get_app": {
+   "args": {
+    "appId": "firecrawl"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_attachment": {
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "reason": "aucune pièce jointe disponible",
+   "status": "not-run"
   },
   "get_draft": {
+   "args": {
+    "draftId": "<create_draft draftId>",
+    "inboxId": "<AGENTMAIL_INBOX>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_inbox": {
+   "args": {
+    "inboxId": "<AGENTMAIL_INBOX>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_labs": {
    "args": {},
+   "cadence": "daily",
    "category": "a",
    "status": "executed"
   },
   "get_list_entry": {
+   "args": {
+    "direction": "receive",
+    "entry": "msm-fixture.invalid",
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "listType": "block"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_message": {
+   "args": {
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "messageId": "<list_messages messages.0.messageId>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "get_thread": {
+   "args": {
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "threadId": "<list_threads threads.0.threadId>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "join_labs": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "list_accounts": {
+   "args": {},
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_apps": {
+   "args": {
+    "limit": 1
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_drafts": {
+   "args": {
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "limit": 1
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_inboxes": {
+   "args": {
+    "limit": 5
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_list_entries": {
+   "args": {
+    "direction": "receive",
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "listType": "block"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_messages": {
+   "args": {
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "limit": 1
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_organizations": {
+   "args": {},
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "list_threads": {
+   "args": {
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "limit": 1
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "reply_to_message": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "search_apps": {
+   "args": {
+    "query": "fire"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_inboxes": {
+   "args": {
+    "query": "<AGENTMAIL_INBOX_PREFIX>"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_messages": {
+   "args": {
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "limit": 1,
+    "query": "welcome"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "search_threads": {
+   "args": {
+    "inboxId": "<AGENTMAIL_INBOX>",
+    "limit": 1,
+    "query": "welcome"
+   },
+   "cadence": "daily",
    "category": "a",
-   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
-   "status": "planned"
+   "status": "executed"
   },
   "select_organization": {
+   "cadence": "never",
    "category": "c",
    "reason": "crée un compte/inbox/repo ou change l'organisation"
   },
   "send_draft": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "send_message": {
+   "cadence": "never",
    "category": "c",
    "reason": "envoie un message / publie"
   },
   "update_draft": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_inbox": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_message": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   },
   "update_thread": {
+   "cadence": "never",
    "category": "c",
    "reason": "écriture sans undo propre dans le même run"
   }
