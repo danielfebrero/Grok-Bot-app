@@ -19,7 +19,7 @@ Versions touchées : agent-store-fuse `9172edf` → `f5cd108` (pointeur `/usr/lo
 - **Perf** : —
 - **Autre/infra** : nouveau build agent-store-fuse (rebuild opaque, classement hypothétique). Seul le fichier de version change : le binaire `cursor-agent-store-fuse` a le **même hash** dans ce snapshot.
 
-Rapport : [reports/2026-10-14_14-47.md](reports/2026-10-14_14-47.md) — [commit](../../../commit/PLACEHOLDER).
+Rapport : [reports/2026-10-14_14-47.md](reports/2026-10-14_14-47.md) — [commit](../../../commit/1e5b6a032a96d6d608ad27f0d0c81adf0b1186f8).
 
 ## 2026-10-14 11:47 (Paris) — snapshot `2026-10-14_10-52` → `2026-10-14_11-47`
 
