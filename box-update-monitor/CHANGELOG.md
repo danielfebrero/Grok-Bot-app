@@ -19,7 +19,7 @@ Versions touchées : aucune (image, sand-host, exec-daemon, orbitd, agent-store-
 - **Perf** : —
 - **Autre/infra** : `managed-skills/cache.json` rafraîchi (`fetchedAt` + miroir des corps de skills). Nouvelle variable d’env nommée `SAND_AGENT_STORE_RPC_SERVICE`. Meta `dpkg-packages.txt` : ~23 paquets absents de l’énumération (dont `openssh-client`, `nmap`, `bind9-*`, `grok-bot` 0.70.2) — à traiter comme signal méta, pas comme preuve d’uninstall silencieux sans vérif locale.
 
-Rapport : [reports/2026-10-14_15-51.md](reports/2026-10-14_15-51.md) — [commit](../../../commit/COMMIT_PLACEHOLDER).
+Rapport : [reports/2026-10-14_15-51.md](reports/2026-10-14_15-51.md) — [commit](../../../commit/6602c63a933985ad67640251bde11c37aab46253).
 
 ## 2026-10-14 14:47 (Paris) — snapshot `2026-10-14_11-47` → `2026-10-14_14-47`
 
