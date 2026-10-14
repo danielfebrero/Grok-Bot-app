@@ -51,6 +51,21 @@ def load_inbox():
         e.setdefault("output_schema_count", None)   # inconnu au niveau "names"
     return nss, full, cat.get("absent", {})
 
+def load_inferred(prev):
+    """inbox/_inferred.json (local) ; sinon reprend celui du snapshot précédent (pas de faux « retiré »)."""
+    p = os.path.join(INBOX, "_inferred.json")
+    if os.path.exists(p):
+        return {ns: {t: {"source": v["source"], "inferredAt": v["inferredAt"], "responseKind": v.get("responseKind"),
+                         "schema": v["schema"]} for t, v in tools.items()} for ns, tools in json.load(open(p)).items()}
+    out = {}
+    if prev:
+        base = os.path.join(SNAPS, prev, "_inferred")
+        for ns in (os.listdir(base) if os.path.isdir(base) else []):
+            for f in os.listdir(os.path.join(base, ns)):
+                d = json.load(open(os.path.join(base, ns, f)))
+                out.setdefault(d["namespace"], {})[d["tool"]] = d["outputSchemaInferred"]
+    return out
+
 def snaps():
     return sorted(d for d in os.listdir(SNAPS) if os.path.isfile(os.path.join(SNAPS, d, "index.json")))
 
@@ -66,7 +81,11 @@ def main():
     prev = snaps()
     prev = prev[-1] if prev else None
     old = json.load(open(os.path.join(SNAPS, prev, "index.json"))) if prev else None
-    if old and old["namespaces"] == nss and old.get("absent") == absent:
+    inf = load_inferred(prev)
+    # hash sur le schéma seul (pas l'horodatage) : une ré-inférence identique n'est pas un changement
+    index["inferred"] = {ns: {t: sha(dumps(v["schema"])) for t, v in tools.items()} for ns, tools in inf.items()}
+    index["totals"]["tools_inferred"] = sum(len(v) for v in inf.values())
+    if old and old["namespaces"] == nss and old.get("absent") == absent and old.get("inferred", {}) == index["inferred"]:
         print(f"NO_CHANGE last={prev}"); return 0
     if prev == ts:
         shutil.rmtree(os.path.join(SNAPS, ts))
@@ -77,6 +96,11 @@ def main():
         d = os.path.join(tmp, SAFE.sub("_", ns)); os.makedirs(d, exist_ok=True)
         for t, data in tools.items():
             open(os.path.join(d, SAFE.sub("_", t) + ".json"), "w").write(dumps(data))
+    for ns, tools in inf.items():
+        d = os.path.join(tmp, "_inferred", SAFE.sub("_", ns)); os.makedirs(d, exist_ok=True)
+        for t, v in tools.items():
+            open(os.path.join(d, SAFE.sub("_", t) + ".json"), "w").write(
+                dumps({"namespace": ns, "tool": t, "outputSchemaInferred": v}))
     os.makedirs(tmp, exist_ok=True)
     open(os.path.join(tmp, "index.json"), "w").write(dumps(index))
     os.rename(tmp, os.path.join(SNAPS, ts))
@@ -112,13 +136,28 @@ def main():
                 d = difflib.unified_diff((open(fa).read() if os.path.exists(fa) else "").splitlines(), open(fb).read().splitlines(),
                                          f"{prev}/{ns}/{t}.json", f"{ts}/{ns}/{t}.json", lineterm="", n=2)
                 body += [f"- **~ {t}**", "", "```diff", *d, "```", ""]
+    oi, ni = old.get("inferred", {}), index["inferred"]; ibody = []; imod = 0
+    for ns in sorted(set(oi) | set(ni)):
+        a, b = oi.get(ns, {}), ni.get(ns, {})
+        for t in sorted(set(a) | set(b)):
+            if a.get(t) == b.get(t): continue
+            imod += 1
+            fa = os.path.join(SNAPS, prev, "_inferred", SAFE.sub("_", ns), SAFE.sub("_", t) + ".json")
+            fb = os.path.join(SNAPS, ts, "_inferred", SAFE.sub("_", ns), SAFE.sub("_", t) + ".json")
+            ga = json.load(open(fa))["outputSchemaInferred"]["schema"] if os.path.exists(fa) else None
+            gb = json.load(open(fb))["outputSchemaInferred"]["schema"] if os.path.exists(fb) else None
+            tag = "+" if ga is None else ("−" if gb is None else "~")
+            d = difflib.unified_diff(("" if ga is None else dumps(ga)).splitlines(), ("" if gb is None else dumps(gb)).splitlines(),
+                                     f"{prev}/{ns}/{t}", f"{ts}/{ns}/{t}", lineterm="", n=2)
+            ibody += [f"- **{tag} {ns}/{t}** (outputSchemaInferred)", "", "```diff", *d, "```", ""]
+    if ibody: body += ["## outputSchemaInferred (schémas de sortie inférés)", *ibody]
     L += [f"Précédent : {prev}", "", "| | Nb |", "|---|---|", f"| Ajoutés | {add} |", f"| Retirés | {rem} |",
-          f"| Modifiés | {mod} |", "", "| Namespace | Tools | outputSchema |", "|---|---|---|",
+          f"| Modifiés | {mod} |", f"| Inférés modifiés | {imod} |", "", "| Namespace | Tools | outputSchema |", "|---|---|---|",
           *[f"| {ns} | {e['tool_count']} | {osc(e)} |" for ns, e in sorted(nss.items())], "", *body]
     open(rep, "w").write("\n".join(L) + "\n")
-    changelog(ts, f"+{add}/−{rem}/~{mod} vs {prev}", rep)
+    changelog(ts, f"+{add}/−{rem}/~{mod}, inférés ~{imod} vs {prev}", rep)
     with open(os.path.join(REPORTS, "NOUVEAU-DIFF.flag"), "a") as fl: fl.write(f"{ts} {rep}\n")
-    print(f"CHANGED old={prev} new={ts} report={rep} added={add} removed={rem} modified={mod}"); return 10
+    print(f"CHANGED old={prev} new={ts} report={rep} added={add} removed={rem} modified={mod} inferred_changed={imod}"); return 10
 
 def osc(e):
     c = e.get("output_schema_count")

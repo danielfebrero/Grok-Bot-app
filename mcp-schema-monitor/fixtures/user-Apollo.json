@@ -1,0 +1,327 @@
+{
+ "fixtures": {
+  "apollo_accounts_bulk_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_accounts_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_accounts_update": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_analytics_sync_report": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_contacts_bulk_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_contacts_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_contacts_search": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_contacts_update": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_context_center_create_product": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_context_center_create_profile": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_context_center_show": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_context_center_show_product": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_context_center_update_product": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_context_center_update_profile": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_conversations_get_insights": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_conversations_get_recording_links": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_conversations_get_transcript": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_conversations_search": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_deals_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_deals_search": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_deals_show": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_domain_purchase_index": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_email_account_purchase_create": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_email_account_purchase_index": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_email_accounts_index": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_emailer_campaigns_activity_feed": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_emailer_campaigns_add_contact_ids": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_emailer_campaigns_approve": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "apollo_emailer_campaigns_remove_or_stop_contact_ids": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "apollo_emailer_campaigns_search": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_emailer_campaigns_show": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_emailer_campaigns_step_content": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_emailer_messages_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_emailer_messages_email_send_status": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "apollo_emailer_messages_get_content": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_emailer_messages_search": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_emailer_messages_send_now": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "apollo_emailer_schedules_index": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_feedback_log": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "apollo_fields_index": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_labels_add_entity_ids_to_label_names": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_labels_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_labels_index": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_labels_remove_entity_ids_from_label_names": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "apollo_labels_update": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_mixed_companies_search": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_mixed_people_api_search": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_organizations_bulk_enrich": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_organizations_enrich": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_organizations_job_postings": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_organizations_lookup": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_people_bulk_match": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_people_match": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_phone_calls_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_phone_calls_search": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_phone_calls_update": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_prompts_suggest": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_sequences_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_sequences_update": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_survey_submit": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "apollo_tasks_bulk_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_tasks_complete": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "apollo_tasks_create": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_tasks_search": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_tasks_show": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_tasks_skip": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "apollo_tasks_update": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "apollo_usage_stats_credit_usage_stats": {
+   "args": {},
+   "category": "a",
+   "status": "executed"
+  },
+  "apollo_users_api_profile": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "apollo_users_search": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "apollo_webhook_result_show": {
+   "category": "c",
+   "reason": "coûte des crédits/argent ou cible des tiers"
+  },
+  "apollo_website_visitor_domain_tracker_index": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "apollo_website_visitor_domain_tracker_install_script": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "apollo_website_visitor_domain_tracker_send_install_email": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "apollo_website_visitor_domain_tracker_update": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "apollo_website_visitors_domain_aggregates": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  }
+ },
+ "namespace": "user-Apollo"
+}

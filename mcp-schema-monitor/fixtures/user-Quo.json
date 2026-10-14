@@ -1,0 +1,93 @@
+{
+ "fixtures": {
+  "create-contact": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create-contact-note": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create-task": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "fetch-call-transcripts": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "fetch-messages": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "fetch-missed-calls": {
+   "category": "c",
+   "reason": "lit des données de tiers (contacts/appels) — hors périmètre fixture"
+  },
+  "get-contact": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list-contact-notes": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list-contacts": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list-inboxes": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list-tasks": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list-users": {
+   "args": {
+    "maxResults": 1
+   },
+   "category": "a",
+   "status": "executed"
+  },
+  "mark-conversations": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "send-bulk-messages": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "send-group-message": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "send-message": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "submit-feedback": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "update-contact": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update-contact-note": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update-task": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  }
+ },
+ "namespace": "user-Quo"
+}

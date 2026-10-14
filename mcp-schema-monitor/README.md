@@ -53,3 +53,36 @@ bash /workspace/mcp-schema-monitor/publish.sh [--dry-run]
 - Le namespace first-party `cursor` n'est inclus que si son fichier d'entrée passe le scan.
 - `publish.sh` scanne exactement les fichiers à pousser ; si non propre : rien n'est poussé,
   `reports/PUBLISH-BLOCKED.flag` (chemins + n° de règle, jamais la valeur) est écrit, exit 2.
+
+## Fixtures et schémas de sortie inférés
+Aucun serveur ne déclare d'`outputSchema` aujourd'hui. On l'infère donc à partir de vraies réponses.
+- `fixtures/<ns>.json` : une entrée par tool, `category` :
+  - `a` lecture seule (`status` executed / planned / failed + raison) ;
+  - `b` révocable : création suivie de son `pair` (delete/undo) dans le même run. **Non exécuté** tant que
+    Dani n'a pas validé explicitement ces écritures (`planned-awaiting-approval`) ;
+  - `c` ignoré + `reason` : envoi de message/email/DM/SMS, publication, crédits/argent, merge/suppression,
+    création d'inbox/domaine/repo, validation de campagne, données de tiers, `get_users_me`.
+- Les valeurs propres à Dani (owner/repo…) sont des placeholders `<OWN_REPO_OWNER>` ; les vraies valeurs
+  sont dans `fixtures/values.local.json` (gitignoré, exclu de la copie).
+- `lib/infer.py <ns> <tool> <réponse_brute>` : infère un JSON Schema (types, clés, `required`, tableaux,
+  types multiples/null) dans `inbox/_inferred.json` (local), puis **supprime la réponse brute**.
+  Aucune valeur n'est conservée ni publiée.
+- `check.sh` écrit `snapshots/<ts>/_inferred/<ns>/<tool>.json`
+  (`outputSchemaInferred` : `source: "inferred"`, `inferredAt`, `responseKind`, `schema`), séparé de
+  l'`outputSchema` déclaré. Le hash d'index ne porte que sur le schéma (pas l'horodatage). Un changement
+  apparaît dans le rapport (section « outputSchemaInferred », ligne « Inférés modifiés »).
+  Sans `inbox/_inferred.json`, les inférences du snapshot précédent sont reprises telles quelles.
+- Cadence recommandée pour rejouer les fixtures : **hebdomadaire** (les sorties bougent peu, les lectures X
+  consomment des crédits et Exa/Tavily limitent le débit). La capture des descripteurs reste quotidienne.
+
+## Procédure de la routine (quotidienne)
+1. `GetDynamicTools` pattern `.` → `inbox/_catalog.json` (statut + noms par namespace).
+2. `GetDynamicTools` namespace=<ns> pour chaque namespace ready → `inbox/<ns>.json` (réponse telle quelle).
+3. (Hebdo) Lire `user-X/get_usage_credits` ; puis pour chaque fixture `a` executed/planned : `CallDynamicTool`
+   avec `write_to_file`, arguments de `fixtures/<ns>.json` (placeholders remplacés depuis
+   `fixtures/values.local.json`), puis `python3 lib/infer.py <ns> <tool> <fichier>` (supprime le brut).
+   Jamais de fixture `b` ou `c` sans accord explicite.
+4. `check.sh` : NO_CHANGE → s'arrêter sans bruit ; BASELINE/CHANGED → `publish.sh`.
+5. PUBLISHED → résumer le rapport à Dani, supprimer `reports/NOUVEAU-DIFF.flag` ; exit 2 → signaler les chemins
+   de `reports/PUBLISH-BLOCKED.flag` sans contourner le scan.
+6. Vider `inbox/` (sauf si l'on veut garder `_inferred.json` pour la semaine).

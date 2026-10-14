@@ -1,0 +1,260 @@
+{
+  "namespace": "user-Apollo",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-14T16:14:06+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "credit_usage_stats": {
+          "properties": {
+            "ai_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "broadcast_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "contact_website_visitor_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "conversation_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "dialer": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "direct_dial_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "export_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "inbound_website_visitor_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "lead_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "power_up_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            },
+            "web_search_record_credit": {
+              "properties": {
+                "consumed": {
+                  "type": "integer"
+                },
+                "left_over": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "consumed",
+                "left_over",
+                "limit"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "ai_credit",
+            "broadcast_credit",
+            "contact_website_visitor_credit",
+            "conversation_credit",
+            "dialer",
+            "direct_dial_credit",
+            "export_credit",
+            "inbound_website_visitor_credit",
+            "lead_credit",
+            "power_up_credit",
+            "web_search_record_credit"
+          ],
+          "type": "object"
+        },
+        "current_credit_cycle": {
+          "properties": {
+            "end_date": {
+              "type": "string"
+            },
+            "start_date": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "end_date",
+            "start_date"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "credit_usage_stats",
+        "current_credit_cycle"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "apollo_usage_stats_credit_usage_stats"
+}

@@ -1,0 +1,344 @@
+{
+ "fixtures": {
+  "add_comment_to_pending_review": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "add_discussion_comment": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "add_issue_comment": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "add_sub_issue": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create_branch": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create_issue": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create_label": {
+   "category": "b",
+   "pair": "delete_label",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "create_pull_request": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create_pull_request_review": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "delete_discussion_comment": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "delete_label": {
+   "category": "b",
+   "pair": "create_label",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "delete_pending_pull_request_review": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "get_commit": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_commit_combined_status": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_discussion": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_discussion_comments": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "get_file_contents": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_git_tree": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_issue": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_job": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_job_logs": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_label": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_latest_release": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_me": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_pull_request": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_pull_request_diff": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_release_by_tag": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_repository": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_tag": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_workflow": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_workflow_run": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_branches": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "per_page": 2,
+    "repo": "<OWN_REPO>"
+   },
+   "category": "a",
+   "status": "executed"
+  },
+  "list_check_runs_for_ref": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_commits": {
+   "args": {
+    "owner": "<OWN_REPO_OWNER>",
+    "per_page": 2,
+    "repo": "<OWN_REPO>"
+   },
+   "category": "a",
+   "status": "executed"
+  },
+  "list_discussion_categories": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_discussions": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_issue_comments": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "list_issues": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_labels": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_my_repositories": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_pull_request_comments": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "list_pull_request_files": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_pull_request_review_comments": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "list_pull_request_reviews": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_pull_requests": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_releases": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_repository_collaborators": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_sub_issues": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_tags": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_workflow_run_jobs": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_workflow_runs": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_workflows": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "mark_discussion_comment_as_answer": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "merge_pull_request": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "remove_sub_issue": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "reply_to_pull_request_review_comment": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "reprioritize_sub_issue": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "search_code": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_commits": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_issues": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_orgs": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_pull_requests": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_repositories": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_users": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "set_pull_request_draft": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "submit_pending_pull_request_review": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "update_discussion_comment": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "update_issue": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_label": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_pull_request": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_pull_request_branch": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  }
+ },
+ "namespace": "cursor-github"
+}

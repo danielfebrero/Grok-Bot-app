@@ -1,0 +1,164 @@
+{
+ "fixtures": {
+  "accept_chat_message_request": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "add_conversation_keys": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "archive_chat_conversation": {
+   "category": "b",
+   "pair": "unarchive_chat_conversation",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "chat_media_download": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "create_activity_subscription": {
+   "category": "b",
+   "pair": "delete_activity_subscription",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "create_users_bookmark": {
+   "category": "b",
+   "pair": "delete_users_bookmark",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "create_users_bookmark_folder": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create_webhooks": {
+   "category": "b",
+   "pair": "delete_webhooks",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "delete_activity_subscription": {
+   "category": "b",
+   "pair": "create_activity_subscription",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "delete_users_bookmark": {
+   "category": "b",
+   "pair": "create_users_bookmark",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "delete_webhooks": {
+   "category": "b",
+   "pair": "create_webhooks",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "get_activity_subscriptions": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_chat_conversation": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_chat_conversation_events": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_chat_conversations": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_chat_message_request": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_chat_message_requests": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_posts_liking_users": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_usage_credits": {
+   "args": {},
+   "category": "a",
+   "status": "executed"
+  },
+  "get_users_bookmark_folders": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_users_bookmarks": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_users_bookmarks_by_folder_id": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_users_me": {
+   "category": "c",
+   "reason": "sortie perso exclue par règle"
+  },
+  "get_users_public_key": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_users_public_keys": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_users_timeline": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "get_webhooks": {
+   "category": "c",
+   "reason": "lecture de DM/données du compte ou crédits X : lectures X limitées à une poignée"
+  },
+  "mark_chat_conversation_read": {
+   "category": "b",
+   "pair": "mark_chat_conversation_unread",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "mark_chat_conversation_unread": {
+   "category": "b",
+   "pair": "mark_chat_conversation_read",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "search_users": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "send_chat_message": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "send_chat_typing_indicator": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "unarchive_chat_conversation": {
+   "category": "b",
+   "pair": "archive_chat_conversation",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "update_activity_subscription": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  }
+ },
+ "namespace": "user-X"
+}

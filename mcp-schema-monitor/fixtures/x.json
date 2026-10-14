@@ -1,0 +1,81 @@
+{
+ "fixtures": {
+  "get_news": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_posts_by_id": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_posts_by_ids": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_posts_counts_recent": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_posts_quoted_posts": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_posts_reposted_by": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_trends_by_woeid": {
+   "args": {
+    "max_trends": 5,
+    "woeid": 23424819
+   },
+   "category": "a",
+   "status": "executed"
+  },
+  "get_users_by_id": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_users_by_username": {
+   "args": {
+    "user.fields": "created_at,description,public_metrics,verified",
+    "username": "X"
+   },
+   "category": "a",
+   "status": "executed"
+  },
+  "get_users_by_usernames": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_users_mentions": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_users_posts": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_news": {
+   "category": "a",
+   "reason": "appel fait, réponse non JSON au parseur v1 ; à refaire",
+   "status": "failed"
+  },
+  "search_posts_all": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  }
+ },
+ "namespace": "x"
+}

@@ -1,0 +1,27 @@
+{
+  "description": "Read a webpage's full content as clean markdown. Use after web_search_exa when highlights are insufficient or to read any URL. Best for: Extracting full content from known URLs. Batch multiple URLs in one call. Returns: Clean text content and metadata from the page(s).",
+  "inputSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "additionalProperties": false,
+    "properties": {
+      "maxCharacters": {
+        "description": "Maximum characters to extract per page (default: 3000)",
+        "minimum": 1,
+        "type": "number"
+      },
+      "urls": {
+        "description": "URLs to read. Batch multiple URLs in one call.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "urls"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "web_fetch_exa"
+}

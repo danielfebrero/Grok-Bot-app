@@ -1,0 +1,197 @@
+{
+ "fixtures": {
+  "agent_attach_human": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "agent_verify": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "authorize_inbox": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "connect_app": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "create_draft": {
+   "category": "b",
+   "pair": "delete_draft",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "create_inbox": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "create_list_entry": {
+   "category": "b",
+   "pair": "delete_list_entry",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "delete_draft": {
+   "category": "b",
+   "pair": "create_draft",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "delete_inbox": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "delete_list_entry": {
+   "category": "b",
+   "pair": "create_list_entry",
+   "reason": "écriture externe (même révocable) non exécutée sans accord explicite de Dani dans le chat",
+   "status": "planned-awaiting-approval"
+  },
+  "delete_thread": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "forward_message": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "get_app": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_attachment": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_draft": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_inbox": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_labs": {
+   "args": {},
+   "category": "a",
+   "status": "executed"
+  },
+  "get_list_entry": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_message": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_thread": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "join_labs": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "list_accounts": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_apps": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_drafts": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_inboxes": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_list_entries": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_messages": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_organizations": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_threads": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "reply_to_message": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "search_apps": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_inboxes": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_messages": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "search_threads": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "select_organization": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "send_draft": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "send_message": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "update_draft": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_inbox": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_message": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_thread": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  }
+ },
+ "namespace": "user-AgentMail"
+}

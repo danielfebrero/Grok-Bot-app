@@ -14,3 +14,4 @@ snapshots/*.partial/
 *.key
 *secret*
 *credential*
+fixtures/*.local.json

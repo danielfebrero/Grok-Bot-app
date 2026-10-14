@@ -1,0 +1,140 @@
+{
+ "fixtures": {
+  "checks_read": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "commit_read": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "compare_commits": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "create_label": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create_pull_request": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create_pull_request_comment": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "create_pull_request_inline_comment": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "create_pull_request_review": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "create_repository": {
+   "category": "c",
+   "reason": "crée un compte/inbox/repo ou change l'organisation"
+  },
+  "dismiss_pull_request_review": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "get_file_contents": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_git_tree": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "get_repository": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "grep_contents": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_branches": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_commits": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_namespaces": {
+   "args": {
+    "pageSize": 5
+   },
+   "category": "a",
+   "status": "executed"
+  },
+  "list_pull_requests": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "list_repositories": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "pull_request_read": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "remove_pull_request_reviewers": {
+   "category": "c",
+   "reason": "destructif / supprime ou valide des données réelles"
+  },
+  "reply_pull_request_review_thread": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "request_pull_request_reviewers": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "sync_mirror": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_pull_request": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_pull_request_base": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_pull_request_comment": {
+   "category": "c",
+   "reason": "envoie un message / publie"
+  },
+  "update_pull_request_labels": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_pull_request_review": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  },
+  "update_pull_request_review_thread": {
+   "category": "c",
+   "reason": "écriture sans undo propre dans le même run"
+  }
+ },
+ "namespace": "cursor-origin"
+}

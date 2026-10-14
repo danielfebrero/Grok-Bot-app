@@ -1,0 +1,30 @@
+{
+ "fixtures": {
+  "tavily_crawl": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "tavily_extract": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "tavily_map": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "tavily_research": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "tavily_search": {
+   "category": "a",
+   "reason": "appel fait mais réponse = erreur rate-limit/auth, pas de schéma",
+   "status": "failed"
+  }
+ },
+ "namespace": "user-tavily"
+}

@@ -1,0 +1,15 @@
+{
+ "fixtures": {
+  "web_fetch_exa": {
+   "category": "a",
+   "reason": "lecture sûre, pas encore appelée (budget de ce run)",
+   "status": "planned"
+  },
+  "web_search_exa": {
+   "category": "a",
+   "reason": "HTTP 429 (rate limit Exa gratuit)",
+   "status": "failed"
+  }
+ },
+ "namespace": "user-exa"
+}

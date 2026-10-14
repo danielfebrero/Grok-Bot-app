@@ -54,7 +54,7 @@ reset_clone || die "reset du clone impossible"
 
 # miroir de l'état publiable (le .gitignore du dossier s'applique en plus)
 rm -rf "$CLONE/$SUBDIR"; mkdir -p "$CLONE/$SUBDIR"
-( cd "$DIR" && tar --exclude=./objects --exclude=./logs --exclude=./.lock --exclude=./.pii-denylist --exclude=./.publish.conf --exclude=./inbox \
+( cd "$DIR" && tar --exclude=./objects --exclude=./logs --exclude=./.lock --exclude=./.pii-denylist --exclude=./.publish.conf --exclude=./inbox --exclude='*.local.json' \
     --exclude=./reports/NOUVEAU-DIFF.flag --exclude=./reports/PUBLISH-BLOCKED.flag --exclude='*.partial' \
     -cf - . ) | ( cd "$CLONE/$SUBDIR" && tar -xf - ) || die "copie impossible"
 touch "$CLONE/$SUBDIR/reports/.gitkeep"
