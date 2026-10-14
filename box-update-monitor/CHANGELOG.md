@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-14 17:55 (Paris) — snapshot `2026-10-14_15-51` → `2026-10-14_17-55`
+
+Versions touchées : aucune (image `726deab`, sand-host, exec-daemon, orbitd, agent-store-fuse `f5cd108`, Chrome, Node, Python inchangés). Fichiers : +0 / −0 / ~0. Seul changement : la méta `dpkg-packages.txt`.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : **nouveau composant** — chaîne OCR **Tesseract 5.5.0** installée sur la box : `tesseract-ocr`, `libtesseract5`, `libleptonica6`, `libarchive13t64`, packs langues `tesseract-ocr-eng` / `tesseract-ocr-fra` / `tesseract-ocr-osd` (eng, fra, osd disponibles). Binaire `/usr/bin/tesseract` opérationnel.
+- **Perf** : —
+- **Autre/infra** : installé par un **agent** via `apt-get install -y -qq tesseract-ocr tesseract-ocr-fra` le 2026-10-14 à 17:02 (Paris) — ce n'est **pas** une mise à jour de l'ordinateur (image inchangée), mais une installation de paquet sur la box en cours d'exécution. Capacité OCR désormais dispo pour toute l'équipe.
+
+Rapport : [reports/2026-10-14_17-55.md](reports/2026-10-14_17-55.md).
+
 ## 2026-10-14 15:51 (Paris) — snapshot `2026-10-14_14-47` → `2026-10-14_15-51`
 
 Versions touchées : aucune (image, sand-host, exec-daemon, orbitd, agent-store-fuse, Chrome, Node, Python inchangés). Fichiers : +0 / −0 / ~5 (tous sous `managed-skills`).
