@@ -64,7 +64,11 @@ show("tokens / clés", "\n".join(lines))
 # valeurs secrètes connues (jamais affichées)
 cands = {}
 for k, v in os.environ.items():
-    if k.startswith(("SAND_", "CURSOR_", "BOX_", "GH_", "GITHUB_")) and len(v) >= 8 and not v.startswith("/"):
+    # Ignore path-like values and short kebab service labels (e.g. "agent-store"),
+    # which collide with public component names and are not secrets.
+    if (k.startswith(("SAND_", "CURSOR_", "BOX_", "GH_", "GITHUB_")) and len(v) >= 8
+            and not v.startswith("/")
+            and not (re.fullmatch(r"[a-z]+(?:-[a-z]+)+", v) and len(v) < 32)):
         cands["env:" + k] = v
 def walk(o, p):
     if isinstance(o, dict):

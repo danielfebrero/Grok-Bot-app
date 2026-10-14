@@ -1,0 +1,11 @@
+--- 2026-10-14_14-47:/home/box/sand-data/managed-skills/skills/export-bot-template/SKILL.md
++++ 2026-10-14_15-51:/home/box/sand-data/managed-skills/skills/export-bot-template/SKILL.md
+@@ -11,7 +11,7 @@
+ 
+ 1. Audience
+ 
+-This user can only create Public templates. They are not on a team so it is not relevant to them.
++This user creates Public templates. Do not offer a Team template or ask who can use it. `CreateBotShareJson` may include a predefined scope if the template already exists and is being updated. In that case, use the existing visibility.
+ 
+ 2. Read
+ 

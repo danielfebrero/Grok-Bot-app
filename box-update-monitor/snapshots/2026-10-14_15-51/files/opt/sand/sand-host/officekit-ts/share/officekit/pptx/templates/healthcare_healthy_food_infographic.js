@@ -1,0 +1,1284 @@
+/**
+ * "Healthy Food Infographic" - 30 slide deck rebuilt with pptxgenjs.
+ *
+ * Run:  node 0a12995e-36ac-4ec2-8719-f2ca84eacbdb_grok_final.js
+ * Out:  0a12995e-36ac-4ec2-8719-f2ca84eacbdb_grok_final.pptx (next to this file)
+ *
+ * The original deck draws every illustration out of hundreds of tiny freeform
+ * paths.  Here each illustration is a small helper function built from native
+ * pptxgenjs shapes, so the artwork stays readable as code.
+ */
+
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ *
+ * Palette (from the deck theme "Healthy Food Infographic")
+ * ------------------------------------------------------------------ */
+const C = {
+  bg: 'F4F4F4',
+
+  green: '67AE44', greenD: '4D8233', greenXD: '335722', greenL: 'A3D28B',
+  orange: 'F29F05', orange2: 'EE8A04', orangeD: 'D67C03', orangeXD: 'B57704',
+  orangeL: 'FCBA61', cream: 'FCC764', creamL: 'FDDA98',
+  red: 'F22929', redD: 'C80C0C', redXD: '850808', redL: 'DE6D6D',
+  blue: '1075D2', blueL: '61ADF3',
+  purple: '7E2696', purpleD: '5E1D70',
+
+  ink: '1B1A22', inkSoft: '0D0D0D', body: '808080',
+  white: 'FFFFFF', black: '000000',
+  grey: '808080', greyD: '595959', greyL: 'BFBFBF', silver: 'A6A6A6',
+  shadow: 'D9D9D9', chip: 'F2F2F2',
+
+  // pastel panel tints
+  mint: 'E0F0D8', mintD: 'C1E1B2', sky: 'CAE4FB', peach: 'FEECCB',
+  peach2: 'FEE8CA', lilac: 'EACCF2',
+};
+
+const F = { head: 'Playfair Display', body: 'Open Sans' };
+const NONE = { type: 'none' };
+
+/* ------------------------------------------------------------------ *
+ * Small drawing helpers
+ * ------------------------------------------------------------------ */
+
+/**
+ * Returns a mapper turning normalised (0..1) coords into slide inches.
+ * With `spin` the whole box is rotated about its centre, which lets a whole
+ * illustration be tilted the way the original groups are.
+ */
+const box = (x, y, w, h, spin) => {
+  const cx = x + w / 2, cy = y + h / 2, a = (spin || 0) * Math.PI / 180;
+  return (nx, ny, nw, nh) => {
+    const gw = nw * w, gh = nh * h;
+    let gx = x + nx * w, gy = y + ny * h;
+    if (spin) {
+      const px = gx + gw / 2 - cx, py = gy + gh / 2 - cy;
+      gx = cx + px * Math.cos(a) - py * Math.sin(a) - gw / 2;
+      gy = cy + px * Math.sin(a) + py * Math.cos(a) - gh / 2;
+    }
+    return { x: gx, y: gy, w: gw, h: gh, spin: spin || 0 };
+  };
+};
+
+/** Native shape placed with a normalised box mapper. */
+function shp(s, kind, B, nx, ny, nw, nh, opt) {
+  const g = B(nx, ny, nw, nh);
+  const o = Object.assign({ line: NONE, x: g.x, y: g.y, w: g.w, h: g.h }, opt);
+  if (g.spin) o.rotate = (o.rotate || 0) + g.spin;
+  s.addShape(kind, o);
+}
+
+/** Closed freeform polygon; `pts` are normalised inside its own bounding box. */
+function poly(s, B, nx, ny, nw, nh, pts, opt) {
+  const g = B(nx, ny, nw, nh);
+  const o = Object.assign({ line: NONE, x: g.x, y: g.y, w: g.w, h: g.h }, opt, {
+    points: pts.map(p => ({ x: p[0] * g.w, y: p[1] * g.h })).concat([{ close: true }]),
+  });
+  if (g.spin) o.rotate = (o.rotate || 0) + g.spin;
+  s.addShape('custGeom', o);
+}
+
+/** roundRect corner radius from the OOXML "adj" fraction. */
+const rr = (w, h, adj) => Math.min(w, h) * adj;
+
+/** Capsule (fully rounded bar), optionally rotated about its centre. */
+function capsule(s, x, y, w, h, color, rot, extra) {
+  s.addShape('roundRect', Object.assign({
+    x, y, w, h, rectRadius: Math.min(w, h) / 2, rotate: rot || 0,
+    fill: { color }, line: NONE,
+  }, extra));
+}
+
+/* ------------------------------------------------------------------ *
+ * Text helpers
+ * ------------------------------------------------------------------ */
+
+/** "Healthy Food / Infographic" deck title (black word + green word). */
+function deckTitle(s, x, y, w, opt) {
+  const o = opt || {};
+  const size = o.size || 30;
+  const sep = o.stacked ? '\n' : '';
+  s.addText([
+    { text: 'Healthy Food ' + sep, options: { color: C.ink } },
+    { text: 'Infographic', options: { color: o.accent || C.green } },
+  ], {
+    x, y, w, h: o.h || (o.stacked ? 1.111 : 0.606),
+    fontFace: F.head, fontSize: size, bold: true,
+    align: o.align || 'left', valign: 'top',
+  });
+}
+
+/** "Insert title <here>" - the coloured word changes per card. */
+function cardTitle(s, x, y, w, hereColor, opt) {
+  const o = opt || {};
+  const parts = hereColor
+    ? [{ text: 'Insert title ', options: { color: C.ink } },
+       { text: 'here', options: { color: hereColor } }]
+    : [{ text: 'Insert title here', options: { color: o.color || C.ink } }];
+  s.addText(parts, {
+    x, y, w, h: 0.303, fontFace: F.body, fontSize: 12, bold: true,
+    align: o.align || 'left', valign: 'bottom',
+  });
+}
+
+/** Grey 8.25pt paragraph with the deck's 150% line spacing. */
+function body(s, x, y, w, h, text, opt) {
+  const o = opt || {};
+  s.addText(text, {
+    x, y, w, h, fontFace: F.body, fontSize: o.size || 8.25,
+    color: o.color || C.body, align: o.align || 'left', valign: 'top',
+    lineSpacingMultiple: o.line === false ? undefined : 1.5,
+  });
+}
+
+/** Small "More info" chip - filled or outlined. */
+function moreInfo(s, x, y, opt) {
+  const o = opt || {};
+  s.addText('More info', {
+    x, y, w: 0.826, h: 0.208, fontFace: F.body, fontSize: 6, bold: true,
+    color: o.fill ? C.white : C.black, align: 'center', valign: 'middle',
+    fill: o.fill ? { color: o.fill } : NONE,
+    line: o.fill ? NONE : { color: C.black, width: 0.75 },
+  });
+}
+
+/** Rounded "Lorem Ipsum is >" pill button. */
+function pill(s, x, y, w, h, opt) {
+  const o = opt || {};
+  const fg = o.fg || C.body;
+  s.addShape('roundRect', {
+    x, y, w, h, rectRadius: rr(w, h, 0.22),
+    fill: { color: o.fill || C.white }, line: NONE,
+    shadow: { type: 'outer', color: '000000', opacity: 0.12, blur: 6, offset: 1, angle: 90 },
+  });
+  s.addText(o.text || 'Lorem Ipsum is', {
+    x: x + 0.082, y: y + 0.25 * h, w: w - 0.3, h: 0.288,
+    fontFace: F.body, fontSize: 8.25, color: fg, valign: 'middle',
+  });
+  const B = box(x + w - 0.2, y + h * 0.37, 0.058, h * 0.3);
+  poly(s, B, 0, 0, 1, 1,
+    [[0, 0], [0.42, 0.5], [0, 1], [0.42, 1], [0.85, 0.5], [0.42, 0]], { fill: { color: fg } });
+}
+
+/** White "Description Here" card with a red heart. */
+function descCard(s, x, y, w, h, edge) {
+  s.addShape('round2DiagRect', {
+    x, y, w, h, fill: { color: C.white },
+    line: edge ? { color: edge, width: 0.75 } : NONE,
+    shadow: { type: 'outer', color: '000000', opacity: 0.12, blur: 8, offset: 1, angle: 90 },
+  });
+  s.addText('Description Here', {
+    x: x + 0.221, y: y + 0.136, w: w - 0.5, h: 0.338,
+    fontFace: F.body, fontSize: 10.5, bold: true, color: C.inkSoft, valign: 'top',
+  });
+  body(s, x + 0.221, y + 0.407, w - 0.5, 0.288, 'Lorem Ipsum\u00A0is simply');
+  s.addShape('heart', {
+    x: x + w - 0.348, y: y + 0.157, w: 0.202, h: 0.21,
+    fill: { color: C.red }, line: NONE,
+  });
+}
+
+/** Legend row: short colour dash + bold caption. */
+function legend(s, x, y, color, text) {
+  s.addShape('rect', { x, y: y + 0.092, w: 0.369, h: 0.077, fill: { color }, line: NONE });
+  s.addText(text, {
+    x: x + 0.551, y, w: 2.6, h: 0.278, fontFace: F.body, fontSize: 10.5,
+    bold: true, color: C.inkSoft, valign: 'top',
+  });
+}
+
+/** Numbered circle bullet ("01") used on the list slides. */
+function numberDot(s, x, y, label, color) {
+  s.addShape('ellipse', { x, y, w: 0.504, h: 0.504, fill: { color }, line: NONE });
+  s.addText(label, {
+    x, y, w: 0.504, h: 0.504, fontFace: F.body, fontSize: 9, bold: true,
+    color: C.white, align: 'center', valign: 'middle',
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Illustrations - each fills the given box, drawn from native shapes
+ * ------------------------------------------------------------------ */
+
+/** Carrot with four leaf blades. Portrait box, ~1 : 3.9. */
+function carrot(s, x, y, w, h, spin) {
+  const B = box(x, y, w, h, spin);
+  shp(s, 'trapezoid', B, 0.13, 0.02, 0.30, 0.35, { rotate: 174, fill: { color: C.green } });
+  shp(s, 'trapezoid', B, 0.42, 0.01, 0.16, 0.35, { rotate: 185, fill: { color: C.orangeL } });
+  shp(s, 'trapezoid', B, 0.72, 0.02, 0.27, 0.35, { rotate: 189, fill: { color: C.green } });
+  shp(s, 'trapezoid', B, 0.51, 0.00, 0.21, 0.35, { rotate: 180, fill: { color: C.greenD } });
+  poly(s, B, 0, 0.31, 1, 0.69,
+    [[0.06, 0.09], [0.34, 0.00], [0.70, 0.00], [0.97, 0.11], [0.90, 0.40],
+     [0.62, 0.84], [0.51, 1.00], [0.39, 0.84], [0.15, 0.42]],
+    { fill: { color: C.orange2 }, line: { color: C.orangeXD, width: 2.25 } });
+  [0.44, 0.58, 0.72].forEach((ny, i) => {
+    poly(s, B, 0.16 + i * 0.05, ny, 0.42 - i * 0.07, 0.045,
+      [[0, 0], [1, 0.45], [0.1, 1]], { fill: { color: C.orangeXD, transparency: 35 } });
+  });
+}
+
+/** Two overlapping carrots (the "bunch" variant), fanned apart slightly. */
+function carrotPair(s, x, y, w, h, spin) {
+  carrot(s, x, y + h * 0.04, w * 0.68, h * 0.94, (spin || 0) - 8);
+  carrot(s, x + w * 0.32, y, w * 0.68, h * 0.94, (spin || 0) + 4);
+}
+
+/** Round tomato with a green star calyx. */
+function tomato(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  shp(s, 'ellipse', B, 0.00, 0.22, 0.99, 0.78,
+    { fill: { color: C.red }, line: { color: C.redD, width: 2.25 } });
+  shp(s, 'pie', B, 0.00, 0.22, 0.99, 0.78,
+    { angleRange: [270, 90], fill: { color: C.redXD, transparency: 55 } });
+  shp(s, 'ellipse', B, 0.14, 0.36, 0.20, 0.15, { fill: { color: C.redL, transparency: 30 } });
+  shp(s, 'rect', B, 0.47, 0.00, 0.05, 0.24, { fill: { color: C.greenD } });
+  shp(s, 'star5', B, 0.20, 0.10, 0.60, 0.32, { rotate: 195, fill: { color: C.green } });
+}
+
+/** Whole orange - same silhouette, warmer palette. */
+function orangeFruit(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  shp(s, 'ellipse', B, 0.00, 0.14, 1.00, 0.86, { fill: { color: C.orangeD } });
+  shp(s, 'ellipse', B, 0.05, 0.18, 0.92, 0.78, { fill: { color: C.orange2 } });
+  shp(s, 'ellipse', B, 0.65, 0.36, 0.17, 0.15, { fill: { color: C.orangeL, transparency: 20 } });
+  shp(s, 'rect', B, 0.46, 0.00, 0.05, 0.20, { fill: { color: C.greenXD } });
+  shp(s, 'star5', B, 0.24, 0.10, 0.44, 0.26, { rotate: 200, fill: { color: C.greenXD } });
+}
+
+/** Cucumber - a rotated capsule with two pale seams. */
+function cucumber(s, x, y, w, h) {
+  const cx = x + w / 2, cy = y + h / 2;
+  const len = Math.hypot(w, h) * 0.92, thick = Math.min(w, h) * 0.62;
+  const rot = 360 - (Math.atan2(h, w) * 180 / Math.PI);
+  const bar = (dx, dy, t, color) => capsule(s,
+    cx - len / 2 + dx, cy - t / 2 + dy, len, t, color, rot);
+  bar(0.03, 0.03, thick, C.greenD);
+  bar(0, 0, thick, C.green);
+  bar(-len * 0.06, -thick * 0.12, thick * 0.16, C.greenL);
+  bar(-len * 0.02, thick * 0.14, thick * 0.10, C.greenL);
+}
+
+/**
+ * Cut of steak: golden fat layer with a red muscle on top.
+ * Wide blob, dipped in the middle of the top edge, tapering to the left.
+ */
+const STEAK_OUTLINE = [
+  [0.02, 0.50], [0.05, 0.30], [0.14, 0.15], [0.28, 0.07], [0.40, 0.11],
+  [0.50, 0.06], [0.64, 0.00], [0.80, 0.02], [0.93, 0.12], [1.00, 0.32],
+  [0.99, 0.58], [0.92, 0.79], [0.78, 0.93], [0.58, 1.00], [0.34, 1.00],
+  [0.14, 0.88], [0.04, 0.70],
+];
+function steak(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  poly(s, B, 0.00, 0.24, 1.00, 0.76, STEAK_OUTLINE, { fill: { color: C.orangeXD } });
+  poly(s, B, 0.00, 0.00, 1.00, 0.82, STEAK_OUTLINE,
+    { fill: { color: C.redD }, line: { color: 'F77E7E', width: 1 } });
+  shp(s, 'ellipse', B, 0.68, 0.12, 0.16, 0.14, { fill: { color: C.white } });
+  [[0.14, 0.38, 0.30], [0.50, 0.42, 0.26], [0.32, 0.56, 0.24]].forEach(m =>
+    poly(s, B, m[0], m[1], m[2], 0.055,
+      [[0, 0.4], [0.6, 0], [1, 0.5], [0.5, 1]],
+      { fill: { color: C.creamL, transparency: 50 } }));
+}
+
+/** Aubergine / eggplant: bulb at the lower-left, calyx at the upper-right. */
+function eggplant(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  poly(s, B, 0.00, 0.14, 1.00, 0.86,
+    [[0.58, 0.00], [0.80, 0.05], [0.94, 0.20], [0.99, 0.42], [0.92, 0.66],
+     [0.74, 0.87], [0.50, 0.99], [0.26, 1.00], [0.08, 0.90], [0.01, 0.72],
+     [0.05, 0.53], [0.20, 0.39], [0.40, 0.26], [0.51, 0.12]],
+    { fill: { color: C.purple }, line: { color: C.purpleD, width: 2.25 } });
+  poly(s, B, 0.40, 0.14, 0.60, 0.86,
+    [[0.30, 0.00], [0.67, 0.05], [0.90, 0.20], [0.98, 0.42], [0.87, 0.66],
+     [0.44, 0.92], [0.06, 1.00], [0.32, 0.76], [0.56, 0.48], [0.62, 0.20]],
+    { fill: { color: C.purpleD } });
+  poly(s, B, 0.07, 0.52, 0.11, 0.30,
+    [[0.55, 0.00], [1.00, 0.10], [0.60, 0.55], [0.85, 1.00], [0.15, 0.62], [0.00, 0.22]],
+    { fill: { color: C.white, transparency: 70 } });
+  poly(s, B, 0.30, 0.04, 0.68, 0.26,
+    [[0.00, 0.42], [0.22, 0.02], [0.44, 0.36], [0.66, 0.00], [0.80, 0.42],
+     [1.00, 0.30], [0.86, 0.74], [0.50, 1.00], [0.20, 0.80]],
+    { fill: { color: C.greenD } });
+  shp(s, 'roundRect', B, 0.52, 0.00, 0.07, 0.11,
+    { rectRadius: 0.02 * h, fill: { color: C.greenD } });
+}
+
+/** Pair of cherries hanging from two stems, with a leaf. */
+function cherries(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  capsule(s, x + w * 0.24, y + h * 0.18, w * 0.05, h * 0.34, C.green, 20);
+  capsule(s, x + w * 0.60, y + h * 0.12, w * 0.05, h * 0.42, C.green, -6);
+  shp(s, 'ellipse', B, 0.60, 0.00, 0.40, 0.20, { rotate: -18, fill: { color: C.greenD } });
+  [[0.00, 0.44], [0.42, 0.46]].forEach(p => {
+    shp(s, 'ellipse', B, p[0], p[1], 0.58, 0.56,
+      { fill: { color: C.redD }, line: { color: C.redXD, width: 2.25 } });
+    shp(s, 'ellipse', B, p[0] + 0.14, p[1] + 0.20, 0.14, 0.13,
+      { fill: { color: C.redL, transparency: 20 } });
+  });
+}
+
+/**
+ * Ragged kale leaf: an egg-shaped blade (narrow at the stalk, broad at the
+ * tip) whose rim alternates between points and notches.
+ */
+function kaleLeaf(s, B, nx, ny, nw, nh, color, tilt) {
+  const pts = [];
+  const N = 40;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 ? 0.50 : 0.43;                        // point / notch
+    const taper = 0.62 + 0.38 * (1 - Math.sin(a)) / 2;    // narrow at the base
+    pts.push([0.5 + Math.cos(a) * r * taper, 0.5 + Math.sin(a) * r]);
+  }
+  poly(s, B, nx, ny, nw, nh, pts, { fill: { color }, rotate: tilt || 0 });
+}
+
+/** Bunch of kale: three ragged leaves over two pale stalks, plus mid-ribs. */
+function lettuce(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  capsule(s, x + w * 0.26, y + h * 0.62, w * 0.06, h * 0.38, C.greenL, 6);
+  capsule(s, x + w * 0.60, y + h * 0.62, w * 0.06, h * 0.38, C.greenL, -6);
+  kaleLeaf(s, B, -0.04, -0.02, 0.74, 0.80, C.greenD, -8);
+  kaleLeaf(s, B, 0.40, 0.10, 0.66, 0.76, C.greenXD, 8);
+  kaleLeaf(s, B, 0.20, 0.34, 0.48, 0.58, C.green, 0);
+  poly(s, B, 0.26, 0.10, 0.09, 0.58, [[0.45, 0], [1, 1], [0, 1]],
+    { fill: { color: C.greenL } });
+  poly(s, B, 0.66, 0.24, 0.09, 0.50, [[0.55, 0], [1, 1], [0, 1]],
+    { fill: { color: C.greenL } });
+  poly(s, B, 0.40, 0.42, 0.07, 0.38, [[0.5, 0], [1, 1], [0, 1]],
+    { fill: { color: C.greenL } });
+}
+
+/** Boiling pot; `opt.fire` adds flames, `opt.bubbles` adds steam dots.
+ *  The reference pot occupies the lower ~2/3 of its box, rim included. */
+function pot(s, x, y, w, h, opt) {
+  const o = opt || {};
+  const B = box(x, y, w, h);
+  shp(s, 'ellipse', B, 0.15, 0.85, 0.72, 0.15, { fill: { color: C.shadow, transparency: 25 } });
+  shp(s, 'rect', B, 0.17, 0.72, 0.035, 0.25, { fill: { color: C.black } });
+  shp(s, 'rect', B, 0.49, 0.79, 0.035, 0.21, { fill: { color: C.black } });
+  shp(s, 'rect', B, 0.80, 0.72, 0.035, 0.25, { fill: { color: C.black } });
+  shp(s, 'roundRect', B, -0.07, 0.30, 0.21, 0.10,
+    { rotate: 348, rectRadius: 0.02, fill: { color: C.black } });
+  shp(s, 'roundRect', B, 0.86, 0.30, 0.21, 0.10,
+    { rotate: 12, rectRadius: 0.02, fill: { color: C.black } });
+  shp(s, 'round2SameRect', B, 0.05, 0.12, 0.90, 0.71, { rotate: 180, fill: { color: C.grey } });
+  shp(s, 'round2SameRect', B, 0.58, 0.12, 0.37, 0.71,
+    { rotate: 180, fill: { color: C.greyD, transparency: 20 } });
+  shp(s, 'rect', B, 0.20, 0.20, 0.16, 0.63, { fill: { color: C.white, transparency: 80 } });
+  shp(s, 'ellipse', B, 0.02, 0.05, 0.96, 0.19, { fill: { color: C.greyL } });
+  shp(s, 'ellipse', B, 0.07, 0.08, 0.86, 0.12, { fill: { color: o.water || C.sky } });
+  if (o.fire) {
+    poly(s, B, 0.20, 0.40, 0.60, 0.42,
+      [[0.00, 0.62], [0.16, 0.36], [0.22, 0.60], [0.34, 0.10], [0.50, 0.00],
+       [0.58, 0.34], [0.76, 0.48], [0.94, 0.42], [1.00, 0.62], [0.86, 1.00], [0.12, 1.00]],
+      { fill: { color: C.red } });
+    poly(s, B, 0.33, 0.58, 0.33, 0.26,
+      [[0.10, 0.60], [0.30, 0.22], [0.36, 0.52], [0.58, 0.00], [0.78, 0.34],
+       [1.00, 0.52], [0.82, 1.00], [0.20, 1.00]],
+      { fill: { color: C.orange } });
+  }
+  if (o.bubbles) {
+    [[0.40, -0.30, 0.075], [0.66, -0.38, 0.05], [0.50, -0.20, 0.042],
+     [0.60, -0.25, 0.058], [0.42, -0.09, 0.068]].forEach(b =>
+      shp(s, 'ellipse', B, b[0], b[1], b[2], b[2] * (w / h),
+        { fill: { color: b[1] < -0.28 ? '95C8F7' : '61ADF3' } }));
+  }
+}
+
+/** Just the basket: tapered tub, three red slats and the rim + handle bar. */
+function basketBody(s, x, y, w, h, color) {
+  const B = box(x, y, w, h);
+  const bar = color || C.orange;
+  const tub = color ? '9CC9F5' : C.cream;
+  poly(s, B, 0.05, 0.22, 0.90, 0.78,
+    [[0, 0], [1, 0], [0.90, 1], [0.10, 1]], { fill: { color: tub } });
+  [[0.14, 0.34, 0.66], [0.17, 0.52, 0.60], [0.22, 0.70, 0.50]].forEach(sl =>
+    capsule(s, x + w * sl[0], y + h * sl[1], w * sl[2], h * 0.09, C.redD, 0));
+  shp(s, 'roundRect', B, 0.00, 0.02, 1.00, 0.22, { rectRadius: 0.03, fill: { color: bar } });
+  capsule(s, x + w * 0.42, y + h * 0.075, w * 0.55, h * 0.10, C.greyL, 0);
+  shp(s, 'ellipse', B, 0.39, 0.048, 0.10, 0.145, { fill: { color: C.greyD } });
+  shp(s, 'ellipse', B, 0.13, 0.98, 0.74, 0.18, { fill: { color: C.shadow, transparency: 40 } });
+}
+
+/** Shopping basket with tomato / cucumber / carrot poking over the rim.
+ *  The tub occupies the lower ~54% of the box, exactly as in the original. */
+function basket(s, x, y, w, h, color) {
+  tomato(s, x + w * 0.063, y + h * 0.084, w * 0.431, h * 0.415);
+  cucumber(s, x + w * 0.232, y + h * 0.163, w * 0.393, h * 0.500);
+  carrot(s, x + w * 0.601, y, w * 0.233, h * 0.782);
+  basketBody(s, x, y + h * 0.464, w, h * 0.536, color);
+}
+
+/** Kitchen scale showing "1.0". */
+function scale(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  shp(s, 'rect', B, 0.02, 0.00, 0.90, 0.10, { fill: { color: C.greyL } });
+  shp(s, 'rect', B, 0.38, 0.08, 0.22, 0.13, { fill: { color: C.silver } });
+  shp(s, 'round2SameRect', B, 0.05, 0.19, 0.90, 0.64, { fill: { color: C.orange } });
+  shp(s, 'roundRect', B, 0.14, 0.28, 0.72, 0.31,
+    { rectRadius: 0.06, fill: { color: C.sky } });
+  poly(s, B, 0.24, 0.29, 0.16, 0.29, [[0.4, 0], [1, 0], [0.6, 1], [0, 1]],
+    { fill: { color: C.white, transparency: 45 } });
+  s.addText('1.0', {
+    x: x + w * 0.55, y: y + h * 0.30, w: w * 0.32, h: h * 0.27,
+    fontFace: F.body, fontSize: 27 * Math.min(1, w / 3.94), bold: true,
+    color: C.ink, align: 'right', valign: 'middle', wrap: false, inset: 0,
+  });
+  shp(s, 'roundRect', B, 0.09, 0.75, 0.82, 0.11, { rectRadius: 0.03, fill: { color: 'D38A04' } });
+  shp(s, 'rect', B, 0.10, 0.86, 0.16, 0.10, { fill: { color: C.black } });
+  shp(s, 'rect', B, 0.74, 0.86, 0.16, 0.10, { fill: { color: C.black } });
+}
+
+/** Tall glass of juice: white cup, straw, then the drink poured over it. */
+function juiceGlass(s, x, y, w, h, juiceColor) {
+  const B = box(x, y, w, h);
+  const jc = juiceColor || '5B993C';
+  poly(s, B, 0.00, 0.13, 1.00, 0.87,
+    [[0, 0], [1, 0], [0.90, 1], [0.10, 1]], { fill: { color: C.white } });
+  // straw: one leaning capsule, then evenly spaced light bands along it
+  const sw = w * 0.10, sh = h * 0.42, sx = x + w * 0.62, sy = y, tilt = 12;
+  capsule(s, sx, sy, sw, sh, C.orange, tilt);
+  const lean = Math.tan(tilt * Math.PI / 180);
+  [0.10, 0.30, 0.50, 0.70].forEach(t => {
+    const dy = sh * (t - 0.5);
+    capsule(s, sx + dy * lean, sy + sh * t, sw, h * 0.045, C.cream, tilt);
+  });
+  poly(s, B, 0.09, 0.26, 0.82, 0.66,
+    [[0, 0], [1, 0], [0.94, 1], [0.06, 1]], { fill: { color: jc } });
+  capsule(s, x + w * 0.19, y + h * 0.82, w * 0.20, h * 0.045, C.greenL, 0);
+  shp(s, 'ellipse', B, 0.14, 0.97, 0.72, 0.09, { fill: { color: C.shadow, transparency: 40 } });
+}
+
+/** Boiled egg: white oval with a coloured yolk. */
+function egg(s, x, y, w, h, yolk) {
+  s.addShape('ellipse', {
+    x, y, w, h, fill: { color: C.white }, line: { color: C.shadow, width: 0.75 },
+    shadow: { type: 'outer', color: '000000', opacity: 0.18, blur: 14, offset: 2, angle: 90 },
+  });
+  s.addShape('ellipse', {
+    x: x + w * 0.215, y: y + h * 0.305, w: w * 0.57, h: h * 0.49,
+    fill: { color: yolk }, line: NONE,
+  });
+}
+
+/** Open hand offering food: flat palm to the right, white cuff at lower-left. */
+function hand(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  poly(s, B, 0.22, 0.00, 0.78, 0.62,
+    [[0.20, 0.10], [0.58, 0.00], [0.86, 0.00], [1.00, 0.06], [0.90, 0.40],
+     [0.68, 0.62], [0.12, 0.90], [0.00, 0.62]],
+    { fill: { color: C.creamL }, line: NONE });
+  poly(s, B, 0.00, 0.26, 0.41, 0.74,
+    [[0.55, 0.00], [1.00, 0.42], [0.45, 1.00], [0.00, 0.58]],
+    { fill: { color: C.chip }, line: { color: C.shadow, width: 0.75 } });
+}
+
+/** Knife + fork silhouette (fork on the right, five tines). */
+function cutlery(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  poly(s, B, 0.00, 0.00, 0.40, 0.52,
+    [[1.00, 0.00], [1.00, 1.00], [0.32, 1.00], [0.00, 0.52], [0.26, 0.16]],
+    { fill: { color: C.silver } });
+  shp(s, 'roundRect', B, 0.16, 0.46, 0.24, 0.54,
+    { rectRadius: 0.11 * w, fill: { color: C.silver } });
+  [0, 1, 2, 3, 4].forEach(i =>
+    capsule(s, x + w * (0.52 + i * 0.105), y + h * 0.005, w * 0.055, h * 0.34, C.silver, 0));
+  poly(s, B, 0.50, 0.24, 0.50, 0.26,
+    [[0, 0], [1, 0], [0.94, 0.55], [0.60, 1.00], [0.38, 1.00], [0.06, 0.55]],
+    { fill: { color: C.silver } });
+  shp(s, 'roundRect', B, 0.66, 0.45, 0.18, 0.55,
+    { rectRadius: 0.09 * w, fill: { color: C.silver } });
+}
+
+/** Round plate carrying a steak and two garnish cubes.
+ *  The plate is the lower ~3/4 of the box; the steak overhangs its back edge. */
+function plateSteak(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  shp(s, 'ellipse', B, 0.00, 0.38, 1.00, 0.62, { fill: { color: C.silver } });
+  shp(s, 'ellipse', B, 0.00, 0.24, 1.00, 0.62, { fill: { color: C.black } });
+  shp(s, 'ellipse', B, 0.06, 0.31, 0.88, 0.48, { fill: { color: C.chip } });
+  steak(s, x + w * 0.16, y, w * 0.52, h * 0.70);
+  poly(s, B, 0.80, 0.34, 0.08, 0.20, [[0.5, 0], [1, 0.6], [0.5, 1], [0, 0.6]],
+    { fill: { color: C.green } });
+  poly(s, B, 0.71, 0.46, 0.08, 0.18, [[0.5, 0], [1, 0.6], [0.5, 1], [0, 0.6]],
+    { fill: { color: C.green } });
+  poly(s, B, 0.73, 0.32, 0.07, 0.13, [[0, 0], [1, 0], [0.85, 1], [0.15, 1]],
+    { fill: { color: C.orange }, line: { color: C.orangeXD, width: 1 } });
+  poly(s, B, 0.79, 0.46, 0.08, 0.14, [[0, 0], [1, 0], [0.85, 1], [0.15, 1]],
+    { fill: { color: C.orange }, line: { color: C.orangeXD, width: 1 } });
+}
+
+/** Balance scales carrying two baskets of produce. */
+function balance(s, x, y, w, h) {
+  const B = box(x, y, w, h);
+  basket(s, x + w * 0.02, y + h * 0.04, w * 0.36, h * 0.62, null);
+  basket(s, x + w * 0.62, y + h * 0.04, w * 0.36, h * 0.62, C.blue);
+  poly(s, B, 0.14, 0.02, 0.72, 0.10,
+    [[0, 0.75], [0.24, 0.10], [0.50, 0.00], [0.76, 0.10], [1, 0.75],
+     [0.92, 1.00], [0.72, 0.34], [0.50, 0.24], [0.28, 0.34], [0.08, 1.00]],
+    { fill: { color: C.greyL } });
+  shp(s, 'ellipse', B, 0.42, 0.00, 0.16, 0.12, { fill: { color: C.greyL } });
+  shp(s, 'ellipse', B, 0.13, 0.05, 0.09, 0.07, { fill: { color: C.greyL } });
+  shp(s, 'ellipse', B, 0.78, 0.05, 0.09, 0.07, { fill: { color: C.greyL } });
+  shp(s, 'rect', B, 0.44, 0.06, 0.12, 0.76, { fill: { color: C.greyL } });
+  shp(s, 'ellipse', B, 0.40, 0.04, 0.20, 0.16, { fill: { color: C.greyL } });
+  [0.02, 0.62].forEach(o => {
+    poly(s, B, o, 0.06, 0.36, 0.52,
+      [[0.5, 0], [0.56, 0], [1, 1], [0.92, 1], [0.53, 0.14], [0.08, 1], [0, 1]],
+      { fill: { color: C.greyL } });
+    shp(s, 'pie', B, o, 0.36, 0.36, 0.36,
+      { angleRange: [0, 180], fill: { color: C.greyL } });
+  });
+  shp(s, 'roundRect', B, 0.36, 0.80, 0.28, 0.12, { rectRadius: 0.05, fill: { color: C.greyL } });
+  shp(s, 'roundRect', B, 0.28, 0.90, 0.44, 0.10, { rectRadius: 0.04, fill: { color: C.greyL } });
+}
+
+/* ------------------------------------------------------------------ *
+ * Re-used copy
+ * ------------------------------------------------------------------ */
+const LOREM = {
+  intro: 'Lorem Ipsum\u00A0is simply dummy text of the printing and simply dummy text of the ' +
+    'PLACEHOLDER',
+  wide: 'Lorem Ipsum\u00A0is simply dummy text of the printing and simply dummy text of the ' +
+    'printing and simply dummy text of  the printing and simply dummy',
+  card: 'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting dummy text of ' +
+    'the printing Ipsum\u00A0is simply',
+  short: 'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting \u00A0is simply ' +
+    'dummy text typesetting',
+  dot: 'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting dummy text of the printing',
+  block: 'Lorem Ipsum\u00A0is simply dummy text of the printing and simply dummy text of the ' +
+    'printing and simply dummy text of the printing and dummy text of the printing and \u00A0is simply dummy',
+  industry: 'Lorem Ipsum\u00A0is simply dummy text of the printing industry. dummy text of the ' +
+    'printing and typesetting industry. Lorem text of the printing and typesetting industry. ',
+  bar: 'Lorem Ipsum\u00A0is simply dummy text of the printing and simply dummy text of the dummy text ',
+};
+
+/* ------------------------------------------------------------------ *
+ * Slides
+ * ------------------------------------------------------------------ */
+const builders = [];
+const slide = fn => builders.push(fn);
+
+/* 1 - cover */
+slide(s => {
+  s.addShape('roundRect', {
+    x: 0.566, y: 0.55, w: 8.929, h: 4.572,
+    rectRadius: rr(8.929, 4.572, 0.092), fill: { color: C.mint }, line: NONE,
+  });
+  // produce pile, back to front
+  orangeFruit(s, 5.033, 3.683, 1.087, 1.261);
+  steak(s, 5.207, 4.363, 1.649, 1.239);
+  cherries(s, 8.019, 3.760, 1.669, 1.834);
+  tomato(s, 7.251, 2.437, 1.241, 1.399);
+  cucumber(s, 8.162, 2.502, 1.131, 2.161);
+  carrot(s, 6.783, 2.158, 0.672, 2.634);
+  eggplant(s, 6.863, 3.319, 1.546, 2.182);
+
+  s.addText([
+    { text: 'HEALTHY\nFOOD\n', options: { color: C.ink } },
+    { text: 'INFOGRAPHIC', options: { color: '4D8233' } },
+  ], {
+    x: 0.978, y: 0.85, w: 4.55, h: 2.146, fontFace: F.head, fontSize: 40.5,
+    bold: true, valign: 'top', lineSpacingMultiple: 0.95,
+  });
+  body(s, 0.997, 3.384, 3.659, 0.704, LOREM.intro);
+  pill(s, 6.636, 1.102, 1.625, 0.453, { fg: C.blue });
+  pill(s, 8.402, 1.100, 1.625, 0.453, { fill: C.orange, fg: C.white });
+  s.addText('More Information . . . ', {
+    x: 1.044, y: 4.340, w: 2.57, h: 0.252, fontFace: F.body, fontSize: 9,
+    bold: true, italic: true, color: C.ink, valign: 'bottom',
+  });
+});
+
+/* 2 - pot on the left, copy on the right */
+slide(s => {
+  carrot(s, 1.581, 0.778, 0.808, 1.815);
+  cucumber(s, 2.744, 1.610, 0.914, 1.257);
+  tomato(s, 2.972, 2.093, 0.658, 0.841);
+  pot(s, 1.045, 2.300, 3.187, 2.810, { fire: true });
+
+  deckTitle(s, 5.45, 0.978, 4.55, { stacked: true });
+  legend(s, 5.643, 2.569, C.blue, 'HEALTHY FOOD');
+  body(s, 5.584, 2.974, 3.659, 1.329,
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and simply dummy text of the ' +
+    'PLACEHOLDER' +
+    'PLACEHOLDER' +
+    'PLACEHOLDER' +
+    'printing and dummy text');
+  pill(s, 5.657, 4.642, 2.248, 0.495, { fg: C.blue, text: 'Lorem Ipsum\u00A0is simply' });
+});
+
+/* 3 - four outline cards around cutlery */
+slide(s => {
+  deckTitle(s, 1.155, 0.644, 7.614, { align: 'center' });
+  cutlery(s, 4.368, 1.510, 1.442, 3.400);
+  const cards = [
+    { x: 0.888, y: 2.053, tx: 1.738, ty: 2.218, bx: 1.738, by: 2.582, bw: 2.131,
+      accent: C.orange2, align: 'left',
+      text: 'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting \u00A0is simply dummy text of' },
+    { x: 0.890, y: 3.528, tx: 1.728, ty: 3.681, bx: 1.728, by: 4.045, bw: 2.140,
+      accent: C.blue, align: 'left',
+      text: 'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting is simply dummy text of' },
+    { x: 6.173, y: 2.036, tx: 6.622, ty: 2.199, bx: 6.320, by: 2.563, bw: 2.006,
+      accent: C.orange, align: 'right',
+      text: 'Lorem Ipsum\u00A0is simply dummy text simply dummy text of the printing and of the' },
+    { x: 6.174, y: 3.511, tx: 6.634, ty: 3.657, bx: 6.320, by: 4.021, bw: 2.018,
+      accent: C.orange2, align: 'right',
+      text: 'Lorem Ipsum\u00A0is simply dummy text simply dummy text of the printing and of the' },
+  ];
+  cards.forEach(c => {
+    s.addShape('roundRect', {
+      x: c.x, y: c.y, w: 3.135, h: 1.35, rectRadius: rr(3.135, 1.35, 0.109),
+      fill: NONE, line: { color: C.greyL, width: 0.75 },
+    });
+    cardTitle(s, c.tx, c.ty, 1.704, c.accent, { align: c.align });
+    body(s, c.bx, c.by, c.bw, 0.704, c.text, { align: c.align });
+  });
+  carrot(s, 0.980, 1.394, 0.561, 2.077);
+  tomato(s, 0.628, 3.585, 0.989, 1.114);
+  steak(s, 8.473, 2.244, 1.180, 0.886);
+  cucumber(s, 8.717, 3.271, 0.832, 1.589);
+});
+
+/* 4 - scale with lettuce */
+slide(s => {
+  s.addShape('rect', { x: 0, y: 3.419, w: 10, h: 2.206, fill: { color: C.mint }, line: NONE });
+  lettuce(s, 1.100, 1.180, 3.100, 2.100);
+  scale(s, 0.795, 2.908, 3.943, 2.042);
+  deckTitle(s, 5.448, 0.918, 4.154, { stacked: true });
+  body(s, 5.5, 2.301, 3.489, 0.912, LOREM.industry +
+    'simply dummy text of the printing and typesetting dummy text');
+  body(s, 5.534, 3.637, 3.470, 0.704, LOREM.industry);
+  moreInfo(s, 5.629, 4.694, { fill: C.red });
+  moreInfo(s, 6.562, 4.684);
+});
+
+/* 5 - three coloured statistic columns */
+slide(s => {
+  deckTitle(s, 1.155, 0.644, 7.614, { align: 'center' });
+  const cols = [
+    { x: 0.626, y: 3.251, h: 2.376, color: C.orange, label: 'FRESH FRUIT', pct: '80%',
+      ly: 3.447, py: 3.697, tx: 1.027, ty: 4.289, tw: 2.217, th: 0.912, lx: 1.246, px: 1.237,
+      text: 'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting is simply ' +
+        'PLACEHOLDER' },
+    { x: 3.592, y: 4.063, h: 1.564, color: C.green, label: 'HEALTHY DRINK', pct: '60%',
+      ly: 4.230, py: 4.432, tx: 3.993, ty: 4.976, tw: 2.140, th: 0.496, lx: 4.141, px: 4.149,
+      text: 'Lorem Ipsum\u00A0is simply dummy text of the printing and' },
+    { x: 6.558, y: 3.533, h: 2.094, color: C.red, label: 'GOOD FOOD', pct: '70%',
+      ly: 3.734, py: 3.944, tx: 7.035, ty: 4.520, tw: 2.140, th: 0.704, lx: 7.246, px: 7.146,
+      text: 'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting is simply dummy text of' },
+  ];
+  orangeFruit(s, 1.468, 1.618, 1.309, 1.518);
+  juiceGlass(s, 4.395, 1.664, 1.185, 2.132);
+  steak(s, 7.199, 1.958, 1.800, 1.352);
+  cols.forEach(c => {
+    s.addShape('rect', { x: c.x, y: c.y, w: 2.966, h: c.h, fill: { color: c.color }, line: NONE });
+    s.addText(c.label, {
+      x: c.lx, y: c.ly, w: 1.789, h: 0.271, fontFace: F.body, fontSize: 10.13,
+      bold: true, color: C.white, align: 'center', valign: 'top',
+    });
+    s.addText(c.pct, {
+      x: c.px, y: c.py, w: 1.789, h: 0.555, fontFace: F.body, fontSize: 27,
+      bold: true, color: C.white, align: 'center', valign: 'top',
+    });
+    body(s, c.tx, c.ty, c.tw, c.th, c.text, { align: 'center', color: C.white });
+  });
+});
+
+/* 6 - copy left, two tinted cards right */
+slide(s => {
+  deckTitle(s, 0.719, 0.958, 4.744, { stacked: true });
+  body(s, 0.77, 2.594, 3.197, 1.537,
+    LOREM.industry + 'PLACEHOLDER' +
+    'printing text of the printing and typesetting industry. Lorem text of the typesetting industry. simply');
+  moreInfo(s, 0.899, 4.735, { fill: C.blue });
+  moreInfo(s, 1.832, 4.724);
+  [{ y: 0.743, tint: C.sky }, { y: 3.210, tint: C.mintD }].forEach(card => {
+    s.addShape('roundRect', {
+      x: 4.592, y: card.y, w: 3.916, h: 2.07, rectRadius: rr(3.916, 2.07, 0.066),
+      fill: { color: card.tint }, line: NONE,
+    });
+    cardTitle(s, 4.793, card.y + 0.114, 2.304, null);
+    body(s, 4.793, card.y + 0.383, 2.793, 0.496,
+      'Lorem Ipsum\u00A0is simply dummy text of\nthe printing and typesetting');
+    descCard(s, 4.788, card.y + 1.045, 2.492, 0.846);
+  });
+  basket(s, 7.599, 0.538, 1.933, 2.261);
+  tomato(s, 7.556, 3.195, 0.85, 0.96);
+  cucumber(s, 8.10, 3.30, 1.10, 1.30);
+  hand(s, 7.556, 4.290, 1.898, 1.118);
+});
+
+/* 7 - three tinted cards + copy */
+slide(s => {
+  deckTitle(s, 5.204, 0.870, 4.569, { stacked: true });
+  body(s, 5.262, 2.194, 3.717, 0.704,
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting \u00A0is simply dummy ' +
+    'text typesetting simply dummy text of the printing and typesetting \u00A0is simply dummy ');
+  [{ x: 0.629, y: 1.070, tint: C.lilac, tx: 0.807 },
+   { x: 0.629, y: 3.283, tint: C.mint, tx: 0.826 },
+   { x: 5.094, y: 3.283, tint: C.peach, tx: 5.273 }].forEach(c => {
+    s.addShape('roundRect', {
+      x: c.x, y: c.y, w: 3.916, h: 1.751, rectRadius: rr(3.916, 1.751, 0.066),
+      fill: { color: c.tint }, line: NONE,
+    });
+    cardTitle(s, c.tx, c.y + 0.239, 2.304, null);
+    body(s, c.tx, c.y + 0.610, 2.793, 0.704, LOREM.card);
+  });
+  eggplant(s, 3.229, 0.950, 1.291, 1.822);
+  cucumber(s, 3.375, 3.408, 0.971, 1.856);
+  carrotPair(s, 7.824, 3.000, 1.220, 2.345);
+});
+
+/* 8 - two text columns + boiling pot */
+slide(s => {
+  deckTitle(s, 0.826, 0.899, 4.744, { stacked: true });
+  cardTitle(s, 0.826, 2.537, 2.57, C.orange2);
+  body(s, 0.826, 3.143, 2.068, 1.329, LOREM.block);
+  cardTitle(s, 3.083, 2.510, 2.57, C.blue);
+  body(s, 3.083, 3.115, 2.068, 1.329, LOREM.block);
+  moreInfo(s, 0.899, 4.735, { fill: C.orange2 });
+  moreInfo(s, 3.157, 4.747);
+  pot(s, 5.571, 2.462, 3.962, 2.731, { fire: true, bubbles: true });
+});
+
+/* 9 - basket with a 2x2 title grid */
+slide(s => {
+  s.addShape('rect', { x: 0, y: 0, w: 2.595, h: 5.625, fill: { color: C.mint }, line: NONE });
+  basket(s, 0.648, 0.784, 3.468, 4.057);
+  deckTitle(s, 4.707, 1.114, 4.744, { stacked: true });
+  const grid = [
+    { x: 4.707, ty: 2.608, by: 2.972, bw: 2.263, accent: C.orange2 },
+    { x: 7.098, ty: 2.559, by: 2.930, bw: 2.314, accent: C.green },
+    { x: 4.707, ty: 4.058, by: 4.455, bw: 2.314, accent: C.red },
+    { x: 7.098, ty: 4.009, by: 4.412, bw: 2.314, accent: C.blue },
+  ];
+  grid.forEach(g => {
+    cardTitle(s, g.x, g.ty, 1.516, g.accent);
+    body(s, g.x, g.by, g.bw, 0.704, LOREM.short);
+  });
+});
+
+/* 10 - two vitamin cards with square ratings */
+slide(s => {
+  deckTitle(s, 1.155, 0.700, 7.614, { align: 'center' });
+  body(s, 1.408, 1.596, 7.184, 0.496, LOREM.wide, { align: 'center' });
+  const cards = [
+    { x: 0.877, tint: C.sky, label: 'VITAMIN A', filled: 5, color: C.orange, pct: '80%', px: 4.096 },
+    { x: 5.174, tint: C.peach2, label: 'VITAMIN C', filled: 6, color: C.red, pct: '90%', px: 8.393 },
+  ];
+  cards.forEach(c => {
+    s.addShape('roundRect', {
+      x: c.x, y: 2.432, w: 4.044, h: 2.716, rectRadius: rr(4.044, 2.716, 0.066),
+      fill: { color: c.tint }, line: NONE,
+    });
+    s.addText(c.label, {
+      x: c.x + 0.341, y: 2.751, w: 2.304, h: 0.271, fontFace: F.body, fontSize: 10.13,
+      bold: true, color: C.ink, valign: 'bottom',
+    });
+    body(s, c.x + 0.296, 3.230, 3.497, 0.912,
+      'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting dummy text of the ' +
+      'printing Ipsum\u00A0is simply Ipsum\u00A0is simply dummy text of the printing and ' +
+      'typesetting dummy text of the printing and');
+    for (let i = 0; i < 7; i++) {
+      s.addShape('rect', {
+        x: c.x + 0.412 + i * 0.384, y: 4.511, w: 0.313, h: 0.222,
+        fill: { color: i < c.filled ? c.color : C.chip }, line: NONE,
+      });
+    }
+    s.addText(c.pct, {
+      x: c.px, y: 4.502, w: 1.016, h: 0.271, fontFace: F.body, fontSize: 10.13,
+      bold: true, color: C.ink, valign: 'bottom',
+    });
+  });
+});
+
+/* 11 - three boiled eggs with timing pills */
+slide(s => {
+  deckTitle(s, 1.155, 0.644, 7.614, { align: 'center' });
+  const eggs = [
+    { x: 1.455, yolk: C.orange, px: 1.478, label: '4 MINUTES', pill: C.orange2 },
+    { x: 4.153, yolk: 'F8C877', px: 4.165, label: '10 MINUTES', pill: C.red },
+    { x: 6.852, yolk: 'FBE0B4', px: 6.875, label: '14 MINUTES', pill: C.blue },
+  ];
+  eggs.forEach(e => {
+    egg(s, e.x, 1.638, 1.672, 2.072, e.yolk);
+    s.addShape('roundRect', {
+      x: e.px, y: 3.973, w: 1.648, h: 0.366, rectRadius: rr(1.648, 0.366, 0.12),
+      fill: { color: e.pill }, line: NONE,
+    });
+    s.addText(e.label, {
+      x: e.px, y: 3.999, w: 1.648, h: 0.303, fontFace: F.body, fontSize: 12,
+      bold: true, color: C.white, align: 'center', valign: 'bottom',
+    });
+  });
+  body(s, 1.397, 4.746, 7.184, 0.496, LOREM.wide, { align: 'center' });
+});
+
+/* 12 - donut chart of four block arcs */
+slide(s => {
+  s.addShape('round2SameRect', {
+    x: 4.315, y: -0.378, w: 2.661, h: 7.326, rotate: 90,
+    fill: { color: C.sky, transparency: 50 }, line: NONE,
+  });
+  const arcs = [
+    { color: C.red, rotate: 309.41, flipH: true },
+    { color: C.orange2, rotate: 230.59, flipH: false },
+    { color: C.blue, rotate: 10.62, flipH: true },
+    { color: C.green, rotate: 169.38, flipH: false },
+  ];
+  arcs.forEach(a => {
+    s.addShape('blockArc', {
+      x: 1.069, y: 1.125, w: 3.658, h: 3.658, rotate: a.rotate, flipH: a.flipH,
+      angleRange: [250.19, 306.28], arcThicknessRatio: 0.4306,
+      fill: { color: a.color, transparency: 66 }, line: NONE,
+    });
+    s.addShape('blockArc', {
+      x: 1.328, y: 1.389, w: 3.141, h: 3.141, rotate: a.rotate, flipH: a.flipH,
+      angleRange: [250.19, 306.28], arcThicknessRatio: 0.4306,
+      fill: { color: a.color }, line: NONE,
+    });
+  });
+  s.addShape('ellipse', {
+    x: 2.247, y: 2.267, w: 1.379, h: 1.385, fill: { color: C.white }, line: NONE,
+    shadow: { type: 'outer', color: '000000', opacity: 0.15, blur: 10, offset: 2, angle: 90 },
+  });
+  s.addText('2022', {
+    x: 1.988, y: 2.785, w: 1.901, h: 0.538, fontFace: F.body, fontSize: 24,
+    bold: true, color: '373545', align: 'center', valign: 'top',
+  });
+  cucumber(s, 0.744, 1.142, 0.874, 1.670);
+  tomato(s, 3.085, 0.891, 1.160, 1.307);
+  cherries(s, 0.681, 3.393, 1.253, 1.377);
+  orangeFruit(s, 3.298, 3.647, 1.105, 1.281);
+
+  deckTitle(s, 4.755, 0.804, 5.098, { stacked: true });
+  cardTitle(s, 4.791, 2.284, 2.57, C.orange2);
+  body(s, 4.791, 2.787, 4.0, 1.121,
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and simply dummy text of the ' +
+    'PLACEHOLDER' +
+    '\u00A0is simply dummy the printing and simply dummy text of the printing and dummy ' +
+    'text of the printing and \u00A0is simply dummy dummy text of the printing ');
+  pill(s, 5.522, 4.317, 1.625, 0.453, { fg: C.blue });
+  pill(s, 7.288, 4.315, 1.625, 0.453, { fill: C.red, fg: C.white });
+});
+
+/* 13 / 24 - six numbered notes around a central illustration */
+function sixPointSlide(centre, greenTitle) {
+  return s => {
+    if (greenTitle) {
+      deckTitle(s, 1.193, 0.75, 7.614, { align: 'center' });
+    } else {
+      s.addText('Healthy Food Infographic', {
+        x: 1.193, y: 0.75, w: 7.614, h: 0.606, fontFace: F.head, fontSize: 30,
+        bold: true, color: C.ink, align: 'center', valign: 'top',
+      });
+    }
+    centre(s);
+    const left = [
+      { dot: [2.713, 2.118], ty: 1.935, label: '01', color: C.orange },
+      { dot: [2.747, 3.186], ty: 3.054, label: '02', color: C.red },
+      { dot: [2.730, 4.319], ty: 4.137, label: '03', color: C.blue },
+    ];
+    const right = [
+      { dot: [6.847, 2.191], ty: 1.999, label: '04', color: C.orange },
+      { dot: [6.880, 3.259], ty: 3.118, label: '05', color: C.red },
+      { dot: [6.863, 4.392], ty: 4.201, label: '06', color: C.blue },
+    ];
+    left.forEach(n => {
+      numberDot(s, n.dot[0], n.dot[1], n.label, n.color);
+      body(s, 0.496, n.ty, 2.104, 0.704, LOREM.dot, { align: 'right' });
+    });
+    right.forEach(n => {
+      numberDot(s, n.dot[0], n.dot[1], n.label, n.color);
+      body(s, 7.455, n.ty, 2.104, 0.704, LOREM.dot);
+    });
+  };
+}
+
+slide(sixPointSlide(s => {
+  s.addShape('ellipse', { x: 3.486, y: 1.858, w: 3.16, h: 3.16, fill: { color: C.sky }, line: NONE });
+  tomato(s, 3.647, 2.336, 1.021, 1.150);
+  eggplant(s, 3.809, 2.175, 1.861, 2.627);
+  carrot(s, 5.213, 2.263, 0.604, 2.367);
+  cucumber(s, 5.676, 2.952, 0.884, 1.689);
+}));
+
+/* 14 - three photo cards */
+slide(s => {
+  deckTitle(s, 1.155, 0.644, 7.614, { align: 'center' });
+  const cards = [
+    { x: 0.297, tint: C.lilac, tx: 0.631, bx: 0.387 },
+    { x: 3.514, tint: C.mint, tx: 3.848, bx: 3.603 },
+    { x: 6.731, tint: C.sky, tx: 7.065, bx: 6.820 },
+  ];
+  plateSteak(s, 0.387, 1.830, 2.972, 1.688);
+  egg(s, 4.319, 1.555, 1.672, 2.072, C.orange);
+  carrot(s, 7.600, 1.463, 0.60, 2.085);
+  cherries(s, 8.10, 2.20, 0.93, 1.30);
+  cards.forEach(c => {
+    s.addShape('roundRect', {
+      x: c.x, y: 3.65, w: 2.972, h: 1.577, rectRadius: rr(2.972, 1.577, 0.066),
+      fill: { color: c.tint }, line: NONE,
+    });
+    cardTitle(s, c.tx, 3.889, 2.304, null, { align: 'center' });
+    body(s, c.bx, 4.260, 2.793, 0.704, LOREM.card, { align: 'center' });
+  });
+});
+
+/* 15 / 23 / 26 - a hero illustration plus a 2x2 title grid */
+function gridSlide(hero, grid) {
+  return s => {
+    hero(s);
+    deckTitle(s, grid.titleX, grid.titleY, 4.744, { stacked: true });
+    grid.cells.forEach(g => {
+      cardTitle(s, g.x, g.ty, 1.516, g.accent, { align: g.align });
+      body(s, g.bx !== undefined ? g.bx : g.x, g.by, g.bw, 0.704, g.text || LOREM.short,
+        { align: g.align });
+    });
+  };
+}
+
+slide(gridSlide(s => {
+  s.addShape('ellipse', { x: 0.488, y: 1.17, w: 3.708, h: 3.708, fill: { color: C.mint }, line: NONE });
+  carrot(s, 1.281, 0.887, 1.049, 3.882, 17);
+  carrot(s, 2.125, 0.656, 1.269, 4.696, 24);
+}, {
+  titleX: 4.806, titleY: 0.839,
+  cells: [
+    { x: 4.806, ty: 2.333, by: 2.697, bw: 2.263, accent: C.orange2 },
+    { x: 7.198, ty: 2.284, by: 2.654, bw: 2.314, accent: C.green },
+    { x: 4.806, ty: 3.782, by: 4.179, bw: 2.314, accent: C.red },
+    { x: 7.198, ty: 3.733, by: 4.137, bw: 2.314, accent: C.blue },
+  ],
+}));
+
+/* 16 - three circular icons */
+slide(s => {
+  deckTitle(s, 1.155, 0.644, 7.614, { align: 'center' });
+  [0.900, 3.734, 6.569].forEach((x, i) =>
+    s.addShape('ellipse', {
+      x, y: 1.674 + i * 0.01, w: 2.532, h: 2.532, fill: { color: C.sky }, line: NONE,
+    }));
+  steak(s, 1.088, 2.131, 2.155, 1.619);
+  pot(s, 4.019, 2.172, 1.989, 1.620, { fire: true });
+  tomato(s, 6.740, 2.018, 1.216, 1.371);
+  cucumber(s, 7.633, 2.082, 1.108, 2.118);
+  body(s, 1.397, 4.746, 7.184, 0.496, LOREM.wide, { align: 'center' });
+});
+
+/* 17 - juice glass with five numbered notes */
+slide(s => {
+  deckTitle(s, 0.724, 1.197, 4.744, { stacked: true });
+  s.addShape('ellipse', {
+    x: 4.33, y: 4.634, w: 1.755, h: 0.268,
+    fill: { color: C.shadow, transparency: 25 }, line: NONE,
+  });
+  juiceGlass(s, 4.121, 0.640, 2.172, 3.906);
+  const notes = [
+    { dot: [0.830, 2.959], label: '01', color: C.red, tx: 1.542, ty: 2.914 },
+    { dot: [0.875, 4.129], label: '02', color: C.blue, tx: 1.542, ty: 3.997 },
+    { dot: [6.592, 2.034], label: '03', color: C.orange, tx: 7.200, ty: 1.842 },
+    { dot: [6.626, 3.102], label: '04', color: C.blue, tx: 7.200, ty: 2.960 },
+    { dot: [6.609, 4.235], label: '05', color: C.green, tx: 7.200, ty: 4.044 },
+  ];
+  notes.forEach(n => {
+    numberDot(s, n.dot[0], n.dot[1], n.label, n.color);
+    body(s, n.tx, n.ty, 2.374, 0.704, LOREM.dot + ' typesetting dummy ');
+  });
+});
+
+/* 18 - two diagonal banners, scale and pot */
+slide(s => {
+  deckTitle(s, 0.749, 0.792, 7.614);
+  s.addShape('round2DiagRect', {
+    x: 2.752, y: 3.604, w: 5.758, h: 1.684, fill: { color: C.blue }, line: NONE,
+  });
+  s.addShape('round2DiagRect', {
+    x: 2.597, y: 1.716, w: 4.207, h: 1.684, fill: { color: C.red }, line: NONE,
+  });
+  cardTitle(s, 3.058, 1.940, 2.57, null, { color: C.white });
+  body(s, 3.050, 2.318, 2.838, 0.704,
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and simply dummy text of the ' +
+    'printing dummy text of the printing and dummy text', { color: C.white });
+  cardTitle(s, 3.887, 3.851, 2.57, null, { color: C.white });
+  body(s, 3.879, 4.228, 3.249, 0.704,
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and simply dummy text of the ' +
+    'PLACEHOLDER', { color: C.white });
+  lettuce(s, 6.500, 0.720, 2.100, 1.600);
+  scale(s, 6.159, 2.040, 2.838, 1.469);
+  carrot(s, 1.672, 2.506, 0.522, 1.215);
+  tomato(s, 2.219, 3.243, 0.399, 0.519);
+  cucumber(s, 2.424, 2.944, 0.462, 0.754);
+  pot(s, 1.210, 3.510, 2.290, 1.790, { fire: true });
+  s.addText('GOOD \nFOOD', {
+    x: 6.790, y: 3.943, w: 1.789, h: 0.442, fontFace: F.body, fontSize: 10.13,
+    bold: true, color: C.white, align: 'center', valign: 'top',
+  });
+  s.addText('70%', {
+    x: 6.790, y: 4.422, w: 1.789, h: 0.555, fontFace: F.body, fontSize: 27,
+    bold: true, color: C.white, align: 'center', valign: 'top',
+  });
+});
+
+/* 19 - cooking tips legend + big steak */
+slide(s => {
+  deckTitle(s, 0.831, 0.855, 4.744, { stacked: true });
+  legend(s, 5.066, 1.000, C.red, 'COOKING TIPS');
+  legend(s, 5.066, 1.250, C.blue, 'FRESH MEET BEST PROTEIN');
+  legend(s, 5.067, 1.534, C.orange, 'NUTRITION FACT');
+  s.addShape('roundRect', {
+    x: 0.831, y: 2.25, w: 4.182, h: 2.976, rectRadius: rr(4.182, 2.976, 0.066),
+    fill: { color: C.sky }, line: NONE,
+  });
+  body(s, 1.242, 2.717, 3.497, 0.912,
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting dummy text of the ' +
+    'printing Ipsum\u00A0is simply Ipsum\u00A0is simply dummy text of the printing and ' +
+    'typesetting dummy text of the printing and');
+  descCard(s, 1.277, 3.980, 2.492, 0.846);
+  s.addShape('ellipse', {
+    x: 5.662, y: 4.826, w: 3.585, h: 0.384,
+    fill: { color: C.shadow, transparency: 25 }, line: NONE,
+  });
+  steak(s, 5.617, 2.090, 3.630, 2.727);
+});
+
+/* 20 - four mint panels around cutlery */
+slide(s => {
+  deckTitle(s, 1.155, 0.644, 7.614, { align: 'center' });
+  [{ x: 1.464, y: 0.765, rot: 270 }, { x: 1.449, y: 2.561, rot: 270 },
+   { x: 7.103, y: 0.753, rot: 90 }, { x: 7.131, y: 2.565, rot: 90 }].forEach(p =>
+    s.addShape('round2SameRect', {
+      x: p.x, y: p.y, w: 1.311, h: 3.21, rotate: p.rot,
+      fill: { color: C.mint }, line: NONE,
+    }));
+  cutlery(s, 4.384, 1.458, 1.409, 3.586);
+  carrot(s, 2.930, 1.389, 0.310, 0.760);
+  cucumber(s, 3.330, 1.660, 0.470, 0.520);
+  tomato(s, 3.290, 1.930, 0.270, 0.300);
+  pot(s, 2.700, 2.000, 1.350, 1.158, { fire: true });
+  basket(s, 6.006, 1.427, 1.333, 1.559);
+  lettuce(s, 2.780, 3.180, 1.140, 0.960);
+  scale(s, 2.630, 3.940, 1.568, 0.964);
+  tomato(s, 5.907, 3.461, 0.590, 0.665);
+  cucumber(s, 6.400, 3.492, 0.777, 1.027);
+  hand(s, 5.907, 4.216, 1.309, 0.771);
+  const cells = [
+    { tx: 0.752, ty: 1.944, bx: 0.730, by: 2.295 },
+    { tx: 0.797, ty: 3.708, bx: 0.775, by: 4.059 },
+    { tx: 7.614, ty: 1.925, bx: 7.592, by: 2.276 },
+    { tx: 7.614, ty: 3.710, bx: 7.592, by: 4.062 },
+  ];
+  cells.forEach(c => {
+    cardTitle(s, c.tx, c.ty, 1.704, C.orange2);
+    body(s, c.bx, c.by, 1.445, 0.496, 'Lorem Ipsum\u00A0is simply dummy text of the');
+  });
+});
+
+/* 21 - hand offering produce + three numbered notes */
+slide(s => {
+  deckTitle(s, 0.792, 0.899, 4.744, { stacked: true });
+  cardTitle(s, 0.826, 2.537, 2.57, C.orange2);
+  body(s, 0.826, 3.143, 2.016, 1.329, LOREM.block);
+  moreInfo(s, 0.899, 4.735, { fill: C.orange2 });
+  tomato(s, 3.683, 1.313, 1.494, 1.684);
+  cucumber(s, 4.780, 1.392, 1.362, 2.602);
+  hand(s, 2.921, 3.227, 3.317, 1.954);
+  [{ dot: [6.823, 1.929], label: '01', color: C.orange, ty: 1.738 },
+   { dot: [6.857, 2.997], label: '02', color: C.blue, ty: 2.856 },
+   { dot: [6.840, 4.074], label: '03', color: C.green, ty: 3.939 }].forEach(n => {
+    numberDot(s, n.dot[0], n.dot[1], n.label, n.color);
+    body(s, 7.431, n.ty, 2.16, 0.704, LOREM.dot);
+  });
+});
+
+/* 22 - lilac card, pot and basket */
+slide(s => {
+  s.addShape('roundRect', {
+    x: 0.831, y: 0.998, w: 3.552, h: 4.228, rectRadius: rr(3.552, 4.228, 0.066),
+    fill: { color: C.lilac }, line: NONE,
+  });
+  cardTitle(s, 1.277, 1.481, 2.304, null);
+  body(s, 1.264, 2.087, 2.793, 1.537,
+    LOREM.card + ' Ipsum\u00A0is simply dummy text of the printing and typesetting dummy text ' +
+    'of the printing Ipsum\u00A0is simply Ipsum\u00A0is simply dummy text of the printing and ' +
+    'typesetting dummy text of the printing Ipsum');
+  descCard(s, 1.277, 3.980, 2.492, 0.846, C.purple);
+  deckTitle(s, 4.846, 0.935, 4.744, { stacked: true });
+  pot(s, 4.566, 3.100, 2.598, 2.166, { fire: true, bubbles: true });
+  basket(s, 7.302, 2.437, 2.232, 2.813);
+});
+
+/* 23 - cherries panel + grid */
+slide(gridSlide(s => {
+  s.addShape('round2SameRect', {
+    x: -0.105, y: 0.963, w: 4.153, h: 3.943, rotate: 90,
+    fill: { color: C.mint }, line: NONE,
+  });
+  carrot(s, 0.879, 0.997, 0.95, 3.10, -14);
+  cherries(s, 1.15, 2.05, 2.21, 2.58);
+}, {
+  titleX: 4.613, titleY: 0.859,
+  cells: [
+    { x: 4.613, ty: 2.353, by: 2.717, bw: 2.263, accent: C.orange2 },
+    { x: 7.004, ty: 2.304, by: 2.674, bw: 2.314, accent: C.green },
+    { x: 4.613, ty: 3.802, by: 4.199, bw: 2.314, accent: C.red },
+    { x: 7.004, ty: 3.753, by: 4.157, bw: 2.314, accent: C.blue },
+  ],
+}));
+
+/* 24 - kale with six numbered notes */
+slide(sixPointSlide(s => lettuce(s, 3.852, 1.505, 2.297, 3.867), true));
+
+/* 25 - five stacked percentage bars */
+slide(s => {
+  deckTitle(s, 1.149, 0.723, 7.614, { align: 'center' });
+  steak(s, 0.199, 2.105, 1.521, 1.142);
+  cucumber(s, 2.654, 1.813, 1.052, 2.010);
+  tomato(s, 4.427, 1.628, 1.359, 1.531);
+  eggplant(s, 6.488, 2.317, 1.323, 1.867);
+  carrotPair(s, 8.400, 1.700, 1.100, 2.330);
+  const bars = [
+    { x: 0, y: 3.508, h: 2.117, color: C.orange, pct: '70%', px: 0.092, py: 3.687,
+      tx: 0.188, ty: 4.312, tw: 1.602, th: 1.121, text: LOREM.bar },
+    { x: 2, y: 4.025, h: 1.600, color: C.purple, pct: '50%', px: 1.998, py: 4.172,
+      tx: 2.119, ty: 4.696, tw: 1.602, th: 0.704,
+      text: 'Lorem Ipsum\u00A0is simply dummy text of the \u00A0is simply dummy text of ' },
+    { x: 4, y: 3.273, h: 2.352, color: C.red, pct: '80%', px: 4.113, py: 3.642,
+      tx: 4.209, ty: 4.268, tw: 1.602, th: 1.121, text: LOREM.bar },
+    { x: 6, y: 4.258, h: 1.367, color: C.green, pct: '40%', px: 6.112, py: 4.387,
+      tx: 6.232, ty: 4.911, tw: 1.602, th: 0.496,
+      text: 'Lorem Ipsum\u00A0is simply dummy text of the' },
+    { x: 8, y: 3.589, h: 2.036, color: C.blue, pct: '70%', px: 8.134, py: 3.870,
+      tx: 8.229, ty: 4.496, tw: 1.602, th: 1.121, text: LOREM.bar },
+  ];
+  bars.forEach(b => {
+    s.addShape('rect', { x: b.x, y: b.y, w: 2, h: b.h, fill: { color: b.color }, line: NONE });
+    s.addText(b.pct, {
+      x: b.px, y: b.py, w: 1.843, h: 0.555, fontFace: F.body, fontSize: 27,
+      bold: true, color: C.white, align: 'center', valign: 'bottom',
+    });
+    body(s, b.tx, b.ty, b.tw, b.th, b.text, { align: 'center', color: C.white });
+  });
+});
+
+/* 26 - eggplant + carrot inside a blue circle */
+slide(gridSlide(s => {
+  deckTitle(s, 1.155, 0.644, 7.614, { align: 'center' });
+  s.addShape('ellipse', { x: 3.288, y: 1.732, w: 3.349, h: 3.349, fill: { color: C.sky }, line: NONE });
+  carrot(s, 5.115, 1.561, 0.976, 3.612, 24);
+  eggplant(s, 3.505, 1.476, 2.218, 3.130);
+}, {
+  titleX: -9, titleY: -9,
+  cells: [
+    { x: 1.539, ty: 1.869, bx: 0.565, by: 2.328, bw: 2.491, accent: C.orange2, align: 'right' },
+    { x: 1.539, ty: 3.738, bx: 0.565, by: 4.230, bw: 2.491, accent: C.red, align: 'right' },
+    { x: 7.050, ty: 1.834, by: 2.293, bw: 2.459, accent: C.purple },
+    { x: 7.050, ty: 3.669, by: 4.161, bw: 2.459, accent: C.orange },
+  ].map(c => Object.assign(c, {
+    text: LOREM.short + ' \u00A0is simply',
+  })),
+}));
+
+/* 27 - blue panel, juice and plated steak */
+slide(s => {
+  s.addShape('round2SameRect', {
+    x: 3.577, y: -0.3, w: 3.123, h: 8.004, rotate: 90,
+    fill: { color: C.sky }, line: NONE,
+  });
+  deckTitle(s, 2.681, 1.091, 6.63, { align: 'right' });
+  juiceGlass(s, 0.665, 1.594, 2.032, 3.654);
+  plateSteak(s, 1.948, 2.732, 4.048, 2.299);
+
+  cardTitle(s, 6.368, 2.361, 2.304, null);
+  body(s, 6.368, 2.880, 2.589, 0.912,
+    LOREM.card + ' Ipsum\u00A0is simply dummy text of the printing and');
+  descCard(s, 6.368, 4.103, 2.492, 0.846);
+});
+
+/* 28 - copy, peach card and a blue basket */
+slide(s => {
+  deckTitle(s, 0.902, 0.722, 4.744, { stacked: true });
+  body(s, 0.896, 2.052, 4.414, 0.912,
+    LOREM.industry + 'PLACEHOLDER' +
+    'printing text of the printing and typesetting');
+  s.addShape('roundRect', {
+    x: 0.924, y: 3.329, w: 4.528, h: 1.751, rectRadius: rr(4.528, 1.751, 0.066),
+    fill: { color: C.peach }, line: NONE,
+  });
+  cardTitle(s, 1.155, 3.624, 2.304, null);
+  body(s, 1.155, 4.077, 2.852, 0.704,
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and typesetting dummy text of the ' +
+    'printing Ipsum\u00A0is simply dummy text of ');
+  cherries(s, 4.114, 3.540, 1.107, 1.216);
+  s.addShape('ellipse', {
+    x: 6.461, y: 4.976, w: 2.446, h: 0.226,
+    fill: { color: C.shadow, transparency: 25 }, line: NONE,
+  });
+  lettuce(s, 6.306, 0.881, 1.910, 2.600);
+  carrot(s, 8.084, 1.129, 0.809, 2.400);
+  tomato(s, 6.695, 3.171, 0.900, 0.900);
+  cucumber(s, 7.300, 3.100, 1.000, 0.900);
+  basketBody(s, 6.001, 3.470, 3.468, 1.405, C.blue);
+});
+
+/* 29 - three juice glasses on a blue band */
+slide(s => {
+  deckTitle(s, 1.155, 0.644, 7.614, { align: 'center' });
+  s.addShape('rect', { x: 0.861, y: 2.562, w: 8.273, h: 1.382, fill: { color: C.sky }, line: NONE });
+  const glasses = [
+    { x: 1.475, y: 1.624, juice: C.green, pct: '30%', tx: 1.299, ty: 2.896 },
+    { x: 4.260, y: 1.636, juice: C.orange, pct: '80%', tx: 4.076, ty: 2.885 },
+    { x: 7.046, y: 1.649, juice: C.red, pct: '60%', tx: 6.864, ty: 2.940 },
+  ];
+  glasses.forEach(g => {
+    juiceGlass(s, g.x, g.y, 1.48, 2.661, g.juice);
+    s.addText(g.pct, {
+      x: g.tx, y: g.ty, w: 1.843, h: 0.505, fontFace: F.body, fontSize: 24,
+      bold: true, color: C.white, align: 'center', valign: 'bottom',
+    });
+  });
+  body(s, 1.475, 4.708, 7.184, 0.704,
+    LOREM.wide + '  text of the printing and simply dummy text of the printing and dummy ' +
+    'text of the printing and simply dummy text of  the ', { align: 'center' });
+});
+
+/* 30 - balance scales */
+slide(s => {
+  s.addShape('round2SameRect', {
+    x: 2.553, y: -1.781, w: 4.25, h: 9.357, rotate: 90,
+    fill: { color: C.mint, transparency: 20 }, line: NONE,
+  });
+  balance(s, 0.268, 1.197, 3.993, 3.396);
+  deckTitle(s, 4.879, 1.233, 4.744, { stacked: true });
+  cardTitle(s, 4.942, 2.644, 2.57, C.orange2);
+  body(s, 4.942, 3.000, 3.715, 0.912,
+    'Lorem Ipsum\u00A0is simply dummy text of the printing and simply dummy text of the ' +
+    'PLACEHOLDER' +
+    '\u00A0is simply dummy printing and simply dummy text of the printing and');
+  moreInfo(s, 4.986, 4.144, { fill: C.orange2 });
+  moreInfo(s, 5.939, 4.152, { fill: C.red });
+});
+
+/* ------------------------------------------------------------------ *
+ * Build
+ * ------------------------------------------------------------------ */
+const pptx = new PptxGenJS();
+pptx.defineLayout({ name: 'DECK', width: 10, height: 5.625 });
+pptx.layout = 'DECK';
+pptx.title = 'Healthy Food Infographic';
+pptx.theme = { headFontFace: F.head, bodyFontFace: F.body };
+
+builders.forEach(build => {
+  const s = pptx.addSlide();
+  s.background = { color: C.bg };
+  build(s);
+});
+
+pptx.writeFile({
+  fileName: path.join(__dirname, '0a12995e-36ac-4ec2-8719-f2ca84eacbdb_grok_final.pptx'),
+}).then(f => console.log('wrote', f));

@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-14 15:51 (Paris) — snapshot `2026-10-14_14-47` → `2026-10-14_15-51`
+
+Versions touchées : aucune (image, sand-host, exec-daemon, orbitd, agent-store-fuse, Chrome, Node, Python inchangés). Fichiers : +0 / −0 / ~5 (tous sous `managed-skills`).
+
+- **Bugfix** : —
+- **Change** : skills gérées — `agent-email` : envoi possible depuis une adresse +tag, routine `name+tag@` limitée à ce tag ; `DraftExternalMessage` ne mentionne plus l’envoi auto via Allow rules. `routines` : listener email documente le filtre par tag. `send-on-behalf` : les « saved send rules » des instructions autorisent aussi l’envoi direct hors carte. `export-bot-template` : wording Public-only (pas d’offre Team) + conservation du scope existant à la mise à jour.
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : `managed-skills/cache.json` rafraîchi (`fetchedAt` + miroir des corps de skills). Nouvelle variable d’env nommée `SAND_AGENT_STORE_RPC_SERVICE`. Meta `dpkg-packages.txt` : ~23 paquets absents de l’énumération (dont `openssh-client`, `nmap`, `bind9-*`, `grok-bot` 0.70.2) — à traiter comme signal méta, pas comme preuve d’uninstall silencieux sans vérif locale.
+
+Rapport : [reports/2026-10-14_15-51.md](reports/2026-10-14_15-51.md) — [commit](../../../commit/COMMIT_PLACEHOLDER).
+
 ## 2026-10-14 14:47 (Paris) — snapshot `2026-10-14_11-47` → `2026-10-14_14-47`
 
 Versions touchées : agent-store-fuse `9172edf` → `f5cd108` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image, sand-host, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.

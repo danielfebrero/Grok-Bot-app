@@ -1,0 +1,11 @@
+--- 2026-10-14_14-47:/home/box/sand-data/managed-skills/skills/routines/SKILL.md
++++ 2026-10-14_15-51:/home/box/sand-data/managed-skills/skills/routines/SKILL.md
+@@ -97,7 +97,7 @@
+   {
+  "type": "email", "inbox": "<one of the user's Grok Bot inbox addresses (ListEmailInboxes)>", "from"?: ["sender@example.com", ...] (omit for any sender), "requireAuthPass"?: true (default;
+  false also wakes on mail that failed SPF/DKIM/DMARC) }
+-, which fires when mail arrives at that inbox. Mail matching no routine wakes nobody. The wake carries headers only;
++, which fires when mail arrives at that inbox. An inbox of name+tag@ instead fires only for mail sent to that tag, so each tag a service was given can run its own routine. Mail matching no routine wakes nobody. The wake carries headers only;
+  read the body with ReadEmailThread.
+   {
+  "type": "webhook" }
