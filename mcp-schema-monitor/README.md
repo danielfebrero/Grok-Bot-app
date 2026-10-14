@@ -1,6 +1,6 @@
 # mcp-schema-monitor
 
-Suit chaque jour les **schémas des tools MCP** exposés à l'agent Grok Bot (nom, description, `inputSchema`)
+Suit chaque jour les **schémas des tools MCP** exposés à l'agent Grok Bot (nom, `title`, description, `inputSchema`, `outputSchema`, `annotations`)
 et le **statut** de chaque serveur (ready / needsAuth, nombre de tools). Calqué sur `box-update-monitor`
 (même verrou, même scan PII bloquant, même publication).
 
@@ -22,7 +22,7 @@ check.sh                 normalise + compare (verrou .lock)
 publish.sh               publication GitHub, bloquée si le scan n'est pas propre
 scan-personal-data.sh    scan données perso / secrets (copie de box-update-monitor)
 snapshots/<ts>/index.json                 statut, nb de tools, sha256 de chaque schéma, niveau de capture
-snapshots/<ts>/<namespace>/<tool>.json    {tool, description, inputSchema}, clés triées
+snapshots/<ts>/<namespace>/<tool>.json    {tool, title?, description, inputSchema, outputSchema, annotations?}, clés triées
 reports/<ts>.md          rapport (ajoutés / retirés / modifiés + diffs JSON unifiés)
 CHANGELOG.md             une ligne par snapshot
 ```
@@ -43,7 +43,13 @@ bash /workspace/mcp-schema-monitor/publish.sh [--dry-run]
 
 ## Données perso
 - `inbox/`, `logs/`, `.pii-denylist`, `.publish.conf` sont gitignorés et exclus de la copie.
-- `msm.py` ne garde que `tool`, `description`, `inputSchema`.
+- `msm.py` ne garde que `tool`, `title`, `description`, `inputSchema`, `outputSchema`, `annotations`.
+
+## outputSchema
+- Conservé tel quel quand le descripteur l'a ; sinon écrit explicitement `"outputSchema": null`.
+- Il fait partie du sha256 du tool : un changement d'outputSchema est un « Modifié » avec diff.
+- `index.json` donne par namespace `output_schema_count` (null au niveau `names`, inconnu) ;
+  le rapport l'affiche en colonne `outputSchema` (n/total).
 - Le namespace first-party `cursor` n'est inclus que si son fichier d'entrée passe le scan.
 - `publish.sh` scanne exactement les fichiers à pousser ; si non propre : rien n'est poussé,
   `reports/PUBLISH-BLOCKED.flag` (chemins + n° de règle, jamais la valeur) est écrit, exit 2.
