@@ -1,0 +1,9 @@
+snapshot	2026-10-14_17-55
+created	2026-10-14 17:55:47 CEST
+label	deep-check
+files	13618
+text_copies	3285
+big_text_gz	5
+unreadable	0
+bytes_hashed	1687913068
+duration_s	14.0

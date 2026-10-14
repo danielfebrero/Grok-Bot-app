@@ -1,0 +1,37 @@
+--- 2026-10-14_15-51/meta/dpkg-packages.txt
++++ 2026-10-14_17-55/meta/dpkg-packages.txt
+@@ -93,6 +93,7 @@
+ libaom3	3.12.1-1+deb13u1	amd64
+ libapparmor1	4.1.0-1	amd64
+ libapt-pkg7.0	3.0.3	amd64
++libarchive13t64	3.7.4-4+deb13u1	amd64
+ libargon2-1	0~20190702+dfsg-4+b2	amd64
+ libasan8	14.2.0-19	amd64
+ libasound2-data	1.2.14-1+deb13u1	all
+@@ -296,6 +297,7 @@
+ liblastlog2-2	2.41.5-0+deb13u1	amd64
+ liblcms2-2	2.16-2+deb13u2	amd64
+ libldap2	2.6.10+dfsg-1	amd64
++libleptonica6	1.84.1-4	amd64
+ liblerc4	4.0.0+ds-5	amd64
+ liblilv-0-0	0.24.26-1	amd64
+ libllvm19	1:19.1.7-3+b1	amd64
+@@ -446,6 +448,7 @@
+ libsystemd0	257.13-1~deb13u1	amd64
+ libtasn1-6	4.20.0-2+deb13u1	amd64
+ libtcl8.6	8.6.16+dfsg-1	amd64
++libtesseract5	5.5.0-1+b1	amd64
+ libtext-charwidth-perl	0.04-11+b4	amd64
+ libtext-wrapi18n-perl	0.06-10	all
+ libthai-data	0.1.29-2	all
+@@ -987,6 +990,10 @@
+ tcl	8.6.16	amd64
+ tcl8.6	8.6.16+dfsg-1	amd64
+ terser	5.38.0-1	all
++tesseract-ocr	5.5.0-1+b1	amd64
++tesseract-ocr-eng	1:4.1.0-2	all
++tesseract-ocr-fra	1:4.1.0-2	all
++tesseract-ocr-osd	1:4.1.0-2	all
+ thunar	4.20.2-1+deb13u1	amd64
+ thunar-data	4.20.2-1+deb13u1	all
+ tk	8.6.16	amd64
