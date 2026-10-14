@@ -9,6 +9,18 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-14 19:48 (Paris) — snapshot `2026-10-14_17-55` → `2026-10-14_19-48`
+
+**Hot-update du host bundle** (sans Update de l'ordinateur) : sand-host `726deab` → `4098fb0` (`supervisor_status.lastCommandId = upgrade-4098fb0`). Image `726deab`, box-scripts, exec-daemon, orbitd, agent-store-fuse `f5cd108`, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~10 (9 sous `/opt/sand`, 1 `managed-skills`).
+
+- **Bugfix** : **restauration des cookies de session Chrome à froid** — `box-chrome` pousse désormais le « cookie seed » sauvegardé (`/home/box/sand-data/chrome-cookie-seed.json`) via `sand-cookie-persist.mjs --restore-port` **avant** de donner une URL à Chrome. Sans ça, une page chargée en premier recevait un cookie de session neuf qui écrasait le login sauvegardé. Important pour la persistance des sessions navigateur des agents (X, etc.).
+- **Change** : protobuf host — `ComputerUseArgs` gagne `mark_monitor_busy` (+ `ComputerUseSuccess.monitor_busy_marked`, `ComputerUseError.monitor_busy_marked`) ; `PrManagementArgs` gagne deux actions `list_prs` et `get_pr` ; `SendToAgentArgs` gagne `tracked_task_keys` (liste). Signale de nouvelles capacités côté outils (computer-use, gestion PR, suivi de tâches inter-agents).
+- **Features** : — (à confirmer dans les tools exposés : `list_prs`/`get_pr` et `tracked_task_keys` sont des champs de schéma, pas forcément déjà actifs).
+- **Perf** : `search-index-worker.cjs` allégé (76 Ko → 42 Ko, −723 lignes). `host-main.cjs` 28,6 → 29,5 Mo, `sand-eval-runner.cjs` 21,8 → 23,1 Mo, `officekit office.mjs` 700 → 827 Ko.
+- **Autre/infra** : `diff-worker.js` +121/−11, `agent-store-worker.cjs` +1157/−11. dpkg : `grok-bot 0.70.2` de nouveau énuméré (était absent de l'énumération du snapshot précédent, pas une réinstallation), `libsecret-1-0` / `libsecret-common` 0.21.7 présents. `managed-skills/cache.json` rafraîchi (`fetchedAt`).
+
+Rapport : [reports/2026-10-14_19-48.md](reports/2026-10-14_19-48.md).
+
 ## 2026-10-14 17:55 (Paris) — snapshot `2026-10-14_15-51` → `2026-10-14_17-55`
 
 Versions touchées : aucune (image `726deab`, sand-host, exec-daemon, orbitd, agent-store-fuse `f5cd108`, Chrome, Node, Python inchangés). Fichiers : +0 / −0 / ~0. Seul changement : la méta `dpkg-packages.txt`.
