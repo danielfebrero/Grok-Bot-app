@@ -1,0 +1,26 @@
+--- 2026-10-15_10-54-2:/opt/sand/deps/runtime-deps-manifest.json
++++ 2026-10-15_12-51:/opt/sand/deps/runtime-deps-manifest.json
+@@ -3,6 +3,7 @@
+   "arch": "x64",
+   "required": [
+     "cursor-proclist",
++    "sand-card-text-recognition",
+     "sand-notification-settings",
+     "tree-sitter",
+     "tree-sitter-bash"
+@@ -11,6 +12,7 @@
+     "cursor-proclist",
+     "node-addon-api",
+     "node-gyp-build",
++    "sand-card-text-recognition",
+     "sand-notification-settings",
+     "tree-sitter",
+     "tree-sitter-bash",
+@@ -18,6 +20,7 @@
+   ],
+   "nodeFiles": [
+     "cursor-proclist/build/Release/cursor_proclist.node",
++    "sand-card-text-recognition/build/Release/sand_card_text_recognition.node",
+     "sand-notification-settings/build/Release/sand_notification_settings.node",
+     "tree-sitter-bash/prebuilds/linux-x64/tree-sitter-bash.node",
+     "tree-sitter/build/Release/tree_sitter_runtime_binding.node"

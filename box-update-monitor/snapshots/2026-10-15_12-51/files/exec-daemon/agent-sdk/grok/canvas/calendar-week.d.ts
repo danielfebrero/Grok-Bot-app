@@ -1,0 +1,30 @@
+import { type JSX } from "react";
+import { type DayEvent } from "./calendar-stack.js";
+export interface WeekEvent extends DayEvent {
+    /** The event's day as `YYYY-MM-DD`; one outside the week is left out. */
+    date: string;
+}
+export interface WeekViewProps {
+    /** The first day shown, as `YYYY-MM-DD`, usually a Monday; the six days after it follow. Nothing renders for any other text. */
+    week: string;
+    /** First hour shown, e.g. 8 or 8.5 for 8:30. */
+    start: number;
+    /** Last hour shown, e.g. 18, at most 24. Both hours are held to the day (0 to 24); events are clipped to `start..end`, and nothing renders when `end` is not after `start`. */
+    end: number;
+    events: readonly WeekEvent[];
+    /** The day drawn as today, `YYYY-MM-DD`: its number on a filled circle, and `now` in its column. */
+    today?: string;
+    /** The hour the red line marks in `today`'s column, e.g. 13.25 for 1:15 PM; skipped when outside `start..end` or `today` is not in the week. */
+    now?: number;
+}
+/**
+ * A calendar week: the day view's card, hour labels and event blocks, in a
+ * column per day under a header of weekday name and number, with today's
+ * number on a filled circle and one danger-red line in its column at `now`.
+ * Each column is too narrow for lanes, so overlapping events stack under
+ * one another, folding what will not fit into a "+N more" row, and a title
+ * wraps to as many lines as its block holds, the rest in its tooltip. On a
+ * narrow block the headers keep only their numbers and the blocks draw as
+ * tinted bars, their titles in their tooltips.
+ */
+export declare function WeekView({ week, start: givenStart, end: givenEnd, events, today, now, }: WeekViewProps): JSX.Element | null;

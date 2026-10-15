@@ -1,0 +1,43 @@
+--- 2026-10-15_10-54-2:/usr/local/libexec/sand/box-chrome
++++ 2026-10-15_12-51:/usr/local/libexec/sand/box-chrome
+@@ -102,6 +102,11 @@
+ CHROME_LAUNCH_WAIT_S=20
+ CHROME_RELEASE_GRACE_S=10
+ CHROME_PORT_WAIT_S=10
++CHROME_COOKIE_RESTORE_WAIT_S=5
++SAND_COOKIE_NODE=/exec-daemon/node
++SAND_COOKIE_PERSIST=/usr/local/bin/sand-cookie-persist.mjs
++SAND_COOKIE_SEED="${SAND_COOKIE_SEED_PATH:-/home/box/sand-data/chrome-cookie-seed.json}"
++SAND_COOKIE_RESTORE_LOG=/tmp/sand-cookie-launch-restore.log
+ SAND_CHROME_PREPARE=0
+ if [ "${1:-}" = "--sand-prepare" ]; then
+ 	SAND_CHROME_PREPARE=1
+@@ -208,6 +213,20 @@
+ 		</dev/null >/dev/null 2>&1 9>&-
+ }
+ 
++# Chrome keeps session cookies only in memory
++# (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/net/cookies/cookie_monster.h),
++# so a cold launch comes up without them until the saved cookie seed is pushed
++# back in. That has to finish before Chrome is handed a URL: a page that loads
++# first gets a fresh session cookie under the same name, and the seed then saves
++# that value over the login.
++restore_cookie_seed() {
++	local out
++	[ -s "${SAND_COOKIE_SEED:-}" ] && [ -x "${SAND_COOKIE_NODE:-}" ] && [ -r "${SAND_COOKIE_PERSIST:-}" ] || return 0
++	out="$(timeout "${CHROME_COOKIE_RESTORE_WAIT_S:-5}" "${SAND_COOKIE_NODE}" "${SAND_COOKIE_PERSIST}" \
++		--restore-port "${CHROME_DEBUG_PORT}" </dev/null 2>&1 9>&-)" || true
++	[ -z "${out}" ] || printf '%s\n' "${out}" 2>/dev/null >>"${SAND_COOKIE_RESTORE_LOG:-/dev/null}" || true
++}
++
+ wait_for_chrome() {
+ 	local visible="$1" end=$((SECONDS + CHROME_LAUNCH_WAIT_S))
+ 	CHROME_CDP_READY_MS=""
+@@ -245,6 +264,7 @@
+ 		outcome=cdp_timeout
+ 	else
+ 		cdp_ready_ms="${CHROME_CDP_READY_MS}"
++		restore_cookie_seed
+ 		if [ "${visible}" -eq 0 ]; then
+ 			outcome=ready
+ 		else

@@ -1,0 +1,9 @@
+snapshot	2026-10-15_12-51
+created	2026-10-15 12:51:49 CEST
+label	auto: changement détecté (sha:/etc/sand-box-image-sha, sha:/exec-daemon/index.js, sha:/exec-daemon/package.json, sha:/opt/sand/deps/runtime-deps-manifest.json, sha:/usr/local/bin/cursor_agent_store_fuse_version)
+files	13622
+text_copies	3288
+big_text_gz	5
+unreadable	0
+bytes_hashed	1689255200
+duration_s	4.2

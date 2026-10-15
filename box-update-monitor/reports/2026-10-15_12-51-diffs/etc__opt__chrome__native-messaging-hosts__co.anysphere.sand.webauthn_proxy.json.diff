@@ -1,0 +1,9 @@
+--- 2026-10-15_10-54-2:/etc/opt/chrome/native-messaging-hosts/co.anysphere.sand.webauthn_proxy.json
++++ 2026-10-15_12-51:/etc/opt/chrome/native-messaging-hosts/co.anysphere.sand.webauthn_proxy.json
+@@ -3,5 +3,5 @@
+ 	"description": "Sand WebAuthn proxy bridge — forwards box browser ceremonies to the in-box host.",
+ 	"path": "/usr/local/bin/sand-webauthn-proxy-host",
+ 	"type": "stdio",
+-	"allowed_origins": ["chrome-extension://oifaalpenddpcpgklkncbmdaocjdnlgc/"]
++	"allowed_origins": ["chrome-extension://alhdnckjfkmaljmljdhjfpecddnfjide/"]
+ }

@@ -1,0 +1,29 @@
+--- 2026-10-15_10-54-2:/home/box/sand-data/managed-skills/skills/slides-executor/SKILL.md
++++ 2026-10-15_12-51:/home/box/sand-data/managed-skills/skills/slides-executor/SKILL.md
+@@ -117,6 +117,17 @@
+ 
+ In the `build` and `fix` phases, do not change `NOTES.md`. Write your notes to `notes/<group>.md`.
+ 
++## Edit through the Slides MCP
++
++When the brief names the Slides MCP as the edit surface, do the work of the phase on the live deck with the MCP tools. Read the deck with `read_presentation`. Change it with `update_presentation`. Check a slide with `read_slide_page_thumbnail`, save each thumbnail that you check into `renders/<group>-<N>/`, and list those paths in `images`. Keep `NOTES.md` and `notes/<group>.md` in the working folder, as in the other phases.
++
++Use batch calls and parallel calls for speed. Each MCP call has a character limit, so a large edit can take several batches or several parallel calls:
++
++- Put the requests that fit one call in one `update_presentation` batch. Put the rest in more batches.
++- Send independent batches in one step, as parallel calls.
++- If a call fails because it is too large, or it arrives without its `requests`, split it into two smaller calls and send both. Split again until each call lands.
++- Continue batch by batch in the MCP until the live deck has the whole edit.
++
+ ## The `clean` phase
+ 
+ The user is satisfied with the delivered deck. Run no setup, and do not render. If the finished `.pptx` that the brief names is not in the working folder, delete nothing and return `status: blocked`. Otherwise, in one step, remove everything else in the working folder. Keep only the finished `.pptx`, `NOTES.md`, and `notes/`. Choose what to keep by those names, not what to delete by a pattern, so a deck file that shares a name with a working file stays.
+@@ -126,7 +137,7 @@
+ ## Work fast
+ 
+ - Put independent tool calls in one step, as parallel calls.
+-- Write the edits for all slides of this phase in one step.
++- Write the edits for all slides of this phase in one step, with batch calls or parallel calls. Each call has a character limit, so a large edit can take several batches or several parallel calls.
+ - Render one time, and one time more after the fix pass.
+ - Inspect only the slides that you change.
+ - Do not check again a slide that you did not change.

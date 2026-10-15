@@ -1,0 +1,2546 @@
+--- 2026-10-15_10-54-2:/exec-daemon/canvas-runtime/canvas-runtime-grok.esm.js
++++ 2026-10-15_12-51:/exec-daemon/canvas-runtime/canvas-runtime-grok.esm.js
+@@ -284,7 +284,7 @@
+         null === transitionTypes ? transition.types = [type] : -1 === transitionTypes.indexOf(type) && transitionTypes.push(type);
+       } else startTransition(addTransitionType.bind(null, type));
+     }
+-    var Children5 = {
++    var Children6 = {
+       map: mapChildren,
+       forEach: function(children, forEachFunc, forEachContext) {
+         mapChildren(
+@@ -316,7 +316,7 @@
+       }
+     };
+     exports.Activity = REACT_ACTIVITY_TYPE;
+-    exports.Children = Children5;
++    exports.Children = Children6;
+     exports.Component = Component;
+     exports.Fragment = REACT_FRAGMENT_TYPE;
+     exports.Profiler = REACT_PROFILER_TYPE;
+@@ -1198,11 +1198,11 @@
+     }
+     var searchTarget = null;
+     var searchBoundary = null;
+-    function isFiberPrecedingCheck(child, target, boundary) {
+-      return child === boundary ? true : child === target ? (searchTarget = child, true) : false;
++    function isFiberPrecedingCheck(child, target, boundary2) {
++      return child === boundary2 ? true : child === target ? (searchTarget = child, true) : false;
+     }
+-    function isFiberFollowingCheck(child, target, boundary) {
+-      return child === boundary ? (searchBoundary = child, false) : child === target ? (null !== searchBoundary && (searchTarget = child), true) : false;
++    function isFiberFollowingCheck(child, target, boundary2) {
++      return child === boundary2 ? (searchBoundary = child, false) : child === target ? (null !== searchBoundary && (searchTarget = child), true) : false;
+     }
+     function getParentForFragmentAncestors(inst) {
+       if (null === inst) return null;
+@@ -5727,12 +5727,12 @@
+         });
+       }
+     }
+-    function logCaughtError(root2, boundary, errorInfo) {
++    function logCaughtError(root2, boundary2, errorInfo) {
+       try {
+         var onCaughtError = root2.onCaughtError;
+         onCaughtError(errorInfo.value, {
+           componentStack: errorInfo.stack,
+-          errorBoundary: 1 === boundary.tag ? boundary.stateNode : null
++          errorBoundary: 1 === boundary2.tag ? boundary2.stateNode : null
+         });
+       } catch (e$79) {
+         setTimeout(function() {
+@@ -14593,7 +14593,7 @@
+   Divider: () => Divider,
+   Equation: () => Equation,
+   Frac: () => Frac,
+-  Fragment: () => import_react24.Fragment,
++  Fragment: () => import_react26.Fragment,
+   Grid: () => Grid,
+   Heatmap: () => Heatmap,
+   Input: () => Input,
+@@ -14628,15 +14628,15 @@
+   Venn: () => Venn,
+   WeekView: () => WeekView,
+   computeDAGLayout: () => computeDAGLayout2,
+-  useCallback: () => import_react24.useCallback,
+-  useEffect: () => import_react24.useEffect,
++  useCallback: () => import_react26.useCallback,
++  useEffect: () => import_react26.useEffect,
+   useGrokTheme: () => useGrokTheme,
+-  useMemo: () => import_react24.useMemo,
+-  useReducer: () => import_react24.useReducer,
+-  useRef: () => import_react24.useRef,
+-  useState: () => import_react24.useState
++  useMemo: () => import_react26.useMemo,
++  useReducer: () => import_react26.useReducer,
++  useRef: () => import_react26.useRef,
++  useState: () => import_react26.useState
+ });
+-var import_react24 = __toESM(require_react(), 1);
++var import_react26 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/grok/avatar.js
+ var import_jsx_runtime = __toESM(require_jsx_runtime(), 1);
+@@ -15402,6 +15402,9 @@
+ };
+ var SectionDepthContext = (0, import_react3.createContext)(0);
+ var GRID_CELL_SECTION_DEPTH = 2;
++function flattenBlocks(children) {
++  return import_react3.Children.toArray(children).flatMap((child) => (0, import_react3.isValidElement)(child) && child.type === import_react3.Fragment ? flattenBlocks(child.props.children) : [child]);
++}
+ var kinds = /* @__PURE__ */ new WeakMap();
+ function markBlockKind(component, kind) {
+   kinds.set(component, kind);
+@@ -17001,8 +17004,8 @@
+     };
+   };
+   const stack = (row) => {
+-    const { segments, stub, gap } = segmentsOf(row);
+-    const sized = segments.every((segment) => segment.size !== void 0);
++    const { segments: segments2, stub, gap } = segmentsOf(row);
++    const sized = segments2.every((segment) => segment.size !== void 0);
+     const share = (totals[row] ?? 0) / max;
+     return (0, import_jsx_runtime8.jsx)("span", { "data-stacked-bar": true, "data-stacked-stub": stub ? "" : void 0, style: {
+       display: "flex",
+@@ -17010,8 +17013,8 @@
+       minWidth: 2,
+       flexShrink: 0,
+       gap,
+-      width: sized ? segments.reduce((sum, segment) => sum + (segment.size ?? 0), 0) + gap * Math.max(0, segments.length - 1) : narrow ? `${share * 100}%` : `max(2px, calc((100% - ${figureReserve}px) * ${share}))`
+-    }, children: segments.map(({ index, size }, k) => {
++      width: sized ? segments2.reduce((sum, segment) => sum + (segment.size ?? 0), 0) + gap * Math.max(0, segments2.length - 1) : narrow ? `${share * 100}%` : `max(2px, calc((100% - ${figureReserve}px) * ${share}))`
++    }, children: segments2.map(({ index, size }, k) => {
+       const r = size === void 0 ? grokMarkRadius.segment : segmentRadius({ size, thickness: STACKED_BAR_PX });
+       return (0, import_jsx_runtime8.jsx)("span", { style: {
+         display: "block",
+@@ -18187,21 +18190,21 @@
+         const values = series.map((s) => at(s, li) ?? 0);
+         const stackH = baseY - y(stackHeights[li] ?? 0);
+         let bottomY = baseY;
+-        const segments = /* @__PURE__ */ new Map();
++        const segments2 = /* @__PURE__ */ new Map();
+         const stacked2 = stackSegments(values, stackH);
+         const gap = stackGapPx({ parts: stacked2.length, length: stackH });
+         stacked2.forEach(({ index, size }, k) => {
+           const top2 = bottomY - size;
+           bottomY = top2 - gap;
+           const r = segmentRadius({ size, thickness: columnW });
+-          segments.set(index, {
++          segments2.set(index, {
+             top: top2,
+             size,
+             radius: k === 0 ? [r, r, 0, 0] : [r, r, r, r]
+           });
+         });
+         return (0, import_jsx_runtime9.jsx)("g", { "data-column-group": true, children: series.map((s, si) => {
+-          const segment = segments.get(si);
++          const segment = segments2.get(si);
+           if (segment === void 0) {
+             return null;
+           }
+@@ -18569,6 +18572,10 @@
+ // ../canvas-components/dist/grok/scroll-fade.js
+ var import_react12 = __toESM(require_react(), 1);
+ var SCROLL_FADE_PX = 24;
++var SCROLL_FADE_ATTRIBUTE = "data-cursor-scroll-fade";
++var LEFT_VAR = "--cursor-scroll-fade-left";
++var RIGHT_VAR = "--cursor-scroll-fade-right";
++var STYLE_ELEMENT_ID = "cursor-scroll-fade-style";
+ var NO_SCROLL_EDGES = { left: false, right: false };
+ function scrollFadeMask(edges) {
+   if (!edges.left && !edges.right) {
+@@ -18578,12 +18585,66 @@
+   const to = edges.right ? `#000 calc(100% - ${SCROLL_FADE_PX}px), transparent` : "#000";
+   return `linear-gradient(90deg, ${from}, ${to})`;
+ }
++function scrollFadeStyleSheet() {
++  const mask = `linear-gradient(90deg, transparent, #000 var(${LEFT_VAR}), #000 calc(100% - var(${RIGHT_VAR})), transparent)`;
++  const ease = "160ms cubic-bezier(0.23, 1, 0.32, 1)";
++  return [
++    `@property ${LEFT_VAR}{syntax:"<length>";inherits:false;initial-value:0px}`,
++    `@property ${RIGHT_VAR}{syntax:"<length>";inherits:false;initial-value:0px}`,
++    `[${SCROLL_FADE_ATTRIBUTE}]{-webkit-mask-image:${mask}!important;mask-image:${mask}!important;transition:${LEFT_VAR} ${ease},${RIGHT_VAR} ${ease}}`,
++    `@media (prefers-reduced-motion:reduce){[${SCROLL_FADE_ATTRIBUTE}]{transition:none}}`
++  ].join("");
++}
++function ensureScrollFadeStyle(doc) {
++  if (doc.getElementById(STYLE_ELEMENT_ID) !== null) {
++    return;
++  }
++  const style = doc.createElement("style");
++  style.id = STYLE_ELEMENT_ID;
++  style.textContent = scrollFadeStyleSheet();
++  doc.head.appendChild(style);
++}
+ function readScrollEdges(element) {
+   return {
+     left: element.scrollLeft > 1,
+     right: element.scrollLeft + element.clientWidth < element.scrollWidth - 1
+   };
+ }
++function watchScrollEdges(element, { onChange, observe = [] } = {}) {
++  ensureScrollFadeStyle(element.ownerDocument);
++  let current;
++  const update = () => {
++    const next = readScrollEdges(element);
++    if (current !== void 0 && current.left === next.left && current.right === next.right) {
++      return;
++    }
++    current = next;
++    element.style.setProperty(LEFT_VAR, next.left ? `${SCROLL_FADE_PX}px` : "0px");
++    element.style.setProperty(RIGHT_VAR, next.right ? `${SCROLL_FADE_PX}px` : "0px");
++    element.toggleAttribute(SCROLL_FADE_ATTRIBUTE, next.left || next.right);
++    onChange?.(next);
++  };
++  update();
++  element.addEventListener("scroll", update, { passive: true });
++  let observer;
++  if (typeof ResizeObserver !== "undefined") {
++    observer = new ResizeObserver(update);
++    observer.observe(element);
++    for (const child of element.children) {
++      observer.observe(child);
++    }
++    for (const content of observe) {
++      observer.observe(content);
++    }
++  }
++  return () => {
++    element.removeEventListener("scroll", update);
++    observer?.disconnect();
++    element.removeAttribute(SCROLL_FADE_ATTRIBUTE);
++    element.style.removeProperty(LEFT_VAR);
++    element.style.removeProperty(RIGHT_VAR);
++  };
++}
+ function useScrollEdges() {
+   const [edges, setEdges] = (0, import_react12.useState)(NO_SCROLL_EDGES);
+   const detach = (0, import_react12.useRef)(void 0);
+@@ -18594,24 +18655,9 @@
+       setEdges((previous) => previous.left || previous.right ? NO_SCROLL_EDGES : previous);
+       return;
+     }
+-    const update = () => {
+-      const next = readScrollEdges(element);
+-      setEdges((previous) => previous.left === next.left && previous.right === next.right ? previous : next);
+-    };
+-    update();
+-    element.addEventListener("scroll", update, { passive: true });
+-    let observer;
+-    if (typeof ResizeObserver !== "undefined") {
+-      observer = new ResizeObserver(update);
+-      observer.observe(element);
+-      for (const child of element.children) {
+-        observer.observe(child);
+-      }
+-    }
+-    detach.current = () => {
+-      element.removeEventListener("scroll", update);
+-      observer?.disconnect();
+-    };
++    detach.current = watchScrollEdges(element, {
++      onChange: (next) => setEdges((previous) => previous.left === next.left && previous.right === next.right ? previous : next)
++    });
+   }, []);
+   return { ref, edges };
+ }
+@@ -18719,11 +18765,11 @@
+   return widest;
+ }
+ function matrixLayout(fit) {
+-  const { rowLabels, columnCount, blockWidth } = fit;
++  const { rowLabels, columnCount: columnCount2, blockWidth } = fit;
+   const widest = Math.max(0, ...rowLabels.map((label) => estimateTextWidth(label, LABEL_FONT_PX)));
+   const rowLabelCap = Math.max(MATRIX_ROW_LABEL_MIN_W, Math.floor(blockWidth * MATRIX_ROW_LABEL_MAX_SHARE));
+   const rowLabelWidth = Math.min(rowLabelCap, Math.max(MATRIX_ROW_LABEL_MIN_W, Math.round(widest) + MATRIX_ROW_LABEL_GAP));
+-  const columns = Math.max(1, columnCount);
++  const columns = Math.max(1, columnCount2);
+   const fluid = (blockWidth - rowLabelWidth - CELL_GAP * (columns - 1)) / columns;
+   const cellWidth = Math.min(MATRIX_CELL_MAX_W, Math.max(MATRIX_CELL_MIN_W, Math.floor(fluid)));
+   const least = rowLabelWidth + columns * (MATRIX_CELL_MIN_W + CELL_GAP) - CELL_GAP;
+@@ -19323,7 +19369,7 @@
+ var DEFAULT_NODE_GAP = 48;
+ var DEFAULT_PAD = 24;
+ function computeDAGLayout(options) {
+-  const { nodes = [], edges = [], direction = "vertical", nodeWidth: nw = DEFAULT_NODE_W, nodeHeight: nh = DEFAULT_NODE_H, rankGap = DEFAULT_RANK_GAP, nodeGap = DEFAULT_NODE_GAP, padding: pad = DEFAULT_PAD } = options;
++  const { nodes = [], edges = [], direction = "vertical", nodeWidth: nw = DEFAULT_NODE_W, nodeHeight: nh = DEFAULT_NODE_H, rankGap = DEFAULT_RANK_GAP, nodeGap = DEFAULT_NODE_GAP, padding: pad2 = DEFAULT_PAD } = options;
+   const horizontal = direction === "horizontal";
+   const nodeIds = nodes.map((n) => n.id);
+   const nodeSet = new Set(nodeIds);
+@@ -19381,7 +19427,7 @@
+   const maxRank = Math.max(...rank.values(), 0);
+   const layoutNodes = [];
+   const nodePos = /* @__PURE__ */ new Map();
+-  let rankOffset = pad;
++  let rankOffset = pad2;
+   for (let r = 0; r <= maxRank; r++) {
+     const group = rankGroups.get(r) ?? [];
+     for (let i = 0; i < group.length; i++) {
+@@ -19389,8 +19435,8 @@
+         id: group[i],
+         rank: r,
+         order: i,
+-        x: horizontal ? rankOffset : pad + i * (nw + nodeGap),
+-        y: horizontal ? pad + i * (nh + nodeGap) : rankOffset
++        x: horizontal ? rankOffset : pad2 + i * (nw + nodeGap),
++        y: horizontal ? pad2 + i * (nh + nodeGap) : rankOffset
+       };
+       layoutNodes.push(ln);
+       nodePos.set(ln.id, ln);
+@@ -19450,8 +19496,8 @@
+   }
+   const allX = layoutNodes.map((n) => n.x + nw);
+   const allY = layoutNodes.map((n) => n.y + nh);
+-  const width = Math.max(...allX, 0) + pad;
+-  const height = Math.max(...allY, 0) + pad;
++  const width = Math.max(...allX, 0) + pad2;
++  const height = Math.max(...allY, 0) + pad2;
+   return {
+     nodes: layoutNodes,
+     edges: layoutEdges,
+@@ -19681,7 +19727,7 @@
+   }
+   return { nodes: kept, edges: order.map((key) => byPair.get(key)) };
+ }
+-function crosses(a, b, box, pad) {
++function crosses(a, b, box, pad2) {
+   const dm = b.m - a.m;
+   const dc = b.c - a.c;
+   let t0 = 0;
+@@ -19704,7 +19750,7 @@
+     }
+     return true;
+   };
+-  return clip(-dm, a.m - (box.m0 - pad)) && clip(dm, box.m1 + pad - a.m) && clip(-dc, a.c - (box.c0 - pad)) && clip(dc, box.c1 + pad - a.c) && t0 <= t1;
++  return clip(-dm, a.m - (box.m0 - pad2)) && clip(dm, box.m1 + pad2 - a.m) && clip(-dc, a.c - (box.c0 - pad2)) && clip(dc, box.c1 + pad2 - a.c) && t0 <= t1;
+ }
+ function labelSize(t) {
+   return {
+@@ -20431,8 +20477,8 @@
+ markChartCard(Diagram);
+ 
+ // ../canvas-components/dist/grok/components.js
+-var import_jsx_runtime14 = __toESM(require_jsx_runtime(), 1);
+-var import_react17 = __toESM(require_react(), 1);
++var import_jsx_runtime16 = __toESM(require_jsx_runtime(), 1);
++var import_react19 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/grok/heading-id.js
+ var import_react15 = __toESM(require_react(), 1);
+@@ -20584,9 +20630,655 @@
+   }, [registry, owners]);
+ }
+ 
+-// ../canvas-components/dist/grok/heading-line.js
++// ../canvas-components/dist/internal/fold-motion.js
++var import_jsx_runtime14 = __toESM(require_jsx_runtime(), 1);
+ var import_react16 = __toESM(require_react(), 1);
+-var HeadingLineContext = (0, import_react16.createContext)(false);
++var FOLD_OPEN_MS = 240;
++var FOLD_CLOSE_MS = 200;
++var EASE_OUT = "cubic-bezier(0.165, 0.84, 0.44, 1)";
++var EASE_IN = "cubic-bezier(0.4, 0, 1, 1)";
++var REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
++function reducedMotionList() {
++  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
++    return void 0;
++  }
++  return window.matchMedia(REDUCED_MOTION_QUERY);
++}
++function prefersReducedMotion() {
++  return reducedMotionList()?.matches ?? false;
++}
++function subscribeReducedMotion(onChange) {
++  const list = reducedMotionList();
++  if (list === void 0 || typeof list.addEventListener !== "function") {
++    return () => {
++    };
++  }
++  list.addEventListener("change", onChange);
++  return () => list.removeEventListener("change", onChange);
++}
++function usePrefersReducedMotion() {
++  return (0, import_react16.useSyncExternalStore)(subscribeReducedMotion, prefersReducedMotion, () => false);
++}
++function foldTransition(property, { open, reducedMotion }) {
++  if (reducedMotion) {
++    return void 0;
++  }
++  return open ? `${property} ${FOLD_OPEN_MS}ms ${EASE_OUT}` : `${property} ${FOLD_CLOSE_MS}ms ${EASE_IN}`;
++}
++function foldTurnTransition(phase) {
++  return foldTransition("transform", phase);
++}
++function useFoldMotion(open) {
++  const [present, setPresent] = (0, import_react16.useState)(open);
++  const clipRef = (0, import_react16.useRef)(null);
++  const motion = (0, import_react16.useRef)(null);
++  const settledOpen = (0, import_react16.useRef)(open);
++  if (open && !present) {
++    setPresent(true);
++  }
++  (0, import_react16.useLayoutEffect)(() => {
++    if (settledOpen.current === open) {
++      return;
++    }
++    settledOpen.current = open;
++    const clip = clipRef.current;
++    const running = motion.current;
++    motion.current = null;
++    if (clip === null || typeof clip.animate !== "function" || prefersReducedMotion()) {
++      running?.cancel();
++      if (!open) {
++        setPresent(false);
++      }
++      return;
++    }
++    let fromHeight = open ? 0 : clip.getBoundingClientRect().height;
++    let fromOpacity = open ? 0 : 1;
++    if (running !== null) {
++      fromHeight = clip.getBoundingClientRect().height;
++      const opacity = Number.parseFloat(getComputedStyle(clip).opacity);
++      fromOpacity = Number.isNaN(opacity) ? fromOpacity : opacity;
++      running.cancel();
++    }
++    const toHeight = open ? clip.getBoundingClientRect().height : 0;
++    clip.style.overflow = "hidden";
++    clip.style.flexGrow = "0";
++    const next = clip.animate([
++      { height: `${fromHeight}px`, opacity: fromOpacity },
++      { height: `${toHeight}px`, opacity: open ? 1 : 0 }
++    ], open ? { duration: FOLD_OPEN_MS, easing: EASE_OUT } : (
++      // Held at the end so the content does not flash back before it unmounts.
++      { duration: FOLD_CLOSE_MS, easing: EASE_IN, fill: "forwards" }
++    ));
++    motion.current = next;
++    next.onfinish = () => {
++      if (motion.current !== next) {
++        return;
++      }
++      motion.current = null;
++      if (open) {
++        clip.style.overflow = "";
++        clip.style.flexGrow = "";
++      } else {
++        setPresent(false);
++      }
++    };
++    next.oncancel = () => {
++      if (motion.current === null) {
++        clip.style.overflow = "";
++        clip.style.flexGrow = "";
++      }
++    };
++  }, [open]);
++  return { present, clipRef };
++}
++var CLIP_STYLE = { display: "flow-root" };
++var FILL_CLIP_STYLE = {
++  display: "flex",
++  flexDirection: "column",
++  flex: "1 1 auto",
++  minWidth: 0
++};
++function FoldClip({ motion, id, fill = false, children }) {
++  if (!motion.present) {
++    return null;
++  }
++  return (0, import_jsx_runtime14.jsx)("div", { ref: motion.clipRef, id, "data-fold-clip": true, style: fill ? FILL_CLIP_STYLE : CLIP_STYLE, children });
++}
++
++// ../canvas-components/dist/internal/table-clipboard.js
++var TABLE_GRID_ATTRIBUTE = "data-table-grid";
++var TABLE_COL_ATTRIBUTE = "data-table-col";
++var TABLE_ROW_ATTRIBUTE = "data-table-row";
++var TABLE_HEADER_ATTRIBUTE = "data-table-header";
++var TABLE_SELECTOR = `table,[${TABLE_GRID_ATTRIBUTE}]`;
++function gridTableAttributes() {
++  return { [TABLE_GRID_ATTRIBUTE]: "" };
++}
++function gridHeaderCellAttributes(col) {
++  return { [TABLE_HEADER_ATTRIBUTE]: "true", [TABLE_COL_ATTRIBUTE]: String(col) };
++}
++function gridBodyCellAttributes({ row, col }) {
++  return { [TABLE_ROW_ATTRIBUTE]: String(row), [TABLE_COL_ATTRIBUTE]: String(col) };
++}
++function columnCount(table) {
++  return Math.max(table.header?.length ?? 0, ...table.rows.map((row) => row.length));
++}
++function escapeHtml(text2) {
++  return text2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
++}
++function cellLines(text2) {
++  const lines = text2.replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[ \t\f\v\u00a0]+/g, " ").trim());
++  while (lines.length > 0 && lines[0] === "") {
++    lines.shift();
++  }
++  while (lines.length > 0 && lines[lines.length - 1] === "") {
++    lines.pop();
++  }
++  return lines;
++}
++function alignStyle(align) {
++  return align === "center" || align === "right" ? ` style="text-align:${align}"` : "";
++}
++function htmlCell(tag, text2, align) {
++  const content = cellLines(text2).map(escapeHtml).join("<br>");
++  return `<${tag}${alignStyle(align)}>${content}</${tag}>`;
++}
++function tableToHtml(table) {
++  const count = columnCount(table);
++  const row = (tag, cells) => {
++    const html = Array.from({ length: count }, (_, c) => htmlCell(tag, cells[c] ?? "", table.align[c]));
++    return `<tr>${html.join("")}</tr>`;
++  };
++  const head = table.header === void 0 ? "" : `<thead>${row("th", table.header)}</thead>`;
++  const body = `<tbody>${table.rows.map((cells) => row("td", cells)).join("")}</tbody>`;
++  return `<table>${head}${body}</table>`;
++}
++function markdownCell(text2) {
++  return cellLines(text2).map((line) => line.replace(/(\\*)\|/g, (_, slashes) => `${slashes}${slashes}\\|`)).join("<br>");
++}
++function pad(text2, width, align) {
++  const room = Math.max(0, width - text2.length);
++  if (align === "right") {
++    return " ".repeat(room) + text2;
++  }
++  if (align === "center") {
++    const left = Math.floor(room / 2);
++    return " ".repeat(left) + text2 + " ".repeat(room - left);
++  }
++  return text2 + " ".repeat(room);
++}
++function delimiter(width, align) {
++  if (align === "center") {
++    return `:${"-".repeat(width - 2)}:`;
++  }
++  if (align === "right") {
++    return `${"-".repeat(width - 1)}:`;
++  }
++  return "-".repeat(width);
++}
++function tableToMarkdown(table) {
++  const count = columnCount(table);
++  const header = Array.from({ length: count }, (_, c) => markdownCell(table.header?.[c] ?? ""));
++  const rows = table.rows.map((cells) => Array.from({ length: count }, (_, c) => markdownCell(cells[c] ?? "")));
++  const widths = Array.from({ length: count }, (_, c) => Math.max(3, header[c]?.length ?? 0, ...rows.map((cells) => cells[c]?.length ?? 0)));
++  const line = (cells) => `| ${cells.map((cell, c) => pad(cell, widths[c] ?? 3, table.align[c])).join(" | ")} |`;
++  const rule = `| ${widths.map((width, c) => delimiter(width, table.align[c])).join(" | ")} |`;
++  return [line(header), rule, ...rows.map(line)].join("\n");
++}
++function selfAndDescendants(element, selector) {
++  const found = [...element.querySelectorAll(selector)];
++  return element.matches(selector) ? [element, ...found] : found;
++}
++function textOf(element) {
++  const shown = element.innerText;
++  return typeof shown === "string" ? shown : element.textContent ?? "";
++}
++function parseAlign(value) {
++  switch (value?.trim().toLowerCase()) {
++    case "left":
++    case "start":
++      return "left";
++    case "center":
++      return "center";
++    case "right":
++    case "end":
++      return "right";
++    default:
++      return void 0;
++  }
++}
++function alignOf(element) {
++  const inline = element.style?.textAlign;
++  return parseAlign(inline) ?? parseAlign(element.getAttribute("align"));
++}
++function tableElementCells(table) {
++  const rows = [...table.querySelectorAll("tr")].filter((tr) => tr.closest("table") === table);
++  const cells = [];
++  let bodyRow = 0;
++  rows.forEach((tr, index) => {
++    const cellElements = [...tr.children].filter((child) => /^t[hd]$/i.test(child.tagName));
++    const isHeader = index === 0 && cellElements.length > 0 && (tr.parentElement?.tagName.toLowerCase() === "thead" || cellElements.every((cell) => cell.tagName.toLowerCase() === "th"));
++    const row = isHeader ? "header" : bodyRow;
++    let col = 0;
++    for (const element of cellElements) {
++      cells.push({ row, col, element });
++      const span = Number.parseInt(element.getAttribute("colspan") ?? "1", 10);
++      col += Number.isFinite(span) && span > 1 ? span : 1;
++    }
++    if (!isHeader) {
++      bodyRow += 1;
++    }
++  });
++  return cells;
++}
++function gridCells(grid) {
++  const cells = [];
++  for (const element of grid.querySelectorAll(`[${TABLE_COL_ATTRIBUTE}]`)) {
++    if (element.closest(`[${TABLE_GRID_ATTRIBUTE}]`) !== grid) {
++      continue;
++    }
++    const col = Number.parseInt(element.getAttribute(TABLE_COL_ATTRIBUTE) ?? "", 10);
++    if (!Number.isFinite(col)) {
++      continue;
++    }
++    if (element.hasAttribute(TABLE_HEADER_ATTRIBUTE)) {
++      cells.push({ row: "header", col, element });
++      continue;
++    }
++    const row = Number.parseInt(element.getAttribute(TABLE_ROW_ATTRIBUTE) ?? "", 10);
++    if (Number.isFinite(row)) {
++      cells.push({ row, col, element });
++    }
++  }
++  return cells;
++}
++function cellsOf(table) {
++  return table.tagName.toLowerCase() === "table" ? tableElementCells(table) : gridCells(table);
++}
++function cellKey(row, col) {
++  return `${row}:${col}`;
++}
++function modelOf(cells, columns) {
++  const cols = columns ?? [...new Set(cells.map((cell) => cell.col))].sort((a, b) => a - b);
++  const byKey = new Map(cells.map((cell) => [cellKey(cell.row, cell.col), cell]));
++  const bodyRows = [
++    ...new Set(cells.flatMap((cell) => cell.row === "header" ? [] : [cell.row]))
++  ].sort((a, b) => a - b);
++  const hasHeader = cells.some((cell) => cell.row === "header");
++  const at = (row, col) => byKey.get(cellKey(row, col));
++  const text2 = (row, col) => {
++    const cell = at(row, col);
++    return cell === void 0 ? "" : textOf(cell.element);
++  };
++  const align = cols.map((col) => {
++    const header = at("header", col);
++    const fromHeader = header === void 0 ? void 0 : alignOf(header.element);
++    if (fromHeader !== void 0) {
++      return fromHeader;
++    }
++    const first = bodyRows.map((row) => at(row, col)).find((cell) => cell !== void 0);
++    return first === void 0 ? void 0 : alignOf(first.element);
++  });
++  return {
++    header: hasHeader ? cols.map((col) => text2("header", col)) : void 0,
++    rows: bodyRows.map((row) => cols.map((col) => text2(row, col))),
++    align
++  };
++}
++function rangeOver(node) {
++  const range = (node.ownerDocument ?? node).createRange();
++  range.selectNode(node);
++  return range;
++}
++function rangeContains(outer, inner) {
++  return outer.compareBoundaryPoints(Range.START_TO_START, inner) <= 0 && outer.compareBoundaryPoints(Range.END_TO_END, inner) >= 0;
++}
++function intersection(range, node) {
++  if (!range.intersectsNode(node)) {
++    return void 0;
++  }
++  const bounds = rangeOver(node);
++  const clipped = range.cloneRange();
++  if (clipped.compareBoundaryPoints(Range.START_TO_START, bounds) < 0) {
++    clipped.setStart(bounds.startContainer, bounds.startOffset);
++  }
++  if (clipped.compareBoundaryPoints(Range.END_TO_END, bounds) > 0) {
++    clipped.setEnd(bounds.endContainer, bounds.endOffset);
++  }
++  return clipped;
++}
++function selectedCells(cells, range) {
++  return cells.filter((cell) => {
++    const part = intersection(range, cell.element);
++    if (part === void 0 || part.collapsed) {
++      return false;
++    }
++    return part.toString().trim() !== "" || rangeContains(range, rangeOver(cell.element));
++  });
++}
++function selectTable(table, range) {
++  const cells = cellsOf(table);
++  const selected = selectedCells(cells, range);
++  if (selected.length <= 1) {
++    return void 0;
++  }
++  const rows = new Set(selected.map((cell) => cell.row));
++  if (rows.size > 1) {
++    return modelOf(cells);
++  }
++  const [row] = rows;
++  const cols = [...new Set(selected.map((cell) => cell.col))].sort((a, b) => a - b);
++  if (row === "header") {
++    return modelOf(selected, cols);
++  }
++  return modelOf(cells.filter((cell) => cell.row === "header" || cell.row === row), cols);
++}
++var BLOCK_DISPLAYS = /* @__PURE__ */ new Set([
++  "block",
++  "flex",
++  "grid",
++  "list-item",
++  "table",
++  "table-row",
++  "table-caption",
++  "flow-root",
++  "-webkit-box"
++]);
++function isElement(node) {
++  return node.nodeType === Node.ELEMENT_NODE;
++}
++function isText(node) {
++  return node.nodeType === Node.TEXT_NODE;
++}
++function rangeText(range) {
++  const root = range.commonAncestorContainer;
++  const view = (root.ownerDocument ?? root).defaultView;
++  let out = "";
++  const breakLine = () => {
++    if (out !== "" && !out.endsWith("\n")) {
++      out += "\n";
++    }
++  };
++  const visit = (node, preformatted) => {
++    if (!range.intersectsNode(node)) {
++      return;
++    }
++    if (isText(node)) {
++      let text2 = node.data;
++      if (node === range.endContainer) {
++        text2 = text2.slice(0, range.endOffset);
++      }
++      if (node === range.startContainer) {
++        text2 = text2.slice(range.startOffset);
++      }
++      out += preformatted ? text2 : text2.replace(/\s+/g, " ");
++      return;
++    }
++    if (!isElement(node)) {
++      for (const child of node.childNodes)
++        visit(child, preformatted);
++      return;
++    }
++    if (node.tagName.toLowerCase() === "br") {
++      out += "\n";
++      return;
++    }
++    const style = view?.getComputedStyle(node);
++    if (style?.display === "none") {
++      return;
++    }
++    const block = style !== void 0 && BLOCK_DISPLAYS.has(style.display);
++    const pre = preformatted || (style?.whiteSpace.startsWith("pre") ?? false);
++    if (block) {
++      breakLine();
++    }
++    for (const child of node.childNodes)
++      visit(child, pre);
++    if (block) {
++      breakLine();
++    }
++  };
++  visit(root, false);
++  return out.split("\n").map((line) => line.replace(/^ +| +$/g, "")).join("\n").replace(/\n{3,}/g, "\n\n").trim();
++}
++var KEEPS_EMPTY = "img,svg,video,audio,canvas,br,hr";
++function pruneEmpty(node) {
++  for (const child of [...node.childNodes]) {
++    if (!isElement(child) || child.matches(KEEPS_EMPTY)) {
++      continue;
++    }
++    pruneEmpty(child);
++    if ((child.textContent ?? "").trim() === "" && child.querySelector(KEEPS_EMPTY) === null) {
++      child.remove();
++    }
++  }
++}
++function rangeHtml(range) {
++  const node = range.commonAncestorContainer;
++  const holder = (node.ownerDocument ?? node).createElement("div");
++  holder.append(range.cloneContents());
++  pruneEmpty(holder);
++  return holder.innerHTML;
++}
++function tablesIn(range, root) {
++  return selfAndDescendants(root, TABLE_SELECTOR).filter((table) => {
++    const outer = table.parentElement?.closest(TABLE_SELECTOR) ?? null;
++    return (outer === null || !root.contains(outer)) && range.intersectsNode(table);
++  });
++}
++function boundary(range, end) {
++  const point = range.cloneRange();
++  point.collapse(!end);
++  return point;
++}
++function between(from, to) {
++  const range = from.cloneRange();
++  range.setEnd(to.startContainer, to.startOffset);
++  return range;
++}
++function segments(range, root) {
++  const out = [];
++  let cursor = boundary(range, false);
++  for (const table of tablesIn(range, root)) {
++    const model = selectTable(table, range);
++    if (model === void 0) {
++      continue;
++    }
++    const bounds = rangeOver(table);
++    const start = boundary(bounds, false);
++    const end = boundary(bounds, true);
++    if (cursor.compareBoundaryPoints(Range.START_TO_START, start) < 0) {
++      out.push({ kind: "gap", range: between(cursor, start) });
++    }
++    out.push({ kind: "table", model });
++    if (cursor.compareBoundaryPoints(Range.START_TO_START, end) < 0) {
++      cursor = end;
++    }
++  }
++  if (out.length === 0) {
++    return out;
++  }
++  const finish = boundary(range, true);
++  if (cursor.compareBoundaryPoints(Range.START_TO_START, finish) < 0) {
++    out.push({ kind: "gap", range: between(cursor, finish) });
++  }
++  return out;
++}
++function clipboardForRange(range, root) {
++  if (range.collapsed) {
++    return void 0;
++  }
++  const parts = segments(range, root);
++  if (parts.length === 0) {
++    return void 0;
++  }
++  const html = [];
++  const text2 = [];
++  for (const part of parts) {
++    if (part.kind === "table") {
++      html.push(tableToHtml(part.model));
++      text2.push(tableToMarkdown(part.model));
++      continue;
++    }
++    const gapHtml = rangeHtml(part.range);
++    if (gapHtml.trim() !== "") {
++      html.push(gapHtml);
++    }
++    const gapText = rangeText(part.range);
++    if (gapText !== "") {
++      text2.push(gapText);
++    }
++  }
++  return { html: html.join(""), text: text2.join("\n\n") };
++}
++function copyTablesInSelection(event, root) {
++  const data = event.clipboardData;
++  if (data === null || event.defaultPrevented) {
++    return false;
++  }
++  const selection = root.ownerDocument.getSelection();
++  if (selection === null || selection.rangeCount === 0) {
++    return false;
++  }
++  const clipboard = clipboardForRange(selection.getRangeAt(0), root);
++  if (clipboard === void 0) {
++    return false;
++  }
++  event.preventDefault();
++  data.setData("text/html", clipboard.html);
++  data.setData("text/plain", clipboard.text);
++  return true;
++}
++function copyWithinTable(event, table) {
++  const selection = table.ownerDocument.getSelection();
++  if (selection === null || selection.rangeCount === 0) {
++    return false;
++  }
++  if (!rangeContains(rangeOver(table), selection.getRangeAt(0))) {
++    return false;
++  }
++  return copyTablesInSelection(event, table);
++}
++function installTableCopy(root) {
++  const doc = root.ownerDocument;
++  const onCopy = (event) => {
++    copyTablesInSelection(event, root);
++  };
++  doc.addEventListener("copy", onCopy);
++  return () => doc.removeEventListener("copy", onCopy);
++}
++
++// ../canvas-components/dist/grok/heading-line.js
++var import_react17 = __toESM(require_react(), 1);
++var HeadingLineContext = (0, import_react17.createContext)(false);
++
++// ../canvas-components/dist/grok/inline-text.js
++var import_jsx_runtime15 = __toESM(require_jsx_runtime(), 1);
++var import_react18 = __toESM(require_react(), 1);
++var HYPHENATED_FIGURE = /\d[\d-]*-\d[\d-]*/g;
++var URL = /(?:https?:\/\/[^\s<>"'`]+|\bwww\.[^\s<>"'`]*\.[^\s<>"'`]+)/gi;
++var TRAILING_PUNCTUATION = /[.,;:!?'"]$/;
++var CLOSERS = { ")": "(", "]": "[", "}": "{" };
++function trimUrlTail(match) {
++  let url = match;
++  for (; ; ) {
++    if (TRAILING_PUNCTUATION.test(url)) {
++      url = url.slice(0, -1);
++      continue;
++    }
++    const last = url.at(-1);
++    const opener = last === void 0 ? void 0 : CLOSERS[last];
++    if (opener === void 0) {
++      return url;
++    }
++    const opens = url.split(opener).length - 1;
++    const closes = url.split(last).length - 1;
++    if (closes <= opens) {
++      return url;
++    }
++    url = url.slice(0, -1);
++  }
++}
++function hrefForUrlText(text2) {
++  return /^https?:\/\//i.test(text2) ? text2 : `https://${text2}`;
++}
++function splitUrls(text2) {
++  const out = [];
++  let last = 0;
++  for (const match of text2.matchAll(URL)) {
++    const at = match.index ?? 0;
++    const url = trimUrlTail(match[0]);
++    if (url.length === 0) {
++      continue;
++    }
++    if (at > last) {
++      out.push({ kind: "text", text: text2.slice(last, at) });
++    }
++    out.push({ kind: "url", text: url });
++    last = at + url.length;
++  }
++  if (last < text2.length) {
++    out.push({ kind: "text", text: text2.slice(last) });
++  }
++  return out;
++}
++function keepFiguresWhole(text2) {
++  if (!/\d-\d/.test(text2)) {
++    return text2;
++  }
++  const out = [];
++  let last = 0;
++  for (const match of text2.matchAll(HYPHENATED_FIGURE)) {
++    const at = match.index ?? 0;
++    if (at > last) {
++      out.push(text2.slice(last, at));
++    }
++    out.push((0, import_jsx_runtime15.jsx)("span", { style: { whiteSpace: "nowrap" }, children: match[0] }, at));
++    last = at + match[0].length;
++  }
++  if (last < text2.length) {
++    out.push(text2.slice(last));
++  }
++  return out;
++}
++function InlineLink({ href, children }) {
++  const theme = useGrokTheme();
++  return (0, import_jsx_runtime15.jsx)("a", { href, target: "_blank", rel: "noopener noreferrer", style: {
++    color: theme.text.accent,
++    textDecoration: "underline",
++    textDecorationColor: `${theme.text.accent}80`,
++    textUnderlineOffset: 2
++  }, children });
++}
++function linkUrls(text2) {
++  if (!/https?:\/\/|www\./i.test(text2)) {
++    return text2;
++  }
++  const segments2 = splitUrls(text2);
++  if (segments2.length === 1 && segments2[0]?.kind === "text") {
++    return text2;
++  }
++  return segments2.map((segment, i) => segment.kind === "url" ? (0, import_jsx_runtime15.jsx)(InlineLink, { href: hrefForUrlText(segment.text), children: segment.text }, i) : segment.text);
++}
++function inlineText(text2) {
++  const linked = linkUrls(text2);
++  if (typeof linked === "string") {
++    return keepFiguresWhole(linked);
++  }
++  return linked.map((node, i) => {
++    if (typeof node !== "string") {
++      return node;
++    }
++    const kept = keepFiguresWhole(node);
++    return typeof kept === "string" ? kept : (0, import_jsx_runtime15.jsx)(import_react18.Fragment, { children: kept }, i);
++  });
++}
++function inlineTextIn(children) {
++  if (typeof children === "string") {
++    return inlineText(children);
++  }
++  return import_react18.Children.map(children, (child) => typeof child === "string" ? inlineText(child) : child);
++}
+ 
+ // ../canvas-components/dist/grok/width.js
+ function pageWidthStyle(width) {
+@@ -20603,14 +21295,14 @@
+ // ../canvas-components/dist/grok/components.js
+ function Page({ title, summary, width = "column", children }) {
+   const theme = useGrokTheme();
+-  const [headingIds] = (0, import_react17.useState)(createHeadingIdRegistry);
+-  const blocks = import_react17.Children.toArray(children);
++  const [headingIds] = (0, import_react19.useState)(createHeadingIdRegistry);
++  const blocks = flattenBlocks(children);
+   const gaps = gapsBetween(blocks, {
+     afterHeading: summary === void 0 ? RHYTHM.afterTitle : void 0,
+     precededBy: summary === void 0 ? void 0 : "text",
+     beforeSection: SECTION_LEVELS[0].before
+   });
+-  return (0, import_jsx_runtime14.jsxs)("div", { style: {
++  return (0, import_jsx_runtime16.jsxs)("div", { style: {
+     ...pageWidthStyle(width),
+     fontFamily: theme.font.family,
+     color: theme.text.primary,
+@@ -20622,10 +21314,10 @@
+     // slot that keeps one line does so with `nowrap`, so a squeezed
+     // figure never shatters inside the number; a `Table` opts out whole.
+     overflowWrap: "anywhere"
+-  }, children: [(0, import_jsx_runtime14.jsx)("h1", { style: typeStyle(theme, "heading1", "semibold", theme.text.primary), children: title }), summary === void 0 ? null : (0, import_jsx_runtime14.jsx)("p", { style: {
++  }, children: [(0, import_jsx_runtime16.jsx)("h1", { style: typeStyle(theme, "heading1", "semibold", theme.text.primary), children: title }), summary === void 0 ? null : (0, import_jsx_runtime16.jsx)("p", { style: {
+     ...typeStyle(theme, "body1", "regular", theme.text.primary),
+     marginTop: RHYTHM.afterTitle
+-  }, children: summary }), (0, import_jsx_runtime14.jsx)(HeadingIdContext.Provider, { value: headingIds, children: blocks.map((block, i) => (0, import_jsx_runtime14.jsx)("div", { style: { marginTop: gaps[i] }, children: block }, i)) })] });
++  }, children: inlineText(summary) }), (0, import_jsx_runtime16.jsx)(HeadingIdContext.Provider, { value: headingIds, children: blocks.map((block, i) => (0, import_jsx_runtime16.jsx)("div", { style: { marginTop: gaps[i] }, children: block }, i)) })] });
+ }
+ var SECTION_LEVELS = [
+   { tag: "h2", type: "heading2", weight: "semibold", before: 64, after: 16 },
+@@ -20654,8 +21346,8 @@
+   if (!touch) {
+     return { padding: 0, margin: 0 };
+   }
+-  const pad = Math.max(0, (FOLD_TOUCH_HIT_PX - lineHeightPx) / 2);
+-  return { padding: `${pad}px 0`, margin: `${-pad}px 0` };
++  const pad2 = Math.max(0, (FOLD_TOUCH_HIT_PX - lineHeightPx) / 2);
++  return { padding: `${pad2}px 0`, margin: `${-pad2}px 0` };
+ }
+ function hasSelectionInside(element) {
+   const selection = element.ownerDocument.defaultView?.getSelection?.() ?? null;
+@@ -20666,27 +21358,30 @@
+ }
+ function Chevron({ open, color, lineHeightPx }) {
+   const inset = (CHEVRON_SLOT_PX - CHEVRON_GLYPH_PX) / 2;
+-  return (0, import_jsx_runtime14.jsx)("svg", { width: CHEVRON_SLOT_PX, height: CHEVRON_SLOT_PX, viewBox: `${-inset} ${-inset} ${CHEVRON_SLOT_PX} ${CHEVRON_SLOT_PX}`, "aria-hidden": true, style: {
++  const reducedMotion = usePrefersReducedMotion();
++  return (0, import_jsx_runtime16.jsx)("svg", { width: CHEVRON_SLOT_PX, height: CHEVRON_SLOT_PX, viewBox: `${-inset} ${-inset} ${CHEVRON_SLOT_PX} ${CHEVRON_SLOT_PX}`, "aria-hidden": true, style: {
+     display: "block",
+     flexShrink: 0,
+     // Centered on the heading's first line, so a wrapped heading keeps it there.
+     marginTop: (lineHeightPx - CHEVRON_SLOT_PX) / 2,
+     color,
+-    transform: open ? void 0 : "rotate(-90deg)"
+-  }, children: (0, import_jsx_runtime14.jsx)("path", { d: "M2.5 4.25 6 7.75 9.5 4.25", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) });
++    transform: open ? void 0 : "rotate(-90deg)",
++    transition: foldTurnTransition({ open, reducedMotion })
++  }, children: (0, import_jsx_runtime16.jsx)("path", { d: "M2.5 4.25 6 7.75 9.5 4.25", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) });
+ }
+ function Section({ heading, id, caption, actions, collapsible = false, defaultOpen = false, children }) {
+   const theme = useGrokTheme();
+   const touch = useCoarsePointer();
+   const { id: headingId, ref: sectionRef } = useHeadingId({ id, heading });
+-  const depth = (0, import_react17.useContext)(SectionDepthContext);
+-  const inCard = (0, import_react17.useContext)(InCardContext);
++  const depth = (0, import_react19.useContext)(SectionDepthContext);
++  const inCard = (0, import_react19.useContext)(InCardContext);
+   const level = sectionLevel(depth);
+-  const [open, setOpen] = (0, import_react17.useState)(defaultOpen);
++  const [open, setOpen] = (0, import_react19.useState)(defaultOpen);
++  const fold = useFoldMotion(open);
+   const folds = collapsible && heading !== void 0 && heading.trim() !== "";
+   const slot = actions ?? void 0;
+-  const blocks = import_react17.Children.toArray(children);
+-  useHiddenHeadingIds(folds && !open ? hiddenHeadingSources(blocks) : NO_HIDDEN_HEADINGS, sectionRef);
++  const blocks = flattenBlocks(children);
++  useHiddenHeadingIds(folds && !fold.present ? hiddenHeadingSources(blocks) : NO_HIDDEN_HEADINGS, sectionRef);
+   const headed = heading !== void 0 || slot !== void 0;
+   const gaps = gapsBetween(blocks, {
+     afterHeading: headed ? folds ? level.foldAfter ?? level.after : level.after : void 0,
+@@ -20701,9 +21396,9 @@
+   const inCell = depth === GRID_CELL_SECTION_DEPTH;
+   const captionAt = caption === void 0 ? -1 : captionedBlock(blocks);
+   const toggle = () => setOpen((value) => !value);
+-  const subtitleId = `${(0, import_react17.useId)()}-subtitle`;
++  const subtitleId = `${(0, import_react19.useId)()}-subtitle`;
+   const hasSubtitle = caption !== void 0 && captionAt === -1;
+-  const subtitle = hasSubtitle ? (0, import_jsx_runtime14.jsx)("p", { id: folds ? subtitleId : void 0, "data-section-caption": true, onClick: folds ? (event) => {
++  const subtitle = hasSubtitle ? (0, import_jsx_runtime16.jsx)("p", { id: folds ? subtitleId : void 0, "data-section-caption": true, onClick: folds ? (event) => {
+     if (!hasSelectionInside(event.currentTarget)) {
+       toggle();
+     }
+@@ -20712,7 +21407,7 @@
+     marginTop: SUBTITLE_GAP_PX,
+     ...folds ? { paddingLeft: FOLD_BODY_INSET_PX, cursor: "pointer" } : void 0
+   }, children: caption }) : null;
+-  const title = heading === void 0 ? null : folds ? (0, import_jsx_runtime14.jsx)(HeadingTag, { style: { ...headingStyle, flex: "1 1 auto", minWidth: 0 }, children: (0, import_jsx_runtime14.jsxs)("button", { type: "button", "aria-expanded": open, "aria-describedby": hasSubtitle ? subtitleId : void 0, onClick: toggle, style: {
++  const title = heading === void 0 ? null : folds ? (0, import_jsx_runtime16.jsx)(HeadingTag, { style: { ...headingStyle, flex: "1 1 auto", minWidth: 0 }, children: (0, import_jsx_runtime16.jsxs)("button", { type: "button", "aria-expanded": open, "aria-describedby": hasSubtitle ? subtitleId : void 0, onClick: toggle, style: {
+     ...foldHit(touch, lineHeightPx),
+     display: "flex",
+     alignItems: "flex-start",
+@@ -20726,43 +21421,43 @@
+     letterSpacing: "inherit",
+     color: "inherit",
+     cursor: "pointer"
+-  }, children: [(0, import_jsx_runtime14.jsx)(Chevron, { open, color: theme.text.tertiary, lineHeightPx }), (0, import_jsx_runtime14.jsx)("span", { style: { flex: "1 1 auto", minWidth: 0 }, children: heading })] }) }) : (0, import_jsx_runtime14.jsx)(HeadingTag, { style: headingStyle, children: heading });
++  }, children: [(0, import_jsx_runtime16.jsx)(Chevron, { open, color: theme.text.tertiary, lineHeightPx }), (0, import_jsx_runtime16.jsx)("span", { style: { flex: "1 1 auto", minWidth: 0 }, children: heading })] }) }) : (0, import_jsx_runtime16.jsx)(HeadingTag, { style: headingStyle, children: heading });
+   const body = blocks.map((block, i) => {
+     if (i !== captionAt || caption === void 0) {
+-      return (0, import_jsx_runtime14.jsx)("div", { style: { marginTop: gaps[i] }, children: block }, i);
++      return (0, import_jsx_runtime16.jsx)("div", { style: { marginTop: gaps[i] }, children: block }, i);
+     }
+     if (!inCard && drawsChartCard(block)) {
+-      return (0, import_jsx_runtime14.jsx)("div", { style: { marginTop: gaps[i] }, children: (0, import_jsx_runtime14.jsx)(CardCaptionContext.Provider, { value: caption, children: block }) }, i);
++      return (0, import_jsx_runtime16.jsx)("div", { style: { marginTop: gaps[i] }, children: (0, import_jsx_runtime16.jsx)(CardCaptionContext.Provider, { value: caption, children: block }) }, i);
+     }
+-    return (0, import_jsx_runtime14.jsxs)("div", { style: { marginTop: gaps[i] }, children: [block, (0, import_jsx_runtime14.jsx)("p", { "data-section-caption": true, style: {
++    return (0, import_jsx_runtime16.jsxs)("div", { style: { marginTop: gaps[i] }, children: [block, (0, import_jsx_runtime16.jsx)("p", { "data-section-caption": true, style: {
+       ...captionStyle(theme),
+       marginTop: inCard ? CARD_CAPTION_GAP_PX : RHYTHM.caption
+     }, children: caption })] }, i);
+   });
+-  return (0, import_jsx_runtime14.jsxs)("section", { id: headingId, ref: sectionRef, style: inCell ? CELL_SECTION : void 0, children: [slot === void 0 ? title : (0, import_jsx_runtime14.jsxs)("div", { style: {
++  return (0, import_jsx_runtime16.jsxs)("section", { id: headingId, ref: sectionRef, style: inCell ? CELL_SECTION : void 0, children: [slot === void 0 ? title : (0, import_jsx_runtime16.jsxs)("div", { style: {
+     display: "flex",
+     flexWrap: "wrap",
+     alignItems: "baseline",
+     justifyContent: "space-between",
+     columnGap: 16,
+     rowGap: 6
+-  }, children: [title ?? (0, import_jsx_runtime14.jsx)("span", {}), (0, import_jsx_runtime14.jsx)("div", {
++  }, children: [title ?? (0, import_jsx_runtime16.jsx)("span", {}), (0, import_jsx_runtime16.jsx)("div", {
+     "data-section-actions": true,
+     // The controls move under the heading when the line is short, and
+     // never take more than the page: a wide Segmented wraps its options.
+     style: { display: "flex", alignItems: "center", minWidth: 0, maxWidth: "100%" },
+-    children: (0, import_jsx_runtime14.jsx)(HeadingLineContext.Provider, { value: true, children: slot })
+-  })] }), subtitle, folds && !open ? null : (0, import_jsx_runtime14.jsx)(SectionDepthContext.Provider, { value: depth + 1, children: inCell || folds ? (0, import_jsx_runtime14.jsx)("div", { "data-fold-body": folds ? true : void 0, style: {
++    children: (0, import_jsx_runtime16.jsx)(HeadingLineContext.Provider, { value: true, children: slot })
++  })] }), subtitle, folds ? (0, import_jsx_runtime16.jsx)(FoldClip, { motion: fold, fill: inCell, children: (0, import_jsx_runtime16.jsx)(SectionDepthContext.Provider, { value: depth + 1, children: (0, import_jsx_runtime16.jsx)("div", { "data-fold-body": true, style: {
+     ...inCell ? CELL_SECTION_BODY : void 0,
+-    ...folds ? { paddingLeft: FOLD_BODY_INSET_PX } : void 0
+-  }, children: body }) : body })] });
++    paddingLeft: FOLD_BODY_INSET_PX
++  }, children: body }) }) }) : (0, import_jsx_runtime16.jsx)(SectionDepthContext.Provider, { value: depth + 1, children: inCell ? (0, import_jsx_runtime16.jsx)("div", { style: CELL_SECTION_BODY, children: body }) : body })] });
+ }
+ markBlockKind(Section, "section");
+ var NO_HIDDEN_HEADINGS = [];
+ function hiddenHeadingSources(blocks) {
+   const sources = [];
+   for (const block of blocks) {
+-    if (!(0, import_react17.isValidElement)(block)) {
++    if (!(0, import_react19.isValidElement)(block)) {
+       continue;
+     }
+     if (block.type === Section) {
+@@ -20772,7 +21467,7 @@
+         sources.push(source);
+       }
+     }
+-    sources.push(...hiddenHeadingSources(import_react17.Children.toArray(block.props.children)));
++    sources.push(...hiddenHeadingSources(import_react19.Children.toArray(block.props.children)));
+   }
+   return sources;
+ }
+@@ -20794,7 +21489,7 @@
+ };
+ function Text({ children }) {
+   const theme = useGrokTheme();
+-  return (0, import_jsx_runtime14.jsx)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: keepFiguresWholeIn(children) });
++  return (0, import_jsx_runtime16.jsx)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: inlineTextIn(children) });
+ }
+ markBlockKind(Text, "text");
+ var CALLOUT_TONE_HUE = {
+@@ -20815,18 +21510,18 @@
+     strokeLinejoin: "round",
+     fill: "none"
+   };
+-  const ring = (0, import_jsx_runtime14.jsx)("circle", { cx: "10", cy: "10", r: "6.75", ...stroke });
++  const ring = (0, import_jsx_runtime16.jsx)("circle", { cx: "10", cy: "10", r: "6.75", ...stroke });
+   const marks = {
+-    info: (0, import_jsx_runtime14.jsxs)(import_jsx_runtime14.Fragment, { children: [ring, (0, import_jsx_runtime14.jsx)("path", { d: "M10 9.4V13.4", ...stroke }), (0, import_jsx_runtime14.jsx)("circle", { cx: "10", cy: "6.75", r: "1", fill: color })] }),
+-    success: (0, import_jsx_runtime14.jsxs)(import_jsx_runtime14.Fragment, { children: [ring, (0, import_jsx_runtime14.jsx)("path", { d: "M6.9 10.2L9.1 12.3L13.2 7.9", ...stroke })] }),
+-    warning: (0, import_jsx_runtime14.jsxs)(import_jsx_runtime14.Fragment, { children: [(0, import_jsx_runtime14.jsx)("path", { d: "M8.91807 3.93978C9.39947 3.10784 10.6005 3.10784 11.0819 3.93978L16.8244 13.864C17.3066 14.6973 16.7053 15.74 15.7425 15.74H4.25748C3.29469 15.74 2.69335 14.6973 3.17555 13.864L8.91807 3.93978Z", ...stroke }), (0, import_jsx_runtime14.jsx)("path", { d: "M10 7.2V10.3", ...stroke }), (0, import_jsx_runtime14.jsx)("circle", { cx: "10", cy: "12.9", r: "1", fill: color })] }),
+-    danger: (0, import_jsx_runtime14.jsxs)(import_jsx_runtime14.Fragment, { children: [ring, (0, import_jsx_runtime14.jsx)("path", { d: "M7.6 7.6L12.4 12.4", ...stroke }), (0, import_jsx_runtime14.jsx)("path", { d: "M12.4 7.6L7.6 12.4", ...stroke })] })
++    info: (0, import_jsx_runtime16.jsxs)(import_jsx_runtime16.Fragment, { children: [ring, (0, import_jsx_runtime16.jsx)("path", { d: "M10 9.4V13.4", ...stroke }), (0, import_jsx_runtime16.jsx)("circle", { cx: "10", cy: "6.75", r: "1", fill: color })] }),
++    success: (0, import_jsx_runtime16.jsxs)(import_jsx_runtime16.Fragment, { children: [ring, (0, import_jsx_runtime16.jsx)("path", { d: "M6.9 10.2L9.1 12.3L13.2 7.9", ...stroke })] }),
++    warning: (0, import_jsx_runtime16.jsxs)(import_jsx_runtime16.Fragment, { children: [(0, import_jsx_runtime16.jsx)("path", { d: "M8.91807 3.93978C9.39947 3.10784 10.6005 3.10784 11.0819 3.93978L16.8244 13.864C17.3066 14.6973 16.7053 15.74 15.7425 15.74H4.25748C3.29469 15.74 2.69335 14.6973 3.17555 13.864L8.91807 3.93978Z", ...stroke }), (0, import_jsx_runtime16.jsx)("path", { d: "M10 7.2V10.3", ...stroke }), (0, import_jsx_runtime16.jsx)("circle", { cx: "10", cy: "12.9", r: "1", fill: color })] }),
++    danger: (0, import_jsx_runtime16.jsxs)(import_jsx_runtime16.Fragment, { children: [ring, (0, import_jsx_runtime16.jsx)("path", { d: "M7.6 7.6L12.4 12.4", ...stroke }), (0, import_jsx_runtime16.jsx)("path", { d: "M12.4 7.6L7.6 12.4", ...stroke })] })
+   };
+-  return (0, import_jsx_runtime14.jsx)("svg", { width: CALLOUT_ICON_PX, height: CALLOUT_ICON_PX, viewBox: `0 0 ${CALLOUT_ICON_PX} ${CALLOUT_ICON_PX}`, fill: "none", "aria-hidden": "true", focusable: "false", style: { display: "block", flexShrink: 0 }, children: marks[tone] });
++  return (0, import_jsx_runtime16.jsx)("svg", { width: CALLOUT_ICON_PX, height: CALLOUT_ICON_PX, viewBox: `0 0 ${CALLOUT_ICON_PX} ${CALLOUT_ICON_PX}`, fill: "none", "aria-hidden": "true", focusable: "false", style: { display: "block", flexShrink: 0 }, children: marks[tone] });
+ }
+ function Callout({ lead, tone, children }) {
+   const theme = useGrokTheme();
+-  const body = import_react17.Children.toArray(keepFiguresWholeIn(children));
++  const body = import_react19.Children.toArray(inlineTextIn(children));
+   if (lead === void 0 && body.length === 0) {
+     return null;
+   }
+@@ -20834,20 +21529,20 @@
+   const toned = tone !== void 0 && hue !== void 0;
+   const leadInk = toned ? theme.text[hue] : theme.text.primary;
+   const bodyInk = toned ? theme.text[`${hue}Deep`] : theme.text.primary;
+-  return (0, import_jsx_runtime14.jsxs)("div", { style: {
++  return (0, import_jsx_runtime16.jsxs)("div", { style: {
+     display: "flex",
+     alignItems: "flex-start",
+     gap: CALLOUT_ICON_GAP_PX,
+     borderRadius: theme.radius.lg,
+     background: toned ? theme.fill[`${hue}Subtle`] : theme.fill.secondary,
+     padding: "12px 16px"
+-  }, children: [toned ? (0, import_jsx_runtime14.jsx)("span", { style: {
++  }, children: [toned ? (0, import_jsx_runtime16.jsx)("span", { style: {
+     display: "flex",
+     alignItems: "center",
+     flexShrink: 0,
+     width: CALLOUT_ICON_PX,
+     height: CALLOUT_ICON_SLOT_PX
+-  }, children: (0, import_jsx_runtime14.jsx)(CalloutIcon, { tone, color: leadInk }) }) : null, (0, import_jsx_runtime14.jsxs)("div", { style: { flex: "1 1 0", minWidth: 0 }, children: [lead === void 0 ? null : (0, import_jsx_runtime14.jsx)("p", { style: typeStyle(theme, "body1", "semibold", leadInk), children: lead }), body.length === 0 ? null : (0, import_jsx_runtime14.jsx)("p", { style: {
++  }, children: (0, import_jsx_runtime16.jsx)(CalloutIcon, { tone, color: leadInk }) }) : null, (0, import_jsx_runtime16.jsxs)("div", { style: { flex: "1 1 0", minWidth: 0 }, children: [lead === void 0 ? null : (0, import_jsx_runtime16.jsx)("p", { style: typeStyle(theme, "body1", "semibold", leadInk), children: lead }), body.length === 0 ? null : (0, import_jsx_runtime16.jsx)("p", { style: {
+     ...typeStyle(theme, "body1", "regular", bodyInk),
+     marginTop: lead === void 0 ? 0 : 2
+   }, children: body })] })] });
+@@ -20857,7 +21552,7 @@
+   return `${glyphs + gapCh}ch`;
+ }
+ function CheckMark({ size = 10 }) {
+-  return (0, import_jsx_runtime14.jsx)("svg", { width: size, height: size, viewBox: "0 0 12 12", "aria-hidden": true, children: (0, import_jsx_runtime14.jsx)("path", { d: "M2.5 6.5 5 9l4.5-6", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }) });
++  return (0, import_jsx_runtime16.jsx)("svg", { width: size, height: size, viewBox: "0 0 12 12", "aria-hidden": true, children: (0, import_jsx_runtime16.jsx)("path", { d: "M2.5 6.5 5 9l4.5-6", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }) });
+ }
+ var CHECKBOX_CELL_PX = 20;
+ var CHECKBOX_LINE_OFFSET_PX = (24 - CHECKBOX_CELL_PX) / 2;
+@@ -20872,15 +21567,15 @@
+ function Checklist({ items }) {
+   const theme = useGrokTheme();
+   const { ref, narrow } = useNarrowBlock();
+-  return (0, import_jsx_runtime14.jsx)("div", { ref, style: { display: "flex", flexDirection: "column" }, children: items.map((item, i) => {
++  return (0, import_jsx_runtime16.jsx)("div", { ref, style: { display: "flex", flexDirection: "column" }, children: items.map((item, i) => {
+     const checked = item.done === true;
+-    return (0, import_jsx_runtime14.jsxs)("div", { style: {
++    return (0, import_jsx_runtime16.jsxs)("div", { style: {
+       display: "flex",
+       flexWrap: narrow ? "wrap" : void 0,
+       alignItems: "flex-start",
+       gap: narrow ? `0 ${CHECKLIST_ROW_GAP_PX}px` : CHECKLIST_ROW_GAP_PX,
+       padding: `${CHECKLIST_ROW_PADDING_PX}px 0`
+-    }, children: [(0, import_jsx_runtime14.jsx)("span", { role: "checkbox", "aria-checked": checked, "aria-readonly": true, style: {
++    }, children: [(0, import_jsx_runtime16.jsx)("span", { role: "checkbox", "aria-checked": checked, "aria-readonly": true, style: {
+       display: "flex",
+       alignItems: "center",
+       justifyContent: "center",
+@@ -20889,7 +21584,7 @@
+       margin: `${CHECKBOX_LINE_OFFSET_PX}px 0 ${-CHECKBOX_LINE_OFFSET_PX}px`,
+       flexShrink: 0,
+       cursor: "default"
+-    }, children: (0, import_jsx_runtime14.jsx)("span", { "aria-hidden": true, style: {
++    }, children: (0, import_jsx_runtime16.jsx)("span", { "aria-hidden": true, style: {
+       display: "inline-flex",
+       alignItems: "center",
+       justifyContent: "center",
+@@ -20900,12 +21595,12 @@
+       border: checked ? `0.5px solid ${theme.border.subtle}` : `1px solid ${theme.border.strong}`,
+       background: checked ? theme.fill.controlChecked : theme.bg.base,
+       color: theme.text.onColor
+-    }, children: checked ? (0, import_jsx_runtime14.jsx)(CheckMark, {}) : null }) }), (0, import_jsx_runtime14.jsx)("p", { style: {
++    }, children: checked ? (0, import_jsx_runtime16.jsx)(CheckMark, {}) : null }) }), (0, import_jsx_runtime16.jsx)("p", { style: {
+       ...typeStyle(theme, "body1", "regular", checked ? theme.text.secondary : theme.text.primary),
+       flex: 1,
+       minWidth: 0,
+       textDecoration: checked ? "line-through" : void 0
+-    }, children: item.text }), item.meta === void 0 ? null : (0, import_jsx_runtime14.jsx)("span", { style: {
++    }, children: inlineText(item.text) }), item.meta === void 0 ? null : (0, import_jsx_runtime16.jsx)("span", { style: {
+       ...typeStyle(theme, "subtext", "regular", theme.text.tertiary),
+       flexShrink: 0,
+       paddingTop: 2,
+@@ -20928,23 +21623,23 @@
+   const lead = `min(${leadWidth},${ROW_LEAD_MAX_WIDTH})`;
+   const metaMax = leads ? `max(${ROW_META_MIN_WIDTH},min(${ROW_META_MAX_WIDTH},calc(100% - ${ROW_TITLE_MIN_WIDTH} - ${lead} - ${ROW_COLUMN_GAP_PX * 2}px)))` : ROW_META_MAX_WIDTH;
+   const meta = `fit-content(${metaMax})`;
+-  return (0, import_jsx_runtime14.jsx)("div", { style: { display: "flex", flexDirection: "column" }, children: rows.map((row, i) => (0, import_jsx_runtime14.jsxs)("div", { style: {
++  return (0, import_jsx_runtime16.jsx)("div", { style: { display: "flex", flexDirection: "column" }, children: rows.map((row, i) => (0, import_jsx_runtime16.jsxs)("div", { style: {
+     display: "grid",
+     columnGap: ROW_COLUMN_GAP_PX,
+     gridTemplateColumns: leads ? `${lead} minmax(0,1fr) ${meta}` : `minmax(0,1fr) ${meta}`,
+     borderTop: hairline(theme),
+     padding: "10px 0"
+-  }, children: [leads ? (0, import_jsx_runtime14.jsx)("span", { title: row.lead, style: {
++  }, children: [leads ? (0, import_jsx_runtime16.jsx)("span", { title: row.lead, style: {
+     ...typeStyle(theme, "body1", "regular", theme.text.tertiary),
+     ...tabularNums,
+     ...truncate
+-  }, children: row.lead }) : null, (0, import_jsx_runtime14.jsxs)("div", { style: { minWidth: 0 }, children: [(0, import_jsx_runtime14.jsxs)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: [keepFiguresWhole(row.title), row.status === void 0 ? null : (0, import_jsx_runtime14.jsxs)("span", { style: {
++  }, children: row.lead }) : null, (0, import_jsx_runtime16.jsxs)("div", { style: { minWidth: 0 }, children: [(0, import_jsx_runtime16.jsxs)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: [inlineText(row.title), row.status === void 0 ? null : (0, import_jsx_runtime16.jsxs)("span", { style: {
+     fontWeight: theme.weight.medium,
+     color: row.status.tone === void 0 ? theme.text.tertiary : theme.text[row.status.tone]
+-  }, children: [" ", "\xB7 ", row.status.label] })] }), row.detail === void 0 ? null : (0, import_jsx_runtime14.jsx)("p", { style: {
++  }, children: [" ", "\xB7 ", row.status.label] })] }), row.detail === void 0 ? null : (0, import_jsx_runtime16.jsx)("p", { style: {
+     ...typeStyle(theme, "subtext", "regular", theme.text.secondary),
+     marginTop: 2
+-  }, children: row.detail })] }), (0, import_jsx_runtime14.jsx)("span", { style: {
++  }, children: inlineText(row.detail) })] }), (0, import_jsx_runtime16.jsx)("span", { style: {
+     ...typeStyle(theme, "subtext", "regular", theme.text.tertiary),
+     paddingTop: 2,
+     textAlign: "right"
+@@ -20952,7 +21647,7 @@
+ }
+ markBlockKind(Rows, "embed");
+ function isTonedWord(cell) {
+-  return typeof cell === "object" && cell !== null && !(0, import_react17.isValidElement)(cell) && typeof cell.text === "string";
++  return typeof cell === "object" && cell !== null && !(0, import_react19.isValidElement)(cell) && typeof cell.text === "string";
+ }
+ var TABLE_SCROLLS_FROM_COLUMNS = 5;
+ var TABLE_SCROLLING_PROSE_MIN_PX = 160;
+@@ -20960,32 +21655,6 @@
+ var FIGURE = /^[+\-–−~≈<>≤≥]?\s*[$€£¥]?\s*\d[\d,.]*\s*(?:%|[A-Za-z°]{1,4}\.?)?$/;
+ var TOKEN = /^\S{1,20}$/;
+ var BLANK = /^(?:|[-–—]|n\/?a)$/i;
+-var HYPHENATED_FIGURE = /\d[\d-]*-\d[\d-]*/g;
+-function keepFiguresWhole(text2) {
+-  if (!/\d-\d/.test(text2)) {
+-    return text2;
+-  }
+-  const out = [];
+-  let last = 0;
+-  for (const match of text2.matchAll(HYPHENATED_FIGURE)) {
+-    const at = match.index ?? 0;
+-    if (at > last) {
+-      out.push(text2.slice(last, at));
+-    }
+-    out.push((0, import_jsx_runtime14.jsx)("span", { style: { whiteSpace: "nowrap" }, children: match[0] }, at));
+-    last = at + match[0].length;
+-  }
+-  if (last < text2.length) {
+-    out.push(text2.slice(last));
+-  }
+-  return out;
+-}
+-function keepFiguresWholeIn(children) {
+-  if (typeof children === "string") {
+-    return keepFiguresWhole(children);
+-  }
+-  return import_react17.Children.map(children, (child) => typeof child === "string" ? keepFiguresWhole(child) : child);
+-}
+ function cellText(cell) {
+   if (typeof cell === "string") {
+     return cell;
+@@ -20999,8 +21668,8 @@
+   const text2 = cellText(cell).trim();
+   return BLANK.test(text2) || FIGURE.test(text2) || TOKEN.test(text2);
+ }
+-function figureColumns(columnCount, rows) {
+-  return Array.from({ length: columnCount }, (_, c) => c > 0 && rows.every((row) => isFigure2(row[c])));
++function figureColumns(columnCount2, rows) {
++  return Array.from({ length: columnCount2 }, (_, c) => c > 0 && rows.every((row) => isFigure2(row[c])));
+ }
+ function tableTemplate(figures2, scrolls) {
+   const hasProse = figures2.some((figure, c) => c > 0 && !figure);
+@@ -21020,21 +21689,24 @@
+ function tableRule(theme) {
+   return `0.5px solid ${theme.border.default}`;
+ }
++function onTableCopy(event) {
++  copyWithinTable(event.nativeEvent, event.currentTarget);
++}
+ function Table({ columns, rows, emphasis, align }) {
+   const theme = useGrokTheme();
+-  const columnCount = Math.max(columns.length, ...rows.map((row) => row.length));
+-  const scrolls = columnCount >= TABLE_SCROLLS_FROM_COLUMNS;
+-  const figures2 = figureColumns(columnCount, rows);
++  const columnCount2 = Math.max(columns.length, ...rows.map((row) => row.length));
++  const scrolls = columnCount2 >= TABLE_SCROLLS_FROM_COLUMNS;
++  const figures2 = figureColumns(columnCount2, rows);
+   const hasProse = figures2.some((figure, c) => c > 0 && !figure);
+-  const scroller = (0, import_react17.useRef)(null);
++  const scroller = (0, import_react19.useRef)(null);
+   const { ref: watchScroller, edges } = useScrollEdges();
+   const mask = scrollFadeMask(edges);
+-  const setScroller = (0, import_react17.useCallback)((element) => {
++  const setScroller = (0, import_react19.useCallback)((element) => {
+     scroller.current = element;
+     watchScroller(element);
+   }, [watchScroller]);
+   const fontLoads2 = useFontLoads();
+-  (0, import_react17.useLayoutEffect)(() => {
++  (0, import_react19.useLayoutEffect)(() => {
+     const element = scroller.current;
+     const grid = element?.firstElementChild;
+     if (scrolls || !hasProse || element === null || !(grid instanceof HTMLElement)) {
+@@ -21072,7 +21744,7 @@
+   });
+   const cellContent = (cell, prose) => {
+     if (typeof cell === "string") {
+-      return prose ? keepFiguresWhole(cell) : cell;
++      return prose ? inlineText(cell) : linkUrls(cell);
+     }
+     if (!isTonedWord(cell)) {
+       return cell ?? "";
+@@ -21080,9 +21752,9 @@
+     if (cell.tone === void 0) {
+       return cell.text;
+     }
+-    return (0, import_jsx_runtime14.jsx)("span", { style: { fontWeight: theme.weight.medium, color: theme.text[cell.tone] }, children: cell.text });
++    return (0, import_jsx_runtime16.jsx)("span", { style: { fontWeight: theme.weight.medium, color: theme.text[cell.tone] }, children: cell.text });
+   };
+-  const headers = Array.from({ length: columnCount }, (_, c) => columns[c] ?? "");
++  const headers = Array.from({ length: columnCount2 }, (_, c) => columns[c] ?? "");
+   const gridStyle = {
+     display: "grid",
+     gridTemplateColumns: tableTemplate(figures2, scrolls),
+@@ -21104,13 +21776,13 @@
+     width: "fit-content",
+     minWidth: "100%"
+   };
+-  return (0, import_jsx_runtime14.jsx)("div", { ref: setScroller, style: { overflowX: "auto", minWidth: 0, maskImage: mask, WebkitMaskImage: mask }, children: (0, import_jsx_runtime14.jsxs)("div", { style: gridStyle, children: [headers.map((column, c) => (0, import_jsx_runtime14.jsx)("span", { "data-table-header": true, style: {
++  return (0, import_jsx_runtime16.jsx)("div", { ref: setScroller, onCopy: onTableCopy, style: { overflowX: "auto", minWidth: 0, maskImage: mask, WebkitMaskImage: mask }, children: (0, import_jsx_runtime16.jsxs)("div", { ...gridTableAttributes(), style: gridStyle, children: [headers.map((column, c) => (0, import_jsx_runtime16.jsx)("span", { ...gridHeaderCellAttributes(c), style: {
+     ...typeStyle(theme, "subtext", "medium", theme.text.primary),
+     ...cellColumn(c),
+     // A scrolling table keeps a two-word header on one line like
+     // its cells; the reader scrolls to it rather than reads it stacked.
+     ...scrolls ? { whiteSpace: "nowrap" } : {}
+-  }, children: keepFiguresWhole(column) }, `h${c}`)), rows.map((row, r) => headers.map((_, c) => (0, import_jsx_runtime14.jsx)("span", { style: {
++  }, children: keepFiguresWhole(column) }, `h${c}`)), rows.map((row, r) => headers.map((_, c) => (0, import_jsx_runtime16.jsx)("span", { ...gridBodyCellAttributes({ row: r, col: c }), style: {
+     ...typeStyle(theme, "table", c > 0 && c === emphasis ? "medium" : "regular", theme.text.primary),
+     ...cellColumn(c),
+     ...figures2[c] === true ? { ...tabularNums, whiteSpace: "nowrap" } : {},
+@@ -21120,14 +21792,14 @@
+ markFigure(Table);
+ 
+ // ../canvas-components/dist/grok/lists.js
+-var import_jsx_runtime15 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime17 = __toESM(require_jsx_runtime(), 1);
+ var LIST_MARKER_PX = 16;
+ var LIST_MARKER_GAP_PX = 8;
+ var TONE_MARK_TILE_PX = 18;
+ var TONE_MARK_GLYPH_PX = 12;
+ function ToneMark({ marker, theme }) {
+   const pro = marker === "pro";
+-  return (0, import_jsx_runtime15.jsx)("span", { "aria-hidden": true, style: {
++  return (0, import_jsx_runtime17.jsx)("span", { "aria-hidden": true, style: {
+     display: "flex",
+     alignItems: "center",
+     justifyContent: "center",
+@@ -21136,11 +21808,11 @@
+     borderRadius: theme.radius.sm,
+     background: pro ? theme.fill.successSubtle : theme.fill.dangerSubtle,
+     color: pro ? theme.text.success : theme.text.danger
+-  }, children: (0, import_jsx_runtime15.jsx)("svg", { width: TONE_MARK_GLYPH_PX, height: TONE_MARK_GLYPH_PX, viewBox: "0 0 12 12", style: { display: "block" }, children: (0, import_jsx_runtime15.jsx)("path", { d: pro ? "M6 2.75V9.25M2.75 6H9.25" : "M2.75 6H9.25", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) }) });
++  }, children: (0, import_jsx_runtime17.jsx)("svg", { width: TONE_MARK_GLYPH_PX, height: TONE_MARK_GLYPH_PX, viewBox: "0 0 12 12", style: { display: "block" }, children: (0, import_jsx_runtime17.jsx)("path", { d: pro ? "M6 2.75V9.25M2.75 6H9.25" : "M2.75 6H9.25", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) }) });
+ }
+ function Bullet({ depth, color, line = 24 }) {
+   const cy = line / 2;
+-  return (0, import_jsx_runtime15.jsx)("svg", { width: LIST_MARKER_PX, height: line, viewBox: `0 0 16 ${line}`, "aria-hidden": true, style: { display: "block", color }, children: depth === 0 ? (0, import_jsx_runtime15.jsx)("circle", { cx: 12, cy, r: 3, fill: "currentColor" }) : (0, import_jsx_runtime15.jsx)("circle", { cx: 12.5, cy, r: 2, fill: "none", stroke: "currentColor", strokeWidth: 1 }) });
++  return (0, import_jsx_runtime17.jsx)("svg", { width: LIST_MARKER_PX, height: line, viewBox: `0 0 16 ${line}`, "aria-hidden": true, style: { display: "block", color }, children: depth === 0 ? (0, import_jsx_runtime17.jsx)("circle", { cx: 12, cy, r: 3, fill: "currentColor" }) : (0, import_jsx_runtime17.jsx)("circle", { cx: 12.5, cy, r: 2, fill: "none", stroke: "currentColor", strokeWidth: 1 }) });
+ }
+ function letterIndex(i) {
+   let n = i + 1;
+@@ -21171,7 +21843,7 @@
+   const toned = toneMarker !== void 0;
+   const marker = numbered ? numberedMarkerColumn(items.length, depth) : `${toned && depth === 0 ? TONE_MARK_TILE_PX : LIST_MARKER_PX}px`;
+   const type = toned ? "subtext" : "body1";
+-  return (0, import_jsx_runtime15.jsx)(Tag, { style: {
++  return (0, import_jsx_runtime17.jsx)(Tag, { style: {
+     display: "flex",
+     flexDirection: "column",
+     gap: RHYTHM.listItem,
+@@ -21182,23 +21854,23 @@
+     ...depth > 0 ? { gridColumn: 2, marginTop: RHYTHM.listItem } : {}
+   }, children: items.map((item, i) => {
+     const { text: text2, items: nested, bullets } = listItemParts(item);
+-    return (0, import_jsx_runtime15.jsxs)("li", { style: {
++    return (0, import_jsx_runtime17.jsxs)("li", { style: {
+       display: "grid",
+       gridTemplateColumns: `${marker} minmax(0,1fr)`,
+       columnGap: LIST_MARKER_GAP_PX
+-    }, children: [numbered ? (0, import_jsx_runtime15.jsx)("span", { style: {
++    }, children: [numbered ? (0, import_jsx_runtime17.jsx)("span", { style: {
+       ...typeStyle(theme, "body1", "regular", theme.text.secondary),
+       ...tabularNums,
+       textAlign: "right"
+-    }, children: numberedMarker(i, depth) }) : toneMarker !== void 0 && depth === 0 ? (0, import_jsx_runtime15.jsx)(ToneMark, { marker: toneMarker, theme }) : (0, import_jsx_runtime15.jsx)(Bullet, { depth, color: theme.text.primary, line: px(theme.font[type].lineHeight) }), (0, import_jsx_runtime15.jsx)("span", { style: typeStyle(theme, type, "regular", theme.text.primary), children: text2 }), nested === void 0 || nested.length === 0 ? null : (0, import_jsx_runtime15.jsx)(ListItems, { items: nested, depth: depth + 1, numbered: numbered && !bullets, toneMarker })] }, i);
++    }, children: numberedMarker(i, depth) }) : toneMarker !== void 0 && depth === 0 ? (0, import_jsx_runtime17.jsx)(ToneMark, { marker: toneMarker, theme }) : (0, import_jsx_runtime17.jsx)(Bullet, { depth, color: theme.text.primary, line: px(theme.font[type].lineHeight) }), (0, import_jsx_runtime17.jsx)("span", { style: typeStyle(theme, type, "regular", theme.text.primary), children: inlineTextIn(text2) }), nested === void 0 || nested.length === 0 ? null : (0, import_jsx_runtime17.jsx)(ListItems, { items: nested, depth: depth + 1, numbered: numbered && !bullets, toneMarker })] }, i);
+   }) });
+ }
+ function BulletList({ items, marker }) {
+-  return (0, import_jsx_runtime15.jsx)(ListItems, { items, depth: 0, numbered: false, toneMarker: marker });
++  return (0, import_jsx_runtime17.jsx)(ListItems, { items, depth: 0, numbered: false, toneMarker: marker });
+ }
+ markBlockKind(BulletList, "list");
+ function NumberedList({ items }) {
+-  return (0, import_jsx_runtime15.jsx)(ListItems, { items, depth: 0, numbered: true });
++  return (0, import_jsx_runtime17.jsx)(ListItems, { items, depth: 0, numbered: true });
+ }
+ markBlockKind(NumberedList, "list");
+ var STEP_MARKER_PX = 24;
+@@ -21211,16 +21883,16 @@
+   if (steps.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime15.jsx)("ol", { style: { display: "flex", flexDirection: "column", margin: 0, padding: 0, listStyle: "none" }, children: steps.map((step, i) => {
++  return (0, import_jsx_runtime17.jsx)("ol", { style: { display: "flex", flexDirection: "column", margin: 0, padding: 0, listStyle: "none" }, children: steps.map((step, i) => {
+     const last = i === steps.length - 1;
+-    return (0, import_jsx_runtime15.jsxs)("li", { style: { display: "flex", alignItems: "stretch", gap: STEP_TEXT_GAP_PX }, children: [(0, import_jsx_runtime15.jsxs)("div", { style: {
++    return (0, import_jsx_runtime17.jsxs)("li", { style: { display: "flex", alignItems: "stretch", gap: STEP_TEXT_GAP_PX }, children: [(0, import_jsx_runtime17.jsxs)("div", { style: {
+       display: "flex",
+       flexDirection: "column",
+       alignItems: "center",
+       width: STEP_MARKER_PX,
+       flexShrink: 0,
+       paddingTop: STEP_TOP_PX
+-    }, children: [(0, import_jsx_runtime15.jsx)("span", { style: {
++    }, children: [(0, import_jsx_runtime17.jsx)("span", { style: {
+       ...typeStyle(theme, "label", "semibold", theme.text.primary),
+       ...tabularNums,
+       display: "flex",
+@@ -21232,30 +21904,30 @@
+       borderRadius: 9999,
+       border: `1px solid ${theme.border.default}`,
+       flexShrink: 0
+-    }, children: i + 1 }), last ? null : (0, import_jsx_runtime15.jsx)("span", { "aria-hidden": true, style: {
++    }, children: i + 1 }), last ? null : (0, import_jsx_runtime17.jsx)("span", { "aria-hidden": true, style: {
+       width: 1,
+       flex: "1 1 auto",
+       background: theme.border.default,
+       marginTop: STEP_LINE_GAP_PX,
+       // The next step's own top inset makes up the rest of the gap.
+       marginBottom: STEP_LINE_GAP_PX - STEP_TOP_PX
+-    } })] }), (0, import_jsx_runtime15.jsxs)("div", { style: {
++    } })] }), (0, import_jsx_runtime17.jsxs)("div", { style: {
+       flex: "1 1 auto",
+       minWidth: 0,
+       paddingTop: STEP_TOP_PX,
+       // The block's rhythm owns the space after the last step.
+       paddingBottom: last ? 0 : STEP_BOTTOM_PX
+-    }, children: [(0, import_jsx_runtime15.jsx)("p", { style: typeStyle(theme, "body1", "semibold", theme.text.primary), children: typeof step.title === "string" ? keepFiguresWhole(step.title) : step.title }), step.detail === void 0 ? null : (0, import_jsx_runtime15.jsx)("p", { style: {
++    }, children: [(0, import_jsx_runtime17.jsx)("p", { style: typeStyle(theme, "body1", "semibold", theme.text.primary), children: typeof step.title === "string" ? inlineText(step.title) : step.title }), step.detail === void 0 ? null : (0, import_jsx_runtime17.jsx)("p", { style: {
+       ...typeStyle(theme, "subtext", "regular", theme.text.secondary),
+       marginTop: 2
+-    }, children: typeof step.detail === "string" ? keepFiguresWhole(step.detail) : step.detail })] })] }, i);
++    }, children: typeof step.detail === "string" ? inlineText(step.detail) : step.detail })] })] }, i);
+   }) });
+ }
+ markBlockKind(Steps, "list");
+ 
+ // ../canvas-components/dist/grok/link-cards.js
+-var import_jsx_runtime16 = __toESM(require_jsx_runtime(), 1);
+-var import_react18 = __toESM(require_react(), 1);
++var import_jsx_runtime18 = __toESM(require_jsx_runtime(), 1);
++var import_react20 = __toESM(require_react(), 1);
+ var LINK_TILE_PX = 28;
+ var LINK_TILE_RADIUS_PX = 6;
+ var LINK_ROW_INSET_PX = 16;
+@@ -21272,14 +21944,14 @@
+   link: "M67 177Q70 180 75.0 180.0Q80 180 83.5 177.0Q87 174 87.0 169.0Q87 164 83 160L55 132Q39 116 39.0 93.5Q39 71 55.0 55.0Q71 39 93.5 39.0Q116 39 132 55L160 83Q164 87 169.0 87.0Q174 87 177.0 83.5Q180 80 180.0 75.0Q180 70 177 67L149 39Q134 24 114.0 18.5Q94 13 74.0 18.5Q54 24 39.0 39.0Q24 54 18.5 74.0Q13 94 18.5 114.0Q24 134 39 149ZM179 196Q183 199 187.5 199.0Q192 199 195.5 195.5Q199 192 199.0 187.5Q199 183 196 179L121 104Q117 101 112.5 101.0Q108 101 104.5 104.5Q101 108 101.0 112.5Q101 117 104 121ZM151 261Q166 276 186.0 281.5Q206 287 226.0 281.5Q246 276 261.0 261.0Q276 246 281.5 226.0Q287 206 281.5 186.0Q276 166 261 151L233 123Q230 120 225.0 120.0Q220 120 216.5 123.0Q213 126 213.0 131.0Q213 136 217 140L245 168Q261 184 261.0 206.5Q261 229 245.0 245.0Q229 261 206.5 261.0Q184 261 168 245L140 217Q136 213 131.0 213.0Q126 213 123.0 216.5Q120 220 120.0 225.0Q120 230 123 233Z"
+ };
+ function LinkGlyph({ glyph, size, color }) {
+-  return (0, import_jsx_runtime16.jsx)("svg", { width: size, height: size, viewBox: `0 0 ${LINK_GLYPH_VIEWBOX} ${LINK_GLYPH_VIEWBOX}`, "aria-hidden": true, style: { display: "block", flexShrink: 0, color }, children: (0, import_jsx_runtime16.jsx)("path", { d: LINK_GLYPH_PATHS[glyph], fill: "currentColor", transform: LINK_GLYPH_TRANSFORM }) });
++  return (0, import_jsx_runtime18.jsx)("svg", { width: size, height: size, viewBox: `0 0 ${LINK_GLYPH_VIEWBOX} ${LINK_GLYPH_VIEWBOX}`, "aria-hidden": true, style: { display: "block", flexShrink: 0, color }, children: (0, import_jsx_runtime18.jsx)("path", { d: LINK_GLYPH_PATHS[glyph], fill: "currentColor", transform: LINK_GLYPH_TRANSFORM }) });
+ }
+ function LinkCards({ links, numbered = false }) {
+   const theme = useGrokTheme();
+   if (links.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime16.jsx)("div", { style: {
++  return (0, import_jsx_runtime18.jsx)("div", { style: {
+     display: "flex",
+     flexDirection: "column",
+     boxSizing: "border-box",
+@@ -21289,11 +21961,11 @@
+     // and a clip would take the focus ring the page draws around a row.
+   }, children: links.map((link, i) => {
+     const meta = [link.site, link.date].filter((part) => part !== void 0).join(" \xB7 ");
+-    return (0, import_jsx_runtime16.jsxs)(import_react18.Fragment, { children: [i > 0 ? (0, import_jsx_runtime16.jsx)("div", { "aria-hidden": true, style: {
++    return (0, import_jsx_runtime18.jsxs)(import_react20.Fragment, { children: [i > 0 ? (0, import_jsx_runtime18.jsx)("div", { "aria-hidden": true, style: {
+       height: 1,
+       marginLeft: LINK_DIVIDER_INSET_PX,
+       background: theme.border.weak
+-    } }) : null, (0, import_jsx_runtime16.jsxs)("a", { href: link.href, target: "_blank", rel: "noopener noreferrer", title: link.title, style: {
++    } }) : null, (0, import_jsx_runtime18.jsxs)("a", { href: link.href, target: "_blank", rel: "noopener noreferrer", title: link.title, style: {
+       display: "flex",
+       alignItems: "center",
+       gap: LINK_ROW_GAP_PX,
+@@ -21301,7 +21973,7 @@
+       padding: `${LINK_ROW_PADDING_Y_PX}px ${LINK_ROW_INSET_PX}px`,
+       textDecoration: "none",
+       color: theme.text.tertiary
+-    }, children: [(0, import_jsx_runtime16.jsx)("span", { style: {
++    }, children: [(0, import_jsx_runtime18.jsx)("span", { style: {
+       display: "flex",
+       alignItems: "center",
+       justifyContent: "center",
+@@ -21312,29 +21984,29 @@
+       borderRadius: LINK_TILE_RADIUS_PX,
+       background: theme.fill.secondary,
+       border: `0.5px solid ${theme.border.subtle}`
+-    }, children: numbered ? (0, import_jsx_runtime16.jsx)("span", { style: {
++    }, children: numbered ? (0, import_jsx_runtime18.jsx)("span", { style: {
+       ...typeStyle(theme, "label", "medium", theme.text.secondary),
+       ...tabularNums
+-    }, children: i + 1 }) : (0, import_jsx_runtime16.jsx)(LinkGlyph, { glyph: "link", size: LINK_ICON_PX, color: theme.text.secondary }) }), (0, import_jsx_runtime16.jsxs)("div", { style: {
++    }, children: i + 1 }) : (0, import_jsx_runtime18.jsx)(LinkGlyph, { glyph: "link", size: LINK_ICON_PX, color: theme.text.secondary }) }), (0, import_jsx_runtime18.jsxs)("div", { style: {
+       display: "flex",
+       flexDirection: "column",
+       justifyContent: "center",
+       minWidth: 0,
+       flex: 1,
+       minHeight: LINK_TEXT_HEIGHT_PX
+-    }, children: [(0, import_jsx_runtime16.jsx)("p", { style: {
++    }, children: [(0, import_jsx_runtime18.jsx)("p", { style: {
+       ...typeStyle(theme, "subtext", "regular", theme.text.primary),
+       ...truncate
+-    }, children: link.title }), meta === "" ? null : (0, import_jsx_runtime16.jsx)("p", { style: {
++    }, children: link.title }), meta === "" ? null : (0, import_jsx_runtime18.jsx)("p", { style: {
+       ...typeStyle(theme, "label", "regular", theme.text.primary),
+       ...truncate
+-    }, children: meta })] }), (0, import_jsx_runtime16.jsx)(LinkGlyph, { glyph: "arrowUpRight", size: LINK_ICON_PX, color: theme.text.tertiary })] })] }, i);
++    }, children: meta })] }), (0, import_jsx_runtime18.jsx)(LinkGlyph, { glyph: "arrowUpRight", size: LINK_ICON_PX, color: theme.text.tertiary })] })] }, i);
+   }) });
+ }
+ markBlockKind(LinkCards, "embed");
+ 
+ // ../canvas-components/dist/grok/properties.js
+-var import_jsx_runtime17 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime19 = __toESM(require_jsx_runtime(), 1);
+ var PROPERTY_LABEL_PX = 120;
+ var PROPERTY_COLUMN_GAP_PX = 12;
+ var PROPERTY_ROW_GAP_PX = 8;
+@@ -21343,37 +22015,37 @@
+   if (items.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime17.jsx)("dl", { style: { display: "flex", flexDirection: "column", gap: PROPERTY_ROW_GAP_PX, margin: 0 }, children: items.map((item, i) => {
++  return (0, import_jsx_runtime19.jsx)("dl", { style: { display: "flex", flexDirection: "column", gap: PROPERTY_ROW_GAP_PX, margin: 0 }, children: items.map((item, i) => {
+     const label = typeof item?.label === "string" ? item.label : "";
+     const value = item?.value;
+-    return (0, import_jsx_runtime17.jsxs)("div", { style: {
++    return (0, import_jsx_runtime19.jsxs)("div", { style: {
+       display: "grid",
+       gridTemplateColumns: `${PROPERTY_LABEL_PX}px minmax(0,1fr)`,
+       columnGap: PROPERTY_COLUMN_GAP_PX,
+       alignItems: "start"
+-    }, children: [(0, import_jsx_runtime17.jsx)("dt", { style: typeStyle(theme, "subtext", "regular", theme.text.secondary), children: label }), (0, import_jsx_runtime17.jsx)("dd", { style: {
++    }, children: [(0, import_jsx_runtime19.jsx)("dt", { style: typeStyle(theme, "subtext", "regular", theme.text.secondary), children: label }), (0, import_jsx_runtime19.jsx)("dd", { style: {
+       ...typeStyle(theme, "subtext", "regular", theme.text.primary),
+       minWidth: 0
+-    }, children: typeof value === "string" ? keepFiguresWhole(value) : value })] }, i);
++    }, children: typeof value === "string" ? inlineText(value) : value })] }, i);
+   }) });
+ }
+ markBlockKind(Properties, "list");
+ 
+ // ../canvas-components/dist/grok/pros-cons.js
+-var import_jsx_runtime18 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime20 = __toESM(require_jsx_runtime(), 1);
+ var PROS_CONS_GAP_PX = 16;
+ var PROS_CONS_MIN_CARD_PX = 240;
+ var PROS_CONS_CARD_PADDING = "12px 16px 16px";
+ var PROS_CONS_TITLE_GAP_PX = 8;
+ function ToneCard({ heading, items, marker, theme }) {
+-  return (0, import_jsx_runtime18.jsxs)("div", { style: {
++  return (0, import_jsx_runtime20.jsxs)("div", { style: {
+     boxSizing: "border-box",
+     minWidth: 0,
+     background: theme.bg.base,
+     border: `1px solid ${theme.border.default}`,
+     borderRadius: theme.radius.lg,
+     padding: PROS_CONS_CARD_PADDING
+-  }, children: [(0, import_jsx_runtime18.jsx)("h4", { style: typeStyle(theme, "body1", "semibold", theme.text.primary), children: heading }), (0, import_jsx_runtime18.jsx)("div", { style: { marginTop: PROS_CONS_TITLE_GAP_PX }, children: (0, import_jsx_runtime18.jsx)(BulletList, { items, marker }) })] });
++  }, children: [(0, import_jsx_runtime20.jsx)("h4", { style: typeStyle(theme, "body1", "semibold", theme.text.primary), children: heading }), (0, import_jsx_runtime20.jsx)("div", { style: { marginTop: PROS_CONS_TITLE_GAP_PX }, children: (0, import_jsx_runtime20.jsx)(BulletList, { items, marker }) })] });
+ }
+ function ProsCons({ pros, cons, prosHeading = "Pros", consHeading = "Cons" }) {
+   const theme = useGrokTheme();
+@@ -21382,17 +22054,17 @@
+   if (prosItems.length === 0 && consItems.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime18.jsxs)("div", { style: {
++  return (0, import_jsx_runtime20.jsxs)("div", { style: {
+     display: "grid",
+     gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${PROS_CONS_MIN_CARD_PX}px), 1fr))`,
+     gap: PROS_CONS_GAP_PX,
+     alignItems: "start"
+-  }, children: [prosItems.length === 0 ? null : (0, import_jsx_runtime18.jsx)(ToneCard, { heading: prosHeading, items: prosItems, marker: "pro", theme }), consItems.length === 0 ? null : (0, import_jsx_runtime18.jsx)(ToneCard, { heading: consHeading, items: consItems, marker: "con", theme })] });
++  }, children: [prosItems.length === 0 ? null : (0, import_jsx_runtime20.jsx)(ToneCard, { heading: prosHeading, items: prosItems, marker: "pro", theme }), consItems.length === 0 ? null : (0, import_jsx_runtime20.jsx)(ToneCard, { heading: consHeading, items: consItems, marker: "con", theme })] });
+ }
+ markBlockKind(ProsCons, "chart");
+ 
+ // ../canvas-components/dist/grok/status.js
+-var import_jsx_runtime19 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime21 = __toESM(require_jsx_runtime(), 1);
+ var STATUS_DOT_PX = 6;
+ var STATUS_DOT_GAP_PX = 6;
+ var STATUS_PADDING_Y_PX = 2;
+@@ -21415,7 +22087,7 @@
+   const theme = useGrokTheme();
+   const { ink, tint } = statusInk(theme, tone);
+   const title = typeof children === "string" || typeof children === "number" ? String(children) : void 0;
+-  return (0, import_jsx_runtime19.jsxs)("span", { title, style: {
++  return (0, import_jsx_runtime21.jsxs)("span", { title, style: {
+     display: "inline-flex",
+     alignItems: "center",
+     gap: STATUS_DOT_GAP_PX,
+@@ -21425,14 +22097,14 @@
+     background: tint,
+     verticalAlign: "top",
+     whiteSpace: "nowrap"
+-  }, children: [(0, import_jsx_runtime19.jsx)("span", { "aria-hidden": true, style: {
++  }, children: [(0, import_jsx_runtime21.jsx)("span", { "aria-hidden": true, style: {
+     display: "block",
+     flex: "none",
+     width: STATUS_DOT_PX,
+     height: STATUS_DOT_PX,
+     borderRadius: theme.radius.full,
+     background: ink
+-  } }), (0, import_jsx_runtime19.jsx)("span", { style: {
++  } }), (0, import_jsx_runtime21.jsx)("span", { style: {
+     ...typeStyle(theme, "label", "medium", ink),
+     minWidth: 0,
+     overflow: "hidden",
+@@ -21442,8 +22114,8 @@
+ markBlockKind(Status, "embed");
+ 
+ // ../canvas-components/dist/grok/toc.js
+-var import_jsx_runtime20 = __toESM(require_jsx_runtime(), 1);
+-var import_react19 = __toESM(require_react(), 1);
++var import_jsx_runtime22 = __toESM(require_jsx_runtime(), 1);
++var import_react21 = __toESM(require_react(), 1);
+ var TOC_INDENT_PX = 16;
+ var TOC_PADDING = "12px 16px";
+ var TOC_GAP_PX = 4;
+@@ -21486,12 +22158,12 @@
+ }
+ function TableOfContents({ items, title = "On this page" }) {
+   const theme = useGrokTheme();
+-  const nav = (0, import_react19.useRef)(null);
+-  const [active, setActive] = (0, import_react19.useState)(0);
++  const nav = (0, import_react21.useRef)(null);
++  const [active, setActive] = (0, import_react21.useState)(0);
+   const entries = items.filter((item) => typeof item === "object" && item !== null && typeof item.label === "string");
+   const ids = uniqueHeadingIds(entries.map((item) => typeof item.id === "string" && item.id !== "" ? { id: item.id } : { slug: slugifyHeading(item.label) }));
+   const key = ids.join("\n");
+-  (0, import_react19.useEffect)(() => {
++  (0, import_react21.useEffect)(() => {
+     const element = nav.current;
+     if (element === null || typeof document === "undefined") {
+       return;
+@@ -21515,7 +22187,7 @@
+     event.preventDefault();
+     document.getElementById(id)?.scrollIntoView({ block: "start" });
+   };
+-  return (0, import_jsx_runtime20.jsxs)("nav", { ref: nav, "aria-label": title, style: {
++  return (0, import_jsx_runtime22.jsxs)("nav", { ref: nav, "aria-label": title, style: {
+     boxSizing: "border-box",
+     width: "100%",
+     display: "flex",
+@@ -21524,11 +22196,11 @@
+     padding: TOC_PADDING,
+     border: `1px solid ${theme.border.default}`,
+     borderRadius: theme.radius.lg
+-  }, children: [(0, import_jsx_runtime20.jsx)("p", { style: typeStyle(theme, "label", "medium", theme.text.secondary), children: title }), entries.map((item, i) => {
++  }, children: [(0, import_jsx_runtime22.jsx)("p", { style: typeStyle(theme, "label", "medium", theme.text.secondary), children: title }), entries.map((item, i) => {
+     const id = ids[i] ?? "";
+     const current = i === active;
+     const depth = Math.max(0, Math.floor(Number(item.depth) || 0));
+-    return (0, import_jsx_runtime20.jsx)("a", { href: `#${id}`, onClick: jump(id), "aria-current": current ? "location" : void 0, title: item.label, style: {
++    return (0, import_jsx_runtime22.jsx)("a", { href: `#${id}`, onClick: jump(id), "aria-current": current ? "location" : void 0, title: item.label, style: {
+       ...typeStyle(theme, "subtext", current ? "medium" : "regular", current ? theme.text.primary : theme.text.secondary),
+       ...truncate,
+       display: "block",
+@@ -21540,28 +22212,28 @@
+ markBlockKind(TableOfContents, "embed");
+ 
+ // ../canvas-components/dist/grok/quote.js
+-var import_jsx_runtime21 = __toESM(require_jsx_runtime(), 1);
+-var import_react20 = __toESM(require_react(), 1);
++var import_jsx_runtime23 = __toESM(require_jsx_runtime(), 1);
++var import_react22 = __toESM(require_react(), 1);
+ var QUOTE_BAR_PX = 4;
+ var QUOTE_BAR_RADIUS_PX = 2;
+ var QUOTE_TEXT_INSET_PX = 18;
+ var QUOTE_CITE_GAP_PX = 4;
+ function Quote({ children, cite }) {
+   const theme = useGrokTheme();
+-  const body = keepFiguresWholeIn(children);
+-  const hasWords = import_react20.Children.toArray(body).some((child) => !(typeof child === "string" && child.trim() === ""));
++  const body = inlineTextIn(children);
++  const hasWords = import_react22.Children.toArray(body).some((child) => !(typeof child === "string" && child.trim() === ""));
+   const source = cite === void 0 || cite.trim() === "" ? void 0 : cite;
+   if (!hasWords && source === void 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime21.jsxs)("blockquote", { style: {
++  return (0, import_jsx_runtime23.jsxs)("blockquote", { style: {
+     position: "relative",
+     margin: 0,
+     paddingLeft: QUOTE_TEXT_INSET_PX,
+     display: "flex",
+     flexDirection: "column",
+     gap: QUOTE_CITE_GAP_PX
+-  }, children: [(0, import_jsx_runtime21.jsx)("span", { "aria-hidden": true, style: {
++  }, children: [(0, import_jsx_runtime23.jsx)("span", { "aria-hidden": true, style: {
+     position: "absolute",
+     left: 0,
+     top: 0,
+@@ -21569,15 +22241,15 @@
+     width: QUOTE_BAR_PX,
+     borderRadius: QUOTE_BAR_RADIUS_PX,
+     background: theme.border.strong
+-  } }), hasWords ? (0, import_jsx_runtime21.jsx)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: body }) : null, source === void 0 ? null : (0, import_jsx_runtime21.jsx)("p", { style: typeStyle(theme, "subtext", "regular", theme.text.primary), children: source })] });
++  } }), hasWords ? (0, import_jsx_runtime23.jsx)("p", { style: typeStyle(theme, "body1", "regular", theme.text.primary), children: body }) : null, source === void 0 ? null : (0, import_jsx_runtime23.jsx)("p", { style: typeStyle(theme, "subtext", "regular", theme.text.primary), children: source })] });
+ }
+ markBlockKind(Quote, "embed");
+ 
+ // ../canvas-components/dist/grok/divider.js
+-var import_jsx_runtime22 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime24 = __toESM(require_jsx_runtime(), 1);
+ function Divider(_props) {
+   const theme = useGrokTheme();
+-  return (0, import_jsx_runtime22.jsx)("hr", { style: {
++  return (0, import_jsx_runtime24.jsx)("hr", { style: {
+     margin: 0,
+     border: "none",
+     borderTop: `0.5px solid ${theme.border.default}`,
+@@ -21587,8 +22259,8 @@
+ markBlockKind(Divider, "embed");
+ 
+ // ../canvas-components/dist/grok/layout.js
+-var import_jsx_runtime23 = __toESM(require_jsx_runtime(), 1);
+-var import_react21 = __toESM(require_react(), 1);
++var import_jsx_runtime25 = __toESM(require_jsx_runtime(), 1);
++var import_react23 = __toESM(require_react(), 1);
+ var GRID_GAP_PX = 12;
+ var GRID_MIN_CELL_PX = 260;
+ var GRID_MIN_CELL_3_PX = 200;
+@@ -21607,10 +22279,11 @@
+   return `1px solid ${theme.border.weak}`;
+ }
+ function Grid({ columns = 2, joined = false, plain = false, children }) {
+-  if (import_react21.Children.toArray(children).length === 0) {
++  const cells = flattenBlocks(children);
++  if (cells.length === 0) {
+     return null;
+   }
+-  return (0, import_jsx_runtime23.jsx)(SectionDepthContext.Provider, { value: GRID_CELL_SECTION_DEPTH, children: (0, import_jsx_runtime23.jsx)(InCardContext.Provider, { value: !plain, children: joined ? (0, import_jsx_runtime23.jsx)(JoinedGrid, { columns, children }) : (0, import_jsx_runtime23.jsx)(CardGrid, { columns, plain, children }) }) });
++  return (0, import_jsx_runtime25.jsx)(SectionDepthContext.Provider, { value: GRID_CELL_SECTION_DEPTH, children: (0, import_jsx_runtime25.jsx)(InCardContext.Provider, { value: !plain, children: joined ? (0, import_jsx_runtime25.jsx)(JoinedGrid, { columns, cells }) : (0, import_jsx_runtime25.jsx)(CardGrid, { columns, plain, cells }) }) });
+ }
+ markBlockKind(Grid, "chart");
+ function gridPerRow({ columns, count, width }) {
+@@ -21637,13 +22310,12 @@
+   }
+   return perRow === 4 ? GRID_MIN_CELL_4_PX : perRow === 3 ? GRID_MIN_CELL_3_PX : GRID_MIN_CELL_PX;
+ }
+-function CardGrid({ columns, plain, children }) {
++function CardGrid({ columns, plain, cells }) {
+   const theme = useGrokTheme();
+   const { ref, width } = useBlockWidth();
+-  const cells = import_react21.Children.toArray(children);
+   const perRow = gridPerRow({ columns, count: cells.length, width });
+   const cell = `calc((100% - ${(columns - 1) * GRID_GAP_PX}px) / ${columns})`;
+-  return (0, import_jsx_runtime23.jsx)("div", { ref, style: {
++  return (0, import_jsx_runtime25.jsx)("div", { ref, style: {
+     display: "grid",
+     // Measured, the row holds the count that fits and divides the cells
+     // evenly (four cells on a column page go 2 + 2, not 3 + 1). Until
+@@ -21652,19 +22324,18 @@
+     gap: GRID_GAP_PX,
+     // Each card ends under its own content; the design's grid cards do not stretch to the row.
+     alignItems: "start"
+-  }, children: import_react21.Children.toArray(children).map((child, i) => (0, import_jsx_runtime23.jsx)("div", { style: plain ? { minWidth: 0 } : { ...cardChrome(theme), ...CELL_COLUMN }, children: child }, i)) });
++  }, children: cells.map((cell2, i) => (0, import_jsx_runtime25.jsx)("div", { style: plain ? { minWidth: 0 } : { ...cardChrome(theme), ...CELL_COLUMN }, children: cell2 }, i)) });
+ }
+ var CELL_COLUMN = { display: "flex", flexDirection: "column" };
+-function JoinedGrid({ columns, children }) {
++function JoinedGrid({ columns, cells }) {
+   const theme = useGrokTheme();
+   const { ref, width } = useBlockWidth();
+-  const cells = import_react21.Children.toArray(children);
+   let perRow = columns;
+   while (perRow > 1 && width !== void 0 && width < perRow * gridMinCellPx(perRow)) {
+     perRow -= 1;
+   }
+   const short = cells.length % perRow;
+-  return (0, import_jsx_runtime23.jsx)("div", { ref, style: { ...cardChrome(theme), padding: 0 }, children: (0, import_jsx_runtime23.jsx)("div", { style: { display: "grid", gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))` }, children: cells.map((cell, i) => (0, import_jsx_runtime23.jsx)("div", { style: {
++  return (0, import_jsx_runtime25.jsx)("div", { ref, style: { ...cardChrome(theme), padding: 0 }, children: (0, import_jsx_runtime25.jsx)("div", { style: { display: "grid", gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))` }, children: cells.map((cell, i) => (0, import_jsx_runtime25.jsx)("div", { style: {
+     ...CELL_COLUMN,
+     minWidth: 0,
+     padding: CARD_PADDING_PX,
+@@ -21676,8 +22347,8 @@
+ function Segmented({ options, value, onChange }) {
+   const theme = useGrokTheme();
+   const touch = useCoarsePointer();
+-  const onHeadingLine = (0, import_react21.useContext)(HeadingLineContext);
+-  return (0, import_jsx_runtime23.jsx)("div", { role: "group", style: {
++  const onHeadingLine = (0, import_react23.useContext)(HeadingLineContext);
++  return (0, import_jsx_runtime25.jsx)("div", { role: "group", style: {
+     display: "flex",
+     flexWrap: "wrap",
+     gap: 16,
+@@ -21685,17 +22356,17 @@
+   }, children: options.map((entry) => {
+     const option = typeof entry === "string" ? { value: entry, label: entry } : entry;
+     const on = option.value === value;
+-    return (0, import_jsx_runtime23.jsx)("button", { type: "button", "aria-pressed": on, onClick: () => onChange(option.value), style: {
++    return (0, import_jsx_runtime25.jsx)("button", { type: "button", "aria-pressed": on, onClick: () => onChange(option.value), style: {
+       ...typeStyle(theme, "body2", on ? "medium" : "regular", on ? theme.text.primary : theme.text.tertiary),
+       ...touch ? SEGMENT_TOUCH_HIT : SEGMENT_POINTER_HIT,
+       background: "none",
+       border: "none",
+       cursor: "pointer"
+-    }, children: (0, import_jsx_runtime23.jsxs)("span", { style: {
++    }, children: (0, import_jsx_runtime25.jsxs)("span", { style: {
+       display: "inline-block",
+       padding: "2px 0",
+       borderBottom: `1.5px solid ${on ? theme.text.primary : "transparent"}`
+-    }, children: [option.label, countText(option.count) === void 0 ? null : (0, import_jsx_runtime23.jsx)("span", { style: {
++    }, children: [option.label, countText(option.count) === void 0 ? null : (0, import_jsx_runtime25.jsx)("span", { style: {
+       ...typeStyle(theme, "label", "regular", theme.text.tertiary),
+       ...tabularNums,
+       marginLeft: 5
+@@ -21740,21 +22411,21 @@
+   const { ref, width } = useBlockWidth();
+   const minCellPx = metricsMinCellPx(metrics.map((metric) => metric.value));
+   const perRow = metricsPerRow({ count: metrics.length, width, minCellPx });
+-  return (0, import_jsx_runtime23.jsx)("div", { ref, style: {
++  return (0, import_jsx_runtime25.jsx)("div", { ref, style: {
+     display: "grid",
+     gridTemplateColumns: perRow === void 0 ? `repeat(auto-fit, minmax(min(${minCellPx}px, 100%), 1fr))` : `repeat(${perRow}, minmax(0, 1fr))`,
+     columnGap: METRICS_COLUMN_GAP_PX,
+     rowGap: METRICS_ROW_GAP_PX
+-  }, children: metrics.map((metric, i) => (0, import_jsx_runtime23.jsxs)("div", { style: { display: "flex", flexDirection: "column", minWidth: 0 }, children: [(0, import_jsx_runtime23.jsx)("span", { style: {
++  }, children: metrics.map((metric, i) => (0, import_jsx_runtime25.jsxs)("div", { style: { display: "flex", flexDirection: "column", minWidth: 0 }, children: [(0, import_jsx_runtime25.jsx)("span", { style: {
+     ...typeStyle(theme, "metric", "medium", theme.text.primary),
+     ...tabularNums,
+     minWidth: 0,
+     overflow: "hidden",
+     textOverflow: "ellipsis"
+-  }, title: metric.value, children: metric.value }), (0, import_jsx_runtime23.jsx)("span", { style: {
++  }, title: metric.value, children: metric.value }), (0, import_jsx_runtime25.jsx)("span", { style: {
+     ...typeStyle(theme, "subtext", "regular", theme.text.primary),
+     marginTop: METRICS_FIGURE_LABEL_GAP_PX
+-  }, children: metric.label }), metric.detail === void 0 ? null : (0, import_jsx_runtime23.jsx)("span", { style: {
++  }, children: metric.label }), metric.detail === void 0 ? null : (0, import_jsx_runtime25.jsx)("span", { style: {
+     ...typeStyle(theme, "subtext", "regular", metric.tone === void 0 ? theme.text.secondary : theme.text[metric.tone]),
+     marginTop: METRICS_LABEL_NOTE_GAP_PX
+   }, children: metric.detail })] }, i)) });
+@@ -21762,8 +22433,8 @@
+ markBlockKind(Metrics, "metrics");
+ 
+ // ../canvas-components/dist/grok/controls.js
+-var import_jsx_runtime24 = __toESM(require_jsx_runtime(), 1);
+-var import_react22 = __toESM(require_react(), 1);
++var import_jsx_runtime26 = __toESM(require_jsx_runtime(), 1);
++var import_react24 = __toESM(require_react(), 1);
+ var CONTROL_HEIGHT_PX = 28;
+ var CONTROL_LINE_PX = 20;
+ var CONTROL_RADIUS_PX = 8;
+@@ -21795,8 +22466,8 @@
+   }
+ }
+ function useControlState() {
+-  const [hovered, setHovered] = (0, import_react22.useState)(false);
+-  const [focused, setFocused] = (0, import_react22.useState)(false);
++  const [hovered, setHovered] = (0, import_react24.useState)(false);
++  const [focused, setFocused] = (0, import_react24.useState)(false);
+   return {
+     hovered,
+     focused,
+@@ -21815,9 +22486,9 @@
+ function Input({ label, value, onChange, placeholder, type = "text" }) {
+   const theme = useGrokTheme();
+   const touch = useCoarsePointer();
+-  const id = (0, import_react22.useId)();
++  const id = (0, import_react24.useId)();
+   const { focused, handlers } = useControlState();
+-  return (0, import_jsx_runtime24.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }, children: [label === void 0 ? null : (0, import_jsx_runtime24.jsx)("label", { htmlFor: id, style: typeStyle(theme, "label", "regular", theme.text.secondary), children: label }), (0, import_jsx_runtime24.jsx)("input", { id, type: "text", inputMode: type === "number" ? "decimal" : void 0, value, placeholder, onChange: (event) => onChange(event.target.value), onFocus: handlers.onFocus, onBlur: handlers.onBlur, style: {
++  return (0, import_jsx_runtime26.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }, children: [label === void 0 ? null : (0, import_jsx_runtime26.jsx)("label", { htmlFor: id, style: typeStyle(theme, "label", "regular", theme.text.secondary), children: label }), (0, import_jsx_runtime26.jsx)("input", { id, type: "text", inputMode: type === "number" ? "decimal" : void 0, value, placeholder, onChange: (event) => onChange(event.target.value), onFocus: handlers.onFocus, onBlur: handlers.onBlur, style: {
+     ...typeStyle(theme, "subtext", "regular", theme.text.primary),
+     ...controlBox(theme),
+     width: "100%",
+@@ -21836,7 +22507,7 @@
+   }
+   const primary = variant === "primary";
+   const hover = hovered && !disabled;
+-  return (0, import_jsx_runtime24.jsx)("button", { type: "button", disabled, onClick: disabled ? void 0 : onClick, ...handlers, style: {
++  return (0, import_jsx_runtime26.jsx)("button", { type: "button", disabled, onClick: disabled ? void 0 : onClick, ...handlers, style: {
+     ...typeStyle(theme, "label", "medium", primary ? theme.text.onPrimary : theme.text.primary),
+     boxSizing: "border-box",
+     border: "none",
+@@ -21884,7 +22555,7 @@
+   }
+ }
+ function useFocusRing() {
+-  const [ring, setRing] = (0, import_react22.useState)(false);
++  const [ring, setRing] = (0, import_react24.useState)(false);
+   return {
+     ring,
+     onFocus: (event) => setRing(focusIsVisible(event.currentTarget)),
+@@ -21919,19 +22590,19 @@
+ function Select({ label, options, value, onChange, placeholder, disabled = false }) {
+   const theme = useGrokTheme();
+   const touch = useCoarsePointer();
+-  const id = (0, import_react22.useId)();
++  const id = (0, import_react24.useId)();
+   const entries = options.map((entry) => typeof entry === "string" ? { value: entry, label: entry } : entry);
+   const selectedIndex = entries.findIndex((entry) => entry.value === value);
+   const hasValue = selectedIndex !== -1;
+   const option = { background: theme.bg.elevated, color: theme.text.primary };
+-  return (0, import_jsx_runtime24.jsxs)("div", { style: {
++  return (0, import_jsx_runtime26.jsxs)("div", { style: {
+     display: "inline-flex",
+     flexDirection: "column",
+     gap: 4,
+     minWidth: 0,
+     maxWidth: "100%",
+     verticalAlign: "top"
+-  }, children: [label === void 0 ? null : (0, import_jsx_runtime24.jsx)("label", { htmlFor: id, style: typeStyle(theme, "label", "regular", theme.text.secondary), children: label }), (0, import_jsx_runtime24.jsxs)("span", { style: { position: "relative", display: "inline-flex", alignItems: "center" }, children: [(0, import_jsx_runtime24.jsxs)("select", { id, value: hasValue ? String(selectedIndex) : "", disabled, onChange: (event) => {
++  }, children: [label === void 0 ? null : (0, import_jsx_runtime26.jsx)("label", { htmlFor: id, style: typeStyle(theme, "label", "regular", theme.text.secondary), children: label }), (0, import_jsx_runtime26.jsxs)("span", { style: { position: "relative", display: "inline-flex", alignItems: "center" }, children: [(0, import_jsx_runtime26.jsxs)("select", { id, value: hasValue ? String(selectedIndex) : "", disabled, onChange: (event) => {
+     const raw = event.target.value;
+     const next = raw === "" ? void 0 : entries[Number(raw)];
+     if (next !== void 0) {
+@@ -21951,7 +22622,7 @@
+     borderRadius: CONTROL_RADIUS_PX,
+     background: theme.fill.secondary,
+     ...disabledChrome(disabled)
+-  }, children: [placeholder === void 0 && hasValue ? null : (0, import_jsx_runtime24.jsx)("option", { value: "", disabled: true, style: { ...option, color: theme.text.tertiary }, children: placeholder ?? "" }), entries.map((entry, index) => (0, import_jsx_runtime24.jsx)("option", { value: String(index), style: option, children: entry.label }, index))] }), (0, import_jsx_runtime24.jsx)("svg", { width: SELECT_CHEVRON_PX, height: SELECT_CHEVRON_PX, viewBox: "0 0 12 12", "aria-hidden": true, style: {
++  }, children: [placeholder === void 0 && hasValue ? null : (0, import_jsx_runtime26.jsx)("option", { value: "", disabled: true, style: { ...option, color: theme.text.tertiary }, children: placeholder ?? "" }), entries.map((entry, index) => (0, import_jsx_runtime26.jsx)("option", { value: String(index), style: option, children: entry.label }, index))] }), (0, import_jsx_runtime26.jsx)("svg", { width: SELECT_CHEVRON_PX, height: SELECT_CHEVRON_PX, viewBox: "0 0 12 12", "aria-hidden": true, style: {
+     position: "absolute",
+     right: SELECT_PADDING_X_PX,
+     top: "50%",
+@@ -21959,13 +22630,13 @@
+     pointerEvents: "none",
+     color: theme.text.secondary,
+     opacity: disabled ? 0.5 : void 0
+-  }, children: (0, import_jsx_runtime24.jsx)("path", { d: "M3 4.5 6 7.5 9 4.5", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) })] })] });
++  }, children: (0, import_jsx_runtime26.jsx)("path", { d: "M3 4.5 6 7.5 9 4.5", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) })] })] });
+ }
+ function Toggle({ label, value, onChange, disabled = false }) {
+   const theme = useGrokTheme();
+   const touch = useCoarsePointer();
+   const focus = useFocusRing();
+-  return (0, import_jsx_runtime24.jsxs)("label", { style: controlRow({ touch, disabled }), children: [(0, import_jsx_runtime24.jsx)("input", { type: "checkbox", role: "switch", checked: value, disabled, onChange: (event) => onChange(event.target.checked), onFocus: focus.onFocus, onBlur: focus.onBlur, style: HIDDEN_INPUT }), (0, import_jsx_runtime24.jsx)("span", { "aria-hidden": true, style: {
++  return (0, import_jsx_runtime26.jsxs)("label", { style: controlRow({ touch, disabled }), children: [(0, import_jsx_runtime26.jsx)("input", { type: "checkbox", role: "switch", checked: value, disabled, onChange: (event) => onChange(event.target.checked), onFocus: focus.onFocus, onBlur: focus.onBlur, style: HIDDEN_INPUT }), (0, import_jsx_runtime26.jsx)("span", { "aria-hidden": true, style: {
+     position: "relative",
+     display: "inline-block",
+     boxSizing: "border-box",
+@@ -21976,7 +22647,7 @@
+     background: value ? theme.text.primary : theme.border.strong,
+     transition: `background ${CONTROL_TRANSITION_MS}ms ease`,
+     ...controlFocusRing(theme, focus.ring)
+-  }, children: (0, import_jsx_runtime24.jsx)("span", { style: {
++  }, children: (0, import_jsx_runtime26.jsx)("span", { style: {
+     position: "absolute",
+     top: SWITCH_KNOB_INSET_PX,
+     left: SWITCH_KNOB_INSET_PX,
+@@ -21986,11 +22657,11 @@
+     background: theme.bg.base,
+     transform: `translateX(${value ? SWITCH_TRACK.width - SWITCH_TRACK.height : 0}px)`,
+     transition: `transform ${CONTROL_TRANSITION_MS}ms ease`
+-  } }) }), label === void 0 ? null : (0, import_jsx_runtime24.jsx)("span", { style: typeStyle(theme, "subtext", "regular", theme.text.primary), children: label })] });
++  } }) }), label === void 0 ? null : (0, import_jsx_runtime26.jsx)("span", { style: typeStyle(theme, "subtext", "regular", theme.text.primary), children: label })] });
+ }
+ function Checkbox({ label, value, disabled = false }) {
+   const theme = useGrokTheme();
+-  return (0, import_jsx_runtime24.jsxs)("span", { role: "checkbox", "aria-checked": value, "aria-readonly": true, "aria-disabled": disabled || void 0, style: {
++  return (0, import_jsx_runtime26.jsxs)("span", { role: "checkbox", "aria-checked": value, "aria-readonly": true, "aria-disabled": disabled || void 0, style: {
+     position: "relative",
+     display: "inline-flex",
+     alignItems: "center",
+@@ -22001,7 +22672,7 @@
+     userSelect: "none",
+     cursor: "default",
+     opacity: disabled ? 0.5 : void 0
+-  }, children: [(0, import_jsx_runtime24.jsx)("span", { "aria-hidden": true, style: {
++  }, children: [(0, import_jsx_runtime26.jsx)("span", { "aria-hidden": true, style: {
+     display: "inline-flex",
+     alignItems: "center",
+     justifyContent: "center",
+@@ -22013,7 +22684,7 @@
+     border: value ? `0.5px solid ${theme.border.subtle}` : `1px solid ${theme.border.strong}`,
+     background: value ? theme.fill.controlChecked : theme.bg.base,
+     color: theme.text.onColor
+-  }, children: value ? (0, import_jsx_runtime24.jsx)(CheckMark, { size: CHECKBOX_CHECK_PX }) : null }), label === void 0 ? null : (0, import_jsx_runtime24.jsx)("span", { style: typeStyle(theme, "subtext", "regular", theme.text.primary), children: label })] });
++  }, children: value ? (0, import_jsx_runtime26.jsx)(CheckMark, { size: CHECKBOX_CHECK_PX }) : null }), label === void 0 ? null : (0, import_jsx_runtime26.jsx)("span", { style: typeStyle(theme, "subtext", "regular", theme.text.primary), children: label })] });
+ }
+ markBlockKind(Input, "embed");
+ markBlockKind(Button, "embed");
+@@ -22022,8 +22693,8 @@
+ markBlockKind(Checkbox, "embed");
+ 
+ // ../canvas-components/dist/grok/equation.js
+-var import_jsx_runtime25 = __toESM(require_jsx_runtime(), 1);
+-var import_react23 = __toESM(require_react(), 1);
++var import_jsx_runtime27 = __toESM(require_jsx_runtime(), 1);
++var import_react25 = __toESM(require_react(), 1);
+ var TERM_GAP_PX = 10;
+ var WRAPPED_LINE_GAP_PX = 4;
+ var EQUATION_PADDING_PX = 16;
+@@ -22044,13 +22715,13 @@
+ }
+ function terms(children) {
+   const out = [];
+-  for (const child of import_react23.Children.toArray(children)) {
++  for (const child of import_react25.Children.toArray(children)) {
+     if (typeof child === "string" || typeof child === "number") {
+       const text2 = String(child).trim();
+       if (text2 === "") {
+         continue;
+       }
+-      out.push((0, import_jsx_runtime25.jsx)("span", { style: { whiteSpace: "normal" }, children: text2 }, out.length));
++      out.push((0, import_jsx_runtime27.jsx)("span", { style: { whiteSpace: "normal" }, children: text2 }, out.length));
+     } else {
+       out.push(child);
+     }
+@@ -22066,7 +22737,7 @@
+     return null;
+   }
+   const tag = label === void 0 || label.trim() === "" ? void 0 : label;
+-  return (0, import_jsx_runtime25.jsxs)("div", { role: "math", style: {
++  return (0, import_jsx_runtime27.jsxs)("div", { role: "math", style: {
+     display: "grid",
+     // The equation sits in the middle track and the side tracks share
+     // what is left, so it centers on the block; the end track is never
+@@ -22078,7 +22749,7 @@
+     alignItems: "center",
+     columnGap: TERM_GAP_PX,
+     padding: `${EQUATION_PADDING_PX}px 0`
+-  }, children: [(0, import_jsx_runtime25.jsx)("div", { style: {
++  }, children: [(0, import_jsx_runtime27.jsx)("div", { style: {
+     ...typeStyle(theme, "body1", "regular", theme.text.primary),
+     gridColumn: 2,
+     display: "flex",
+@@ -22094,7 +22765,7 @@
+     // A single term wider than the column (a long fraction) scrolls
+     // inside its line rather than running past the page.
+     overflowX: "auto"
+-  }, children: items }), tag === void 0 ? null : (0, import_jsx_runtime25.jsx)("span", { style: {
++  }, children: items }), tag === void 0 ? null : (0, import_jsx_runtime27.jsx)("span", { style: {
+     ...typeStyle(theme, "subtext", "regular", theme.text.secondary),
+     gridColumn: 3,
+     justifySelf: "end",
+@@ -22107,22 +22778,22 @@
+ markBlockKind(Equation, "text");
+ function Frac({ num, den }) {
+   const theme = useGrokTheme();
+-  return (0, import_jsx_runtime25.jsxs)("span", { style: {
++  return (0, import_jsx_runtime27.jsxs)("span", { style: {
+     display: "inline-flex",
+     flexDirection: "column",
+     alignItems: "center",
+     gap: STACK_GAP_PX,
+     verticalAlign: "middle"
+-  }, children: [(0, import_jsx_runtime25.jsx)("span", { children: num }), (0, import_jsx_runtime25.jsx)("span", { "aria-hidden": true, style: ruleStyle(theme) }), (0, import_jsx_runtime25.jsx)("span", { children: den })] });
++  }, children: [(0, import_jsx_runtime27.jsx)("span", { children: num }), (0, import_jsx_runtime27.jsx)("span", { "aria-hidden": true, style: ruleStyle(theme) }), (0, import_jsx_runtime27.jsx)("span", { children: den })] });
+ }
+ function Pow({ base, exp }) {
+   const tall = isTall(base);
+-  return (0, import_jsx_runtime25.jsxs)("span", { style: {
++  return (0, import_jsx_runtime27.jsxs)("span", { style: {
+     display: "inline-flex",
+     alignItems: "flex-start",
+     verticalAlign: "middle",
+     ...tall ? { padding: `${SCRIPT_LIFT_EM}em 0` } : {}
+-  }, children: [(0, import_jsx_runtime25.jsx)("span", { children: base }), (0, import_jsx_runtime25.jsx)("sup", { style: {
++  }, children: [(0, import_jsx_runtime27.jsx)("span", { children: base }), (0, import_jsx_runtime27.jsx)("sup", { style: {
+     ...scriptStyle,
+     verticalAlign: "baseline",
+     // The run's line box is one em; its baseline is about 0.8 em down,
+@@ -22133,7 +22804,7 @@
+ var SCRIPT_BASELINE_EM = 0.8;
+ var SCRIPT_LIFT_EM = 0.6;
+ function isTall(node) {
+-  if (!(0, import_react23.isValidElement)(node)) {
++  if (!(0, import_react25.isValidElement)(node)) {
+     return Array.isArray(node) ? node.some(isTall) : false;
+   }
+   const element = node;
+@@ -22157,78 +22828,78 @@
+ function Paren({ open = "(", close = ")", children }) {
+   const theme = useGrokTheme();
+   const tall = isTall(children);
+-  return (0, import_jsx_runtime25.jsxs)("span", { style: {
++  return (0, import_jsx_runtime27.jsxs)("span", { style: {
+     display: "inline-flex",
+     alignItems: "stretch",
+     verticalAlign: "middle",
+     // A stroke stands a little off its term; a glyph has its own side bearings.
+     columnGap: tall ? STACK_GAP_PX : 0
+-  }, children: [(0, import_jsx_runtime25.jsx)(Delimiter, { char: open, tall, theme }), (0, import_jsx_runtime25.jsx)("span", { children }), (0, import_jsx_runtime25.jsx)(Delimiter, { char: close, tall, theme })] });
++  }, children: [(0, import_jsx_runtime27.jsx)(Delimiter, { char: open, tall, theme }), (0, import_jsx_runtime27.jsx)("span", { children }), (0, import_jsx_runtime27.jsx)(Delimiter, { char: close, tall, theme })] });
+ }
+ function Delimiter({ char, tall, theme }) {
+   const path = STRETCHED_DELIMITERS[char];
+   if (!tall || path === void 0) {
+-    return (0, import_jsx_runtime25.jsx)("span", { style: { display: "inline-flex", alignItems: "center" }, children: char });
++    return (0, import_jsx_runtime27.jsx)("span", { style: { display: "inline-flex", alignItems: "center" }, children: char });
+   }
+-  return (0, import_jsx_runtime25.jsx)(StretchedStroke, { path, label: char, widthEm: STRETCHED_DELIMITER_WIDTH_EM, theme });
++  return (0, import_jsx_runtime27.jsx)(StretchedStroke, { path, label: char, widthEm: STRETCHED_DELIMITER_WIDTH_EM, theme });
+ }
+ var STRETCHED_DELIMITER_WIDTH_EM = 0.35;
+ function StretchedStroke({ path, label, widthEm, theme }) {
+-  return (0, import_jsx_runtime25.jsx)("span", { style: {
++  return (0, import_jsx_runtime27.jsx)("span", { style: {
+     position: "relative",
+     alignSelf: "stretch",
+     flex: "none",
+     width: `${widthEm}em`
+-  }, children: (0, import_jsx_runtime25.jsx)("svg", { role: "img", "aria-label": label, viewBox: "0 0 10 100", preserveAspectRatio: "none", style: {
++  }, children: (0, import_jsx_runtime27.jsx)("svg", { role: "img", "aria-label": label, viewBox: "0 0 10 100", preserveAspectRatio: "none", style: {
+     position: "absolute",
+     inset: 0,
+     display: "block",
+     width: "100%",
+     height: "100%",
+     overflow: "visible"
+-  }, children: (0, import_jsx_runtime25.jsx)("path", { d: path, fill: "none", stroke: theme.text.primary, strokeWidth: RULE_PX, strokeLinecap: "round", strokeLinejoin: "round", vectorEffect: "non-scaling-stroke" }) }) });
++  }, children: (0, import_jsx_runtime27.jsx)("path", { d: path, fill: "none", stroke: theme.text.primary, strokeWidth: RULE_PX, strokeLinecap: "round", strokeLinejoin: "round", vectorEffect: "non-scaling-stroke" }) }) });
+ }
+ var ROOT_SIGN_PATH = "M0.5 62 L3 56 L5.8 99 L10 0.5";
+ var ROOT_SIGN_WIDTH_EM = 0.5;
+ function Sqrt({ children }) {
+   const theme = useGrokTheme();
+   const tall = isTall(children);
+-  return (0, import_jsx_runtime25.jsxs)("span", { style: {
++  return (0, import_jsx_runtime27.jsxs)("span", { style: {
+     display: "inline-flex",
+     alignItems: tall ? "stretch" : "center",
+     verticalAlign: "middle"
+-  }, children: [tall ? (0, import_jsx_runtime25.jsx)(StretchedStroke, { path: ROOT_SIGN_PATH, label: "\u221A", widthEm: ROOT_SIGN_WIDTH_EM, theme }) : (0, import_jsx_runtime25.jsx)("span", { children: "\u221A" }), (0, import_jsx_runtime25.jsxs)("span", { style: {
++  }, children: [tall ? (0, import_jsx_runtime27.jsx)(StretchedStroke, { path: ROOT_SIGN_PATH, label: "\u221A", widthEm: ROOT_SIGN_WIDTH_EM, theme }) : (0, import_jsx_runtime27.jsx)("span", { children: "\u221A" }), (0, import_jsx_runtime27.jsxs)("span", { style: {
+     display: "inline-flex",
+     flexDirection: "column",
+     gap: STACK_GAP_PX
+-  }, children: [(0, import_jsx_runtime25.jsx)("span", { "aria-hidden": true, style: ruleStyle(theme) }), (0, import_jsx_runtime25.jsx)("span", { children })] })] });
++  }, children: [(0, import_jsx_runtime27.jsx)("span", { "aria-hidden": true, style: ruleStyle(theme) }), (0, import_jsx_runtime27.jsx)("span", { children })] })] });
+ }
+ function Sum({ from, to, sign = "\u2211" }) {
+-  return (0, import_jsx_runtime25.jsxs)("span", { style: {
++  return (0, import_jsx_runtime27.jsxs)("span", { style: {
+     display: "inline-flex",
+     flexDirection: "column",
+     alignItems: "center",
+     gap: STACK_GAP_PX,
+     verticalAlign: "middle"
+-  }, children: [to === void 0 ? null : (0, import_jsx_runtime25.jsx)("span", { style: scriptStyle, children: to }), (0, import_jsx_runtime25.jsx)("span", { children: sign }), from === void 0 ? null : (0, import_jsx_runtime25.jsx)("span", { style: scriptStyle, children: from })] });
++  }, children: [to === void 0 ? null : (0, import_jsx_runtime27.jsx)("span", { style: scriptStyle, children: to }), (0, import_jsx_runtime27.jsx)("span", { children: sign }), from === void 0 ? null : (0, import_jsx_runtime27.jsx)("span", { style: scriptStyle, children: from })] });
+ }
+ 
+ // src/canvas-bootstrap-grok.ts
+-var import_react33 = __toESM(require_react(), 1);
++var import_react35 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/index.js
+-var import_react30 = __toESM(require_react(), 1);
++var import_react32 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/chart-primitives.js
+-var import_jsx_runtime28 = __toESM(require_jsx_runtime(), 1);
+-var import_react26 = __toESM(require_react(), 1);
++var import_jsx_runtime30 = __toESM(require_jsx_runtime(), 1);
++var import_react28 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/ui-primitives.js
+-var import_jsx_runtime27 = __toESM(require_jsx_runtime(), 1);
+-var import_react25 = __toESM(require_react(), 1);
++var import_jsx_runtime29 = __toESM(require_jsx_runtime(), 1);
++var import_react27 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/callout-tone-icons.js
+-var import_jsx_runtime26 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime28 = __toESM(require_jsx_runtime(), 1);
+ var CALLOUT_ICON_VIEWBOX = 300;
+ var CALLOUT_ICON_GLYPH_TRANSFORM = `matrix(1 0 0 -1 0 ${CALLOUT_ICON_VIEWBOX})`;
+ var NEUTRAL_FILLED_CIRCLE_CENTER = CALLOUT_ICON_VIEWBOX / 2;
+@@ -22239,7 +22910,7 @@
+ };
+ var rowToneMarkerSizePx = canvasSpacing["1.5"];
+ var rowToneMarkerOffsetTopPx = (20 - rowToneMarkerSizePx) / 2;
+-var typographyInlineContext = (0, import_react25.createContext)(false);
++var typographyInlineContext = (0, import_react27.createContext)(false);
+ var defaultCardChrome = {
+   size: "base",
+   stickyHeader: false,
+@@ -22248,14 +22919,14 @@
+   toggle: () => {
+   }
+ };
+-var CardChromeContext = (0, import_react25.createContext)(defaultCardChrome);
++var CardChromeContext = (0, import_react27.createContext)(defaultCardChrome);
+ 
+ // ../canvas-components/dist/collapsible-section.js
+-var import_jsx_runtime29 = __toESM(require_jsx_runtime(), 1);
+-var import_react27 = __toESM(require_react(), 1);
++var import_jsx_runtime31 = __toESM(require_jsx_runtime(), 1);
++var import_react29 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/diff-view.js
+-var import_jsx_runtime30 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime32 = __toESM(require_jsx_runtime(), 1);
+ 
+ // ../../node_modules/.pnpm/@shikijs+langs@4.0.2/node_modules/@shikijs/langs/dist/shellscript.mjs
+ var lang = Object.freeze(JSON.parse(`{"displayName":"Shell","name":"shellscript","patterns":[{"include":"#initial_context"}],"repository":{"alias_statement":{"begin":"[\\\\t ]*+(alias)[\\\\t ]*+((?:((?<!\\\\w)-\\\\w+)\\\\b[\\\\t ]*+)*)[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))","beginCaptures":{"1":{"name":"storage.type.alias.shell"},"2":{"patterns":[{"match":"(?<!\\\\w)-\\\\w+\\\\b","name":"string.unquoted.argument.shell constant.other.option.shell"}]},"3":{"name":"string.unquoted.argument.shell constant.other.option.shell"},"4":{"name":"variable.other.assignment.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"variable.other.assignment.shell"},"7":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"8":{"name":"punctuation.definition.array.access.shell"},"9":{"name":"keyword.operator.assignment.shell"},"10":{"name":"keyword.operator.assignment.compound.shell"},"11":{"name":"keyword.operator.assignment.compound.shell"}},"end":"(?=[\\\\t ]|$)|(?:(?:(?:(;)|(&&))|(\\\\|\\\\|))|(&))","endCaptures":{"1":{"name":"punctuation.terminator.statement.semicolon.shell"},"2":{"name":"punctuation.separator.statement.and.shell"},"3":{"name":"punctuation.separator.statement.or.shell"},"4":{"name":"punctuation.separator.statement.background.shell"}},"name":"meta.expression.assignment.alias.shell","patterns":[{"include":"#normal_context"}]},"argument":{"begin":"[\\\\t ]++(?![\\\\n#\\\\&(\\\\[|]|$|;)","beginCaptures":{},"end":"(?=[\\\\t \\\\&;|]|$|[\\\\n)\`])","endCaptures":{},"name":"meta.argument.shell","patterns":[{"include":"#argument_context"},{"include":"#line_continuation"}]},"argument_context":{"patterns":[{"captures":{"1":{"name":"string.unquoted.argument.shell","patterns":[{"match":"\\\\*","name":"variable.language.special.wildcard.shell"},{"include":"#variable"},{"include":"#numeric_literal"},{"captures":{"1":{"name":"constant.language.$1.shell"}},"match":"(?<!\\\\w)\\\\b(true|false)\\\\b(?!\\\\w)"}]}},"match":"[\\\\t ]*+([^\\\\t\\\\n \\"$\\\\&-);<>\\\\\\\\\`|]+(?!>))"},{"include":"#normal_context"}]},"arithmetic_double":{"patterns":[{"begin":"\\\\(\\\\(","beginCaptures":{"0":{"name":"punctuation.section.arithmetic.double.shell"}},"end":"\\\\)\\\\s*\\\\)","endCaptures":{"0":{"name":"punctuation.section.arithmetic.double.shell"}},"name":"meta.arithmetic.shell","patterns":[{"include":"#math"},{"include":"#string"}]}]},"arithmetic_no_dollar":{"patterns":[{"begin":"\\\\(","beginCaptures":{"0":{"name":"punctuation.section.arithmetic.single.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.section.arithmetic.single.shell"}},"name":"meta.arithmetic.shell","patterns":[{"include":"#math"},{"include":"#string"}]}]},"array_access_inline":{"captures":{"1":{"name":"punctuation.section.array.shell"},"2":{"patterns":[{"include":"#special_expansion"},{"include":"#string"},{"include":"#variable"}]},"3":{"name":"punctuation.section.array.shell"}},"match":"(\\\\[)([^]\\\\[]+)(])"},"array_value":{"begin":"[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))[\\\\t ]*+(\\\\()","beginCaptures":{"1":{"name":"variable.other.assignment.shell"},"2":{"name":"punctuation.definition.array.access.shell"},"3":{"name":"variable.other.assignment.shell"},"4":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"keyword.operator.assignment.shell"},"7":{"name":"keyword.operator.assignment.compound.shell"},"8":{"name":"keyword.operator.assignment.compound.shell"},"9":{"name":"punctuation.definition.array.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.array.shell"}},"patterns":[{"include":"#comment"},{"captures":{"1":{"name":"variable.other.assignment.array.shell entity.other.attribute-name.shell"},"2":{"name":"keyword.operator.assignment.shell punctuation.definition.assignment.shell"}},"match":"((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(=)"},{"captures":{"1":{"name":"punctuation.definition.bracket.named-array.shell"},"2":{"name":"string.unquoted.shell entity.other.attribute-name.bracket.shell"},"3":{"name":"punctuation.definition.bracket.named-array.shell"},"4":{"name":"punctuation.definition.assignment.shell"}},"match":"(\\\\[)(.+?)(])(=)"},{"include":"#normal_context"},{"include":"#simple_unquoted"}]},"assignment_statement":{"patterns":[{"include":"#array_value"},{"include":"#modified_assignment_statement"},{"include":"#normal_assignment_statement"}]},"basic_command_name":{"captures":{"1":{"name":"storage.modifier.$1.shell"},"2":{"name":"entity.name.function.call.shell entity.name.command.shell","patterns":[{"match":"(?<!\\\\w)(?:continue|return|break)(?!\\\\w)","name":"keyword.control.$0.shell"},{"match":"(?<!\\\\w)(?:unfunction|continue|autoload|unsetopt|bindkey|builtin|getopts|command|declare|unalias|history|unlimit|typeset|suspend|source|printf|unhash|disown|ulimit|return|which|alias|break|false|print|shift|times|umask|unset|read|type|exec|eval|wait|echo|dirs|jobs|kill|hash|stat|exit|test|trap|true|let|set|pwd|cd|fg|bg|fc|[.:])(?!/)(?!\\\\w)(?!-)","name":"support.function.builtin.shell"},{"include":"#variable"}]}},"match":"(?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;])(?!nocorrect |nocorrect\\\\t|nocorrect$|readonly |readonly\\\\t|readonly$|function |function\\\\t|function$|foreach |foreach\\\\t|foreach$|coproc |coproc\\\\t|coproc$|logout |logout\\\\t|logout$|export |export\\\\t|export$|select |select\\\\t|select$|repeat |repeat\\\\t|repeat$|pushd |pushd\\\\t|pushd$|until |until\\\\t|until$|while |while\\\\t|while$|local |local\\\\t|local$|case |case\\\\t|case$|done |done\\\\t|done$|elif |elif\\\\t|elif$|else |else\\\\t|else$|esac |esac\\\\t|esac$|popd |popd\\\\t|popd$|then |then\\\\t|then$|time |time\\\\t|time$|for |for\\\\t|for$|end |end\\\\t|end$|fi |fi\\\\t|fi$|do |do\\\\t|do$|in |in\\\\t|in$|if |if\\\\t|if$)(?:((?<=^|[\\\\t \\\\&;])(?:readonly|declare|typeset|export|local)(?=[\\\\t \\\\&;]|$))|((?![\\"']|\\\\\\\\\\\\n?$)[^\\\\t\\\\n\\\\r !\\"'<>]+?))(?:(?=[\\\\t ])|(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\))","name":"meta.statement.command.name.basic.shell"},"block_comment":{"begin":"\\\\s*+(/\\\\*)","beginCaptures":{"1":{"name":"punctuation.definition.comment.begin.shell"}},"end":"\\\\*/","endCaptures":{"0":{"name":"punctuation.definition.comment.end.shell"}},"name":"comment.block.shell"},"boolean":{"match":"\\\\b(?:true|false)\\\\b","name":"constant.language.$0.shell"},"case_statement":{"begin":"\\\\b(case)\\\\b[\\\\t ]*+(.+?)[\\\\t ]*+\\\\b(in)\\\\b","beginCaptures":{"1":{"name":"keyword.control.case.shell"},"2":{"patterns":[{"include":"#initial_context"}]},"3":{"name":"keyword.control.in.shell"}},"end":"\\\\besac\\\\b","endCaptures":{"0":{"name":"keyword.control.esac.shell"}},"name":"meta.case.shell","patterns":[{"include":"#comment"},{"captures":{"1":{"name":"keyword.operator.pattern.case.default.shell"}},"match":"[\\\\t ]*+(\\\\* *\\\\))"},{"begin":"(?<!\\\\))(?![\\\\t ]*+(?:esac\\\\b|$))","beginCaptures":{},"end":"(?=\\\\besac\\\\b)|(\\\\))","endCaptures":{"1":{"name":"keyword.operator.pattern.case.shell"}},"name":"meta.case.entry.pattern.shell","patterns":[{"include":"#case_statement_context"}]},{"begin":"(?<=\\\\))","beginCaptures":{},"end":"(;;)|(?=\\\\besac\\\\b)","endCaptures":{"1":{"name":"punctuation.terminator.statement.case.shell"}},"name":"meta.case.entry.body.shell","patterns":[{"include":"#typical_statements"},{"include":"#initial_context"}]}]},"case_statement_context":{"patterns":[{"match":"\\\\*","name":"variable.language.special.quantifier.star.shell keyword.operator.quantifier.star.shell punctuation.definition.arbitrary-repetition.shell punctuation.definition.regex.arbitrary-repetition.shell"},{"match":"\\\\+","name":"variable.language.special.quantifier.plus.shell keyword.operator.quantifier.plus.shell punctuation.definition.arbitrary-repetition.shell punctuation.definition.regex.arbitrary-repetition.shell"},{"match":"\\\\?","name":"variable.language.special.quantifier.question.shell keyword.operator.quantifier.question.shell punctuation.definition.arbitrary-repetition.shell punctuation.definition.regex.arbitrary-repetition.shell"},{"match":"@","name":"variable.language.special.at.shell keyword.operator.at.shell punctuation.definition.regex.at.shell"},{"match":"\\\\|","name":"keyword.operator.orvariable.language.special.or.shell keyword.operator.alternation.ruby.shell punctuation.definition.regex.alternation.shell punctuation.separator.regex.alternation.shell"},{"match":"\\\\\\\\.","name":"constant.character.escape.shell"},{"match":"(?<=\\\\tin| in|[\\\\t ]|;;)\\\\(","name":"keyword.operator.pattern.case.shell"},{"begin":"(?<=\\\\S)(\\\\()","beginCaptures":{"1":{"name":"punctuation.definition.group.shell punctuation.definition.regex.group.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.definition.regex.group.shell"}},"name":"meta.parenthese.shell","patterns":[{"include":"#case_statement_context"}]},{"begin":"\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.character-class.shell"}},"end":"]","endCaptures":{"0":{"name":"punctuation.definition.character-class.shell"}},"name":"string.regexp.character-class.shell","patterns":[{"match":"\\\\\\\\.","name":"constant.character.escape.shell"}]},{"include":"#string"},{"match":"[^\\\\t\\\\n )*?@\\\\[|]","name":"string.unquoted.pattern.shell string.regexp.unquoted.shell"}]},"command_name_range":{"begin":"\\\\G","beginCaptures":{},"end":"(?=[\\\\t \\\\&;|]|$|[\\\\n)\`])|(?=<)","endCaptures":{},"name":"meta.statement.command.name.shell","patterns":[{"match":"(?<!\\\\w)(?:continue|return|break)(?!\\\\w)","name":"entity.name.function.call.shell entity.name.command.shell keyword.control.$0.shell"},{"match":"(?<!\\\\w)(?:unfunction|continue|autoload|unsetopt|bindkey|builtin|getopts|command|declare|unalias|history|unlimit|typeset|suspend|source|printf|unhash|disown|ulimit|return|which|alias|break|false|print|shift|times|umask|unset|read|type|exec|eval|wait|echo|dirs|jobs|kill|hash|stat|exit|test|trap|true|let|set|pwd|cd|fg|bg|fc|[.:])(?!/)(?!\\\\w)(?!-)","name":"entity.name.function.call.shell entity.name.command.shell support.function.builtin.shell"},{"include":"#variable"},{"captures":{"1":{"name":"entity.name.function.call.shell entity.name.command.shell"}},"match":"(?<!\\\\w)(?<=\\\\G|[\\"')}])([^\\\\t\\\\n\\\\r \\"\\\\&');->\`{|]+)"},{"begin":"(?:\\\\G|(?<![\\\\t\\\\n #\\\\&;{|]))(\\\\$?)((\\")|('))","beginCaptures":{"1":{"name":"meta.statement.command.name.quoted.shell punctuation.definition.string.shell entity.name.function.call.shell entity.name.command.shell"},"2":{},"3":{"name":"meta.statement.command.name.quoted.shell string.quoted.double.shell punctuation.definition.string.begin.shell entity.name.function.call.shell entity.name.command.shell"},"4":{"name":"meta.statement.command.name.quoted.shell string.quoted.single.shell punctuation.definition.string.begin.shell entity.name.function.call.shell entity.name.command.shell"}},"end":"(?<!\\\\G)(?<=\\\\2)","endCaptures":{},"patterns":[{"include":"#continuation_of_single_quoted_command_name"},{"include":"#continuation_of_double_quoted_command_name"}]},{"include":"#line_continuation"},{"include":"#simple_unquoted"}]},"command_statement":{"begin":"[\\\\t ]*+(?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;])(?!nocorrect |nocorrect\\\\t|nocorrect$|readonly |readonly\\\\t|readonly$|function |function\\\\t|function$|foreach |foreach\\\\t|foreach$|coproc |coproc\\\\t|coproc$|logout |logout\\\\t|logout$|export |export\\\\t|export$|select |select\\\\t|select$|repeat |repeat\\\\t|repeat$|pushd |pushd\\\\t|pushd$|until |until\\\\t|until$|while |while\\\\t|while$|local |local\\\\t|local$|case |case\\\\t|case$|done |done\\\\t|done$|elif |elif\\\\t|elif$|else |else\\\\t|else$|esac |esac\\\\t|esac$|popd |popd\\\\t|popd$|then |then\\\\t|then$|time |time\\\\t|time$|for |for\\\\t|for$|end |end\\\\t|end$|fi |fi\\\\t|fi$|do |do\\\\t|do$|in |in\\\\t|in$|if |if\\\\t|if$)(?!\\\\\\\\\\\\n?$)","beginCaptures":{},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.command.shell","patterns":[{"include":"#command_name_range"},{"include":"#line_continuation"},{"include":"#option"},{"include":"#argument"},{"include":"#string"},{"include":"#heredoc"}]},"comment":{"captures":{"1":{"name":"comment.line.number-sign.shell meta.shebang.shell"},"2":{"name":"punctuation.definition.comment.shebang.shell"},"3":{"name":"comment.line.number-sign.shell"},"4":{"name":"punctuation.definition.comment.shell"}},"match":"(?:^|[\\\\t ]++)(?:((#!).*)|((#).*))"},"comments":{"patterns":[{"include":"#block_comment"},{"include":"#line_comment"}]},"compound-command":{"patterns":[{"begin":"\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"end":"]","endCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"name":"meta.scope.logical-expression.shell","patterns":[{"include":"#logical-expression"},{"include":"#initial_context"}]},{"begin":"(?<=\\\\s|^)\\\\{(?=\\\\s|$)","beginCaptures":{"0":{"name":"punctuation.definition.group.shell"}},"end":"(?<=^|;)\\\\s*(})","endCaptures":{"1":{"name":"punctuation.definition.group.shell"}},"name":"meta.scope.group.shell","patterns":[{"include":"#initial_context"}]}]},"continuation_of_double_quoted_command_name":{"begin":"\\\\G(?<=\\")","beginCaptures":{},"contentName":"meta.statement.command.name.continuation string.quoted.double entity.name.function.call entity.name.command","end":"\\"","endCaptures":{"0":{"name":"string.quoted.double.shell punctuation.definition.string.end.shell entity.name.function.call.shell entity.name.command.shell"}},"patterns":[{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"include":"#variable"},{"include":"#interpolation"}]},"continuation_of_single_quoted_command_name":{"begin":"\\\\G(?<=')","beginCaptures":{},"contentName":"meta.statement.command.name.continuation string.quoted.single entity.name.function.call entity.name.command","end":"'","endCaptures":{"0":{"name":"string.quoted.single.shell punctuation.definition.string.end.shell entity.name.function.call.shell entity.name.command.shell"}}},"custom_command_names":{"patterns":[]},"custom_commands":{"patterns":[]},"double_quote_context":{"patterns":[{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"include":"#variable"},{"include":"#interpolation"}]},"double_quote_escape_char":{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},"floating_keyword":{"patterns":[{"match":"(?<=^|[\\\\t \\\\&;])(?:then|elif|else|done|end|do|if|fi)(?=[\\\\t \\\\&;]|$)","name":"keyword.control.$0.shell"}]},"for_statement":{"patterns":[{"begin":"\\\\b(for)\\\\b[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))[\\\\t ]*+\\\\b(in)\\\\b","beginCaptures":{"1":{"name":"keyword.control.for.shell"},"2":{"name":"variable.other.for.shell"},"3":{"name":"keyword.control.in.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.for.in.shell","patterns":[{"include":"#string"},{"include":"#simple_unquoted"},{"include":"#normal_context"}]},{"begin":"\\\\b(for)\\\\b","beginCaptures":{"1":{"name":"keyword.control.for.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.for.shell","patterns":[{"include":"#arithmetic_double"},{"include":"#normal_context"}]}]},"function_definition":{"applyEndPatternLast":1,"begin":"[\\\\t ]*+(?:\\\\b(function)\\\\b[\\\\t ]*+([^\\\\t\\\\n\\\\r \\"'()=]+)(?:(\\\\()[\\\\t ]*+(\\\\)))?|([^\\\\t\\\\n\\\\r \\"'()=]+)[\\\\t ]*+(\\\\()[\\\\t ]*+(\\\\)))","beginCaptures":{"1":{"name":"storage.type.function.shell"},"2":{"name":"entity.name.function.shell"},"3":{"name":"punctuation.definition.arguments.shell"},"4":{"name":"punctuation.definition.arguments.shell"},"5":{"name":"entity.name.function.shell"},"6":{"name":"punctuation.definition.arguments.shell"},"7":{"name":"punctuation.definition.arguments.shell"}},"end":"(?<=[)}])","endCaptures":{},"name":"meta.function.shell","patterns":[{"match":"\\\\G[\\\\t\\\\n ]"},{"begin":"\\\\{","beginCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"end":"}","endCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"name":"meta.function.body.shell","patterns":[{"include":"#initial_context"}]},{"begin":"\\\\(","beginCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"name":"meta.function.body.shell","patterns":[{"include":"#initial_context"}]},{"include":"#initial_context"}]},"heredoc":{"patterns":[{"begin":"((?<!<)<<-)[\\\\t ]*+([\\"'])[\\\\t ]*+([^\\"']+?)(?=[\\"\\\\&';<\\\\s])(\\\\2)(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.quote.shell"},"3":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"4":{"name":"punctuation.definition.string.heredoc.quote.shell"},"5":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.quoted.heredoc.indent.$3","end":"^\\\\t*\\\\3(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.$0.shell"}},"patterns":[]},{"begin":"((?<!<)<<(?!<))[\\\\t ]*+([\\"'])[\\\\t ]*+([^\\"']+?)(?=[\\"\\\\&';<\\\\s])(\\\\2)(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.quote.shell"},"3":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"4":{"name":"punctuation.definition.string.heredoc.quote.shell"},"5":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.quoted.heredoc.no-indent.$3","end":"^\\\\3(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.delimiter.shell"}},"patterns":[]},{"begin":"((?<!<)<<-)[\\\\t ]*+([^\\\\t \\"']+)(?=[\\"\\\\&';<\\\\s])(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"3":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.unquoted.heredoc.indent.$2","end":"^\\\\t*\\\\2(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.delimiter.shell"}},"patterns":[{"include":"#double_quote_escape_char"},{"include":"#variable"},{"include":"#interpolation"}]},{"begin":"((?<!<)<<(?!<))[\\\\t ]*+([^\\\\t \\"']+)(?=[\\"\\\\&';<\\\\s])(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"3":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.unquoted.heredoc.no-indent.$2","end":"^\\\\2(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.delimiter.shell"}},"patterns":[{"include":"#double_quote_escape_char"},{"include":"#variable"},{"include":"#interpolation"}]}]},"herestring":{"patterns":[{"begin":"(<<<)\\\\s*(('))","beginCaptures":{"1":{"name":"keyword.operator.herestring.shell"},"2":{"name":"string.quoted.single.shell"},"3":{"name":"punctuation.definition.string.begin.shell"}},"contentName":"string.quoted.single.shell","end":"(')","endCaptures":{"0":{"name":"string.quoted.single.shell"},"1":{"name":"punctuation.definition.string.end.shell"}},"name":"meta.herestring.shell"},{"begin":"(<<<)\\\\s*((\\"))","beginCaptures":{"1":{"name":"keyword.operator.herestring.shell"},"2":{"name":"string.quoted.double.shell"},"3":{"name":"punctuation.definition.string.begin.shell"}},"contentName":"string.quoted.double.shell","end":"(\\")","endCaptures":{"0":{"name":"string.quoted.double.shell"},"1":{"name":"punctuation.definition.string.end.shell"}},"name":"meta.herestring.shell","patterns":[{"include":"#double_quote_context"}]},{"captures":{"1":{"name":"keyword.operator.herestring.shell"},"2":{"name":"string.unquoted.herestring.shell","patterns":[{"include":"#initial_context"}]}},"match":"(<<<)\\\\s*(([^)\\\\\\\\\\\\s]|\\\\\\\\.)+)","name":"meta.herestring.shell"}]},"initial_context":{"patterns":[{"include":"#comment"},{"include":"#pipeline"},{"include":"#normal_statement_seperator"},{"include":"#logical_expression_double"},{"include":"#logical_expression_single"},{"include":"#assignment_statement"},{"include":"#case_statement"},{"include":"#for_statement"},{"include":"#loop"},{"include":"#function_definition"},{"include":"#line_continuation"},{"include":"#arithmetic_double"},{"include":"#misc_ranges"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#redirection"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#alias_statement"},{"include":"#normal_statement"},{"include":"#string"},{"include":"#support"}]},"inline_comment":{"captures":{"1":{"name":"comment.block.shell punctuation.definition.comment.begin.shell"},"2":{"name":"comment.block.shell"},"3":{"patterns":[{"match":"\\\\*/","name":"comment.block.shell punctuation.definition.comment.end.shell"},{"match":"\\\\*","name":"comment.block.shell"}]}},"match":"(/\\\\*)((?:[^*]|\\\\*++[^/])*+(\\\\*++/))"},"interpolation":{"patterns":[{"include":"#arithmetic_dollar"},{"include":"#subshell_dollar"},{"begin":"\`","beginCaptures":{"0":{"name":"punctuation.definition.evaluation.backticks.shell"}},"end":"\`","endCaptures":{"0":{"name":"punctuation.definition.evaluation.backticks.shell"}},"name":"string.interpolated.backtick.shell","patterns":[{"match":"\\\\\\\\[$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"begin":"(?<=\\\\W)(?=#)(?!#\\\\{)","beginCaptures":{"1":{"name":"punctuation.whitespace.comment.leading.shell"}},"end":"(?!\\\\G)","patterns":[{"begin":"#","beginCaptures":{"0":{"name":"punctuation.definition.comment.shell"}},"end":"(?=\`)","name":"comment.line.number-sign.shell"}]},{"include":"#initial_context"}]}]},"keyword":{"patterns":[{"match":"(?<=^|[\\\\&;\\\\s])(then|else|elif|fi|for|in|do|done|select|continue|esac|while|until|return)(?=[\\\\&;\\\\s]|$)","name":"keyword.control.shell"},{"match":"(?<=^|[\\\\&;\\\\s])(?:export|declare|typeset|local|readonly)(?=[\\\\&;\\\\s]|$)","name":"storage.modifier.shell"}]},"line_comment":{"begin":"\\\\s*+(//)","beginCaptures":{"1":{"name":"punctuation.definition.comment.shell"}},"end":"(?<=\\\\n)(?<!\\\\\\\\\\\\n)","endCaptures":{},"name":"comment.line.double-slash.shell","patterns":[{"include":"#line_continuation_character"}]},"line_continuation":{"match":"\\\\\\\\(?=\\\\n)","name":"constant.character.escape.line-continuation.shell"},"logical-expression":{"patterns":[{"include":"#arithmetic_no_dollar"},{"match":"=[=~]?|!=?|[<>]|&&|\\\\|\\\\|","name":"keyword.operator.logical.shell"},{"match":"(?<!\\\\S)-(nt|ot|ef|eq|ne|l[et]|g[et]|[GLNOSa-hknopr-uwxz])\\\\b","name":"keyword.operator.logical.shell"}]},"logical_expression_context":{"patterns":[{"include":"#regex_comparison"},{"include":"#arithmetic_no_dollar"},{"include":"#logical-expression"},{"include":"#logical_expression_single"},{"include":"#logical_expression_double"},{"include":"#comment"},{"include":"#boolean"},{"include":"#redirect_number"},{"include":"#numeric_literal"},{"include":"#pipeline"},{"include":"#normal_statement_seperator"},{"include":"#string"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#support"}]},"logical_expression_double":{"begin":"\\\\[\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"end":"]]","endCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"name":"meta.scope.logical-expression.shell","patterns":[{"include":"#logical_expression_context"}]},"logical_expression_single":{"begin":"\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"end":"]","endCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"name":"meta.scope.logical-expression.shell","patterns":[{"include":"#logical_expression_context"}]},"loop":{"patterns":[{"begin":"(?<=^|[\\\\&;\\\\s])(for)\\\\s+(.+?)\\\\s+(in)(?=[\\\\&;\\\\s]|$)","beginCaptures":{"1":{"name":"keyword.control.shell"},"2":{"name":"variable.other.loop.shell","patterns":[{"include":"#string"}]},"3":{"name":"keyword.control.shell"}},"end":"(?<=^|[\\\\&;\\\\s])done(?=[\\\\&;\\\\s]|$|\\\\))","endCaptures":{"0":{"name":"keyword.control.shell"}},"name":"meta.scope.for-in-loop.shell","patterns":[{"include":"#initial_context"}]},{"begin":"(?<=^|[\\\\&;\\\\s])(while|until)(?=[\\\\&;\\\\s]|$)","beginCaptures":{"1":{"name":"keyword.control.shell"}},"end":"(?<=^|[\\\\&;\\\\s])done(?=[\\\\&;\\\\s]|$|\\\\))","endCaptures":{"0":{"name":"keyword.control.shell"}},"name":"meta.scope.while-loop.shell","patterns":[{"include":"#initial_context"}]},{"begin":"(?<=^|[\\\\&;\\\\s])(select)\\\\s+((?:[^\\\\\\\\\\\\s]|\\\\\\\\.)+)(?=[\\\\&;\\\\s]|$)","beginCaptures":{"1":{"name":"keyword.control.shell"},"2":{"name":"variable.other.loop.shell"}},"end":"(?<=^|[\\\\&;\\\\s])(done)(?=[\\\\&;\\\\s]|$|\\\\))","endCaptures":{"1":{"name":"keyword.control.shell"}},"name":"meta.scope.select-block.shell","patterns":[{"include":"#initial_context"}]},{"begin":"(?<=^|[\\\\&;\\\\s])if(?=[\\\\&;\\\\s]|$)","beginCaptures":{"0":{"name":"keyword.control.if.shell"}},"end":"(?<=^|[\\\\&;\\\\s])fi(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"keyword.control.fi.shell"}},"name":"meta.scope.if-block.shell","patterns":[{"include":"#initial_context"}]}]},"math":{"patterns":[{"include":"#variable"},{"match":"\\\\+{1,2}|-{1,2}|[!~]|\\\\*{1,2}|[%/]|<[<=]?|>[=>]?|==|!=|^|\\\\|{1,2}|&{1,2}|[,:=?]|[-%\\\\&*+/^|]=|<<=|>>=","name":"keyword.operator.arithmetic.shell"},{"match":"0[Xx]\\\\h+","name":"constant.numeric.hex.shell"},{"match":";","name":"punctuation.separator.semicolon.range"},{"match":"0\\\\d+","name":"constant.numeric.octal.shell"},{"match":"\\\\d{1,2}#[0-9@-Z_a-z]+","name":"constant.numeric.other.shell"},{"match":"\\\\d+","name":"constant.numeric.integer.shell"},{"match":"(?<!\\\\w)[0-9A-Z_a-z]+(?!\\\\w)","name":"variable.other.normal.shell"}]},"math_operators":{"patterns":[{"match":"\\\\+{1,2}|-{1,2}|[!~]|\\\\*{1,2}|[%/]|<[<=]?|>[=>]?|==|!=|^|\\\\|{1,2}|&{1,2}|[,:=?]|[-%\\\\&*+/^|]=|<<=|>>=","name":"keyword.operator.arithmetic.shell"},{"match":"0[Xx]\\\\h+","name":"constant.numeric.hex.shell"},{"match":"0\\\\d+","name":"constant.numeric.octal.shell"},{"match":"\\\\d{1,2}#[0-9@-Z_a-z]+","name":"constant.numeric.other.shell"},{"match":"\\\\d+","name":"constant.numeric.integer.shell"}]},"misc_ranges":{"patterns":[{"include":"#logical_expression_single"},{"include":"#logical_expression_double"},{"include":"#subshell_dollar"},{"begin":"(?<![^\\\\t ])(\\\\{)(?![$\\\\w])","beginCaptures":{"1":{"name":"punctuation.definition.group.shell"}},"end":"}","endCaptures":{"0":{"name":"punctuation.definition.group.shell"}},"name":"meta.scope.group.shell","patterns":[{"include":"#initial_context"}]}]},"modified_assignment_statement":{"begin":"(?<=^|[\\\\t \\\\&;])(?:readonly|declare|typeset|export|local)(?=[\\\\t \\\\&;]|$)","beginCaptures":{"0":{"name":"storage.modifier.$0.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.shell meta.expression.assignment.modified.shell","patterns":[{"match":"(?<!\\\\w)-\\\\w+\\\\b","name":"string.unquoted.argument.shell constant.other.option.shell"},{"include":"#array_value"},{"captures":{"1":{"name":"variable.other.assignment.shell"},"2":{"name":"punctuation.definition.array.access.shell"},"3":{"name":"variable.other.assignment.shell"},"4":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"keyword.operator.assignment.shell"},"7":{"name":"keyword.operator.assignment.compound.shell"},"8":{"name":"keyword.operator.assignment.compound.shell"},"9":{"name":"constant.numeric.shell constant.numeric.hex.shell"},"10":{"name":"constant.numeric.shell constant.numeric.octal.shell"},"11":{"name":"constant.numeric.shell constant.numeric.other.shell"},"12":{"name":"constant.numeric.shell constant.numeric.decimal.shell"},"13":{"name":"constant.numeric.shell constant.numeric.version.shell"},"14":{"name":"constant.numeric.shell constant.numeric.integer.shell"}},"match":"((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))?(?:(?<=[\\\\t =]|^|[(\\\\[{])(?:(?:(?:(?:(?:(0[Xx]\\\\h+)|(0\\\\d+))|(\\\\d{1,2}#[0-9@-Z_a-z]+))|(-?\\\\d+\\\\.\\\\d+))|(-?\\\\d+(?:\\\\.\\\\d+)+))|(-?\\\\d+))(?=[\\\\t ]|$|[);}]))?"},{"include":"#normal_context"}]},"modifiers":{"match":"(?<=^|[\\\\t \\\\&;])(?:readonly|declare|typeset|export|local)(?=[\\\\t \\\\&;]|$)","name":"storage.modifier.$0.shell"},"normal_assignment_statement":{"begin":"[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))","beginCaptures":{"1":{"name":"variable.other.assignment.shell"},"2":{"name":"punctuation.definition.array.access.shell"},"3":{"name":"variable.other.assignment.shell"},"4":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"keyword.operator.assignment.shell"},"7":{"name":"keyword.operator.assignment.compound.shell"},"8":{"name":"keyword.operator.assignment.compound.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.expression.assignment.shell","patterns":[{"include":"#comment"},{"include":"#string"},{"include":"#normal_assignment_statement"},{"begin":"(?<=[\\\\t ])(?![\\\\t ]|\\\\w+=)","beginCaptures":{},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.command.env.shell","patterns":[{"include":"#command_name_range"},{"include":"#line_continuation"},{"include":"#option"},{"include":"#argument"},{"include":"#string"}]},{"include":"#simple_unquoted"},{"include":"#normal_context"}]},"normal_context":{"patterns":[{"include":"#comment"},{"include":"#pipeline"},{"include":"#normal_statement_seperator"},{"include":"#misc_ranges"},{"include":"#boolean"},{"include":"#redirect_number"},{"include":"#numeric_literal"},{"include":"#string"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#redirection"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#support"},{"include":"#parenthese"}]},"normal_statement":{"begin":"(?!^[\\\\t ]*+$)(?:(?<=(?:^until| until|\\\\tuntil|^while| while|\\\\twhile|^elif| elif|\\\\telif|^else| else|\\\\telse|^then| then|\\\\tthen|^do| do|\\\\tdo|^if| if|\\\\tif) )|(?<=^|[!\\\\&(;\`{|]))[\\\\t ]*+(?!nocorrect\\\\W|nocorrect\\\\$|function\\\\W|function\\\\$|foreach\\\\W|foreach\\\\$|repeat\\\\W|repeat\\\\$|logout\\\\W|logout\\\\$|coproc\\\\W|coproc\\\\$|select\\\\W|select\\\\$|while\\\\W|while\\\\$|pushd\\\\W|pushd\\\\$|until\\\\W|until\\\\$|case\\\\W|case\\\\$|done\\\\W|done\\\\$|elif\\\\W|elif\\\\$|else\\\\W|else\\\\$|esac\\\\W|esac\\\\$|popd\\\\W|popd\\\\$|then\\\\W|then\\\\$|time\\\\W|time\\\\$|for\\\\W|for\\\\$|end\\\\W|end\\\\$|fi\\\\W|fi\\\\$|do\\\\W|do\\\\$|in\\\\W|in\\\\$|if\\\\W|if\\\\$)","beginCaptures":{},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.shell","patterns":[{"include":"#typical_statements"}]},"normal_statement_seperator":{"captures":{"1":{"name":"punctuation.terminator.statement.semicolon.shell"},"2":{"name":"punctuation.separator.statement.and.shell"},"3":{"name":"punctuation.separator.statement.or.shell"},"4":{"name":"punctuation.separator.statement.background.shell"}},"match":"(?:(?:(;)|(&&))|(\\\\|\\\\|))|(&)"},"numeric_literal":{"captures":{"1":{"name":"constant.numeric.shell constant.numeric.hex.shell"},"2":{"name":"constant.numeric.shell constant.numeric.octal.shell"},"3":{"name":"constant.numeric.shell constant.numeric.other.shell"},"4":{"name":"constant.numeric.shell constant.numeric.decimal.shell"},"5":{"name":"constant.numeric.shell constant.numeric.version.shell"},"6":{"name":"constant.numeric.shell constant.numeric.integer.shell"}},"match":"(?<=[\\\\t =]|^|[(\\\\[{])(?:(?:(?:(?:(?:(0[Xx]\\\\h+)|(0\\\\d+))|(\\\\d{1,2}#[0-9@-Z_a-z]+))|(-?\\\\d+\\\\.\\\\d+))|(-?\\\\d+(?:\\\\.\\\\d+)+))|(-?\\\\d+))(?=[\\\\t ]|$|[);}])"},"option":{"begin":"[\\\\t ]++(-)((?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;]))","beginCaptures":{"1":{"name":"string.unquoted.argument.shell constant.other.option.dash.shell"},"2":{"name":"string.unquoted.argument.shell constant.other.option.shell"}},"contentName":"string.unquoted.argument constant.other.option","end":"(?=[\\\\t ])|(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"patterns":[{"include":"#option_context"}]},"option_context":{"patterns":[{"include":"#misc_ranges"},{"include":"#string"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#redirection"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#support"}]},"parenthese":{"patterns":[{"begin":"\\\\(","beginCaptures":{"0":{"name":"punctuation.section.parenthese.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.section.parenthese.shell"}},"name":"meta.parenthese.group.shell","patterns":[{"include":"#initial_context"}]}]},"pathname":{"patterns":[{"match":"(?<=[:=\\\\s]|^)~","name":"keyword.operator.tilde.shell"},{"match":"[*?]","name":"keyword.operator.glob.shell"},{"begin":"([!*+?@])(\\\\()","beginCaptures":{"1":{"name":"keyword.operator.extglob.shell"},"2":{"name":"punctuation.definition.extglob.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.extglob.shell"}},"name":"meta.structure.extglob.shell","patterns":[{"include":"#initial_context"}]}]},"pipeline":{"patterns":[{"match":"(?<=^|[\\\\&;\\\\s])(time)(?=[\\\\&;\\\\s]|$)","name":"keyword.other.shell"},{"match":"[!|]","name":"keyword.operator.pipe.shell"}]},"redirect_fix":{"captures":{"1":{"name":"keyword.operator.redirect.shell"},"2":{"name":"string.unquoted.argument.shell"}},"match":"(>>?)[\\\\t ]*+([^\\\\t\\\\n \\"$\\\\&-);<>\\\\\\\\\`|]+)"},"redirect_number":{"captures":{"1":{"name":"keyword.operator.redirect.stdout.shell"},"2":{"name":"keyword.operator.redirect.stderr.shell"},"3":{"name":"keyword.operator.redirect.$3.shell"}},"match":"(?<=[\\\\t ])(?:(1)|(2)|(\\\\d+))(?=>)"},"redirection":{"patterns":[{"begin":"[<>]\\\\(","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.interpolated.process-substitution.shell","patterns":[{"include":"#initial_context"}]},{"match":"(?<![<>])(&>|\\\\d*>&\\\\d*|\\\\d*(>>|[<>])|\\\\d*<&|\\\\d*<>)(?![<>])","name":"keyword.operator.redirect.shell"}]},"regex_comparison":{"match":"=~","name":"keyword.operator.logical.regex.shell"},"regexp":{"patterns":[{"match":".+"}]},"simple_options":{"captures":{"0":{"patterns":[{"captures":{"1":{"name":"string.unquoted.argument.shell constant.other.option.dash.shell"},"2":{"name":"string.unquoted.argument.shell constant.other.option.shell"}},"match":"[\\\\t ]++(-)(\\\\w+)"}]}},"match":"(?:[\\\\t ]++-\\\\w+)*"},"simple_unquoted":{"match":"[^\\\\t\\\\n \\"$\\\\&-);<>\\\\\\\\\`|]","name":"string.unquoted.shell"},"special_expansion":{"match":"!|:[-=?]?|[*@]|##?|%%|[%/]","name":"keyword.operator.expansion.shell"},"start_of_command":{"match":"[\\\\t ]*+(?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;])(?!nocorrect |nocorrect\\\\t|nocorrect$|readonly |readonly\\\\t|readonly$|function |function\\\\t|function$|foreach |foreach\\\\t|foreach$|coproc |coproc\\\\t|coproc$|logout |logout\\\\t|logout$|export |export\\\\t|export$|select |select\\\\t|select$|repeat |repeat\\\\t|repeat$|pushd |pushd\\\\t|pushd$|until |until\\\\t|until$|while |while\\\\t|while$|local |local\\\\t|local$|case |case\\\\t|case$|done |done\\\\t|done$|elif |elif\\\\t|elif$|else |else\\\\t|else$|esac |esac\\\\t|esac$|popd |popd\\\\t|popd$|then |then\\\\t|then$|time |time\\\\t|time$|for |for\\\\t|for$|end |end\\\\t|end$|fi |fi\\\\t|fi$|do |do\\\\t|do$|in |in\\\\t|in$|if |if\\\\t|if$)(?!\\\\\\\\\\\\n?$)"},"string":{"patterns":[{"match":"\\\\\\\\.","name":"constant.character.escape.shell"},{"begin":"'","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"'","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.quoted.single.shell"},{"begin":"\\\\$?\\"","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"\\"","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.quoted.double.shell","patterns":[{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"include":"#variable"},{"include":"#interpolation"}]},{"begin":"\\\\$'","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"'","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.quoted.single.dollar.shell","patterns":[{"match":"\\\\\\\\['\\\\\\\\abefnrtv]","name":"constant.character.escape.ansi-c.shell"},{"match":"\\\\\\\\[0-9]{3}\\"","name":"constant.character.escape.octal.shell"},{"match":"\\\\\\\\x\\\\h{2}\\"","name":"constant.character.escape.hex.shell"},{"match":"\\\\\\\\c.\\"","name":"constant.character.escape.control-char.shell"}]}]},"subshell_dollar":{"patterns":[{"begin":"\\\\$\\\\(","beginCaptures":{"0":{"name":"punctuation.definition.subshell.single.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.subshell.single.shell"}},"name":"meta.scope.subshell","patterns":[{"include":"#parenthese"},{"include":"#initial_context"}]}]},"support":{"patterns":[{"match":"(?<=^|[\\\\&;\\\\s])[.:](?=[\\\\&;\\\\s]|$)","name":"support.function.builtin.shell"}]},"typical_statements":{"patterns":[{"include":"#assignment_statement"},{"include":"#case_statement"},{"include":"#for_statement"},{"include":"#while_statement"},{"include":"#function_definition"},{"include":"#command_statement"},{"include":"#line_continuation"},{"include":"#arithmetic_double"},{"include":"#normal_context"}]},"variable":{"patterns":[{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.parameter.positional.all.shell"},"2":{"name":"variable.parameter.positional.all.shell"}},"match":"(\\\\$)(@(?!\\\\w))"},{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.parameter.positional.shell"},"2":{"name":"variable.parameter.positional.shell"}},"match":"(\\\\$)([0-9](?!\\\\w))"},{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.language.special.shell"},"2":{"name":"variable.language.special.shell"}},"match":"(\\\\$)([-!#$*0?_](?!\\\\w))"},{"begin":"(\\\\$)(\\\\{)[\\\\t ]*+(?=\\\\d)","beginCaptures":{"1":{"name":"punctuation.definition.variable.shell variable.parameter.positional.shell"},"2":{"name":"punctuation.section.bracket.curly.variable.begin.shell punctuation.definition.variable.shell variable.parameter.positional.shell"}},"contentName":"meta.parameter-expansion","end":"}","endCaptures":{"0":{"name":"punctuation.section.bracket.curly.variable.end.shell punctuation.definition.variable.shell variable.parameter.positional.shell"}},"patterns":[{"include":"#special_expansion"},{"include":"#array_access_inline"},{"match":"[0-9]+","name":"variable.parameter.positional.shell"},{"match":"(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)","name":"variable.other.normal.shell"},{"include":"#variable"},{"include":"#string"}]},{"begin":"(\\\\$)(\\\\{)","beginCaptures":{"1":{"name":"punctuation.definition.variable.shell"},"2":{"name":"punctuation.section.bracket.curly.variable.begin.shell punctuation.definition.variable.shell"}},"contentName":"meta.parameter-expansion","end":"}","endCaptures":{"0":{"name":"punctuation.section.bracket.curly.variable.end.shell punctuation.definition.variable.shell"}},"patterns":[{"include":"#special_expansion"},{"include":"#array_access_inline"},{"match":"(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)","name":"variable.other.normal.shell"},{"include":"#variable"},{"include":"#string"}]},{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.other.normal.shell"},"2":{"name":"variable.other.normal.shell"}},"match":"(\\\\$)(\\\\w+(?!\\\\w))"}]},"while_statement":{"patterns":[{"begin":"\\\\b(while)\\\\b","beginCaptures":{"1":{"name":"keyword.control.while.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.while.shell","patterns":[{"include":"#line_continuation"},{"include":"#math_operators"},{"include":"#option"},{"include":"#simple_unquoted"},{"include":"#normal_context"},{"include":"#string"}]}]}},"scopeName":"source.shell","aliases":["bash","sh","shell","zsh"]}`));
+@@ -22440,18 +23111,18 @@
+ }
+ 
+ // ../canvas-components/dist/form-primitives.js
+-var import_jsx_runtime31 = __toESM(require_jsx_runtime(), 1);
+-var import_react28 = __toESM(require_react(), 1);
++var import_jsx_runtime33 = __toESM(require_jsx_runtime(), 1);
++var import_react30 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/swatch.js
+-var import_jsx_runtime32 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime34 = __toESM(require_jsx_runtime(), 1);
+ 
+ // ../canvas-components/dist/todo-list.js
+-var import_jsx_runtime33 = __toESM(require_jsx_runtime(), 1);
+-var import_react29 = __toESM(require_react(), 1);
++var import_jsx_runtime35 = __toESM(require_jsx_runtime(), 1);
++var import_react31 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/usage-bar.js
+-var import_jsx_runtime34 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime36 = __toESM(require_jsx_runtime(), 1);
+ 
+ // ../canvas-shared/dist/canvas-design-mode.js
+ var CANVAS_DESIGN_CAPABLE_MESSAGE_TYPE = "cursor-canvas-design-capable";
+@@ -22494,7 +23165,7 @@
+ var CANVAS_ERROR_PANEL_BODY = "Its code ran into an error. Ask the agent that made it to fix it.";
+ var CANVAS_ERROR_PANEL_DETAILS_LABEL = "Error details";
+ var CANVAS_ERROR_PANEL_MAX_MESSAGE_CHARS = 4e3;
+-function escapeHtml(value) {
++function escapeHtml2(value) {
+   return value.replace(/[&<>"']/g, (char) => {
+     switch (char) {
+       case "&":
+@@ -22525,7 +23196,7 @@
+ function canvasErrorPanelHtml(message) {
+   const shown = truncateCanvasErrorMessage(message.trim());
+   const hiddenAttr = shown ? "" : " hidden";
+-  return `<style>${PANEL_CSS}</style><div ${CANVAS_ERROR_PANEL_ATTRIBUTE}="" role="alert"><h2>${CANVAS_ERROR_PANEL_TITLE}</h2><p>${CANVAS_ERROR_PANEL_BODY}</p><details${hiddenAttr}><summary>${CANVAS_ERROR_PANEL_DETAILS_LABEL}</summary><pre ${CANVAS_ERROR_PANEL_MESSAGE_ATTRIBUTE}="">${escapeHtml(shown)}</pre></details></div>`;
++  return `<style>${PANEL_CSS}</style><div ${CANVAS_ERROR_PANEL_ATTRIBUTE}="" role="alert"><h2>${CANVAS_ERROR_PANEL_TITLE}</h2><p>${CANVAS_ERROR_PANEL_BODY}</p><details${hiddenAttr}><summary>${CANVAS_ERROR_PANEL_DETAILS_LABEL}</summary><pre ${CANVAS_ERROR_PANEL_MESSAGE_ATTRIBUTE}="">${escapeHtml2(shown)}</pre></details></div>`;
+ }
+ 
+ // ../canvas-shared/dist/canvas-frame-find.js
+@@ -22552,6 +23223,34 @@
+ function canvasFindRequest(){try{parent.postMessage({type:${JSON.stringify(CANVAS_FRAME_FIND_REQUEST_MESSAGE_TYPE)}},'*')}catch{}}`;
+ }
+ 
++// ../canvas-shared/dist/canvas-frame-height-floor.js
++var CANVAS_FRAME_HEIGHT_FLOOR_ACTION_SETTLE_MS = 400;
++var CANVAS_FRAME_HEIGHT_FLOOR_SCRIPT = `(function(){
++var root=document.documentElement,inside=false,floor=0,actedUntil=0;
++function follow(){
++var next=Math.min(Math.ceil(scrollY+innerHeight),root.scrollHeight);
++if(!(next>0)||next===floor)return;
++floor=next;root.style.minHeight=next+'px'}
++function settle(){
++if(floor!==0&&!(inside&&performance.now()>=actedUntil)){floor=0;root.style.minHeight=''}
++follow()}
++function enter(e){if(e.pointerType==='touch')return;inside=true;follow()}
++function leave(){inside=false;settle()}
++function acted(){actedUntil=performance.now()+${CANVAS_FRAME_HEIGHT_FLOOR_ACTION_SETTLE_MS};settle()}
++addEventListener('pointerover',enter,true);
++addEventListener('pointermove',enter,{passive:true});
++root.addEventListener('pointerleave',leave);
++addEventListener('scroll',follow,{passive:true});
++addEventListener('resize',follow);
++addEventListener('load',follow);
++addEventListener('click',acted,true);
++addEventListener('keydown',acted,true);
++addEventListener('beforeprint',acted);
++addEventListener('pagehide',leave);
++document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')leave()});
++if(typeof ResizeObserver!=='undefined'&&document.body)new ResizeObserver(settle).observe(document.body);
++follow()})();`;
++
+ // ../canvas-shared/dist/canvas-root-layout.js
+ var CANVAS_VIEWPORT_HEIGHT_CSS_VAR = "--cursor-canvas-viewport-height";
+ var CANVAS_BODY_PADDING_VERTICAL_PX = 24;
+@@ -22585,6 +23284,7 @@
+ if(typeof bottom==='number'&&bottom>=0)style.setProperty('${CANVAS_FRAME_BOTTOM_INSET_CSS_VAR}',bottom+'px');else style.removeProperty('${CANVAS_FRAME_BOTTOM_INSET_CSS_VAR}')});
+ ${canvasFrameFindScript()}
+ <\/script>`;
++var HEIGHT_FLOOR_SCRIPT = `<script>${CANVAS_FRAME_HEIGHT_FLOOR_SCRIPT}<\/script>`;
+ var CSP_QUOTE = String.fromCodePoint(39);
+ var cspKeyword = (keyword) => `${CSP_QUOTE}${keyword}${CSP_QUOTE}`;
+ var CSP_NONE = cspKeyword("none");
+@@ -22627,11 +23327,11 @@
+ var CANVAS_FRAME_BASE_LINE_HEIGHT = 1.385;
+ 
+ // src/canvas-bootstrap.ts
+-var import_react32 = __toESM(require_react(), 1);
++var import_react34 = __toESM(require_react(), 1);
+ var import_client = __toESM(require_client(), 1);
+ 
+ // src/canvas-source-anchors.ts
+-var import_react31 = __toESM(require_react(), 1);
++var import_react33 = __toESM(require_react(), 1);
+ 
+ // src/canvas-source-anchors-contract.ts
+ var CANVAS_SOURCE_ANCHORS_GLOBAL = "__cursorCanvasSourceAnchors";
+@@ -22699,16 +23399,16 @@
+ function sourceAnchorJsxDEV(type, props, key, _isStaticChildren, source) {
+   const anchor = readAnchor(source);
+   const elementType = type;
+-  if (anchor === void 0 || type === import_react31.default.Fragment) {
+-    return import_react31.default.createElement(elementType, withKey(props, key));
++  if (anchor === void 0 || type === import_react33.default.Fragment) {
++    return import_react33.default.createElement(elementType, withKey(props, key));
+   }
+   if (typeof type === "string") {
+-    return import_react31.default.createElement(elementType, {
++    return import_react33.default.createElement(elementType, {
+       ...withKey(props, key),
+       [CANVAS_SOURCE_ATTRIBUTE]: `${anchor.line}:${anchor.column}`
+     });
+   }
+-  const element = import_react31.default.createElement(elementType, withKey(props, key));
++  const element = import_react33.default.createElement(elementType, withKey(props, key));
+   componentAnchors.set(element.props, {
+     name: componentName(type),
+     anchor,
+@@ -22969,6 +23669,55 @@
+   postToParent({ type: CANVAS_DESIGN_CAPABLE_MESSAGE_TYPE, sourceFile: anchors.sourceFile });
+ }
+ 
++// src/canvas-table-scroll-fade.ts
++var RAW_TABLE_SELECTOR = 'table,[role="table"],[role="grid"]';
++function horizontalScrollerOf(table, root) {
++  const view = root.ownerDocument.defaultView;
++  if (view === null) {
++    return void 0;
++  }
++  for (let node = table.parentElement; node !== null && node !== root; node = node.parentElement) {
++    const { overflowX } = view.getComputedStyle(node);
++    if (overflowX === "auto" || overflowX === "scroll") {
++      return node;
++    }
++  }
++  return void 0;
++}
++function installTableScrollFades(root) {
++  const fades = /* @__PURE__ */ new Map();
++  const scan = () => {
++    const live = /* @__PURE__ */ new Set();
++    for (const table of root.querySelectorAll(RAW_TABLE_SELECTOR)) {
++      const scroller = horizontalScrollerOf(table, root);
++      if (scroller === void 0 || live.has(scroller)) {
++        continue;
++      }
++      live.add(scroller);
++      const fade = fades.get(scroller);
++      if (fade?.table === table) {
++        continue;
++      }
++      fade?.stop();
++      fades.set(scroller, { table, stop: watchScrollEdges(scroller, { observe: [table] }) });
++    }
++    for (const [scroller, fade] of fades) {
++      if (!live.has(scroller)) {
++        fade.stop();
++        fades.delete(scroller);
++      }
++    }
++  };
++  scan();
++  const mutations = typeof MutationObserver === "undefined" ? void 0 : new MutationObserver(scan);
++  mutations?.observe(root, { childList: true, subtree: true });
++  return () => {
++    mutations?.disconnect();
++    for (const fade of fades.values()) fade.stop();
++    fades.clear();
++  };
++}
++
+ // src/canvas-bootstrap.ts
+ var CANVAS_PREVIEW_RESIZE_MESSAGE_TYPE = "cursor-canvas-preview-resize";
+ function getCanvasRuntimeGlobal() {
+@@ -23028,7 +23777,7 @@
+ }) {
+   const theme = useBodyTheme();
+   const narrowViewport = useNarrowViewport();
+-  import_react32.default.useLayoutEffect(() => {
++  import_react34.default.useLayoutEffect(() => {
+     applyBodyTheme(theme, { previewMode, narrowViewport });
+   }, [theme, previewMode, narrowViewport]);
+   return children;
+@@ -23045,7 +23794,7 @@
+   return () => query?.removeEventListener("change", onChange);
+ }
+ function useNarrowViewport() {
+-  return import_react32.default.useSyncExternalStore(
++  return import_react34.default.useSyncExternalStore(
+     subscribeToNarrowViewport,
+     () => narrowViewportQuery()?.matches ?? false
+   );
+@@ -23134,7 +23883,7 @@
+   }
+   reportErrorToHost(message, phase);
+ }
+-var HostRuntimeErrorBoundary = class extends import_react32.default.Component {
++var HostRuntimeErrorBoundary = class extends import_react34.default.Component {
+   constructor() {
+     super(...arguments);
+     this.state = { errorMessage: null };
+@@ -23154,7 +23903,7 @@
+     if (this.props.silent) {
+       return null;
+     }
+-    return import_react32.default.createElement("div", {
++    return import_react34.default.createElement("div", {
+       dangerouslySetInnerHTML: { __html: canvasErrorPanelHtml(errorMessage) }
+     });
+   }
+@@ -23187,8 +23936,8 @@
+ async function mountCanvasWithKit(appModuleUrl, kit) {
+   const previewMode = isCanvasPreviewMode();
+   const runtimeGlobal = getCanvasRuntimeGlobal();
+-  runtimeGlobal.React = import_react32.default;
+-  Object.assign(runtimeGlobal, import_react32.default);
++  runtimeGlobal.React = import_react34.default;
++  Object.assign(runtimeGlobal, import_react34.default);
+   Object.assign(runtimeGlobal, kit.globals);
+   installSourceAnchorRuntime();
+   const rootElement = document.getElementById("root");
+@@ -23213,16 +23962,18 @@
+     }
+     const root = (0, import_client.createRoot)(rootElement);
+     root.render(
+-      import_react32.default.createElement(
++      import_react34.default.createElement(
+         HostRuntimeErrorBoundary,
+         { silent: previewMode },
+-        import_react32.default.createElement(
++        import_react34.default.createElement(
+           CanvasShell,
+           { previewMode, useBodyTheme: kit.useBodyTheme },
+-          import_react32.default.createElement(CanvasComponent)
++          import_react34.default.createElement(CanvasComponent)
+         )
+       )
+     );
++    installTableScrollFades(rootElement);
++    installTableCopy(rootElement);
+     if (previewMode) {
+       installPreviewResizeReporter(rootElement);
+     } else {
+@@ -23242,7 +23993,7 @@
+ // src/canvas-bootstrap-grok.ts
+ function useGrokBodyTheme() {
+   const theme = useGrokTheme();
+-  return import_react33.default.useMemo(
++  return import_react35.default.useMemo(
+     () => ({
+       kind: theme.kind,
+       background: theme.bg.base,

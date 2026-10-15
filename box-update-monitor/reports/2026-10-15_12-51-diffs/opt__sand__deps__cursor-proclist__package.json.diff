@@ -1,0 +1,11 @@
+--- 2026-10-15_10-54-2:/opt/sand/deps/cursor-proclist/package.json
++++ 2026-10-15_12-51:/opt/sand/deps/cursor-proclist/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "cursor-proclist",
+   "version": "1.0.0",
+-  "description": "Native Node.js module for process listing",
++  "description": "Native Node.js module for process listing and macOS window chrome",
+   "main": "index.js",
+   "private": true,
+   "files": [

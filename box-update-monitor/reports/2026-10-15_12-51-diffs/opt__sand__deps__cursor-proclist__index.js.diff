@@ -1,0 +1,13 @@
+--- 2026-10-15_10-54-2:/opt/sand/deps/cursor-proclist/index.js
++++ 2026-10-15_12-51:/opt/sand/deps/cursor-proclist/index.js
+@@ -18,5 +18,9 @@
+ 	// () => { totalBytes, availableBytes, pressureLevel? } | null
+ 	// Non-null only where a native read exists (macOS); callers fall back to
+ 	// os.freemem()-based logic elsewhere.
+-	cursor_proclist_system_memory: binding.cursor_proclist_system_memory
++	cursor_proclist_system_memory: binding.cursor_proclist_system_memory,
++	// (nativeWindowHandle: Buffer, enabled: boolean) => boolean
++	// macOS only: attaches or removes the empty compact NSToolbar that gives a
++	// window AppKit's 20pt corner on macOS 26+. See cursor_proclist.h.
++	cursor_set_compact_window_toolbar: binding.cursor_set_compact_window_toolbar
+ };

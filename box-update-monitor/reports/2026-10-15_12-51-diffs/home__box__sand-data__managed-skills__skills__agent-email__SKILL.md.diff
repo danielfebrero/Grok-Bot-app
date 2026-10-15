@@ -1,0 +1,14 @@
+--- 2026-10-15_10-54-2:/home/box/sand-data/managed-skills/skills/agent-email/SKILL.md
++++ 2026-10-15_12-51:/home/box/sand-data/managed-skills/skills/agent-email/SKILL.md
+@@ -2,8 +2,9 @@
+ name: agent-email
+ description: >-
+   When you send any email, from your own Grok Bot inbox or the user's Gmail or
+-  Outlook, read or search mail in your own inbox, or the user wants you to have
+-  an email address (you have none until one is claimed).
++  Outlook, read or search mail in your own inbox, use a name+tag@ form of your
++  address, or the user wants you to have an email address (you have none until
++  one is claimed).
+ ---
+ # Agent email
+ 

@@ -1,0 +1,70 @@
+--- 2026-10-15_10-54-2:/usr/local/bin/start-sand-box
++++ 2026-10-15_12-51:/usr/local/bin/start-sand-box
+@@ -151,6 +151,39 @@
+ 	[ "${SAND_HOST_UID_SPLIT_ACTIVE}" = "1" ]
+ }
+ 
++# write_hibernate_hook_script must emit the same bytes as
++# buildHibernateHookScript in
++# sand/src/host/extensions/box-store-sync/hibernate-hook-service.ts;
++# hibernate-hook-service.test.ts asserts the parity.
++sand_box_hibernate_hook_requested() {
++	[ "${SAND_BOX_STORE_HIBERNATE_HOOK:-}" = "1" ]
++}
++write_hibernate_hook_script() {
++	local fifo_dir="$1"
++	printf '%s\n' \
++		'#!/bin/sh' \
++		"resp=\$(mktemp -u \"${fifo_dir}/response.\$\$.XXXXXXXX\") || exit 2" \
++		"trap 'rm -f \"\$resp\"' EXIT" \
++		'mkfifo -m 0622 "$resp" || exit 2' \
++		"printf 'flush %s\\n' \"\$resp\" > ${fifo_dir}/request || exit 2" \
++		'IFS= read -r status < "$resp" || exit 2' \
++		'[ "$status" = "ok" ]'
++}
++provision_hibernate_hook_channel() {
++	local hook_path="$1" fifo_dir="$2" owner="$3" group="$4"
++	rm -rf "${fifo_dir}" "${hook_path}.staged" 2>/dev/null || true
++	if ! sand_box_hibernate_hook_requested; then
++		rm -f "${hook_path}" 2>/dev/null || true
++		return 0
++	fi
++	install -d -m 1733 -o "${owner}" -g "${group}" "${fifo_dir}" || return 1
++	mkfifo -m 0622 "${fifo_dir}/request" || return 1
++	chown "${owner}:${group}" "${fifo_dir}/request" || return 1
++	write_hibernate_hook_script "${fifo_dir}" >"${hook_path}.staged" || return 1
++	chmod 0755 "${hook_path}.staged" || return 1
++	mv -f "${hook_path}.staged" "${hook_path}" || return 1
++}
++
+ SAND_DATA_HOST_OWNED_FILES=(gateway.json webhook-keys.json teach-queue-key.json box-secrets.json)
+ remove_host_owned_write_leftovers() {
+ 	box_no_follow remove-leftovers sand-data /home/box/sand-data "${SAND_DATA_HOST_OWNED_FILES[@]}" || true
+@@ -647,6 +680,7 @@
+ 		rm -f /etc/sudoers.d/box /etc/sudoers.d/sand-host 2>/dev/null || true
+ 	fi
+ fi
++export SAND_HOST_UID_SPLIT_ACTIVE
+ 
+ SAND_DAEMON_LAUNCHERS_DIR="/usr/local/libexec/sand"
+ SAND_DAEMON_RELEASE_STORE_DIR="/var/lib/sand-daemon-supervisor"
+@@ -799,6 +833,19 @@
+ 	fi
+ fi
+ 
++if [ "$(id -u)" -eq 0 ]; then
++	hibernate_hook_channel_owner=root
++	if sand_host_uid_split; then
++		hibernate_hook_channel_owner="${SAND_HOST_USER}"
++	elif sand_user_non_root; then
++		hibernate_hook_channel_owner=box
++	fi
++	if ! provision_hibernate_hook_channel /var/run/anyrun-hibernate-hook /run/sand-box-store-flush \
++		"${hibernate_hook_channel_owner}" "${hibernate_hook_channel_owner}"; then
++		echo "[start-sand-box] could not provision the hibernate hook channel; the host will report it unavailable" >&2
++	fi
++fi
++
+ if [ "$(id -u)" -eq 0 ]; then
+ 	rm -f /tmp/sand-managed-converge.log
+ 	if sand_host_uid_split; then

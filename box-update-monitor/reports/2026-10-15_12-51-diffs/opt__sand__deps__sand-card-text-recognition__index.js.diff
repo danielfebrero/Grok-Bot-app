@@ -1,0 +1,10 @@
+--- 2026-10-15_10-54-2:/opt/sand/deps/sand-card-text-recognition/index.js
++++ 2026-10-15_12-51:/opt/sand/deps/sand-card-text-recognition/index.js
+@@ -0,0 +1,7 @@
++// Copyright Anysphere Inc.
++
++const binding = require("./build/Release/sand_card_text_recognition.node");
++
++module.exports = {
++  recognize_text_async: binding.recognize_text_async,
++};

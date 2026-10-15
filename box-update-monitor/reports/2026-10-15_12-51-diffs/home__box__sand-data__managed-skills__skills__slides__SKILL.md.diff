@@ -1,0 +1,30 @@
+--- 2026-10-15_10-54-2:/home/box/sand-data/managed-skills/skills/slides/SKILL.md
++++ 2026-10-15_12-51:/home/box/sand-data/managed-skills/skills/slides/SKILL.md
+@@ -18,8 +18,8 @@
+ **Start, work, destination.** Every deck has these three places:
+ 
+ - **Start.** The file that they named or pasted, or a new deck. Get the file onto the box before anything else. `DownloadFile` is the usual tool. You can also use the Drive or Slides MCP to download a file or to copy a template. If you need the Drive connection id, list the connections.
+-- **Work.** All work on the deck happens on the local `.pptx` on the box. Drive, Slides, Figma, and MCP tools are never the edit surface.
+-- **Destination.** The platform that they named, or the live deck that they asked you to edit. When the deck is done, put the finished `.pptx` there.
++- **Work.** All work on the deck happens on the local `.pptx` on the box. When they ask you to use the Slides MCP, the work happens on the live deck through the Slides MCP. Name the Slides MCP as the edit surface in every brief of that deck.
++- **Destination.** The platform that they named, or the live deck that they asked you to edit. When the deck is done, put the finished `.pptx` there. When the work happened on the live deck, the live deck already holds the result.
+ 
+ **Convert to Google Slides on upload.** If they want a `.pptx` in Google Slides, `UploadFile` it to Google Drive with `destination.convertToGoogleFormat: true`. Drive imports it as a native Slides deck in that same call. The result `mimeType` tells you which type landed. A request for only this conversion needs no Task.
+ 
+@@ -147,7 +147,7 @@
+ 
+ ### 9. Deliver
+ 
+-When the `finish` Task returns `status: deck done`, `SendToUser` the finished `.pptx` and its images in the chat. Tell them each defect that is left, with its reason. Then `UploadFile` the `.pptx` one time, and put it on the destination. Never `UploadFile` slide images or working files.
++When the `finish` Task returns `status: deck done`, `SendToUser` the finished `.pptx` and its images in the chat. Tell them each defect that is left, with its reason. Then `UploadFile` the `.pptx` one time, and put it on the destination. Never `UploadFile` slide images or working files. When the work happened on the live deck through the Slides MCP, send the link of the live deck and its images in place of the `.pptx`.
+ 
+ ### 10. The next message
+ 
+@@ -195,6 +195,7 @@
+ - read the `slides-executor` skill and follow it
+ - the workflow, the phase, and the group name in a `build` or `fix` Task
+ - the destination platform
++- the edit surface: the local `.pptx`, or the live deck through the Slides MCP
+ - the local path of the start file. In a `family` Task, there is no start file.
+ - the working folder
+ - the approved outline, or that this is one shot

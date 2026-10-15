@@ -1,0 +1,1971 @@
+--- 2026-10-15_10-54-2:/exec-daemon/canvas-runtime/canvas-runtime.esm.js
++++ 2026-10-15_12-51:/exec-daemon/canvas-runtime/canvas-runtime.esm.js
+@@ -1198,11 +1198,11 @@
+     }
+     var searchTarget = null;
+     var searchBoundary = null;
+-    function isFiberPrecedingCheck(child, target, boundary) {
+-      return child === boundary ? true : child === target ? (searchTarget = child, true) : false;
++    function isFiberPrecedingCheck(child, target, boundary2) {
++      return child === boundary2 ? true : child === target ? (searchTarget = child, true) : false;
+     }
+-    function isFiberFollowingCheck(child, target, boundary) {
+-      return child === boundary ? (searchBoundary = child, false) : child === target ? (null !== searchBoundary && (searchTarget = child), true) : false;
++    function isFiberFollowingCheck(child, target, boundary2) {
++      return child === boundary2 ? (searchBoundary = child, false) : child === target ? (null !== searchBoundary && (searchTarget = child), true) : false;
+     }
+     function getParentForFragmentAncestors(inst) {
+       if (null === inst) return null;
+@@ -5727,12 +5727,12 @@
+         });
+       }
+     }
+-    function logCaughtError(root3, boundary, errorInfo) {
++    function logCaughtError(root3, boundary2, errorInfo) {
+       try {
+         var onCaughtError = root3.onCaughtError;
+         onCaughtError(errorInfo.value, {
+           componentStack: errorInfo.stack,
+-          errorBoundary: 1 === boundary.tag ? boundary.stateNode : null
++          errorBoundary: 1 === boundary2.tag ? boundary2.stateNode : null
+         });
+       } catch (e$79) {
+         setTimeout(function() {
+@@ -14629,13 +14629,13 @@
+   usageColorSequence: () => usageColorSequence,
+   useCanvasAction: () => useCanvasAction,
+   useCanvasState: () => useCanvasState,
+-  useEffect: () => import_react8.useEffect,
++  useEffect: () => import_react9.useEffect,
+   useHostTheme: () => useHostTheme,
+-  useMemo: () => import_react8.useMemo,
+-  useRef: () => import_react8.useRef,
+-  useState: () => import_react8.useState
++  useMemo: () => import_react9.useMemo,
++  useRef: () => import_react9.useRef,
++  useState: () => import_react9.useState
+ });
+-var import_react8 = __toESM(require_react(), 1);
++var import_react9 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/canvas-tokens.js
+ var ON_ACCENT_DARK = "#191C22";
+@@ -15012,8 +15012,8 @@
+ }
+ 
+ // ../canvas-components/dist/chart-primitives.js
+-var import_jsx_runtime3 = __toESM(require_jsx_runtime(), 1);
+-var import_react4 = __toESM(require_react(), 1);
++var import_jsx_runtime4 = __toESM(require_jsx_runtime(), 1);
++var import_react5 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/hooks.js
+ var import_react2 = __toESM(require_react(), 1);
+@@ -15250,8 +15250,8 @@
+ }
+ 
+ // ../canvas-components/dist/ui-primitives.js
+-var import_jsx_runtime2 = __toESM(require_jsx_runtime(), 1);
+-var import_react3 = __toESM(require_react(), 1);
++var import_jsx_runtime3 = __toESM(require_jsx_runtime(), 1);
++var import_react4 = __toESM(require_react(), 1);
+ 
+ // ../canvas-components/dist/callout-tone-icons.js
+ var import_jsx_runtime = __toESM(require_jsx_runtime(), 1);
+@@ -15281,13 +15281,545 @@
+   return (0, import_jsx_runtime.jsx)("svg", { width: CALLOUT_TONE_ICON_PX, height: CALLOUT_TONE_ICON_PX, viewBox: `0 0 ${CALLOUT_ICON_VIEWBOX} ${CALLOUT_ICON_VIEWBOX}`, "aria-hidden": "true", style: svgStyle, children: tone === "neutral" ? (0, import_jsx_runtime.jsx)("circle", { cx: NEUTRAL_FILLED_CIRCLE_CENTER, cy: NEUTRAL_FILLED_CIRCLE_CENTER, r: NEUTRAL_FILLED_CIRCLE_RADIUS, fill: "currentColor" }) : (0, import_jsx_runtime.jsx)("g", { transform: CALLOUT_ICON_GLYPH_TRANSFORM, children: (0, import_jsx_runtime.jsx)("path", { fill: "currentColor", d: calloutToneIconPaths[calloutToneIconGlyph[tone]] }) }) });
+ }
+ 
++// ../canvas-components/dist/internal/fold-motion.js
++var import_jsx_runtime2 = __toESM(require_jsx_runtime(), 1);
++var import_react3 = __toESM(require_react(), 1);
++var FOLD_OPEN_MS = 240;
++var FOLD_CLOSE_MS = 200;
++var EASE_OUT = "cubic-bezier(0.165, 0.84, 0.44, 1)";
++var EASE_IN = "cubic-bezier(0.4, 0, 1, 1)";
++var REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
++function reducedMotionList() {
++  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
++    return void 0;
++  }
++  return window.matchMedia(REDUCED_MOTION_QUERY);
++}
++function prefersReducedMotion() {
++  return reducedMotionList()?.matches ?? false;
++}
++function subscribeReducedMotion(onChange) {
++  const list = reducedMotionList();
++  if (list === void 0 || typeof list.addEventListener !== "function") {
++    return () => {
++    };
++  }
++  list.addEventListener("change", onChange);
++  return () => list.removeEventListener("change", onChange);
++}
++function usePrefersReducedMotion() {
++  return (0, import_react3.useSyncExternalStore)(subscribeReducedMotion, prefersReducedMotion, () => false);
++}
++function foldTransition(property, { open, reducedMotion }) {
++  if (reducedMotion) {
++    return void 0;
++  }
++  return open ? `${property} ${FOLD_OPEN_MS}ms ${EASE_OUT}` : `${property} ${FOLD_CLOSE_MS}ms ${EASE_IN}`;
++}
++function foldTurnTransition(phase) {
++  return foldTransition("transform", phase);
++}
++function foldFadeTransition(phase) {
++  return foldTransition("border-color", phase);
++}
++function useFoldMotion(open) {
++  const [present, setPresent] = (0, import_react3.useState)(open);
++  const clipRef = (0, import_react3.useRef)(null);
++  const motion = (0, import_react3.useRef)(null);
++  const settledOpen = (0, import_react3.useRef)(open);
++  if (open && !present) {
++    setPresent(true);
++  }
++  (0, import_react3.useLayoutEffect)(() => {
++    if (settledOpen.current === open) {
++      return;
++    }
++    settledOpen.current = open;
++    const clip = clipRef.current;
++    const running = motion.current;
++    motion.current = null;
++    if (clip === null || typeof clip.animate !== "function" || prefersReducedMotion()) {
++      running?.cancel();
++      if (!open) {
++        setPresent(false);
++      }
++      return;
++    }
++    let fromHeight = open ? 0 : clip.getBoundingClientRect().height;
++    let fromOpacity = open ? 0 : 1;
++    if (running !== null) {
++      fromHeight = clip.getBoundingClientRect().height;
++      const opacity = Number.parseFloat(getComputedStyle(clip).opacity);
++      fromOpacity = Number.isNaN(opacity) ? fromOpacity : opacity;
++      running.cancel();
++    }
++    const toHeight = open ? clip.getBoundingClientRect().height : 0;
++    clip.style.overflow = "hidden";
++    clip.style.flexGrow = "0";
++    const next = clip.animate([
++      { height: `${fromHeight}px`, opacity: fromOpacity },
++      { height: `${toHeight}px`, opacity: open ? 1 : 0 }
++    ], open ? { duration: FOLD_OPEN_MS, easing: EASE_OUT } : (
++      // Held at the end so the content does not flash back before it unmounts.
++      { duration: FOLD_CLOSE_MS, easing: EASE_IN, fill: "forwards" }
++    ));
++    motion.current = next;
++    next.onfinish = () => {
++      if (motion.current !== next) {
++        return;
++      }
++      motion.current = null;
++      if (open) {
++        clip.style.overflow = "";
++        clip.style.flexGrow = "";
++      } else {
++        setPresent(false);
++      }
++    };
++    next.oncancel = () => {
++      if (motion.current === null) {
++        clip.style.overflow = "";
++        clip.style.flexGrow = "";
++      }
++    };
++  }, [open]);
++  return { present, clipRef };
++}
++var CLIP_STYLE = { display: "flow-root" };
++var FILL_CLIP_STYLE = {
++  display: "flex",
++  flexDirection: "column",
++  flex: "1 1 auto",
++  minWidth: 0
++};
++function FoldClip({ motion, id, fill = false, children }) {
++  if (!motion.present) {
++    return null;
++  }
++  return (0, import_jsx_runtime2.jsx)("div", { ref: motion.clipRef, id, "data-fold-clip": true, style: fill ? FILL_CLIP_STYLE : CLIP_STYLE, children });
++}
++
++// ../canvas-components/dist/internal/table-clipboard.js
++var TABLE_GRID_ATTRIBUTE = "data-table-grid";
++var TABLE_COL_ATTRIBUTE = "data-table-col";
++var TABLE_ROW_ATTRIBUTE = "data-table-row";
++var TABLE_HEADER_ATTRIBUTE = "data-table-header";
++var TABLE_SELECTOR = `table,[${TABLE_GRID_ATTRIBUTE}]`;
++function columnCount(table) {
++  return Math.max(table.header?.length ?? 0, ...table.rows.map((row) => row.length));
++}
++function escapeHtml(text2) {
++  return text2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
++}
++function cellLines(text2) {
++  const lines = text2.replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[ \t\f\v\u00a0]+/g, " ").trim());
++  while (lines.length > 0 && lines[0] === "") {
++    lines.shift();
++  }
++  while (lines.length > 0 && lines[lines.length - 1] === "") {
++    lines.pop();
++  }
++  return lines;
++}
++function alignStyle(align) {
++  return align === "center" || align === "right" ? ` style="text-align:${align}"` : "";
++}
++function htmlCell(tag, text2, align) {
++  const content = cellLines(text2).map(escapeHtml).join("<br>");
++  return `<${tag}${alignStyle(align)}>${content}</${tag}>`;
++}
++function tableToHtml(table) {
++  const count = columnCount(table);
++  const row = (tag, cells2) => {
++    const html5 = Array.from({ length: count }, (_3, c) => htmlCell(tag, cells2[c] ?? "", table.align[c]));
++    return `<tr>${html5.join("")}</tr>`;
++  };
++  const head2 = table.header === void 0 ? "" : `<thead>${row("th", table.header)}</thead>`;
++  const body3 = `<tbody>${table.rows.map((cells2) => row("td", cells2)).join("")}</tbody>`;
++  return `<table>${head2}${body3}</table>`;
++}
++function markdownCell(text2) {
++  return cellLines(text2).map((line) => line.replace(/(\\*)\|/g, (_3, slashes) => `${slashes}${slashes}\\|`)).join("<br>");
++}
++function pad(text2, width, align) {
++  const room = Math.max(0, width - text2.length);
++  if (align === "right") {
++    return " ".repeat(room) + text2;
++  }
++  if (align === "center") {
++    const left = Math.floor(room / 2);
++    return " ".repeat(left) + text2 + " ".repeat(room - left);
++  }
++  return text2 + " ".repeat(room);
++}
++function delimiter(width, align) {
++  if (align === "center") {
++    return `:${"-".repeat(width - 2)}:`;
++  }
++  if (align === "right") {
++    return `${"-".repeat(width - 1)}:`;
++  }
++  return "-".repeat(width);
++}
++function tableToMarkdown(table) {
++  const count = columnCount(table);
++  const header = Array.from({ length: count }, (_3, c) => markdownCell(table.header?.[c] ?? ""));
++  const rows = table.rows.map((cells2) => Array.from({ length: count }, (_3, c) => markdownCell(cells2[c] ?? "")));
++  const widths = Array.from({ length: count }, (_3, c) => Math.max(3, header[c]?.length ?? 0, ...rows.map((cells2) => cells2[c]?.length ?? 0)));
++  const line = (cells2) => `| ${cells2.map((cell, c) => pad(cell, widths[c] ?? 3, table.align[c])).join(" | ")} |`;
++  const rule = `| ${widths.map((width, c) => delimiter(width, table.align[c])).join(" | ")} |`;
++  return [line(header), rule, ...rows.map(line)].join("\n");
++}
++function selfAndDescendants(element2, selector) {
++  const found = [...element2.querySelectorAll(selector)];
++  return element2.matches(selector) ? [element2, ...found] : found;
++}
++function textOf(element2) {
++  const shown = element2.innerText;
++  return typeof shown === "string" ? shown : element2.textContent ?? "";
++}
++function parseAlign(value) {
++  switch (value?.trim().toLowerCase()) {
++    case "left":
++    case "start":
++      return "left";
++    case "center":
++      return "center";
++    case "right":
++    case "end":
++      return "right";
++    default:
++      return void 0;
++  }
++}
++function alignOf(element2) {
++  const inline = element2.style?.textAlign;
++  return parseAlign(inline) ?? parseAlign(element2.getAttribute("align"));
++}
++function tableElementCells(table) {
++  const rows = [...table.querySelectorAll("tr")].filter((tr2) => tr2.closest("table") === table);
++  const cells2 = [];
++  let bodyRow = 0;
++  rows.forEach((tr2, index) => {
++    const cellElements = [...tr2.children].filter((child) => /^t[hd]$/i.test(child.tagName));
++    const isHeader = index === 0 && cellElements.length > 0 && (tr2.parentElement?.tagName.toLowerCase() === "thead" || cellElements.every((cell) => cell.tagName.toLowerCase() === "th"));
++    const row = isHeader ? "header" : bodyRow;
++    let col = 0;
++    for (const element2 of cellElements) {
++      cells2.push({ row, col, element: element2 });
++      const span = Number.parseInt(element2.getAttribute("colspan") ?? "1", 10);
++      col += Number.isFinite(span) && span > 1 ? span : 1;
++    }
++    if (!isHeader) {
++      bodyRow += 1;
++    }
++  });
++  return cells2;
++}
++function gridCells(grid) {
++  const cells2 = [];
++  for (const element2 of grid.querySelectorAll(`[${TABLE_COL_ATTRIBUTE}]`)) {
++    if (element2.closest(`[${TABLE_GRID_ATTRIBUTE}]`) !== grid) {
++      continue;
++    }
++    const col = Number.parseInt(element2.getAttribute(TABLE_COL_ATTRIBUTE) ?? "", 10);
++    if (!Number.isFinite(col)) {
++      continue;
++    }
++    if (element2.hasAttribute(TABLE_HEADER_ATTRIBUTE)) {
++      cells2.push({ row: "header", col, element: element2 });
++      continue;
++    }
++    const row = Number.parseInt(element2.getAttribute(TABLE_ROW_ATTRIBUTE) ?? "", 10);
++    if (Number.isFinite(row)) {
++      cells2.push({ row, col, element: element2 });
++    }
++  }
++  return cells2;
++}
++function cellsOf(table) {
++  return table.tagName.toLowerCase() === "table" ? tableElementCells(table) : gridCells(table);
++}
++function cellKey(row, col) {
++  return `${row}:${col}`;
++}
++function modelOf(cells2, columns) {
++  const cols = columns ?? [...new Set(cells2.map((cell) => cell.col))].sort((a2, b3) => a2 - b3);
++  const byKey = new Map(cells2.map((cell) => [cellKey(cell.row, cell.col), cell]));
++  const bodyRows = [
++    ...new Set(cells2.flatMap((cell) => cell.row === "header" ? [] : [cell.row]))
++  ].sort((a2, b3) => a2 - b3);
++  const hasHeader = cells2.some((cell) => cell.row === "header");
++  const at = (row, col) => byKey.get(cellKey(row, col));
++  const text2 = (row, col) => {
++    const cell = at(row, col);
++    return cell === void 0 ? "" : textOf(cell.element);
++  };
++  const align = cols.map((col) => {
++    const header = at("header", col);
++    const fromHeader = header === void 0 ? void 0 : alignOf(header.element);
++    if (fromHeader !== void 0) {
++      return fromHeader;
++    }
++    const first = bodyRows.map((row) => at(row, col)).find((cell) => cell !== void 0);
++    return first === void 0 ? void 0 : alignOf(first.element);
++  });
++  return {
++    header: hasHeader ? cols.map((col) => text2("header", col)) : void 0,
++    rows: bodyRows.map((row) => cols.map((col) => text2(row, col))),
++    align
++  };
++}
++function rangeOver(node) {
++  const range2 = (node.ownerDocument ?? node).createRange();
++  range2.selectNode(node);
++  return range2;
++}
++function rangeContains(outer, inner) {
++  return outer.compareBoundaryPoints(Range.START_TO_START, inner) <= 0 && outer.compareBoundaryPoints(Range.END_TO_END, inner) >= 0;
++}
++function intersection(range2, node) {
++  if (!range2.intersectsNode(node)) {
++    return void 0;
++  }
++  const bounds = rangeOver(node);
++  const clipped = range2.cloneRange();
++  if (clipped.compareBoundaryPoints(Range.START_TO_START, bounds) < 0) {
++    clipped.setStart(bounds.startContainer, bounds.startOffset);
++  }
++  if (clipped.compareBoundaryPoints(Range.END_TO_END, bounds) > 0) {
++    clipped.setEnd(bounds.endContainer, bounds.endOffset);
++  }
++  return clipped;
++}
++function selectedCells(cells2, range2) {
++  return cells2.filter((cell) => {
++    const part = intersection(range2, cell.element);
++    if (part === void 0 || part.collapsed) {
++      return false;
++    }
++    return part.toString().trim() !== "" || rangeContains(range2, rangeOver(cell.element));
++  });
++}
++function selectTable(table, range2) {
++  const cells2 = cellsOf(table);
++  const selected = selectedCells(cells2, range2);
++  if (selected.length <= 1) {
++    return void 0;
++  }
++  const rows = new Set(selected.map((cell) => cell.row));
++  if (rows.size > 1) {
++    return modelOf(cells2);
++  }
++  const [row] = rows;
++  const cols = [...new Set(selected.map((cell) => cell.col))].sort((a2, b3) => a2 - b3);
++  if (row === "header") {
++    return modelOf(selected, cols);
++  }
++  return modelOf(cells2.filter((cell) => cell.row === "header" || cell.row === row), cols);
++}
++var BLOCK_DISPLAYS = /* @__PURE__ */ new Set([
++  "block",
++  "flex",
++  "grid",
++  "list-item",
++  "table",
++  "table-row",
++  "table-caption",
++  "flow-root",
++  "-webkit-box"
++]);
++function isElement(node) {
++  return node.nodeType === Node.ELEMENT_NODE;
++}
++function isText(node) {
++  return node.nodeType === Node.TEXT_NODE;
++}
++function rangeText(range2) {
++  const root2 = range2.commonAncestorContainer;
++  const view = (root2.ownerDocument ?? root2).defaultView;
++  let out = "";
++  const breakLine = () => {
++    if (out !== "" && !out.endsWith("\n")) {
++      out += "\n";
++    }
++  };
++  const visit = (node, preformatted) => {
++    if (!range2.intersectsNode(node)) {
++      return;
++    }
++    if (isText(node)) {
++      let text2 = node.data;
++      if (node === range2.endContainer) {
++        text2 = text2.slice(0, range2.endOffset);
++      }
++      if (node === range2.startContainer) {
++        text2 = text2.slice(range2.startOffset);
++      }
++      out += preformatted ? text2 : text2.replace(/\s+/g, " ");
++      return;
++    }
++    if (!isElement(node)) {
++      for (const child of node.childNodes)
++        visit(child, preformatted);
++      return;
++    }
++    if (node.tagName.toLowerCase() === "br") {
++      out += "\n";
++      return;
++    }
++    const style = view?.getComputedStyle(node);
++    if (style?.display === "none") {
++      return;
++    }
++    const block = style !== void 0 && BLOCK_DISPLAYS.has(style.display);
++    const pre = preformatted || (style?.whiteSpace.startsWith("pre") ?? false);
++    if (block) {
++      breakLine();
++    }
++    for (const child of node.childNodes)
++      visit(child, pre);
++    if (block) {
++      breakLine();
++    }
++  };
++  visit(root2, false);
++  return out.split("\n").map((line) => line.replace(/^ +| +$/g, "")).join("\n").replace(/\n{3,}/g, "\n\n").trim();
++}
++var KEEPS_EMPTY = "img,svg,video,audio,canvas,br,hr";
++function pruneEmpty(node) {
++  for (const child of [...node.childNodes]) {
++    if (!isElement(child) || child.matches(KEEPS_EMPTY)) {
++      continue;
++    }
++    pruneEmpty(child);
++    if ((child.textContent ?? "").trim() === "" && child.querySelector(KEEPS_EMPTY) === null) {
++      child.remove();
++    }
++  }
++}
++function rangeHtml(range2) {
++  const node = range2.commonAncestorContainer;
++  const holder = (node.ownerDocument ?? node).createElement("div");
++  holder.append(range2.cloneContents());
++  pruneEmpty(holder);
++  return holder.innerHTML;
++}
++function tablesIn(range2, root2) {
++  return selfAndDescendants(root2, TABLE_SELECTOR).filter((table) => {
++    const outer = table.parentElement?.closest(TABLE_SELECTOR) ?? null;
++    return (outer === null || !root2.contains(outer)) && range2.intersectsNode(table);
++  });
++}
++function boundary(range2, end) {
++  const point = range2.cloneRange();
++  point.collapse(!end);
++  return point;
++}
++function between(from, to) {
++  const range2 = from.cloneRange();
++  range2.setEnd(to.startContainer, to.startOffset);
++  return range2;
++}
++function segments(range2, root2) {
++  const out = [];
++  let cursor = boundary(range2, false);
++  for (const table of tablesIn(range2, root2)) {
++    const model = selectTable(table, range2);
++    if (model === void 0) {
++      continue;
++    }
++    const bounds = rangeOver(table);
++    const start = boundary(bounds, false);
++    const end = boundary(bounds, true);
++    if (cursor.compareBoundaryPoints(Range.START_TO_START, start) < 0) {
++      out.push({ kind: "gap", range: between(cursor, start) });
++    }
++    out.push({ kind: "table", model });
++    if (cursor.compareBoundaryPoints(Range.START_TO_START, end) < 0) {
++      cursor = end;
++    }
++  }
++  if (out.length === 0) {
++    return out;
++  }
++  const finish = boundary(range2, true);
++  if (cursor.compareBoundaryPoints(Range.START_TO_START, finish) < 0) {
++    out.push({ kind: "gap", range: between(cursor, finish) });
++  }
++  return out;
++}
++function clipboardForRange(range2, root2) {
++  if (range2.collapsed) {
++    return void 0;
++  }
++  const parts = segments(range2, root2);
++  if (parts.length === 0) {
++    return void 0;
++  }
++  const html5 = [];
++  const text2 = [];
++  for (const part of parts) {
++    if (part.kind === "table") {
++      html5.push(tableToHtml(part.model));
++      text2.push(tableToMarkdown(part.model));
++      continue;
++    }
++    const gapHtml = rangeHtml(part.range);
++    if (gapHtml.trim() !== "") {
++      html5.push(gapHtml);
++    }
++    const gapText = rangeText(part.range);
++    if (gapText !== "") {
++      text2.push(gapText);
++    }
++  }
++  return { html: html5.join(""), text: text2.join("\n\n") };
++}
++function copyTablesInSelection(event, root2) {
++  const data = event.clipboardData;
++  if (data === null || event.defaultPrevented) {
++    return false;
++  }
++  const selection = root2.ownerDocument.getSelection();
++  if (selection === null || selection.rangeCount === 0) {
++    return false;
++  }
++  const clipboard = clipboardForRange(selection.getRangeAt(0), root2);
++  if (clipboard === void 0) {
++    return false;
++  }
++  event.preventDefault();
++  data.setData("text/html", clipboard.html);
++  data.setData("text/plain", clipboard.text);
++  return true;
++}
++function copyWithinTable(event, table) {
++  const selection = table.ownerDocument.getSelection();
++  if (selection === null || selection.rangeCount === 0) {
++    return false;
++  }
++  if (!rangeContains(rangeOver(table), selection.getRangeAt(0))) {
++    return false;
++  }
++  return copyTablesInSelection(event, table);
++}
++function installTableCopy(root2) {
++  const doc = root2.ownerDocument;
++  const onCopy = (event) => {
++    copyTablesInSelection(event, root2);
++  };
++  doc.addEventListener("copy", onCopy);
++  return () => doc.removeEventListener("copy", onCopy);
++}
++
+ // ../canvas-components/dist/ui-primitives.js
+ function mergeStyle(base, override) {
+   return override ? { ...base, ...override } : base;
+ }
+ var mono = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+ function Stack({ children, gap = 12, style }) {
+-  return (0, import_jsx_runtime2.jsx)("div", { style: mergeStyle({
++  return (0, import_jsx_runtime3.jsx)("div", { style: mergeStyle({
+     display: "flex",
+     flexDirection: "column",
+     gap: `${gap}px`,
+@@ -15295,7 +15827,7 @@
+   }, style), children });
+ }
+ function Row({ children, gap = 8, align = "center", justify = "start", wrap = false, style }) {
+-  return (0, import_jsx_runtime2.jsx)("div", { style: mergeStyle({
++  return (0, import_jsx_runtime3.jsx)("div", { style: mergeStyle({
+     display: "flex",
+     flexDirection: "row",
+     flexWrap: wrap ? "wrap" : "nowrap",
+@@ -15307,7 +15839,7 @@
+ }
+ function Grid({ children, columns, gap = 12, align = "stretch", style }) {
+   const gridTemplateColumns = typeof columns === "number" ? `repeat(${columns}, minmax(0, 1fr))` : columns;
+-  return (0, import_jsx_runtime2.jsx)("div", { style: mergeStyle({
++  return (0, import_jsx_runtime3.jsx)("div", { style: mergeStyle({
+     display: "grid",
+     gridTemplateColumns,
+     gap: `${gap}px`,
+@@ -15317,7 +15849,7 @@
+ }
+ function Divider({ style }) {
+   const { tokens: t } = useHostTheme();
+-  return (0, import_jsx_runtime2.jsx)("hr", { style: mergeStyle({
++  return (0, import_jsx_runtime3.jsx)("hr", { style: mergeStyle({
+     width: "100%",
+     border: "none",
+     borderTop: `1px solid ${t.stroke.tertiary}`,
+@@ -15325,7 +15857,7 @@
+   }, style) });
+ }
+ function Spacer() {
+-  return (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1 } });
++  return (0, import_jsx_runtime3.jsx)("div", { style: { flex: 1 } });
+ }
+ var tableCellPadding = {
+   padding: `${canvasSpacing[2]}px ${canvasSpacing[3]}px`
+@@ -15341,9 +15873,12 @@
+ }
+ var rowToneMarkerSizePx = canvasSpacing["1.5"];
+ var rowToneMarkerOffsetTopPx = (20 - rowToneMarkerSizePx) / 2;
++function onTableCopy(event) {
++  copyWithinTable(event.nativeEvent, event.currentTarget);
++}
+ function RowToneMarker({ tone }) {
+   const { chart } = useHostTheme();
+-  return (0, import_jsx_runtime2.jsx)("span", { "aria-hidden": true, style: {
++  return (0, import_jsx_runtime3.jsx)("span", { "aria-hidden": true, style: {
+     width: rowToneMarkerSizePx,
+     height: rowToneMarkerSizePx,
+     marginTop: rowToneMarkerOffsetTopPx,
+@@ -15355,7 +15890,7 @@
+ function Table({ headers = [], rows = [], columnAlign, rowTone, framed = true, striped = false, stickyHeader = false, style, emptyMessage = "No rows." }) {
+   const { tokens: t, radius, typography } = useHostTheme();
+   if (headers.length === 0) {
+-    return (0, import_jsx_runtime2.jsx)("div", { style: {
++    return (0, import_jsx_runtime3.jsx)("div", { style: {
+       padding: `${canvasSpacing[3]}px`,
+       color: t.text.secondary,
+       fontSize: typography.body.fontSize,
+@@ -15405,29 +15940,29 @@
+   const stripedBg = {
+     background: t.fill.quaternary
+   };
+-  const tableEl = (0, import_jsx_runtime2.jsxs)("table", { style: mergeStyle(baseTableStyle, style), children: [(0, import_jsx_runtime2.jsx)("thead", { style: theadStyle, children: (0, import_jsx_runtime2.jsx)("tr", { children: headers.map((h2, i2) => (0, import_jsx_runtime2.jsx)("th", { scope: "col", style: headerTh(i2), children: h2 }, i2)) }) }), (0, import_jsx_runtime2.jsx)("tbody", { children: rows.length === 0 ? (0, import_jsx_runtime2.jsx)("tr", { children: (0, import_jsx_runtime2.jsx)("td", { colSpan: colCount, style: mergeStyle(bodyTd(0), {
++  const tableEl = (0, import_jsx_runtime3.jsxs)("table", { onCopy: onTableCopy, style: mergeStyle(baseTableStyle, style), children: [(0, import_jsx_runtime3.jsx)("thead", { style: theadStyle, children: (0, import_jsx_runtime3.jsx)("tr", { children: headers.map((h2, i2) => (0, import_jsx_runtime3.jsx)("th", { scope: "col", style: headerTh(i2), children: h2 }, i2)) }) }), (0, import_jsx_runtime3.jsx)("tbody", { children: rows.length === 0 ? (0, import_jsx_runtime3.jsx)("tr", { children: (0, import_jsx_runtime3.jsx)("td", { colSpan: colCount, style: mergeStyle(bodyTd(0), {
+     color: t.text.secondary,
+     borderBottom: `1px solid ${t.stroke.tertiary}`
+   }), children: emptyMessage }) }) : rows.map((row, ri) => {
+     const tone = rowTone?.[ri];
+-    return (0, import_jsx_runtime2.jsx)("tr", { style: {
++    return (0, import_jsx_runtime3.jsx)("tr", { style: {
+       ...ri < rows.length - 1 ? bodyRowBorder : void 0,
+       ...striped && ri % 2 === 1 ? stripedBg : void 0
+     }, children: Array.from({ length: colCount }, (_3, ci) => {
+       const cell = row[ci] ?? null;
+-      return (0, import_jsx_runtime2.jsx)("td", { style: bodyTd(ci), children: tone && ci === 0 ? (0, import_jsx_runtime2.jsxs)("span", { style: {
++      return (0, import_jsx_runtime3.jsx)("td", { style: bodyTd(ci), children: tone && ci === 0 ? (0, import_jsx_runtime3.jsxs)("span", { style: {
+         display: "inline-flex",
+         alignItems: "flex-start",
+         gap: `${canvasSpacing[1.5]}px`,
+         minWidth: 0,
+         maxWidth: "100%"
+-      }, children: [(0, import_jsx_runtime2.jsx)(RowToneMarker, { tone }), (0, import_jsx_runtime2.jsx)("span", { style: { minWidth: 0, flex: 1 }, children: cell })] }) : cell }, ci);
++      }, children: [(0, import_jsx_runtime3.jsx)(RowToneMarker, { tone }), (0, import_jsx_runtime3.jsx)("span", { style: { minWidth: 0, flex: 1 }, children: cell })] }) : cell }, ci);
+     }) }, ri);
+   }) })] });
+   if (!framed) {
+     return tableEl;
+   }
+-  return (0, import_jsx_runtime2.jsx)("div", { style: {
++  return (0, import_jsx_runtime3.jsx)("div", { style: {
+     width: "100%",
+     minWidth: 0,
+     boxSizing: "border-box",
+@@ -15445,10 +15980,10 @@
+   semibold: 590,
+   bold: 650
+ };
+-var typographyInlineContext = (0, import_react3.createContext)(false);
++var typographyInlineContext = (0, import_react4.createContext)(false);
+ function Text({ children, tone = "primary", size = "body", as, weight = "normal", italic = false, truncate = false, style }) {
+   const { tokens: t, typography } = useHostTheme();
+-  const isInlineTypography = (0, import_react3.useContext)(typographyInlineContext);
++  const isInlineTypography = (0, import_react4.useContext)(typographyInlineContext);
+   const element2 = as ?? (isInlineTypography ? "span" : "p");
+   const textToneColor = {
+     primary: t.text.primary,
+@@ -15465,8 +16000,8 @@
+     ...element2 === "span" ? { display: "inline-block", maxWidth: "100%" } : {},
+     ...truncateMode === "start" ? { direction: "rtl", textAlign: "left" } : {}
+   } : void 0;
+-  const content = truncateMode === "start" ? (0, import_jsx_runtime2.jsx)("bdi", { children }) : children;
+-  return (0, import_jsx_runtime2.jsx)(typographyInlineContext.Provider, { value: true, children: element2 === "span" ? (0, import_jsx_runtime2.jsx)("span", { style: mergeStyle({
++  const content = truncateMode === "start" ? (0, import_jsx_runtime3.jsx)("bdi", { children }) : children;
++  return (0, import_jsx_runtime3.jsx)(typographyInlineContext.Provider, { value: true, children: element2 === "span" ? (0, import_jsx_runtime3.jsx)("span", { style: mergeStyle({
+     margin: 0,
+     color: textToneColor[tone],
+     fontFamily: typography.fontFamily,
+@@ -15475,7 +16010,7 @@
+     fontWeight: textWeightMap[weight],
+     fontStyle: italic ? "italic" : void 0,
+     ...truncateBaseStyle
+-  }, style), children: content }) : (0, import_jsx_runtime2.jsx)("p", { style: mergeStyle({
++  }, style), children: content }) : (0, import_jsx_runtime3.jsx)("p", { style: mergeStyle({
+     margin: 0,
+     color: textToneColor[tone],
+     fontFamily: typography.fontFamily,
+@@ -15488,7 +16023,7 @@
+ }
+ function H1({ children, style }) {
+   const { tokens: t, typography } = useHostTheme();
+-  return (0, import_jsx_runtime2.jsx)(typographyInlineContext.Provider, { value: true, children: (0, import_jsx_runtime2.jsx)("h1", { style: mergeStyle({
++  return (0, import_jsx_runtime3.jsx)(typographyInlineContext.Provider, { value: true, children: (0, import_jsx_runtime3.jsx)("h1", { style: mergeStyle({
+     margin: 0,
+     color: t.text.primary,
+     fontFamily: typography.fontFamily,
+@@ -15499,7 +16034,7 @@
+ }
+ function H2({ children, style }) {
+   const { tokens: t, typography } = useHostTheme();
+-  return (0, import_jsx_runtime2.jsx)(typographyInlineContext.Provider, { value: true, children: (0, import_jsx_runtime2.jsx)("h2", { style: mergeStyle({
++  return (0, import_jsx_runtime3.jsx)(typographyInlineContext.Provider, { value: true, children: (0, import_jsx_runtime3.jsx)("h2", { style: mergeStyle({
+     margin: 0,
+     color: t.text.primary,
+     fontFamily: typography.fontFamily,
+@@ -15510,7 +16045,7 @@
+ }
+ function H3({ children, style }) {
+   const { tokens: t, typography } = useHostTheme();
+-  return (0, import_jsx_runtime2.jsx)(typographyInlineContext.Provider, { value: true, children: (0, import_jsx_runtime2.jsx)("h3", { style: mergeStyle({
++  return (0, import_jsx_runtime3.jsx)(typographyInlineContext.Provider, { value: true, children: (0, import_jsx_runtime3.jsx)("h3", { style: mergeStyle({
+     margin: 0,
+     color: t.text.primary,
+     fontFamily: typography.fontFamily,
+@@ -15521,7 +16056,7 @@
+ }
+ function Code({ children, style }) {
+   const { tokens: t, radius } = useHostTheme();
+-  return (0, import_jsx_runtime2.jsx)("code", { style: mergeStyle({
++  return (0, import_jsx_runtime3.jsx)("code", { style: mergeStyle({
+     fontFamily: mono,
+     fontSize: "0.92em",
+     padding: "2px 5px",
+@@ -15532,7 +16067,7 @@
+ }
+ function Link({ children, href, style }) {
+   const { tokens: t, typography } = useHostTheme();
+-  return (0, import_jsx_runtime2.jsx)("a", { href, target: "_blank", rel: "noopener noreferrer", style: mergeStyle({
++  return (0, import_jsx_runtime3.jsx)("a", { href, target: "_blank", rel: "noopener noreferrer", style: mergeStyle({
+     color: t.text.link,
+     fontFamily: typography.fontFamily,
+     textDecoration: "underline",
+@@ -15548,21 +16083,23 @@
+   toggle: () => {
+   }
+ };
+-var CardChromeContext = (0, import_react3.createContext)(defaultCardChrome);
++var CardChromeContext = (0, import_react4.createContext)(defaultCardChrome);
+ function CanvasChevron({ expanded }) {
+-  return (0, import_jsx_runtime2.jsx)("svg", { width: 12, height: 12, viewBox: "0 0 12 12", fill: "none", xmlns: "http://www.w3.org/2000/svg", "aria-hidden": true, style: {
++  const reducedMotion = usePrefersReducedMotion();
++  return (0, import_jsx_runtime3.jsx)("svg", { width: 12, height: 12, viewBox: "0 0 12 12", fill: "none", xmlns: "http://www.w3.org/2000/svg", "aria-hidden": true, style: {
+     display: "block",
+     flexShrink: 0,
+     color: "inherit",
+-    transform: expanded ? void 0 : "rotate(-90deg)"
+-  }, children: (0, import_jsx_runtime2.jsx)("path", { d: "M3 4.5 6 7.5 9 4.5", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round", strokeLinejoin: "round" }) });
++    transform: expanded ? void 0 : "rotate(-90deg)",
++    transition: foldTurnTransition({ open: expanded, reducedMotion })
++  }, children: (0, import_jsx_runtime3.jsx)("path", { d: "M3 4.5 6 7.5 9 4.5", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round", strokeLinejoin: "round" }) });
+ }
+ function Card({ children, variant = "default", size = "base", stickyHeader = false, collapsible = false, defaultOpen = true, open: openProp, onOpenChange, style }) {
+   const { tokens: t, radius } = useHostTheme();
+   const isControlled = openProp !== void 0;
+-  const [internalOpen, setInternalOpen] = (0, import_react3.useState)(defaultOpen);
++  const [internalOpen, setInternalOpen] = (0, import_react4.useState)(defaultOpen);
+   const effectiveOpen = collapsible ? isControlled ? openProp : internalOpen : true;
+-  const toggle = (0, import_react3.useCallback)(() => {
++  const toggle = (0, import_react4.useCallback)(() => {
+     if (!collapsible)
+       return;
+     const next = !effectiveOpen;
+@@ -15587,26 +16124,27 @@
+     boxSizing: "border-box",
+     position: "relative"
+   };
+-  return (0, import_jsx_runtime2.jsx)(CardChromeContext.Provider, { value: {
++  return (0, import_jsx_runtime3.jsx)(CardChromeContext.Provider, { value: {
+     size,
+     stickyHeader,
+     collapsible,
+     isOpen: effectiveOpen,
+     toggle
+-  }, children: (0, import_jsx_runtime2.jsx)("div", { style: mergeStyle(root2, style), children: (0, import_jsx_runtime2.jsx)("div", { style: inner, children }) }) });
++  }, children: (0, import_jsx_runtime3.jsx)("div", { style: mergeStyle(root2, style), children: (0, import_jsx_runtime3.jsx)("div", { style: inner, children }) }) });
+ }
+ function compactTrailingPills(node) {
+-  if ((0, import_react3.isValidElement)(node) && node.type === Pill) {
++  if ((0, import_react4.isValidElement)(node) && node.type === Pill) {
+     const props = node.props;
+     if (props.size !== "sm") {
+-      return (0, import_react3.cloneElement)(node, { size: "sm" });
++      return (0, import_react4.cloneElement)(node, { size: "sm" });
+     }
+   }
+   return node;
+ }
+ function CardHeader({ children, trailing, style }) {
+   const { tokens: t, typography } = useHostTheme();
+-  const { size, stickyHeader, collapsible, isOpen, toggle } = (0, import_react3.useContext)(CardChromeContext);
++  const { size, stickyHeader, collapsible, isOpen, toggle } = (0, import_react4.useContext)(CardChromeContext);
++  const reducedMotion = usePrefersReducedMotion();
+   const headerHeight = size === "lg" ? 32 : 28;
+   const titlePadX = size === "lg" ? canvasSpacing["2.5"] : canvasSpacing["2"];
+   const titleGap = size === "lg" ? canvasSpacing["2"] : canvasSpacing["1.5"];
+@@ -15624,7 +16162,9 @@
+     fontSize: "12px",
+     fontFamily: typography.fontFamily,
+     color: t.text.primary,
+-    borderBottom: collapsible && !isOpen ? "none" : `1px solid ${t.stroke.tertiary}`
++    // The rule fades with the body under it, so it is there for the whole close.
++    borderBottom: `1px solid ${collapsible && !isOpen ? "transparent" : t.stroke.tertiary}`,
++    transition: foldFadeTransition({ open: isOpen, reducedMotion })
+   };
+   const titleRow = {
+     boxSizing: "border-box",
+@@ -15655,16 +16195,15 @@
+       width: "100%",
+       color: "inherit"
+     };
+-    return (0, import_jsx_runtime2.jsxs)("button", { type: "button", onClick: toggle, "aria-expanded": isOpen, style: mergeStyle(buttonStyle, style), children: [(0, import_jsx_runtime2.jsxs)("div", { style: titleRow, children: [(0, import_jsx_runtime2.jsx)(CanvasChevron, { expanded: isOpen }), children] }), compacted ? (0, import_jsx_runtime2.jsx)("div", { style: trailingRow, children: compacted }) : null] });
++    return (0, import_jsx_runtime3.jsxs)("button", { type: "button", onClick: toggle, "aria-expanded": isOpen, style: mergeStyle(buttonStyle, style), children: [(0, import_jsx_runtime3.jsxs)("div", { style: titleRow, children: [(0, import_jsx_runtime3.jsx)(CanvasChevron, { expanded: isOpen }), children] }), compacted ? (0, import_jsx_runtime3.jsx)("div", { style: trailingRow, children: compacted }) : null] });
+   }
+-  return (0, import_jsx_runtime2.jsxs)("div", { style: mergeStyle(header, style), children: [(0, import_jsx_runtime2.jsx)("div", { style: titleRow, children }), compacted ? (0, import_jsx_runtime2.jsx)("div", { style: trailingRow, children: compacted }) : null] });
++  return (0, import_jsx_runtime3.jsxs)("div", { style: mergeStyle(header, style), children: [(0, import_jsx_runtime3.jsx)("div", { style: titleRow, children }), compacted ? (0, import_jsx_runtime3.jsx)("div", { style: trailingRow, children: compacted }) : null] });
+ }
+ function CardBody({ children, style }) {
+   const { tokens: t, typography } = useHostTheme();
+-  const { collapsible, isOpen } = (0, import_react3.useContext)(CardChromeContext);
+-  if (collapsible && !isOpen)
+-    return null;
+-  return (0, import_jsx_runtime2.jsx)("div", { style: mergeStyle({
++  const { collapsible, isOpen } = (0, import_react4.useContext)(CardChromeContext);
++  const fold = useFoldMotion(!collapsible || isOpen);
++  const content = (0, import_jsx_runtime3.jsx)("div", { style: mergeStyle({
+     boxSizing: "border-box",
+     padding: `${canvasSpacing[3]}px`,
+     fontSize: typography.small.fontSize,
+@@ -15672,6 +16211,7 @@
+     fontFamily: typography.fontFamily,
+     color: t.text.secondary
+   }, style), children });
++  return collapsible ? (0, import_jsx_runtime3.jsx)(FoldClip, { motion: fold, children: content }) : content;
+ }
+ function Button({ children, variant = "primary", disabled = false, type = "button", style, onClick }) {
+   const { tokens: t, radius, typography } = useHostTheme();
+@@ -15713,7 +16253,7 @@
+     }
+   };
+   const hoverHint = variant === "primary" || variant === "ghost" ? { transition: "background 120ms ease" } : {};
+-  return (0, import_jsx_runtime2.jsx)("button", { type, disabled, onClick: disabled ? void 0 : onClick, style: mergeStyle(mergeStyle(mergeStyle(base, variants[variant]), hoverHint), style), children });
++  return (0, import_jsx_runtime3.jsx)("button", { type, disabled, onClick: disabled ? void 0 : onClick, style: mergeStyle(mergeStyle(mergeStyle(base, variants[variant]), hoverHint), style), children });
+ }
+ function Pill({ children, active = false, size = "md", leadingContent, keyboardHint, disabled = false, title, style, onClick }) {
+   const { tokens: t, radius, typography } = useHostTheme();
+@@ -15743,21 +16283,21 @@
+     opacity: disabled ? 0.3 : 1,
+     transition: interactive ? "color 120ms ease, background 120ms ease" : void 0
+   };
+-  const inner = (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [leadingContent ? (0, import_jsx_runtime2.jsx)("span", { style: {
++  const inner = (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [leadingContent ? (0, import_jsx_runtime3.jsx)("span", { style: {
+     display: "inline-flex",
+     alignItems: "center",
+     justifyContent: "center",
+     flexShrink: 0,
+     color: "inherit"
+-  }, children: leadingContent }) : null, (0, import_jsx_runtime2.jsx)("span", { style: { flexShrink: 0, color: "inherit" }, children }), keyboardHint ? (0, import_jsx_runtime2.jsx)("span", { style: {
++  }, children: leadingContent }) : null, (0, import_jsx_runtime3.jsx)("span", { style: { flexShrink: 0, color: "inherit" }, children }), keyboardHint ? (0, import_jsx_runtime3.jsx)("span", { style: {
+     flexShrink: 0,
+     color: t.text.primary,
+     opacity: 0.3
+   }, children: keyboardHint }) : null] });
+   if (interactive) {
+-    return (0, import_jsx_runtime2.jsx)("button", { type: "button", disabled, title, onClick: disabled ? void 0 : onClick, style: mergeStyle(mergeStyle(shell, { margin: 0 }), style), children: inner });
++    return (0, import_jsx_runtime3.jsx)("button", { type: "button", disabled, title, onClick: disabled ? void 0 : onClick, style: mergeStyle(mergeStyle(shell, { margin: 0 }), style), children: inner });
+   }
+-  return (0, import_jsx_runtime2.jsx)("span", { title, style: mergeStyle(shell, style), children: inner });
++  return (0, import_jsx_runtime3.jsx)("span", { title, style: mergeStyle(shell, style), children: inner });
+ }
+ function statToneColors(palette) {
+   return {
+@@ -15769,20 +16309,20 @@
+ }
+ function Stat({ value, label, tone, style }) {
+   const { tokens: t, typography, chart } = useHostTheme();
+-  return (0, import_jsx_runtime2.jsxs)("div", { style: mergeStyle({
++  return (0, import_jsx_runtime3.jsxs)("div", { style: mergeStyle({
+     display: "flex",
+     flexDirection: "column",
+     alignItems: "center",
+     gap: `${canvasSpacing["0.5"]}px`,
+     padding: `${canvasSpacing[3]}px ${canvasSpacing[2]}px`
+-  }, style), children: [(0, import_jsx_runtime2.jsx)("div", { style: {
++  }, style), children: [(0, import_jsx_runtime3.jsx)("div", { style: {
+     fontSize: "24px",
+     lineHeight: "28px",
+     fontWeight: 600,
+     fontFamily: typography.fontFamily,
+     fontVariantNumeric: "tabular-nums",
+     color: tone ? statToneColors(chart.palette)[tone] : t.text.primary
+-  }, children: value }), (0, import_jsx_runtime2.jsx)("div", { style: {
++  }, children: value }), (0, import_jsx_runtime3.jsx)("div", { style: {
+     fontSize: typography.small.fontSize,
+     lineHeight: typography.small.lineHeight,
+     fontFamily: typography.fontFamily,
+@@ -15842,8 +16382,8 @@
+     fontWeight: typography.body.fontWeight,
+     lineHeight: bodyLineHeight
+   };
+-  const leading = icon != null ? (0, import_jsx_runtime2.jsx)("span", { style: { ...leadingSlotBase, minWidth: toneIconSize }, children: icon }) : (0, import_jsx_runtime2.jsx)("span", { style: { ...leadingSlotBase, width: toneIconSize }, "aria-hidden": true, children: (0, import_jsx_runtime2.jsx)(CalloutToneIcon, { tone, color: toneColor }) });
+-  return (0, import_jsx_runtime2.jsxs)("div", { role: "note", style: mergeStyle(container, style), children: [leading, (0, import_jsx_runtime2.jsxs)("div", { style: bodyColumn, children: [title != null ? (0, import_jsx_runtime2.jsx)("div", { style: titleStyle, children: title }) : null, children != null ? (0, import_jsx_runtime2.jsx)("div", { style: contentStyle, children }) : null] })] });
++  const leading = icon != null ? (0, import_jsx_runtime3.jsx)("span", { style: { ...leadingSlotBase, minWidth: toneIconSize }, children: icon }) : (0, import_jsx_runtime3.jsx)("span", { style: { ...leadingSlotBase, width: toneIconSize }, "aria-hidden": true, children: (0, import_jsx_runtime3.jsx)(CalloutToneIcon, { tone, color: toneColor }) });
++  return (0, import_jsx_runtime3.jsxs)("div", { role: "note", style: mergeStyle(container, style), children: [leading, (0, import_jsx_runtime3.jsxs)("div", { style: bodyColumn, children: [title != null ? (0, import_jsx_runtime3.jsx)("div", { style: titleStyle, children: title }) : null, children != null ? (0, import_jsx_runtime3.jsx)("div", { style: contentStyle, children }) : null] })] });
+ }
+ 
+ // ../canvas-components/dist/chart-primitives.js
+@@ -15853,9 +16393,9 @@
+ var VERTICAL_MARGINS = { top: 16, right: 12, bottom: 40, left: 48 };
+ var HORIZONTAL_BAR_MARGINS = { top: 12, right: 28, bottom: 24, left: 96 };
+ function useMeasuredWidth() {
+-  const ref = (0, import_react4.useRef)(null);
+-  const [width, setWidth] = (0, import_react4.useState)(FALLBACK_CHART_WIDTH);
+-  (0, import_react4.useEffect)(() => {
++  const ref = (0, import_react5.useRef)(null);
++  const [width, setWidth] = (0, import_react5.useState)(FALLBACK_CHART_WIDTH);
++  (0, import_react5.useEffect)(() => {
+     const el = ref.current;
+     if (!el)
+       return;
+@@ -16007,13 +16547,13 @@
+   const txt = svgTextProps(t, fontFamily);
+   return scale.ticks.map((v2) => {
+     const y3 = m3.top + innerH - valueFrac(scale, v2) * innerH;
+-    return (0, import_jsx_runtime3.jsxs)("g", { children: [v2 > scale.min ? (0, import_jsx_runtime3.jsx)("line", { x1: m3.left, x2: width - m3.right, y1: y3, y2: y3, stroke: t.stroke.tertiary, strokeWidth: 1 }) : null, (0, import_jsx_runtime3.jsx)("text", { x: m3.left - canvasSpacing[2], y: y3 + 4, textAnchor: "end", ...txt, children: formatWithAffix(v2, prefix, suffix) })] }, v2);
++    return (0, import_jsx_runtime4.jsxs)("g", { children: [v2 > scale.min ? (0, import_jsx_runtime4.jsx)("line", { x1: m3.left, x2: width - m3.right, y1: y3, y2: y3, stroke: t.stroke.tertiary, strokeWidth: 1 }) : null, (0, import_jsx_runtime4.jsx)("text", { x: m3.left - canvasSpacing[2], y: y3 + 4, textAnchor: "end", ...txt, children: formatWithAffix(v2, prefix, suffix) })] }, v2);
+   });
+ }
+ function refLabelChip(label, x2, baseline, anchor, color, t, fontFamily) {
+   const estW = label.length * 6.5 + 8;
+   const chipX = anchor === "end" ? x2 - estW : x2 - estW / 2;
+-  return (0, import_jsx_runtime3.jsxs)("g", { children: [(0, import_jsx_runtime3.jsx)("rect", { x: chipX, y: baseline - 11, width: estW, height: 14, fill: t.bg.editor, rx: 2 }), (0, import_jsx_runtime3.jsx)("text", { x: x2, y: baseline, textAnchor: anchor, fill: color, fontFamily, fontSize: canvasTypography.small.fontSize, fontWeight: 500, children: label })] });
++  return (0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("rect", { x: chipX, y: baseline - 11, width: estW, height: 14, fill: t.bg.editor, rx: 2 }), (0, import_jsx_runtime4.jsx)("text", { x: x2, y: baseline, textAnchor: anchor, fill: color, fontFamily, fontSize: canvasTypography.small.fontSize, fontWeight: 500, children: label })] });
+ }
+ function renderReferenceLines(orientation, width, height, m3, scale, lines, t, palette = chartPalette, fontFamily = canvasTypography.fontFamily) {
+   if (!lines || lines.length === 0)
+@@ -16030,16 +16570,16 @@
+     const key2 = `ref-${ln.value}-${ln.label ?? ""}`;
+     if (orientation === "horizontal") {
+       const y3 = m3.top + innerH - valueFrac(scale, ln.value) * innerH;
+-      out.push((0, import_jsx_runtime3.jsxs)("g", { children: [(0, import_jsx_runtime3.jsx)("line", { x1: m3.left, x2: width - m3.right, y1: y3, y2: y3, stroke: color, strokeWidth: 1, strokeDasharray: "4 3" }), ln.label ? refLabelChip(ln.label, width - m3.right, y3 - 3, "end", color, t, fontFamily) : null] }, key2));
++      out.push((0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("line", { x1: m3.left, x2: width - m3.right, y1: y3, y2: y3, stroke: color, strokeWidth: 1, strokeDasharray: "4 3" }), ln.label ? refLabelChip(ln.label, width - m3.right, y3 - 3, "end", color, t, fontFamily) : null] }, key2));
+     } else {
+       const x2 = m3.left + valueFrac(scale, ln.value) * innerW;
+-      out.push((0, import_jsx_runtime3.jsxs)("g", { children: [(0, import_jsx_runtime3.jsx)("line", { x1: x2, x2, y1: m3.top, y2: height - m3.bottom, stroke: color, strokeWidth: 1, strokeDasharray: "4 3" }), ln.label ? refLabelChip(ln.label, x2, m3.top - 2, "middle", color, t, fontFamily) : null] }, key2));
++      out.push((0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("line", { x1: x2, x2, y1: m3.top, y2: height - m3.bottom, stroke: color, strokeWidth: 1, strokeDasharray: "4 3" }), ln.label ? refLabelChip(ln.label, x2, m3.top - 2, "middle", color, t, fontFamily) : null] }, key2));
+     }
+   }
+   return out;
+ }
+ function emptyState(h2, t, style, radius = canvasRadius, typography = canvasTypography) {
+-  return (0, import_jsx_runtime3.jsx)("div", { style: mergeStyle({
++  return (0, import_jsx_runtime4.jsx)("div", { style: mergeStyle({
+     width: "100%",
+     minWidth: 0,
+     height: `${h2}px`,
+@@ -16056,9 +16596,9 @@
+   }, style), children: "No data" });
+ }
+ function useTooltip() {
+-  const [tip, setTip] = (0, import_react4.useState)(null);
+-  const show = (0, import_react4.useCallback)((x2, y3, label, entries, total) => setTip({ x: x2, y: y3, label, entries, total }), []);
+-  const hide = (0, import_react4.useCallback)(() => setTip(null), []);
++  const [tip, setTip] = (0, import_react5.useState)(null);
++  const show = (0, import_react5.useCallback)((x2, y3, label, entries, total) => setTip({ x: x2, y: y3, label, entries, total }), []);
++  const hide = (0, import_react5.useCallback)(() => setTip(null), []);
+   return { tip, show, hide };
+ }
+ function TooltipOverlay({ tip, t, containerWidth, suffix, prefix }) {
+@@ -16066,7 +16606,7 @@
+   const tooltipW = 180;
+   const flipped = tip.x + tooltipW + 16 > containerWidth;
+   const left = flipped ? Math.max(0, tip.x - tooltipW - 12) : tip.x + 12;
+-  return (0, import_jsx_runtime3.jsxs)("div", { style: {
++  return (0, import_jsx_runtime4.jsxs)("div", { style: {
+     position: "absolute",
+     top: `${Math.max(tip.y - 8, 0)}px`,
+     left: `${left}px`,
+@@ -16082,32 +16622,32 @@
+     fontSize: canvasTypography.small.fontSize,
+     lineHeight: canvasTypography.small.lineHeight,
+     color: t.text.primary
+-  }, children: [(0, import_jsx_runtime3.jsx)("div", { style: {
++  }, children: [(0, import_jsx_runtime4.jsx)("div", { style: {
+     fontWeight: 600,
+     marginBottom: `${canvasSpacing["0.5"]}px`
+-  }, children: tip.label }), tip.entries.map((e) => (0, import_jsx_runtime3.jsxs)("div", { style: {
++  }, children: tip.label }), tip.entries.map((e) => (0, import_jsx_runtime4.jsxs)("div", { style: {
+     display: "flex",
+     alignItems: "center",
+     justifyContent: "space-between",
+     gap: `${canvasSpacing[3]}px`,
+     marginBottom: "1px"
+-  }, children: [(0, import_jsx_runtime3.jsxs)("div", { style: {
++  }, children: [(0, import_jsx_runtime4.jsxs)("div", { style: {
+     display: "flex",
+     alignItems: "center",
+     gap: `${canvasSpacing[1]}px`,
+     color: t.text.secondary
+-  }, children: [(0, import_jsx_runtime3.jsx)("span", { style: {
++  }, children: [(0, import_jsx_runtime4.jsx)("span", { style: {
+     display: "inline-block",
+     width: "8px",
+     height: "8px",
+     borderRadius: `${radius.full}px`,
+     background: e.color,
+     flexShrink: 0
+-  } }), (0, import_jsx_runtime3.jsx)("span", { children: e.name })] }), (0, import_jsx_runtime3.jsx)("span", { style: {
++  } }), (0, import_jsx_runtime4.jsx)("span", { children: e.name })] }), (0, import_jsx_runtime4.jsx)("span", { style: {
+     fontWeight: 600,
+     fontVariantNumeric: "tabular-nums",
+     color: t.text.primary
+-  }, children: formatWithAffix(e.value, prefix ?? "", suffix ?? "") })] }, e.name)), tip.total != null ? (0, import_jsx_runtime3.jsxs)("div", { style: {
++  }, children: formatWithAffix(e.value, prefix ?? "", suffix ?? "") })] }, e.name)), tip.total != null ? (0, import_jsx_runtime4.jsxs)("div", { style: {
+     display: "flex",
+     alignItems: "center",
+     justifyContent: "space-between",
+@@ -16115,7 +16655,7 @@
+     marginTop: `${canvasSpacing["0.5"]}px`,
+     paddingTop: `${canvasSpacing["0.5"]}px`,
+     borderTop: `1px solid ${t.stroke.secondary}`
+-  }, children: [(0, import_jsx_runtime3.jsx)("span", { style: { color: t.text.secondary }, children: "Total" }), (0, import_jsx_runtime3.jsx)("span", { style: {
++  }, children: [(0, import_jsx_runtime4.jsx)("span", { style: { color: t.text.secondary }, children: "Total" }), (0, import_jsx_runtime4.jsx)("span", { style: {
+     fontWeight: 600,
+     fontVariantNumeric: "tabular-nums",
+     color: t.text.primary
+@@ -16125,7 +16665,7 @@
+   const { typography } = useHostTheme();
+   if (items.length <= 1)
+     return null;
+-  return (0, import_jsx_runtime3.jsx)("div", { style: {
++  return (0, import_jsx_runtime4.jsx)("div", { style: {
+     display: "flex",
+     flexWrap: "wrap",
+     justifyContent: "center",
+@@ -16135,17 +16675,17 @@
+     fontSize: canvasTypography.small.fontSize,
+     lineHeight: canvasTypography.small.lineHeight,
+     color: t.text.secondary
+-  }, children: items.map((it) => (0, import_jsx_runtime3.jsxs)("div", { style: {
++  }, children: items.map((it) => (0, import_jsx_runtime4.jsxs)("div", { style: {
+     display: "inline-flex",
+     alignItems: "center",
+     gap: `${canvasSpacing[1]}px`
+-  }, children: [(0, import_jsx_runtime3.jsx)("span", { style: {
++  }, children: [(0, import_jsx_runtime4.jsx)("span", { style: {
+     width: "8px",
+     height: "8px",
+     borderRadius: `${canvasRadius.full}px`,
+     background: it.color,
+     flexShrink: 0
+-  } }), (0, import_jsx_runtime3.jsx)("span", { children: it.name })] }, it.name)) });
++  } }), (0, import_jsx_runtime4.jsx)("span", { children: it.name })] }, it.name)) });
+ }
+ function BarChart({ categories = [], series = [], height = DEFAULT_CHART_HEIGHT, stacked = false, horizontal = false, normalized = false, valueSuffix = "", valuePrefix = "", showValues, beginAtZero = true, yMin, yMax, referenceLines, style }) {
+   const { tokens: t, chart, radius, typography } = useHostTheme();
+@@ -16221,58 +16761,58 @@
+   if (horizontal) {
+     const slotH = innerH / Math.max(catLen, 1);
+     const txt2 = svgTextProps(t, typography.fontFamily);
+-    return (0, import_jsx_runtime3.jsxs)("div", { ref, style: mergeStyle({ width: "100%", minWidth: 0, position: "relative" }, style), onMouseLeave: hide, children: [(0, import_jsx_runtime3.jsxs)("svg", { width: svgW, height, viewBox: `0 0 ${svgW} ${height}`, role: "img", "aria-label": "Bar chart", style: { display: "block", width: "100%", height: `${height}px` }, children: [scale.ticks.map((v2) => {
++    return (0, import_jsx_runtime4.jsxs)("div", { ref, style: mergeStyle({ width: "100%", minWidth: 0, position: "relative" }, style), onMouseLeave: hide, children: [(0, import_jsx_runtime4.jsxs)("svg", { width: svgW, height, viewBox: `0 0 ${svgW} ${height}`, role: "img", "aria-label": "Bar chart", style: { display: "block", width: "100%", height: `${height}px` }, children: [scale.ticks.map((v2) => {
+       const x2 = m3.left + valueFrac(scale, v2) * innerW;
+-      return (0, import_jsx_runtime3.jsxs)("g", { children: [v2 > scale.min ? (0, import_jsx_runtime3.jsx)("line", { x1: x2, x2, y1: m3.top, y2: height - m3.bottom, stroke: t.stroke.tertiary, strokeWidth: 1 }) : null, (0, import_jsx_runtime3.jsx)("text", { x: x2, y: height - canvasSpacing[1], textAnchor: "middle", ...txt2, children: formatWithAffix(v2, prefix, suffix) })] }, v2);
++      return (0, import_jsx_runtime4.jsxs)("g", { children: [v2 > scale.min ? (0, import_jsx_runtime4.jsx)("line", { x1: x2, x2, y1: m3.top, y2: height - m3.bottom, stroke: t.stroke.tertiary, strokeWidth: 1 }) : null, (0, import_jsx_runtime4.jsx)("text", { x: x2, y: height - canvasSpacing[1], textAnchor: "middle", ...txt2, children: formatWithAffix(v2, prefix, suffix) })] }, v2);
+     }), categories.map((cat, ci) => {
+       const yBase = m3.top + ci * slotH;
+       if (isStacked) {
+         const total = catTotals[ci];
+         let xOff = 0;
+-        return (0, import_jsx_runtime3.jsxs)("g", { onMouseMove: (e) => {
++        return (0, import_jsx_runtime4.jsxs)("g", { onMouseMove: (e) => {
+           const rect = e.currentTarget.ownerSVGElement.getBoundingClientRect();
+           showTooltip(ci, e.clientX - rect.left, e.clientY - rect.top);
+-        }, children: [(catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime3.jsx)("text", { x: m3.left - canvasSpacing[2], y: yBase + slotH / 2, textAnchor: "end", dominantBaseline: "middle", ...txt2, children: truncateLabel(cat, 14) }) : null, series.map((s2, si) => {
++        }, children: [(catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime4.jsx)("text", { x: m3.left - canvasSpacing[2], y: yBase + slotH / 2, textAnchor: "end", dominantBaseline: "middle", ...txt2, children: truncateLabel(cat, 14) }) : null, series.map((s2, si) => {
+           const raw2 = sanitize(s2.data[ci] ?? 0);
+           const frac = total > 0 ? normalized ? raw2 / total : raw2 / scale.max : 0;
+           const barW = frac * innerW;
+           const x2 = m3.left + xOff;
+           xOff += barW;
+-          return (0, import_jsx_runtime3.jsx)("rect", { x: x2, y: yBase + slotH * 0.15, width: Math.max(barW, 0), height: slotH * 0.7, fill: barColorAt(si, ci), rx: ci === 0 || ci === catLen - 1 ? 2 : 0 }, s2.name);
++          return (0, import_jsx_runtime4.jsx)("rect", { x: x2, y: yBase + slotH * 0.15, width: Math.max(barW, 0), height: slotH * 0.7, fill: barColorAt(si, ci), rx: ci === 0 || ci === catLen - 1 ? 2 : 0 }, s2.name);
+         })] }, cat);
+       }
+       const barH = slotH * 0.7 / serLen;
+-      return (0, import_jsx_runtime3.jsxs)("g", { onMouseMove: (e) => {
++      return (0, import_jsx_runtime4.jsxs)("g", { onMouseMove: (e) => {
+         const rect = e.currentTarget.ownerSVGElement.getBoundingClientRect();
+         showTooltip(ci, e.clientX - rect.left, e.clientY - rect.top);
+-      }, children: [(catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime3.jsx)("text", { x: m3.left - canvasSpacing[2], y: yBase + slotH / 2, textAnchor: "end", dominantBaseline: "middle", ...txt2, children: truncateLabel(cat, 14) }) : null, series.map((s2, si) => {
++      }, children: [(catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime4.jsx)("text", { x: m3.left - canvasSpacing[2], y: yBase + slotH / 2, textAnchor: "end", dominantBaseline: "middle", ...txt2, children: truncateLabel(cat, 14) }) : null, series.map((s2, si) => {
+         const v2 = sanitize(s2.data[ci] ?? 0);
+         const barW = valueFrac(scale, v2) * innerW;
+         const barY = yBase + slotH * 0.15 + si * barH;
+-        return (0, import_jsx_runtime3.jsxs)("g", { children: [(0, import_jsx_runtime3.jsx)("rect", { x: m3.left, y: barY, width: barW, height: Math.max(barH - 1, 1), fill: barColorAt(si, ci) }), labelBars && v2 > 0 ? (0, import_jsx_runtime3.jsx)("text", { x: m3.left + barW + canvasSpacing["1.5"], y: barY + barH / 2, textAnchor: "start", dominantBaseline: "middle", fill: t.text.primary, fontFamily: typography.fontFamily, fontSize: canvasTypography.small.fontSize, fontWeight: 500, children: formatWithAffix(v2, prefix, suffix) }) : null] }, s2.name);
++        return (0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("rect", { x: m3.left, y: barY, width: barW, height: Math.max(barH - 1, 1), fill: barColorAt(si, ci) }), labelBars && v2 > 0 ? (0, import_jsx_runtime4.jsx)("text", { x: m3.left + barW + canvasSpacing["1.5"], y: barY + barH / 2, textAnchor: "start", dominantBaseline: "middle", fill: t.text.primary, fontFamily: typography.fontFamily, fontSize: canvasTypography.small.fontSize, fontWeight: 500, children: formatWithAffix(v2, prefix, suffix) }) : null] }, s2.name);
+       })] }, cat);
+-    }), renderReferenceLines("vertical", svgW, height, m3, scale, referenceLines, t, chart.palette, typography.fontFamily)] }), tip ? (0, import_jsx_runtime3.jsx)(TooltipOverlay, { tip, t, containerWidth: svgW, suffix, prefix }) : null] });
++    }), renderReferenceLines("vertical", svgW, height, m3, scale, referenceLines, t, chart.palette, typography.fontFamily)] }), tip ? (0, import_jsx_runtime4.jsx)(TooltipOverlay, { tip, t, containerWidth: svgW, suffix, prefix }) : null] });
+   }
+   const slotW = innerW / Math.max(catLen, 1);
+   const txt = svgTextProps(t, typography.fontFamily);
+-  return (0, import_jsx_runtime3.jsxs)("div", { ref, style: mergeStyle({ width: "100%", minWidth: 0, position: "relative" }, style), onMouseLeave: hide, children: [(0, import_jsx_runtime3.jsxs)("svg", { width: svgW, height, viewBox: `0 0 ${svgW} ${height}`, role: "img", "aria-label": "Bar chart", style: { display: "block", width: "100%", height: `${height}px` }, children: [renderYAxis(svgW, height, m3, scale, t, suffix, prefix, typography.fontFamily), categories.map((cat, ci) => {
++  return (0, import_jsx_runtime4.jsxs)("div", { ref, style: mergeStyle({ width: "100%", minWidth: 0, position: "relative" }, style), onMouseLeave: hide, children: [(0, import_jsx_runtime4.jsxs)("svg", { width: svgW, height, viewBox: `0 0 ${svgW} ${height}`, role: "img", "aria-label": "Bar chart", style: { display: "block", width: "100%", height: `${height}px` }, children: [renderYAxis(svgW, height, m3, scale, t, suffix, prefix, typography.fontFamily), categories.map((cat, ci) => {
+     const xBase = m3.left + ci * slotW;
+     if (isStacked) {
+       const total = catTotals[ci];
+       let yOff = 0;
+       const barW2 = Math.min(slotW * 0.7, 56);
+       const xBar = xBase + (slotW - barW2) / 2;
+-      return (0, import_jsx_runtime3.jsxs)("g", { onMouseMove: (e) => {
++      return (0, import_jsx_runtime4.jsxs)("g", { onMouseMove: (e) => {
+         const rect = e.currentTarget.ownerSVGElement.getBoundingClientRect();
+         showTooltip(ci, e.clientX - rect.left, e.clientY - rect.top);
+-      }, children: [(0, import_jsx_runtime3.jsx)("rect", { x: xBase, y: m3.top, width: slotW, height: innerH, fill: "transparent" }), [...series].reverse().map((s2, ri) => {
++      }, children: [(0, import_jsx_runtime4.jsx)("rect", { x: xBase, y: m3.top, width: slotW, height: innerH, fill: "transparent" }), [...series].reverse().map((s2, ri) => {
+         const si = serLen - 1 - ri;
+         const raw2 = sanitize(s2.data[ci] ?? 0);
+         const frac = total > 0 ? normalized ? raw2 / total : raw2 / scale.max : 0;
+         const barH = frac * innerH;
+         const y3 = m3.top + innerH - yOff - barH;
+         yOff += barH;
+-        return (0, import_jsx_runtime3.jsx)("rect", { x: xBar, y: y3, width: barW2, height: Math.max(barH, 0), fill: barColorAt(si, ci) }, s2.name);
++        return (0, import_jsx_runtime4.jsx)("rect", { x: xBar, y: y3, width: barW2, height: Math.max(barH, 0), fill: barColorAt(si, ci) }, s2.name);
+       }), serLen > 1 ? (() => {
+         let sepOff = 0;
+         return [...series].reverse().map((s2, ri) => {
+@@ -16283,25 +16823,25 @@
+           if (ri === serLen - 1)
+             return null;
+           const sepY = m3.top + innerH - sepOff;
+-          return (0, import_jsx_runtime3.jsx)("line", { x1: xBar, x2: xBar + barW2, y1: sepY, y2: sepY, stroke: t.bg.editor, strokeWidth: 0.5, strokeOpacity: 0.4 }, `sep-${s2.name}`);
++          return (0, import_jsx_runtime4.jsx)("line", { x1: xBar, x2: xBar + barW2, y1: sepY, y2: sepY, stroke: t.bg.editor, strokeWidth: 0.5, strokeOpacity: 0.4 }, `sep-${s2.name}`);
+         });
+-      })() : null, (catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime3.jsx)("text", { x: xBase + slotW / 2, y: height - canvasSpacing[1], textAnchor: "middle", ...txt, children: truncateLabel(cat) }) : null] }, cat);
++      })() : null, (catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime4.jsx)("text", { x: xBase + slotW / 2, y: height - canvasSpacing[1], textAnchor: "middle", ...txt, children: truncateLabel(cat) }) : null] }, cat);
+     }
+     const groupW = slotW * 0.7;
+     const barW = groupW / serLen;
+     const groupX = xBase + (slotW - groupW) / 2;
+-    return (0, import_jsx_runtime3.jsxs)("g", { onMouseMove: (e) => {
++    return (0, import_jsx_runtime4.jsxs)("g", { onMouseMove: (e) => {
+       const rect = e.currentTarget.ownerSVGElement.getBoundingClientRect();
+       showTooltip(ci, e.clientX - rect.left, e.clientY - rect.top);
+-    }, children: [(0, import_jsx_runtime3.jsx)("rect", { x: xBase, y: m3.top, width: slotW, height: innerH, fill: "transparent" }), series.map((s2, si) => {
++    }, children: [(0, import_jsx_runtime4.jsx)("rect", { x: xBase, y: m3.top, width: slotW, height: innerH, fill: "transparent" }), series.map((s2, si) => {
+       const v2 = sanitize(s2.data[ci] ?? 0);
+       const barH = valueFrac(scale, v2) * innerH;
+       const bx = groupX + si * barW;
+       const by = m3.top + innerH - barH;
+       const fits = serLen === 1 || barW >= 14;
+-      return (0, import_jsx_runtime3.jsxs)("g", { children: [(0, import_jsx_runtime3.jsx)("rect", { x: bx, y: by, width: Math.max(barW - 1, 1), height: barH, fill: barColorAt(si, ci) }), labelBars && fits && v2 > 0 ? (0, import_jsx_runtime3.jsx)("text", { x: bx + barW / 2, y: Math.max(by - 4, m3.top), textAnchor: "middle", fill: t.text.primary, fontFamily: typography.fontFamily, fontSize: canvasTypography.small.fontSize, fontWeight: 500, children: formatWithAffix(v2, prefix, suffix) }) : null] }, s2.name);
+-    }), (catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime3.jsx)("text", { x: xBase + slotW / 2, y: height - canvasSpacing[1], textAnchor: "middle", ...txt, children: truncateLabel(cat) }) : null] }, cat);
+-  }), renderReferenceLines("horizontal", svgW, height, m3, scale, referenceLines, t, chart.palette, typography.fontFamily)] }), tip ? (0, import_jsx_runtime3.jsx)(TooltipOverlay, { tip, t, containerWidth: svgW, suffix, prefix }) : null, (0, import_jsx_runtime3.jsx)(Legend, { items: series.map((s2, i2) => ({
++      return (0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("rect", { x: bx, y: by, width: Math.max(barW - 1, 1), height: barH, fill: barColorAt(si, ci) }), labelBars && fits && v2 > 0 ? (0, import_jsx_runtime4.jsx)("text", { x: bx + barW / 2, y: Math.max(by - 4, m3.top), textAnchor: "middle", fill: t.text.primary, fontFamily: typography.fontFamily, fontSize: canvasTypography.small.fontSize, fontWeight: 500, children: formatWithAffix(v2, prefix, suffix) }) : null] }, s2.name);
++    }), (catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime4.jsx)("text", { x: xBase + slotW / 2, y: height - canvasSpacing[1], textAnchor: "middle", ...txt, children: truncateLabel(cat) }) : null] }, cat);
++  }), renderReferenceLines("horizontal", svgW, height, m3, scale, referenceLines, t, chart.palette, typography.fontFamily)] }), tip ? (0, import_jsx_runtime4.jsx)(TooltipOverlay, { tip, t, containerWidth: svgW, suffix, prefix }) : null, (0, import_jsx_runtime4.jsx)(Legend, { items: series.map((s2, i2) => ({
+     name: s2.name,
+     color: seriesColorAt(i2, s2.tone)
+   })), t })] });
+@@ -16357,7 +16897,7 @@
+   };
+   const txt = svgTextProps(t, typography.fontFamily);
+   const hoverGuideX = showHoverGuide && tip ? Math.max(m3.left, Math.min(m3.left + innerW, tip.x)) : null;
+-  return (0, import_jsx_runtime3.jsxs)("div", { ref, style: mergeStyle({ width: "100%", minWidth: 0, position: "relative" }, style), onMouseLeave: hide, children: [(0, import_jsx_runtime3.jsxs)("svg", { width: svgW, height, viewBox: `0 0 ${svgW} ${height}`, role: "img", "aria-label": "Line chart", style: { display: "block", width: "100%", height: `${height}px` }, children: [renderYAxis(svgW, height, m3, scale, t, valueSuffix, valuePrefix, typography.fontFamily), series.map((s2, si) => {
++  return (0, import_jsx_runtime4.jsxs)("div", { ref, style: mergeStyle({ width: "100%", minWidth: 0, position: "relative" }, style), onMouseLeave: hide, children: [(0, import_jsx_runtime4.jsxs)("svg", { width: svgW, height, viewBox: `0 0 ${svgW} ${height}`, role: "img", "aria-label": "Line chart", style: { display: "block", width: "100%", height: `${height}px` }, children: [renderYAxis(svgW, height, m3, scale, t, valueSuffix, valuePrefix, typography.fontFamily), series.map((s2, si) => {
+     const color = resolvedColors[si];
+     const pts = s2.data.map((v2, ci) => ({ x: pointX(ci), y: pointY(v2) }));
+     if (pts.length === 0)
+@@ -16369,22 +16909,22 @@
+       `L ${pts[pts.length - 1].x} ${m3.top + innerH}`,
+       "Z"
+     ].join(" ") : void 0;
+-    return (0, import_jsx_runtime3.jsxs)("g", { children: [areaD ? (0, import_jsx_runtime3.jsx)("path", { d: areaD, fill: color, fillOpacity: 0.12, stroke: "none" }) : null, (0, import_jsx_runtime3.jsx)("path", { d: lineD, fill: "none", stroke: color, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }), catLen <= 20 ? pts.map((p2, ci) => {
++    return (0, import_jsx_runtime4.jsxs)("g", { children: [areaD ? (0, import_jsx_runtime4.jsx)("path", { d: areaD, fill: color, fillOpacity: 0.12, stroke: "none" }) : null, (0, import_jsx_runtime4.jsx)("path", { d: lineD, fill: "none", stroke: color, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }), catLen <= 20 ? pts.map((p2, ci) => {
+       const catKey = categories[ci] ?? ci;
+-      return (0, import_jsx_runtime3.jsx)("circle", { cx: p2.x, cy: p2.y, r: 2.5, fill: color }, `${s2.name}-${catKey}`);
++      return (0, import_jsx_runtime4.jsx)("circle", { cx: p2.x, cy: p2.y, r: 2.5, fill: color }, `${s2.name}-${catKey}`);
+     }) : null, showValues && catLen <= 20 ? pts.map((p2, ci) => {
+       const catKey = categories[ci] ?? ci;
+       const v2 = sanitize(s2.data[ci] ?? 0);
+-      return (0, import_jsx_runtime3.jsx)("text", { x: p2.x, y: Math.max(p2.y - 7, m3.top + 2), textAnchor: "middle", fill: t.text.primary, fontFamily: typography.fontFamily, fontSize: canvasTypography.small.fontSize, fontWeight: 500, children: formatWithAffix(v2, valuePrefix, valueSuffix) }, `label-${s2.name}-${catKey}`);
++      return (0, import_jsx_runtime4.jsx)("text", { x: p2.x, y: Math.max(p2.y - 7, m3.top + 2), textAnchor: "middle", fill: t.text.primary, fontFamily: typography.fontFamily, fontSize: canvasTypography.small.fontSize, fontWeight: 500, children: formatWithAffix(v2, valuePrefix, valueSuffix) }, `label-${s2.name}-${catKey}`);
+     }) : null] }, s2.name);
+   }), categories.map((cat, ci) => {
+     const x2 = catLen === 1 ? m3.left : m3.left + innerW * ci / (catLen - 1);
+     const hitW = catLen === 1 ? innerW : innerW / (catLen - 1);
+-    return (0, import_jsx_runtime3.jsxs)("g", { children: [(0, import_jsx_runtime3.jsx)("rect", { x: x2 - hitW / 2, y: m3.top, width: hitW, height: innerH, fill: "transparent", onMouseMove: (e) => {
++    return (0, import_jsx_runtime4.jsxs)("g", { children: [(0, import_jsx_runtime4.jsx)("rect", { x: x2 - hitW / 2, y: m3.top, width: hitW, height: innerH, fill: "transparent", onMouseMove: (e) => {
+       const rect = e.currentTarget.ownerSVGElement.getBoundingClientRect();
+       showTooltip(ci, e.clientX - rect.left, e.clientY - rect.top);
+-    } }), (catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime3.jsx)("text", { x: x2, y: height - canvasSpacing[1], textAnchor: "middle", ...txt, children: truncateLabel(cat) }) : null] }, cat);
+-  }), renderReferenceLines("horizontal", svgW, height, m3, scale, referenceLines, t, chart.palette, typography.fontFamily), hoverGuideX !== null ? (0, import_jsx_runtime3.jsx)("line", { "data-hover-guide": "true", x1: hoverGuideX, x2: hoverGuideX, y1: m3.top, y2: m3.top + innerH, stroke: t.stroke.focused, strokeDasharray: "4 4", strokeLinecap: "round", strokeWidth: 1.5, opacity: 0.72, pointerEvents: "none", vectorEffect: "non-scaling-stroke" }) : null] }), tip ? (0, import_jsx_runtime3.jsx)(TooltipOverlay, { tip, t, containerWidth: svgW, suffix: valueSuffix, prefix: valuePrefix }) : null, (0, import_jsx_runtime3.jsx)(Legend, { items: series.map((s2, i2) => ({
++    } }), (catLen - 1 - ci) % stride === 0 ? (0, import_jsx_runtime4.jsx)("text", { x: x2, y: height - canvasSpacing[1], textAnchor: "middle", ...txt, children: truncateLabel(cat) }) : null] }, cat);
++  }), renderReferenceLines("horizontal", svgW, height, m3, scale, referenceLines, t, chart.palette, typography.fontFamily), hoverGuideX !== null ? (0, import_jsx_runtime4.jsx)("line", { "data-hover-guide": "true", x1: hoverGuideX, x2: hoverGuideX, y1: m3.top, y2: m3.top + innerH, stroke: t.stroke.focused, strokeDasharray: "4 4", strokeLinecap: "round", strokeWidth: 1.5, opacity: 0.72, pointerEvents: "none", vectorEffect: "non-scaling-stroke" }) : null] }), tip ? (0, import_jsx_runtime4.jsx)(TooltipOverlay, { tip, t, containerWidth: svgW, suffix: valueSuffix, prefix: valuePrefix }) : null, (0, import_jsx_runtime4.jsx)(Legend, { items: series.map((s2, i2) => ({
+     name: s2.name,
+     color: resolvedColors[i2]
+   })), t })] });
+@@ -16422,7 +16962,7 @@
+ }
+ function PieChart({ data = [], size = DEFAULT_PIE_SIZE, donut = false, style }) {
+   const { tokens: t, chart, radius, typography } = useHostTheme();
+-  const [hoveredIndex, setHoveredIndex] = (0, import_react4.useState)(null);
++  const [hoveredIndex, setHoveredIndex] = (0, import_react5.useState)(null);
+   const chartData = data.map((d2, i2) => ({
+     ...d2,
+     value: sanitize(d2.value),
+@@ -16461,7 +17001,7 @@
+     }
+   }
+   const hoveredSlice = hoveredIndex !== null ? chartData[hoveredIndex] : void 0;
+-  return (0, import_jsx_runtime3.jsxs)("div", { style: mergeStyle({
++  return (0, import_jsx_runtime4.jsxs)("div", { style: mergeStyle({
+     width: "100%",
+     minWidth: 0,
+     display: "flex",
+@@ -16469,7 +17009,7 @@
+     alignItems: "center",
+     gap: `${canvasSpacing[3]}px`,
+     position: "relative"
+-  }, style), onMouseLeave: () => setHoveredIndex(null), children: [(0, import_jsx_runtime3.jsxs)("svg", { width: size + 8, height: size + 8, viewBox: `-4 -4 ${size + 8} ${size + 8}`, role: "img", "aria-label": "Pie chart", style: { display: "block" }, children: [isSingle ? (0, import_jsx_runtime3.jsxs)("g", { onMouseEnter: () => setHoveredIndex(singleSliceIndex), onMouseLeave: () => setHoveredIndex(null), children: [(0, import_jsx_runtime3.jsx)("circle", { cx, cy, r: hoveredIndex === singleSliceIndex ? hoverOuter : outer, fill: positiveSlices[0].color, style: { transition: "r 120ms ease" } }), donut ? (0, import_jsx_runtime3.jsx)("circle", { cx, cy, r: inner, fill: t.bg.editor }) : null] }) : slices.map((sl) => (0, import_jsx_runtime3.jsx)("path", { d: hoveredIndex === sl.dataIndex ? sl.dHover : sl.d, fill: sl.color, fillOpacity: hoveredIndex === null || hoveredIndex === sl.dataIndex ? 1 : 0.4, style: { transition: "d 120ms ease, fill-opacity 120ms ease" }, onMouseEnter: () => setHoveredIndex(sl.dataIndex), onMouseLeave: () => setHoveredIndex(null) }, sl.label)), donut ? (0, import_jsx_runtime3.jsxs)("g", { style: { pointerEvents: "none" }, children: [(0, import_jsx_runtime3.jsx)("text", { x: cx, y: cy - 5, textAnchor: "middle", dominantBaseline: "middle", fill: t.text.primary, fontFamily: typography.fontFamily, fontSize: canvasTypography.body.fontSize, fontWeight: 600, children: formatValue(total) }), (0, import_jsx_runtime3.jsx)("text", { x: cx, y: cy + 12, textAnchor: "middle", dominantBaseline: "middle", fill: t.text.tertiary, fontFamily: typography.fontFamily, fontSize: canvasTypography.small.fontSize, children: "Total" })] }) : null] }), hoveredSlice && hoveredSlice.value > 0 ? (0, import_jsx_runtime3.jsxs)("div", { style: {
++  }, style), onMouseLeave: () => setHoveredIndex(null), children: [(0, import_jsx_runtime4.jsxs)("svg", { width: size + 8, height: size + 8, viewBox: `-4 -4 ${size + 8} ${size + 8}`, role: "img", "aria-label": "Pie chart", style: { display: "block" }, children: [isSingle ? (0, import_jsx_runtime4.jsxs)("g", { onMouseEnter: () => setHoveredIndex(singleSliceIndex), onMouseLeave: () => setHoveredIndex(null), children: [(0, import_jsx_runtime4.jsx)("circle", { cx, cy, r: hoveredIndex === singleSliceIndex ? hoverOuter : outer, fill: positiveSlices[0].color, style: { transition: "r 120ms ease" } }), donut ? (0, import_jsx_runtime4.jsx)("circle", { cx, cy, r: inner, fill: t.bg.editor }) : null] }) : slices.map((sl) => (0, import_jsx_runtime4.jsx)("path", { d: hoveredIndex === sl.dataIndex ? sl.dHover : sl.d, fill: sl.color, fillOpacity: hoveredIndex === null || hoveredIndex === sl.dataIndex ? 1 : 0.4, style: { transition: "d 120ms ease, fill-opacity 120ms ease" }, onMouseEnter: () => setHoveredIndex(sl.dataIndex), onMouseLeave: () => setHoveredIndex(null) }, sl.label)), donut ? (0, import_jsx_runtime4.jsxs)("g", { style: { pointerEvents: "none" }, children: [(0, import_jsx_runtime4.jsx)("text", { x: cx, y: cy - 5, textAnchor: "middle", dominantBaseline: "middle", fill: t.text.primary, fontFamily: typography.fontFamily, fontSize: canvasTypography.body.fontSize, fontWeight: 600, children: formatValue(total) }), (0, import_jsx_runtime4.jsx)("text", { x: cx, y: cy + 12, textAnchor: "middle", dominantBaseline: "middle", fill: t.text.tertiary, fontFamily: typography.fontFamily, fontSize: canvasTypography.small.fontSize, children: "Total" })] }) : null] }), hoveredSlice && hoveredSlice.value > 0 ? (0, import_jsx_runtime4.jsxs)("div", { style: {
+     position: "absolute",
+     top: `${size + 12}px`,
+     left: "50%",
+@@ -16488,16 +17028,16 @@
+     display: "flex",
+     alignItems: "center",
+     gap: `${canvasSpacing["1.5"]}px`
+-  }, children: [(0, import_jsx_runtime3.jsx)("span", { style: {
++  }, children: [(0, import_jsx_runtime4.jsx)("span", { style: {
+     width: "8px",
+     height: "8px",
+     borderRadius: `${canvasRadius.full}px`,
+     background: hoveredSlice.color,
+     flexShrink: 0
+-  } }), (0, import_jsx_runtime3.jsx)("span", { style: { color: t.text.secondary }, children: hoveredSlice.label }), (0, import_jsx_runtime3.jsx)("span", { style: {
++  } }), (0, import_jsx_runtime4.jsx)("span", { style: { color: t.text.secondary }, children: hoveredSlice.label }), (0, import_jsx_runtime4.jsx)("span", { style: {
+     fontWeight: 600,
+     fontVariantNumeric: "tabular-nums"
+-  }, children: formatValue(hoveredSlice.value) }), (0, import_jsx_runtime3.jsx)("span", { style: { color: t.text.tertiary }, children: formatPercent(hoveredSlice.value / total * 100) })] }) : null, (0, import_jsx_runtime3.jsx)("div", { style: {
++  }, children: formatValue(hoveredSlice.value) }), (0, import_jsx_runtime4.jsx)("span", { style: { color: t.text.tertiary }, children: formatPercent(hoveredSlice.value / total * 100) })] }) : null, (0, import_jsx_runtime4.jsx)("div", { style: {
+     width: "100%",
+     display: "flex",
+     flexWrap: "wrap",
+@@ -16506,7 +17046,7 @@
+   }, children: chartData.map((d2, i2) => {
+     const pct = total > 0 ? d2.value / total * 100 : 0;
+     const isActive = hoveredIndex === null || hoveredIndex === i2;
+-    return (0, import_jsx_runtime3.jsxs)("div", { style: {
++    return (0, import_jsx_runtime4.jsxs)("div", { style: {
+       display: "inline-flex",
+       alignItems: "center",
+       gap: `${canvasSpacing["1.5"]}px`,
+@@ -16517,23 +17057,24 @@
+       opacity: isActive ? 1 : 0.4,
+       transition: "opacity 120ms ease",
+       cursor: "default"
+-    }, onMouseEnter: () => setHoveredIndex(i2), onMouseLeave: () => setHoveredIndex(null), children: [(0, import_jsx_runtime3.jsx)("span", { style: {
++    }, onMouseEnter: () => setHoveredIndex(i2), onMouseLeave: () => setHoveredIndex(null), children: [(0, import_jsx_runtime4.jsx)("span", { style: {
+       width: `${canvasSpacing[2]}px`,
+       height: `${canvasSpacing[2]}px`,
+       borderRadius: `${canvasRadius.full}px`,
+       background: d2.color
+-    } }), (0, import_jsx_runtime3.jsx)("span", { children: truncateLabel(d2.label, 18) }), (0, import_jsx_runtime3.jsx)("span", { style: { color: t.text.tertiary }, children: formatPercent(pct) })] }, d2.label);
++    } }), (0, import_jsx_runtime4.jsx)("span", { children: truncateLabel(d2.label, 18) }), (0, import_jsx_runtime4.jsx)("span", { style: { color: t.text.tertiary }, children: formatPercent(pct) })] }, d2.label);
+   }) })] });
+ }
+ 
+ // ../canvas-components/dist/collapsible-section.js
+-var import_jsx_runtime4 = __toESM(require_jsx_runtime(), 1);
+-var import_react5 = __toESM(require_react(), 1);
++var import_jsx_runtime5 = __toESM(require_jsx_runtime(), 1);
++var import_react6 = __toESM(require_react(), 1);
+ function CollapsibleSection({ title, leading, count, trailing, children, defaultOpen = false, style }) {
+   const { tokens: t, typography } = useHostTheme();
+-  const [open, setOpen] = (0, import_react5.useState)(defaultOpen);
+-  const bodyId = (0, import_react5.useId)();
+-  const toggle = (0, import_react5.useCallback)(() => {
++  const [open, setOpen] = (0, import_react6.useState)(defaultOpen);
++  const bodyId = (0, import_react6.useId)();
++  const fold = useFoldMotion(open);
++  const toggle = (0, import_react6.useCallback)(() => {
+     setOpen((prev) => !prev);
+   }, []);
+   const root2 = {
+@@ -16599,7 +17140,7 @@
+     paddingBottom: `${canvasSpacing[2]}px`,
+     minWidth: 0
+   };
+-  return (0, import_jsx_runtime4.jsxs)("div", { style: mergeStyle(root2, style), children: [(0, import_jsx_runtime4.jsxs)("button", { type: "button", onClick: toggle, "aria-expanded": open, "aria-controls": bodyId, style: headerRow, children: [(0, import_jsx_runtime4.jsx)("span", { style: chevronStyle, children: (0, import_jsx_runtime4.jsx)(CanvasChevron, { expanded: open }) }), leading != null ? (0, import_jsx_runtime4.jsx)("span", { style: { flexShrink: 0 }, children: leading }) : null, (0, import_jsx_runtime4.jsx)("span", { style: titleStyle, children: title }), count != null ? (0, import_jsx_runtime4.jsx)("span", { style: countStyle, children: count }) : null, trailing != null ? (0, import_jsx_runtime4.jsx)("span", { style: trailingStyle, children: trailing }) : null] }), open ? (0, import_jsx_runtime4.jsx)("div", { id: bodyId, style: body3, children }) : null] });
++  return (0, import_jsx_runtime5.jsxs)("div", { style: mergeStyle(root2, style), children: [(0, import_jsx_runtime5.jsxs)("button", { type: "button", onClick: toggle, "aria-expanded": open, "aria-controls": bodyId, style: headerRow, children: [(0, import_jsx_runtime5.jsx)("span", { style: chevronStyle, children: (0, import_jsx_runtime5.jsx)(CanvasChevron, { expanded: open }) }), leading != null ? (0, import_jsx_runtime5.jsx)("span", { style: { flexShrink: 0 }, children: leading }) : null, (0, import_jsx_runtime5.jsx)("span", { style: titleStyle, children: title }), count != null ? (0, import_jsx_runtime5.jsx)("span", { style: countStyle, children: count }) : null, trailing != null ? (0, import_jsx_runtime5.jsx)("span", { style: trailingStyle, children: trailing }) : null] }), (0, import_jsx_runtime5.jsx)(FoldClip, { motion: fold, id: bodyId, children: (0, import_jsx_runtime5.jsx)("div", { style: body3, children }) })] });
+ }
+ 
+ // ../canvas-components/dist/dag-layout.js
+@@ -16644,7 +17185,7 @@
+ var DEFAULT_NODE_GAP = 48;
+ var DEFAULT_PAD = 24;
+ function computeDAGLayout(options) {
+-  const { nodes = [], edges = [], direction = "vertical", nodeWidth: nw = DEFAULT_NODE_W, nodeHeight: nh = DEFAULT_NODE_H, rankGap = DEFAULT_RANK_GAP, nodeGap = DEFAULT_NODE_GAP, padding: pad = DEFAULT_PAD } = options;
++  const { nodes = [], edges = [], direction = "vertical", nodeWidth: nw = DEFAULT_NODE_W, nodeHeight: nh = DEFAULT_NODE_H, rankGap = DEFAULT_RANK_GAP, nodeGap = DEFAULT_NODE_GAP, padding: pad2 = DEFAULT_PAD } = options;
+   const horizontal = direction === "horizontal";
+   const nodeIds = nodes.map((n) => n.id);
+   const nodeSet = new Set(nodeIds);
+@@ -16702,7 +17243,7 @@
+   const maxRank = Math.max(...rank.values(), 0);
+   const layoutNodes = [];
+   const nodePos = /* @__PURE__ */ new Map();
+-  let rankOffset = pad;
++  let rankOffset = pad2;
+   for (let r4 = 0; r4 <= maxRank; r4++) {
+     const group = rankGroups.get(r4) ?? [];
+     for (let i2 = 0; i2 < group.length; i2++) {
+@@ -16710,8 +17251,8 @@
+         id: group[i2],
+         rank: r4,
+         order: i2,
+-        x: horizontal ? rankOffset : pad + i2 * (nw + nodeGap),
+-        y: horizontal ? pad + i2 * (nh + nodeGap) : rankOffset
++        x: horizontal ? rankOffset : pad2 + i2 * (nw + nodeGap),
++        y: horizontal ? pad2 + i2 * (nh + nodeGap) : rankOffset
+       };
+       layoutNodes.push(ln);
+       nodePos.set(ln.id, ln);
+@@ -16771,8 +17312,8 @@
+   }
+   const allX = layoutNodes.map((n) => n.x + nw);
+   const allY = layoutNodes.map((n) => n.y + nh);
+-  const width = Math.max(...allX, 0) + pad;
+-  const height = Math.max(...allY, 0) + pad;
++  const width = Math.max(...allX, 0) + pad2;
++  const height = Math.max(...allY, 0) + pad2;
+   return {
+     nodes: layoutNodes,
+     edges: layoutEdges,
+@@ -16836,7 +17377,7 @@
+ }
+ 
+ // ../canvas-components/dist/diff-view.js
+-var import_jsx_runtime5 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime6 = __toESM(require_jsx_runtime(), 1);
+ 
+ // ../../node_modules/.pnpm/@shikijs+langs@4.0.2/node_modules/@shikijs/langs/dist/shellscript.mjs
+ var lang = Object.freeze(JSON.parse(`{"displayName":"Shell","name":"shellscript","patterns":[{"include":"#initial_context"}],"repository":{"alias_statement":{"begin":"[\\\\t ]*+(alias)[\\\\t ]*+((?:((?<!\\\\w)-\\\\w+)\\\\b[\\\\t ]*+)*)[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))","beginCaptures":{"1":{"name":"storage.type.alias.shell"},"2":{"patterns":[{"match":"(?<!\\\\w)-\\\\w+\\\\b","name":"string.unquoted.argument.shell constant.other.option.shell"}]},"3":{"name":"string.unquoted.argument.shell constant.other.option.shell"},"4":{"name":"variable.other.assignment.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"variable.other.assignment.shell"},"7":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"8":{"name":"punctuation.definition.array.access.shell"},"9":{"name":"keyword.operator.assignment.shell"},"10":{"name":"keyword.operator.assignment.compound.shell"},"11":{"name":"keyword.operator.assignment.compound.shell"}},"end":"(?=[\\\\t ]|$)|(?:(?:(?:(;)|(&&))|(\\\\|\\\\|))|(&))","endCaptures":{"1":{"name":"punctuation.terminator.statement.semicolon.shell"},"2":{"name":"punctuation.separator.statement.and.shell"},"3":{"name":"punctuation.separator.statement.or.shell"},"4":{"name":"punctuation.separator.statement.background.shell"}},"name":"meta.expression.assignment.alias.shell","patterns":[{"include":"#normal_context"}]},"argument":{"begin":"[\\\\t ]++(?![\\\\n#\\\\&(\\\\[|]|$|;)","beginCaptures":{},"end":"(?=[\\\\t \\\\&;|]|$|[\\\\n)\`])","endCaptures":{},"name":"meta.argument.shell","patterns":[{"include":"#argument_context"},{"include":"#line_continuation"}]},"argument_context":{"patterns":[{"captures":{"1":{"name":"string.unquoted.argument.shell","patterns":[{"match":"\\\\*","name":"variable.language.special.wildcard.shell"},{"include":"#variable"},{"include":"#numeric_literal"},{"captures":{"1":{"name":"constant.language.$1.shell"}},"match":"(?<!\\\\w)\\\\b(true|false)\\\\b(?!\\\\w)"}]}},"match":"[\\\\t ]*+([^\\\\t\\\\n \\"$\\\\&-);<>\\\\\\\\\`|]+(?!>))"},{"include":"#normal_context"}]},"arithmetic_double":{"patterns":[{"begin":"\\\\(\\\\(","beginCaptures":{"0":{"name":"punctuation.section.arithmetic.double.shell"}},"end":"\\\\)\\\\s*\\\\)","endCaptures":{"0":{"name":"punctuation.section.arithmetic.double.shell"}},"name":"meta.arithmetic.shell","patterns":[{"include":"#math"},{"include":"#string"}]}]},"arithmetic_no_dollar":{"patterns":[{"begin":"\\\\(","beginCaptures":{"0":{"name":"punctuation.section.arithmetic.single.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.section.arithmetic.single.shell"}},"name":"meta.arithmetic.shell","patterns":[{"include":"#math"},{"include":"#string"}]}]},"array_access_inline":{"captures":{"1":{"name":"punctuation.section.array.shell"},"2":{"patterns":[{"include":"#special_expansion"},{"include":"#string"},{"include":"#variable"}]},"3":{"name":"punctuation.section.array.shell"}},"match":"(\\\\[)([^]\\\\[]+)(])"},"array_value":{"begin":"[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))[\\\\t ]*+(\\\\()","beginCaptures":{"1":{"name":"variable.other.assignment.shell"},"2":{"name":"punctuation.definition.array.access.shell"},"3":{"name":"variable.other.assignment.shell"},"4":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"keyword.operator.assignment.shell"},"7":{"name":"keyword.operator.assignment.compound.shell"},"8":{"name":"keyword.operator.assignment.compound.shell"},"9":{"name":"punctuation.definition.array.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.array.shell"}},"patterns":[{"include":"#comment"},{"captures":{"1":{"name":"variable.other.assignment.array.shell entity.other.attribute-name.shell"},"2":{"name":"keyword.operator.assignment.shell punctuation.definition.assignment.shell"}},"match":"((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(=)"},{"captures":{"1":{"name":"punctuation.definition.bracket.named-array.shell"},"2":{"name":"string.unquoted.shell entity.other.attribute-name.bracket.shell"},"3":{"name":"punctuation.definition.bracket.named-array.shell"},"4":{"name":"punctuation.definition.assignment.shell"}},"match":"(\\\\[)(.+?)(])(=)"},{"include":"#normal_context"},{"include":"#simple_unquoted"}]},"assignment_statement":{"patterns":[{"include":"#array_value"},{"include":"#modified_assignment_statement"},{"include":"#normal_assignment_statement"}]},"basic_command_name":{"captures":{"1":{"name":"storage.modifier.$1.shell"},"2":{"name":"entity.name.function.call.shell entity.name.command.shell","patterns":[{"match":"(?<!\\\\w)(?:continue|return|break)(?!\\\\w)","name":"keyword.control.$0.shell"},{"match":"(?<!\\\\w)(?:unfunction|continue|autoload|unsetopt|bindkey|builtin|getopts|command|declare|unalias|history|unlimit|typeset|suspend|source|printf|unhash|disown|ulimit|return|which|alias|break|false|print|shift|times|umask|unset|read|type|exec|eval|wait|echo|dirs|jobs|kill|hash|stat|exit|test|trap|true|let|set|pwd|cd|fg|bg|fc|[.:])(?!/)(?!\\\\w)(?!-)","name":"support.function.builtin.shell"},{"include":"#variable"}]}},"match":"(?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;])(?!nocorrect |nocorrect\\\\t|nocorrect$|readonly |readonly\\\\t|readonly$|function |function\\\\t|function$|foreach |foreach\\\\t|foreach$|coproc |coproc\\\\t|coproc$|logout |logout\\\\t|logout$|export |export\\\\t|export$|select |select\\\\t|select$|repeat |repeat\\\\t|repeat$|pushd |pushd\\\\t|pushd$|until |until\\\\t|until$|while |while\\\\t|while$|local |local\\\\t|local$|case |case\\\\t|case$|done |done\\\\t|done$|elif |elif\\\\t|elif$|else |else\\\\t|else$|esac |esac\\\\t|esac$|popd |popd\\\\t|popd$|then |then\\\\t|then$|time |time\\\\t|time$|for |for\\\\t|for$|end |end\\\\t|end$|fi |fi\\\\t|fi$|do |do\\\\t|do$|in |in\\\\t|in$|if |if\\\\t|if$)(?:((?<=^|[\\\\t \\\\&;])(?:readonly|declare|typeset|export|local)(?=[\\\\t \\\\&;]|$))|((?![\\"']|\\\\\\\\\\\\n?$)[^\\\\t\\\\n\\\\r !\\"'<>]+?))(?:(?=[\\\\t ])|(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\))","name":"meta.statement.command.name.basic.shell"},"block_comment":{"begin":"\\\\s*+(/\\\\*)","beginCaptures":{"1":{"name":"punctuation.definition.comment.begin.shell"}},"end":"\\\\*/","endCaptures":{"0":{"name":"punctuation.definition.comment.end.shell"}},"name":"comment.block.shell"},"boolean":{"match":"\\\\b(?:true|false)\\\\b","name":"constant.language.$0.shell"},"case_statement":{"begin":"\\\\b(case)\\\\b[\\\\t ]*+(.+?)[\\\\t ]*+\\\\b(in)\\\\b","beginCaptures":{"1":{"name":"keyword.control.case.shell"},"2":{"patterns":[{"include":"#initial_context"}]},"3":{"name":"keyword.control.in.shell"}},"end":"\\\\besac\\\\b","endCaptures":{"0":{"name":"keyword.control.esac.shell"}},"name":"meta.case.shell","patterns":[{"include":"#comment"},{"captures":{"1":{"name":"keyword.operator.pattern.case.default.shell"}},"match":"[\\\\t ]*+(\\\\* *\\\\))"},{"begin":"(?<!\\\\))(?![\\\\t ]*+(?:esac\\\\b|$))","beginCaptures":{},"end":"(?=\\\\besac\\\\b)|(\\\\))","endCaptures":{"1":{"name":"keyword.operator.pattern.case.shell"}},"name":"meta.case.entry.pattern.shell","patterns":[{"include":"#case_statement_context"}]},{"begin":"(?<=\\\\))","beginCaptures":{},"end":"(;;)|(?=\\\\besac\\\\b)","endCaptures":{"1":{"name":"punctuation.terminator.statement.case.shell"}},"name":"meta.case.entry.body.shell","patterns":[{"include":"#typical_statements"},{"include":"#initial_context"}]}]},"case_statement_context":{"patterns":[{"match":"\\\\*","name":"variable.language.special.quantifier.star.shell keyword.operator.quantifier.star.shell punctuation.definition.arbitrary-repetition.shell punctuation.definition.regex.arbitrary-repetition.shell"},{"match":"\\\\+","name":"variable.language.special.quantifier.plus.shell keyword.operator.quantifier.plus.shell punctuation.definition.arbitrary-repetition.shell punctuation.definition.regex.arbitrary-repetition.shell"},{"match":"\\\\?","name":"variable.language.special.quantifier.question.shell keyword.operator.quantifier.question.shell punctuation.definition.arbitrary-repetition.shell punctuation.definition.regex.arbitrary-repetition.shell"},{"match":"@","name":"variable.language.special.at.shell keyword.operator.at.shell punctuation.definition.regex.at.shell"},{"match":"\\\\|","name":"keyword.operator.orvariable.language.special.or.shell keyword.operator.alternation.ruby.shell punctuation.definition.regex.alternation.shell punctuation.separator.regex.alternation.shell"},{"match":"\\\\\\\\.","name":"constant.character.escape.shell"},{"match":"(?<=\\\\tin| in|[\\\\t ]|;;)\\\\(","name":"keyword.operator.pattern.case.shell"},{"begin":"(?<=\\\\S)(\\\\()","beginCaptures":{"1":{"name":"punctuation.definition.group.shell punctuation.definition.regex.group.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.definition.regex.group.shell"}},"name":"meta.parenthese.shell","patterns":[{"include":"#case_statement_context"}]},{"begin":"\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.character-class.shell"}},"end":"]","endCaptures":{"0":{"name":"punctuation.definition.character-class.shell"}},"name":"string.regexp.character-class.shell","patterns":[{"match":"\\\\\\\\.","name":"constant.character.escape.shell"}]},{"include":"#string"},{"match":"[^\\\\t\\\\n )*?@\\\\[|]","name":"string.unquoted.pattern.shell string.regexp.unquoted.shell"}]},"command_name_range":{"begin":"\\\\G","beginCaptures":{},"end":"(?=[\\\\t \\\\&;|]|$|[\\\\n)\`])|(?=<)","endCaptures":{},"name":"meta.statement.command.name.shell","patterns":[{"match":"(?<!\\\\w)(?:continue|return|break)(?!\\\\w)","name":"entity.name.function.call.shell entity.name.command.shell keyword.control.$0.shell"},{"match":"(?<!\\\\w)(?:unfunction|continue|autoload|unsetopt|bindkey|builtin|getopts|command|declare|unalias|history|unlimit|typeset|suspend|source|printf|unhash|disown|ulimit|return|which|alias|break|false|print|shift|times|umask|unset|read|type|exec|eval|wait|echo|dirs|jobs|kill|hash|stat|exit|test|trap|true|let|set|pwd|cd|fg|bg|fc|[.:])(?!/)(?!\\\\w)(?!-)","name":"entity.name.function.call.shell entity.name.command.shell support.function.builtin.shell"},{"include":"#variable"},{"captures":{"1":{"name":"entity.name.function.call.shell entity.name.command.shell"}},"match":"(?<!\\\\w)(?<=\\\\G|[\\"')}])([^\\\\t\\\\n\\\\r \\"\\\\&');->\`{|]+)"},{"begin":"(?:\\\\G|(?<![\\\\t\\\\n #\\\\&;{|]))(\\\\$?)((\\")|('))","beginCaptures":{"1":{"name":"meta.statement.command.name.quoted.shell punctuation.definition.string.shell entity.name.function.call.shell entity.name.command.shell"},"2":{},"3":{"name":"meta.statement.command.name.quoted.shell string.quoted.double.shell punctuation.definition.string.begin.shell entity.name.function.call.shell entity.name.command.shell"},"4":{"name":"meta.statement.command.name.quoted.shell string.quoted.single.shell punctuation.definition.string.begin.shell entity.name.function.call.shell entity.name.command.shell"}},"end":"(?<!\\\\G)(?<=\\\\2)","endCaptures":{},"patterns":[{"include":"#continuation_of_single_quoted_command_name"},{"include":"#continuation_of_double_quoted_command_name"}]},{"include":"#line_continuation"},{"include":"#simple_unquoted"}]},"command_statement":{"begin":"[\\\\t ]*+(?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;])(?!nocorrect |nocorrect\\\\t|nocorrect$|readonly |readonly\\\\t|readonly$|function |function\\\\t|function$|foreach |foreach\\\\t|foreach$|coproc |coproc\\\\t|coproc$|logout |logout\\\\t|logout$|export |export\\\\t|export$|select |select\\\\t|select$|repeat |repeat\\\\t|repeat$|pushd |pushd\\\\t|pushd$|until |until\\\\t|until$|while |while\\\\t|while$|local |local\\\\t|local$|case |case\\\\t|case$|done |done\\\\t|done$|elif |elif\\\\t|elif$|else |else\\\\t|else$|esac |esac\\\\t|esac$|popd |popd\\\\t|popd$|then |then\\\\t|then$|time |time\\\\t|time$|for |for\\\\t|for$|end |end\\\\t|end$|fi |fi\\\\t|fi$|do |do\\\\t|do$|in |in\\\\t|in$|if |if\\\\t|if$)(?!\\\\\\\\\\\\n?$)","beginCaptures":{},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.command.shell","patterns":[{"include":"#command_name_range"},{"include":"#line_continuation"},{"include":"#option"},{"include":"#argument"},{"include":"#string"},{"include":"#heredoc"}]},"comment":{"captures":{"1":{"name":"comment.line.number-sign.shell meta.shebang.shell"},"2":{"name":"punctuation.definition.comment.shebang.shell"},"3":{"name":"comment.line.number-sign.shell"},"4":{"name":"punctuation.definition.comment.shell"}},"match":"(?:^|[\\\\t ]++)(?:((#!).*)|((#).*))"},"comments":{"patterns":[{"include":"#block_comment"},{"include":"#line_comment"}]},"compound-command":{"patterns":[{"begin":"\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"end":"]","endCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"name":"meta.scope.logical-expression.shell","patterns":[{"include":"#logical-expression"},{"include":"#initial_context"}]},{"begin":"(?<=\\\\s|^)\\\\{(?=\\\\s|$)","beginCaptures":{"0":{"name":"punctuation.definition.group.shell"}},"end":"(?<=^|;)\\\\s*(})","endCaptures":{"1":{"name":"punctuation.definition.group.shell"}},"name":"meta.scope.group.shell","patterns":[{"include":"#initial_context"}]}]},"continuation_of_double_quoted_command_name":{"begin":"\\\\G(?<=\\")","beginCaptures":{},"contentName":"meta.statement.command.name.continuation string.quoted.double entity.name.function.call entity.name.command","end":"\\"","endCaptures":{"0":{"name":"string.quoted.double.shell punctuation.definition.string.end.shell entity.name.function.call.shell entity.name.command.shell"}},"patterns":[{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"include":"#variable"},{"include":"#interpolation"}]},"continuation_of_single_quoted_command_name":{"begin":"\\\\G(?<=')","beginCaptures":{},"contentName":"meta.statement.command.name.continuation string.quoted.single entity.name.function.call entity.name.command","end":"'","endCaptures":{"0":{"name":"string.quoted.single.shell punctuation.definition.string.end.shell entity.name.function.call.shell entity.name.command.shell"}}},"custom_command_names":{"patterns":[]},"custom_commands":{"patterns":[]},"double_quote_context":{"patterns":[{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"include":"#variable"},{"include":"#interpolation"}]},"double_quote_escape_char":{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},"floating_keyword":{"patterns":[{"match":"(?<=^|[\\\\t \\\\&;])(?:then|elif|else|done|end|do|if|fi)(?=[\\\\t \\\\&;]|$)","name":"keyword.control.$0.shell"}]},"for_statement":{"patterns":[{"begin":"\\\\b(for)\\\\b[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))[\\\\t ]*+\\\\b(in)\\\\b","beginCaptures":{"1":{"name":"keyword.control.for.shell"},"2":{"name":"variable.other.for.shell"},"3":{"name":"keyword.control.in.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.for.in.shell","patterns":[{"include":"#string"},{"include":"#simple_unquoted"},{"include":"#normal_context"}]},{"begin":"\\\\b(for)\\\\b","beginCaptures":{"1":{"name":"keyword.control.for.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.for.shell","patterns":[{"include":"#arithmetic_double"},{"include":"#normal_context"}]}]},"function_definition":{"applyEndPatternLast":1,"begin":"[\\\\t ]*+(?:\\\\b(function)\\\\b[\\\\t ]*+([^\\\\t\\\\n\\\\r \\"'()=]+)(?:(\\\\()[\\\\t ]*+(\\\\)))?|([^\\\\t\\\\n\\\\r \\"'()=]+)[\\\\t ]*+(\\\\()[\\\\t ]*+(\\\\)))","beginCaptures":{"1":{"name":"storage.type.function.shell"},"2":{"name":"entity.name.function.shell"},"3":{"name":"punctuation.definition.arguments.shell"},"4":{"name":"punctuation.definition.arguments.shell"},"5":{"name":"entity.name.function.shell"},"6":{"name":"punctuation.definition.arguments.shell"},"7":{"name":"punctuation.definition.arguments.shell"}},"end":"(?<=[)}])","endCaptures":{},"name":"meta.function.shell","patterns":[{"match":"\\\\G[\\\\t\\\\n ]"},{"begin":"\\\\{","beginCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"end":"}","endCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"name":"meta.function.body.shell","patterns":[{"include":"#initial_context"}]},{"begin":"\\\\(","beginCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.group.shell punctuation.section.function.definition.shell"}},"name":"meta.function.body.shell","patterns":[{"include":"#initial_context"}]},{"include":"#initial_context"}]},"heredoc":{"patterns":[{"begin":"((?<!<)<<-)[\\\\t ]*+([\\"'])[\\\\t ]*+([^\\"']+?)(?=[\\"\\\\&';<\\\\s])(\\\\2)(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.quote.shell"},"3":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"4":{"name":"punctuation.definition.string.heredoc.quote.shell"},"5":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.quoted.heredoc.indent.$3","end":"^\\\\t*\\\\3(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.$0.shell"}},"patterns":[]},{"begin":"((?<!<)<<(?!<))[\\\\t ]*+([\\"'])[\\\\t ]*+([^\\"']+?)(?=[\\"\\\\&';<\\\\s])(\\\\2)(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.quote.shell"},"3":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"4":{"name":"punctuation.definition.string.heredoc.quote.shell"},"5":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.quoted.heredoc.no-indent.$3","end":"^\\\\3(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.delimiter.shell"}},"patterns":[]},{"begin":"((?<!<)<<-)[\\\\t ]*+([^\\\\t \\"']+)(?=[\\"\\\\&';<\\\\s])(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"3":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.unquoted.heredoc.indent.$2","end":"^\\\\t*\\\\2(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.delimiter.shell"}},"patterns":[{"include":"#double_quote_escape_char"},{"include":"#variable"},{"include":"#interpolation"}]},{"begin":"((?<!<)<<(?!<))[\\\\t ]*+([^\\\\t \\"']+)(?=[\\"\\\\&';<\\\\s])(.*)","beginCaptures":{"1":{"name":"keyword.operator.heredoc.shell"},"2":{"name":"punctuation.definition.string.heredoc.delimiter.shell"},"3":{"patterns":[{"include":"#redirect_fix"},{"include":"#typical_statements"}]}},"contentName":"string.unquoted.heredoc.no-indent.$2","end":"^\\\\2(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"punctuation.definition.string.heredoc.delimiter.shell"}},"patterns":[{"include":"#double_quote_escape_char"},{"include":"#variable"},{"include":"#interpolation"}]}]},"herestring":{"patterns":[{"begin":"(<<<)\\\\s*(('))","beginCaptures":{"1":{"name":"keyword.operator.herestring.shell"},"2":{"name":"string.quoted.single.shell"},"3":{"name":"punctuation.definition.string.begin.shell"}},"contentName":"string.quoted.single.shell","end":"(')","endCaptures":{"0":{"name":"string.quoted.single.shell"},"1":{"name":"punctuation.definition.string.end.shell"}},"name":"meta.herestring.shell"},{"begin":"(<<<)\\\\s*((\\"))","beginCaptures":{"1":{"name":"keyword.operator.herestring.shell"},"2":{"name":"string.quoted.double.shell"},"3":{"name":"punctuation.definition.string.begin.shell"}},"contentName":"string.quoted.double.shell","end":"(\\")","endCaptures":{"0":{"name":"string.quoted.double.shell"},"1":{"name":"punctuation.definition.string.end.shell"}},"name":"meta.herestring.shell","patterns":[{"include":"#double_quote_context"}]},{"captures":{"1":{"name":"keyword.operator.herestring.shell"},"2":{"name":"string.unquoted.herestring.shell","patterns":[{"include":"#initial_context"}]}},"match":"(<<<)\\\\s*(([^)\\\\\\\\\\\\s]|\\\\\\\\.)+)","name":"meta.herestring.shell"}]},"initial_context":{"patterns":[{"include":"#comment"},{"include":"#pipeline"},{"include":"#normal_statement_seperator"},{"include":"#logical_expression_double"},{"include":"#logical_expression_single"},{"include":"#assignment_statement"},{"include":"#case_statement"},{"include":"#for_statement"},{"include":"#loop"},{"include":"#function_definition"},{"include":"#line_continuation"},{"include":"#arithmetic_double"},{"include":"#misc_ranges"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#redirection"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#alias_statement"},{"include":"#normal_statement"},{"include":"#string"},{"include":"#support"}]},"inline_comment":{"captures":{"1":{"name":"comment.block.shell punctuation.definition.comment.begin.shell"},"2":{"name":"comment.block.shell"},"3":{"patterns":[{"match":"\\\\*/","name":"comment.block.shell punctuation.definition.comment.end.shell"},{"match":"\\\\*","name":"comment.block.shell"}]}},"match":"(/\\\\*)((?:[^*]|\\\\*++[^/])*+(\\\\*++/))"},"interpolation":{"patterns":[{"include":"#arithmetic_dollar"},{"include":"#subshell_dollar"},{"begin":"\`","beginCaptures":{"0":{"name":"punctuation.definition.evaluation.backticks.shell"}},"end":"\`","endCaptures":{"0":{"name":"punctuation.definition.evaluation.backticks.shell"}},"name":"string.interpolated.backtick.shell","patterns":[{"match":"\\\\\\\\[$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"begin":"(?<=\\\\W)(?=#)(?!#\\\\{)","beginCaptures":{"1":{"name":"punctuation.whitespace.comment.leading.shell"}},"end":"(?!\\\\G)","patterns":[{"begin":"#","beginCaptures":{"0":{"name":"punctuation.definition.comment.shell"}},"end":"(?=\`)","name":"comment.line.number-sign.shell"}]},{"include":"#initial_context"}]}]},"keyword":{"patterns":[{"match":"(?<=^|[\\\\&;\\\\s])(then|else|elif|fi|for|in|do|done|select|continue|esac|while|until|return)(?=[\\\\&;\\\\s]|$)","name":"keyword.control.shell"},{"match":"(?<=^|[\\\\&;\\\\s])(?:export|declare|typeset|local|readonly)(?=[\\\\&;\\\\s]|$)","name":"storage.modifier.shell"}]},"line_comment":{"begin":"\\\\s*+(//)","beginCaptures":{"1":{"name":"punctuation.definition.comment.shell"}},"end":"(?<=\\\\n)(?<!\\\\\\\\\\\\n)","endCaptures":{},"name":"comment.line.double-slash.shell","patterns":[{"include":"#line_continuation_character"}]},"line_continuation":{"match":"\\\\\\\\(?=\\\\n)","name":"constant.character.escape.line-continuation.shell"},"logical-expression":{"patterns":[{"include":"#arithmetic_no_dollar"},{"match":"=[=~]?|!=?|[<>]|&&|\\\\|\\\\|","name":"keyword.operator.logical.shell"},{"match":"(?<!\\\\S)-(nt|ot|ef|eq|ne|l[et]|g[et]|[GLNOSa-hknopr-uwxz])\\\\b","name":"keyword.operator.logical.shell"}]},"logical_expression_context":{"patterns":[{"include":"#regex_comparison"},{"include":"#arithmetic_no_dollar"},{"include":"#logical-expression"},{"include":"#logical_expression_single"},{"include":"#logical_expression_double"},{"include":"#comment"},{"include":"#boolean"},{"include":"#redirect_number"},{"include":"#numeric_literal"},{"include":"#pipeline"},{"include":"#normal_statement_seperator"},{"include":"#string"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#support"}]},"logical_expression_double":{"begin":"\\\\[\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"end":"]]","endCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"name":"meta.scope.logical-expression.shell","patterns":[{"include":"#logical_expression_context"}]},"logical_expression_single":{"begin":"\\\\[","beginCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"end":"]","endCaptures":{"0":{"name":"punctuation.definition.logical-expression.shell"}},"name":"meta.scope.logical-expression.shell","patterns":[{"include":"#logical_expression_context"}]},"loop":{"patterns":[{"begin":"(?<=^|[\\\\&;\\\\s])(for)\\\\s+(.+?)\\\\s+(in)(?=[\\\\&;\\\\s]|$)","beginCaptures":{"1":{"name":"keyword.control.shell"},"2":{"name":"variable.other.loop.shell","patterns":[{"include":"#string"}]},"3":{"name":"keyword.control.shell"}},"end":"(?<=^|[\\\\&;\\\\s])done(?=[\\\\&;\\\\s]|$|\\\\))","endCaptures":{"0":{"name":"keyword.control.shell"}},"name":"meta.scope.for-in-loop.shell","patterns":[{"include":"#initial_context"}]},{"begin":"(?<=^|[\\\\&;\\\\s])(while|until)(?=[\\\\&;\\\\s]|$)","beginCaptures":{"1":{"name":"keyword.control.shell"}},"end":"(?<=^|[\\\\&;\\\\s])done(?=[\\\\&;\\\\s]|$|\\\\))","endCaptures":{"0":{"name":"keyword.control.shell"}},"name":"meta.scope.while-loop.shell","patterns":[{"include":"#initial_context"}]},{"begin":"(?<=^|[\\\\&;\\\\s])(select)\\\\s+((?:[^\\\\\\\\\\\\s]|\\\\\\\\.)+)(?=[\\\\&;\\\\s]|$)","beginCaptures":{"1":{"name":"keyword.control.shell"},"2":{"name":"variable.other.loop.shell"}},"end":"(?<=^|[\\\\&;\\\\s])(done)(?=[\\\\&;\\\\s]|$|\\\\))","endCaptures":{"1":{"name":"keyword.control.shell"}},"name":"meta.scope.select-block.shell","patterns":[{"include":"#initial_context"}]},{"begin":"(?<=^|[\\\\&;\\\\s])if(?=[\\\\&;\\\\s]|$)","beginCaptures":{"0":{"name":"keyword.control.if.shell"}},"end":"(?<=^|[\\\\&;\\\\s])fi(?=[\\\\&;\\\\s]|$)","endCaptures":{"0":{"name":"keyword.control.fi.shell"}},"name":"meta.scope.if-block.shell","patterns":[{"include":"#initial_context"}]}]},"math":{"patterns":[{"include":"#variable"},{"match":"\\\\+{1,2}|-{1,2}|[!~]|\\\\*{1,2}|[%/]|<[<=]?|>[=>]?|==|!=|^|\\\\|{1,2}|&{1,2}|[,:=?]|[-%\\\\&*+/^|]=|<<=|>>=","name":"keyword.operator.arithmetic.shell"},{"match":"0[Xx]\\\\h+","name":"constant.numeric.hex.shell"},{"match":";","name":"punctuation.separator.semicolon.range"},{"match":"0\\\\d+","name":"constant.numeric.octal.shell"},{"match":"\\\\d{1,2}#[0-9@-Z_a-z]+","name":"constant.numeric.other.shell"},{"match":"\\\\d+","name":"constant.numeric.integer.shell"},{"match":"(?<!\\\\w)[0-9A-Z_a-z]+(?!\\\\w)","name":"variable.other.normal.shell"}]},"math_operators":{"patterns":[{"match":"\\\\+{1,2}|-{1,2}|[!~]|\\\\*{1,2}|[%/]|<[<=]?|>[=>]?|==|!=|^|\\\\|{1,2}|&{1,2}|[,:=?]|[-%\\\\&*+/^|]=|<<=|>>=","name":"keyword.operator.arithmetic.shell"},{"match":"0[Xx]\\\\h+","name":"constant.numeric.hex.shell"},{"match":"0\\\\d+","name":"constant.numeric.octal.shell"},{"match":"\\\\d{1,2}#[0-9@-Z_a-z]+","name":"constant.numeric.other.shell"},{"match":"\\\\d+","name":"constant.numeric.integer.shell"}]},"misc_ranges":{"patterns":[{"include":"#logical_expression_single"},{"include":"#logical_expression_double"},{"include":"#subshell_dollar"},{"begin":"(?<![^\\\\t ])(\\\\{)(?![$\\\\w])","beginCaptures":{"1":{"name":"punctuation.definition.group.shell"}},"end":"}","endCaptures":{"0":{"name":"punctuation.definition.group.shell"}},"name":"meta.scope.group.shell","patterns":[{"include":"#initial_context"}]}]},"modified_assignment_statement":{"begin":"(?<=^|[\\\\t \\\\&;])(?:readonly|declare|typeset|export|local)(?=[\\\\t \\\\&;]|$)","beginCaptures":{"0":{"name":"storage.modifier.$0.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.shell meta.expression.assignment.modified.shell","patterns":[{"match":"(?<!\\\\w)-\\\\w+\\\\b","name":"string.unquoted.argument.shell constant.other.option.shell"},{"include":"#array_value"},{"captures":{"1":{"name":"variable.other.assignment.shell"},"2":{"name":"punctuation.definition.array.access.shell"},"3":{"name":"variable.other.assignment.shell"},"4":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"keyword.operator.assignment.shell"},"7":{"name":"keyword.operator.assignment.compound.shell"},"8":{"name":"keyword.operator.assignment.compound.shell"},"9":{"name":"constant.numeric.shell constant.numeric.hex.shell"},"10":{"name":"constant.numeric.shell constant.numeric.octal.shell"},"11":{"name":"constant.numeric.shell constant.numeric.other.shell"},"12":{"name":"constant.numeric.shell constant.numeric.decimal.shell"},"13":{"name":"constant.numeric.shell constant.numeric.version.shell"},"14":{"name":"constant.numeric.shell constant.numeric.integer.shell"}},"match":"((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))?(?:(?<=[\\\\t =]|^|[(\\\\[{])(?:(?:(?:(?:(?:(0[Xx]\\\\h+)|(0\\\\d+))|(\\\\d{1,2}#[0-9@-Z_a-z]+))|(-?\\\\d+\\\\.\\\\d+))|(-?\\\\d+(?:\\\\.\\\\d+)+))|(-?\\\\d+))(?=[\\\\t ]|$|[);}]))?"},{"include":"#normal_context"}]},"modifiers":{"match":"(?<=^|[\\\\t \\\\&;])(?:readonly|declare|typeset|export|local)(?=[\\\\t \\\\&;]|$)","name":"storage.modifier.$0.shell"},"normal_assignment_statement":{"begin":"[\\\\t ]*+((?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w))(?:(\\\\[)((?:(?:\\\\$?(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)|@)|\\\\*)|(-?\\\\d+))(]))?(?:(?:(=)|(\\\\+=))|(-=))","beginCaptures":{"1":{"name":"variable.other.assignment.shell"},"2":{"name":"punctuation.definition.array.access.shell"},"3":{"name":"variable.other.assignment.shell"},"4":{"name":"constant.numeric.shell constant.numeric.integer.shell"},"5":{"name":"punctuation.definition.array.access.shell"},"6":{"name":"keyword.operator.assignment.shell"},"7":{"name":"keyword.operator.assignment.compound.shell"},"8":{"name":"keyword.operator.assignment.compound.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.expression.assignment.shell","patterns":[{"include":"#comment"},{"include":"#string"},{"include":"#normal_assignment_statement"},{"begin":"(?<=[\\\\t ])(?![\\\\t ]|\\\\w+=)","beginCaptures":{},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.command.env.shell","patterns":[{"include":"#command_name_range"},{"include":"#line_continuation"},{"include":"#option"},{"include":"#argument"},{"include":"#string"}]},{"include":"#simple_unquoted"},{"include":"#normal_context"}]},"normal_context":{"patterns":[{"include":"#comment"},{"include":"#pipeline"},{"include":"#normal_statement_seperator"},{"include":"#misc_ranges"},{"include":"#boolean"},{"include":"#redirect_number"},{"include":"#numeric_literal"},{"include":"#string"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#redirection"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#support"},{"include":"#parenthese"}]},"normal_statement":{"begin":"(?!^[\\\\t ]*+$)(?:(?<=(?:^until| until|\\\\tuntil|^while| while|\\\\twhile|^elif| elif|\\\\telif|^else| else|\\\\telse|^then| then|\\\\tthen|^do| do|\\\\tdo|^if| if|\\\\tif) )|(?<=^|[!\\\\&(;\`{|]))[\\\\t ]*+(?!nocorrect\\\\W|nocorrect\\\\$|function\\\\W|function\\\\$|foreach\\\\W|foreach\\\\$|repeat\\\\W|repeat\\\\$|logout\\\\W|logout\\\\$|coproc\\\\W|coproc\\\\$|select\\\\W|select\\\\$|while\\\\W|while\\\\$|pushd\\\\W|pushd\\\\$|until\\\\W|until\\\\$|case\\\\W|case\\\\$|done\\\\W|done\\\\$|elif\\\\W|elif\\\\$|else\\\\W|else\\\\$|esac\\\\W|esac\\\\$|popd\\\\W|popd\\\\$|then\\\\W|then\\\\$|time\\\\W|time\\\\$|for\\\\W|for\\\\$|end\\\\W|end\\\\$|fi\\\\W|fi\\\\$|do\\\\W|do\\\\$|in\\\\W|in\\\\$|if\\\\W|if\\\\$)","beginCaptures":{},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.statement.shell","patterns":[{"include":"#typical_statements"}]},"normal_statement_seperator":{"captures":{"1":{"name":"punctuation.terminator.statement.semicolon.shell"},"2":{"name":"punctuation.separator.statement.and.shell"},"3":{"name":"punctuation.separator.statement.or.shell"},"4":{"name":"punctuation.separator.statement.background.shell"}},"match":"(?:(?:(;)|(&&))|(\\\\|\\\\|))|(&)"},"numeric_literal":{"captures":{"1":{"name":"constant.numeric.shell constant.numeric.hex.shell"},"2":{"name":"constant.numeric.shell constant.numeric.octal.shell"},"3":{"name":"constant.numeric.shell constant.numeric.other.shell"},"4":{"name":"constant.numeric.shell constant.numeric.decimal.shell"},"5":{"name":"constant.numeric.shell constant.numeric.version.shell"},"6":{"name":"constant.numeric.shell constant.numeric.integer.shell"}},"match":"(?<=[\\\\t =]|^|[(\\\\[{])(?:(?:(?:(?:(?:(0[Xx]\\\\h+)|(0\\\\d+))|(\\\\d{1,2}#[0-9@-Z_a-z]+))|(-?\\\\d+\\\\.\\\\d+))|(-?\\\\d+(?:\\\\.\\\\d+)+))|(-?\\\\d+))(?=[\\\\t ]|$|[);}])"},"option":{"begin":"[\\\\t ]++(-)((?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;]))","beginCaptures":{"1":{"name":"string.unquoted.argument.shell constant.other.option.dash.shell"},"2":{"name":"string.unquoted.argument.shell constant.other.option.shell"}},"contentName":"string.unquoted.argument constant.other.option","end":"(?=[\\\\t ])|(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"patterns":[{"include":"#option_context"}]},"option_context":{"patterns":[{"include":"#misc_ranges"},{"include":"#string"},{"include":"#variable"},{"include":"#interpolation"},{"include":"#heredoc"},{"include":"#herestring"},{"include":"#redirection"},{"include":"#pathname"},{"include":"#floating_keyword"},{"include":"#support"}]},"parenthese":{"patterns":[{"begin":"\\\\(","beginCaptures":{"0":{"name":"punctuation.section.parenthese.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.section.parenthese.shell"}},"name":"meta.parenthese.group.shell","patterns":[{"include":"#initial_context"}]}]},"pathname":{"patterns":[{"match":"(?<=[:=\\\\s]|^)~","name":"keyword.operator.tilde.shell"},{"match":"[*?]","name":"keyword.operator.glob.shell"},{"begin":"([!*+?@])(\\\\()","beginCaptures":{"1":{"name":"keyword.operator.extglob.shell"},"2":{"name":"punctuation.definition.extglob.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.extglob.shell"}},"name":"meta.structure.extglob.shell","patterns":[{"include":"#initial_context"}]}]},"pipeline":{"patterns":[{"match":"(?<=^|[\\\\&;\\\\s])(time)(?=[\\\\&;\\\\s]|$)","name":"keyword.other.shell"},{"match":"[!|]","name":"keyword.operator.pipe.shell"}]},"redirect_fix":{"captures":{"1":{"name":"keyword.operator.redirect.shell"},"2":{"name":"string.unquoted.argument.shell"}},"match":"(>>?)[\\\\t ]*+([^\\\\t\\\\n \\"$\\\\&-);<>\\\\\\\\\`|]+)"},"redirect_number":{"captures":{"1":{"name":"keyword.operator.redirect.stdout.shell"},"2":{"name":"keyword.operator.redirect.stderr.shell"},"3":{"name":"keyword.operator.redirect.$3.shell"}},"match":"(?<=[\\\\t ])(?:(1)|(2)|(\\\\d+))(?=>)"},"redirection":{"patterns":[{"begin":"[<>]\\\\(","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.interpolated.process-substitution.shell","patterns":[{"include":"#initial_context"}]},{"match":"(?<![<>])(&>|\\\\d*>&\\\\d*|\\\\d*(>>|[<>])|\\\\d*<&|\\\\d*<>)(?![<>])","name":"keyword.operator.redirect.shell"}]},"regex_comparison":{"match":"=~","name":"keyword.operator.logical.regex.shell"},"regexp":{"patterns":[{"match":".+"}]},"simple_options":{"captures":{"0":{"patterns":[{"captures":{"1":{"name":"string.unquoted.argument.shell constant.other.option.dash.shell"},"2":{"name":"string.unquoted.argument.shell constant.other.option.shell"}},"match":"[\\\\t ]++(-)(\\\\w+)"}]}},"match":"(?:[\\\\t ]++-\\\\w+)*"},"simple_unquoted":{"match":"[^\\\\t\\\\n \\"$\\\\&-);<>\\\\\\\\\`|]","name":"string.unquoted.shell"},"special_expansion":{"match":"!|:[-=?]?|[*@]|##?|%%|[%/]","name":"keyword.operator.expansion.shell"},"start_of_command":{"match":"[\\\\t ]*+(?![\\\\n!#\\\\&()<>\\\\[{|]|$|[\\\\t ;])(?!nocorrect |nocorrect\\\\t|nocorrect$|readonly |readonly\\\\t|readonly$|function |function\\\\t|function$|foreach |foreach\\\\t|foreach$|coproc |coproc\\\\t|coproc$|logout |logout\\\\t|logout$|export |export\\\\t|export$|select |select\\\\t|select$|repeat |repeat\\\\t|repeat$|pushd |pushd\\\\t|pushd$|until |until\\\\t|until$|while |while\\\\t|while$|local |local\\\\t|local$|case |case\\\\t|case$|done |done\\\\t|done$|elif |elif\\\\t|elif$|else |else\\\\t|else$|esac |esac\\\\t|esac$|popd |popd\\\\t|popd$|then |then\\\\t|then$|time |time\\\\t|time$|for |for\\\\t|for$|end |end\\\\t|end$|fi |fi\\\\t|fi$|do |do\\\\t|do$|in |in\\\\t|in$|if |if\\\\t|if$)(?!\\\\\\\\\\\\n?$)"},"string":{"patterns":[{"match":"\\\\\\\\.","name":"constant.character.escape.shell"},{"begin":"'","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"'","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.quoted.single.shell"},{"begin":"\\\\$?\\"","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"\\"","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.quoted.double.shell","patterns":[{"match":"\\\\\\\\[\\\\n\\"$\\\\\\\\\`]","name":"constant.character.escape.shell"},{"include":"#variable"},{"include":"#interpolation"}]},{"begin":"\\\\$'","beginCaptures":{"0":{"name":"punctuation.definition.string.begin.shell"}},"end":"'","endCaptures":{"0":{"name":"punctuation.definition.string.end.shell"}},"name":"string.quoted.single.dollar.shell","patterns":[{"match":"\\\\\\\\['\\\\\\\\abefnrtv]","name":"constant.character.escape.ansi-c.shell"},{"match":"\\\\\\\\[0-9]{3}\\"","name":"constant.character.escape.octal.shell"},{"match":"\\\\\\\\x\\\\h{2}\\"","name":"constant.character.escape.hex.shell"},{"match":"\\\\\\\\c.\\"","name":"constant.character.escape.control-char.shell"}]}]},"subshell_dollar":{"patterns":[{"begin":"\\\\$\\\\(","beginCaptures":{"0":{"name":"punctuation.definition.subshell.single.shell"}},"end":"\\\\)","endCaptures":{"0":{"name":"punctuation.definition.subshell.single.shell"}},"name":"meta.scope.subshell","patterns":[{"include":"#parenthese"},{"include":"#initial_context"}]}]},"support":{"patterns":[{"match":"(?<=^|[\\\\&;\\\\s])[.:](?=[\\\\&;\\\\s]|$)","name":"support.function.builtin.shell"}]},"typical_statements":{"patterns":[{"include":"#assignment_statement"},{"include":"#case_statement"},{"include":"#for_statement"},{"include":"#while_statement"},{"include":"#function_definition"},{"include":"#command_statement"},{"include":"#line_continuation"},{"include":"#arithmetic_double"},{"include":"#normal_context"}]},"variable":{"patterns":[{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.parameter.positional.all.shell"},"2":{"name":"variable.parameter.positional.all.shell"}},"match":"(\\\\$)(@(?!\\\\w))"},{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.parameter.positional.shell"},"2":{"name":"variable.parameter.positional.shell"}},"match":"(\\\\$)([0-9](?!\\\\w))"},{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.language.special.shell"},"2":{"name":"variable.language.special.shell"}},"match":"(\\\\$)([-!#$*0?_](?!\\\\w))"},{"begin":"(\\\\$)(\\\\{)[\\\\t ]*+(?=\\\\d)","beginCaptures":{"1":{"name":"punctuation.definition.variable.shell variable.parameter.positional.shell"},"2":{"name":"punctuation.section.bracket.curly.variable.begin.shell punctuation.definition.variable.shell variable.parameter.positional.shell"}},"contentName":"meta.parameter-expansion","end":"}","endCaptures":{"0":{"name":"punctuation.section.bracket.curly.variable.end.shell punctuation.definition.variable.shell variable.parameter.positional.shell"}},"patterns":[{"include":"#special_expansion"},{"include":"#array_access_inline"},{"match":"[0-9]+","name":"variable.parameter.positional.shell"},{"match":"(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)","name":"variable.other.normal.shell"},{"include":"#variable"},{"include":"#string"}]},{"begin":"(\\\\$)(\\\\{)","beginCaptures":{"1":{"name":"punctuation.definition.variable.shell"},"2":{"name":"punctuation.section.bracket.curly.variable.begin.shell punctuation.definition.variable.shell"}},"contentName":"meta.parameter-expansion","end":"}","endCaptures":{"0":{"name":"punctuation.section.bracket.curly.variable.end.shell punctuation.definition.variable.shell"}},"patterns":[{"include":"#special_expansion"},{"include":"#array_access_inline"},{"match":"(?<!\\\\w)[-0-9A-Z_a-z]+(?!\\\\w)","name":"variable.other.normal.shell"},{"include":"#variable"},{"include":"#string"}]},{"captures":{"1":{"name":"punctuation.definition.variable.shell variable.other.normal.shell"},"2":{"name":"variable.other.normal.shell"}},"match":"(\\\\$)(\\\\w+(?!\\\\w))"}]},"while_statement":{"patterns":[{"begin":"\\\\b(while)\\\\b","beginCaptures":{"1":{"name":"keyword.control.while.shell"}},"end":"(?=[\\\\n\\\\&);\`{|}]|[\\\\t ]*#|])(?<!\\\\\\\\)","endCaptures":{},"name":"meta.while.shell","patterns":[{"include":"#line_continuation"},{"include":"#math_operators"},{"include":"#option"},{"include":"#simple_unquoted"},{"include":"#normal_context"},{"include":"#string"}]}]}},"scopeName":"source.shell","aliases":["bash","sh","shell","zsh"]}`));
+@@ -17132,10 +17673,10 @@
+     }
+     return path;
+   }
+-  static from(...segments) {
++  static from(...segments2) {
+     let result = null;
+-    for (let i2 = 0; i2 < segments.length; i2++) {
+-      result = new _ScopeStack(result, segments[i2]);
++    for (let i2 = 0; i2 < segments2.length; i2++) {
++      result = new _ScopeStack(result, segments2[i2]);
+     }
+     return result;
+   }
+@@ -17242,9 +17783,9 @@
+     let fontStyle = -1;
+     if (typeof entry.settings.fontStyle === "string") {
+       fontStyle = 0;
+-      let segments = entry.settings.fontStyle.split(" ");
+-      for (let j2 = 0, lenJ = segments.length; j2 < lenJ; j2++) {
+-        let segment = segments[j2];
++      let segments2 = entry.settings.fontStyle.split(" ");
++      for (let j2 = 0, lenJ = segments2.length; j2 < lenJ; j2++) {
++        let segment = segments2[j2];
+         switch (segment) {
+           case "italic":
+             fontStyle = fontStyle | 1;
+@@ -17271,11 +17812,11 @@
+     }
+     for (let j2 = 0, lenJ = scopes.length; j2 < lenJ; j2++) {
+       let _scope = scopes[j2].trim();
+-      let segments = _scope.split(" ");
+-      let scope = segments[segments.length - 1];
++      let segments2 = _scope.split(" ");
++      let scope = segments2[segments2.length - 1];
+       let parentScopes = null;
+-      if (segments.length > 1) {
+-        parentScopes = segments.slice(0, segments.length - 1);
++      if (segments2.length > 1) {
++        parentScopes = segments2.slice(0, segments2.length - 1);
+         parentScopes.reverse();
+       }
+       result[resultLen++] = new ParsedThemeRule(
+@@ -27573,7 +28114,7 @@
+     fontSize: canvasTypography.small.fontSize,
+     lineHeight: canvasTypography.small.lineHeight
+   };
+-  return (0, import_jsx_runtime5.jsxs)("span", { style: mergeStyle(wrapper, style), children: [additions > 0 ? (0, import_jsx_runtime5.jsxs)("span", { style: { color: DIFF_GREEN }, children: ["+", additions] }) : null, deletions > 0 ? (0, import_jsx_runtime5.jsxs)("span", { style: { color: DIFF_RED }, children: ["-", deletions] }) : null] });
++  return (0, import_jsx_runtime6.jsxs)("span", { style: mergeStyle(wrapper, style), children: [additions > 0 ? (0, import_jsx_runtime6.jsxs)("span", { style: { color: DIFF_GREEN }, children: ["+", additions] }) : null, deletions > 0 ? (0, import_jsx_runtime6.jsxs)("span", { style: { color: DIFF_RED }, children: ["-", deletions] }) : null] });
+ }
+ function DiffView({ lines = [], path, language, showLineNumbers = true, coloredLineNumbers = true, showAccentStrip = true, style }) {
+   const { tokens: t } = useHostTheme();
+@@ -27592,7 +28133,7 @@
+     width: "max-content",
+     paddingBlock: "2px"
+   };
+-  return (0, import_jsx_runtime5.jsx)("div", { style: mergeStyle(root2, style), children: (0, import_jsx_runtime5.jsx)("div", { style: contentWrapper, children: lines.map((line, i2) => (0, import_jsx_runtime5.jsx)(
++  return (0, import_jsx_runtime6.jsx)("div", { style: mergeStyle(root2, style), children: (0, import_jsx_runtime6.jsx)("div", { style: contentWrapper, children: lines.map((line, i2) => (0, import_jsx_runtime6.jsx)(
+     DiffViewLine,
+     { line, language: effectiveLang, showLineNumbers, coloredLineNumbers, showAccentStrip },
+     i2
+@@ -27654,12 +28195,12 @@
+     color: t.text.primary
+   };
+   const tokens = language !== void 0 && line.content.length > 0 ? tokenizeDiffLine(line.content, language) : null;
+-  return (0, import_jsx_runtime5.jsxs)("div", { style: rowStyle, children: [showAccentStrip ? (0, import_jsx_runtime5.jsx)("div", { style: stripStyle }) : null, showLineNumbers ? (0, import_jsx_runtime5.jsx)("div", { style: gutterStyle, children: (0, import_jsx_runtime5.jsx)("span", { style: lineNumStyle, children: line.lineNumber != null ? line.lineNumber : "" }) }) : null, (0, import_jsx_runtime5.jsx)("div", { style: contentStyle, children: tokens != null ? tokens.map((token2) => (0, import_jsx_runtime5.jsx)("span", { style: { color: token2.color, ...getFontStyle(token2.fontStyle) }, children: token2.content }, token2.col)) : line.content })] });
++  return (0, import_jsx_runtime6.jsxs)("div", { style: rowStyle, children: [showAccentStrip ? (0, import_jsx_runtime6.jsx)("div", { style: stripStyle }) : null, showLineNumbers ? (0, import_jsx_runtime6.jsx)("div", { style: gutterStyle, children: (0, import_jsx_runtime6.jsx)("span", { style: lineNumStyle, children: line.lineNumber != null ? line.lineNumber : "" }) }) : null, (0, import_jsx_runtime6.jsx)("div", { style: contentStyle, children: tokens != null ? tokens.map((token2) => (0, import_jsx_runtime6.jsx)("span", { style: { color: token2.color, ...getFontStyle(token2.fontStyle) }, children: token2.content }, token2.col)) : line.content })] });
+ }
+ 
+ // ../canvas-components/dist/form-primitives.js
+-var import_jsx_runtime6 = __toESM(require_jsx_runtime(), 1);
+-var import_react6 = __toESM(require_react(), 1);
++var import_jsx_runtime7 = __toESM(require_jsx_runtime(), 1);
++var import_react7 = __toESM(require_react(), 1);
+ function TextInput({ value, onChange, placeholder, disabled = false, type = "text", style }) {
+   const { tokens: t, radius, typography } = useHostTheme();
+   const base = {
+@@ -27679,19 +28220,19 @@
+     opacity: disabled ? 0.5 : 1,
+     cursor: disabled ? "not-allowed" : "text"
+   };
+-  return (0, import_jsx_runtime6.jsx)("input", { type, value, onChange: onChange ? (e) => onChange(e.target.value) : void 0, placeholder, disabled, style: mergeStyle(base, style) });
++  return (0, import_jsx_runtime7.jsx)("input", { type, value, onChange: onChange ? (e) => onChange(e.target.value) : void 0, placeholder, disabled, style: mergeStyle(base, style) });
+ }
+ function TextArea({ value, onChange, placeholder, disabled = false, rows = 3, style }) {
+   const { tokens: t, radius, typography } = useHostTheme();
+-  const ref = (0, import_react6.useRef)(null);
+-  const resizeToContent = (0, import_react6.useCallback)(() => {
++  const ref = (0, import_react7.useRef)(null);
++  const resizeToContent = (0, import_react7.useCallback)(() => {
+     const el = ref.current;
+     if (!el)
+       return;
+     el.style.height = "auto";
+     el.style.height = `${el.scrollHeight}px`;
+   }, []);
+-  (0, import_react6.useLayoutEffect)(() => {
++  (0, import_react7.useLayoutEffect)(() => {
+     resizeToContent();
+   }, [resizeToContent]);
+   const base = {
+@@ -27713,7 +28254,7 @@
+     opacity: disabled ? 0.5 : 1,
+     cursor: disabled ? "not-allowed" : "text"
+   };
+-  return (0, import_jsx_runtime6.jsx)("textarea", { ref, value, onChange: onChange ? (e) => onChange(e.target.value) : void 0, onInput: resizeToContent, placeholder, disabled, rows, style: mergeStyle(base, style) });
++  return (0, import_jsx_runtime7.jsx)("textarea", { ref, value, onChange: onChange ? (e) => onChange(e.target.value) : void 0, onInput: resizeToContent, placeholder, disabled, rows, style: mergeStyle(base, style) });
+ }
+ function Checkbox({ checked = false, onChange, disabled = false, label, style }) {
+   const { tokens: t, radius } = useHostTheme();
+@@ -27756,9 +28297,9 @@
+     if (!disabled)
+       onChange?.(!checked);
+   };
+-  const checkMark = checked ? (0, import_jsx_runtime6.jsx)("svg", { width: 10, height: 10, viewBox: "0 0 10 10", fill: "none", xmlns: "http://www.w3.org/2000/svg", "aria-hidden": "true", style: { display: "block" }, children: (0, import_jsx_runtime6.jsx)("path", { d: "M2 5.2 4.2 7.5 8 3", stroke: t.text.onAccent, strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) }) : null;
+-  const inner = (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [(0, import_jsx_runtime6.jsx)("span", { style: box, children: checkMark }), label != null ? (0, import_jsx_runtime6.jsx)("span", { children: label }) : null] });
+-  return (0, import_jsx_runtime6.jsxs)("label", { style: mergeStyle(wrapper, style), children: [(0, import_jsx_runtime6.jsx)("input", { type: "checkbox", checked, disabled, onChange: (e) => onChange?.(e.target.checked), style: input }), inner] });
++  const checkMark = checked ? (0, import_jsx_runtime7.jsx)("svg", { width: 10, height: 10, viewBox: "0 0 10 10", fill: "none", xmlns: "http://www.w3.org/2000/svg", "aria-hidden": "true", style: { display: "block" }, children: (0, import_jsx_runtime7.jsx)("path", { d: "M2 5.2 4.2 7.5 8 3", stroke: t.text.onAccent, strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }) }) : null;
++  const inner = (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [(0, import_jsx_runtime7.jsx)("span", { style: box, children: checkMark }), label != null ? (0, import_jsx_runtime7.jsx)("span", { children: label }) : null] });
++  return (0, import_jsx_runtime7.jsxs)("label", { style: mergeStyle(wrapper, style), children: [(0, import_jsx_runtime7.jsx)("input", { type: "checkbox", checked, disabled, onChange: (e) => onChange?.(e.target.checked), style: input }), inner] });
+ }
+ var toggleSizes = {
+   sm: { track: 16, width: 26, knobOffset: 2 },
+@@ -27796,7 +28337,7 @@
+     transform: checked ? `translateX(${knobTravel}px)` : "translateX(0)",
+     transition: "transform 150ms ease"
+   };
+-  return (0, import_jsx_runtime6.jsx)("button", { type: "button", role: "switch", "aria-checked": checked, disabled, onClick: disabled ? void 0 : () => onChange?.(!checked), style: mergeStyle(track, style), children: (0, import_jsx_runtime6.jsx)("span", { style: knob, "aria-hidden": "true" }) });
++  return (0, import_jsx_runtime7.jsx)("button", { type: "button", role: "switch", "aria-checked": checked, disabled, onClick: disabled ? void 0 : () => onChange?.(!checked), style: mergeStyle(track, style), children: (0, import_jsx_runtime7.jsx)("span", { style: knob, "aria-hidden": "true" }) });
+ }
+ function Select({ value, onChange, options = [], placeholder, disabled = false, style }) {
+   const { tokens: t, kind, radius, typography } = useHostTheme();
+@@ -27844,7 +28385,7 @@
+     display: "flex",
+     alignItems: "center"
+   };
+-  return (0, import_jsx_runtime6.jsxs)("span", { style: mergeStyle(wrapper, style), children: [(0, import_jsx_runtime6.jsxs)("select", { value: value ?? "", onChange: onChange ? (e) => onChange(e.target.value) : void 0, disabled, style: select, children: [placeholder != null && (0, import_jsx_runtime6.jsx)("option", { value: "", disabled: true, style: placeholderOption, children: placeholder }), options.map((opt) => (0, import_jsx_runtime6.jsx)("option", { value: opt.value, disabled: opt.disabled, style: option2, children: opt.label }, opt.value))] }), (0, import_jsx_runtime6.jsx)("span", { style: chevron, "aria-hidden": "true", children: (0, import_jsx_runtime6.jsx)("svg", { width: 10, height: 10, viewBox: "0 0 12 12", fill: "none", xmlns: "http://www.w3.org/2000/svg", "aria-hidden": "true", children: (0, import_jsx_runtime6.jsx)("path", { d: "M3 4.5 6 7.5 9 4.5", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round", strokeLinejoin: "round" }) }) })] });
++  return (0, import_jsx_runtime7.jsxs)("span", { style: mergeStyle(wrapper, style), children: [(0, import_jsx_runtime7.jsxs)("select", { value: value ?? "", onChange: onChange ? (e) => onChange(e.target.value) : void 0, disabled, style: select, children: [placeholder != null && (0, import_jsx_runtime7.jsx)("option", { value: "", disabled: true, style: placeholderOption, children: placeholder }), options.map((opt) => (0, import_jsx_runtime7.jsx)("option", { value: opt.value, disabled: opt.disabled, style: option2, children: opt.label }, opt.value))] }), (0, import_jsx_runtime7.jsx)("span", { style: chevron, "aria-hidden": "true", children: (0, import_jsx_runtime7.jsx)("svg", { width: 10, height: 10, viewBox: "0 0 12 12", fill: "none", xmlns: "http://www.w3.org/2000/svg", "aria-hidden": "true", children: (0, import_jsx_runtime7.jsx)("path", { d: "M3 4.5 6 7.5 9 4.5", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round", strokeLinejoin: "round" }) }) })] });
+ }
+ function IconButton({ children, onClick, disabled = false, title, variant = "default", size = "md", style }) {
+   const { tokens: t, radius, typography } = useHostTheme();
+@@ -27869,11 +28410,11 @@
+     lineHeight: 1,
+     transition: "background 120ms ease, color 120ms ease"
+   };
+-  return (0, import_jsx_runtime6.jsx)("button", { type: "button", title, disabled, onClick: disabled ? void 0 : onClick, style: mergeStyle(base, style), children });
++  return (0, import_jsx_runtime7.jsx)("button", { type: "button", title, disabled, onClick: disabled ? void 0 : onClick, style: mergeStyle(base, style), children });
+ }
+ 
+ // ../canvas-components/dist/swatch.js
+-var import_jsx_runtime7 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime8 = __toESM(require_jsx_runtime(), 1);
+ var SWATCH_SIZE_PX = 24;
+ function Swatch({ color, style }) {
+   const { category, radius } = useHostTheme();
+@@ -27886,12 +28427,12 @@
+     borderRadius: `${radius.sm}px`,
+     background: category[color]
+   };
+-  return (0, import_jsx_runtime7.jsx)("span", { style: mergeStyle(box, style), "aria-hidden": true });
++  return (0, import_jsx_runtime8.jsx)("span", { style: mergeStyle(box, style), "aria-hidden": true });
+ }
+ 
+ // ../canvas-components/dist/todo-list.js
+-var import_jsx_runtime8 = __toESM(require_jsx_runtime(), 1);
+-var import_react7 = __toESM(require_react(), 1);
++var import_jsx_runtime9 = __toESM(require_jsx_runtime(), 1);
++var import_react8 = __toESM(require_react(), 1);
+ function asTodoStatus(status) {
+   switch (status) {
+     case "in_progress":
+@@ -27927,13 +28468,13 @@
+   };
+   switch (status) {
+     case "pending":
+-      return (0, import_jsx_runtime8.jsxs)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg", role: "img", "aria-label": statusLabel, style: s2, children: [(0, import_jsx_runtime8.jsx)("path", { d: "M10.1 2.182a10 10 0 0 1 3.8 0", ...v24stroke }), (0, import_jsx_runtime8.jsx)("path", { d: "M13.9 21.818a10 10 0 0 1-3.8 0", ...v24stroke }), (0, import_jsx_runtime8.jsx)("path", { d: "M17.609 3.721a10 10 0 0 1 2.69 2.7", ...v24stroke }), (0, import_jsx_runtime8.jsx)("path", { d: "M2.182 13.9a10 10 0 0 1 0-3.8", ...v24stroke }), (0, import_jsx_runtime8.jsx)("path", { d: "M20.279 17.609a10 10 0 0 1-2.7 2.69", ...v24stroke }), (0, import_jsx_runtime8.jsx)("path", { d: "M21.818 10.1a10 10 0 0 1 0 3.8", ...v24stroke }), (0, import_jsx_runtime8.jsx)("path", { d: "M3.721 6.391a10 10 0 0 1 2.7-2.69", ...v24stroke }), (0, import_jsx_runtime8.jsx)("path", { d: "M6.391 20.279a10 10 0 0 1-2.69-2.7", ...v24stroke })] });
++      return (0, import_jsx_runtime9.jsxs)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg", role: "img", "aria-label": statusLabel, style: s2, children: [(0, import_jsx_runtime9.jsx)("path", { d: "M10.1 2.182a10 10 0 0 1 3.8 0", ...v24stroke }), (0, import_jsx_runtime9.jsx)("path", { d: "M13.9 21.818a10 10 0 0 1-3.8 0", ...v24stroke }), (0, import_jsx_runtime9.jsx)("path", { d: "M17.609 3.721a10 10 0 0 1 2.69 2.7", ...v24stroke }), (0, import_jsx_runtime9.jsx)("path", { d: "M2.182 13.9a10 10 0 0 1 0-3.8", ...v24stroke }), (0, import_jsx_runtime9.jsx)("path", { d: "M20.279 17.609a10 10 0 0 1-2.7 2.69", ...v24stroke }), (0, import_jsx_runtime9.jsx)("path", { d: "M21.818 10.1a10 10 0 0 1 0 3.8", ...v24stroke }), (0, import_jsx_runtime9.jsx)("path", { d: "M3.721 6.391a10 10 0 0 1 2.7-2.69", ...v24stroke }), (0, import_jsx_runtime9.jsx)("path", { d: "M6.391 20.279a10 10 0 0 1-2.69-2.7", ...v24stroke })] });
+     case "in_progress":
+-      return (0, import_jsx_runtime8.jsxs)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg", role: "img", "aria-label": statusLabel, style: s2, children: [(0, import_jsx_runtime8.jsx)("circle", { cx: 12, cy: 12, r: 10, ...v24stroke }), (0, import_jsx_runtime8.jsx)("path", { d: "M8 12h8", ...v24stroke }), (0, import_jsx_runtime8.jsx)("path", { d: "m12 16 4-4-4-4", ...v24stroke })] });
++      return (0, import_jsx_runtime9.jsxs)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", xmlns: "http://www.w3.org/2000/svg", role: "img", "aria-label": statusLabel, style: s2, children: [(0, import_jsx_runtime9.jsx)("circle", { cx: 12, cy: 12, r: 10, ...v24stroke }), (0, import_jsx_runtime9.jsx)("path", { d: "M8 12h8", ...v24stroke }), (0, import_jsx_runtime9.jsx)("path", { d: "m12 16 4-4-4-4", ...v24stroke })] });
+     case "completed":
+-      return (0, import_jsx_runtime8.jsxs)("svg", { width: 14, height: 14, viewBox: "0 0 14 14", fill: "none", xmlns: "http://www.w3.org/2000/svg", role: "img", "aria-label": statusLabel, style: s2, children: [(0, import_jsx_runtime8.jsx)("circle", { cx: 7, cy: 7, r: 5.25, stroke: "currentColor", strokeWidth: 1.2 }), (0, import_jsx_runtime8.jsx)("path", { d: "M4.5 7 6.5 9 9.5 5", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round", strokeLinejoin: "round" })] });
++      return (0, import_jsx_runtime9.jsxs)("svg", { width: 14, height: 14, viewBox: "0 0 14 14", fill: "none", xmlns: "http://www.w3.org/2000/svg", role: "img", "aria-label": statusLabel, style: s2, children: [(0, import_jsx_runtime9.jsx)("circle", { cx: 7, cy: 7, r: 5.25, stroke: "currentColor", strokeWidth: 1.2 }), (0, import_jsx_runtime9.jsx)("path", { d: "M4.5 7 6.5 9 9.5 5", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round", strokeLinejoin: "round" })] });
+     case "cancelled":
+-      return (0, import_jsx_runtime8.jsxs)("svg", { width: 14, height: 14, viewBox: "0 0 14 14", fill: "none", xmlns: "http://www.w3.org/2000/svg", role: "img", "aria-label": statusLabel, style: s2, children: [(0, import_jsx_runtime8.jsx)("circle", { cx: 7, cy: 7, r: 5.25, stroke: "currentColor", strokeWidth: 1.2 }), (0, import_jsx_runtime8.jsx)("path", { d: "m5 5 4 4M9 5l-4 4", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round" })] });
++      return (0, import_jsx_runtime9.jsxs)("svg", { width: 14, height: 14, viewBox: "0 0 14 14", fill: "none", xmlns: "http://www.w3.org/2000/svg", role: "img", "aria-label": statusLabel, style: s2, children: [(0, import_jsx_runtime9.jsx)("circle", { cx: 7, cy: 7, r: 5.25, stroke: "currentColor", strokeWidth: 1.2 }), (0, import_jsx_runtime9.jsx)("path", { d: "m5 5 4 4M9 5l-4 4", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round" })] });
+   }
+ }
+ function indicatorColor(status, t) {
+@@ -27985,13 +28526,13 @@
+     color: contentColor,
+     textDecoration: rowStrike ? "line-through" : void 0
+   };
+-  return (0, import_jsx_runtime8.jsx)("li", { id: `todo-${todo.id}`, style: {
++  return (0, import_jsx_runtime9.jsx)("li", { id: `todo-${todo.id}`, style: {
+     position: "relative",
+     display: "flex",
+     alignItems: "flex-start",
+     padding: 0,
+     margin: 0
+-  }, children: (0, import_jsx_runtime8.jsxs)("button", { type: "button", onClick: () => onTodoClick?.(todo), style: labelStyle, children: [(0, import_jsx_runtime8.jsx)("span", { style: indicatorBox, children: (0, import_jsx_runtime8.jsx)(TodoStatusGlyph, { status, color: iconTone }) }), (0, import_jsx_runtime8.jsx)("span", { style: contentStyle, children: todo.content })] }) });
++  }, children: (0, import_jsx_runtime9.jsxs)("button", { type: "button", onClick: () => onTodoClick?.(todo), style: labelStyle, children: [(0, import_jsx_runtime9.jsx)("span", { style: indicatorBox, children: (0, import_jsx_runtime9.jsx)(TodoStatusGlyph, { status, color: iconTone }) }), (0, import_jsx_runtime9.jsx)("span", { style: contentStyle, children: todo.content })] }) });
+ }
+ function TodoList({ todos = [], dimmedTodoIds, onTodoClick, style }) {
+   if (todos.length === 0)
+@@ -28005,16 +28546,17 @@
+     gap: `${canvasSpacing["2.5"]}px`,
+     width: "100%"
+   };
+-  return (0, import_jsx_runtime8.jsx)("ul", { style: mergeStyle(listStyle, style), children: todos.map((todo) => (0, import_jsx_runtime8.jsx)(CanvasTodoListItem, { todo, isDimmed: dimmedTodoIds?.has(todo.id), onTodoClick }, todo.id)) });
++  return (0, import_jsx_runtime9.jsx)("ul", { style: mergeStyle(listStyle, style), children: todos.map((todo) => (0, import_jsx_runtime9.jsx)(CanvasTodoListItem, { todo, isDimmed: dimmedTodoIds?.has(todo.id), onTodoClick }, todo.id)) });
+ }
+ function TodoListCard({ todos = [], dimmedTodoIds, defaultExpanded = true, onTodoClick, style }) {
+   const { tokens: t, radius, typography } = useHostTheme();
+-  const [isExpanded, setIsExpanded] = (0, import_react7.useState)(defaultExpanded);
+-  const finishedCount = (0, import_react7.useMemo)(() => todos.filter((item) => {
++  const [isExpanded, setIsExpanded] = (0, import_react8.useState)(defaultExpanded);
++  const fold = useFoldMotion(isExpanded);
++  const finishedCount = (0, import_react8.useMemo)(() => todos.filter((item) => {
+     const s2 = asTodoStatus(item.status);
+     return s2 === "completed" || s2 === "cancelled";
+   }).length, [todos]);
+-  const handleToggle = (0, import_react7.useCallback)(() => {
++  const handleToggle = (0, import_react8.useCallback)(() => {
+     setIsExpanded((prev) => !prev);
+   }, []);
+   if (todos.length === 0)
+@@ -28065,18 +28607,18 @@
+   const body3 = {
+     padding: `${canvasSpacing["2"]}px ${canvasSpacing["4"]}px`
+   };
+-  return (0, import_jsx_runtime8.jsxs)("div", { style: mergeStyle(container, style), children: [(0, import_jsx_runtime8.jsx)("button", { type: "button", onClick: handleToggle, style: headerStyle, "aria-expanded": isExpanded, children: (0, import_jsx_runtime8.jsx)("div", { style: headerLeft, children: (0, import_jsx_runtime8.jsxs)("div", { style: titleRow, children: [(0, import_jsx_runtime8.jsx)(CanvasChevron, { expanded: isExpanded }), finishedCount > 0 ? (0, import_jsx_runtime8.jsxs)("span", { children: [finishedCount, " of ", todos.length, " Done"] }) : (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: ["To-dos ", (0, import_jsx_runtime8.jsx)("span", { style: countStyle, children: todos.length })] })] }) }) }), isExpanded ? (0, import_jsx_runtime8.jsx)("div", { style: body3, children: (0, import_jsx_runtime8.jsx)(TodoList, { todos, dimmedTodoIds, onTodoClick }) }) : null] });
++  return (0, import_jsx_runtime9.jsxs)("div", { style: mergeStyle(container, style), children: [(0, import_jsx_runtime9.jsx)("button", { type: "button", onClick: handleToggle, style: headerStyle, "aria-expanded": isExpanded, children: (0, import_jsx_runtime9.jsx)("div", { style: headerLeft, children: (0, import_jsx_runtime9.jsxs)("div", { style: titleRow, children: [(0, import_jsx_runtime9.jsx)(CanvasChevron, { expanded: isExpanded }), finishedCount > 0 ? (0, import_jsx_runtime9.jsxs)("span", { children: [finishedCount, " of ", todos.length, " Done"] }) : (0, import_jsx_runtime9.jsxs)(import_jsx_runtime9.Fragment, { children: ["To-dos ", (0, import_jsx_runtime9.jsx)("span", { style: countStyle, children: todos.length })] })] }) }) }), (0, import_jsx_runtime9.jsx)(FoldClip, { motion: fold, children: (0, import_jsx_runtime9.jsx)("div", { style: body3, children: (0, import_jsx_runtime9.jsx)(TodoList, { todos, dimmedTodoIds, onTodoClick }) }) })] });
+ }
+ 
+ // ../canvas-components/dist/usage-bar.js
+-var import_jsx_runtime9 = __toESM(require_jsx_runtime(), 1);
++var import_jsx_runtime10 = __toESM(require_jsx_runtime(), 1);
+ function safeValue(value) {
+   return Number.isFinite(value) && value > 0 ? value : 0;
+ }
+-function UsageBar({ segments, total, topLeftLabel, topRightLabel, style }) {
++function UsageBar({ segments: segments2, total, topLeftLabel, topRightLabel, style }) {
+   const { tokens: t, typography } = useHostTheme();
+   const safeTotal = safeValue(total);
+-  const used = segments.reduce((sum, segment) => sum + safeValue(segment.value), 0);
++  const used = segments2.reduce((sum, segment) => sum + safeValue(segment.value), 0);
+   const remainder = Math.max(0, safeTotal - used);
+   const showLabelRow = topLeftLabel != null || topRightLabel != null;
+   const wrapperStyle = {
+@@ -28118,14 +28660,14 @@
+     minWidth: canvasSpacing[1],
+     borderRadius: 1
+   };
+-  return (0, import_jsx_runtime9.jsxs)("div", { style: mergeStyle(wrapperStyle, style), children: [showLabelRow ? (0, import_jsx_runtime9.jsxs)("div", { style: labelRowStyle, children: [(0, import_jsx_runtime9.jsx)("span", { style: { minWidth: 0 }, children: topLeftLabel }), (0, import_jsx_runtime9.jsx)("span", { style: { minWidth: 0, textAlign: "right" }, children: topRightLabel })] }) : null, (0, import_jsx_runtime9.jsx)("div", { role: "img", "aria-label": `Usage bar: ${used} of ${safeTotal} used`, style: barStyle, children: (0, import_jsx_runtime9.jsxs)("div", { style: segmentsRowStyle, children: [segments.map((segment, index) => {
++  return (0, import_jsx_runtime10.jsxs)("div", { style: mergeStyle(wrapperStyle, style), children: [showLabelRow ? (0, import_jsx_runtime10.jsxs)("div", { style: labelRowStyle, children: [(0, import_jsx_runtime10.jsx)("span", { style: { minWidth: 0 }, children: topLeftLabel }), (0, import_jsx_runtime10.jsx)("span", { style: { minWidth: 0, textAlign: "right" }, children: topRightLabel })] }) : null, (0, import_jsx_runtime10.jsx)("div", { role: "img", "aria-label": `Usage bar: ${used} of ${safeTotal} used`, style: barStyle, children: (0, import_jsx_runtime10.jsxs)("div", { style: segmentsRowStyle, children: [segments2.map((segment, index) => {
+     const resolvedColor = segment.color ?? usageColorSequence[index % usageColorSequence.length];
+-    return (0, import_jsx_runtime9.jsx)("span", { "aria-hidden": "true", style: {
++    return (0, import_jsx_runtime10.jsx)("span", { "aria-hidden": "true", style: {
+       ...baseSegmentStyle,
+       flexGrow: safeValue(segment.value),
+       background: t.category[resolvedColor]
+     } }, segment.id);
+-  }), (0, import_jsx_runtime9.jsx)("span", { "aria-hidden": "true", style: {
++  }), (0, import_jsx_runtime10.jsx)("span", { "aria-hidden": "true", style: {
+     ...baseSegmentStyle,
+     flexGrow: remainder,
+     background: t.fill.tertiary
+@@ -28178,7 +28720,7 @@
+ var CANVAS_ERROR_PANEL_BODY = "Its code ran into an error. Ask the agent that made it to fix it.";
+ var CANVAS_ERROR_PANEL_DETAILS_LABEL = "Error details";
+ var CANVAS_ERROR_PANEL_MAX_MESSAGE_CHARS = 4e3;
+-function escapeHtml(value) {
++function escapeHtml2(value) {
+   return value.replace(/[&<>"']/g, (char) => {
+     switch (char) {
+       case "&":
+@@ -28209,7 +28751,7 @@
+ function canvasErrorPanelHtml(message) {
+   const shown = truncateCanvasErrorMessage(message.trim());
+   const hiddenAttr = shown ? "" : " hidden";
+-  return `<style>${PANEL_CSS}</style><div ${CANVAS_ERROR_PANEL_ATTRIBUTE}="" role="alert"><h2>${CANVAS_ERROR_PANEL_TITLE}</h2><p>${CANVAS_ERROR_PANEL_BODY}</p><details${hiddenAttr}><summary>${CANVAS_ERROR_PANEL_DETAILS_LABEL}</summary><pre ${CANVAS_ERROR_PANEL_MESSAGE_ATTRIBUTE}="">${escapeHtml(shown)}</pre></details></div>`;
++  return `<style>${PANEL_CSS}</style><div ${CANVAS_ERROR_PANEL_ATTRIBUTE}="" role="alert"><h2>${CANVAS_ERROR_PANEL_TITLE}</h2><p>${CANVAS_ERROR_PANEL_BODY}</p><details${hiddenAttr}><summary>${CANVAS_ERROR_PANEL_DETAILS_LABEL}</summary><pre ${CANVAS_ERROR_PANEL_MESSAGE_ATTRIBUTE}="">${escapeHtml2(shown)}</pre></details></div>`;
+ }
+ 
+ // ../canvas-shared/dist/canvas-frame-find.js
+@@ -28236,6 +28778,34 @@
+ function canvasFindRequest(){try{parent.postMessage({type:${JSON.stringify(CANVAS_FRAME_FIND_REQUEST_MESSAGE_TYPE)}},'*')}catch{}}`;
+ }
+ 
++// ../canvas-shared/dist/canvas-frame-height-floor.js
++var CANVAS_FRAME_HEIGHT_FLOOR_ACTION_SETTLE_MS = 400;
++var CANVAS_FRAME_HEIGHT_FLOOR_SCRIPT = `(function(){
++var root=document.documentElement,inside=false,floor=0,actedUntil=0;
++function follow(){
++var next=Math.min(Math.ceil(scrollY+innerHeight),root.scrollHeight);
++if(!(next>0)||next===floor)return;
++floor=next;root.style.minHeight=next+'px'}
++function settle(){
++if(floor!==0&&!(inside&&performance.now()>=actedUntil)){floor=0;root.style.minHeight=''}
++follow()}
++function enter(e){if(e.pointerType==='touch')return;inside=true;follow()}
++function leave(){inside=false;settle()}
++function acted(){actedUntil=performance.now()+${CANVAS_FRAME_HEIGHT_FLOOR_ACTION_SETTLE_MS};settle()}
++addEventListener('pointerover',enter,true);
++addEventListener('pointermove',enter,{passive:true});
++root.addEventListener('pointerleave',leave);
++addEventListener('scroll',follow,{passive:true});
++addEventListener('resize',follow);
++addEventListener('load',follow);
++addEventListener('click',acted,true);
++addEventListener('keydown',acted,true);
++addEventListener('beforeprint',acted);
++addEventListener('pagehide',leave);
++document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')leave()});
++if(typeof ResizeObserver!=='undefined'&&document.body)new ResizeObserver(settle).observe(document.body);
++follow()})();`;
++
+ // ../canvas-shared/dist/canvas-root-layout.js
+ var CANVAS_VIEWPORT_HEIGHT_CSS_VAR = "--cursor-canvas-viewport-height";
+ var CANVAS_BODY_PADDING_VERTICAL_PX = 24;
+@@ -28269,6 +28839,7 @@
+ if(typeof bottom==='number'&&bottom>=0)style.setProperty('${CANVAS_FRAME_BOTTOM_INSET_CSS_VAR}',bottom+'px');else style.removeProperty('${CANVAS_FRAME_BOTTOM_INSET_CSS_VAR}')});
+ ${canvasFrameFindScript()}
+ <\/script>`;
++var HEIGHT_FLOOR_SCRIPT = `<script>${CANVAS_FRAME_HEIGHT_FLOOR_SCRIPT}<\/script>`;
+ var CSP_QUOTE = String.fromCodePoint(39);
+ var cspKeyword = (keyword) => `${CSP_QUOTE}${keyword}${CSP_QUOTE}`;
+ var CSP_NONE = cspKeyword("none");
+@@ -28316,11 +28887,11 @@
+ var CANVAS_FRAME_BASE_LINE_HEIGHT = 1.385;
+ 
+ // src/canvas-bootstrap.ts
+-var import_react10 = __toESM(require_react(), 1);
++var import_react12 = __toESM(require_react(), 1);
+ var import_client = __toESM(require_client(), 1);
+ 
+ // src/canvas-source-anchors.ts
+-var import_react9 = __toESM(require_react(), 1);
++var import_react10 = __toESM(require_react(), 1);
+ 
+ // src/canvas-source-anchors-contract.ts
+ var CANVAS_SOURCE_ANCHORS_GLOBAL = "__cursorCanvasSourceAnchors";
+@@ -28388,16 +28959,16 @@
+ function sourceAnchorJsxDEV(type, props, key2, _isStaticChildren, source) {
+   const anchor = readAnchor(source);
+   const elementType = type;
+-  if (anchor === void 0 || type === import_react9.default.Fragment) {
+-    return import_react9.default.createElement(elementType, withKey(props, key2));
++  if (anchor === void 0 || type === import_react10.default.Fragment) {
++    return import_react10.default.createElement(elementType, withKey(props, key2));
+   }
+   if (typeof type === "string") {
+-    return import_react9.default.createElement(elementType, {
++    return import_react10.default.createElement(elementType, {
+       ...withKey(props, key2),
+       [CANVAS_SOURCE_ATTRIBUTE]: `${anchor.line}:${anchor.column}`
+     });
+   }
+-  const element2 = import_react9.default.createElement(elementType, withKey(props, key2));
++  const element2 = import_react10.default.createElement(elementType, withKey(props, key2));
+   componentAnchors.set(element2.props, {
+     name: componentName(type),
+     anchor,
+@@ -28658,6 +29229,123 @@
+   postToParent({ type: CANVAS_DESIGN_CAPABLE_MESSAGE_TYPE, sourceFile: anchors.sourceFile });
+ }
+ 
++// ../canvas-components/dist/grok/scroll-fade.js
++var import_react11 = __toESM(require_react(), 1);
++var SCROLL_FADE_PX = 24;
++var SCROLL_FADE_ATTRIBUTE = "data-cursor-scroll-fade";
++var LEFT_VAR = "--cursor-scroll-fade-left";
++var RIGHT_VAR = "--cursor-scroll-fade-right";
++var STYLE_ELEMENT_ID = "cursor-scroll-fade-style";
++function scrollFadeStyleSheet() {
++  const mask = `linear-gradient(90deg, transparent, #000 var(${LEFT_VAR}), #000 calc(100% - var(${RIGHT_VAR})), transparent)`;
++  const ease = "160ms cubic-bezier(0.23, 1, 0.32, 1)";
++  return [
++    `@property ${LEFT_VAR}{syntax:"<length>";inherits:false;initial-value:0px}`,
++    `@property ${RIGHT_VAR}{syntax:"<length>";inherits:false;initial-value:0px}`,
++    `[${SCROLL_FADE_ATTRIBUTE}]{-webkit-mask-image:${mask}!important;mask-image:${mask}!important;transition:${LEFT_VAR} ${ease},${RIGHT_VAR} ${ease}}`,
++    `@media (prefers-reduced-motion:reduce){[${SCROLL_FADE_ATTRIBUTE}]{transition:none}}`
++  ].join("");
++}
++function ensureScrollFadeStyle(doc) {
++  if (doc.getElementById(STYLE_ELEMENT_ID) !== null) {
++    return;
++  }
++  const style = doc.createElement("style");
++  style.id = STYLE_ELEMENT_ID;
++  style.textContent = scrollFadeStyleSheet();
++  doc.head.appendChild(style);
++}
++function readScrollEdges(element2) {
++  return {
++    left: element2.scrollLeft > 1,
++    right: element2.scrollLeft + element2.clientWidth < element2.scrollWidth - 1
++  };
++}
++function watchScrollEdges(element2, { onChange, observe = [] } = {}) {
++  ensureScrollFadeStyle(element2.ownerDocument);
++  let current;
++  const update = () => {
++    const next = readScrollEdges(element2);
++    if (current !== void 0 && current.left === next.left && current.right === next.right) {
++      return;
++    }
++    current = next;
++    element2.style.setProperty(LEFT_VAR, next.left ? `${SCROLL_FADE_PX}px` : "0px");
++    element2.style.setProperty(RIGHT_VAR, next.right ? `${SCROLL_FADE_PX}px` : "0px");
++    element2.toggleAttribute(SCROLL_FADE_ATTRIBUTE, next.left || next.right);
++    onChange?.(next);
++  };
++  update();
++  element2.addEventListener("scroll", update, { passive: true });
++  let observer;
++  if (typeof ResizeObserver !== "undefined") {
++    observer = new ResizeObserver(update);
++    observer.observe(element2);
++    for (const child of element2.children) {
++      observer.observe(child);
++    }
++    for (const content of observe) {
++      observer.observe(content);
++    }
++  }
++  return () => {
++    element2.removeEventListener("scroll", update);
++    observer?.disconnect();
++    element2.removeAttribute(SCROLL_FADE_ATTRIBUTE);
++    element2.style.removeProperty(LEFT_VAR);
++    element2.style.removeProperty(RIGHT_VAR);
++  };
++}
++
++// src/canvas-table-scroll-fade.ts
++var RAW_TABLE_SELECTOR = 'table,[role="table"],[role="grid"]';
++function horizontalScrollerOf(table, root2) {
++  const view = root2.ownerDocument.defaultView;
++  if (view === null) {
++    return void 0;
++  }
++  for (let node = table.parentElement; node !== null && node !== root2; node = node.parentElement) {
++    const { overflowX } = view.getComputedStyle(node);
++    if (overflowX === "auto" || overflowX === "scroll") {
++      return node;
++    }
++  }
++  return void 0;
++}
++function installTableScrollFades(root2) {
++  const fades = /* @__PURE__ */ new Map();
++  const scan = () => {
++    const live = /* @__PURE__ */ new Set();
++    for (const table of root2.querySelectorAll(RAW_TABLE_SELECTOR)) {
++      const scroller = horizontalScrollerOf(table, root2);
++      if (scroller === void 0 || live.has(scroller)) {
++        continue;
++      }
++      live.add(scroller);
++      const fade = fades.get(scroller);
++      if (fade?.table === table) {
++        continue;
++      }
++      fade?.stop();
++      fades.set(scroller, { table, stop: watchScrollEdges(scroller, { observe: [table] }) });
++    }
++    for (const [scroller, fade] of fades) {
++      if (!live.has(scroller)) {
++        fade.stop();
++        fades.delete(scroller);
++      }
++    }
++  };
++  scan();
++  const mutations = typeof MutationObserver === "undefined" ? void 0 : new MutationObserver(scan);
++  mutations?.observe(root2, { childList: true, subtree: true });
++  return () => {
++    mutations?.disconnect();
++    for (const fade of fades.values()) fade.stop();
++    fades.clear();
++  };
++}
++
+ // src/canvas-bootstrap.ts
+ var CANVAS_PREVIEW_RESIZE_MESSAGE_TYPE = "cursor-canvas-preview-resize";
+ function getCanvasRuntimeGlobal() {
+@@ -28712,7 +29400,7 @@
+ }
+ function useCursorBodyTheme() {
+   const theme = useHostTheme();
+-  return import_react10.default.useMemo(
++  return import_react12.default.useMemo(
+     () => ({
+       kind: theme.kind,
+       background: theme.tokens.bg.editor,
+@@ -28730,7 +29418,7 @@
+ }) {
+   const theme = useBodyTheme();
+   const narrowViewport = useNarrowViewport();
+-  import_react10.default.useLayoutEffect(() => {
++  import_react12.default.useLayoutEffect(() => {
+     applyBodyTheme(theme, { previewMode, narrowViewport });
+   }, [theme, previewMode, narrowViewport]);
+   return children;
+@@ -28747,7 +29435,7 @@
+   return () => query?.removeEventListener("change", onChange);
+ }
+ function useNarrowViewport() {
+-  return import_react10.default.useSyncExternalStore(
++  return import_react12.default.useSyncExternalStore(
+     subscribeToNarrowViewport,
+     () => narrowViewportQuery()?.matches ?? false
+   );
+@@ -28836,7 +29524,7 @@
+   }
+   reportErrorToHost(message, phase);
+ }
+-var HostRuntimeErrorBoundary = class extends import_react10.default.Component {
++var HostRuntimeErrorBoundary = class extends import_react12.default.Component {
+   constructor() {
+     super(...arguments);
+     this.state = { errorMessage: null };
+@@ -28856,7 +29544,7 @@
+     if (this.props.silent) {
+       return null;
+     }
+-    return import_react10.default.createElement("div", {
++    return import_react12.default.createElement("div", {
+       dangerouslySetInnerHTML: { __html: canvasErrorPanelHtml(errorMessage) }
+     });
+   }
+@@ -28895,8 +29583,8 @@
+ async function mountCanvasWithKit(appModuleUrl, kit) {
+   const previewMode = isCanvasPreviewMode();
+   const runtimeGlobal = getCanvasRuntimeGlobal();
+-  runtimeGlobal.React = import_react10.default;
+-  Object.assign(runtimeGlobal, import_react10.default);
++  runtimeGlobal.React = import_react12.default;
++  Object.assign(runtimeGlobal, import_react12.default);
+   Object.assign(runtimeGlobal, kit.globals);
+   installSourceAnchorRuntime();
+   const rootElement = document.getElementById("root");
+@@ -28921,16 +29609,18 @@
+     }
+     const root2 = (0, import_client.createRoot)(rootElement);
+     root2.render(
+-      import_react10.default.createElement(
++      import_react12.default.createElement(
+         HostRuntimeErrorBoundary,
+         { silent: previewMode },
+-        import_react10.default.createElement(
++        import_react12.default.createElement(
+           CanvasShell,
+           { previewMode, useBodyTheme: kit.useBodyTheme },
+-          import_react10.default.createElement(CanvasComponent)
++          import_react12.default.createElement(CanvasComponent)
+         )
+       )
+     );
++    installTableScrollFades(rootElement);
++    installTableCopy(rootElement);
+     if (previewMode) {
+       installPreviewResizeReporter(rootElement);
+     } else {
