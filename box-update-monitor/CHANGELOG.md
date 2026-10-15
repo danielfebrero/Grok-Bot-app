@@ -9,6 +9,31 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-15 18:45 (Paris) — snapshot `2026-10-15_17-46` → `2026-10-15_18-45`
+
+Versions touchées : agent-store-fuse `f624c0a` → `a5f7c61` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `701b86e`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump agent-store-fuse (rebuild opaque / oscillation du pin, comme les snapshots précédents). Seul le fichier de version change.
+
+Rapport : [reports/2026-10-15_18-45.md](reports/2026-10-15_18-45.md).
+
+
+## 2026-10-15 17:46 (Paris) — snapshot `2026-10-15_12-51` → `2026-10-15_17-46`
+
+Versions touchées : **sand-host** `4098fb0` → `701b86e` (hot-update, image inchangée `4098fb0`) ; agent-store-fuse `0c3b083` → `f624c0a` ; exec-daemon, orbitd, Chrome 154.0.8037.97, Node, Python inchangés. Fichiers : +1 / −0 / ~13.
+
+- **Bugfix** : —
+- **Change** : `box-chrome` v3 exporte `SAND_DESKTOP_UNIT`, ajoute `--disable-blink-features=AutomationControlled` et un flag launcher versionné ; `stop-window` gagne un mode `--park` (garde le profil Chrome) et un arrêt propre du navigateur du profil avant le sweep ; `start-window` source `sand-desktop-unit.sh` et tue l’unité avant de relancer X.
+- **Features** : nouveau script `sand-desktop-unit.sh` (kill des process tagués `SAND_DESKTOP_UNIT` + Chrome du profil) ; `sand-window-router` marque les displays utilisés via `/tmp/sand-window-used.d` (touch périodique + marqueurs `.inflight`).
+- **Perf** : `sand-ua-governor` attache récursivement iframes/workers out-of-process (`Target.setAutoAttach` + filtre) pour propager le traitement UA au-delà des enfants directs.
+- **Autre/infra** : rebuilds `host-main.cjs` / `sand-eval-runner.cjs` ; `agent-store-worker`, `box-store-vacuum-worker` et `search-index-worker` reçoivent la lib d’écriture atomique no-follow + exclusions sand-data host-owned ; bump agent-store-fuse (pin S3).
+
+Rapport : [reports/2026-10-15_17-46.md](reports/2026-10-15_17-46.md).
+
 ## 2026-10-15 12:51 (Paris) — snapshot `2026-10-15_10-54-2` → `2026-10-15_12-51`
 
 Versions touchées : **image** `726deab` → `4098fb0` (box scripts idem) ; exec-daemon build `2026-10-12T14:49` → `2026-10-14T14:48` ; agent-store-fuse `7516de1` → `0c3b083` ; sand-host déjà `4098fb0` (alignement image↔host après Update Computer). Chrome 154.0.8037.97, Node, Python, orbitd inchangés. Fichiers : +4 / −0 / ~42.
