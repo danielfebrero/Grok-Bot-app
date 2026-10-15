@@ -40,7 +40,8 @@
    "cadence": "daily",
    "category": "b",
    "pair": "delete_label",
-   "status": "executed-cleaned"
+   "status": "skipped",
+   "reason": "GitHub 403 « Resource not accessible by integration » (2026-10-15) — à rejouer si la permission de l'intégration est rétablie"
   },
   "create_pull_request": {
    "cadence": "never",
@@ -66,7 +67,8 @@
    "cadence": "daily",
    "category": "b",
    "pair": "create_label",
-   "status": "executed-cleaned"
+   "status": "skipped",
+   "reason": "paire non jouée : create_label refusé (403, 2026-10-15)"
   },
   "delete_pending_pull_request_review": {
    "cadence": "never",
@@ -163,7 +165,8 @@
    },
    "cadence": "daily",
    "category": "a",
-   "status": "executed"
+   "status": "not-run",
+   "reason": "dépend du label temporaire (create_label 403, 2026-10-15) ; vérif 404 OK"
   },
   "get_latest_release": {
    "args": {
@@ -393,7 +396,8 @@
    },
    "cadence": "daily",
    "category": "a",
-   "status": "executed"
+   "status": "not-run",
+   "reason": "GitHub 403 « Resource not accessible by integration » (2026-10-15) — à rejouer si la permission de l'intégration est rétablie"
   },
   "list_sub_issues": {
    "args": {

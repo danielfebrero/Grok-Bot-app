@@ -1,0 +1,21 @@
+{
+  "namespace": "user-Apollo",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-14T16:24:10+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "email_accounts": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "required": [
+        "email_accounts"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "apollo_email_accounts_index"
+}

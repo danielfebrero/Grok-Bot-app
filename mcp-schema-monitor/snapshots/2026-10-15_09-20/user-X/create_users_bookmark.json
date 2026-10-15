@@ -1,0 +1,31 @@
+{
+  "description": "Create Bookmark",
+  "inputSchema": {
+    "properties": {
+      "folder_id": {
+        "description": "Optional ID of the Bookmark folder to add the Post(s) to. When omitted, Posts are added to the us...",
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "tweet_id": {
+        "description": "The ID of the Post to add to the user's Bookmarks. Mutually exclusive with `tweet_ids`.",
+        "type": "string"
+      },
+      "tweet_ids": {
+        "description": "Post IDs to add to the user's Bookmarks. At most 25. Mutually exclusive with `tweet_id`.",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_users_bookmark"
+}

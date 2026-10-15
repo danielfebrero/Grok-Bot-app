@@ -1,0 +1,43 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-15T09:18:50+02:00",
+    "responseKind": "json",
+    "schema": {
+      "items": {
+        "properties": {
+          "commit": {
+            "properties": {
+              "sha": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "sha",
+              "url"
+            ],
+            "type": "object"
+          },
+          "name": {
+            "type": "string"
+          },
+          "protected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "commit",
+          "name",
+          "protected"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_branches"
+}

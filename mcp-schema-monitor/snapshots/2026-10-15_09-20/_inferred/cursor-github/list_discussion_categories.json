@@ -1,0 +1,41 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-15T09:18:50+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "repository": {
+          "properties": {
+            "discussionCategories": {
+              "properties": {
+                "nodes": {
+                  "items": {},
+                  "type": "array"
+                },
+                "totalCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "nodes",
+                "totalCount"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "discussionCategories"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "repository"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "list_discussion_categories"
+}

@@ -1,0 +1,77 @@
+{
+  "description": "Create X activity subscription",
+  "inputSchema": {
+    "properties": {
+      "event_type": {
+        "description": "Activity event type in dot notation. `chat.conversation_join` is a deprecated alias of `chat.conv...",
+        "enum": [
+          "profile.update.bio",
+          "profile.update.profile_picture",
+          "profile.update.banner_picture",
+          "profile.update.screenname",
+          "profile.update.geo",
+          "profile.update.url",
+          "profile.update.verified_badge",
+          "profile.update.affiliate_badge",
+          "profile.update.handle",
+          "news.new",
+          "follow.follow",
+          "follow.unfollow",
+          "subscriptions.subscribe",
+          "subscriptions.unsubscribe",
+          "spaces.start",
+          "spaces.end",
+          "broadcast.start",
+          "broadcast.end",
+          "broadcast.chat",
+          "broadcast.chat.remove"
+        ],
+        "type": "string"
+      },
+      "expires_at": {
+        "description": "Optional RFC 3339 expiration time. Re-creating the same subscription refreshes this value; omitti...",
+        "type": "string"
+      },
+      "filter": {
+        "properties": {
+          "direction": {
+            "description": "Optional direction filter for directional events. Not supported for mute.* or block.* events.",
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "type": "string"
+          },
+          "keyword": {
+            "description": "Optional keyword filter.",
+            "type": "string"
+          },
+          "qualifiers": {
+            "description": "Optional event-specific string predicates.",
+            "type": "object"
+          },
+          "user_id": {
+            "description": "User the subscription is scoped to. For mute.* and block.* events, this must be the authenticated...",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "tag": {
+        "description": "Optional caller-defined tag.",
+        "type": "string"
+      },
+      "webhook_id": {
+        "description": "Webhook to deliver the subscription events to.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event_type",
+      "filter"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "create_activity_subscription"
+}

@@ -55,8 +55,7 @@
    "args": {},
    "cadence": "daily",
    "category": "a",
-   "reason": "timeout serveur (MCP -32001)",
-   "status": "not-run"
+   "status": "executed"
   },
   "list-users": {
    "args": {
