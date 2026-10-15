@@ -9,6 +9,19 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-15 12:51 (Paris) — snapshot `2026-10-15_10-54-2` → `2026-10-15_12-51`
+
+Versions touchées : **image** `726deab` → `4098fb0` (box scripts idem) ; exec-daemon build `2026-10-12T14:49` → `2026-10-14T14:48` ; agent-store-fuse `7516de1` → `0c3b083` ; sand-host déjà `4098fb0` (alignement image↔host après Update Computer). Chrome 154.0.8037.97, Node, Python, orbitd inchangés. Fichiers : +4 / −0 / ~42.
+
+- **Bugfix** : restauration des cookies Chrome au cold launch (`box-chrome` + `sand-cookie-persist.mjs --restore-port`) pour éviter qu’une page charge avant le seed et écrase la session.
+- **Change** : extension WebAuthn proxy re-pinnée (`oifaalpenddpcpgklkncbmdaocjdnlgc` → `alhdnckjfkmaljmljdhjfpecddnfjide`, crx + policy + native-messaging + update.xml). Paquets Debian : curl/libcurl → u7 ; `librsvg2` security bump ; retrait dpkg de `grok-bot` 0.70.2, tesseract/leptonica/libsecret, et des libs FIDO2/`openssh-client` ajoutées à 10:54. Skills gérées : slides/slides-executor (édition live via Slides MCP), purchases (vérifier commande après échec), agent-email (forme `name+tag@`), code-changes (watch = conversation, pas session).
+- **Features** : nouveau module natif `sand-card-text-recognition` (OCR on-device pour fill photo de carte) dans `/opt/sand/deps` + manifeste runtime ; hook hibernate/box-store-flush dans `start-sand-box` (`SAND_BOX_STORE_HIBERNATE_HOOK`, fifo `/run/sand-box-store-flush`) ; `cursor-proclist` expose `cursor_set_compact_window_toolbar` (macOS) ; chunk exec-daemon `81.index.js`.
+- **Perf** : —
+- **Autre/infra** : rebuilds binaires (`cursorsandbox`, `tools/origin`, `sand-egress-tunnel`, `uv`/`uvx`, `sand-daemon-supervisor`, canvas-runtime, polished-renderer) ; bump agent-store-fuse (pin S3).
+
+Rapport : [reports/2026-10-15_12-51.md](reports/2026-10-15_12-51.md).
+
+
 ## 2026-10-15 10:54 (Paris) — snapshot `2026-10-15_07-46` → `2026-10-15_10-54`
 
 Versions touchées : agent-store-fuse `0c3b083` → `7516de1` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; **nouveau support WebAuthn / FIDO2 côté box**. image `726deab`, sand-host `4098fb0`, exec-daemon, orbitd, Chrome 154.0.8037.97, Node, Python inchangés. Fichiers : +0 / −0 / ~2.
