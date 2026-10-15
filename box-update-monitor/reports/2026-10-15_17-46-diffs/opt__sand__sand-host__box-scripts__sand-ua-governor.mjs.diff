@@ -1,0 +1,114 @@
+--- 2026-10-15_12-51:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
++++ 2026-10-15_17-46:/opt/sand/sand-host/box-scripts/sand-ua-governor.mjs
+@@ -128,8 +128,7 @@
+ 
+ export async function installDocumentScript(browser, sessionId, script) {
+   if (documentScriptMap(browser).has(sessionId)) await removeDocumentScript(browser, sessionId);
+-  const [, , added] = await Promise.all([
+-    browser.send("Runtime.evaluate", { expression: script }, sessionId),
++  const [, added] = await Promise.all([
+     browser.send("Page.enable", {}, sessionId),
+     browser.send("Page.addScriptToEvaluateOnNewDocument", { source: script }, sessionId),
+   ]);
+@@ -138,18 +137,71 @@
+   }
+ }
+ 
+-export async function applyUaTreatmentToTarget(browser, sessionId, targetInfo) {
++function relatedTargetSessions(browser) {
++  if (browser.relatedTargetSessions == null) {
++    browser.relatedTargetSessions = new Set();
++  }
++  return browser.relatedTargetSessions;
++}
++
++/*
++Chrome auto-attach reaches only the direct children of the session it is
++called on, so each page, frame, and worker has to attach its own
++out-of-process iframes and workers
++(https://chromedevtools.github.io/devtools-protocol/tot/Target/#method-setAutoAttach).
++*/
++const RELATED_TARGET_FILTER = [
++  { type: "iframe", exclude: false },
++  { type: "worker", exclude: false },
++  { type: "shared_worker", exclude: false },
++  { exclude: true },
++];
++
++function attachRelatedTargets(browser, sessionId) {
++  const sessions = relatedTargetSessions(browser);
++  if (sessions.has(sessionId)) return Promise.resolve();
++  sessions.add(sessionId);
++  return browser
++    .send(
++      "Target.setAutoAttach",
++      {
++        autoAttach: true,
++        waitForDebuggerOnStart: true,
++        flatten: true,
++        filter: RELATED_TARGET_FILTER,
++      },
++      sessionId,
++    )
++    .catch((error) => {
++      sessions.delete(sessionId);
++      throw error;
++    });
++}
++
++function startsBeforeFirstDocument(target) {
++  return target?.type === "iframe" && target.waitingForDebugger === true;
++}
++
++export async function applyUaTreatmentToTarget(browser, sessionId, target) {
+   if (!hardwareProfileEnabledForBrowser(browser)) {
+     await applyDesktopUaToTarget(browser, sessionId);
+     return;
+   }
+-  if (isWorkerTargetType(targetInfo?.type)) {
+-    await browser.send("Runtime.evaluate", { expression: documentScript(browser) }, sessionId);
++  const script = documentScript(browser);
++  if (isWorkerTargetType(target?.type)) {
++    await Promise.all([
++      browser.send("Runtime.evaluate", { expression: script }, sessionId),
++      attachRelatedTargets(browser, sessionId),
++    ]);
+     return;
+   }
+   await Promise.all([
+     applyDesktopUaToTarget(browser, sessionId),
+-    installDocumentScript(browser, sessionId, documentScript(browser)),
++    startsBeforeFirstDocument(target)
++      ? null
++      : browser.send("Runtime.evaluate", { expression: script }, sessionId),
++    installDocumentScript(browser, sessionId, script),
++    attachRelatedTargets(browser, sessionId),
+   ]);
+ }
+ 
+@@ -162,6 +214,7 @@
+     if (message.method === "Target.detachedFromTarget") {
+       browser.attachedSessions.delete(sessionId);
+       browser.attachedTargetTypes.delete(sessionId);
++      browser.relatedTargetSessions?.delete(sessionId);
+       return;
+     }
+     if (message.method !== "Target.attachedToTarget") return;
+@@ -171,12 +224,13 @@
+       browser.attachedTargetTypes.set(sessionId, targetType);
+     }
+     const reportUnlessGone = (step) => (error) => {
+-      if (isCdpTargetGone(error)) return;
++      if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
+       console.error(`${step} failed port=${browser.port}: ${errorClass(error)}`);
+     };
+-    void applyUaTreatmentToTarget(browser, sessionId, { type: targetType }).catch(
+-      reportUnlessGone("ua apply"),
+-    );
++    void applyUaTreatmentToTarget(browser, sessionId, {
++      type: targetType,
++      waitingForDebugger: message.params?.waitingForDebugger === true,
++    }).catch(reportUnlessGone("ua apply"));
+     void browser
+       .send("Runtime.runIfWaitingForDebugger", {}, sessionId)
+       .catch(reportUnlessGone("resume"));

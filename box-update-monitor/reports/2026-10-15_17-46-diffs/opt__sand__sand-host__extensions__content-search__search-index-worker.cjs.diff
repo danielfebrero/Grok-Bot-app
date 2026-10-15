@@ -1,0 +1,365 @@
+--- 2026-10-15_12-51:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
++++ 2026-10-15_17-46:/opt/sand/sand-host/extensions/content-search/search-index-worker.cjs
+@@ -1,5 +1,27 @@
+ const __mod=require('node:module');const __p=require('node:path');const __depsDir=__p.join(__dirname,'..','deps');process.env.NODE_PATH=__depsDir+(process.env.NODE_PATH?__p.delimiter+process.env.NODE_PATH:'');__mod.Module._initPaths();const __import_meta_url=require('node:url').pathToFileURL(__filename).href;
+ "use strict";
++var __create = Object.create;
++var __defProp = Object.defineProperty;
++var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
++var __getOwnPropNames = Object.getOwnPropertyNames;
++var __getProtoOf = Object.getPrototypeOf;
++var __hasOwnProp = Object.prototype.hasOwnProperty;
++var __copyProps = (to, from, except, desc) => {
++  if (from && typeof from === "object" || typeof from === "function") {
++    for (let key of __getOwnPropNames(from))
++      if (!__hasOwnProp.call(to, key) && key !== except)
++        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
++  }
++  return to;
++};
++var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
++  // If the importer is in node compatibility mode or this is not an ESM
++  // file that has been converted to a CommonJS file using a Babel-
++  // compatible transform (i.e. "__esModule" has not been set), then set
++  // "default" to the CommonJS "module.exports" for node compatibility.
++  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
++  mod
++));
+ 
+ // src/host/extensions/content-search/search-index-worker.ts
+ var import_node_worker_threads = require("node:worker_threads");
+@@ -114,7 +136,7 @@
+ }
+ 
+ // src/host/extensions/content-search/search-index-db.ts
+-var import_node_path = require("node:path");
++var import_node_path5 = require("node:path");
+ var import_node_sqlite2 = require("node:sqlite");
+ 
+ // src/shared/ids.ts
+@@ -444,6 +466,220 @@
+   return isOutboundAgentPeerMessageEntry(entry) && entry.toAgent.kind !== "agent" && entry.toAgent.kind !== "cloud-agent";
+ }
+ 
++// src/host/sand-data-files.ts
++var import_node_fs4 = require("node:fs");
++var import_node_path4 = require("node:path");
++
++// ../dune/atomic-write/dist/internal/atomic-write.js
++var import_node_fs = __toESM(require("node:fs"), 1);
++var REFUSED = {
++  "target-link": "a symbolic link at the target path",
++  "parent-link": "a symbolic link at the parent path",
++  "not-a-file": "a non-regular file at the target path"
++};
++var NoFollowRefusedError = class extends Error {
++  constructor(reason, path) {
++    super(`refused ${REFUSED[reason]} ${path}`);
++    this.name = "NoFollowRefusedError";
++    this.reason = reason;
++    this.path = path;
++  }
++};
++var fs = typeof process.getBuiltinModule === "function" ? process.getBuiltinModule("node:fs") : import_node_fs.default;
++var { O_RDONLY, O_WRONLY, O_CREAT, O_EXCL, O_DIRECTORY = 0, O_NOFOLLOW = 0, O_NONBLOCK = 0 } = fs.constants;
++var TEMP_CREATE = O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW;
++var NO_FOLLOW_READ = O_RDONLY | O_NOFOLLOW | O_NONBLOCK;
++var NO_FOLLOW_DIRECTORY = O_RDONLY | O_DIRECTORY | O_NOFOLLOW;
++var TEMP_SUFFIX_BOUND = 2 ** 32;
++
++// ../dune/atomic-write/dist/internal/durable-file.js
++var import_node_fs2 = __toESM(require("node:fs"), 1);
++var fs2 = typeof process.getBuiltinModule === "function" ? process.getBuiltinModule("node:fs") : import_node_fs2.default;
++
++// ../packages/grok-bot-harness/src/host-paths.ts
++var import_node_os = require("node:os");
++var import_node_path2 = require("node:path");
++
++// src/shared/node/paths.ts
++var import_node_path = require("node:path");
++function isPathWithin(parent, child, opts = {}) {
++  const rel = (0, import_node_path.relative)((0, import_node_path.resolve)(parent), (0, import_node_path.resolve)(child));
++  if (rel === "") return opts.isInclusive ?? false;
++  return !rel.startsWith("..") && !(0, import_node_path.isAbsolute)(rel);
++}
++
++// src/shared/node/sand-variant.ts
++function sandVariantOf(packaged, labBuild) {
++  if (!packaged) return "sand-dev";
++  if (labBuild) return "sand-lab";
++  return "sand";
++}
++function getSandVariant() {
++  return sandVariantOf(process.env.SAND_PACKAGED === "1", process.env.SAND_LAB === "1");
++}
++
++// ../packages/grok-bot-harness/src/host-paths.ts
++var SAND_DATA_ROOT_ENV = "SAND_DATA_ROOT";
++var SAND_PRODUCTION_DATA_DIRNAME = ".grokbot";
++var SAND_USER_DATA_DIR_ENV = "SAND_USER_DATA_DIR";
++var SAND_DATA_DIRNAME = "sand-data";
++var USER_DATA_DIR_FLAG = "--user-data-dir";
++var SAND_BOX_HOME_DIR = "/home/box";
++var SAND_BOX_DATA_ROOT = `${SAND_BOX_HOME_DIR}/${SAND_DATA_DIRNAME}`;
++var SAND_BOX_MODEL_VISIBLE_DATA_ROOT = `${SAND_BOX_HOME_DIR}/agent-data`;
++var SAND_BOX_REFERENCE_DIR = `${SAND_BOX_HOME_DIR}/reference`;
++var LEGACY_SAND_BOX_REFERENCE_DIR = `${SAND_BOX_HOME_DIR}/sand-reference`;
++var DEBUGGING_THE_BOX_FILE = "debugging-the-box.md";
++var SAND_APP_UI_FILE = "app-ui.md";
++var SAND_BOX_DEBUGGING_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${DEBUGGING_THE_BOX_FILE}`;
++var SAND_APP_UI_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_UI_FILE}`;
++function readUserDataDirArg(argv) {
++  for (let i = 0; i < argv.length; i++) {
++    const arg = argv[i];
++    if (arg === USER_DATA_DIR_FLAG) {
++      const next = argv[i + 1];
++      return next != null && !next.startsWith("--") ? next : null;
++    }
++    const prefix = `${USER_DATA_DIR_FLAG}=`;
++    if (arg.startsWith(prefix)) return arg.slice(prefix.length);
++  }
++  return null;
++}
++function resolveSandUserDataDir(argv = [], env = process.env, cwd = process.cwd()) {
++  const raw = readUserDataDirArg(argv) ?? env[SAND_USER_DATA_DIR_ENV];
++  const trimmed = raw?.trim();
++  if (trimmed == null || trimmed.length === 0) return null;
++  return (0, import_node_path2.isAbsolute)(trimmed) ? trimmed : (0, import_node_path2.resolve)(cwd, trimmed);
++}
++function getSandProductionRootDir(homeDir = (0, import_node_os.homedir)()) {
++  return (0, import_node_path2.join)(homeDir, SAND_PRODUCTION_DATA_DIRNAME);
++}
++function resolveSandDataRootOverride(env = process.env) {
++  const override = env[SAND_DATA_ROOT_ENV]?.trim();
++  return override != null && override.length > 0 && (0, import_node_path2.isAbsolute)(override) ? override : null;
++}
++function getSandRootDir(homeDir = (0, import_node_os.homedir)()) {
++  const override = resolveSandDataRootOverride();
++  if (override != null) return override;
++  const userDataDir = resolveSandUserDataDir([], process.env);
++  if (userDataDir != null) {
++    return (0, import_node_path2.join)(userDataDir, SAND_DATA_DIRNAME);
++  }
++  const variant = getSandVariant();
++  return variant === "sand" ? getSandProductionRootDir(homeDir) : (0, import_node_path2.join)(homeDir, ".cursor", variant);
++}
++
++// src/host/durable-file-policy.ts
++var SAND_UPGRADE_RESUME_FILE_NAME = "host-upgrade-resume.json";
++var SAND_ACK_OBLIGATIONS_FILE_NAME = "ack-obligations.json";
++var SAND_PENDING_WAKE_FILE_NAME = "host-pending-wakes.json";
++var SAND_DISK_PRESSURE_REMINDERS_FILE_NAME = "host-disk-pressure-reminders.json";
++var SAND_DATA_HOST_OWNED_FILE_NAMES = [
++  "gateway.json",
++  "webhook-keys.json",
++  "teach-queue-key.json",
++  "box-secrets.json"
++];
++var BOX_STORE_SAND_DATA_EXCLUDED_FILE_NAMES = [
++  SAND_UPGRADE_RESUME_FILE_NAME,
++  SAND_ACK_OBLIGATIONS_FILE_NAME,
++  SAND_PENDING_WAKE_FILE_NAME,
++  SAND_DISK_PRESSURE_REMINDERS_FILE_NAME,
++  "sand-statsig-bootstrap.json",
++  ...SAND_DATA_HOST_OWNED_FILE_NAMES.map((name) => `${name}.*`)
++];
++function hostNoFollowRoot(nonLinuxRoot) {
++  return process.platform === "linux" ? "/" : nonLinuxRoot;
++}
++
++// src/host/no-follow-walk.ts
++var import_node_fs3 = require("node:fs");
++var import_node_path3 = require("node:path");
++var NO_FOLLOW_DIRECTORY2 = import_node_fs3.constants.O_RDONLY | import_node_fs3.constants.O_DIRECTORY | import_node_fs3.constants.O_NOFOLLOW;
++var FOLLOW_DIRECTORY = import_node_fs3.constants.O_RDONLY | import_node_fs3.constants.O_DIRECTORY;
++function segmentsBelow(root, dir) {
++  const rel = (0, import_node_path3.relative)(root, dir);
++  if (rel === "") return [];
++  invariant(
++    rel !== ".." && !rel.startsWith(`..${import_node_path3.sep}`) && !(0, import_node_path3.isAbsolute)(rel),
++    "a no-follow walk must stay below its root"
++  );
++  return rel.split(import_node_path3.sep);
++}
++
++// src/host/sand-data-files.ts
++var SAND_DATA_JSON_MAX_BYTES = 16 * 1024 * 1024;
++var SQLITE_FILE_SUFFIXES = ["", "-wal", "-shm", "-journal"];
++function refuseDatabaseFileLinks(parentFd, path) {
++  const name = (0, import_node_path4.basename)(path);
++  for (const suffix of SQLITE_FILE_SUFFIXES) {
++    const entry = entryOf(parentFd, `${path}${suffix}`, `${name}${suffix}`);
++    if ((0, import_node_fs4.lstatSync)(entry, { throwIfNoEntry: false })?.isSymbolicLink() === true) {
++      throw new NoFollowRefusedError("target-link", `${path}${suffix}`);
++    }
++  }
++}
++function refuseSandDataDatabaseLinksSync(target) {
++  const path = (0, import_node_path4.resolve)(target);
++  withParentNoFollowSync(path, (parentFd) => refuseDatabaseFileLinks(parentFd, path));
++}
++function checkSandDataDatabaseSync(db, target) {
++  const path = (0, import_node_path4.resolve)(target);
++  withParentNoFollowSync(path, (parentFd) => {
++    refuseDatabaseFileLinks(parentFd, path);
++    if (process.platform === "linux" && mainDatabaseFile(db) !== (0, import_node_path4.join)((0, import_node_fs4.readlinkSync)(descriptorDirOf(parentFd, path)), (0, import_node_path4.basename)(path))) {
++      throw new NoFollowRefusedError("parent-link", path);
++    }
++  });
++}
++function mainDatabaseFile(db) {
++  const file = db.prepare("PRAGMA database_list").get()?.file;
++  return typeof file === "string" ? file : void 0;
++}
++function withParentNoFollowSync(path, use) {
++  const root = sandDataNoFollowRoot(path);
++  let fd = openDirectoryRefusingLinks(root, root, { followRoot: true });
++  let current = root;
++  try {
++    for (const name of segmentsBelow(root, (0, import_node_path4.dirname)(path))) {
++      current = (0, import_node_path4.join)(current, name);
++      const child = openDirectoryRefusingLinks(entryOf(fd, current, name), current);
++      (0, import_node_fs4.closeSync)(fd);
++      fd = child;
++    }
++    return use(fd);
++  } finally {
++    (0, import_node_fs4.closeSync)(fd);
++  }
++}
++function openDirectoryRefusingLinks(entry, shown, options = {}) {
++  try {
++    return (0, import_node_fs4.openSync)(
++      entry,
++      options.followRoot === true ? import_node_fs4.constants.O_RDONLY | import_node_fs4.constants.O_DIRECTORY : NO_FOLLOW_DIRECTORY2
++    );
++  } catch (error) {
++    const errno = findSystemErrno(error);
++    const link = errno === "ELOOP" || errno === "ENOTDIR" && (0, import_node_fs4.lstatSync)(entry, { throwIfNoEntry: false })?.isSymbolicLink() === true;
++    throw link ? new NoFollowRefusedError("parent-link", shown) : error;
++  }
++}
++function entryOf(fd, logicalPath, name) {
++  return process.platform === "linux" ? `/proc/self/fd/${fd}/${name}` : logicalPath;
++}
++function descriptorDirOf(fd, logicalPath) {
++  return process.platform === "linux" ? `/proc/self/fd/${fd}` : logicalPath;
++}
++function sandDataNoFollowRoot(path) {
++  return isSandDataPath(path) ? sandDataAnchor() : hostNoFollowRoot((0, import_node_path4.dirname)(path));
++}
++function isSandDataPath(path) {
++  return isPathWithin(sandDataAnchor(), path);
++}
++function sandDataAnchor() {
++  return (0, import_node_path4.dirname)(getSandRootDir());
++}
++
+ // ../packages/grok-bot-harness/src/host-diagnostics.ts
+ var pinnedReporter = null;
+ function reportHostDiagnostic(diagnostic) {
+@@ -617,8 +853,10 @@
+   }
+ }
+ function openSearchIndexDb(dbPath) {
++  refuseSandDataDatabaseLinksSync(dbPath);
+   const db = new import_node_sqlite2.DatabaseSync(dbPath);
+   try {
++    checkSandDataDatabaseSync(db, dbPath);
+     applyStorePragmas(db, { incrementalAutoVacuum: true });
+     return db;
+   } catch (error) {
+@@ -707,7 +945,7 @@
+     subject = decodeURIComponent(subject);
+   } catch {
+   }
+-  return (0, import_node_path.basename)(subject);
++  return (0, import_node_path5.basename)(subject);
+ }
+ function deriveMediaRow(entry) {
+   let fileName;
+@@ -726,7 +964,7 @@
+     return null;
+   }
+   if (fileName.length === 0) return null;
+-  const ext = (0, import_node_path.extname)(fileName).toLowerCase();
++  const ext = (0, import_node_path5.extname)(fileName).toLowerCase();
+   const mime = imageMimeFromPath(fileName) ?? videoMimeFromPath(fileName) ?? audioMimeFromPath(fileName) ?? null;
+   return {
+     entryId: entry.id,
+@@ -923,8 +1161,8 @@
+ }
+ 
+ // src/host/extensions/content-search/search-index-writer.ts
+-var import_node_fs = require("node:fs");
+-var import_node_path2 = require("node:path");
++var import_node_fs5 = require("node:fs");
++var import_node_path6 = require("node:path");
+ var import_node_sqlite3 = require("node:sqlite");
+ var STORE_FILENAME = "store.db";
+ var INCREMENTAL_VACUUM_PAGES = 512;
+@@ -1039,7 +1277,7 @@
+   }
+   applyServerRange(range) {
+     const agentId = parseAgentId(range.agentId);
+-    if (agentId == null || !(0, import_node_fs.existsSync)((0, import_node_path2.join)(this.agentsRootDir, agentId))) {
++    if (agentId == null || !(0, import_node_fs5.existsSync)((0, import_node_path6.join)(this.agentsRootDir, agentId))) {
+       return "unknown-agent";
+     }
+     return this.inTransaction(() => {
+@@ -1076,7 +1314,7 @@
+     });
+   }
+   storeDbPath(agentId) {
+-    return (0, import_node_path2.join)(this.agentsRootDir, agentId, STORE_FILENAME);
++    return (0, import_node_path6.join)(this.agentsRootDir, agentId, STORE_FILENAME);
+   }
+   evictStoreConnection(agentId) {
+     const cached = this.storeConnections.get(agentId);
+@@ -1091,10 +1329,17 @@
+     const cached = this.storeConnections.get(agentId);
+     if (cached != null) return cached;
+     const path = this.storeDbPath(agentId);
+-    if (!(0, import_node_fs.existsSync)(path)) return null;
++    if (!(0, import_node_fs5.existsSync)(path)) return null;
+     try {
++      refuseSandDataDatabaseLinksSync(path);
+       const db = new import_node_sqlite3.DatabaseSync(path, { readOnly: true });
+-      db.exec(`PRAGMA busy_timeout = ${DB_BUSY_TIMEOUT_MS}`);
++      try {
++        checkSandDataDatabaseSync(db, path);
++        db.exec(`PRAGMA busy_timeout = ${DB_BUSY_TIMEOUT_MS}`);
++      } catch (error) {
++        db.close();
++        throw error;
++      }
+       const connection = { db };
+       this.storeConnections.set(agentId, connection);
+       return connection;
+@@ -1204,7 +1449,7 @@
+   reindexAgent(agentId) {
+     if (this.isServerOwned(agentId)) return;
+     this.evictStoreConnection(agentId);
+-    if (!(0, import_node_fs.existsSync)(this.storeDbPath(agentId))) {
++    if (!(0, import_node_fs5.existsSync)(this.storeDbPath(agentId))) {
+       this.clearAgent(agentId);
+       return;
+     }
+@@ -1242,7 +1487,7 @@
+   reconcile() {
+     let agentDirs;
+     try {
+-      agentDirs = (0, import_node_fs.readdirSync)(this.agentsRootDir, { withFileTypes: true }).flatMap((dirent) => {
++      agentDirs = (0, import_node_fs5.readdirSync)(this.agentsRootDir, { withFileTypes: true }).flatMap((dirent) => {
+         const agentId = dirent.isDirectory() ? parseAgentId(dirent.name) : null;
+         return agentId == null ? [] : [agentId];
+       });
+@@ -1257,7 +1502,7 @@
+       if (!onDisk.has(agentId)) this.clearAgent(agentId);
+     }
+     for (const agentId of agentDirs) {
+-      if (!(0, import_node_fs.existsSync)(this.storeDbPath(agentId))) continue;
++      if (!(0, import_node_fs5.existsSync)(this.storeDbPath(agentId))) continue;
+       const storeFingerprint = this.readStoreFingerprint(agentId);
+       if (storeFingerprint == null) continue;
+       const indexed = this.statements.readFingerprint.get(agentId);

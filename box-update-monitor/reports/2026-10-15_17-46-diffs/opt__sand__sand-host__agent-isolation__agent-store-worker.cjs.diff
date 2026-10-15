@@ -1,0 +1,1036 @@
+--- 2026-10-15_12-51:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-15_17-46:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -1,5 +1,27 @@
+ const __mod=require('node:module');const __p=require('node:path');const __depsDir=__p.join(__dirname,'..','deps');process.env.NODE_PATH=__depsDir+(process.env.NODE_PATH?__p.delimiter+process.env.NODE_PATH:'');__mod.Module._initPaths();const __import_meta_url=require('node:url').pathToFileURL(__filename).href;
+ "use strict";
++var __create = Object.create;
++var __defProp = Object.defineProperty;
++var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
++var __getOwnPropNames = Object.getOwnPropertyNames;
++var __getProtoOf = Object.getPrototypeOf;
++var __hasOwnProp = Object.prototype.hasOwnProperty;
++var __copyProps = (to, from, except, desc) => {
++  if (from && typeof from === "object" || typeof from === "function") {
++    for (let key of __getOwnPropNames(from))
++      if (!__hasOwnProp.call(to, key) && key !== except)
++        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
++  }
++  return to;
++};
++var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
++  // If the importer is in node compatibility mode or this is not an ESM
++  // file that has been converted to a CommonJS file using a Babel-
++  // compatible transform (i.e. "__esModule" has not been set), then set
++  // "default" to the CommonJS "module.exports" for node compatibility.
++  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
++  mod
++));
+ 
+ // src/host/agent-isolation/agent-store-worker.ts
+ var import_node_worker_threads = require("node:worker_threads");
+@@ -54,10 +76,268 @@
+ }
+ 
+ // src/host/agent-isolation/conversation-blob-db.ts
+-var import_node_fs2 = require("node:fs");
+-var import_node_path = require("node:path");
++var import_node_fs6 = require("node:fs");
++var import_node_path6 = require("node:path");
+ var import_node_sqlite3 = require("node:sqlite");
+ 
++// src/host/sand-data-files.ts
++var import_node_fs4 = require("node:fs");
++var import_node_path5 = require("node:path");
++
++// ../dune/atomic-write/dist/internal/atomic-write.js
++var import_node_crypto = require("node:crypto");
++var import_node_fs = __toESM(require("node:fs"), 1);
++var import_node_path = require("node:path");
++var REFUSED = {
++  "target-link": "a symbolic link at the target path",
++  "parent-link": "a symbolic link at the parent path",
++  "not-a-file": "a non-regular file at the target path"
++};
++var NoFollowRefusedError = class extends Error {
++  constructor(reason, path) {
++    super(`refused ${REFUSED[reason]} ${path}`);
++    this.name = "NoFollowRefusedError";
++    this.reason = reason;
++    this.path = path;
++  }
++};
++var fs = typeof process.getBuiltinModule === "function" ? process.getBuiltinModule("node:fs") : import_node_fs.default;
++var { O_RDONLY, O_WRONLY, O_CREAT, O_EXCL, O_DIRECTORY = 0, O_NOFOLLOW = 0, O_NONBLOCK = 0 } = fs.constants;
++var TEMP_CREATE = O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW;
++var NO_FOLLOW_READ = O_RDONLY | O_NOFOLLOW | O_NONBLOCK;
++var NO_FOLLOW_DIRECTORY = O_RDONLY | O_DIRECTORY | O_NOFOLLOW;
++var NEW_FILE_MODE = 438;
++var NO_FOLLOW_FILE_MODE = 384;
++var SPECIAL_FILE_OPEN_CODES = /* @__PURE__ */ new Set(["ENXIO", "ENODEV", "EOPNOTSUPP"]);
++var TEMP_SUFFIX_BOUND = 2 ** 32;
++function writeFileAtomicSync(path, data, options = {}) {
++  const { noFollow } = options;
++  if (noFollow === void 0) {
++    createParentsKeepingCallOrder(path);
++    commitSync(followedSlotSync(path, options.mode), data);
++    return;
++  }
++  const parent = openParentNoFollow(path, noFollow.root, true);
++  try {
++    commitSync(noFollowSlot(parent, options.mode), data);
++  } finally {
++    parent.close();
++  }
++}
++function openNoFollowSync(path, options) {
++  const parent = openParentNoFollow(path, options.root, false);
++  try {
++    refuseTargetLink(parent);
++    return refuseUnlessFileSync(openTargetSync(parent), parent.shown);
++  } finally {
++    parent.close();
++  }
++}
++function removeNoFollowSync(path, options) {
++  try {
++    const parent = openParentNoFollow(path, options.root, false);
++    try {
++      refuseTargetLink(parent);
++      fs.unlinkSync(parent.entry(parent.name));
++    } finally {
++      parent.close();
++    }
++  } catch (error) {
++    if (!isMissing(error))
++      throw error;
++  }
++}
++function commitSync({ temp, target, mode, checkTarget }, data) {
++  const fd = fs.openSync(temp, TEMP_CREATE, mode ?? NEW_FILE_MODE);
++  try {
++    try {
++      fs.writeFileSync(fd, data);
++      if (mode !== void 0) {
++        try {
++          fs.fchmodSync(fd, mode);
++        } catch (error) {
++          rethrowUnlessRefused(error);
++        }
++      }
++      fs.fsyncSync(fd);
++    } finally {
++      fs.closeSync(fd);
++    }
++    checkTarget?.();
++    fs.renameSync(temp, target);
++  } catch (error) {
++    fs.rmSync(temp, { force: true });
++    throw error;
++  }
++}
++function followedSlotSync(path, requestedMode) {
++  const target = realTargetSync(path);
++  const mode = requestedMode ?? existingModeSync(target);
++  return { temp: tempPathOf(target), target, mode };
++}
++function noFollowSlot(parent, requestedMode) {
++  const target = parent.entry(parent.name);
++  refuseTargetLink(parent);
++  return {
++    temp: tempPathOf(target),
++    target,
++    mode: requestedMode ?? NO_FOLLOW_FILE_MODE,
++    checkTarget: () => refuseTargetLink(parent)
++  };
++}
++function refuseTargetLink(parent) {
++  const stat = fs.lstatSync(parent.entry(parent.name), { throwIfNoEntry: false });
++  if (stat?.isSymbolicLink() === true)
++    throw new NoFollowRefusedError("target-link", parent.shown);
++}
++function openTargetSync(parent) {
++  try {
++    return fs.openSync(parent.entry(parent.name), NO_FOLLOW_READ);
++  } catch (error) {
++    throw refusedTargetOr(error, parent.shown);
++  }
++}
++function refuseUnlessFileSync(fd, shown) {
++  try {
++    if (fs.fstatSync(fd).isFile())
++      return fd;
++    throw new NoFollowRefusedError("not-a-file", shown);
++  } catch (error) {
++    fs.closeSync(fd);
++    throw error;
++  }
++}
++function openParentNoFollow(path, root, create) {
++  const base = (0, import_node_path.resolve)(root);
++  const shown = (0, import_node_path.resolve)(path);
++  const below = (0, import_node_path.relative)(base, shown);
++  if (below === "" || below === ".." || below.startsWith(`..${import_node_path.sep}`) || (0, import_node_path.isAbsolute)(below)) {
++    throw new RangeError(`${shown} is not below the no-follow root ${base}`);
++  }
++  if (create)
++    fs.mkdirSync(base, { recursive: true });
++  const parents = (0, import_node_path.dirname)(below) === "." ? [] : (0, import_node_path.dirname)(below).split(import_node_path.sep);
++  const walk = process.platform === "linux" ? walkByDescriptor : walkByLstat;
++  return { ...walk(base, parents, create), name: (0, import_node_path.basename)(below), shown };
++}
++function walkByDescriptor(base, parents, create) {
++  let fd = fs.openSync(base, O_RDONLY | O_DIRECTORY);
++  let shown = base;
++  try {
++    for (const segment of parents) {
++      shown = (0, import_node_path.join)(shown, segment);
++      const child = openDirectoryNoFollow(descriptorEntry(fd, segment), shown, create);
++      fs.closeSync(fd);
++      fd = child;
++    }
++  } catch (error) {
++    fs.closeSync(fd);
++    throw error;
++  }
++  const verified = fd;
++  return {
++    entry: (name) => descriptorEntry(verified, name),
++    close: () => fs.closeSync(verified)
++  };
++}
++function descriptorEntry(fd, name) {
++  return `/proc/self/fd/${fd}/${name}`;
++}
++function openDirectoryNoFollow(entry, shown, create) {
++  if (create)
++    mkdirUnlessPresent(entry);
++  try {
++    return fs.openSync(entry, NO_FOLLOW_DIRECTORY);
++  } catch (error) {
++    throw refusedParentOr(error, entry, shown);
++  }
++}
++function walkByLstat(base, parents, create) {
++  const directory = parents.reduce((parent, segment) => {
++    const child = (0, import_node_path.join)(parent, segment);
++    if (create)
++      mkdirUnlessPresent(child);
++    if (fs.lstatSync(child, { throwIfNoEntry: false })?.isSymbolicLink() === true) {
++      throw new NoFollowRefusedError("parent-link", child);
++    }
++    return child;
++  }, base);
++  return { entry: (name) => (0, import_node_path.join)(directory, name), close: () => void 0 };
++}
++function mkdirUnlessPresent(path) {
++  try {
++    fs.mkdirSync(path);
++  } catch (error) {
++    if (errorCodeOf(error) !== "EEXIST")
++      throw error;
++  }
++}
++function refusedTargetOr(error, shown) {
++  const code = errorCodeOf(error);
++  if (code === "ELOOP")
++    return new NoFollowRefusedError("target-link", shown);
++  if (code !== void 0 && SPECIAL_FILE_OPEN_CODES.has(code)) {
++    return new NoFollowRefusedError("not-a-file", shown);
++  }
++  return error;
++}
++function refusedParentOr(error, entry, shown) {
++  const code = errorCodeOf(error);
++  const refused = code === "ELOOP" || code === "ENOTDIR" && !holdsNonDirectory(entry);
++  return refused ? new NoFollowRefusedError("parent-link", shown) : error;
++}
++function holdsNonDirectory(entry) {
++  const stat = fs.lstatSync(entry, { throwIfNoEntry: false });
++  return stat !== void 0 && !stat.isSymbolicLink() && !stat.isDirectory();
++}
++function createParentsKeepingCallOrder(path) {
++  fs.mkdirSync((0, import_node_path.dirname)(path), { recursive: true });
++}
++function tempPathOf(target) {
++  return `${target}.${(0, import_node_crypto.randomInt)(TEMP_SUFFIX_BOUND)}`;
++}
++function realTargetSync(path) {
++  try {
++    return fs.realpathSync(path);
++  } catch (error) {
++    if (isMissing(error))
++      return path;
++    throw error;
++  }
++}
++function existingModeSync(target) {
++  try {
++    return fs.statSync(target).mode;
++  } catch (error) {
++    if (isMissing(error))
++      return void 0;
++    throw error;
++  }
++}
++function errorCodeOf(error) {
++  return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : void 0;
++}
++function isMissing(error) {
++  return errorCodeOf(error) === "ENOENT";
++}
++function rethrowUnlessRefused(error) {
++  const code = errorCodeOf(error);
++  if (code === "ENOSYS")
++    return;
++  const unprivileged = process.getuid === void 0 || process.getuid() !== 0;
++  if (unprivileged && (code === "EINVAL" || code === "EPERM"))
++    return;
++  throw error;
++}
++
++// ../dune/atomic-write/dist/internal/durable-file.js
++var import_node_fs2 = __toESM(require("node:fs"), 1);
++var fs2 = typeof process.getBuiltinModule === "function" ? process.getBuiltinModule("node:fs") : import_node_fs2.default;
++
++// ../packages/grok-bot-harness/src/host-paths.ts
++var import_node_os = require("node:os");
++var import_node_path3 = require("node:path");
++
+ // src/shared/errors/system-errno.ts
+ function findErrorCode(error, pattern) {
+   const seen = /* @__PURE__ */ new Set();
+@@ -74,6 +354,304 @@
+   return findErrorCode(error, /^E[A-Z_]+$/);
+ }
+ 
++// src/shared/node/paths.ts
++var import_node_path2 = require("node:path");
++function isPathWithin(parent, child, opts = {}) {
++  const rel = (0, import_node_path2.relative)((0, import_node_path2.resolve)(parent), (0, import_node_path2.resolve)(child));
++  if (rel === "") return opts.isInclusive ?? false;
++  return !rel.startsWith("..") && !(0, import_node_path2.isAbsolute)(rel);
++}
++
++// src/shared/node/sand-variant.ts
++function sandVariantOf(packaged, labBuild) {
++  if (!packaged) return "sand-dev";
++  if (labBuild) return "sand-lab";
++  return "sand";
++}
++function getSandVariant() {
++  return sandVariantOf(process.env.SAND_PACKAGED === "1", process.env.SAND_LAB === "1");
++}
++
++// ../packages/grok-bot-harness/src/host-paths.ts
++var SAND_DATA_ROOT_ENV = "SAND_DATA_ROOT";
++var SAND_PRODUCTION_DATA_DIRNAME = ".grokbot";
++var SAND_USER_DATA_DIR_ENV = "SAND_USER_DATA_DIR";
++var SAND_DATA_DIRNAME = "sand-data";
++var USER_DATA_DIR_FLAG = "--user-data-dir";
++var SAND_BOX_HOME_DIR = "/home/box";
++var SAND_BOX_DATA_ROOT = `${SAND_BOX_HOME_DIR}/${SAND_DATA_DIRNAME}`;
++var SAND_BOX_MODEL_VISIBLE_DATA_ROOT = `${SAND_BOX_HOME_DIR}/agent-data`;
++var SAND_BOX_REFERENCE_DIR = `${SAND_BOX_HOME_DIR}/reference`;
++var LEGACY_SAND_BOX_REFERENCE_DIR = `${SAND_BOX_HOME_DIR}/sand-reference`;
++var DEBUGGING_THE_BOX_FILE = "debugging-the-box.md";
++var SAND_APP_UI_FILE = "app-ui.md";
++var SAND_BOX_DEBUGGING_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${DEBUGGING_THE_BOX_FILE}`;
++var SAND_APP_UI_REFERENCE_PATH = `${SAND_BOX_REFERENCE_DIR}/${SAND_APP_UI_FILE}`;
++function readUserDataDirArg(argv) {
++  for (let i = 0; i < argv.length; i++) {
++    const arg = argv[i];
++    if (arg === USER_DATA_DIR_FLAG) {
++      const next = argv[i + 1];
++      return next != null && !next.startsWith("--") ? next : null;
++    }
++    const prefix = `${USER_DATA_DIR_FLAG}=`;
++    if (arg.startsWith(prefix)) return arg.slice(prefix.length);
++  }
++  return null;
++}
++function resolveSandUserDataDir(argv = [], env = process.env, cwd = process.cwd()) {
++  const raw = readUserDataDirArg(argv) ?? env[SAND_USER_DATA_DIR_ENV];
++  const trimmed = raw?.trim();
++  if (trimmed == null || trimmed.length === 0) return null;
++  return (0, import_node_path3.isAbsolute)(trimmed) ? trimmed : (0, import_node_path3.resolve)(cwd, trimmed);
++}
++function getSandProductionRootDir(homeDir = (0, import_node_os.homedir)()) {
++  return (0, import_node_path3.join)(homeDir, SAND_PRODUCTION_DATA_DIRNAME);
++}
++function resolveSandDataRootOverride(env = process.env) {
++  const override = env[SAND_DATA_ROOT_ENV]?.trim();
++  return override != null && override.length > 0 && (0, import_node_path3.isAbsolute)(override) ? override : null;
++}
++function getSandRootDir(homeDir = (0, import_node_os.homedir)()) {
++  const override = resolveSandDataRootOverride();
++  if (override != null) return override;
++  const userDataDir = resolveSandUserDataDir([], process.env);
++  if (userDataDir != null) {
++    return (0, import_node_path3.join)(userDataDir, SAND_DATA_DIRNAME);
++  }
++  const variant = getSandVariant();
++  return variant === "sand" ? getSandProductionRootDir(homeDir) : (0, import_node_path3.join)(homeDir, ".cursor", variant);
++}
++
++// src/host/durable-file-policy.ts
++var SAND_UPGRADE_RESUME_FILE_NAME = "host-upgrade-resume.json";
++var SAND_ACK_OBLIGATIONS_FILE_NAME = "ack-obligations.json";
++var SAND_PENDING_WAKE_FILE_NAME = "host-pending-wakes.json";
++var SAND_DISK_PRESSURE_REMINDERS_FILE_NAME = "host-disk-pressure-reminders.json";
++var SAND_DATA_HOST_OWNED_FILE_NAMES = [
++  "gateway.json",
++  "webhook-keys.json",
++  "teach-queue-key.json",
++  "box-secrets.json"
++];
++var BOX_STORE_SAND_DATA_EXCLUDED_FILE_NAMES = [
++  SAND_UPGRADE_RESUME_FILE_NAME,
++  SAND_ACK_OBLIGATIONS_FILE_NAME,
++  SAND_PENDING_WAKE_FILE_NAME,
++  SAND_DISK_PRESSURE_REMINDERS_FILE_NAME,
++  "sand-statsig-bootstrap.json",
++  ...SAND_DATA_HOST_OWNED_FILE_NAMES.map((name) => `${name}.*`)
++];
++function hostNoFollowRoot(nonLinuxRoot) {
++  return process.platform === "linux" ? "/" : nonLinuxRoot;
++}
++
++// src/host/no-follow-walk.ts
++var import_node_fs3 = require("node:fs");
++var import_node_path4 = require("node:path");
++var NO_FOLLOW_DIRECTORY2 = import_node_fs3.constants.O_RDONLY | import_node_fs3.constants.O_DIRECTORY | import_node_fs3.constants.O_NOFOLLOW;
++var FOLLOW_DIRECTORY = import_node_fs3.constants.O_RDONLY | import_node_fs3.constants.O_DIRECTORY;
++function segmentsBelow(root, dir) {
++  const rel = (0, import_node_path4.relative)(root, dir);
++  if (rel === "") return [];
++  invariant(
++    rel !== ".." && !rel.startsWith(`..${import_node_path4.sep}`) && !(0, import_node_path4.isAbsolute)(rel),
++    "a no-follow walk must stay below its root"
++  );
++  return rel.split(import_node_path4.sep);
++}
++
++// src/host/sand-data-files.ts
++var UNTRUSTED = {
++  "foreign-owner": "not owned by the host user",
++  "foreign-writable": "writable by users other than the host user",
++  "outside-root": "resolves outside its expected root"
++};
++var UntrustedSandDataFileError = class extends Error {
++  name = "UntrustedSandDataFileError";
++  reason;
++  path;
++  constructor(reason, path) {
++    super(`refused ${path}: ${UNTRUSTED[reason]}`);
++    this.reason = reason;
++    this.path = path;
++  }
++};
++function isRefusedSandDataFile(error) {
++  return error instanceof NoFollowRefusedError || error instanceof UntrustedSandDataFileError;
++}
++function writeSandDataFileSync(path, data, options = {}) {
++  writeFileAtomicSync(path, data, {
++    mode: options.mode ?? keptModeSync(path),
++    noFollow: { root: sandDataNoFollowRoot(path) }
++  });
++}
++var SAND_DATA_JSON_MAX_BYTES = 16 * 1024 * 1024;
++function ensureSandDataDirSync(target, mode) {
++  const path = (0, import_node_path5.resolve)(target);
++  const root = sandDataNoFollowRoot(path);
++  (0, import_node_fs4.mkdirSync)(root, { recursive: true });
++  let fd = openDirectoryRefusingLinks(root, root, { followRoot: true });
++  let current = root;
++  try {
++    for (const name of segmentsBelow(root, path)) {
++      current = (0, import_node_path5.join)(current, name);
++      const entry = entryOf(fd, current, name);
++      try {
++        (0, import_node_fs4.mkdirSync)(entry, mode === void 0 ? void 0 : { mode });
++      } catch (error) {
++        if (findSystemErrno(error) !== "EEXIST") throw error;
++      }
++      const child = openDirectoryRefusingLinks(entry, current);
++      (0, import_node_fs4.closeSync)(fd);
++      fd = child;
++    }
++    if (mode !== void 0) (0, import_node_fs4.fchmodSync)(fd, mode);
++  } finally {
++    (0, import_node_fs4.closeSync)(fd);
++  }
++}
++var SQLITE_FILE_SUFFIXES = ["", "-wal", "-shm", "-journal"];
++function refuseDatabaseFileLinks(parentFd, path) {
++  const name = (0, import_node_path5.basename)(path);
++  for (const suffix of SQLITE_FILE_SUFFIXES) {
++    const entry = entryOf(parentFd, `${path}${suffix}`, `${name}${suffix}`);
++    if ((0, import_node_fs4.lstatSync)(entry, { throwIfNoEntry: false })?.isSymbolicLink() === true) {
++      throw new NoFollowRefusedError("target-link", `${path}${suffix}`);
++    }
++  }
++}
++function refuseSandDataDatabaseLinksSync(target) {
++  const path = (0, import_node_path5.resolve)(target);
++  withParentNoFollowSync(path, (parentFd) => refuseDatabaseFileLinks(parentFd, path));
++}
++function checkSandDataDatabaseSync(db, target) {
++  const path = (0, import_node_path5.resolve)(target);
++  withParentNoFollowSync(path, (parentFd) => {
++    refuseDatabaseFileLinks(parentFd, path);
++    if (process.platform === "linux" && mainDatabaseFile(db) !== (0, import_node_path5.join)((0, import_node_fs4.readlinkSync)(descriptorDirOf(parentFd, path)), (0, import_node_path5.basename)(path))) {
++      throw new NoFollowRefusedError("parent-link", path);
++    }
++  });
++}
++function mainDatabaseFile(db) {
++  const file = db.prepare("PRAGMA database_list").get()?.file;
++  return typeof file === "string" ? file : void 0;
++}
++function removeSandDataFileSync(path) {
++  removeNoFollowSync(path, { root: sandDataNoFollowRoot(path) });
++}
++function removeSandDataTreeSync(target) {
++  const path = (0, import_node_path5.resolve)(target);
++  try {
++    withParentNoFollowSync(path, (parentFd) => {
++      removeEntryTreeSync(parentFd, path, (0, import_node_path5.basename)(path));
++    });
++  } catch (error) {
++    if (findSystemErrno(error) !== "ENOENT") throw error;
++  }
++}
++function copySandDataFileSync(source, target) {
++  const fd = openNoFollowSync(source, { root: sandDataNoFollowRoot(source) });
++  try {
++    const from = process.platform === "linux" ? `/proc/self/fd/${fd}` : source;
++    const path = (0, import_node_path5.resolve)(target);
++    withParentNoFollowSync(path, (parentFd) => {
++      const entry = entryOf(parentFd, path, (0, import_node_path5.basename)(path));
++      unlinkIgnoringMissing(entry);
++      (0, import_node_fs4.copyFileSync)(from, entry, import_node_fs4.constants.COPYFILE_EXCL);
++    });
++  } finally {
++    (0, import_node_fs4.closeSync)(fd);
++  }
++}
++function withParentNoFollowSync(path, use) {
++  const root = sandDataNoFollowRoot(path);
++  let fd = openDirectoryRefusingLinks(root, root, { followRoot: true });
++  let current = root;
++  try {
++    for (const name of segmentsBelow(root, (0, import_node_path5.dirname)(path))) {
++      current = (0, import_node_path5.join)(current, name);
++      const child = openDirectoryRefusingLinks(entryOf(fd, current, name), current);
++      (0, import_node_fs4.closeSync)(fd);
++      fd = child;
++    }
++    return use(fd);
++  } finally {
++    (0, import_node_fs4.closeSync)(fd);
++  }
++}
++function removeEntryTreeSync(parentFd, logicalPath, name) {
++  const entry = entryOf(parentFd, logicalPath, name);
++  let fd;
++  try {
++    fd = (0, import_node_fs4.openSync)(entry, NO_FOLLOW_DIRECTORY2);
++  } catch (error) {
++    const errno = findSystemErrno(error);
++    if (errno === "ENOENT") return;
++    if (errno !== "ENOTDIR" && errno !== "ELOOP") throw error;
++    unlinkIgnoringMissing(entry);
++    return;
++  }
++  try {
++    for (const child of (0, import_node_fs4.readdirSync)(descriptorDirOf(fd, logicalPath))) {
++      removeEntryTreeSync(fd, (0, import_node_path5.join)(logicalPath, child), child);
++    }
++  } finally {
++    (0, import_node_fs4.closeSync)(fd);
++  }
++  try {
++    (0, import_node_fs4.rmdirSync)(entry);
++  } catch (error) {
++    if (findSystemErrno(error) !== "ENOENT") throw error;
++  }
++}
++function openDirectoryRefusingLinks(entry, shown, options = {}) {
++  try {
++    return (0, import_node_fs4.openSync)(
++      entry,
++      options.followRoot === true ? import_node_fs4.constants.O_RDONLY | import_node_fs4.constants.O_DIRECTORY : NO_FOLLOW_DIRECTORY2
++    );
++  } catch (error) {
++    const errno = findSystemErrno(error);
++    const link = errno === "ELOOP" || errno === "ENOTDIR" && (0, import_node_fs4.lstatSync)(entry, { throwIfNoEntry: false })?.isSymbolicLink() === true;
++    throw link ? new NoFollowRefusedError("parent-link", shown) : error;
++  }
++}
++function unlinkIgnoringMissing(entry) {
++  try {
++    (0, import_node_fs4.unlinkSync)(entry);
++  } catch (error) {
++    if (findSystemErrno(error) !== "ENOENT") throw error;
++  }
++}
++function entryOf(fd, logicalPath, name) {
++  return process.platform === "linux" ? `/proc/self/fd/${fd}/${name}` : logicalPath;
++}
++function descriptorDirOf(fd, logicalPath) {
++  return process.platform === "linux" ? `/proc/self/fd/${fd}` : logicalPath;
++}
++function sandDataNoFollowRoot(path) {
++  return isSandDataPath(path) ? sandDataAnchor() : hostNoFollowRoot((0, import_node_path5.dirname)(path));
++}
++function isSandDataPath(path) {
++  return isPathWithin(sandDataAnchor(), path);
++}
++function sandDataAnchor() {
++  return (0, import_node_path5.dirname)(getSandRootDir());
++}
++function isHostOwned(uid) {
++  const hostUid = process.geteuid?.();
++  return hostUid === void 0 || uid === hostUid;
++}
++var NEW_FILE_MODE2 = 438;
++function keptModeOf(info) {
++  return info?.isFile() === true && isHostOwned(info.uid) ? info.mode & 511 : NEW_FILE_MODE2 & ~process.umask();
++}
++function keptModeSync(path) {
++  return keptModeOf((0, import_node_fs4.lstatSync)(path, { throwIfNoEntry: false }));
++}
++
+ // src/shared/errors/errors.ts
+ var SandDomainError = class extends Error {
+ };
+@@ -124,7 +702,7 @@
+ }
+ 
+ // src/host/storage/sqlite-recovery.ts
+-var import_node_fs = require("node:fs");
++var import_node_fs5 = require("node:fs");
+ var import_node_sqlite2 = require("node:sqlite");
+ 
+ // src/shared/parse/unknown-record.ts
+@@ -169,7 +747,7 @@
+ function removeSqliteSidecars(dbPath) {
+   for (const suffix of SQLITE_DB_SIDECAR_SUFFIXES) {
+     try {
+-      (0, import_node_fs.rmSync)(`${dbPath}${suffix}`, { force: true, recursive: true });
++      removeSandDataTreeSync(`${dbPath}${suffix}`);
+     } catch {
+     }
+   }
+@@ -179,10 +757,8 @@
+   let removeError;
+   for (let attempt = 0; attempt < attempts; attempt += 1) {
+     try {
+-      (0, import_node_fs.rmSync)(options.path, {
+-        force: true,
+-        recursive: options.recursive === true
+-      });
++      if (options.recursive === true) removeSandDataTreeSync(options.path);
++      else removeSandDataFileSync(options.path);
+       removeError = void 0;
+       break;
+     } catch (error) {
+@@ -214,23 +790,23 @@
+   const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+   const quarantinePath = options.quarantinePath ?? `${dbPath}.corrupt-${stamp}`;
+   try {
+-    (0, import_node_fs.rmSync)(quarantinePath, { force: true });
++    removeSandDataFileSync(quarantinePath);
+     removeSqliteSidecars(quarantinePath);
+   } catch {
+   }
+   try {
+-    (0, import_node_fs.renameSync)(dbPath, quarantinePath);
++    (0, import_node_fs5.renameSync)(dbPath, quarantinePath);
+   } catch (error) {
+     const renameErrorCode = error.code ?? "error";
+     let copied = false;
+     try {
+-      (0, import_node_fs.copyFileSync)(dbPath, quarantinePath);
++      copySandDataFileSync(dbPath, quarantinePath);
+       copied = true;
+       for (const suffix of SQLITE_DB_SIDECAR_SUFFIXES) {
+         const sidecar = `${dbPath}${suffix}`;
+-        if ((0, import_node_fs.existsSync)(sidecar)) {
++        if ((0, import_node_fs5.existsSync)(sidecar)) {
+           try {
+-            (0, import_node_fs.copyFileSync)(sidecar, `${quarantinePath}${suffix}`);
++            copySandDataFileSync(sidecar, `${quarantinePath}${suffix}`);
+           } catch {
+           }
+         }
+@@ -259,21 +835,35 @@
+   for (const suffix of SQLITE_DB_SIDECAR_SUFFIXES) {
+     try {
+       const sidecar = `${dbPath}${suffix}`;
+-      if ((0, import_node_fs.existsSync)(sidecar)) {
+-        (0, import_node_fs.renameSync)(sidecar, `${quarantinePath}${suffix}`);
++      if ((0, import_node_fs5.existsSync)(sidecar)) {
++        (0, import_node_fs5.renameSync)(sidecar, `${quarantinePath}${suffix}`);
+       }
+     } catch {
+-      (0, import_node_fs.rmSync)(`${dbPath}${suffix}`, { force: true });
++      removeSandDataFileSync(`${dbPath}${suffix}`);
+     }
+   }
+   return { quarantinePath, copied: false, renameErrorCode: null };
+ }
+ function openSqliteForSalvage(options) {
++  const db = openSqliteForSalvageInPlace(options);
++  if (db === void 0) return void 0;
++  try {
++    checkSandDataDatabaseSync(db, options.dbPath);
++  } catch (error) {
++    db.close();
++    reportFallback("sqlite_recovery", error);
++    return void 0;
++  }
++  return db;
++}
++function openSqliteForSalvageInPlace(options) {
+   const { dbPath } = options;
+-  if (!(0, import_node_fs.existsSync)(dbPath)) return void 0;
++  if (!(0, import_node_fs5.existsSync)(dbPath)) return void 0;
+   const open = () => {
++    refuseSandDataDatabaseLinksSync(dbPath);
+     const db = new import_node_sqlite2.DatabaseSync(dbPath);
+     try {
++      checkSandDataDatabaseSync(db, dbPath);
+       if (options.busyTimeoutMs != null) {
+         db.exec(`PRAGMA busy_timeout = ${options.busyTimeoutMs}`);
+       }
+@@ -290,6 +880,10 @@
+   try {
+     return open();
+   } catch (error) {
++    if (isRefusedSandDataFile(error)) {
++      reportFallback("sqlite_recovery", error);
++      return void 0;
++    }
+     if (!isSqliteIoError(error) && !isSqliteCantOpenError(error) && !isSqliteCorruptError(error)) {
+       return void 0;
+     }
+@@ -299,6 +893,7 @@
+     } catch (retryError) {
+       if (isSqliteCorruptError(retryError)) {
+         try {
++          refuseSandDataDatabaseLinksSync(dbPath);
+           return new import_node_sqlite2.DatabaseSync(dbPath);
+         } catch (error2) {
+           reportFallback("sqlite_recovery", error2);
+@@ -402,8 +997,10 @@
+   name = "ConversationBlobRecoveryError";
+ };
+ function openConfiguredConversationBlobDb(dbPath, busyTimeoutMs) {
++  refuseSandDataDatabaseLinksSync(dbPath);
+   const db = new import_node_sqlite3.DatabaseSync(dbPath);
+   try {
++    checkSandDataDatabaseSync(db, dbPath);
+     applyStorePragmas(db, { busyTimeoutMs, allowWalFailure: true });
+     db.exec(CONVERSATION_BLOB_SCHEMA);
+     return db;
+@@ -430,7 +1027,9 @@
+   for (let attempt = 0; attempt < 2; attempt += 1) {
+     let db;
+     try {
++      refuseSandDataDatabaseLinksSync(options.dbPath);
+       db = new import_node_sqlite3.DatabaseSync(options.dbPath, { readOnly: true });
++      checkSandDataDatabaseSync(db, options.dbPath);
+       db.exec(`PRAGMA busy_timeout = ${options.busyTimeoutMs}`);
+       return runQuickCheck(db);
+     } catch (error) {
+@@ -458,7 +1057,7 @@
+   const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+   const intendedQuarantinePath = `${options.dbPath}.corrupt-${stamp}`;
+   const intentPath = `${intendedQuarantinePath}.intent`;
+-  (0, import_node_fs2.writeFileSync)(intentPath, "");
++  writeSandDataFileSync(intentPath, "");
+   const quarantine = recovery.quarantineCorruptSqliteDb({
+     dbPath: options.dbPath,
+     quarantinePath: intendedQuarantinePath,
+@@ -467,7 +1066,7 @@
+     removeRetryDelayMs: 50
+   });
+   const pendingPath = `${quarantine.quarantinePath ?? intendedQuarantinePath}.pending`;
+-  (0, import_node_fs2.renameSync)(intentPath, pendingPath);
++  (0, import_node_fs6.renameSync)(intentPath, pendingPath);
+   if (quarantine.renameErrorCode != null) {
+     if (quarantine.quarantinePath == null) {
+       options.log?.(
+@@ -573,7 +1172,7 @@
+   }
+   removeSqliteSidecars(options.replacementPath);
+   options.recovery.removeSqliteDb({ dbPath: options.dbPath });
+-  (0, import_node_fs2.renameSync)(options.replacementPath, options.dbPath);
++  (0, import_node_fs6.renameSync)(options.replacementPath, options.dbPath);
+   const installed = openConfiguredConversationBlobDb(options.dbPath, options.busyTimeoutMs);
+   if (getHealth(installed) !== "healthy") {
+     installed.close();
+@@ -583,7 +1182,7 @@
+     );
+   }
+   if (options.pendingPath != null) {
+-    (0, import_node_fs2.rmSync)(options.pendingPath, { force: true });
++    removeSandDataFileSync(options.pendingPath);
+   }
+   return installed;
+ }
+@@ -593,7 +1192,7 @@
+   let pendingPath = args.pendingPath;
+   let quarantinePath = args.quarantinePath;
+   let replacementPath = `${quarantinePath ?? options.dbPath}.replacement`;
+-  if (!(0, import_node_fs2.existsSync)(options.dbPath) && (0, import_node_fs2.existsSync)(replacementPath)) {
++  if (!(0, import_node_fs6.existsSync)(options.dbPath) && (0, import_node_fs6.existsSync)(replacementPath)) {
+     const installed = installCompletedConversationBlobReplacement({
+       dbPath: options.dbPath,
+       replacementPath,
+@@ -602,13 +1201,13 @@
+       recovery
+     });
+     if (installed != null) return installed;
+-    const hasSeparateQuarantine = quarantinePath != null && quarantinePath !== options.dbPath && (0, import_node_fs2.existsSync)(quarantinePath);
++    const hasSeparateQuarantine = quarantinePath != null && quarantinePath !== options.dbPath && (0, import_node_fs6.existsSync)(quarantinePath);
+     if (!hasSeparateQuarantine) {
+       quarantinePath = replacementPath;
+       replacementPath = `${replacementPath}.replacement`;
+     }
+   }
+-  if ((0, import_node_fs2.existsSync)(options.dbPath)) {
++  if ((0, import_node_fs6.existsSync)(options.dbPath)) {
+     let existing;
+     const sourceHealth = getHealthOnDisk({
+       dbPath: options.dbPath,
+@@ -638,7 +1237,7 @@
+             dbPath: `${quarantinePath}.replacement`
+           });
+         }
+-        if (pendingPath != null) (0, import_node_fs2.rmSync)(pendingPath, { force: true });
++        if (pendingPath != null) removeSandDataFileSync(pendingPath);
+         return existing;
+       }
+       if (configuredHealth === "unavailable") {
+@@ -657,7 +1256,7 @@
+     } catch {
+     }
+     if (quarantinePath === options.dbPath) {
+-    } else if (quarantinePath != null && !(0, import_node_fs2.existsSync)(quarantinePath)) {
++    } else if (quarantinePath != null && !(0, import_node_fs6.existsSync)(quarantinePath)) {
+       const quarantine = recovery.quarantineCorruptSqliteDb({
+         dbPath: options.dbPath,
+         quarantinePath,
+@@ -668,7 +1267,7 @@
+       quarantinePath = quarantine.quarantinePath;
+       const resumedPendingPath = quarantinePath == null ? null : `${quarantinePath}.pending`;
+       if (pendingPath != null && resumedPendingPath != null && pendingPath !== resumedPendingPath) {
+-        (0, import_node_fs2.renameSync)(pendingPath, resumedPendingPath);
++        (0, import_node_fs6.renameSync)(pendingPath, resumedPendingPath);
+         pendingPath = resumedPendingPath;
+       }
+       replacementPath = `${quarantinePath ?? options.dbPath}.replacement`;
+@@ -689,7 +1288,7 @@
+         dbPath: quarantinePath,
+         busyTimeoutMs: options.busyTimeoutMs
+       });
+-      if (source == null && (0, import_node_fs2.existsSync)(quarantinePath)) {
++      if (source == null && (0, import_node_fs6.existsSync)(quarantinePath)) {
+         throw new ConversationBlobRecoveryError(
+           "SAND_BLOB_RECOVERY_QUARANTINE_UNREADABLE",
+           "quarantined conversation blob database is unreadable"
+@@ -727,7 +1326,7 @@
+     attempts: Math.ceil(options.busyTimeoutMs / 50),
+     retryDelayMs: 50
+   });
+-  (0, import_node_fs2.renameSync)(replacementPath, options.dbPath);
++  (0, import_node_fs6.renameSync)(replacementPath, options.dbPath);
+   const installedDb = openConfiguredConversationBlobDb(options.dbPath, options.busyTimeoutMs);
+   if (getHealth(installedDb) !== "healthy") {
+     installedDb.close();
+@@ -742,20 +1341,20 @@
+     salvagedBlobs
+   };
+   options.log?.(
+-    `[agent-store-worker] conversation-blobs.db recovery: outcome=${info.outcome} agent=${options.agentId} quarantine=${info.quarantinePath != null ? (0, import_node_path.basename)(info.quarantinePath) : "none"} salvaged.blobs=${info.salvagedBlobs}`
++    `[agent-store-worker] conversation-blobs.db recovery: outcome=${info.outcome} agent=${options.agentId} quarantine=${info.quarantinePath != null ? (0, import_node_path6.basename)(info.quarantinePath) : "none"} salvaged.blobs=${info.salvagedBlobs}`
+   );
+   try {
+     options.onRecovery?.(info);
+   } catch {
+   }
+-  if (pendingPath != null) (0, import_node_fs2.rmSync)(pendingPath, { force: true });
++  if (pendingPath != null) removeSandDataFileSync(pendingPath);
+   return installedDb;
+ }
+ function findPendingRecovery(dbPath, recovery) {
+-  const dir = (0, import_node_path.dirname)(dbPath);
+-  const dbName = (0, import_node_path.basename)(dbPath);
++  const dir = (0, import_node_path6.dirname)(dbPath);
++  const dbName = (0, import_node_path6.basename)(dbPath);
+   const prefix = `${dbName}.corrupt-`;
+-  const names = (0, import_node_fs2.readdirSync)(dir);
++  const names = (0, import_node_fs6.readdirSync)(dir);
+   const quarantineMarkerNames = names.filter(
+     (name) => name.startsWith(prefix) && (name.endsWith(".intent") || name.endsWith(".pending"))
+   ).sort();
+@@ -766,7 +1365,7 @@
+   ];
+   const markerName = markerNames.at(-1);
+   const quarantinePathFor = (name) => {
+-    const markerPath = (0, import_node_path.join)(dir, name);
++    const markerPath = (0, import_node_path6.join)(dir, name);
+     if (name === `${dbName}.pending`) return dbPath;
+     const suffix = name.endsWith(".intent") ? ".intent" : ".pending";
+     return markerPath.slice(0, -suffix.length);
+@@ -774,7 +1373,7 @@
+   const activeReplacement = markerName == null ? null : `${quarantinePathFor(markerName)}.replacement`;
+   for (const name of names) {
+     if ((name.startsWith(prefix) || name === `${dbName}.replacement`) && name.endsWith(".replacement")) {
+-      const replacementPath = (0, import_node_path.join)(dir, name);
++      const replacementPath = (0, import_node_path6.join)(dir, name);
+       if (replacementPath !== activeReplacement) {
+         recovery.removeSqliteDb({ dbPath: replacementPath });
+       }
+@@ -782,19 +1381,19 @@
+   }
+   if (markerName == null) return void 0;
+   for (const staleName of markerNames.slice(0, -1)) {
+-    (0, import_node_fs2.rmSync)((0, import_node_path.join)(dir, staleName), { force: true });
++    removeSandDataFileSync((0, import_node_path6.join)(dir, staleName));
+     recovery.removeSqliteDb({
+       dbPath: `${quarantinePathFor(staleName)}.replacement`
+     });
+   }
+-  const pendingPath = (0, import_node_path.join)(dir, markerName);
++  const pendingPath = (0, import_node_path6.join)(dir, markerName);
+   return {
+     pendingPath,
+     quarantinePath: quarantinePathFor(markerName)
+   };
+ }
+ function openConversationBlobDb(options) {
+-  (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(options.dbPath), { recursive: true });
++  ensureSandDataDirSync((0, import_node_path6.dirname)(options.dbPath));
+   const pending = findPendingRecovery(options.dbPath, options.recovery ?? DISK_RECOVERY);
+   if (pending != null) {
+     return finishConversationBlobRecovery({
+@@ -860,8 +1459,8 @@
+ }
+ 
+ // src/host/agent-isolation/conversation-blob-store.ts
+-var import_node_crypto = require("node:crypto");
+-var import_node_fs3 = require("node:fs");
++var import_node_crypto2 = require("node:crypto");
++var import_node_fs7 = require("node:fs");
+ 
+ // ../node_modules/.pnpm/@bufbuild+protobuf@1.10.1_patch_hash=b56e7d63154958cee98db228b1c9efd9a1cb20db048af22a56bba107b262264e/node_modules/@bufbuild/protobuf/dist/esm/private/assert.js
+ function assert(condition, msg) {
+@@ -3771,7 +4370,7 @@
+ var CustomSubagentPermissionMode = /* @__PURE__ */ enumType(proto3, __protoPackage, "CustomSubagentPermissionMode", [[0, "UNSPECIFIED"], [1, "DEFAULT"], [2, "READONLY"], [3, "AGENT_ONLY"]], 1);
+ var SubagentExecutionEnvironment = /* @__PURE__ */ enumType(proto3, __protoPackage, "SubagentExecutionEnvironment", [[0, "UNSPECIFIED"], [1, "LOCAL"], [2, "CLOUD"]], 1);
+ var SubagentBackgroundReason = /* @__PURE__ */ enumType(proto3, __protoPackage, "SubagentBackgroundReason", [[0, "UNSPECIFIED"], [1, "AGENT_REQUEST"], [2, "USER_REQUEST"], [3, "QUEUED_FOLLOW_UP"]], 1);
+-var BackgroundTaskCompletionReason = /* @__PURE__ */ enumType(proto3, __protoPackage, "BackgroundTaskCompletionReason", [[0, "UNSPECIFIED"], [1, "TASK_FINISHED"], [2, "TASK_PROGRESS"], [3, "WORKER_REPARENTED"], [4, "WORKER_MESSAGE"], [5, "WORKER_NEEDS_ATTENTION"]], 1);
++var BackgroundTaskCompletionReason = /* @__PURE__ */ enumType(proto3, __protoPackage, "BackgroundTaskCompletionReason", [[0, "UNSPECIFIED"], [1, "TASK_FINISHED"], [2, "TASK_PROGRESS"], [3, "WORKER_REPARENTED"], [4, "WORKER_MESSAGE"], [5, "WORKER_NEEDS_ATTENTION"], [6, "PROJECT_SESSION_MESSAGE"]], 1);
+ var TaskMode = /* @__PURE__ */ enumType(proto3, __protoPackage, "TaskMode", [[0, "UNSPECIFIED"], [1, "AGENT"], [2, "PLAN"]], 1);
+ var SubagentType = class _SubagentType extends __protoMessage3 {
+   constructor(data) {
+@@ -9354,7 +9953,7 @@
+     return proto3.util.equals(_ComputerUseArgs, a, b);
+   }
+   static $() {
+-    return ["ComputerUseArgs|1 tool_call_id 9|2 actions #0*|3 description 9?|4 bind_unmapped_characters 8?|5 desktop_lease_actor_id 9?|6 screenshot_settle_ms 5?|10 native_x11_driver #1?|11 mark_monitor_busy 8?", ComputerUseAction, NativeX11Driver];
++    return ["ComputerUseArgs|1 tool_call_id 9|2 actions #0*|3 description 9?|4 bind_unmapped_characters 8?|5 desktop_lease_actor_id 9?|6 screenshot_settle_ms 5?|10 native_x11_driver #1?|11 mark_monitor_busy 8?|9 full_resolution_screenshot 8?", ComputerUseAction, NativeX11Driver];
+   }
+ };
+ var NativeX11Driver = class _NativeX11Driver extends __protoMessage336 {
+@@ -9685,7 +10284,33 @@
+     return proto3.util.equals(_ComputerUseSuccess, a, b);
+   }
+   static $() {
+-    return ["ComputerUseSuccess|1 action_count 5|2 duration_ms 5|3 screenshot 9?|4 log 9?|5 screenshot_path 9?|6 cursor_position #0?|7 settle_ms 5?|9 driver #1?|10 monitor_busy_marked 8?", Coordinate, ComputerUseDriver];
++    return ["ComputerUseSuccess|1 action_count 5|2 duration_ms 5|3 screenshot 9?|4 log 9?|5 screenshot_path 9?|6 cursor_position #0?|7 settle_ms 5?|9 driver #1?|10 monitor_busy_marked 8?|11 full_resolution_screenshot #2?", Coordinate, ComputerUseDriver, ComputerUseFullResolutionScreenshot];
++  }
++};
++var ComputerUseFullResolutionScreenshot = class _ComputerUseFullResolutionScreenshot extends __protoMessage336 {
++  constructor(data) {
++    super();
++    this.path = "";
++    this.sha256 = "";
++    this.sizeBytes = 0;
++    this.width = 0;
++    this.height = 0;
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _ComputerUseFullResolutionScreenshot().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _ComputerUseFullResolutionScreenshot().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _ComputerUseFullResolutionScreenshot().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_ComputerUseFullResolutionScreenshot, a, b);
++  }
++  static $() {
++    return ["ComputerUseFullResolutionScreenshot|1 path 9|2 sha256 9|3 size_bytes 13|4 width 5|5 height 5"];
+   }
+ };
+ var ComputerUseError = class _ComputerUseError extends __protoMessage336 {
+@@ -18579,7 +19204,7 @@
+     return proto3.util.equals(_InvocationContext_SlackThread, a, b);
+   }
+   static $() {
+-    return ["InvocationContext.SlackThread|1 thread 9|2 channel_name 9?|3 channel_purpose 9?|4 channel_topic 9?|5 sender_name 9?|6 sender_id 9?|7 sender_type 9?|8 is_directly_addressed 8?"];
++    return ["InvocationContext.SlackThread|1 thread 9|2 channel_name 9?|3 channel_purpose 9?|4 channel_topic 9?|5 sender_name 9?|6 sender_id 9?|7 sender_type 9?|8 is_directly_addressed 8?|9 message_permalink 9?"];
+   }
+ };
+ var InvocationContext_MicrosoftTeamsThread = class _InvocationContext_MicrosoftTeamsThread extends __protoMessage380 {
+@@ -18760,6 +19385,7 @@
+ var CustomModeSource = /* @__PURE__ */ enumType(proto3, __protoPackage83, "CustomModeSource", [[0, "UNSPECIFIED"], [1, "AGENT_SKILL"], [2, "PLUGIN_SKILL"], [3, "REPO_SKILL"], [4, "MANAGED_SKILL"]], 1);
+ var SimulatedMsgReason = /* @__PURE__ */ enumType(proto3, __protoPackage83, "SimulatedMsgReason", [[0, "UNSPECIFIED"], [1, "PLAN_EXECUTION"], [2, "COMMIT_REMINDER"], [3, "BACKGROUND_TASK_COMPLETION"], [4, "DIFF_TAB_COMMIT"], [5, "DIFF_TAB_COMMIT_AND_PUSH"], [6, "DIFF_TAB_PUSH"], [7, "DIFF_TAB_CREATE_PR"], [8, "DIFF_TAB_FIX_MERGE_CONFLICTS"], [9, "USER_SENT_TO_SUBAGENT"], [10, "USER_INTERRUPTED_SUBAGENT"], [11, "USER_QUEUED_TO_SUBAGENT"], [12, "BABYSIT_PR_IN_CLOUD"], [13, "CI_PANEL_INVESTIGATE_FAILURE"], [14, "MULTITASK"], [15, "BUILD_IN_PARALLEL"], [16, "MULTITASK_SPLIT_PRS"], [17, "APPLY_LOCALLY"], [18, "CHECKOUT_BRANCH"], [19, "DIFF_TAB_UPDATE_BRANCH"], [20, "PR_TAB_BUGBOT_FIX"], [22, "RUN_BUGBOT_REVIEW"], [23, "RUN_SECURITY_REVIEW"], [24, "FSD_APPLY_FINDING"], [25, "FSD_UNDO_FINDING"], [26, "FSD_START"], [27, "FSD_PR_INTERRUPT"], [28, "SUBSCRIPTION"], [29, "DIFF_TAB_CREATE_BRANCH"], [30, "AGENT_STORE_CONFLICT"], [31, "GOAL_CONTINUATION"], [32, "PROJECT_KICKOFF"], [33, "MARKDOWN_PROMPT_BUTTON"], [34, "USER_QUICK_ACTION"], [35, "INTERACTION_RESPONSE"]], 1);
+ var SubscriptionSource = /* @__PURE__ */ enumType(proto3, __protoPackage83, "SubscriptionSource", [[0, "UNSPECIFIED"], [1, "SLACK"], [2, "GITHUB"], [3, "LINEAR"], [4, "ORIGIN"], [5, "FACTORY"]], 1);
++var ReplyAudience = /* @__PURE__ */ enumType(proto3, __protoPackage83, "ReplyAudience", [[0, "UNSPECIFIED"], [1, "USER"], [2, "AGENT"]], 1);
+ var TaskArgs = class _TaskArgs extends __protoMessage381 {
+   constructor(data) {
+     super();
+@@ -19585,7 +20211,7 @@
+     return proto3.util.equals(_UserMessage, a, b);
+   }
+   static $() {
+-    return ["UserMessage|1 text 9|2 message_id 9|3 selected_context #0?|4 mode #1|5 is_simulated_msg 8?|6 best_of_n_group_id 9?|7 try_use_best_of_n_promotion 8?|8 rich_text 9?|9 simulated_msg_reason #2?|10 conversation_state_blob_id 12|11 subagent_system_reminder 9?|13 triggering_user_info #3?|14 execute_plan_info #4?|15 simulated_message_metadata #5?|16 prompt_reference_id 9?|17 thread_id 9?|18 text_blob_id 12?|19 rich_text_blob_id 12?|21 hook_additional_contexts #6*|22 custom_mode_intent #7?|23 project_details #8?|24 turn_steer 8?|25 started_at_ms 4?|26 completed_at_ms 4?|27 sent_by_agent_id 9?|28 sent_by_voice_call 8?|29 sender #9?|30 forked_context 9?|31 reply_to 9?", SelectedContext, AgentMode, SimulatedMsgReason, TriggeringUserInfo, ExecutePlanInfo, UserMessage_SimulatedMessageMetadata, HookAdditionalContext, CustomModeIntent, ProjectDetails, MessageSender];
++    return ["UserMessage|1 text 9|2 message_id 9|3 selected_context #0?|4 mode #1|5 is_simulated_msg 8?|6 best_of_n_group_id 9?|7 try_use_best_of_n_promotion 8?|8 rich_text 9?|9 simulated_msg_reason #2?|10 conversation_state_blob_id 12|11 subagent_system_reminder 9?|13 triggering_user_info #3?|14 execute_plan_info #4?|15 simulated_message_metadata #5?|16 prompt_reference_id 9?|17 thread_id 9?|18 text_blob_id 12?|19 rich_text_blob_id 12?|21 hook_additional_contexts #6*|22 custom_mode_intent #7?|23 project_details #8?|24 turn_steer 8?|25 started_at_ms 4?|26 completed_at_ms 4?|27 sent_by_agent_id 9?|28 sent_by_voice_call 8?|29 sender #9?|30 forked_context 9?|31 reply_to 9?|32 reply_audience #10?|33 reply_to_tool_call_id 9?", SelectedContext, AgentMode, SimulatedMsgReason, TriggeringUserInfo, ExecutePlanInfo, UserMessage_SimulatedMessageMetadata, HookAdditionalContext, CustomModeIntent, ProjectDetails, MessageSender, ReplyAudience];
+   }
+ };
+ var UserMessage_SimulatedMessageMetadata = class _UserMessage_SimulatedMessageMetadata extends __protoMessage381 {
+@@ -21535,7 +22161,7 @@
+     if (migrationState !== "unstarted" && migrationState !== "recovery-rebuilt") {
+       return;
+     }
+-    if (!(0, import_node_fs3.existsSync)(legacyBlobDbPath)) return;
++    if (!(0, import_node_fs7.existsSync)(legacyBlobDbPath)) return;
+     try {
+       this.db.prepare("ATTACH DATABASE ? AS legacy").run(legacyBlobDbPath);
+       try {
+@@ -21610,7 +22236,7 @@
+     return {
+       outcome: "walked",
+       rootBytes,
+-      rootHexId: (0, import_node_crypto.createHash)("sha256").update(rootBytes).digest("hex"),
++      rootHexId: (0, import_node_crypto2.createHash)("sha256").update(rootBytes).digest("hex"),
+       reachableHexIds,
+       unresolvedProtoRefs: walk.unresolvedProtoRefs,
+       closureByteSize
+@@ -21655,7 +22281,7 @@
+       const row = this.getBlobStmt.get(id);
+       const data = row?.data;
+       if (!(data instanceof Uint8Array)) continue;
+-      if ((0, import_node_crypto.createHash)("sha256").update(data).digest("hex") !== id) continue;
++      if ((0, import_node_crypto2.createHash)("sha256").update(data).digest("hex") !== id) continue;
+       let structure;
+       try {
+         structure = ConversationStateStructure.fromBinary(data);

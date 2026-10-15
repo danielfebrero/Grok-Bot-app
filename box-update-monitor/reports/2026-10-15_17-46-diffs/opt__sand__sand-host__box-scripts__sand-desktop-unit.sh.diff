@@ -1,0 +1,74 @@
+--- 2026-10-15_12-51:/opt/sand/sand-host/box-scripts/sand-desktop-unit.sh
++++ 2026-10-15_17-46:/opt/sand/sand-host/box-scripts/sand-desktop-unit.sh
+@@ -0,0 +1,71 @@
++# shellcheck shell=bash
++
++SAND_DESKTOP_UNIT_PROC_ROOT="${SAND_DESKTOP_UNIT_PROC_ROOT:-/proc}"
++SAND_DESKTOP_UNIT_TERM_WAIT_TENTHS="${SAND_DESKTOP_UNIT_TERM_WAIT_TENTHS:-30}"
++SAND_DESKTOP_UNIT_PEER_USER="${SAND_DESKTOP_UNIT_PEER_USER-box}"
++
++sand_desktop_unit_profile_pattern() {
++	printf -- '--user-data-dir=%s( |$)' "$(printf '%s' "$1" | sed 's/[][\.*^$+?(){}|/]/\\&/g')"
++}
++
++sand_desktop_unit_tagged_environs() {
++	local unit="$1" peer="${SAND_DESKTOP_UNIT_PEER_USER}"
++	grep -slzxF -- "SAND_DESKTOP_UNIT=${unit}" "${SAND_DESKTOP_UNIT_PROC_ROOT}"/[0-9]*/environ 2>/dev/null || true
++	[ -n "${peer}" ] && [ "$(id -u)" -eq 0 ] || return 0
++	id -u "${peer}" >/dev/null 2>&1 || return 0
++	setpriv --reuid="${peer}" --regid="${peer}" --clear-groups -- \
++		grep -slzxF -- "SAND_DESKTOP_UNIT=${unit}" "${SAND_DESKTOP_UNIT_PROC_ROOT}"/[0-9]*/environ 2>/dev/null || true
++}
++
++sand_desktop_unit_profile_cmdlines() {
++	local profile="$1"
++	[ -n "${profile}" ] || return 0
++	grep -slzE -- "$(sand_desktop_unit_profile_pattern "${profile}")" \
++		"${SAND_DESKTOP_UNIT_PROC_ROOT}"/[0-9]*/cmdline 2>/dev/null || true
++}
++
++sand_desktop_unit_pids() {
++	local unit="$1" profile="${2:-}" path pid
++	[ -n "${unit}" ] || return 0
++	{
++		sand_desktop_unit_tagged_environs "${unit}"
++		sand_desktop_unit_profile_cmdlines "${profile}"
++	} | while IFS= read -r path; do
++		pid="${path%/*}"
++		pid="${pid##*/}"
++		case "${pid}" in
++		'' | *[!0-9]*) continue ;;
++		esac
++		[ "${pid}" = "$$" ] && continue
++		[ "${pid}" = "${BASHPID:-}" ] && continue
++		printf '%s\n' "${pid}"
++	done | sort -un
++}
++
++sand_desktop_unit_signal() {
++	local signal="$1" pids="$2" pid
++	for pid in ${pids}; do
++		kill "-${signal}" "${pid}" 2>/dev/null || true
++	done
++}
++
++sand_desktop_unit_kill() {
++	local unit="$1" profile="${2:-}" pids
++	[ -n "${unit}" ] || return 0
++	pids="$(sand_desktop_unit_pids "${unit}" "${profile}")"
++	[ -n "${pids}" ] || return 0
++	sand_desktop_unit_signal TERM "${pids}"
++	for _ in $(seq 1 "${SAND_DESKTOP_UNIT_TERM_WAIT_TENTHS}"); do
++		sleep 0.1
++		pids="$(sand_desktop_unit_pids "${unit}" "${profile}")"
++		[ -n "${pids}" ] || return 0
++	done
++	for _ in $(seq 1 30); do
++		sand_desktop_unit_signal KILL "${pids}"
++		sleep 0.1
++		pids="$(sand_desktop_unit_pids "${unit}" "${profile}")"
++		[ -n "${pids}" ] || return 0
++	done
++	echo "sand-desktop-unit: ${unit} still has processes after SIGKILL: ${pids//$'\n'/ }" >&2
++	return 1
++}

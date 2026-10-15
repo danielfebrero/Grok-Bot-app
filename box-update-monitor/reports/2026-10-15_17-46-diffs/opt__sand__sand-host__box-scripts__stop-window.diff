@@ -1,0 +1,109 @@
+--- 2026-10-15_12-51:/opt/sand/sand-host/box-scripts/stop-window
++++ 2026-10-15_17-46:/opt/sand/sand-host/box-scripts/stop-window
+@@ -1,8 +1,15 @@
+ #!/usr/bin/env bash
+ set -uo pipefail
+ 
++STOP_MODE=stop
++if [ "${1:-}" = "--park" ]; then
++	STOP_MODE=park
++	shift
++fi
+ DISPLAY_NUM="${1:?display number required}"
++DESKTOP_UNIT=":${DISPLAY_NUM}"
+ CHROME_PROFILE="/home/box/chrome-profile/Fork-${DISPLAY_NUM}"
++CHROME_STOP_WAIT_TENTHS="${SAND_CHROME_STOP_WAIT_TENTHS:-100}"
+ 
+ if [ "${DISPLAY_NUM}" -le 1 ] 2>/dev/null; then
+ 	echo "stop-window: refusing to stop primary desktop :${DISPLAY_NUM}" >&2
+@@ -16,7 +23,9 @@
+ VNC_PORT=$((5900 + DISPLAY_NUM))
+ # <<< box port table <<<
+ 
+-rm -f "${WINDOW_TOKEN_DIR}/${DISPLAY_NUM}"
++if [ "${STOP_MODE}" = stop ]; then
++	rm -f "${WINDOW_TOKEN_DIR}/${DISPLAY_NUM}"
++fi
+ 
+ if [ -r /usr/local/bin/sand-desktop-supervise.sh ]; then
+ 	# shellcheck source=/dev/null
+@@ -27,6 +36,15 @@
+ fi
+ sand_desktop_unregister_group "d${DISPLAY_NUM}"
+ 
++SAND_DESKTOP_UNIT_LIB="${SAND_DESKTOP_UNIT_LIB:-/usr/local/bin/sand-desktop-unit.sh}"
++if [ -r "${SAND_DESKTOP_UNIT_LIB}" ]; then
++	# shellcheck source=/dev/null
++	. "${SAND_DESKTOP_UNIT_LIB}"
++fi
++if ! command -v sand_desktop_unit_kill >/dev/null 2>&1; then
++	sand_desktop_unit_kill() { :; }
++fi
++
+ pids_on_port() {
+ 	local port="$1"
+ 	[ -n "${port}" ] || return 0
+@@ -40,6 +58,28 @@
+ 
+ kill_pid() { [ -n "${1:-}" ] && kill "${1}" 2>/dev/null || true; }
+ 
++profile_browser_pids() {
++	local pid args
++	for pid in $(pgrep -x chrome 2>/dev/null); do
++		args="$( (tr '\0' '\n' <"/proc/${pid}/cmdline") 2>/dev/null || true)"
++		printf '%s\n' "${args}" | grep -q '^--type=' && continue
++		printf '%s\n' "${args}" | grep -qxF -- "--user-data-dir=${CHROME_PROFILE}" && printf '%s\n' "${pid}"
++	done
++}
++
++stop_profile_browser() {
++	local pids pid
++	pids="$(profile_browser_pids)"
++	[ -n "${pids}" ] || return 0
++	for pid in ${pids}; do kill -TERM "${pid}" 2>/dev/null || true; done
++	for _ in $(seq 1 "${CHROME_STOP_WAIT_TENTHS}"); do
++		pids="$(profile_browser_pids)"
++		[ -n "${pids}" ] || return 0
++		sleep 0.1
++	done
++	echo "stop-window ${DISPLAY_NUM}: Chrome did not exit within the grace period; the unit sweep kills it" >&2
++}
++
+ x11vnc_pids_on_port() {
+ 	local port="$1" pid cmd
+ 	[ -n "${port}" ] || return 0
+@@ -75,6 +115,8 @@
+ 
+ rm -f "${NOVNC_TOKEN_DIR}/${DISPLAY_NUM}"
+ 
++stop_profile_browser
++
+ for pid in $(pids_on_port "${EXEC_DAEMON_PORT}"); do kill_pid "${pid}"; done
+ 
+ reap_x11vnc_on_port "${VNC_PORT}"
+@@ -82,11 +124,21 @@
+ LOCK="/tmp/.X${DISPLAY_NUM}-lock"
+ if [ -f "${LOCK}" ]; then kill_pid "$(tr -dc '0-9' <"${LOCK}")"; fi
+ 
++sand_desktop_unit_kill "${DESKTOP_UNIT}" "${CHROME_PROFILE}"
++
+ rm -f "${LOCK}" "/tmp/.X11-unix/X${DISPLAY_NUM}"
+-rm -rf \
+-	"${CHROME_PROFILE}" \
+-	"/tmp/xdg-runtime-box-${DISPLAY_NUM}" \
+-	"/tmp/xdg-runtime-${DISPLAY_NUM}" \
++RUNTIME_PATHS=(
++	"/tmp/xdg-runtime-box-${DISPLAY_NUM}"
++	"/tmp/xdg-runtime-${DISPLAY_NUM}"
+ 	"/tmp/sand-window-${DISPLAY_NUM}"
++)
++if [ "${STOP_MODE}" = stop ]; then
++	RUNTIME_PATHS+=("${CHROME_PROFILE}")
++fi
++rm -rf "${RUNTIME_PATHS[@]}"
+ 
++if [ "${STOP_MODE}" = park ]; then
++	echo "sand window ${DISPLAY_NUM} parked"
++	exit 0
++fi
+ echo "sand window ${DISPLAY_NUM} stopped"
