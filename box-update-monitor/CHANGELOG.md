@@ -9,6 +9,19 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-15 10:54 (Paris) — snapshot `2026-10-15_07-46` → `2026-10-15_10-54`
+
+Versions touchées : agent-store-fuse `0c3b083` → `7516de1` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; **nouveau support WebAuthn / FIDO2 côté box**. image `726deab`, sand-host `4098fb0`, exec-daemon, orbitd, Chrome 154.0.8037.97, Node, Python inchangés. Fichiers : +0 / −0 / ~2.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : support WebAuthn ajouté au Chrome de la box. La policy managée `/etc/opt/chrome/policies/managed/sand-webauthn.json` passe de `{}` à un `ExtensionSettings` qui **force-install** l'extension `oifaalpenddpcpgklkncbmdaocjdnlgc` (proxy WebAuthn), via `update_url` `file:///usr/local/share/sand-webauthn-proxy-update.xml`. Nouveaux paquets Debian : `libfido2-1` (1.15.0-1+b1), `libcbor0.10` (0.10.2-2), `openssh-client` (1:10.0p1-7+deb13u4) — brique FIDO2 / clé de sécurité.
+- **Perf** : —
+- **Autre/infra** : bump agent-store-fuse (rebuild opaque / oscillation du pin, comme les snapshots précédents).
+
+Rapport : [reports/2026-10-15_10-54.md](reports/2026-10-15_10-54.md).
+
+
 ## 2026-10-15 07:46 (Paris) — snapshot `2026-10-15_06-52` → `2026-10-15_07-46`
 
 Versions touchées : agent-store-fuse `51fd48b` → `0c3b083` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version` vers la nouvelle archive) ; image `726deab`, sand-host `4098fb0`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
