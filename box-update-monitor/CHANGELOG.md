@@ -9,6 +9,19 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-16 00:49 (Paris) — snapshot `2026-10-15_23-46` → `2026-10-16_00-49`
+
+Versions touchées : agent-store-fuse `b64fcb3` → `49b7f26` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `701b86e`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
+
+- **Bugfix** : —
+- **Change** : —
+- **Features** : —
+- **Perf** : —
+- **Autre/infra** : bump agent-store-fuse (rebuild opaque / oscillation du pin S3). Seul le fichier de version change.
+
+Rapport : [reports/2026-10-16_00-49.md](reports/2026-10-16_00-49.md).
+
+
 ## 2026-10-15 23:46 (Paris) — snapshot `2026-10-15_20-47` → `2026-10-15_23-46`
 
 Versions touchées : agent-store-fuse `6bd47b6` → `b64fcb3` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `701b86e`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
