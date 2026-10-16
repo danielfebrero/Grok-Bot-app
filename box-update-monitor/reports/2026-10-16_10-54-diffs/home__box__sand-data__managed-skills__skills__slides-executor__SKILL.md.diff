@@ -1,0 +1,30 @@
+--- 2026-10-16_09-48:/home/box/sand-data/managed-skills/skills/slides-executor/SKILL.md
++++ 2026-10-16_10-54:/home/box/sand-data/managed-skills/skills/slides-executor/SKILL.md
+@@ -128,6 +128,17 @@
+ - If a call fails because it is too large, or it arrives without its `requests`, split it into two smaller calls and send both. Split again until each call lands.
+ - Continue batch by batch in the MCP until the live deck has the whole edit.
+ 
++## A deck in Google Slides
++
++Follow these rules when the brief names Google Slides as the destination. The deck is one file in their Drive.
++
++- Build and check the slides on the box, in the phases above.
++- In the `finish` phase, after the full pack, upload the finished `.pptx` one time with `UploadFile` and `destination.convertToGoogleFormat: true`. That file is the deck.
++- Google can draw a slide differently from the box render. To see the deck as the user sees it, read the thumbnail of each slide of that file with `read_slide_page_thumbnail` or `get_slide_thumbnail`. Save each thumbnail into `renders/google-<N>/`, with the next free N.
++- Fix what Google draws differently in that same file, with the edit tools of the Slides connector, as "Edit through the Slides MCP" says. Then read the thumbnails of the changed slides again.
++- Before you return, trash each file that you made in their accounts that is not the deck, with the `trash_file` tool of the Drive connector. Keep a file only when the brief says that the user asked to keep it.
++- In your return, give the URL of the deck. In `images`, give the Google thumbnails. Name each file that you trashed, and each file that you could not trash.
++
+ ## The `clean` phase
+ 
+ The user is satisfied with the delivered deck. Run no setup, and do not render. If the finished `.pptx` that the brief names is not in the working folder, delete nothing and return `status: blocked`. Otherwise, in one step, remove everything else in the working folder. Keep only the finished `.pptx`, `NOTES.md`, and `notes/`. Choose what to keep by those names, not what to delete by a pattern, so a deck file that shares a name with a working file stays.
+@@ -336,7 +347,8 @@
+ - Extract media or sample pixels with code to learn a style.
+ - Measure text widths or pixels with code. Render the slide and look at it.
+ - Convert the rendered images to another format.
+-- Upload files, or address the user.
++- Upload files, except as "A deck in Google Slides" says.
++- Address the user.
+ 
+ ## Return
+ 

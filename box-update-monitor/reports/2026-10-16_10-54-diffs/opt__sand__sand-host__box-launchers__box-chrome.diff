@@ -1,0 +1,11 @@
+--- 2026-10-16_09-48:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-16_10-54:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -100,7 +100,7 @@
+ SAND_WEBAUTHN_ID_FILE=/usr/local/share/sand-webauthn-proxy.id
+ SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+ CHROME_LOG="/tmp/chrome${DISPLAY:-:1}.log"
+-BOX_CHROME_LAUNCHER_VERSION=3
++BOX_CHROME_LAUNCHER_VERSION=4
+ CHROME_FLAGS+=(--sand-box-chrome-launcher="${BOX_CHROME_LAUNCHER_VERSION}")
+ CHROME_LAUNCH_WAIT_S=20
+ CHROME_RELEASE_GRACE_S=10

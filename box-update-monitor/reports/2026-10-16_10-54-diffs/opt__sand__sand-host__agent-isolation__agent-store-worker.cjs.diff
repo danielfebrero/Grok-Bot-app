@@ -1,0 +1,98 @@
+--- 2026-10-16_09-48:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
++++ 2026-10-16_10-54:/opt/sand/sand-host/agent-isolation/agent-store-worker.cjs
+@@ -16680,6 +16680,8 @@
+     super();
+     this.key = "";
+     this.version = protoInt64.zero;
++    this.title = "";
++    this.statusLabel = "";
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -16695,7 +16697,7 @@
+     return proto3.util.equals(_TrackedTaskUpdated, a, b);
+   }
+   static $() {
+-    return ["TrackedTaskUpdated|1 key 9|2 version 4"];
++    return ["TrackedTaskUpdated|1 key 9|2 version 4|3 title 9|4 status_label 9"];
+   }
+ };
+ var UpdateTrackedTasksSuccess = class _UpdateTrackedTasksSuccess extends __protoMessage372 {
+@@ -20211,7 +20213,7 @@
+     return proto3.util.equals(_UserMessage, a, b);
+   }
+   static $() {
+-    return ["UserMessage|1 text 9|2 message_id 9|3 selected_context #0?|4 mode #1|5 is_simulated_msg 8?|6 best_of_n_group_id 9?|7 try_use_best_of_n_promotion 8?|8 rich_text 9?|9 simulated_msg_reason #2?|10 conversation_state_blob_id 12|11 subagent_system_reminder 9?|13 triggering_user_info #3?|14 execute_plan_info #4?|15 simulated_message_metadata #5?|16 prompt_reference_id 9?|17 thread_id 9?|18 text_blob_id 12?|19 rich_text_blob_id 12?|21 hook_additional_contexts #6*|22 custom_mode_intent #7?|23 project_details #8?|24 turn_steer 8?|25 started_at_ms 4?|26 completed_at_ms 4?|27 sent_by_agent_id 9?|28 sent_by_voice_call 8?|29 sender #9?|30 forked_context 9?|31 reply_to 9?|32 reply_audience #10?|33 reply_to_tool_call_id 9?", SelectedContext, AgentMode, SimulatedMsgReason, TriggeringUserInfo, ExecutePlanInfo, UserMessage_SimulatedMessageMetadata, HookAdditionalContext, CustomModeIntent, ProjectDetails, MessageSender, ReplyAudience];
++    return ["UserMessage|1 text 9|2 message_id 9|3 selected_context #0?|4 mode #1|5 is_simulated_msg 8?|6 best_of_n_group_id 9?|7 try_use_best_of_n_promotion 8?|8 rich_text 9?|9 simulated_msg_reason #2?|10 conversation_state_blob_id 12|11 subagent_system_reminder 9?|13 triggering_user_info #3?|14 execute_plan_info #4?|15 simulated_message_metadata #5?|16 prompt_reference_id 9?|17 thread_id 9?|18 text_blob_id 12?|19 rich_text_blob_id 12?|21 hook_additional_contexts #6*|22 custom_mode_intent #7?|23 project_details #8?|24 turn_steer 8?|25 started_at_ms 4?|26 completed_at_ms 4?|27 sent_by_agent_id 9?|28 sent_by_voice_call 8?|29 sender #9?|30 forked_context 9?|31 reply_to 9?|32 reply_audience #10?|33 reply_to_tool_call_id 9?|34 during_voice_call 8?|35 inherits_voice_call 8?|36 voice_calls_read_utterances 8?", SelectedContext, AgentMode, SimulatedMsgReason, TriggeringUserInfo, ExecutePlanInfo, UserMessage_SimulatedMessageMetadata, HookAdditionalContext, CustomModeIntent, ProjectDetails, MessageSender, ReplyAudience];
+   }
+ };
+ var UserMessage_SimulatedMessageMetadata = class _UserMessage_SimulatedMessageMetadata extends __protoMessage381 {
+@@ -20941,6 +20943,9 @@
+     this.durableSkillBlocks = [];
+     this.recentUserMessageIds = [];
+     this.mentionedAgentIds = [];
++    this.voiceCallUtterances = [];
++    this.voiceCallTimeTaskIds = [];
++    this.writesVoiceCallUtterances = false;
+     proto3.util.initPartial(data, this);
+   }
+   static fromBinary(bytes, options) {
+@@ -20956,7 +20961,57 @@
+     return proto3.util.equals(_ConversationStateStructure, a, b);
+   }
+   static $() {
+-    return ["ConversationStateStructure|1 root_prompt_messages_json 12*|8 turns 12*|3 todos 12*|4 pending_tool_calls 9*|5 token_details #0|6 summary 12?|7 plan 12?|9 previous_workspace_uris 9*|10 mode #1?|11 summary_archive 12?|12 file_states 9,12|15 file_states_v2 9,#2|13 summary_archives 12*|14 turn_timings #3*|16 subagent_states 9,#4|17 self_summary_count 13|18 read_paths 9*|19 active_branch_name 9?|20 plans 9,#5|21 tracked_git_repo_branches #6*|22 agent_type 9?|23 communicate_update_history #7*|24 subagent_threads 9,9|25 communicate_update_final_summary 9?|28 communicate_update_completed_subtitle 9?|29 communicate_update_states_by_parent_tool_call_id 9,#8|30 subagent_runs_by_parent_tool_call_id 9,#9|26 conversation_started_timestamp_ms 4?|27 conversation_started_time_zone 9?|31 subagent_state_refs 9,12|32 goal_state #10?|33 is_root_project_conversation 8?|34 completed_ask_question_tool_call_ids 9*|35 durable_skill_blocks 9*|36 durable_custom_mode_id 9?|37 message_count_at_last_compaction 13?|38 recent_user_message_ids 9*|39 recent_user_message_ids_older_turn_count 13?|40 turn_telemetry #11?|42 mentioned_agent_ids 9*", ConversationTokenDetails, AgentMode, FileStateStructure, StepTiming, SubagentPersistedState, PlanRegistryEntry, TrackedGitRepo, CommunicateUpdateHistoryEntry, CommunicateUpdateTurnState, SubagentRunState, GoalState, TurnTelemetryState];
++    return ["ConversationStateStructure|1 root_prompt_messages_json 12*|8 turns 12*|3 todos 12*|4 pending_tool_calls 9*|5 token_details #0|6 summary 12?|7 plan 12?|9 previous_workspace_uris 9*|10 mode #1?|11 summary_archive 12?|12 file_states 9,12|15 file_states_v2 9,#2|13 summary_archives 12*|14 turn_timings #3*|16 subagent_states 9,#4|17 self_summary_count 13|18 read_paths 9*|19 active_branch_name 9?|20 plans 9,#5|21 tracked_git_repo_branches #6*|22 agent_type 9?|23 communicate_update_history #7*|24 subagent_threads 9,9|25 communicate_update_final_summary 9?|28 communicate_update_completed_subtitle 9?|29 communicate_update_states_by_parent_tool_call_id 9,#8|30 subagent_runs_by_parent_tool_call_id 9,#9|26 conversation_started_timestamp_ms 4?|27 conversation_started_time_zone 9?|31 subagent_state_refs 9,12|32 goal_state #10?|33 is_root_project_conversation 8?|34 completed_ask_question_tool_call_ids 9*|35 durable_skill_blocks 9*|36 durable_custom_mode_id 9?|37 message_count_at_last_compaction 13?|38 recent_user_message_ids 9*|39 recent_user_message_ids_older_turn_count 13?|40 turn_telemetry #11?|42 mentioned_agent_ids 9*|43 voice_call_utterances #12*|44 voice_call_pending_answer #13?|45 voice_call_time_task_ids 9*|46 writes_voice_call_utterances 8|47 voice_calls_read_utterances 8?", ConversationTokenDetails, AgentMode, FileStateStructure, StepTiming, SubagentPersistedState, PlanRegistryEntry, TrackedGitRepo, CommunicateUpdateHistoryEntry, CommunicateUpdateTurnState, SubagentRunState, GoalState, TurnTelemetryState, VoiceCallUtterance, VoiceCallPendingAnswer];
++  }
++};
++var VoiceCallUtterance = class _VoiceCallUtterance extends __protoMessage381 {
++  constructor(data) {
++    super();
++    this.id = "";
++    this.kind = VoiceCallUtterance_Kind.UNSPECIFIED;
++    this.text = "";
++    this.answersMessageIds = [];
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _VoiceCallUtterance().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _VoiceCallUtterance().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _VoiceCallUtterance().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_VoiceCallUtterance, a, b);
++  }
++  static $() {
++    return ["VoiceCallUtterance|1 id 9|2 kind #0|3 text 9|4 answers_message_ids 9*", VoiceCallUtterance_Kind];
++  }
++};
++var VoiceCallUtterance_Kind = /* @__PURE__ */ enumType(proto3, __protoPackage83, "VoiceCallUtterance.Kind", [[0, "UNSPECIFIED"], [1, "SEND"], [2, "TERMINAL"]], 1);
++var VoiceCallPendingAnswer = class _VoiceCallPendingAnswer extends __protoMessage381 {
++  constructor(data) {
++    super();
++    this.messageIds = [];
++    this.readsUtterances = false;
++    this.endedOnSend = false;
++    proto3.util.initPartial(data, this);
++  }
++  static fromBinary(bytes, options) {
++    return new _VoiceCallPendingAnswer().fromBinary(bytes, options);
++  }
++  static fromJson(jsonValue, options) {
++    return new _VoiceCallPendingAnswer().fromJson(jsonValue, options);
++  }
++  static fromJsonString(jsonString, options) {
++    return new _VoiceCallPendingAnswer().fromJsonString(jsonString, options);
++  }
++  static equals(a, b) {
++    return proto3.util.equals(_VoiceCallPendingAnswer, a, b);
++  }
++  static $() {
++    return ["VoiceCallPendingAnswer|1 message_ids 9*|2 reads_utterances 8|3 ended_on_send 8"];
+   }
+ };
+ var InteractionResponse = class _InteractionResponse extends __protoMessage381 {

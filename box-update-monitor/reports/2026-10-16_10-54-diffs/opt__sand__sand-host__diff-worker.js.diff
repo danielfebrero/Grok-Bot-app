@@ -1,0 +1,40 @@
+--- 2026-10-16_09-48:/opt/sand/sand-host/diff-worker.js
++++ 2026-10-16_10-54:/opt/sand/sand-host/diff-worker.js
+@@ -517,6 +517,8 @@
+   return hunks;
+ }
+ function calculateDiff(params) {
++  const measure = params.measure === true;
++  const startedAt = measure ? performance.now() : 0;
+   const ensureNL = (s) => s === "" || s.endsWith("\n") ? s : `${s}
+ `;
+   const original = ensureNL(params.original);
+@@ -544,12 +546,23 @@
+       ...h.lines
+     ])
+   ].join("\n");
++  const linesAdded = hunks.reduce(
++    (sum, h) => sum + h.lines.filter((l) => l.startsWith("+")).length,
++    0
++  );
++  const linesRemoved = hunks.reduce(
++    (sum, h) => sum + h.lines.filter((l) => l.startsWith("-")).length,
++    0
++  );
+   return {
+     diffString,
+-    linesAdded: hunks.reduce((sum, h) => sum + h.lines.filter((l) => l.startsWith("+")).length, 0),
+-    linesRemoved: hunks.reduce(
+-      (sum, h) => sum + h.lines.filter((l) => l.startsWith("-")).length,
+-      0
+-    )
++    linesAdded,
++    linesRemoved,
++    observation: {
++      durationMs: measure ? performance.now() - startedAt : 0,
++      editLength: linesAdded + linesRemoved,
++      oldChars: measure ? params.original.length : 0,
++      newChars: measure ? params.new.length : 0
++    }
+   };
+ }

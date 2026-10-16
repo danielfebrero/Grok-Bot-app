@@ -1,0 +1,20 @@
+--- 2026-10-16_09-48:/home/box/sand-data/managed-skills/skills/slides/SKILL.md
++++ 2026-10-16_10-54:/home/box/sand-data/managed-skills/skills/slides/SKILL.md
+@@ -23,6 +23,8 @@
+ 
+ **Convert to Google Slides on upload.** If they want a `.pptx` in Google Slides, `UploadFile` it to Google Drive with `destination.convertToGoogleFormat: true`. Drive imports it as a native Slides deck in that same call. The result `mimeType` tells you which type landed. A request for only this conversion needs no Task.
+ 
++**One file in their Drive.** When the destination is Google Slides, the deck reaches their Drive as one file. The `finish` Task uploads it one time, checks how Google draws each slide of that file, and fixes that file in place. Every brief that can write to their Drive tells the child to trash each file it made in their accounts that is not the deck, before it returns, and to name those files in its return.
++
+ **If you cannot download a file that they named, stop and say so.** Tell them what failed, and quote the error. Do not continue on the MCP.
+ 
+ **The person owns the story and the taste.** On a new deck, stop for the outline and for each sample. Ask before you search their files. Use only the decks that they named or pasted.
+@@ -147,7 +149,7 @@
+ 
+ ### 9. Deliver
+ 
+-When the `finish` Task returns `status: deck done`, `SendToUser` the finished `.pptx` and its images in the chat. Tell them each defect that is left, with its reason. Then `UploadFile` the `.pptx` one time, and put it on the destination. Never `UploadFile` slide images or working files. When the work happened on the live deck through the Slides MCP, send the link of the live deck and its images in place of the `.pptx`.
++When the `finish` Task returns `status: deck done`, `SendToUser` the finished `.pptx` and its images in the chat. Tell them each defect that is left, with its reason. Then `UploadFile` the `.pptx` one time, and put it on the destination. Never `UploadFile` slide images or working files. When the destination is Google Slides, the `finish` Task already put the deck in their Drive. Send its URL with the images, in place of the upload. When the work happened on the live deck through the Slides MCP, send the link of the live deck and its images in place of the `.pptx`.
+ 
+ ### 10. The next message
+ 
