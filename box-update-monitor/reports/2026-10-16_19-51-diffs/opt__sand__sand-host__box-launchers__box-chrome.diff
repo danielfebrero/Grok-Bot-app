@@ -1,0 +1,93 @@
+--- 2026-10-16_17-51:/opt/sand/sand-host/box-launchers/box-chrome
++++ 2026-10-16_19-51:/opt/sand/sand-host/box-launchers/box-chrome
+@@ -96,6 +96,37 @@
+ 		)
+ 	fi
+ fi
++SAND_BOX_BROWSER_RUNNING=/tmp/sand-box-browser-running
++BOX_BROWSER_RUNNING_FILE="${SAND_BOX_BROWSER_RUNNING}-${CHROME_DEBUG_PORT}"
++UNGOOGLED_CHROMIUM=/opt/ungoogled-chromium/chrome
++box_browser_ungoogled_wanted() {
++	[ "${SAND_BOX_BROWSER_UNGOOGLED:-0}" = "1" ] || [ -e "${SAND_BOX_BROWSER_UNGOOGLED_FILE:-/tmp/sand-box-browser-ungoogled}" ]
++}
++resolve_box_browser() {
++	local ticks
++	if [ ! -e "${BOX_BROWSER_RUNNING_FILE}" ] && [ -x "${UNGOOGLED_CHROMIUM}" ] && ! box_browser_ungoogled_wanted; then
++		ticks=$((${SAND_BOX_BROWSER_GATE_WAIT_S:-5} * 10))
++		while [ "${ticks}" -gt 0 ] && [ ! -e "${SAND_BOX_EXPERIMENTS_READY_FILE:-/tmp/sand-box-experiments-ready}" ]; do
++			sleep 0.1
++			ticks=$((ticks - 1))
++		done
++	fi
++	if box_browser_ungoogled_wanted && [ -x "${UNGOOGLED_CHROMIUM}" ]; then
++		printf ungoogled-chromium
++	else
++		printf chrome
++	fi
++}
++UNGOOGLED_CHROMIUM_FLAGS=(
++	"--enable-features=ReducedSystemInfo,SpoofWebGLInfo,SetIpv6ProbeFalse"
++	"--disable-features=OptimizationGuideModelDownloading,OptimizationHintsFetching,OptimizationTargetPrediction,OptimizationHints,EnforcePrivacySandboxAttestations,Translate,MediaRouter,DialMediaRouteProvider,CalculateNativeWinOcclusion,InterestFeedContentSuggestions,CertificateTransparencyComponentUpdater,AutofillServerCommunication,PrivacySandboxSettings4,AutomationControlled,HttpsUpgrades"
++	--webrtc-ip-handling-policy=disable_non_proxied_udp
++)
++BOX_BROWSER="$(resolve_box_browser)"
++case "${BOX_BROWSER}" in
++ungoogled-chromium) CHROME_BIN="${UNGOOGLED_CHROMIUM}" ;;
++*) CHROME_BIN=google-chrome-stable ;;
++esac
+ /usr/local/bin/box-chrome-policy || true
+ SAND_WEBAUTHN_ID_FILE=/usr/local/share/sand-webauthn-proxy.id
+ SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+@@ -210,12 +241,29 @@
+ }
+ 
+ launch_chrome() {
++	local flags=("${CHROME_FLAGS[@]}")
++	[ "${CHROME_BIN}" != "${UNGOOGLED_CHROMIUM}" ] || flags+=("${UNGOOGLED_CHROMIUM_FLAGS[@]}")
+ 	setsid -f /usr/local/bin/box-bounded-log --run "${CHROME_LOG}" -- \
+ 		"${CHROME_ENV[@]}" \
+-		nice -n 10 google-chrome-stable "${CHROME_FLAGS[@]}" "$@" \
++		nice -n 10 "${CHROME_BIN}" "${flags[@]}" "$@" \
+ 		</dev/null >/dev/null 2>&1 9>&-
+ }
+ 
++record_box_browser() {
++	printf '%s\n' "${BOX_BROWSER}" >"${BOX_BROWSER_RUNNING_FILE}.$$" &&
++		mv -f "${BOX_BROWSER_RUNNING_FILE}.$$" "${BOX_BROWSER_RUNNING_FILE}" 2>/dev/null || true
++}
++
++use_running_browser() {
++	local recorded=""
++	read -r recorded 2>/dev/null <"${BOX_BROWSER_RUNNING_FILE}" || true
++	if [ "${recorded}" = ungoogled-chromium ] && [ -x "${UNGOOGLED_CHROMIUM}" ]; then
++		CHROME_BIN="${UNGOOGLED_CHROMIUM}"
++	else
++		CHROME_BIN=google-chrome-stable
++	fi
++}
++
+ # Chrome keeps session cookies only in memory
+ # (https://chromium.googlesource.com/chromium/src/+/refs/tags/151.0.7922.169/net/cookies/cookie_monster.h),
+ # so a cold launch comes up without them until the saved cookie seed is pushed
+@@ -262,7 +310,12 @@
+ 	[ "${mode}" = window ] || visible=0
+ 	attempt="$(next_launch_attempt)"
+ 	started_ms="$(date +%s%3N)"
+-	[ "${CHROME_PORT_HELD}" -eq 1 ] || launch_chrome --no-startup-window
++	if [ "${CHROME_PORT_HELD}" -eq 0 ]; then
++		record_box_browser
++		launch_chrome --no-startup-window
++	else
++		use_running_browser
++	fi
+ 	if ! wait_for_chrome 0; then
+ 		outcome=cdp_timeout
+ 	else
+@@ -340,6 +393,7 @@
+ fi
+ 
+ if chrome_ready; then
++	use_running_browser
+ 	launch_chrome "$@"
+ 	wait_for_chrome 1
+ else

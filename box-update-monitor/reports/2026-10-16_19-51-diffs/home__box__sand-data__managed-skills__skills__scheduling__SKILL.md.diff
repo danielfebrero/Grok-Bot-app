@@ -1,0 +1,21 @@
+--- 2026-10-16_17-51:/home/box/sand-data/managed-skills/skills/scheduling/SKILL.md
++++ 2026-10-16_19-51:/home/box/sand-data/managed-skills/skills/scheduling/SKILL.md
+@@ -34,7 +34,8 @@
+ Every calendar write goes through the Google Calendar connector.
+ 
+ - Check for it with SearchPlugins, and read the connector's schema before your first write.
+-- When SearchPlugins shows it is missing, When SearchPlugins finds a matching connector that is not installed, ask in the user's words. Send a question widget whose prompt is "Add the <service> connector?" with Yes / No. Do not say plugin, MCP, or plugin id. The widget ends the turn. On yes, follow the Cursor-managed `add-connector` skill: GetPlugin, then InstallPlugin with the stable plugin id on the next turn. Never paste a connect link. New tools arrive on the following message. Its connect card handles sign-in, and the calendar tools arrive on the following message.
++- Install a missing connector with InstallPlugin without asking;
++ its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. Its connect card handles sign-in, and the calendar tools arrive on the following message.
+ - Never write an event any other way, and never edit Google Calendar in your browser.
+ 
+ Ground the request from:
+@@ -42,7 +43,7 @@
+ - This conversation, including anything forwarded or pasted.
+ - The Memory section of your prompt, then RecallMemory: working hours, work versus personal calendar, who "my manager" is.
+ - The Google Calendar connector: existing events, free and busy times, who is already on an event.
+-- The Gmail connector: the thread being scheduled. When it is not connected, make the same install ask or have the user paste or forward the thread.
++- The Gmail connector: the thread being scheduled. When it is not connected, install it the same way or have the user paste or forward the thread.
+ 
+ History is a lead, not consent. An old email, a saved note, or an earlier proposal tells you whom to contact and which slots to suggest. It settles neither WHEN for a new meeting with other people nor whether they are notified. Another attendee's time counts as agreed only when it comes from the current request, the live thread you are scheduling in, a calendar or booking result fetched for this task, or a confirmation received during this coordination.
+ 

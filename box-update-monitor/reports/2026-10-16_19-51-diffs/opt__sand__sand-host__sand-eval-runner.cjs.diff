@@ -1,0 +1,3832 @@
+--- 2026-10-16_17-51:/opt/sand/sand-host/sand-eval-runner.cjs
++++ 2026-10-16_19-51:/opt/sand/sand-host/sand-eval-runner.cjs
+@@ -253472,7 +253472,7 @@
+ 
+ }
+ 
+-var import_promises10, import_node_os11, import_node_path49, __addDisposableResource31, __disposeResources31, BashState;
++var import_promises10, import_node_os11, import_node_path49, __addDisposableResource32, __disposeResources32, BashState;
+ 
+ var init_bash = __esm({
+ 
+@@ -253502,7 +253502,7 @@
+ 
+     init_runtime_env();
+ 
+-    __addDisposableResource31 = function(env, value, async) {
++    __addDisposableResource32 = function(env, value, async) {
+ 
+       if (value !== null && value !== void 0) {
+ 
+@@ -253564,7 +253564,7 @@
+     }
+ ;
+ 
+-    __disposeResources31 = /* @__PURE__ */ (function(SuppressedError2) {
++    __disposeResources32 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+       return function(env) {
+ 
+@@ -253694,7 +253694,7 @@
+ 
+         try {
+ 
+-          const span = __addDisposableResource31(env_1, createSpan(ctx.withName("BashState.execute")), false);
++          const span = __addDisposableResource32(env_1, createSpan(ctx.withName("BashState.execute")), false);
+ 
+           const pipeStdin = options2?.pipeStdin ?? false;
+ 
+@@ -254178,7 +254178,7 @@
+         }
+  finally {
+ 
+-          __disposeResources31(env_1);
++          __disposeResources32(env_1);
+ 
+         }
+ 
+@@ -254194,7 +254194,7 @@
+ 
+ 
+ // ../packages/shell-exec/dist/shell-state/lazy.js
+-var __addDisposableResource32, __disposeResources32, LazyTerminalExecutor;
++var __addDisposableResource33, __disposeResources33, LazyTerminalExecutor;
+ 
+ var init_lazy = __esm({
+ 
+@@ -254204,7 +254204,7 @@
+ 
+     init_dist();
+ 
+-    __addDisposableResource32 = function(env, value, async) {
++    __addDisposableResource33 = function(env, value, async) {
+ 
+       if (value !== null && value !== void 0) {
+ 
+@@ -254266,7 +254266,7 @@
+     }
+ ;
+ 
+-    __disposeResources32 = /* @__PURE__ */ (function(SuppressedError2) {
++    __disposeResources33 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+       return function(env) {
+ 
+@@ -254387,7 +254387,7 @@
+ 
+         try {
+ 
+-          const _span = __addDisposableResource32(env_1, createSpan(ctx.withName("LazyTerminalExecutor.execute")), false);
++          const _span = __addDisposableResource33(env_1, createSpan(ctx.withName("LazyTerminalExecutor.execute")), false);
+ 
+           const executor = await this.getExecutor();
+ 
+@@ -254407,7 +254407,7 @@
+         }
+  finally {
+ 
+-          __disposeResources32(env_1);
++          __disposeResources33(env_1);
+ 
+         }
+ 
+@@ -254483,7 +254483,7 @@
+ 
+ }
+ 
+-var import_node_crypto39, import_node_fs12, fs6, import_promises11, os8, path21, __addDisposableResource33, __disposeResources33, PowerShellState, UTF8_BOM;
++var import_node_crypto39, import_node_fs12, fs6, import_promises11, os8, path21, __addDisposableResource34, __disposeResources34, PowerShellState, UTF8_BOM;
+ 
+ var init_powershell = __esm({
+ 
+@@ -254517,7 +254517,7 @@
+ 
+     init_runtime_env();
+ 
+-    __addDisposableResource33 = function(env, value, async) {
++    __addDisposableResource34 = function(env, value, async) {
+ 
+       if (value !== null && value !== void 0) {
+ 
+@@ -254579,7 +254579,7 @@
+     }
+ ;
+ 
+-    __disposeResources33 = /* @__PURE__ */ (function(SuppressedError2) {
++    __disposeResources34 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+       return function(env) {
+ 
+@@ -254681,7 +254681,7 @@
+ 
+         try {
+ 
+-          const span = __addDisposableResource33(env_1, createSpan(ctx.withName("PowerShellState.execute")), false);
++          const span = __addDisposableResource34(env_1, createSpan(ctx.withName("PowerShellState.execute")), false);
+ 
+           const pipeStdin = options2?.pipeStdin ?? false;
+ 
+@@ -254955,7 +254955,7 @@
+         }
+  finally {
+ 
+-          __disposeResources33(env_1);
++          __disposeResources34(env_1);
+ 
+         }
+ 
+@@ -254987,7 +254987,7 @@
+ 
+ }
+ 
+-var __addDisposableResource34, __disposeResources34, NaiveTerminalExecutor;
++var __addDisposableResource35, __disposeResources35, NaiveTerminalExecutor;
+ 
+ var init_naive = __esm({
+ 
+@@ -255009,7 +255009,7 @@
+ 
+     init_runtime_env();
+ 
+-    __addDisposableResource34 = function(env, value, async) {
++    __addDisposableResource35 = function(env, value, async) {
+ 
+       if (value !== null && value !== void 0) {
+ 
+@@ -255071,7 +255071,7 @@
+     }
+ ;
+ 
+-    __disposeResources34 = /* @__PURE__ */ (function(SuppressedError2) {
++    __disposeResources35 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+       return function(env) {
+ 
+@@ -255177,7 +255177,7 @@
+ 
+         try {
+ 
+-          const span = __addDisposableResource34(env_1, createSpan(ctx.withName("NaiveTerminalExecutor.execute")), false);
++          const span = __addDisposableResource35(env_1, createSpan(ctx.withName("NaiveTerminalExecutor.execute")), false);
+ 
+           const iterable = createWritableIterable();
+ 
+@@ -255325,7 +255325,7 @@
+         }
+  finally {
+ 
+-          __disposeResources34(env_1);
++          __disposeResources35(env_1);
+ 
+         }
+ 
+@@ -255442,7 +255442,7 @@
+ 
+ }
+ 
+-var __addDisposableResource35, __disposeResources35, ZshLightState;
++var __addDisposableResource36, __disposeResources36, ZshLightState;
+ 
+ var init_zsh_light = __esm({
+ 
+@@ -255466,7 +255466,7 @@
+ 
+     init_runtime_env();
+ 
+-    __addDisposableResource35 = function(env, value, async) {
++    __addDisposableResource36 = function(env, value, async) {
+ 
+       if (value !== null && value !== void 0) {
+ 
+@@ -255528,7 +255528,7 @@
+     }
+ ;
+ 
+-    __disposeResources35 = /* @__PURE__ */ (function(SuppressedError2) {
++    __disposeResources36 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+       return function(env) {
+ 
+@@ -255634,7 +255634,7 @@
+ 
+         try {
+ 
+-          const span = __addDisposableResource35(env_1, createSpan(ctx.withName("ZshLightState.execute")), false);
++          const span = __addDisposableResource36(env_1, createSpan(ctx.withName("ZshLightState.execute")), false);
+ 
+           const pipeStdin = options2?.pipeStdin ?? false;
+ 
+@@ -255948,7 +255948,7 @@
+         }
+  finally {
+ 
+-          __disposeResources35(env_1);
++          __disposeResources36(env_1);
+ 
+         }
+ 
+@@ -256060,7 +256060,7 @@
+ 
+ }
+ 
+-var __addDisposableResource36, __disposeResources36, ZshState;
++var __addDisposableResource37, __disposeResources37, ZshState;
+ 
+ var init_zsh = __esm({
+ 
+@@ -256084,7 +256084,7 @@
+ 
+     init_runtime_env();
+ 
+-    __addDisposableResource36 = function(env, value, async) {
++    __addDisposableResource37 = function(env, value, async) {
+ 
+       if (value !== null && value !== void 0) {
+ 
+@@ -256146,7 +256146,7 @@
+     }
+ ;
+ 
+-    __disposeResources36 = /* @__PURE__ */ (function(SuppressedError2) {
++    __disposeResources37 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+       return function(env) {
+ 
+@@ -256252,7 +256252,7 @@
+ 
+         try {
+ 
+-          const span = __addDisposableResource36(env_1, createSpan(ctx.withName("ZshState.execute")), false);
++          const span = __addDisposableResource37(env_1, createSpan(ctx.withName("ZshState.execute")), false);
+ 
+           const pipeStdin = options2?.pipeStdin ?? false;
+ 
+@@ -256604,7 +256604,7 @@
+         }
+  finally {
+ 
+-          __disposeResources36(env_1);
++          __disposeResources37(env_1);
+ 
+         }
+ 
+@@ -653179,6 +653179,227 @@
+ }
+ ;
+ 
++var MergeBotSettings = class _MergeBotSettings extends __protoMessage3135 {
++
++  constructor(data2) {
++
++    super();
++
++    this.inTestGroup = false;
++
++    this.nudges = false;
++
++    this.agenticMerge = false;
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _MergeBotSettings().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _MergeBotSettings().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _MergeBotSettings().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_MergeBotSettings, a, b2);
++
++  }
++
++  static $() {
++
++    return ["MergeBotSettings|1 in_test_group 8|2 nudges 8|3 agentic_merge 8"];
++
++  }
++
++}
++;
++
++var GetMergeBotSettingsRequest = class _GetMergeBotSettingsRequest extends __protoMessage3135 {
++
++  constructor(data2) {
++
++    super();
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _GetMergeBotSettingsRequest().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _GetMergeBotSettingsRequest().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _GetMergeBotSettingsRequest().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_GetMergeBotSettingsRequest, a, b2);
++
++  }
++
++  static $() {
++
++    return ["GetMergeBotSettingsRequest"];
++
++  }
++
++}
++;
++
++var GetMergeBotSettingsResponse = class _GetMergeBotSettingsResponse extends __protoMessage3135 {
++
++  constructor(data2) {
++
++    super();
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _GetMergeBotSettingsResponse().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _GetMergeBotSettingsResponse().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _GetMergeBotSettingsResponse().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_GetMergeBotSettingsResponse, a, b2);
++
++  }
++
++  static $() {
++
++    return ["GetMergeBotSettingsResponse|1 settings #0", MergeBotSettings];
++
++  }
++
++}
++;
++
++var SetMergeBotConsentRequest = class _SetMergeBotConsentRequest extends __protoMessage3135 {
++
++  constructor(data2) {
++
++    super();
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _SetMergeBotConsentRequest().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _SetMergeBotConsentRequest().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _SetMergeBotConsentRequest().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_SetMergeBotConsentRequest, a, b2);
++
++  }
++
++  static $() {
++
++    return ["SetMergeBotConsentRequest|1 nudges 8?|2 agentic_merge 8?"];
++
++  }
++
++}
++;
++
++var SetMergeBotConsentResponse = class _SetMergeBotConsentResponse extends __protoMessage3135 {
++
++  constructor(data2) {
++
++    super();
++
++    proto3.util.initPartial(data2, this);
++
++  }
++
++  static fromBinary(bytes, options2) {
++
++    return new _SetMergeBotConsentResponse().fromBinary(bytes, options2);
++
++  }
++
++  static fromJson(jsonValue2, options2) {
++
++    return new _SetMergeBotConsentResponse().fromJson(jsonValue2, options2);
++
++  }
++
++  static fromJsonString(jsonString, options2) {
++
++    return new _SetMergeBotConsentResponse().fromJsonString(jsonString, options2);
++
++  }
++
++  static equals(a, b2) {
++
++    return proto3.util.equals(_SetMergeBotConsentResponse, a, b2);
++
++  }
++
++  static $() {
++
++    return ["SetMergeBotConsentResponse|1 settings #0", MergeBotSettings];
++
++  }
++
++}
++;
++
+ var GetUsageLimitPolicyStatusRequest = class _GetUsageLimitPolicyStatusRequest extends __protoMessage3135 {
+ 
+   constructor(data2) {
+@@ -791991,11 +792212,15 @@
+ 
+     this.sawThinking = false;
+ 
++    this.sawText = false;
++
++    this.startedToolCallCount = 0;
++
+     this.stopped = false;
+ 
+     this.didPreempt = false;
+ 
+-    this.toolCallWriteStartedAtMs = /* @__PURE__ */ new Map();
++    this.toolCallStarts = /* @__PURE__ */ new Map();
+ 
+     this.writtenUnderPendingSteer = [];
+ 
+@@ -792070,6 +792295,12 @@
+ 
+     }
+ 
++    if (type2 === "text-delta") {
++
++      this.sawText = true;
++
++    }
++
+     if (this.idle && IDLE_ENDING_CHUNK_TYPES.has(type2)) {
+ 
+       this.idle = false;
+@@ -792086,11 +792317,7 @@
+ 
+     if (type2 === "tool-call-streaming-start" || type2 === "tool-call-delta") {
+ 
+-      if (!this.toolCallWriteStartedAtMs.has(toolCall2.toolCallId)) {
+-
+-        this.toolCallWriteStartedAtMs.set(toolCall2.toolCallId, nowMs);
+-
+-      }
++      this.noteToolCallStarted(toolCall2.toolCallId, nowMs);
+ 
+       return;
+ 
+@@ -792102,9 +792329,9 @@
+ 
+     }
+ 
+-    const writeStartedAtMs = this.toolCallWriteStartedAtMs.get(toolCall2.toolCallId) ?? nowMs;
++    const start = this.noteToolCallStarted(toolCall2.toolCallId, nowMs);
+ 
+-    this.toolCallWriteStartedAtMs.delete(toolCall2.toolCallId);
++    this.toolCallStarts.delete(toolCall2.toolCallId);
+ 
+     if (!this.options.signal.hasPendingUserInjections()) {
+ 
+@@ -792112,6 +792339,8 @@
+ 
+     }
+ 
++    const writeStartedAtMs = start.startedAtMs;
++
+     const writeMs = nowMs - writeStartedAtMs;
+ 
+     const pendingSinceMs = this.options.policy.pendingSinceMs();
+@@ -792119,6 +792348,8 @@
+     this.writtenUnderPendingSteer.push({
+ 
+       toolName: toolCall2.toolName,
++      positionInSample: start.position,
++      priorOutput: start.priorOutput,
+       writeMs,
+       steerWaitedDuringWriteMs: pendingSinceMs === void 0 ? void 0 : Math.min(writeMs, Math.max(0, nowMs - pendingSinceMs)),
+       steerAdmittedMidWrite: pendingSinceMs === void 0 ? void 0 : pendingSinceMs > writeStartedAtMs
+@@ -792127,6 +792358,32 @@
+ 
+   }
+ 
++  noteToolCallStarted(toolCallId, nowMs) {
++
++    const existing = this.toolCallStarts.get(toolCallId);
++
++    if (existing !== void 0) {
++
++      return existing;
++
++    }
++
++    const start = {
++
++      startedAtMs: nowMs,
++      position: this.startedToolCallCount === 0 ? "first" : "later",
++      priorOutput: this.startedToolCallCount > 0 ? "tool_call" : this.sawText ? "text" : this.sawThinking ? "thinking" : "none"
++    }
++;
++
++    this.startedToolCallCount += 1;
++
++    this.toolCallStarts.set(toolCallId, start);
++
++    return start;
++
++  }
++
+   stop() {
+ 
+     if (this.stopped) {
+@@ -792221,6 +792478,106 @@
+ }
+ 
+ 
++// ../packages/agent/dist/steer-tool-execution-telemetry.js
++init_dist();
++
++var steerTelemetryAgentKindKey = createKey(/* @__PURE__ */ Symbol("steerTelemetryAgentKind"), void 0);
++
++function steerTelemetryAgentKind(ctx) {
++
++  return ctx.get(steerTelemetryAgentKindKey) ?? "unknown";
++
++}
++
++var steerWaitedDuringToolExecutionMs = createHistogram("agent.context_injection.steer_waited_during_tool_execution_ms", {
++
++  description: "Portion of a tool's execution that a pending user steer waited through before the step boundary could deliver it",
++  labelNames: ["tool_name", "agent_kind", "pending_at_start"]
++}
++);
++
++var ToolExecutionSteerWaitWatcher = class {
++
++  constructor(signal, now = Date.now) {
++
++    this.signal = signal;
++
++    this.now = now;
++
++    this.finished = false;
++
++    this.pendingAtStart = signal.hasPendingUserInjections();
++
++    if (this.pendingAtStart) {
++
++      this.pendingSinceMs = now();
++
++      return;
++
++    }
++
++    this.unsubscribe = signal.onUserInjectionAdmitted(() => {
++
++      this.pendingSinceMs ??= this.now();
++
++      this.stopListening();
++
++    }
++);
++
++  }
++
++  finish() {
++
++    if (this.finished) {
++
++      return void 0;
++
++    }
++
++    this.finished = true;
++
++    this.stopListening();
++
++    if (this.pendingSinceMs === void 0 || !this.signal.hasPendingUserInjections()) {
++
++      return void 0;
++
++    }
++
++    return {
++
++      waitedMs: Math.max(0, this.now() - this.pendingSinceMs),
++      pendingAtStart: this.pendingAtStart
++    }
++;
++
++  }
++
++  stopListening() {
++
++    this.unsubscribe?.();
++
++    this.unsubscribe = void 0;
++
++  }
++
++}
++;
++
++function recordSteerWaitedDuringToolExecution(ctx, args) {
++
++  steerWaitedDuringToolExecutionMs.histogram(ctx, args.waitedMs, {
++
++    tool_name: args.toolName,
++    agent_kind: steerTelemetryAgentKind(ctx),
++    pending_at_start: String(args.pendingAtStart)
++  }
++);
++
++}
++
++
+ // ../packages/agent/dist/telemetry/tool-call-events.js
+ init_dist();
+ 
+@@ -794210,6 +794567,28 @@
+   }
+ ;
+ 
++  const steerSignal = extraT.contextInjectionSignal;
++
++  const steerWaitWatcher = steerSignal === void 0 ? void 0 : new ToolExecutionSteerWaitWatcher(steerSignal);
++
++  const recordSteerWait = () => {
++
++    const steerWait = steerWaitWatcher?.finish();
++
++    if (steerWait !== void 0) {
++
++      recordSteerWaitedDuringToolExecution(ctx, {
++
++        toolName: toolCallTelemetryName(tool, effectiveToolName),
++        ...steerWait
++      }
++);
++
++    }
++
++  }
++;
++
+   try {
+ 
+     const executeTool = () => executeToolResultOrError(toolToExecute, toolCallCtx, interactionHandler, argsIterable, {
+@@ -794267,6 +794646,8 @@
+ 
+     const settledToolOutput = await toolOutputPromise;
+ 
++    recordSteerWait();
++
+     if (!settledToolOutput.ok) {
+ 
+       throw settledToolOutput.error;
+@@ -794520,6 +794901,8 @@
+   }
+  catch (err) {
+ 
++    steerWaitWatcher?.finish();
++
+     observer.start();
+ 
+     const settledAtMs = Date.now();
+@@ -809231,21 +809614,28 @@
+ var steerPendingToolCallWritten = createCounter("agent.context_injection.tool_call_written_under_pending_steer", {
+ 
+   description: "Tool calls completed by the model while a user steer was pending",
+-  labelNames: ["tool_name", "project_coordinator", "admitted_mid_write"]
++  labelNames: ["tool_name", "project_coordinator", "admitted_mid_write", "agent_kind"]
+ }
+ );
+ 
+ var steerPendingToolCallWriteMs = createHistogram("agent.context_injection.tool_call_write_under_pending_steer_ms", {
+ 
+   description: "Time the model spent writing a tool call (first streamed chunk to completed call) that a pending steer waited on",
+-  labelNames: ["tool_name", "project_coordinator"]
++  labelNames: ["tool_name", "project_coordinator", "agent_kind"]
+ }
+ );
+ 
+ var steerWaitedDuringToolCallWriteMs = createHistogram("agent.context_injection.steer_waited_during_tool_call_write_ms", {
+ 
+   description: "Portion of a tool call's write that the oldest pending steer waited through (upper bound on what a mid-write interruption saves)",
+-  labelNames: ["tool_name", "project_coordinator"]
++  labelNames: ["tool_name", "project_coordinator", "admitted_mid_write", "agent_kind"]
++}
++);
++
++var steerWaitedDuringToolCallWriteBySampleMs = createHistogram("agent.context_injection.steer_waited_during_tool_call_write_by_sample_ms", {
++
++  description: "Steer wait during a tool-call write, by the call's position in its sample and what the sample had produced before it",
++  labelNames: ["call_position", "prior_output", "admitted_mid_write", "agent_kind"]
+ }
+ );
+ 
+@@ -815116,20 +815506,26 @@
+ 
+     const projectCoordinator = isProjectSendMessageEnabled(args.stateHandler) ? "true" : "false";
+ 
++    const agentKind = steerTelemetryAgentKind(ctx);
++
+     for (const write2 of writes) {
+ 
++      const admittedMidWrite = write2.steerAdmittedMidWrite === void 0 ? "unknown" : String(write2.steerAdmittedMidWrite);
++
+       steerPendingToolCallWritten.increment(ctx, 1, {
+ 
+         tool_name: write2.toolName,
+         project_coordinator: projectCoordinator,
+-        admitted_mid_write: write2.steerAdmittedMidWrite === void 0 ? "unknown" : String(write2.steerAdmittedMidWrite)
++        admitted_mid_write: admittedMidWrite,
++        agent_kind: agentKind
+       }
+ );
+ 
+       steerPendingToolCallWriteMs.histogram(ctx, write2.writeMs, {
+ 
+         tool_name: write2.toolName,
+-        project_coordinator: projectCoordinator
++        project_coordinator: projectCoordinator,
++        agent_kind: agentKind
+       }
+ );
+ 
+@@ -815138,7 +815534,18 @@
+         steerWaitedDuringToolCallWriteMs.histogram(ctx, write2.steerWaitedDuringWriteMs, {
+ 
+           tool_name: write2.toolName,
+-          project_coordinator: projectCoordinator
++          project_coordinator: projectCoordinator,
++          admitted_mid_write: admittedMidWrite,
++          agent_kind: agentKind
++        }
++);
++
++        steerWaitedDuringToolCallWriteBySampleMs.histogram(ctx, write2.steerWaitedDuringWriteMs, {
++
++          call_position: write2.positionInSample,
++          prior_output: write2.priorOutput,
++          admitted_mid_write: admittedMidWrite,
++          agent_kind: agentKind
+         }
+ );
+ 
+@@ -853303,47 +853710,217 @@
+ 
+ 
+ // ../packages/agent/dist/sand-auto-review/sand-auto-review-conversation-context.js
+-function getAssistantMessageText(step) {
++init_dist();
++
++var __addDisposableResource30 = function(env, value, async) {
++
++  if (value !== null && value !== void 0) {
++
++    if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
++
++    var dispose, inner;
++
++    if (async) {
++
++      if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
++
++      dispose = value[Symbol.asyncDispose];
++
++    }
++
++    if (dispose === void 0) {
++
++      if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
++
++      dispose = value[Symbol.dispose];
++
++      if (async) inner = dispose;
++
++    }
++
++    if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
++
++    if (inner) dispose = function() {
++
++      try {
++
++        inner.call(this);
++
++      }
++ catch (e) {
++
++        return Promise.reject(e);
++
++      }
++
++    }
++;
++
++    env.stack.push({
++ value, dispose, async }
++);
++
++  }
++ else if (async) {
++
++    env.stack.push({
++ async: true }
++);
++
++  }
++
++  return value;
++
++}
++;
++
++var __disposeResources30 = /* @__PURE__ */ (function(SuppressedError2) {
++
++  return function(env) {
++
++    function fail2(e) {
++
++      env.error = env.hasError ? new SuppressedError2(e, env.error, "An error was suppressed during disposal.") : e;
++
++      env.hasError = true;
++
++    }
++
++    var r, s3 = 0;
++
++    function next() {
++
++      while (r = env.stack.pop()) {
++
++        try {
++
++          if (!r.async && s3 === 1) return s3 = 0, env.stack.push(r), Promise.resolve().then(next);
++
++          if (r.dispose) {
++
++            var result = r.dispose.call(r.value);
++
++            if (r.async) return s3 |= 2, Promise.resolve(result).then(next, function(e) {
++
++              fail2(e);
++
++              return next();
++
++            }
++);
++
++          }
++ else s3 |= 1;
++
++        }
++ catch (e) {
++
++          fail2(e);
++
++        }
++
++      }
++
++      if (s3 === 1) return env.hasError ? Promise.reject(env.error) : Promise.resolve();
++
++      if (env.hasError) throw env.error;
++
++    }
+ 
+-  if (step.message.case !== "assistantMessage") {
++    return next();
++
++  }
++;
++
++}
++)(typeof SuppressedError === "function" ? SuppressedError : function(error63, suppressed, message) {
++
++  var e = new Error(message);
++
++  return e.name = "SuppressedError", e.error = error63, e.suppressed = suppressed, e;
++
++}
++);
++
++function getSentMessageText(step) {
++
++  if (step.message.case !== "toolCall" || step.message.value.tool.case !== "sendMessageToolCall") {
+ 
+     return void 0;
+ 
+   }
+ 
+-  const text3 = step.message.value.text.unwrap(PrivacyCapability.UNSAFE_ALWAYS_ALLOWED).trim();
++  const {
++ args, result }
++ = step.message.value.tool.value;
++
++  if (result?.result.case === "error" || args?.message.case !== "text") {
++
++    return void 0;
++
++  }
++
++  const text3 = args.message.value.content.unwrap(PrivacyCapability.UNSAFE_ALWAYS_ALLOWED).trim();
+ 
+   return text3.length > 0 ? text3 : void 0;
+ 
+ }
+ 
+-async function collectRecentAssistantMessages(ctx, stateHandler, maxMessages) {
++var ASSISTANT_STEP_READ_BATCH = 16;
++
++async function collectRecentAssistantMessages(ctx, stateHandler, {
++ maxMessages, maxSteps }
++) {
+ 
+   const assistantMessagesNewestFirst = [];
+ 
++  let stepBudget = maxSteps;
++
++  const fetchTurn = (turnIndex) => {
++
++    if (turnIndex < 0)
++      return void 0;
++
++    const turn = stateHandler.turns[turnIndex].get(ctx);
++
++    turn.catch(() => void 0);
++
++    return turn;
++
++  }
++;
++
++  let nextTurn = fetchTurn(stateHandler.turns.length - 1);
++
+   for (let turnIndex = stateHandler.turns.length - 1;
+- turnIndex >= 0 && assistantMessagesNewestFirst.length < maxMessages;
++ turnIndex >= 0 && stepBudget > 0 && assistantMessagesNewestFirst.length < maxMessages;
+  turnIndex--) {
+ 
+-    const turn = await stateHandler.turns[turnIndex].get(ctx);
++    const turn = await (nextTurn ?? fetchTurn(turnIndex));
+ 
+-    if (!(turn instanceof AgentConversationTurnHandle)) {
++    const stepRefs = turn instanceof AgentConversationTurnHandle ? turn.steps.slice(-stepBudget).toReversed() : [];
+ 
+-      continue;
++    stepBudget -= Math.max(1, stepRefs.length);
+ 
+-    }
++    const certainlyNeedsNextTurn = stepBudget > 0 && stepRefs.length < maxMessages - assistantMessagesNewestFirst.length;
+ 
+-    for (let stepIndex = turn.steps.length - 1;
+- stepIndex >= 0 && assistantMessagesNewestFirst.length < maxMessages;
+- stepIndex--) {
++    nextTurn = certainlyNeedsNextTurn ? fetchTurn(turnIndex - 1) : void 0;
++
++    for (let start = 0;
++ start < stepRefs.length && assistantMessagesNewestFirst.length < maxMessages;
++ start += ASSISTANT_STEP_READ_BATCH) {
+ 
+-      const step = await turn.steps[stepIndex].get(ctx);
++      const steps = await Promise.all(stepRefs.slice(start, start + ASSISTANT_STEP_READ_BATCH).map((ref2) => ref2.get(ctx)));
+ 
+-      const text3 = getAssistantMessageText(step);
++      for (const step of steps) {
+ 
+-      if (text3 !== void 0) {
++        const text3 = getSentMessageText(step);
++
++        if (text3 !== void 0 && assistantMessagesNewestFirst.length < maxMessages) {
+ 
+-        assistantMessagesNewestFirst.push(text3);
++          assistantMessagesNewestFirst.push(text3);
++
++        }
+ 
+       }
+ 
+@@ -853799,53 +854376,84 @@
+ 
+ }
+ 
+-async function extractAutoReviewConversationContext2(ctx, stateHandler, config2) {
++async function extractAutoReviewConversationContext2(parentCtx, stateHandler, config2) {
+ 
+-  const {
++  const env_1 = {
++ stack: [], error: void 0, hasError: false }
++;
++
++  try {
++
++    const span = __addDisposableResource30(env_1, createSpan(parentCtx.withName("autoReviewConversationContext")), false);
++
++    span.span.setAttribute("turnCount", stateHandler.turns.length);
++
++    const ctx = withSuppressedChildSpans(span.ctx);
++
++    const {
+  limits, userMessageFilter }
+  = config2;
+ 
+-  const [assistantMessages, userMessages, questionAnswers, computerToolCalls] = await Promise.all([
+-    collectRecentAssistantMessages(ctx, stateHandler, limits.maxAssistantMessages),
+-    collectRecentUserMessages(ctx, stateHandler, limits.maxUserMessages, userMessageFilter, config2.includeInvokedWorkflowFilesAnnotation),
+-    collectRecentAskQuestionAnswers(ctx, stateHandler, limits.maxQuestionResults, limits.maxQuestionSteps),
+-    config2.collectComputerToolCalls === void 0 ? [] : config2.collectComputerToolCalls(ctx, stateHandler, userMessageFilter)
+-  ]);
++    const [assistantMessages, userMessages, questionAnswers, computerToolCalls] = await Promise.all([
++      collectRecentAssistantMessages(ctx, stateHandler, {
++
++        maxMessages: limits.maxAssistantMessages,
++        maxSteps: limits.maxAssistantSteps
++      }
++),
++      collectRecentUserMessages(ctx, stateHandler, limits.maxUserMessages, userMessageFilter, config2.includeInvokedWorkflowFilesAnnotation),
++      collectRecentAskQuestionAnswers(ctx, stateHandler, limits.maxQuestionResults, limits.maxQuestionSteps),
++      config2.collectComputerToolCalls === void 0 ? [] : config2.collectComputerToolCalls(ctx, stateHandler, userMessageFilter)
++    ]);
+ 
+-  const messages = [
+-    ...assistantMessages.map((content) => ({
++    const messages = [
++      ...assistantMessages.map((content) => ({
+ 
+-      role: "assistant",
+-      content
+-    }
++        role: "assistant",
++        content
++      }
+ )),
+-    ...userMessages.map((content) => ({
++      ...userMessages.map((content) => ({
+ 
+-      role: "user",
+-      content
+-    }
++        role: "user",
++        content
++      }
+ )),
+-    ...questionAnswers.map((content) => ({
++      ...questionAnswers.map((content) => ({
+ 
+-      role: "user_answer",
+-      content
+-    }
++        role: "user_answer",
++        content
++      }
+ )),
+-    ...computerToolCalls.map((content) => ({
++      ...computerToolCalls.map((content) => ({
+ 
+-      role: "computer",
+-      content
+-    }
++        role: "computer",
++        content
++      }
+ ))
+-  ];
++    ];
+ 
+-  return config2.truncateMessages(messages).map((message) => new SmartModeClassifierConversationMessage({
++    return config2.truncateMessages(messages).map((message) => new SmartModeClassifierConversationMessage({
+ 
+-    role: message.role,
+-    content: message.content
+-  }
++      role: message.role,
++      content: message.content
++    }
+ ));
+ 
++  }
++ catch (e_1) {
++
++    env_1.error = e_1;
++
++    env_1.hasError = true;
++
++  }
++ finally {
++
++    __disposeResources30(env_1);
++
++  }
++
+ }
+ 
+ 
+@@ -853866,9 +854474,12 @@
+ 
+ var SAND_AUTO_REVIEW_CLASSIFIER_MAX_QUESTION_STEPS = 50;
+ 
++var SAND_AUTO_REVIEW_CLASSIFIER_MAX_ASSISTANT_STEPS = 50;
++
+ var SAND_AUTO_REVIEW_CLASSIFIER_CONTEXT_LIMITS = {
+ 
+   maxAssistantMessages: SAND_AUTO_REVIEW_CLASSIFIER_MAX_ASSISTANT_MESSAGES,
++  maxAssistantSteps: SAND_AUTO_REVIEW_CLASSIFIER_MAX_ASSISTANT_STEPS,
+   maxUserMessages: SAND_AUTO_REVIEW_CLASSIFIER_MAX_USER_MESSAGES,
+   maxQuestionResults: SAND_AUTO_REVIEW_CLASSIFIER_MAX_QUESTION_RESULTS,
+   maxQuestionSteps: SAND_AUTO_REVIEW_CLASSIFIER_MAX_QUESTION_STEPS
+@@ -858793,7 +859404,7 @@
+ 
+ 
+ // ../packages/agent/dist/index.js
+-var __addDisposableResource30 = function(env, value, async) {
++var __addDisposableResource31 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -858855,7 +859466,7 @@
+ }
+ ;
+ 
+-var __disposeResources30 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources31 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -859019,6 +859630,12 @@
+ 
+ var AnysphereAgent = class {
+ 
++  withSteerTelemetryAgentKind(ctx) {
++
++    return ctx.with(steerTelemetryAgentKindKey, this.config.maxSteps === 1 ? "cloud" : "local");
++
++  }
++
+   shouldTrackAgentTypeChange(actionCase) {
+ 
+     return actionCase === "userMessageAction" || actionCase === "subscriptionNotificationAction" || actionCase === "goalContinuationAction" || actionCase === "resumeAction" || actionCase === "executePlanAction";
+@@ -859222,7 +859839,7 @@
+ 
+     try {
+ 
+-      const spanCtxt = __addDisposableResource30(env_1, createSpan(parentCtx.withName("runStream")), false);
++      const spanCtxt = __addDisposableResource31(env_1, createSpan(parentCtx.withName("runStream")), false);
+ 
+       let ctx = withLogAttributes(spanCtxt.ctx, {
+ 
+@@ -859254,6 +859871,8 @@
+ 
+       }
+ 
++      ctx = this.withSteerTelemetryAgentKind(ctx);
++
+       const handlerCheckpoints = new FireAndForgetCheckpointWrites();
+ 
+       ctx = ctx.with(fireAndForgetCheckpointWritesKey, handlerCheckpoints);
+@@ -859345,7 +859964,7 @@
+ 
+         try {
+ 
+-          const span = __addDisposableResource30(env_4, createSpan(innerCtx.withName("onStateUpdateWithFlush")), false);
++          const span = __addDisposableResource31(env_4, createSpan(innerCtx.withName("onStateUpdateWithFlush")), false);
+ 
+           await this.blobStore.flush(span.ctx);
+ 
+@@ -859361,7 +859980,7 @@
+         }
+  finally {
+ 
+-          __disposeResources30(env_4);
++          __disposeResources31(env_4);
+ 
+         }
+ 
+@@ -859382,7 +860001,7 @@
+ 
+           try {
+ 
+-            const notes = __addDisposableResource30(env_2, this.startThinkingNotes(ctx, stateHandler), false);
++            const notes = __addDisposableResource31(env_2, this.startThinkingNotes(ctx, stateHandler), false);
+ 
+             currentState = await handler.handle(withModelCallState(notes.ctx, stateHandler, this.config.bindConversationMessageInputs), action.action.value, baseExecutor, stateHandler, mcpTools, onStateUpdateWithFlush);
+ 
+@@ -859396,7 +860015,7 @@
+           }
+  finally {
+ 
+-            __disposeResources30(env_2);
++            __disposeResources31(env_2);
+ 
+           }
+ 
+@@ -859477,7 +860096,7 @@
+             }
+ ));
+ 
+-            const queuedNotes = __addDisposableResource30(env_3, this.startThinkingNotes(ctx, updatedStateHandler), false);
++            const queuedNotes = __addDisposableResource31(env_3, this.startThinkingNotes(ctx, updatedStateHandler), false);
+ 
+             currentState = await queuedHandler.handle(withModelCallState(queuedNotes.ctx, updatedStateHandler, this.config.bindConversationMessageInputs), queuedAction.action.value, baseExecutor, updatedStateHandler, mcpTools, onStateUpdateWithFlush);
+ 
+@@ -859521,7 +860140,7 @@
+           }
+  finally {
+ 
+-            __disposeResources30(env_3);
++            __disposeResources31(env_3);
+ 
+           }
+ 
+@@ -859577,7 +860196,7 @@
+     }
+  finally {
+ 
+-      __disposeResources30(env_1);
++      __disposeResources31(env_1);
+ 
+     }
+ 
+@@ -859711,7 +860330,7 @@
+ 
+     try {
+ 
+-      const spanCtxt = __addDisposableResource30(env_5, createSpan(parentCtx.withName("setupSingleStep")), false);
++      const spanCtxt = __addDisposableResource31(env_5, createSpan(parentCtx.withName("setupSingleStep")), false);
+ 
+       let ctx = withLogAttributes(spanCtxt.ctx, {
+ 
+@@ -859743,6 +860362,8 @@
+ 
+       }
+ 
++      ctx = this.withSteerTelemetryAgentKind(ctx);
++
+       const trackAgentTypeChange = this.shouldTrackAgentTypeChange(action.action.case);
+ 
+       const prewarmed = this.prewarmedSingleStepStateHandle;
+@@ -859875,7 +860496,7 @@
+ 
+         try {
+ 
+-          const span = __addDisposableResource30(env_6, createSpan(innerCtx.withName("onStateUpdateWithFlush")), false);
++          const span = __addDisposableResource31(env_6, createSpan(innerCtx.withName("onStateUpdateWithFlush")), false);
+ 
+           await this.blobStore.flush(span.ctx);
+ 
+@@ -859891,7 +860512,7 @@
+         }
+  finally {
+ 
+-          __disposeResources30(env_6);
++          __disposeResources31(env_6);
+ 
+         }
+ 
+@@ -859912,7 +860533,7 @@
+     }
+  finally {
+ 
+-      __disposeResources30(env_5);
++      __disposeResources31(env_5);
+ 
+     }
+ 
+@@ -859942,7 +860563,7 @@
+  baseExecutor, stateHandler, handler, onStateUpdateWithFlush }
+  = setup;
+ 
+-      const notes = __addDisposableResource30(env_7, this.startThinkingNotes(setup.ctx, stateHandler, this.splitStepNotesMemory(action)), false);
++      const notes = __addDisposableResource31(env_7, this.startThinkingNotes(setup.ctx, stateHandler, this.splitStepNotesMemory(action)), false);
+ 
+       const ctx = notes.ctx;
+ 
+@@ -859981,7 +860602,7 @@
+     }
+  finally {
+ 
+-      __disposeResources30(env_7);
++      __disposeResources31(env_7);
+ 
+     }
+ 
+@@ -860049,7 +860670,7 @@
+ 
+       const setupSingleStepMs = performance.now() - setupSingleStepStartMs;
+ 
+-      const notes = __addDisposableResource30(env_8, this.startThinkingNotes(setup.ctx, stateHandler, this.splitStepNotesMemory(action)), false);
++      const notes = __addDisposableResource31(env_8, this.startThinkingNotes(setup.ctx, stateHandler, this.splitStepNotesMemory(action)), false);
+ 
+       const ctx = notes.ctx;
+ 
+@@ -860097,7 +860718,7 @@
+     }
+  finally {
+ 
+-      __disposeResources30(env_8);
++      __disposeResources31(env_8);
+ 
+     }
+ 
+@@ -860111,9 +860732,9 @@
+ 
+     try {
+ 
+-      const spanCtxt = __addDisposableResource30(env_9, createSpan(parentCtx.withName("executeToolCall")), false);
++      const spanCtxt = __addDisposableResource31(env_9, createSpan(parentCtx.withName("executeToolCall")), false);
+ 
+-      const ctx = this.config.isBackground === true ? spanCtxt.ctx.with(bubbleRetryableTaskErrorsKey, true) : spanCtxt.ctx;
++      const ctx = this.withSteerTelemetryAgentKind(this.config.isBackground === true ? spanCtxt.ctx.with(bubbleRetryableTaskErrorsKey, true) : spanCtxt.ctx);
+ 
+       const baseExecutor = new RedactedPromptToolExecutor(this.promptSession.getExecutor(), PrivacyMode2.UNSPECIFIED);
+ 
+@@ -860124,7 +860745,7 @@
+       }
+ ));
+ 
+-      const notes = __addDisposableResource30(env_9, this.startThinkingNotes(ctx, stateHandler), false);
++      const notes = __addDisposableResource31(env_9, this.startThinkingNotes(ctx, stateHandler), false);
+ 
+       notes.settle();
+ 
+@@ -860184,7 +860805,7 @@
+     }
+  finally {
+ 
+-      __disposeResources30(env_9);
++      __disposeResources31(env_9);
+ 
+     }
+ 
+@@ -860198,7 +860819,7 @@
+ 
+     try {
+ 
+-      const spanCtxt = __addDisposableResource30(env_10, createSpan(parentCtx.withName("prepareSubagent")), false);
++      const spanCtxt = __addDisposableResource31(env_10, createSpan(parentCtx.withName("prepareSubagent")), false);
+ 
+       const ctx = spanCtxt.ctx;
+ 
+@@ -860211,7 +860832,7 @@
+       }
+ ));
+ 
+-      const notes = __addDisposableResource30(env_10, this.startThinkingNotes(ctx, stateHandler), false);
++      const notes = __addDisposableResource31(env_10, this.startThinkingNotes(ctx, stateHandler), false);
+ 
+       notes.settle();
+ 
+@@ -860229,7 +860850,7 @@
+     }
+  finally {
+ 
+-      __disposeResources30(env_10);
++      __disposeResources31(env_10);
+ 
+     }
+ 
+@@ -860243,7 +860864,7 @@
+ 
+     try {
+ 
+-      const spanCtxt = __addDisposableResource30(env_11, createSpan(parentCtx.withName("finalizeStep")), false);
++      const spanCtxt = __addDisposableResource31(env_11, createSpan(parentCtx.withName("finalizeStep")), false);
+ 
+       const ctx = spanCtxt.ctx;
+ 
+@@ -860272,7 +860893,7 @@
+ 
+         try {
+ 
+-          const span = __addDisposableResource30(env_12, createSpan(innerCtx.withName("onStateUpdateWithFlush")), false);
++          const span = __addDisposableResource31(env_12, createSpan(innerCtx.withName("onStateUpdateWithFlush")), false);
+ 
+           await onStateUpdate?.(span.ctx, fromRedactedConversationStateStructure(innerState, PrivacyCapability.UNSAFE_ALWAYS_ALLOWED));
+ 
+@@ -860288,7 +860909,7 @@
+         }
+  finally {
+ 
+-          __disposeResources30(env_12);
++          __disposeResources31(env_12);
+ 
+         }
+ 
+@@ -860319,7 +860940,7 @@
+     }
+  finally {
+ 
+-      __disposeResources30(env_11);
++      __disposeResources31(env_11);
+ 
+     }
+ 
+@@ -860367,7 +860988,7 @@
+ 
+     try {
+ 
+-      const spanCtxt = __addDisposableResource30(env_13, createSpan(parentCtx.withName("computeSummarizedConversationState")), false);
++      const spanCtxt = __addDisposableResource31(env_13, createSpan(parentCtx.withName("computeSummarizedConversationState")), false);
+ 
+       const ctx = spanCtxt.ctx;
+ 
+@@ -860430,7 +861051,7 @@
+     }
+  finally {
+ 
+-      __disposeResources30(env_13);
++      __disposeResources31(env_13);
+ 
+     }
+ 
+@@ -863729,6 +864350,17 @@
+ CHANNEL_INBOUND_WAKE_CUE}
+  cue also wakes you when someone reacts to one of your messages (e.g. \u2764\uFE0F). A reaction is a lightweight acknowledgement, not a question: you usually do not need to reply, only act on it if it is useful.`;
+ 
++var PERSONAL_SLACK_PROMPT_CUE = "Personal Slack is available";
++
++var PERSONAL_SLACK_LINE = `PERSONAL SLACK: apply these rules only when the system prompt says "${
++PERSONAL_SLACK_PROMPT_CUE}
++". Slack channel messages may trigger your routines, but only your owner's messages in your 1:1 DM arrive as conversational turns. Send Slack messages only to that owner DM. If someone asks you to post or reply in a shared channel, tell them: Personal Bots can only send Slack messages to your DM. Share this bot with your team to post or reply in shared Slack channels. When your owner asks to connect Slack, use ${
++GROK_BOT_TOOL_NAMES.SetUpSlack}
++ start and ${
++GROK_BOT_TOOL_NAMES.SetUpSlack}
++ status when that tool is available;
++ otherwise direct them to your Details.`;
++
+ var CHANNELS_PROTOCOL_LINES = [
+   CHANNELS_REACTIONS_LINE,
+   `OUTBOUND: ${
+@@ -863751,6 +864383,7 @@
+   CHANNELS_SECRET_LINE,
+   CHANNELS_ADDRESS_LINE,
+   CHANNELS_INBOUND_LINE,
++  PERSONAL_SLACK_LINE,
+   ...CHANNELS_PROTOCOL_LINES
+ ];
+ 
+@@ -881161,7 +881794,7 @@
+ 
+   static $() {
+ 
+-    return ["InferenceStreamRequest|1 messages #0*|2 tools #1*|3 provider_defined_tools #2*|4 model_config #3?|5 model_id 9?|6 invocation_id 9?|7 requested_model #4?|8 conversation_id 9?|9 accepted_unadvertised_tool_names 9*|10 automation_id 9?|11 inference_reason #5?|12 conversation_group_id 9?|13 parent_request_id 9?|14 root_parent_request_id 9?|15 parent_agent_tool_call_id 9?|16 subagent_type 9?|17 compaction_epoch 5?|18 turn_unit_id 9?|19 turn_unit_type 9?|20 originating_flow 9?|21 routing_reason 9?|22 summarized_message_count 5?|23 is_simulated_msg 8?|24 simulated_msg_reason 5?|25 parent_conversation_call 8?", InferenceCoreMessage, InferenceAgentTool, InferenceNamedProviderDefinedTool, InferenceModelConfig, InferenceRequestedModel, InferenceReason];
++    return ["InferenceStreamRequest|1 messages #0*|2 tools #1*|3 provider_defined_tools #2*|4 model_config #3?|5 model_id 9?|6 invocation_id 9?|7 requested_model #4?|8 conversation_id 9?|9 accepted_unadvertised_tool_names 9*|10 automation_id 9?|11 inference_reason #5?|12 conversation_group_id 9?|13 parent_request_id 9?|14 root_parent_request_id 9?|15 parent_agent_tool_call_id 9?|16 subagent_type 9?|17 compaction_epoch 5?|18 turn_unit_id 9?|19 turn_unit_type 9?|20 originating_flow 9?|21 routing_reason 9?|22 summarized_message_count 5?|23 is_simulated_msg 8?|24 simulated_msg_reason 5?|25 parent_conversation_call 8?|26 system_static_prefix_length 5?", InferenceCoreMessage, InferenceAgentTool, InferenceNamedProviderDefinedTool, InferenceModelConfig, InferenceRequestedModel, InferenceReason];
+ 
+   }
+ 
+@@ -885663,6 +886296,8 @@
+ 
+ var requestedModelKey = createKey(/* @__PURE__ */ Symbol("requestedModel"), void 0);
+ 
++var systemStaticPrefixLengthKey = createKey(/* @__PURE__ */ Symbol("systemStaticPrefixLength"), void 0);
++
+ 
+ // ../packages/chat-inference-proto/dist/routing-reason.js
+ init_dist();
+@@ -886856,7 +887491,7 @@
+ function buildStreamRequest(options2) {
+ 
+   const {
+- messages, requestedModel, tools, providerDefinedTools, modelConfig, invocationId, conversationId, conversationGroupId, automationId, originatingFlow, routingReason, parentRequestId, rootParentRequestId, parentAgentToolCallId, subagentType, turnUnitId, turnUnitType, parentConversationCall, compactionEpoch, summarizedMessageCount, isSimulatedMsg, simulatedMsgReason, inferenceReason, acceptedUnadvertisedToolNames }
++ messages, requestedModel, tools, providerDefinedTools, modelConfig, invocationId, conversationId, conversationGroupId, automationId, originatingFlow, routingReason, parentRequestId, rootParentRequestId, parentAgentToolCallId, subagentType, turnUnitId, turnUnitType, parentConversationCall, compactionEpoch, summarizedMessageCount, isSimulatedMsg, simulatedMsgReason, systemStaticPrefixLength, inferenceReason, acceptedUnadvertisedToolNames }
+  = options2;
+ 
+   const request3 = new InferenceStreamRequest();
+@@ -886985,6 +887620,12 @@
+ 
+   }
+ 
++  if (systemStaticPrefixLength !== void 0) {
++
++    request3.systemStaticPrefixLength = systemStaticPrefixLength;
++
++  }
++
+   if (inferenceReason) {
+ 
+     request3.inferenceReason = inferenceReason;
+@@ -887410,6 +888051,10 @@
+ 
+     const simulatedFields = ctx.get(currentUserMessageSimulatedFieldsKey)?.();
+ 
++    const systemMessage = requestMessages[0];
++
++    const systemStaticPrefixLength = systemMessage?.role === "system" ? ctx.get(systemStaticPrefixLengthKey)?.(systemMessage.content) : void 0;
++
+     const request3 = buildStreamRequest({
+ 
+       messages: requestMessages,
+@@ -887434,6 +888079,7 @@
+       summarizedMessageCount: ctx.get(summarizedMessageCountKey)?.(),
+       isSimulatedMsg: simulatedFields?.isSimulatedMsg,
+       simulatedMsgReason: simulatedFields?.simulatedMsgReason,
++      systemStaticPrefixLength,
+       inferenceReason: this.inferenceReason,
+       acceptedUnadvertisedToolNames: options2.acceptedUnadvertisedToolNames
+     }
+@@ -902414,6 +903060,37 @@
+     }
+ ,
+     /**
++     * The caller's merge bot settings: membership in the merge bot test group,
++     * and the two consents stored in their review preferences blob, returned
++     * whether or not the caller is in the group.
++     *
++     * @generated from rpc aiserver.v1.DashboardService.GetMergeBotSettings
++     */
++    getMergeBotSettings: {
++
++      name: "GetMergeBotSettings",
++      I: GetMergeBotSettingsRequest,
++      O: GetMergeBotSettingsResponse,
++      kind: MethodKind.Unary
++    }
++,
++    /**
++     * Changes the caller's merge bot consents. Turning a consent on needs the
++     * merge bot test group;
++ turning one off is always allowed.
++     * SetOriginReviewPreferences never changes them.
++     *
++     * @generated from rpc aiserver.v1.DashboardService.SetMergeBotConsent
++     */
++    setMergeBotConsent: {
++
++      name: "SetMergeBotConsent",
++      I: SetMergeBotConsentRequest,
++      O: SetMergeBotConsentResponse,
++      kind: MethodKind.Unary
++    }
++,
++    /**
+      * Sleeptime Memories: the items learned for the team's Origin repositories,
+      * for the learned list on the Team Rules page. The caller needs
+      * ReadTeamRules on the team (every member has it, and implicit org admins
+@@ -909763,7 +910440,7 @@
+ function sandClientBaseVersionOf(clientAppVersion) {
+ 
+   return stampedVersionBaseOf(clientAppVersion) ?? stampedVersionBaseOf(
+-    true ? "0.72.0-pre.42" : void 0
++    true ? "0.72.0-pre.44" : void 0
+   ) ?? SAND_CLIENT_FALLBACK_BASE_VERSION;
+ 
+ }
+@@ -910549,6 +911226,17 @@
+ 
+   headers.set("x-ghost-mode", ghostModeHeader);
+ 
++  if (options2.featureGateOverrides !== void 0 && Object.keys(options2.featureGateOverrides).length > 0) {
++
++    headers.set(
++      "x-dev-experiment-overrides",
++      JSON.stringify({
++ featureFlags: options2.featureGateOverrides }
++)
++    );
++
++  }
++
+   for (const [headerName, headerValue] of Object.entries(
+     buildSandRequestLineageHeaders(options2.lineage)
+   )) {
+@@ -958162,10 +958850,26 @@
+ 
+ }
+ 
+-var SAND_CONNECTOR_SEARCH_FIRST_LINE = `- When a task needs a service you have no connector for, run ${
++var CONNECTOR_SEARCH_FIRST_DEFAULT_TEXT = `When a task needs a service you have no connector for, run ${
+ GROK_BOT_TOOL_NAMES.SearchPlugins}
+  first, before the web or your browser. Searching is read-only and needs no permission.`;
+ 
++function normalizeConnectorSearchFirstText(text3) {
++
++  const line = (text3 ?? "").replace(/\s+/g, " ").trim();
++
++  return line.length === 0 ? CONNECTOR_SEARCH_FIRST_DEFAULT_TEXT : line;
++
++}
++
++function connectorSearchFirstLine(text3) {
++
++  return `- ${
++normalizeConnectorSearchFirstText(text3)}
++`;
++
++}
++
+ var SAND_SUBAGENT_AGENT_EMAIL_LINE = subagentAgentEmailLine(true);
+ 
+ var SAND_SUBAGENT_ASSIGNED_EMAIL_LINE = subagentAgentEmailLine(false);
+@@ -958769,7 +959473,7 @@
+  every call is live. ${
+ connectorAuth}
+  On any other failure or suspiciously empty result, refetch the descriptor once, at most every few minutes, and retry only if it changed. Before retrying a mutation, check whether it already succeeded.`,
+-      ...connectorSearchFirst ? [SAND_CONNECTOR_SEARCH_FIRST_LINE] : [],
++      ...connectorSearchFirst ? [connectorSearchFirstLine(options2.connectorSearchFirstLine)] : [],
+       `- Escalate in this order: context and files, connector, ${
+ connectorSearchFirst ? `${
+ GROK_BOT_TOOL_NAMES.SearchPlugins}
+@@ -959531,6 +960235,7 @@
+     activeReactions: options2.activeReactions === true,
+     ackBeforeTools: options2.ackBeforeTools === true,
+     connectorSearchFirst: options2.connectorSearchFirst === true,
++    connectorSearchFirstLine: options2.connectorSearchFirst === true ? normalizeConnectorSearchFirstText(options2.connectorSearchFirstLine) : "",
+     linkItemsEnabled: options2.linkItemsEnabled === true,
+     linkVerificationEnabled: options2.linkVerificationEnabled === true,
+     vaultCards: options2.vaultCards === true,
+@@ -964347,11 +965052,13 @@
+   `Notices, status updates, and ordinary answers post with ${
+ GROK_BOT_TOOL_NAMES.RespondInMeeting}
+ . Never hand those to the main agent to draft. If the review blocks a notice, rewrite it so it carries no private detail and post it again.`,
+-  `When your answer holds content from the owner's account integrations or data sources that needs their approval to share, or the review blocks what your answer says, do not strip or blur it. Your first message says whether the person you attend for can approve blocked content as a draft. When they can, post a short notice that sending it needs their approval in their DM with the bot, naming them by the first name you were given. It carries none of the blocked content. Then call ${
++  `When your answer holds content from the owner's account integrations or data sources that needs their approval to share, or the review blocks what your answer says, do not strip or blur it. Your first message says whether the person you attend for can approve blocked content as a draft. When they can, call ${
++GROK_BOT_TOOL_NAMES.WakeParent}
++ right away, before you post anything about it, with this meeting_id and the full message you meant to post, asking the main agent to raise a draft of that content right away. The draft is their approval, so the main agent should not ask them first. Once ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+- with this meeting_id and the full message you meant to post, asking the main agent to raise a draft of that content right away. The draft is their approval, so the main agent should not ask them first. Do not draft the notice. If even the notice is not posted, skip it and still hand the draft over. When they cannot approve drafts, post one short message that tells the room plainly you can't share that here, promising no approval or later answer, then call ${
++ says the main agent has it, post a short notice that sending it needs their approval in their DM with the bot, naming them by the first name you were given. It carries none of the blocked content. Do not draft the notice. If even the notice is not posted, skip it. When they cannot approve drafts, post one short message that tells the room plainly you can't share that here, promising no approval or later answer, then call ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+- with this meeting_id and the full message you meant to post, so the main agent can tell them privately. Hand that content off once: when the review blocks content you already handed off, or content a reply from the main agent brought, they already have it, so do not hold or hand it off again. Word every notice or status post in plain terms for the room. Never mention the main agent, a parent agent, a card, or any other workings of the bot.`,
++ with this meeting_id and the full message you meant to post, so the main agent can tell them privately. Hand that content off once: when the review blocks content you already handed off, they already have it, so do not hold or hand it off again. Content a reply from the main agent brought needs no handoff either, unless sharing it needs their approval as a draft and the reply does not say the main agent raised one. Word every notice or status post in plain terms for the room. Never mention the main agent, a parent agent, a card, or any other workings of the bot.`,
+   "",
+   `When your turn ends you wait, and everything you read and did stays yours. A new message starts you again while the meeting is live: when someone in the meeting speaks to the bot in a line you have not read, or when the main agent replies to a handoff. Either comes when it happens: while you are still working, it interrupts whatever you are doing, even a read in progress, unless you already read that line. Your work so far stays in your history;
+  posts you already queued still go out, and their outcomes still reach you. Handle what the message brings, then finish any request it cut off. A message for a new request carries the first line of that request and everything said since your last read, or, when the meeting notes cover everything you already read and are shorter than the lines they stand for, those notes and what was said after them. When such a message leaves out earlier lines to stay short, it says how many, and ${
+@@ -964366,6 +965073,11 @@
+   `You do not act for the owner yourself: you cannot send messages, change calendars or files, or reach the owner's private accounts. Those go to the main agent too, as does anything only it can approve, such as an action for the owner, the owner's private data, or content the owner should see before it is posted. Call ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+  with the request as a job: who asked, what to do or find out, every limit the speaker set, what you already know, and what to come back with, and ask the main agent to name that request in its reply, since replies to separate handoffs can arrive together. Hand over only what the main agent needs, not the transcript. Asking again for something already handed over is the same request: say in the meeting where it stands and hand nothing new over. A change to it, stopping it included, goes to the main agent as that same request changed.`,
++  `Whenever something needs a person's approval, the owner's included, call ${
++GROK_BOT_TOOL_NAMES.WakeParent}
++ for that approval, and never skip it. Never tell anyone, people in the meeting included, that something needs or is waiting for approval unless ${
++GROK_BOT_TOOL_NAMES.WakeParent}
++ said the main agent has that request. If it says the main agent was not reached, do not mention approval.`,
+   `After a handoff you stay free: end your turn, and answer any new request that comes in while the main agent works. The main agent's reply arrives as a new message, with what was said since your last read in the same shape. Post what the reply brings in the meeting, and say which request it answers when others came up meanwhile. To the room you and the main agent are the same bot, so relay its reply in the first person: what it did or will do, you did or will do, and someone's chat with the bot is our chat when you speak to them. Say something is done only when the reply says so.`
+ ].join("\n");
+ 
+@@ -964463,7 +965175,13 @@
+ 
+   }
+ 
+-  static opening(request3) {
++  static header(request3) {
++
++    return _MeetingRequestPrompt.headerLines(request3).join("\n");
++
++  }
++
++  static headerLines(request3) {
+ 
+     const owner = request3.ownerName.length === 0 ? "the bot's owner" : request3.ownerName;
+ 
+@@ -964471,7 +965189,7 @@
+ request3.meetingTitle}
+ ".`;
+ 
+-    return withReplyReminder([
++    return [
+       `You are in the meeting as "${
+ request3.botName}
+ ", for ${
+@@ -964499,7 +965217,25 @@
+ . The review of your messages reads it too: content it explicitly asks you to share in the meeting counts as ${
+ owner}
+ 's approval to share it, and content it does not cover is reviewed as usual.`
+-      ],
++      ]
++    ];
++
++  }
++
++  static firstWake({
++ header, notes, wake }
++) {
++
++    if (notes === void 0) return [header, "", wake].join("\n");
++
++    return [header, "", "Meeting notes so far:", notes ?? "No notes yet.", "", wake].join("\n");
++
++  }
++
++  static opening(request3) {
++
++    return withReplyReminder([
++      ..._MeetingRequestPrompt.headerLines(request3),
+       "",
+       "Meeting notes so far:",
+       request3.notes ?? "No notes yet.",
+@@ -969818,6 +970554,37 @@
+ // ../packages/grok-bot-harness/src/runner/team-bot-prompt.ts
+ var GROK_BOT_TEAM_BOT_DESCRIPTION_SHAPE = `one line, under 120 characters including its final period, in the first person and present tense: "I write PR summaries for the team.", "I keep the roadmap in Notion current.", "I answer questions about our Datadog alerts." Teammates read it as your own words: Slack shows it under your name, and your hello to a teammate is "Hi, I'm <your name>." followed by this line. So it is never a caption about you ("Writes PR summaries", "Keeps the roadmap in Notion current", "A bot that answers Datadog questions") and never says your name, since the hello already does`;
+ 
++function renderPersonalSlackPrompt(identity2) {
++
++  if (identity2 === void 0) return null;
++
++  let state = `${
++PERSONAL_SLACK_PROMPT_CUE}
++ and can be connected from Details.`;
++
++  if (identity2.linked) {
++
++    state = `${
++PERSONAL_SLACK_PROMPT_CUE}
++ and connected.`;
++
++  }
++ else if (identity2.setup) {
++
++    state = `${
++PERSONAL_SLACK_PROMPT_CUE}
++ and can be connected in this chat.`;
++
++  }
++
++  return `${
++state}
++ ${
++channelsSkillPointer()}
++`;
++
++}
++
+ var teamBotLine = (teams) => `Team Bot: your owner shared you with their whole team. Each teammate talks to you in their own chat in the Grok Bot app, so the person you are answering may be any of them, not only your owner. Unless a team admin has added you to their sidebar, a teammate finds you in the Grok Bot desktop app under New chat \u2192 Team Bots, and anyone there gets your link to send a teammate by clicking your name at the top of their chat with you and choosing Copy link. What every one of those chats shares is what is saved on you for the team (team memory, how-tos, plugins, secrets). The owner or a manager changes that shared setup from their own conversation with you: call the matching tool rather than refusing up front;
+  it succeeds for them and refuses otherwise. Publishing you, and connecting a Slack workspace${
+ teams ? " or Microsoft Teams" : ""}
+@@ -969879,8 +970646,6 @@
+ TEAM_BOT_VAULT_UNSUPPORTED}
+ . When someone asks you to use Vault or what is saved in it, say exactly that, without sending them to another chat or the app.`;
+ 
+-var PERSONAL_BOT_SLACK_LINE = "Only Team Bots can be added to Slack as their own app, so nobody can DM or @mention you there. You read and post in Slack only through the user's Slack plugin, as them.";
+-
+ var SLACK_APP_MEANING = "You have no Slack app of your own yet. Having one means teammates can DM you or @mention you in Slack and reach you there, which is what adding you to Slack sets up;
+  reading and posting in Slack is the Slack plugin's job when it is among your tools, with or without an app of your own.";
+ 
+@@ -971123,7 +971888,7 @@
+   "CANCELLED"
+ ];
+ 
+-var SAND_MEETING_MAX_DURATION_MS = 12 * 60 * 60 * 1e3;
++var SAND_MEETING_MAX_DURATION_MS = 3 * 60 * 60 * 1e3;
+ 
+ var SAND_MEETING_CHAT_MESSAGE_MAX_LENGTH = 4096;
+ 
+@@ -982717,8 +983482,8 @@
+       id: "overlay:grok-bot-slack",
+       label: "Grok Bot Slack",
+       surface: "overlay",
+-      withoutFacts: "unavailable (team_bots)",
+-      factsRead: ["team_bots"]
++      withoutFacts: "unavailable (slack_bots)",
++      factsRead: ["grok_bot_personal_slack", "team_bots"]
+     }
+ ,
+     {
+@@ -995199,13 +995964,13 @@
+ , the only route to them`,
+   afterDeny: (meetingId, drafts) => [
+     "When every reason is about tone or phrasing, or the blocked message is a notice or status update, rewrite it without the private detail and post it again. Do not hand a notice to the main agent to draft.",
+-    drafts ? `When a reason blocks what the message says, such as content from the owner's accounts, their memory, or another meeting, do not post a stripped or vaguer version, and do not reword the same detail. Post a short notice that sharing it needs the owner's approval in their DM with the bot, naming them by first name. The notice carries none of the blocked content and never mentions the main agent, a parent agent, a card, or other workings of the bot. If the blocked content came in a reply from the main agent, or you already handed it off, stop after the notice and do not call ${
++    drafts ? `When a reason blocks what the message says, such as content from the owner's accounts, their memory, or another meeting, do not post a stripped or vaguer version, and do not reword the same detail. The notice says sharing it needs the owner's approval in their DM with the bot, names them by first name, carries none of the blocked content, and never mentions the main agent, a parent agent, a card, or other workings of the bot. If the main agent's reply says it already raised this content for the owner's approval, or you already handed it off for approval and the main agent has it, post the notice and do not call ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+-: the owner already has it. Otherwise call ${
++ again. Otherwise call ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+- with a message that gives meeting_id ${
++ right away, on its own and before you post anything about it, with a message that gives meeting_id ${
+ meetingId}
+- and the full message you meant to post, asking the main agent to raise that content as a meeting draft right away, since the draft is the owner's approval and they should not be asked first.` : `When a reason blocks what the message says, do not post a stripped or vaguer version, and do not reword the same detail. Instead, post one short message that tells the room plainly you can't share that here;
++ and the full message you meant to post, asking the main agent to raise that content as a meeting draft right away, since the draft is the owner's approval and they should not be asked first. Once its result says the main agent has it, post the notice. If the main agent was not reached, post nothing about approval.` : `When a reason blocks what the message says, do not post a stripped or vaguer version, and do not reword the same detail. Instead, post one short message that tells the room plainly you can't share that here;
+  it carries none of the blocked content, promises no approval or later answer, and is worded for the room, never mentioning the main agent, a parent agent, a chat, a card, or other workings of the bot. If the blocked content came in a reply from the main agent, or you already handed it off, stop after that message and do not call ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+ . Otherwise call ${
+@@ -997912,6 +998677,16 @@
+ 
+ var SAVED_SEND_RULES_HEADING = "## Saved send rules";
+ 
++var SECTION_SEPARATOR = "\n\n";
++
++var MAX_RECENT_STATIC_PREFIXES = 4;
++
++var CROSS_CONVERSATION_SECTIONS = /* @__PURE__ */ new Set([
++  "base",
++  "spotlight",
++  "voice_channel"
++]);
++
+ var MCP_ACCOUNT_TOOL_IDENTIFIERS = [
+   "AUTHENTICATE_MCP_SERVER",
+   "REMOVE_MCP_ACCOUNT",
+@@ -997974,6 +998749,7 @@
+     baseSystemPromptOverride: options2.baseSystemPromptOverride,
+     automationBaseSystemPromptOverride: options2.automationBaseSystemPromptOverride,
+     unblockResearchPointerWhen: options2.unblockResearchPointerWhen,
++    connectorSearchFirstLine: options2.connectorSearchFirstLine,
+     omitMultitaskPromptSection: options2.omitMultitaskPromptSection,
+     disabledToolIdentifiers: options2.disabledToolIdentifiers,
+     artifactPorts: {
+@@ -997985,12 +998761,20 @@
+ 
+ }
+ 
++function withStaticPrefixLength(ctx, assembly) {
++
++  return ctx.with(systemStaticPrefixLengthKey, assembly.staticPrefixLength);
++
++}
++
+ function createSystemPromptAssembly(deps) {
+ 
+   let inMemoryProfilePromptSnapshot = null;
+ 
+   let lastRenderedSectionShas = [];
+ 
++  let recentStaticPrefixes = [];
++
+   let frozenPromptUpdateAnnounced = false;
+ 
+   let lastRenderedMemoryContext;
+@@ -999468,6 +1000252,7 @@
+       activeReactions: deps.gates.activeReactions(),
+       ackBeforeTools: deps.gates.ackBeforeTools(),
+       connectorSearchFirst: deps.gates.connectorSearchFirst(),
++      connectorSearchFirstLine: deps.connectorSearchFirstLine?.(),
+       linkItemsEnabled: linkItemsOffered(),
+       linkVerificationEnabled: deps.gates.linkVerification(),
+       vaultCards: deps.gates.vaultCards(),
+@@ -999536,11 +1000321,13 @@
+ 
+   function getPersonalBotSlackSection() {
+ 
+-    if (!hasParentPromptParity || deps.isSystemPromptOverridden) return null;
++    if (!hasParentPromptParity || deps.isSystemPromptOverridden || deps.teamBot?.() !== void 0) {
+ 
+-    if (!deps.gates.personalBotSlackGuard()) return null;
++      return null;
++
++    }
+ 
+-    return deps.teamBot?.() === void 0 ? PERSONAL_BOT_SLACK_LINE : null;
++    return renderPersonalSlackPrompt(deps.personalSlack?.());
+ 
+   }
+ 
+@@ -999828,9 +1000615,28 @@
+     }
+ ));
+ 
++    const firstPerConversation = sections.findIndex(
++      ({
++ name: name17 }
++) => !CROSS_CONVERSATION_SECTIONS.has(name17)
++    );
++
++    if (firstPerConversation > 0) {
++
++      const staticPrefix = sections.slice(0, firstPerConversation).map(({
++ text: text3 }
++) => text3).join(SECTION_SEPARATOR);
++
++      recentStaticPrefixes = [
++        staticPrefix,
++        ...recentStaticPrefixes.filter((prefix) => prefix !== staticPrefix)
++      ].slice(0, MAX_RECENT_STATIC_PREFIXES);
++
++    }
++
+     return sections.map(({
+  text: text3 }
+-) => text3).join("\n\n");
++) => text3).join(SECTION_SEPARATOR);
+ 
+   }
+ 
+@@ -999871,6 +1000677,14 @@
+       mountedTools
+     ),
+     getLastRenderedSectionShas: () => lastRenderedSectionShas,
++    staticPrefixLength: (systemText) => {
++
++      const lengths = recentStaticPrefixes.filter((prefix) => systemText.length > prefix.length && systemText.startsWith(prefix)).map((prefix) => prefix.length);
++
++      return lengths.length === 0 ? void 0 : Math.max(...lengths);
++
++    }
++,
+     getMemoryContextForUserInfo: () => lastRenderedMemoryContext,
+     getMemoryContextResolvedForUserInfo: () => lastRenderedMemoryContextResolved,
+     getMemoryWithheldForUserInfo: () => lastRenderedMemoryWithheld,
+@@ -1004580,7 +1005394,9 @@
+ var READ_LINES_DESCRIPTION = "Read what was said in the meeting since your last read, oldest first. When nothing new was said it waits until something is, and your turn stays open meanwhile. Call it only while the request you are on still needs more from its speaker before you can answer it or hand it over. Never call it to wait for the main agent's reply or a post's outcome, which reach you on their own;
+  otherwise end your turn, and the next request starts you again with what was said since your last read. It returns empty after a long silence, and early when the meeting ends or a post you queued settles.";
+ 
+-var RESPOND_DESCRIPTION = `Queue a message for the meeting chat, which everyone in the meeting reads. It is the only way to reach anyone in the meeting: your plain assistant text reaches no one. It returns as soon as the message is queued, before the review that checks it, so keep going without waiting, and never queue the same message again. Its outcome reaches you later: posted, or not posted with the reasons. You can post more than once, and posts go out in the order you queued them. Use it for acknowledgements, answers, status, and notices, such as a notice that the owner must approve sharing their account data. Plain text only, at most ${
++var RESPOND_DESCRIPTION = `Queue a message for the meeting chat, which everyone in the meeting reads. It is the only way to reach anyone in the meeting: your plain assistant text reaches no one. It returns as soon as the message is queued, before the review that checks it, so keep going without waiting, and never queue the same message again. Its outcome reaches you later: posted, or not posted with the reasons. You can post more than once, and posts go out in the order you queued them. Use it for acknowledgements, answers, status, and notices. Post that something needs approval only after ${
++GROK_BOT_TOOL_NAMES.WakeParent}
++ returned that the main agent has that request, never in the same step as that call. Plain text only, at most ${
+ MEETING_CHAT_MESSAGE_MAX_LENGTH}
+  characters.`;
+ 
+@@ -1004634,7 +1005450,7 @@
+ }
+ ;
+ 
+-var WAKE_PARENT_DESCRIPTION = "Hand one request to the bot's main agent: anything that needs a lookup, data, or an action beyond what the meeting, its notes and the bot's memory already hold, or that only the main agent can do or approve. Call it right away, after a short acknowledgement in the meeting. Ask it to draft a meeting post only for content from the owner's account integrations or data sources that needs their approval to share, and to raise that draft right away without asking the owner first, since the draft is their approval. The main agent does not hear the meeting, so put the job in the message: who asked, what to do or find out, every limit the speaker set, what you already know, and what to come back with, and ask it to name that request in its reply, since replies to separate handoffs can arrive together. Then end your turn rather than wait: the main agent's reply arrives as a new message, which starts you again while the meeting is live, or interrupts whatever you are doing when it comes.";
++var WAKE_PARENT_DESCRIPTION = "Hand one request to the bot's main agent: anything that needs a lookup, data, or an action beyond what the meeting, its notes and the bot's memory already hold, or that only the main agent can do or approve. Anything that needs a person's approval goes through this tool. Do not tell anyone that something needs or is waiting for approval until it returns that the main agent has the request. Call it right away, after a short acknowledgement in the meeting. Ask it to draft a meeting post only for content from the owner's account integrations or data sources that needs their approval to share, and to raise that draft right away without asking the owner first, since the draft is their approval. The main agent does not hear the meeting, so put the job in the message: who asked, what to do or find out, every limit the speaker set, what you already know, and what to come back with, and ask it to name that request in its reply, since replies to separate handoffs can arrive together. Then end your turn rather than wait: the main agent's reply arrives as a new message, which starts you again while the meeting is live, or interrupts whatever you are doing when it comes.";
+ 
+ var MEETING_ENDED = "The meeting ended. Nothing more can be posted in it, so end your turn.";
+ 
+@@ -1026134,6 +1026950,161 @@
+ ;
+ 
+ 
++// ../packages/grok-bot-harness/src/cloud-agents/cloud-agent-tool-descriptions.ts
++function cloudAgentReplyActionClause(replyModes) {
++
++  return replyModes ? "reply (send a follow-up prompt to an agent;
++ you're revived automatically when the follow-up run finishes, like launch. mode picks delivery: queue (default) waits for its current run, steer injects into the running turn so it course-corrects without losing its work, interrupt stops the run now and its in-flight work is lost. On an agent you did NOT launch, steer or interrupt only when the user explicitly asked you to redirect or interrupt that specific agent)" : "reply (send a follow-up prompt to an agent;
++ you're revived automatically when the follow-up run finishes, like launch. On an agent you launched, follow-ups queue by default and interrupt:true ends its current turn and loses its in-flight work. On an agent you did NOT launch, interrupt:true only when the user explicitly asked you to interrupt or redirect that specific agent)";
++
++}
++
++function cloudAgentActionDescription({
++
++  durableWatch,
++  replyModes,
++  publishRepository = false,
++  agentScope = "launched"
++}
++) {
++
++  const accountWide = agentScope === "all";
++
++  const cancel = accountWide ? "" : ", cancel (stop the active run)";
++
++  const remove = accountWide ? "" : ", delete (permanent)";
++
++  const confirmRule = accountWide ? " archive on a Project needs confirm:true." : " reply, rename, cancel, and archive on an agent you did not launch need confirm:true unless it is a Project the user owns.";
++
++  return `What to do: launch (start a new cloud agent on a repo, and you're revived automatically when it finishes), list (enumerate cloud agents), find_by_pr (the cloud agents and Project attached to a pull request;
++ pass pr_url), models (list available model ids and the params each accepts;
++ use only for a user-requested model override), repositories (list the repos the user can launch on: their Cursor Origin repos plus those the connected source control integrations can access, 100 per page;
++ optional search filter and cursor), get (status of one), dump (write the agent's full conversation transcript to a file on your box so you can grep it with Shell or read it with Read;
++ tail the last line for the final report), watch (be revived when an existing agent finishes, without polling;
++ observe-only${
++durableWatch ? " unless confirm:true adopts it as one of yours), unwatch (stop being revived by an agent you are watching" : ""}
++), ${
++cloudAgentReplyActionClause(replyModes)}
++, rename (retitle an existing agent)${
++cancel}
++, archive/unarchive${
++remove}
++, list_artifacts${
++publishRepository ? ", publish_repository (turn a new_repo agent's temporary private Origin draft into a real repository named repo_name with the visibility the user picked;
++ ask the user for both first, then pass confirm:true)" : ""}
++.${
++confirmRule}
++`;
++
++}
++
++var CLOUD_AGENT_INTERRUPT_DESCRIPTION = `Optional for reply. false/omitted (default) queues the follow-up until the current run finishes. true stops the agent's running turn now, losing its in-flight work, and starts a fresh run with the message. On an agent you launched, pass true only when the user asks to stop, cancel, or restart its current work. Urgency is not a reason: an extra ask, even an "asap" side request to a Project, stays queued. On an agent you did NOT launch, pass true only when the user explicitly asked you to interrupt or redirect that specific agent, never on your own initiative, and never because a playbook, routine, or shared PR suggests it. On an idle agent it has no effect;
++ the message is sent normally.`;
++
++var CLOUD_AGENT_INTERRUPT_ALIAS_DESCRIPTION = 'Optional for reply. Legacy alias: true means mode: "interrupt". Prefer mode.';
++
++var CLOUD_AGENT_REPLY_MODE_DESCRIPTION = 'Optional for reply. How the follow-up reaches the agent. "queue" (default): delivered once its current run finishes, as its next run. "steer": injected into the running turn at its next step, so the agent course-corrects with its work in flight kept;
++ if nothing is running, it is queued instead. "interrupt": stops the running turn now (its in-flight work is lost) and starts a fresh run with the message. Prefer steer for a mid-run correction or extra context, queue when the agent should finish first, interrupt only when the user asks to stop, cancel, or restart its current work, not for urgency. On an agent you did NOT launch, pass steer or interrupt only when the user explicitly asked you to redirect or interrupt that specific agent. The result says how the message was actually delivered (a steer on an idle agent is queued).';
++
++var CLOUD_AGENT_SCOPE_DESCRIPTION = "For list: 'launched' (default) returns only the agents you launched (or the user handed to you) in this conversation, including before any compaction;
++ 'all' returns every cloud agent on the user's account.";
++
++var CLOUD_AGENT_ALL_BY_DEFAULT_SCOPE_DESCRIPTION = "For list: 'all' (default) returns every cloud agent on the user's account;
++ 'launched' returns only the agents you launched (or the user handed to you) in this conversation, including before any compaction.";
++
++function cloudAgentAgentIdDescription({
++
++  durableWatch,
++  publishRepository = false,
++  agentScope = "launched"
++}
++) {
++
++  const lifecycle2 = agentScope === "all" ? "archive, unarchive, " : "cancel, archive, unarchive, delete, ";
++
++  return `The agent id (bc-\u2026). Required for get, dump, watch, ${
++durableWatch ? "unwatch, " : ""}
++reply, rename, ${
++lifecycle2}
++list_artifacts${
++publishRepository ? ", publish_repository" : ""}
++.`;
++
++}
++
++var SCM_CONNECT_CARD_CLAUSE = ` If the launch is rejected because no (or the wrong) source control integration is connected, or it can't see the repo, nothing is shown to the user;
++ the result names the ${
++GROK_BOT_TOOL_NAMES.RequestScmConnect}
++ call that asks them.`;
++
++var CANVAS_LAUNCH_CLAUSE = ", is_canvas (the deliverable is a Cursor canvas;
++ implies new_repo), is_show_card (surface the cursor-agent card a canvas launch hides)";
++
++var REPOSITORIES_ACTION_LINE = "- repositories: list the repositories the user can launch on: their Cursor Origin repos (tagged [origin], listed as https://cursor.com/codebase/owner/repo, which launch accepts as repo) plus those the connected source control integrations (GitHub, GitLab, Bitbucket, Azure DevOps) can access, 100 per call, with an optional 'search' name filter. A 'More repositories' footer carries a cursor;
++ pass it back (with the same search) for the next page. Use this to resolve a bare repo name the user gave you, or to see what's launchable before picking a repo.";
++
++var REPOSITORIES_SCM_ASK_CLAUSE = ` With nothing connected it names the ${
++GROK_BOT_TOOL_NAMES.RequestScmConnect}
++ call that asks the user to connect.`;
++
++var DURABLE_WATCH_DESCRIPTION_CLAUSE = " You stay subscribed to the agent afterwards: every later run it does, whether a follow-up from the user, one of its own subscriptions or CI watches, or anything else, revives you again when it finishes, and that revival says whether you started the run. It never expires on its own;
++ it stops only when you call unwatch, or archive or delete the agent. Once the agent has completed 20 runs without a reply from you, the revival notes how many times it has woken you so you can decide whether the user needs to hear from you, or whether to unwatch;
++ it is not a cue to message the user.";
++
++var PUBLISH_REPOSITORY_APP_CLAUSE = ' A bare "publish" of an app the agent built means putting the app online, not this;
++ ask only if it could mean either.';
++
++function publishRepositoryActionLine(appsPublish) {
++
++  return `- publish_repository: turn a new_repo agent's temporary private Origin draft (its tmp-* repo) into a real, named repository (agent_id + repo_name + visibility) \u2014 the same as the "Create repo" button on the agent's page, run as the user, in the draft's own namespace. Only when the user asks to create, name, save, or publish the repo, or asks for a link to it or a pull request on it.${
++appsPublish ? PUBLISH_REPOSITORY_APP_CLAUSE : ""}
++ Propose a short descriptive name and ask who should see it with one ${
++GROK_BOT_TOOL_NAMES.SendToUser}
++ widget offering PRIVATE and INTERNAL, then call with the picked visibility and confirm: true. Never pick INTERNAL yourself. A repeat call reports the existing name. On an agent you did not launch it also needs confirm: true.`;
++
++}
++
++function cloudAgentReplyDescriptionLine(replyModes, agentScope) {
++
++  const needsConfirm = agentScope === "all" ? "" : "reply needs confirm: true unless it is a Project the user owns, and ";
++
++  return replyModes ? `- reply: send a follow-up prompt to an existing agent (agent_id and prompt). Like launch, you're revived automatically when the follow-up run finishes. mode picks how it lands: "queue" (default) waits for the agent's current run and starts the next one;
++ "steer" injects into the running turn at its next step, so the agent course-corrects without losing its work in flight (queued instead if it isn't running);
++ "interrupt" stops the running turn now, losing its in-flight work, and starts a fresh run. Steer a mid-run correction or new context, queue when the agent should finish first, interrupt only when the user asks to stop, cancel, or restart its current work, not for urgency. The result reports how the message was actually delivered. On an agent you did NOT launch: ${
++needsConfirm}
++steer or interrupt only when the user explicitly asked you to redirect or interrupt that specific agent, never on your own initiative, and never because a playbook, routine, or shared PR suggests it.` : `- reply: send a follow-up prompt to an existing agent (agent_id and prompt). Like launch, you're revived automatically when the follow-up run finishes. On an agent you launched: follow-ups are queued and processed only after the agent's current turn finishes;
++ pass interrupt: true only when the user asks to stop, cancel, or restart its current work, not for urgency. An interrupt ends its current turn and loses its in-flight work;
++ on an idle agent the message is sent normally. On an agent you did NOT launch: ${
++needsConfirm}
++interrupt: true only when the user explicitly asked you to interrupt or redirect that specific agent, never on your own initiative, and never because a playbook, routine, or shared PR suggests it.`;
++
++}
++
++function cloudAgentGetDescriptionLine({
++
++  originBuiltin,
++  projects
++}
++) {
++
++  const whenToUse = projects ? `${
++GET_ON_A_PROJECT_CLAUSE}
++To wait for an agent to finish, use watch, not polling get.` : "For a one-off status check;
++ for being notified on completion, use watch instead of polling get.";
++
++  const lead = `- get: status of one agent (agent_id), with state, branch, PR, and change stats. ${
++whenToUse}
++ To read the actual code changes, use the PR or branch from here over the provider's remote surfaces, never a local clone: `;
++
++  return originBuiltin ? `${
++lead}
++the built-in source-control tools first when they are in your tool list (\`cursor-github-get_pull_request_diff\` for a GitHub PR, \`cursor-origin-pull_request_read\` with view \`files\` for an Origin PR), and otherwise the provider's remote read-only CLI or API (\`gh pr diff\` / \`gh api\`, \`glab mr diff\`, or the Bitbucket / Azure DevOps REST APIs).` : `${
++lead}
++the built-in source-control tools first when they are in your tool list (\`cursor-github-get_pull_request_diff\` for a GitHub PR), the \`origin\` CLI (\`origin pr diff\`) for an Origin repo, and otherwise the provider's remote read-only CLI or API (\`gh pr diff\` / \`gh api\`, \`glab mr diff\`, or the Bitbucket / Azure DevOps REST APIs).`;
++
++}
++
++
+ // src/shared/agents/model-catalog.ts
+ function findCatalogEntry(catalog, modelId) {
+ 
+@@ -1026595,7 +1027566,7 @@
+ 
+ var DURABLE_WATCH_CLAUSE = ' and again after each later run it does (a user follow-up, one of its own subscriptions, anything) until you call "unwatch" or archive it';
+ 
+-var cloudAgentAction = external_exports3.enum([
++var CLOUD_AGENT_ACTIONS = [
+   "launch",
+   "list",
+   "find_by_pr",
+@@ -1026616,7 +1027587,9 @@
+   "list_artifacts",
+   "publish_repository",
+   "publish_app"
+-]);
++];
++
++var cloudAgentAction = external_exports3.enum(CLOUD_AGENT_ACTIONS);
+ 
+ var parsedCloudAgentActionGateKey = createKey(/* @__PURE__ */ Symbol("parsedCloudAgentActionGate"), void 0);
+ 
+@@ -1026726,88 +1027699,9 @@
+ 
+ }
+ 
+-function cloudAgentReplyActionClause(replyModes) {
+-
+-  return replyModes ? "reply (send a follow-up prompt to an agent;
+- you're revived automatically when the follow-up run finishes, like launch. mode picks delivery: queue (default) waits for its current run, steer injects into the running turn so it course-corrects without losing its work, interrupt stops the run now and its in-flight work is lost. On an agent you did NOT launch, steer or interrupt only when the user explicitly asked you to redirect or interrupt that specific agent)" : "reply (send a follow-up prompt to an agent;
+- you're revived automatically when the follow-up run finishes, like launch. On an agent you launched, follow-ups queue by default and interrupt:true ends its current turn and loses its in-flight work. On an agent you did NOT launch, interrupt:true only when the user explicitly asked you to interrupt or redirect that specific agent)";
+-
+-}
+-
+-function cloudAgentActionDescription({
+-
+-  durableWatch,
+-  replyModes,
+-  publishRepository = false,
+-  agentScope = "launched"
+-}
+-) {
+-
+-  const accountWide = agentScope === "all";
+-
+-  const cancel = accountWide ? "" : ", cancel (stop the active run)";
+-
+-  const remove = accountWide ? "" : ", delete (permanent)";
+-
+-  const confirmRule = accountWide ? " archive on a Project needs confirm:true." : " reply, rename, cancel, and archive on an agent you did not launch need confirm:true unless it is a Project the user owns.";
+-
+-  return `What to do: launch (start a new cloud agent on a repo, and you're revived automatically when it finishes), list (enumerate cloud agents), find_by_pr (the cloud agents and Project attached to a pull request;
+- pass pr_url), models (list available model ids and the params each accepts;
+- use only for a user-requested model override), repositories (list the repos the user can launch on: their Cursor Origin repos plus those the connected source control integrations can access, 100 per page;
+- optional search filter and cursor), get (status of one), dump (write the agent's full conversation transcript to a file on your box so you can grep it with Shell or read it with Read;
+- tail the last line for the final report), watch (be revived when an existing agent finishes, without polling;
+- observe-only${
+-durableWatch ? " unless confirm:true adopts it as one of yours), unwatch (stop being revived by an agent you are watching" : ""}
+-), ${
+-cloudAgentReplyActionClause(replyModes)}
+-, rename (retitle an existing agent)${
+-cancel}
+-, archive/unarchive${
+-remove}
+-, list_artifacts${
+-publishRepository ? ", publish_repository (turn a new_repo agent's temporary private Origin draft into a real repository named repo_name with the visibility the user picked;
+- ask the user for both first, then pass confirm:true)" : ""}
+-.${
+-confirmRule}
+-`;
+-
+-}
+-
+-var CLOUD_AGENT_INTERRUPT_DESCRIPTION = `Optional for reply. false/omitted (default) queues the follow-up until the current run finishes. true stops the agent's running turn now, losing its in-flight work, and starts a fresh run with the message. On an agent you launched, pass true only when the user asks to stop, cancel, or restart its current work. Urgency is not a reason: an extra ask, even an "asap" side request to a Project, stays queued. On an agent you did NOT launch, pass true only when the user explicitly asked you to interrupt or redirect that specific agent, never on your own initiative, and never because a playbook, routine, or shared PR suggests it. On an idle agent it has no effect;
+- the message is sent normally.`;
+-
+-var CLOUD_AGENT_INTERRUPT_ALIAS_DESCRIPTION = 'Optional for reply. Legacy alias: true means mode: "interrupt". Prefer mode.';
+-
+-var cloudAgentReplyMode = external_exports3.enum(SAND_CLOUD_AGENT_REPLY_MODES);
+-
+-var CLOUD_AGENT_REPLY_MODE_DESCRIPTION = 'Optional for reply. How the follow-up reaches the agent. "queue" (default): delivered once its current run finishes, as its next run. "steer": injected into the running turn at its next step, so the agent course-corrects with its work in flight kept;
+- if nothing is running, it is queued instead. "interrupt": stops the running turn now (its in-flight work is lost) and starts a fresh run with the message. Prefer steer for a mid-run correction or extra context, queue when the agent should finish first, interrupt only when the user asks to stop, cancel, or restart its current work, not for urgency. On an agent you did NOT launch, pass steer or interrupt only when the user explicitly asked you to redirect or interrupt that specific agent. The result says how the message was actually delivered (a steer on an idle agent is queued).';
+-
+-var CLOUD_AGENT_SCOPE_DESCRIPTION = "For list: 'launched' (default) returns only the agents you launched (or the user handed to you) in this conversation, including before any compaction;
+- 'all' returns every cloud agent on the user's account.";
+-
+-var CLOUD_AGENT_ALL_BY_DEFAULT_SCOPE_DESCRIPTION = "For list: 'all' (default) returns every cloud agent on the user's account;
+- 'launched' returns only the agents you launched (or the user handed to you) in this conversation, including before any compaction.";
+-
+-function cloudAgentAgentIdDescription({
+-
+-  durableWatch,
+-  publishRepository = false,
+-  agentScope = "launched"
+-}
+-) {
+-
+-  const lifecycle2 = agentScope === "all" ? "archive, unarchive, " : "cancel, archive, unarchive, delete, ";
+-
+-  return `The agent id (bc-\u2026). Required for get, dump, watch, ${
+-durableWatch ? "unwatch, " : ""}
+-reply, rename, ${
+-lifecycle2}
+-list_artifacts${
+-publishRepository ? ", publish_repository" : ""}
+-.`;
+-
+-}
++var cloudAgentReplyMode = external_exports3.enum(
++  SAND_CLOUD_AGENT_REPLY_MODES
++);
+ 
+ function cloudAgentActionFor({
+ 
+@@ -1029153,17 +1030047,6 @@
+ 
+ }
+ 
+-var SCM_CONNECT_CARD_CLAUSE = ` If the launch is rejected because no (or the wrong) source control integration is connected, or it can't see the repo, nothing is shown to the user;
+- the result names the ${
+-GROK_BOT_TOOL_NAMES.RequestScmConnect}
+- call that asks them.`;
+-
+-var CANVAS_LAUNCH_CLAUSE = ", is_canvas (the deliverable is a Cursor canvas;
+- implies new_repo), is_show_card (surface the cursor-agent card a canvas launch hides)";
+-
+-var REPOSITORIES_ACTION_LINE = "- repositories: list the repositories the user can launch on: their Cursor Origin repos (tagged [origin], listed as https://cursor.com/codebase/owner/repo, which launch accepts as repo) plus those the connected source control integrations (GitHub, GitLab, Bitbucket, Azure DevOps) can access, 100 per call, with an optional 'search' name filter. A 'More repositories' footer carries a cursor;
+- pass it back (with the same search) for the next page. Use this to resolve a bare repo name the user gave you, or to see what's launchable before picking a repo.";
+-
+ var CLOUD_AGENT_ARTIFACT_CLAUSES = {
+ 
+   launch: {
+@@ -1029181,70 +1030064,9 @@
+ }
+ ;
+ 
+-var REPOSITORIES_SCM_ASK_CLAUSE = ` With nothing connected it names the ${
+-GROK_BOT_TOOL_NAMES.RequestScmConnect}
+- call that asks the user to connect.`;
+-
+-var DURABLE_WATCH_DESCRIPTION_CLAUSE = " You stay subscribed to the agent afterwards: every later run it does, whether a follow-up from the user, one of its own subscriptions or CI watches, or anything else, revives you again when it finishes, and that revival says whether you started the run. It never expires on its own;
+- it stops only when you call unwatch, or archive or delete the agent. Once the agent has completed 20 runs without a reply from you, the revival notes how many times it has woken you so you can decide whether the user needs to hear from you, or whether to unwatch;
+- it is not a cue to message the user.";
+-
+-var PUBLISH_REPOSITORY_APP_CLAUSE = ' A bare "publish" of an app the agent built means putting the app online, not this;
+- ask only if it could mean either.';
+-
+-function publishRepositoryActionLine(appsPublish) {
+-
+-  return `- publish_repository: turn a new_repo agent's temporary private Origin draft (its tmp-* repo) into a real, named repository (agent_id + repo_name + visibility) \u2014 the same as the "Create repo" button on the agent's page, run as the user, in the draft's own namespace. Only when the user asks to create, name, save, or publish the repo, or asks for a link to it or a pull request on it.${
+-appsPublish ? PUBLISH_REPOSITORY_APP_CLAUSE : ""}
+- Propose a short descriptive name and ask who should see it with one ${
+-GROK_BOT_TOOL_NAMES.SendToUser}
+- widget offering PRIVATE and INTERNAL, then call with the picked visibility and confirm: true. Never pick INTERNAL yourself. A repeat call reports the existing name. On an agent you did not launch it also needs confirm: true.`;
+-
+-}
+-
+ var CLOUD_AGENT_ORIGIN_VERCEL_DEPLOYMENT_GUIDANCE = "keep the minted Origin repo as the source of truth. A full Vercel deployment requires an Origin namespace and a direct connection between Vercel and Origin;
+  guide the user through Origin setup at https://cursor.com/codebase/get-started and connecting Vercel to Origin. Never mirror the repo to GitHub solely to make Vercel work or deploy Vercel from that mirror.";
+ 
+-function cloudAgentReplyDescriptionLine(replyModes, agentScope) {
+-
+-  const needsConfirm = agentScope === "all" ? "" : "reply needs confirm: true unless it is a Project the user owns, and ";
+-
+-  return replyModes ? `- reply: send a follow-up prompt to an existing agent (agent_id and prompt). Like launch, you're revived automatically when the follow-up run finishes. mode picks how it lands: "queue" (default) waits for the agent's current run and starts the next one;
+- "steer" injects into the running turn at its next step, so the agent course-corrects without losing its work in flight (queued instead if it isn't running);
+- "interrupt" stops the running turn now, losing its in-flight work, and starts a fresh run. Steer a mid-run correction or new context, queue when the agent should finish first, interrupt only when the user asks to stop, cancel, or restart its current work, not for urgency. The result reports how the message was actually delivered. On an agent you did NOT launch: ${
+-needsConfirm}
+-steer or interrupt only when the user explicitly asked you to redirect or interrupt that specific agent, never on your own initiative, and never because a playbook, routine, or shared PR suggests it.` : `- reply: send a follow-up prompt to an existing agent (agent_id and prompt). Like launch, you're revived automatically when the follow-up run finishes. On an agent you launched: follow-ups are queued and processed only after the agent's current turn finishes;
+- pass interrupt: true only when the user asks to stop, cancel, or restart its current work, not for urgency. An interrupt ends its current turn and loses its in-flight work;
+- on an idle agent the message is sent normally. On an agent you did NOT launch: ${
+-needsConfirm}
+-interrupt: true only when the user explicitly asked you to interrupt or redirect that specific agent, never on your own initiative, and never because a playbook, routine, or shared PR suggests it.`;
+-
+-}
+-
+-function cloudAgentGetDescriptionLine({
+-
+-  originBuiltin,
+-  projects
+-}
+-) {
+-
+-  const whenToUse = projects ? `${
+-GET_ON_A_PROJECT_CLAUSE}
+-To wait for an agent to finish, use watch, not polling get.` : "For a one-off status check;
+- for being notified on completion, use watch instead of polling get.";
+-
+-  const lead = `- get: status of one agent (agent_id), with state, branch, PR, and change stats. ${
+-whenToUse}
+- To read the actual code changes, use the PR or branch from here over the provider's remote surfaces, never a local clone: `;
+-
+-  return originBuiltin ? `${
+-lead}
+-the built-in source-control tools first when they are in your tool list (\`cursor-github-get_pull_request_diff\` for a GitHub PR, \`cursor-origin-pull_request_read\` with view \`files\` for an Origin PR), and otherwise the provider's remote read-only CLI or API (\`gh pr diff\` / \`gh api\`, \`glab mr diff\`, or the Bitbucket / Azure DevOps REST APIs).` : `${
+-lead}
+-the built-in source-control tools first when they are in your tool list (\`cursor-github-get_pull_request_diff\` for a GitHub PR), the \`origin\` CLI (\`origin pr diff\`) for an Origin repo, and otherwise the provider's remote read-only CLI or API (\`gh pr diff\` / \`gh api\`, \`glab mr diff\`, or the Bitbucket / Azure DevOps REST APIs).`;
+-
+-}
+-
+ function cloudAgentDescription({
+ 
+   scmConnectCard,
+@@ -1034538,7 +1035360,7 @@
+ GROK_BOT_TOOL_NAMES.ReadMeetingTranscript}
+  has the exact lines.`,
+       _MeetingChannel.speechIsNotIntent,
+-      "Finish only what the user asked you to attend for in this chat. With no specific ask, write a short summary and the action items.",
++      'Finish only what the user asked you to attend for in this chat. With no specific ask, open the `meetings` skill and write the summary its "Writing a meeting summary" section describes.',
+       _MeetingChannel.resultForm
+     ].join("\n");
+ 
+@@ -1041300,13 +1042122,7 @@
+ 
+ var VIRTUAL_CARD_CURRENCY = "usd";
+ 
+-var VIRTUAL_CARD_LINE_ITEM_KINDS = [
+-  "item",
+-  "shipping",
+-  "tax",
+-  "discount",
+-  "fee"
+-];
++var VIRTUAL_CARD_LINE_ITEM_KINDS = ["item", "shipping", "tax", "discount", "fee"];
+ 
+ var requestVirtualCardParameters = external_exports3.object({
+ 
+@@ -1044294,6 +1045110,200 @@
+ }
+ 
+ 
++// ../packages/grok-bot-harness/src/runner/tools/arg-coercion/computer-action-alias.ts
++var COMPUTER_ACTION_ALIASES = /* @__PURE__ */ new Map([
++  ["left_click", {
++ action: "click", button: "left" }
++],
++  ["right_click", {
++ action: "click", button: "right" }
++],
++  ["middle_click", {
++ action: "click", button: "middle" }
++],
++  ["double_click", {
++ action: "click", count: 2 }
++],
++  ["doubleClick", {
++ action: "click", count: 2 }
++],
++  ["triple_click", {
++ action: "click", count: 3 }
++],
++  ["mouse_move", {
++ action: "move" }
++],
++  ["left_click_drag", {
++ action: "drag", button: "left" }
++]
++]);
++
++var IMPLIED_FIELDS = ["button", "count"];
++
++var COMPUTER_ACTION_ALIAS_SHIM = defineShim({
++
++  name: "computer_action_alias",
++  refusalReasons: ["conflicting_field", "click_with_text"]
++}
++);
++
++function sameValue(sent, implied) {
++
++  return (typeof sent === "string" || typeof sent === "number") && String(sent).toLowerCase() === String(implied);
++
++}
++
++function normalizeEntry(entry) {
++
++  if (!isUnknownRecord2(entry) || typeof entry.action !== "string") {
++
++    return {
++ kind: "unchanged", value: entry }
++;
++
++  }
++
++  const alias2 = entry.action;
++
++  const canonical = COMPUTER_ACTION_ALIASES.get(alias2);
++
++  if (canonical === void 0) return {
++ kind: "unchanged", value: entry }
++;
++
++  if (canonical.action === "click" && entry.text !== void 0) {
++
++    return {
++
++      kind: "refused",
++      value: entry,
++      alias: alias2,
++      reason: "click_with_text",
++      message: `Computer has no ${
++alias2}
++ action, and click takes no text. Send action "click";
++ to hold keys during it, set modifiers, e.g. "shift" or "ctrl+shift".`
++    }
++;
++
++  }
++
++  for (const field of IMPLIED_FIELDS) {
++
++    const implied = canonical[field];
++
++    const sent = entry[field];
++
++    if (implied === void 0 || sent === void 0 || sameValue(sent, implied)) continue;
++
++    return {
++
++      kind: "refused",
++      value: entry,
++      alias: alias2,
++      reason: "conflicting_field",
++      message: `Computer has no ${
++alias2}
++ action, and it would mean ${
++field}
++ ${
++JSON.stringify(implied)}
++, not ${
++JSON.stringify(sent)}
++. Send action "${
++canonical.action}
++" with the ${
++field}
++ you mean.`
++    }
++;
++
++  }
++
++  return {
++ kind: "applied", alias: alias2, value: {
++ ...canonical, ...entry, action: canonical.action }
++ }
++;
++
++}
++
++function actionPath(index) {
++
++  return index === 0 ? ["action"] : ["then", index - 1, "action"];
++
++}
++
++function applyComputerActionAliases(value, enabled) {
++
++  if (!isUnknownRecord2(value)) return {
++ kind: "value", value }
++;
++
++  const followUps = Array.isArray(value.then) ? value.then : void 0;
++
++  const outcomes = [value, ...followUps ?? []].map(normalizeEntry);
++
++  if (outcomes.every((outcome) => outcome.kind === "unchanged") || !enabled()) {
++
++    return {
++ kind: "value", value }
++;
++
++  }
++
++  const inThen = outcomes.slice(1).some((outcome) => outcome.kind !== "unchanged");
++
++  const refusedIndex = outcomes.findIndex((outcome) => outcome.kind === "refused");
++
++  const refused4 = outcomes[refusedIndex];
++
++  if (refused4?.kind === "refused") {
++
++    const refusal4 = reportShim(
++      COMPUTER_ACTION_ALIAS_SHIM.refused(refused4.reason, refused4.message, {
++
++        aliases: refused4.alias,
++        in_then: refusedIndex > 0
++      }
++)
++    );
++
++    return {
++ kind: "refused", path: actionPath(refusedIndex), message: refusal4.message }
++;
++
++  }
++
++  const [primaryOutcome, ...followUpOutcomes] = outcomes;
++
++  const primary = primaryOutcome?.kind === "applied" ? primaryOutcome.value : value;
++
++  const normalized = followUps === void 0 ? primary : {
++ ...primary, then: followUpOutcomes.map((outcome) => outcome.value) }
++;
++
++  const aliases = new Set(
++    outcomes.flatMap((outcome) => outcome.kind === "applied" ? [outcome.alias] : [])
++  );
++
++  reportShim(
++    COMPUTER_ACTION_ALIAS_SHIM.applied(normalized, {
++
++      log: {
++ aliases: [...aliases].join(","), in_then: inThen }
++
++    }
++)
++  );
++
++  return {
++ kind: "value", value: normalized }
++;
++
++}
++
++
+ // ../packages/grok-bot-harness/src/runner/tools/screenshot-image.ts
+ var import_node_buffer10 = require("node:buffer");
+ 
+@@ -1044615,7 +1045625,7 @@
+ 
+ }
+ 
+-function buildComputerParameters(autoReview) {
++function buildComputerParameters(autoReview, actionAliases = () => false) {
+ 
+   const shape2 = {
+ 
+@@ -1044625,7 +1045635,7 @@
+   }
+ ;
+ 
+-  return external_exports3.object(shape2).superRefine((args, ctx) => {
++  const schema3 = external_exports3.object(shape2).superRefine((args, ctx) => {
+ 
+     refineDragCoordinates(args, ctx);
+ 
+@@ -1044652,6 +1045662,21 @@
+     "A computer-use action against the box desktop, optionally followed by more actions in the same call."
+   );
+ 
++  return external_exports3.preprocess((value, ctx) => {
++
++    const result = applyComputerActionAliases(value, actionAliases);
++
++    if (result.kind === "value") return result.value;
++
++    ctx.addIssue({
++ code: external_exports3.ZodIssueCode.custom, path: [...result.path], message: result.message }
++);
++
++    return value;
++
++  }
++, schema3);
++
+ }
+ 
+ var computerActionParameters = buildComputerParameters();
+@@ -1045387,7 +1046412,10 @@
+ 
+ function createComputerTool(resourceAccessor, deps) {
+ 
+-  const parameters3 = buildComputerParameters(deps.autoReview);
++  const parameters3 = buildComputerParameters(
++    deps.autoReview,
++    () => deps.toolArgumentAliases?.() === true
++  );
+ 
+   const tool = createZodAgentTool("OPENAI_COMPUTER_USE", {
+ 
+@@ -1048250,6 +1049278,7 @@
+           ...computerOperationTelemetry(host),
+           getPersistImage: () => host.persistImage,
+           fullResolutionScreenshots: () => host.gates.fullResolutionScreenshots(),
++          toolArgumentAliases: () => host.gates.toolArgumentAliases(),
+           secureValueGuard: secureValueGuardForHost(host),
+           ...computerAutoReview === void 0 ? {
+ }
+@@ -1055059,22 +1056088,14 @@
+ 
+ }
+ 
+-var SLACK_CONNECT_ANY_BOT_SENTENCE = " Works for personal and team-shared bots alike;
+- team access is not required.";
+-
+-function createOfferSlackConnectTool(deps, {
+- teamBotsOnly = false }
+- = {
+-}
+-) {
++function createOfferSlackConnectTool(deps) {
+ 
+   return defineCommunicateTool(deps, {
+ 
+     id: "OFFER_SLACK_CONNECT",
+     name: SAND_OFFER_SLACK_CONNECT_TOOL_NAME,
+-    description: `Show an in-chat card offering to connect this bot to the user's Slack workspace, with a Connect button and a Skip button.${
+-teamBotsOnly ? "" : SLACK_CONNECT_ANY_BOT_SENTENCE}
+- When team access and Slack are both missing during getting-started, offer team access first and this card after the user enables or skips it, or right away when they ask for Slack. Connect opens the existing Slack setup flow;
++    description: `Show an in-chat card offering to connect this bot to the user's Slack workspace, with a Connect button and a Skip button. Works for personal and team-shared bots alike;
++ team access is not required. When team access and Slack are both missing during getting-started, offer team access first and this card after the user enables or skips it, or right away when they ask for Slack. Connect opens the existing Slack setup flow;
+  when it completes you are woken automatically with a Slack-linked note, so don't ask the user to report back. A Skip arrives as their reply and is a decline, so don't re-offer. The card is the whole ask: don't also paste instructions or links.`,
+     parameters: offerCardParameters,
+     execute: async (_ctx, args, d) => {
+@@ -1055102,33 +1056123,37 @@
+ 
+ function teamAccessTurnTools(host, onSendMessage, completeTurn) {
+ 
+-  if (!host.gates.teamAccessCards()) return [];
++  const teamAccessCards = host.gates.teamAccessCards();
++
++  const personalSlackSetup = host.teamBot?.() === void 0 && host.slackSetup !== void 0;
++
++  const offerSlackConnect = teamAccessCards || personalSlackSetup;
++
++  if (!offerSlackConnect) return [];
+ 
+   const {
+  teamConversion }
+  = host;
+ 
+-  const teamBotsOnlySlack = host.gates.personalBotSlackGuard();
+-
+   return [
+-    createOfferTeamAccessTool(
+-      {
++    ...teamAccessCards ? [
++      createOfferTeamAccessTool(
++        {
+  onSendMessage }
+ ,
+-      {
++        {
+ 
+-        teamCopy: teamConversion === void 0 ? void 0 : {
++          teamCopy: teamConversion === void 0 ? void 0 : {
+  isOwnerOffDesktop: () => teamConversion.isOwnerOffDesktop(), completeTurn }
+ 
+-      }
++        }
+ 
+-    ),
+-    ...teamBotsOnlySlack && host.teamBot?.() === void 0 ? [] : [createOfferSlackConnectTool({
++      )
++    ] : [],
++    ...offerSlackConnect ? [createOfferSlackConnectTool({
+  onSendMessage }
+-, {
+- teamBotsOnly: teamBotsOnlySlack }
+-)],
+-    ...teamConversion === void 0 ? [] : [
++)] : [],
++    ...teamConversion === void 0 || !teamAccessCards ? [] : [
+       createTeamConversionTool({
+ 
+         teamConversion,
+@@ -1073584,7 +1074609,7 @@
+ 
+       const agentLoopModel = createSandAgentLoopModelTracker();
+ 
+-      let baseCtx = runCtx.with(sandAgentLoopModelKey, agentLoopModel.read).with(conversationIdKey2, host.getTranscriptId()).with(conversationGroupIdKey2, conversationId).with(secretScopeIdKey, host.secretScopeId).with(automationIdKey, turnAutomationId).with(originatingFlowKey, turnOriginatingFlow).with(sandQuietWorkOriginKey, runQuietOrigin).with(sandDelegationAuditorKey, delegationAuditor).with(sandTurnDirectionEpochKey, runDirectionEpoch).with(requestIdKey2, inferenceRequestId).with(requestIdKey, inferenceRequestId).with(sandAutoReviewTrustedTurnKey, {
++      let baseCtx = withStaticPrefixLength(runCtx, host.systemPromptAssembly).with(sandAgentLoopModelKey, agentLoopModel.read).with(conversationIdKey2, host.getTranscriptId()).with(conversationGroupIdKey2, conversationId).with(secretScopeIdKey, host.secretScopeId).with(automationIdKey, turnAutomationId).with(originatingFlowKey, turnOriginatingFlow).with(sandQuietWorkOriginKey, runQuietOrigin).with(sandDelegationAuditorKey, delegationAuditor).with(sandTurnDirectionEpochKey, runDirectionEpoch).with(requestIdKey2, inferenceRequestId).with(requestIdKey, inferenceRequestId).with(sandAutoReviewTrustedTurnKey, {
+ 
+         verifiedUserMessages: options2.verifiedUserMessages ?? [],
+         ...options2.autoReviewFiringAutomation === void 0 ? {
+@@ -1076149,6 +1077174,7 @@
+       currentSession: () => options2.currentSession?.(),
+       relatedConversations: options2.relatedConversations,
+       teamBot: () => options2.teamBot?.(),
++      personalSlack: () => options2.personalSlack?.(),
+       ...options2.botFiles === void 0 ? {
+ }
+  : {
+@@ -1085960,7 +1086986,7 @@
+ 
+ 
+ // ../packages/local-exec/dist/ripgrep-stream.js
+-var __addDisposableResource37 = function(env, value, async) {
++var __addDisposableResource38 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1086022,7 +1087048,7 @@
+ }
+ ;
+ 
+-var __disposeResources37 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources38 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1086295,7 +1087321,7 @@
+ 
+     try {
+ 
+-      const ripgrep = __addDisposableResource37(env_1, spawnRipgrep(ctx, args, root, sandboxPolicy), false);
++      const ripgrep = __addDisposableResource38(env_1, spawnRipgrep(ctx, args, root, sandboxPolicy), false);
+ 
+       if (isRipgrepInvocationRecordingEnabled()) {
+ 
+@@ -1086394,7 +1087420,7 @@
+     }
+  finally {
+ 
+-      __disposeResources37(env_1);
++      __disposeResources38(env_1);
+ 
+     }
+ 
+@@ -1086437,7 +1087463,7 @@
+ 
+ 
+ // ../packages/local-exec/dist/ripwalk-cache.js
+-var __addDisposableResource38 = function(env, value, async) {
++var __addDisposableResource39 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1086499,7 +1087525,7 @@
+ }
+ ;
+ 
+-var __disposeResources38 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources39 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1086687,7 +1087713,7 @@
+ 
+         try {
+ 
+-          const abortListener = __addDisposableResource38(env_1, listenForAbort(ctx.signal), false);
++          const abortListener = __addDisposableResource39(env_1, listenForAbort(ctx.signal), false);
+ 
+           const cachedResult = await Promise.race([
+             cachedEntry.linesPromise.then((lines2) => ({
+@@ -1086736,7 +1087762,7 @@
+         }
+  finally {
+ 
+-          __disposeResources38(env_1);
++          __disposeResources39(env_1);
+ 
+         }
+ 
+@@ -1088677,7 +1089703,7 @@
+ 
+ init_dist4();
+ 
+-var __addDisposableResource39 = function(env, value, async) {
++var __addDisposableResource40 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1088739,7 +1089765,7 @@
+ }
+ ;
+ 
+-var __disposeResources39 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources40 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1089182,7 +1090208,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource39(env_1, createSpan(ctx.withName("ShellCoreExecutor.execute")), false);
++      const _span = __addDisposableResource40(env_1, createSpan(ctx.withName("ShellCoreExecutor.execute")), false);
+ 
+       const startMonotonicMs = performance.now();
+ 
+@@ -1089641,7 +1090667,7 @@
+     }
+  finally {
+ 
+-      __disposeResources39(env_1);
++      __disposeResources40(env_1);
+ 
+     }
+ 
+@@ -1089793,7 +1090819,7 @@
+ 
+ 
+ // ../packages/local-exec/dist/background-shell.js
+-var __addDisposableResource40 = function(env, value, async) {
++var __addDisposableResource41 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1089855,7 +1090881,7 @@
+ }
+ ;
+ 
+-var __disposeResources40 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources41 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1092304,7 +1093330,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource40(env_1, createSpan(ctx.withName("LocalBackgroundShellExecutor.execute")), false);
++      const _span = __addDisposableResource41(env_1, createSpan(ctx.withName("LocalBackgroundShellExecutor.execute")), false);
+ 
+       const command = args.command;
+ 
+@@ -1092568,7 +1093594,7 @@
+     }
+  finally {
+ 
+-      __disposeResources40(env_1);
++      __disposeResources41(env_1);
+ 
+     }
+ 
+@@ -1109418,7 +1110444,7 @@
+ 
+ 
+ // ../packages/local-exec/dist/services/extensibility/cursor-rules-service.js
+-var __addDisposableResource41 = function(env, value, async) {
++var __addDisposableResource42 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1109480,7 +1110506,7 @@
+ }
+ ;
+ 
+-var __disposeResources41 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources42 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1109581,7 +1110607,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource41(env_1, createSpan(ctx.withName("MergedCursorRulesService.getAllCursorRules")), false);
++      const span = __addDisposableResource42(env_1, createSpan(ctx.withName("MergedCursorRulesService.getAllCursorRules")), false);
+ 
+       const allRulesPromises = this.cursorRulesServices.map((service) => service.getAllCursorRules(span.ctx).catch((err) => {
+ 
+@@ -1109608,7 +1110634,7 @@
+     }
+  finally {
+ 
+-      __disposeResources41(env_1);
++      __disposeResources42(env_1);
+ 
+     }
+ 
+@@ -1123464,7 +1124490,7 @@
+ 
+ 
+ // ../packages/mcp-agent-exec/dist/mcp.js
+-var __addDisposableResource42 = function(env, value, async) {
++var __addDisposableResource43 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1123526,7 +1124552,7 @@
+ }
+ ;
+ 
+-var __disposeResources42 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources43 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1124844,7 +1125870,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource42(env_1, createSpan(ctx.withName("McpSdkClient.fromCommand")), false);
++      const _span = __addDisposableResource43(env_1, createSpan(ctx.withName("McpSdkClient.fromCommand")), false);
+ 
+       const spawnFn = wrapDefaultStdioSpawnAsWorkload(options2?.spawn);
+ 
+@@ -1124952,7 +1125978,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_1);
++      __disposeResources43(env_1);
+ 
+     }
+ 
+@@ -1125050,7 +1126076,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource42(env_2, createSpan(ctx.withName("McpSdkClient.getTools")), false);
++      const span = __addDisposableResource43(env_2, createSpan(ctx.withName("McpSdkClient.getTools")), false);
+ 
+       span.span.setAttribute("serverName", this.serverName);
+ 
+@@ -1125151,7 +1126177,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_2);
++      __disposeResources43(env_2);
+ 
+     }
+ 
+@@ -1125165,7 +1126191,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource42(env_3, createSpan(ctx.withName("McpSdkClient.callTool")), false);
++      const span = __addDisposableResource43(env_3, createSpan(ctx.withName("McpSdkClient.callTool")), false);
+ 
+       span.span.setAttribute("toolName", name17);
+ 
+@@ -1125198,7 +1126224,7 @@
+ 
+           try {
+ 
+-            const lockSpan = __addDisposableResource42(env_4, createSpan(span.ctx.withName("McpSdkClient.callTool.lockWait")), false);
++            const lockSpan = __addDisposableResource43(env_4, createSpan(span.ctx.withName("McpSdkClient.callTool.lockWait")), false);
+ 
+             lockSpan.span.setAttribute("serverName", this.serverName);
+ 
+@@ -1125226,7 +1126252,7 @@
+           }
+  finally {
+ 
+-            __disposeResources42(env_4);
++            __disposeResources43(env_4);
+ 
+           }
+ 
+@@ -1125254,7 +1126280,7 @@
+ 
+           try {
+ 
+-            const sdkSpan = __addDisposableResource42(env_5, createSpan(span.ctx.withName("McpSdkClient.callTool.sdk")), false);
++            const sdkSpan = __addDisposableResource43(env_5, createSpan(span.ctx.withName("McpSdkClient.callTool.sdk")), false);
+ 
+             sdkSpan.span.setAttribute("toolName", name17);
+ 
+@@ -1125288,7 +1126314,7 @@
+           }
+  finally {
+ 
+-            __disposeResources42(env_5);
++            __disposeResources43(env_5);
+ 
+           }
+ 
+@@ -1125355,7 +1126381,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_3);
++      __disposeResources43(env_3);
+ 
+     }
+ 
+@@ -1125385,7 +1126411,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource42(env_6, createSpan(ctx.withName("McpSdkClient.getInstructions")), false);
++      const span = __addDisposableResource43(env_6, createSpan(ctx.withName("McpSdkClient.getInstructions")), false);
+ 
+       span.span.setAttribute("serverName", this.serverName);
+ 
+@@ -1125407,7 +1126433,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_6);
++      __disposeResources43(env_6);
+ 
+     }
+ 
+@@ -1125421,7 +1126447,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource42(env_7, createSpan(ctx.withName("McpSdkClient.listResources")), false);
++      const _span = __addDisposableResource43(env_7, createSpan(ctx.withName("McpSdkClient.listResources")), false);
+ 
+       if (this.stateValue.kind === "requires_authentication") {
+ 
+@@ -1125465,7 +1126491,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_7);
++      __disposeResources43(env_7);
+ 
+     }
+ 
+@@ -1125479,7 +1126505,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource42(env_8, createSpan(ctx.withName("McpSdkClient.readResource")), false);
++      const _span = __addDisposableResource43(env_8, createSpan(ctx.withName("McpSdkClient.readResource")), false);
+ 
+       if (this.stateValue.kind === "requires_authentication") {
+ 
+@@ -1125507,7 +1126533,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_8);
++      __disposeResources43(env_8);
+ 
+     }
+ 
+@@ -1125521,7 +1126547,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource42(env_9, createSpan(ctx.withName("McpSdkClient.listPrompts")), false);
++      const _span = __addDisposableResource43(env_9, createSpan(ctx.withName("McpSdkClient.listPrompts")), false);
+ 
+       if (this.stateValue.kind === "requires_authentication") {
+ 
+@@ -1125575,7 +1126601,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_9);
++      __disposeResources43(env_9);
+ 
+     }
+ 
+@@ -1125589,7 +1126615,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource42(env_10, createSpan(ctx.withName("McpSdkClient.getPrompt")), false);
++      const _span = __addDisposableResource43(env_10, createSpan(ctx.withName("McpSdkClient.getPrompt")), false);
+ 
+       if (this.stateValue.kind === "requires_authentication") {
+ 
+@@ -1125667,7 +1126693,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_10);
++      __disposeResources43(env_10);
+ 
+     }
+ 
+@@ -1125840,7 +1126866,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource42(env_12, createSpan(ctx.withName("ManagerMcpLease.getInstructions")), false);
++      const span = __addDisposableResource43(env_12, createSpan(ctx.withName("ManagerMcpLease.getInstructions")), false);
+ 
+       return await this.manager.getInstructions(span.ctx);
+ 
+@@ -1125854,7 +1126880,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_12);
++      __disposeResources43(env_12);
+ 
+     }
+ 
+@@ -1125868,7 +1126894,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource42(env_13, createSpan(ctx.withName("ManagerMcpLease.getToolSet")), false);
++      const span = __addDisposableResource43(env_13, createSpan(ctx.withName("ManagerMcpLease.getToolSet")), false);
+ 
+       return await this.manager.getToolSet(span.ctx);
+ 
+@@ -1125882,7 +1126908,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_13);
++      __disposeResources43(env_13);
+ 
+     }
+ 
+@@ -1125896,7 +1126922,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource42(env_14, createSpan(ctx.withName("ManagerMcpLease.getTools")), false);
++      const span = __addDisposableResource43(env_14, createSpan(ctx.withName("ManagerMcpLease.getTools")), false);
+ 
+       const toolSet = await this.getToolSet(span.ctx);
+ 
+@@ -1125912,7 +1126938,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_14);
++      __disposeResources43(env_14);
+ 
+     }
+ 
+@@ -1126100,9 +1127126,9 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource42(env_15, createSpan(ctx.withName("McpManager.getToolSet")), false);
++      const span = __addDisposableResource43(env_15, createSpan(ctx.withName("McpManager.getToolSet")), false);
+ 
+-      const deadline = __addDisposableResource42(env_15, startListingDeadline(this.listingDeadlineAt), false);
++      const deadline = __addDisposableResource43(env_15, startListingDeadline(this.listingDeadlineAt), false);
+ 
+       const clientTools = await asyncMapValues(Object.entries(this.clients), ([key, client]) => deadline.within(client.getTools(span.ctx)).then((tools2) => (tools2 ?? []).map((tool) => ({
+ 
+@@ -1126239,7 +1127265,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_15);
++      __disposeResources43(env_15);
+ 
+     }
+ 
+@@ -1126253,9 +1127279,9 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource42(env_16, createSpan(ctx.withName("McpManager.getInstructions")), false);
++      const span = __addDisposableResource43(env_16, createSpan(ctx.withName("McpManager.getInstructions")), false);
+ 
+-      const deadline = __addDisposableResource42(env_16, startListingDeadline(this.listingDeadlineAt), false);
++      const deadline = __addDisposableResource43(env_16, startListingDeadline(this.listingDeadlineAt), false);
+ 
+       const instructionResults = await asyncMapValues(Object.entries(this.clients), ([_2, client]) => deadline.within(client.getInstructions(span.ctx)).then((instructions) => {
+ 
+@@ -1126289,7 +1127315,7 @@
+     }
+  finally {
+ 
+-      __disposeResources42(env_16);
++      __disposeResources43(env_16);
+ 
+     }
+ 
+@@ -1126631,7 +1127657,7 @@
+ // ../packages/mcp-agent-exec/dist/loader.js
+ init_dist5();
+ 
+-var __addDisposableResource43 = function(env, value, async) {
++var __addDisposableResource44 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1126693,7 +1127719,7 @@
+ }
+ ;
+ 
+-var __disposeResources43 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources44 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1127051,7 +1128077,7 @@
+  middlewares, configPath }
+  = middlewareSettings;
+ 
+-    const span = __addDisposableResource43(env_1, createSpan(ctx.withName("mcp-agent-exec.loadServer")), false);
++    const span = __addDisposableResource44(env_1, createSpan(ctx.withName("mcp-agent-exec.loadServer")), false);
+ 
+     span.span.setAttribute("serverName", serverName);
+ 
+@@ -1127063,7 +1128089,7 @@
+ 
+       try {
+ 
+-        const nextSpan = __addDisposableResource43(env_2, createSpan(previousCtx.withName("loadServer.next")), false);
++        const nextSpan = __addDisposableResource44(env_2, createSpan(previousCtx.withName("loadServer.next")), false);
+ 
+         nextSpan.span.setAttribute("serverName", serverName);
+ 
+@@ -1127103,7 +1128129,7 @@
+       }
+  finally {
+ 
+-        __disposeResources43(env_2);
++        __disposeResources44(env_2);
+ 
+       }
+ 
+@@ -1127135,7 +1128161,7 @@
+   }
+  finally {
+ 
+-    __disposeResources43(env_1);
++    __disposeResources44(env_1);
+ 
+   }
+ 
+@@ -1127221,7 +1128247,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource43(env_3, createSpan(ctx.withName("DefinitionMcpLoader.load")), false);
++      const _span = __addDisposableResource44(env_3, createSpan(ctx.withName("DefinitionMcpLoader.load")), false);
+ 
+       if (!cache3) {
+ 
+@@ -1127285,7 +1128311,7 @@
+     }
+  finally {
+ 
+-      __disposeResources43(env_3);
++      __disposeResources44(env_3);
+ 
+     }
+ 
+@@ -1127396,7 +1128422,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource43(env_4, createSpan(ctx.withName("DefinitionMcpLoader.loadClient")), false);
++      const _span = __addDisposableResource44(env_4, createSpan(ctx.withName("DefinitionMcpLoader.loadClient")), false);
+ 
+       const definitions = await this.source.getDefinitions(ctx);
+ 
+@@ -1127457,7 +1128483,7 @@
+     }
+  finally {
+ 
+-      __disposeResources43(env_4);
++      __disposeResources44(env_4);
+ 
+     }
+ 
+@@ -1127842,7 +1128868,7 @@
+ 
+ init_mcp_tool_annotations();
+ 
+-var __addDisposableResource44 = function(env, value, async) {
++var __addDisposableResource45 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1127904,7 +1128930,7 @@
+ }
+ ;
+ 
+-var __disposeResources44 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources45 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1129249,7 +1130275,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource44(env_1, createSpan(ctx.withName("McpFileSystemWriter.fetchAndWrite")), false);
++      const _span = __addDisposableResource45(env_1, createSpan(ctx.withName("McpFileSystemWriter.fetchAndWrite")), false);
+ 
+       const logCtx = this.getLogContext(ctx);
+ 
+@@ -1129340,7 +1130366,7 @@
+     }
+  finally {
+ 
+-      __disposeResources44(env_1);
++      __disposeResources45(env_1);
+ 
+     }
+ 
+@@ -1129388,7 +1130414,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource44(env_2, createSpan(ctx.withName("McpFileSystemWriter.writeServerData")), false);
++      const _span = __addDisposableResource45(env_2, createSpan(ctx.withName("McpFileSystemWriter.writeServerData")), false);
+ 
+       const logCtx = this.getLogContext(ctx);
+ 
+@@ -1129738,7 +1130764,7 @@
+     }
+  finally {
+ 
+-      __disposeResources44(env_2);
++      __disposeResources45(env_2);
+ 
+     }
+ 
+@@ -1129752,7 +1130778,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource44(env_3, createSpan(ctx.withName("McpFileSystemWriter.writeServerAtomic")), false);
++      const _span = __addDisposableResource45(env_3, createSpan(ctx.withName("McpFileSystemWriter.writeServerAtomic")), false);
+ 
+       const stagingName = `${
+ server.sanitizedId}
+@@ -1129857,7 +1130883,7 @@
+     }
+  finally {
+ 
+-      __disposeResources44(env_3);
++      __disposeResources45(env_3);
+ 
+     }
+ 
+@@ -1129871,7 +1130897,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource44(env_4, createSpan(ctx.withName("McpFileSystemWriter.writeServerDirectory")), false);
++      const _span = __addDisposableResource45(env_4, createSpan(ctx.withName("McpFileSystemWriter.writeServerDirectory")), false);
+ 
+       const serverDir = (0, import_node_path72.join)(opts.basePath, opts.dirName ?? server.sanitizedId);
+ 
+@@ -1130005,7 +1131031,7 @@
+     }
+  finally {
+ 
+-      __disposeResources44(env_4);
++      __disposeResources45(env_4);
+ 
+     }
+ 
+@@ -1130029,7 +1131055,7 @@
+ 
+       }
+ 
+-      const _span = __addDisposableResource44(env_5, createSpan(ctx.withName("McpFileSystemWriter.getMcpFileSystemOptions")), false);
++      const _span = __addDisposableResource45(env_5, createSpan(ctx.withName("McpFileSystemWriter.getMcpFileSystemOptions")), false);
+ 
+       const logCtx = this.getLogContext(ctx);
+ 
+@@ -1130119,7 +1131145,7 @@
+     }
+  finally {
+ 
+-      __disposeResources44(env_5);
++      __disposeResources45(env_5);
+ 
+     }
+ 
+@@ -1130226,7 +1131252,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource44(env_6, createSpan(ctx.withName("McpFileSystemWriter.buildOptionsFromSnapshots")), false);
++      const _span = __addDisposableResource45(env_6, createSpan(ctx.withName("McpFileSystemWriter.buildOptionsFromSnapshots")), false);
+ 
+       const logCtx = this.getLogContext(ctx);
+ 
+@@ -1130326,7 +1131352,7 @@
+     }
+  finally {
+ 
+-      __disposeResources44(env_6);
++      __disposeResources45(env_6);
+ 
+     }
+ 
+@@ -1130705,7 +1131731,7 @@
+ 
+ 
+ // ../packages/local-exec/dist/mcp.js
+-var __addDisposableResource45 = function(env, value, async) {
++var __addDisposableResource46 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1130767,7 +1131793,7 @@
+ }
+ ;
+ 
+-var __disposeResources45 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources46 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1131185,7 +1132211,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource45(env_1, createSpan(parentCtx.withName("LocalMcpToolExecutor.execute")), false);
++      const span = __addDisposableResource46(env_1, createSpan(parentCtx.withName("LocalMcpToolExecutor.execute")), false);
+ 
+       const ctx = span.ctx;
+ 
+@@ -1131451,7 +1132477,7 @@
+     }
+  finally {
+ 
+-      __disposeResources45(env_1);
++      __disposeResources46(env_1);
+ 
+     }
+ 
+@@ -1132018,7 +1133044,7 @@
+ 
+ 
+ // ../packages/local-exec/dist/grep.js
+-var __addDisposableResource46 = function(env, value, async) {
++var __addDisposableResource47 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1132080,7 +1133106,7 @@
+ }
+ ;
+ 
+-var __disposeResources46 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources47 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1132478,7 +1133504,7 @@
+ 
+   try {
+ 
+-    const _span = __addDisposableResource46(env_1, createSpan(ctx.withName("parseContentOutput")), false);
++    const _span = __addDisposableResource47(env_1, createSpan(ctx.withName("parseContentOutput")), false);
+ 
+     return parseRipgrepContentOutput(stdout, clientLimitLines, ripgrepHardCuttoffLines);
+ 
+@@ -1132492,7 +1133518,7 @@
+   }
+  finally {
+ 
+-    __disposeResources46(env_1);
++    __disposeResources47(env_1);
+ 
+   }
+ 
+@@ -1133088,7 +1134114,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource46(env_2, createSpan(ctx.withName("LocalGrepExecutor.runFilesMode")), false);
++      const _span = __addDisposableResource47(env_2, createSpan(ctx.withName("LocalGrepExecutor.runFilesMode")), false);
+ 
+       const args = await this.buildArgs(root, params, "files_with_matches", sortAfterRipgrep);
+ 
+@@ -1133157,7 +1134183,7 @@
+     }
+  finally {
+ 
+-      __disposeResources46(env_2);
++      __disposeResources47(env_2);
+ 
+     }
+ 
+@@ -1133171,7 +1134197,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource46(env_3, createSpan(ctx.withName("LocalGrepExecutor.runCountMode")), false);
++      const _span = __addDisposableResource47(env_3, createSpan(ctx.withName("LocalGrepExecutor.runCountMode")), false);
+ 
+       const args = await this.buildArgs(root, params, "count", sortAfterRipgrep);
+ 
+@@ -1133231,7 +1134257,7 @@
+     }
+  finally {
+ 
+-      __disposeResources46(env_3);
++      __disposeResources47(env_3);
+ 
+     }
+ 
+@@ -1133245,7 +1134271,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource46(env_4, createSpan(ctx.withName("LocalGrepExecutor.runContentMode")), false);
++      const _span = __addDisposableResource47(env_4, createSpan(ctx.withName("LocalGrepExecutor.runContentMode")), false);
+ 
+       const args = await this.buildArgs(root, params, "content", sortAfterRipgrep);
+ 
+@@ -1133320,7 +1134346,7 @@
+     }
+  finally {
+ 
+-      __disposeResources46(env_4);
++      __disposeResources47(env_4);
+ 
+     }
+ 
+@@ -1133881,7 +1134907,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource46(env_5, createSpan(ctx.withName("LocalGrepExecutor.execute")), false);
++      const _span = __addDisposableResource47(env_5, createSpan(ctx.withName("LocalGrepExecutor.execute")), false);
+ 
+       const workspacePaths = Array.isArray(this.workspacePath) ? this.workspacePath : [this.workspacePath ?? process.cwd()];
+ 
+@@ -1134280,7 +1135306,7 @@
+     }
+  finally {
+ 
+-      __disposeResources46(env_5);
++      __disposeResources47(env_5);
+ 
+     }
+ 
+@@ -1134416,7 +1135442,7 @@
+ 
+ init_dist4();
+ 
+-var __addDisposableResource47 = function(env, value, async) {
++var __addDisposableResource48 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1134478,7 +1135504,7 @@
+ }
+ ;
+ 
+-var __disposeResources47 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources48 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1134570,7 +1135596,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource47(env_1, createSpan(parentCtx.withName("LocalLsExecutor.execute")), false);
++      const span = __addDisposableResource48(env_1, createSpan(parentCtx.withName("LocalLsExecutor.execute")), false);
+ 
+       const ctx = span.ctx;
+ 
+@@ -1134744,7 +1135770,7 @@
+     }
+  finally {
+ 
+-      __disposeResources47(env_1);
++      __disposeResources48(env_1);
+ 
+     }
+ 
+@@ -1134758,7 +1135784,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource47(env_2, createSpan(parentCtx.withName("LocalLsExecutor.getDirectoryTree")), false);
++      const _span = __addDisposableResource48(env_2, createSpan(parentCtx.withName("LocalLsExecutor.getDirectoryTree")), false);
+ 
+       return await this.buildTreeFromRipgrepStream(parentCtx, directoryPath, ignoreGlobs, sandboxPolicy, DEFAULT_CHARACTER_BUDGET);
+ 
+@@ -1134772,7 +1135798,7 @@
+     }
+  finally {
+ 
+-      __disposeResources47(env_2);
++      __disposeResources48(env_2);
+ 
+     }
+ 
+@@ -1134790,7 +1135816,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource47(env_3, createSpan(ctx.withName("LocalLsExecutor.buildTreeFromRipgrepStream")), false);
++      const _span = __addDisposableResource48(env_3, createSpan(ctx.withName("LocalLsExecutor.buildTreeFromRipgrepStream")), false);
+ 
+       const normalizedRoot = (0, import_node_path77.resolve)(directoryPath);
+ 
+@@ -1134874,7 +1135900,7 @@
+     }
+  finally {
+ 
+-      __disposeResources47(env_3);
++      __disposeResources48(env_3);
+ 
+     }
+ 
+@@ -1135247,7 +1136273,7 @@
+ 
+ 
+ // ../packages/local-exec/dist/read.js
+-var __addDisposableResource48 = function(env, value, async) {
++var __addDisposableResource49 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1135309,7 +1136335,7 @@
+ }
+ ;
+ 
+-var __disposeResources48 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources49 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1136968,7 +1137994,7 @@
+ 
+     try {
+ 
+-      const _span = __addDisposableResource48(env_1, createSpan(ctx.withName("LocalReadExecutor.execute")), false);
++      const _span = __addDisposableResource49(env_1, createSpan(ctx.withName("LocalReadExecutor.execute")), false);
+ 
+       const filePath = args.path;
+ 
+@@ -1137370,7 +1138396,7 @@
+     }
+  finally {
+ 
+-      __disposeResources48(env_1);
++      __disposeResources49(env_1);
+ 
+     }
+ 
+@@ -1137432,7 +1138458,7 @@
+ 
+ init_dist4();
+ 
+-var __addDisposableResource49 = function(env, value, async) {
++var __addDisposableResource50 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1137494,7 +1138520,7 @@
+ }
+ ;
+ 
+-var __disposeResources49 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources50 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1139157,7 +1140183,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource49(env_1, createSpan(parentCtx.withName("LocalRecordScreenExecutor.execute")), false);
++      const span = __addDisposableResource50(env_1, createSpan(parentCtx.withName("LocalRecordScreenExecutor.execute")), false);
+ 
+       try {
+ 
+@@ -1139640,7 +1140666,7 @@
+     }
+  finally {
+ 
+-      __disposeResources49(env_1);
++      __disposeResources50(env_1);
+ 
+     }
+ 
+@@ -1139705,7 +1140731,7 @@
+ 
+ 
+ // ../packages/local-exec/dist/shell.js
+-var __addDisposableResource50 = function(env, value, async) {
++var __addDisposableResource51 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1139767,7 +1140793,7 @@
+ }
+ ;
+ 
+-var __disposeResources50 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources51 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1140088,7 +1141114,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource50(env_1, createSpan(parentCtx.withName("LocalShellExecutor.execute")), false);
++      const span = __addDisposableResource51(env_1, createSpan(parentCtx.withName("LocalShellExecutor.execute")), false);
+ 
+       const ctx = span.ctx;
+ 
+@@ -1140211,7 +1141237,7 @@
+     }
+  finally {
+ 
+-      __disposeResources50(env_1);
++      __disposeResources51(env_1);
+ 
+     }
+ 
+@@ -1140226,7 +1141252,7 @@
+ 
+ init_api2();
+ 
+-var __addDisposableResource51 = function(env, value, async) {
++var __addDisposableResource52 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1140288,7 +1141314,7 @@
+ }
+ ;
+ 
+-var __disposeResources51 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources52 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1140599,7 +1141625,7 @@
+ 
+       ctx.signal?.throwIfAborted();
+ 
+-      const _span = __addDisposableResource51(env_1, createSpan(ctx.withName("LocalShellStreamExecutor.execute")), false);
++      const _span = __addDisposableResource52(env_1, createSpan(ctx.withName("LocalShellStreamExecutor.execute")), false);
+ 
+       const command = args.command;
+ 
+@@ -1141266,7 +1142292,7 @@
+     }
+  finally {
+ 
+-      __disposeResources51(env_1);
++      __disposeResources52(env_1);
+ 
+     }
+ 
+@@ -1141436,7 +1142462,7 @@
+ 
+ 
+ // ../packages/local-exec/dist/services/extensibility/agent-skills-service.js
+-var __addDisposableResource52 = function(env, value, async) {
++var __addDisposableResource53 = function(env, value, async) {
+ 
+   if (value !== null && value !== void 0) {
+ 
+@@ -1141498,7 +1142524,7 @@
+ }
+ ;
+ 
+-var __disposeResources52 = /* @__PURE__ */ (function(SuppressedError2) {
++var __disposeResources53 = /* @__PURE__ */ (function(SuppressedError2) {
+ 
+   return function(env) {
+ 
+@@ -1141592,7 +1142618,7 @@
+ 
+     try {
+ 
+-      const span = __addDisposableResource52(env_1, createSpan(ctx.withName("MergedAgentSkillsService.getAllAgentSkills")), false);
++      const span = __addDisposableResource53(env_1, createSpan(ctx.withName("MergedAgentSkillsService.getAllAgentSkills")), false);
+ 
+       const allPromises = this.services.map((service) => service.getAllAgentSkills(span.ctx).catch((err) => {
+ 
+@@ -1141670,7 +1142696,7 @@
+     }
+  finally {
+ 
+-      __disposeResources52(env_1);
++      __disposeResources53(env_1);
+ 
+     }
+ 

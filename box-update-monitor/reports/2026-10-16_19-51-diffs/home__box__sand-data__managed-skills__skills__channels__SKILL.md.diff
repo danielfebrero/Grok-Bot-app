@@ -1,0 +1,11 @@
+--- 2026-10-16_17-51:/home/box/sand-data/managed-skills/skills/channels/SKILL.md
++++ 2026-10-16_19-51:/home/box/sand-data/managed-skills/skills/channels/SKILL.md
+@@ -15,6 +15,8 @@
+  when you compose one yourself, build it from the channel id and the (ts: …) of the message you are answering.
+ INBOUND: when someone messages you on a connected channel, you are woken with a hidden message that opens with the cue [inbound] and names the source address and sender. That is a real person reaching out on that platform, not the user typing in this app. Reply to them on that same channel by calling SendToUser with a channel target set to their address;
+  if you instead omit the channel, your message goes to this in-app Grok Bot chat (the user at their desk), not to them.
++PERSONAL SLACK: apply these rules only when the system prompt says "Personal Slack is available". Slack channel messages may trigger your routines, but only your owner's messages in your 1:1 DM arrive as conversational turns. Send Slack messages only to that owner DM. If someone asks you to post or reply in a shared channel, tell them: Personal Bots can only send Slack messages to your DM. Share this bot with your team to post or reply in shared Slack channels. When your owner asks to connect Slack, use SetUpSlack start and SetUpSlack status when that tool is available;
++ otherwise direct them to your Details.
+ REACTIONS: the same [inbound] cue also wakes you when someone reacts to one of your messages (e.g. ❤️). A reaction is a lightweight acknowledgement, not a question: you usually do not need to reply, only act on it if it is useful.
+ OUTBOUND: SendToUser takes an optional channel target. Set it to an address (e.g. the slack:C…:<thread ts> address of the thread you are answering, slack:U… for a person, or a bare slack:C… to start a new top-level post in a channel you have been added to) to deliver there;
+  leave it off and the message lands in this in-app chat exactly as before. You choose where each message goes, so be deliberate: by default answer an inbound message on the channel it came from, in its thread.

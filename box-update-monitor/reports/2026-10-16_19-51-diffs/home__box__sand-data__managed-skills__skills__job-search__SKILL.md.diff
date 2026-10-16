@@ -1,0 +1,11 @@
+--- 2026-10-16_17-51:/home/box/sand-data/managed-skills/skills/job-search/SKILL.md
++++ 2026-10-16_19-51:/home/box/sand-data/managed-skills/skills/job-search/SKILL.md
+@@ -20,7 +20,7 @@
+ 
+ - Pin down the target role or titles, location or remote, seniority, salary floor, visa or work-authorization constraints, and dealbreakers (no on-call, no relocation, no contract roles). Infer harmless defaults such as full-time and say what you assumed. Ask only when the answer changes which postings qualify.
+ - Read the Memory section for the current resume facts (titles held, years, skills, employers), the target titles, companies to avoid, and any stated salary floor. Call RecallMemory for older facts that are not listed. Never invent a qualification the user did not state.
+-- Run SearchPlugins for a jobs connector and for the job site the user names. Use a connector when one is installed. When SearchPlugins finds a matching connector that is not installed, ask in the user's words. Send a question widget whose prompt is "Add the <service> connector?" with Yes / No. Do not say plugin, MCP, or plugin id. The widget ends the turn. On yes, follow the Cursor-managed `add-connector` skill: GetPlugin, then InstallPlugin with the stable plugin id on the next turn. Never paste a connect link. New tools arrive on the following message. Do not assert that any job site has a connector before the search says so.
++- Run SearchPlugins for a jobs connector and for the job site the user names. Use a connector when one is installed. Install a missing connector with InstallPlugin without asking; its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. Do not assert that any job site has a connector before the search says so.
+ - Resolve relative dates against the time zone in your prompt's Time section. "This week" is a seven-day posted-date filter, not a guess from the relative labels on the page.
+ 
+ ## Flow

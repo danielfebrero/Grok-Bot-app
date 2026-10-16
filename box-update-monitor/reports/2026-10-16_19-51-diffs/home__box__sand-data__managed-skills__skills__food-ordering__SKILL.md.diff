@@ -1,0 +1,12 @@
+--- 2026-10-16_17-51:/home/box/sand-data/managed-skills/skills/food-ordering/SKILL.md
++++ 2026-10-16_19-51:/home/box/sand-data/managed-skills/skills/food-ordering/SKILL.md
+@@ -21,7 +21,8 @@
+ ## Before you start
+ 
+ - Find the preferred app. Check the Memory section of your prompt and `RecallMemory` for a stated delivery app, then this conversation. If none is recorded, pick the platform with the best coverage for their area and say which one you chose.
+-- Run `SearchPlugins` for that platform. Use a connector if one is installed. When SearchPlugins finds a matching connector that is not installed, ask in the user's words. Send a question widget whose prompt is "Add the <service> connector?" with Yes / No. Do not say plugin, MCP, or plugin id. The widget ends the turn. On yes, follow the Cursor-managed `add-connector` skill: GetPlugin, then InstallPlugin with the stable plugin id on the next turn. Never paste a connect link. New tools arrive on the following message. If the search finds nothing, dispatch a `computerUse` subagent. Do not claim a connector exists without a search hit.
++- Run `SearchPlugins` for that platform. Use a connector if one is installed. Install a missing connector with InstallPlugin without asking;
++ its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. If the search finds nothing, dispatch a `computerUse` subagent. Do not claim a connector exists without a search hit.
+ - Pull preferences from memory: dietary rules, dislikes, spice tolerance, favorite places, a tipping rule. Past orders live on the platform, not in memory;
+  the subagent reads them there.
+ - Resolve delivery versus pickup and timing (now or scheduled). Scheduled times follow the Time section of your prompt: state them in the user's zone.

@@ -1,0 +1,17 @@
+--- 2026-10-16_17-51:/home/box/sand-data/managed-skills/skills/add-connector/SKILL.md
++++ 2026-10-16_19-51:/home/box/sand-data/managed-skills/skills/add-connector/SKILL.md
+@@ -18,10 +18,10 @@
+ - **`installed=no`**: install it (step 3). If several entries plausibly match an ambiguous name, send a question widget listing only the real matches and let the user pick — never invent options.
+ - **Nothing matches**: go to step 5.
+ 
+-## 3. Read the detail, confirm, then install
+-- Call GetPlugin with the plugin id first. SearchPlugins does not resolve setup fields, so this is the only place the required fields, which of them are secret, and the full set of connectors and skills the plugin adds show up — read it before you describe the install to the user.
+-- Installing changes the user's account, so confirm with a question widget (e.g. prompt "Add the <name> connector?", options Yes / No). A question widget ends your turn — stop and wait for their answer. Installing in the same turn as the widget is refused outright, so install on your next turn.
+-- After they say yes, call InstallPlugin with the plugin id from SearchPlugins — never a display name.
++## 3. Read the detail, then install
++- Call GetPlugin with the plugin id first. SearchPlugins does not resolve setup fields, so this is the only place the required fields, which of them are secret, and the full set of connectors and skills the plugin adds show up — read it before you install.
++- Install a missing connector with InstallPlugin without asking; its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. If you ask, install on your next turn.
++- Call InstallPlugin with the plugin id from SearchPlugins, never a display name.
+ - Pass any setup fields GetPlugin lists in InstallPlugin's `values` argument, keyed by the field key it shows. Ask the user for any secret you don't already have rather than guessing, and never invent a value. (Don't use a secret-request for these — that surface writes messaging-channel credentials, not plugin setup values.)
+ - Newly installed tools and skills become available on your NEXT message, not the same one.
+ 

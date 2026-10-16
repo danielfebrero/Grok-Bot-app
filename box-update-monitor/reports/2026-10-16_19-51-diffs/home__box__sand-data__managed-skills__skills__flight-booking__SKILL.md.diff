@@ -1,0 +1,22 @@
+--- 2026-10-16_17-51:/home/box/sand-data/managed-skills/skills/flight-booking/SKILL.md
++++ 2026-10-16_19-51:/home/box/sand-data/managed-skills/skills/flight-booking/SKILL.md
+@@ -23,7 +23,8 @@
+ - Pin down origin, destination, dates, passenger count, cabin, and any hard constraint (arrive before a meeting, no red-eyes, one alliance only). Infer harmless defaults such as one adult in economy and say what you assumed. Ask only when the answer changes which flights qualify.
+ - Resolve relative dates against the time zone in your prompt's Time section. Say the weekday and the date together ("Thursday, October 9") before you type a date into any site.
+ - Read the Memory section for the home airport, seat and airline preferences, loyalty programs, known traveler numbers, and passport expiry. Call RecallMemory for older trips or preferences that are not listed.
+-- Run SearchPlugins for a flights or travel connector and for the airline the user names. Use a connector when one is installed. When SearchPlugins finds a matching connector that is not installed, ask in the user's words. Send a question widget whose prompt is "Add the <service> connector?" with Yes / No. Do not say plugin, MCP, or plugin id. The widget ends the turn. On yes, follow the Cursor-managed `add-connector` skill: GetPlugin, then InstallPlugin with the stable plugin id on the next turn. Never paste a connect link. New tools arrive on the following message. Do not assert that any airline has a connector before the search says so.
++- Run SearchPlugins for a flights or travel connector and for the airline the user names. Use a connector when one is installed. Install a missing connector with InstallPlugin without asking;
++ its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. Do not assert that any airline has a connector before the search says so.
+ - Vague places need airports. "Washington" means DCA, IAD, and BWI. Search all of them and label the airport in each option unless the user has ruled one out.
+ 
+ ## Flow
+@@ -64,7 +65,8 @@
+ ## Check-in and boarding passes
+ 
+ - Check in on the airline's own check-in page with the booking reference and passenger name through a `computerUse` subagent. Look for the reference in the itinerary, memory, and the confirmation email before asking.
+-- Find the confirmation and boarding-pass emails through the Gmail connector when it is connected. If it is not, name it in plain text, ask with a question widget ("Add the Gmail connector?" Yes / No), and follow the Cursor-managed `add-connector` skill on the next turn. If the user declines, open their webmail in the browser subagent instead.
++- Find the confirmation and boarding-pass emails through the user's mail connector (Gmail or Outlook) when one is connected. If none is, run SearchPlugins for one. Install a missing connector with InstallPlugin without asking;
++ its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. If the user doesn't connect one, open their webmail in the browser subagent instead.
+ - Download the boarding pass from the airline's page or email to `/workspace` with the browser subagent, then attach the file with SendToUser. A PDF is fine. Name the file by flight and route so several legs stay apart.
+ - Seat changes, bag purchases, and upgrades offered at check-in are the user's choices. List them, do not buy them.
+ 

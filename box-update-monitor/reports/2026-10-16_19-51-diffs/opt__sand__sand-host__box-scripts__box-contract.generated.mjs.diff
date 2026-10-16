@@ -1,0 +1,15 @@
+--- 2026-10-16_17-51:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
++++ 2026-10-16_19-51:/opt/sand/sand-host/box-scripts/box-contract.generated.mjs
+@@ -1,8 +1,11 @@
+-// @generated SignedSource<<7060165354b480605129befb53d1d6eb42f15d35b3588ed96f81d0ffc3deedce>>
++// @generated SignedSource<<db515b3b5969a9459e1fe301b6e21068cf9d003813426dd9ca367713a1a36c55>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const ENABLE_SPOOF_GPU_MARKER_PATH = "/tmp/sand-enable-spoof-gpu";
+ export const BROWSER_HARDWARE_PROFILE_MARKER_PATH = "/tmp/sand-browser-hardware-profile";
++export const BOX_BROWSER_UNGOOGLED_MARKER_PATH = "/tmp/sand-box-browser-ungoogled";
++export const BOX_EXPERIMENTS_READY_MARKER_PATH = "/tmp/sand-box-experiments-ready";
++export const BOX_BROWSER_RUNNING_PATH_PREFIX = "/tmp/sand-box-browser-running";
+ export const BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH = "/tmp/sand-browser-accept-language-en-us";
+ export const WEB_BOT_AUTH_SIGNED_CACHE_PATH = "/tmp/sand-web-bot-auth-signed.json";
+ export const WEB_BOT_AUTH_SIGNED_TTL_MS = 120000;

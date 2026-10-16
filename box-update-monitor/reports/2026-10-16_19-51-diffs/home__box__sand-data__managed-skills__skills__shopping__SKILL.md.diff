@@ -1,0 +1,12 @@
+--- 2026-10-16_17-51:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
++++ 2026-10-16_19-51:/home/box/sand-data/managed-skills/skills/shopping/SKILL.md
+@@ -21,7 +21,8 @@
+ ## Before you start
+ 
+ - Resolve what, how many, and any hard constraint (budget, brand, delivery-by date, size). Infer harmless defaults and state them. Ask only when the answer changes what to buy.
+-- Run SearchPlugins for the retailer the user named. Use a connector when one is installed. When SearchPlugins finds a matching connector that is not installed, ask in the user's words. Send a question widget whose prompt is "Add the <service> connector?" with Yes / No. Do not say plugin, MCP, or plugin id. The widget ends the turn. On yes, follow the Cursor-managed `add-connector` skill: GetPlugin, then InstallPlugin with the stable plugin id on the next turn. Never paste a connect link. New tools arrive on the following message. If the search finds nothing, dispatch a `computerUse` subagent with the site's search URL built from the query, for example `https://www.amazon.com/s?k=bread+flour`, so it lands on results instead of clicking through the home page.
++- Run SearchPlugins for the retailer the user named. Use a connector when one is installed. Install a missing connector with InstallPlugin without asking;
++ its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. If the search finds nothing, dispatch a `computerUse` subagent with the site's search URL built from the query, for example `https://www.amazon.com/s?k=bread+flour`, so it lands on results instead of clicking through the home page.
+ - Read the Memory section for the user's preferred retailer, membership status, default shipping address, sizes, brand rules, and anything they have said about upsells or delivery speed. Call RecallMemory for a past order they mention.
+ - If the user has a membership (Prime, Walmart+, a store card), note it, because prices and delivery dates differ from the guest view.
+ 

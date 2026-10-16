@@ -1,0 +1,12 @@
+--- 2026-10-16_17-51:/home/box/sand-data/managed-skills/skills/accommodation-booking/SKILL.md
++++ 2026-10-16_19-51:/home/box/sand-data/managed-skills/skills/accommodation-booking/SKILL.md
+@@ -22,7 +22,8 @@
+ - Pin down the destination or neighborhood, check-in and check-out dates, the guest count with children's ages, the budget as a total or per night, and every hard constraint (entire place or a room, pets, accessibility, parking, kitchen, cancellation flexibility). Infer harmless defaults such as two adults and say what you assumed. Ask only when the answer changes which listings qualify.
+ - Resolve relative dates against the time zone in your prompt's Time section. Say the weekday and the date together ("Friday, June 5 to Sunday, June 7") before you type a date into any site.
+ - Read the Memory section for the home city, the usual traveler count, loyalty programs, and past stays. Call RecallMemory for older trips or preferences that are not listed.
+-- Run SearchPlugins for a travel or lodging connector and for the site the user names. Use a connector when one is installed. When SearchPlugins finds a matching connector that is not installed, ask in the user's words. Send a question widget whose prompt is "Add the <service> connector?" with Yes / No. Do not say plugin, MCP, or plugin id. The widget ends the turn. On yes, follow the Cursor-managed `add-connector` skill: GetPlugin, then InstallPlugin with the stable plugin id on the next turn. Never paste a connect link. New tools arrive on the following message. Do not assert that any lodging site has a connector before the search says so.
++- Run SearchPlugins for a travel or lodging connector and for the site the user names. Use a connector when one is installed. Install a missing connector with InstallPlugin without asking;
++ its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector. Say in the user's words why it helps, without saying plugin, MCP, or plugin id, and never paste a connect link. Do not assert that any lodging site has a connector before the search says so.
+ 
+ ## Flow
+ 
