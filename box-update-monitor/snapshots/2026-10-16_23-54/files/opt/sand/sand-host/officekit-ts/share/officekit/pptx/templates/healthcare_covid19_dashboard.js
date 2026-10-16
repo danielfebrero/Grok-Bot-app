@@ -1,0 +1,1743 @@
+/**
+ * Medical Dashboard — 40-slide deck rebuilt with pptxgenjs.
+ * Run: node 0589275e-6eaf-4607-b5e4-2a9e1b6048cc_grok_final.js
+ */
+'use strict';
+
+const path = require('path');
+const PptxGenJS = require('pptxgenjs');
+
+/* ------------------------------------------------------------------ theme */
+
+const RED = 'E22E3F'; // accent1
+const RED2 = 'EE423E'; // accent2
+const ORG1 = 'EE583A'; // accent3
+const ORG2 = 'ED753F'; // accent4
+const ORG3 = 'EB8539'; // accent5
+const ORG4 = 'F5922F'; // accent6
+const ACCENT = [RED, RED2, ORG1, ORG2, ORG3, ORG4];
+const DARK = '2C2C2C'; // tx1
+const WHITE = 'FFFFFF';
+const GREY = '969696'; // tx1 @ 50% luminance (subtitles)
+
+const HEAD = 'Lato Black'; // major latin font
+const BODY = 'Open Sans Light'; // minor latin font
+
+// pptxgenjs mutates the shadow object it is handed, so hand out a fresh one every time
+function shadow() {
+    return { type: 'outer', color: '000000', opacity: 0.15, blur: 6, offset: 1, angle: 45 };
+}
+
+let pptx; // set in build()
+let S; // pptx.ShapeType shorthand
+
+/* ---------------------------------------------------------------- helpers */
+
+/** Rounded card. `r` is the corner radius in inches. */
+function card(s, x, y, w, h, fill, r, o) {
+    s.addShape(S.roundRect, Object.assign({
+        x: x, y: y, w: w, h: h, rectRadius: r,
+        fill: fill === null ? { type: 'none' } : { color: fill },
+        line: { type: 'none' }
+    }, o));
+}
+
+function rect(s, x, y, w, h, fill, o) {
+    s.addShape(S.rect, Object.assign({ x: x, y: y, w: w, h: h, fill: { color: fill }, line: { type: 'none' } }, o));
+}
+
+function oval(s, x, y, w, h, fill, o) {
+    s.addShape(S.ellipse, Object.assign({
+        x: x, y: y, w: w, h: h,
+        fill: fill === null ? { type: 'none' } : { color: fill },
+        line: { type: 'none' }
+    }, o));
+}
+
+/** Circle given its centre. */
+function dot(s, cx, cy, d, fill, o) {
+    oval(s, cx - d / 2, cy - d / 2, d, d, fill, o);
+}
+
+function hline(s, x, y, w, color, width, transparency) {
+    s.addShape(S.line, { x: x, y: y, w: w, h: 0, line: { color: color, width: width || 1, transparency: transparency || 0 } });
+}
+
+function vline(s, x, y, h, color, width, transparency) {
+    s.addShape(S.line, { x: x, y: y, w: 0, h: h, line: { color: color, width: width || 1, transparency: transparency || 0 } });
+}
+
+/** Text box. Everything defaults to the deck's body style. */
+function txt(s, text, o) {
+    s.addText(text, Object.assign({ fontFace: BODY, fontSize: 12, color: DARK, valign: 'top' }, o));
+}
+
+/** Bold heading (Lato Black). */
+function head(s, text, o) {
+    txt(s, text, Object.assign({ fontFace: HEAD, bold: true, valign: 'bottom' }, o));
+}
+
+/** "Title" + light sub-caption pair used all over the deck. */
+function heading(s, x, y, w, title, sub, o) {
+    o = o || {};
+    head(s, title, { x: x, y: y, w: w, h: 0.337, fontSize: o.size || 14, color: o.color || DARK });
+    if (sub) txt(s, sub, { x: x, y: y + (o.gap || 0.337), w: w, h: 0.303, color: o.subColor || DARK });
+}
+
+/** Rounded pill badge with centred bold caption. */
+function pill(s, x, y, w, h, text, o) {
+    o = o || {};
+    card(s, x, y, w, h, o.fill || RED, h / 2, {
+        line: o.line ? { color: o.line, width: 1 } : { type: 'none' },
+        shadow: o.shadow ? shadow() : undefined
+    });
+    txt(s, text, {
+        x: x, y: y, w: w, h: h, align: 'center', valign: 'middle', margin: 0,
+        fontFace: HEAD, bold: true, fontSize: o.size || 12, color: o.color || WHITE
+    });
+}
+
+/** White rounded value box with a small caption underneath (KPI tiles). */
+function numBox(s, o) {
+    const w = o.w || 0.487, h = o.h || 0.611, capW = o.capW || 1.091;
+    card(s, o.x, o.y, w, h, WHITE, 0.06, { shadow: shadow() });
+    txt(s, o.value, {
+        x: o.x, y: o.y, w: w, h: h, align: 'center', valign: 'middle', margin: 0,
+        fontFace: HEAD, fontSize: o.size || 18, color: o.valueColor || DARK
+    });
+    if (o.cap) {
+        txt(s, o.cap, {
+            x: o.x + (w - capW) / 2, y: o.y + h + 0.029, w: capW, h: o.capH || 0.505,
+            align: 'center', margin: 2.8, color: o.capColor || DARK
+        });
+    }
+}
+
+/** Small round icon badge with a white cross glyph. */
+function iconCircle(s, x, y, d, fill, glyph) {
+    oval(s, x, y, d, d, fill);
+    glyphMark(s, x + d / 2, y + d / 2, d * 0.46, glyph || 'plus', WHITE);
+}
+
+/** Simple vector glyph standing in for the deck's medical pictograms. */
+function glyphMark(s, cx, cy, size, kind, color) {
+    const h = size / 2;
+    if (kind === 'plus') {
+        s.addShape(S.mathPlus, { x: cx - h, y: cy - h, w: size, h: size, fill: { color: color }, line: { type: 'none' } });
+    } else if (kind === 'dot') {
+        s.addShape(S.star5, { x: cx - h, y: cy - h, w: size, h: size, fill: { color: color }, line: { type: 'none' } });
+    } else if (kind === 'bar') { // stands in for microscope / instrument icons
+        s.addShape(S.roundRect, {
+            x: cx - size * 0.09, y: cy - h, w: size * 0.18, h: size * 0.8, rectRadius: 0.02,
+            fill: { color: color }, line: { type: 'none' }, rotate: 22
+        });
+        s.addShape(S.roundRect, {
+            x: cx - size * 0.4, y: cy + size * 0.34, w: size * 0.8, h: size * 0.12, rectRadius: 0.02,
+            fill: { color: color }, line: { type: 'none' }
+        });
+    } else if (kind === 'ring') {
+        oval(s, cx - h * 0.82, cy - h * 0.82, size * 0.82, size * 0.82, null, { line: { color: color, width: size * 13 } });
+    } else if (kind === 'person') {
+        dot(s, cx, cy - size * 0.22, size * 0.42, color);
+        s.addShape(S.chord, { x: cx - h, y: cy - size * 0.1, w: size, h: size * 0.72, fill: { color: color }, line: { type: 'none' }, angleRange: [180, 0] });
+    } else if (kind === 'syringe') {
+        s.addShape(S.rect, { x: cx - h, y: cy - size * 0.09, w: size, h: size * 0.18, fill: { color: color }, line: { type: 'none' }, rotate: 315 });
+    } else if (kind === 'virus') { // hub with radiating spikes
+        dot(s, cx, cy, size * 0.56, color);
+        for (let i = 0; i < 12; i++) {
+            const a = i * Math.PI / 6;
+            dot(s, cx + Math.cos(a) * size * 0.38, cy + Math.sin(a) * size * 0.38, size * 0.16, color);
+        }
+    } else if (kind === 'people') {
+        [-0.26, 0, 0.26].forEach(function (dx, i) {
+            const d = i === 1 ? 1 : 0.82;
+            dot(s, cx + dx * size, cy - size * 0.2, size * 0.3 * d, color);
+            s.addShape(S.chord, {
+                x: cx + dx * size - size * 0.28 * d, y: cy - size * 0.04, w: size * 0.56 * d, h: size * 0.5 * d,
+                fill: { color: color }, line: { type: 'none' }, angleRange: [180, 0]
+            });
+        });
+    } else if (kind === 'bed') { // headboard + mattress
+        s.addShape(S.round2SameRect, { x: cx - h, y: cy - size * 0.28, w: size * 0.55, h: size * 0.34, fill: { color: color }, line: { type: 'none' } });
+        s.addShape(S.round2SameRect, { x: cx - h, y: cy + size * 0.02, w: size, h: size * 0.3, fill: { color: color }, line: { type: 'none' } });
+    } else if (kind === 'money') { // coin
+        dot(s, cx, cy, size, color);
+    } else if (kind === 'tomb') {
+        s.addShape(S.round2SameRect, { x: cx - size * 0.32, y: cy - h, w: size * 0.64, h: size * 0.85, fill: { color: color }, line: { type: 'none' } });
+        rect(s, cx - h, cy + size * 0.35, size, size * 0.15, color);
+    }
+}
+
+/** Decorative background pictogram (light grey silhouette). */
+function ghost(s, x, y, w, h, transparency) {
+    oval(s, x, y, w, h, DARK, { fill: { color: DARK, transparency: transparency || 80 } });
+}
+
+/** Placeholder block standing in for a bitmap/vector artwork region. */
+function artPlaceholder(s, x, y, w, h, label, color, transparency) {
+    card(s, x, y, w, h, color || DARK, 0.08, {
+        fill: { color: color || DARK, transparency: transparency === undefined ? 90 : transparency }
+    });
+    if (label) txt(s, label, { x: x, y: y + h / 2 - 0.15, w: w, h: 0.3, align: 'center', color: GREY, fontSize: 10 });
+}
+
+/** Progress bar: grey track, coloured fill, end dot and value pill. */
+function bar(s, x, y, w, fillW, color, label, o) {
+    o = o || {};
+    hline(s, x, y, w, DARK, 10, 90);
+    hline(s, x, y, fillW, color, 10);
+    dot(s, x + fillW - 0.072 + 0.1015, y + 0.0015, 0.203, color);
+    const px = o.pillX !== undefined ? o.pillX : x + fillW + 0.161;
+    pill(s, px, y - 0.206, 0.853, 0.411, label, { fill: WHITE, color: DARK, size: 18, shadow: true });
+}
+
+/** Marker + connector + value pill callout used on the line/column charts. */
+function callout(s, x, y, label, dir, color) {
+    color = color || RED;
+    dot(s, x, y, 0.331, color);
+    if (dir === 'r') {
+        hline(s, x + 0.165, y + 0.166, 0.613, DARK, 1, 90);
+        dot(s, x + 0.911 + 0.1015, y + 0.064 + 0.1015, 0.203, color);
+        pill(s, x + 1.144, y - 0.205, 0.853, 0.411, label, { fill: WHITE, color: DARK, size: 18, shadow: true });
+    } else if (dir === 'u') {
+        vline(s, x + 0.165, y - 0.157, 0.157, DARK, 1, 90);
+        dot(s, x + 0.165, y - 0.259, 0.203, color);
+        pill(s, x - 0.261, y - 0.810, 0.853, 0.411, label, { fill: WHITE, color: DARK, size: 18, shadow: true });
+    } else {
+        vline(s, x + 0.165, y + 0.331, 0.157, DARK, 1, 90);
+        dot(s, x + 0.165, y + 0.590, 0.203, color);
+        pill(s, x - 0.261, y + 0.731, 0.853, 0.411, label, { fill: WHITE, color: DARK, size: 18, shadow: true });
+    }
+}
+
+/**
+ * Concentric "dial": soft halo, thin track ring, thick coloured progress arc,
+ * filled hub and centred value/label.
+ */
+function dial(s, o) {
+    const x = o.x, y = o.y, d = o.d;
+    const cx = x + d / 2, cy = y + d / 2;
+    const ringD = o.ringD, hubD = o.hubD;
+    const from = o.from === undefined ? 243.1 : o.from;
+    const to = o.to === undefined ? 116.2 : o.to;
+    if (o.halo !== false) oval(s, x, y, d, d, o.haloColor || DARK, { fill: { color: o.haloColor || DARK, transparency: o.haloAlpha === undefined ? 95 : o.haloAlpha } });
+    oval(s, cx - ringD / 2, cy - ringD / 2, ringD, ringD, null, {
+        line: { color: o.trackColor || DARK, transparency: o.trackAlpha === undefined ? 80 : o.trackAlpha, width: o.trackW || 1 }
+    });
+    s.addShape(S.arc, {
+        x: cx - ringD / 2, y: cy - ringD / 2, w: ringD, h: ringD,
+        fill: { type: 'none' }, line: { color: o.arcColor, width: o.arcW || 10 }, angleRange: [from, to]
+    });
+    if (o.endDot) {
+        const a = to * Math.PI / 180;
+        dot(s, cx + Math.cos(a) * ringD / 2, cy + Math.sin(a) * ringD / 2, o.endDotD || 0.245, o.endDot);
+    }
+    oval(s, cx - hubD / 2, cy - hubD / 2, hubD, hubD, o.hubColor);
+    if (o.value) {
+        txt(s, o.value, {
+            x: cx - hubD / 2, y: cy - hubD / 2 + (o.valueDy === undefined ? 0.132 : o.valueDy), w: hubD, h: o.valueH || 0.37,
+            align: 'center', valign: 'bottom', fontFace: HEAD, bold: true, fontSize: o.valueSize || 16, color: o.textColor || WHITE
+        });
+    }
+    if (o.label) {
+        txt(s, o.label, {
+            x: cx - hubD / 2, y: cy - hubD / 2 + (o.labelDy === undefined ? 0.466 : o.labelDy), w: hubD, h: 0.303,
+            align: 'center', fontSize: o.labelSize || 10, color: o.textColor || WHITE
+        });
+    }
+}
+
+/** Half-circle speedometer with tick marks, scale numbers and a needle. */
+function gauge(s, x, y, w, o) {
+    const k = w / 2.382; // reference gauge is 2.382" wide
+    const h = 1.813 * k;
+    const ax = x + 0.1634 * w, ay = y + 0.2081 * h, ad = 0.6027 * w;
+    const cx = ax + ad / 2, cy = ay + ad / 2;
+    (o.arcs || []).forEach(function (a) {
+        s.addShape(S.arc, {
+            x: ax, y: ay, w: ad, h: ad, fill: { type: 'none' },
+            line: { color: a.color, width: a.w, transparency: a.transparency || 0 }, angleRange: [a.from, a.to]
+        });
+    });
+    for (let i = 0; i <= 18; i++) { // scale ticks
+        const a = Math.PI + (i / 18) * Math.PI;
+        const r0 = 0.375 * w, r1 = 0.408 * w;
+        s.addShape(S.line, {
+            x: cx + Math.cos(a) * r0, y: cy + Math.sin(a) * r0, w: Math.cos(a) * (r1 - r0), h: Math.sin(a) * (r1 - r0),
+            line: { color: DARK, width: 0.75, transparency: 40 }
+        });
+    }
+    [['0', 0.0, 0.5354, 0.1083], ['25', 0.0752, 0.2044, 0.1319], ['50', 0.3938, 0.0, 0.1319],
+    ['75', 0.7519, 0.2044, 0.1319], ['100', 0.8095, 0.5354, 0.1905]].forEach(function (t) {
+        txt(s, t[0], { x: x + t[1] * w, y: y + t[2] * h, w: t[3] * w, h: 0.1207 * h, fontSize: 7, align: 'center', margin: 0, color: o.scaleColor || DARK });
+    });
+    const ang = (o.needle === undefined ? 47 : o.needle) * Math.PI / 180; // clockwise from 12 o'clock
+    const len = 0.819 * k, nw = 0.079 * k;
+    s.addShape(S.triangle, {
+        x: cx + Math.sin(ang) * len / 2 - nw / 2, y: cy - Math.cos(ang) * len / 2 - len / 2,
+        w: nw, h: len, fill: { color: DARK }, line: { type: 'none' }, rotate: o.needle === undefined ? 47 : o.needle
+    });
+    dot(s, cx, cy, 0.104 * w, DARK);
+}
+
+/** White rounded square holding the slide number. */
+function slideNum(s, n, variant) {
+    const geo = variant === 1 ? [12.801, 0.182, 0.355] : variant === 2 ? [12.939, 0.101, 0.394] : [12.687, 0.182, 0.395];
+    card(s, geo[0], geo[1], geo[2], geo[2], WHITE, 0.09, { shadow: shadow() });
+    txt(s, String(n), { x: geo[0], y: geo[1], w: geo[2], h: geo[2], align: 'center', valign: 'middle', margin: 0, fontSize: 9 });
+}
+
+/** Standard slide title + italic sub-title (layout placeholders in the source). */
+function slideTitle(s, title, sub) {
+    s.addText(title, { x: 0.917, y: 0.576, w: 11.5, h: 0.803, valign: 'bottom', fontFace: HEAD, bold: true, fontSize: 32, color: DARK });
+    txt(s, sub === undefined ? 'Lorem ipsum' : sub, { x: 0.905, y: 1.38, w: 11.524, h: 0.364, fontSize: 10, italic: true, color: GREY });
+}
+
+/* ------------------------------------------------------------ chart bases */
+
+const CAT_BASE = {
+    showLegend: false, valAxisHidden: true,
+    catAxisLineShow: false, catAxisMajorTickMark: 'none', valAxisMajorTickMark: 'none',
+    catGridLine: { style: 'none' }, valGridLine: { style: 'none' },
+    catAxisLabelFontFace: BODY, catAxisLabelFontSize: 10, catAxisLabelColor: DARK,
+    chartColors: [RED]
+};
+
+function chartOpts(extra) {
+    return Object.assign({}, CAT_BASE, extra);
+}
+
+function series(name, cats, vals) {
+    return { name: name, labels: cats, values: vals };
+}
+
+/* ------------------------------------------------------------ shared data */
+
+const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEK_VALS = [4.3, 2.5, 3.5, 4.5, 3, 2, 4];
+const WEEK_VALS2 = [3, 1, 3, 4.2, 2, 1.9, 3];
+const WEEKS4 = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+const DEPTS = ['Dermatology', 'Cardilogy', 'Neurology', 'Oncology', 'Surgery', 'Gynecology', 'Orthopaedics'];
+const DEPT_VALS = [45, 35, 27, 49, 15, 60, 10];
+const DAYS31 = Array.from({ length: 31 }, function (_, i) { return String(i + 1); });
+const MONTH_VALS = [2301, 4211, 3011, 2198, 1987, 2546, 3819, 4502, 3302, 1520, 6789, 4563, 2458, 4011, 2301,
+    4211, 3011, 2198, 1987, 2546, 3819, 4502, 3302, 1520, 6789, 4563, 2458, 4011, 1987, 2546, 3819];
+const LOREM = 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled book.\u00a0';
+const LOREM_SHORT = 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.\u00a0';
+const LOREM_TINY = 'Lorem Ipsum has been the industry\'s standard dummy text.\u00a0';
+const LOREM_LONG = 'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. ';
+const LOREM_SIMPLE = 'Lorem Ipsum\u00a0is simply dummy text of the printing and typesetting industry. ';
+
+/* --------------------------------------------------- composite components */
+
+/** Red banner with "14 807 / Total Tested" and the MON..SUN day strip. */
+function weekHeader(s) {
+    card(s, 0.06, 0.053, 13.214, 2.043, RED, 0.191);
+    card(s, 5.274, 0.495, 0.738, 1.358, WHITE, 0.369);
+    head(s, '14 807', { x: 1.051, y: 0.395, w: 4.592, h: 0.404, fontSize: 18, color: WHITE });
+    txt(s, 'Total Tested', { x: 1.051, y: 0.784, w: 4.592, h: 0.303, color: WHITE });
+    s.addShape(S.chevron, { x: 0.633, y: 0.452, w: 0.167, h: 0.332, fill: { color: WHITE }, line: { type: 'none' }, rotate: 180 });
+    ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].forEach(function (d, i) {
+        const x = 3.87 + i * 1.2272;
+        const color = i === 1 ? DARK : WHITE;
+        txt(s, d, { x: x, y: 0.796, w: 1.091, h: 0.303, align: 'center', valign: 'bottom', margin: 2.8, color: color });
+        txt(s, '0' + (i + 1), { x: x, y: 1.138, w: 1.091, h: 0.37, align: 'center', margin: 2.8, fontSize: 16, fontFace: HEAD, color: color });
+    });
+}
+
+/** Big coloured KPI card: value, caption and a small badge. */
+function statCard(s, x, y, o) {
+    card(s, x, y, 3.571, 1.515, o.fill, 0.19);
+    head(s, o.value, { x: x + 0.32, y: y + 0.158, w: 1.865, h: 0.404, fontSize: 18, color: WHITE });
+    txt(s, o.label, { x: x + 0.32, y: y + 0.547, w: 1.865, h: 0.303, color: WHITE });
+    pill(s, x + 0.393, y + 0.951, o.badgeW || 0.821, 0.335, o.badge,
+        { fill: WHITE, line: o.badgeLine || o.fill, color: o.badgeColor || DARK, shadow: true });
+    glyphMark(s, x + 2.935, y + 0.755, 0.75, o.glyph || 'ring', WHITE);
+}
+
+/** Red "APR" banner card (Health Activity / Patient Satisfaction / Healthcare). */
+function bannerCard(s, o) {
+    card(s, 0.918, 1.88, 4.37, 2.582, RED, 0.258);
+    head(s, o.title, { x: 1.184, y: 2.113, w: 2.508, h: 0.337, fontSize: 14, color: WHITE });
+    txt(s, 'Lorem ipsum is simply text.', { x: 1.426, y: 2.504, w: 3.67, h: 0.302, color: WHITE });
+    s.addShape(S.triangle, { x: 1.279, y: 2.618, w: 0.158, h: 0.089, fill: { color: WHITE }, line: { type: 'none' }, rotate: 180 });
+    head(s, o.value, { x: 1.279, y: 3.121, w: 1.632, h: 0.64, fontSize: 32, color: WHITE, align: 'center' });
+    txt(s, 'Lorem ipsum', { x: 1.279, y: 3.745, w: 1.632, h: 0.303, align: 'center', color: WHITE });
+    pill(s, 4.265, 2.111, 0.831, 0.335, 'APR', { fill: WHITE, line: RED, color: DARK, shadow: true });
+    if (o.glyph) glyphMark(s, o.glyph[0], o.glyph[1], o.glyph[2], o.glyph[3], WHITE);
+}
+
+/** Tall white profile card (Doctor / Patient). */
+function profileCard(s, o) {
+    card(s, 0.92, 1.88, 3.63, 5.023, WHITE, 0.269, { shadow: shadow() });
+    head(s, o.kind, { x: 1.184, y: o.titleY, w: 3.204, h: 0.337, fontSize: 14 });
+    head(s, o.name, { x: 1.714, y: 4.226, w: 1.999, h: 0.337, fontSize: 14, align: 'center' });
+    txt(s, o.role, { x: 1.714, y: 4.563, w: 1.999, h: 0.303, align: 'center' });
+    hline(s, 0.917, 5.135, 3.633, DARK, 1, 90);
+    hline(s, 0.917, 6.385, 3.633, DARK, 1, 90);
+    txt(s, LOREM, { x: 1.079, y: 5.358, w: 3.309, h: 0.909, align: 'center' });
+    s.addShape(S.heart, { x: 1.714, y: 6.587, w: 0.166, h: 0.142, fill: { color: 'FF0000' }, line: { type: 'none' } });
+    txt(s, 'Lorem ipsum is simply text', { x: 1.88, y: 6.524, w: 1.96, h: 0.269, align: 'center', fontSize: 10 });
+}
+
+/** Row of round icons above white value tiles (bed numbers, doctors, ...). */
+function kpiRow(s, y, items) {
+    items.forEach(function (it) {
+        const w = it.w || 0.487;
+        iconCircle(s, it.x + w / 2 - 0.3485, y - 0.796, 0.697, it.color, it.glyph);
+        numBox(s, { x: it.x, y: y, w: w, value: it.value, cap: it.cap });
+    });
+}
+
+/** Vertical red rail with icon buttons down the left edge (slides 30-33). */
+function sideRail(s, month, glyphs) {
+    rect(s, 0, 0, 1.118, 7.5, RED);
+    (glyphs || ['person', 'dot', 'bar', 'syringe']).forEach(function (g, i) {
+        oval(s, 0.345, 2.79 + i * 0.727, 0.406, 0.406, WHITE);
+        glyphMark(s, 0.548, 2.993 + i * 0.727, 0.19, g, DARK);
+    });
+    oval(s, 0.51, 1.049, 1.305, 1.305, RED);
+    glyphMark(s, 1.162, 1.701, 0.5, 'plus', WHITE);
+    txt(s, month, { x: 0.109, y: 0.328, w: 0.915, h: 0.303, align: 'center', color: WHITE });
+    txt(s, [{ text: 'Lorem ', options: { italic: true } }, { text: 'Ipsum has been the industry\'s standard dummy text ever since the 1500s.', options: { italic: true } }],
+        { x: 1.387, y: 0.33, w: 6.457, h: 0.303 });
+    hline(s, 1.118, 0.879, 11.297, DARK, 1, 90);
+}
+
+/** Rounded red rail with a big white circle badge (slides 36-38, 40). */
+function leftRail(s, o) {
+    const rx = o.x, cx = o.mirror ? rx - 0.595 : rx + 0.4;
+    card(s, rx, 0.316, 1.257, o.h || 5.379, RED, 0.188);
+    glyphMark(s, rx + 0.64, 0.869, 0.4, o.topGlyph || 'people', WHITE);
+    oval(s, cx, 1.311, 1.524, 1.524, WHITE);
+    head(s, o.value, { x: cx, y: o.label === false ? 1.715 : 1.659, w: 1.524, h: 0.64, fontSize: 32, align: 'center' });
+    if (o.label !== false) txt(s, 'Patients', { x: cx - 0.003, y: 2.35, w: 1.527, h: 0.303, align: 'center' });
+    (o.glyphs || ['person', 'bar', 'syringe']).forEach(function (g, i) {
+        glyphMark(s, rx + 0.628, 3.355 + i * 0.727, 0.38, g, WHITE);
+    });
+    if (o.badge) {
+        pill(s, rx + 0.157, 6.159, 1.011, 0.335, o.badge, { fill: ORG4 });
+        txt(s, 'Lorem ipsum', { x: rx + 0.041, y: 6.506, w: 1.243, h: 0.303, align: 'center', italic: true });
+    }
+}
+
+/** "69% (+1,5%)" star metric block. */
+function starMetric(s, x, y, o) {
+    o = o || {};
+    oval(s, x, y, 0.314, 0.314, RED2, { fill: { color: o.iconColor || RED2, transparency: 80 } });
+    glyphMark(s, x + 0.157, y + 0.157, 0.17, 'dot', DARK);
+    s.addText([
+        { text: o.value || '69% ', options: { fontFace: HEAD, bold: true, fontSize: 18, color: DARK } },
+        { text: o.delta || '(+1,5%)', options: { fontFace: HEAD, bold: true, fontSize: 12, color: RED } }
+    ], { x: x + 0.374, y: y - 0.059, w: 1.422, h: 0.404, valign: 'bottom' });
+    if (o.sub) txt(s, o.sub, { x: x, y: y + 0.451, w: 1.975, h: 0.303 });
+}
+
+/* ------------------------------------------------------------ slides 1-10 */
+
+/** Title slide: red band, gradient panel and scattered medical pictograms. */
+function slide01(s) {
+    // scattered background pictograms: x, y, w, h, glyph
+    const icons = [
+        [12.435, 5.235, 0.635, 0.773, 'bar'], [5.772, 1.133, 3.005, 3.039, 'virus'],
+        [10.078, 5.114, 1.392, 1.408, 'ring'], [0.654, 0.255, 2.089, 2.544, 'people'],
+        [3.144, 6.032, 0.551, 0.566, 'person'], [6.294, 6.358, 0.851, 1.037, 'person'],
+        [9.919, 0.307, 0.72, 1.382, 'bar'], [8.807, 0.419, 0.323, 0.352, 'person'],
+        [12.632, 0.511, 0.561, 0.105, 'syringe'], [4.106, 0.753, 1.011, 1.011, 'plus'],
+        [1.538, 5.931, 0.849, 1.264, 'bar'], [4.172, 5.896, 0.87, 0.948, 'person'],
+        [8.379, 6.347, 1.749, 0.492, 'ring'], [2.992, 0.555, 0.838, 0.236, 'syringe'],
+        [0.249, 5.898, 0.838, 0.236, 'syringe'], [12.704, 1.23, 0.403, 0.491, 'dot'],
+        [0.246, 6.836, 0.398, 0.403, 'virus'], [5.809, 5.877, 0.313, 0.264, 'dot'],
+        [7.071, 0.305, 0.631, 0.533, 'dot'], [12.647, 6.993, 0.299, 0.252, 'dot'],
+        [7.857, 5.753, 0.637, 0.637, 'plus'], [2.895, 7.048, 0.359, 0.359, 'plus'],
+        [11.712, 0.192, 0.359, 0.359, 'plus'], [12.85, 3.82, 0.359, 0.359, 'plus'],
+        [0.127, 0.149, 0.359, 0.359, 'plus'], [10.725, 6.813, 0.323, 0.352, 'person'],
+        [3.254, 1.327, 0.323, 0.352, 'person'], [1.139, 6.178, 0.323, 0.352, 'person'],
+        [11.276, 0.783, 0.56, 0.833, 'bar'], [5.303, 6.788, 0.446, 0.565, 'ring'],
+        [5.56, 0.174, 0.446, 0.565, 'ring'], [11.909, 6.16, 0.446, 0.565, 'ring'],
+        [9.076, 1.448, 0.299, 0.252, 'dot']
+    ];
+    icons.forEach(function (p) {
+        glyphMark(s, p[0] + p[2] / 2, p[1] + p[3] / 2, Math.min(p[2], p[3]), p[4], 'D6D6D6');
+    });
+
+    card(s, 0, 1.9, 12.686, 3.7, RED, 0.237);
+    // gradient panel (accent2 -> accent6, 135deg) faked with interpolated bands
+    const bands = 32;
+    for (let i = 0; i < bands; i++) {
+        const t = i / (bands - 1);
+        const mix = function (a, b) { return Math.round(a + (b - a) * t).toString(16).padStart(2, '0'); };
+        rect(s, 0 + (3.805 / bands) * i, 1.9, 3.805 / bands + 0.01, 3.7,
+            (mix(0xEE, 0xF5) + mix(0x42, 0x92) + mix(0x3E, 0x2F)).toUpperCase());
+    }
+    vline(s, 3.805, 2.432, 2.636, WHITE, 0.5);
+    s.addText([
+        { text: 'MEDICAL ', options: { fontFace: HEAD, fontSize: 66, color: WHITE, breakLine: true } },
+        { text: 'Dashboard', options: { fontFace: BODY, fontSize: 60, color: WHITE } }
+    ], { x: 4.45, y: 2.639, w: 5.688, h: 2.221, valign: 'middle', lineSpacingMultiple: 0.9 });
+    txt(s, 'POWERPOINT PRESENTATION TEMPLATE', { x: 1.131, y: 4.017, w: 2.188, h: 0.808, align: 'right', fontSize: 14, color: WHITE });
+    oval(s, 10.452, 3.244, 1.011, 1.011, null, { line: { color: WHITE, width: 3 } });
+    glyphMark(s, 10.958, 3.75, 0.55, 'plus', WHITE);
+}
+
+/** Covid-19 dashboard: red panel with white card, 91% tile and line chart. */
+function slide02(s) {
+    card(s, 4.922, 1.083, 7.493, 5.333, RED, 0.25);
+    card(s, 5.537, 2.164, 6.642, 4.0, WHITE, 0.188);
+    s.addText([
+        { text: 'Covid-19 ', options: { fontFace: BODY, fontSize: 32, color: DARK, breakLine: true } },
+        { text: 'Dashboard', options: { fontFace: HEAD, bold: true, fontSize: 32, color: DARK } }
+    ], { x: 0.918, y: 2.879, w: 3.358, h: 1.178, valign: 'bottom', lineSpacingMultiple: 0.9 });
+    txt(s, LOREM, { x: 0.918, y: 4.391, w: 3.358, h: 0.909 });
+    pill(s, 1.008, 2.443, 1.009, 0.335, '+5,2%');
+    s.addText([
+        { text: 'Lorem Ipsum\u00a0is simply dummy text : ', options: { fontFace: BODY, fontSize: 12, italic: true, color: WHITE } },
+        { text: '1 859 260 (57.8%)', options: { fontFace: HEAD, bold: true, fontSize: 24, color: WHITE } }
+    ], { x: 5.776, y: 1.386, w: 5.999, h: 0.505, valign: 'top' });
+
+    card(s, 5.149, 2.814, 1.426, 1.244, ORG4, 0.249);
+    head(s, '91%', { x: 5.255, y: 3.002, w: 1.228, h: 0.505, fontSize: 24, color: WHITE, align: 'center' });
+    txt(s, 'Corona Tested', { x: 5.255, y: 3.47, w: 1.228, h: 0.505, align: 'center', color: WHITE });
+    numBox(s, { x: 7.007, y: 2.972, value: '27', cap: 'DAYS', capW: 0.593, capH: 0.303 });
+    numBox(s, { x: 7.69, y: 2.972, value: '06', cap: 'HOURS', capW: 0.67, capH: 0.303 });
+    txt(s, LOREM, { x: 8.629, y: 2.981, w: 3.358, h: 0.909 });
+
+    s.addChart(pptx.ChartType.line, [series('stats', WEEK, WEEK_VALS)], chartOpts({
+        x: 6.247, y: 4.176, w: 5.528, h: 1.676,
+        lineDataSymbol: 'circle', lineDataSymbolSize: 10, lineDataSymbolLineSize: 0, lineSize: 2
+    }));
+}
+
+/** Mirrored version of slide 2 with a column chart and syringe badge. */
+function slide03(s) {
+    card(s, 0.918, 1.083, 7.493, 5.333, RED, 0.25);
+    card(s, 1.533, 2.164, 6.642, 4.0, WHITE, 0.188);
+    head(s, 'Medical Dashboard', { x: 9.063, y: 2.879, w: 3.358, h: 1.178, fontSize: 32 });
+    txt(s, LOREM, { x: 9.063, y: 4.391, w: 3.358, h: 0.909 });
+    pill(s, 9.153, 2.443, 1.009, 0.335, '$789k');
+    s.addText([
+        { text: 'Vaccination: ', options: { fontFace: BODY, fontSize: 12, italic: true, color: WHITE } },
+        { text: '1 859 260 (57.8%)', options: { fontFace: HEAD, bold: true, fontSize: 24, color: WHITE } }
+    ], { x: 2.555, y: 1.386, w: 5.216, h: 0.505, valign: 'top' });
+    iconCircle(s, 1.182, 1.386, 1.181, ORG4, 'syringe');
+    ghost(s, 4.532, 2.542, 3.29, 3.327, 95);
+    head(s, '$45.98k', { x: 2.247, y: 2.646, w: 5.008, h: 0.337, fontSize: 14 });
+    txt(s, 'Corona vaccines', { x: 2.247, y: 3.037, w: 5.008, h: 0.303 });
+    pill(s, 2.342, 3.457, 1.009, 0.335, '+5,2%');
+    s.addChart(pptx.ChartType.bar, [series('stats', WEEK, WEEK_VALS)], chartOpts({
+        x: 2.171, y: 4.058, w: 5.528, h: 1.676, chartColors: [ORG2], barGapWidthPct: 360, barOverlapPct: -30
+    }));
+}
+
+/** "+1.82%" headline with a big red panel, donut dial and age legend. */
+function slide04(s) {
+    head(s, '+1.82%', { x: 2.299, y: 0.886, w: 3.358, h: 1.01, fontSize: 54 });
+    txt(s, LOREM_TINY, { x: 2.299, y: 1.938, w: 3.358, h: 0.505 });
+    s.addText([
+        { text: 'Covid-19 ', options: { fontFace: BODY, fontSize: 32, color: DARK } },
+        { text: 'Dashboard', options: { fontFace: HEAD, bold: true, fontSize: 32, color: DARK } }
+    ], { x: 6.536, y: 1.132, w: 4.551, h: 0.64, valign: 'bottom' });
+    txt(s, LOREM, { x: 6.536, y: 1.896, w: 4.551, h: 0.707 });
+    pill(s, 10.077, 2.801, 1.009, 0.335, '+5,2%');
+    vline(s, 5.994, 1.056, 1.745, DARK, 1, 90);
+
+    card(s, 0.918, 3.473, 11.497, 3.34, RED, 0.344);
+    dial(s, {
+        x: 2.299, y: 3.645, d: 3.016, ringD: 1.936, hubD: 1.191, haloColor: WHITE, haloAlpha: 90,
+        trackColor: WHITE, trackAlpha: 80, trackW: 10, arcColor: WHITE, arcW: 11, hubColor: ORG4,
+        from: 270, to: 74.9, endDot: ORG4, value: '59%', label: 'Tested', valueSize: 24, valueDy: 0.209, valueH: 0.505, labelDy: 0.676, labelSize: 12
+    });
+    glyphMark(s, 1.626, 4.244, 0.55, 'ring', WHITE);
+    numBox(s, { x: 6.312, y: 4.166, value: '27', cap: 'DAYS', capW: 0.593, capH: 0.303, capColor: WHITE });
+    numBox(s, { x: 6.995, y: 4.166, value: '06', cap: 'HOURS', capW: 0.67, capH: 0.303, capColor: WHITE });
+    txt(s, LOREM, { x: 7.935, y: 4.175, w: 3.822, h: 0.909, color: WHITE });
+    hline(s, 6.293, 5.447, 5.464, WHITE, 1, 90);
+    [['0-9: ', '0,8k'], ['10-19: ', '1,99k'], ['20-39: ', '0,65k'], ['40-59: ', '1,1k'], ['60+: ', '2,75k']]
+        .forEach(function (p, i) {
+            const x = [6.313, 7.413, 8.536, 9.636, 10.759][i];
+            dot(s, x + 0.064, 6.018, 0.128, WHITE);
+            s.addText([
+                { text: p[0], options: { fontFace: BODY, fontSize: 10, color: WHITE, breakLine: true } },
+                { text: p[1], options: { fontFace: HEAD, bold: true, fontSize: 10, color: WHITE } }
+            ], { x: x + 0.149, y: 5.807, w: 0.803, h: 0.438, valign: 'middle' });
+        });
+}
+
+/** Patients card with donut plus three "active" icon stats. */
+function slide05(s) {
+    heading(s, 4.721, 0.921, 7.694, 'Hospital', 'Lorem ipsum is simple text', { gap: 0.391 });
+    pill(s, 11.406, 0.98, 1.009, 0.335, '+5,2%');
+    card(s, 0.92, 0.921, 3.075, 5.658, RED, 0.165);
+    heading(s, 1.184, 1.312, 2.62, 'Patients', 'March', { gap: 0.391, color: WHITE, subColor: WHITE });
+    txt(s, LOREM, { x: 1.184, y: 2.209, w: 2.616, h: 1.111, color: WHITE });
+    card(s, 1.08, 3.75, 2.72, 2.632, WHITE, 0.124);
+    s.addChart(pptx.ChartType.doughnut, [series('Patients', ['Male', 'Female', 'Child'], [8.2, 7, 3])], {
+        x: 1.184, y: 3.915, w: 2.539, h: 2.29, holeSize: 75, chartColors: [RED, RED2, ORG1],
+        showLegend: true, legendPos: 'b', legendFontFace: BODY, legendFontSize: 10, legendColor: DARK,
+        dataBorder: { pt: 0, color: 'FFFFFF' }, showValue: false
+    });
+    oval(s, 2.049, 4.469, 0.839, 0.839, ORG4);
+    txt(s, '59%', { x: 2.049, y: 4.686, w: 0.839, h: 0.404, align: 'center', valign: 'middle', fontFace: HEAD, bold: true, fontSize: 18, color: WHITE });
+
+    heading(s, 4.721, 4.26, 7.694, 'Hospital', 'Lorem ipsum is simple text', { gap: 0.39 });
+    [['121', 'Active Doctors', RED, 4.404, 5.21, 'person'], ['1 789', 'Active Patients', RED2, 7.135, 7.94, 'people'],
+    ['542', 'Active Nurses', ORG1, 9.866, 10.671, 'person']].forEach(function (d) {
+        iconCircle(s, d[3] + 0.413, 5.36, 0.697, d[2], d[5]);
+        head(s, d[0], { x: d[4] + 0.489, y: 5.327, w: 1.44, h: 0.404, fontSize: 18 });
+        txt(s, d[1], { x: d[4] + 0.489, y: 5.731, w: 1.44, h: 0.303, italic: true, color: d[2] });
+        txt(s, 'Lorem ipsum is simple text', { x: d[4] + 0.489, y: 6.074, w: 1.44, h: 0.505 });
+    });
+}
+
+/** Covid hospital card + two mini dials + grouped column chart. */
+function slide06(s) {
+    card(s, 0.92, 0.921, 3.075, 5.658, RED, 0.165);
+    head(s, 'Hospital', { x: 1.184, y: 1.312, w: 2.62, h: 0.337, fontSize: 14, color: WHITE, align: 'center' });
+    head(s, 'Covid hospital', { x: 1.184, y: 4.568, w: 2.62, h: 0.37, fontSize: 16, color: WHITE, align: 'center' });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley.\u00a0',
+        { x: 1.184, y: 5.102, w: 2.616, h: 0.909, color: WHITE, align: 'center' });
+    pill(s, 4.721, 0.98, 1.009, 0.335, '+5,2%');
+    head(s, '25 896', { x: 4.721, y: 1.628, w: 3.358, h: 0.64, fontSize: 32 });
+    txt(s, LOREM_TINY, { x: 4.721, y: 2.31, w: 3.358, h: 0.505 });
+    miniDial(s, 8.662, 1.454, '1,1k', 'Oct', RED);
+    miniDial(s, 10.693, 1.454, '1,96k', 'Nov', ORG4);
+    s.addChart(pptx.ChartType.bar, [
+        series('Female', WEEKS4, [4.3, 2.5, 3.5, 4.5]),
+        series('Male', WEEKS4, [2.4, 4.4, 1.8, 2.8]),
+        series('Child', WEEKS4, [1, 0.7, 0.4, 0.13])
+    ], chartOpts({
+        x: 4.721, y: 3.5, w: 7.694, h: 2.276, chartColors: [RED, ORG1, ORG3],
+        barGapWidthPct: 219, barOverlapPct: -27, showLegend: true, legendPos: 'r', legendFontFace: BODY, legendFontSize: 12,
+        valAxisHidden: false, valGridLine: { color: DARK, size: 0.75, style: 'solid' }, valAxisLineShow: false,
+        catAxisLineShow: true, catAxisLineColor: 'E4E4E4', catAxisLabelFontFace: HEAD, catAxisLabelFontSize: 12,
+        valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12
+    }));
+    txt(s, LOREM, { x: 4.721, y: 6.011, w: 7.7, h: 0.505 });
+}
+
+/** Small ring dial used for the Oct/Nov/Dec figures. */
+function miniDial(s, x, y, value, label, color) {
+    dial(s, {
+        x: x, y: y, d: 1.582, ringD: 1.229, hubD: 0.824, haloAlpha: 95,
+        trackColor: DARK, trackAlpha: 80, trackW: 1, arcColor: color, arcW: 10,
+        from: 243.1, to: 116.2, hubColor: color, value: value, label: label
+    });
+}
+
+/** Doctor profile card with KPI icon row and a two-series line chart. */
+function slide07(s) {
+    card(s, 9.446, 0.921, 3.075, 5.658, RED, 0.165);
+    head(s, 'Doctor Tomas Harp', { x: 9.71, y: 1.312, w: 2.62, h: 0.337, fontSize: 14, color: WHITE, align: 'center' });
+    txt(s, 'Lorem ipsum', { x: 9.71, y: 1.628, w: 2.62, h: 0.303, align: 'center', italic: true, color: WHITE });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard text.\u00a0', { x: 9.71, y: 4.698, w: 2.616, h: 0.505, align: 'center', color: WHITE });
+    hline(s, 9.446, 5.334, 3.075, WHITE, 1, 90);
+    [['Experience', '21 years', 9.672, 9.703, 0.765], ['Operations', '1 302', 10.604, 10.685, 0.664],
+    ['Patients', '>89k', 11.536, 11.617, 0.664]].forEach(function (d) {
+        txt(s, d[0], { x: d[2], y: 5.528, w: 0.827, h: 0.269, align: 'center', margin: 2.8, fontSize: 10, color: WHITE });
+        pill(s, d[3], 5.894, d[4], 0.335, d[1], { fill: WHITE, line: RED, color: DARK, shadow: true });
+    });
+    kpiRow(s, 1.717, [
+        { x: 1.319, value: '47', cap: 'NEW PATIENTS', color: RED, glyph: 'people' },
+        { x: 2.92, value: '37', cap: 'OUR DOCTORS', color: RED2, glyph: 'people' },
+        { x: 4.522, value: '19', cap: 'LAST OPERATIONS', color: ORG1, glyph: 'bar' },
+        { x: 5.924, value: '1 989', cap: 'TOTAL VACCINES', color: ORG2, glyph: 'syringe', w: 0.884 },
+        { x: 7.495, value: '$501k', cap: 'MONTHLY INCOME', color: ORG3, glyph: 'money', w: 0.945 }
+    ]);
+    head(s, 'Patient Status', { x: 0.918, y: 3.488, w: 7.597, h: 0.337, fontSize: 14 });
+    s.addChart(pptx.ChartType.line, [
+        series('Progress', WEEK, WEEK_VALS), series('Recovered', WEEK, WEEK_VALS2)
+    ], chartOpts({
+        x: 0.918, y: 3.962, w: 7.748, h: 2.74, chartColors: [RED, ORG4],
+        lineDataSymbol: 'circle', lineDataSymbolSize: 10, lineDataSymbolLineSize: 0, lineSize: 2,
+        showLegend: true, legendPos: 'b', legendFontFace: BODY, legendFontSize: 12,
+        valAxisHidden: false, valAxisLineShow: true, valAxisLineColor: DARK, catAxisLabelFontSize: 12,
+        valAxisMajorUnit: 1, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12
+    }));
+    callout(s, 4.712, 4.112, '+17%', 'r');
+}
+
+/** Week header banner, doctor card, mini line chart, progress bar, donut. */
+function slide08(s) {
+    weekHeader(s);
+    profileCard(s, { kind: 'Doctor', titleY: 2.378, name: 'Samantha Smith', role: 'Infectionist' });
+    iconCircle(s, 3.31, 2.986, 0.697, RED2, 'person');
+    numBox(s, { x: 5.27, y: 2.986, w: 0.673, value: '247', cap: 'HOURS', capW: 0.67, capH: 0.303 });
+    s.addChart(pptx.ChartType.line, [series('stats', WEEK, WEEK_VALS)], chartOpts({
+        x: 6.445, y: 2.546, w: 5.879, h: 1.676,
+        lineDataSymbol: 'circle', lineDataSymbolSize: 10, lineDataSymbolLineSize: 0, lineSize: 2
+    }));
+    heading(s, 5.101, 4.82, 2.637, 'Lorem Ipsum dummy text', 'April', { gap: 0.336 });
+    oval(s, 8.081, 4.815, 0.314, 0.314, ORG2, { fill: { color: ORG2, transparency: 80 } });
+    glyphMark(s, 8.238, 4.972, 0.17, 'plus', DARK);
+    head(s, '79%', { x: 8.454, y: 4.756, w: 1.004, h: 0.404, fontSize: 18 });
+    pill(s, 8.103, 5.292, 1.011, 0.335, '$491k', { fill: ORG2 });
+    heading(s, 5.678, 5.841, 2.708, '865', 'Lorem ipsum', { gap: 0.337 });
+    bar(s, 5.27, 6.66, 3.844, 1.583, ORG1, '47%');
+    glyphMark(s, 5.42, 6.2, 0.4, 'ring', DARK);
+    card(s, 9.636, 4.448, 2.72, 2.632, WHITE, 0.124, { shadow: shadow() });
+    s.addChart(pptx.ChartType.doughnut, [series('Patients', ['Male', 'Female', 'Child'], [8.2, 7, 3])], {
+        x: 9.74, y: 4.613, w: 2.539, h: 2.29, holeSize: 75, chartColors: [RED, RED2, ORG1],
+        showLegend: true, legendPos: 'b', legendFontFace: BODY, legendFontSize: 10, legendColor: DARK,
+        dataBorder: { pt: 0, color: 'FFFFFF' }, showValue: false
+    });
+    oval(s, 10.605, 5.167, 0.839, 0.839, ORG4);
+    txt(s, '59%', { x: 10.605, y: 5.384, w: 0.839, h: 0.404, align: 'center', valign: 'middle', fontFace: HEAD, bold: true, fontSize: 18, color: WHITE });
+}
+
+/** Two big stat cards, a US bubble map placeholder and a stacked column chart. */
+function slide09(s) {
+    statCard(s, 0.918, 0.921, { fill: RED, value: '14 807', label: 'Total Cases', badge: 'Today: 1 302', badgeW: 1.338, glyph: 'virus' });
+    [['132', 'Death', 'Today: 18', 1.134], ['1 058', 'Recovered', 'Today: 92', 2.864]].forEach(function (d) {
+        head(s, d[0], { x: d[3], y: 2.647, w: 1.444, h: 0.337, fontSize: 14, align: 'center' });
+        txt(s, d[1], { x: d[3], y: 2.984, w: 1.444, h: 0.303, align: 'center' });
+        txt(s, d[2], { x: d[3], y: 3.354, w: 1.444, h: 0.269, align: 'center', fontSize: 10, italic: true, color: RED });
+    });
+    vline(s, 2.703, 2.647, 0.894, DARK, 1, 90);
+    statCard(s, 0.918, 3.941, { fill: ORG4, value: '118 539', label: 'Total Tested', badge: 'Today: 22 289', badgeW: 1.338, badgeLine: ORG4, glyph: 'bar' });
+    [['13 208 (14%)', 'Positive', 'Today: 1 859', 1.134], ['18 506 (76%)', 'Negative', 'Today: 9 204', 2.864]].forEach(function (d) {
+        head(s, d[0], { x: d[3], y: 5.676, w: 1.444, h: 0.337, fontSize: 14, align: 'center' });
+        txt(s, d[1], { x: d[3], y: 6.012, w: 1.444, h: 0.303, align: 'center' });
+        txt(s, d[2], { x: d[3], y: 6.382, w: 1.444, h: 0.269, align: 'center', fontSize: 10, italic: true, color: ORG4 });
+    });
+    heading(s, 5.315, 0.987, 2.863, 'Affected Area', 'Overview', { gap: 0.337 });
+    artPlaceholder(s, 5.157, 1.603, 5.167, 3.212, '[map]', DARK, 94);
+    [[5.776, 2.51, 0.332, RED2], [6.565, 1.984, 0.332, RED2], [6.986, 3.746, 0.332, RED2], [7.46, 2.944, 0.332, RED2],
+    [10.8, 2.379, 0.332, RED2], [10.661, 1.666, 0.611, RED], [10.851, 2.812, 0.231, ORG1],
+    [5.27, 2.393, 0.123, ORG2], [5.981, 3.025, 0.123, ORG2], [7.665, 4.34, 0.123, ORG2],
+    [8.731, 2.814, 0.123, ORG2], [9.678, 2.722, 0.123, ORG2], [10.905, 3.138, 0.123, ORG2]]
+        .forEach(function (b) { oval(s, b[0], b[1], b[2], b[2], b[3]); });
+    [['>100 000 cases', 1.819, 0.472], ['>10 000 cases', 2.404, 0.28], ['>1 000 cases', 2.769, 0.18], ['>100 cases', 3.046, 0.11]]
+        .forEach(function (l) {
+            dot(s, 11.13, l[1] + 0.15, l[2], RED);
+            txt(s, l[0], { x: 11.339, y: l[1], w: 1.442, h: 0.303, align: 'center' });
+        });
+    heading(s, 5.511, 4.595, 1.999, 'States Stats', 'Overview', { gap: 0.337 });
+    s.addChart(pptx.ChartType.bar, [
+        series('Covid cases', ['Texas', 'California', 'Georgia ', 'Carolina', 'Arizona', 'New York', 'Ohio', 'Montana', 'Washington', 'New Mexico'],
+            [2301, 4211, 3011, 2198, 1987, 2546, 3819, 4502, 3302, 1520]),
+        series('tested', ['Texas', 'California', 'Georgia ', 'Carolina', 'Arizona', 'New York', 'Ohio', 'Montana', 'Washington', 'New Mexico'],
+            [2301, 4211, 3011, 2198, 1987, 2546, 3819, 4502, 3302, 1520])
+    ], chartOpts({
+        x: 5.381, y: 4.932, w: 6.693, h: 2.094, chartColors: [RED, ORG4], barGrouping: 'stacked',
+        barGapWidthPct: 150, catAxisLineShow: true, catAxisLineColor: 'E4E4E4', catAxisLabelRotate: -45
+    }));
+}
+
+/** Quote card with a big 73% dial and a smoothed 31-day line chart. */
+function slide10(s) {
+    slideTitle(s, 'Medical Dashboard');
+    card(s, 0.92, 1.88, 4.748, 5.023, RED, 0.269);
+    txt(s, [
+        { text: 'It is health that is real wealth and not pieces of gold and silver. ', options: { fontFace: HEAD, fontSize: 14, color: WHITE, breakLine: true } },
+        { text: '- Mahatma Gandhi', options: { fontFace: BODY, fontSize: 12, color: WHITE, align: 'right' } }
+    ], { x: 1.292, y: 2.231, w: 4.104, h: 0.774 });
+    pill(s, 1.292, 3.041, 1.009, 0.335, '1,3k', { fill: WHITE, line: RED, color: DARK, shadow: true });
+    dial(s, {
+        x: 1.83, y: 3.539, d: 3.016, ringD: 1.936, hubD: 1.191, haloColor: WHITE, haloAlpha: 90,
+        trackColor: WHITE, trackAlpha: 80, trackW: 10, arcColor: WHITE, arcW: 11, hubColor: ORG4,
+        from: 270, to: 74.9, endDot: ORG4, value: '73%', label: 'Tested', valueSize: 24, valueDy: 0.209, valueH: 0.505, labelDy: 0.676, labelSize: 12
+    });
+    head(s, 'Statistic', { x: 7.472, y: 2.113, w: 4.943, h: 0.337, fontSize: 14 });
+    txt(s, LOREM_SIMPLE, { x: 6.37, y: 2.504, w: 6.045, h: 0.303 });
+    pill(s, 6.37, 2.113, 1.009, 0.335, 'MAR');
+    hline(s, 6.37, 3.163, 6.045, DARK, 1, 90);
+    numBox(s, { x: 6.463, y: 3.376, value: '27', cap: 'DAYS', capW: 0.593, capH: 0.303 });
+    numBox(s, { x: 7.146, y: 3.376, value: '14', cap: 'HOURS', capW: 0.67, capH: 0.303 });
+    head(s, 'Subtitle', { x: 8.168, y: 3.425, w: 4.26, h: 0.37, fontSize: 16 });
+    txt(s, LOREM, { x: 8.168, y: 3.795, w: 4.26, h: 0.707 });
+    s.addChart(pptx.ChartType.line, [series('campaign', DAYS31, MONTH_VALS)], chartOpts({
+        x: 6.37, y: 4.452, w: 5.816, h: 2.473, lineDataSymbol: 'none', lineSmooth: true, lineSize: 1.5
+    }));
+    callout(s, 8.248, 4.748, '97%', 'r');
+    oval(s, 10.498, 6.063, 0.331, 0.331, ORG4);
+}
+
+/* ----------------------------------------------------------- slides 11-20 */
+
+/** Red banner, nested "care" arcs and four weekly progress bars. */
+function slide11(s) {
+    slideTitle(s, 'Medical Dashboard');
+    card(s, 0.918, 1.88, 11.498, 1.549, RED, 0.194);
+    glyphMark(s, 1.75, 2.646, 0.6, 'ring', WHITE);
+    txt(s, LOREM_SIMPLE, { x: 2.582, y: 2.211, w: 5.999, h: 0.303, italic: true, color: WHITE, valign: 'bottom' });
+    head(s, '1 859 260 (57.8%)', { x: 2.582, y: 2.546, w: 5.999, h: 0.64, fontSize: 32, color: WHITE, valign: 'top' });
+
+    // five nested C-shaped arcs, thickest ring outermost
+    [[2.443, 4.792, 1.136, RED, 226.9], [2.208, 4.557, 1.607, RED2, 180.1], [1.995, 4.344, 2.032, ORG1, 145.3],
+    [1.769, 4.118, 2.484, ORG2, 117.8], [1.535, 3.884, 2.952, ORG3, 94.5]].forEach(function (a) {
+        s.addShape(S.arc, { x: a[0], y: a[1], w: a[2], h: a[2], fill: { type: 'none' }, line: { color: a[3], width: 10 }, angleRange: [a[4], 0] });
+    });
+    glyphMark(s, 2.988, 5.372, 0.5, 'plus', DARK);
+    ['Heart care', 'Stroke care', 'Cancer care', 'Joint care', 'Weight care'].forEach(function (t, i) {
+        const x = [4.361, 4.155, 3.909, 3.686, 3.432][i];
+        txt(s, t, { x: x, y: 5.758 + i * 0.229, w: 1.633, h: 0.303 });
+        dot(s, [3.578, 3.807, 4.036, 4.259, 4.493][i], 5.453, 0.203, ACCENT[i]);
+        vline(s, [3.57, 3.799, 4.028, 4.251, 4.485][i], 5.545, [1.168, 0.933, 0.709, 0.474, 0.213][i], DARK, 1, 90);
+    });
+    vline(s, 5.994, 3.75, 3.262, DARK, 1, 90);
+    heading(s, 6.446, 3.833, 5.983, 'Weekly Stats', 'Lorem Ipsum has been the industry\'s standard dummy text.\u00a0', { size: 16, gap: 0.37 });
+    [[4.769, 2.421, RED, '51%'], [5.404, 3.084, RED2, '69%'], [6.003, 1.993, ORG1, '48%'], [6.597, 3.504, ORG2, '80%']]
+        .forEach(function (b) {
+            txt(s, 'Week 1', { x: 6.446, y: b[0], w: 1.13, h: 0.303 });
+            bar(s, 7.541, b[0] + 0.152, 4.61, b[1], b[2], b[3]);
+        });
+}
+
+/** Timeline card, three ring dials and a horizontal bar chart. */
+function slide12(s) {
+    slideTitle(s, 'Medical Dashboard');
+    card(s, 0.92, 1.88, 3.048, 2.889, WHITE, 0.198, { shadow: shadow() });
+    [['721', '01', 'st', 2.211, RED], ['830', '13', 'th', 3.019, RED2], ['650', '21', 'th', 3.831, RED2]].forEach(function (d, i) {
+        head(s, d[0], { x: 1.687, y: d[3], w: 2.063, h: 0.337, fontSize: 14 });
+        s.addText([
+            { text: d[1], options: { fontFace: BODY, fontSize: 12, color: DARK } },
+            { text: d[2], options: { fontFace: BODY, fontSize: 12, color: DARK, superscript: true } },
+            { text: ' Jan, corona cases', options: { fontFace: BODY, fontSize: 12, color: DARK } }
+        ], { x: 1.687, y: d[3] + 0.336, w: 2.063, h: 0.303, valign: 'top' });
+        dot(s, 1.469, d[3] + 0.202, 0.203, d[4]);
+        if (i < 2) vline(s, 1.469, d[3] + 0.304, 0.613, i === 0 ? RED : DARK, 1, i === 0 ? 0 : 90);
+    });
+    card(s, 0.918, 5.066, 3.049, 1.209, RED, 0.198);
+    s.addShape(S.upArrow, { x: 1.185, y: 5.518, w: 0.208, h: 0.304, fill: { color: WHITE }, line: { type: 'none' } });
+    txt(s, '+5% higher than last month', { x: 1.469, y: 5.235, w: 2.281, h: 0.269, fontSize: 10, italic: true, color: WHITE });
+    head(s, '2,93k', { x: 1.469, y: 5.451, w: 2.281, h: 0.438, fontSize: 20, color: WHITE, valign: 'top', margin: 5.7 });
+    txt(s, 'DEC, corona cases', { x: 1.469, y: 5.836, w: 2.281, h: 0.303, color: WHITE });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text.\u00a0', { x: 1.033, y: 6.49, w: 2.935, h: 0.505 });
+    heading(s, 4.565, 1.88, 1.648, '+3%', 'Corona cases', { gap: 0.336, subColor: RED });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type book.\u00a0',
+        { x: 4.565, y: 2.598, w: 1.648, h: 1.111, fontSize: 10, italic: true });
+    miniDial(s, 6.693, 2.076, '1,1k', 'Oct', RED);
+    miniDial(s, 8.725, 2.076, '1,96k', 'Nov', RED2);
+    miniDial(s, 10.833, 2.076, '2,93k', 'Dec', ORG1);
+    hline(s, 4.565, 4.185, 7.85, DARK, 1, 90);
+    head(s, 'Statistic', { x: 5.667, y: 4.532, w: 4.943, h: 0.337, fontSize: 14 });
+    txt(s, LOREM_SIMPLE, { x: 4.565, y: 4.923, w: 6.045, h: 0.303 });
+    pill(s, 4.565, 4.532, 1.009, 0.335, '3 month');
+    s.addChart(pptx.ChartType.bar, [
+        series('Oct', ['cases'], [1.1]), series('Nov', ['cases'], [1.96]), series('Dec', ['cases'], [2.93])
+    ], chartOpts({
+        x: 4.671, y: 5.365, w: 7.659, h: 1.348, barDir: 'bar', chartColors: [RED, RED2, ORG1],
+        barGapWidthPct: 250, barOverlapPct: -80, catAxisHidden: true, valAxisHidden: false,
+        showLegend: true, legendPos: 'l', legendFontFace: BODY, legendFontSize: 12,
+        valGridLine: { color: DARK, size: 0.75, style: 'solid' }, valAxisLineShow: false, valAxisLabelFontSize: 12
+    }));
+}
+
+/** Four coloured week cards with dials plus a grouped column chart. */
+function slide13(s) {
+    slideTitle(s, 'Medical Dashboard');
+    [[0.918, RED, ORG1, '1,1k', 'Week 1'], [3.904, RED2, ORG2, '1,86k', 'Week 2'],
+    [6.889, ORG1, ORG3, '2,2k', 'Week 3'], [9.874, ORG2, ORG4, '1,9k', 'Week 4']].forEach(function (c) {
+        card(s, c[0], 1.88, 2.541, 2.434, c[1], 0.196);
+        txt(s, c[4], { x: c[0] + 0.292, y: 2.12, w: 1.936, h: 0.337, fontFace: HEAD, fontSize: 14, color: WHITE });
+        dial(s, {
+            x: c[0] + 0.413, y: 2.467, d: 1.686, ringD: 1.229, hubD: 0.824,
+            haloColor: WHITE, haloAlpha: 90, trackColor: WHITE, trackAlpha: 80, trackW: 1,
+            arcColor: WHITE, arcW: 10, from: 243.1, to: 116.2, hubColor: c[2], value: c[3], label: 'cases'
+        });
+    });
+    s.addChart(pptx.ChartType.bar, [
+        series('Female', WEEKS4, [4.3, 2.5, 3.5, 4.5]), series('Male', WEEKS4, [2.4, 4.4, 1.8, 2.8])
+    ], chartOpts({
+        x: 0.918, y: 4.795, w: 11.497, h: 2.167, chartColors: [RED, ORG1],
+        barGapWidthPct: 219, barOverlapPct: -27, showLegend: true, legendPos: 'r', legendFontFace: BODY, legendFontSize: 12,
+        valAxisHidden: false, valGridLine: { color: DARK, size: 0.75, style: 'solid' }, valAxisLineShow: false,
+        catAxisLineShow: true, catAxisLineColor: 'E4E4E4', catAxisLabelFontFace: HEAD, catAxisLabelFontSize: 12,
+        valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12
+    }));
+}
+
+/** Two white cards, each with a smoothed line chart and two callouts. */
+function slide14(s) {
+    s.addText([
+        { text: 'Covid-19 ', options: { fontFace: HEAD, bold: true, fontSize: 32, color: DARK } },
+        { text: 'Dashboard', options: { fontFace: HEAD, bold: true, fontSize: 32, color: DARK } }
+    ], { x: 0.917, y: 0.576, w: 11.5, h: 0.803, valign: 'bottom' });
+    txt(s, 'Lorem ipsum', { x: 0.905, y: 1.38, w: 11.524, h: 0.364, fontSize: 10, italic: true, color: GREY });
+    [{ x: 0.92, tx: 1.184, value: '2,17k', badge: '+5,2%', color: RED, chart: [4.3, 2.5, 3.5, 4.5, 3, 2], cx: 1.279,
+        up: [3.88, 3.812, '+3,7%', RED], down: [5.414, 5.0, '-0,6%', RED2] },
+    { x: 6.861, tx: 7.125, value: '2,56k', badge: '+6,4%', color: ORG4, chart: [4.3, 2.5, 5, 4.5, 3, 3], cx: 7.219,
+        up: [9.173, 3.927, '+3,9%', ORG4], down: [8.32, 5.0, '-0,5%', ORG3] }].forEach(function (c) {
+        card(s, c.x, 1.88, 5.554, 5.023, WHITE, 0.269, { shadow: shadow() });
+        heading(s, c.tx, 2.113, 5.008, c.value, 'Female corona cases', { gap: 0.391 });
+        pill(s, c.cx, 2.925, 1.009, 0.335, c.badge, { fill: c.color });
+        s.addChart(pptx.ChartType.line, [series('Series 1', ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], c.chart)], chartOpts({
+            x: c.cx, y: 3.597, w: 4.825, h: 2.966, chartColors: [c.color],
+            lineDataSymbol: 'none', lineSmooth: true, lineSize: 1.5, catAxisLabelFontSize: 12,
+            catAxisLineShow: true, catAxisLineColor: 'E4E4E4'
+        }));
+        callout(s, c.up[0], c.up[1], c.up[2], 'u', c.up[3]);
+        callout(s, c.down[0], c.down[1], c.down[2], 'd', c.down[3]);
+        glyphMark(s, c.x + 5.003, 2.45, 0.55, 'ring', c.color);
+    });
+}
+
+/** Health Activity banner, weekly column chart, three stats and an age chart. */
+function slide15(s) {
+    slideTitle(s, 'Medical Dashboard');
+    bannerCard(s, { title: 'Health Activity', value: '96%', glyph: [4.628, 3.469, 1.27, 'bar'] });
+    heading(s, 5.986, 1.865, 2.863, 'Weekly Activity', 'Overview', { gap: 0.336 });
+    s.addChart(pptx.ChartType.bar, [series('stats', WEEK, WEEK_VALS)], chartOpts({
+        x: 6.199, y: 2.504, w: 6.051, h: 1.957, barGapWidthPct: 360, barOverlapPct: -30, catAxisLabelFontSize: 12
+    }));
+    txt(s, LOREM, { x: 1.033, y: 4.917, w: 4.217, h: 0.707, align: 'center' });
+    hline(s, 1.385, 5.866, 3.633, DARK, 1, 90);
+    [['30.1k', 'Active Cases', 1.548], ['2,47k ', 'Corona Cases', 2.704], ['29,1k', 'Beds Available', 3.856]].forEach(function (d) {
+        s.addText([
+            { text: d[0], options: { fontFace: HEAD, bold: true, fontSize: 12, color: DARK, breakLine: true } },
+            { text: d[1], options: { fontFace: BODY, fontSize: 10, color: DARK } }
+        ], { x: d[2], y: 6.16, w: 1.003, h: 0.64, align: 'center', valign: 'top' });
+    });
+    card(s, 5.724, 4.934, 6.691, 2.193, WHITE, 0.265, { shadow: shadow() });
+    heading(s, 5.986, 5.226, 2.197, 'Age Stats', 'Loren ipsum', { gap: 0.337 });
+    const ages = ['10-19 years', '20-29 years', '30-39 years', '40-49 years', '50-59 years', '60-69 years', '70-79 years', '80+ years'];
+    s.addChart(pptx.ChartType.bar, [
+        series('Women', ages, [4.3, 2.5, 3.5, 4.5, 3, 2, 4, 7]), series('Men', ages, [2, 3, 4, 3, 4, 3, 2, 6.5])
+    ], chartOpts({
+        x: 7.057, y: 5.226, w: 5.132, h: 1.747, chartColors: [RED, ORG4], barGapWidthPct: 380, barOverlapPct: -30,
+        showLegend: true, legendPos: 't', legendFontFace: BODY, legendFontSize: 10
+    }));
+}
+
+/** Patient card, health-rate ring, activity metrics with line + column charts. */
+function slide16(s) {
+    slideTitle(s, 'Patient Information Dashboard');
+    card(s, 0.918, 1.88, 4.053, 3.329, RED, 0.25);
+    head(s, 'Patient', { x: 1.184, y: 2.113, w: 3.607, h: 0.337, fontSize: 14, color: WHITE });
+    head(s, 'Amanda CROSS', { x: 2.198, y: 2.662, w: 2.593, h: 0.337, fontSize: 14, color: WHITE });
+    txt(s, 'Lorem Ipsum', { x: 2.198, y: 2.983, w: 2.593, h: 0.303, color: WHITE });
+    hline(s, 2.198, 3.554, 2.495, WHITE, 1, 90);
+    [['Blood: ', 'A+', 2.217, 3.969], ['Age: ', '27', 3.591, 3.969], ['Weight: ', '59kg+', 2.217, 4.629], ['Hight: ', '1.82m', 3.591, 4.629]]
+        .forEach(function (d) {
+            dot(s, d[2] + 0.064, d[3] + 0.064, 0.128, WHITE);
+            s.addText([
+                { text: d[0], options: { fontFace: BODY, fontSize: 10, color: WHITE, breakLine: true } },
+                { text: d[1], options: { fontFace: HEAD, bold: true, fontSize: 10, color: WHITE } }
+            ], { x: d[2] + 0.15, y: d[3] - 0.147, w: 0.952, h: 0.438, valign: 'middle' });
+        });
+    oval(s, 1.347, 5.624, 1.227, 1.227, null, { line: { color: DARK, transparency: 80, width: 10 } });
+    s.addShape(S.arc, { x: 1.347, y: 5.624, w: 1.227, h: 1.227, fill: { type: 'none' }, line: { color: ORG4, width: 12 }, angleRange: [33.6, 152.6] });
+    s.addShape(S.arc, { x: 1.347, y: 5.624, w: 1.227, h: 1.227, fill: { type: 'none' }, line: { color: RED, width: 15 }, angleRange: [270, 34.2] });
+    oval(s, 1.67, 5.947, 0.582, 0.582, RED);
+    glyphMark(s, 1.961, 6.238, 0.3, 'ring', WHITE);
+    head(s, 'Health Rate', { x: 3.07, y: 5.686, w: 1.721, h: 0.337, fontSize: 14 });
+    s.addText([
+        { text: '28% ', options: { fontFace: HEAD, bold: true, fontSize: 12, color: DARK } },
+        { text: '- progress', options: { fontFace: BODY, fontSize: 12, color: DARK, breakLine: true } },
+        { text: '31% ', options: { fontFace: HEAD, bold: true, fontSize: 12, color: DARK } },
+        { text: '- done', options: { fontFace: BODY, fontSize: 12, color: DARK } }
+    ], { x: 3.07, y: 6.129, w: 1.721, h: 0.505, valign: 'top' });
+    head(s, 'Activities', { x: 5.596, y: 2.084, w: 3.812, h: 0.337, fontSize: 14 });
+    [{ title: 'Sleep', y: 2.753, value: '79%', pillText: '6h 30mim', color: RED, chart: 'line', chartY: 2.753, cy: 2.721, callY: 2.85 },
+    { title: 'Calories', y: 5.146, value: '800', pillText: '831 cal', color: ORG2, chart: 'bar', chartY: 5.228, cy: 5.113, callY: 5.243 }]
+        .forEach(function (a) {
+            heading(s, 5.689, a.y, 1.661, a.title, 'April', { gap: 0.336 });
+            oval(s, 5.737, a.y + 0.767, 0.314, 0.314, a.color, { fill: { color: a.color, transparency: 80 } });
+            glyphMark(s, 5.894, a.y + 0.924, 0.17, 'dot', DARK);
+            head(s, a.value, { x: 6.11, y: a.y + 0.708, w: 1.24, h: 0.404, fontSize: 18 });
+            pill(s, 5.759, a.y + 1.244, 1.011, 0.335, a.pillText, { fill: a.color });
+            vline(s, 7.559, a.cy, 1.695, DARK, 1, 90);
+        });
+    s.addChart(pptx.ChartType.line, [series('Series 1', ['1', '2', '3', '4', '5', '6', '7'], [6.3, 5, 7, 6, 6, 6.2, 8.1])], chartOpts({
+        x: 8.1, y: 2.753, w: 4.315, h: 1.578, chartColors: [RED2], lineDataSymbol: 'none', lineSmooth: true, lineSize: 1.5,
+        catAxisLabelFontSize: 12, catAxisLineShow: true, catAxisLineColor: 'E4E4E4'
+    }));
+    callout(s, 11.813, 2.85, '8,1', 'u');
+    s.addChart(pptx.ChartType.bar, [series('Series 1', ['1', '2', '3', '4', '5', '6', '7'], [750, 800, 831, 760, 700, 790, 785])], chartOpts({
+        x: 8.1, y: 5.228, w: 4.315, h: 1.578, chartColors: [ORG2], barGapWidthPct: 250,
+        catAxisLabelFontSize: 12, catAxisLineShow: true, catAxisLineColor: 'E4E4E4'
+    }));
+    callout(s, 9.55, 5.243, '8,1', 'u', ORG2);
+}
+
+/** Patient profile card, three vitals badges and a weekly tests chart. */
+function slide17(s) {
+    slideTitle(s, 'Patient Information Dashboard');
+    profileCard(s, { kind: 'Patient', titleY: 2.113, name: 'Tomas Smith', role: 'Patient' });
+    [['Body Temperature', 5.435, 5.523, 1.011, '36,6 \u25e6C', RED, 0.572],
+    ['Pulse', 7.915, 8.003, 1.011, '87 bpm', RED2, 0.337],
+    ['Blood Pressure', 10.394, 10.483, 1.366, '120/80 mmHg', ORG1, 0.337]].forEach(function (d) {
+        head(s, d[0], { x: d[1], y: 1.878 + (d[6] === 0.337 ? 0.235 : 0), w: 1.661, h: d[6], fontSize: 14 });
+        s.addText([
+            { text: '27', options: { fontFace: BODY, fontSize: 12, color: DARK } },
+            { text: 'th', options: { fontFace: BODY, fontSize: 12, color: DARK, superscript: true } },
+            { text: ' April', options: { fontFace: BODY, fontSize: 12, color: DARK } }
+        ], { x: d[1], y: 2.45, w: 1.661, h: 0.303, valign: 'top' });
+        pill(s, d[2], 3.063, d[3], 0.335, d[4], { fill: d[5], color: DARK });
+    });
+    vline(s, 7.425, 2.08, 1.126, DARK, 1, 90);
+    vline(s, 9.785, 2.08, 1.126, DARK, 1, 90);
+    heading(s, 5.435, 4.105, 2.863, 'Tests', 'Overview', { gap: 0.336 });
+    pill(s, 5.435, 4.813, 1.009, 0.335, 'WEEK', { fill: ORG2 });
+    s.addChart(pptx.ChartType.bar, [series('stats', WEEK, WEEK_VALS)], chartOpts({
+        x: 5.647, y: 4.935, w: 6.767, h: 1.844, chartColors: [ORG2], barGapWidthPct: 360, barOverlapPct: -30, catAxisLabelFontSize: 12
+    }));
+    callout(s, 8.849, 5.193, '72%', 'u', ORG2);
+    iconCircle(s, 3.31, 2.986, 0.697, RED, 'ring');
+}
+
+/** World bubble map card plus a 2x2 grid of "total ..." metrics. */
+function slide18(s) {
+    slideTitle(s, 'Covid-19 Dashboard');
+    card(s, 0.92, 1.88, 5.563, 5.133, WHITE, 0.269, { shadow: shadow() });
+    heading(s, 1.168, 2.232, 1.999, 'Covid map', 'Lorem ipsum', { gap: 0.337 });
+    artPlaceholder(s, 0.895, 3.162, 5.391, 3.018, '[map]', DARK, 94);
+    [[1.907, 4.208, 0.472, RED], [1.735, 4.277, 0.334, ORG1], [3.347, 4.176, 0.397, RED], [3.628, 4.211, 0.281, ORG1],
+    [2.662, 5.235, 0.263, RED], [4.946, 4.556, 0.199, RED], [5.675, 5.688, 0.123, RED], [2.613, 5.468, 0.123, ORG1],
+    [5.141, 4.664, 0.191, ORG1], [1.589, 4.082, 0.199, RED], [1.935, 4.021, 0.191, ORG1]]
+        .forEach(function (b) { oval(s, b[0], b[1], b[2], b[2], b[3]); });
+    glyphMark(s, 1.337, 6.399, 0.236, 'ring', DARK);
+    s.addText([
+        { text: '31 days', options: { fontFace: BODY, fontSize: 10, color: DARK, breakLine: true } },
+        { text: 'Mar, 2021', options: { fontFace: BODY, bold: true, fontSize: 10, color: DARK } }
+    ], { x: 1.494, y: 6.237, w: 1.418, h: 0.438, valign: 'middle' });
+    [['Total cases', 7.449, 2.238, '10 896', RED, 3.721], ['Active cases', 10.302, 2.238, '7 630', RED2, 3.721],
+    ['Total patients', 7.449, 4.617, '7 630', ORG1, 6.1], ['Total Death', 10.302, 4.617, '1 200', ORG2, 6.1]]
+        .forEach(function (d) {
+            head(s, d[0], { x: d[1], y: d[2], w: 1.975, h: 0.337, fontSize: 14 });
+            s.addText([
+                { text: '27', options: { fontFace: BODY, fontSize: 12, color: DARK } },
+                { text: 'th', options: { fontFace: BODY, fontSize: 12, color: DARK } },
+                { text: ' April', options: { fontFace: BODY, fontSize: 12, color: DARK } }
+            ], { x: d[1], y: d[2] + 0.336, w: 1.975, h: 0.303, valign: 'top' });
+            txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.\u00a0',
+                { x: d[1], y: d[2] + 0.744, w: 1.975, h: 0.606, fontSize: 10 });
+            pill(s, d[1] + 0.089, d[5], 1.011, 0.335, d[3], { fill: d[4], color: DARK });
+        });
+    vline(s, 9.799, 2.205, 1.126, DARK, 1, 90);
+    vline(s, 9.799, 4.584, 1.126, DARK, 1, 90);
+}
+
+/** Three stacked stat cards next to a shaded world map. */
+function slide19(s) {
+    slideTitle(s, 'Covid-19 Dashboard');
+    statCard(s, 0.918, 1.88, { fill: RED, value: '14 807', label: 'Total Cases', badge: '-7%', glyph: 'virus' });
+    statCard(s, 0.925, 3.71, { fill: RED2, value: '6 807', label: 'Recovered', badge: '+13%', glyph: 'people' });
+    statCard(s, 0.901, 5.538, { fill: RED2, value: '612', label: 'Death', badge: '+3%', badgeLine: ORG1, badgeColor: 'FF0000', glyph: 'tomb' });
+    artPlaceholder(s, 4.587, 1.917, 8.008, 5.116, '[map]', RED, 93);
+    heading(s, 5.315, 2.013, 2.863, 'Affected Area', 'Overview', { gap: 0.336 });
+    [['>100 000 cases', 8.15, 8.337, 60], ['>10 000 cases', 9.74, 9.927, 50], ['>1000 cases', 11.33, 11.517, 40]]
+        .forEach(function (l) {
+            oval(s, l[1], 2.219, 0.128, 0.128, RED, { fill: { color: RED, transparency: l[3] } });
+            txt(s, l[0], { x: l[2], y: 2.132, w: 0.947, h: 0.508, valign: 'bottom' });
+        });
+}
+
+/** Three stat cards in a row above a 31-day stacked column chart. */
+function slide20(s) {
+    slideTitle(s, 'Covid-19 Dashboard');
+    statCard(s, 0.918, 1.88, { fill: RED, value: '14 807', label: 'Total Cases', badge: '-7%', glyph: 'virus' });
+    statCard(s, 4.909, 1.88, { fill: ORG1, value: '6 807', label: 'Recovered', badge: '+13%', badgeLine: RED2, glyph: 'people' });
+    statCard(s, 8.9, 1.88, { fill: ORG3, value: '612', label: 'Death', badge: '+3%', badgeLine: ORG1, badgeColor: 'FF0000', glyph: 'tomb' });
+    heading(s, 1.098, 3.86, 2.863, 'Affected Area', 'Overview', { gap: 0.337 });
+    s.addChart(pptx.ChartType.bar, [
+        series('total cases', DAYS31, [2301, 4211, 3011, 2198, 1987, 2546, 3819, 4502, 3302, 1520, 6789, 4563, 2458, 4011, 2301,
+            4211, 3011, 2198, 1987, 2546, 3819, 4502, 3302, 1520, 5400, 4563, 2458, 4011, 1987, 2546, 3819]),
+        series('recovered', DAYS31, [1300, 2900, 2500, 1500, 1325, 1700, 229, 2500, 1500, 1325, 1700, 229, 1800, 3000, 1000,
+            1300, 2900, 2500, 1500, 1325, 1700, 229, 2500, 1500, 2500, 1500, 1325, 1700, 600, 1400, 800]),
+        series('death', DAYS31, [901, 853, 600, 500, 112, 803, 563, 600, 500, 112, 803, 563, 420, 967, 803,
+            901, 853, 600, 500, 112, 803, 563, 600, 500, 600, 500, 112, 803, 100, 52, 563])
+    ], chartOpts({
+        x: 0.918, y: 3.877, w: 11.156, h: 3.105, chartColors: [RED, ORG1, ORG3],
+        barGapWidthPct: 100, catAxisLabelFontSize: 12
+    }));
+    callout(s, 4.489, 4.237, '+19%', 'r');
+    callout(s, 9.401, 4.626, '+7%', 'r');
+}
+
+/* ----------------------------------------------------------- slides 21-30 */
+
+/** Satisfaction banner, happy-patients gauge, waiting-time bars and donut. */
+function slide21(s) {
+    slideTitle(s, 'Patient Satisfaction Dashboard');
+    bannerCard(s, { title: 'Patient Satisfaction', value: '75%', glyph: [4.471, 3.599, 0.97, 'ring'] });
+    gauge(s, 5.983, 2.183, 2.382, {
+        needle: 47, arcs: [
+            { from: 267.6, to: 359.3, color: ORG3, w: 20 },
+            { from: 206.5, to: 269.6, color: ORG1, w: 20 },
+            { from: 181.3, to: 208.2, color: RED, w: 20 }
+        ]
+    });
+    glyphMark(s, 7.094, 3.73, 0.366, 'ring', DARK);
+    head(s, 'Happy Patients', { x: 5.788, y: 4.0, w: 2.641, h: 0.337, fontSize: 14, align: 'center', margin: 2.8 });
+    heading(s, 1.02, 4.9, 2.863, 'Waiting Time', 'Overview', { gap: 0.337 });
+    s.addChart(pptx.ChartType.bar, [series('stats', DEPTS, DEPT_VALS)], chartOpts({
+        x: 2.911, y: 4.766, w: 5.591, h: 2.484, barDir: 'bar', barGapWidthPct: 100,
+        catAxisLabelFontSize: 12, valAxisHidden: true, catAxisLineShow: false, catAxisOrientation: 'maxMin'
+    }));
+    card(s, 9.046, 1.88, 3.369, 5.023, WHITE, 0.269, { shadow: shadow() });
+    heading(s, 9.367, 2.113, 2.961, 'Patient Stats', 'April', { gap: 0.387 });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.\u00a0',
+        { x: 9.367, y: 2.908, w: 2.961, h: 0.438, fontSize: 10 });
+    pill(s, 9.455, 3.599, 1.011, 0.335, '98%', { color: DARK });
+    s.addChart(pptx.ChartType.doughnut, [series('Posts', ['Medicare', 'Incurance', 'Other'], [8.2, 3.2, 1.4])], {
+        x: 9.189, y: 4.205, w: 3.138, h: 2.47, holeSize: 75, chartColors: [RED, RED2, ORG1],
+        showLegend: true, legendPos: 'b', legendFontFace: BODY, legendFontSize: 10, legendColor: DARK,
+        dataBorder: { pt: 0, color: 'FFFFFF' }, showValue: false
+    });
+    oval(s, 10.466, 4.916, 0.642, 0.642, RED);
+    txt(s, '$45k', { x: 10.466, y: 4.916, w: 0.642, h: 0.642, align: 'center', valign: 'middle', margin: 0, fontFace: HEAD, fontSize: 14, color: WHITE });
+}
+
+/** Treemap of departments plus occupancy gauge and weekly bars. */
+function slide22(s) {
+    slideTitle(s, 'Medical Dashboard');
+    head(s, 'Activity per Department', { x: 0.918, y: 1.981, w: 4.335, h: 0.37, fontSize: 16 });
+    [[0.918, 2.547, 2.07, 4.248, RED, '$145k', 'Pediatrics', 1.221, 2.905, 1.865],
+    [2.988, 2.547, 4.434, 1.37, RED2, '$129k', 'Oncology', 3.389, 2.905, 1.865],
+    [2.988, 3.918, 1.638, 2.878, ORG1, '$91k', 'Surgery', 3.191, 4.18, 1.291],
+    [4.626, 3.918, 2.796, 1.335, ORG2, '$88k', 'Gynecology', 4.854, 4.18, 2.086],
+    [4.626, 5.253, 1.386, 1.542, ORG3, '$45k', 'Men\u2019s Health', 4.854, 5.397, 1.05],
+    [6.012, 5.253, 1.41, 1.542, ORG4, '$43k', 'Women\u2019s Health', 6.203, 5.397, 1.05]].forEach(function (t) {
+        rect(s, t[0], t[1], t[2], t[3], t[4]);
+        head(s, t[5], { x: t[7], y: t[8], w: t[9], h: 0.404, fontSize: 18, color: WHITE });
+        txt(s, t[6], { x: t[7], y: t[8] + 0.389, w: t[9], h: 0.505, color: WHITE });
+    });
+    head(s, 'Hospital Occupancy', { x: 8.111, y: 1.981, w: 4.335, h: 0.37, fontSize: 16 });
+    gauge(s, 7.998, 2.547, 2.382, {
+        needle: 47, arcs: [
+            { from: 179.5, to: 359.3, color: DARK, w: 10, transparency: 80 },
+            { from: 181.3, to: 308.7, color: RED, w: 20 }
+        ]
+    });
+    iconCircle(s, 11.178, 2.002, 0.697, RED, 'people');
+    numBox(s, { x: 11.166, y: 2.799, w: 0.725, value: '75%', cap: 'CURRENT BED OCCUPANCY', capW: 1.468 });
+    head(s, 'Weekly Stats', { x: 8.086, y: 4.252, w: 4.343, h: 0.37, fontSize: 16 });
+    [['Week 1', 4.706, 5.051, 2.421, RED, '64%'], ['Week 2', 5.224, 5.568, 3.084, RED2, '81%'],
+    ['Week 3', 5.741, 6.085, 1.993, ORG1, '50%'], ['Week 4', 6.266, 6.61, 4.088, ORG2, '99%']].forEach(function (b) {
+        txt(s, b[0], { x: 8.102, y: b[1], w: 1.941, h: 0.303, valign: 'bottom' });
+        bar(s, 8.177, b[2], 4.173, b[3], b[4], b[5], b[5] === '99%' ? { pillX: 11.216 } : undefined);
+    });
+}
+
+/** Three KPI tiles, department column chart and a service indicator card. */
+function slide23(s) {
+    slideTitle(s, 'Medical Dashboard');
+    card(s, 0.918, 1.88, 1.629, 2.372, RED, 0.245);
+    oval(s, 1.379, 2.104, 0.697, 0.697, WHITE, { fill: { color: WHITE, transparency: 90 } });
+    glyphMark(s, 1.728, 2.453, 0.32, 'people', WHITE);
+    numBox(s, { x: 1.368, y: 2.9, w: 0.725, value: '75%', cap: 'CURRENT BED OCCUPANCY', capW: 1.468, capColor: WHITE });
+    iconCircle(s, 3.312, 2.104, 0.697, RED2, 'bed');
+    numBox(s, { x: 3.157, y: 2.9, w: 1.012, value: '1 890', cap: 'BED NUMBERS', capW: 1.389 });
+    iconCircle(s, 4.919, 2.104, 0.697, RED2, 'people');
+    numBox(s, { x: 4.821, y: 2.9, w: 0.899, value: '1 235', cap: 'CURRENT PATIENTS', capW: 1.389 });
+    s.addChart(pptx.ChartType.bar, [series('stats', DEPTS, DEPT_VALS)], chartOpts({
+        x: 0.905, y: 4.582, w: 4.946, h: 2.43, barGapWidthPct: 150, valAxisHidden: false,
+        valAxisLineShow: false, catAxisLabelFontSize: 12, catAxisLabelRotate: -45,
+        valAxisMaxVal: 60, valAxisMajorUnit: 20, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12
+    }));
+    card(s, 6.346, 1.88, 6.069, 5.133, WHITE, 0.269, { shadow: shadow() });
+    head(s, 'Service Indicator', { x: 6.796, y: 2.22, w: 5.428, h: 0.37, fontSize: 16 });
+    starMetric(s, 6.876, 2.845, { sub: 'April' });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.\u00a0',
+        { x: 6.876, y: 3.705, w: 1.975, h: 0.606, fontSize: 10 });
+    pill(s, 6.965, 4.444, 1.011, 0.335, '10 896', { color: DARK });
+    dial(s, {
+        x: 9.635, y: 2.311, d: 2.406, ringD: 1.868, hubD: 0.824, haloAlpha: 95, trackColor: DARK, trackAlpha: 80, trackW: 1,
+        arcColor: RED, arcW: 10, from: 222.6, to: 140, hubColor: RED, value: '>2k', label: 'Patients'
+    });
+    hline(s, 6.346, 5.195, 6.069, DARK, 1, 90);
+    heading(s, 6.796, 5.508, 3.476, 'Patient Satisfaction', null, {});
+    txt(s, 'Lorem ipsum', { x: 7.19, y: 5.845, w: 3.049, h: 0.303 });
+    oval(s, 6.877, 5.893, 0.246, 0.246, ORG1, { fill: { color: ORG1, transparency: 80 } });
+    glyphMark(s, 7.0, 6.016, 0.15, 'dot', DARK);
+    bar(s, 6.952, 6.477, 5.19, 3.084, RED2, '72%');
+}
+
+/** Three "arrival to ..." gauge cards, middle one highlighted in red. */
+function slide24(s) {
+    slideTitle(s, 'Patient Metrics Dashboard');
+    card(s, 0.918, 1.88, 1.629, 2.372, WHITE, 0.245, { shadow: shadow() });
+    iconCircle(s, 1.384, 2.092, 0.697, RED, 'people');
+    numBox(s, { x: 1.385, y: 2.889, w: 0.725, value: '75%', cap: 'PATIENT\u2019S SATISFACTION', capW: 1.468 });
+    head(s, 'Hospital Occupancy', { x: 3.033, y: 2.161, w: 3.646, h: 0.37, fontSize: 16 });
+    card(s, 6.303, 2.306, 3.092, 4.417, RED, 0.324);
+    [{ x: 3.418, tx: 3.494, title: 'Arrival to Physician', delta: '+3%', pillFill: RED, pillColor: DARK, value: '60 min',
+        arc: RED, track: DARK, trackA: 80, color: DARK, deltaColor: RED, needle: 47 },
+    { x: 6.743, tx: 6.823, title: 'Arrival to Doctor', delta: '+3%', pillFill: WHITE, pillColor: DARK, value: '30 min',
+        arc: WHITE, track: WHITE, trackA: 80, color: WHITE, deltaColor: WHITE, needle: 47 },
+    { x: 9.876, tx: 9.952, title: 'Arrival to Rest', delta: '+11%', pillFill: RED2, pillColor: DARK, value: '24 min',
+        arc: RED2, track: DARK, trackA: 80, color: DARK, deltaColor: RED, needle: 61.2 }].forEach(function (c) {
+        gauge(s, c.x, 2.713, 2.382, {
+            needle: c.needle, scaleColor: c.color, arcs: [
+                { from: 179.5, to: 359.3, color: c.track, w: 10, transparency: c.trackA },
+                { from: 181.3, to: c.needle > 50 ? 325.4 : 308.7, color: c.arc, w: 20 }
+            ]
+        });
+        head(s, c.title, { x: c.tx, y: 4.297, w: 1.975, h: 0.337, fontSize: 14, align: 'center', color: c.color });
+        txt(s, c.delta, { x: c.tx, y: 4.633, w: 1.975, h: 0.303, align: 'center', italic: true, color: c.deltaColor });
+        txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.\u00a0',
+            { x: c.tx, y: 5.041, w: 1.975, h: 0.606, align: 'center', fontSize: 10, color: c.color });
+        pill(s, c.tx + 0.529, 5.84, 1.011, 0.335, c.value, { fill: c.pillFill, color: c.pillColor });
+    });
+    vline(s, 6.212, 3.121, 2.527, DARK, 1, 90);
+    vline(s, 9.476, 3.121, 2.527, DARK, 1, 90);
+}
+
+/** Weekly stats card, big vaccines dial and a stacked area chart. */
+function slide25(s) {
+    slideTitle(s, 'Medical Dashboard');
+    card(s, 0.918, 1.88, 6.657, 2.582, WHITE, 0.258, { shadow: shadow() });
+    heading(s, 1.168, 2.232, 1.999, 'Weekly Statistics', 'Lorem ipsum', { gap: 0.337 });
+    s.addChart(pptx.ChartType.bar, [series('stats', WEEK, [4.3, 2.5, 3.5, 5, 3, 2, 4])], chartOpts({
+        x: 1.394, y: 2.569, w: 5.894, h: 1.673, barGapWidthPct: 360, barOverlapPct: -30
+    }));
+    callout(s, 4.178, 2.609, '+19%', 'r');
+    card(s, 8.045, 1.88, 4.37, 2.582, RED, 0.258);
+    dial(s, {
+        x: 9.439, y: 1.753, d: 2.791, ringD: 1.739, hubD: 1.191, haloColor: WHITE, haloAlpha: 90,
+        trackColor: WHITE, trackAlpha: 80, trackW: 10, arcColor: WHITE, arcW: 11, hubColor: ORG4,
+        from: 270, to: 140.6, endDot: ORG4, value: '71%', label: 'Vaccines', valueSize: 24, valueDy: 0.209, valueH: 0.505, labelDy: 0.677, labelSize: 12
+    });
+    head(s, '14 807', { x: 8.432, y: 2.22, w: 1.865, h: 0.404, fontSize: 18, color: WHITE });
+    txt(s, 'Total patients', { x: 8.432, y: 2.609, w: 1.865, h: 0.303, color: WHITE });
+    pill(s, 8.504, 3.013, 0.821, 0.335, '+1,5%', { fill: WHITE, line: RED, color: DARK, shadow: true });
+    heading(s, 1.606, 5.137, 1.661, 'Sleep', 'April', { gap: 0.336 });
+    oval(s, 1.654, 5.904, 0.314, 0.314, RED, { fill: { color: RED, transparency: 80 } });
+    glyphMark(s, 1.811, 6.061, 0.17, 'dot', DARK);
+    head(s, '79%', { x: 2.027, y: 5.845, w: 1.24, h: 0.404, fontSize: 18 });
+    pill(s, 1.676, 6.38, 1.011, 0.335, '6h 30mim');
+    vline(s, 3.476, 5.104, 1.695, DARK, 1, 90);
+    s.addChart(pptx.ChartType.area, [
+        series('Vaccine 1', WEEK, [6.3, 5, 7, 6, 6, 6.2, 8.1]),
+        series('Vaccine 2', WEEK, [2, 6, 4, 3, 5, 7, 5]),
+        series('Vaccine 3', WEEK, [3, 4, 2, 2, 4, 5, 6])
+    ], chartOpts({
+        x: 4.017, y: 5.213, w: 8.412, h: 1.578, chartColors: [RED, RED2, ORG1],
+        showLegend: true, legendPos: 'r', legendFontFace: BODY, legendFontSize: 12,
+        catAxisLabelFontSize: 12, catAxisLineShow: true, catAxisLineColor: 'E4E4E4'
+    }));
+    callout(s, 6.435, 5.563, '8,1', 'u');
+}
+
+/** Healthcare banner + donut, and a card with four labelled progress bars. */
+function slide26(s) {
+    slideTitle(s, 'Medical Dashboard');
+    bannerCard(s, { title: 'Healthcare Dashboard', value: '>12k' });
+    oval(s, 3.438, 2.547, 1.766, 1.766, WHITE, { fill: { color: WHITE, transparency: 90 } });
+    glyphMark(s, 4.321, 3.43, 1.16, 'plus', WHITE);
+    s.addChart(pptx.ChartType.doughnut, [series('Posts', ['Medicare', 'Healthcare', 'Incurance', 'Other'], [8.2, 5, 3.2, 1.4])], {
+        x: 1.796, y: 4.552, w: 3.138, h: 2.47, holeSize: 75, chartColors: [RED, RED2, ORG1, ORG2],
+        showLegend: true, legendPos: 'r', legendFontFace: BODY, legendFontSize: 10, legendColor: DARK,
+        dataBorder: { pt: 0, color: 'FFFFFF' }, showValue: false
+    });
+    oval(s, 2.541, 5.463, 0.642, 0.642, RED);
+    txt(s, '$45k', { x: 2.541, y: 5.463, w: 0.642, h: 0.642, align: 'center', valign: 'middle', margin: 0, fontFace: HEAD, fontSize: 14, color: WHITE });
+    card(s, 5.719, 1.97, 6.657, 4.984, WHITE, 0.318, { shadow: shadow() });
+    [['>1,3k', 2.21, 3.029, 4.246, RED, '82%', 'bar'], ['985 ', 3.367, 4.187, 1.985, RED2, '36%', 'ring'],
+    ['865', 4.524, 5.343, 2.833, ORG1, '51%', 'dot'], ['520', 5.684, 6.503, 4.867, RED, '90%', 'syringe']]
+        .forEach(function (d) {
+            heading(s, 6.667, d[1], 2.708, d[0], 'Lorem ipsum', { gap: 0.337 });
+            glyphMark(s, 6.343, d[1] + 0.25, 0.42, d[6], DARK);
+            bar(s, 6.259, d[2], 5.628, d[3], d[4], d[5], d[5] === '90%' ? { pillX: 10.192 } : undefined);
+        });
+}
+
+/** Healthcare line chart and three "personal" ring cards. */
+function slide27(s) {
+    slideTitle(s, 'Medical Dashboard');
+    heading(s, 0.905, 2.113, 2.131, '2,17k', 'Healthcare dashboard', { gap: 0.391 });
+    pill(s, 0.999, 2.925, 1.009, 0.335, '+5,2%');
+    s.addChart(pptx.ChartType.line, [series('Series 1', DAYS31, MONTH_VALS)], chartOpts({
+        x: 3.414, y: 2.059, w: 8.962, h: 1.78, lineDataSymbol: 'circle', lineDataSymbolSize: 10,
+        lineDataSymbolLineSize: 0, lineSize: 1.5, catAxisLineShow: true, catAxisLineColor: 'E4E4E4'
+    }));
+    card(s, 0.92, 4.238, 11.457, 2.601, WHITE, 0.269, { shadow: shadow() });
+    [{ x: 1.168, title: 'Doctors', ring: 2.662, color: RED, pct: '44%', act: '125 (44%)', wk: '241 (66%)', to: 71.8 },
+    { x: 4.96, title: 'Nurses', ring: 6.453, color: ORG1, pct: '75%', act: '325 (75%)', wk: '141 (25%)', to: 142 },
+    { x: 8.814, title: 'Other Personal', ring: 10.308, color: ORG3, pct: '67%', act: '263 (67%)', wk: '101 (33%)', to: 120 }]
+        .forEach(function (c, i) {
+            heading(s, c.x, 4.592, 2.863, c.title, 'Lorem ipsum', { gap: 0.337 });
+            dial(s, {
+                x: c.ring, y: 4.763, d: 1.755, ringD: 1.003, hubD: 0.573, haloAlpha: 95,
+                trackColor: DARK, trackAlpha: 80, trackW: 1, arcColor: c.color, arcW: 10,
+                from: 284.2, to: c.to, hubColor: c.color
+            });
+            txt(s, c.pct, { x: c.ring + 0.591, y: 5.354, w: 0.573, h: 0.573, align: 'center', valign: 'middle', margin: 0, fontFace: HEAD, fontSize: 14, color: WHITE });
+            [['Active: ', c.act, 5.78, c.color], ['Weekend: ', c.wk, 6.177, 'D6D6D6']].forEach(function (r) {
+                dot(s, c.x + 0.332, r[2] + 0.064, 0.128, r[3]);
+                s.addText([
+                    { text: r[0], options: { fontFace: BODY, fontSize: 10, color: DARK, breakLine: true } },
+                    { text: r[1], options: { fontFace: BODY, bold: true, fontSize: 10, color: DARK } }
+                ], { x: c.x + 0.42, y: r[2] - 0.147, w: 1.184, h: 0.438, valign: 'middle' });
+            });
+            if (i < 2) vline(s, [4.632, 8.423][i], 4.238, 2.601, DARK, 1, 90);
+        });
+}
+
+/** New-patients tile, six KPI icons and a weekly line chart. */
+function slide28(s) {
+    slideTitle(s, 'Medical Dashboard');
+    card(s, 0.918, 1.88, 1.913, 2.372, RED, 0.234);
+    oval(s, 1.515, 2.104, 0.697, 0.697, WHITE, { fill: { color: WHITE, transparency: 90 } });
+    glyphMark(s, 1.864, 2.453, 0.32, 'people', WHITE);
+    numBox(s, { x: 1.435, y: 2.9, w: 0.862, value: '1 238', cap: 'NEW PATIENTS', capW: 1.468, capH: 0.303, capColor: WHITE });
+    kpiRow(s, 2.948, [
+        { x: 4.041, value: '47', cap: 'BED NUMBERS', color: RED, glyph: 'bed' },
+        { x: 5.573, value: '37', cap: 'OUR DOCTORS', color: RED2, glyph: 'people' },
+        { x: 7.108, value: '19', cap: 'LAST OPERATIONS', color: ORG1, glyph: 'bar' },
+        { x: 8.446, value: '1 989', cap: 'TOTAL VACCINES', color: ORG2, glyph: 'syringe', w: 0.884 },
+        { x: 9.948, value: '30 min', cap: 'AVERAGE TIME ', color: ORG3, glyph: 'ring', w: 0.945 },
+        { x: 11.484, value: '$501k', cap: 'MONTHLY INCOME', color: ORG4, glyph: 'money', w: 0.945 }
+    ]);
+    card(s, 1.199, 4.121, 1.426, 1.244, ORG4, 0.249);
+    head(s, '91%', { x: 1.305, y: 4.309, w: 1.228, h: 0.505, fontSize: 24, color: WHITE, align: 'center' });
+    txt(s, 'Corona Tested', { x: 1.305, y: 4.777, w: 1.228, h: 0.505, align: 'center', color: WHITE });
+    numBox(s, { x: 1.588, y: 5.661, w: 0.673, value: '247', cap: 'HOURS', capW: 0.67, capH: 0.303 });
+    txt(s, LOREM, { x: 2.621, y: 5.67, w: 3.358, h: 0.909 });
+    hline(s, 3.98, 4.764, 8.435, DARK, 1, 90);
+    s.addChart(pptx.ChartType.line, [series('stats', WEEK, WEEK_VALS)], chartOpts({
+        x: 6.47, y: 5.101, w: 5.945, h: 1.676, lineDataSymbol: 'circle', lineDataSymbolSize: 10, lineDataSymbolLineSize: 0, lineSize: 2
+    }));
+}
+
+/** Visitors card, two column charts and a vaccines dial panel. */
+function slide29(s) {
+    slideTitle(s, 'Medical Dashboard');
+    card(s, 0.918, 1.88, 5.119, 1.954, WHITE, 0.194, { shadow: shadow() });
+    head(s, 'Visitors', { x: 1.184, y: 2.137, w: 1.214, h: 0.337, fontSize: 14 });
+    txt(s, '1-07 March', { x: 1.426, y: 2.528, w: 0.972, h: 0.505 });
+    s.addShape(S.triangle, { x: 1.279, y: 2.642, w: 0.158, h: 0.089, fill: { color: DARK }, line: { type: 'none' }, rotate: 180 });
+    [['57%', 'Women', 2.66, 2.651, 1.211, '+14%', RED], ['43%', 'Men', 4.302, 4.292, 1.211, '+4%', ORG4]].forEach(function (d) {
+        head(s, d[0], { x: d[2], y: 2.465, w: 1.253, h: 0.404, fontSize: 18, align: 'center' });
+        txt(s, d[1], { x: d[2], y: 2.854, w: 1.253, h: 0.303, align: 'center' });
+        pill(s, d[3], 3.263, d[4], 0.335, d[5], { fill: d[6] });
+    });
+    vline(s, 4.093, 2.348, 1.324, DARK, 1, 90);
+    s.addChart(pptx.ChartType.bar, [series('Women', WEEK, WEEK_VALS), series('Men', WEEK, WEEK_VALS2)], chartOpts({
+        x: 6.667, y: 2.006, w: 5.748, h: 1.828, chartColors: [RED, ORG4], barGapWidthPct: 220, barOverlapPct: -30,
+        valAxisHidden: false, valAxisLineShow: true, valAxisLineColor: DARK,
+        valGridLine: { color: DARK, size: 0.75, style: 'solid' }, showLegend: false, catAxisLabelFontSize: 12
+    }));
+    s.addChart(pptx.ChartType.bar, [series('stats', DEPTS, DEPT_VALS)], chartOpts({
+        x: 0.905, y: 4.24, w: 4.946, h: 2.741, barGapWidthPct: 150, valAxisHidden: false, valAxisLineShow: false,
+        catAxisLabelFontSize: 12, catAxisLabelRotate: -45,
+        valAxisMaxVal: 60, valAxisMajorUnit: 20, valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12
+    }));
+    card(s, 6.667, 4.367, 5.748, 2.582, RED, 0.258);
+    dial(s, {
+        x: 9.317, y: 4.24, d: 2.791, ringD: 1.739, hubD: 1.191, haloColor: WHITE, haloAlpha: 90,
+        trackColor: WHITE, trackAlpha: 80, trackW: 10, arcColor: WHITE, arcW: 11, hubColor: ORG4,
+        from: 270, to: 140.6, endDot: ORG4, value: '71%', label: 'Vaccines', valueSize: 24, valueDy: 0.209, valueH: 0.505, labelDy: 0.677, labelSize: 12
+    });
+    head(s, '14 807', { x: 7.146, y: 4.707, w: 1.865, h: 0.404, fontSize: 18, color: WHITE });
+    txt(s, 'Total patients', { x: 7.146, y: 5.097, w: 1.865, h: 0.303, color: WHITE });
+    pill(s, 7.219, 5.5, 0.821, 0.335, '+1,5%', { fill: WHITE, line: RED, color: DARK, shadow: true });
+}
+
+/** Side-rail layout: hospital donut and a department column chart. */
+function slide30(s) {
+    sideRail(s, 'MAR');
+    card(s, 6.662, 1.17, 5.71, 5.789, WHITE, 0.269, { shadow: shadow() });
+    heading(s, 2.117, 1.367, 4.181, 'Hospital', 'April', { size: 16, gap: 0.37 });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.\u00a0',
+        { x: 2.117, y: 2.145, w: 4.181, h: 0.438, fontSize: 10 });
+    ghost(s, 1.968, 3.0, 3.695, 3.695, 95);
+    s.addChart(pptx.ChartType.doughnut, [series('Posts', ['Medicare', 'Incurance', 'Other'], [8.2, 3.2, 1.4])], {
+        x: 2.431, y: 3.446, w: 2.718, h: 2.845, holeSize: 75, chartColors: [RED, RED2, ORG1],
+        showLegend: true, legendPos: 'b', legendFontFace: BODY, legendFontSize: 10, legendColor: DARK,
+        dataBorder: { pt: 0, color: 'FFFFFF' }, showValue: false
+    });
+    iconCircle(s, 3.457, 4.355, 0.697, ORG3, 'money');
+    numBox(s, { x: 7.161, y: 1.534, value: '27', cap: 'DAYS', capW: 0.593, capH: 0.303 });
+    numBox(s, { x: 7.844, y: 1.534, value: '14', cap: 'HOURS', capW: 0.67, capH: 0.303 });
+    txt(s, LOREM, { x: 8.867, y: 1.53, w: 3.12, h: 0.909 });
+    s.addChart(pptx.ChartType.bar, [series('stats', DEPTS, DEPT_VALS)], chartOpts({
+        x: 7.161, y: 2.729, w: 4.825, h: 2.931, barGapWidthPct: 150, catAxisLabelFontSize: 12,
+        catAxisLineShow: true, catAxisLineColor: 'E4E4E4', catAxisLabelRotate: -45,
+        showValue: true, dataLabelFontFace: BODY, dataLabelFontSize: 12, dataLabelColor: DARK, dataLabelPosition: 'outEnd'
+    }));
+    heading(s, 7.268, 5.899, 2.909, 'Lorem Ipsum the dummy text', 'April', { gap: 0.336 });
+    oval(s, 10.488, 5.894, 0.314, 0.314, RED, { fill: { color: RED, transparency: 80 } });
+    glyphMark(s, 10.645, 6.051, 0.17, 'plus', DARK);
+    head(s, '79%', { x: 10.862, y: 5.835, w: 1.24, h: 0.404, fontSize: 18 });
+    pill(s, 10.511, 6.371, 1.011, 0.335, '$491k');
+}
+
+/* ----------------------------------------------------------- slides 31-40 */
+
+/** Side rail, three numbered indicator rows and a weekly area chart. */
+function slide31(s) {
+    sideRail(s, 'APR');
+    head(s, 'Service Indicator', { x: 2.203, y: 1.068, w: 4.026, h: 0.37, fontSize: 16 });
+    starMetric(s, 2.283, 1.693, { sub: 'April' });
+    [['65%', 2.7, RED, '01', 3.161, 3.214], ['71%', 4.184, ORG1, '02', 4.635, 4.694], ['28%', 5.673, ORG3, '03', 6.133, 6.183]]
+        .forEach(function (r, i) {
+            card(s, 2.265, r[1], 3.914, 1.194, WHITE, 0.188, { shadow: shadow() });
+            head(s, r[0], { x: 2.472, y: r[1] + 0.292, w: 1.248, h: 0.64, fontSize: 32, align: 'center', valign: 'middle' });
+            txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text.\u00a0',
+                { x: 4.017, y: r[1] + 0.259, w: 2.044, h: 0.707, align: 'center', valign: 'middle' });
+            vline(s, 3.802, r[1], 1.194, DARK, 1, 90);
+            dot(s, 2.265, r[5] + 0.1, 0.203, r[2]);
+            txt(s, r[3], { x: 1.551, y: r[4], w: 0.563, h: 0.303, align: 'right', italic: true });
+            if (i < 2) vline(s, 2.265, r[5] + 0.203, 1.28, i === 0 ? RED : ORG1, 1);
+        });
+    oval(s, 7.072, 1.303, 0.314, 0.314, RED, { fill: { color: RED, transparency: 80 } });
+    glyphMark(s, 7.229, 1.46, 0.17, 'plus', DARK);
+    head(s, '>1.8k', { x: 7.445, y: 1.244, w: 0.875, h: 0.404, fontSize: 18 });
+    pill(s, 7.094, 1.78, 1.011, 0.335, '$491k');
+    txt(s, LOREM, { x: 8.744, y: 1.247, w: 3.671, h: 0.909 });
+    s.addChart(pptx.ChartType.area, [
+        series('Vaccine 1', ['Week 1', 'Week 2', 'Week 3', 'Weeek 4'], [6.3, 5, 7, 6]),
+        series('Vaccine 2', ['Week 1', 'Week 2', 'Week 3', 'Weeek 4'], [2, 6, 4, 3]),
+        series('Vaccine 3', ['Week 1', 'Week 2', 'Week 3', 'Weeek 4'], [3, 4, 2, 2])
+    ], chartOpts({
+        x: 7.027, y: 2.859, w: 5.388, h: 1.932, chartColors: [RED, RED2, ORG1],
+        showLegend: true, legendPos: 'l', legendFontFace: BODY, legendFontSize: 12,
+        catAxisLabelFontSize: 12, catAxisLineShow: true, catAxisLineColor: 'E4E4E4'
+    }));
+    callout(s, 10.659, 3.087, '8,1', 'u');
+    hline(s, 7.297, 5.238, 5.118, DARK, 1, 90);
+    heading(s, 7.763, 5.622, 2.708, '520', 'Lorem ipsum', { gap: 0.336 });
+    glyphMark(s, 7.564, 5.99, 0.42, 'syringe', DARK);
+    bar(s, 7.355, 6.44, 4.965, 3.368, RED, '79%', { pillX: 10.919 });
+}
+
+/** Side rail, weekly bar chart, patients dial and a 31-day line chart card. */
+function slide32(s) {
+    sideRail(s, 'MAY', ['person', 'dot', 'bar', 'syringe']);
+    head(s, '25 896', { x: 2.241, y: 1.163, w: 4.035, h: 0.64, fontSize: 32 });
+    txt(s, LOREM_TINY, { x: 2.241, y: 1.844, w: 4.035, h: 0.505 });
+    s.addChart(pptx.ChartType.bar, [series('stats', WEEK, [4.3, 2.5, 3.5, 5, 3, 2, 4])], chartOpts({
+        x: 2.0, y: 2.569, w: 4.276, h: 2.441, barGapWidthPct: 180, barOverlapPct: -30, catAxisLabelFontSize: 12
+    }));
+    callout(s, 3.973, 2.799, '+19%', 'r');
+    starMetric(s, 7.17, 2.724, { sub: 'May' });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.\u00a0',
+        { x: 7.17, y: 3.584, w: 1.975, h: 0.606, fontSize: 10 });
+    pill(s, 7.258, 4.322, 1.011, 0.335, '10 896', { color: DARK });
+    dial(s, {
+        x: 9.929, y: 2.473, d: 2.406, ringD: 1.868, hubD: 0.824, haloAlpha: 95, trackColor: DARK, trackAlpha: 80, trackW: 1,
+        arcColor: RED, arcW: 10, from: 222.6, to: 140, hubColor: RED, value: '>2k', label: 'Patients'
+    });
+    vline(s, 6.627, 2.758, 2.12, DARK, 1, 90);
+    card(s, 2.241, 5.295, 10.132, 1.664, WHITE, 0.166, { shadow: shadow() });
+    head(s, 'Service Indicator', { x: 2.597, y: 5.472, w: 4.026, h: 0.37, fontSize: 16 });
+    s.addChart(pptx.ChartType.line, [series('Series 1', DAYS31, MONTH_VALS)], chartOpts({
+        x: 2.526, y: 5.46, w: 9.539, h: 1.45, lineDataSymbol: 'circle', lineDataSymbolSize: 10, lineDataSymbolLineSize: 0, lineSize: 1.5
+    }));
+}
+
+/** Side rail, vertical progress bar, four milestone pills and two tiles. */
+function slide33(s) {
+    sideRail(s, 'MAY', ['person', 'dot', 'bar', 'syringe']);
+    head(s, '25 896', { x: 2.241, y: 1.163, w: 4.035, h: 0.64, fontSize: 32 });
+    txt(s, LOREM_TINY, { x: 2.241, y: 1.844, w: 4.035, h: 0.505 });
+    numBox(s, { x: 7.161, y: 1.534, value: '27', cap: 'DAYS', capW: 0.593, capH: 0.303 });
+    numBox(s, { x: 7.844, y: 1.534, value: '14', cap: 'HOURS', capW: 0.67, capH: 0.303 });
+    txt(s, LOREM, { x: 8.867, y: 1.53, w: 3.12, h: 0.909 });
+    vline(s, 2.771, 2.859, 3.914, DARK, 10, 90);
+    vline(s, 2.77, 5.168, 1.605, RED, 10);
+    glyphMark(s, 2.473, 6.495, 0.4, 'bar', DARK);
+    dot(s, 2.771, 5.169, 0.203, RED);
+    pill(s, 2.904, 4.962, 0.853, 0.411, '82%', { fill: WHITE, color: DARK, size: 18, shadow: true });
+    heading(s, 2.938, 6.134, 1.317, '>1,3k', 'Lorem ipsum', { gap: 0.337 });
+    [['1 356', 2.79, RED], ['2 893', 3.933, RED2], ['961', 5.076, ORG1], ['1068', 6.219, ORG2]].forEach(function (m, i) {
+        pill(s, 4.685, m[1], 1.211, 0.335, m[0], { fill: m[2] });
+        dot(s, 4.919, m[1] + 0.372, 0.203, m[2]);
+        if (i < 3) vline(s, 4.919, m[1] + 0.474, 0.669, m[2], 1);
+        txt(s, 'Lorem ipsum', { x: 4.919, y: m[1] + 0.488, w: 1.076, h: 0.269, align: 'center', fontSize: 10, italic: true });
+    });
+    [{ x: 7.099, fill: WHITE, value: '7 658', cap: 'NEW PATIENTS', icon: ORG3, tx: 7.261, capColor: DARK, iconAlpha: 0 },
+    { x: 9.959, fill: ORG4, value: '1 238', cap: 'TESTED PATIENTS', icon: WHITE, tx: 10.121, capColor: WHITE, iconAlpha: 90 }]
+        .forEach(function (c) {
+            card(s, c.x, 3.002, 2.278, 2.372, c.fill, 0.234, { shadow: c.fill === WHITE ? shadow() : undefined });
+            oval(s, c.x + 0.78, 3.226, 0.697, 0.697, c.icon, { fill: { color: c.icon, transparency: c.iconAlpha } });
+            glyphMark(s, c.x + 1.129, 3.575, 0.32, 'person', WHITE);
+            numBox(s, { x: c.x + 0.699, y: 4.022, w: 0.862, value: c.value });
+            txt(s, c.cap, { x: c.tx, y: 4.69, w: 1.941, h: 0.303, align: 'center', margin: 2.8, color: c.capColor });
+            txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type.\u00a0',
+                { x: c.tx + 0.007, y: 5.644, w: 1.951, h: 1.313, align: 'center' });
+        });
+}
+
+/** Top red bar with icon strip, patients dial, long paragraph, orange card. */
+function slide34(s) {
+    topBar(s, 'MAY', 1.325, [3.358, 4.128, 4.897, 5.67]);
+    head(s, '25 896', { x: 3.278, y: 1.099, w: 4.035, h: 0.64, fontSize: 32 });
+    hline(s, 3.358, 1.974, 9.057, DARK, 1, 90);
+    dial(s, {
+        x: 0.878, y: 2.003, d: 2.406, ringD: 1.868, hubD: 0.936, haloAlpha: 95, trackColor: DARK, trackAlpha: 80, trackW: 1,
+        arcColor: RED2, arcW: 10, from: 222.6, to: 140, hubColor: RED2, value: '>2k', label: 'Patients', valueDy: 0.188, labelDy: 0.522
+    });
+    oval(s, 3.806, 2.832, 0.314, 0.314, ORG1, { fill: { color: ORG1, transparency: 80 } });
+    glyphMark(s, 3.963, 2.989, 0.17, 'plus', DARK);
+    head(s, '>1.8k', { x: 4.18, y: 2.773, w: 0.875, h: 0.404, fontSize: 18 });
+    pill(s, 3.828, 3.308, 1.011, 0.335, '$491k', { fill: ORG1 });
+    txt(s, LOREM_LONG + 'It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.',
+        { x: 5.478, y: 2.448, w: 6.899, h: 1.515, align: 'center' });
+    card(s, 0.878, 4.844, 11.494, 2.115, ORG2, 0.257);
+    glyphMark(s, 1.497, 5.418, 0.5, 'person', WHITE);
+    head(s, '14 807', { x: 2.074, y: 5.111, w: 1.865, h: 0.404, fontSize: 18, color: WHITE });
+    txt(s, 'Total Tested', { x: 2.074, y: 5.5, w: 1.865, h: 0.303, color: WHITE });
+    txt(s, '31 days', { x: 2.074, y: 5.807, w: 1.865, h: 0.269, fontSize: 10, italic: true, color: WHITE });
+    s.addChart(pptx.ChartType.line, [series('Series 1', DAYS31, MONTH_VALS)], chartOpts({
+        x: 3.467, y: 5.056, w: 8.598, h: 1.692, chartColors: [WHITE], lineDataSymbol: 'circle',
+        lineDataSymbolSize: 10, lineDataSymbolLineSize: 0, lineSize: 1.5, catAxisLabelColor: WHITE
+    }));
+}
+
+/** Red top bar, total-cases card, Jan timeline and two bar charts. */
+function slide35(s) {
+    topBar(s, 'JAN', 4.809, [1.494, 2.264, 3.033, 3.806], 'virus');
+    statCard(s, 0.918, 1.568, { fill: RED, value: '140 807', label: 'Total Cases', badge: 'Today: 1 302', badgeW: 1.338, glyph: 'virus' });
+    [['132', 'Death', 'Today: 18', 1.134], ['1 058', 'Recovered', 'Today: 92', 2.864]].forEach(function (d) {
+        head(s, d[0], { x: d[3], y: 3.294, w: 1.444, h: 0.337, fontSize: 14, align: 'center' });
+        txt(s, d[1], { x: d[3], y: 3.63, w: 1.444, h: 0.303, align: 'center' });
+        txt(s, d[2], { x: d[3], y: 4.0, w: 1.444, h: 0.269, align: 'center', fontSize: 10, italic: true, color: RED });
+    });
+    vline(s, 2.703, 3.294, 0.894, DARK, 1, 90);
+    [['721', '01', 'st', 1.891, RED], ['830', '13', 'th', 2.7, RED2], ['650', '21', 'th', 3.512, RED2]].forEach(function (d, i) {
+        head(s, d[0], { x: 5.67, y: d[3], w: 2.063, h: 0.337, fontSize: 14 });
+        s.addText([
+            { text: d[1], options: { fontFace: BODY, fontSize: 12, color: DARK } },
+            { text: d[2], options: { fontFace: BODY, fontSize: 12, color: DARK, superscript: true } },
+            { text: ' Jan, corona cases', options: { fontFace: BODY, fontSize: 12, color: DARK } }
+        ], { x: 5.67, y: d[3] + 0.337, w: 2.063, h: 0.303, valign: 'top' });
+        dot(s, 5.452, d[3] + 0.202, 0.203, d[4]);
+        if (i < 2) vline(s, 5.452, d[3] + 0.304, 0.613, i === 0 ? RED : DARK, 1, i === 0 ? 0 : 90);
+    });
+    s.addChart(pptx.ChartType.bar, [
+        series('Female', WEEKS4, [4.3, 2.5, 3.5, 4.5]), series('Male', WEEKS4, [2.4, 4.4, 1.8, 2.8]),
+        series('Child', WEEKS4, [1, 0.7, 0.4, 0.13])
+    ], chartOpts({
+        x: 8.536, y: 1.726, w: 3.841, h: 2.479, chartColors: [RED, ORG1, ORG1],
+        barGapWidthPct: 219, barOverlapPct: -27, showLegend: true, legendPos: 'b', legendFontFace: BODY, legendFontSize: 12,
+        valAxisHidden: false, valGridLine: { color: DARK, size: 0.75, style: 'solid' }, valAxisLineShow: false,
+        catAxisLineShow: true, catAxisLineColor: 'E4E4E4', catAxisLabelFontFace: HEAD, catAxisLabelFontSize: 12,
+        valAxisLabelFontFace: BODY, valAxisLabelFontSize: 12
+    }));
+    card(s, 0.878, 4.64, 11.494, 2.319, WHITE, 0.285, { shadow: shadow() });
+    heading(s, 1.279, 5.126, 1.661, 'Testes', 'January', { gap: 0.336 });
+    pill(s, 1.367, 6.075, 1.011, 0.335, '103 850', { fill: ORG2, color: DARK });
+    s.addChart(pptx.ChartType.bar, [series('Series 1', DAYS31, MONTH_VALS)], chartOpts({
+        x: 3.033, y: 5.156, w: 9.033, h: 1.754, chartColors: [ORG2], barGapWidthPct: 150,
+        catAxisLineShow: true, catAxisLineColor: 'E4E4E4'
+    }));
+}
+
+/** Red top bar with a month tag and a strip of round icon buttons. */
+function topBar(s, month, badgeX, iconXs, badgeGlyph) {
+    rect(s, 0, 0, 13.333, 0.915, RED);
+    txt(s, month, { x: 0.224, y: 0.328, w: 0.915, h: 0.303, align: 'center', color: WHITE });
+    oval(s, badgeX, 0.263, 1.305, 1.305, RED);
+    glyphMark(s, badgeX + 0.652, 0.915, 0.55, badgeGlyph || 'bar', WHITE);
+    ['person', 'dot', 'bar', 'syringe'].forEach(function (g, i) {
+        oval(s, iconXs[i], 0.311, 0.406, 0.406, WHITE);
+        glyphMark(s, iconXs[i] + 0.203, 0.514, 0.19, g, DARK);
+    });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text.', { x: 6.858, y: 0.33, w: 5.013, h: 0.303, italic: true, color: WHITE });
+}
+
+/** Left rail with 81%, progress bar, mini line chart and a procedures card. */
+function slide36(s) {
+    leftRail(s, { x: 0.343, h: 6.869, value: '81%', label: false, topGlyph: 'plus', glyphs: ['person', 'ring', 'bar', 'syringe', 'syringe'] });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.',
+        { x: 1.829, y: 0.723, w: 6.457, h: 0.303, align: 'center', italic: true });
+    head(s, '>1,3k', { x: 2.549, y: 1.582, w: 2.708, h: 0.37, fontSize: 16 });
+    bar(s, 2.549, 2.055, 5.004, 3.757, RED, '81%');
+    txt(s, 'Lorem ipsum', { x: 2.549, y: 2.204, w: 2.708, h: 0.303 });
+    s.addChart(pptx.ChartType.line, [series('stats', WEEK, WEEK_VALS)], chartOpts({
+        x: 8.412, y: 1.431, w: 3.965, h: 1.275, lineDataSymbol: 'circle', lineDataSymbolSize: 10,
+        lineDataSymbolLineSize: 0, lineSize: 2, catAxisHidden: true
+    }));
+    card(s, 2.048, 2.88, 10.329, 4.305, WHITE, 0.269, { shadow: shadow() });
+    starMetric(s, 2.492, 3.376, { sub: 'May' });
+    txt(s, LOREM_LONG, { x: 2.492, y: 4.237, w: 1.975, h: 1.784, fontSize: 10 });
+    pill(s, 2.581, 6.261, 1.011, 0.335, '10 896', { color: DARK });
+    vline(s, 4.889, 2.88, 4.305, DARK, 1, 90);
+    [['07 JUN', 'The first ', '01', 5.337, 6.089, RED, 6.231], ['15 JUN', 'The second', '02', 7.637, 8.389, ORG1, 8.531],
+    ['27 JUN', 'The third', '03', 9.926, 10.679, ORG3, 10.821]].forEach(function (p, i) {
+        head(s, p[0], { x: p[3], y: 3.308, w: 1.996, h: 0.337, fontSize: 14, align: 'center', bold: false });
+        s.addText([
+            { text: p[1], options: { fontFace: BODY, fontSize: 12, color: DARK, breakLine: true } },
+            { text: 'Procedure', options: { fontFace: BODY, fontSize: 12, color: DARK } }
+        ], { x: p[3], y: 3.674, w: 1.996, h: 0.505, align: 'center', valign: 'top', margin: 2.8 });
+        numBox(s, { x: p[4], y: 4.257, value: p[2] });
+        dot(s, p[6] + 0.1015, 5.047, 0.203, p[5]);
+        if (i < 2) hline(s, p[6] + 0.203, 5.047, 2.087, p[5], 1);
+    });
+    [['>1,1k', 5.532, RED, 5.962], ['>2,3k', 7.801, ORG1, 8.23], ['>1,7k', 10.085, ORG3, 10.515]].forEach(function (d) {
+        dial(s, {
+            x: d[1], y: 5.311, d: 1.675, ringD: 1.3, hubD: 0.824, haloAlpha: 95, trackColor: DARK, trackAlpha: 80, trackW: 1,
+            arcColor: d[2], arcW: 10, from: 222.6, to: 140, hubColor: d[2], value: d[0], label: 'Patients'
+        });
+    });
+}
+
+/** Left rail with 753, KPI icon row and a red panel with gauge + dial. */
+function slide37(s) {
+    card(s, 2.111, 3.933, 10.261, 3.026, RED2, 0.283);
+    leftRail(s, { x: 0.343, value: '753', badge: '10 896' });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.',
+        { x: 1.829, y: 0.723, w: 6.457, h: 0.303, align: 'center', italic: true });
+    kpiRow(s, 2.529, [
+        { x: 3.211, value: '47', cap: 'BED NUMBERS', color: RED, glyph: 'bed' },
+        { x: 4.811, value: '37', cap: 'OUR DOCTORS', color: RED2, glyph: 'people' },
+        { x: 6.413, value: '19', cap: 'LAST OPERATIONS', color: ORG1, glyph: 'bar' },
+        { x: 7.819, value: '1 989', cap: 'TOTAL VACCINES', color: ORG2, glyph: 'syringe', w: 0.884 },
+        { x: 9.388, value: '30 min', cap: 'AVERAGE TIME ', color: ORG3, glyph: 'ring', w: 0.945 },
+        { x: 10.992, value: '$501k', cap: 'MONTHLY INCOME', color: ORG4, glyph: 'money', w: 0.945 }
+    ]);
+    gauge(s, 2.723, 4.559, 2.382, {
+        needle: 47, scaleColor: WHITE, arcs: [
+            { from: 179.5, to: 359.3, color: WHITE, w: 10, transparency: 80 },
+            { from: 181.3, to: 308.7, color: WHITE, w: 20 }
+        ]
+    });
+    head(s, 'Arrival to Procedure', { x: 2.775, y: 6.089, w: 2.191, h: 0.337, fontSize: 14, color: WHITE, align: 'center' });
+    txt(s, '+3%', { x: 2.775, y: 6.426, w: 2.191, h: 0.303, align: 'center', italic: true, color: WHITE });
+    pill(s, 2.356, 4.17, 0.821, 0.335, '-7%', { fill: WHITE, line: RED, color: DARK, shadow: true });
+    vline(s, 5.523, 3.933, 3.026, WHITE, 1, 90);
+    head(s, '753', { x: 6.039, y: 4.272, w: 2.664, h: 0.404, fontSize: 18, color: WHITE });
+    txt(s, 'Total patients', { x: 6.039, y: 4.661, w: 2.664, h: 0.303, color: WHITE });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley.\u00a0',
+        { x: 6.035, y: 5.065, w: 2.668, h: 0.909, color: WHITE });
+    pill(s, 6.112, 6.27, 0.821, 0.335, '+1,5%', { fill: WHITE, line: RED, color: DARK, shadow: true });
+    dial(s, {
+        x: 9.144, y: 4.074, d: 2.791, ringD: 1.739, hubD: 1.191, haloColor: WHITE, haloAlpha: 90,
+        trackColor: WHITE, trackAlpha: 80, trackW: 10, arcColor: WHITE, arcW: 11, hubColor: ORG4,
+        from: 270, to: 140.6, endDot: ORG4, value: '71%', label: 'Recovered', valueSize: 24, valueDy: 0.209, valueH: 0.505, labelDy: 0.677, labelSize: 12
+    });
+}
+
+/** Left rail with 7 053, two vertical progress bars and an active-cases card. */
+function slide38(s) {
+    leftRail(s, { x: 0.343, value: '7 053', badge: '10 896' });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.',
+        { x: 1.829, y: 0.723, w: 6.457, h: 0.303, align: 'center', italic: true });
+    starMetric(s, 2.694, 1.747, { sub: 'May' });
+    [{ x: 2.914, top: 2.9, h: 2.965, fillTop: 5.194, fillH: 0.671, color: RED, pct: '19%', px: 3.048, py: 4.988,
+        label: '>1,3k', lx: 2.263, glyph: [2.633, 5.224, 'bar'] },
+    { x: 4.679, top: 2.911, h: 2.954, fillTop: 3.884, fillH: 1.981, color: RED2, pct: '78%', px: 4.813, py: 3.555,
+        label: '>3,76k', lx: 4.027, glyph: [4.43, 3.821, 'syringe'] }].forEach(function (b) {
+        vline(s, b.x, b.top, b.h, DARK, 10, 90);
+        vline(s, b.x, b.fillTop, b.fillH, b.color, 10);
+        dot(s, b.x, b.fillTop, 0.203, b.color);
+        pill(s, b.px, b.py, 0.853, 0.411, b.pct, { fill: WHITE, color: DARK, size: 18, shadow: true });
+        glyphMark(s, b.glyph[0], b.glyph[1], 0.4, b.glyph[2], DARK);
+        heading(s, b.lx, 6.08, 1.317, b.label, 'Lorem ipsum', { gap: 0.337 });
+    });
+    card(s, 6.25, 1.311, 6.165, 5.873, WHITE, 0.246, { shadow: shadow() });
+    heading(s, 6.8, 1.737, 5.357, 'Active cases', null, {});
+    s.addText([
+        { text: '27', options: { fontFace: BODY, fontSize: 12, color: DARK } },
+        { text: 'th', options: { fontFace: BODY, fontSize: 12, color: DARK, superscript: true } },
+        { text: ' May', options: { fontFace: BODY, fontSize: 12, color: DARK } }
+    ], { x: 6.8, y: 2.074, w: 5.357, h: 0.303, valign: 'top' });
+    ghost(s, 9.896, 1.687, 2.202, 2.227, 95);
+    txt(s, LOREM_LONG + 'It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. ',
+        { x: 6.8, y: 2.482, w: 5.357, h: 0.942, fontSize: 10 });
+    pill(s, 6.889, 3.707, 1.011, 0.335, '7 630', { color: DARK });
+    s.addChart(pptx.ChartType.bar, [series('Test', WEEK, WEEK_VALS), series('Vaccina', WEEK, WEEK_VALS2)], chartOpts({
+        x: 6.667, y: 4.248, w: 5.49, h: 2.41, chartColors: [RED, ORG4], barGapWidthPct: 220, barOverlapPct: -30, catAxisLabelFontSize: 12
+    }));
+}
+
+/** Week header banner, spiral arcs, corona-tests card and a patients dial. */
+function slide39(s) {
+    weekHeader(s);
+    starMetric(s, 1.033, 2.613, { sub: 'May' });
+    txt(s, LOREM_LONG, { x: 3.355, y: 2.555, w: 4.197, h: 0.942, fontSize: 10 });
+    // four nested arcs opening to the right, each capped with a dot at both ends
+    [{ box: [4.132, 3.84, 3.941, 2.82], from: 129.0, to: 233.3, color: ORG2, num: '04', nx: 5.281, ny: 3.768,
+        d1: [5.083, 3.894], d2: [5.083, 6.4], lx: 5.286, ly: 6.48 },
+    { box: [4.471, 4.116, 3.21, 2.268], from: 115.2, to: 243.3, color: ORG1, num: '03', nx: 5.685, ny: 3.968,
+        d1: [5.463, 4.078], d2: [5.463, 6.228], lx: 5.673, ly: 6.212 },
+    { box: [4.759, 4.406, 2.494, 1.688], from: 100.9, to: 258.1, color: RED2, num: '02', nx: 5.954, ny: 4.255,
+        d1: [5.739, 4.308], d2: [5.739, 5.986], lx: 5.958, ly: 5.966 },
+    { box: [5.101, 4.682, 1.732, 1.136], from: 88.9, to: 267.2, color: RED, num: '01', nx: 6.097, ny: 4.524,
+        d1: [5.865, 4.584], d2: [5.865, 5.729], lx: 6.102, ly: 5.663 }].forEach(function (a) {
+        s.addShape(S.arc, {
+            x: a.box[0], y: a.box[1], w: a.box[2], h: a.box[3],
+            fill: { type: 'none' }, line: { color: a.color, width: 10 }, angleRange: [a.from, a.to]
+        });
+        oval(s, a.d1[0], a.d1[1], 0.203, 0.203, a.color);
+        oval(s, a.d2[0], a.d2[1], 0.203, 0.203, a.color);
+        txt(s, a.num, { x: a.nx, y: a.ny, w: 0.458, h: 0.303, align: 'center', fontFace: HEAD });
+        txt(s, 'Lorem ipsum', { x: a.lx, y: a.ly, w: 1.633, h: 0.303, align: 'center' });
+    });
+    glyphMark(s, 5.652, 5.232, 0.42, 'person', ORG4);
+    dial(s, {
+        x: 0.913, y: 4.155, d: 2.107, ringD: 1.3, hubD: 0.824, haloAlpha: 95, trackColor: DARK, trackAlpha: 80, trackW: 1,
+        arcColor: RED, arcW: 10, from: 222.6, to: 140, hubColor: RED, value: '>1,1k', label: 'Patients'
+    });
+    numBox(s, { x: 3.282, y: 4.958, value: '37', cap: 'OUR DOCTORS' });
+    card(s, 8.018, 1.88, 4.542, 5.023, WHITE, 0.205, { shadow: shadow() });
+    ghost(s, 10.604, 2.079, 1.74, 1.719, 95);
+    heading(s, 8.52, 2.679, 3.803, 'Corona Tests', 'April', { gap: 0.387 });
+    txt(s, LOREM_LONG, { x: 8.52, y: 3.474, w: 3.803, h: 0.942, fontSize: 10 });
+    pill(s, 8.608, 4.634, 1.011, 0.335, '98%', { color: DARK });
+    hline(s, 8.018, 5.376, 4.542, DARK, 1, 90);
+    head(s, '>1,3k', { x: 8.891, y: 5.63, w: 2.205, h: 0.337, fontSize: 14 });
+    glyphMark(s, 8.494, 6.099, 0.4, 'bar', DARK);
+    bar(s, 8.939, 6.086, 3.385, 2.077, RED, '70%', { pillX: 11.194 });
+    txt(s, 'Lorem ipsum', { x: 8.891, y: 6.188, w: 2.205, h: 0.303, italic: true });
+}
+
+/** Lungs artwork, covid gauge and a five-step procedure timeline. */
+function slide40(s) {
+    leftRail(s, { x: 11.825, mirror: true, value: '7 053', badge: '10 896' });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.',
+        { x: 5.07, y: 0.723, w: 6.457, h: 0.303, align: 'right', italic: true });
+    artPlaceholder(s, 1.107, 1.745, 3.127, 2.836, '[lungs]', DARK, 90);
+    glyphMark(s, 3.781, 3.285, 1.6, 'virus', RED);
+    glyphMark(s, 1.53, 4.041, 0.5, 'virus', RED);
+    starMetric(s, 1.217, 0.826, { sub: 'May', iconColor: RED2 });
+    gauge(s, 7.83, 1.891, 3.453, {
+        needle: 47, arcs: [
+            { from: 179.5, to: 359.3, color: DARK, w: 10, transparency: 80 },
+            { from: 181.3, to: 308.7, color: RED, w: 20 }
+        ]
+    });
+    head(s, 'Covid cases', { x: 5.363, y: 2.351, w: 1.975, h: 0.337, fontSize: 14, align: 'center' });
+    txt(s, '+3%', { x: 5.363, y: 2.688, w: 1.975, h: 0.303, align: 'center', italic: true, color: RED });
+    txt(s, 'Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s.\u00a0',
+        { x: 5.363, y: 3.096, w: 1.975, h: 0.606, align: 'center', fontSize: 10 });
+    pill(s, 5.892, 3.895, 1.011, 0.335, '24 days', { color: DARK });
+    card(s, 0.954, 5.154, 10.329, 2.03, WHITE, 0.222, { shadow: shadow() });
+    [['01 May', 'The first ', 1.664, 1.441, 2.122, RED], ['11 May', 'The second', 3.641, 3.418, 4.099, RED2],
+    ['19 May', 'The third', 5.626, 5.403, 6.084, ORG1], ['28 May', 'The forth', 7.582, 7.359, 8.041, ORG2],
+    ['03 Jun', 'The fifth', 9.55, 9.327, 10.009, ORG3]].forEach(function (p, i) {
+        numBox(s, { x: p[2], y: 5.393, w: 1.119, value: p[0] });
+        s.addText([
+            { text: p[1], options: { fontFace: BODY, fontSize: 12, color: DARK, breakLine: true } },
+            { text: 'Procedure', options: { fontFace: BODY, fontSize: 12, color: DARK } }
+        ], { x: p[3], y: 6.431, w: 1.57, h: 0.505, align: 'center', valign: 'top', margin: 2.8 });
+        dot(s, p[4] + 0.1015, 6.184, 0.203, p[5]);
+        if (i < 4) hline(s, p[4] + 0.203, 6.183, 1.772, p[5], 1);
+    });
+}
+
+/* -------------------------------------------------------------- assembly */
+
+// slide builder, slide-number badge variant (null = no badge)
+const SLIDES = [
+    [slide01, null], [slide02, 0], [slide03, 0], [slide04, 0], [slide05, 0],
+    [slide06, 2], [slide07, 2], [slide08, null], [slide09, 0], [slide10, 1],
+    [slide11, 1], [slide12, 1], [slide13, 1], [slide14, 1], [slide15, 1],
+    [slide16, 0], [slide17, 0], [slide18, 1], [slide19, 1], [slide20, 1],
+    [slide21, 1], [slide22, 1], [slide23, 1], [slide24, 1], [slide25, 1],
+    [slide26, 1], [slide27, 1], [slide28, 1], [slide29, 1], [slide30, 0],
+    [slide31, 0], [slide32, 0], [slide33, 0], [slide34, 0], [slide35, 0],
+    [slide36, 0], [slide37, 0], [slide38, 0], [slide39, null], [slide40, null]
+];
+
+function build() {
+    pptx = new PptxGenJS();
+    S = pptx.ShapeType;
+    pptx.defineLayout({ name: 'DECK', width: 13.333, height: 7.5 });
+    pptx.layout = 'DECK';
+    pptx.theme = { headFontFace: HEAD, bodyFontFace: BODY };
+    pptx.title = 'Medical Dashboard';
+
+    SLIDES.forEach(function (def, i) {
+        const s = pptx.addSlide();
+        def[0](s);
+        if (def[1] !== null) slideNum(s, i + 1, def[1]);
+    });
+
+    return pptx.writeFile({ fileName: path.join(__dirname, '0589275e-6eaf-4607-b5e4-2a9e1b6048cc_grok_final.pptx') });
+}
+
+build().then(function (f) { console.log('wrote ' + f); }).catch(function (e) { console.error(e); process.exit(1); });
