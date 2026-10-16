@@ -9,6 +9,19 @@ agent-store-fuse `e44f687`, Chrome 154.0.8037.57, Node 22.14.0 / 20.19.2, Python
 
 ---
 
+## 2026-10-16 10:54 (Paris) — snapshot `2026-10-16_09-48` → `2026-10-16_10-54`
+
+**Hot-update du host bundle** (sans Update de l'ordinateur) : **sand-host** `701b86e` → `885e54d` (`supervisor_status.lastCommandId = upgrade-885e54d`). Image `4098fb0`, agent-store-fuse `c466eee`, exec-daemon, orbitd, Chrome 154.0.8037.97, Node, Python inchangés. Fichiers : +0 / −0 / ~12 (9 sous `/opt/sand`, 3 `managed-skills`).
+
+- **Bugfix** : —
+- **Change** : `box-chrome` launcher v3 → v4 ; marker contrat `BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH` (`/tmp/sand-browser-accept-language-en-us`) + feature gate `sand_browser_accept_language_en_us` ; `sand-ua-governor` attache aussi les `service_worker` et applique le traitement UA Accept-Language en-US quand le marker est actif. Skills slides / slides-executor : flux Google Slides « un seul fichier Drive » (upload `finish` + trash des fichiers temporaires).
+- **Features** : protobuf / état conversation — `TrackedTaskUpdated` gagne `title` + `status_label` ; `ConversationStateStructure` / `UserMessage` étendus pour voice-call (`VoiceCallUtterance`, `VoiceCallPendingAnswer`, champs `during_voice_call` / `inherits_voice_call` / `voice_calls_read_utterances`).
+- **Perf** : `diff-worker` + chemin edit-diff de `host-main` mesurent `durationMs` / `editLength` / chars (histograms `editDiff*`) quand `measure=true`.
+- **Autre/infra** : rebuilds `host-main.cjs` / `sand-eval-runner.cjs` / `agent-store-worker.cjs` ; shim `semver` officekit (résolution symlinks + WSL2/node.exe).
+
+Rapport : [reports/2026-10-16_10-54.md](reports/2026-10-16_10-54.md).
+
+
 ## 2026-10-16 09:48 (Paris) — snapshot `2026-10-16_06-51` → `2026-10-16_09-48`
 
 Versions touchées : agent-store-fuse `32d54e6` → `c466eee` (pointeur `/usr/local/bin/cursor_agent_store_fuse_version`) ; image `4098fb0`, sand-host `701b86e`, exec-daemon, orbitd, Chrome, Node, Python inchangés. Fichiers : +0 / −0 / ~1.
