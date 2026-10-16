@@ -1,0 +1,14 @@
+--- 2026-10-16_16-48/meta/versions.txt
++++ 2026-10-16_17-51/meta/versions.txt
+@@ -1,8 +1,8 @@
+ image_sha (/etc/sand-box-image-sha)	885e54d
+ box_scripts_version (/usr/local/share/sand-box-scripts/version)	885e54d
+-sand_host_version (/opt/sand/sand-host/version)	885e54d
+-supervisor_status.hostVersion (runtime)	885e54d
+-supervisor_status.lastCommandId (runtime)	None
++sand_host_version (/opt/sand/sand-host/version)	c24203b
++supervisor_status.hostVersion (runtime)	c24203b
++supervisor_status.lastCommandId (runtime)	upgrade-c24203b
+ supervisor_status.pendingUpgradeVersion (runtime)	None
+ exec_daemon.name	@anysphere/exec-daemon-runtime
+ exec_daemon.gitCommit	unknown

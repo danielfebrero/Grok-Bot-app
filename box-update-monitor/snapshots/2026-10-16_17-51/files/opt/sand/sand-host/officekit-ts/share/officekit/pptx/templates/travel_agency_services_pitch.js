@@ -1,0 +1,908 @@
+/**
+ * "Your Travel" agency deck - 30 slides, 13.333 x 7.5 in (16:9).
+ *
+ * Rebuilt with pptxgenjs only.  Every shape, colour, font size and string below
+ * is a plain literal so the deck's design can be read straight from this file.
+ * Photographs in the original are replaced by flat placeholder blocks (PHOTO
+ * grey / device outlines) as no raster data is embedded.
+ *
+ *   node this-file.js   ->   writes the .pptx next to itself
+ */
+'use strict'
+const path = require('path')
+const PptxGenJS = require('pptxgenjs')
+
+/* ------------------------------------------------------------------ palette */
+const NAVY = '19385A'      // primary brand navy
+const ORANGE = 'E46F45'    // accent orange
+const WHITE = 'FFFFFF'
+const MIST = 'D8D8D8'      // body copy on navy
+const INK = '3F3F3F'       // body copy on white
+const SILVER = 'BFBFBF'    // eyebrow labels
+const SLATE = '595959'
+const BLACK = '000000'
+const PHOTO = 'E7E6E6'     // stand-in for photographs
+const PEACH = 'EC9A7C'
+const SALMON = 'EA9172'
+const RUST = 'C2471C'
+const GREY = '7F7F7F'
+const CHAR = '525252'
+const PINE = '0E373D'
+
+/* -------------------------------------------------------------------- type */
+const MONT = 'Montserrat'
+const SEMI = 'Montserrat SemiBold'
+const BLACKF = 'Montserrat Black'
+const OPEN = 'Open Sans'
+
+/* soft drop shadow used by every card in the deck (fresh object per shape) */
+function shadow () { return { type: 'outer', color: BLACK, opacity: 0.2, blur: 22, offset: 3, angle: 45 } }
+
+/* --------------------------------------------------------------- helpers */
+
+// Preset autoshape.  o: {fill, alpha, line, lw, r (corner radius, in), rot, flipH, shadow}
+function sh (s, kind, x, y, wd, ht, o) {
+  o = o || {}
+  const opt = { x: x, y: y, w: wd, h: ht }
+  if (o.fill) opt.fill = o.alpha ? { color: o.fill, transparency: o.alpha } : { color: o.fill }
+  else opt.fill = { type: 'none' }
+  if (o.line) opt.line = { color: o.line, width: o.lw || 0.75 }
+  if (o.r !== undefined) opt.rectRadius = o.r
+  if (o.dash) opt.line = { color: o.line, width: o.lw || 0.75, dashType: o.dash }
+  if (o.angleRange) opt.angleRange = o.angleRange
+  if (o.thick) opt.arcThicknessRatio = o.thick
+  if (o.rot) opt.rotate = o.rot
+  if (o.flipH) opt.flipH = true
+  if (o.flipV) opt.flipV = true
+  if (o.shadow) opt.shadow = shadow()
+  s.addShape(kind, opt)
+  return opt
+}
+
+// Free-form path from the PATHS table, scaled into the box x,y,wd,ht.
+function pth (s, pts, x, y, wd, ht, o) {
+  o = o || {}
+  const points = pts.map(function (p) {
+    if (p[0] === 'Z') return { close: true }
+    if (p[0] === 'M') return { x: p[1] * wd, y: p[2] * ht, moveTo: true }
+    if (p[0] === 'L') return { x: p[1] * wd, y: p[2] * ht }
+    return {
+      x: p[5] * wd,
+      y: p[6] * ht,
+      curve: { type: 'cubic', x1: p[1] * wd, y1: p[2] * ht, x2: p[3] * wd, y2: p[4] * ht }
+    }
+  })
+  const opt = { x: x, y: y, w: wd, h: ht, points: points }
+  opt.fill = o.fill ? { color: o.fill } : { type: 'none' }
+  if (o.line) opt.line = { color: o.line, width: o.lw || 0.75 }
+  if (o.rot) opt.rotate = o.rot
+  if (o.shadow) opt.shadow = shadow()
+  s.addShape('custGeom', opt)
+}
+
+// Text box.  `runs` is a string, or [[text, colour, breakLineAfter], ...].
+// o: {size, color, font, b, i, align, valign, ls (line-spacing multiple), rot}
+function tx (s, x, y, wd, ht, runs, o) {
+  o = o || {}
+  const list = (typeof runs === 'string' ? [[runs]] : runs).map(function (r) {
+    return { text: r[0], options: { color: r[1] || o.color || NAVY, breakLine: !!r[2] } }
+  })
+  s.addText(list, {
+    x: x, y: y, w: wd, h: ht, isTextBox: true, wrap: true,
+    fontFace: o.font || MONT, fontSize: o.size || 14, color: o.color || NAVY,
+    bold: !!o.b, italic: !!o.i, align: o.align || 'left', valign: o.valign || 'top',
+    lineSpacingMultiple: o.ls, rotate: o.rot
+  })
+}
+
+// Rectangle whose two TOP corners are rounded (OOXML round2SameRect).
+const KAPPA = 0.5523
+function topRound (s, x, y, wd, ht, r, o) {
+  o = o || {}
+  const k = KAPPA * r
+  pth(s, [
+    ['M', 0, 1], ['L', 0, r / ht],
+    ['C', 0, (r - k) / ht, (r - k) / wd, 0, r / wd, 0],
+    ['L', (wd - r) / wd, 0],
+    ['C', (wd - r + k) / wd, 0, 1, (r - k) / ht, 1, r / ht],
+    ['L', 1, 1], ['Z']
+  ], x, y, wd, ht, o)
+}
+
+// Parallelogram (OOXML `parallelogram`): top edge slid right by `off` inches.
+function skew (s, x, y, wd, ht, off, o) {
+  o = o || {}
+  const d = (o.flipH ? -1 : 1) * off / wd
+  const a = o.flipH ? 1 : 0
+  pth(s, [['M', a, 1], ['L', a + d, 0], ['L', 1 - a, 0], ['L', 1 - a - d, 1], ['Z']],
+    x, y, wd, ht, o)
+}
+
+// Photo stand-in: flat grey block where the original deck placed a picture.
+function photo (s, kind, x, y, wd, ht, o) {
+  o = o || {}
+  o.fill = PHOTO
+  sh(s, kind, x, y, wd, ht, o)
+}
+
+
+/* ---------------------------------------------------------------- icons
+ * Line-art icons rebuilt from native shapes (the originals were freeform
+ * vector art).  Each takes the bounding box it should fill plus a colour.  */
+
+function icoPlane (s, x, y, wd, ht, c) { pth(s, PLANE, x, y, wd, ht, { fill: c, rot: 3.2 }) }
+
+function icoMapPin (s, x, y, wd, ht, c) {          // outlined location pin
+  pth(s, PIN, x, y, wd, ht, { line: c, lw: 3.5 })
+  pth(s, PIN_DOT, x + wd * 0.11, y + ht * 0.11, wd * 0.49, ht * 0.34, { line: c, lw: 3.5 })
+}
+
+function icoStar (s, x, y, wd, ht, c) {            // rounded 5-point star outline
+  sh(s, 'star5', x, y, wd, ht, { line: c, lw: 1.5 })
+}
+
+function icoHeart (s, x, y, wd, ht, c) { sh(s, 'heart', x, y, wd, ht, { line: c, lw: 1.5 }) }
+
+function icoShare (s, x, y, wd, ht, c) {           // three nodes joined by two arms
+  const d = wd * 0.26
+  sh(s, 'line', x + d * 0.6, y + ht * 0.5, wd * 0.55, -ht * 0.28, { line: c, lw: 1.25 })
+  sh(s, 'line', x + d * 0.6, y + ht * 0.5, wd * 0.55, ht * 0.28, { line: c, lw: 1.25 })
+  sh(s, 'ellipse', x, y + (ht - d) / 2, d, d, { fill: WHITE, line: c, lw: 1.25 })
+  sh(s, 'ellipse', x + wd - d, y, d, d, { fill: WHITE, line: c, lw: 1.25 })
+  sh(s, 'ellipse', x + wd - d, y + ht - d, d, d, { fill: WHITE, line: c, lw: 1.25 })
+}
+
+function icoShield (s, x, y, wd, ht, c) {          // shield + plus (safety)
+  sh(s, 'pentagon', x, y, wd, ht, { line: c, lw: 2.25, flipV: true })
+  sh(s, 'mathPlus', x + wd * 0.28, y + ht * 0.26, wd * 0.44, ht * 0.4, { line: c, lw: 2.25 })
+}
+
+function icoMoneyBag (s, x, y, wd, ht, c) {        // money bag with a $
+  sh(s, 'trapezoid', x + wd * 0.28, y, wd * 0.44, ht * 0.24, { line: c, lw: 2.25, flipV: true })
+  sh(s, 'ellipse', x, y + ht * 0.2, wd, ht * 0.8, { line: c, lw: 2.25 })
+  tx(s, x + wd * 0.25, y + ht * 0.36, wd * 0.5, ht * 0.36, '$',
+    { size: 12, color: c, b: 1, align: 'center', valign: 'middle' })
+}
+
+function icoCompass (s, x, y, wd, ht, c) {         // ring with a needle
+  sh(s, 'ellipse', x + wd * 0.42, y, wd * 0.16, ht * 0.1, { fill: c })
+  sh(s, 'donut', x, y + ht * 0.06, wd, ht * 0.94, { fill: c })
+  sh(s, 'diamond', x + wd * 0.36, y + ht * 0.3, wd * 0.28, ht * 0.42, { fill: c })
+}
+
+function icoSuitcase (s, x, y, wd, ht, c) {        // briefcase with side latches
+  sh(s, 'roundRect', x + wd * 0.34, y, wd * 0.32, ht * 0.14, { line: c, r: 0.03 })
+  sh(s, 'roundRect', x, y + ht * 0.1, wd, ht * 0.9, { line: c, r: 0.06 })
+  sh(s, 'roundRect', x + wd * 0.35, y + ht * 0.44, wd * 0.3, ht * 0.24, { line: c, r: 0.02 })
+  ;[0.13, 0.79].forEach(function (fx) {
+    sh(s, 'roundRect', x + wd * fx, y + ht * 0.36, wd * 0.09, ht * 0.32, { line: c, r: 0.02 })
+  })
+}
+
+function icoMapFold (s, x, y, wd, ht, c) {         // folded map with a route
+  ;[0, 0.34, 0.68].forEach(function (fx) {
+    sh(s, 'roundRect', x + wd * fx, y, wd * 0.32, ht, { line: c, r: 0.03 })
+  })
+  sh(s, 'line', x + wd * 0.08, y + ht * 0.62, wd * 0.6, -ht * 0.1, { line: c, lw: 0.75, dash: 'sysDot' })
+  sh(s, 'ellipse', x + wd * 0.68, y + ht * 0.16, wd * 0.24, ht * 0.34, { line: c, lw: 0.75 })
+}
+
+function icoGlobeArc (s, x, y, wd, ht, c) {        // globe under a dashed flight arc
+  sh(s, 'arc', x + wd * 0.02, y + ht * 0.1, wd * 0.96, ht * 1.4,
+    { line: c, lw: 2, dash: 'dash', angleRange: [180, 360] })
+  sh(s, 'pie', x + wd * 0.1, y + ht * 0.5, wd * 0.8, ht * 1.0,
+    { line: c, lw: 2.5, angleRange: [180, 360] })
+  sh(s, 'line', x + wd * 0.36, y + ht * 0.55, wd * 0.06, ht * 0.42, { line: c, lw: 2.5 })
+  icoPlane(s, x + wd * 0.3, y + ht * 0.02, wd * 0.36, ht * 0.28, c)
+}
+
+function icoGlobeShield (s, x, y, wd, ht, c) {     // globe ringed by dashes, small shield
+  sh(s, 'ellipse', x, y + ht * 0.06, wd * 0.94, ht * 0.94, { line: c, lw: 1, dash: 'sysDash' })
+  sh(s, 'ellipse', x + wd * 0.1, y + ht * 0.16, wd * 0.74, ht * 0.74, { line: c, lw: 1.5 })
+  sh(s, 'line', x + wd * 0.34, y + ht * 0.2, wd * 0.1, ht * 0.66, { line: c, lw: 1.25 })
+  sh(s, 'pentagon', x + wd * 0.62, y, wd * 0.38, ht * 0.38, { fill: WHITE, line: c, lw: 1.25, flipV: true })
+  tx(s, x + wd * 0.62, y + ht * 0.02, wd * 0.38, ht * 0.28, '\u2713',
+    { size: 7, color: c, align: 'center', valign: 'middle' })
+}
+
+function icoHotel (s, x, y, wd, ht, c) {           // building with a window grid
+  sh(s, 'rect', x + wd * 0.09, y, wd * 0.82, ht * 0.95, { line: c, lw: 1.25 })
+  sh(s, 'rect', x, y + ht * 0.95, wd, ht * 0.05, { fill: c })
+  for (let r = 0; r < 4; r++) {
+    for (let k = 0; k < 3; k++) {
+      sh(s, 'rect', x + wd * (0.2 + k * 0.22), y + ht * (0.14 + r * 0.145), wd * 0.13, ht * 0.07, { fill: c })
+    }
+  }
+  sh(s, 'rect', x + wd * 0.38, y + ht * 0.76, wd * 0.24, ht * 0.19, { fill: c })
+}
+
+function icoTicket (s, x, y, wd, ht, c) {          // boarding pass with a plane
+  sh(s, 'roundRect', x + wd * 0.1, y, wd * 0.9, ht * 0.28, { line: c, lw: 1.25, r: 0.04, rot: -6 })
+  sh(s, 'roundRect', x, y + ht * 0.16, wd * 0.86, ht * 0.84, { fill: WHITE, line: c, lw: 1.5, r: 0.05 })
+  for (let k = 0; k < 4; k++) {
+    sh(s, 'rect', x + wd * 0.24, y + ht * (0.34 + k * 0.15), wd * 0.05, ht * 0.07, { fill: c })
+  }
+  icoPlane(s, x + wd * 0.42, y + ht * 0.42, wd * 0.3, ht * 0.24, c)
+}
+
+const ICON = {
+  plane: icoPlane, mapPin: icoMapPin, star: icoStar, heart: icoHeart, share: icoShare,
+  shield: icoShield, moneyBag: icoMoneyBag, compass: icoCompass, suitcase: icoSuitcase,
+  mapFold: icoMapFold, globeArc: icoGlobeArc, globeShield: icoGlobeShield,
+  hotel: icoHotel, ticket: icoTicket
+}
+
+/* "YOUR TRAVEL" lock-up: paper-plane mark plus the wordmark. */
+function logo (s, x, y, c) {
+  icoPlane(s, x, y, 0.42, 0.27, ORANGE)
+  tx(s, x + 0.483, y - 0.058, 2.51, 0.39, 'YOUR TRAVEL', { size: 17, b: 1, color: c })
+}
+
+/* ------------------------------------------------- device mock-up stand-ins
+ * The original slides show photographic product renders; these are flat
+ * vector substitutes drawn to the same bounding boxes.                     */
+const BEZEL = '2B2B2B'
+
+function phone (s, x, y, wd, ht) {
+  sh(s, 'roundRect', x, y, wd, ht, { fill: BEZEL, r: wd * 0.13 })
+  sh(s, 'roundRect', x + wd * 0.05, y + ht * 0.02, wd * 0.9, ht * 0.96,
+    { fill: WHITE, r: wd * 0.1 })
+  sh(s, 'roundRect', x + wd * 0.3, y + ht * 0.02, wd * 0.4, ht * 0.028,
+    { fill: BEZEL, r: wd * 0.014 })            // notch
+}
+
+function tablet (s, x, y, wd, ht) {
+  sh(s, 'roundRect', x, y, wd, ht, { fill: BEZEL, r: wd * 0.055 })
+  sh(s, 'rect', x + wd * 0.05, y + ht * 0.04, wd * 0.9, ht * 0.92, { fill: WHITE })
+}
+
+function monitor (s, x, y, wd, ht) {
+  sh(s, 'rect', x, y, wd, ht * 0.79, { fill: BEZEL })
+  sh(s, 'rect', x + wd * 0.02, y + ht * 0.03, wd * 0.96, ht * 0.72, { fill: WHITE })
+  sh(s, 'trapezoid', x + wd * 0.39, y + ht * 0.79, wd * 0.22, ht * 0.15, { fill: 'C9CACC' })
+  sh(s, 'roundRect', x + wd * 0.16, y + ht * 0.93, wd * 0.68, ht * 0.06,
+    { fill: 'C9CACC', r: 0.03 })               // stand foot
+}
+
+function laptop (s, x, y, wd, ht) {
+  sh(s, 'rect', x + wd * 0.09, y, wd * 0.82, ht * 0.93, { fill: BEZEL })
+  sh(s, 'rect', x + wd * 0.12, y + ht * 0.05, wd * 0.76, ht * 0.82, { fill: WHITE })
+  sh(s, 'rect', x, y + ht * 0.93, wd, ht * 0.07, { fill: 'D6D7D9' })
+  sh(s, 'roundRect', x + wd * 0.42, y + ht * 0.94, wd * 0.16, ht * 0.03,
+    { fill: 'A8AAAD', r: 0.02 })               // trackpad notch
+}
+
+
+/* --------------------------------------------------- free-form outlines
+ * Normalised path data (0..1 of the shape box) for the deck's organic
+ * cut-outs, swooshes and the paper-plane mark.                          */
+const PLANE = [['M',.174,1],['L',.128,.873],['L',.008,.72],['L',.006,.714],['C',-.006,.681,.001,.639,.022,.621],['L',.087,.562],['L',.256,.581],['L',.388,.451],['L',.115,.207],['L',.111,.197],['C',.098,.161,.106,.114,.129,.093],['L',.233,0],['L',.638,.209],['L',.804,.049],['C',.825,.03,.848,.02,.873,.02],['C',.919,.02,.961,.056,.984,.117],['C',.998,.155,1.003,.199,.999,.242],['L',.997,.262],['Z'],['M',.065,.681],['L',.171,.817],['L',.195,.881],['L',.944,.209],['C',.944,.192,.941,.175,.935,.16],['C',.923,.126,.899,.106,.873,.106],['C',.858,.106,.844,.112,.832,.123],['L',.645,.304],['L',.239,.094],['L',.17,.156],['L',.496,.448],['L',.271,.669],['L',.1,.65],['Z']]
+const PIN = [['M',1,.35],['C',1,.543,.5,1,.5,1],['C',.5,1,0,.543,0,.35],['C',0,.157,.224,0,.5,0],['C',.776,0,1,.157,1,.35],['Z']]
+const PIN_DOT = [['M',1,.5],['C',1,.776,.776,1,.5,1],['C',.224,1,0,.776,0,.5],['C',0,.224,.224,0,.5,0],['C',.776,0,1,.224,1,.5],['Z']]
+const s1a = [['M',0,0],['L',.831,0],['L',.846,.018],['C',.942,.143,1,.302,1,.476],['C',1,.675,.924,.855,.802,.985],['L',.787,1],['L',0,1],['Z']]
+const s1b = [['M',0,0],['L',.812,0],['L',.849,.041],['C',.943,.159,1,.311,1,.476],['C',1,.665,.926,.836,.806,.959],['L',.762,1],['L',0,1],['Z']]
+const s2a = [['M',.568,0],['C',.734,0,.883,.089,.987,.231],['L',1,.25],['L',1,1],['L',.047,1],['L',.039,.978],['C',.014,.896,0,.808,0,.715],['C',0,.32,.254,0,.568,0],['Z']]
+const s2b = [['M',.003,0],['L',1,0],['L',1,.854],['L',.957,.89],['C',.865,.96,.76,1,.648,1],['C',.29,1,0,.593,0,.091],['L',.001,.044],['Z']]
+const s2c = [['M',.601,.01],['C',.829,.057,1,.258,1,.5],['C',1,.638,.944,.763,.854,.854],['L',.827,.878],['L',.818,.886],['C',.732,.957,.621,1,.5,1],['C',.224,1,0,.776,0,.5],['C',0,.241,.197,.028,.449,.003],['L',.48,.001],['L',.477,.033],['L',.48,.001],['L',.5,0],['C',.535,0,.568,.003,.601,.01],['Z']]
+const s4a = [['M',.217,0],['L',1,0],['L',1,.993],['L',.953,.998],['L',.874,1],['C',.391,1,0,.73,0,.397],['C',0,.26,.066,.135,.177,.033],['Z']]
+const s4b = [['M',.249,0],['L',1,0],['L',1,.992],['L',.943,.998],['L',.865,1],['C',.387,1,0,.737,0,.412],['C',0,.26,.085,.121,.225,.016],['Z']]
+const s5a = [['M',0,0],['L',.953,0],['L',.958,.013],['C',.985,.098,1,.192,1,.29],['C',1,.682,.758,1,.461,1],['C',.274,1,.11,.876,.013,.687],['L',0,.658],['Z']]
+const s6a = [['M',0,0],['L',.728,0],['L',.769,.032],['C',.911,.152,1,.329,1,.526],['C',1,.707,.925,.87,.805,.988],['L',.791,1],['L',0,1],['Z']]
+const s6b = [['M',0,0],['L',.694,0],['L',.731,.023],['C',.894,.136,1,.319,1,.526],['C',1,.698,.927,.853,.808,.966],['L',.773,.996],['L',.769,1],['L',0,1],['Z']]
+const s8a = [['M',.182,0],['L',1,0],['L',1,1],['L',.231,1],['L',.199,.971],['C',.076,.844,0,.669,0,.476],['C',0,.294,.067,.129,.177,.005],['Z']]
+const s9a = [['M',.597,0],['C',.618,-0,.64,.001,.662,.005],['C',.772,.021,.875,.077,.963,.163],['L',1,.203],['L',1,1],['L',.004,1],['L',.001,.96],['L',0,.863],['C',.012,.371,.273,.002,.597,0],['Z']]
+const s9c = [['M',0,0],['L',.662,0],['L',.68,.012],['C',.858,.14,.978,.32,.997,.521],['C',1.014,.696,.952,.859,.833,.987],['L',.82,1],['L',0,1],['Z']]
+const s9d = [['M',0,0],['L',.617,0],['L',.674,.035],['C',.855,.158,.977,.33,.997,.522],['C',1.015,.69,.95,.845,.83,.968],['L',.795,1],['L',0,1],['Z']]
+const s10a = [['M',.047,0],['L',1,.286],['L',.905,.911],['L',.902,.913],['C',.815,.968,.716,1,.611,1],['C',.273,1,0,.676,0,.277],['C',0,.19,.013,.106,.037,.029],['Z']]
+const s10b = [['M',.015,0],['L',1,0],['L',1,.729],['L',.971,.769],['C',.896,.865,.805,.936,.703,.973],['C',.379,1.091,.068,.81,.01,.345],['C',-.005,.228,-.003,.112,.015,0],['Z']]
+const s14a = [['M',0,0],['L',.428,0],['L',.856,0],['L',.859,.01],['C',.93,.216,.979,.467,.995,.737],['L',1,.871],['L',1,1],['L',0,1],['Z']]
+const s15a = [['M',.615,.512],['L',.973,.512],['L',.991,.514],['L',1,.517],['L',1,1],['L',.526,1],['L',.526,.602],['C',.526,.552,.566,.512,.615,.512],['Z'],['M',.083,.512],['L',.417,.512],['C',.463,.512,.5,.55,.5,.596],['L',.5,1],['L',0,1],['L',0,.596],['C',0,.55,.037,.512,.083,.512],['Z'],['M',.526,0],['L',1,0],['L',1,.481],['L',.991,.484],['L',.973,.486],['L',.615,.486],['C',.566,.486,.526,.446,.526,.396],['Z'],['M',0,0],['L',.5,0],['L',.5,.402],['C',.5,.448,.463,.486,.417,.486],['L',.083,.486],['C',.037,.486,0,.448,0,.402],['Z']]
+const s16a = [['M',0,0],['L',.885,0],['L',.9,.022],['C',.963,.122,1,.243,1,.373],['C',1,.719,.739,1,.416,1],['C',.255,1,.109,.93,.003,.816],['L',0,.812],['Z']]
+const s16b = [['M',0,0],['L',.874,0],['L',.903,.04],['C',.964,.139,1,.257,1,.385],['C',1,.724,.744,1,.429,1],['C',.272,1,.129,.931,.026,.82],['L',0,.789],['Z']]
+const s16c = [['M',.098,0],['L',1,0],['L',1,1],['L',0,1],['L',0,.245],['C',0,.11,.044,0,.098,0],['Z']]
+const s17a = [['M',.022,0],['L',.978,0],['C',.987,0,.995,.264,.998,.639],['L',1,1],['L',0,1],['L',.002,.639],['C',.005,.264,.013,0,.022,0],['Z']]
+const s19a = [['M',.801,.074],['L',1,.617],['L',.285,1],['L',0,.223],['L',.006,.216],['C',.117,.085,.294,0,.493,0],['C',.598,0,.697,.023,.783,.065],['Z']]
+const s19b = [['M',.809,.082],['L',1,.61],['L',.28,1],['L',0,.226],['L',.013,.21],['C',.121,.083,.294,0,.489,0],['C',.602,0,.708,.028,.798,.076],['Z']]
+const s21a = [['M',.004,.76],['L',0,1],['L',.998,1],['L',1,0],['L',.493,.554],['L',.256,.401],['L',.004,.76],['Z']]
+const s21b = [['M',0,.773],['L',0,1],['L',.244,.811],['L',.5,.903],['L',1,.626],['L',1,0],['L',.491,.563],['L',.253,.408],['L',0,.773],['Z']]
+const s24a = [['M',.31,1],['C',.424,.858,.576,.858,.689,1],['L',1,.442],['C',.713,0,.287,0,0,.442],['L',.31,1]]
+const s24b = [['M',1,.689],['C',.858,.576,.858,.424,1,.31],['L',.443,0],['C',0,.287,0,.713,.443,1],['L',1,.689]]
+const s24c = [['M',0,.31],['C',.142,.424,.142,.576,0,.689],['L',.557,1],['C',1,.713,1,.287,.557,0],['L',0,.31]]
+const s24d = [['M',.69,0],['C',.576,.142,.424,.142,.31,0],['L',0,.557],['C',.287,1,.713,1,1,.557],['L',.69,0]]
+const s25a = [['M',.953,.754],['L',.49,1],['L',0,.398],['L',.748,0],['L',.755,.005],['C',.905,.131,1,.312,1,.513],['C',1,.596,.984,.676,.955,.749],['Z']]
+const s25b = [['M',.414,0],['L',1,0],['L',1,1],['L',.022,1],['L',.017,.979],['C',-.029,.747,.018,.486,.167,.26],['C',.228,.167,.302,.087,.384,.023],['Z']]
+const s26a = [['M',1,.943],['L',.133,1],['L',.126,.987],['C',.046,.844,0,.672,0,.487],['C',0,.333,.032,.187,.089,.061],['L',.091,.056],['L',.947,0],['Z']]
+const s26b = [['M',0,0],['L',.887,0],['L',.899,.024],['C',.971,.176,1.009,.357,.998,.547],['C',.989,.706,.949,.853,.884,.98],['L',.873,1],['L',0,1],['Z']]
+const s27a = [['M',.647,1],['L',0,.264],['L',.816,0],['L',.833,.018],['C',.939,.138,1,.279,1,.429],['C',1,.648,.871,.846,.662,.99],['Z']]
+const s27b = [['M',1,0],['L',1,1],['L',.001,1],['L',0,.97],['C',-.002,.807,.058,.637,.186,.478],['C',.371,.246,.665,.081,.991,.002],['Z']]
+const s27c = [['M',.277,.45],['L',.26,.495],['C',.254,.511,.242,.516,.232,.506],['L',.225,.493],['L',.213,.46],['L',.2,.495],['C',.194,.511,.181,.516,.172,.506],['L',.165,.495],['L',.156,.475],['L',.053,.814],['L',.354,.814],['L',.418,.605],['L',.387,.502],['L',.382,.504],['C',.377,.504,.371,.501,.367,.494],['L',.346,.46],['L',.334,.492],['L',.317,.474],['L',.334,.492],['C',.328,.508,.316,.512,.306,.502],['L',.301,.495],['Z'],['M',.353,.39],['L',.343,.408],['L',.353,.391],['Z'],['M',.766,.374],['L',.714,.455],['C',.706,.468,.693,.467,.686,.454],['L',.682,.444],['L',.679,.437],['L',.666,.467],['L',.659,.478],['C',.65,.487,.637,.482,.631,.467],['L',.613,.417],['L',.586,.466],['L',.581,.473],['C',.571,.483,.559,.479,.553,.463],['L',.57,.445],['L',.553,.463],['L',.539,.428],['L',.495,.499],['L',.363,.933],['L',.946,.933],['Z'],['M',.536,.364],['L',.543,.375],['Z'],['M',.593,.178],['L',.543,.341],['C',.548,.341,.554,.345,.557,.351],['L',.561,.358],['L',.573,.39],['L',.601,.339],['C',.609,.325,.622,.324,.63,.337],['L',.634,.345],['L',.65,.39],['L',.658,.373],['L',.593,.178],['Z'],['M',.267,.108],['L',.176,.408],['L',.181,.418],['L',.196,.378],['L',.197,.375],['L',.199,.372],['L',.201,.368],['L',.203,.366],['L',.205,.365],['L',.208,.363],['L',.21,.362],['L',.213,.362],['L',.216,.362],['L',.218,.363],['L',.221,.365],['L',.224,.367],['L',.225,.368],['L',.227,.372],['L',.23,.376],['L',.23,.377],['L',.243,.413],['L',.256,.379],['L',.26,.37],['C',.268,.358,.281,.359,.288,.372],['L',.314,.419],['L',.325,.391],['L',.328,.384],['C',.332,.378,.337,.374,.343,.374],['L',.348,.376],['Z'],['M',.266,0],['C',.274,-.001,.282,.006,.285,.019],['L',.267,.034],['L',.285,.019],['L',.441,.53],['L',.573,.094],['C',.574,.087,.578,.081,.582,.077],['C',.592,.068,.604,.074,.609,.09],['L',.592,.106],['L',.609,.09],['L',.705,.377],['L',.756,.298],['L',.762,.29],['C',.772,.282,.784,.288,.789,.304],['L',.997,.948],['L',1,.966],['C',1,.985,.991,1,.98,1],['L',.331,1],['L',.322,.996],['C',.312,.988,.308,.968,.313,.951],['L',.334,.881],['L',.021,.881],['L',.011,.877],['C',.001,.869,-.003,.849,.002,.832],['L',.248,.021],['C',.25,.014,.253,.007,.258,.004],['L',.266,0],['Z']]
+const s28a = [['M',1,.317],['L',.642,1],['L',0,.703],['L',.001,.684],['C',.029,.3,.265,0,.551,0],['C',.732,0,.893,.12,.994,.306],['Z']]
+const s29a = [['M',.313,0],['L',1,0],['L',1,1],['L',.23,1],['C',.089,.883,0,.716,0,.529],['C',0,.323,.108,.14,.275,.024],['Z']]
+const s29b = [['M',.329,0],['L',1,0],['L',1,1],['L',.242,1],['L',.204,.969],['C',.078,.856,0,.701,0,.529],['C',0,.307,.129,.113,.324,.003],['Z']]
+const s30a = [['M',.5,0],['C',.704,0,.884,.179,.99,.451],['L',1,.478],['L',1,1],['L',0,1],['L',0,.478],['L',.01,.451],['C',.116,.179,.296,0,.5,0],['Z']]
+const s30b = [['M',.5,0],['C',.71,0,.894,.195,.995,.488],['L',1,.503],['L',1,1],['L',0,1],['L',0,.503],['L',.005,.488],['C',.106,.195,.29,0,.5,0],['Z']]
+
+/* ------------------------------------------------------------------ slides */
+
+// Slide 1 - Title slide - orange arc over the photo panel, navy headline block.
+function slide01 (s) {
+  sh(s, 'rect', 4.79, -0, 8.55, 5.86, { fill: NAVY, flipH: 1, shadow: 1 })
+  tx(s, 7.35, 6.66, 5.27, .34, 'Travel Presentation By Mahative', { color: PINE })
+  tx(s, 7.84, .69, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: WHITE })
+  ICON.plane(s, 7.36, .75, .42, .27, ORANGE)
+  tx(s, 7.35, 1.9, 4.57, 1.11, 'TRAVEL', { size: 60, font: BLACKF, b: 1, i: 1, color: ORANGE })
+  tx(s, 7.35, 4.22, 5.27, .69, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.', { color: MIST, ls: 1.5 })
+  tx(s, 7.35, 2.78, 4.57, 1.11, 'AGENCY', { size: 60, font: BLACKF, b: 1, i: 1, color: WHITE })
+  pth(s, s1a, 0, -0, 6.7, 7.5, { fill: ORANGE, shadow: 1 })
+  sh(s, 'roundRect', 7.46, 5.49, 2.49, .7, { fill: ORANGE, shadow: 1, r: .158 })
+  tx(s, 7.68, 5.67, 1.44, .35, 'Get Started', { size: 15, color: WHITE, align: 'center', ls: 1.5 })
+  sh(s, 'roundRect', 9.32, 5.62, .49, .44, { fill: WHITE, shadow: 1, r: .128 })
+  sh(s, 'chevron', 9.5, 5.73, .16, .23, { fill: ORANGE })
+  pth(s, s1b, 0, 0, 6.48, 7.5, { fill: PHOTO, shadow: 1 })
+}
+
+// Slide 2 - About us - copy on the left, circular photo + navy card on the right.
+function slide02 (s) {
+  pth(s, s2a, 7.14, 1.82, 6.19, 5.68, { fill: NAVY })
+  pth(s, s2b, 7.88, 0, 5.45, 3.91, { fill: PHOTO })
+  pth(s, s2c, 6.49, .55, 3.57, 3.7, { fill: ORANGE, shadow: 1 })
+  tx(s, .79, 2.19, 4.7, 1.72, [['Welcome to '], ['Your Travel', ORANGE]], { size: 48, b: 1, color: NAVY })
+  tx(s, .81, 1.51, 2.44, .37, 'A B O U T  U S', { size: 16, color: SILVER })
+  tx(s, .81, 4.64, 5.38, 2.1, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure. Lorem oyi ipsum dolor sit amet, consectetur adipiscing elit.', { color: INK, ls: 1.5 })
+  tx(s, 8.09, 4.68, 4.3, .39, 'Project Management', { size: 17, font: SEMI, color: WHITE })
+  tx(s, 8.09, 5.38, 4.62, 1.3, 'Lorem ipsum dolor sit amet, conse ctetur adi pis cing elit, sed do eiusmod tempor incidi dunt ut labore et dolore magna aliqua. enim ad minim veniam quis nostrud exercit yoi yolur nostred.', { size: 13, color: MIST, ls: 1.5 })
+  tx(s, .99, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, .5, .47, .42, .27, ORANGE)
+}
+
+// Slide 3 - About our agency - photo collage left, journey stat card.
+function slide03 (s) {
+  tx(s, 7.37, 1.66, 5.38, 1.92, [['About Our '], ['Agency', ORANGE]], { size: 54, b: 1, color: NAVY })
+  tx(s, 7.37, 1.11, 2.98, .37, 'A B O U T  U S', { size: 16, color: SILVER })
+  tx(s, 7.37, 4.93, 5.38, 1.4, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip.', { color: INK, ls: 1.5 })
+  tx(s, 7.37, 4.12, 4.3, .4, 'Our Journey', { size: 18, font: SEMI, color: NAVY })
+  sh(s, 'roundRect', 4.01, 4.12, 2.63, 2.22, { fill: NAVY, shadow: 1, r: .234 })
+  tx(s, 4.4, 5.07, 1.87, .4, 'Our Journey', { size: 18, font: SEMI, b: 1, color: WHITE, align: 'center' })
+  tx(s, 4.4, 5.48, 1.87, .64, '999+', { size: 32, font: SEMI, b: 1, color: WHITE, align: 'center' })
+  tx(s, .99, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, .5, .47, .42, .27, ORANGE)
+  sh(s, 'roundRect', 0, 6.91, 13.33, .59, { fill: NAVY, r: 0 })
+  ICON.globeArc(s, 4.95, 4.36, .76, .61, ORANGE)
+}
+
+// Slide 4 - Our travel services - three service cards under the heading.
+function slide04 (s) {
+  pth(s, s4a, 8.65, 0, 4.69, 7.04, { fill: ORANGE })
+  pth(s, s4b, 8.89, 0, 4.44, 6.77, { fill: PHOTO })
+  topRound(s, .51, 4.63, 3.93, 2.87, .403, { fill: NAVY, shadow: 1 })
+  tx(s, .51, 2, 4.33, 1.58, [['Our Travel '], ['Services', ORANGE]], { size: 44, b: 1, color: NAVY })
+  tx(s, .51, 1.4, 2.98, .37, 'O U R  S E R V I C E', { size: 16, color: SILVER })
+  tx(s, .95, 5.69, 3.05, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo tetur adipiscing elit, sed do derema oyilur.', { color: MIST, ls: 1.5 })
+  tx(s, .99, 5.08, 3.05, .4, 'Flight Booking', { size: 18, font: SEMI, color: WHITE })
+  tx(s, 4.97, 2.16, 3.04, 1.75, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem ipsum dolor sit .', { color: INK, ls: 1.5 })
+  tx(s, 4.97, 1.38, 3.22, .4, 'Our Agency Service', { size: 18, font: SEMI, color: NAVY })
+  tx(s, .99, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, .5, .47, .42, .27, ORANGE)
+  topRound(s, 4.77, 4.63, 3.93, 2.87, .403, { fill: NAVY, shadow: 1 })
+  tx(s, 5.21, 5.69, 3.05, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo tetur adipiscing elit, sed do derema oyilur.', { color: MIST, ls: 1.5 })
+  tx(s, 5.24, 5.08, 3.05, .4, 'Passport', { size: 18, font: SEMI, color: WHITE })
+  topRound(s, 9.03, 4.63, 3.93, 2.87, .403, { fill: NAVY, shadow: 1 })
+  tx(s, 9.47, 5.69, 3.05, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo tetur adipiscing elit, sed do derema oyilur.', { color: MIST, ls: 1.5 })
+  tx(s, 9.5, 5.08, 3.05, .4, 'Tour', { size: 18, font: SEMI, color: WHITE })
+}
+
+// Slide 5 - We are the biggest travel agency - two award cards over the photo.
+function slide05 (s) {
+  pth(s, s5a, 0, 0, 7.14, 5.59, { fill: PHOTO })
+  tx(s, 7.49, 2.1, 5.25, 2.52, [['We Are The Biggest Travel'], [' Agency Ever', ORANGE]], { size: 48, b: 1, color: NAVY })
+  tx(s, 7.49, 5.66, 4.69, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem ipsum dolor sit amet consec oyilor.', { color: INK, ls: 1.5 })
+  tx(s, 7.49, 4.96, 3.22, .4, 'Our Agency Service', { size: 18, font: SEMI, color: NAVY })
+  tx(s, 10.57, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, 10.09, .47, .42, .27, ORANGE)
+  sh(s, 'roundRect', 3.67, 3.63, 2.84, 4.35, { fill: NAVY, shadow: 1, r: .474 })
+  tx(s, 4.16, 5.07, 1.87, .4, 'Best Service', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 4.06, 5.86, 2.07, 1.04, 'Lorem ipsum dolor sit amet, consec adipiscing eli.', { color: MIST, align: 'center', ls: 1.5 })
+  sh(s, 'roundRect', .4, 2.9, 2.86, 4.02, { fill: NAVY, shadow: 1, r: .476 })
+  tx(s, .74, 4.37, 2.18, .4, '5 Star Award', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, .74, 5.14, 2.18, 1.04, 'Lorem ipsum dolor sit amet, consec adipiscing eli.', { color: MIST, align: 'center', ls: 1.5 })
+  tx(s, 1.65, 3.66, .37, .4, '5', { size: 18, font: SEMI, b: 1, color: ORANGE, align: 'center' })
+  ICON.star(s, 1.5, 3.52, .66, .63, ORANGE)
+  ICON.globeShield(s, 4.75, 4.1, .7, .73, ORANGE)
+}
+
+// Slide 6 - Take a trusted journey - three stat cards under photo thumbnails.
+function slide06 (s) {
+  pth(s, s6a, 0, 0, 6.23, 7.5, { fill: ORANGE })
+  pth(s, s6b, 0, 0, 6.01, 7.5, { fill: PHOTO })
+  tx(s, 6.7, .55, 6.08, 1.58, [['Take A Trusted'], [' Journey With Us', ORANGE]], { size: 44, b: 1, color: NAVY })
+  tx(s, 6.7, 2.31, 5.92, .69, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore.', { color: INK, ls: 1.5 })
+  sh(s, 'roundRect', 4.18, 4.78, 2.49, 2.25, { fill: NAVY, shadow: 1, r: .209 })
+  sh(s, 'roundRect', 7.13, 4.78, 2.49, 2.25, { fill: NAVY, shadow: 1, r: .209 })
+  sh(s, 'roundRect', 10.09, 4.78, 2.49, 2.25, { fill: NAVY, shadow: 1, r: .209 })
+  tx(s, 4.75, 5.45, 1.35, .57, 'Thousands of Trips', { font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 4.56, 6.04, 1.77, .69, 'Lorem ipsum dolor sit amet.', { color: MIST, align: 'center', ls: 1.5 })
+  tx(s, 7.64, 5.45, 1.47, .57, 'Branches Around', { font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 7.48, 6.04, 1.85, .69, 'Lorem ipsum dolor sit amet.', { color: MIST, align: 'center', ls: 1.5 })
+  tx(s, 10.47, 5.45, 1.71, .57, [['Travel', 0, 1], ['Feels Safe']], { font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 10.43, 6.04, 1.84, .69, 'Lorem ipsum dolor sit amet.', { color: MIST, align: 'center', ls: 1.5 })
+}
+
+// Slide 7 - Agency vision - three staggered vision cards.
+function slide07 (s) {
+  tx(s, .97, .94, 6.02, 1.72, [['Our Travel '], ['Agency Vision ', ORANGE]], { size: 48, b: 1, color: NAVY })
+  tx(s, 6.88, 1.83, 5.42, .69, 'Lorem ipsum dolor sit amet cons ecoyilo indi tetur adipiscing elito sed do derema oyilur et lore.', { color: INK, ls: 1.5 })
+  sh(s, 'roundRect', .93, 3.21, 3.32, 3.66, { fill: NAVY, shadow: 1, r: .345 })
+  tx(s, 1.31, 5.29, 1.68, .4, 'Vision A', { size: 18, font: SEMI, color: WHITE })
+  tx(s, 1.31, 5.82, 2.59, .69, 'Lorem ipsum dolor sito amet cons ecoyilo ind.', { color: MIST, ls: 1.5 })
+  sh(s, 'roundRect', 9.04, 3.21, 3.32, 3.66, { fill: NAVY, shadow: 1, r: .345 })
+  tx(s, 9.42, 5.3, 1.68, .4, 'Vision C', { size: 18, font: SEMI, color: WHITE })
+  tx(s, 9.42, 5.84, 2.59, .69, 'Lorem ipsum dolor sito amet cons ecoyilo ind.', { color: MIST, ls: 1.5 })
+  sh(s, 'roundRect', 4.99, 3.21, 3.32, 3.66, { fill: NAVY, shadow: 1, r: .345 })
+  tx(s, 5.35, 3.49, 1.68, .4, 'Vision B', { size: 18, font: SEMI, color: WHITE })
+  tx(s, 5.35, 4.02, 2.59, .69, 'Lorem ipsum dolor sito amet cons ecoyilo ind.', { color: MIST, ls: 1.5 })
+  tx(s, 10.57, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, 10.09, .47, .42, .27, ORANGE)
+}
+
+// Slide 8 - Agency mission - three mission rows beside the copy.
+function slide08 (s) {
+  pth(s, s8a, 7.2, 0, 6.13, 7.5, { fill: PHOTO })
+  tx(s, .87, .93, 3.94, 2.52, [['Our Travel '], ['Agency Mision ', ORANGE]], { size: 48, b: 1, color: NAVY })
+  tx(s, .87, 5.77, 3.94, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem ipsumdol.', { color: INK, ls: 1.5 })
+  tx(s, .87, 4.16, 3.22, .4, 'Our Agency Service', { size: 18, font: SEMI, color: NAVY })
+  tx(s, .87, 4.81, 3.94, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed.', { color: INK, ls: 1.5 })
+  sh(s, 'roundRect', 5.54, 1.15, 4.21, 1.57, { fill: NAVY, shadow: 1, r: .163 })
+  tx(s, 6.97, 1.53, 1.68, .4, 'Mision A', { size: 18, font: SEMI, color: WHITE })
+  tx(s, 6.97, 2, 2.41, .34, 'Lorem ipsum dolor sit.', { color: MIST, ls: 1.5 })
+  sh(s, 'roundRect', 5.54, 3.19, 4.21, 1.57, { fill: NAVY, shadow: 1, r: .163 })
+  tx(s, 6.97, 3.57, 1.68, .4, 'Mision B', { size: 18, font: SEMI, color: WHITE })
+  tx(s, 6.97, 4.03, 2.41, .34, 'Lorem ipsum dolor sit.', { color: MIST, ls: 1.5 })
+  sh(s, 'roundRect', 5.54, 5.23, 4.21, 1.58, { fill: NAVY, shadow: 1, r: .164 })
+  tx(s, 6.97, 5.62, 1.68, .4, 'Mision C', { size: 18, font: SEMI, color: WHITE })
+  tx(s, 6.97, 6.08, 2.41, .34, 'Lorem ipsum dolor sit.', { color: MIST, ls: 1.5 })
+  ICON.suitcase(s, 6.04, 5.76, .67, .51, ORANGE)
+  ICON.mapFold(s, 6.02, 3.69, .7, .53, ORANGE)
+  ICON.compass(s, 6.08, 1.57, .58, .66, ORANGE)
+}
+
+// Slide 9 - Agency goals - navy/orange panel with two award pills.
+function slide09 (s) {
+  pth(s, s9a, 7.05, 4.93, 6.28, 2.57, { fill: PHOTO, shadow: 1 })
+  pth(s, s2c, 7.14, 4.89, 1.78, 1.77, { fill: ORANGE, rot: 4.2, shadow: 1 })
+  pth(s, s9c, -.02, 0, 3.42, 7.5, { fill: ORANGE })
+  pth(s, s9d, 0, 0, 3.21, 7.5, { fill: NAVY })
+  tx(s, 7.11, .79, 5.36, 1.72, [['Our Travel '], ['Agency Goals', ORANGE]], { size: 48, b: 1, color: NAVY })
+  tx(s, 7.11, 3.63, 5.36, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyiluret labroeyoi.', { color: INK, ls: 1.5 })
+  tx(s, 7.11, 3.04, 4.36, .4, 'Become The Best Travel Agent', { size: 18, font: SEMI, color: NAVY })
+  sh(s, 'roundRect', 3.01, 5.48, 3.16, .9, { fill: NAVY, shadow: 1, r: .203 })
+  tx(s, 3.42, 5.73, 2.34, .4, 'Best Travel 2022', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+  sh(s, 'roundRect', 3.01, 2.52, 3.16, .9, { fill: NAVY, shadow: 1, r: .203 })
+  tx(s, 3.36, 2.77, 2.46, .4, 'Best Travel 2021', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+}
+
+// Slide 10 - The best travel agency is here - one wide navy card, three features.
+function slide10 (s) {
+  pth(s, s10a, 6.64, -.72, 6.99, 4.97, { fill: ORANGE, rot: -12.1, shadow: 1 })
+  pth(s, s10b, 6.63, 0, 6.7, 3.94, { fill: PHOTO, shadow: 1 })
+  tx(s, .67, .85, 6.22, 1.58, [['The Best Travel '], ['Agency Is Here', ORANGE]], { size: 44, b: 1, color: NAVY })
+  sh(s, 'roundRect', .8, 3.15, 7.66, 3.56, { fill: NAVY, shadow: 1, r: .529 })
+  tx(s, 9.29, 5.66, 3.14, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipi scing elit, sed do derema.', { color: INK, ls: 1.5 })
+  tx(s, 9.29, 4.7, 3.28, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur.', { color: INK, ls: 1.5 })
+  tx(s, 1.53, 4.6, 1.68, .4, '5 Star', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 1.38, 5.1, 1.99, 1.04, 'Lorem ipsum dolor sito amet cons ecoyilo.', { color: MIST, align: 'center', ls: 1.5 })
+  tx(s, 3.79, 4.6, 1.68, .4, 'Safety', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 3.64, 5.1, 1.99, 1.04, 'Lorem ipsum dolor sito amet cons ecoyilo.', { color: MIST, align: 'center', ls: 1.5 })
+  tx(s, 6.06, 4.6, 1.68, .4, 'Cheaper', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 5.9, 5.1, 1.99, 1.04, 'Lorem ipsum dolor sito amet cons ecoyilo.', { color: MIST, align: 'center', ls: 1.5 })
+  tx(s, 2.19, 3.79, .37, .4, '5', { size: 18, font: SEMI, b: 1, color: ORANGE, align: 'center' })
+  ICON.star(s, 2.04, 3.66, .66, .63, ORANGE)
+  ICON.shield(s, 4.36, 3.69, .55, .6, ORANGE)
+  ICON.moneyBag(s, 6.64, 3.67, .52, .66, ORANGE)
+}
+
+// Slide 11 - Our history - horizontal timeline with year bubbles.
+function slide11 (s) {
+  sh(s, 'roundRect', 8.49, 4.09, 1.12, .17, { fill: NAVY, rot: 90, shadow: 1, r: .083 })
+  sh(s, 'roundRect', 8.98, 3.62, 3.45, .17, { fill: NAVY, shadow: 1, r: .086 })
+  sh(s, 'roundRect', .79, 4.57, 8.62, .17, { fill: NAVY, shadow: 1, r: .083 })
+  tx(s, .62, 1.3, 5.86, 1.11, [['Our '], ['History', ORANGE]], { size: 60, b: 1, color: NAVY })
+  sh(s, 'ellipse', .68, 4.11, 1.06, 1.06, { fill: WHITE, shadow: 1 })
+  tx(s, .75, 4.42, .91, .44, '2019', { size: 20, font: SEMI, color: NAVY, align: 'center' })
+  sh(s, 'ellipse', 4.35, 4.11, 1.06, 1.06, { fill: WHITE, shadow: 1 })
+  tx(s, 4.35, 4.42, 1.06, .44, '2020', { size: 20, font: SEMI, color: NAVY, align: 'center' })
+  sh(s, 'ellipse', 8.52, 4.11, 1.06, 1.06, { fill: WHITE, shadow: 1 })
+  tx(s, 8.64, 4.41, .83, .44, '2021', { size: 20, font: SEMI, color: NAVY, align: 'center' })
+  sh(s, 'ellipse', 11.37, 3.18, 1.06, 1.06, { fill: WHITE, shadow: 1 })
+  tx(s, 11.37, 3.49, 1.06, .44, '2022', { size: 20, font: SEMI, color: NAVY, align: 'center' })
+  tx(s, .62, 6.06, 3.02, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi teturin.', { color: INK, ls: 1.5 })
+  tx(s, .62, 5.52, 3.22, .4, 'Stand Early', { size: 18, font: SEMI, color: NAVY })
+  tx(s, 4.31, 6.06, 3.02, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi teturin.', { color: INK, ls: 1.5 })
+  tx(s, 4.31, 5.52, 3.22, .4, 'Start Up', { size: 18, font: SEMI, color: NAVY })
+  tx(s, 8.48, 6.06, 3.02, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi teturin.', { color: INK, ls: 1.5 })
+  tx(s, 8.48, 5.52, 3.22, .4, 'Adding a Branch', { size: 18, font: SEMI, color: NAVY })
+  tx(s, 9.46, 1.48, 2.97, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi teturin.', { color: INK, align: 'right', ls: 1.5 })
+  tx(s, 9.68, 2.37, 2.74, .4, 'The world\'s largest', { size: 18, font: SEMI, color: NAVY, align: 'right' })
+  tx(s, .62, 2.8, 7.5, .69, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim.', { color: INK, ls: 1.5 })
+  tx(s, .99, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, .5, .47, .42, .27, ORANGE)
+}
+
+// Slide 12 - Most favorite best destination - four photos with orange labels.
+function slide12 (s) {
+  tx(s, .93, .64, 11.47, .91, [['Most Favorite '], ['Best Destination', ORANGE]], { size: 48, b: 1, color: NAVY, align: 'center' })
+  sh(s, 'roundRect', 8.23, 3.5, 2.64, .66, { fill: ORANGE, shadow: 1, r: .213 })
+  sh(s, 'roundRect', 8.27, 6.2, 2.64, .66, { fill: ORANGE, shadow: 1, r: .213 })
+  sh(s, 'roundRect', 2.42, 3.5, 2.64, .66, { fill: ORANGE, shadow: 1, r: .213 })
+  sh(s, 'roundRect', 2.46, 6.2, 2.64, .66, { fill: ORANGE, shadow: 1, r: .213 })
+  tx(s, 2.71, 3.66, 2.06, .37, 'Hawaii', { size: 16, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 8.43, 3.64, 2.23, .37, 'Everest Mountain', { size: 16, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 2.76, 6.36, 2.06, .37, 'Himalaya', { size: 16, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 8.56, 6.34, 2.06, .37, 'Raja Ampat ', { size: 16, font: SEMI, color: WHITE, align: 'center' })
+  sh(s, 'ellipse', 5.98, 3.46, 1.43, 1.43, { fill: NAVY, shadow: 1 })
+  ICON.mapPin(s, 6.47, 3.82, .44, .63, WHITE)
+}
+
+// Slide 13 - Meet the team - three circular portraits on a navy card.
+function slide13 (s) {
+  sh(s, 'roundRect', .67, 3.34, 11.99, 3.49, { fill: NAVY, shadow: 1, r: .395 })
+  tx(s, 3.42, .54, 6.49, .91, [['Meet The '], ['Team', ORANGE]], { size: 48, b: 1, color: NAVY, align: 'center' })
+  tx(s, 4.95, 5.22, 3.45, .5, 'Jenny Norra', { size: 24, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 5.64, 5.81, 2.08, .4, 'CEO/Founder', { size: 18, i: 1, color: MIST, align: 'center', ls: 1.5 })
+  tx(s, 8.84, 5.22, 3.06, .5, 'Baston Aquar', { size: 24, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 9.52, 5.81, 1.7, .4, 'Logistic', { size: 18, i: 1, color: MIST, align: 'center', ls: 1.5 })
+  tx(s, 1.46, 5.22, 3.06, .5, 'Thomas Thura', { size: 24, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 2.34, 5.81, 1.29, .4, 'Guide', { size: 18, i: 1, color: MIST, align: 'center', ls: 1.5 })
+  pth(s, s2c, 5.25, 1.91, 2.86, 2.86, { fill: ORANGE, rot: 4.2, shadow: 1 })
+  pth(s, s2c, 1.56, 1.91, 2.86, 2.86, { fill: ORANGE, rot: 4.2, shadow: 1 })
+  pth(s, s2c, 8.94, 1.91, 2.86, 2.86, { fill: ORANGE, rot: 4.2, shadow: 1 })
+}
+
+// Slide 14 - Advantage of our travel agency - two circular photos.
+function slide14 (s) {
+  pth(s, s14a, 0, 0, 5.61, 7.5, { fill: PHOTO, shadow: 1 })
+  sh(s, 'ellipse', 3.81, 1.4, 2.49, 2.49, { fill: ORANGE, shadow: 1 })
+  sh(s, 'ellipse', 4.41, 4.54, 2.07, 2.07, { fill: ORANGE, shadow: 1 })
+  tx(s, 7.31, 1.37, 5.14, 2.32, [['Advantage of Our Travel '], ['Agency', ORANGE]], { size: 44, b: 1, color: NAVY })
+  tx(s, 7.31, 5.03, 4.89, 1.4, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem ipsumdol oloram oyilut rorem ipsum dolor sit amet, consec oyilo indi tetur.', { color: INK, ls: 1.5 })
+  tx(s, 7.31, 4.33, 4.89, .4, 'Cheaper And Safer Than Others', { size: 18, font: SEMI, color: NAVY })
+  tx(s, 10.57, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, 10.09, .47, .42, .27, ORANGE)
+}
+
+// Slide 15 - Entrust your happy holiday - navy oval panel with a Book Now button.
+function slide15 (s) {
+  pth(s, s15a, 5.79, 0, 7.55, 7.5, { fill: PHOTO, shadow: 1 })
+  sh(s, 'ellipse', 8.46, 2.53, 2.51, 2.51, { fill: WHITE, shadow: 1 })
+  sh(s, 'ellipse', -5.92, .39, 17.99, 7.43, { fill: NAVY, rot: 87.5, shadow: 1 })
+  tx(s, .89, 1.04, 5.02, 2.32, [['Entrust Your Happy Holiday'], [' ', NAVY], ['With Us', ORANGE]], { size: 44, b: 1, color: WHITE })
+  tx(s, .89, 4.09, 5.02, 1.4, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem ipsumdol.', { color: MIST, ls: 1.5 })
+  sh(s, 'roundRect', 3.41, 6.17, 2.35, .63, { fill: ORANGE, shadow: 1, r: .144 })
+  tx(s, 3.6, 6.31, 1.44, .35, 'Book Now', { size: 15, color: WHITE, align: 'center', ls: 1.5 })
+  sh(s, 'roundRect', 5.16, 6.27, .49, .44, { fill: WHITE, shadow: 1, r: .128 })
+  sh(s, 'chevron', 5.34, 6.38, .16, .23, { fill: ORANGE })
+}
+
+// Slide 16 - Make your holiday the best - trips counter card.
+function slide16 (s) {
+  pth(s, s16a, 0, 0, 5.95, 6.69, { fill: ORANGE, shadow: 1 })
+  pth(s, s16b, 0, 0, 5.77, 6.46, { fill: PHOTO })
+  pth(s, s16c, 6.16, 4.62, 7.17, 2.88, { fill: NAVY, shadow: 1 })
+  tx(s, 6.87, .58, 5.65, 1.58, [['Make Your '], ['Holiday The Best', ORANGE]], { size: 44, b: 1, color: NAVY })
+  tx(s, 6.87, 3.42, 5.65, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem.', { color: INK, ls: 1.5 })
+  tx(s, 6.87, 2.7, 5.65, .4, 'Make Your Vacation Dreams Come True', { size: 18, font: SEMI, color: NAVY })
+  tx(s, 6.87, 5.29, 5.2, .4, 'The Best Travel Agency In The World', { size: 18, font: SEMI, color: WHITE })
+  tx(s, 6.87, 5.96, 2.62, 1.04, 'Lorem ipsum dolor sit amet, con sec oyilo indi tetur adipiscing elit.', { color: MIST, ls: 1.5 })
+  tx(s, 9.83, 5.96, 2.62, 1.04, 'Lorem ipsum dolor sit amet, con sec oyilo indi tetur adipiscing elit.', { color: MIST, ls: 1.5 })
+  topRound(s, 1.4, 3.75, 3.23, 3.75, .64, { fill: NAVY, shadow: 1 })
+  tx(s, 1.81, 5.66, 2.41, .77, '1.218+', { size: 40, b: 1, color: WHITE, align: 'center' })
+  pth(s, PLANE, 2.45, 4.71, 1.14, .73, { fill: ORANGE, rot: 7.4 })
+  tx(s, 1.82, 6.57, 2.4, .4, 'Trips in 2022', { size: 18, color: WHITE, align: 'center' })
+}
+
+// Slide 17 - Your dream vacation - tall photo plus a bulleted trip list.
+function slide17 (s) {
+  tx(s, .61, 1.32, 4.37, 2.12, [['Your Dream Vacation Will '], ['Come True', ORANGE]], { size: 40, b: 1, color: NAVY })
+  sh(s, 'ellipse', 10.07, 2.14, .13, .13, { fill: ORANGE, shadow: 1 })
+  sh(s, 'ellipse', 10.07, 3.8, .13, .13, { fill: NAVY, shadow: 1 })
+  sh(s, 'ellipse', 10.07, 5.5, .13, .13, { fill: ORANGE, shadow: 1 })
+  tx(s, 10.32, 2.5, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, ls: 1.5 })
+  tx(s, 10.32, 2.01, 2.31, .4, 'Safety Trips', { size: 18, font: SEMI, color: NAVY })
+  tx(s, 10.32, 4.17, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, ls: 1.5 })
+  tx(s, 10.32, 3.68, 2.31, .4, 'Beautiful Trips', { size: 18, font: SEMI, color: NAVY })
+  tx(s, 10.32, 5.88, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, ls: 1.5 })
+  tx(s, 10.32, 5.39, 2.31, .4, 'Best Trips', { size: 18, font: SEMI, color: NAVY })
+  tx(s, .61, 5.17, 3.94, 1.4, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem ipsumdolor em ipsum dolor sit amet, consec.', { color: INK, ls: 1.5 })
+  tx(s, .61, 4.47, 3.68, .4, 'Enjoy a Beautiful Nature', { size: 18, font: SEMI, color: NAVY })
+  pth(s, s17a, .61, 7.25, 12.01, .25, { fill: NAVY, shadow: 1 })
+  tx(s, .99, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, .5, .47, .42, .27, ORANGE)
+}
+
+// Slide 18 - Enjoy the beauty of heaven on earth - four destination tiles.
+function slide18 (s) {
+  tx(s, 2.74, .68, 7.86, 1.58, [['Enjoy The Beauty of '], ['Heaven On Earth', ORANGE]], { size: 44, b: 1, color: NAVY, align: 'center' })
+  sh(s, 'ellipse', .94, 4.52, 2.25, 2.25, { fill: ORANGE, shadow: 1 })
+  sh(s, 'ellipse', 10.14, 2.82, 2.25, 2.25, { fill: NAVY, shadow: 1 })
+  sh(s, 'roundRect', 7.1, 4.52, 2.2, 2.2, { fill: ORANGE, shadow: 1, r: .366 })
+  tx(s, .92, 3.39, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, align: 'center', ls: 1.5 })
+  tx(s, .92, 2.87, 2.31, .4, 'Belize Beach', { size: 18, font: SEMI, color: NAVY, align: 'center' })
+  tx(s, 3.97, 5.95, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, align: 'center', ls: 1.5 })
+  tx(s, 3.97, 5.43, 2.31, .4, 'Maldives', { size: 18, font: SEMI, color: NAVY, align: 'center' })
+  tx(s, 10.11, 5.95, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, align: 'center', ls: 1.5 })
+  tx(s, 10.11, 5.43, 2.31, .4, 'Iceland', { size: 18, font: SEMI, color: NAVY, align: 'center' })
+  tx(s, 7.03, 3.39, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, align: 'center', ls: 1.5 })
+  tx(s, 7.03, 2.87, 2.31, .4, 'Eibsee', { size: 18, font: SEMI, color: NAVY, align: 'center' })
+  sh(s, 'roundRect', 4.03, 2.88, 2.2, 2.2, { fill: NAVY, shadow: 1, r: .366 })
+}
+
+// Slide 19 - Our portfolio - four photo frames behind a rotated navy sweep.
+function slide19 (s) {
+  pth(s, s19a, 5.75, .04, 9.59, 7.93, { fill: ORANGE, rot: -66.1, shadow: 1 })
+  pth(s, s19b, 5.85, .11, 9.53, 7.79, { fill: NAVY, rot: -66.1, shadow: 1 })
+  tx(s, .65, 2, 3.75, 1.72, [['Our '], ['Portfolio', ORANGE]], { size: 48, b: 1, color: NAVY })
+  tx(s, .76, 1.44, 2.44, .37, 'P O R T F O L I O', { size: 16, color: SILVER })
+  tx(s, .99, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, .5, .47, .42, .27, ORANGE)
+}
+
+// Slide 20 - Travel pricelist - three price cards, middle one featured.
+function slide20 (s) {
+  tx(s, 3.74, .59, 5.86, .91, [['Travel '], ['Pricelist', ORANGE]], { size: 48, b: 1, color: NAVY, align: 'center' })
+  sh(s, 'roundRect', 4.56, 1.86, 4.22, 4.69, { fill: NAVY, shadow: 1, r: .647 })
+  tx(s, 5.22, 2.4, 2.89, .5, 'Premium Trips ', { size: 24, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 5.45, 2.91, 2.44, .37, 'P O P U L A R', { size: 16, color: SILVER, align: 'center' })
+  tx(s, 5.15, 3.83, 2.73, 1.11, '$170', { size: 60, b: 1, color: WHITE, align: 'center' })
+  tx(s, 7.38, 4.38, .8, .34, '/Trips', { font: SEMI, color: ORANGE })
+  tx(s, 5.15, 5.05, 3.03, .69, 'Lorem ipsum dolor sit amet, con sec oyilo indi tetur.', { color: MIST, align: 'center', ls: 1.5 })
+  sh(s, 'roundRect', 5.22, 6.17, 2.89, .65, { fill: ORANGE, shadow: 1, r: .186 })
+  tx(s, 5.63, 6.29, 2.08, .4, 'BOOK NOW', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+  sh(s, 'roundRect', 9.1, 2.21, 3.29, 3.96, { fill: NAVY, shadow: 1, r: .505 })
+  tx(s, 9.58, 2.88, 2.33, .4, 'Exclusive Trips ', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 9.38, 3.88, 2.33, .91, '$270', { size: 48, b: 1, color: ORANGE, align: 'center' })
+  tx(s, 11.32, 4.32, .8, .34, '/Trips', { font: SEMI, color: WHITE })
+  tx(s, 9.71, 3.58, 2.08, .34, 'Start From', { font: SEMI, color: MIST, align: 'center' })
+  tx(s, 9.38, 5.04, 2.73, .34, 'Lorem ipsum dolor sit.', { color: MIST, align: 'center', ls: 1.5 })
+  sh(s, 'roundRect', 9.91, 5.85, 1.68, .57, { fill: WHITE, shadow: 1, r: .189 })
+  tx(s, 10.08, 5.96, 1.34, .37, 'GET IT', { size: 16, font: SEMI, color: ORANGE, align: 'center' })
+  sh(s, 'roundRect', .94, 2.21, 3.29, 3.96, { fill: NAVY, shadow: 1, r: .505 })
+  tx(s, 1.43, 2.88, 2.31, .4, 'Standard Trips', { size: 18, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 1.22, 3.88, 2.33, .91, '$100', { size: 48, b: 1, color: ORANGE, align: 'center' })
+  tx(s, 3.15, 4.32, .8, .34, '/Trips', { font: SEMI, color: WHITE })
+  tx(s, 1.22, 5.04, 2.73, .34, 'Lorem ipsum dolor sit.', { color: MIST, align: 'center', ls: 1.5 })
+  tx(s, 1.55, 3.58, 2.08, .34, 'Start From', { font: SEMI, color: MIST, align: 'center' })
+  sh(s, 'roundRect', 1.74, 5.85, 1.68, .57, { fill: WHITE, shadow: 1, r: .164 })
+  tx(s, 1.92, 5.96, 1.34, .37, 'GET IT', { size: 16, font: SEMI, color: ORANGE, align: 'center' })
+  tx(s, 5.63, 3.58, 2.08, .34, 'Start From', { font: SEMI, color: MIST, align: 'center' })
+}
+
+// Slide 21 - Our travel statistic - area chart, KPI card and two donut gauges.
+function slide21 (s) {
+  sh(s, 'line', .82, 2.64, 6.78, 0, { line: MIST })
+  sh(s, 'line', .82, 3.75, 6.78, 0, { line: MIST })
+  sh(s, 'line', .82, 4.3, 6.78, 0, { line: MIST })
+  sh(s, 'line', .82, 4.86, 6.78, 0, { line: MIST })
+  sh(s, 'line', .82, 5.41, 6.78, 0, { line: MIST })
+  sh(s, 'line', .82, 5.96, 6.78, 0, { line: MIST })
+  sh(s, 'line', .82, 6.52, 6.78, 0, { line: MIST })
+  sh(s, 'line', .82, 3.2, 6.78, 0, { line: MIST })
+  tx(s, .3, 6.62, .97, .3, 'JAN', { size: 12, color: SLATE, align: 'center' })
+  tx(s, 2.01, 6.62, .97, .3, 'APR', { size: 12, color: SLATE, align: 'center' })
+  tx(s, 3.71, 6.62, .97, .3, 'JUN', { size: 12, color: SLATE, align: 'center' })
+  tx(s, 5.42, 6.62, .97, .3, 'SEP', { size: 12, color: SLATE, align: 'center' })
+  tx(s, 7.13, 6.62, .97, .3, 'DEC', { size: 12, color: SLATE, align: 'center' })
+  pth(s, s21a, .78, 3.45, 6.82, 3.06, { fill: NAVY })
+  pth(s, s21b, .81, 2.97, 6.79, 3.01, { fill: MIST })
+  tx(s, .67, .76, 8.31, 1.01, [['Our Travel '], ['Statistic', ORANGE]], { size: 54, b: 1, color: NAVY })
+  sh(s, 'roundRect', 4.16, 2.3, 2.29, 1.9, { fill: WHITE, shadow: 1, r: .292 })
+  tx(s, 4.44, 2.52, 1.72, .34, 'Statistic 2022', { color: NAVY, align: 'center' })
+  tx(s, 4.34, 2.9, 1.92, .71, '999+', { size: 36, b: 1, color: ORANGE, align: 'center' })
+  tx(s, 4.44, 3.66, 1.72, .34, 'Traveler Come', { font: SEMI, color: NAVY, align: 'center' })
+  tx(s, 8.68, 3.28, 1.26, .5, '89%', { size: 24, b: 1, color: ORANGE, align: 'center' })
+  tx(s, 8.68, 5.43, 1.26, .5, '85%', { size: 24, b: 1, color: ORANGE, align: 'center' })
+  tx(s, 10.46, 2.83, 1.72, .34, 'Statistic 2022', { font: SEMI, color: NAVY })
+  tx(s, 10.46, 3.25, 2.18, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur.', { color: INK, ls: 1.5 })
+  tx(s, 10.46, 4.87, 1.72, .34, 'Statistic 2022', { font: SEMI, color: NAVY })
+  tx(s, 10.46, 5.29, 2.18, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur.', { color: INK, ls: 1.5 })
+  tx(s, 10.57, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, 10.09, .47, .42, .27, ORANGE)
+  sh(s, 'blockArc', 8.44, 2.69, 1.68, 1.68, { fill: NAVY, rot: 165.5, angleRange: [105.7, 362.5], thick: .2753 })
+  sh(s, 'blockArc', 8.44, 2.69, 1.68, 1.68, { fill: MIST, rot: -93.5, angleRange: [263.4, 362.5], thick: .2753 })
+  sh(s, 'blockArc', 8.44, 4.84, 1.68, 1.68, { fill: MIST, rot: 165.5, angleRange: [105.7, 362.5], thick: .2753 })
+  sh(s, 'blockArc', 8.44, 4.84, 1.68, 1.68, { fill: NAVY, rot: -93.5, angleRange: [263.4, 362.5], thick: .2753 })
+}
+
+// Slide 22 - Increase the number of tourists - zig-zag bar chart on navy.
+function slide22 (s) {
+  sh(s, 'ellipse', -3.72, -3.06, 13.91, 6.42, { fill: NAVY, rot: 173.4, shadow: 1 })
+  tx(s, .7, .48, 6.93, 2.12, [['Increase the Number of Tourists in Our '], ['Travel Agency', ORANGE]], { size: 40, b: 1, color: WHITE })
+  tx(s, 7.93, 2.74, 1.5, .4, '2021', { size: 18, b: 1, color: NAVY, valign: 'middle' })
+  tx(s, 7.93, 3.16, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, ls: 1.5 })
+  tx(s, 5.21, 3.47, 1.5, .4, '2020', { size: 18, b: 1, color: NAVY, valign: 'middle' })
+  tx(s, 5.21, 3.89, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, ls: 1.5 })
+  tx(s, 2.96, 4.22, 1.5, .4, '2019', { size: 18, b: 1, color: NAVY, valign: 'middle' })
+  tx(s, 2.96, 4.64, 2.31, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, ls: 1.5 })
+  tx(s, 10.64, .94, 1.11, .4, '2022', { size: 18, b: 1, color: NAVY, valign: 'middle' })
+  tx(s, 10.64, 1.35, 2.13, .69, 'Lorem ipsum dolor sit amet, consec.', { color: INK, ls: 1.5 })
+  sh(s, 'ellipse', .91, 4.3, .24, .24, { fill: PEACH })
+  tx(s, 1.16, 4.25, 1.26, .34, 'Data 1', { color: INK })
+  sh(s, 'ellipse', .91, 5.04, .24, .24, { fill: SILVER })
+  tx(s, 1.16, 4.98, 1.26, .34, 'Data 2', { color: INK })
+  sh(s, 'ellipse', .91, 5.77, .24, .24, { fill: ORANGE })
+  tx(s, 1.16, 5.72, 1.26, .34, 'Data 3', { color: INK })
+  sh(s, 'ellipse', .91, 6.51, .24, .24, { fill: NAVY })
+  tx(s, 1.16, 6.45, 1.26, .34, 'Data 4', { color: INK })
+  skew(s, 3.63, 5.59, 1.07, 1.48, .44, { fill: ORANGE, flipH: 1 })
+  skew(s, 5.78, 5.01, 1.49, 2.06, .767, { fill: GREY, flipH: 1 })
+  skew(s, 8.27, 4.17, 2.1, 2.91, 1.111, { fill: RUST, flipH: 1 })
+  skew(s, 2.7, 5.59, 1.07, 1.48, .44, { fill: SALMON })
+  skew(s, 4.61, 5.01, 1.49, 2.06, .767, { fill: SILVER })
+  skew(s, 6.97, 4.17, 2.1, 2.91, 1.111, { fill: ORANGE })
+  skew(s, 9.66, 2.37, 2.11, 4.7, 1.095, { fill: NAVY })
+}
+
+// Slide 23 - Most frequently visited destinations - three grouped column sets.
+function slide23 (s) {
+  topRound(s, 10.45, 2.04, .85, 2.99, .423, { fill: ORANGE, alpha: 10.2 })
+  topRound(s, 11.3, 1.45, .85, 3.58, .423, { fill: ORANGE, alpha: 25.1 })
+  topRound(s, 9.6, 2.67, .85, 2.35, .423, { fill: ORANGE })
+  tx(s, 9.2, 3.76, 1.65, .42, 'Niagara Falls', { size: 12, font: SEMI, color: WHITE, valign: 'middle', rot: -90 })
+  tx(s, 10.05, 3.76, 1.65, .42, 'Utah', { size: 12, font: SEMI, color: WHITE, valign: 'middle', rot: -90 })
+  tx(s, 10.9, 3.76, 1.65, .42, 'Florida', { size: 12, font: SEMI, color: WHITE, valign: 'middle', rot: -90 })
+  topRound(s, 6.28, 2.19, .85, 2.83, .423, { fill: CHAR, alpha: 9.8 })
+  topRound(s, 7.12, 3.05, .85, 1.97, .423, { fill: CHAR, alpha: 25.1 })
+  topRound(s, 5.43, 2.67, .85, 2.35, .423, { fill: CHAR })
+  tx(s, 5.03, 3.76, 1.65, .42, 'Adelboden', { size: 12, font: SEMI, color: WHITE, valign: 'middle', rot: -90 })
+  tx(s, 5.88, 3.76, 1.65, .42, 'Eiffel Tower', { size: 12, font: SEMI, color: WHITE, valign: 'middle', rot: -90 })
+  tx(s, 6.8, 3.84, 1.49, .42, 'Lofoten Island', { size: 12, font: SEMI, color: WHITE, valign: 'middle', rot: -90 })
+  topRound(s, 2.03, 2.51, .85, 2.52, .423, { fill: NAVY, alpha: 10.2 })
+  topRound(s, 2.87, 3.43, .85, 1.6, .423, { fill: NAVY, alpha: 25.1 })
+  topRound(s, 1.18, 1.77, .85, 3.25, .423, { fill: NAVY })
+  tx(s, .78, 3.76, 1.65, .42, 'Fuji Mountain', { size: 12, font: SEMI, color: WHITE, valign: 'middle', rot: -90 })
+  tx(s, 1.63, 3.76, 1.65, .42, 'Raja Ampat', { size: 12, font: SEMI, color: WHITE, valign: 'middle', rot: -90 })
+  tx(s, 2.84, 4.13, .92, .42, 'El Nido', { size: 12, font: SEMI, color: WHITE, valign: 'middle', rot: -90 })
+  tx(s, 3.27, .41, 6.79, 1.45, [['Our Most Frequently '], ['Visited Destinations', ORANGE]], { size: 40, b: 1, color: NAVY, align: 'center' })
+  sh(s, 'roundRect', 9.05, 5.01, 3.57, 1.91, { fill: ORANGE, r: .293 })
+  tx(s, 9.9, 5.37, 1.88, .44, 'America', { size: 20, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 9.51, 5.87, 2.65, .61, 'occaecati cupiditate non culpa qui officia deserunt', { size: 12, font: OPEN, color: MIST, align: 'center', ls: 1.5 })
+  sh(s, 'roundRect', 4.88, 5.01, 3.57, 1.91, { fill: CHAR, r: .293 })
+  tx(s, 5.72, 5.37, 1.88, .44, 'Eropa', { size: 20, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 5.34, 5.87, 2.65, .61, 'occaecati cupiditate non culpa qui officia deserunt', { size: 12, font: OPEN, color: MIST, align: 'center', ls: 1.5 })
+  sh(s, 'roundRect', .7, 5.01, 3.57, 1.91, { fill: NAVY, shadow: 1, r: .293 })
+  tx(s, 1.54, 5.37, 1.88, .44, 'Asia', { size: 20, font: SEMI, color: WHITE, align: 'center' })
+  tx(s, 1.16, 5.87, 2.65, .61, 'occaecati cupiditate non culpa qui officia deserunt', { size: 12, font: OPEN, color: MIST, align: 'center', ls: 1.5 })
+}
+
+// Slide 24 - Our best travel service - four-part donut diagram and progress bars.
+function slide24 (s) {
+  pth(s, s24a, 1.55, 1.52, 3.32, 1.85, { fill: PEACH })
+  pth(s, s24b, .45, 2.61, 1.85, 3.32, { fill: NAVY })
+  pth(s, s24c, 4.11, 2.61, 1.85, 3.32, { fill: SILVER })
+  pth(s, s24d, 1.55, 5.18, 3.32, 1.85, { fill: ORANGE })
+  tx(s, 11.79, 4.08, .97, .36, '70%', { color: BLACK, ls: .95 })
+  tx(s, 11.79, 4.88, .97, .36, '60%', { color: BLACK, ls: .95 })
+  tx(s, 11.79, 5.69, .97, .36, '90%', { color: BLACK, ls: .95 })
+  tx(s, 6.68, 3.73, 2.38, .33, 'Entrance Ticket', { color: BLACK, ls: .95 })
+  sh(s, 'roundRect', 9.17, 1.81, .1, 4.91, { fill: SILVER, alpha: 50.2, rot: 90, r: .052 })
+  sh(s, 'roundRect', 6.77, 4.19, 3.6, .15, { fill: PEACH, r: .077 })
+  tx(s, 6.68, 4.54, 3, .33, 'Convenient Transportation', { color: BLACK, ls: .95 })
+  sh(s, 'roundRect', 9.24, 2.67, .1, 4.76, { fill: SILVER, alpha: 50.2, rot: 90, r: .052 })
+  sh(s, 'roundRect', 6.77, 4.98, 3, .15, { fill: SILVER, r: .077 })
+  tx(s, 6.68, 5.35, 2.38, .33, 'Comfortable Hotel', { color: BLACK, ls: .95 })
+  sh(s, 'roundRect', 9.23, 3.48, .1, 4.79, { fill: SILVER, alpha: 50.2, rot: 90, r: .051 })
+  sh(s, 'roundRect', 6.77, 5.81, 4.07, .15, { fill: ORANGE, r: .077 })
+  tx(s, 6.68, 6.21, 4.29, .33, 'Friendly and Welcoming Service', { color: BLACK, ls: .95 })
+  sh(s, 'roundRect', 9.23, 4.35, .1, 4.79, { fill: SILVER, alpha: 50.2, rot: 90, r: .051 })
+  sh(s, 'roundRect', 6.77, 6.67, 4.07, .15, { fill: NAVY, r: .077 })
+  tx(s, 11.79, 6.56, .97, .36, '90%', { color: BLACK, ls: .95 })
+  tx(s, 6.62, .78, 4.87, 1.58, [['Our Best '], ['Travel Service', ORANGE]], { size: 44, b: 1, color: NAVY })
+  tx(s, 6.68, 2.5, 5.65, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem.', { color: INK, ls: 1.5 })
+  tx(s, .99, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, .5, .47, .42, .27, ORANGE)
+  ICON.globeShield(s, 1.07, 3.96, .61, .64, WHITE)
+  ICON.plane(s, 4.75, 4.1, .61, .39, WHITE)
+  ICON.hotel(s, 2.95, 5.87, .51, .51, WHITE)
+  sh(s, 'roundRect', 3.01, 5.87, .31, .03, { fill: WHITE, r: .006 })
+  ICON.ticket(s, 2.88, 2.19, .64, .46, WHITE)
+}
+
+// Slide 25 - The right choice - phone mock-ups beside the navy panel.
+function slide25 (s) {
+  pth(s, s25a, 6.19, -.9, 8.42, 10.41, { fill: ORANGE, rot: -146.7, shadow: 1 })
+  pth(s, s25b, 5.86, 0, 7.47, 7.5, { fill: NAVY })
+  phone(s, 3.98, -1.67, 3.07, 6.14)
+  phone(s, .54, 2.61, 3.07, 6.14)
+  phone(s, 3.97, 4.64, 3.07, 6.14)
+  phone(s, .55, -3.87, 3.07, 6.14)
+  tx(s, 8.07, 1.7, 4.87, 2.32, [['The Right Choice By '], ['Choosing Us', ORANGE]], { size: 44, b: 1, color: WHITE })
+  tx(s, 10.57, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: WHITE })
+  ICON.plane(s, 10.09, .47, .42, .27, ORANGE)
+  tx(s, 8.07, 4.69, 4.46, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem ipsumdolor em ipsum.', { color: MIST, ls: 1.5 })
+  tx(s, 8.07, 6.16, 4.46, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do.', { color: MIST, ls: 1.5 })
+}
+
+// Slide 26 - Your favorite place to visit - desktop mock-up, share/like stats.
+function slide26 (s) {
+  pth(s, s26a, -.22, -.2, 8.63, 7.94, { fill: ORANGE, rot: -176.5, shadow: 1 })
+  pth(s, s26b, 0, 0, 8.25, 7.5, { fill: NAVY })
+  monitor(s, 6.88, 1.24, 6.95, 5.7)
+  tx(s, .93, 3.15, 5.01, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem ipsumdolor em ipsum.', { color: MIST, ls: 1.5 })
+  tx(s, .93, 5.43, 2.2, 1.04, [['Lorem ipsum dolor', 0, 1], ['sit amet, consec oyilo indi tetur adip,']], { color: MIST, ls: 1.5 })
+  tx(s, .93, 1.12, 5.41, 1.72, [['Your Favorite '], ['Place to Visit', ORANGE]], { size: 48, b: 1, color: WHITE })
+  tx(s, 10.57, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, 10.09, .47, .42, .27, ORANGE)
+  tx(s, 1.53, 4.87, 1.51, .34, '46.652 Share', { b: 1, color: MIST })
+  tx(s, 4.15, 4.87, 1.34, .34, '76.652 Like', { b: 1, color: MIST })
+  tx(s, 3.58, 5.43, 2.2, 1.04, [['Lorem ipsum dolor', 0, 1], ['sit amet, consec oyilo indi tetur adip,']], { color: MIST, ls: 1.5 })
+  ICON.heart(s, 3.67, 4.91, .29, .26, ORANGE)
+  ICON.share(s, 1, 4.9, .29, .29, ORANGE)
+}
+
+// Slide 27 - Best destination with beautiful view - tablet mock-up.
+function slide27 (s) {
+  sh(s, 'roundRect', .76, 5.02, 5.77, 1.83, { fill: NAVY, shadow: 1, r: .28 })
+  sh(s, 'ellipse', 5.44, 5, 1.85, 1.85, { fill: ORANGE, shadow: 1 })
+  pth(s, s27a, 10.3, 1.9, 4, 6.59, { fill: ORANGE, rot: -151.9, shadow: 1 })
+  pth(s, s27b, 9.77, 2.14, 3.57, 5.36, { fill: NAVY })
+  tablet(s, 8.03, .8, 4.62, 6.09)
+  tx(s, .78, .85, 6.54, 1.45, [['Best Destination '], ['With Beautiful View', ORANGE]], { size: 40, b: 1, color: NAVY })
+  tx(s, .76, 3.55, 6.24, 1.04, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema oyilur et Lorem ipsumdol oloram oyilut rorem ipsum dolor sit amet, consec oyilo indi tetur.', { color: INK, ls: 1.5 })
+  tx(s, 2.59, 5.37, 1.88, .4, 'Switzerland', { size: 18, font: SEMI, color: WHITE })
+  tx(s, 2.59, 5.84, 2.65, .69, 'Lorem ipsum dolor sit amet consectetur.', { color: MIST, ls: 1.5 })
+  tx(s, .76, 2.85, 3.68, .4, 'Comfortable Vacation', { size: 18, font: SEMI, color: NAVY })
+  pth(s, s27c, 1.38, 5.47, .96, .58, { fill: ORANGE })
+}
+
+// Slide 28 - Enjoy a comfortable holiday - laptop mock-up and a white callout.
+function slide28 (s) {
+  pth(s, s28a, 5.44, -1.47, 8.62, 9.18, { fill: NAVY, rot: -116.2, shadow: 1 })
+  laptop(s, -2.32, 1.03, 10.22, 5.9)
+  tx(s, .99, .41, 2.51, .39, 'YOUR TRAVEL', { size: 17, b: 1, color: NAVY })
+  ICON.plane(s, .5, .47, .42, .27, ORANGE)
+  tx(s, 7.6, 1.47, 5.18, 2.12, [['Enjoy a Comfortable'], [' ', NAVY], ['Holiday With Us', ORANGE]], { size: 40, b: 1, color: WHITE })
+  sh(s, 'roundRect', 6.13, 5.26, 6.61, 1.69, { fill: WHITE, shadow: 1, r: .175 })
+  tx(s, 7.6, 5.67, 2.49, .4, 'Friendly Service', { size: 18, font: SEMI, color: NAVY })
+  tx(s, 7.6, 6.14, 4.73, .34, 'Lorem ipsum dolor sit amet, consec oyilo', { color: INK, ls: 1.5 })
+  tx(s, 7.6, 4.02, 4.29, .69, 'Lorem ipsum dolor sit amet, consec oyilo indi tetur adipiscing elit, sed do derema.', { color: MIST, ls: 1.5 })
+  ICON.globeShield(s, 6.62, 5.69, .7, .74, ORANGE)
+  tx(s, 7.6, .94, 2.98, .37, 'O U R  S E R V I C E', { size: 16, color: SILVER })
+}
+
+// Slide 29 - Pull quote from the CEO.
+function slide29 (s) {
+  pth(s, s29a, 7.56, 0, 5.77, 7.5, { fill: ORANGE, shadow: 1 })
+  sh(s, 'rect', 0, -0, .67, 7.5, { fill: NAVY, flipH: 1, shadow: 1 })
+  tx(s, 1.29, 2.03, 6.04, 3.33, [['A Journey of a Thousand Miles '], ['Begins With a Single Step.', ORANGE]], { size: 48, b: 1, color: NAVY })
+  tx(s, 1.29, .49, 3.77, 2.12, '“', { size: 120, b: 1, color: NAVY })
+  tx(s, 1.29, 5.88, 3.45, .5, 'Jenny Norra', { size: 24, font: SEMI, b: 1, color: NAVY })
+  tx(s, 1.29, 6.4, 2.08, .4, 'CEO/Founder', { size: 18, i: 1, color: SLATE, ls: 1.5 })
+  sh(s, 'line', 1.43, 5.62, 5.35, 0, { line: GREY, lw: 1 })
+  pth(s, s29b, 7.67, 0, 5.67, 7.5, { fill: PHOTO, shadow: 1 })
+}
+
+// Slide 30 - Thank-you closing slide.
+function slide30 (s) {
+  pth(s, s30a, 0, 1.62, 13.33, 5.88, { fill: ORANGE, shadow: 1 })
+  pth(s, s30b, 0, 1.75, 13.33, 5.75, { fill: NAVY, shadow: 1 })
+  tx(s, 2.09, 3.57, 9.15, 1.92, [['THANK YOU FOR '], ['YOUR ATTENTION', WHITE]], { size: 54, font: BLACKF, b: 1, i: 1, color: ORANGE, align: 'center' })
+  sh(s, 'ellipse', 5.71, .84, 1.92, 1.92, { fill: WHITE, shadow: 1 })
+  pth(s, PLANE, 6.13, 1.53, 1.07, .69, { fill: ORANGE, rot: 7.4 })
+  tx(s, 4.03, 6.5, 5.27, .4, 'Travel Presentation By Mahative', { size: 18, color: MIST, align: 'center' })
+}
+
+const BUILDERS = [slide01, slide02, slide03, slide04, slide05, slide06, slide07, slide08, slide09, slide10, slide11, slide12, slide13, slide14, slide15, slide16, slide17, slide18, slide19, slide20, slide21, slide22, slide23, slide24, slide25, slide26, slide27, slide28, slide29, slide30]
+
+const pptx = new PptxGenJS()
+pptx.defineLayout({ name: 'W16x9', width: 13.333, height: 7.5 })
+pptx.layout = 'W16x9'
+pptx.author = 'Mahative'
+pptx.title = 'Travel Agency Presentation'
+
+BUILDERS.forEach(function (build) {
+  const s = pptx.addSlide()
+  s.background = { color: WHITE }
+  build(s)
+})
+
+pptx.writeFile({ fileName: path.join(__dirname, '0e4f906f-0924-4362-8dae-d37bd74402ba_grok_final.pptx') })
+  .then(function (f) { console.log('wrote ' + f) })
+

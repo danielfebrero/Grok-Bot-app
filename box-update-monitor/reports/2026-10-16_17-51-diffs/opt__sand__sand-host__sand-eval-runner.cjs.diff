@@ -1,0 +1,2459 @@
+--- 2026-10-16_16-48:/opt/sand/sand-host/sand-eval-runner.cjs
++++ 2026-10-16_17-51:/opt/sand/sand-host/sand-eval-runner.cjs
+@@ -7220,7 +7220,7 @@
+ 
+ 
+ // ../packages/constants/dist/pull-request-review-links.js
+-var ORIGIN_PR_IDENTITY_HOST, ORIGIN_PR_IDENTITY_HOST_STAGING;
++var ORIGIN_PR_IDENTITY_HOST, ORIGIN_PR_IDENTITY_HOST_STAGING, CLIENT_ONLY_ORIGIN_PR_IDENTITY_HOSTS;
+ 
+ var init_pull_request_review_links = __esm({
+ 
+@@ -7232,6 +7232,12 @@
+ 
+     ORIGIN_PR_IDENTITY_HOST_STAGING = "staging.cursor.com";
+ 
++    CLIENT_ONLY_ORIGIN_PR_IDENTITY_HOSTS = {
++
++      stagingIdentityHost: ORIGIN_PR_IDENTITY_HOST_STAGING
++    }
++;
++
+   }
+ 
+ }
+@@ -7239,46 +7245,6 @@
+ 
+ 
+ // ../packages/constants/dist/origin-stages.js
+-function originStageHostTable({
+- stagingIdentityHost }
+- = {
+-
+-  stagingIdentityHost: ORIGIN_PR_IDENTITY_HOST_STAGING
+-}
+-) {
+-
+-  return [
+-    {
+-
+-      stage: "prod",
+-      gitHost: "origin.cursor.com",
+-      apiHost: "api.origin.cursor.com",
+-      internalHost: "origin-prod.internal.cursor.com",
+-      prIdentityHost: ORIGIN_PR_IDENTITY_HOST
+-    }
+-,
+-    {
+-
+-      stage: "staging",
+-      gitHost: "origin-staging.cursor.com",
+-      apiHost: "api.origin-staging.cursor.com",
+-      internalHost: "origin-staging.internal.cursor.com",
+-      prIdentityHost: stagingIdentityHost
+-    }
+-,
+-    {
+-
+-      stage: "test",
+-      gitHost: "origin-test.cursor.com",
+-      apiHost: "api.origin-test.cursor.com",
+-      internalHost: "origin-test.internal.cursor.com",
+-      prIdentityHost: void 0
+-    }
+-
+-  ];
+-
+-}
+-
+ function originStageHosts(stage) {
+ 
+   const hosts = ORIGIN_STAGE_HOSTS.find((entry) => entry.stage === stage);
+@@ -7295,19 +7261,15 @@
+ 
+ }
+ 
+-function gitHostByPrIdentityHost(table) {
+-
+-  const gitHosts = /* @__PURE__ */ new Map();
++function originGitHostByPrIdentityHost({
++ stagingIdentityHost }
++) {
+ 
+-  for (const {
+- prIdentityHost, gitHost }
+- of table) {
++  const gitHosts = /* @__PURE__ */ new Map([[ORIGIN_PR_IDENTITY_HOST, originStageHosts("prod").gitHost]]);
+ 
+-    if (prIdentityHost !== void 0 && !gitHosts.has(prIdentityHost)) {
++  if (stagingIdentityHost !== void 0 && !gitHosts.has(stagingIdentityHost)) {
+ 
+-      gitHosts.set(prIdentityHost, gitHost);
+-
+-    }
++    gitHosts.set(stagingIdentityHost, originStageHosts("staging").gitHost);
+ 
+   }
+ 
+@@ -7315,13 +7277,7 @@
+ 
+ }
+ 
+-function originGitHostByPrIdentityHost(identityHosts) {
+-
+-  return identityHosts === void 0 ? ORIGIN_GIT_HOST_BY_PR_IDENTITY_HOST : gitHostByPrIdentityHost(originStageHostTable(identityHosts));
+-
+-}
+-
+-var ORIGIN_STAGE_HOSTS, ORIGIN_API_HOST_BY_GIT_HOST, ORIGIN_GIT_HOST_BY_API_HOST, ORIGIN_INTERNAL_HOST_BY_API_HOST, ORIGIN_GIT_HOST_BY_PR_IDENTITY_HOST;
++var ORIGIN_STAGE_HOSTS, ORIGIN_API_HOST_BY_GIT_HOST, ORIGIN_GIT_HOST_BY_API_HOST, ORIGIN_INTERNAL_HOST_BY_API_HOST;
+ 
+ var init_origin_stages = __esm({
+ 
+@@ -7331,7 +7287,32 @@
+ 
+     init_pull_request_review_links();
+ 
+-    ORIGIN_STAGE_HOSTS = originStageHostTable();
++    ORIGIN_STAGE_HOSTS = [
++      {
++
++        stage: "prod",
++        gitHost: "origin.cursor.com",
++        apiHost: "api.origin.cursor.com",
++        internalHost: "origin-prod.internal.cursor.com"
++      }
++,
++      {
++
++        stage: "staging",
++        gitHost: "origin-staging.cursor.com",
++        apiHost: "api.origin-staging.cursor.com",
++        internalHost: "origin-staging.internal.cursor.com"
++      }
++,
++      {
++
++        stage: "test",
++        gitHost: "origin-test.cursor.com",
++        apiHost: "api.origin-test.cursor.com",
++        internalHost: "origin-test.internal.cursor.com"
++      }
++
++    ];
+ 
+     ORIGIN_API_HOST_BY_GIT_HOST = new Map(ORIGIN_STAGE_HOSTS.map((entry) => [entry.gitHost, entry.apiHost]));
+ 
+@@ -7339,8 +7320,6 @@
+ 
+     ORIGIN_INTERNAL_HOST_BY_API_HOST = new Map(ORIGIN_STAGE_HOSTS.map((entry) => [entry.apiHost, entry.internalHost]));
+ 
+-    ORIGIN_GIT_HOST_BY_PR_IDENTITY_HOST = gitHostByPrIdentityHost(ORIGIN_STAGE_HOSTS);
+-
+   }
+ 
+ }
+@@ -7635,6 +7614,8 @@
+ 
+     init_project_send_message();
+ 
++    init_pull_request_review_links();
++
+     init_smart_mode_classifier();
+ 
+     init_system_notification();
+@@ -12957,7 +12938,7 @@
+ 
+ }
+ 
+-function parseOriginPortalRepoPage(url2, identityHosts) {
++function parseOriginPortalRepoPage(url2, identityHosts = CLIENT_ONLY_ORIGIN_PR_IDENTITY_HOSTS) {
+ 
+   let parsed;
+ 
+@@ -66229,7 +66210,7 @@
+ 
+   if ("_idmap" in input2) {
+ 
+-    const registry2 = input2;
++    const registry3 = input2;
+ 
+     const ctx2 = initializeContext({
+  ...params, processors: allProcessors }
+@@ -66239,7 +66220,7 @@
+ }
+ ;
+ 
+-    for (const entry of registry2._idmap.entries()) {
++    for (const entry of registry3._idmap.entries()) {
+ 
+       const [_2, schema3] = entry;
+ 
+@@ -66253,7 +66234,7 @@
+ 
+     const external = {
+ 
+-      registry: registry2,
++      registry: registry3,
+       uri: params?.uri,
+       defs
+     }
+@@ -66261,7 +66242,7 @@
+ 
+     ctx2.external = external;
+ 
+-    for (const entry of registry2._idmap.entries()) {
++    for (const entry of registry3._idmap.entries()) {
+ 
+       const [key, schema3] = entry;
+ 
+@@ -246272,6 +246253,29 @@
+ );
+ 
+ 
++// ../packages/utils/dist/test-resets.js
++function registerTestReset(reset2) {
++
++  registry2?.add(reset2);
++
++}
++
++var registry2;
++
++var init_test_resets = __esm({
++
++  "../packages/utils/dist/test-resets.js"() {
++
++    "use strict";
++
++    registry2 = typeof process === "undefined" || process.env.VITEST === void 0 ? void 0 : globalThis.__cursorTestResets ??= /* @__PURE__ */ new Set();
++
++  }
++
++}
++);
++
++
+ // ../packages/shell-exec/dist/sandbox/cache-env.js
+ function generateSessionId() {
+ 
+@@ -246291,6 +246295,12 @@
+ 
+ }
+ 
++function _resetSessionIdForTesting() {
++
++  cachedSessionId = void 0;
++
++}
++
+ function isPrivateOwnedDirectory(path32, uid) {
+ 
+   const stat14 = (0, import_node_fs8.lstatSync)(path32);
+@@ -246479,8 +246489,12 @@
+ 
+     init_dist4();
+ 
++    init_test_resets();
++
+     SANDBOX_CACHE_DIR = "cursor-sandbox-cache";
+ 
++    registerTestReset(_resetSessionIdForTesting);
++
+     SANDBOX_TEMP_RESTORE_EVAL = `builtin eval "\${
+ __CURSOR_SANDBOX_TEMP_RESTORE:-}
+ " 2>/dev/null;
+@@ -249499,10 +249513,6 @@
+ 
+   const common2 = mergeCommonWorkspaceFields(sources, options2);
+ 
+-  const orderedSources = [perUser, perRepo, teamAdmin];
+-
+-  const sourceNames = ["perUser", "perRepo", "teamAdmin", "hardcoded"];
+-
+   const additionalReadwritePaths = mergePathsUnion(perUser?.additionalReadwritePaths, perRepo?.additionalReadwritePaths, teamAdmin?.additionalReadwritePaths);
+ 
+   const policy = {
+@@ -250424,6 +250434,22 @@
+ 
+ }
+ 
++function resetSandboxSupportCacheForTests() {
++
++  cachedSandboxHelperSupported = null;
++
++  cachedVerdictIsWorkspaceRooted = false;
++
++  inFlightWorkspaceProbe = null;
++
++  lastSandboxFailureReason = null;
++
++  binaryAvailable = null;
++
++  binaryCheckError = null;
++
++}
++
+ function isSandboxHelperSupported(ctx) {
+ 
+   if (cachedSandboxHelperSupported !== null) {
+@@ -251269,6 +251295,8 @@
+ 
+     init_policy_file();
+ 
++    init_test_resets();
++
+     isMacOS = process.platform === "darwin";
+ 
+     isLinux = process.platform === "linux";
+@@ -251289,6 +251317,8 @@
+ 
+     inFlightWorkspaceProbe = null;
+ 
++    registerTestReset(resetSandboxSupportCacheForTests);
++
+     PREFLIGHT_PROBE_TIMEOUT_MS = 15e3;
+ 
+   }
+@@ -253696,8 +253726,6 @@
+ 
+             tempDir = await (0, import_promises10.mkdtemp)(import_node_path49.default.join(import_node_os11.default.tmpdir(), "cursor-bash-state-"));
+ 
+-            const dirname20 = import_node_path49.default.basename(tempDir);
+-
+             stateInputPath = import_node_path49.default.join(tempDir, "state-in");
+ 
+             stateOutputPath = import_node_path49.default.join(tempDir, "state-out");
+@@ -371130,12 +371158,12 @@
+ );
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
+ var LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS, RELATED_TASK_META_KEY, JSONRPC_VERSION2, AssertObjectSchema, ProgressTokenSchema, CursorSchema, TaskCreationParamsSchema, TaskMetadataSchema, RelatedTaskMetadataSchema, RequestMetaSchema, BaseRequestParamsSchema, TaskAugmentedRequestParamsSchema, isTaskAugmentedRequestParams, RequestSchema2, NotificationsParamsSchema, NotificationSchema, ResultSchema2, RequestIdSchema, JSONRPCRequestSchema2, isJSONRPCRequest, JSONRPCNotificationSchema2, isJSONRPCNotification, JSONRPCResultResponseSchema, isJSONRPCResultResponse, ErrorCode, JSONRPCErrorResponseSchema, isJSONRPCErrorResponse, JSONRPCMessageSchema2, JSONRPCResponseSchema2, EmptyResultSchema, CancelledNotificationParamsSchema, CancelledNotificationSchema, IconSchema, IconsSchema, BaseMetadataSchema, ImplementationSchema, FormElicitationCapabilitySchema, ElicitationCapabilitySchema, ClientTasksCapabilitySchema, ServerTasksCapabilitySchema, ClientCapabilitiesSchema, InitializeRequestParamsSchema, InitializeRequestSchema, isInitializeRequest, ServerCapabilitiesSchema2, InitializeResultSchema2, InitializedNotificationSchema, isInitializedNotification, PingRequestSchema, ProgressSchema, ProgressNotificationParamsSchema, ProgressNotificationSchema, PaginatedRequestParamsSchema, PaginatedRequestSchema, PaginatedResultSchema2, TaskStatusSchema, TaskSchema, CreateTaskResultSchema, TaskStatusNotificationParamsSchema, TaskStatusNotificationSchema, GetTaskRequestSchema, GetTaskResultSchema, GetTaskPayloadRequestSchema, GetTaskPayloadResultSchema, ListTasksRequestSchema, ListTasksResultSchema, CancelTaskRequestSchema, CancelTaskResultSchema, ResourceContentsSchema2, TextResourceContentsSchema2, Base64Schema, BlobResourceContentsSchema2, RoleSchema, AnnotationsSchema, ResourceSchema, ResourceTemplateSchema, ListResourcesRequestSchema, ListResourcesResultSchema, ListResourceTemplatesRequestSchema, ListResourceTemplatesResultSchema, ResourceRequestParamsSchema, ReadResourceRequestParamsSchema, ReadResourceRequestSchema, ReadResourceResultSchema, ResourceListChangedNotificationSchema, SubscribeRequestParamsSchema, SubscribeRequestSchema, UnsubscribeRequestParamsSchema, UnsubscribeRequestSchema, ResourceUpdatedNotificationParamsSchema, ResourceUpdatedNotificationSchema, PromptArgumentSchema, PromptSchema, ListPromptsRequestSchema, ListPromptsResultSchema, GetPromptRequestParamsSchema, GetPromptRequestSchema, TextContentSchema2, ImageContentSchema2, AudioContentSchema, ToolUseContentSchema, EmbeddedResourceSchema2, ResourceLinkSchema, ContentBlockSchema, PromptMessageSchema, GetPromptResultSchema, PromptListChangedNotificationSchema, ToolAnnotationsSchema, ToolExecutionSchema, ToolSchema2, ListToolsRequestSchema, ListToolsResultSchema2, CallToolResultSchema2, CompatibilityCallToolResultSchema, CallToolRequestParamsSchema, CallToolRequestSchema, ToolListChangedNotificationSchema, ListChangedOptionsBaseSchema, LoggingLevelSchema, SetLevelRequestParamsSchema, SetLevelRequestSchema, LoggingMessageNotificationParamsSchema, LoggingMessageNotificationSchema, ModelHintSchema, ModelPreferencesSchema, ToolChoiceSchema, ToolResultContentSchema, SamplingContentSchema, SamplingMessageContentBlockSchema, SamplingMessageSchema, CreateMessageRequestParamsSchema, CreateMessageRequestSchema, CreateMessageResultSchema, CreateMessageResultWithToolsSchema, BooleanSchemaSchema, StringSchemaSchema, NumberSchemaSchema, UntitledSingleSelectEnumSchemaSchema, TitledSingleSelectEnumSchemaSchema, LegacyTitledEnumSchemaSchema, SingleSelectEnumSchemaSchema, UntitledMultiSelectEnumSchemaSchema, TitledMultiSelectEnumSchemaSchema, MultiSelectEnumSchemaSchema, EnumSchemaSchema, PrimitiveSchemaDefinitionSchema, ElicitRequestFormParamsSchema, ElicitRequestURLParamsSchema, ElicitRequestParamsSchema, ElicitRequestSchema, ElicitationCompleteNotificationParamsSchema, ElicitationCompleteNotificationSchema, ElicitResultSchema, ResourceTemplateReferenceSchema, PromptReferenceSchema, CompleteRequestParamsSchema, CompleteRequestSchema, CompleteResultSchema, RootSchema, ListRootsRequestSchema, ListRootsResultSchema, RootsListChangedNotificationSchema, ClientRequestSchema, ClientNotificationSchema, ClientResultSchema, ServerRequestSchema, ServerNotificationSchema, ServerResultSchema, McpError2, UrlElicitationRequiredError;
+ 
+ var init_types5 = __esm({
+ 
+-  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js"() {
++  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js"() {
+ 
+     init_v4();
+ 
+@@ -373203,12 +373231,12 @@
+ );
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/auth.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/auth.js
+ var SafeUrlSchema, OAuthProtectedResourceMetadataSchema, OAuthMetadataSchema, OpenIdProviderMetadataSchema, OpenIdProviderDiscoveryMetadataSchema, OAuthTokensSchema, OAuthErrorResponseSchema, OptionalSafeUrlSchema, OAuthClientMetadataSchema, OAuthClientInformationSchema, OAuthClientInformationFullSchema, OAuthClientRegistrationErrorSchema, OAuthTokenRevocationRequestSchema;
+ 
+ var init_auth = __esm({
+ 
+-  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/auth.js"() {
++  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/auth.js"() {
+ 
+     init_v4();
+ 
+@@ -373409,7 +373437,7 @@
+ );
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/auth-utils.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/auth-utils.js
+ function resourceUrlFromServerUrl(url2) {
+ 
+   const resourceURL = typeof url2 === "string" ? new URL(url2) : new URL(url2.href);
+@@ -373450,7 +373478,7 @@
+ 
+ var init_auth_utils = __esm({
+ 
+-  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/auth-utils.js"() {
++  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/auth-utils.js"() {
+ 
+   }
+ 
+@@ -373458,12 +373486,12 @@
+ );
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js
+ var OAuthError, InvalidRequestError, InvalidClientError, InvalidGrantError, UnauthorizedClientError, UnsupportedGrantTypeError, InvalidScopeError, AccessDeniedError, ServerError, TemporarilyUnavailableError, UnsupportedResponseTypeError, UnsupportedTokenTypeError, InvalidTokenError, MethodNotAllowedError, TooManyRequestsError, InvalidClientMetadataError, InsufficientScopeError, InvalidTargetError, OAUTH_ERRORS;
+ 
+ var init_errors4 = __esm({
+ 
+-  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js"() {
++  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/auth/errors.js"() {
+ 
+     OAuthError = class extends Error {
+ 
+@@ -373655,7 +373683,7 @@
+ );
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js
+ function __cursorIsRetryableOAuthRefreshError(error63, provider) {
+ 
+   return provider?.isRetryableOAuthRefreshError?.(error63) === true;
+@@ -373698,6 +373726,12 @@
+ 
+ }
+ 
++function __cursorIsClientRefusal(error63, status) {
++
++  return error63 instanceof OAuthError && status !== void 0 && status >= 400 && status < 500 && status !== 429;
++
++}
++
+ async function __cursorRegisterClientWithRedirectFallback(provider, authorizationServerUrl, {
+  metadata: metadata2, clientMetadata, fetchFn }
+ ) {
+@@ -373712,9 +373746,32 @@
+ 
+   const attempts2 = [full, ...[activeRedirectUri, ...provider.registrationFallbackRedirectUris?.() ?? []].filter((uri, index, all) => all.indexOf(uri) === index && !(full.length === 1 && full[0] === uri)).map((uri) => [uri])];
+ 
++  const untyped = provider.registrationUntypedRedirectUris?.();
++
++  const untypedIndex = untyped?.length ? attempts2.push([...untyped]) - 1 : void 0;
++
++  let status;
++
++  const observedFetch = async (input2, init) => {
++
++    const response = await (fetchFn ?? fetch)(input2, init);
++
++    status = response.status;
++
++    return response;
++
++  }
++;
++
+   let lastError;
+ 
+-  for (const redirect_uris of attempts2) {
++  for (let index = 0;
++ index < attempts2.length;
++ index++) {
++
++    const redirect_uris = attempts2[index];
++
++    status = void 0;
+ 
+     try {
+ 
+@@ -373724,7 +373781,7 @@
+         clientMetadata: {
+  ...clientMetadata, ...provider.registrationMetadataForRedirectUris?.(redirect_uris), redirect_uris }
+ ,
+-        fetchFn
++        fetchFn: observedFetch
+       }
+ );
+ 
+@@ -373735,13 +373792,27 @@
+     }
+  catch (error63) {
+ 
+-      if (!__cursorIsRedirectRejection(error63, provider.registrationMetadataForRedirectUris?.(redirect_uris)?.application_type !== void 0)) {
++      const typedAttempt = provider.registrationMetadataForRedirectUris?.(redirect_uris)?.application_type !== void 0;
+ 
+-        throw error63;
++      if (__cursorIsRedirectRejection(error63, typedAttempt)) {
++
++        lastError = error63;
++
++        continue;
+ 
+       }
+ 
+-      lastError = error63;
++      if (typedAttempt && untypedIndex !== void 0 && index < untypedIndex && __cursorIsClientRefusal(error63, status)) {
++
++        lastError = error63;
++
++        index = untypedIndex - 1;
++
++        continue;
++
++      }
++
++      throw error63;
+ 
+     }
+ 
+@@ -374854,7 +374925,7 @@
+ 
+ var init_auth2 = __esm({
+ 
+-  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js"() {
++  "../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/auth.js"() {
+ 
+     init_index_node();
+ 
+@@ -375219,6 +375290,12 @@
+ 
+ 
+ // ../packages/mcp-core/dist/oauth/rest-mcp-provider-metadata.js
++function resetRestMcpProviderMetadataCacheForTests() {
++
++  cache2.clear();
++
++}
++
+ async function resolveRestMcpProviderMetadataFromPrm(serverUrl, fetchImpl = fetch) {
+ 
+   if (getRestMcpProviderIdForUrlPath(serverUrl) === void 0) {
+@@ -375285,10 +375362,14 @@
+ 
+     init_dist3();
+ 
++    init_test_resets();
++
+     PRM_CACHE_TTL_MS = 5 * 60 * 1e3;
+ 
+     cache2 = /* @__PURE__ */ new Map();
+ 
++    registerTestReset(resetRestMcpProviderMetadataCacheForTests);
++
+   }
+ 
+ }
+@@ -380080,7 +380161,7 @@
+ 
+       const oneofSeen = /* @__PURE__ */ new Map();
+ 
+-      const registry2 = options2.typeRegistry;
++      const registry3 = options2.typeRegistry;
+ 
+       for (const [jsonKey, jsonValue2] of Object.entries(json3)) {
+ 
+@@ -380123,9 +380204,9 @@
+ 
+           let found = false;
+ 
+-          if ((registry2 === null || registry2 === void 0 ? void 0 : registry2.findExtension) && jsonKey.startsWith("[") && jsonKey.endsWith("]")) {
++          if ((registry3 === null || registry3 === void 0 ? void 0 : registry3.findExtension) && jsonKey.startsWith("[") && jsonKey.endsWith("]")) {
+ 
+-            const ext2 = registry2.findExtension(jsonKey.substring(1, jsonKey.length - 1));
++            const ext2 = registry3.findExtension(jsonKey.substring(1, jsonKey.length - 1));
+ 
+             if (ext2 && ext2.extendee.typeName == type2.typeName) {
+ 
+@@ -380207,13 +380288,13 @@
+ 
+         }
+ 
+-        const registry2 = options2.typeRegistry;
++        const registry3 = options2.typeRegistry;
+ 
+-        if (registry2 === null || registry2 === void 0 ? void 0 : registry2.findExtensionFor) {
++        if (registry3 === null || registry3 === void 0 ? void 0 : registry3.findExtensionFor) {
+ 
+           for (const uf of type2.runtime.bin.listUnknownFields(message)) {
+ 
+-            const ext2 = registry2.findExtensionFor(type2.typeName, uf.no);
++            const ext2 = registry3.findExtensionFor(type2.typeName, uf.no);
+ 
+             if (ext2 && hasExtension(message, ext2)) {
+ 
+@@ -517242,7 +517323,7 @@
+ */
+   findDetails(typeOrRegistry) {
+ 
+-    const registry2 = "typeName" in typeOrRegistry ? {
++    const registry3 = "typeName" in typeOrRegistry ? {
+ 
+       findMessage: (typeName) => typeName === typeOrRegistry.typeName ? typeOrRegistry : void 0
+     }
+@@ -517254,7 +517335,7 @@
+ 
+       if ("getType" in data2) {
+ 
+-        if (registry2.findMessage(data2.getType().typeName)) {
++        if (registry3.findMessage(data2.getType().typeName)) {
+ 
+           details.push(data2);
+ 
+@@ -517264,7 +517345,7 @@
+ 
+       }
+ 
+-      const type2 = registry2.findMessage(data2.type);
++      const type2 = registry3.findMessage(data2.type);
+ 
+       if (type2) {
+ 
+@@ -704396,6 +704477,8 @@
+ 
+ var CloudAgentTimingEventType = /* @__PURE__ */ enumType(proto3, __protoPackage147, "CloudAgentTimingEventType", [[0, "UNSPECIFIED"], [1, "REQUEST_RECEIVED"], [2, "PREWARMED_POD_RECEIVED"], [3, "POD_REQUESTED"], [4, "POD_READY"], [5, "FIRST_TOKEN"], [6, "STALE_SNAPSHOT_USED"]], 1);
+ 
++var CloudAgentGuestOs = /* @__PURE__ */ enumType(proto3, __protoPackage147, "CloudAgentGuestOs", [[0, "UNSPECIFIED"], [1, "LINUX"], [2, "WINDOWS"]], 1);
++
+ var BackgroundComposerDesktopLeaseAction = /* @__PURE__ */ enumType(proto3, __protoPackage147, "BackgroundComposerDesktopLeaseAction", [[0, "UNSPECIFIED"], [1, "ACQUIRE"], [2, "RELEASE"]], 1);
+ 
+ var GithubAccessErrorType = /* @__PURE__ */ enumType(proto3, __protoPackage147, "GithubAccessErrorType", [[0, "UNSPECIFIED"], [1, "NONE"], [2, "NO_AUTH_TOKEN"], [3, "APP_NOT_INSTALLED"], [4, "USER_NO_ACCESS"], [5, "APP_INSUFFICIENT_PERMS"], [6, "PUBLIC_REPO"]], 1);
+@@ -720693,6 +720776,8 @@
+ 
+     this.cluster = "";
+ 
++    this.guestOs = CloudAgentGuestOs.UNSPECIFIED;
++
+     proto3.util.initPartial(data2, this);
+ 
+   }
+@@ -720723,7 +720808,7 @@
+ 
+   static $() {
+ 
+-    return ["PodReference|1 pod_id 9|2 tenant_id 9|3 network_token 9|4 cluster 9|5 exec_daemon_auth_token 9?|6 pty_auth_token 9?|7 pod_proxy_url_template 9?"];
++    return ["PodReference|1 pod_id 9|2 tenant_id 9|3 network_token 9|4 cluster 9|5 exec_daemon_auth_token 9?|6 pty_auth_token 9?|7 pod_proxy_url_template 9?|8 guest_os #0", CloudAgentGuestOs];
+ 
+   }
+ 
+@@ -755375,9 +755460,9 @@
+ 
+ }
+ 
+-function mergeBuiltinToolsServer(servers, registry2) {
++function mergeBuiltinToolsServer(servers, registry3) {
+ 
+-  if (registry2 === void 0 || registry2.isEmpty()) {
++  if (registry3 === void 0 || registry3.isEmpty()) {
+ 
+     return servers;
+ 
+@@ -755385,7 +755470,7 @@
+ 
+   const withoutReserved = servers.filter((server) => !isReservedDynamicToolsNamespace(server.descriptor.serverIdentifier));
+ 
+-  const descriptor2 = registry2.getMcpDescriptor();
++  const descriptor2 = registry3.getMcpDescriptor();
+ 
+   if (descriptor2 === void 0) {
+ 
+@@ -755393,7 +755478,7 @@
+ 
+   }
+ 
+-  return registry2.listsFirstInCatalog() ? [{
++  return registry3.listsFirstInCatalog() ? [{
+  descriptor: descriptor2 }
+ , ...withoutReserved] : [...withoutReserved, {
+  descriptor: descriptor2 }
+@@ -765032,9 +765117,9 @@
+ 
+   const toolNames = getMcpMetaToolSnapshotToolNames(toolSetHandle);
+ 
+-  const registry2 = toolSetHandle.getDynamicToolRegistry();
++  const registry3 = toolSetHandle.getDynamicToolRegistry();
+ 
+-  return withMcpMetaToolSnapshotToolNames(mcpMetaToolOptions, toolNames, registry2?.getMcpDescriptor(toolNames), registry2?.listsFirstInCatalog() === true, registry2?.getExternalCatalogOptions());
++  return withMcpMetaToolSnapshotToolNames(mcpMetaToolOptions, toolNames, registry3?.getMcpDescriptor(toolNames), registry3?.listsFirstInCatalog() === true, registry3?.getExternalCatalogOptions());
+ 
+ }
+ 
+@@ -780325,14 +780410,14 @@
+ 
+   const workspacePaths = props.env?.workspacePaths ?? [];
+ 
+-  const skills = overrides?.skills ?? categorizeCursorRulesForDisplay(props.cursorRules, workspacePaths, props.displayOptions, props.featureFlags).skills;
+-
+   const computerUseSubagentSurface = props.displayOptions?.computerUseSubagentSurface === true;
+ 
+   const agentSkillsFromProto = filterByAgentEnvironment(props.agentSkills ?? [], props.displayOptions?.agentType).filter((s3) => !s3.disableModelInvocation && !isFileScopedSkill(s3, workspacePaths));
+ 
+   const useAgentSkillsProto = (props.agentSkills?.length ?? 0) > 0;
+ 
++  const skills = useAgentSkillsProto ? [] : overrides?.skills ?? categorizeCursorRulesForDisplay(props.cursorRules, workspacePaths, props.displayOptions, props.featureFlags).skills;
++
+   const filteredAgentSkillsFromProto = computerUseSubagentSurface ? agentSkillsFromProto.filter((skill) => isComputerUseGuidedSkill(skill)) : agentSkillsFromProto;
+ 
+   const filteredLegacySkills = computerUseSubagentSurface ? skills.filter((skill) => isComputerUseGuidedSkill({
+@@ -781060,7 +781145,7 @@
+ 
+   const {
+  globalRules, agentRequestableRules, userRules, skills }
+- = categorizeCursorRulesForDisplay(props.cursorRules, workspacePaths, props.displayOptions, props.featureFlags, props.metricsCtx);
++ = categorizeCursorRulesForDisplay(props.cursorRules, workspacePaths, props.displayOptions, props.featureFlags, props.metricsCtx, (props.agentSkills?.length ?? 0) > 0);
+ 
+   const readToolName = props.toolInfo?.allTools?.READ?.name;
+ 
+@@ -781365,13 +781450,14 @@
+ 
+ }
+ 
+-function categorizeCursorRulesForDisplay(cursorRules, workspacePaths, displayOptions, featureFlags, metricsCtx) {
++function categorizeCursorRulesForDisplay(cursorRules, workspacePaths, displayOptions, featureFlags, metricsCtx, omitSkills) {
+ 
+   return categorizeCursorRules(cursorRules, workspacePaths, displayOptions?.agentType, {
+ 
+     cacheDisableModelInvocation: displayOptions?.cacheDisableModelInvocation === true,
+     featureFlags,
+-    metricsCtx
++    metricsCtx,
++    omitSkills
+   }
+ );
+ 
+@@ -781411,7 +781497,7 @@
+             globalRules.push(rule);
+ 
+           }
+- else {
++ else if (options2?.omitSkills !== true) {
+ 
+             const content = rule.content;
+ 
+@@ -784707,6 +784793,10 @@
+ }
+ ;
+ 
++var summarizedMessageCountByArchiveBlobId = new LRUCache({
++ max: 4096 }
++);
++
+ function simulatedMessageFieldsOf(userMessage) {
+ 
+   return {
+@@ -787793,15 +787883,29 @@
+ 
+     }
+ 
++    const blobIdHex = toHex(persistedBlobId);
++
++    const cachedCount = summarizedMessageCountByArchiveBlobId.get(blobIdHex);
++
++    if (cachedCount !== void 0) {
++
++      return cachedCount;
++
++    }
++
+     return this.blobStore.getBlob(ctx, persistedBlobId).then((blob) => {
+ 
+       if (blob === void 0) {
+ 
+-        throw new BlobNotFoundError([toHex(persistedBlobId)]);
++        throw new BlobNotFoundError([blobIdHex]);
+ 
+       }
+ 
+-      return this.serdes.conversationSummaryArchive.deserialize(blob).summarizedMessages.length;
++      const count2 = this.serdes.conversationSummaryArchive.deserialize(blob).summarizedMessages.length;
++
++      summarizedMessageCountByArchiveBlobId.set(blobIdHex, count2);
++
++      return count2;
+ 
+     }
+ );
+@@ -803676,7 +803780,8 @@
+  = categorizeCursorRules(params.rules, workspacePaths, params.userInfoDisplayOptions?.agentType, {
+ 
+     cacheDisableModelInvocation: params.userInfoDisplayOptions?.cacheDisableModelInvocation === true,
+-    featureFlags: params.featureFlags
++    featureFlags: params.featureFlags,
++    omitSkills: true
+   }
+ );
+ 
+@@ -806480,6 +806585,64 @@
+ }
+ ));
+ 
++function printParseErrorCode(code) {
++
++  switch (code) {
++
++    case 1:
++      return "InvalidSymbol";
++
++    case 2:
++      return "InvalidNumberFormat";
++
++    case 3:
++      return "PropertyNameExpected";
++
++    case 4:
++      return "ValueExpected";
++
++    case 5:
++      return "ColonExpected";
++
++    case 6:
++      return "CommaExpected";
++
++    case 7:
++      return "CloseBraceExpected";
++
++    case 8:
++      return "CloseBracketExpected";
++
++    case 9:
++      return "EndOfFileExpected";
++
++    case 10:
++      return "InvalidCommentToken";
++
++    case 11:
++      return "UnexpectedEndOfComment";
++
++    case 12:
++      return "UnexpectedEndOfString";
++
++    case 13:
++      return "UnexpectedEndOfNumber";
++
++    case 14:
++      return "InvalidUnicode";
++
++    case 15:
++      return "InvalidEscapeCharacter";
++
++    case 16:
++      return "InvalidCharacter";
++
++  }
++
++  return "<unknown ParseErrorCode>";
++
++}
++
+ 
+ // ../packages/cursor-config/dist/permissions-file-config.js
+ function filterStrings(value) {
+@@ -806613,6 +806776,37 @@
+ 
+ }
+ 
++var warnedPermissionFileFailures = /* @__PURE__ */ new Set();
++
++function warnPermissionsFileOnce(path32, kind, errorCode2) {
++
++  const key = `${
++path32}
++\0${
++kind}
++\0${
++errorCode2}
++`;
++
++  if (warnedPermissionFileFailures.has(key))
++    return;
++
++  warnedPermissionFileFailures.add(key);
++
++  console.warn(JSON.stringify({
++ path: path32, kind, errorCode: errorCode2 }
++));
++
++}
++
++function nodeErrorCode(error63) {
++
++  const code = error63?.code;
++
++  return typeof code === "string" ? code : "unknown";
++
++}
++
+ var PermissionsFileProvider = class _PermissionsFileProvider {
+ 
+   constructor(permissions, autoRunInstructions) {
+@@ -806643,7 +806837,19 @@
+ 
+       const raw = await (0, import_promises2.readFile)(path32, "utf8");
+ 
+-      const parsed = parse6(raw);
++      const errors = [];
++
++      const parsed = parse6(raw, errors, {
++ allowTrailingComma: true }
++);
++
++      const parseError = errors[0];
++
++      if (parseError !== void 0) {
++
++        warnPermissionsFileOnce(path32, "parse", printParseErrorCode(parseError.error));
++
++      }
+ 
+       if (!parsed || typeof parsed !== "object") {
+ 
+@@ -806686,7 +806892,15 @@
+ , autoRunInstructions);
+ 
+     }
+- catch {
++ catch (error63) {
++
++      const errorCode2 = nodeErrorCode(error63);
++
++      if (errorCode2 !== "ENOENT") {
++
++        warnPermissionsFileOnce(path32, "read", errorCode2);
++
++      }
+ 
+       return void 0;
+ 
+@@ -823770,7 +823984,7 @@
+ async function processSubagentIterationSuccess(currentState, turnsAtStartOfIteration, iterState, completionCtx, deps, persistState, subagentType) {
+ 
+   const {
+- ctx, blobStore, registry: registry2 }
++ ctx, blobStore, registry: registry3 }
+  = deps;
+ 
+   const {
+@@ -823975,7 +824189,7 @@
+ async function buildFinalResult(currentState, _iterState, completionCtx, deps, iterationScan) {
+ 
+   const {
+- ctx, blobStore, registry: registry2 }
++ ctx, blobStore, registry: registry3 }
+  = deps;
+ 
+   const {
+@@ -824019,7 +824233,7 @@
+   }
+ );
+ 
+-  registry2.cleanup(subagentId);
++  registry3.cleanup(subagentId);
+ 
+   const successResult = new TaskResult({
+ 
+@@ -824177,7 +824391,7 @@
+ async function handleSubagentExecutionError(error63, state, iterState, completionCtx, deps, subagentCtxCanceled, abortOptions) {
+ 
+   const {
+- ctx, registry: registry2 }
++ ctx, registry: registry3 }
+  = deps;
+ 
+   const {
+@@ -824270,7 +824484,7 @@
+   }
+ );
+ 
+-  registry2.cleanup(subagentId);
++  registry3.cleanup(subagentId);
+ 
+   if (deps.enableTaskToolHooksExec) {
+ 
+@@ -829694,7 +829908,7 @@
+ 
+         const [subagentCtx, cancelSubagent] = subagentDetachedCtx.withCancel();
+ 
+-        const registry2 = resourceAccessor.get(subagentRegistryResource);
++        const registry3 = resourceAccessor.get(subagentRegistryResource);
+ 
+         const parentRequestId = prepared.parentRequestId;
+ 
+@@ -829712,7 +829926,7 @@
+ 
+         }
+ 
+-        registry2.register(subagentId, {
++        registry3.register(subagentId, {
+  cancel: cancelSubagent }
+ , meta3.toolCallId);
+ 
+@@ -829720,7 +829934,7 @@
+ 
+         const executionTimeoutId = executionTimeoutMs !== void 0 && Number.isFinite(executionTimeoutMs) && executionTimeoutMs > 0 ? setTimeout(() => {
+ 
+-          registry2.cancel(subagentId, {
++          registry3.cancel(subagentId, {
+ 
+             intentional: true,
+             reason: `Subagent exceeded execution timeout of ${
+@@ -829732,9 +829946,9 @@
+         }
+ , executionTimeoutMs) : void 0;
+ 
+-        const isParallel = registry2.size > 1;
++        const isParallel = registry3.size > 1;
+ 
+-        const parallelBatchSize = isParallel ? registry2.size : void 0;
++        const parallelBatchSize = isParallel ? registry3.size : void 0;
+ 
+         trackPreparedTaskSubagentCreated(ctx, prepared, {
+ 
+@@ -829800,7 +830014,7 @@
+           ctx,
+           blobStore,
+           resourceAccessor,
+-          registry: registry2,
++          registry: registry3,
+           hookContext,
+           enableTaskToolHooksExec,
+           configuredSteps,
+@@ -829833,7 +830047,7 @@
+             }
+  catch (runStreamError) {
+ 
+-              await handleSubagentRunStreamError(runStreamError, currentState, iterState, completionCtx, completionDeps, subagentCtx.canceled, registry2.lastAbortOptions);
++              await handleSubagentRunStreamError(runStreamError, currentState, iterState, completionCtx, completionDeps, subagentCtx.canceled, registry3.lastAbortOptions);
+ 
+             }
+ 
+@@ -829860,7 +830074,7 @@
+         }
+  catch (error63) {
+ 
+-          return await handleSubagentExecutionError(error63, state, iterState, completionCtx, completionDeps, subagentCtx.canceled, registry2.lastAbortOptions);
++          return await handleSubagentExecutionError(error63, state, iterState, completionCtx, completionDeps, subagentCtx.canceled, registry3.lastAbortOptions);
+ 
+         }
+  finally {
+@@ -832253,7 +832467,9 @@
+ 
+ 
+ // ../packages/agent/dist/slack-status-phrase.js
+-var slackStatusPhraseSchema = external_exports3.string().trim().min(4).max(50).regex(/^is [^\r\n<>]+$/);
++init_v4();
++
++var slackStatusPhraseSchema = string2().trim().min(4).max(50).regex(/^is [^\r\n<>]+$/);
+ 
+ 
+ // ../packages/agent/dist/loop-detection/loop-nudge-middleware.js
+@@ -855172,26 +855388,47 @@
+ 
+ var SMART_MODE_MCP_BLOCKED_AUTONOMOUS_REMINDER_LEAD2 = "Auto-review blocked this autonomous";
+ 
+-var SMART_MODE_MCP_BLOCKED_AUTONOMOUS_REASON_SUFFIX2 = `
++var BLOCKED_AUTONOMOUS_PATHS = "Decide now between two paths: (1) if a genuinely safer, lower-privilege, authorized path satisfies the request, use it;
++ (2) if this blocked action is still necessary and the user should approve it,";
+ 
+-<system_reminder>
+-${
+-SMART_MODE_MCP_BLOCKED_AUTONOMOUS_REMINDER_LEAD2}
+- tool call. Decide now between two paths: (1) if a genuinely safer, lower-privilege, authorized path satisfies the request, use it;
+- (2) if this blocked action is still necessary and the user should approve it, immediately retry the exact same call_mcp_tool call with requestSmartModeApproval set to true AND smartModeBlockReason set to the exact block reason text above. That retry is what shows the native approval card;
+- stopping here leaves the user with no approval UI. Do not change the tool arguments or use an escalated variant when retrying for approval. Trying a different anonymous public file host, pastebin, disposable transfer link, or similar courier is NOT path (1) \u2014 that is the same unauthorized data-exposure crossing \u2014 so for that class prefer path (2) or ask the user, do not shop for another intermediary.
+-</system_reminder>`;
++var BLOCKED_AUTONOMOUS_COURIER = "Trying a different anonymous public file host, pastebin, disposable transfer link, or similar courier is NOT path (1) \u2014 that is the same unauthorized data-exposure crossing \u2014 so for that class prefer path (2) or ask the user, do not shop for another intermediary.";
++
++var TRUTHFUL_BLOCK_OUTCOME = ", so nothing ran. If you already told the user you were sending, adding, posting, or doing it, send the user a correction that it did not run before the approval retry. The retry pauses the turn at the card, so a correction after it is never shown.";
++
++var TRUTHFUL_BLOCK_RETRY = "correct any claim that it was already happening where the user can see it, then retry";
+ 
+-var SMART_MODE_DYNAMIC_MCP_BLOCKED_AUTONOMOUS_REASON_SUFFIX2 = `
++function blockedAutonomousReminder({
++ toolCall: toolCall2, retry: retry2, truthful }
++) {
++
++  return `
+ 
+ <system_reminder>
+ ${
+ SMART_MODE_MCP_BLOCKED_AUTONOMOUS_REMINDER_LEAD2}
+- MCP tool call. Decide now between two paths: (1) if a genuinely safer, lower-privilege, authorized path satisfies the request, use it;
+- (2) if this blocked action is still necessary and the user should approve it, immediately retry the exact same CallDynamicTool call with mcpDetails.requestSmartModeApproval set to true AND mcpDetails.smartModeBlockReason set to the exact block reason text above. Preserve mcpDetails.description from the blocked call. That retry is what shows the native approval card;
+- stopping here leaves the user with no approval UI. Do not change the tool arguments or use an escalated variant when retrying for approval. Trying a different anonymous public file host, pastebin, disposable transfer link, or similar courier is NOT path (1) \u2014 that is the same unauthorized data-exposure crossing \u2014 so for that class prefer path (2) or ask the user, do not shop for another intermediary.
++ ${
++toolCall2}
++${
++truthful ? TRUTHFUL_BLOCK_OUTCOME : "."}
++ ${
++BLOCKED_AUTONOMOUS_PATHS}
++ ${
++truthful ? TRUTHFUL_BLOCK_RETRY : "immediately retry"}
++ the exact same ${
++retry2}
++ ${
++BLOCKED_AUTONOMOUS_COURIER}
++
+ </system_reminder>`;
+ 
++}
++
++var MCP_APPROVAL_RETRY = "call_mcp_tool call with requestSmartModeApproval set to true AND smartModeBlockReason set to the exact block reason text above. That retry is what shows the native approval card;
++ stopping here leaves the user with no approval UI. Do not change the tool arguments or use an escalated variant when retrying for approval.";
++
++var DYNAMIC_MCP_APPROVAL_RETRY = "CallDynamicTool call with mcpDetails.requestSmartModeApproval set to true AND mcpDetails.smartModeBlockReason set to the exact block reason text above. Preserve mcpDetails.description from the blocked call. That retry is what shows the native approval card;
++ stopping here leaves the user with no approval UI. Do not change the tool arguments or use an escalated variant when retrying for approval.";
++
+ var SMART_MODE_MCP_CLASSIFIER_ERROR_REASON = SMART_MODE_CLASSIFIER_MANUAL_REVIEW_ERROR_REASON2;
+ 
+ var SMART_MODE_MCP_PARENT_REQUESTED_APPROVAL_FALLBACK_REASON = SMART_MODE_MCP_CLASSIFIER_ERROR_REASON;
+@@ -855251,12 +855488,20 @@
+ 
+ }
+ 
+-function createSmartModeMcpBlockedAutonomousReason(reason, useNestedMcpDetails) {
++function createSmartModeMcpBlockedAutonomousReason(reason, {
++ useNestedMcpDetails, truthfulOutcome }
++) {
+ 
+   return `${
+ reason}
+ ${
+-useNestedMcpDetails ? SMART_MODE_DYNAMIC_MCP_BLOCKED_AUTONOMOUS_REASON_SUFFIX2 : SMART_MODE_MCP_BLOCKED_AUTONOMOUS_REASON_SUFFIX2}
++blockedAutonomousReminder({
++
++    toolCall: useNestedMcpDetails ? "MCP tool call" : "tool call",
++    retry: useNestedMcpDetails ? DYNAMIC_MCP_APPROVAL_RETRY : MCP_APPROVAL_RETRY,
++    truthful: truthfulOutcome
++  }
++)}
+ `;
+ 
+ }
+@@ -855470,6 +855715,12 @@
+ 
+ }
+ 
++function smartModeMcpCallFingerprint(args) {
++
++  return computeSmartModeMcpApprovalTargetFingerprint2(buildSmartModeMcpApprovalTarget(args, ""));
++
++}
++
+ async function createSmartModeMcpApprovalForParentRequest(ctx, args, blockReason) {
+ 
+   const approvalStore = args.resourceAccessor.get(smartModeMcpApprovalStoreResource2);
+@@ -855630,10 +855881,18 @@
+ 
+     const held = decision.appliedRules === void 0 ? void 0 : args.approvalProvider?.holdAllowed?.(args.target, decision.appliedRules);
+ 
+-    return held === void 0 ? void 0 : blockSmartModeMcpCall(ctx, args, held, {
++    if (held !== void 0) {
++
++      return blockSmartModeMcpCall(ctx, args, held, {
+  appliedRules: decision.appliedRules }
+ );
+ 
++    }
++
++    const blocked = args.requestSmartModeApproval === true ? args.approvalProvider?.autonomousBlockTracker?.blockFor(smartModeMcpCallFingerprint(args)) : void 0;
++
++    return blocked === void 0 ? void 0 : blockSmartModeMcpCall(ctx, args, blocked.reason, blocked);
++
+   }
+ 
+   if (decision.kind === "reject") {
+@@ -855670,7 +855929,19 @@
+ 
+   }
+ 
+-  const error63 = new ToolCallRejectedError(createSmartModeMcpBlockedAutonomousReason(reason, args.useNestedMcpDetails === true) + (args.approvalProvider?.blockedReminder?.(args.target) ?? ""));
++  const truthfulOutcome = args.approvalProvider?.autonomousBlockTracker?.record(smartModeMcpCallFingerprint(args), {
++
++    ...options2,
++    reason
++  }
++) === true;
++
++  const error63 = new ToolCallRejectedError(createSmartModeMcpBlockedAutonomousReason(reason, {
++
++    useNestedMcpDetails: args.useNestedMcpDetails === true,
++    truthfulOutcome
++  }
++) + (args.approvalProvider?.blockedReminder?.(args.target) ?? ""));
+ 
+   await args.onRejectWithoutNativeApproval?.(error63);
+ 
+@@ -856044,9 +856315,16 @@
+ 
+ var SMART_MODE_SHELL_CLASSIFIER_ERROR_REASON = SMART_MODE_CLASSIFIER_MANUAL_REVIEW_ERROR_REASON2;
+ 
+-var SMART_MODE_SHELL_BLOCKED_AUTONOMOUS_REASON_SUFFIX = "\n\n<system_reminder>\nAuto-review blocked this autonomous tool call. Decide now between two paths: (1) if a genuinely safer, lower-privilege, authorized path satisfies the request, use it;
+- (2) if this blocked action is still necessary and the user should approve it, immediately retry the exact same Shell call with request_smart_mode_approval set to true AND smart_mode_block_reason set to the exact block reason text above. That retry is what shows the native approval card;
+- stopping here leaves the user with no approval UI. Do not change the command, add permissions, or use an escalated variant when retrying for approval. Trying a different anonymous public file host, pastebin, disposable transfer link, or similar courier is NOT path (1) \u2014 that is the same unauthorized data-exposure crossing \u2014 so for that class prefer path (2) or ask the user, do not shop for another intermediary.\n</system_reminder>";
++var SHELL_APPROVAL_RETRY = "Shell call with request_smart_mode_approval set to true AND smart_mode_block_reason set to the exact block reason text above. That retry is what shows the native approval card;
++ stopping here leaves the user with no approval UI. Do not change the command, add permissions, or use an escalated variant when retrying for approval.";
++
++var SMART_MODE_SHELL_BLOCKED_AUTONOMOUS_REASON_SUFFIX = blockedAutonomousReminder({
++
++  toolCall: "tool call",
++  retry: SHELL_APPROVAL_RETRY,
++  truthful: false
++}
++);
+ 
+ var SMART_MODE_SHELL_PARENT_REQUESTED_APPROVAL_FALLBACK_REASON = SMART_MODE_SHELL_CLASSIFIER_ERROR_REASON;
+ 
+@@ -856060,12 +856338,18 @@
+ 
+ }
+ 
+-function formatSmartModeShellBlockedAutonomousReason(reason) {
++function formatSmartModeShellBlockedAutonomousReason(reason, truthfulOutcome) {
+ 
+   return `${
+ reason}
+ ${
+-SMART_MODE_SHELL_BLOCKED_AUTONOMOUS_REASON_SUFFIX}
++blockedAutonomousReminder({
++
++    toolCall: "tool call",
++    retry: SHELL_APPROVAL_RETRY,
++    truthful: truthfulOutcome
++  }
++)}
+ `;
+ 
+ }
+@@ -856717,7 +857001,7 @@
+ 
+           const loadWorkspacePermissionFiles = options2?.loadSmartModeWorkspacePermissionFiles !== false;
+ 
+-          const decision = recordedCardReason !== void 0 ? {
++          const reviewed = recordedCardReason !== void 0 ? {
+  kind: "block", reason: recordedCardReason }
+  : await getSmartModeShellPreflightDecision(ctx, {
+ 
+@@ -856748,6 +857032,12 @@
+           }
+ );
+ 
++          const blocked = reviewed.kind === "allow" && isSmartModeNativeApprovalRequested(rawArgs) ? options2?.smartModeApprovalProvider?.autonomousBlockTracker?.blockFor(computeSmartModeShellApprovalTargetFingerprint2(buildApprovalTarget(""))) : void 0;
++
++          const decision = blocked === void 0 ? reviewed : {
++ ...blocked, kind: "block" }
++;
++
+           if (decision.kind === "allow") {
+ 
+             smartModeClassifierAllowed = smartModeClassifierEnabled;
+@@ -856838,7 +857128,16 @@
+ 
+           }
+ 
+-          throw new SmartModeShellBlockedAutonomousError2(command, workingDirectory, formatSmartModeShellBlockedAutonomousReason(decision.reason));
++          const truthfulOutcome = options2?.smartModeApprovalProvider?.autonomousBlockTracker?.record(computeSmartModeShellApprovalTargetFingerprint2(buildApprovalTarget("")), {
++
++            reason: decision.reason,
++            proposedAllowRule: decision.proposedAllowRule,
++            proposedAllowRuleReplaces: decision.proposedAllowRuleReplaces,
++            appliedRules: decision.appliedRules
++          }
++) === true;
++
++          throw new SmartModeShellBlockedAutonomousError2(command, workingDirectory, formatSmartModeShellBlockedAutonomousReason(decision.reason, truthfulOutcome));
+ 
+         }
+ ;
+@@ -870980,6 +871279,8 @@
+ 
+ }
+ 
++var NOT_ADDED_TEAM_BOTS_HEADER = "Team Bots your user has not added yet, which you can't message (point your user to one instead):";
++
+ 
+ // ../packages/grok-bot-harness/src/host-diagnostics.ts
+ var pinnedReporter = null;
+@@ -871330,6 +871631,10 @@
+ }
+ 
+ 
++// ../packages/grok-bot-harness/src/runner/tools/status/sand-status-tool.ts
++init_v4();
++
++
+ // ../packages/grok-bot-harness/src/runner/tools/communicate-tool.ts
+ init_v4();
+ 
+@@ -872191,7 +872496,7 @@
+ 
+ var SET_STATUS_PHRASE_DESCRIPTION = `The step of the task you are on: "is", then a verb and what it acts on, six words or fewer after "is" and at most 50 characters. Name the work, not the tool or command doing it, and name the step by what it does rather than its place in a sequence ("first", "step 2"), which stops being true once you move on: "is checking last night's deploy logs", "is drafting the launch post", "is comparing the two pricing sheets".`;
+ 
+-var setStatusParameters = external_exports3.object({
++var setStatusParameters = object({
+ 
+   status: slackStatusPhraseSchema.describe(SET_STATUS_PHRASE_DESCRIPTION)
+ }
+@@ -872210,7 +872515,7 @@
+ 
+ function createSetStatusTool(status) {
+ 
+-  return defineCommunicateTool(status, {
++  return defineZod4CommunicateTool(status, {
+ 
+     id: "PLATFORM_ACTION",
+     name: SAND_SET_STATUS_TOOL_NAME,
+@@ -872686,6 +872991,10 @@
+ }
+ 
+ 
++// ../packages/grok-bot-harness/src/runner/tools/slack/sand-slack-status-tool.ts
++init_v4();
++
++
+ // ../packages/grok-bot-harness/src/runner/tools/channel/channel-status-tool-text.ts
+ var CHANNEL_STATUS_PHRASE_ARG_DESCRIPTION = `What you are doing right now, as a phrase starting with "is" and at most 50 characters, naming the concrete thing: "is checking last night's deploy logs", "is drafting the launch post", "is comparing the two pricing sheets".`;
+ 
+@@ -872695,7 +873004,7 @@
+ // ../packages/grok-bot-harness/src/runner/tools/slack/sand-slack-status-tool.ts
+ var SAND_SET_SLACK_STATUS_TOOL_NAME = GROK_BOT_TOOL_NAMES.SetSlackStatus;
+ 
+-var setSlackStatusParameters = external_exports3.object({
++var setSlackStatusParameters = object({
+ 
+   status: slackStatusPhraseSchema.describe(CHANNEL_STATUS_PHRASE_ARG_DESCRIPTION)
+ }
+@@ -872703,7 +873012,7 @@
+ 
+ function createSetSlackStatusTool(slackStatus) {
+ 
+-  return defineCommunicateTool(slackStatus, {
++  return defineZod4CommunicateTool(slackStatus, {
+ 
+     id: "PLATFORM_ACTION",
+     name: SAND_SET_SLACK_STATUS_TOOL_NAME,
+@@ -872761,9 +873070,11 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/runner/tools/teams/sand-teams-status-tool.ts
++init_v4();
++
+ var SAND_SET_MICROSOFT_TEAMS_STATUS_TOOL_NAME = GROK_BOT_TOOL_NAMES.SetMicrosoftTeamsStatus;
+ 
+-var setMicrosoftTeamsStatusParameters = external_exports3.object({
++var setMicrosoftTeamsStatusParameters = object({
+ 
+   status: slackStatusPhraseSchema.describe(CHANNEL_STATUS_PHRASE_ARG_DESCRIPTION)
+ }
+@@ -872771,7 +873082,7 @@
+ 
+ function createSetMicrosoftTeamsStatusTool(teamsStatus) {
+ 
+-  return defineCommunicateTool(teamsStatus, {
++  return defineZod4CommunicateTool(teamsStatus, {
+ 
+     id: "PLATFORM_ACTION",
+     name: SAND_SET_MICROSOFT_TEAMS_STATUS_TOOL_NAME,
+@@ -879009,7 +879320,7 @@
+   }
+ ;
+ 
+-  const registry2 = () => {
++  const registry3 = () => {
+ 
+     if (shellRegistry === void 0) {
+ 
+@@ -879181,7 +879492,7 @@
+ 
+     if (shellRewatches.has(id)) return;
+ 
+-    if (registry2().listWork({
++    if (registry3().listWork({
+  kind: "shell" }
+ ).some((work) => work.id === id)) {
+ 
+@@ -879247,7 +879558,7 @@
+ 
+   return {
+ 
+-    registry: registry2,
++    registry: registry3,
+     watchCloudAgent,
+     watchBackgroundShell,
+     pendingCloudAgentWatchBcIds: () => [...watchedCloudAgentBcIds.keys()],
+@@ -909452,7 +909763,7 @@
+ function sandClientBaseVersionOf(clientAppVersion) {
+ 
+   return stampedVersionBaseOf(clientAppVersion) ?? stampedVersionBaseOf(
+-    true ? "0.72.0-pre.41" : void 0
++    true ? "0.72.0-pre.42" : void 0
+   ) ?? SAND_CLIENT_FALLBACK_BASE_VERSION;
+ 
+ }
+@@ -951935,6 +952246,16 @@
+ 
+ }
+ 
++function teamBotLinksSkillPointer(skillAccess = "read") {
++
++  return builtinSkillPointer(
++    "Before linking your user to one of these",
++    GROK_BOT_BUILTIN_SKILL_IDS.teamBotLinks,
++    skillAccess
++  );
++
++}
++
+ function channelsSkillPointer(skillAccess = "read") {
+ 
+   return builtinSkillPointer(
+@@ -954509,6 +954830,13 @@
+ init_dist3();
+ 
+ 
++// src/shared/mcp/connector-install-prompt.ts
++var CONNECTOR_INSTALL_PROMPT_LINE = `Install a missing connector with ${
++GROK_BOT_TOOL_NAMES.InstallPlugin}
++ without asking;
++ its connect card is the ask. Ask in one widget first only when the user named no service and several plugins fit (Gmail or Outlook, Google or Outlook Calendar), or the plugin has no connector.`;
++
++
+ // ../packages/grok-bot-harness/src/sand-multitask.ts
+ var EXECUTOR_SUBAGENT_TYPE = "executor";
+ 
+@@ -955660,6 +955988,7 @@
+   cloudAgentExchange: false,
+   cloudCanvasTools: false,
+   sendToAgentRoster: false,
++  teamBotDiscovery: false,
+   automationSendToAgent: false,
+   taskSubagentRoster: false,
+   executorForkContext: false,
+@@ -955753,6 +956082,7 @@
+   peerWakeApprovalReminder: false,
+   peerWakeDelegationAwareReminder: false,
+   typedCardReply: false,
++  truthfulAutoReviewOutcomes: false,
+   unansweredCardOnWake: false,
+   typedCardReplyChatFollowup: false,
+   executorSendRules: false,
+@@ -955860,6 +956190,7 @@
+   cloudAgentExchange: "default",
+   cloudCanvasTools: "default",
+   sendToAgentRoster: "inherited",
++  teamBotDiscovery: "inherited",
+   automationSendToAgent: "default",
+   taskSubagentRoster: "inherited",
+   executorForkContext: "default",
+@@ -955933,6 +956264,7 @@
+   peerWakeApprovalReminder: "default",
+   peerWakeDelegationAwareReminder: "default",
+   typedCardReply: "default",
++  truthfulAutoReviewOutcomes: "default",
+   unansweredCardOnWake: "default",
+   typedCardReplyChatFollowup: "default",
+   executorSendRules: "inherited",
+@@ -957832,7 +958164,7 @@
+ 
+ var SAND_CONNECTOR_SEARCH_FIRST_LINE = `- When a task needs a service you have no connector for, run ${
+ GROK_BOT_TOOL_NAMES.SearchPlugins}
+- first, before the web or your browser. Searching is read-only and needs no permission. Ask only before you install.`;
++ first, before the web or your browser. Searching is read-only and needs no permission.`;
+ 
+ var SAND_SUBAGENT_AGENT_EMAIL_LINE = subagentAgentEmailLine(true);
+ 
+@@ -957986,7 +958318,7 @@
+     `Your own email address is assigned automatically, and ${
+ GROK_BOT_TOOL_NAMES.ListEmailInboxes}
+  shows it. Use it whenever you need an address of your own: to send or receive mail, to sign up for a service, or when the user asks you to "create an email for yourself". Never sign up for AgentMail or another third-party inbox.`,
+-    `The user gets this one address and can't pick its name, so never ask them for one. If ${
++    `Never ask the user to pick a name. They can choose their own address once on the Email plugin's page. If ${
+ GROK_BOT_TOOL_NAMES.ListEmailInboxes}
+  shows no address, tell the user email isn't available to you yet.`,
+     AGENT_EMAIL_CONNECTED_ACCOUNTS_LINE
+@@ -958451,7 +958783,7 @@
+           options2.unblockResearchPointerWhen
+         )
+       ] : [],
+-      "- A request to use a service already authorizes its connector or your signed-in browser. Ask again only to install something, pick an account, or take a consequential action."
++      "- A request to use a service already authorizes its connector or your signed-in browser, including installing a missing connector. Ask again only to pick between connectors or accounts, or take a consequential action."
+     ]
+   }
+ ;
+@@ -958462,9 +958794,11 @@
+ 
+   heading: "## Managing plugins and connectors",
+   body: [
+-    "A plugin is an install bundle;
+- a connector is the user-facing name for its MCP server. When a task needs a service, search for it. Ask in plain text before installing, then install and let its connect card handle auth. Never paste install or connect links.",
+-    `- Installing, uninstalling, restarting, and authenticating change the user's account, so confirm with a widget before doing them yourself. Searches, status reads, and a user tapping a connect card need no confirmation. Save connector preferences with ${
++    `A plugin is an install bundle;
++ a connector is the user-facing name for its MCP server. When a task needs a service, search for it. ${
++CONNECTOR_INSTALL_PROMPT_LINE}
++ Never paste install or connect links.`,
++    `- Uninstalling and restarting change the user's account, so confirm with a widget before doing them yourself. Searches, status reads, signing in, and a user tapping a connect card need no confirmation. Save connector preferences with ${
+ GROK_BOT_TOOL_NAMES.SetMcpInstructions}
+  without asking.`
+   ]
+@@ -966365,6 +966699,109 @@
+ 
+ }
+ 
++var TEAM_BOT_PROMPT_LINK_TEMPLATE = "[Open <name>](grokbot://app/v1/prompt?id=<id>&text=<message encoded with encodeURIComponent, so spaces are %20>)";
++
++var NOT_ADDED_TEAM_BOTS_INLINE_LINK_LINE = `When one of these fits, link your user to it as ${
++TEAM_BOT_PROMPT_LINK_TEMPLATE}
++, which opens its chat with that message ready to send.`;
++
++var TEAMMATE_ROSTER_GROUPS = [
++  {
++
++    matches: (address) => address.isGroup !== true && address.teamBot === void 0,
++    header: "Your user's own bots, which you can message:"
++  }
++,
++  {
++
++    matches: (address) => address.teamBot === "added",
++    header: "Team Bots your user has added, which you can message (a message lands in your user's DM thread with that bot):"
++  }
++,
++  {
++
++    matches: (address) => address.isGroup === true && address.teamBot === void 0,
++    takesLeftoverSlots: true,
++    header: "Your user's group chats, which you can post to (every member sees the post):"
++  }
++,
++  {
++
++    matches: (address) => address.teamBot === "not_added",
++    header: NOT_ADDED_TEAM_BOTS_HEADER,
++    footer: (options2) => options2.notAddedTeamBotsSkillPointer ?? NOT_ADDED_TEAM_BOTS_INLINE_LINK_LINE
++  }
++
++];
++
++var MORE_TEAMMATES_LINE = "\u2026and more (read the agent folders above for the full roster).";
++
++function teammateRosterLines(others, options2) {
++
++  if (options2.sections) {
++
++    return sectionedTeammateRosterLines(others, options2.groupsListedWithMembers ?? [], options2);
++
++  }
++
++  if (others.length === 0) return [];
++
++  return [
++    "Teammates you can message right now:",
++    ...others.slice(0, AGENT_DIRECTORY_PROMPT_LIMIT).map(describeAddress),
++    ...others.length > AGENT_DIRECTORY_PROMPT_LIMIT ? [MORE_TEAMMATES_LINE] : []
++  ];
++
++}
++
++function sectionedTeammateRosterLines(unfilteredOthers, groupsListedWithMembers, options2) {
++
++  const listedGroupIds = new Set(groupsListedWithMembers.map((group) => group.id));
++
++  const sortedOthers = unfilteredOthers.filter(
++    (address) => address.isGroup !== true || !listedGroupIds.has(address.id)
++  );
++
++  const shownByGroup = /* @__PURE__ */ new Map();
++
++  let listed = 0;
++
++  for (const group of [...TEAMMATE_ROSTER_GROUPS].sort(
++    (a, b2) => Number(a.takesLeftoverSlots === true) - Number(b2.takesLeftoverSlots === true)
++  )) {
++
++    const shown = sortedOthers.filter(group.matches).slice(0, Math.max(0, AGENT_DIRECTORY_PROMPT_LIMIT - listed));
++
++    shownByGroup.set(group, shown);
++
++    listed += shown.length;
++
++  }
++
++  const lines2 = [];
++
++  for (const group of TEAMMATE_ROSTER_GROUPS) {
++
++    const shown = shownByGroup.get(group) ?? [];
++
++    if (shown.length === 0) continue;
++
++    lines2.push(group.header, ...shown.map(describeAddress));
++
++    if (group.footer !== void 0) lines2.push(group.footer(options2));
++
++  }
++
++  if (sortedOthers.length > listed) {
++
++    lines2.push(MORE_TEAMMATES_LINE);
++
++  }
++
++  return lines2;
++
++}
++
+ var agentFolderDiscoveryLine = (agentsRootDir) => `Discovering agents is file-based. Every agent (yours included) is a sibling folder under ${
+ agentsRootDir}
+ . Read ${
+@@ -966472,29 +966909,23 @@
+ 
+   }
+ 
+-  if (others.length > 0) {
+-
+-    lines2.push("Teammates you can message right now:");
+-
+-    for (const address of others.slice(0, AGENT_DIRECTORY_PROMPT_LIMIT)) {
+-
+-      lines2.push(describeAddress(address));
+-
+-    }
++  const listedGroups = groups.slice(0, AGENT_DIRECTORY_PROMPT_LIMIT);
+ 
+-    if (others.length > AGENT_DIRECTORY_PROMPT_LIMIT) {
+-
+-      lines2.push("\u2026and more (read the agent folders above for the full roster).");
++  lines2.push(
++    ...teammateRosterLines(others, {
+ 
++      sections: options2?.teammateRosterSections === true,
++      groupsListedWithMembers: listedGroups,
++      notAddedTeamBotsSkillPointer: options2?.notAddedTeamBotsSkillPointer
+     }
+-
+-  }
++)
++  );
+ 
+   if (groups.length > 0) {
+ 
+     lines2.push("Group chats you're in (post to one by its id to reach all its members):");
+ 
+-    for (const group of groups.slice(0, AGENT_DIRECTORY_PROMPT_LIMIT)) {
++    for (const group of listedGroups) {
+ 
+       const memberNames = group.members.map((member) => member.name).join(", ");
+ 
+@@ -966553,7 +966984,7 @@
+ 
+ }
+ 
+-function rosterLines(others, groups, agentsRootDir) {
++function rosterLines(others, groups, agentsRootDir, options2) {
+ 
+   const lines2 = [];
+ 
+@@ -966563,23 +966994,17 @@
+ 
+   }
+ 
+-  if (others.length > 0) {
+-
+-    lines2.push("Teammates you can message right now:");
+-
+-    for (const address of others.slice(0, AGENT_DIRECTORY_PROMPT_LIMIT)) {
++  const listedGroups = groups.slice(0, AGENT_DIRECTORY_PROMPT_LIMIT);
+ 
+-      lines2.push(describeAddress(address));
+-
+-    }
+-
+-    if (others.length > AGENT_DIRECTORY_PROMPT_LIMIT) {
+-
+-      lines2.push("\u2026and more (read the agent folders above for the full roster).");
++  lines2.push(
++    ...teammateRosterLines(others, {
+ 
++      sections: options2?.teammateRosterSections === true,
++      groupsListedWithMembers: listedGroups,
++      notAddedTeamBotsSkillPointer: options2?.notAddedTeamBotsSkillPointer
+     }
+-
+-  }
++)
++  );
+ 
+   if (groups.length > 0) {
+ 
+@@ -966587,7 +967012,7 @@
+       "Group chats (channels) you're in (post to one by its id to reach all its members):"
+     );
+ 
+-    for (const group of groups.slice(0, AGENT_DIRECTORY_PROMPT_LIMIT)) {
++    for (const group of listedGroups) {
+ 
+       const memberNames = group.members.map((member) => member.name).join(", ");
+ 
+@@ -966611,7 +967036,7 @@
+ 
+ }
+ 
+-function renderTrimmedAgentDirectorySystemPrompt(unorderedOthers, unorderedGroups, agentsRootDir) {
++function renderTrimmedAgentDirectorySystemPrompt(unorderedOthers, unorderedGroups, agentsRootDir, options2) {
+ 
+   const {
+  others, groups }
+@@ -966632,7 +967057,7 @@
+     intro,
+     OFFER_TEAMMATE_LINE,
+     INBOUND_TEAMMATE_MESSAGE_LINE,
+-    ...rosterLines(others, groups, agentsRootDir)
++    ...rosterLines(others, groups, agentsRootDir, options2)
+   ];
+ 
+   if (groups.length > 0) lines2.push(groupChatHistoryLine("these group chats"));
+@@ -966641,7 +967066,7 @@
+ 
+ }
+ 
+-function renderAutomationAgentDirectorySystemPrompt(unorderedOthers, unorderedGroups, agentsRootDir) {
++function renderAutomationAgentDirectorySystemPrompt(unorderedOthers, unorderedGroups, agentsRootDir, options2) {
+ 
+   const {
+  others, groups }
+@@ -966671,7 +967096,11 @@
+     `Replies come back to the parent bot's conversation, not to this run. Say what you sent and to whom in your final message, or in your ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+  reason when you call it.`,
+-    ...rosterLines(others, groups, agentsRootDir)
++    ...rosterLines(others, groups, agentsRootDir, {
++
++      teammateRosterSections: options2?.teammateRosterSections
++    }
++)
+   ].join("\n");
+ 
+ }
+@@ -966697,7 +967126,7 @@
+ 
+ }
+ 
+-function renderTeammatesUserInfoBlock(unorderedOthers, unorderedGroups, agentsRootDir) {
++function renderTeammatesUserInfoBlock(unorderedOthers, unorderedGroups, agentsRootDir, options2) {
+ 
+   const {
+  others, groups }
+@@ -966706,7 +967135,7 @@
+   const lines2 = [
+     TEAMMATES_USER_INFO_OPEN,
+     `Each teammate is its own assistant with its own chat, persona, and memory, and the user may not know you can reach them. When looping one in would genuinely help, offer it ("want me to ask your research agent?"), and treat "@ that agent", "tell my other agent\u2026", or "ask the group" as a request to send.`,
+-    ...rosterLines(others, groups, agentsRootDir)
++    ...rosterLines(others, groups, agentsRootDir, options2)
+   ];
+ 
+   if (groups.length > 0) lines2.push(groupChatHistoryLine("these group chats"));
+@@ -986891,6 +987320,17 @@
+ PHONE_TOOL_DESCRIPTION_SUFFIX}
+ `;
+ 
++var PERMISSION_OF_OS_PERMISSION = {
++
++  calendar: "calendar",
++  contacts: "contacts",
++  home: "home",
++  reminders: "reminders",
++  location: "location",
++  notification_access: "notifications"
++}
++;
++
+ var mobileLocalToolParameters = (shape2) => object({
+ 
+   ...shape2,
+@@ -986961,6 +987401,7 @@
+     ownerTeam: tool.ownerTeam,
+     name: tool.name,
+     permissionCardTitle: tool.permissionCardTitle,
++    permission: tool.permission ?? (tool.osPermission === void 0 ? "none" : PERMISSION_OF_OS_PERMISSION[tool.osPermission]),
+     ...tool.notRepeatable === void 0 ? {
+ }
+  : {
+@@ -988751,6 +989192,7 @@
+   ownerTeam: "async",
+   name: SAND_MOBILE_SET_ALARM_TOOL_NAME,
+   permissionCardTitle: "Alarms",
++  permission: "alarms",
+   notRepeatable: {
+ }
+ ,
+@@ -994757,16 +995199,20 @@
+ , the only route to them`,
+   afterDeny: (meetingId, drafts) => [
+     "When every reason is about tone or phrasing, or the blocked message is a notice or status update, rewrite it without the private detail and post it again. Do not hand a notice to the main agent to draft.",
+-    drafts ? `When a reason blocks what the message says, such as content from the owner's accounts, their memory, or another meeting, do not post a stripped or vaguer version, and do not reword the same detail. Post a short notice that sharing it needs the owner's approval in their DM with the bot, naming them by first name. The notice carries none of the blocked content and never mentions the main agent, a parent agent, a card, or other workings of the bot. Then call ${
++    drafts ? `When a reason blocks what the message says, such as content from the owner's accounts, their memory, or another meeting, do not post a stripped or vaguer version, and do not reword the same detail. Post a short notice that sharing it needs the owner's approval in their DM with the bot, naming them by first name. The notice carries none of the blocked content and never mentions the main agent, a parent agent, a card, or other workings of the bot. If the blocked content came in a reply from the main agent, or you already handed it off, stop after the notice and do not call ${
++GROK_BOT_TOOL_NAMES.WakeParent}
++: the owner already has it. Otherwise call ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+  with a message that gives meeting_id ${
+ meetingId}
+- and the full message you meant to post, asking the main agent to raise that content as a meeting draft right away, since the draft is the owner's approval and they should not be asked first. Do this once: when the blocked content was already handed off, or came in a reply from the main agent, the owner already has it, so do not hand it off again.` : `When a reason blocks what the message says, do not post a stripped or vaguer version, and do not reword the same detail. Instead, post one short message that tells the room plainly you can't share that here;
+- it carries none of the blocked content, promises no approval or later answer, and is worded for the room, never mentioning the main agent, a parent agent, a chat, a card, or other workings of the bot. Then call ${
++ and the full message you meant to post, asking the main agent to raise that content as a meeting draft right away, since the draft is the owner's approval and they should not be asked first.` : `When a reason blocks what the message says, do not post a stripped or vaguer version, and do not reword the same detail. Instead, post one short message that tells the room plainly you can't share that here;
++ it carries none of the blocked content, promises no approval or later answer, and is worded for the room, never mentioning the main agent, a parent agent, a chat, a card, or other workings of the bot. If the blocked content came in a reply from the main agent, or you already handed it off, stop after that message and do not call ${
++GROK_BOT_TOOL_NAMES.WakeParent}
++. Otherwise call ${
+ GROK_BOT_TOOL_NAMES.WakeParent}
+  with a message that gives meeting_id ${
+ meetingId}
+- and the full message you meant to post, so the main agent can tell the person who brought you into the meeting privately. Do this once: when the blocked content was already handed off, or came in a reply from the main agent, do not hand it off again.`
++ and the full message you meant to post, so the main agent can tell the person who brought you into the meeting privately.`
+   ]
+ }
+ ;
+@@ -998689,12 +999135,17 @@
+ 
+     if (!hasParentPromptParity) return null;
+ 
++    const teammateRosterSections = deps.gates.teamBotDiscovery();
++
+     if (deps.isParentMediatedAutomationSubagent) {
+ 
+       return offersSendToAgent(deps) ? renderAutomationAgentDirectorySystemPrompt(
+         deps.agentDirectory?.() ?? [],
+         deps.agentGroups?.() ?? [],
+-        deps.agentsRootDir?.()
++        deps.agentsRootDir?.(),
++        {
++ teammateRosterSections }
++
+       ) : null;
+ 
+     }
+@@ -998715,11 +999166,23 @@
+ 
+     const groups = deps.agentGroups?.() ?? [];
+ 
++    const rosterOptions = {
++
++      teammateRosterSections,
++      ...usesBuiltinSkillPointers() ? {
++ notAddedTeamBotsSkillPointer: teamBotLinksSkillPointer(deps.skillAccess()) }
++ : {
++}
++
++    }
++;
++
+     if (!deps.gates.sendToAgentRoster()) {
+ 
+       return renderAgentDirectorySystemPrompt(others, groups, deps.agentsRootDir?.(), {
+ 
+-        hasChannelTools: deps.channelManagement != null
++        hasChannelTools: deps.channelManagement != null,
++        ...rosterOptions
+       }
+ );
+ 
+@@ -998727,11 +999190,16 @@
+ 
+     if ((others.length > 0 || groups.length > 0) && deps.sendToAgentImpl != null) {
+ 
+-      return renderTeammatesUserInfoBlock(others, groups, deps.agentsRootDir?.());
++      return renderTeammatesUserInfoBlock(others, groups, deps.agentsRootDir?.(), rosterOptions);
+ 
+     }
+ 
+-    return renderTrimmedAgentDirectorySystemPrompt(others, groups, deps.agentsRootDir?.());
++    return renderTrimmedAgentDirectorySystemPrompt(
++      others,
++      groups,
++      deps.agentsRootDir?.(),
++      rosterOptions
++    );
+ 
+   }
+ 
+@@ -1003639,10 +1004107,10 @@
+ 
+   const dynamicTools = replaced(handle.getDynamicTools());
+ 
+-  const registry2 = handle.getDynamicToolRegistry();
++  const registry3 = handle.getDynamicToolRegistry();
+ 
+-  return registry2 === void 0 ? ToolSetHandle.fromTools([...staticTools, ...dynamicTools]) : ToolSetHandle.fromTools({
+- staticTools, dynamicTools, dynamicToolRegistry: registry2 }
++  return registry3 === void 0 ? ToolSetHandle.fromTools([...staticTools, ...dynamicTools]) : ToolSetHandle.fromTools({
++ staticTools, dynamicTools, dynamicToolRegistry: registry3 }
+ );
+ 
+ }
+@@ -1005180,6 +1005648,8 @@
+ 
+ 
+ // ../packages/grok-bot-harness/src/cloud-agents/origin-repo-reference.ts
++init_dist3();
++
+ init_dist4();
+ 
+ function repoReferenceAsUrl(raw) {
+@@ -1005227,7 +1005697,9 @@
+ 
+   const hostname3 = repoReferenceAsUrl(raw)?.hostname;
+ 
+-  return hostname3 != null && isOriginGitHost(hostname3) || portalRepoCloneUrl(raw) != null;
++  return hostname3 != null && isOriginGitHost(hostname3) || portalRepoCloneUrl(raw, {
++ stagingIdentityHost: ORIGIN_PR_IDENTITY_HOST_STAGING }
++) != null;
+ 
+ }
+ 
+@@ -1005239,7 +1005711,9 @@
+ 
+   const url2 = repoReferenceAsUrl(raw);
+ 
+-  const page = url2 == null ? void 0 : parseOriginPortalRepoPage(url2);
++  const page = url2 == null ? void 0 : parseOriginPortalRepoPage(url2, {
++ stagingIdentityHost: ORIGIN_PR_IDENTITY_HOST_STAGING }
++);
+ 
+   return page === void 0 ? null : {
+  owner: page.owner, name: page.name }
+@@ -1022827,6 +1023301,31 @@
+ }
+ ;
+ 
++function reviewOfAllowed(by) {
++
++  switch (by) {
++
++    case "classifier":
++      return "allow";
++
++    case "user":
++      return "ask";
++
++    case "unreviewed":
++      return "skipped";
++
++  }
++
++}
++
++function reviewOfDenied(reason, userDenied) {
++
++  if (userDenied) return "ask";
++
++  return reason === PHONE_TOOL_REVIEW_SPEC.classifierErrorReason ? "error" : "deny";
++
++}
++
+ function withPhoneToolAutoReview(port, review, tools = SAND_PHONE_LOCAL_TOOLS) {
+ 
+   return {
+@@ -1022840,7 +1023339,7 @@
+         const options2 = review.options();
+ 
+         if (options2.mode === "off") return {
+- allowed: true }
++ allowed: true, review: "skipped" }
+ ;
+ 
+         const tool = tools.find((candidate) => candidate.toolId === args.toolId);
+@@ -1022848,7 +1023347,7 @@
+         if (tool === void 0) {
+ 
+           return {
+- allowed: false, reason: SAND_PHONE_TOOL_UNREVIEWABLE_REASON }
++ allowed: false, reason: SAND_PHONE_TOOL_UNREVIEWABLE_REASON, review: "error" }
+ ;
+ 
+         }
+@@ -1022858,13 +1023357,15 @@
+         if (toolCallId === void 0) {
+ 
+           return {
+- allowed: false, reason: SAND_PHONE_TOOL_UNSCOPED_REASON }
++ allowed: false, reason: SAND_PHONE_TOOL_UNSCOPED_REASON, review: "error" }
+ ;
+ 
+         }
+ 
+         review.assertNoPendingAutoReviewApproval();
+ 
++        let userDenied = false;
++
+         const decision = await runSandAutoReviewFlow({
+ 
+           ctx: reviewCtx,
+@@ -1022874,12 +1023375,28 @@
+ ,
+           options: options2,
+           spec: PHONE_TOOL_REVIEW_SPEC,
+-          signal: reviewCtx.signal
++          signal: reviewCtx.signal,
++          onUserDenied: () => {
++
++            userDenied = true;
++
++          }
++
+         }
+ );
+ 
+-        return decision.allowed === false ? decision : {
+- allowed: true }
++        if (decision.allowed !== false) {
++
++          return {
++ allowed: true, review: reviewOfAllowed(decision.allowed.by) }
++;
++
++        }
++
++        if (decision.reason === SAND_PHONE_TOOL_REVIEW_CANCELLED_REASON) return decision;
++
++        return {
++ ...decision, review: reviewOfDenied(decision.reason, userDenied) }
+ ;
+ 
+       }
+@@ -1048206,9 +1048723,9 @@
+  serverIdentifier }
+ ) => !isReservedDynamicToolsNamespace(serverIdentifier);
+ 
+-function cursorNamespaceCatalog(registry2, decisions) {
++function cursorNamespaceCatalog(registry3, decisions) {
+ 
+-  const names3 = registry2.getToolNames();
++  const names3 = registry3.getToolNames();
+ 
+   const hintLines = names3.flatMap((name17) => {
+ 
+@@ -1050724,7 +1051241,9 @@
+  already lists does not need it. Read-only.`,
+   installDescription: `Install a plugin by its STABLE plugin id (from ${
+ GROK_BOT_TOOL_NAMES.SearchPlugins}
+-) into the user's Cursor account. Only call this after the user has agreed. Confirm with a question widget first, since installing changes the user's configuration. Idempotent: re-installing an installed plugin is safe. Pass any setup values ${
++) into the user's Cursor account. ${
++CONNECTOR_INSTALL_PROMPT_LINE}
++ Idempotent: re-installing an installed plugin is safe. Pass any setup values ${
+ GROK_BOT_TOOL_NAMES.GetPlugin}
+  lists (ask the user for secrets like API keys, never guess). If an installed connector needs authentication, its connect card is shown to the user automatically. Finish unrelated work, then end your turn;
+  you're resumed when they authorize. New tools and skills become available on your next message.`,
+@@ -1050937,8 +1051456,8 @@
+ 
+ }
+ 
+-var MCP_AWAITING_SELECTION_MESSAGE = "You just sent a question widget, so this turn is waiting on the user's selection. Their answer arrives as the next message. Don't install, uninstall, restart, or authenticate an MCP server in the same turn as the confirmation widget;
+- wait for the user to confirm, then do it on your next turn.";
++var MCP_AWAITING_SELECTION_MESSAGE = "You just sent a question widget, so this turn is waiting on the user's selection. Their answer arrives as the next message. Don't install, uninstall, restart, or authenticate an MCP server in the same turn as that widget;
++ wait for their answer, then act on your next turn.";
+ 
+ function privateTailnetMcpUnavailableMessage(url2) {
+ 
+@@ -1051178,6 +1051697,29 @@
+ 
+ var USER_STARTED_TURN_SOURCES = /* @__PURE__ */ new Set(["turn", "voice-call"]);
+ 
++var installGuardRefusals = createCounter("grok_bot.mcp.install_guard", {
++
++  description: "Personal plugin installs refused because the user did not start the turn, by request source",
++  labelNames: ["source"]
++}
++);
++
++function describeInstallNotUserTurn(plugin) {
++
++  return `Nothing was installed: the user did not start this turn, and installing adds ${
++plugin.displayName}
++ to their account. Only install when the user asks for it in their own chat with you, never on a turn a routine, another agent, or a Slack or Teams message started. Tell the user this needs ${
++plugin.displayName}
++, which they can add themselves in the Grok Bot app.`;
++
++}
++
++function isUserStartedTurn(source) {
++
++  return source !== void 0 && USER_STARTED_TURN_SOURCES.has(source);
++
++}
++
+ function removalEffect(target) {
+ 
+   return target.tool === GROK_BOT_TOOL_NAMES.RenameMcpAccount ? `renaming the account moves the user's ${
+@@ -1051393,9 +1051935,7 @@
+ 
+   const removalRefusal = (intent, target) => {
+ 
+-    const source = intent.turnRequestSource();
+-
+-    if (source === void 0 || !USER_STARTED_TURN_SOURCES.has(source)) {
++    if (!isUserStartedTurn(intent.turnRequestSource())) {
+ 
+       return {
+  reason: "no_user_turn" }
+@@ -1051682,7 +1052222,7 @@
+       describeActivity: (args) => /^\d+$/.test(args.plugin_id) ? void 0 : {
+  detail: args.plugin_id }
+ ,
+-      execute: guardMutation(async (_ctx, args, deps) => {
++      execute: guardMutation(async (ctx, args, deps) => {
+ 
+         if (teamSetupUnderway()) return MCP_TEAM_SETUP_UNDERWAY_MESSAGE;
+ 
+@@ -1051700,6 +1052240,24 @@
+ 
+         }
+ 
++        const intent = options2?.removalIntent;
++
++        if (pluginRemovalsSignOut && intent !== void 0) {
++
++          const source = intent.turnRequestSource();
++
++          if (!isUserStartedTurn(source)) {
++
++            installGuardRefusals.increment(ctx, 1, {
++ source: source ?? "unknown" }
++);
++
++            return describeInstallNotUserTurn(before);
++
++          }
++
++        }
++
+         repairs.noteInstall([args.plugin_id, before.pluginId]);
+ 
+         const installRefusal = await installRefusingPrivateTailnet(
+@@ -1057348,10 +1057906,33 @@
+ 
+ }
+ 
++function createAutonomousBlockTracker(truthfulAutoReviewOutcomes) {
++
++  const blocks = /* @__PURE__ */ new Map();
++
++  return {
++
++    record: (fingerprint, block) => {
++
++      if (truthfulAutoReviewOutcomes?.() !== true) return false;
++
++      blocks.set(fingerprint, block);
++
++      return true;
++
++    }
++,
++    blockFor: (fingerprint) => blocks.get(fingerprint)
++  }
++;
++
++}
++
+ function createSandShellApprovalProvider(args) {
+ 
+   return {
+ 
++    autonomousBlockTracker: createAutonomousBlockTracker(args.truthfulAutoReviewOutcomes),
+     cardReasonFor: (card) => recordedCardRefusal(args.toolDecisionAudit, args.controller, card),
+     requestApproval: async (request3) => {
+ 
+@@ -1057447,6 +1058028,7 @@
+ 
+   return {
+ 
++    autonomousBlockTracker: createAutonomousBlockTracker(args.truthfulAutoReviewOutcomes),
+     ...args.blockedReminder === void 0 ? {
+ }
+  : {
+@@ -1057685,6 +1058267,7 @@
+     getApprovalExpiryPolicy,
+     draftToolAvailable,
+     holdUncoveredSends,
++    truthfulAutoReviewOutcomes,
+     ownerTypedTurn: ownerTypedTurn2,
+     holdScope,
+     cardHiddenFromChannel
+@@ -1057700,6 +1058283,7 @@
+     surface: "host_shell",
+     getExpiryPolicy: getApprovalExpiryPolicy,
+     toolDecisionAudit: turnToolHost.toolDecisionAudit,
++    truthfulAutoReviewOutcomes,
+     ...localToolPermission !== void 0 ? {
+ 
+       beforeApproval: (request3) => localToolPermission.awaitDesktopStandingDecision({
+@@ -1057733,7 +1058317,8 @@
+     agentId: turnToolHost.getConversationId(),
+     surface: "box_shell",
+     getExpiryPolicy: getApprovalExpiryPolicy,
+-    toolDecisionAudit: turnToolHost.toolDecisionAudit
++    toolDecisionAudit: turnToolHost.toolDecisionAudit,
++    truthfulAutoReviewOutcomes
+   }
+ ) : void 0;
+ 
+@@ -1057751,6 +1058336,7 @@
+     agentId: turnToolHost.getConversationId(),
+     getExpiryPolicy: getApprovalExpiryPolicy,
+     toolDecisionAudit: turnToolHost.toolDecisionAudit,
++    truthfulAutoReviewOutcomes,
+     ...allowsSystemReminder(turnToolHost, "blockedSendDraft") ? {
+  blockedReminder: createBlockedSendDraftReminder(draftableSend) }
+  : {
+@@ -1066352,6 +1066938,7 @@
+       getApprovalExpiryPolicy,
+       draftToolAvailable,
+       holdUncoveredSends: () => heldSendForTurn(turnToolHost, turnToolDecisions),
++      truthfulAutoReviewOutcomes: turnToolHost.gates.truthfulAutoReviewOutcomes,
+       ownerTypedTurn: () => ownerTypedTurn(turnToolHost),
+       holdScope: () => uncoveredSendHoldScopeForTurn(turnToolHost),
+       cardHiddenFromChannel: () => cardHiddenFromChannelForTurn(turnToolHost)
+@@ -1081747,9 +1082334,9 @@
+ 
+ function unavailableGenerateImageResources() {
+ 
+-  const registry2 = new RegistryResourceAccessor();
++  const registry3 = new RegistryResourceAccessor();
+ 
+-  registry2.register(readExecutorResource, {
++  registry3.register(readExecutorResource, {
+ 
+     execute: async (_ctx, args) => new ReadResult({
+ 
+@@ -1081766,7 +1082353,7 @@
+   }
+ );
+ 
+-  registry2.register(writeExecutorResource, {
++  registry3.register(writeExecutorResource, {
+ 
+     execute: async () => new WriteResult({
+ 
+@@ -1081783,7 +1082370,7 @@
+   }
+ );
+ 
+-  return registry2;
++  return registry3;
+ 
+ }
+ 
+@@ -1081831,6 +1082418,7 @@
+     cloudCanvasTools: fixedGate(false, EVAL_RUNNER_PIN),
+     sendToUserReminderDelegation: fixedGate(false, EVAL_RUNNER_PIN),
+     sendToAgentRoster: fixedGate(false, EVAL_RUNNER_PIN),
++    teamBotDiscovery: fixedGate(false, EVAL_RUNNER_PIN),
+     automationSendToAgent: fixedGate(false, EVAL_RUNNER_PIN),
+     taskSubagentRoster: fixedGate(false, EVAL_RUNNER_PIN),
+     executorForkContext: fixedGate(false, EVAL_RUNNER_PIN),
+@@ -1081904,6 +1082492,7 @@
+     peerWakeApprovalReminder: fixedGate(false, EVAL_RUNNER_PIN),
+     peerWakeDelegationAwareReminder: fixedGate(false, EVAL_RUNNER_PIN),
+     typedCardReply: fixedGate(false, EVAL_RUNNER_PIN),
++    truthfulAutoReviewOutcomes: fixedGate(false, EVAL_RUNNER_PIN),
+     unansweredCardOnWake: fixedGate(false, EVAL_RUNNER_PIN),
+     typedCardReplyChatFollowup: fixedGate(false, EVAL_RUNNER_PIN),
+     executorSendRules: fixedGate(false, EVAL_RUNNER_PIN),
+@@ -1083533,6 +1084122,8 @@
+ 
+ 
+ // ../packages/local-exec/dist/forced-egress.js
++init_test_resets();
++
+ var FORCED_SHELL_EGRESS_ENV = "CURSOR_FORCED_SHELL_EGRESS";
+ 
+ var FORCED_SHELL_EGRESS_DEPENDENCY_REGEX_ENV = "CURSOR_FORCED_SHELL_EGRESS_DEPENDENCY_REGEX";
+@@ -1083582,6 +1084173,20 @@
+ 
+ }
+ 
++function resetForcedShellEgressCacheForTests() {
++
++  cachedEnabled = void 0;
++
++  cachedDependencyRe = void 0;
++
++  cachedSourceLookupRe = void 0;
++
++  cachedPolicyOverrides = void 0;
++
++}
++
++registerTestReset(resetForcedShellEgressCacheForTests);
++
+ function requiredRegexSource(envVar) {
+ 
+   const raw = (process.env[envVar] ?? "").trim();
+@@ -1086421,6 +1087026,8 @@
+ 
+ 
+ // ../packages/local-exec/dist/services/ignore-service.js
++init_test_resets();
++
+ var IGNORE_FILE_NAMES = [".gitignore", ".cursorignore"];
+ 
+ var REPO_BLOCK_URL_CACHE_MAX = 2048;
+@@ -1086510,6 +1087117,16 @@
+ 
+ }
+ 
++function clearRepoBlockMatchCachesForTests() {
++
++  normalizedRepoUrlCache.clear();
++
++  repoGlobMatcherCache.clear();
++
++}
++
++registerTestReset(clearRepoBlockMatchCachesForTests);
++
+ function makeResolvedIgnorePath(path32) {
+ 
+   return path32;
+@@ -1100209,6 +1100826,8 @@
+ 
+ var import_node_path64 = require("node:path");
+ 
++init_test_resets();
++
+ var DISABLE_SPARSE_PLUGIN_CLONES_ENV = "CURSOR_DISABLE_SPARSE_PLUGIN_CLONES";
+ 
+ var ALWAYS_SPARSE_DIRS = MARKETPLACE_MANIFEST_PATHS.map((p2) => p2.split("/")[0]);
+@@ -1100275,6 +1100894,14 @@
+ 
+ }
+ 
++function resetSparseCloneSupportCacheForTests() {
++
++  sparseSupportPromise = void 0;
++
++}
++
++registerTestReset(resetSparseCloneSupportCacheForTests);
++
+ function normalizeSparseCheckoutDir(dir) {
+ 
+   let normalized = dir.trim().replaceAll("\\", "/");
+@@ -1116080,7 +1116707,7 @@
+ init_auth2();
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
+ function isZ4Schema(s3) {
+ 
+   const schema3 = s3;
+@@ -1116201,11 +1116828,11 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
+ init_types5();
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
+ function isTerminal(status) {
+ 
+   return status === "completed" || status === "failed" || status === "cancelled";
+@@ -1116213,7 +1116840,7 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
+ function getMethodLiteral(schema3) {
+ 
+   const shape2 = getObjectShape(schema3);
+@@ -1116253,7 +1116880,7 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
+ var DEFAULT_REQUEST_TIMEOUT_MSEC = 6e4;
+ 
+ var Protocol = class {
+@@ -1118135,11 +1118762,11 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js
+ init_types5();
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
+ var import_ajv2 = __toESM(require_ajv(), 1);
+ 
+ var import_ajv_formats = __toESM(require_dist2(), 1);
+@@ -1118253,7 +1118880,7 @@
+ ;
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/client.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/client.js
+ init_types5();
+ 
+ var ExperimentalClientTasks = class {
+@@ -1118508,7 +1119135,7 @@
+ ;
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
+ function assertToolsCallTaskCapability(requests2, method, entityName) {
+ 
+   if (!requests2) {
+@@ -1118591,7 +1119218,7 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js
+ function applyElicitationDefaults(schema3, data2) {
+ 
+   if (!schema3 || data2 === null || typeof data2 !== "object")
+@@ -1120498,7 +1121125,7 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/transport.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/transport.js
+ function normalizeHeaders(headers) {
+ 
+   if (!headers)
+@@ -1120553,7 +1121180,7 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/client/sse.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/sse.js
+ init_types5();
+ 
+ init_auth2();
+@@ -1120945,7 +1121572,7 @@
+ ;
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js
+ var import_cross_spawn = __toESM(require_cross_spawn(), 1);
+ 
+ var import_node_process = __toESM(require("node:process"), 1);
+@@ -1120953,7 +1121580,7 @@
+ var import_node_stream6 = require("node:stream");
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+ init_types5();
+ 
+ var ReadBuffer = class {
+@@ -1121024,7 +1121651,7 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js
+ var DEFAULT_INHERITED_ENV_VARS = import_node_process.default.platform === "win32" ? [
+   "APPDATA",
+   "HOMEDRIVE",
+@@ -1121341,7 +1121968,7 @@
+ }
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/client/streamableHttp.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/streamableHttp.js
+ init_types5();
+ 
+ init_auth2();
+@@ -1121398,7 +1122025,7 @@
+ ;
+ 
+ 
+-// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=cd984547f0dfd7b4edc3bf6bfdbeda973e47fb93f7f_c2b9aad3320ab9f5b199a9a3cbc77495/node_modules/@modelcontextprotocol/sdk/dist/esm/client/streamableHttp.js
++// ../node_modules/.pnpm/@modelcontextprotocol+sdk@1.25.1_patch_hash=77c6ee065ffd446c891e26297b3de31aebbe74ac99c_7c0ebdbfa31b907d43e1d7dddf6f25e4/node_modules/@modelcontextprotocol/sdk/dist/esm/client/streamableHttp.js
+ var DEFAULT_STREAMABLE_HTTP_RECONNECTION_OPTIONS = {
+ 
+   initialReconnectionDelay: 1e3,
