@@ -1,0 +1,8 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/calendar-month.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/calendar-month.d.ts
+@@ -21,4 +21,4 @@
+  * a narrow block the chips keep their rule and drop their title, which
+  * stays in the tooltip.
+  */
+-export declare function MonthView({ month, events, today }: MonthViewProps): JSX.Element | null;
++export declare function MonthView(props: MonthViewProps): JSX.Element | null;

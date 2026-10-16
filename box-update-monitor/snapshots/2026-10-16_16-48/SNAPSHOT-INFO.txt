@@ -1,0 +1,9 @@
+snapshot	2026-10-16_16-48
+created	2026-10-16 16:48:50 CEST
+label	auto: changement détecté (sha:/etc/sand-box-image-sha, sha:/exec-daemon/agent-sdk/canvas-sdk-version, sha:/exec-daemon/index.js, sha:/exec-daemon/package.json, sha:/usr/local/bin/cursor_agent_store_fuse_version)
+files	15573
+text_copies	3290
+big_text_gz	5
+unreadable	0
+bytes_hashed	1750845745
+duration_s	4.8

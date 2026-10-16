@@ -1,0 +1,8 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/divider.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/divider.d.ts
+@@ -7,4 +7,4 @@
+  * the next begins, e.g. under the opening part's last figure, ahead of the
+  * next section. Sparingly: headings already separate sections.
+  */
+-export declare function Divider(_props: DividerProps): JSX.Element;
++export declare function Divider(props: DividerProps): JSX.Element;

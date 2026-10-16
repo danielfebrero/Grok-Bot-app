@@ -1,0 +1,201 @@
+--- 2026-10-16_13-52:/usr/local/bin/sand-ua-governor.mjs
++++ 2026-10-16_16-48:/usr/local/bin/sand-ua-governor.mjs
+@@ -1,7 +1,10 @@
+-import { readFileSync } from "node:fs";
++import { existsSync, readFileSync } from "node:fs";
+ import { pathToFileURL } from "node:url";
+ 
+-import { BROWSER_HARDWARE_PROFILE_MARKER_PATH } from "./box-contract.generated.mjs";
++import {
++  BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH,
++  BROWSER_HARDWARE_PROFILE_MARKER_PATH,
++} from "./box-contract.generated.mjs";
+ import {
+   connectBrowser,
+   discoverMonitorPorts,
+@@ -51,7 +54,7 @@
+   return browser.documentScripts;
+ }
+ 
+-const WORKER_TARGET_TYPES = new Set(["worker", "shared_worker"]);
++const WORKER_TARGET_TYPES = new Set(["worker", "shared_worker", "service_worker"]);
+ 
+ export function isWorkerTargetType(targetType) {
+   return WORKER_TARGET_TYPES.has(targetType);
+@@ -96,6 +99,22 @@
+   return browser.hardwareProfileEnabled === true;
+ }
+ 
++export function resolveAcceptLanguageEnUsEnabled(
++  markerPath = BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH,
++) {
++  return existsSync(markerPath);
++}
++
++export function acceptLanguageEnUsEnabledForBrowser(
++  browser,
++  resolve = resolveAcceptLanguageEnUsEnabled,
++) {
++  if (!Object.prototype.hasOwnProperty.call(browser, "acceptLanguageEnUsEnabled")) {
++    browser.acceptLanguageEnUsEnabled = resolve() === true;
++  }
++  return browser.acceptLanguageEnUsEnabled === true;
++}
++
+ export function canvasSeedForBrowser(browser) {
+   if (Object.prototype.hasOwnProperty.call(browser, "canvasSeed")) {
+     const seed = browser.canvasSeed;
+@@ -128,8 +147,7 @@
+ 
+ export async function installDocumentScript(browser, sessionId, script) {
+   if (documentScriptMap(browser).has(sessionId)) await removeDocumentScript(browser, sessionId);
+-  const [, , added] = await Promise.all([
+-    browser.send("Runtime.evaluate", { expression: script }, sessionId),
++  const [, added] = await Promise.all([
+     browser.send("Page.enable", {}, sessionId),
+     browser.send("Page.addScriptToEvaluateOnNewDocument", { source: script }, sessionId),
+   ]);
+@@ -138,18 +156,85 @@
+   }
+ }
+ 
+-export async function applyUaTreatmentToTarget(browser, sessionId, targetInfo) {
+-  if (!hardwareProfileEnabledForBrowser(browser)) {
++function relatedTargetSessions(browser) {
++  if (browser.relatedTargetSessions == null) {
++    browser.relatedTargetSessions = new Set();
++  }
++  return browser.relatedTargetSessions;
++}
++
++/*
++Chrome auto-attach reaches only the direct children of the session it is
++called on, so each page, frame, and worker has to attach its own
++out-of-process iframes and workers
++(https://chromedevtools.github.io/devtools-protocol/tot/Target/#method-setAutoAttach).
++*/
++const RELATED_TARGET_FILTER = [
++  { type: "iframe", exclude: false },
++  { type: "worker", exclude: false },
++  { type: "shared_worker", exclude: false },
++  { exclude: true },
++];
++
++function attachRelatedTargets(browser, sessionId) {
++  const sessions = relatedTargetSessions(browser);
++  if (sessions.has(sessionId)) return Promise.resolve();
++  sessions.add(sessionId);
++  return browser
++    .send(
++      "Target.setAutoAttach",
++      {
++        autoAttach: true,
++        waitForDebuggerOnStart: true,
++        flatten: true,
++        filter: acceptLanguageEnUsEnabledForBrowser(browser)
++          ? [{ type: "service_worker", exclude: false }, ...RELATED_TARGET_FILTER]
++          : RELATED_TARGET_FILTER,
++      },
++      sessionId,
++    )
++    .catch((error) => {
++      sessions.delete(sessionId);
++      throw error;
++    });
++}
++
++function startsBeforeFirstDocument(target) {
++  return target?.type === "iframe" && target.waitingForDebugger === true;
++}
++
++export async function applyUaTreatmentToTarget(browser, sessionId, target) {
++  const hardwareProfile = hardwareProfileEnabledForBrowser(browser);
++  const acceptLanguageEnUs = acceptLanguageEnUsEnabledForBrowser(browser);
++  if (!hardwareProfile && !acceptLanguageEnUs) {
+     await applyDesktopUaToTarget(browser, sessionId);
+     return;
+   }
+-  if (isWorkerTargetType(targetInfo?.type)) {
+-    await browser.send("Runtime.evaluate", { expression: documentScript(browser) }, sessionId);
++  if (isWorkerTargetType(target?.type)) {
++    await Promise.all([
++      acceptLanguageEnUs ? applyDesktopUaToTarget(browser, sessionId) : null,
++      hardwareProfile
++        ? browser.send("Runtime.evaluate", { expression: documentScript(browser) }, sessionId)
++        : null,
++      target.type === "service_worker" ? null : attachRelatedTargets(browser, sessionId),
++    ]);
++    return;
++  }
++  if (!hardwareProfile) {
++    await Promise.all([
++      applyDesktopUaToTarget(browser, sessionId),
++      attachRelatedTargets(browser, sessionId),
++    ]);
+     return;
+   }
++  const script = documentScript(browser);
+   await Promise.all([
+     applyDesktopUaToTarget(browser, sessionId),
+-    installDocumentScript(browser, sessionId, documentScript(browser)),
++    startsBeforeFirstDocument(target)
++      ? null
++      : browser.send("Runtime.evaluate", { expression: script }, sessionId),
++    installDocumentScript(browser, sessionId, script),
++    attachRelatedTargets(browser, sessionId),
+   ]);
+ }
+ 
+@@ -162,6 +247,7 @@
+     if (message.method === "Target.detachedFromTarget") {
+       browser.attachedSessions.delete(sessionId);
+       browser.attachedTargetTypes.delete(sessionId);
++      browser.relatedTargetSessions?.delete(sessionId);
+       return;
+     }
+     if (message.method !== "Target.attachedToTarget") return;
+@@ -171,29 +257,34 @@
+       browser.attachedTargetTypes.set(sessionId, targetType);
+     }
+     const reportUnlessGone = (step) => (error) => {
+-      if (isCdpTargetGone(error)) return;
++      if (isCdpTargetGone(error) || !browser.attachedSessions.has(sessionId)) return;
+       console.error(`${step} failed port=${browser.port}: ${errorClass(error)}`);
+     };
+-    void applyUaTreatmentToTarget(browser, sessionId, { type: targetType }).catch(
+-      reportUnlessGone("ua apply"),
+-    );
++    void applyUaTreatmentToTarget(browser, sessionId, {
++      type: targetType,
++      waitingForDebugger: message.params?.waitingForDebugger === true,
++    }).catch(reportUnlessGone("ua apply"));
+     void browser
+       .send("Runtime.runIfWaitingForDebugger", {}, sessionId)
+       .catch(reportUnlessGone("resume"));
+   });
+   const hardwareProfile = hardwareProfileEnabledForBrowser(browser);
+-  await browser.send("Target.setAutoAttach", {
+-    autoAttach: true,
+-    waitForDebuggerOnStart: true,
+-    flatten: true,
+-    filter: hardwareProfile
++  const acceptLanguageEnUs = acceptLanguageEnUsEnabledForBrowser(browser);
++  const filter =
++    hardwareProfile || acceptLanguageEnUs
+       ? [
+           { type: "page", exclude: false },
+           { type: "worker", exclude: false },
+           { type: "shared_worker", exclude: false },
+           { exclude: true },
+         ]
+-      : [{ type: "page", exclude: false }, { exclude: true }],
++      : [{ type: "page", exclude: false }, { exclude: true }];
++  if (acceptLanguageEnUs) filter.unshift({ type: "service_worker", exclude: false });
++  await browser.send("Target.setAutoAttach", {
++    autoAttach: true,
++    waitForDebuggerOnStart: true,
++    flatten: true,
++    filter,
+   });
+ }
+ 

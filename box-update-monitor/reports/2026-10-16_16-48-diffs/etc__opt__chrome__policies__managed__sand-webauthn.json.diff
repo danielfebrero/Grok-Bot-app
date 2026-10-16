@@ -1,0 +1,5 @@
+--- 2026-10-16_13-52:/etc/opt/chrome/policies/managed/sand-webauthn.json
++++ 2026-10-16_16-48:/etc/opt/chrome/policies/managed/sand-webauthn.json
+@@ -1 +1 @@
+-{"ExtensionSettings":{"alhdnckjfkmaljmljdhjfpecddnfjide":{"installation_mode":"force_installed","update_url":"file:///usr/local/share/sand-webauthn-proxy-update.xml"}}}
++{"ExtensionSettings":{"hghnnanbhcnnfehekklkjljicjoodaje":{"installation_mode":"force_installed","update_url":"file:///usr/local/share/sand-webauthn-proxy-update.xml"}}}

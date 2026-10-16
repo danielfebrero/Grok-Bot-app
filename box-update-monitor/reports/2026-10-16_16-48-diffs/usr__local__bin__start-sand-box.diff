@@ -1,0 +1,176 @@
+--- 2026-10-16_13-52:/usr/local/bin/start-sand-box
++++ 2026-10-16_16-48:/usr/local/bin/start-sand-box
+@@ -210,11 +210,15 @@
+ 	parser.add_argument("box", type=ids)
+ 	parser.add_argument("--host", type=ids)
+ 	parser.add_argument("--host-file", action="append", default=[])
++	parser.add_argument("--box-group-tree", action="store_true")
+ 	parser.add_argument("--mode", type=lambda value: int(value, 8))
+ 	parser.add_argument("--shallow", action="store_true")
+ 	parser.add_argument("roots", nargs="+")
+ 	args = parser.parse_args()
+ 	host_files = set(args.host_file)
++	SETGID = stat.S_ISGID
++	SHARED = stat.S_ISGID | stat.S_IRWXG
++	WORLD_LISTABLE = stat.S_IROTH | stat.S_IXOTH
+ 
+ 
+ 	def is_host_file(name):
+@@ -228,6 +232,15 @@
+ 	    return args.host is not None and info.st_uid == args.host[0]
+ 
+ 
++	def is_shareable_host_dir(info):
++	    return (
++	        args.box_group_tree
++	        and is_host_owned(info)
++	        and stat.S_ISDIR(info.st_mode)
++	        and info.st_mode & WORLD_LISTABLE == WORLD_LISTABLE
++	    )
++
++
+ 	def owner_for(info, name, top):
+ 	    if is_host_owned(info):
+ 	        return None
+@@ -236,6 +249,18 @@
+ 	    return args.box
+ 
+ 
++	def add_mode(fd, info, bits):
++	    mode = stat.S_IMODE(info.st_mode)
++	    if mode | bits != mode:
++	        os.fchmod(fd, mode | bits)
++
++
++	def share(fd, info):
++	    if info.st_gid != args.box[1]:
++	        os.fchown(fd, -1, args.box[1])
++	    add_mode(fd, info, SHARED)
++
++
+ 	def open_entry(name, dir_fd):
+ 	    flags = os.O_NOFOLLOW | os.O_CLOEXEC
+ 	    try:
+@@ -272,10 +297,22 @@
+ 	        os.close(parent)
+ 
+ 
+-	def settle(fd, opened_dir, info, name, top):
++	HAND_OVER = "hand-over"
++	SHARE_ONLY = "share-only"
++
++
++	def settle(fd, opened_dir, info, name, top, walk_mode):
++	    if opened_dir and is_shareable_host_dir(info):
++	        try:
++	            share(fd, info)
++	        except OSError:
++	            return None
++	        return SHARE_ONLY
++	    if walk_mode == SHARE_ONLY:
++	        return None
+ 	    owner = owner_for(info, name, top)
+ 	    if owner is None:
+-	        return False
++	        return None
+ 	    try:
+ 	        if (info.st_uid, info.st_gid) != owner:
+ 	            if opened_dir:
+@@ -283,16 +320,25 @@
+ 	            else:
+ 	                os.chown("/proc/self/fd/%d" % fd, *owner)
+ 	    except OSError:
+-	        return False
+-	    return opened_dir and owner == args.box
++	        return None
++	    if not opened_dir or owner != args.box:
++	        return None
++	    if args.box_group_tree:
++	        try:
++	            add_mode(fd, info, SETGID)
++	        except OSError:
++	            pass
++	    return HAND_OVER
+ 
+ 
+-	def already_settled(name, dir_fd, top):
++	def already_settled(name, dir_fd, top, walk_mode):
+ 	    try:
+ 	        info = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+ 	    except OSError:
+ 	        return True
+-	    if is_host_owned(info):
++	    if is_shareable_host_dir(info):
++	        return False
++	    if walk_mode == SHARE_ONLY or is_host_owned(info):
+ 	        return True
+ 	    if top and is_host_file(name):
+ 	        return False
+@@ -305,32 +351,33 @@
+ 	    except OSError:
+ 	        return
+ 	    try:
+-	        descend = settle(fd, opened_dir, info, os.path.basename(path), False)
+-	        if descend and args.mode is not None:
++	        walk_mode = settle(fd, opened_dir, info, os.path.basename(path), False, HAND_OVER)
++	        if walk_mode == HAND_OVER and args.mode is not None:
+ 	            os.fchmod(fd, args.mode)
+-	        names = os.listdir(fd) if descend and not args.shallow else None
++	        names = os.listdir(fd) if walk_mode is not None and not args.shallow else None
+ 	    except OSError:
+ 	        names = None
+ 	    if names is None:
+ 	        os.close(fd)
+ 	        return
+-	    stack = [(fd, iter(names), True)]
++	    stack = [(fd, iter(names), walk_mode == HAND_OVER, walk_mode)]
+ 	    while stack:
+-	        dir_fd, entries, top = stack[-1]
++	        dir_fd, entries, top, walk_mode = stack[-1]
+ 	        name = next(entries, None)
+ 	        if name is None:
+ 	            os.close(dir_fd)
+ 	            stack.pop()
+ 	            continue
+-	        if already_settled(name, dir_fd, top):
++	        if already_settled(name, dir_fd, top, walk_mode):
+ 	            continue
+ 	        try:
+ 	            child, opened_dir, info = open_entry(name, dir_fd)
+ 	        except OSError:
+ 	            continue
+ 	        try:
+-	            if settle(child, opened_dir, info, name, top):
+-	                stack.append((child, iter(os.listdir(child)), False))
++	            child_mode = settle(child, opened_dir, info, name, top, walk_mode)
++	            if child_mode is not None:
++	                stack.append((child, iter(os.listdir(child)), False, child_mode))
+ 	                continue
+ 	        except OSError:
+ 	            pass
+@@ -608,13 +655,14 @@
+ }
+ chown_sand_data_to_box() {
+ 	remove_host_owned_write_leftovers
+-	local name host_files=()
++	local name split_args=()
+ 	if sand_host_uid_split; then
++		split_args+=(--box-group-tree)
+ 		for name in "${SAND_DATA_HOST_OWNED_FILES[@]}"; do
+-			host_files+=(--host-file "${name}")
++			split_args+=(--host-file "${name}")
+ 		done
+ 	fi
+-	chown_tree_to_box "${host_files[@]}" /home/box/sand-data
++	chown_tree_to_box "${split_args[@]}" /home/box/sand-data
+ }
+ 
+ reassert_cli_config_owner() {
+@@ -1255,6 +1303,7 @@
+ 			# host learns the desktop role's health file from its env.
+ 			(
+ 				printf '%s\n' '-1000' >/proc/self/oom_score_adj 2>/dev/null || true
++				umask 0002
+ 				exec "${AS_HOST[@]}" /usr/bin/setsid /usr/bin/nohup /usr/bin/env \
+ 					SAND_SUPERVISOR_ROLE=host \
+ 					SAND_SUPERVISOR_DESKTOP_HEALTH_PATH=/tmp/sand-desktop-supervisor/desktop-health.json \

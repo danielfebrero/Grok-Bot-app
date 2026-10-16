@@ -1,0 +1,8 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/pros-cons.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/pros-cons.d.ts
+@@ -26,4 +26,4 @@
+  * />
+  * ```
+  */
+-export declare function ProsCons({ pros, cons, prosHeading, consHeading, }: ProsConsProps): JSX.Element | null;
++export declare function ProsCons(props: ProsConsProps): JSX.Element | null;

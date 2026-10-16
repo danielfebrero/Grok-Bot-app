@@ -1,0 +1,14 @@
+--- 2026-10-16_13-52:/opt/sand/deps/sand-notification-settings/index.js
++++ 2026-10-16_16-48:/opt/sand/deps/sand-notification-settings/index.js
+@@ -7,4 +7,11 @@
+   // The calling app's OS notification permission (macOS, Windows); null
+   // elsewhere or when unreadable.
+   notification_settings_async: binding.notification_settings_async,
++  // (productName, valueName) => number | string | null
++  // A device-management policy value under Software\Policies\Cursor\<productName>
++  // (Windows, machine before user): a number for REG_DWORD/REG_QWORD or a
++  // string of a whole number, the registry type name for any other value,
++  // READ_ERROR_<status> when the value exists but cannot be read, null when
++  // unset or off Windows.
++  managed_policy_value_sync: binding.managed_policy_value_sync,
+ };

@@ -1,0 +1,25 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/lists.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/lists.d.ts
+@@ -27,14 +27,14 @@
+  * `"con"` each item takes a green plus or a red minus in a tinted tile
+  * instead of the dot; `ProsCons` draws the pair of them as two cards.
+  */
+-export declare function BulletList({ items, marker }: BulletListProps): JSX.Element;
++export declare function BulletList(props: BulletListProps): JSX.Element;
+ /**
+  * Numbered list for ranked items or a procedure of one-liners: `1.`, `2.`
+  * in secondary ink, and under an item with `items` of its own, `a.`, `b.`
+  * 24 px in (or bullets, when the item says `bullets`). A procedure whose
+  * steps have a title and a line of detail is `Steps`.
+  */
+-export declare function NumberedList({ items }: ListProps): JSX.Element;
++export declare function NumberedList(props: ListProps): JSX.Element;
+ export interface Step {
+     /** The step in a few words, set bold. */
+     title: ReactNode;
+@@ -51,4 +51,4 @@
+  * a thin line joins each circle to the next. One with no steps draws
+  * nothing. A list of one-liners is a `NumberedList` instead.
+  */
+-export declare function Steps({ steps }: StepsProps): JSX.Element | null;
++export declare function Steps(props: StepsProps): JSX.Element | null;

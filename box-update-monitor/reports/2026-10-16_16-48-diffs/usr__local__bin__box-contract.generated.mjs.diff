@@ -1,0 +1,13 @@
+--- 2026-10-16_13-52:/usr/local/bin/box-contract.generated.mjs
++++ 2026-10-16_16-48:/usr/local/bin/box-contract.generated.mjs
+@@ -1,8 +1,9 @@
+-// @generated SignedSource<<fd6f0e3dc5c8c1c5eb2c8f956990326eb6da70cfedf569fc6f59375ae2f15cf2>>
++// @generated SignedSource<<7060165354b480605129befb53d1d6eb42f15d35b3588ed96f81d0ffc3deedce>>
+ // Emitted by scripts/gen-box-contract.mts from sand/src/shared/box/box-contract.ts;
+ // regenerate with `pnpm --filter sand run gen:box-contract`.
+ export const ENABLE_SPOOF_GPU_MARKER_PATH = "/tmp/sand-enable-spoof-gpu";
+ export const BROWSER_HARDWARE_PROFILE_MARKER_PATH = "/tmp/sand-browser-hardware-profile";
++export const BROWSER_ACCEPT_LANGUAGE_EN_US_MARKER_PATH = "/tmp/sand-browser-accept-language-en-us";
+ export const WEB_BOT_AUTH_SIGNED_CACHE_PATH = "/tmp/sand-web-bot-auth-signed.json";
+ export const WEB_BOT_AUTH_SIGNED_TTL_MS = 120000;
+ export const WEB_BOT_AUTH_SIGNATURE_SOURCES = ["fresh","box_cache","fleet_cache"];

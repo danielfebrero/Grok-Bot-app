@@ -1,0 +1,9 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/heatmap.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/heatmap.d.ts
+@@ -76,5 +76,5 @@
+  *
+  * @kitNote Pass `from` and `to` to draw a whole year; without them the calendar spans the days given.
+  */
+-export declare function CalendarHeatmap({ days, from, to, max, note, }: CalendarHeatmapProps): JSX.Element | null;
++export declare function CalendarHeatmap(props: CalendarHeatmapProps): JSX.Element | null;
+ export {};

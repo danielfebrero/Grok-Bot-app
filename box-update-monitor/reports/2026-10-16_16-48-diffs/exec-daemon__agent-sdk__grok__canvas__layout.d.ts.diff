@@ -1,0 +1,17 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/layout.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/layout.d.ts
+@@ -35,7 +35,7 @@
+  * </Grid>
+  * ```
+  */
+-export declare function Grid({ columns, joined, plain, children, }: GridProps): JSX.Element | null;
++export declare function Grid(props: GridProps): JSX.Element | null;
+ /** An option whose shown label differs from the value kept in state. */
+ export interface SegmentedOption<T extends string = string> {
+     value: T;
+@@ -96,4 +96,4 @@
+  * four, not seven and one), and on a phone four figures sit two by two. A
+  * long figure widens every cell rather than breaking mid-number.
+  */
+-export declare function Metrics({ metrics }: MetricsProps): JSX.Element;
++export declare function Metrics(props: MetricsProps): JSX.Element;

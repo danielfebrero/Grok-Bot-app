@@ -1,0 +1,8 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/calendar-week.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/calendar-week.d.ts
+@@ -27,4 +27,4 @@
+  * narrow block the headers keep only their numbers and the blocks draw as
+  * tinted bars, their titles in their tooltips.
+  */
+-export declare function WeekView({ week, start: givenStart, end: givenEnd, events, today, now, }: WeekViewProps): JSX.Element | null;
++export declare function WeekView(props: WeekViewProps): JSX.Element | null;

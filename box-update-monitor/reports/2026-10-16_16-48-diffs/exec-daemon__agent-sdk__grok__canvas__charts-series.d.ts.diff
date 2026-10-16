@@ -1,0 +1,17 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/charts-series.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/charts-series.d.ts
+@@ -17,7 +17,7 @@
+  *
+  * @kitNote Only above a custom visual; `ColumnSeries`, `LineChart`, and `Pie` draw their own.
+  */
+-export declare function Legend({ names, comparison, dots }: LegendProps): JSX.Element;
++export declare function Legend(props: LegendProps): JSX.Element;
+ export interface ReferenceLine {
+     /** Where across the value axis the line sits, e.g. a target or a limit. */
+     value: number;
+@@ -81,4 +81,4 @@
+  * />
+  * ```
+  */
+-export declare function ColumnSeries({ labels, series, stacked, ceiling, unit, format, reference, legend, }: ColumnSeriesProps): JSX.Element | null;
++export declare function ColumnSeries(props: ColumnSeriesProps): JSX.Element | null;

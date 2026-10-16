@@ -1,0 +1,8 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/properties.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/properties.d.ts
+@@ -28,4 +28,4 @@
+  * />
+  * ```
+  */
+-export declare function Properties({ items }: PropertiesProps): JSX.Element | null;
++export declare function Properties(props: PropertiesProps): JSX.Element | null;

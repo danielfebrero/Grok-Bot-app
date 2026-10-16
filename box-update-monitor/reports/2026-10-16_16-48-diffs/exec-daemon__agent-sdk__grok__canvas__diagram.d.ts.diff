@@ -1,0 +1,26 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/diagram.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/diagram.d.ts
+@@ -1,4 +1,5 @@
+ import { type JSX } from "react";
++import { type DiagramGeometry } from "./diagram-layout.js";
+ import { type DiagramProps } from "./diagram-model.js";
+ /**
+  * A diagram of nodes and the lines between them: a relationship or
+@@ -22,11 +23,11 @@
+  * On a block narrower than the drawing, a horizontal diagram turns vertical
+  * when that drawing is the narrower one, and a vertical drawing with a rank
+  * wider than the block stacks its nodes in one column, the lines between
+- * nodes that are not neighbours in it running in lanes beside it; past
+- * that, the diagram keeps its natural size and scrolls sideways, as a wide
+- * table does, fading at the edge with more beyond it and keeping a lane for
+- * the scrollbar. It is never scaled down.
++ * nodes that are not neighbours in it running in lanes beside it, when the
++ * column fits or scrolls far less; past that, the diagram keeps its natural
++ * size and scrolls sideways, as a wide table does, opening on its nodes,
++ * fading at the edge with more beyond it and keeping a lane for the
++ * scrollbar. It is never scaled down.
+  */
+ export type { DiagramEdge, DiagramNode, DiagramNodeKind, DiagramProps } from "./diagram-model.js";
+-declare function Diagram({ nodes, edges, direction }: DiagramProps): JSX.Element | null;
+-export { Diagram };
++export declare function Diagram(props: DiagramProps): JSX.Element | null;

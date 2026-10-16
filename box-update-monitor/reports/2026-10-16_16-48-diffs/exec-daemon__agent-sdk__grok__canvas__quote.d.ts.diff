@@ -1,0 +1,8 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/quote.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/quote.d.ts
+@@ -11,4 +11,4 @@
+  * a customer, a message, a review, or a source; the page's own point is a
+  * `Callout`. One with nothing to say draws nothing.
+  */
+-export declare function Quote({ children, cite }: QuoteProps): JSX.Element | null;
++export declare function Quote(props: QuoteProps): JSX.Element | null;

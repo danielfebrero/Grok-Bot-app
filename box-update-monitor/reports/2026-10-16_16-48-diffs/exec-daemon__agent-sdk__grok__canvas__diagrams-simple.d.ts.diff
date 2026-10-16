@@ -1,0 +1,17 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/diagrams-simple.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/diagrams-simple.d.ts
+@@ -40,7 +40,7 @@
+  * />
+  * ```
+  */
+-export declare function Matrix2x2({ axes, quadrants, points }: Matrix2x2Props): JSX.Element;
++export declare function Matrix2x2(props: Matrix2x2Props): JSX.Element;
+ export interface VennSet {
+     /** The set's name, beside its circle. */
+     label: string;
+@@ -74,4 +74,4 @@
+  * />
+  * ```
+  */
+-export declare function Venn({ sets: given, overlap }: VennProps): JSX.Element | null;
++export declare function Venn(props: VennProps): JSX.Element | null;

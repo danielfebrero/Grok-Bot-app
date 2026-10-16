@@ -1,0 +1,8 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/calendar.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/calendar.d.ts
+@@ -26,4 +26,4 @@
+  * row stops short of it, as every event does on a wide block, so the label
+  * sits beside the events rather than on their fills.
+  */
+-export declare function DayView({ start: givenStart, end: givenEnd, events, mark, }: DayViewProps): JSX.Element | null;
++export declare function DayView(props: DayViewProps): JSX.Element | null;

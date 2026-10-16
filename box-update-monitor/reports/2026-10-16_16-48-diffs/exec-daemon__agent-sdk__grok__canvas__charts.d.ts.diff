@@ -1,0 +1,45 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/charts.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/charts.d.ts
+@@ -39,7 +39,7 @@
+  * scale and shows an empty track with a dash. Nothing renders for an empty
+  * series.
+  */
+-export declare function Bars({ bars, emphasis }: BarsProps): JSX.Element | null;
++export declare function Bars(props: BarsProps): JSX.Element | null;
+ export interface StackedBar {
+     label: string;
+     /** One value per entry in `series`, none below zero; extra values are dropped, a negative counts as zero. */
+@@ -70,7 +70,7 @@
+  * label and its total share one row over a stack that takes the block's
+  * whole width. Nothing renders for an empty series.
+  */
+-export declare function StackedBars({ series, bars }: StackedBarsProps): JSX.Element | null;
++export declare function StackedBars(props: StackedBarsProps): JSX.Element | null;
+ export interface ColumnPoint {
+     label: string;
+     value: number;
+@@ -99,7 +99,7 @@
+  * finite number has no say in the scale and shows no bar and a dash. Nothing
+  * renders for an empty series.
+  */
+-export declare function Columns({ points: given, emphasis }: ColumnsProps): JSX.Element | null;
++export declare function Columns(props: ColumnsProps): JSX.Element | null;
+ export interface LinePoint {
+     label: string;
+     value: number;
+@@ -182,7 +182,7 @@
+  *
+  * @kitNote Draws its own legend from `labels` and `lines`; add no `Legend` to it (`legend={false}` turns it off).
+  */
+-export declare function LineChart({ points, ceiling, floor: floorProp, unit, format, lines, secondary, labels, annotations, legend: showLegend, }: LineChartProps): JSX.Element | null;
++export declare function LineChart(props: LineChartProps): JSX.Element | null;
+ export interface PiePart {
+     label: string;
+     /** Its size, at least zero; a negative counts as zero. */
+@@ -224,5 +224,5 @@
+  * of the whole fold into one "Other (n)" ({@link foldPieParts}). Nothing
+  * renders for an empty series.
+  */
+-export declare function Pie({ parts: given, total: showTotal, label }: PieProps): JSX.Element | null;
++export declare function Pie(props: PieProps): JSX.Element | null;
+ export {};

@@ -1,0 +1,11 @@
+--- 2026-10-16_13-52:/opt/sand/deps/sand-notification-settings/package.json
++++ 2026-10-16_16-48:/opt/sand/deps/sand-notification-settings/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "sand-notification-settings",
+   "version": "1.0.0",
+-  "description": "Native read of the Sand desktop app's OS notification permission",
++  "description": "Native reads of the Sand desktop app's OS notification permission and Windows device-management policy",
+   "main": "index.js",
+   "private": true,
+   "scripts": {

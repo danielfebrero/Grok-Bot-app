@@ -1,0 +1,8 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/toc.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/toc.d.ts
+@@ -36,4 +36,4 @@
+  * />
+  * ```
+  */
+-export declare function TableOfContents({ items, title, }: TableOfContentsProps): JSX.Element | null;
++export declare function TableOfContents(props: TableOfContentsProps): JSX.Element | null;

@@ -1,0 +1,10 @@
+--- 2026-10-16_13-52/meta/python-dists.txt
++++ 2026-10-16_16-48/meta/python-dists.txt
+@@ -4,7 +4,6 @@
+ /usr/lib/python3/dist-packages	chardet-5.2.0.dist-info
+ /usr/lib/python3/dist-packages	charset_normalizer-3.4.2.dist-info
+ /usr/lib/python3/dist-packages	cryptography-43.0.0.dist-info
+-/usr/lib/python3/dist-packages	gyp_next-0.16.2.dist-info
+ /usr/lib/python3/dist-packages	idna-3.10.dist-info
+ /usr/lib/python3/dist-packages	jwcrypto-1.5.6.egg-info
+ /usr/lib/python3/dist-packages	numpy-2.2.4.dist-info

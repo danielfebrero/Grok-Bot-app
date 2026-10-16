@@ -1,0 +1,9 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/scatter.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/scatter.d.ts
+@@ -62,5 +62,5 @@
+  * />
+  * ```
+  */
+-export declare function Scatter({ points: given, x: xAxis, y: yAxis, size: sizeMeasure, trend, legend, }: ScatterProps): JSX.Element | null;
++export declare function Scatter(props: ScatterProps): JSX.Element | null;
+ export {};

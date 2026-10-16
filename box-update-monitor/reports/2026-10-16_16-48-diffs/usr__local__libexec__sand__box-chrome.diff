@@ -1,0 +1,28 @@
+--- 2026-10-16_13-52:/usr/local/libexec/sand/box-chrome
++++ 2026-10-16_16-48:/usr/local/libexec/sand/box-chrome
+@@ -28,6 +28,7 @@
+ 	CHROME_PROFILE="${CHROME_USER_DATA_DIR:-/home/box/chrome-profile/Fork-${BOX_DISPLAY_NUM}}"
+ 	CHROME_XDG="/tmp/xdg-runtime-box-${BOX_DISPLAY_NUM}"
+ 	CHROME_DEBUG_PORT="${SAND_CHROME_REMOTE_DEBUG_PORT:-$((SAND_BOX_CDP_PORT_BASE + BOX_DISPLAY_NUM))}"
++	export SAND_DESKTOP_UNIT=":${BOX_DISPLAY_NUM}"
+ 	if [ -z "${CHROME_USER_DATA_DIR:-}" ]; then
+ 		LEGACY_CHROME_PROFILE="/home/box/chrome-profile-${BOX_DISPLAY_NUM}"
+ 		if [ -d "${LEGACY_CHROME_PROFILE}" ] && [ ! -L "${LEGACY_CHROME_PROFILE}" ] && [ ! -e "${CHROME_PROFILE}" ]; then
+@@ -83,6 +84,7 @@
+ CHROME_FLAGS+=(
+ 	--remote-debugging-port="${CHROME_DEBUG_PORT}"
+ 	--remote-debugging-address=127.0.0.1
++	--disable-blink-features=AutomationControlled
+ )
+ SAND_EGRESS_PROXY_FILE=/tmp/sand-egress-proxy
+ if [ -r "${SAND_EGRESS_PROXY_FILE}" ]; then
+@@ -98,7 +100,8 @@
+ SAND_WEBAUTHN_ID_FILE=/usr/local/share/sand-webauthn-proxy.id
+ SAND_WEBAUTHN_MARKER=/home/box/.sand-webauthn-proxy-enabled
+ CHROME_LOG="/tmp/chrome${DISPLAY:-:1}.log"
+-BOX_CHROME_LAUNCHER_VERSION=2
++BOX_CHROME_LAUNCHER_VERSION=4
++CHROME_FLAGS+=(--sand-box-chrome-launcher="${BOX_CHROME_LAUNCHER_VERSION}")
+ CHROME_LAUNCH_WAIT_S=20
+ CHROME_RELEASE_GRACE_S=10
+ CHROME_PORT_WAIT_S=10

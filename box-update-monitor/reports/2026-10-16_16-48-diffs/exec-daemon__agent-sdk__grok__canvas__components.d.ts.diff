@@ -1,0 +1,51 @@
+--- 2026-10-16_13-52:/exec-daemon/agent-sdk/grok/canvas/components.d.ts
++++ 2026-10-16_16-48:/exec-daemon/agent-sdk/grok/canvas/components.d.ts
+@@ -92,13 +92,13 @@
+  * a chevron, and a caption under a figure folds with them while a subtitle
+  * stays with the heading and presses with it.
+  */
+-export declare function Section({ heading, id, caption, actions, collapsible, defaultOpen, children, }: SectionProps): JSX.Element;
++export declare function Section(props: SectionProps): JSX.Element;
+ export interface TextProps {
+     /** One paragraph of plain sentences. */
+     children?: ReactNode;
+ }
+ /** A paragraph of body text. Use one `Text` per paragraph. */
+-export declare function Text({ children }: TextProps): JSX.Element;
++export declare function Text(props: TextProps): JSX.Element;
+ /**
+  * What a `Callout` is about. `info` is a note or a fact to keep in mind,
+  * `success` what shipped or went well, `warning` what to watch, `danger`
+@@ -123,7 +123,7 @@
+  * default; a `tone` tints the box, leads with its icon, and inks the text.
+  * Use at most one or two per page. One with nothing to say draws nothing.
+  */
+-export declare function Callout({ lead, tone, children }: CalloutProps): JSX.Element | null;
++export declare function Callout(props: CalloutProps): JSX.Element | null;
+ export interface ChecklistItem {
+     text: string;
+     /** The recorded status: ticked and struck through when true. */
+@@ -143,7 +143,7 @@
+  *
+  * @kitNote Shows recorded status (`done`), as of when the page was written; the viewer cannot tick an item. Say so in copy ("status as of…"), and update the page when a status changes.
+  */
+-export declare function Checklist({ items }: ChecklistProps): JSX.Element;
++export declare function Checklist(props: ChecklistProps): JSX.Element;
+ export interface Row {
+     /** Short fixed-width lead, e.g. a time or a rank. */
+     lead?: string;
+@@ -165,7 +165,7 @@
+  * detail line, and a right-aligned meta. Two or three numbers belong here
+  * (value as `meta`), not in a chart.
+  */
+-export declare function Rows({ rows }: RowsProps): JSX.Element;
++export declare function Rows(props: RowsProps): JSX.Element;
+ /**
+  * One table cell: its text, a status word with a `tone` of `"success"`,
+  * `"warning"`, or `"danger"` that colors it, or any React node (a kit
+@@ -202,4 +202,4 @@
+  * with more beyond it; from five columns it scrolls as a unit with every
+  * label on one line.
+  */
+-export declare function Table({ columns, rows, emphasis, align }: TableProps): JSX.Element;
++export declare function Table(props: TableProps): JSX.Element;

@@ -1,0 +1,15 @@
+--- 2026-10-16_13-52:/usr/local/bin/sand-desktop-supervise.sh
++++ 2026-10-16_16-48:/usr/local/bin/sand-desktop-supervise.sh
+@@ -52,9 +52,11 @@
+ 		--arg home "${HOME:-}" \
+ 		--arg xdg "${XDG_RUNTIME_DIR:-}" \
+ 		--arg dbus "${DBUS_SESSION_BUS_ADDRESS:-}" \
++		--arg unit "${SAND_DESKTOP_UNIT:-}" \
+ 		--argjson argv "${argv_json}" \
+ 		'({name: $name, group: $group, order: $order, logFile: $logfile, pidFile: $pidfile,
+-		  env: ({DISPLAY: $display, HOME: $home, XDG_RUNTIME_DIR: $xdg, DBUS_SESSION_BUS_ADDRESS: $dbus}
++		  env: ({DISPLAY: $display, HOME: $home, XDG_RUNTIME_DIR: $xdg, DBUS_SESSION_BUS_ADDRESS: $dbus,
++		         SAND_DESKTOP_UNIT: $unit}
+ 		        | with_entries(select(.value != ""))),
+ 		  argv: $argv}
+ 		  + if $listen_port == null then {} else {listenPort: $listen_port} end)' >"${tmp}" 2>/dev/null; then
