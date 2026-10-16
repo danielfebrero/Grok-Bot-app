@@ -1,0 +1,29 @@
+{
+  "namespace": "cursor-github",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-16T09:20:11+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "incomplete_results": {
+          "type": "boolean"
+        },
+        "items": {
+          "items": {},
+          "type": "array"
+        },
+        "total_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "incomplete_results",
+        "items",
+        "total_count"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "search_commits"
+}

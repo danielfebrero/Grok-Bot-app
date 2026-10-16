@@ -1,0 +1,17 @@
+{
+  "description": "Unarchive a Chat conversation",
+  "inputSchema": {
+    "properties": {
+      "id": {
+        "description": "The ID of the conversation: a group ID starting with `g`, the other user's ID for a 1:1 conversat...",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "unarchive_chat_conversation"
+}

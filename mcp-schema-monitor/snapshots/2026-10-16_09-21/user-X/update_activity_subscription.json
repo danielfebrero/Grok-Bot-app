@@ -1,0 +1,24 @@
+{
+  "description": "Update X activity subscription",
+  "inputSchema": {
+    "properties": {
+      "subscription_id": {
+        "type": "string"
+      },
+      "tag": {
+        "description": "Optional caller-defined tag.",
+        "type": "string"
+      },
+      "webhook_id": {
+        "description": "Webhook to deliver the subscription events to.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "subscription_id"
+    ],
+    "type": "object"
+  },
+  "outputSchema": null,
+  "tool": "update_activity_subscription"
+}

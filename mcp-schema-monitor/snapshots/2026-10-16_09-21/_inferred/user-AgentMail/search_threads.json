@@ -1,0 +1,29 @@
+{
+  "namespace": "user-AgentMail",
+  "outputSchemaInferred": {
+    "inferredAt": "2026-10-16T09:21:09+02:00",
+    "responseKind": "json",
+    "schema": {
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "threads": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "required": [
+        "count",
+        "limit",
+        "threads"
+      ],
+      "type": "object"
+    },
+    "source": "inferred"
+  },
+  "tool": "search_threads"
+}
